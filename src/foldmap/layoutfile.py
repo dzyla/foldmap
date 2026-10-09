@@ -41,6 +41,7 @@ LAYOUT = (
     "msa",
     "msa_reference",
     "membrane",
+    "chains",
 )
 EDITS = ("rename", "swap", "move")
 

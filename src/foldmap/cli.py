@@ -88,8 +88,15 @@ def make_layout(
     msa=None,
     msa_reference: str | None = None,
     membrane: str = "off",
+    chains: list[str] | None = None,
 ):
     bb = load_backbone(path, assembly)
+    if chains:
+        present = list(dict.fromkeys(l.chain for l in bb.labels))
+        missing = [c for c in chains if c not in present]
+        if missing:
+            raise ValueError(f"no protein chain {', '.join(missing)}; the structure has {', '.join(present)}")
+        bb = bb.only(chains)
     if (look or Style()).color_by == "conservation" and not msa:
         raise ValueError("conservation colouring needs an alignment: add --msa ALIGNMENT")
     dssp = assign_dssp(bb)
@@ -377,6 +384,8 @@ def _figure_spec(args):
     opts["domains"] = domains
     opts["msa"] = args.msa or lay.get("msa")
     opts["membrane"] = args.membrane or lay.get("membrane", "off")
+    chains = args.chains or lay.get("chains")
+    opts["chains"] = [c.strip() for c in chains.split(",") if c.strip()] if isinstance(chains, str) else chains
     opts["msa_reference"] = args.msa_reference or lay.get("msa_reference")
     edits = layoutfile.edits_of(doc)
     edits["rename"].update(cli["rename"])
@@ -549,6 +558,7 @@ def main(argv: list[str] | None = None) -> int:
             choices=["off", "auto"],
             help="draw the lipid bilayer: auto finds it (OPM dummy atoms, or estimated); default off",
         )
+        q.add_argument("--chains", metavar="A,B", help="draw only these chains (e.g. one subunit of a big complex)")
         q.add_argument("--msa", metavar="ALIGNMENT", help="alignment for conservation colouring (--theme conservation)")
         q.add_argument("--msa-reference", metavar="NAME", help="alignment row that is the structure (default: best)")
         q.add_argument(
@@ -613,6 +623,7 @@ def main(argv: list[str] | None = None) -> int:
                 domains=opts["domains"],
                 msa=opts["msa"],
                 membrane=opts["membrane"],
+                chains=opts["chains"],
                 msa_reference=opts["msa_reference"],
                 **edits,
             )

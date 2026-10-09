@@ -39,6 +39,17 @@ class Backbone:
     def __len__(self) -> int:
         return len(self.labels)
 
+    def only(self, chains) -> Backbone:
+        """The same backbone restricted to some chains."""
+        keep = [k for k, l in enumerate(self.labels) if l.chain in set(chains)]
+        return Backbone(
+            [self.labels[k] for k in keep],
+            self.xyz[keep],
+            self.prev[keep],
+            set(self.asu_chains),
+            self.b[keep] if self.b is not None else None,
+        )
+
     @property
     def nxt(self) -> np.ndarray:
         out = np.zeros(len(self), bool)
