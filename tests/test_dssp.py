@@ -1,8 +1,8 @@
 import gemmi
 import numpy as np
 
-from topoplot.dssp import _resolve, assign_dssp
-from topoplot.io import load_backbone
+from foldmap.dssp import _resolve, assign_dssp
+from foldmap.io import load_backbone
 
 
 def test_ubiquitin_helix_and_strands(ubq):

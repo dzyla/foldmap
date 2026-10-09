@@ -4,9 +4,9 @@ import numpy as np
 import pytest
 from helpers import fake_sse, pipeline
 
-from topoplot.frame import view_frame
-from topoplot.layout import HELIX_W, PITCH, Layout, Placed, build_layout
-from topoplot.route import route_loops
+from foldmap.frame import view_frame
+from foldmap.layout import HELIX_W, PITCH, Layout, Placed, build_layout
+from foldmap.route import route_loops
 
 MODES = ["projected", "stack"]
 
@@ -184,7 +184,7 @@ def self_crossing(points, eps=1e-9):
 def test_kinked_helix_pieces_are_joined_straight_not_by_a_fallback():
     from pathlib import Path
 
-    from topoplot.cli import make_layout
+    from foldmap.cli import make_layout
 
     lay, sses, bb = make_layout(Path(__file__).parent / "data" / "8UUP.cif")
     loops = {(l.a_id, l.b_id): l for l in route_loops(lay, sses, bb)}

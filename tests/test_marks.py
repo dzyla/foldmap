@@ -6,8 +6,8 @@ import numpy as np
 import pytest
 from matplotlib.colors import to_hex
 
-from topoplot.cli import make_figure, make_layout
-from topoplot.style import Style
+from foldmap.cli import make_figure, make_layout
+from foldmap.style import Style
 
 DATA = Path(__file__).parent / "data"
 FIMA = DATA / "2JTY.cif"  # self-complemented FimA: the donor strand is the last one, residues 167-182
@@ -21,7 +21,7 @@ def _fill(fig, sid):
 
 
 def test_resolve_element_references():
-    from topoplot.layout import resolve
+    from foldmap.layout import resolve
 
     lay, sses, _ = make_layout(FIMA)
     donor = next(s.id for s in sses if s.first.seq == 167)
@@ -45,7 +45,7 @@ def test_mark_paints_the_named_elements_only():
 
 
 def test_mark_without_a_colour_uses_the_mark_colour():
-    from topoplot.render import MARK_DEFAULT
+    from foldmap.render import MARK_DEFAULT
 
     lay, sses, _ = make_layout(FIMA)
     donor = next(s.id for s in sses if s.first.seq == 167)
@@ -65,7 +65,7 @@ def test_highlight_legend_is_compact():
 
 
 def test_rename_sets_element_labels(tmp_path):
-    from topoplot.cli import main
+    from foldmap.cli import main
 
     lay, sses, _ = make_layout(FIMA, rename={"res:167-182": "Gd"})
     donor = next(s.id for s in sses if s.first.seq == 167)
@@ -101,7 +101,7 @@ def test_move_shifts_an_element_and_nothing_overlaps():
 
 
 def test_cli_swap_move_and_view(tmp_path):
-    from topoplot.cli import main
+    from foldmap.cli import main
 
     out = tmp_path / "x.svg"
     assert main(["plot", str(DATA / "2LZM.cif"), "-o", str(out), "--swap", "α1,α3", "--move", "α2=1,-2"]) == 0

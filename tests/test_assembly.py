@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 from helpers import pipeline
 
-from topoplot.io import load_backbone
+from foldmap.io import load_backbone
 
 DATA = Path(__file__).parent / "data"
 APO = DATA / "assemblies" / "7A4M.cif"  # mouse apoferritin: one subunit deposited, 24 by the O operators
@@ -34,7 +34,7 @@ def test_single_copy_files_are_unchanged(ubq):
 
 
 def test_apoferritin_is_octahedral():
-    from topoplot.symmetry import detect_symmetry
+    from foldmap.symmetry import detect_symmetry
 
     bb = load_backbone(APO)
     s = detect_symmetry(bb)
@@ -47,7 +47,7 @@ def test_tetrahedral_group_is_recognised(tmp_path):
 
     from test_symmetry_scenarios import build, rot
 
-    from topoplot.symmetry import detect_symmetry
+    from foldmap.symmetry import detect_symmetry
 
     gens = [rot((1, 1, 1), 120), rot((0, 0, 1), 180)]
     group = [np.eye(3)]
@@ -66,9 +66,9 @@ def test_tetrahedral_group_is_recognised(tmp_path):
 def test_highlight_keeps_the_asu_coloured_and_greys_the_mates(tmp_path):
     from matplotlib.colors import to_hex
 
-    from topoplot.cli import make_figure, make_layout
-    from topoplot.render import MATE_GREY
-    from topoplot.style import Style
+    from foldmap.cli import make_figure, make_layout
+    from foldmap.render import MATE_GREY
+    from foldmap.style import Style
 
     lay, sses, bb = make_layout(APO)
     fig = make_figure(APO, look=Style(highlight="asu"))
@@ -84,9 +84,9 @@ def test_highlight_keeps_the_asu_coloured_and_greys_the_mates(tmp_path):
 def test_highlight_by_chain_list():
     from matplotlib.colors import to_hex
 
-    from topoplot.cli import make_figure
-    from topoplot.render import MATE_GREY
-    from topoplot.style import Style
+    from foldmap.cli import make_figure
+    from foldmap.render import MATE_GREY
+    from foldmap.style import Style
 
     fig = make_figure(DATA / "2HHB.cif", look=Style(highlight="A,B"))
     for a in fig.axes[0].patches:
@@ -97,14 +97,14 @@ def test_highlight_by_chain_list():
 
 
 def test_bad_highlight_value_is_rejected():
-    from topoplot.style import resolve_style
+    from foldmap.style import resolve_style
 
     with pytest.raises(ValueError, match="highlight"):
         resolve_style(overrides=["highlight=A;B"])
 
 
 def test_cli_assembly_and_highlight(tmp_path, capsys):
-    from topoplot.cli import main
+    from foldmap.cli import main
 
     out = tmp_path / "apo.svg"
     assert main(["plot", str(APO), "-o", str(out), "--assembly", "asu"]) == 0

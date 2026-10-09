@@ -1,7 +1,7 @@
 import numpy as np
 from helpers import pipeline
 
-from topoplot.features import MIN_CONTACT_PAIRS, sse_contacts
+from foldmap.features import MIN_CONTACT_PAIRS, sse_contacts
 
 
 def test_paired_strands_touch_and_distant_elements_do_not(ubq):
@@ -28,7 +28,7 @@ def test_no_elements_no_contacts(ubq):
 
 
 def _bundles(path):
-    from topoplot.features import helix_bundles
+    from foldmap.features import helix_bundles
 
     _, sses, _ = pipeline(path)
     return [set(g) for g in helix_bundles(sses)]

@@ -9,8 +9,8 @@ import pytest
 from test_layout import overlaps
 from test_route import segments_clear, self_crossing
 
-from topoplot.cli import make_layout
-from topoplot.route import route_loops
+from foldmap.cli import make_layout
+from foldmap.route import route_loops
 
 DATA = Path(__file__).parent / "data"
 STRUCTURES = sorted(p.stem for p in DATA.glob("*.cif"))
@@ -68,7 +68,7 @@ def test_loops_start_and_end_at_their_ports(case):
 
 
 def test_loops_keep_off_labels_and_chain_ends(case):
-    from topoplot.layout import label_boxes
+    from foldmap.layout import label_boxes
 
     _, _, lay, sses, loops = case
     boxes = label_boxes(lay, sses)
@@ -80,7 +80,7 @@ def test_loops_keep_off_labels_and_chain_ends(case):
 
 
 def test_labels_fit_inside_the_layout_bounds(case):
-    from topoplot.layout import label_boxes
+    from foldmap.layout import label_boxes
 
     _, _, lay, sses, _ = case
     x0, y0, x1, y1 = lay.bounds
@@ -89,7 +89,7 @@ def test_labels_fit_inside_the_layout_bounds(case):
 
 
 def test_label_keep_out_never_forces_a_fallback(case, monkeypatch):
-    import topoplot.route as route
+    import foldmap.route as route
 
     name, mode, lay, sses, loops = case
     monkeypatch.setattr(route, "label_boxes", lambda *a: [])
@@ -99,7 +99,7 @@ def test_label_keep_out_never_forces_a_fallback(case, monkeypatch):
 
 
 def test_chain_end_labels_sit_clear_of_elements(case):
-    from topoplot.layout import label_boxes
+    from foldmap.layout import label_boxes
 
     _, _, lay, sses, _ = case
     rects = [p.rect for p in [*lay.placed.values(), *lay.ghosts, *lay.dna]]

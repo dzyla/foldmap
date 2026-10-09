@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from topoplot.interactive import THREEDMOL, build_page
+from foldmap.interactive import THREEDMOL, build_page
 
 DATA = Path(__file__).parent / "data"
 
@@ -43,7 +43,7 @@ def test_residues_point_back_to_their_elements():
 
 
 def test_page_honours_the_theme():
-    from topoplot.style import Style
+    from foldmap.style import Style
 
     plain = _data(build_page(DATA / "1UBQ.cif"))
     rainbow = _data(build_page(DATA / "1UBQ.cif", look=Style(color_by="sequence")))
@@ -95,7 +95,7 @@ console.log(JSON.stringify(out));
 
 
 def test_cli_interactive_writes_the_page(tmp_path):
-    from topoplot.cli import main
+    from foldmap.cli import main
 
     out = tmp_path / "view.html"
     assert main(["interactive", str(DATA / "1LMB.cif"), "-o", str(out), "--theme", "trace"]) == 0

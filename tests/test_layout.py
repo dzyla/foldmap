@@ -4,8 +4,8 @@ import numpy as np
 import pytest
 from helpers import fake_sse, pipeline
 
-from topoplot.frame import Frame, view_frame
-from topoplot.layout import HELIX_W, HELIX_RISE, PITCH, SCALE, STRAND_RISE, build_layout
+from foldmap.frame import Frame, view_frame
+from foldmap.layout import HELIX_W, HELIX_RISE, PITCH, SCALE, STRAND_RISE, build_layout
 
 MODES = ["projected", "stack"]
 NAMES = ["ubq", "zs5", "zya"]
@@ -18,7 +18,7 @@ def overlaps(a, b, tol=1e-6):
 
 
 def build(path, mode, **style):
-    from topoplot.style import Style
+    from foldmap.style import Style
 
     _, sses, sheets = pipeline(path)
     f = view_frame(sses)
@@ -170,7 +170,7 @@ def test_element_lengths_are_true_to_scale(name, request):
 def test_one_unit_is_the_same_distance_for_strands_and_helices():
     assert PITCH == pytest.approx(4.8 * SCALE, rel=0.05)  # neighbouring strands are ~4.8 A apart
     assert HELIX_W == pytest.approx(5.0 * SCALE, rel=0.15)  # a helix ribbon is ~5 A across (CA radius 2.3 A)
-    from topoplot.layout import HEAD
+    from foldmap.layout import HEAD
 
     assert 0.9 * HEAD <= HELIX_W <= 1.4 * HEAD  # about as wide as a strand's arrowhead, as in a cartoon
 
@@ -201,7 +201,7 @@ def order_kept(home, got, axis, gap=10.0, skip=None):
 
 @pytest.mark.parametrize("pdb", ["6ZS5", "1TIM", "1C3W", "2HHB", "1EMA", "2LZM", "8UUP"])
 def test_attraction_shortens_loops_and_keeps_the_projected_fold(pdb, ubq):
-    from topoplot.features import sse_contacts
+    from foldmap.features import sse_contacts
 
     bb, sses, sheets = pipeline(ubq.parent / f"{pdb}.cif")
     f = view_frame(sses)
@@ -222,7 +222,7 @@ def test_attraction_shortens_loops_and_keeps_the_projected_fold(pdb, ubq):
 
 
 def test_attraction_stays_bounded_when_loops_pull_hard(monkeypatch):
-    import topoplot.layout as L
+    import foldmap.layout as L
 
     monkeypatch.setattr(L, "_W_SEQ", 4.0)  # strong pulls once made the relaxation diverge
     bb, sses, sheets = pipeline(Path(__file__).parent / "data" / "1TIM.cif")
@@ -268,7 +268,7 @@ def test_stack_mode_draws_helices_full_length_and_upright(pdb):
 
 @pytest.mark.parametrize("pdb", ["2HHB", "1TIM", "8UUP", "6ZS5"])
 def test_stack_rows_leave_room_for_chain_end_labels(pdb):
-    from topoplot.layout import label_boxes
+    from foldmap.layout import label_boxes
 
     sses, _, _, lay = build(Path(__file__).parent / "data" / f"{pdb}.cif", "stack")
     ends = [b for name, b in label_boxes(lay, sses) if name.startswith(("N:", "C:"))]
@@ -278,7 +278,7 @@ def test_stack_rows_leave_room_for_chain_end_labels(pdb):
 
 
 def test_overlap_fallback_slide_runs_and_separates(monkeypatch):
-    import topoplot.layout as L
+    import foldmap.layout as L
 
     monkeypatch.setattr(L, "_SEP_SWEEPS", 0)  # no push-apart sweeps: straight to the guaranteed slide
     f = Frame(np.zeros(3), np.array([1.0, 0, 0]), np.array([0, 1.0, 0]), np.array([0, 0, 1.0]))
@@ -290,8 +290,8 @@ def test_overlap_fallback_slide_runs_and_separates(monkeypatch):
 
 @pytest.mark.parametrize("pdb, member", [("8UUP", "D:456-485"), ("1LMB", "3:78-90")])
 def test_bundled_helices_are_drawn_side_by_side(pdb, member):
-    from topoplot.cli import make_layout
-    from topoplot.features import helix_bundles
+    from foldmap.cli import make_layout
+    from foldmap.features import helix_bundles
 
     lay, sses, _ = make_layout(Path(__file__).parent / "data" / f"{pdb}.cif")
     group = next(g for g in helix_bundles(sses) if member in g)
@@ -301,7 +301,7 @@ def test_bundled_helices_are_drawn_side_by_side(pdb, member):
     side = np.array([-d[1], d[0]])
     columns = sorted({round(float(np.array([p.cx, p.cy]) @ side), 3) for p in pl})
     assert len(columns) == len({k.split(":")[0] for k in group})  # one column per chain
-    from topoplot.features import BUNDLE_DIST
+    from foldmap.features import BUNDLE_DIST
 
     gap = columns[1] - columns[0]
     assert np.allclose(np.diff(columns), gap) and gap <= max(BUNDLE_DIST * SCALE, pl[0].width + 1.2) + 1e-6  # packed

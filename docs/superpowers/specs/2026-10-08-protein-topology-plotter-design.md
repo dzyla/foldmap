@@ -1,4 +1,4 @@
-# topoplot: publication-grade protein topology diagrams
+# foldmap: publication-grade protein topology diagrams
 
 Date: 2026-10-08. Status: draft for review.
 
@@ -43,7 +43,7 @@ parse -> assign -> features -> layout -> route -> render
 | `layout` | Place sheet blocks and helices (section 4) | scipy |
 | `route` | Loop and connector routing (section 5) | numpy |
 | `render` | Draw to matplotlib; SVG with editable text and named layers (`gid`), PDF with embedded Type 42 fonts | matplotlib |
-| `cli`, `config` | `topoplot in.cif -o fig.svg [--pdf] [--config layout.yaml]`; YAML for domains, colors, view axis, membrane normal, manual nudges | |
+| `cli`, `config` | `foldmap in.cif -o fig.svg [--pdf] [--config layout.yaml]`; YAML for domains, colors, view axis, membrane normal, manual nudges | |
 
 Each stage is testable on its own. `layout` and `route` never touch gemmi objects; they take SSE/sheet/feature dataclasses.
 
@@ -83,7 +83,7 @@ Each stage is testable on its own. `layout` and `route` never touch gemmi object
 - **Visual:** render 6ZS5/6ZYA to PNG and compare against Fig 2B by eye with the user. This is the acceptance test for step 2.
 
 ## 8. Decisions made (defaults, changeable)
-- Name/package: `topoplot`. Python 3.13; deps: gemmi, numpy, scipy, networkx, matplotlib, PyYAML. No `mkdssp` dependency (not installed here).
+- Name/package: `foldmap`. Python 3.13; deps: gemmi, numpy, scipy, networkx, matplotlib, PyYAML. No `mkdssp` dependency (not installed here).
 - Drawing through matplotlib, not a hand-written SVG writer.
 - Uses first model only; altlocs: first altloc.
 - Project is not a git repository; I will not run `git init` unless asked.

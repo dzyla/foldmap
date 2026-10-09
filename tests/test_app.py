@@ -7,7 +7,7 @@ import pytest
 pytest.importorskip("streamlit")
 from streamlit.testing.v1 import AppTest  # noqa: E402
 
-APP = Path(__file__).parents[1] / "src" / "topoplot" / "app.py"
+APP = Path(__file__).parents[1] / "src" / "foldmap" / "app.py"
 DATA = Path(__file__).parent / "data"
 
 
@@ -78,7 +78,7 @@ def test_layout_errors_are_shown_in_the_editor():
 
 
 def test_download_buttons_are_offered():
-    from topoplot.app import figure_files
+    from foldmap.app import figure_files
 
     files = figure_files(DATA / "1UBQ.cif", {"theme": "publication"})
     assert set(files) == {"svg", "png", "pdf"}

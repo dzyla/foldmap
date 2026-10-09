@@ -2,7 +2,7 @@ import gemmi
 import numpy as np
 import pytest
 
-from topoplot.io import load_backbone
+from foldmap.io import load_backbone
 
 
 def test_ubiquitin_backbone(ubq):

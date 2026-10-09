@@ -1,6 +1,6 @@
 """Streamlit app: load a structure, pick a style from previews of it, then fine-tune and download.
 
-Run with `topoplot app` (or `streamlit run src/topoplot/app.py`)."""
+Run with `foldmap app` (or `streamlit run src/foldmap/app.py`)."""
 
 from __future__ import annotations
 
@@ -12,16 +12,16 @@ import urllib.request
 from dataclasses import fields, replace
 from pathlib import Path
 
-from topoplot.cli import _adjustments, _domain_spec, _protomers, make_figure_and_loops, make_layout
-from topoplot.render import save, save_svg
-from topoplot.style import CHOICES, THEMES, Style
+from foldmap.cli import _adjustments, _domain_spec, _protomers, make_figure_and_loops, make_layout
+from foldmap.render import save, save_svg
+from foldmap.style import CHOICES, THEMES, Style
 
 STYLE_FIELDS = {f.name: f.type for f in fields(Style)}
 PREVIEW_THEMES = ["publication", "shaded", "trace", "rainbow", "richardson", "flexibility", "hydropathy",
                   "goodsell", "minimal"]
 LAYOUT_DEFAULTS = {"mode": "projected", "rotate": 0, "symmetry": "auto", "assembly": "auto", "rename": "",
                    "swap": "", "move": "", "title": "", "domains": ""}
-CACHE = Path.home() / ".cache" / "topoplot"
+CACHE = Path.home() / ".cache" / "foldmap"
 EXAMPLES = {"1LMB": "λ repressor on DNA", "5NKT": "FimA", "8UTF": "measles F trimer", "1UBQ": "ubiquitin"}
 
 
@@ -84,7 +84,7 @@ def figure_files(path, settings: dict) -> dict[str, bytes]:
 
 def layout_document(path, settings: dict) -> dict:
     """The app's settings as a layout file document (element references saved as residue ranges)."""
-    from topoplot import layoutfile
+    from foldmap import layoutfile
 
     look, opts = look_of(settings), layout_options(settings)
     edits = {k: opts.pop(k) for k in ("rename", "swap", "move")}
@@ -113,7 +113,7 @@ def settings_from_document(doc: dict) -> dict:
 
 
 def summary(path) -> str:
-    from topoplot.symmetry import detect_symmetry
+    from foldmap.symmetry import detect_symmetry
 
     layout, sses, bb = make_layout(path)
     chains = sorted({l.chain for l in bb.labels})
@@ -131,7 +131,7 @@ def main() -> None:
     import streamlit as st
     import streamlit.components.v1 as components
 
-    st.set_page_config(page_title="Topoplot", page_icon="🧬", layout="wide")
+    st.set_page_config(page_title="Foldmap", page_icon="🧬", layout="wide")
     ss = st.session_state
     ss.setdefault("stage", "load")
 
@@ -155,7 +155,7 @@ def main() -> None:
 
     @st.cache_data(show_spinner=False, max_entries=8)
     def interactive(path: str, settings_json: str) -> str:
-        from topoplot.interactive import build_page
+        from foldmap.interactive import build_page
 
         settings = json.loads(settings_json)
         return build_page(path, settings.get("mode", "projected"), look=look_of(settings),
@@ -187,7 +187,7 @@ def main() -> None:
         ss["stage"] = "load"
 
     def apply_layout_file() -> None:
-        from topoplot import layoutfile
+        from foldmap import layoutfile
 
         up = ss.get("layout_upload")
         if up is None:
@@ -204,7 +204,7 @@ def main() -> None:
         for key, value in settings_from_document(doc).items():
             ss[key] = value
 
-    st.markdown("#### Topoplot · protein topology diagrams")
+    st.markdown("#### Foldmap · protein topology diagrams")
 
     if ss["stage"] == "load":
         st.write("Start with a structure: a PDB ID, a file path, or an upload (mmCIF or PDB).")
@@ -321,7 +321,7 @@ def main() -> None:
 
 
 def run() -> None:
-    """Entry point for `topoplot app`."""
+    """Entry point for `foldmap app`."""
     import subprocess
     import sys
 

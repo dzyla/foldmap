@@ -3,9 +3,9 @@ import xml.etree.ElementTree as ET
 import pytest
 from helpers import pipeline, tripeptide
 
-from topoplot.cli import make_figure
-from topoplot.palette import chain_colors
-from topoplot.render import save
+from foldmap.cli import make_figure
+from foldmap.palette import chain_colors
+from foldmap.render import save
 
 
 def svg_ids(path):
@@ -83,7 +83,7 @@ def test_barrel_ghost_strand_is_drawn_and_named(tmp_path, ubq):
 
 
 def test_named_palettes_are_distinct_and_unknown_names_fail():
-    from topoplot.palette import PALETTES
+    from foldmap.palette import PALETTES
 
     assert {"okabe-ito", "tol-bright", "tol-muted", "greys"} <= set(PALETTES)
     for name in PALETTES:
@@ -104,9 +104,9 @@ def _artist(fig, gid):
 def test_helix_labels_sit_outside_the_helix(ubq):
     import numpy as np
 
-    from topoplot.cli import make_layout
-    from topoplot.render import draw
-    from topoplot.route import route_loops
+    from foldmap.cli import make_layout
+    from foldmap.render import draw
+    from foldmap.route import route_loops
 
     lay, sses, bb = make_layout(ubq.parent / "1EMA.cif")
     fig = draw(lay, route_loops(lay, sses, bb), sses)
@@ -143,7 +143,7 @@ def _polys(patch):
 def test_helix_is_a_coil_built_from_one_repeated_turn(ubq):
     import numpy as np
 
-    from topoplot.cli import make_layout
+    from foldmap.cli import make_layout
 
     lay, sses, _ = make_layout(ubq)
     fig = make_figure(ubq)
@@ -165,7 +165,7 @@ def test_helix_is_a_coil_built_from_one_repeated_turn(ubq):
 def test_coil_starts_and_ends_on_the_ports(ubq):
     import numpy as np
 
-    from topoplot.cli import make_layout
+    from foldmap.cli import make_layout
 
     lay, _, _ = make_layout(ubq)
     fig = make_figure(ubq)
@@ -194,7 +194,7 @@ def test_curved_loops_are_smooth_and_still_end_at_the_ports(ubq):
 
     from matplotlib.path import Path as MPath
 
-    from topoplot.cli import make_layout
+    from foldmap.cli import make_layout
 
     fig = make_figure(ubq, loops="curved")
     lay, sses, _ = make_layout(ubq)
@@ -213,9 +213,9 @@ def test_curved_corners_stay_clear_of_elements(ubq, pdb):
     import numpy as np
     from matplotlib.path import Path as MPath
 
-    from topoplot.cli import make_layout
-    from topoplot.render import draw
-    from topoplot.route import route_loops
+    from foldmap.cli import make_layout
+    from foldmap.render import draw
+    from foldmap.route import route_loops
 
     lay, sses, bb = make_layout(ubq.parent / f"{pdb}.cif")
     loops = route_loops(lay, sses, bb)
@@ -239,9 +239,9 @@ def test_every_corner_of_a_routed_loop_is_rounded(ubq):
     import numpy as np
     from matplotlib.path import Path as MPath
 
-    from topoplot.cli import make_layout
-    from topoplot.render import draw
-    from topoplot.route import route_loops
+    from foldmap.cli import make_layout
+    from foldmap.render import draw
+    from foldmap.route import route_loops
 
     lay, sses, bb = make_layout(ubq.parent / "1TIM.cif")
     loops = route_loops(lay, sses, bb)
@@ -257,9 +257,9 @@ def test_legend_fits_a_narrow_many_chain_figure():
     import numpy as np
     from helpers import fake_sse
 
-    from topoplot.frame import Frame
-    from topoplot.layout import build_layout
-    from topoplot.render import draw
+    from foldmap.frame import Frame
+    from foldmap.layout import build_layout
+    from foldmap.render import draw
 
     f = Frame(np.zeros(3), np.array([1.0, 0, 0]), np.array([0, 1.0, 0]), np.array([0, 0, 1.0]))
     sses = [fake_sse("H", 1, 20, centroid=(0, 0, 0), axis=(0, 1, 0), chain=c) for c in "ABCDEF"]  # coiled-coil-like
@@ -275,8 +275,8 @@ def test_legend_fits_a_narrow_many_chain_figure():
 
 
 def test_each_sheet_sits_on_its_own_panel(ubq):
-    from topoplot.cli import make_layout
-    from topoplot.style import Style
+    from foldmap.cli import make_layout
+    from foldmap.style import Style
 
     path = ubq.parent / "5NKT.cif"  # FimA: a two-sheet sandwich
     lay, sses, _ = make_layout(path)

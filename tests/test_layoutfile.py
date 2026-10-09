@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 import yaml
 
-from topoplot.cli import main
+from foldmap.cli import main
 
 DATA = Path(__file__).parent / "data"
 
@@ -33,7 +33,7 @@ def test_saved_references_are_residue_ranges(tmp_path):
     refs = [*doc["edits"]["swap"][0], *doc["edits"]["move"], *doc["edits"]["rename"]]
     assert all(r.startswith("res:A:") for r in refs)
     assert doc["style"]["mark"].startswith("res:A:")
-    assert doc["topoplot"] == 1 and doc["theme"] == "publication"
+    assert doc["foldmap"] == 1 and doc["theme"] == "publication"
 
 
 def test_command_line_wins_over_the_file(tmp_path):
@@ -55,7 +55,7 @@ def test_edits_from_file_and_command_line_add_up(tmp_path):
     assert len(yaml.safe_load(both.read_text())["edits"]["move"]) == 2
 
 
-@pytest.mark.parametrize("text, msg", [("topoplot: 1\ncolour: red\n", "colour"), ("topoplot: 9\n", "version"),
+@pytest.mark.parametrize("text, msg", [("foldmap: 1\ncolour: red\n", "colour"), ("foldmap: 9\n", "version"),
                                        ("- a\n- b\n", "mapping")])
 def test_bad_layout_files_are_explained(tmp_path, text, msg, capsys):
     lf = tmp_path / "bad.yaml"
@@ -72,7 +72,7 @@ def test_layout_file_drives_the_interactive_page_too(tmp_path):
 
 
 def test_app_settings_round_trip_through_a_layout_file(tmp_path):
-    from topoplot.app import layout_document, settings_from_document
+    from foldmap.app import layout_document, settings_from_document
 
     settings = {"theme": "trace", "residue_numbers": True, "mode": "stack", "swap": "α1,α3", "move": "α2=1,-2",
                 "rename": "", "rotate": 30, "symmetry": "auto", "assembly": "auto", "title": "T4L"}

@@ -1,7 +1,7 @@
 """Layout files: one YAML document holding everything that defines a figure, so a hand-tuned figure can be
 re-rendered later, after the model changes, or shared.
 
-    topoplot: 1                       # file format version
+    foldmap: 1                       # file format version
     structure: model.cif              # for the record; the structure is always given on the command line
     theme: trace
     style: {residue_numbers: true}    # only what differs from the theme
@@ -26,7 +26,7 @@ from .model import SSE
 from .style import THEMES, Style
 
 VERSION = 1
-TOP = ("topoplot", "structure", "theme", "style", "layout", "domains", "edits")
+TOP = ("foldmap", "structure", "theme", "style", "layout", "domains", "edits")
 LAYOUT = ("mode", "rotate", "flip_v", "symmetry", "symmetry_tol", "assembly", "protomers", "up", "view", "title")
 EDITS = ("rename", "swap", "move")
 
@@ -53,7 +53,7 @@ def document(structure, theme: str, look: Style, options: dict, edits: dict, lay
     for ref, (dx, dy) in edits.get("move") or []:
         for c in canonical(layout, sses, ref):
             move[c] = [float(dx), float(dy)]
-    doc = {"topoplot": VERSION, "structure": str(structure), "theme": theme, "style": style,
+    doc = {"foldmap": VERSION, "structure": str(structure), "theme": theme, "style": style,
            "layout": {k: v for k, v in options.items() if k in LAYOUT and v is not None}}
     if layout.domains:  # saved as resolved element ranges, so 'auto' domains are frozen as found
         by_id = {s.id: s for s in sses}
@@ -69,7 +69,7 @@ def _range(s: SSE) -> str:
 def save(path, doc: dict) -> Path:
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    head = "# topoplot layout: re-render with  topoplot plot STRUCTURE --layout-file " + path.name + "\n"
+    head = "# foldmap layout: re-render with  foldmap plot STRUCTURE --layout-file " + path.name + "\n"
     path.write_text(head + yaml.safe_dump(doc, sort_keys=False, allow_unicode=True))
     return path
 
@@ -78,9 +78,9 @@ def load(path) -> dict:
     """The document, checked: unknown keys and other versions are errors that say what is wrong."""
     doc = yaml.safe_load(Path(path).read_text())
     if not isinstance(doc, dict):
-        raise ValueError(f"{path}: a layout file is a mapping of keys (topoplot, theme, style, layout, edits)")
-    if doc.get("topoplot", VERSION) != VERSION:
-        raise ValueError(f"{path}: layout file version {doc.get('topoplot')} is not supported (this is version {VERSION})")
+        raise ValueError(f"{path}: a layout file is a mapping of keys (foldmap, theme, style, layout, edits)")
+    if doc.get("foldmap", VERSION) != VERSION:
+        raise ValueError(f"{path}: layout file version {doc.get('foldmap')} is not supported (this is version {VERSION})")
     for key in doc:
         if key not in TOP:
             raise ValueError(f"{path}: unknown key {key!r}; a layout file has {', '.join(TOP)}")

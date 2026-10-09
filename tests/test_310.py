@@ -5,16 +5,16 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from topoplot.cli import make_figure, make_layout
-from topoplot.style import Style
+from foldmap.cli import make_figure, make_layout
+from foldmap.style import Style
 
 DATA = Path(__file__).parent / "data"
 
 
 def _sses(name, on=True):
-    from topoplot.dssp import assign_dssp
-    from topoplot.io import load_backbone
-    from topoplot.ss import build_sses
+    from foldmap.dssp import assign_dssp
+    from foldmap.io import load_backbone
+    from foldmap.ss import build_sses
 
     bb = load_backbone(DATA / f"{name}.cif", "asu")
     d = assign_dssp(bb)
@@ -38,7 +38,7 @@ def test_off_by_default_at_the_unit_level():
 
 
 def test_310_layout_size_and_labels():
-    from topoplot.layout import HELIX_W, SCALE, TEN_RISE
+    from foldmap.layout import HELIX_W, SCALE, TEN_RISE
 
     lay, sses, _ = make_layout(DATA / "1UBQ.cif")
     g = [s for s in sses if s.kind == "G"]
@@ -66,7 +66,7 @@ def test_310_drawn_as_boxes_and_switchable():
 
 
 def test_loops_reach_310_elements(ubq):
-    from topoplot.route import route_loops
+    from foldmap.route import route_loops
 
     lay, sses, bb = make_layout(ubq)
     loops = route_loops(lay, sses, bb)
@@ -88,7 +88,7 @@ def test_richardson_gives_310_its_own_colour():
 
 
 def test_summary_counts_310(capsys):
-    from topoplot.cli import main
+    from foldmap.cli import main
 
     assert main(["summary", str(DATA / "1UBQ.cif")]) == 0
     assert "3₁₀ helices: 2" in capsys.readouterr().out
@@ -98,7 +98,7 @@ def test_interactive_page_lists_310_elements():
     import json
     import re
 
-    from topoplot.interactive import build_page
+    from foldmap.interactive import build_page
 
     page = build_page(DATA / "1UBQ.cif")
     data = json.loads(re.search(r'id="topo-data">(.*?)</script>', page, re.S).group(1))

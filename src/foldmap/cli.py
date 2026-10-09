@@ -1,4 +1,4 @@
-"""Command line: `topoplot summary FILE` prints secondary structure and sheet ordering."""
+"""Command line: `foldmap summary FILE` prints secondary structure and sheet ordering."""
 
 from __future__ import annotations
 
@@ -291,7 +291,7 @@ def styles_help() -> str:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(prog="topoplot")
+    parser = argparse.ArgumentParser(prog="foldmap")
     sub = parser.add_subparsers(dest="command", required=True)
     p = sub.add_parser("summary", help="print secondary structure elements and sheet ordering")
     p.add_argument("structure")
@@ -309,8 +309,8 @@ def main(argv: list[str] | None = None) -> int:
         q.add_argument("--flip-v", action="store_true", help="mirror top/bottom (changes handedness)")
         q.add_argument("--title")
         q.add_argument("--theme", "--preset", dest="theme", choices=list(THEMES),
-                       help="a ready-made look (default: publication); see `topoplot styles`")
-        q.add_argument("--style-file", help="YAML file of style keys (may name a theme); see `topoplot styles`")
+                       help="a ready-made look (default: publication); see `foldmap styles`")
+        q.add_argument("--style-file", help="YAML file of style keys (may name a theme); see `foldmap styles`")
         q.add_argument("--set", action="append", default=[], metavar="KEY=VALUE",
                        help="one style key, e.g. helix_scale=0.8 or loops=curved (repeatable; wins over the rest)")
         q.add_argument("--palette", choices=list(PALETTES), help="chain colours (same as --set palette=...)")
@@ -362,7 +362,7 @@ def main(argv: list[str] | None = None) -> int:
                                                     opts["title"], **kw)
                 stuck = [f"{l.a_id}>{l.b_id}" for l in routed if l.fallback]
                 if stuck:
-                    print(f"topoplot: warning: no clear route for {len(stuck)} loop(s), drawn as plain curves "
+                    print(f"foldmap: warning: no clear route for {len(stuck)} loop(s), drawn as plain curves "
                           f"that may cross elements: {', '.join(stuck)}", file=sys.stderr)
                 for out in args.output:
                     print(f"wrote {save(fig, out)}")
@@ -374,7 +374,7 @@ def main(argv: list[str] | None = None) -> int:
             return 0
         print(summarize(args.structure))
     except (FileNotFoundError, ValueError) as err:
-        print(f"topoplot: {err}", file=sys.stderr)
+        print(f"foldmap: {err}", file=sys.stderr)
         return 1
     return 0
 

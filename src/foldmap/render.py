@@ -799,7 +799,7 @@ def save_svg(fig: Figure) -> str:
     import io as _io
 
     buf = _io.StringIO()
-    with rc_context({"svg.fonttype": "none", "svg.hashsalt": "topoplot", **_RC}):
+    with rc_context({"svg.fonttype": "none", "svg.hashsalt": "foldmap", **_RC}):
         fig.savefig(buf, format="svg", metadata={"Date": None}, facecolor="white")
     text = buf.getvalue()
     return text[text.index("<svg"):]
@@ -812,6 +812,6 @@ def save(fig: Figure, path: str | FsPath) -> FsPath:
         raise ValueError(f"unsupported extension {path.suffix!r}; use .svg, .pdf or .png")
     path.parent.mkdir(parents=True, exist_ok=True)
     meta = {"svg": {"Date": None}, "pdf": {"CreationDate": None}, "png": {"Software": None}}[fmt]
-    with rc_context({"svg.fonttype": "none", "pdf.fonttype": 42, "svg.hashsalt": "topoplot", **_RC}):
+    with rc_context({"svg.fonttype": "none", "pdf.fonttype": 42, "svg.hashsalt": "foldmap", **_RC}):
         fig.savefig(path, format=fmt, dpi=300, metadata=meta, facecolor="white")
     return path

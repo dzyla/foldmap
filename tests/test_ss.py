@@ -1,8 +1,8 @@
 import numpy as np
 
-from topoplot.dssp import assign_dssp
-from topoplot.io import load_backbone
-from topoplot.ss import build_sses
+from foldmap.dssp import assign_dssp
+from foldmap.io import load_backbone
+from foldmap.ss import build_sses
 
 
 def test_ubiquitin_sses(ubq):

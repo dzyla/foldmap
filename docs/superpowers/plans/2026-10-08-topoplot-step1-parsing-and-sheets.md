@@ -1,8 +1,8 @@
-# topoplot Step 1: Structure Parsing, Secondary Structure, Sheet Ordering
+# foldmap Step 1: Structure Parsing, Secondary Structure, Sheet Ordering
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** A `topoplot summary FILE` command that reads a PDB/mmCIF, assigns helices and strands, groups strands into ordered sheets (including sheets completed by strands from another chain), and prints the result. This is build step 1 of 4 in the spec; steps 2-4 (layout/routing/rendering, annotation layers, membrane mode) get their own plans.
+**Goal:** A `foldmap summary FILE` command that reads a PDB/mmCIF, assigns helices and strands, groups strands into ordered sheets (including sheets completed by strands from another chain), and prints the result. This is build step 1 of 4 in the spec; steps 2-4 (layout/routing/rendering, annotation layers, membrane mode) get their own plans.
 
 **Architecture:** Pipeline of small modules with plain dataclasses between them: `io.load_backbone` -> `dssp.assign_dssp` -> `ss.build_sses` -> `sheets.build_sheets`, driven by `cli`. Secondary structure is always computed by a built-in numpy Kabsch-Sander DSSP, because the sheet-pairing graph needs backbone H-bonds anyway and the deposited sheet records are not reliable (in 6ZS5 the same strand appears in two sheets). The deposited annotation is used only as a test cross-check.
 
@@ -12,7 +12,7 @@
 
 ## Global Constraints
 
-- Package name `topoplot`, source in `src/topoplot/`, tests in `tests/`.
+- Package name `foldmap`, source in `src/foldmap/`, tests in `tests/`.
 - Dependencies: gemmi, numpy, scipy, networkx, matplotlib, PyYAML (matplotlib/PyYAML are declared now for later steps); no `mkdssp` dependency.
 - Only model 1 is read; only amino-acid residues with a complete N, CA, C, O backbone are kept; the first altloc is used (`res.find_atom(name, "*")`). *This replaces the spec's "highest occupancy" wording; the spec has been updated.*
 - Interfaces between stages are the dataclasses in `model.py`; stages never pass gemmi objects.
@@ -34,7 +34,7 @@ Inputs the spec implies but a happy-path test would miss, most likely first:
 ### Task 1: Scaffold, data model, structure loading
 
 **Files:**
-- Create: `pyproject.toml`, `src/topoplot/__init__.py`, `src/topoplot/model.py`, `src/topoplot/io.py`
+- Create: `pyproject.toml`, `src/foldmap/__init__.py`, `src/foldmap/model.py`, `src/foldmap/io.py`
 - Create: `tests/conftest.py`, `tests/test_io.py`
 
 **Interfaces:**
@@ -53,7 +53,7 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "topoplot"
+name = "foldmap"
 version = "0.1.0"
 description = "Publication-grade protein topology diagrams"
 requires-python = ">=3.11"
@@ -63,7 +63,7 @@ dependencies = ["gemmi>=0.7", "numpy", "scipy", "networkx", "matplotlib", "PyYAM
 test = ["pytest"]
 
 [project.scripts]
-topoplot = "topoplot.cli:main"
+foldmap = "foldmap.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
@@ -72,15 +72,15 @@ where = ["src"]
 testpaths = ["tests"]
 ```
 
-**`src/topoplot/__init__.py`**
+**`src/foldmap/__init__.py`**
 
 ```python
-"""topoplot: publication-grade protein topology diagrams."""
+"""foldmap: publication-grade protein topology diagrams."""
 
 __version__ = "0.1.0"
 ```
 
-**`src/topoplot/model.py`**
+**`src/foldmap/model.py`**
 
 ```python
 """Plain data containers shared by all pipeline stages."""
@@ -195,7 +195,7 @@ def zya():
 - [ ] **Step 2: Create the environment**
 
 Run: `python3 -m venv --system-site-packages .venv && . .venv/bin/activate && pip install -q -e '.[test]'`
-Expected: installs without error; `python -c "import topoplot"` succeeds.
+Expected: installs without error; `python -c "import foldmap"` succeeds.
 
 - [ ] **Step 3: Write the failing tests**
 
@@ -206,7 +206,7 @@ import gemmi
 import numpy as np
 import pytest
 
-from topoplot.io import load_backbone
+from foldmap.io import load_backbone
 
 
 def test_ubiquitin_backbone(ubq):
@@ -269,11 +269,11 @@ def test_residue_missing_backbone_atom_is_skipped_and_breaks_chain(ubq, tmp_path
 - [ ] **Step 4: Run to verify they fail**
 
 Run: `python -m pytest tests/test_io.py -q`
-Expected: collection error `ModuleNotFoundError: No module named 'topoplot.io'`.
+Expected: collection error `ModuleNotFoundError: No module named 'foldmap.io'`.
 
 - [ ] **Step 5: Implement**
 
-**`src/topoplot/io.py`**
+**`src/foldmap/io.py`**
 
 ```python
 """Read PDB/mmCIF into a Backbone (first model, first altloc, amino acids only)."""
@@ -329,7 +329,7 @@ Expected: 7 passed.
 ### Task 2: Kabsch-Sander DSSP
 
 **Files:**
-- Create: `src/topoplot/dssp.py`, `tests/test_dssp.py`
+- Create: `src/foldmap/dssp.py`, `tests/test_dssp.py`
 
 **Interfaces:**
 - Consumes: `io.load_backbone`, `model.Backbone`, `model.Bridge`.
@@ -343,8 +343,8 @@ Expected: 7 passed.
 import gemmi
 import numpy as np
 
-from topoplot.dssp import assign_dssp
-from topoplot.io import load_backbone
+from foldmap.dssp import assign_dssp
+from foldmap.io import load_backbone
 
 
 def test_ubiquitin_helix_and_strands(ubq):
@@ -391,11 +391,11 @@ def test_bridge_invariants(ubq):
 - [ ] **Step 2: Run to verify they fail**
 
 Run: `python -m pytest tests/test_dssp.py -q`
-Expected: collection error `ModuleNotFoundError: No module named 'topoplot.dssp'`.
+Expected: collection error `ModuleNotFoundError: No module named 'foldmap.dssp'`.
 
 - [ ] **Step 3: Implement**
 
-**`src/topoplot/dssp.py`**
+**`src/foldmap/dssp.py`**
 
 ```python
 """Kabsch-Sander DSSP: H-bond energies, helices, bridges.
@@ -523,7 +523,7 @@ Expected: 11 passed.
 ### Task 3: SSE builder
 
 **Files:**
-- Create: `src/topoplot/ss.py`, `tests/test_ss.py`
+- Create: `src/foldmap/ss.py`, `tests/test_ss.py`
 
 **Interfaces:**
 - Consumes: `Backbone`, the `ss` string from `assign_dssp`.
@@ -536,9 +536,9 @@ Expected: 11 passed.
 ```python
 import numpy as np
 
-from topoplot.dssp import assign_dssp
-from topoplot.io import load_backbone
-from topoplot.ss import build_sses
+from foldmap.dssp import assign_dssp
+from foldmap.io import load_backbone
+from foldmap.ss import build_sses
 
 
 def test_ubiquitin_sses(ubq):
@@ -583,11 +583,11 @@ def test_short_runs_filtered(ubq):
 - [ ] **Step 2: Run to verify they fail**
 
 Run: `python -m pytest tests/test_ss.py -q`
-Expected: collection error `ModuleNotFoundError: No module named 'topoplot.ss'`.
+Expected: collection error `ModuleNotFoundError: No module named 'foldmap.ss'`.
 
 - [ ] **Step 3: Implement**
 
-**`src/topoplot/ss.py`**
+**`src/foldmap/ss.py`**
 
 ```python
 """Turn per-residue DSSP codes into helix/strand SSE objects with an axis and centroid."""
@@ -656,7 +656,7 @@ Expected: 15 passed.
 ### Task 4: Sheet grouping and ordering
 
 **Files:**
-- Create: `src/topoplot/sheets.py`, `tests/test_sheets.py`
+- Create: `src/foldmap/sheets.py`, `tests/test_sheets.py`
 
 **Interfaces:**
 - Consumes: `list[SSE]` from `build_sses`, `list[Bridge]` from `assign_dssp`.
@@ -669,11 +669,11 @@ Expected: 15 passed.
 ```python
 import numpy as np
 
-from topoplot.dssp import assign_dssp
-from topoplot.io import load_backbone
-from topoplot.model import Bridge, ResLabel, SSE
-from topoplot.sheets import build_sheets
-from topoplot.ss import build_sses
+from foldmap.dssp import assign_dssp
+from foldmap.io import load_backbone
+from foldmap.model import Bridge, ResLabel, SSE
+from foldmap.sheets import build_sheets
+from foldmap.ss import build_sses
 
 
 def fake(start, end):
@@ -754,11 +754,11 @@ def test_uromodulin_sheets(zs5):
 - [ ] **Step 2: Run to verify they fail**
 
 Run: `python -m pytest tests/test_sheets.py -q`
-Expected: collection error `ModuleNotFoundError: No module named 'topoplot.sheets'`.
+Expected: collection error `ModuleNotFoundError: No module named 'foldmap.sheets'`.
 
 - [ ] **Step 3: Implement**
 
-**`src/topoplot/sheets.py`**
+**`src/foldmap/sheets.py`**
 
 ```python
 """Group strands into sheets from bridge pairing and order the strands side by side."""
@@ -848,21 +848,21 @@ Expected: 22 passed.
 
 ---
 
-### Task 5: `topoplot summary` command
+### Task 5: `foldmap summary` command
 
 **Files:**
-- Create: `src/topoplot/cli.py`, `src/topoplot/__main__.py`, `tests/test_cli.py`
+- Create: `src/foldmap/cli.py`, `src/foldmap/__main__.py`, `tests/test_cli.py`
 
 **Interfaces:**
 - Consumes: `load_backbone`, `assign_dssp`, `build_sses`, `build_sheets`.
-- Produces: `cli.summarize(path: str) -> str` and `cli.main(argv) -> int` (0 on success; 1 with `topoplot: <message>` on stderr for a missing or unusable file). Installed as the `topoplot` console script and runnable as `python -m topoplot`.
+- Produces: `cli.summarize(path: str) -> str` and `cli.main(argv) -> int` (0 on success; 1 with `foldmap: <message>` on stderr for a missing or unusable file). Installed as the `foldmap` console script and runnable as `python -m foldmap`.
 
 - [ ] **Step 1: Write the failing tests**
 
 **`tests/test_cli.py`**
 
 ```python
-from topoplot.cli import main
+from foldmap.cli import main
 
 
 def test_summary_output(ubq, capsys):
@@ -875,7 +875,7 @@ def test_summary_output(ubq, capsys):
 
 def test_missing_file_exit_code(tmp_path, capsys):
     assert main(["summary", str(tmp_path / "nope.cif")]) == 1
-    assert "topoplot:" in capsys.readouterr().err
+    assert "foldmap:" in capsys.readouterr().err
 
 
 def test_fragment_without_secondary_structure(ubq, tmp_path, capsys):
@@ -894,14 +894,14 @@ def test_fragment_without_secondary_structure(ubq, tmp_path, capsys):
 - [ ] **Step 2: Run to verify they fail**
 
 Run: `python -m pytest tests/test_cli.py -q`
-Expected: collection error `ModuleNotFoundError: No module named 'topoplot.cli'`.
+Expected: collection error `ModuleNotFoundError: No module named 'foldmap.cli'`.
 
 - [ ] **Step 3: Implement**
 
-**`src/topoplot/cli.py`**
+**`src/foldmap/cli.py`**
 
 ```python
-"""Command line: `topoplot summary FILE` prints secondary structure and sheet ordering."""
+"""Command line: `foldmap summary FILE` prints secondary structure and sheet ordering."""
 
 from __future__ import annotations
 
@@ -937,7 +937,7 @@ def summarize(path: str) -> str:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(prog="topoplot")
+    parser = argparse.ArgumentParser(prog="foldmap")
     sub = parser.add_subparsers(dest="command", required=True)
     p = sub.add_parser("summary", help="print secondary structure elements and sheet ordering")
     p.add_argument("structure")
@@ -945,7 +945,7 @@ def main(argv: list[str] | None = None) -> int:
     try:
         print(summarize(args.structure))
     except (FileNotFoundError, ValueError) as err:
-        print(f"topoplot: {err}", file=sys.stderr)
+        print(f"foldmap: {err}", file=sys.stderr)
         return 1
     return 0
 
@@ -954,7 +954,7 @@ if __name__ == "__main__":
     raise SystemExit(main())
 ```
 
-**`src/topoplot/__main__.py`**
+**`src/foldmap/__main__.py`**
 
 ```python
 from .cli import main
@@ -969,7 +969,7 @@ Expected: 25 passed.
 
 - [ ] **Step 5: Check the real structures by eye**
 
-Run: `topoplot summary tests/data/1UBQ.cif && topoplot summary tests/data/6ZS5.cif`
+Run: `foldmap summary tests/data/1UBQ.cif && foldmap summary tests/data/6ZS5.cif`
 Expected for ubiquitin: `helix  A:23-34` and one 5-strand sheet `A:12-16(+) =anti= A:2-7(-) =par= A:66-71(-) =anti= A:41-45(+) =anti= A:48-49(-)` (or its reverse). Expected for 6ZS5: 21 strands in 5 sheets; sheet 1 is `A:331-333, A:339-345, A:377-383, A:369-371`; at least one sheet mixes chains A and D (the linker completing the neighbouring sheet).
 
 ---

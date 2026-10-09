@@ -1,4 +1,4 @@
-from topoplot.cli import main
+from foldmap.cli import main
 
 
 def test_summary_output(ubq, capsys):
@@ -11,7 +11,7 @@ def test_summary_output(ubq, capsys):
 
 def test_missing_file_exit_code(tmp_path, capsys):
     assert main(["summary", str(tmp_path / "nope.cif")]) == 1
-    assert "topoplot:" in capsys.readouterr().err
+    assert "foldmap:" in capsys.readouterr().err
 
 
 def test_fragment_without_secondary_structure(ubq, tmp_path, capsys):
@@ -36,7 +36,7 @@ def test_plot_writes_every_requested_file(ubq, tmp_path, capsys):
 
 def test_plot_missing_file_exit_code(tmp_path, capsys):
     assert main(["plot", str(tmp_path / "nope.cif"), "-o", str(tmp_path / "x.svg")]) == 1
-    assert "topoplot:" in capsys.readouterr().err
+    assert "foldmap:" in capsys.readouterr().err
 
 
 def test_plot_bad_extension_exit_code(ubq, tmp_path, capsys):
@@ -47,13 +47,13 @@ def test_plot_bad_extension_exit_code(ubq, tmp_path, capsys):
 def test_plot_layout_uses_3d_contacts(zs5):
     from helpers import pipeline
 
-    from topoplot.cli import make_layout
-    from topoplot.features import sse_contacts
-    from topoplot.frame import view_frame
-    from topoplot.layout import build_layout
+    from foldmap.cli import make_layout
+    from foldmap.features import sse_contacts
+    from foldmap.frame import view_frame
+    from foldmap.layout import build_layout
 
-    from topoplot.cli import _bridge_contacts, _bridge_springs
-    from topoplot.io import load_links
+    from foldmap.cli import _bridge_contacts, _bridge_springs
+    from foldmap.io import load_links
 
     bb, sses, sheets = pipeline(zs5)
     links = load_links(zs5, bb)
@@ -73,13 +73,13 @@ def test_plot_accepts_palette_style_and_loop_options(ubq, tmp_path):
     import subprocess
     import sys
 
-    bad = subprocess.run([sys.executable, "-m", "topoplot", "plot", str(ubq), "-o", str(out), "--palette", "rainbow"],
+    bad = subprocess.run([sys.executable, "-m", "foldmap", "plot", str(ubq), "-o", str(out), "--palette", "rainbow"],
                          capture_output=True, text=True)
     assert bad.returncode == 2 and "invalid choice" in bad.stderr
 
 
 def test_plot_warns_about_loops_drawn_as_fallback_curves(ubq, tmp_path, capsys, monkeypatch):
-    import topoplot.cli as cli
+    import foldmap.cli as cli
 
     real = cli.route_loops
 

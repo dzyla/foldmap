@@ -8,7 +8,7 @@ import numpy as np
 import pytest
 from helpers import pipeline
 
-from topoplot.symmetry import detect_symmetry
+from foldmap.symmetry import detect_symmetry
 
 DATA = Path(__file__).parent / "data"
 NAMES = "ABCDEFGHIJKLMNOP"
@@ -174,7 +174,7 @@ def test_symmetry_off():
 
 
 def test_cli_symmetry_options(tmp_path, capsys):
-    from topoplot.cli import main
+    from foldmap.cli import main
 
     out = tmp_path / "x.svg"
     assert main(["plot", str(DATA / "1BL8.cif"), "-o", str(out), "--symmetry", "C2"]) == 0
@@ -186,7 +186,7 @@ def test_cli_symmetry_options(tmp_path, capsys):
 
 
 def test_symmetric_layout_works_for_synthetic_c4_and_helix(tmp_path):
-    from topoplot.cli import make_layout
+    from foldmap.cli import make_layout
 
     for fname, ops in (("c4.pdb", cyclic(4)), ("h.pdb", [(rot((0, 0, 1), 33 * k), np.array([0, 0, 9.0 * k]))
                                                         for k in range(5)])):

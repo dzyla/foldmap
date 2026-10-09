@@ -2,11 +2,11 @@
 
 import numpy as np
 
-from topoplot.dssp import assign_dssp
-from topoplot.io import load_backbone
-from topoplot.model import ResLabel, SSE
-from topoplot.sheets import build_sheets
-from topoplot.ss import build_sses
+from foldmap.dssp import assign_dssp
+from foldmap.io import load_backbone
+from foldmap.model import ResLabel, SSE
+from foldmap.sheets import build_sheets
+from foldmap.ss import build_sses
 
 
 def pipeline(path, assembly="asu"):

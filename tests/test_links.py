@@ -5,9 +5,9 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from topoplot.cli import make_figure, make_layout
-from topoplot.io import load_backbone, load_links
-from topoplot.style import Style
+from foldmap.cli import make_figure, make_layout
+from foldmap.io import load_backbone, load_links
+from foldmap.style import Style
 
 DATA = Path(__file__).parent / "data"
 
@@ -36,8 +36,8 @@ def _gids(fig, prefix):
 
 @pytest.mark.parametrize("name", ["5NKT", "6ZS5"])
 def test_disulfides_are_drawn_between_their_residues(name):
-    from topoplot.render import residue_point
-    from topoplot.route import route_loops
+    from foldmap.render import residue_point
+    from foldmap.route import route_loops
 
     path = DATA / f"{name}.cif"
     lay, sses, bb = make_layout(path)
@@ -66,8 +66,8 @@ def test_links_can_be_switched_off():
 
 
 def test_residue_point_lies_on_its_element():
-    from topoplot.render import residue_point
-    from topoplot.route import route_loops
+    from foldmap.render import residue_point
+    from foldmap.route import route_loops
 
     lay, sses, bb = make_layout(DATA / "1UBQ.cif")
     loops = route_loops(lay, sses, bb)
@@ -82,9 +82,9 @@ def test_residue_point_lies_on_its_element():
 
 @pytest.mark.parametrize("name, strict", [("2JTY", True), ("6ZS5", False)])  # 6ZS5: bridges inside one sheet
 def test_layout_pulls_bridged_cysteines_together(name, strict, monkeypatch):
-    import topoplot.cli as cli
-    from topoplot.render import residue_point
-    from topoplot.route import route_loops
+    import foldmap.cli as cli
+    from foldmap.render import residue_point
+    from foldmap.route import route_loops
 
     path = DATA / f"{name}.cif"
 
@@ -104,9 +104,9 @@ def test_layout_pulls_bridged_cysteines_together(name, strict, monkeypatch):
 
 @pytest.mark.parametrize("name", ["2JTY", "8UTF"])
 def test_cysteine_springs_bring_bridged_residues_closer_than_box_contacts(name, monkeypatch):
-    import topoplot.cli as cli
-    from topoplot.render import residue_point
-    from topoplot.route import route_loops
+    import foldmap.cli as cli
+    from foldmap.render import residue_point
+    from foldmap.route import route_loops
 
     path = DATA / f"{name}.cif"
 

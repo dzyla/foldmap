@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 from helpers import pipeline
 
-from topoplot.io import load_nucleic
+from foldmap.io import load_nucleic
 
 
 def test_protein_only_file_has_no_nucleic_acid(ubq):
@@ -50,15 +50,15 @@ def test_strand_ids_and_ends(ubq):
 
 
 def _dna_layout(path, mode, with_dna=True):
-    from topoplot.features import sse_contacts
-    from topoplot.frame import view_frame
-    from topoplot.layout import build_layout
+    from foldmap.features import sse_contacts
+    from foldmap.frame import view_frame
+    from foldmap.layout import build_layout
 
-    from topoplot.frame import dna_view_frame
+    from foldmap.frame import dna_view_frame
 
     bb, sses, sheets = pipeline(path)
     na = load_nucleic(path, bb)
-    from topoplot.frame import dna_radial_frame
+    from foldmap.frame import dna_radial_frame
 
     f = dna_radial_frame(sses, na) if with_dna and na.strands else view_frame(sses)
     lay = build_layout(sses, sheets, f, mode, contacts=sse_contacts(bb, sses), nucleic=na if with_dna else None)
@@ -72,7 +72,7 @@ def _overlap(a, b):
 @pytest.mark.parametrize("pdb", ["1ZAA", "1LMB"])
 @pytest.mark.parametrize("mode", ["projected", "stack"])
 def test_duplex_is_placed_true_to_scale_and_clear_of_the_protein(ubq, pdb, mode):
-    from topoplot.layout import SCALE
+    from foldmap.layout import SCALE
 
     _, _, na, f, lay = _dna_layout(ubq.parent / f"{pdb}.cif", mode)
     (d,) = lay.dna
@@ -116,7 +116,7 @@ def _gaps(path):
 
 @pytest.mark.parametrize("pdb", ["1ZAA", "1LMB"])
 def test_every_protein_chain_reaches_the_dna(ubq, pdb):
-    from topoplot.layout import HELIX_W, MARGIN
+    from foldmap.layout import HELIX_W, MARGIN
 
     rows = _gaps(ubq.parent / f"{pdb}.cif")
     for chain in {c for c, _, _ in rows}:
@@ -136,7 +136,7 @@ def test_protein_only_layout_has_no_dna(ubq):
 
 
 def _figure(path, **kw):
-    from topoplot.cli import make_figure_and_loops
+    from foldmap.cli import make_figure_and_loops
 
     return make_figure_and_loops(path, **kw)
 
@@ -166,7 +166,7 @@ def test_dna_ends_are_labelled_five_and_three_prime(ubq):
 def test_contacts_are_marked_in_the_protein_chain_colour(ubq):
     from matplotlib.colors import to_hex
 
-    from topoplot.palette import chain_colors
+    from foldmap.palette import chain_colors
 
     fig, _ = _figure(ubq.parent / "1LMB.cif")
     marks = _gid(fig, "dna-contact:")
@@ -179,8 +179,8 @@ def test_contacts_are_marked_in_the_protein_chain_colour(ubq):
 def test_loops_route_around_the_duplex(ubq):
     from test_route import segments_clear
 
-    from topoplot.cli import make_layout
-    from topoplot.route import route_loops
+    from foldmap.cli import make_layout
+    from foldmap.route import route_loops
 
     for pdb in ("1ZAA", "1LMB"):
         lay, sses, bb = make_layout(ubq.parent / f"{pdb}.cif")
@@ -191,7 +191,7 @@ def test_loops_route_around_the_duplex(ubq):
 
 
 def test_no_dna_option_hides_it(ubq, tmp_path):
-    from topoplot.cli import main
+    from foldmap.cli import main
 
     out = tmp_path / "x.svg"
     assert main(["plot", str(ubq.parent / "1ZAA.cif"), "-o", str(out), "--no-dna"]) == 0
@@ -201,7 +201,7 @@ def test_no_dna_option_hides_it(ubq, tmp_path):
 
 
 def test_summary_lists_the_nucleic_acid(ubq, capsys):
-    from topoplot.cli import main
+    from foldmap.cli import main
 
     assert main(["summary", str(ubq.parent / "1LMB.cif")]) == 0
     out = capsys.readouterr().out
@@ -210,7 +210,7 @@ def test_summary_lists_the_nucleic_acid(ubq, capsys):
 
 @pytest.mark.parametrize("pdb", ["1ZAA", "1LMB"])
 def test_tethers_join_an_element_to_its_nearest_contact_mark(ubq, pdb):
-    from topoplot.cli import make_layout
+    from foldmap.cli import make_layout
 
     fig, _ = _figure(ubq.parent / f"{pdb}.cif")
     lay, _, _ = make_layout(ubq.parent / f"{pdb}.cif")
@@ -229,7 +229,7 @@ def test_tethers_join_an_element_to_its_nearest_contact_mark(ubq, pdb):
 
 
 def _contact_points(lay, sse):
-    from topoplot.layout import dna_to_page, dna_y
+    from foldmap.layout import dna_to_page, dna_y
 
     (d,) = lay.dna
     na = lay.nucleic
@@ -243,7 +243,7 @@ def _contact_points(lay, sse):
 def test_tethers_never_cross_other_elements(ubq, pdb, mode):
     from test_route import segments_clear
 
-    from topoplot.cli import make_layout
+    from foldmap.cli import make_layout
 
     fig, _ = _figure(ubq.parent / f"{pdb}.cif", mode=mode)
     lay, _, _ = make_layout(ubq.parent / f"{pdb}.cif", mode)
@@ -255,7 +255,7 @@ def test_tethers_never_cross_other_elements(ubq, pdb, mode):
 
 @pytest.mark.parametrize("pdb", ["1ZAA", "1LMB"])
 def test_dna_complexes_are_viewed_with_the_dna_across_and_the_protein_below(ubq, pdb):
-    from topoplot.cli import make_layout
+    from foldmap.cli import make_layout
 
     lay, _, _ = make_layout(ubq.parent / f"{pdb}.cif")
     (d,) = lay.dna
@@ -265,7 +265,7 @@ def test_dna_complexes_are_viewed_with_the_dna_across_and_the_protein_below(ubq,
 
 
 def test_dna_view_is_a_rotation_not_a_mirror(ubq):
-    from topoplot.frame import dna_view_frame
+    from foldmap.frame import dna_view_frame
 
     path = ubq.parent / "1LMB.cif"
     bb, sses, _ = pipeline(path)
@@ -287,7 +287,7 @@ def test_every_nucleotide_is_labelled_with_its_base(ubq):
 
 
 def test_nucleotide_labels_can_be_switched_off(ubq):
-    from topoplot.style import Style
+    from foldmap.style import Style
 
     fig, _ = _figure(ubq.parent / "1ZAA.cif", look=Style(nucleotide_labels=False))
     assert not _gid(fig, "nt:")
@@ -295,7 +295,7 @@ def test_nucleotide_labels_can_be_switched_off(ubq):
 
 @pytest.mark.parametrize("pdb", ["1ZAA", "1LMB"])
 def test_every_protein_element_hangs_below_the_dna(ubq, pdb):
-    from topoplot.cli import make_layout
+    from foldmap.cli import make_layout
 
     lay, _, _ = make_layout(ubq.parent / f"{pdb}.cif")
     (d,) = lay.dna
@@ -303,7 +303,7 @@ def test_every_protein_element_hangs_below_the_dna(ubq, pdb):
 
 
 def test_zinc_fingers_are_compact_under_their_sites(ubq):
-    from topoplot.cli import make_layout
+    from foldmap.cli import make_layout
 
     lay, sses, _ = make_layout(ubq.parent / "1ZAA.cif")
     (d,) = lay.dna
@@ -314,7 +314,7 @@ def test_zinc_fingers_are_compact_under_their_sites(ubq):
 
 
 def test_radial_dna_frame_is_a_rotation_everywhere(ubq):
-    from topoplot.frame import dna_radial_frame
+    from foldmap.frame import dna_radial_frame
 
     path = ubq.parent / "1ZAA.cif"
     bb, sses, _ = pipeline(path)
@@ -327,10 +327,10 @@ def test_radial_dna_frame_is_a_rotation_everywhere(ubq):
 
 @pytest.mark.parametrize("pdb", ["1ZAA", "1LMB"])
 def test_stack_mode_keeps_the_protein_close_and_the_dna_over_its_binders(ubq, pdb):
-    from topoplot.cli import make_layout
-    from topoplot.layout import MARGIN
+    from foldmap.cli import make_layout
+    from foldmap.layout import MARGIN
 
-    from topoplot.layout import label_boxes
+    from foldmap.layout import label_boxes
 
     lay, sses, bb = make_layout(ubq.parent / f"{pdb}.cif", "stack")
     na = load_nucleic(ubq.parent / f"{pdb}.cif", bb)

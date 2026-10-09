@@ -5,7 +5,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from topoplot.cli import main, make_figure, make_layout
+from foldmap.cli import main, make_figure, make_layout
 
 DATA = Path(__file__).parent / "data"
 UMOD = DATA / "6ZS5.cif"
@@ -93,14 +93,14 @@ def test_cli_domains_and_layout_file(tmp_path):
 
 
 def test_app_settings_carry_domains():
-    from topoplot.app import layout_options
+    from foldmap.app import layout_options
 
     opts = layout_options({"domains": "ZPN=res:A:331-440\nZPC=res:D:447-582"})
     assert opts["domains"] == DOMAINS
 
 
 def test_app_layout_file_keeps_domains():
-    from topoplot.app import layout_document, settings_from_document
+    from foldmap.app import layout_document, settings_from_document
 
     doc = layout_document(T4L, {"theme": "publication", "domains": "N=res:A:13-59\nC=res:A:1-12,res:A:60-164"})
     assert set(doc["domains"]) == {"N", "C"}
@@ -109,8 +109,8 @@ def test_app_layout_file_keeps_domains():
 
 
 def test_loops_keep_off_domain_names():
-    from topoplot.layout import label_boxes
-    from topoplot.route import route_loops
+    from foldmap.layout import label_boxes
+    from foldmap.route import route_loops
 
     lay, sses, bb = make_layout(T4L, domains=T4L_DOMAINS)
     names = [b for k, b in label_boxes(lay, sses) if k.startswith("domain-label:")]

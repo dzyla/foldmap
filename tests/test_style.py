@@ -1,6 +1,6 @@
 import pytest
 
-from topoplot.style import LAYOUT_KEYS, THEME_KEYS, THEMES, Style, resolve_style
+from foldmap.style import LAYOUT_KEYS, THEME_KEYS, THEMES, Style, resolve_style
 
 PRESETS = THEMES  # older name
 
@@ -55,7 +55,7 @@ def test_style_file_with_unknown_key_fails(tmp_path):
 import numpy as np  # noqa: E402
 from helpers import pipeline  # noqa: E402
 
-from topoplot.cli import make_layout, make_figure  # noqa: E402
+from foldmap.cli import make_layout, make_figure  # noqa: E402
 
 
 def _artists(fig, prefix):
@@ -78,7 +78,7 @@ def test_shading_none_gives_the_back_face_the_front_colour(ubq):
 
 @pytest.mark.parametrize("scale", [0.6, 1.5])
 def test_element_scales_change_drawn_widths(zs5, scale):
-    from topoplot.layout import DNA_W, HELIX_W, PITCH
+    from foldmap.layout import DNA_W, HELIX_W, PITCH
 
     look = Style(helix_scale=scale, strand_scale=scale, dna_scale=scale)
     lay, sses, _ = make_layout(zs5.parent / "1LMB.cif", look=look)
@@ -119,7 +119,7 @@ def test_helix_angle_modes(ubq, pdb):
 
 
 def test_snapped_helix_keeps_the_nearest_axis_direction(ubq):
-    from topoplot.frame import view_frame
+    from foldmap.frame import view_frame
 
     path = ubq.parent / "2LZM.cif"
     _, sses, _ = pipeline(path)
@@ -134,7 +134,7 @@ def test_snapped_helix_keeps_the_nearest_axis_direction(ubq):
 
 
 def test_cli_preset_set_and_style_file(ubq, tmp_path):
-    from topoplot.cli import main
+    from foldmap.cli import main
 
     out = tmp_path / "x.svg"
     assert main(["plot", str(ubq), "-o", str(out), "--theme", "minimal", "--set", "helix_scale=0.8"]) == 0
@@ -146,7 +146,7 @@ def test_cli_preset_set_and_style_file(ubq, tmp_path):
 
 
 def test_cli_lists_presets(capsys):
-    from topoplot.cli import main
+    from foldmap.cli import main
 
     assert main(["styles"]) == 0
     out = capsys.readouterr().out
@@ -168,7 +168,7 @@ def test_old_fill_names_still_work(old, new):
 
 
 def test_styles_help_separates_themes_theme_keys_and_layout_keys(capsys):
-    from topoplot.cli import main
+    from foldmap.cli import main
 
     assert main(["styles"]) == 0
     out = capsys.readouterr().out
@@ -184,14 +184,14 @@ def _hex(c):
 def test_sequence_colouring_runs_n_to_c_along_each_chain(ubq):
     from matplotlib import colormaps
 
-    from topoplot.cli import make_layout
+    from foldmap.cli import make_layout
 
     lay, sses, _ = make_layout(ubq)
     fig = make_figure(ubq, look=Style(color_by="sequence"))
     order = [s.id for s in sses]
     cols = [_hex(_artists(fig, f"{ {'E': 'strand', 'G': 'eta'}.get(s.kind, 'helix') }:{s.id}")[0].get_facecolor()) for s in sses]
     assert len(set(cols)) == len(cols)  # every element its own shade
-    from topoplot.render import sequence_colour
+    from foldmap.render import sequence_colour
 
     ramp = Style().sequence_map
     assert cols[0] == sequence_colour(0.0, ramp) and cols[-1] == sequence_colour(1.0, ramp)  # N end, C end
@@ -203,10 +203,10 @@ def test_sequence_colouring_restarts_for_each_chain(zs5):
     fig = make_figure(zs5, look=Style(color_by="sequence"))
     from matplotlib import colormaps
 
-    from topoplot.cli import make_layout
+    from foldmap.cli import make_layout
 
     lay, sses, _ = make_layout(zs5)
-    from topoplot.render import sequence_colour
+    from foldmap.render import sequence_colour
 
     start = sequence_colour(0.0, Style().sequence_map)
     for chain in ("A", "D"):
@@ -232,7 +232,7 @@ def _element_colours(fig, sses):
 
 
 def test_shade_colouring_darkens_each_chain_from_n_to_c(zs5):
-    from topoplot.cli import make_layout
+    from foldmap.cli import make_layout
 
     _, sses, _ = make_layout(zs5)
     cols = _element_colours(make_figure(zs5, look=Style(color_by="shade")), sses)
@@ -247,8 +247,8 @@ def test_shade_colouring_darkens_each_chain_from_n_to_c(zs5):
 
 @pytest.mark.parametrize("mode", ["chain", "element"])
 def test_loops_can_take_the_colour_of_their_chain_or_element(zs5, mode):
-    from topoplot.cli import make_layout
-    from topoplot.palette import chain_colors
+    from foldmap.cli import make_layout
+    from foldmap.palette import chain_colors
 
     _, sses, _ = make_layout(zs5)
     fig = make_figure(zs5, look=Style(loop_color=mode))
@@ -257,15 +257,15 @@ def test_loops_can_take_the_colour_of_their_chain_or_element(zs5, mode):
     by_id = {s.id: s for s in sses}
     for loop in _artists(fig, "loop:"):
         a = loop.get_gid().split(":", 1)[1].split(">")[0]
-        from topoplot.render import _legible
+        from foldmap.render import _legible
 
         want = chain[by_id[a].chain] if mode == "chain" else cols[a]
         assert _hex(loop.get_edgecolor()) == _legible(want).lower()  # the colour, darkened if too pale for a line
 
 
 def test_loop_arrows_point_from_n_to_c(ubq):
-    from topoplot.cli import make_layout
-    from topoplot.route import route_loops
+    from foldmap.cli import make_layout
+    from foldmap.route import route_loops
 
     lay, sses, bb = make_layout(ubq)
     loops = {f"{l.a_id}>{l.b_id}": l for l in route_loops(lay, sses, bb)}
@@ -282,7 +282,7 @@ def test_loop_arrows_point_from_n_to_c(ubq):
 
 
 def test_residue_numbers_mark_each_element_end(ubq):
-    from topoplot.cli import make_layout
+    from foldmap.cli import make_layout
 
     lay, sses, _ = make_layout(ubq)
     fig = make_figure(ubq, look=Style(residue_numbers=True))
@@ -302,7 +302,7 @@ def test_coloured_loops_stay_dark_enough_to_follow(zs5):
 
 @pytest.mark.parametrize("name, mode", [("1ZAA", "stack"), ("5NKT", "projected")])
 def test_residue_numbers_never_sit_on_another_element(ubq, name, mode):
-    from topoplot.cli import make_layout
+    from foldmap.cli import make_layout
 
     path = ubq.parent / f"{name}.cif"
     lay, sses, _ = make_layout(path, mode)
@@ -321,9 +321,9 @@ def _element_fills(fig, sses):
 
 
 def test_bfactor_colouring_runs_rigid_blue_to_flexible_red(ubq):
-    from topoplot.cli import make_layout
-    from topoplot.io import load_backbone
-    from topoplot.render import property_colour
+    from foldmap.cli import make_layout
+    from foldmap.io import load_backbone
+    from foldmap.render import property_colour
 
     lay, sses, _ = make_layout(ubq)
     bb = load_backbone(ubq)
@@ -336,8 +336,8 @@ def test_bfactor_colouring_runs_rigid_blue_to_flexible_red(ubq):
 
 
 def test_hydropathy_colouring_follows_kyte_doolittle(ubq):
-    from topoplot.cli import make_layout
-    from topoplot.render import KYTE_DOOLITTLE, property_colour
+    from foldmap.cli import make_layout
+    from foldmap.render import KYTE_DOOLITTLE, property_colour
 
     lay, sses, bb = make_layout(ubq)
     kd = {s.id: float(np.mean([KYTE_DOOLITTLE.get(bb.labels[r].name, 0.0) for r in range(s.start, s.end + 1)]))
@@ -348,7 +348,7 @@ def test_hydropathy_colouring_follows_kyte_doolittle(ubq):
 
 
 def test_sstype_colouring_gives_one_colour_per_kind(zs5):
-    from topoplot.cli import make_layout
+    from foldmap.cli import make_layout
 
     _, sses, _ = make_layout(DATA_UBQ := zs5.parent / "2LZM.cif")
     cols = _element_fills(make_figure(DATA_UBQ, look=Style(color_by="sstype")), sses)
@@ -359,8 +359,8 @@ def test_sstype_colouring_gives_one_colour_per_kind(zs5):
 
 @pytest.mark.parametrize("theme", ["flexibility", "hydropathy", "richardson", "goodsell", "journal"])
 def test_new_themes_render(ubq, theme, tmp_path):
-    from topoplot.render import save
-    from topoplot.style import THEMES
+    from foldmap.render import save
+    from foldmap.style import THEMES
 
     assert theme in THEMES
     save(make_figure(ubq, look=THEMES[theme]), tmp_path / f"{theme}.svg")

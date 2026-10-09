@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 from helpers import pipeline
 
-from topoplot.symmetry import detect_symmetry
+from foldmap.symmetry import detect_symmetry
 
 DATA = __import__("pathlib").Path(__file__).parent / "data"
 
@@ -49,7 +49,7 @@ def _mates(sses, s):
 
 @pytest.mark.parametrize("name", ["8UUP", "2HHB", "1TIM"])
 def test_unrolled_projection_draws_every_protomer_the_same(name):
-    from topoplot.frame import symmetric_frame
+    from foldmap.frame import symmetric_frame
 
     bb, sses, s = sym(name)
     f = symmetric_frame(sses, s)
@@ -68,7 +68,7 @@ def test_unrolled_projection_draws_every_protomer_the_same(name):
 
 
 def test_unrolled_frame_is_a_rotation_everywhere():
-    from topoplot.frame import symmetric_frame
+    from foldmap.frame import symmetric_frame
 
     _, sses, s = sym("8UUP")
     f = symmetric_frame(sses, s)
@@ -80,7 +80,7 @@ def test_unrolled_frame_is_a_rotation_everywhere():
 
 @pytest.mark.parametrize("name", ["8UUP", "2HHB"])
 def test_symmetric_layout_repeats_the_protomer(name):
-    from topoplot.cli import make_layout
+    from foldmap.cli import make_layout
 
     bb, sses, s = sym(name)
     lay, _, _ = make_layout(DATA / f"{name}.cif")
@@ -96,7 +96,7 @@ def test_symmetric_layout_repeats_the_protomer(name):
 
 
 def test_symmetry_can_be_switched_off(tmp_path):
-    from topoplot.cli import main
+    from foldmap.cli import main
 
     out = tmp_path / "x.svg"
     assert main(["plot", str(DATA / "2HHB.cif"), "-o", str(out), "--symmetry", "off"]) == 0
