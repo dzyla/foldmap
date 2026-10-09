@@ -6,6 +6,7 @@ import shutil
 import subprocess
 from pathlib import Path
 
+import numpy as np
 import pytest
 
 from foldmap.interactive import THREEDMOL, build_page
@@ -103,3 +104,20 @@ def test_cli_interactive_writes_the_page(tmp_path):
     out = tmp_path / "view.html"
     assert main(["interactive", str(DATA / "1LMB.cif"), "-o", str(out), "--theme", "trace"]) == 0
     assert out.stat().st_size > 10_000 and "topo-data" in out.read_text()
+
+
+def test_3d_model_is_turned_to_match_the_figure():
+    """The exported model is in page coordinates: x right, y up, z toward the viewer, as the figure is drawn."""
+    import gemmi
+
+    from foldmap.cli import make_layout
+    from foldmap.interactive import _model_cif
+
+    path = DATA / "1UBQ.cif"
+    lay, _, bb = make_layout(path)
+    rot, centre = np.array(lay.page_axes), np.array(lay.page_centre)
+    assert np.allclose(rot @ rot.T, np.eye(3), atol=1e-6) and np.linalg.det(rot) > 0.99
+    doc = gemmi.cif.read_string(_model_cif(path, "auto", rot, centre))
+    st = gemmi.make_structure_from_block(doc.sole_block())
+    ca = next(a.pos for r in st[0]["A"] for a in r if a.name == "CA")
+    assert np.allclose([ca.x, ca.y, ca.z], rot @ (bb.ca[0] - centre), atol=1e-2)

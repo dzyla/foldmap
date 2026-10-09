@@ -81,7 +81,48 @@ _APP = r"""
   const data = JSON.parse(document.getElementById('topo-data').textContent);
   const lib = globalThis.TopoLib, idx = lib.index(data);
   const info = document.getElementById('info');
-  const svg = document.querySelector('#topology svg');
+  const svg = document.querySelector('#stage svg');
+  const stage = document.getElementById('stage');
+
+  // ---- topology: fit to the panel, wheel to zoom, drag to pan
+  const full = (svg.getAttribute('viewBox') || '').split(/\s+/).map(Number);
+  if (full.length !== 4 || full.some(isNaN)) {
+    const w = parseFloat(svg.getAttribute('width')), h = parseFloat(svg.getAttribute('height'));
+    full.splice(0, 4, 0, 0, w, h);
+  }
+  svg.setAttribute('viewBox', full.join(' '));
+  svg.removeAttribute('width'); svg.removeAttribute('height');
+  svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+  let view = full.slice();
+  function setView(v) { view = v; svg.setAttribute('viewBox', v.join(' ')); }
+  function zoom(f, cx, cy) {
+    const [x, y, w, h] = view;
+    const px = cx === undefined ? x + w / 2 : cx, py = cy === undefined ? y + h / 2 : cy;
+    const nw = Math.min(full[2] * 4, Math.max(full[2] / 12, w * f)), k = nw / w;
+    setView([px - (px - x) * k, py - (py - y) * k, w * k, h * k]);
+  }
+  function toSvg(ev) {
+    const pt = svg.createSVGPoint(); pt.x = ev.clientX; pt.y = ev.clientY;
+    return pt.matrixTransform(svg.getScreenCTM().inverse());
+  }
+  stage.addEventListener('wheel', ev => { ev.preventDefault(); const p = toSvg(ev); zoom(ev.deltaY > 0 ? 1.15 : 1 / 1.15, p.x, p.y); },
+                         { passive: false });
+  let drag = null;
+  stage.addEventListener('pointerdown', ev => { drag = { x: ev.clientX, y: ev.clientY, v: view.slice(), moved: false }; });
+  window.addEventListener('pointermove', ev => {
+    if (!drag) return;
+    const dx = ev.clientX - drag.x, dy = ev.clientY - drag.y;
+    if (Math.abs(dx) + Math.abs(dy) > 3) { drag.moved = true; stage.classList.add('dragging'); }
+    if (!drag.moved) return;
+    const s = drag.v[2] / stage.clientWidth > drag.v[3] / stage.clientHeight ? drag.v[2] / stage.clientWidth
+                                                                             : drag.v[3] / stage.clientHeight;
+    setView([drag.v[0] - dx * s, drag.v[1] - dy * s, drag.v[2], drag.v[3]]);
+  });
+  window.addEventListener('pointerup', () => { if (drag) setTimeout(() => { drag = null; }, 0); stage.classList.remove('dragging'); });
+  document.getElementById('zin').onclick = () => zoom(1 / 1.3);
+  document.getElementById('zout').onclick = () => zoom(1.3);
+  document.getElementById('zfit').onclick = () => setView(full.slice());
+  stage.addEventListener('dblclick', () => setView(full.slice()));
   const MAX = 700, CUT = 8;
 
   // ---- topology: element groups by id
@@ -136,7 +177,8 @@ _APP = r"""
   }
 
   // ---- 3D
-  const viewer = $3Dmol.createViewer(document.getElementById('mol'), { backgroundColor: 'white' });
+  const molDiv = document.getElementById('mol');
+  const viewer = $3Dmol.createViewer(molDiv, { backgroundColor: 'white', antialias: true });
   viewer.addModel(data.model, 'cif');
   function residueOf(atom) { return idx.byKey[atom.chain + ':' + atom.resi + (atom.icode || '').trim()]; }
   function colourOf(atom) {
@@ -152,12 +194,22 @@ _APP = r"""
   baseStyle();
   viewer.zoomTo();
   viewer.render();
-  function molOn(residues) {
-    baseStyle();
-    if (residues.length) {
-      const sel = { or: residues.map(k => ({ chain: data.residues[k].c, resi: data.residues[k].n })) };
-      viewer.setStyle(sel, { cartoon: { color: '#ff6a00' }, stick: { radius: 0.2, color: '#ff6a00' } });
-    }
+  function fitMol() { viewer.resize(); viewer.zoomTo(); viewer.render(); }
+  new ResizeObserver(() => { viewer.resize(); viewer.render(); }).observe(molDiv);
+  setTimeout(fitMol, 50);
+  document.getElementById('molreset').onclick = () => { viewer.zoomTo({}, 400); viewer.render(); };
+  function fly(residues) {  // centre the element, keeping its neighbourhood in view
+    if (!residues.length) return;
+    const sel = { or: residues.map(k => ({ chain: data.residues[k].c, resi: data.residues[k].n })) };
+    viewer.zoomTo(sel);
+    viewer.zoom(0.35);
+    viewer.render();
+  }
+  function molOn(residues) {  // like the topology: the selection in its figure colours, everything else pale
+    if (!residues.length) { baseStyle(); viewer.render(); return; }
+    viewer.setStyle({}, { cartoon: { color: '#dde2e7', opacity: 0.85 } });
+    const sel = { or: residues.map(k => ({ chain: data.residues[k].c, resi: data.residues[k].n })) };
+    viewer.setStyle(sel, { cartoon: { colorfunc: colourOf }, stick: { radius: 0.18, colorscheme: 'grayCarbon' } });
     viewer.render();
   }
 
@@ -191,6 +243,19 @@ _APP = r"""
     }
   });
   svg.addEventListener('mouseleave', clear);
+  svg.addEventListener('click', ev => {
+    if (drag && drag.moved) return;
+    for (let n = ev.target; n && n !== svg; n = n.parentNode) {
+      const m = n.id && n.id.match(/^(strand|helix|helix-back|eta|label|ghost):(.+)$/);
+      if (m && idx.byElement[m[2]]) { const e = idx.byElement[m[2]]; return fly(range(e.start, e.end)); }
+      if (n.id && n.id.startsWith('loop:')) {
+        const [a, b] = n.id.slice(5).split('>'), s = lib.loopSpan(data, a, b);
+        if (s && s[1] >= s[0]) return fly(range(s[0], s[1]));
+      }
+    }
+  });
+  const mapBox = document.querySelector('.map'), stripEl = document.getElementById('strip');
+  new ResizeObserver(() => { stripEl.style.width = mapBox.clientWidth + 'px'; }).observe(mapBox);
   over.addEventListener('mousemove', ev => {
     const box = over.getBoundingClientRect();
     const J = Math.floor((ev.clientX - box.left) / box.width * M.count), I = Math.floor((ev.clientY - box.top) / box.height * M.count);
@@ -211,34 +276,55 @@ _APP = r"""
 """
 
 _CSS = """
-:root { --bg: #f4f6f8; --panel: #ffffff; --ink: #1d2733; --muted: #5d6877; --line: #d8dee5; --accent: #ff6a00;
-        --sans: "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif; --mono: "IBM Plex Mono", Menlo, monospace; }
-@media (prefers-color-scheme: dark) { :root { --bg: #11161c; --panel: #1a2129; --ink: #e5eaf0; --muted: #98a3b1;
-        --line: #2b343f; color-scheme: dark } }
+:root { --bg: #eef1f4; --panel: #ffffff; --ink: #1d2733; --muted: #5d6877; --line: #d5dce3; --accent: #ff6a00;
+        --sans: "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif; --mono: "IBM Plex Mono", Menlo, monospace;
+        color-scheme: light }
 * { box-sizing: border-box }
-body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.45 var(--sans); padding: 16px }
-header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 16px; margin-bottom: 12px }
-h1 { font-size: 18px; font-weight: 600; margin: 0 }
-header p { margin: 0; color: var(--muted) }
-.grid { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 12px }
-@media (max-width: 900px) { .grid { grid-template-columns: minmax(0, 1fr) } }
-.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 10px; min-width: 0 }
-.panel h2 { font: 600 12px var(--mono); text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 0 0 8px }
-#topology { grid-row: span 2; overflow: auto }
-#credit { margin: 14px 0 4px; font: 11px var(--mono); color: var(--muted) }
-#topology svg { width: 100%; height: auto; display: block; background: #fff; border-radius: 4px }
-#topology svg [id^="strand:"], #topology svg [id^="helix:"], #topology svg [id^="loop:"] { cursor: pointer }
-#topology svg.focus [id^="strand:"]:not(.on), #topology svg.focus [id^="helix:"]:not(.on),
-#topology svg.focus [id^="helix-back:"]:not(.on), #topology svg.focus [id^="eta:"]:not(.on), #topology svg.focus [id^="loop:"]:not(.on),
-#topology svg.focus [id^="loop-arrow:"]:not(.on), #topology svg.focus [id^="ghost:"]:not(.on) { opacity: .22; transition: opacity .12s }
-#mol { position: relative; width: 100%; height: 420px; border-radius: 4px; overflow: hidden }
-.map { position: relative; width: 100%; max-width: 520px; aspect-ratio: 1 }
-.map canvas { position: absolute; inset: 0; width: 100%; height: 100%; image-rendering: pixelated }
+html, body { height: 100% }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.45 var(--sans); display: flex;
+       flex-direction: column; overflow: hidden }
+header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 16px; padding: 10px 16px 6px }
+h1 { font-size: 17px; font-weight: 600; margin: 0 }
+header p { margin: 0; color: var(--muted); font-size: 13px }
+main { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) minmax(320px, 38%); gap: 10px;
+       padding: 0 16px }
+.side { display: flex; flex-direction: column; gap: 10px; min-height: 0 }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; min-width: 0;
+         min-height: 0; display: flex; flex-direction: column; position: relative }
+.panel h2 { font: 600 11px var(--mono); text-transform: uppercase; letter-spacing: .06em; color: var(--muted);
+            margin: 0 0 6px; display: flex; align-items: center; gap: 8px }
+.panel h2 .tools { margin-left: auto; display: flex; gap: 4px }
+.tools button { font: 12px var(--mono); border: 1px solid var(--line); background: #f7f9fb; color: var(--ink);
+                border-radius: 5px; padding: 1px 8px; cursor: pointer }
+.tools button:hover { border-color: var(--accent) }
+#topology { min-height: 0 }
+#stage { flex: 1; min-height: 0; overflow: hidden; border-radius: 6px; background: #fff; cursor: grab;
+         touch-action: none }
+#stage.dragging { cursor: grabbing }
+#stage svg { width: 100%; height: 100%; display: block }
+#stage svg [id^="strand:"], #stage svg [id^="helix:"], #stage svg [id^="eta:"], #stage svg [id^="loop:"] { cursor: pointer }
+#stage svg.focus [id^="strand:"]:not(.on), #stage svg.focus [id^="helix:"]:not(.on),
+#stage svg.focus [id^="helix-back:"]:not(.on), #stage svg.focus [id^="eta:"]:not(.on),
+#stage svg.focus [id^="loop:"]:not(.on), #stage svg.focus [id^="loop-arrow:"]:not(.on),
+#stage svg.focus [id^="ghost:"]:not(.on) { opacity: .2; transition: opacity .12s }
+#molpanel { flex: 1.15 }
+#mol { flex: 1; min-height: 200px; position: relative; border-radius: 6px; overflow: hidden; background: #fff }
+#mappanel { flex: 1 }
+.mapwrap { flex: 1; min-height: 0; display: flex; flex-direction: column; align-items: center }
+.map { position: relative; height: 100%; max-width: 100%; aspect-ratio: 1 }
+.map canvas { position: absolute; inset: 0; width: 100%; height: 100%; image-rendering: pixelated; border-radius: 3px }
 #map-over { cursor: crosshair }
-#strip { display: block; width: 100%; max-width: 520px; height: 10px; image-rendering: pixelated; margin-top: 4px }
-#info { font: 13px var(--mono); padding: 8px 10px; background: var(--panel); border: 1px solid var(--line);
-        border-radius: 6px; margin-top: 12px; min-height: 2.6em }
-.legend { color: var(--muted); font-size: 12px; margin-top: 6px }
+#strip { display: block; height: 8px; image-rendering: pixelated; margin-top: 4px; border-radius: 2px }
+.legend { color: var(--muted); font-size: 11.5px; margin: 4px 0 0 }
+#info { font: 13px var(--mono); padding: 7px 12px; background: var(--panel); border: 1px solid var(--line);
+        border-radius: 8px; margin: 10px 16px 0; min-height: 2.4em; white-space: nowrap; overflow: hidden;
+        text-overflow: ellipsis }
+#credit { padding: 6px 16px 10px; font: 11px var(--mono); color: var(--muted) }
+@media (max-width: 900px) {
+  body { overflow: auto; display: block }
+  main { display: flex; flex-direction: column }
+  #topology { height: 75vh } #molpanel { height: 60vh } #mappanel { height: 70vw }
+}
 """
 
 
@@ -253,8 +339,14 @@ def _residues(bb, sses) -> list[dict]:
     ]
 
 
-def _model_cif(path, assembly: str) -> str:
+def _model_cif(path, assembly: str, axes=None, centre=None) -> str:
+    """The model as mmCIF; with axes (rows: page-right, page-up, toward viewer) turned into page coordinates, so
+    the 3D viewer's default camera sees it the way the figure shows it."""
     model, _ = read_model(path, assembly)
+    if axes is not None:
+        rot = np.asarray(axes, float)
+        shift = -rot @ np.asarray(centre, float)
+        model.transform_pos_and_adp(gemmi.Transform(gemmi.Mat33(rot.tolist()), gemmi.Vec3(*shift)))
     st = gemmi.Structure()
     st.add_model(model)
     st.remove_waters()
@@ -292,7 +384,7 @@ def build_page(
             for s in sses
             if s.id in layout.placed
         ],
-        "model": _model_cif(path, layout_options.get("assembly", "auto")),
+        "model": _model_cif(path, layout_options.get("assembly", "auto"), layout.page_axes, layout.page_centre),
     }
     blob = json.dumps(data, separators=(",", ":")).replace("</", "<\\/")
     name = html.escape(data["title"])
@@ -305,15 +397,21 @@ def build_page(
 <style>{_CSS}</style>
 <script src="{THREEDMOL}"></script>
 </head><body>
-<header><h1>{name}</h1><p>{chains} chain(s) · {n_res} residues · {n_el} helices and strands. Hover anything: the same residues light up in all three views.</p></header>
-<div class="grid">
-  <section class="panel" id="topology"><h2>Topology</h2>{svg}</section>
-  <section class="panel"><h2>3D model</h2><div id="mol"></div></section>
-  <section class="panel"><h2>Contact map · CA–CA distance</h2>
-    <div class="map"><canvas id="map"></canvas><canvas id="map-over"></canvas></div>
-    <canvas id="strip"></canvas>
-    <p class="legend">Dark: close (contacts under 8 Å), pale: 30 Å or more. The strip shows each element in its figure colour.</p></section>
-</div>
+<header><h1>{name}</h1><p>{chains} chain(s) · {n_res} residues · {n_el} helices and strands · hover anything: the
+same residues light up in all three views · click an element to fly the 3D view to it</p></header>
+<main>
+  <section class="panel" id="topology"><h2>Topology <span class="tools"><button id="zin" title="zoom in">+</button>
+    <button id="zout" title="zoom out">−</button><button id="zfit" title="fit the whole figure">fit</button></span></h2>
+    <div id="stage">{svg}</div></section>
+  <div class="side">
+    <section class="panel" id="molpanel"><h2>3D model <span class="tools"><button id="molreset" title="show the whole
+      model">reset view</button></span></h2><div id="mol"></div></section>
+    <section class="panel" id="mappanel"><h2>Contact map · CA–CA distance</h2>
+      <div class="mapwrap"><div class="map"><canvas id="map"></canvas><canvas id="map-over"></canvas></div>
+      <canvas id="strip"></canvas></div>
+      <p class="legend">Dark: in contact (under 8 Å) · pale: 30 Å or more · strip: elements in figure colours.</p></section>
+  </div>
+</main>
 <div id="info">Hover a helix, strand or loop in the topology, a cell of the contact map, or an atom in 3D.</div>
 <footer id="credit">{CREDIT}</footer>
 <script type="application/json" id="topo-data">{blob}</script>

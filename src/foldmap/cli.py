@@ -162,6 +162,10 @@ def make_layout(
     lay.res_chain = [l.chain for l in bb.labels]
     lay.res_name = [l.name for l in bb.labels]
     lay.res_b = [float(x) for x in bb.b] if bb.b is not None else []
+    first = [s.centroid for s in sses if s.chain == sses[0].chain] if sses else [bb.ca.mean(axis=0)]
+    centre = np.mean(first, axis=0)
+    lay.page_axes = [list(map(float, a)) for a in frame.basis(centre)]
+    lay.page_centre = list(map(float, bb.ca.mean(axis=0)))
     if mem is not None:
         lay.membrane = _membrane_band(lay, sses, bb, mem)
     if msa:

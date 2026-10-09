@@ -127,6 +127,8 @@ class Layout:
     res_chain: list[str] = field(default_factory=list)  # chain of each Backbone residue
     res_name: list[str] = field(default_factory=list)  # residue type of each Backbone residue
     res_b: list[float] = field(default_factory=list)  # CA B-factor of each Backbone residue
+    page_axes: list | None = None  # 3x3 rows: page-right, page-up, toward-viewer (for the first protomer)
+    page_centre: list | None = None  # the 3D point those axes are taken around
     membrane: dict | None = None  # {"y": (bottom, top) of the band, "inside": "below"|"above", "source": ...}
     res_cons: list[float] = field(default_factory=list)  # alignment conservation of each residue (nan: none)
 
