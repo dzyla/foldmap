@@ -52,6 +52,7 @@ _PANEL = "#eef1f4"
 _LIPID, _HEADS, _HEAD_EDGE = "#f7f0de", "#e6d3a3", "#c2a765"  # membrane band, lipid head groups
 _RUN_EDGE, _RUN_EDGE_W = "#3a3a3a", 1.8  # dark edge under residue-coloured loops (pale colours stay legible)
 _SHORT_HELIX = 1.6  # helices/3-10 boxes shorter than this hold their residue numbers past the ends
+LONG_LOOP, LONG_TAIL = 25, 10  # loops / chain ends at least this many residues get a residue-count label
 _DOMAIN_TONES = ("#4c78a8", "#e45756", "#54a24b", "#b279a2", "#f58518", "#72b7b2")  # one hue per domain
 MARK_DEFAULT = "#d1495b"  # a marked element without its own colour
 MATE_GREY = "#c4c9cf"  # symmetry mates (or other chains) when one part is highlighted
@@ -1251,6 +1252,24 @@ def _draw(
         )
         line.set_gid(f"loop:{name}")
         ax.add_patch(line)
+        b_sse = sse_by_id.get(loop.b_id)
+        if a_sse is not None and b_sse is not None and b_sse.start - a_sse.end - 1 >= LONG_LOOP:
+            pts = np.asarray(loop.points, float)  # the residue count, beside the loop's longest straight run
+            k = max(range(len(pts) - 1), key=lambda j: np.hypot(*(pts[j + 1] - pts[j])))
+            mid, d = (pts[k] + pts[k + 1]) / 2, pts[k + 1] - pts[k]
+            vertical = abs(d[1]) > abs(d[0])
+            t = ax.text(
+                mid[0] + (0.15 if vertical else 0.0),
+                mid[1] + (0.0 if vertical else 0.22),
+                f"{b_sse.start - a_sse.end - 1} aa",
+                ha="left" if vertical else "center",
+                va="center" if vertical else "bottom",
+                fontsize=font * 0.72,
+                color=_legible("#5d6877"),
+                zorder=4,
+                rotation=0,
+            )
+            t.set_gid(f"loop-length:{name}")
         if look.loop_color == "residue" and loop_c != _MATE_LINE and a_sse is not None:
             b_sse = sse_by_id.get(loop.b_id)
             span = range(a_sse.end + 1, b_sse.start) if b_sse is not None else range(0)
@@ -1511,6 +1530,22 @@ def _draw(
             zorder=4,
         )
         t.set_gid(f"terminus:{end}:{chain}")
+        mine = [s for s in sses if s.chain == chain]
+        ours = [r for r, c in enumerate(layout.res_chain) if c == chain] if layout.res_chain else []
+        if mine and ours:  # a long unstructured end: say how long, so it is not mistaken for a short stub
+            n_tail = (mine[0].start - ours[0]) if end == "N" else (ours[-1] - mine[-1].end)
+            if n_tail >= LONG_TAIL:
+                at = np.add(port, np.asarray(ex) * (END_LABEL + 0.62))
+                t = ax.text(
+                    *at,
+                    f"{n_tail} aa",
+                    ha="center",
+                    va="center",
+                    fontsize=font * 0.72,
+                    color=_legible("#5d6877"),
+                    zorder=4,
+                )
+                t.set_gid(f"tail-length:{end}:{chain}")
 
     for k, (colour, text) in enumerate(entries):
         row, col = divmod(k, per_row)

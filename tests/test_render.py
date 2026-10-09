@@ -327,3 +327,21 @@ def test_title_clears_everything_else(name):
     for t in fig.axes[0].texts:
         if t is not title and t.get_text().strip():
             assert not tb.overlaps(t.get_window_extent(r)), t.get_text()
+
+
+def test_long_loops_and_tails_say_how_long_they_are():
+    from pathlib import Path
+
+    from foldmap.cli import make_figure, make_layout
+
+    path = Path(__file__).parent / "data" / "AF-P04637.cif"  # p53: long disordered C-terminal tail
+    lay, sses, _ = make_layout(path)
+    fig = make_figure(path)
+    texts = {(t.get_gid() or ""): t.get_text() for t in fig.axes[0].texts}
+    tails = {k: v for k, v in texts.items() if k.startswith("tail-length:")}
+    n_tail, c_tail = sses[0].start, len(lay.res_chain) - 1 - sses[-1].end
+    assert tails["tail-length:N:A"] == f"{n_tail} aa" and tails["tail-length:C:A"] == f"{c_tail} aa"
+    loops = [v for k, v in texts.items() if k.startswith("loop-length:")]
+    assert all(int(v.split()[0]) >= 25 for v in loops)
+    short = make_figure(Path(__file__).parent / "data" / "1UBQ.cif")
+    assert not any((t.get_gid() or "").startswith(("tail-length:", "loop-length:")) for t in short.axes[0].texts)
