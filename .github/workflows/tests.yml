@@ -29,5 +29,5 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
           cache: pip
-      - run: pip install ".[test,app]"
+      - run: pip install ".[test,app,mcp]"
       - run: python -m pytest -q

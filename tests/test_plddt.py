@@ -71,7 +71,7 @@ def test_cli_warns_when_b_factors_do_not_look_like_plddt(tmp_path, capsys):
     ],
 )
 def test_app_fetches_alphafold_models(text, url, monkeypatch, tmp_path):
-    import foldmap.app as app
+    import foldmap.fetch as app
 
     asked = []
 

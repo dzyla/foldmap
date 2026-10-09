@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import dataclasses
 import sys
+from pathlib import Path
 
 import numpy as np
 
@@ -437,6 +438,9 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("structure")
     sub.add_parser("styles", help="list themes and every style key")
     sub.add_parser("app", help="open the Streamlit app in your browser (needs: pip install streamlit)")
+    sub.add_parser(
+        "mcp", help="run the MCP server (stdio) so AI agents can use foldmap (needs: pip install foldmap[mcp])"
+    )
     sq = sub.add_parser("sequence", help="the sequence (or an alignment) with secondary structure drawn on top")
     sq.add_argument("structure")
     sq.add_argument("-o", "--output", action="append", required=True, help=".svg, .pdf or .png (repeatable)")
@@ -559,6 +563,15 @@ def main(argv: list[str] | None = None) -> int:
         )
     args = parser.parse_args(argv)
     try:
+        if getattr(args, "structure", None) and not Path(args.structure).expanduser().is_file():
+            from .fetch import fetch
+
+            args.structure = str(fetch(args.structure))  # a PDB ID or UniProt accession: downloaded once, cached
+        if args.command == "mcp":
+            from .mcp_server import main as serve
+
+            serve()
+            return 0
         if args.command == "app":
             from .app import run
 

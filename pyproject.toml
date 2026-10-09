@@ -23,8 +23,9 @@ dependencies = ["gemmi>=0.7", "numpy", "scipy", "networkx", "matplotlib", "PyYAM
 
 [project.optional-dependencies]
 test = ["pytest"]
-dev = ["pytest", "ruff"]
+dev = ["pytest", "ruff", "mcp>=2.2,<3", "streamlit>=1.40"]
 app = ["streamlit>=1.40"]
+mcp = ["mcp>=2.2,<3"]
 
 [project.scripts]
 foldmap = "foldmap.cli:main"
