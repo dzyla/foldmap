@@ -1,0 +1,85 @@
+"""The Streamlit app, driven headlessly: load a structure, pick a style, edit, download."""
+
+from pathlib import Path
+
+import pytest
+
+pytest.importorskip("streamlit")
+from streamlit.testing.v1 import AppTest  # noqa: E402
+
+APP = Path(__file__).parents[1] / "src" / "topoplot" / "app.py"
+DATA = Path(__file__).parent / "data"
+
+
+def _app():
+    return AppTest.from_file(str(APP), default_timeout=120)
+
+
+def _load(at, source):
+    at.run()
+    at.text_input(key="source").input(str(source))
+    at.button(key="load").click()
+    at.run()
+    return at
+
+
+def _svg(at) -> str:
+    return next(m.value for m in at.markdown if "<svg" in m.value)
+
+
+def test_first_screen_asks_for_a_structure():
+    at = _app()
+    at.run()
+    assert not at.exception
+    assert at.text_input(key="source") is not None and at.session_state["stage"] == "load"
+
+
+def test_loading_leads_to_style_choice_with_previews():
+    at = _load(_app(), DATA / "1UBQ.cif")
+    assert not at.exception and at.session_state["stage"] == "style"
+    picks = [b for b in at.button if (b.key or "").startswith("pick_")]
+    assert len(picks) >= 6
+
+
+def test_picking_a_style_opens_the_editor_with_that_theme():
+    at = _load(_app(), DATA / "1LMB.cif")
+    at.button(key="pick_trace").click()
+    at.run()
+    assert not at.exception and at.session_state["stage"] == "edit"
+    assert at.selectbox(key="theme").value == "trace"
+    assert at.session_state["loop_arrows"] is True and "<svg" in _svg(at)
+
+
+def test_controls_change_the_figure():
+    at = _load(_app(), DATA / "1UBQ.cif")
+    at.button(key="pick_publication").click()
+    at.run()
+    assert "resnum:" not in _svg(at)
+    at.checkbox(key="residue_numbers").check()
+    at.run()
+    assert "resnum:" in _svg(at)
+    at.selectbox(key="mode").select("stack")
+    at.run()
+    assert not at.exception and "<svg" in _svg(at)
+
+
+def test_bad_input_is_reported_not_raised():
+    at = _load(_app(), "/nowhere/missing.cif")
+    assert not at.exception and at.session_state["stage"] == "load" and at.error
+
+
+def test_layout_errors_are_shown_in_the_editor():
+    at = _load(_app(), DATA / "2LZM.cif")
+    at.button(key="pick_publication").click()
+    at.run()
+    at.text_input(key="swap").input("α1")  # one element: not a swap
+    at.run()
+    assert not at.exception and any("swap" in e.value for e in at.error)
+
+
+def test_download_buttons_are_offered():
+    from topoplot.app import figure_files
+
+    files = figure_files(DATA / "1UBQ.cif", {"theme": "publication"})
+    assert set(files) == {"svg", "png", "pdf"}
+    assert files["png"][:4] == b"\x89PNG" and files["pdf"][:4] == b"%PDF" and b"<svg" in files["svg"]
