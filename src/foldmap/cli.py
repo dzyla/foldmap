@@ -109,6 +109,7 @@ def make_layout(
 
         nucleic = crop_nucleic(nucleic)
     sym = detect_symmetry(bb, sses, symmetry, protomers, symmetry_tol) if sses else None
+    shared = _homolog_labels(bb, sses)  # copies of one protein share labels, however much of each is modelled
     if focus == "auto" and (look or Style()).highlight != "none":
         focus = "none"  # highlighting the asymmetric unit or a protomer asks for the whole assembly
     focus_chains = _focus_chains(focus, sym, bb, sses)
@@ -117,6 +118,7 @@ def make_layout(
         from .layout import provisional
 
         labels = {k: p.label for k, p in provisional(sses).placed.items()}
+        labels.update(shared)
         rank = {s.id: k for k, s in enumerate(sses)}
         sses, partial = _focus_subset(sses, focus_chains, dssp.bridges)
         unjoined = {(a.id, b.id) for a, b in zip(sses, sses[1:]) if a.chain == b.chain and rank[b.id] != rank[a.id] + 1}
@@ -127,8 +129,13 @@ def make_layout(
         for s in sses:
             if s.chain in partial:
                 rename.setdefault(f"res:{s.chain}:{s.first.seq}-{s.last.seq}", labels[s.id] + primes[s.chain])
-        context = _context(sym, focus_chains, bb)
+        context = _context(sym, focus_chains, bb, bool(partial))
         sym = None  # one subunit: no copies to draw alike
+    if shared:  # applied to the elements actually drawn (focus mode may have left some out)
+        rename = dict(rename or {})
+        for s in sses:
+            if s.id in shared and s.chain not in partial:
+                rename.setdefault(f"res:{s.chain}:{s.first.seq}-{s.last.seq}", shared[s.id])
     mem = None
     if membrane not in ("off", None):
         from .membrane import find_membrane
@@ -303,11 +310,50 @@ def _focus_subset(sses, focus: set, bridges) -> tuple[list, set]:
     return keep, {s.chain for s in keep if s.chain not in focus}
 
 
-def _context(sym, focus: set, bb) -> str:
+def _homolog_labels(bb, sses) -> dict[str, str]:
+    """Labels for elements of partial copies of a protein (e.g. a chain modelled from its second domain only):
+    the label of the overlapping element in the fullest copy, so the same helix is called the same everywhere."""
+    from .layout import provisional
+
+    labels = {k: p.label for k, p in provisional(sses).placed.items()}
+    residues: dict[str, dict] = {}
+    for l in bb.labels:
+        residues.setdefault(l.chain, {})[(l.seq, l.icode)] = l.name
+    chains = list(residues)
+    count = {c: sum(s.chain == c for s in sses) for c in chains}
+    group = {c: c for c in chains}
+    for i, a in enumerate(chains):
+        for b in chains[i + 1 :]:
+            common = residues[a].keys() & residues[b].keys()
+            same = sum(residues[a][k] == residues[b][k] for k in common)
+            if len(common) >= 20 and same >= 0.9 * len(common):
+                group[b] = group[a] if group[a] == a else group[a]
+    out = {}
+    for c in chains:
+        members = [m for m in chains if group[m] == group[c]]
+        ref = max(members, key=lambda m: (count[m], -chains.index(m)))
+        if ref == c:
+            continue
+        theirs = [s for s in sses if s.chain == ref]
+        for s in (s for s in sses if s.chain == c):
+            best, overlap = None, 0
+            for t in theirs:
+                if t.kind != s.kind:
+                    continue
+                o = min(s.last.seq, t.last.seq) - max(s.first.seq, t.first.seq) + 1
+                if o > overlap:
+                    best, overlap = t, o
+            if best is not None and overlap >= 0.5 * (s.last.seq - s.first.seq + 1) and labels[best.id] != labels[s.id]:
+                out[s.id] = labels[best.id]
+    return out
+
+
+def _context(sym, focus: set, bb, neighbours: bool = True) -> str:
     """One line saying what the figure shows of the assembly."""
     total = len(set(l.chain for l in bb.labels))
+    grey = " · grey: neighbouring subunits completing its fold" if neighbours else ""
     if sym is None:
-        return f"chain {', '.join(sorted(focus))} of {total} shown in full · grey: neighbouring parts"
+        return f"chain {', '.join(sorted(focus))} of {total} shown in full" + grey
     copies = sum(len(p) for p in sym.protomers) / max(len(sym.protomers), 1) / max(len(focus), 1)
     n = int(round(len(sym.protomers) * copies))
     if sym.kind == "H":
@@ -315,7 +361,7 @@ def _context(sym, focus: set, bb) -> str:
         kind = f"helical, {np.degrees(abs(sym.twist)):.1f}° twist, {abs(sym.rise):.1f} Å rise per {step}"
     else:
         kind = f"{sym.label} symmetry"
-    return f"1 of {n} subunits shown · {kind} · grey: neighbouring subunits completing its fold"
+    return f"1 of {n} subunits shown · {kind}" + grey
 
 
 _DOMAIN_PULL = 6  # CA-pair-equivalents of attraction between any two elements of one domain

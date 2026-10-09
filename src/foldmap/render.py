@@ -1032,7 +1032,8 @@ def _draw(
     if layout.focus is not None:
         entries = [(colors[c], f"Chain {c}") for c in chains if c in layout.focus]
         if layout.focus_chains:
-            entries.append((MATE_GREY, "neighbouring subunits (′, ″)"))
+            if layout.partial:
+                entries.append((MATE_GREY, "neighbouring subunits (′, ″)"))
         else:
             entries.append((MATE_GREY, "symmetry copies" if look.highlight in ("asu", "protomer") else "other chains"))
     if look.color_by == "sequence":

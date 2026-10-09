@@ -125,3 +125,21 @@ def test_ligands_only_when_they_touch_the_subunit():
         g for g in lay.links.ligands if not g.additive and any(lay.res_chain[r] in lay.focus_chains for r in g.contacts)
     ]
     assert len(markers) == len(touching)
+
+
+CAPSID = DATA / "9TX7.cif"  # MPMV capsid 3-fold interface: full CA chains A, C, E; CTD-only chains B, D, F
+
+
+def test_copies_of_one_protein_share_element_labels():
+    lay, sses, _ = make_layout(CAPSID, focus="none")
+    label = {(p.sse.chain, p.sse.first.seq): p.label for p in lay.placed.values()}
+    assert label[("B", 156)] == label[("A", 156)] == "α7"  # B starts at the CTD: its first helix is still α7
+    assert label[("D", 206)] == label[("A", 206)]
+
+
+def test_no_neighbour_legend_when_no_neighbour_is_drawn():
+    lay, _, _ = make_layout(CAPSID, focus="A")
+    if not lay.partial:
+        fig = make_figure(CAPSID, focus="A")
+        texts = " ".join(t.get_text() for t in fig.axes[0].texts)
+        assert "neighbour" not in texts and "1 of" in texts
