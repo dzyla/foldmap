@@ -1020,7 +1020,7 @@ def _draw(
         (cx, cy), (hw, hh) = m["centre"], m["half"]
         x0, y0, x1, y1 = min(x0, cx - hw), min(y0, cy - hh), max(x1, cx + hw), max(y1, cy + hh)
     pad = 1.0
-    top = 1.2 if title else 0.0
+    top = 1.9 if title else 0.0
     entries = [(colors[c], f"Chain {c}") for c in chains]
     if layout.focus is not None:
         entries = [(colors[c], f"Chain {c}") for c in chains if c in layout.focus]
@@ -1400,7 +1400,7 @@ def _draw(
             ax.add_patch(Rectangle((x, y - 0.3), 0.6, 0.6, fc=colour, ec=darken(colour), lw=lw * 0.8))
         ax.text(x + 0.85, y, text, ha="left", va="center", fontsize=font)
     if title:
-        ax.text((xmin + xmax) / 2, ymax - 0.7, title, ha="center", va="center", fontsize=font * 1.3, fontweight="bold")
+        ax.text((xmin + xmax) / 2, ymax - 0.8, title, ha="center", va="center", fontsize=font * 1.3, fontweight="bold")
     return fig
 
 

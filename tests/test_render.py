@@ -309,3 +309,21 @@ def test_text_uses_a_journal_font(ubq, tmp_path):
 
 def _gids(fig, prefix):
     return [a for a in [*fig.axes[0].patches, *fig.axes[0].texts] if (a.get_gid() or "").startswith(prefix)]
+
+
+@pytest.mark.parametrize("name", ["1LMB", "1ZAA", "1UBQ"])
+def test_title_clears_everything_else(name):
+    from pathlib import Path
+
+    from matplotlib.backends.backend_agg import FigureCanvasAgg
+
+    from foldmap.cli import make_figure
+
+    title_text = "A title for the figure, as long as a real one (with its PDB id)"
+    fig = make_figure(Path(__file__).parent / "data" / f"{name}.cif", title=title_text, assembly="asu")
+    r = FigureCanvasAgg(fig).get_renderer()
+    title = next(t for t in fig.axes[0].texts if t.get_text() == title_text)
+    tb = title.get_window_extent(r)
+    for t in fig.axes[0].texts:
+        if t is not title and t.get_text().strip():
+            assert not tb.overlaps(t.get_window_extent(r)), t.get_text()
