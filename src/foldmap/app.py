@@ -18,17 +18,31 @@ from foldmap.render import save, save_svg
 from foldmap.style import CHOICES, THEMES, Style
 
 STYLE_FIELDS = {f.name: f.type for f in fields(Style)}
-PREVIEW_THEMES = [
+PREVIEW_THEMES = [  # shown in the style picker as static thumbnails (scripts/make_previews.py)
     "publication",
+    "journal",
+    "minimal",
+    "print",
     "shaded",
     "trace",
     "rainbow",
     "richardson",
+    "cartoon",
+    "presentation",
     "flexibility",
     "hydropathy",
+    "alphafold",
     "goodsell",
     "blueprint",
 ]
+PREVIEWS = Path(__file__).parent / "assets" / "previews"
+
+
+def preview_image(theme: str) -> bytes:
+    """The theme's thumbnail, drawn once on a reference structure and shipped with foldmap."""
+    return (PREVIEWS / f"{theme}.png").read_bytes()
+
+
 LAYOUT_DEFAULTS = {
     "mode": "projected",
     "rotate": 0,
@@ -208,13 +222,6 @@ def main() -> None:
     ss = st.session_state
     ss.setdefault("stage", "load")
 
-    @st.cache_data(show_spinner=False, max_entries=64)
-    def preview(path: str, theme: str) -> bytes:
-        fig, _ = figure(path, {"theme": theme, "legend": False})
-        with tempfile.TemporaryDirectory() as tmp:
-            fig.set_dpi(60)
-            return save(fig, Path(tmp) / "p.png").read_bytes()
-
     @st.cache_data(show_spinner=False, max_entries=32)
     def render(path: str, settings_json: str) -> tuple[str, dict]:
         settings = json.loads(settings_json)
@@ -336,15 +343,16 @@ def main() -> None:
     path = ss["path"]
     if ss["stage"] == "style":
         st.write(f"**{Path(path).stem}** · {ss.get('info', '')}")
-        st.write("Pick a style to start from; every control stays adjustable afterwards.")
-        cols = st.columns(3)
-        for k, theme in enumerate(PREVIEW_THEMES):
-            with cols[k % 3]:
-                try:
-                    st.image(preview(path, theme), caption=theme, width="stretch")
-                except Exception as err:  # noqa: BLE001 - a preview that fails should not block the others
-                    st.warning(f"{theme}: {err}")
-                st.button("Use this style", key=f"pick_{theme}", on_click=pick, args=(theme,))
+        st.write(
+            "Pick a style to start from: the thumbnails show each theme on ubiquitin (AlphaFold confidence on "
+            "p53); your structure is drawn once you choose, and every control stays adjustable afterwards."
+        )
+        for start in range(0, len(PREVIEW_THEMES), 5):  # rows of five, so each row lines up
+            cols = st.columns(5)
+            for col, theme in zip(cols, PREVIEW_THEMES[start : start + 5]):
+                with col:
+                    st.image(preview_image(theme), caption=theme, width="stretch")
+                    st.button("Use this style", key=f"pick_{theme}", on_click=pick, args=(theme,))
         st.button("← another structure", key="back_style", on_click=restart)
         return
 

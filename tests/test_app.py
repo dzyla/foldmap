@@ -143,3 +143,29 @@ def test_app_passes_uniprot_options():
     opts = layout_options({"uniprot": "auto", "uniprot_domains": True})
     assert opts["uniprot"] == "auto" and opts["domains"] == "uniprot"
     assert layout_options({})["uniprot"] is None
+
+
+def test_style_previews_are_static_files_for_every_theme():
+    from foldmap.app import PREVIEW_THEMES, preview_image
+
+    for theme in PREVIEW_THEMES:
+        data = preview_image(theme)
+        assert data[:8] == b"\x89PNG\r\n\x1a\n" and len(data) < 120_000, theme
+
+
+def test_style_stage_draws_nothing(monkeypatch):
+    """Picking a style must not render the loaded structure once per theme."""
+    from streamlit.testing.v1 import AppTest
+
+    import foldmap.cli as cli
+
+    calls = []
+    real = cli.make_figure_and_loops
+    monkeypatch.setattr(cli, "make_figure_and_loops", lambda *a, **k: (calls.append(1), real(*a, **k))[1])
+    at = AppTest.from_file(str(APP), default_timeout=120)
+    at.run()
+    at.text_input(key="source").set_value(str(DATA / "1UBQ.cif"))
+    at.button(key="load").click().run()
+    assert at.session_state["stage"] == "style" and not at.exception
+    assert len(at.image) == len(__import__("foldmap.app", fromlist=["x"]).PREVIEW_THEMES)
+    assert calls == []
