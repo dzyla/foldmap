@@ -59,7 +59,9 @@ def _subunits(bb: Backbone) -> dict[str, tuple[str, np.ndarray]]:
     xyz: dict[str, list] = {}
     for k, l in enumerate(bb.labels):
         info = gemmi.find_tabulated_residue(l.name)
-        seqs.setdefault(l.chain, []).append(info.one_letter_code.upper() if info and info.one_letter_code != " " else "X")
+        seqs.setdefault(l.chain, []).append(
+            info.one_letter_code.upper() if info and info.one_letter_code != " " else "X"
+        )
         xyz.setdefault(l.chain, []).append(bb.ca[k])
     return {c: ("".join(seqs[c]), np.array(xyz[c])) for c in seqs if len(seqs[c]) >= MIN_RES}
 
@@ -384,8 +386,13 @@ def _from_user(asm: _Assembly, protomers: list[list[str]], tol: float) -> Symmet
     return sym
 
 
-def detect_symmetry(bb: Backbone, sses: list[SSE] | None = None, request: str | None = "auto",
-                    protomers: list[list[str]] | None = None, tolerance: float = TOLERANCE) -> Symmetry | None:
+def detect_symmetry(
+    bb: Backbone,
+    sses: list[SSE] | None = None,
+    request: str | None = "auto",
+    protomers: list[list[str]] | None = None,
+    tolerance: float = TOLERANCE,
+) -> Symmetry | None:
     """The assembly's symmetry, or None. `request`: auto, off, Cn, Dn or helical (an error if absent);
     `protomers`: the user's own grouping, in order; `tolerance`: CA RMSD in Å between copies."""
     kind, n = _parse(request)
@@ -422,6 +429,9 @@ def detect_symmetry(bb: Backbone, sses: list[SSE] | None = None, request: str | 
             found.angles = [k * angle for k in range(len(groups))]
     if found is None and kind != "auto":
         best = detect_symmetry(bb, sses, "auto", tolerance=tolerance) if kind != "auto" else None
-        raise ValueError(f"no {kind}{n or ''} symmetry within {tolerance:g} Å"
-                         f" (found: {best.label if best else 'none'})".replace("Hhelical", "helical"))
+        raise ValueError(
+            f"no {kind}{n or ''} symmetry within {tolerance:g} Å (found: {best.label if best else 'none'})".replace(
+                "Hhelical", "helical"
+            )
+        )
     return found

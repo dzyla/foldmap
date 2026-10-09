@@ -36,8 +36,7 @@ def canonical(layout: Layout, sses: list[SSE], ref: str) -> list[str]:
     return [_range(by_id[k]) for k in resolve(layout, sses, ref)]
 
 
-def document(structure, theme: str, look: Style, options: dict, edits: dict, layout: Layout,
-             sses: list[SSE]) -> dict:
+def document(structure, theme: str, look: Style, options: dict, edits: dict, layout: Layout, sses: list[SSE]) -> dict:
     """The layout document for a figure: theme, style changes, layout options, edits in residue form."""
     base = THEMES[theme]
     style = {k: v for k, v in asdict(look).items() if v != getattr(base, k)}
@@ -53,8 +52,13 @@ def document(structure, theme: str, look: Style, options: dict, edits: dict, lay
     for ref, (dx, dy) in edits.get("move") or []:
         for c in canonical(layout, sses, ref):
             move[c] = [float(dx), float(dy)]
-    doc = {"foldmap": VERSION, "structure": str(structure), "theme": theme, "style": style,
-           "layout": {k: v for k, v in options.items() if k in LAYOUT and v is not None}}
+    doc = {
+        "foldmap": VERSION,
+        "structure": str(structure),
+        "theme": theme,
+        "style": style,
+        "layout": {k: v for k, v in options.items() if k in LAYOUT and v is not None},
+    }
     if layout.domains:  # saved as resolved element ranges, so 'auto' domains are frozen as found
         by_id = {s.id: s for s in sses}
         doc["domains"] = {name: [_range(by_id[k]) for k in ids] for name, ids in layout.domains}
@@ -80,7 +84,9 @@ def load(path) -> dict:
     if not isinstance(doc, dict):
         raise ValueError(f"{path}: a layout file is a mapping of keys (foldmap, theme, style, layout, edits)")
     if doc.get("foldmap", VERSION) != VERSION:
-        raise ValueError(f"{path}: layout file version {doc.get('foldmap')} is not supported (this is version {VERSION})")
+        raise ValueError(
+            f"{path}: layout file version {doc.get('foldmap')} is not supported (this is version {VERSION})"
+        )
     for key in doc:
         if key not in TOP:
             raise ValueError(f"{path}: unknown key {key!r}; a layout file has {', '.join(TOP)}")
@@ -101,6 +107,8 @@ def load(path) -> dict:
 def edits_of(doc: dict) -> dict:
     """The document's edits in the form the layout takes (rename dict, swap pairs, move list)."""
     e = doc.get("edits") or {}
-    return {"rename": dict(e.get("rename") or {}),
-            "swap": [tuple(p) for p in e.get("swap") or []],
-            "move": [(ref, (float(d[0]), float(d[1]))) for ref, d in (e.get("move") or {}).items()]}
+    return {
+        "rename": dict(e.get("rename") or {}),
+        "swap": [tuple(p) for p in e.get("swap") or []],
+        "move": [(ref, (float(d[0]), float(d[1]))) for ref, d in (e.get("move") or {}).items()],
+    }

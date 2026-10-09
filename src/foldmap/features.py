@@ -7,7 +7,7 @@ from collections import Counter
 import numpy as np
 from scipy.spatial import cKDTree
 
-from .model import Backbone, SSE
+from .model import SSE, Backbone
 
 CONTACT_CUTOFF = 8.0  # Å between CA atoms
 MIN_CONTACT_PAIRS = 3  # CA pairs needed to call two elements neighbours

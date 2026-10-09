@@ -6,9 +6,9 @@ from pathlib import Path
 import gemmi
 import numpy as np
 import pytest
-from helpers import pipeline
 
 from foldmap.symmetry import detect_symmetry
+from helpers import pipeline
 
 DATA = Path(__file__).parent / "data"
 NAMES = "ABCDEFGHIJKLMNOP"
@@ -21,8 +21,18 @@ def rot(axis, deg):
     return np.eye(3) + np.sin(t) * k + (1 - np.cos(t)) * k @ k
 
 
-def build(tmp_path, ops, src="1UBQ", offset=(22.0, 4.0, 3.0), names=None, renumber=None, drop=None,
-          noise=0.0, extra=None, fname="asm.pdb"):
+def build(
+    tmp_path,
+    ops,
+    src="1UBQ",
+    offset=(22.0, 4.0, 3.0),
+    names=None,
+    renumber=None,
+    drop=None,
+    noise=0.0,
+    extra=None,
+    fname="asm.pdb",
+):
     """One copy of `src` chain A per operator (R, t), after moving it `offset` away from the origin."""
     st = gemmi.read_structure(str(DATA / f"{src}.cif"))
     st.remove_ligands_and_waters()
@@ -136,8 +146,10 @@ def test_monomer_has_no_symmetry(tmp_path):
 
 
 # --- real structures --------------------------------------------------------------------------------------
-@pytest.mark.parametrize("name, kind, n, per", [("1BL8", "C", 4, 1), ("8UUP", "C", 3, 2), ("1TIM", "C", 2, 1),
-                                                ("2HHB", "C", 2, 2), ("1LMB", "C", 2, 1)])
+@pytest.mark.parametrize(
+    "name, kind, n, per",
+    [("1BL8", "C", 4, 1), ("8UUP", "C", 3, 2), ("1TIM", "C", 2, 1), ("2HHB", "C", 2, 2), ("1LMB", "C", 2, 1)],
+)
 def test_real_assemblies(name, kind, n, per):
     s = found(DATA / f"{name}.cif")
     assert (s.kind, s.n) == (kind, n) and all(len(p) == per for p in s.protomers) and s.rmsd < 3.0
@@ -188,8 +200,10 @@ def test_cli_symmetry_options(tmp_path, capsys):
 def test_symmetric_layout_works_for_synthetic_c4_and_helix(tmp_path):
     from foldmap.cli import make_layout
 
-    for fname, ops in (("c4.pdb", cyclic(4)), ("h.pdb", [(rot((0, 0, 1), 33 * k), np.array([0, 0, 9.0 * k]))
-                                                        for k in range(5)])):
+    for fname, ops in (
+        ("c4.pdb", cyclic(4)),
+        ("h.pdb", [(rot((0, 0, 1), 33 * k), np.array([0, 0, 9.0 * k])) for k in range(5)]),
+    ):
         path = build(tmp_path, ops, offset=(18.0, 0.0, 0.0), fname=fname)
         lay, sses, _ = make_layout(path)
         first = {s.chain: s for s in sses if s.kind == "H"}

@@ -4,7 +4,7 @@ import numpy as np
 
 from foldmap.dssp import assign_dssp
 from foldmap.io import load_backbone
-from foldmap.model import ResLabel, SSE
+from foldmap.model import SSE, ResLabel
 from foldmap.sheets import build_sheets
 from foldmap.ss import build_sses
 

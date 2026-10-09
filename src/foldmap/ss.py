@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from .model import Backbone, SSE
+from .model import SSE, Backbone
 
 _MIN_STRAND = 2
 _BULGE_GAP = 1  # strand runs this many residues apart are one strand with a beta-bulge
@@ -68,14 +68,14 @@ def build_sses(bb: Backbone, ss: str, short_helices: bool = False) -> list[SSE]:
             if kind == "H" and not (ss[a : b + 1].count("H") >= _MIN_HELIX_H or n >= _MIN_HELIX_ANY):
                 continue
             ca = bb.ca[a : b + 1]
-            out.append(
-                SSE(kind, bb.labels[a].chain, a, b, bb.labels[a], bb.labels[b], ca.mean(axis=0), _fit_axis(ca))
-            )
+            out.append(SSE(kind, bb.labels[a].chain, a, b, bb.labels[a], bb.labels[b], ca.mean(axis=0), _fit_axis(ca)))
     if short_helices:
         taken = {k for s in out for k in range(s.start, s.end + 1)}
         for a, b in _runs(ss, "G", bb.prev):
             if b - a + 1 >= _MIN_310 and not taken & set(range(a, b + 1)):
                 ca = bb.ca[a : b + 1]
-                out.append(SSE("G", bb.labels[a].chain, a, b, bb.labels[a], bb.labels[b], ca.mean(axis=0), _fit_axis(ca)))
+                out.append(
+                    SSE("G", bb.labels[a].chain, a, b, bb.labels[a], bb.labels[b], ca.mean(axis=0), _fit_axis(ca))
+                )
     out.sort(key=lambda s: s.start)
     return out

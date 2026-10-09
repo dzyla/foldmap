@@ -72,7 +72,9 @@ def read_model(path: str | Path, assembly: str = "auto"):
     else:
         found = [a for a in st.assemblies if a.name == assembly]
         if not found:
-            raise ValueError(f"{path}: no assembly {assembly!r}; the file has {', '.join(a.name for a in st.assemblies)}")
+            raise ValueError(
+                f"{path}: no assembly {assembly!r}; the file has {', '.join(a.name for a in st.assemblies)}"
+            )
         chosen = found[0]
     built = gemmi.make_assembly(chosen, model, gemmi.HowToNameCopiedChain.AddNumber)
     original = {c.name: np.array([a.pos.tolist() for r in c for a in r][:20]) for c in model}
@@ -136,14 +138,25 @@ def _nucleic_strands(model):
             out.append((chain.name, run))
     strands = []
     for name, run in out:
+
         def point(r):
             a = r.find_atom("P", "*") or r.find_atom("C4'", "*") or r.find_atom("C1'", "*")
             return a.pos.tolist()
 
         labels = [ResLabel(name, r.seqid.num, r.seqid.icode.strip(), r.name) for r in run]
         rna = any(r.find_atom("O2'", "*") is not None for r in run)
-        strands.append((NAStrand(name, labels, np.array([point(r) for r in run]),
-                                 np.array([r.find_atom("C1'", "*").pos.tolist() for r in run]), rna), run))
+        strands.append(
+            (
+                NAStrand(
+                    name,
+                    labels,
+                    np.array([point(r) for r in run]),
+                    np.array([r.find_atom("C1'", "*").pos.tolist() for r in run]),
+                    rna,
+                ),
+                run,
+            )
+        )
     return strands
 
 
@@ -201,8 +214,25 @@ def load_nucleic(path: str | Path, bb: Backbone, assembly: str = "auto") -> Nucl
     return Nucleic([s for s, _ in found], _watson_crick(found), contacts, {k: bb.labels[k].chain for k in contacts})
 
 
-SUGARS = {"NAG", "NDG", "A2G", "NGA", "MAN", "BMA", "GAL", "GLA", "GLC", "BGC", "FUC", "FUL", "SIA", "XYS", "XYP",
-          "GCS", "GLB"}
+SUGARS = {
+    "NAG",
+    "NDG",
+    "A2G",
+    "NGA",
+    "MAN",
+    "BMA",
+    "GAL",
+    "GLA",
+    "GLC",
+    "BGC",
+    "FUC",
+    "FUL",
+    "SIA",
+    "XYS",
+    "XYP",
+    "GCS",
+    "GLB",
+}
 _SS_MAX = 2.5  # Å between cysteine SG atoms
 _LINK_MAX = 2.0  # Å between a sugar's C1 and the atom it is bonded to
 
@@ -222,8 +252,13 @@ def load_links(path: str | Path, bb: Backbone, assembly: str = "auto") -> Links:
             if sg[a][1].pos.dist(sg[b][1].pos) < _SS_MAX and sg[a][0] in where and sg[b][0] in where:
                 disulfides.append(tuple(sorted((where[sg[a][0]], where[sg[b][0]]))))
     sugars = [(c, r) for c in model for r in c if r.name in SUGARS and r.find_atom("C1", "*") is not None]
-    anchors = [(key(c, r), r.find_atom(n, "*")) for c in model for r in c
-               for n in {"ASN": ("ND2",), "SER": ("OG",), "THR": ("OG1",)}.get(r.name, ()) if r.find_atom(n, "*")]
+    anchors = [
+        (key(c, r), r.find_atom(n, "*"))
+        for c in model
+        for r in c
+        for n in {"ASN": ("ND2",), "SER": ("OG",), "THR": ("OG1",)}.get(r.name, ())
+        if r.find_atom(n, "*")
+    ]
     glycans = []
     used = set()
     for k_res, atom in anchors:

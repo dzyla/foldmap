@@ -12,15 +12,33 @@ import urllib.request
 from dataclasses import fields, replace
 from pathlib import Path
 
-from foldmap.cli import _adjustments, _domain_spec, _protomers, make_figure_and_loops, make_layout
+from foldmap.cli import _adjustments, _domain_spec, make_figure_and_loops, make_layout
 from foldmap.render import save, save_svg
 from foldmap.style import CHOICES, THEMES, Style
 
 STYLE_FIELDS = {f.name: f.type for f in fields(Style)}
-PREVIEW_THEMES = ["publication", "shaded", "trace", "rainbow", "richardson", "flexibility", "hydropathy",
-                  "goodsell", "minimal"]
-LAYOUT_DEFAULTS = {"mode": "projected", "rotate": 0, "symmetry": "auto", "assembly": "auto", "rename": "",
-                   "swap": "", "move": "", "title": "", "domains": ""}
+PREVIEW_THEMES = [
+    "publication",
+    "shaded",
+    "trace",
+    "rainbow",
+    "richardson",
+    "flexibility",
+    "hydropathy",
+    "goodsell",
+    "minimal",
+]
+LAYOUT_DEFAULTS = {
+    "mode": "projected",
+    "rotate": 0,
+    "symmetry": "auto",
+    "assembly": "auto",
+    "rename": "",
+    "swap": "",
+    "move": "",
+    "title": "",
+    "domains": "",
+}
 CACHE = Path.home() / ".cache" / "foldmap"
 EXAMPLES = {"1LMB": "λ repressor on DNA", "5NKT": "FimA", "8UTF": "measles F trimer", "1UBQ": "ubiquitin"}
 
@@ -64,13 +82,23 @@ def layout_options(settings: dict) -> dict:
 
     lines = [p.strip() for p in re.split(r"[;\n]", settings.get("domains", "") or "") if p.strip()]
     domains = "auto" if lines == ["auto"] else _domain_spec(lines) or None
-    return {"symmetry": settings.get("symmetry", "auto") or "auto", "assembly": settings.get("assembly", "auto") or "auto",
-            "rotate": float(settings.get("rotate", 0)), "domains": domains, **_adjustments(Args)}
+    return {
+        "symmetry": settings.get("symmetry", "auto") or "auto",
+        "assembly": settings.get("assembly", "auto") or "auto",
+        "rotate": float(settings.get("rotate", 0)),
+        "domains": domains,
+        **_adjustments(Args),
+    }
 
 
 def figure(path, settings: dict):
-    return make_figure_and_loops(path, settings.get("mode", "projected"), title=settings.get("title") or None,
-                                 look=look_of(settings), **layout_options(settings))
+    return make_figure_and_loops(
+        path,
+        settings.get("mode", "projected"),
+        title=settings.get("title") or None,
+        look=look_of(settings),
+        **layout_options(settings),
+    )
 
 
 def figure_files(path, settings: dict) -> dict[str, bytes]:
@@ -88,11 +116,25 @@ def layout_document(path, settings: dict) -> dict:
 
     look, opts = look_of(settings), layout_options(settings)
     edits = {k: opts.pop(k) for k in ("rename", "swap", "move")}
-    layout, sses, _ = make_layout(path, settings.get("mode", "projected"), opts["rotate"], look=look,
-                                  symmetry=opts["symmetry"], assembly=opts["assembly"], domains=opts["domains"])
-    options = {"mode": settings.get("mode", "projected"), "rotate": opts["rotate"], "symmetry": opts["symmetry"],
-               "assembly": opts["assembly"], "title": settings.get("title") or None}
-    return layoutfile.document(Path(path).name, settings.get("theme", "publication"), look, options, edits, layout, sses)
+    layout, sses, _ = make_layout(
+        path,
+        settings.get("mode", "projected"),
+        opts["rotate"],
+        look=look,
+        symmetry=opts["symmetry"],
+        assembly=opts["assembly"],
+        domains=opts["domains"],
+    )
+    options = {
+        "mode": settings.get("mode", "projected"),
+        "rotate": opts["rotate"],
+        "symmetry": opts["symmetry"],
+        "assembly": opts["assembly"],
+        "title": settings.get("title") or None,
+    }
+    return layoutfile.document(
+        Path(path).name, settings.get("theme", "publication"), look, options, edits, layout, sses
+    )
 
 
 def settings_from_document(doc: dict) -> dict:
@@ -158,8 +200,13 @@ def main() -> None:
         from foldmap.interactive import build_page
 
         settings = json.loads(settings_json)
-        return build_page(path, settings.get("mode", "projected"), look=look_of(settings),
-                          title=settings.get("title") or None, **layout_options(settings))
+        return build_page(
+            path,
+            settings.get("mode", "projected"),
+            look=look_of(settings),
+            title=settings.get("title") or None,
+            **layout_options(settings),
+        )
 
     def apply_theme(name: str | None = None) -> None:
         name = name or ss["theme"]
@@ -275,8 +322,12 @@ def main() -> None:
             st.text_input("Swap", key="swap", help="two elements, e.g. α1,α3 (several: separate with ;)")
             st.text_input("Move", key="move", help="e.g. α2=1,-2 (page units)")
             st.text_input("Rename", key="rename", help="e.g. res:167-182=Gd")
-            st.text_area("Domains", key="domains", height=80,
-                         help="one per line, NAME=REF[,REF...], e.g. ZPN=res:A:331-440; or just 'auto'")
+            st.text_area(
+                "Domains",
+                key="domains",
+                height=80,
+                help="one per line, NAME=REF[,REF...], e.g. ZPN=res:A:331-440; or just 'auto'",
+            )
         with st.expander("Symmetry and assembly"):
             st.text_input("Symmetry", key="symmetry", help="auto, off, C2, D3, helical")
             st.text_input("Assembly", key="assembly", help="auto, asu, or an assembly id")
@@ -297,8 +348,7 @@ def main() -> None:
             return
         if notes["fallback"]:
             st.warning("No clear route for: " + ", ".join(notes["fallback"]) + " (drawn as plain curves).")
-        st.markdown(f'<div style="background:#fff;border-radius:6px;padding:8px">{svg}</div>',
-                    unsafe_allow_html=True)
+        st.markdown(f'<div style="background:#fff;border-radius:6px;padding:8px">{svg}</div>', unsafe_allow_html=True)
         out = files(path, blob)
         stem = Path(path).stem
         c1, c2, c3 = st.columns(3)
@@ -309,14 +359,20 @@ def main() -> None:
             import yaml
 
             doc = layout_document(path, settings)
-            st.download_button("Layout file (YAML): re-render this figure later", yaml.safe_dump(
-                doc, sort_keys=False, allow_unicode=True).encode(), f"{stem}-layout.yaml", "application/x-yaml",
-                key="dl_layout")
+            st.download_button(
+                "Layout file (YAML): re-render this figure later",
+                yaml.safe_dump(doc, sort_keys=False, allow_unicode=True).encode(),
+                f"{stem}-layout.yaml",
+                "application/x-yaml",
+                key="dl_layout",
+            )
         except ValueError as err:
             st.caption(f"Layout file unavailable: {err}")
     with tab_live:
         page = interactive(path, blob)
-        st.download_button("Interactive page (HTML)", page.encode(), f"{stem}-explorer.html", "text/html", key="dl_html")
+        st.download_button(
+            "Interactive page (HTML)", page.encode(), f"{stem}-explorer.html", "text/html", key="dl_html"
+        )
         components.html(page, height=1100, scrolling=True)
 
 

@@ -81,8 +81,23 @@ def test_cli_domains_and_layout_file(tmp_path):
     import yaml
 
     out, lf = tmp_path / "u.svg", tmp_path / "u.yaml"
-    assert main(["plot", str(UMOD), "-o", str(out), "--domain", "ZPN=res:A:331-440", "--domain",
-                 "ZPC=res:D:447-582", "--save-layout", str(lf)]) == 0
+    assert (
+        main(
+            [
+                "plot",
+                str(UMOD),
+                "-o",
+                str(out),
+                "--domain",
+                "ZPN=res:A:331-440",
+                "--domain",
+                "ZPC=res:D:447-582",
+                "--save-layout",
+                str(lf),
+            ]
+        )
+        == 0
+    )
     assert "domain:ZPN" in out.read_text()
     doc = yaml.safe_load(lf.read_text())
     assert set(doc["domains"]) == {"ZPN", "ZPC"}

@@ -1,5 +1,4 @@
 import gemmi
-import numpy as np
 
 from foldmap.dssp import _resolve, assign_dssp
 from foldmap.io import load_backbone

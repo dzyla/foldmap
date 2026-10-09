@@ -1,11 +1,11 @@
 import xml.etree.ElementTree as ET
 
 import pytest
-from helpers import pipeline, tripeptide
 
 from foldmap.cli import make_figure
 from foldmap.palette import chain_colors
 from foldmap.render import save
+from helpers import pipeline, tripeptide
 
 
 def svg_ids(path):
@@ -148,8 +148,10 @@ def test_helix_is_a_coil_built_from_one_repeated_turn(ubq):
     lay, sses, _ = make_layout(ubq)
     fig = make_figure(ubq)
     p = lay.placed["A:23-34"]  # 12 residues: about 3 turns of 3.6
-    front = [poly @ np.array([[np.cos(-p.angle), np.sin(-p.angle)], [-np.sin(-p.angle), np.cos(-p.angle)]])
-             for poly in _polys(_artist(fig, "helix:A:23-34"))]  # page -> helix frame (rotation only)
+    front = [
+        poly @ np.array([[np.cos(-p.angle), np.sin(-p.angle)], [-np.sin(-p.angle), np.cos(-p.angle)]])
+        for poly in _polys(_artist(fig, "helix:A:23-34"))
+    ]  # page -> helix frame (rotation only)
     back = _polys(_artist(fig, "helix-back:A:23-34"))
     turns = len(back)
     assert turns == 3 and len(front) == turns + 1  # a half front band at each end
@@ -191,7 +193,6 @@ def test_unknown_style_is_rejected(ubq):
 
 def test_curved_loops_are_smooth_and_still_end_at_the_ports(ubq):
     import numpy as np
-
     from matplotlib.path import Path as MPath
 
     from foldmap.cli import make_layout
@@ -227,16 +228,22 @@ def test_curved_corners_stay_clear_of_elements(ubq, pdb):
             continue
         path = _artist(fig, f"loop:{loop.a_id}>{loop.b_id}").get_path()
         v, codes = path.vertices, path.codes
-        for k in np.flatnonzero(codes == MPath.CURVE4)[::3]:  # each cubic: v[k-1] start, v[k], v[k+1] controls, v[k+2] end
+        for k in np.flatnonzero(codes == MPath.CURVE4)[
+            ::3
+        ]:  # each cubic: v[k-1] start, v[k], v[k+1] controls, v[k+2] end
             p0, p1, p2, p3 = v[k - 1], v[k], v[k + 1], v[k + 2]
             pts = (1 - t) ** 3 * p0 + 3 * (1 - t) ** 2 * t * p1 + 3 * (1 - t) * t**2 * p2 + t**3 * p3
             for x0, y0, x1, y1 in rects:
-                inside = (pts[:, 0] > x0 + 1e-6) & (pts[:, 0] < x1 - 1e-6) & (pts[:, 1] > y0 + 1e-6) & (pts[:, 1] < y1 - 1e-6)
+                inside = (
+                    (pts[:, 0] > x0 + 1e-6)
+                    & (pts[:, 0] < x1 - 1e-6)
+                    & (pts[:, 1] > y0 + 1e-6)
+                    & (pts[:, 1] < y1 - 1e-6)
+                )
                 assert not inside.any(), (loop.a_id, loop.b_id)
 
 
 def test_every_corner_of_a_routed_loop_is_rounded(ubq):
-    import numpy as np
     from matplotlib.path import Path as MPath
 
     from foldmap.cli import make_layout
@@ -255,11 +262,11 @@ def test_every_corner_of_a_routed_loop_is_rounded(ubq):
 
 def test_legend_fits_a_narrow_many_chain_figure():
     import numpy as np
-    from helpers import fake_sse
 
     from foldmap.frame import Frame
     from foldmap.layout import build_layout
     from foldmap.render import draw
+    from helpers import fake_sse
 
     f = Frame(np.zeros(3), np.array([1.0, 0, 0]), np.array([0, 1.0, 0]), np.array([0, 0, 1.0]))
     sses = [fake_sse("H", 1, 20, centroid=(0, 0, 0), axis=(0, 1, 0), chain=c) for c in "ABCDEF"]  # coiled-coil-like

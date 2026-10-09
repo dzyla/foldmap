@@ -2,10 +2,10 @@ from pathlib import Path
 
 import numpy as np
 import pytest
-from helpers import fake_sse, pipeline
 
 from foldmap.frame import Frame, view_frame
-from foldmap.layout import HELIX_W, HELIX_RISE, PITCH, SCALE, STRAND_RISE, build_layout
+from foldmap.layout import HELIX_RISE, HELIX_W, PITCH, SCALE, STRAND_RISE, build_layout
+from helpers import fake_sse, pipeline
 
 MODES = ["projected", "stack"]
 NAMES = ["ubq", "zs5", "zya"]
@@ -108,7 +108,9 @@ def test_ports_are_the_element_ends(ubq, mode):
 def test_deterministic(zs5, mode):
     _, _, _, a = build(zs5, mode)
     _, _, _, b = build(zs5, mode)
-    assert {k: (v.cx, v.cy, v.angle) for k, v in a.placed.items()} == {k: (v.cx, v.cy, v.angle) for k, v in b.placed.items()}
+    assert {k: (v.cx, v.cy, v.angle) for k, v in a.placed.items()} == {
+        k: (v.cx, v.cy, v.angle) for k, v in b.placed.items()
+    }
 
 
 def test_labels_are_per_chain_in_sequence_order(zs5):

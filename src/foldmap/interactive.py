@@ -5,7 +5,6 @@ the other two views."""
 from __future__ import annotations
 
 import html
-import io
 import json
 from pathlib import Path
 
@@ -246,8 +245,10 @@ def _residues(bb, sses) -> list[dict]:
     for s in sses:
         for k in range(s.start, s.end + 1):
             owner[k] = s.id
-    return [{"c": l.chain, "n": l.seq, "i": l.icode, "r": l.name.title(), "e": owner.get(k)}
-            for k, l in enumerate(bb.labels)]
+    return [
+        {"c": l.chain, "n": l.seq, "i": l.icode, "r": l.name.title(), "e": owner.get(k)}
+        for k, l in enumerate(bb.labels)
+    ]
 
 
 def _model_cif(path, assembly: str) -> str:
@@ -259,8 +260,9 @@ def _model_cif(path, assembly: str) -> str:
     return st.make_mmcif_document().as_string()
 
 
-def build_page(path, mode: str = "projected", look: Style | None = None, title: str | None = None,
-               **layout_options) -> str:
+def build_page(
+    path, mode: str = "projected", look: Style | None = None, title: str | None = None, **layout_options
+) -> str:
     """The HTML page as a string. layout_options go to cli.make_layout (symmetry, assembly, swap, ...)."""
     from .cli import make_layout
 
@@ -273,9 +275,21 @@ def build_page(path, mode: str = "projected", look: Style | None = None, title: 
         "title": title or Path(path).stem,
         "residues": _residues(bb, sses),
         "ca": np.round(bb.ca, 2).tolist(),
-        "elements": [{"id": s.id, "kind": s.kind, "chain": s.chain, "label": layout.placed[s.id].label,
-                      "first": s.first.seq, "last": s.last.seq, "start": s.start, "end": s.end,
-                      "colour": colours[s.id].lower()} for s in sses if s.id in layout.placed],
+        "elements": [
+            {
+                "id": s.id,
+                "kind": s.kind,
+                "chain": s.chain,
+                "label": layout.placed[s.id].label,
+                "first": s.first.seq,
+                "last": s.last.seq,
+                "start": s.start,
+                "end": s.end,
+                "colour": colours[s.id].lower(),
+            }
+            for s in sses
+            if s.id in layout.placed
+        ],
         "model": _model_cif(path, layout_options.get("assembly", "auto")),
     }
     blob = json.dumps(data, separators=(",", ":")).replace("</", "<\\/")

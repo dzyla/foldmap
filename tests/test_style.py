@@ -7,7 +7,7 @@ PRESETS = THEMES  # older name
 
 def test_presets_cover_the_common_uses_and_are_valid():
     assert {"publication", "minimal", "print", "presentation", "cartoon"} <= set(PRESETS)
-    for name, s in PRESETS.items():
+    for s in PRESETS.values():
         assert isinstance(s, Style)
         s.validate()
 
@@ -24,9 +24,16 @@ def test_overrides_apply_on_top_of_a_preset():
     assert s.fill == PRESETS["minimal"].fill
 
 
-@pytest.mark.parametrize("bad, msg", [("colour=red", "helix_scale"), ("helix_scale=big", "number"),
-                                      ("loops=zigzag", "orthogonal"), ("helix_scale=-1", "positive"),
-                                      ("helix_scale", "key=value")])
+@pytest.mark.parametrize(
+    "bad, msg",
+    [
+        ("colour=red", "helix_scale"),
+        ("helix_scale=big", "number"),
+        ("loops=zigzag", "orthogonal"),
+        ("helix_scale=-1", "positive"),
+        ("helix_scale", "key=value"),
+    ],
+)
 def test_bad_overrides_say_what_is_allowed(bad, msg):
     with pytest.raises(ValueError, match=msg):
         resolve_style(overrides=[bad])
@@ -53,9 +60,9 @@ def test_style_file_with_unknown_key_fails(tmp_path):
 
 # --- the style reaching the figure ---------------------------------------------------------------
 import numpy as np  # noqa: E402
-from helpers import pipeline  # noqa: E402
 
-from foldmap.cli import make_layout, make_figure  # noqa: E402
+from foldmap.cli import make_figure, make_layout  # noqa: E402
+from helpers import pipeline  # noqa: E402
 
 
 def _artists(fig, prefix):
@@ -153,7 +160,6 @@ def test_cli_lists_presets(capsys):
     assert all(name in out for name in PRESETS) and "helix_scale" in out
 
 
-
 def test_themes_only_change_how_things_look_not_where_they_go():
     default = Style()
     for name, theme in THEMES.items():
@@ -182,14 +188,15 @@ def _hex(c):
 
 
 def test_sequence_colouring_runs_n_to_c_along_each_chain(ubq):
-    from matplotlib import colormaps
 
     from foldmap.cli import make_layout
 
     lay, sses, _ = make_layout(ubq)
     fig = make_figure(ubq, look=Style(color_by="sequence"))
-    order = [s.id for s in sses]
-    cols = [_hex(_artists(fig, f"{ {'E': 'strand', 'G': 'eta'}.get(s.kind, 'helix') }:{s.id}")[0].get_facecolor()) for s in sses]
+    cols = [
+        _hex(_artists(fig, f"{ {'E': 'strand', 'G': 'eta'}.get(s.kind, 'helix') }:{s.id}")[0].get_facecolor())
+        for s in sses
+    ]
     assert len(set(cols)) == len(cols)  # every element its own shade
     from foldmap.render import sequence_colour
 
@@ -201,7 +208,6 @@ def test_sequence_colouring_runs_n_to_c_along_each_chain(ubq):
 
 def test_sequence_colouring_restarts_for_each_chain(zs5):
     fig = make_figure(zs5, look=Style(color_by="sequence"))
-    from matplotlib import colormaps
 
     from foldmap.cli import make_layout
 
@@ -340,8 +346,10 @@ def test_hydropathy_colouring_follows_kyte_doolittle(ubq):
     from foldmap.render import KYTE_DOOLITTLE, property_colour
 
     lay, sses, bb = make_layout(ubq)
-    kd = {s.id: float(np.mean([KYTE_DOOLITTLE.get(bb.labels[r].name, 0.0) for r in range(s.start, s.end + 1)]))
-          for s in sses}
+    kd = {
+        s.id: float(np.mean([KYTE_DOOLITTLE.get(bb.labels[r].name, 0.0) for r in range(s.start, s.end + 1)]))
+        for s in sses
+    }
     cols = _element_fills(make_figure(ubq, look=Style(color_by="hydropathy")), sses)
     assert cols[max(kd, key=kd.get)] == property_colour(1.0, "hydropathy")
     assert cols[min(kd, key=kd.get)] == property_colour(0.0, "hydropathy")

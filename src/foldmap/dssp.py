@@ -35,7 +35,7 @@ def _hydrogen_positions(bb: Backbone) -> np.ndarray:
 
 def _hbond_set(bb: Backbone) -> set[tuple[int, int]]:
     """Set of (acceptor, donor): CO of acceptor bonded to NH of donor."""
-    xyz, n = bb.xyz, len(bb)
+    xyz = bb.xyz
     h = _hydrogen_positions(bb)
     close = np.array(sorted(cKDTree(bb.ca).query_pairs(_CA_CUTOFF)))
     if close.size == 0:
@@ -95,9 +95,7 @@ def assign_dssp(bb: Backbone) -> DsspResult:
 
     turns: dict[str, set[int]] = {"H": set(), "G": set(), "I": set()}
     for k, code in ((4, "H"), (3, "G"), (5, "I")):
-        turn = [
-            i + k < n and (i, i + k) in bonds and all(nxt[i + m] for m in range(k)) for i in range(n)
-        ]
+        turn = [i + k < n and (i, i + k) in bonds and all(nxt[i + m] for m in range(k)) for i in range(n)]
         for i in range(1, n - k):
             if turn[i - 1] and turn[i]:
                 turns[code].update(range(i, i + k))

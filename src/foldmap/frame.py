@@ -101,8 +101,17 @@ def symmetric_frame(sses: list[SSE], sym) -> CylinderFrame:
     ref = ref / np.linalg.norm(ref) if np.linalg.norm(ref) > 1e-6 else _any_perpendicular(sym.axis)
     sector = {c: k for k, p in enumerate(sym.protomers) for c in p}
     classes = {c: i for p in sym.protomers for i, c in enumerate(p)}
-    return CylinderFrame(sym.centre, sym.axis, ref, len(sym.protomers), max(radius, 5.0), sector, classes,
-                         list(sym.angles) or None, float(sym.rise))
+    return CylinderFrame(
+        sym.centre,
+        sym.axis,
+        ref,
+        len(sym.protomers),
+        max(radius, 5.0),
+        sector,
+        classes,
+        list(sym.angles) or None,
+        float(sym.rise),
+    )
 
 
 def _unit(x: np.ndarray) -> np.ndarray:
@@ -115,14 +124,18 @@ def _any_perpendicular(v: np.ndarray) -> np.ndarray:
 
 
 def view_frame(
-    sses: list[SSE], rotate: float = 0.0, flip_v: bool = False, up: list[float] | np.ndarray | None = None,
+    sses: list[SSE],
+    rotate: float = 0.0,
+    flip_v: bool = False,
+    up: list[float] | np.ndarray | None = None,
     view: list[float] | np.ndarray | None = None,
 ) -> Frame:
     """Page axes chosen so helices and strands lie along the page.
 
     Page-up is the length-weighted dominant element axis, signed so the first element points up, or
-    `up` exactly as given (e.g. a membrane normal pointing to the side that belongs on top). Page-right is the widest spread of the element centroids
-    perpendicular to it, signed so the last element lies to the right of the first. `rotate` turns
+    `up` exactly as given (e.g. a membrane normal pointing to the side that belongs on top). Page-right is
+    the widest spread of the element centroids perpendicular to it, signed so the last element lies to the
+    right of the first. `rotate` turns
     the picture counter-clockwise (degrees); `flip_v` mirrors it (on request only).
     """
     if not sses:

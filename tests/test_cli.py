@@ -45,23 +45,21 @@ def test_plot_bad_extension_exit_code(ubq, tmp_path, capsys):
 
 
 def test_plot_layout_uses_3d_contacts(zs5):
-    from helpers import pipeline
-
-    from foldmap.cli import make_layout
+    from foldmap.cli import _bridge_contacts, _bridge_springs, make_layout
     from foldmap.features import sse_contacts
     from foldmap.frame import view_frame
-    from foldmap.layout import build_layout
-
-    from foldmap.cli import _bridge_contacts, _bridge_springs
     from foldmap.io import load_links
+    from foldmap.layout import build_layout
+    from helpers import pipeline
 
     bb, sses, sheets = pipeline(zs5)
     links = load_links(zs5, bb)
     contacts = sse_contacts(bb, sses)
     for key, n in _bridge_contacts(bb, sses, links).items():  # disulfides count as contacts and as springs
         contacts[key] = contacts.get(key, 0) + n
-    want = build_layout(sses, sheets, view_frame(sses), "projected", contacts=contacts,
-                        bridges=_bridge_springs(bb, sses, links))
+    want = build_layout(
+        sses, sheets, view_frame(sses), "projected", contacts=contacts, bridges=_bridge_springs(bb, sses, links)
+    )
     got, _, _ = make_layout(zs5)
     assert {k: (p.cx, p.cy) for k, p in got.placed.items()} == {k: (p.cx, p.cy) for k, p in want.placed.items()}
 
@@ -73,8 +71,11 @@ def test_plot_accepts_palette_style_and_loop_options(ubq, tmp_path):
     import subprocess
     import sys
 
-    bad = subprocess.run([sys.executable, "-m", "foldmap", "plot", str(ubq), "-o", str(out), "--palette", "rainbow"],
-                         capture_output=True, text=True)
+    bad = subprocess.run(
+        [sys.executable, "-m", "foldmap", "plot", str(ubq), "-o", str(out), "--palette", "rainbow"],
+        capture_output=True,
+        text=True,
+    )
     assert bad.returncode == 2 and "invalid choice" in bad.stderr
 
 

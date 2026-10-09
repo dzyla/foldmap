@@ -6,8 +6,8 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
-from .frame import Frame
 from .features import helix_bundles
+from .frame import Frame
 from .model import SSE, Nucleic, Sheet, duplex_axis, duplex_groups
 from .style import Style
 
@@ -153,8 +153,12 @@ class _Item:
     def box(self) -> tuple[float, float, float, float]:
         """Footprint relative to (cx, cy): every member with its label room."""
         fp = [_footprint(m) for m in self.members]
-        return (min(o[0] + f[0] for o, f in zip(self.offsets, fp)), min(o[1] + f[1] for o, f in zip(self.offsets, fp)),
-                max(o[0] + f[2] for o, f in zip(self.offsets, fp)), max(o[1] + f[3] for o, f in zip(self.offsets, fp)))
+        return (
+            min(o[0] + f[0] for o, f in zip(self.offsets, fp)),
+            min(o[1] + f[1] for o, f in zip(self.offsets, fp)),
+            max(o[0] + f[2] for o, f in zip(self.offsets, fp)),
+            max(o[1] + f[3] for o, f in zip(self.offsets, fp)),
+        )
 
     @property
     def half(self) -> tuple[float, float]:
@@ -228,7 +232,9 @@ def _sheet_item(sheet: Sheet, frame: Frame, pitch: float = PITCH) -> _Item:
     return _Item(members, offsets, home[0], home[1], home, *_anchor(strands))
 
 
-def _helix_item(sse: SSE, frame: Frame, angle_mode: str = "snap", width: float = HELIX_W, rise: float = HELIX_RISE) -> _Item:
+def _helix_item(
+    sse: SSE, frame: Frame, angle_mode: str = "snap", width: float = HELIX_W, rise: float = HELIX_RISE
+) -> _Item:
     """Always true length. angle_mode: 'tilted' as seen in the view; 'snap' to the nearest of up, down, left,
     right (the topology-diagram convention); 'upright' up or down like a strand (stack mode)."""
     au, av = frame.direction(sse.centroid, sse.axis)
@@ -242,7 +248,9 @@ def _helix_item(sse: SSE, frame: Frame, angle_mode: str = "snap", width: float =
         angle = seen
     pos = frame.project(sse.centroid, [sse.chain])[0] * SCALE
     placed = Placed(sse, 0, 0, length, angle, width)
-    return _Item([placed], [(0.0, 0.0)], float(pos[0]), float(pos[1]), (float(pos[0]), float(pos[1])), sse.start, sse.chain)
+    return _Item(
+        [placed], [(0.0, 0.0)], float(pos[0]), float(pos[1]), (float(pos[0]), float(pos[1])), sse.start, sse.chain
+    )
 
 
 def _angle(seen: float, av: float, mode: str) -> float:
@@ -291,7 +299,9 @@ def _bundle_item(group: list[SSE], frame: Frame, angle_mode: str, width: float) 
             offsets.append(tuple(float(v) for v in d2 * along + side2 * lat))
     pos = frame.project(centre)[0] * SCALE
     first = min(group, key=lambda s: s.start)
-    return _Item(members, offsets, float(pos[0]), float(pos[1]), (float(pos[0]), float(pos[1])), first.start, first.chain)
+    return _Item(
+        members, offsets, float(pos[0]), float(pos[1]), (float(pos[0]), float(pos[1])), first.start, first.chain
+    )
 
 
 def _separate(items: list[_Item]) -> None:
@@ -331,8 +341,12 @@ def _separate(items: list[_Item]) -> None:
 
 
 def _owner(items: list[_Item]) -> dict[str, tuple[int, Placed, tuple[float, float]]]:
-    return {(m.id if isinstance(m, PlacedDNA) else m.sse.id): (k, m, o)
-            for k, it in enumerate(items) for m, o in zip(it.members, it.offsets) if not m.ghost}
+    return {
+        (m.id if isinstance(m, PlacedDNA) else m.sse.id): (k, m, o)
+        for k, it in enumerate(items)
+        for m, o in zip(it.members, it.offsets)
+        if not m.ghost
+    }
 
 
 def _contact_weights(items: list[_Item], contacts: dict[frozenset[str], int]) -> np.ndarray:
@@ -407,9 +421,15 @@ def _energy(flat, home, anchor_w, want, W, loops, lam, mids=None):
     return E, grad.ravel()
 
 
-def _attract(items: list[_Item], sses: list[SSE], contacts: dict[frozenset[str], int],
-             ties: dict[int, tuple[int, int]] | None = None, spread: float = 0.0, lift: float = 0.0,
-             bridges: list[tuple[str, float, str, float]] = ()) -> None:
+def _attract(
+    items: list[_Item],
+    sses: list[SSE],
+    contacts: dict[frozenset[str], int],
+    ties: dict[int, tuple[int, int]] | None = None,
+    spread: float = 0.0,
+    lift: float = 0.0,
+    bridges: list[tuple[str, float, str, float]] = (),
+) -> None:
     """Minimise the layout energy (_energy) from the projected positions, raising the overlap penalty in
     stages. The result becomes each item's new home; _separate then guarantees no overlap remains."""
     from scipy.optimize import minimize
@@ -425,13 +445,24 @@ def _attract(items: list[_Item], sses: list[SSE], contacts: dict[frozenset[str],
         if a in owner and b in owner and owner[a][0] != owner[b][0]:
             bridges_used.append((a, b))
             (i, ma, oa), (j, mb, ob) = owner[a], owner[b]
-            springs.append((i, np.add(oa, ma.direction * (ta - 0.5) * ma.length),
-                            j, np.add(ob, mb.direction * (tb - 0.5) * mb.length)))
+            springs.append(
+                (
+                    i,
+                    np.add(oa, ma.direction * (ta - 0.5) * ma.length),
+                    j,
+                    np.add(ob, mb.direction * (tb - 0.5) * mb.length),
+                )
+            )
             weight.append(_W_SS)
             slack.append(_SS_SLACK)
-    loops = (np.array([s[0] for s in springs], int), np.array([s[1] for s in springs], float).reshape(-1, 2),
-             np.array([s[2] for s in springs], int), np.array([s[3] for s in springs], float).reshape(-1, 2),
-             np.array(weight, float), np.array(slack, float))
+    loops = (
+        np.array([s[0] for s in springs], int),
+        np.array([s[1] for s in springs], float).reshape(-1, 2),
+        np.array([s[2] for s in springs], int),
+        np.array([s[3] for s in springs], float).reshape(-1, 2),
+        np.array(weight, float),
+        np.array(slack, float),
+    )
     home = np.array([it.home for it in items], float)
     h = np.array([it.half for it in items], float)
     want = h[:, None, :] + h[None, :, :] + MARGIN
@@ -458,7 +489,7 @@ def _attract(items: list[_Item], sses: list[SSE], contacts: dict[frozenset[str],
 
     def solve(z, stages=_LAMBDAS):
         nonlocal lam
-        for lam in stages:
+        for lam in stages:  # noqa: B007 - read by tied() through nonlocal
             z = minimize(tied, z, jac=True, method="L-BFGS-B", options={"maxiter": 300}).x
         return z
 
@@ -477,7 +508,7 @@ def _attract(items: list[_Item], sses: list[SSE], contacts: dict[frozenset[str],
             continue
         trial = z.copy()
         target = P[anchor] + oa - om + np.array([0.0, -1.0])  # the lighter element's cysteine beside its partner
-        trial[2 * slot[mover]: 2 * slot[mover] + 2] = target
+        trial[2 * slot[mover] : 2 * slot[mover] + 2] = target
         trial = solve(trial, _LAMBDAS[1:])
         lam = _LAMBDAS[-1]
         energy = tied(trial)[0]
@@ -522,12 +553,17 @@ def _stack(items: list[_Item]) -> None:
 
 def _centre_dna_over_binders(items: list[_Item], contacts: dict[frozenset[str], int]) -> None:
     owner = _owner(items)
-    for k, it in enumerate(items):
+    for it in items:
         dna = [m for m in it.members if isinstance(m, PlacedDNA)]
         if not dna:
             continue
-        xs = [items[owner[x][0]].cx + owner[x][2][0] for key in contacts if dna[0].id in key
-              for x in key if x != dna[0].id and x in owner]
+        xs = [
+            items[owner[x][0]].cx + owner[x][2][0]
+            for key in contacts
+            if dna[0].id in key
+            for x in key
+            if x != dna[0].id and x in owner
+        ]
         if xs:
             it.cx = float(np.mean(xs))
 
@@ -552,8 +588,11 @@ def _duplexes(na: Nucleic) -> list[list[int]]:
 
 def _dna_item(k: int, strands: list[int], na: Nucleic, frame: Frame, flat: bool, width: float = DNA_W) -> _Item:
     centre, axis = duplex_axis(na, strands)  # the first strand runs 5' -> 3' along the drawn direction
-    along = {(s, i): float((na.strands[s].c1[i] - centre) @ axis) * SCALE  # C1' sits level across a base pair
-             for s in strands for i in range(len(na.strands[s]))}
+    along = {
+        (s, i): float((na.strands[s].c1[i] - centre) @ axis) * SCALE  # C1' sits level across a base pair
+        for s in strands
+        for i in range(len(na.strands[s]))
+    }
     for a, i, b, j in na.pairs:  # a base pair is drawn as one straight rung
         if (a, i) in along and (b, j) in along:
             along[(a, i)] = along[(b, j)] = (along[(a, i)] + along[(b, j)]) / 2
@@ -587,8 +626,12 @@ def _symmetry_ties(items: list[_Item], frame) -> dict[int, tuple[int, int]]:
         return {}
 
     def residues(it):
-        return {(classes[m.sse.chain], r) for m in it.members if isinstance(m, Placed) and not m.ghost
-                for r in range(m.sse.first.seq, m.sse.last.seq + 1)}
+        return {
+            (classes[m.sse.chain], r)
+            for m in it.members
+            if isinstance(m, Placed) and not m.ghost
+            for r in range(m.sse.first.seq, m.sse.last.seq + 1)
+        }
 
     def protomer(it):
         ks = {sector.get(m.sse.chain) for m in it.members if isinstance(m, Placed)}
@@ -609,16 +652,23 @@ def _symmetry_ties(items: list[_Item], frame) -> dict[int, tuple[int, int]]:
         def span(m):
             return {(classes[m.sse.chain], r) for r in range(m.sse.first.seq, m.sse.last.seq + 1)}
 
-        pairs = [max(range(len(mate.members)), key=lambda q: (len(span(m) & span(mate.members[q])),
-                                                             mate.members[q].ghost == m.ghost))
-                 for m in it.members]
+        pairs = [
+            max(
+                range(len(mate.members)),
+                key=lambda q: (len(span(m) & span(mate.members[q])), mate.members[q].ghost == m.ghost),
+            )
+            for m in it.members
+        ]
         if len(mate.members) == len(it.members) and sorted(pairs) == list(range(len(pairs))):
             for m, q in zip(it.members, pairs):  # one-to-one: take the mate's shape member by member
                 m.angle, m.length = mate.members[q].angle, mate.members[q].length
             it.offsets = [mate.offsets[q] for q in pairs]
         else:  # DSSP split or merged an element in one copy: keep the shape, match the orientation
-            votes = [np.cos(m.angle - mate.members[q].angle) for m, q in zip(it.members, pairs)
-                     if span(m) & span(mate.members[q])]
+            votes = [
+                np.cos(m.angle - mate.members[q].angle)
+                for m, q in zip(it.members, pairs)
+                if span(m) & span(mate.members[q])
+            ]
             if votes and np.mean(votes) < 0:  # drawn upside down: turn the block 180 degrees in the page
                 for m in it.members:
                     m.angle += np.pi
@@ -647,8 +697,7 @@ def resolve(layout: Layout, sses: list[SSE], ref: str) -> list[str]:
             lo, hi = int(a), int(b or a)
         except ValueError:
             raise ValueError(f"residue reference {ref!r} must look like res:150-159 or res:A:150-159") from None
-        out = [s.id for s in placed if (chain is None or s.chain == chain)
-               and s.first.seq <= hi and s.last.seq >= lo]
+        out = [s.id for s in placed if (chain is None or s.chain == chain) and s.first.seq <= hi and s.last.seq >= lo]
     elif ":" in ref:
         chain, label = ref.split(":", 1)
         out = [s.id for s in placed if s.chain == chain and layout.placed[s.id].label == label]
@@ -666,10 +715,18 @@ def _one(layout: Layout, sses: list[SSE], ref: str) -> str:
     return ids[0]
 
 
-def _adjust(items: list[_Item], lay: Layout, sses: list[SSE], rename: dict[str, str],
-            swap: list[tuple[str, str]], move: list[tuple[str, tuple[float, float]]]) -> None:
+def _adjust(
+    items: list[_Item],
+    lay: Layout,
+    sses: list[SSE],
+    rename: dict[str, str],
+    swap: list[tuple[str, str]],
+    move: list[tuple[str, tuple[float, float]]],
+) -> None:
     """The user's own hand on the layout: new labels, exchanged places, nudges; then overlaps are cleared."""
-    where = {m.sse.id: (it, k) for it in items for k, m in enumerate(it.members) if isinstance(m, Placed) and not m.ghost}
+    where = {
+        m.sse.id: (it, k) for it in items for k, m in enumerate(it.members) if isinstance(m, Placed) and not m.ghost
+    }
     for ref, name in rename.items():
         for sid in resolve(lay, sses, ref):
             it, k = where[sid]
@@ -728,17 +785,22 @@ def build_layout(
     bundled = {k for g in bundles for k in g}
     by_id = {s.id: s for s in sses}
     items += [_bundle_item([by_id[k] for k in g], frame, angle_mode, HELIX_W * style.helix_scale) for g in bundles]
-    items += [_helix_item(s, frame, angle_mode, HELIX_W * style.helix_scale) for s in sses
-              if s.kind == "H" and s.id not in bundled]
-    items += [_helix_item(s, frame, angle_mode, HELIX_W * ETA_W * style.helix_scale, TEN_RISE) for s in sses
-              if s.kind == "G"]
+    items += [
+        _helix_item(s, frame, angle_mode, HELIX_W * style.helix_scale)
+        for s in sses
+        if s.kind == "H" and s.id not in bundled
+    ]
+    items += [
+        _helix_item(s, frame, angle_mode, HELIX_W * ETA_W * style.helix_scale, TEN_RISE) for s in sses if s.kind == "G"
+    ]
     if not items:
         return Layout({}, (0.0, 0.0, 0.0, 0.0))
     contacts = dict(contacts or {})
     if nucleic is not None and nucleic.strands:
         groups = _duplexes(nucleic)
-        items += [_dna_item(k, g, nucleic, frame, mode == "stack", DNA_W * style.dna_scale)
-                  for k, g in enumerate(groups)]
+        items += [
+            _dna_item(k, g, nucleic, frame, mode == "stack", DNA_W * style.dna_scale) for k, g in enumerate(groups)
+        ]
     if nucleic is not None and nucleic.strands:
         for key, n in _dna_contacts(sses, nucleic, groups).items():
             contacts[key] = contacts.get(key, 0) + n
@@ -781,14 +843,29 @@ def build_layout(
     for g in ghosts:
         g.label = real[g.sse.id].label
     rects = np.array([p.rect for p in placed + ghosts + dna])
-    sheet_blocks = [[m.sse.id for m in it.members if not m.ghost] for it in items
-                    if it.members and all(isinstance(m, Placed) and m.sse.kind == "E" for m in it.members)]
-    lay = Layout(real, (0.0, 0.0, 0.0, 0.0), ghosts, dna, nucleic if dna else None, sheet_blocks,
-                 bool(dna) and style.nucleotide_labels)
+    sheet_blocks = [
+        [m.sse.id for m in it.members if not m.ghost]
+        for it in items
+        if it.members and all(isinstance(m, Placed) and m.sse.kind == "E" for m in it.members)
+    ]
+    lay = Layout(
+        real,
+        (0.0, 0.0, 0.0, 0.0),
+        ghosts,
+        dna,
+        nucleic if dna else None,
+        sheet_blocks,
+        bool(dna) and style.nucleotide_labels,
+    )
     lay.domains = [(name, [k for k in ids if k in real]) for name, ids in domains or []]
     rects = np.vstack([rects, *[[domain_panel(lay, name)] for name, _ in lay.domains]]) if lay.domains else rects
     rects = np.vstack([rects, [b for _, b in label_boxes(lay, sses)] or np.empty((0, 4))])
-    lay.bounds = (float(rects[:, 0].min()), float(rects[:, 1].min()), float(rects[:, 2].max()), float(rects[:, 3].max()))
+    lay.bounds = (
+        float(rects[:, 0].min()),
+        float(rects[:, 1].min()),
+        float(rects[:, 2].max()),
+        float(rects[:, 3].max()),
+    )
     return lay
 
 
@@ -824,7 +901,10 @@ def _part_domains(items: list[_Item], domains: list[tuple[str, list[str]]], swee
                 if ox <= 0 or oy <= 0:
                     continue
                 clash = moved = True
-                ca, cb = np.array([(A[0] + A[2]) / 2, (A[1] + A[3]) / 2]), np.array([(B[0] + B[2]) / 2, (B[1] + B[3]) / 2])
+                ca, cb = (
+                    np.array([(A[0] + A[2]) / 2, (A[1] + A[3]) / 2]),
+                    np.array([(B[0] + B[2]) / 2, (B[1] + B[3]) / 2]),
+                )
                 if ox <= oy:  # the cheaper direction, each side going half way
                     step = np.array([ox / 2 if cb[0] >= ca[0] else -ox / 2, 0.0])
                 else:
@@ -915,11 +995,17 @@ def label_boxes(layout: Layout, sses: list[SSE]) -> list[tuple[str, tuple[float,
     out = []
     for p in layout.placed.values():
         if p.sse.kind in ("H", "G"):
-            out.append((f"label:{p.sse.id}", _box(*helix_label_pos(p), _GLYPH_W * len(p.label) / 2 + 0.05, _GLYPH_H / 2)))
+            out.append(
+                (f"label:{p.sse.id}", _box(*helix_label_pos(p), _GLYPH_W * len(p.label) / 2 + 0.05, _GLYPH_H / 2))
+            )
     for end, chain, port, ex in termini(layout, sses):
         a, b = np.add(port, ex * 0.15), np.add(port, ex * END_STUB)
-        out.append((f"{end}-stub:{chain}", (min(a[0], b[0]) - 0.05, min(a[1], b[1]) - 0.05,
-                                             max(a[0], b[0]) + 0.05, max(a[1], b[1]) + 0.05)))
+        out.append(
+            (
+                f"{end}-stub:{chain}",
+                (min(a[0], b[0]) - 0.05, min(a[1], b[1]) - 0.05, max(a[0], b[0]) + 0.05, max(a[1], b[1]) + 0.05),
+            )
+        )
         t = np.add(port, ex * END_LABEL)
         out.append((f"{end}:{chain}", _box(float(t[0]), float(t[1]), _GLYPH_W / 2 + 0.05, _GLYPH_H / 2)))
     for d in layout.dna:
@@ -927,13 +1013,26 @@ def label_boxes(layout: Layout, sses: list[SSE]) -> list[tuple[str, tuple[float,
             for row, k in enumerate(d.strands[:2]):
                 xs = [d.axial[(k, i)] for i in range(len(layout.nucleic.strands[k]))]
                 (x0, y0), (x1, y1) = dna_letter_pos(d, row, min(xs)), dna_letter_pos(d, row, max(xs))
-                out.append((f"dna-seq:{k}", (min(x0, x1) - _GLYPH_W / 2, min(y0, y1) - _GLYPH_H / 2,
-                                             max(x0, x1) + _GLYPH_W / 2, max(y0, y1) + _GLYPH_H / 2)))
+                out.append(
+                    (
+                        f"dna-seq:{k}",
+                        (
+                            min(x0, x1) - _GLYPH_W / 2,
+                            min(y0, y1) - _GLYPH_H / 2,
+                            max(x0, x1) + _GLYPH_W / 2,
+                            max(y0, y1) + _GLYPH_H / 2,
+                        ),
+                    )
+                )
         for sid, end, (x, y) in dna_end_labels(d, layout.nucleic):
             out.append((f"dna-end:{sid}:{end}", _box(x, y, _GLYPH_W + 0.05, _GLYPH_H / 2)))
     for name, ids in layout.domains:  # a domain's name, top left inside its panel
         if ids:
             x0, _, _, y1 = domain_panel(layout, name)
-            out.append((f"domain-label:{name}", (x0 + 0.25, y1 - 0.35 - _GLYPH_H * 1.1,
-                                                   x0 + 0.45 + _GLYPH_W * 1.1 * len(name), y1 - 0.2)))
+            out.append(
+                (
+                    f"domain-label:{name}",
+                    (x0 + 0.25, y1 - 0.35 - _GLYPH_H * 1.1, x0 + 0.45 + _GLYPH_W * 1.1 * len(name), y1 - 0.2),
+                )
+            )
     return out

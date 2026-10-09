@@ -1,8 +1,8 @@
 import numpy as np
 import pytest
-from helpers import pipeline
 
 from foldmap.io import load_nucleic
+from helpers import pipeline
 
 
 def test_protein_only_file_has_no_nucleic_acid(ubq):
@@ -53,8 +53,6 @@ def _dna_layout(path, mode, with_dna=True):
     from foldmap.features import sse_contacts
     from foldmap.frame import view_frame
     from foldmap.layout import build_layout
-
-    from foldmap.frame import dna_view_frame
 
     bb, sses, sheets = pipeline(path)
     na = load_nucleic(path, bb)
@@ -110,8 +108,10 @@ def _gaps(path):
     def gap(a, b):  # between boxes; 0 when they touch
         return float(np.hypot(max(a[0] - b[2], b[0] - a[2], 0), max(a[1] - b[3], b[1] - a[3], 0)))
 
-    return [(s.chain, any(r in na.contacts for r in range(s.start, s.end + 1)), gap(lay.placed[s.id].rect, d.rect))
-            for s in sses]
+    return [
+        (s.chain, any(r in na.contacts for r in range(s.start, s.end + 1)), gap(lay.placed[s.id].rect, d.rect))
+        for s in sses
+    ]
 
 
 @pytest.mark.parametrize("pdb", ["1ZAA", "1LMB"])
@@ -142,8 +142,11 @@ def _figure(path, **kw):
 
 
 def _gid(fig, prefix):
-    return [a for a in [*fig.axes[0].patches, *fig.axes[0].texts, *fig.axes[0].lines, *fig.axes[0].collections]
-            if (a.get_gid() or "").startswith(prefix)]
+    return [
+        a
+        for a in [*fig.axes[0].patches, *fig.axes[0].texts, *fig.axes[0].lines, *fig.axes[0].collections]
+        if (a.get_gid() or "").startswith(prefix)
+    ]
 
 
 def test_duplex_is_drawn_as_a_double_helix_from_one_repeated_turn(ubq):
@@ -177,10 +180,9 @@ def test_contacts_are_marked_in_the_protein_chain_colour(ubq):
 
 
 def test_loops_route_around_the_duplex(ubq):
-    from test_route import segments_clear
-
     from foldmap.cli import make_layout
     from foldmap.route import route_loops
+    from test_route import segments_clear
 
     for pdb in ("1ZAA", "1LMB"):
         lay, sses, bb = make_layout(ubq.parent / f"{pdb}.cif")
@@ -241,9 +243,8 @@ def _contact_points(lay, sse):
 @pytest.mark.parametrize("pdb", ["1ZAA", "1LMB"])
 @pytest.mark.parametrize("mode", ["projected", "stack"])
 def test_tethers_never_cross_other_elements(ubq, pdb, mode):
-    from test_route import segments_clear
-
     from foldmap.cli import make_layout
+    from test_route import segments_clear
 
     fig, _ = _figure(ubq.parent / f"{pdb}.cif", mode=mode)
     lay, _, _ = make_layout(ubq.parent / f"{pdb}.cif", mode)
@@ -273,7 +274,6 @@ def test_dna_view_is_a_rotation_not_a_mirror(ubq):
     f = dna_view_frame(sses, na)
     m = np.array([f.u, f.v, f.w])
     assert np.allclose(m @ m.T, np.eye(3), atol=1e-9) and np.linalg.det(m) == pytest.approx(1.0)
-
 
 
 def test_every_nucleotide_is_labelled_with_its_base(ubq):
@@ -328,9 +328,7 @@ def test_radial_dna_frame_is_a_rotation_everywhere(ubq):
 @pytest.mark.parametrize("pdb", ["1ZAA", "1LMB"])
 def test_stack_mode_keeps_the_protein_close_and_the_dna_over_its_binders(ubq, pdb):
     from foldmap.cli import make_layout
-    from foldmap.layout import MARGIN
-
-    from foldmap.layout import label_boxes
+    from foldmap.layout import MARGIN, label_boxes
 
     lay, sses, bb = make_layout(ubq.parent / f"{pdb}.cif", "stack")
     na = load_nucleic(ubq.parent / f"{pdb}.cif", bb)

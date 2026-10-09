@@ -67,7 +67,9 @@ def test_library_logic_in_node(tmp_path):
     page = build_page(DATA / "1UBQ.cif")
     data = _data(page)
     probe = tmp_path / "probe.js"
-    probe.write_text(_script(page, "topo-lib") + """
+    probe.write_text(
+        _script(page, "topo-lib")
+        + """
 const data = JSON.parse(require('fs').readFileSync(process.argv[2], 'utf8'));
 const lib = globalThis.TopoLib;
 const idx = lib.index(data);
@@ -80,7 +82,8 @@ const out = {
   img: Array.from(lib.matrix(data.ca, 20).values.slice(0, 3)).map(v => Math.round(v * 10) / 10),
 };
 console.log(JSON.stringify(out));
-""")
+"""
+    )
     blob = tmp_path / "data.json"
     blob.write_text(json.dumps(data))
     res = subprocess.run([node, str(probe), str(blob)], capture_output=True, text=True)

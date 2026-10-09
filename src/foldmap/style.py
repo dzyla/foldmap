@@ -110,8 +110,9 @@ def _coerce(key: str, value):
     return str(value)
 
 
-def resolve_style(theme: str | None = None, style_file: str | Path | None = None,
-                  overrides: list[str] | tuple[str, ...] = ()) -> Style:
+def resolve_style(
+    theme: str | None = None, style_file: str | Path | None = None, overrides: list[str] | tuple[str, ...] = ()
+) -> Style:
     """Theme (or the file's `theme:`), then the file's keys, then key=value overrides; validated."""
     settings: dict = {}
     if style_file is not None:

@@ -6,18 +6,19 @@ from pathlib import Path
 
 import numpy as np
 import pytest
-from test_layout import overlaps
-from test_route import segments_clear, self_crossing
 
 from foldmap.cli import make_layout
 from foldmap.route import route_loops
+from test_layout import overlaps
+from test_route import segments_clear, self_crossing
 
 DATA = Path(__file__).parent / "data"
 STRUCTURES = sorted(p.stem for p in DATA.glob("*.cif"))
 
 
-@pytest.fixture(scope="module", params=[(s, m) for s in STRUCTURES for m in ("projected", "stack")],
-                ids=lambda p: f"{p[0]}-{p[1]}")
+@pytest.fixture(
+    scope="module", params=[(s, m) for s in STRUCTURES for m in ("projected", "stack")], ids=lambda p: f"{p[0]}-{p[1]}"
+)
 def case(request):
     name, mode = request.param
     lay, sses, bb = make_layout(DATA / f"{name}.cif", mode)
@@ -106,4 +107,6 @@ def test_chain_end_labels_sit_clear_of_elements(case):
     for name, box in label_boxes(lay, sses):
         if name[:2] in ("N:", "C:"):
             for r in rects:
-                assert not (min(box[2], r[2]) - max(box[0], r[0]) > 1e-6 and min(box[3], r[3]) - max(box[1], r[1]) > 1e-6), name
+                assert not (
+                    min(box[2], r[2]) - max(box[0], r[0]) > 1e-6 and min(box[3], r[3]) - max(box[1], r[1]) > 1e-6
+                ), name

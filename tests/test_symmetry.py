@@ -1,8 +1,8 @@
 import numpy as np
 import pytest
-from helpers import pipeline
 
 from foldmap.symmetry import detect_symmetry
+from helpers import pipeline
 
 DATA = __import__("pathlib").Path(__file__).parent / "data"
 
@@ -43,8 +43,12 @@ def _mates(sses, s):
         if e.chain in cls:
             k, i = cls[e.chain]
             by[(k, i, e.first.seq, e.last.seq)] = e
-    return [[by[(k, i, a, b)] for k in range(s.n)] for (k0, i, a, b) in list(by) if k0 == 0
-            if all((k, i, a, b) in by for k in range(s.n))]
+    return [
+        [by[(k, i, a, b)] for k in range(s.n)]
+        for (k0, i, a, b) in list(by)
+        if k0 == 0
+        if all((k, i, a, b) in by for k in range(s.n))
+    ]
 
 
 @pytest.mark.parametrize("name", ["8UUP", "2HHB", "1TIM"])

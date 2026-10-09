@@ -1,7 +1,5 @@
-import numpy as np
-from helpers import pipeline
-
 from foldmap.features import MIN_CONTACT_PAIRS, sse_contacts
+from helpers import pipeline
 
 
 def test_paired_strands_touch_and_distant_elements_do_not(ubq):

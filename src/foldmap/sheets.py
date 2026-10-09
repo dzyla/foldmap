@@ -7,7 +7,7 @@ from itertools import combinations
 
 import networkx as nx
 
-from .model import Bridge, SSE, Sheet
+from .model import SSE, Bridge, Sheet
 
 _SPLIT_GAP = 4  # strands of one chain this close end to end are pieces of one long strand
 _MIN_PAIRS = 2  # bridges needed between two strands to count them as neighbours
@@ -83,10 +83,6 @@ def build_sheets(sses: list[SSE], bridges: list[Bridge]) -> list[Sheet]:
         for parent, child in nx.bfs_edges(tree, order[0]):
             flip = -1 if tree.edges[parent, child]["kind"] == "A" else 1
             direction[child] = direction[parent] * flip
-        kinds = [
-            tree.edges[a, b]["kind"] if tree.has_edge(a, b) else "?" for a, b in zip(order, order[1:])
-        ]
-        sheets.append(
-            Sheet([strands[k] for k in order], [direction[k] for k in order], kinds, closed, ambiguous)
-        )
+        kinds = [tree.edges[a, b]["kind"] if tree.has_edge(a, b) else "?" for a, b in zip(order, order[1:])]
+        sheets.append(Sheet([strands[k] for k in order], [direction[k] for k in order], kinds, closed, ambiguous))
     return sheets

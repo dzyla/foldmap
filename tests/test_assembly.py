@@ -4,7 +4,6 @@ from pathlib import Path
 
 import numpy as np
 import pytest
-from helpers import pipeline
 
 from foldmap.io import load_backbone
 
@@ -45,9 +44,8 @@ def test_apoferritin_is_octahedral():
 def test_tetrahedral_group_is_recognised(tmp_path):
     from itertools import product
 
-    from test_symmetry_scenarios import build, rot
-
     from foldmap.symmetry import detect_symmetry
+    from test_symmetry_scenarios import build, rot
 
     gens = [rot((1, 1, 1), 120), rot((0, 0, 1), 180)]
     group = [np.eye(3)]
@@ -73,8 +71,11 @@ def test_highlight_keeps_the_asu_coloured_and_greys_the_mates(tmp_path):
     lay, sses, bb = make_layout(APO)
     fig = make_figure(APO, look=Style(highlight="asu"))
     ax = fig.axes[0]
-    fills = {a.get_gid().split(":", 1)[1]: to_hex(a.get_facecolor()) for a in ax.patches
-             if (a.get_gid() or "").startswith("helix:")}
+    fills = {
+        a.get_gid().split(":", 1)[1]: to_hex(a.get_facecolor())
+        for a in ax.patches
+        if (a.get_gid() or "").startswith("helix:")
+    }
     asu = [s.id for s in sses if s.chain in bb.asu_chains]
     mates = [s.id for s in sses if s.chain not in bb.asu_chains]
     assert asu and all(fills[k] != MATE_GREY for k in asu)

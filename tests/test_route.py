@@ -2,11 +2,11 @@ from types import SimpleNamespace
 
 import numpy as np
 import pytest
-from helpers import fake_sse, pipeline
 
 from foldmap.frame import view_frame
 from foldmap.layout import HELIX_W, PITCH, Layout, Placed, build_layout
 from foldmap.route import route_loops
+from helpers import fake_sse, pipeline
 
 MODES = ["projected", "stack"]
 
@@ -63,8 +63,10 @@ def test_walled_in_port_falls_back_and_finishes():
     a = strand(0, 0, 0)
     b = strand(20, 4, 0, length=2.0, angle=-np.pi / 2)
     walls = [
-        bar(40, 4, 1 + HELIX_W / 2 + 0.2, 5, 0), bar(50, 4, -1 - HELIX_W / 2 - 0.2, 5, 0),
-        bar(60, 1.5 - HELIX_W / 2, 0, 5, np.pi / 2), bar(70, 6.5 + HELIX_W / 2, 0, 5, np.pi / 2),
+        bar(40, 4, 1 + HELIX_W / 2 + 0.2, 5, 0),
+        bar(50, 4, -1 - HELIX_W / 2 - 0.2, 5, 0),
+        bar(60, 1.5 - HELIX_W / 2, 0, 5, np.pi / 2),
+        bar(70, 6.5 + HELIX_W / 2, 0, 5, np.pi / 2),
     ]
     lay = layout_of(a, b, *walls)
     (loop,) = route_loops(lay, [a.sse, b.sse], stub_bb())
@@ -75,8 +77,8 @@ def test_walled_in_port_falls_back_and_finishes():
 
 def shared_length(p, q):
     total = 0.0
-    for (a0, a1) in zip(p, p[1:]):
-        for (b0, b1) in zip(q, q[1:]):
+    for a0, a1 in zip(p, p[1:]):
+        for b0, b1 in zip(q, q[1:]):
             if abs(a0[0] - a1[0]) < 1e-9 and abs(b0[0] - b1[0]) < 1e-9 and abs(a0[0] - b0[0]) < 0.05:
                 total += max(0, min(max(a0[1], a1[1]), max(b0[1], b1[1])) - max(min(a0[1], a1[1]), min(b0[1], b1[1])))
             if abs(a0[1] - a1[1]) < 1e-9 and abs(b0[1] - b1[1]) < 1e-9 and abs(a0[1] - b0[1]) < 0.05:
@@ -86,8 +88,10 @@ def shared_length(p, q):
 
 def test_later_loops_do_not_run_on_top_of_earlier_ones():
     s = [
-        strand(0, 0, 0), strand(20, 6, 0, angle=-np.pi / 2),
-        strand(40, 2, 0), strand(60, 4, 0, angle=-np.pi / 2),
+        strand(0, 0, 0),
+        strand(20, 6, 0, angle=-np.pi / 2),
+        strand(40, 2, 0),
+        strand(60, 4, 0, angle=-np.pi / 2),
     ]
     lay = layout_of(*s)
     loops = route_loops(lay, [p.sse for p in s], stub_bb())
@@ -129,7 +133,10 @@ def test_real_structures_loops_join_their_ports_and_stay_clear(name, mode, reque
             continue
         others = [p.rect for k, p in lay.placed.items() if k not in (l.a_id, l.b_id)]
         assert segments_clear(l.points, others, step=0.1), (l.a_id, l.b_id)  # never through a third element
-        assert segments_clear(l.points[1:-1], [a.rect, b.rect], step=0.1), (l.a_id, l.b_id)  # only the stubs touch the ends
+        assert segments_clear(l.points[1:-1], [a.rect, b.rect], step=0.1), (
+            l.a_id,
+            l.b_id,
+        )  # only the stubs touch the ends
     assert sum(l.fallback for l in loops) <= max(1, len(loops) // 4)
 
 
@@ -164,18 +171,26 @@ def test_routes_never_circle_back_over_themselves(pdb):
 
 def self_crossing(points, eps=1e-9):
     """True if two non-adjacent segments of the polyline touch or cross."""
+
     def cross(o, a, b):
         return (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0])
 
     def on(p, a, b):
-        return min(a[0], b[0]) - eps <= p[0] <= max(a[0], b[0]) + eps and min(a[1], b[1]) - eps <= p[1] <= max(a[1], b[1]) + eps
+        return (
+            min(a[0], b[0]) - eps <= p[0] <= max(a[0], b[0]) + eps
+            and min(a[1], b[1]) - eps <= p[1] <= max(a[1], b[1]) + eps
+        )
 
     def meet(a, b, c, d):
         d1, d2, d3, d4 = cross(c, d, a), cross(c, d, b), cross(a, b, c), cross(a, b, d)
-        if ((d1 > eps and d2 < -eps) or (d1 < -eps and d2 > eps)) and ((d3 > eps and d4 < -eps) or (d3 < -eps and d4 > eps)):
+        if ((d1 > eps and d2 < -eps) or (d1 < -eps and d2 > eps)) and (
+            (d3 > eps and d4 < -eps) or (d3 < -eps and d4 > eps)
+        ):
             return True
-        return any(abs(v) <= eps and on(p, *seg) for v, p, seg in
-                   ((d1, a, (c, d)), (d2, b, (c, d)), (d3, c, (a, b)), (d4, d, (a, b))))
+        return any(
+            abs(v) <= eps and on(p, *seg)
+            for v, p, seg in ((d1, a, (c, d)), (d2, b, (c, d)), (d3, c, (a, b)), (d4, d, (a, b)))
+        )
 
     segs = list(zip(points, points[1:]))
     return any(meet(*segs[i], *segs[j]) for i in range(len(segs)) for j in range(i + 2, len(segs)))
@@ -191,4 +206,6 @@ def test_kinked_helix_pieces_are_joined_straight_not_by_a_fallback():
     for key in [("B:456-478", "B:480-485"), ("F:456-472", "F:474-485")]:
         l = loops[key]
         assert not l.fallback and len(l.points) == 2, key  # one straight link across the kink
-        assert np.allclose(l.points[0], lay.placed[key[0]].c_port) and np.allclose(l.points[1], lay.placed[key[1]].n_port)
+        assert np.allclose(l.points[0], lay.placed[key[0]].c_port) and np.allclose(
+            l.points[1], lay.placed[key[1]].n_port
+        )

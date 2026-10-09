@@ -7,19 +7,19 @@ import sys
 
 import numpy as np
 
+from . import layoutfile
 from .dssp import assign_dssp
 from .features import sse_contacts
 from .frame import dna_radial_frame, dna_view_frame, symmetric_frame, view_frame
-from . import layoutfile
-from .symmetry import TOLERANCE, detect_symmetry
 from .io import load_backbone, load_links, load_nucleic
 from .layout import build_layout, resolve
 from .palette import PALETTES
-from .style import CHOICES, LAYOUT_KEYS, SCALES, THEME_KEYS, THEMES, Style, describe, resolve_style
 from .render import LOOP_STYLES, STYLES, draw, save
 from .route import route_loops
 from .sheets import build_sheets
 from .ss import build_sses
+from .style import CHOICES, LAYOUT_KEYS, SCALES, THEME_KEYS, THEMES, Style, describe, resolve_style
+from .symmetry import TOLERANCE, detect_symmetry
 
 
 def summarize(path: str) -> str:
@@ -28,8 +28,10 @@ def summarize(path: str) -> str:
     sses = build_sses(bb, dssp.ss, short_helices=True)
     sheets = build_sheets(sses, dssp.bridges)
     lines = [f"{path}: {len(bb)} residues, {len(set(l.chain for l in bb.labels))} chain(s)"]
-    lines.append(f"helices: {sum(s.kind == 'H' for s in sses)}  strands: {sum(s.kind == 'E' for s in sses)}"
-                 f"  3₁₀ helices: {sum(s.kind == 'G' for s in sses)}")
+    lines.append(
+        f"helices: {sum(s.kind == 'H' for s in sses)}  strands: {sum(s.kind == 'E' for s in sses)}"
+        f"  3₁₀ helices: {sum(s.kind == 'G' for s in sses)}"
+    )
     for s in sses:
         if s.kind == "H":
             lines.append(f"  helix  {s.id}")
@@ -48,20 +50,40 @@ def summarize(path: str) -> str:
         sym = None
     if sym is not None:
         extra = f"; twist {np.degrees(sym.twist):.1f}°, rise {sym.rise:.1f} Å" if sym.kind == "H" else ""
-        lines.append(f"symmetry: {sym.label} — protomers {' | '.join(','.join(p) for p in sym.protomers)}"
-                     f"; CA RMSD {sym.rmsd:.2f} Å{extra}" + (f"; unpaired chains {','.join(sym.others)}" if sym.others else ""))
+        lines.append(
+            f"symmetry: {sym.label} — protomers {' | '.join(','.join(p) for p in sym.protomers)}"
+            f"; CA RMSD {sym.rmsd:.2f} Å{extra}" + (f"; unpaired chains {','.join(sym.others)}" if sym.others else "")
+        )
     na = load_nucleic(path, bb)
     if na.strands:
-        kind = "RNA" if all(st.rna for st in na.strands) else "DNA" if not any(st.rna for st in na.strands) else "DNA/RNA"
-        lines.append(f"{kind}: {len(na.strands)} strand(s) {', '.join(st.id for st in na.strands)}; "
-                     f"{len(na.pairs)} base pairs; {len(na.contacts)} protein residues make contacts")
+        kind = (
+            "RNA" if all(st.rna for st in na.strands) else "DNA" if not any(st.rna for st in na.strands) else "DNA/RNA"
+        )
+        lines.append(
+            f"{kind}: {len(na.strands)} strand(s) {', '.join(st.id for st in na.strands)}; "
+            f"{len(na.pairs)} base pairs; {len(na.contacts)} protein residues make contacts"
+        )
     return "\n".join(lines)
 
 
-def make_layout(path, mode: str = "projected", rotate: float = 0.0, flip_v: bool = False, dna: bool = True,
-                look: Style | None = None, symmetry: str = "auto", protomers: list[list[str]] | None = None,
-                symmetry_tol: float = TOLERANCE, assembly: str = "auto", rename: dict | None = None,
-                swap: list | None = None, move: list | None = None, up=None, view=None, domains=None):
+def make_layout(
+    path,
+    mode: str = "projected",
+    rotate: float = 0.0,
+    flip_v: bool = False,
+    dna: bool = True,
+    look: Style | None = None,
+    symmetry: str = "auto",
+    protomers: list[list[str]] | None = None,
+    symmetry_tol: float = TOLERANCE,
+    assembly: str = "auto",
+    rename: dict | None = None,
+    swap: list | None = None,
+    move: list | None = None,
+    up=None,
+    view=None,
+    domains=None,
+):
     bb = load_backbone(path, assembly)
     dssp = assign_dssp(bb)
     sses = build_sses(bb, dssp.ss, short_helices=(look or Style()).helices_310)
@@ -69,8 +91,14 @@ def make_layout(path, mode: str = "projected", rotate: float = 0.0, flip_v: bool
     nucleic = load_nucleic(path, bb, assembly) if dna else None
     sym = detect_symmetry(bb, sses, symmetry, protomers, symmetry_tol) if sses else None
     if nucleic is not None and nucleic.strands:
-        frame = dna_radial_frame(sses, nucleic) if not rotate and not flip_v else dna_view_frame(sses, nucleic, rotate, flip_v)
-    elif sym is not None and not rotate and not flip_v and up is None and view is None:  # an assembly: every protomer drawn alike, side by side
+        frame = (
+            dna_radial_frame(sses, nucleic)
+            if not rotate and not flip_v
+            else dna_view_frame(sses, nucleic, rotate, flip_v)
+        )
+    elif (
+        sym is not None and not rotate and not flip_v and up is None and view is None
+    ):  # an assembly: every protomer drawn alike, side by side
         frame = symmetric_frame(sses, sym)
     else:
         frame = view_frame(sses, rotate, flip_v, up, view)
@@ -84,8 +112,20 @@ def make_layout(path, mode: str = "projected", rotate: float = 0.0, flip_v: bool
             for b in range(a + 1, len(ids)):
                 key = frozenset((ids[a], ids[b]))
                 contacts[key] = contacts.get(key, 0) + _DOMAIN_PULL
-    lay = build_layout(sses, sheets, frame, mode, contacts=contacts, nucleic=nucleic, style=look,
-                       bridges=_bridge_springs(bb, sses, links), domains=named, rename=rename, swap=swap, move=move)
+    lay = build_layout(
+        sses,
+        sheets,
+        frame,
+        mode,
+        contacts=contacts,
+        nucleic=nucleic,
+        style=look,
+        bridges=_bridge_springs(bb, sses, links),
+        domains=named,
+        rename=rename,
+        swap=swap,
+        move=move,
+    )
     lay.focus = _focus((look or Style()).highlight, bb, sym)
     lay.links = links
     lay.res_chain = [l.chain for l in bb.labels]
@@ -140,6 +180,7 @@ def _bridge_springs(bb, sses, links) -> list[tuple[str, float, str, float]]:
 def _bridge_contacts(bb, sses, links) -> dict[frozenset[str], int]:
     """A disulfide ties two elements together like a full contact: the cysteine's own element, or the element
     nearest it along its chain when it sits in a loop."""
+
     def element(r: int):
         chain = bb.labels[r].chain
         mine = [s for s in sses if s.chain == chain]
@@ -172,13 +213,27 @@ def _focus(highlight: str, bb, sym) -> set[str] | None:
     return wanted
 
 
-def make_figure_and_loops(path, mode: str = "projected", rotate: float = 0.0, flip_v: bool = False,
-                          title: str | None = None, *, palette: str | None = None, style: str | None = None,
-                          loops: str | None = None, dna: bool = True, look: Style | None = None,
-                          symmetry: str = "auto", protomers: list[list[str]] | None = None,
-                          symmetry_tol: float = TOLERANCE, assembly: str = "auto", **adjust):
-    layout, sses, bb = make_layout(path, mode, rotate, flip_v, dna, look, symmetry, protomers, symmetry_tol, assembly,
-                                   **adjust)
+def make_figure_and_loops(
+    path,
+    mode: str = "projected",
+    rotate: float = 0.0,
+    flip_v: bool = False,
+    title: str | None = None,
+    *,
+    palette: str | None = None,
+    style: str | None = None,
+    loops: str | None = None,
+    dna: bool = True,
+    look: Style | None = None,
+    symmetry: str = "auto",
+    protomers: list[list[str]] | None = None,
+    symmetry_tol: float = TOLERANCE,
+    assembly: str = "auto",
+    **adjust,
+):
+    layout, sses, bb = make_layout(
+        path, mode, rotate, flip_v, dna, look, symmetry, protomers, symmetry_tol, assembly, **adjust
+    )
     routed = route_loops(layout, sses, bb)
     return draw(layout, routed, sses, title, look=look, palette=palette, style=style, loop_style=loops), routed
 
@@ -217,7 +272,13 @@ def _adjustments(args) -> dict:
         if len(d) != 2:
             raise ValueError(f"--move needs REF=DX,DY, got {item!r}")
         move.append((ref, (d[0], d[1])))
-    return {"rename": rename, "swap": swap, "move": move, "up": _vector(args.up, "up"), "view": _vector(args.view, "view")}
+    return {
+        "rename": rename,
+        "swap": swap,
+        "move": move,
+        "up": _vector(args.up, "up"),
+        "view": _vector(args.view, "view"),
+    }
 
 
 def _figure_spec(args):
@@ -225,8 +286,9 @@ def _figure_spec(args):
     doc = layoutfile.load(args.layout_file) if args.layout_file else {}
     theme = args.theme or doc.get("theme") or "publication"
     file_style = [f"{k}={v}" for k, v in (doc.get("style") or {}).items()]
-    shorthand = [f"{k}={v}" for k, v in (("palette", args.palette), ("fill", args.style), ("loops", args.loops))
-                 if v is not None]
+    shorthand = [
+        f"{k}={v}" for k, v in (("palette", args.palette), ("fill", args.style), ("loops", args.loops)) if v is not None
+    ]
     look = resolve_style(theme, args.style_file, file_style + shorthand + args.set)
     lay = doc.get("layout") or {}
 
@@ -237,12 +299,18 @@ def _figure_spec(args):
     cli = _adjustments(args)
     vec = lambda v, what: _vector(v, what) if isinstance(v, str) else v  # noqa: E731
     protomers = args.protomers or lay.get("protomers")
-    opts = {"mode": pick("mode", "projected"), "rotate": float(pick("rotate", 0.0)),
-            "flip_v": bool(args.flip_v or lay.get("flip_v", False)), "symmetry": pick("symmetry", "auto"),
-            "symmetry_tol": float(pick("symmetry_tol", TOLERANCE)), "assembly": str(pick("assembly", "auto")),
-            "protomers": _protomers(protomers) if isinstance(protomers, str) else protomers,
-            "up": cli["up"] or vec(lay.get("up"), "up"), "view": cli["view"] or vec(lay.get("view"), "view"),
-            "title": args.title if args.title is not None else lay.get("title")}
+    opts = {
+        "mode": pick("mode", "projected"),
+        "rotate": float(pick("rotate", 0.0)),
+        "flip_v": bool(args.flip_v or lay.get("flip_v", False)),
+        "symmetry": pick("symmetry", "auto"),
+        "symmetry_tol": float(pick("symmetry_tol", TOLERANCE)),
+        "assembly": str(pick("assembly", "auto")),
+        "protomers": _protomers(protomers) if isinstance(protomers, str) else protomers,
+        "up": cli["up"] or vec(lay.get("up"), "up"),
+        "view": cli["view"] or vec(lay.get("view"), "view"),
+        "title": args.title if args.title is not None else lay.get("title"),
+    }
     domains = _domain_spec(args.domain) or args.domains or doc.get("domains") or None
     if isinstance(domains, dict):
         domains = [(name, list(refs)) for name, refs in domains.items()]
@@ -299,7 +367,8 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("app", help="open the Streamlit app in your browser (needs: pip install streamlit)")
     q = sub.add_parser("plot", help="draw the topology figure")
     iq = sub.add_parser("interactive", help="an HTML page linking the topology, the contact map and the 3D model")
-    for q in (q, iq):
+    for cmd in (q, iq):
+        q = cmd
         q.add_argument("structure")
         q.add_argument("-o", "--output", action="append", required=True, help=".svg, .pdf or .png (repeatable)")
         q.add_argument("--mode", choices=["projected", "stack"], help="projected (default) or stack")
@@ -308,36 +377,81 @@ def main(argv: list[str] | None = None) -> int:
         q.add_argument("--save-layout", metavar="YAML", help="write everything that defines this figure to a file")
         q.add_argument("--flip-v", action="store_true", help="mirror top/bottom (changes handedness)")
         q.add_argument("--title")
-        q.add_argument("--theme", "--preset", dest="theme", choices=list(THEMES),
-                       help="a ready-made look (default: publication); see `foldmap styles`")
+        q.add_argument(
+            "--theme",
+            "--preset",
+            dest="theme",
+            choices=list(THEMES),
+            help="a ready-made look (default: publication); see `foldmap styles`",
+        )
         q.add_argument("--style-file", help="YAML file of style keys (may name a theme); see `foldmap styles`")
-        q.add_argument("--set", action="append", default=[], metavar="KEY=VALUE",
-                       help="one style key, e.g. helix_scale=0.8 or loops=curved (repeatable; wins over the rest)")
+        q.add_argument(
+            "--set",
+            action="append",
+            default=[],
+            metavar="KEY=VALUE",
+            help="one style key, e.g. helix_scale=0.8 or loops=curved (repeatable; wins over the rest)",
+        )
         q.add_argument("--palette", choices=list(PALETTES), help="chain colours (same as --set palette=...)")
         q.add_argument("--style", choices=STYLES, help="element fill (same as --set fill=...)")
         q.add_argument("--loops", choices=LOOP_STYLES, help="right-angled or smooth loops (same as --set loops=...)")
         q.add_argument("--no-dna", action="store_true", help="leave out DNA/RNA even when the file has it")
-        q.add_argument("--symmetry", metavar="auto|off|Cn|Dn|helical",
-                       help="auto finds cyclic, dihedral or helical symmetry and draws every protomer alike, side by side; "
-                            "name one (C3, D2, helical) to insist on it; off to ignore it")
-        q.add_argument("--protomers", metavar="A,B;C,D",
-                       help="your own protomers, in order around the axis (chains separated by commas, protomers by ;)")
-        q.add_argument("--assembly", metavar="auto|asu|ID",
-                       help="auto builds the file's first biological assembly when it adds copies (up to 24 chains); "
-                            "asu keeps the file as deposited; or give an assembly id from the file")
-        q.add_argument("--rename", action="append", default=[], metavar="REF=NAME",
-                       help="your own element name, e.g. res:167-182=Gd or A:B=B' (repeatable)")
-        q.add_argument("--swap", action="append", default=[], metavar="REF,REF",
-                       help="exchange the places of two elements, e.g. α1,α3 or A:C,A:D (repeatable)")
-        q.add_argument("--move", action="append", default=[], metavar="REF=DX,DY",
-                       help="nudge an element (page units, one strand spacing ~1.1), e.g. α2=1,-2 (repeatable)")
-        q.add_argument("--domain", action="append", default=[], metavar="NAME=REF[,REF...]",
-                       help="a named domain panel, e.g. ZPN=res:A:331-440 (repeatable)")
+        q.add_argument(
+            "--symmetry",
+            metavar="auto|off|Cn|Dn|helical",
+            help="auto finds cyclic, dihedral or helical symmetry and draws every protomer alike, side by side; "
+            "name one (C3, D2, helical) to insist on it; off to ignore it",
+        )
+        q.add_argument(
+            "--protomers",
+            metavar="A,B;C,D",
+            help="your own protomers, in order around the axis (chains separated by commas, protomers by ;)",
+        )
+        q.add_argument(
+            "--assembly",
+            metavar="auto|asu|ID",
+            help="auto builds the file's first biological assembly when it adds copies (up to 24 chains); "
+            "asu keeps the file as deposited; or give an assembly id from the file",
+        )
+        q.add_argument(
+            "--rename",
+            action="append",
+            default=[],
+            metavar="REF=NAME",
+            help="your own element name, e.g. res:167-182=Gd or A:B=B' (repeatable)",
+        )
+        q.add_argument(
+            "--swap",
+            action="append",
+            default=[],
+            metavar="REF,REF",
+            help="exchange the places of two elements, e.g. α1,α3 or A:C,A:D (repeatable)",
+        )
+        q.add_argument(
+            "--move",
+            action="append",
+            default=[],
+            metavar="REF=DX,DY",
+            help="nudge an element (page units, one strand spacing ~1.1), e.g. α2=1,-2 (repeatable)",
+        )
+        q.add_argument(
+            "--domain",
+            action="append",
+            default=[],
+            metavar="NAME=REF[,REF...]",
+            help="a named domain panel, e.g. ZPN=res:A:331-440 (repeatable)",
+        )
         q.add_argument("--domains", choices=["auto"], help="find domains from element contacts (D1, D2...)")
-        q.add_argument("--up", metavar="X,Y,Z", help="3D direction to put at the top of the page (e.g. a membrane normal)")
+        q.add_argument(
+            "--up", metavar="X,Y,Z", help="3D direction to put at the top of the page (e.g. a membrane normal)"
+        )
         q.add_argument("--view", metavar="X,Y,Z", help="3D direction pointing at the viewer")
-        q.add_argument("--symmetry-tol", type=float, metavar="Å",
-                       help=f"how far copies may differ, CA RMSD (default {TOLERANCE:g}; raise it for low-resolution X-ray)")
+        q.add_argument(
+            "--symmetry-tol",
+            type=float,
+            metavar="Å",
+            help=f"how far copies may differ, CA RMSD (default {TOLERANCE:g}; raise it for low-resolution X-ray)",
+        )
     args = parser.parse_args(argv)
     try:
         if args.command == "app":
@@ -349,21 +463,35 @@ def main(argv: list[str] | None = None) -> int:
             return 0
         if args.command in ("plot", "interactive"):
             theme, look, opts, edits = _figure_spec(args)
-            kw = dict(dna=not args.no_dna, look=look, symmetry=opts["symmetry"], protomers=opts["protomers"],
-                      symmetry_tol=opts["symmetry_tol"], assembly=opts["assembly"], up=opts["up"], view=opts["view"],
-                      domains=opts["domains"], **edits)
+            kw = dict(
+                dna=not args.no_dna,
+                look=look,
+                symmetry=opts["symmetry"],
+                protomers=opts["protomers"],
+                symmetry_tol=opts["symmetry_tol"],
+                assembly=opts["assembly"],
+                up=opts["up"],
+                view=opts["view"],
+                domains=opts["domains"],
+                **edits,
+            )
             if args.command == "interactive":
                 from .interactive import write_page
 
+                page = dict(mode=opts["mode"], title=opts["title"], rotate=opts["rotate"], flip_v=opts["flip_v"])
                 for out in args.output:
-                    print(f"wrote {write_page(args.structure, out, mode=opts['mode'], title=opts['title'], rotate=opts['rotate'], flip_v=opts['flip_v'], **kw)}")
+                    print(f"wrote {write_page(args.structure, out, **page, **kw)}")
             else:
-                fig, routed = make_figure_and_loops(args.structure, opts["mode"], opts["rotate"], opts["flip_v"],
-                                                    opts["title"], **kw)
+                fig, routed = make_figure_and_loops(
+                    args.structure, opts["mode"], opts["rotate"], opts["flip_v"], opts["title"], **kw
+                )
                 stuck = [f"{l.a_id}>{l.b_id}" for l in routed if l.fallback]
                 if stuck:
-                    print(f"foldmap: warning: no clear route for {len(stuck)} loop(s), drawn as plain curves "
-                          f"that may cross elements: {', '.join(stuck)}", file=sys.stderr)
+                    print(
+                        f"foldmap: warning: no clear route for {len(stuck)} loop(s), drawn as plain curves "
+                        f"that may cross elements: {', '.join(stuck)}",
+                        file=sys.stderr,
+                    )
                 for out in args.output:
                     print(f"wrote {save(fig, out)}")
             if args.save_layout:

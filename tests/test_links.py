@@ -30,8 +30,11 @@ def test_glycans_hang_on_asparagine_with_their_sugars_in_order():
 
 
 def _gids(fig, prefix):
-    return [a for a in [*fig.axes[0].patches, *fig.axes[0].lines, *fig.axes[0].collections]
-            if (a.get_gid() or "").startswith(prefix)]
+    return [
+        a
+        for a in [*fig.axes[0].patches, *fig.axes[0].lines, *fig.axes[0].collections]
+        if (a.get_gid() or "").startswith(prefix)
+    ]
 
 
 @pytest.mark.parametrize("name", ["5NKT", "6ZS5"])
@@ -91,8 +94,10 @@ def test_layout_pulls_bridged_cysteines_together(name, strict, monkeypatch):
     def mean_bar():
         lay, sses, bb = make_layout(path)
         loops = route_loops(lay, sses, bb)
-        ends = [(residue_point(lay, loops, sses, bb, i), residue_point(lay, loops, sses, bb, j))
-                for i, j in lay.links.disulfides]
+        ends = [
+            (residue_point(lay, loops, sses, bb, i), residue_point(lay, loops, sses, bb, j))
+            for i, j in lay.links.disulfides
+        ]
         return np.mean([np.hypot(a[0] - b[0], a[1] - b[1]) for a, b in ends])
 
     pulled = mean_bar()
@@ -113,8 +118,10 @@ def test_cysteine_springs_bring_bridged_residues_closer_than_box_contacts(name, 
     def bars():
         lay, sses, bb = make_layout(path)
         loops = route_loops(lay, sses, bb)
-        ends = [(residue_point(lay, loops, sses, bb, i), residue_point(lay, loops, sses, bb, j))
-                for i, j in lay.links.disulfides]
+        ends = [
+            (residue_point(lay, loops, sses, bb, i), residue_point(lay, loops, sses, bb, j))
+            for i, j in lay.links.disulfides
+        ]
         return np.array([np.hypot(a[0] - b[0], a[1] - b[1]) for a, b in ends if a and b])
 
     sprung = bars()
