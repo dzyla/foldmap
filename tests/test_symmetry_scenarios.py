@@ -231,3 +231,10 @@ def test_peptide_outside_every_protomer_does_not_break_the_layout():
 
     lay, sses, _ = make_layout(Path(__file__).parent / "data" / "4CH9.cif")
     assert lay.placed and {s.chain for s in sses} >= {"A", "B"}
+
+
+def test_near_translations_are_not_helices(tmp_path):
+    """Copies related by a translation plus rounding-level rotation (what other BLAS builds produce) are not a
+    helix: a helical filament needs a real twist."""
+    ops = [(rot((0, 0, 1), 0.01 * k), np.array([60.0 * k, 0, 0])) for k in range(3)]
+    assert found(build(tmp_path, ops)) is None

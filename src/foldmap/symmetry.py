@@ -30,6 +30,7 @@ SAME = 0.9  # aligned identity for two chains to be copies
 MIN_RES = 10  # chains shorter than this are left out
 MIN_TURN = np.radians(10)  # smaller rotations are lattice-like translations, not symmetry
 MIN_RISE = 2.0  # Å along the axis per copy for a helical filament
+MIN_TWIST = np.radians(3.0)  # a helical filament turns at least this much per copy (less: a translation)
 MAX_ORDER = 24
 
 
@@ -295,7 +296,7 @@ def _helical(asm: _Assembly, tol: float):
                     continue
                 r, t, rmsd = _kabsch(p, q)
                 angle, ax, cen, rise = _screw(r, t)
-                if rmsd > tol or abs(rise) < MIN_RISE:
+                if rmsd > tol or abs(rise) < MIN_RISE or abs(angle) < MIN_TWIST:
                     continue
                 if rise < 0:
                     continue  # the same screw is found the other way round from (b, a)
