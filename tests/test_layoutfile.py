@@ -137,3 +137,11 @@ def test_app_settings_round_trip_through_a_layout_file(tmp_path):
     back = settings_from_document(doc)
     assert back["theme"] == "trace" and back["residue_numbers"] is True and back["mode"] == "stack"
     assert back["rotate"] == 30 and back["title"] == "T4L" and back["swap"].startswith("res:A:")
+
+
+def test_version_flag(capsys):
+    from importlib.metadata import version
+
+    with pytest.raises(SystemExit):
+        main(["--version"])
+    assert capsys.readouterr().out.strip() == f"foldmap {version('foldmap')}"

@@ -48,6 +48,7 @@ _EXT = {".svg": "svg", ".pdf": "pdf", ".png": "png"}
 _FONTS = ["Arial", "Helvetica", "Liberation Sans", "Nimbus Sans", "DejaVu Sans"]  # journal sans first
 _RC = {"font.family": "sans-serif", "font.sans-serif": _FONTS}
 _PANEL = "#eef1f4"
+_SHORT_HELIX = 1.6  # helices/3-10 boxes shorter than this hold their residue numbers past the ends
 _DOMAIN_TONES = ("#4c78a8", "#e45756", "#54a24b", "#b279a2", "#f58518", "#72b7b2")  # one hue per domain
 MARK_DEFAULT = "#d1495b"  # a marked element without its own colour
 MATE_GREY = "#c4c9cf"  # symmetry mates (or other chains) when one part is highlighted
@@ -731,9 +732,10 @@ def _draw(
     elif look.color_by in _PROPERTY:
         entries = [(("ramp", look.color_by), _PROPERTY[look.color_by][3])]
     elif look.color_by == "sstype":
-        entries = [(_SSTYPE["H"], "helix"), (_SSTYPE["E"], "strand")]
-        if any(s.kind == "G" for s in sses):
-            entries.append((_SSTYPE["G"], "3₁₀ helix"))
+        kinds = {p.sse.kind for p in layout.placed.values()}
+        entries = [
+            (_SSTYPE[k], name) for k, name in (("H", "helix"), ("E", "strand"), ("G", "3₁₀ helix")) if k in kinds
+        ]
     if layout.dna and look.legend:
         ids = sorted({layout.nucleic.strands[k].chain for d in layout.dna for k in d.strands})
         kind = "RNA" if all(layout.nucleic.strands[k].rna for d in layout.dna for k in d.strands) else "DNA"
@@ -948,7 +950,8 @@ def _draw(
                 inward = p.direction * (1.0 if end == "N" else -1.0)
                 if p.sse.kind in ("H", "G"):
                     away = -1.0 if nrm[1] >= 0 else 1.0  # the side opposite the helix name
-                    xy, ink = np.asarray(port) + inward * 0.35 + nrm * away * (p.width / 2 + 0.38), "#4a4a4a"
+                    along = 0.35 if p.length >= _SHORT_HELIX else -0.3  # a short box: just past each end instead
+                    xy, ink = np.asarray(port) + inward * along + nrm * away * (p.width / 2 + 0.38), "#4a4a4a"
                 elif p.length >= 3.0:  # room for both numbers and the strand letter between them
                     reach = 0.35 if end == "N" else min(_HEAD_LEN, p.length * 0.45) + 0.3  # clear of the head
                     xy, ink = (
@@ -1036,7 +1039,7 @@ def save_svg(fig: Figure) -> str:
     return text[text.index("<svg") :]
 
 
-def save(fig: Figure, path: str | FsPath) -> FsPath:
+def save(fig: Figure, path: str | FsPath, dpi: int = 300) -> FsPath:
     path = FsPath(path)
     fmt = _EXT.get(path.suffix.lower())
     if fmt is None:
@@ -1044,5 +1047,5 @@ def save(fig: Figure, path: str | FsPath) -> FsPath:
     path.parent.mkdir(parents=True, exist_ok=True)
     meta = {"svg": {"Date": None}, "pdf": {"CreationDate": None}, "png": {"Software": None}}[fmt]
     with rc_context({"svg.fonttype": "none", "pdf.fonttype": 42, "svg.hashsalt": "foldmap", **_RC}):
-        fig.savefig(path, format=fmt, dpi=300, metadata=meta, facecolor="white")
+        fig.savefig(path, format=fmt, dpi=dpi, metadata=meta, facecolor="white")
     return path

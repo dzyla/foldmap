@@ -104,3 +104,37 @@ def test_interactive_page_lists_310_elements():
     data = json.loads(re.search(r'id="topo-data">(.*?)</script>', page, re.S).group(1))
     g = [e for e in data["elements"] if e["kind"] == "G"]
     assert len(g) == 2 and all(f'id="eta:{e["id"]}"' in page for e in g)
+
+
+@pytest.mark.parametrize("name", ["1UBQ", "1LMB", "5NKT", "1TIM"])
+def test_residue_numbers_of_one_element_never_overlap(name):
+    from foldmap.style import Style
+
+    fig = make_figure(DATA / f"{name}.cif", look=Style(residue_numbers=True), assembly="asu")
+    from matplotlib.backends.backend_agg import FigureCanvasAgg
+
+    r = FigureCanvasAgg(fig).get_renderer()
+    nums = {}
+    for t in fig.axes[0].texts:
+        gid = t.get_gid() or ""
+        if gid.startswith("resnum:"):
+            nums.setdefault(gid.rsplit(":", 1)[0], []).append(t.get_window_extent(r))
+    assert nums
+    for key, (a, b) in nums.items():
+        assert not a.overlaps(b), key
+
+
+def test_sstype_legend_lists_only_kinds_present():
+    fig = make_figure(DATA / "5NKT.cif", look=Style(color_by="sstype"), assembly="asu")  # strands + one 3-10, no α
+    texts = {t.get_text() for t in fig.axes[0].texts}
+    assert "strand" in texts and "3₁₀ helix" in texts and "helix" not in texts
+
+
+def test_save_takes_a_resolution(tmp_path):
+    from matplotlib.image import imread
+
+    from foldmap.render import save
+
+    fig = make_figure(DATA / "1UBQ.cif")
+    lo, hi = imread(save(fig, tmp_path / "lo.png", dpi=100)), imread(save(fig, tmp_path / "hi.png"))
+    assert hi.shape[0] == pytest.approx(lo.shape[0] * 3, rel=0.02)

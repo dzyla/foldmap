@@ -359,7 +359,10 @@ def styles_help() -> str:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(prog="foldmap")
+    from importlib.metadata import version
+
+    parser = argparse.ArgumentParser(prog="foldmap", description="Publication-grade protein topology diagrams.")
+    parser.add_argument("--version", action="version", version=f"foldmap {version('foldmap')}")
     sub = parser.add_subparsers(dest="command", required=True)
     p = sub.add_parser("summary", help="print secondary structure elements and sheet ordering")
     p.add_argument("structure")
