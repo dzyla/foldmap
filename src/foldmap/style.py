@@ -79,6 +79,7 @@ class Style:
     glycans: bool = True  # SNFG symbols on glycosylated residues
     background: str = "#ffffff"  # page colour
     ink: str = "#000000"  # text and plain loops
+    uniprot_sites: str = "auto"  # with --uniprot: auto (active + binding sites), all, none, or types "active,modified"
     ligands: str = "auto"  # bound ligands/metal ions: auto (skip buffer additives), all, none, or codes "HEM,ZN"
     mark: str = ""  # elements in a colour of their own: "G", "A:G=#2ca02c", "#3", "res:150-159=red", comma-separated
 
@@ -91,6 +92,10 @@ class Style:
         for key in ("background", "ink"):
             if not is_color_like(getattr(self, key)):
                 raise ValueError(f"{key} must be a colour such as #0d2a4a or white; got {getattr(self, key)!r}")
+        if not re.fullmatch(r"auto|all|none|[a-z-]+(,[a-z-]+)*", self.uniprot_sites):
+            raise ValueError(
+                f"uniprot_sites must be auto, all, none or types like active,binding; got {self.uniprot_sites!r}"
+            )
         if not re.fullmatch(r"auto|all|none|[A-Za-z0-9]{1,5}(,[A-Za-z0-9]{1,5})*", self.ligands):
             raise ValueError(f"ligands must be auto, all, none or residue codes like HEM,ZN; got {self.ligands!r}")
         if not re.fullmatch(r"none|asu|protomer|[A-Za-z0-9]+(,[A-Za-z0-9]+)*", self.highlight):

@@ -8,10 +8,10 @@ from pathlib import Path as FsPath
 import numpy as np
 from matplotlib import rc_context
 from matplotlib.figure import Figure
-from matplotlib.patches import PathPatch, Polygon, Rectangle
+from matplotlib.patches import Circle, PathPatch, Polygon, Rectangle
 from matplotlib.path import Path
 
-from .palette import darken
+from .palette import darken, text_color_on
 from .render import _PAGE, _RC, _legible
 from .sequence import GAP, Alignment, chain_track, column_classes, conservation, map_alignment
 from .style import Style
@@ -48,6 +48,7 @@ def draw_sequence(
     threshold: float = 0.7,
     conservation_bar: bool = True,
     title: str | None = None,
+    uniprot: str | None = None,
 ) -> Figure:
     """ss_colour: 'figure' paints each element as in the topology figure drawn with `look`; 'black' is the
     classic plain style."""
@@ -70,6 +71,7 @@ def draw_sequence(
             threshold,
             conservation_bar,
             title,
+            uniprot,
         )
 
 
@@ -83,8 +85,66 @@ def _element_colours(path, look: Style, ss_colour: str) -> dict[str, str]:
     return element_colours(layout, sses, look)[0]
 
 
-def _draw(path, chain, alignment, reference, columns, look, full_sequence, ss_colour, threshold, cons_bar, title):
+REGION_COLOURS = {
+    "Domain": "#4c78a8",
+    "Region": "#9c9c9c",
+    "Repeat": "#72b7b2",
+    "Zinc finger": "#b279a2",
+    "DNA binding": "#f58518",
+    "Motif": "#e45756",
+    "Transmembrane": "#c49c3b",
+    "Coiled coil": "#54a24b",
+    "Signal": "#ff9da6",
+    "Propeptide": "#bab0ac",
+    "Topological domain": "#d8d2c4",
+}
+_FEAT_H, _SITE_H, _MAX_LANES = 1.25, 1.0, 4
+
+
+def _uniprot_track(path, track, accession):
+    """(regions as (feature, first, last track position, lane), sites as (feature, track position)) for the chain."""
+    from .io import load_backbone
+    from .uniprot import annotate
+
+    ann = annotate(path, load_backbone(path, "asu"), None if accession == "auto" else accession)
+    where = {r: p for p, r in enumerate(track.residue) if r is not None}
+    regions, lanes = [], []
+    spans = sorted(
+        (
+            (f, min(where[k] for k in ks if k in where), max(where[k] for k in ks if k in where))
+            for f, c, ks in ann.regions
+            if c == track.chain and any(k in where for k in ks)
+        ),
+        key=lambda t: (t[1], -(t[2] - t[1])),
+    )
+    for f, a, b in spans:
+        lane = next((i for i, end in enumerate(lanes) if end < a), None)
+        if lane is None:
+            if len(lanes) >= _MAX_LANES:
+                continue
+            lanes.append(-1)
+            lane = len(lanes) - 1
+        lanes[lane] = b
+        regions.append((f, a, b, lane))
+    sites = sorted(
+        {
+            (f.type, where[k]): (f, where[k])
+            for f, c, ks in ann.sites
+            if c == track.chain and f.type not in ("Glycosylation", "Disulfide bond")
+            for k in ks
+            if k in where
+        }.values(),
+        key=lambda t: t[1],
+    )
+    return regions, len(lanes), sites
+
+
+def _draw(
+    path, chain, alignment, reference, columns, look, full_sequence, ss_colour, threshold, cons_bar, title, uniprot=None
+):
     track = chain_track(path, chain, full_sequence)
+    regions, lanes, sites = _uniprot_track(path, track, uniprot) if uniprot else ([], 0, [])
+    feat_h = lanes * _FEAT_H + (_SITE_H if sites else 0.0) + (0.4 if lanes or sites else 0.0)
     colour_of = _element_colours(path, look, ss_colour)
     if alignment is not None:
         mapping = map_alignment(alignment, track, reference)
@@ -100,7 +160,7 @@ def _draw(path, chain, alignment, reference, columns, look, full_sequence, ss_co
     mono = _mono()
     col_of = {p: c for c, p in enumerate(position) if p is not None}
     blocks = -(-width // columns)
-    block_h = _LABEL_H + _GLYPH_H + _NUM_H + n_rows * _ROW_H + (_CONS_H if cons is not None else 0.0) + _GAP_H
+    block_h = _LABEL_H + _GLYPH_H + _NUM_H + n_rows * _ROW_H + feat_h + (_CONS_H if cons is not None else 0.0) + _GAP_H
     margin = max(len(n) for n in names) * 0.62 + 1.6
     title_h = 2.4 if title else 0.6
     total_h = title_h + blocks * block_h
@@ -198,10 +258,53 @@ def _draw(path, chain, alignment, reference, columns, look, full_sequence, ss_co
                 )
                 t.set_gid(f"num:{c}")
             if cons is not None:
-                base = y_bot - _CONS_H + 0.15
+                base = y_bot - feat_h - _CONS_H + 0.15
                 bar = Rectangle((x - 0.42, base), 0.84, max(cons[c], 0.02) * (_CONS_H - 0.4), fc=BAR, ec="none")
                 bar.set_gid(f"cons:{c}")
                 ax.add_patch(bar)
+
+    from .render import SITE_COLOURS
+
+    def feat_y(b: int) -> float:  # top of the UniProt track in block b
+        return row_y(b, n_rows - 1) - _ROW_H / 2 - 0.2
+
+    for n, (f, a, z, lane) in enumerate(regions):
+        if a not in col_of or z not in col_of:
+            continue
+        c0, c1 = col_of[a], col_of[z]
+        colour = REGION_COLOURS.get(f.type, "#9c9c9c")
+        for piece, b in enumerate(range(c0 // columns, c1 // columns + 1)):
+            lo, hi = max(c0, b * columns), min(c1, (b + 1) * columns - 1)
+            y = feat_y(b) - lane * _FEAT_H - 0.75
+            bar = Rectangle(
+                (lo - b * columns - 0.45, y), hi - lo + 0.9, 0.7, fc=colour, ec="none", alpha=0.85, zorder=2
+            )
+            bar.set_gid(f"uniprot-region:{n}:{piece}")
+            ax.add_patch(bar)
+            if piece == 0 or lo == b * columns:
+                room = hi - lo + 0.9
+                text = f.label if len(f.label) * 0.55 < room else f.label[: max(0, int(room / 0.55) - 1)] + "…"
+                if room > 2.5:
+                    ax.text(
+                        lo - b * columns,
+                        y + 0.35,
+                        text,
+                        ha="left",
+                        va="center",
+                        fontsize=font * 0.68,
+                        color=text_color_on(colour),
+                        zorder=3,
+                        clip_on=True,
+                    )
+    for n, (f, p) in enumerate(sites):
+        if p not in col_of:
+            continue
+        c = col_of[p]
+        b = c // columns
+        y = feat_y(b) - lanes * _FEAT_H - _SITE_H / 2
+        dot = Circle((c - b * columns, y), 0.3, fc=SITE_COLOURS.get(f.type, "#555555"), ec="none", zorder=3)
+        dot.set_gid(f"uniprot-site:{n}")
+        ax.add_patch(dot)
 
     for e in track.elements:
         if e.start not in col_of or e.end not in col_of:

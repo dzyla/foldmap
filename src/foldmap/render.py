@@ -713,6 +713,65 @@ def _draw_ligands(ax, marks: list[dict], lw: float, font: float) -> None:
         t.set_gid(f"ligand-label:{key}")
 
 
+SITE_COLOURS = {  # UniProt site types, Okabe-Ito based
+    "Active site": "#d55e00",
+    "Binding site": "#0072b2",
+    "Site": "#009e73",
+    "Modified residue": "#cc79a7",
+    "Lipidation": "#e69f00",
+    "Cross-link": "#56b4e9",
+    "Glycosylation": "#7f7f7f",
+    "Disulfide bond": "#f0c419",
+}
+SITE_GROUPS = {
+    "active": "Active site",
+    "binding": "Binding site",
+    "site": "Site",
+    "modified": "Modified residue",
+    "lipidation": "Lipidation",
+    "cross-link": "Cross-link",
+}
+
+
+def uniprot_marks(layout, loops, sses, look) -> list[dict]:
+    """UniProt sites to draw: (feature, chain, residue, page point). Glycosylation and disulfides come from the
+    structure itself, so they are not repeated here."""
+    ann = getattr(layout, "uniprot", None)
+    if ann is None or look.uniprot_sites == "none":
+        return []
+    if look.uniprot_sites == "auto":
+        wanted = {"Active site", "Binding site"}
+    elif look.uniprot_sites == "all":
+        wanted = set(SITE_GROUPS.values())
+    else:
+        wanted = {SITE_GROUPS[t] for t in look.uniprot_sites.split(",") if t in SITE_GROUPS}
+    shown = lambda c: not layout.partial or c not in layout.partial  # noqa: E731
+    out, seen = [], set()
+    for f, chain, ks in ann.sites:
+        if f.type not in wanted or not shown(chain):
+            continue
+        for k in ks:
+            if (f.type, k) in seen:
+                continue
+            seen.add((f.type, k))
+            at = residue_point(layout, loops, sses, layout.res_chain, k)
+            if at is not None:
+                out.append({"feature": f, "chain": chain, "residue": k, "at": at})
+    return out
+
+
+def _draw_uniprot(ax, marks: list[dict], layout, lw: float, font: float) -> None:
+    for n, m in enumerate(marks):
+        f, (x, y) = m["feature"], m["at"]
+        colour = SITE_COLOURS.get(f.type, "#555555")
+        halo = Circle((x, y), 0.27, fc=_PAGE["background"], ec=_legible("#1d1d1f"), lw=lw * 0.9, zorder=3.84)
+        halo.set_gid(f"feature-ring:{n}")
+        ax.add_patch(halo)
+        dot = Circle((x, y), 0.17, fc=colour, ec="none", zorder=3.85)
+        dot.set_gid(f"feature:{n}")
+        ax.add_patch(dot)
+
+
 def _draw_links(ax, layout: Layout, loops: list[Loop], sses: list[SSE], look: Style, lw: float) -> None:
     links = layout.links
     if links is None:
@@ -1079,6 +1138,7 @@ def _draw(
 
     x0, y0, x1, y1 = layout.bounds
     marks = ligand_marks(layout, loops, sses, look)
+    umarks = uniprot_marks(layout, loops, sses, look)
     for m in marks:  # markers may sit just outside the elements' bounds
         (cx, cy), (hw, hh) = m["centre"], m["half"]
         x0, y0, x1, y1 = min(x0, cx - hw), min(y0, cy - hh), max(x1, cx + hw), max(y1, cy + hh)
@@ -1105,6 +1165,8 @@ def _draw(
         entries = [
             (_SSTYPE[k], name) for k, name in (("H", "helix"), ("E", "strand"), ("G", "3₁₀ helix")) if k in kinds
         ]
+    for kind in dict.fromkeys(m["feature"].type for m in umarks):  # UniProt site types shown
+        entries.append((SITE_COLOURS.get(kind, "#555555"), f"{kind.lower()} (UniProt)"))
     if layout.dna and look.legend:
         ids = sorted({layout.nucleic.strands[k].chain for d in layout.dna for k in d.strands})
         kind = "RNA" if all(layout.nucleic.strands[k].rna for d in layout.dna for k in d.strands) else "DNA"
@@ -1371,6 +1433,7 @@ def _draw(
 
     _draw_links(ax, layout, loops, sses, look, lw)
     _draw_ligands(ax, marks, lw, font)
+    _draw_uniprot(ax, umarks, layout, lw, font)
 
     if look.residue_numbers:  # helices: beside each end; strands: inside the arrow near each end (or just past it)
         for p in layout.placed.values():

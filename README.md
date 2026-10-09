@@ -199,6 +199,23 @@ Elements are named by label (`A`, `α2`, `η1`), `chain:label`, position (`#3`) 
 layout options, domains and edits, with element references stored as residue ranges so they survive a new model.
 `foldmap plot model.cif --layout-file fig.yaml -o fig.svg` re-renders it; the command line overrides the file.
 
+## UniProt annotation
+
+`--uniprot auto` finds each chain's UniProt entry (PDBe SIFTS mapping for PDB entries, the accession for AlphaFold
+models; or give one, `--uniprot P07911`) and maps its features onto the structure, correcting for numbering
+offsets. Active and binding sites are marked on the figure (`--set uniprot_sites=all` for every site and
+modification), `--domains uniprot` turns UniProt domains into panels, and `foldmap sequence ... --uniprot auto`
+adds a feature track.
+
+```bash
+foldmap uniprot P07911                             # domains, sites, every PDB structure, the AlphaFold model
+foldmap plot 2HHB --uniprot auto --domains uniprot -o hb.svg
+foldmap sequence 6ZS5 --chain A --uniprot auto -o umod.svg
+```
+
+In the app, typing an accession lists its AlphaFold model and experimental structures (widest coverage first,
+with method and resolution) to load with one click.
+
 ## Sequence view
 
 ```bash
@@ -292,8 +309,22 @@ python -m venv .venv && .venv/bin/pip install -e ".[dev,app,mcp]"
 
 ## Citing
 
-If you use foldmap in published work, please cite it. GitHub's "Cite this repository" button gives the reference
-in APA and BibTeX form (from [`CITATION.cff`](CITATION.cff)).
+If you use foldmap in published work, please cite it:
+
+> Zyla, D. *foldmap: publication-grade protein topology diagrams* (2026). https://github.com/dzyla/foldmap
+
+```bibtex
+@software{zyla_foldmap_2026,
+  author  = {Zyla, Dawid},
+  title   = {foldmap: publication-grade protein topology diagrams},
+  year    = {2026},
+  url     = {https://github.com/dzyla/foldmap},
+  license = {AGPL-3.0-or-later}
+}
+```
+
+GitHub's "Cite this repository" button gives the same reference (from [`CITATION.cff`](CITATION.cff)). Each
+release is archived on Zenodo with its own DOI; please cite the version you used.
 
 ## License
 

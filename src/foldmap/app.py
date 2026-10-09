@@ -40,6 +40,8 @@ LAYOUT_DEFAULTS = {
     "title": "",
     "membrane": "off",
     "focus": "auto",
+    "uniprot": "off",
+    "uniprot_domains": False,
     "msa_path": "",
     "msa_reference": "",
     "domains": "",
@@ -62,6 +64,8 @@ def layout_options(settings: dict) -> dict:
 
     lines = [p.strip() for p in re.split(r"[;\n]", settings.get("domains", "") or "") if p.strip()]
     domains = "auto" if lines == ["auto"] else _domain_spec(lines) or None
+    if settings.get("uniprot_domains") and (settings.get("uniprot") or "off") not in ("off", ""):
+        domains = "uniprot"
     return {
         "symmetry": settings.get("symmetry", "auto") or "auto",
         "assembly": settings.get("assembly", "auto") or "auto",
@@ -69,10 +73,28 @@ def layout_options(settings: dict) -> dict:
         "domains": domains,
         "membrane": settings.get("membrane", "off") or "off",
         "focus": settings.get("focus", "auto") or "auto",
+        "uniprot": None if (settings.get("uniprot") or "off") in ("off", "") else settings["uniprot"],
         "msa": settings.get("msa_path") or None,
         "msa_reference": settings.get("msa_reference") or None,
         **_adjustments(Args),
     }
+
+
+def structure_choices(source: str, limit: int = 12) -> list[tuple[str, str]]:
+    """For a UniProt accession: its AlphaFold model and experimental structures (widest coverage first) as
+    (id to load, description) pairs; [] for anything else."""
+    from foldmap import uniprot
+
+    if not uniprot.ACCESSION.fullmatch((source or "").strip().upper()):
+        return []
+    e = uniprot.entry(source)
+    out = []
+    if e.alphafold:
+        out.append((f"AF-{e.alphafold}-F1", f"AlphaFold model · whole chain ({len(e.sequence)} aa)"))
+    for s in e.structures[:limit]:
+        res = f"{s.resolution:.2f} Å" if s.resolution is not None else ""
+        out.append((s.id, f"{s.method} {res} · chains {s.chains}".strip()))
+    return out
 
 
 def sequence_files(path, settings: dict, view: dict) -> dict[str, bytes]:
@@ -298,6 +320,17 @@ def main() -> None:
             st.file_uploader("…or upload a file", type=["cif", "mmcif", "pdb", "ent"], key="upload")
         if ss.get("load_error"):
             st.error(ss["load_error"])
+        try:
+            choices = structure_choices(ss.get("source", ""))
+        except ValueError as err:
+            choices = []
+            st.caption(f"UniProt: {err}")
+        if choices:
+            st.write("**Structures of this protein** (UniProt): pick one, or load the AlphaFold model above.")
+            for sid, text in choices:
+                c1, c2 = st.columns([1, 5])
+                c1.button(sid, key=f"pdb_{sid}", on_click=load, args=(sid,))
+                c2.caption(text)
         return
 
     path = ss["path"]
@@ -379,6 +412,16 @@ def main() -> None:
                 height=80,
                 help="one per line, NAME=REF[,REF...], e.g. ZPN=res:A:331-440; or just 'auto'",
             )
+        with st.expander("UniProt annotation"):
+            st.text_input(
+                "UniProt", key="uniprot", help="off, auto (each chain's entry via SIFTS / AlphaFold), or an accession"
+            )
+            st.checkbox("UniProt domains as panels", key="uniprot_domains")
+            st.text_input(
+                "Sites shown",
+                key="uniprot_sites",
+                help="auto (active + binding), all, none, or types: active,binding,modified",
+            )
         with st.expander("Symmetry and assembly"):
             st.text_input("Symmetry", key="symmetry", help="auto, off, C2, D3, helical")
             st.text_input("Assembly", key="assembly", help="auto, asu, or an assembly id")
@@ -455,7 +498,10 @@ def main() -> None:
         st.download_button(
             "Interactive page (HTML)", page.encode(), f"{stem}-explorer.html", "text/html", key="dl_html"
         )
-        components.html(page, height=1100, scrolling=True)
+        if hasattr(st, "iframe"):  # Streamlit >= 1.52; the page is foldmap's own output
+            st.iframe(page, height=1100)
+        else:
+            components.html(page, height=1100, scrolling=True)
 
 
 def run() -> None:

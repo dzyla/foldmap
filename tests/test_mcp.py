@@ -20,7 +20,14 @@ def call(name, args):
 def test_tools_are_listed_with_descriptions():
     tools = asyncio.run(server.list_tools())
     names = {t.name for t in tools}
-    assert names == {"summarize_structure", "list_styles", "draw_topology", "draw_sequence", "interactive_page"}
+    assert names == {
+        "summarize_structure",
+        "list_styles",
+        "draw_topology",
+        "draw_sequence",
+        "interactive_page",
+        "uniprot_info",
+    }
     assert all(t.description for t in tools)
 
 

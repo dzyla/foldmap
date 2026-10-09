@@ -33,7 +33,7 @@ _LIB = r"""
         case 'loop': return 'loop:' + item.a + '>' + item.b;
         case 'chain': return 'chain:' + item.chain;
         case 'pair': return 'pair:' + item.i + '-' + item.j;
-        case 'disulfide': case 'glycan': case 'ligand': return item.type + ':' + item.key;
+        case 'disulfide': case 'glycan': case 'ligand': case 'feature': return item.type + ':' + item.key;
         default: return 'residue:' + item.k;
       }
     },
@@ -162,10 +162,11 @@ _APP = r"""
     const key = 'loop ' + a + '>' + b;
     (parts[key] = parts[key] || []).push(node);
   });
-  svg.querySelectorAll('[id^="disulfide:"], [id^="ss-dot:"], [id^="glycan:"], [id^="ligand"]').forEach(node => {
+  svg.querySelectorAll('[id^="disulfide:"], [id^="ss-dot:"], [id^="glycan:"], [id^="ligand"], [id^="feature"]').forEach(node => {
     let m = node.id.match(/^(disulfide|ss-dot):(.+)$/), key = null;
     if (m) key = 'disulfide ' + m[2];
     else if ((m = node.id.match(/^glycan:(\d+):/))) key = 'glycan ' + m[1];
+    else if ((m = node.id.match(/^feature(?:-ring)?:(\d+)$/))) key = 'feature ' + m[1];
     else if ((m = node.id.match(/^ligand(?:-label|-tether)?:(.+?)(?::\d+)?$/))) key = 'ligand ' + m[1];
     if (key) (parts[key] = parts[key] || []).push(node);
   });
@@ -372,7 +373,7 @@ _APP = r"""
                residues: [item.i, item.j], label: name(item.i) + '·' + name(item.j),
                text: name(item.i) + ' · ' + name(item.j) + ' — ' + d.toFixed(1) + ' Å' + (d <= CUT ? ' (contact)' : '') };
     }
-    if (item.type === 'disulfide' || item.type === 'glycan' || item.type === 'ligand') {
+    if (['disulfide', 'glycan', 'ligand', 'feature'].includes(item.type)) {
       const list = data.links[item.type === 'disulfide' ? 'disulfides' : item.type + 's'];
       const x = list.find(d => d.key === item.key);
       const keys = [item.type + ' ' + item.key].concat(x.residues.map(k => data.residues[k].e).filter(Boolean));
@@ -433,6 +434,7 @@ _APP = r"""
       let l = n.id.match(/^(?:disulfide|ss-dot):(.+)$/);
       if (l) return { type: 'disulfide', key: l[1] };
       if ((l = n.id.match(/^glycan:(\d+):/))) return { type: 'glycan', key: l[1] };
+      if ((l = n.id.match(/^feature(?:-ring)?:(\d+)$/))) return { type: 'feature', key: l[1] };
       if ((l = n.id.match(/^ligand(?:-label|-tether)?:(.+?)(?::\d+)?$/))) return { type: 'ligand', key: l[1] };
     }
     return null;
@@ -498,7 +500,8 @@ main { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1
 #stage svg.focus [id^="loop:"]:not(.on), #stage svg.focus [id^="loop-arrow:"]:not(.on),
 #stage svg.focus [id^="ghost:"]:not(.on),
 #stage svg.focus [id^="disulfide:"]:not(.on), #stage svg.focus [id^="ss-dot:"]:not(.on),
-#stage svg.focus [id^="glycan:"]:not(.on), #stage svg.focus [id^="ligand"]:not(.on) { opacity: .2; transition: opacity .12s }
+#stage svg.focus [id^="glycan:"]:not(.on), #stage svg.focus [id^="ligand"]:not(.on),
+#stage svg.focus [id^="feature"]:not(.on) { opacity: .2; transition: opacity .12s }
 #stage svg [id^="disulfide:"], #stage svg [id^="ss-dot:"], #stage svg [id^="glycan:"], #stage svg [id^="ligand"] { cursor: pointer }
 #molpanel { flex: 1.15 }
 #mol { flex: 1; min-height: 200px; position: relative; border-radius: 6px; overflow: hidden; background: #fff }
@@ -583,18 +586,18 @@ def _links(layout, loops, sses, bb, look) -> dict:
     from .render import ligand_marks
 
     links = layout.links
-    out = {"disulfides": [], "glycans": [], "ligands": []}
-    if links is None:
+    out = {"disulfides": [], "glycans": [], "ligands": [], "features": []}
+    if links is None and getattr(layout, "uniprot", None) is None:
         return out
     shown = lambda r: not layout.partial or layout.res_chain[r] not in layout.partial  # noqa: E731
     label = lambda r: f"{bb.labels[r].chain} {bb.labels[r].name.title()}{bb.labels[r].seq}"  # noqa: E731
-    if look.disulfides:
+    if look.disulfides and links is not None:
         for i, j in links.disulfides:
             if shown(i) and shown(j):
                 out["disulfides"].append(
                     {"key": f"{i}-{j}", "residues": [i, j], "text": f"disulfide {label(i)} – {label(j)}"}
                 )
-    if look.glycans:
+    if look.glycans and links is not None:
         members = getattr(links, "glycan_members", []) or [[] for _ in links.glycans]
         for (r, sugars), het in zip(links.glycans, members):
             if shown(r):
@@ -606,6 +609,13 @@ def _links(layout, loops, sses, bb, look) -> dict:
                         "text": f"glycan on {label(r)}: {'-'.join(sugars)}",
                     }
                 )
+    from .render import uniprot_marks
+
+    for n, m in enumerate(uniprot_marks(layout, loops, sses, look)):
+        f, k = m["feature"], m["residue"]
+        out["features"].append(
+            {"key": str(n), "residues": [k], "text": f"UniProt {f.type.lower()}: {f.label} ({label(k)})"}
+        )
     for m in ligand_marks(layout, loops, sses, look):
         g = m["ligand"]
         key = f"{g.name}:{g.chain}{g.seq}"

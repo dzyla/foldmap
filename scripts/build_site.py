@@ -174,6 +174,26 @@ MODES = [
         [("Haemoglobin and its four hemes", "publication", [], {"assembly": "asu"}, "foldmap plot 2HHB")],
     ),
 ]
+MODES.append(
+    (
+        "uniprot",
+        "UniProt annotation",
+        "Each chain is matched to its UniProt entry (SIFTS, or the AlphaFold accession) and its features mapped onto "
+        "the structure: domains become panels, active and binding sites are marked. foldmap uniprot lists every "
+        "structure of the protein and its AlphaFold model.",
+        "2HHB.cif",
+        [
+            (
+                "Haemoglobin: UniProt Globin domains and heme-binding histidines",
+                "publication",
+                [],
+                {"assembly": "asu", "uniprot": "auto", "domains": "uniprot"},
+                "foldmap plot 2HHB --uniprot auto --domains uniprot",
+            )
+        ],
+    )
+)
+
 SEQUENCES = [  # (key, caption, alignment or None, columns, command)
     ("sequence", "Ubiquitin: sequence with secondary structure", None, 40, "foldmap sequence 1UBQ --columns 40"),
     (
@@ -193,8 +213,22 @@ def _svg(fig, path: Path) -> str:
     return path.as_posix()
 
 
+def _offline_uniprot(folder: Path) -> None:
+    """Point UniProt lookups at the saved test fixtures, so the site builds without reaching UniProt or PDBe."""
+    import foldmap.uniprot as uniprot
+
+    cache = folder / "uniprot"
+    cache.mkdir(parents=True, exist_ok=True)
+    for f in (DATA / "uniprot").iterdir():
+        shutil.copy(f, cache / f.name)
+    uniprot.CACHE = folder
+
+
 def build(out: Path, quick: bool = False) -> dict:
     out = Path(out)
+    import tempfile
+
+    _offline_uniprot(Path(tempfile.mkdtemp(prefix="foldmap-site-")))
     if out.exists():
         shutil.rmtree(out)
     shutil.copytree(SITE, out)

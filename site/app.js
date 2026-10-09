@@ -30,8 +30,9 @@
     if (!b) return;
     const text = (b.dataset.copy ? $(b.dataset.copy) : b.previousElementSibling).textContent;
     navigator.clipboard && navigator.clipboard.writeText(text).then(() => {
+      const before = b.textContent;
       b.textContent = 'copied'; b.classList.add('done');
-      setTimeout(() => { b.textContent = 'copy'; b.classList.remove('done'); }, 1200);
+      setTimeout(() => { b.textContent = before; b.classList.remove('done'); }, 1200);
     });
   });
 

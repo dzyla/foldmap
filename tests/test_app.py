@@ -123,3 +123,23 @@ def test_app_passes_focus_to_the_layout():
 
     assert layout_options({"focus": "none"})["focus"] == "none"
     assert layout_options({})["focus"] == "auto"
+
+
+def test_app_lists_structures_for_a_uniprot_accession(monkeypatch):
+    import foldmap.app as app
+    from foldmap import uniprot
+
+    e = uniprot.parse_entry(__import__("json").loads((DATA / "uniprot" / "P07911.json").read_text()))
+    monkeypatch.setattr(uniprot, "entry", lambda acc, cache_dir=None: e)
+    choices = app.structure_choices("P07911")
+    assert choices[0][0] == "AF-P07911-F1" and "AlphaFold" in choices[0][1]
+    assert len(choices) > 2 and all(len(c[0]) == 4 for c in choices[1:])  # PDB IDs, widest coverage first
+    assert app.structure_choices("1LMB") == []
+
+
+def test_app_passes_uniprot_options():
+    from foldmap.app import layout_options
+
+    opts = layout_options({"uniprot": "auto", "uniprot_domains": True})
+    assert opts["uniprot"] == "auto" and opts["domains"] == "uniprot"
+    assert layout_options({})["uniprot"] is None

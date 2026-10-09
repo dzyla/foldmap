@@ -90,6 +90,7 @@ def make_layout(
     membrane: str = "off",
     chains: list[str] | None = None,
     focus: str = "auto",
+    uniprot: str | None = None,
 ):
     bb = load_backbone(path, assembly)
     if chains:
@@ -165,6 +166,15 @@ def make_layout(
     contacts = sse_contacts(bb, sses)
     for key, n in _bridge_contacts(bb, sses, links).items():
         contacts[key] = contacts.get(key, 0) + n
+    ann = None
+    if uniprot not in (None, "off", "none"):
+        from .uniprot import annotate
+
+        ann = annotate(path, bb, None if uniprot == "auto" else uniprot)
+    if domains == "uniprot":
+        if ann is None:
+            raise ValueError("--domains uniprot needs UniProt annotation: add --uniprot auto (or an accession)")
+        domains = _uniprot_domains(ann, sses)
     named = _domains(domains, sses, contacts)
     for _, ids in named:  # a domain holds together: its elements pull on each other
         for a in range(len(ids)):
@@ -194,6 +204,7 @@ def make_layout(
     lay.res_chain = [l.chain for l in bb.labels]
     lay.res_name = [l.name for l in bb.labels]
     lay.res_b = [float(x) for x in bb.b] if bb.b is not None else []
+    lay.uniprot = ann
     first = [s.centroid for s in sses if s.chain == sses[0].chain] if sses else [bb.ca.mean(axis=0)]
     centre = np.mean(first, axis=0)
     lay.page_axes = [list(map(float, a)) for a in frame.basis(centre)]
@@ -367,6 +378,28 @@ def _context(sym, focus: set, bb, neighbours: bool = True) -> str:
 _DOMAIN_PULL = 6  # CA-pair-equivalents of attraction between any two elements of one domain
 
 
+UNIPROT_DOMAINS = ("Domain", "Repeat", "Zinc finger", "DNA binding")
+
+
+def _uniprot_domains(ann, sses) -> list[tuple[str, list[str]]]:
+    """Domain panels from UniProt: each domain takes the elements with most of their residues inside it."""
+    chains = {c for _, c, _ in ann.regions}
+    out = []
+    for f, chain, ks in ann.regions:
+        if f.type not in UNIPROT_DOMAINS:
+            continue
+        inside = set(ks)
+        ids = [
+            s.id
+            for s in sses
+            if s.chain == chain and sum(r in inside for r in range(s.start, s.end + 1)) > (s.end - s.start + 1) / 2
+        ]
+        if ids:
+            name = f.description or f.type
+            out.append((name if len(chains) == 1 else f"{name} · {chain}", ids))
+    return [(name, ids) for name, ids in out]
+
+
 def _domains(spec, sses, contacts) -> list[tuple[str, list[str]]]:
     """[(name, element ids)] from 'auto' or [(name, [refs])]; every element in at most one domain."""
     from .features import auto_domains
@@ -376,6 +409,11 @@ def _domains(spec, sses, contacts) -> list[tuple[str, list[str]]]:
         return []
     if spec == "auto":
         return auto_domains(sses, contacts)
+    if spec and all(
+        isinstance(ids, list) and all(":" in i and "-" in i and not i.startswith("res:") for i in ids)
+        for _, ids in spec
+    ):
+        return [(name, list(ids)) for name, ids in spec]  # already element ids (UniProt domains)
     lay, out, seen = provisional(sses), [], set()
     for name, refs in spec:
         ids = []
@@ -547,6 +585,7 @@ def _figure_spec(args):
     opts["domains"] = domains
     opts["msa"] = args.msa or lay.get("msa")
     opts["membrane"] = args.membrane or lay.get("membrane", "off")
+    opts["uniprot"] = args.uniprot or lay.get("uniprot")
     opts["focus"] = args.focus or lay.get("focus", "auto")
     chains = args.chains or lay.get("chains")
     opts["chains"] = [c.strip() for c in chains.split(",") if c.strip()] if isinstance(chains, str) else chains
@@ -611,6 +650,8 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("structure")
     sub.add_parser("styles", help="list themes and every style key")
     sub.add_parser("app", help="open the Streamlit app in your browser (needs: pip install streamlit)")
+    up = sub.add_parser("uniprot", help="UniProt annotation: features, domains, PDB structures and the AlphaFold model")
+    up.add_argument("source", help="a UniProt accession (P04637), a PDB ID or a structure file")
     sub.add_parser(
         "mcp", help="run the MCP server (stdio) so AI agents can use foldmap (needs: pip install foldmap[mcp])"
     )
@@ -640,6 +681,7 @@ def main(argv: list[str] | None = None) -> int:
     sq.add_argument("--style-file", metavar="YAML")
     sq.add_argument("--set", action="append", default=[], metavar="KEY=VALUE")
     sq.add_argument("--title")
+    sq.add_argument("--uniprot", metavar="auto|ACCESSION", help="add a UniProt feature track (domains, sites)")
     q = sub.add_parser("plot", help="draw the topology figure")
     iq = sub.add_parser("interactive", help="an HTML page linking the topology, the contact map and the 3D model")
     iq.add_argument("--viewer", choices=["molstar", "3dmol"], default="molstar", help="3D viewer (default Mol*)")
@@ -717,7 +759,16 @@ def main(argv: list[str] | None = None) -> int:
             metavar="NAME=REF[,REF...]",
             help="a named domain panel, e.g. ZPN=res:A:331-440 (repeatable)",
         )
-        q.add_argument("--domains", choices=["auto"], help="find domains from element contacts (D1, D2...)")
+        q.add_argument(
+            "--domains",
+            choices=["auto", "uniprot"],
+            help="auto: from element contacts (D1, D2...); uniprot: UniProt's domains (with --uniprot)",
+        )
+        q.add_argument(
+            "--uniprot",
+            metavar="auto|ACCESSION",
+            help="annotate from UniProt: auto finds each chain's entry (SIFTS, or the AlphaFold accession)",
+        )
         q.add_argument(
             "--membrane",
             choices=["off", "auto"],
@@ -744,6 +795,11 @@ def main(argv: list[str] | None = None) -> int:
         )
     args = parser.parse_args(argv)
     try:
+        if args.command == "uniprot":
+            from .uniprot import report
+
+            print(report(args.source))
+            return 0
         if getattr(args, "structure", None) and not Path(args.structure).expanduser().is_file():
             from .fetch import fetch
 
@@ -773,6 +829,7 @@ def main(argv: list[str] | None = None) -> int:
                 threshold=args.similarity,
                 conservation_bar=not args.no_conservation_bar,
                 title=args.title,
+                uniprot=args.uniprot,
             )
             for out in args.output:
                 print(f"wrote {save(fig, out)}")
@@ -794,6 +851,7 @@ def main(argv: list[str] | None = None) -> int:
                 domains=opts["domains"],
                 msa=opts["msa"],
                 membrane=opts["membrane"],
+                uniprot=opts["uniprot"],
                 chains=opts["chains"],
                 focus=opts["focus"],
                 msa_reference=opts["msa_reference"],

@@ -1,5 +1,5 @@
 cff-version: 1.2.0
-message: "If you use foldmap in your work, please cite it as below."
+message: "If you use foldmap in your work, please cite it as below. Each release is archived on Zenodo with its own DOI."
 title: "foldmap: publication-grade protein topology diagrams"
 type: software
 repository-code: "https://github.com/dzyla/foldmap"
@@ -9,6 +9,7 @@ authors:
     given-names: Dawid
 version: 0.1.0
 date-released: 2026-10-09
+license: AGPL-3.0-or-later
 keywords:
   - protein topology
   - structural biology

@@ -93,6 +93,17 @@ def summarize_structure(source: str, assembly: str = "auto") -> str:
 
 
 @tool
+def uniprot_info(source: str) -> str:
+    """UniProt annotation for a UniProt accession (P04637), a PDB ID or a structure file: which entry each chain
+    is, the protein's names, domains and regions, sites and modifications, its experimental PDB structures (widest
+    coverage first, with method and resolution) and its AlphaFold model. To show UniProt sites on a figure call
+    draw_topology with uniprot="auto" (or an accession); add uniprot_domains=true for UniProt domain panels."""
+    from .uniprot import report
+
+    return report(source)
+
+
+@tool
 def list_styles() -> str:
     """Themes (whole looks) and every style key with its allowed values."""
     from .cli import styles_help
@@ -111,6 +122,8 @@ def draw_topology(
     symmetry: str = "auto",
     membrane: str = "off",
     focus: str = "auto",
+    uniprot: str | None = None,
+    uniprot_domains: bool = False,
     domains: dict[str, list[str]] | None = None,
     swap: list[list[str]] | None = None,
     move: dict[str, list[float]] | None = None,
@@ -129,7 +142,8 @@ def draw_topology(
     [["α1", "α3"]]. move: nudges in page units, e.g. {"α2": [1, -2]}. rename: {"res:A:167-182": "Gd"}.
     membrane: off or auto (draw the lipid bilayer). focus: auto draws filaments, cages and large assemblies as one
     subunit plus the neighbouring parts of its fold; none draws the whole assembly; or chains, e.g. "B".
-    msa_path: alignment for theme 'conservation'.
+    msa_path: alignment for theme 'conservation'. uniprot: "auto" or an accession, to mark UniProt active and binding
+    sites (style key uniprot_sites: all, or types like "active,modified"); uniprot_domains: UniProt domain panels.
     layout_file / save_layout: load or write a YAML layout file that re-creates the figure."""
     from .cli import main
 
@@ -157,6 +171,10 @@ def draw_topology(
     ]
     for key, value in (style or {}).items():
         argv += ["--set", f"{key}={value}"]
+    if uniprot:
+        argv += ["--uniprot", uniprot]
+        if uniprot_domains:
+            argv += ["--domains", "uniprot"]
     for name, refs in (domains or {}).items():
         argv += ["--domain", f"{name}={','.join(refs)}"]
     for pair in swap or []:

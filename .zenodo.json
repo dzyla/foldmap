@@ -1,0 +1,14 @@
+{
+  "title": "foldmap: publication-grade protein topology diagrams",
+  "description": "<p>foldmap draws publication-grade 2D topology diagrams of proteins from PDB/mmCIF files, PDB IDs and AlphaFold models: helices, strands and loops to scale, laid out from the 3D structure, with protein–DNA complexes, symmetric assemblies and filaments, membranes, ligands, glycans, disulfides, UniProt annotation, sequence and alignment views, an interactive explorer (topology, 3D model and contact map), a Streamlit app and an MCP server for AI agents.</p>",
+  "upload_type": "software",
+  "creators": [
+    {"name": "Zyla, Dawid"}
+  ],
+  "license": "AGPL-3.0-or-later",
+  "keywords": ["protein topology", "structural biology", "secondary structure", "visualization", "PDB", "AlphaFold", "cryo-EM"],
+  "related_identifiers": [
+    {"identifier": "https://github.com/dzyla/foldmap", "relation": "isSupplementedBy", "scheme": "url"},
+    {"identifier": "https://dzyla.github.io/foldmap/", "relation": "isDocumentedBy", "scheme": "url"}
+  ]
+}

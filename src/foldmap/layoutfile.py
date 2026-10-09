@@ -43,6 +43,7 @@ LAYOUT = (
     "membrane",
     "chains",
     "focus",
+    "uniprot",
 )
 EDITS = ("rename", "swap", "move")
 
