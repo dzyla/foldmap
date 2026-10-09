@@ -11,6 +11,7 @@ from pathlib import Path
 import gemmi
 import numpy as np
 
+from . import CREDIT
 from .io import read_model
 from .render import draw, element_colours, save_svg
 from .route import route_loops
@@ -224,6 +225,7 @@ header p { margin: 0; color: var(--muted) }
 .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 10px; min-width: 0 }
 .panel h2 { font: 600 12px var(--mono); text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 0 0 8px }
 #topology { grid-row: span 2; overflow: auto }
+#credit { margin: 14px 0 4px; font: 11px var(--mono); color: var(--muted) }
 #topology svg { width: 100%; height: auto; display: block; background: #fff; border-radius: 4px }
 #topology svg [id^="strand:"], #topology svg [id^="helix:"], #topology svg [id^="loop:"] { cursor: pointer }
 #topology svg.focus [id^="strand:"]:not(.on), #topology svg.focus [id^="helix:"]:not(.on),
@@ -313,6 +315,7 @@ def build_page(
     <p class="legend">Dark: close (contacts under 8 Å), pale: 30 Å or more. The strip shows each element in its figure colour.</p></section>
 </div>
 <div id="info">Hover a helix, strand or loop in the topology, a cell of the contact map, or an atom in 3D.</div>
+<footer id="credit">{CREDIT}</footer>
 <script type="application/json" id="topo-data">{blob}</script>
 <script id="topo-lib">{_LIB}</script>
 <script id="topo-app">{_APP}</script>

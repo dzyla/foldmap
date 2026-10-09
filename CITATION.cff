@@ -1,0 +1,14 @@
+cff-version: 1.2.0
+message: "If you use foldmap in your work, please cite it as below."
+title: "foldmap: publication-grade protein topology diagrams"
+type: software
+authors:
+  - family-names: Zyla
+    given-names: Dawid
+version: 0.1.0
+date-released: 2026-10-09
+keywords:
+  - protein topology
+  - structural biology
+  - secondary structure
+  - visualization

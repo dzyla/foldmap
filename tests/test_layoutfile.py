@@ -145,3 +145,17 @@ def test_version_flag(capsys):
     with pytest.raises(SystemExit):
         main(["--version"])
     assert capsys.readouterr().out.strip() == f"foldmap {version('foldmap')}"
+
+
+def test_interactive_page_credits_foldmap():
+    from foldmap.interactive import build_page
+
+    page = build_page(DATA / "1UBQ.cif")
+    assert 'id="credit"' in page and "foldmap" in page and "AGPL-3.0" in page
+
+
+def test_app_credits_foldmap():
+    from streamlit.testing.v1 import AppTest
+
+    at = AppTest.from_file(str(Path(__file__).parents[1] / "src" / "foldmap" / "app.py")).run(timeout=60)
+    assert any("AGPL-3.0" in c.value and "cite" in c.value for c in at.caption)

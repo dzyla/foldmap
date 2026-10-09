@@ -1,0 +1,13 @@
+foldmap: publication-grade protein topology diagrams
+Copyright (C) 2026 Dawid Zyla
+
+This program is free software: you can redistribute it and/or modify it under the terms of the GNU Affero
+General Public License as published by the Free Software Foundation, either version 3 of the License, or (at
+your option) any later version. It is distributed WITHOUT ANY WARRANTY; see the LICENSE file for details.
+
+Additional terms under section 7(b) of the GNU Affero General Public License:
+
+  Copies and modified versions of foldmap must preserve the author attribution "foldmap, by Dawid Zyla", the
+  credit line shown by the foldmap app and the interactive HTML pages, and the CITATION.cff file.
+
+If you use foldmap in published work, please cite it as described in CITATION.cff.

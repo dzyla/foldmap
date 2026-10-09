@@ -120,3 +120,15 @@ python -m venv .venv && .venv/bin/pip install -e ".[dev,app]"
 ```
 
 Test structures live in `tests/data`.
+
+## Citing
+
+If you use foldmap in published work, please cite it. GitHub's "Cite this repository" button gives the
+reference in APA and BibTeX form (from [`CITATION.cff`](CITATION.cff)).
+
+## License
+
+foldmap is free software under the [GNU Affero General Public License v3.0 or later](LICENSE), with one
+additional attribution term (see [`NOTICE`](NOTICE)). In short: you may use, study, change and share it; any
+modified version you distribute, or run as a service for others, must be released under the same license with
+its source code, and must keep the foldmap attribution. Copyright © 2026 Dawid Zyla.

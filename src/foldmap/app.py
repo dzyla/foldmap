@@ -12,6 +12,7 @@ import urllib.request
 from dataclasses import fields, replace
 from pathlib import Path
 
+from foldmap import CREDIT
 from foldmap.cli import _adjustments, _domain_spec, make_figure_and_loops, make_layout
 from foldmap.render import save, save_svg
 from foldmap.style import CHOICES, THEMES, Style
@@ -197,6 +198,7 @@ def main() -> None:
     import streamlit.components.v1 as components
 
     st.set_page_config(page_title="Foldmap", page_icon="🧬", layout="wide")
+    st.caption(CREDIT)
     ss = st.session_state
     ss.setdefault("stage", "load")
 
