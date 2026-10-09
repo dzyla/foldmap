@@ -21,6 +21,11 @@ classifiers = [
 ]
 dependencies = ["gemmi>=0.7", "numpy", "scipy", "networkx", "matplotlib", "PyYAML"]
 
+[project.urls]
+Homepage = "https://github.com/dzyla/foldmap"
+Source = "https://github.com/dzyla/foldmap"
+Issues = "https://github.com/dzyla/foldmap/issues"
+
 [project.optional-dependencies]
 test = ["pytest"]
 dev = ["pytest", "ruff", "mcp>=2.2,<3", "streamlit>=1.40"]

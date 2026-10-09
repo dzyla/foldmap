@@ -10,21 +10,21 @@ glycans.
 
 <table>
 <tr>
-<td width="50%"><img src="docs/images/lambda-repressor-dna.png" alt="λ repressor dimer bound to DNA"><br>
+<td width="50%"><img src="https://raw.githubusercontent.com/dzyla/foldmap/main/docs/images/lambda-repressor-dna.png" alt="λ repressor dimer bound to DNA"><br>
 <sub><b>Protein–DNA.</b> λ repressor (1LMB): the duplex is unrolled above its binding helices, with base letters and contact beads.</sub></td>
-<td width="50%"><img src="docs/images/t4-lysozyme-domains.png" alt="T4 lysozyme with N- and C-lobe domain panels"><br>
+<td width="50%"><img src="https://raw.githubusercontent.com/dzyla/foldmap/main/docs/images/t4-lysozyme-domains.png" alt="T4 lysozyme with N- and C-lobe domain panels"><br>
 <sub><b>Domain panels.</b> T4 lysozyme (2LZM), journal theme: named domains kept together on their own panels.</sub></td>
 </tr>
 <tr>
-<td><img src="docs/images/fima-richardson.png" alt="FimA pilin coloured by secondary structure type"><br>
+<td><img src="https://raw.githubusercontent.com/dzyla/foldmap/main/docs/images/fima-richardson.png" alt="FimA pilin coloured by secondary structure type"><br>
 <sub><b>Disulfides and 3₁₀ helices.</b> FimA (5NKT), Richardson colouring: the disulfide is drawn as a bar, the 3₁₀ helix as η1.</sub></td>
-<td><img src="docs/images/p53-alphafold.png" alt="p53 AlphaFold model coloured by pLDDT confidence"><br>
+<td><img src="https://raw.githubusercontent.com/dzyla/foldmap/main/docs/images/p53-alphafold.png" alt="p53 AlphaFold model coloured by pLDDT confidence"><br>
 <sub><b>AlphaFold models.</b> p53 (AF-P04637), alphafold theme: elements, loops and tails in pLDDT confidence bands.</sub></td>
 </tr>
 <tr>
-<td><img src="docs/images/measles-f-trimer.png" alt="Measles fusion protein trimer with one protomer highlighted"><br>
+<td><img src="https://raw.githubusercontent.com/dzyla/foldmap/main/docs/images/measles-f-trimer.png" alt="Measles fusion protein trimer with one protomer highlighted"><br>
 <sub><b>Symmetry.</b> Measles F trimer (8UTF): C3 detected, protomers drawn alike, one highlighted and its copies greyed.</sub></td>
-<td><img src="docs/images/tim-barrel-rainbow.png" alt="Triosephosphate isomerase dimer coloured N to C"><br>
+<td><img src="https://raw.githubusercontent.com/dzyla/foldmap/main/docs/images/tim-barrel-rainbow.png" alt="Triosephosphate isomerase dimer coloured N to C"><br>
 <sub><b>N→C colouring.</b> Triosephosphate isomerase (1TIM), rainbow theme: each element shaded by its place in the chain.</sub></td>
 </tr>
 </table>

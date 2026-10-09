@@ -2,6 +2,8 @@ cff-version: 1.2.0
 message: "If you use foldmap in your work, please cite it as below."
 title: "foldmap: publication-grade protein topology diagrams"
 type: software
+repository-code: "https://github.com/dzyla/foldmap"
+url: "https://github.com/dzyla/foldmap"
 authors:
   - family-names: Zyla
     given-names: Dawid
