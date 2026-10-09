@@ -94,8 +94,12 @@ def assign_dssp(bb: Backbone) -> DsspResult:
         return i + 1 if nxt[i] else None
 
     turns: dict[str, set[int]] = {"H": set(), "G": set(), "I": set()}
+    single: set[int] = set()  # residues inside any one H-bonded turn (DSSP 'T' where nothing else applies)
     for k, code in ((4, "H"), (3, "G"), (5, "I")):
         turn = [i + k < n and (i, i + k) in bonds and all(nxt[i + m] for m in range(k)) for i in range(n)]
+        for i in range(n):
+            if turn[i]:
+                single.update(range(i + 1, i + k))
         for i in range(1, n - k):
             if turn[i - 1] and turn[i]:
                 turns[code].update(range(i, i + k))
@@ -120,4 +124,5 @@ def assign_dssp(bb: Backbone) -> DsspResult:
             if 0 <= nj < n and Bridge(i + 1, nj, kind) in known:
                 in_ladder.update((i, j, i + 1, nj))
     ss = _resolve(n, turns["H"], turns["G"], turns["I"], in_ladder, in_bridge)
+    ss = ["T" if c == "-" and i in single else c for i, c in enumerate(ss)]
     return DsspResult("".join(ss), bridges)

@@ -644,6 +644,24 @@ def plddt_colour(v: float) -> str:
     return next(c for lo, c, _ in PLDDT_BANDS if v >= lo)
 
 
+CONSURF = (  # ConSurf's nine conservation grades, 1 (variable, turquoise) .. 9 (conserved, maroon)
+    "#10c8d1",
+    "#8cffff",
+    "#d7ffff",
+    "#eaffff",
+    "#ffffff",
+    "#fcedf4",
+    "#fac9de",
+    "#f07dab",
+    "#a02560",
+)
+NO_DATA = "#d9d9d9"  # residues the alignment says nothing about
+
+
+def consurf_colour(v: float) -> str:
+    return NO_DATA if v != v else CONSURF[int(np.clip(v, 0.0, 1.0) * 8.999)]
+
+
 def _residue_values(layout: Layout, kind: str) -> list[float]:
     if kind == "bfactor":
         return list(layout.res_b) or [0.0] * len(layout.res_chain)
@@ -655,6 +673,20 @@ def _colouring(sses: list[SSE], chains: list[str], colors: dict[str, str], look:
     from the chain's first element (N) to its last (C), restarted for every chain."""
     if look.color_by == "sstype":
         return {s.id: _SSTYPE.get(s.kind, "#7f7f7f") for s in sses}, (lambda r, chain=None: "#7f7f7f")
+    if look.color_by == "conservation":  # relative grades, as ConSurf: spread over this protein's own range
+        c = np.array(layout.res_cons if layout is not None and layout.res_cons else [], float)
+        if not c.size or np.all(np.isnan(c)):
+            return {s.id: NO_DATA for s in sses}, (lambda r, chain=None: None)
+        lo, hi = np.nanmin(c), np.nanmax(c)
+
+        def grade(v: float) -> str:
+            return consurf_colour((v - lo) / (hi - lo) if hi > lo else 1.0)
+
+        means = {
+            s.id: np.nanmean(c[s.start : s.end + 1]) if np.any(~np.isnan(c[s.start : s.end + 1])) else np.nan
+            for s in sses
+        }
+        return {k: grade(v) for k, v in means.items()}, (lambda r, chain=None: grade(c[r]))
     if look.color_by == "plddt":  # absolute bands, never rescaled: 'confident' means the same in every figure
         b = list(layout.res_b) if layout is not None else []
         if not b:
@@ -789,6 +821,8 @@ def _draw(
         entries = [(("ramp", look.color_by), _PROPERTY[look.color_by][3])]
     elif look.color_by == "plddt":
         entries = [(c, text) for _, c, text in PLDDT_BANDS]
+    elif look.color_by == "conservation":
+        entries = [(("grades",), "conservation: variable → conserved")]
     elif look.color_by == "sstype":
         kinds = {p.sse.kind for p in layout.placed.values()}
         entries = [
@@ -985,7 +1019,7 @@ def _draw(
                     ha="center",
                     va="center",
                     fontsize=font * 0.9,
-                    color=darken(color, 0.8),
+                    color=_legible(darken(color, 0.8)),
                     zorder=4,
                 )
                 t.set_gid(f"label:{p.sse.id}")
@@ -1015,7 +1049,7 @@ def _draw(
                     ha="center",
                     va="center",
                     fontsize=font,
-                    color=darken(color, 0.8),
+                    color=_legible(darken(color, 0.8)),
                     zorder=4,
                 )
                 t.set_gid(f"label:{p.sse.id}")
@@ -1101,7 +1135,11 @@ def _draw(
     for k, (colour, text) in enumerate(entries):
         row, col = divmod(k, per_row)
         x, y = xmin + pad + col * entry, ymin + legend_h - 1.1 - row * _LEGEND_ROW
-        if isinstance(colour, tuple):  # a property ramp
+        if isinstance(colour, tuple) and colour[0] == "grades":  # ConSurf's nine grades
+            for q, shade in enumerate(CONSURF):
+                ax.add_patch(Rectangle((x + q * 0.6 / 9, y - 0.3), 0.6 / 9, 0.6, fc=shade, ec="none"))
+            ax.add_patch(Rectangle((x, y - 0.3), 0.6, 0.6, fc="none", ec="#9a9a9a", lw=lw * 0.5))
+        elif isinstance(colour, tuple):  # a property ramp
             for q in range(6):
                 ax.add_patch(
                     Rectangle((x + q * 0.1, y - 0.3), 0.1, 0.6, fc=property_colour(q / 5, colour[1]), ec="none")

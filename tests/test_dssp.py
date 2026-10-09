@@ -55,3 +55,9 @@ def test_strand_outranks_310_and_pi_but_not_alpha():
     assert codes[4] == "I"
     assert codes[5] == "B"
     assert codes[6] == "-" and codes[7] == "-"
+
+
+def test_turns_marked_like_dssp(ubq):
+    ss = assign_dssp(load_backbone(ubq)).ss
+    assert "T" in ss
+    assert ss.replace("T", "-").count("H") == ss.count("H")  # turns never displace other codes

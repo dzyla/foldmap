@@ -24,6 +24,7 @@ CHOICES = {
         "bfactor",
         "hydropathy",
         "plddt",
+        "conservation",
     ),  # chain / N->C ramp / chain hue
     # light N -> dark C / helix vs strand (Richardson) / mean B-factor, rigid -> flexible / Kyte-Doolittle
     "loop_color": (
@@ -92,6 +93,7 @@ THEMES = {
     "richardson": Style(color_by="sstype", helix_shading="depth", loops="curved"),
     "flexibility": Style(color_by="bfactor"),
     "hydropathy": Style(color_by="hydropathy"),
+    "conservation": Style(color_by="conservation", loop_color="residue"),
     "alphafold": Style(color_by="plddt", loop_color="residue", loop_width=1.3),
     "goodsell": Style(palette="tol-bright", fill="pale", helix_shading="none", loop_width=1.3, sheet_panels=False),
     "journal": Style(palette="tol-muted", loop_width=0.8, font_scale=0.9),

@@ -83,8 +83,12 @@ def make_layout(
     up=None,
     view=None,
     domains=None,
+    msa=None,
+    msa_reference: str | None = None,
 ):
     bb = load_backbone(path, assembly)
+    if (look or Style()).color_by == "conservation" and not msa:
+        raise ValueError("conservation colouring needs an alignment: add --msa ALIGNMENT")
     dssp = assign_dssp(bb)
     sses = build_sses(bb, dssp.ss, short_helices=(look or Style()).helices_310)
     sheets = build_sheets(sses, dssp.bridges)
@@ -131,6 +135,11 @@ def make_layout(
     lay.res_chain = [l.chain for l in bb.labels]
     lay.res_name = [l.name for l in bb.labels]
     lay.res_b = [float(x) for x in bb.b] if bb.b is not None else []
+    if msa:
+        from .sequence import read_alignment, residue_conservation
+
+        scores = residue_conservation(bb, read_alignment(msa), msa_reference)
+        lay.res_cons = [scores.get(k, float("nan")) for k in range(len(bb))]
     return lay, sses, bb
 
 
@@ -315,6 +324,8 @@ def _figure_spec(args):
     if isinstance(domains, dict):
         domains = [(name, list(refs)) for name, refs in domains.items()]
     opts["domains"] = domains
+    opts["msa"] = args.msa or lay.get("msa")
+    opts["msa_reference"] = args.msa_reference or lay.get("msa_reference")
     edits = layoutfile.edits_of(doc)
     edits["rename"].update(cli["rename"])
     edits["swap"] += cli["swap"]
@@ -375,6 +386,32 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("structure")
     sub.add_parser("styles", help="list themes and every style key")
     sub.add_parser("app", help="open the Streamlit app in your browser (needs: pip install streamlit)")
+    sq = sub.add_parser("sequence", help="the sequence (or an alignment) with secondary structure drawn on top")
+    sq.add_argument("structure")
+    sq.add_argument("-o", "--output", action="append", required=True, help=".svg, .pdf or .png (repeatable)")
+    sq.add_argument("--chain", help="protein chain to show (default: the first)")
+    sq.add_argument("--msa", metavar="ALIGNMENT", help="multiple sequence alignment (FASTA, Clustal or Stockholm)")
+    sq.add_argument("--reference", metavar="NAME", help="alignment row that is the structure (default: best match)")
+    sq.add_argument("--columns", type=int, default=60, help="residues (alignment columns) per row (default 60)")
+    sq.add_argument("--full-sequence", action="store_true", help="include unmodelled residues at both ends")
+    sq.add_argument(
+        "--ss-colour",
+        choices=["figure", "black"],
+        default="figure",
+        help="colour elements as in the topology figure (default) or plain black",
+    )
+    sq.add_argument(
+        "--similarity",
+        type=float,
+        default=0.7,
+        metavar="F",
+        help="fraction of sequences that must agree for a column to count as similar (default 0.7)",
+    )
+    sq.add_argument("--no-conservation-bar", action="store_true", help="leave out the conservation bars")
+    sq.add_argument("--theme", "--preset", dest="theme", choices=sorted(THEMES))
+    sq.add_argument("--style-file", metavar="YAML")
+    sq.add_argument("--set", action="append", default=[], metavar="KEY=VALUE")
+    sq.add_argument("--title")
     q = sub.add_parser("plot", help="draw the topology figure")
     iq = sub.add_parser("interactive", help="an HTML page linking the topology, the contact map and the 3D model")
     for cmd in (q, iq):
@@ -452,6 +489,8 @@ def main(argv: list[str] | None = None) -> int:
             help="a named domain panel, e.g. ZPN=res:A:331-440 (repeatable)",
         )
         q.add_argument("--domains", choices=["auto"], help="find domains from element contacts (D1, D2...)")
+        q.add_argument("--msa", metavar="ALIGNMENT", help="alignment for conservation colouring (--theme conservation)")
+        q.add_argument("--msa-reference", metavar="NAME", help="alignment row that is the structure (default: best)")
         q.add_argument(
             "--up", metavar="X,Y,Z", help="3D direction to put at the top of the page (e.g. a membrane normal)"
         )
@@ -468,6 +507,26 @@ def main(argv: list[str] | None = None) -> int:
             from .app import run
 
             run()
+        if args.command == "sequence":
+            from .seqplot import draw_sequence
+            from .sequence import read_alignment
+
+            fig = draw_sequence(
+                args.structure,
+                chain=args.chain,
+                alignment=read_alignment(args.msa) if args.msa else None,
+                reference=args.reference,
+                columns=args.columns,
+                look=resolve_style(args.theme or "publication", args.style_file, args.set),
+                full_sequence=args.full_sequence,
+                ss_colour=args.ss_colour,
+                threshold=args.similarity,
+                conservation_bar=not args.no_conservation_bar,
+                title=args.title,
+            )
+            for out in args.output:
+                print(f"wrote {save(fig, out)}")
+            return 0
         if args.command == "styles":
             print(styles_help())
             return 0
@@ -483,6 +542,8 @@ def main(argv: list[str] | None = None) -> int:
                 up=opts["up"],
                 view=opts["view"],
                 domains=opts["domains"],
+                msa=opts["msa"],
+                msa_reference=opts["msa_reference"],
                 **edits,
             )
             if args.command == "interactive":

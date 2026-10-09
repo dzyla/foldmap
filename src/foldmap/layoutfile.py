@@ -27,7 +27,20 @@ from .style import THEMES, Style
 
 VERSION = 1
 TOP = ("foldmap", "structure", "theme", "style", "layout", "domains", "edits")
-LAYOUT = ("mode", "rotate", "flip_v", "symmetry", "symmetry_tol", "assembly", "protomers", "up", "view", "title")
+LAYOUT = (
+    "mode",
+    "rotate",
+    "flip_v",
+    "symmetry",
+    "symmetry_tol",
+    "assembly",
+    "protomers",
+    "up",
+    "view",
+    "title",
+    "msa",
+    "msa_reference",
+)
 EDITS = ("rename", "swap", "move")
 
 

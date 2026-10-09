@@ -37,7 +37,7 @@ def _merge_bulges(runs, ss: str, prev: np.ndarray):
         if merged:
             last = merged[-1]
             gap = a - last[1] - 1
-            if gap == _BULGE_GAP and prev[last[1] + 1] and prev[a] and ss[last[1] + 1] in "-B":
+            if gap == _BULGE_GAP and prev[last[1] + 1] and prev[a] and ss[last[1] + 1] in "-BT":
                 last[1] = b
                 continue
         merged.append([a, b])
