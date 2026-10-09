@@ -627,11 +627,11 @@ def _symmetry_ties(items: list[_Item], frame) -> dict[int, tuple[int, int]]:
     if not sector or not classes:
         return {}
 
-    def residues(it):
+    def residues(it):  # chains outside every protomer (bound peptides, unpaired chains) take no part
         return {
             (classes[m.sse.chain], r)
             for m in it.members
-            if isinstance(m, Placed) and not m.ghost
+            if isinstance(m, Placed) and not m.ghost and m.sse.chain in classes
             for r in range(m.sse.first.seq, m.sse.last.seq + 1)
         }
 
@@ -652,6 +652,8 @@ def _symmetry_ties(items: list[_Item], frame) -> dict[int, tuple[int, int]]:
         mate = items[best]
 
         def span(m):
+            if m.sse.chain not in classes:
+                return set()
             return {(classes[m.sse.chain], r) for r in range(m.sse.first.seq, m.sse.last.seq + 1)}
 
         pairs = [

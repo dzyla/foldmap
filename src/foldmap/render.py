@@ -151,6 +151,8 @@ def _dna_turns(d: PlacedDNA, slot: int) -> tuple[list[np.ndarray], list[np.ndarr
 
 
 def _compound(polys: list[np.ndarray], closed: bool = True) -> Path:
+    if not polys:
+        return Path(np.empty((0, 2)))
     if closed:
         verts = np.vstack([np.vstack([q, q[:1]]) for q in polys])
         codes = np.concatenate([[Path.MOVETO] + [Path.LINETO] * (len(q) - 1) + [Path.CLOSEPOLY] for q in polys])
@@ -682,20 +684,50 @@ def _draw_links(ax, layout: Layout, loops: list[Loop], sses: list[SSE], look: St
     if look.glycans:
         x0, y0, x1, y1 = layout.bounds
         centre = np.array([(x0 + x1) / 2, (y0 + y1) / 2])
+        taken = [p.rect for p in layout.placed.values()] + [g.rect for g in layout.ghosts]
+        taken += [box for _, box in label_boxes(layout, sses)]
+        for loop in loops:  # loop lines too, as thin boxes along each segment
+            pts = np.asarray(loop.points, float)
+            for a, b in zip(pts, pts[1:]):
+                taken.append(
+                    (min(a[0], b[0]) - 0.06, min(a[1], b[1]) - 0.06, max(a[0], b[0]) + 0.06, max(a[1], b[1]) + 0.06)
+                )
+        size, step = 0.34, 0.42
         for r, sugars in links.glycans:
             at = residue_point(layout, loops, sses, chains, r)
             if at is None:
                 continue
-            out = np.asarray(at) - centre
-            out = out / np.linalg.norm(out) if np.linalg.norm(out) > 1e-6 else np.array([0.0, 1.0])
-            if abs(out[0]) > abs(out[1]):  # stems run along the page axes, away from the middle
-                out = np.array([np.sign(out[0]), 0.0])
-            else:
-                out = np.array([0.0, np.sign(out[1])])
-            size, step = 0.34, 0.42
-            tip = np.asarray(at) + out * (0.35 + step * (min(len(sugars), 5) - 0.5))
+            at = np.asarray(at, float)
+            count = min(len(sugars), 5)
+            away = at - centre
+            best = None
+            for out in (np.array([1.0, 0.0]), np.array([-1.0, 0.0]), np.array([0.0, 1.0]), np.array([0.0, -1.0])):
+                for lead in np.arange(0.35, 3.0, 0.1):  # the shortest stem that clears everything
+                    boxes = [
+                        _box(*(at + out * (lead + step * k)), size / 2 + 0.03, size / 2 + 0.03) for k in range(count)
+                    ]
+                    if not any(_hits(b, taken) for b in boxes):
+                        cost = lead - 0.15 * float(np.dot(out, away) > 0)  # ties: point outward
+                        if best is None or cost < best[0]:
+                            best = (cost, out, lead, boxes)
+                        break
+            if best is None:  # nowhere clear: the outward default
+                out = (
+                    np.array([np.sign(away[0]) or 1.0, 0.0])
+                    if abs(away[0]) > abs(away[1])
+                    else np.array([0.0, np.sign(away[1]) or 1.0])
+                )
+                best = (
+                    0.0,
+                    out,
+                    0.35,
+                    [_box(*(at + out * (0.35 + step * k)), size / 2, size / 2) for k in range(count)],
+                )
+            _, out, lead, boxes = best
+            taken += boxes
+            tip = at + out * (lead + step * (count - 0.5))
             stem = PathPatch(
-                Path([at, tuple(tip)], [Path.MOVETO, Path.LINETO]),
+                Path([tuple(at), tuple(tip)], [Path.MOVETO, Path.LINETO]),
                 fc="none",
                 ec=_legible("#2b2b2b"),
                 lw=lw * 0.8,
@@ -705,7 +737,15 @@ def _draw_links(ax, layout: Layout, loops: list[Loop], sses: list[SSE], look: St
             ax.add_patch(stem)
             for k, name in enumerate(sugars[:5]):
                 shape, colour = _SNFG.get(name, ("circle", "#ffffff"))
-                _symbol(ax, shape, colour, np.asarray(at) + out * (0.35 + step * k), size, lw, f"glycan:{r}:{k}")
+                _symbol(ax, shape, colour, at + out * (lead + step * k), size, lw, f"glycan:{r}:{k}")
+
+
+def _box(cx: float, cy: float, hw: float, hh: float) -> tuple[float, float, float, float]:
+    return (cx - hw, cy - hh, cx + hw, cy + hh)
+
+
+def _hits(box, rects) -> bool:
+    return any(box[0] < t[2] and t[0] < box[2] and box[1] < t[3] and t[1] < box[3] for t in rects)
 
 
 def _chevron(points, size: float) -> Path | None:

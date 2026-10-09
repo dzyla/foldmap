@@ -221,3 +221,13 @@ def test_a_large_ring_is_found_quickly(tmp_path):
     t = time.perf_counter()
     s = found(path)
     assert s.n == 12 and time.perf_counter() - t < 10
+
+
+def test_peptide_outside_every_protomer_does_not_break_the_layout():
+    """KLHL3 Kelch domains with bound WNK4 peptides (4CH9): the peptides belong to no protomer."""
+    from pathlib import Path
+
+    from foldmap.cli import make_layout
+
+    lay, sses, _ = make_layout(Path(__file__).parent / "data" / "4CH9.cif")
+    assert lay.placed and {s.chain for s in sses} >= {"A", "B"}

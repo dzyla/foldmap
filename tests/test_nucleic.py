@@ -352,3 +352,9 @@ def test_contact_beads_leave_the_base_letters_readable(ubq, pdb):
         r = np.sqrt(beads.get_sizes()[0]) / 2 * px_per_pt / unit_px  # marker radius, page units
         for b in beads.get_offsets():
             assert np.min(np.hypot(*(letters - b).T)) >= r + glyph * 0.8
+
+
+def test_empty_turn_list_gives_an_empty_path():
+    from foldmap.render import _compound
+
+    assert len(_compound([]).vertices) == 0 and len(_compound([], closed=False).vertices) == 0

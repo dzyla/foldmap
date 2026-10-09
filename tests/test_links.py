@@ -131,3 +131,23 @@ def test_cysteine_springs_bring_bridged_residues_closer_than_box_contacts(name, 
         assert sprung.mean() < 0.5 * boxed.mean()
     else:  # many bridges sit inside one sheet or tie symmetry copies: still shorter on average and at worst
         assert sprung.mean() < boxed.mean() and sprung.max() < boxed.max()
+
+
+@pytest.mark.parametrize("name", ["6ZS5", "8UUP", "6ZYA", "8UTF"])
+def test_glycans_stay_off_elements(name):
+    from foldmap.cli import make_figure, make_layout
+
+    path = Path(__file__).parent / "data" / f"{name}.cif"
+    lay, _, _ = make_layout(path)
+    fig = make_figure(path)
+    inv = fig.axes[0].transData.inverted()
+    rects = [p.rect for p in lay.placed.values()]
+    bad = []
+    for a in fig.axes[0].patches:
+        gid = a.get_gid() or ""
+        if gid.startswith("glycan:") and not gid.endswith(":stem"):
+            b = a.get_window_extent().transformed(inv)
+            for x0, y0, x1, y1 in rects:
+                if min(b.x1, x1) - max(b.x0, x0) > 0.05 and min(b.y1, y1) - max(b.y0, y0) > 0.05:
+                    bad.append(gid)
+    assert not bad, bad

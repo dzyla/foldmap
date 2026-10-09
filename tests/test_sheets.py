@@ -100,3 +100,30 @@ def test_filament_sheet_with_bulge_strand_is_ordered_like_the_deposited_one(zya)
     ids = [s.id for s in sh.strands]
     assert ids in (["A:563-572", "A:499-509", "A:520-521"], ["A:520-521", "A:499-509", "A:563-572"])
     assert not sh.ambiguous  # deposited order is 563-572 | 499-509 | 520-523
+
+
+def test_tim_barrel_is_closed_by_its_single_beta7_beta8_bridge():
+    """1TIM: beta8 pairs back with beta1 (two bridges) and beta7 (one bridge): a closed barrel, as published."""
+    from pathlib import Path
+
+    from foldmap.dssp import assign_dssp
+    from foldmap.io import load_backbone
+    from foldmap.ss import build_sses
+
+    bb = load_backbone(Path(__file__).parent / "data" / "1TIM.cif", "asu")
+    d = assign_dssp(bb)
+    sheets = build_sheets(build_sses(bb, d.ss), d.bridges)
+    assert len(sheets) == 2 and all(sh.closed and len(sh.strands) == 8 for sh in sheets)
+
+
+def test_single_bridges_do_not_close_ordinary_sheets():
+    from pathlib import Path
+
+    from foldmap.dssp import assign_dssp
+    from foldmap.io import load_backbone
+    from foldmap.ss import build_sses
+
+    for name in ("1UBQ", "5NKT", "2JTY", "6ZS5"):
+        bb = load_backbone(Path(__file__).parent / "data" / f"{name}.cif", "asu")
+        d = assign_dssp(bb)
+        assert not any(sh.closed for sh in build_sheets(build_sses(bb, d.ss), d.bridges)), name

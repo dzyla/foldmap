@@ -10,10 +10,11 @@ import networkx as nx
 from .model import SSE, Bridge, Sheet
 
 _SPLIT_GAP = 4  # strands of one chain this close end to end are pieces of one long strand
+_BARREL_MIN = 5  # strands a sheet needs before a lone end-to-end bridge may close it into a barrel
 _MIN_PAIRS = 2  # bridges needed between two strands to count them as neighbours
 
 
-def _edge_table(strands: list[SSE], bridges: list[Bridge]):
+def _edge_table(strands: list[SSE], bridges: list[Bridge], minimum: int = _MIN_PAIRS):
     owner: dict[int, int] = {}
     for k, s in enumerate(strands):
         for r in range(s.start, s.end + 1):
@@ -23,7 +24,7 @@ def _edge_table(strands: list[SSE], bridges: list[Bridge]):
         a, b = owner.get(i), owner.get(j)
         if a is not None and b is not None and a != b:
             table[(min(a, b), max(a, b))][kind] += 1
-    return {e: c for e, c in table.items() if sum(c.values()) >= _MIN_PAIRS}
+    return {e: c for e, c in table.items() if sum(c.values()) >= minimum}
 
 
 def _majority(c: Counter) -> str:
@@ -67,6 +68,7 @@ def _order_tree(tree: nx.Graph, first: int) -> tuple[list[int], bool]:
 def build_sheets(sses: list[SSE], bridges: list[Bridge]) -> list[Sheet]:
     strands = [s for s in sses if s.kind == "E"]
     table = _edge_table(strands, bridges)
+    weak = _edge_table(strands, bridges, minimum=1)  # single bridges, used only to close barrels
     graph = nx.Graph()
     graph.add_nodes_from(range(len(strands)))
     for (a, b), c in table.items():
@@ -84,5 +86,8 @@ def build_sheets(sses: list[SSE], bridges: list[Bridge]) -> list[Sheet]:
             flip = -1 if tree.edges[parent, child]["kind"] == "A" else 1
             direction[child] = direction[parent] * flip
         kinds = [tree.edges[a, b]["kind"] if tree.has_edge(a, b) else "?" for a, b in zip(order, order[1:])]
+        ends = (min(order[0], order[-1]), max(order[0], order[-1]))
+        if not closed and not ambiguous and len(order) >= _BARREL_MIN and ends in weak:
+            closed = True  # a barrel whose last pairing is a lone bridge (DSSP counts it as a ladder too)
         sheets.append(Sheet([strands[k] for k in order], [direction[k] for k in order], kinds, closed, ambiguous))
     return sheets
