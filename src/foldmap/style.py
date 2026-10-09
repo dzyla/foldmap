@@ -16,9 +16,22 @@ from .palette import PALETTES
 CHOICES = {
     "palette": tuple(PALETTES),
     "fill": ("bold", "pale", "outline"),  # solid colour / pale fills / white fills with coloured edges
-    "color_by": ("chain", "sequence", "shade", "sstype", "bfactor", "hydropathy"),  # chain / N->C ramp / chain hue
+    "color_by": (
+        "chain",
+        "sequence",
+        "shade",
+        "sstype",
+        "bfactor",
+        "hydropathy",
+        "plddt",
+    ),  # chain / N->C ramp / chain hue
     # light N -> dark C / helix vs strand (Richardson) / mean B-factor, rigid -> flexible / Kyte-Doolittle
-    "loop_color": ("black", "chain", "element"),  # loops in black / their chain's colour / the element they leave
+    "loop_color": (
+        "black",
+        "chain",
+        "element",
+        "residue",
+    ),  # loops in black / their chain's colour / the element they leave / each residue's colour
     "sequence_map": ("turbo", "viridis", "plasma", "cividis"),
     "loops": ("orthogonal", "curved"),
     "helix_shading": ("depth", "none", "gloss"),  # back face darker / no shading / darker back + glint
@@ -79,6 +92,7 @@ THEMES = {
     "richardson": Style(color_by="sstype", helix_shading="depth", loops="curved"),
     "flexibility": Style(color_by="bfactor"),
     "hydropathy": Style(color_by="hydropathy"),
+    "alphafold": Style(color_by="plddt", loop_color="residue", loop_width=1.3),
     "goodsell": Style(palette="tol-bright", fill="pale", helix_shading="none", loop_width=1.3, sheet_panels=False),
     "journal": Style(palette="tol-muted", loop_width=0.8, font_scale=0.9),
     "trace": Style(color_by="shade", loop_color="element", loop_arrows=True),

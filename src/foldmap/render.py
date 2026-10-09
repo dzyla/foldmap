@@ -48,6 +48,7 @@ _EXT = {".svg": "svg", ".pdf": "pdf", ".png": "png"}
 _FONTS = ["Arial", "Helvetica", "Liberation Sans", "Nimbus Sans", "DejaVu Sans"]  # journal sans first
 _RC = {"font.family": "sans-serif", "font.sans-serif": _FONTS}
 _PANEL = "#eef1f4"
+_RUN_EDGE, _RUN_EDGE_W = "#3a3a3a", 1.8  # dark edge under residue-coloured loops (pale colours stay legible)
 _SHORT_HELIX = 1.6  # helices/3-10 boxes shorter than this hold their residue numbers past the ends
 _DOMAIN_TONES = ("#4c78a8", "#e45756", "#54a24b", "#b279a2", "#f58518", "#72b7b2")  # one hue per domain
 MARK_DEFAULT = "#d1495b"  # a marked element without its own colour
@@ -596,6 +597,53 @@ def property_colour(t: float, kind: str) -> str:
     return to_hex(colormaps[name](lo + float(np.clip(t, 0.0, 1.0)) * (hi - lo)))
 
 
+PLDDT_BANDS = (  # AlphaFold's own confidence colours: (lower bound, colour, legend text)
+    (90.0, "#0053d6", "very high (> 90)"),
+    (70.0, "#65cbf3", "confident (70–90)"),
+    (50.0, "#ffdb13", "low (50–70)"),
+    (-np.inf, "#ff7d45", "very low (< 50)"),
+)
+
+
+def _flatten(path: Path, per_curve: int = 12) -> np.ndarray:
+    """A path's points along its length, Bézier pieces sampled."""
+    pts = []
+    for seg, _ in path.iter_bezier():
+        t = np.linspace(0.0, 1.0, per_curve if seg.degree > 1 else 2)
+        q = seg(t)
+        pts.extend(q if not pts else q[1:])
+    return np.asarray(pts, float)
+
+
+def _cut(pts: np.ndarray, at: np.ndarray, t0: float, t1: float) -> np.ndarray:
+    """The stretch of polyline pts between arc lengths t0 and t1 (at: cumulative arc length)."""
+    inner = pts[(at > t0) & (at < t1)]
+    a = np.array([np.interp(t0, at, pts[:, 0]), np.interp(t0, at, pts[:, 1])])
+    b = np.array([np.interp(t1, at, pts[:, 0]), np.interp(t1, at, pts[:, 1])])
+    return np.vstack([a, inner, b])
+
+
+def residue_runs(path: Path, colours: list) -> list[tuple[str, np.ndarray]]:
+    """Split a loop path into runs of equal colour, one equal share of its length per residue, in order."""
+    pts = _flatten(path)
+    at = np.concatenate([[0.0], np.cumsum(np.hypot(*np.diff(pts, axis=0).T))])
+    total, n, runs, start = at[-1], len(colours), [], 0
+    for k in range(1, n + 1):
+        if k == n or colours[k] != colours[start]:
+            runs.append((colours[start], _cut(pts, at, total * start / n, total * k / n)))
+            start = k
+    return runs
+
+
+def _typical(colours: list) -> str | None:
+    found = [c for c in colours if c is not None]
+    return max(set(found), key=found.count) if found else None
+
+
+def plddt_colour(v: float) -> str:
+    return next(c for lo, c, _ in PLDDT_BANDS if v >= lo)
+
+
 def _residue_values(layout: Layout, kind: str) -> list[float]:
     if kind == "bfactor":
         return list(layout.res_b) or [0.0] * len(layout.res_chain)
@@ -607,6 +655,14 @@ def _colouring(sses: list[SSE], chains: list[str], colors: dict[str, str], look:
     from the chain's first element (N) to its last (C), restarted for every chain."""
     if look.color_by == "sstype":
         return {s.id: _SSTYPE.get(s.kind, "#7f7f7f") for s in sses}, (lambda r, chain=None: "#7f7f7f")
+    if look.color_by == "plddt":  # absolute bands, never rescaled: 'confident' means the same in every figure
+        b = list(layout.res_b) if layout is not None else []
+        if not b:
+            return {s.id: plddt_colour(0.0) for s in sses}, (lambda r, chain=None: None)
+        return (
+            {s.id: plddt_colour(float(np.mean(b[s.start : s.end + 1]))) for s in sses},
+            lambda r, chain=None: plddt_colour(b[r]),
+        )
     if look.color_by in _PROPERTY:
         values = _residue_values(layout, look.color_by) if layout is not None and layout.res_chain else []
         if not values:
@@ -731,6 +787,8 @@ def _draw(
         entries = [(None, "N → C" + (" (each chain)" if len(chains) > 1 else ""))]
     elif look.color_by in _PROPERTY:
         entries = [(("ramp", look.color_by), _PROPERTY[look.color_by][3])]
+    elif look.color_by == "plddt":
+        entries = [(c, text) for _, c, text in PLDDT_BANDS]
     elif look.color_by == "sstype":
         kinds = {p.sse.kind for p in layout.placed.values()}
         entries = [
@@ -781,6 +839,7 @@ def _draw(
             "black": "black",
             "chain": colors.get(a_sse.chain, "black") if a_sse else "black",
             "element": element_colour.get(loop.a_id, "black"),
+            "residue": "black",  # replaced by per-residue runs below
         }[look.loop_color]
         loop_c = _legible(loop_c)
         if layout.focus is not None and a_sse is not None and a_sse.chain not in layout.focus:
@@ -811,6 +870,27 @@ def _draw(
         )
         line.set_gid(f"loop:{name}")
         ax.add_patch(line)
+        if look.loop_color == "residue" and loop_c != _MATE_LINE and a_sse is not None:
+            b_sse = sse_by_id.get(loop.b_id)
+            span = range(a_sse.end + 1, b_sse.start) if b_sse is not None else range(0)
+            ends = [a_sse.end, b_sse.start] if b_sse is not None else [a_sse.end]
+            shades = [residue_colour(r, a_sse.chain) for r in (span or ends)]
+            shades = [c or "black" for c in shades]  # true colours, matching the legend ...
+            line.set_edgecolor(_RUN_EDGE)  # ... on a dark edge (the loop's own line, also the hover target)
+            line.set_linewidth(loop_lw * _RUN_EDGE_W)
+            for k, (shade, piece) in enumerate(residue_runs(path, shades)):
+                run = PathPatch(
+                    Path(piece),
+                    fc="none",
+                    ec=shade,
+                    lw=loop_lw,
+                    capstyle="butt",
+                    joinstyle="round",
+                    ls=(0, (3, 2)) if loop.dashed else "-",
+                    zorder=1 + i * 1e-3 + 6e-4,
+                )
+                run.set_gid(f"loop-seg:{name}:{k}")
+                ax.add_patch(run)
 
     for k, (name, ids) in enumerate(layout.domains):  # named domains: a soft tinted panel, name at top left
         if not ids:
@@ -993,7 +1073,18 @@ def _draw(
 
     for end, chain, port, ex in termini(layout, sses):
         tip = (port[0] + ex[0] * END_STUB, port[1] + ex[1] * END_STUB)
-        stub = PathPatch(Path([port, tip], [Path.MOVETO, Path.LINETO]), fc="none", ec="black", lw=loop_lw, zorder=2)
+        ink = "black"
+        if look.loop_color == "residue" and layout.res_chain:  # a terminal tail: its typical colour
+            mine = [s for s in sses if s.chain == chain]
+            ours = [r for r, c in enumerate(layout.res_chain) if c == chain]
+            if mine and ours:
+                tail = range(ours[0], mine[0].start) if end == "N" else range(mine[-1].end + 1, ours[-1] + 1)
+                ink = _typical([residue_colour(r, chain) for r in tail]) or "black"
+        if ink != "black":
+            edge = PathPatch(Path([port, tip]), fc="none", ec=_RUN_EDGE, lw=loop_lw * _RUN_EDGE_W, zorder=1.99)
+            edge.set_gid(f"stub-edge:{end}:{chain}")
+            ax.add_patch(edge)
+        stub = PathPatch(Path([port, tip], [Path.MOVETO, Path.LINETO]), fc="none", ec=ink, lw=loop_lw, zorder=2)
         stub.set_gid(f"stub:{end}:{chain}")
         ax.add_patch(stub)
         ax.text(

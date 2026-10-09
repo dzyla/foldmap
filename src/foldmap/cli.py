@@ -322,6 +322,13 @@ def _figure_spec(args):
     return theme, look, opts, edits
 
 
+def experimental_method(path) -> str | None:
+    """The experimental method a file declares (X-RAY DIFFRACTION, ELECTRON MICROSCOPY...); None for models."""
+    import gemmi
+
+    return dict(gemmi.read_structure(str(path)).info).get("_exptl.method") or None
+
+
 def _domain_spec(items: list[str]) -> list[tuple[str, list[str]]]:
     out = []
     for item in items:
@@ -497,6 +504,13 @@ def main(argv: list[str] | None = None) -> int:
                     )
                 for out in args.output:
                     print(f"wrote {save(fig, out)}")
+            if look.color_by == "plddt" and experimental_method(args.structure):
+                print(
+                    f"foldmap: warning: {args.structure} is an experimental structure "
+                    f"({experimental_method(args.structure).lower()}); its B-factor column holds B-factors, "
+                    "not pLDDT confidence",
+                    file=sys.stderr,
+                )
             if args.save_layout:
                 plain = {k: v for k, v in kw.items() if k not in ("rename", "swap", "move")}
                 layout, sses, _ = make_layout(args.structure, opts["mode"], opts["rotate"], opts["flip_v"], **plain)

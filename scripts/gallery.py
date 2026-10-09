@@ -18,7 +18,6 @@ DATA, OUT = ROOT / "tests" / "data", ROOT / "docs" / "images"
 
 # (output name, structure, title, theme, style overrides, layout options)
 FIGURES = [
-    ("ubiquitin", "1UBQ.cif", "Ubiquitin (1UBQ)", "publication", ["residue_numbers=true"], {"assembly": "asu"}),
     ("lambda-repressor-dna", "1LMB.cif", "λ repressor on DNA (1LMB)", "publication", [], {"assembly": "asu"}),
     ("fima-richardson", "5NKT.cif", "FimA (5NKT) · richardson", "richardson", [], {"assembly": "asu"}),
     (
@@ -37,6 +36,7 @@ FIGURES = [
         ["highlight=asu", "loop_color=chain"],
         {},
     ),
+    ("p53-alphafold", "AF-P04637.cif", "p53 AlphaFold model (AF-P04637) · pLDDT", "alphafold", [], {}),
     ("tim-barrel-rainbow", "1TIM.cif", "TIM barrel (1TIM) · N→C", "rainbow", [], {"assembly": "asu"}),
 ]
 

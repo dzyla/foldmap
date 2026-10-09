@@ -40,12 +40,15 @@ LAYOUT_DEFAULTS = {
     "domains": "",
 }
 CACHE = Path.home() / ".cache" / "foldmap"
+AFDB_VERSION = 6  # AlphaFold DB model version to fetch
+AGENT = "foldmap (https://pypi.org/project/foldmap)"  # the AlphaFold DB refuses requests without a user agent
 EXAMPLES = {"1LMB": "λ repressor on DNA", "5NKT": "FimA", "8UTF": "measles F trimer", "1UBQ": "ubiquitin"}
 
 
 # ---------------------------------------------------------------------------------------------- core
 def fetch(source: str, upload: tuple[str, bytes] | None = None) -> Path:
-    """A local structure file from an upload, a path, or a PDB ID (downloaded from RCSB once, then cached)."""
+    """A local structure file from an upload, a path, a PDB ID (from RCSB) or a UniProt accession / AlphaFold DB
+    id (the AlphaFold model); downloads are cached."""
     if upload is not None:
         name, data = upload
         CACHE.mkdir(parents=True, exist_ok=True)
@@ -55,6 +58,23 @@ def fetch(source: str, upload: tuple[str, bytes] | None = None) -> Path:
     text = (source or "").strip()
     if text and Path(text).expanduser().is_file():
         return Path(text).expanduser()
+    af = re.fullmatch(
+        r"(?:AF-)?([OPQ][0-9][A-Z0-9]{3}[0-9]|[A-NR-Z][0-9](?:[A-Z][A-Z0-9]{2}[0-9]){1,2})(?:-F1)?", text.upper()
+    )
+    if af:  # a UniProt accession or AlphaFold DB id: the AlphaFold model
+        acc = af.group(1)
+        CACHE.mkdir(parents=True, exist_ok=True)
+        path = CACHE / f"AF-{acc}-F1.cif"
+        if not path.is_file():
+            url = f"https://alphafold.ebi.ac.uk/files/AF-{acc}-F1-model_v{AFDB_VERSION}.cif"
+            try:
+                with urllib.request.urlopen(
+                    urllib.request.Request(url, headers={"User-Agent": AGENT}), timeout=30
+                ) as r:
+                    path.write_bytes(r.read())
+            except OSError as err:
+                raise ValueError(f"could not download AF-{acc} from the AlphaFold DB ({err})") from None
+        return path
     if re.fullmatch(r"[0-9][A-Za-z0-9]{3}", text):
         CACHE.mkdir(parents=True, exist_ok=True)
         path = CACHE / f"{text.upper()}.cif"
@@ -65,7 +85,10 @@ def fetch(source: str, upload: tuple[str, bytes] | None = None) -> Path:
             except OSError as err:
                 raise ValueError(f"could not download {text.upper()} from the PDB ({err})") from None
         return path
-    raise ValueError("Enter a 4-character PDB ID (e.g. 1LMB), a path to a .cif or .pdb file, or upload a file.")
+    raise ValueError(
+        "Enter a PDB ID (e.g. 1LMB), a UniProt accession or AlphaFold DB id (e.g. P04637), "
+        "a path to a .cif or .pdb file, or upload a file."
+    )
 
 
 def look_of(settings: dict) -> Style:
@@ -254,10 +277,10 @@ def main() -> None:
     st.markdown("#### Foldmap · protein topology diagrams")
 
     if ss["stage"] == "load":
-        st.write("Start with a structure: a PDB ID, a file path, or an upload (mmCIF or PDB).")
+        st.write("Start with a structure: a PDB ID, a UniProt accession (AlphaFold model), a file path, or an upload.")
         left, right = st.columns([3, 2])
         with left:
-            st.text_input("PDB ID or file path", key="source", placeholder="e.g. 1LMB")
+            st.text_input("PDB ID, UniProt accession or file path", key="source", placeholder="e.g. 1LMB or P04637")
             st.button("Load structure", key="load", type="primary", on_click=load)
             st.caption("Examples")
             cols = st.columns(len(EXAMPLES))

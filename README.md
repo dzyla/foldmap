@@ -5,7 +5,8 @@
 foldmap reads a structure, assigns secondary structure, finds β-sheets, helix bundles and symmetry, and lays the
 elements out as a clean 2D topology diagram. Helices are drawn as coiled ribbons, strands as arrows and short 3₁₀
 helices as small boxes, all on one consistent scale, with loops routed around everything else. It handles
-protein–DNA/RNA complexes, symmetric assemblies from cryo-EM and crystallography, disulfides and glycans.
+protein–DNA/RNA complexes, symmetric assemblies from cryo-EM and crystallography, AlphaFold models, disulfides and
+glycans.
 
 <table>
 <tr>
@@ -17,8 +18,8 @@ protein–DNA/RNA complexes, symmetric assemblies from cryo-EM and crystallograp
 <tr>
 <td><img src="docs/images/fima-richardson.png" alt="FimA pilin coloured by secondary structure type"><br>
 <sub><b>Disulfides and 3₁₀ helices.</b> FimA (5NKT), Richardson colouring: the disulfide is drawn as a bar, the 3₁₀ helix as η1.</sub></td>
-<td><img src="docs/images/ubiquitin.png" alt="Ubiquitin with residue numbers"><br>
-<sub><b>Residue numbers.</b> Ubiquitin (1UBQ): first and last residue of every element.</sub></td>
+<td><img src="docs/images/p53-alphafold.png" alt="p53 AlphaFold model coloured by pLDDT confidence"><br>
+<sub><b>AlphaFold models.</b> p53 (AF-P04637), alphafold theme: elements, loops and tails in pLDDT confidence bands.</sub></td>
 </tr>
 <tr>
 <td><img src="docs/images/measles-f-trimer.png" alt="Measles fusion protein trimer with one protomer highlighted"><br>
@@ -44,7 +45,7 @@ foldmap summary model.cif                     # elements, sheets, symmetry
 foldmap plot model.cif -o figure.svg          # .svg, .png (300 dpi) or .pdf; -o is repeatable
 foldmap plot model.cif -o fig.png --theme richardson --set residue_numbers=true
 foldmap interactive model.cif -o view.html    # linked topology / contact map / 3D view
-foldmap app                                   # Streamlit app in the browser
+foldmap app                                   # Streamlit app: PDB IDs, UniProt accessions (AlphaFold), files
 ```
 
 SVG output keeps text as text, so labels stay editable in Illustrator or Inkscape.
@@ -63,10 +64,12 @@ SVG output keeps text as text, so labels stay editable in Illustrator or Inkscap
 | `richardson` | coloured by element type |
 | `rainbow`, `shaded`, `trace` | N→C colouring; `trace` also colours loops and adds direction arrows |
 | `flexibility`, `hydropathy` | coloured by B-factor or Kyte–Doolittle hydropathy |
+| `alphafold` | AlphaFold pLDDT confidence bands, with loops and tails coloured residue by residue |
 | `goodsell` | pale, illustrative |
 
 Change any single key with `--set KEY=VALUE` (repeatable), or collect them in a YAML file for `--style-file`.
-Useful keys: `color_by`, `palette`, `fill`, `loops`, `loop_color`, `residue_numbers`, `highlight`
+Useful keys: `color_by`, `palette`, `fill`, `loops`, `loop_color` (`residue` colours loops residue by
+residue), `residue_numbers`, `highlight`
 (`asu`, `protomer` or a chain list), `mark` (highlight chosen elements), `disulfides`, `glycans`,
 `helices_310`, `helix_scale`, `strand_scale`, `font_scale`.
 
