@@ -987,10 +987,12 @@ def dna_end_labels(d: PlacedDNA, na: Nucleic) -> list[tuple[str, str, tuple[floa
     for slot, k in enumerate(d.strands):
         n = len(na.strands[k])
         sign = 1 if slot % 2 == 0 else -1  # slot 0 runs 5' -> 3' along the drawn direction, slot 1 back
+        strand = na.strands[k]
         for end, i in (("5′", 0), ("3′", n - 1)):
             x = d.axial[(k, i)] + (reach if (end == "3′") == (sign > 0) else -reach)
             pos = dna_to_page(d, x, dna_y(slot % 2, x, d.width))
-            out.append((na.strands[k].id, end, (float(pos[0]), float(pos[1]))))
+            cut = strand.cut5 if end == "5′" else strand.cut3
+            out.append((strand.id, "…" if cut else end, (float(pos[0]), float(pos[1]))))  # cropped: it goes on
     return out
 
 

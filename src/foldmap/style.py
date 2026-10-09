@@ -16,6 +16,7 @@ from .palette import PALETTES
 CHOICES = {
     "palette": tuple(PALETTES),
     "fill": ("bold", "pale", "outline"),  # solid colour / pale fills / white fills with coloured edges
+    "dna_extent": ("contacts", "all"),
     "color_by": (
         "chain",
         "sequence",
@@ -39,7 +40,14 @@ CHOICES = {
     "helix_angle": ("snap", "upright", "tilted"),  # nearest of vertical/horizontal / always vertical / as in 3D
 }
 _ALIASES = {"fill": {"classic": "bold", "flat": "pale"}}
-LAYOUT_KEYS = ("helix_angle", "helix_scale", "strand_scale", "dna_scale", "helices_310")  # these move elements
+LAYOUT_KEYS = (
+    "helix_angle",
+    "helix_scale",
+    "strand_scale",
+    "dna_scale",
+    "helices_310",
+    "dna_extent",
+)  # these move elements
 SCALES = ("helix_scale", "strand_scale", "dna_scale", "loop_width", "font_scale")
 
 
@@ -60,6 +68,7 @@ class Style:
     color_by: str = "chain"
     sequence_map: str = "turbo"  # blue (N) -> red (C), like PyMOL's spectrum
     nucleotide_labels: bool = True  # base letters on DNA/RNA
+    dna_extent: str = "contacts"  # DNA/RNA drawn: contacts (the stretch the protein touches, +6 nt) or all
     helices_310: bool = True  # short 3-10 helices as small boxes (η1, η2...)
     sheet_panels: bool = True  # a light panel behind each β-sheet, so sandwiches read as two sheets
     loop_color: str = "black"

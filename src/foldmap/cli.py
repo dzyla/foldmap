@@ -103,6 +103,10 @@ def make_layout(
     sses = build_sses(bb, dssp.ss, short_helices=(look or Style()).helices_310)
     sheets = build_sheets(sses, dssp.bridges)
     nucleic = load_nucleic(path, bb, assembly) if dna else None
+    if nucleic is not None and (look or Style()).dna_extent == "contacts":
+        from .model import crop_nucleic
+
+        nucleic = crop_nucleic(nucleic)
     sym = detect_symmetry(bb, sses, symmetry, protomers, symmetry_tol) if sses else None
     mem = None
     if membrane not in ("off", None):

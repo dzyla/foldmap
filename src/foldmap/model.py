@@ -103,6 +103,8 @@ class NAStrand:
     p: np.ndarray  # (n, 3)
     c1: np.ndarray  # (n, 3)
     rna: bool
+    cut5: bool = False  # cropped: the strand continues beyond its 5' end
+    cut3: bool = False  # ... beyond its 3' end
 
     @property
     def id(self) -> str:
@@ -121,6 +123,52 @@ class Nucleic:
     pairs: list[tuple[int, int, int, int]] = field(default_factory=list)
     contacts: dict[int, set[tuple[int, int]]] = field(default_factory=dict)
     contact_chain: dict[int, str] = field(default_factory=dict)  # protein chain of each contacting residue
+
+
+def crop_nucleic(na: Nucleic, flank: int = 6) -> Nucleic:
+    """Only the stretches the protein touches, plus `flank` nucleotides each side (and their base-pair
+    partners, so duplexes stay whole); duplexes the protein never touches are dropped."""
+    window: dict[int, list[int]] = {}
+    for v in na.contacts.values():
+        for k, i in v:
+            lo, hi = window.get(k, [i, i])
+            window[k] = [min(lo, i), max(hi, i)]
+    for k, w in window.items():
+        window[k] = [max(0, w[0] - flank), min(len(na.strands[k]) - 1, w[1] + flank)]
+    for _ in range(3):  # partners of every kept nucleotide are kept too
+        for a, i, b, j in na.pairs:
+            for x, y, u, v in ((a, i, b, j), (b, j, a, i)):
+                if x in window and window[x][0] <= y <= window[x][1]:
+                    lo, hi = window.get(u, [v, v])
+                    window[u] = [min(lo, v), max(hi, v)]
+    keep = sorted(window)
+    index = {k: n for n, k in enumerate(keep)}
+    strands = []
+    for k in keep:
+        s, (lo, hi) = na.strands[k], window[k]
+        strands.append(
+            NAStrand(
+                s.chain,
+                s.labels[lo : hi + 1],
+                s.p[lo : hi + 1],
+                s.c1[lo : hi + 1],
+                s.rna,
+                s.cut5 or lo > 0,
+                s.cut3 or hi < len(s) - 1,
+            )
+        )
+
+    def inside(k: int, i: int) -> bool:
+        return k in window and window[k][0] <= i <= window[k][1]
+
+    pairs = [
+        (index[a], i - window[a][0], index[b], j - window[b][0])
+        for a, i, b, j in na.pairs
+        if inside(a, i) and inside(b, j)
+    ]
+    contacts = {r: {(index[k], i - window[k][0]) for k, i in v if inside(k, i)} for r, v in na.contacts.items()}
+    contacts = {r: v for r, v in contacts.items() if v}
+    return Nucleic(strands, pairs, contacts, {r: c for r, c in na.contact_chain.items() if r in contacts})
 
 
 def duplex_groups(na: Nucleic) -> list[list[int]]:

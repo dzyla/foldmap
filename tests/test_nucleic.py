@@ -1,8 +1,12 @@
+from pathlib import Path
+
 import numpy as np
 import pytest
 
 from foldmap.io import load_nucleic
 from helpers import pipeline
+
+DATA = Path(__file__).parent / "data"
 
 
 def test_protein_only_file_has_no_nucleic_acid(ubq):
@@ -358,3 +362,54 @@ def test_empty_turn_list_gives_an_empty_path():
     from foldmap.render import _compound
 
     assert len(_compound([]).vertices) == 0 and len(_compound([], closed=False).vertices) == 0
+
+
+def _touched(na):
+    out = {}
+    for v in na.contacts.values():
+        for k, i in v:
+            out.setdefault(k, set()).add(i)
+    return out
+
+
+def test_dna_cropped_to_the_contacted_stretch():
+    from foldmap.io import load_backbone, load_nucleic
+    from foldmap.model import crop_nucleic
+
+    path = DATA / "1LMB.cif"
+    bb = load_backbone(path, "asu")
+    na = load_nucleic(path, bb, "asu")
+    cut = crop_nucleic(na, flank=0)
+    assert len(cut.strands) == len(na.strands)
+    for k, s in enumerate(cut.strands):
+        assert len(s) <= len(na.strands[k])
+        assert s.labels[0].seq >= na.strands[k].labels[0].seq
+    for a, i, b, j in cut.pairs:  # indices stay valid and still name the same nucleotides
+        assert 0 <= i < len(cut.strands[a]) and 0 <= j < len(cut.strands[b])
+    old = {(na.strands[a].labels[i], na.strands[b].labels[j]) for a, i, b, j in na.pairs}
+    assert {(cut.strands[a].labels[i], cut.strands[b].labels[j]) for a, i, b, j in cut.pairs} <= old
+    assert sum(len(v) for v in _touched(cut).values()) == sum(len(v) for v in _touched(na).values())
+    assert any(s.cut5 or s.cut3 for s in cut.strands)
+
+
+def test_untouched_duplexes_are_dropped():
+    from foldmap.io import load_backbone, load_nucleic
+    from foldmap.model import crop_nucleic
+
+    path = DATA / "1LMB.cif"
+    bb = load_backbone(path, "asu")
+    na = load_nucleic(path, bb, "asu")
+    na.contacts = {}
+    assert crop_nucleic(na).strands == []
+
+
+def test_cropped_ends_are_marked_and_full_dna_on_request():
+    from foldmap.cli import make_figure
+
+    texts = lambda fig: [t.get_text() for t in fig.axes[0].texts]  # noqa: E731
+    from foldmap.style import Style
+
+    cropped = make_figure(DATA / "1LMB.cif", look=Style(dna_extent="contacts"))
+    full = make_figure(DATA / "1LMB.cif", look=Style(dna_extent="all"))
+    assert "5′" in texts(full) and texts(full).count("5′") >= 2
+    assert len(texts(cropped)) <= len(texts(full))
