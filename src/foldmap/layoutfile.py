@@ -40,6 +40,7 @@ LAYOUT = (
     "title",
     "msa",
     "msa_reference",
+    "membrane",
 )
 EDITS = ("rename", "swap", "move")
 

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import dataclasses
 import sys
 
 import numpy as np
@@ -85,6 +86,7 @@ def make_layout(
     domains=None,
     msa=None,
     msa_reference: str | None = None,
+    membrane: str = "off",
 ):
     bb = load_backbone(path, assembly)
     if (look or Style()).color_by == "conservation" and not msa:
@@ -94,6 +96,19 @@ def make_layout(
     sheets = build_sheets(sses, dssp.bridges)
     nucleic = load_nucleic(path, bb, assembly) if dna else None
     sym = detect_symmetry(bb, sses, symmetry, protomers, symmetry_tol) if sses else None
+    mem = None
+    if membrane not in ("off", None):
+        from .membrane import find_membrane
+
+        mem = find_membrane(path, bb)
+        if mem is None:
+            print(f"foldmap: warning: no membrane found in {path}; drawing it without one", file=sys.stderr)
+        elif up is None and view is None:  # the bilayer horizontal, outside on top (unless the symmetry axis
+            along = sym is not None and abs(float(np.dot(sym.axis, mem.normal))) > 0.9  # already stands upright)
+            if not along:
+                up = mem.normal
+            elif mem.sided and float(np.dot(sym.axis, mem.normal)) < 0:  # turn the unrolled assembly over
+                sym = dataclasses.replace(sym, axis=-sym.axis, angles=[-a for a in sym.angles], rise=-sym.rise)
     if nucleic is not None and nucleic.strands:
         frame = (
             dna_radial_frame(sses, nucleic)
@@ -135,12 +150,47 @@ def make_layout(
     lay.res_chain = [l.chain for l in bb.labels]
     lay.res_name = [l.name for l in bb.labels]
     lay.res_b = [float(x) for x in bb.b] if bb.b is not None else []
+    if mem is not None:
+        lay.membrane = _membrane_band(lay, sses, bb, mem)
     if msa:
         from .sequence import read_alignment, residue_conservation
 
         scores = residue_conservation(bb, read_alignment(msa), msa_reference)
         lay.res_cons = [scores.get(k, float("nan")) for k in range(len(bb))]
     return lay, sses, bb
+
+
+def _membrane_band(lay, sses, bb, mem) -> dict | None:
+    """The band on the page: where the transmembrane elements pass the two membrane faces (medians)."""
+    depth = mem.depth(bb.ca)
+    outs, ins = [], []
+    for s in sses:
+        p = lay.placed.get(s.id)
+        seg = depth[s.start : s.end + 1]
+        if p is None or len(seg) < 2 or seg.min() > -mem.half + 2 or seg.max() < mem.half - 2:
+            continue
+
+        def page_y(face: float, seg=seg, p=p) -> float | None:
+            k = np.flatnonzero(np.diff(np.sign(seg - face)) != 0)
+            if not k.size:
+                return None
+            k = int(k[0])
+            t = (k + (face - seg[k]) / (seg[k + 1] - seg[k])) / (len(seg) - 1)
+            return float(p.n_port[1] + t * (p.c_port[1] - p.n_port[1]))
+
+        o, i = page_y(mem.half), page_y(-mem.half)
+        if o is not None and i is not None and abs(o - i) > 1.0:
+            outs.append(o)
+            ins.append(i)
+    if not outs:
+        return None
+    y_out, y_in = float(np.median(outs)), float(np.median(ins))
+    return {
+        "y": (min(y_out, y_in), max(y_out, y_in)),
+        "inside": "below" if y_in < y_out else "above",
+        "source": mem.source,
+        "sides": mem.sided,
+    }
 
 
 _DOMAIN_PULL = 6  # CA-pair-equivalents of attraction between any two elements of one domain
@@ -325,6 +375,7 @@ def _figure_spec(args):
         domains = [(name, list(refs)) for name, refs in domains.items()]
     opts["domains"] = domains
     opts["msa"] = args.msa or lay.get("msa")
+    opts["membrane"] = args.membrane or lay.get("membrane", "off")
     opts["msa_reference"] = args.msa_reference or lay.get("msa_reference")
     edits = layoutfile.edits_of(doc)
     edits["rename"].update(cli["rename"])
@@ -489,6 +540,11 @@ def main(argv: list[str] | None = None) -> int:
             help="a named domain panel, e.g. ZPN=res:A:331-440 (repeatable)",
         )
         q.add_argument("--domains", choices=["auto"], help="find domains from element contacts (D1, D2...)")
+        q.add_argument(
+            "--membrane",
+            choices=["off", "auto"],
+            help="draw the lipid bilayer: auto finds it (OPM dummy atoms, or estimated); default off",
+        )
         q.add_argument("--msa", metavar="ALIGNMENT", help="alignment for conservation colouring (--theme conservation)")
         q.add_argument("--msa-reference", metavar="NAME", help="alignment row that is the structure (default: best)")
         q.add_argument(
@@ -543,6 +599,7 @@ def main(argv: list[str] | None = None) -> int:
                 view=opts["view"],
                 domains=opts["domains"],
                 msa=opts["msa"],
+                membrane=opts["membrane"],
                 msa_reference=opts["msa_reference"],
                 **edits,
             )

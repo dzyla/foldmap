@@ -49,6 +49,7 @@ _EXT = {".svg": "svg", ".pdf": "pdf", ".png": "png"}
 _FONTS = ["Arial", "Helvetica", "Liberation Sans", "Nimbus Sans", "DejaVu Sans"]  # journal sans first
 _RC = {"font.family": "sans-serif", "font.sans-serif": _FONTS}
 _PANEL = "#eef1f4"
+_LIPID, _HEADS, _HEAD_EDGE = "#f7f0de", "#e6d3a3", "#c2a765"  # membrane band, lipid head groups
 _RUN_EDGE, _RUN_EDGE_W = "#3a3a3a", 1.8  # dark edge under residue-coloured loops (pale colours stay legible)
 _SHORT_HELIX = 1.6  # helices/3-10 boxes shorter than this hold their residue numbers past the ends
 _DOMAIN_TONES = ("#4c78a8", "#e45756", "#54a24b", "#b279a2", "#f58518", "#72b7b2")  # one hue per domain
@@ -1050,6 +1051,30 @@ def _draw(
                 )
                 run.set_gid(f"loop-seg:{name}:{k}")
                 ax.add_patch(run)
+
+    if layout.membrane is not None:  # the lipid bilayer behind everything: a band with head groups on both faces
+        b0, b1 = layout.membrane["y"]
+        left, right = x0 - pad * 0.7, x1 + pad * 0.7
+        band = Rectangle((left, b0), right - left, b1 - b0, fc=_LIPID, ec="none", zorder=0.1)
+        band.set_gid("membrane")
+        ax.add_patch(band)
+        xs = np.arange(left + 0.2, right, 0.42)
+        for face, y in (("low", b0), ("high", b1)):
+            heads = ax.scatter(
+                xs,
+                np.full(len(xs), y),
+                s=(lw * 4.2) ** 2,
+                c=_HEADS,
+                edgecolors=_HEAD_EDGE,
+                linewidths=lw * 0.4,
+                zorder=0.15,
+            )
+            heads.set_gid(f"membrane-heads:{face}")
+        below = layout.membrane["inside"] == "below"
+        sides = (("out" if below else "in", b1 + 0.35, "bottom"), ("in" if below else "out", b0 - 0.35, "top"))
+        for text, y, va in sides if layout.membrane.get("sides", True) else ():
+            t = ax.text(left + 0.1, y, text, ha="left", va=va, fontsize=font * 0.9, style="italic", color="#7a6a45")
+            t.set_gid(f"membrane-side:{text}")
 
     for k, (name, ids) in enumerate(layout.domains):  # named domains: a soft tinted panel, name at top left
         if not ids:
