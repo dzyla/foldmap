@@ -345,31 +345,111 @@ _METAL_REACH = 3.1  # Å, metal to a coordinating atom (K+ to carbonyl O is ~2.8
 _LIGAND_REACH = 4.0  # Å, ligand heavy atom to a residue atom
 
 
+SHORT_NAMES = {  # sugar residues by their usual short names (SNFG); other ligands keep their CCD code
+    "NAG": "GlcNAc",
+    "NDG": "GlcNAc",
+    "GN1": "GlcNAc-P",
+    "A1E9H": "GlcNAc-P",
+    "RAM": "Rha",
+    "GZL": "Galf",
+    "GAL": "Gal",
+    "GLA": "Gal",
+    "GLC": "Glc",
+    "BGC": "Glc",
+    "MAN": "Man",
+    "BMA": "Man",
+    "FUC": "Fuc",
+    "XYL": "Xyl",
+    "SIA": "Neu5Ac",
+    "A2G": "GalNAc",
+    "NGA": "GalNAc",
+}
+_BOND = 1.9  # Å between heavy atoms of two residues that are covalently joined
+
+
+def _ligand_label(codes: list[str]) -> str:
+    """A1E8P·GlcNAc-P·Rha·Galf×3: residues in bond order, short sugar names, runs compressed."""
+    names = [SHORT_NAMES.get(c, c) for c in codes]
+    out: list[str] = []
+    for n in names:
+        if out and out[-1].split("×")[0] == n:
+            k = int(out[-1].split("×")[1]) if "×" in out[-1] else 1
+            out[-1] = f"{n}×{k + 1}"
+        else:
+            out.append(n)
+    return "·".join(out)
+
+
 def _ligands(model, where) -> list[Ligand]:
-    """Non-polymer residues (not water, not sugars) touching the protein, with the residues that hold them."""
+    """Ligands touching the protein, with the residues that hold them. Non-polymer residues bonded to each other
+    (a lipid-linked oligosaccharide, a cofactor built of parts) are one ligand; metals stay single ions."""
     search = gemmi.NeighborSearch(model, gemmi.UnitCell(), 5).populate()
-    out = []
+    parts = []
     for chain in model:
         polymer = {(r.seqid.num, r.seqid.icode) for r in chain.get_polymer()}
         for res in chain:
             if (res.seqid.num, res.seqid.icode) in polymer or res.is_water() or res.name in SUGARS:
                 continue
             heavy = [a for a in res if a.element.name != "H"]
-            if not heavy:
+            if heavy:
+                parts.append((chain.name, res, heavy, len(heavy) == 1 and heavy[0].element.is_metal))
+    group = list(range(len(parts)))
+
+    def root(x: int) -> int:
+        while group[x] != x:
+            group[x] = group[group[x]]
+            x = group[x]
+        return x
+
+    for a in range(len(parts)):
+        for b in range(a + 1, len(parts)):
+            if parts[a][3] or parts[b][3]:
                 continue
-            metal = len(heavy) == 1 and heavy[0].element.is_metal
+            if any(x.pos.dist(y.pos) < _BOND for x in parts[a][2] for y in parts[b][2]):
+                group[root(a)] = root(b)
+    members: dict[int, list[int]] = {}
+    for k in range(len(parts)):
+        members.setdefault(root(k), []).append(k)
+
+    out = []
+    for ks in members.values():
+        ks = _bond_order(ks, parts)
+        touching = set()
+        for k in ks:
+            _, res, heavy, metal = parts[k]
             reach = _METAL_REACH if metal else _LIGAND_REACH
-            touching = set()
             for atom in heavy:
                 for mark in search.find_atoms(atom.pos, radius=reach):
                     cra = mark.to_cra(model)
                     key = (cra.chain.name, cra.residue.seqid.num, cra.residue.seqid.icode.strip())
                     if key in where and (not metal or cra.atom.element.name in ("O", "N", "S")):
                         touching.add(where[key])
-            if not touching:
-                continue
-            symbol = heavy[0].element.name.capitalize() if metal else res.name
-            out.append(
-                Ligand(res.name, chain.name, res.seqid.num, metal, symbol, sorted(touching), res.name in ADDITIVES)
+        if not touching:
+            continue
+        chain, res, heavy, metal = parts[ks[0]]
+        codes = [parts[k][1].name for k in ks]
+        symbol = heavy[0].element.name.capitalize() if metal else _ligand_label(codes)
+        name = codes[0] if len(codes) == 1 else "+".join(dict.fromkeys(codes))
+        out.append(
+            Ligand(
+                name, chain, res.seqid.num, metal, symbol, sorted(touching), all(c in ADDITIVES for c in codes), codes
             )
+        )
     return out
+
+
+def _bond_order(ks: list[int], parts) -> list[int]:
+    """The residues of one ligand from an end (a residue with one bonded partner), walking along the bonds."""
+    if len(ks) == 1:
+        return ks
+    near = {
+        k: [m for m in ks if m != k and any(x.pos.dist(y.pos) < _BOND for x in parts[k][2] for y in parts[m][2])]
+        for k in ks
+    }
+    start = min((k for k in ks if len(near[k]) <= 1), default=ks[0], key=lambda k: ks.index(k))
+    order, seen = [start], {start}
+    while len(order) < len(ks):
+        nxt = [m for m in near[order[-1]] if m not in seen] or [m for m in ks if m not in seen]
+        order.append(nxt[0])
+        seen.add(nxt[0])
+    return order

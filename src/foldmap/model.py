@@ -213,6 +213,7 @@ class Ligand:
     symbol: str  # element symbol of a metal ion (Zn, Fe, K...), else the residue name
     contacts: list[int] = field(default_factory=list)
     additive: bool = False
+    codes: list[str] = field(default_factory=list)  # residue codes of a covalently joined ligand, in bond order
 
 
 @dataclass(eq=False)

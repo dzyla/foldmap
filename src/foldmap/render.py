@@ -559,7 +559,7 @@ def ligand_marks(layout: Layout, loops: list[Loop], sses: list[SSE], look: Style
     chosen = [
         g
         for g in links.ligands
-        if (codes is not None and g.name.upper() in codes)
+        if (codes is not None and {c.upper() for c in (g.codes or [g.name])} & codes)
         or (codes is None and (look.ligands == "all" or not g.additive))
     ]
     if layout.focus_chains:  # one subunit of an assembly: only what binds it

@@ -97,3 +97,18 @@ def test_ligands_tether_to_at_most_four_elements():
         per.setdefault(gid.rsplit(":", 1)[0], 0)
         per[gid.rsplit(":", 1)[0]] += 1
     assert len(per) == 4 and all(1 <= n <= 4 for n in per.values())
+
+
+def test_covalently_joined_ligand_residues_are_one_ligand():
+    """25IN: each substrate is farnesyl phosphate bonded to GlcNAc-1-P, then Rha and three Galf - one molecule."""
+    bb, ligs = _ligands("25IN")
+    long = [g for g in ligs if "GZL" in g.codes]
+    assert len(long) == 2 and all(g.codes == ["A1E8P", "A1E9H", "RAM", "GZL", "GZL", "GZL"] for g in long)
+    assert all(g.symbol == "A1E8P·GlcNAc-P·Rha·Galf×3" for g in long)
+    short = [g for g in ligs if g.codes == ["A1E8P", "GN1", "RAM"]]
+    assert len(short) == 2 and len(ligs) == 4  # per transporter half: one long and one short lipid-linked glycan
+
+
+def test_ligand_choice_by_any_of_its_codes():
+    fig = make_figure(DATA / "25IN.cif", look=Style(ligands="GZL"))
+    assert len(_markers(fig)) == 2
