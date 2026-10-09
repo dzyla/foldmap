@@ -9,7 +9,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from foldmap.interactive import THREEDMOL, build_page
+from foldmap.interactive import MOLSTAR_JS, build_page
 
 DATA = Path(__file__).parent / "data"
 
@@ -27,7 +27,7 @@ def _script(page: str, sid: str) -> str:
 def test_page_carries_svg_data_and_model(name):
     page = build_page(DATA / f"{name}.cif")
     data = _data(page)
-    assert "<svg" in page and THREEDMOL in page
+    assert "<svg" in page and MOLSTAR_JS in page
     assert len(data["residues"]) == len(data["ca"]) > 0
     ids = set(re.findall(r'id="([^"]+)"', page))
     for e in data["elements"]:
@@ -121,3 +121,55 @@ def test_3d_model_is_turned_to_match_the_figure():
     st = gemmi.make_structure_from_block(doc.sole_block())
     ca = next(a.pos for r in st[0]["A"] for a in r if a.name == "CA")
     assert np.allclose([ca.x, ca.y, ca.z], rot @ (bb.ca[0] - centre), atol=1e-2)
+
+
+def _data(page):
+    import json
+    import re
+
+    return json.loads(re.search(r'id="topo-data">(.*?)</script>', page, re.S).group(1))
+
+
+def test_molstar_is_the_default_3d_viewer():
+    from foldmap.interactive import MOLSTAR_CSS, MOLSTAR_JS, build_page
+
+    page = build_page(DATA / "1UBQ.cif")
+    assert MOLSTAR_JS in page and MOLSTAR_CSS in page and "3Dmol-min.js" not in page
+    assert "pdbe-molstar@3.12.0" in MOLSTAR_JS  # pinned
+    assert _data(page)["viewer"] == "molstar"
+
+
+def test_3dmol_on_request():
+    from foldmap.interactive import THREEDMOL, build_page
+
+    page = build_page(DATA / "1UBQ.cif", viewer="3dmol")
+    assert THREEDMOL in page and "pdbe-molstar-plugin.js" not in page and _data(page)["viewer"] == "3dmol"
+
+
+def test_unknown_viewer_is_explained():
+    from foldmap.interactive import build_page
+
+    with pytest.raises(ValueError, match="molstar"):
+        build_page(DATA / "1UBQ.cif", viewer="pymol")
+
+
+def test_cli_viewer_option(tmp_path):
+    from foldmap.cli import main
+
+    out = tmp_path / "v.html"
+    assert main(["interactive", str(DATA / "1UBQ.cif"), "-o", str(out), "--viewer", "3dmol"]) == 0
+    assert "3Dmol" in out.read_text()
+
+
+@pytest.mark.parametrize("name", ["1UBQ", "1LMB", "8UTF"])
+def test_exported_model_types_its_residues(name):
+    """Mol* (and other readers) decide what is polymer from _chem_comp.type; '.' made everything a ligand."""
+    import gemmi
+
+    from foldmap.interactive import _model_cif
+
+    block = gemmi.cif.read_string(_model_cif(DATA / f"{name}.cif", "auto")).sole_block()
+    types = {r[0]: gemmi.cif.as_string(r[1]) for r in block.find("_chem_comp.", ["id", "type"])}
+    assert types["ALA"].lower() == "l-peptide linking" and "." not in types.values()
+    if name == "1LMB":
+        assert any("dna linking" in t.lower() for t in types.values())

@@ -251,16 +251,20 @@ def draw_sequence(
 
 @tool
 def interactive_page(
-    source: str, output_path: str | None = None, theme: str = "publication", assembly: str = "auto"
+    source: str,
+    output_path: str | None = None,
+    theme: str = "publication",
+    assembly: str = "auto",
+    viewer: str = "molstar",
 ) -> str:
     """Write a self-contained HTML page linking the topology, a residue contact map and the 3D model (hover
-    anything: the same residues light up in all three). Returns the path."""
+    anything: the same residues light up in all three). viewer: molstar (Mol*, default) or 3dmol. Returns the path."""
     from .interactive import write_page
     from .style import THEMES
 
     path = _structure(source)
     out = Path(output_path).expanduser() if output_path else _output(None, ".html", f"{path.stem}-explorer")
-    return f"wrote {write_page(path, out, look=THEMES[theme], assembly=assembly)}"
+    return f"wrote {write_page(path, out, look=THEMES[theme], assembly=assembly, viewer=viewer)}"
 
 
 def main() -> None:

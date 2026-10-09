@@ -92,7 +92,9 @@ alt="Interactive page: topology, 3D model and contact map side by side">
 
 `foldmap interactive` writes one HTML page with the topology, the 3D model and a residue contact map side by
 side. Hover an element, a loop, a map cell or an atom and the same residues light up in all three; click an
-element to fly the 3D view to it. The 3D model starts in the same orientation as the figure.
+element to fly the 3D view to it. The 3D model starts in the same orientation as the figure. The 3D panel uses
+[Mol*](https://molstar.org) (the PDBe build); `--viewer 3dmol` switches to the lighter
+[3Dmol.js](https://3dmol.csb.pitt.edu/). Either loads from a CDN, so the page needs an internet connection.
 
 ## Install
 

@@ -18,6 +18,9 @@ from .route import route_loops
 from .style import Style
 
 THREEDMOL = "https://cdnjs.cloudflare.com/ajax/libs/3Dmol/2.1.0/3Dmol-min.js"
+MOLSTAR_JS = "https://cdn.jsdelivr.net/npm/pdbe-molstar@3.12.0/build/pdbe-molstar-plugin.js"  # Mol* (PDBe build)
+MOLSTAR_CSS = "https://cdn.jsdelivr.net/npm/pdbe-molstar@3.12.0/build/pdbe-molstar-light.css"
+VIEWERS = ("molstar", "3dmol")
 _LOOP_GREY = "#9aa3ad"
 
 # DOM-free helpers: unit-tested under node (tests/test_interactive.py)
@@ -176,42 +179,117 @@ _APP = r"""
     }
   }
 
-  // ---- 3D
+  // ---- 3D: one interface over Mol* (default) or 3Dmol: base colours, highlight, fly-to, reset, hover callbacks
   const molDiv = document.getElementById('mol');
-  const viewer = $3Dmol.createViewer(molDiv, { backgroundColor: 'white', antialias: true });
-  viewer.addModel(data.model, 'cif');
-  function residueOf(atom) { return idx.byKey[atom.chain + ':' + atom.resi + (atom.icode || '').trim()]; }
-  function colourOf(atom) {
-    const k = residueOf(atom);
-    if (k === undefined) return '#c7ccd2';
+  const LOOP = '#9aa3ad', PALE = '#dde2e7', LOOP_ON = '#4a4f57';
+  function colourOfResidue(k) {
     const e = data.residues[k].e;
-    return e ? idx.byElement[e].colour : '#9aa3ad';
+    return e ? idx.byElement[e].colour : LOOP;
   }
-  function baseStyle() {
-    viewer.setStyle({}, { cartoon: { colorfunc: colourOf } });
-    viewer.setStyle({ hetflag: true }, { stick: { radius: 0.15, colorscheme: 'grayCarbon' } });
+  function runs(residues) {  // contiguous stretches of one chain and one colour, for range-based selections
+    const ks = residues.slice().sort((a, b) => a - b), out = [];
+    ks.forEach(k => {
+      const r = data.residues[k], colour = colourOfResidue(k), last = out[out.length - 1];
+      if (last && last.chain === r.c && last.colour === colour && last.endIndex === k - 1) {
+        last.end = r.n; last.endIndex = k;
+      } else {
+        out.push({ chain: r.c, begin: r.n, end: r.n, endIndex: k, colour });
+      }
+    });
+    return out;
   }
-  baseStyle();
-  viewer.zoomTo();
-  viewer.render();
-  function fitMol() { viewer.resize(); viewer.zoomTo(); viewer.render(); }
-  new ResizeObserver(() => { viewer.resize(); viewer.render(); }).observe(molDiv);
-  setTimeout(fitMol, 50);
-  document.getElementById('molreset').onclick = () => { viewer.zoomTo({}, 400); viewer.render(); };
-  function fly(residues) {  // centre the element, keeping its neighbourhood in view
-    if (!residues.length) return;
-    const sel = { or: residues.map(k => ({ chain: data.residues[k].c, resi: data.residues[k].n })) };
-    viewer.zoomTo(sel);
-    viewer.zoom(0.35);
-    viewer.render();
+  const hooks = {};
+
+  function molstarViewer() {
+    const plugin = new PDBeMolstarPlugin();
+    const url = URL.createObjectURL(new Blob([data.model], { type: 'text/plain' }));
+    const query = run => ({ auth_asym_id: run.chain, beg_auth_seq_id: run.begin, end_auth_seq_id: run.end });
+    const baseData = data.elements.map(e => ({ auth_asym_id: e.chain, beg_auth_seq_id: e.first,
+                                               end_auth_seq_id: e.last, color: e.colour }));
+    let ready = false, busy = false, pending = null;
+    async function apply(params) {  // Mol* calls are asynchronous: keep only the latest request while one runs
+      if (!ready || busy) { pending = params; return; }
+      busy = true;
+      try { await plugin.visual.select(params); } catch (err) { console.warn(err); }
+      busy = false;
+      if (pending) { const next = pending; pending = null; apply(next); }
+    }
+    const base = () => apply({ data: baseData, nonSelectedColor: LOOP });
+    plugin.render(molDiv, {
+      customData: { url, format: 'mmcif', binary: false }, bgColor: '#ffffff', hideControls: true,
+      sequencePanel: false, leftPanel: false, pdbeLink: false, expanded: false, landscape: false,
+      loadingOverlay: false, visualStyle: 'cartoon', hideStructure: ['water'],
+      hideCanvasControls: ['expand', 'selection', 'animation', 'controlToggle', 'controlInfo'],
+    });
+    plugin.events.loadComplete.subscribe(ok => { if (ok) { ready = true; base(); } });
+    function key(d) { return idx.byKey[d.auth_asym_id + ':' + d.auth_seq_id + ((d.ins_code || '').trim())]; }
+    molDiv.addEventListener('PDB.molstar.mouseover', ev => {
+      const k = key(ev.eventData || {});
+      if (k !== undefined && hooks.hover) hooks.hover(k);
+    });
+    molDiv.addEventListener('PDB.molstar.mouseout', () => hooks.leave && hooks.leave());
+    new ResizeObserver(() => { const c = plugin.plugin && plugin.plugin.canvas3d; if (c) c.handleResize(); })
+      .observe(molDiv);
+    return {
+      name: 'molstar',
+      on(residues) {
+        if (!residues.length) return base();
+        apply({ data: runs(residues).map(r => Object.assign(query(r), { color: r.colour === LOOP ? LOOP_ON : r.colour,
+                                                                         sideChain: true })),
+                nonSelectedColor: PALE });
+      },
+      async fly(residues) {  // focus, then step back so the element sits in its surroundings
+        if (!ready || !residues.length) return;
+        await plugin.visual.focus(runs(residues).map(query));
+        setTimeout(() => {
+          const c = plugin.plugin && plugin.plugin.canvas3d;
+          if (!c) return;
+          const snap = c.camera.getSnapshot(), k = 2.4;
+          const position = [0, 1, 2].map(i => snap.target[i] + (snap.position[i] - snap.target[i]) * k);
+          c.camera.setState({ position, radius: snap.radius * k }, 300);
+        }, 450);
+      },
+      reset() { if (ready) plugin.visual.reset({ camera: true }); },
+      plugin,
+    };
   }
-  function molOn(residues) {  // like the topology: the selection in its figure colours, everything else pale
-    if (!residues.length) { baseStyle(); viewer.render(); return; }
-    viewer.setStyle({}, { cartoon: { color: '#dde2e7', opacity: 0.85 } });
-    const sel = { or: residues.map(k => ({ chain: data.residues[k].c, resi: data.residues[k].n })) };
-    viewer.setStyle(sel, { cartoon: { colorfunc: colourOf }, stick: { radius: 0.18, colorscheme: 'grayCarbon' } });
-    viewer.render();
+
+  function threeDmolViewer() {
+    const viewer = $3Dmol.createViewer(molDiv, { backgroundColor: 'white', antialias: true });
+    viewer.addModel(data.model, 'cif');
+    const residueOf = atom => idx.byKey[atom.chain + ':' + atom.resi + (atom.icode || '').trim()];
+    const colourOf = atom => { const k = residueOf(atom); return k === undefined ? '#c7ccd2' : colourOfResidue(k); };
+    function base() {
+      viewer.setStyle({}, { cartoon: { colorfunc: colourOf } });
+      viewer.setStyle({ hetflag: true }, { stick: { radius: 0.15, colorscheme: 'grayCarbon' } });
+    }
+    base(); viewer.zoomTo(); viewer.render();
+    new ResizeObserver(() => { viewer.resize(); viewer.render(); }).observe(molDiv);
+    setTimeout(() => { viewer.resize(); viewer.zoomTo(); viewer.render(); }, 50);
+    viewer.setHoverable({}, true, atom => {
+      const k = residueOf(atom);
+      if (k !== undefined && hooks.hover) hooks.hover(k);
+    }, () => hooks.leave && hooks.leave());
+    const sel = residues => ({ or: residues.map(k => ({ chain: data.residues[k].c, resi: data.residues[k].n })) });
+    return {
+      name: '3dmol',
+      on(residues) {  // like the topology: the selection in its figure colours, everything else pale
+        if (!residues.length) { base(); viewer.render(); return; }
+        viewer.setStyle({}, { cartoon: { color: PALE, opacity: 0.85 } });
+        viewer.setStyle(sel(residues), { cartoon: { colorfunc: colourOf }, stick: { radius: 0.18, colorscheme: 'grayCarbon' } });
+        viewer.render();
+      },
+      fly(residues) { if (residues.length) { viewer.zoomTo(sel(residues)); viewer.zoom(0.35); viewer.render(); } },
+      reset() { viewer.zoomTo({}, 400); viewer.render(); },
+      viewer,
+    };
   }
+
+  const mol = data.viewer === '3dmol' ? threeDmolViewer() : molstarViewer();
+  window.foldmapViewer = mol;
+  document.getElementById('molreset').onclick = () => mol.reset();
+  const molOn = residues => mol.on(residues);
+  const fly = residues => mol.fly(residues);
 
   // ---- linking
   function range(a, b) { const out = []; for (let k = a; k <= b; k++) out.push(k); return out; }
@@ -266,12 +344,11 @@ _APP = r"""
                  (lib.distance(data.ca, i, j) <= CUT ? ' (contact)' : '') });
   });
   over.addEventListener('mouseleave', clear);
-  viewer.setHoverable({}, true, atom => {
-    const k = residueOf(atom);
-    if (k === undefined) return;
+  hooks.hover = k => {  // hovering the 3D model
     const e = data.residues[k].e;
     if (e) element(e); else show({ residues: [k], ranges: [[k, k]], text: name(k) + ' (loop)' });
-  }, clear);
+  };
+  hooks.leave = clear;
 })();
 """
 
@@ -351,14 +428,58 @@ def _model_cif(path, assembly: str, axes=None, centre=None) -> str:
     st.add_model(model)
     st.remove_waters()
     st.setup_entities()
-    return st.make_mmcif_document().as_string()
+    doc = st.make_mmcif_document()
+    _type_components(doc.sole_block(), path)
+    return doc.as_string()
+
+
+def _type_components(block, path) -> None:
+    """Fill _chem_comp.type (gemmi leaves it '.'): from the source file when it has them, else from gemmi's
+    residue table. Viewers such as Mol* tell polymer from ligand by it."""
+    known = {}
+    try:
+        src = gemmi.cif.read(str(path)).sole_block().find("_chem_comp.", ["id", "type"])
+        known = {r[0]: gemmi.cif.as_string(r[1]) for r in src}
+    except (RuntimeError, ValueError, IndexError):
+        pass
+    table = block.find("_chem_comp.", ["id", "type"])
+    for row in table:
+        name = row[0]
+        kind = known.get(name) or _component_type(name)
+        row[1] = gemmi.cif.quote(kind)
+
+
+def _component_type(name: str) -> str:
+    info = gemmi.find_tabulated_residue(name)
+    if info is None:
+        return "non-polymer"
+    if info.is_amino_acid():
+        return "peptide linking" if name == "GLY" else "L-peptide linking"
+    if info.is_nucleic_acid():
+        return "DNA linking" if name.startswith("D") else "RNA linking"
+    return "non-polymer"
+
+
+def _viewer_head(viewer: str) -> str:
+    if viewer == "3dmol":
+        return f'<script src="{THREEDMOL}"></script>'
+    return f'<link rel="stylesheet" href="{MOLSTAR_CSS}">\n<script src="{MOLSTAR_JS}"></script>'
 
 
 def build_page(
-    path, mode: str = "projected", look: Style | None = None, title: str | None = None, **layout_options
+    path,
+    mode: str = "projected",
+    look: Style | None = None,
+    title: str | None = None,
+    viewer: str = "molstar",
+    **layout_options,
 ) -> str:
-    """The HTML page as a string. layout_options go to cli.make_layout (symmetry, assembly, swap, ...)."""
+    """The HTML page as a string. viewer: 'molstar' (Mol*, PDBe build) or '3dmol' for the 3D panel.
+    layout_options go to cli.make_layout (symmetry, assembly, swap, ...)."""
     from .cli import make_layout
+
+    if viewer not in VIEWERS:
+        raise ValueError(f"unknown 3D viewer {viewer!r}; choose from {', '.join(VIEWERS)}")
 
     look = look or Style()
     layout, sses, bb = make_layout(path, mode, look=look, **layout_options)
@@ -385,6 +506,7 @@ def build_page(
             if s.id in layout.placed
         ],
         "model": _model_cif(path, layout_options.get("assembly", "auto"), layout.page_axes, layout.page_centre),
+        "viewer": viewer,
     }
     blob = json.dumps(data, separators=(",", ":")).replace("</", "<\\/")
     name = html.escape(data["title"])
@@ -395,7 +517,7 @@ def build_page(
 <title>{name} · topology explorer</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;600&family=IBM+Plex+Mono&display=swap">
 <style>{_CSS}</style>
-<script src="{THREEDMOL}"></script>
+{_viewer_head(viewer)}
 </head><body>
 <header><h1>{name}</h1><p>{chains} chain(s) · {n_res} residues · {n_el} helices and strands · hover anything: the
 same residues light up in all three views · click an element to fly the 3D view to it</p></header>

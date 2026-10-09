@@ -642,6 +642,7 @@ def main(argv: list[str] | None = None) -> int:
     sq.add_argument("--title")
     q = sub.add_parser("plot", help="draw the topology figure")
     iq = sub.add_parser("interactive", help="an HTML page linking the topology, the contact map and the 3D model")
+    iq.add_argument("--viewer", choices=["molstar", "3dmol"], default="molstar", help="3D viewer (default Mol*)")
     for cmd in (q, iq):
         q = cmd
         q.add_argument("structure")
@@ -801,7 +802,13 @@ def main(argv: list[str] | None = None) -> int:
             if args.command == "interactive":
                 from .interactive import write_page
 
-                page = dict(mode=opts["mode"], title=opts["title"], rotate=opts["rotate"], flip_v=opts["flip_v"])
+                page = dict(
+                    mode=opts["mode"],
+                    title=opts["title"],
+                    rotate=opts["rotate"],
+                    flip_v=opts["flip_v"],
+                    viewer=args.viewer,
+                )
                 for out in args.output:
                     print(f"wrote {write_page(args.structure, out, **page, **kw)}")
             else:
