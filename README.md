@@ -54,7 +54,22 @@ alt="Topology of the lambda repressor dimer bound to its operator DNA">
 <td><img src="https://raw.githubusercontent.com/dzyla/foldmap/main/docs/images/ubiquitin-sequence.png" alt="Ubiquitin sequence with secondary structure"><br>
 <sub><b>Sequence view.</b> The same labels and colours as the topology, turns (TT) and residue numbers.</sub></td>
 </tr>
+<tr>
+<td><img src="https://raw.githubusercontent.com/dzyla/foldmap/main/docs/images/fima-pilus-rod.png" alt="One FimA subunit of the type 1 pilus rod with its neighbours' strands"><br>
+<sub><b>Filaments.</b> Type 1 pilus rod (6Y7S): one FimA subunit in full; the next subunit's donor strand A″ completes its Ig fold, its own strand A pairs with the previous subunit.</sub></td>
+<td><img src="https://raw.githubusercontent.com/dzyla/foldmap/main/docs/images/ferritin-cage.png" alt="One apoferritin subunit with the neighbouring helices of the four-fold channel"><br>
+<sub><b>Cages.</b> Apoferritin (7A4M), 24 subunits: one chain in full, with the neighbours' α5 helices that line the four-fold channel.</sub></td>
+</tr>
 </table>
+
+### Large assemblies
+
+Filaments, cages and other large symmetric assemblies are drawn one subunit at a time (`--focus auto`): the
+smallest repeating unit (one copy of each distinct chain) in full, plus the parts of its neighbours that belong to
+its fold: strands paired with its own by backbone hydrogen bonds (donor strands, domain swaps, β-augmentation,
+cross-β stacking) and helices bundled with its own. Neighbours' elements are grey and primed (A′, A″), carry no
+termini or loops of their own, and a line under the legend says what is shown, e.g. *1 of 6 subunits shown ·
+helical, 115.0° twist, 7.9 Å rise per subunit*. `--focus none` draws everything; `--focus B` picks the subunit.
 
 ### Sequence and alignment
 
@@ -115,7 +130,8 @@ foldmap styles                                    # every theme and style key
   contacting elements and disulfide partners stay close, and nothing overlaps; loops routed orthogonally around
   elements and labels.
 - **Assemblies and symmetry**: biological assemblies are built from the file; cyclic, dihedral, cubic and helical
-  symmetry is detected and every protomer drawn alike; highlight one protomer or the asymmetric unit.
+  symmetry is detected and every protomer drawn alike; highlight one protomer or the asymmetric unit; filaments,
+  cages and large assemblies drawn as one subunit with the neighbouring parts that complete its fold.
 - **Protein–DNA/RNA**: duplexes drawn as double helices with base letters and contact beads, cropped to the
   stretch the protein touches.
 - **Annotations**: disulfides, glycans (SNFG symbols), ligands and metal ions, membrane bands, named domain panels,
@@ -157,6 +173,7 @@ Change any key with `--set KEY=VALUE` (repeatable) or a YAML file for `--style-f
 | Highlight elements | `--set mark=α4=#2ca02c` |
 | Named domain panels | `--domain N-lobe=res:A:13-59` (repeatable) or `--domains auto` |
 | Only some chains | `--chains A,B` |
+| Large assemblies | `--focus auto\|none\|protomer\|B` (one subunit plus what its neighbours add to its fold) |
 | Membrane | `--membrane auto` (OPM dummy atoms if present, otherwise estimated) |
 | Conservation | `--theme conservation --msa family.fasta` |
 | Orientation | `--up X,Y,Z`, `--view X,Y,Z`, `--rotate DEG` |

@@ -220,8 +220,15 @@ def _route_pair(grid: _Grid, a: Placed, b: Placed):
 
 
 def route_loops(layout: Layout, sses: list[SSE], bb) -> list[Loop]:
+    unjoined = getattr(layout, "unjoined", set())  # neighbours' fragments with unshown elements between
     pairs = [
-        (a, b) for a, b in zip(sses, sses[1:]) if a.chain == b.chain and a.id in layout.placed and b.id in layout.placed
+        (a, b)
+        for a, b in zip(sses, sses[1:])
+        if a.chain == b.chain
+        and a.id in layout.placed
+        and b.id in layout.placed
+        and (a.id, b.id) not in unjoined
+        and a.chain not in getattr(layout, "partial", ())  # neighbours' fragments: shown, not traced
     ]
     if not pairs:
         return []

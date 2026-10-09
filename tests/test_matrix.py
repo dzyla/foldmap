@@ -39,8 +39,12 @@ def test_every_element_placed_once_and_nothing_overlaps(case):
 
 
 def test_one_loop_per_sequence_neighbour_pair(case):
-    _, _, _, sses, loops = case
-    want = [(a.id, b.id) for a, b in zip(sses, sses[1:]) if a.chain == b.chain]
+    _, _, lay, sses, loops = case
+    want = [
+        (a.id, b.id)
+        for a, b in zip(sses, sses[1:])
+        if a.chain == b.chain and (a.id, b.id) not in lay.unjoined and a.chain not in lay.partial
+    ]
     assert [(l.a_id, l.b_id) for l in loops] == want
 
 

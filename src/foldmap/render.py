@@ -562,6 +562,8 @@ def ligand_marks(layout: Layout, loops: list[Loop], sses: list[SSE], look: Style
         if (codes is not None and g.name.upper() in codes)
         or (codes is None and (look.ligands == "all" or not g.additive))
     ]
+    if layout.focus_chains:  # one subunit of an assembly: only what binds it
+        chosen = [g for g in chosen if any(layout.res_chain[r] in layout.focus_chains for r in g.contacts)]
     taken = [p.rect for p in layout.placed.values()] + [g.rect for g in layout.ghosts]
     taken += [box for _, box in label_boxes(layout, sses)]
     out = []
@@ -656,8 +658,11 @@ def _draw_links(ax, layout: Layout, loops: list[Loop], sses: list[SSE], look: St
     if links is None:
         return
     chains = layout.res_chain
+    shown = lambda r: not layout.partial or chains[r] not in layout.partial  # noqa: E731 - fragments: no links
     if look.disulfides:
         for i, j in links.disulfides:
+            if not (shown(i) and shown(j)):
+                continue
             a, b = residue_point(layout, loops, sses, chains, i), residue_point(layout, loops, sses, chains, j)
             if a is None or b is None:
                 continue
@@ -694,6 +699,8 @@ def _draw_links(ax, layout: Layout, loops: list[Loop], sses: list[SSE], look: St
                 )
         size, step = 0.34, 0.42
         for r, sugars in links.glycans:
+            if not shown(r):
+                continue
             at = residue_point(layout, loops, sses, chains, r)
             if at is None:
                 continue
@@ -1024,7 +1031,10 @@ def _draw(
     entries = [(colors[c], f"Chain {c}") for c in chains]
     if layout.focus is not None:
         entries = [(colors[c], f"Chain {c}") for c in chains if c in layout.focus]
-        entries.append((MATE_GREY, "symmetry copies" if look.highlight in ("asu", "protomer") else "other chains"))
+        if layout.focus_chains:
+            entries.append((MATE_GREY, "neighbouring subunits (′, ″)"))
+        else:
+            entries.append((MATE_GREY, "symmetry copies" if look.highlight in ("asu", "protomer") else "other chains"))
     if look.color_by == "sequence":
         entries = [(None, "N → C" + (" (each chain)" if len(chains) > 1 else ""))]
     elif look.color_by in _PROPERTY:
@@ -1049,6 +1059,8 @@ def _draw(
     if not look.legend:
         entries = []
     legend_h = 0.8 + _LEGEND_ROW * -(-len(entries) // per_row) if entries else 0.3
+    if layout.context and look.legend:
+        legend_h += 1.3
     xmin, xmax, ymin, ymax = x0 - pad, x1 + pad, y0 - pad - legend_h, y1 + pad + top
     w_u, h_u = xmax - xmin, ymax - ymin
     scale = min(_IN_PER_UNIT, _MAX_WIDTH_IN / w_u)
@@ -1399,6 +1411,21 @@ def _draw(
         else:
             ax.add_patch(Rectangle((x, y - 0.3), 0.6, 0.6, fc=colour, ec=darken(colour), lw=lw * 0.8))
         ax.text(x + 0.85, y, text, ha="left", va="center", fontsize=font)
+    if layout.context and look.legend:  # what the figure shows of a large assembly, under the legend
+        import textwrap
+
+        per_line = max(30, int((xmax - xmin - 2 * pad) * pt_per_unit / (font * 0.85 * 0.52)))
+        t = ax.text(
+            xmin + pad,
+            ymin + 0.55,
+            "\n".join(textwrap.wrap(layout.context, per_line)),
+            ha="left",
+            va="center",
+            fontsize=font * 0.85,
+            style="italic",
+            color=_legible("#5d6877"),
+        )
+        t.set_gid("context")
     if title:
         ax.text((xmin + xmax) / 2, ymax - 0.8, title, ha="center", va="center", fontsize=font * 1.3, fontweight="bold")
     return fig

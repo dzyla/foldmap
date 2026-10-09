@@ -89,6 +89,7 @@ def make_layout(
     msa_reference: str | None = None,
     membrane: str = "off",
     chains: list[str] | None = None,
+    focus: str = "auto",
 ):
     bb = load_backbone(path, assembly)
     if chains:
@@ -108,6 +109,26 @@ def make_layout(
 
         nucleic = crop_nucleic(nucleic)
     sym = detect_symmetry(bb, sses, symmetry, protomers, symmetry_tol) if sses else None
+    if focus == "auto" and (look or Style()).highlight != "none":
+        focus = "none"  # highlighting the asymmetric unit or a protomer asks for the whole assembly
+    focus_chains = _focus_chains(focus, sym, bb, sses)
+    partial, context, unjoined = set(), None, set()
+    if focus_chains:  # a large assembly: one subunit in full, plus what its neighbours lend to its fold
+        from .layout import provisional
+
+        labels = {k: p.label for k, p in provisional(sses).placed.items()}
+        rank = {s.id: k for k, s in enumerate(sses)}
+        sses, partial = _focus_subset(sses, focus_chains, dssp.bridges)
+        unjoined = {(a.id, b.id) for a, b in zip(sses, sses[1:]) if a.chain == b.chain and rank[b.id] != rank[a.id] + 1}
+        sheets = build_sheets(sses, dssp.bridges)
+        order = sorted(partial, key=lambda c: min(s.start for s in sses if s.chain == c))
+        primes = {c: "′″‴"[min(n, 2)] for n, c in enumerate(order)}
+        rename = dict(rename or {})
+        for s in sses:
+            if s.chain in partial:
+                rename.setdefault(f"res:{s.chain}:{s.first.seq}-{s.last.seq}", labels[s.id] + primes[s.chain])
+        context = _context(sym, focus_chains, bb)
+        sym = None  # one subunit: no copies to draw alike
     mem = None
     if membrane not in ("off", None):
         from .membrane import find_membrane
@@ -152,12 +173,16 @@ def make_layout(
         nucleic=nucleic,
         style=look,
         bridges=_bridge_springs(bb, sses, links),
+        partial=partial,
         domains=named,
         rename=rename,
         swap=swap,
         move=move,
     )
     lay.focus = _focus((look or Style()).highlight, bb, sym)
+    if focus_chains:
+        lay.focus, lay.focus_chains, lay.context = set(focus_chains), set(focus_chains), context
+        lay.unjoined = unjoined
     lay.links = links
     lay.res_chain = [l.chain for l in bb.labels]
     lay.res_name = [l.name for l in bb.labels]
@@ -207,6 +232,90 @@ def _membrane_band(lay, sses, bb, mem) -> dict | None:
         "source": mem.source,
         "sides": mem.sided,
     }
+
+
+FOCUS_CHAINS, FOCUS_ELEMENTS = 6, 160  # symmetric assemblies larger than this are drawn one subunit at a time
+
+
+def _focus_chains(focus: str, sym, bb, sses) -> set | None:
+    """The chains drawn in full: none ('none', or a modest assembly under 'auto'), one protomer (helical
+    filaments, cubic cages, or assemblies over FOCUS_CHAINS chains / FOCUS_ELEMENTS elements), or the chains
+    named. Helical filaments use their middle subunit, so it has neighbours on both sides."""
+    present = list(dict.fromkeys(l.chain for l in bb.labels))
+    if focus in (None, "none"):
+        return None
+    if focus not in ("auto", "protomer"):
+        named = [c.strip() for c in focus.split(",") if c.strip()]
+        missing = [c for c in named if c not in present]
+        if missing:
+            raise ValueError(f"--focus: no chain {', '.join(missing)}; the structure has {', '.join(present)}")
+        return set(named)
+    if sym is None:
+        if focus == "protomer":
+            raise ValueError("--focus protomer needs a symmetric assembly; name chains instead (--focus A)")
+        return None
+    big = sym.kind in ("H", "T", "O", "I") or len(present) > FOCUS_CHAINS or len(sses) > FOCUS_ELEMENTS
+    if focus == "auto" and not big:
+        return None
+    k = len(sym.protomers) // 2 if sym.kind == "H" else 0
+    return _one_of_each(sym.protomers[k], bb)
+
+
+def _one_of_each(chains: list[str], bb) -> set:
+    """The smallest repeating unit inside a protomer: one chain of each distinct sequence, those nearest the
+    first (a homo-oligomer's protomer gives one chain; a heterodimer's, both partners)."""
+    from difflib import SequenceMatcher
+
+    seq = {c: [l.name for l in bb.labels if l.chain == c] for c in chains}
+    centre = {c: bb.ca[[k for k, l in enumerate(bb.labels) if l.chain == c]].mean(axis=0) for c in chains}
+    groups: list[list[str]] = []
+    for c in chains:
+        for g in groups:
+            if SequenceMatcher(None, seq[g[0]], seq[c], autojunk=False).ratio() > 0.9:
+                g.append(c)
+                break
+        else:
+            groups.append([c])
+    first = groups[0][0]
+    return {min(g, key=lambda c: float(np.linalg.norm(centre[c] - centre[first]))) for g in groups}
+
+
+def _focus_subset(sses, focus: set, bridges) -> tuple[list, set]:
+    """The focus chains' elements plus other chains' elements that complete them: strands paired with theirs by
+    backbone H-bond bridges (donor strands, domain swaps, beta-augmentation) and helices bundled with theirs."""
+    from .features import helix_bundles
+
+    owner = {r: s for s in sses for r in range(s.start, s.end + 1)}
+    own = {s.id for s in sses if s.chain in focus}
+    guests = set()
+    for i, j, _ in bridges:
+        a, b = owner.get(i), owner.get(j)
+        if a is None or b is None:
+            continue
+        if a.id in own and b.chain not in focus:
+            guests.add(b.id)
+        if b.id in own and a.chain not in focus:
+            guests.add(a.id)
+    for group in helix_bundles(sses):
+        if own & set(group):
+            guests |= {k for k in group if k not in own}
+    keep = [s for s in sses if s.id in own or s.id in guests]
+    return keep, {s.chain for s in keep if s.chain not in focus}
+
+
+def _context(sym, focus: set, bb) -> str:
+    """One line saying what the figure shows of the assembly."""
+    total = len(set(l.chain for l in bb.labels))
+    if sym is None:
+        return f"chain {', '.join(sorted(focus))} of {total} shown in full · grey: neighbouring parts"
+    copies = sum(len(p) for p in sym.protomers) / max(len(sym.protomers), 1) / max(len(focus), 1)
+    n = int(round(len(sym.protomers) * copies))
+    if sym.kind == "H":
+        step = "subunit" if copies <= 1 else f"repeat of {int(round(copies * len(focus)))} chains"
+        kind = f"helical, {np.degrees(abs(sym.twist)):.1f}° twist, {abs(sym.rise):.1f} Å rise per {step}"
+    else:
+        kind = f"{sym.label} symmetry"
+    return f"1 of {n} subunits shown · {kind} · grey: neighbouring subunits completing its fold"
 
 
 _DOMAIN_PULL = 6  # CA-pair-equivalents of attraction between any two elements of one domain
@@ -392,6 +501,7 @@ def _figure_spec(args):
     opts["domains"] = domains
     opts["msa"] = args.msa or lay.get("msa")
     opts["membrane"] = args.membrane or lay.get("membrane", "off")
+    opts["focus"] = args.focus or lay.get("focus", "auto")
     chains = args.chains or lay.get("chains")
     opts["chains"] = [c.strip() for c in chains.split(",") if c.strip()] if isinstance(chains, str) else chains
     opts["msa_reference"] = args.msa_reference or lay.get("msa_reference")
@@ -566,6 +676,12 @@ def main(argv: list[str] | None = None) -> int:
             choices=["off", "auto"],
             help="draw the lipid bilayer: auto finds it (OPM dummy atoms, or estimated); default off",
         )
+        q.add_argument(
+            "--focus",
+            metavar="auto|none|protomer|A,B",
+            help="large assemblies: draw one subunit in full plus what its neighbours add to its fold "
+            "(auto: helical filaments, cages and assemblies over 6 chains / 160 elements)",
+        )
         q.add_argument("--chains", metavar="A,B", help="draw only these chains (e.g. one subunit of a big complex)")
         q.add_argument("--msa", metavar="ALIGNMENT", help="alignment for conservation colouring (--theme conservation)")
         q.add_argument("--msa-reference", metavar="NAME", help="alignment row that is the structure (default: best)")
@@ -632,6 +748,7 @@ def main(argv: list[str] | None = None) -> int:
                 msa=opts["msa"],
                 membrane=opts["membrane"],
                 chains=opts["chains"],
+                focus=opts["focus"],
                 msa_reference=opts["msa_reference"],
                 **edits,
             )

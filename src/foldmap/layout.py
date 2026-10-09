@@ -127,6 +127,10 @@ class Layout:
     res_chain: list[str] = field(default_factory=list)  # chain of each Backbone residue
     res_name: list[str] = field(default_factory=list)  # residue type of each Backbone residue
     res_b: list[float] = field(default_factory=list)  # CA B-factor of each Backbone residue
+    focus_chains: set | None = None  # large assemblies: the subunit drawn in full (None: everything drawn)
+    unjoined: set = field(default_factory=set)  # (a, b) element pairs shown side by side but not adjacent in sequence
+    partial: set = field(default_factory=set)  # chains present only as the elements that complete its fold
+    context: str | None = None  # what the figure shows of the assembly, e.g. "1 of 6 subunits · helical ..."
     page_axes: list | None = None  # 3x3 rows: page-right, page-up, toward-viewer (for the first protomer)
     page_centre: list | None = None  # the 3D point those axes are taken around
     membrane: dict | None = None  # {"y": (bottom, top) of the band, "inside": "below"|"above", "source": ...}
@@ -775,6 +779,7 @@ def build_layout(
     style: Style | None = None,
     bridges: list[tuple[str, float, str, float]] | None = None,
     domains: list[tuple[str, list[str]]] | None = None,
+    partial: set | None = None,
     rename: dict[str, str] | None = None,
     swap: list[tuple[str, str]] | None = None,
     move: list[tuple[str, tuple[float, float]]] | None = None,
@@ -814,7 +819,7 @@ def build_layout(
     members = {m.sse.id: m for it in items for m in it.members if isinstance(m, Placed) and not m.ghost}
     for chain in dict.fromkeys(s.chain for s in sses):
         mine = [s for s in sses if s.chain == chain and s.id in members]
-        if mine:
+        if mine and chain not in (partial or ()):  # fragments of neighbours have no termini of their own
             members[mine[0].id].ends += "N"
             members[mine[-1].id].ends += "C"
     if mode == "stack":
@@ -863,6 +868,7 @@ def build_layout(
         sheet_blocks,
         bool(dna) and style.nucleotide_labels,
     )
+    lay.partial = set(partial or ())
     lay.domains = [(name, [k for k in ids if k in real]) for name, ids in domains or []]
     rects = np.vstack([rects, *[[domain_panel(lay, name)] for name, _ in lay.domains]]) if lay.domains else rects
     rects = np.vstack([rects, [b for _, b in label_boxes(lay, sses)] or np.empty((0, 4))])
@@ -950,7 +956,7 @@ def termini(layout: Layout, sses: list[SSE]) -> list[tuple[str, str, tuple[float
     out = []
     for chain in dict.fromkeys(s.chain for s in sses):
         mine = [s for s in sses if s.chain == chain and s.id in layout.placed]
-        if mine:
+        if mine and chain not in layout.partial:
             first, last = layout.placed[mine[0].id], layout.placed[mine[-1].id]
             out += [("N", chain, first.n_port, first.exit_n), ("C", chain, last.c_port, last.exit_c)]
     return out

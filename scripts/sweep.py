@@ -27,7 +27,9 @@ QUERY = """query($ids:[String!]!){ entries(entry_ids:$ids){ rcsb_id exptl{method
 
 
 def sample(n: int, seed: int) -> list[dict]:
-    ids = json.load(urllib.request.urlopen("https://data.rcsb.org/rest/v1/holdings/current/entry_ids", timeout=60))
+    ids = sorted(
+        json.load(urllib.request.urlopen("https://data.rcsb.org/rest/v1/holdings/current/entry_ids", timeout=60))
+    )  # noqa: E501 - stable order: same seed, same sample
     random.seed(seed)
     pick = random.sample(ids, n * 2)
     body = json.dumps({"query": QUERY, "variables": {"ids": pick}}).encode()

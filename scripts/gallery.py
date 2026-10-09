@@ -32,6 +32,15 @@ FIGURES = [
     ("fima-richardson", "5NKT.cif", "FimA (5NKT) · richardson", "richardson", [], {"assembly": "asu"}),
     ("p53-alphafold", "AF-P04637.cif", "p53 AlphaFold model (AF-P04637) · pLDDT", "alphafold", [], {}),
     (
+        "fima-pilus-rod",
+        "6Y7S.cif",
+        "Type 1 pilus rod (6Y7S) · one FimA subunit and its neighbours",
+        "publication",
+        [],
+        {},
+    ),
+    ("ferritin-cage", "assemblies/7A4M.cif", "Apoferritin (7A4M) · 1 of 24 subunits", "journal", [], {}),
+    (
         "measles-f-trimer",
         "8UTF.cif",
         "Measles F trimer (8UTF) · C3, one protomer highlighted",
