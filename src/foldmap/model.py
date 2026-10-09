@@ -141,6 +141,21 @@ def duplex_axis(na: Nucleic, strands: list[int]) -> tuple[np.ndarray, np.ndarray
     return centre, axis
 
 
+@dataclass
+class Ligand:
+    """A small molecule or ion bound to the protein. contacts: Backbone indices of the residues holding it
+    (coordinating a metal, or within reach of a ligand); additive: a common buffer, cryoprotectant, detergent or
+    counter-ion, hidden unless asked for."""
+
+    name: str
+    chain: str
+    seq: int
+    metal: bool
+    symbol: str  # element symbol of a metal ion (Zn, Fe, K...), else the residue name
+    contacts: list[int] = field(default_factory=list)
+    additive: bool = False
+
+
 @dataclass(eq=False)
 class Links:
     """Covalent extras of model 1. disulfides: (residue i, residue j) in Backbone order;
@@ -148,3 +163,4 @@ class Links:
 
     disulfides: list[tuple[int, int]] = field(default_factory=list)
     glycans: list[tuple[int, list[str]]] = field(default_factory=list)
+    ligands: list[Ligand] = field(default_factory=list)

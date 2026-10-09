@@ -7,7 +7,7 @@ from pathlib import Path
 import gemmi
 import numpy as np
 
-from .model import Backbone, Links, NAStrand, Nucleic, ResLabel
+from .model import Backbone, Ligand, Links, NAStrand, Nucleic, ResLabel
 
 _BB_ATOMS = ("N", "CA", "C", "O")
 _PEPTIDE_BOND_MAX = 2.0  # Å, C(i-1)-N(i)
@@ -283,4 +283,93 @@ def load_links(path: str | Path, bb: Backbone, assembly: str = "auto") -> Links:
                         nxt.append((c, r))
             frontier = nxt
         glycans.append((where[k_res], [r.name for _, r in tree]))
-    return Links(sorted(set(disulfides)), glycans)
+    return Links(sorted(set(disulfides)), glycans, _ligands(model, where))
+
+
+ADDITIVES = {  # crystallisation and purification leftovers: hidden from figures unless asked for
+    "SO4",
+    "PO4",
+    "GOL",
+    "EDO",
+    "PEG",
+    "PG4",
+    "PGE",
+    "1PE",
+    "P6G",
+    "ACT",
+    "ACY",
+    "FMT",
+    "DMS",
+    "MPD",
+    "TRS",
+    "EPE",
+    "MES",
+    "BME",
+    "IMD",
+    "CIT",
+    "FLC",
+    "TAR",
+    "MLI",
+    "NO3",
+    "SCN",
+    "AZI",
+    "IPA",
+    "EOH",
+    "MOH",
+    "BU3",
+    "CL",
+    "BR",
+    "IOD",
+    "NA",
+    "UNX",
+    "UNL",
+    "BOG",
+    "LDA",
+    "LMT",
+    "DDM",
+    "OLC",
+    "OLA",
+    "PLM",
+    "LI1",
+    "SQU",
+    "CPS",
+    "HTG",
+    "C8E",
+    "UMQ",
+    "PC1",
+    "POV",
+    "CDL",
+    "LHG",
+}
+_METAL_REACH = 3.1  # Å, metal to a coordinating atom (K+ to carbonyl O is ~2.8-3.0)
+_LIGAND_REACH = 4.0  # Å, ligand heavy atom to a residue atom
+
+
+def _ligands(model, where) -> list[Ligand]:
+    """Non-polymer residues (not water, not sugars) touching the protein, with the residues that hold them."""
+    search = gemmi.NeighborSearch(model, gemmi.UnitCell(), 5).populate()
+    out = []
+    for chain in model:
+        polymer = {(r.seqid.num, r.seqid.icode) for r in chain.get_polymer()}
+        for res in chain:
+            if (res.seqid.num, res.seqid.icode) in polymer or res.is_water() or res.name in SUGARS:
+                continue
+            heavy = [a for a in res if a.element.name != "H"]
+            if not heavy:
+                continue
+            metal = len(heavy) == 1 and heavy[0].element.is_metal
+            reach = _METAL_REACH if metal else _LIGAND_REACH
+            touching = set()
+            for atom in heavy:
+                for mark in search.find_atoms(atom.pos, radius=reach):
+                    cra = mark.to_cra(model)
+                    key = (cra.chain.name, cra.residue.seqid.num, cra.residue.seqid.icode.strip())
+                    if key in where and (not metal or cra.atom.element.name in ("O", "N", "S")):
+                        touching.add(where[key])
+            if not touching:
+                continue
+            symbol = heavy[0].element.name.capitalize() if metal else res.name
+            out.append(
+                Ligand(res.name, chain.name, res.seqid.num, metal, symbol, sorted(touching), res.name in ADDITIVES)
+            )
+    return out

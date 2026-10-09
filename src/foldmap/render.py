@@ -9,7 +9,7 @@ import numpy as np
 from matplotlib import colormaps, rc_context
 from matplotlib.colors import to_hex
 from matplotlib.figure import Figure
-from matplotlib.patches import FancyBboxPatch, PathPatch, Polygon, Rectangle
+from matplotlib.patches import Circle, FancyBboxPatch, PathPatch, Polygon, Rectangle
 from matplotlib.path import Path
 from matplotlib.transforms import Affine2D
 
@@ -31,6 +31,7 @@ from .layout import (
     dna_y,
     domain_panel,
     helix_label_pos,
+    label_boxes,
     resolve,
     termini,
 )
@@ -489,6 +490,126 @@ def _symbol(ax, shape: str, colour: str, xy, size: float, lw: float, gid: str) -
     ax.add_patch(patch)
 
 
+METAL_COLOURS = {  # Jmol-like element colours, darkened enough to carry a white symbol
+    "Zn": "#6f7bb0",
+    "Fe": "#d0602c",
+    "Mg": "#4f9a3a",
+    "Ca": "#3d8a3d",
+    "K": "#8f40d4",
+    "Na": "#7b4fc9",
+    "Cu": "#b8752e",
+    "Mn": "#8a63b8",
+    "Co": "#c75c7a",
+    "Ni": "#3f9f6a",
+    "Cd": "#b08a2e",
+    "Hg": "#7a7a92",
+}
+LIGAND_FILL, LIGAND_EDGE = "#fff1c1", "#b8860b"
+_LIGAND_TETHERS = 4  # a ligand is tethered to the elements it touches most, at most this many
+
+
+def ligand_marks(layout: Layout, loops: list[Loop], sses: list[SSE], look: Style) -> list[dict]:
+    """Where each shown ligand/ion goes: as close as possible to the residues holding it, clear of elements,
+    labels and other markers. Each mark: ligand, centre, half size, tether targets."""
+    links = layout.links
+    if links is None or look.ligands == "none" or not getattr(links, "ligands", None):
+        return []
+    codes = None if look.ligands in ("auto", "all") else {c.upper() for c in look.ligands.split(",")}
+    chosen = [
+        g
+        for g in links.ligands
+        if (codes is not None and g.name.upper() in codes)
+        or (codes is None and (look.ligands == "all" or not g.additive))
+    ]
+    taken = [p.rect for p in layout.placed.values()] + [g.rect for g in layout.ghosts]
+    taken += [box for _, box in label_boxes(layout, sses)]
+    out = []
+    for g in sorted(chosen, key=lambda g: g.contacts[0]):
+        groups: dict[str, list[int]] = {}  # contacts by the element (or loop) they belong to
+        for r in g.contacts:
+            home = next((s.id for s in sses if s.start <= r <= s.end and s.id in layout.placed), None)
+            if home is None:
+                home = "loop:" + str(max((s.end for s in sses if s.end < r), default=-1))
+            groups.setdefault(home, []).append(r)
+        ranked = sorted(groups.values(), key=len, reverse=True)
+        if not g.metal:  # a ligand: one tether per element it sits on, the four it touches most
+            ranked = [[sorted(rs)[len(rs) // 2]] for rs in ranked[:_LIGAND_TETHERS]]
+        targets, weights = [], []
+        for rs in ranked:
+            for r in rs:
+                at = residue_point(layout, loops, sses, layout.res_chain, r)
+                if at is not None and all(np.hypot(at[0] - t[0], at[1] - t[1]) > 0.3 for t in targets):
+                    targets.append(at)
+                    weights.append(len(groups.get(next(k for k, v in groups.items() if r in v), [])))
+        if not targets:
+            continue
+        anchor = np.average(np.asarray(targets), axis=0, weights=weights)
+        half = (0.3, 0.3) if g.metal else (0.12 * len(g.name) + 0.2, 0.27)
+        spot = None
+        for ring in np.arange(0.0, 12.0, 0.35):
+            for angle in np.linspace(0, 2 * np.pi, max(1, int(ring * 10)), endpoint=False):
+                c = anchor + ring * np.array([np.cos(angle), np.sin(angle)])
+                box = (c[0] - half[0] - 0.08, c[1] - half[1] - 0.08, c[0] + half[0] + 0.08, c[1] + half[1] + 0.08)
+                if not any(box[0] < t[2] and t[0] < box[2] and box[1] < t[3] and t[1] < box[3] for t in taken):
+                    spot = c
+                    break
+            if spot is not None:
+                break
+        if spot is None:
+            continue
+        taken.append((spot[0] - half[0], spot[1] - half[1], spot[0] + half[0], spot[1] + half[1]))
+        out.append({"ligand": g, "centre": (float(spot[0]), float(spot[1])), "half": half, "targets": targets})
+    return out
+
+
+def _draw_ligands(ax, marks: list[dict], lw: float, font: float) -> None:
+    for m in marks:
+        g, (cx, cy), (hw, hh) = m["ligand"], m["centre"], m["half"]
+        key = f"{g.name}:{g.chain}{g.seq}"
+        for k, (tx, ty) in enumerate(m["targets"]):
+            tether = PathPatch(
+                Path([(cx, cy), (tx, ty)]),
+                fc="none",
+                ec="#6b6b6b",
+                lw=lw * 0.7,
+                ls=(0, (1.2, 1.4)),
+                capstyle="round",
+                zorder=3.6,
+            )
+            tether.set_gid(f"ligand-tether:{key}:{k}")
+            ax.add_patch(tether)
+        if g.metal:
+            fill = METAL_COLOURS.get(g.symbol, "#7f7f7f")
+            marker = Circle((cx, cy), hw, fc=fill, ec=darken(fill, 0.7), lw=lw * 0.7, zorder=3.8)
+            ink = text_color_on(fill)
+        else:
+            marker = FancyBboxPatch(
+                (cx - hw, cy - hh),
+                2 * hw,
+                2 * hh,
+                boxstyle="round,pad=0,rounding_size=0.12",
+                fc=LIGAND_FILL,
+                ec=LIGAND_EDGE,
+                lw=lw * 0.7,
+                zorder=3.8,
+            )
+            ink = "#5c4300"
+        marker.set_gid(f"ligand:{key}")
+        ax.add_patch(marker)
+        t = ax.text(
+            cx,
+            cy,
+            g.symbol,
+            ha="center",
+            va="center",
+            fontsize=font * (0.62 if g.metal else 0.6),
+            fontweight="bold",
+            color=ink,
+            zorder=3.9,
+        )
+        t.set_gid(f"ligand-label:{key}")
+
+
 def _draw_links(ax, layout: Layout, loops: list[Loop], sses: list[SSE], look: Style, lw: float) -> None:
     links = layout.links
     if links is None:
@@ -809,6 +930,10 @@ def _draw(
         return fig
 
     x0, y0, x1, y1 = layout.bounds
+    marks = ligand_marks(layout, loops, sses, look)
+    for m in marks:  # markers may sit just outside the elements' bounds
+        (cx, cy), (hw, hh) = m["centre"], m["half"]
+        x0, y0, x1, y1 = min(x0, cx - hw), min(y0, cy - hh), max(x1, cx + hw), max(y1, cy + hh)
     pad = 1.0
     top = 1.2 if title else 0.0
     entries = [(colors[c], f"Chain {c}") for c in chains]
@@ -1055,6 +1180,7 @@ def _draw(
                 t.set_gid(f"label:{p.sse.id}")
 
     _draw_links(ax, layout, loops, sses, look, lw)
+    _draw_ligands(ax, marks, lw, font)
 
     if look.residue_numbers:  # helices: beside each end; strands: inside the arrow near each end (or just past it)
         for p in layout.placed.values():

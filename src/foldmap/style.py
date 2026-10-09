@@ -68,12 +68,15 @@ class Style:
     highlight: str = "none"  # none / asu (as deposited) / protomer (the first) / chains "A,B": the rest in grey
     disulfides: bool = True  # yellow bars between bridged cysteines
     glycans: bool = True  # SNFG symbols on glycosylated residues
+    ligands: str = "auto"  # bound ligands/metal ions: auto (skip buffer additives), all, none, or codes "HEM,ZN"
     mark: str = ""  # elements in a colour of their own: "G", "A:G=#2ca02c", "#3", "res:150-159=red", comma-separated
 
     def validate(self) -> Style:
         for key, allowed in CHOICES.items():
             if getattr(self, key) not in allowed:
                 raise ValueError(f"{key} must be one of {', '.join(allowed)}; got {getattr(self, key)!r}")
+        if not re.fullmatch(r"auto|all|none|[A-Za-z0-9]{1,5}(,[A-Za-z0-9]{1,5})*", self.ligands):
+            raise ValueError(f"ligands must be auto, all, none or residue codes like HEM,ZN; got {self.ligands!r}")
         if not re.fullmatch(r"none|asu|protomer|[A-Za-z0-9]+(,[A-Za-z0-9]+)*", self.highlight):
             raise ValueError(f"highlight must be none, asu, protomer or chains like A,B; got {self.highlight!r}")
         for key in SCALES:
