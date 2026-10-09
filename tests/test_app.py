@@ -116,3 +116,10 @@ def test_app_shows_the_sequence_tab():
     assert not at.exception
     assert any(t.label == "Sequence" for t in at.tabs)
     assert at.slider(key="seq_columns").value == 60
+
+
+def test_app_passes_focus_to_the_layout():
+    from foldmap.app import layout_options
+
+    assert layout_options({"focus": "none"})["focus"] == "none"
+    assert layout_options({})["focus"] == "auto"

@@ -89,3 +89,10 @@ def test_server_speaks_mcp_over_stdio(tmp_path):
 
     names, text = asyncio.run(go())
     assert "draw_topology" in names and "76 residues" in text
+
+
+def test_draw_topology_can_draw_the_whole_assembly(tmp_path):
+    whole, one = tmp_path / "whole.svg", tmp_path / "one.svg"
+    call("draw_topology", {"source": str(DATA / "6Y7S.cif"), "output_path": str(whole), "focus": "none"})
+    call("draw_topology", {"source": str(DATA / "6Y7S.cif"), "output_path": str(one)})
+    assert whole.read_text().count('id="strand:') > 2 * one.read_text().count('id="strand:')

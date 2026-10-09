@@ -110,6 +110,7 @@ def draw_topology(
     assembly: str = "auto",
     symmetry: str = "auto",
     membrane: str = "off",
+    focus: str = "auto",
     domains: dict[str, list[str]] | None = None,
     swap: list[list[str]] | None = None,
     move: dict[str, list[float]] | None = None,
@@ -126,7 +127,9 @@ def draw_topology(
     style: style keys to change, e.g. {"color_by": "sequence", "residue_numbers": "true", "mark": "α2=#d1495b"}.
     domains: named domain panels, e.g. {"N-lobe": ["res:A:13-59"]}. swap: pairs of elements to exchange, e.g.
     [["α1", "α3"]]. move: nudges in page units, e.g. {"α2": [1, -2]}. rename: {"res:A:167-182": "Gd"}.
-    membrane: off or auto (draw the lipid bilayer). msa_path: alignment for theme 'conservation'.
+    membrane: off or auto (draw the lipid bilayer). focus: auto draws filaments, cages and large assemblies as one
+    subunit plus the neighbouring parts of its fold; none draws the whole assembly; or chains, e.g. "B".
+    msa_path: alignment for theme 'conservation'.
     layout_file / save_layout: load or write a YAML layout file that re-creates the figure."""
     from .cli import main
 
@@ -145,6 +148,8 @@ def draw_topology(
         symmetry,
         "--membrane",
         membrane,
+        "--focus",
+        focus,
         "--mode",
         mode,
         "--rotate",
@@ -169,7 +174,7 @@ def draw_topology(
     if save_layout:
         argv += ["--save-layout", save_layout]
     _run(main, argv)
-    preview = _figure_preview(path, theme, style, title, assembly, symmetry, membrane, msa_path)
+    preview = _figure_preview(path, theme, style, title, assembly, symmetry, membrane, msa_path, focus)
     note = f"wrote {out}" + (f" and layout file {save_layout}" if save_layout else "")
     return [note, preview] if preview is not None else [note]
 
@@ -185,14 +190,21 @@ def _run(main, argv: list[str]) -> None:
         raise ValueError(err.getvalue().strip() or "foldmap failed")
 
 
-def _figure_preview(path, theme, style, title, assembly, symmetry, membrane, msa_path):
+def _figure_preview(path, theme, style, title, assembly, symmetry, membrane, msa_path, focus="auto"):
     from .cli import make_figure
     from .style import resolve_style
 
     try:
         look = resolve_style(theme, None, [f"{k}={v}" for k, v in (style or {}).items()])
         fig = make_figure(
-            path, title=title, look=look, assembly=assembly, symmetry=symmetry, membrane=membrane, msa=msa_path
+            path,
+            title=title,
+            look=look,
+            assembly=assembly,
+            symmetry=symmetry,
+            membrane=membrane,
+            msa=msa_path,
+            focus=focus,
         )
         return _preview(fig)
     except ValueError:

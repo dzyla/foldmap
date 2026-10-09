@@ -39,6 +39,7 @@ LAYOUT_DEFAULTS = {
     "move": "",
     "title": "",
     "membrane": "off",
+    "focus": "auto",
     "msa_path": "",
     "msa_reference": "",
     "domains": "",
@@ -67,6 +68,7 @@ def layout_options(settings: dict) -> dict:
         "rotate": float(settings.get("rotate", 0)),
         "domains": domains,
         "membrane": settings.get("membrane", "off") or "off",
+        "focus": settings.get("focus", "auto") or "auto",
         "msa": settings.get("msa_path") or None,
         "msa_reference": settings.get("msa_reference") or None,
         **_adjustments(Args),
@@ -380,6 +382,12 @@ def main() -> None:
         with st.expander("Symmetry and assembly"):
             st.text_input("Symmetry", key="symmetry", help="auto, off, C2, D3, helical")
             st.text_input("Assembly", key="assembly", help="auto, asu, or an assembly id")
+            st.text_input(
+                "Large assemblies",
+                key="focus",
+                help="auto: filaments, cages and big assemblies as one subunit plus the neighbouring parts of its "
+                "fold; none: draw everything; or chains to show in full, e.g. B",
+            )
         st.file_uploader("Load a layout file", type=["yaml", "yml"], key="layout_upload", on_change=apply_layout_file)
         if ss.get("layout_error"):
             st.error(ss["layout_error"])
