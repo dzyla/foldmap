@@ -27,7 +27,7 @@ PREVIEW_THEMES = [
     "flexibility",
     "hydropathy",
     "goodsell",
-    "minimal",
+    "blueprint",
 ]
 LAYOUT_DEFAULTS = {
     "mode": "projected",
@@ -38,6 +38,9 @@ LAYOUT_DEFAULTS = {
     "swap": "",
     "move": "",
     "title": "",
+    "membrane": "off",
+    "msa_path": "",
+    "msa_reference": "",
     "domains": "",
 }
 CACHE = Path.home() / ".cache" / "foldmap"
@@ -111,8 +114,35 @@ def layout_options(settings: dict) -> dict:
         "assembly": settings.get("assembly", "auto") or "auto",
         "rotate": float(settings.get("rotate", 0)),
         "domains": domains,
+        "membrane": settings.get("membrane", "off") or "off",
+        "msa": settings.get("msa_path") or None,
+        "msa_reference": settings.get("msa_reference") or None,
         **_adjustments(Args),
     }
+
+
+def sequence_files(path, settings: dict, view: dict) -> dict[str, bytes]:
+    """The sequence figure (with the alignment, if one is loaded) as SVG, PNG and PDF."""
+    from foldmap.seqplot import draw_sequence
+    from foldmap.sequence import read_alignment
+
+    msa = settings.get("msa_path")
+    fig = draw_sequence(
+        path,
+        chain=view.get("chain") or None,
+        alignment=read_alignment(msa) if msa else None,
+        reference=settings.get("msa_reference") or None,
+        columns=int(view.get("columns", 60)),
+        look=look_of(settings),
+        full_sequence=bool(view.get("full_sequence", False)),
+        ss_colour=view.get("ss_colour", "figure"),
+        title=settings.get("title") or None,
+    )
+    out = {"svg": save_svg(fig).encode()}
+    with tempfile.TemporaryDirectory() as tmp:
+        for ext in ("png", "pdf"):
+            out[ext] = save(fig, Path(tmp) / f"sequence.{ext}").read_bytes()
+    return out
 
 
 def figure(path, settings: dict):
@@ -220,6 +250,28 @@ def main() -> None:
     def files(path: str, settings_json: str) -> dict:
         return figure_files(path, json.loads(settings_json))
 
+    @st.cache_data(show_spinner=False, max_entries=16)
+    def sequence(path: str, settings_json: str, view_json: str) -> dict:
+        return sequence_files(path, json.loads(settings_json), json.loads(view_json))
+
+    def store_alignment() -> None:
+        up = ss.get("msa_upload")
+        if up is None:
+            ss["msa_path"] = ""
+            return
+        CACHE.mkdir(parents=True, exist_ok=True)
+        data = up.getvalue()
+        target = CACHE / f"msa-{hashlib.sha1(data).hexdigest()[:12]}{Path(up.name).suffix or '.fasta'}"
+        target.write_bytes(data)
+        try:
+            from foldmap.sequence import read_alignment
+
+            read_alignment(target)
+        except ValueError as err:
+            ss["msa_error"], ss["msa_path"] = str(err), ""
+            return
+        ss["msa_error"], ss["msa_path"] = "", str(target)
+
     @st.cache_data(show_spinner=False, max_entries=8)
     def interactive(path: str, settings_json: str) -> str:
         from foldmap.interactive import build_page
@@ -321,6 +373,9 @@ def main() -> None:
             st.selectbox("Helix shading", CHOICES["helix_shading"], key="helix_shading")
             st.text_input("Mark elements", key="mark", help="e.g. G, A:G=#2ca02c, #3, res:150-159=red")
             st.text_input("Highlight", key="highlight", help="none, asu, protomer, or chains like A,B")
+            c_bg, c_ink = st.columns(2)
+            c_bg.color_picker("Background", key="background")
+            c_ink.color_picker("Ink", key="ink")
         with st.expander("Loops"):
             st.selectbox("Loop shape", CHOICES["loops"], key="loops")
             st.selectbox("Loop colour", CHOICES["loop_color"], key="loop_color")
@@ -337,6 +392,23 @@ def main() -> None:
             st.checkbox("Disulfides", key="disulfides")
             st.checkbox("Glycans", key="glycans")
             st.checkbox("Sheet panels", key="sheet_panels")
+            st.text_input(
+                "Ligands and ions", key="ligands", help="auto (skips buffer additives), all, none, or codes like HEM,ZN"
+            )
+            st.selectbox("Membrane", ["off", "auto"], key="membrane", help="auto: find the bilayer and draw it")
+        with st.expander("Alignment (conservation)"):
+            st.file_uploader(
+                "Multiple sequence alignment",
+                type=["fasta", "fa", "aln", "sto", "txt"],
+                key="msa_upload",
+                on_change=store_alignment,
+            )
+            if ss.get("msa_error"):
+                st.error(ss["msa_error"])
+            st.text_input(
+                "Reference row", key="msa_reference", help="name of the structure's row (default: best match)"
+            )
+            st.caption("With an alignment: colour by 'conservation', and the Sequence tab shows the alignment.")
         with st.expander("Sizes and layout"):
             st.selectbox("Mode", ["projected", "stack"], key="mode")
             st.selectbox("Helix angle", CHOICES["helix_angle"], key="helix_angle")
@@ -364,7 +436,7 @@ def main() -> None:
     settings = {k: ss[k] for k in [*STYLE_FIELDS, *LAYOUT_DEFAULTS, "theme"] if k in ss}
     blob = json.dumps(settings, sort_keys=True, default=str)
     st.write(f"**{Path(path).stem}** · {ss.get('info', '')}")
-    tab_fig, tab_live = st.tabs(["Figure", "Interactive"])
+    tab_fig, tab_seq, tab_live = st.tabs(["Figure", "Sequence", "Interactive"])
     with tab_fig:
         try:
             svg, notes = render(path, blob)
@@ -373,7 +445,10 @@ def main() -> None:
             return
         if notes["fallback"]:
             st.warning("No clear route for: " + ", ".join(notes["fallback"]) + " (drawn as plain curves).")
-        st.markdown(f'<div style="background:#fff;border-radius:6px;padding:8px">{svg}</div>', unsafe_allow_html=True)
+        page_bg = settings.get("background", "#ffffff")
+        st.markdown(
+            f'<div style="background:{page_bg};border-radius:6px;padding:8px">{svg}</div>', unsafe_allow_html=True
+        )
         out = files(path, blob)
         stem = Path(path).stem
         c1, c2, c3 = st.columns(3)
@@ -393,6 +468,28 @@ def main() -> None:
             )
         except ValueError as err:
             st.caption(f"Layout file unavailable: {err}")
+    with tab_seq:
+        c1, c2, c3 = st.columns(3)
+        c1.slider("Columns per row", 20, 150, 60, step=5, key="seq_columns")
+        c2.selectbox("Element colours", ["figure", "black"], key="seq_ss_colour")
+        c3.checkbox("Include unmodelled ends", key="seq_full")
+        view = {"columns": ss["seq_columns"], "ss_colour": ss["seq_ss_colour"], "full_sequence": ss["seq_full"]}
+        try:
+            seq = sequence(path, blob, json.dumps(view, sort_keys=True))
+        except ValueError as err:
+            st.error(str(err))
+        else:
+            page_bg = settings.get("background", "#ffffff")
+            st.markdown(
+                f'<div style="background:{page_bg};border-radius:6px;padding:8px;overflow-x:auto">'
+                f"{seq['svg'].decode()}</div>",
+                unsafe_allow_html=True,
+            )
+            stem = Path(path).stem
+            d1, d2, d3 = st.columns(3)
+            d1.download_button("SVG", seq["svg"], f"{stem}-sequence.svg", "image/svg+xml", key="dl_seq_svg")
+            d2.download_button("PNG (300 dpi)", seq["png"], f"{stem}-sequence.png", "image/png", key="dl_seq_png")
+            d3.download_button("PDF", seq["pdf"], f"{stem}-sequence.pdf", "application/pdf", key="dl_seq_pdf")
     with tab_live:
         page = interactive(path, blob)
         st.download_button(

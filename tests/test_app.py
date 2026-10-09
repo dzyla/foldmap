@@ -83,3 +83,36 @@ def test_download_buttons_are_offered():
     files = figure_files(DATA / "1UBQ.cif", {"theme": "publication"})
     assert set(files) == {"svg", "png", "pdf"}
     assert files["png"][:4] == b"\x89PNG" and files["pdf"][:4] == b"%PDF" and b"<svg" in files["svg"]
+
+
+def test_app_passes_membrane_and_alignment_to_the_layout():
+    from foldmap.app import layout_options
+
+    opts = layout_options({"membrane": "auto", "msa_path": str(DATA / "ubq_family.fasta"), "msa_reference": "1UBQ"})
+    assert opts["membrane"] == "auto" and opts["msa"] == str(DATA / "ubq_family.fasta")
+    assert opts["msa_reference"] == "1UBQ"
+    assert layout_options({})["msa"] is None
+
+
+def test_app_sequence_files():
+    from foldmap.app import sequence_files
+
+    out = sequence_files(DATA / "1UBQ.cif", {"theme": "publication"}, {"columns": 30, "ss_colour": "figure"})
+    assert out["svg"].startswith(b"<svg") and out["png"][:4] == b"\x89PNG" and out["pdf"][:4] == b"%PDF"
+    msa = sequence_files(
+        DATA / "1UBQ.cif", {"theme": "publication", "msa_path": str(DATA / "ubq_family.fasta")}, {"columns": 40}
+    )
+    assert b"strict:" in msa["svg"]
+
+
+def test_app_shows_the_sequence_tab():
+    from streamlit.testing.v1 import AppTest
+
+    at = AppTest.from_file(str(APP), default_timeout=120)
+    at.run()
+    at.text_input(key="source").set_value(str(DATA / "1UBQ.cif"))
+    at.button(key="load").click().run()
+    at.button(key="pick_publication").click().run()
+    assert not at.exception
+    assert any(t.label == "Sequence" for t in at.tabs)
+    assert at.slider(key="seq_columns").value == 60
