@@ -18,3 +18,6 @@ reference/
 
 # development planning notes
 docs/superpowers/
+
+# website build output
+_site/

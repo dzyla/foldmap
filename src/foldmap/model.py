@@ -213,6 +213,7 @@ class Ligand:
     symbol: str  # element symbol of a metal ion (Zn, Fe, K...), else the residue name
     contacts: list[int] = field(default_factory=list)
     additive: bool = False
+    members: list[tuple[str, int]] = field(default_factory=list)  # (chain, residue number) of each part
     codes: list[str] = field(default_factory=list)  # residue codes of a covalently joined ligand, in bond order
 
 
@@ -224,3 +225,4 @@ class Links:
     disulfides: list[tuple[int, int]] = field(default_factory=list)
     glycans: list[tuple[int, list[str]]] = field(default_factory=list)
     ligands: list[Ligand] = field(default_factory=list)
+    glycan_members: list[list[tuple[str, int]]] = field(default_factory=list)  # sugar residues of each glycan

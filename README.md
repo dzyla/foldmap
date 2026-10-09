@@ -6,6 +6,8 @@
 
 **Publication-grade protein topology diagrams, straight from a PDB/mmCIF file, a PDB ID or an AlphaFold model.**
 
+**Website, live theme gallery and interactive examples: <https://dzyla.github.io/foldmap/>**
+
 ```bash
 pip install git+https://github.com/dzyla/foldmap.git
 foldmap plot 1LMB -o lambda.svg

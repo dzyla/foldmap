@@ -33,6 +33,7 @@ _LIB = r"""
         case 'loop': return 'loop:' + item.a + '>' + item.b;
         case 'chain': return 'chain:' + item.chain;
         case 'pair': return 'pair:' + item.i + '-' + item.j;
+        case 'disulfide': case 'glycan': case 'ligand': return item.type + ':' + item.key;
         default: return 'residue:' + item.k;
       }
     },
@@ -161,6 +162,13 @@ _APP = r"""
     const key = 'loop ' + a + '>' + b;
     (parts[key] = parts[key] || []).push(node);
   });
+  svg.querySelectorAll('[id^="disulfide:"], [id^="ss-dot:"], [id^="glycan:"], [id^="ligand"]').forEach(node => {
+    let m = node.id.match(/^(disulfide|ss-dot):(.+)$/), key = null;
+    if (m) key = 'disulfide ' + m[2];
+    else if ((m = node.id.match(/^glycan:(\d+):/))) key = 'glycan ' + m[1];
+    else if ((m = node.id.match(/^ligand(?:-label|-tether)?:(.+?)(?::\d+)?$/))) key = 'ligand ' + m[1];
+    if (key) (parts[key] = parts[key] || []).push(node);
+  });
   function svgOn(keys) {
     svg.classList.toggle('focus', keys.length > 0);
     svg.querySelectorAll('.on').forEach(n => n.classList.remove('on'));
@@ -203,7 +211,7 @@ _APP = r"""
 
   // ---- 3D: one interface over Mol* (default) or 3Dmol: base colours, highlight, fly-to, reset, hover callbacks
   const molDiv = document.getElementById('mol');
-  const LOOP = '#9aa3ad', PALE = '#dde2e7', LOOP_ON = '#4a4f57';
+  const LOOP = '#9aa3ad', PALE = '#dde2e7', LOOP_ON = '#4a4f57', HET = '#e69f00';
   function colourOfResidue(k) {
     const e = data.residues[k].e;
     return e ? idx.byElement[e].colour : LOOP;
@@ -258,11 +266,13 @@ _APP = r"""
       .observe(molDiv);
     return {
       name: 'molstar',
-      on(residues) {
-        if (!residues.length) return base();
-        apply({ data: runs(residues).map(r => Object.assign(query(r), { color: r.colour === LOOP ? LOOP_ON : r.colour,
-                                                                         sideChain: true })),
-                nonSelectedColor: PALE });
+      on(residues, het) {
+        if (!residues.length && !het.length) return base();
+        const parts = runs(residues).map(r => Object.assign(query(r), { color: r.colour === LOOP ? LOOP_ON : r.colour,
+                                                                         sideChain: true }));
+        het.forEach(([chain, seq]) => parts.push({ auth_asym_id: chain, auth_seq_id: seq, color: HET,
+                                                   representation: 'ball-and-stick', representationColor: HET }));
+        apply({ data: parts, nonSelectedColor: PALE });
       },
       async fly(residues) {  // focus, then step back so the element sits in its surroundings
         if (!ready || !residues.length) return;
@@ -303,10 +313,14 @@ _APP = r"""
     const sel = residues => ({ or: residues.map(k => ({ chain: data.residues[k].c, resi: data.residues[k].n })) });
     return {
       name: '3dmol',
-      on(residues) {  // like the topology: the selection in its figure colours, everything else pale
-        if (!residues.length) { base(); viewer.render(); return; }
+      on(residues, het) {  // like the topology: the selection in its figure colours, everything else pale
+        if (!residues.length && !het.length) { base(); viewer.render(); return; }
         viewer.setStyle({}, { cartoon: { color: PALE, opacity: 0.85 } });
-        viewer.setStyle(sel(residues), { cartoon: { colorfunc: colourOf }, stick: { radius: 0.18, colorscheme: 'grayCarbon' } });
+        if (residues.length) {
+          viewer.setStyle(sel(residues), { cartoon: { colorfunc: colourOf }, stick: { radius: 0.18, colorscheme: 'grayCarbon' } });
+        }
+        het.forEach(([chain, seq]) => viewer.setStyle({ chain, resi: seq }, { stick: { radius: 0.25, color: HET },
+                                                                              sphere: { scale: 0.3, color: HET } }));
         viewer.render();
       },
       fly(residues) { if (residues.length) { viewer.zoomTo(sel(residues)); viewer.zoom(0.35); viewer.render(); } },
@@ -318,7 +332,7 @@ _APP = r"""
   const mol = data.viewer === '3dmol' ? threeDmolViewer() : molstarViewer();
   window.foldmapViewer = mol;
   document.getElementById('molreset').onclick = () => mol.reset();
-  const molOn = residues => mol.on(residues);
+  const molOn = (residues, het) => mol.on(residues, het || []);
   const fly = residues => mol.fly(residues);
 
   // ---- linking: hover previews, click pins (shift-click adds), chains via legend or termini
@@ -358,6 +372,13 @@ _APP = r"""
                residues: [item.i, item.j], label: name(item.i) + '·' + name(item.j),
                text: name(item.i) + ' · ' + name(item.j) + ' — ' + d.toFixed(1) + ' Å' + (d <= CUT ? ' (contact)' : '') };
     }
+    if (item.type === 'disulfide' || item.type === 'glycan' || item.type === 'ligand') {
+      const list = data.links[item.type === 'disulfide' ? 'disulfides' : item.type + 's'];
+      const x = list.find(d => d.key === item.key);
+      const keys = [item.type + ' ' + item.key].concat(x.residues.map(k => data.residues[k].e).filter(Boolean));
+      return { keys: item.type === 'ligand' ? [keys[0]] : keys, residues: x.residues, het: x.het || [],
+               label: item.type === 'ligand' ? x.text.split(',')[0] : item.type, text: x.text };
+    }
     return { keys: [], residues: [item.k], label: name(item.k), text: name(item.k) + ' (loop)' };
   }
   let pinned = [], hovered = null, shiftDown = false;
@@ -365,11 +386,13 @@ _APP = r"""
     const items = hovered ? pinned.concat([hovered]) : pinned, states = items.map(stateOf);
     const keys = new Set(), res = new Set();
     let pair = null;
-    states.forEach(st => { st.keys.forEach(k => keys.add(k)); st.residues.forEach(k => res.add(k)); if (st.pair) pair = st.pair; });
+    const het = [];
+    states.forEach(st => { st.keys.forEach(k => keys.add(k)); st.residues.forEach(k => res.add(k)); if (st.pair) pair = st.pair;
+                           (st.het || []).forEach(h => het.push(h)); });
     svgOn(Array.from(keys));
     states.forEach(st => { if (st.chain) (chainParts[st.chain] || []).forEach(n => n.classList.add('on')); });
     mapOn(runsOf(Array.from(res)), pair);
-    molOn(Array.from(res));
+    molOn(Array.from(res), het);
     let text = info.dataset.idle;
     if (states.length === 1) text = states[0].text;
     else if (states.length > 1) text = states.length + ' selected: ' + states.map(st => st.label).join(', ') + ' — ' + res.size + ' residues';
@@ -407,6 +430,10 @@ _APP = r"""
       }
       const c = n.id.match(/^(legend-chain|legend-chain-label|terminus:[NC]|stub:[NC]):(.+)$/);
       if (c) return { type: 'chain', chain: c[2] };
+      let l = n.id.match(/^(?:disulfide|ss-dot):(.+)$/);
+      if (l) return { type: 'disulfide', key: l[1] };
+      if ((l = n.id.match(/^glycan:(\d+):/))) return { type: 'glycan', key: l[1] };
+      if ((l = n.id.match(/^ligand(?:-label|-tether)?:(.+?)(?::\d+)?$/))) return { type: 'ligand', key: l[1] };
     }
     return null;
   }
@@ -469,7 +496,10 @@ main { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1
 #stage svg.focus [id^="strand:"]:not(.on), #stage svg.focus [id^="helix:"]:not(.on),
 #stage svg.focus [id^="helix-back:"]:not(.on), #stage svg.focus [id^="eta:"]:not(.on),
 #stage svg.focus [id^="loop:"]:not(.on), #stage svg.focus [id^="loop-arrow:"]:not(.on),
-#stage svg.focus [id^="ghost:"]:not(.on) { opacity: .2; transition: opacity .12s }
+#stage svg.focus [id^="ghost:"]:not(.on),
+#stage svg.focus [id^="disulfide:"]:not(.on), #stage svg.focus [id^="ss-dot:"]:not(.on),
+#stage svg.focus [id^="glycan:"]:not(.on), #stage svg.focus [id^="ligand"]:not(.on) { opacity: .2; transition: opacity .12s }
+#stage svg [id^="disulfide:"], #stage svg [id^="ss-dot:"], #stage svg [id^="glycan:"], #stage svg [id^="ligand"] { cursor: pointer }
 #molpanel { flex: 1.15 }
 #mol { flex: 1; min-height: 200px; position: relative; border-radius: 6px; overflow: hidden; background: #fff }
 #mappanel { flex: 1 }
@@ -547,6 +577,50 @@ def _component_type(name: str) -> str:
     return "non-polymer"
 
 
+def _links(layout, loops, sses, bb, look) -> dict:
+    """Disulfides, glycans and ligands as drawn, each with its protein residues (Backbone indices) and, for
+    glycans and ligands, their own residues (chain, number) for the 3D view."""
+    from .render import ligand_marks
+
+    links = layout.links
+    out = {"disulfides": [], "glycans": [], "ligands": []}
+    if links is None:
+        return out
+    shown = lambda r: not layout.partial or layout.res_chain[r] not in layout.partial  # noqa: E731
+    label = lambda r: f"{bb.labels[r].chain} {bb.labels[r].name.title()}{bb.labels[r].seq}"  # noqa: E731
+    if look.disulfides:
+        for i, j in links.disulfides:
+            if shown(i) and shown(j):
+                out["disulfides"].append(
+                    {"key": f"{i}-{j}", "residues": [i, j], "text": f"disulfide {label(i)} – {label(j)}"}
+                )
+    if look.glycans:
+        members = getattr(links, "glycan_members", []) or [[] for _ in links.glycans]
+        for (r, sugars), het in zip(links.glycans, members):
+            if shown(r):
+                out["glycans"].append(
+                    {
+                        "key": str(r),
+                        "residues": [r],
+                        "het": [list(h) for h in het],
+                        "text": f"glycan on {label(r)}: {'-'.join(sugars)}",
+                    }
+                )
+    for m in ligand_marks(layout, loops, sses, look):
+        g = m["ligand"]
+        key = f"{g.name}:{g.chain}{g.seq}"
+        held = ", ".join(label(r) for r in g.contacts[:6]) + (" …" if len(g.contacts) > 6 else "")
+        out["ligands"].append(
+            {
+                "key": key,
+                "residues": list(g.contacts),
+                "het": [list(h) for h in g.members or [(g.chain, g.seq)]],
+                "text": f"{'metal' if g.metal else 'ligand'} {g.symbol}, held by {held}",
+            }
+        )
+    return out
+
+
 def _viewer_head(viewer: str) -> str:
     if viewer == "3dmol":
         return f'<script src="{THREEDMOL}"></script>'
@@ -594,6 +668,7 @@ def build_page(
         ],
         "model": _model_cif(path, layout_options.get("assembly", "auto"), layout.page_axes, layout.page_centre),
         "viewer": viewer,
+        "links": _links(layout, loops, sses, bb, look),
     }
     blob = json.dumps(data, separators=(",", ":")).replace("</", "<\\/")
     name = html.escape(data["title"])

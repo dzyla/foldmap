@@ -259,7 +259,7 @@ def load_links(path: str | Path, bb: Backbone, assembly: str = "auto") -> Links:
         for n in {"ASN": ("ND2",), "SER": ("OG",), "THR": ("OG1",)}.get(r.name, ())
         if r.find_atom(n, "*")
     ]
-    glycans = []
+    glycans, members = [], []
     used = set()
     for k_res, atom in anchors:
         if k_res not in where:
@@ -283,7 +283,8 @@ def load_links(path: str | Path, bb: Backbone, assembly: str = "auto") -> Links:
                         nxt.append((c, r))
             frontier = nxt
         glycans.append((where[k_res], [r.name for _, r in tree]))
-    return Links(sorted(set(disulfides)), glycans, _ligands(model, where))
+        members.append([(c.name, r.seqid.num) for c, r in tree])
+    return Links(sorted(set(disulfides)), glycans, _ligands(model, where), members)
 
 
 ADDITIVES = {  # crystallisation and purification leftovers: hidden from figures unless asked for
@@ -432,7 +433,15 @@ def _ligands(model, where) -> list[Ligand]:
         name = codes[0] if len(codes) == 1 else "+".join(dict.fromkeys(codes))
         out.append(
             Ligand(
-                name, chain, res.seqid.num, metal, symbol, sorted(touching), all(c in ADDITIVES for c in codes), codes
+                name,
+                chain,
+                res.seqid.num,
+                metal,
+                symbol,
+                sorted(touching),
+                all(c in ADDITIVES for c in codes),
+                [(parts[k][0], parts[k][1].seqid.num) for k in ks],
+                codes,
             )
         )
     return out

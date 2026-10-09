@@ -215,3 +215,30 @@ console.log(JSON.stringify({ one, again, two, back, swap, n: chainRes.length,
     assert out["back"] == ["element:" + data["elements"][1]["id"]]
     assert out["swap"] == ["chain:" + data["residues"][0]["c"]]
     assert out["n"] == sum(r["c"] == data["residues"][0]["c"] for r in data["residues"]) and out["same"]
+
+
+def test_links_are_listed_with_their_residues_for_selection():
+    data = _data(build_page(DATA / "6ZS5.cif"))
+    links = data["links"]
+    assert links["disulfides"] and all(len(d["residues"]) == 2 for d in links["disulfides"])
+    assert links["glycans"] and all(g["het"] and g["residues"] for g in links["glycans"])
+    zinc = _data(build_page(DATA / "1ZAA.cif"))["links"]["ligands"]
+    assert len(zinc) == 3 and all(z["het"] and len(z["residues"]) == 4 for z in zinc)
+    page = build_page(DATA / "1ZAA.cif")
+    assert all(f'id="ligand:{z["key"]}"' in page for z in zinc)
+
+
+@pytest.mark.skipif(node is None, reason="node not installed")
+def test_link_items_have_their_own_keys(tmp_path):
+    page = build_page(DATA / "1ZAA.cif")
+    probe = tmp_path / "k.js"
+    probe.write_text(
+        _script(page, "topo-lib")
+        + """
+const lib = globalThis.TopoLib;
+console.log(JSON.stringify([lib.itemKey({type: 'disulfide', key: '3-9'}), lib.itemKey({type: 'glycan', key: '12'}),
+                            lib.itemKey({type: 'ligand', key: 'ZN:C101'})]));
+"""
+    )
+    res = subprocess.run([node, str(probe)], capture_output=True, text=True)
+    assert json.loads(res.stdout) == ["disulfide:3-9", "glycan:12", "ligand:ZN:C101"]

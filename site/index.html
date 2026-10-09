@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>foldmap · protein topology diagrams</title>
+<meta name="description" content="Publication-grade protein topology diagrams from PDB/mmCIF files, PDB IDs and AlphaFold models.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <a class="brand" href="#top">fold<span>map</span></a>
+  <nav>
+    <a href="#themes">Themes</a>
+    <a href="#modes">Modes</a>
+    <a href="#explore">Explore</a>
+    <a href="#how">How it works</a>
+    <a href="#use">Use it</a>
+    <a class="gh" href="https://github.com/dzyla/foldmap">GitHub</a>
+  </nav>
+  <button id="mode-toggle" class="icon" aria-label="Switch light/dark">☾</button>
+</header>
+
+<main id="top">
+<section class="hero">
+  <div class="hero-text">
+    <p class="kicker">Open-source · Python · v{{VERSION}}</p>
+    <h1>Protein topology diagrams, drawn from the structure.</h1>
+    <p class="lede">foldmap turns a PDB/mmCIF file, a PDB ID or an AlphaFold model into a clean 2D map of its helices,
+      strands and loops: to scale, laid out from the 3D structure, with DNA, ligands, membranes and symmetry.</p>
+    <div class="install"><code id="install">pip install "foldmap @ git+https://github.com/dzyla/foldmap.git"</code>
+      <button class="copy" data-copy="install" aria-label="Copy install command">copy</button></div>
+    <div class="install"><code id="first">foldmap plot 1LMB -o lambda.svg</code>
+      <button class="copy" data-copy="first" aria-label="Copy command">copy</button></div>
+    <div class="cta"><a class="btn primary" href="#themes">Try the themes</a>
+      <a class="btn" href="#explore">Open an explorer</a></div>
+  </div>
+  <figure class="hero-fig"><img src="assets/modes/dna-0.svg" alt="Topology of the Zif268 zinc fingers bound to DNA" id="hero-img"></figure>
+</section>
+
+<section id="themes" class="band">
+  <div class="section-head">
+    <h2>One structure, sixteen looks</h2>
+    <p>Themes change only how things are drawn, never where. Pick a structure and a theme: every figure below
+      was drawn by foldmap from the PDB file.</p>
+  </div>
+  <div class="chips" id="structure-chips" role="tablist" aria-label="Structure"></div>
+  <div class="playground">
+    <aside class="theme-list" id="theme-list" role="listbox" aria-label="Theme"></aside>
+    <div class="stage">
+      <figure class="figure-panel" id="theme-panel">
+        <img id="theme-img" alt="">
+        <div class="spinner" aria-hidden="true"></div>
+      </figure>
+      <div class="caption">
+        <div><strong id="theme-name"></strong> <span id="theme-note" class="muted"></span></div>
+        <div class="cmd"><code id="theme-cmd"></code><button class="copy" data-copy="theme-cmd">copy</button></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="modes">
+  <div class="section-head">
+    <h2>Built for real structures</h2>
+    <p>Assemblies, filaments, membranes, DNA, AlphaFold models, alignments, ligands: each handled with the
+      biology in mind.</p>
+  </div>
+  <div class="tabs" id="mode-tabs" role="tablist" aria-label="Mode"></div>
+  <div class="mode" id="mode-body"></div>
+</section>
+
+<section id="sequence" class="band">
+  <div class="section-head">
+    <h2>Sequence and alignment views</h2>
+    <p>The same labels and colours as the topology, drawn over the sequence, or over a whole alignment with the
+      structure following its reference row, ESPript-style.</p>
+  </div>
+  <div class="sequence-grid" id="sequence-grid"></div>
+</section>
+
+<section id="explore">
+  <div class="section-head">
+    <h2>Explore it live</h2>
+    <p><code>foldmap interactive</code> writes one HTML page linking the topology, the 3D model (Mol*) and a contact
+      map. Hover anything; click to select (shift-click adds); click a chain in the legend to select it.</p>
+  </div>
+  <div class="chips" id="explorer-chips"></div>
+  <div class="explorer-frame">
+    <iframe id="explorer" title="Interactive topology explorer" loading="lazy"></iframe>
+    <a id="explorer-open" class="open-full" target="_blank" rel="noopener">open full screen ↗</a>
+  </div>
+</section>
+
+<section id="how" class="band">
+  <div class="section-head">
+    <h2>How a diagram is made</h2>
+    <p>Every figure, from the command line, the app or an AI agent, goes through the same eight steps.</p>
+  </div>
+  <ol class="steps">
+    <li><h3>Read</h3><p>gemmi reads the file, or the one downloaded for a PDB ID or UniProt accession; biological assemblies are built from its operators.</p></li>
+    <li><h3>Secondary structure</h3><p>A DSSP implementation finds backbone hydrogen bonds and calls α- and 3₁₀ helices, strands with bulges, and turns.</p></li>
+    <li><h3>Sheets</h3><p>Strands joined by H-bond ladders form sheets; order and direction come from the ladders; closed barrels are recognised.</p></li>
+    <li><h3>Context</h3><p>Symmetry from chain superposition; disulfides, glycans and ligands from the atoms; the membrane estimated on request.</p></li>
+    <li><h3>Projection</h3><p>3D is turned into the page: dominant direction up, assemblies unrolled around their axis, DNA complexes around the DNA. Never mirrored.</p></li>
+    <li><h3>Layout</h3><p>One energy is minimised: springs to projected positions, short loops, contacts and disulfides pulling together, no overlaps.</p></li>
+    <li><h3>Loops</h3><p>Each loop is routed on a grid by A* search: orthogonal lines around elements and labels.</p></li>
+    <li><h3>Draw</h3><p>Elements to scale, then loops, annotations and legend; SVG keeps text as text for editing.</p></li>
+  </ol>
+  <p class="note">Steps 1–7 depend only on the structure, step 8 on the theme: restyling never moves anything.</p>
+</section>
+
+<section id="use">
+  <div class="section-head">
+    <h2>Use it your way</h2>
+  </div>
+  <div class="cards">
+    <article class="card">
+      <h3>Command line</h3>
+      <pre><code>foldmap summary 1UBQ
+foldmap plot 1UBQ -o fig.svg --theme journal
+foldmap plot P04637 -o p53.png --theme alphafold
+foldmap sequence 1UBQ -o aln.svg --msa family.fasta
+foldmap interactive 8UTF -o explorer.html</code></pre>
+    </article>
+    <article class="card">
+      <h3>App</h3>
+      <p>A Streamlit app: load a PDB ID or file, pick a style from previews of your structure, tune every option,
+        download SVG, PNG, PDF and layout files.</p>
+      <pre><code>pip install "foldmap[app] @ git+https://github.com/dzyla/foldmap.git"
+foldmap app</code></pre>
+    </article>
+    <article class="card">
+      <h3>AI agents (MCP)</h3>
+      <p>An MCP server lets agents summarise structures and draw figures, with image previews.</p>
+      <pre><code>claude mcp add foldmap -- foldmap mcp</code></pre>
+    </article>
+    <article class="card">
+      <h3>Python</h3>
+      <pre><code>from foldmap.cli import make_figure
+from foldmap.fetch import fetch
+from foldmap.render import save
+
+fig = make_figure(fetch("1UBQ"), title="Ubiquitin")
+save(fig, "ubiquitin.pdf")</code></pre>
+    </article>
+  </div>
+</section>
+</main>
+
+<footer>
+  <p><strong>foldmap</strong> · © Dawid Zyla · <a href="https://github.com/dzyla/foldmap/blob/main/LICENSE">AGPL-3.0</a>
+    · if you use it in published work, please <a href="https://github.com/dzyla/foldmap/blob/main/CITATION.cff">cite it</a>.</p>
+  <p class="muted">Structures from the <a href="https://www.rcsb.org">PDB</a> and the
+    <a href="https://alphafold.ebi.ac.uk">AlphaFold DB</a>; 3D viewer <a href="https://molstar.org">Mol*</a>.</p>
+</footer>
+
+<script type="application/json" id="site-data">{{SITE_DATA}}</script>
+<script src="app.js"></script>
+</body>
+</html>
