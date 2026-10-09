@@ -27,6 +27,25 @@ _LOOP_GREY = "#9aa3ad"
 _LIB = r"""
 (function (g) {
   const TopoLib = {
+    itemKey(item) {  // one string per selectable thing
+      switch (item.type) {
+        case 'element': return 'element:' + item.id;
+        case 'loop': return 'loop:' + item.a + '>' + item.b;
+        case 'chain': return 'chain:' + item.chain;
+        case 'pair': return 'pair:' + item.i + '-' + item.j;
+        default: return 'residue:' + item.k;
+      }
+    },
+    toggle(pinned, item, additive) {  // click: pin it (or clear if it is the only pin); shift-click: add/remove
+      const key = TopoLib.itemKey(item), has = pinned.some(p => TopoLib.itemKey(p) === key);
+      if (additive) return has ? pinned.filter(p => TopoLib.itemKey(p) !== key) : pinned.concat([item]);
+      return has && pinned.length === 1 ? [] : [item];
+    },
+    chainResidues(data, chain) {
+      const out = [];
+      data.residues.forEach((r, k) => { if (r.c === chain) out.push(k); });
+      return out;
+    },
     binning(n, max) {
       const size = Math.max(1, Math.ceil(n / max));
       return { size, count: Math.ceil(n / size) };
@@ -113,7 +132,7 @@ _APP = r"""
   let drag = null;
   stage.addEventListener('pointerdown', ev => { drag = { x: ev.clientX, y: ev.clientY, v: view.slice(), moved: false }; });
   window.addEventListener('pointermove', ev => {
-    if (!drag) return;
+    if (!drag || drag.up) return;  // released: a quick move right after a click must not pan
     const dx = ev.clientX - drag.x, dy = ev.clientY - drag.y;
     if (Math.abs(dx) + Math.abs(dy) > 3) { drag.moved = true; stage.classList.add('dragging'); }
     if (!drag.moved) return;
@@ -121,7 +140,10 @@ _APP = r"""
                                                                              : drag.v[3] / stage.clientHeight;
     setView([drag.v[0] - dx * s, drag.v[1] - dy * s, drag.v[2], drag.v[3]]);
   });
-  window.addEventListener('pointerup', () => { if (drag) setTimeout(() => { drag = null; }, 0); stage.classList.remove('dragging'); });
+  window.addEventListener('pointerup', () => {
+    if (drag) { drag.up = true; setTimeout(() => { drag = null; }, 0); }
+    stage.classList.remove('dragging');
+  });
   document.getElementById('zin').onclick = () => zoom(1 / 1.3);
   document.getElementById('zout').onclick = () => zoom(1.3);
   document.getElementById('zfit').onclick = () => setView(full.slice());
@@ -228,6 +250,10 @@ _APP = r"""
       if (k !== undefined && hooks.hover) hooks.hover(k);
     });
     molDiv.addEventListener('PDB.molstar.mouseout', () => hooks.leave && hooks.leave());
+    molDiv.addEventListener('PDB.molstar.click', ev => {
+      const k = key(ev.eventData || {});
+      if (k !== undefined && hooks.click) hooks.click(k);
+    });
     new ResizeObserver(() => { const c = plugin.plugin && plugin.plugin.canvas3d; if (c) c.handleResize(); })
       .observe(molDiv);
     return {
@@ -270,6 +296,10 @@ _APP = r"""
       const k = residueOf(atom);
       if (k !== undefined && hooks.hover) hooks.hover(k);
     }, () => hooks.leave && hooks.leave());
+    viewer.setClickable({}, true, atom => {
+      const k = residueOf(atom);
+      if (k !== undefined && hooks.click) hooks.click(k);
+    });
     const sel = residues => ({ or: residues.map(k => ({ chain: data.residues[k].c, resi: data.residues[k].n })) });
     return {
       name: '3dmol',
@@ -291,64 +321,120 @@ _APP = r"""
   const molOn = residues => mol.on(residues);
   const fly = residues => mol.fly(residues);
 
-  // ---- linking
+  // ---- linking: hover previews, click pins (shift-click adds), chains via legend or termini
   function range(a, b) { const out = []; for (let k = a; k <= b; k++) out.push(k); return out; }
   function name(k) { const r = data.residues[k]; return r.c + ' ' + r.r + r.n + (r.i || ''); }
-  function show(state) {
-    svgOn(state.keys || []);
-    mapOn(state.ranges || [], state.pair || null);
-    molOn(state.residues || []);
-    info.textContent = state.text || info.dataset.idle;
+  function runsOf(ks) {  // index runs as [start, end] pairs, for the contact map
+    const s = ks.slice().sort((a, b) => a - b), out = [];
+    s.forEach(k => { const last = out[out.length - 1]; if (last && last[1] === k - 1) last[1] = k; else out.push([k, k]); });
+    return out;
   }
-  function element(id) {
-    const e = idx.byElement[id];
-    show({ keys: [id], ranges: [[e.start, e.end]], residues: range(e.start, e.end),
-           text: e.label + ' — ' + e.chain + ' ' + e.first + '–' + e.last + ' (' + (e.end - e.start + 1) + ' residues)' });
-  }
-  function clear() { show({}); }
-  info.dataset.idle = info.textContent;
-
-  svg.addEventListener('mouseover', ev => {
-    for (let n = ev.target; n && n !== svg; n = n.parentNode) {
-      if (!n.id) continue;
-      const m = n.id.match(/^(strand|helix|helix-back|eta|label|ghost):(.+)$/);
-      if (m && idx.byElement[m[2]]) return element(m[2]);
-      if (n.id.startsWith('loop:')) {
-        const [a, b] = n.id.slice(5).split('>'), s = lib.loopSpan(data, a, b);
-        if (s && s[1] >= s[0]) return show({ keys: ['loop ' + a + '>' + b], ranges: [s], residues: range(s[0], s[1]),
-                                             text: 'loop ' + name(s[0]) + ' – ' + name(s[1]) });
-      }
-    }
+  const chainParts = {};  // chain -> svg nodes of its legend entry and termini (lit when the chain is selected)
+  svg.querySelectorAll('[id^="legend-chain"], [id^="terminus:"], [id^="stub:"]').forEach(n => {
+    const c = n.id.split(':').pop();
+    (chainParts[c] = chainParts[c] || []).push(n);
   });
-  svg.addEventListener('mouseleave', clear);
+  function stateOf(item) {
+    if (item.type === 'element') {
+      const e = idx.byElement[item.id];
+      return { keys: [item.id], residues: range(e.start, e.end), label: e.label + ' (' + e.chain + ')',
+               text: e.label + ' — ' + e.chain + ' ' + e.first + '–' + e.last + ' (' + (e.end - e.start + 1) + ' residues)' };
+    }
+    if (item.type === 'loop') {
+      const s = lib.loopSpan(data, item.a, item.b);
+      return { keys: ['loop ' + item.a + '>' + item.b], residues: range(s[0], s[1]), label: 'loop ' + name(s[0]),
+               text: 'loop ' + name(s[0]) + ' – ' + name(s[1]) };
+    }
+    if (item.type === 'chain') {
+      const ks = lib.chainResidues(data, item.chain);
+      const keys = Object.keys(parts).filter(k => k.replace(/^loop /, '').startsWith(item.chain + ':'));
+      const n = data.elements.filter(e => e.chain === item.chain).length;
+      return { keys, chain: item.chain, residues: ks, label: 'chain ' + item.chain,
+               text: 'chain ' + item.chain + ' — ' + ks.length + ' residues, ' + n + ' helices and strands' };
+    }
+    if (item.type === 'pair') {
+      const d = lib.distance(data.ca, item.i, item.j);
+      return { keys: [lib.elementAt(data, item.i), lib.elementAt(data, item.j)].filter(Boolean), pair: [item.i, item.j],
+               residues: [item.i, item.j], label: name(item.i) + '·' + name(item.j),
+               text: name(item.i) + ' · ' + name(item.j) + ' — ' + d.toFixed(1) + ' Å' + (d <= CUT ? ' (contact)' : '') };
+    }
+    return { keys: [], residues: [item.k], label: name(item.k), text: name(item.k) + ' (loop)' };
+  }
+  let pinned = [], hovered = null, shiftDown = false;
+  function render() {
+    const items = hovered ? pinned.concat([hovered]) : pinned, states = items.map(stateOf);
+    const keys = new Set(), res = new Set();
+    let pair = null;
+    states.forEach(st => { st.keys.forEach(k => keys.add(k)); st.residues.forEach(k => res.add(k)); if (st.pair) pair = st.pair; });
+    svgOn(Array.from(keys));
+    states.forEach(st => { if (st.chain) (chainParts[st.chain] || []).forEach(n => n.classList.add('on')); });
+    mapOn(runsOf(Array.from(res)), pair);
+    molOn(Array.from(res));
+    let text = info.dataset.idle;
+    if (states.length === 1) text = states[0].text;
+    else if (states.length > 1) text = states.length + ' selected: ' + states.map(st => st.label).join(', ') + ' — ' + res.size + ' residues';
+    if (pinned.length) text += '   ·   click again or Esc to clear, shift-click to add';
+    info.textContent = text;
+    info.classList.toggle('pinned', pinned.length > 0);
+  }
+  function hover(item) { hovered = item; render(); }
+  function unhover() { if (hovered) { hovered = null; render(); } }
+  function pick(item, additive) {
+    pinned = lib.toggle(pinned, item, additive);
+    hovered = null;
+    render();
+    if (pinned.length) {
+      const ks = new Set();
+      pinned.forEach(p => stateOf(p).residues.forEach(k => ks.add(k)));
+      fly(Array.from(ks));
+    }
+  }
+  function clearPins() { pinned = []; hovered = null; render(); }
+  window.foldmapSelection = () => pinned.map(lib.itemKey);  // for tests and scripting
+  info.dataset.idle = info.textContent;
+  window.addEventListener('keydown', ev => { if (ev.key === 'Shift') shiftDown = true; if (ev.key === 'Escape') clearPins(); });
+  window.addEventListener('keyup', ev => { if (ev.key === 'Shift') shiftDown = false; });
+
+  function itemAt(target) {  // the selectable thing under the pointer in the topology, if any
+    for (let n = target; n && n !== svg; n = n.parentNode) {
+      if (!n.id) continue;
+      const m = n.id.match(/^(strand|helix|helix-back|eta|label|ghost|resnum):(.+?)(:[NC])?$/);
+      if (m && idx.byElement[m[2]]) return { type: 'element', id: m[2] };
+      if (n.id.startsWith('loop:') || n.id.startsWith('loop-seg:')) {
+        const body = n.id.startsWith('loop:') ? n.id.slice(5) : n.id.slice(9).replace(/:\d+$/, '');
+        const [a, b] = body.split('>'), s = lib.loopSpan(data, a, b);
+        if (s && s[1] >= s[0]) return { type: 'loop', a, b };
+      }
+      const c = n.id.match(/^(legend-chain|legend-chain-label|terminus:[NC]|stub:[NC]):(.+)$/);
+      if (c) return { type: 'chain', chain: c[2] };
+    }
+    return null;
+  }
+  svg.addEventListener('mouseover', ev => { const item = itemAt(ev.target); if (item) hover(item); else unhover(); });
+  svg.addEventListener('mouseleave', unhover);
   svg.addEventListener('click', ev => {
     if (drag && drag.moved) return;
-    for (let n = ev.target; n && n !== svg; n = n.parentNode) {
-      const m = n.id && n.id.match(/^(strand|helix|helix-back|eta|label|ghost):(.+)$/);
-      if (m && idx.byElement[m[2]]) { const e = idx.byElement[m[2]]; return fly(range(e.start, e.end)); }
-      if (n.id && n.id.startsWith('loop:')) {
-        const [a, b] = n.id.slice(5).split('>'), s = lib.loopSpan(data, a, b);
-        if (s && s[1] >= s[0]) return fly(range(s[0], s[1]));
-      }
-    }
+    const item = itemAt(ev.target);
+    if (item) pick(item, ev.shiftKey);
+    else if (!ev.shiftKey) clearPins();  // a click on empty paper clears the selection
   });
+  svg.querySelectorAll('[id^="legend-chain"], [id^="terminus:"]').forEach(n => { n.style.cursor = 'pointer'; });
+
   const mapBox = document.querySelector('.map'), stripEl = document.getElementById('strip');
   new ResizeObserver(() => { stripEl.style.width = mapBox.clientWidth + 'px'; }).observe(mapBox);
-  over.addEventListener('mousemove', ev => {
+  function pairAt(ev) {
     const box = over.getBoundingClientRect();
     const J = Math.floor((ev.clientX - box.left) / box.width * M.count), I = Math.floor((ev.clientY - box.top) / box.height * M.count);
-    const i = Math.min(data.ca.length - 1, I * M.size), j = Math.min(data.ca.length - 1, J * M.size);
-    const keys = [lib.elementAt(data, i), lib.elementAt(data, j)].filter(Boolean);
-    show({ keys, pair: [i, j], residues: [i, j],
-           text: name(i) + ' · ' + name(j) + ' — ' + lib.distance(data.ca, i, j).toFixed(1) + ' Å' +
-                 (lib.distance(data.ca, i, j) <= CUT ? ' (contact)' : '') });
-  });
-  over.addEventListener('mouseleave', clear);
-  hooks.hover = k => {  // hovering the 3D model
-    const e = data.residues[k].e;
-    if (e) element(e); else show({ residues: [k], ranges: [[k, k]], text: name(k) + ' (loop)' });
-  };
-  hooks.leave = clear;
+    return { type: 'pair', i: Math.min(data.ca.length - 1, I * M.size), j: Math.min(data.ca.length - 1, J * M.size) };
+  }
+  over.addEventListener('mousemove', ev => hover(pairAt(ev)));
+  over.addEventListener('mouseleave', unhover);
+  over.addEventListener('click', ev => pick(pairAt(ev), ev.shiftKey));
+
+  const residueItem = k => (data.residues[k].e ? { type: 'element', id: data.residues[k].e } : { type: 'residue', k });
+  hooks.hover = k => hover(residueItem(k));  // the 3D model
+  hooks.leave = unhover;
+  hooks.click = k => pick(residueItem(k), shiftDown);
 })();
 """
 
@@ -393,6 +479,7 @@ main { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1
 #map-over { cursor: crosshair }
 #strip { display: block; height: 8px; image-rendering: pixelated; margin-top: 4px; border-radius: 2px }
 .legend { color: var(--muted); font-size: 11.5px; margin: 4px 0 0 }
+#info.pinned { border-color: var(--accent) }
 #info { font: 13px var(--mono); padding: 7px 12px; background: var(--panel); border: 1px solid var(--line);
         border-radius: 8px; margin: 10px 16px 0; min-height: 2.4em; white-space: nowrap; overflow: hidden;
         text-overflow: ellipsis }

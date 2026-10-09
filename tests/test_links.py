@@ -39,7 +39,7 @@ def _gids(fig, prefix):
 
 @pytest.mark.parametrize("name", ["5NKT", "6ZS5"])
 def test_disulfides_are_drawn_between_their_residues(name):
-    from foldmap.render import residue_point
+    from foldmap.render import disulfide_points
     from foldmap.route import route_loops
 
     path = DATA / f"{name}.cif"
@@ -52,7 +52,7 @@ def test_disulfides_are_drawn_between_their_residues(name):
     for bar in bars:
         i, j = (int(x) for x in bar.get_gid().split(":")[1].split("-"))
         ends = bar.get_path().vertices[[0, -1]]
-        want = np.array([residue_point(lay, loops, sses, bb, i), residue_point(lay, loops, sses, bb, j)])
+        want = np.array(disulfide_points(lay, loops, sses, lay.res_chain, i, j))
         assert np.allclose(sorted(map(tuple, ends)), sorted(map(tuple, want)), atol=1e-6)
 
 
@@ -151,3 +151,26 @@ def test_glycans_stay_off_elements(name):
                 if min(b.x1, x1) - max(b.x0, x0) > 0.05 and min(b.y1, y1) - max(b.y0, y0) > 0.05:
                     bad.append(gid)
     assert not bad, bad
+
+
+def _bars(name):
+    from foldmap.cli import make_figure
+
+    fig = make_figure(Path(__file__).parent / "data" / f"{name}.cif")
+    out = []
+    for a in fig.axes[0].patches:
+        if (a.get_gid() or "").startswith("disulfide:"):
+            v = a.get_path().vertices
+            out.append(float(np.hypot(*(v[-1] - v[0]))))
+    return out
+
+
+@pytest.mark.parametrize("name", ["8UUP", "6Y7S", "6ZS5"])
+def test_loop_cysteines_sit_where_their_loop_passes_closest_to_the_partner(name):
+    bars = _bars(name)
+    assert bars and min(bars) >= 0.49  # always a visible bar
+    # 6ZS5's Cys335-Cys425 joins strand A's loop to helix H across the C-F-G sheet: its strand order is fixed by
+    # backbone H-bonds, so that one bar has to span three strands; every other bar is short
+    # and Cys527-Cys582 joins the G-H loop (between two sheets) to the short C-terminal stub of strand J
+    allowed = 2 if name == "6ZS5" else 0
+    assert sum(b > 3.0 for b in bars) <= allowed, sorted(bars)

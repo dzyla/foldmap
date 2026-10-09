@@ -91,8 +91,18 @@ alt="Interactive page: topology, 3D model and contact map side by side">
 </p>
 
 `foldmap interactive` writes one HTML page with the topology, the 3D model and a residue contact map side by
-side. Hover an element, a loop, a map cell or an atom and the same residues light up in all three; click an
-element to fly the 3D view to it. The 3D model starts in the same orientation as the figure. The 3D panel uses
+side.
+
+| Action | Effect |
+| --- | --- |
+| Hover an element, loop, map cell or residue in 3D | preview: the same residues light up in all three views |
+| Click | select it (stays lit) and fly the 3D view to it |
+| Click it again, click empty paper, or press Esc | clear the selection |
+| Shift-click | add to (or remove from) the selection |
+| Click a chain in the legend, or its N/C terminus | select the whole chain |
+| Mouse wheel / drag / `fit` on the topology | zoom / pan / fit |
+
+The info bar lists what is selected and how many residues. The 3D model starts in the same orientation as the figure. The 3D panel uses
 [Mol*](https://molstar.org) (the PDBe build); `--viewer 3dmol` switches to the lighter
 [3Dmol.js](https://3dmol.csb.pitt.edu/). Either loads from a CDN, so the page needs an internet connection.
 
@@ -198,11 +208,46 @@ Options: `--chain`, `--columns` (residues per row), `--full-sequence` (unmodelle
 `--ss-colour figure|black`, `--similarity` (fraction that must agree for a similar column, default 0.7),
 `--no-conservation-bar`, `--theme`/`--set` (element colours follow the topology figure).
 
+## How the topology is made
+
+Every figure (command line, app, MCP or Python) goes through the same steps:
+
+1. **Read the structure.** gemmi reads the mmCIF/PDB file (or the file downloaded for a PDB ID or UniProt
+   accession). With `--assembly auto` the biological assembly is built from the file's own operators.
+2. **Secondary structure.** A DSSP implementation assigns hydrogen bonds from the backbone and calls α-helices,
+   3₁₀ helices, β-strands (with bulges) and turns.
+3. **Sheets and bundles.** Strands joined by backbone H-bond ladders form sheets; their order and directions come
+   from the ladder network, and a sheet whose ends pair is a closed barrel. Helices packed along their length
+   across chains form bundles.
+4. **Context.** Symmetry (cyclic, dihedral, cubic, helical) is found by superposing chains of the same sequence;
+   disulfides, glycans and ligands are read from the atoms; a membrane is estimated on request.
+5. **Projection.** A frame turns 3D into page coordinates: the dominant element direction points up and the
+   widest spread runs left–right (single chains); a symmetric assembly is unrolled around its axis, protein–DNA
+   complexes around the DNA axis, membrane proteins with the bilayer horizontal. Never mirrored.
+6. **Layout.** Sheets (as rigid blocks), helices and DNA are placed by minimising one energy: springs to their
+   projected positions, short loops between sequence neighbours, attraction between elements in contact, a pull
+   between disulfide-bonded cysteines, and an overlap penalty; then any remaining overlaps are cleared.
+   Symmetry copies are tied to look identical.
+7. **Loops.** Each loop is routed on a grid with A* search: orthogonal lines that go around elements and labels.
+8. **Drawing.** matplotlib draws the elements to scale (one helix turn tiled along each helix, arrows for
+   strands), then loops, annotations, legend and title, and writes SVG (text kept as text), PNG or PDF.
+
+Steps 1–7 depend only on the structure and the layout options; themes and style keys only change step 8, so a
+figure keeps its shape while you restyle it.
+
 ## App
 
-`foldmap app` opens a Streamlit app: load a PDB ID, UniProt accession or file, pick a style from previews of your
-structure, then adjust every option with the figure updating as you go. Tabs for the figure, the sequence view
-(with an uploaded alignment) and the interactive explorer; downloads as SVG, PNG, PDF, HTML and layout files.
+`foldmap app` opens a Streamlit app in the browser. It runs the same pipeline as the command line:
+
+1. **Load**: type a PDB ID, a UniProt accession (the AlphaFold model) or a file path, upload a file, or pick an
+   example. A summary shows chains, residues, element counts and the symmetry found.
+2. **Pick a style**: previews of *your* structure in each theme; choose one to start from.
+3. **Edit**: every option sits in the sidebar (colours, loops, labels, features such as disulfides, glycans,
+   ligands and membranes, sizes and layout, symmetry and assembly, large-assembly focus, alignment upload). The
+   figure redraws as you change anything; results are cached, so switching back is instant.
+4. **Export**: the Figure tab downloads SVG, PNG (300 dpi), PDF and a layout file that recreates the figure; the
+   Sequence tab draws the sequence (or the uploaded alignment) with secondary structure on top; the Interactive
+   tab embeds the explorer page and downloads it as HTML.
 
 ## MCP server for AI agents
 

@@ -513,6 +513,66 @@ def residue_point(layout: Layout, loops: list[Loop], sses: list[SSE], bb, r: int
     return None
 
 
+def loop_of(layout: Layout, loops: list[Loop], sses: list[SSE], chains, r: int) -> np.ndarray | None:
+    """The routed points of the loop residue r lies in (None if it sits in an element or a chain end)."""
+    chain = chains[r]
+    mine = [s for s in sses if s.chain == chain and s.id in layout.placed]
+    if any(s.start <= r <= s.end for s in mine):
+        return None
+    before = [s for s in mine if s.end < r]
+    after = [s for s in mine if s.start > r]
+    if not (before and after):
+        return None
+    loop = next((l for l in loops if l.a_id == before[-1].id and l.b_id == after[0].id), None)
+    return None if loop is None else np.asarray(loop.points, float)
+
+
+def _nearest_on(pts: np.ndarray, q) -> tuple[float, float]:
+    """The point of polyline pts closest to q, kept clear of the loop's two end stubs."""
+    q = np.asarray(q, float)
+    best, d_best = None, np.inf
+    for a, b in zip(pts, pts[1:]):
+        ab = b - a
+        t = float(np.clip(np.dot(q - a, ab) / max(np.dot(ab, ab), 1e-12), 0.0, 1.0))
+        c = a + t * ab
+        d = float(np.hypot(*(c - q)))
+        if d < d_best:
+            best, d_best = c, d
+    return float(best[0]), float(best[1])
+
+
+def disulfide_points(layout, loops, sses, chains, i: int, j: int):
+    """Where to draw a disulfide's two cysteines. A cysteine in a loop is placed where its loop passes closest
+    to its partner: loop routes are schematic, so any point on its own loop is faithful, and the nearest one
+    keeps the bond short. Cysteines in elements stay at their place along the element."""
+    a, b = residue_point(layout, loops, sses, chains, i), residue_point(layout, loops, sses, chains, j)
+    if a is None or b is None:
+        return None, None
+    la, lb = loop_of(layout, loops, sses, chains, i), loop_of(layout, loops, sses, chains, j)
+    for _ in range(3):  # both in loops: settle by alternating
+        if la is not None:
+            a = _nearest_on(la, b)
+        if lb is not None:
+            b = _nearest_on(lb, a)
+    if np.hypot(a[0] - b[0], a[1] - b[1]) < _SS_MIN and (la is not None or lb is not None):
+        b = _nearest_beyond(lb, a) if lb is not None else b  # loops crossing at the bond: keep a visible bar
+        if np.hypot(a[0] - b[0], a[1] - b[1]) < _SS_MIN and la is not None:
+            a = _nearest_beyond(la, b)
+    return a, b
+
+
+_SS_MIN = 0.5  # shortest disulfide bar drawn (page units)
+
+
+def _nearest_beyond(pts: np.ndarray, q) -> tuple[float, float]:
+    """The point of polyline pts closest to q but at least _SS_MIN from it."""
+    dense = np.vstack([a + t * (b - a) for a, b in zip(pts, pts[1:]) for t in np.linspace(0, 1, 30)])
+    d = np.hypot(*(dense - np.asarray(q, float)).T)
+    ok = d >= _SS_MIN
+    k = int(np.argmin(np.where(ok, d, np.inf))) if ok.any() else int(np.argmax(d))
+    return float(dense[k][0]), float(dense[k][1])
+
+
 def _symbol(ax, shape: str, colour: str, xy, size: float, lw: float, gid: str) -> None:
     x, y = xy
     h = size / 2
@@ -663,7 +723,7 @@ def _draw_links(ax, layout: Layout, loops: list[Loop], sses: list[SSE], look: St
         for i, j in links.disulfides:
             if not (shown(i) and shown(j)):
                 continue
-            a, b = residue_point(layout, loops, sses, chains, i), residue_point(layout, loops, sses, chains, j)
+            a, b = disulfide_points(layout, loops, sses, chains, i, j)
             if a is None or b is None:
                 continue
             bar = PathPatch(
@@ -709,7 +769,7 @@ def _draw_links(ax, layout: Layout, loops: list[Loop], sses: list[SSE], look: St
             away = at - centre
             best = None
             for out in (np.array([1.0, 0.0]), np.array([-1.0, 0.0]), np.array([0.0, 1.0]), np.array([0.0, -1.0])):
-                for lead in np.arange(0.35, 3.0, 0.1):  # the shortest stem that clears everything
+                for lead in np.arange(0.35, 6.0, 0.1):  # the shortest stem that clears everything
                     boxes = [
                         _box(*(at + out * (lead + step * k)), size / 2 + 0.03, size / 2 + 0.03) for k in range(count)
                     ]
@@ -718,18 +778,14 @@ def _draw_links(ax, layout: Layout, loops: list[Loop], sses: list[SSE], look: St
                         if best is None or cost < best[0]:
                             best = (cost, out, lead, boxes)
                         break
-            if best is None:  # nowhere clear: the outward default
-                out = (
-                    np.array([np.sign(away[0]) or 1.0, 0.0])
-                    if abs(away[0]) > abs(away[1])
-                    else np.array([0.0, np.sign(away[1]) or 1.0])
-                )
-                best = (
-                    0.0,
-                    out,
-                    0.35,
-                    [_box(*(at + out * (0.35 + step * k)), size / 2, size / 2) for k in range(count)],
-                )
+            if best is None:  # nowhere clear: the direction and stem crossing the fewest things
+                tries = []
+                for out in (np.array([1.0, 0.0]), np.array([-1.0, 0.0]), np.array([0.0, 1.0]), np.array([0.0, -1.0])):
+                    for lead in np.arange(0.35, 6.0, 0.25):
+                        boxes = [_box(*(at + out * (lead + step * k)), size / 2, size / 2) for k in range(count)]
+                        tries.append((sum(_hits(b, taken) for b in boxes), lead, out.tolist(), boxes))
+                hits, lead, out, boxes = min(tries, key=lambda t: (t[0], t[1]))
+                best = (0.0, np.array(out), lead, boxes)
             _, out, lead, boxes = best
             taken += boxes
             tip = at + out * (lead + step * (count - 0.5))
@@ -1381,7 +1437,7 @@ def _draw(
         stub = PathPatch(Path([port, tip], [Path.MOVETO, Path.LINETO]), fc="none", ec=ink, lw=loop_lw, zorder=2)
         stub.set_gid(f"stub:{end}:{chain}")
         ax.add_patch(stub)
-        ax.text(
+        t = ax.text(
             port[0] + ex[0] * END_LABEL,
             port[1] + ex[1] * END_LABEL,
             end,
@@ -1391,6 +1447,7 @@ def _draw(
             fontweight="bold",
             zorder=4,
         )
+        t.set_gid(f"terminus:{end}:{chain}")
 
     for k, (colour, text) in enumerate(entries):
         row, col = divmod(k, per_row)
@@ -1410,8 +1467,13 @@ def _draw(
                     Rectangle((x + q * 0.1, y - 0.3), 0.1, 0.6, fc=sequence_colour(q / 5, look.sequence_map), ec="none")
                 )
         else:
-            ax.add_patch(Rectangle((x, y - 0.3), 0.6, 0.6, fc=colour, ec=darken(colour), lw=lw * 0.8))
-        ax.text(x + 0.85, y, text, ha="left", va="center", fontsize=font)
+            swatch = Rectangle((x, y - 0.3), 0.6, 0.6, fc=colour, ec=darken(colour), lw=lw * 0.8)
+            ax.add_patch(swatch)
+            if text.startswith("Chain "):  # a chain's legend entry: clickable in the interactive page
+                swatch.set_gid(f"legend-chain:{text[6:]}")
+        t = ax.text(x + 0.85, y, text, ha="left", va="center", fontsize=font)
+        if text.startswith("Chain "):
+            t.set_gid(f"legend-chain-label:{text[6:]}")
     if layout.context and look.legend:  # what the figure shows of a large assembly, under the legend
         import textwrap
 

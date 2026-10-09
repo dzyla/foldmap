@@ -148,7 +148,7 @@ def test_cli_preset_set_and_style_file(ubq, tmp_path):
     f = tmp_path / "look.yaml"
     f.write_text("theme: print\nlabels: false\n")
     assert main(["plot", str(ubq), "-o", str(out), "--style-file", str(f)]) == 0
-    assert "label:" not in out.read_text()
+    assert 'id="label:' not in out.read_text()  # no element labels (legend ids may contain the word)
     assert main(["plot", str(ubq), "-o", str(out), "--set", "helix_scale=big"]) == 1
 
 

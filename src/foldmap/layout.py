@@ -514,14 +514,17 @@ def _attract(
         mover, anchor, om, oa = (i, j, oi, oj) if mass[i] <= mass[j] else (j, i, oj, oi)
         if mover in ties:
             continue
-        trial = z.copy()
-        target = P[anchor] + oa - om + np.array([0.0, -1.0])  # the lighter element's cysteine beside its partner
-        trial[2 * slot[mover] : 2 * slot[mover] + 2] = target
-        trial = solve(trial, _LAMBDAS[1:])
-        lam = _LAMBDAS[-1]
-        energy = tied(trial)[0]
-        if energy < best:
-            z, best = trial, energy
+        hm, ha = items[mover].half, items[anchor].half
+        gap_x, gap_y = hm[0] + ha[0] + MARGIN, hm[1] + ha[1] + MARGIN
+        for side in ((0.0, -1.0), (-gap_x, 0.0), (gap_x, 0.0), (0.0, gap_y), (0.0, -gap_y)):
+            # the lighter element brought beside its partner: just below the cysteine, or clear of its footprint
+            trial = z.copy()
+            trial[2 * slot[mover] : 2 * slot[mover] + 2] = P[anchor] + oa - om + np.array(side)
+            trial = solve(trial, _LAMBDAS[1:])
+            lam = _LAMBDAS[-1]
+            energy = tied(trial)[0]
+            if energy < best:
+                z, best = trial, energy
     x = expand(z).ravel()
     for it, p in zip(items, x.reshape(n, 2)):
         it.cx, it.cy = float(p[0]), float(p[1])

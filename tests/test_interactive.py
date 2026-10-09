@@ -173,3 +173,45 @@ def test_exported_model_types_its_residues(name):
     assert types["ALA"].lower() == "l-peptide linking" and "." not in types.values()
     if name == "1LMB":
         assert any("dna linking" in t.lower() for t in types.values())
+
+
+def test_chains_are_clickable_in_the_figure():
+    page = build_page(DATA / "1LMB.cif")
+    for chain in ("3", "4"):
+        assert f'id="legend-chain:{chain}"' in page and f'id="terminus:N:{chain}"' in page
+
+
+@pytest.mark.skipif(node is None, reason="node not installed")
+def test_selection_logic_in_node(tmp_path):
+    page = build_page(DATA / "1LMB.cif")
+    data = _data(page)
+    probe = tmp_path / "sel.js"
+    probe.write_text(
+        _script(page, "topo-lib")
+        + """
+const data = JSON.parse(require('fs').readFileSync(process.argv[2], 'utf8'));
+const lib = globalThis.TopoLib;
+const a = { type: 'element', id: data.elements[0].id }, b = { type: 'element', id: data.elements[1].id };
+const c = { type: 'chain', chain: data.residues[0].c };
+let p = lib.toggle([], a, false);
+const one = p.length;
+const again = lib.toggle(p, a, false).length;          // clicking the pinned item again clears it
+p = lib.toggle(p, b, true);                             // shift-click adds
+const two = p.length;
+p = lib.toggle(p, a, true);                             // shift-click on a pinned item removes it
+const back = p.map(lib.itemKey);
+const swap = lib.toggle([a, b], c, false).map(lib.itemKey);  // plain click replaces everything
+const chainRes = lib.chainResidues(data, c.chain);
+console.log(JSON.stringify({ one, again, two, back, swap, n: chainRes.length,
+  same: chainRes.every(k => data.residues[k].c === c.chain) }));
+"""
+    )
+    blob = tmp_path / "data.json"
+    blob.write_text(json.dumps(data))
+    res = subprocess.run([node, str(probe), str(blob)], capture_output=True, text=True)
+    assert res.returncode == 0, res.stderr
+    out = json.loads(res.stdout)
+    assert out["one"] == 1 and out["again"] == 0 and out["two"] == 2
+    assert out["back"] == ["element:" + data["elements"][1]["id"]]
+    assert out["swap"] == ["chain:" + data["residues"][0]["c"]]
+    assert out["n"] == sum(r["c"] == data["residues"][0]["c"] for r in data["residues"]) and out["same"]
