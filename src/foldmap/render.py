@@ -115,6 +115,13 @@ _DNA = {
     "pale": ("#6b7781", "#c5ccd2", "#d5dade"),
     "outline": ("#3d4852", "#d5dade", "#d5dade"),
 }  # front backbone, back backbone, base-pair rungs
+_DNA_DARK = ("#d3dce5", "#7d8b99", "#5a6b7c")  # the same on a dark page
+
+
+def _dna_colours(style: str) -> tuple[str, str, str]:
+    return _DNA_DARK if _luminance(_PAGE["background"]) < 0.5 else _DNA[style]
+
+
 _DNA_TUBE = 0.42  # backbone tube width, page units
 _DNA_SEG = 16  # points along each half-turn
 _TETHER_MIN = 2  # residues an element must have touching the DNA to get a tether
@@ -191,7 +198,7 @@ def _draw_dna(
     look: Style,
 ) -> None:
     na = layout.nucleic
-    front_c, back_c, rung_c = _DNA[style]
+    front_c, back_c, rung_c = _dna_colours(style)
     for d in layout.dna:
         slot = {k: n % 2 for n, k in enumerate(d.strands)}
         fronts, backs = [], []
@@ -406,10 +413,41 @@ def _shade(colour: str, t: float) -> str:
     return tint(colour, 0.55 * (1 - 2 * t)) if t < 0.5 else darken(colour, 1 - 0.4 * (2 * t - 1))
 
 
-def _legible(colour: str, ceiling: float = 0.5) -> str:
-    """Darken a line colour until it stands out on white (pale shades are fine for fills, not for thin lines)."""
+_PAGE = {"background": "#ffffff"}  # the page being drawn (set by _draw), so line colours can adapt to it
+
+
+def _luminance(colour) -> float:
     from matplotlib.colors import to_rgb
 
+    r, g, b = to_rgb(colour)
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b
+
+
+def _mix(a: str, b: str, t: float) -> str:
+    """a blended toward b by t (0 = a, 1 = b)."""
+    from matplotlib.colors import to_rgb
+
+    return to_hex([x + (y - x) * t for x, y in zip(to_rgb(a), to_rgb(b))])
+
+
+def _label_ink(colour: str) -> str:
+    """Text in an element's own hue: a deeper shade on light pages, the colour itself on dark ones."""
+    if _luminance(_PAGE["background"]) < 0.5:
+        return _legible(colour)
+    return _legible(darken(colour, 0.8))
+
+
+def _legible(colour: str, ceiling: float = 0.5) -> str:
+    """Shift a line colour until it stands out on the page: darker on light pages (pale shades are fine for
+    fills, not for thin lines), lighter on dark ones."""
+    from matplotlib.colors import to_rgb
+
+    if _luminance(_PAGE["background"]) < 0.5:
+        for _ in range(12):
+            if _luminance(colour) >= 0.55:
+                break
+            colour = _mix(to_hex(to_rgb(colour)), "#ffffff", 0.2)
+        return colour
     for _ in range(12):
         r, g, b = to_rgb(colour)
         if 0.2126 * r + 0.7152 * g + 0.0722 * b <= ceiling:
@@ -486,7 +524,7 @@ def _symbol(ax, shape: str, colour: str, xy, size: float, lw: float, gid: str) -
         n, r0 = {"triangle": (3, 1.15), "diamond": (4, 1.2), "star": (5, 1.15)}[shape]
         ang = np.pi / 2 + np.arange(n) * 2 * np.pi / n
         patch = Polygon(np.column_stack([x + r0 * h * np.cos(ang), y + r0 * h * np.sin(ang)]), closed=True)
-    patch.set(facecolor=colour, edgecolor="#2b2b2b", linewidth=lw * 0.6, zorder=3.8)
+    patch.set(facecolor=colour, edgecolor=_legible("#2b2b2b"), linewidth=lw * 0.6, zorder=3.8)
     patch.set_gid(gid)
     ax.add_patch(patch)
 
@@ -571,7 +609,7 @@ def _draw_ligands(ax, marks: list[dict], lw: float, font: float) -> None:
             tether = PathPatch(
                 Path([(cx, cy), (tx, ty)]),
                 fc="none",
-                ec="#6b6b6b",
+                ec=_legible("#6b6b6b"),
                 lw=lw * 0.7,
                 ls=(0, (1.2, 1.4)),
                 capstyle="round",
@@ -657,7 +695,11 @@ def _draw_links(ax, layout: Layout, loops: list[Loop], sses: list[SSE], look: St
             size, step = 0.34, 0.42
             tip = np.asarray(at) + out * (0.35 + step * (min(len(sugars), 5) - 0.5))
             stem = PathPatch(
-                Path([at, tuple(tip)], [Path.MOVETO, Path.LINETO]), fc="none", ec="#2b2b2b", lw=lw * 0.8, zorder=3.75
+                Path([at, tuple(tip)], [Path.MOVETO, Path.LINETO]),
+                fc="none",
+                ec=_legible("#2b2b2b"),
+                lw=lw * 0.8,
+                zorder=3.75,
             )
             stem.set_gid(f"glycan:{r}:stem")
             ax.add_patch(stem)
@@ -895,7 +937,9 @@ def element_colours(layout: Layout, sses: list[SSE], look: Style):
 
 def draw(layout: Layout, loops: list[Loop], sses: list[SSE], title: str | None = None, **kw) -> Figure:
     """`look` carries every visual choice; palette/style (fill)/loop_style are shorthands that override it."""
-    with rc_context(_RC):  # fonts are fixed when text is made, so set them here, not only when saving
+    look = (kw.get("look") or Style()).validate()
+    _PAGE["background"] = look.background
+    with rc_context({**_RC, "text.color": look.ink}):  # fonts/colours are fixed when text is made: set them here
         return _draw(layout, loops, sses, title, **kw)
 
 
@@ -957,7 +1001,7 @@ def _draw(
     if layout.dna and look.legend:
         ids = sorted({layout.nucleic.strands[k].chain for d in layout.dna for k in d.strands})
         kind = "RNA" if all(layout.nucleic.strands[k].rna for d in layout.dna for k in d.strands) else "DNA"
-        entries.append((_DNA[style][0], f"{kind} ({', '.join(ids)})"))
+        entries.append((_dna_colours(style)[0], f"{kind} ({', '.join(ids)})"))
     longest = max(len(text) for _, text in entries)
     entry = 0.85 + 0.62 * _LEGEND_FONT_U * longest + 0.9  # swatch, text, gap (page units)
     x1 = max(x1, x0 + entry - 0.9)  # never narrower than one legend entry
@@ -968,7 +1012,7 @@ def _draw(
     xmin, xmax, ymin, ymax = x0 - pad, x1 + pad, y0 - pad - legend_h, y1 + pad + top
     w_u, h_u = xmax - xmin, ymax - ymin
     scale = min(_IN_PER_UNIT, _MAX_WIDTH_IN / w_u)
-    fig = Figure(figsize=(w_u * scale, h_u * scale))
+    fig = Figure(figsize=(w_u * scale, h_u * scale), facecolor=look.background)
     ax = fig.add_axes([0, 0, 1, 1])
     ax.set_xlim(xmin, xmax)
     ax.set_ylim(ymin, ymax)
@@ -990,16 +1034,22 @@ def _draw(
             path = _rounded_path(loop.points)
         name = f"{loop.a_id}>{loop.b_id}"
         casing = PathPatch(
-            path, fc="none", ec="white", lw=loop_lw * 3.0, capstyle="round", joinstyle="round", zorder=1 + i * 1e-3
+            path,
+            fc="none",
+            ec=look.background,
+            lw=loop_lw * 3.0,
+            capstyle="round",
+            joinstyle="round",
+            zorder=1 + i * 1e-3,
         )
         casing.set_gid(f"loopcase:{name}")
         ax.add_patch(casing)
         a_sse = sse_by_id.get(loop.a_id)
         loop_c = {
-            "black": "black",
-            "chain": colors.get(a_sse.chain, "black") if a_sse else "black",
-            "element": element_colour.get(loop.a_id, "black"),
-            "residue": "black",  # replaced by per-residue runs below
+            "black": look.ink,
+            "chain": colors.get(a_sse.chain, look.ink) if a_sse else look.ink,
+            "element": element_colour.get(loop.a_id, look.ink),
+            "residue": look.ink,  # replaced by per-residue runs below
         }[look.loop_color]
         loop_c = _legible(loop_c)
         if layout.focus is not None and a_sse is not None and a_sse.chain not in layout.focus:
@@ -1035,7 +1085,7 @@ def _draw(
             span = range(a_sse.end + 1, b_sse.start) if b_sse is not None else range(0)
             ends = [a_sse.end, b_sse.start] if b_sse is not None else [a_sse.end]
             shades = [residue_colour(r, a_sse.chain) for r in (span or ends)]
-            shades = [c or "black" for c in shades]  # true colours, matching the legend ...
+            shades = [c or look.ink for c in shades]  # true colours, matching the legend ...
             line.set_edgecolor(_RUN_EDGE)  # ... on a dark edge (the loop's own line, also the hover target)
             line.set_linewidth(loop_lw * _RUN_EDGE_W)
             for k, (shade, piece) in enumerate(residue_runs(path, shades)):
@@ -1086,8 +1136,8 @@ def _draw(
             x1 - x0,
             y1 - y0,
             boxstyle="round,pad=0,rounding_size=0.6",
-            fc=tint(tone, 0.88),
-            ec=tint(tone, 0.6),
+            fc=_mix(tone, look.background, 0.86),
+            ec=_mix(tone, look.background, 0.55),
             lw=lw * 0.6,
             zorder=0.2,
         )
@@ -1115,7 +1165,13 @@ def _draw(
             x0, y0 = rects[:, 0].min() - 0.3, rects[:, 1].min() - 0.3
             x1, y1 = rects[:, 2].max() + 0.3, rects[:, 3].max() + 0.3
             panel = FancyBboxPatch(
-                (x0, y0), x1 - x0, y1 - y0, boxstyle="round,pad=0,rounding_size=0.35", fc=_PANEL, ec="none", zorder=0.3
+                (x0, y0),
+                x1 - x0,
+                y1 - y0,
+                boxstyle="round,pad=0,rounding_size=0.35",
+                fc=_mix(look.background, look.ink, 0.07) if look.background != "#ffffff" else _PANEL,
+                ec="none",
+                zorder=0.3,
             )
             panel.set_gid(f"sheet-panel:{k}")
             ax.add_patch(panel)
@@ -1128,7 +1184,7 @@ def _draw(
         outline = style == "outline"
         edge, edge_w = (color, lw * 1.2) if outline else (darken(color), lw * 0.8)
         if p.sse.kind == "E":
-            strand_fill = "white" if outline else tint(color, 0.45) if style == "pale" else color
+            strand_fill = look.background if outline else tint(color, 0.45) if style == "pale" else color
             if style == "pale":
                 edge = darken(color, 0.5)  # pastel body, firm outline (illustration style)
             patch = Polygon(_arrow(p), closed=True, fc=strand_fill, ec=edge, lw=edge_w, joinstyle="round", zorder=3)
@@ -1143,12 +1199,12 @@ def _draw(
                     va="center",
                     fontsize=font,
                     fontweight="bold",
-                    color=darken(color) if outline else text_color_on(strand_fill),
+                    color=_label_ink(color) if outline else text_color_on(strand_fill),
                     zorder=4,
                 )
                 t.set_gid(f"label:{p.sse.id}")
         elif p.sse.kind == "G":  # a short 3-10 helix: a small rounded box
-            fill = {"bold": color, "pale": tint(color, 0.35), "outline": "white"}[style]
+            fill = {"bold": color, "pale": tint(color, 0.35), "outline": look.background}[style]
             box = FancyBboxPatch(
                 (-p.length / 2, -p.width / 2),
                 p.length,
@@ -1169,7 +1225,7 @@ def _draw(
                     ha="center",
                     va="center",
                     fontsize=font * 0.9,
-                    color=_legible(darken(color, 0.8)),
+                    color=_label_ink(color),
                     zorder=4,
                 )
                 t.set_gid(f"label:{p.sse.id}")
@@ -1177,7 +1233,7 @@ def _draw(
             fill, shade = {
                 "bold": (color, darken(color, 0.72)),
                 "pale": (tint(color, 0.15), tint(color, 0.55)),
-                "outline": ("white", tint(color, 0.7)),
+                "outline": (look.background, _mix(color, look.background, 0.7)),
             }[style]
             if look.helix_shading == "none":
                 shade = fill
@@ -1199,7 +1255,7 @@ def _draw(
                     ha="center",
                     va="center",
                     fontsize=font,
-                    color=_legible(darken(color, 0.8)),
+                    color=_label_ink(color),
                     zorder=4,
                 )
                 t.set_gid(f"label:{p.sse.id}")
@@ -1216,7 +1272,7 @@ def _draw(
                 if p.sse.kind in ("H", "G"):
                     away = -1.0 if nrm[1] >= 0 else 1.0  # the side opposite the helix name
                     along = 0.35 if p.length >= _SHORT_HELIX else -0.3  # a short box: just past each end instead
-                    xy, ink = np.asarray(port) + inward * along + nrm * away * (p.width / 2 + 0.38), "#4a4a4a"
+                    xy, ink = np.asarray(port) + inward * along + nrm * away * (p.width / 2 + 0.38), _legible("#4a4a4a")
                 elif p.length >= 3.0:  # room for both numbers and the strand letter between them
                     reach = 0.35 if end == "N" else min(_HEAD_LEN, p.length * 0.45) + 0.3  # clear of the head
                     xy, ink = (
@@ -1224,7 +1280,7 @@ def _draw(
                         darken(colour) if style == "outline" else text_color_on(colour),
                     )
                 else:  # too short to hold numbers: just past the end, beside the loop stub
-                    xy, ink = np.asarray(port) - inward * 0.45 + nrm * 0.42, "#4a4a4a"
+                    xy, ink = np.asarray(port) - inward * 0.45 + nrm * 0.42, _legible("#4a4a4a")
                 t = ax.text(*xy, str(num), ha="center", va="center", fontsize=font * 0.62, color=ink, zorder=4.5)
                 t.set_gid(f"resnum:{p.sse.id}:{end}")
 
@@ -1258,14 +1314,14 @@ def _draw(
 
     for end, chain, port, ex in termini(layout, sses):
         tip = (port[0] + ex[0] * END_STUB, port[1] + ex[1] * END_STUB)
-        ink = "black"
+        ink = look.ink
         if look.loop_color == "residue" and layout.res_chain:  # a terminal tail: its typical colour
             mine = [s for s in sses if s.chain == chain]
             ours = [r for r, c in enumerate(layout.res_chain) if c == chain]
             if mine and ours:
                 tail = range(ours[0], mine[0].start) if end == "N" else range(mine[-1].end + 1, ours[-1] + 1)
-                ink = _typical([residue_colour(r, chain) for r in tail]) or "black"
-        if ink != "black":
+                ink = _typical([residue_colour(r, chain) for r in tail]) or look.ink
+        if ink != look.ink:
             edge = PathPatch(Path([port, tip]), fc="none", ec=_RUN_EDGE, lw=loop_lw * _RUN_EDGE_W, zorder=1.99)
             edge.set_gid(f"stub-edge:{end}:{chain}")
             ax.add_patch(edge)
@@ -1314,7 +1370,7 @@ def save_svg(fig: Figure) -> str:
 
     buf = _io.StringIO()
     with rc_context({"svg.fonttype": "none", "svg.hashsalt": "foldmap", **_RC}):
-        fig.savefig(buf, format="svg", metadata={"Date": None}, facecolor="white")
+        fig.savefig(buf, format="svg", metadata={"Date": None}, facecolor=fig.get_facecolor())
     text = buf.getvalue()
     return text[text.index("<svg") :]
 
@@ -1327,5 +1383,5 @@ def save(fig: Figure, path: str | FsPath, dpi: int = 300) -> FsPath:
     path.parent.mkdir(parents=True, exist_ok=True)
     meta = {"svg": {"Date": None}, "pdf": {"CreationDate": None}, "png": {"Software": None}}[fmt]
     with rc_context({"svg.fonttype": "none", "pdf.fonttype": 42, "svg.hashsalt": "foldmap", **_RC}):
-        fig.savefig(path, format=fmt, dpi=dpi, metadata=meta, facecolor="white")
+        fig.savefig(path, format=fmt, dpi=dpi, metadata=meta, facecolor=fig.get_facecolor())
     return path

@@ -12,7 +12,7 @@ from matplotlib.patches import PathPatch, Polygon, Rectangle
 from matplotlib.path import Path
 
 from .palette import darken
-from .render import _RC
+from .render import _PAGE, _RC, _legible
 from .sequence import GAP, Alignment, chain_track, column_classes, conservation, map_alignment
 from .style import Style
 
@@ -55,7 +55,9 @@ def draw_sequence(
         raise ValueError("columns must be at least 10")
     if ss_colour not in ("figure", "black"):
         raise ValueError("ss_colour is 'figure' or 'black'")
-    with rc_context(_RC):
+    look = (look or Style()).validate()
+    _PAGE["background"] = look.background
+    with rc_context({**_RC, "text.color": look.ink}):
         return _draw(
             path,
             chain,
@@ -105,14 +107,15 @@ def _draw(path, chain, alignment, reference, columns, look, full_sequence, ss_co
 
     font = 8.0 * look.font_scale
     unit = font / 72 * 0.8  # inches per column
-    fig = Figure(figsize=((margin + columns + 1.0) * unit, total_h * unit))
+    fig = Figure(figsize=((margin + columns + 1.0) * unit, total_h * unit), facecolor=look.background)
+    ink, frame_c = look.ink, _legible(FRAME)
     ax = fig.add_axes([0, 0, 1, 1])
     ax.set_xlim(-margin, columns + 1.0)
     ax.set_ylim(-total_h, 0)
     ax.set_aspect("equal")
     ax.axis("off")
     if title:
-        ax.text(-margin + 0.4, -1.1, title, ha="left", va="center", fontsize=font * 1.25, fontweight="bold", color=INK)
+        ax.text(-margin + 0.4, -1.1, title, ha="left", va="center", fontsize=font * 1.25, fontweight="bold", color=ink)
 
     def top(b: int) -> float:
         return -title_h - b * block_h
@@ -137,7 +140,7 @@ def _draw(path, chain, alignment, reference, columns, look, full_sequence, ss_co
                 va="center",
                 fontsize=font * 0.85,
                 fontweight="bold" if k == ref and n_rows > 1 else "normal",
-                color=INK,
+                color=ink,
             )
             t.set_gid(f"name:{k}:{b}")
         y_top, y_bot = row_y(b, 0) + _ROW_H / 2, row_y(b, n_rows - 1) - _ROW_H / 2
@@ -148,7 +151,7 @@ def _draw(path, chain, alignment, reference, columns, look, full_sequence, ss_co
                 run = c
             elif not kept and run is not None:
                 frame = Rectangle(
-                    (run - lo - 0.5, y_bot), c - run, y_top - y_bot, fill=False, ec=FRAME, lw=0.8, zorder=3
+                    (run - lo - 0.5, y_bot), c - run, y_top - y_bot, fill=False, ec=frame_c, lw=0.8, zorder=3
                 )
                 frame.set_gid(f"frame:{b}:{run}")
                 ax.add_patch(frame)
@@ -161,7 +164,7 @@ def _draw(path, chain, alignment, reference, columns, look, full_sequence, ss_co
                 ax.add_patch(box)
             for k, row in enumerate(rows):
                 ch = row[c]
-                colour, weight = INK, "normal"
+                colour, weight = ink, "normal"
                 if alignment is None and not track.observed[p]:
                     ch, colour = ch.lower(), UNMODELLED
                 elif ch == GAP:
@@ -221,7 +224,7 @@ def _draw(path, chain, alignment, reference, columns, look, full_sequence, ss_co
                     ha="left",
                     va="center",
                     fontsize=font * 0.9,
-                    color=darken(colour, 0.85) if colour != "#000000" else INK,
+                    color=_legible(darken(colour, 0.85)) if colour != "#000000" else ink,
                 )
                 t.set_gid(f"sslabel:{e.id}")
 
@@ -236,7 +239,7 @@ def _draw(path, chain, alignment, reference, columns, look, full_sequence, ss_co
                 c = (col_of[k] + col_of[j]) / 2
                 b = col_of[k] // columns
                 t = ax.text(
-                    c - b * columns, glyph_y(b), "TT", ha="center", va="center", fontsize=font * 0.75, color=INK
+                    c - b * columns, glyph_y(b), "TT", ha="center", va="center", fontsize=font * 0.75, color=ink
                 )
                 t.set_gid(f"turn:{k}")
             k = j + 1

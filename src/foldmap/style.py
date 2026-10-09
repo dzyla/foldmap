@@ -68,6 +68,8 @@ class Style:
     highlight: str = "none"  # none / asu (as deposited) / protomer (the first) / chains "A,B": the rest in grey
     disulfides: bool = True  # yellow bars between bridged cysteines
     glycans: bool = True  # SNFG symbols on glycosylated residues
+    background: str = "#ffffff"  # page colour
+    ink: str = "#000000"  # text and plain loops
     ligands: str = "auto"  # bound ligands/metal ions: auto (skip buffer additives), all, none, or codes "HEM,ZN"
     mark: str = ""  # elements in a colour of their own: "G", "A:G=#2ca02c", "#3", "res:150-159=red", comma-separated
 
@@ -75,6 +77,11 @@ class Style:
         for key, allowed in CHOICES.items():
             if getattr(self, key) not in allowed:
                 raise ValueError(f"{key} must be one of {', '.join(allowed)}; got {getattr(self, key)!r}")
+        from matplotlib.colors import is_color_like
+
+        for key in ("background", "ink"):
+            if not is_color_like(getattr(self, key)):
+                raise ValueError(f"{key} must be a colour such as #0d2a4a or white; got {getattr(self, key)!r}")
         if not re.fullmatch(r"auto|all|none|[A-Za-z0-9]{1,5}(,[A-Za-z0-9]{1,5})*", self.ligands):
             raise ValueError(f"ligands must be auto, all, none or residue codes like HEM,ZN; got {self.ligands!r}")
         if not re.fullmatch(r"none|asu|protomer|[A-Za-z0-9]+(,[A-Za-z0-9]+)*", self.highlight):
@@ -96,6 +103,14 @@ THEMES = {
     "richardson": Style(color_by="sstype", helix_shading="depth", loops="curved"),
     "flexibility": Style(color_by="bfactor"),
     "hydropathy": Style(color_by="hydropathy"),
+    "blueprint": Style(
+        background="#0d2a4a",
+        ink="#e8f1ff",
+        palette="blueprint",
+        fill="outline",
+        helix_shading="none",
+        loop_width=0.9,
+    ),
     "conservation": Style(color_by="conservation", loop_color="residue"),
     "alphafold": Style(color_by="plddt", loop_color="residue", loop_width=1.3),
     "goodsell": Style(palette="tol-bright", fill="pale", helix_shading="none", loop_width=1.3, sheet_panels=False),

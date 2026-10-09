@@ -6,6 +6,7 @@ PALETTES = {
     "okabe-ito": ["#0072B2", "#E69F00", "#CC79A7", "#009E73", "#56B4E9", "#D55E00", "#F0E442", "#999999"],
     "tol-bright": ["#4477AA", "#EE6677", "#228833", "#CCBB44", "#66CCEE", "#AA3377", "#BBBBBB"],
     "tol-muted": ["#332288", "#88CCEE", "#44AA99", "#117733", "#999933", "#DDCC77", "#CC6677", "#882255", "#AA4499"],
+    "blueprint": ["#9fd3ff", "#ffd27f", "#b6f0b1", "#ffb3cf", "#d7c4ff", "#8ff0e6", "#ffffff"],  # pale, for dark pages
     "greys": ["#404040", "#8C8C8C", "#BFBFBF", "#262626", "#A6A6A6", "#666666"],
 }
 
