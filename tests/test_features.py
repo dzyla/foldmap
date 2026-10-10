@@ -34,13 +34,14 @@ def _bundles(path):
 
 def test_8uup_stalk_and_heterodimer_pairs_are_bundles(ubq):
     groups = _bundles(ubq.parent / "8UUP.cif")
-    assert {"B:456-478", "D:456-485", "F:456-472", "F:474-485"} <= next(g for g in groups if "D:456-485" in g)
-    for pair in ({"A:70-97", "B:195-217"}, {"C:70-97", "D:195-217"}, {"E:70-97", "F:195-217"}):
+    stalk = {"B:456-472", "B:474-478", "B:480-485", "D:456-472", "D:474-477", "D:480-485"}
+    assert stalk | {"F:456-472", "F:474-477", "F:480-483"} <= next(g for g in groups if "D:456-472" in g)
+    for pair in ({"A:70-95", "B:195-217"}, {"C:70-95", "D:195-217"}, {"E:70-95", "F:195-217"}):
         assert any(pair <= g for g in groups), pair
 
 
 def test_lambda_repressor_dimerisation_helices_are_a_bundle(ubq):
-    assert _bundles(ubq.parent / "1LMB.cif") == [{"3:78-90", "4:78-90"}]
+    assert _bundles(ubq.parent / "1LMB.cif") == [{"3:78-88", "4:78-88"}]
 
 
 def test_no_bundles_without_a_long_parallel_interface(ubq):

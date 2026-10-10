@@ -203,7 +203,7 @@ def test_kinked_helix_pieces_are_joined_straight_not_by_a_fallback():
 
     lay, sses, bb = make_layout(Path(__file__).parent / "data" / "8UUP.cif")
     loops = {(l.a_id, l.b_id): l for l in route_loops(lay, sses, bb)}
-    for key in [("B:456-478", "B:480-485"), ("F:456-472", "F:474-485")]:
+    for key in [("B:456-472", "B:474-478"), ("B:474-478", "B:480-485"), ("F:456-472", "F:474-477")]:
         l = loops[key]
         assert not l.fallback and len(l.points) == 2, key  # one straight link across the kink
         assert np.allclose(l.points[0], lay.placed[key[0]].c_port) and np.allclose(

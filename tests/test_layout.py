@@ -79,6 +79,10 @@ def test_arrow_up_down_matches_projected_axis(name, request):
     sses, sheets, f, lay = build(request.getfixturevalue(name), "projected", helix_angle="tilted")
     checked = 0
     ambiguous = {s.id for sh in sheets if sh.ambiguous for s in sh.strands}  # one "up" cannot fit a branched sheet
+    for sh in sheets:  # nor neighbours twisted far apart (6ZYA A:369-371 and A:377-383, cos -0.34)
+        for a, b in zip(sh.strands, sh.strands[1:]):
+            if abs(float(a.axis @ b.axis)) < 0.5:
+                ambiguous |= {a.id, b.id}
     for s in sses:
         up = float(s.axis @ f.v)
         p = lay.placed[s.id]
@@ -290,7 +294,7 @@ def test_overlap_fallback_slide_runs_and_separates(monkeypatch):
     assert not any(overlaps(a, b) for i, a in enumerate(items) for b in items[i + 1 :])
 
 
-@pytest.mark.parametrize("pdb, member", [("8UUP", "D:456-485"), ("1LMB", "3:78-90")])
+@pytest.mark.parametrize("pdb, member", [("8UUP", "D:456-472"), ("1LMB", "3:78-88")])
 def test_bundled_helices_are_drawn_side_by_side(pdb, member):
     from foldmap.cli import make_layout
     from foldmap.features import helix_bundles

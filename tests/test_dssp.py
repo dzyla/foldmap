@@ -2,9 +2,11 @@ from collections import Counter
 from pathlib import Path
 
 import gemmi
+import numpy as np
 
 from foldmap.dssp import _hbond_set, assign_dssp
 from foldmap.io import load_backbone
+from foldmap.model import Bridge
 
 
 def test_ubiquitin_helix_and_strands(ubq):
@@ -103,3 +105,72 @@ def test_peptide_too_short_for_any_turn(tmp_path):
 
     res = assign_dssp(load_backbone(tripeptide(DATA / "1UBQ.cif", tmp_path)))
     assert res.ss == "---" and res.bridges == []
+
+
+def test_310_needs_every_residue_free():
+    from foldmap.dssp import Ladder, _assign_codes
+
+    # 3-turns at 0 and 1 would make residues 1-3 a 3-10 helix, but 2 and 3 are strand: no G at all
+    ss = "".join(_assign_codes(12, [Ladder("A", [2, 3], [8, 9])], _starts(12, k3=[0, 1])))
+    assert ss[1:4] == "TEE"
+
+
+def test_pi_helix_takes_priority_over_alpha():
+    from foldmap.dssp import _assign_codes
+
+    starts = _starts(12, k4=[0, 1, 2, 3], k5=[0, 1])
+    assert "".join(_assign_codes(12, [], starts))[1:7] == "IIIIIH"  # mkdssp >= 2.1
+    assert "".join(_assign_codes(12, [], starts, prefer_pi=False))[1:7] == "HHHHHH"  # DSSP 1983
+
+
+def test_pi_never_overwrites_a_strand():
+    from foldmap.dssp import Ladder, _assign_codes
+
+    ss = "".join(_assign_codes(12, [Ladder("A", [5, 6], [9, 10])], _starts(12, k4=[0, 1], k5=[0, 1])))
+    assert ss[1:7] == "HHHHEE"  # the pi segment 1-5 would cover strand residue 5
+
+
+def test_310_turns_do_not_join_alpha_helices():
+    from foldmap.ss import build_sses
+
+    bb = load_backbone(DATA / "8UUP.cif", "asu")
+    ids = {s.id for s in build_sses(bb, assign_dssp(bb).ss)}
+    assert {"B:456-472", "B:474-478"} <= ids and "B:456-478" not in ids  # mkdssp: T at 473
+
+
+def test_ladders_join_across_a_bulge():
+    from foldmap.dssp import _assign_codes, _ladders
+
+    # antiparallel 10-12 / 40-38, then 14-15 / 36-35: one extra residue on each strand (13 and 37)
+    bridges = [Bridge(10, 40, "A"), Bridge(11, 39, "A"), Bridge(12, 38, "A"), Bridge(14, 36, "A"), Bridge(15, 35, "A")]
+    (lad,) = _ladders(bridges, np.ones(60, bool))
+    assert lad.i == [10, 11, 12, 14, 15] and lad.j == [35, 36, 38, 39, 40]
+    ss = "".join(_assign_codes(60, [lad], _starts(60)))
+    assert ss[10:16] == "EEEEEE" and ss[35:41] == "EEEEEE"
+
+
+def test_bulge_join_stops_at_chain_breaks_and_wide_gaps():
+    from foldmap.dssp import _ladders
+
+    bridges = [Bridge(10, 40, "A"), Bridge(11, 39, "A"), Bridge(12, 38, "A"), Bridge(14, 36, "A"), Bridge(15, 35, "A")]
+    prev = np.ones(60, bool)
+    prev[13] = False
+    assert len(_ladders(bridges, prev)) == 2
+    far = [Bridge(10, 40, "A"), Bridge(11, 39, "A"), Bridge(20, 30, "A"), Bridge(21, 29, "A")]
+    assert len(_ladders(far, np.ones(60, bool))) == 2
+
+
+def test_lone_bridge_joined_across_a_bulge_is_strand():
+    from foldmap.dssp import _assign_codes, _ladders
+
+    lads = _ladders([Bridge(10, 40, "A"), Bridge(12, 38, "A"), Bridge(13, 37, "A")], np.ones(60, bool))
+    assert len(lads) == 1
+    ss = "".join(_assign_codes(60, lads, _starts(60)))
+    assert ss[10:14] == "EEEE" and ss[37:41] == "EEEE"
+
+
+def test_bulged_strands_stay_whole():
+    from foldmap.ss import build_sses
+
+    bb = load_backbone(DATA / "5NKT.cif", "asu")
+    assert sum(s.kind == "E" for s in build_sses(bb, assign_dssp(bb).ss)) == 12  # mkdssp: 12 strands

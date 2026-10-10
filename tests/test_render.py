@@ -285,11 +285,11 @@ def test_each_sheet_sits_on_its_own_panel(ubq):
     from foldmap.cli import make_layout
     from foldmap.style import Style
 
-    path = ubq.parent / "5NKT.cif"  # FimA: a two-sheet sandwich
+    path = ubq.parent / "5NKT.cif"  # FimA: a two-sheet sandwich plus a small hairpin sheet
     lay, sses, _ = make_layout(path)
     fig = make_figure(path)
     panels = _gids(fig, "sheet-panel:")
-    assert len(panels) == len(lay.sheets) == 2
+    assert len(panels) == len(lay.sheets) == 3
     for panel, ids in zip(panels, lay.sheets):
         box = panel.get_window_extent().transformed(fig.axes[0].transData.inverted())
         for k in ids:

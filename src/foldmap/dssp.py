@@ -1,7 +1,8 @@
-"""Kabsch-Sander DSSP: H-bond energies, n-turns, helices, bridges and ladders.
+"""Kabsch-Sander DSSP as mkdssp 3.x does it: H-bond energies, n-turns, helices, bridges, ladders, beta-bulges.
 
-Not implemented: beta-bulges and bends (S). Output codes: H alpha, G 3-10, I pi, E strand (ladder of >= 2
-bridges), B isolated bridge, T H-bonded turn, '-' other. DSSP priority: H > E > B > G > I.
+Not implemented: bends (S). Output codes: H alpha, G 3-10, I pi, E strand (ladder of >= 2 bridges, or ladders
+joined across a beta-bulge), B isolated bridge, T H-bonded turn, '-' other. Priority as in mkdssp >= 2.1:
+H replaces E/B; G and I need every residue of the segment free, except that I may replace H (prefer_pi).
 """
 
 from __future__ import annotations
@@ -90,8 +91,18 @@ def _find_bridges(bb: Backbone, bonds: set[tuple[int, int]]) -> list[Bridge]:
     return out
 
 
+def _unbroken(prev: np.ndarray, lo: int, hi: int) -> bool:
+    return bool(prev[lo + 1 : hi + 1].all())
+
+
+def _gap(a: int, b: int) -> int:
+    """a - b as mkdssp computes it, in unsigned arithmetic: a negative gap is never small."""
+    return a - b if a >= b else 1 << 30
+
+
 def _ladders(bridges: list[Bridge], prev: np.ndarray) -> list[Ladder]:
-    """Consecutive bridges of one kind form a ladder."""
+    """Consecutive bridges of one kind form a ladder. Two ladders of one kind are joined across a beta-bulge
+    when the gap is < 6 residues on one strand and < 3 on the other (mkdssp's rule)."""
     ladders: list[Ladder] = []
     for i, j, kind in sorted(bridges):
         for lad in ladders:
@@ -105,12 +116,34 @@ def _ladders(bridges: list[Bridge], prev: np.ndarray) -> list[Ladder]:
                 break
         else:
             ladders.append(Ladder(kind, [i], [j]))
+    ladders.sort(key=lambda lad: (lad.i[0], lad.j[0]))
+    a = 0
+    while a < len(ladders):
+        b = a + 1
+        while b < len(ladders):
+            x, y = ladders[a], ladders[b]
+            ibi, iei, jbi, jei = x.i[0], x.i[-1], x.j[0], x.j[-1]
+            ibj, iej, jbj, jej = y.i[0], y.i[-1], y.j[0], y.j[-1]
+            joinable = (
+                x.kind == y.kind
+                and _unbroken(prev, min(ibi, ibj), max(iei, iej))
+                and _unbroken(prev, min(jbi, jbj), max(jei, jej))
+                and _gap(ibj, iei) < 6
+                and not (iei >= ibj and ibi <= iej)
+            )
+            other = _gap(jbj, jei) if x.kind == "P" else _gap(jbi, jej)
+            if joinable and ((other < 6 and _gap(ibj, iei) < 3) or other < 3):
+                ladders[a] = Ladder(x.kind, sorted(set(x.i) | set(y.i)), sorted(set(x.j) | set(y.j)))
+                del ladders[b]
+            else:
+                b += 1
+        a += 1
     return ladders
 
 
-def _assign_codes(n: int, ladders: list[Ladder], starts: dict[int, list[bool]]) -> list[str]:
-    """Per-residue codes: E/B from the ladders, then H over them, then G and I on residues still '-',
-    then T inside any turn that is still '-'."""
+def _assign_codes(n: int, ladders: list[Ladder], starts: dict[int, list[bool]], prefer_pi: bool = True) -> list[str]:
+    """Per-residue codes in mkdssp's order: E/B from the ladders; H over them; then G and I only where every
+    residue of the segment is free (I may replace H when prefer_pi); T inside any turn that is still '-'."""
     ss = ["-"] * n
     for lad in ladders:
         code = "E" if len(lad.i) > 1 else "B"
@@ -118,20 +151,21 @@ def _assign_codes(n: int, ladders: list[Ladder], starts: dict[int, list[bool]]) 
             for r in range(lo, hi + 1):
                 if ss[r] != "E":
                     ss[r] = code
-    for k, code in ((4, "H"), (3, "G"), (5, "I")):
+    for k, code, free in ((4, "H", None), (3, "G", "-G"), (5, "I", "-IH" if prefer_pi else "-I")):
         turn = starts[k]
         for i in range(1, n - k):
             if turn[i - 1] and turn[i]:
-                for r in range(i, i + k):
-                    if code == "H" or ss[r] == "-":
+                seg = range(i, i + k)
+                if free is None or all(ss[r] in free for r in seg):
+                    for r in seg:
                         ss[r] = code
     inside = {i + m for k, turn in starts.items() for i in range(n) if turn[i] for m in range(1, k)}
     return ["T" if c == "-" and i in inside else c for i, c in enumerate(ss)]
 
 
-def assign_dssp(bb: Backbone) -> DsspResult:
+def assign_dssp(bb: Backbone, prefer_pi: bool = True) -> DsspResult:
     n = len(bb)
     bonds = _hbond_set(bb)
     bridges = _find_bridges(bb, bonds)
-    ss = _assign_codes(n, _ladders(bridges, bb.prev), _turn_starts(bonds, bb.nxt, n))
+    ss = _assign_codes(n, _ladders(bridges, bb.prev), _turn_starts(bonds, bb.nxt, n), prefer_pi)
     return DsspResult("".join(ss), bridges)

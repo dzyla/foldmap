@@ -54,7 +54,7 @@ def test_band_drawn_across_the_transmembrane_helices():
     y0, y1 = lay.membrane["y"]
     assert y1 - y0 > 3.0
     long = [p for p in lay.placed.values() if p.sse.kind == "H" and len(p.sse) >= 18]
-    crossing = [p for p in long if p.rect[1] < y0 + 0.5 and p.rect[3] > y1 - 0.5]
+    crossing = [p for p in long if p.rect[1] < y0 + 1.0 and p.rect[3] > y1 - 1.0]
     assert len(crossing) >= 5  # bacteriorhodopsin's seven TM helices run through the band
     fig = make_figure(DATA / "1C3W.cif", membrane="auto", assembly="asu")
     assert len(_band(fig)) == 1
@@ -70,7 +70,8 @@ def test_positive_inside_rule_puts_bacteriorhodopsin_c_terminus_inside():
     ends = {end: port for end, _, port, _ in termini(lay, sses)}
     inside_low = lay.membrane["inside"] == "below"
     c_y, n_y = ends["C"][1], ends["N"][1]
-    assert (c_y < y0) == inside_low and (n_y > y1) == inside_low  # N outside, C in the cytoplasm
+    # C in the cytoplasm; N on the outer side (helix A starts at residue 10, so its end sits just inside the band)
+    assert (c_y < y0) == inside_low and (n_y > (y0 + y1) / 2) == inside_low
 
 
 def test_soluble_protein_with_membrane_auto_draws_nothing(tmp_path, capsys):

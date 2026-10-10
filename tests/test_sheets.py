@@ -98,7 +98,7 @@ def test_filament_sheet_with_bulge_strand_is_ordered_like_the_deposited_one(zya)
     _, _, sheets = _pipeline(zya)
     sh = next(s for s in sheets if any(x.id == "A:499-509" for x in s.strands))
     ids = [s.id for s in sh.strands]
-    assert ids in (["A:563-572", "A:499-509", "A:520-521"], ["A:520-521", "A:499-509", "A:563-572"])
+    assert ids in (["A:563-572", "A:499-509", "A:520-523"], ["A:520-523", "A:499-509", "A:563-572"])
     assert not sh.ambiguous  # deposited order is 563-572 | 499-509 | 520-523
 
 
