@@ -147,7 +147,7 @@ def main() -> None:
                 f"{r['id']}: {'ok' if r.get('ok') else 'FAIL'} {r.get('seconds', '')}s {r.get('error', '')[:100]}",
                 flush=True,
             )
-    (out / "report.json").write_text(json.dumps(rows, indent=1))
+    (out / "report.json").write_text(json.dumps(rows, indent=1), encoding="utf-8")
     ok = [r for r in rows if r.get("ok")]
     lines = [
         f"# Sweep: {len(ok)}/{len(rows)} rendered",
@@ -161,7 +161,7 @@ def main() -> None:
             f"{r.get('elements', '')} | {r.get('overlaps', '')} | {r.get('fallback', '')} | "
             f"{r.get('seconds', '')} | {r.get('error', '')[:80]} |"
         )
-    (out / "report.md").write_text("\n".join(lines) + "\n")
+    (out / "report.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
     sheets(rows, out)
 
 

@@ -91,13 +91,13 @@ def save(path, doc: dict) -> Path:
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     head = "# foldmap layout: re-render with  foldmap plot STRUCTURE --layout-file " + path.name + "\n"
-    path.write_text(head + yaml.safe_dump(doc, sort_keys=False, allow_unicode=True))
+    path.write_text(head + yaml.safe_dump(doc, sort_keys=False, allow_unicode=True), encoding="utf-8")
     return path
 
 
 def load(path) -> dict:
     """The document, checked: unknown keys and other versions are errors that say what is wrong."""
-    doc = yaml.safe_load(Path(path).read_text())
+    doc = yaml.safe_load(Path(path).read_text(encoding="utf-8"))
     if not isinstance(doc, dict):
         raise ValueError(f"{path}: a layout file is a mapping of keys (foldmap, theme, style, layout, edits)")
     if doc.get("foldmap", VERSION) != VERSION:

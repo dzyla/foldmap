@@ -289,8 +289,9 @@ def build(out: Path, quick: bool = False) -> dict:
 
     index = out / "index.html"
     blob = json.dumps(data, ensure_ascii=False).replace("</", "<\\/")
-    index.write_text(index.read_text().replace("{{SITE_DATA}}", blob).replace("{{VERSION}}", __version__))
-    (out / ".nojekyll").write_text("")
+    page = index.read_text(encoding="utf-8").replace("{{SITE_DATA}}", blob).replace("{{VERSION}}", __version__)
+    index.write_text(page, encoding="utf-8")
+    (out / ".nojekyll").write_text("", encoding="utf-8")
     return data
 
 

@@ -129,7 +129,7 @@ class Alignment:
 
 def read_alignment(path) -> Alignment:
     """An alignment from FASTA (aligned, '-' gaps), Clustal or Stockholm; '.' gaps become '-'."""
-    text = Path(path).read_text()
+    text = Path(path).read_text(encoding="utf-8")
     lines = [l.rstrip() for l in text.splitlines()]
     first = next((l for l in lines if l.strip()), "")
     order: list[str] = []

@@ -718,5 +718,5 @@ same residues light up in all three views · click an element to fly the 3D view
 def write_page(path, out, **kw) -> Path:
     out = Path(out)
     out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(build_page(path, **kw))
+    out.write_text(build_page(path, **kw), encoding="utf-8")
     return out
