@@ -35,10 +35,10 @@ def test_zenodo_version_matches_package():
 
 FLOORS = {
     "gemmi": "0.7",
-    "numpy": "1.25",
+    "numpy": "1.24",
     "scipy": "1.10",
     "networkx": "3.0",
-    "matplotlib": "3.11",
+    "matplotlib": "3.10",
     "PyYAML": "6.0.1",
     "threadpoolctl": "3.1",
 }

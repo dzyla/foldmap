@@ -9,6 +9,7 @@ import gemmi
 import matplotlib
 import numpy as np
 import pytest
+from matplotlib.figure import Figure
 
 from foldmap import render
 from foldmap.cli import main
@@ -115,6 +116,7 @@ def test_each_thread_draws_on_its_own_page(monkeypatch):
             b_inside.set()
             a_left.wait(0.5)  # unserialised, A has left page() by now
         seen[bg] = (render._BACKGROUND.get(), matplotlib.rcParams["text.color"])
+        return Figure()
 
     def run(bg, ink):
         render.draw(None, [], [], look=Style(background=bg, ink=ink))

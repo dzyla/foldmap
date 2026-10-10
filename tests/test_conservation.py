@@ -252,9 +252,35 @@ def test_legend_does_not_widen_the_figure_beyond_the_protein():
 
 
 def test_long_legend_is_never_clipped():
+    from foldmap import render
+
+    look = THEMES["conservation"]
+    fig = make_figure(UBQ, look=look, msa=FAMILY)
+    with render.page(look):  # measured in the context the figure is drawn in
+        fig.canvas.draw()
+        legend = [t for t in fig.axes[0].texts if "conservation" in t.get_text()]
+        assert legend
+        for t in legend:
+            assert t.get_window_extent().x1 <= fig.bbox.x1
+
+
+def test_plain_savefig_uses_foldmap_fonts_and_keeps_the_legend_inside():
+    import io
+    import re
+
+    import matplotlib
+
+    from foldmap import render
+
     fig = make_figure(UBQ, look=THEMES["conservation"], msa=FAMILY)
-    fig.canvas.draw()
-    legend = [t for t in fig.axes[0].texts if "conservation" in t.get_text()]
-    assert legend
-    for t in legend:
-        assert t.get_window_extent().x1 <= fig.bbox.x1
+    with matplotlib.rc_context(
+        {**matplotlib.rcParamsDefault, "svg.fonttype": "none"}
+    ):  # as a user's script or a notebook saves it
+        plain = io.StringIO()
+        fig.savefig(plain, format="svg", metadata={"Date": None}, facecolor=fig.get_facecolor())
+        fig.canvas.draw()
+        legend = [t for t in fig.axes[0].texts if "conservation" in t.get_text()]
+        assert legend and all(t.get_window_extent().x1 <= fig.bbox.x1 for t in legend)
+    families = lambda svg: set(re.findall(r"font-family: ([^;\"]*)", svg))  # noqa: E731
+    assert families(plain.getvalue()) == families(render.save_svg(fig))
+    assert families(plain.getvalue()) and all("Liberation Sans" in f for f in families(plain.getvalue()))

@@ -11,7 +11,7 @@ from matplotlib.patches import Circle, PathPatch, Polygon, Rectangle
 from matplotlib.path import Path
 
 from .palette import darken, text_color_on
-from .render import _legible, page
+from .render import _legible, page, pin_fonts
 from .sequence import GAP, Alignment, chain_track, column_classes, conservation, map_alignment
 from .style import Style
 
@@ -59,20 +59,22 @@ def draw_sequence(
         raise ValueError("ss_colour is 'figure' or 'black'")
     look = (look or Style()).validate()
     with page(look):
-        return _draw(
-            path,
-            chain,
-            alignment,
-            reference,
-            columns,
-            look or Style(),
-            full_sequence,
-            ss_colour,
-            threshold,
-            conservation_bar,
-            title,
-            uniprot,
-            msa,
+        return pin_fonts(
+            _draw(
+                path,
+                chain,
+                alignment,
+                reference,
+                columns,
+                look or Style(),
+                full_sequence,
+                ss_colour,
+                threshold,
+                conservation_bar,
+                title,
+                uniprot,
+                msa,
+            )
         )
 
 

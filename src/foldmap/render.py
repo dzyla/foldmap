@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import threading
 from collections import Counter
 from contextlib import contextmanager
@@ -13,9 +14,11 @@ import numpy as np
 from matplotlib import colormaps, rc_context
 from matplotlib.colors import to_hex
 from matplotlib.figure import Figure
+from matplotlib.font_manager import FontProperties
 from matplotlib.patches import Circle, FancyBboxPatch, PathPatch, Polygon, Rectangle
 from matplotlib.path import Path
-from matplotlib.textpath import TextPath
+from matplotlib.text import Text
+from matplotlib.textpath import text_to_path
 from matplotlib.transforms import Affine2D
 
 from .layout import (
@@ -52,7 +55,19 @@ _HEAD_LEN = 0.7
 _CORNER = 0.3
 _EXT = {".svg": "svg", ".pdf": "pdf", ".png": "png"}
 _FONTS = ["Arial", "Helvetica", "Liberation Sans", "Nimbus Sans", "DejaVu Sans"]  # journal sans first
+_MEASURE = FontProperties(family=_FONTS, size=10)  # text widths are measured at this size and scaled
 _RC = {"font.family": "sans-serif", "font.sans-serif": _FONTS}
+
+
+class _QuietMissingFonts(logging.Filter):
+    """The figure names the whole journal font list, so fonts a machine lacks are expected: matplotlib
+    would warn about each one at every first draw. Other font warnings are left alone."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        return not any(record.getMessage() == f"findfont: Font family {name!r} not found." for name in _FONTS)
+
+
+logging.getLogger("matplotlib.font_manager").addFilter(_QuietMissingFonts())
 _PANEL = "#eef1f4"
 _LIPID, _HEADS, _HEAD_EDGE = "#f7f0de", "#e6d3a3", "#c2a765"  # membrane band, lipid head groups
 _RUN_EDGE, _RUN_EDGE_W = "#3a3a3a", 1.8  # dark edge under residue-coloured loops (pale colours stay legible)
@@ -432,6 +447,15 @@ _BACKGROUND: ContextVar[str] = ContextVar("foldmap_background", default="#ffffff
 
 # rc_context edits the process-wide rcParams, and matplotlib is not thread-safe, so pages are drawn one at a time.
 _DRAWING = threading.RLock()
+
+
+def pin_fonts(fig: Figure) -> Figure:
+    """Name foldmap's fonts on every text that follows the default family, so the figure looks the same
+    however it is saved (plain fig.savefig, a notebook) and not only inside page()."""
+    for t in fig.findobj(Text):
+        if t.get_fontfamily() == ["sans-serif"]:
+            t.set_fontfamily(_FONTS)
+    return fig
 
 
 @contextmanager
@@ -1240,7 +1264,7 @@ def draw(layout: Layout, loops: list[Loop], sses: list[SSE], title: str | None =
     """`look` carries every visual choice; palette/style (fill)/loop_style are shorthands that override it."""
     look = (kw.get("look") or Style()).validate()
     with page(look):  # fonts/colours are fixed when text is made: set them here
-        return _draw(layout, loops, sses, title, **kw)
+        return pin_fonts(_draw(layout, loops, sses, title, **kw))
 
 
 def _draw(
@@ -1313,7 +1337,10 @@ def _draw(
     def legend_entry(x1: float) -> float:  # one legend entry's width in page units: swatch, text, gap
         scale = min(_IN_PER_UNIT, _MAX_WIDTH_IN / (x1 - x0 + 2 * pad))  # as the figure below
         font_u = _font_pt(scale) * look.font_scale / (scale * 72)  # text drawn at that size, in page units
-        return 0.85 + max(TextPath((0, 0), text, size=font_u).get_extents().width for _, text in entries) + 0.9
+        # the unhinted advance width, which is what is drawn (ink extents differ between matplotlib versions);
+        # measured at a size matplotlib does not clamp (it floors font sizes at 1 pt) and scaled to font_u
+        widest = max(text_to_path.get_text_width_height_descent(text, _MEASURE, ismath=False)[0] for _, text in entries)
+        return 0.85 + widest * font_u / _MEASURE.get_size_in_points() + 0.9
 
     entry = legend_entry(x1)
     if x0 + entry - 0.9 > x1:  # never narrower than one legend entry; a wider page may shrink, so measure again
