@@ -326,11 +326,30 @@ def icosahedral(tmp_path):
     return build(tmp_path, ops, offset=(0.0, 25.0, 8.0), names=names, fname="ico.cif")
 
 
-def test_an_icosahedral_cage_is_found_quickly(tmp_path):
+def test_an_icosahedral_cage_is_found_without_superposing_every_pair_again(tmp_path, monkeypatch):
     import time
 
+    from foldmap import symmetry
+
+    calls = {"kabsch": 0, "pair": 0}
+    kabsch, pair = symmetry._kabsch, symmetry._Assembly.pair
+
+    def count_kabsch(p, q):
+        calls["kabsch"] += 1
+        return kabsch(p, q)
+
+    def count_pair(self, a, b):
+        calls["pair"] += 1
+        return pair(self, a, b)
+
+    monkeypatch.setattr(symmetry, "_kabsch", count_kabsch)
+    monkeypatch.setattr(symmetry._Assembly, "pair", count_pair)
     path = icosahedral(tmp_path)
     t = time.perf_counter()
     s = found(path)
+    elapsed = time.perf_counter() - t
+    n = 60
     assert s.kind == "I" and s.n == 5 and s.rmsd < 0.1
-    assert time.perf_counter() - t < 8  # was ~35 s: every pair superposed again for every trial motion
+    # before: ~5300 superpositions and ~199000 pair lookups (every copy against every copy, for every trial motion)
+    assert calls["kabsch"] < 2 * n * n and calls["pair"] < 10 * n * n
+    assert elapsed < 30
