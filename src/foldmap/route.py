@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import heapq
+import logging
 import math
 from dataclasses import dataclass
 
@@ -14,6 +15,7 @@ from .model import SSE
 
 RES = 0.25  # grid cell size, page units
 _INFLATE = 0.15  # keep loops this far from arrows
+_TOUCH = 0.02  # a drawn loop nearer than this to an element counts as crossing it
 _TURN = 2.5
 _REUSE = 6.0  # extra cost for a cell an earlier loop already uses
 _PAD = 3.0
@@ -21,6 +23,8 @@ _MAX_NODES = 200_000
 _MAX_CELLS = 1_500_000
 _DIRS = [(1, 0), (0, 1), (-1, 0), (0, -1)]
 _PUSH = [0.4 + 0.25 * k for k in range(12)]  # how far out along the exit the path may start
+
+log = logging.getLogger(__name__)
 
 
 @dataclass(eq=False)
@@ -44,7 +48,10 @@ class _Grid:
         xs = self.x0 + (np.arange(self.nx) + 0.5) * self.res
         ys = self.y0 + (np.arange(self.ny) + 0.5) * self.res
 
-        reach = (self.res - RES) / 2  # on a coarse grid a cell is blocked if any part of it meets the obstacle
+        # On a coarse grid a cell is blocked if any part of it meets the obstacle: the open interval of blocked
+        # centres, the rect grown by _INFLATE and then by reach on each side, is w + res + 0.05 > res long on
+        # each axis, so even a zero-width obstacle always blocks at least one cell.
+        reach = (self.res - RES) / 2
 
         def mask(rects):
             m = np.zeros((self.nx, self.ny), bool)
@@ -121,6 +128,45 @@ def clip_len(p, q, rect) -> float:
 def segment_clear(p, q, rects, grow=_INFLATE) -> bool:
     """True when segment p-q keeps the routing clearance from every rect (each grown by `grow`)."""
     return all(clip_len(p, q, (r[0] - grow, r[1] - grow, r[2] + grow, r[3] + grow)) <= 1e-9 for r in rects)
+
+
+def _crosses_body(p, q, e: Placed) -> bool:
+    """True when segment p-q runs through the element's own (possibly tilted) body, not just its end."""
+    c, s = math.cos(e.angle), math.sin(e.angle)
+    u0, v0 = (p[0] - e.cx) * c + (p[1] - e.cy) * s, (p[1] - e.cy) * c - (p[0] - e.cx) * s  # along, across it
+    u1, v1 = (q[0] - e.cx) * c + (q[1] - e.cy) * s, (q[1] - e.cy) * c - (q[0] - e.cx) * s
+    hl, hw = e.length / 2 - 1e-6, e.width / 2 - 1e-6
+    return clip_len((u0, v0), (u1, v1), (-hl, -hw, hl, hw)) > 1e-9
+
+
+def _clear(path, own: tuple[Placed, Placed], rects: np.ndarray, owners: list, grow=_TOUCH) -> bool:
+    """True when the connector `path` between its own two elements comes no nearer than `grow` to any of
+    `rects` (a (4, n) array of x0, y0, x1, y1 rows; owners[k] is the element id owning rect k, or None), by
+    exact clipping. The end segments leave from ports on the own elements' boxes (inside them when tilted),
+    so the own boxes are not checked there. A route with turns must still leave and enter its ports from
+    outside: its end segments may touch the own elements' true outlines but not enter them. A straight link
+    from port to port (a kink) is the join itself and skips its own two elements (and their labels)."""
+    skip = (own[0].sse.id, own[1].sse.id)
+    xs, ys = [p[0] for p in path], [p[1] for p in path]
+    x0, y0, x1, y1 = min(xs) - grow, min(ys) - grow, max(xs) + grow, max(ys) + grow
+    rx0, ry0, rx1, ry1 = rects
+    segs = list(zip(path, path[1:]))
+    last = len(segs) - 1
+    for k in np.flatnonzero((rx0 <= x1) & (rx1 >= x0) & (ry0 <= y1) & (ry1 >= y0)).tolist():
+        box = (rx0[k] - grow, ry0[k] - grow, rx1[k] + grow, ry1[k] + grow)
+        mine = owners[k] in skip
+        for i, (p, q) in enumerate(segs):
+            if mine and (i == 0 or i == last):
+                continue
+            if (
+                max(p[0], q[0]) > box[0]
+                and min(p[0], q[0]) < box[2]
+                and max(p[1], q[1]) > box[1]
+                and min(p[1], q[1]) < box[3]  # else it misses the box: no need to clip
+                and clip_len(p, q, box) > 1e-9
+            ):
+                return False
+    return last == 0 or not any(_crosses_body(*segs[i], e) for i in (0, last) for e in own)
 
 
 def _axis(vec) -> int:
@@ -229,6 +275,7 @@ def _curve(pa, ea, pb, eb, n=24):
 
 
 def _route_pair(grid: _Grid, a: Placed, b: Placed):
+    """Grid cells of the cheapest orthogonal route from a's C port to b's N port, or None."""
     pa, pb = a.c_port, b.n_port
     start = grid.free_cell_along(pa, a.exit_c, a)
     goal = grid.free_cell_along(pb, b.exit_n, b)
@@ -240,13 +287,16 @@ def _route_pair(grid: _Grid, a: Placed, b: Placed):
     cells = _astar(grid, start, _axis(a.exit_c), goal, _axis(-b.exit_n))
     for c in stubs:
         grid.blocked[c] = False
-    if cells is None:
-        return None
-    for c in cells:
-        grid.used[c] += 1
+    return cells
+
+
+def _polyline(grid: _Grid, cells, a: Placed, b: Placed, snap: bool):
+    """The route through `cells` from port to port, its end runs moved onto the ports' axes if `snap`."""
+    pa, pb = a.c_port, b.n_port
     pts = [list(grid.center(c)) for c in _corners(cells)]
-    _snap_to_port(pts, pa, a.exit_c, True)
-    _snap_to_port(pts, pb, b.exit_n, False)
+    if snap:
+        _snap_to_port(pts, pa, a.exit_c, True)
+        _snap_to_port(pts, pb, b.exit_n, False)
     return _simplify([pa] + [(x, y) for x, y in pts] + [pb])
 
 
@@ -265,10 +315,35 @@ def route_loops(layout: Layout, sses: list[SSE], bb) -> list[Loop]:
         return []
     keep_out = label_boxes(layout, sses)
     grid = _Grid(layout, [b for _, b in keep_out])
-    # (owner element id or None, rect) of everything a kink link must keep clear of but its own two elements
+    # (owner element id or None, rect): the elements every drawn loop must not cross, then the text and
+    # stubs a kink link also keeps clear of
     obstacles = [(k, p.rect) for k, p in layout.placed.items()]
     obstacles += [(None, o.rect) for o in [*layout.ghosts, *layout.dna]]
+    n_elements = len(obstacles)
     obstacles += [(n.removeprefix("label:") if n.startswith("label:") else None, r) for n, r in keep_out]
+    owners = [k for k, _ in obstacles]
+    rects = np.array([r for _, r in obstacles], float).reshape(-1, 4).T.copy()  # rows x0, y0, x1, y1
+    elements = rects[:, :n_elements], owners[:n_elements]
+    tight = rejected = 0
+
+    def drawn(a: Placed, b: Placed):
+        """The A* route from a to b as drawn, snapped to the ports or else unsnapped; None if there is no
+        route or every drawing of it crosses an element."""
+        nonlocal tight, rejected
+        cells = _route_pair(grid, a, b)
+        if cells is None:
+            return None
+        for snap in (True, False):
+            pts = _polyline(grid, cells, a, b, snap)
+            if _clear(pts, (a, b), *elements):
+                for c in cells:
+                    grid.used[c] += 1
+                if log.isEnabledFor(logging.DEBUG):
+                    tight += not _clear(pts, (a, b), *elements, grow=_INFLATE - 1e-6)
+                return pts
+            rejected += 1
+        return None
+
     dist = lambda ab: math.dist(layout.placed[ab[0].id].c_port, layout.placed[ab[1].id].n_port)  # noqa: E731
     routed: dict[tuple[str, str], tuple[list, bool, bool]] = {}  # points, fallback curve, over labels
     for a, b in sorted(pairs, key=dist):
@@ -278,21 +353,29 @@ def route_loops(layout: Layout, sses: list[SSE], bb) -> list[Loop]:
             b.start - a.end - 1 <= KINK_GAP
             and np.hypot(*gap) < 1.5
             and gap @ pa.exit_c > 0
-            and segment_clear(pa.c_port, pb.n_port, [r for k, r in obstacles if k not in (a.id, b.id)])
+            and _clear([pa.c_port, pb.n_port], (pa, pb), rects, owners, grow=_INFLATE)  # labels too, full clearance
         ):
             for c in grid.cells_along(pa.c_port, pb.n_port):
                 grid.used[c] += 1
             routed[(a.id, b.id)] = ([pa.c_port, pb.n_port], False, False)  # a kink: the helix just carries on
             continue
-        pts, over = _route_pair(grid, pa, pb), False
+        pts, over = drawn(pa, pb), False
         if pts is None and grid.soft.any():
             grid.blocked &= ~grid.soft
-            pts, over = _route_pair(grid, pa, pb), True
+            pts, over = drawn(pa, pb), True
             grid.blocked |= grid.soft
         if pts is None:
             routed[(a.id, b.id)] = (_curve(pa.c_port, pa.exit_c, pb.n_port, pb.exit_n), True, False)
         else:
             routed[(a.id, b.id)] = (pts, False, over)
+    log.debug(
+        "%d loops: %d fallback curves, %d drawn nearer than %.2f to an element, %d drawings rejected as crossing",
+        len(pairs),
+        sum(fb for _, fb, _ in routed.values()),
+        tight,
+        _INFLATE,
+        rejected,
+    )
     out = []
     for a, b in pairs:
         pts, fb, over = routed[(a.id, b.id)]

@@ -1,11 +1,13 @@
+import logging
 from types import SimpleNamespace
 
 import numpy as np
 import pytest
 
+from foldmap import route
 from foldmap.frame import view_frame
-from foldmap.layout import ETA_W, HELIX_W, PITCH, Layout, Placed, build_layout
-from foldmap.route import _INFLATE, _Grid, route_loops, segment_clear
+from foldmap.layout import ETA_W, HELIX_W, PITCH, Layout, Placed, build_layout, label_boxes
+from foldmap.route import _INFLATE, _MAX_CELLS, _Grid, route_loops, segment_clear
 from helpers import fake_sse, pipeline
 
 MODES = ["projected", "stack"]
@@ -303,3 +305,92 @@ def test_random_layouts_never_route_through_an_element(page):
                 rects = other_rects(loop, placed)
                 assert all(segment_clear(p, q, rects, grow=0.0) for p, q in zip(loop.points, loop.points[1:])), loop
     assert checked > 100
+
+
+def strands_over_the_top(*more):
+    """Two strands joined over their tops (as in the first test), plus any further elements."""
+    a, b = strand(0, 0, 0), strand(20, 4, 0, angle=-np.pi / 2)
+    return a, b, layout_of(a, b, *more)
+
+
+def test_a_route_pushed_into_an_element_after_a_star_is_redrawn_unsnapped(monkeypatch, caplog):
+    """A post-processing step that moves a found route into its own elements: the route is checked again
+    after it and redrawn from the A* cells without the port snap, never drawn through the elements."""
+    snap = route._snap_to_port
+
+    def snap_too_far(pts, port, exit_vec, at_start):
+        snap(pts, port, exit_vec, at_start)
+        for p in pts:
+            p[1] -= 2.0  # down through the bodies of both strands
+
+    monkeypatch.setattr(route, "_snap_to_port", snap_too_far)
+    caplog.set_level(logging.DEBUG, logger="foldmap.route")
+    a, b, lay = strands_over_the_top()
+    (loop,) = route_loops(lay, [a.sse, b.sse], stub_bb())
+    assert "1 drawings rejected as crossing" in caplog.text  # the snapped drawing
+    assert not loop.fallback
+    assert np.allclose(loop.points[0], a.c_port) and np.allclose(loop.points[-1], b.n_port)
+    assert all(segment_clear(p, q, [a.rect, b.rect], grow=0.0) for p, q in zip(loop.points, loop.points[1:]))
+    assert max(p[1] for p in loop.points) > a.c_port[1] + 0.2  # still over the tops
+
+
+def test_a_route_through_an_element_that_cannot_be_redrawn_is_marked_fallback(monkeypatch, caplog):
+    """A* cells straight through a third element (a broken router step): neither the snapped nor the
+    unsnapped drawing is clear, so the loop is the flagged fallback curve, not a silent crossing."""
+    wall = bar(40, 2, 1.0, 6.0, np.pi / 2)  # stands between the strands, up past their tops
+    a, b, lay = strands_over_the_top(wall)
+    monkeypatch.setattr(
+        route, "_astar", lambda grid, start, sd, goal, gd: [(x, start[1]) for x in range(start[0], goal[0] + 1)]
+    )
+    caplog.set_level(logging.DEBUG, logger="foldmap.route")
+    (loop,) = route_loops(lay, [a.sse, b.sse], stub_bb())
+    assert loop.fallback
+    assert "4 drawings rejected as crossing" in caplog.text  # snapped and not, with and without the labels
+
+
+@pytest.mark.parametrize("res", [0.25, 0.26, 0.5, 1.3])
+@pytest.mark.parametrize("width", [0.0, 0.35])
+def test_coarse_grid_blocks_a_cell_for_any_narrow_obstacle(res, width):
+    side = res * np.sqrt(_MAX_CELLS)  # a page this size gets cells of this size
+    lay = Layout({}, (0.0, 0.0, side - 2 * 3.0, side - 2 * 3.0))
+    for k in range(8):  # slide the obstacle across one cell in both directions
+        x = y = 100.0 + k * res / 8
+        g = _Grid(lay, [(x, y, x + width, y + width)])
+        assert g.res == pytest.approx(res)
+        assert g.soft.any(axis=1).sum() >= 1 and g.soft.any(axis=0).sum() >= 1, (k, g.res)
+
+
+def kink_with(third):
+    """Helix a leaves (0, 0) along +x; helix b, one residue on, is entered at (1, 1) from below: a kink."""
+    a = bar(0, -2.0, 0.0, 4.0, 0.0)
+    b = bar(11, 1.0, 3.0, 4.0, np.pi / 2)
+    lay = layout_of(a, b, third)
+    (loop,) = route_loops(lay, [a.sse, b.sse], stub_bb())  # chain B has no chain-end stubs in the way
+    return a, b, lay, loop
+
+
+def test_kink_blocked_by_a_small_element_is_routed_around_it():
+    third = Placed(fake_sse("E", 0, 6, chain="B"), 0.5, 0.5, 0.3, np.pi / 4, 0.3, "A")  # on the diagonal
+    a, b, _, loop = kink_with(third)
+    assert not segment_clear(a.c_port, b.n_port, [third.rect], grow=0.0)
+    assert not loop.fallback and not loop.crosses_labels and len(loop.points) > 2
+    assert all(segment_clear(p, q, [third.rect]) for p, q in zip(loop.points, loop.points[1:]))
+
+
+def test_kink_blocked_only_by_another_elements_label_is_routed_around_it():
+    third = Placed(fake_sse("H", 0, 9, chain="B"), 0.15, 0.7, 0.4, -np.pi / 2, 0.1, "α")  # label to its right
+    a, b, lay, loop = kink_with(third)
+    label = dict(label_boxes(lay, [a.sse, b.sse]))["label:B:0-9"]
+    assert segment_clear(a.c_port, b.n_port, [third.rect])  # the element itself leaves room for the link
+    assert not segment_clear(a.c_port, b.n_port, [label])  # its label does not
+    assert not loop.fallback and not loop.crosses_labels and len(loop.points) > 2
+    assert all(segment_clear(p, q, [label, third.rect]) for p, q in zip(loop.points, loop.points[1:]))
+
+
+def test_kink_between_tilted_pieces_with_overlapping_boxes_stays_straight():
+    a = bar(0, -1.3, -0.75, 3.0, np.pi / 6)  # C port near (0, 0)
+    b = bar(11, a.c_port[0] + 0.6 + 1.5 * np.cos(np.pi / 3), a.c_port[1] + 1.5 * np.sin(np.pi / 3), 3.0, np.pi / 3)
+    assert segment_clear(a.c_port, b.n_port, [a.rect], grow=0.0) is False  # the link runs inside both boxes
+    lay = layout_of(a, b)
+    (loop,) = route_loops(lay, [a.sse, b.sse], stub_bb())
+    assert not loop.fallback and len(loop.points) == 2
