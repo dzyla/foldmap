@@ -158,17 +158,151 @@ def pair_nucleotides(runs: list[list]) -> list[BasePair]:
 
 
 @dataclass(eq=False)
-class NAStructure:  # filled in by Task 3
-    stems: list = field(default_factory=list)
-    runs: list = field(default_factory=list)
-    ties: list = field(default_factory=list)
+class Stem:
+    """Stacked base pairs. pairs[0] is the outermost: the first arm (strand a) runs 5'->3' from it, the second
+    arm (strand b) runs 5'->3' back to it. bulges: (strand, nucleotide) left unpaired inside the stem."""
+
+    pairs: list[BasePair]
+    bulges: list[tuple[int, int]] = field(default_factory=list)
+    id: str = ""
+    name: str = ""
+    parent: str = ""  # a straight piece of a bent stem: the whole stem's id
+
+    @property
+    def a(self) -> int:
+        return self.pairs[0].a
+
+    @property
+    def b(self) -> int:
+        return self.pairs[0].b
+
+    @property
+    def arm5(self) -> tuple[int, int, int]:
+        """(strand, first, last) nucleotide of the first arm."""
+        return self.a, self.pairs[0].i, self.pairs[-1].i
+
+    @property
+    def arm3(self) -> tuple[int, int, int]:
+        """(strand, first, last) nucleotide of the second arm, 5'->3'."""
+        return self.b, self.pairs[-1].j, self.pairs[0].j
+
+    def __len__(self) -> int:
+        return len(self.pairs)
+
+    def nucleotides(self) -> list[tuple[int, int]]:
+        """Every (strand, nucleotide) of both arms, bulges included: first arm 5'->3', then the second."""
+        (a, i0, i1), (b, j0, j1) = self.arm5, self.arm3
+        return [(a, i) for i in range(i0, i1 + 1)] + [(b, j) for j in range(j0, j1 + 1)]
 
 
-class NAGap(NamedTuple):  # Task 3 gives it its docstring
+class NARun(NamedTuple):
+    """Unpaired nucleotides lo..hi of one strand. left/right: the paired (strand, nucleotide) just before and
+    after it (None at a strand end). kind: hairpin, internal, junction, linker or tail."""
+
+    strand: int
+    lo: int
+    hi: int
+    left: tuple[int, int] | None
+    right: tuple[int, int] | None
+    kind: str
+
+
+class NAGap(NamedTuple):
+    """Nucleotides left out by cropping between strand piece `before` (its 3' end) and `after` (its 5' end)."""
+
     before: int
     after: int
     count: int
 
 
-def secondary_structure(strands, pairs):  # replaced in Task 3
-    return NAStructure()
+@dataclass(eq=False)
+class NAStructure:
+    stems: list[Stem] = field(default_factory=list)
+    runs: list[NARun] = field(default_factory=list)
+    ties: list[BasePair] = field(default_factory=list)  # isolated pairs: drawn as a bar, not a stem
+
+
+def _stacks(p: BasePair, q: BasePair) -> bool:
+    """q continues p's stem: the next step, a bulge of up to 2 nt on one side, or a 1x1 mismatch."""
+    if (p.a, p.b) != (q.a, q.b):
+        return False
+    gi, gj = q.i - p.i - 1, p.j - q.j - 1
+    if gi < 0 or gj < 0:
+        return False
+    return (gi == 0 and gj <= 2) or (gj == 0 and gi <= 2) or (gi == gj == 1)
+
+
+def _group_stems(pairs: list[BasePair]) -> list[list[BasePair]]:
+    stems: list[list[BasePair]] = []
+    for p in sorted(pairs, key=lambda p: (p.a, p.b, p.i, -p.j)):
+        for st in stems:
+            if _stacks(st[-1], p):
+                st.append(p)
+                break
+        else:
+            stems.append([p])
+    return stems
+
+
+def _nested(pairs: list[BasePair]) -> list[BasePair]:
+    """Intra-strand pairs without crossings, keeping the pairs of the longest stems first."""
+    keep: list[BasePair] = []
+    for st in sorted(_group_stems([p for p in pairs if p.a == p.b]), key=len, reverse=True):
+        if all(not (p.a == q.a and (p.i < q.i < p.j < q.j or q.i < p.i < q.j < p.j)) for p in st for q in keep):
+            keep += st
+    return keep
+
+
+def _loop_kind(strand: int, lo: int, hi: int, nested: list[BasePair]) -> str:
+    """hairpin / internal / junction by the loop the run lies in (the innermost pair enclosing it on its strand
+    and how many stems branch off that loop); linker when nothing encloses it."""
+    mine = [p for p in nested if p.a == strand and p.i < lo and hi < p.j]
+    if not mine:
+        return "linker"
+    close = max(mine, key=lambda p: p.i)
+    inner = [p for p in nested if p.a == strand and close.i < p.i and p.j < close.j]
+    branches = [p for p in inner if not any(q.i < p.i and p.j < q.j for q in inner)]
+    return "hairpin" if not branches else "internal" if len(branches) == 1 else "junction"
+
+
+def secondary_structure(strands, pairs: list[BasePair]) -> NAStructure:
+    """Stems (two or more stacked pairs), ties (an isolated pair) and the single-stranded runs between them.
+    Stems are named P1, P2 ... (RNA) or DNA 1, DNA 2 ... in 5'->3' order of their first arm."""
+    out = NAStructure()
+    for group in _group_stems(pairs):
+        if len(group) < 2:
+            out.ties += group
+            continue
+        stem = Stem(group)
+        for p, q in zip(group, group[1:]):
+            stem.bulges += [(p.a, i) for i in range(p.i + 1, q.i)] + [(p.b, j) for j in range(q.j + 1, p.j)]
+        out.stems.append(stem)
+    out.stems.sort(key=lambda s: (s.a, s.pairs[0].i))
+    rna = dna = 0
+    for st in out.stems:
+        la, lb = strands[st.a].labels, strands[st.b].labels
+        (_, i0, i1), (_, j0, j1) = st.arm5, st.arm3
+        st.id = f"{la[i0].chain}:{la[i0].tag}-{la[i1].tag}/{lb[j0].chain}:{lb[j0].tag}-{lb[j1].tag}"
+        if strands[st.a].rna or strands[st.b].rna:
+            rna += 1
+            st.name = f"P{rna}"
+        else:
+            dna += 1
+            st.name = f"DNA {dna}"
+    inside = {n for st in out.stems for n in st.nucleotides()}
+    nested = _nested([p for st in out.stems for p in st.pairs])
+    for s, strand in enumerate(strands):
+        i, n = 0, len(strand)
+        while i < n:
+            if (s, i) in inside:
+                i += 1
+                continue
+            j = i
+            while j + 1 < n and (s, j + 1) not in inside:
+                j += 1
+            left = (s, i - 1) if i > 0 else None
+            right = (s, j + 1) if j + 1 < n else None
+            kind = "tail" if left is None or right is None else _loop_kind(s, i, j, nested)
+            out.runs.append(NARun(s, i, j, left, right, kind))
+            i = j + 1
+    return out
