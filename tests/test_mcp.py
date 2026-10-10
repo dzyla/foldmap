@@ -142,3 +142,46 @@ def test_server_survives_a_bad_argument_over_stdio(tmp_path):
     bad, good = asyncio.run(asyncio.wait_for(go(), 120))
     assert bad.is_error and "unknown theme" in bad.content[0].text
     assert "76 residues" in good.content[0].text
+
+
+@pytest.mark.parametrize(
+    "tool, args",
+    [
+        ("interactive_page", {"output_path": "page.sh"}),
+        ("draw_topology", {"output_path": "fig.svg", "save_layout": "layout.sh"}),
+        ("draw_topology", {"output_path": "fig.html"}),
+        ("draw_sequence", {"output_path": "seq.txt"}),
+    ],
+)
+def test_outputs_must_have_the_right_extension(tool, args, tmp_path):
+    from mcp.server.mcpserver.exceptions import ToolError
+
+    args = {k: str(tmp_path / v) for k, v in args.items()}
+    with pytest.raises(ToolError, match="must end in"):
+        call(tool, {"source": UBQ, **args})
+    assert not any(tmp_path.iterdir())
+
+
+def test_output_dir_confines_writes(tmp_path, monkeypatch):
+    from mcp.server.mcpserver.exceptions import ToolError
+
+    monkeypatch.setenv("FOLDMAP_OUTPUT_DIR", str(tmp_path / "allowed"))
+    with pytest.raises(ToolError, match="outside FOLDMAP_OUTPUT_DIR"):
+        call("draw_sequence", {"source": UBQ, "output_path": str(tmp_path / "elsewhere.svg")})
+    call("draw_sequence", {"source": UBQ, "output_path": str(tmp_path / "allowed" / "s.svg")})
+    assert (tmp_path / "allowed" / "s.svg").is_file()
+
+
+def test_output_dir_follows_relative_paths_and_symlinks(tmp_path, monkeypatch):
+    from mcp.server.mcpserver.exceptions import ToolError
+
+    allowed = tmp_path / "allowed"
+    allowed.mkdir()
+    (allowed / "escape").symlink_to(tmp_path)
+    monkeypatch.setenv("FOLDMAP_OUTPUT_DIR", str(allowed))
+    monkeypatch.chdir(allowed)
+    call("draw_sequence", {"source": UBQ, "output_path": "rel.svg"})
+    assert (allowed / "rel.svg").is_file()
+    with pytest.raises(ToolError, match="outside FOLDMAP_OUTPUT_DIR"):
+        call("draw_sequence", {"source": UBQ, "output_path": "escape/out.svg"})
+    assert not (tmp_path / "out.svg").exists()

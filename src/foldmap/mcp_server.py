@@ -7,6 +7,7 @@ small PNG preview so the agent can look at the result."""
 from __future__ import annotations
 
 import functools
+import os
 import tempfile
 from pathlib import Path
 
@@ -45,13 +46,23 @@ def _structure(source: str) -> Path:
     return fetch(source)
 
 
-def _output(path: str | None, suffix: str, stem: str) -> Path:
-    if path:
-        out = Path(path).expanduser()
-        if out.suffix.lower() not in (".svg", ".png", ".pdf", ".html"):
-            raise ValueError(f"output_path must end in .svg, .png or .pdf (got {out.name!r})")
-        return out
-    return Path(tempfile.mkdtemp(prefix="foldmap-")) / f"{stem}{suffix}"
+FIGURE_SUFFIXES = (".svg", ".png", ".pdf")
+PAGE_SUFFIXES = (".html",)
+LAYOUT_SUFFIXES = (".yaml", ".yml")
+
+
+def _output(path: str | None, suffix: str, stem: str, allowed: tuple[str, ...]) -> Path:
+    """Where to write: the path asked for (with an allowed extension, inside FOLDMAP_OUTPUT_DIR when that is set),
+    or a fresh temporary file."""
+    if not path:
+        return Path(tempfile.mkdtemp(prefix="foldmap-")) / f"{stem}{suffix}"
+    out = Path(path).expanduser()
+    if out.suffix.lower() not in allowed:
+        raise ValueError(f"{out.name!r} must end in {' or '.join(allowed)}")
+    root = os.environ.get("FOLDMAP_OUTPUT_DIR")
+    if root and not out.resolve().is_relative_to(Path(root).expanduser().resolve()):
+        raise ValueError(f"{out} is outside FOLDMAP_OUTPUT_DIR ({root}); write inside it")
+    return out
 
 
 def _theme(name: str):
@@ -158,7 +169,9 @@ def draw_topology(
 
     _theme(theme)  # a readable message instead of argparse's exit
     path = _structure(source)
-    out = _output(output_path, ".svg", path.stem)
+    out = _output(output_path, ".svg", path.stem, FIGURE_SUFFIXES)
+    if save_layout:
+        save_layout = str(_output(save_layout, ".yaml", path.stem, LAYOUT_SUFFIXES))
     argv = [
         "plot",
         str(path),
@@ -263,7 +276,7 @@ def draw_sequence(
     from .sequence import read_alignment
 
     path = _structure(source)
-    out = _output(output_path, ".svg", f"{path.stem}-sequence")
+    out = _output(output_path, ".svg", f"{path.stem}-sequence", FIGURE_SUFFIXES)
     fig = draw(
         path,
         chain=chain,
@@ -287,12 +300,13 @@ def interactive_page(
     assembly: str = "auto",
     viewer: str = "molstar",
 ) -> str:
-    """Write a self-contained HTML page linking the topology, a residue contact map and the 3D model (hover
-    anything: the same residues light up in all three). viewer: molstar (Mol*, default) or 3dmol. Returns the path."""
+    """Write an HTML page (output_path must end in .html) linking the topology, a residue contact map and the 3D model
+    (hover anything: the same residues light up in all three). viewer: molstar (Mol*, default) or 3dmol.
+    Returns the path."""
     from .interactive import write_page
 
     path = _structure(source)
-    out = Path(output_path).expanduser() if output_path else _output(None, ".html", f"{path.stem}-explorer")
+    out = _output(output_path, ".html", f"{path.stem}-explorer", PAGE_SUFFIXES)
     return f"wrote {write_page(path, out, look=_theme(theme), assembly=assembly, viewer=viewer)}"
 
 

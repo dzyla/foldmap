@@ -286,6 +286,9 @@ claude mcp add foldmap -- foldmap mcp        # Claude Code
 
 (the second form for clients configured by JSON, such as Claude Desktop).
 
+Figures must end in `.svg`, `.png` or `.pdf`, pages in `.html` and layout files in `.yaml`. Set
+`FOLDMAP_OUTPUT_DIR` in the server's environment to confine every file the server writes to one folder.
+
 ## Python
 
 ```python
