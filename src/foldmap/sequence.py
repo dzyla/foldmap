@@ -43,7 +43,6 @@ class Track:
     elements: list[Element] = field(default_factory=list)
     residue: list[int | None] = field(default_factory=list)  # backbone index of each position (None: not modelled)
     deposited: bool = True  # positions follow the deposited sequence (False: modelled residues only, no SEQRES)
-    deposited: bool = True  # positions follow the deposited sequence (False: modelled residues only, no SEQRES)
 
 
 def _one_letter(names: list[str]) -> str:

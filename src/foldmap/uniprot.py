@@ -227,7 +227,10 @@ def chain_maps(path, accession: str | None = None, cache_dir: Path | None = None
                 for k in range(n):
                     m.to_label[ustart + k] = start + k
         for m in out:  # SIFTS counts the deposited sequence; a file without one (no SEQRES) is aligned instead
-            track = chain_track(path, m.chain, full_sequence=True)
+            try:
+                track = chain_track(path, m.chain, full_sequence=True)
+            except ValueError:  # a SIFTS chain that is not a protein chain of this file keeps its SIFTS numbering
+                continue
             if not track.deposited:
                 seq = entry(m.accession, cache_dir).sequence
                 m.to_label = {i + 1: j + 1 for i, j in _global(seq, track.letters)}

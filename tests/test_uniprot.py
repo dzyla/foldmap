@@ -205,3 +205,17 @@ def test_pdb_file_with_any_name_maps_by_alignment(cache, tmp_path):
     pdb = _as_pdb(tmp_path, "6ZS5", filename="model.pdb")
     assert uniprot.pdb_id_of(pdb) is None
     assert _mapped_identity(pdb, "P07911") == {"A": 1.0, "D": 1.0}
+
+
+def test_sifts_chain_absent_from_the_file_does_not_fail_the_others(cache, monkeypatch):
+    real = uniprot.sifts
+
+    def with_extra_chain(pdb, cache_dir=None):
+        out = real(pdb, cache_dir)
+        acc, segs = next(iter(out.items()))
+        out[acc] = segs + [{**segs[0], "chain_id": "Z"}]
+        return out
+
+    monkeypatch.setattr(uniprot, "sifts", with_extra_chain)
+    maps = {m.chain for m in uniprot.chain_maps(DATA / "6ZS5.cif")}
+    assert {"A", "D", "Z"} <= maps
