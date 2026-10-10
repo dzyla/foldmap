@@ -1,8 +1,9 @@
+from collections import Counter
 from pathlib import Path
 
 import gemmi
 
-from foldmap.dssp import _resolve, assign_dssp
+from foldmap.dssp import _hbond_set, _resolve, assign_dssp
 from foldmap.io import load_backbone
 
 
@@ -76,3 +77,16 @@ def test_insertion_codes_do_not_change_the_assignment(tmp_path):
     st.make_mmcif_document().write_file(str(path))
     plain = assign_dssp(load_backbone(DATA / "1UBQ.cif", "asu")).ss
     assert assign_dssp(load_backbone(path, "asu")).ss == plain
+
+
+def _index(bb, chain, seq):
+    return next(k for k, l in enumerate(bb.labels) if l.chain == chain and l.seq == seq)
+
+
+def test_an_acceptor_may_take_more_than_two_hbonds():
+    # mkdssp keeps the two best acceptors per NH and never limits a CO; 1LMB O(37) -> N(41) is one it keeps
+    bb = load_backbone(DATA / "1LMB.cif", "asu")
+    bonds = _hbond_set(bb)
+    assert max(Counter(a for a, _ in bonds).values()) == 3
+    assert max(Counter(d for _, d in bonds).values()) <= 2
+    assert (_index(bb, "3", 37), _index(bb, "3", 41)) in bonds

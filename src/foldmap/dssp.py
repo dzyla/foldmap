@@ -49,14 +49,13 @@ def _hbond_set(bb: Backbone) -> set[tuple[int, int]]:
     d = lambda p, q: np.linalg.norm(p - q, axis=1)  # noqa: E731
     e = _Q1Q2F * (1 / d(oa, nd) + 1 / d(ca, hd) - 1 / d(oa, hd) - 1 / d(ca, nd))
     order = np.argsort(e)
-    used_d, used_a, bonds = {}, {}, set()
+    used_d, bonds = {}, set()
     for k in order:
         if e[k] >= _HBOND_E:
             break
         di, ai = int(don[k]), int(acc[k])
-        if used_d.get(di, 0) < 2 and used_a.get(ai, 0) < 2:
+        if used_d.get(di, 0) < 2:  # DSSP keeps each NH's two best acceptors; a CO may accept any number
             used_d[di] = used_d.get(di, 0) + 1
-            used_a[ai] = used_a.get(ai, 0) + 1
             bonds.add((ai, di))
     return bonds
 
