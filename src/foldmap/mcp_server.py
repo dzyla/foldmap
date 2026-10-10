@@ -6,8 +6,10 @@ small PNG preview so the agent can look at the result."""
 
 from __future__ import annotations
 
+import contextlib
 import functools
 import os
+import shutil
 import tempfile
 from pathlib import Path
 
@@ -36,8 +38,10 @@ def tool(fn):
     def wrapped(*args, **kwargs):
         try:
             return fn(*args, **kwargs)
-        except (ValueError, FileNotFoundError, KeyError, RuntimeError, OSError) as err:
-            raise ToolError(str(err).strip("'\"")) from err
+        except KeyError as err:  # str(KeyError) is the repr of its key: quotes included
+            raise ToolError(str(err.args[0]) if err.args else "not found") from err
+        except (ValueError, FileNotFoundError, RuntimeError, OSError) as err:
+            raise ToolError(str(err)) from err
 
     return server.tool()(wrapped)
 
@@ -51,23 +55,35 @@ PAGE_SUFFIXES = (".html",)
 LAYOUT_SUFFIXES = (".yaml", ".yml")
 
 
-def _output(path: str | None, suffix: str, stem: str, allowed: tuple[str, ...]) -> Path:
-    """Where to write: the path asked for (with an allowed extension, inside FOLDMAP_OUTPUT_DIR when that is set),
-    or a fresh temporary file."""
-    root = os.environ.get("FOLDMAP_OUTPUT_DIR")
-    if not path:
-        folder = None
-        if root:
-            folder = Path(root).expanduser()
-            folder.mkdir(parents=True, exist_ok=True)
-        return Path(tempfile.mkdtemp(prefix="foldmap-", dir=folder)) / f"{stem}{suffix}"
+def _checked(path: str, allowed: tuple[str, ...]) -> Path:
+    """The path asked for, if it has an allowed extension and lies inside FOLDMAP_OUTPUT_DIR (when that is set)."""
     out = Path(path).expanduser()
     if out.suffix.lower() not in allowed:
         names = ", ".join(allowed[:-1]) + " or " + allowed[-1] if len(allowed) > 1 else allowed[0]
         raise ValueError(f"{out.name!r} must end in {names}")
+    root = os.environ.get("FOLDMAP_OUTPUT_DIR")
     if root and not out.resolve().is_relative_to(Path(root).expanduser().resolve()):
         raise ValueError(f"{out} is outside FOLDMAP_OUTPUT_DIR ({root}); write inside it")
     return out
+
+
+@contextlib.contextmanager
+def _output(path: str | None, suffix: str, stem: str, allowed: tuple[str, ...]):
+    """Where to write: the path asked for (checked by _checked), or a file in a fresh temporary folder (inside
+    FOLDMAP_OUTPUT_DIR when set). A temporary folder is removed again if the call fails."""
+    if path:
+        yield _checked(path, allowed)
+        return
+    root = os.environ.get("FOLDMAP_OUTPUT_DIR")
+    folder = Path(root).expanduser() if root else None
+    if folder:
+        folder.mkdir(parents=True, exist_ok=True)
+    made = Path(tempfile.mkdtemp(prefix="foldmap-", dir=folder))
+    try:
+        yield made / f"{stem}{suffix}"
+    except BaseException:
+        shutil.rmtree(made, ignore_errors=True)
+        raise
 
 
 def _theme(name: str):
@@ -180,39 +196,39 @@ def draw_topology(
     from .spec import draw_spec, figure_spec, layout_document
 
     path = _structure(source)
-    keep = _output(save_layout, ".yaml", path.stem, LAYOUT_SUFFIXES) if save_layout else None  # checked first
-    out = _output(output_path, ".svg", path.stem, FIGURE_SUFFIXES)
-    for ref, d in (move or {}).items():
-        if len(d) != 2:
-            raise ValueError(f"move needs two numbers [dx, dy] for {ref!r}, got {d!r}")
-    spec = figure_spec(
-        path,
-        theme=theme,
-        style=[f"{k}={v}" for k, v in (style or {}).items()],
-        layout_file=layout_file,
-        title=title,
-        mode=mode,
-        rotate=rotate,
-        assembly=assembly,
-        symmetry=symmetry,
-        membrane=membrane,
-        focus=focus,
-        chains=chains,
-        uniprot=uniprot,
-        domains=[(n, list(r)) for n, r in (domains or {}).items()] or ("uniprot" if uniprot_domains else None),
-        msa=msa_path,
-        rename=rename,
-        swap=[tuple(p) for p in swap or []],
-        move=[(ref, (d[0], d[1])) for ref, d in (move or {}).items()],
-    )
-    drawn = draw_spec(spec)
-    save(drawn.figure, out)
-    note = f"wrote {out}"
-    if keep is not None:
-        note += f" and layout file {layoutfile.save(keep, layout_document(spec))}"
-    if drawn.stuck:
-        note += f"; no clear route for {', '.join(drawn.stuck)} (drawn as plain curves)"
-    return [note, _preview(drawn.figure)]
+    keep = _checked(save_layout, LAYOUT_SUFFIXES) if save_layout else None  # checked first
+    with _output(output_path, ".svg", path.stem, FIGURE_SUFFIXES) as out:
+        for ref, d in (move or {}).items():
+            if len(d) != 2:
+                raise ValueError(f"move needs two numbers [dx, dy] for {ref!r}, got {d!r}")
+        spec = figure_spec(
+            path,
+            theme=theme,
+            style=[f"{k}={v}" for k, v in (style or {}).items()],
+            layout_file=layout_file,
+            title=title,
+            mode=mode,
+            rotate=rotate,
+            assembly=assembly,
+            symmetry=symmetry,
+            membrane=membrane,
+            focus=focus,
+            chains=chains,
+            uniprot=uniprot,
+            domains=[(n, list(r)) for n, r in (domains or {}).items()] or ("uniprot" if uniprot_domains else None),
+            msa=msa_path,
+            rename=rename,
+            swap=[tuple(p) for p in swap or []],
+            move=[(ref, (d[0], d[1])) for ref, d in (move or {}).items()],
+        )
+        drawn = draw_spec(spec)
+        save(drawn.figure, out)
+        note = f"wrote {out}"
+        if keep is not None:
+            note += f" and layout file {layoutfile.save(keep, layout_document(spec))}"
+        if drawn.stuck:
+            note += f"; no clear route for {', '.join(drawn.stuck)} (drawn as plain curves)"
+        return [note, _preview(drawn.figure)]
 
 
 @tool
@@ -236,21 +252,21 @@ def draw_sequence(
     from .sequence import read_alignment
 
     path = _structure(source)
-    out = _output(output_path, ".svg", f"{path.stem}-sequence", FIGURE_SUFFIXES)
-    fig = draw(
-        path,
-        chain=chain,
-        alignment=read_alignment(msa_path) if msa_path else None,
-        reference=reference,
-        columns=columns,
-        look=_theme(theme),
-        full_sequence=full_sequence,
-        ss_colour=ss_colour,
-        title=title,
-        msa=msa_path,
-    )
-    save(fig, out)
-    return [f"wrote {out}", _preview(fig)]
+    with _output(output_path, ".svg", f"{path.stem}-sequence", FIGURE_SUFFIXES) as out:
+        fig = draw(
+            path,
+            chain=chain,
+            alignment=read_alignment(msa_path) if msa_path else None,
+            reference=reference,
+            columns=columns,
+            look=_theme(theme),
+            full_sequence=full_sequence,
+            ss_colour=ss_colour,
+            title=title,
+            msa=msa_path,
+        )
+        save(fig, out)
+        return [f"wrote {out}", _preview(fig)]
 
 
 @tool
@@ -267,8 +283,8 @@ def interactive_page(
     from .interactive import write_page
 
     path = _structure(source)
-    out = _output(output_path, ".html", f"{path.stem}-explorer", PAGE_SUFFIXES)
-    return f"wrote {write_page(path, out, look=_theme(theme), assembly=assembly, viewer=viewer)}"
+    with _output(output_path, ".html", f"{path.stem}-explorer", PAGE_SUFFIXES) as out:
+        return f"wrote {write_page(path, out, look=_theme(theme), assembly=assembly, viewer=viewer)}"
 
 
 def main() -> None:

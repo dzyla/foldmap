@@ -291,3 +291,33 @@ def test_uniprot_domains_without_any_uniprot_is_an_error(tmp_path):
 
     with pytest.raises(ToolError, match="needs UniProt annotation"):
         call("draw_topology", {"source": UBQ, "output_path": str(tmp_path / "x.svg"), "uniprot_domains": True})
+
+
+@pytest.mark.parametrize(
+    "tool, args",
+    [
+        ("draw_topology", {"theme": "nope"}),
+        ("draw_topology", {"mode": "weird"}),
+        ("draw_topology", {"move": {"A": [1]}}),
+        ("draw_sequence", {"theme": "nope"}),
+        ("draw_sequence", {"msa_path": "/nowhere/x.fasta"}),
+        ("interactive_page", {"theme": "nope"}),
+        ("interactive_page", {"viewer": "nope"}),
+    ],
+)
+def test_rejected_calls_leave_no_temporary_folders(tool, args, tmp_path, monkeypatch):
+    from mcp.server.mcpserver.exceptions import ToolError
+
+    root = tmp_path / "root"
+    monkeypatch.setenv("FOLDMAP_OUTPUT_DIR", str(root))
+    with pytest.raises(ToolError):
+        call(tool, {"source": UBQ, **args})
+    assert not root.exists() or not any(root.iterdir())
+
+
+def test_error_messages_keep_their_quotes(tmp_path):
+    from mcp.server.mcpserver.exceptions import ToolError
+
+    with pytest.raises(ToolError) as err:
+        call("draw_sequence", {"source": UBQ, "output_path": str(tmp_path / "fig.txt")})
+    assert "'fig.txt' must end in" in str(err.value)  # the repr's opening quote is not stripped
