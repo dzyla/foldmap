@@ -81,6 +81,7 @@ def test_plot_accepts_palette_style_and_loop_options(ubq, tmp_path):
 
 def test_plot_warns_about_loops_drawn_as_fallback_curves(ubq, tmp_path, capsys, monkeypatch):
     import foldmap.cli as cli
+    import foldmap.spec as spec
 
     real = cli.route_loops
 
@@ -89,7 +90,7 @@ def test_plot_warns_about_loops_drawn_as_fallback_curves(ubq, tmp_path, capsys, 
         loops[1].fallback = True
         return loops
 
-    monkeypatch.setattr(cli, "route_loops", one_stuck)
+    monkeypatch.setattr(spec, "route_loops", one_stuck)
     assert main(["plot", str(ubq), "-o", str(tmp_path / "u.svg")]) == 0
     err = capsys.readouterr().err
     assert "A:12-16>A:23-34" in err and "no clear route" in err

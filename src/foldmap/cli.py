@@ -21,9 +21,12 @@ from .palette import PALETTES
 from .render import LOOP_STYLES, STYLES, draw, save
 from .route import route_loops
 from .sheets import build_sheets
+from .spec import FigureSpec, draw_spec, figure_spec, layout_document, parse_domains, parse_protomers, parse_vector
 from .ss import build_sses
 from .style import CHOICES, LAYOUT_KEYS, SCALES, THEME_KEYS, THEMES, Style, describe, resolve_style
 from .symmetry import TOLERANCE, detect_symmetry
+
+_vector, _protomers, _domain_spec = parse_vector, parse_protomers, parse_domains  # older names, used by the app
 
 
 def summarize(path: str) -> str:
@@ -575,18 +578,6 @@ def make_figure(path, *args, **kwargs):
     return make_figure_and_loops(path, *args, **kwargs)[0]
 
 
-def _vector(text: str | None, what: str):
-    if text is None:
-        return None
-    try:
-        v = [float(x) for x in text.split(",")]
-    except ValueError:
-        v = []
-    if len(v) != 3:
-        raise ValueError(f"--{what} needs three numbers like 0,0,1; got {text!r}")
-    return v
-
-
 def _adjustments(args) -> dict:
     rename, swap, move = {}, [], []
     for item in args.rename:
@@ -614,52 +605,40 @@ def _adjustments(args) -> dict:
     }
 
 
-def _figure_spec(args):
-    """(theme, look, options, edits): a layout file (if given) overlaid by the command line, then defaults."""
-    doc = layoutfile.load(args.layout_file) if args.layout_file else {}
-    theme = args.theme or doc.get("theme") or "publication"
-    file_style = [f"{k}={v}" for k, v in (doc.get("style") or {}).items()]
+def _spec_of(args) -> FigureSpec:
+    """The figure the command line asks for: a layout file (if given) overlaid by the options given."""
     shorthand = [
         f"{k}={v}" for k, v in (("palette", args.palette), ("fill", args.style), ("loops", args.loops)) if v is not None
     ]
-    look = resolve_style(theme, args.style_file, file_style + shorthand + args.set)
-    lay = doc.get("layout") or {}
-
-    def pick(name, default):
-        value = getattr(args, name, None)
-        return value if value is not None else lay.get(name, default)
-
-    cli = _adjustments(args)
-    vec = lambda v, what: _vector(v, what) if isinstance(v, str) else v  # noqa: E731
-    protomers = args.protomers or lay.get("protomers")
-    opts = {
-        "mode": pick("mode", "projected"),
-        "rotate": float(pick("rotate", 0.0)),
-        "flip_v": bool(args.flip_v or lay.get("flip_v", False)),
-        "symmetry": pick("symmetry", "auto"),
-        "symmetry_tol": float(pick("symmetry_tol", TOLERANCE)),
-        "assembly": str(pick("assembly", "auto")),
-        "protomers": _protomers(protomers) if isinstance(protomers, str) else protomers,
-        "up": cli["up"] or vec(lay.get("up"), "up"),
-        "view": cli["view"] or vec(lay.get("view"), "view"),
-        "title": args.title if args.title is not None else lay.get("title"),
-    }
-    domains = _domain_spec(args.domain) or args.domains or doc.get("domains") or None
-    if isinstance(domains, dict):
-        domains = [(name, list(refs)) for name, refs in domains.items()]
-    opts["domains"] = domains
-    opts["msa"] = args.msa or lay.get("msa")
-    opts["membrane"] = args.membrane or lay.get("membrane", "off")
-    opts["uniprot"] = args.uniprot or lay.get("uniprot")
-    opts["focus"] = args.focus or lay.get("focus", "auto")
-    chains = args.chains or lay.get("chains")
-    opts["chains"] = [c.strip() for c in chains.split(",") if c.strip()] if isinstance(chains, str) else chains
-    opts["msa_reference"] = args.msa_reference or lay.get("msa_reference")
-    edits = layoutfile.edits_of(doc)
-    edits["rename"].update(cli["rename"])
-    edits["swap"] += cli["swap"]
-    edits["move"] += cli["move"]
-    return theme, look, opts, edits
+    edits = _adjustments(args)
+    return figure_spec(
+        args.structure,
+        theme=args.theme,
+        style=shorthand + args.set,
+        style_file=args.style_file,
+        layout_file=args.layout_file,
+        title=args.title,
+        mode=args.mode,
+        rotate=args.rotate,
+        flip_v=args.flip_v or None,
+        dna=False if args.no_dna else None,
+        symmetry=args.symmetry,
+        symmetry_tol=args.symmetry_tol,
+        protomers=args.protomers,
+        assembly=args.assembly,
+        up=edits["up"],
+        view=edits["view"],
+        domains=_domain_spec(args.domain) or args.domains,
+        msa=args.msa,
+        msa_reference=args.msa_reference,
+        membrane=args.membrane,
+        uniprot=args.uniprot,
+        chains=args.chains,
+        focus=args.focus,
+        rename=edits["rename"],
+        swap=edits["swap"],
+        move=edits["move"],
+    )
 
 
 def experimental_method(path) -> str | None:
@@ -674,22 +653,6 @@ def _has(module: str) -> bool:
     from importlib.util import find_spec
 
     return find_spec(module) is not None
-
-
-def _domain_spec(items: list[str]) -> list[tuple[str, list[str]]]:
-    out = []
-    for item in items:
-        name, sep, refs = item.partition("=")
-        if not sep or not name.strip() or not refs.strip():
-            raise ValueError(f"--domain needs NAME=REF[,REF...], got {item!r}")
-        out.append((name.strip(), [r.strip() for r in refs.split(",") if r.strip()]))
-    return out
-
-
-def _protomers(text: str | None) -> list[list[str]] | None:
-    if not text:
-        return None
-    return [[c.strip() for c in group.split(",") if c.strip()] for group in text.split(";") if group.strip()]
 
 
 def styles_help() -> str:
@@ -921,62 +884,31 @@ def main(argv: list[str] | None = None) -> int:
             print(styles_help())
             return 0
         if args.command in ("plot", "interactive"):
-            theme, look, opts, edits = _figure_spec(args)
-            kw = dict(
-                dna=not args.no_dna,
-                look=look,
-                symmetry=opts["symmetry"],
-                protomers=opts["protomers"],
-                symmetry_tol=opts["symmetry_tol"],
-                assembly=opts["assembly"],
-                up=opts["up"],
-                view=opts["view"],
-                domains=opts["domains"],
-                msa=opts["msa"],
-                membrane=opts["membrane"],
-                uniprot=opts["uniprot"],
-                chains=opts["chains"],
-                focus=opts["focus"],
-                msa_reference=opts["msa_reference"],
-                **edits,
-            )
+            spec = _spec_of(args)
             if args.command == "interactive":
                 from .interactive import write_page
 
-                page = dict(
-                    mode=opts["mode"],
-                    title=opts["title"],
-                    rotate=opts["rotate"],
-                    flip_v=opts["flip_v"],
-                    viewer=args.viewer,
-                )
                 for out in args.output:
-                    print(f"wrote {write_page(args.structure, out, **page, **kw)}")
+                    print(f"wrote {write_page(spec.structure, out, viewer=args.viewer, **spec.page_kwargs())}")
             else:
-                fig, routed = make_figure_and_loops(
-                    args.structure, opts["mode"], opts["rotate"], opts["flip_v"], opts["title"], **kw
-                )
-                stuck = [f"{l.a_id}>{l.b_id}" for l in routed if l.fallback]
-                if stuck:
+                drawn = draw_spec(spec)
+                if drawn.stuck:
                     print(
-                        f"foldmap: warning: no clear route for {len(stuck)} loop(s), drawn as plain curves "
-                        f"that may cross elements: {', '.join(stuck)}",
+                        f"foldmap: warning: no clear route for {len(drawn.stuck)} loop(s), drawn as plain curves "
+                        f"that may cross elements: {', '.join(drawn.stuck)}",
                         file=sys.stderr,
                     )
                 for out in args.output:
-                    print(f"wrote {save(fig, out)}")
-            if look.color_by == "plddt" and experimental_method(args.structure):
+                    print(f"wrote {save(drawn.figure, out)}")
+            method = experimental_method(spec.structure) if spec.look.color_by == "plddt" else None
+            if method:
                 print(
-                    f"foldmap: warning: {args.structure} is an experimental structure "
-                    f"({experimental_method(args.structure).lower()}); its B-factor column holds B-factors, "
-                    "not pLDDT confidence",
+                    f"foldmap: warning: {spec.structure} is an experimental structure ({method.lower()}); "
+                    "its B-factor column holds B-factors, not pLDDT confidence",
                     file=sys.stderr,
                 )
             if args.save_layout:
-                plain = {k: v for k, v in kw.items() if k not in ("rename", "swap", "move")}
-                layout, sses, _ = make_layout(args.structure, opts["mode"], opts["rotate"], opts["flip_v"], **plain)
-                doc = layoutfile.document(args.structure, theme, look, opts, edits, layout, sses)
-                print(f"wrote {layoutfile.save(args.save_layout, doc)}")
+                print(f"wrote {layoutfile.save(args.save_layout, layout_document(spec))}")
             return 0
         print(summarize(args.structure))
     except (FileNotFoundError, ValueError, RuntimeError) as err:  # RuntimeError: gemmi cannot read the file
