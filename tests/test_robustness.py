@@ -9,7 +9,7 @@ import pytest
 
 from foldmap.cli import main
 from foldmap.frame import view_frame
-from foldmap.io import load_backbone, load_nucleic
+from foldmap.io import _copies, load_backbone, load_nucleic
 from foldmap.layout import build_layout
 from helpers import pipeline
 
@@ -86,3 +86,9 @@ def test_ca_only_model_is_explained(ubq, tmp_path):
     trace = _strip(ubq, tmp_path, "ca.cif", lambda k, atom: atom == "CA")
     with pytest.raises(ValueError, match="only Cα atoms"):
         load_backbone(trace)
+
+
+@pytest.mark.parametrize("pdb, chains", [("4CH9", 2), ("6ZYA", 12), ("2HHB", 4)])
+def test_assembly_copies_count_chains_named_by_subchain(pdb, chains):
+    st = gemmi.read_structure(str(DATA / f"{pdb}.cif"))
+    assert _copies(st.assemblies[0], st[0]) == chains

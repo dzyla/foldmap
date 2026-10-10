@@ -69,6 +69,17 @@ def _drop_free_hetero(found):
 AUTO_MAX = 24  # `auto` builds assemblies up to this many chains (a capsid is better asked for by name)
 
 
+def _copies(assembly, model) -> int:
+    """Chains an assembly would build. PDB files name the chains of each generator; mmCIF files name subchains
+    (label_asym_id), which are mapped back to the chains that hold them."""
+    total = 0
+    for g in assembly.generators:
+        subchains = set(g.subchains)
+        chains = set(g.chains) or {c.name for c in model if any(r.subchain in subchains for r in c)}
+        total += len(g.operators) * len(chains)
+    return total
+
+
 def read_model(path: str | Path, assembly: str = "auto"):
     """(model, deposited chain names). assembly: 'asu' as deposited; an assembly id from the file; or 'auto':
     the first assembly when it adds copies and stays within AUTO_MAX chains."""
@@ -86,7 +97,7 @@ def read_model(path: str | Path, assembly: str = "auto"):
         return model, deposited
     if assembly == "auto":
         chosen = st.assemblies[0]
-        copies = sum(len(g.operators) * len(set(g.chains) or deposited) for g in chosen.generators)
+        copies = _copies(chosen, model)
         if copies <= len(deposited) or copies > AUTO_MAX:
             return model, deposited
     else:
