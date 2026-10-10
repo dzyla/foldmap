@@ -9,6 +9,8 @@ from typing import NamedTuple
 
 import numpy as np
 
+from .nucleic import BasePair, NAGap, NAStructure, secondary_structure
+
 
 class ResLabel(NamedTuple):
     chain: str
@@ -138,12 +140,35 @@ class NAStrand:
 @dataclass(eq=False)
 class Nucleic:
     """Nucleic acid of model 1. pairs: (strand a, nucleotide i, strand b, nucleotide j) with a <= b.
-    contacts: protein residue index (Backbone order) -> {(strand, nucleotide)} within contact distance."""
+    contacts: protein residue index (Backbone order) -> {(strand, nucleotide)} within contact distance.
+    base_pairs: the same pairs with their kind; structure: stems, runs and ties built from them; gaps: where
+    cropping left nucleotides out between two pieces of one strand."""
 
     strands: list[NAStrand] = field(default_factory=list)
     pairs: list[tuple[int, int, int, int]] = field(default_factory=list)
     contacts: dict[int, set[tuple[int, int]]] = field(default_factory=dict)
     contact_chain: dict[int, str] = field(default_factory=dict)  # protein chain of each contacting residue
+    base_pairs: list[BasePair] = field(default_factory=list)
+    structure: NAStructure = field(default_factory=NAStructure)
+    gaps: list[NAGap] = field(default_factory=list)
+
+    @property
+    def size(self) -> int:
+        return sum(len(s) for s in self.strands)
+
+
+def nucleic_from_pairs(strands, base_pairs, contacts, contact_chain, gaps=()) -> Nucleic:
+    """A Nucleic with its derived fields (pairs, structure) filled in."""
+    base_pairs = sorted(base_pairs)
+    return Nucleic(
+        list(strands),
+        [tuple(p[:4]) for p in base_pairs],
+        contacts,
+        contact_chain,
+        base_pairs,
+        secondary_structure(strands, base_pairs),
+        list(gaps),
+    )
 
 
 def crop_nucleic(na: Nucleic, flank: int = 6) -> Nucleic:

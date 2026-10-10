@@ -125,8 +125,8 @@ def main(argv=None) -> int:
         kept = {(c.name, r.seqid.num, r.seqid.icode.strip()) for c in st[0] for r in c}
         reference[pdb] = [p for p in _reference_pairs(text) if tuple(p[0]) in kept and tuple(p[1]) in kept]
         path = OUT / f"{pdb}.cif.gz"
-        with gzip.open(path, "wt", encoding="utf-8", compresslevel=9) as f:
-            f.write(st.make_mmcif_document().as_string())
+        cif = st.make_mmcif_document().as_string()
+        path.write_bytes(gzip.compress(cif.encode("utf-8"), 9, mtime=0))  # no timestamp: rerunning is reproducible
         size = path.stat().st_size
         total += size
         chains = ",".join(c.name for c in st[0])

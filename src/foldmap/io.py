@@ -10,7 +10,8 @@ import gemmi
 import numpy as np
 from scipy.spatial import cKDTree
 
-from .model import Backbone, Ligand, Links, NAStrand, Nucleic, ResLabel
+from .model import Backbone, Ligand, Links, NAStrand, Nucleic, ResLabel, nucleic_from_pairs
+from .nucleic import pair_nucleotides
 
 _BB_ATOMS = ("N", "CA", "C", "O")
 _PEPTIDE_BOND_MAX = 2.5  # Å, C(i-1)-N(i), as in DSSP
@@ -158,16 +159,20 @@ def load_backbone(
     return Backbone(labels, xyz, prev, (asu & chains) or chains, np.asarray(bfac, float))
 
 
-_PURINES = {"A", "G", "DA", "DG", "I", "DI"}
-_PYRIMIDINES = {"C", "U", "T", "DC", "DT", "DU"}
 _NA_LINK_MAX = 2.0  # Å, O3'(i-1)-P(i)
-_WC_MAX = 3.4  # Å, purine N1 - pyrimidine N3 in a Watson-Crick pair
 _CONTACT = 4.0  # Å, heavy atoms of a protein residue and a nucleotide
 
 
 def _is_nucleotide(res) -> bool:
+    """A nucleotide: tabulated as one (modified ones included), or, for a code gemmi does not know (5MC, YG),
+    a sugar with its C1', C4' and O4' plus a phosphate or O3' link."""
+    if res.find_atom("C1'", "*") is None:
+        return False
     info = gemmi.find_tabulated_residue(res.name)
-    return bool(info and info.is_nucleic_acid()) and res.find_atom("C1'", "*") is not None
+    if info is not None and info.is_nucleic_acid():
+        return True
+    names = {a.name for a in res}
+    return {"C4'", "O4'"} <= names and ("P" in names or "O3'" in names)
 
 
 def _nucleic_strands(model):
@@ -210,34 +215,6 @@ def _nucleic_strands(model):
     return strands
 
 
-def _watson_crick(strands) -> list[tuple[int, int, int, int]]:
-    """Each nucleotide's closest partner with purine N1 - pyrimidine N3 under _WC_MAX, on another strand or
-    far along the same one (a hairpin), mutual best only."""
-    atoms = []  # (strand, index, is_purine, position)
-    for a, (_, run) in enumerate(strands):
-        for i, r in enumerate(run):
-            name = r.name.strip()
-            pur = name in _PURINES
-            if not pur and name not in _PYRIMIDINES:
-                continue
-            at = r.find_atom("N1" if pur else "N3", "*")
-            if at is not None:
-                atoms.append((a, i, pur, np.array(at.pos.tolist())))
-    best: dict[tuple[int, int], tuple[float, tuple[int, int]]] = {}
-    for x in atoms:
-        for y in atoms:
-            if x[2] == y[2] or (x[0] == y[0] and abs(x[1] - y[1]) < 3):
-                continue
-            d = float(np.linalg.norm(x[3] - y[3]))
-            if d < _WC_MAX and d < best.get((x[0], x[1]), (np.inf,))[0]:
-                best[(x[0], x[1])] = (d, (y[0], y[1]))
-    pairs = set()
-    for k, (_, other) in best.items():
-        if best.get(other, (0, None))[1] == k:
-            pairs.add(min((k[0], k[1], other[0], other[1]), (other[0], other[1], k[0], k[1])))
-    return sorted(pairs)
-
-
 def load_nucleic(
     path: str | Path, bb: Backbone, assembly: str = "auto", *, model: tuple[gemmi.Model, set[str]] | None = None
 ) -> Nucleic:
@@ -264,7 +241,9 @@ def load_nucleic(
                     k = where.get((cra.chain.name, cra.residue.seqid.num, cra.residue.seqid.icode.strip()))
                     if k is not None:
                         contacts.setdefault(k, set()).add((s, i))
-    return Nucleic([s for s, _ in found], _watson_crick(found), contacts, {k: bb.labels[k].chain for k in contacts})
+    strands = [s for s, _ in found]
+    pairs = pair_nucleotides([run for _, run in found])
+    return nucleic_from_pairs(strands, pairs, contacts, {k: bb.labels[k].chain for k in contacts})
 
 
 SUGARS = {

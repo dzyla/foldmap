@@ -108,6 +108,19 @@ def test_no_ligands_need_no_search():
     assert io._bonded_parts([]) == set()
 
 
+def test_pairing_a_large_rna_is_fast():
+    import time
+
+    from foldmap.io import _nucleic_strands, read_model
+    from foldmap.nucleic import pair_nucleotides
+
+    model, _ = read_model(Path(__file__).parent / "data" / "na" / "4YBB.cif.gz", "asu")
+    runs = [run for _, run in _nucleic_strands(model)]
+    t = time.perf_counter()
+    pairs = pair_nucleotides(runs)
+    assert len(pairs) > 250 and time.perf_counter() - t < 3.0  # 1,000 nt: about 0.2 s measured
+
+
 def _random_state(n, seed=0):
     rng = np.random.default_rng(seed)
     P = rng.normal(0, 3, (n, 2))

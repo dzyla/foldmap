@@ -32,7 +32,7 @@ from foldmap.cli import make_layout
 DATA = Path(__file__).resolve().parent.parent / "tests" / "data"
 PHASES = {  # timed wherever they are looked up
     "read_model": (io, cli),
-    "_watson_crick": (io,),
+    "pair_nucleotides": (io,),
     "_ligands": (io,),
     "_attract": (layout,),
     "_separate": (layout,),
