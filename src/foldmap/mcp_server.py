@@ -101,16 +101,16 @@ def summarize_structure(source: str, assembly: str = "auto") -> str:
     for s in sses:
         p = layout.placed.get(s.id)
         label = p.label if p is not None else "?"
-        lines.append(f"  {label}: {s.chain} {s.first.seq}-{s.last.seq} ({kinds.get(s.kind, s.kind)}, {len(s)} res)")
+        lines.append(f"  {label}: {s.chain} {s.first.tag}-{s.last.tag} ({kinds.get(s.kind, s.kind)}, {len(s)} res)")
     links = layout.links
     if links is not None:
         for i, j in links.disulfides:
             a, b = bb.labels[i], bb.labels[j]
-            lines.append(f"disulfide: {a.chain} Cys{a.seq} - {b.chain} Cys{b.seq}")
+            lines.append(f"disulfide: {a.chain} Cys{a.tag} - {b.chain} Cys{b.tag}")
         for r, sugars in links.glycans:
-            lines.append(f"glycan on {bb.labels[r].chain} {bb.labels[r].name}{bb.labels[r].seq}: {'-'.join(sugars)}")
+            lines.append(f"glycan on {bb.labels[r].chain} {bb.labels[r].name}{bb.labels[r].tag}: {'-'.join(sugars)}")
         for g in links.ligands:
-            held = ", ".join(f"{bb.labels[r].name}{bb.labels[r].seq}" for r in g.contacts[:8])
+            held = ", ".join(f"{bb.labels[r].name}{bb.labels[r].tag}" for r in g.contacts[:8])
             extra = " (buffer additive, hidden by default)" if g.additive else ""
             lines.append(f"{'metal' if g.metal else 'ligand'} {g.name} {g.chain}{g.seq}: held by {held}{extra}")
     return "\n".join(lines)
@@ -139,13 +139,14 @@ def list_styles() -> str:
 def draw_topology(
     source: str,
     output_path: str | None = None,
-    theme: str = "publication",
+    theme: str | None = None,
     style: dict[str, str] | None = None,
     title: str | None = None,
-    assembly: str = "auto",
-    symmetry: str = "auto",
-    membrane: str = "off",
-    focus: str = "auto",
+    assembly: str | None = None,
+    symmetry: str | None = None,
+    membrane: str | None = None,
+    focus: str | None = None,
+    chains: list[str] | None = None,
     uniprot: str | None = None,
     uniprot_domains: bool = False,
     domains: dict[str, list[str]] | None = None,
@@ -153,112 +154,65 @@ def draw_topology(
     move: dict[str, list[float]] | None = None,
     rename: dict[str, str] | None = None,
     msa_path: str | None = None,
-    rotate: float = 0.0,
-    mode: str = "projected",
+    rotate: float | None = None,
+    mode: str | None = None,
     layout_file: str | None = None,
     save_layout: str | None = None,
 ) -> list:
     """Draw the topology diagram and write it to output_path (.svg, .png or .pdf; default: a temporary .svg).
-    Returns where it was written plus a PNG preview.
+    Returns where it was written plus a PNG preview of the same figure.
 
+    Options left out come from layout_file (if given), otherwise the defaults: theme publication, assembly auto,
+    symmetry auto, membrane off, focus auto, mode projected, rotate 0.
     style: style keys to change, e.g. {"color_by": "sequence", "residue_numbers": "true", "mark": "α2=#d1495b"}.
     domains: named domain panels, e.g. {"N-lobe": ["res:A:13-59"]}. swap: pairs of elements to exchange, e.g.
     [["α1", "α3"]]. move: nudges in page units, e.g. {"α2": [1, -2]}. rename: {"res:A:167-182": "Gd"}.
     membrane: off, auto (draw the lipid bilayer) or flip (the same, the two sides swapped). focus: auto draws
     filaments, cages and large assemblies as one subunit plus the neighbouring parts of its fold; none draws the
     whole assembly; or chains, e.g. "B".
+    chains: draw only these chains, e.g. ["A", "B"].
     msa_path: alignment for theme 'conservation'. uniprot: "auto" or an accession, to mark UniProt active and binding
     sites (style key uniprot_sites: all, or types like "active,modified"); uniprot_domains: UniProt domain panels.
     layout_file / save_layout: load or write a YAML layout file that re-creates the figure
     (save_layout must end in .yaml or .yml)."""
-    from .cli import main
+    from . import layoutfile
+    from .render import save
+    from .spec import draw_spec, figure_spec, layout_document
 
-    _theme(theme)  # a readable message instead of argparse's exit
     path = _structure(source)
-    if save_layout:  # checked first, so a bad layout path leaves no temporary folder behind
-        save_layout = str(_output(save_layout, ".yaml", path.stem, LAYOUT_SUFFIXES))
+    keep = _output(save_layout, ".yaml", path.stem, LAYOUT_SUFFIXES) if save_layout else None  # checked first
     out = _output(output_path, ".svg", path.stem, FIGURE_SUFFIXES)
-    argv = [
-        "plot",
-        str(path),
-        "-o",
-        str(out),
-        "--theme",
-        theme,
-        "--assembly",
-        assembly,
-        "--symmetry",
-        symmetry,
-        "--membrane",
-        membrane,
-        "--focus",
-        focus,
-        "--mode",
-        mode,
-        "--rotate",
-        str(rotate),
-    ]
-    for key, value in (style or {}).items():
-        argv += ["--set", f"{key}={value}"]
-    if uniprot:
-        argv += ["--uniprot", uniprot]
-        if uniprot_domains:
-            argv += ["--domains", "uniprot"]
-    for name, refs in (domains or {}).items():
-        argv += ["--domain", f"{name}={','.join(refs)}"]
-    for pair in swap or []:
-        argv += ["--swap", ",".join(pair)]
-    for ref, (dx, dy) in (move or {}).items():
-        argv += ["--move", f"{ref}={dx},{dy}"]
-    for ref, name in (rename or {}).items():
-        argv += ["--rename", f"{ref}={name}"]
-    if title:
-        argv += ["--title", title]
-    if msa_path:
-        argv += ["--msa", msa_path]
-    if layout_file:
-        argv += ["--layout-file", layout_file]
-    if save_layout:
-        argv += ["--save-layout", save_layout]
-    _run(main, argv)
-    preview = _figure_preview(path, theme, style, title, assembly, symmetry, membrane, msa_path, focus)
-    note = f"wrote {out}" + (f" and layout file {save_layout}" if save_layout else "")
-    return [note, preview] if preview is not None else [note]
-
-
-def _run(main, argv: list[str]) -> None:
-    import contextlib
-    import io
-
-    err = io.StringIO()
-    with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(err):
-        try:
-            code = main(argv)
-        except SystemExit as exit_:  # argparse rejects an argument by exiting; the server must live on
-            code = exit_.code if isinstance(exit_.code, int) else 2
-    if code != 0:
-        raise ValueError(err.getvalue().strip() or "foldmap failed")
-
-
-def _figure_preview(path, theme, style, title, assembly, symmetry, membrane, msa_path, focus="auto"):
-    from .cli import make_figure
-    from .style import resolve_style
-
-    try:
-        look = resolve_style(theme, None, [f"{k}={v}" for k, v in (style or {}).items()])
-        fig = make_figure(
-            path,
-            title=title,
-            look=look,
-            assembly=assembly,
-            symmetry=symmetry,
-            membrane=membrane,
-            msa=msa_path,
-            focus=focus,
-        )
-        return _preview(fig)
-    except ValueError:
-        return None
+    for ref, d in (move or {}).items():
+        if len(d) != 2:
+            raise ValueError(f"move needs two numbers [dx, dy] for {ref!r}, got {d!r}")
+    spec = figure_spec(
+        path,
+        theme=theme,
+        style=[f"{k}={v}" for k, v in (style or {}).items()],
+        layout_file=layout_file,
+        title=title,
+        mode=mode,
+        rotate=rotate,
+        assembly=assembly,
+        symmetry=symmetry,
+        membrane=membrane,
+        focus=focus,
+        chains=chains,
+        uniprot=uniprot,
+        domains="uniprot" if uniprot and uniprot_domains else [(n, list(r)) for n, r in (domains or {}).items()],
+        msa=msa_path,
+        rename=rename,
+        swap=[tuple(p) for p in swap or []],
+        move=[(ref, (d[0], d[1])) for ref, d in (move or {}).items()],
+    )
+    drawn = draw_spec(spec)
+    save(drawn.figure, out)
+    note = f"wrote {out}"
+    if keep is not None:
+        note += f" and layout file {layoutfile.save(keep, layout_document(spec))}"
+    if drawn.stuck:
+        note += f"; no clear route for {', '.join(drawn.stuck)} (drawn as plain curves)"
+    return [note, _preview(drawn.figure)]
 
 
 @tool

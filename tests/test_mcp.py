@@ -210,3 +210,43 @@ def test_output_dir_covers_layouts_pages_and_default_outputs(tmp_path, monkeypat
     assert len(list(root.glob("foldmap-*/*.svg"))) == 1
     call("draw_sequence", {"source": UBQ, "output_path": str(root / "UPPER.SVG")})
     assert (root / "UPPER.SVG").is_file()
+
+
+def test_layout_file_settings_are_not_overridden_by_tool_defaults(tmp_path):
+    from foldmap.cli import main
+
+    lf = tmp_path / "fig.yaml"
+    first = ["plot", UBQ, "-o", str(tmp_path / "a.svg"), "--theme", "blueprint", "--rotate", "90"]
+    assert main([*first, "--save-layout", str(lf)]) == 0
+    assert main(["plot", UBQ, "-o", str(tmp_path / "cli.svg"), "--layout-file", str(lf)]) == 0
+    call("draw_topology", {"source": UBQ, "output_path": str(tmp_path / "mcp.svg"), "layout_file": str(lf)})
+    assert (tmp_path / "mcp.svg").read_text() == (tmp_path / "cli.svg").read_text()
+
+
+def test_draw_topology_lays_out_once_and_previews_that_figure(tmp_path, monkeypatch):
+    import foldmap.cli as cli
+
+    calls = []
+    real = cli.make_layout
+    monkeypatch.setattr(cli, "make_layout", lambda *a, **k: (calls.append(1), real(*a, **k))[1])
+    r = call("draw_topology", {"source": UBQ, "output_path": str(tmp_path / "u.svg"), "rename": {"res:A:1-7": "Zq"}})
+    assert len(calls) == 1 and [c.type for c in r.content] == ["text", "image"]
+    assert ">Zq<" in (tmp_path / "u.svg").read_text()
+
+
+def test_draw_topology_takes_chains_and_checks_moves(tmp_path):
+    from mcp.server.mcpserver.exceptions import ToolError
+
+    out = tmp_path / "hb.svg"
+    call("draw_topology", {"source": str(DATA / "2HHB.cif"), "output_path": str(out), "chains": ["A"], "focus": "none"})
+    assert 'id="helix:A:' in out.read_text() and 'id="helix:B:' not in out.read_text()
+    with pytest.raises(ToolError, match="two numbers"):
+        call("draw_topology", {"source": UBQ, "output_path": str(tmp_path / "x.svg"), "move": {"A": [1]}})
+
+
+def test_a_structure_without_elements_still_gets_a_preview(tmp_path):
+    from helpers import tripeptide
+
+    tri = tripeptide(DATA / "1UBQ.cif", tmp_path)
+    r = call("draw_topology", {"source": str(tri), "output_path": str(tmp_path / "t.svg")})
+    assert [c.type for c in r.content] == ["text", "image"]
