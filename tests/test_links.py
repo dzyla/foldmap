@@ -301,4 +301,15 @@ def test_4ch9_bond_lying_on_another_detours_in_a_bracket():
     assert np.hypot(*(v[1] - v[0])) >= step - 1e-9  # the legs are at least a lane step long
     along = (straight[1] - straight[0]) / np.hypot(*(straight[1] - straight[0]))
     gap = abs((v[1] - straight[0]) @ np.array([-along[1], along[0]]))
-    assert gap >= step - 2 * lw * 2.4 / (scale * 72)  # the run clears the straight bar by about a lane step
+    assert gap >= step - 1e-9  # the run clears the straight bar by a lane step
+
+
+@pytest.mark.parametrize("inches_per_unit", [0.12, 0.3, 0.6])  # a large, a typical and a small figure
+def test_the_lane_step_clears_a_sulfur_dot(inches_per_unit):
+    from foldmap.render import _IN_PER_UNIT, disulfide_step
+
+    ppu = inches_per_unit * 72
+    lw = float(np.clip(0.9 * inches_per_unit / _IN_PER_UNIT, 0.5, 1.2))  # the line width draw() derives
+    step = disulfide_step(lw, ppu)
+    assert step > 5.5 * lw / ppu  # more than a dot's diameter
+    assert step >= 3 * 2.4 * lw / ppu  # and three bar widths
