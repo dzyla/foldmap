@@ -595,7 +595,14 @@ def disulfide_points(layout, loops, sses, chains, i: int, j: int):
 _SS_MIN = 0.5  # shortest disulfide bar drawn (page units)
 _SS_PARALLEL = np.cos(np.radians(10))  # bars closer in direction than this can lie on top of each other
 _SS_CLEAR = 2.0  # bars nearer than this many bar widths (side by side) cannot be told apart
-_SS_STEP = 1.5  # lane spacing of a detouring bar, in bar widths
+_SS_STEP = 3.0  # lane spacing of a detouring bar: at least this many bar widths...
+_SS_DOT_STEP = 2.5  # ...and this many sulfur-dot radii, so the legs always stand out from a dot
+
+
+def disulfide_step(lw: float, pt_per_unit: float) -> float:
+    """Spacing between lanes of detouring bars, page units (bar and dot sizes as _draw_links draws them)."""
+    bar, dot_radius = lw * 2.4 / pt_per_unit, lw * 5.5 / 2 / pt_per_unit
+    return max(_SS_STEP * bar, _SS_DOT_STEP * dot_radius)
 
 
 def _unit(a, b) -> np.ndarray:
@@ -643,17 +650,17 @@ def disulfide_lanes(segments, width: float) -> list[int]:
     return lanes
 
 
-def disulfide_route(a, b, lane: int, side: int, width: float) -> list[tuple[float, float]]:
+def disulfide_route(a, b, lane: int, side: int, step: float) -> list[tuple[float, float]]:
     """The points of a bar: straight in lane 0, else out from each cysteine, along, and back (side is +/-1)."""
     a, b = np.asarray(a, float), np.asarray(b, float)
     if lane == 0:
         return [tuple(a), tuple(b)]
     u = _unit(a, b)
-    off = side * lane * _SS_STEP * width * np.array([-u[1], u[0]])
+    off = side * lane * step * np.array([-u[1], u[0]])
     return [tuple(a), tuple(a + off), tuple(b + off), tuple(b)]
 
 
-def disulfide_side(a, b, lane: int, taken, width: float) -> int:
+def disulfide_side(a, b, lane: int, taken, width: float, step: float) -> int:
     """Which side (+1 or -1 of the bar's left normal) a detour leaves on: the one with less overlap against the
     boxes in taken; a tie goes below, or to the right for a vertical bar."""
     u = _unit(a, b)
@@ -664,7 +671,7 @@ def disulfide_side(a, b, lane: int, taken, width: float) -> int:
         below = 1 if n[0] > 0 else -1  # vertical bar: the sign whose normal points right
 
     def covered(side: int) -> float:
-        pts = disulfide_route(a, b, lane, side, width)
+        pts = disulfide_route(a, b, lane, side, step)
         total, h = 0.0, width / 2
         for p, q in zip(pts, pts[1:]):
             x0, y0, x1, y1 = min(p[0], q[0]) - h, min(p[1], q[1]) - h, max(p[0], q[0]) + h, max(p[1], q[1]) + h
@@ -903,12 +910,13 @@ def _draw_links(
             if a is not None and b is not None:
                 bars.append((i, j, a, b))
         width = lw * 2.4 / pt_per_unit  # bar width in page units
+        step = disulfide_step(lw, pt_per_unit)
         lanes = disulfide_lanes([(a, b) for _, _, a, b in bars], width)
         keep_out = [p.rect for p in layout.placed.values()] + [g.rect for g in layout.ghosts]
         keep_out += [box for _, box in label_boxes(layout, sses)]
         for (i, j, a, b), lane in zip(bars, lanes):
-            side = disulfide_side(a, b, lane, keep_out, width) if lane else 1
-            route = disulfide_route(a, b, lane, side, width)
+            side = disulfide_side(a, b, lane, keep_out, width, step) if lane else 1
+            route = disulfide_route(a, b, lane, side, step)
             bar = PathPatch(
                 Path(route, [Path.MOVETO] + [Path.LINETO] * (len(route) - 1)),
                 fc="none",

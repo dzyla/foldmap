@@ -256,10 +256,10 @@ def test_the_bracket_leaves_on_the_side_with_less_in_the_way():
     from foldmap.render import disulfide_side
 
     a, b = np.array([0.0, 0.0]), np.array([3.0, 0.0])
-    assert disulfide_side(a, b, 1, [], 0.1) == -1  # nothing in the way: below (the normal of a -> b points up)
-    assert disulfide_side(b, a, 1, [], 0.1) == 1  # the same side whichever way the bar is read
-    assert disulfide_side(a, b, 1, [(0.5, -1.0, 2.5, -0.1)], 0.1) == 1  # a box below pushes it above
-    assert disulfide_side(np.array([0.0, 0.0]), np.array([0.0, 3.0]), 1, [], 0.1) == -1  # vertical: to the right
+    assert disulfide_side(a, b, 1, [], 0.1, 0.3) == -1  # nothing in the way: below (the normal of a -> b points up)
+    assert disulfide_side(b, a, 1, [], 0.1, 0.3) == 1  # the same side whichever way the bar is read
+    assert disulfide_side(a, b, 1, [(0.5, -1.0, 2.5, -0.1)], 0.1, 0.3) == 1  # a box below pushes it above
+    assert disulfide_side(np.array([0.0, 0.0]), np.array([0.0, 3.0]), 1, [], 0.1, 0.3) == -1  # vertical: to the right
 
 
 def test_overlapping_bars_are_drawn_as_brackets_that_keep_their_cysteines(monkeypatch):
@@ -291,3 +291,14 @@ def test_4ch9_bond_lying_on_another_detours_in_a_bracket():
     assert [len(v) for _, v in sorted(bars.items())].count(4) == 1
     assert len(bars["disulfide:249-512"]) == 4  # nested under the longer bar, ends still on its cysteines
     assert any(d.get_gid() == "ss-dot:249-512" for d in _gids(fig, "ss-dot:"))
+    from foldmap.render import _IN_PER_UNIT, disulfide_step
+
+    ax = fig.axes[0]
+    scale = fig.get_figwidth() / np.subtract(*ax.get_xlim()[::-1])  # inches per page unit
+    lw = float(np.clip(0.9 * scale / _IN_PER_UNIT, 0.5, 1.2))
+    step = disulfide_step(lw, scale * 72)
+    v, straight = bars["disulfide:249-512"], bars["disulfide:226-535"]
+    assert np.hypot(*(v[1] - v[0])) >= step - 1e-9  # the legs are at least a lane step long
+    along = (straight[1] - straight[0]) / np.hypot(*(straight[1] - straight[0]))
+    gap = abs((v[1] - straight[0]) @ np.array([-along[1], along[0]]))
+    assert gap >= step - 2 * lw * 2.4 / (scale * 72)  # the run clears the straight bar by about a lane step
