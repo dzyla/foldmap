@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import re
+import threading
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 
 import numpy as np
@@ -537,6 +539,33 @@ def _attract(
         it.home = (it.cx, it.cy)
 
 
+_BLAS_LOCK = threading.Lock()
+_BLAS_USERS = 0  # layouts running under the one-thread limit, across threads (the app draws several at once)
+_BLAS_LIMIT = None
+
+
+@contextmanager
+def _one_blas_thread():
+    """BLAS limited to one thread while L-BFGS runs: its vectors are a few hundred long, so threads only add
+    overhead, and with several figures at once (app, MCP) they oversubscribe every core. The limit is
+    process-wide, so the first layout in sets it and the last one out restores it."""
+    global _BLAS_USERS, _BLAS_LIMIT
+    from threadpoolctl import threadpool_limits
+
+    with _BLAS_LOCK:
+        if _BLAS_USERS == 0:
+            _BLAS_LIMIT = threadpool_limits(limits=1, user_api="blas")
+        _BLAS_USERS += 1
+    try:
+        yield
+    finally:
+        with _BLAS_LOCK:
+            _BLAS_USERS -= 1
+            if _BLAS_USERS == 0:
+                _BLAS_LIMIT.restore_original_limits()
+                _BLAS_LIMIT = None
+
+
 def _collide(a: _Item, ha, ma, b: _Item, hb, mb) -> bool:
     """Do the footprints (half extents h, centre offsets m) of a and b, plus MARGIN, overlap?"""
     dx, dy = b.cx + mb[0] - a.cx - ma[0], b.cy + mb[1] - a.cy - ma[1]
@@ -872,7 +901,8 @@ def build_layout(
                 items[i].cx, items[i].cy = items[j].cx + k * spread, items[j].cy + k * lift
                 items[i].home = (items[j].home[0] + k * spread, items[j].home[1] + k * lift)
         if attract and len(items) > 1:
-            _attract(items, sses, contacts, ties, spread, getattr(frame, "rise", 0.0) * SCALE, bridges or [])
+            with _one_blas_thread():
+                _attract(items, sses, contacts, ties, spread, getattr(frame, "rise", 0.0) * SCALE, bridges or [])
         _separate(items)
         if domains and _part_domains(items, domains):
             _separate(items)
