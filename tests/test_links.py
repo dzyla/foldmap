@@ -221,3 +221,73 @@ def test_free_sugars_are_ligands():
     _, ha = _links("2WR7_site")
     (analogue,) = ha.ligands
     assert analogue.symbol == "Gal·GlcNAc·Gal·Neu5Ac" and not ha.glycans
+
+
+def _seg(x0, x1, y=0.0):
+    return (np.array([x0, y]), np.array([x1, y]))
+
+
+def test_bars_on_top_of_each_other_take_separate_lanes():
+    from foldmap.render import disulfide_lanes
+
+    assert disulfide_lanes([_seg(0, 2), _seg(1, 3)], 0.1) == [0, 1]
+    assert disulfide_lanes([_seg(0, 4), _seg(1, 3), _seg(2, 5)], 0.1) == [0, 1, 2]
+    assert disulfide_lanes([_seg(3, 1), _seg(2, 0)], 0.1) == [0, 1]  # the direction of a bar does not matter
+
+
+def test_bars_that_do_not_cover_each_other_stay_straight():
+    from foldmap.render import disulfide_lanes
+
+    assert disulfide_lanes([_seg(0, 1), _seg(2, 3)], 0.1) == [0, 0]  # disjoint spans, same height
+    assert disulfide_lanes([_seg(0, 2), _seg(0, 2, y=0.5)], 0.1) == [0, 0]  # parallel but clearly apart
+    cross = [(np.array([0.0, -1.0]), np.array([0.0, 1.0])), _seg(-1, 1)]
+    assert disulfide_lanes(cross, 0.1) == [0, 0]  # crossing at 90 degrees
+    slanted = (np.array([0.0, 0.0]), np.array([2.0, 0.6]))
+    assert disulfide_lanes([_seg(0, 2), slanted], 0.1) == [0, 0]  # about 17 degrees apart
+
+
+def test_a_chain_of_overlaps_reuses_lanes():
+    from foldmap.render import disulfide_lanes
+
+    assert disulfide_lanes([_seg(0, 2), _seg(1, 3), _seg(2.5, 4)], 0.1) == [0, 1, 0]
+
+
+def test_the_bracket_leaves_on_the_side_with_less_in_the_way():
+    from foldmap.render import disulfide_side
+
+    a, b = np.array([0.0, 0.0]), np.array([3.0, 0.0])
+    assert disulfide_side(a, b, 1, [], 0.1) == -1  # nothing in the way: below (the normal of a -> b points up)
+    assert disulfide_side(b, a, 1, [], 0.1) == 1  # the same side whichever way the bar is read
+    assert disulfide_side(a, b, 1, [(0.5, -1.0, 2.5, -0.1)], 0.1) == 1  # a box below pushes it above
+    assert disulfide_side(np.array([0.0, 0.0]), np.array([0.0, 3.0]), 1, [], 0.1) == -1  # vertical: to the right
+
+
+def test_overlapping_bars_are_drawn_as_brackets_that_keep_their_cysteines(monkeypatch):
+    import foldmap.render as render
+
+    path = DATA / "6ZS5.cif"
+    pairs = load_links(path, load_backbone(path)).disulfides
+    spots = {}
+    for k, pair in enumerate(pairs):  # the first two lie on top of each other, the others far apart
+        y = 0.0 if k < 2 else 50.0 * k
+        spots[pair] = (np.array([1.0, y]), np.array([4.0 + k, y]))
+    monkeypatch.setattr(render, "disulfide_points", lambda lay, loops, sses, chains, i, j: spots[(i, j)])
+    fig = make_figure(path)
+    bars = {b.get_gid(): b.get_path().vertices for b in _gids(fig, "disulfide:")}
+    first, second = (bars[f"disulfide:{i}-{j}"] for i, j in pairs[:2])
+    assert len(first) == 2 and len(second) == 4
+    a, b = spots[pairs[1]]
+    assert np.allclose(second[0], a) and np.allclose(second[-1], b)  # still ends on its cysteines
+    assert abs(second[1][1] - a[1]) >= 0.1 and np.isclose(second[1][1], second[2][1])  # a lane clear of the first bar
+    assert all(len(v) == 2 for g, v in bars.items() if g not in {f"disulfide:{i}-{j}" for i, j in pairs[:2]})
+    dots = {d.get_gid(): d.get_offsets() for d in _gids(fig, "ss-dot:")}
+    i, j = pairs[1]
+    assert np.allclose(dots[f"ss-dot:{i}-{j}"], [a, b])
+
+
+def test_4ch9_bond_lying_on_another_detours_in_a_bracket():
+    fig = make_figure(DATA / "4CH9.cif")
+    bars = {b.get_gid(): b.get_path().vertices for b in _gids(fig, "disulfide:")}
+    assert [len(v) for _, v in sorted(bars.items())].count(4) == 1
+    assert len(bars["disulfide:249-512"]) == 4  # nested under the longer bar, ends still on its cysteines
+    assert any(d.get_gid() == "ss-dot:249-512" for d in _gids(fig, "ss-dot:"))

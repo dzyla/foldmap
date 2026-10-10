@@ -593,6 +593,89 @@ def disulfide_points(layout, loops, sses, chains, i: int, j: int):
 
 
 _SS_MIN = 0.5  # shortest disulfide bar drawn (page units)
+_SS_PARALLEL = np.cos(np.radians(10))  # bars closer in direction than this can lie on top of each other
+_SS_CLEAR = 2.0  # bars nearer than this many bar widths (side by side) cannot be told apart
+_SS_STEP = 1.5  # lane spacing of a detouring bar, in bar widths
+
+
+def _unit(a, b) -> np.ndarray:
+    d = np.asarray(b, float) - np.asarray(a, float)
+    return d / (np.hypot(*d) or 1.0)
+
+
+def _bars_collide(s, t, width: float) -> bool:
+    """Two bars (point pairs) nearly parallel, closer than _SS_CLEAR bar widths and overlapping along their length."""
+    u, v = _unit(*s), _unit(*t)
+    if abs(u @ v) < _SS_PARALLEL:
+        return False
+    n = np.array([-u[1], u[0]])
+    if np.mean([abs((np.asarray(p, float) - np.asarray(s[0], float)) @ n) for p in t]) >= _SS_CLEAR * width:
+        return False
+    along_s = sorted(float((np.asarray(p, float) - np.asarray(s[0], float)) @ u) for p in s)
+    along_t = sorted(float((np.asarray(p, float) - np.asarray(s[0], float)) @ u) for p in t)
+    return min(along_s[1], along_t[1]) > max(along_s[0], along_t[0])
+
+
+def disulfide_lanes(segments, width: float) -> list[int]:
+    """A lane for each bar: 0 stays straight; bars that would lie on top of one another get different lanes, by
+    interval colouring in order of where they start (so the result does not depend on the order given)."""
+    n = len(segments)
+    hit = [[_bars_collide(segments[i], segments[j], width) if i != j else False for j in range(n)] for i in range(n)]
+    lanes = [0] * n
+    done: set[int] = set()
+    for i in range(n):  # one conflict group at a time, coloured along the group's first bar
+        if i in done:
+            continue
+        group, todo = [], [i]
+        while todo:
+            k = todo.pop()
+            if k not in done:
+                done.add(k)
+                group.append(k)
+                todo.extend(j for j in range(n) if hit[k][j] and j not in done)
+        origin, u = np.asarray(segments[min(group)][0], float), _unit(*segments[min(group)])
+        start = {k: min(float((np.asarray(p, float) - origin) @ u) for p in segments[k]) for k in group}
+        placed: list[int] = []
+        for k in sorted(group, key=lambda k: (start[k], k)):
+            used = {lanes[j] for j in placed if hit[k][j]}
+            lanes[k] = next(lane for lane in range(n) if lane not in used)
+            placed.append(k)
+    return lanes
+
+
+def disulfide_route(a, b, lane: int, side: int, width: float) -> list[tuple[float, float]]:
+    """The points of a bar: straight in lane 0, else out from each cysteine, along, and back (side is +/-1)."""
+    a, b = np.asarray(a, float), np.asarray(b, float)
+    if lane == 0:
+        return [tuple(a), tuple(b)]
+    u = _unit(a, b)
+    off = side * lane * _SS_STEP * width * np.array([-u[1], u[0]])
+    return [tuple(a), tuple(a + off), tuple(b + off), tuple(b)]
+
+
+def disulfide_side(a, b, lane: int, taken, width: float) -> int:
+    """Which side (+1 or -1 of the bar's left normal) a detour leaves on: the one with less overlap against the
+    boxes in taken; a tie goes below, or to the right for a vertical bar."""
+    u = _unit(a, b)
+    n = np.array([-u[1], u[0]])
+    if abs(n[1]) > 1e-9:
+        below = 1 if n[1] < 0 else -1  # the sign whose normal points down
+    else:
+        below = 1 if n[0] > 0 else -1  # vertical bar: the sign whose normal points right
+
+    def covered(side: int) -> float:
+        pts = disulfide_route(a, b, lane, side, width)
+        total, h = 0.0, width / 2
+        for p, q in zip(pts, pts[1:]):
+            x0, y0, x1, y1 = min(p[0], q[0]) - h, min(p[1], q[1]) - h, max(p[0], q[0]) + h, max(p[1], q[1]) + h
+            total += sum(
+                max(0.0, min(x1, bx1) - max(x0, bx0)) * max(0.0, min(y1, by1) - max(y0, by0))
+                for bx0, by0, bx1, by1 in taken
+            )
+        return total
+
+    less = covered(1) - covered(-1)
+    return below if abs(less) < 1e-9 else (1 if less < 0 else -1)
 
 
 def _nearest_beyond(pts: np.ndarray, q) -> tuple[float, float]:
@@ -803,25 +886,36 @@ def _draw_uniprot(ax, marks: list[dict], layout, lw: float, font: float) -> None
         ax.add_patch(dot)
 
 
-def _draw_links(ax, layout: Layout, loops: list[Loop], sses: list[SSE], look: Style, lw: float) -> None:
+def _draw_links(
+    ax, layout: Layout, loops: list[Loop], sses: list[SSE], look: Style, lw: float, pt_per_unit: float
+) -> None:
     links = layout.links
     if links is None:
         return
     chains = layout.res_chain
     shown = lambda r: not layout.partial or chains[r] not in layout.partial  # noqa: E731 - fragments: no links
     if look.disulfides:
+        bars = []
         for i, j in links.disulfides:
             if not (shown(i) and shown(j)):
                 continue
             a, b = disulfide_points(layout, loops, sses, chains, i, j)
-            if a is None or b is None:
-                continue
+            if a is not None and b is not None:
+                bars.append((i, j, a, b))
+        width = lw * 2.4 / pt_per_unit  # bar width in page units
+        lanes = disulfide_lanes([(a, b) for _, _, a, b in bars], width)
+        keep_out = [p.rect for p in layout.placed.values()] + [g.rect for g in layout.ghosts]
+        keep_out += [box for _, box in label_boxes(layout, sses)]
+        for (i, j, a, b), lane in zip(bars, lanes):
+            side = disulfide_side(a, b, lane, keep_out, width) if lane else 1
+            route = disulfide_route(a, b, lane, side, width)
             bar = PathPatch(
-                Path([a, b], [Path.MOVETO, Path.LINETO]),
+                Path(route, [Path.MOVETO] + [Path.LINETO] * (len(route) - 1)),
                 fc="none",
                 ec=_SULFUR,
                 lw=lw * 2.4,
                 capstyle="round",
+                joinstyle="round",
                 zorder=3.7,
             )
             bar.set_gid(f"disulfide:{i}-{j}")
@@ -1493,7 +1587,7 @@ def _draw(
                 )
                 t.set_gid(f"label:{p.sse.id}")
 
-    _draw_links(ax, layout, loops, sses, look, lw)
+    _draw_links(ax, layout, loops, sses, look, lw, pt_per_unit)
     _draw_ligands(ax, marks, lw, font)
     _draw_uniprot(ax, umarks, layout, lw, font)
 
