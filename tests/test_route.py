@@ -5,7 +5,7 @@ import pytest
 
 from foldmap.frame import view_frame
 from foldmap.layout import ETA_W, HELIX_W, PITCH, Layout, Placed, build_layout
-from foldmap.route import _INFLATE, route_loops
+from foldmap.route import _INFLATE, _Grid, route_loops, segment_clear
 from helpers import fake_sse, pipeline
 
 MODES = ["projected", "stack"]
@@ -246,3 +246,60 @@ def test_kink_shortcut_does_not_cross_a_third_element(third):
     grown = np.add(third.rect, (-_INFLATE, -_INFLATE, _INFLATE, _INFLATE))  # with the router's clearance
     clear = all(clip_len(p, q, grown) < 1e-9 for p, q in zip(loop.points, loop.points[1:]))
     assert loop.fallback or clear  # a drawn route (not the marked fallback curve) never passes through it
+
+
+def corner_chains():
+    """Four lone helices far apart: they stretch the page until the router's grid cells are coarse."""
+    return [
+        Placed(fake_sse("H", 0, 9, chain=c), x, y, 4.0, 0.0, HELIX_W, "α")
+        for c, x, y in (("W", 0, 0), ("X", 1480, 0), ("Y", 0, 1480), ("Z", 1480, 1480))
+    ]
+
+
+def other_rects(loop, placed):
+    return [p.rect for p in placed if p.sse.id not in (loop.a_id, loop.b_id)]
+
+
+@pytest.mark.parametrize("step", range(12))
+def test_coarse_grid_keeps_narrow_elements(step):
+    a = Placed(fake_sse("E", 0, 7), 700.0, 700.0, 3.0, np.pi / 2, PITCH, "A")  # up; C port on top
+    b = Placed(fake_sse("E", 20, 27), 706.0, 700.0, 3.0, -np.pi / 2, PITCH, "B")  # down; N port on top
+    eta = Placed(fake_sse("G", 0, 3, chain="C"), 702.4 + step * 0.1, 702.0, 16.0, np.pi / 2, HELIX_W * ETA_W, "η1")
+    placed = [a, b, eta, *corner_chains()]
+    lay = layout_of(*placed)
+    assert _Grid(lay).res > 1.2  # narrower than a cell once grown by the clearance
+    loops = route_loops(lay, [p.sse for p in placed], stub_bb(10_000))
+    (loop,) = [l for l in loops if l.a_id == a.sse.id]
+    assert loop.fallback or all(segment_clear(p, q, [eta.rect], grow=0.0) for p, q in zip(loop.points, loop.points[1:]))
+
+
+@pytest.mark.parametrize("page", ["normal", "big"])
+def test_random_layouts_never_route_through_an_element(page):
+    rng = np.random.default_rng(0)
+    widths = {"H": HELIX_W, "E": PITCH, "G": HELIX_W * ETA_W}
+    checked = 0
+    for _ in range(150):
+        off = 700.0 if page == "big" else 0.0
+        placed = []
+        for i in range(int(rng.integers(4, 9))):
+            kind = str(rng.choice(["H", "E", "G"]))
+            ang = float(rng.choice([0, np.pi / 2, np.pi, -np.pi / 2]))
+            x, y, length = rng.uniform(0, 14) + off, rng.uniform(0, 10) + off, rng.uniform(2, 6)
+            placed.append(Placed(fake_sse(kind, 20 * i, 20 * i + 9), x, y, length, ang, widths[kind], f"e{i}"))
+        r = np.array([p.rect for p in placed])
+        if any(
+            min(r[i, 2], r[j, 2]) > max(r[i, 0], r[j, 0]) - 0.05
+            and min(r[i, 3], r[j, 3]) > max(r[i, 1], r[j, 1]) - 0.05
+            for i in range(len(placed))
+            for j in range(i + 1, len(placed))
+        ):
+            continue  # only non-overlapping boxes; near-touching ones are allowed
+        placed += corner_chains() if page == "big" else []
+        lay = layout_of(*placed)
+        assert (_Grid(lay).res > 1.0) == (page == "big")
+        for loop in route_loops(lay, [p.sse for p in placed], stub_bb(10_000)):
+            checked += 1
+            if not loop.fallback:
+                rects = other_rects(loop, placed)
+                assert all(segment_clear(p, q, rects, grow=0.0) for p, q in zip(loop.points, loop.points[1:])), loop
+    assert checked > 100

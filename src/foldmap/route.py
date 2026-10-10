@@ -44,11 +44,14 @@ class _Grid:
         xs = self.x0 + (np.arange(self.nx) + 0.5) * self.res
         ys = self.y0 + (np.arange(self.ny) + 0.5) * self.res
 
+        reach = (self.res - RES) / 2  # on a coarse grid a cell is blocked if any part of it meets the obstacle
+
         def mask(rects):
             m = np.zeros((self.nx, self.ny), bool)
             for rx0, ry0, rx1, ry1 in rects:
                 m |= np.outer(
-                    (xs > rx0 - _INFLATE) & (xs < rx1 + _INFLATE), (ys > ry0 - _INFLATE) & (ys < ry1 + _INFLATE)
+                    (xs + reach > rx0 - _INFLATE) & (xs - reach < rx1 + _INFLATE),
+                    (ys + reach > ry0 - _INFLATE) & (ys - reach < ry1 + _INFLATE),
                 )
             return m
 
