@@ -629,7 +629,10 @@ def _one_blas_thread():
 
     with _BLAS_LOCK:
         if _BLAS_USERS == 0:
-            _BLAS_LIMIT = threadpool_limits(limits=1, user_api="blas")
+            try:
+                _BLAS_LIMIT = threadpool_limits(limits=1, user_api="blas")
+            except Exception:  # a broken BLAS must not fail the figure: run without the limit
+                _BLAS_LIMIT = None
         _BLAS_USERS += 1
     try:
         yield
@@ -637,7 +640,8 @@ def _one_blas_thread():
         with _BLAS_LOCK:
             _BLAS_USERS -= 1
             if _BLAS_USERS == 0:
-                _BLAS_LIMIT.restore_original_limits()
+                if _BLAS_LIMIT is not None:
+                    _BLAS_LIMIT.restore_original_limits()
                 _BLAS_LIMIT = None
 
 

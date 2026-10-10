@@ -118,8 +118,11 @@ def read_model(path: str | Path, assembly: str = "auto"):
     return built, asu
 
 
-def load_backbone(path: str | Path, assembly: str = "auto", *, model=None) -> Backbone:
-    """`model`: read_model(path, assembly) already in hand (a figure reads the file once for every loader)."""
+def load_backbone(
+    path: str | Path, assembly: str = "auto", *, model: tuple[gemmi.Model, set[str]] | None = None
+) -> Backbone:
+    """`model`: the result of read_model(path, assembly), with this same assembly, already in hand (a figure reads
+    the file once for every loader)."""
     model, asu = model or read_model(path, assembly)
     labels: list[ResLabel] = []
     coords: list[list[list[float]]] = []
@@ -233,9 +236,11 @@ def _watson_crick(strands) -> list[tuple[int, int, int, int]]:
     return sorted(pairs)
 
 
-def load_nucleic(path: str | Path, bb: Backbone, assembly: str = "auto", *, model=None) -> Nucleic:
+def load_nucleic(
+    path: str | Path, bb: Backbone, assembly: str = "auto", *, model: tuple[gemmi.Model, set[str]] | None = None
+) -> Nucleic:
     """Nucleic-acid strands of model 1, their base pairs, and which protein residues touch which nucleotides.
-    `model`: as for load_backbone."""
+    `model`: as for load_backbone (same assembly)."""
     model, _ = model or read_model(path, assembly)
     st = gemmi.Structure()  # NeighborSearch wants a cell; an empty one means none
 
@@ -299,10 +304,12 @@ _SS_MAX = 2.5  # Å between cysteine SG atoms
 _GLYCAN_LINK_MAX = 2.0  # Å between a sugar's anomeric carbon and the atom it is bonded to
 
 
-def load_links(path: str | Path, bb: Backbone, assembly: str = "auto", *, model=None) -> Links:
+def load_links(
+    path: str | Path, bb: Backbone, assembly: str = "auto", *, model: tuple[gemmi.Model, set[str]] | None = None
+) -> Links:
     """Disulfide bridges (SG-SG) and glycans (a sugar's anomeric carbon on Asn ND2, Ser OG or Thr OG1, then
     sugar-to-sugar). Sugars in no glycan (bound saccharides, receptor analogues) are ligands.
-    `model`: as for load_backbone."""
+    `model`: as for load_backbone (same assembly)."""
     model, _ = model or read_model(path, assembly)
     where = {(l.chain, l.seq, l.icode): k for k, l in enumerate(bb.labels)}
 

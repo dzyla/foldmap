@@ -130,7 +130,11 @@ def main(argv=None) -> int:
     args = ap.parse_args(argv)
     if args.check and not (args.exact or args.area):
         ap.error("--check needs --exact or --area, otherwise it cannot fail")
-    tmp = Path(tempfile.mkdtemp())
+    with tempfile.TemporaryDirectory() as tmp:
+        return _run(args, Path(tmp))
+
+
+def _run(args, tmp: Path) -> int:
     names = args.names or [p.stem for p in sorted(DATA.glob("*.cif"))] + ["big32"]
     files = [big_complex(tmp / "big32.cif") if n == "big32" else DATA / f"{n}.cif" for n in names]
     for name, mods in PHASES.items():

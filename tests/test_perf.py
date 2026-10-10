@@ -56,19 +56,24 @@ def _pile(n):
 
 
 def test_layout_runs_blas_on_one_thread_and_restores_it(monkeypatch):
-    before = _blas_threads()
-    seen = []
-    real = L._attract
+    from threadpoolctl import threadpool_limits
 
-    def spy(*a, **k):
-        seen.append(_blas_threads())
-        return real(*a, **k)
+    if not _blas_threads():
+        pytest.skip("no BLAS library detected")
+    with threadpool_limits(2, "blas"):  # not already 1, so 'one inside, restored after' says something
+        before = _blas_threads()
+        seen = []
+        real = L._attract
 
-    monkeypatch.setattr(L, "_attract", spy)
-    sses, f = _pile(4)
-    build_layout(sses, [], f, "projected")
-    assert seen and all(t == 1 for t in seen[0])
-    assert _blas_threads() == before
+        def spy(*a, **k):
+            seen.append(_blas_threads())
+            return real(*a, **k)
+
+        monkeypatch.setattr(L, "_attract", spy)
+        sses, f = _pile(4)
+        build_layout(sses, [], f, "projected")
+        assert seen and all(t == 1 for t in seen[0])
+        assert _blas_threads() == before
 
 
 def test_overlapping_layouts_in_threads_keep_the_limit_and_restore_it():
@@ -273,3 +278,32 @@ def test_a_32_chain_complex_lays_out_in_reasonable_time(tmp_path):
     for i, a in enumerate(rects):
         for b in rects[i + 1 :]:
             assert min(a[2], b[2]) - max(a[0], b[0]) <= 1e-6 or min(a[3], b[3]) - max(a[1], b[1]) <= 1e-6
+
+
+def test_a_broken_blas_limit_does_not_fail_the_figure(monkeypatch):
+    import threadpoolctl
+
+    def broken(*a, **k):
+        raise RuntimeError("broken BLAS")
+
+    monkeypatch.setattr(threadpoolctl, "threadpool_limits", broken)
+    with L._one_blas_thread():
+        pass
+    with L._one_blas_thread():  # the count stayed consistent: the next layout tries again, and also runs
+        assert L._BLAS_USERS == 1
+    assert L._BLAS_USERS == 0 and L._BLAS_LIMIT is None
+    sses, f = _pile(3)
+    build_layout(sses, [], f, "projected")
+
+
+def test_bench_leaves_no_temp_dir_behind(monkeypatch, tmp_path):
+    import tempfile
+
+    sys.path.insert(0, str(ROOT / "scripts"))
+    try:
+        import bench
+    finally:
+        sys.path.pop(0)
+    monkeypatch.setattr(tempfile, "tempdir", str(tmp_path))
+    assert bench.main(["2HHB"]) == 0
+    assert list(tmp_path.iterdir()) == []
