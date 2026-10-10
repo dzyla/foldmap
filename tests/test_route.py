@@ -8,7 +8,7 @@ import pytest
 from foldmap import route
 from foldmap.frame import view_frame
 from foldmap.layout import ETA_W, HELIX_W, PITCH, Layout, Placed, build_layout, label_boxes
-from foldmap.route import _INFLATE, _MAX_CELLS, _Grid, route_loops, segment_clear
+from foldmap.route import _INFLATE, _MAX_CELLS, _Grid, route_loops
 from helpers import fake_sse, pipeline
 
 MODES = ["projected", "stack"]
@@ -231,6 +231,11 @@ def clip_len(p, q, rect):
         if t0 >= t1:
             return 0.0
     return (t1 - t0) * np.hypot(dx, dy)
+
+
+def segment_clear(p, q, rects, grow=_INFLATE) -> bool:
+    """True when segment p-q keeps the clearance from every rect (each grown by `grow`)."""
+    return all(clip_len(p, q, (r[0] - grow, r[1] - grow, r[2] + grow, r[3] + grow)) <= 1e-9 for r in rects)
 
 
 @pytest.mark.parametrize(

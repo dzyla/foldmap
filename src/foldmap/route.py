@@ -15,10 +15,10 @@ from .model import SSE
 
 RES = 0.25  # grid cell size, page units
 _INFLATE = 0.15  # keep loops this far from arrows
-# A drawn loop nearer than this to an element counts as crossing it. A free cell can come within RES/2 of
-# an inflated obstacle (at any res, as the reach makes up the rest of the coarser cell), and the port snap
-# moves a run anywhere inside its cells, so a snapped route keeps at least _INFLATE - RES/2 = 0.025: 0.02
-# leaves a margin. A drawing that still breaches it is redrawn unsnapped, then becomes the flagged fallback.
+# A drawn loop nearer than this to an element counts as crossing it. A free cell centre reaches RES/2 into the
+# _INFLATE clearance margin (at any res, the reach makes up the rest of a coarser cell), and the port snap
+# moves a run anywhere inside its cells, so a snapped route can come as close as _INFLATE - RES/2 = 0.025:
+# 0.02 leaves a margin. A drawing that still breaches it is redrawn unsnapped, then becomes the flagged fallback.
 _TOUCH = 0.02
 _TURN = 2.5
 _REUSE = 6.0  # extra cost for a cell an earlier loop already uses
@@ -128,12 +128,6 @@ def clip_len(p, q, rect) -> float:
         if t0 >= t1:
             return 0.0
     return (t1 - t0) * math.hypot(dx, dy)
-
-
-def segment_clear(p, q, rects, grow=_INFLATE) -> bool:
-    """True when segment p-q keeps the routing clearance from every rect (each grown by `grow`).
-    The router uses _clear; this simple form is kept for the tests."""
-    return all(clip_len(p, q, (r[0] - grow, r[1] - grow, r[2] + grow, r[3] + grow)) <= 1e-9 for r in rects)
 
 
 def _crosses_body(p, q, e: Placed) -> bool:
@@ -355,6 +349,7 @@ def route_loops(layout: Layout, sses: list[SSE], bb) -> list[Loop]:
     for a, b in sorted(pairs, key=dist):
         pa, pb = layout.placed[a.id], layout.placed[b.id]
         gap = np.subtract(pb.n_port, pa.c_port)
+        # a kink is drawn straight with no grid clearance, so it clears by the full _INFLATE (drawn routes use _TOUCH)
         if (
             b.start - a.end - 1 <= KINK_GAP
             and np.hypot(*gap) < 1.5
