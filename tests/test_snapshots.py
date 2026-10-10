@@ -5,7 +5,9 @@ Refactors of the layout and drawing code must keep these unchanged. After an int
 and review the JSON diff before committing it.
 """
 
+import os
 import sys
+from functools import lru_cache
 from pathlib import Path
 
 import pytest
@@ -85,6 +87,32 @@ def test_snapshot_roundtrip_keeps_unicode_and_lf(tmp_path):
     assert load(path) == fp
 
 
+@pytest.mark.parametrize(
+    ("ci", "family", "outcome"),
+    [
+        (None, "Liberation Sans", "pass"),
+        ("true", "Liberation Sans", "pass"),
+        (None, "DejaVu Sans", "skip"),
+        ("true", "DejaVu Sans", "fail"),
+    ],
+)
+def test_missing_snapshot_font_skips_locally_and_fails_in_ci(monkeypatch, ci, family, outcome):
+    monkeypatch.setattr(sys, "platform", "linux")
+    monkeypatch.setattr(sys.modules[__name__], "_resolved_font_family", lambda: family)
+    if ci is None:
+        monkeypatch.delenv("CI", raising=False)
+    else:
+        monkeypatch.setenv("CI", ci)
+    if outcome == "pass":
+        _require_snapshot_font()
+        return
+    expected = pytest.skip.Exception if outcome == "skip" else pytest.fail.Exception
+    with pytest.raises(expected) as info:
+        _require_snapshot_font()
+    message = str(info.value)
+    assert f"resolved {family!r}" in message and "fonts-liberation" in message
+
+
 CASES = {
     "1UBQ-publication": ("1UBQ.cif", []),  # sheet panel, helix, terminus
     "1TIM-symmetry": ("1TIM.cif", []),  # symmetric assembly: protomer ghosts
@@ -100,25 +128,45 @@ CASES = {
 }
 
 
+@lru_cache(maxsize=1)
 def _resolved_font_family() -> str:
     """Family of the font matplotlib picks for foldmap's font list (what the figures are measured in)."""
     try:
         path = font_manager.findfont(font_manager.FontProperties(family=render._FONTS))
         return font_manager.FontProperties(fname=path).get_name()
-    except Exception:  # noqa: BLE001 - an unresolvable font simply disables the snapshots
+    except Exception:  # noqa: BLE001 - an unresolvable font is reported as "" by _font_problem
         return ""
 
 
-_FONT = _resolved_font_family() if sys.platform == "linux" else ""
-_SNAPSHOT_SKIP = (
-    "snapshots need Linux with Liberation Sans installed (CI: apt-get install fonts-liberation): "
-    f"fonts differ by machine, so text metrics and glyph paths do; matplotlib resolved {_FONT!r}"
-)
+def _font_problem() -> str | None:
+    """Why the figure snapshots cannot be compared on this machine, or None when they can."""
+    if sys.platform != "linux":
+        return f"snapshots are recorded on Linux only (platform is {sys.platform})"
+    family = _resolved_font_family()
+    if family != "Liberation Sans":
+        return (
+            "snapshots need Liberation Sans (install fonts-liberation: sudo apt-get install fonts-liberation); "
+            f"matplotlib resolved {family!r}. Fonts differ by machine, so text metrics and glyph paths do."
+        )
+    return None
 
 
-@pytest.mark.skipif(sys.platform != "linux" or _FONT != "Liberation Sans", reason=_SNAPSHOT_SKIP)
+def _skip_or_fail(reason: str) -> None:
+    """Skip locally; under CI on Linux a font that does not resolve fails the run instead of skipping it."""
+    if os.environ.get("CI") and sys.platform == "linux":
+        pytest.fail(reason, pytrace=False)
+    pytest.skip(reason)
+
+
+def _require_snapshot_font() -> None:
+    problem = _font_problem()
+    if problem is not None:
+        _skip_or_fail(problem)
+
+
 @pytest.mark.parametrize("name", sorted(CASES))
 def test_figure_matches_snapshot(name, tmp_path, update_snapshots):
+    _require_snapshot_font()
     file, flags = CASES[name]
     out = tmp_path / "f.svg"
     assert main(["plot", str(DATA / file), "-o", str(out), *flags]) == 0
