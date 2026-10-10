@@ -13,7 +13,7 @@ def pipeline(path, assembly="asu"):
     """Step-1 pipeline on the file as deposited (figures build the biological assembly; unit tests don't)."""
     bb = load_backbone(path, assembly)
     d = assign_dssp(bb)
-    sses = build_sses(bb, d.ss)
+    sses = build_sses(bb, d.ss, bridges=d.bridges)
     return bb, sses, build_sheets(sses, d.bridges)
 
 

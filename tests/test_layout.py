@@ -130,20 +130,24 @@ def test_stack_mode_is_compact_rows_in_sequence_order(zs5):
     sses, sheets, _, lay = build(zs5, "stack")
     x0, _, x1, _ = lay.bounds
     assert x1 - x0 <= 45
-    blocks = []  # (anchor chain, first residue, row, x) per sheet or helix
+    blocks = []  # (anchor chain, first residue, top, bottom, x) per sheet or helix
     for sh in sheets:
         first = min(sh.strands, key=lambda s: s.start)
         ps = [lay.placed[s.id] for s in sh.strands]
-        blocks.append((first.chain, first.start, round(-ps[0].cy, 3), float(np.mean([p.cx for p in ps]))))
+        top, bottom = max(p.rect[3] for p in ps), min(p.rect[1] for p in ps)
+        blocks.append((first.chain, first.start, top, bottom, float(np.mean([p.cx for p in ps]))))
     for s in sses:
         if s.kind == "H":
             p = lay.placed[s.id]
-            blocks.append((s.chain, s.start, round(-p.cy, 3), p.cx))
+            blocks.append((s.chain, s.start, p.rect[3], p.rect[1], p.cx))
     for chain in {b[0] for b in blocks}:
         mine = sorted(b for b in blocks if b[0] == chain)  # by first residue
-        reading = [(b[2], b[3]) for b in mine]
-        assert reading == sorted(reading), chain  # row by row, left to right
-    assert len({b[2] for b in blocks}) > 1  # it really wraps into several rows
+        for (_, _, t0, b0, x0), (_, _, t1, b1, x1) in zip(mine, mine[1:]):
+            if b1 < t0 and b0 < t1:  # side by side in one row (blocks are centred, not top-aligned): left to right
+                assert x1 > x0, chain
+            else:  # or on the next row down
+                assert t1 <= b0, chain
+    assert max(b[3] for b in blocks) >= min(b[2] for b in blocks)  # it really wraps into several rows
 
 
 def test_helix_pile_on_one_point_is_separated():

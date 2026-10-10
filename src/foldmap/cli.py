@@ -28,7 +28,7 @@ from .symmetry import TOLERANCE, detect_symmetry
 def summarize(path: str) -> str:
     bb = load_backbone(path)
     dssp = assign_dssp(bb)
-    sses = build_sses(bb, dssp.ss, short_helices=True)
+    sses = build_sses(bb, dssp.ss, short_helices=True, bridges=dssp.bridges)
     sheets = build_sheets(sses, dssp.bridges)
     lines = [f"{path}: {len(bb)} residues, {len(set(l.chain for l in bb.labels))} chain(s)"]
     lines.append(
@@ -103,7 +103,7 @@ def make_layout(
     if (look or Style()).color_by == "conservation" and not msa:
         raise ValueError("conservation colouring needs an alignment: add --msa ALIGNMENT")
     dssp = assign_dssp(bb)
-    sses = build_sses(bb, dssp.ss, short_helices=(look or Style()).helices_310)
+    sses = build_sses(bb, dssp.ss, short_helices=(look or Style()).helices_310, bridges=dssp.bridges)
     sheets = build_sheets(sses, dssp.bridges)
     nucleic = load_nucleic(path, bb, assembly) if dna else None
     if nucleic is not None and (look or Style()).dna_extent == "contacts":

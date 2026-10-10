@@ -57,7 +57,7 @@ def chain_track(path, chain: str | None = None, full_sequence: bool = False) -> 
     unmodelled stretches inside it); full_sequence covers the whole deposited sequence."""
     bb = load_backbone(path, "asu")
     dssp = assign_dssp(bb)
-    sses = build_sses(bb, dssp.ss, short_helices=True)
+    sses = build_sses(bb, dssp.ss, short_helices=True, bridges=dssp.bridges)
     labels = {k: p.label for k, p in provisional(sses).placed.items()}
     chains = list(dict.fromkeys(l.chain for l in bb.labels))
     if not chains:

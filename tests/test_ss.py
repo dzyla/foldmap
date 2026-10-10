@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import numpy as np
 
 from foldmap.dssp import assign_dssp
@@ -72,3 +74,13 @@ def test_merge_never_crosses_chain_break(zs5):
     ss[i + 1 : i + 4] = "EEE"  # break sits between, one residue (i) in the gap
     for s in build_sses(bb, "".join(ss)):
         assert all(bb.prev[k] for k in range(s.start + 1, s.end + 1))
+
+
+def test_strands_one_residue_apart_join_only_when_they_share_a_partner():
+    bb = load_backbone(Path(__file__).parent / "data" / "6ZS5.cif", "asu")
+    d = assign_dssp(bb)
+    ids = {s.id for s in build_sses(bb, d.ss, bridges=d.bridges)}
+    assert {"A:419-428", "A:430-434"} <= ids and "A:419-434" not in ids  # each half pairs with another sheet
+    r74 = load_backbone(Path(__file__).parent / "data" / "6R74.cif", "asu")
+    d = assign_dssp(r74)
+    assert "A:127-147" in {s.id for s in build_sses(r74, d.ss, bridges=d.bridges)}  # one partner: still one strand

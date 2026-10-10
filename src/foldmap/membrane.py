@@ -54,7 +54,8 @@ def find_membrane(path, bb: Backbone) -> Membrane | None:
 
 
 def _estimate(bb: Backbone) -> Membrane | None:
-    sses = build_sses(bb, assign_dssp(bb).ss)
+    dssp = assign_dssp(bb)
+    sses = build_sses(bb, dssp.ss, bridges=dssp.bridges)
     long = [s for s in sses if (s.kind == "H" and len(s) >= 16) or (s.kind == "E" and len(s) >= 8)]
     if not long:
         return None
