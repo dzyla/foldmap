@@ -51,7 +51,7 @@ class _Grid:
         # On a coarse grid a cell is blocked if any part of it meets the obstacle: the open interval of blocked
         # centres, the rect grown by _INFLATE and then by reach on each side, is w + res + 0.05 > res long on
         # each axis, so even a zero-width obstacle always blocks at least one cell.
-        reach = (self.res - RES) / 2
+        self.reach = reach = (self.res - RES) / 2
 
         def mask(rects):
             m = np.zeros((self.nx, self.ny), bool)
@@ -91,8 +91,9 @@ class _Grid:
         return self.cells_along(port, self.center(end)) - {end}
 
     def free_cell_along(self, port, exit_vec, own: Placed):
-        """First free cell on the way out of a port. Only the element's own bounding box (a tilted
-        helix end can sit inside it) may be skipped; any other obstacle in the way means no route."""
+        """First free cell on the way out of a port. Only the cells the element's own bounding box blocks
+        (a tilted helix end can sit inside it) may be skipped; any other obstacle in the way means no route."""
+        g = _INFLATE + self.reach
         rx0, ry0, rx1, ry1 = own.rect
         for t in _PUSH:
             pt = (port[0] + exit_vec[0] * t, port[1] + exit_vec[1] * t)
@@ -100,7 +101,7 @@ class _Grid:
             if self.free(c):
                 return c
             cx, cy = self.center(c)
-            if not (rx0 - _INFLATE < cx < rx1 + _INFLATE and ry0 - _INFLATE < cy < ry1 + _INFLATE):
+            if not (rx0 - g < cx < rx1 + g and ry0 - g < cy < ry1 + g):
                 return None
         return None
 

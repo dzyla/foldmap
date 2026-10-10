@@ -394,3 +394,17 @@ def test_kink_between_tilted_pieces_with_overlapping_boxes_stays_straight():
     lay = layout_of(a, b)
     (loop,) = route_loops(lay, [a.sse, b.sse], stub_bb())
     assert not loop.fallback and len(loop.points) == 2
+
+
+@pytest.mark.parametrize("x", [700.0, 700.3, 700.6, 700.9])
+def test_coarse_grid_still_routes_an_open_loop(x):
+    """On a coarse grid a port's first cells are blocked by its own element out to the cell reach; they must
+    be skipped like the element's own box, not taken to wall the port in."""
+    a = Placed(fake_sse("E", 0, 7), x, 700.0, 3.0, np.pi / 2, PITCH, "A")  # up; C port on top
+    b = Placed(fake_sse("E", 20, 27), x + 6.0, 700.0, 3.0, -np.pi / 2, PITCH, "B")  # down; N port on top
+    placed = [a, b, *corner_chains()]
+    lay = layout_of(*placed)
+    assert _Grid(lay).res > 1.2
+    (loop,) = [l for l in route_loops(lay, [p.sse for p in placed], stub_bb(10_000)) if l.a_id == a.sse.id]
+    assert not loop.fallback
+    assert all(segment_clear(p, q, [a.rect, b.rect], grow=0.0) for p, q in zip(loop.points, loop.points[1:]))
