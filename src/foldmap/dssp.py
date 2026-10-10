@@ -91,7 +91,8 @@ def _turn_starts(bonds: set[tuple[int, int]], nxt: np.ndarray, n: int) -> dict[i
 
 
 def _find_bridges(bb: Backbone, bonds: set[tuple[int, int]]) -> list[Bridge]:
-    """Bridges i < j (j >= i + 3). As in DSSP, i-1, i+1, j-1 and j+1 must exist and be peptide-bonded to i and j."""
+    """Bridges i < j (j >= i + 3). As in DSSP, i-1, i+1, j-1 and j+1 must exist and be peptide-bonded to i and j,
+    and a pair matching both patterns is parallel."""
     prev, nxt = bb.prev, bb.nxt
     out: list[Bridge] = []
     for i, j in sorted(cKDTree(bb.ca).query_pairs(_CA_CUTOFF)):
@@ -99,7 +100,7 @@ def _find_bridges(bb: Backbone, bonds: set[tuple[int, int]]) -> list[Bridge]:
             continue
         if ((i - 1, j) in bonds and (j, i + 1) in bonds) or ((j - 1, i) in bonds and (i, j + 1) in bonds):
             out.append(Bridge(i, j, "P"))
-        if ((i, j) in bonds and (j, i) in bonds) or ((i - 1, j + 1) in bonds and (j - 1, i + 1) in bonds):
+        elif ((i, j) in bonds and (j, i) in bonds) or ((i - 1, j + 1) in bonds and (j - 1, i + 1) in bonds):
             out.append(Bridge(i, j, "A"))
     return out
 

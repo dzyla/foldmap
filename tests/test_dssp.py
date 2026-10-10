@@ -241,3 +241,15 @@ def test_ladders_scale_to_large_assemblies():
     ladders = _ladders(bridges, np.ones(60_020, bool))
     assert time.perf_counter() - start < 1.0
     assert len(ladders) == 3000 and ladders[5] == Ladder("A", [100, 101], [109, 110])
+
+
+def test_a_bridge_matching_both_patterns_is_parallel():
+    from foldmap.dssp import _find_bridges
+    from foldmap.model import Backbone, ResLabel
+
+    # residues 3 and 7 satisfy the parallel pattern (2->7, 7->4) and the antiparallel one (3->7, 7->3):
+    # mkdssp's TestBridge checks parallel first and calls it parallel only
+    n = 10
+    xyz = np.random.default_rng(0).uniform(0, 4, (n, 4, 3))
+    bb = Backbone([ResLabel("A", k + 1, "", "ALA") for k in range(n)], xyz, np.r_[False, np.ones(n - 1, bool)])
+    assert _find_bridges(bb, {(2, 7), (7, 4), (3, 7), (7, 3)}) == [Bridge(3, 7, "P")]
