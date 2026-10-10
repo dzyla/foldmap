@@ -141,7 +141,8 @@ def draw_topology(
     domains: named domain panels, e.g. {"N-lobe": ["res:A:13-59"]}. swap: pairs of elements to exchange, e.g.
     [["α1", "α3"]]. move: nudges in page units, e.g. {"α2": [1, -2]}. rename: {"res:A:167-182": "Gd"}.
     membrane: off, auto (draw the lipid bilayer) or flip (the same, the two sides swapped). focus: auto draws
-    filaments, cages and large assemblies as one subunit plus the neighbouring parts of its fold; none draws the whole assembly; or chains, e.g. "B".
+    filaments, cages and large assemblies as one subunit plus the neighbouring parts of its fold; none draws the
+    whole assembly; or chains, e.g. "B".
     msa_path: alignment for theme 'conservation'. uniprot: "auto" or an accession, to mark UniProt active and binding
     sites (style key uniprot_sites: all, or types like "active,modified"); uniprot_domains: UniProt domain panels.
     layout_file / save_layout: load or write a YAML layout file that re-creates the figure."""
