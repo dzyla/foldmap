@@ -253,3 +253,17 @@ def test_a_bridge_matching_both_patterns_is_parallel():
     xyz = np.random.default_rng(0).uniform(0, 4, (n, 4, 3))
     bb = Backbone([ResLabel("A", k + 1, "", "ALA") for k in range(n)], xyz, np.r_[False, np.ones(n - 1, bool)])
     assert _find_bridges(bb, {(2, 7), (7, 4), (3, 7), (7, 3)}) == [Bridge(3, 7, "P")]
+
+
+def test_bridge_candidates_come_from_the_hbonds_not_a_ca_cutoff():
+    """An antiparallel bridge whose Cα atoms are just over 9 Å apart is still a bridge (mkdssp tests every pair)."""
+    from types import SimpleNamespace
+
+    from foldmap.dssp import _find_bridges
+
+    n = 40
+    ca = np.zeros((n, 3))
+    ca[:, 0] = np.arange(n) * 3.8  # an extended chain: residues 10 and 30 are 76 Å apart along x
+    bb = SimpleNamespace(prev=np.r_[False, np.ones(n - 1, bool)], nxt=np.r_[np.ones(n - 1, bool), False], ca=ca)
+    bonds = {(10, 30), (30, 10)}  # antiparallel pattern Hbond(i, j) and Hbond(j, i)
+    assert [tuple(b) for b in _find_bridges(bb, bonds)] == [(10, 30, "A")]

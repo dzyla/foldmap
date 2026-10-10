@@ -92,10 +92,18 @@ def _turn_starts(bonds: set[tuple[int, int]], nxt: np.ndarray, n: int) -> dict[i
 
 def _find_bridges(bb: Backbone, bonds: set[tuple[int, int]]) -> list[Bridge]:
     """Bridges i < j (j >= i + 3). As in DSSP, i-1, i+1, j-1 and j+1 must exist and be peptide-bonded to i and j,
-    and a pair matching both patterns is parallel."""
+    and a pair matching both patterns is parallel. Every pattern needs an H-bond between {i-1, i, i+1} and
+    {j-1, j, j+1}, so only pairs next to an H-bonded pair are tested (mkdssp tests all pairs, with the same result)."""
     prev, nxt = bb.prev, bb.nxt
+    n = len(prev)
+    near = set()
+    for a, d in bonds:
+        for x in (a - 1, a, a + 1):
+            for y in (d - 1, d, d + 1):
+                if 0 <= x < n and 0 <= y < n:
+                    near.add((min(x, y), max(x, y)))
     out: list[Bridge] = []
-    for i, j in sorted(cKDTree(bb.ca).query_pairs(_CA_CUTOFF)):
+    for i, j in sorted(near):
         if j < i + 3 or not (prev[i] and nxt[i] and prev[j] and nxt[j]):
             continue
         if ((i - 1, j) in bonds and (j, i + 1) in bonds) or ((j - 1, i) in bonds and (i, j + 1) in bonds):
