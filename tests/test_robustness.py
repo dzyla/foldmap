@@ -121,3 +121,12 @@ def test_each_thread_draws_on_its_own_page(monkeypatch):
 def test_typical_colour_ties_go_to_the_first_met():
     assert render._typical(["#bbbbbb", "#aaaaaa", None, "#aaaaaa", "#bbbbbb"]) == "#bbbbbb"
     assert render._typical([None]) is None
+
+
+@pytest.mark.parametrize("name, content", [("notes.txt", "just some notes\n"), ("cut.cif", "data_x\nloop_\n_atom")])
+def test_files_that_are_not_structures_are_reported(tmp_path, capsys, name, content):
+    f = tmp_path / name
+    f.write_text(content, encoding="utf-8")
+    assert main(["summary", str(f)]) == 1
+    err = capsys.readouterr().err
+    assert err.startswith("foldmap: ") and "Traceback" not in err

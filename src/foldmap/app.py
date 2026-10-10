@@ -281,7 +281,7 @@ def main() -> None:
         try:
             path = fetch(example or ss.get("source", ""), (up.name, up.getvalue()) if up and not example else None)
             ss["info"] = summary(path)
-        except (ValueError, FileNotFoundError, OSError) as err:
+        except (ValueError, FileNotFoundError, OSError, RuntimeError) as err:  # RuntimeError: gemmi cannot read it
             ss["load_error"] = str(err)
             return
         ss["path"], ss["stage"], ss["load_error"] = str(path), "style", ""

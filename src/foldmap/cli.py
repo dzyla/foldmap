@@ -897,7 +897,7 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"wrote {layoutfile.save(args.save_layout, doc)}")
             return 0
         print(summarize(args.structure))
-    except (FileNotFoundError, ValueError) as err:
+    except (FileNotFoundError, ValueError, RuntimeError) as err:  # RuntimeError: gemmi cannot read the file
         print(f"foldmap: {err}", file=sys.stderr)
         return 1
     return 0

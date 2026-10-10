@@ -169,3 +169,10 @@ def test_style_stage_draws_nothing(monkeypatch):
     assert at.session_state["stage"] == "style" and not at.exception
     assert len(at.image) == len(__import__("foldmap.app", fromlist=["x"]).PREVIEW_THEMES)
     assert calls == []
+
+
+def test_file_that_is_not_a_structure_is_reported(tmp_path):
+    notes = tmp_path / "notes.txt"
+    notes.write_text("just some notes\n", encoding="utf-8")
+    at = _load(_app(), notes)
+    assert not at.exception and at.session_state["stage"] == "load" and at.error
