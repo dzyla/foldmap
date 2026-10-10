@@ -72,6 +72,25 @@ def test_ci_matrix_covers_the_tested_pythons():
 
 
 @needs_workflow
+def test_linux_jobs_that_run_pytest_install_the_snapshot_font():
+    """The snapshot gate needs Liberation Sans; without it the fallback font moves text by several points."""
+    jobs = yaml.safe_load(WORKFLOW.read_text(encoding="utf-8"))["jobs"]
+    checked = 0
+    for name, job in jobs.items():
+        steps = job["steps"]
+        if not any("pytest" in s.get("run", "") for s in steps):
+            continue
+        if not str(job["runs-on"]).startswith("ubuntu") and "matrix.os" not in str(job["runs-on"]):
+            continue
+        installs = [s for s in steps if "fonts-liberation" in s.get("run", "")]
+        assert installs, f"job {name} runs pytest on Linux without installing fonts-liberation"
+        if "matrix.os" in str(job["runs-on"]):
+            assert all(s.get("if") == "runner.os == 'Linux'" for s in installs), f"job {name}: guard the install"
+        checked += 1
+    assert checked >= 3
+
+
+@needs_workflow
 def test_minimum_deps_job_pins_equal_the_floors():
     """The floor "1.24" is pinned as "==1.24.*" and "0.7" as "==0.7.0"; nothing else is accepted.
 

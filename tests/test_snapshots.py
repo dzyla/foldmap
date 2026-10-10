@@ -9,7 +9,9 @@ import sys
 from pathlib import Path
 
 import pytest
+from matplotlib import font_manager
 
+from foldmap import render
 from foldmap.cli import main
 from snapshot import compare, dump, fingerprint, load
 
@@ -98,10 +100,23 @@ CASES = {
 }
 
 
-@pytest.mark.skipif(
-    sys.platform != "linux",
-    reason="snapshots are Linux-only: the fonts differ by OS, so the text metrics and glyph paths do",
+def _resolved_font_family() -> str:
+    """Family of the font matplotlib picks for foldmap's font list (what the figures are measured in)."""
+    try:
+        path = font_manager.findfont(font_manager.FontProperties(family=render._FONTS))
+        return font_manager.FontProperties(fname=path).get_name()
+    except Exception:  # noqa: BLE001 - an unresolvable font simply disables the snapshots
+        return ""
+
+
+_FONT = _resolved_font_family() if sys.platform == "linux" else ""
+_SNAPSHOT_SKIP = (
+    "snapshots need Linux with Liberation Sans installed (CI: apt-get install fonts-liberation): "
+    f"fonts differ by machine, so text metrics and glyph paths do; matplotlib resolved {_FONT!r}"
 )
+
+
+@pytest.mark.skipif(sys.platform != "linux" or _FONT != "Liberation Sans", reason=_SNAPSHOT_SKIP)
 @pytest.mark.parametrize("name", sorted(CASES))
 def test_figure_matches_snapshot(name, tmp_path, update_snapshots):
     file, flags = CASES[name]

@@ -38,6 +38,9 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
           cache: pip
+      - name: Install Liberation Sans (the snapshot tests need it)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y fonts-liberation
       - run: pip install ".[test,app,mcp]"
       - run: python -m pytest -q
 
@@ -48,6 +51,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - name: Install Liberation Sans (the snapshot tests need it)
+        run: sudo apt-get update && sudo apt-get install -y fonts-liberation
       - run: pip install build
       - run: python -m build --sdist
       - name: Install from the unpacked sdist and run its own tests (no repository files)
@@ -65,6 +70,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+      - name: Install Liberation Sans (the snapshot tests need it)
+        run: sudo apt-get update && sudo apt-get install -y fonts-liberation
       - run: pip install "gemmi==0.7.0" "numpy==1.24.*" "scipy==1.10.*" "networkx==3.0" "matplotlib==3.10.*" "PyYAML==6.0.1" pytest
       - run: pip install --no-deps .
       - run: python -m pytest -q
