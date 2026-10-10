@@ -46,6 +46,7 @@ _STEP = 0.15
 _SWEEPS = 400
 _SEP_SWEEPS = 5000  # push-apart passes before the guaranteed slide
 _SEP_ORBIT_SWEEPS = 1000  # push-apart passes that keep symmetry copies alike, before they may move alone
+_SEP_SYM_ROOM = 1.05  # copies drawn alike may take at most this much more area than items moved one by one
 _SEP_PUSH = 0.005  # each push clears an overlap by this much more, so touching boxes cannot trade it back and forth
 _SLIDE_STEP = 0.5  # the guaranteed slide moves an item by this much at a time
 _LAMBDAS = (0.3, 3.0, 30.0, 300.0)  # overlap penalty, stage by stage
@@ -328,27 +329,46 @@ def _overlapping(xy: np.ndarray, halves: np.ndarray, mids: np.ndarray) -> np.nda
 
 def _separate(items: list[_Item], ties: dict[int, tuple[int, int]] | None = None) -> None:
     """Push overlapping items apart, then slide any left over clear. With `ties` (_symmetry_ties) the pushes
-    keep every protomer drawn alike (_push_apart); if that cannot clear every overlap within
-    _SEP_ORBIT_SWEEPS sweeps, the items start again from where they were and move one by one."""
+    keep every protomer drawn alike (_push_apart), and that result is kept if it clears every overlap within
+    _SEP_ORBIT_SWEEPS sweeps and its box takes at most _SEP_SYM_ROOM times the area of moving the items one by
+    one from the same start (widening the spread can otherwise cost far more room); else the one-by-one
+    result is used."""
     halves = np.array([it.half for it in items], float).reshape(-1, 2)
     mids = np.array([it.mid for it in items], float).reshape(-1, 2)
     start = np.array([(it.cx, it.cy) for it in items], float).reshape(-1, 2)
     home = np.array([it.home for it in items], float).reshape(-1, 2)
     xy = start.copy()
-    if not ties or not _push_apart(xy, halves, mids, home, ties, _SEP_ORBIT_SWEEPS):
-        xy = start.copy()
-        _push_apart(xy, halves, mids, home, {}, _SEP_SWEEPS)
+    alone = start.copy()
+    _push_apart(alone, halves, mids, home, {}, _SEP_SWEEPS)
+    together = ties and _push_apart(xy, halves, mids, home, ties, _SEP_ORBIT_SWEEPS)
+    if not together or _box_area(xy, halves, mids) > _SEP_SYM_ROOM * _box_area(alone, halves, mids):
+        xy = alone
     for it, (x, y) in zip(items, xy.tolist()):
         it.cx, it.cy = x, y
     _slide_clear(items)
 
 
-def _push_apart(xy, halves, mids, home, ties: dict[int, tuple[int, int]], sweeps: int) -> bool:
+def _box_area(xy: np.ndarray, halves: np.ndarray, mids: np.ndarray) -> float:
+    """Area of the box around every footprint."""
+    q = xy + mids
+    lo, hi = (q - halves).min(axis=0), (q + halves).max(axis=0)
+    return float((hi[0] - lo[0]) * (hi[1] - lo[1]))
+
+
+def _push_apart(
+    xy: np.ndarray,
+    halves: np.ndarray,
+    mids: np.ndarray,
+    home: np.ndarray,
+    ties: dict[int, tuple[int, int]],
+    sweeps: int,
+) -> bool:
     """Push overlapping footprints apart in place (axis of least penetration); spring back to home early on.
     Each sweep finds the overlapping pairs at once and resolves them in order. With `ties` a push moves an
     item's whole orbit (it and its symmetry copies) by the same amount, and a sideways push between two
-    protomers moves protomer k by k times the amount, only ever widening the spread between protomers; two
-    copies of one element move alone. True if no overlap is left."""
+    protomers moves protomer k by k times the amount when that widens the spread between protomers (also
+    between two copies of one element); otherwise two copies of one element, which no orbit-wide move can
+    part, move alone. True if no overlap is left."""
     n = len(xy)
     root = list(range(n))  # the protomer-0 item of each item's orbit
     copy_k = np.zeros(n)  # protomer of each copy (0 for everything else)
@@ -376,7 +396,7 @@ def _push_apart(xy, halves, mids, home, ties: dict[int, tuple[int, int]], sweeps
                 s = (1 if dx > 0 else -1) if dx != 0 else 1
                 if None not in (protomer[i], protomer[j]) and protomer[i] != protomer[j]:
                     wider = s * (px + 2 * _SEP_PUSH) / (protomer[j] - protomer[i])
-                    if wider * widen > 0:
+                    if wider * widen > 0:  # items without copies (copy_k 0) stay put, whichever protomer
                         xy[:, 0] += copy_k * wider
                         continue
                 xy[gi, 0] -= s * (px / 2 + _SEP_PUSH)

@@ -124,13 +124,19 @@ def test_separation_keeps_every_copy_where_its_mate_is(name, monkeypatch):
         assert np.ptp(np.array(o), axis=0).max() < 1e-9
 
 
-def _box(x, y, start, chain="A", tall=2.0):
-    """A one-strand item at (x, y), 1 wide and `tall` long."""
+def _box(x, y, start, chain="A", tall=2.0, angle=np.pi / 2):
+    """A one-strand item at (x, y), 1 wide and `tall` long (upright; angle 0: lying)."""
     from foldmap.layout import Placed, _Item
     from helpers import fake_sse
 
     s = fake_sse("E", start, start + 6, chain=chain)
-    return _Item([Placed(s, 0.0, 0.0, tall, np.pi / 2, 1.0)], [(0.0, 0.0)], x, y, (x, y), start, chain)
+    return _Item([Placed(s, 0.0, 0.0, tall, angle, 1.0)], [(0.0, 0.0)], x, y, (x, y), start, chain)
+
+
+def _area(items):
+    x0 = min(it.cx + it.box[0] for it in items)
+    y0 = min(it.cy + it.box[1] for it in items)
+    return (max(it.cx + it.box[2] for it in items) - x0) * (max(it.cy + it.box[3] for it in items) - y0)
 
 
 def _overlaps(items):
@@ -167,18 +173,27 @@ def test_without_ties_each_item_moves_alone(monkeypatch):
 
 
 def test_copies_of_one_element_that_overlap_are_pushed_apart_alone(monkeypatch):
-    """Moving a whole orbit cannot part two of its own copies: they move individually."""
+    """Moving a whole orbit cannot part two of its own copies: one above the other, they move apart alone."""
+    items = [_box(0.0, 0.0, 1, tall=4.0, angle=0.0), _box(0.3, 0.2, 1, "B", tall=4.0, angle=0.0)]
+    assert _pushed_apart(monkeypatch, items, {1: (0, 1)}) == 0
+    assert items[0].cx == 0.0 and items[1].cx == 0.3  # a push up and down only
+    assert items[0].cy < 0.0 < 0.2 < items[1].cy
+
+
+def test_overlapping_copies_side_by_side_widen_the_spread(monkeypatch):
+    """Two copies of one element overlapping sideways: protomer 1 moves further along, the copy goes with it."""
     items = [_box(0.0, 0.0, 1), _box(0.3, 0.0, 1, "B")]
     assert _pushed_apart(monkeypatch, items, {1: (0, 1)}) == 0
+    assert items[0].cx == 0.0 and items[1].cx > 0.3
 
 
 def test_a_sideways_overlap_between_protomers_widens_the_spread(monkeypatch):
-    """Protomer 1's copy of `a` lands on protomer 0's `b`: protomer 1 moves over as a whole."""
-    items = [_box(0.0, 0.0, 1), _box(5.0, 0.0, 20), _box(5.5, 0.0, 1, "B"), _box(10.5, 0.0, 20, "B")]
+    """Protomer 1's copy of `a` touches protomer 0's `b`: protomer 1 moves over as a whole."""
+    items = [_box(0.0, 0.0, 1), _box(5.0, 0.0, 20), _box(6.6, 0.0, 1, "B"), _box(11.6, 0.0, 20, "B")]
     assert _pushed_apart(monkeypatch, items, {2: (0, 1), 3: (1, 1)}) == 0
     assert items[2].cx - items[0].cx == pytest.approx(items[3].cx - items[1].cx, abs=1e-12)
     assert items[1].cx - items[0].cx == pytest.approx(5.0, abs=1e-12)  # each protomer itself unchanged
-    assert items[2].cx - items[0].cx > 5.5
+    assert items[2].cx - items[0].cx > 6.6
 
 
 def test_copies_move_alone_when_moving_them_together_cannot_clear(monkeypatch):
@@ -197,6 +212,36 @@ def test_copies_move_alone_when_moving_them_together_cannot_clear(monkeypatch):
     assert len(sweeps) > layout._SEP_ORBIT_SWEEPS
     layout._separate(alone)
     assert [(it.cx, it.cy) for it in items] == [(it.cx, it.cy) for it in alone]  # as if there were no copies
+
+
+def test_symmetric_separation_never_costs_much_more_room_than_moving_items_alone():
+    """Four copies of an 11-element protomer, one spread apart, and four free elements among them (a random
+    stress case): the symmetric pushes widen the spread to four times its start. The figure keeps the
+    symmetric result only if it is at most 5 % larger than separating the items one by one."""
+    from foldmap import layout
+
+    protomer = [(2.48, 9.39, 3.83, 0), (4.71, 4.16, 3.11, 0), (-0.75, 7.38, 3.56, 1), (5.13, 0.55, 1.63, 0)]
+    protomer += [(5.77, 6.83, 2.73, 1), (7.57, 2.26, 2.48, 1), (1.82, 1.91, 1.51, 1), (4.78, 2.35, 2.96, 0)]
+    protomer += [(7.58, 5.51, 2.41, 1), (0.41, 3.97, 3.87, 0), (1.85, 6.68, 2.81, 1)]
+    free = [(23.11, 8.18, 3.02, 1), (48.59, 6.31, 1.39, 1), (25.27, 5.35, 1.53, 0), (36.83, 9.35, 2.63, 0)]
+    spread, lift = 11.21, -0.64
+
+    def build():
+        items, ties = [], {}
+        for k in range(4):
+            for a, (x, y, tall, up) in enumerate(protomer):
+                items.append(_box(x + k * spread, y + k * lift, 10 * a + 1, "ABCD"[k], tall, np.pi / 2 * up))
+                if k:
+                    ties[len(items) - 1] = (a, k)
+        items += [_box(x, y, 500 + 10 * u, "Z", tall, np.pi / 2 * up) for u, (x, y, tall, up) in enumerate(free)]
+        return items, ties
+
+    items, ties = build()
+    alone, _ = build()
+    layout._separate(items, ties)
+    layout._separate(alone)
+    assert _overlaps(items) == 0
+    assert _area(items) <= 1.05 * _area(alone)
 
 
 def test_symmetry_can_be_switched_off(tmp_path):
