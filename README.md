@@ -189,7 +189,7 @@ Change any key with `--set KEY=VALUE` (repeatable) or a YAML file for `--style-f
 | Named domain panels | `--domain N-lobe=res:A:13-59` (repeatable) or `--domains auto` |
 | Only some chains | `--chains A,B` |
 | Large assemblies | `--focus auto\|none\|protomer\|B` (one subunit plus what its neighbours add to its fold) |
-| Membrane | `--membrane auto` (OPM dummy atoms if present, otherwise estimated) |
+| Membrane | `--membrane auto` (OPM dummy atoms if present, otherwise estimated); `--membrane flip` puts the other side on top |
 | Conservation | `--theme conservation --msa family.fasta`, or `--msa consurf_grades.txt` for ConSurf's own grades |
 | Orientation | `--up X,Y,Z`, `--view X,Y,Z`, `--rotate DEG` |
 | Symmetry and assembly | `--symmetry auto\|off\|C3\|D2\|helical`, `--protomers "A,B;C,D"`, `--assembly auto\|asu\|ID` |

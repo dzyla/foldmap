@@ -131,3 +131,44 @@ def test_dummy_atoms_without_sides_fall_back_to_positive_inside(tmp_path):
     m = find_membrane(out, load_backbone(out, "asu"))
     assert m.source == "opm" and m.half == pytest.approx(16.2, abs=0.05)
     assert abs(m.normal[2]) == pytest.approx(1.0)
+
+
+def test_membrane_flip_turns_the_figure_over_without_mirroring():
+    auto, _, _ = make_layout(DATA / "1C3W.cif", membrane="auto", assembly="asu")
+    flip, _, _ = make_layout(DATA / "1C3W.cif", membrane="flip", assembly="asu")
+    a, f = np.array(auto.page_axes), np.array(flip.page_axes)
+    assert np.allclose(f[0], a[0], atol=1e-6)  # page-right kept
+    assert np.allclose(f[1], -a[1], atol=1e-6) and np.allclose(f[2], -a[2], atol=1e-6)  # up and depth turned over
+    assert np.linalg.det(f) > 0  # a rotation, not a mirror
+    assert flip.membrane["inside"] == auto.membrane["inside"]  # the face now called "outside" is drawn on top
+
+
+def test_membrane_flip_turns_an_unrolled_channel_over():
+    auto, sses, _ = make_layout(DATA / "1BL8.cif", membrane="auto")  # KcsA: C4 axis along the membrane normal
+    flip, _, _ = make_layout(DATA / "1BL8.cif", membrane="flip")
+    top, low = "A:86-112", "A:27-51"  # the pore helix pair either side of the selectivity filter
+    assert auto.placed[top].cy > auto.placed[low].cy  # the unrolled channel stands with this helix on top
+    assert flip.placed[top].cy < flip.placed[low].cy  # and is turned over
+    assert flip.membrane["y"] != auto.membrane["y"]
+
+
+def test_membrane_flip_round_trips_through_a_layout_file(tmp_path):
+    saved = tmp_path / "fig.yaml"
+    assert (
+        main(
+            [
+                "plot",
+                str(DATA / "1C3W.cif"),
+                "--membrane",
+                "flip",
+                "-o",
+                str(tmp_path / "a.svg"),
+                "--save-layout",
+                str(saved),
+            ]
+        )
+        == 0
+    )
+    assert "membrane: flip" in saved.read_text(encoding="utf-8")
+    assert main(["plot", str(DATA / "1C3W.cif"), "--layout-file", str(saved), "-o", str(tmp_path / "b.svg")]) == 0
+    assert (tmp_path / "a.svg").read_bytes() == (tmp_path / "b.svg").read_bytes()

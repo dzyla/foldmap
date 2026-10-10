@@ -153,13 +153,16 @@ def make_layout(
         from .membrane import find_membrane
 
         mem = find_membrane(path, bb)
+        flip = membrane == "flip"
+        if mem is not None and flip:  # the other face is the outside: a 180° turn, never a mirror
+            mem = dataclasses.replace(mem, normal=-mem.normal, centre=-mem.centre)
         if mem is None:
             print(f"foldmap: warning: no membrane found in {path}; drawing it without one", file=sys.stderr)
         elif up is None and view is None:  # the bilayer horizontal, outside on top (unless the symmetry axis
             along = sym is not None and abs(float(np.dot(sym.axis, mem.normal))) > 0.9  # already stands upright)
             if not along:
                 up = mem.normal
-            elif mem.sided and float(np.dot(sym.axis, mem.normal)) < 0:  # turn the unrolled assembly over
+            elif (mem.sided and float(np.dot(sym.axis, mem.normal)) < 0) or (flip and not mem.sided):  # turn it over
                 sym = dataclasses.replace(
                     sym, axis=-sym.axis, angles=[-a for a in sym.angles], rise=-sym.rise, twist=-sym.twist
                 )
@@ -817,8 +820,9 @@ def main(argv: list[str] | None = None) -> int:
         )
         q.add_argument(
             "--membrane",
-            choices=["off", "auto"],
-            help="draw the lipid bilayer: auto finds it (OPM dummy atoms, or estimated); default off",
+            choices=["off", "auto", "flip"],
+            help="draw the lipid bilayer: auto finds it (OPM dummy atoms, or estimated); flip: the same with the "
+            "two sides swapped; default off",
         )
         q.add_argument(
             "--focus",

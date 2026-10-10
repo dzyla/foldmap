@@ -390,7 +390,12 @@ def main() -> None:
             st.text_input(
                 "Ligands and ions", key="ligands", help="auto (skips buffer additives), all, none, or codes like HEM,ZN"
             )
-            st.selectbox("Membrane", ["off", "auto"], key="membrane", help="auto: find the bilayer and draw it")
+            st.selectbox(
+                "Membrane",
+                ["off", "auto", "flip"],
+                key="membrane",
+                help="auto: find the bilayer and draw it; flip: the same, other side on top",
+            )
         with st.expander("Alignment (conservation)"):
             st.file_uploader(
                 "Multiple sequence alignment",

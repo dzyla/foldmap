@@ -176,3 +176,10 @@ def test_file_that_is_not_a_structure_is_reported(tmp_path):
     notes.write_text("just some notes\n", encoding="utf-8")
     at = _load(_app(), notes)
     assert not at.exception and at.session_state["stage"] == "load" and at.error
+
+
+def test_app_offers_flip_for_the_membrane():
+    from foldmap.app import layout_options
+
+    opts = layout_options({"membrane": "flip"})
+    assert opts["membrane"] == "flip"
