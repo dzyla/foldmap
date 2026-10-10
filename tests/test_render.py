@@ -345,3 +345,21 @@ def test_long_loops_and_tails_say_how_long_they_are():
     assert all(int(v.split()[0]) >= 25 for v in loops)
     short = make_figure(Path(__file__).parent / "data" / "1UBQ.cif")
     assert not any((t.get_gid() or "").startswith(("tail-length:", "loop-length:")) for t in short.axes[0].texts)
+
+
+@pytest.mark.parametrize("name", ["6Y7S", "8UTF"])
+def test_legend_text_ends_before_the_next_swatch_on_a_wide_figure(name):
+    """A wide figure draws legend text at the 4 pt floor; the legend is spaced for that size, not a smaller one."""
+    from pathlib import Path
+
+    from matplotlib.backends.backend_agg import FigureCanvasAgg
+
+    fig = make_figure(Path(__file__).parent / "data" / f"{name}.cif", focus="none")
+    r = FigureCanvasAgg(fig).get_renderer()
+    swatches = [p.get_window_extent(r) for p in _gids(fig, "legend-chain:")]
+    texts = [t.get_window_extent(r) for t in _gids(fig, "legend-chain-label:")]
+    assert len(texts) > 4 and fig.get_size_inches()[0] == pytest.approx(7.2)
+    for t in texts:
+        row = [s for s in swatches if abs((s.y0 + s.y1) / 2 - (t.y0 + t.y1) / 2) < 2 and s.x0 > t.x0]
+        if row:
+            assert t.x1 <= min(s.x0 for s in row), (t, min(s.x0 for s in row))

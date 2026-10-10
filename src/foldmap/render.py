@@ -67,6 +67,11 @@ STYLES = CHOICES["fill"]
 LOOP_STYLES = CHOICES["loops"]
 
 
+def _font_pt(scale: float) -> float:
+    """The figure's text size in points (before Style.font_scale) at `scale` inches per page unit."""
+    return float(np.clip(0.55 * SHAFT * scale * 72, 4.0, 9.0))
+
+
 _RES_PER_TURN = 3.6
 _MIN_PITCH = 0.5  # page units; an end-on helix keeps legible turns instead of a dark smear
 _BAND = 0.36  # ribbon width along the axis, as a fraction of one turn
@@ -1201,10 +1206,16 @@ def _draw(
         ids = sorted({layout.nucleic.strands[k].chain for d in layout.dna for k in d.strands})
         kind = "RNA" if all(layout.nucleic.strands[k].rna for d in layout.dna for k in d.strands) else "DNA"
         entries.append((_dna_colours(style)[0], f"{kind} ({', '.join(ids)})"))
-    font_u = 0.55 * SHAFT * look.font_scale  # legend text height in page units
-    text_u = max(TextPath((0, 0), text, size=font_u).get_extents().width for _, text in entries)
-    entry = 0.85 + text_u + 0.9  # swatch, text, gap (page units)
-    x1 = max(x1, x0 + entry - 0.9)  # never narrower than one legend entry
+
+    def legend_entry(x1: float) -> float:  # one legend entry's width in page units: swatch, text, gap
+        scale = min(_IN_PER_UNIT, _MAX_WIDTH_IN / (x1 - x0 + 2 * pad))  # as the figure below
+        font_u = _font_pt(scale) * look.font_scale / (scale * 72)  # text drawn at that size, in page units
+        return 0.85 + max(TextPath((0, 0), text, size=font_u).get_extents().width for _, text in entries) + 0.9
+
+    entry = legend_entry(x1)
+    if x0 + entry - 0.9 > x1:  # never narrower than one legend entry; a wider page may shrink, so measure again
+        entry = legend_entry(x0 + entry - 0.9)
+        x1 = max(x1, x0 + entry - 0.9)
     per_row = max(1, int((x1 - x0 + 0.9) // entry))
     if not look.legend:
         entries = []
@@ -1221,7 +1232,7 @@ def _draw(
     ax.set_aspect("equal")
     ax.axis("off")
     pt_per_unit = scale * 72
-    font = float(np.clip(0.55 * SHAFT * pt_per_unit, 4.0, 9.0)) * look.font_scale
+    font = _font_pt(scale) * look.font_scale
     lw = float(np.clip(0.9 * scale / _IN_PER_UNIT, 0.5, 1.2))
     loop_lw = lw * look.loop_width
 
