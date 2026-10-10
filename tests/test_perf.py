@@ -7,6 +7,7 @@ import sys
 from pathlib import Path
 
 import numpy as np
+import pytest
 
 import foldmap.layout as L
 from foldmap import io
@@ -112,3 +113,44 @@ def test_a_figure_reads_its_file_once(monkeypatch):
     assert len(calls) == 1
     cli.summarize(str(DATA / "1LMB.cif"))
     assert len(calls) == 2
+
+
+def _tiled(pdb, copies):
+    """Model 1 of a test entry, repeated `copies` times 80 Å apart along x (new chain names)."""
+    import gemmi
+
+    st = gemmi.read_structure(str(DATA / f"{pdb}.cif"))
+    st.setup_entities()
+    model = st[0]
+    base = [c.clone() for c in model]
+    for c in list(model):
+        model.remove_chain(c.name)
+    names = (a + b for a in "ABCDEFGHIJKLMNOPQRSTUVWXYZ" for b in "ABCDEFGHIJKLMNOPQRSTUVWXYZ")
+    for k in range(copies):
+        for c in base:
+            new = c.clone()
+            new.name = next(names)
+            for r in new:
+                for a in r:
+                    a.pos = gemmi.Position(a.pos.x + 80 * k, a.pos.y, a.pos.z)
+            model.add_chain(new)
+    return model
+
+
+@pytest.mark.parametrize("pdb, copies", [("1C3W", 1), ("2HHB", 1), ("1BL8", 1), ("25IN", 1), ("25IN", 6)])
+def test_bonded_ligand_parts_equal_the_all_against_all_search(pdb, copies):
+    parts = io._ligand_parts(_tiled(pdb, copies))
+    assert parts
+    brute = {
+        (a, b)
+        for a in range(len(parts))
+        for b in range(a + 1, len(parts))
+        if not parts[a][3]
+        and not parts[b][3]
+        and any(x.pos.dist(y.pos) < io._BOND for x in parts[a][2] for y in parts[b][2])
+    }
+    assert io._bonded_parts(parts) == brute
+
+
+def test_no_ligands_need_no_search():
+    assert io._bonded_parts([]) == set()

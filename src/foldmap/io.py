@@ -6,6 +6,7 @@ from pathlib import Path
 
 import gemmi
 import numpy as np
+from scipy.spatial import cKDTree
 
 from .model import Backbone, Ligand, Links, NAStrand, Nucleic, ResLabel
 
@@ -456,19 +457,7 @@ def _ligands(model, where, skip: set | None = None) -> list[Ligand]:
     (chain, number, icode) of residues drawn otherwise (the sugars of glycans)."""
     skip = skip or set()
     search = gemmi.NeighborSearch(model, gemmi.UnitCell(), 5).populate()
-    parts = []
-    for chain in model:
-        polymer = {(r.seqid.num, r.seqid.icode) for r in chain.get_polymer()}
-        for res in chain:
-            if (
-                (res.seqid.num, res.seqid.icode) in polymer
-                or res.is_water()
-                or (chain.name, res.seqid.num, res.seqid.icode.strip()) in skip
-            ):
-                continue
-            heavy = [a for a in res if a.element.name != "H"]
-            if heavy:
-                parts.append((chain.name, res, heavy, len(heavy) == 1 and heavy[0].element.is_metal))
+    parts = _ligand_parts(model, skip)
     group = list(range(len(parts)))
 
     def root(x: int) -> int:
@@ -477,19 +466,16 @@ def _ligands(model, where, skip: set | None = None) -> list[Ligand]:
             x = group[x]
         return x
 
-    for a in range(len(parts)):
-        for b in range(a + 1, len(parts)):
-            if parts[a][3] or parts[b][3]:
-                continue
-            if any(x.pos.dist(y.pos) < _BOND for x in parts[a][2] for y in parts[b][2]):
-                group[root(a)] = root(b)
+    bonded = _bonded_parts(parts)
+    for a, b in sorted(bonded):  # the order the pairwise loop met them in
+        group[root(a)] = root(b)
     members: dict[int, list[int]] = {}
     for k in range(len(parts)):
         members.setdefault(root(k), []).append(k)
 
     out = []
     for ks in members.values():
-        ks = _bond_order(ks, parts)
+        ks = _bond_order(ks, bonded)
         touching = set()
         for k in ks:
             _, res, heavy, metal = parts[k]
@@ -522,14 +508,45 @@ def _ligands(model, where, skip: set | None = None) -> list[Ligand]:
     return out
 
 
-def _bond_order(ks: list[int], parts) -> list[int]:
+def _ligand_parts(model, skip: set | None = None) -> list[tuple[str, gemmi.Residue, list[gemmi.Atom], bool]]:
+    """(chain name, residue, heavy atoms, is a metal ion) for every residue outside the polymers, waters and
+    skipped glycan sugars: the pieces _ligands joins into ligands."""
+    skip = skip or set()
+    parts = []
+    for chain in model:
+        polymer = {(r.seqid.num, r.seqid.icode) for r in chain.get_polymer()}
+        for res in chain:
+            if (
+                (res.seqid.num, res.seqid.icode) in polymer
+                or res.is_water()
+                or (chain.name, res.seqid.num, res.seqid.icode.strip()) in skip
+            ):
+                continue
+            heavy = [a for a in res if a.element.name != "H"]
+            if heavy:
+                parts.append((chain.name, res, heavy, len(heavy) == 1 and heavy[0].element.is_metal))
+    return parts
+
+
+def _bonded_parts(parts) -> set[tuple[int, int]]:
+    """(a, b), a < b: ligand parts with heavy atoms closer than _BOND. Metal ions bond to nothing."""
+    atoms = [(k, a) for k, (_, _, heavy, metal) in enumerate(parts) if not metal for a in heavy]
+    if not atoms:
+        return set()
+    xyz = np.array([a.pos.tolist() for _, a in atoms])
+    out = set()
+    for i, j in sorted(cKDTree(xyz).query_pairs(_BOND)):
+        (a, x), (b, y) = atoms[i], atoms[j]
+        if a != b and x.pos.dist(y.pos) < _BOND:  # query_pairs includes the boundary; the cutoff does not
+            out.add((min(a, b), max(a, b)))
+    return out
+
+
+def _bond_order(ks: list[int], bonded: set[tuple[int, int]]) -> list[int]:
     """The residues of one ligand from an end (a residue with one bonded partner), walking along the bonds."""
     if len(ks) == 1:
         return ks
-    near = {
-        k: [m for m in ks if m != k and any(x.pos.dist(y.pos) < _BOND for x in parts[k][2] for y in parts[m][2])]
-        for k in ks
-    }
+    near = {k: [m for m in ks if m != k and (min(k, m), max(k, m)) in bonded] for k in ks}
     start = min((k for k in ks if len(near[k]) <= 1), default=ks[0], key=lambda k: ks.index(k))
     order, seen = [start], {start}
     while len(order) < len(ks):
