@@ -3,10 +3,20 @@
 from pathlib import Path
 
 import numpy as np
+import pytest
 
 from foldmap.io import _nucleic_strands, load_backbone, load_nucleic, read_model
 from foldmap.model import NAStrand, ResLabel, nucleic_from_pairs
-from foldmap.nucleic import BasePair, NARun, pair_nucleotides, secondary_structure
+from foldmap.nucleic import (
+    BasePair,
+    NARun,
+    bend,
+    pair_nucleotides,
+    secondary_structure,
+    segment_stem,
+    stem_axis,
+    straight_duplex,
+)
 
 NA = Path(__file__).parent / "data" / "na"
 DATA = Path(__file__).parent / "data"
@@ -185,3 +195,41 @@ def test_a_one_nucleotide_strand_is_a_tail():
         NARun(1, 0, 0, None, None, "tail"),
         NARun(2, 0, 1, None, (2, 2), "tail"),
     ]
+
+
+@pytest.mark.parametrize("pdb", ["1LMB", "1ZAA"])
+def test_straight_duplexes_stay_whole_and_keep_the_classic_frame(pdb):
+    na = _na(pdb)
+    (st,) = na.structure.stems
+    assert len(segment_stem(st, na.strands)) == 1
+    assert straight_duplex(na.structure, na.strands) == [st.a, st.b]
+
+
+def test_long_duplex_axis_agrees_with_its_backbone():
+    na = _na("1LMB")
+    (st,) = na.structure.stems
+    _, axis = stem_axis(st, na.strands)
+    pts = np.vstack([s.p for s in na.strands])
+    pca = np.linalg.svd(pts - pts.mean(axis=0))[2][0]
+    assert abs(axis @ pca) > np.cos(np.radians(8))
+
+
+def test_nucleosome_dna_follows_the_superhelix_in_straight_pieces():
+    na = _na("1KX5")
+    (st,) = na.structure.stems
+    pieces = segment_stem(st, na.strands)
+    assert len(pieces) >= 10
+    assert sum(len(p) for p in pieces) == len(st)
+    axes = [stem_axis(p, na.strands)[1] for p in pieces]
+    turns = [np.degrees(np.arccos(np.clip(a @ b, -1, 1))) for a, b in zip(axes, axes[1:])]
+    assert sum(turns) > 300  # 1.65 turns of superhelix: well over a full circle of bending
+    assert [p.name for p in pieces[:3]] == ["DNA 1a", "DNA 1b", "DNA 1c"]
+    assert all(p.parent == st.id for p in pieces)
+    assert straight_duplex(na.structure, na.strands) is None  # bent: not the classic straight picture
+
+
+def test_ihf_bends_its_dna_by_more_than_150_degrees():
+    na = _na("1IHF")
+    pieces = [p for st in na.structure.stems for p in segment_stem(st, na.strands)]
+    assert len(pieces) >= 2
+    assert bend([pieces[0], pieces[-1]], na.strands) > 150
