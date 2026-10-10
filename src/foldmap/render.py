@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import threading
 from collections import Counter
 from contextlib import contextmanager
 from contextvars import ContextVar
@@ -424,15 +425,20 @@ def _shade(colour: str, t: float) -> str:
 _BACKGROUND: ContextVar[str] = ContextVar("foldmap_background", default="#ffffff")
 
 
+# rc_context edits the process-wide rcParams, and matplotlib is not thread-safe, so pages are drawn one at a time.
+_DRAWING = threading.RLock()
+
+
 @contextmanager
 def page(look: Style):
     """Draw on `look`'s page: its background for colour choices and its ink and fonts for text."""
-    token = _BACKGROUND.set(look.background)
-    try:
-        with rc_context({**_RC, "text.color": look.ink}):
-            yield
-    finally:
-        _BACKGROUND.reset(token)
+    with _DRAWING:
+        token = _BACKGROUND.set(look.background)
+        try:
+            with rc_context({**_RC, "text.color": look.ink}):
+                yield
+        finally:
+            _BACKGROUND.reset(token)
 
 
 def _luminance(colour) -> float:
@@ -1475,7 +1481,7 @@ def _draw(
         for p in layout.placed.values():
             nrm = np.array([-np.sin(p.angle), np.cos(p.angle)])
             colour = element_colour[p.sse.id]
-            for end, port, num in (("N", p.n_port, p.sse.first.seq), ("C", p.c_port, p.sse.last.seq)):
+            for end, port, num in (("N", p.n_port, p.sse.first.tag), ("C", p.c_port, p.sse.last.tag)):
                 inward = p.direction * (1.0 if end == "N" else -1.0)
                 if p.sse.kind in ("H", "G"):
                     away = -1.0 if nrm[1] >= 0 else 1.0  # the side opposite the helix name

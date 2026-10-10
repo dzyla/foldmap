@@ -6,6 +6,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import gemmi
+import matplotlib
 import numpy as np
 import pytest
 
@@ -99,24 +100,37 @@ def test_assembly_copies_count_chains_named_by_subchain(pdb, chains):
 
 
 def test_each_thread_draws_on_its_own_page(monkeypatch):
-    barrier = threading.Barrier(2, timeout=10)
+    """Thread A leaves page() while thread B is still inside it: B's text colour must survive, and so must the rcParams."""
+    a_inside, b_inside, a_left = threading.Event(), threading.Event(), threading.Event()
     seen = {}
+    before = matplotlib.rcParams["text.color"]
 
     def fake_draw(layout, loops, sses, title, **kw):
-        barrier.wait()  # both threads have entered page() before either reads it
-        seen[kw["look"].background] = render._BACKGROUND.get()
+        bg = kw["look"].background
+        if bg == "#0d2a4a":  # A
+            a_inside.set()
+            b_inside.wait(0.5)  # unserialised, B is inside too; serialised, this just times out
+        else:  # B
+            a_inside.wait(5)
+            b_inside.set()
+            a_left.wait(0.5)  # unserialised, A has left page() by now
+        seen[bg] = (render._BACKGROUND.get(), matplotlib.rcParams["text.color"])
+
+    def run(bg, ink):
+        render.draw(None, [], [], look=Style(background=bg, ink=ink))
+        if bg == "#0d2a4a":
+            a_left.set()
 
     monkeypatch.setattr(render, "_draw", fake_draw)
-    threads = [
-        threading.Thread(target=render.draw, args=(None, [], []), kwargs={"look": Style(background=bg)})
-        for bg in ("#0d2a4a", "#ffffff")
-    ]
+    inks = {"#0d2a4a": "#e8f1ff", "#ffffff": "#101010"}
+    threads = [threading.Thread(target=run, args=item) for item in inks.items()]
     for t in threads:
         t.start()
     for t in threads:
         t.join()
-    assert seen == {"#0d2a4a": "#0d2a4a", "#ffffff": "#ffffff"}
+    assert seen == {bg: (bg, ink) for bg, ink in inks.items()}
     assert render._BACKGROUND.get() == "#ffffff"
+    assert matplotlib.rcParams["text.color"] == before
 
 
 def test_typical_colour_ties_go_to_the_first_met():

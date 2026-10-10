@@ -8,6 +8,7 @@ import pytest
 from foldmap.cli import main, make_layout
 from foldmap.layout import resolve
 from foldmap.model import ResLabel, res_ref
+from foldmap.style import Style
 from helpers import pipeline
 
 
@@ -137,3 +138,11 @@ def test_layout_file_with_insertion_codes_reloads(ubq, tmp_path):
     )
     assert "res:A:1L-1P: B2" in saved.read_text(encoding="utf-8")
     assert main(["plot", str(src), "--layout-file", str(saved), "-o", str(tmp_path / "b.svg")]) == 0
+
+
+def test_terminus_numbers_show_insertion_codes(ubq, tmp_path):
+    from foldmap.cli import make_figure
+
+    fig = make_figure(_icodes(ubq, tmp_path), look=Style(residue_numbers=True))
+    shown = {t.get_text() for ax in fig.axes for t in ax.texts}
+    assert {"1B", "1G", "1L", "1P"} <= shown
