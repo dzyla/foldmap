@@ -120,6 +120,8 @@ def figure_spec(
 
     def pick(name: str):
         """The given value, else the file's, else the default; None and '' count as not given."""
+        if name == "title" and given.get("title") == "":
+            return None  # an explicit empty title means no title, whatever the file says
         for source in (given, lay):
             value = source.get(name)
             if value is not None and value != "":
@@ -151,7 +153,7 @@ def figure_spec(
         title=pick("title"),
         mode=mode,
         rotate=float(pick("rotate")),
-        flip_v=bool(pick("flip_v")),
+        flip_v=_flag(pick("flip_v"), "flip_v"),
         dna=bool(pick("dna")),
         symmetry=str(pick("symmetry")),
         symmetry_tol=float(pick("symmetry_tol")),
@@ -168,6 +170,18 @@ def figure_spec(
         focus=str(pick("focus")),
         **edits,
     )
+
+
+def _flag(value, what: str) -> bool:
+    """A true/false value from a real boolean or yes/no/true/false text."""
+    if isinstance(value, bool):
+        return value
+    word = value.strip().lower() if isinstance(value, str) else None
+    if word in ("true", "yes"):
+        return True
+    if word in ("false", "no"):
+        return False
+    raise ValueError(f"{what} must be true or false, got {value!r}")
 
 
 def _pair(item) -> tuple[str, str]:

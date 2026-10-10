@@ -109,3 +109,12 @@ def test_missing_extras_are_explained(monkeypatch, capsys):
     assert "pip install 'foldmap[mcp]'" in capsys.readouterr().err
     assert cli.main(["app"]) == 1
     assert "pip install 'foldmap[app]'" in capsys.readouterr().err
+
+
+def test_empty_title_option_clears_the_layout_files_title(ubq, tmp_path):
+    lf = tmp_path / "fig.yaml"
+    lf.write_text("foldmap: 1\nlayout: {title: Layout title}\n", encoding="utf-8")
+    kept, cleared = tmp_path / "kept.svg", tmp_path / "cleared.svg"
+    assert main(["plot", str(ubq), "-o", str(kept), "--layout-file", str(lf)]) == 0
+    assert main(["plot", str(ubq), "-o", str(cleared), "--layout-file", str(lf), "--title", ""]) == 0
+    assert "Layout title" in kept.read_text() and "Layout title" not in cleared.read_text()

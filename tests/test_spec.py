@@ -151,3 +151,24 @@ def test_round_trip_through_a_layout_file(tmp_path):
     doc = layout_document(spec, structure_name="1UBQ.cif")
     path = layoutfile.save(tmp_path / "rt.yaml", doc)
     assert figure_spec(UBQ, layout_file=path) == spec
+
+
+def test_an_empty_title_clears_the_layout_files_title(tmp_path):
+    lf = layoutfile.save(tmp_path / "f.yaml", {"foldmap": 1, "layout": {"title": "From file"}})
+    assert figure_spec(UBQ, layout_file=lf).title == "From file"
+    assert figure_spec(UBQ, layout_file=lf, title=None).title == "From file"
+    assert figure_spec(UBQ, layout_file=lf, title="").title is None
+    assert figure_spec(UBQ, layout_file=lf, title="Mine").title == "Mine"
+
+
+def test_flip_v_accepts_booleans_and_yes_no_text_only(tmp_path):
+    def spec(value):
+        lf = layoutfile.save(tmp_path / "f.yaml", {"foldmap": 1, "layout": {"flip_v": value}})
+        return figure_spec(UBQ, layout_file=lf)
+
+    assert spec(True).flip_v is True and spec("Yes").flip_v is True and spec("true").flip_v is True
+    assert spec("no").flip_v is False and spec("FALSE").flip_v is False
+    with pytest.raises(ValueError, match="flip_v"):
+        spec("maybe")
+    with pytest.raises(ValueError, match="flip_v"):
+        spec(1)
