@@ -71,7 +71,8 @@ smallest repeating unit (one copy of each distinct chain) in full, plus the part
 its fold: strands paired with its own by backbone hydrogen bonds (donor strands, domain swaps, β-augmentation,
 cross-β stacking) and helices bundled with its own. Neighbours' elements are grey and primed (A′, A″), carry no
 termini or loops of their own, and a line under the legend says what is shown, e.g. *1 of 6 subunits shown ·
-helical, 115.0° twist, 7.9 Å rise per subunit*. `--focus none` draws everything; `--focus B` picks the subunit.
+helical, 115.0° twist, 7.9 Å rise per subunit*. A left-handed filament has a negative twist and says so:
+*−115.0° twist (left-handed)*. `--focus none` draws everything; `--focus B` picks the subunit.
 
 ### Sequence and alignment
 
@@ -149,8 +150,8 @@ foldmap styles                                    # every theme and style key
   cages and large assemblies drawn as one subunit with the neighbouring parts that complete its fold.
 - **Protein–DNA/RNA**: duplexes drawn as double helices with base letters and contact beads, cropped to the
   stretch the protein touches.
-- **Annotations**: disulfides, glycans (SNFG symbols), ligands and metal ions, membrane bands, named domain panels,
-  residue numbers, marked elements.
+- **Annotations**: disulfides, glycans (SNFG symbols, sialic acids included), ligands and metal ions, membrane bands,
+  named domain panels, residue numbers, marked elements.
 - **Colouring**: by chain, N→C, per-element shade, secondary-structure type, B-factor, hydropathy, AlphaFold pLDDT
   or conservation from an alignment.
 
@@ -168,7 +169,7 @@ Themes change only how things are drawn, never where. `foldmap styles` lists the
 | `rainbow`, `shaded`, `trace` | N→C colouring; `trace` also colours loops and adds direction arrows |
 | `flexibility`, `hydropathy` | B-factor or Kyte–Doolittle hydropathy |
 | `alphafold` | pLDDT confidence bands, loops and tails residue by residue |
-| `conservation` | conservation from `--msa`: weighted Shannon entropy, graded 1–9 in ConSurf's colours (not Rate4Site) |
+| `conservation` | conservation from `--msa`: Henikoff-weighted Shannon entropy, z-score grades 1–9 in ConSurf's colours (not Rate4Site), or ConSurf's own grades table |
 | `blueprint` | dark navy page, pale outlined elements |
 | `goodsell` | pale, illustrative |
 
@@ -203,8 +204,8 @@ layout options, domains and edits, with element references stored as residue ran
 ## UniProt annotation
 
 `--uniprot auto` finds each chain's UniProt entry (PDBe SIFTS mapping for PDB entries, the accession for AlphaFold
-models; or give one, `--uniprot P07911`) and maps its features onto the structure, correcting for numbering
-offsets. Active and binding sites are marked on the figure (`--set uniprot_sites=all` for every site and
+models and files that name one; `.pdb` files map the same way, with or without SEQRES; or give one,
+`--uniprot P07911`) and maps its features onto the structure, correcting for numbering offsets. Active and binding sites are marked on the figure (`--set uniprot_sites=all` for every site and
 modification), `--domains uniprot` turns UniProt domains into panels, and `foldmap sequence ... --uniprot auto`
 adds a feature track.
 
