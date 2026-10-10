@@ -1,0 +1,6 @@
+include CITATION.cff .zenodo.json
+graft tests
+graft scripts
+graft site
+graft docs/examples
+global-exclude *.py[cod] __pycache__

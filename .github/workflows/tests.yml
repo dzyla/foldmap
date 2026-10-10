@@ -31,3 +31,20 @@ jobs:
           cache: pip
       - run: pip install ".[test,app,mcp]"
       - run: python -m pytest -q
+
+  sdist:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install build
+      - run: python -m build --sdist
+      - name: Install from the unpacked sdist and run its own tests (no repository files)
+        run: |
+          mkdir ../sdist-check
+          tar xzf dist/foldmap-*.tar.gz -C ../sdist-check --strip-components 1
+          cd ../sdist-check
+          pip install ".[test]"
+          python -m pytest -q

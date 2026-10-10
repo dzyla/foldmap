@@ -156,6 +156,7 @@ def test_interactive_page_credits_foldmap():
 
 
 def test_app_credits_foldmap():
+    pytest.importorskip("streamlit")
     from streamlit.testing.v1 import AppTest
 
     at = AppTest.from_file(str(Path(__file__).parents[1] / "src" / "foldmap" / "app.py")).run(timeout=60)
