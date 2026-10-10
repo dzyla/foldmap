@@ -50,7 +50,18 @@ def encode(rows: list[tuple[str, int, str, str]]) -> str:
     return "".join(f"{c} {n} {s}\n" for c, n, s in lines)
 
 
+def check_version() -> None:
+    """Stop unless mkdssp is the version the references are documented to come from."""
+    try:
+        out = subprocess.run(["mkdssp", "--version"], capture_output=True, text=True, check=True).stdout
+    except (OSError, subprocess.CalledProcessError) as err:
+        sys.exit(f"cannot run mkdssp: {err}")
+    if "mkdssp version 3.1.2" not in out:
+        sys.exit(f"mkdssp 3.1.2 is required (found: {out.splitlines()[0] if out else 'no version output'})")
+
+
 def main(paths: list[str]) -> None:
+    check_version()
     OUT.mkdir(exist_ok=True)
     for path in map(Path, paths or sorted(DATA.glob("*.cif"))):
         with tempfile.TemporaryDirectory() as tmp:
