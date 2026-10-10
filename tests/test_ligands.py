@@ -121,3 +121,15 @@ def test_glycosylated_entries_gain_no_spurious_ligands():
         bb = load_backbone(path, "auto")
         links = load_links(path, bb, "auto")
         assert links.glycans and not links.ligands, name
+
+
+def test_glycans_of_chains_left_out_are_not_ligands():
+    """--chains drops the other chains' glycans with their chains; they never come back as ligands."""
+    for name in ("6ZS5", "6ZYA", "8UTF", "8UUP"):
+        path = DATA / f"{name}.cif"
+        bb = load_backbone(path, "auto")
+        first = bb.labels[0].chain
+        links = load_links(path, bb.only([first]), "auto")
+        assert not links.ligands, (name, [lg.symbol for lg in links.ligands])
+    lay, _, _ = make_layout(DATA / "6ZYA.cif", chains=["A1"])
+    assert not lay.links.ligands

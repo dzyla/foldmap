@@ -322,9 +322,7 @@ def load_links(path: str | Path, bb: Backbone, assembly: str = "auto") -> Links:
     ]
     glycans, members = [], []
     used = set()
-    for k_res, atom in anchors:
-        if k_res not in where:
-            continue
+    for k_res, atom in anchors:  # every tree is grown, so a left-out chain's glycan is not taken for a ligand
         root = next(
             ((c, r) for c, r in sugars if id(r) not in used and anomeric(r).pos.dist(atom.pos) < _GLYCAN_LINK_MAX),
             None,
@@ -346,8 +344,9 @@ def load_links(path: str | Path, bb: Backbone, assembly: str = "auto") -> Links:
                         tree.append((c, r))
                         nxt.append((c, r))
             frontier = nxt
-        glycans.append((where[k_res], [r.name for _, r in tree]))
-        members.append([(c.name, r.seqid.num) for c, r in tree])
+        if k_res in where:
+            glycans.append((where[k_res], [r.name for _, r in tree]))
+            members.append([(c.name, r.seqid.num) for c, r in tree])
     in_glycans = {key(c, r) for c, r in sugars if id(r) in used}
     return Links(sorted(set(disulfides)), glycans, _ligands(model, where, in_glycans), members)
 
