@@ -231,9 +231,27 @@ def make_layout(
             table = read_consurf(msa)
             deposited = {c for c, _, _ in table}
 
+            names: dict[str, dict[tuple[int, str], str]] = {}
+            for l in bb.labels:
+                names.setdefault(l.chain, {})[(l.seq, l.icode)] = l.name
+
+            def same_sequence(a: str, b: str) -> bool:  # >= 95 % identical residue names over shared numbers
+                shared = names[a].keys() & names[b].keys()
+                return bool(shared) and sum(names[a][k] == names[b][k] for k in shared) >= 0.95 * len(shared)
+
+            def source(chain: str) -> str | None:
+                if chain in deposited:
+                    return chain
+                stripped = re.sub(r"-?\d+$", "", chain)  # assembly copies: A1, A-1
+                if stripped in deposited:
+                    return stripped
+                # a table covers one chain of identical ones (ConSurf-DB): take it from a same-sequence chain
+                return next((c for c in sorted(deposited & names.keys()) if same_sequence(chain, c)), None)
+
+            sources = {c: source(c) for c in names}
+
             def grade(l) -> int:
-                chain = l.chain if l.chain in deposited else re.sub(r"-?\d+$", "", l.chain)
-                return table.get((chain, l.seq, l.icode), 0)
+                return table.get((sources[l.chain], l.seq, l.icode), 0)
 
             lay.res_grade = [grade(l) for l in bb.labels]
             lay.cons_label = CONSURF_LEGEND

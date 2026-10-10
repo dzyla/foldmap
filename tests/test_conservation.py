@@ -165,3 +165,25 @@ def test_consurf_atoms_with_insertion_codes_and_missing_positions(tmp_path):
     legend_only = tmp_path / "l.txt"
     legend_only.write_text("COLOR and ATOM are columns\n>a\nMKV\n", encoding="utf-8")
     assert not is_consurf(legend_only)
+
+
+def test_consurf_grades_follow_identical_chains():
+    """ConSurf-DB tables cover one chain of a homodimer: its identical partner takes the same grades."""
+    lay, _, bb = make_layout(UBQ.parent / "1TIM.cif", msa=DATA / "consurf" / "1TIM_A_grades.txt")
+    by = {(l.chain, l.seq): g for l, g in zip(bb.labels, lay.res_grade)}
+    for n in (4, 6, 13):
+        assert by[("A", n)] in (9, 4) and by[("B", n)] == by[("A", n)]
+    assert by[("B", 100)] == 0  # beyond the trimmed fixture: no grade for either chain
+
+
+def test_consurf_grades_skip_chains_with_a_different_sequence(tmp_path):
+    import gemmi
+
+    st = gemmi.read_structure(str(DATA / "1TIM.cif"))
+    for res in st[0]["B"]:
+        res.name = "GLY"  # chain B no longer has chain A's sequence
+    mutated = tmp_path / "tim_b_gly.cif"
+    st.make_mmcif_document().write_file(str(mutated))
+    lay, _, bb = make_layout(mutated, msa=DATA / "consurf" / "1TIM_A_grades.txt")
+    by = {(l.chain, l.seq): g for l, g in zip(bb.labels, lay.res_grade)}
+    assert by[("A", 4)] == 9 and by[("B", 4)] == 0
