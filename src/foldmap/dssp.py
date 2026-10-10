@@ -117,18 +117,19 @@ def _ladders(bridges: list[Bridge], prev: np.ndarray) -> list[Ladder]:
     """Consecutive bridges of one kind form a ladder. Two ladders of one kind are joined across a beta-bulge
     when the gap is < 6 residues on one strand and < 3 on the other (mkdssp's rule)."""
     ladders: list[Ladder] = []
+    last: dict[tuple[str, int, int], Ladder] = {}  # (kind, i, j) of each ladder's latest bridge
     for i, j, kind in sorted(bridges):
-        for lad in ladders:
-            if kind == "P" and lad.kind == "P" and i == lad.i[-1] + 1 and prev[i] and j == lad.j[-1] + 1:
-                lad.i.append(i)
-                lad.j.append(j)
-                break
-            if kind == "A" and lad.kind == "A" and i == lad.i[-1] + 1 and prev[i] and j == lad.j[0] - 1:
-                lad.i.append(i)
-                lad.j.insert(0, j)
-                break
+        lad = last.pop((kind, i - 1, j - 1 if kind == "P" else j + 1), None) if prev[i] else None
+        if lad is None:
+            lad = Ladder(kind, [i], [j])
+            ladders.append(lad)
         else:
-            ladders.append(Ladder(kind, [i], [j]))
+            lad.i.append(i)
+            if kind == "P":
+                lad.j.append(j)
+            else:
+                lad.j.insert(0, j)
+        last[(kind, i, j)] = lad
     ladders.sort(key=lambda lad: (lad.i[0], lad.j[0]))
     a = 0
     while a < len(ladders):
@@ -137,12 +138,14 @@ def _ladders(bridges: list[Bridge], prev: np.ndarray) -> list[Ladder]:
             x, y = ladders[a], ladders[b]
             ibi, iei, jbi, jei = x.i[0], x.i[-1], x.j[0], x.j[-1]
             ibj, iej, jbj, jej = y.i[0], y.i[-1], y.j[0], y.j[-1]
+            if ibj >= iei + 6:  # sorted by first i: no later ladder can join this one either
+                break
             joinable = (
                 x.kind == y.kind
-                and _unbroken(prev, min(ibi, ibj), max(iei, iej))
-                and _unbroken(prev, min(jbi, jbj), max(jei, jej))
                 and _gap(ibj, iei) < 6
                 and not (iei >= ibj and ibi <= iej)
+                and _unbroken(prev, min(ibi, ibj), max(iei, iej))
+                and _unbroken(prev, min(jbi, jbj), max(jei, jej))
             )
             other = _gap(jbj, jei) if x.kind == "P" else _gap(jbi, jej)
             if joinable and ((other < 6 and _gap(ibj, iei) < 3) or other < 3):

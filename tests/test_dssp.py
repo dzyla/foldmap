@@ -227,3 +227,17 @@ def test_equal_energies_keep_the_lower_acceptors(monkeypatch):
     for donor in range(1, n):
         acceptors = [a for a in range(n) if a not in (donor, donor - 1)][:2]
         assert {a for a, d in bonds if d == donor} == set(acceptors), donor
+
+
+def test_ladders_scale_to_large_assemblies():
+    import time
+
+    from foldmap.dssp import Ladder, _ladders
+
+    # 3000 two-bridge ladders, each 20 residues from the next: none can join, and finding that out must not
+    # compare every pair of ladders (7.7 s when it did)
+    bridges = [b for k in range(3000) for b in (Bridge(20 * k, 20 * k + 10, "A"), Bridge(20 * k + 1, 20 * k + 9, "A"))]
+    start = time.perf_counter()
+    ladders = _ladders(bridges, np.ones(60_020, bool))
+    assert time.perf_counter() - start < 1.0
+    assert len(ladders) == 3000 and ladders[5] == Ladder("A", [100, 101], [109, 110])
