@@ -98,3 +98,13 @@ def test_plot_warns_about_loops_drawn_as_fallback_curves(ubq, tmp_path, capsys, 
 def test_plot_is_quiet_when_every_loop_is_routed(ubq, tmp_path, capsys):
     assert main(["plot", str(ubq), "-o", str(tmp_path / "u.svg")]) == 0
     assert capsys.readouterr().err == ""
+
+
+def test_missing_extras_are_explained(monkeypatch, capsys):
+    import foldmap.cli as cli
+
+    monkeypatch.setattr(cli, "_has", lambda name: False, raising=False)
+    assert cli.main(["mcp"]) == 1
+    assert "pip install 'foldmap[mcp]'" in capsys.readouterr().err
+    assert cli.main(["app"]) == 1
+    assert "pip install 'foldmap[app]'" in capsys.readouterr().err

@@ -669,6 +669,13 @@ def experimental_method(path) -> str | None:
     return dict(gemmi.read_structure(str(path)).info).get("_exptl.method") or None
 
 
+def _has(module: str) -> bool:
+    """Whether an optional dependency is installed."""
+    from importlib.util import find_spec
+
+    return find_spec(module) is not None
+
+
 def _domain_spec(items: list[str]) -> list[tuple[str, list[str]]]:
     out = []
     for item in items:
@@ -875,11 +882,17 @@ def main(argv: list[str] | None = None) -> int:
 
             args.structure = str(fetch(args.structure))  # a PDB ID or UniProt accession: downloaded once, cached
         if args.command == "mcp":
+            if not _has("mcp"):
+                print("foldmap: the MCP server needs the mcp package: pip install 'foldmap[mcp]'", file=sys.stderr)
+                return 1
             from .mcp_server import main as serve
 
             serve()
             return 0
         if args.command == "app":
+            if not _has("streamlit"):
+                print("foldmap: the app needs Streamlit: pip install 'foldmap[app]'", file=sys.stderr)
+                return 1
             from .app import run
 
             run()
