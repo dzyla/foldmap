@@ -327,7 +327,17 @@ def test_group_by_chain_keeps_chain_order_and_filters():
     from foldmap.model import group_by_chain
     from helpers import fake_sse
 
-    a1, b1, a2 = fake_sse("H", 1, 9, chain="A"), fake_sse("E", 3, 7, chain="B"), fake_sse("E", 12, 15, chain="A")
-    assert list(group_by_chain([a1, b1, a2])) == ["A", "B"]
-    assert group_by_chain([a1, b1, a2])["A"] == [a1, a2]
-    assert group_by_chain([a1, b1, a2], keep={a2.id}) == {"A": [a2]}
+    b1, a1, b2 = fake_sse("E", 3, 7, chain="B"), fake_sse("H", 1, 9, chain="A"), fake_sse("E", 12, 15, chain="B")
+    assert list(group_by_chain([b1, a1, b2])) == ["B", "A"]  # first appearance, not sorted
+    assert group_by_chain([b1, a1, b2])["B"] == [b1, b2]
+    assert group_by_chain([b1, a1, b2], keep={b2.id}) == {"B": [b2]}
+
+
+def test_centred_box_and_overlaps_any():
+    from foldmap.layout import centred_box, overlaps_any
+
+    assert centred_box(1.0, 2.0, 0.5, 0.25) == (0.5, 1.75, 1.5, 2.25)
+    box = (0.0, 0.0, 1.0, 1.0)
+    assert overlaps_any(box, [(5, 5, 6, 6), (0.5, 0.5, 2.0, 2.0)])
+    assert not overlaps_any(box, [(1.0, 0.0, 2.0, 1.0), (0.0, 1.0, 1.0, 2.0)])  # edges only touch
+    assert not overlaps_any(box, [])
