@@ -11,21 +11,41 @@ from .model import Backbone, Ligand, Links, NAStrand, Nucleic, ResLabel
 
 _BB_ATOMS = ("N", "CA", "C", "O")
 _PEPTIDE_BOND_MAX = 2.0  # Å, C(i-1)-N(i)
+_CO_BOND = 1.231  # Å, carbonyl C=O
 
 
 def _chain_residues(chain):
-    """(label, coords, is_hetero) per usable residue; one residue per seqid (microheterogeneity)."""
+    """(label, coords, is_hetero, CA B-factor) per residue with N, CA and C; one residue per seqid
+    (microheterogeneity). coords[3] (O) is None when the file has no carbonyl oxygen."""
     seen: set[tuple[int, str]] = set()
     out = []
     for res in chain:
         key = (res.seqid.num, res.seqid.icode.strip())
         atoms = [res.find_atom(a, "*") for a in _BB_ATOMS]
-        if key in seen or any(a is None for a in atoms):
+        if key in seen or any(a is None for a in atoms[:3]):
             continue
         seen.add(key)
         label = ResLabel(chain.name, res.seqid.num, res.seqid.icode.strip(), res.name)
-        out.append((label, [a.pos.tolist() for a in atoms], res.het_flag == "H", atoms[1].b_iso))
+        coords = [a.pos.tolist() if a is not None else None for a in atoms]
+        out.append((label, coords, res.het_flag == "H", atoms[1].b_iso))
     return out
+
+
+def _rebuild_oxygens(found):
+    """Place a missing carbonyl O in the peptide plane, opposite the bisector of C->CA and C->N(next), 1.231 Å
+    from C. A residue missing O with no peptide-bonded successor (a chain end or break) is dropped."""
+    keep = []
+    for k, item in enumerate(found):
+        n, ca, c, o = (None if p is None else np.asarray(p, float) for p in item[1])
+        if o is None:
+            nxt = np.asarray(found[k + 1][1][0], float) if k + 1 < len(found) else None
+            if nxt is None or np.linalg.norm(nxt - c) >= _PEPTIDE_BOND_MAX:
+                continue
+            u = (c - ca) / np.linalg.norm(c - ca) + (c - nxt) / np.linalg.norm(c - nxt)
+            o = c + _CO_BOND * u / np.linalg.norm(u)
+            item = (item[0], [*item[1][:3], o.tolist()], *item[2:])
+        keep.append(item)
+    return keep
 
 
 def _drop_free_hetero(found):
@@ -93,11 +113,16 @@ def load_backbone(path: str | Path, assembly: str = "auto") -> Backbone:
     bfac: list[float] = []
     for chain in model:
         found = _chain_residues(chain)
-        found = _drop_free_hetero(found)
+        found = _rebuild_oxygens(_drop_free_hetero(found))
         labels.extend(f[0] for f in found)
         coords.extend(f[1] for f in found)
         bfac.extend(f[3] for f in found)
     if not labels:
+        if any(r.find_atom("CA", "*") is not None and r.find_atom("N", "*") is None for c in model for r in c):
+            raise ValueError(
+                f"{path}: only Cα atoms; foldmap needs the N, CA and C atoms of each residue to assign secondary "
+                "structure (rebuild the backbone first, e.g. with PULCHRA or modeller)"
+            )
         raise ValueError(f"{path}: no protein residues with a complete backbone")
     xyz = np.asarray(coords, float)
     prev = np.zeros(len(labels), bool)

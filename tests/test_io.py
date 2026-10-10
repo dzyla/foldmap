@@ -104,7 +104,7 @@ def test_microheterogeneity_keeps_one_residue_per_position(ubq, tmp_path):
 def test_residue_missing_backbone_atom_is_skipped_and_breaks_chain(ubq, tmp_path):
     st = gemmi.read_structure(str(ubq))
     res = next(r for r in st[0]["A"] if r.seqid.num == 30)
-    res.remove_atom("O", "*")
+    res.remove_atom("CA", "*")  # a missing O is rebuilt instead (test_robustness)
     out = tmp_path / "gap.cif"
     st.make_mmcif_document().write_file(str(out))
     bb = load_backbone(out)
