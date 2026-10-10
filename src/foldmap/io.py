@@ -129,7 +129,14 @@ def load_backbone(path: str | Path, assembly: str = "auto") -> Backbone:
         coords.extend(f[1] for f in found)
         bfac.extend(f[3] for f in found)
     if not labels:
-        if any(r.find_atom("CA", "*") is not None and r.find_atom("N", "*") is None for c in model for r in c):
+        if any(
+            gemmi.find_tabulated_residue(r.name) is not None
+            and gemmi.find_tabulated_residue(r.name).is_amino_acid()
+            and r.find_atom("CA", "*") is not None
+            and r.find_atom("N", "*") is None
+            for c in model
+            for r in c
+        ):
             raise ValueError(
                 f"{path}: only Cα atoms; foldmap needs the N, CA and C atoms of each residue to assign secondary "
                 "structure (rebuild the backbone first, e.g. with PULCHRA or modeller)"

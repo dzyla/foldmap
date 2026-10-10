@@ -100,7 +100,7 @@ def test_assembly_copies_count_chains_named_by_subchain(pdb, chains):
 
 
 def test_each_thread_draws_on_its_own_page(monkeypatch):
-    """Thread A leaves page() while thread B is still inside it: B's text colour must survive, and so must the rcParams."""
+    """Thread A leaves page() while B is still inside it: B keeps its own text colour, and rcParams are restored."""
     a_inside, b_inside, a_left = threading.Event(), threading.Event(), threading.Event()
     seen = {}
     before = matplotlib.rcParams["text.color"]
@@ -154,3 +154,21 @@ def test_symmetric_frame_when_the_first_protomer_has_no_elements():
     with np.errstate(all="raise"):
         frame = symmetric_frame([fake_sse("H", 1, 10, centroid=(-10, 0, 0), axis=(0, 0, 1), chain="B")], sym)
     assert np.isfinite(frame.ref).all() and abs(frame.ref @ sym.axis) < 1e-9
+
+
+def test_dna_with_a_calcium_ion_is_not_called_a_ca_only_trace(tmp_path):
+    st = gemmi.read_structure(str(DATA / "1LMB.cif"))
+    st.remove_ligands_and_waters()
+    for name in [c.name for c in st[0] if c.name in ("3", "4")]:
+        st[0].remove_chain(name)
+    ion = gemmi.Residue()
+    ion.name, ion.het_flag, ion.seqid = "CA", "H", gemmi.SeqId(500, " ")
+    atom = gemmi.Atom()
+    atom.name, atom.element, atom.pos = "CA", gemmi.Element("Ca"), gemmi.Position(0, 0, 0)
+    ion.add_atom(atom)
+    st[0][0].add_residue(ion)
+    st.setup_entities()
+    src = tmp_path / "dna_ca.cif"
+    st.make_mmcif_document().write_file(str(src))
+    with pytest.raises(ValueError, match="no protein residues with a complete backbone"):
+        load_backbone(src, "asu")
