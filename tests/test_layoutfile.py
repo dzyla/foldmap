@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 import yaml
 
+from foldmap import layoutfile
 from foldmap.cli import main
 
 DATA = Path(__file__).parent / "data"
@@ -159,3 +160,10 @@ def test_app_credits_foldmap():
 
     at = AppTest.from_file(str(Path(__file__).parents[1] / "src" / "foldmap" / "app.py")).run(timeout=60)
     assert any("AGPL-3.0" in c.value and "cite" in c.value for c in at.caption)
+
+
+def test_invalid_yaml_is_a_readable_error(tmp_path):
+    bad = tmp_path / "bad.yaml"
+    bad.write_text("layout: {rotate: 30\n", encoding="utf-8")
+    with pytest.raises(ValueError, match=r"layout file bad\.yaml is not valid YAML"):
+        layoutfile.load(bad)
