@@ -2,8 +2,11 @@
 
 import json
 import re
+import shlex
 import tomllib
 from pathlib import Path
+
+import yaml
 
 import foldmap
 
@@ -46,3 +49,29 @@ FLOORS = {
 def test_every_dependency_has_the_tested_floor():
     deps = dict(re.match(r"([A-Za-z0-9_.-]+)>=(\S+)", d).groups() for d in _pyproject()["project"]["dependencies"])
     assert deps == FLOORS, "keep pyproject floors and the minimum-deps CI job in step with FLOORS"
+
+
+TESTED = {"3.11", "3.12", "3.13", "3.14"}
+
+
+def test_classifiers_name_the_tested_pythons():
+    meta = _pyproject()["project"]
+    listed = {
+        c.rsplit(" :: ", 1)[1] for c in meta["classifiers"] if re.match(r"Programming Language :: Python :: 3\.\d+$", c)
+    }
+    assert listed == TESTED and meta["requires-python"] == ">=3.11"
+    tests_yml = (ROOT / ".github" / "workflows" / "tests.yml").read_text(encoding="utf-8")
+    assert all(f'"{v}"' in tests_yml for v in TESTED)
+
+
+def test_minimum_deps_job_pins_equal_the_floors():
+    """The floor "1.24" is pinned as "==1.24.*" and "0.7" as "==0.7.0"; nothing else is accepted."""
+    workflow = yaml.safe_load((ROOT / ".github" / "workflows" / "tests.yml").read_text(encoding="utf-8"))
+    runs = [s["run"] for s in workflow["jobs"]["minimum-deps"]["steps"] if "run" in s]
+    (install,) = [r for r in runs if r.startswith("pip install ") and "==" in r]
+    pins = dict(re.fullmatch(r"([A-Za-z0-9_.-]+)==(\S+)", t).groups() for t in shlex.split(install) if "==" in t)
+    assert set(pins) == set(FLOORS)
+    for name, floor in FLOORS.items():
+        assert pins[name] in (f"{floor}.*", f"{floor}.0", floor), (
+            f"minimum-deps pins {name}=={pins[name]} but the floor is {floor}"
+        )
