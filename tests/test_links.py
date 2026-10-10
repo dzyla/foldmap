@@ -194,6 +194,26 @@ def test_sialic_acid_joins_its_glycan_through_c2():
     assert all(lig.name != "SIA" for lig in links.ligands)  # drawn once, in the glycan
 
 
+def test_kdn_is_a_sialic_acid_of_its_glycan(tmp_path):
+    """Kdn (as 4BYH's Neu5Ac renamed) joins through C2 like Neu5Ac and is drawn as SNFG's green diamond."""
+    import gemmi
+
+    from foldmap.io import ANOMERIC, SUGARS
+    from foldmap.render import _SNFG
+
+    st = gemmi.read_structure(str(GLY / "4BYH_AC.cif"))
+    for res in (r for ch in st[0] for r in ch if r.name == "SIA"):
+        res.name = "KDN"
+    path = tmp_path / "kdn.cif"
+    st.make_mmcif_document().write_file(str(path))
+    bb = load_backbone(path, "asu")
+    links = load_links(path, bb, "asu")
+    ((_, names),) = links.glycans
+    assert "KDN" in names and all("KDN" not in lig.codes for lig in links.ligands)
+    assert _SNFG["KDN"] == ("diamond", "#00a651")
+    assert set(ANOMERIC) <= SUGARS  # only sugars that can be in a glycan
+
+
 def test_free_sugars_are_ligands():
     _, mbp = _links("1ANF")
     assert [(lig.symbol, lig.codes) for lig in mbp.ligands] == [("Glc×2", ["GLC", "GLC"])]

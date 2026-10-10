@@ -505,6 +505,7 @@ _SNFG = {  # Symbol Nomenclature for Glycans: (shape, colour)
     "SIA": ("diamond", "#a54399"),
     "SLB": ("diamond", "#a54399"),
     "NGC": ("diamond", "#8fcce9"),
+    "KDN": ("diamond", "#00a651"),
     "XYS": ("star", "#f47920"),
     "XYP": ("star", "#f47920"),
 }

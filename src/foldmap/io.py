@@ -277,14 +277,13 @@ SUGARS = {
     "GLB",
     "SLB",
     "NGC",
+    "KDN",
 }
-ANOMERIC = {  # sugars whose glycosidic bond leaves from C2 (sialic acids, Kdn, Kdo, fructose); every other one: C1
+ANOMERIC = {  # sugars whose glycosidic bond leaves from C2 (the sialic acids: Neu5Ac, Neu5Gc, Kdn); others: C1
     "SIA": "C2",
     "SLB": "C2",
     "NGC": "C2",
     "KDN": "C2",
-    "KDO": "C2",
-    "FRU": "C2",
 }
 
 
@@ -428,6 +427,7 @@ SHORT_NAMES = {  # sugar residues by their usual short names (SNFG); other ligan
     "SIA": "Neu5Ac",
     "SLB": "Neu5Ac",
     "NGC": "Neu5Gc",
+    "KDN": "Kdn",
     "A2G": "GalNAc",
     "NGA": "GalNAc",
 }
