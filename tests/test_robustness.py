@@ -3,6 +3,7 @@ named by subchain, concurrent drawing, files that are not structures."""
 
 import threading
 from pathlib import Path
+from types import SimpleNamespace
 
 import gemmi
 import numpy as np
@@ -10,11 +11,11 @@ import pytest
 
 from foldmap import render
 from foldmap.cli import main
-from foldmap.frame import view_frame
+from foldmap.frame import symmetric_frame, view_frame
 from foldmap.io import _copies, load_backbone, load_nucleic
 from foldmap.layout import build_layout
 from foldmap.style import Style
-from helpers import pipeline
+from helpers import fake_sse, pipeline
 
 DATA = Path(__file__).parent / "data"
 
@@ -130,3 +131,12 @@ def test_files_that_are_not_structures_are_reported(tmp_path, capsys, name, cont
     assert main(["summary", str(f)]) == 1
     err = capsys.readouterr().err
     assert err.startswith("foldmap: ") and "Traceback" not in err
+
+
+def test_symmetric_frame_when_the_first_protomer_has_no_elements():
+    sym = SimpleNamespace(
+        centre=np.zeros(3), axis=np.array([0, 0, 1.0]), protomers=[["A"], ["B"]], angles=[0.0, np.pi], rise=0.0
+    )
+    with np.errstate(all="raise"):
+        frame = symmetric_frame([fake_sse("H", 1, 10, centroid=(-10, 0, 0), axis=(0, 0, 1), chain="B")], sym)
+    assert np.isfinite(frame.ref).all() and abs(frame.ref @ sym.axis) < 1e-9

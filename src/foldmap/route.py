@@ -234,7 +234,7 @@ def route_loops(layout: Layout, sses: list[SSE], bb) -> list[Loop]:
         return []
     grid = _Grid(layout, [b for _, b in label_boxes(layout, sses)])
     dist = lambda ab: math.dist(layout.placed[ab[0].id].c_port, layout.placed[ab[1].id].n_port)  # noqa: E731
-    routed: dict[tuple[str, str], tuple[list, bool]] = {}
+    routed: dict[tuple[str, str], tuple[list, bool, bool]] = {}  # points, fallback curve, over labels
     for a, b in sorted(pairs, key=dist):
         pa, pb = layout.placed[a.id], layout.placed[b.id]
         gap = np.subtract(pb.n_port, pa.c_port)

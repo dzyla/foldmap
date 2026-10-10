@@ -96,7 +96,8 @@ def symmetric_frame(sses: list[SSE], sym) -> CylinderFrame:
     rel = cents - sym.centre
     rho = rel - np.outer(rel @ sym.axis, sym.axis)
     radius = float(np.median(np.linalg.norm(rho, axis=1)))
-    first = np.array([s.centroid for s in sses if s.chain in sym.protomers[0]]).mean(axis=0) - sym.centre
+    own = [s.centroid for s in sses if s.chain in sym.protomers[0]]  # none: protomer 0 has no helix or strand
+    first = np.mean(own, axis=0) - sym.centre if own else np.zeros(3)
     ref = first - (first @ sym.axis) * sym.axis
     ref = ref / np.linalg.norm(ref) if np.linalg.norm(ref) > 1e-6 else _any_perpendicular(sym.axis)
     sector = {c: k for k, p in enumerate(sym.protomers) for c in p}

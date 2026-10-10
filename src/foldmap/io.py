@@ -146,7 +146,7 @@ def load_backbone(path: str | Path, assembly: str = "auto") -> Backbone:
 
 _PURINES = {"A", "G", "DA", "DG", "I", "DI"}
 _PYRIMIDINES = {"C", "U", "T", "DC", "DT", "DU"}
-_LINK_MAX = 2.0  # Å, O3'(i-1)-P(i)
+_NA_LINK_MAX = 2.0  # Å, O3'(i-1)-P(i)
 _WC_MAX = 3.4  # Å, purine N1 - pyrimidine N3 in a Watson-Crick pair
 _CONTACT = 4.0  # Å, heavy atoms of a protein residue and a nucleotide
 
@@ -166,7 +166,7 @@ def _nucleic_strands(model):
                 continue
             if run:
                 o3, p = run[-1].find_atom("O3'", "*"), res.find_atom("P", "*")
-                if o3 is None or p is None or o3.pos.dist(p.pos) > _LINK_MAX:
+                if o3 is None or p is None or o3.pos.dist(p.pos) > _NA_LINK_MAX:
                     out.append((chain.name, run))
                     run = []
             run.append(res)
@@ -270,7 +270,7 @@ SUGARS = {
     "GLB",
 }
 _SS_MAX = 2.5  # Å between cysteine SG atoms
-_LINK_MAX = 2.0  # Å between a sugar's C1 and the atom it is bonded to
+_GLYCAN_LINK_MAX = 2.0  # Å between a sugar's C1 and the atom it is bonded to
 
 
 def load_links(path: str | Path, bb: Backbone, assembly: str = "auto") -> Links:
@@ -300,7 +300,7 @@ def load_links(path: str | Path, bb: Backbone, assembly: str = "auto") -> Links:
     for k_res, atom in anchors:
         if k_res not in where:
             continue
-        root = next(((c, r) for c, r in sugars if r.find_atom("C1", "*").pos.dist(atom.pos) < _LINK_MAX), None)
+        root = next(((c, r) for c, r in sugars if r.find_atom("C1", "*").pos.dist(atom.pos) < _GLYCAN_LINK_MAX), None)
         if root is None:
             continue
         tree, frontier = [root], [root]
@@ -313,7 +313,7 @@ def load_links(path: str | Path, bb: Backbone, assembly: str = "auto") -> Links:
                     if id(r) in used:
                         continue
                     c1 = r.find_atom("C1", "*")
-                    if any(c1.pos.dist(o.pos) < _LINK_MAX for o in oxygens):
+                    if any(c1.pos.dist(o.pos) < _GLYCAN_LINK_MAX for o in oxygens):
                         used.add(id(r))
                         tree.append((c, r))
                         nxt.append((c, r))
