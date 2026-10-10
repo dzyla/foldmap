@@ -42,6 +42,8 @@ class Track:
     ss: str
     elements: list[Element] = field(default_factory=list)
     residue: list[int | None] = field(default_factory=list)  # backbone index of each position (None: not modelled)
+    deposited: bool = True  # positions follow the deposited sequence (False: modelled residues only, no SEQRES)
+    deposited: bool = True  # positions follow the deposited sequence (False: modelled residues only, no SEQRES)
 
 
 def _one_letter(names: list[str]) -> str:
@@ -70,12 +72,14 @@ def chain_track(path, chain: str | None = None, full_sequence: bool = False) -> 
 
     st = gemmi.read_structure(str(path))
     st.setup_entities()
+    st.assign_label_seq_id()  # PDB-format files carry no label_seq; gemmi aligns SEQRES to the model to set it
     polymer = st[0][chain].get_polymer()
     entity = st.get_entity_of(polymer) if len(polymer) else None
     full = list(entity.full_sequence) if entity is not None else []
     by_id = {(r.seqid.num, r.seqid.icode.strip()): r.label_seq for r in polymer}
     seats = [by_id.get((bb.labels[k].seq, bb.labels[k].icode)) for k in mine]
-    if full and all(s is not None and 1 <= s <= len(full) for s in seats):
+    deposited = bool(full) and all(s is not None and 1 <= s <= len(full) for s in seats)
+    if deposited:
         names = [gemmi.Entity.first_mon(m) for m in full]
         position = {k: s - 1 for k, s in zip(mine, seats)}
     else:  # no deposited sequence (e.g. a PDB file without SEQRES): the modelled residues only
@@ -115,6 +119,7 @@ def chain_track(path, chain: str | None = None, full_sequence: bool = False) -> 
         "".join(ss[lo : hi + 1]),
         [shift(e) for e in elements],
         residue[lo : hi + 1],
+        deposited,
     )
 
 

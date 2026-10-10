@@ -153,3 +153,55 @@ def test_interactive_page_lists_uniprot_features(cache):
     feats = data["links"]["features"]
     assert feats and all('id="feature:' + f["key"] + '"' in page for f in feats)
     assert any("heme" in f["text"] or "binding" in f["text"] for f in feats)
+
+
+def _as_pdb(tmp_path, name, seqres=True, filename=None):
+    """The mmCIF fixture written in PDB format (gemmi keeps SEQRES), optionally without SEQRES."""
+    import gemmi
+
+    st = gemmi.read_structure(str(DATA / f"{name}.cif"))
+    st.setup_entities()
+    out = tmp_path / (filename or f"{name}.pdb")
+    st.write_pdb(str(out))
+    if not seqres:
+        out.write_text("".join(l for l in out.read_text().splitlines(True) if not l.startswith("SEQRES")))
+    return out
+
+
+def _mapped_identity(path, accession=None):
+    """Per chain: the share of UniProt -> structure pairs whose residue types agree."""
+    from foldmap.sequence import chain_track
+
+    out = {}
+    for m in uniprot.chain_maps(path, accession):
+        seq = uniprot.entry(m.accession).sequence
+        t = chain_track(path, m.chain, full_sequence=True)
+        pairs = [(u, p) for u, p in m.to_label.items() if 1 <= p <= len(t.letters) and t.observed[p - 1]]
+        out[m.chain] = sum(seq[u - 1] == t.letters[p - 1] for u, p in pairs) / max(len(pairs), 1)
+    return out
+
+
+@pytest.mark.parametrize("seqres", [True, False])
+def test_sifts_mapping_of_a_pdb_format_file(cache, tmp_path, seqres):
+    pdb = _as_pdb(tmp_path, "6ZS5", seqres=seqres)
+    assert uniprot.pdb_id_of(pdb) == "6ZS5"
+    assert _mapped_identity(DATA / "6ZS5.cif") == {"A": 1.0, "D": 1.0}
+    assert _mapped_identity(pdb) == {"A": 1.0, "D": 1.0}  # was 0.06 / 0.07: SIFTS numbering on modelled residues
+
+
+def test_pdb_format_file_gets_the_same_features_as_the_cif(cache, tmp_path):
+    def features(path):
+        bb = load_backbone(path, "asu")
+        ann = uniprot.annotate(path, bb)
+        return sorted(
+            (f.type, f.description, c, tuple(bb.labels[k].seq for k in ks)) for f, c, ks in ann.regions + ann.sites
+        )
+
+    assert features(_as_pdb(tmp_path, "6ZS5")) == features(DATA / "6ZS5.cif")
+
+
+def test_pdb_file_with_any_name_maps_by_alignment(cache, tmp_path):
+    """Not a PDB ID, so no SIFTS; the accession given is aligned, as for the mmCIF."""
+    pdb = _as_pdb(tmp_path, "6ZS5", filename="model.pdb")
+    assert uniprot.pdb_id_of(pdb) is None
+    assert _mapped_identity(pdb, "P07911") == {"A": 1.0, "D": 1.0}

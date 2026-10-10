@@ -226,6 +226,11 @@ def chain_maps(path, accession: str | None = None, cache_dir: Path | None = None
                     out.append(m)
                 for k in range(n):
                     m.to_label[ustart + k] = start + k
+        for m in out:  # SIFTS counts the deposited sequence; a file without one (no SEQRES) is aligned instead
+            track = chain_track(path, m.chain, full_sequence=True)
+            if not track.deposited:
+                seq = entry(m.accession, cache_dir).sequence
+                m.to_label = {i + 1: j + 1 for i, j in _global(seq, track.letters)}
         return out
     acc = accession or _accession_in_file(path)
     if acc is None:
