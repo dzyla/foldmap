@@ -8,6 +8,7 @@ import argparse
 import dataclasses
 import re
 import sys
+from collections.abc import Callable
 from pathlib import Path
 
 import numpy as np
@@ -848,17 +849,17 @@ def _resolve_structure(text: str) -> str:
     return str(fetch(text))  # a PDB ID or UniProt accession: downloaded once, cached
 
 
-def _cmd_summary(args) -> int:
+def _cmd_summary(args: argparse.Namespace) -> int:
     print(summarize(args.structure))
     return 0
 
 
-def _cmd_styles(args) -> int:
+def _cmd_styles(args: argparse.Namespace) -> int:
     print(styles_help())
     return 0
 
 
-def _cmd_app(args) -> int:
+def _cmd_app(args: argparse.Namespace) -> int:
     if not _has("streamlit"):
         print("foldmap: the app needs Streamlit: pip install 'foldmap[app]'", file=sys.stderr)
         return 1
@@ -868,14 +869,14 @@ def _cmd_app(args) -> int:
     return 0
 
 
-def _cmd_uniprot(args) -> int:
+def _cmd_uniprot(args: argparse.Namespace) -> int:
     from .uniprot import report
 
     print(report(args.source))
     return 0
 
 
-def _cmd_mcp(args) -> int:
+def _cmd_mcp(args: argparse.Namespace) -> int:
     if not _has("mcp"):
         print("foldmap: the MCP server needs the mcp package: pip install 'foldmap[mcp]'", file=sys.stderr)
         return 1
@@ -885,7 +886,7 @@ def _cmd_mcp(args) -> int:
     return 0
 
 
-def _cmd_sequence(args) -> int:
+def _cmd_sequence(args: argparse.Namespace) -> int:
     from .seqplot import draw_sequence
     from .sequence import read_alignment
 
@@ -909,7 +910,7 @@ def _cmd_sequence(args) -> int:
     return 0
 
 
-def _cmd_figure(args) -> int:
+def _cmd_figure(args: argparse.Namespace) -> int:
     """plot and interactive: the same figure spec, drawn or written as a page."""
     spec = _spec_of(args)
     if args.command == "interactive":
@@ -939,7 +940,7 @@ def _cmd_figure(args) -> int:
     return 0
 
 
-_COMMANDS = {
+_COMMANDS: dict[str, Callable[[argparse.Namespace], int]] = {
     "summary": _cmd_summary,
     "styles": _cmd_styles,
     "app": _cmd_app,
