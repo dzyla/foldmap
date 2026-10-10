@@ -16,6 +16,8 @@ from .model import Backbone, Bridge
 
 _Q1Q2F = 0.084 * 332.0  # kcal/mol * Å
 _HBOND_E = -0.5
+_HBOND_E_MIN = -9.9  # kcal/mol: DSSP's floor, also the energy of any pair with atoms closer than _MIN_DIST
+_MIN_DIST = 0.5  # Å
 _CA_CUTOFF = 9.0
 
 
@@ -42,6 +44,15 @@ def _hydrogen_positions(bb: Backbone) -> np.ndarray:
     return h
 
 
+def _hbond_energy(d_on, d_ch, d_oh, d_cn) -> np.ndarray:
+    """Electrostatic energy from the O-N, C-H, O-H and C-N distances, floored at -9.9 kcal/mol as in mkdssp."""
+    d_on, d_ch, d_oh, d_cn = (np.asarray(x, float) for x in (d_on, d_ch, d_oh, d_cn))
+    with np.errstate(divide="ignore", invalid="ignore"):
+        e = _Q1Q2F * (1 / d_on + 1 / d_ch - 1 / d_oh - 1 / d_cn)
+    clash = np.minimum.reduce([d_on, d_ch, d_oh, d_cn]) < _MIN_DIST
+    return np.where(clash, _HBOND_E_MIN, np.maximum(e, _HBOND_E_MIN))
+
+
 def _hbond_set(bb: Backbone) -> set[tuple[int, int]]:
     """Set of (acceptor, donor): CO of acceptor bonded to NH of donor."""
     xyz = bb.xyz
@@ -56,7 +67,7 @@ def _hbond_set(bb: Backbone) -> set[tuple[int, int]]:
     hd, nd = h[don], xyz[don, 0]
     oa, ca = xyz[acc, 3], xyz[acc, 2]
     d = lambda p, q: np.linalg.norm(p - q, axis=1)  # noqa: E731
-    e = _Q1Q2F * (1 / d(oa, nd) + 1 / d(ca, hd) - 1 / d(oa, hd) - 1 / d(ca, nd))
+    e = _hbond_energy(d(oa, nd), d(ca, hd), d(oa, hd), d(ca, nd))
     order = np.argsort(e)
     used_d, bonds = {}, set()
     for k in order:

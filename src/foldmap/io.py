@@ -10,7 +10,7 @@ import numpy as np
 from .model import Backbone, Ligand, Links, NAStrand, Nucleic, ResLabel
 
 _BB_ATOMS = ("N", "CA", "C", "O")
-_PEPTIDE_BOND_MAX = 2.0  # Å, C(i-1)-N(i)
+_PEPTIDE_BOND_MAX = 2.5  # Å, C(i-1)-N(i), as in DSSP
 _CO_BOND = 1.231  # Å, carbonyl C=O
 
 

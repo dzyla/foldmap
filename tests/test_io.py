@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import gemmi
 import numpy as np
 import pytest
@@ -111,3 +113,26 @@ def test_residue_missing_backbone_atom_is_skipped_and_breaks_chain(ubq, tmp_path
     assert len(bb) == 75
     i31 = next(i for i, l in enumerate(bb.labels) if l.seq == 31)
     assert not bb.prev[i31]  # 29 and 31 are no longer bonded
+
+
+def _stretched_ubiquitin(tmp_path, gap):
+    """1UBQ with residues 30 onwards moved so that C(29)-N(30) is `gap` Å."""
+    st = gemmi.read_structure(str(Path(__file__).parent / "data" / "1UBQ.cif"))
+    chain = st[0][0]
+    c = np.array(chain[28]["C"][0].pos.tolist())  # Ile 29
+    n = np.array(chain[29]["N"][0].pos.tolist())  # Lys 30
+    shift = (n - c) / np.linalg.norm(n - c) * (gap - np.linalg.norm(n - c))
+    for res in list(chain)[29:]:
+        for atom in res:
+            atom.pos = gemmi.Position(*(np.array(atom.pos.tolist()) + shift))
+    path = tmp_path / f"gap{gap}.cif"
+    st.make_mmcif_document().write_file(str(path))
+    return load_backbone(path, "asu")
+
+
+def test_peptide_bond_up_to_2_5_angstrom_as_dssp(tmp_path):
+    bb = _stretched_ubiquitin(tmp_path, 2.2)
+    k = next(i for i, l in enumerate(bb.labels) if l.seq == 30)
+    assert bb.prev[k]
+    bb = _stretched_ubiquitin(tmp_path, 2.7)
+    assert not bb.prev[next(i for i, l in enumerate(bb.labels) if l.seq == 30)]

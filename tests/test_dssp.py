@@ -3,6 +3,7 @@ from pathlib import Path
 
 import gemmi
 import numpy as np
+import pytest
 
 from foldmap.dssp import _hbond_set, assign_dssp
 from foldmap.io import load_backbone
@@ -174,3 +175,22 @@ def test_bulged_strands_stay_whole():
 
     bb = load_backbone(DATA / "5NKT.cif", "asu")
     assert sum(s.kind == "E" for s in build_sses(bb, assign_dssp(bb).ss)) == 12  # mkdssp: 12 strands
+
+
+def test_hbond_energy_is_floored_like_dssp():
+    from foldmap.dssp import _hbond_energy
+
+    e = _hbond_energy([0.3, 3.0, 5.0], [2.0, 2.1, 5.0], [1.9, 2.0, 0.6], [3.0, 3.0, 0.6])
+    assert e[0] == pytest.approx(-9.9)  # an atom pair closer than 0.5 Å
+    assert e[1] == pytest.approx(-0.664, abs=1e-3)  # an ordinary H-bond, unchanged
+    assert e[2] == pytest.approx(-9.9)  # -81.8 kcal/mol, floored
+
+
+def test_coincident_atoms_give_the_floor_without_warnings():
+    import warnings
+
+    from foldmap.dssp import _hbond_energy
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        assert _hbond_energy([0.0], [0.0], [0.0], [0.0])[0] == pytest.approx(-9.9)
