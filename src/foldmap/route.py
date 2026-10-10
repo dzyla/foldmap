@@ -15,7 +15,11 @@ from .model import SSE
 
 RES = 0.25  # grid cell size, page units
 _INFLATE = 0.15  # keep loops this far from arrows
-_TOUCH = 0.02  # a drawn loop nearer than this to an element counts as crossing it
+# A drawn loop nearer than this to an element counts as crossing it. A free cell can come within RES/2 of
+# an inflated obstacle (at any res, as the reach makes up the rest of the coarser cell), and the port snap
+# moves a run anywhere inside its cells, so a snapped route keeps at least _INFLATE - RES/2 = 0.025: 0.02
+# leaves a margin. A drawing that still breaches it is redrawn unsnapped, then becomes the flagged fallback.
+_TOUCH = 0.02
 _TURN = 2.5
 _REUSE = 6.0  # extra cost for a cell an earlier loop already uses
 _PAD = 3.0
@@ -127,7 +131,8 @@ def clip_len(p, q, rect) -> float:
 
 
 def segment_clear(p, q, rects, grow=_INFLATE) -> bool:
-    """True when segment p-q keeps the routing clearance from every rect (each grown by `grow`)."""
+    """True when segment p-q keeps the routing clearance from every rect (each grown by `grow`).
+    The router uses _clear; this simple form is kept for the tests."""
     return all(clip_len(p, q, (r[0] - grow, r[1] - grow, r[2] + grow, r[3] + grow)) <= 1e-9 for r in rects)
 
 
@@ -140,13 +145,13 @@ def _crosses_body(p, q, e: Placed) -> bool:
     return clip_len((u0, v0), (u1, v1), (-hl, -hw, hl, hw)) > 1e-9
 
 
-def _clear(path, own: tuple[Placed, Placed], rects: np.ndarray, owners: list, grow=_TOUCH) -> bool:
+def _clear(path, own: tuple[Placed, Placed], rects: np.ndarray, owners: list, grow=_TOUCH, kink=False) -> bool:
     """True when the connector `path` between its own two elements comes no nearer than `grow` to any of
     `rects` (a (4, n) array of x0, y0, x1, y1 rows; owners[k] is the element id owning rect k, or None), by
     exact clipping. The end segments leave from ports on the own elements' boxes (inside them when tilted),
     so the own boxes are not checked there. A route with turns must still leave and enter its ports from
-    outside: its end segments may touch the own elements' true outlines but not enter them. A straight link
-    from port to port (a kink) is the join itself and skips its own two elements (and their labels)."""
+    outside: its end segments may touch the own elements' true outlines but not enter them. A kink link
+    (`kink`: the straight join of two pieces of one element) skips its own two elements and their labels."""
     skip = (own[0].sse.id, own[1].sse.id)
     xs, ys = [p[0] for p in path], [p[1] for p in path]
     x0, y0, x1, y1 = min(xs) - grow, min(ys) - grow, max(xs) + grow, max(ys) + grow
@@ -167,7 +172,7 @@ def _clear(path, own: tuple[Placed, Placed], rects: np.ndarray, owners: list, gr
                 and clip_len(p, q, box) > 1e-9
             ):
                 return False
-    return last == 0 or not any(_crosses_body(*segs[i], e) for i in (0, last) for e in own)
+    return kink or not any(_crosses_body(*segs[i], e) for i in {0, last} for e in own)
 
 
 def _axis(vec) -> int:
@@ -354,7 +359,7 @@ def route_loops(layout: Layout, sses: list[SSE], bb) -> list[Loop]:
             b.start - a.end - 1 <= KINK_GAP
             and np.hypot(*gap) < 1.5
             and gap @ pa.exit_c > 0
-            and _clear([pa.c_port, pb.n_port], (pa, pb), rects, owners, grow=_INFLATE)  # labels too, full clearance
+            and _clear([pa.c_port, pb.n_port], (pa, pb), rects, owners, grow=_INFLATE, kink=True)  # and labels
         ):
             for c in grid.cells_along(pa.c_port, pb.n_port):
                 grid.used[c] += 1

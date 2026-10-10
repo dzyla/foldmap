@@ -1,4 +1,5 @@
 import logging
+import re
 from types import SimpleNamespace
 
 import numpy as np
@@ -272,14 +273,16 @@ def test_coarse_grid_keeps_narrow_elements(step):
     assert _Grid(lay).res > 1.2  # narrower than a cell once grown by the clearance
     loops = route_loops(lay, [p.sse for p in placed], stub_bb(10_000))
     (loop,) = [l for l in loops if l.a_id == a.sse.id]
-    assert loop.fallback or all(segment_clear(p, q, [eta.rect], grow=0.0) for p, q in zip(loop.points, loop.points[1:]))
+    assert not loop.fallback and all(
+        segment_clear(p, q, [eta.rect], grow=0.0) for p, q in zip(loop.points, loop.points[1:])
+    )
 
 
 @pytest.mark.parametrize("page", ["normal", "big"])
 def test_random_layouts_never_route_through_an_element(page):
     rng = np.random.default_rng(0)
     widths = {"H": HELIX_W, "E": PITCH, "G": HELIX_W * ETA_W}
-    checked = 0
+    checked = fallbacks = 0
     for _ in range(150):
         off = 700.0 if page == "big" else 0.0
         placed = []
@@ -301,10 +304,20 @@ def test_random_layouts_never_route_through_an_element(page):
         assert (_Grid(lay).res > 1.0) == (page == "big")
         for loop in route_loops(lay, [p.sse for p in placed], stub_bb(10_000)):
             checked += 1
+            fallbacks += loop.fallback
             if not loop.fallback:
                 rects = other_rects(loop, placed)
                 assert all(segment_clear(p, q, rects, grow=0.0) for p, q in zip(loop.points, loop.points[1:])), loop
     assert checked > 100
+    # 5 and 35 of 134 now: a route can no longer be a silent crossing, so over-blocking shows only as fallbacks
+    # (a port skip that ignored the coarse reach made it 100 on the big page)
+    assert fallbacks <= {"normal": 8, "big": 45}[page], fallbacks
+
+
+def logged(caplog, what):
+    """The count route_loops logged for `what` in its debug line."""
+    (n,) = re.findall(rf"\b(\d+) {what}", caplog.text)
+    return int(n)
 
 
 def strands_over_the_top(*more):
@@ -327,7 +340,7 @@ def test_a_route_pushed_into_an_element_after_a_star_is_redrawn_unsnapped(monkey
     caplog.set_level(logging.DEBUG, logger="foldmap.route")
     a, b, lay = strands_over_the_top()
     (loop,) = route_loops(lay, [a.sse, b.sse], stub_bb())
-    assert "1 drawings rejected as crossing" in caplog.text  # the snapped drawing
+    assert logged(caplog, "drawings rejected as crossing") == 1  # the snapped drawing
     assert not loop.fallback
     assert np.allclose(loop.points[0], a.c_port) and np.allclose(loop.points[-1], b.n_port)
     assert all(segment_clear(p, q, [a.rect, b.rect], grow=0.0) for p, q in zip(loop.points, loop.points[1:]))
@@ -345,19 +358,24 @@ def test_a_route_through_an_element_that_cannot_be_redrawn_is_marked_fallback(mo
     caplog.set_level(logging.DEBUG, logger="foldmap.route")
     (loop,) = route_loops(lay, [a.sse, b.sse], stub_bb())
     assert loop.fallback
-    assert "4 drawings rejected as crossing" in caplog.text  # snapped and not, with and without the labels
+    assert logged(caplog, "fallback curves") == 1
+    assert logged(caplog, "drawings rejected as crossing") == 4  # snapped and not, with and without labels
 
 
-@pytest.mark.parametrize("res", [0.25, 0.26, 0.5, 1.3])
+# res 0.5 and 1.3 only: below 2 * _INFLATE = 0.3 the inflated rect alone always spans a cell centre, so a
+# finer grid could not tell whether the reach is there
+@pytest.mark.parametrize("res", [0.5, 1.3])
 @pytest.mark.parametrize("width", [0.0, 0.35])
-def test_coarse_grid_blocks_a_cell_for_any_narrow_obstacle(res, width):
+def test_coarse_grid_blocks_the_cells_under_any_narrow_obstacle(res, width):
     side = res * np.sqrt(_MAX_CELLS)  # a page this size gets cells of this size
     lay = Layout({}, (0.0, 0.0, side - 2 * 3.0, side - 2 * 3.0))
     for k in range(8):  # slide the obstacle across one cell in both directions
         x = y = 100.0 + k * res / 8
         g = _Grid(lay, [(x, y, x + width, y + width)])
         assert g.res == pytest.approx(res)
-        assert g.soft.any(axis=1).sum() >= 1 and g.soft.any(axis=0).sum() >= 1, (k, g.res)
+        (i0, j0), (i1, j1) = g.cell((x, y)), g.cell((x + width, y + width))
+        assert g.soft[i0 : i1 + 1, :].any() and g.soft[:, j0 : j1 + 1].any(), k  # its own column and row bands
+        assert g.soft[i0 : i1 + 1, j0 : j1 + 1].any(), k  # and a cell it lies in
 
 
 def kink_with(third):
@@ -390,7 +408,8 @@ def test_kink_blocked_only_by_another_elements_label_is_routed_around_it():
 def test_kink_between_tilted_pieces_with_overlapping_boxes_stays_straight():
     a = bar(0, -1.3, -0.75, 3.0, np.pi / 6)  # C port near (0, 0)
     b = bar(11, a.c_port[0] + 0.6 + 1.5 * np.cos(np.pi / 3), a.c_port[1] + 1.5 * np.sin(np.pi / 3), 3.0, np.pi / 3)
-    assert segment_clear(a.c_port, b.n_port, [a.rect], grow=0.0) is False  # the link runs inside both boxes
+    assert not segment_clear(a.c_port, b.n_port, [a.rect], grow=0.0)  # the link runs inside both boxes
+    assert not segment_clear(a.c_port, b.n_port, [b.rect], grow=0.0)
     lay = layout_of(a, b)
     (loop,) = route_loops(lay, [a.sse, b.sse], stub_bb())
     assert not loop.fallback and len(loop.points) == 2
@@ -408,3 +427,23 @@ def test_coarse_grid_still_routes_an_open_loop(x):
     (loop,) = [l for l in route_loops(lay, [p.sse for p in placed], stub_bb(10_000)) if l.a_id == a.sse.id]
     assert not loop.fallback
     assert all(segment_clear(p, q, [a.rect, b.rect], grow=0.0) for p, q in zip(loop.points, loop.points[1:]))
+
+
+def helix_piece(start, port, angle, length):
+    """A helix piece whose N port is at `port`."""
+    c = np.add(port, np.array([np.cos(angle), np.sin(angle)]) * length / 2)
+    return Placed(fake_sse("H", start, start + 9), float(c[0]), float(c[1]), length, angle, HELIX_W, "α")
+
+
+def test_kink_is_not_drawn_through_the_box_of_a_third_piece_of_the_same_helix():
+    """Only the two joined pieces are exempt. A third piece, beyond the next kink, is an obstacle by its
+    bounding box like any other element (the grid blocks the same box), even where its tilted body leaves
+    room: the link is not drawn straight, and the loop is routed or flagged instead."""
+    a = helix_piece(0, (-3 * np.cos(np.pi / 6), -3 * np.sin(np.pi / 6)), np.pi / 6, 3.0)  # C port at (0, 0)
+    b = helix_piece(11, (0.5, 0.29), np.pi / 6, 0.6)  # a short piece one residue on
+    c = helix_piece(22, np.add(b.c_port, (0.08, 0.1)), 3 * np.pi / 4, 4.0)  # turns back up over the a-b gap
+    assert not segment_clear(a.c_port, b.n_port, [c.rect])  # within the clearance of c's box
+    assert not route._crosses_body(a.c_port, b.n_port, c)  # though not through c itself
+    loops = {l.a_id: l for l in route_loops(layout_of(a, b, c), [a.sse, b.sse, c.sse], stub_bb())}
+    assert len(loops[a.sse.id].points) > 2  # not the straight kink link
+    assert loops[b.sse.id].points == [b.c_port, c.n_port]  # the b-c kink is
