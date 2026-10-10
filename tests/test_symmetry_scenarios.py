@@ -303,6 +303,20 @@ def test_unrolled_filament_steps_evenly_in_its_own_direction(tmp_path, sign):
     assert np.ptp(steps) < 0.05
 
 
+@pytest.mark.parametrize("sign", [1, -1])
+def test_pilus_rod_unrolls_in_its_own_direction(tmp_path, sign):
+    """6Y7S and its mirror image: one subunit per ~13 page units, rightwards for the right-handed rod."""
+    from foldmap.cli import make_layout
+
+    lay, sses, _ = make_layout(DATA / "6Y7S.cif" if sign > 0 else mirrored(tmp_path), focus="none")
+    first = {}
+    for s in sses:
+        first.setdefault(s.chain, s)
+    steps = np.diff([lay.placed[first[c].id].cx for c in sorted(first)])
+    assert len(steps) == 5 and np.all(np.sign(steps) == sign)
+    assert np.median(steps) == pytest.approx(sign * 13, abs=2.5)
+
+
 def test_left_handed_filament_says_so_on_the_figure(tmp_path, capsys):
     """Review focus 5: the default figure (focus auto) and the summary name the hand."""
     from foldmap.cli import main, make_figure
