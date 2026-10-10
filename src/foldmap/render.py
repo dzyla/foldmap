@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from collections import Counter
+from contextlib import contextmanager
+from contextvars import ContextVar
 from dataclasses import replace
 from pathlib import Path as FsPath
 
@@ -120,7 +123,7 @@ _DNA_DARK = ("#d3dce5", "#7d8b99", "#5a6b7c")  # the same on a dark page
 
 
 def _dna_colours(style: str) -> tuple[str, str, str]:
-    return _DNA_DARK if _luminance(_PAGE["background"]) < 0.5 else _DNA[style]
+    return _DNA_DARK if _luminance(_BACKGROUND.get()) < 0.5 else _DNA[style]
 
 
 _DNA_TUBE = 0.42  # backbone tube width, page units
@@ -416,7 +419,20 @@ def _shade(colour: str, t: float) -> str:
     return tint(colour, 0.55 * (1 - 2 * t)) if t < 0.5 else darken(colour, 1 - 0.4 * (2 * t - 1))
 
 
-_PAGE = {"background": "#ffffff"}  # the page being drawn (set by _draw), so line colours can adapt to it
+# The page being drawn (set by page()), so line colours can adapt to it. A context variable, not a global:
+# concurrent app sessions draw in their own threads.
+_BACKGROUND: ContextVar[str] = ContextVar("foldmap_background", default="#ffffff")
+
+
+@contextmanager
+def page(look: Style):
+    """Draw on `look`'s page: its background for colour choices and its ink and fonts for text."""
+    token = _BACKGROUND.set(look.background)
+    try:
+        with rc_context({**_RC, "text.color": look.ink}):
+            yield
+    finally:
+        _BACKGROUND.reset(token)
 
 
 def _luminance(colour) -> float:
@@ -435,7 +451,7 @@ def _mix(a: str, b: str, t: float) -> str:
 
 def _label_ink(colour: str) -> str:
     """Text in an element's own hue: a deeper shade on light pages, the colour itself on dark ones."""
-    if _luminance(_PAGE["background"]) < 0.5:
+    if _luminance(_BACKGROUND.get()) < 0.5:
         return _legible(colour)
     return _legible(darken(colour, 0.8))
 
@@ -445,7 +461,7 @@ def _legible(colour: str, ceiling: float = 0.5) -> str:
     fills, not for thin lines), lighter on dark ones."""
     from matplotlib.colors import to_rgb
 
-    if _luminance(_PAGE["background"]) < 0.5:
+    if _luminance(_BACKGROUND.get()) < 0.5:
         for _ in range(12):
             if _luminance(colour) >= 0.55:
                 break
@@ -765,7 +781,7 @@ def _draw_uniprot(ax, marks: list[dict], layout, lw: float, font: float) -> None
     for n, m in enumerate(marks):
         f, (x, y) = m["feature"], m["at"]
         colour = SITE_COLOURS.get(f.type, "#555555")
-        halo = Circle((x, y), 0.27, fc=_PAGE["background"], ec=_legible("#1d1d1f"), lw=lw * 0.9, zorder=3.84)
+        halo = Circle((x, y), 0.27, fc=_BACKGROUND.get(), ec=_legible("#1d1d1f"), lw=lw * 0.9, zorder=3.84)
         halo.set_gid(f"feature-ring:{n}")
         ax.add_patch(halo)
         dot = Circle((x, y), 0.17, fc=colour, ec="none", zorder=3.85)
@@ -963,8 +979,9 @@ def residue_runs(path: Path, colours: list) -> list[tuple[str, np.ndarray]]:
 
 
 def _typical(colours: list) -> str | None:
+    """The most common colour; ties go to the one met first, so the result never depends on hashing."""
     found = [c for c in colours if c is not None]
-    return max(set(found), key=found.count) if found else None
+    return Counter(found).most_common(1)[0][0] if found else None
 
 
 def plddt_colour(v: float) -> str:
@@ -1101,8 +1118,7 @@ def element_colours(layout: Layout, sses: list[SSE], look: Style):
 def draw(layout: Layout, loops: list[Loop], sses: list[SSE], title: str | None = None, **kw) -> Figure:
     """`look` carries every visual choice; palette/style (fill)/loop_style are shorthands that override it."""
     look = (kw.get("look") or Style()).validate()
-    _PAGE["background"] = look.background
-    with rc_context({**_RC, "text.color": look.ink}):  # fonts/colours are fixed when text is made: set them here
+    with page(look):  # fonts/colours are fixed when text is made: set them here
         return _draw(layout, loops, sses, title, **kw)
 
 

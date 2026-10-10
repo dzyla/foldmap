@@ -6,13 +6,12 @@ from __future__ import annotations
 from pathlib import Path as FsPath
 
 import numpy as np
-from matplotlib import rc_context
 from matplotlib.figure import Figure
 from matplotlib.patches import Circle, PathPatch, Polygon, Rectangle
 from matplotlib.path import Path
 
 from .palette import darken, text_color_on
-from .render import _PAGE, _RC, _legible
+from .render import _legible, page
 from .sequence import GAP, Alignment, chain_track, column_classes, conservation, map_alignment
 from .style import Style
 
@@ -57,8 +56,7 @@ def draw_sequence(
     if ss_colour not in ("figure", "black"):
         raise ValueError("ss_colour is 'figure' or 'black'")
     look = (look or Style()).validate()
-    _PAGE["background"] = look.background
-    with rc_context({**_RC, "text.color": look.ink}):
+    with page(look):
         return _draw(
             path,
             chain,

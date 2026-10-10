@@ -1,16 +1,19 @@
 """Inputs and situations the pipeline must survive: missing atoms, DNA with no protein elements, assemblies
 named by subchain, concurrent drawing, files that are not structures."""
 
+import threading
 from pathlib import Path
 
 import gemmi
 import numpy as np
 import pytest
 
+from foldmap import render
 from foldmap.cli import main
 from foldmap.frame import view_frame
 from foldmap.io import _copies, load_backbone, load_nucleic
 from foldmap.layout import build_layout
+from foldmap.style import Style
 from helpers import pipeline
 
 DATA = Path(__file__).parent / "data"
@@ -92,3 +95,29 @@ def test_ca_only_model_is_explained(ubq, tmp_path):
 def test_assembly_copies_count_chains_named_by_subchain(pdb, chains):
     st = gemmi.read_structure(str(DATA / f"{pdb}.cif"))
     assert _copies(st.assemblies[0], st[0]) == chains
+
+
+def test_each_thread_draws_on_its_own_page(monkeypatch):
+    barrier = threading.Barrier(2, timeout=10)
+    seen = {}
+
+    def fake_draw(layout, loops, sses, title, **kw):
+        barrier.wait()  # both threads have entered page() before either reads it
+        seen[kw["look"].background] = render._BACKGROUND.get()
+
+    monkeypatch.setattr(render, "_draw", fake_draw)
+    threads = [
+        threading.Thread(target=render.draw, args=(None, [], []), kwargs={"look": Style(background=bg)})
+        for bg in ("#0d2a4a", "#ffffff")
+    ]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    assert seen == {"#0d2a4a": "#0d2a4a", "#ffffff": "#ffffff"}
+    assert render._BACKGROUND.get() == "#ffffff"
+
+
+def test_typical_colour_ties_go_to_the_first_met():
+    assert render._typical(["#bbbbbb", "#aaaaaa", None, "#aaaaaa", "#bbbbbb"]) == "#bbbbbb"
+    assert render._typical([None]) is None
