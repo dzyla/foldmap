@@ -308,3 +308,19 @@ def test_hosted_app_ignores_alignment_paths_in_layout_files(monkeypatch):
     monkeypatch.setenv("FOLDMAP_APP_LOCAL_FILES", "off")
     back = settings_from_document(doc)
     assert back["msa_path"] == "" and back["msa_missing"] == str(DATA / "ubq_family.fasta")
+
+
+def test_app_alignment_of_one_structure_does_not_carry_to_the_next():
+    at = _load(_app(), DATA / "1UBQ.cif")
+    at.button(key="pick_publication").click().run()
+    at.file_uploader(key="msa_upload").set_value(
+        ("ubq.fasta", (DATA / "ubq_family.fasta").read_bytes(), "text/plain")
+    ).run()
+    assert at.session_state["msa_path"]
+    at.button(key="back_edit").click().run()
+    at.text_input(key="source").input(str(DATA / "1LMB.cif"))
+    at.button(key="load").click().run()
+    at.button(key="pick_publication").click().run()
+    assert not at.exception and not at.error
+    assert at.session_state["msa_path"] == "" and at.session_state["msa_error"] == ""
+    assert at.session_state["msa_reference"] == ""

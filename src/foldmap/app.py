@@ -308,7 +308,8 @@ def main() -> None:
         ss["path"], ss["stage"], ss["load_error"] = str(path), "style", ""
         for key in HIDDEN_LAYOUT:  # the last structure's are not this one's
             ss[key] = LAYOUT_DEFAULTS[key]
-        ss["msa_missing"] = ""
+        for key in ("msa_path", "msa_error", "msa_reference", "msa_missing"):  # the last structure's alignment
+            ss[key] = ""
 
     def pick(theme: str) -> None:
         apply_theme(theme)
