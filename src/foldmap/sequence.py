@@ -180,7 +180,7 @@ def read_alignment(path) -> Alignment:
 
 
 _CONSURF_HEADER = re.compile(r"^\s*POS\s+SEQ\s+(?:3L)?ATOM\s+SCORE\s+COLOR", re.MULTILINE)
-_CONSURF_ATOM = re.compile(r"[A-Z]{3}:?(-?\d+)([A-Za-z]?):([A-Za-z0-9]+)")  # ALA246:A (job server) or ALA:246:A (DB)
+_CONSURF_ATOM = re.compile(r"([A-Z]{3}):?(-?\d+)([A-Za-z]?):([A-Za-z0-9]+)")  # ALA246:A (job server), ALA:246:A (DB)
 
 
 def is_consurf(path) -> bool:
@@ -188,17 +188,17 @@ def is_consurf(path) -> bool:
     return bool(_CONSURF_HEADER.search(Path(path).read_text(encoding="utf-8", errors="replace")))
 
 
-def read_consurf(path) -> dict[tuple[str, int, str], int]:
-    """ConSurf's grades (Rate4Site, 1 variable .. 9 conserved) by (chain, residue number, insertion code), for
-    the positions ConSurf placed on the structure. Grades ConSurf marks as unreliable ('*') are kept."""
-    out: dict[tuple[str, int, str], int] = {}
+def read_consurf(path) -> dict[tuple[str, int, str], tuple[str, int]]:
+    """(residue name, ConSurf grade: Rate4Site, 1 variable .. 9 conserved) by (chain, residue number, insertion
+    code), for the positions ConSurf placed on the structure. Grades ConSurf marks as unreliable ('*') are kept."""
+    out: dict[tuple[str, int, str], tuple[str, int]] = {}
     for line in Path(path).read_text(encoding="utf-8", errors="replace").splitlines():
         parts = line.split()
         if len(parts) < 5 or not parts[0].isdigit():
             continue
         atom, grade = _CONSURF_ATOM.fullmatch(parts[2]), parts[4].rstrip("*")
         if atom and grade.isdigit() and 1 <= int(grade) <= 9:
-            out[(atom.group(3), int(atom.group(1)), atom.group(2))] = int(grade)
+            out[(atom.group(4), int(atom.group(2)), atom.group(3))] = (atom.group(1), int(grade))
     return out
 
 

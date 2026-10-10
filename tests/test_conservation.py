@@ -99,14 +99,15 @@ def test_grade_colours():
     assert to_hex(grade_colour(0)) == "#d9d9d9"
 
 
-def consurf_table(tmp_path, grade_of):
-    """A ConSurf grades table for ubiquitin chain A: grade_of(residue number) -> grade (synthesised in the
-    documented consurf_grades.txt layout; no real file is available offline)."""
+def consurf_table(tmp_path, grade_of, numbers=range(1, 77)):
+    """A ConSurf grades table for ubiquitin chain A (residues `numbers`): grade_of(residue number) -> grade
+    (synthesised in the documented consurf_grades.txt layout; no real file is available offline)."""
     import gemmi
 
     st = gemmi.read_structure(str(UBQ))
     rows = [" POS\t SEQ\t    3LATOM\tSCORE\t\tCOLOR\tCONFIDENCE INTERVAL", "    \t    \t        \t(normalized)"]
-    for k, res in enumerate(st[0]["A"].get_polymer(), 1):
+    polymer = [res for res in st[0]["A"].get_polymer() if res.seqid.num in numbers]
+    for k, res in enumerate(polymer, 1):
         one = gemmi.find_tabulated_residue(res.name).one_letter_code.upper()
         g = grade_of(res.seqid.num)
         flag = "*" if k == 1 else ""  # ConSurf's mark for a grade with too little data
@@ -123,7 +124,7 @@ def test_consurf_table_colours_by_its_own_grades(tmp_path):
     table = consurf_table(tmp_path, lambda n: 9 if n <= 10 else 1)
     assert is_consurf(table) and not is_consurf(FAMILY)
     grades = read_consurf(table)
-    assert grades[("A", 1, "")] == 9 and grades[("A", 70, "")] == 1 and len(grades) == 76
+    assert grades[("A", 1, "")] == ("MET", 9) and grades[("A", 70, "")] == ("VAL", 1) and len(grades) == 76
     lay, sses, _ = make_layout(UBQ, msa=table)
     assert lay.cons_label == "conservation (ConSurf grades)"
     colours, _ = element_colours(lay, sses, Style(color_by="conservation"))
@@ -144,8 +145,8 @@ def test_real_consurf_db_table_is_parsed():
     assert is_consurf(table)
     grades = read_consurf(table)
     assert len(grades) == 12
-    assert grades[("A", 1, "")] == 8  # '8*': below ConSurf's confidence cut-off, grade kept
-    assert grades[("A", 4, "")] == 9 and grades[("A", 6, "")] == 4 and grades[("A", 13, "")] == 9
+    assert grades[("A", 1, "")] == ("ALA", 8)  # '8*': below ConSurf's confidence cut-off, grade kept
+    assert grades[("A", 4, "")] == ("ARG", 9) and grades[("A", 6, "")][1] == 4 and grades[("A", 13, "")][1] == 9
     assert ("A", 3, "") not in grades  # numbering follows the structure (POS 3 is residue 4)
 
 
@@ -161,7 +162,7 @@ def test_consurf_atoms_with_insertion_codes_and_missing_positions(tmp_path):
             encoding="utf-8",
         )
         assert is_consurf(path)
-        assert read_consurf(path) == {("A", 52, "A"): 7, ("A", -3, ""): 2}
+        assert read_consurf(path) == {("A", 52, "A"): ("ALA", 7), ("A", -3, ""): ("ALA", 2)}
     legend_only = tmp_path / "l.txt"
     legend_only.write_text("COLOR and ATOM are columns\n>a\nMKV\n", encoding="utf-8")
     assert not is_consurf(legend_only)
@@ -187,6 +188,61 @@ def test_consurf_grades_skip_chains_with_a_different_sequence(tmp_path):
     lay, _, bb = make_layout(mutated, msa=DATA / "consurf" / "1TIM_A_grades.txt")
     by = {(l.chain, l.seq): g for l, g in zip(bb.labels, lay.res_grade)}
     assert by[("A", 4)] == 9 and by[("B", 4)] == 0
+
+
+def test_consurf_table_of_another_protein_grades_nothing_and_warns(capsys):
+    """Grades follow residue numbers only where the residue names agree: triosephosphate isomerase's table
+    numbers 1-13 too, but none of it is ubiquitin."""
+    lay, _, _ = make_layout(UBQ, msa=DATA / "consurf" / "1TIM_A_grades.txt")
+    assert not any(lay.res_grade)
+    err = capsys.readouterr().err
+    assert "foldmap: warning:" in err and "chain A" in err and "no residue" in err
+
+
+def test_consurf_grades_skip_single_residues_with_another_name(tmp_path, capsys):
+    import gemmi
+
+    st = gemmi.read_structure(str(UBQ))
+    st[0]["A"][0].name = "ALA"  # a point mutant of the table's protein: Met1 -> Ala
+    mutant = tmp_path / "ubq_m1a.cif"
+    st.make_mmcif_document().write_file(str(mutant))
+    lay, _, bb = make_layout(mutant, msa=consurf_table(tmp_path, lambda n: 7))
+    by = {l.seq: g for l, g in zip(bb.labels, lay.res_grade)}
+    assert by[1] == 0 and by[2] == 7 and capsys.readouterr().err == ""
+
+
+def test_assembly_copies_take_grades_only_with_the_same_sequence(tmp_path):
+    """A2 borrows chain A's grades by name only when its residues are A's: here A2 is poly-Gly, B is TIM."""
+    import gemmi
+
+    st = gemmi.read_structure(str(DATA / "1TIM.cif"))
+    st[0]["A"].name = "A2"
+    for res in st[0]["A2"]:
+        res.name = "GLY"
+    copy = tmp_path / "tim_a2.cif"
+    st.make_mmcif_document().write_file(str(copy))
+    lay, _, bb = make_layout(copy, msa=DATA / "consurf" / "1TIM_A_grades.txt")
+    by = {(l.chain, l.seq): g for l, g in zip(bb.labels, lay.res_grade)}
+    assert by[("A2", 4)] == 0 and by[("B", 4)] == 9
+
+
+def test_borrowing_needs_enough_shared_residues(tmp_path, capsys):
+    """Chain B (ubiquitin 31-76) shares 10 residues with a table of A 1-40: too few to call it the same chain;
+    with the table of 1-60 it shares 30."""
+    import gemmi
+
+    st = gemmi.read_structure(str(UBQ))
+    st[0]["A"].name = "B"
+    chain = st[0]["B"]
+    for k in reversed(range(len(chain))):
+        if chain[k].seqid.num < 31:
+            del chain[k]
+    part = tmp_path / "ubq_b.cif"
+    st.make_mmcif_document().write_file(str(part))
+    lay, _, bb = make_layout(part, msa=consurf_table(tmp_path, lambda n: 7, range(1, 41)))
+    assert not any(lay.res_grade) and "no residue" in capsys.readouterr().err
+    lay, _, bb = make_layout(part, msa=consurf_table(tmp_path, lambda n: 7, range(1, 61)))
+    assert {l.seq for l, g in zip(bb.labels, lay.res_grade) if g} == set(range(31, 61))
 
 
 def test_legend_does_not_widen_the_figure_beyond_the_protein():

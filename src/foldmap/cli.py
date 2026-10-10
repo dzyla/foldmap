@@ -230,33 +230,50 @@ def make_layout(
     if msa:
         from .sequence import grades, is_consurf, read_alignment, read_consurf, residue_conservation
 
-        if is_consurf(msa):  # ConSurf's own grades: by residue, copies of a chain take its grades
-            table = read_consurf(msa)
-            deposited = {c for c, _, _ in table}
-
+        if is_consurf(msa):  # ConSurf's own grades by residue, where the structure has the table's residue there
+            rows: dict[str, dict[tuple[int, str], tuple[str, int]]] = {}
+            for (c, n, icode), row in read_consurf(msa).items():
+                rows.setdefault(c, {})[(n, icode)] = row
             names: dict[str, dict[tuple[int, str], str]] = {}
             for l in bb.labels:
                 names.setdefault(l.chain, {})[(l.seq, l.icode)] = l.name
 
-            def same_sequence(a: str, b: str) -> bool:  # >= 95 % identical residue names over shared numbers
-                shared = names[a].keys() & names[b].keys()
-                return bool(shared) and sum(names[a][k] == names[b][k] for k in shared) >= 0.95 * len(shared)
+            def agreement(c: str, chain: str) -> tuple[int, int]:  # numbers in both, of them with the same residue
+                shared = rows[c].keys() & names[chain].keys()
+                return len(shared), sum(rows[c][k][0] == names[chain][k] for k in shared)
+
+            def matches(c: str, chain: str, borrowed: bool) -> bool:
+                """>= 90 % of table chain c's rows placed on `chain` name its residue; a chain borrowing another
+                chain's grades must also share >= 20 residues or half the shorter of the two."""
+                shared, same = agreement(c, chain)
+                enough = not borrowed or shared >= min(20, 0.5 * min(len(rows[c]), len(names[chain])))
+                return shared > 0 and same >= 0.9 * shared and enough
 
             def source(chain: str) -> str | None:
-                if chain in deposited:
-                    return chain
-                stripped = re.sub(r"-?\d+$", "", chain)  # assembly copies: A1, A-1
-                if stripped in deposited:
-                    return stripped
-                # a table covers one chain of identical ones (ConSurf-DB): take it from a same-sequence chain
-                return next((c for c in sorted(deposited & names.keys()) if same_sequence(chain, c)), None)
+                if chain in rows:
+                    if matches(chain, chain, False):
+                        return chain
+                    shared, same = agreement(chain, chain)
+                    print(
+                        f"foldmap: warning: {msa} does not match chain {chain} ({same} of {shared} residue names "
+                        "agree); chain left without grades",
+                        file=sys.stderr,
+                    )
+                    return None
+                # assembly copies (A1, A-1) and chains identical to the one a ConSurf-DB table covers
+                stripped = re.sub(r"-?\d+$", "", chain)
+                candidates = ([stripped] if stripped in rows else []) + sorted(rows)
+                return next((c for c in candidates if matches(c, chain, True)), None)
 
             sources = {c: source(c) for c in names}
 
             def grade(l) -> int:
-                return table.get((sources[l.chain], l.seq, l.icode), 0)
+                row = rows[sources[l.chain]].get((l.seq, l.icode)) if sources[l.chain] else None
+                return row[1] if row and row[0] == l.name else 0
 
             lay.res_grade = [grade(l) for l in bb.labels]
+            if not any(lay.res_grade):
+                print(f"foldmap: warning: no residue of {path} matches {msa}; nothing is graded", file=sys.stderr)
             lay.cons_label = CONSURF_LEGEND
         else:
             scores = residue_conservation(bb, read_alignment(msa), msa_reference)
