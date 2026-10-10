@@ -32,7 +32,9 @@ END_LABEL = 1.15  # distance from a chain-end port to its N/C letter
 _GLYPH_W, _GLYPH_H = 0.32, 0.42  # rough label glyph size in page units, for keep-out boxes
 _MAX_ROW = 30.0
 _MIN_STRAND = 1.0  # shortest drawn strand (room for the arrow head)
-_PAIR_ENERGY_MIN = 200  # items: above it the energy runs over pairs that matter; below, the dense one (layouts fixed)
+# items: at or below it the dense energy keeps recorded layouts bit-identical (the pair-list summation order
+# moves L-BFGS minima)
+_PAIR_ENERGY_ABOVE = 200
 _W_SEQ = 1.0  # pull between the two ends of a loop
 _LOOP_SLACK = 1.5  # loop ends closer than this are left alone
 _W_SS = 2.0  # pull between two bridged cysteines (twice a loop: disulfides should read as short bars)
@@ -398,11 +400,8 @@ def _mass(it: _Item) -> float:
 
 
 def _energy(flat, home, anchor_w, want, pull, loops, lam, mids=None):
-    """Layout energy and its gradient. Terms: stay near the projected position (fold); loop ends within
-    _LOOP_SLACK of each other; touching elements' (and DNA binders') boxes adjacent (`pull`: the item pairs
-    i < j with a contact weight, and the weights); lam * squared box overlap (raised stage by stage until
-    overlaps are gone). Only pairs that overlap or pull contribute, so the cost is one n x n test plus work
-    on those pairs."""
+    """Layout energy and gradient over only the overlapping boxes and the contact pairs `pull` = (i, j, w), i < j.
+    Same terms as _energy_dense."""
     P = flat.reshape(-1, 2)
     grad = 2 * anchor_w * (P - home)
     E = float((anchor_w[:, 0] * ((P - home) ** 2).sum(1)).sum())
@@ -548,7 +547,7 @@ def _attract(
         return P
 
     def tied(z):  # one position per orbit of symmetry copies, plus the spread between protomers
-        if n > _PAIR_ENERGY_MIN:
+        if n > _PAIR_ENERGY_ABOVE:
             E, g = _energy(expand(z).ravel(), home, anchor_w, want, pull, loops, lam, mids)
         else:
             E, g = _energy_dense(expand(z).ravel(), home, anchor_w, want, W, loops, lam, mids)

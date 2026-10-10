@@ -156,43 +156,6 @@ def test_no_ligands_need_no_search():
     assert io._bonded_parts([]) == set()
 
 
-def _dense_energy(flat, home, anchor_w, want, W, loops, lam, mids):
-    """The n x n layout energy foldmap used before the pair-list version (kept here as the reference)."""
-    P = flat.reshape(-1, 2)
-    n = len(P)
-    grad = 2 * anchor_w * (P - home)
-    E = float((anchor_w[:, 0] * ((P - home) ** 2).sum(1)).sum())
-    Q = P + mids
-    d = Q[None, :, :] - Q[:, None, :]
-    sg = np.sign(d)
-    px, py = want[..., 0] - np.abs(d[..., 0]), want[..., 1] - np.abs(d[..., 1])
-    upper = np.triu(np.ones((n, n), bool), 1)
-
-    def pair_grad(gx, gy):
-        grad[:, 0] += (gx * sg[..., 0]).sum(1) - (gx * sg[..., 0]).sum(0)
-        grad[:, 1] += (gy * sg[..., 1]).sum(1) - (gy * sg[..., 1]).sum(0)
-
-    on_x = px < py
-    ov = upper & (px > 0) & (py > 0)
-    E += lam * float((np.where(on_x, px, py)[ov] ** 2).sum())
-    pair_grad(np.where(ov & on_x, 2 * lam * px, 0.0), np.where(ov & ~on_x, 2 * lam * py, 0.0))
-    gap = np.maximum(-px, -py)
-    ct = upper & (W > 0) & (gap > 0)
-    E += float((W[ct] * gap[ct] ** 2).sum())
-    cg = np.where(ct, 2 * W * gap, 0.0)
-    side = -px >= -py
-    pair_grad(-np.where(side, cg, 0.0), -np.where(~side, cg, 0.0))
-    I, OI, J, OJ, w, slack = loops
-    g = (P[J] + OJ) - (P[I] + OI)
-    dist = np.maximum(np.hypot(g[:, 0], g[:, 1]), 1e-12)
-    excess = np.clip(dist - slack, 0.0, None)
-    E += float((w * excess**2).sum())
-    dg = (2 * w * excess / dist)[:, None] * g
-    np.add.at(grad, J, dg)
-    np.add.at(grad, I, -dg)
-    return E, grad.ravel()
-
-
 def _random_state(n, seed=0):
     rng = np.random.default_rng(seed)
     P = rng.normal(0, 3, (n, 2))
@@ -215,13 +178,17 @@ def _pull(W):
 def test_pair_list_energy_equals_dense_energy(n):
     P, home, aw, want, W, loops, mids = _random_state(n)
     e, g = L._energy(P.ravel(), home, aw, want, _pull(W), loops, 30.0, mids)
-    e0, g0 = _dense_energy(P.ravel(), home, aw, want, W, loops, 30.0, mids)
+    e0, g0 = L._energy_dense(P.ravel(), home, aw, want, W, loops, 30.0, mids)
     assert e == pytest.approx(e0, rel=1e-12)
     np.testing.assert_allclose(g, g0, rtol=1e-9, atol=1e-9)
 
 
 def test_energy_gradient_matches_finite_differences():
-    P, home, aw, want, W, loops, mids = _random_state(12, seed=3)
+    P, home, aw, want, W, loops, mids = _random_state(12, seed=5)
+    ci, cj, _ = _pull(W)
+    Q = P + mids
+    gap = np.maximum(-(want[ci, cj, 0] - abs(Q[cj, 0] - Q[ci, 0])), -(want[ci, cj, 1] - abs(Q[cj, 1] - Q[ci, 1])))
+    assert (gap > 0).any()  # at least one contact pair is pulling
     x = P.ravel()
     _, g = L._energy(x, home, aw, want, _pull(W), loops, 3.0, mids)
     h = 1e-6
@@ -243,9 +210,9 @@ def test_small_layouts_keep_the_dense_energy(monkeypatch):
     dense, pair = L._energy_dense, L._energy
     monkeypatch.setattr(L, "_energy_dense", lambda *a, **k: called.append("dense") or dense(*a, **k))
     monkeypatch.setattr(L, "_energy", lambda *a, **k: called.append("pair") or pair(*a, **k))
-    layout = make_layout("tests/data/1BL8.cif")[0]  # 12 items, well under the threshold
-    assert layout and set(called) == {"dense"}
+    layout = make_layout(DATA / "1BL8.cif")[0]  # 12 items, well under the threshold
+    assert layout.placed and set(called) == {"dense"}
     called.clear()
-    monkeypatch.setattr(L, "_PAIR_ENERGY_MIN", 5)
-    make_layout("tests/data/1BL8.cif")
+    monkeypatch.setattr(L, "_PAIR_ENERGY_ABOVE", 5)
+    make_layout(DATA / "1BL8.cif")
     assert set(called) == {"pair"}
