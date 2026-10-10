@@ -141,11 +141,11 @@ def test_app_settings_round_trip_through_a_layout_file(tmp_path):
 
 
 def test_version_flag(capsys):
-    from importlib.metadata import version
+    from foldmap import __version__
 
     with pytest.raises(SystemExit):
         main(["--version"])
-    assert capsys.readouterr().out.strip() == f"foldmap {version('foldmap')}"
+    assert capsys.readouterr().out.strip() == f"foldmap {__version__}"
 
 
 def test_interactive_page_credits_foldmap():

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "foldmap"
-version = "0.1.0"
+dynamic = ["version"]
 description = "Publication-grade protein topology diagrams from PDB/mmCIF structures"
 readme = "README.md"
 license = "AGPL-3.0-or-later"
@@ -40,6 +40,9 @@ where = ["src"]
 
 [tool.setuptools.package-data]
 foldmap = ["assets/previews/*.png"]
+
+[tool.setuptools.dynamic]
+version = { attr = "foldmap.__version__" }
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

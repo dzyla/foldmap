@@ -1,0 +1,33 @@
+"""Release metadata agrees with itself: one version, declared floors, matching citation files."""
+
+import json
+import re
+import tomllib
+from pathlib import Path
+
+import foldmap
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+def _pyproject() -> dict:
+    return tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+
+
+def test_pyproject_takes_version_from_the_package():
+    meta = _pyproject()
+    assert "version" not in meta["project"] and "version" in meta["project"]["dynamic"]
+    assert meta["tool"]["setuptools"]["dynamic"]["version"] == {"attr": "foldmap.__version__"}
+
+
+def test_citation_version_matches_package():
+    text = (ROOT / "CITATION.cff").read_text(encoding="utf-8")
+    m = re.search(r"^version:\s*['\"]?([^'\"\s]+)", text, re.M)
+    assert m and m.group(1) == foldmap.__version__, (
+        f"CITATION.cff says {m and m.group(1)!r}; bump it (and date-released) to {foldmap.__version__!r}"
+    )
+
+
+def test_zenodo_version_matches_package():
+    meta = json.loads((ROOT / ".zenodo.json").read_text(encoding="utf-8"))
+    assert meta.get("version") == foldmap.__version__, f'.zenodo.json needs "version": "{foldmap.__version__}"'
