@@ -48,3 +48,15 @@ jobs:
           cd ../sdist-check
           pip install ".[test]"
           python -m pytest -q
+
+  minimum-deps:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install "gemmi==0.7.0" "numpy==1.25.*" "scipy==1.10.*" "networkx==3.0" "matplotlib==3.11.*" "PyYAML==6.0.1" "threadpoolctl==3.1.0" pytest
+      - run: pip install --no-deps .
+      # The snapshots and the 8UUP layout test only agree with numpy 2.5 numerics (numpy 2.5 needs Python 3.12+); the other jobs run them
+      - run: python -m pytest -q --ignore=tests/test_snapshots.py --deselect "tests/test_symmetry.py::test_symmetric_layout_repeats_the_protomer[8UUP]"

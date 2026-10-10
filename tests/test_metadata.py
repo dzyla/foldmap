@@ -31,3 +31,19 @@ def test_citation_version_matches_package():
 def test_zenodo_version_matches_package():
     meta = json.loads((ROOT / ".zenodo.json").read_text(encoding="utf-8"))
     assert meta.get("version") == foldmap.__version__, f'.zenodo.json needs "version": "{foldmap.__version__}"'
+
+
+FLOORS = {
+    "gemmi": "0.7",
+    "numpy": "1.25",
+    "scipy": "1.10",
+    "networkx": "3.0",
+    "matplotlib": "3.11",
+    "PyYAML": "6.0.1",
+    "threadpoolctl": "3.1",
+}
+
+
+def test_every_dependency_has_the_tested_floor():
+    deps = dict(re.match(r"([A-Za-z0-9_.-]+)>=(\S+)", d).groups() for d in _pyproject()["project"]["dependencies"])
+    assert deps == FLOORS, "keep pyproject floors and the minimum-deps CI job in step with FLOORS"
