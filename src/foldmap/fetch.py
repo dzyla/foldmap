@@ -7,13 +7,19 @@ import hashlib
 import http.client
 import os
 import re
+import stat
 import tempfile
+import time
 import urllib.request
 from pathlib import Path
 
 CACHE = Path.home() / ".cache" / "foldmap"
 AFDB_VERSION = 6  # AlphaFold DB model version to fetch
 AGENT = "foldmap (https://pypi.org/project/foldmap)"  # the AlphaFold DB refuses requests without a user agent
+STRUCTURE_SUFFIXES = (".cif", ".mmcif", ".pdb", ".ent")
+ALIGNMENT_SUFFIXES = (".fasta", ".fa", ".aln", ".sto", ".txt")
+UPLOAD_MAX_AGE = 24 * 3600  # seconds an uploaded file is kept in the cache
+_UPLOAD_NAME = re.compile(r"upload-[0-9a-f]{12}\.[a-z]+")
 
 
 def atomic_write(path: Path, data: bytes | str) -> None:
@@ -55,16 +61,43 @@ def _download(url: str, path: Path, what: str) -> Path:
     return path
 
 
-def fetch(source: str, upload: tuple[str, bytes] | None = None) -> Path:
+def _prune_uploads(folder: Path) -> None:
+    """Remove uploads older than UPLOAD_MAX_AGE. Only regular files named like foldmap's own uploads go; symlinks,
+    other files and everything outside the folder are left alone."""
+    if folder.is_symlink():
+        return
+    now = time.time()
+    for old in folder.iterdir():
+        if not _UPLOAD_NAME.fullmatch(old.name):
+            continue
+        try:
+            info = old.lstat()
+            if stat.S_ISREG(info.st_mode) and now - info.st_mtime > UPLOAD_MAX_AGE:
+                old.unlink(missing_ok=True)
+        except OSError:
+            continue
+
+
+def keep_upload(name: str, data: bytes, suffixes: tuple[str, ...] = STRUCTURE_SUFFIXES) -> Path:
+    """An uploaded file, saved under the cache's uploads/ folder by content hash (so the same upload is the same
+    path). Old uploads are removed first. The name only lends its suffix, when allowed."""
+    folder = CACHE / "uploads"
+    folder.mkdir(parents=True, exist_ok=True)
+    _prune_uploads(folder)
+    suffix = Path(name).suffix.lower()
+    target = folder / f"upload-{hashlib.sha1(data).hexdigest()[:12]}{suffix if suffix in suffixes else suffixes[0]}"
+    atomic_write(target, data)
+    return target
+
+
+def fetch(source: str, upload: tuple[str, bytes] | None = None, *, local: bool = True) -> Path:
     """A local structure file from an upload, a path, a PDB ID (from RCSB) or a UniProt accession / AlphaFold DB
-    id (the AlphaFold model); downloads are cached."""
+    id (the AlphaFold model); downloads are cached. local=False never reads a path given as source (for a hosted
+    app, whose visitors must not read the server's files)."""
     if upload is not None:
-        name, data = upload
-        path = CACHE / f"upload-{hashlib.sha1(data).hexdigest()[:12]}{Path(name).suffix or '.cif'}"
-        atomic_write(path, data)
-        return path
+        return keep_upload(*upload)
     text = (source or "").strip()
-    if text and Path(text).expanduser().is_file():
+    if local and text and Path(text).expanduser().is_file():
         return Path(text).expanduser()
     af = re.fullmatch(
         r"(?:AF-)?([OPQ][0-9][A-Z0-9]{3}[0-9]|[A-NR-Z][0-9](?:[A-Z][A-Z0-9]{2}[0-9]){1,2})(?:-F1)?", text.upper()
@@ -76,4 +109,5 @@ def fetch(source: str, upload: tuple[str, bytes] | None = None) -> Path:
     if re.fullmatch(r"[0-9][A-Za-z0-9]{3}", text):
         pdb = text.upper()
         return _download(f"https://files.rcsb.org/download/{pdb}.cif", CACHE / f"{pdb}.cif", f"{pdb} from the PDB")
-    raise ValueError(f"{text!r} is not a structure file, a PDB ID (e.g. 1LMB) or a UniProt accession (e.g. P04637)")
+    what = "a structure file, a PDB ID" if local else "a PDB ID"
+    raise ValueError(f"{text!r} is not {what} (e.g. 1LMB) or a UniProt accession (e.g. P04637)")

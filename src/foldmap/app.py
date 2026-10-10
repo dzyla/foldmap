@@ -4,8 +4,8 @@ Run with `foldmap app` (or `streamlit run src/foldmap/app.py`)."""
 
 from __future__ import annotations
 
-import hashlib
 import json
+import os
 import re
 import tempfile
 from dataclasses import fields, replace
@@ -13,7 +13,7 @@ from pathlib import Path
 
 from foldmap import CREDIT
 from foldmap.cli import _adjustments, _domain_spec, make_layout
-from foldmap.fetch import CACHE, fetch  # noqa: F401 - fetch is part of the app's API
+from foldmap.fetch import ALIGNMENT_SUFFIXES, fetch, keep_upload
 from foldmap.render import save, save_svg
 from foldmap.spec import FigureSpec, draw_spec
 from foldmap.spec import layout_document as spec_document
@@ -72,6 +72,14 @@ LAYOUT_DEFAULTS = {
     "view": None,
 }
 HIDDEN_LAYOUT = ("flip_v", "dna", "symmetry_tol", "protomers", "up", "view")  # in layout files, no app control
+
+
+def local_files() -> bool:
+    """Whether the app may open files by path: yes on your own machine; set FOLDMAP_APP_LOCAL_FILES=0 when the
+    app is hosted for others, so visitors can only load PDB IDs, UniProt accessions and uploads."""
+    return os.environ.get("FOLDMAP_APP_LOCAL_FILES", "1").strip().lower() not in ("0", "false", "no", "off")
+
+
 EXAMPLES = {"1LMB": "λ repressor on DNA", "5NKT": "FimA", "8UTF": "measles F trimer", "1UBQ": "ubiquitin"}
 
 
@@ -206,7 +214,7 @@ def settings_from_document(doc: dict) -> dict:
     chains = lay.get("chains")
     out["chains"] = ",".join(chains) if isinstance(chains, list) else (chains or "")
     msa = lay.get("msa")
-    out["msa_path"] = msa if msa and Path(msa).is_file() else ""
+    out["msa_path"] = msa if msa and local_files() and Path(msa).is_file() else ""  # no server paths when hosted
     out["msa_missing"] = msa if msa and not out["msa_path"] else ""  # saved on another machine
     out["title"] = out["title"] or ""
     out["rotate"] = int(round(float(out["rotate"])))
@@ -262,10 +270,7 @@ def main() -> None:
         if up is None:
             ss["msa_path"] = ""
             return
-        CACHE.mkdir(parents=True, exist_ok=True)
-        data = up.getvalue()
-        target = CACHE / f"msa-{hashlib.sha1(data).hexdigest()[:12]}{Path(up.name).suffix or '.fasta'}"
-        target.write_bytes(data)
+        target = keep_upload(up.name, up.getvalue(), ALIGNMENT_SUFFIXES)
         try:
             from foldmap.sequence import is_consurf, read_alignment
 
@@ -294,7 +299,8 @@ def main() -> None:
     def load(example: str | None = None) -> None:
         up = ss.get("upload")
         try:
-            path = fetch(example or ss.get("source", ""), (up.name, up.getvalue()) if up and not example else None)
+            upload = (up.name, up.getvalue()) if up and not example else None
+            path = fetch(example or ss.get("source", ""), upload, local=local_files())
             ss["info"] = summary(path)
         except (ValueError, FileNotFoundError, OSError, RuntimeError) as err:  # RuntimeError: gemmi cannot read it
             ss["load_error"] = str(err)
@@ -332,10 +338,15 @@ def main() -> None:
     st.markdown("#### Foldmap · protein topology diagrams")
 
     if ss["stage"] == "load":
-        st.write("Start with a structure: a PDB ID, a UniProt accession (AlphaFold model), a file path, or an upload.")
+        paths = local_files()
+        st.write(
+            "Start with a structure: a PDB ID, a UniProt accession (AlphaFold model), "
+            + ("a file path, or an upload." if paths else "or an upload.")
+        )
         left, right = st.columns([3, 2])
         with left:
-            st.text_input("PDB ID, UniProt accession or file path", key="source", placeholder="e.g. 1LMB or P04637")
+            label = "PDB ID, UniProt accession or file path" if paths else "PDB ID or UniProt accession"
+            st.text_input(label, key="source", placeholder="e.g. 1LMB or P04637")
             st.button("Load structure", key="load", type="primary", on_click=load)
             st.caption("Examples")
             cols = st.columns(len(EXAMPLES))

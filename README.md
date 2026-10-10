@@ -270,6 +270,10 @@ figure keeps its shape while you restyle it.
    Sequence tab draws the sequence (or the uploaded alignment) with secondary structure on top; the Interactive
    tab embeds the explorer page and downloads it as HTML.
 
+Hosting the app for other people: set `FOLDMAP_APP_LOCAL_FILES=0` so the app accepts PDB IDs, UniProt accessions
+and uploads but never opens a file path on the server (including alignment paths in uploaded layout files).
+Uploads are kept in `~/.cache/foldmap/uploads` for a day.
+
 ## MCP server for AI agents
 
 `foldmap mcp` runs a [Model Context Protocol](https://modelcontextprotocol.io) server over stdio, so agents can

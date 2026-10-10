@@ -292,3 +292,19 @@ def test_app_edits_of_one_structure_do_not_carry_to_the_next():
     assert not at.exception and not at.error
     ss = at.session_state
     assert ss["rename"] == "" and ss["chains"] == "" and ss["domains"] == "" and "<svg" in _svg(at)
+
+
+def test_hosted_app_refuses_file_paths(monkeypatch):
+    monkeypatch.setenv("FOLDMAP_APP_LOCAL_FILES", "0")
+    at = _load(_app(), DATA / "1UBQ.cif")
+    assert at.session_state["stage"] == "load" and "is not a PDB ID" in at.error[0].value
+
+
+def test_hosted_app_ignores_alignment_paths_in_layout_files(monkeypatch):
+    from foldmap.app import settings_from_document
+
+    doc = {"layout": {"msa": str(DATA / "ubq_family.fasta")}}
+    assert settings_from_document(doc)["msa_path"] == str(DATA / "ubq_family.fasta")
+    monkeypatch.setenv("FOLDMAP_APP_LOCAL_FILES", "off")
+    back = settings_from_document(doc)
+    assert back["msa_path"] == "" and back["msa_missing"] == str(DATA / "ubq_family.fasta")

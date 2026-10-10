@@ -144,3 +144,44 @@ def test_cut_off_cache_file_is_replaced_without_deleting_it_first(monkeypatch, t
 
     monkeypatch.setattr(Path, "unlink", no_unlink)
     assert fetch("1UBQ").read_bytes() == UBQ
+
+
+def test_uploads_are_kept_by_content_and_old_ones_removed(monkeypatch, tmp_path):
+    import os
+    import time
+
+    monkeypatch.setattr(fetch_mod, "CACHE", tmp_path)
+    (tmp_path / "1UBQ.cif").write_bytes(UBQ)  # a downloaded structure, not an upload
+    a = fetch("", ("x.cif", UBQ))
+    assert a == fetch("", ("renamed.cif", UBQ)) and a.parent == tmp_path / "uploads"
+    odd = fetch("", ("../../evil.sh", b"data_x\n"))
+    assert odd.parent == tmp_path / "uploads" and odd.suffix == ".cif"
+    stranger = tmp_path / "uploads" / "notes.txt"  # not made by foldmap
+    stranger.write_text("mine")
+    outside = tmp_path / "outside.txt"
+    outside.write_text("keep me")
+    link = tmp_path / "uploads" / "upload-000000000000.cif"
+    link.symlink_to(outside)
+    old = time.time() - fetch_mod.UPLOAD_MAX_AGE - 60
+    for f in (a, stranger, tmp_path / "1UBQ.cif"):
+        os.utime(f, (old, old))
+    os.utime(link, (old, old), follow_symlinks=False)
+    os.utime(outside, (old, old))
+    fetch("", ("y.pdb", b"other"))
+    assert not a.exists() and odd.exists()
+    assert stranger.exists() and (tmp_path / "1UBQ.cif").exists() and outside.exists()
+    assert link.is_symlink()  # not made by foldmap as a file: left alone
+
+
+def test_alignment_uploads_keep_only_allowed_suffixes(monkeypatch, tmp_path):
+    monkeypatch.setattr(fetch_mod, "CACHE", tmp_path)
+    ok = fetch_mod.keep_upload("a.STO", b">x\nAA\n", fetch_mod.ALIGNMENT_SUFFIXES)
+    odd = fetch_mod.keep_upload("a.py", b">x\nAA\n", fetch_mod.ALIGNMENT_SUFFIXES)
+    assert ok.suffix == ".sto" and odd.suffix == ".fasta"
+
+
+def test_paths_can_be_switched_off_for_a_hosted_app():
+    path = DATA / "1UBQ.cif"
+    assert fetch(str(path)) == path
+    with pytest.raises(ValueError, match="is not a PDB ID"):
+        fetch(str(path), local=False)
