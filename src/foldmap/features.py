@@ -68,10 +68,20 @@ def helix_bundles(sses: list[SSE]) -> list[list[str]]:
         group[root(a)] = root(b)
 
     kinked: dict[str, list[SSE]] = {}
-    for a, b in zip(helices, helices[1:]):  # kinks
-        if a.chain == b.chain and b.start - a.end - 1 <= KINK_GAP:
-            if min(len(a), len(b)) < KINK_SHORT or float(a.axis @ b.axis) > KINK_COS:
-                join(a.id, b.id)
+    nexts = list(zip(helices, helices[1:]))
+    cos = [float(a.axis @ b.axis) for a, b in nexts]
+    kink = [  # pieces k and k+1 are one helix
+        a.chain == b.chain and b.start - a.end - 1 <= KINK_GAP and (x > KINK_COS or min(len(a), len(b)) < KINK_SHORT)
+        for (a, b), x in zip(nexts, cos)
+    ]
+    for k in range(1, len(helices) - 1):  # a short piece joins the pieces either side only when they are collinear
+        a, b, c = helices[k - 1 : k + 2]
+        if len(b) < KINK_SHORT and kink[k - 1] and kink[k] and float(a.axis @ c.axis) <= KINK_COS:
+            weaker = k - 1 if cos[k - 1] < cos[k] else k
+            if cos[weaker] <= KINK_COS:  # it continues the neighbour it is closer in direction to
+                kink[weaker] = False
+    for k in np.flatnonzero(kink):
+        join(helices[k].id, helices[k + 1].id)
     for s in helices:
         kinked.setdefault(root(s.id), []).append(s)
     shapes = [[s] for s in helices] + [p for p in kinked.values() if len(p) > 1]  # pieces, and whole kinked helices

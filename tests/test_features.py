@@ -60,3 +60,13 @@ def test_a_short_kinked_piece_stays_with_its_helix_in_a_bundle():
     a2 = fake_sse("H", 27, 30, centroid=(0, 0, 14), axis=(1, 0, 0), chain="A")
     b = fake_sse("H", 10, 35, centroid=(10, 0, 6), axis=(0, 0, 1), chain="B")  # packed alongside, 10 Å away
     assert helix_bundles([a1, a2, b]) == [["A:10-25", "A:27-30", "B:10-35"]]
+
+
+def test_a_short_piece_does_not_join_antiparallel_helices():
+    # chain A: a helix, a 4-residue turn piece, then a helix running back down beside the first (2LZM A:126-155);
+    # chain B packs against the returning helix only, so only that helix is in the bundle
+    a1 = fake_sse("H", 10, 25, centroid=(0, 0, 0), axis=(0, 0, 1), chain="A")
+    a2 = fake_sse("H", 27, 30, centroid=(5, 0, 14), axis=(1, 0, 0.3), chain="A")
+    a3 = fake_sse("H", 32, 47, centroid=(10, 0, 0), axis=(0, 0, -1), chain="A")
+    b = fake_sse("H", 10, 25, centroid=(20, 0, 0), axis=(0, 0, 1), chain="B")
+    assert helix_bundles([a1, a2, a3, b]) == [["A:32-47", "B:10-25"]]
