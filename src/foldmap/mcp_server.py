@@ -35,7 +35,7 @@ def tool(fn):
     def wrapped(*args, **kwargs):
         try:
             return fn(*args, **kwargs)
-        except (ValueError, FileNotFoundError, KeyError) as err:
+        except (ValueError, FileNotFoundError, KeyError, RuntimeError, OSError) as err:
             raise ToolError(str(err).strip("'\"")) from err
 
     return server.tool()(wrapped)
@@ -52,6 +52,14 @@ def _output(path: str | None, suffix: str, stem: str) -> Path:
             raise ValueError(f"output_path must end in .svg, .png or .pdf (got {out.name!r})")
         return out
     return Path(tempfile.mkdtemp(prefix="foldmap-")) / f"{stem}{suffix}"
+
+
+def _theme(name: str):
+    from .style import THEMES
+
+    if name not in THEMES:
+        raise ValueError(f"unknown theme {name!r}; choose from {', '.join(THEMES)}")
+    return THEMES[name]
 
 
 def _preview(fig) -> Image:
@@ -148,6 +156,7 @@ def draw_topology(
     layout_file / save_layout: load or write a YAML layout file that re-creates the figure."""
     from .cli import main
 
+    _theme(theme)  # a readable message instead of argparse's exit
     path = _structure(source)
     out = _output(output_path, ".svg", path.stem)
     argv = [
@@ -204,7 +213,10 @@ def _run(main, argv: list[str]) -> None:
 
     err = io.StringIO()
     with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(err):
-        code = main(argv)
+        try:
+            code = main(argv)
+        except SystemExit as exit_:  # argparse rejects an argument by exiting; the server must live on
+            code = exit_.code if isinstance(exit_.code, int) else 2
     if code != 0:
         raise ValueError(err.getvalue().strip() or "foldmap failed")
 
@@ -249,7 +261,6 @@ def draw_sequence(
     from .render import save
     from .seqplot import draw_sequence as draw
     from .sequence import read_alignment
-    from .style import THEMES
 
     path = _structure(source)
     out = _output(output_path, ".svg", f"{path.stem}-sequence")
@@ -259,7 +270,7 @@ def draw_sequence(
         alignment=read_alignment(msa_path) if msa_path else None,
         reference=reference,
         columns=columns,
-        look=THEMES[theme],
+        look=_theme(theme),
         full_sequence=full_sequence,
         ss_colour=ss_colour,
         title=title,
@@ -279,11 +290,10 @@ def interactive_page(
     """Write a self-contained HTML page linking the topology, a residue contact map and the 3D model (hover
     anything: the same residues light up in all three). viewer: molstar (Mol*, default) or 3dmol. Returns the path."""
     from .interactive import write_page
-    from .style import THEMES
 
     path = _structure(source)
     out = Path(output_path).expanduser() if output_path else _output(None, ".html", f"{path.stem}-explorer")
-    return f"wrote {write_page(path, out, look=THEMES[theme], assembly=assembly, viewer=viewer)}"
+    return f"wrote {write_page(path, out, look=_theme(theme), assembly=assembly, viewer=viewer)}"
 
 
 def main() -> None:

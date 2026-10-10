@@ -11,6 +11,7 @@ pytest.importorskip("mcp")
 from foldmap.mcp_server import server  # noqa: E402
 
 DATA = Path(__file__).parent / "data"
+UBQ = str(DATA / "1UBQ.cif")
 
 
 def call(name, args):
@@ -103,3 +104,41 @@ def test_draw_topology_can_draw_the_whole_assembly(tmp_path):
     call("draw_topology", {"source": str(DATA / "6Y7S.cif"), "output_path": str(whole), "focus": "none"})
     call("draw_topology", {"source": str(DATA / "6Y7S.cif"), "output_path": str(one)})
     assert whole.read_text().count('id="strand:') > 2 * one.read_text().count('id="strand:')
+
+
+def test_bad_theme_is_a_message_not_an_exit(tmp_path):
+    from mcp.server.mcpserver.exceptions import ToolError
+
+    for tool in ("draw_topology", "draw_sequence"):
+        with pytest.raises(ToolError, match="unknown theme 'nope'"):
+            call(tool, {"source": UBQ, "output_path": str(tmp_path / "x.svg"), "theme": "nope"})
+    with pytest.raises(ToolError, match="unknown theme 'nope'"):
+        call("interactive_page", {"source": UBQ, "output_path": str(tmp_path / "x.html"), "theme": "nope"})
+    with pytest.raises(ToolError, match="'weird'"):
+        call("draw_topology", {"source": UBQ, "output_path": str(tmp_path / "x.svg"), "mode": "weird"})
+
+
+def test_unreadable_files_are_a_message(tmp_path):
+    from mcp.server.mcpserver.exceptions import ToolError
+
+    junk = tmp_path / "notes.cif"
+    junk.write_text("this is not a structure\n")
+    with pytest.raises(ToolError):
+        call("summarize_structure", {"source": str(junk)})
+
+
+def test_server_survives_a_bad_argument_over_stdio(tmp_path):
+    from mcp import Client, StdioServerParameters
+
+    async def go():
+        params = StdioServerParameters(command=sys.executable, args=["-m", "foldmap.mcp_server"])
+        async with Client(params) as client:
+            bad = await client.call_tool(
+                "draw_topology", {"source": UBQ, "output_path": str(tmp_path / "x.svg"), "theme": "nope"}
+            )
+            good = await client.call_tool("summarize_structure", {"source": UBQ})
+            return bad, good
+
+    bad, good = asyncio.run(asyncio.wait_for(go(), 120))
+    assert bad.is_error and "unknown theme" in bad.content[0].text
+    assert "76 residues" in good.content[0].text
