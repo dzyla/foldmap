@@ -49,6 +49,7 @@ _SEP_PUSH = 0.005  # each push clears an overlap by this much more, so touching 
 _SLIDE_STEP = 0.5  # the guaranteed slide moves an item by this much at a time
 _LAMBDAS = (0.3, 3.0, 30.0, 300.0)  # overlap penalty, stage by stage
 _MAX_MOVE = 0.5  # largest step an item takes in one sweep
+_GRID = 1e4  # optimiser inputs and item geometry are rounded to 1/_GRID page units (radians for angles)
 
 
 @dataclass(eq=False)
@@ -258,13 +259,7 @@ def _helix_item(
     right (the topology-diagram convention); 'upright' up or down like a strand (stack mode)."""
     au, av = frame.direction(sse.centroid, sse.axis)
     length = max(width, (len(sse) - 1) * rise * SCALE)  # true length even when tilted: equal pitch everywhere
-    seen = float(np.arctan2(av, au))
-    if angle_mode == "upright":
-        angle = np.pi / 2 if av >= 0 else -np.pi / 2
-    elif angle_mode == "snap":
-        angle = float(np.round(seen / (np.pi / 2)) * (np.pi / 2))
-    else:
-        angle = seen
+    angle = _angle(float(np.arctan2(av, au)), float(av), angle_mode)
     pos = frame.project(sse.centroid, [sse.chain])[0] * SCALE
     placed = Placed(sse, 0, 0, length, angle, width)
     return _Item(
@@ -277,7 +272,7 @@ def _angle(seen: float, av: float, mode: str) -> float:
         return np.pi / 2 if av >= 0 else -np.pi / 2
     if mode == "snap":
         return float(np.round(seen / (np.pi / 2)) * (np.pi / 2))
-    return seen
+    return float(_snap(seen))  # as seen, on the grid (radians)
 
 
 def _bundle_item(group: list[SSE], frame: Frame, angle_mode: str, width: float) -> _Item:
@@ -315,7 +310,7 @@ def _bundle_item(group: list[SSE], frame: Frame, angle_mode: str, width: float) 
             last_end = along + length / 2
             members.append(Placed(s, 0, 0, length, angle if float(s.axis @ m) >= 0 else angle + np.pi, width))
             lat = (k - (len(columns) - 1) / 2) * spacing
-            offsets.append(tuple(float(v) for v in d2 * along + side2 * lat))
+            offsets.append(tuple(float(v) for v in _snap(d2 * along + side2 * lat)))  # on the grid, like positions
     pos = frame.project(centre)[0] * SCALE
     first = min(group, key=lambda s: s.start)
     return _Item(
@@ -449,7 +444,7 @@ def _energy(flat, home, anchor_w, want, pull, loops, lam, mids=None):
     I, OI, J, OJ, w, slack = loops
     if len(I):
         g = (P[J] + OJ) - (P[I] + OI)
-        dist = np.maximum(np.hypot(g[:, 0], g[:, 1]), 1e-12)
+        dist = np.maximum(np.sqrt(g[:, 0] * g[:, 0] + g[:, 1] * g[:, 1]), 1e-12)
         excess = np.clip(dist - slack, 0.0, None)
         E += float((w * excess**2).sum())
         dg = (2 * w * excess / dist)[:, None] * g
@@ -498,13 +493,105 @@ def _energy_dense(flat, home, anchor_w, want, W, loops, lam, mids=None):
     I, OI, J, OJ, w, slack = loops
     if len(I):
         g = (P[J] + OJ) - (P[I] + OI)
-        dist = np.maximum(np.hypot(g[:, 0], g[:, 1]), 1e-12)
+        dist = np.maximum(np.sqrt(g[:, 0] * g[:, 0] + g[:, 1] * g[:, 1]), 1e-12)
         excess = np.clip(dist - slack, 0.0, None)
         E += float((w * excess**2).sum())
         dg = (2 * w * excess / dist)[:, None] * g
         np.add.at(grad, J, dg)
         np.add.at(grad, I, -dg)
     return E, grad.ravel()
+
+
+def _snap(v) -> np.ndarray:
+    """Round to the 1/_GRID grid, so noise of ~1e-16 in a projection (np.linalg.svd and small dot products
+    differ between BLAS kernels) never reaches the optimiser, which would amplify it, nor the drawn geometry."""
+    return np.round(np.asarray(v, float) * _GRID) / _GRID
+
+
+def _lbfgs(fun, x0, maxiter=300, m=10, pgtol=1e-5, ftol=2.2e-9):
+    """Minimise fun (x -> (value, gradient)) from x0 by L-BFGS (two-loop recursion, last m steps) with a
+    strong-Wolfe line search; stops like scipy's L-BFGS-B: largest gradient component <= pgtol, relative
+    decrease <= ftol, or maxiter iterations. numpy only and every dot product an elementwise (a * b).sum(): no
+    BLAS, whose results depend on the CPU kernel, so the same input gives the same minimum everywhere."""
+    x = np.array(x0, float)
+    f, g = fun(x)
+    S, Y, R = [], [], []  # steps, gradient changes, 1 / (s . y)
+    for _ in range(maxiter):
+        if np.abs(g).max() <= pgtol:
+            break
+        d = -g
+        alpha = []
+        for s, y, r in zip(reversed(S), reversed(Y), reversed(R)):
+            a = r * (s * d).sum()
+            alpha.append(a)
+            d -= a * y
+        if S:
+            d *= (S[-1] * Y[-1]).sum() / (Y[-1] * Y[-1]).sum()
+        for s, y, r, a in zip(S, Y, R, reversed(alpha)):
+            d += (a - r * (y * d).sum()) * s
+        if S and (g * d).sum() >= 0:  # not a descent direction: forget the curvature pairs
+            S, Y, R = [], [], []
+            d = -g
+        step = 1.0 if S else min(1.0 / np.sqrt((d * d).sum()), 1e10)
+        found = _wolfe(fun, x, f, g, d, step)
+        if found is None:
+            if not S:
+                break  # no step along steepest descent satisfies the conditions
+            S, Y, R = [], [], []  # retry once from steepest descent, as L-BFGS-B does
+            continue
+        step, f_new, g_new = found
+        s, y = step * d, g_new - g
+        x, f_old, f, g = x + s, f, f_new, g_new
+        if np.abs(g).max() <= pgtol or f_old - f <= ftol * max(abs(f_old), abs(f), 1.0):
+            break
+        sy = (s * y).sum()
+        if sy > np.finfo(float).eps * (y * y).sum():  # keep only pairs with positive curvature
+            S.append(s)
+            Y.append(y)
+            R.append(1.0 / sy)
+            if len(S) > m:
+                del S[0], Y[0], R[0]
+    return x
+
+
+def _wolfe(fun, x, f0, g0, d, step, c1=1e-3, c2=0.9, evals=20):
+    """A step along d meeting the strong Wolfe conditions (sufficient decrease c1, curvature c2): grow the
+    step until it brackets one, then shrink the bracket by safeguarded cubic interpolation. Returns
+    (step, value, gradient) there, or None after `evals` evaluations."""
+    slope0 = (g0 * d).sum()
+    lo, f_lo, s_lo = 0.0, f0, slope0  # the best step so far that decreases enough
+    hi = None
+    for k in range(evals):
+        if hi is not None:  # zoom: cubic through both ends, kept in the bracket's inner 80 %, else bisect
+            a, fa, sa, b, fb, sb = lo, f_lo, s_lo, *hi
+            if a == b:
+                return None  # the bracket has shrunk to a point
+            d1 = sa + sb - 3 * (fa - fb) / (a - b)
+            rad = d1 * d1 - sa * sb
+            t = (a + b) / 2
+            if rad >= 0:
+                d2 = np.copysign(np.sqrt(rad), b - a)
+                den = sb - sa + 2 * d2
+                if den != 0:
+                    c = b - (b - a) * (sb + d2 - d1) / den
+                    if min(a, b) + 0.1 * abs(b - a) <= c <= max(a, b) - 0.1 * abs(b - a):
+                        t = c
+            step = float(t)
+        f, g = fun(x + step * d)
+        slope = (g * d).sum()
+        if f > f0 + c1 * step * slope0 or (f >= f_lo and (hi is not None or k > 0)):
+            hi = (step, f, slope)  # too far: the minimum lies between lo and here
+        elif abs(slope) <= -c2 * slope0:
+            return step, f, g
+        else:
+            if hi is not None and slope * (hi[0] - lo) >= 0:
+                hi = (lo, f_lo, s_lo)
+            elif hi is None and slope >= 0:
+                hi = (lo, f_lo, s_lo)
+            lo, f_lo, s_lo = step, f, slope
+            if hi is None:
+                step *= 2.0  # still going down: try further
+    return None
 
 
 def _attract(
@@ -517,9 +604,8 @@ def _attract(
     bridges: list[tuple[str, float, str, float]] = (),
 ) -> None:
     """Minimise the layout energy (_energy) from the projected positions, raising the overlap penalty in
-    stages. The result becomes each item's new home; _separate then guarantees no overlap remains."""
-    from scipy.optimize import minimize
-
+    stages. The result becomes each item's new home; _separate then guarantees no overlap remains. Every input
+    is snapped to the grid (_snap) and _lbfgs runs without BLAS, so the minimum is the same on every machine."""
     n = len(items)
     W = _contact_weights(items, contacts)
     ci, cj = np.nonzero(np.triu(W > 0, 1))
@@ -543,6 +629,7 @@ def _attract(
             )
             weight.append(_W_SS)
             slack.append(_SS_SLACK)
+    springs = [(i, _snap(oi), j, _snap(oj)) for i, oi, j, oj in springs]
     loops = (
         np.array([s[0] for s in springs], int),
         np.array([s[1] for s in springs], float).reshape(-1, 2),
@@ -551,11 +638,12 @@ def _attract(
         np.array(weight, float),
         np.array(slack, float),
     )
-    home = np.array([it.home for it in items], float)
-    h = np.array([it.half for it in items], float)
+    home = _snap([it.home for it in items])
+    h = _snap([it.half for it in items])
     want = h[:, None, :] + h[None, :, :] + MARGIN
     anchor_w = _K_HOME * np.array([[_mass(it)] for it in items], float)
-    mids = np.array([it.mid for it in items], float)
+    mids = _snap([it.mid for it in items])
+    spread, lift = float(_snap(spread)), float(_snap(lift))
     ties = ties or {}
     free = [i for i in range(n) if i not in ties]
     slot = {i: k for k, i in enumerate(free)}
@@ -581,28 +669,29 @@ def _attract(
     def solve(z, stages=_LAMBDAS):
         nonlocal lam
         for lam in stages:  # noqa: B007 - read by tied() through nonlocal
-            z = minimize(tied, z, jac=True, method="L-BFGS-B", options={"maxiter": 300}).x
+            z = _lbfgs(tied, z)
         return z
 
     lam = _LAMBDAS[0]
-    z = solve(np.append(np.array([[items[i].cx, items[i].cy] for i in free], float).ravel(), spread))
+    z = solve(np.append(_snap([[items[i].cx, items[i].cy] for i in free]).ravel(), spread))
     lam = _LAMBDAS[-1]
     best = tied(z)[0]
     mass = np.array([_mass(it) for it in items])
     for k in range(len(springs) - len(bridges_used), len(springs)):  # disulfides still stretched: a second start
         i, oi, j, oj = springs[k]
         P = expand(z)
-        if np.hypot(*((P[j] + oj) - (P[i] + oi))) <= 2 * _SS_SLACK + 1.0:
+        gx, gy = (P[j] + oj) - (P[i] + oi)
+        if np.sqrt(gx * gx + gy * gy) <= 2 * _SS_SLACK + 1.0:
             continue
         mover, anchor, om, oa = (i, j, oi, oj) if mass[i] <= mass[j] else (j, i, oj, oi)
         if mover in ties:
             continue
-        hm, ha = items[mover].half, items[anchor].half
+        hm, ha = h[mover], h[anchor]
         gap_x, gap_y = hm[0] + ha[0] + MARGIN, hm[1] + ha[1] + MARGIN
         for side in ((0.0, -1.0), (-gap_x, 0.0), (gap_x, 0.0), (0.0, gap_y), (0.0, -gap_y)):
             # the lighter element brought beside its partner: just below the cysteine, or clear of its footprint
-            trial = z.copy()
-            trial[2 * slot[mover] : 2 * slot[mover] + 2] = P[anchor] + oa - om + np.array(side)
+            trial = _snap(z)  # every start on the grid
+            trial[2 * slot[mover] : 2 * slot[mover] + 2] = _snap(P[anchor] + oa - om + np.array(side))
             trial = solve(trial, _LAMBDAS[1:])
             lam = _LAMBDAS[-1]
             energy = tied(trial)[0]
@@ -723,10 +812,10 @@ def _dna_item(k: int, strands: list[int], na: Nucleic, frame: Frame, flat: bool,
             along[(a, i)] = along[(b, j)] = (along[(a, i)] + along[(b, j)]) / 2
     span = max(along.values()) - min(along.values())
     mid = (max(along.values()) + min(along.values())) / 2
-    along = {key: v - mid for key, v in along.items()}
-    length = span + DNA_RISE * SCALE  # half a step beyond the end base pairs on each side
+    along = {key: float(_snap(v - mid)) for key, v in along.items()}  # on the grid, like positions
+    length = float(_snap(span + DNA_RISE * SCALE))  # half a step beyond the end base pairs on each side
     a2 = frame.direction(centre, axis)
-    angle = 0.0 if flat or np.linalg.norm(a2) < 1e-6 else float(np.arctan2(a2[1], a2[0]))
+    angle = 0.0 if flat or np.linalg.norm(a2) < 1e-6 else float(_snap(np.arctan2(a2[1], a2[0])))  # on the grid
     pos = frame.project(centre)[0] * SCALE
     d = PlacedDNA(f"dna:{k}", list(strands), 0.0, 0.0, length, angle, width, along)
     return _Item([d], [(0.0, 0.0)], float(pos[0]), float(pos[1]), (float(pos[0]), float(pos[1])), -1, "")

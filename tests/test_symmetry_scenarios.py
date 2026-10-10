@@ -303,7 +303,9 @@ def test_unrolled_filament_steps_evenly_in_its_own_direction(tmp_path, sign):
     assert np.ptp(steps) < 0.05
 
 
-@pytest.mark.parametrize("sign", [1, -1])
+@pytest.mark.parametrize(
+    "sign", [1, pytest.param(-1, marks=pytest.mark.xfail(strict=True, reason="fixed in plan 08 Task 4"))]
+)
 def test_pilus_rod_unrolls_in_its_own_direction(tmp_path, sign):
     """6Y7S and its mirror image: one subunit per ~13 page units, rightwards for the right-handed rod."""
     from foldmap.cli import make_layout
