@@ -136,3 +136,16 @@ def test_residue_loops_work_for_every_colouring():
     for by in ("chain", "sequence", "bfactor", "hydropathy", "sstype"):
         fig = make_figure(DATA / "1UBQ.cif", look=Style(color_by=by, loop_color="residue"))
         assert _segs(fig), by
+
+
+def test_plddt_stored_as_fractions_reads_as_percent():
+    from foldmap.render import element_colours, plddt_percent
+
+    assert plddt_percent([0.95, 0.4]) == pytest.approx([95.0, 40.0])
+    assert plddt_percent([95.0, 0.4]) == pytest.approx([95.0, 0.4])  # a 0-100 model is left alone
+    lay, sses, _ = make_layout(P53)
+    percent = list(lay.res_b)
+    lay.res_b = [v / 100.0 for v in percent]  # the same model as an ESMFold-style 0-1 file
+    colours, residue = element_colours(lay, sses, Style(color_by="plddt"))
+    for s in sses:
+        assert to_hex(colours[s.id]) == BANDS[_band(np.mean(percent[s.start : s.end + 1]))], s.id

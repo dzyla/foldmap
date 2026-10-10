@@ -996,6 +996,13 @@ def plddt_colour(v: float) -> str:
     return next(c for lo, c, _ in PLDDT_BANDS if v >= lo)
 
 
+def plddt_percent(values) -> list[float]:
+    """pLDDT on AlphaFold's 0-100 scale. Some predictors (ESMFold, some ColabFold exports) store 0-1 in the
+    B-factor column: when no value exceeds 1, the whole model is read as fractions."""
+    v = [float(x) for x in values]
+    return [x * 100.0 for x in v] if v and max(v) <= 1.0 else v
+
+
 CONSURF = (  # ConSurf's nine conservation grades, 1 (variable, turquoise) .. 9 (conserved, maroon)
     "#10c8d1",
     "#8cffff",
@@ -1038,7 +1045,7 @@ def _colouring(sses: list[SSE], chains: list[str], colors: dict[str, str], look:
 
         return {s.id: element(s) for s in sses}, (lambda r, chain=None: grade_colour(int(g[r])))
     if look.color_by == "plddt":  # absolute bands, never rescaled: 'confident' means the same in every figure
-        b = list(layout.res_b) if layout is not None else []
+        b = plddt_percent(layout.res_b) if layout is not None else []
         if not b:
             return {s.id: plddt_colour(0.0) for s in sses}, (lambda r, chain=None: None)
         return (
