@@ -226,14 +226,15 @@ def chain_maps(path, accession: str | None = None, cache_dir: Path | None = None
                     out.append(m)
                 for k in range(n):
                     m.to_label[ustart + k] = start + k
-        for m in out:  # SIFTS counts the deposited sequence; a file without one (no SEQRES) is aligned instead
-            try:
-                track = chain_track(path, m.chain, full_sequence=True)
-            except ValueError:  # a SIFTS chain that is not a protein chain of this file keeps its SIFTS numbering
-                continue
-            if not track.deposited:
-                seq = entry(m.accession, cache_dir).sequence
-                m.to_label = {i + 1: j + 1 for i, j in _global(seq, track.letters)}
+        if out and not _has_deposited_sequence(path):  # SIFTS counts the deposited sequence: align instead
+            from .io import load_backbone
+
+            chains = {l.chain for l in load_backbone(path, "asu").labels}
+            for m in out:  # a SIFTS chain that is not a protein chain of this file keeps its SIFTS numbering
+                if m.chain in chains:
+                    track = chain_track(path, m.chain, full_sequence=True)
+                    seq = entry(m.accession, cache_dir).sequence
+                    m.to_label = {i + 1: j + 1 for i, j in _global(seq, track.letters)}
         return out
     acc = accession or _accession_in_file(path)
     if acc is None:
@@ -248,6 +249,16 @@ def chain_maps(path, accession: str | None = None, cache_dir: Path | None = None
         if same >= MIN_IDENTITY * min(len(track.letters), len(e.sequence)):
             out.append(ChainMap(chain, e.accession, {i + 1: j + 1 for i, j in pairs}))
     return out
+
+
+def _has_deposited_sequence(path: Path) -> bool:
+    """Every polymer of the file has its deposited sequence (mmCIF entity_poly, PDB SEQRES)."""
+    import gemmi
+
+    st = gemmi.read_structure(str(path))
+    st.setup_entities()
+    polymers = [e for e in st.entities if e.entity_type == gemmi.EntityType.Polymer]
+    return bool(polymers) and all(e.full_sequence for e in polymers)
 
 
 def _accession_in_file(path: Path) -> str | None:

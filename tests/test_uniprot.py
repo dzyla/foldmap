@@ -219,3 +219,19 @@ def test_sifts_chain_absent_from_the_file_does_not_fail_the_others(cache, monkey
     monkeypatch.setattr(uniprot, "sifts", with_extra_chain)
     maps = {m.chain for m in uniprot.chain_maps(DATA / "6ZS5.cif")}
     assert {"A", "D", "Z"} <= maps
+
+
+@pytest.mark.parametrize("pdb_format,seqres", [(False, True), (True, True), (True, False)])
+def test_sifts_numbering_is_aligned_only_for_files_without_a_deposited_sequence(
+    cache, tmp_path, monkeypatch, pdb_format, seqres
+):
+    """A file with a deposited sequence (mmCIF entities, SEQRES) uses SIFTS numbering as it is: no chain track."""
+    from foldmap import sequence
+
+    calls = []
+    real = sequence.chain_track
+    monkeypatch.setattr(sequence, "chain_track", lambda *a, **k: (calls.append(a[1]), real(*a, **k))[1])
+    path = _as_pdb(tmp_path, "6ZS5", seqres=seqres) if pdb_format else DATA / "6ZS5.cif"
+    maps = uniprot.chain_maps(path)
+    assert {m.chain for m in maps} == {"A", "D"}
+    assert sorted(calls) == ([] if seqres else ["A", "D"])
