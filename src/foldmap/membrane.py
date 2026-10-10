@@ -1,6 +1,7 @@
-"""Where the lipid bilayer is: exactly from OPM's dummy atoms when the file has them, otherwise estimated from
-the structure (the long helices and strands give the normal; a 30 Å slab is slid to the most hydrophobic,
-least charged position). The cytoplasmic side follows the positive-inside rule (more Lys/Arg)."""
+"""Where the lipid bilayer is: exactly from OPM's dummy atoms when the file has them (planes, thickness and
+sides), otherwise estimated from the structure (the long helices and strands give the normal; a 30 Å slab is
+slid to the most hydrophobic, least charged position) with the cytoplasmic side from the positive-inside rule
+(more Lys/Arg)."""
 
 from __future__ import annotations
 
@@ -35,11 +36,20 @@ class Membrane:
 
 
 def _opm(path) -> Membrane | None:
+    """The bilayer from OPM/PPM dummy atoms. Those files are in the membrane frame (normal along z) and mark the
+    hydrophobic boundaries with DUM atoms: 'O' on the outer (extracellular, periplasmic, lumenal) boundary and
+    'N' on the inner (cytoplasmic) one, so they give the sides as well as the planes."""
     st = gemmi.read_structure(str(path))
-    dummies = [a.pos for ch in st[0] for r in ch if r.name == "DUM" for a in r]
+    dummies = [(a.name, a.pos.z) for ch in st[0] for r in ch if r.name == "DUM" for a in r]
     if not dummies:
         return None
-    z = np.array([p.z for p in dummies])
+    inner = [z for name, z in dummies if name == "N"]
+    outer = [z for name, z in dummies if name == "O"]
+    if inner and outer and abs(np.mean(outer) - np.mean(inner)) > 1.0:
+        zi, zo = float(np.mean(inner)), float(np.mean(outer))
+        normal = np.array([0.0, 0.0, 1.0 if zo > zi else -1.0])
+        return Membrane(normal, (zi + zo) / 2 * normal[2], abs(zo - zi) / 2, "opm", sided=True)
+    z = np.array([z for _, z in dummies])
     return Membrane(np.array([0.0, 0.0, 1.0]), 0.0, float(np.abs(z).max()), "opm")
 
 
@@ -50,7 +60,7 @@ def find_membrane(path, bb: Backbone) -> Membrane | None:
         found = _estimate(bb)
     if found is None:
         return None
-    return _orient(found, bb)
+    return found if found.sided else _orient(found, bb)  # OPM's own sides, when its dummy atoms give them
 
 
 def _estimate(bb: Backbone) -> Membrane | None:

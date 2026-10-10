@@ -99,3 +99,35 @@ def test_trimer_protomers_are_drawn_side_by_side():
         span[p.sse.chain] = (min(lo, p.cx), max(hi, p.cx))
     (a0, a1), (b0, b1), (c0, c1) = sorted(span.values())
     assert len(span) == 3 and a1 < b0 and b1 < c0  # each chain its own x-range, no interleaving
+
+
+OPM = DATA / "opm" / "1BL8_opm.pdb"
+
+
+def test_opm_file_gives_the_sides():
+    """OPM marks the outer boundary with O dummies, the inner (cytoplasmic) one with N: KcsA's selectivity
+    filter faces out, its N-terminus in."""
+    bb = load_backbone(OPM, "asu")
+    m = find_membrane(OPM, bb)
+    assert m.source == "opm" and m.sided and m.half == pytest.approx(16.2, abs=0.05)
+    filter77 = next(k for k, l in enumerate(bb.labels) if l.chain == "A" and l.seq == 77)
+    n_term = next(k for k, l in enumerate(bb.labels) if l.chain == "A")
+    assert m.depth(bb.ca[filter77]) == pytest.approx(12.8, abs=0.5)  # was -12.8: re-derived from Lys/Arg
+    assert m.depth(bb.ca[n_term]) < -15
+
+
+def test_dummy_atoms_without_sides_fall_back_to_positive_inside(tmp_path):
+    """Review focus 4: dummies all of one name give the planes, not the sides."""
+    import gemmi
+
+    st = gemmi.read_structure(str(OPM))
+    for chain in st[0]:
+        for res in chain:
+            if res.name == "DUM":
+                for atom in res:
+                    atom.name = "C"
+    out = tmp_path / "one_name.pdb"
+    st.write_pdb(str(out))
+    m = find_membrane(out, load_backbone(out, "asu"))
+    assert m.source == "opm" and m.half == pytest.approx(16.2, abs=0.05)
+    assert abs(m.normal[2]) == pytest.approx(1.0)
