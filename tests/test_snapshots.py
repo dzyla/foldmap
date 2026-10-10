@@ -18,7 +18,7 @@ SNAPSHOTS = DATA / "snapshots"
 
 SAMPLE = """<svg xmlns="http://www.w3.org/2000/svg" width="100pt" height="50.25pt">
 <g id="figure_1"><g id="patch_1"><path d="M 0 0 L 100 50 z"/></g>
-<g id="helix:A:2-9"><path d="M 10 20 L 30.04 40 z"/></g>
+<g id="helix:A:2-9"><path d="M 10 20 L 30.04 40 z" style="fill: #ABC; stroke: rgb(0, 0, 255)"/></g>
 <g id="label:A:2-9"><text x="12.5" y="8">α1</text></g>
 <g id="loop:A:2-9>A:12-15"><path d="M 1 1 L 2 2"/></g>
 <g id="loop:A:2-9>A:12-15"><path d="M 3 3 L 4 4"/></g>
@@ -29,7 +29,11 @@ def test_fingerprint_keeps_named_items_text_and_extent():
     fp = fingerprint(SAMPLE)
     assert fp["size"] == [100.0, 50.2]
     assert "figure_1" not in fp["items"] and "patch_1" not in fp["items"]
-    assert fp["items"]["helix:A:2-9"] == {"bbox": [10.0, 20.0, 30.0, 40.0], "text": []}
+    assert fp["items"]["helix:A:2-9"] == {
+        "bbox": [10.0, 20.0, 30.0, 40.0],
+        "text": [],
+        "colours": ["fill:#aabbcc", "stroke:#0000ff"],
+    }
     assert fp["items"]["label:A:2-9"]["text"] == ["α1"]
     assert {"loop:A:2-9>A:12-15", "loop:A:2-9>A:12-15#2"} <= set(fp["items"])
     assert fp["unnamed"] == {"patch": 1, "text": 1}
@@ -48,6 +52,14 @@ def test_compare_reports_moves_beyond_tolerance_only():
     assert any("new helix:A:2-10" in p for p in compare(a, e))
 
 
+def test_compare_detects_a_colour_only_change():
+    a = fingerprint(SAMPLE)
+    b = fingerprint(SAMPLE.replace("#ABC", "#ABD"))
+    assert compare(a, fingerprint(SAMPLE.replace("#ABC", "#aabbcc"))) == []
+    assert any(p.startswith("helix:A:2-9: colours") for p in compare(a, b))
+    assert fingerprint(SAMPLE.replace("#ABC", "none"))["items"]["helix:A:2-9"]["colours"][0] == "fill:none"
+
+
 def test_snapshot_roundtrip_keeps_unicode_and_lf(tmp_path):
     fp = fingerprint(SAMPLE.replace(">α1<", ">η1 A′<"))
     path = tmp_path / "s.json"
@@ -63,6 +75,11 @@ CASES = {
     "1LMB-dna": ("1LMB.cif", []),  # DNA ladder, contacts, protein-DNA
     "1C3W-membrane": ("1C3W.cif", ["--membrane", "auto"]),  # membrane slab and heads, ligands
     "6ZS5-disulfide-glycan": ("6ZS5.cif", []),  # disulfide lane brackets, glycans, ss-dots
+    "2HHB-journal": ("2HHB.cif", ["--theme", "journal"]),  # journal colours and fonts
+    "2HHB-shaded": ("2HHB.cif", ["--theme", "shaded"]),  # shade branch of the colouring
+    "1TIM-shaded": ("1TIM.cif", ["--theme", "shaded"]),  # shade branch with symmetry copies
+    "2HHB-trace": ("2HHB.cif", ["--theme", "trace"]),  # trace theme
+    "2HHB-highlight": ("2HHB.cif", ["--set", "highlight=A"]),  # dimmed MATE_GREY branch, other chains grey
     "2LZM-domains-rainbow": ("2LZM.cif", ["--domains", "auto", "--theme", "rainbow", "--set", "residue_numbers=true"]),
 }
 
