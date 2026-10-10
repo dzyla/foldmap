@@ -321,3 +321,13 @@ def test_bundled_helices_are_drawn_side_by_side(pdb, member):
         lo, hi = span.get(k.split(":")[0], [np.inf, -np.inf])
         span[k.split(":")[0]] = [min(lo, c - p.length / 2), max(hi, c + p.length / 2)]
     assert max(a for a, _ in span.values()) < min(b for _, b in span.values())  # columns side by side: a stalk
+
+
+def test_group_by_chain_keeps_chain_order_and_filters():
+    from foldmap.model import group_by_chain
+    from helpers import fake_sse
+
+    a1, b1, a2 = fake_sse("H", 1, 9, chain="A"), fake_sse("E", 3, 7, chain="B"), fake_sse("E", 12, 15, chain="A")
+    assert list(group_by_chain([a1, b1, a2])) == ["A", "B"]
+    assert group_by_chain([a1, b1, a2])["A"] == [a1, a2]
+    assert group_by_chain([a1, b1, a2], keep={a2.id}) == {"A": [a2]}

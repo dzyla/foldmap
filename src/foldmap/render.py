@@ -7,6 +7,7 @@ from __future__ import annotations
 import logging
 import threading
 from collections import Counter
+from collections.abc import Callable
 from contextlib import contextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass, replace
@@ -15,6 +16,7 @@ from typing import NamedTuple
 
 import numpy as np
 from matplotlib import colormaps, rc_context
+from matplotlib.axes import Axes
 from matplotlib.colors import to_hex
 from matplotlib.figure import Figure
 from matplotlib.font_manager import FontProperties
@@ -36,6 +38,7 @@ from .layout import (
     Layout,
     Placed,
     PlacedDNA,
+    centred_box,
     dna_end_labels,
     dna_letter_pos,
     dna_to_page,
@@ -43,10 +46,11 @@ from .layout import (
     domain_panel,
     helix_label_pos,
     label_boxes,
+    overlaps_any,
     resolve,
     termini,
 )
-from .model import SSE
+from .model import SSE, group_by_chain
 from .palette import chain_colors, darken, text_color_on, tint
 from .route import Loop
 from .style import _ALIASES, CHOICES, Style
@@ -990,9 +994,10 @@ def _draw_links(
             for out in (np.array([1.0, 0.0]), np.array([-1.0, 0.0]), np.array([0.0, 1.0]), np.array([0.0, -1.0])):
                 for lead in np.arange(0.35, 6.0, 0.1):  # the shortest stem that clears everything
                     boxes = [
-                        _box(*(at + out * (lead + step * k)), size / 2 + 0.03, size / 2 + 0.03) for k in range(count)
+                        centred_box(*(at + out * (lead + step * k)), size / 2 + 0.03, size / 2 + 0.03)
+                        for k in range(count)
                     ]
-                    if not any(_hits(b, taken) for b in boxes):
+                    if not any(overlaps_any(b, taken) for b in boxes):
                         cost = lead - 0.15 * float(np.dot(out, away) > 0)  # ties: point outward
                         if best is None or cost < best[0]:
                             best = (cost, out, lead, boxes)
@@ -1001,8 +1006,8 @@ def _draw_links(
                 tries = []
                 for out in (np.array([1.0, 0.0]), np.array([-1.0, 0.0]), np.array([0.0, 1.0]), np.array([0.0, -1.0])):
                     for lead in np.arange(0.35, 6.0, 0.25):
-                        boxes = [_box(*(at + out * (lead + step * k)), size / 2, size / 2) for k in range(count)]
-                        tries.append((sum(_hits(b, taken) for b in boxes), lead, out.tolist(), boxes))
+                        boxes = [centred_box(*(at + out * (lead + step * k)), size / 2, size / 2) for k in range(count)]
+                        tries.append((sum(overlaps_any(b, taken) for b in boxes), lead, out.tolist(), boxes))
                 hits, lead, out, boxes = min(tries, key=lambda t: (t[0], t[1]))
                 best = (0.0, np.array(out), lead, boxes)
             _, out, lead, boxes = best
@@ -1020,14 +1025,6 @@ def _draw_links(
             for k, name in enumerate(sugars[:5]):
                 shape, colour = _SNFG.get(name, ("circle", "#ffffff"))
                 _symbol(ax, shape, colour, at + out * (lead + step * k), size, lw, f"glycan:{r}:{k}")
-
-
-def _box(cx: float, cy: float, hw: float, hh: float) -> tuple[float, float, float, float]:
-    return (cx - hw, cy - hh, cx + hw, cy + hh)
-
-
-def _hits(box, rects) -> bool:
-    return any(box[0] < t[2] and t[0] < box[2] and box[1] < t[3] and t[1] < box[3] for t in rects)
 
 
 def _chevron(points, size: float) -> Path | None:
@@ -1203,8 +1200,9 @@ def _colouring(sses: list[SSE], chains: list[str], colors: dict[str, str], look:
         )
     if look.color_by == "shade":
         out, span = {}, {}
+        groups = group_by_chain(sses)
         for chain in chains:
-            mine = [s for s in sses if s.chain == chain]
+            mine = groups[chain]
             for k, s in enumerate(mine):
                 out[s.id] = _shade(colors[chain], k / (len(mine) - 1) if len(mine) > 1 else 0.5)
             span[chain] = (mine[0].start, mine[-1].end)
@@ -1223,8 +1221,9 @@ def _colouring(sses: list[SSE], chains: list[str], colors: dict[str, str], look:
 
         return {s.id: colors[s.chain] for s in sses}, by_chain
     out, span = {}, {}
+    groups = group_by_chain(sses)
     for chain in chains:
-        mine = [s for s in sses if s.chain == chain]
+        mine = groups[chain]
         for k, s in enumerate(mine):
             out[s.id] = sequence_colour(k / (len(mine) - 1) if len(mine) > 1 else 0.0, look.sequence_map)
         span[chain] = (mine[0].start, mine[-1].end)
@@ -1275,11 +1274,11 @@ class _Canvas:
     """What every drawing step shares: the axes, the resolved look, colours and the page geometry."""
 
     fig: Figure
-    ax: object
+    ax: Axes
     look: Style
     colors: dict[str, str]
     element_colour: dict[str, str]
-    residue_colour: object  # (residue index, chain) -> colour or None
+    residue_colour: Callable[[int, str], str | None]
     font: float
     lw: float
     loop_lw: float
@@ -1734,12 +1733,13 @@ def _draw_ghosts(c: _Canvas, layout: Layout) -> None:
 
 def _draw_termini(c: _Canvas, layout: Layout, sses: list[SSE]) -> None:
     """The N and C terminal stubs, their letters and long-tail lengths."""
+    groups = group_by_chain(sses)
     for end, chain, port, ex in termini(layout, sses):
         tip = (port[0] + ex[0] * END_STUB, port[1] + ex[1] * END_STUB)
         ink = c.look.ink
         if c.look.loop_color == "residue" and layout.res_chain:  # a terminal tail: its typical colour
-            mine = [s for s in sses if s.chain == chain]
-            ours = [r for r, c in enumerate(layout.res_chain) if c == chain]
+            mine = groups.get(chain, [])
+            ours = [r for r, ch in enumerate(layout.res_chain) if ch == chain]
             if mine and ours:
                 tail = range(ours[0], mine[0].start) if end == "N" else range(mine[-1].end + 1, ours[-1] + 1)
                 ink = _typical([c.residue_colour(r, chain) for r in tail]) or c.look.ink
@@ -1761,8 +1761,8 @@ def _draw_termini(c: _Canvas, layout: Layout, sses: list[SSE]) -> None:
             zorder=4,
         )
         t.set_gid(f"terminus:{end}:{chain}")
-        mine = [s for s in sses if s.chain == chain]
-        ours = [r for r, c in enumerate(layout.res_chain) if c == chain] if layout.res_chain else []
+        mine = groups.get(chain, [])
+        ours = [r for r, ch in enumerate(layout.res_chain) if ch == chain] if layout.res_chain else []
         if mine and ours:  # a long unstructured end: say how long, so it is not mistaken for a short stub
             n_tail = (mine[0].start - ours[0]) if end == "N" else (ours[-1] - mine[-1].end)
             if n_tail >= LONG_TAIL:

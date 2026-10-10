@@ -94,6 +94,15 @@ class SSE:
         return self.end - self.start + 1
 
 
+def group_by_chain(sses, keep=None) -> dict[str, list[SSE]]:
+    """Elements grouped by chain, chains in order of first appearance; `keep` (ids) filters the elements."""
+    out: dict[str, list[SSE]] = {}
+    for s in sses:
+        if keep is None or s.id in keep:
+            out.setdefault(s.chain, []).append(s)
+    return out
+
+
 @dataclass(eq=False)
 class Sheet:
     """Strands in sheet order. directions[k] is +1 if strands[k] runs the same way as

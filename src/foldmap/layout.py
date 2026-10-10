@@ -11,7 +11,7 @@ import numpy as np
 
 from .features import helix_bundles
 from .frame import Frame
-from .model import SSE, Nucleic, Sheet, duplex_axis, duplex_groups
+from .model import SSE, Nucleic, Sheet, duplex_axis, duplex_groups, group_by_chain
 from .style import Style
 
 PITCH = 1.1  # distance between neighbouring strand centres
@@ -1069,9 +1069,8 @@ def build_layout(
             contacts[key] = contacts.get(key, 0) + n
     items.sort(key=lambda it: it.order)
     members = {m.sse.id: m for it in items for m in it.members if isinstance(m, Placed) and not m.ghost}
-    for chain in dict.fromkeys(s.chain for s in sses):
-        mine = [s for s in sses if s.chain == chain and s.id in members]
-        if mine and chain not in (partial or ()):  # fragments of neighbours have no termini of their own
+    for chain, mine in group_by_chain(sses, keep=members).items():
+        if chain not in (partial or ()):  # fragments of neighbours have no termini of their own
             members[mine[0].id].ends += "N"
             members[mine[-1].id].ends += "C"
     if mode == "stack":
@@ -1208,16 +1207,21 @@ def helix_label_pos(p: Placed) -> tuple[float, float]:
 def termini(layout: Layout, sses: list[SSE]) -> list[tuple[str, str, tuple[float, float], np.ndarray]]:
     """(N or C, chain, port, outward direction) for each chain's first and last placed element."""
     out = []
-    for chain in dict.fromkeys(s.chain for s in sses):
-        mine = [s for s in sses if s.chain == chain and s.id in layout.placed]
-        if mine and chain not in layout.partial:
+    for chain, mine in group_by_chain(sses, keep=layout.placed).items():
+        if chain not in layout.partial:
             first, last = layout.placed[mine[0].id], layout.placed[mine[-1].id]
             out += [("N", chain, first.n_port, first.exit_n), ("C", chain, last.c_port, last.exit_c)]
     return out
 
 
-def _box(cx: float, cy: float, hx: float, hy: float) -> tuple[float, float, float, float]:
+def centred_box(cx: float, cy: float, hx: float, hy: float) -> tuple[float, float, float, float]:
+    """(x0, y0, x1, y1) of the box with centre (cx, cy) and half-sizes (hx, hy)."""
     return (cx - hx, cy - hy, cx + hx, cy + hy)
+
+
+def overlaps_any(box, rects) -> bool:
+    """True when the box overlaps any of the rects (x0, y0, x1, y1), touching edges excluded."""
+    return any(box[0] < t[2] and t[0] < box[2] and box[1] < t[3] and t[1] < box[3] for t in rects)
 
 
 def dna_y(slot: int, x: np.ndarray | float, width: float = DNA_W) -> np.ndarray | float:
@@ -1264,7 +1268,10 @@ def label_boxes(layout: Layout, sses: list[SSE]) -> list[tuple[str, tuple[float,
     for p in layout.placed.values():
         if p.sse.kind in ("H", "G"):
             out.append(
-                (f"label:{p.sse.id}", _box(*helix_label_pos(p), _GLYPH_W * len(p.label) / 2 + 0.05, _GLYPH_H / 2))
+                (
+                    f"label:{p.sse.id}",
+                    centred_box(*helix_label_pos(p), _GLYPH_W * len(p.label) / 2 + 0.05, _GLYPH_H / 2),
+                )
             )
     for end, chain, port, ex in termini(layout, sses):
         a, b = np.add(port, ex * 0.15), np.add(port, ex * END_STUB)
@@ -1275,7 +1282,7 @@ def label_boxes(layout: Layout, sses: list[SSE]) -> list[tuple[str, tuple[float,
             )
         )
         t = np.add(port, ex * END_LABEL)
-        out.append((f"{end}:{chain}", _box(float(t[0]), float(t[1]), _GLYPH_W / 2 + 0.05, _GLYPH_H / 2)))
+        out.append((f"{end}:{chain}", centred_box(float(t[0]), float(t[1]), _GLYPH_W / 2 + 0.05, _GLYPH_H / 2)))
     for d in layout.dna:
         if layout.nt_rows:
             for row, k in enumerate(d.strands[:2]):
@@ -1293,7 +1300,7 @@ def label_boxes(layout: Layout, sses: list[SSE]) -> list[tuple[str, tuple[float,
                     )
                 )
         for sid, end, (x, y) in dna_end_labels(d, layout.nucleic):
-            out.append((f"dna-end:{sid}:{end}", _box(x, y, _GLYPH_W + 0.05, _GLYPH_H / 2)))
+            out.append((f"dna-end:{sid}:{end}", centred_box(x, y, _GLYPH_W + 0.05, _GLYPH_H / 2)))
     for name, ids in layout.domains:  # a domain's name, top left inside its panel
         if ids:
             x0, _, _, y1 = domain_panel(layout, name)
