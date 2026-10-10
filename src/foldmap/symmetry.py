@@ -46,8 +46,9 @@ class Symmetry:
     rmsd: float
     others: list[str] = field(default_factory=list)  # chains with no symmetry copy
     angles: list[float] = field(default_factory=list)  # each protomer's turn about the axis (radians, unwrapped)
-    twist: float = 0.0  # helical: turn per copy (radians) about `axis`, negative for a left-handed screw
-    rise: float = 0.0  # helical: Å along the axis per copy (the axis points along the rise: never negative)
+    twist: float = 0.0  # helical: turn per copy (radians) about `axis`; of opposite sign to rise: left-handed
+    rise: float = 0.0  # helical: Å along the axis per copy; positive as found (the axis points along the rise),
+    # negative once the membrane turns the assembly over (axis, angles, twist and rise all flip; the hand holds)
 
     @property
     def label(self) -> str:
