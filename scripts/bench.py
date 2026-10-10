@@ -5,6 +5,9 @@ python scripts/bench.py 6ZYA 8UTF                # some of them
 python scripts/bench.py --record before.json     # keep each layout (positions, bounds)
 python scripts/bench.py --check before.json --exact      # fail unless every layout is bit-identical
 python scripts/bench.py --check before.json --area 1.01  # fail if a figure's area grew by more than 1 %
+
+A signature holds every placed element, ghost and duplex with all its geometry, plus sheets, domains, unjoined
+pairs and nt_rows. Loop points are derived from the layout at render time, so identical layouts give identical loops.
 """
 
 from __future__ import annotations
@@ -12,6 +15,7 @@ from __future__ import annotations
 import argparse
 import json
 import string
+import subprocess
 import sys
 import tempfile
 import time
@@ -19,6 +23,7 @@ from pathlib import Path
 
 import gemmi
 
+import foldmap
 from foldmap import cli, io, layout
 from foldmap.cli import make_layout
 
@@ -31,6 +36,16 @@ PHASES = {  # timed wherever they are looked up
     "_separate": (layout,),
 }
 SPENT: dict[str, float] = {}
+OPTIONS = {  # every make_layout option the figures depend on, passed explicitly so a changed default cannot go unseen
+    "mode": "projected",
+    "rotate": 0.0,
+    "flip_v": False,
+    "dna": True,
+    "symmetry": "auto",
+    "assembly": "auto",
+    "membrane": "off",
+    "focus": "auto",
+}
 
 
 def big_complex(path: Path, copies: int = 8) -> Path:
@@ -67,11 +82,37 @@ def _timed(name: str, f):
     return run
 
 
+def _meta() -> dict:
+    try:
+        done = subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True, text=True, cwd=DATA, check=True)
+        commit = done.stdout.strip()
+    except (OSError, subprocess.CalledProcessError):
+        commit = "unknown"
+    return {"options": OPTIONS, "commit": commit, "version": foldmap.__version__}
+
+
 def signature(lay) -> dict:
-    sig = {k: [p.cx, p.cy, p.angle, p.length] for k, p in sorted(lay.placed.items())}
-    sig["_ghosts"] = [[g.cx, g.cy] for g in lay.ghosts]
-    sig["_dna"] = [[d.cx, d.cy] for d in lay.dna]
+    sig = {k: [p.cx, p.cy, p.angle, p.length, p.width, p.ends, p.ghost, p.label] for k, p in sorted(lay.placed.items())}
+    sig["_ghosts"] = [[g.cx, g.cy, g.angle, g.length, g.width, g.ends, g.ghost, g.label] for g in lay.ghosts]
+    sig["_dna"] = [
+        [
+            d.id,
+            d.strands,
+            d.cx,
+            d.cy,
+            d.angle,
+            d.length,
+            d.width,
+            d.ghost,
+            sorted([list(k), v] for k, v in d.axial.items()),
+        ]
+        for d in lay.dna
+    ]
     sig["_bounds"] = list(lay.bounds)
+    sig["_sheets"] = [list(x) for x in lay.sheets]
+    sig["_domains"] = [[n, list(ids)] for n, ids in lay.domains]
+    sig["_unjoined"] = sorted(sorted(pair) for pair in lay.unjoined)
+    sig["_nt_rows"] = lay.nt_rows
     return sig
 
 
@@ -87,6 +128,8 @@ def main(argv=None) -> int:
     ap.add_argument("--exact", action="store_true", help="with --check: fail unless layouts are bit-identical")
     ap.add_argument("--area", type=float, help="with --check: fail if a figure's area grew by more than this factor")
     args = ap.parse_args(argv)
+    if args.check and not (args.exact or args.area):
+        ap.error("--check needs --exact or --area, otherwise it cannot fail")
     tmp = Path(tempfile.mkdtemp())
     names = args.names or [p.stem for p in sorted(DATA.glob("*.cif"))] + ["big32"]
     files = [big_complex(tmp / "big32.cif") if n == "big32" else DATA / f"{n}.cif" for n in names]
@@ -95,16 +138,23 @@ def main(argv=None) -> int:
         for mod in mods:
             setattr(mod, name, wrapped)
     ref = json.loads(Path(args.check).read_text(encoding="utf-8")) if args.check else {}
-    out, failed = {}, []
+    meta = _meta()
+    out, failed = {"_meta": meta}, []
+    if ref and ref.get("_meta", {}).get("options") != OPTIONS:
+        print("failed: make_layout options differ from the recorded ones", file=sys.stderr)
+        return 1
     for f in files:
         SPENT.clear()
         t = time.perf_counter()
-        lay, _, _ = make_layout(f)
+        lay, _, _ = make_layout(f, **OPTIONS)
         total = time.perf_counter() - t
         sig = out[f.stem] = signature(lay)
         b = sig["_bounds"]
         note = ""
-        if f.stem in ref:
+        if args.check and f.stem not in ref:
+            note = "MISSING from baseline"
+            failed.append(f.stem)
+        elif f.stem in ref:
             r = ref[f.stem]
             same = r == sig
             grew = _area(b) / max(_area(r["_bounds"]), 1e-9)
@@ -114,6 +164,12 @@ def main(argv=None) -> int:
         phases = " ".join(f"{k}={v:.2f}" for k, v in SPENT.items() if v >= 0.005)
         size = f"{b[2] - b[0]:6.1f} x {b[3] - b[1]:5.1f}"
         print(f"{f.stem:10s} {len(lay.placed):4d} el {total:7.2f} s  {size}  {phases}  {note}")
+    if ref:
+        unmeasured = sorted(set(ref) - set(out))
+        if unmeasured:
+            print("not measured:", " ".join(unmeasured), file=sys.stderr)
+            if not args.names:  # a full run must cover the whole baseline
+                failed.extend(unmeasured)
     if args.record:
         Path(args.record).write_text(json.dumps(out), encoding="utf-8")
     if failed:

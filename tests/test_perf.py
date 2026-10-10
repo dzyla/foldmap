@@ -23,10 +23,11 @@ print(json.dumps(out))
 def test_layout_does_not_depend_on_the_hash_seed():
     files = [str(DATA / f"{p}.cif") for p in ("2HHB", "1LMB", "9TX7")]
     runs = []
-    for seed in ("0", "12345"):
+    for seed in ("0", "12345", "777"):
         env = dict(os.environ, PYTHONHASHSEED=seed)
         done = subprocess.run(
             [sys.executable, "-c", _SIGNATURE, *files], env=env, capture_output=True, text=True, check=True
         )
         runs.append(json.loads(done.stdout))
-    assert runs[0] == runs[1]
+    assert runs[0] and all(runs[0][f] for f in runs[0])
+    assert runs[0] == runs[1] == runs[2]
