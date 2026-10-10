@@ -58,8 +58,43 @@ def test_layout_with_insertion_codes_builds_and_resolves(ubq, tmp_path):
 def test_ranges_without_insertion_codes_stop_before_the_insertions(ubq, tmp_path):
     lay, sses, _ = make_layout(_icodes(ubq, tmp_path))
     assert resolve(lay, sses, "res:A:1A-1Z") == ["A:1B-1G", "A:1L-1P"]
+    # No element holds a plain "1", so the number-only fallback of 0.1.0 files takes over
+    assert resolve(lay, sses, "res:A:1") == ["A:1B-1G", "A:1L-1P"]
     with pytest.raises(ValueError, match="no element"):
-        resolve(lay, sses, "res:A:1")  # residue 1 itself, without an insertion code, is in no element
+        resolve(lay, sses, "res:A:2")
+
+
+def test_zero_one_zero_layout_with_number_only_reference_reloads(ubq, tmp_path):
+    """0.1.0 wrote res:A:1-1 for a strand wholly inside an insertion block; it must still load."""
+    src = _renumber(
+        ubq, tmp_path, "block.cif", lambda k, r: gemmi.SeqId(1, string.ascii_uppercase[k]) if k < 10 else r.seqid
+    )
+    layout = tmp_path / "old.yaml"
+    layout.write_text("edits:\n  rename:\n    res:A:1-1: B1\n", encoding="utf-8")
+    assert main(["plot", str(src), "--layout-file", str(layout), "-o", str(tmp_path / "b.svg")]) == 0
+    assert ">B1<" in (tmp_path / "b.svg").read_text(encoding="utf-8")
+
+
+def test_descending_insertion_codes_resolve_and_reload(ubq, tmp_path):
+    """Chymotrypsin/IMGT style numbering 1I ... 1A, 1 runs backwards through the codes."""
+    n = 9
+    src = _renumber(
+        ubq,
+        tmp_path,
+        "desc.cif",
+        lambda k, r: gemmi.SeqId(1, string.ascii_uppercase[n - 1 - k] if k < n else " ") if k <= n else r.seqid,
+    )
+    lay, sses, _ = make_layout(src)
+    strand = next(s for s in sses if s.first.tag == "1H")
+    assert (strand.first.tag, strand.last.tag) == ("1H", "1C")
+    assert resolve(lay, sses, "res:A:1H-1C") == [strand.id]
+    assert resolve(lay, sses, "res:A:1C-1H") == [strand.id]
+    saved = tmp_path / "fig.yaml"
+    assert (
+        main(["plot", str(src), "--rename", "#1=B1", "--save-layout", str(saved), "-o", str(tmp_path / "a.svg")]) == 0
+    )
+    assert main(["plot", str(src), "--layout-file", str(saved), "-o", str(tmp_path / "b.svg")]) == 0
+    assert ">B1<" in (tmp_path / "b.svg").read_text(encoding="utf-8")
 
 
 def test_pdb_format_keeps_insertion_codes(ubq, tmp_path):

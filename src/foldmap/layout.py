@@ -720,13 +720,24 @@ def resolve(layout: Layout, sses: list[SSE], ref: str) -> list[str]:
             )
         lo = (int(m[1]), m[2])
         hi = (int(m[3]), m[4]) if m[3] is not None else lo
-        out = [
-            s.id
-            for s in placed
-            if (chain is None or s.chain == chain)
-            and (s.first.seq, s.first.icode) <= hi
-            and (s.last.seq, s.last.icode) >= lo
-        ]
+        in_chain = [s for s in placed if chain is None or s.chain == chain]
+        # An element's own reference first: descending numbering (1H ... 1A, 1) has first > last.
+        out = [s.id for s in in_chain if (s.first.tag, s.last.tag) == (f"{lo[0]}{lo[1]}", f"{hi[0]}{hi[1]}")]
+        if not out:
+            lo, hi = min(lo, hi), max(lo, hi)
+            out = [
+                s.id
+                for s in in_chain
+                if min((s.first.seq, s.first.icode), (s.last.seq, s.last.icode)) <= hi
+                and max((s.first.seq, s.first.icode), (s.last.seq, s.last.icode)) >= lo
+            ]
+        if not out and not lo[1] and not hi[1]:
+            # Saved by foldmap 0.1.0, which ignored insertion codes: match by residue number alone.
+            out = [
+                s.id
+                for s in in_chain
+                if min(s.first.seq, s.last.seq) <= hi[0] and max(s.first.seq, s.last.seq) >= lo[0]
+            ]
     elif ":" in ref:
         chain, label = ref.split(":", 1)
         out = [s.id for s in placed if s.chain == chain and layout.placed[s.id].label == label]
