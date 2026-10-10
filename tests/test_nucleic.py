@@ -1,5 +1,6 @@
 from pathlib import Path
 
+import gemmi
 import numpy as np
 import pytest
 
@@ -413,3 +414,27 @@ def test_cropped_ends_are_marked_and_full_dna_on_request():
     full = make_figure(DATA / "1LMB.cif", look=Style(dna_extent="all"))
     assert "5′" in texts(full) and texts(full).count("5′") >= 2
     assert len(texts(cropped)) <= len(texts(full))
+
+
+@pytest.mark.parametrize("fmt", ["cif", "pdb"])
+def test_a_nucleotide_ligand_is_no_strand_and_stays_a_ligand(tmp_path, fmt):
+    path = DATA / "na" / "1ATP.cif.gz"  # protein kinase A with ATP
+    if fmt == "pdb":
+        path = tmp_path / "1ATP.pdb"
+        gemmi.read_structure(str(DATA / "na" / "1ATP.cif.gz")).write_pdb(str(path))
+    bb, _, _ = pipeline(path)
+    assert load_nucleic(path, bb).strands == []
+    fig, _ = _figure(path)
+    assert not _gid(fig, "dna-")
+    assert any("ATP" in a.get_gid() for a in _gid(fig, "ligand:"))
+
+
+def test_without_entity_types_a_nucleotide_needs_a_linked_neighbour():
+    from foldmap.io import _nucleic_strands, read_model
+
+    for name, lengths in (("1ATP", []), ("1EHZ", [76])):
+        model, _ = read_model(DATA / "na" / f"{name}.cif.gz", "asu")
+        for chain in model:
+            for res in chain:
+                res.entity_type = gemmi.EntityType.Unknown
+        assert [len(s) for s, _ in _nucleic_strands(model)] == lengths, name

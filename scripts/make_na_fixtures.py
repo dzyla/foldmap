@@ -4,12 +4,14 @@
 
     python scripts/make_na_fixtures.py                 # download from RCSB, write tests/data/na/*.cif.gz
     python scripts/make_na_fixtures.py --from DIR      # use DIR/<ID>.cif instead of downloading
+    python scripts/make_na_fixtures.py 1ATP 4YBB-psi   # only these fixtures (reference.json keeps the others)
 
 Each entry keeps its nucleic-acid chains (optionally a residue window of them), every protein chain with an atom
 within 8 Å of the kept nucleic acid (whole chains, so their secondary structure is intact), no waters and no
 assemblies (the fixtures are read as deposited). Files are written gzipped; gemmi reads them directly.
 reference.json holds the canonical and wobble pairs RNApolis finds in each deposited entry (pip install rnapolis),
-the independent reference tests/test_na_pairs.py checks foldmap's pairing against.
+the independent reference tests/test_na_pairs.py checks foldmap's pairing against. CONTROLS are fixtures for one
+property each, with no reference pairs: chains and residue windows kept as listed, waters dropped.
 """
 
 from __future__ import annotations
@@ -39,6 +41,11 @@ ENTRIES = {
     # (S4 AD, S8 AH, S15 AO, S16 AP, S17 AQ, S20 AT)
     "4YBB": (["AA"], {"AA": (1, 1000)}, ["AD", "AH", "AO", "AP", "AQ", "AT"]),
 }
+# fixture name -> (id, chains to keep or None for all, {chain: (first, last)} residue windows)
+CONTROLS = {
+    "1ATP": ("1ATP", None, {}),  # protein kinase A with ATP: a nucleotide ligand, never a strand
+    "4YBB-psi": ("4YBB", ["DA"], {"DA": (2586, 2608)}),  # 23S rRNA hairpin: pseudouridine 2604 pairs with A2590
+}
 
 
 def _is_nucleic(chain) -> bool:
@@ -49,18 +56,48 @@ def _is_nucleic(chain) -> bool:
     )
 
 
-def trim(st: gemmi.Structure, na_chains, windows, allowed) -> gemmi.Structure:
+def _first_model(st: gemmi.Structure, windows) -> gemmi.Model:
+    """Model 1 without waters or hydrogens, the windowed chains cut to their windows."""
     st.remove_waters()
     st.remove_hydrogens()
     while len(st) > 1:
         del st[1]
     model = st[0]
-    keep_na = [c.name for c in model if _is_nucleic(c) and (na_chains is None or c.name in na_chains)]
     for name, (lo, hi) in windows.items():
         chain = model[name]
         for k in reversed(range(len(chain))):
             if not lo <= chain[k].seqid.num <= hi:
                 del chain[k]
+    return model
+
+
+def _finish(st: gemmi.Structure) -> gemmi.Structure:
+    st.assemblies.clear()
+    st.remove_empty_chains()
+    st.setup_entities()
+    return st
+
+
+def control(st: gemmi.Structure, chains, windows) -> gemmi.Structure:
+    model = _first_model(st, windows)
+    for name in [c.name for c in model]:
+        if chains is not None and name not in chains:
+            model.remove_chain(name)
+    _finish(st)
+    kept = {r.subchain for c in model for r in c}
+    names = {c.name for c in model}
+    for k in reversed(range(len(st.entities))):  # entities and links of dropped chains only add bulk
+        if not kept & set(st.entities[k].subchains):
+            del st.entities[k]
+    for k in reversed(range(len(st.connections))):
+        if not {st.connections[k].partner1.chain_name, st.connections[k].partner2.chain_name} <= names:
+            del st.connections[k]
+    return st
+
+
+def trim(st: gemmi.Structure, na_chains, windows, allowed) -> gemmi.Structure:
+    model = _first_model(st, windows)
+    keep_na = [c.name for c in model if _is_nucleic(c) and (na_chains is None or c.name in na_chains)]
     ns = gemmi.NeighborSearch(model, st.cell, NEAR + 1).populate()
     near = set()
     for name in keep_na:
@@ -78,10 +115,7 @@ def trim(st: gemmi.Structure, na_chains, windows, allowed) -> gemmi.Structure:
     for name in [c.name for c in model]:
         if name not in keep_na and name not in proteins:
             model.remove_chain(name)
-    st.assemblies.clear()
-    st.remove_empty_chains()
-    st.setup_entities()
-    return st
+    return _finish(st)
 
 
 def _reference_pairs(text: str) -> list:
@@ -108,31 +142,51 @@ def _reference_pairs(text: str) -> list:
     return sorted(out)
 
 
+def _fetch(pdb: str, src: Path | None) -> str:
+    if src:
+        return (src / f"{pdb}.cif").read_text(encoding="utf-8")
+    with urllib.request.urlopen(f"https://files.rcsb.org/download/{pdb}.cif.gz", timeout=60) as r:
+        return gzip.decompress(r.read()).decode("utf-8")
+
+
+def _write(name: str, st: gemmi.Structure) -> int:
+    path = OUT / f"{name}.cif.gz"
+    cif = st.make_mmcif_document().as_string()
+    path.write_bytes(gzip.compress(cif.encode("utf-8"), 9, mtime=0))  # no timestamp: rerunning is reproducible
+    size = path.stat().st_size
+    chains = ",".join(c.name for c in st[0])
+    print(f"{path.name}: chains {chains}, {size / 1024:.0f} KB")
+    return size
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    ap.add_argument("names", nargs="*", help="fixtures to build (default: all)")
     ap.add_argument("--from", dest="src", type=Path, help="read DIR/<ID>.cif instead of downloading")
     args = ap.parse_args(argv)
+    unknown = set(args.names) - set(ENTRIES) - set(CONTROLS)
+    if unknown:
+        ap.error(f"unknown fixture {', '.join(sorted(unknown))}")
+    wanted = set(args.names) or set(ENTRIES) | set(CONTROLS)
     OUT.mkdir(parents=True, exist_ok=True)
     total = 0
-    reference: dict[str, list] = {}
+    ref_path = OUT / "reference.json"
+    reference: dict[str, list] = json.loads(ref_path.read_text(encoding="utf-8")) if ref_path.is_file() else {}
     for pdb, (na_chains, windows, allowed) in ENTRIES.items():
-        if args.src:
-            text = (args.src / f"{pdb}.cif").read_text(encoding="utf-8")
-        else:
-            with urllib.request.urlopen(f"https://files.rcsb.org/download/{pdb}.cif.gz", timeout=60) as r:
-                text = gzip.decompress(r.read()).decode("utf-8")
+        if pdb not in wanted:
+            continue
+        text = _fetch(pdb, args.src)
         st = trim(gemmi.read_structure_string(text), na_chains, windows, allowed)
         kept = {(c.name, r.seqid.num, r.seqid.icode.strip()) for c in st[0] for r in c}
         reference[pdb] = [p for p in _reference_pairs(text) if tuple(p[0]) in kept and tuple(p[1]) in kept]
-        path = OUT / f"{pdb}.cif.gz"
-        cif = st.make_mmcif_document().as_string()
-        path.write_bytes(gzip.compress(cif.encode("utf-8"), 9, mtime=0))  # no timestamp: rerunning is reproducible
-        size = path.stat().st_size
-        total += size
-        chains = ",".join(c.name for c in st[0])
-        print(f"{path.name}: chains {chains}, {size / 1024:.0f} KB")
-    (OUT / "reference.json").write_text(json.dumps(reference, separators=(",", ":")) + "\n", encoding="utf-8")
-    print(f"total {total / 1024:.0f} KB; reference pairs in {OUT / 'reference.json'}")
+        total += _write(pdb, st)
+    for name, (pdb, chains, windows) in CONTROLS.items():
+        if name in wanted:
+            total += _write(name, control(gemmi.read_structure_string(_fetch(pdb, args.src)), chains, windows))
+    if wanted & set(ENTRIES):
+        ref_path.write_text(json.dumps(reference, separators=(",", ":")) + "\n", encoding="utf-8")
+        print(f"reference pairs in {ref_path}")
+    print(f"total {total / 1024:.0f} KB")
     return 0
 
 

@@ -18,7 +18,8 @@ C1_PAIR = (9.0, 12.0)  # Å, C1'-C1' across a Watson-Crick or wobble pair (10.5 
 PLANE_MAX = 45.0  # degrees between the two base planes (TBP and nucleosome DNA reach 40 of propeller twist)
 MIN_LOOP = 3  # a hairpin closes at least this many unpaired nucleotides
 
-# (purine, pyrimidine) parent bases -> the hydrogen bonds checked, how many must hold, the pair kind
+# (purine, pyrimidine) parent bases -> the hydrogen bonds checked, how many must hold, the pair kind.
+# 4-thiouridine (4SU) has S4 in place of O4, so by design it never makes the A-U pair's second bond.
 _PAIRS = {
     ("G", "C"): ((("N1", "N3"), ("O6", "N4"), ("N2", "O2")), 2, "WC"),
     ("I", "C"): ((("N1", "N3"), ("O6", "N4")), 2, "WC"),
@@ -28,6 +29,8 @@ _PAIRS = {
     ("G", "T"): ((("N1", "O2"), ("O6", "N3")), 2, "GU"),
 }
 _PURINE = {"A", "G", "I"}
+# Pseudouridine hangs from C5, not N1: its ring turns over, O2 takes uracil's O4 place and O4 takes O2's
+_PSEUDO = {"O2": "O4", "O4": "O2"}
 _RING = ("N1", "C2", "N3", "C4", "C5", "C6")
 
 
@@ -57,14 +60,22 @@ def parent_base(res) -> str | None:
     return None
 
 
-def _glycosidic(res) -> np.ndarray | None:
-    """C1' -> the base atom bonded to it (N9 of a purine, N1 of a pyrimidine, C5 of pseudouridine)."""
+def _base_atom(res) -> gemmi.Atom | None:
+    """The base atom bonded to C1' (N9 of a purine, N1 of a pyrimidine, C5 of pseudouridine), or None."""
     c1 = res.find_atom("C1'", "*")
     for name in ("N9", "N1", "C5"):
         a = res.find_atom(name, "*")
         if c1 is not None and a is not None and c1.pos.dist(a.pos) < 1.7:
-            return np.array(a.pos.tolist()) - np.array(c1.pos.tolist())
+            return a
     return None
+
+
+def _glycosidic(res) -> np.ndarray | None:
+    """C1' -> the base atom bonded to it."""
+    a = _base_atom(res)
+    if a is None:
+        return None
+    return np.array(a.pos.tolist()) - np.array(res.find_atom("C1'", "*").pos.tolist())
 
 
 def _cis(x: np.ndarray, gx: np.ndarray | None, y: np.ndarray, gy: np.ndarray | None) -> bool:
@@ -89,9 +100,9 @@ def pair_nucleotides(runs: list[list]) -> list[BasePair]:
     """Watson-Crick and G·U wobble pairs among the gemmi residues of each strand (runs[strand][nucleotide]).
 
     A pair needs its hydrogen bonds (two of the three for G-C), the C1'-C1' span of a paired duplex, roughly
-    coplanar bases in the cis orientation of a double helix and, on one strand, more than MIN_LOOP nucleotides
-    between the partners. Each nucleotide
-    keeps its best pair (more bonds, then shorter ones); only mutual best pairs are kept."""
+    coplanar bases in the cis orientation of a double helix and, on one strand, partners more than MIN_LOOP apart
+    (at least MIN_LOOP unpaired nucleotides between them). Each nucleotide keeps its best pair (more bonds, then
+    shorter ones); only mutual best pairs are kept."""
     bases = []  # (strand, index, parent, residue, C1' position)
     for s, run in enumerate(runs):
         for i, r in enumerate(run):
@@ -115,8 +126,11 @@ def pair_nucleotides(runs: list[list]) -> list[BasePair]:
         if rule is None:
             continue
         bonds, need, kind = rule
+        glycosidic = _base_atom(pyr[3])
+        turned = glycosidic is not None and glycosidic.name == "C5"  # pseudouridine
         found = []
         for p_atom, q_atom in bonds:
+            q_atom = _PSEUDO.get(q_atom, q_atom) if turned else q_atom
             p, q = pur[3].find_atom(p_atom, "*"), pyr[3].find_atom(q_atom, "*")
             if p is not None and q is not None and p.pos.dist(q.pos) <= HBOND_MAX:
                 found.append(p.pos.dist(q.pos))

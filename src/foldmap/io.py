@@ -163,16 +163,31 @@ _NA_LINK_MAX = 2.0  # Å, O3'(i-1)-P(i)
 _CONTACT = 4.0  # Å, heavy atoms of a protein residue and a nucleotide
 
 
-def _is_nucleotide(res) -> bool:
-    """A nucleotide: tabulated as one (modified ones included), or, for a code gemmi does not know (5MC, YG),
-    a sugar with its C1', C4' and O4' plus a phosphate or O3' link."""
+def _linked(a, b) -> bool:
+    """The O3' of nucleotide a is bonded to the P of b."""
+    o3, p = a.find_atom("O3'", "*"), b.find_atom("P", "*")
+    return o3 is not None and p is not None and o3.pos.dist(p.pos) <= _NA_LINK_MAX
+
+
+def _is_nucleotide(chain, k: int) -> bool:
+    """chain[k] is a nucleotide: tabulated as one (modified ones included), or, for a code gemmi does not know
+    (5MC, YYG), a sugar with its C1', C4' and O4' plus a phosphate or O3' that is part of a polymer entity or,
+    where the file sets no entity types, O3'-P linked to a neighbouring nucleotide. So a nucleotide ligand (ATP,
+    GTP, SAM) is never a strand."""
+    res = chain[k]
     if res.find_atom("C1'", "*") is None:
         return False
     info = gemmi.find_tabulated_residue(res.name)
     if info is not None and info.is_nucleic_acid():
         return True
     names = {a.name for a in res}
-    return {"C4'", "O4'"} <= names and ("P" in names or "O3'" in names)
+    if not ({"C4'", "O4'"} <= names and ("P" in names or "O3'" in names)):
+        return False
+    if res.entity_type != gemmi.EntityType.Unknown:
+        return res.entity_type == gemmi.EntityType.Polymer
+    before = k > 0 and chain[k - 1].find_atom("C1'", "*") is not None and _linked(chain[k - 1], res)
+    after = k + 1 < len(chain) and chain[k + 1].find_atom("C1'", "*") is not None and _linked(res, chain[k + 1])
+    return before or after
 
 
 def _nucleic_strands(model):
@@ -180,14 +195,12 @@ def _nucleic_strands(model):
     out = []
     for chain in model:
         run: list = []
-        for res in chain:
-            if not _is_nucleotide(res):
+        for k, res in enumerate(chain):
+            if not _is_nucleotide(chain, k):
                 continue
-            if run:
-                o3, p = run[-1].find_atom("O3'", "*"), res.find_atom("P", "*")
-                if o3 is None or p is None or o3.pos.dist(p.pos) > _NA_LINK_MAX:
-                    out.append((chain.name, run))
-                    run = []
+            if run and not _linked(run[-1], res):
+                out.append((chain.name, run))
+                run = []
             run.append(res)
         if run:
             out.append((chain.name, run))

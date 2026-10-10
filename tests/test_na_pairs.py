@@ -3,8 +3,11 @@
 import json
 from pathlib import Path
 
+import gemmi
+import numpy as np
 import pytest
 
+from foldmap import nucleic
 from foldmap.io import _nucleic_strands, load_backbone, load_nucleic, read_model
 from foldmap.nucleic import BasePair, pair_nucleotides, parent_base
 
@@ -59,6 +62,7 @@ def test_trna_wobble_and_modified_nucleotides_pair():
     found = _found("1EHZ")
     strands = [s for s, _ in found]
     assert len(strands) == 1 and len(strands[0]) == 76  # 5MC and YG, unknown to gemmi, keep the strand whole
+    assert {"5MC", "YYG"} <= {lab.name for lab in strands[0].labels}
     pairs = _named(strands, pair_nucleotides([run for _, run in found]))
     key = lambda a, b: frozenset((("A", a, ""), ("A", b, "")))  # noqa: E731
     assert pairs[key(4, 69)] == "GU"
@@ -73,6 +77,60 @@ def test_pair_closing_a_two_nucleotide_loop_is_rejected():
     pairs = _named(strands, pair_nucleotides([run for _, run in found]))
     assert frozenset((("1", 82, ""), ("1", 85, ""))) not in pairs
     assert frozenset((("1", 81, ""), ("1", 86, ""))) in pairs
+
+
+def test_pseudouridine_pairs_with_its_turned_face():
+    # Ψ hangs from C5, so its Watson-Crick carbonyl is O2: A2590 N6-Ψ2604 O2 3.0 Å (23S rRNA, 4YBB)
+    found = _found("4YBB-psi")
+    strands = [s for s, _ in found]
+    pairs = _named(strands, pair_nucleotides([run for _, run in found]))
+    assert strands[0].labels[2604 - 2586].name == "PSU"
+    assert pairs[frozenset((("DA", 2590, ""), ("DA", 2604, "")))] == "WC"
+
+
+def test_an_untabulated_purine_pairs_as_its_parent_base():
+    found = _found("4YBB")
+    (run,) = [run for _, run in found]
+    g7m = next(r for r in run if r.seqid.num == 527)
+    info = gemmi.find_tabulated_residue(g7m.name)
+    assert g7m.name == "G7M" and not (info and info.is_nucleic_acid())  # gemmi does not know it as a nucleotide
+    assert parent_base(g7m) == "G"  # from its atoms: N9 and O6
+    pairs = _named([s for s, _ in found], pair_nucleotides([run]))
+    assert pairs[frozenset((("AA", 522, ""), ("AA", 527, "")))] == "WC"
+
+
+def _tRNA_pairs():
+    found = _found("1EHZ")
+    run = found[0][1]
+    return run, {(run[p.i].seqid.num, run[p.j].seqid.num) for p in pair_nucleotides([run])}
+
+
+def test_a_trans_pair_is_not_a_helix_pair(monkeypatch):
+    # The Levitt pair G15·C48 bonds like G-C but with its glycosidic bonds on opposite sides
+    assert (15, 48) not in _tRNA_pairs()[1]
+    monkeypatch.setattr(nucleic, "_cis", lambda *a: True)
+    assert (15, 48) in _tRNA_pairs()[1]
+
+
+def _tilt(res, degrees):
+    """Turn the base of res (and its C1') about the N3-N4 line: the N1-N3 and O6-N4 bonds of a G-C pair hold."""
+    p, q = (np.array(res.find_atom(n, "*").pos.tolist()) for n in ("N3", "N4"))
+    k = (q - p) / np.linalg.norm(q - p)
+    t = np.radians(degrees)
+    K = np.array([[0, -k[2], k[1]], [k[2], 0, -k[0]], [-k[1], k[0], 0]])
+    R = np.eye(3) + np.sin(t) * K + (1 - np.cos(t)) * K @ K
+    for a in res:
+        if ("'" not in a.name and "P" not in a.name) or a.name == "C1'":
+            a.pos = gemmi.Position(*(R @ (np.array(a.pos.tolist()) - p) + p))
+
+
+@pytest.mark.parametrize("degrees, plane_max, paired", [(0, 45.0, True), (60, 45.0, False), (60, 70.0, True)])
+def test_bases_far_from_coplanar_do_not_pair(monkeypatch, degrees, plane_max, paired):
+    run = _found("1EHZ")[0][1]
+    c72 = next(r for r in run if r.seqid.num == 72)
+    _tilt(c72, degrees)
+    monkeypatch.setattr(nucleic, "PLANE_MAX", plane_max)
+    assert ((1, 72) in {(run[p.i].seqid.num, run[p.j].seqid.num) for p in pair_nucleotides([run])}) is paired
 
 
 def test_parent_bases_of_modified_nucleotides():
