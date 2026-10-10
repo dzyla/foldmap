@@ -187,3 +187,18 @@ def test_consurf_grades_skip_chains_with_a_different_sequence(tmp_path):
     lay, _, bb = make_layout(mutated, msa=DATA / "consurf" / "1TIM_A_grades.txt")
     by = {(l.chain, l.seq): g for l, g in zip(bb.labels, lay.res_grade)}
     assert by[("A", 4)] == 9 and by[("B", 4)] == 0
+
+
+def test_legend_does_not_widen_the_figure_beyond_the_protein():
+    wide = make_figure(UBQ, look=THEMES["conservation"], msa=FAMILY)
+    plain = make_figure(UBQ, look=THEMES["publication"])
+    assert wide.get_size_inches()[0] <= plain.get_size_inches()[0] * 1.1
+
+
+def test_long_legend_is_never_clipped():
+    fig = make_figure(UBQ, look=THEMES["conservation"], msa=FAMILY)
+    fig.canvas.draw()
+    legend = [t for t in fig.axes[0].texts if "conservation" in t.get_text()]
+    assert legend
+    for t in legend:
+        assert t.get_window_extent().x1 <= fig.bbox.x1

@@ -15,6 +15,7 @@ from matplotlib.colors import to_hex
 from matplotlib.figure import Figure
 from matplotlib.patches import Circle, FancyBboxPatch, PathPatch, Polygon, Rectangle
 from matplotlib.path import Path
+from matplotlib.textpath import TextPath
 from matplotlib.transforms import Affine2D
 
 from .layout import (
@@ -62,7 +63,6 @@ MARK_DEFAULT = "#d1495b"  # a marked element without its own colour
 MATE_GREY = "#c4c9cf"  # symmetry mates (or other chains) when one part is highlighted
 _MATE_LINE = "#aab0b7"
 _LEGEND_ROW = 1.0
-_LEGEND_FONT_U = 0.45  # legend text height in page units at the smallest font, used to size entries
 STYLES = CHOICES["fill"]
 LOOP_STYLES = CHOICES["loops"]
 
@@ -1201,8 +1201,9 @@ def _draw(
         ids = sorted({layout.nucleic.strands[k].chain for d in layout.dna for k in d.strands})
         kind = "RNA" if all(layout.nucleic.strands[k].rna for d in layout.dna for k in d.strands) else "DNA"
         entries.append((_dna_colours(style)[0], f"{kind} ({', '.join(ids)})"))
-    longest = max(len(text) for _, text in entries)
-    entry = 0.85 + 0.62 * _LEGEND_FONT_U * longest + 0.9  # swatch, text, gap (page units)
+    font_u = 0.55 * SHAFT * look.font_scale  # legend text height in page units
+    text_u = max(TextPath((0, 0), text, size=font_u).get_extents().width for _, text in entries)
+    entry = 0.85 + text_u + 0.9  # swatch, text, gap (page units)
     x1 = max(x1, x0 + entry - 0.9)  # never narrower than one legend entry
     per_row = max(1, int((x1 - x0 + 0.9) // entry))
     if not look.legend:
