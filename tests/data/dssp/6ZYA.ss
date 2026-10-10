@@ -1,0 +1,1 @@
+A 328 ----EEEE---EEEEEE-GGGGTGGG----EEE---TT-B-EEE-----EEEEEEE----TT--EEEE---EEEEEEEEEEE---------EEEEEEEEEE-----------------------------EEEEEE--TT-------------TT-EEEEEEEE----TTTEEEEEEEEEEE----TT----EEEE----B-TT-TTEEEEE-----EEEEEEE-----------EEEEEEEEEETTT---------

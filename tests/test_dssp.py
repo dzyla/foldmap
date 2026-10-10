@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import gemmi
 
 from foldmap.dssp import _resolve, assign_dssp
@@ -61,3 +63,16 @@ def test_turns_marked_like_dssp(ubq):
     ss = assign_dssp(load_backbone(ubq)).ss
     assert "T" in ss
     assert ss.replace("T", "-").count("H") == ss.count("H")  # turns never displace other codes
+
+
+DATA = Path(__file__).parent / "data"
+
+
+def test_insertion_codes_do_not_change_the_assignment(tmp_path):
+    st = gemmi.read_structure(str(DATA / "1UBQ.cif"))
+    for k, res in enumerate(list(st[0][0])[:17]):  # residues 1-17 become 1A, 1B, ... 1Q (antibody-style)
+        res.seqid = gemmi.SeqId(1, chr(ord("A") + k))
+    path = tmp_path / "icodes.cif"
+    st.make_mmcif_document().write_file(str(path))
+    plain = assign_dssp(load_backbone(DATA / "1UBQ.cif", "asu")).ss
+    assert assign_dssp(load_backbone(path, "asu")).ss == plain
