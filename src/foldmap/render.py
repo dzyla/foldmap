@@ -1130,7 +1130,7 @@ def _draw(
     chains = _chains_in_order(sses)
     colors = chain_colors(chains, palette)
     element_colour, residue_colour = element_colours(layout, sses, look)
-    if not layout.placed:
+    if not layout.placed and not layout.dna:
         fig = Figure(figsize=(4.0, 1.5))
         ax = fig.add_axes([0, 0, 1, 1])
         ax.axis("off")
@@ -1195,7 +1195,8 @@ def _draw(
     lw = float(np.clip(0.9 * scale / _IN_PER_UNIT, 0.5, 1.2))
     loop_lw = lw * look.loop_width
 
-    boxes = np.array([p.rect for p in [*layout.placed.values(), *layout.ghosts]]) + [1e-6, 1e-6, -1e-6, -1e-6]
+    boxes = np.array([p.rect for p in [*layout.placed.values(), *layout.ghosts]]).reshape(-1, 4)  # none: DNA only
+    boxes = boxes + [1e-6, 1e-6, -1e-6, -1e-6]
     sse_by_id = {s.id: s for s in sses}
     for i, loop in enumerate(loops):
         if loop.fallback:  # already a smooth curve

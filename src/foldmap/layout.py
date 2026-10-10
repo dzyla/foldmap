@@ -823,14 +823,14 @@ def build_layout(
     items += [
         _helix_item(s, frame, angle_mode, HELIX_W * ETA_W * style.helix_scale, TEN_RISE) for s in sses if s.kind == "G"
     ]
-    if not items:
-        return Layout({}, (0.0, 0.0, 0.0, 0.0))
-    contacts = dict(contacts or {})
     if nucleic is not None and nucleic.strands:
         groups = _duplexes(nucleic)
         items += [
             _dna_item(k, g, nucleic, frame, mode == "stack", DNA_W * style.dna_scale) for k, g in enumerate(groups)
         ]
+    if not items:
+        return Layout({}, (0.0, 0.0, 0.0, 0.0))
+    contacts = dict(contacts or {})
     if nucleic is not None and nucleic.strands:
         for key, n in _dna_contacts(sses, nucleic, groups).items():
             contacts[key] = contacts.get(key, 0) + n
