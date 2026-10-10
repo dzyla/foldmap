@@ -202,8 +202,6 @@ def settings_from_document(doc: dict) -> dict:
     ):
         if lay.get(key) is not None:
             out[key] = lay[key]
-        if lay.get(key) is not None:
-            out[key] = lay[key]
     out["uniprot"] = lay.get("uniprot") or "off"
     chains = lay.get("chains")
     out["chains"] = ",".join(chains) if isinstance(chains, list) else (chains or "")
@@ -302,8 +300,9 @@ def main() -> None:
             ss["load_error"] = str(err)
             return
         ss["path"], ss["stage"], ss["load_error"] = str(path), "style", ""
-        for key in HIDDEN_LAYOUT:  # carried over from a layout file; the last structure's are not this one's
+        for key in HIDDEN_LAYOUT:  # the last structure's are not this one's
             ss[key] = LAYOUT_DEFAULTS[key]
+        ss["msa_missing"] = ""
 
     def pick(theme: str) -> None:
         apply_theme(theme)

@@ -276,4 +276,19 @@ def test_app_layout_file_options_without_a_control_do_not_carry_to_the_next_stru
     at.button(key="pick_publication").click().run()
     assert not at.exception and not at.error
     assert at.session_state["flip_v"] is False and at.session_state["protomers"] is None
-    assert "<svg" in _svg(at)
+    assert not at.warning and "<svg" in _svg(at)
+
+
+def test_app_edits_of_one_structure_do_not_carry_to_the_next():
+    at = _load(_app(), DATA / "2HHB.cif")
+    at.button(key="pick_publication").click().run()
+    at.text_input(key="rename").set_value("res:B:1-10=Zz")
+    at.text_input(key="chains").set_value("B,D").run()
+    assert not at.exception and not at.error
+    at.button(key="back_edit").click().run()
+    at.text_input(key="source").input(str(DATA / "1UBQ.cif"))
+    at.button(key="load").click().run()
+    at.button(key="pick_publication").click().run()
+    assert not at.exception and not at.error
+    ss = at.session_state
+    assert ss["rename"] == "" and ss["chains"] == "" and ss["domains"] == "" and "<svg" in _svg(at)
