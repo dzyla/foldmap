@@ -1,5 +1,5 @@
-from foldmap.features import MIN_CONTACT_PAIRS, sse_contacts
-from helpers import pipeline
+from foldmap.features import MIN_CONTACT_PAIRS, helix_bundles, sse_contacts
+from helpers import fake_sse, pipeline
 
 
 def test_paired_strands_touch_and_distant_elements_do_not(ubq):
@@ -46,3 +46,11 @@ def test_lambda_repressor_dimerisation_helices_are_a_bundle(ubq):
 def test_no_bundles_without_a_long_parallel_interface(ubq):
     for name in ("1UBQ", "2HHB", "1TIM", "6ZS5", "2LZM"):
         assert _bundles(ubq.parent / f"{name}.cif") == [], name
+
+
+def test_a_short_kinked_piece_stays_with_its_helix_in_a_bundle():
+    # chain A: a 16-residue helix, then after one residue a 4-residue piece whose fitted axis is meaningless
+    a1 = fake_sse("H", 10, 25, centroid=(0, 0, 0), axis=(0, 0, 1), chain="A")
+    a2 = fake_sse("H", 27, 30, centroid=(0, 0, 14), axis=(1, 0, 0), chain="A")
+    b = fake_sse("H", 10, 35, centroid=(10, 0, 6), axis=(0, 0, 1), chain="B")  # packed alongside, 10 Å away
+    assert helix_bundles([a1, a2, b]) == [["A:10-25", "A:27-30", "B:10-35"]]

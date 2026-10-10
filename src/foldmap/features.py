@@ -33,14 +33,24 @@ def sse_contacts(bb: Backbone, sses: list[SSE], cutoff: float = CONTACT_CUTOFF) 
 BUNDLE_MIN = 10  # residues: shorter helices are turns at an interface, not a coiled-coil stalk
 BUNDLE_COS = 0.75  # |cos| between axes: parallel or antiparallel
 BUNDLE_DIST = 12.0  # Å between axis segments
-BUNDLE_COVER = 0.8  # fraction of the shorter helix that must run that close
+BUNDLE_COVER = 0.75  # fraction of the shorter helix that must run that close
 KINK_GAP = 2  # residues: helix pieces this close in one chain, roughly collinear, count as one helix
 KINK_COS = 0.5  # a kink bends the axis by up to 60 degrees
+KINK_SHORT = 7  # residues: a piece this short has no reliable axis of its own, so it continues its neighbour
 
 
 def _segment(s: SSE, n: int = 20) -> np.ndarray:
     half = (len(s) - 1) * 0.75  # 1.5 Å rise per residue
     return np.linspace(s.centroid - s.axis * half, s.centroid + s.axis * half, n)
+
+
+def _shape(pieces: list[SSE]) -> tuple[np.ndarray, int, np.ndarray]:
+    """Points along a helix (one piece, or the kinked pieces of one), its length and its axis (longest piece).
+    Kinked pieces get a point per residue, so each weighs by its length."""
+    if len(pieces) == 1:
+        return _segment(pieces[0]), len(pieces[0]), pieces[0].axis
+    pts = np.vstack([_segment(s, max(2, len(s))) for s in pieces])
+    return pts, sum(len(s) for s in pieces), max(pieces, key=len).axis
 
 
 def helix_bundles(sses: list[SSE]) -> list[list[str]]:
@@ -57,24 +67,25 @@ def helix_bundles(sses: list[SSE]) -> list[list[str]]:
     def join(a: str, b: str) -> None:
         group[root(a)] = root(b)
 
-    pieces = {}
+    kinked: dict[str, list[SSE]] = {}
     for a, b in zip(helices, helices[1:]):  # kinks
-        if a.chain == b.chain and b.start - a.end - 1 <= KINK_GAP and float(a.axis @ b.axis) > KINK_COS:
-            pieces.setdefault(a.id, a)
-            pieces.setdefault(b.id, b)
-            join(a.id, b.id)
-    linked = set()
-    long_ = [s for s in helices if len(s) >= BUNDLE_MIN]
-    for i, a in enumerate(long_):
-        pa = _segment(a)
-        for b in long_[i + 1 :]:
-            if a.chain == b.chain or abs(float(a.axis @ b.axis)) < BUNDLE_COS:
-                continue
-            d = np.linalg.norm(pa[:, None] - _segment(b)[None], axis=2)
-            near = d.min(1) if len(a) <= len(b) else d.min(0)
-            if (near < BUNDLE_DIST).mean() >= BUNDLE_COVER:
+        if a.chain == b.chain and b.start - a.end - 1 <= KINK_GAP:
+            if min(len(a), len(b)) < KINK_SHORT or float(a.axis @ b.axis) > KINK_COS:
                 join(a.id, b.id)
-                linked |= {a.id, b.id}
+    for s in helices:
+        kinked.setdefault(root(s.id), []).append(s)
+    shapes = [[s] for s in helices] + [p for p in kinked.values() if len(p) > 1]  # pieces, and whole kinked helices
+    long_ = [(p, *_shape(p)) for p in shapes if sum(len(s) for s in p) >= BUNDLE_MIN]
+    linked = set()
+    for i, (a, pa, la, xa) in enumerate(long_):
+        for b, pb, lb, xb in long_[i + 1 :]:
+            if a[0].chain == b[0].chain or abs(float(xa @ xb)) < BUNDLE_COS:
+                continue
+            d = np.linalg.norm(pa[:, None] - pb[None], axis=2)
+            near = d.min(1) if la <= lb else d.min(0)
+            if (near < BUNDLE_DIST).mean() >= BUNDLE_COVER:
+                join(a[0].id, b[0].id)
+                linked |= {a[0].id, b[0].id}
     out: dict[str, list[str]] = {}
     for s in helices:
         out.setdefault(root(s.id), []).append(s.id)
