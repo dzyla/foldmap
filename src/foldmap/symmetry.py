@@ -31,6 +31,7 @@ MIN_RES = 10  # chains shorter than this are left out
 MIN_TURN = np.radians(10)  # smaller rotations are lattice-like translations, not symmetry
 MIN_RISE = 2.0  # Å along the axis per copy for a helical filament
 MIN_TWIST = np.radians(3.0)  # a helical filament turns at least this much per copy (less: a translation)
+_PSEUDO_21 = 170.0  # degrees: a helix turning more than this per copy is a pseudo-2₁ screw, its hand not named
 MAX_ORDER = 24
 _NEAREST = 3  # copies tried as the image of each subunit: those whose centroids land closest
 
@@ -58,6 +59,12 @@ class Symmetry:
     def left_handed(self) -> bool:
         """Helical: the copies turn clockwise looking along the rise (twist and rise of opposite sign)."""
         return self.kind == "H" and self.twist * self.rise < 0
+
+    @property
+    def hand(self) -> str:
+        """' (left-handed)' for a left-handed helix, as figure and summary name it; nothing for a pseudo-2₁
+        screw (|twist| > 170°), whose visible hand is the two-step screw's, opposite to the one-step twist."""
+        return " (left-handed)" if self.left_handed and abs(self.twist) <= np.radians(_PSEUDO_21) else ""
 
 
 # ---------------------------------------------------------------------------------------------- subunits

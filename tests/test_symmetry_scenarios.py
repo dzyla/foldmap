@@ -316,6 +316,21 @@ def test_left_handed_filament_says_so_on_the_figure(tmp_path, capsys):
     assert "115.0° twist," in right and "left-handed" not in right
 
 
+@pytest.mark.parametrize("sign", [1, -1])
+def test_pseudo_two_fold_screw_names_no_hand(tmp_path, capsys, sign):
+    """Near 180° per copy (cross-β fibrils, pseudo-2₁) the hand one sees is the two-step screw's, opposite to the
+    one-step twist: only the signed twist is reported."""
+    from foldmap.cli import main, make_figure
+
+    ops = [(rot((0, 0, 1), sign * 178 * k), np.array([0, 0, 30.0 * k])) for k in range(6)]
+    path = build(tmp_path, ops, offset=(25.0, 0.0, 0.0))
+    texts = " ".join(t.get_text() for t in make_figure(path).axes[0].texts)
+    assert ("−178.0° twist," if sign < 0 else "178.0° twist,") in texts and "handed" not in texts
+    assert main(["summary", str(path)]) == 0
+    out = capsys.readouterr().out
+    assert f"twist {'-' if sign < 0 else ''}178.0°, rise 30.0 Å" in out and "handed" not in out
+
+
 def icosahedral(tmp_path):
     """60 ubiquitin copies under the icosahedral rotation group, off-axis."""
     from scipy.spatial.transform import Rotation

@@ -55,7 +55,7 @@ def summarize(path: str) -> str:
     if sym is not None:
         extra = (
             f"; twist {np.degrees(abs(sym.twist)) * (-1 if sym.left_handed else 1):.1f}°, rise {abs(sym.rise):.1f} Å"
-            + (" (left-handed)" if sym.left_handed else "")
+            + sym.hand
             if sym.kind == "H"
             else ""
         )
@@ -434,8 +434,7 @@ def _context(sym, focus: set, bb, neighbours: bool = True) -> str:
     if sym.kind == "H":
         step = "subunit" if copies <= 1 else f"repeat of {int(round(copies * len(focus)))} chains"
         twist = f"{np.degrees(abs(sym.twist)) * (-1 if sym.left_handed else 1):.1f}".replace("-", "−")
-        hand = " (left-handed)" if sym.left_handed else ""
-        kind = f"helical, {twist}° twist{hand}, {abs(sym.rise):.1f} Å rise per {step}"
+        kind = f"helical, {twist}° twist{sym.hand}, {abs(sym.rise):.1f} Å rise per {step}"
     else:
         kind = f"{sym.label} symmetry"
     return f"1 of {n} subunits shown · {kind}" + grey
