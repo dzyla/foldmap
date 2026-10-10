@@ -4,6 +4,7 @@ import json
 import os
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 import numpy as np
@@ -216,3 +217,59 @@ def test_small_layouts_keep_the_dense_energy(monkeypatch):
     monkeypatch.setattr(L, "_PAIR_ENERGY_ABOVE", 5)
     make_layout(DATA / "1BL8.cif")
     assert set(called) == {"pair"}
+
+
+def test_push_apart_clears_a_crowd_without_the_fallback_slide(monkeypatch):
+    left = []
+    real = L._slide_clear
+
+    def spy(items):
+        h = [it.half for it in items]
+        m = [it.mid for it in items]
+        left.append(
+            sum(L._collide(items[i], h[i], m[i], items[j], h[j], m[j]) for i in range(len(items)) for j in range(i))
+        )
+        real(items)
+
+    monkeypatch.setattr(L, "_slide_clear", spy)
+    sses, f = _pile(60)
+    build_layout(sses, [], f, "projected", attract=False)
+    assert left == [0]
+
+
+def test_fallback_slide_takes_the_nearest_clear_side(monkeypatch):
+    monkeypatch.setattr(L, "_SEP_SWEEPS", 0)  # straight to the slide
+    f = Frame(np.zeros(3), np.array([1.0, 0, 0]), np.array([0, 1.0, 0]), np.array([0, 0, 1.0]))
+    a = fake_sse("H", 1, 9, centroid=(0, 0, 0), axis=(0, 1, 0))
+    b = fake_sse("H", 20, 28, centroid=(-2.0, 0, 0), axis=(0, 1, 0))  # just left of a, overlapping
+    lay = build_layout([a, b], [], f, "projected", attract=False)
+    pa, pb = lay.placed[a.id], lay.placed[b.id]
+    assert pb.cx < pa.cx  # pushed out to the left, the short way, not all the way across to the right
+    assert pb.rect[2] <= pa.rect[0] + 1e-9 or pb.rect[3] <= pa.rect[1] + 1e-9 or pb.rect[1] >= pa.rect[3] - 1e-9
+
+
+def test_one_element_layout_is_left_where_it_projects():
+    f = Frame(np.zeros(3), np.array([1.0, 0, 0]), np.array([0, 1.0, 0]), np.array([0, 0, 1.0]))
+    s = fake_sse("H", 1, 12, centroid=(4.0, -2.0, 0), axis=(0, 1, 0))
+    lay = build_layout([s], [], f, "projected", domains=[("only", [s.id])])
+    p = lay.placed[s.id]
+    assert (p.cx, p.cy) == pytest.approx((4.0 * L.SCALE, -2.0 * L.SCALE))
+
+
+@pytest.mark.slow
+def test_a_32_chain_complex_lays_out_in_reasonable_time(tmp_path):
+    sys.path.insert(0, str(ROOT / "scripts"))
+    try:
+        from bench import big_complex
+    finally:
+        sys.path.pop(0)
+    from foldmap.cli import make_layout
+
+    path = big_complex(tmp_path / "big32.cif")
+    t = time.perf_counter()
+    lay, _, _ = make_layout(path)
+    assert time.perf_counter() - t < 60  # ~7-11 s here; 96-163 s before the push-apart and energy rewrites
+    rects = [p.rect for p in lay.placed.values()]
+    for i, a in enumerate(rects):
+        for b in rects[i + 1 :]:
+            assert min(a[2], b[2]) - max(a[0], b[0]) <= 1e-6 or min(a[3], b[3]) - max(a[1], b[1]) <= 1e-6

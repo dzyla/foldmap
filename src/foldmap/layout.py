@@ -45,6 +45,8 @@ _K_HOME = 0.02  # pull back toward the projected position, keeps the fold recogn
 _STEP = 0.15
 _SWEEPS = 400
 _SEP_SWEEPS = 5000  # push-apart passes before the guaranteed slide
+_SEP_PUSH = 0.005  # each push clears an overlap by this much more, so touching boxes cannot trade it back and forth
+_SLIDE_STEP = 0.5  # the guaranteed slide moves an item by this much at a time
 _LAMBDAS = (0.3, 3.0, 30.0, 300.0)  # overlap penalty, stage by stage
 _MAX_MOVE = 0.5  # largest step an item takes in one sweep
 
@@ -321,40 +323,60 @@ def _bundle_item(group: list[SSE], frame: Frame, angle_mode: str, width: float) 
     )
 
 
+def _overlapping(xy: np.ndarray, halves: np.ndarray, mids: np.ndarray) -> np.ndarray:
+    """(i, j) with i < j, in row order, for every pair of footprints (plus MARGIN) that overlap."""
+    q = xy + mids
+    depth = halves[:, None, :] + halves[None, :, :] + MARGIN - np.abs(q[None, :, :] - q[:, None, :])
+    return np.argwhere(np.triu((depth[..., 0] > 1e-9) & (depth[..., 1] > 1e-9), 1))
+
+
 def _separate(items: list[_Item]) -> None:
-    """Push overlapping items apart (axis of least penetration); spring back to home early on."""
+    """Push overlapping items apart (axis of least penetration); spring back to home early on. Each sweep
+    finds the overlapping pairs at once and resolves them in order; then any left over slide clear."""
+    halves = np.array([it.half for it in items], float).reshape(-1, 2)
+    mids = np.array([it.mid for it in items], float).reshape(-1, 2)
+    xy = np.array([(it.cx, it.cy) for it in items], float).reshape(-1, 2)
+    home = np.array([it.home for it in items], float).reshape(-1, 2)
+    for sweep in range(_SEP_SWEEPS):
+        pairs = _overlapping(xy, halves, mids)
+        if not len(pairs) and sweep >= 100:
+            break
+        for i, j in pairs.tolist():
+            dx = xy[j, 0] + mids[j, 0] - xy[i, 0] - mids[i, 0]
+            dy = xy[j, 1] + mids[j, 1] - xy[i, 1] - mids[i, 1]
+            px = halves[i, 0] + halves[j, 0] + MARGIN - abs(dx)
+            py = halves[i, 1] + halves[j, 1] + MARGIN - abs(dy)
+            if px <= 1e-9 or py <= 1e-9:  # an earlier push this sweep already cleared it
+                continue
+            if px < py:
+                s = (1 if dx > 0 else -1) if dx != 0 else 1
+                xy[i, 0] -= s * (px / 2 + _SEP_PUSH)
+                xy[j, 0] += s * (px / 2 + _SEP_PUSH)
+            else:
+                s = (1 if dy > 0 else -1) if dy != 0 else 1
+                xy[i, 1] -= s * (py / 2 + _SEP_PUSH)
+                xy[j, 1] += s * (py / 2 + _SEP_PUSH)
+        if sweep < 100:
+            xy += 0.03 * (home - xy)
+    for it, (x, y) in zip(items, xy.tolist()):
+        it.cx, it.cy = x, y
+    _slide_clear(items)
+
+
+def _slide_clear(items: list[_Item]) -> None:
+    """Guarantee: each item in turn, if it still overlaps one already settled, takes the nearest clear spot
+    straight right, left, up or down (in that order on a tie), in _SLIDE_STEP steps."""
     halves = [it.half for it in items]
     mids = [it.mid for it in items]
-    for sweep in range(_SEP_SWEEPS):
-        moved = False
-        for i in range(len(items)):
-            for j in range(i + 1, len(items)):
-                a, b = items[i], items[j]
-                dx, dy = b.cx + mids[j][0] - a.cx - mids[i][0], b.cy + mids[j][1] - a.cy - mids[i][1]
-                px = halves[i][0] + halves[j][0] + MARGIN - abs(dx)
-                py = halves[i][1] + halves[j][1] + MARGIN - abs(dy)
-                if px > 1e-9 and py > 1e-9:
-                    moved = True
-                    if px < py:
-                        s = (1 if dx > 0 else -1) if dx != 0 else 1
-                        a.cx -= s * px / 2
-                        b.cx += s * px / 2
-                    else:
-                        s = (1 if dy > 0 else -1) if dy != 0 else 1
-                        a.cy -= s * py / 2
-                        b.cy += s * py / 2
-        if sweep < 100:
-            for it in items:
-                it.cx += 0.03 * (it.home[0] - it.cx)
-                it.cy += 0.03 * (it.home[1] - it.cy)
-        if not moved and sweep >= 100:
-            return
-    # guarantee: slide remaining collisions to the right, one item at a time
-    placed: list[int] = []
-    for i in range(len(items)):
-        while any(_collide(items[i], halves[i], mids[i], items[j], halves[j], mids[j]) for j in placed):
-            items[i].cx += 0.5
-        placed.append(i)
+    for i, it in enumerate(items):
+        x0, y0 = it.cx, it.cy
+        k = 0
+        while any(_collide(it, halves[i], mids[i], items[j], halves[j], mids[j]) for j in range(i)):
+            k += 1
+            for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                it.cx, it.cy = x0 + k * dx * _SLIDE_STEP, y0 + k * dy * _SLIDE_STEP
+                if not any(_collide(it, halves[i], mids[i], items[j], halves[j], mids[j]) for j in range(i)):
+                    break
 
 
 def _owner(items: list[_Item]) -> dict[str, tuple[int, Placed, tuple[float, float]]]:
