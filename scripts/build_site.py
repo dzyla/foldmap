@@ -43,7 +43,7 @@ THEME_NOTES = {
     "hydropathy": "Kyte–Doolittle hydropathy: hydrophilic to hydrophobic.",
     "goodsell": "Pale, illustrative colours in the spirit of David Goodsell.",
     "alphafold": "AlphaFold pLDDT confidence bands, loops coloured residue by residue.",
-    "conservation": "ConSurf conservation grades from a multiple sequence alignment.",
+    "conservation": "Conservation from a multiple sequence alignment (weighted entropy) in ConSurf's colour scale.",
     "blueprint": "A dark navy page with pale outlined elements.",
 }
 
@@ -134,7 +134,7 @@ MODES = [
         "conservation",
         "Conservation from an alignment",
         "Colour the structure by how conserved each position is in a multiple sequence alignment (FASTA, Clustal or "
-        "Stockholm), in ConSurf's nine grades.",
+        "Stockholm): weighted Shannon entropy, graded 1–9 relative to the protein in ConSurf's colours.",
         "1UBQ.cif",
         [
             (

@@ -7,7 +7,7 @@ import pytest
 from matplotlib.colors import to_hex
 
 from foldmap.cli import main, make_figure, make_layout
-from foldmap.render import CONSURF, element_colours
+from foldmap.render import CONSURF, element_colours, grade_colour
 from foldmap.sequence import read_alignment, residue_conservation
 from foldmap.style import THEMES, Style
 
@@ -83,3 +83,17 @@ def test_helix_labels_stay_readable_on_pale_grades():
         if (t.get_gid() or "").startswith("label:") and t.get_text()[:1] in "αη":
             r, g, b = to_rgb(t.get_color())
             assert 0.2126 * r + 0.7152 * g + 0.0722 * b <= 0.5, t.get_text()
+
+
+def test_layout_carries_grades_and_honest_legend():
+    lay, sses, _ = make_layout(UBQ, msa=FAMILY)
+    assert len(lay.res_grade) == len(lay.res_chain) and set(lay.res_grade) <= set(range(10))
+    assert lay.cons_label == "conservation (entropy-based, ConSurf colour scale)"
+    fig = make_figure(UBQ, look=THEMES["conservation"], msa=FAMILY)
+    texts = [t.get_text() for t in fig.axes[0].texts]
+    assert any("entropy-based, ConSurf colour scale" in t for t in texts)
+
+
+def test_grade_colours():
+    assert [grade_colour(g) for g in range(1, 10)] == list(CONSURF)
+    assert to_hex(grade_colour(0)) == "#d9d9d9"

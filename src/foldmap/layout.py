@@ -137,6 +137,8 @@ class Layout:
     uniprot: object = None  # uniprot.Annotation when UniProt features were requested
     membrane: dict | None = None  # {"y": (bottom, top) of the band, "inside": "below"|"above", "source": ...}
     res_cons: list[float] = field(default_factory=list)  # alignment conservation of each residue (nan: none)
+    res_grade: list[int] = field(default_factory=list)  # conservation grade 1..9 of each residue (0: none)
+    cons_label: str = ""  # legend text saying where the grades come from
 
     @property
     def width(self) -> float:

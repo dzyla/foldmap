@@ -250,20 +250,67 @@ def column_classes(aln: Alignment, threshold: float = 0.7) -> tuple[np.ndarray, 
     return strict, similar
 
 
-def conservation(aln: Alignment) -> np.ndarray:
-    """Per column, 0 (variable) .. 1 (invariant): 1 - Shannon entropy / log 20 over the residues present,
-    scaled down by the fraction of gaps."""
-    out = np.zeros(aln.width)
+def henikoff_weights(aln: Alignment) -> np.ndarray:
+    """Position-based sequence weights (Henikoff & Henikoff 1994), summing to 1: in every column each residue type
+    present shares 1/r of the weight (r: types in the column) equally among the sequences that carry it, so
+    near-duplicate sequences share the weight one of them would have alone. Gaps carry no weight."""
     n = len(aln.rows)
+    w = np.zeros(n)
     for c in range(aln.width):
-        letters = [r[c] for r in aln.rows if r[c] != GAP]
-        if not letters:
+        col = [r[c] for r in aln.rows]
+        present = [x for x in col if x != GAP]
+        if not present:
             continue
-        _, counts = np.unique(letters, return_counts=True)
-        p = counts / counts.sum()
+        types, counts = np.unique(present, return_counts=True)
+        share = dict(zip(types, 1.0 / (len(types) * counts)))
+        for s, x in enumerate(col):
+            if x != GAP:
+                w[s] += share[x]
+    return w / w.sum() if w.sum() > 0 else np.full(n, 1.0 / max(n, 1))
+
+
+def conservation(aln: Alignment, weighted: bool = True) -> np.ndarray:
+    """Per column, 0 (variable) .. 1 (invariant): 1 - Shannon entropy / log 20 of the residues present, scaled
+    down by the share of sequences that have a gap there. With `weighted`, every frequency and share uses
+    Henikoff sequence weights, so a family that is mostly near-identical copies does not look conserved."""
+    n = len(aln.rows)
+    w = henikoff_weights(aln) if weighted else np.full(n, 1.0 / max(n, 1))
+    out = np.zeros(aln.width)
+    for c in range(aln.width):
+        mass: dict[str, float] = {}
+        for s, r in enumerate(aln.rows):
+            if r[c] != GAP:
+                mass[r[c]] = mass.get(r[c], 0.0) + w[s]
+        present = sum(mass.values())
+        if present <= 0:
+            continue
+        p = np.array(list(mass.values())) / present
         h = float(-(p * np.log(p)).sum())
-        out[c] = (1.0 - h / np.log(20)) * len(letters) / n
+        out[c] = (1.0 - h / np.log(20)) * present
     return np.clip(out, 0.0, 1.0)
+
+
+GRADE_STEP = 0.5  # standard deviations per conservation grade
+
+
+def grades(scores) -> list[int]:
+    """ConSurf-style grades 1 (variable) .. 9 (conserved) relative to this protein: each score as a z-score over
+    the scored residues, in bins of GRADE_STEP standard deviations centred on the mean (grade 5: within 0.25 SD
+    of the mean; grade 9: 1.75 SD or more above it; grade 1: more than 1.75 SD below). 0: no score (nan). A
+    single outlier moves the mean and SD a little, not every bin (unlike a min-max scale). When every score is
+    the same there is nothing to grade: all 5. These are not Rate4Site's evolutionary-rate grades."""
+    v = np.asarray(list(scores), float)
+    out = np.zeros(len(v), int)
+    ok = ~np.isnan(v)
+    if not ok.any():
+        return out.tolist()
+    sd = float(v[ok].std())
+    if sd < 1e-9:
+        out[ok] = 5
+        return out.tolist()
+    z = (v[ok] - float(v[ok].mean())) / sd
+    out[ok] = np.clip(np.floor(z / GRADE_STEP + 0.5).astype(int) + 5, 1, 9)
+    return out.tolist()
 
 
 MIN_IDENTITY = 0.5  # a chain takes an alignment's scores only if it is at least this identical to the reference

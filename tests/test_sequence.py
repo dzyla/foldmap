@@ -10,6 +10,8 @@ from foldmap.sequence import (
     chain_track,
     column_classes,
     conservation,
+    grades,
+    henikoff_weights,
     map_alignment,
     read_alignment,
 )
@@ -95,3 +97,37 @@ def test_conservation_scores():
     c = conservation(aln)
     assert c[0] == pytest.approx(1.0) and np.all((c >= 0) & (c <= 1))
     assert c[0] > c[1] > c[3] and c[4] < c[0]
+
+
+def test_henikoff_weights_share_weight_among_near_duplicates():
+    w = henikoff_weights(Alignment(list("abcd"), ["MK", "MK", "MK", "MR"]))
+    assert w == pytest.approx([5 / 24, 5 / 24, 5 / 24, 3 / 8])  # the odd one out weighs more than each copy
+    assert w.sum() == pytest.approx(1.0)
+
+
+def test_redundant_copies_inflate_conservation_less_when_weighted():
+    base = conservation(Alignment(["a", "b"], ["MKA", "MRA"]))[1]
+    red = Alignment(list("abcde"), ["MKA"] * 4 + ["MRA"])
+    weighted, plain = conservation(red)[1], conservation(red, weighted=False)[1]
+    assert abs(weighted - base) < abs(plain - base)  # 0.796 vs 0.833, from 0.769 with no duplicates
+
+
+def test_grades_are_z_score_bins():
+    assert grades([0.1, 0.9]) == [3, 7]  # one SD either side of the mean
+    assert grades([float("nan"), 0.2, 0.4, 0.6]) == [0, 3, 5, 7]
+    v = list(np.linspace(0.2, 0.6, 40))
+    changed = sum(a != b for a, b in zip(grades(v), grades(v + [0.0])[:-1]))
+    assert changed <= 10  # one outlier does not regrade the whole protein (min-max scaling moved 33 of 40)
+
+
+def test_weights_and_grades_survive_degenerate_alignments():
+    """Review focus 2: one sequence, identical sequences, an all-gap row."""
+    one = Alignment(["a"], ["MKV"])
+    assert henikoff_weights(one) == pytest.approx([1.0]) and conservation(one) == pytest.approx([1, 1, 1])
+    gaps = Alignment(["a", "b", "c"], ["MKV", "MKV", "---"])
+    w = henikoff_weights(gaps)
+    assert np.all(np.isfinite(w)) and w[2] == 0.0
+    c = conservation(gaps)
+    assert np.all(np.isfinite(c)) and c[0] == pytest.approx(1.0)
+    assert grades(conservation(Alignment(["a", "b"], ["MKV", "MKV"]))) == [5, 5, 5]
+    assert grades([]) == [] and grades([float("nan")]) == [0]

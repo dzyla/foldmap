@@ -74,6 +74,9 @@ def summarize(path: str) -> str:
     return "\n".join(lines)
 
 
+CONSERVATION_LEGEND = "conservation (entropy-based, ConSurf colour scale)"
+
+
 def make_layout(
     path,
     mode: str = "projected",
@@ -220,10 +223,12 @@ def make_layout(
     if mem is not None:
         lay.membrane = _membrane_band(lay, sses, bb, mem)
     if msa:
-        from .sequence import read_alignment, residue_conservation
+        from .sequence import grades, read_alignment, residue_conservation
 
         scores = residue_conservation(bb, read_alignment(msa), msa_reference)
         lay.res_cons = [scores.get(k, float("nan")) for k in range(len(bb))]
+        lay.res_grade = grades(lay.res_cons)
+        lay.cons_label = CONSERVATION_LEGEND
     return lay, sses, bb
 
 

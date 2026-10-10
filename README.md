@@ -42,7 +42,7 @@ alt="Topology of the lambda repressor dimer bound to its operator DNA">
 <td><img src="https://raw.githubusercontent.com/dzyla/foldmap/main/docs/images/p53-alphafold.png" alt="p53 AlphaFold model coloured by pLDDT"><br>
 <sub><b>AlphaFold models.</b> p53 (AF-P04637), alphafold theme: elements, loops and tails in pLDDT confidence bands.</sub></td>
 <td><img src="https://raw.githubusercontent.com/dzyla/foldmap/main/docs/images/ubiquitin-conservation.png" alt="Ubiquitin coloured by conservation"><br>
-<sub><b>Conservation.</b> Ubiquitin (1UBQ) coloured from an alignment of the ubiquitin-like family, ConSurf grades.</sub></td>
+<sub><b>Conservation.</b> Ubiquitin (1UBQ) coloured from an alignment of the ubiquitin-like family: weighted entropy, in ConSurf's colour scale.</sub></td>
 </tr>
 <tr>
 <td><img src="https://raw.githubusercontent.com/dzyla/foldmap/main/docs/images/tim-barrel-rainbow.png" alt="TIM barrel dimer coloured N to C"><br>
@@ -168,7 +168,7 @@ Themes change only how things are drawn, never where. `foldmap styles` lists the
 | `rainbow`, `shaded`, `trace` | N→C colouring; `trace` also colours loops and adds direction arrows |
 | `flexibility`, `hydropathy` | B-factor or Kyte–Doolittle hydropathy |
 | `alphafold` | pLDDT confidence bands, loops and tails residue by residue |
-| `conservation` | ConSurf grades from `--msa` |
+| `conservation` | conservation from `--msa`: weighted Shannon entropy, graded 1–9 in ConSurf's colours (not Rate4Site) |
 | `blueprint` | dark navy page, pale outlined elements |
 | `goodsell` | pale, illustrative |
 
