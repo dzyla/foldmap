@@ -12,7 +12,7 @@ import urllib.request
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from .fetch import AGENT, CACHE
+from .fetch import AGENT, CACHE, atomic_write
 
 ENTRY_URL = "https://rest.uniprot.org/uniprotkb/{acc}.json"
 SIFTS_URL = "https://www.ebi.ac.uk/pdbe/api/mappings/uniprot/{pdb}"
@@ -109,15 +109,17 @@ class Entry:
 
 def _get(url: str, cache: Path) -> dict:
     if cache.is_file():
-        return json.loads(cache.read_text())
-    cache.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            return json.loads(cache.read_text(encoding="utf-8"))
+        except (ValueError, UnicodeDecodeError):  # cut off (written by an older foldmap): fetch it again
+            cache.unlink(missing_ok=True)
     try:
         req = urllib.request.Request(url, headers={"User-Agent": AGENT, "Accept": "application/json"})
         with urllib.request.urlopen(req, timeout=30) as r:
             data = json.loads(r.read().decode())
     except OSError as err:
         raise ValueError(f"could not reach {url.split('/')[2]} ({err})") from None
-    cache.write_text(json.dumps(data))
+    atomic_write(cache, json.dumps(data))
     return data
 
 
