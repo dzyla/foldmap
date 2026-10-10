@@ -45,6 +45,7 @@ _K_HOME = 0.02  # pull back toward the projected position, keeps the fold recogn
 _STEP = 0.15
 _SWEEPS = 400
 _SEP_SWEEPS = 5000  # push-apart passes before the guaranteed slide
+_SEP_ORBIT_SWEEPS = 1000  # push-apart passes that keep symmetry copies alike, before they may move alone
 _SEP_PUSH = 0.005  # each push clears an overlap by this much more, so touching boxes cannot trade it back and forth
 _SLIDE_STEP = 0.5  # the guaranteed slide moves an item by this much at a time
 _LAMBDAS = (0.3, 3.0, 30.0, 300.0)  # overlap penalty, stage by stage
@@ -325,17 +326,44 @@ def _overlapping(xy: np.ndarray, halves: np.ndarray, mids: np.ndarray) -> np.nda
     return np.argwhere(np.triu((depth[..., 0] > 1e-9) & (depth[..., 1] > 1e-9), 1))
 
 
-def _separate(items: list[_Item]) -> None:
-    """Push overlapping items apart (axis of least penetration); spring back to home early on. Each sweep
-    finds the overlapping pairs at once and resolves them in order; then any left over slide clear."""
+def _separate(items: list[_Item], ties: dict[int, tuple[int, int]] | None = None) -> None:
+    """Push overlapping items apart, then slide any left over clear. With `ties` (_symmetry_ties) the pushes
+    keep every protomer drawn alike (_push_apart); if that cannot clear every overlap within
+    _SEP_ORBIT_SWEEPS sweeps, the items start again from where they were and move one by one."""
     halves = np.array([it.half for it in items], float).reshape(-1, 2)
     mids = np.array([it.mid for it in items], float).reshape(-1, 2)
-    xy = np.array([(it.cx, it.cy) for it in items], float).reshape(-1, 2)
+    start = np.array([(it.cx, it.cy) for it in items], float).reshape(-1, 2)
     home = np.array([it.home for it in items], float).reshape(-1, 2)
-    for sweep in range(_SEP_SWEEPS):
+    xy = start.copy()
+    if not ties or not _push_apart(xy, halves, mids, home, ties, _SEP_ORBIT_SWEEPS):
+        xy = start.copy()
+        _push_apart(xy, halves, mids, home, {}, _SEP_SWEEPS)
+    for it, (x, y) in zip(items, xy.tolist()):
+        it.cx, it.cy = x, y
+    _slide_clear(items)
+
+
+def _push_apart(xy, halves, mids, home, ties: dict[int, tuple[int, int]], sweeps: int) -> bool:
+    """Push overlapping footprints apart in place (axis of least penetration); spring back to home early on.
+    Each sweep finds the overlapping pairs at once and resolves them in order. With `ties` a push moves an
+    item's whole orbit (it and its symmetry copies) by the same amount, and a sideways push between two
+    protomers moves protomer k by k times the amount, only ever widening the spread between protomers; two
+    copies of one element move alone. True if no overlap is left."""
+    n = len(xy)
+    root = list(range(n))  # the protomer-0 item of each item's orbit
+    copy_k = np.zeros(n)  # protomer of each copy (0 for everything else)
+    for i, (j, k) in ties.items():
+        root[i], copy_k[i] = j, k
+    orbits: dict[int, list[int]] = {}
+    for i, r in enumerate(root):
+        orbits.setdefault(r, []).append(i)
+    group = [np.array(orbits[r]) for r in root]
+    protomer = [copy_k[i] if len(orbits[root[i]]) > 1 else None for i in range(n)]  # None: item has no copies
+    widen = np.sign(sum((xy[i, 0] - xy[j, 0]) / k for i, (j, k) in ties.items())) or 1.0  # protomer k lies this way
+    for sweep in range(sweeps):
         pairs = _overlapping(xy, halves, mids)
         if not len(pairs) and sweep >= 100:
-            break
+            return True
         for i, j in pairs.tolist():
             dx = xy[j, 0] + mids[j, 0] - xy[i, 0] - mids[i, 0]
             dy = xy[j, 1] + mids[j, 1] - xy[i, 1] - mids[i, 1]
@@ -343,19 +371,23 @@ def _separate(items: list[_Item]) -> None:
             py = halves[i, 1] + halves[j, 1] + MARGIN - abs(dy)
             if px <= 1e-9 or py <= 1e-9:  # an earlier push this sweep already cleared it
                 continue
+            gi, gj = (group[i], group[j]) if root[i] != root[j] else (i, j)
             if px < py:
                 s = (1 if dx > 0 else -1) if dx != 0 else 1
-                xy[i, 0] -= s * (px / 2 + _SEP_PUSH)
-                xy[j, 0] += s * (px / 2 + _SEP_PUSH)
+                if None not in (protomer[i], protomer[j]) and protomer[i] != protomer[j]:
+                    wider = s * (px + 2 * _SEP_PUSH) / (protomer[j] - protomer[i])
+                    if wider * widen > 0:
+                        xy[:, 0] += copy_k * wider
+                        continue
+                xy[gi, 0] -= s * (px / 2 + _SEP_PUSH)
+                xy[gj, 0] += s * (px / 2 + _SEP_PUSH)
             else:
                 s = (1 if dy > 0 else -1) if dy != 0 else 1
-                xy[i, 1] -= s * (py / 2 + _SEP_PUSH)
-                xy[j, 1] += s * (py / 2 + _SEP_PUSH)
+                xy[gi, 1] -= s * (py / 2 + _SEP_PUSH)
+                xy[gj, 1] += s * (py / 2 + _SEP_PUSH)
         if sweep < 100:
             xy += 0.03 * (home - xy)
-    for it, (x, y) in zip(items, xy.tolist()):
-        it.cx, it.cy = x, y
-    _slide_clear(items)
+    return not len(_overlapping(xy, halves, mids))
 
 
 def _slide_clear(items: list[_Item]) -> None:
@@ -1071,9 +1103,9 @@ def build_layout(
         if attract and len(items) > 1:
             with _one_blas_thread():
                 _attract(items, sses, contacts, ties, spread, getattr(frame, "rise", 0.0) * SCALE, bridges or [])
-        _separate(items)
+        _separate(items, ties)
         if domains and _part_domains(items, domains):
-            _separate(items)
+            _separate(items, ties)
     for it in items:
         it.apply()
     dna = [m for it in items for m in it.members if isinstance(m, PlacedDNA)]

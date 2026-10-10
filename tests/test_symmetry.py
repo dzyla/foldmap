@@ -82,7 +82,7 @@ def test_unrolled_frame_is_a_rotation_everywhere():
         assert np.allclose(m @ m.T, np.eye(3), atol=1e-9) and np.linalg.det(m) == pytest.approx(1.0)
 
 
-@pytest.mark.parametrize("name", ["8UUP", "2HHB"])
+@pytest.mark.parametrize("name", ["8UUP", "2HHB", "1TIM"])
 def test_symmetric_layout_repeats_the_protomer(name):
     from foldmap.cli import make_layout
 
@@ -97,6 +97,106 @@ def test_symmetric_layout_repeats_the_protomer(name):
     rel = np.array(rel)  # orbit, copy, xy
     typical = np.median(rel, axis=0)
     assert (np.abs(rel - typical).max(axis=2) < 1.5).mean() > 0.8  # most elements sit at the same place in each copy
+
+
+@pytest.mark.parametrize("name", ["8UUP", "2HHB", "1TIM", "4CH9", "9TX7"])
+def test_separation_keeps_every_copy_where_its_mate_is(name, monkeypatch):
+    """Overlaps are cleared by moving each element together with its symmetry copies, so after separation
+    every copy still sits at the same offset from its protomer-0 mate as the others of its protomer."""
+    from foldmap import layout
+    from foldmap.cli import make_layout
+
+    seen = {}
+    real = layout._symmetry_ties
+
+    def spy(items, frame):
+        seen["items"], seen["ties"] = items, real(items, frame)
+        return seen["ties"]
+
+    monkeypatch.setattr(layout, "_symmetry_ties", spy)
+    make_layout(DATA / f"{name}.cif")
+    items, ties = seen["items"], seen["ties"]
+    offsets: dict[int, list[tuple[float, float]]] = {}
+    for i, (j, k) in ties.items():
+        offsets.setdefault(k, []).append((items[i].cx - items[j].cx, items[i].cy - items[j].cy))
+    assert offsets
+    for o in offsets.values():
+        assert np.ptp(np.array(o), axis=0).max() < 1e-9
+
+
+def _box(x, y, start, chain="A", tall=2.0):
+    """A one-strand item at (x, y), 1 wide and `tall` long."""
+    from foldmap.layout import Placed, _Item
+    from helpers import fake_sse
+
+    s = fake_sse("E", start, start + 6, chain=chain)
+    return _Item([Placed(s, 0.0, 0.0, tall, np.pi / 2, 1.0)], [(0.0, 0.0)], x, y, (x, y), start, chain)
+
+
+def _overlaps(items):
+    from foldmap.layout import _collide
+
+    h, m = [it.half for it in items], [it.mid for it in items]
+    return sum(_collide(items[i], h[i], m[i], items[j], h[j], m[j]) for i in range(len(items)) for j in range(i))
+
+
+def _pushed_apart(monkeypatch, items, ties):
+    """Run _separate; how many overlaps were left for the fallback slide."""
+    from foldmap import layout
+
+    left = []
+    real = layout._slide_clear
+    monkeypatch.setattr(layout, "_slide_clear", lambda its: left.append(_overlaps(its)) or real(its))
+    layout._separate(items, ties)
+    assert _overlaps(items) == 0
+    return left[0]
+
+
+def test_a_push_in_one_protomer_moves_the_copies_too(monkeypatch):
+    """Element 0 overlaps an untied neighbour (1); its copy (2) overlaps nothing but moves the same way."""
+    items = [_box(0.0, 0.0, 1), _box(0.4, 0.0, 20), _box(10.0, 0.0, 1, "B")]
+    assert _pushed_apart(monkeypatch, items, {2: (0, 1)}) == 0
+    assert items[0].cx != 0.0
+    assert (items[2].cx - items[0].cx, items[2].cy - items[0].cy) == pytest.approx((10.0, 0.0), abs=1e-12)
+
+
+def test_without_ties_each_item_moves_alone(monkeypatch):
+    items = [_box(0.0, 0.0, 1), _box(0.4, 0.0, 20), _box(10.0, 0.0, 1, "B")]
+    assert _pushed_apart(monkeypatch, items, {}) == 0
+    assert (items[2].cx, items[2].cy) == (10.0, 0.0)
+
+
+def test_copies_of_one_element_that_overlap_are_pushed_apart_alone(monkeypatch):
+    """Moving a whole orbit cannot part two of its own copies: they move individually."""
+    items = [_box(0.0, 0.0, 1), _box(0.3, 0.0, 1, "B")]
+    assert _pushed_apart(monkeypatch, items, {1: (0, 1)}) == 0
+
+
+def test_a_sideways_overlap_between_protomers_widens_the_spread(monkeypatch):
+    """Protomer 1's copy of `a` lands on protomer 0's `b`: protomer 1 moves over as a whole."""
+    items = [_box(0.0, 0.0, 1), _box(5.0, 0.0, 20), _box(5.5, 0.0, 1, "B"), _box(10.5, 0.0, 20, "B")]
+    assert _pushed_apart(monkeypatch, items, {2: (0, 1), 3: (1, 1)}) == 0
+    assert items[2].cx - items[0].cx == pytest.approx(items[3].cx - items[1].cx, abs=1e-12)
+    assert items[1].cx - items[0].cx == pytest.approx(5.0, abs=1e-12)  # each protomer itself unchanged
+    assert items[2].cx - items[0].cx > 5.5
+
+
+def test_copies_move_alone_when_moving_them_together_cannot_clear(monkeypatch):
+    """A free element (u) wedged between protomer 1's copies, where protomer 0 has room: the symmetric pushes
+    go round in circles. After _SEP_ORBIT_SWEEPS sweeps the items start again from where they were and move
+    one by one."""
+    from foldmap import layout
+
+    sweeps = []
+    real = layout._overlapping
+    monkeypatch.setattr(layout, "_overlapping", lambda *a: sweeps.append(1) or real(*a))
+    a, b = (0.8, 0.3), (3.4, 3.4)
+    items = [_box(*a, 1), _box(*b, 20), _box(a[0] + 3, a[1], 1, "B"), _box(b[0] + 3, b[1], 20, "B"), _box(5.3, 2.8, 40)]
+    alone = [_box(it.cx, it.cy, it.order, it.chain) for it in items]
+    assert _pushed_apart(monkeypatch, items, {2: (0, 1), 3: (1, 1)}) == 0
+    assert len(sweeps) > layout._SEP_ORBIT_SWEEPS
+    layout._separate(alone)
+    assert [(it.cx, it.cy) for it in items] == [(it.cx, it.cy) for it in alone]  # as if there were no copies
 
 
 def test_symmetry_can_be_switched_off(tmp_path):

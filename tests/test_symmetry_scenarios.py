@@ -303,18 +303,17 @@ def test_unrolled_filament_steps_evenly_in_its_own_direction(tmp_path, sign):
     assert np.ptp(steps) < 0.05
 
 
-@pytest.mark.parametrize(
-    "sign", [1, pytest.param(-1, marks=pytest.mark.xfail(strict=True, reason="fixed in plan 08 Task 4"))]
-)
+@pytest.mark.parametrize("sign", [1, -1])
 def test_pilus_rod_unrolls_in_its_own_direction(tmp_path, sign):
-    """6Y7S and its mirror image: one subunit per ~13 page units, rightwards for the right-handed rod."""
+    """6Y7S and its mirror image: one subunit per ~13 page units, rightwards for the right-handed rod. Each
+    subunit is placed by the median x of its elements (one element alone may sit in a block of several)."""
     from foldmap.cli import make_layout
 
     lay, sses, _ = make_layout(DATA / "6Y7S.cif" if sign > 0 else mirrored(tmp_path), focus="none")
-    first = {}
+    xs: dict[str, list[float]] = {}
     for s in sses:
-        first.setdefault(s.chain, s)
-    steps = np.diff([lay.placed[first[c].id].cx for c in sorted(first)])
+        xs.setdefault(s.chain, []).append(lay.placed[s.id].cx)
+    steps = np.diff([np.median(xs[c]) for c in sorted(xs)])
     assert len(steps) == 5 and np.all(np.sign(steps) == sign)
     assert np.median(steps) == pytest.approx(sign * 13, abs=2.5)
 
