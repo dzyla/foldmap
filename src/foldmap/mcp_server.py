@@ -54,12 +54,17 @@ LAYOUT_SUFFIXES = (".yaml", ".yml")
 def _output(path: str | None, suffix: str, stem: str, allowed: tuple[str, ...]) -> Path:
     """Where to write: the path asked for (with an allowed extension, inside FOLDMAP_OUTPUT_DIR when that is set),
     or a fresh temporary file."""
+    root = os.environ.get("FOLDMAP_OUTPUT_DIR")
     if not path:
-        return Path(tempfile.mkdtemp(prefix="foldmap-")) / f"{stem}{suffix}"
+        folder = None
+        if root:
+            folder = Path(root).expanduser()
+            folder.mkdir(parents=True, exist_ok=True)
+        return Path(tempfile.mkdtemp(prefix="foldmap-", dir=folder)) / f"{stem}{suffix}"
     out = Path(path).expanduser()
     if out.suffix.lower() not in allowed:
-        raise ValueError(f"{out.name!r} must end in {' or '.join(allowed)}")
-    root = os.environ.get("FOLDMAP_OUTPUT_DIR")
+        names = ", ".join(allowed[:-1]) + " or " + allowed[-1] if len(allowed) > 1 else allowed[0]
+        raise ValueError(f"{out.name!r} must end in {names}")
     if root and not out.resolve().is_relative_to(Path(root).expanduser().resolve()):
         raise ValueError(f"{out} is outside FOLDMAP_OUTPUT_DIR ({root}); write inside it")
     return out
@@ -164,14 +169,15 @@ def draw_topology(
     whole assembly; or chains, e.g. "B".
     msa_path: alignment for theme 'conservation'. uniprot: "auto" or an accession, to mark UniProt active and binding
     sites (style key uniprot_sites: all, or types like "active,modified"); uniprot_domains: UniProt domain panels.
-    layout_file / save_layout: load or write a YAML layout file that re-creates the figure."""
+    layout_file / save_layout: load or write a YAML layout file that re-creates the figure
+    (save_layout must end in .yaml or .yml)."""
     from .cli import main
 
     _theme(theme)  # a readable message instead of argparse's exit
     path = _structure(source)
-    out = _output(output_path, ".svg", path.stem, FIGURE_SUFFIXES)
-    if save_layout:
+    if save_layout:  # checked first, so a bad layout path leaves no temporary folder behind
         save_layout = str(_output(save_layout, ".yaml", path.stem, LAYOUT_SUFFIXES))
+    out = _output(output_path, ".svg", path.stem, FIGURE_SUFFIXES)
     argv = [
         "plot",
         str(path),

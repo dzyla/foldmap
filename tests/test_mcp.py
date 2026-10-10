@@ -14,6 +14,11 @@ DATA = Path(__file__).parent / "data"
 UBQ = str(DATA / "1UBQ.cif")
 
 
+@pytest.fixture(autouse=True)
+def _no_output_dir(monkeypatch):
+    monkeypatch.delenv("FOLDMAP_OUTPUT_DIR", raising=False)
+
+
 def call(name, args):
     return asyncio.run(server.call_tool(name, args))
 
@@ -185,3 +190,23 @@ def test_output_dir_follows_relative_paths_and_symlinks(tmp_path, monkeypatch):
     with pytest.raises(ToolError, match="outside FOLDMAP_OUTPUT_DIR"):
         call("draw_sequence", {"source": UBQ, "output_path": "escape/out.svg"})
     assert not (tmp_path / "out.svg").exists()
+
+
+def test_output_dir_covers_layouts_pages_and_default_outputs(tmp_path, monkeypatch):
+    from mcp.server.mcpserver.exceptions import ToolError
+
+    root = tmp_path / "root"
+    monkeypatch.setenv("FOLDMAP_OUTPUT_DIR", str(root))
+    outside = tmp_path / "outside"
+    for tool, args in [
+        ("draw_topology", {"save_layout": str(outside / "l.yaml")}),
+        ("interactive_page", {"output_path": str(outside / "p.html")}),
+    ]:
+        with pytest.raises(ToolError, match="outside FOLDMAP_OUTPUT_DIR"):
+            call(tool, {"source": UBQ, **args})
+    assert not outside.exists()
+    assert not root.exists()  # nothing was created by the rejected calls
+    call("draw_sequence", {"source": UBQ})
+    assert len(list(root.glob("foldmap-*/*.svg"))) == 1
+    call("draw_sequence", {"source": UBQ, "output_path": str(root / "UPPER.SVG")})
+    assert (root / "UPPER.SVG").is_file()
