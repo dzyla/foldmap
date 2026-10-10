@@ -134,3 +134,34 @@ def test_consurf_table_colours_by_its_own_grades(tmp_path):
 def test_consurf_table_is_not_an_alignment(tmp_path):
     with pytest.raises(ValueError, match="ConSurf"):
         read_alignment(consurf_table(tmp_path, lambda n: 5))
+
+
+def test_real_consurf_db_table_is_parsed():
+    """A trimmed ConSurf-DB score file (header `ATOM`, atoms as RES:number:chain, legend and footer text)."""
+    from foldmap.sequence import is_consurf, read_consurf
+
+    table = DATA / "consurf" / "1TIM_A_grades.txt"
+    assert is_consurf(table)
+    grades = read_consurf(table)
+    assert len(grades) == 12
+    assert grades[("A", 1, "")] == 8  # '8*': below ConSurf's confidence cut-off, grade kept
+    assert grades[("A", 4, "")] == 9 and grades[("A", 6, "")] == 4 and grades[("A", 13, "")] == 9
+    assert ("A", 3, "") not in grades  # numbering follows the structure (POS 3 is residue 4)
+
+
+def test_consurf_atoms_with_insertion_codes_and_missing_positions(tmp_path):
+    from foldmap.sequence import is_consurf, read_consurf
+
+    header = "POS\tSEQ\t     ATOM\t SCORE\tCOLOR\tCONFIDENCE INTERVAL\n"
+    for atoms in (("ALA:52A:A", "ALA:-3:A"), ("ALA52A:A", "ALA-3:A")):
+        path = tmp_path / "t.txt"
+        path.write_text(
+            "Legend: the COLOR and ATOM columns\n\n" + header + f"1\tA\t{atoms[0]}\t0.1\t 7*\t-\n"
+            f"2\tA\t{atoms[1]}\t0.1\t 2\t-\n3\tG\t      -   \t0.1\t 4\t-\n",
+            encoding="utf-8",
+        )
+        assert is_consurf(path)
+        assert read_consurf(path) == {("A", 52, "A"): 7, ("A", -3, ""): 2}
+    legend_only = tmp_path / "l.txt"
+    legend_only.write_text("COLOR and ATOM are columns\n>a\nMKV\n", encoding="utf-8")
+    assert not is_consurf(legend_only)

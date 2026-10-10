@@ -1,0 +1,36 @@
+	 Amino Acid Conservation Scores
+	=======================================
+
+The layers for assigning grades are as follows.
+from -1.270 to -0.988 the grade is 9
+from -0.988 to -0.706 the grade is 8
+from -0.706 to -0.423 the grade is 7
+from -0.423 to -0.141 the grade is 6
+from -0.141 to  0.292 the grade is 5
+from  0.292 to  0.876 the grade is 4
+from  0.876 to  1.459 the grade is 3
+
+- POS: The position of the acid in the sequence.
+- SEQ: The acid one letter.
+- ATOM: When there's a model, The ATOM derived sequence in three letter code, including the acid's positions as they appear in the PDB file and the chain identifier.
+- SCORE: The normalized conservation scores.
+- COLOR: The color scale representing the conservation scores (9 - conserved, 1 - variable).
+
+POS	SEQ	     ATOM	 SCORE	COLOR	CONFIDENCE INTERVAL	B/E	F/S	MSA DATA	RESIDUE VARIETY
+
+  1	  A	  ALA:1:A	-0.855	   8*	-1.200, -0.711  9,8	  e	  f	   4/300	A
+  2	  P	  PRO:2:A	-0.428	   7 	-0.809, -0.168  8,6	  e	   	  17/300	P 70%, A 17%, N  5%, V  5%
+  3	  R	  ARG:4:A	-1.150	   9 	-1.235, -1.130  9,9	  e	  f	 157/300	R 94%, P  2%, G  1%, A <1%, M <1%, Q <1%
+  4	  K	  LYS:5:A	-0.452	   7 	-0.601, -0.410  7,6	  e	   	 185/300	K 52%, R 32%, Q  7%, T  2%, M  1%, S  1%, L <1%, N <1%, A <1%, D <1%, E <1%
+  5	  F	  PHE:6:A	 0.701	   4 	 0.310,  0.996  4,3	  e	   	 195/300	P 33%, K 24%, F 12%, Q  4%, T  4%, Y  3%, I  3%, N  3%, L  3%, R  3%, A  2%, V  1%, H  1%, M <1%, D <1%
+  6	  F	  PHE:7:A	-0.088	   5 	-0.255,  0.040  6,5	  b	   	 260/300	L 41%, I 26%, F 16%, V  5%, Y  4%, W  1%, M  1%, A <1%, T <1%
+  7	  V	  VAL:8:A	-0.654	   7 	-0.761, -0.601  8,7	  b	   	 272/300	V 42%, I 42%, M  6%, A  5%, L  2%, F <1%
+  8	  G	  GLY:9:A	-0.880	   8 	-0.981, -0.855  8,8	  b	   	 276/300	A 72%, G 10%, V  9%, I  3%, L  1%, S  1%, F  1%
+  9	  G	 GLY:10:A	-0.821	   8 	-0.940, -0.761  8,8	  b	   	 277/300	G 91%, A  7%, L <1%, T <1%
+ 10	  N	 ASN:11:A	-1.270	   9 	-1.291, -1.271  9,9	  e	  f	 277/300	N 99%, S <1%
+ 11	  W	 TRP:12:A	-1.177	   9 	-1.235, -1.166  9,9	  b	  s	 277/300	W 96%, F  2%, L <1%
+ 12	  K	 LYS:13:A	-1.270	   9 	-1.291, -1.271  9,9	  e	  f	 277/300	K
+
+
+*Below the confidence cut-off - The calculations for this site were performed on less than 6 non-gaped homologue sequences,
+or the confidence interval for the estimated score is equal to- or larger than- 4 color grades.
