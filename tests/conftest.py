@@ -27,3 +27,16 @@ def _temp_cache(tmp_path, monkeypatch):
 
     monkeypatch.setattr(fetch, "CACHE", tmp_path / "cache")
     monkeypatch.setattr(uniprot, "CACHE", tmp_path / "cache")
+
+
+def pytest_addoption(parser):
+    parser.addoption(
+        "--update-snapshots",
+        action="store_true",
+        help="rewrite tests/data/snapshots/*.json from the current figures (review the diff before committing)",
+    )
+
+
+@pytest.fixture(scope="session")
+def update_snapshots(request):
+    return request.config.getoption("--update-snapshots")
