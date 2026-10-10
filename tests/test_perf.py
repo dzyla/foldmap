@@ -9,6 +9,7 @@ from pathlib import Path
 import numpy as np
 
 import foldmap.layout as L
+from foldmap import io
 from foldmap.frame import Frame
 from foldmap.layout import build_layout
 from helpers import fake_sse
@@ -93,3 +94,21 @@ def test_overlapping_layouts_in_threads_keep_the_limit_and_restore_it():
         t.join()
     assert seen and all(n == 1 for n in seen[0])
     assert _blas_threads() == before
+
+
+def test_a_figure_reads_its_file_once(monkeypatch):
+    from foldmap import cli
+
+    calls = []
+    real = io.read_model
+
+    def counting(*a, **k):
+        calls.append(a[0])
+        return real(*a, **k)
+
+    monkeypatch.setattr(io, "read_model", counting)
+    monkeypatch.setattr(cli, "read_model", counting, raising=False)
+    cli.make_layout(DATA / "1LMB.cif")  # protein, DNA and links all come from the one read
+    assert len(calls) == 1
+    cli.summarize(str(DATA / "1LMB.cif"))
+    assert len(calls) == 2

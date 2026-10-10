@@ -14,7 +14,7 @@ from . import layoutfile
 from .dssp import assign_dssp
 from .features import sse_contacts
 from .frame import dna_radial_frame, dna_view_frame, symmetric_frame, view_frame
-from .io import load_backbone, load_links, load_nucleic
+from .io import load_backbone, load_links, load_nucleic, read_model
 from .layout import build_layout, resolve
 from .model import res_ref
 from .palette import PALETTES
@@ -30,7 +30,8 @@ _vector, _protomers, _domain_spec = parse_vector, parse_protomers, parse_domains
 
 
 def summarize(path: str) -> str:
-    bb = load_backbone(path)
+    model = read_model(path)  # once, for both loaders
+    bb = load_backbone(path, model=model)
     dssp = assign_dssp(bb)
     sses = build_sses(bb, dssp.ss, short_helices=True, bridges=dssp.bridges)
     sheets = build_sheets(sses, dssp.bridges)
@@ -66,7 +67,7 @@ def summarize(path: str) -> str:
             f"symmetry: {sym.label} — protomers {' | '.join(','.join(p) for p in sym.protomers)}"
             f"; CA RMSD {sym.rmsd:.2f} Å{extra}" + (f"; unpaired chains {','.join(sym.others)}" if sym.others else "")
         )
-    na = load_nucleic(path, bb)
+    na = load_nucleic(path, bb, model=model)
     if na.strands:
         kind = (
             "RNA" if all(st.rna for st in na.strands) else "DNA" if not any(st.rna for st in na.strands) else "DNA/RNA"
@@ -106,7 +107,8 @@ def make_layout(
     focus: str = "auto",
     uniprot: str | None = None,
 ):
-    bb = load_backbone(path, assembly)
+    model = read_model(path, assembly)  # once, for every loader below
+    bb = load_backbone(path, assembly, model=model)
     if chains:
         present = list(dict.fromkeys(l.chain for l in bb.labels))
         missing = [c for c in chains if c not in present]
@@ -118,7 +120,7 @@ def make_layout(
     dssp = assign_dssp(bb)
     sses = build_sses(bb, dssp.ss, short_helices=(look or Style()).helices_310, bridges=dssp.bridges)
     sheets = build_sheets(sses, dssp.bridges)
-    nucleic = load_nucleic(path, bb, assembly) if dna else None
+    nucleic = load_nucleic(path, bb, assembly, model=model) if dna else None
     if nucleic is not None and (look or Style()).dna_extent == "contacts":
         from .model import crop_nucleic
 
@@ -181,7 +183,7 @@ def make_layout(
         frame = symmetric_frame(sses, sym)
     else:
         frame = view_frame(sses, rotate, flip_v, up, view)
-    links = load_links(path, bb, assembly)
+    links = load_links(path, bb, assembly, model=model)
     contacts = sse_contacts(bb, sses)
     for key, n in _bridge_contacts(bb, sses, links).items():
         contacts[key] = contacts.get(key, 0) + n
