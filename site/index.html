@@ -102,7 +102,7 @@
   </div>
   <ol class="steps">
     <li><h3>Read</h3><p>gemmi reads the file, or the one downloaded for a PDB ID or UniProt accession; biological assemblies are built from its operators.</p></li>
-    <li><h3>Secondary structure</h3><p>A DSSP implementation finds backbone hydrogen bonds and calls α- and 3₁₀ helices, strands with bulges, and turns.</p></li>
+    <li><h3>Secondary structure</h3><p>A DSSP implementation, checked residue by residue against mkdssp, finds backbone hydrogen bonds and calls α-, 3₁₀- and π-helices, strands with bulges, and turns.</p></li>
     <li><h3>Sheets</h3><p>Strands joined by H-bond ladders form sheets; order and direction come from the ladders; closed barrels are recognised.</p></li>
     <li><h3>Context</h3><p>Symmetry from chain superposition; disulfides, glycans and ligands from the atoms; the membrane estimated on request.</p></li>
     <li><h3>Projection</h3><p>3D is turned into the page: dominant direction up, assemblies unrolled around their axis, DNA complexes around the DNA. Never mirrored.</p></li>

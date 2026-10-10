@@ -138,7 +138,8 @@ foldmap styles                                    # every theme and style key
 
 ## What it handles
 
-- **Secondary structure** by a DSSP implementation: α-helices, β-strands with bulges, 3₁₀ helices, turns; β-sheets
+- **Secondary structure** by a DSSP implementation that matches mkdssp 3.1.2 residue for residue on the test set:
+  α-, 3₁₀- and π-helices (π before α, as in DSSP ≥ 2.1), β-strands with bulges, turns; β-sheets
   with strand order and direction, closed barrels shown with a ghost of the first strand.
 - **Layout** from the 3D structure: elements projected onto the page, then arranged so sheets stay in order,
   contacting elements and disulfide partners stay close, and nothing overlaps; loops routed orthogonally around
@@ -233,8 +234,8 @@ Every figure (command line, app, MCP or Python) goes through the same steps:
 
 1. **Read the structure.** gemmi reads the mmCIF/PDB file (or the file downloaded for a PDB ID or UniProt
    accession). With `--assembly auto` the biological assembly is built from the file's own operators.
-2. **Secondary structure.** A DSSP implementation assigns hydrogen bonds from the backbone and calls α-helices,
-   3₁₀ helices, β-strands (with bulges) and turns.
+2. **Secondary structure.** A DSSP implementation assigns hydrogen bonds from the backbone and calls α-, 3₁₀- and
+   π-helices, β-strands (with bulges) and turns, exactly as mkdssp 3.1.2 does on every test structure.
 3. **Sheets and bundles.** Strands joined by backbone H-bond ladders form sheets; their order and directions come
    from the ladder network, and a sheet whose ends pair is a closed barrel. Helices packed along their length
    across chains form bundles.
