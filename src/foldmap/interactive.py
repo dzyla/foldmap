@@ -1,6 +1,8 @@
-"""One self-contained HTML page linking three views of a structure: the topology figure, the CA distance
-(contact) map and the 3D model. Hovering an element, a map cell or an atom highlights the same residues in
-the other two views."""
+"""One HTML page linking three views of a structure: the topology figure, the CA distance (contact) map and
+the 3D model. Hovering an element, a map cell or an atom highlights the same residues in the other two views.
+
+The page carries its own data, figure and code; only the 3D viewer (Mol* or 3Dmol.js) loads from a CDN, pinned
+to one version and checked by Subresource Integrity, so the 3D panel needs a network connection."""
 
 from __future__ import annotations
 
@@ -20,6 +22,13 @@ from .style import Style
 THREEDMOL = "https://cdnjs.cloudflare.com/ajax/libs/3Dmol/2.1.0/3Dmol-min.js"
 MOLSTAR_JS = "https://cdn.jsdelivr.net/npm/pdbe-molstar@3.12.0/build/pdbe-molstar-plugin.js"  # Mol* (PDBe build)
 MOLSTAR_CSS = "https://cdn.jsdelivr.net/npm/pdbe-molstar@3.12.0/build/pdbe-molstar-light.css"
+# Subresource Integrity: the browser refuses a CDN file whose SHA-384 differs. Recompute when a URL changes:
+#   curl -fsSL -o f URL; openssl dgst -sha384 -binary f | openssl base64 -A  (hash a saved file)
+SRI = {
+    THREEDMOL: "sha384-TxfnTy2TY3ms7kc3hVNjePx2ekn5oouyllBzqjsaZMmtran9oNs+yTKd0TY+x0eY",
+    MOLSTAR_JS: "sha384-Whyx5/jg1RTZAEdrf9uj7bdQcSHC2EVtMGgnXGVdgCOGxLbhf9XC4k8brO4hV6yp",
+    MOLSTAR_CSS: "sha384-kARlbziDLc0Hj8qk+KXR1P27YYVjD71TknAF2jm8h4pCtySxFh7ivRH8IXXJNC/B",
+}
 VIEWERS = ("molstar", "3dmol")
 _LOOP_GREY = "#9aa3ad"
 
@@ -632,9 +641,13 @@ def _links(layout, loops, sses, bb, look) -> dict:
 
 
 def _viewer_head(viewer: str) -> str:
+    def script(url: str) -> str:
+        return f'<script src="{url}" integrity="{SRI[url]}" crossorigin="anonymous"></script>'
+
     if viewer == "3dmol":
-        return f'<script src="{THREEDMOL}"></script>'
-    return f'<link rel="stylesheet" href="{MOLSTAR_CSS}">\n<script src="{MOLSTAR_JS}"></script>'
+        return script(THREEDMOL)
+    css = f'<link rel="stylesheet" href="{MOLSTAR_CSS}" integrity="{SRI[MOLSTAR_CSS]}" crossorigin="anonymous">'
+    return css + "\n" + script(MOLSTAR_JS)
 
 
 def _script_json(data) -> str:
@@ -693,7 +706,6 @@ def build_page(
     return f"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{name} · topology explorer</title>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;600&family=IBM+Plex+Mono&display=swap">
 <style>{_CSS}</style>
 {_viewer_head(viewer)}
 </head><body>

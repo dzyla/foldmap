@@ -1,6 +1,7 @@
 """The linked interactive page: topology SVG + contact map + 3D model, one self-contained HTML file."""
 
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -9,7 +10,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from foldmap.interactive import MOLSTAR_JS, build_page
+from foldmap.interactive import MOLSTAR_JS, VIEWERS, build_page
 
 DATA = Path(__file__).parent / "data"
 
@@ -257,3 +258,30 @@ def test_hostile_names_cannot_break_out_of_the_data_block(tmp_path):
     assert "<" not in blob and ">" not in blob
     assert {r["c"] for r in _data(page)["residues"]} == {"<!--<script>"}
     assert "<script>alert(9)" not in page
+
+
+def test_cdn_files_are_pinned_with_integrity():
+    from foldmap.interactive import SRI
+
+    for viewer in VIEWERS:
+        page = build_page(DATA / "1UBQ.cif", viewer=viewer)
+        external = re.findall(r'<(?:script|link)[^>]+(?:src|href)="https?://[^"]+"[^>]*>', page)
+        assert external
+        for tag in external:
+            url = re.search(r'(?:src|href)="([^"]+)"', tag).group(1)
+            assert f'integrity="{SRI[url]}"' in tag and 'crossorigin="anonymous"' in tag, tag
+        assert "fonts.googleapis.com" not in page
+
+
+@pytest.mark.skipif(not os.environ.get("FOLDMAP_NETWORK_TESTS"), reason="set FOLDMAP_NETWORK_TESTS=1 to download")
+def test_sri_hashes_match_the_cdn():
+    import base64
+    import hashlib
+    import urllib.request
+
+    from foldmap.interactive import SRI
+
+    for url, expected in SRI.items():
+        with urllib.request.urlopen(url, timeout=60) as r:
+            digest = base64.b64encode(hashlib.sha384(r.read()).digest()).decode()
+        assert expected == f"sha384-{digest}", url
