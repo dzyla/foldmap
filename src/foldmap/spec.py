@@ -115,14 +115,16 @@ def figure_spec(
     file_style = [f"{k}={v}" for k, v in (doc.get("style") or {}).items()]
     shorthand = [f"{k}={v}" for k, v in (("palette", palette), ("fill", fill), ("loops", loops)) if v is not None]
     look = resolve_style(theme, style_file, file_style + shorthand + list(style))
-    lay = doc.get("layout") or {}
+    lay = {k: v for k, v in (doc.get("layout") or {}).items() if v is not None}
     defaults = FigureSpec(Path(structure))
 
     def pick(name: str):
-        value = given.get(name)
-        if value is not None:
-            return value
-        return lay.get(name, getattr(defaults, name))
+        """The given value, else the file's, else the default; None and '' count as not given."""
+        for source in (given, lay):
+            value = source.get(name)
+            if value is not None and value != "":
+                return "off" if value is False and name in ("membrane", "symmetry") else value
+        return getattr(defaults, name)
 
     mode = pick("mode")
     if mode not in MODES:
@@ -135,8 +137,12 @@ def figure_spec(
         domains = [(name, list(refs)) for name, refs in domains.items()]
     edits = layoutfile.edits_of(doc)
     edits["rename"].update(given.get("rename") or {})
-    edits["swap"] += [tuple(p) for p in given.get("swap") or []]
-    edits["move"] += [(ref, (float(d[0]), float(d[1]))) for ref, d in given.get("move") or []]
+    edits["swap"] += [_pair(p) for p in given.get("swap") or []]
+    moves = given.get("move") or []
+    for ref, d in moves.items() if isinstance(moves, dict) else moves:
+        if len(d) != 2:
+            raise ValueError(f"a move needs two numbers (dx, dy), got {d!r} for {ref!r}")
+        edits["move"].append((ref, (float(d[0]), float(d[1]))))
     protomers, chains = pick("protomers"), pick("chains")
     return FigureSpec(
         structure=Path(structure),
@@ -145,7 +151,7 @@ def figure_spec(
         title=pick("title"),
         mode=mode,
         rotate=float(pick("rotate")),
-        flip_v=bool(given.get("flip_v") or lay.get("flip_v", False)),
+        flip_v=bool(pick("flip_v")),
         dna=bool(pick("dna")),
         symmetry=str(pick("symmetry")),
         symmetry_tol=float(pick("symmetry_tol")),
@@ -162,6 +168,14 @@ def figure_spec(
         focus=str(pick("focus")),
         **edits,
     )
+
+
+def _pair(item) -> tuple[str, str]:
+    """Two element references from a pair or from 'REF,REF' text."""
+    parts = [p.strip() for p in item.split(",") if p.strip()] if isinstance(item, str) else list(item)
+    if len(parts) != 2:
+        raise ValueError(f"a swap needs two elements, like A,B; got {item!r}")
+    return parts[0], parts[1]
 
 
 def parse_vector(value, what: str) -> list[float] | None:

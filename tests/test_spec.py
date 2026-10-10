@@ -71,3 +71,83 @@ def test_shorthands_membrane_and_passthrough_options():
     assert spec.membrane == "flip" and spec.msa == "x.grades"
     with pytest.raises(ValueError, match="unknown membrane 'up'"):
         figure_spec(UBQ, membrane="up")
+
+
+def test_none_and_empty_arguments_keep_the_files_values(tmp_path):
+    lf = layoutfile.save(
+        tmp_path / "f.yaml",
+        {
+            "foldmap": 1,
+            "layout": {
+                "focus": "none",
+                "chains": "A",
+                "membrane": "flip",
+                "msa": "a.fa",
+                "uniprot": "P0",
+                "rotate": 45,
+            },
+        },
+    )
+    spec = figure_spec(
+        UBQ, layout_file=lf, focus=None, chains="", membrane="", msa=None, uniprot="", rotate=None, protomers=""
+    )
+    assert (spec.focus, spec.chains, spec.membrane, spec.msa, spec.uniprot, spec.rotate) == (
+        "none", ["A"], "flip", "a.fa", "P0", 45.0,
+    )  # fmt: skip
+    assert spec.protomers is None
+
+
+def test_fill_and_shorthand_over_file_style(tmp_path):
+    lf = layoutfile.save(tmp_path / "f.yaml", {"foldmap": 1, "style": {"fill": "bold", "palette": "greys"}})
+    spec = figure_spec(UBQ, layout_file=lf, fill="outline", style=[])
+    assert spec.look.fill == "outline" and spec.look.palette == "greys"
+    assert figure_spec(UBQ, layout_file=lf, palette="tol-muted").look.palette == "tol-muted"
+
+
+def test_flip_v_from_file_and_explicit_false(tmp_path):
+    lf = layoutfile.save(tmp_path / "f.yaml", {"foldmap": 1, "layout": {"flip_v": True, "membrane": False}})
+    assert figure_spec(UBQ, layout_file=lf).flip_v is True
+    assert figure_spec(UBQ, layout_file=lf, flip_v=False).flip_v is False
+    assert figure_spec(UBQ, layout_file=lf, flip_v=None).flip_v is True
+    assert figure_spec(UBQ, layout_file=lf).membrane == "off"
+
+
+def test_edit_shapes():
+    spec = figure_spec(UBQ, swap=["A,B", ("C", "D")], move={"res:A:2-7": [1, 2]})
+    assert spec.swap == [("A", "B"), ("C", "D")] and spec.move == [("res:A:2-7", (1.0, 2.0))]
+    with pytest.raises(ValueError, match="two elements"):
+        figure_spec(UBQ, swap=["A,B,C"])
+    with pytest.raises(ValueError, match="two numbers"):
+        figure_spec(UBQ, move=[("res:A:2-7", [1])])
+
+
+def test_round_trip_through_a_layout_file(tmp_path):
+    spec = figure_spec(
+        UBQ,
+        theme="blueprint",
+        style=["residue_numbers=true"],
+        title="T",
+        mode="stack",
+        rotate=30.0,
+        flip_v=True,
+        dna=False,
+        symmetry="off",
+        symmetry_tol=2.5,
+        protomers=[["A"]],
+        assembly="asu",
+        up=[0.0, 0.0, 1.0],
+        view=[1.0, 0.0, 0.0],
+        domains=[("core", ["res:A:2-7"])],
+        msa=str(DATA / "ubq_family.fasta"),
+        msa_reference="1UBQ_A",
+        membrane="flip",
+        uniprot="P0CG48",
+        chains=["A"],
+        focus="none",
+        rename={"res:A:2-7": "N"},
+        swap=[("res:A:2-7", "res:A:12-16")],
+        move=[("res:A:2-7", (1.0, -2.0))],
+    )
+    doc = layout_document(spec, structure_name="1UBQ.cif")
+    path = layoutfile.save(tmp_path / "rt.yaml", doc)
+    assert figure_spec(UBQ, layout_file=path) == spec

@@ -31,6 +31,7 @@ LAYOUT = (
     "mode",
     "rotate",
     "flip_v",
+    "dna",
     "symmetry",
     "symmetry_tol",
     "assembly",
