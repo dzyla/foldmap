@@ -6,4 +6,7 @@ __version__ = "0.1.0"
 
 ATTRIBUTION = "foldmap, by Dawid Zyla"
 
-CREDIT = f"Made with {ATTRIBUTION} · AGPL-3.0 · if you use it in your work, please cite it (see CITATION.cff)"
+CREDIT = (
+    f"Made with {ATTRIBUTION} · AGPL-3.0 (output exception: see NOTICE) "
+    "· if you use it in your work, please cite it (see CITATION.cff)"
+)

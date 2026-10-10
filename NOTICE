@@ -11,4 +11,12 @@ Additional terms under section 7(b) of the GNU Affero General Public License:
   credit line shown by the foldmap app, the MCP server's instructions and the interactive HTML pages, and must
   keep the CITATION.cff file.
 
+Output exception (additional permission under section 7 of the GNU Affero General Public License):
+
+  The figures, sequence views and interactive HTML pages that foldmap generates from your input, including the
+  portions of foldmap's own code, styles and scripts that foldmap copies into them, are not covered by the GNU
+  Affero General Public License. You may use, share and license such output under terms of your choice. This
+  exception does not apply to foldmap itself or to modified versions of it, and it does not remove the
+  attribution requirement above from the credit line embedded in the interactive pages.
+
 If you use foldmap in published work, please cite it as described in CITATION.cff.

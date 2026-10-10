@@ -343,3 +343,6 @@ foldmap is free software under the [GNU Affero General Public License v3.0 or la
 attribution term (see [`NOTICE`](NOTICE)). You may use, study, change and share it; any modified version you
 distribute, or run as a service for others, must be released under the same license with its source code and keep
 the foldmap attribution. Copyright © 2026 Dawid Zyla.
+
+Figures and interactive pages that foldmap generates are yours to license as you like (see [`NOTICE`](NOTICE), output
+exception); the credit line on interactive pages stays.

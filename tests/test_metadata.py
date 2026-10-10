@@ -103,6 +103,14 @@ def test_notice_names_the_attribution_the_code_shows():
     assert "AGPL-3.0" in CREDIT and "cite" in CREDIT
 
 
+def test_output_exception_is_in_notice_and_the_credit_points_to_it():
+    from foldmap import CREDIT
+
+    notice = (ROOT / "NOTICE").read_text(encoding="utf-8")
+    assert "Output exception" in notice
+    assert "output exception: see NOTICE" in CREDIT
+
+
 def test_citation_file_ships_in_the_wheel_metadata():
     assert "CITATION.cff" in _pyproject()["project"]["license-files"]
 
