@@ -43,64 +43,10 @@ def test_layout_does_not_depend_on_the_hash_seed():
     assert runs[0] == runs[1] == runs[2]
 
 
-def _blas_threads():
-    from threadpoolctl import threadpool_info
-
-    return [i["num_threads"] for i in threadpool_info() if i["user_api"] == "blas"]
-
-
 def _pile(n):
     """n helices projected onto one point: the push-apart must untangle them by itself."""
     f = Frame(np.zeros(3), np.array([1.0, 0, 0]), np.array([0, 1.0, 0]), np.array([0, 0, 1.0]))
     return [fake_sse("H", 10 * k, 10 * k + 8, centroid=(0, 0, 0), axis=(0.2, 0.1, 1)) for k in range(n)], f
-
-
-def test_layout_runs_blas_on_one_thread_and_restores_it(monkeypatch):
-    from threadpoolctl import threadpool_limits
-
-    if not _blas_threads():
-        pytest.skip("no BLAS library detected")
-    with threadpool_limits(2, "blas"):  # not already 1, so 'one inside, restored after' says something
-        before = _blas_threads()
-        seen = []
-        real = L._attract
-
-        def spy(*a, **k):
-            seen.append(_blas_threads())
-            return real(*a, **k)
-
-        monkeypatch.setattr(L, "_attract", spy)
-        sses, f = _pile(4)
-        build_layout(sses, [], f, "projected")
-        assert seen and all(t == 1 for t in seen[0])
-        assert _blas_threads() == before
-
-
-def test_overlapping_layouts_in_threads_keep_the_limit_and_restore_it():
-    import threading
-
-    before = _blas_threads()
-    inside, first_out = threading.Barrier(2), threading.Event()
-    seen = []
-
-    def first():
-        with L._one_blas_thread():
-            inside.wait()
-        first_out.set()
-
-    def second():
-        with L._one_blas_thread():
-            inside.wait()
-            first_out.wait()
-            seen.append(_blas_threads())  # the other layout has finished: this one still runs on one thread
-
-    threads = [threading.Thread(target=first), threading.Thread(target=second)]
-    for t in threads:
-        t.start()
-    for t in threads:
-        t.join()
-    assert seen and all(n == 1 for n in seen[0])
-    assert _blas_threads() == before
 
 
 def test_a_figure_reads_its_file_once(monkeypatch):
@@ -278,22 +224,6 @@ def test_a_32_chain_complex_lays_out_in_reasonable_time(tmp_path):
     for i, a in enumerate(rects):
         for b in rects[i + 1 :]:
             assert min(a[2], b[2]) - max(a[0], b[0]) <= 1e-6 or min(a[3], b[3]) - max(a[1], b[1]) <= 1e-6
-
-
-def test_a_broken_blas_limit_does_not_fail_the_figure(monkeypatch):
-    import threadpoolctl
-
-    def broken(*a, **k):
-        raise RuntimeError("broken BLAS")
-
-    monkeypatch.setattr(threadpoolctl, "threadpool_limits", broken)
-    with L._one_blas_thread():
-        pass
-    with L._one_blas_thread():  # the count stayed consistent: the next layout tries again, and also runs
-        assert L._BLAS_USERS == 1
-    assert L._BLAS_USERS == 0 and L._BLAS_LIMIT is None
-    sses, f = _pile(3)
-    build_layout(sses, [], f, "projected")
 
 
 def test_bench_leaves_no_temp_dir_behind(monkeypatch, tmp_path):

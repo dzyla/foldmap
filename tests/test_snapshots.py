@@ -100,7 +100,7 @@ CASES = {
 
 @pytest.mark.skipif(
     sys.platform != "linux",
-    reason="layout minimisation goes through the platform BLAS; snapshots are recorded and compared on Linux",
+    reason="snapshots are Linux-only: the fonts differ by OS, so the text metrics and glyph paths do",
 )
 @pytest.mark.parametrize("name", sorted(CASES))
 def test_figure_matches_snapshot(name, tmp_path, update_snapshots):

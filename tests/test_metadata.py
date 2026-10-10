@@ -40,7 +40,6 @@ FLOORS = {
     "networkx": "3.0",
     "matplotlib": "3.10",
     "PyYAML": "6.0.1",
-    "threadpoolctl": "3.1",
 }
 
 

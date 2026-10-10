@@ -3,8 +3,6 @@
 from __future__ import annotations
 
 import re
-import threading
-from contextlib import contextmanager
 from dataclasses import dataclass, field
 
 import numpy as np
@@ -556,7 +554,9 @@ def _energy_dense(flat, home, anchor_w, want, W, loops, lam, mids=None):
 
 def _snap(v) -> np.ndarray:
     """Round to the 1/_GRID grid, so noise of ~1e-16 in a projection (np.linalg.svd and small dot products
-    differ between BLAS kernels) never reaches the optimiser, which would amplify it, nor the drawn geometry."""
+    differ between BLAS kernels) never reaches the optimiser, which would amplify it, nor the drawn geometry.
+    The rounding removes that noise except when a value sits within noise of a half-grid point (probability
+    ~1e-12 per value); exact libm values such as cos 0 = 1 are safe."""
     return np.round(np.asarray(v, float) * _GRID) / _GRID
 
 
@@ -753,37 +753,6 @@ def _attract(
     for it, p in zip(items, x.reshape(n, 2)):
         it.cx, it.cy = float(p[0]), float(p[1])
         it.home = (it.cx, it.cy)
-
-
-_BLAS_LOCK = threading.Lock()
-_BLAS_USERS = 0  # layouts running under the one-thread limit, across threads (the app draws several at once)
-_BLAS_LIMIT = None
-
-
-@contextmanager
-def _one_blas_thread():
-    """BLAS limited to one thread while L-BFGS runs: its vectors are a few hundred long, so threads only add
-    overhead, and with several figures at once (app, MCP) they oversubscribe every core. The limit is
-    process-wide, so the first layout in sets it and the last one out restores it."""
-    global _BLAS_USERS, _BLAS_LIMIT
-    from threadpoolctl import threadpool_limits
-
-    with _BLAS_LOCK:
-        if _BLAS_USERS == 0:
-            try:
-                _BLAS_LIMIT = threadpool_limits(limits=1, user_api="blas")
-            except Exception:  # a broken BLAS must not fail the figure: run without the limit
-                _BLAS_LIMIT = None
-        _BLAS_USERS += 1
-    try:
-        yield
-    finally:
-        with _BLAS_LOCK:
-            _BLAS_USERS -= 1
-            if _BLAS_USERS == 0:
-                if _BLAS_LIMIT is not None:
-                    _BLAS_LIMIT.restore_original_limits()
-                _BLAS_LIMIT = None
 
 
 def _collide(a: _Item, ha, ma, b: _Item, hb, mb) -> bool:
@@ -1121,8 +1090,7 @@ def build_layout(
                 items[i].cx, items[i].cy = items[j].cx + k * spread, items[j].cy + k * lift
                 items[i].home = (items[j].home[0] + k * spread, items[j].home[1] + k * lift)
         if attract and len(items) > 1:
-            with _one_blas_thread():
-                _attract(items, sses, contacts, ties, spread, getattr(frame, "rise", 0.0) * SCALE, bridges or [])
+            _attract(items, sses, contacts, ties, spread, getattr(frame, "rise", 0.0) * SCALE, bridges or [])
         _separate(items, ties)
         if domains and _part_domains(items, domains):
             _separate(items, ties)

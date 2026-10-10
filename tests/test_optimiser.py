@@ -166,3 +166,83 @@ def test_snap_rounds_to_the_grid_and_is_idempotent():
     assert s.tolist() == [0.1235, -3.0, 12.3457, 0.0]
     assert L._snap(s).tolist() == s.tolist()
     assert L._snap(v + 1e-15).tolist() == s.tolist()  # noise far below the grid is gone
+
+
+def _counted(fun):
+    calls = []
+
+    def wrapped(x):
+        calls.append(x.copy())
+        return fun(x)
+
+    return wrapped, calls
+
+
+def test_lbfgs_converges_to_the_kink_of_a_max_of_two_quadratics():
+    def kinked(x):  # max((x0 - 1)^2, (x0 + 1)^2) + x1^2: not differentiable on x0 = 0, minimum 1 at the origin
+        a, b = (x[0] - 1) ** 2, (x[0] + 1) ** 2
+        g = np.array([2 * (x[0] - 1) if a >= b else 2 * (x[0] + 1), 2 * x[1]])
+        return float(max(a, b) + x[1] ** 2), g
+
+    x0 = np.array([2.5, -1.5])
+    x = L._lbfgs(kinked, x0)
+    assert abs(x[0]) < 1e-2  # on the kink (it may stop short along it: the line search fails there)
+    assert abs(x[1]) < 0.5 and kinked(x)[0] < kinked(x0)[0] / 5 and kinked(x)[0] < 1.0 + 0.25
+
+
+def test_lbfgs_gives_up_on_an_inconsistent_gradient_and_leaves_x_alone():
+    f, _, x0 = _quadratic()
+    x0 = x0.copy()
+
+    def lying(x):  # the gradient points downhill-to-uphill: no step along -g ever decreases f
+        value, g = f(x)
+        return value, -g
+
+    wrapped, calls = _counted(lying)
+    x = L._lbfgs(wrapped, x0)
+    assert x.tolist() == x0.tolist()
+    assert 1 < len(calls) <= 1 + 20  # the start plus at most one line search's budget, then it stops
+
+
+def test_lbfgs_ftol_stops_on_a_function_that_flattens():
+    def flat(x):  # Rosenbrock riding on a huge value: the relative decrease falls under ftol while it still descends
+        f, g = _rosen(x)
+        return 1e6 + 1e-3 * f, 1e-3 * g
+
+    x0 = np.array([-1.2, 1.0])
+    stopped, calls = _counted(flat)
+    x = L._lbfgs(stopped, x0)
+    full, full_calls = _counted(flat)
+    ref = L._lbfgs(full, x0, ftol=0.0)
+    np.testing.assert_allclose(ref, np.ones(2), atol=1e-3)  # without ftol it runs to the minimum
+    assert len(calls) < len(full_calls) / 2  # with ftol it stops early ...
+    assert np.abs(flat(x)[1]).max() > 1e-5  # ... while the gradient is still above pgtol
+    assert flat(x)[0] < flat(x0)[0]
+
+
+def test_wolfe_returns_a_step_meeting_the_strong_conditions():
+    f, _, x0 = _quadratic()
+    f0, g0 = f(x0)
+    d = -g0
+    c1, c2 = 1e-3, 0.9
+    for step in (1e-3, 1.0, 50.0):  # too short (grown), about right, far too long (shrunk)
+        found = L._wolfe(f, x0, f0, g0, d, step, c1=c1, c2=c2)
+        assert found is not None
+        a, fa, ga = found
+        assert a > 0
+        np.testing.assert_allclose(f(x0 + a * d)[0], fa)
+        slope0 = (g0 * d).sum()
+        assert fa <= f0 + c1 * a * slope0  # sufficient decrease
+        assert abs((ga * d).sum()) <= -c2 * slope0  # curvature
+
+
+def test_wolfe_rejects_a_step_that_decreases_too_little():
+    def sq(x):
+        return float((x * x).sum()), 2 * x
+
+    x0 = np.array([1.0])
+    f0, g0 = sq(x0)
+    # step 0.9 lands on x = -0.8 (f = 0.64): curvature holds there, but c1 = 0.4 demands f <= 1 - 0.4 * 0.9 * 4
+    a, fa, ga = L._wolfe(sq, x0, f0, g0, -g0, 0.9, c1=0.4, c2=0.9)
+    assert fa <= f0 + 0.4 * a * (g0 * -g0).sum()
+    assert a != 0.9
