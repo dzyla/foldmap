@@ -315,6 +315,7 @@ python -m venv .venv && .venv/bin/pip install -e ".[dev,app,mcp]"
 .venv/bin/ruff check . && .venv/bin/ruff format --check .
 .venv/bin/python scripts/gallery.py     # re-render the images above
 .venv/bin/python scripts/sweep.py --sample 60 --out sweep/   # render random PDB entries and check them
+.venv/bin/python scripts/bench.py                                # time layouts (add --record/--check to compare runs)
 ```
 
 ## Citing

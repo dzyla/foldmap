@@ -43,6 +43,7 @@ foldmap = ["assets/previews/*.png"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = ["slow: takes tens of seconds (deselect with -m 'not slow')"]
 
 [tool.ruff]
 line-length = 120
