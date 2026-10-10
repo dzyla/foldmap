@@ -21,6 +21,9 @@ from .render import draw, element_colours, save_svg
 from .route import route_loops
 from .style import Style
 
+_NOTICE_URL = "https://github.com/dzyla/foldmap/blob/main/NOTICE"
+_CREDIT_HTML = CREDIT.replace("see NOTICE", f'see <a href="{_NOTICE_URL}">NOTICE</a>')
+
 THREEDMOL = "https://cdnjs.cloudflare.com/ajax/libs/3Dmol/2.1.0/3Dmol-min.js"
 MOLSTAR_JS = "https://cdn.jsdelivr.net/npm/pdbe-molstar@3.12.0/build/pdbe-molstar-plugin.js"  # Mol* (PDBe build)
 MOLSTAR_CSS = "https://cdn.jsdelivr.net/npm/pdbe-molstar@3.12.0/build/pdbe-molstar-light.css"
@@ -727,7 +730,7 @@ same residues light up in all three views · click an element to fly the 3D view
   </div>
 </main>
 <div id="info">Hover a helix, strand or loop in the topology, a cell of the contact map, or an atom in 3D.</div>
-<footer id="credit">{CREDIT}</footer>
+<footer id="credit">{_CREDIT_HTML}</footer>
 <script type="application/json" id="topo-data">{blob}</script>
 <script id="topo-lib">{_LIB}</script>
 <script id="topo-app">{_APP}</script>

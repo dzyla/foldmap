@@ -153,6 +153,7 @@ def test_interactive_page_credits_foldmap():
 
     page = build_page(DATA / "1UBQ.cif")
     assert 'id="credit"' in page and "foldmap" in page and "AGPL-3.0" in page
+    assert 'see <a href="https://github.com/dzyla/foldmap/blob/main/NOTICE">NOTICE</a>' in page
 
 
 def test_app_credits_foldmap():

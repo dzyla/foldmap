@@ -30,7 +30,7 @@ dependencies = [
     "numpy>=1.24",
     "scipy>=1.10",
     "networkx>=3.0",
-    "matplotlib>=3.10",
+    "matplotlib>=3.10",  # 3.7-3.9 SVGs name only the resolved font (no fallback list): fails test_text_uses_a_journal_font
     "PyYAML>=6.0.1",
 ]
 
