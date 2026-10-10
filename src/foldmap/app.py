@@ -48,7 +48,7 @@ def preview_image(theme: str) -> bytes:
 
 LAYOUT_DEFAULTS = {
     "mode": "projected",
-    "rotate": 0,
+    "rotate": 0.0,
     "symmetry": "auto",
     "assembly": "auto",
     "rename": "",
@@ -224,7 +224,7 @@ def settings_from_document(doc: dict) -> dict:
     out["msa_path"] = msa if msa and local_files() and Path(msa).is_file() else ""  # no server paths when hosted
     out["msa_missing"] = msa if msa and not out["msa_path"] else ""  # saved on another machine
     out["title"] = out["title"] or ""
-    out["rotate"] = int(round(float(out["rotate"])))
+    out["rotate"] = float(out["rotate"])
     e = doc.get("edits") or {}
     out["rename"] = "; ".join(f"{k}={v}" for k, v in (e.get("rename") or {}).items())
     out["swap"] = "; ".join(f"{a},{b}" for a, b in e.get("swap") or [])
@@ -467,7 +467,7 @@ def main() -> None:
             st.slider("Helix size", 0.5, 2.0, step=0.05, key="helix_scale")
             st.slider("Strand size", 0.5, 2.0, step=0.05, key="strand_scale")
             st.slider("DNA size", 0.5, 2.0, step=0.05, key="dna_scale")
-            st.slider("Rotate (°)", -180, 180, step=15, key="rotate")
+            st.slider("Rotate (°)", -180.0, 180.0, step=0.5, key="rotate")
             st.text_input("Swap", key="swap", help="two elements, e.g. α1,α3 (several: separate with ;)")
             st.text_input("Move", key="move", help="e.g. α2=1,-2 (page units)")
             st.text_input("Rename", key="rename", help="e.g. res:167-182=Gd")

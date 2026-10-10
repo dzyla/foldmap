@@ -177,3 +177,13 @@ def test_flip_v_accepts_booleans_and_yes_no_text_only(tmp_path):
         spec("maybe")
     with pytest.raises(ValueError, match="flip_v"):
         spec(1)
+
+
+def test_layout_document_of_a_conservation_figure(tmp_path):
+    """A conservation-coloured figure with an alignment can be saved as a layout file and reloaded."""
+    msa = str(DATA / "ubq_family.fasta")
+    spec = figure_spec(UBQ, theme="conservation", msa=msa)
+    doc = layout_document(spec)
+    assert doc["theme"] == "conservation" and doc["layout"]["msa"] == msa
+    again = figure_spec(UBQ, layout_file=layoutfile.save(tmp_path / "fig.yaml", doc))
+    assert again.theme == "conservation" and str(again.msa) == msa

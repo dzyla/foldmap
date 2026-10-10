@@ -402,3 +402,23 @@ def test_app_reports_a_layout_file_with_a_bad_value():
     bad = b"layout: {rotate: 30\n"
     at.file_uploader(key="layout_upload").set_value(("layout.yaml", bad, "application/x-yaml")).run()
     assert not at.exception and any("not valid YAML" in e.value for e in at.error)
+
+
+def test_app_layout_file_keeps_a_fractional_rotate():
+    import yaml
+
+    from foldmap.app import settings_from_document
+
+    assert settings_from_document({"layout": {"rotate": 12.5}})["rotate"] == 12.5
+    doc = {"foldmap": 1, "layout": {"rotate": 12.5}}
+    at = _load(_app(), DATA / "1UBQ.cif")
+    at.button(key="pick_publication").click().run()
+    up = ("layout.yaml", yaml.safe_dump(doc).encode(), "application/x-yaml")
+    at.file_uploader(key="layout_upload").set_value(up).run()
+    assert not at.exception and not at.error
+    assert at.session_state["rotate"] == 12.5
+    old = {"foldmap": 1, "layout": {"rotate": 30}}
+    at.file_uploader(key="layout_upload").set_value(
+        ("l.yaml", yaml.safe_dump(old).encode(), "application/x-yaml")
+    ).run()
+    assert not at.exception and at.session_state["rotate"] == 30
