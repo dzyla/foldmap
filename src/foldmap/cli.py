@@ -876,6 +876,7 @@ def main(argv: list[str] | None = None) -> int:
                 conservation_bar=not args.no_conservation_bar,
                 title=args.title,
                 uniprot=args.uniprot,
+                msa=args.msa,
             )
             for out in args.output:
                 print(f"wrote {save(fig, out)}")

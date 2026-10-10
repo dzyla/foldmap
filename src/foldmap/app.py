@@ -12,10 +12,13 @@ from dataclasses import fields, replace
 from pathlib import Path
 
 from foldmap import CREDIT
-from foldmap.cli import _adjustments, _domain_spec, make_figure_and_loops, make_layout
+from foldmap.cli import _adjustments, _domain_spec, make_layout
 from foldmap.fetch import CACHE, fetch  # noqa: F401 - fetch is part of the app's API
 from foldmap.render import save, save_svg
+from foldmap.spec import FigureSpec, draw_spec
+from foldmap.spec import layout_document as spec_document
 from foldmap.style import CHOICES, THEMES, Style
+from foldmap.symmetry import TOLERANCE
 
 STYLE_FIELDS = {f.name: f.type for f in fields(Style)}
 PREVIEW_THEMES = [  # shown in the style picker as static thumbnails (scripts/make_previews.py)
@@ -59,6 +62,14 @@ LAYOUT_DEFAULTS = {
     "msa_path": "",
     "msa_reference": "",
     "domains": "",
+    "chains": "",
+    # layout-file options the app has no control for: kept as loaded and saved again
+    "flip_v": False,
+    "dna": True,
+    "symmetry_tol": TOLERANCE,
+    "protomers": None,
+    "up": None,
+    "view": None,
 }
 EXAMPLES = {"1LMB": "λ repressor on DNA", "5NKT": "FimA", "8UTF": "measles F trimer", "1UBQ": "ubiquitin"}
 
@@ -90,8 +101,22 @@ def layout_options(settings: dict) -> dict:
         "uniprot": None if (settings.get("uniprot") or "off") in ("off", "") else settings["uniprot"],
         "msa": settings.get("msa_path") or None,
         "msa_reference": settings.get("msa_reference") or None,
+        "chains": [c.strip() for c in (settings.get("chains") or "").split(",") if c.strip()] or None,
+        **{k: settings[k] for k in ("flip_v", "dna", "symmetry_tol", "protomers", "up", "view") if k in settings},
         **_adjustments(Args),
     }
+
+
+def spec_of(path, settings: dict) -> FigureSpec:
+    """The figure the app's settings describe: the same FigureSpec the command line and the MCP server build."""
+    return FigureSpec(
+        Path(path),
+        theme=settings.get("theme", "publication"),
+        look=look_of(settings),
+        title=settings.get("title") or None,
+        mode=settings.get("mode", "projected"),
+        **layout_options(settings),
+    )
 
 
 def structure_choices(source: str, limit: int = 12) -> list[tuple[str, str]]:
@@ -128,6 +153,7 @@ def sequence_files(path, settings: dict, view: dict) -> dict[str, bytes]:
         full_sequence=bool(view.get("full_sequence", False)),
         ss_colour=view.get("ss_colour", "figure"),
         title=settings.get("title") or None,
+        msa=msa or None,
     )
     out = {"svg": save_svg(fig).encode()}
     with tempfile.TemporaryDirectory() as tmp:
@@ -137,13 +163,8 @@ def sequence_files(path, settings: dict, view: dict) -> dict[str, bytes]:
 
 
 def figure(path, settings: dict):
-    return make_figure_and_loops(
-        path,
-        settings.get("mode", "projected"),
-        title=settings.get("title") or None,
-        look=look_of(settings),
-        **layout_options(settings),
-    )
+    drawn = draw_spec(spec_of(path, settings))
+    return drawn.figure, drawn.loops
 
 
 def figure_files(path, settings: dict) -> dict[str, bytes]:
@@ -157,29 +178,7 @@ def figure_files(path, settings: dict) -> dict[str, bytes]:
 
 def layout_document(path, settings: dict) -> dict:
     """The app's settings as a layout file document (element references saved as residue ranges)."""
-    from foldmap import layoutfile
-
-    look, opts = look_of(settings), layout_options(settings)
-    edits = {k: opts.pop(k) for k in ("rename", "swap", "move")}
-    layout, sses, _ = make_layout(
-        path,
-        settings.get("mode", "projected"),
-        opts["rotate"],
-        look=look,
-        symmetry=opts["symmetry"],
-        assembly=opts["assembly"],
-        domains=opts["domains"],
-    )
-    options = {
-        "mode": settings.get("mode", "projected"),
-        "rotate": opts["rotate"],
-        "symmetry": opts["symmetry"],
-        "assembly": opts["assembly"],
-        "title": settings.get("title") or None,
-    }
-    return layoutfile.document(
-        Path(path).name, settings.get("theme", "publication"), look, options, edits, layout, sses
-    )
+    return spec_document(spec_of(path, settings), structure_name=Path(path).name)
 
 
 def settings_from_document(doc: dict) -> dict:
@@ -188,7 +187,18 @@ def settings_from_document(doc: dict) -> dict:
     out = {"theme": theme, **vars(THEMES[theme]), **(doc.get("style") or {})}
     lay = doc.get("layout") or {}
     for key, default in LAYOUT_DEFAULTS.items():
-        out[key] = lay.get(key, default) if key in ("mode", "rotate", "symmetry", "assembly", "title") else default
+        out[key] = default
+    for key in (
+        "mode", "rotate", "symmetry", "assembly", "title", "membrane", "focus", "msa_reference",
+        "flip_v", "dna", "symmetry_tol", "protomers", "up", "view",
+    ):  # fmt: skip
+        if lay.get(key) is not None:
+            out[key] = lay[key]
+    out["uniprot"] = lay.get("uniprot") or "off"
+    chains = lay.get("chains")
+    out["chains"] = ",".join(chains) if isinstance(chains, list) else (chains or "")
+    msa = lay.get("msa")
+    out["msa_path"] = msa if msa and Path(msa).is_file() else ""  # an alignment saved on another machine is not here
     out["title"] = out["title"] or ""
     out["rotate"] = int(round(float(out["rotate"])))
     e = doc.get("edits") or {}
@@ -262,13 +272,7 @@ def main() -> None:
         from foldmap.interactive import build_page
 
         settings = json.loads(settings_json)
-        return build_page(
-            path,
-            settings.get("mode", "projected"),
-            look=look_of(settings),
-            title=settings.get("title") or None,
-            **layout_options(settings),
-        )
+        return build_page(path, **spec_of(path, settings).page_kwargs())
 
     def apply_theme(name: str | None = None) -> None:
         name = name or ss["theme"]
@@ -443,6 +447,7 @@ def main() -> None:
         with st.expander("Symmetry and assembly"):
             st.text_input("Symmetry", key="symmetry", help="auto, off, C2, D3, helical")
             st.text_input("Assembly", key="assembly", help="auto, asu, or an assembly id")
+            st.text_input("Chains", key="chains", help="draw only these chains, e.g. A,B (empty: all)")
             st.text_input(
                 "Large assemblies",
                 key="focus",

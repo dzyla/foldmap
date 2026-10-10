@@ -48,9 +48,11 @@ def draw_sequence(
     conservation_bar: bool = True,
     title: str | None = None,
     uniprot: str | None = None,
+    msa: str | None = None,
 ) -> Figure:
     """ss_colour: 'figure' paints each element as in the topology figure drawn with `look`; 'black' is the
-    classic plain style."""
+    classic plain style. msa: the alignment or ConSurf table file the figure's colours come from (theme
+    'conservation'); `alignment` is what the sequence view shows."""
     if columns < 10:
         raise ValueError("columns must be at least 10")
     if ss_colour not in ("figure", "black"):
@@ -70,16 +72,17 @@ def draw_sequence(
             conservation_bar,
             title,
             uniprot,
+            msa,
         )
 
 
-def _element_colours(path, look: Style, ss_colour: str) -> dict[str, str]:
+def _element_colours(path, look: Style, ss_colour: str, msa=None, reference=None) -> dict[str, str]:
     if ss_colour == "black":
         return {}
     from .cli import make_layout
     from .render import element_colours
 
-    layout, sses, _ = make_layout(path, look=look, assembly="asu")
+    layout, sses, _ = make_layout(path, look=look, assembly="asu", msa=msa, msa_reference=reference)
     return element_colours(layout, sses, look)[0]
 
 
@@ -138,12 +141,24 @@ def _uniprot_track(path, track, accession):
 
 
 def _draw(
-    path, chain, alignment, reference, columns, look, full_sequence, ss_colour, threshold, cons_bar, title, uniprot=None
+    path,
+    chain,
+    alignment,
+    reference,
+    columns,
+    look,
+    full_sequence,
+    ss_colour,
+    threshold,
+    cons_bar,
+    title,
+    uniprot=None,
+    msa=None,
 ):
     track = chain_track(path, chain, full_sequence)
     regions, lanes, sites = _uniprot_track(path, track, uniprot) if uniprot else ([], 0, [])
     feat_h = lanes * _FEAT_H + (_SITE_H if sites else 0.0) + (0.4 if lanes or sites else 0.0)
-    colour_of = _element_colours(path, look, ss_colour)
+    colour_of = _element_colours(path, look, ss_colour, msa, reference)
     if alignment is not None:
         mapping = map_alignment(alignment, track, reference)
         rows, names, position, ref = alignment.rows, alignment.names, mapping.position, mapping.reference

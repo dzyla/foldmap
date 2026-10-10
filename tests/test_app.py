@@ -157,11 +157,11 @@ def test_style_stage_draws_nothing(monkeypatch):
     """Picking a style must not render the loaded structure once per theme."""
     from streamlit.testing.v1 import AppTest
 
-    import foldmap.cli as cli
+    import foldmap.spec as spec
 
     calls = []
-    real = cli.make_figure_and_loops
-    monkeypatch.setattr(cli, "make_figure_and_loops", lambda *a, **k: (calls.append(1), real(*a, **k))[1])
+    real = spec.draw_spec
+    monkeypatch.setattr(spec, "draw_spec", lambda *a, **k: (calls.append(1), real(*a, **k))[1])
     at = AppTest.from_file(str(APP), default_timeout=120)
     at.run()
     at.text_input(key="source").set_value(str(DATA / "1UBQ.cif"))
@@ -198,3 +198,61 @@ def test_app_accepts_a_consurf_table():
     assert any("ConSurf" in c.value for c in at.caption)
     out = sequence_files(DATA / "1TIM.cif", {"theme": "publication", "msa_path": str(table)}, {"columns": 40})
     assert out["svg"].startswith(b"<svg") and b"strict:" not in out["svg"]
+
+
+def test_app_layout_file_keeps_every_layout_option():
+    from foldmap.app import layout_document, settings_from_document
+
+    msa = str(DATA / "ubq_family.fasta")
+    settings = {"theme": "publication", "focus": "none", "chains": "A", "msa_path": msa, "msa_reference": "1UBQ_A"}
+    doc = layout_document(DATA / "1UBQ.cif", settings)
+    assert doc["layout"]["focus"] == "none" and doc["layout"]["chains"] == ["A"] and doc["layout"]["msa"] == msa
+    back = settings_from_document(doc)
+    assert back["focus"] == "none" and back["chains"] == "A" and back["msa_path"] == msa
+    assert back["msa_reference"] == "1UBQ_A" and back["uniprot"] == "off" and back["membrane"] == "off"
+    back = settings_from_document({"layout": {"membrane": "auto", "uniprot": "P0CG48", "msa": "/nowhere/x.fasta"}})
+    assert back["membrane"] == "auto" and back["uniprot"] == "P0CG48" and back["msa_path"] == ""
+
+
+def test_app_layout_file_round_trips_through_the_app():
+    """Download the layout file with every option set, load it into a fresh app: every option comes back."""
+    import yaml
+
+    from foldmap.app import layout_document
+
+    msa = str(DATA / "ubq_family.fasta")
+    settings = {
+        "theme": "trace", "membrane": "flip", "focus": "none", "chains": "A", "msa_path": msa,
+        "msa_reference": "1UBQ_A", "rename": "res:A:23-34=Hx", "swap": "", "move": "", "dna": False,
+        "domains": "N=res:A:1-30", "rotate": 30, "title": "Round trip",
+    }  # fmt: skip
+    text = yaml.safe_dump(layout_document(DATA / "1UBQ.cif", settings), sort_keys=False)
+    at = _load(_app(), DATA / "1UBQ.cif")
+    at.button(key="pick_publication").click().run()
+    at.file_uploader(key="layout_upload").set_value(("layout.yaml", text.encode(), "application/x-yaml")).run()
+    assert not at.exception and not at.error
+    ss = at.session_state
+    assert ss["theme"] == "trace" and ss["membrane"] == "flip" and ss["focus"] == "none" and ss["chains"] == "A"
+    assert ss["msa_path"] == msa and ss["msa_reference"] == "1UBQ_A" and ss["dna"] is False
+    assert ss["rotate"] == 30 and ss["title"] == "Round trip" and "Hx" in ss["rename"] and "N=" in ss["domains"]
+    from foldmap.app import LAYOUT_DEFAULTS, STYLE_FIELDS
+
+    again = layout_document(
+        DATA / "1UBQ.cif", {k: ss[k] for k in [*STYLE_FIELDS, *LAYOUT_DEFAULTS, "theme"] if k in ss}
+    )
+    first = yaml.safe_load(text)
+    for key in ("membrane", "focus", "chains", "msa", "msa_reference", "dna"):
+        assert again["layout"][key] == first["layout"][key], key
+    assert again["domains"] == first["domains"] and again["edits"] == first["edits"]
+
+
+def test_app_sequence_tab_with_the_conservation_theme(tmp_path):
+    """The conservation theme colours the sequence view's elements from the same alignment as the figure."""
+    at = _load(_app(), DATA / "1UBQ.cif")
+    at.button(key="pick_publication").click().run()
+    at.file_uploader(key="msa_upload").set_value(
+        ("ubq.fasta", (DATA / "ubq_family.fasta").read_bytes(), "text/plain")
+    ).run()
+    at.selectbox(key="theme").select("conservation").run()
+    assert not at.exception and at.session_state["msa_path"]
+    assert any("strict:" in m.value for m in at.markdown)

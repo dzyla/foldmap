@@ -247,6 +247,7 @@ def draw_sequence(
         full_sequence=full_sequence,
         ss_colour=ss_colour,
         title=title,
+        msa=msa_path,
     )
     save(fig, out)
     return [f"wrote {out}", _preview(fig)]
