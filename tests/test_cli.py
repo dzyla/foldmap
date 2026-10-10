@@ -118,3 +118,10 @@ def test_empty_title_option_clears_the_layout_files_title(ubq, tmp_path):
     assert main(["plot", str(ubq), "-o", str(kept), "--layout-file", str(lf)]) == 0
     assert main(["plot", str(ubq), "-o", str(cleared), "--layout-file", str(lf), "--title", ""]) == 0
     assert "Layout title" in kept.read_text() and "Layout title" not in cleared.read_text()
+
+
+def test_every_subcommand_has_a_handler():
+    from foldmap.cli import _COMMANDS, build_parser
+
+    sub = next(a for a in build_parser()._actions if a.dest == "command")
+    assert set(sub.choices) == set(_COMMANDS)

@@ -679,7 +679,7 @@ def styles_help() -> str:
     return "\n".join(lines)
 
 
-def main(argv: list[str] | None = None) -> int:
+def build_parser() -> argparse.ArgumentParser:
     from . import __version__
 
     parser = argparse.ArgumentParser(prog="foldmap", description="Publication-grade protein topology diagrams.")
@@ -837,89 +837,129 @@ def main(argv: list[str] | None = None) -> int:
             metavar="Å",
             help=f"how far copies may differ, CA RMSD (default {TOLERANCE:g}; raise it for low-resolution X-ray)",
         )
-    args = parser.parse_args(argv)
-    try:
-        if args.command == "uniprot":
-            from .uniprot import report
+    return parser
 
-            print(report(args.source))
-            return 0
-        if getattr(args, "structure", None) and not Path(args.structure).expanduser().is_file():
-            from .fetch import fetch
 
-            args.structure = str(fetch(args.structure))  # a PDB ID or UniProt accession: downloaded once, cached
-        if args.command == "mcp":
-            if not _has("mcp"):
-                print("foldmap: the MCP server needs the mcp package: pip install 'foldmap[mcp]'", file=sys.stderr)
-                return 1
-            from .mcp_server import main as serve
+def _resolve_structure(text: str) -> str:
+    if Path(text).expanduser().is_file():
+        return text
+    from .fetch import fetch
 
-            serve()
-            return 0
-        if args.command == "app":
-            if not _has("streamlit"):
-                print("foldmap: the app needs Streamlit: pip install 'foldmap[app]'", file=sys.stderr)
-                return 1
-            from .app import run
+    return str(fetch(text))  # a PDB ID or UniProt accession: downloaded once, cached
 
-            run()
-        if args.command == "sequence":
-            from .seqplot import draw_sequence
-            from .sequence import read_alignment
 
-            fig = draw_sequence(
-                args.structure,
-                chain=args.chain,
-                alignment=read_alignment(args.msa) if args.msa else None,
-                reference=args.reference,
-                columns=args.columns,
-                look=resolve_style(args.theme or "publication", args.style_file, args.set),
-                full_sequence=args.full_sequence,
-                ss_colour=args.ss_colour,
-                threshold=args.similarity,
-                conservation_bar=not args.no_conservation_bar,
-                title=args.title,
-                uniprot=args.uniprot,
-                msa=args.msa,
+def _cmd_summary(args) -> int:
+    print(summarize(args.structure))
+    return 0
+
+
+def _cmd_styles(args) -> int:
+    print(styles_help())
+    return 0
+
+
+def _cmd_app(args) -> int:
+    if not _has("streamlit"):
+        print("foldmap: the app needs Streamlit: pip install 'foldmap[app]'", file=sys.stderr)
+        return 1
+    from .app import run
+
+    run()
+    return 0
+
+
+def _cmd_uniprot(args) -> int:
+    from .uniprot import report
+
+    print(report(args.source))
+    return 0
+
+
+def _cmd_mcp(args) -> int:
+    if not _has("mcp"):
+        print("foldmap: the MCP server needs the mcp package: pip install 'foldmap[mcp]'", file=sys.stderr)
+        return 1
+    from .mcp_server import main as serve
+
+    serve()
+    return 0
+
+
+def _cmd_sequence(args) -> int:
+    from .seqplot import draw_sequence
+    from .sequence import read_alignment
+
+    fig = draw_sequence(
+        args.structure,
+        chain=args.chain,
+        alignment=read_alignment(args.msa) if args.msa else None,
+        reference=args.reference,
+        columns=args.columns,
+        look=resolve_style(args.theme or "publication", args.style_file, args.set),
+        full_sequence=args.full_sequence,
+        ss_colour=args.ss_colour,
+        threshold=args.similarity,
+        conservation_bar=not args.no_conservation_bar,
+        title=args.title,
+        uniprot=args.uniprot,
+        msa=args.msa,
+    )
+    for out in args.output:
+        print(f"wrote {save(fig, out)}")
+    return 0
+
+
+def _cmd_figure(args) -> int:
+    """plot and interactive: the same figure spec, drawn or written as a page."""
+    spec = _spec_of(args)
+    if args.command == "interactive":
+        from .interactive import write_page
+
+        for out in args.output:
+            print(f"wrote {write_page(spec.structure, out, viewer=args.viewer, **spec.page_kwargs())}")
+    else:
+        drawn = draw_spec(spec)
+        if drawn.stuck:
+            print(
+                f"foldmap: warning: no clear route for {len(drawn.stuck)} loop(s), drawn as plain curves "
+                f"that may cross elements: {', '.join(drawn.stuck)}",
+                file=sys.stderr,
             )
-            for out in args.output:
-                print(f"wrote {save(fig, out)}")
-            return 0
-        if args.command == "styles":
-            print(styles_help())
-            return 0
-        if args.command in ("plot", "interactive"):
-            spec = _spec_of(args)
-            if args.command == "interactive":
-                from .interactive import write_page
+        for out in args.output:
+            print(f"wrote {save(drawn.figure, out)}")
+    method = experimental_method(spec.structure) if spec.look.color_by == "plddt" else None
+    if method:
+        print(
+            f"foldmap: warning: {spec.structure} is an experimental structure ({method.lower()}); "
+            "its B-factor column holds B-factors, not pLDDT confidence",
+            file=sys.stderr,
+        )
+    if args.save_layout:
+        print(f"wrote {layoutfile.save(args.save_layout, layout_document(spec))}")
+    return 0
 
-                for out in args.output:
-                    print(f"wrote {write_page(spec.structure, out, viewer=args.viewer, **spec.page_kwargs())}")
-            else:
-                drawn = draw_spec(spec)
-                if drawn.stuck:
-                    print(
-                        f"foldmap: warning: no clear route for {len(drawn.stuck)} loop(s), drawn as plain curves "
-                        f"that may cross elements: {', '.join(drawn.stuck)}",
-                        file=sys.stderr,
-                    )
-                for out in args.output:
-                    print(f"wrote {save(drawn.figure, out)}")
-            method = experimental_method(spec.structure) if spec.look.color_by == "plddt" else None
-            if method:
-                print(
-                    f"foldmap: warning: {spec.structure} is an experimental structure ({method.lower()}); "
-                    "its B-factor column holds B-factors, not pLDDT confidence",
-                    file=sys.stderr,
-                )
-            if args.save_layout:
-                print(f"wrote {layoutfile.save(args.save_layout, layout_document(spec))}")
-            return 0
-        print(summarize(args.structure))
+
+_COMMANDS = {
+    "summary": _cmd_summary,
+    "styles": _cmd_styles,
+    "app": _cmd_app,
+    "uniprot": _cmd_uniprot,
+    "mcp": _cmd_mcp,
+    "sequence": _cmd_sequence,
+    "plot": _cmd_figure,
+    "interactive": _cmd_figure,
+}
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = build_parser().parse_args(argv)
+    try:
+        if getattr(args, "structure", None):
+            args.structure = _resolve_structure(args.structure)
+        return _COMMANDS[args.command](args)
     except (FileNotFoundError, ValueError, RuntimeError) as err:  # RuntimeError: gemmi cannot read the file
         print(f"foldmap: {err}", file=sys.stderr)
         return 1
-    return 0
 
 
 if __name__ == "__main__":
