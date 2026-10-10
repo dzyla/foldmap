@@ -1,5 +1,6 @@
 """Downloads and the cache: only whole files are kept, and a broken cache entry is fetched again. Offline."""
 
+import http.client
 import json
 from pathlib import Path
 
@@ -106,3 +107,40 @@ def test_broken_uniprot_cache_entry_is_fetched_again(monkeypatch, tmp_path):
     assert uniprot.entry("P69905").sequence
     assert len(asked) == 1
     assert json.loads((folder / "P69905.json").read_bytes()) == json.loads(good)
+
+
+class _Dropped:
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *a):
+        return False
+
+    def read(self):
+        raise http.client.IncompleteRead(b"abc", 100)
+
+
+def test_connection_cut_mid_download_gives_a_friendly_error_and_caches_nothing(monkeypatch, tmp_path):
+    monkeypatch.setattr(fetch_mod, "CACHE", tmp_path)
+    monkeypatch.setattr(fetch_mod.urllib.request, "urlopen", lambda request, timeout=0: _Dropped())
+    with pytest.raises(ValueError, match="could not download"):
+        fetch("1UBQ")
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_connection_cut_mid_uniprot_request_gives_a_friendly_error(monkeypatch, tmp_path):
+    monkeypatch.setattr(uniprot, "CACHE", tmp_path)
+    monkeypatch.setattr(uniprot.urllib.request, "urlopen", lambda request, timeout=0: _Dropped())
+    with pytest.raises(ValueError, match="could not reach"):
+        uniprot.entry("P69905")
+
+
+def test_cut_off_cache_file_is_replaced_without_deleting_it_first(monkeypatch, tmp_path):
+    (tmp_path / "1UBQ.cif").write_bytes(UBQ[:3000])
+    _serve(monkeypatch, tmp_path, UBQ)
+
+    def no_unlink(self, *a, **k):
+        raise AssertionError("the cut-off file must be replaced atomically, not unlinked")
+
+    monkeypatch.setattr(Path, "unlink", no_unlink)
+    assert fetch("1UBQ").read_bytes() == UBQ

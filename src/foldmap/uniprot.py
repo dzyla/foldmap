@@ -6,6 +6,7 @@ the UniProt sequence to the chain. Entries and mappings are downloaded once and 
 
 from __future__ import annotations
 
+import http.client
 import json
 import re
 import urllib.request
@@ -117,7 +118,7 @@ def _get(url: str, cache: Path) -> dict:
         req = urllib.request.Request(url, headers={"User-Agent": AGENT, "Accept": "application/json"})
         with urllib.request.urlopen(req, timeout=30) as r:
             data = json.loads(r.read().decode())
-    except OSError as err:
+    except (OSError, http.client.HTTPException) as err:
         raise ValueError(f"could not reach {url.split('/')[2]} ({err})") from None
     atomic_write(cache, json.dumps(data))
     return data

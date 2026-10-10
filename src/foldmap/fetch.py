@@ -4,6 +4,7 @@ paths, or uploaded bytes. Downloads are cached in ~/.cache/foldmap."""
 from __future__ import annotations
 
 import hashlib
+import http.client
 import os
 import re
 import tempfile
@@ -43,11 +44,10 @@ def _download(url: str, path: Path, what: str) -> Path:
             f.seek(max(0, path.stat().st_size - 64))
             if _complete(f.read()):
                 return path
-        path.unlink()
     try:
         with urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": AGENT}), timeout=30) as r:
             data = r.read()
-    except OSError as err:
+    except (OSError, http.client.HTTPException) as err:
         raise ValueError(f"could not download {what} ({err})") from None
     if not _complete(data):
         raise ValueError(f"could not download {what} (the file arrived incomplete; try again)")
