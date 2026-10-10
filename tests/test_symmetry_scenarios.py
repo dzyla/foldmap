@@ -67,7 +67,10 @@ def build(
         out[0].add_chain(ch)
     out.setup_entities()
     path = tmp_path / fname
-    out.write_pdb(str(path))
+    if path.suffix == ".cif":
+        out.make_mmcif_document().write_file(str(path))
+    else:
+        out.write_pdb(str(path))
     return path
 
 
@@ -311,3 +314,23 @@ def test_left_handed_filament_says_so_on_the_figure(tmp_path, capsys):
     assert "twist -115.0°, rise 7.9 Å (left-handed)" in capsys.readouterr().out
     right = " ".join(t.get_text() for t in make_figure(DATA / "6Y7S.cif").axes[0].texts)
     assert "115.0° twist," in right and "left-handed" not in right
+
+
+def icosahedral(tmp_path):
+    """60 ubiquitin copies under the icosahedral rotation group, off-axis."""
+    from scipy.spatial.transform import Rotation
+
+    group = Rotation.create_group("I")
+    ops = [(group[k].as_matrix(), np.zeros(3)) for k in range(len(group))]
+    names = [f"{chr(65 + k % 26)}{k // 26 or ''}" for k in range(len(ops))]
+    return build(tmp_path, ops, offset=(0.0, 25.0, 8.0), names=names, fname="ico.cif")
+
+
+def test_an_icosahedral_cage_is_found_quickly(tmp_path):
+    import time
+
+    path = icosahedral(tmp_path)
+    t = time.perf_counter()
+    s = found(path)
+    assert s.kind == "I" and s.n == 5 and s.rmsd < 0.1
+    assert time.perf_counter() - t < 8  # was ~35 s: every pair superposed again for every trial motion

@@ -32,6 +32,7 @@ MIN_TURN = np.radians(10)  # smaller rotations are lattice-like translations, no
 MIN_RISE = 2.0  # Å along the axis per copy for a helical filament
 MIN_TWIST = np.radians(3.0)  # a helical filament turns at least this much per copy (less: a translation)
 MAX_ORDER = 24
+_NEAREST = 3  # copies tried as the image of each subunit: those whose centroids land closest
 
 
 @dataclass(eq=False)
@@ -105,10 +106,27 @@ class _Assembly:
         self.cluster_of = {c: k for k, cl in enumerate(self.clusters) for c in cl}
         self.atoms = {c: {to_rep[c][i]: subs[c][1][i] for i in to_rep[c]} for c in subs}
         self.ca = {c: subs[c][1] for c in subs}
+        self._pairs: dict[tuple[str, str], tuple[np.ndarray, np.ndarray]] = {}
+        self._trees: dict[int, cKDTree] = {}  # cluster -> its members' centroids
+        self._axes: dict[float, list[np.ndarray]] = {}  # tolerance -> candidate axes
 
     def pair(self, a: str, b: str) -> tuple[np.ndarray, np.ndarray]:
-        keys = sorted(self.atoms[a].keys() & self.atoms[b].keys())
-        return np.array([self.atoms[a][k] for k in keys]), np.array([self.atoms[b][k] for k in keys])
+        """Matched CA atoms of two copies (cached: the searches ask for the same pairs many times)."""
+        if (a, b) not in self._pairs:
+            keys = sorted(self.atoms[a].keys() & self.atoms[b].keys())
+            self._pairs[(a, b)] = (
+                np.array([self.atoms[a][k] for k in keys]).reshape(-1, 3),
+                np.array([self.atoms[b][k] for k in keys]).reshape(-1, 3),
+            )
+        return self._pairs[(a, b)]
+
+    def nearest(self, cluster: int, point: np.ndarray, k: int) -> list[str]:
+        """The k members of a cluster whose centroids lie closest to a point."""
+        cl = self.clusters[cluster]
+        if cluster not in self._trees:
+            self._trees[cluster] = cKDTree(np.array([self.centroid(c) for c in cl]))
+        _, idx = self._trees[cluster].query(point, k=min(k, len(cl)))
+        return [cl[j] for j in np.atleast_1d(idx)]
 
     def centroid(self, c: str) -> np.ndarray:
         return self.ca[c].mean(axis=0)
@@ -152,7 +170,10 @@ def _screw(r: np.ndarray, t: np.ndarray) -> tuple[float, np.ndarray, np.ndarray,
 
 def _candidate_axes(asm: _Assembly, tol: float) -> list[np.ndarray]:
     """Directions proposed by superposing copies onto each other, merged when within ~8 degrees."""
+    if tol in asm._axes:
+        return asm._axes[tol]
     axes: list[np.ndarray] = []
+    asm._axes[tol] = axes
     for cl in asm.clusters:
         for i, a in enumerate(cl):
             for b in cl[i + 1 :]:
@@ -170,12 +191,12 @@ def _candidate_axes(asm: _Assembly, tol: float) -> list[np.ndarray]:
 def _maps(asm: _Assembly, motion, tol: float) -> tuple[dict[str, str], float] | None:
     """Apply a motion to every clustered subunit; each must land on a distinct copy within tol Å."""
     perm, worst = {}, 0.0
-    for cl in asm.clusters:
+    for k, cl in enumerate(asm.clusters):
         if len(cl) < 2:
             continue
         for a in cl:
             best, score = None, np.inf
-            for b in cl:
+            for b in asm.nearest(k, motion(asm.centroid(a)[None])[0], _NEAREST):
                 p, q = asm.pair(a, b)
                 if len(p) < MIN_RES:
                     continue
