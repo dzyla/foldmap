@@ -52,6 +52,20 @@ def test_compare_reports_moves_beyond_tolerance_only():
     assert any("new helix:A:2-10" in p for p in compare(a, e))
 
 
+HASHED = """<svg xmlns="http://www.w3.org/2000/svg" width="10pt" height="10pt">
+<defs><clipPath id="p1a2b3c4d5e"><rect x="0" y="0" width="5" height="5"/></clipPath>
+<path id="m0123456789" d="M 0 0 L 1 1"/><pattern id="hfedcba9876"/></defs>
+<g id="helix:A:1-5" clip-path="url(#p1a2b3c4d5e)"><path d="M 1 1 L 2 2" style="fill: url(#hfedcba9876)"/></g></svg>"""
+
+
+def test_hashed_matplotlib_ids_are_ignored():
+    fp = fingerprint(HASHED)
+    assert list(fp["items"]) == ["helix:A:1-5"]
+    renamed = HASHED.replace("p1a2b3c4d5e", "p00000000ff").replace("m0123456789", "maaaaaaaaaa")
+    assert compare(fp, fingerprint(renamed)) == []
+    assert fp["unnamed"] == {}
+
+
 def test_compare_detects_a_colour_only_change():
     a = fingerprint(SAMPLE)
     b = fingerprint(SAMPLE.replace("#ABC", "#ABD"))

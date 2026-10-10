@@ -14,6 +14,9 @@ from pathlib import Path
 SVG = "{http://www.w3.org/2000/svg}"
 TOL = 0.75  # points
 _AUTO = re.compile(r"^(figure|axes|patch|line2d|text|PathCollection|PolyCollection|LineCollection|image|legend)_\d+$")
+# matplotlib names clip paths, markers and hatches p/m/h + a salted hash of their full-precision geometry,
+# so a 1-ulp change renames them; they carry no layout information of their own.
+_HASHED = re.compile(r"^[pmh][0-9a-f]{10}$")
 _NUM = re.compile(r"-?\d+(?:\.\d+)?(?:e-?\d+)?")
 
 
@@ -71,6 +74,8 @@ def fingerprint(svg_text: str) -> dict:
     for el in root.iter():
         gid = el.get("id")
         if not gid:
+            continue
+        if _HASHED.match(gid):
             continue
         auto = _AUTO.match(gid)
         if auto:
