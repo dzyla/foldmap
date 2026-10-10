@@ -196,8 +196,9 @@ class Stem:
 
 
 class NARun(NamedTuple):
-    """Unpaired nucleotides lo..hi of one strand. left/right: the paired (strand, nucleotide) just before and
-    after it (None at a strand end). kind: hairpin, internal, junction, linker or tail."""
+    """Nucleotides lo..hi of one strand that are in no stem (a tie's nucleotides can be among them).
+    left/right: the stem nucleotide (strand, nucleotide) just before and after it (None at a strand end).
+    kind: hairpin, internal, junction, linker or tail."""
 
     strand: int
     lo: int
@@ -222,21 +223,27 @@ class NAStructure:
     ties: list[BasePair] = field(default_factory=list)  # isolated pairs: drawn as a bar, not a stem
 
 
-def _stacks(p: BasePair, q: BasePair) -> bool:
-    """q continues p's stem: the next step, a bulge of up to 2 nt on one side, or a 1x1 mismatch."""
+def _stacks(p: BasePair, q: BasePair, paired: set[tuple[int, int]]) -> bool:
+    """q continues p's stem: the next step, a bulge of up to 2 nt on one side, or a 1x1 mismatch. A nucleotide
+    the step skips must be unpaired (`paired`: every paired (strand, nucleotide)), else it would sit in the stem
+    and in another pair."""
     if (p.a, p.b) != (q.a, q.b):
         return False
     gi, gj = q.i - p.i - 1, p.j - q.j - 1
     if gi < 0 or gj < 0:
         return False
-    return (gi == 0 and gj <= 2) or (gj == 0 and gi <= 2) or (gi == gj == 1)
+    if not ((gi == 0 and gj <= 2) or (gj == 0 and gi <= 2) or (gi == gj == 1)):
+        return False
+    skipped = [(p.a, i) for i in range(p.i + 1, q.i)] + [(p.b, j) for j in range(q.j + 1, p.j)]
+    return not any(n in paired for n in skipped)
 
 
 def _group_stems(pairs: list[BasePair]) -> list[list[BasePair]]:
+    paired = {(p.a, p.i) for p in pairs} | {(p.b, p.j) for p in pairs}
     stems: list[list[BasePair]] = []
     for p in sorted(pairs, key=lambda p: (p.a, p.b, p.i, -p.j)):
         for st in stems:
-            if _stacks(st[-1], p):
+            if _stacks(st[-1], p, paired):
                 st.append(p)
                 break
         else:
@@ -276,6 +283,7 @@ def secondary_structure(strands, pairs: list[BasePair]) -> NAStructure:
         stem = Stem(group)
         for p, q in zip(group, group[1:]):
             stem.bulges += [(p.a, i) for i in range(p.i + 1, q.i)] + [(p.b, j) for j in range(q.j + 1, p.j)]
+        stem.bulges.sort()
         out.stems.append(stem)
     out.stems.sort(key=lambda s: (s.a, s.pairs[0].i))
     rna = dna = 0

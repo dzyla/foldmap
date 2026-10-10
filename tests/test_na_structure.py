@@ -2,9 +2,11 @@
 
 from pathlib import Path
 
+import numpy as np
+
 from foldmap.io import _nucleic_strands, load_backbone, load_nucleic, read_model
-from foldmap.model import nucleic_from_pairs
-from foldmap.nucleic import pair_nucleotides
+from foldmap.model import NAStrand, ResLabel, nucleic_from_pairs
+from foldmap.nucleic import BasePair, NARun, pair_nucleotides, secondary_structure
 
 NA = Path(__file__).parent / "data" / "na"
 DATA = Path(__file__).parent / "data"
@@ -14,7 +16,9 @@ def _na(pdb):
     path = NA / f"{pdb}.cif.gz" if (NA / f"{pdb}.cif.gz").is_file() else DATA / f"{pdb}.cif"
     try:
         bb = load_backbone(path, "asu")
-    except ValueError:  # nucleic acid only (1EHZ): no Backbone to load against until Task 6
+    except ValueError as e:  # nucleic acid only (1EHZ): no Backbone to load against until Task 6
+        if "no protein residues" not in str(e):
+            raise
         found = _nucleic_strands(read_model(path, "asu")[0])
         return nucleic_from_pairs([s for s, _ in found], pair_nucleotides([r for _, r in found]), {}, {})
     return load_nucleic(path, bb, "asu")
@@ -24,6 +28,30 @@ def _arms(na, st):
     (a, i0, i1), (b, j0, j1) = st.arm5, st.arm3
     la, lb = na.strands[a].labels, na.strands[b].labels
     return f"{la[i0].chain}:{la[i0].tag}-{la[i1].tag}/{lb[j0].chain}:{lb[j0].tag}-{lb[j1].tag}"
+
+
+def _runs(na):
+    out = []
+    for r in na.structure.runs:
+        labels = na.strands[r.strand].labels
+        out.append((r.kind, f"{labels[r.lo].chain}:{labels[r.lo].tag}-{labels[r.hi].tag}"))
+    return out
+
+
+def _strands(*lengths):
+    """Synthetic RNA strands A, B ... of these lengths, numbered from 1 (nucleotide index k is residue k + 1)."""
+    out = []
+    for chain, n in zip("ABCDEFGH", lengths):
+        out.append(
+            NAStrand(
+                chain, [ResLabel(chain, k + 1, "", "A") for k in range(n)], np.zeros((n, 3)), np.zeros((n, 3)), True
+            )
+        )
+    return out
+
+
+def _pairs(*ij, a=0, b=0):
+    return [BasePair(a, i, b, j, "WC") for i, j in ij]
 
 
 def test_30qm_ncrna_has_its_six_stems():
@@ -37,8 +65,17 @@ def test_30qm_ncrna_has_its_six_stems():
         "P5": (3, "1:67-69/1:73-75"),
         "P6": (5, "1:77-81/1:86-90"),
     }
-    kinds = sorted(r.kind for r in na.structure.runs)
-    assert kinds.count("hairpin") == 5 and kinds.count("junction") == 3 and kinds.count("tail") == 1
+    assert _runs(na) == [
+        ("hairpin", "1:13-15"),
+        ("hairpin", "1:28-32"),
+        ("junction", "1:40-51"),
+        ("hairpin", "1:57-61"),
+        ("hairpin", "1:70-72"),
+        ("junction", "1:76-76"),
+        ("hairpin", "1:82-85"),
+        ("junction", "1:91-111"),
+        ("tail", "1:119-121"),
+    ]
 
 
 def test_trna_cloverleaf():
@@ -50,7 +87,15 @@ def test_trna_cloverleaf():
         ("P3", 4, "A:27-30/A:40-43"),  # anticodon: A31·Ψ39 is not a Watson-Crick pair in this structure
         ("P4", 5, "A:49-53/A:61-65"),  # T
     ]
-    assert sorted(r.kind for r in na.structure.runs).count("hairpin") == 3
+    assert _runs(na) == [
+        ("junction", "A:8-9"),
+        ("hairpin", "A:14-21"),  # D loop: holds G19 of the G19·C56 tie
+        ("junction", "A:26-26"),
+        ("hairpin", "A:31-39"),  # anticodon loop
+        ("junction", "A:44-48"),  # variable loop
+        ("hairpin", "A:54-60"),  # T loop: holds C56
+        ("tail", "A:73-76"),  # CCA end
+    ]
 
 
 def test_cas9_heteroduplex_is_one_stem_across_two_strands():
@@ -86,3 +131,57 @@ def test_stem_ids_are_unique_and_name_their_arms():
     ids = [st.id for st in na.structure.stems]
     assert len(ids) == len(set(ids))
     assert ids[0].startswith("AA:") and "/" in ids[0]
+
+
+def test_a_bulge_nucleotide_that_is_paired_elsewhere_breaks_the_stem():
+    # (10,40) -> (11,37) would skip 38 and 39 as a 2-nt bulge, but 38 pairs with 60
+    pairs = _pairs((10, 40), (11, 37), (12, 36), (38, 60))
+    ss = secondary_structure(_strands(70), pairs)
+    assert [st.pairs for st in ss.stems] == [_pairs((11, 37), (12, 36))]
+    assert ss.ties == _pairs((10, 40), (38, 60))
+    stem_nts = [n for st in ss.stems for n in st.nucleotides()]
+    assert len(stem_nts) == len(set(stem_nts))
+    tie_nts = {(t.a, t.i) for t in ss.ties} | {(t.b, t.j) for t in ss.ties}
+    assert not tie_nts & set(stem_nts)
+
+
+def test_bulges_are_sorted():
+    # a 1-nt bulge on the second arm (17), then one on the first arm (3)
+    ss = secondary_structure(_strands(20), _pairs((0, 19), (1, 18), (2, 16), (4, 15), (5, 14)))
+    assert len(ss.stems) == 1 and len(ss.stems[0]) == 5
+    assert ss.stems[0].bulges == [(0, 3), (0, 17)]
+
+
+def test_a_1x1_mismatch_stays_inside_the_stem():
+    ss = secondary_structure(_strands(20), _pairs((0, 19), (1, 18), (3, 16), (4, 15)))
+    assert [len(st) for st in ss.stems] == [4] and not ss.ties
+    assert ss.stems[0].bulges == [(0, 2), (0, 17)]
+    assert ss.runs == [NARun(0, 5, 14, (0, 4), (0, 15), "hairpin")]
+
+
+def test_an_internal_loop_between_two_stems():
+    ss = secondary_structure(_strands(30), _pairs((0, 29), (1, 28), (2, 27), (6, 23), (7, 22), (8, 21)))
+    assert [st.id for st in ss.stems] == ["A:1-3/A:28-30", "A:7-9/A:22-24"]
+    assert [(r.lo, r.hi, r.kind) for r in ss.runs] == [(3, 5, "internal"), (9, 20, "hairpin"), (24, 26, "internal")]
+
+
+def test_a_run_no_pair_encloses_is_a_linker():
+    ss = secondary_structure(_strands(22), _pairs((0, 9), (1, 8), (12, 21), (13, 20)))
+    assert [(r.lo, r.hi, r.kind) for r in ss.runs] == [(2, 7, "hairpin"), (10, 11, "linker"), (14, 19, "hairpin")]
+    assert ss.runs[1].left == (0, 9) and ss.runs[1].right == (0, 12)
+
+
+def test_strands_without_pairs_are_one_tail_each():
+    ss = secondary_structure(_strands(5, 3), [])
+    assert not ss.stems and not ss.ties
+    assert ss.runs == [NARun(0, 0, 4, None, None, "tail"), NARun(1, 0, 2, None, None, "tail")]
+
+
+def test_a_one_nucleotide_strand_is_a_tail():
+    ss = secondary_structure(_strands(4, 1, 4), _pairs((0, 3), (1, 2), a=0, b=2))
+    assert ss.stems[0].id == "A:1-2/C:3-4"
+    assert ss.runs == [
+        NARun(0, 2, 3, (0, 1), None, "tail"),
+        NARun(1, 0, 0, None, None, "tail"),
+        NARun(2, 0, 1, None, (2, 2), "tail"),
+    ]
