@@ -1,7 +1,7 @@
-"""Kabsch-Sander DSSP: H-bond energies, helices, bridges.
+"""Kabsch-Sander DSSP: H-bond energies, n-turns, helices, bridges and ladders.
 
-Not implemented: bulge merging and the turn/bend (T, S) classes. Output codes:
-H alpha, G 3-10, I pi, E strand (ladder of >= 2 bridges), B isolated bridge, '-' other.
+Not implemented: beta-bulges and bends (S). Output codes: H alpha, G 3-10, I pi, E strand (ladder of >= 2
+bridges), B isolated bridge, T H-bonded turn, '-' other. DSSP priority: H > E > B > G > I.
 """
 
 from __future__ import annotations
@@ -21,6 +21,14 @@ _CA_CUTOFF = 9.0
 class DsspResult(NamedTuple):
     ss: str
     bridges: list[Bridge]
+
+
+class Ladder(NamedTuple):
+    """Bridges of one kind along two strands; i and j ascending (j runs backwards for antiparallel)."""
+
+    kind: str
+    i: list[int]
+    j: list[int]
 
 
 def _hydrogen_positions(bb: Backbone) -> np.ndarray:
@@ -60,68 +68,70 @@ def _hbond_set(bb: Backbone) -> set[tuple[int, int]]:
     return bonds
 
 
-def _resolve(n, alpha, g, pi, ladder, bridge) -> list[str]:
-    """Per-residue code from overlapping evidence. DSSP priority: H > E > B > G > I."""
-    out = []
-    for i in range(n):
-        if i in alpha:
-            out.append("H")
-        elif i in ladder:
-            out.append("E")
-        elif i in bridge:
-            out.append("B")
-        elif i in g:
-            out.append("G")
-        elif i in pi:
-            out.append("I")
-        else:
-            out.append("-")
+def _turn_starts(bonds: set[tuple[int, int]], nxt: np.ndarray, n: int) -> dict[int, list[bool]]:
+    """starts[k][i]: CO(i) is bonded to NH(i+k) with no chain break in between (an n-turn of length k)."""
+    return {
+        k: [i + k < n and (i, i + k) in bonds and all(nxt[i + m] for m in range(k)) for i in range(n)]
+        for k in (3, 4, 5)
+    }
+
+
+def _find_bridges(bb: Backbone, bonds: set[tuple[int, int]]) -> list[Bridge]:
+    """Bridges i < j (j >= i + 3). As in DSSP, i-1, i+1, j-1 and j+1 must exist and be peptide-bonded to i and j."""
+    prev, nxt = bb.prev, bb.nxt
+    out: list[Bridge] = []
+    for i, j in sorted(cKDTree(bb.ca).query_pairs(_CA_CUTOFF)):
+        if j < i + 3 or not (prev[i] and nxt[i] and prev[j] and nxt[j]):
+            continue
+        if ((i - 1, j) in bonds and (j, i + 1) in bonds) or ((j - 1, i) in bonds and (i, j + 1) in bonds):
+            out.append(Bridge(i, j, "P"))
+        if ((i, j) in bonds and (j, i) in bonds) or ((i - 1, j + 1) in bonds and (j - 1, i + 1) in bonds):
+            out.append(Bridge(i, j, "A"))
     return out
 
 
-def assign_dssp(bb: Backbone) -> DsspResult:
-    n, prev, nxt = len(bb), bb.prev, bb.nxt
-    bonds = _hbond_set(bb)
+def _ladders(bridges: list[Bridge], prev: np.ndarray) -> list[Ladder]:
+    """Consecutive bridges of one kind form a ladder."""
+    ladders: list[Ladder] = []
+    for i, j, kind in sorted(bridges):
+        for lad in ladders:
+            if kind == "P" and lad.kind == "P" and i == lad.i[-1] + 1 and prev[i] and j == lad.j[-1] + 1:
+                lad.i.append(i)
+                lad.j.append(j)
+                break
+            if kind == "A" and lad.kind == "A" and i == lad.i[-1] + 1 and prev[i] and j == lad.j[0] - 1:
+                lad.i.append(i)
+                lad.j.insert(0, j)
+                break
+        else:
+            ladders.append(Ladder(kind, [i], [j]))
+    return ladders
 
-    def hb(a: int | None, b: int | None) -> bool:
-        return a is not None and b is not None and (a, b) in bonds
 
-    def before(i: int) -> int | None:
-        return i - 1 if prev[i] else None
-
-    def after(i: int) -> int | None:
-        return i + 1 if nxt[i] else None
-
-    turns: dict[str, set[int]] = {"H": set(), "G": set(), "I": set()}
-    single: set[int] = set()  # residues inside any one H-bonded turn (DSSP 'T' where nothing else applies)
+def _assign_codes(n: int, ladders: list[Ladder], starts: dict[int, list[bool]]) -> list[str]:
+    """Per-residue codes: E/B from the ladders, then H over them, then G and I on residues still '-',
+    then T inside any turn that is still '-'."""
+    ss = ["-"] * n
+    for lad in ladders:
+        code = "E" if len(lad.i) > 1 else "B"
+        for lo, hi in ((lad.i[0], lad.i[-1]), (lad.j[0], lad.j[-1])):
+            for r in range(lo, hi + 1):
+                if ss[r] != "E":
+                    ss[r] = code
     for k, code in ((4, "H"), (3, "G"), (5, "I")):
-        turn = [i + k < n and (i, i + k) in bonds and all(nxt[i + m] for m in range(k)) for i in range(n)]
-        for i in range(n):
-            if turn[i]:
-                single.update(range(i + 1, i + k))
+        turn = starts[k]
         for i in range(1, n - k):
             if turn[i - 1] and turn[i]:
-                turns[code].update(range(i, i + k))
+                for r in range(i, i + k):
+                    if code == "H" or ss[r] == "-":
+                        ss[r] = code
+    inside = {i + m for k, turn in starts.items() for i in range(n) if turn[i] for m in range(1, k)}
+    return ["T" if c == "-" and i in inside else c for i, c in enumerate(ss)]
 
-    bridges: list[Bridge] = []
-    close = cKDTree(bb.ca).query_pairs(_CA_CUTOFF)
-    for i, j in sorted(close):
-        if j < i + 3:
-            continue
-        im, ip, jm, jp = before(i), after(i), before(j), after(j)
-        if (hb(im, j) and hb(j, ip)) or (hb(jm, i) and hb(i, jp)):
-            bridges.append(Bridge(i, j, "P"))
-        if (hb(i, j) and hb(j, i)) or (hb(im, jp) and hb(jm, ip)):
-            bridges.append(Bridge(i, j, "A"))
 
-    known = set(bridges)
-    in_ladder, in_bridge = set(), set()
-    for i, j, kind in bridges:
-        in_bridge.update((i, j))
-        if i + 1 < n and prev[i + 1]:
-            nj = j + 1 if kind == "P" else j - 1
-            if 0 <= nj < n and Bridge(i + 1, nj, kind) in known:
-                in_ladder.update((i, j, i + 1, nj))
-    ss = _resolve(n, turns["H"], turns["G"], turns["I"], in_ladder, in_bridge)
-    ss = ["T" if c == "-" and i in single else c for i, c in enumerate(ss)]
+def assign_dssp(bb: Backbone) -> DsspResult:
+    n = len(bb)
+    bonds = _hbond_set(bb)
+    bridges = _find_bridges(bb, bonds)
+    ss = _assign_codes(n, _ladders(bridges, bb.prev), _turn_starts(bonds, bb.nxt, n))
     return DsspResult("".join(ss), bridges)

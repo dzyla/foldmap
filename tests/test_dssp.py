@@ -3,7 +3,7 @@ from pathlib import Path
 
 import gemmi
 
-from foldmap.dssp import _hbond_set, _resolve, assign_dssp
+from foldmap.dssp import _hbond_set, assign_dssp
 from foldmap.io import load_backbone
 
 
@@ -48,18 +48,6 @@ def test_bridge_invariants(ubq):
     assert all(b.j >= b.i + 3 and b.kind in "PA" for b in res.bridges)
 
 
-def test_strand_outranks_310_and_pi_but_not_alpha():
-    # DSSP priority: H > E > B > G > I
-    codes = _resolve(8, alpha={0}, g={0, 1, 2}, pi={3, 4}, ladder={0, 2, 3}, bridge={1, 3, 5})
-    assert codes[0] == "H"  # alpha beats strand
-    assert codes[1] == "B"  # bridge beats 3-10
-    assert codes[2] == "E"  # strand beats 3-10
-    assert codes[3] == "E"  # strand beats pi
-    assert codes[4] == "I"
-    assert codes[5] == "B"
-    assert codes[6] == "-" and codes[7] == "-"
-
-
 def test_turns_marked_like_dssp(ubq):
     ss = assign_dssp(load_backbone(ubq)).ss
     assert "T" in ss
@@ -90,3 +78,28 @@ def test_an_acceptor_may_take_more_than_two_hbonds():
     assert max(Counter(a for a, _ in bonds).values()) == 3
     assert max(Counter(d for _, d in bonds).values()) <= 2
     assert (_index(bb, "3", 37), _index(bb, "3", 41)) in bonds
+
+
+def _starts(n, **turns):
+    """Turn starts for _assign_codes: _starts(12, k4=[0, 1]) has 4-turns starting at residues 0 and 1."""
+    return {k: [i in set(turns.get(f"k{k}", ())) for i in range(n)] for k in (3, 4, 5)}
+
+
+def test_alpha_replaces_strand_and_bridge():
+    from foldmap.dssp import Ladder, _assign_codes
+
+    ss = "".join(_assign_codes(12, [Ladder("A", [2, 3], [8, 9]), Ladder("P", [5], [10])], _starts(12, k4=[1, 2])))
+    assert ss[2:6] == "HHHH" and ss[8:11] == "EEB"
+
+
+def test_bridges_need_unbroken_neighbours():
+    bb = load_backbone(DATA / "6Y7S.cif", "asu")
+    for i, j, _ in assign_dssp(bb).bridges:
+        assert bb.prev[i] and bb.nxt[i] and bb.prev[j] and bb.nxt[j], (bb.labels[i], bb.labels[j])
+
+
+def test_peptide_too_short_for_any_turn(tmp_path):
+    from helpers import tripeptide
+
+    res = assign_dssp(load_backbone(tripeptide(DATA / "1UBQ.cif", tmp_path)))
+    assert res.ss == "---" and res.bridges == []
