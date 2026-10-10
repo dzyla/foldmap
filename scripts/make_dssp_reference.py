@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Dawid Zyla. Additional terms (AGPL-3.0 section 7(b)): see NOTICE.
 """Write mkdssp's per-residue secondary structure for every test structure to tests/data/dssp/<ID>.ss.
 
 Needs mkdssp (3.1.2 was used) on PATH; CI does not run this, it only reads the files it writes.

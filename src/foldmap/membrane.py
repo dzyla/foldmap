@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Dawid Zyla. Additional terms (AGPL-3.0 section 7(b)): see NOTICE.
 """Where the lipid bilayer is: exactly from OPM's dummy atoms when the file has them (planes, thickness and
 sides), otherwise estimated from the structure (the long helices and strands give the normal; a 30 Å slab is
 slid to the most hydrophobic, least charged position) with the cytoplasmic side from the positive-inside rule

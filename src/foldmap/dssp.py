@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Dawid Zyla. Additional terms (AGPL-3.0 section 7(b)): see NOTICE.
 """Kabsch-Sander DSSP as mkdssp 3.x does it: H-bond energies, n-turns, helices, bridges, ladders, beta-bulges.
 
 Not implemented: bends (S). Output codes: H alpha, G 3-10, I pi, E strand (ladder of >= 2 bridges, or ladders

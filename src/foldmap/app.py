@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Dawid Zyla. Additional terms (AGPL-3.0 section 7(b)): see NOTICE.
 """Streamlit app: load a structure, pick a style from previews of it, then fine-tune and download.
 
 Run with `foldmap app` (or `streamlit run src/foldmap/app.py`)."""

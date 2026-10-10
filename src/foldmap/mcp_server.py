@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Dawid Zyla. Additional terms (AGPL-3.0 section 7(b)): see NOTICE.
 """foldmap as an MCP server, so agents can draw protein topology diagrams and sequence figures.
 
 Run with `foldmap mcp` (stdio). Structures are given as a file path, a PDB ID (e.g. 1LMB) or a UniProt

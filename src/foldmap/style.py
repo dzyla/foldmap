@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Dawid Zyla. Additional terms (AGPL-3.0 section 7(b)): see NOTICE.
 """Everything about how a figure looks, in one place: named themes, a YAML style file, key=value overrides.
 
 Theme keys change only how things are drawn; layout keys (LAYOUT_KEYS) change where they go. Themes set

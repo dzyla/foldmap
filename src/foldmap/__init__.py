@@ -1,8 +1,9 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Dawid Zyla. Additional terms (AGPL-3.0 section 7(b)): see NOTICE.
 """foldmap: publication-grade protein topology diagrams."""
 
 __version__ = "0.1.0"
 
-CREDIT = (
-    "Made with foldmap · © Dawid Zyla · AGPL-3.0 · "
-    "if you use it in your work, please cite it (see CITATION.cff in the source)"
-)
+ATTRIBUTION = "foldmap, by Dawid Zyla"
+
+CREDIT = f"Made with {ATTRIBUTION} · AGPL-3.0 · if you use it in your work, please cite it (see CITATION.cff)"

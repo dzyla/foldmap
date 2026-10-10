@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Dawid Zyla. Additional terms (AGPL-3.0 section 7(b)): see NOTICE.
 """The sequence figure: secondary structure drawn over a chain's sequence, or over a multiple sequence
 alignment through its reference row, in rows of N columns (ESPript-style conservation boxes)."""
 

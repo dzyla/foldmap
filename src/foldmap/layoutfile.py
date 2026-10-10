@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Dawid Zyla. Additional terms (AGPL-3.0 section 7(b)): see NOTICE.
 """Layout files: one YAML document holding everything that defines a figure, so a hand-tuned figure can be
 re-rendered later, after the model changes, or shared.
 

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Dawid Zyla. Additional terms (AGPL-3.0 section 7(b)): see NOTICE.
 """Compare foldmap's DSSP with mkdssp on perturbed copies of the test structures, residue by residue.
 
 Needs mkdssp 3.1.2 on PATH; CI does not run this. Variants are written as PDB, because mkdssp 3.1.2 fails on

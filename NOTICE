@@ -7,7 +7,8 @@ your option) any later version. It is distributed WITHOUT ANY WARRANTY; see the 
 
 Additional terms under section 7(b) of the GNU Affero General Public License:
 
-  Copies and modified versions of foldmap must preserve the author attribution "foldmap, by Dawid Zyla", the
-  credit line shown by the foldmap app and the interactive HTML pages, and the CITATION.cff file.
+  Copies and modified versions of foldmap must preserve the author attribution "foldmap, by Dawid Zyla" in the
+  credit line shown by the foldmap app, the MCP server's instructions and the interactive HTML pages, and must
+  keep the CITATION.cff file.
 
 If you use foldmap in published work, please cite it as described in CITATION.cff.

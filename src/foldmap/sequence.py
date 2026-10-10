@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Dawid Zyla. Additional terms (AGPL-3.0 section 7(b)): see NOTICE.
 """Sequence view data: a chain's sequence with its secondary structure (labelled as in the topology figure),
 and multiple sequence alignments mapped onto it."""
 

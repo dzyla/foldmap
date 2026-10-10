@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Dawid Zyla. Additional terms (AGPL-3.0 section 7(b)): see NOTICE.
 """Global page frame: which 3D directions become page-right (u), page-up (v) and the view axis (w)."""
 
 from __future__ import annotations

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Dawid Zyla. Additional terms (AGPL-3.0 section 7(b)): see NOTICE.
 """Global symmetry of an assembly, in the spirit of the RCSB/BioJava global-symmetry search.
 
 1. Subunits (protein chains) are clustered by aligned sequence, so copies match whatever their numbering,

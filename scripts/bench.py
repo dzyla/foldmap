@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Dawid Zyla. Additional terms (AGPL-3.0 section 7(b)): see NOTICE.
 """Time the layout of the test structures (and a synthetic 32-chain complex) and compare layouts between runs.
 
 python scripts/bench.py                          # every tests/data structure plus the 32-chain complex

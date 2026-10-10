@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Dawid Zyla. Additional terms (AGPL-3.0 section 7(b)): see NOTICE.
 """Render a random sample of PDB entries with the default style and check every figure.
 
     python scripts/sweep.py --sample 60 --seed 20261009 --out sweep/

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Dawid Zyla. Additional terms (AGPL-3.0 section 7(b)): see NOTICE.
 """Render the theme thumbnails shown in the app's style picker (src/foldmap/assets/previews/*.png).
 
 They are drawn once, on ubiquitin, and shipped with the package, so picking a style is instant whatever

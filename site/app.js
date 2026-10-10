@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (C) 2026 Dawid Zyla. Additional terms (AGPL-3.0 section 7(b)): see NOTICE.
 (function () {
   const data = JSON.parse(document.getElementById('site-data').textContent);
   const $ = id => document.getElementById(id);

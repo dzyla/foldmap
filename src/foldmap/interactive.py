@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Dawid Zyla. Additional terms (AGPL-3.0 section 7(b)): see NOTICE.
 """One HTML page linking three views of a structure: the topology figure, the CA distance (contact) map and
 the 3D model. Hovering an element, a map cell or an atom highlights the same residues in the other two views.
 

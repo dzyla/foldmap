@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Dawid Zyla. Additional terms (AGPL-3.0 section 7(b)): see NOTICE.
 """One description of a figure, shared by the command line, the app and the MCP server: the structure, how it is
 laid out (layout options and edits) and how it is drawn (theme and style). A layout file supplies a starting
 point; values given explicitly win; defaults fill the rest."""

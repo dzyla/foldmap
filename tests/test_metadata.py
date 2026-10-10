@@ -86,3 +86,30 @@ def test_minimum_deps_job_pins_equal_the_floors():
         assert pins[name] in (f"{floor}.*", f"{floor}.0", floor), (
             f"minimum-deps pins {name}=={pins[name]} but the floor is {floor}"
         )
+
+
+HEADER = (
+    "# SPDX-License-Identifier: AGPL-3.0-or-later\n"
+    "# Copyright (C) 2026 Dawid Zyla. Additional terms (AGPL-3.0 section 7(b)): see NOTICE.\n"
+)
+
+
+def test_notice_names_the_attribution_the_code_shows():
+    from foldmap import ATTRIBUTION, CREDIT
+
+    notice = (ROOT / "NOTICE").read_text(encoding="utf-8")
+    assert ATTRIBUTION == "foldmap, by Dawid Zyla"
+    assert f'"{ATTRIBUTION}"' in notice and ATTRIBUTION in CREDIT
+    assert "AGPL-3.0" in CREDIT and "cite" in CREDIT
+
+
+def test_citation_file_ships_in_the_wheel_metadata():
+    assert "CITATION.cff" in _pyproject()["project"]["license-files"]
+
+
+def test_every_source_file_names_its_license():
+    files = sorted((ROOT / "src" / "foldmap").glob("*.py")) + sorted((ROOT / "scripts").glob("*.py"))
+    missing = [f.name for f in files if not f.read_text(encoding="utf-8").startswith(HEADER)]
+    assert not missing, f"add the SPDX header to: {', '.join(missing)}"
+    js = (ROOT / "site" / "app.js").read_text(encoding="utf-8")
+    assert js.startswith("// SPDX-License-Identifier: AGPL-3.0-or-later\n")
