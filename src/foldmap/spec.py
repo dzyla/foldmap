@@ -153,8 +153,8 @@ def figure_spec(
         title=pick("title"),
         mode=mode,
         rotate=float(pick("rotate")),
-        flip_v=_flag(pick("flip_v"), "flip_v"),
-        dna=bool(pick("dna")),
+        flip_v=parse_flag(pick("flip_v"), "flip_v"),
+        dna=parse_flag(pick("dna"), "dna"),
         symmetry=str(pick("symmetry")),
         symmetry_tol=float(pick("symmetry_tol")),
         protomers=parse_protomers(protomers) if isinstance(protomers, str) else protomers,
@@ -172,7 +172,7 @@ def figure_spec(
     )
 
 
-def _flag(value, what: str) -> bool:
+def parse_flag(value, what: str) -> bool:
     """A true/false value from a real boolean or yes/no/true/false text."""
     if isinstance(value, bool):
         return value

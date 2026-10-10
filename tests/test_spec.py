@@ -161,6 +161,11 @@ def test_an_empty_title_clears_the_layout_files_title(tmp_path):
     assert figure_spec(UBQ, layout_file=lf, title="Mine").title == "Mine"
 
 
+def test_dna_text_from_a_layout_file_is_read_as_yes_or_no(tmp_path):
+    lf = layoutfile.save(tmp_path / "f.yaml", {"foldmap": 1, "layout": {"dna": "no"}})
+    assert figure_spec(UBQ, layout_file=lf).dna is False
+
+
 def test_flip_v_accepts_booleans_and_yes_no_text_only(tmp_path):
     def spec(value):
         lf = layoutfile.save(tmp_path / "f.yaml", {"foldmap": 1, "layout": {"flip_v": value}})

@@ -366,3 +366,39 @@ def test_app_alignment_that_cannot_be_stored_is_a_message(monkeypatch):
     ).run()
     assert not at.exception and at.session_state["msa_path"] == ""
     assert at.session_state["msa_error"] and "/srv/secret" not in at.session_state["msa_error"]
+
+
+def test_app_reads_hand_written_layout_values_like_the_command_line():
+    """Unquoted `symmetry: off` is YAML false; up, view and protomers may be written as text."""
+    from foldmap.app import settings_from_document
+
+    doc = {"layout": {"symmetry": False, "membrane": False, "up": "0,0,1", "view": [1, 0, 0], "protomers": "A,B;C,D"}}
+    got = settings_from_document(doc)
+    assert got["symmetry"] == "off" and got["membrane"] == "off"
+    assert (
+        got["up"] == [0.0, 0.0, 1.0] and got["view"] == [1.0, 0.0, 0.0] and got["protomers"] == [["A", "B"], ["C", "D"]]
+    )
+    assert settings_from_document({"layout": {"flip_v": "no", "dna": "no"}})["flip_v"] is False
+    with pytest.raises(ValueError, match="needs three numbers"):
+        settings_from_document({"layout": {"up": "1,2"}})
+
+
+def test_app_loads_a_hand_written_layout_file():
+    text = "foldmap: 1\nlayout:\n  symmetry: off\n  membrane: off\n  up: '0,0,1'\n  protomers: 'A'\n  flip_v: 'no'\n"
+    at = _load(_app(), DATA / "1UBQ.cif")
+    at.button(key="pick_publication").click().run()
+    at.file_uploader(key="layout_upload").set_value(("layout.yaml", text.encode(), "application/x-yaml")).run()
+    assert not at.exception and not at.error
+    assert at.session_state["symmetry"] == "off" and at.session_state["up"] == [0.0, 0.0, 1.0]
+    assert "<svg" in _svg(at)
+
+
+def test_app_reports_a_layout_file_with_a_bad_value():
+    at = _load(_app(), DATA / "1UBQ.cif")
+    at.button(key="pick_publication").click().run()
+    text = b"foldmap: 1\nlayout: {up: '1,2', flip_v: maybe}\n"
+    at.file_uploader(key="layout_upload").set_value(("layout.yaml", text, "application/x-yaml")).run()
+    assert not at.exception and any("three numbers" in e.value for e in at.error)
+    bad = b"layout: {rotate: 30\n"
+    at.file_uploader(key="layout_upload").set_value(("layout.yaml", bad, "application/x-yaml")).run()
+    assert not at.exception and any("not valid YAML" in e.value for e in at.error)

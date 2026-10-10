@@ -15,7 +15,7 @@ from foldmap import CREDIT
 from foldmap.cli import _adjustments, _domain_spec, make_layout
 from foldmap.fetch import ALIGNMENT_SUFFIXES, fetch, keep_upload
 from foldmap.render import save, save_svg
-from foldmap.spec import FigureSpec, draw_spec
+from foldmap.spec import FigureSpec, draw_spec, parse_flag, parse_protomers, parse_vector
 from foldmap.spec import layout_document as spec_document
 from foldmap.style import CHOICES, THEMES, Style
 from foldmap.symmetry import TOLERANCE
@@ -210,6 +210,13 @@ def settings_from_document(doc: dict) -> dict:
     ):
         if lay.get(key) is not None:
             out[key] = lay[key]
+    for key in ("symmetry", "membrane"):  # unquoted `off` in YAML is False
+        if out[key] is False:
+            out[key] = "off"
+    out["up"], out["view"] = parse_vector(out["up"], "up"), parse_vector(out["view"], "view")
+    if isinstance(out["protomers"], str):
+        out["protomers"] = parse_protomers(out["protomers"])
+    out["flip_v"], out["dna"] = parse_flag(out["flip_v"], "flip_v"), parse_flag(out["dna"], "dna")
     out["uniprot"] = lay.get("uniprot") or "off"
     chains = lay.get("chains")
     out["chains"] = ",".join(chains) if isinstance(chains, list) else (chains or "")
@@ -340,11 +347,12 @@ def main() -> None:
                 f = Path(tmp) / "layout.yaml"
                 f.write_bytes(up.getvalue())
                 doc = layoutfile.load(f)
+            settings = settings_from_document(doc)
         except (ValueError, OSError) as err:
             ss["layout_error"] = str(err)
             return
         ss["layout_error"] = ""
-        for key, value in settings_from_document(doc).items():
+        for key, value in settings.items():
             ss[key] = value
 
     st.markdown("#### Foldmap · protein topology diagrams")
