@@ -223,7 +223,9 @@ def test_app_layout_file_round_trips_through_the_app():
     msa = str(DATA / "ubq_family.fasta")
     settings = {
         "theme": "trace", "membrane": "flip", "focus": "none", "chains": "A", "msa_path": msa,
-        "msa_reference": "1UBQ_A", "rename": "res:A:23-34=Hx", "swap": "", "move": "", "dna": False,
+        "msa_reference": "1UBQ_A",
+        "flip_v": True, "symmetry_tol": 2.5, "up": [0, 1, 0], "view": [0, 0, 1],
+        "rename": "res:A:23-34=Hx", "swap": "", "move": "", "dna": False,
         "domains": "N=res:A:1-30", "rotate": 30, "title": "Round trip",
     }  # fmt: skip
     text = yaml.safe_dump(layout_document(DATA / "1UBQ.cif", settings), sort_keys=False)
@@ -241,7 +243,7 @@ def test_app_layout_file_round_trips_through_the_app():
         DATA / "1UBQ.cif", {k: ss[k] for k in [*STYLE_FIELDS, *LAYOUT_DEFAULTS, "theme"] if k in ss}
     )
     first = yaml.safe_load(text)
-    for key in ("membrane", "focus", "chains", "msa", "msa_reference", "dna"):
+    for key in ("membrane", "focus", "chains", "msa", "msa_reference", "dna", "flip_v", "symmetry_tol", "up", "view"):
         assert again["layout"][key] == first["layout"][key], key
     assert again["domains"] == first["domains"] and again["edits"] == first["edits"]
 
@@ -255,4 +257,23 @@ def test_app_sequence_tab_with_the_conservation_theme(tmp_path):
     ).run()
     at.selectbox(key="theme").select("conservation").run()
     assert not at.exception and at.session_state["msa_path"]
-    assert any("strict:" in m.value for m in at.markdown)
+    assert not at.error and any("strict:" in m.value for m in at.markdown)
+
+
+def test_app_layout_file_options_without_a_control_do_not_carry_to_the_next_structure(tmp_path):
+    import yaml
+
+    doc = {"foldmap": 1, "layout": {"flip_v": True, "protomers": [["A", "B"], ["C", "D"]], "msa": "/nowhere/x.fasta"}}
+    at = _load(_app(), DATA / "2HHB.cif")
+    at.button(key="pick_publication").click().run()
+    up = ("layout.yaml", yaml.safe_dump(doc).encode(), "application/x-yaml")
+    at.file_uploader(key="layout_upload").set_value(up).run()
+    assert at.session_state["flip_v"] is True and at.session_state["protomers"] == [["A", "B"], ["C", "D"]]
+    assert any("/nowhere/x.fasta" in w.value for w in at.warning)
+    at.button(key="back_edit").click().run()
+    at.text_input(key="source").input(str(DATA / "1UBQ.cif"))
+    at.button(key="load").click().run()
+    at.button(key="pick_publication").click().run()
+    assert not at.exception and not at.error
+    assert at.session_state["flip_v"] is False and at.session_state["protomers"] is None
+    assert "<svg" in _svg(at)

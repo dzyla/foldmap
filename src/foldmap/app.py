@@ -71,6 +71,7 @@ LAYOUT_DEFAULTS = {
     "up": None,
     "view": None,
 }
+HIDDEN_LAYOUT = ("flip_v", "dna", "symmetry_tol", "protomers", "up", "view")  # in layout files, no app control
 EXAMPLES = {"1LMB": "λ repressor on DNA", "5NKT": "FimA", "8UTF": "measles F trimer", "1UBQ": "ubiquitin"}
 
 
@@ -102,8 +103,8 @@ def layout_options(settings: dict) -> dict:
         "msa": settings.get("msa_path") or None,
         "msa_reference": settings.get("msa_reference") or None,
         "chains": [c.strip() for c in (settings.get("chains") or "").split(",") if c.strip()] or None,
-        **{k: settings[k] for k in ("flip_v", "dna", "symmetry_tol", "protomers", "up", "view") if k in settings},
         **_adjustments(Args),
+        **{k: settings[k] for k in HIDDEN_LAYOUT if k in settings},
     }
 
 
@@ -189,16 +190,26 @@ def settings_from_document(doc: dict) -> dict:
     for key, default in LAYOUT_DEFAULTS.items():
         out[key] = default
     for key in (
-        "mode", "rotate", "symmetry", "assembly", "title", "membrane", "focus", "msa_reference",
-        "flip_v", "dna", "symmetry_tol", "protomers", "up", "view",
-    ):  # fmt: skip
+        "mode",
+        "rotate",
+        "symmetry",
+        "assembly",
+        "title",
+        "membrane",
+        "focus",
+        "msa_reference",
+        *HIDDEN_LAYOUT,
+    ):
+        if lay.get(key) is not None:
+            out[key] = lay[key]
         if lay.get(key) is not None:
             out[key] = lay[key]
     out["uniprot"] = lay.get("uniprot") or "off"
     chains = lay.get("chains")
     out["chains"] = ",".join(chains) if isinstance(chains, list) else (chains or "")
     msa = lay.get("msa")
-    out["msa_path"] = msa if msa and Path(msa).is_file() else ""  # an alignment saved on another machine is not here
+    out["msa_path"] = msa if msa and Path(msa).is_file() else ""
+    out["msa_missing"] = msa if msa and not out["msa_path"] else ""  # saved on another machine
     out["title"] = out["title"] or ""
     out["rotate"] = int(round(float(out["rotate"])))
     e = doc.get("edits") or {}
@@ -291,6 +302,8 @@ def main() -> None:
             ss["load_error"] = str(err)
             return
         ss["path"], ss["stage"], ss["load_error"] = str(path), "style", ""
+        for key in HIDDEN_LAYOUT:  # carried over from a layout file; the last structure's are not this one's
+            ss[key] = LAYOUT_DEFAULTS[key]
 
     def pick(theme: str) -> None:
         apply_theme(theme)
@@ -457,6 +470,10 @@ def main() -> None:
         st.file_uploader("Load a layout file", type=["yaml", "yml"], key="layout_upload", on_change=apply_layout_file)
         if ss.get("layout_error"):
             st.error(ss["layout_error"])
+        if ss.get("msa_missing") and not ss.get("msa_path"):
+            st.warning(
+                f"The layout file's alignment {ss['msa_missing']} is not on this machine; upload it under Alignment."
+            )
         st.button("← another structure", key="back_edit", on_click=restart)
 
     settings = {k: ss[k] for k in [*STYLE_FIELDS, *LAYOUT_DEFAULTS, "theme"] if k in ss}
