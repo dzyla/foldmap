@@ -9,8 +9,9 @@ import threading
 from collections import Counter
 from contextlib import contextmanager
 from contextvars import ContextVar
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from pathlib import Path as FsPath
+from typing import NamedTuple
 
 import numpy as np
 from matplotlib import colormaps, rc_context
@@ -1269,45 +1270,53 @@ def draw(layout: Layout, loops: list[Loop], sses: list[SSE], title: str | None =
         return pin_fonts(_draw(layout, loops, sses, title, **kw))
 
 
-def _draw(
-    layout: Layout,
-    loops: list[Loop],
-    sses: list[SSE],
-    title: str | None = None,
-    *,
-    look: Style | None = None,
-    palette: str | None = None,
-    style: str | None = None,
-    loop_style: str | None = None,
-) -> Figure:
+@dataclass
+class _Canvas:
+    """What every drawing step shares: the axes, the resolved look, colours and the page geometry."""
+
+    fig: Figure
+    ax: object
+    look: Style
+    colors: dict[str, str]
+    element_colour: dict[str, str]
+    residue_colour: object  # (residue index, chain) -> colour or None
+    font: float
+    lw: float
+    loop_lw: float
+    pt_per_unit: float
+    pad: float
+    content: tuple[float, float, float, float]  # x0, y0, x1, y1: elements, marks, at least one legend entry wide
+    page: tuple[float, float, float, float]  # xmin, xmax, ymin, ymax
+
+
+class _Legend(NamedTuple):
+    entries: list
+    entry: float  # width of one legend entry (page units)
+    per_row: int
+    height: float
+
+
+def _resolve_look(look, palette, style, loop_style) -> Style:
     style = _ALIASES["fill"].get(style, style)
     if style is not None and style not in STYLES:
         raise ValueError(f"unknown style {style!r}; choose from {', '.join(STYLES)}")
     if loop_style is not None and loop_style not in LOOP_STYLES:
         raise ValueError(f"unknown loop style {loop_style!r}; choose from {', '.join(LOOP_STYLES)}")
-    look = replace(
+    return replace(
         look or Style(),
         **{k: v for k, v in (("palette", palette), ("fill", style), ("loops", loop_style)) if v is not None},
     ).validate()
-    style, palette, loop_style = look.fill, look.palette, look.loops
-    chains = _chains_in_order(sses)
-    colors = chain_colors(chains, palette)
-    element_colour, residue_colour = element_colours(layout, sses, look)
-    if not layout.placed and not layout.dna:
-        fig = Figure(figsize=(4.0, 1.5))
-        ax = fig.add_axes([0, 0, 1, 1])
-        ax.axis("off")
-        ax.text(0.5, 0.5, "no helices or strands found", ha="center", va="center", fontsize=9, transform=ax.transAxes)
-        return fig
 
-    x0, y0, x1, y1 = layout.bounds
-    marks = ligand_marks(layout, loops, sses, look)
-    umarks = uniprot_marks(layout, loops, sses, look)
-    for m in marks:  # markers may sit just outside the elements' bounds
-        (cx, cy), (hw, hh) = m["centre"], m["half"]
-        x0, y0, x1, y1 = min(x0, cx - hw), min(y0, cy - hh), max(x1, cx + hw), max(y1, cy + hh)
-    pad = 1.0
-    top = 1.9 if title else 0.0
+
+def _empty_figure() -> Figure:
+    fig = Figure(figsize=(4.0, 1.5))
+    ax = fig.add_axes([0, 0, 1, 1])
+    ax.axis("off")
+    ax.text(0.5, 0.5, "no helices or strands found", ha="center", va="center", fontsize=9, transform=ax.transAxes)
+    return fig
+
+
+def _legend_entries(layout: Layout, look: Style, chains: list[str], colors: dict[str, str], umarks) -> list:
     entries = [(colors[c], f"Chain {c}") for c in chains]
     if layout.focus is not None:
         entries = [(colors[c], f"Chain {c}") for c in chains if c in layout.focus]
@@ -1334,7 +1343,22 @@ def _draw(
     if layout.dna and look.legend:
         ids = sorted({layout.nucleic.strands[k].chain for d in layout.dna for k in d.strands})
         kind = "RNA" if all(layout.nucleic.strands[k].rna for d in layout.dna for k in d.strands) else "DNA"
-        entries.append((_dna_colours(style)[0], f"{kind} ({', '.join(ids)})"))
+        entries.append((_dna_colours(look.fill)[0], f"{kind} ({', '.join(ids)})"))
+
+    return entries
+
+
+def _canvas(
+    layout: Layout, look: Style, title, chains, colors, element_colour, residue_colour, marks, umarks
+) -> tuple[_Canvas, _Legend]:
+    """The figure, its axes and every size the steps share; also lays the legend out, as it sets the page width."""
+    x0, y0, x1, y1 = layout.bounds
+    for m in marks:  # markers may sit just outside the elements' bounds
+        (cx, cy), (hw, hh) = m["centre"], m["half"]
+        x0, y0, x1, y1 = min(x0, cx - hw), min(y0, cy - hh), max(x1, cx + hw), max(y1, cy + hh)
+    pad = 1.0
+    top = 1.9 if title else 0.0
+    entries = _legend_entries(layout, look, chains, colors, umarks)
 
     def legend_entry(x1: float) -> float:  # one legend entry's width in page units: swatch, text, gap
         scale = min(_IN_PER_UNIT, _MAX_WIDTH_IN / (x1 - x0 + 2 * pad))  # as the figure below
@@ -1366,15 +1390,33 @@ def _draw(
     pt_per_unit = scale * 72
     font = _font_pt(scale) * look.font_scale
     lw = float(np.clip(0.9 * scale / _IN_PER_UNIT, 0.5, 1.2))
-    loop_lw = lw * look.loop_width
+    canvas = _Canvas(
+        fig,
+        ax,
+        look,
+        colors,
+        element_colour,
+        residue_colour,
+        font,
+        lw,
+        lw * look.loop_width,
+        pt_per_unit,
+        pad,
+        (x0, y0, x1, y1),
+        (xmin, xmax, ymin, ymax),
+    )
+    return canvas, _Legend(entries, entry, per_row, legend_h)
 
+
+def _draw_loops(c: _Canvas, layout: Layout, loops: list[Loop], sses: list[SSE]) -> None:
+    """Each loop: a casing in the background colour, its coloured line, arrows, residue runs and length labels."""
     boxes = np.array([p.rect for p in [*layout.placed.values(), *layout.ghosts]]).reshape(-1, 4)  # none: DNA only
     boxes = boxes + [1e-6, 1e-6, -1e-6, -1e-6]
     sse_by_id = {s.id: s for s in sses}
     for i, loop in enumerate(loops):
         if loop.fallback:  # already a smooth curve
             path = _polyline(loop.points)
-        elif loop_style == "curved":
+        elif c.look.loops == "curved":
             path = _smooth_path(loop.points, boxes)
         else:
             path = _rounded_path(loop.points)
@@ -1382,114 +1424,121 @@ def _draw(
         casing = PathPatch(
             path,
             fc="none",
-            ec=look.background,
-            lw=loop_lw * 3.0,
+            ec=c.look.background,
+            lw=c.loop_lw * 3.0,
             capstyle="round",
             joinstyle="round",
             zorder=1 + i * 1e-3,
         )
         casing.set_gid(f"loopcase:{name}")
-        ax.add_patch(casing)
+        c.ax.add_patch(casing)
         a_sse = sse_by_id.get(loop.a_id)
         loop_c = {
-            "black": look.ink,
-            "chain": colors.get(a_sse.chain, look.ink) if a_sse else look.ink,
-            "element": element_colour.get(loop.a_id, look.ink),
-            "residue": look.ink,  # replaced by per-residue runs below
-        }[look.loop_color]
+            "black": c.look.ink,
+            "chain": c.colors.get(a_sse.chain, c.look.ink) if a_sse else c.look.ink,
+            "element": c.element_colour.get(loop.a_id, c.look.ink),
+            "residue": c.look.ink,  # replaced by per-residue runs below
+        }[c.look.loop_color]
         loop_c = _legible(loop_c)
         if layout.focus is not None and a_sse is not None and a_sse.chain not in layout.focus:
             loop_c = _MATE_LINE
-        if look.loop_arrows:
-            arrow = _chevron(loop.points, 0.22 * look.loop_width**0.5)
+        if c.look.loop_arrows:
+            arrow = _chevron(loop.points, 0.22 * c.look.loop_width**0.5)
             if arrow is not None:
                 head = PathPatch(
                     arrow,
                     fc="none",
                     ec=loop_c,
-                    lw=loop_lw,
+                    lw=c.loop_lw,
                     capstyle="round",
                     joinstyle="round",
                     zorder=1 + i * 1e-3 + 7e-4,
                 )
                 head.set_gid(f"loop-arrow:{name}")
-                ax.add_patch(head)
+                c.ax.add_patch(head)
         line = PathPatch(
             path,
             fc="none",
             ec=loop_c,
-            lw=loop_lw,
+            lw=c.loop_lw,
             capstyle="round",
             joinstyle="round",
             ls=(0, (3, 2)) if loop.dashed else "-",
             zorder=1 + i * 1e-3 + 5e-4,
         )
         line.set_gid(f"loop:{name}")
-        ax.add_patch(line)
+        c.ax.add_patch(line)
         b_sse = sse_by_id.get(loop.b_id)
         if a_sse is not None and b_sse is not None and b_sse.start - a_sse.end - 1 >= LONG_LOOP:
             pts = np.asarray(loop.points, float)  # the residue count, beside the loop's longest straight run
             k = max(range(len(pts) - 1), key=lambda j: np.hypot(*(pts[j + 1] - pts[j])))
             mid, d = (pts[k] + pts[k + 1]) / 2, pts[k + 1] - pts[k]
             vertical = abs(d[1]) > abs(d[0])
-            t = ax.text(
+            t = c.ax.text(
                 mid[0] + (0.15 if vertical else 0.0),
                 mid[1] + (0.0 if vertical else 0.22),
                 f"{b_sse.start - a_sse.end - 1} aa",
                 ha="left" if vertical else "center",
                 va="center" if vertical else "bottom",
-                fontsize=font * 0.72,
+                fontsize=c.font * 0.72,
                 color=_legible("#5d6877"),
                 zorder=4,
                 rotation=0,
             )
             t.set_gid(f"loop-length:{name}")
-        if look.loop_color == "residue" and loop_c != _MATE_LINE and a_sse is not None:
+        if c.look.loop_color == "residue" and loop_c != _MATE_LINE and a_sse is not None:
             b_sse = sse_by_id.get(loop.b_id)
             span = range(a_sse.end + 1, b_sse.start) if b_sse is not None else range(0)
             ends = [a_sse.end, b_sse.start] if b_sse is not None else [a_sse.end]
-            shades = [residue_colour(r, a_sse.chain) for r in (span or ends)]
-            shades = [c or look.ink for c in shades]  # true colours, matching the legend ...
+            shades = [c.residue_colour(r, a_sse.chain) for r in (span or ends)]
+            shades = [col or c.look.ink for col in shades]  # true colours, matching the legend ...
             line.set_edgecolor(_RUN_EDGE)  # ... on a dark edge (the loop's own line, also the hover target)
-            line.set_linewidth(loop_lw * _RUN_EDGE_W)
+            line.set_linewidth(c.loop_lw * _RUN_EDGE_W)
             for k, (shade, piece) in enumerate(residue_runs(path, shades)):
                 run = PathPatch(
                     Path(piece),
                     fc="none",
                     ec=shade,
-                    lw=loop_lw,
+                    lw=c.loop_lw,
                     capstyle="butt",
                     joinstyle="round",
                     ls=(0, (3, 2)) if loop.dashed else "-",
                     zorder=1 + i * 1e-3 + 6e-4,
                 )
                 run.set_gid(f"loop-seg:{name}:{k}")
-                ax.add_patch(run)
+                c.ax.add_patch(run)
 
+
+def _draw_membrane(c: _Canvas, layout: Layout) -> None:
+    """The lipid bilayer behind everything."""
+    x0, y0, x1, y1 = c.content
     if layout.membrane is not None:  # the lipid bilayer behind everything: a band with head groups on both faces
         b0, b1 = layout.membrane["y"]
-        left, right = x0 - pad * 0.7, x1 + pad * 0.7
+        left, right = x0 - c.pad * 0.7, x1 + c.pad * 0.7
         band = Rectangle((left, b0), right - left, b1 - b0, fc=_LIPID, ec="none", zorder=0.1)
         band.set_gid("membrane")
-        ax.add_patch(band)
+        c.ax.add_patch(band)
         xs = np.arange(left + 0.2, right, 0.42)
         for face, y in (("low", b0), ("high", b1)):
-            heads = ax.scatter(
+            heads = c.ax.scatter(
                 xs,
                 np.full(len(xs), y),
-                s=(lw * 4.2) ** 2,
+                s=(c.lw * 4.2) ** 2,
                 c=_HEADS,
                 edgecolors=_HEAD_EDGE,
-                linewidths=lw * 0.4,
+                linewidths=c.lw * 0.4,
                 zorder=0.15,
             )
             heads.set_gid(f"membrane-heads:{face}")
         below = layout.membrane["inside"] == "below"
         sides = (("out" if below else "in", b1 + 0.35, "bottom"), ("in" if below else "out", b0 - 0.35, "top"))
         for text, y, va in sides if layout.membrane.get("sides", True) else ():
-            t = ax.text(left + 0.1, y, text, ha="left", va=va, fontsize=font * 0.9, style="italic", color="#7a6a45")
+            t = c.ax.text(left + 0.1, y, text, ha="left", va=va, fontsize=c.font * 0.9, style="italic", color="#7a6a45")
             t.set_gid(f"membrane-side:{text}")
 
+
+def _draw_domains(c: _Canvas, layout: Layout) -> None:
+    """Named domains: a soft tinted panel each."""
     for k, (name, ids) in enumerate(layout.domains):  # named domains: a soft tinted panel, name at top left
         if not ids:
             continue
@@ -1500,27 +1549,30 @@ def _draw(
             x1 - x0,
             y1 - y0,
             boxstyle="round,pad=0,rounding_size=0.6",
-            fc=_mix(tone, look.background, 0.86),
-            ec=_mix(tone, look.background, 0.55),
-            lw=lw * 0.6,
+            fc=_mix(tone, c.look.background, 0.86),
+            ec=_mix(tone, c.look.background, 0.55),
+            lw=c.lw * 0.6,
             zorder=0.2,
         )
         panel.set_gid(f"domain:{name}")
-        ax.add_patch(panel)
-        t = ax.text(
+        c.ax.add_patch(panel)
+        t = c.ax.text(
             x0 + 0.35,
             y1 - 0.3,
             name,
             ha="left",
             va="top",
-            fontsize=font * 1.05,
+            fontsize=c.font * 1.05,
             fontweight="bold",
             color=darken(tone, 0.75),
             zorder=0.25,
         )
         t.set_gid(f"domain-label:{name}")
 
-    if look.sheet_panels:
+
+def _draw_sheet_panels(c: _Canvas, layout: Layout) -> None:
+    """A pale panel behind each sheet."""
+    if c.look.sheet_panels:
         ghosts = {g.sse.id: g for g in layout.ghosts}
         for k, ids in enumerate(layout.sheets):
             if len(ids) < 2:
@@ -1533,42 +1585,42 @@ def _draw(
                 x1 - x0,
                 y1 - y0,
                 boxstyle="round,pad=0,rounding_size=0.35",
-                fc=_mix(look.background, look.ink, 0.07) if look.background != "#ffffff" else _PANEL,
+                fc=_mix(c.look.background, c.look.ink, 0.07) if c.look.background != "#ffffff" else _PANEL,
                 ec="none",
                 zorder=0.3,
             )
             panel.set_gid(f"sheet-panel:{k}")
-            ax.add_patch(panel)
+            c.ax.add_patch(panel)
 
-    if layout.dna:
-        _draw_dna(ax, layout, sses, residue_colour, style, lw, font, pt_per_unit, look)
 
+def _draw_elements(c: _Canvas, layout: Layout) -> None:
+    """The strands, 3-10 helices and helices, with their labels."""
     for p in layout.placed.values():
-        color = element_colour[p.sse.id]
-        outline = style == "outline"
-        edge, edge_w = (color, lw * 1.2) if outline else (darken(color), lw * 0.8)
+        color = c.element_colour[p.sse.id]
+        outline = c.look.fill == "outline"
+        edge, edge_w = (color, c.lw * 1.2) if outline else (darken(color), c.lw * 0.8)
         if p.sse.kind == "E":
-            strand_fill = look.background if outline else tint(color, 0.45) if style == "pale" else color
-            if style == "pale":
+            strand_fill = c.look.background if outline else tint(color, 0.45) if c.look.fill == "pale" else color
+            if c.look.fill == "pale":
                 edge = darken(color, 0.5)  # pastel body, firm outline (illustration style)
             patch = Polygon(_arrow(p), closed=True, fc=strand_fill, ec=edge, lw=edge_w, joinstyle="round", zorder=3)
             patch.set_gid(f"strand:{p.sse.id}")
-            ax.add_patch(patch)
-            if look.labels:
-                t = ax.text(
+            c.ax.add_patch(patch)
+            if c.look.labels:
+                t = c.ax.text(
                     p.cx,
                     p.cy,
                     p.label,
                     ha="center",
                     va="center",
-                    fontsize=font,
+                    fontsize=c.font,
                     fontweight="bold",
                     color=_label_ink(color) if outline else text_color_on(strand_fill),
                     zorder=4,
                 )
                 t.set_gid(f"label:{p.sse.id}")
         elif p.sse.kind == "G":  # a short 3-10 helix: a small rounded box
-            fill = {"bold": color, "pale": tint(color, 0.35), "outline": look.background}[style]
+            fill = {"bold": color, "pale": tint(color, 0.35), "outline": c.look.background}[c.look.fill]
             box = FancyBboxPatch(
                 (-p.length / 2, -p.width / 2),
                 p.length,
@@ -1579,16 +1631,16 @@ def _draw(
                 lw=edge_w,
                 zorder=3,
             )
-            box.set_transform(Affine2D().rotate(p.angle).translate(p.cx, p.cy) + ax.transData)
+            box.set_transform(Affine2D().rotate(p.angle).translate(p.cx, p.cy) + c.ax.transData)
             box.set_gid(f"eta:{p.sse.id}")
-            ax.add_patch(box)
-            if look.labels:
-                t = ax.text(
+            c.ax.add_patch(box)
+            if c.look.labels:
+                t = c.ax.text(
                     *helix_label_pos(p),
                     p.label,
                     ha="center",
                     va="center",
-                    fontsize=font * 0.9,
+                    fontsize=c.font * 0.9,
                     color=_label_ink(color),
                     zorder=4,
                 )
@@ -1597,41 +1649,40 @@ def _draw(
             fill, shade = {
                 "bold": (color, darken(color, 0.72)),
                 "pale": (tint(color, 0.15), tint(color, 0.55)),
-                "outline": (look.background, _mix(color, look.background, 0.7)),
-            }[style]
-            if look.helix_shading == "none":
+                "outline": (c.look.background, _mix(color, c.look.background, 0.7)),
+            }[c.look.fill]
+            if c.look.helix_shading == "none":
                 shade = fill
             front, back, shine = _coil(p, len(p.sse))
             behind = PathPatch(back, fc=shade, ec=edge, lw=edge_w * 0.8, joinstyle="round", zorder=2.9)
             behind.set_gid(f"helix-back:{p.sse.id}")
-            ax.add_patch(behind)
+            c.ax.add_patch(behind)
             bar = PathPatch(front, fc=fill, ec=edge, lw=edge_w, joinstyle="round", zorder=3)
             bar.set_gid(f"helix:{p.sse.id}")
-            ax.add_patch(bar)
-            if shine is not None and look.helix_shading == "gloss" and style != "outline":
+            c.ax.add_patch(bar)
+            if shine is not None and c.look.helix_shading == "gloss" and c.look.fill != "outline":
                 gloss = PathPatch(shine, fc=tint(fill, 0.4), ec="none", alpha=0.85, zorder=3.05)
                 gloss.set_gid(f"helix-shine:{p.sse.id}")
-                ax.add_patch(gloss)
-            if look.labels:
-                t = ax.text(
+                c.ax.add_patch(gloss)
+            if c.look.labels:
+                t = c.ax.text(
                     *helix_label_pos(p),
                     p.label,
                     ha="center",
                     va="center",
-                    fontsize=font,
+                    fontsize=c.font,
                     color=_label_ink(color),
                     zorder=4,
                 )
                 t.set_gid(f"label:{p.sse.id}")
 
-    _draw_links(ax, layout, loops, sses, look, lw, pt_per_unit)
-    _draw_ligands(ax, marks, lw, font)
-    _draw_uniprot(ax, umarks, layout, lw, font)
 
-    if look.residue_numbers:  # helices: beside each end; strands: inside the arrow near each end (or just past it)
+def _draw_residue_numbers(c: _Canvas, layout: Layout) -> None:
+    """First and last residue numbers at the ends of each element."""
+    if c.look.residue_numbers:  # helices: beside each end; strands: inside the arrow near each end (or just past it)
         for p in layout.placed.values():
             nrm = np.array([-np.sin(p.angle), np.cos(p.angle)])
-            colour = element_colour[p.sse.id]
+            colour = c.element_colour[p.sse.id]
             for end, port, num in (("N", p.n_port, p.sse.first.tag), ("C", p.c_port, p.sse.last.tag)):
                 inward = p.direction * (1.0 if end == "N" else -1.0)
                 if p.sse.kind in ("H", "G"):
@@ -1642,64 +1693,70 @@ def _draw(
                     reach = 0.35 if end == "N" else min(_HEAD_LEN, p.length * 0.45) + 0.3  # clear of the head
                     xy, ink = (
                         np.asarray(port) + inward * reach,
-                        darken(colour) if style == "outline" else text_color_on(colour),
+                        darken(colour) if c.look.fill == "outline" else text_color_on(colour),
                     )
                 else:  # too short to hold numbers: just past the end, beside the loop stub
                     xy, ink = np.asarray(port) - inward * 0.45 + nrm * 0.42, _legible("#4a4a4a")
-                t = ax.text(*xy, str(num), ha="center", va="center", fontsize=font * 0.62, color=ink, zorder=4.5)
+                t = c.ax.text(*xy, str(num), ha="center", va="center", fontsize=c.font * 0.62, color=ink, zorder=4.5)
                 t.set_gid(f"resnum:{p.sse.id}:{end}")
 
+
+def _draw_ghosts(c: _Canvas, layout: Layout) -> None:
+    """Dashed copies of elements that belong to a neighbouring subunit."""
     for g in layout.ghosts:
-        color = element_colour[g.sse.id]
+        color = c.element_colour[g.sse.id]
         patch = Polygon(
             _arrow(g),
             closed=True,
             fc=tint(color, 0.8),
             ec=darken(color),
-            lw=lw * 0.8,
+            lw=c.lw * 0.8,
             ls=(0, (2, 1.5)),
             joinstyle="round",
             zorder=3,
         )
         patch.set_gid(f"ghost:{g.sse.id}")
-        ax.add_patch(patch)
-        if look.labels:
-            t = ax.text(
+        c.ax.add_patch(patch)
+        if c.look.labels:
+            t = c.ax.text(
                 g.cx,
                 g.cy,
                 g.label,
                 ha="center",
                 va="center",
-                fontsize=font,
+                fontsize=c.font,
                 fontweight="bold",
                 color=darken(color),
                 zorder=4,
             )
             t.set_gid(f"ghostlabel:{g.sse.id}")
 
+
+def _draw_termini(c: _Canvas, layout: Layout, sses: list[SSE]) -> None:
+    """The N and C terminal stubs, their letters and long-tail lengths."""
     for end, chain, port, ex in termini(layout, sses):
         tip = (port[0] + ex[0] * END_STUB, port[1] + ex[1] * END_STUB)
-        ink = look.ink
-        if look.loop_color == "residue" and layout.res_chain:  # a terminal tail: its typical colour
+        ink = c.look.ink
+        if c.look.loop_color == "residue" and layout.res_chain:  # a terminal tail: its typical colour
             mine = [s for s in sses if s.chain == chain]
             ours = [r for r, c in enumerate(layout.res_chain) if c == chain]
             if mine and ours:
                 tail = range(ours[0], mine[0].start) if end == "N" else range(mine[-1].end + 1, ours[-1] + 1)
-                ink = _typical([residue_colour(r, chain) for r in tail]) or look.ink
-        if ink != look.ink:
-            edge = PathPatch(Path([port, tip]), fc="none", ec=_RUN_EDGE, lw=loop_lw * _RUN_EDGE_W, zorder=1.99)
+                ink = _typical([c.residue_colour(r, chain) for r in tail]) or c.look.ink
+        if ink != c.look.ink:
+            edge = PathPatch(Path([port, tip]), fc="none", ec=_RUN_EDGE, lw=c.loop_lw * _RUN_EDGE_W, zorder=1.99)
             edge.set_gid(f"stub-edge:{end}:{chain}")
-            ax.add_patch(edge)
-        stub = PathPatch(Path([port, tip], [Path.MOVETO, Path.LINETO]), fc="none", ec=ink, lw=loop_lw, zorder=2)
+            c.ax.add_patch(edge)
+        stub = PathPatch(Path([port, tip], [Path.MOVETO, Path.LINETO]), fc="none", ec=ink, lw=c.loop_lw, zorder=2)
         stub.set_gid(f"stub:{end}:{chain}")
-        ax.add_patch(stub)
-        t = ax.text(
+        c.ax.add_patch(stub)
+        t = c.ax.text(
             port[0] + ex[0] * END_LABEL,
             port[1] + ex[1] * END_LABEL,
             end,
             ha="center",
             va="center",
-            fontsize=font,
+            fontsize=c.font,
             fontweight="bold",
             zorder=4,
         )
@@ -1710,60 +1767,108 @@ def _draw(
             n_tail = (mine[0].start - ours[0]) if end == "N" else (ours[-1] - mine[-1].end)
             if n_tail >= LONG_TAIL:
                 at = np.add(port, np.asarray(ex) * (END_LABEL + 0.62))
-                t = ax.text(
+                t = c.ax.text(
                     *at,
                     f"{n_tail} aa",
                     ha="center",
                     va="center",
-                    fontsize=font * 0.72,
+                    fontsize=c.font * 0.72,
                     color=_legible("#5d6877"),
                     zorder=4,
                 )
                 t.set_gid(f"tail-length:{end}:{chain}")
 
-    for k, (colour, text) in enumerate(entries):
-        row, col = divmod(k, per_row)
-        x, y = xmin + pad + col * entry, ymin + legend_h - 1.1 - row * _LEGEND_ROW
+
+def _draw_legend(c: _Canvas, layout: Layout, legend: _Legend) -> None:
+    """The legend rows and, for a large assembly, the context caption under them."""
+    xmin, xmax, ymin, ymax = c.page
+    for k, (colour, text) in enumerate(legend.entries):
+        row, col = divmod(k, legend.per_row)
+        x, y = xmin + c.pad + col * legend.entry, ymin + legend.height - 1.1 - row * _LEGEND_ROW
         if isinstance(colour, tuple) and colour[0] == "grades":  # the nine grades in ConSurf's colours
             for q, shade in enumerate(CONSURF):
-                ax.add_patch(Rectangle((x + q * 0.6 / 9, y - 0.3), 0.6 / 9, 0.6, fc=shade, ec="none"))
-            ax.add_patch(Rectangle((x, y - 0.3), 0.6, 0.6, fc="none", ec="#9a9a9a", lw=lw * 0.5))
+                c.ax.add_patch(Rectangle((x + q * 0.6 / 9, y - 0.3), 0.6 / 9, 0.6, fc=shade, ec="none"))
+            c.ax.add_patch(Rectangle((x, y - 0.3), 0.6, 0.6, fc="none", ec="#9a9a9a", lw=c.lw * 0.5))
         elif isinstance(colour, tuple):  # a property ramp
             for q in range(6):
-                ax.add_patch(
+                c.ax.add_patch(
                     Rectangle((x + q * 0.1, y - 0.3), 0.1, 0.6, fc=property_colour(q / 5, colour[1]), ec="none")
                 )
         elif colour is None:  # the N -> C ramp
             for q in range(6):
-                ax.add_patch(
-                    Rectangle((x + q * 0.1, y - 0.3), 0.1, 0.6, fc=sequence_colour(q / 5, look.sequence_map), ec="none")
+                c.ax.add_patch(
+                    Rectangle(
+                        (x + q * 0.1, y - 0.3), 0.1, 0.6, fc=sequence_colour(q / 5, c.look.sequence_map), ec="none"
+                    )
                 )
         else:
-            swatch = Rectangle((x, y - 0.3), 0.6, 0.6, fc=colour, ec=darken(colour), lw=lw * 0.8)
-            ax.add_patch(swatch)
+            swatch = Rectangle((x, y - 0.3), 0.6, 0.6, fc=colour, ec=darken(colour), lw=c.lw * 0.8)
+            c.ax.add_patch(swatch)
             if text.startswith("Chain "):  # a chain's legend entry: clickable in the interactive page
                 swatch.set_gid(f"legend-chain:{text[6:]}")
-        t = ax.text(x + 0.85, y, text, ha="left", va="center", fontsize=font)
+        t = c.ax.text(x + 0.85, y, text, ha="left", va="center", fontsize=c.font)
         if text.startswith("Chain "):
             t.set_gid(f"legend-chain-label:{text[6:]}")
-    if layout.context and look.legend:  # what the figure shows of a large assembly, under the legend
+    if layout.context and c.look.legend:  # what the figure shows of a large assembly, under the legend
         import textwrap
 
-        per_line = max(30, int((xmax - xmin - 2 * pad) * pt_per_unit / (font * 0.85 * 0.52)))
-        t = ax.text(
-            xmin + pad,
+        per_line = max(30, int((xmax - xmin - 2 * c.pad) * c.pt_per_unit / (c.font * 0.85 * 0.52)))
+        t = c.ax.text(
+            xmin + c.pad,
             ymin + 0.55,
             "\n".join(textwrap.wrap(layout.context, per_line)),
             ha="left",
             va="center",
-            fontsize=font * 0.85,
+            fontsize=c.font * 0.85,
             style="italic",
             color=_legible("#5d6877"),
         )
         t.set_gid("context")
+
+
+def _draw_title(c: _Canvas, title: str) -> None:
+    """The title, centred at the top."""
+    xmin, xmax, ymin, ymax = c.page
+    c.ax.text((xmin + xmax) / 2, ymax - 0.8, title, ha="center", va="center", fontsize=c.font * 1.3, fontweight="bold")
+
+
+def _draw(
+    layout: Layout,
+    loops: list[Loop],
+    sses: list[SSE],
+    title: str | None = None,
+    *,
+    look: Style | None = None,
+    palette: str | None = None,
+    style: str | None = None,
+    loop_style: str | None = None,
+) -> Figure:
+    look = _resolve_look(look, palette, style, loop_style)
+    chains = _chains_in_order(sses)
+    colors = chain_colors(chains, look.palette)
+    element_colour, residue_colour = element_colours(layout, sses, look)
+    if not layout.placed and not layout.dna:
+        return _empty_figure()
+    marks = ligand_marks(layout, loops, sses, look)
+    umarks = uniprot_marks(layout, loops, sses, look)
+    c, legend = _canvas(layout, look, title, chains, colors, element_colour, residue_colour, marks, umarks)
+    _draw_loops(c, layout, loops, sses)
+    _draw_membrane(c, layout)
+    _draw_domains(c, layout)
+    _draw_sheet_panels(c, layout)
+    if layout.dna:
+        _draw_dna(c.ax, layout, sses, residue_colour, look.fill, c.lw, c.font, c.pt_per_unit, look)
+    _draw_elements(c, layout)
+    _draw_links(c.ax, layout, loops, sses, look, c.lw, c.pt_per_unit)
+    _draw_ligands(c.ax, marks, c.lw, c.font)
+    _draw_uniprot(c.ax, umarks, layout, c.lw, c.font)
+    _draw_residue_numbers(c, layout)
+    _draw_ghosts(c, layout)
+    _draw_termini(c, layout, sses)
+    _draw_legend(c, layout, legend)
     if title:
-        ax.text((xmin + xmax) / 2, ymax - 0.8, title, ha="center", va="center", fontsize=font * 1.3, fontweight="bold")
-    return fig
+        _draw_title(c, title)
+    return c.fig
 
 
 def save_svg(fig: Figure) -> str:
