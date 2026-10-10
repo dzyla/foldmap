@@ -35,8 +35,10 @@ def test_prerelease_must_match_exactly():
 
 
 @needs_workflows
-def test_release_runs_the_tests_and_checks_the_tag_before_building():
+def test_release_checks_the_tag_first_then_tests_then_builds_and_publishes():
     jobs = yaml.safe_load(RELEASE.read_text(encoding="utf-8"))["jobs"]
-    assert jobs["tests"]["uses"] == "./.github/workflows/tests.yml"
+    assert any("check_release.py" in s.get("run", "") for s in jobs["check-tag"]["steps"])
+    assert "needs" not in jobs["check-tag"]
+    assert jobs["tests"]["uses"] == "./.github/workflows/tests.yml" and jobs["tests"]["needs"] == "check-tag"
     assert jobs["build"]["needs"] == "tests" and jobs["publish"]["needs"] == "build"
-    assert any("check_release.py" in s.get("run", "") for s in jobs["build"]["steps"])
+    assert not any("check_release.py" in s.get("run", "") for s in jobs["build"]["steps"])
