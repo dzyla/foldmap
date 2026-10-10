@@ -185,3 +185,35 @@ def test_paths_can_be_switched_off_for_a_hosted_app():
     assert fetch(str(path)) == path
     with pytest.raises(ValueError, match="is not a PDB ID"):
         fetch(str(path), local=False)
+
+
+P53 = DATA / "AF-P04637.cif"
+
+
+def _offline(monkeypatch, tmp_path, asked: list):
+    class Reply:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+        def read(self):
+            return P53.read_bytes()
+
+    def fake(request, timeout=0):
+        asked.append(getattr(request, "full_url", request))
+        return Reply()
+
+    monkeypatch.setattr(fetch_mod, "CACHE", tmp_path)
+    monkeypatch.setattr(fetch_mod.urllib.request, "urlopen", fake)
+
+
+def test_alphafold_models_are_cached_per_release(monkeypatch, tmp_path):
+    asked = []
+    _offline(monkeypatch, tmp_path, asked)
+    first = fetch("P04637")
+    assert first.name == "AF-P04637-F1.cif" and first.parent.name == "afdb-v6"
+    monkeypatch.setattr(fetch_mod, "AFDB_VERSION", 7)
+    second = fetch("P04637")
+    assert second != first and len(asked) == 2 and asked[-1].endswith("-model_v7.cif")

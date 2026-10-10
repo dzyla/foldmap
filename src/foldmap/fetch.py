@@ -105,7 +105,8 @@ def fetch(source: str, upload: tuple[str, bytes] | None = None, *, local: bool =
     if af:  # a UniProt accession or AlphaFold DB id: the AlphaFold model
         acc = af.group(1)
         url = f"https://alphafold.ebi.ac.uk/files/AF-{acc}-F1-model_v{AFDB_VERSION}.cif"
-        return _download(url, CACHE / f"AF-{acc}-F1.cif", f"AF-{acc} from the AlphaFold DB")
+        folder = CACHE / f"afdb-v{AFDB_VERSION}"  # a new AlphaFold DB release is a new download
+        return _download(url, folder / f"AF-{acc}-F1.cif", f"AF-{acc} from the AlphaFold DB")
     if re.fullmatch(r"[0-9][A-Za-z0-9]{3}", text):
         pdb = text.upper()
         return _download(f"https://files.rcsb.org/download/{pdb}.cif", CACHE / f"{pdb}.cif", f"{pdb} from the PDB")
