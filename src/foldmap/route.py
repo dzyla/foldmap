@@ -65,17 +65,20 @@ class _Grid:
     def free(self, c) -> bool:
         return 0 <= c[0] < self.nx and 0 <= c[1] < self.ny and not self.blocked[c]
 
+    def cells_along(self, p, q) -> set[tuple[int, int]]:
+        """Free cells under the straight segment p-q."""
+        n = max(2, int(math.dist(p, q) / (self.res / 4)))
+        out = set()
+        for t in np.linspace(0.0, 1.0, n):
+            c = self.cell((p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t))
+            if self.free(c):
+                out.add(c)
+        return out
+
     def stub_cells(self, port, end) -> set[tuple[int, int]]:
         """Free cells under the straight stub from a port to its first routing cell (that cell excluded),
         so no other part of the same loop can pass between the two and be crossed by the stub."""
-        ex, ey = self.center(end)
-        n = max(2, int(math.dist(port, (ex, ey)) / (self.res / 4)))
-        out = set()
-        for t in np.linspace(0.0, 1.0, n):
-            c = self.cell((port[0] + (ex - port[0]) * t, port[1] + (ey - port[1]) * t))
-            if c != end and self.free(c):
-                out.add(c)
-        return out
+        return self.cells_along(port, self.center(end)) - {end}
 
     def free_cell_along(self, port, exit_vec, own: Placed):
         """First free cell on the way out of a port. Only the element's own bounding box (a tilted
@@ -90,6 +93,31 @@ class _Grid:
             if not (rx0 - _INFLATE < cx < rx1 + _INFLATE and ry0 - _INFLATE < cy < ry1 + _INFLATE):
                 return None
         return None
+
+
+def clip_len(p, q, rect) -> float:
+    """Length of the part of segment p-q strictly inside rect (Liang-Barsky clipping); 0.0 when it misses
+    or only touches the edge."""
+    x0, y0, x1, y1 = rect
+    dx, dy = q[0] - p[0], q[1] - p[1]
+    t0, t1 = 0.0, 1.0
+    for pk, qk in ((-dx, p[0] - x0), (dx, x1 - p[0]), (-dy, p[1] - y0), (dy, y1 - p[1])):
+        if pk == 0:
+            if qk <= 0:
+                return 0.0
+            continue
+        if pk < 0:
+            t0 = max(t0, qk / pk)
+        else:
+            t1 = min(t1, qk / pk)
+        if t0 >= t1:
+            return 0.0
+    return (t1 - t0) * math.hypot(dx, dy)
+
+
+def segment_clear(p, q, rects, grow=_INFLATE) -> bool:
+    """True when segment p-q keeps the routing clearance from every rect (each grown by `grow`)."""
+    return all(clip_len(p, q, (r[0] - grow, r[1] - grow, r[2] + grow, r[3] + grow)) <= 1e-9 for r in rects)
 
 
 def _axis(vec) -> int:
@@ -232,13 +260,25 @@ def route_loops(layout: Layout, sses: list[SSE], bb) -> list[Loop]:
     ]
     if not pairs:
         return []
-    grid = _Grid(layout, [b for _, b in label_boxes(layout, sses)])
+    keep_out = label_boxes(layout, sses)
+    grid = _Grid(layout, [b for _, b in keep_out])
+    # (owner element id or None, rect) of everything a kink link must keep clear of but its own two elements
+    obstacles = [(k, p.rect) for k, p in layout.placed.items()]
+    obstacles += [(None, o.rect) for o in [*layout.ghosts, *layout.dna]]
+    obstacles += [(n.removeprefix("label:") if n.startswith("label:") else None, r) for n, r in keep_out]
     dist = lambda ab: math.dist(layout.placed[ab[0].id].c_port, layout.placed[ab[1].id].n_port)  # noqa: E731
     routed: dict[tuple[str, str], tuple[list, bool, bool]] = {}  # points, fallback curve, over labels
     for a, b in sorted(pairs, key=dist):
         pa, pb = layout.placed[a.id], layout.placed[b.id]
         gap = np.subtract(pb.n_port, pa.c_port)
-        if b.start - a.end - 1 <= KINK_GAP and np.hypot(*gap) < 1.5 and gap @ pa.exit_c > 0:
+        if (
+            b.start - a.end - 1 <= KINK_GAP
+            and np.hypot(*gap) < 1.5
+            and gap @ pa.exit_c > 0
+            and segment_clear(pa.c_port, pb.n_port, [r for k, r in obstacles if k not in (a.id, b.id)])
+        ):
+            for c in grid.cells_along(pa.c_port, pb.n_port):
+                grid.used[c] += 1
             routed[(a.id, b.id)] = ([pa.c_port, pb.n_port], False, False)  # a kink: the helix just carries on
             continue
         pts, over = _route_pair(grid, pa, pb), False

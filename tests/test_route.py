@@ -4,8 +4,8 @@ import numpy as np
 import pytest
 
 from foldmap.frame import view_frame
-from foldmap.layout import HELIX_W, PITCH, Layout, Placed, build_layout
-from foldmap.route import route_loops
+from foldmap.layout import ETA_W, HELIX_W, PITCH, Layout, Placed, build_layout
+from foldmap.route import _INFLATE, route_loops
 from helpers import fake_sse, pipeline
 
 MODES = ["projected", "stack"]
@@ -209,3 +209,40 @@ def test_kinked_helix_pieces_are_joined_straight_not_by_a_fallback():
         assert np.allclose(l.points[0], lay.placed[key[0]].c_port) and np.allclose(
             l.points[1], lay.placed[key[1]].n_port
         )
+
+
+def clip_len(p, q, rect):
+    """Length of segment p-q strictly inside rect (Liang-Barsky clipping); 0.0 when it misses."""
+    x0, y0, x1, y1 = rect
+    dx, dy = q[0] - p[0], q[1] - p[1]
+    t0, t1 = 0.0, 1.0
+    for pk, qk in ((-dx, p[0] - x0), (dx, x1 - p[0]), (-dy, p[1] - y0), (dy, y1 - p[1])):
+        if pk == 0:
+            if qk <= 0:
+                return 0.0
+            continue
+        if pk < 0:
+            t0 = max(t0, qk / pk)
+        else:
+            t1 = min(t1, qk / pk)
+        if t0 >= t1:
+            return 0.0
+    return (t1 - t0) * np.hypot(dx, dy)
+
+
+@pytest.mark.parametrize(
+    "third",
+    [
+        Placed(fake_sse("G", 0, 3, chain="B"), 0.7, 0.0, 2.0, np.pi / 2, HELIX_W * ETA_W, "η1"),
+        Placed(fake_sse("E", 0, 6, chain="B"), 0.7, 0.0, 3.0, np.pi / 2, PITCH, "A"),
+    ],
+    ids=["3-10", "strand"],
+)
+def test_kink_shortcut_does_not_cross_a_third_element(third):
+    a = bar(0, -2.0, 0.0, 4.0, 0.0)  # C port at (0, 0), leaving along +x
+    b = bar(11, 3.4, 0.0, 4.0, 0.0)  # N port at (1.4, 0): one residue on, close enough for a kink link
+    lay = layout_of(a, b, third)
+    (loop,) = route_loops(lay, [a.sse, b.sse, third.sse], stub_bb())
+    grown = np.add(third.rect, (-_INFLATE, -_INFLATE, _INFLATE, _INFLATE))  # with the router's clearance
+    clear = all(clip_len(p, q, grown) < 1e-9 for p, q in zip(loop.points, loop.points[1:]))
+    assert loop.fallback or clear  # a drawn route (not the marked fallback curve) never passes through it
