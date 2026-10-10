@@ -32,6 +32,7 @@ END_LABEL = 1.15  # distance from a chain-end port to its N/C letter
 _GLYPH_W, _GLYPH_H = 0.32, 0.42  # rough label glyph size in page units, for keep-out boxes
 _MAX_ROW = 30.0
 _MIN_STRAND = 1.0  # shortest drawn strand (room for the arrow head)
+_PAIR_ENERGY_MIN = 200  # items: above it the energy runs over pairs that matter; below, the dense one (layouts fixed)
 _W_SEQ = 1.0  # pull between the two ends of a loop
 _LOOP_SLACK = 1.5  # loop ends closer than this are left alone
 _W_SS = 2.0  # pull between two bridged cysteines (twice a loop: disulfides should read as short bars)
@@ -396,7 +397,55 @@ def _mass(it: _Item) -> float:
     return sum(len(m.axial) / 4 if isinstance(m, PlacedDNA) else 1 for m in it.members)
 
 
-def _energy(flat, home, anchor_w, want, W, loops, lam, mids=None):
+def _energy(flat, home, anchor_w, want, pull, loops, lam, mids=None):
+    """Layout energy and its gradient. Terms: stay near the projected position (fold); loop ends within
+    _LOOP_SLACK of each other; touching elements' (and DNA binders') boxes adjacent (`pull`: the item pairs
+    i < j with a contact weight, and the weights); lam * squared box overlap (raised stage by stage until
+    overlaps are gone). Only pairs that overlap or pull contribute, so the cost is one n x n test plus work
+    on those pairs."""
+    P = flat.reshape(-1, 2)
+    grad = 2 * anchor_w * (P - home)
+    E = float((anchor_w[:, 0] * ((P - home) ** 2).sum(1)).sum())
+    Q = P if mids is None else P + mids  # footprint centres
+    oi, oj = np.nonzero(np.triu(want[..., 0] > np.abs(Q[None, :, 0] - Q[:, None, 0]), 1))
+    keep = want[oi, oj, 1] > np.abs(Q[oj, 1] - Q[oi, 1])
+    oi, oj = oi[keep], oj[keep]
+    if len(oi):  # overlapping boxes: pushed apart along the axis of least overlap
+        d = Q[oj] - Q[oi]
+        px, py = want[oi, oj, 0] - np.abs(d[:, 0]), want[oi, oj, 1] - np.abs(d[:, 1])
+        on_x = px < py
+        E += lam * float((np.where(on_x, px, py) ** 2).sum())
+        _pair_grad(grad, oi, oj, d, np.where(on_x, 2 * lam * px, 0.0), np.where(on_x, 0.0, 2 * lam * py))
+    ci, cj, cw = pull
+    if len(ci):  # touching in 3D but apart on the page: pulled together until the boxes meet
+        d = Q[cj] - Q[ci]
+        px, py = want[ci, cj, 0] - np.abs(d[:, 0]), want[ci, cj, 1] - np.abs(d[:, 1])
+        gap = np.maximum(-px, -py)  # how far apart two boxes are beyond touching
+        cg = np.where(gap > 0, 2 * cw * gap, 0.0)
+        E += float((np.where(gap > 0, cw * gap**2, 0.0)).sum())
+        on_x = -px >= -py
+        _pair_grad(grad, ci, cj, d, -np.where(on_x, cg, 0.0), -np.where(on_x, 0.0, cg))
+    I, OI, J, OJ, w, slack = loops
+    if len(I):
+        g = (P[J] + OJ) - (P[I] + OI)
+        dist = np.maximum(np.hypot(g[:, 0], g[:, 1]), 1e-12)
+        excess = np.clip(dist - slack, 0.0, None)
+        E += float((w * excess**2).sum())
+        dg = (2 * w * excess / dist)[:, None] * g
+        np.add.at(grad, J, dg)
+        np.add.at(grad, I, -dg)
+    return E, grad.ravel()
+
+
+def _pair_grad(grad, i, j, d, gx, gy) -> None:
+    """Add dE/d(overlap depth) of pairs (i, j), d = Q_j - Q_i, to the per-item gradient (in place)."""
+    n = len(grad)
+    fx, fy = gx * np.sign(d[:, 0]), gy * np.sign(d[:, 1])
+    grad[:, 0] += np.bincount(i, fx, n) - np.bincount(j, fx, n)
+    grad[:, 1] += np.bincount(i, fy, n) - np.bincount(j, fy, n)
+
+
+def _energy_dense(flat, home, anchor_w, want, W, loops, lam, mids=None):
     """Layout energy and its gradient. Terms: stay near the projected position (fold); loop ends within
     _LOOP_SLACK of each other; touching elements' (and DNA binders') boxes adjacent;
     lam * squared box overlap (raised stage by stage until overlaps are gone)."""
@@ -452,6 +501,8 @@ def _attract(
 
     n = len(items)
     W = _contact_weights(items, contacts)
+    ci, cj = np.nonzero(np.triu(W > 0, 1))
+    pull = (ci, cj, W[ci, cj])
     springs = _loop_springs(items, sses)
     weight = [_W_SEQ] * len(springs)
     slack = [_LOOP_SLACK] * len(springs)
@@ -497,7 +548,10 @@ def _attract(
         return P
 
     def tied(z):  # one position per orbit of symmetry copies, plus the spread between protomers
-        E, g = _energy(expand(z).ravel(), home, anchor_w, want, W, loops, lam, mids)
+        if n > _PAIR_ENERGY_MIN:
+            E, g = _energy(expand(z).ravel(), home, anchor_w, want, pull, loops, lam, mids)
+        else:
+            E, g = _energy_dense(expand(z).ravel(), home, anchor_w, want, W, loops, lam, mids)
         g = g.reshape(-1, 2)
         gz = np.zeros((len(free), 2))
         np.add.at(gz, base, g)
