@@ -22,7 +22,7 @@ from pathlib import Path
 import yaml
 
 from .layout import Layout, resolve
-from .model import SSE
+from .model import SSE, res_ref
 from .style import THEMES, Style
 
 VERSION = 1
@@ -84,7 +84,7 @@ def document(structure, theme: str, look: Style, options: dict, edits: dict, lay
 
 
 def _range(s: SSE) -> str:
-    return f"res:{s.chain}:{s.first.seq}-{s.last.seq}"
+    return res_ref(s.chain, s.first, s.last)
 
 
 def save(path, doc: dict) -> Path:

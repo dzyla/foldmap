@@ -14,6 +14,16 @@ class ResLabel(NamedTuple):
     icode: str
     name: str
 
+    @property
+    def tag(self) -> str:
+        """Residue number with its insertion code, as written in a structure file: 100, 100A, -7."""
+        return f"{self.seq}{self.icode}"
+
+
+def res_ref(chain: str, first: ResLabel, last: ResLabel) -> str:
+    """A residue-range reference (see layout.resolve) that names exactly first..last of a chain."""
+    return f"res:{chain}:{first.tag}-{last.tag}"
+
 
 class Bridge(NamedTuple):
     """Backbone H-bond bridge between residues i < j. kind: 'P' parallel, 'A' antiparallel."""
@@ -76,7 +86,7 @@ class SSE:
 
     @property
     def id(self) -> str:
-        return f"{self.chain}:{self.first.seq}-{self.last.seq}"
+        return f"{self.chain}:{self.first.tag}-{self.last.tag}"
 
     def __len__(self) -> int:
         return self.end - self.start + 1
@@ -108,7 +118,7 @@ class NAStrand:
 
     @property
     def id(self) -> str:
-        return f"{self.chain}:{self.labels[0].seq}-{self.labels[-1].seq}"
+        return f"{self.chain}:{self.labels[0].tag}-{self.labels[-1].tag}"
 
     def __len__(self) -> int:
         return len(self.labels)

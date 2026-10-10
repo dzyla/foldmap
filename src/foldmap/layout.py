@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 
 import numpy as np
@@ -363,6 +364,8 @@ def _contact_weights(items: list[_Item], contacts: dict[frozenset[str], int]) ->
     owner = _owner(items)
     w = np.zeros((len(items), len(items)))
     for pair, count in sorted((tuple(sorted(k)), v) for k, v in contacts.items()):
+        if len(pair) != 2:
+            continue  # an element touching itself carries no pull
         a, b = (owner.get(x) for x in pair)
         if a and b and a[0] != b[0]:
             w[a[0], b[0]] += _W_CONTACT * min(count, _CONTACT_CAP) / _CONTACT_CAP
@@ -691,9 +694,13 @@ def _symmetry_ties(items: list[_Item], frame) -> dict[int, tuple[int, int]]:
     return ties
 
 
+_RES_RANGE = re.compile(r"(-?\d+)([A-Za-z]?)(?:-(-?\d+)([A-Za-z]?))?")  # 150, 150-159, -7-4, 100A-100K
+
+
 def resolve(layout: Layout, sses: list[SSE], ref: str) -> list[str]:
     """Element ids for a reference: a label (G, α2; every chain), chain:label (A:G), #k (the k-th element
-    from the N terminus, 1-based), or res:a-b / res:chain:a-b (elements overlapping those residue numbers)."""
+    from the N terminus, 1-based), or res:a-b / res:chain:a-b (elements overlapping those residues; negative
+    numbers and insertion codes as in the file, e.g. res:A:-7-4, res:H:100A-100K)."""
     ref = ref.strip()
     placed = [s for s in sses if s.id in layout.placed]
     if ref.startswith("#"):
@@ -706,12 +713,20 @@ def resolve(layout: Layout, sses: list[SSE], ref: str) -> list[str]:
         chain = None
         if body.count(":") == 1:
             chain, body = body.split(":")
-        a, _, b = body.partition("-")
-        try:
-            lo, hi = int(a), int(b or a)
-        except ValueError:
-            raise ValueError(f"residue reference {ref!r} must look like res:150-159 or res:A:150-159") from None
-        out = [s.id for s in placed if (chain is None or s.chain == chain) and s.first.seq <= hi and s.last.seq >= lo]
+        m = _RES_RANGE.fullmatch(body)
+        if m is None:
+            raise ValueError(
+                f"residue reference {ref!r} must look like res:150-159, res:A:150-159, res:A:-7-4 or res:H:100A-100K"
+            )
+        lo = (int(m[1]), m[2])
+        hi = (int(m[3]), m[4]) if m[3] is not None else lo
+        out = [
+            s.id
+            for s in placed
+            if (chain is None or s.chain == chain)
+            and (s.first.seq, s.first.icode) <= hi
+            and (s.last.seq, s.last.icode) >= lo
+        ]
     elif ":" in ref:
         chain, label = ref.split(":", 1)
         out = [s.id for s in placed if s.chain == chain and layout.placed[s.id].label == label]

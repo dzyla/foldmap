@@ -15,6 +15,7 @@ from .features import sse_contacts
 from .frame import dna_radial_frame, dna_view_frame, symmetric_frame, view_frame
 from .io import load_backbone, load_links, load_nucleic
 from .layout import build_layout, resolve
+from .model import res_ref
 from .palette import PALETTES
 from .render import LOOP_STYLES, STYLES, draw, save
 from .route import route_loops
@@ -129,14 +130,14 @@ def make_layout(
         rename = dict(rename or {})
         for s in sses:
             if s.chain in partial:
-                rename.setdefault(f"res:{s.chain}:{s.first.seq}-{s.last.seq}", labels[s.id] + primes[s.chain])
+                rename.setdefault(res_ref(s.chain, s.first, s.last), labels[s.id] + primes[s.chain])
         context = _context(sym, focus_chains, bb, bool(partial))
         sym = None  # one subunit: no copies to draw alike
     if shared:  # applied to the elements actually drawn (focus mode may have left some out)
         rename = dict(rename or {})
         for s in sses:
             if s.id in shared and s.chain not in partial:
-                rename.setdefault(f"res:{s.chain}:{s.first.seq}-{s.last.seq}", shared[s.id])
+                rename.setdefault(res_ref(s.chain, s.first, s.last), shared[s.id])
     mem = None
     if membrane not in ("off", None):
         from .membrane import find_membrane
