@@ -194,3 +194,36 @@ def test_coincident_atoms_give_the_floor_without_warnings():
     with warnings.catch_warnings():
         warnings.simplefilter("error")
         assert _hbond_energy([0.0], [0.0], [0.0], [0.0])[0] == pytest.approx(-9.9)
+
+
+def _energy_distances(e):
+    """O-N, C-H, O-H and C-N distances whose energy is e: C-H and C-N cancel, O-H is 2 Å."""
+    from foldmap.dssp import _Q1Q2F
+
+    return [1 / (e / _Q1Q2F + 0.5)], [3.0], [2.0], [3.0]
+
+
+def test_hbond_energy_is_rounded_to_a_thousandth_like_mkdssp():
+    from foldmap.dssp import _HBOND_E, _hbond_energy
+
+    assert _hbond_energy(*_energy_distances(-0.5003))[0] == -0.5  # mkdssp: not a bond (the test is < -0.5)
+    assert not _hbond_energy(*_energy_distances(-0.5003))[0] < _HBOND_E
+    assert _hbond_energy(*_energy_distances(-0.5006))[0] == -0.501  # a bond
+    assert _hbond_energy(*_energy_distances(-0.5006))[0] < _HBOND_E
+
+
+def test_equal_energies_keep_the_lower_acceptors(monkeypatch):
+    import foldmap.dssp as dssp
+    from foldmap.model import Backbone, ResLabel
+
+    # eight residues packed within 9 Å, every CO-NH pair at the same energy: each NH keeps its two
+    # lowest-numbered acceptors, as mkdssp does (strict < while it walks acceptors in order)
+    rng = np.random.default_rng(0)
+    n = 8
+    xyz = rng.uniform(0, 4, (n, 4, 3))
+    bb = Backbone([ResLabel("A", k + 1, "", "ALA") for k in range(n)], xyz, np.r_[False, np.ones(n - 1, bool)])
+    monkeypatch.setattr(dssp, "_hbond_energy", lambda d_on, *_: np.full(len(d_on), -1.0))
+    bonds = dssp._hbond_set(bb)
+    for donor in range(1, n):
+        acceptors = [a for a in range(n) if a not in (donor, donor - 1)][:2]
+        assert {a for a, d in bonds if d == donor} == set(acceptors), donor

@@ -45,10 +45,12 @@ def _hydrogen_positions(bb: Backbone) -> np.ndarray:
 
 
 def _hbond_energy(d_on, d_ch, d_oh, d_cn) -> np.ndarray:
-    """Electrostatic energy from the O-N, C-H, O-H and C-N distances, floored at -9.9 kcal/mol as in mkdssp."""
+    """Electrostatic energy from the O-N, C-H, O-H and C-N distances, rounded to 0.001 kcal/mol and floored at
+    -9.9 kcal/mol as in mkdssp."""
     d_on, d_ch, d_oh, d_cn = (np.asarray(x, float) for x in (d_on, d_ch, d_oh, d_cn))
     with np.errstate(divide="ignore", invalid="ignore"):
         e = _Q1Q2F * (1 / d_on + 1 / d_ch - 1 / d_oh - 1 / d_cn)
+    e = np.round(e * 1000) / 1000
     clash = np.minimum.reduce([d_on, d_ch, d_oh, d_cn]) < _MIN_DIST
     return np.where(clash, _HBOND_E_MIN, np.maximum(e, _HBOND_E_MIN))
 
@@ -68,7 +70,7 @@ def _hbond_set(bb: Backbone) -> set[tuple[int, int]]:
     oa, ca = xyz[acc, 3], xyz[acc, 2]
     d = lambda p, q: np.linalg.norm(p - q, axis=1)  # noqa: E731
     e = _hbond_energy(d(oa, nd), d(ca, hd), d(oa, hd), d(ca, nd))
-    order = np.argsort(e)
+    order = np.lexsort((acc, e))  # equal energies: the lower acceptor wins, as in mkdssp
     used_d, bonds = {}, set()
     for k in order:
         if e[k] >= _HBOND_E:
