@@ -324,3 +324,45 @@ def test_app_alignment_of_one_structure_does_not_carry_to_the_next():
     assert not at.exception and not at.error
     assert at.session_state["msa_path"] == "" and at.session_state["msa_error"] == ""
     assert at.session_state["msa_reference"] == ""
+
+
+def test_app_pruned_upload_is_a_message_not_a_traceback():
+    at = _app()
+    at.run()
+    at.file_uploader(key="upload").set_value(("ubq.cif", (DATA / "1UBQ.cif").read_bytes(), "chemical/x-cif")).run()
+    at.button(key="load").click().run()
+    at.button(key="pick_publication").click().run()
+    assert not at.exception and not at.error
+    kept = Path(at.session_state["path"])
+    assert kept.is_file()
+    kept.unlink()  # a long hosted session: the upload was pruned
+    at.selectbox(key="mode").select("stack").run()
+    assert not at.exception
+    assert any("load it again" in e.value and str(kept.parent) not in e.value for e in at.error)
+
+
+def test_app_pruned_upload_in_the_sequence_tab_is_a_message(monkeypatch):
+    at = _app()
+    at.run()
+    at.file_uploader(key="upload").set_value(("ubq.cif", (DATA / "1UBQ.cif").read_bytes(), "chemical/x-cif")).run()
+    at.button(key="load").click().run()
+    at.button(key="pick_publication").click().run()
+    Path(at.session_state["path"]).unlink()
+    at.slider(key="seq_columns").set_value(80).run()  # the figure is cached; the sequence is drawn again
+    assert not at.exception and any("load it again" in e.value for e in at.error)
+
+
+def test_app_alignment_that_cannot_be_stored_is_a_message(monkeypatch):
+    import foldmap.fetch as fetch_mod
+
+    def fail(*a, **k):
+        raise OSError("disk full: /srv/secret/path")
+
+    at = _load(_app(), DATA / "1UBQ.cif")
+    at.button(key="pick_publication").click().run()
+    monkeypatch.setattr(fetch_mod, "atomic_write", fail)
+    at.file_uploader(key="msa_upload").set_value(
+        ("ubq.fasta", (DATA / "ubq_family.fasta").read_bytes(), "text/plain")
+    ).run()
+    assert not at.exception and at.session_state["msa_path"] == ""
+    assert at.session_state["msa_error"] and "/srv/secret" not in at.session_state["msa_error"]

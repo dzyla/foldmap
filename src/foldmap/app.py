@@ -226,6 +226,14 @@ def settings_from_document(doc: dict) -> dict:
     return out
 
 
+def trouble(err: Exception) -> str:
+    """What to tell the visitor: a ValueError says what is wrong with the input; anything else means the structure
+    file itself is gone or unreadable (an upload is removed after a day), and server paths stay out of the message."""
+    if isinstance(err, ValueError):
+        return str(err)
+    return "this upload is no longer available (or cannot be read); load it again"
+
+
 def summary(path) -> str:
     from foldmap.symmetry import detect_symmetry
 
@@ -270,14 +278,17 @@ def main() -> None:
         if up is None:
             ss["msa_path"] = ""
             return
-        target = keep_upload(up.name, up.getvalue(), ALIGNMENT_SUFFIXES)
         try:
+            target = keep_upload(up.name, up.getvalue(), ALIGNMENT_SUFFIXES)
             from foldmap.sequence import is_consurf, read_alignment
 
             if not is_consurf(target):  # a ConSurf grades table is used as it is (make_layout reads it)
                 read_alignment(target)
-        except ValueError as err:
-            ss["msa_error"], ss["msa_path"] = str(err), ""
+        except (ValueError, OSError) as err:
+            ss["msa_error"] = (
+                str(err) if isinstance(err, ValueError) else "the alignment could not be stored; try again"
+            )
+            ss["msa_path"] = ""
             return
         ss["msa_error"], ss["msa_path"] = "", str(target)
 
@@ -494,8 +505,8 @@ def main() -> None:
     with tab_fig:
         try:
             svg, notes = render(path, blob)
-        except ValueError as err:
-            st.error(str(err))
+        except (ValueError, OSError, RuntimeError) as err:
+            st.error(trouble(err))
             return
         if notes["fallback"]:
             st.warning("No clear route for: " + ", ".join(notes["fallback"]) + " (drawn as plain curves).")
@@ -520,8 +531,8 @@ def main() -> None:
                 "application/x-yaml",
                 key="dl_layout",
             )
-        except ValueError as err:
-            st.caption(f"Layout file unavailable: {err}")
+        except (ValueError, OSError, RuntimeError) as err:
+            st.caption(f"Layout file unavailable: {trouble(err)}")
     with tab_seq:
         c1, c2, c3 = st.columns(3)
         c1.slider("Columns per row", 20, 150, 60, step=5, key="seq_columns")
@@ -530,8 +541,8 @@ def main() -> None:
         view = {"columns": ss["seq_columns"], "ss_colour": ss["seq_ss_colour"], "full_sequence": ss["seq_full"]}
         try:
             seq = sequence(path, blob, json.dumps(view, sort_keys=True))
-        except ValueError as err:
-            st.error(str(err))
+        except (ValueError, OSError, RuntimeError) as err:
+            st.error(trouble(err))
         else:
             page_bg = settings.get("background", "#ffffff")
             st.markdown(
@@ -545,14 +556,18 @@ def main() -> None:
             d2.download_button("PNG (300 dpi)", seq["png"], f"{stem}-sequence.png", "image/png", key="dl_seq_png")
             d3.download_button("PDF", seq["pdf"], f"{stem}-sequence.pdf", "application/pdf", key="dl_seq_pdf")
     with tab_live:
-        page = interactive(path, blob)
-        st.download_button(
-            "Interactive page (HTML)", page.encode(), f"{stem}-explorer.html", "text/html", key="dl_html"
-        )
-        if hasattr(st, "iframe"):  # Streamlit >= 1.52; the page is foldmap's own output
-            st.iframe(page, height=1100)
+        try:
+            page = interactive(path, blob)
+        except (ValueError, OSError, RuntimeError) as err:
+            st.error(trouble(err))
         else:
-            components.html(page, height=1100, scrolling=True)
+            st.download_button(
+                "Interactive page (HTML)", page.encode(), f"{stem}-explorer.html", "text/html", key="dl_html"
+            )
+            if hasattr(st, "iframe"):  # Streamlit >= 1.52; the page is foldmap's own output
+                st.iframe(page, height=1100)
+            else:
+                components.html(page, height=1100, scrolling=True)
 
 
 def run() -> None:
