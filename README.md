@@ -190,7 +190,7 @@ Change any key with `--set KEY=VALUE` (repeatable) or a YAML file for `--style-f
 | Only some chains | `--chains A,B` |
 | Large assemblies | `--focus auto\|none\|protomer\|B` (one subunit plus what its neighbours add to its fold) |
 | Membrane | `--membrane auto` (OPM dummy atoms if present, otherwise estimated) |
-| Conservation | `--theme conservation --msa family.fasta` |
+| Conservation | `--theme conservation --msa family.fasta`, or `--msa consurf_grades.txt` for ConSurf's own grades |
 | Orientation | `--up X,Y,Z`, `--view X,Y,Z`, `--rotate DEG` |
 | Symmetry and assembly | `--symmetry auto\|off\|C3\|D2\|helical`, `--protomers "A,B;C,D"`, `--assembly auto\|asu\|ID` |
 

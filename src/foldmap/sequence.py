@@ -3,6 +3,7 @@ and multiple sequence alignments mapped onto it."""
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -129,6 +130,11 @@ class Alignment:
 
 def read_alignment(path) -> Alignment:
     """An alignment from FASTA (aligned, '-' gaps), Clustal or Stockholm; '.' gaps become '-'."""
+    if is_consurf(path):
+        raise ValueError(
+            f"{path} is a ConSurf grades table, not an alignment: it colours the topology (plot --msa), "
+            "not the sequence view"
+        )
     text = Path(path).read_text(encoding="utf-8")
     lines = [l.rstrip() for l in text.splitlines()]
     first = next((l for l in lines if l.strip()), "")
@@ -167,6 +173,29 @@ def read_alignment(path) -> Alignment:
     if len(rows) < 1 or len({len(r) for r in rows}) != 1:
         raise ValueError(f"{path}: alignment rows must all have the same length (got {sorted({len(r) for r in rows})})")
     return Alignment(order, rows)
+
+
+_CONSURF_ATOM = re.compile(r"([A-Z]{3})(-?\d+)([A-Za-z]?):([A-Za-z0-9]+)")
+
+
+def is_consurf(path) -> bool:
+    """A ConSurf results table (consurf_grades.txt, *.gradesPE) rather than an alignment."""
+    head = Path(path).read_text(encoding="utf-8", errors="replace")[:4000]
+    return "3LATOM" in head and "COLOR" in head
+
+
+def read_consurf(path) -> dict[tuple[str, int, str], int]:
+    """ConSurf's grades (Rate4Site, 1 variable .. 9 conserved) by (chain, residue number, insertion code), for
+    the positions ConSurf placed on the structure. Grades ConSurf marks as unreliable ('*') are kept."""
+    out: dict[tuple[str, int, str], int] = {}
+    for line in Path(path).read_text(encoding="utf-8", errors="replace").splitlines():
+        parts = line.split()
+        if len(parts) < 5 or not parts[0].isdigit():
+            continue
+        atom, grade = _CONSURF_ATOM.fullmatch(parts[2]), parts[4].rstrip("*")
+        if atom and grade.isdigit() and 1 <= int(grade) <= 9:
+            out[(atom.group(4), int(atom.group(2)), atom.group(3))] = int(grade)
+    return out
 
 
 def _global(a: str, b: str, match: float = 2.0, mismatch: float = -1.0, gap: float = 2.0):

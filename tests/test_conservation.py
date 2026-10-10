@@ -97,3 +97,40 @@ def test_layout_carries_grades_and_honest_legend():
 def test_grade_colours():
     assert [grade_colour(g) for g in range(1, 10)] == list(CONSURF)
     assert to_hex(grade_colour(0)) == "#d9d9d9"
+
+
+def consurf_table(tmp_path, grade_of):
+    """A ConSurf grades table for ubiquitin chain A: grade_of(residue number) -> grade (synthesised in the
+    documented consurf_grades.txt layout; no real file is available offline)."""
+    import gemmi
+
+    st = gemmi.read_structure(str(UBQ))
+    rows = [" POS\t SEQ\t    3LATOM\tSCORE\t\tCOLOR\tCONFIDENCE INTERVAL", "    \t    \t        \t(normalized)"]
+    for k, res in enumerate(st[0]["A"].get_polymer(), 1):
+        one = gemmi.find_tabulated_residue(res.name).one_letter_code.upper()
+        g = grade_of(res.seqid.num)
+        flag = "*" if k == 1 else ""  # ConSurf's mark for a grade with too little data
+        rows.append(f"{k:4d}\t   {one}\t{res.name}{res.seqid.num}:A\t{0.1 * (5 - g):.3f}\t\t  {g}{flag}\t-")
+    rows.append(f"{len(rows):4d}\t   G\t      -   \t 0.125\t\t  4\t-")  # a position not in the structure
+    path = tmp_path / "consurf_grades.txt"
+    path.write_text("Amino Acid Conservation Scores\n=====\n\n" + "\n".join(rows) + "\n", encoding="utf-8")
+    return path
+
+
+def test_consurf_table_colours_by_its_own_grades(tmp_path):
+    from foldmap.sequence import is_consurf, read_consurf
+
+    table = consurf_table(tmp_path, lambda n: 9 if n <= 10 else 1)
+    assert is_consurf(table) and not is_consurf(FAMILY)
+    grades = read_consurf(table)
+    assert grades[("A", 1, "")] == 9 and grades[("A", 70, "")] == 1 and len(grades) == 76
+    lay, sses, _ = make_layout(UBQ, msa=table)
+    assert lay.cons_label == "conservation (ConSurf grades)"
+    colours, _ = element_colours(lay, sses, Style(color_by="conservation"))
+    first = min(sses, key=lambda s: s.start)  # β1, residues 1-7: grade 9
+    assert to_hex(colours[first.id]) == to_hex(CONSURF[8])
+
+
+def test_consurf_table_is_not_an_alignment(tmp_path):
+    with pytest.raises(ValueError, match="ConSurf"):
+        read_alignment(consurf_table(tmp_path, lambda n: 5))

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import dataclasses
+import re
 import sys
 from pathlib import Path
 
@@ -75,6 +76,7 @@ def summarize(path: str) -> str:
 
 
 CONSERVATION_LEGEND = "conservation (entropy-based, ConSurf colour scale)"
+CONSURF_LEGEND = "conservation (ConSurf grades)"
 
 
 def make_layout(
@@ -223,12 +225,23 @@ def make_layout(
     if mem is not None:
         lay.membrane = _membrane_band(lay, sses, bb, mem)
     if msa:
-        from .sequence import grades, read_alignment, residue_conservation
+        from .sequence import grades, is_consurf, read_alignment, read_consurf, residue_conservation
 
-        scores = residue_conservation(bb, read_alignment(msa), msa_reference)
-        lay.res_cons = [scores.get(k, float("nan")) for k in range(len(bb))]
-        lay.res_grade = grades(lay.res_cons)
-        lay.cons_label = CONSERVATION_LEGEND
+        if is_consurf(msa):  # ConSurf's own grades: by residue, copies of a chain take its grades
+            table = read_consurf(msa)
+            deposited = {c for c, _, _ in table}
+
+            def grade(l) -> int:
+                chain = l.chain if l.chain in deposited else re.sub(r"-?\d+$", "", l.chain)
+                return table.get((chain, l.seq, l.icode), 0)
+
+            lay.res_grade = [grade(l) for l in bb.labels]
+            lay.cons_label = CONSURF_LEGEND
+        else:
+            scores = residue_conservation(bb, read_alignment(msa), msa_reference)
+            lay.res_cons = [scores.get(k, float("nan")) for k in range(len(bb))]
+            lay.res_grade = grades(lay.res_cons)
+            lay.cons_label = CONSERVATION_LEGEND
     return lay, sses, bb
 
 
@@ -796,7 +809,11 @@ def main(argv: list[str] | None = None) -> int:
             "(auto: helical filaments, cages and assemblies over 6 chains / 160 elements)",
         )
         q.add_argument("--chains", metavar="A,B", help="draw only these chains (e.g. one subunit of a big complex)")
-        q.add_argument("--msa", metavar="ALIGNMENT", help="alignment for conservation colouring (--theme conservation)")
+        q.add_argument(
+            "--msa",
+            metavar="ALIGNMENT",
+            help="alignment (or a ConSurf grades table) for conservation colouring (--theme conservation)",
+        )
         q.add_argument("--msa-reference", metavar="NAME", help="alignment row that is the structure (default: best)")
         q.add_argument(
             "--up", metavar="X,Y,Z", help="3D direction to put at the top of the page (e.g. a membrane normal)"
