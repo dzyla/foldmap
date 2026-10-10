@@ -174,3 +174,30 @@ def test_loop_cysteines_sit_where_their_loop_passes_closest_to_the_partner(name)
     # and Cys527-Cys582 joins the G-H loop (between two sheets) to the short C-terminal stub of strand J
     allowed = 2 if name == "6ZS5" else 0
     assert sum(b > 3.0 for b in bars) <= allowed, sorted(bars)
+
+
+GLY = Path(__file__).parent / "data" / "glycans"
+
+
+def _links(name):
+    path = GLY / f"{name}.cif"
+    bb = load_backbone(path, "asu")
+    return bb, load_links(path, bb, "asu")
+
+
+def test_sialic_acid_joins_its_glycan_through_c2():
+    """IgG1 Fc (4BYH): the N297 glycan ends Gal-a2,6-Neu5Ac; Neu5Ac's glycosidic bond leaves from C2."""
+    bb, links = _links("4BYH_AC")
+    ((site, names),) = links.glycans
+    assert (bb.labels[site].name, bb.labels[site].seq) == ("ASN", 297)
+    assert sorted(names) == sorted(["NAG", "NAG", "FUC", "BMA", "MAN", "MAN", "NAG", "NAG", "GAL", "SIA"])
+    assert all(lig.name != "SIA" for lig in links.ligands)  # drawn once, in the glycan
+
+
+def test_free_sugars_are_ligands():
+    _, mbp = _links("1ANF")
+    assert [(lig.symbol, lig.codes) for lig in mbp.ligands] == [("Glc×2", ["GLC", "GLC"])]
+    assert len(mbp.ligands[0].contacts) >= 10  # the binding cleft holds it
+    _, ha = _links("2WR7_site")
+    (analogue,) = ha.ligands
+    assert analogue.symbol == "Gal·GlcNAc·Gal·Neu5Ac" and not ha.glycans

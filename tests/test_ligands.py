@@ -112,3 +112,12 @@ def test_covalently_joined_ligand_residues_are_one_ligand():
 def test_ligand_choice_by_any_of_its_codes():
     fig = make_figure(DATA / "25IN.cif", look=Style(ligands="GZL"))
     assert len(_markers(fig)) == 2
+
+
+def test_glycosylated_entries_gain_no_spurious_ligands():
+    """Sugars inside glycans stay glycans: the glycosylated fixtures list the same ligands as before (none)."""
+    for name in ("6ZS5", "6ZYA", "8UTF", "8UUP"):
+        path = DATA / f"{name}.cif"
+        bb = load_backbone(path, "auto")
+        links = load_links(path, bb, "auto")
+        assert links.glycans and not links.ligands, name

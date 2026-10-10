@@ -275,13 +275,31 @@ SUGARS = {
     "XYP",
     "GCS",
     "GLB",
+    "SLB",
+    "NGC",
 }
+ANOMERIC = {  # sugars whose glycosidic bond leaves from C2 (sialic acids, Kdn, Kdo, fructose); every other one: C1
+    "SIA": "C2",
+    "SLB": "C2",
+    "NGC": "C2",
+    "KDN": "C2",
+    "KDO": "C2",
+    "FRU": "C2",
+}
+
+
+def anomeric(res):
+    """The sugar's anomeric carbon: the atom of its glycosidic bond to the protein or the next sugar in."""
+    return res.find_atom(ANOMERIC.get(res.name, "C1"), "*")
+
+
 _SS_MAX = 2.5  # Å between cysteine SG atoms
-_GLYCAN_LINK_MAX = 2.0  # Å between a sugar's C1 and the atom it is bonded to
+_GLYCAN_LINK_MAX = 2.0  # Å between a sugar's anomeric carbon and the atom it is bonded to
 
 
 def load_links(path: str | Path, bb: Backbone, assembly: str = "auto") -> Links:
-    """Disulfide bridges (SG-SG) and glycans (sugar C1 on Asn ND2, Ser OG or Thr OG1, then sugar-to-sugar)."""
+    """Disulfide bridges (SG-SG) and glycans (a sugar's anomeric carbon on Asn ND2, Ser OG or Thr OG1, then
+    sugar-to-sugar). Sugars in no glycan (bound saccharides, receptor analogues) are ligands."""
     model, _ = read_model(path, assembly)
     where = {(l.chain, l.seq, l.icode): k for k, l in enumerate(bb.labels)}
 
@@ -294,7 +312,7 @@ def load_links(path: str | Path, bb: Backbone, assembly: str = "auto") -> Links:
         for b in range(a + 1, len(sg)):
             if sg[a][1].pos.dist(sg[b][1].pos) < _SS_MAX and sg[a][0] in where and sg[b][0] in where:
                 disulfides.append(tuple(sorted((where[sg[a][0]], where[sg[b][0]]))))
-    sugars = [(c, r) for c in model for r in c if r.name in SUGARS and r.find_atom("C1", "*") is not None]
+    sugars = [(c, r) for c in model for r in c if r.name in SUGARS and anomeric(r) is not None]
     anchors = [
         (key(c, r), r.find_atom(n, "*"))
         for c in model
@@ -307,27 +325,31 @@ def load_links(path: str | Path, bb: Backbone, assembly: str = "auto") -> Links:
     for k_res, atom in anchors:
         if k_res not in where:
             continue
-        root = next(((c, r) for c, r in sugars if r.find_atom("C1", "*").pos.dist(atom.pos) < _GLYCAN_LINK_MAX), None)
+        root = next(
+            ((c, r) for c, r in sugars if id(r) not in used and anomeric(r).pos.dist(atom.pos) < _GLYCAN_LINK_MAX),
+            None,
+        )
         if root is None:
             continue
         tree, frontier = [root], [root]
         used.add(id(root[1]))
-        while frontier:  # sugars whose C1 bonds to an oxygen of a sugar already in the tree
+        while frontier:  # sugars whose anomeric carbon bonds to an oxygen of a sugar already in the tree
             nxt = []
             for _, parent in frontier:
                 oxygens = [a for a in parent if a.element.name == "O"]
                 for c, r in sugars:
                     if id(r) in used:
                         continue
-                    c1 = r.find_atom("C1", "*")
-                    if any(c1.pos.dist(o.pos) < _GLYCAN_LINK_MAX for o in oxygens):
+                    link = anomeric(r)
+                    if any(link.pos.dist(o.pos) < _GLYCAN_LINK_MAX for o in oxygens):
                         used.add(id(r))
                         tree.append((c, r))
                         nxt.append((c, r))
             frontier = nxt
         glycans.append((where[k_res], [r.name for _, r in tree]))
         members.append([(c.name, r.seqid.num) for c, r in tree])
-    return Links(sorted(set(disulfides)), glycans, _ligands(model, where), members)
+    in_glycans = {key(c, r) for c, r in sugars if id(r) in used}
+    return Links(sorted(set(disulfides)), glycans, _ligands(model, where, in_glycans), members)
 
 
 ADDITIVES = {  # crystallisation and purification leftovers: hidden from figures unless asked for
@@ -405,6 +427,8 @@ SHORT_NAMES = {  # sugar residues by their usual short names (SNFG); other ligan
     "FUC": "Fuc",
     "XYL": "Xyl",
     "SIA": "Neu5Ac",
+    "SLB": "Neu5Ac",
+    "NGC": "Neu5Gc",
     "A2G": "GalNAc",
     "NGA": "GalNAc",
 }
@@ -424,15 +448,21 @@ def _ligand_label(codes: list[str]) -> str:
     return "·".join(out)
 
 
-def _ligands(model, where) -> list[Ligand]:
+def _ligands(model, where, skip: set | None = None) -> list[Ligand]:
     """Ligands touching the protein, with the residues that hold them. Non-polymer residues bonded to each other
-    (a lipid-linked oligosaccharide, a cofactor built of parts) are one ligand; metals stay single ions."""
+    (a lipid-linked oligosaccharide, a cofactor built of parts) are one ligand; metals stay single ions. skip:
+    (chain, number, icode) of residues drawn otherwise (the sugars of glycans)."""
+    skip = skip or set()
     search = gemmi.NeighborSearch(model, gemmi.UnitCell(), 5).populate()
     parts = []
     for chain in model:
         polymer = {(r.seqid.num, r.seqid.icode) for r in chain.get_polymer()}
         for res in chain:
-            if (res.seqid.num, res.seqid.icode) in polymer or res.is_water() or res.name in SUGARS:
+            if (
+                (res.seqid.num, res.seqid.icode) in polymer
+                or res.is_water()
+                or (chain.name, res.seqid.num, res.seqid.icode.strip()) in skip
+            ):
                 continue
             heavy = [a for a in res if a.element.name != "H"]
             if heavy:
