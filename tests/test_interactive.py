@@ -242,3 +242,18 @@ console.log(JSON.stringify([lib.itemKey({type: 'disulfide', key: '3-9'}), lib.it
     )
     res = subprocess.run([node, str(probe)], capture_output=True, text=True)
     assert json.loads(res.stdout) == ["disulfide:3-9", "glycan:12", "ligand:ZN:C101"]
+
+
+def test_hostile_names_cannot_break_out_of_the_data_block(tmp_path):
+    import gemmi
+
+    st = gemmi.read_structure(str(DATA / "1UBQ.cif"))
+    st[0]["A"].name = "<!--<script>"
+    st.setup_entities()
+    evil = tmp_path / "evil.cif"
+    st.make_mmcif_document().write_file(str(evil))
+    page = build_page(evil, assembly="asu", title="T</title><script>alert(9)</script>")
+    blob = re.search(r'<script type="application/json" id="topo-data">(.*?)</script>', page, re.S).group(1)
+    assert "<" not in blob and ">" not in blob
+    assert {r["c"] for r in _data(page)["residues"]} == {"<!--<script>"}
+    assert "<script>alert(9)" not in page

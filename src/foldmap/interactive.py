@@ -637,6 +637,12 @@ def _viewer_head(viewer: str) -> str:
     return f'<link rel="stylesheet" href="{MOLSTAR_CSS}">\n<script src="{MOLSTAR_JS}"></script>'
 
 
+def _script_json(data) -> str:
+    """JSON safe inside a <script> element: no character of it can end the element or open a comment."""
+    text = json.dumps(data, separators=(",", ":"))
+    return text.replace("<", "\\u003c").replace(">", "\\u003e").replace("&", "\\u0026")
+
+
 def build_page(
     path,
     mode: str = "projected",
@@ -680,7 +686,7 @@ def build_page(
         "viewer": viewer,
         "links": _links(layout, loops, sses, bb, look),
     }
-    blob = json.dumps(data, separators=(",", ":")).replace("</", "<\\/")
+    blob = _script_json(data)
     name = html.escape(data["title"])
     n_res, n_el = len(data["residues"]), len(data["elements"])
     chains = len({r["c"] for r in data["residues"]})
