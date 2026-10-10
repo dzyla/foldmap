@@ -238,3 +238,76 @@ def test_near_translations_are_not_helices(tmp_path):
     helix: a helical filament needs a real twist."""
     ops = [(rot((0, 0, 1), 0.01 * k), np.array([60.0 * k, 0, 0])) for k in range(3)]
     assert found(build(tmp_path, ops)) is None
+
+
+def mirrored(tmp_path, name="6Y7S"):
+    """The structure reflected through the yz plane (x -> -x): every right-handed screw becomes left-handed."""
+    st = gemmi.read_structure(str(DATA / f"{name}.cif"))
+    for model in st:
+        for chain in model:
+            for res in chain:
+                for atom in res:
+                    atom.pos = gemmi.Position(-atom.pos.x, atom.pos.y, atom.pos.z)
+    st.setup_entities()
+    path = tmp_path / f"{name}_mirror.cif"
+    st.make_mmcif_document().write_file(str(path))
+    return path
+
+
+@pytest.mark.parametrize("sign", [1, -1])
+def test_helical_filament_of_either_hand(tmp_path, sign):
+    ops = [(rot((0, 0, 1), sign * 33 * k), np.array([0, 0, 9.0 * k])) for k in range(6)]
+    s = found(build(tmp_path, ops, offset=(15.0, 0.0, 0.0)))
+    assert s.kind == "H" and len(s.protomers) == 6
+    assert s.twist == pytest.approx(np.radians(sign * 33), abs=np.radians(2))
+    assert s.rise == pytest.approx(9.0, abs=0.5)
+    assert s.left_handed == (sign < 0)
+
+
+def test_left_handed_filament_listed_top_down(tmp_path):
+    """Review focus 1: the hand is a property of the filament, not of which copy is called A."""
+    ops = [(rot((0, 0, 1), -33 * k), np.array([0, 0, 9.0 * k])) for k in range(6)]
+    s = found(build(tmp_path, ops, offset=(15.0, 0.0, 0.0), names="FEDCBA"))
+    assert len(s.protomers) == 6 and s.left_handed
+    assert s.twist == pytest.approx(np.radians(-33), abs=np.radians(2)) and s.rise > 0
+
+
+def test_mirrored_pilus_rod_is_the_same_filament_left_handed(tmp_path):
+    right = found(DATA / "6Y7S.cif")
+    left = found(mirrored(tmp_path))
+    assert np.degrees(right.twist) == pytest.approx(115.0, abs=0.1) and right.rise == pytest.approx(7.88, abs=0.05)
+    assert len(left.protomers) == 6 and left.left_handed
+    assert np.degrees(left.twist) == pytest.approx(-115.0, abs=0.1) and left.rise == pytest.approx(7.88, abs=0.05)
+
+
+def test_user_protomers_of_a_left_handed_filament(tmp_path):
+    s = found(mirrored(tmp_path), protomers=[[c] for c in "ABCDEF"])
+    assert s.kind == "H" and s.rise > 0 and s.left_handed
+    assert np.degrees(s.twist) == pytest.approx(-115.0, abs=0.5)
+    assert s.angles == pytest.approx([k * s.twist for k in range(6)])
+
+
+@pytest.mark.parametrize("sign", [1, -1])
+def test_unrolled_filament_steps_evenly_in_its_own_direction(tmp_path, sign):
+    from foldmap.cli import make_layout
+
+    ops = [(rot((0, 0, 1), sign * 33 * k), np.array([0, 0, 9.0 * k])) for k in range(5)]
+    lay, sses, _ = make_layout(build(tmp_path, ops, offset=(25.0, 0.0, 0.0)), focus="none")
+    first = {s.chain: s for s in sses if s.kind == "H"}
+    xs = np.array([lay.placed[first[c].id].cx for c in sorted(first)])
+    steps = np.diff(xs)
+    assert np.all(np.sign(steps) == sign)  # a filament turning the other way unrolls the other way
+    assert np.ptp(steps) < 0.05
+
+
+def test_left_handed_filament_says_so_on_the_figure(tmp_path, capsys):
+    """Review focus 5: the default figure (focus auto) and the summary name the hand."""
+    from foldmap.cli import main, make_figure
+
+    path = mirrored(tmp_path)
+    texts = " ".join(t.get_text() for t in make_figure(path).axes[0].texts)
+    assert "−115.0° twist (left-handed)" in texts and "7.9 Å rise" in texts
+    assert main(["summary", str(path)]) == 0
+    assert "twist -115.0°, rise 7.9 Å (left-handed)" in capsys.readouterr().out
+    right = " ".join(t.get_text() for t in make_figure(DATA / "6Y7S.cif").axes[0].texts)
+    assert "115.0° twist," in right and "left-handed" not in right

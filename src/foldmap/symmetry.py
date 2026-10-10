@@ -44,14 +44,19 @@ class Symmetry:
     rmsd: float
     others: list[str] = field(default_factory=list)  # chains with no symmetry copy
     angles: list[float] = field(default_factory=list)  # each protomer's turn about the axis (radians, unwrapped)
-    twist: float = 0.0  # helical: turn per copy (radians)
-    rise: float = 0.0  # helical: Å along the axis per copy
+    twist: float = 0.0  # helical: turn per copy (radians) about `axis`, negative for a left-handed screw
+    rise: float = 0.0  # helical: Å along the axis per copy (the axis points along the rise: never negative)
 
     @property
     def label(self) -> str:
         if self.kind == "H":
             return "helical"
         return self.kind if self.kind in "TOI" else f"{self.kind}{self.n}"
+
+    @property
+    def left_handed(self) -> bool:
+        """Helical: the copies turn clockwise looking along the rise (twist and rise of opposite sign)."""
+        return self.kind == "H" and self.twist * self.rise < 0
 
 
 # ---------------------------------------------------------------------------------------------- subunits
@@ -298,8 +303,9 @@ def _helical(asm: _Assembly, tol: float):
                 angle, ax, cen, rise = _screw(r, t)
                 if rmsd > tol or abs(rise) < MIN_RISE or abs(angle) < MIN_TWIST:
                     continue
-                if rise < 0:
-                    continue  # the same screw is found the other way round from (b, a)
+                twist = angle
+                if rise < 0:  # a left-handed screw: point the axis along the rise; the turn becomes negative
+                    ax, rise, twist = -ax, -rise, -angle
                 step = {}
                 for c in _within(asm):
                     for d in asm.clusters[asm.cluster_of[c]]:
@@ -312,7 +318,7 @@ def _helical(asm: _Assembly, tol: float):
                     continue
                 score = (len(chains[0]), -abs(rise))
                 if best is None or score > best[0]:
-                    best = (score, angle, ax, cen, rise, chains, rmsd)
+                    best = (score, twist, ax, cen, rise, chains, rmsd)
     return best
 
 
@@ -377,13 +383,14 @@ def _from_user(asm: _Assembly, protomers: list[list[str]], tol: float) -> Symmet
     n = len(protomers)
     others = sorted(known - {c for p in protomers for c in p})
     if abs(rise) >= MIN_RISE and abs(angle - 2 * np.pi / n) > np.radians(15):
-        if rise < 0:
-            axis, rise = -axis, -rise
-        sym = Symmetry("H", n, axis, centre, protomers, rmsd, others, twist=angle, rise=rise)
+        twist = angle
+        if rise < 0:  # as in _helical: the axis along the rise, a left-handed turn negative
+            axis, rise, twist = -axis, -rise, -angle
+        sym = Symmetry("H", n, axis, centre, protomers, rmsd, others, twist=twist, rise=rise)
     else:
         centre = np.mean([asm.centroid(c) for p in protomers for c in p], axis=0)
         sym = Symmetry("C", n, axis, centre, protomers, rmsd, others)
-    sym.angles = _around(asm, protomers, sym.axis, sym.centre) if sym.kind != "H" else [k * angle for k in range(n)]
+    sym.angles = _around(asm, protomers, sym.axis, sym.centre) if sym.kind != "H" else [k * sym.twist for k in range(n)]
     return sym
 
 
@@ -423,11 +430,11 @@ def detect_symmetry(
     if found is None and kind in ("auto", "H"):
         best = _helical(asm, tolerance)
         if best is not None:
-            _, angle, axis, centre, rise, paths, rmsd = best
+            _, twist, axis, centre, rise, paths, rmsd = best
             groups = [list(g) for g in zip(*paths)]
             others = sorted(set(asm.ca) - {c for g in groups for c in g})
-            found = Symmetry("H", len(groups), axis, centre, groups, rmsd, others, twist=angle, rise=rise)
-            found.angles = [k * angle for k in range(len(groups))]
+            found = Symmetry("H", len(groups), axis, centre, groups, rmsd, others, twist=twist, rise=rise)
+            found.angles = [k * twist for k in range(len(groups))]
     if found is None and kind != "auto":
         best = detect_symmetry(bb, sses, "auto", tolerance=tolerance) if kind != "auto" else None
         raise ValueError(

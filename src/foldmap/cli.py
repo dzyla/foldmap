@@ -52,7 +52,12 @@ def summarize(path: str) -> str:
     except ValueError:
         sym = None
     if sym is not None:
-        extra = f"; twist {np.degrees(sym.twist):.1f}°, rise {sym.rise:.1f} Å" if sym.kind == "H" else ""
+        extra = (
+            f"; twist {np.degrees(abs(sym.twist)) * (-1 if sym.left_handed else 1):.1f}°, rise {abs(sym.rise):.1f} Å"
+            + (" (left-handed)" if sym.left_handed else "")
+            if sym.kind == "H"
+            else ""
+        )
         lines.append(
             f"symmetry: {sym.label} — protomers {' | '.join(','.join(p) for p in sym.protomers)}"
             f"; CA RMSD {sym.rmsd:.2f} Å{extra}" + (f"; unpaired chains {','.join(sym.others)}" if sym.others else "")
@@ -150,7 +155,9 @@ def make_layout(
             if not along:
                 up = mem.normal
             elif mem.sided and float(np.dot(sym.axis, mem.normal)) < 0:  # turn the unrolled assembly over
-                sym = dataclasses.replace(sym, axis=-sym.axis, angles=[-a for a in sym.angles], rise=-sym.rise)
+                sym = dataclasses.replace(
+                    sym, axis=-sym.axis, angles=[-a for a in sym.angles], rise=-sym.rise, twist=-sym.twist
+                )
     if nucleic is not None and nucleic.strands:
         frame = (
             dna_radial_frame(sses, nucleic)
@@ -370,7 +377,9 @@ def _context(sym, focus: set, bb, neighbours: bool = True) -> str:
     n = int(round(len(sym.protomers) * copies))
     if sym.kind == "H":
         step = "subunit" if copies <= 1 else f"repeat of {int(round(copies * len(focus)))} chains"
-        kind = f"helical, {np.degrees(abs(sym.twist)):.1f}° twist, {abs(sym.rise):.1f} Å rise per {step}"
+        twist = f"{np.degrees(abs(sym.twist)) * (-1 if sym.left_handed else 1):.1f}".replace("-", "−")
+        hand = " (left-handed)" if sym.left_handed else ""
+        kind = f"helical, {twist}° twist{hand}, {abs(sym.rise):.1f} Å rise per {step}"
     else:
         kind = f"{sym.label} symmetry"
     return f"1 of {n} subunits shown · {kind}" + grey

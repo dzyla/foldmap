@@ -862,7 +862,9 @@ def build_layout(
             mates = {j for j, _ in ties.values()}
             x0 = min(items[j].cx + items[j].box[0] for j in mates)
             x1 = max(items[j].cx + items[j].box[2] for j in mates)
-            spread = max(frame.period * SCALE, x1 - x0 + 2 * MARGIN)
+            # protomer k sits k spreads along: rightwards when the copies turn anticlockwise seen from the top
+            # of the axis, leftwards for a left-handed filament (or an assembly turned over), as projected
+            spread = float(np.sign(frame.period) or 1.0) * max(abs(frame.period) * SCALE, x1 - x0 + 2 * MARGIN)
             lift = getattr(frame, "rise", 0.0) * SCALE
             for i, (j, k) in ties.items():
                 items[i].cx, items[i].cy = items[j].cx + k * spread, items[j].cy + k * lift
