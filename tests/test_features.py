@@ -25,10 +25,10 @@ def test_no_elements_no_contacts(ubq):
     assert sse_contacts(bb, []) == {}
 
 
-def _bundles(path):
+def _bundles(path, assembly="asu"):
     from foldmap.features import helix_bundles
 
-    _, sses, _ = pipeline(path)
+    _, sses, _ = pipeline(path, assembly)
     return [set(g) for g in helix_bundles(sses)]
 
 
@@ -47,6 +47,11 @@ def test_lambda_repressor_dimerisation_helices_are_a_bundle(ubq):
 def test_no_bundles_without_a_long_parallel_interface(ubq):
     for name in ("1UBQ", "2HHB", "1TIM", "6ZS5", "2LZM"):
         assert _bundles(ubq.parent / f"{name}.cif") == [], name
+
+
+def test_bacteriorhodopsin_trimer_interface_helices_are_not_a_bundle(ubq):
+    # helix B of one protomer runs within 12 Å of helix D of the next over exactly 3/4 of its length
+    assert _bundles(ubq.parent / "1C3W.cif", assembly="auto") == []
 
 
 def test_a_short_kinked_piece_stays_with_its_helix_in_a_bundle():

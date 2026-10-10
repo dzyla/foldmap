@@ -89,3 +89,13 @@ def test_sides_labelled_only_when_the_positive_inside_rule_is_clear():
 def test_outside_on_top_even_for_symmetric_assemblies():
     lay, _, _ = make_layout(DATA / "1C3W.cif", membrane="auto")  # bacteriorhodopsin trimer, unrolled about C3
     assert lay.membrane["sides"] and lay.membrane["inside"] == "below"
+
+
+def test_trimer_protomers_are_drawn_side_by_side():
+    lay, _, _ = make_layout(DATA / "1C3W.cif", membrane="auto")
+    span = {}
+    for p in lay.placed.values():
+        lo, hi = span.get(p.sse.chain, (p.cx, p.cx))
+        span[p.sse.chain] = (min(lo, p.cx), max(hi, p.cx))
+    (a0, a1), (b0, b1), (c0, c1) = sorted(span.values())
+    assert len(span) == 3 and a1 < b0 and b1 < c0  # each chain its own x-range, no interleaving
