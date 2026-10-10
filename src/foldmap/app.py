@@ -112,15 +112,16 @@ def structure_choices(source: str, limit: int = 12) -> list[tuple[str, str]]:
 
 
 def sequence_files(path, settings: dict, view: dict) -> dict[str, bytes]:
-    """The sequence figure (with the alignment, if one is loaded) as SVG, PNG and PDF."""
+    """The sequence figure (with the alignment, if one is loaded) as SVG, PNG and PDF. A ConSurf grades table
+    colours the topology only: the sequence is drawn without an alignment."""
     from foldmap.seqplot import draw_sequence
-    from foldmap.sequence import read_alignment
+    from foldmap.sequence import is_consurf, read_alignment
 
     msa = settings.get("msa_path")
     fig = draw_sequence(
         path,
         chain=view.get("chain") or None,
-        alignment=read_alignment(msa) if msa else None,
+        alignment=read_alignment(msa) if msa and not is_consurf(msa) else None,
         reference=settings.get("msa_reference") or None,
         columns=int(view.get("columns", 60)),
         look=look_of(settings),
@@ -247,9 +248,10 @@ def main() -> None:
         target = CACHE / f"msa-{hashlib.sha1(data).hexdigest()[:12]}{Path(up.name).suffix or '.fasta'}"
         target.write_bytes(data)
         try:
-            from foldmap.sequence import read_alignment
+            from foldmap.sequence import is_consurf, read_alignment
 
-            read_alignment(target)
+            if not is_consurf(target):  # a ConSurf grades table is used as it is (make_layout reads it)
+                read_alignment(target)
         except ValueError as err:
             ss["msa_error"], ss["msa_path"] = str(err), ""
             return
@@ -398,7 +400,7 @@ def main() -> None:
             )
         with st.expander("Alignment (conservation)"):
             st.file_uploader(
-                "Multiple sequence alignment",
+                "Multiple sequence alignment or ConSurf grades table",
                 type=["fasta", "fa", "aln", "sto", "txt"],
                 key="msa_upload",
                 on_change=store_alignment,
@@ -408,7 +410,10 @@ def main() -> None:
             st.text_input(
                 "Reference row", key="msa_reference", help="name of the structure's row (default: best match)"
             )
-            st.caption("With an alignment: colour by 'conservation', and the Sequence tab shows the alignment.")
+            st.caption(
+                "With an alignment: colour by 'conservation', and the Sequence tab shows the alignment. "
+                "A ConSurf grades table (consurf_grades.txt) colours by ConSurf's own grades."
+            )
         with st.expander("Sizes and layout"):
             st.selectbox("Mode", ["projected", "stack"], key="mode")
             st.selectbox("Helix angle", CHOICES["helix_angle"], key="helix_angle")

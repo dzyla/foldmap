@@ -183,3 +183,18 @@ def test_app_offers_flip_for_the_membrane():
 
     opts = layout_options({"membrane": "flip"})
     assert opts["membrane"] == "flip"
+
+
+def test_app_accepts_a_consurf_table():
+    """A ConSurf grades table colours by conservation; the Sequence tab draws the plain sequence beside it."""
+    from foldmap.app import sequence_files
+
+    table = DATA / "consurf" / "1TIM_A_grades.txt"
+    at = _load(_app(), DATA / "1TIM.cif")
+    at.button(key="pick_publication").click().run()
+    at.file_uploader(key="msa_upload").set_value(("1TIM_A_grades.txt", table.read_bytes(), "text/plain")).run()
+    assert not at.exception and not at.error
+    assert at.session_state["msa_error"] == "" and at.session_state["msa_path"].endswith(".txt")
+    assert any("ConSurf" in c.value for c in at.caption)
+    out = sequence_files(DATA / "1TIM.cif", {"theme": "publication", "msa_path": str(table)}, {"columns": 40})
+    assert out["svg"].startswith(b"<svg") and b"strict:" not in out["svg"]
