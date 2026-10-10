@@ -199,7 +199,7 @@ def draw_topology(
         focus=focus,
         chains=chains,
         uniprot=uniprot,
-        domains="uniprot" if uniprot and uniprot_domains else [(n, list(r)) for n, r in (domains or {}).items()],
+        domains=[(n, list(r)) for n, r in (domains or {}).items()] or ("uniprot" if uniprot_domains else None),
         msa=msa_path,
         rename=rename,
         swap=[tuple(p) for p in swap or []],

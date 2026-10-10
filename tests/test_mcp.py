@@ -250,3 +250,44 @@ def test_a_structure_without_elements_still_gets_a_preview(tmp_path):
     tri = tripeptide(DATA / "1UBQ.cif", tmp_path)
     r = call("draw_topology", {"source": str(tri), "output_path": str(tmp_path / "t.svg")})
     assert [c.type for c in r.content] == ["text", "image"]
+
+
+def _spec_drawn_by(monkeypatch, args):
+    """The FigureSpec draw_topology builds for args (the drawing itself is stopped)."""
+    from mcp.server.mcpserver.exceptions import ToolError
+
+    import foldmap.spec as spec_mod
+
+    seen = []
+
+    def stop(spec):
+        seen.append(spec)
+        raise ValueError("stopped")
+
+    monkeypatch.setattr(spec_mod, "draw_spec", stop)
+    with pytest.raises(ToolError, match="stopped"):
+        call("draw_topology", {"source": UBQ, **args})
+    return seen[0]
+
+
+def test_explicit_domains_beat_uniprot_domains(monkeypatch):
+    spec = _spec_drawn_by(
+        monkeypatch, {"uniprot": "auto", "uniprot_domains": True, "domains": {"core": ["res:A:1-40"]}}
+    )
+    assert spec.domains == [("core", ["res:A:1-40"])]
+
+
+def test_uniprot_domains_work_with_a_layout_files_uniprot(tmp_path, monkeypatch):
+    lf = tmp_path / "fig.yaml"
+    lf.write_text("foldmap: 1\nlayout: {uniprot: P0CG48}\n", encoding="utf-8")
+    spec = _spec_drawn_by(monkeypatch, {"layout_file": str(lf), "uniprot_domains": True})
+    assert spec.uniprot == "P0CG48" and spec.domains == "uniprot"
+    spec = _spec_drawn_by(monkeypatch, {"layout_file": str(lf)})
+    assert spec.domains is None
+
+
+def test_uniprot_domains_without_any_uniprot_is_an_error(tmp_path):
+    from mcp.server.mcpserver.exceptions import ToolError
+
+    with pytest.raises(ToolError, match="needs UniProt annotation"):
+        call("draw_topology", {"source": UBQ, "output_path": str(tmp_path / "x.svg"), "uniprot_domains": True})
