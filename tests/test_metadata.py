@@ -6,11 +6,14 @@ import shlex
 import tomllib
 from pathlib import Path
 
+import pytest
 import yaml
 
 import foldmap
 
 ROOT = Path(__file__).resolve().parents[1]
+WORKFLOW = ROOT / ".github" / "workflows" / "tests.yml"
+needs_workflow = pytest.mark.skipif(not WORKFLOW.exists(), reason="the CI workflow is not part of the sdist")
 
 
 def _pyproject() -> dict:
@@ -60,13 +63,21 @@ def test_classifiers_name_the_tested_pythons():
         c.rsplit(" :: ", 1)[1] for c in meta["classifiers"] if re.match(r"Programming Language :: Python :: 3\.\d+$", c)
     }
     assert listed == TESTED and meta["requires-python"] == ">=3.11"
-    tests_yml = (ROOT / ".github" / "workflows" / "tests.yml").read_text(encoding="utf-8")
+
+
+@needs_workflow
+def test_ci_matrix_covers_the_tested_pythons():
+    tests_yml = WORKFLOW.read_text(encoding="utf-8")
     assert all(f'"{v}"' in tests_yml for v in TESTED)
 
 
+@needs_workflow
 def test_minimum_deps_job_pins_equal_the_floors():
-    """The floor "1.24" is pinned as "==1.24.*" and "0.7" as "==0.7.0"; nothing else is accepted."""
-    workflow = yaml.safe_load((ROOT / ".github" / "workflows" / "tests.yml").read_text(encoding="utf-8"))
+    """The floor "1.24" is pinned as "==1.24.*" and "0.7" as "==0.7.0"; nothing else is accepted.
+
+    The minimum-deps pins must stay on a single `pip install` line; this test reads that one line.
+    """
+    workflow = yaml.safe_load(WORKFLOW.read_text(encoding="utf-8"))
     runs = [s["run"] for s in workflow["jobs"]["minimum-deps"]["steps"] if "run" in s]
     (install,) = [r for r in runs if r.startswith("pip install ") and "==" in r]
     pins = dict(re.fullmatch(r"([A-Za-z0-9_.-]+)==(\S+)", t).groups() for t in shlex.split(install) if "==" in t)
