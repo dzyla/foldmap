@@ -4,7 +4,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import NamedTuple
 
 import numpy as np
@@ -183,7 +183,9 @@ def crop_nucleic(na: Nucleic, flank: int = 6, *, by: str = "contacts") -> Nuclei
     """Only what the protein touches. by="contacts": the touched stretch of each strand plus `flank`
     nucleotides each side (and their base-pair partners, so duplexes stay whole); strands never touched are
     dropped. by="stems": the stems with a touched nucleotide plus one stem either side in sequence, and the
-    short runs between them; each strand may fall into several pieces, with a gap recorded between them."""
+    short runs between them; each strand may fall into several pieces, with a gap recorded between them. A stem
+    or isolated pair only partly inside goes into the gap whole, so no half stem and no paired nucleotide drawn
+    as single-stranded."""
     if by == "contacts":
         window: dict[int, list[int]] = {}
         for k, i in _touched(na):
@@ -203,13 +205,17 @@ def crop_nucleic(na: Nucleic, flank: int = 6, *, by: str = "contacts") -> Nuclei
     stems = na.structure.stems
     touched = _touched(na)
     hit = [n for n, st in enumerate(stems) if touched & set(st.nucleotides())]
-    keep = {m for n in hit for m in (n - 1, n, n + 1) if 0 <= m < len(stems)}
+    # with the stem before and after each on its own strand (stems are in 5'->3' order of their first arm)
+    keep = {m for n in hit for m in (n - 1, n, n + 1) if 0 <= m < len(stems) and stems[m].a == stems[n].a}
     spans: dict[int, list[list[int]]] = {}
     for n in sorted(keep):
         for s, lo, hi in (stems[n].arm5, stems[n].arm3):
             spans.setdefault(s, []).append([lo, hi])
-    for k, i in touched:  # touched single-stranded nucleotides stay too
-        spans.setdefault(k, []).append([i, i])
+    tie_of = {x: p for p in na.structure.ties for x in ((p.a, p.i), (p.b, p.j))}
+    for k, i in sorted(touched):  # touched single-stranded nucleotides stay too; a touched tie with its partner
+        tie = tie_of.get((k, i))
+        for s, j in ((tie.a, tie.i), (tie.b, tie.j)) if tie else ((k, i),):
+            spans.setdefault(s, []).append([j, j])
     windows: dict[int, list[tuple[int, int]]] = {}
     for k, found in spans.items():
         merged: list[list[int]] = []
@@ -219,18 +225,36 @@ def crop_nucleic(na: Nucleic, flank: int = 6, *, by: str = "contacts") -> Nuclei
             else:
                 merged.append([lo, hi])
         windows[k] = [(lo, hi) for lo, hi in merged]
-    return _cut(na, windows)
+    inside = {(k, i) for k, w in windows.items() for lo, hi in w for i in range(lo, hi + 1)}
+    for group in [st.nucleotides() for st in stems] + [[(p.a, p.i), (p.b, p.j)] for p in na.structure.ties]:
+        if not all(x in inside for x in group):  # partly inside: its part inside goes into the gap
+            inside -= set(group)
+    return _cut(na, {k: _stretches(sorted(i for s, i in inside if s == k)) for k in sorted({s for s, _ in inside})})
+
+
+def _stretches(idx: list[int]) -> list[tuple[int, int]]:
+    """Sorted indices as runs of consecutive ones, (first, last)."""
+    out: list[tuple[int, int]] = []
+    for i in idx:
+        if out and i == out[-1][1] + 1:
+            out[-1] = (out[-1][0], i)
+        else:
+            out.append((i, i))
+    return out
 
 
 def nucleic_touching(na: Nucleic, chains) -> Nucleic:
     """Only the strands a protein chain in `chains` touches, with every strand base-paired to them."""
-    keep = {s for r, v in na.contacts.items() if na.contact_chain.get(r) in set(chains) for s, _ in v}
+    chosen = set(chains)
+    contacts = {r: v for r, v in na.contacts.items() if na.contact_chain.get(r) in chosen}  # theirs only
+    keep = {s for v in contacts.values() for s, _ in v}
     for _ in range(len(na.strands)):
         grown = keep | {p.b for p in na.base_pairs if p.a in keep} | {p.a for p in na.base_pairs if p.b in keep}
         if grown == keep:
             break
         keep = grown
-    return _cut(na, {s: [(0, len(na.strands[s]) - 1)] for s in sorted(keep)})
+    held = replace(na, contacts=contacts, contact_chain={r: na.contact_chain[r] for r in contacts})
+    return _cut(held, {s: [(0, len(na.strands[s]) - 1)] for s in sorted(keep)})
 
 
 def _cut(na: Nucleic, windows: dict[int, list[tuple[int, int]]]) -> Nucleic:

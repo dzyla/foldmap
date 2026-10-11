@@ -133,9 +133,6 @@ def make_layout(
     sses = build_sses(bb, dssp.ss, short_helices=(look or Style()).helices_310, bridges=dssp.bridges)
     sheets = build_sheets(sses, dssp.bridges)
     nucleic = load_nucleic(path, bb, assembly, model=model) if dna else None
-    na_cropped = False  # Task 6 stores it on the layout
-    if nucleic is not None and nucleic.strands:
-        nucleic, na_cropped = _na_extent(nucleic, (look or Style()).na_extent)
     sym = detect_symmetry(bb, sses, symmetry, protomers, symmetry_tol) if sses else None
     shared = _homolog_labels(bb, sses)  # copies of one protein share labels, however much of each is modelled
     if focus == "auto" and (look or Style()).highlight != "none":
@@ -143,6 +140,9 @@ def make_layout(
     focus_chains = _focus_chains(focus, sym, bb, sses)
     if focus_chains and nucleic is not None and nucleic.strands:  # one subunit: the nucleic acid it holds
         nucleic = nucleic_touching(nucleic, focus_chains)
+    na_cropped = False  # Task 6 stores it on the layout
+    if nucleic is not None and nucleic.strands:  # after focus: auto crops to the stems the subunit touches
+        nucleic, na_cropped = _na_extent(nucleic, (look or Style()).na_extent)
     partial, context, unjoined = set(), None, set()
     if focus_chains:  # a large assembly: one subunit in full, plus what its neighbours lend to its fold
         from .layout import provisional

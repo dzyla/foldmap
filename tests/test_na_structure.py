@@ -281,8 +281,67 @@ def test_auto_extent_crops_a_large_rna_to_the_touched_stems():
     assert cut.size < na.size and cut.gaps
     assert _touched(cut) == _touched(na)  # nothing the protein touches is cropped away
     assert all(g.count > 0 for g in cut.gaps)
-    for st in cut.structure.stems:  # stems survive whole
-        assert len(st) >= 2
+    cut_stems = [_pair_labels(cut, st.pairs) for st in cut.structure.stems]
+    touched = {(s, i) for v in na.contacts.values() for s, i in v}
+    for st in na.structure.stems:  # every stem the protein touches survives whole
+        if touched & set(st.nucleotides()):
+            assert _pair_labels(na, st.pairs) in cut_stems
+
+
+def _label(na, s, i):
+    return na.strands[s].labels[i][:3]
+
+
+def _pair_labels(na, pairs):
+    return {frozenset((_label(na, p.a, p.i), _label(na, p.b, p.j))) for p in pairs}
+
+
+def test_a_stem_crop_draws_no_paired_nucleotide_single_stranded_and_no_half_stem():
+    na = _na("4YBB")
+    cut = crop_nucleic(na, by="stems")
+    whole = [_pair_labels(na, st.pairs) for st in na.structure.stems]
+    for st in cut.structure.stems:  # each stem drawn is an original stem with all its pairs
+        assert _pair_labels(cut, st.pairs) in whole
+    paired = {x for p in na.base_pairs for x in (_label(na, p.a, p.i), _label(na, p.b, p.j))}
+    tie_ends = {x for p in cut.structure.ties for x in (_label(cut, p.a, p.i), _label(cut, p.b, p.j))}
+    for r in cut.structure.runs:
+        for i in range(r.lo, r.hi + 1):
+            x = _label(cut, r.strand, i)
+            assert x not in paired or x in tie_ends, x
+
+
+def test_stem_crop_takes_neighbour_stems_on_the_same_strand_only():
+    def strand(chain):
+        n = 40
+        labels = [ResLabel(chain, k + 1, "", "G" if k % 2 else "C") for k in range(n)]
+        return NAStrand(chain, labels, np.zeros((n, 3)), np.zeros((n, 3)), True)
+
+    def hairpin(s, i):  # two stacked pairs closing a 6-nt loop: i-(i+9), (i+1)-(i+8)
+        return [BasePair(s, i, s, i + 9, "WC"), BasePair(s, i + 1, s, i + 8, "WC")]
+
+    pairs = hairpin(0, 0) + hairpin(0, 20) + hairpin(1, 0) + hairpin(1, 20)
+    na = nucleic_from_pairs([strand("R"), strand("S")], pairs, {5: {(0, 20)}}, {5: "A"})
+    assert [(st.a, st.pairs[0].i) for st in na.structure.stems] == [(0, 0), (0, 20), (1, 0), (1, 20)]
+    cut = crop_nucleic(na, by="stems")
+    assert {s.chain for s in cut.strands} == {"R"}  # strand S's first stem is next in the list, not in sequence
+    assert len(cut.structure.stems) == 2
+
+
+def test_focus_on_a_subunit_keeps_only_its_contacts_and_crops_to_its_stems():
+    from foldmap.cli import make_layout
+
+    full, _, _ = make_layout(NA / "4YBB.cif.gz", focus="none")
+    lay, _, _ = make_layout(NA / "4YBB.cif.gz", focus="AD")
+    assert set(lay.nucleic.contact_chain.values()) <= {"AD"}
+    assert lay.nucleic.size < full.nucleic.size  # auto crops to the stems the focused subunit touches
+
+
+def test_focus_drops_contacts_of_chains_not_placed():
+    from foldmap.cli import make_layout
+
+    lay, sses, _ = make_layout(NA / "1KX5.cif.gz", focus="A")
+    assert lay.nucleic.contacts
+    assert set(lay.nucleic.contact_chain.values()) <= {s.chain for s in sses}
 
 
 def test_crop_by_contacts_is_unchanged():
