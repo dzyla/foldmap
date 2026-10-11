@@ -1940,3 +1940,27 @@ def test_a_free_end_is_never_drawn_into_another_stems_hairpin_loop(monkeypatch):
     path, _, _ = route_na._tail(router, lay, d, key[0], key, tail.nts, five, None, circles=[circle])
     assert not path.fallback and not route_na._enters(path.points, [circle], d)
     assert not route_na._enters(straight, [(circle[0], 1.0, d)], d)  # its own stem's loop is not another's
+
+
+def test_a_free_end_the_protein_holds_lies_toward_it():
+    """1URN: U1A's RRM holds the hairpin loop R:6-12, drawn as a free end; it was drawn straight on, away from the
+    sheet (R:11 5.4 from its nearest touching strand against a median element gap of 5.1). A touched free end tries
+    the turns that bring it nearest its touching elements first: each loop nucleotide a strand of the RRM touches
+    is drawn nearer that strand than the median element."""
+    from foldmap.nacheck import _gap, ss_drawn
+
+    lay, sses, _, _ = _routed("1URN")
+    na, where = lay.nucleic, ss_drawn(lay)
+    drawn = [s for s in sses if s.id in lay.placed]
+    checked = 0
+    for x in sorted(where):
+        strands = [
+            s for s in drawn if s.kind == "E" and any(x in na.contacts.get(r, ()) for r in range(s.start, s.end + 1))
+        ]
+        if not strands:
+            continue
+        pt = (*where[x], *where[x])
+        gaps = [_gap(lay.placed[s.id].rect, pt) for s in drawn]
+        assert min(_gap(lay.placed[s.id].rect, pt) for s in strands) < np.median(gaps), x
+        checked += 1
+    assert checked >= 4

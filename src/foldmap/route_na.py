@@ -266,13 +266,15 @@ def _tail(
     drawn so far (`strands`); else it is drawn straight, a fallback. A drawing that keeps out of its partner's
     doorway (_doorway) comes first: (path, end label position, outward direction at its tip). No drawing comes into
     another stem's hairpin loop (`circles`: (centre, radius, stem) of every hairpin loop, _enters): a gap leaving
-    the end from there would cross the loop (4YBB)."""
+    the end from there would cross the loop (4YBB). A free end the protein touches tries its turns nearest its
+    touching elements first (_toward), so it lies along what holds it (1URN's loop on U1A's RRM)."""
     found = None
     tries = (True, False) if labels is not None else (False,)
     door = _doorway(d, key, five)
+    turns = _toward(layout, d, s, key, nts, five)
     for keep_door in (True, False):
         for need_label in tries:
-            for turn in _TURNS:
+            for turn in turns:
                 pts, xy, tip = _free_end(d, key, len(nts), five, turn)
                 drawn = [*(pts[::-1] if five else pts), tip]
                 if (
@@ -302,6 +304,42 @@ def _tail(
     far = xy[0] if five else xy[-1]
     v = np.subtract(tip, far)
     return path, tip, v / max(float(np.hypot(*v)), 1e-9)
+
+
+def _touchers(layout: Layout, s: int, nts) -> dict[int, list[tuple[float, float, float, float]]]:
+    """Nucleotide of strand s (of `nts`) -> the boxes of the placed elements touching it."""
+    na, want = layout.nucleic, set(nts)
+    out: dict[int, list] = {}
+    for p in layout.placed.values():
+        held = {k for r in range(p.sse.start, p.sse.end + 1) for t, k in na.contacts.get(r, ()) if t == s and k in want}
+        for k in sorted(held):
+            out.setdefault(k, []).append(p.rect)
+    return out
+
+
+def _toward(layout: Layout, d: PlacedStem, s: int, key, nts: list[int], five: bool) -> tuple[float, ...]:
+    """_TURNS, of those at most a right angle off straight the ones that bring a free end's touched nucleotides
+    nearest their touching elements' boxes (mean gap) first, then the rest; as they are when the protein touches
+    none of it."""
+    held = _touchers(layout, s, nts)
+    if not held:
+        return _TURNS
+
+    def gap(turn: float) -> float:
+        xy = dict(zip(nts, _free_end(d, key, len(nts), five, turn)[1]))
+        return float(np.mean([_box_gap(xy[k], b) for k in sorted(held) for b in held[k]]))
+
+    ahead = sorted((t for t in _TURNS if abs(t) <= np.pi / 2 + 1e-9), key=lambda t: _snap_gap(gap(t)))
+    return (*ahead, *(t for t in _TURNS if abs(t) > np.pi / 2 + 1e-9))  # folding back along the stem only after
+
+
+def _box_gap(xy, b) -> float:
+    """Distance from a point to a box (x0, y0, x1, y1), 0 inside it."""
+    return float(math.hypot(max(b[0] - xy[0], xy[0] - b[2], 0.0), max(b[1] - xy[1], xy[1] - b[3], 0.0)))
+
+
+def _snap_gap(v: float) -> float:
+    return round(v, 6)  # ties (and their order, _TURNS') kept the same on every machine
 
 
 def _doorway(d: PlacedStem, key, five: bool):
