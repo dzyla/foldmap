@@ -407,3 +407,26 @@ def test_end_labels_keep_clear_of_loops_elements_and_other_labels(pdb):
             assert all(clip_len(p, q, box) <= 1e-9 for p, q in zip(loop.points, loop.points[1:])), (s, end, loop.a_id)
         samples = [(x, y) for x in np.linspace(box[0], box[2], 4) for y in np.linspace(box[1], box[3], 4)]
         assert not any(_in_outline(q, e) for q in samples for e in bodies), (s, end)
+
+
+def test_letters_are_placed_quickly_on_a_whole_ribosomal_rna(monkeypatch):
+    """Each letter looks only at its neighbours (a cell hash), not at every letter placed before it: on the whole
+    4YBB small-subunit RNA (1000 nt, na_extent=all) placing them took 6.5 s when it was quadratic."""
+    import time
+
+    import foldmap.route_na as route_na
+    from foldmap.style import Style
+
+    lay, sses, bb = make_layout(_path("4YBB"), look=Style(na_extent="all"))
+    assert lay.nucleic.size == 1000
+    real, spent = route_na._place_letters, []
+
+    def timed(*a, **k):
+        t = time.perf_counter()
+        out = real(*a, **k)
+        spent.append(time.perf_counter() - t)
+        return out
+
+    monkeypatch.setattr(route_na, "_place_letters", timed)
+    route_loops(lay, sses, bb)
+    assert len(lay.na_letters) > 400 and spent[0] < 1.5, spent

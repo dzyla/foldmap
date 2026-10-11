@@ -438,17 +438,22 @@ def _place_letters(layout: Layout, paths: list[NAPath]) -> dict[tuple[int, int],
     nucleotides, end labels, elements and stem names; when none is clear, the one furthest from the others."""
     where = {key: d.point(key) for d in layout.stems for key in d.axial}
     where.update({(p.strand, i): np.asarray(xy) for p in paths for i, xy in zip(p.nts, p.nt_xy)})
-    taken = [d.point(key, NT_ROW) for d in layout.stems for key in d.axial] + list(where.values())
-    taken += [np.asarray(xy) for _, _, xy in layout.na_ends]
+    taken = _Points(1.0)  # every letter, nucleotide and end label so far: nearer than 1 is measured exactly
+    for d in layout.stems:
+        for key in d.axial:
+            taken.add(d.point(key, NT_ROW))
+    index = {key: taken.add(xy) for key, xy in where.items()}  # a letter's own nucleotide does not count
+    for _, _, xy in layout.na_ends:
+        taken.add(xy)
     bodies = [*layout.placed.values(), *layout.stems]  # by their true (tilted) outlines, not their boxes
     g = 1.2 * _GLYPH_H  # a stem's name stands a letter and a half clear of any base letter
     boxes = [np.add(_stem_label_box(d), (-g, -g, g, g)) for d in layout.stems]
     out: dict[tuple[int, int], tuple[float, float]] = {}
 
-    def room(q, own) -> float:
+    def room(q, own: int) -> float:
         if any(x0 < q[0] < x1 and y0 < q[1] < y1 for x0, y0, x1, y1 in boxes) or any(_near(q, e) for e in bodies):
             return 0.0
-        return min((float(np.hypot(*(q - t))) for t in taken if t is not own), default=np.inf)
+        return taken.nearest(q, own)
 
     at = {key: d for d in layout.stems for key in d.axial}
     for p in paths:
@@ -466,12 +471,45 @@ def _place_letters(layout: Layout, paths: list[NAPath]) -> dict[tuple[int, int],
                 side = -side
             options = [xy + side * NT_ROW * f for f in (1.0, -1.0, 1.7, -1.7, 2.4, -2.4)]
             options += [xy + side * NT_ROW * f + ahead * t for f in (1.0, -1.0) for t in (0.4, -0.4)]
-            spaces = [room(q, where[(p.strand, i)]) for q in options]
+            spaces = [room(q, index[(p.strand, i)]) for q in options]
             clear = [q for q, r in zip(options, spaces) if r >= _LETTER_GAP]
             spot = clear[0] if clear else options[int(np.argmax(spaces))]
             out[(p.strand, i)] = (float(spot[0]), float(spot[1]))
-            taken.append(spot)
+            taken.add(spot)
     return out
+
+
+class _Points:
+    """Points in a cell hash of cell size `reach`: the nearest one within reach is found among the 3 x 3 cells
+    around a query, so placing n letters is linear in n, not quadratic."""
+
+    def __init__(self, reach: float):
+        self.reach = reach
+        self.xy: list[tuple[float, float]] = []
+        self.cells: dict[tuple[int, int], list[int]] = {}
+
+    def _cell(self, x: float, y: float) -> tuple[int, int]:
+        return math.floor(x / self.reach), math.floor(y / self.reach)
+
+    def add(self, q) -> int:
+        """Add a point; its index."""
+        x, y = float(q[0]), float(q[1])
+        self.xy.append((x, y))
+        self.cells.setdefault(self._cell(x, y), []).append(len(self.xy) - 1)
+        return len(self.xy) - 1
+
+    def nearest(self, q, skip: int = -1) -> float:
+        """Distance from q to the nearest point but `skip`, or `reach` when none is nearer."""
+        x, y = float(q[0]), float(q[1])
+        cx, cy = self._cell(x, y)
+        best = self.reach
+        for dx in (-1, 0, 1):
+            for dy in (-1, 0, 1):
+                for k in self.cells.get((cx + dx, cy + dy), ()):
+                    if k != skip:
+                        tx, ty = self.xy[k]
+                        best = min(best, float(np.hypot(x - tx, y - ty)))
+        return best
 
 
 def _widen(layout: Layout, paths: list[NAPath]) -> None:
