@@ -161,12 +161,37 @@ def _polymer_entities(st, chains) -> list[str]:
     return out
 
 
+_POLYMER_KINDS = {
+    gemmi.PolymerType.PeptideL: {"protein"},
+    gemmi.PolymerType.PeptideD: {"protein"},
+    gemmi.PolymerType.Dna: {"DNA"},
+    gemmi.PolymerType.Rna: {"RNA"},
+    gemmi.PolymerType.DnaRnaHybrid: {"DNA", "RNA"},
+}
+
+
+def _polymer_kinds(chains) -> set[str]:
+    """The kinds of polymer the chains hold: protein, DNA, RNA. From each chain's polymer type, and from its
+    nucleotides (_is_nucleotide; RNA where the sugar has an O2') for chains whose file gives no entity."""
+    out = set()
+    for c in chains:
+        polymer = c.get_polymer()
+        if len(polymer):
+            out |= _POLYMER_KINDS.get(polymer.check_polymer_type(), set())
+        for k in range(len(c)):
+            if _is_nucleotide(c, k):
+                out.add("RNA" if c[k].find_atom("O2'", "*") is not None else "DNA")
+    return out
+
+
 def _one_complex_of_several(st, assembly, model) -> bool:
     """`assembly` is one of several copies of a complex deposited in the asymmetric unit (4OO8: two Cas9
     complexes, assembly 1 = A, B, C; 1URN: three U1A–RNA complexes; 4CH9: two Kelch domains with their WNK4
     peptides, assembly 1 = B, D): every operator the identity, a strict subset of the deposited chains, each of its
-    polymer entities deposited at least twice as often as it holds it. The other copies lie next to it by crystal
-    packing, not by biology."""
+    polymer entities deposited at least twice as often as it holds it, and every kind of polymer the asymmetric
+    unit holds (protein, DNA, RNA) among its own chains: a protein–DNA entry whose assembly 1 leaves the DNA out
+    keeps the asymmetric unit, never silently losing the DNA. The other copies lie next to it by crystal packing,
+    not by biology."""
     if not all(op.transform.is_identity() for g in assembly.generators for op in g.operators):
         return False
     subchains = {s for g in assembly.generators for s in g.subchains}
@@ -176,6 +201,8 @@ def _one_complex_of_several(st, assembly, model) -> bool:
         return False
     held, deposited = _polymer_entities(st, members), _polymer_entities(st, model)
     if not held or "" in held + deposited:
+        return False
+    if _polymer_kinds(members) != _polymer_kinds(model):
         return False
     return all(deposited.count(e) >= 2 * held.count(e) for e in set(held))
 

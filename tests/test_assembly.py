@@ -365,10 +365,10 @@ def test_kelch_dimer_asu_draws_its_biological_assembly():
     assert {l.chain for l in bb.labels} == {"B", "D"} and detect_symmetry(bb) is None
 
 
-def test_assembly_one_is_judged_by_its_own_chains(tmp_path):
-    """_one_complex_of_several looks at the assembly's own chains (with the nucleic-acid gate gone, an RNA that no
-    assembly holds no longer decides anything): two protein copies whose assembly 1 is one of them, beside that
-    RNA, draw assembly 1 under auto; asu still draws every chain."""
+def test_nucleic_acid_outside_assembly_one_does_not_choose_it(tmp_path):
+    """Assembly 1 is chosen only when it holds every kind of polymer the asymmetric unit holds: two protein copies
+    whose assembly 1 is one of them, beside an RNA that no assembly holds, keep the asymmetric unit (the RNA is
+    never silently dropped)."""
     import gemmi
 
     from foldmap.io import read_model
@@ -380,6 +380,4 @@ def test_assembly_one_is_judged_by_its_own_chains(tmp_path):
     out = tmp_path / "with_rna.cif"
     st.make_mmcif_document().write_file(str(out))
     model, deposited = read_model(out)
-    assert [c.name for c in model] == ["C"] and deposited == {"C"}
-    model, deposited = read_model(out, "asu")
     assert sorted(c.name for c in model) == ["C", "D", "R"] and deposited == {"C", "D", "R"}
