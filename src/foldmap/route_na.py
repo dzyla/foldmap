@@ -11,7 +11,21 @@ from dataclasses import dataclass, field
 import numpy as np
 
 from .layout import _GLYPH_H, _GLYPH_W, NT_ROW, NT_STEP, Layout, PlacedStem, _stem_label_box, label_boxes
-from .route import _INFLATE, _clear, _curve, _element_obstacles, _Grid, _Router, _simplify, clip_len
+from .route import (
+    _DIRS,
+    _INFLATE,
+    _REUSE,
+    _TURN,
+    _clear,
+    _corners,
+    _curve,
+    _element_obstacles,
+    _Grid,
+    _Router,
+    _simplify,
+    _snap_to_port,
+    clip_len,
+)
 
 log = logging.getLogger(__name__)
 
@@ -19,6 +33,7 @@ log = logging.getLogger(__name__)
 _BOW_MAX = 8  # internal-loop sides up to this many nucleotides are drawn as bows, not routed
 SHORT_GAP = 3  # a cropped gap of fewer nucleotides is drawn as a bare break, without its "… N nt …" label
 _JOINT_STRAIGHT = 1.5  # a joint between two pieces of a bent duplex shorter than this may be drawn straight
+_TAIL_ROUTED = 6  # a free end of more nucleotides that no straight drawing keeps clear is routed out to free space
 
 
 @dataclass(eq=False)
@@ -179,20 +194,39 @@ def _free_end(d: PlacedStem, key, m: int, five: bool, turn: float = 0.0):
     return _xy(pts), _xy(xy), (float(tip[0]), float(tip[1]))
 
 
-def _tail(router: _Router, layout: Layout, d: PlacedStem, s: int, key, nts: list[int], five: bool, labels):
+def _tail(
+    router: _Router, layout: Layout, d: PlacedStem, s: int, key, nts: list[int], five: bool, labels, strands=None
+):
     """A free end drawn straight on, or bent after its first nucleotide when that is what keeps it (and its end
-    label) clear of the elements, and its label clear of loops and other text: (path, end label position,
-    outward direction at its tip)."""
+    label) clear of the elements, and its label clear of loops and other text; one of more than _TAIL_ROUTED
+    nucleotides that no such drawing keeps clear is routed out to free space (_routed_end), keeping off the strands
+    drawn so far (`strands`); else it is drawn straight, a fallback. A drawing that keeps out of its partner's
+    doorway (_doorway) comes first: (path, end label position, outward direction at its tip)."""
     found = None
-    for need_label in (True, False) if labels is not None else (False,):
-        for turn in _TURNS:
-            pts, xy, tip = _free_end(d, key, len(nts), five, turn)
-            drawn = pts[::-1] if five else pts
-            if _na_clear([*drawn, tip], (d,), router.elements) and (
-                not need_label or _label_room(router, layout, tip, labels)
-            ):
-                found = pts, xy, tip
+    tries = (True, False) if labels is not None else (False,)
+    door = _doorway(d, key, five)
+    for keep_door in (True, False):
+        for need_label in tries:
+            for turn in _TURNS:
+                pts, xy, tip = _free_end(d, key, len(nts), five, turn)
+                drawn = [*(pts[::-1] if five else pts), tip]
+                if (
+                    _na_clear(drawn, (d,), router.elements)
+                    and not (keep_door and door is not None and _crosses_segment(drawn[:-1], *door))
+                    and (not need_label or _label_room(router, layout, tip, labels))
+                ):
+                    found = pts, xy, tip
+                    break
+            if found:
                 break
+        # routed: first off every cell a loop or strand uses; crossing them only as a cost when the doorway is given up
+        for strict, need_label in [(True, n) for n in tries] + ([] if keep_door else [(False, n) for n in tries]):
+            if found is not None or len(nts) <= _TAIL_ROUTED:
+                break
+            room = labels if need_label else None
+            found = _routed_end(
+                router, layout, d, key, len(nts), five, room, strands, door if keep_door else None, strict
+            )
         if found:
             break
     pts, xy, tip = found or _free_end(d, key, len(nts), five)
@@ -200,6 +234,189 @@ def _tail(router: _Router, layout: Layout, d: PlacedStem, s: int, key, nts: list
     far = xy[0] if five else xy[-1]
     v = np.subtract(tip, far)
     return path, tip, v / max(float(np.hypot(*v)), 1e-9)
+
+
+def _doorway(d: PlacedStem, key, five: bool):
+    """Where the partner of a free end's stem nucleotide leaves (or enters) the stem at the same end: the segment from
+    its end face 3 nucleotide steps straight out, the way a strand from there to another stem starts. A free end
+    turned across it would close it off. None if the nucleotide is unpaired."""
+    partner = next(((b, j) for a, i, b, j in d.pairs if (a, i) == key), None)
+    partner = partner or next(((a, i) for a, i, b, j in d.pairs if (b, j) == key), None)
+    if partner is None or partner not in d.axial:
+        return None
+    face, out = _face(d, partner, five)
+    return face, face + out * 3 * NT_STEP
+
+
+def _crosses_segment(pts, a, b) -> bool:
+    """Does the polyline cross segment a-b (properly, not merely touch)?"""
+
+    def turn(o, u, v) -> float:
+        return (u[0] - o[0]) * (v[1] - o[1]) - (u[1] - o[1]) * (v[0] - o[0])
+
+    for p, q in zip(pts, pts[1:]):
+        if turn(p, q, a) * turn(p, q, b) < -1e-12 and turn(a, b, p) * turn(a, b, q) < -1e-12:
+            return True
+    return False
+
+
+def _along(pts, at: float) -> np.ndarray:
+    """The point `at` along the polyline (its last point when it is shorter)."""
+    p = np.asarray(pts, float)
+    for a, b in zip(p, p[1:]):
+        step = float(np.hypot(*(b - a)))
+        if at <= step:
+            return a + (b - a) * (at / step if step else 0.0)
+        at -= step
+    return p[-1]
+
+
+def _upto(pts, at: float) -> list[tuple[float, float]]:
+    """The polyline cut `at` along it."""
+    p = np.asarray(pts, float)
+    out = [p[0]]
+    for a, b in zip(p, p[1:]):
+        step = float(np.hypot(*(b - a)))
+        if at <= step:
+            out.append(a + (b - a) * (at / step if step else 0.0))
+            return _xy(out)
+        out.append(b)
+        at -= step
+    return _xy(out)
+
+
+def _strung(line, gaps):
+    """Marks strung along the polyline from its start, each the first point at exactly gaps[k] (measured straight)
+    from the one before: (the marks, how far along the polyline the last but one lies), or None if it is too
+    short."""
+    p = np.asarray(line, float)
+    marks: list[tuple[float, float]] = []
+    prev, done, along, at = p[0], 0, 0.0, None
+    for a, b in zip(p, p[1:]):
+        v = b - a
+        vv = _dot(v, v)
+        t0 = 0.0
+        while vv > 0:
+            w = a - prev
+            # the furthest root of |w + v t| = gap: where the segment leaves the circle around the last mark
+            bq, cq = 2 * _dot(w, v), _dot(w, w) - gaps[done] ** 2
+            disc = bq * bq - 4 * vv * cq
+            t = (-bq + math.sqrt(disc)) / (2 * vv) if disc >= 0 else -1.0
+            if not t0 <= t <= 1.0:
+                break
+            q = a + v * t
+            marks.append((float(q[0]), float(q[1])))
+            prev, done, t0 = q, done + 1, t
+            if done == len(gaps) - 1:
+                at = along + math.sqrt(vv) * t
+            if done == len(gaps):
+                return marks, at
+        along += math.sqrt(vv)
+    return None
+
+
+def _reach_out(grid: _Grid, start, heading: int, steps: int, max_nodes: int = 50_000):
+    """The cheapest orthogonal path of `steps` free cells from `start`, leaving along `heading` (an index into
+    route._DIRS): a cell costs 1, a turn _TURN, a cell an earlier route uses _REUSE more, so it runs out into free
+    space. Cells from start; None if no path is that long."""
+    import heapq
+
+    best = {(start, heading): 0.0}
+    heap = [(0.0, 0, start, heading, 1)]
+    parent: dict = {}
+    tie, nodes = 0, 0
+    while heap:
+        g, _, cell, d, n = heapq.heappop(heap)
+        if n >= steps:
+            cells = [cell]
+            key = (cell, d)
+            while key in parent:
+                key = parent[key]
+                cells.append(key[0])
+            return cells[::-1]
+        if g > best.get((cell, d), math.inf):
+            continue
+        nodes += 1
+        if nodes > max_nodes:
+            return None
+        for nd in range(4):
+            if nd == (d + 2) % 4:
+                continue
+            nxt = (cell[0] + _DIRS[nd][0], cell[1] + _DIRS[nd][1])
+            if not grid.free(nxt):
+                continue
+            cost = g + 1 + (_TURN if nd != d else 0) + (_REUSE if grid.used[nxt] else 0)
+            if cost < best.get((nxt, nd), math.inf):
+                best[(nxt, nd)] = cost
+                parent[(nxt, nd)] = (cell, d)
+                tie += 1
+                heapq.heappush(heap, (cost, tie, nxt, nd, n + 1))
+    return None
+
+
+def _routed_end(
+    router: _Router,
+    layout: Layout,
+    d: PlacedStem,
+    key,
+    m: int,
+    five: bool,
+    labels,
+    strands=None,
+    door=None,
+    strict=False,
+):
+    """A long free end routed from its stem's end face out to free space along the grid (around the elements, off
+    the cells of the strands drawn so far, `strands`), its m nucleotides spaced NT_STEP apart along it as on a
+    straight end, checked like one: (points, nucleotide positions, end label position) as _free_end gives them, or
+    None when no such drawing is clear (or, with `labels`, leaves its end label no room, or crosses `door`).
+    `strict`: the cells any loop or strand drawn so far uses are blocked, not only paid for."""
+    grid = router.grid
+    rail = d.point(key)
+    face, out = _face(d, key, not five)
+    start = grid.free_cell_along(face, out, d)
+    if start is None:
+        return None
+    # the first nucleotide 1.5 steps from the rail, the next ones a step apart, the end label beyond, as on a
+    # straight end (measured straight, so a corner cannot bunch them up)
+    gaps = [1.5 * NT_STEP] + [NT_STEP] * (m - 1) + [NT_STEP + NT_ROW]
+    heading = min(range(4), key=lambda k: -_dot(_DIRS[k], out))
+    saved = grid.blocked.copy()
+    if strands is not None:
+        grid.blocked |= strands.cells
+    for c in grid.cells_along(*door) if door is not None else ():
+        grid.blocked[c] = True
+    if strict:
+        grid.blocked |= grid.used > 0
+    grid.blocked[start] = saved[start]
+    try:
+        cells = _reach_out(grid, start, heading, int(math.ceil(sum(gaps) / grid.res)) + 4)
+    finally:
+        grid.blocked = saved
+    if cells is None:
+        return None
+    centres = [list(grid.center(c)) for c in _corners(cells)] if len(cells) > 1 else [list(grid.center(cells[0]))]
+    _snap_to_port(centres, face, out, True)
+    line = [_xy([rail])[0], *_rounded(_simplify([tuple(face), *[tuple(c) for c in centres]]))]
+    strung = _strung(line, gaps)
+    if strung is None:
+        return None
+    marks, last = strung
+    if min(math.dist(p, q) for k, p in enumerate(marks) for q in marks[k + 1 :]) < 0.9 * NT_STEP:
+        return None  # it turns back on itself: its nucleotides would bunch up
+    xy, tip = marks[:-1], marks[-1]
+    pts = _upto(line, last)
+    if not _na_clear([*pts, tip], (d,), router.elements) or (strands is not None and strands.crosses(pts)):
+        return None
+    if door is not None and _crosses_segment(pts, *door):
+        return None
+    if labels is not None and not _label_room(router, layout, tip, labels):
+        return None
+    for c in cells:
+        grid.used[c] += 1
+    if five:
+        pts, xy = pts[::-1], xy[::-1]
+    return pts, xy, tip
 
 
 _END_SPOTS = ((1.0, 0.0), (1.0, 0.6), (2.0, 0.0), (2.0, 0.6), (1.0, -0.6), (3.0, 0.0), (0.0, 2.4), (3.0, 1.2))
@@ -327,13 +544,19 @@ def route_nucleic(layout: Layout, router: _Router | None = None) -> list[NAPath]
         if (s, e) not in gapped:
             labels.append(xy)
 
+    strands = _Strands(router.grid)  # the strands drawn so far; hairpin loops and free ends are hard obstacles
     fixed: dict[tuple[int, int], NAPath] = {}  # (strand, nucleotide before it) -> a path of fixed shape
+
+    def fix(key, path: NAPath) -> None:
+        fixed[key] = path
+        strands.add(among(path, at), hard=path.kind in ("hairpin", "tail"))
+
     between: list[tuple] = []  # strands from stem to stem still to route, once the fixed shapes are known
     for s, strand in enumerate(na.strands):
         n = len(strand)
         if s in layout.na_traces:
             pts = _xy(layout.na_traces[s])
-            fixed[(s, -1)] = checked(NAPath("trace", s, list(range(n)), pts, pts), ())
+            fix((s, -1), checked(NAPath("trace", s, list(range(n)), pts, pts), ()))
             for label, a, b in (("5′", pts[0], pts[1]), ("3′", pts[-1], pts[-2])):
                 v = np.subtract(a, b)
                 v = v / max(float(np.hypot(*v)), 1e-9)
@@ -346,8 +569,8 @@ def route_nucleic(layout: Layout, router: _Router | None = None) -> list[NAPath]
         first, last = held[0], held[-1]
         d0 = at[(s, first)]
         if first > 0:
-            path, tip, v = _tail(router, layout, d0, s, (s, first), list(range(first)), True, room(s, "5′"))
-            fixed[(s, -1)] = path
+            path, tip, v = _tail(router, layout, d0, s, (s, first), list(range(first)), True, room(s, "5′"), strands)
+            fix((s, -1), path)
             exits[(s, 0)] = (np.add(path.nt_xy[0], v * NT_STEP / 2), v, d0)
         else:
             tip = _face_label(router, layout, d0, (s, 0), False, room(s, "5′"))
@@ -358,13 +581,15 @@ def route_nucleic(layout: Layout, router: _Router | None = None) -> list[NAPath]
             if da is db and da.side[(s, i)] == da.side[(s, j)]:
                 continue  # along one rail of a stem (a bulge is drawn on the rail)
             if da is db:  # a hairpin loop: an arc over the tip
-                fixed[(s, i)] = _strand_between(router, s, i, j, da, db, None)
+                fix((s, i), _strand_between(router, s, i, j, da, db, None))
             else:
                 between.append((s, i, j, da, db, kind_of.get((s, i + 1))))
         dn = at[(s, last)]
         if last < n - 1:
-            path, tip, v = _tail(router, layout, dn, s, (s, last), list(range(last + 1, n)), False, room(s, "3′"))
-            fixed[(s, last)] = path
+            path, tip, v = _tail(
+                router, layout, dn, s, (s, last), list(range(last + 1, n)), False, room(s, "3′"), strands
+            )
+            fix((s, last), path)
             exits[(s, n - 1)] = (np.add(path.nt_xy[-1], v * NT_STEP / 2), v, dn)
         else:
             tip = _face_label(router, layout, dn, (s, last), True, room(s, "3′"))
@@ -378,11 +603,10 @@ def route_nucleic(layout: Layout, router: _Router | None = None) -> list[NAPath]
         if p.kind in ("hairpin", "tail"):
             _use(router.grid, p.points)
     names = [_stem_label_box(d) for d in layout.stems]
-    drawn = [(None, p.points) for p in fixed.values()]  # strands drawn so far: a straight joint must cross none
     routed = {}
     for s, i, j, da, db, kind in between:
-        routed[(s, i)] = _strand_between(router, s, i, j, da, db, kind, names, drawn)
-        drawn.append((frozenset((da.id, db.id)), routed[(s, i)].points))
+        p = routed[(s, i)] = _strand_between(router, s, i, j, da, db, kind, names, strands)
+        strands.add(among(p, at), frozenset((da.id, db.id)) if p.kind == "joint" else None, hard=False)
     out = [p for _, p in sorted({**fixed, **routed}.items())]
     for g in na.gaps:  # cropped away: the 3' end of one piece to the 5' end of the next, dashed
         a, b = exits.get((g.before, len(na.strands[g.before]) - 1)), exits.get((g.after, 0))
@@ -397,30 +621,74 @@ def route_nucleic(layout: Layout, router: _Router | None = None) -> list[NAPath]
     return out
 
 
-def _straight_joint(router: _Router, da: PlacedStem, db: PlacedStem, fa, ea, fb, drawn=()) -> bool:
+class _Strands:
+    """The nucleic-acid strands drawn so far, each as it lies among the elements (among): their segments, for an
+    exact crossing test, and the grid cells under the hard ones, which a strand's first routing pass may not
+    enter. A joint's segments carry the ids of the two pieces it joins (its partner strand may cross it)."""
+
+    def __init__(self, grid: _Grid):
+        self.grid = grid
+        self.cells = np.zeros(grid.blocked.shape, bool)
+        self._parts: list[tuple[np.ndarray, object, bool]] = []  # (segments, joined ids or None, hard)
+        self._all = None  # (segments, ids, hard) of every part, concatenated when first needed
+
+    def add(self, pts, ids=None, hard: bool = True) -> None:
+        p = np.asarray(pts, float).reshape(-1, 2)
+        if len(p) < 2:
+            return
+        self._parts.append((np.hstack([p[:-1], p[1:]]), ids, hard))
+        self._all = None
+        if hard:
+            for a, b in zip(pts, pts[1:]):
+                for c in self.grid.cells_along(a, b):
+                    self.cells[c] = True
+
+    def crosses(self, pts, skip=None, hard_only: bool = False) -> bool:
+        """Does the polyline cross (properly, not merely touch) a strand drawn so far: any but a joint between the
+        pieces `skip` (ids), or with `hard_only` only the hard ones?"""
+        q = np.asarray(pts, float).reshape(-1, 2)
+        if len(q) < 2 or not self._parts:
+            return False
+        if self._all is None:
+            segs = np.vstack([seg for seg, _, _ in self._parts])
+            ids = [i for seg, i, _ in self._parts for _ in range(len(seg))]
+            hard = np.concatenate([np.full(len(seg), h) for seg, _, h in self._parts])
+            self._all = segs, ids, hard
+        segs, ids, hard = self._all
+        keep = np.ones(len(segs), bool) if not hard_only else hard.copy()
+        if skip is not None:
+            keep &= np.array([i != skip for i in ids])
+        x0, y0 = q.min(axis=0)
+        x1, y1 = q.max(axis=0)
+        keep &= (np.minimum(segs[:, 0], segs[:, 2]) <= x1) & (np.maximum(segs[:, 0], segs[:, 2]) >= x0)
+        keep &= (np.minimum(segs[:, 1], segs[:, 3]) <= y1) & (np.maximum(segs[:, 1], segs[:, 3]) >= y0)
+        other = segs[keep]
+        if not len(other):
+            return False
+        a = np.hstack([q[:-1], q[1:]])
+        p0, p1 = a[:, None, 0:2], a[:, None, 2:4]
+        u, v = other[None, :, 0:2], other[None, :, 2:4]
+
+        def turn(o, e, w):  # written out elementwise, never through BLAS
+            return (e[..., 0] - o[..., 0]) * (w[..., 1] - o[..., 1]) - (e[..., 1] - o[..., 1]) * (w[..., 0] - o[..., 0])
+
+        crossed = (turn(p0, p1, u) * turn(p0, p1, v) < -1e-12) & (turn(u, v, p0) * turn(u, v, p1) < -1e-12)
+        return bool(crossed.any())
+
+
+def _straight_joint(router: _Router, da: PlacedStem, db: PlacedStem, fa, ea, fb, strands=None) -> bool:
     """May a joint no route reaches be drawn straight from face fa to face fb, as a kink joins two pieces of one
     helix? Only between pieces that are near (faces closer than _JOINT_STRAIGHT) or whose boxes touch, going on
     forward (along fa's outward direction ea), clear by _INFLATE of every element and stem but its own two, and
-    crossing no nucleic-acid strand drawn so far (`drawn`: (ids of the two stems it joins, polyline)) other than
-    the partner strand of this same joint (two strands may cross where the duplex carries on, as in a helix)."""
+    crossing no nucleic-acid strand drawn so far (`strands`, a _Strands) other than the partner strand of this
+    same joint (two strands may cross where the duplex carries on, as in a helix)."""
     a, b = da.rect, db.rect
     touching = min(a[2], b[2]) - max(a[0], b[0]) >= -1e-9 and min(a[3], b[3]) - max(a[1], b[1]) >= -1e-9
     if not (math.dist(fa, fb) < _JOINT_STRAIGHT or touching) or _dot(np.subtract(fb, fa), ea) <= 0:
         return False
     if not _clear(_xy([fa, fb]), (da, db), *router.elements, grow=_INFLATE, kink=True):
         return False
-    own = frozenset((da.id, db.id))
-    return not any(_cross(fa, fb, p, q) for ids, pts in drawn if ids != own for p, q in zip(pts, pts[1:]))
-
-
-def _cross(p, q, a, b) -> bool:
-    """Do segments p-q and a-b cross (properly, not merely touch)?"""
-
-    def turn(o, u, v) -> float:
-        return (u[0] - o[0]) * (v[1] - o[1]) - (u[1] - o[1]) * (v[0] - o[0])
-
-    d1, d2, d3, d4 = turn(p, q, a), turn(p, q, b), turn(a, b, p), turn(a, b, q)
-    return d1 * d2 < -1e-12 and d3 * d4 < -1e-12
+    return strands is None or not strands.crosses(_xy([fa, fb]), skip=frozenset((da.id, db.id)))
 
 
 def among(path: NAPath, at: dict) -> list[tuple[float, float]]:
@@ -434,13 +702,16 @@ def among(path: NAPath, at: dict) -> list[tuple[float, float]]:
 
 
 def _strand_between(
-    router: _Router, s: int, i: int, j: int, da: PlacedStem, db: PlacedStem, kind, names=(), drawn=()
+    router: _Router, s: int, i: int, j: int, da: PlacedStem, db: PlacedStem, kind, names=(), strands=None
 ) -> NAPath:
     """The single strand from stem nucleotide i to stem nucleotide j (the m nucleotides between drawn on it): along
     its rail from i to its stem's end face, from that face to the next stem's end face, along the rail to j. Between
     the faces it is checked against every element and stem, its own two by their true bodies (_clear, own_body).
-    `names` (the stem-label boxes) are hard obstacles for a run's first choice of drawing: the first one clear of
-    the elements that also keeps off every name; only when none does, the first one clear of the elements."""
+    Two passes: in the first the hard strands drawn so far (`strands`, a _Strands: hairpin loops and free ends) are
+    obstacles, their grid cells blocked and no drawing crossing them taken; only when that finds nothing, the second
+    pass, where crossing them is only a cost. In each pass `names` (the stem-label boxes) are hard obstacles for the
+    first choice of drawing: the first one clear that also keeps off every name; only when none does, the first one
+    clear."""
     m, nts, between = j - i - 1, list(range(i + 1, j)), ((s, i), (s, j))
     own, need = (da, db), (j - i) * NT_STEP
     ra, rb = da.point((s, i)), db.point((s, j))
@@ -450,36 +721,68 @@ def _strand_between(
             "hairpin", s, nts, pts, _spaced(pts, m), fallback=not _na_clear(pts, own, router.elements), between=between
         )
     (fa, ea), (fb, eb) = _face(da, (s, i), True), _face(db, (s, j), False)
+    joint = m == 0 and da.parent and da.parent == db.parent
+    for hard in (True, False) if strands is not None else (False,):
+        used = router.grid.used.copy() if hard else None
+        path = _drawing(
+            router, s, nts, between, da, db, (ra, fa, ea, fb, eb, rb), need, joint, kind, names, strands, hard
+        )
+        if path is not None:
+            return path
+        router.grid.used = used  # the first pass drew nothing: as if it had never run
+    raise AssertionError("the second pass always draws")  # pragma: no cover
+
+
+def _drawing(router: _Router, s, nts, between, da, db, ends, need, joint, kind, names, strands, hard):
+    """One pass of _strand_between: the strand as drawn, or None when `hard` and no drawing clear of the elements
+    keeps off the hard strands drawn so far."""
+    ra, fa, ea, fb, eb, rb = ends
+    m, own = len(nts), (da, db)
+    grid = router.grid
     on_rails = lambda mid: _xy([ra, *mid, rb])  # noqa: E731
-    ok = lambda pts: _clear(pts[1:-1], own, *router.elements, own_body=True)  # noqa: E731
-    reach = max(need - math.dist(ra, fa) - math.dist(fb, rb), 0.0)  # what the part between the faces must hold
+    skip = frozenset((da.id, db.id)) if joint else None  # a joint's partner strand may cross it
+
+    def ok(pts) -> bool:  # clear between the faces, and off the hard strands in the first pass
+        if not _clear(pts[1:-1], own, *router.elements, own_body=True):
+            return False
+        return not (hard and strands.crosses(pts[1:-1], skip, hard_only=True))
 
     def off_names(pts) -> bool:
         return not any(clip_len(p, q, b) > 1e-9 for b in names for p, q in zip(pts[1:-1], pts[2:-1]))
 
-    joint = m == 0 and da.parent and da.parent == db.parent
+    reach = max(need - math.dist(ra, fa) - math.dist(fb, rb), 0.0)  # what the part between the faces must hold
     if joint and math.dist(fa, fb) < _JOINT_STRAIGHT and _dot(fb - fa, ea) > 0:
         pts = on_rails([fa, fb])  # the duplex just carries on
         if ok(pts):
-            for c in router.grid.cells_along(fa, fb):
-                router.grid.used[c] += 1
+            for c in grid.cells_along(fa, fb):
+                grid.used[c] += 1
             return NAPath("joint", s, [], pts, [], between=between)
     bowed = None
     if kind == "internal" and m <= _BOW_MAX:
         # one side of an internal loop: bowed out from face to face on its own side, so the two sides never meet
-        bowed = on_rails(_side_bow(da, (s, i), fa, fb, reach))
+        bowed = on_rails(_side_bow(da, between[0], fa, fb, reach))
         if not ok(bowed):
             bowed = None
         elif off_names(bowed):
             return NAPath("run", s, nts, bowed, _spaced(bowed, m), between=between)
-    route, _ = router.route(fa, ea, da, fb, eb, db, own_body=True)
-    if route is None and joint and _straight_joint(router, da, db, fa, ea, fb, drawn):
+    if hard:
+        saved = grid.blocked.copy()
+        grid.blocked |= strands.cells
+        try:
+            route, _ = router.route(fa, ea, da, fb, eb, db, own_body=True)
+        finally:
+            grid.blocked = saved
+    else:
+        route, _ = router.route(fa, ea, da, fb, eb, db, own_body=True)
+    if route is None and joint and _straight_joint(router, da, db, fa, ea, fb, strands):
         # pieces that touch (no margin is kept between them): the duplex carries on straight across their meeting
         # corner, as a kink joins two pieces of one helix
-        for c in router.grid.cells_along(fa, fb):
-            router.grid.used[c] += 1
+        for c in grid.cells_along(fa, fb):
+            grid.used[c] += 1
         return NAPath("joint", s, [], on_rails([fa, fb]), [], between=between)
     fallback = route is None
+    if fallback and hard and bowed is None:
+        return None
     if route is None:
         route = _curve(fa, ea, fb, eb)
     pts = on_rails(route)
@@ -491,6 +794,10 @@ def _strand_between(
         left = np.array([fa[1] - fb[1], fb[0] - fa[0]])
         bows = (on_rails(_bow(fa, fb, reach, out=left)), on_rails(_bow(fa, fb, reach, out=-left)))
         shapes = [b for b in bows if ok(b)] + shapes
+    if hard:
+        shapes = [q for q in shapes if not fallback and ok(q)]
+        if not shapes and bowed is None:
+            return None
     soft = [bowed] if bowed is not None else [shapes[0]]  # the first choice when every drawing meets a name
     pts = next((q for q in shapes if not fallback and ok(q) and off_names(q)), soft[0])
     kind_drawn = "joint" if joint else "run"

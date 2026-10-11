@@ -759,7 +759,7 @@ def test_a_straight_joint_may_cross_its_partner_strand_but_no_other():
     crosses no strand drawn so far, except the other strand of the same joint (3D0U's P3b-P3a: the two strands
     cross there as they do along a helix)."""
     from foldmap.route import _element_obstacles, _Grid, _Router
-    from foldmap.route_na import _face, _straight_joint
+    from foldmap.route_na import _face, _straight_joint, _Strands
 
     lay, _, _, _ = _routed("1RVA")
     at = {key: d for d in lay.stems for key in d.axial}
@@ -770,9 +770,12 @@ def test_a_straight_joint_may_cross_its_partner_strand_but_no_other():
     mid, normal = (np.add(fa, fb)) / 2, np.array([fa[1] - fb[1], fb[0] - fa[0]])
     across = [tuple(mid + normal), tuple(mid - normal)]  # a strand crossing the joint's middle
     router = _Router(_Grid(lay), _element_obstacles(lay))
-    assert _straight_joint(router, da, db, fa, ea, fb, [])
-    assert _straight_joint(router, da, db, fa, ea, fb, [(frozenset((da.id, db.id)), across)])
-    assert not _straight_joint(router, da, db, fa, ea, fb, [(None, across)])
+    assert _straight_joint(router, da, db, fa, ea, fb, _Strands(router.grid))
+    partner, other = _Strands(router.grid), _Strands(router.grid)
+    partner.add(across, frozenset((da.id, db.id)))
+    other.add(across)
+    assert _straight_joint(router, da, db, fa, ea, fb, partner)
+    assert not _straight_joint(router, da, db, fa, ea, fb, other)
 
 
 def _enters_core(p, q, d) -> bool:
@@ -927,8 +930,10 @@ def _segments_cross(p, q, a, b) -> bool:
     return turn(a, b, p) * turn(a, b, q) < 0 and turn(p, q, a) * turn(p, q, b) < 0
 
 
-@pytest.mark.parametrize("pdb", ["1EHZ", "4OO8", "30QM"])
+@pytest.mark.parametrize("pdb", ["1EHZ", "4OO8", "30QM", "4LD0", "2GIS"])
 def test_runs_steer_round_hairpin_loops_and_free_ends(pdb):
+    """Hairpin loops and free ends are hard obstacles for a run's first routing pass (4LD0: the run C:24-25 crossed
+    the free end D:13 when they were only a cost to cross)."""
     from foldmap.route_na import among
 
     lay, _, _, _ = _routed(pdb)
@@ -946,6 +951,64 @@ def test_runs_steer_round_hairpin_loops_and_free_ends(pdb):
                     f.kind,
                     f.nts[:2],
                 )
+
+
+def test_a_long_free_end_is_routed_round_what_blocks_it(monkeypatch):
+    """A free end of more than six nucleotides that no straight drawing keeps clear of the elements is routed out to
+    free space (5W1H's 17-nt spacer was drawn straight through three helices). 4YBB's 10-nt end AA:557-566, with
+    only the straight drawing allowed and an element planted across it."""
+    import foldmap.route_na as route_na
+    from foldmap.layout import NT_STEP
+    from foldmap.route import _clear, _element_obstacles, _Grid, _Router
+
+    lay, _, _, _ = _routed("4YBB")
+    at = {key: d for d in lay.stems for key in d.axial}
+    tail = next(p for p in lay.na_paths if p.kind == "tail" and len(p.nts) == 10)
+    (key,) = tail.between
+    d = at[key]
+    five = tail.nts[-1] < key[1]
+    ahead = np.asarray(tail.nt_xy[0 if five else -1])
+    out = ahead - np.asarray(tail.nt_xy[-1 if five else 0])
+    out /= np.hypot(*out)
+    centre = ahead - out * 2.0  # a block across the end's middle, 3 wide
+    block = (*np.minimum(centre - 1.5, centre + 1.5), *np.maximum(centre - 1.5, centre + 1.5))
+    rects, owners = _element_obstacles(lay)
+    elements = (np.hstack([rects, np.array(block, float).reshape(4, 1)]), [*owners, "block"])
+    grid = _Grid(lay)
+    grid.blocked |= grid._mask([block])
+    router = _Router(grid, elements)
+    monkeypatch.setattr(route_na, "_TURNS", (0.0,))  # the straight drawing only
+    path, tip, _ = route_na._tail(router, lay, d, key[0], key, tail.nts, five, None)
+    assert not path.fallback and path.nts == tail.nts and len(path.nt_xy) == 10
+    assert _clear(route_na.outside_own(path.points, (d,)), (d,), *elements, own_body=True)
+    steps = np.hypot(*np.diff(np.asarray(path.nt_xy), axis=0).T)
+    assert np.all(steps <= NT_STEP + 1e-6) and np.all(steps > 0.5 * NT_STEP)
+
+
+def test_a_free_end_keeps_out_of_its_partners_doorway(monkeypatch):
+    """A free end is not turned across the way its partner nucleotide's strand leaves the same end of the stem, when
+    another drawing is clear (5F9R: the non-target strand's free end D:12-20, turned across the face of DNA 1, closed
+    off the run from P1b, which had to cross it). 4YBB's 10-nt end AA:557-566, offered first a turn across the
+    doorway."""
+    import foldmap.route_na as route_na
+    from foldmap.route import _element_obstacles, _Grid, _Router
+
+    lay, _, _, _ = _routed("4YBB")
+    at = {key: d for d in lay.stems for key in d.axial}
+    tail = next(p for p in lay.na_paths if p.kind == "tail" and len(p.nts) == 10)
+    (key,) = tail.between
+    d, five = at[key], tail.nts[-1] < key[1]
+    door = route_na._doorway(d, key, five)
+    turns = [
+        t
+        for t in (np.pi / 2, -np.pi / 2)
+        if route_na._crosses_segment(route_na._free_end(d, key, 10, five, t)[0], *door)
+    ]
+    assert len(turns) == 1  # the turn towards the partner runs across its doorway
+    monkeypatch.setattr(route_na, "_TURNS", (turns[0], 0.0))
+    router = _Router(_Grid(lay), _element_obstacles(lay))
+    path, _, _ = route_na._tail(router, lay, d, key[0], key, tail.nts, five, None)
+    assert not path.fallback and not route_na._crosses_segment(path.points, *door)
 
 
 def _in_outline(pt, e) -> bool:

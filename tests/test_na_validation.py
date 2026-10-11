@@ -37,10 +37,11 @@ LIMITS = {  # metric: (lowest or highest allowed, "min" or "max")
 # at its value measured when the metric came in (absent: 0), a regression bound. Task 14 tightens them after the
 # campaign (Task 13). 4YBB: run AA:26 across the free ends AA:2-8 and AA:557-566; two contact beads overlapping;
 # the "... 36 nt ..." label on stem P34 and on a run.
-# Routing, step 3: with the stems where 3D has them (C2), 4LD0's run from DNA 4 to DNA 2 crosses near the junction
-# and two of 4OO8's contact beads overlap. Held until the routing step (C1, C8, C12) is in.
+# Routing, step 3: with the stems where 3D has them (C2), two of 4OO8's contact beads overlap. Held until the routing
+# step (C1, C8, C12) is in. (4LD0's run from DNA 4 to DNA 2 across a free end went with C8: free ends are hard
+# obstacles for a run's first routing pass.)
 CAMPAIGN = {
-    "na_crossings": {"4YBB": 2, "4LD0": 1},
+    "na_crossings": {"4YBB": 2},
     "bead_overlaps": {"4YBB": 2, "4OO8": 1},
     "gap_label_collisions": {"4YBB": 2},
 }
