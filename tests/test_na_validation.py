@@ -109,6 +109,17 @@ def test_contacted_stems_stay_nearer_their_touching_elements(measured):
     assert m["stems_nearer_frac"] >= NEARER.get(pdb, 1.0)
 
 
+def test_every_hold_still_fails_its_real_limit(measured):
+    """A hold (HELD, NEARER, CAMPAIGN) excuses a fixture from nacheck.THRESHOLDS at its measured value. Once the
+    drawing meets the real limit the hold must go: this fails until it is removed (strict-xfail style)."""
+    pdb, m, _ = measured
+    holds = [metric for (p, metric) in HELD if p == pdb]
+    holds += ["stems_nearer_frac"] if pdb in NEARER else []
+    holds += [metric for metric, bound in CAMPAIGN.items() if pdb in bound]
+    for metric in holds:
+        assert judge({metric: m[metric]}), f"{pdb}: {metric} {m[metric]} meets THRESHOLDS now: remove its hold"
+
+
 def test_crossings_count_proper_crossings_only():
     from foldmap.nacheck import _crossings, _segments
 
