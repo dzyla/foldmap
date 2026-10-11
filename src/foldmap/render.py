@@ -310,13 +310,28 @@ def _draw_na_marks(ink: _NAInk, layout: Layout, style: str, residue_colour, pt_p
     """Isolated pairs as bars, base letters (touched ones in the toucher's colour), beads on the touched
     nucleotides in the protein chain's colour, and the strands' 5' and 3' ends."""
     na = layout.nucleic
-    for p in na.structure.ties:
-        a, b = where.get((p.a, p.i)), where.get((p.b, p.j))
-        if a is not None and b is not None:
+    for tie in layout.na_ties:  # a short clear tie as a dotted line; a long or crossing one as two labelled marks
+        gid = f"na:tie:{na.strands[tie.a[0]].labels[tie.a[1]].tag}-{na.strands[tie.b[0]].labels[tie.b[1]].tag}"
+        if not tie.label:
             (line,) = ink.ax.plot(
-                *np.c_[a, b], color=ink.rung, lw=ink.lw * 1.2, ls=(0, (1, 1.5)) if p.kind == "GU" else "-", zorder=1.8
+                *np.c_[tie.ends[0], tie.ends[1]], color=ink.rung, lw=ink.lw, ls=(0, (1, 1.5)), zorder=1.8
             )
-            line.set_gid(f"na:tie:{na.strands[p.a].labels[p.i].tag}-{na.strands[p.b].labels[p.j].tag}")
+            line.set_gid(gid)
+            continue
+        for a, b, at in tie.marks:
+            (tick,) = ink.ax.plot(*np.c_[a, b], color=ink.front, lw=ink.lw * 1.2, solid_capstyle="round", zorder=2.4)
+            tick.set_gid(f"{gid}:mark")
+            t = ink.ax.text(
+                *at,
+                tie.label,
+                ha="center",
+                va="center",
+                fontsize=ink.font * 0.75,
+                style="italic",
+                color=ink.front,
+                zorder=4,
+            )
+            t.set_gid(f"{gid}:label")
     touched: dict[tuple[int, int], tuple[str, str]] = {}  # nucleotide -> (chain, colour) of its first toucher
     for r, nts in sorted(na.contacts.items()):
         chain = na.contact_chain.get(r)

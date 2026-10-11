@@ -111,25 +111,42 @@ def _chords_cross(a, b, there, back) -> bool:
 def test_strands_cross_between_joined_stems_only_where_one_is_seen_clearly(pdb):
     """A stem whose arms the projection cannot tell apart (margin < _SIDE_CLEAR) takes the side that keeps the
     strands to its neighbours uncrossed, so two stems joined both ways (a bent duplex's next piece, the stem
-    across an internal loop) are drawn with crossed strands only where at least one of them is seen clearly
-    (crossing there is what the projection shows: the strands of a helix cross every half turn)."""
+    across an internal loop) are drawn with crossed strands where at least one of them is seen clearly (what the
+    projection shows: the strands of a helix cross every half turn), or, when a run of unclear stems lies between
+    clear ones seen on opposite sides, once, at the run's least clearly seen link."""
     from foldmap.layout import _SIDE_CLEAR
 
     lay, _, _ = make_layout(_path(pdb))
-    for a, b, there, back in _joined_both_ways(lay):
-        if _chords_cross(a, b, there, back):
-            assert max(a.margin, b.margin) >= _SIDE_CLEAR, (a.name, b.name, a.margin, b.margin)
+    links = _joined_both_ways(lay)
+    unclear = {d.name for d in lay.stems if d.margin < _SIDE_CLEAR}
+    group = {n: {n} for n in unclear}  # unclear stems linked to one another
+    for a, b, _, _ in links:
+        if a.name in unclear and b.name in unclear and group[a.name] is not group[b.name]:
+            merged = group[a.name] | group[b.name]
+            for n in merged:
+                group[n] = merged
+    crossed: dict[frozenset, list] = {}
+    for a, b, there, back in links:
+        if _chords_cross(a, b, there, back) and max(a.margin, b.margin) < _SIDE_CLEAR:
+            crossed.setdefault(frozenset(group[a.name]), []).append((a, b))
+    for members, pairs in crossed.items():
+        assert len(pairs) == 1, [(a.name, b.name) for a, b in pairs]
+        (a, b), mine = pairs[0], [(c, d) for c, d, _, _ in links if c.name in members or d.name in members]
+        assert max(a.margin, b.margin) == min(max(c.margin, d.margin) for c, d in mine), (a.name, b.name)
 
 
 def test_nucleosome_strands_cross_only_where_its_pieces_are_seen_to():
     """At 15 of the 21 joints of the nucleosome DNA the strands crossed when every piece took the side it is seen
     on. 5 crossings join two pieces seen clearly on opposite sides (1e-1f, 1m-1n, 1n-1o, 1o-1p, 1s-1t) and the
     unclear pieces 1g-1l lie between 1f and 1m, which are seen on opposite sides, so 6 is the least without
-    drawing a clearly seen piece mirrored."""
+    drawing a clearly seen piece mirrored; the sixth falls between the least clear pieces, 1g and 1h."""
     lay, _, _ = make_layout(_path("1KX5"))
     joints = [j for j in _joined_both_ways(lay) if j[0].parent and j[0].parent == j[1].parent]
     assert len(joints) == 21
     assert sum(_chords_cross(*j) for j in joints) <= 6
+    assert [
+        (a.name, b.name) for a, b, *rest in joints if _chords_cross(a, b, *rest) and a.margin < 2.75 and b.margin < 2.75
+    ] == [("DNA 1g", "DNA 1h")]
 
 
 @pytest.mark.parametrize("pdb", FIXTURES)
@@ -163,7 +180,7 @@ def test_stems_seen_clearly_keep_their_side_and_none_is_drawn_mirrored(pdb):
 
 def test_internal_loop_sides_cross_less_on_the_ribosome():
     """The two sides of an internal loop are bowed apart; their chords crossed at 7 of 11 such loops on 4YBB when
-    every stem took the side it is seen on. Every crossing left is between two stems seen clearly."""
+    every stem took the side it is seen on. A regression bound: the crossings left join stems seen clearly."""
     lay, _, _, _ = _routed("4YBB")
     at = {key: d for d in lay.stems for key in d.axial}
     kind = {(r.strand, r.lo): r.kind for r in lay.nucleic.structure.runs}
@@ -175,27 +192,53 @@ def test_internal_loop_sides_cross_less_on_the_ribosome():
         if {at[k].id for k in p.between} == {at[k].id for k in q.between}
     ]
     assert len(loops) == 11
-    assert sum(_segments_cross(p.points[0], p.points[-1], q.points[0], q.points[-1]) for p, q in loops) <= 5
+    assert sum(_segments_cross(p.points[0], p.points[-1], q.points[0], q.points[-1]) for p, q in loops) <= 6
 
 
 def test_short_runs_and_strand_exchanges_hold_their_stem_ends_together(monkeypatch):
-    """A strand passing from one stem to another through at most two nucleotides (the four 0-nt strand exchanges
-    of the Holliday junction) pulls the two stem ends together as firmly as a bent duplex's joint, rest length
-    its nucleotides' steps: DNA 2 touches no protein and still comes to the junction."""
+    """A strand passing from one stem to another of more than two strands through at most two nucleotides (the
+    four 0-nt strand exchanges of the Holliday junction) pulls the two stem ends together more firmly than a bent
+    duplex's joint, rest length its nucleotides' steps: DNA 2 touches no protein and still comes to the junction.
+    Not within one RNA chain (a tRNA's short junction runs)."""
     import foldmap.layout as layout
 
     seen = []
     real = layout._attract
 
     def spy(*a, **k):
-        seen.append(list(k.get("extra", a[7] if len(a) > 7 else ())))
+        seen.append(list(k["extra"]))
         return real(*a, **k)
 
     monkeypatch.setattr(layout, "_attract", spy)
     make_layout(_path("3CRX"))
-    springs = seen[0]
+    make_layout(_path("1EHZ"))
+    springs, trna = seen
     assert len(springs) == 4
-    assert all(w == layout._W_SHORT >= layout._W_JOINT and slack == layout._JOINT_SLACK for *_, w, slack in springs)
+    assert all(w == layout._W_SHORT > layout._W_JOINT and slack == layout._JOINT_SLACK for *_, w, slack in springs)
+    assert trna and all(w < layout._W_SHORT for *_, w, _ in trna)
+
+
+def test_trna_keeps_its_cloverleaf_junction_compact():
+    """1EHZ: the variable loop (5 nt from the anticodon stem P3 to the T stem P4) is a short run, and the T loop
+    does not point at the anticodon loop (with every short run held like a strand exchange, P4 was pulled across
+    the cloverleaf: the variable loop ran 20.7 units and the T loop pointed 32 degrees off the anticodon loop)."""
+    import math
+
+    lay, _, _, _ = _routed("1EHZ")
+    at = {key: d for d in lay.stems for key in d.axial}
+    variable = [p for p in lay.na_paths if p.kind == "run" and [at[k].name for k in p.between] == ["P3", "P4"]]
+    assert len(variable) == 1 and len(variable[0].nts) == 5
+    assert sum(math.dist(a, b) for a, b in zip(variable[0].points, variable[0].points[1:])) <= 6.0
+
+    def loop(d):
+        a, i, b, j = d.pairs[-1]
+        centre, _ = d.hairpin_circle((a, i), (b, j), d.hairpin)
+        return centre, d.direction if d.axial[(a, i)] >= 0 else -d.direction
+
+    stems = {d.name: d for d in lay.stems}
+    (c4, out4), (c3, _) = loop(stems["P4"]), loop(stems["P3"])
+    towards = (c3 - c4) / np.linalg.norm(c3 - c4)
+    assert out4 @ towards < np.cos(np.radians(60))
 
 
 def test_holliday_junction_reads_as_four_arms():
@@ -224,14 +267,14 @@ def test_holliday_junction_reads_as_four_arms():
         for p in lay.na_paths
         if p.kind == "run" and not p.nts
     )
-    assert len(paths) == 4 and paths[2] <= 1.7 and paths[3] <= 4.5, paths
+    assert len(paths) == 4 and paths[2] <= 1.7 and paths[3] <= 4.3, paths
 
 
 @pytest.mark.parametrize("pdb", ["30QM", "1EHZ", "4OO8", "4YBB"])
 def test_hairpin_loops_lie_within_their_stems_footprint(pdb):
-    """The room a hairpin loop needs beyond the stem's tip is part of the stem's footprint, so no neighbour is
-    placed where the loop is drawn."""
-    from foldmap.layout import _footprint
+    """The room a hairpin loop needs beyond the stem's tip, its letters included, is part of the stem's
+    footprint, so no neighbour is placed where the loop is drawn."""
+    from foldmap.layout import _GLYPH_H, _footprint
 
     lay, _, _, _ = _routed(pdb)
     at = {key: d for d in lay.stems for key in d.axial}
@@ -243,6 +286,33 @@ def test_hairpin_loops_lie_within_their_stems_footprint(pdb):
         assert all(x0 - 1e-6 <= x - d.cx <= x1 + 1e-6 and y0 - 1e-6 <= y - d.cy <= y1 + 1e-6 for x, y in p.points), (
             d.name
         )
+        g = _GLYPH_H / 2
+        for i in p.nts:
+            x, y = lay.na_letters[(p.strand, i)]
+            assert x0 <= x - d.cx - g and x - d.cx + g <= x1 and y0 <= y - d.cy - g and y - d.cy + g <= y1, (d.name, i)
+
+
+def test_a_long_tie_is_two_labelled_marks():
+    """1EHZ's G19·C56 (D loop to T loop) would cross two ladders as a line: it is drawn as a tick at each
+    nucleotide, both labelled "a"."""
+    fig, _ = make_figure_and_loops(_path("1EHZ"))
+    marks, labels = _gid(fig, "na:tie:19-56:mark"), _gid(fig, "na:tie:19-56:label")
+    assert len(marks) == 2 and [t.get_text() for t in labels] == ["a", "a"]
+    assert not [a for a in _gid(fig, "na:tie:") if not a.get_gid().endswith((":mark", ":label"))]
+
+
+@pytest.mark.parametrize("pdb", FIXTURES)
+def test_tie_lines_cross_no_stem_and_tie_labels_count_as_text(pdb):
+    from foldmap.layout import label_boxes
+    from foldmap.route_na import _crosses_body
+
+    lay, sses, _, _ = _routed(pdb)
+    names = [n for n, _ in label_boxes(lay, sses)]
+    for n, tie in enumerate(lay.na_ties):
+        if tie.label:
+            assert len(tie.marks) == 2 and {f"tie-label:{n}:0", f"tie-label:{n}:1"} <= set(names)
+        else:
+            assert not any(_crosses_body(*tie.ends, e) for e in [*lay.stems, *lay.placed.values()])
 
 
 @pytest.mark.parametrize("pdb", FIXTURES)

@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+import itertools
 import re
 from dataclasses import dataclass, field
 
@@ -183,6 +184,7 @@ class Layout:
     na_traces: dict = field(default_factory=dict)  # strand -> projected backbone (page units), for unpaired strands
     na_ends: list = field(default_factory=list)  # (strand, "5′" or "3′", label position), filled by route_loops
     na_letters: dict = field(default_factory=dict)  # single-stranded (strand, nt) -> its letter's place (route_loops)
+    na_ties: list = field(default_factory=list)  # route_na.NATie: isolated pairs as drawn (route_loops)
     na_cropped: bool = False  # na_extent auto cropped a large nucleic acid to the stems the protein touches
     frame: object = None  # the frame.Frame (or RadialFrame, CylinderFrame) that took 3D to the page
     focus: set[str] | None = None  # chains drawn in colour when highlighting; the rest in grey
@@ -265,10 +267,10 @@ def _footprint(m) -> tuple[float, float, float, float]:
     if isinstance(m, PlacedStem):  # a stem's name beside it
         x0, y0, x1, y1 = _stem_label_box(m)
         box = (min(box[0], x0 - m.cx), min(box[1], y0 - m.cy), max(box[2], x1 - m.cx), max(box[3], y1 - m.cy))
-    if isinstance(m, PlacedStem) and m.hairpin >= 0:  # and its hairpin loop over the tip
+    if isinstance(m, PlacedStem) and m.hairpin >= 0:  # and its hairpin loop over the tip, with the loop's letters
         a, i, b, j = m.pairs[-1]
         (x, y), r = m.hairpin_circle((a, i), (b, j), m.hairpin)
-        x, y = x - m.cx, y - m.cy
+        x, y, r = x - m.cx, y - m.cy, r + NT_ROW + _GLYPH_H / 2
         box = (min(box[0], x - r), min(box[1], y - r), max(box[2], x + r), max(box[3], y + r))
     if isinstance(m, Placed) and m.ends:
         d = m.direction
@@ -979,6 +981,7 @@ def _stem_item(piece: Stem, na: Nucleic, frame: Frame, flat: bool, width: float 
 # Å: a stem seen with its arms at least this far apart keeps the side it is seen on. On the test structures every
 # stem below it fits its projection about as well turned round; the closest one that does not is 4YBB P5 at 2.81 Å.
 _SIDE_CLEAR = 2.75
+_CYCLE_MAX = 12  # unclear stems linked round a cycle: up to this many are settled by trying every turning
 
 
 def _cross2(u: np.ndarray, v: np.ndarray) -> float:
@@ -989,8 +992,9 @@ def _continuous_sides(stems: list[PlacedStem], na: Nucleic) -> None:
     """Turn round (swap the rails of) the stems whose side the projection cannot tell (margin < _SIDE_CLEAR), so
     their strands run on uncrossed to the stems they are joined to both ways: the next piece of a bent duplex,
     or the stem across an internal loop or bulge (one strand goes from A to B, another from B back to A).
-    Stems seen clearly keep their side; the others are settled in stem order, each one beside a settled stem
-    first, by a vote of its settled partners (a tie keeps the side it is seen on)."""
+    Stems seen clearly keep their side. Each group of unclear stems linked to one another is settled exactly
+    (_two_colour): fewest crossed links, any crossing that cannot be avoided at the link whose stems are seen
+    least clearly, then fewest stems turned; so the result does not depend on the order of the stems."""
     at = {key: k for k, d in enumerate(stems) for key in d.axial}
     steps: dict[tuple[int, int], list[tuple[int, int, int]]] = {}
     for s, strand in enumerate(na.strands):
@@ -998,7 +1002,7 @@ def _continuous_sides(stems: list[PlacedStem], na: Nucleic) -> None:
         for i, j in zip(held, held[1:]):
             if at[(s, i)] != at[(s, j)]:
                 steps.setdefault((at[(s, i)], at[(s, j)]), []).append((s, i, j))
-    want: dict[int, list[tuple[int, int]]] = {}  # stem -> (partner, +1: same turn as the partner, -1: opposite)
+    links: list[tuple[int, int, int]] = []  # (stem, stem, +1: same turn wanted, -1: opposite turns wanted)
     for (k, m), there in sorted(steps.items()):
         back = steps.get((m, k), [])
         if k > m or len(there) != 1 or len(back) != 1:
@@ -1011,20 +1015,101 @@ def _continuous_sides(stems: list[PlacedStem], na: Nucleic) -> None:
         ca = float(_snap(_cross2(u, a.point((t, r)) - a.point((s, i)))))
         cb = float(_snap(_cross2(u, b.point((t, q)) - b.point((s, j)))))
         if ca and cb:
-            sign = 1 if (ca > 0) == (cb > 0) else -1
-            want.setdefault(k, []).append((m, sign))
-            want.setdefault(m, []).append((k, sign))
-    turn = {k: 1 for k, d in enumerate(stems) if d.margin >= _SIDE_CLEAR}
-    pending = [k for k in range(len(stems)) if k not in turn]
-    while pending:
-        k = next((k for k in pending if any(m in turn for m, _ in want.get(k, ()))), pending[0])
-        pending.remove(k)
-        vote = sum(sign * turn[m] for m, sign in want.get(k, ()) if m in turn)
-        turn[k] = -1 if vote < 0 else 1
+            links.append((k, m, 1 if (ca > 0) == (cb > 0) else -1))
+    fixed = {k for k, d in enumerate(stems) if d.margin >= _SIDE_CLEAR}
+    turn = dict.fromkeys(fixed, 1)
+    nbr: dict[int, list[int]] = {}
+    for k, m, _ in links:
+        if k not in fixed and m not in fixed:
+            nbr.setdefault(k, []).append(m)
+            nbr.setdefault(m, []).append(k)
+    for k in range(len(stems)):
+        if k in turn:
+            continue
+        group, todo = {k}, [k]
+        while todo:
+            for m in nbr.get(todo.pop(), ()):
+                if m not in group:
+                    group.add(m)
+                    todo.append(m)
+        mine = [ln for ln in links if ln[0] in group or ln[1] in group]
+        turn.update(_two_colour(sorted(group), mine, nbr, turn, stems))
     for k, d in enumerate(stems):
         if turn[k] < 0:
             d.first = -d.first
             d.side = {key: -v for key, v in d.side.items()}
+
+
+def _two_colour(group, links, nbr, fixed, stems) -> dict[int, int]:
+    """+1 (keep) or -1 (turn round) for each stem of `group` (sorted), given the settled stems in `fixed`: the
+    least cost over `links` (k, m, wanted sign), counting each crossed link as one, below that the rank of how
+    clearly its stems are seen (least clear cheapest), below that each stem turned. Exact by dynamic programming
+    on a tree (chains of pieces and loops are trees); a group with a cycle is solved by trying every turning up
+    to 2**_CYCLE_MAX, beyond that on a spanning tree."""
+    order = sorted(
+        links,
+        key=lambda ln: (
+            max(stems[ln[0]].margin, stems[ln[1]].margin),
+            min(stems[ln[0]].margin, stems[ln[1]].margin),
+            ln,
+        ),
+    )
+    rank = {ln: r for r, ln in enumerate(order)}
+    big = len(links) * len(links) + 1  # one crossing fewer outweighs any ranks
+    unit = len(group) + 1  # and any ranks outweigh the number of stems turned
+
+    def cost(ln) -> int:
+        return (big + rank[ln]) * unit
+
+    inner = [ln for ln in links if ln[0] in group and ln[1] in group]
+    if len(inner) >= len(group) and len(group) <= _CYCLE_MAX:  # a cycle: every turning
+        best, pick = None, None
+        for signs in itertools.product((1, -1), repeat=len(group)):
+            t = {**fixed, **dict(zip(group, signs))}
+            c = sum(cost(ln) for ln in links if t[ln[0]] * t[ln[1]] != ln[2]) + signs.count(-1)
+            if best is None or c < best:
+                best, pick = c, dict(zip(group, signs))
+        return pick
+    edge: dict[tuple[int, int], list[tuple[int, int, int]]] = {}
+    for ln in links:
+        edge.setdefault((ln[0], ln[1]), []).append(ln)
+        edge.setdefault((ln[1], ln[0]), []).append(ln)
+    root, parent, bfs = group[0], {}, [group[0]]
+    children: dict[int, list[int]] = {v: [] for v in group}
+    for v in bfs:
+        for m in sorted(nbr.get(v, ())):
+            if m in children and m != root and m not in parent:
+                parent[m] = v
+                children[v].append(m)
+                bfs.append(m)
+
+    def unary(v, s) -> int:  # links to settled stems, and the turn itself
+        out = 0 if s > 0 else 1
+        for ln in links:
+            other = ln[1] if ln[0] == v else ln[0] if ln[1] == v else None
+            if other is not None and other in fixed and s * fixed[other] != ln[2]:
+                out += cost(ln)
+        return out
+
+    def between(v, s, c, t) -> int:
+        return sum(cost(ln) for ln in edge.get((v, c), ()) if s * t != ln[2])
+
+    best: dict[int, dict[int, int]] = {}
+    pick: dict[tuple[int, int], int] = {}
+    for v in reversed(bfs):
+        best[v] = {}
+        for s in (1, -1):
+            total = unary(v, s)
+            for c in children[v]:
+                options = [(between(v, s, c, t) + best[c][t], -t) for t in (1, -1)]
+                value, neg = min(options)
+                pick[(c, s)] = -neg
+                total += value
+            best[v][s] = total
+    out = {root: 1 if best[root][1] <= best[root][-1] else -1}
+    for v in bfs[1:]:
+        out[v] = pick[(v, out[parent[v]])]
+    return out
 
 
 def _traces(na: Nucleic, frame: Frame) -> dict[int, np.ndarray]:
@@ -1066,15 +1151,18 @@ def _stem_contacts(sses: list[SSE], na: Nucleic, pieces: list[Stem]) -> dict[fro
 
 _W_JOINT = 4.0  # pull between consecutive pieces of one bent duplex: the chain follows the duplex
 _JOINT_SLACK = 0.3
-_SHORT_RUN = 2  # a strand passing from stem to stem through at most this many nucleotides holds the stem ends close
-_W_SHORT = 10.0  # its pull: firmer than a joint's, so arms no protein holds (a Holliday junction's) come in too
+# a strand passing through at most _SHORT_RUN nucleotides between two stems of more than two strands (a strand
+# exchange, as at a Holliday junction) holds the stem ends close, firmer than a joint, so arms no protein holds come
+# in too. Not within one RNA chain: there it pulled a tRNA's T arm across its cloverleaf.
+_SHORT_RUN = 2
+_W_SHORT = 10.0
 
 
 def _stem_springs(items: list[_Item], na: Nucleic) -> list[tuple[int, np.ndarray, int, np.ndarray, float, float]]:
     """(item, port offset, item, port offset, weight, slack) along each strand from one stem to the next: the
-    joint between two pieces of a bent duplex holds them end to end; a strand exchange or a run of at most
-    _SHORT_RUN nucleotides holds the two stem ends close (slack: its nucleotides' steps); a longer run pulls its
-    two stems together like a loop (with slack for its nucleotides)."""
+    joint between two pieces of a bent duplex holds them end to end; a strand exchange (at most _SHORT_RUN
+    nucleotides between stems of more than two strands) holds the two stem ends close (slack: its nucleotides'
+    steps); any other run pulls its two stems together like a loop (with slack for its nucleotides)."""
     owner = _owner(items)
     stems = [(k, m) for k, it in enumerate(items) for m in it.members if isinstance(m, PlacedStem)]
     at = {key: (k, m) for k, m in stems for key in m.axial}
@@ -1090,7 +1178,7 @@ def _stem_springs(items: list[_Item], na: Nucleic) -> list[tuple[int, np.ndarray
             n = j - i - 1
             if n == 0 and mi.parent and mi.parent == mj.parent:  # a joint: the duplex carries on
                 w, slack = _W_JOINT, _JOINT_SLACK
-            elif n <= _SHORT_RUN:  # a strand exchange or a short run: the stem ends held close
+            elif n <= _SHORT_RUN and len({*mi.strands, *mj.strands}) > 2:  # a strand exchange: ends held close
                 w, slack = _W_SHORT, max(_JOINT_SLACK, n * NT_STEP)
             else:
                 w, slack = _W_SEQ, max(_LOOP_SLACK, 0.5 * n * NT_STEP)
@@ -1336,7 +1424,9 @@ def build_layout(
                 items[i].home = (items[j].home[0] + k * spread, items[j].home[1] + k * lift)
         if attract and len(items) > 1:
             extra = _stem_springs(items, nucleic) if pieces else []
-            _attract(items, sses, contacts, ties, spread, getattr(frame, "rise", 0.0) * SCALE, bridges or [], extra)
+            _attract(
+                items, sses, contacts, ties, spread, getattr(frame, "rise", 0.0) * SCALE, bridges or [], extra=extra
+            )
         _separate(items, ties)
         if domains and _part_domains(items, domains):
             _separate(items, ties)
@@ -1525,6 +1615,9 @@ def label_boxes(layout: Layout, sses: list[SSE]) -> list[tuple[str, tuple[float,
         out.append((f"{end}:{chain}", centred_box(float(t[0]), float(t[1]), _GLYPH_W / 2 + 0.05, _GLYPH_H / 2)))
     for k, d in enumerate(layout.stems):
         out.append((f"stem-label:{k}", _stem_label_box(d)))
+    for n, tie in enumerate(layout.na_ties):  # a long tie's labels at its two marks
+        for end, (_, _, (x, y)) in enumerate(tie.marks):
+            out.append((f"tie-label:{n}:{end}", centred_box(x, y, _GLYPH_W / 2 + 0.05, _GLYPH_H / 2)))
     for name, ids in layout.domains:  # a domain's name, top left inside its panel
         if ids:
             x0, _, _, y1 = domain_panel(layout, name)

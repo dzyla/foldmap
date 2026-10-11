@@ -6,12 +6,12 @@ from __future__ import annotations
 
 import logging
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import numpy as np
 
 from .layout import _GLYPH_H, _GLYPH_W, NT_ROW, NT_STEP, Layout, PlacedStem, _stem_label_box, label_boxes
-from .route import _clear, _curve, _element_obstacles, _Grid, _Router, _simplify
+from .route import _clear, _curve, _element_obstacles, _Grid, _Router, _simplify, clip_len
 
 log = logging.getLogger(__name__)
 
@@ -37,6 +37,24 @@ class NAPath:
     label: str = ""
     fallback: bool = False
     between: tuple = ()
+
+
+_TIE_SHORT = 3.0  # stem widths: a longer tie is drawn as two labelled marks, not a line
+_TICK_GAP, _TICK = 0.15, 0.35  # a tie mark: a tick this far out from its nucleotide, this long
+_TIE_TURNS = (0.0, 45.0, -45.0, 90.0, -90.0, 135.0, -135.0, 180.0)  # degrees from the partner a mark may point
+
+
+@dataclass(eq=False)
+class NATie:
+    """An isolated base pair (a tie) as drawn, between nucleotides `a` and `b` at `ends`. Unlabelled: a thin
+    dotted line (short, crossing no stem, element or letter). Labelled: at each end a tick (from, to) and the
+    label's centre, `marks`, both ends carrying the same lowercase label."""
+
+    a: tuple[int, int]
+    b: tuple[int, int]
+    ends: list[tuple[float, float]]
+    label: str = ""
+    marks: list = field(default_factory=list)
 
 
 def path_name(path: NAPath, na) -> str:
@@ -366,6 +384,7 @@ def route_nucleic(layout: Layout, router: _Router | None = None) -> list[NAPath]
             out.append(_gap(router, g, a, b))
     layout.na_ends = [e for e in ends if (e[0], e[1]) not in gapped]
     layout.na_letters = _place_letters(layout, out)
+    layout.na_ties = _ties(layout, out)
     _widen(layout, out)
     if log.isEnabledFor(logging.DEBUG):
         log.debug("%d nucleic-acid paths: %d fallbacks", len(out), sum(p.fallback for p in out))
@@ -477,6 +496,86 @@ def _place_letters(layout: Layout, paths: list[NAPath]) -> dict[tuple[int, int],
     return out
 
 
+def _tie_name(n: int) -> str:
+    """a, b, ..., z, aa, ab, ...: the label of the n-th tie drawn as marks."""
+    return _tie_name(n // 26 - 1) + chr(97 + n % 26) if n >= 26 else chr(97 + n)
+
+
+def _seg_dist(q, a, b) -> float:
+    """Distance from point q to segment a-b."""
+    q, a, b = (np.asarray(x, float) for x in (q, a, b))
+    ab = b - a
+    t = 0.0 if not ab.any() else float(np.clip(_dot(q - a, ab) / _dot(ab, ab), 0.0, 1.0))
+    return float(np.hypot(*(q - a - t * ab)))
+
+
+def _crosses_body(p, q, e) -> bool:
+    """Does segment p-q pass through the element's (or stem's) true, tilted outline?"""
+    (u0, v0), (u1, v1) = _local(p, e), _local(q, e)
+    return clip_len((u0, v0), (u1, v1), (-e.length / 2, -e.width / 2, e.length / 2, e.width / 2)) > 1e-9
+
+
+def _ties(layout: Layout, paths: list[NAPath]) -> list[NATie]:
+    """Each isolated pair as drawn: a straight dotted line when it is short (at most _TIE_SHORT stem widths) and
+    crosses no stem, element or letter, otherwise a tick at each nucleotide with the same label (a, b, ... in
+    the order of the ties), each tick turned from its partner as little as keeps it and its label clear of
+    bodies, letters, nucleotides, labels and strands."""
+    na = layout.nucleic
+    where = {key: d.point(key) for d in layout.stems for key in d.axial}
+    where.update({(p.strand, i): np.asarray(xy) for p in paths for i, xy in zip(p.nts, p.nt_xy)})
+    letters = {key: d.point(key, NT_ROW) for d in layout.stems for key in d.axial}
+    letters.update({key: np.asarray(xy) for key, xy in layout.na_letters.items()})
+    bodies = [*layout.placed.values(), *layout.stems]
+    width = max((d.width for d in layout.stems), default=1.0)
+    boxes = [b for _, b in label_boxes(layout, [])] + [
+        (x - _GLYPH_W / 2, y - _GLYPH_H / 2, x + _GLYPH_W / 2, y + _GLYPH_H / 2) for _, _, (x, y) in layout.na_ends
+    ]
+    segments = [(a, b) for p in paths for a, b in zip(p.points, p.points[1:])]
+    taken = [*letters.values(), *where.values()]
+    hw, hh = _GLYPH_W / 2 + 0.05, _GLYPH_H / 2
+
+    def clear(tick, at, own) -> bool:  # own: the tie's nucleotide, which the tick starts beside
+        (a, b), (x, y) = tick, at
+        box = (x - hw, y - hh, x + hw, y + hh)
+        if any(_near(at, e, 0.0) or _crosses_body(a, b, e) for e in bodies):
+            return False
+        near = [t for t in taken if math.dist(t, own) > 1e-9]
+        if any(math.dist(at, t) < _LETTER_GAP + hh for t in near) or any(_seg_dist(t, a, b) < 0.2 for t in near):
+            return False
+        if any(min(box[2], o[2]) > max(box[0], o[0]) and min(box[3], o[3]) > max(box[1], o[1]) for o in boxes):
+            return False
+        return not any(clip_len(p, q, box) > 1e-9 or _seg_dist(b, p, q) < 0.15 for p, q in segments)
+
+    out: list[NATie] = []
+    for p in na.structure.ties:
+        ka, kb = (p.a, p.i), (p.b, p.j)
+        if ka not in where or kb not in where:
+            continue  # cropped away
+        pa, pb = where[ka], where[kb]
+        tie = NATie(ka, kb, [tuple(map(float, pa)), tuple(map(float, pb))])
+        long = math.dist(pa, pb) > _TIE_SHORT * width
+        hit = any(_crosses_body(pa, pb, e) for e in bodies) or any(
+            _seg_dist(xy, pa, pb) < _GLYPH_H / 2 for key, xy in letters.items() if key not in (ka, kb)
+        )
+        if long or hit:
+            tie.label = _tie_name(sum(1 for t in out if t.label))
+            for xy, other in ((pa, pb), (pb, pa)):
+                toward = np.subtract(other, xy)
+                toward = toward / max(float(np.hypot(*toward)), 1e-9)
+                options = []
+                for deg in _TIE_TURNS:
+                    c, s_ = math.cos(math.radians(deg)), math.sin(math.radians(deg))
+                    u = np.array([toward[0] * c - toward[1] * s_, toward[0] * s_ + toward[1] * c])
+                    a, b = xy + u * _TICK_GAP, xy + u * (_TICK_GAP + _TICK)
+                    options.append(((a, b), b + u * (hh + 0.1)))
+                (a, b), at = next((o for o in options if clear(*o, xy)), options[0])
+                tie.marks.append(((float(a[0]), float(a[1])), (float(b[0]), float(b[1])), (float(at[0]), float(at[1]))))
+                boxes.append((at[0] - hw, at[1] - hh, at[0] + hw, at[1] + hh))
+                taken.append(np.asarray(at))
+        out.append(tie)
+    return out
+
+
 class _Points:
     """Points in a cell hash of cell size `reach`: the nearest one within reach is found among the 3 x 3 cells
     around a query, so placing n letters is linear in n, not quadratic."""
@@ -511,7 +610,8 @@ class _Points:
 
 
 def _widen(layout: Layout, paths: list[NAPath]) -> None:
-    """Grow layout.bounds to hold the strands, every base letter, the end labels and the gaps' labels."""
+    """Grow layout.bounds to hold the strands, every base letter, the end labels, the gaps' labels and the
+    ties' labels."""
     pad = NT_ROW + max(_GLYPH_W, _GLYPH_H)
     boxes = [(x - pad, y - pad, x + pad, y + pad) for p in paths for x, y in p.points]
     g = max(_GLYPH_W, _GLYPH_H) / 2 + 0.05  # a letter turned any way
@@ -523,6 +623,7 @@ def _widen(layout: Layout, paths: list[NAPath]) -> None:
             x, y = midway(p.points)
             half = _GLYPH_W * len(p.label) / 2 + 0.05
             boxes.append((x - half, y, x + half, y + _GLYPH_H))
+    boxes += [b for name, b in label_boxes(layout, []) if name.startswith("tie-label:")]
     if not boxes:
         return
     b = np.asarray(boxes, float)
