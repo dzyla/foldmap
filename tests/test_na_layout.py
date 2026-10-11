@@ -136,8 +136,11 @@ def test_stem_names_keep_clear_of_base_letters(pdb):
 def test_layout_is_the_same_whatever_the_hash_seed():
     code = (
         "from foldmap.cli import make_layout\n"
-        f"lay, _, _ = make_layout({str(_path('30QM'))!r})\n"
-        "print([(d.id, round(d.cx, 6), round(d.cy, 6), round(d.angle, 6)) for d in lay.stems])"
+        "from foldmap.route import route_loops\n"
+        f"lay, sses, bb = make_layout({str(_path('30QM'))!r})\n"
+        "print([(d.id, round(d.cx, 6), round(d.cy, 6), round(d.angle, 6)) for d in lay.stems])\n"
+        "route_loops(lay, sses, bb)\n"
+        "print([(p.kind, p.points, p.nt_xy) for p in lay.na_paths], lay.na_ends, sorted(lay.na_letters.items()))"
     )
     runs = {
         subprocess.run(
@@ -158,7 +161,6 @@ def test_wobble_pairs_are_dotted_rungs():
     assert sum(1 for r in rungs if r.get_linestyle() != "-") == 4  # 30QM has four G·U pairs
 
 
-@pytest.mark.xfail(reason="beads on single-stranded nucleotides arrive with route_nucleic in Task 7", strict=True)
 def test_beads_mark_every_touched_nucleotide_in_its_chain_colour():
     from matplotlib.colors import to_hex
 
@@ -172,3 +174,142 @@ def test_beads_mark_every_touched_nucleotide_in_its_chain_colour():
         assert {to_hex(c) for c in b.get_facecolors()} == {colours[chain].lower()}
     touched = {x for v in lay.nucleic.contacts.values() for x in v}
     assert sum(len(b.get_offsets()) for b in beads) == len(touched)
+
+
+def test_protein_free_rna_is_drawn_on_its_own():
+    lay, sses, bb, loops = _routed("1EHZ")
+    assert len(bb) == 0 and sses == [] and loops == []
+    assert [d.name for d in lay.stems] == ["P1", "P2", "P3", "P4"]
+    assert lay.na_paths
+
+
+@pytest.mark.parametrize("pdb", FIXTURES)
+def test_strands_route_without_fallbacks_and_every_nucleotide_is_drawn_once(pdb):
+    lay, _, _, _ = _routed(pdb)
+    assert not [p for p in lay.na_paths if p.fallback]
+    na = lay.nucleic
+    drawn = [key for d in lay.stems for key in d.axial] + [(p.strand, i) for p in lay.na_paths for i in p.nts]
+    assert len(drawn) == len(set(drawn))
+    assert set(drawn) == {(s, i) for s, strand in enumerate(na.strands) for i in range(len(strand))}
+    for p in lay.na_paths:
+        assert len(p.nt_xy) == len(p.nts)
+
+
+def test_runs_go_round_the_other_elements():
+    from test_route import segments_clear
+
+    lay, _, _, _ = _routed("30QM")
+    for p in lay.na_paths:
+        if p.kind == "run":
+            others = [q.rect for q in lay.placed.values()]
+            assert segments_clear(p.points[1:-1], others), p.nts[:3]
+
+
+@pytest.mark.parametrize("pdb", ["1KX5", "1IHF", "3CRX", "30QM", "4OO8"])
+def test_joints_and_runs_cross_no_stem_or_element(pdb):
+    """Every run and every joint between two pieces of a bent duplex, as drawn from where it leaves its own stems'
+    bodies, passes the router's own final check (route._clear) against every element and stem."""
+    from foldmap.route import _clear, _element_obstacles, _outside
+
+    lay, _, _, _ = _routed(pdb)
+    at = {key: d for d in lay.stems for key in d.axial}
+    rects, owners = _element_obstacles(lay)
+    kinds = {"run": 0, "joint": 0}
+    for p in lay.na_paths:
+        if p.kind in kinds:
+            own = tuple(at[key] for key in p.between)
+            assert _clear(_outside(p.points, own), own, rects, owners, own_body=True), (p.kind, p.strand, p.between)
+            kinds[p.kind] += 1
+    assert kinds["joint"] >= (20 if pdb == "1KX5" else 2 if pdb == "1IHF" else 0)
+    assert kinds["run"] or pdb == "1KX5"
+
+
+@pytest.mark.parametrize("pdb", FIXTURES)
+def test_runs_keep_off_the_stem_names(pdb):
+    from foldmap.layout import label_boxes
+    from foldmap.route import _outside
+
+    lay, sses, _, _ = _routed(pdb)
+    at = {key: d for d in lay.stems for key in d.axial}
+    names = [b for n, b in label_boxes(lay, sses) if n.startswith("stem-label:")]
+    for p in lay.na_paths:
+        if p.kind in ("run", "joint"):
+            pts = _outside(p.points, tuple(at[key] for key in p.between))
+            assert all(segment_clear(a, b, names) for a, b in zip(pts, pts[1:])), (p.kind, p.between)
+
+
+def segment_clear(p, q, rects):
+    from foldmap.route import clip_len
+
+    return all(clip_len(p, q, r) <= 1e-9 for r in rects)
+
+
+def test_hairpin_loops_are_arcs_beyond_the_stem_tip():
+    lay, _, _, _ = _routed("30QM")
+    by_key = {key: d for d in lay.stems for key in d.axial}
+    hairpins = [p for p in lay.na_paths if p.kind == "hairpin"]
+    assert len(hairpins) == 5
+    for p in hairpins:
+        d = by_key[(p.strand, p.nts[0] - 1)]
+        tip = max(d.axial[(p.strand, p.nts[0] - 1)], d.axial[(p.strand, p.nts[-1] + 1)], key=abs)
+        for xy in p.nt_xy:  # every loop nucleotide beyond the stem's end
+            along = (np.asarray(xy) - [d.cx, d.cy]) @ d.direction
+            assert along * np.sign(tip) > abs(tip) - 1e-6
+
+
+def test_every_strand_end_is_labelled_unless_cropped_into_a_gap():
+    lay, _, _, _ = _routed("4YBB")
+    ends = {(s, e) for s, e, _ in lay.na_ends}
+    gapped = {(g.before, "3′") for g in lay.nucleic.gaps} | {(g.after, "5′") for g in lay.nucleic.gaps}
+    for s in range(len(lay.nucleic.strands)):
+        for e in ("5′", "3′"):
+            assert ((s, e) in ends) != ((s, e) in gapped)
+    assert len([p for p in lay.na_paths if p.kind == "gap"]) == len(lay.nucleic.gaps)
+    assert lay.na_cropped
+
+
+def test_short_gaps_are_a_bare_break_and_long_ones_say_how_many_nucleotides():
+    fig, _ = make_figure_and_loops(_path("4YBB"))
+    lay, _, _, _ = _routed("4YBB")
+    gaps = [p for p in lay.na_paths if p.kind == "gap"]
+    counts = sorted(g.count for g in lay.nucleic.gaps)
+    assert counts[0] < 3 <= counts[-1]  # 4YBB cropped: 1-nt gaps from keeping stems whole, and long ones
+    for p, g in zip(gaps, lay.nucleic.gaps):
+        assert p.label == ("" if g.count < 3 else f"… {g.count} nt …")
+    labels = sorted(t.get_text() for t in _gid(fig, "na:gap:"))
+    assert labels == sorted(f"… {c} nt …" for c in counts if c >= 3)
+    assert len([a for a in _gid(fig, "na:run:") if a.get_linestyle() != "-"]) == len(gaps)  # every gap is a break
+
+
+@pytest.mark.parametrize("pdb", ["30QM", "4OO8", "1EHZ"])
+def test_no_text_leaves_the_page_and_letters_do_not_collide(pdb):
+    from matplotlib.backends.backend_agg import FigureCanvasAgg
+
+    fig, _ = make_figure_and_loops(_path(pdb))
+    canvas = FigureCanvasAgg(fig)
+    canvas.draw()
+    r = canvas.get_renderer()
+    page = fig.bbox
+    texts = [t for t in fig.axes[0].texts if t.get_text().strip()]
+    for t in texts:
+        e = t.get_window_extent(r)
+        assert e.x0 >= page.x0 - 1 and e.y0 >= page.y0 - 1 and e.x1 <= page.x1 + 1 and e.y1 <= page.y1 + 1, t.get_text()
+    boxes = [t.get_window_extent(r) for t in texts if (t.get_gid() or "").startswith("na:nt:")]
+    clash = 0
+    for k, a in enumerate(boxes):
+        for b in boxes[k + 1 :]:
+            w, h = min(a.x1, b.x1) - max(a.x0, b.x0), min(a.y1, b.y1) - max(a.y0, b.y0)
+            clash += w > 0 and h > 0 and w * h > min(a.width * a.height, b.width * b.height) / 3
+    assert clash == 0
+
+
+def test_strands_without_pairs_are_traced(monkeypatch):
+    import foldmap.io
+
+    monkeypatch.setattr(foldmap.io, "pair_nucleotides", lambda runs: [])  # as for a G-quadruplex
+    fig, _ = make_figure_and_loops(_path("1IHF"))
+    lay, _, _, _ = _routed("1IHF")
+    assert lay.stems == [] and set(lay.na_traces) == {0, 1, 2}
+    assert [p.kind for p in lay.na_paths] == ["trace"] * 3
+    assert len(_gid(fig, "na:nt:")) == 70 and len(_gid(fig, "na:end:")) == 6
+    assert any("DNA (C, D, E)" in t.get_text() for t in fig.axes[0].texts)

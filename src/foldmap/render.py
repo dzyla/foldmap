@@ -51,7 +51,7 @@ from .layout import (
 )
 from .model import SSE, group_by_chain
 from .palette import chain_colors, darken, text_color_on, tint
-from .route import Loop
+from .route import Loop, midway
 from .style import _ALIASES, CHOICES, Style
 
 _IN_PER_UNIT = 0.30
@@ -203,32 +203,6 @@ def _na_style(layout: Layout, look: Style) -> str:
     return "block" if look.na_style == "ladder" and layout.na_cropped else look.na_style
 
 
-_LETTER_GAP = 0.38  # page units: closest two base letters (or a letter and a bead) may sit
-
-
-def _place_run_letters(letters: dict, pending: list, where: dict, layout: Layout) -> None:
-    """A letter for each single-stranded nucleotide beside its strand: the left side, else the right, else
-    further out on either side, or a little along the strand, whichever first keeps clear of other letters,
-    beads and elements; when none is clear, the one furthest from the others."""
-    taken = [xy for xy, _ in letters.values()] + list(where.values())
-    boxes = [p.rect for p in layout.placed.values()] + [d.rect for d in layout.stems]
-
-    def room(q, own) -> float:
-        if any(x0 < q[0] < x1 and y0 < q[1] < y1 for x0, y0, x1, y1 in boxes):
-            return 0.0
-        return min((float(np.hypot(*(q - t))) for t in taken if t is not own), default=np.inf)
-
-    for key, xy, side in pending:
-        ahead = np.array([side[1], -side[0]])
-        options = [xy + side * NT_ROW * f for f in (1.0, -1.0, 1.7, -1.7, 2.4, -2.4)]
-        options += [xy + side * NT_ROW * f + ahead * t for f in (1.0, -1.0) for t in (0.4, -0.4)]
-        spaces = [room(q, where[key]) for q in options]
-        clear = [q for q, r in zip(options, spaces) if r >= _LETTER_GAP]
-        spot = clear[0] if clear else options[int(np.argmax(spaces))]
-        letters[key] = (spot, 0.0)
-        taken.append(spot)
-
-
 class _NAInk(NamedTuple):
     """What every nucleic-acid drawing step shares."""
 
@@ -304,16 +278,17 @@ _STEM_STYLES = {"ladder": _ladder}  # na_style -> how a stem is drawn
 
 
 def _draw_strands(ink: _NAInk, layout: Layout, style: str, where: dict, letters: dict) -> None:
-    """Single strands along their drawn paths (gaps dashed and labelled); their letters beside them."""
-    pending = []  # single-stranded nucleotides whose letters still need a free spot
+    """Single strands along their drawn paths (cropped gaps dashed, labelled unless short); their letters beside
+    them, where routing placed them (on the strand itself in the letters style)."""
     for n, path in enumerate(layout.na_paths):
         pts = np.asarray(path.points, float)
+        gap = path.kind == "gap"
         (line,) = ink.ax.plot(
             pts[:, 0],
             pts[:, 1],
             color=ink.front,
-            lw=ink.lw * (1.4 if path.kind != "gap" else 1.0),
-            ls=(0, (2, 2)) if path.kind == "gap" else "-",
+            lw=ink.lw * (1.0 if gap else 1.4),
+            ls=((0, (2, 2)) if path.label else (0, (1, 1.5))) if gap else "-",
             solid_capstyle="round",
             solid_joinstyle="round",
             zorder=1.9,
@@ -321,20 +296,13 @@ def _draw_strands(ink: _NAInk, layout: Layout, style: str, where: dict, letters:
         line.set_gid(f"na:run:{n}")
         if path.label:
             t = ink.ax.text(
-                *pts.mean(axis=0), path.label, ha="center", va="bottom", fontsize=ink.font * 0.75, color=ink.front
+                *midway(path.points), path.label, ha="center", va="bottom", fontsize=ink.font * 0.75, color=ink.front
             )
             t.set_gid(f"na:gap:{n}")
-        for m, (i, xy) in enumerate(zip(path.nts, path.nt_xy)):
-            where[(path.strand, i)] = np.asarray(xy)
-            if style == "letters":
-                letters[(path.strand, i)] = (np.asarray(xy), 0.0)
-                continue
-            ahead = np.asarray(path.nt_xy[min(m + 1, len(path.nt_xy) - 1)]) - np.asarray(path.nt_xy[max(m - 1, 0)])
-            if len(path.nt_xy) < 2:
-                ahead = pts[-1] - pts[0]
-            ahead = ahead / max(float(np.hypot(*ahead)), 1e-9)
-            pending.append(((path.strand, i), np.asarray(xy), np.array([-ahead[1], ahead[0]])))
-    _place_run_letters(letters, pending, where, layout)
+        for i, xy in zip(path.nts, path.nt_xy):
+            key = (path.strand, i)
+            where[key] = np.asarray(xy)
+            letters[key] = (np.asarray(xy if style == "letters" else layout.na_letters[key]), 0.0)
 
 
 def _draw_na_marks(ink: _NAInk, layout: Layout, style: str, residue_colour, pt_per_unit, look, where, letters):

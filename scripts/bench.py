@@ -10,7 +10,9 @@ python scripts/bench.py --check before.json --area 1.01  # fail if a figure's ar
 
 A signature holds every placed element, ghost and nucleic-acid stem with all its geometry, plus sheets, domains,
 unjoined pairs and whether base letters are drawn (under the keys "_dna" and "_nt_rows" that older baselines use).
-Loop points are derived from the layout at render time, so identical layouts give identical loops.
+Loop points are derived from the layout at render time, so identical layouts give identical loops. A layout holding
+nucleic acid is also routed: its strands as drawn, their end labels and letters (key "_na") and the bounds they
+widen are part of its signature.
 """
 
 from __future__ import annotations
@@ -29,6 +31,7 @@ import gemmi
 import foldmap
 from foldmap import cli, io, layout
 from foldmap.cli import make_layout
+from foldmap.route import route_loops
 
 DATA = Path(__file__).resolve().parent.parent / "tests" / "data"
 PHASES = {  # timed wherever they are looked up
@@ -120,6 +123,15 @@ def signature(lay) -> dict:
     sig["_domains"] = [[n, list(ids)] for n, ids in lay.domains]
     sig["_unjoined"] = sorted(sorted(pair) for pair in lay.unjoined)
     sig["_nt_rows"] = lay.nt_letters
+    if lay.na_paths or lay.na_ends:
+        sig["_na"] = [
+            [
+                [p.kind, p.strand, p.nts, [list(q) for q in p.points], [list(q) for q in p.nt_xy], p.label, p.fallback]
+                for p in lay.na_paths
+            ],
+            [[s, e, list(xy)] for s, e, xy in lay.na_ends],
+            sorted([list(k), list(v)] for k, v in lay.na_letters.items()),
+        ]
     return sig
 
 
@@ -157,8 +169,10 @@ def _run(args, tmp: Path) -> int:
     for f in files:
         SPENT.clear()
         t = time.perf_counter()
-        lay, _, _ = make_layout(f, **OPTIONS)
+        lay, sses, bb = make_layout(f, **OPTIONS)
         total = time.perf_counter() - t
+        if lay.nucleic is not None:  # its strands are routed, and widen the bounds
+            route_loops(lay, sses, bb)
         sig = out[f.stem] = signature(lay)
         b = sig["_bounds"]
         note = ""

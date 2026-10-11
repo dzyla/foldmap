@@ -168,7 +168,6 @@ def test_duplex_is_drawn_as_a_double_helix_from_one_repeated_turn(ubq):
     assert len(_gid(fig, "na:stem:0:rungs")) == 1  # base pairs: one compound path
 
 
-@pytest.mark.xfail(reason="strand ends come from routing in Task 7", strict=True)
 def test_dna_ends_are_labelled_five_and_three_prime(ubq):
     fig, _ = _figure(ubq.parent / "1ZAA.cif")
     ends = sorted(t.get_text() for t in _gid(fig, "na:end:"))
@@ -240,7 +239,6 @@ def test_dna_view_is_a_rotation_not_a_mirror(ubq):
     assert np.allclose(m @ m.T, np.eye(3), atol=1e-9) and np.linalg.det(m) == pytest.approx(1.0)
 
 
-@pytest.mark.xfail(reason="overhang letters come from free ends routed in Task 7", strict=True)
 def test_every_nucleotide_is_labelled_with_its_base(ubq):
     fig, _ = _figure(ubq.parent / "1ZAA.cif")
     bb, _, _ = pipeline(ubq.parent / "1ZAA.cif")
@@ -364,7 +362,6 @@ def test_untouched_duplexes_are_dropped():
     assert crop_nucleic(na).strands == []
 
 
-@pytest.mark.xfail(reason="strand ends come from routing in Task 7", strict=True)
 def test_cropped_ends_are_marked_and_full_dna_on_request():
     from foldmap.cli import make_figure
 
