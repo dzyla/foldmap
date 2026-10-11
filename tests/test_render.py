@@ -1,4 +1,5 @@
 import xml.etree.ElementTree as ET
+from pathlib import Path
 
 import pytest
 
@@ -6,6 +7,8 @@ from foldmap.cli import make_figure
 from foldmap.palette import chain_colors
 from foldmap.render import save
 from helpers import pipeline, tripeptide
+
+DATA = Path(__file__).parent / "data"
 
 
 def svg_ids(path):
@@ -363,3 +366,10 @@ def test_legend_text_ends_before_the_next_swatch_on_a_wide_figure(name):
         row = [s for s in swatches if abs((s.y0 + s.y1) / 2 - (t.y0 + t.y1) / 2) < 2 and s.x0 > t.x0]
         if row:
             assert t.x1 <= min(s.x0 for s in row), (t, min(s.x0 for s in row))
+
+
+def test_chromophore_is_marked_on_the_chain():
+    fig = make_figure(DATA / "1EMA.cif")
+    gids = {a.get_gid() for a in fig.axes[0].get_children()}
+    assert "linked:A:66" in gids
+    assert "CRO66" in {t.get_text() for t in fig.axes[0].texts}

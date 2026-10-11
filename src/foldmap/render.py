@@ -1123,6 +1123,93 @@ def _draw_ligands(ax, marks: list[dict], lw: float, font: float) -> None:
         t.set_gid(f"ligand-label:{key}")
 
 
+_LINKED_STAR = 0.22  # radius of the mark of a residue fused into the chain
+_LINKED_LABEL = 0.6  # its label, as a fraction of the font
+
+
+def linked_marks(layout: Layout, loops: list[Loop], sses: list[SSE], marks: list[dict]) -> list[dict]:
+    """A star on the chain at each peptide-linked non-standard residue (a chromophore: GFP's CRO66) of a drawn
+    chain, and its code and number beside it, in the first free spot on rings around it. Each mark: residue
+    label, star centre, label centre, label half size."""
+    shown = [k for k in layout.res_linked if layout.res_chain[k] in {s.chain for s in sses if s.id in layout.placed}]
+    if layout.focus_chains:
+        shown = [k for k in shown if layout.res_chain[k] in layout.focus_chains]
+    if not shown:
+        return []
+    taken = [p.rect for p in layout.placed.values()] + [g.rect for g in layout.ghosts]
+    taken += [box for _, box in label_boxes(layout, sses)]
+    taken += [
+        (
+            m["centre"][0] - m["half"][0],
+            m["centre"][1] - m["half"][1],
+            m["centre"][0] + m["half"][0],
+            m["centre"][1] + m["half"][1],
+        )
+        for m in marks
+    ]
+    out = []
+    for k in shown:
+        at = residue_point(layout, loops, sses, layout.res_chain, k)
+        if at is None:
+            continue
+        label = layout.res_labels[k]
+        text = f"{label.name}{label.tag}"
+        half = (0.07 * len(text) + 0.1, 0.17)
+        taken.append((at[0] - _LINKED_STAR, at[1] - _LINKED_STAR, at[0] + _LINKED_STAR, at[1] + _LINKED_STAR))
+        spot = None
+        for ring in np.arange(_LINKED_STAR + 0.1, 12.0, 0.35):
+            for angle in np.linspace(0, 2 * np.pi, max(1, int(ring * 10)), endpoint=False):
+                c = np.asarray(at) + ring * np.array([np.cos(angle), np.sin(angle)])
+                box = (c[0] - half[0] - 0.12, c[1] - half[1] - 0.05, c[0] + half[0] + 0.12, c[1] + half[1] + 0.05)
+                if not any(box[0] < t[2] and t[0] < box[2] and box[1] < t[3] and t[1] < box[3] for t in taken):
+                    spot = c
+                    break
+            if spot is not None:
+                break
+        if spot is not None:
+            taken.append((spot[0] - half[0], spot[1] - half[1], spot[0] + half[0], spot[1] + half[1]))
+        out.append(
+            {
+                "label": label,
+                "text": text,
+                "centre": (float(at[0]), float(at[1])),
+                "text_at": None if spot is None else (float(spot[0]), float(spot[1])),
+                "half": half,
+            }
+        )
+    return out
+
+
+def _draw_linked(ax, linked: list[dict], lw: float, font: float) -> None:
+    for m in linked:
+        cx, cy = m["centre"]
+        key = f"{m['label'].chain}:{m['label'].tag}"
+        angles = np.pi / 2 + np.arange(10) * np.pi / 5  # points out, notches in at 0.4 of the radius
+        radii = np.where(np.arange(10) % 2 == 0, _LINKED_STAR, 0.4 * _LINKED_STAR)
+        star = Polygon(
+            np.c_[cx + radii * np.cos(angles), cy + radii * np.sin(angles)],
+            closed=True,
+            fc=LIGAND_FILL,
+            ec=LIGAND_EDGE,
+            lw=lw * 0.7,
+            joinstyle="round",
+            zorder=3.8,
+        )
+        star.set_gid(f"linked:{key}")
+        ax.add_patch(star)
+        if m["text_at"] is not None:
+            t = ax.text(
+                *m["text_at"],
+                m["text"],
+                ha="center",
+                va="center",
+                fontsize=font * _LINKED_LABEL,
+                color="#5c4300",
+                zorder=3.9,
+            )
+            t.set_gid(f"linked-label:{key}")
+
+
 SITE_COLOURS = {  # UniProt site types, Okabe-Ito based
     "Active site": "#d55e00",
     "Binding site": "#0072b2",
@@ -1707,6 +1794,7 @@ def _legend_entries(
     umarks,
     na_colours: dict[str, str],
     hb: HBondOverlay | None = None,
+    linked: list[dict] = (),
 ) -> list:
     entries = [(colors[c], f"Chain {c}") for c in chains]
     if layout.focus is not None:
@@ -1743,21 +1831,23 @@ def _legend_entries(
             entries.append((colour, f"{kind} ({', '.join(mine)})"))
     if hb is not None and hb.lines and look.legend:
         entries.append((look.hbond_color, hb.legend()))
+    if linked and look.legend:
+        entries.append((LIGAND_FILL, "chromophore / linked residue"))
     return entries
 
 
 def _canvas(
-    layout: Layout, look: Style, title, chains, colors, element_colour, residue_colour, marks, umarks, hb
+    layout: Layout, look: Style, title, chains, colors, element_colour, residue_colour, marks, umarks, hb, linked=()
 ) -> tuple[_Canvas, _Legend]:
     """The figure, its axes and every size the steps share; also lays the legend out, as it sets the page width."""
     x0, y0, x1, y1 = layout.bounds
-    for m in marks:  # markers may sit just outside the elements' bounds
-        (cx, cy), (hw, hh) = m["centre"], m["half"]
+    for m in [*marks, *({"centre": m["text_at"], "half": m["half"]} for m in linked if m["text_at"])]:
+        (cx, cy), (hw, hh) = m["centre"], m["half"]  # markers may sit just outside the elements' bounds
         x0, y0, x1, y1 = min(x0, cx - hw), min(y0, cy - hh), max(x1, cx + hw), max(y1, cy + hh)
     pad = 1.0
     top = 1.9 if title else 0.0
     backbone = backbone_colours(layout, chains, look, colors)  # once per figure
-    entries = _legend_entries(layout, look, chains, colors, umarks, backbone[0], hb)
+    entries = _legend_entries(layout, look, chains, colors, umarks, backbone[0], hb, linked)
 
     def legend_entry(x1: float) -> float:  # one legend entry's width in page units: swatch, text, gap
         scale = min(_IN_PER_UNIT, _MAX_WIDTH_IN / (x1 - x0 + 2 * pad))  # as the figure below
@@ -2268,9 +2358,10 @@ def _draw(
     if not layout.placed and not layout.stems and not layout.na_paths:
         return _empty_figure()
     marks = ligand_marks(layout, loops, sses, look)
+    linked = linked_marks(layout, loops, sses, marks)
     umarks = uniprot_marks(layout, loops, sses, look)
     hb = hbond_overlay(layout, loops, sses, look, model)
-    c, legend = _canvas(layout, look, title, chains, colors, element_colour, residue_colour, marks, umarks, hb)
+    c, legend = _canvas(layout, look, title, chains, colors, element_colour, residue_colour, marks, umarks, hb, linked)
     _draw_loops(c, layout, loops, sses)
     _draw_membrane(c, layout)
     _draw_domains(c, layout)
@@ -2284,6 +2375,7 @@ def _draw(
     _draw_elements(c, layout)
     _draw_links(c.ax, layout, loops, sses, look, c.lw, c.pt_per_unit)
     _draw_ligands(c.ax, marks, c.lw, c.font)
+    _draw_linked(c.ax, linked, c.lw, c.font)
     _draw_uniprot(c.ax, umarks, layout, c.lw, c.font)
     _draw_residue_numbers(c, layout)
     _draw_ghosts(c, layout)

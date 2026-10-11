@@ -49,6 +49,7 @@ class Backbone:
     prev: np.ndarray  # (N,) bool
     asu_chains: set[str] = field(default_factory=set)  # chains as deposited (the rest were built by symmetry)
     b: np.ndarray | None = None  # (N,) CA B-factor (or whatever the model stores there: local resolution, ADP)
+    linked: frozenset[int] = frozenset()  # residues whose N/CA/C/O are stand-ins (a chromophore fused into the chain)
 
     def __len__(self) -> int:
         return len(self.labels)
@@ -62,6 +63,7 @@ class Backbone:
             self.prev[keep],
             set(self.asu_chains),
             self.b[keep] if self.b is not None else None,
+            frozenset(new for new, old in enumerate(keep) if old in self.linked),
         )
 
     @property

@@ -16,22 +16,63 @@ from .nucleic import NAGap, pair_nucleotides, parent_base
 _BB_ATOMS = ("N", "CA", "C", "O")
 _PEPTIDE_BOND_MAX = 2.5  # Å, C(i-1)-N(i), as in DSSP
 _CO_BOND = 1.231  # Å, carbonyl C=O
+_CO_MAX = 1.5  # Å, the farthest an oxygen still counts as the carbonyl one
+
+
+def _substitute_backbone(res, before, after):
+    """The N, CA, C, O stand-ins of a polymer residue with no N/CA/C of its own (GFP's chromophore CRO66, which
+    fuses three residues into one ring system): its N bonded to the C of the residue before, its C bonded to the N
+    of the one after, its CA the other carbon nearest that N, its O the oxygen on that C (None: rebuilt later).
+    None when the residue is not between two residues it is peptide-bonded to."""
+    if before is None or after is None:
+        return None
+    prev_c, next_n = before.find_atom("C", "*"), after.find_atom("N", "*")
+    if prev_c is None or next_n is None:
+        return None
+    elements = {el: [a for a in res if a.element.name == el] for el in ("N", "C", "O")}
+    n_in = min(elements["N"], key=lambda a: a.pos.dist(prev_c.pos), default=None)
+    c_out = min(elements["C"], key=lambda a: a.pos.dist(next_n.pos), default=None)
+    if n_in is None or c_out is None:
+        return None
+    if n_in.pos.dist(prev_c.pos) >= _PEPTIDE_BOND_MAX or c_out.pos.dist(next_n.pos) >= _PEPTIDE_BOND_MAX:
+        return None
+    ca = min((a for a in elements["C"] if a is not c_out), key=lambda a: a.pos.dist(n_in.pos), default=None)
+    if ca is None:
+        return None
+    o = min(elements["O"], key=lambda a: a.pos.dist(c_out.pos), default=None)
+    if o is not None and o.pos.dist(c_out.pos) > _CO_MAX:
+        o = None
+    return [n_in, ca, c_out, o]
 
 
 def _chain_residues(chain):
-    """(label, coords, is_hetero, CA B-factor) per residue with N, CA and C; one residue per seqid
-    (microheterogeneity). coords[3] (O) is None when the file has no carbonyl oxygen."""
+    """(label, coords, is_hetero, CA B-factor, linked) per residue with N, CA and C; one residue per seqid
+    (microheterogeneity). coords[3] (O) is None when the file has no carbonyl oxygen. A polymer residue of
+    another kind (not a nucleotide) between two residues it is peptide-bonded to takes substitute backbone atoms
+    (_substitute_backbone) and is `linked`."""
     seen: set[tuple[int, str]] = set()
     out = []
-    for res in chain:
+    residues = list(chain)
+    for k, res in enumerate(residues):
         key = (res.seqid.num, res.seqid.icode.strip())
         atoms = [res.find_atom(a, "*") for a in _BB_ATOMS]
+        linked = False
+        if (
+            all(a is None for a in atoms[:3])  # none of N, CA, C: a damaged residue is skipped, not stood in for
+            and res.entity_type == gemmi.EntityType.Polymer
+            and res.find_atom("C1'", "*") is None
+        ):
+            sub = _substitute_backbone(
+                res, residues[k - 1] if k else None, residues[k + 1] if k + 1 < len(residues) else None
+            )
+            if sub is not None:
+                atoms, linked = sub, True
         if key in seen or any(a is None for a in atoms[:3]):
             continue
         seen.add(key)
         label = ResLabel(chain.name, res.seqid.num, res.seqid.icode.strip(), res.name)
         coords = [a.pos.tolist() if a is not None else None for a in atoms]
-        out.append((label, coords, res.het_flag == "H", atoms[1].b_iso))
+        out.append((label, coords, res.het_flag == "H", atoms[1].b_iso, linked))
     return out
 
 
@@ -267,9 +308,11 @@ def load_backbone(
     labels: list[ResLabel] = []
     coords: list[list[list[float]]] = []
     bfac: list[float] = []
+    linked: set[int] = set()
     for chain in model:
         found = _chain_residues(chain)
         found = _rebuild_oxygens(_drop_free_hetero(found))
+        linked.update(len(labels) + k for k, f in enumerate(found) if f[4])
         labels.extend(f[0] for f in found)
         coords.extend(f[1] for f in found)
         bfac.extend(f[3] for f in found)
@@ -295,7 +338,7 @@ def load_backbone(
         if labels[i].chain == labels[i - 1].chain:
             prev[i] = np.linalg.norm(xyz[i - 1, 2] - xyz[i, 0]) < _PEPTIDE_BOND_MAX
     chains = {l.chain for l in labels}
-    return Backbone(labels, xyz, prev, (asu & chains) or chains, np.asarray(bfac, float))
+    return Backbone(labels, xyz, prev, (asu & chains) or chains, np.asarray(bfac, float), frozenset(linked))
 
 
 _NA_LINK_MAX = 2.0  # Å, O3'(i-1)-P(i)

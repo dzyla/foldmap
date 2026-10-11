@@ -293,6 +293,7 @@ def make_layout(
     lay.res_chain = [l.chain for l in bb.labels]
     lay.res_name = [l.name for l in bb.labels]
     lay.res_labels = list(bb.labels)
+    lay.res_linked = sorted(bb.linked)
     lay.res_b = [float(x) for x in bb.b] if bb.b is not None else []
     lay.uniprot = ann
     first = [s.centroid for s in sses if s.chain == sses[0].chain] if sses else [_any_centre(bb, nucleic)]

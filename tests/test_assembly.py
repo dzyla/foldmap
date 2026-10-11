@@ -381,3 +381,14 @@ def test_nucleic_acid_outside_assembly_one_does_not_choose_it(tmp_path):
     st.make_mmcif_document().write_file(str(out))
     model, deposited = read_model(out)
     assert sorted(c.name for c in model) == ["C", "D", "R"] and deposited == {"C", "D", "R"}
+
+
+def test_a_chromophore_is_a_protein_residue_for_the_kind_gate():
+    """GFP's CRO66 has no N/CA/C names and no C1': it is neither a nucleotide nor a new polymer kind."""
+    from foldmap.io import _is_nucleotide, _polymer_kinds, read_model
+
+    model, _ = read_model(DATA / "1EMA.cif", "asu")
+    chain = model["A"]
+    k = next(i for i, r in enumerate(chain) if r.name == "CRO")
+    assert not _is_nucleotide(chain, k)
+    assert _polymer_kinds(model) == {"protein"}

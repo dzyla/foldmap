@@ -6,6 +6,8 @@ import pytest
 
 from foldmap.io import load_backbone
 
+DATA = Path(__file__).parent / "data"
+
 
 def test_ubiquitin_backbone(ubq):
     bb = load_backbone(ubq)
@@ -136,3 +138,39 @@ def test_peptide_bond_up_to_2_5_angstrom_as_dssp(tmp_path):
     assert bb.prev[k]
     bb = _stretched_ubiquitin(tmp_path, 2.7)
     assert not bb.prev[next(i for i, l in enumerate(bb.labels) if l.seq == 30)]
+
+
+def test_gfp_chromophore_keeps_the_chain_whole():
+    from foldmap.cli import make_layout
+    from foldmap.dssp import assign_dssp
+    from foldmap.model import ResLabel
+    from foldmap.route import route_loops
+    from foldmap.ss import build_sses
+
+    bb = load_backbone(DATA / "1EMA.cif", "asu")
+    k = bb.labels.index(ResLabel("A", 66, "", "CRO"))
+    assert bb.prev[k] and bb.prev[k + 1] and bb.linked == frozenset({k})
+    d = assign_dssp(bb)
+    assert "A:57-64" in {s.id for s in build_sses(bb, d.ss, bridges=d.bridges)}  # the central helix, one piece
+    lay, sses, bb = make_layout(DATA / "1EMA.cif")
+    assert not [lp for lp in route_loops(lay, sses, bb) if lp.dashed]  # no "missing residues" at 65-67
+    assert lay.res_linked == [k]
+
+
+def test_only_peptide_linked_nonstandard_residues_join_the_chain(tmp_path):
+    st = gemmi.read_structure(str(DATA / "1EMA.cif"))
+    chain = st[0]["A"]
+    k = next(i for i, r in enumerate(chain) if r.name == "CRO")
+    for a in chain[k]:
+        a.pos = gemmi.Position(a.pos.x + 30, a.pos.y, a.pos.z)  # moved off: bonded to neither neighbour
+    path = tmp_path / "loose.cif"
+    st.make_mmcif_document().write_file(str(path))
+    bb = load_backbone(path, "asu")
+    assert not bb.linked and all(l.name != "CRO" for l in bb.labels)
+
+
+def test_backbone_only_keeps_and_remaps_linked_residues():
+    bb = load_backbone(DATA / "1EMA.cif", "asu")
+    (k,) = bb.linked
+    assert bb.only({"A"}).linked == bb.linked
+    assert not bb.only({"Z"}).linked

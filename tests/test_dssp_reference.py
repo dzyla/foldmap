@@ -28,11 +28,15 @@ def disagreements(name: str) -> tuple[int, list[str]]:
     bb = load_backbone(DATA / f"{name}.cif", "asu")
     ss = assign_dssp(bb).ss
     keys = [(l.chain, l.seq, l.icode) for l in bb.labels]
-    assert set(keys) == set(ref), "foldmap and mkdssp read different residues"
+    # a chromophore foldmap keeps in the chain (CRO66) mkdssp skips, so it sees the chain broken there: compare
+    # neither it nor the residues whose turns and bridges reach across it (within four)
+    stood_in = {keys[k] for k in bb.linked}
+    near = {keys[j] for k in bb.linked for j in range(k - 4, k + 5) if 0 <= j < len(keys)} - stood_in
+    assert set(keys) - stood_in == set(ref), "foldmap and mkdssp read different residues"
     return len(keys), [
         f"{c}{n}{i} mkdssp {ref[(c, n, i)]} foldmap {ss[k]}"
         for k, (c, n, i) in enumerate(keys)
-        if ss[k] != ref[(c, n, i)]
+        if (c, n, i) in ref and (c, n, i) not in near and ss[k] != ref[(c, n, i)]
     ]
 
 
