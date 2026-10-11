@@ -84,6 +84,167 @@ def test_a_bent_duplex_is_a_chain_of_pieces_end_to_end(pdb):
     assert max(gaps) <= 2.6, sorted(gaps)[-5:]
 
 
+def _joined_both_ways(lay):
+    """(stem A, stem B, (s, i, j), (t, k, l)): a strand steps from A's nucleotide i to B's j, another from B's k
+    back to A's l (the next piece of a bent duplex, or the stem across an internal loop or bulge)."""
+    at = {key: n for n, d in enumerate(lay.stems) for key in d.axial}
+    steps = {}
+    for s, strand in enumerate(lay.nucleic.strands):
+        held = [i for i in range(len(strand)) if (s, i) in at]
+        for i, j in zip(held, held[1:]):
+            if at[(s, i)] != at[(s, j)]:
+                steps.setdefault((at[(s, i)], at[(s, j)]), []).append((s, i, j))
+    return [
+        (lay.stems[a], lay.stems[b], there[0], steps[(b, a)][0])
+        for (a, b), there in sorted(steps.items())
+        if a < b and len(there) == 1 and len(steps.get((b, a), ())) == 1
+    ]
+
+
+def _chords_cross(a, b, there, back) -> bool:
+    """Do the straight chords (rail point to rail point) of the two strands joining stems a and b cross?"""
+    (s, i, j), (t, k, l) = there, back
+    return _segments_cross(a.point((s, i)), b.point((s, j)), b.point((t, k)), a.point((t, l)))
+
+
+@pytest.mark.parametrize("pdb", FIXTURES)
+def test_strands_cross_between_joined_stems_only_where_one_is_seen_clearly(pdb):
+    """A stem whose arms the projection cannot tell apart (margin < _SIDE_CLEAR) takes the side that keeps the
+    strands to its neighbours uncrossed, so two stems joined both ways (a bent duplex's next piece, the stem
+    across an internal loop) are drawn with crossed strands only where at least one of them is seen clearly
+    (crossing there is what the projection shows: the strands of a helix cross every half turn)."""
+    from foldmap.layout import _SIDE_CLEAR
+
+    lay, _, _ = make_layout(_path(pdb))
+    for a, b, there, back in _joined_both_ways(lay):
+        if _chords_cross(a, b, there, back):
+            assert max(a.margin, b.margin) >= _SIDE_CLEAR, (a.name, b.name, a.margin, b.margin)
+
+
+def test_nucleosome_strands_cross_only_where_its_pieces_are_seen_to():
+    """At 15 of the 21 joints of the nucleosome DNA the strands crossed when every piece took the side it is seen
+    on. 5 crossings join two pieces seen clearly on opposite sides (1e-1f, 1m-1n, 1n-1o, 1o-1p, 1s-1t) and the
+    unclear pieces 1g-1l lie between 1f and 1m, which are seen on opposite sides, so 6 is the least without
+    drawing a clearly seen piece mirrored."""
+    lay, _, _ = make_layout(_path("1KX5"))
+    joints = [j for j in _joined_both_ways(lay) if j[0].parent and j[0].parent == j[1].parent]
+    assert len(joints) == 21
+    assert sum(_chords_cross(*j) for j in joints) <= 6
+
+
+@pytest.mark.parametrize("pdb", FIXTURES)
+def test_stems_seen_clearly_keep_their_side_and_none_is_drawn_mirrored(pdb):
+    """Only a stem whose side the projection cannot tell is turned round; the rotation-vs-reflection fit of
+    every drawn stem to its projected C1' atoms never prefers the reflection (by 30 %)."""
+    from foldmap.layout import _SIDE_CLEAR, SCALE, _side_signal, stem_pieces
+    from foldmap.nucleic import stem_axis
+
+    def fit(P, Q, reflect):
+        P, Q = P - P.mean(0), Q - Q.mean(0)
+        P = P * [1, -1] if reflect else P
+        U, _, Vt = np.linalg.svd(P.T @ Q)
+        if np.linalg.det(U @ Vt) < 0:
+            U[:, -1] *= -1
+        return np.sqrt(((P @ (U @ Vt) - Q) ** 2).sum(1).mean())
+
+    lay, _, _ = make_layout(_path(pdb))
+    na, frame = lay.nucleic, lay.frame
+    pieces = {p.id: p for p in stem_pieces(na)}
+    for d in lay.stems:
+        signal = _side_signal(pieces[d.id], na, frame, stem_axis(pieces[d.id], na.strands)[0], d.angle)
+        assert d.margin == pytest.approx(abs(signal))
+        if d.margin >= _SIDE_CLEAR:
+            assert d.first == (1 if signal >= 0 else -1), d.name
+        keys = sorted(d.axial)
+        P = np.asarray(frame.project(np.array([na.strands[s].c1[i] for s, i in keys])))[:, :2] * SCALE
+        Q = np.array([d.point(k) for k in keys])
+        assert fit(P, Q, True) >= 0.7 * fit(P, Q, False), d.name
+
+
+def test_internal_loop_sides_cross_less_on_the_ribosome():
+    """The two sides of an internal loop are bowed apart; their chords crossed at 7 of 11 such loops on 4YBB when
+    every stem took the side it is seen on. Every crossing left is between two stems seen clearly."""
+    lay, _, _, _ = _routed("4YBB")
+    at = {key: d for d in lay.stems for key in d.axial}
+    kind = {(r.strand, r.lo): r.kind for r in lay.nucleic.structure.runs}
+    sides = [p for p in lay.na_paths if p.kind == "run" and p.nts and kind.get((p.strand, p.nts[0])) == "internal"]
+    loops = [
+        (p, q)
+        for n, p in enumerate(sides)
+        for q in sides[n + 1 :]
+        if {at[k].id for k in p.between} == {at[k].id for k in q.between}
+    ]
+    assert len(loops) == 11
+    assert sum(_segments_cross(p.points[0], p.points[-1], q.points[0], q.points[-1]) for p, q in loops) <= 5
+
+
+def test_short_runs_and_strand_exchanges_hold_their_stem_ends_together(monkeypatch):
+    """A strand passing from one stem to another through at most two nucleotides (the four 0-nt strand exchanges
+    of the Holliday junction) pulls the two stem ends together as firmly as a bent duplex's joint, rest length
+    its nucleotides' steps: DNA 2 touches no protein and still comes to the junction."""
+    import foldmap.layout as layout
+
+    seen = []
+    real = layout._attract
+
+    def spy(*a, **k):
+        seen.append(list(k.get("extra", a[7] if len(a) > 7 else ())))
+        return real(*a, **k)
+
+    monkeypatch.setattr(layout, "_attract", spy)
+    make_layout(_path("3CRX"))
+    springs = seen[0]
+    assert len(springs) == 4
+    assert all(w == layout._W_SHORT >= layout._W_JOINT and slack == layout._JOINT_SLACK for *_, w, slack in springs)
+
+
+def test_holliday_junction_reads_as_four_arms():
+    """3CRX: the arms' inner ends gather at the junction (DNA 2, touching no protein, was 2.8 widths away), the
+    arms lie in four quadrants around it (DNA 2 shared one with DNA 1), and the strand exchanges are short.
+    Box separation of the tilted arms keeps the inner ends 0.9-1.5 widths from the centre."""
+    import math
+
+    lay, _, _, _ = _routed("3CRX")
+    at = {key: d for d in lay.stems for key in d.axial}
+    w = lay.stems[0].width
+    ends = {d.name: [] for d in lay.stems}
+    for s, strand in enumerate(lay.nucleic.strands):
+        held = [i for i in range(len(strand)) if (s, i) in at]
+        for i, j in zip(held, held[1:]):
+            if at[(s, i)] is not at[(s, j)] and j - i - 1 <= 2:
+                ends[at[(s, i)].name].append(at[(s, i)].point((s, i)))
+                ends[at[(s, j)].name].append(at[(s, j)].point((s, j)))
+    inner = {n: np.mean(v, axis=0) for n, v in ends.items()}
+    centre = np.mean(list(inner.values()), axis=0)
+    assert len(inner) == 4
+    assert all(math.dist(p, centre) <= 1.6 * w for p in inner.values()), inner
+    assert len({(d.cx >= centre[0], d.cy >= centre[1]) for d in lay.stems}) == 4
+    paths = sorted(
+        sum(math.dist(a, b) for a, b in zip(p.points, p.points[1:])) / w
+        for p in lay.na_paths
+        if p.kind == "run" and not p.nts
+    )
+    assert len(paths) == 4 and paths[2] <= 1.7 and paths[3] <= 4.5, paths
+
+
+@pytest.mark.parametrize("pdb", ["30QM", "1EHZ", "4OO8", "4YBB"])
+def test_hairpin_loops_lie_within_their_stems_footprint(pdb):
+    """The room a hairpin loop needs beyond the stem's tip is part of the stem's footprint, so no neighbour is
+    placed where the loop is drawn."""
+    from foldmap.layout import _footprint
+
+    lay, _, _, _ = _routed(pdb)
+    at = {key: d for d in lay.stems for key in d.axial}
+    arcs = [p for p in lay.na_paths if p.kind == "hairpin"]
+    assert arcs
+    for p in arcs:
+        d = at[p.between[0]]
+        x0, y0, x1, y1 = _footprint(d)
+        assert all(x0 - 1e-6 <= x - d.cx <= x1 + 1e-6 and y0 - 1e-6 <= y - d.cy <= y1 + 1e-6 for x, y in p.points), (
+            d.name
+        )
+
+
 @pytest.mark.parametrize("pdb", FIXTURES)
 def test_both_arms_run_monotonic_along_every_stem(pdb):
     lay, _, _ = make_layout(_path(pdb))

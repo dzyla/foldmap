@@ -128,6 +128,8 @@ class PlacedStem:
     bulges: set = field(default_factory=set)
     parent: str = ""  # a piece of a bent duplex: the whole stem's id
     first: int = 1  # the side the first arm's rail is on
+    margin: float = 0.0  # Å the first arm is seen beside the second (_side_signal): how clearly the side is seen
+    hairpin: int = -1  # nucleotides of the hairpin loop over the stem's inner tip (-1: no hairpin loop there)
     ghost: bool = False
 
     @property
@@ -156,6 +158,15 @@ class PlacedStem:
         return self.point(key) + along * NT_STEP / 2, along
 
     rect = Placed.rect
+
+    def hairpin_circle(self, ka: tuple[int, int], kb: tuple[int, int], m: int) -> tuple[np.ndarray, float]:
+        """(centre, radius) of the near-circle a hairpin loop of m nucleotides from ka to kb is drawn on, beyond
+        the stem's tip."""
+        pa, pb = self.point(ka), self.point(kb)
+        out = self.direction if self.axial[ka] >= 0 else -self.direction
+        half = float(np.hypot(*(pb - pa))) / 2
+        r = max(half * 1.02, (m + 1) * NT_STEP / (1.6 * np.pi))
+        return (pa + pb) / 2 + out * np.sqrt(max(r * r - half * half, 0.0)), r
 
 
 @dataclass(eq=False)
@@ -254,6 +265,11 @@ def _footprint(m) -> tuple[float, float, float, float]:
     if isinstance(m, PlacedStem):  # a stem's name beside it
         x0, y0, x1, y1 = _stem_label_box(m)
         box = (min(box[0], x0 - m.cx), min(box[1], y0 - m.cy), max(box[2], x1 - m.cx), max(box[3], y1 - m.cy))
+    if isinstance(m, PlacedStem) and m.hairpin >= 0:  # and its hairpin loop over the tip
+        a, i, b, j = m.pairs[-1]
+        (x, y), r = m.hairpin_circle((a, i), (b, j), m.hairpin)
+        x, y = x - m.cx, y - m.cy
+        box = (min(box[0], x - r), min(box[1], y - r), max(box[2], x + r), max(box[3], y + r))
     if isinstance(m, Placed) and m.ends:
         d = m.direction
         for end in m.ends:
@@ -904,6 +920,26 @@ def _rungs(piece: Stem, na: Nucleic, centre: np.ndarray, axis: np.ndarray) -> di
     return out
 
 
+def _side_signal(piece: Stem, na: Nucleic, frame: Frame, centre: np.ndarray, angle: float) -> float:
+    """How far (Å, on the grid) the first arm is seen to the left of the drawn direction `angle` from the second:
+    its mean C1' against the second arm's. Its sign is the side that fits the projection best, so the drawing
+    turns the stem, never mirrors it; near zero (the arms seen nearly on top of each other) both sides fit about
+    equally. Not the outermost pair's C1'-C1' line: it turns with the helical twist, so its side depends on where
+    in the turn the stem starts."""
+    (a, i0, i1), (b, j0, j1) = piece.arm5, piece.arm3
+    across = np.mean([na.strands[a].c1[i] for i in range(i0, i1 + 1)], axis=0) - np.mean(
+        [na.strands[b].c1[j] for j in range(j0, j1 + 1)], axis=0
+    )
+    seen = frame.direction(centre, across)
+    return float(_snap(np.cos(angle) * seen[1] - np.sin(angle) * seen[0]))
+
+
+def _hairpin(piece: Stem, na: Nucleic) -> int:
+    """Nucleotides of the hairpin loop closed by the piece's innermost pair, or -1 if that pair closes none."""
+    a, i, b, j = piece.pairs[-1][:4]
+    return next((r.hi - r.lo + 1 for r in na.structure.runs if r.left == (a, i) and r.right == (b, j)), -1)
+
+
 def _stem_item(piece: Stem, na: Nucleic, frame: Frame, flat: bool, width: float = NA_W) -> _Item:
     """A stem piece as a rigid item at its projected place, turned onto the page (never mirrored). Its axis
     differs in the last bit between BLAS kernels, so every number the layout takes from it is snapped (_snap)."""
@@ -915,15 +951,8 @@ def _stem_item(piece: Stem, na: Nucleic, frame: Frame, flat: bool, width: float 
     length = float(_snap(max(along.values()) - min(along.values()) + DNA_RISE * SCALE))  # half a step beyond each end
     a2 = frame.direction(centre, axis)
     angle = 0.0 if flat or np.linalg.norm(a2) < 1e-6 else float(_snap(np.arctan2(a2[1], a2[0])))
-    # the first arm on the side it is seen on: its mean C1' against the second arm's, the side that fits the
-    # projection best, so the drawing turns the stem, never mirrors it (seen nearly on top of each other, the
-    # two arms fit about equally either way). Not the outermost pair's C1'-C1' line: it turns with the helical
-    # twist, so its side depends on where in the turn the stem starts.
-    across = np.mean([na.strands[a].c1[i] for i in range(i0, i1 + 1)], axis=0) - np.mean(
-        [na.strands[b].c1[j] for j in range(j0, j1 + 1)], axis=0
-    )
-    seen = frame.direction(centre, across)
-    first = 1 if np.cos(angle) * seen[1] - np.sin(angle) * seen[0] >= 0 else -1
+    signal = _side_signal(piece, na, frame, centre, angle)
+    first = 1 if signal >= 0 else -1
     side = {k: first if n <= i1 - i0 else -first for n, k in enumerate(keys)}  # keys: first arm, then second
     x, y = (float(v) for v in _snap(frame.project(centre)[0] * SCALE))
     d = PlacedStem(
@@ -941,8 +970,61 @@ def _stem_item(piece: Stem, na: Nucleic, frame: Frame, flat: bool, width: float 
         set(piece.bulges),
         piece.parent,
         first,
+        abs(signal),
+        _hairpin(piece, na),
     )
     return _Item([d], [(0.0, 0.0)], x, y, (x, y), -1, "")
+
+
+# Å: a stem seen with its arms at least this far apart keeps the side it is seen on. On the test structures every
+# stem below it fits its projection about as well turned round; the closest one that does not is 4YBB P5 at 2.81 Å.
+_SIDE_CLEAR = 2.75
+
+
+def _cross2(u: np.ndarray, v: np.ndarray) -> float:
+    return float(u[0] * v[1] - u[1] * v[0])
+
+
+def _continuous_sides(stems: list[PlacedStem], na: Nucleic) -> None:
+    """Turn round (swap the rails of) the stems whose side the projection cannot tell (margin < _SIDE_CLEAR), so
+    their strands run on uncrossed to the stems they are joined to both ways: the next piece of a bent duplex,
+    or the stem across an internal loop or bulge (one strand goes from A to B, another from B back to A).
+    Stems seen clearly keep their side; the others are settled in stem order, each one beside a settled stem
+    first, by a vote of its settled partners (a tie keeps the side it is seen on)."""
+    at = {key: k for k, d in enumerate(stems) for key in d.axial}
+    steps: dict[tuple[int, int], list[tuple[int, int, int]]] = {}
+    for s, strand in enumerate(na.strands):
+        held = [i for i in range(len(strand)) if (s, i) in at]
+        for i, j in zip(held, held[1:]):
+            if at[(s, i)] != at[(s, j)]:
+                steps.setdefault((at[(s, i)], at[(s, j)]), []).append((s, i, j))
+    want: dict[int, list[tuple[int, int]]] = {}  # stem -> (partner, +1: same turn as the partner, -1: opposite)
+    for (k, m), there in sorted(steps.items()):
+        back = steps.get((m, k), [])
+        if k > m or len(there) != 1 or len(back) != 1:
+            continue
+        (s, i, j), (t, q, r) = there[0], back[0]
+        a, b = stems[k], stems[m]
+        # the two chords A(s,i)->B(s,j) and B(t,q)->A(t,r) cross when, seen along the way from A's end to B's,
+        # A's two rail points lie the other way round from B's (turning a stem round swaps its rail points)
+        u = a.port((s, i), True)[1] - b.port((s, j), False)[1]
+        ca = float(_snap(_cross2(u, a.point((t, r)) - a.point((s, i)))))
+        cb = float(_snap(_cross2(u, b.point((t, q)) - b.point((s, j)))))
+        if ca and cb:
+            sign = 1 if (ca > 0) == (cb > 0) else -1
+            want.setdefault(k, []).append((m, sign))
+            want.setdefault(m, []).append((k, sign))
+    turn = {k: 1 for k, d in enumerate(stems) if d.margin >= _SIDE_CLEAR}
+    pending = [k for k in range(len(stems)) if k not in turn]
+    while pending:
+        k = next((k for k in pending if any(m in turn for m, _ in want.get(k, ()))), pending[0])
+        pending.remove(k)
+        vote = sum(sign * turn[m] for m, sign in want.get(k, ()) if m in turn)
+        turn[k] = -1 if vote < 0 else 1
+    for k, d in enumerate(stems):
+        if turn[k] < 0:
+            d.first = -d.first
+            d.side = {key: -v for key, v in d.side.items()}
 
 
 def _traces(na: Nucleic, frame: Frame) -> dict[int, np.ndarray]:
@@ -984,12 +1066,15 @@ def _stem_contacts(sses: list[SSE], na: Nucleic, pieces: list[Stem]) -> dict[fro
 
 _W_JOINT = 4.0  # pull between consecutive pieces of one bent duplex: the chain follows the duplex
 _JOINT_SLACK = 0.3
+_SHORT_RUN = 2  # a strand passing from stem to stem through at most this many nucleotides holds the stem ends close
+_W_SHORT = 10.0  # its pull: firmer than a joint's, so arms no protein holds (a Holliday junction's) come in too
 
 
 def _stem_springs(items: list[_Item], na: Nucleic) -> list[tuple[int, np.ndarray, int, np.ndarray, float, float]]:
-    """(item, port offset, item, port offset, weight, slack) along each strand from one stem to the next: a
-    single-stranded run pulls its two stems together like a loop (with slack for its nucleotides); the joint
-    between two pieces of a bent duplex holds them end to end."""
+    """(item, port offset, item, port offset, weight, slack) along each strand from one stem to the next: the
+    joint between two pieces of a bent duplex holds them end to end; a strand exchange or a run of at most
+    _SHORT_RUN nucleotides holds the two stem ends close (slack: its nucleotides' steps); a longer run pulls its
+    two stems together like a loop (with slack for its nucleotides)."""
     owner = _owner(items)
     stems = [(k, m) for k, it in enumerate(items) for m in it.members if isinstance(m, PlacedStem)]
     at = {key: (k, m) for k, m in stems for key in m.axial}
@@ -1002,8 +1087,13 @@ def _stem_springs(items: list[_Item], na: Nucleic) -> list[tuple[int, np.ndarray
                 continue
             oi = np.subtract(mi.port((s, i), True)[0], (mi.cx, mi.cy)) + owner[mi.id][2]
             oj = np.subtract(mj.port((s, j), False)[0], (mj.cx, mj.cy)) + owner[mj.id][2]
-            joint = j == i + 1 and mi.parent and mi.parent == mj.parent
-            w, slack = (_W_JOINT, _JOINT_SLACK) if joint else (_W_SEQ, max(_LOOP_SLACK, 0.5 * (j - i - 1) * NT_STEP))
+            n = j - i - 1
+            if n == 0 and mi.parent and mi.parent == mj.parent:  # a joint: the duplex carries on
+                w, slack = _W_JOINT, _JOINT_SLACK
+            elif n <= _SHORT_RUN:  # a strand exchange or a short run: the stem ends held close
+                w, slack = _W_SHORT, max(_JOINT_SLACK, n * NT_STEP)
+            else:
+                w, slack = _W_SEQ, max(_LOOP_SLACK, 0.5 * n * NT_STEP)
             out.append((ki, oi, kj, oj, w, slack))
     return out
 
@@ -1212,7 +1302,10 @@ def build_layout(
     ]
     contacts = dict(contacts or {})
     pieces = stem_pieces(nucleic) if nucleic is not None and nucleic.strands else []
-    items += [_stem_item(p, nucleic, frame, mode == "stack", NA_W * style.dna_scale) for p in pieces]
+    stem_items = [_stem_item(p, nucleic, frame, mode == "stack", NA_W * style.dna_scale) for p in pieces]
+    if stem_items:
+        _continuous_sides([it.members[0] for it in stem_items], nucleic)
+    items += stem_items
     for key, n in (_stem_contacts(sses, nucleic, pieces) if pieces else {}).items():
         contacts[key] = contacts.get(key, 0) + n
     traces = _traces(nucleic, frame) if nucleic is not None and nucleic.strands else {}

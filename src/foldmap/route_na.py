@@ -133,9 +133,7 @@ def _arc(d: PlacedStem, ka, kb, m: int) -> list[tuple[float, float]]:
     """A hairpin loop: a near-circle beyond the stem's tip from nucleotide ka to kb, room for m nucleotides."""
     pa, pb = d.point(ka), d.point(kb)
     out = d.direction if d.axial[ka] >= 0 else -d.direction
-    half = float(np.hypot(*(pb - pa))) / 2
-    r = max(half * 1.02, (m + 1) * NT_STEP / (1.6 * np.pi))
-    centre = (pa + pb) / 2 + out * np.sqrt(max(r * r - half * half, 0.0))
+    centre, r = d.hairpin_circle(ka, kb, m)
     a0 = np.arctan2(*(pa - centre)[::-1])
     a1 = np.arctan2(*(pb - centre)[::-1])
     cands = [a1 + 2 * np.pi * k for k in (-1, 0, 1) if 0 < abs(a1 + 2 * np.pi * k - a0) < 2 * np.pi]
