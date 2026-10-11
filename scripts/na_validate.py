@@ -20,7 +20,9 @@ For every entry it measures
   contacts  whether the protein elements touching a stem are drawn nearest it (AUC, precision at k); beads drawn
             for every touched nucleotide, in the touching chain's colour
   render    overlapping boxes, text off the page, overlapping base letters, routing fallbacks, run time
-Pairing is measured on the model as deposited (the asymmetric unit); the figure may be drawn from an assembly.
+Pairing is measured on the pairs the figure draws (assembly copies mapped back to their deposited chains by
+stripping the copy number; a cropped figure against the reference pairs it draws both nucleotides of), and is
+also reported on the model as deposited (deposited_pair_f1, deposited_stem_recall, not judged).
 With --require-rnapolis an entry whose pairing cannot be measured fails; without it a warning is printed and the
 report says how many entries were not validated. The exit code is 0 only if every entry passes. The run time
 (`seconds`) is gated but is a timing, not a deterministic quantity.
@@ -142,29 +144,43 @@ def reference_pairs(path: Path) -> set[frozenset]:
     return {frozenset(tuple(x) for x in pair) for pair in json.loads(done.stdout)}
 
 
-def pairing(path) -> dict:
-    """foldmap's pairs and stems against RNApolis' on the deposited model."""
-    path = Path(path)
-    try:
-        theirs = reference_pairs(path)
-    except (RuntimeError, subprocess.TimeoutExpired) as err:
-        return {"pair_f1": None, "stem_recall": None, "note": str(err)}
-    model, _ = read_model(path, "asu")
-    found = _nucleic_strands(model)
-    strands = [s for s, _ in found]
-    ours = pair_nucleotides([run for _, run in found])
-    mine = {frozenset((_key(strands[p.a].labels[p.i]), _key(strands[p.b].labels[p.j]))) for p in ours}
-    tp = len(mine & theirs)
+def _chain_map(names, deposited) -> dict[str, tuple[str, str]]:
+    """Drawn chain name -> (deposited chain, copy). A model read as deposited keeps the names (copy ""); an
+    assembly names each copy by its deposited chain plus the operator's number (gemmi AddNumber), stripped here
+    (the longest deposited name the drawn one extends by digits). Names that match no deposited chain are left
+    out."""
+    names = sorted(set(names))
+    if set(names) <= set(deposited):
+        return {c: (c, "") for c in names}
+    out = {}
+    for c in names:
+        stems = [d for d in deposited if c.startswith(d) and c[len(d) :].isdigit()]
+        if stems:
+            d = max(stems, key=len)
+            out[c] = (d, c[len(d) :])
+    return out
+
+
+def _score(strands, ours, theirs: set[frozenset], where: dict, drawn_only: bool) -> dict:
+    """Pairs and stems of `ours` (BasePairs on `strands`) against the reference pairs `theirs` (frozensets of
+    deposited (chain, number, icode) keys). where: (strand, nucleotide) -> (copy, deposited key). drawn_only:
+    recall counts only the reference pairs whose two nucleotides are both drawn in one copy (a cropped figure is
+    not short of the pairs it leaves out)."""
+    index = {v: k for k, v in sorted(where.items())}
+    copies = sorted({c for c, _ in where.values()})
+    mine = {frozenset((where[(p.a, p.i)][1], where[(p.b, p.j)][1])) for p in ours}
+    scope = {p for p in theirs if any(all((c, k) in index for k in p) for c in copies)} if drawn_only else theirs
+    tp = len(mine & scope)
     prec = tp / len(mine) if mine else 1.0
-    rec = tp / len(theirs) if theirs else 1.0
+    rec = tp / len(scope) if scope else 1.0
     f1 = 2 * prec * rec / (prec + rec) if prec + rec else 0.0
     # stems: group the reference pairs exactly as foldmap groups its own, then match arms within one nucleotide
-    index = {_key(l): (s, i) for s, strand in enumerate(strands) for i, l in enumerate(strand.labels)}
     ref_pairs = []
     for pair in sorted(theirs, key=sorted):
-        if all(k in index for k in pair):
-            x, y = sorted(index[k] for k in pair)
-            ref_pairs.append(BasePair(x[0], x[1], y[0], y[1], "WC"))
+        for c in copies:  # the deposited pair, in every copy that holds both nucleotides
+            if all((c, k) in index for k in pair):
+                x, y = sorted(index[(c, k)] for k in pair)
+                ref_pairs.append(BasePair(x[0], x[1], y[0], y[1], "WC"))
     ref = secondary_structure(strands, ref_pairs).stems
     got = secondary_structure(strands, ours).stems
 
@@ -177,16 +193,43 @@ def pairing(path) -> dict:
     matched = sum(1 for r in ref if any(close(r, g) for g in got))
     return {
         "pairs_foldmap": len(mine),
-        "pairs_reference": len(theirs),
+        "pairs_reference": len(scope),
         "pair_precision": round(prec, 3),
         "pair_recall": round(rec, 3),
         "pair_f1": round(f1, 3),
         "stems_foldmap": len(got),
         "stems_reference": len(ref),
         "stem_recall": round(matched / len(ref), 3) if ref else 1.0,
-        "missed_pairs": sorted(sorted(p) for p in theirs - mine)[:20],
-        "extra_pairs": sorted(sorted(p) for p in mine - theirs)[:20],
+        "missed_pairs": sorted(sorted(p) for p in scope - mine)[:20],
+        "extra_pairs": sorted(sorted(p) for p in mine - scope)[:20],
     }
+
+
+def pairing(path, theirs: set[frozenset]) -> dict:
+    """foldmap's pairs and stems against RNApolis' on the deposited model (the asymmetric unit), every key
+    prefixed `deposited_`; reported, not judged (the figure may be drawn from an assembly: drawn_pairing)."""
+    model, _ = read_model(Path(path), "asu")
+    found = _nucleic_strands(model)
+    strands = [s for s, _ in found]
+    ours = pair_nucleotides([run for _, run in found])
+    where = {(s, i): ("", _key(l)) for s, strand in enumerate(strands) for i, l in enumerate(strand.labels)}
+    m = _score(strands, ours, theirs, where, drawn_only=False)
+    return {f"deposited_{k}": v for k, v in m.items() if k not in ("missed_pairs", "extra_pairs")}
+
+
+def drawn_pairing(na, theirs: set[frozenset], deposited) -> dict:
+    """The pairs and stems the figure draws (`na`, the layout's nucleic acid: assembly copies, cropped) against
+    RNApolis' on the deposited model, each drawn chain mapped back to the deposited one it copies. A pair drawn
+    between two copies that the deposited model pairs within one counts as wrong; the gate uses these values."""
+    chains = _chain_map([s.chain for s in na.strands], deposited)
+    where = {
+        (s, i): (chains[strand.chain][1], (chains[strand.chain][0], l.seq, l.icode))
+        for s, strand in enumerate(na.strands)
+        if strand.chain in chains
+        for i, l in enumerate(strand.labels)
+    }
+    ours = [p for p in na.base_pairs if (p.a, p.i) in where and (p.b, p.j) in where]
+    return _score(na.strands, ours, theirs, where, drawn_only=True)
 
 
 def _bounds(points, margin: float = 0.06):
@@ -330,8 +373,13 @@ TIMEOUT = 900  # seconds an entry may take before it is reported as a failure
 
 
 def run(name: str, path: Path, out: Path, options: dict | None = None) -> dict:
-    m: dict = {"entry": name}
-    m.update(pairing(path))
+    m: dict = {"entry": name, "pair_f1": None, "stem_recall": None}
+    try:
+        theirs = reference_pairs(path)
+    except (RuntimeError, subprocess.TimeoutExpired) as err:
+        theirs, m["note"] = None, str(err)
+    else:
+        m.update(pairing(path, theirs))
     t = time.time()
     options = options or {}
     model = read_model(path, options.get("assembly", "auto"))  # read once; the bead checks compare with it
@@ -339,6 +387,8 @@ def run(name: str, path: Path, out: Path, options: dict | None = None) -> dict:
     loops = route_loops(lay, sses, bb)
     fig = draw(lay, loops, sses, name, model=model)
     m["seconds"] = round(time.time() - t, 1)
+    if lay.nucleic is not None and theirs is not None:
+        m.update(drawn_pairing(lay.nucleic, theirs, read_model(path, "asu")[1]))
     if lay.nucleic is not None:
         m.update(shape(lay))
         m.update(contacts(lay, sses))
@@ -428,6 +478,8 @@ def main(argv=None) -> int:
         "stems_foldmap",
         "stems_reference",
         "stem_recall",
+        "deposited_pair_f1",
+        "deposited_stem_recall",
         "stems_drawn",
         "spearman",
         "procrustes",

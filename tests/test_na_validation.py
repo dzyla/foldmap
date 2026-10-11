@@ -210,3 +210,59 @@ def test_planted_bead_and_gap_label_collisions_are_counted():
     helix = max(lay.placed.values(), key=lambda e: e.length)
     label.set_position((helix.cx, helix.cy - 0.1))  # on a helix
     assert count("gap_label_collisions") == labels + 1
+
+
+def _na_validate():
+    import sys
+
+    sys.path.insert(0, str(Path(__file__).parent.parent / "scripts"))
+    try:
+        import na_validate
+    finally:
+        sys.path.pop(0)
+    return na_validate
+
+
+def _reference(pdb) -> set[frozenset]:
+    import json
+
+    ref = json.loads((NA / "reference.json").read_text(encoding="utf-8"))[pdb]
+    return {frozenset((tuple(a), tuple(b))) for a, b, _ in ref}
+
+
+def test_drawn_chains_map_back_to_the_deposited_chains_they_copy():
+    nv = _na_validate()
+    assert nv._chain_map(["C", "D"], {"C", "D", "A"}) == {"C": ("C", ""), "D": ("D", "")}
+    assert nv._chain_map(["C1", "C2", "D1", "X1"], {"C", "D"}) == {"C1": ("C", "1"), "C2": ("C", "2"), "D1": ("D", "1")}
+    assert nv._chain_map(["111", "12"], {"1", "11"}) == {"111": ("11", "1"), "12": ("1", "2")}
+
+
+def test_pairing_is_scored_on_the_pairs_the_figure_draws(monkeypatch):
+    """3CRX: the assembly figure draws the deposited pairs once per strand (C5), scored like the deposited model.
+    With its coincident copies kept, the pairing alternates between twins (C1 with F2 where the deposited
+    structure pairs C with D): the deposited model still scores 1.0, the drawn pairs do not."""
+    import foldmap.io as fio
+
+    nv = _na_validate()
+    path, theirs = NA / "3CRX.cif.gz", _reference("3CRX")
+    deposited = read_model(path, "asu")[1]
+    assert nv.pairing(path, theirs)["deposited_pair_f1"] == 1.0
+    lay, _, _ = make_layout(path)
+    m = nv.drawn_pairing(lay.nucleic, theirs, deposited)
+    assert (m["pair_f1"], m["stem_recall"], m["stems_foldmap"]) == (1.0, 1.0, 4)
+    monkeypatch.setattr(fio, "_drop_coincident", lambda model: [])
+    lay, _, _ = make_layout(path)
+    assert len(lay.nucleic.strands) == 8
+    m = nv.drawn_pairing(lay.nucleic, theirs, deposited)
+    assert m["pair_precision"] < 0.9 and m["stem_recall"] < 0.5, m
+
+
+def test_a_cropped_figure_is_scored_on_the_pairs_it_draws_both_nucleotides_of():
+    """4YBB: auto crops the rRNA to the stems the proteins touch; the pairs it leaves out are not missed."""
+    nv = _na_validate()
+    path, theirs = NA / "4YBB.cif.gz", _reference("4YBB")
+    lay, _, _ = make_layout(path)
+    m = nv.drawn_pairing(lay.nucleic, theirs, read_model(path, "asu")[1])
+    whole = nv.pairing(path, theirs)  # 0.977 precision, 0.981 recall on the whole deposited fixture
+    assert m["pairs_reference"] < len(theirs) and m["pair_recall"] >= whole["deposited_pair_recall"], m
+    assert m["pair_precision"] >= 0.97, m
