@@ -52,6 +52,7 @@ CONTROLS = {
     "1ATP": ("1ATP", None, {}),  # protein kinase A with ATP: a nucleotide ligand, never a strand
     "4YBB-psi": ("4YBB", ["DA"], {"DA": (2586, 2608)}),  # 23S rRNA hairpin: pseudouridine 2604 pairs with A2590
     "2OEU": ("2OEU", None, {}),  # hammerhead ribozyme: three stems placed by the strands between them (P2 and P3)
+    "2GIS": ("2GIS", ["A"], {}),  # SAM-I riboswitch, RNA only: internal loops and runs between seven stems
 }
 
 

@@ -660,7 +660,7 @@ def test_joints_and_runs_cross_no_stem_or_element(pdb):
     straight from face to face (two pieces that touch or overlap, which no overlap term keeps apart) is checked as a
     kink: clear by _INFLATE of every element and stem but its own two."""
     from foldmap.route import _INFLATE, _clear, _element_obstacles
-    from foldmap.route_na import outside_own
+    from foldmap.route_na import among
 
     lay, _, _, _ = _routed(pdb)
     at = {key: d for d in lay.stems for key in d.axial}
@@ -672,7 +672,7 @@ def test_joints_and_runs_cross_no_stem_or_element(pdb):
             if p.kind == "joint" and len(p.points) == 4:
                 assert _clear(p.points[1:3], own, rects, owners, grow=_INFLATE, kink=True), (p.kind, p.between)
             else:
-                assert _clear(outside_own(p.points, own), own, rects, owners, own_body=True), (p.kind, p.between)
+                assert _clear(among(p, at), own, rects, owners, own_body=True), (p.kind, p.between)
             kinds[p.kind] += 1
     assert kinds["joint"] >= (20 if pdb == "1KX5" else 2 if pdb == "1IHF" else 0)
     assert kinds["run"] or pdb == "1KX5"
@@ -681,14 +681,14 @@ def test_joints_and_runs_cross_no_stem_or_element(pdb):
 @pytest.mark.parametrize("pdb", FIXTURES)
 def test_runs_keep_off_the_stem_names(pdb):
     from foldmap.layout import label_boxes
-    from foldmap.route_na import outside_own
+    from foldmap.route_na import among
 
     lay, sses, _, _ = _routed(pdb)
     at = {key: d for d in lay.stems for key in d.axial}
     names = [b for n, b in label_boxes(lay, sses) if n.startswith("stem-label:")]
     for p in lay.na_paths:
         if p.kind in ("run", "joint"):
-            pts = outside_own(p.points, tuple(at[key] for key in p.between))
+            pts = among(p, at)
             assert all(segment_clear(a, b, names) for a, b in zip(pts, pts[1:])), (p.kind, p.between)
 
 
@@ -697,14 +697,14 @@ def test_a_run_goes_round_a_stem_name_it_could_cross():
     names are hard obstacles for a run's first drawing; one that crosses a name is drawn only when nothing else
     is clear of the elements."""
     from foldmap.layout import label_boxes
-    from foldmap.route_na import outside_own
+    from foldmap.route_na import among
 
     lay, sses, _, _ = _routed("4YBB")
     at = {key: d for d in lay.stems for key in d.axial}
     names = [b for n, b in label_boxes(lay, sses) if n.startswith("stem-label:")]
     run = next(p for p in lay.na_paths if p.between == ((1, 391), (1, 393)))
     assert [at[k].name for k in run.between] == ["P27", "P26"] and not run.fallback
-    pts = outside_own(run.points, tuple(at[k] for k in run.between))
+    pts = among(run, at)
     assert all(segment_clear(a, b, names) for a, b in zip(pts, pts[1:]))
 
 
@@ -732,7 +732,7 @@ def test_an_internal_loop_side_keeps_its_bow_when_every_drawing_meets_a_name():
     """One side of an internal loop is bowed out on its own side. When the bow (and every route) crosses a stem
     name, the bow is still the drawing taken (the soft choice), not a route nor a fallback (4OO8's two sides)."""
     from foldmap.route import _element_obstacles, _Grid, _Router
-    from foldmap.route_na import NT_STEP, _bow, _strand_between
+    from foldmap.route_na import NT_STEP, _face, _side_bow, _strand_between
 
     lay, _, _, _ = _routed("4OO8")
     at = {key: d for d in lay.stems for key in d.axial}
@@ -742,8 +742,13 @@ def test_an_internal_loop_side_keeps_its_bow_when_every_drawing_meets_a_name():
     for p in sides:
         (s, i), (_, j) = p.between
         da, db = at[(s, i)], at[(s, j)]
-        bow = _bow(da.point((s, i)), db.point((s, j)), (j - i) * NT_STEP, out=da.normal * da.side[(s, i)])
-        assert p.points == bow  # drawn as its bow
+        (ra, (fa, _)), (rb, (fb, _)) = (
+            (da.point((s, i)), _face(da, (s, i), True)),
+            (db.point((s, j)), _face(db, (s, j), False)),
+        )
+        reach = (j - i) * NT_STEP - np.hypot(*(fa - ra)) - np.hypot(*(rb - fb))
+        bow = [tuple(map(float, ra)), *_side_bow(da, (s, i), fa, fb, reach), tuple(map(float, rb))]
+        assert p.points == bow  # drawn as its bow, from face to face
         router = _Router(_Grid(lay), _element_obstacles(lay))
         covered = _strand_between(router, s, i, j, da, db, "internal", [(-1e3, -1e3, 1e3, 1e3)])
         assert covered.points == bow and not covered.fallback and covered.kind == "run"
@@ -768,6 +773,34 @@ def test_a_straight_joint_may_cross_its_partner_strand_but_no_other():
     assert _straight_joint(router, da, db, fa, ea, fb, [])
     assert _straight_joint(router, da, db, fa, ea, fb, [(frozenset((da.id, db.id)), across)])
     assert not _straight_joint(router, da, db, fa, ea, fb, [(None, across)])
+
+
+def _enters_core(p, q, d) -> bool:
+    """Does segment p-q run inside the stem's core, strictly between its two rails (where its pairs are drawn)?"""
+    from foldmap.route import clip_len
+
+    c, s = np.cos(d.angle), np.sin(d.angle)
+    u0, v0 = (p[0] - d.cx) * c + (p[1] - d.cy) * s, (p[1] - d.cy) * c - (p[0] - d.cx) * s
+    u1, v1 = (q[0] - d.cx) * c + (q[1] - d.cy) * s, (q[1] - d.cy) * c - (q[0] - d.cx) * s
+    hl, hw = d.length / 2 - 1e-6, d.rail - 1e-6
+    return clip_len((u0, v0), (u1, v1), (-hl, -hw, hl, hw)) > 1e-6
+
+
+@pytest.mark.parametrize("pdb", ["2GIS", "1EHZ", "30QM", "4OO8", "1IHF", "1KX5", "3CRX"])
+def test_no_run_or_joint_enters_its_own_stems_core(pdb):
+    """A run or joint leaves its stem along its rail to the stem's end face and is drawn from face to face; no part
+    of it runs between the rails of its own stems (2GIS: the sides of the P2-P3 internal loop were bowed from rail
+    point to rail point, straight through P3's core, an X over both stems)."""
+    lay, _, _, _ = _routed(pdb)
+    at = {key: d for d in lay.stems for key in d.axial}
+    bad = [
+        (p.kind, p.between, d.name)
+        for p in lay.na_paths
+        if p.kind in ("run", "joint")
+        for d in {at[k].id: at[k] for k in p.between}.values()
+        if any(_enters_core(a, b, d) for a, b in zip(p.points, p.points[1:]))
+    ]
+    assert not bad
 
 
 def segment_clear(p, q, rects):
@@ -896,11 +929,11 @@ def _segments_cross(p, q, a, b) -> bool:
 
 @pytest.mark.parametrize("pdb", ["1EHZ", "4OO8", "30QM"])
 def test_runs_steer_round_hairpin_loops_and_free_ends(pdb):
-    from foldmap.route_na import outside_own
+    from foldmap.route_na import among
 
     lay, _, _, _ = _routed(pdb)
     at = {key: d for d in lay.stems for key in d.axial}
-    drawn = {id(p): outside_own(p.points, tuple(at[key] for key in p.between)) for p in lay.na_paths}
+    drawn = {id(p): among(p, at) for p in lay.na_paths}
     fixed = [p for p in lay.na_paths if p.kind in ("hairpin", "tail")]
     for p in lay.na_paths:
         if p.kind in ("run", "joint", "gap"):

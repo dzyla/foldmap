@@ -24,7 +24,7 @@ from .io import CONTACT
 from .layout import SCALE, joined_pieces, stem_pieces
 from .nucleic import stem_axis
 from .route import clip_len
-from .route_na import crosses_body, in_body, outside_own
+from .route_na import among, crosses_body, in_body
 
 
 @dataclass(frozen=True)
@@ -534,9 +534,11 @@ def _box_meets_body(box, d) -> bool:
 
 
 def _trimmed(lay) -> list[np.ndarray]:
-    """Each nucleic-acid path's segments, without its stretches inside its own stems (the rails it runs along)."""
+    """Each nucleic-acid path's segments as drawn among the elements (route_na.among): a run or joint without the
+    two known rail stretches it runs along to its stems' end faces, so a pass through its own stem counts; any other
+    path without its first and last stretches inside its own stems."""
     at = {key: d for d in lay.stems for key in d.axial}
-    return [_segments(outside_own(p.points, tuple(at[k] for k in p.between if k in at))) for p in lay.na_paths]
+    return [_segments(among(p, at)) for p in lay.na_paths]
 
 
 def na_crossings(lay, loops) -> dict:

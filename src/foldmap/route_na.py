@@ -423,36 +423,51 @@ def _cross(p, q, a, b) -> bool:
     return d1 * d2 < -1e-12 and d3 * d4 < -1e-12
 
 
+def among(path: NAPath, at: dict) -> list[tuple[float, float]]:
+    """The part of a drawn strand that lies among the other elements. A run or a joint (stem to stem) is drawn as
+    [rail point, end face, ..., end face, rail point]: without its two rail stretches, its first and last segments.
+    Any other strand without its first and last stretches inside its own stems (outside_own). `at`: stem nucleotide
+    -> its PlacedStem."""
+    if path.kind in ("run", "joint") and len(path.between) == 2:
+        return list(path.points[1:-1])
+    return outside_own(path.points, tuple(at[k] for k in path.between if k in at))
+
+
 def _strand_between(
     router: _Router, s: int, i: int, j: int, da: PlacedStem, db: PlacedStem, kind, names=(), drawn=()
 ) -> NAPath:
-    """The single strand from stem nucleotide i to stem nucleotide j (the m nucleotides between drawn on it).
+    """The single strand from stem nucleotide i to stem nucleotide j (the m nucleotides between drawn on it): along
+    its rail from i to its stem's end face, from that face to the next stem's end face, along the rail to j. Between
+    the faces it is checked against every element and stem, its own two by their true bodies (_clear, own_body).
     `names` (the stem-label boxes) are hard obstacles for a run's first choice of drawing: the first one clear of
     the elements that also keeps off every name; only when none does, the first one clear of the elements."""
     m, nts, between = j - i - 1, list(range(i + 1, j)), ((s, i), (s, j))
     own, need = (da, db), (j - i) * NT_STEP
     ra, rb = da.point((s, i)), db.point((s, j))
-    ok = lambda pts: _na_clear(pts, own, router.elements)  # noqa: E731
-
-    def off_names(pts) -> bool:
-        out = outside_own(pts, own)
-        return not any(clip_len(p, q, b) > 1e-9 for b in names for p, q in zip(out, out[1:]))
-
     if da is db:  # over the stem's tip: a hairpin loop
         pts = _arc(da, (s, i), (s, j), m)
-        return NAPath("hairpin", s, nts, pts, _spaced(pts, m), fallback=not ok(pts), between=between)
+        return NAPath(
+            "hairpin", s, nts, pts, _spaced(pts, m), fallback=not _na_clear(pts, own, router.elements), between=between
+        )
     (fa, ea), (fb, eb) = _face(da, (s, i), True), _face(db, (s, j), False)
+    on_rails = lambda mid: _xy([ra, *mid, rb])  # noqa: E731
+    ok = lambda pts: _clear(pts[1:-1], own, *router.elements, own_body=True)  # noqa: E731
+    reach = max(need - math.dist(ra, fa) - math.dist(fb, rb), 0.0)  # what the part between the faces must hold
+
+    def off_names(pts) -> bool:
+        return not any(clip_len(p, q, b) > 1e-9 for b in names for p, q in zip(pts[1:-1], pts[2:-1]))
+
     joint = m == 0 and da.parent and da.parent == db.parent
     if joint and math.dist(fa, fb) < _JOINT_STRAIGHT and _dot(fb - fa, ea) > 0:
-        pts = _xy([ra, fa, fb, rb])  # the duplex just carries on
+        pts = on_rails([fa, fb])  # the duplex just carries on
         if ok(pts):
             for c in router.grid.cells_along(fa, fb):
                 router.grid.used[c] += 1
             return NAPath("joint", s, [], pts, [], between=between)
     bowed = None
     if kind == "internal" and m <= _BOW_MAX:
-        # one side of an internal loop: bowed out on its own side, so the two sides never meet
-        bowed = _bow(ra, rb, need, out=da.normal * da.side[(s, i)])
+        # one side of an internal loop: bowed out from face to face on its own side, so the two sides never meet
+        bowed = on_rails(_side_bow(da, (s, i), fa, fb, reach))
         if not ok(bowed):
             bowed = None
         elif off_names(bowed):
@@ -463,22 +478,29 @@ def _strand_between(
         # corner, as a kink joins two pieces of one helix
         for c in router.grid.cells_along(fa, fb):
             router.grid.used[c] += 1
-        return NAPath("joint", s, [], _xy([ra, fa, fb, rb]), [], between=between)
+        return NAPath("joint", s, [], on_rails([fa, fb]), [], between=between)
     fallback = route is None
     if route is None:
         route = _curve(fa, ea, fb, eb)
-    pts = _xy([ra, *route, rb])
+    pts = on_rails(route)
     shapes = [pts]  # the drawings clear of the elements, in order of preference
     if not fallback:
-        rounded = _rounded(pts)
+        rounded = on_rails(_rounded(route))
         shapes = [rounded, pts] if ok(rounded) else [pts]
     if not fallback and _length(shapes[0]) < need:  # too short for its nucleotides: bowed out, if that is clear
-        left = np.array([ra[1] - rb[1], rb[0] - ra[0]])
-        shapes = [b for b in (_bow(ra, rb, need, out=left), _bow(ra, rb, need, out=-left)) if ok(b)] + shapes
+        left = np.array([fa[1] - fb[1], fb[0] - fa[0]])
+        bows = (on_rails(_bow(fa, fb, reach, out=left)), on_rails(_bow(fa, fb, reach, out=-left)))
+        shapes = [b for b in bows if ok(b)] + shapes
     soft = [bowed] if bowed is not None else [shapes[0]]  # the first choice when every drawing meets a name
     pts = next((q for q in shapes if not fallback and ok(q) and off_names(q)), soft[0])
     kind_drawn = "joint" if joint else "run"
     return NAPath(kind_drawn, s, nts, pts, _spaced(pts, m), fallback=fallback and pts is not bowed, between=between)
+
+
+def _side_bow(d: PlacedStem, key, fa, fb, reach: float) -> list[tuple[float, float]]:
+    """One side of an internal loop from end face fa to end face fb, bowed out on the side of its rail on stem d
+    (at nucleotide `key`) until the part between the faces is `reach` long."""
+    return _bow(fa, fb, reach, out=d.normal * d.side[key])
 
 
 def _gap(router: _Router, g, a, b) -> NAPath:

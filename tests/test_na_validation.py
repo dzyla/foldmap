@@ -204,6 +204,27 @@ def test_planted_crossings_are_counted():
         lay.na_paths.pop()
 
 
+def test_a_run_through_its_own_stem_is_counted():
+    """A run is trimmed only by its two rail stretches (its first and last segments), so a drawing that leaves its
+    rail straight into its own stem's core and out of the far side counts as a pass through that stem. Trimmed by
+    any first stretch inside its own stems, as before, the whole pass was dropped (2GIS: an X over P3 and P2)."""
+    import copy
+
+    lay, _, _, loops, _, _ = _drawn("4OO8")
+    base = na_crossings(lay, loops)["na_crossings"]
+    at = {key: d for d in lay.stems for key in d.axial}
+    run = next(p for p in lay.na_paths if p.kind == "run")
+    d = at[run.between[0]]
+    centre = np.array([d.cx, d.cy])
+    across = -d.normal * d.side[run.between[0]]  # from its rail over the axis to the other side
+    far = centre + across * (d.width + 0.5)
+    planted = copy.copy(run)
+    end = tuple(far + across * 0.5)
+    planted.points = [tuple(d.point(run.between[0])), tuple(centre), tuple(far), end, end]
+    lay.na_paths.append(planted)
+    assert na_crossings(lay, loops)["na_crossings"] == base + 1
+
+
 def test_planted_bead_and_gap_label_collisions_are_counted():
     lay, sses, bb, loops, model, fig = _drawn("4YBB")
     ax = fig.axes[0]
