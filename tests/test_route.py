@@ -471,3 +471,26 @@ def test_loops_between_tm_helices_stay_out_of_the_slab(assembly):
             if abs(ya - yb) < 1e-9 and abs(xa - xb) > 0.5:
                 assert not y0 + 0.3 < ya < y1 - 0.3, (lp.a_id, lp.b_id, ya)
         assert not lp.fallback
+
+
+@pytest.mark.parametrize("assembly", ["asu", "auto"])
+def test_stacked_loops_stay_out_of_the_slab_except_at_a_port_inside_it(assembly):
+    """1C3W --mode stack --membrane auto: a loop runs sideways inside a band only next to one of its own ports
+    that is itself inside the band (a strand or helix ending within the bilayer): on the stub out of that port or
+    the first run after it (alpha2 -> strand A passes under the hairpin, whose lower port is in the band)."""
+    from foldmap.cli import make_layout
+
+    lay, sses, bb = make_layout(DATA / "1C3W.cif", mode="stack", membrane="auto", assembly=assembly)
+    bands = lay.membrane["bands"]
+    assert len(bands) == len({s.chain for s in sses})  # the trimer wraps one chain per row
+
+    def inside(y):
+        return any(lo + 0.3 < y < hi - 0.3 for lo, hi in bands)
+
+    for lp in route_loops(lay, sses, bb):
+        n = len(lp.points)
+        for k, ((xa, ya), (xb, yb)) in enumerate(zip(lp.points, lp.points[1:])):
+            if abs(ya - yb) < 1e-9 and abs(xa - xb) > 0.5 and inside(ya):
+                at_port = (k <= 1 and inside(lp.points[0][1])) or (k >= n - 3 and inside(lp.points[-1][1]))
+                assert at_port, (lp.a_id, lp.b_id, ya)
+        assert not lp.fallback
