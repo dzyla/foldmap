@@ -39,7 +39,12 @@ def summarize(path: str) -> str:
     dssp = assign_dssp(bb)
     sses = build_sses(bb, dssp.ss, short_helices=True, bridges=dssp.bridges)
     sheets = build_sheets(sses, dssp.bridges)
-    lines = [f"{path}: {len(bb)} residues, {len(set(l.chain for l in bb.labels))} chain(s)"]
+    na = load_nucleic(path, bb, model=model)
+    if len(bb) or not na.strands:
+        lines = [f"{path}: {len(bb)} residues, {len(set(l.chain for l in bb.labels))} chain(s)"]
+    else:  # a nucleic acid alone: its nucleotides, not 0 residues
+        nts = sum(len(st) for st in na.strands)
+        lines = [f"{path}: {nts} nucleotides, {len({l.chain for st in na.strands for l in st.labels})} chain(s)"]
     lines.append(
         f"helices: {sum(s.kind == 'H' for s in sses)}  strands: {sum(s.kind == 'E' for s in sses)}"
         f"  3₁₀ helices: {sum(s.kind == 'G' for s in sses)}"
@@ -71,7 +76,6 @@ def summarize(path: str) -> str:
             f"symmetry: {sym.label} — protomers {' | '.join(','.join(p) for p in sym.protomers)}"
             f"; CA RMSD {sym.rmsd:.2f} Å{extra}" + (f"; unpaired chains {','.join(sym.others)}" if sym.others else "")
         )
-    na = load_nucleic(path, bb, model=model)
     if na.strands:
         kind = (
             "RNA" if all(st.rna for st in na.strands) else "DNA" if not any(st.rna for st in na.strands) else "DNA/RNA"

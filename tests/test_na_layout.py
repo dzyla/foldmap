@@ -1649,6 +1649,14 @@ def test_summary_lists_the_stems(capsys):
     assert "32 base pairs" in out and "P1" in out and "1:1-7 · 1:112-118" in out
 
 
+def test_summary_of_a_nucleic_acid_alone_counts_its_nucleotides(capsys):
+    from foldmap.cli import main
+
+    assert main(["summary", str(_path("1EHZ"))]) == 0
+    first = capsys.readouterr().out.splitlines()[0]
+    assert first.endswith(": 76 nucleotides, 1 chain(s)")
+
+
 @pytest.mark.parametrize("pdb", SMALL)
 def test_stems_sit_nearer_the_elements_that_touch_them(pdb):
     from foldmap.nacheck import contacts
