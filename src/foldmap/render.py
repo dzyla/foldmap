@@ -399,16 +399,21 @@ def _draw_na_marks(ink: _NAInk, layout: Layout, style: str, residue_colour, pt_p
             )
             t.set_gid(f"{gid}:label")
     touched: dict[tuple[int, int], tuple[str, str]] = {}  # nucleotide -> (chain, colour) of its first toucher
+    toucher: dict[tuple[int, int], int] = {}  # nucleotide -> that protein residue (Backbone index)
     for r, nts in sorted(na.contacts.items()):
         chain = na.contact_chain.get(r)
         colour = residue_colour(r, chain)
         for key in sorted(nts):
-            if colour is not None:
-                touched.setdefault(key, (chain, colour))
+            if colour is not None and key not in touched:
+                touched[key] = (chain, colour)
+                toucher[key] = r
+    layout.na_beads = {}  # what is marked as touched, for nacheck and the explorer's hover
     if look.nucleotide_labels and style != "block":
         for key, (xy, rot) in sorted(letters.items()):
             hit = touched.get(key)
             lab = na.strands[key[0]].labels[key[1]]
+            if hit and style == "letters":  # the bold coloured letter is the mark
+                layout.na_beads.setdefault(hit[0], []).append((key, toucher[key], hit[1]))
             t = ink.ax.text(
                 *xy,
                 _base_letter(lab.name),
@@ -426,6 +431,7 @@ def _draw_na_marks(ink: _NAInk, layout: Layout, style: str, residue_colour, pt_p
         for chain in sorted({c for c, _ in touched.values()}):
             keys = [key for key, (c, _) in sorted(touched.items()) if c == chain and key in where]
             if keys:
+                layout.na_beads[chain] = [(key, toucher[key], touched[key][1]) for key in keys]  # scatter order
                 xy = np.array([where[key] for key in keys])
                 sc = ink.ax.scatter(
                     xy[:, 0],

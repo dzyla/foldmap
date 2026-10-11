@@ -48,6 +48,7 @@ _LIB = r"""
         case 'chain': return 'chain:' + item.chain;
         case 'pair': return 'pair:' + item.i + '-' + item.j;
         case 'disulfide': case 'glycan': case 'ligand': case 'feature': return item.type + ':' + item.key;
+        case 'bead': return 'bead:' + item.chain + ':' + item.idx;
         default: return 'residue:' + item.k;
       }
     },
@@ -387,6 +388,10 @@ _APP = r"""
                residues: [item.i, item.j], label: name(item.i) + '·' + name(item.j),
                text: name(item.i) + ' · ' + name(item.j) + ' — ' + d.toFixed(1) + ' Å' + (d <= CUT ? ' (contact)' : '') };
     }
+    if (item.type === 'bead') {  // a nucleotide the protein touches: who touches it, and how closely
+      const x = data.beads[item.chain][item.idx];
+      return { keys: [], residues: [x.k], label: x.text, text: x.text };
+    }
     if (['disulfide', 'glycan', 'ligand', 'feature'].includes(item.type)) {
       const list = data.links[item.type === 'disulfide' ? 'disulfides' : item.type + 's'];
       const x = list.find(d => d.key === item.key);
@@ -442,6 +447,13 @@ _APP = r"""
         const body = n.id.startsWith('loop:') ? n.id.slice(5) : n.id.slice(9).replace(/:\d+$/, '');
         const [a, b] = body.split('>'), s = lib.loopSpan(data, a, b);
         if (s && s[1] >= s[0]) return { type: 'loop', a, b };
+      }
+      const b = n.id.match(/^na:contact:(.+)$/);
+      if (b && data.beads && data.beads[b[1]]) {
+        let u = target;
+        while (u && u !== n && u.tagName !== 'use') u = u.parentNode;
+        const idx = u && u !== n ? Array.prototype.indexOf.call(n.querySelectorAll('use'), u) : -1;
+        if (idx >= 0 && data.beads[b[1]][idx]) return { type: 'bead', chain: b[1], idx };
       }
       const c = n.id.match(/^(legend-chain|legend-chain-label|terminus:[NC]|stub:[NC]):(.+)$/);
       if (c) return { type: 'chain', chain: c[2] };
@@ -645,6 +657,23 @@ def _links(layout, loops, sses, bb, look) -> dict:
     return out
 
 
+def _beads(layout, bb, model) -> dict:
+    """Per chain, the contact beads in the order they are drawn: the toucher (Backbone index) and the hover
+    note, e.g. "DG7 – contacted by A:Arg42 (2.9 Å)", the distance being the closest heavy-atom pair."""
+    from .nacheck import verify_contacts
+
+    pairs = {b.key: b.pair for b in verify_contacts(model, layout, bb).beads}
+    out = {}
+    for chain, items in layout.na_beads.items():
+        out[chain] = []
+        for key, r, _ in items:
+            lab, who = layout.nucleic.strands[key[0]].labels[key[1]], bb.labels[r]
+            text = f"{lab.name}{lab.seq}{lab.icode} – contacted by {who.chain}:{who.name.title()}{who.seq}{who.icode}"
+            pair = pairs.get(key)
+            out[chain].append({"k": r, "text": text + (f" ({pair.dist:.1f} Å)" if pair else "")})
+    return out
+
+
 def _viewer_head(viewer: str) -> str:
     def script(url: str) -> str:
         return f'<script src="{url}" integrity="{SRI[url]}" crossorigin="anonymous"></script>'
@@ -703,6 +732,7 @@ def build_page(
         "model": _model_cif(path, layout_options.get("assembly", "auto"), layout.page_axes, layout.page_centre),
         "viewer": viewer,
         "links": _links(layout, loops, sses, bb, look),
+        "beads": _beads(layout, bb, read_model(path, layout_options.get("assembly", "auto"))),
     }
     blob = _script_json(data)
     name = html.escape(data["title"])

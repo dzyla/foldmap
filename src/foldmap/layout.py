@@ -185,6 +185,7 @@ class Layout:
     na_ends: list = field(default_factory=list)  # (strand, "5′" or "3′", label position), filled by route_loops
     na_letters: dict = field(default_factory=dict)  # single-stranded (strand, nt) -> its letter's place (route_loops)
     na_ties: list = field(default_factory=list)  # route_na.NATie: isolated pairs as drawn (route_loops)
+    na_beads: dict = field(default_factory=dict)  # chain -> [(nucleotide, protein residue, colour)] marked by draw
     na_cropped: bool = False  # na_extent auto cropped a large nucleic acid to the stems the protein touches
     frame: object = None  # the frame.Frame (or RadialFrame, CylinderFrame) that took 3D to the page
     focus: set[str] | None = None  # chains drawn in colour when highlighting; the rest in grey
