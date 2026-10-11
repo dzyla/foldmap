@@ -378,11 +378,11 @@ def route_nucleic(layout: Layout, router: _Router | None = None) -> list[NAPath]
         if p.kind in ("hairpin", "tail"):
             _use(router.grid, p.points)
     names = [_stem_label_box(d) for d in layout.stems]
-    drawn = [p.points for p in fixed.values()]  # strands drawn so far: a straight joint must cross none
+    drawn = [(None, p.points) for p in fixed.values()]  # strands drawn so far: a straight joint must cross none
     routed = {}
     for s, i, j, da, db, kind in between:
         routed[(s, i)] = _strand_between(router, s, i, j, da, db, kind, names, drawn)
-        drawn.append(routed[(s, i)].points)
+        drawn.append((frozenset((da.id, db.id)), routed[(s, i)].points))
     out = [p for _, p in sorted({**fixed, **routed}.items())]
     for g in na.gaps:  # cropped away: the 3' end of one piece to the 5' end of the next, dashed
         a, b = exits.get((g.before, len(na.strands[g.before]) - 1)), exits.get((g.after, 0))
@@ -401,14 +401,16 @@ def _straight_joint(router: _Router, da: PlacedStem, db: PlacedStem, fa, ea, fb,
     """May a joint no route reaches be drawn straight from face fa to face fb, as a kink joins two pieces of one
     helix? Only between pieces that are near (faces closer than _JOINT_STRAIGHT) or whose boxes touch, going on
     forward (along fa's outward direction ea), clear by _INFLATE of every element and stem but its own two, and
-    crossing no nucleic-acid strand drawn so far (`drawn`, polylines)."""
+    crossing no nucleic-acid strand drawn so far (`drawn`: (ids of the two stems it joins, polyline)) other than
+    the partner strand of this same joint (two strands may cross where the duplex carries on, as in a helix)."""
     a, b = da.rect, db.rect
     touching = min(a[2], b[2]) - max(a[0], b[0]) >= -1e-9 and min(a[3], b[3]) - max(a[1], b[1]) >= -1e-9
     if not (math.dist(fa, fb) < _JOINT_STRAIGHT or touching) or _dot(np.subtract(fb, fa), ea) <= 0:
         return False
     if not _clear(_xy([fa, fb]), (da, db), *router.elements, grow=_INFLATE, kink=True):
         return False
-    return not any(_cross(fa, fb, p, q) for pts in drawn for p, q in zip(pts, pts[1:]))
+    own = frozenset((da.id, db.id))
+    return not any(_cross(fa, fb, p, q) for ids, pts in drawn if ids != own for p, q in zip(pts, pts[1:]))
 
 
 def _cross(p, q, a, b) -> bool:

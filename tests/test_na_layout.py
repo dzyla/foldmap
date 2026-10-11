@@ -749,6 +749,27 @@ def test_an_internal_loop_side_keeps_its_bow_when_every_drawing_meets_a_name():
         assert covered.points == bow and not covered.fallback and covered.kind == "run"
 
 
+def test_a_straight_joint_may_cross_its_partner_strand_but_no_other():
+    """A joint no route reaches is drawn straight across the meeting corner of two touching pieces only if it
+    crosses no strand drawn so far, except the other strand of the same joint (3D0U's P3b-P3a: the two strands
+    cross there as they do along a helix)."""
+    from foldmap.route import _element_obstacles, _Grid, _Router
+    from foldmap.route_na import _face, _straight_joint
+
+    lay, _, _, _ = _routed("1RVA")
+    at = {key: d for d in lay.stems for key in d.axial}
+    joint = next(p for p in lay.na_paths if p.kind == "joint" and len(p.points) == 4)
+    a, b = joint.between
+    da, db = at[a], at[b]
+    (fa, ea), (fb, _) = _face(da, a, True), _face(db, b, False)
+    mid, normal = (np.add(fa, fb)) / 2, np.array([fa[1] - fb[1], fb[0] - fa[0]])
+    across = [tuple(mid + normal), tuple(mid - normal)]  # a strand crossing the joint's middle
+    router = _Router(_Grid(lay), _element_obstacles(lay))
+    assert _straight_joint(router, da, db, fa, ea, fb, [])
+    assert _straight_joint(router, da, db, fa, ea, fb, [(frozenset((da.id, db.id)), across)])
+    assert not _straight_joint(router, da, db, fa, ea, fb, [(None, across)])
+
+
 def segment_clear(p, q, rects):
     from foldmap.route import clip_len
 
