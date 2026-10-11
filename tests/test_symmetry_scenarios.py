@@ -471,3 +471,23 @@ def test_only_a_dyad_in_the_page_makes_a_mirror_line():
     f = frame()
     _mirror_frame(f, SimpleNamespace(**(vars(sym) | {"axis": np.array([0.0, 0.0, 1.0])})))  # seen end on: a turn
     assert f.mirror_x is None and f.sector is None
+
+
+@pytest.mark.parametrize(
+    "chains, sector, kept",
+    [
+        ("AB", {"A": 0, "B": 0, "C": 1, "D": 1}, [["A", "B"]]),  # a protomer of two chains keeps its bundle
+        ("AP", {"A": 0, "B": 1}, [["A", "P"]]),  # a protomer helix with a peptide outside every protomer
+        ("AB", {"A": 0, "B": 1}, []),  # across the dyad: cut, each drawn alone (1LMB alpha5)
+        ("ABC", {"A": 0, "B": 0, "C": 1, "D": 1}, [["A", "B"]]),  # the part in one protomer stays bundled
+    ],
+    ids=["one-protomer", "outside-peptide", "two-protomers", "two-protomers-part"],
+)
+def test_bundles_are_cut_only_between_two_protomers(chains, sector, kept):
+    from foldmap.layout import _within_protomers
+    from helpers import fake_sse
+
+    sses = [fake_sse("H", 10, 25, chain=c) for c in chains]
+    by_id = {s.id: s for s in sses}
+    out = _within_protomers([[s.id for s in sses]], by_id, sector)
+    assert [[by_id[k].chain for k in g] for g in out] == kept

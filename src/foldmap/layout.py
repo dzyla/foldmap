@@ -1526,15 +1526,20 @@ def _short_loops(na: Nucleic) -> set[frozenset[str]]:
 
 
 def _within_protomers(bundles: list[list[str]], by_id: dict[str, SSE], sector: dict) -> list[list[str]]:
-    """Helix bundles (features.helix_bundles) cut at protomer boundaries: the part of a bundle in one protomer
-    stays a bundle if it still spans two chains, else its helices are drawn alone. A bundle of a dimer's two
-    copies of one helix (1LMB α5) would hold them in one item, side by side across their axis, where no mirror
-    line can pass between them; apart, each copy can sit at its mate's mirror image."""
+    """Helix bundles (features.helix_bundles) cut where they cross between two protomers: the part of such a
+    bundle in one protomer stays a bundle if it still spans two chains, else its helices are drawn alone. A
+    bundle of a dimer's two copies of one helix (1LMB α5) would hold them in one item, side by side across their
+    axis, where no mirror line can pass between them; apart, each copy can sit at its mate's mirror image. A
+    bundle within one protomer, or of one protomer and chains outside every protomer (sector -1: a bound
+    peptide), is kept whole."""
     out = []
     for g in bundles:
         parts: dict[int, list[str]] = {}
         for k in g:
             parts.setdefault(sector.get(by_id[k].chain, -1), []).append(k)
+        if len(parts.keys() - {-1}) < 2:
+            out.append(g)
+            continue
         out += [parts[p] for p in sorted(parts) if len({by_id[k].chain for k in parts[p]}) > 1]
     return out
 

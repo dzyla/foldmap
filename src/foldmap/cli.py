@@ -131,7 +131,12 @@ DYAD_IN_PAGE = np.radians(10)  # a two-fold axis within this of the page plane i
 def _mirror_frame(frame, sym) -> None:
     """A dimer whose dyad lies in the page (perpendicular to the duplex of a RadialFrame, along page-up of a
     Frame) is drawn as one protomer and its mirror image: the frame learns the protomers (sector, classes, as
-    symmetric_frame gives them) and the page x of the mirror line, where the dyad projects (snapped)."""
+    symmetric_frame gives them) and the page x of the mirror line, where the dyad projects (snapped).
+
+    The mirror is exact for the default view of a dimer of matching copies (1LMB, to 6e-16). Elsewhere it is best
+    effort: a dyad up to DYAD_IN_PAGE off the page (as an --up or --view can leave it) is mirrored as if it lay
+    in it, copies that do not match one-to-one are tied by vote, and a sheet shared between the two protomers is
+    one item that no mirror line can pass through."""
     if isinstance(frame, RadialFrame):
         in_page = abs(float(sym.axis @ frame.axis)) < np.sin(DYAD_IN_PAGE)
     else:
