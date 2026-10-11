@@ -407,6 +407,32 @@ def test_every_theme_backbone_default_is_distinct_from_ink_and_the_first_eight_c
     assert delta_e(look.dna_color, look.rna_color) >= 15
 
 
+@pytest.mark.parametrize("theme", list(THEMES))
+def test_every_theme_hbond_colour_is_clear_of_the_ink_the_chains_the_backbones_and_the_chain_pool(theme):
+    """The dashed hydrogen-bond lines must not pass for a chain, a backbone or the ink. A greyscale theme (its
+    chains are greys) asks only for a grey clear of the ink, the page and the two nucleic-acid greys."""
+    from foldmap.palette import PALETTES, delta_e
+    from foldmap.render import _CHAIN_POOL
+
+    look = THEMES[theme]
+    colour = look.hbond_color
+    if theme in GREYSCALE:
+        r, g, b = (int(colour[i : i + 2], 16) for i in (1, 3, 5))
+        assert r == g == b, (theme, colour)
+        others = [look.ink, look.background, look.dna_color, look.rna_color]
+    else:
+        palette = PALETTES[look.palette]
+        others = [
+            look.ink,
+            look.background,
+            look.dna_color,
+            look.rna_color,
+            *[palette[i % len(palette)] for i in range(8)],
+            *_CHAIN_POOL,
+        ]
+    assert min(delta_e(colour, other) for other in others) >= 15, (theme, colour)
+
+
 @pytest.mark.parametrize("theme", GREYSCALE)
 def test_greyscale_themes_keep_nucleic_acid_in_two_distinct_greys(theme):
     """A grey palette cannot keep a grey clear of all its chain greys, so such themes ask only that the two

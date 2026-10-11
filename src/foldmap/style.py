@@ -117,7 +117,7 @@ class Style:
     hbonds: str = (
         "off"  # dashed lines for hydrogen bonds: off, na (protein with nucleic acid), interchain or chains:A+B,C+D
     )
-    hbond_color: str = "#2a9d8f"  # the dashed lines
+    hbond_color: str = "#d020f8"  # the dashed lines (a violet-magenta clear of every theme palette; see THEMES)
     hbond_max: int = 200  # at most this many lines, the shortest kept
     mark: str = ""  # elements in a colour of their own: "G", "A:G=#2ca02c", "#3", "res:150-159=red", comma-separated
 
@@ -140,7 +140,7 @@ class Style:
         backbone_overrides(self.backbone_colors)
         parse_selection(self.hbonds)
         if not is_color_like(self.hbond_color):
-            raise ValueError(f"hbond_color must be a colour such as #2a9d8f or teal; got {self.hbond_color!r}")
+            raise ValueError(f"hbond_color must be a colour such as #d020f8 or teal; got {self.hbond_color!r}")
         if isinstance(self.hbond_max, bool) or not isinstance(self.hbond_max, int) or self.hbond_max < 1:
             raise ValueError(f"hbond_max must be a whole number of 1 or more; got {self.hbond_max!r}")
         if not re.fullmatch(r"auto|all|none|[a-z-]+(,[a-z-]+)*", self.uniprot_sites):
@@ -161,7 +161,13 @@ THEMES = {
     "publication": Style(),
     "minimal": Style(fill="outline", helix_shading="none", loop_width=0.8, na_style="block"),
     "print": Style(
-        palette="greys", fill="pale", helix_shading="none", na_style="block", dna_color="#4d4d4d", rna_color="#808080"
+        palette="greys",
+        fill="pale",
+        helix_shading="none",
+        na_style="block",
+        dna_color="#4d4d4d",
+        rna_color="#808080",
+        hbond_color="#b3b3b3",
     ),
     "presentation": Style(loop_width=1.6, font_scale=1.4, helix_shading="gloss", loops="curved", na_style="ribbon"),
     "cartoon": Style(loops="curved", helix_shading="gloss", palette="tol-bright", na_style="ribbon"),
@@ -179,6 +185,7 @@ THEMES = {
         loop_width=0.9,
         dna_color="#e8743b",
         rna_color="#a06cd5",
+        hbond_color="#989890",
     ),
     "conservation": Style(color_by="conservation", loop_color="residue"),
     "alphafold": Style(color_by="plddt", loop_color="residue", loop_width=1.3),
