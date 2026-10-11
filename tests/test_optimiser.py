@@ -139,10 +139,10 @@ def test_optimiser_inputs_are_snapped_to_a_grid(pdb, focus, restarts, monkeypatc
         starts.append(np.array(x0))
         return real_lbfgs(f, x0, **k)
 
-    def dense(flat, home, anchor_w, want, W, loops, lam, mids=None):
+    def dense(flat, home, anchor_w, want, W, loops, lam, mids=None, fixed=None):
         if len(firsts) < len(starts):
-            firsts.append((lam, flat, home, want, loops[1], loops[3], mids))
-        return real_dense(flat, home, anchor_w, want, W, loops, lam, mids)
+            firsts.append((lam, flat, home, want, loops[1], loops[3], mids, fixed))
+        return real_dense(flat, home, anchor_w, want, W, loops, lam, mids, fixed)
 
     monkeypatch.setattr(L, "_lbfgs", lbfgs)
     monkeypatch.setattr(L, "_energy_dense", dense)
@@ -155,8 +155,9 @@ def test_optimiser_inputs_are_snapped_to_a_grid(pdb, focus, restarts, monkeypatc
     assert len(first_stages) == 1 + (len(starts) - len(L._LAMBDAS)) // (len(L._LAMBDAS) - 1)
     assert (len(first_stages) > 1) == restarts
     assert all(_on_grid(z) for z in first_stages)
-    for _, _, home, want, oi, oj, mids in firsts:
+    for _, _, home, want, oi, oj, mids, fixed in firsts:
         assert _on_grid(home) and _on_grid(want) and _on_grid(oi) and _on_grid(oj) and _on_grid(mids)
+        assert fixed is None or (_on_grid(fixed[0]) and _on_grid(fixed[1]))  # the traces' boxes
     assert _on_grid(firsts[0][1])  # spread and lift too: every copy starts on the grid
 
 

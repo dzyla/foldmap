@@ -7,6 +7,7 @@ from __future__ import annotations
 import itertools
 import re
 from dataclasses import dataclass, field
+from types import SimpleNamespace
 
 import numpy as np
 
@@ -407,14 +408,18 @@ def _joint_matrix(n: int, joints) -> np.ndarray:
 
 
 def _separate(
-    items: list[_Item], ties: dict[int, tuple[int, int]] | None = None, joints: set[tuple[int, int]] = frozenset()
+    items: list[_Item],
+    ties: dict[int, tuple[int, int]] | None = None,
+    joints: set[tuple[int, int]] = frozenset(),
+    fixed: list[tuple[float, float, float, float]] = (),
 ) -> None:
     """Push overlapping items apart, then slide any left over clear. With `ties` (_symmetry_ties) the pushes
     keep every protomer drawn alike (_push_apart), and that result is kept if it clears every overlap within
     _SEP_ORBIT_SWEEPS sweeps and its box takes at most _SEP_SYM_ROOM times the area of moving the items one by
     one from the same start (widening the spread can otherwise cost far more room); else the one-by-one
     result is used. Consecutive pieces of one bent duplex (`joints`, _joints) in a short chain (_rigid_joints)
-    are moved together and never pushed apart."""
+    are moved together and never pushed apart. Items are pushed off the `fixed` boxes (x0, y0, x1, y1), which
+    stay where they are."""
     halves = np.array([it.half for it in items], float).reshape(-1, 2)
     mids = np.array([it.mid for it in items], float).reshape(-1, 2)
     start = np.array([(it.cx, it.cy) for it in items], float).reshape(-1, 2)
@@ -423,13 +428,13 @@ def _separate(
     apart = _joint_matrix(len(items), joints)
     xy = start.copy()
     alone = start.copy()
-    _push_apart(alone, halves, mids, home, {}, _SEP_SWEEPS, apart)
-    together = ties and _push_apart(xy, halves, mids, home, ties, _SEP_ORBIT_SWEEPS, apart)
+    _push_apart(alone, halves, mids, home, {}, _SEP_SWEEPS, apart, fixed)
+    together = ties and _push_apart(xy, halves, mids, home, ties, _SEP_ORBIT_SWEEPS, apart, fixed)
     if not together or _box_area(xy, halves, mids) > _SEP_SYM_ROOM * _box_area(alone, halves, mids):
         xy = alone
     for it, (x, y) in zip(items, xy.tolist()):
         it.cx, it.cy = x, y
-    _slide_clear(items, joints)
+    _slide_clear(items, joints, fixed)
 
 
 def _components(n: int, links) -> np.ndarray:
@@ -505,6 +510,7 @@ def _push_apart(
     ties: dict[int, tuple[int, int]],
     sweeps: int,
     apart: np.ndarray | None = None,
+    fixed: list[tuple[float, float, float, float]] = (),
 ) -> bool:
     """Push overlapping footprints apart in place (axis of least penetration); spring back to home early on.
     Each sweep finds the overlapping pairs at once and resolves them in order. With `ties` a push moves an
@@ -513,6 +519,7 @@ def _push_apart(
     between two copies of one element); otherwise two copies of one element, which no orbit-wide move can
     part, move alone. Items joined by `apart` (consecutive pieces of one bent duplex) are never pushed apart: a push
     moves the whole chain of pieces (with their orbits); two items of one such group that overlap move alone.
+    An item overlapping a `fixed` box (x0, y0, x1, y1) is pushed (with its group) the whole way off it.
     True if no overlap is left."""
     n = len(xy)
     root = list(range(n))  # the protomer-0 item of each item's orbit
@@ -528,9 +535,10 @@ def _push_apart(
     group = [members[c] for c in cid.tolist()]
     protomer = [copy_k[i] if len(orbits[root[i]]) > 1 else None for i in range(n)]  # None: item has no copies
     widen = np.sign(sum((xy[i, 0] - xy[j, 0]) / k for i, (j, k) in ties.items())) or 1.0  # protomer k lies this way
+    walls = np.asarray(fixed, float).reshape(-1, 4)
     for sweep in range(sweeps):
         pairs = _overlapping(xy, halves, mids, apart)
-        if not len(pairs) and sweep >= 100:
+        if not len(pairs) and not _off_walls(xy, halves, mids, walls, group, move=False) and sweep >= 100:
             return True
         for i, j in pairs.tolist():
             dx = xy[j, 0] + mids[j, 0] - xy[i, 0] - mids[i, 0]
@@ -553,20 +561,52 @@ def _push_apart(
                 s = (1 if dy > 0 else -1) if dy != 0 else 1
                 xy[gi, 1] -= s * (py / 2 + _SEP_PUSH)
                 xy[gj, 1] += s * (py / 2 + _SEP_PUSH)
+        _off_walls(xy, halves, mids, walls, group)
         if sweep < 100:
             xy += 0.03 * (home - xy)
-    return not len(_overlapping(xy, halves, mids, apart))
+    return not len(_overlapping(xy, halves, mids, apart)) and not _off_walls(xy, halves, mids, walls, group, move=False)
 
 
-def _slide_clear(items: list[_Item], joints: set[tuple[int, int]] = frozenset()) -> None:
+def _off_walls(xy, halves, mids, walls, group, move: bool = True) -> bool:
+    """Push each footprint overlapping a fixed box (walls: x0, y0, x1, y1 rows), MARGIN kept, the whole way off it
+    along the axis of least overlap, moving its group (`group[i]`, the items moved with item i) in place. True if
+    any overlapped (with move=False, only that is reported)."""
+    if not len(walls):
+        return False
+    centres, half = (walls[:, :2] + walls[:, 2:]) / 2, (walls[:, 2:] - walls[:, :2]) / 2
+    d = centres[None, :, :] - (xy + mids)[:, None, :]
+    pen = halves[:, None, :] + half[None, :, :] + MARGIN - np.abs(d)
+    hits = np.argwhere((pen[..., 0] > 1e-9) & (pen[..., 1] > 1e-9))
+    if not move or not len(hits):
+        return bool(len(hits))
+    for i, w in hits.tolist():  # in order; an earlier push may already have cleared it
+        dx, dy = centres[w] - xy[i] - mids[i]
+        px = halves[i, 0] + half[w, 0] + MARGIN - abs(dx)
+        py = halves[i, 1] + half[w, 1] + MARGIN - abs(dy)
+        if px <= 1e-9 or py <= 1e-9:
+            continue
+        if px < py:
+            xy[group[i], 0] -= ((1 if dx > 0 else -1) if dx != 0 else 1) * (px + _SEP_PUSH)
+        else:
+            xy[group[i], 1] -= ((1 if dy > 0 else -1) if dy != 0 else 1) * (py + _SEP_PUSH)
+    return True
+
+
+def _slide_clear(
+    items: list[_Item], joints: set[tuple[int, int]] = frozenset(), fixed: list[tuple[float, float, float, float]] = ()
+) -> None:
     """Guarantee: each item in turn, if it still overlaps one already settled (other than a piece it is joined
-    to, `joints`), takes the nearest clear spot straight right, left, up or down (in that order on a tie), in
-    _SLIDE_STEP steps."""
+    to, `joints`) or a `fixed` box, takes the nearest clear spot straight right, left, up or down (in that order on
+    a tie), in _SLIDE_STEP steps."""
     halves = [it.half for it in items]
     mids = [it.mid for it in items]
+    walls = [
+        (SimpleNamespace(cx=(x0 + x1) / 2, cy=(y0 + y1) / 2), ((x1 - x0) / 2, (y1 - y0) / 2), (0.0, 0.0))
+        for x0, y0, x1, y1 in fixed
+    ]
     for i, it in enumerate(items):
         x0, y0 = it.cx, it.cy
-        settled = [(items[j], halves[j], mids[j]) for j in range(i) if (j, i) not in joints]
+        settled = walls + [(items[j], halves[j], mids[j]) for j in range(i) if (j, i) not in joints]
         k = 0
         while any(_collide(it, halves[i], mids[i], *other) for other in settled):
             k += 1
@@ -618,13 +658,14 @@ def _mass(it: _Item) -> float:
     return sum(len(m.axial) / 4 if isinstance(m, PlacedStem) else 1 for m in it.members)
 
 
-def _energy(flat, home, anchor_w, want, pull, loops, lam, mids=None):
+def _energy(flat, home, anchor_w, want, pull, loops, lam, mids=None, fixed=None):
     """Layout energy and gradient over only the overlapping boxes and the contact pairs `pull` = (i, j, w), i < j.
     Same terms as _energy_dense."""
     P = flat.reshape(-1, 2)
     grad = 2 * anchor_w * (P - home)
     E = float((anchor_w[:, 0] * ((P - home) ** 2).sum(1)).sum())
     Q = P if mids is None else P + mids  # footprint centres
+    E += _fixed_overlap(Q, fixed, lam, grad)
     oi, oj = np.nonzero(np.triu(want[..., 0] > np.abs(Q[None, :, 0] - Q[:, None, 0]), 1))
     keep = want[oi, oj, 1] > np.abs(Q[oj, 1] - Q[oi, 1])
     oi, oj = oi[keep], oj[keep]
@@ -655,6 +696,21 @@ def _energy(flat, home, anchor_w, want, pull, loops, lam, mids=None):
     return E, grad.ravel()
 
 
+def _fixed_overlap(Q, fixed, lam, grad) -> float:
+    """lam * squared overlap of each footprint (centres Q) with each fixed box, `fixed` = (box centres (m, 2),
+    wanted centre distances (n, m, 2): half extents of both plus MARGIN), along the axis of least overlap; the
+    gradient (added to `grad` in place) moves the footprints only."""
+    if fixed is None or not len(fixed[0]):
+        return 0.0
+    centres, want = fixed
+    d = centres[None, :, :] - Q[:, None, :]
+    px, py = want[..., 0] - np.abs(d[..., 0]), want[..., 1] - np.abs(d[..., 1])
+    hit, on_x = (px > 0) & (py > 0), px < py
+    grad[:, 0] += np.where(hit & on_x, 2 * lam * px * np.sign(d[..., 0]), 0.0).sum(1)
+    grad[:, 1] += np.where(hit & ~on_x, 2 * lam * py * np.sign(d[..., 1]), 0.0).sum(1)
+    return lam * float((np.where(on_x, px, py)[hit] ** 2).sum())
+
+
 def _pair_grad(grad, i, j, d, gx, gy) -> None:
     """Add dE/d(overlap depth) of pairs (i, j), d = Q_j - Q_i, to the per-item gradient (in place)."""
     n = len(grad)
@@ -663,15 +719,17 @@ def _pair_grad(grad, i, j, d, gx, gy) -> None:
     grad[:, 1] += np.bincount(i, fy, n) - np.bincount(j, fy, n)
 
 
-def _energy_dense(flat, home, anchor_w, want, W, loops, lam, mids=None):
+def _energy_dense(flat, home, anchor_w, want, W, loops, lam, mids=None, fixed=None):
     """Layout energy and its gradient. Terms: stay near the projected position (fold); loop ends within
     _LOOP_SLACK of each other; touching elements' (and DNA binders') boxes adjacent;
-    lam * squared box overlap (raised stage by stage until overlaps are gone)."""
+    lam * squared box overlap (raised stage by stage until overlaps are gone), with each other and with the
+    `fixed` boxes (_fixed_overlap)."""
     P = flat.reshape(-1, 2)
     n = len(P)
     grad = 2 * anchor_w * (P - home)
     E = float((anchor_w[:, 0] * ((P - home) ** 2).sum(1)).sum())
     Q = P if mids is None else P + mids  # footprint centres
+    E += _fixed_overlap(Q, fixed, lam, grad)
     d = Q[None, :, :] - Q[:, None, :]  # d[i, j] = Q_j - Q_i
     sg = np.sign(d)
     px, py = want[..., 0] - np.abs(d[..., 0]), want[..., 1] - np.abs(d[..., 1])  # overlap depth per axis
@@ -808,13 +866,15 @@ def _attract(
     bridges: list[tuple[str, float, str, float]] = (),
     extra: list[tuple[int, np.ndarray, int, np.ndarray, float, float]] = (),
     joints: set[tuple[int, int]] = frozenset(),
+    fixed: list[tuple[float, float, float, float]] = (),
 ) -> None:
     """Minimise the layout energy (_energy) from the projected positions, raising the overlap penalty in
     stages. The result becomes each item's new home; _separate then guarantees no overlap remains. Every input
     is snapped to the grid (_snap) and _lbfgs runs without BLAS, so the minimum is the same on every machine.
     `extra`: further springs (item i, port offset, item j, port offset, weight, slack), the nucleic-acid strands
     from stem to stem (_stem_springs). `joints` (_joints): pairs of items kept apart without MARGIN, so their
-    boxes may touch and no element fits between them for long."""
+    boxes may touch and no element fits between them for long. `fixed`: boxes (x0, y0, x1, y1) that stay where
+    they are, every item kept MARGIN off them (the traces of unpaired strands)."""
     n = len(items)
     W = _contact_weights(items, contacts)
     ci, cj = np.nonzero(np.triu(W > 0, 1))
@@ -858,6 +918,9 @@ def _attract(
     want[joined] = (h[:, None, :] + h[None, :, :])[joined]
     anchor_w = _K_HOME * np.array([[_mass(it)] for it in items], float)
     mids = _snap([it.mid for it in items])
+    boxes = np.asarray(fixed, float).reshape(-1, 4)
+    centres, halves = _snap((boxes[:, :2] + boxes[:, 2:]) / 2), _snap((boxes[:, 2:] - boxes[:, :2]) / 2)
+    walls = (centres, h[:, None, :] + halves[None, :, :] + MARGIN)
     spread, lift = float(_snap(spread)), float(_snap(lift))
     ties = ties or {}
     free = [i for i in range(n) if i not in ties]
@@ -873,9 +936,9 @@ def _attract(
 
     def tied(z):  # one position per orbit of symmetry copies, plus the spread between protomers
         if n > _PAIR_ENERGY_ABOVE:
-            E, g = _energy(expand(z).ravel(), home, anchor_w, want, pull, loops, lam, mids)
+            E, g = _energy(expand(z).ravel(), home, anchor_w, want, pull, loops, lam, mids, walls)
         else:
-            E, g = _energy_dense(expand(z).ravel(), home, anchor_w, want, W, loops, lam, mids)
+            E, g = _energy_dense(expand(z).ravel(), home, anchor_w, want, W, loops, lam, mids, walls)
         g = g.reshape(-1, 2)
         gz = np.zeros((len(free), 2))
         np.add.at(gz, base, g)
@@ -1439,9 +1502,10 @@ def _adjust(
     swap: list[tuple[str, str]],
     move: list[tuple[str, tuple[float, float]]],
     joints: set[tuple[int, int]] = frozenset(),
+    fixed: list[tuple[float, float, float, float]] = (),
 ) -> None:
     """The user's own hand on the layout: new labels, exchanged places, nudges; then overlaps are cleared
-    (consecutive pieces of a bent duplex, `joints`, may still meet)."""
+    (consecutive pieces of a bent duplex, `joints`, may still meet; items keep off the `fixed` boxes)."""
     where = {
         m.sse.id: (it, k) for it in items for k, m in enumerate(it.members) if isinstance(m, Placed) and not m.ghost
     }
@@ -1470,7 +1534,7 @@ def _adjust(
     if moved:
         for it in items:
             it.home = (it.cx, it.cy)
-        _separate(items, None, joints)
+        _separate(items, None, joints, fixed)
         for it in items:
             it.apply()
 
@@ -1531,6 +1595,7 @@ def build_layout(
             members[mine[0].id].ends += "N"
             members[mine[-1].id].ends += "C"
     joints = _joints(items, nucleic) if pieces else set()
+    walls = [(*pts.min(axis=0), *pts.max(axis=0)) for pts in traces.values()]  # traces stay: items keep off them
     if mode == "stack":
         _stack(items)
         _centre_dna_over_binders(items, contacts)
@@ -1551,10 +1616,10 @@ def build_layout(
         if attract and len(items) > 1:
             extra = _stem_springs(items, nucleic) if pieces else []
             rise = getattr(frame, "rise", 0.0) * SCALE
-            _attract(items, sses, contacts, ties, spread, rise, bridges or [], extra=extra, joints=joints)
-        _separate(items, ties, joints)
+            _attract(items, sses, contacts, ties, spread, rise, bridges or [], extra=extra, joints=joints, fixed=walls)
+        _separate(items, ties, joints, walls)
         if domains and _part_domains(items, domains):
-            _separate(items, ties, joints)
+            _separate(items, ties, joints, walls)
     for it in items:
         it.apply()
     dna = [m for it in items for m in it.members if isinstance(m, PlacedStem)]
@@ -1563,7 +1628,7 @@ def build_layout(
     _assign_labels(placed)
     real = {p.sse.id: p for p in placed}
     if rename or swap or move:
-        _adjust(items, Layout(real, (0.0, 0.0, 0.0, 0.0)), sses, rename or {}, swap or [], move or [], joints)
+        _adjust(items, Layout(real, (0.0, 0.0, 0.0, 0.0)), sses, rename or {}, swap or [], move or [], joints, walls)
     for g in ghosts:
         g.label = real[g.sse.id].label
     rects = np.array([p.rect for p in placed + ghosts + dna]).reshape(-1, 4)

@@ -1651,3 +1651,32 @@ def test_a_chain_break_is_drawn_as_a_gap_with_no_ends_at_it():
     (gap,) = [p for p in lay.na_paths if p.kind == "gap"]
     assert gap.strand == 0 and gap.label == ""  # 2 nt: a bare dashed break
     assert not isinstance(lay.frame, RadialFrame)
+
+
+def test_a_trace_is_an_obstacle_the_protein_keeps_off():
+    """1QBJ: hexamer F pairs only with a crystal mate, so it is drawn as a trace at its projected place; chain C's
+    alpha1 was placed on it (the trace a routing fallback). The trace's box is a fixed obstacle in placement."""
+    lay, _, _, _ = _routed("1QBJ")
+    (pts,) = lay.na_traces.values()
+    box = (*np.min(pts, axis=0), *np.max(pts, axis=0))
+    assert not [p.sse.id for p in lay.placed.values() if _overlap(p.rect, box)]
+    assert not [d.id for d in lay.stems if _overlap(d.rect, box)]
+    assert not [p.kind for p in lay.na_paths if p.fallback]
+
+
+def test_the_trace_boxes_reach_the_optimiser_on_the_grid(monkeypatch):
+    import foldmap.layout as L
+
+    seen, real = [], L._energy_dense
+
+    def dense(*a):
+        seen.append(a[8])
+        return real(*a)
+
+    monkeypatch.setattr(L, "_energy_dense", dense)
+    make_layout(_path("1QBJ"))
+    centres, want = seen[0]
+    assert len(centres) == 1
+    for v in (centres, want):
+        v = np.asarray(v) * 1e4
+        assert np.all(np.abs(v - np.round(v)) < 1e-6)
