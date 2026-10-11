@@ -2011,3 +2011,13 @@ def test_a_trace_seen_straight_end_on_is_nudged_apart_too():
     pts = _traces(SimpleNamespace(strands=[strand], structure=SimpleNamespace(stems=[])), frame)[0]
     d = np.hypot(*(pts[:, None] - pts[None]).transpose(2, 0, 1))
     assert d[np.triu_indices(3, 1)].min() >= _BEAD - 1e-3
+
+
+def test_drawn_base_letters_are_the_parent_bases():
+    # 1EHZ: tRNA with 5MC, YYG, PSU, ... drawn as their parent base, not the last character of the residue name
+    fig, _ = make_figure_and_loops(_path("1EHZ"))
+    drawn = {t.get_gid(): t.get_text() for t in _gid(fig, "na:nt:")}
+    assert len(drawn) == 76
+    assert drawn["na:nt:A:40"] == "C"  # 5MC40
+    assert drawn["na:nt:A:37"] == "G"  # YYG37 (wybutosine)
+    assert set(drawn.values()) <= set("ACGU")

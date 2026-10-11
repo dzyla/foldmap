@@ -128,6 +128,11 @@ class NAStrand:
     rna: bool
     cut5: bool = False  # cropped, or a chain break: the molecule continues beyond its 5' end
     cut3: bool = False  # ... beyond its 3' end
+    bases: str = ""  # the parent base letter per nucleotide (A C G U T I; N when it has none); "N" throughout if unset
+
+    def __post_init__(self):
+        if not self.bases:
+            self.bases = "N" * len(self.labels)
 
     @property
     def id(self) -> str:
@@ -299,6 +304,7 @@ def _cut(na: Nucleic, windows: dict[int, list[tuple[int, int]]]) -> Nucleic:
                     s.rna,
                     s.cut5 or lo > 0 or k in joined,
                     s.cut3 or hi < len(s) - 1 or k in after,
+                    s.bases[lo : hi + 1],
                 )
             )
             last, left_out, pos = len(strands) - 1, 0, hi + 1

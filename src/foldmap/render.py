@@ -243,12 +243,6 @@ def _compound(polys: list[np.ndarray], closed: bool = True) -> Path:
     return Path(verts, codes)
 
 
-def _base_letter(name: str) -> str:
-    """DA -> A, U -> U; anything unusual -> N."""
-    letter = name.strip()[-1:].upper()
-    return letter if letter in "ACGTUI" else "N"
-
-
 def _na_style(layout: Layout, look: Style) -> str:
     """The stem style drawn: a large nucleic acid cropped by na_extent auto goes from ladder to block."""
     return "block" if look.na_style == "ladder" and layout.na_cropped else look.na_style
@@ -539,7 +533,7 @@ def _draw_na_marks(ink: _NAInk, layout: Layout, style: str, residue_colour, pt_p
                 marks.setdefault(hit[0], []).append((key, toucher[key], hit[1]))
             t = ink.ax.text(
                 *xy,
-                _base_letter(lab.name),
+                na.strands[key[0]].bases[key[1]],
                 ha="center",
                 va="center",
                 rotation=rot,

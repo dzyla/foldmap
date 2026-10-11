@@ -11,7 +11,7 @@ import numpy as np
 from scipy.spatial import cKDTree
 
 from .model import Backbone, Ligand, Links, NAStrand, Nucleic, ResLabel, nucleic_from_pairs
-from .nucleic import NAGap, pair_nucleotides
+from .nucleic import NAGap, pair_nucleotides, parent_base
 
 _BB_ATOMS = ("N", "CA", "C", "O")
 _PEPTIDE_BOND_MAX = 2.5  # Å, C(i-1)-N(i), as in DSSP
@@ -335,6 +335,7 @@ def _nucleic_strands(model):
                     np.array([point(r) for r in run]),
                     np.array([r.find_atom("C1'", "*").pos.tolist() for r in run]),
                     rna,
+                    bases="".join(parent_base(r) or "N" for r in run),
                 ),
                 run,
             )

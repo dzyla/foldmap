@@ -194,3 +194,62 @@ def test_a_stretched_pair_needs_a_strict_neighbour_in_register():
     assert frozenset((("E", 867, ""), ("F", 887, ""))) not in pairs
     assert frozenset((("E", 868, ""), ("F", 886, ""))) not in pairs
     assert frozenset((("E", 866, ""), ("F", 888, ""))) in pairs  # the strict pairs around are untouched
+
+
+def _synthetic_run(names_and_bases):
+    """A gemmi chain of RNA-like residues, O3'-P linked, each with the sugar atoms and the base atoms given."""
+    base_atoms = {
+        "A": ("N9", "N6"),
+        "C": ("N1", "N4"),
+        "U": ("N1", "N3", "O4"),
+    }
+    chain = gemmi.Chain("A")
+    for k, (name, base) in enumerate(names_and_bases):
+        res = gemmi.Residue()
+        res.name, res.seqid = name, gemmi.SeqId(k + 1, " ")
+        x = 3.5 * k
+        for a, dx, dy in (
+            ("P", -1.6, 0),
+            ("C4'", 0, 1),
+            ("O4'", 0.5, 1.2),
+            ("C1'", 1, 1),
+            ("O3'", 1.6, 0),
+            ("O2'", 1, 2),
+        ):
+            atom = gemmi.Atom()
+            atom.name, atom.pos = a, gemmi.Position(x + dx, dy, 0)
+            res.add_atom(atom)
+        for n in base_atoms[base]:
+            atom = gemmi.Atom()
+            atom.name, atom.pos = n, gemmi.Position(x, 5, 0)
+            res.add_atom(atom)
+        chain.add_residue(res)
+    model = gemmi.Model("1")
+    model.add_chain(chain)
+    return model
+
+
+def test_strand_bases_are_the_parent_bases_of_modified_and_untabulated_nucleotides():
+    # CFL and UFT are 2'-F cytidine and uridine: gemmi does not know them, and their names end in L and T
+    model = _synthetic_run([("A", "A"), ("CFL", "C"), ("UFT", "U"), ("A", "A")])
+    ((strand, run),) = _nucleic_strands(model)
+    assert [r.name for r in run] == ["A", "CFL", "UFT", "A"]
+    assert strand.bases == "ACUA"
+
+
+def test_strand_bases_of_a_nucleotide_without_a_base_are_n():
+    model = _synthetic_run([("A", "A"), ("ZZZ", "A"), ("A", "A")])
+    for atom_name in ("N9", "N6"):
+        model[0][1].remove_atom(atom_name, "*")
+    ((strand, _),) = _nucleic_strands(model)
+    assert strand.bases == "ANA"
+
+
+def test_strand_bases_follow_the_residues_through_a_cut():
+    from foldmap.model import _cut, nucleic_from_pairs
+
+    strand = _found("1EHZ")[0][0]
+    assert len(strand.bases) == len(strand) == 76 and "N" not in strand.bases  # 5MC, YYG keep their parent base
+    assert strand.labels[39].name == "5MC" and strand.bases[39] == "C"
+    (piece,) = _cut(nucleic_from_pairs([strand], [], {}, {}), {0: [(35, 45)]}).strands
+    assert piece.bases == strand.bases[35:46] and piece.bases[4] == "C"
