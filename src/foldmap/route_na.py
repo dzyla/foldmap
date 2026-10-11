@@ -39,7 +39,16 @@ _TAIL_ROUTED = 6  # a free end of more nucleotides that no straight drawing keep
 # crossing a strand only a cost: run-run crossings 250 -> 239, protein loops crossed 178 -> 175, no entry worse in
 # either (bound 2: 245; unbounded: 250, with 4YBB, 2GIS and 4P9R worse)
 _DETOUR = 3.0
-_FIRST_NODES = 20_000  # the A* budget of that first stage (route._MAX_NODES for any other route)
+# either stage's drawing is also at most this many nucleotide steps longer than the plain one per nucleotide on it
+# (and per end): no perimeter loops (4YBB's
+# P72->P71 was drawn 5.7 times its direct distance, 1GID's P15->P16 3.6). Measured on all 39 entries: 6 keeps every
+# entry's protein-loop crossings at or below step 2's (total 158 -> 165; 4 and 5 put 5B43 and 4YBB above it), the
+# longest run at 3.1 times its direct distance (was 5.7)
+_DETOUR_STEPS = 6.0
+# the A* budget of that first stage (route._MAX_NODES for any other route): a detour longer than the caps above is not
+# taken, so there is no need to search far. 5000 (was 20000) keeps 4YBB's routing within 1.5x of step 2's time and
+# changes no entry's crossings but 1Y26's run-run (3 -> 5)
+_FIRST_NODES = 5_000
 # failing that, a strand pays for the cells beside the strands (a run with nucleotides) and protein loops it passes
 # as well, where its nucleotides would touch theirs, and that makes crossing them cost more than a cell; taken when
 # at most this many times as long as its plain drawing. Measured on all 39 campaign entries with the first stage:
@@ -822,17 +831,18 @@ def _strand_between(
     if strands is None:
         return _drawing(*args, 0)
     grid = router.grid
-    start = grid.used
+    start, counts = grid.used, (router.tight, router.rejected)
 
-    def attempt(levels, cost):  # the first of these passes that draws, with this extra cost: (path, cells used)
+    def attempt(levels, cost):  # the first of these passes that draws, with this extra cost: (path, cells used, counts)
+        router.tight, router.rejected = counts  # the debug counts of the attempt taken only
         for level in levels:
             grid.used = start + cost if cost is not None else start.copy()
             path = _drawing(*args, level)
             if path is not None:
-                return path, (grid.used - cost if cost is not None else grid.used)
-        return None, None
+                return path, (grid.used - cost if cost is not None else grid.used), (router.tight, router.rejected)
+        return None, None, None
 
-    plain, used = attempt((1, 0), None)  # off the hairpin loops and free ends, else crossing them only a cost
+    plain, used, plain_counts = attempt((1, 0), None)  # off the hairpin loops and free ends, else crossing them
     skip = frozenset((da.id, db.id)) if joint else None
     grid.used = used
     if not strands.crosses(plain.points[1:-1], skip) and (loops is None or not loops.crosses(plain.points[1:-1])):
@@ -840,21 +850,43 @@ def _strand_between(
     stages = [((2,), None, _DETOUR)] if nts else []  # off every strand and loop: a run with nucleotides only
     stages += [((1, 0), extra, _BESIDE_DETOUR)] if extra is not None else []  # paying for the cells beside them
     for levels, cost, bound in stages:
-        path, marked = attempt(levels, cost)
-        if (
-            path is not None
-            and _length(path.points) <= bound * _length(plain.points) + 1e-9
-            and (_off_names(path.points, names) or not _off_names(plain.points, names))
-        ):
+        path, marked, taken = attempt(levels, cost)
+        if path is not None and _takes_over(path, plain, bound, len(nts), names):
             grid.used = marked
+            router.tight, router.rejected = taken
             return path
     grid.used = used
+    router.tight, router.rejected = plain_counts
     return plain
+
+
+def _takes_over(path: NAPath, plain: NAPath, bound: float, m: int, names) -> bool:
+    """May a later stage's drawing of a strand with m nucleotides replace its plain drawing? Only if it is no fallback
+    where the plain one is clean, keeps off the stem names if the plain one does, and is no long detour: at most
+    `bound` times as long as the plain drawing and at most _DETOUR_STEPS nucleotide steps per nucleotide (and end)
+    longer."""
+    longest = min(bound * _length(plain.points), _length(plain.points) + _DETOUR_STEPS * NT_STEP * (m + 2))
+    return (
+        _length(path.points) <= longest + 1e-9
+        and (not path.fallback or plain.fallback)
+        and (_off_names(path.points, names) or not _off_names(plain.points, names))
+    )
 
 
 def _off_names(pts, names) -> bool:
     """Does a run's drawing keep off every stem-label box (`names`) between its faces?"""
-    return not any(clip_len(p, q, b) > 1e-9 for b in names for p, q in zip(pts[1:-1], pts[2:-1]))
+    mid = pts[1:-1]
+    if len(mid) < 2:
+        return True
+    xs, ys = [p[0] for p in mid], [p[1] for p in mid]
+    x0, y0, x1, y1 = min(xs), min(ys), max(xs), max(ys)
+    near = [b for b in names if b[0] < x1 and x0 < b[2] and b[1] < y1 and y0 < b[3]]  # the boxes it can meet
+    for p, q in zip(mid, mid[1:]):
+        lo_x, hi_x, lo_y, hi_y = min(p[0], q[0]), max(p[0], q[0]), min(p[1], q[1]), max(p[1], q[1])
+        for b in near:
+            if b[0] < hi_x and lo_x < b[2] and b[1] < hi_y and lo_y < b[3] and clip_len(p, q, b) > 1e-9:
+                return False
+    return True
 
 
 def _drawing(router: _Router, s, nts, between, da, db, ends, need, joint, kind, names, strands, loops, level):

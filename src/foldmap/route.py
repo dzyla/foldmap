@@ -338,7 +338,7 @@ class _Router:
     def __init__(self, grid: _Grid, elements: tuple[np.ndarray, list], keep_out=()):
         self.grid, self.elements = grid, elements
         self.keep_out = list(keep_out)  # the text and stub boxes the grid's soft cells were made from
-        self.tight = self.rejected = 0
+        self.tight = self.rejected = 0  # debug counts: routes drawn tight, drawings rejected as crossing
         self.max_nodes = _MAX_NODES  # the A* search's budget
 
     def drawn(self, pa, ea, own_a, pb, eb, own_b, own_body=False, loose=False):

@@ -1,5 +1,6 @@
 """Nucleic acids on the page: stems placed like elements, strands routed, four drawing styles, the explorer."""
 
+import copy
 import json
 import os
 import shutil
@@ -1011,12 +1012,13 @@ def test_a_free_end_keeps_out_of_its_partners_doorway(monkeypatch):
     assert not path.fallback and not route_na._crosses_segment(path.points, *door)
 
 
-@pytest.mark.parametrize("pdb, runs, protein", [("2GIS", 6, 0), ("30QM", 2, 6)])
+@pytest.mark.parametrize("pdb, runs, protein", [("2GIS", 6, 0), ("30QM", 2, 10)])
 def test_runs_keep_off_the_strands_drawn_before_them(pdb, runs, protein):
     """A run with nucleotides on it is routed off every strand drawn before it, and every protein loop, unless that
     is a long detour (route_na._DETOUR); failing that it pays for the cells beside them too (_BESIDE_DETOUR), else
-    crossing them is only a cost. Measured with crossing them only a cost: run-run crossings 2GIS 8, 30QM 3 (protein
-    loops crossed 17)."""
+    crossing them is only a cost; neither detour more than _DETOUR_STEPS steps per nucleotide longer. Measured with
+    crossing them only a cost: run-run crossings 2GIS 8, 30QM 3 (protein loops crossed 17; 6 with no step cap, which
+    drew the P2->P1 run boxing P1 in)."""
     from foldmap.nacheck import na_crossings
 
     lay, _, _, loops = _routed(pdb)
@@ -1066,6 +1068,72 @@ def test_a_crowded_letter_looks_further_out_and_along_its_strand():
     spot = letters[key]
     others = [q for k, q in letters.items() if k != key]
     assert not _near(spot, block) and min(np.hypot(*(np.subtract(others, spot)).T)) >= _LETTER_GAP
+
+
+def _straight(length):
+    from foldmap.route_na import NAPath
+
+    return NAPath("run", 0, [1, 2], [(0.0, 0.0), (0.0, 0.0), (length, 0.0), (length, 0.0)], [])
+
+
+@pytest.mark.parametrize("stage", ["first", "beside"])
+def test_a_later_stage_takes_over_only_within_its_detour_caps(stage):
+    """A staged drawing of a run replaces its plain one only within both caps: `bound` times as long (_DETOUR for
+    the drawing off every strand and loop, _BESIDE_DETOUR for the one paying for the cells beside them) and at most
+    _DETOUR_STEPS nucleotide steps longer per nucleotide and end (4YBB's P72->P71 went 5.7 times its direct distance
+    round a cluster of stems)."""
+    from foldmap.route_na import _BESIDE_DETOUR, _DETOUR, _DETOUR_STEPS, NT_STEP, _length, _takes_over
+
+    bound = _DETOUR if stage == "first" else _BESIDE_DETOUR
+    m, plain = 2, _straight(20.0)
+    extra = _DETOUR_STEPS * NT_STEP * (m + 2)  # 13.2: under (bound - 1) x 20 for both stages
+    assert extra < (bound - 1) * _length(plain.points)
+    assert _takes_over(_straight(20.0 + extra - 0.1), plain, bound, m, ())
+    assert not _takes_over(_straight(20.0 + extra + 0.3), plain, bound, m, ())  # over the step cap
+    short = _straight(4.0)  # here the ratio is the tighter cap
+    assert not _takes_over(_straight(4.0 * bound + 0.3), short, bound, m, ())
+
+
+def test_a_later_stage_never_replaces_a_clean_drawing_with_a_fallback():
+    from foldmap.route_na import _DETOUR, _takes_over
+
+    plain, staged = _straight(10.0), _straight(10.5)
+    staged.fallback = True
+    assert not _takes_over(staged, plain, _DETOUR, 2, ())
+    plain.fallback = True
+    assert _takes_over(staged, plain, _DETOUR, 2, ())  # both fallbacks: the later stage may still be taken
+
+
+def test_a_staged_strand_counts_the_router_debug_counts_of_its_drawing_only(monkeypatch):
+    """router.tight and router.rejected count once per strand routed: the attempts a later stage discards (here
+    the plain drawing and the first stage) leave no count behind."""
+    import foldmap.route_na as route_na
+    from foldmap.route import _element_obstacles, _Grid, _Router
+
+    lay, _, _, _ = _routed("1EHZ")
+    at = {key: d for d in lay.stems for key in d.axial}
+    run = next(p for p in lay.na_paths if p.kind == "run" and p.nts)
+    (s, i), (_, j) = run.between
+    router = _Router(_Grid(lay), _element_obstacles(lay))
+    plain, staged = copy.copy(run), copy.copy(run)
+    plain.fallback = staged.fallback = False
+
+    calls = []
+
+    def drawing(router, *args):  # every attempt counts one of each; level 2 draws nothing
+        router.tight += 1
+        router.rejected += 1
+        calls.append(args[-1])
+        return None if args[-1] == 2 else plain if len(calls) == 1 else staged
+
+    monkeypatch.setattr(route_na, "_drawing", drawing)
+    strands = route_na._Strands(router.grid)
+    a, b = np.asarray(plain.points[1]), np.asarray(plain.points[2])
+    mid, normal = (a + b) / 2, np.array([a[1] - b[1], b[0] - a[0]])
+    strands.add([tuple(mid - normal), tuple(mid + normal)])  # a strand across the plain drawing
+    extra = np.zeros_like(router.grid.used)
+    got = route_na._strand_between(router, s, i, j, at[(s, i)], at[(s, j)], None, (), strands, None, extra)
+    assert calls == [1, 2, 1] and got is staged and (router.tight, router.rejected) == (1, 1)
 
 
 def _in_outline(pt, e) -> bool:
