@@ -382,3 +382,28 @@ def test_runs_steer_round_hairpin_loops_and_free_ends(pdb):
                     f.kind,
                     f.nts[:2],
                 )
+
+
+def _in_outline(pt, e) -> bool:
+    c, s = np.cos(e.angle), np.sin(e.angle)
+    x, y = pt[0] - e.cx, pt[1] - e.cy
+    return abs(x * c + y * s) < e.length / 2 and abs(y * c - x * s) < e.width / 2
+
+
+@pytest.mark.parametrize("pdb", FIXTURES)
+def test_end_labels_keep_clear_of_loops_elements_and_other_labels(pdb):
+    from foldmap.layout import _GLYPH_H, _GLYPH_W, centred_box, label_boxes
+    from foldmap.route import clip_len
+
+    lay, sses, _, loops = _routed(pdb)
+    hw, hh = _GLYPH_W / 2 + 0.05, _GLYPH_H / 2
+    boxes = [centred_box(x, y, hw, hh) for _, _, (x, y) in lay.na_ends]
+    others = [b for _, b in label_boxes(lay, sses)]
+    bodies = [*lay.placed.values(), *lay.stems]
+    for k, (s, end, _) in enumerate(lay.na_ends):
+        box = boxes[k]
+        assert not any(_overlap(box, o) for o in others + boxes[:k] + boxes[k + 1 :]), (s, end)
+        for loop in loops:
+            assert all(clip_len(p, q, box) <= 1e-9 for p, q in zip(loop.points, loop.points[1:])), (s, end, loop.a_id)
+        samples = [(x, y) for x in np.linspace(box[0], box[2], 4) for y in np.linspace(box[1], box[3], 4)]
+        assert not any(_in_outline(q, e) for q in samples for e in bodies), (s, end)

@@ -335,8 +335,9 @@ def _polyline(grid: _Grid, cells, pa, ea, pb, eb, snap: bool):
 class _Router:
     """Draws routes on one grid and validates each drawing by _clear against the elements (and stems)."""
 
-    def __init__(self, grid: _Grid, elements: tuple[np.ndarray, list]):
+    def __init__(self, grid: _Grid, elements: tuple[np.ndarray, list], keep_out=()):
         self.grid, self.elements = grid, elements
+        self.keep_out = list(keep_out)  # the text and stub boxes the grid's soft cells were made from
         self.tight = self.rejected = 0
 
     def drawn(self, pa, ea, own_a, pb, eb, own_b, own_body=False, loose=False):
@@ -389,7 +390,7 @@ def route_loops(layout: Layout, sses: list[SSE], bb) -> list[Loop]:
     elements = _element_obstacles(layout)
     owners = elements[1] + [n.removeprefix("label:") if n.startswith("label:") else None for n, _ in keep_out]
     rects = np.hstack([elements[0], np.array([r for _, r in keep_out], float).reshape(-1, 4).T])
-    router = _Router(grid, elements)
+    router = _Router(grid, elements, [b for _, b in keep_out])
 
     dist = lambda ab: math.dist(layout.placed[ab[0].id].c_port, layout.placed[ab[1].id].n_port)  # noqa: E731
     routed: dict[tuple[str, str], tuple[list, bool, bool]] = {}  # points, fallback curve, over labels

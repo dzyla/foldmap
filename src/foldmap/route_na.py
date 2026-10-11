@@ -163,21 +163,58 @@ def _free_end(d: PlacedStem, key, m: int, five: bool, turn: float = 0.0):
     return _xy(pts), _xy(xy), (float(tip[0]), float(tip[1]))
 
 
-def _tail(d: PlacedStem, s: int, key, nts: list[int], five: bool, elements) -> tuple[NAPath, tuple, np.ndarray]:
+def _tail(router: _Router, layout: Layout, d: PlacedStem, s: int, key, nts: list[int], five: bool, labels):
     """A free end drawn straight on, or bent after its first nucleotide when that is what keeps it (and its end
-    label) clear of the elements: (path, end label position, outward direction at its tip)."""
-    for turn in _TURNS:
-        pts, xy, tip = _free_end(d, key, len(nts), five, turn)
-        drawn = pts[::-1] if five else pts
-        if _na_clear([*drawn, tip], (d,), elements):
+    label) clear of the elements, and its label clear of loops and other text: (path, end label position,
+    outward direction at its tip)."""
+    found = None
+    for need_label in (True, False) if labels is not None else (False,):
+        for turn in _TURNS:
+            pts, xy, tip = _free_end(d, key, len(nts), five, turn)
+            drawn = pts[::-1] if five else pts
+            if _na_clear([*drawn, tip], (d,), router.elements) and (
+                not need_label or _label_room(router, layout, tip, labels)
+            ):
+                found = pts, xy, tip
+                break
+        if found:
             break
-    else:
-        pts, xy, tip = _free_end(d, key, len(nts), five)
-        turn = None
-    path = NAPath("tail", s, nts, pts, xy, fallback=turn is None, between=(key,))
+    pts, xy, tip = found or _free_end(d, key, len(nts), five)
+    path = NAPath("tail", s, nts, pts, xy, fallback=found is None, between=(key,))
     far = xy[0] if five else xy[-1]
     v = np.subtract(tip, far)
     return path, tip, v / max(float(np.hypot(*v)), 1e-9)
+
+
+_END_SPOTS = ((1.0, 0.0), (1.0, 0.6), (2.0, 0.0), (2.0, 0.6), (1.0, -0.6), (3.0, 0.0), (0.0, 2.4), (3.0, 1.2))
+
+
+def _face_label(router: _Router, layout: Layout, d: PlacedStem, key, leaving: bool, labels) -> tuple:
+    """Where the end label of a strand ending at a stem goes: just beyond its rail's end, else a little out to
+    the side or further on, the first spot clear of loops, elements, stems and other text."""
+    port, along = d.port(key, leaving)
+    side = d.normal * d.side[key]  # away from the stem's axis
+    spots = [port + along * NT_ROW * a + side * _GLYPH_H * b for a, b in _END_SPOTS]
+    clear = (q for q in spots if labels is not None and _label_room(router, layout, q, labels))
+    spot = next(clear, spots[0])
+    return float(spot[0]), float(spot[1])
+
+
+def _label_room(router: _Router, layout: Layout, xy, labels: list) -> bool:
+    """An end label at xy keeps clear of the loops routed so far (their grid cells), every element's and stem's
+    body, the text and stub boxes, and the end labels already placed."""
+    hw, hh = _GLYPH_W / 2 + 0.05, _GLYPH_H / 2
+    x0, y0, x1, y1 = xy[0] - hw, xy[1] - hh, xy[0] + hw, xy[1] + hh
+    grid = router.grid
+    (i0, j0), (i1, j1) = grid.cell((x0, y0)), grid.cell((x1, y1))
+    i0, j0, i1, j1 = max(i0, 0), max(j0, 0), min(i1, grid.nx - 1), min(j1, grid.ny - 1)
+    if i0 <= i1 and j0 <= j1 and grid.used[i0 : i1 + 1, j0 : j1 + 1].any():
+        return False
+    if any(bx0 < x1 and x0 < bx1 and by0 < y1 and y0 < by1 for bx0, by0, bx1, by1 in router.keep_out):
+        return False
+    if any(abs(x - xy[0]) < 2 * hw and abs(y - xy[1]) < 2 * hh for x, y in labels):
+        return False
+    return not any(_near(xy, e, hh + 0.05) for e in [*layout.placed.values(), *layout.stems])
 
 
 def _face(d: PlacedStem, key, leaving: bool) -> tuple[np.ndarray, np.ndarray]:
@@ -250,7 +287,8 @@ def route_nucleic(layout: Layout, router: _Router | None = None) -> list[NAPath]
     single-stranded nucleotide's letter goes), and widens layout.bounds to hold it all."""
     na = layout.nucleic
     if router is None:
-        router = _Router(_Grid(layout, [b for _, b in label_boxes(layout, [])]), _element_obstacles(layout))
+        keep_out = [b for _, b in label_boxes(layout, [])]
+        router = _Router(_Grid(layout, keep_out), _element_obstacles(layout), keep_out)
     elements = router.elements
     at = {key: d for d in layout.stems for key in d.axial}
     kind_of = {(r.strand, r.lo): r.kind for r in na.structure.runs}
@@ -262,6 +300,16 @@ def route_nucleic(layout: Layout, router: _Router | None = None) -> list[NAPath]
         return path
 
     gapped = {(g.before, "3′") for g in na.gaps} | {(g.after, "5′") for g in na.gaps}
+    labels: list[tuple[float, float]] = []  # the end labels placed so far (a cropped end into a gap has none)
+
+    def room(s: int, e: str):  # the labels an end's own label must keep clear of; None: it has no label
+        return None if (s, e) in gapped else labels
+
+    def end(s: int, e: str, xy) -> None:
+        ends.append((s, e, xy))
+        if (s, e) not in gapped:
+            labels.append(xy)
+
     fixed: dict[tuple[int, int], NAPath] = {}  # (strand, nucleotide before it) -> a path of fixed shape
     between: list[tuple] = []  # strands from stem to stem still to route, once the fixed shapes are known
     for s, strand in enumerate(na.strands):
@@ -272,7 +320,7 @@ def route_nucleic(layout: Layout, router: _Router | None = None) -> list[NAPath]
             for label, a, b in (("5′", pts[0], pts[1]), ("3′", pts[-1], pts[-2])):
                 v = np.subtract(a, b)
                 v = v / max(float(np.hypot(*v)), 1e-9)
-                ends.append((s, label, tuple(float(c) for c in np.add(a, v * (NT_ROW + _GLYPH_W)))))
+                end(s, label, tuple(float(c) for c in np.add(a, v * (NT_ROW + _GLYPH_W))))
                 exits[(s, 0 if label == "5′" else n - 1)] = (np.add(a, v * NT_STEP / 2), v, None)
             continue
         held = [i for i in range(n) if (s, i) in at]
@@ -281,14 +329,13 @@ def route_nucleic(layout: Layout, router: _Router | None = None) -> list[NAPath]
         first, last = held[0], held[-1]
         d0 = at[(s, first)]
         if first > 0:
-            path, tip, v = _tail(d0, s, (s, first), list(range(first)), True, elements)
+            path, tip, v = _tail(router, layout, d0, s, (s, first), list(range(first)), True, room(s, "5′"))
             fixed[(s, -1)] = path
             exits[(s, 0)] = (np.add(path.nt_xy[0], v * NT_STEP / 2), v, d0)
         else:
-            port, along = d0.port((s, 0), False)
-            tip = tuple(float(c) for c in port + along * NT_ROW)
+            tip = _face_label(router, layout, d0, (s, 0), False, room(s, "5′"))
             exits[(s, 0)] = (*_face(d0, (s, 0), False), d0)
-        ends.append((s, "5′", tip))
+        end(s, "5′", tip)
         for i, j in zip(held, held[1:]):
             da, db = at[(s, i)], at[(s, j)]
             if da is db and da.side[(s, i)] == da.side[(s, j)]:
@@ -299,14 +346,13 @@ def route_nucleic(layout: Layout, router: _Router | None = None) -> list[NAPath]
                 between.append((s, i, j, da, db, kind_of.get((s, i + 1))))
         dn = at[(s, last)]
         if last < n - 1:
-            path, tip, v = _tail(dn, s, (s, last), list(range(last + 1, n)), False, elements)
+            path, tip, v = _tail(router, layout, dn, s, (s, last), list(range(last + 1, n)), False, room(s, "3′"))
             fixed[(s, last)] = path
             exits[(s, n - 1)] = (np.add(path.nt_xy[-1], v * NT_STEP / 2), v, dn)
         else:
-            port, along = dn.port((s, last), True)
-            tip = tuple(float(c) for c in port + along * NT_ROW)
+            tip = _face_label(router, layout, dn, (s, last), True, room(s, "3′"))
             exits[(s, n - 1)] = (*_face(dn, (s, last), True), dn)
-        ends.append((s, "3′", tip))
+        end(s, "3′", tip)
     # routes keep off the strands' end labels (as a protein loop keeps off its chain's N and C)
     g = _GLYPH_H / 2 + 0.05
     router.grid.keep_off([(x - g, y - g, x + g, y + g) for s, e, (x, y) in ends if (s, e) not in gapped])
