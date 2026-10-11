@@ -2052,3 +2052,16 @@ def test_only_traces_of_three_nucleotides_or_more_are_walls():
     long = np.array([[5.0, 0.0], [6.0, 0.0], [7.0, 0.0]])
     assert len(_trace_walls([], {0: short}, na).boxes) == 0
     assert len(_trace_walls([], {0: short, 1: long}, na).boxes) == 3
+
+
+def test_a_gap_is_named_as_a_gap_in_warnings():
+    """A fallback dashed gap is warned about as "gap after <chain>:<last>", not as a one-nucleotide strand (5LJ3 read
+    "strand I:10-10" for the gap skipping I:11-53)."""
+    from types import SimpleNamespace
+
+    from foldmap.na_paths import NAPath, path_name
+
+    labels = [SimpleNamespace(chain="I", tag=str(n)) for n in range(1, 11)]
+    na = SimpleNamespace(strands=[SimpleNamespace(labels=labels)])
+    assert path_name(NAPath("gap", 0, [], [], []), na) == "gap after I:10"
+    assert path_name(NAPath("tail", 0, [8, 9], [], []), na) == "strand I:9-10"
