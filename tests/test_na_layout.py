@@ -1680,3 +1680,44 @@ def test_the_trace_boxes_reach_the_optimiser_on_the_grid(monkeypatch):
     for v in (centres, want):
         v = np.asarray(v) * 1e4
         assert np.all(np.abs(v - np.round(v)) < 1e-6)
+
+
+def _gap_label_box(p):
+    from foldmap.layout import _GLYPH_H, _GLYPH_W
+
+    x, y = p.label_xy
+    hw = _GLYPH_W * len(p.label) / 2 + 0.05
+    return (x - hw, y - _GLYPH_H / 2, x + hw, y + _GLYPH_H / 2)
+
+
+def test_a_gap_label_is_placed_clear_of_letters_beads_bodies_and_strands():
+    """4YBB: "... 21 nt ..." sat at its gap's midpoint on element AC:26-46 and two runs (C10). A gap label is placed
+    along its gap, either side, where its box keeps clear of bodies, strands, letters and nucleotides."""
+    from foldmap.route import clip_len
+    from foldmap.route_na import crosses_body
+
+    lay, _, _, loops = _routed("4YBB")
+    labelled = [p for p in lay.na_paths if p.kind == "gap" and p.label]
+    assert labelled
+    letters = [*lay.na_letters.values(), *[d.point(k, 0.0) for d in lay.stems for k in d.axial]]
+    segments = [(a, b) for q in lay.na_paths for a, b in zip(q.points, q.points[1:])]
+    segments += [(a, b) for loop in loops for a, b in zip(loop.points, loop.points[1:])]
+    for p in labelled:
+        x0, y0, x1, y1 = box = _gap_label_box(p)
+        edges = [((x0, y0), (x1, y0)), ((x1, y0), (x1, y1)), ((x1, y1), (x0, y1)), ((x0, y1), (x0, y0))]
+        assert not any(x0 < x < x1 and y0 < y < y1 for x, y in letters)
+        assert not any(clip_len(a, b, box) > 1e-9 for a, b in segments)
+        bodies = [*lay.placed.values(), *lay.stems]
+        assert not any(crosses_body(a, b, e) for e in bodies for a, b in edges)
+
+
+def test_a_gap_label_moves_off_a_letter_planted_on_its_first_spot():
+    from foldmap.route_na import _label_gaps
+
+    lay, _, _, loops = _routed("4YBB")
+    p = next(p for p in lay.na_paths if p.kind == "gap" and p.label)
+    first = p.label_xy
+    lay.na_letters[(-1, -1)] = first  # a letter where the label went
+    _label_gaps(lay, lay.na_paths, [loop.points for loop in loops])
+    x0, y0, x1, y1 = _gap_label_box(p)
+    assert p.label_xy != first and not (x0 < first[0] < x1 and y0 < first[1] < y1)

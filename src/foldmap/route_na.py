@@ -658,6 +658,7 @@ def route_nucleic(layout: Layout, router: _Router | None = None, loops=()) -> li
     layout.na_ends = [e for e in ends if (e[0], e[1]) not in gapped]
     layout.na_letters = _place_letters(layout, out)
     layout.na_ties = _ties(layout, out)
+    _label_gaps(layout, out, loops)
     _widen(layout, out)
     if log.isEnabledFor(logging.DEBUG):
         log.debug("%d nucleic-acid paths: %d fallbacks", len(out), sum(p.fallback for p in out))
@@ -1047,6 +1048,95 @@ def _place_letters(layout: Layout, paths: list[NAPath]) -> dict[tuple[int, int],
     return out
 
 
+_GAP_ALONG = (0.5, 0.4, 0.6, 0.3, 0.7, 0.2, 0.8, 0.1, 0.9)  # fractions along a gap its label may sit at
+
+
+def _gap_box(p: NAPath) -> tuple[float, float, float, float]:
+    """The box a gap's label takes: centred at label_xy, else standing on the gap's midpoint."""
+    hw = _GLYPH_W * len(p.label) / 2 + 0.05
+    if p.label_xy is None:
+        x, y = midway(p.points)
+        return (x - hw, y, x + hw, y + _GLYPH_H)
+    x, y = p.label_xy
+    return (x - hw, y - _GLYPH_H / 2, x + hw, y + _GLYPH_H / 2)
+
+
+def _along(pts, f: float):
+    """(the point a fraction f of the way along the polyline, the unit direction there)."""
+    p = np.asarray(pts, float)
+    seg = np.hypot(*np.diff(p, axis=0).T)
+    cum = np.concatenate([[0.0], np.cumsum(seg)])
+    t = f * cum[-1]
+    k = min(int(np.searchsorted(cum, t, side="right")) - 1, len(seg) - 1)
+    u = (p[k + 1] - p[k]) / seg[k] if seg[k] > 0 else np.array([1.0, 0.0])
+    return p[k] + (t - cum[k]) * u, u
+
+
+def _label_gaps(layout: Layout, paths: list[NAPath], loops=()) -> None:
+    """Put each labelled gap's "... N nt ..." beside its dashed path (NAPath.label_xy), as base letters are placed:
+    at a fraction of the way along it (_GAP_ALONG, the middle first), on either side, then twice as far out, the
+    first spot whose box meets nothing: no element's or stem's body, strand or protein loop (`loops`, polylines),
+    base letter, nucleotide (where its bead goes), end label, name or gap label placed before it; when every spot
+    meets something, the one meeting the fewest."""
+    gaps = [p for p in paths if p.kind == "gap" and p.label and len(p.points) > 1]
+    if not gaps:
+        return
+    bodies = [*layout.placed.values(), *layout.ghosts, *layout.stems]
+    segs = [(a, b) for p in paths for a, b in zip(p.points, p.points[1:])]
+    segs += [(a, b) for pts in loops for a, b in zip(pts, pts[1:])]
+    seg_box = np.array([(min(a[0], b[0]), min(a[1], b[1]), max(a[0], b[0]), max(a[1], b[1])) for a, b in segs])
+    seg_box = seg_box.reshape(-1, 4)
+    g = _GLYPH_W / 2 + 0.05, _GLYPH_H / 2
+    glyphs = [d.point(key, NT_ROW) for d in layout.stems for key in d.axial] + list(layout.na_letters.values())
+    glyphs += [xy for _, _, xy in layout.na_ends]
+    taken = [(x - g[0], y - g[1], x + g[0], y + g[1]) for x, y in glyphs] + [b for _, b in label_boxes(layout, [])]
+    beads = [d.point(key) for d in layout.stems for key in d.axial] + [q for p in paths for q in p.nt_xy]
+    beads = np.asarray(beads, float).reshape(-1, 2)
+
+    def meets(box) -> int:
+        x0, y0, x1, y1 = box
+        edges = [((x0, y0), (x1, y0)), ((x1, y0), (x1, y1)), ((x1, y1), (x0, y1)), ((x0, y1), (x0, y0))]
+        n = sum(
+            1
+            for e in bodies
+            if _near(((x0 + x1) / 2, (y0 + y1) / 2), e, 0.0)
+            or x0 < e.cx < x1
+            and y0 < e.cy < y1
+            or any(crosses_body(a, b, e) for a, b in edges)
+        )
+        near = np.flatnonzero((seg_box[:, 0] < x1) & (x0 < seg_box[:, 2]) & (seg_box[:, 1] < y1) & (y0 < seg_box[:, 3]))
+        n += sum(1 for k in near.tolist() if clip_len(*segs[k], box) > 1e-9)
+        n += sum(1 for b in taken if b[0] < x1 and x0 < b[2] and b[1] < y1 and y0 < b[3])
+        if len(beads):
+            dx = beads[:, 0] - np.clip(beads[:, 0], x0, x1)
+            dy = beads[:, 1] - np.clip(beads[:, 1], y0, y1)
+            n += int(np.count_nonzero(dx * dx + dy * dy < (_BEAD / 2) ** 2))
+        return n
+
+    for p in gaps:
+        hw = _GLYPH_W * len(p.label) / 2 + 0.05
+        best = None
+        for out in (1.0, 2.0):
+            for f in _GAP_ALONG:
+                q, u = _along(p.points, f)
+                normal = np.array([-u[1], u[0]])
+                reach = out * (abs(normal[0]) * hw + abs(normal[1]) * g[1] + 0.1)  # the box just clear of the gap
+                for side in (1.0, -1.0):
+                    x, y = q + side * reach * normal
+                    box = (x - hw, y - g[1], x + hw, y + g[1])
+                    n = meets(box)
+                    if best is None or n < best[0]:
+                        best = (n, (float(x), float(y)), box)
+                    if not n:
+                        break
+                if not best[0]:
+                    break
+            if not best[0]:
+                break
+        p.label_xy = best[1]
+        taken.append(best[2])
+
+
 def _tie_name(n: int) -> str:
     """a, b, ..., z, aa, ab, ...: the label of the n-th tie drawn as marks."""
     return _tie_name(n // 26 - 1) + chr(97 + n % 26) if n >= 26 else chr(97 + n)
@@ -1169,11 +1259,7 @@ def _widen(layout: Layout, paths: list[NAPath]) -> None:
     letters = [d.point(key, NT_ROW) for d in layout.stems for key in d.axial] + list(layout.na_letters.values())
     letters += [xy for _, _, xy in layout.na_ends]
     boxes += [(x - g, y - g, x + g, y + g) for x, y in letters]
-    for p in paths:
-        if p.label:
-            x, y = midway(p.points)
-            half = _GLYPH_W * len(p.label) / 2 + 0.05
-            boxes.append((x - half, y, x + half, y + _GLYPH_H))
+    boxes += [_gap_box(p) for p in paths if p.label]
     boxes += [b for name, b in label_boxes(layout, []) if name.startswith("tie-label:")]
     if not boxes:
         return

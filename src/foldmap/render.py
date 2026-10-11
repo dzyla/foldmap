@@ -466,10 +466,9 @@ def _draw_strands(ink: _NAInk, layout: Layout, style: str, where: dict, letters:
             zorder=1.9,
         )
         line.set_gid(f"na:run:{n}")
-        if path.label:
-            t = ink.ax.text(
-                *midway(path.points), path.label, ha="center", va="bottom", fontsize=ink.font * 0.75, color=ink.front
-            )
+        if path.label:  # where routing put it (_label_gaps), else standing on the gap's midpoint
+            xy, va = (path.label_xy, "center") if path.label_xy is not None else (midway(path.points), "bottom")
+            t = ink.ax.text(*xy, path.label, ha="center", va=va, fontsize=ink.font * 0.75, color=ink.front)
             t.set_gid(f"na:gap:{n}")
         for i, xy in zip(path.nts, path.nt_xy):
             key = (path.strand, i)
