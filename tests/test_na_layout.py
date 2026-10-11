@@ -352,3 +352,33 @@ def test_app_and_spec_report_stuck_strands(monkeypatch):
     monkeypatch.setattr(route_na, "route_nucleic", all_stuck)
     drawn = draw_spec(FigureSpec(_path("1EHZ")))
     assert len([s for s in drawn.stuck if s.startswith("strand A:")]) == 3  # 1EHZ's three hairpin loops
+
+
+def _segments_cross(p, q, a, b) -> bool:
+    """Segments p-q and a-b cross properly (not just touch at an end)."""
+
+    def turn(u, v, w):
+        return (v[0] - u[0]) * (w[1] - u[1]) - (v[1] - u[1]) * (w[0] - u[0])
+
+    return turn(a, b, p) * turn(a, b, q) < 0 and turn(p, q, a) * turn(p, q, b) < 0
+
+
+@pytest.mark.parametrize("pdb", ["1EHZ", "4OO8", "30QM"])
+def test_runs_steer_round_hairpin_loops_and_free_ends(pdb):
+    from foldmap.route_na import _outside
+
+    lay, _, _, _ = _routed(pdb)
+    at = {key: d for d in lay.stems for key in d.axial}
+    drawn = {id(p): _outside(p.points, tuple(at[key] for key in p.between)) for p in lay.na_paths}
+    fixed = [p for p in lay.na_paths if p.kind in ("hairpin", "tail")]
+    for p in lay.na_paths:
+        if p.kind in ("run", "joint", "gap"):
+            a = drawn[id(p)]
+            for f in fixed:
+                b = drawn[id(f)]
+                assert not any(_segments_cross(*s, *t) for s in zip(a, a[1:]) for t in zip(b, b[1:])), (
+                    p.kind,
+                    p.nts[:2],
+                    f.kind,
+                    f.nts[:2],
+                )

@@ -48,6 +48,13 @@ def path_name(path: NAPath, na) -> str:
     return f"strand {first.chain}:{first.tag}-{last.tag}"
 
 
+def _use(grid: _Grid, pts) -> None:
+    """Mark the cells under a drawn strand as used, so later routes avoid crossing it (at the reuse cost)."""
+    cells = sorted({c for a, b in zip(pts, pts[1:]) for c in grid.cells_along(a, b)})
+    for c in cells:
+        grid.used[c] += 1
+
+
 def _dot(a, b) -> float:
     """a . b of two 2-vectors, written out: numpy's dot goes through BLAS, whose kernels differ in the last bit."""
     return float(a[0]) * float(b[0]) + float(a[1]) * float(b[1])
@@ -303,6 +310,10 @@ def route_nucleic(layout: Layout, router: _Router | None = None) -> list[NAPath]
     # routes keep off the strands' end labels (as a protein loop keeps off its chain's N and C)
     g = _GLYPH_H / 2 + 0.05
     router.grid.keep_off([(x - g, y - g, x + g, y + g) for s, e, (x, y) in ends if (s, e) not in gapped])
+    # and pay to cross a hairpin loop or a free end, as a loop pays to share an earlier loop's cells
+    for p in fixed.values():
+        if p.kind in ("hairpin", "tail"):
+            _use(router.grid, p.points)
     routed = {(s, i): _strand_between(router, s, i, j, da, db, kind) for s, i, j, da, db, kind in between}
     out = [p for _, p in sorted({**fixed, **routed}.items())]
     for g in na.gaps:  # cropped away: the 3' end of one piece to the 5' end of the next, dashed
