@@ -383,3 +383,16 @@ def test_an_icosahedral_cage_is_found_without_superposing_every_pair_again(tmp_p
     # before: ~5300 superpositions and ~199000 pair lookups (every copy against every copy, for every trial motion)
     assert calls["kabsch"] < 2 * n * n and calls["pair"] < 10 * n * n
     assert elapsed < 30
+
+
+def test_four_copies_on_a_screw_are_helical_under_auto(tmp_path):
+    ops = [(rot((0, 0, 1), 120 * k), np.array([0, 0, 25.0 * k])) for k in range(4)]
+    s = found(build(tmp_path, ops, offset=(15.0, 0.0, 0.0)))
+    assert s.kind == "H" and len(s.protomers) == 4
+
+
+def test_three_copies_on_a_screw_are_helical_only_when_asked(tmp_path):
+    ops = [(rot((0, 0, 1), 120 * k), np.array([0, 0, 25.0 * k])) for k in range(3)]
+    path = build(tmp_path, ops, offset=(15.0, 0.0, 0.0))
+    assert found(path) is None  # crystal packing, as the three copies of 1URN
+    assert found(path, request="helical").kind == "H"

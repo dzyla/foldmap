@@ -34,6 +34,7 @@ MIN_TURN = np.radians(10)  # smaller rotations are lattice-like translations, no
 MIN_RISE = 2.0  # Å along the axis per copy for a helical filament
 MIN_TWIST = np.radians(3.0)  # a helical filament turns at least this much per copy (less: a translation)
 MIN_HELIX_COPIES = 4  # copies on a screw before auto calls it helical (three: crystal packing, as in 1URN)
+MIN_HELIX_COPIES_ASKED = 3  # ... and when the user asks for "helical"
 _PSEUDO_21 = 170.0  # degrees: a helix turning more than this per copy is a pseudo-2₁ screw, its hand not named
 MAX_ORDER = 24
 _NEAREST = 3  # copies tried as the image of each subunit: those whose centroids land closest
@@ -436,7 +437,7 @@ def detect_symmetry(
     tolerance: float = TOLERANCE,
 ) -> Symmetry | None:
     """The assembly's symmetry, or None. `request`: auto, off, Cn, Dn or helical (an error if absent; auto calls
-    a screw helical from MIN_HELIX_COPIES copies, an explicit helical from three);
+    a screw helical from MIN_HELIX_COPIES copies, an explicit helical from MIN_HELIX_COPIES_ASKED);
     `protomers`: the user's own grouping, in order; `tolerance`: CA RMSD in Å between copies."""
     kind, n = _parse(request)
     if kind == "off":
@@ -463,7 +464,7 @@ def detect_symmetry(
                 if kind == "C" and found.kind == "D":
                     found.kind = "C"  # asked for the cyclic part only
     if found is None and kind in ("auto", "H"):
-        best = _helical(asm, tolerance, MIN_HELIX_COPIES if kind == "auto" else 3)
+        best = _helical(asm, tolerance, MIN_HELIX_COPIES if kind == "auto" else MIN_HELIX_COPIES_ASKED)
         if best is not None:
             _, twist, axis, centre, rise, paths, rmsd = best
             groups = [list(g) for g in zip(*paths)]

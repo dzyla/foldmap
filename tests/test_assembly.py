@@ -392,3 +392,46 @@ def test_a_chromophore_is_a_protein_residue_for_the_kind_gate():
     k = next(i for i, r in enumerate(chain) if r.name == "CRO")
     assert not _is_nucleotide(chain, k)
     assert _polymer_kinds(model) == {"protein"}
+
+
+def test_dna_outside_assembly_one_keeps_the_asymmetric_unit(tmp_path):
+    """The same gate for a protein–DNA entry: assembly 1 holds one protein copy and no DNA, so auto keeps the
+    asymmetric unit, DNA included."""
+    import gemmi
+
+    from foldmap.io import read_model
+
+    path = _copies_in_asu(tmp_path, 2, keep={"C"})
+    st = gemmi.read_structure(str(path))
+    dna = gemmi.read_structure(str(DATA / "na" / "1KX5.cif.gz"))[0]["I"].clone()
+    st[0].add_chain(dna)
+    st.setup_entities()
+    out = tmp_path / "with_dna.cif"
+    st.make_mmcif_document().write_file(str(out))
+    model, deposited = read_model(out)
+    assert sorted(c.name for c in model) == ["C", "D", "I"] and deposited == {"C", "D", "I"}
+    model, _ = read_model(out, "asu")
+    assert sorted(c.name for c in model) == ["C", "D", "I"]
+
+
+def test_a_ligand_outside_assembly_one_is_not_a_polymer_kind(tmp_path):
+    """A nucleotide ligand (ATP) beside two protein copies is no DNA or RNA: assembly 1 still holds every kind of
+    polymer the asymmetric unit holds, and auto draws it."""
+    import gemmi
+
+    from foldmap.io import _polymer_kinds, read_model
+
+    path = _copies_in_asu(tmp_path, 2, keep={"C"})
+    st = gemmi.read_structure(str(path))
+    atp = gemmi.read_structure(str(DATA / "na" / "1ATP.cif.gz"))
+    res = next(r for c in atp[0] for r in c if r.name == "ATP")
+    ligand = gemmi.Chain("L")
+    ligand.add_residue(res.clone())
+    st[0].add_chain(ligand)
+    st.setup_entities()
+    out = tmp_path / "with_atp.cif"
+    st.make_mmcif_document().write_file(str(out))
+    model, _ = read_model(out, "asu")
+    assert "L" in [c.name for c in model] and _polymer_kinds(model) == {"protein"}
+    model, deposited = read_model(out)
+    assert [c.name for c in model] == ["C"] and deposited == {"C"}
