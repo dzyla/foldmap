@@ -165,7 +165,7 @@ def _one_complex_of_several(st, assembly, model) -> bool:
     """`assembly` is one of several copies of a complex deposited in the asymmetric unit (4OO8: two Cas9
     complexes, assembly 1 = A, B, C; 1URN: three U1A–RNA complexes): every operator the identity, a strict subset of
     the deposited chains, each of its polymer entities deposited at least twice as often as it holds it. The other
-    copies lie next to it by crystal packing, not by biology. Taken only for a model holding nucleic acid (a
+    copies lie next to it by crystal packing, not by biology. Taken only for an assembly holding nucleic acid (a
     protein-only figure keeps the asymmetric unit, as before)."""
     if not all(op.transform.is_identity() for g in assembly.generators for op in g.operators):
         return False
@@ -179,7 +179,7 @@ def _one_complex_of_several(st, assembly, model) -> bool:
         return False
     if any(deposited.count(e) < 2 * held.count(e) for e in set(held)):
         return False
-    return any(_is_nucleotide(chain, k) for chain in model for k in range(len(chain)))
+    return any(_is_nucleotide(chain, k) for chain in members for k in range(len(chain)))
 
 
 def read_model(path: str | Path, assembly: str = "auto"):

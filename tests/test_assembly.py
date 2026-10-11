@@ -349,3 +349,20 @@ def test_one_protein_complex_of_several_in_the_asymmetric_unit_is_drawn_as_befor
     path = _copies_in_asu(tmp_path, 2, keep={"C"})
     model, deposited = read_model(path)
     assert sorted(c.name for c in model) == ["C", "D"] and deposited == {"C", "D"}
+
+
+def test_nucleic_acid_outside_assembly_one_does_not_choose_it(tmp_path):
+    """_one_complex_of_several asks whether the assembly's own chains hold nucleic acid: two protein copies whose
+    assembly 1 is one of them, beside an RNA that no assembly holds, keep the asymmetric unit (protein rule)."""
+    import gemmi
+
+    from foldmap.io import read_model
+
+    path = _copies_in_asu(tmp_path, 2, keep={"C"})
+    st = gemmi.read_structure(str(path))
+    rna = gemmi.read_structure(str(DATA / "na" / "1URN.cif.gz"))[0]["R"].clone()
+    st[0].add_chain(rna)
+    out = tmp_path / "with_rna.cif"
+    st.make_mmcif_document().write_file(str(out))
+    model, deposited = read_model(out)
+    assert sorted(c.name for c in model) == ["C", "D", "R"] and deposited == {"C", "D", "R"}
