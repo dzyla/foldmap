@@ -573,3 +573,22 @@ def test_single_stranded_contacts_are_reported_not_judged():
     m = contacts(lay, sses)
     assert 0.0 < m["ss_contacts_nearer"] <= 1.0
     assert "ss_contacts_nearer" not in THRESHOLDS and not judge({"ss_contacts_nearer": 0.0})
+
+
+def test_contact_sheet_panels_hang_from_the_top(monkeypatch, tmp_path):
+    """1LMB: the 3D panel of a straight duplex is wider than the 2.5:1 the sheet allows, so it is shrunk in
+    height; it hangs from the top of its slot (anchor N), its title in line with the others, not mid-sheet."""
+    import matplotlib.pyplot as plt
+
+    nv = _na_validate()
+    path = Path(__file__).parent / "data" / "1LMB.cif"
+    lay, sses, bb = make_layout(path)
+    fig = draw(lay, route_loops(lay, sses, bb), sses, "1LMB")
+    made, figure = [], plt.figure
+    monkeypatch.setattr(plt, "figure", lambda *a, **k: made.append(figure(*a, **k)) or made[-1])
+    monkeypatch.setattr(plt, "close", lambda *a: None)
+    nv.contact_sheet("1LMB", lay, sses, bb, fig, {"failed": []}, tmp_path)
+    sheet = made[-1]
+    sheet.canvas.draw()
+    tops = [a.get_position().y1 for a in sheet.axes]
+    assert max(tops) - min(tops) < 1e-6, tops

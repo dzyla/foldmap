@@ -457,6 +457,8 @@ def contact_sheet(name, lay, sses, bb, fig, metrics, out: Path) -> Path:
     a2.set_ylim(*seen_box[2:])
     for a in (a1, a2):
         a.set_aspect("equal", adjustable="box")
+    for a in axes:  # a panel shrunk to its aspect hangs from the top of its slot, its title in line with the others
+        a.set_anchor("N")
     for a in axes:
         a.set_axis_off()
     fails = "; ".join(metrics.get("failed", [])) or "none"
