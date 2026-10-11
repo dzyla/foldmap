@@ -1,5 +1,6 @@
 import logging
 import re
+from pathlib import Path
 from types import SimpleNamespace
 
 import numpy as np
@@ -10,6 +11,8 @@ from foldmap.frame import view_frame
 from foldmap.layout import ETA_W, HELIX_W, PITCH, Layout, Placed, build_layout, label_boxes
 from foldmap.route import _INFLATE, _MAX_CELLS, _Grid, route_loops
 from helpers import fake_sse, pipeline
+
+DATA = Path(__file__).parent / "data"
 
 MODES = ["projected", "stack"]
 
@@ -454,3 +457,17 @@ def test_kink_is_not_drawn_through_the_box_of_a_third_piece_of_the_same_helix():
     loops = {l.a_id: l for l in route_loops(layout_of(a, b, c), [a.sse, b.sse, c.sse], stub_bb())}
     assert len(loops[a.sse.id].points) > 2  # not the straight kink link
     assert loops[b.sse.id].points == [b.c_port, c.n_port]  # the b-c kink is
+
+
+@pytest.mark.parametrize("assembly", ["asu", "auto"])
+def test_loops_between_tm_helices_stay_out_of_the_slab(assembly):
+    """1C3W ASU: the C-D loop ran along y = -4.04 inside the band -4.40..2.96."""
+    from foldmap.cli import make_layout
+
+    lay, sses, bb = make_layout(DATA / "1C3W.cif", membrane="auto", assembly=assembly)
+    y0, y1 = lay.membrane["y"]
+    for lp in route_loops(lay, sses, bb):
+        for (xa, ya), (xb, yb) in zip(lp.points, lp.points[1:]):
+            if abs(ya - yb) < 1e-9 and abs(xa - xb) > 0.5:
+                assert not y0 + 0.3 < ya < y1 - 0.3, (lp.a_id, lp.b_id, ya)
+        assert not lp.fallback
