@@ -2021,3 +2021,22 @@ def test_drawn_base_letters_are_the_parent_bases():
     assert drawn["na:nt:A:40"] == "C"  # 5MC40
     assert drawn["na:nt:A:37"] == "G"  # YYG37 (wybutosine)
     assert set(drawn.values()) <= set("ACGU")
+
+
+def test_a_block_bars_first_pair_names_the_partners_chain_when_it_is_another_chain():
+    from foldmap.style import Style
+
+    fig, _ = make_figure_and_loops(_path("1IHF"), look=Style(na_style="block"))
+    lay, _, _ = make_layout(_path("1IHF"), look=Style(na_style="block"))
+    firsts = {a.get_gid(): a.get_text() for a in _gid(fig, "na:stem:") if a.get_gid().endswith(":first")}
+    strands = lay.nucleic.strands
+    across = 0
+    for k, d in enumerate(lay.stems):
+        a, i, b, j = d.pairs[0]
+        own, other = strands[a].labels[i], strands[b].labels[j]
+        if other.chain == own.chain:
+            assert firsts[f"na:stem:{k}:first"] == f"{own.seq}·{other.seq}"
+        else:
+            across += 1
+            assert firsts[f"na:stem:{k}:first"] == f"{own.seq}·{other.chain}:{other.seq}"
+    assert across

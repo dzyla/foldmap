@@ -421,9 +421,10 @@ def _block(ink: _NAInk, k: int, d: PlacedStem, where: dict, letters: dict) -> No
     )
     t.set_gid(f"na:label:{k}")
     a, i, b, j = d.pairs[0]  # the first pair (outermost): its two residue numbers, in the slot beside the stem
+    partner = f"{ink.chains[b]}:" if ink.chains[b] != ink.chains[a] else ""  # across chains, the partner's chain too
     t = ink.ax.text(
         *stem_label_pos(d),
-        f"{ink.seqs[a][i]}\u00b7{ink.seqs[b][j]}",
+        f"{ink.seqs[a][i]}\u00b7{partner}{ink.seqs[b][j]}",
         ha="center",
         va="center",
         rotation=_upright(d.angle),
