@@ -2095,11 +2095,14 @@ def _draw_loops(c: _Canvas, layout: Layout, loops: list[Loop], sses: list[SSE]) 
 def _draw_membrane(c: _Canvas, layout: Layout) -> None:
     """The lipid bilayer behind everything."""
     x0, y0, x1, y1 = c.content
-    if layout.membrane is not None:  # the lipid bilayer behind everything: a band with head groups on both faces
-        b0, b1 = layout.membrane["y"]
+    if layout.membrane is None:
+        return
+    # the lipid bilayer behind everything: a band with head groups on both faces; one per row of a wrapped stack
+    for k, (b0, b1) in enumerate(layout.membrane.get("bands", [layout.membrane["y"]])):
+        row = f":{k}" if k else ""
         left, right = x0 - c.pad * 0.7, x1 + c.pad * 0.7
         band = Rectangle((left, b0), right - left, b1 - b0, fc=_LIPID, ec="none", zorder=0.1)
-        band.set_gid("membrane")
+        band.set_gid(f"membrane{row}")
         c.ax.add_patch(band)
         xs = np.arange(left + 0.2, right, 0.42)
         for face, y in (("low", b0), ("high", b1)):
@@ -2112,12 +2115,12 @@ def _draw_membrane(c: _Canvas, layout: Layout) -> None:
                 linewidths=c.lw * 0.4,
                 zorder=0.15,
             )
-            heads.set_gid(f"membrane-heads:{face}")
+            heads.set_gid(f"membrane-heads:{face}{row}")
         below = layout.membrane["inside"] == "below"
         sides = (("out" if below else "in", b1 + 0.35, "bottom"), ("in" if below else "out", b0 - 0.35, "top"))
         for text, y, va in sides if layout.membrane.get("sides", True) else ():
             t = c.ax.text(left + 0.1, y, text, ha="left", va=va, fontsize=c.font * 0.9, style="italic", color="#7a6a45")
-            t.set_gid(f"membrane-side:{text}")
+            t.set_gid(f"membrane-side:{text}{row}")
 
 
 def _draw_domains(c: _Canvas, layout: Layout) -> None:

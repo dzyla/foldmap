@@ -205,6 +205,8 @@ class Layout:
     page_centre: list | None = None  # the 3D point those axes are taken around
     uniprot: object = None  # uniprot.Annotation when UniProt features were requested
     membrane: dict | None = None  # {"y": (bottom, top) of the band, "inside": "below"|"above", "source": ...}
+    # with "bands": one (bottom, top) per stack row ("y" is the first)
+    stack_rows: list[list[str]] = field(default_factory=list)  # a depth-keeping stack wrapped: each row's ids
     res_cons: list[float] = field(default_factory=list)  # alignment conservation of each residue (nan: none)
     res_grade: list[int] = field(default_factory=list)  # conservation grade 1..9 of each residue (0: none)
     cons_label: str = ""  # legend text saying where the grades come from
@@ -1022,17 +1024,28 @@ def _collide(a: _Item, ha, ma, b: _Item, hb, mb) -> bool:
     return ha[0] + hb[0] + MARGIN - abs(dx) > 1e-9 and ha[1] + hb[1] + MARGIN - abs(dy) > 1e-9
 
 
-def _stack(items: list[_Item], depth: bool = False) -> None:
+def _stack(items: list[_Item], depth: bool = False) -> list[list[_Item]]:
     """Rows in sequence order, one row break per chain and when a row is full. With `depth` (a membrane is
-    drawn) there is one row, chains side by side, and every item keeps its height along the frame's up."""
+    drawn) every item keeps its height along the frame's up: the chains side by side in one row, or, when that
+    row would be wider than _MAX_ROW, one chain per row, each row moved down as a whole. The rows are returned."""
     items.sort(key=lambda it: (it.chain, it.order))
     if depth:
-        x = 0.0
-        for it in items:
-            it.cx = x - it.box[0]
-            it.cy = float(_snap(it.home[1]))
-            x += it.box[2] - it.box[0] + _ROW_GAP
-        return
+        width = sum(it.box[2] - it.box[0] for it in items) + _ROW_GAP * (len(items) - 1)
+        chains = list(dict.fromkeys(it.chain for it in items))
+        # a single chain wider than _MAX_ROW stays one row: its elements keep their depth, so it cannot fold back
+        rows = [items] if width <= _MAX_ROW else [[it for it in items if it.chain == c] for c in chains]
+        bottom = None
+        for row in rows:
+            ys = [float(_snap(it.home[1])) for it in row]
+            top = max(y + it.box[3] for y, it in zip(ys, row))
+            shift = 0.0 if bottom is None else float(_snap(bottom - _ROW_SPACING - top))
+            x = 0.0
+            for y, it in zip(ys, row):
+                it.cx = x - it.box[0]
+                it.cy = y + shift
+                x += it.box[2] - it.box[0] + _ROW_GAP
+            bottom = min(it.cy + it.box[1] for it in row)
+        return rows
     rows: list[list[_Item]] = []
     width = 0.0
     for it in items:
@@ -1053,6 +1066,7 @@ def _stack(items: list[_Item], depth: bool = False) -> None:
             x += it.box[2] - it.box[0] + _ROW_GAP
         dna_row = all(isinstance(m, PlacedStem) for it in row for m in it.members)
         y_top -= height + (MARGIN if dna_row else _ROW_SPACING)  # binders hang right under the DNA
+    return rows
 
 
 def _centre_dna_over_binders(items: list[_Item], contacts: dict[frozenset[str], int]) -> None:
@@ -1762,8 +1776,9 @@ def build_layout(
             members[mine[-1].id].ends += "C"
     joints = _joints(items, nucleic) if pieces else set()
     walls = _trace_walls(items, traces, nucleic) if traces else None  # traces stay: items keep off them
+    rows: list[list[_Item]] = []
     if mode == "stack":
-        _stack(items, keep_depth)
+        rows = _stack(items, keep_depth)
         _centre_dna_over_binders(items, contacts)
     else:
         ties = _symmetry_ties(items, frame)
@@ -1832,6 +1847,8 @@ def build_layout(
     )
     lay.na_traces = traces
     lay.frame = frame
+    if keep_depth and len(rows) > 1:  # wrapped one chain per row: each row gets its own membrane band
+        lay.stack_rows = [[m.sse.id for it in row for m in it.members if isinstance(m, Placed)] for row in rows]
     if traces:
         pts = np.vstack(list(traces.values()))
         rects = np.vstack([rects, [[pts[:, 0].min(), pts[:, 1].min(), pts[:, 0].max(), pts[:, 1].max()]]])

@@ -76,10 +76,10 @@ class _Grid:
         self.blocked = self._mask(p.rect for p in [*layout.placed.values(), *layout.ghosts, *layout.stems])
         self.soft = self._mask(keep_out) & ~self.blocked  # text, stubs: avoided, given up only if nothing else routes
         self.blocked |= self.soft
-        self.slab = np.zeros((self.nx, self.ny), bool)  # cells strictly inside the membrane band
+        self.slab = np.zeros((self.nx, self.ny), bool)  # cells strictly inside the membrane band (one per row)
         if layout.membrane:
-            lo, hi = layout.membrane["y"]
-            self.slab[:, (self.ys > lo + 0.1) & (self.ys < hi - 0.1)] = True
+            for lo, hi in layout.membrane.get("bands", [layout.membrane["y"]]):
+                self.slab[:, (self.ys > lo + 0.1) & (self.ys < hi - 0.1)] = True
 
     def _mask(self, rects) -> np.ndarray:
         xs, ys, reach = self.xs, self.ys, self.reach

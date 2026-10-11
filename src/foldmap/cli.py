@@ -379,7 +379,26 @@ def make_layout(
 
 
 def _membrane_band(lay, sses, bb, mem) -> dict | None:
-    """The band on the page: where the transmembrane elements pass the two membrane faces (medians)."""
+    """The band on the page: where the transmembrane elements pass the two membrane faces (medians). A
+    depth-keeping stack wrapped into rows has one band per row ("bands"), each from its own row's elements; a
+    row with no transmembrane element (a soluble partner chain) has none."""
+    rows = [set(ids) for ids in lay.stack_rows] or [set(lay.placed)]
+    bands = [_face_medians(lay, [s for s in sses if s.id in ids], bb, mem) for ids in rows]
+    bands = [b for b in bands if b is not None]
+    if not bands:
+        return None
+    y_out, y_in = bands[0]
+    return {
+        "y": (min(y_out, y_in), max(y_out, y_in)),
+        "bands": [(min(o, i), max(o, i)) for o, i in bands],
+        "inside": "below" if y_in < y_out else "above",
+        "source": mem.source,
+        "sides": mem.sided,
+    }
+
+
+def _face_medians(lay, sses, bb, mem) -> tuple[float, float] | None:
+    """Where these elements pass the outer and the inner membrane face on the page (medians), if any is TM."""
     depth = mem.depth(bb.ca)
     outs, ins = [], []
     for s in sses:
@@ -402,13 +421,7 @@ def _membrane_band(lay, sses, bb, mem) -> dict | None:
             ins.append(i)
     if not outs:
         return None
-    y_out, y_in = float(np.median(outs)), float(np.median(ins))
-    return {
-        "y": (min(y_out, y_in), max(y_out, y_in)),
-        "inside": "below" if y_in < y_out else "above",
-        "source": mem.source,
-        "sides": mem.sided,
-    }
+    return float(np.median(outs)), float(np.median(ins))
 
 
 FOCUS_CHAINS, FOCUS_ELEMENTS = 6, 160  # symmetric assemblies larger than this are drawn one subunit at a time
