@@ -291,16 +291,17 @@ def verify_contacts(model, drawn, layout, bb, *, path=None) -> ContactReport:
 
 # pass/fail limits, set from the measured campaign (see the plan's Task 13); `None` disables a check
 THRESHOLDS = {
-    "pair_f1": 0.90,  # canonical + wobble pairs against RNApolis (campaign v3: 0.92-1.00, median 1.00)
-    "stem_recall": 0.80,  # RNApolis stems (>= 2 pairs) matched one to one, by a foldmap stem holding 2/3 of their pairs
-    "spearman": 0.60,  # pairwise stem-centre distances, drawn against 3D, entries with >= 5 stems (0.44-0.98)
-    "procrustes": 0.80,  # normalised RMSD of drawn stem centres after a similarity fit, no reflection (0.07-0.86)
-    # angle and joint errors: 0 by construction on a plain frame (regression guards), measured on unrolled ones
-    "angle_median": 5.0,  # degrees, drawn stem direction against its projected 3D axis
-    "angle_max": 5.0,  # degrees, the worst stem; fixtures 0.0 (stems drawn along their seen axes), plus a margin
-    "joint_error_max": 5.0,  # degrees, signed drawn bend against signed seen bend at the worst joint (fixtures 0.0)
+    "pair_f1": 0.95,  # canonical + wobble pairs against RNApolis (final campaign: 0.96-1.00; started at 0.90)
+    "stem_recall": 0.85,  # RNApolis stems matched one to one by a stem holding 2/3 of their pairs (0.857-1)
+    "spearman": 0.60,  # pairwise stem-centre distances, drawn against 3D, entries with >= 5 stems (0.601-0.96)
+    "procrustes": 0.50,  # normalised RMSD of drawn stem centres after a similarity fit, no reflection (0.09-0.499)
+    # angle and joint errors: 0 by construction on a plain frame (regression guards), measured on unrolled ones; the
+    # final campaign has 0.0 on every entry but 30QM, so the limit is one rounding step (reports show 0.1 degrees)
+    "angle_median": 0.05,  # degrees, drawn stem direction against its projected 3D axis
+    "angle_max": 0.05,  # degrees, the worst stem; campaign 0.0 (stems drawn along their seen axes)
+    "joint_error_max": 0.05,  # degrees, signed drawn bend against signed seen bend at the worst joint (campaign 0.0)
     "mirrored": 0,  # stems seen clearly (SIDE_SEEN) drawn with their arms swapped
-    "contact_auc": 0.60,  # elements touching a stem drawn nearer it than the rest (0.42-1.00, median 0.83)
+    "contact_auc": 0.60,  # elements touching a stem drawn nearer it than the rest (0.609-1.00)
     "stems_nearer_frac": 1.0,  # contacted stems drawn nearer their touching elements than the median element
     "beads_missing": 0,  # protein residues touching a drawn nucleotide with no bead (verify_contacts' missing)
     "bead_colour_wrong": 0,  # beads not in their toucher's chain colour (verify_contacts' wrong colour)

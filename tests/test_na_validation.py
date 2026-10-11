@@ -16,12 +16,12 @@ from foldmap.route import route_loops
 
 NA = Path(__file__).parent / "data" / "na"
 FIXTURES = ["30QM", "1EHZ", "4OO8", "1KX5", "1IHF", "3CRX", "4YBB", "1RVA", "4LD0"]
-LIMITS = {  # metric: (lowest or highest allowed, "min" or "max")
-    "spearman": (0.6, "min"),
-    "procrustes": (0.8, "max"),
-    "angle_median": (5.0, "max"),
-    "angle_max": (5.0, "max"),  # fixtures 0.0, plus a margin; Task 14 tightens it
-    "joint_error_max": (5.0, "max"),
+LIMITS = {  # metric: (lowest or highest allowed, "min" or "max"): the worst fixture value, rounded safe (Task 14)
+    "spearman": (0.85, "min"),
+    "procrustes": (0.5, "max"),
+    "angle_median": (0.05, "max"),
+    "angle_max": (0.05, "max"),  # fixtures 0.0 (reports round to 0.1)
+    "joint_error_max": (0.05, "max"),
     "mirrored": (0, "max"),
     "contact_auc": (0.6, "min"),
     "overlaps": (0, "max"),
@@ -33,14 +33,10 @@ LIMITS = {  # metric: (lowest or highest allowed, "min" or "max")
     "beads_unmatched": (0, "max"),
     "fallbacks": (0, "max"),
 }
-# Campaign defects whose target (nacheck.THRESHOLDS) is 0 but which some fixtures still show: each fixture is held
-# at its value measured when the metric came in (absent: 0), a regression bound. Task 14 tightens them after the
-# campaign (Task 13). 4YBB: one crossing left (was 2: run AA:26 across the free ends AA:2-8 and AA:557-566); the
-# "... 36 nt ..." label on stem P34 and on a run.
-# Routing, step 3 removed the others: 4LD0's run from DNA 4 to DNA 2 across a free end (C8: free ends are hard
-# obstacles for a run's first routing pass); 4YBB's overlapping contact beads (runs side by side: a run pays to pass
-# beside a strand); 4OO8's, where the two sides of the P2-P3 internal loop cross (a run's nucleotides slide along it
-# off other strands').
+# Campaign defects whose target (nacheck.THRESHOLDS) is 0: a fixture could be held at a measured value here (absent:
+# 0), a regression bound. The final campaign (Task 14) leaves every fixture at 0, so none is held. The 4YBB campaign
+# entry (not this fixture) keeps fallbacks 2, na_crossings 1 and bead_overlaps 1 as accepted failures
+# (docs/validation/na/review.md).
 CAMPAIGN = {
     "na_crossings": {},  # every fixture at 0
     "bead_overlaps": {},  # every fixture at 0
@@ -55,9 +51,11 @@ NEARER: dict[str, float] = {"30QM": 0.833}
 # joints). 1RVA's contact_auc hold (0.58) went with C3: its two pieces meet across the kink (0.609).
 # 30QM, unrolled side by side (see NEARER): its stems are measured against the plain projection of the same
 # orientation (nacheck.measuring_frame), so the angles and the distance ranks measure the unrolling itself, which
-# turns each protomer's half to face the viewer (angle_median 35.7, angle_max 109.6, spearman 0.521).
+# turns each protomer's half to face the viewer (angle_median 35.7, angle_max 109.6, spearman 0.521, procrustes
+# 0.776: the limit set from the final campaign, 0.50, excludes the unrolled figure).
 HELD = {
     ("3CRX", "procrustes"): 0.817,
+    ("30QM", "procrustes"): 0.776,
     ("30QM", "angle_median"): 35.7,
     ("30QM", "angle_max"): 109.6,
     ("30QM", "spearman"): 0.521,
@@ -119,7 +117,7 @@ def test_fixture_is_drawn_true_to_its_structure(measured, metric):
 def test_fixture_has_no_more_campaign_defects_than_when_measured(measured, metric):
     pdb, m, _ = measured
     bound = CAMPAIGN[metric].get(pdb, 0)
-    assert m[metric] <= bound, f"{pdb}: {metric} {m[metric]} (held at {bound} until Task 14)"
+    assert m[metric] <= bound, f"{pdb}: {metric} {m[metric]} (held at {bound})"
 
 
 def test_contacted_stems_stay_nearer_their_touching_elements(measured):
@@ -152,9 +150,9 @@ def test_crossings_count_proper_crossings_only():
 def test_judge_names_each_metric_past_its_limit():
     assert judge({"spearman": 0.9, "procrustes": 0.1, "mirrored": 0, "contact_auc": None}) == []
     failed = judge({"spearman": 0.5, "procrustes": 0.9, "mirrored": 1, "letter_overlaps": 0})
-    assert failed == ["spearman 0.5 (limit 0.6)", "procrustes 0.9 (limit 0.8)", "mirrored 1 (limit 0)"]
+    assert failed == ["spearman 0.5 (limit 0.6)", "procrustes 0.9 (limit 0.5)", "mirrored 1 (limit 0)"]
     assert set(LIMITS) <= set(THRESHOLDS)
-    assert judge({"procrustes": float("nan")}) == ["procrustes nan (limit 0.8)"]
+    assert judge({"procrustes": float("nan")}) == ["procrustes nan (limit 0.5)"]
 
 
 def test_procrustes_fits_a_turned_scaled_copy_exactly_and_never_a_mirror_image():
