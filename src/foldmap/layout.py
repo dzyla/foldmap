@@ -1287,9 +1287,9 @@ _WALL_MIN = 3  # a trace of fewer nucleotides (a dinucleotide ligand-like oligo)
 
 
 def _trace_walls(items: list[_Item], traces: dict[int, np.ndarray], na: Nucleic) -> Walls:
-    """Each nucleotide of a trace of at least _WALL_MIN as a fixed box (_TRACE_HALF either side), which the items keep off, but for an item
-    holding an element that touches that trace: a single strand wrapped over its protein (1EYG's ssDNA across the
-    SSB tetramer) does not push away the protein it lies on."""
+    """Each nucleotide of a trace of at least _WALL_MIN as a fixed box (_TRACE_HALF either side), which the items
+    keep off, but for an item holding an element that touches that trace: a single strand wrapped over its protein
+    (1EYG's ssDNA across the SSB tetramer) does not push away the protein it lies on."""
     boxes, owner = [], []
     for s, pts in traces.items():
         if len(pts) < _WALL_MIN:
