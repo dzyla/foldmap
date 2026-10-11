@@ -1163,7 +1163,8 @@ def _stem_springs(items: list[_Item], na: Nucleic) -> list[tuple[int, np.ndarray
     """(item, port offset, item, port offset, weight, slack) along each strand from one stem to the next: the
     joint between two pieces of a bent duplex holds them end to end; a strand exchange (at most _SHORT_RUN
     nucleotides between stems of more than two strands) holds the two stem ends close (slack: its nucleotides'
-    steps); any other run pulls its two stems together like a loop (with slack for its nucleotides)."""
+    steps); any other run pulls its two stems together like a loop, with slack for its nucleotides or, when longer,
+    the distance between its ends at the items' home (projected) places."""
     owner = _owner(items)
     stems = [(k, m) for k, it in enumerate(items) for m in it.members if isinstance(m, PlacedStem)]
     at = {key: (k, m) for k, m in stems for key in m.axial}
@@ -1181,8 +1182,9 @@ def _stem_springs(items: list[_Item], na: Nucleic) -> list[tuple[int, np.ndarray
                 w, slack = _W_JOINT, _JOINT_SLACK
             elif n <= _SHORT_RUN and len({*mi.strands, *mj.strands}) > 2:  # a strand exchange: ends held close
                 w, slack = _W_SHORT, max(_JOINT_SLACK, n * NT_STEP)
-            else:
-                w, slack = _W_SEQ, max(_LOOP_SLACK, 0.5 * n * NT_STEP)
+            else:  # pulls only beyond the distance seen between its ends: the stems keep their 3D arrangement
+                seen = np.add(items[kj].home, oj) - np.add(items[ki].home, oi)
+                w, slack = _W_SEQ, max(_LOOP_SLACK, 0.5 * n * NT_STEP, float(_snap(np.hypot(*seen))))
             out.append((ki, oi, kj, oj, w, slack))
     return out
 

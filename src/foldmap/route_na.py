@@ -377,7 +377,8 @@ def route_nucleic(layout: Layout, router: _Router | None = None) -> list[NAPath]
     for p in fixed.values():
         if p.kind in ("hairpin", "tail"):
             _use(router.grid, p.points)
-    routed = {(s, i): _strand_between(router, s, i, j, da, db, kind) for s, i, j, da, db, kind in between}
+    names = [_stem_label_box(d) for d in layout.stems]
+    routed = {(s, i): _strand_between(router, s, i, j, da, db, kind, names) for s, i, j, da, db, kind in between}
     out = [p for _, p in sorted({**fixed, **routed}.items())]
     for g in na.gaps:  # cropped away: the 3' end of one piece to the 5' end of the next, dashed
         a, b = exits.get((g.before, len(na.strands[g.before]) - 1)), exits.get((g.after, 0))
@@ -392,12 +393,19 @@ def route_nucleic(layout: Layout, router: _Router | None = None) -> list[NAPath]
     return out
 
 
-def _strand_between(router: _Router, s: int, i: int, j: int, da: PlacedStem, db: PlacedStem, kind) -> NAPath:
-    """The single strand from stem nucleotide i to stem nucleotide j (the m nucleotides between drawn on it)."""
+def _strand_between(router: _Router, s: int, i: int, j: int, da: PlacedStem, db: PlacedStem, kind, names=()) -> NAPath:
+    """The single strand from stem nucleotide i to stem nucleotide j (the m nucleotides between drawn on it).
+    `names` (the stem-label boxes) are hard obstacles for a run's first choice of drawing: the first one clear of
+    the elements that also keeps off every name; only when none does, the first one clear of the elements."""
     m, nts, between = j - i - 1, list(range(i + 1, j)), ((s, i), (s, j))
     own, need = (da, db), (j - i) * NT_STEP
     ra, rb = da.point((s, i)), db.point((s, j))
     ok = lambda pts: _na_clear(pts, own, router.elements)  # noqa: E731
+
+    def off_names(pts) -> bool:
+        out = outside_own(pts, own)
+        return not any(clip_len(p, q, b) > 1e-9 for b in names for p, q in zip(out, out[1:]))
+
     if da is db:  # over the stem's tip: a hairpin loop
         pts = _arc(da, (s, i), (s, j), m)
         return NAPath("hairpin", s, nts, pts, _spaced(pts, m), fallback=not ok(pts), between=between)
@@ -409,22 +417,30 @@ def _strand_between(router: _Router, s: int, i: int, j: int, da: PlacedStem, db:
             for c in router.grid.cells_along(fa, fb):
                 router.grid.used[c] += 1
             return NAPath("joint", s, [], pts, [], between=between)
+    bowed = None
     if kind == "internal" and m <= _BOW_MAX:
         # one side of an internal loop: bowed out on its own side, so the two sides never meet
-        pts = _bow(ra, rb, need, out=da.normal * da.side[(s, i)])
-        if ok(pts):
-            return NAPath("run", s, nts, pts, _spaced(pts, m), between=between)
+        bowed = _bow(ra, rb, need, out=da.normal * da.side[(s, i)])
+        if not ok(bowed):
+            bowed = None
+        elif off_names(bowed):
+            return NAPath("run", s, nts, bowed, _spaced(bowed, m), between=between)
     route, _ = router.route(fa, ea, da, fb, eb, db, own_body=True)
     fallback = route is None
     if route is None:
         route = _curve(fa, ea, fb, eb)
     pts = _xy([ra, *route, rb])
+    shapes = [pts]  # the drawings clear of the elements, in order of preference
     if not fallback:
-        pts = next((q for q in (_rounded(pts),) if ok(q)), pts)
-    if not fallback and _length(pts) < need:  # too short for its nucleotides: bowed out, if that is clear
+        rounded = _rounded(pts)
+        shapes = [rounded, pts] if ok(rounded) else [pts]
+    if not fallback and _length(shapes[0]) < need:  # too short for its nucleotides: bowed out, if that is clear
         left = np.array([ra[1] - rb[1], rb[0] - ra[0]])
-        pts = next((b for b in (_bow(ra, rb, need, out=left), _bow(ra, rb, need, out=-left)) if ok(b)), pts)
-    return NAPath("joint" if joint else "run", s, nts, pts, _spaced(pts, m), fallback=fallback, between=between)
+        shapes = [b for b in (_bow(ra, rb, need, out=left), _bow(ra, rb, need, out=-left)) if ok(b)] + shapes
+    soft = [bowed] if bowed is not None else [shapes[0]]  # the first choice when every drawing meets a name
+    pts = next((q for q in shapes if not fallback and ok(q) and off_names(q)), soft[0])
+    kind_drawn = "joint" if joint else "run"
+    return NAPath(kind_drawn, s, nts, pts, _spaced(pts, m), fallback=fallback and pts is not bowed, between=between)
 
 
 def _gap(router: _Router, g, a, b) -> NAPath:

@@ -221,17 +221,36 @@ def test_short_runs_and_strand_exchanges_hold_their_stem_ends_together(monkeypat
     assert trna and all(w < layout._W_SHORT for *_, w, _ in trna)
 
 
+def _seen(lay):
+    """Each drawn stem's centre as seen in the layout's frame, page units."""
+    from foldmap.layout import SCALE, stem_pieces
+    from foldmap.nucleic import stem_axis
+
+    pieces = {p.id: p for p in stem_pieces(lay.nucleic)}
+    centres = np.array([stem_axis(pieces[d.id], lay.nucleic.strands)[0] for d in lay.stems])
+    return {d.name: np.asarray(c)[:2] * SCALE for d, c in zip(lay.stems, lay.frame.project(centres))}
+
+
 def test_trna_keeps_its_cloverleaf_junction_compact():
     """1EHZ: the variable loop (5 nt from the anticodon stem P3 to the T stem P4) is a short run, and the T loop
     does not point at the anticodon loop (with every short run held like a strand exchange, P4 was pulled across
-    the cloverleaf: the variable loop ran 20.7 units and the T loop pointed 32 degrees off the anticodon loop)."""
+    the cloverleaf: the variable loop ran 20.7 units and the T loop pointed 32 degrees off the anticodon loop).
+    The tRNA is drawn in its L shape (runs pull only beyond the distance 3D shows), so the variable loop spans what
+    3D shows between P3 and P4 rather than a cloverleaf's 6 units: its ends lie no farther apart than 1.35 times
+    their distance at the stems' projected places (measured 1.27)."""
     import math
 
     lay, _, _, _ = _routed("1EHZ")
     at = {key: d for d in lay.stems for key in d.axial}
     variable = [p for p in lay.na_paths if p.kind == "run" and [at[k].name for k in p.between] == ["P3", "P4"]]
     assert len(variable) == 1 and len(variable[0].nts) == 5
-    assert sum(math.dist(a, b) for a, b in zip(variable[0].points, variable[0].points[1:])) <= 6.0
+    (a, b), seen = variable[0].between, _seen(lay)
+    da, db = at[a], at[b]
+    drawn = math.dist(da.port(a, True)[0], db.port(b, False)[0])
+    there = math.dist(
+        da.port(a, True)[0] - (da.cx, da.cy) + seen["P3"], db.port(b, False)[0] - (db.cx, db.cy) + seen["P4"]
+    )
+    assert drawn <= 1.35 * there, (drawn, there)
 
     def loop(d):
         a, i, b, j = d.pairs[-1]
@@ -242,6 +261,24 @@ def test_trna_keeps_its_cloverleaf_junction_compact():
     (c4, out4), (c3, _) = loop(stems["P4"]), loop(stems["P3"])
     towards = (c3 - c4) / np.linalg.norm(c3 - c4)
     assert out4 @ towards < np.cos(np.radians(60))
+
+
+def test_a_trna_is_drawn_in_its_3d_arrangement():
+    """A run between two stems pulls only when the drawing stretches it beyond the distance 3D shows: pulled to its
+    nucleotides' length, the runs drew 1EHZ's cloverleaf away from its L shape (procrustes 0.716)."""
+    from foldmap.nacheck import shape
+
+    lay, _, _ = make_layout(_path("1EHZ"))
+    assert shape(lay)["procrustes"] < 0.4
+
+
+def test_stems_joined_by_runs_keep_the_order_they_are_seen_in():
+    """2OEU (hammerhead ribozyme): P3 is seen left of P2; the runs pulling P2 and P3 to their nucleotides' length
+    swapped them on the page."""
+    lay, _, _ = make_layout(_path("2OEU"))
+    seen = _seen(lay)
+    drawn = {d.name: np.array([d.cx, d.cy]) for d in lay.stems}
+    assert (drawn["P3"] - drawn["P2"]) @ (seen["P3"] - seen["P2"]) > 0
 
 
 @pytest.mark.parametrize(
@@ -542,6 +579,42 @@ def test_runs_keep_off_the_stem_names(pdb):
         if p.kind in ("run", "joint"):
             pts = outside_own(p.points, tuple(at[key] for key in p.between))
             assert all(segment_clear(a, b, names) for a, b in zip(pts, pts[1:])), (p.kind, p.between)
+
+
+def test_a_run_goes_round_a_stem_name_it_could_cross():
+    """4YBB: with the stems where 3D has them (C2), the 1-nt run from P27 to P26 was bowed across P27's name. Stem
+    names are hard obstacles for a run's first drawing; one that crosses a name is drawn only when nothing else
+    is clear of the elements."""
+    from foldmap.layout import label_boxes
+    from foldmap.route_na import outside_own
+
+    lay, sses, _, _ = _routed("4YBB")
+    at = {key: d for d in lay.stems for key in d.axial}
+    names = [b for n, b in label_boxes(lay, sses) if n.startswith("stem-label:")]
+    run = next(p for p in lay.na_paths if p.between == ((1, 391), (1, 393)))
+    assert [at[k].name for k in run.between] == ["P27", "P26"] and not run.fallback
+    pts = outside_own(run.points, tuple(at[k] for k in run.between))
+    assert all(segment_clear(a, b, names) for a, b in zip(pts, pts[1:]))
+
+
+def test_a_run_over_a_stem_name_is_drawn_when_nothing_else_is_clear():
+    """The names are hard only in the first pass: with every drawing over a name, each run is drawn as without."""
+    from foldmap.route import _element_obstacles, _Grid, _Router
+    from foldmap.route_na import _strand_between
+
+    lay, _, _, _ = _routed("1EHZ")
+    at = {key: d for d in lay.stems for key in d.axial}
+    runs = [p for p in lay.na_paths if p.kind == "run"]
+    assert runs
+
+    def drawn(p, names):
+        (s, i), (_, j) = p.between
+        router = _Router(_Grid(lay), _element_obstacles(lay))
+        return _strand_between(router, s, i, j, at[(s, i)], at[(s, j)], None, names)
+
+    for p in runs:
+        plain, covered = drawn(p, ()), drawn(p, [(-1e3, -1e3, 1e3, 1e3)])
+        assert covered.points == plain.points and covered.fallback == plain.fallback
 
 
 def segment_clear(p, q, rects):
