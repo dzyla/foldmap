@@ -1,6 +1,7 @@
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
+import numpy as np
 import pytest
 
 from foldmap.cli import make_figure
@@ -373,3 +374,16 @@ def test_chromophore_is_marked_on_the_chain():
     gids = {a.get_gid() for a in fig.axes[0].get_children()}
     assert "linked:A:66" in gids
     assert "CRO66" in {t.get_text() for t in fig.axes[0].texts}
+
+
+def test_chromophore_star_is_easy_to_see():
+    fig = make_figure(DATA / "1EMA.cif")
+    ax = fig.axes[0]
+    (star,) = [a for a in ax.get_children() if a.get_gid() == "linked:A:66"]
+    v = star.get_xy()
+    r = max(np.hypot(*(v - v.mean(axis=0)).T))
+    assert r >= 0.35
+    (label,) = [t for t in ax.texts if t.get_gid() == "linked-label:A:66"]
+    assert label.get_fontsize() >= 7
+    (swatch,) = [a for a in ax.get_children() if a.get_gid() == "legend-linked"]
+    assert len(swatch.get_xy()) >= 10  # a star, not the plain square of the other entries

@@ -1123,8 +1123,9 @@ def _draw_ligands(ax, marks: list[dict], lw: float, font: float) -> None:
         t.set_gid(f"ligand-label:{key}")
 
 
-_LINKED_STAR = 0.22  # radius of the mark of a residue fused into the chain
+_LINKED_STAR = 0.38  # radius of the mark of a residue fused into the chain
 _LINKED_LABEL = 0.6  # its label, as a fraction of the font
+_LINKED_LABEL_MIN = 7.0  # but never smaller than this (pt)
 
 
 def linked_marks(layout: Layout, loops: list[Loop], sses: list[SSE], marks: list[dict]) -> list[dict]:
@@ -1180,14 +1181,19 @@ def linked_marks(layout: Layout, loops: list[Loop], sses: list[SSE], marks: list
     return out
 
 
+def _star(cx: float, cy: float, r: float) -> np.ndarray:
+    """Five points out, notches in at 0.4 of the radius."""
+    angles = np.pi / 2 + np.arange(10) * np.pi / 5
+    radii = np.where(np.arange(10) % 2 == 0, r, 0.4 * r)
+    return np.c_[cx + radii * np.cos(angles), cy + radii * np.sin(angles)]
+
+
 def _draw_linked(ax, linked: list[dict], lw: float, font: float) -> None:
     for m in linked:
         cx, cy = m["centre"]
         key = f"{m['label'].chain}:{m['label'].tag}"
-        angles = np.pi / 2 + np.arange(10) * np.pi / 5  # points out, notches in at 0.4 of the radius
-        radii = np.where(np.arange(10) % 2 == 0, _LINKED_STAR, 0.4 * _LINKED_STAR)
         star = Polygon(
-            np.c_[cx + radii * np.cos(angles), cy + radii * np.sin(angles)],
+            _star(cx, cy, _LINKED_STAR),
             closed=True,
             fc=LIGAND_FILL,
             ec=LIGAND_EDGE,
@@ -1203,7 +1209,7 @@ def _draw_linked(ax, linked: list[dict], lw: float, font: float) -> None:
                 m["text"],
                 ha="center",
                 va="center",
-                fontsize=font * _LINKED_LABEL,
+                fontsize=max(_LINKED_LABEL_MIN, font * _LINKED_LABEL),
                 color="#5c4300",
                 zorder=3.9,
             )
@@ -2308,6 +2314,10 @@ def _draw_legend(c: _Canvas, layout: Layout, legend: _Legend) -> None:
         elif _NA_ENTRY.match(text):  # a nucleic-acid backbone: a short thick stroke, not a chain's square
             (rail,) = c.ax.plot([x, x + 0.6], [y, y], color=colour, lw=c.lw * 2.4, solid_capstyle="butt")
             rail.set_gid("legend-na")
+        elif text.startswith("chromophore"):  # the mark itself: a star
+            star = Polygon(_star(x + 0.3, y, 0.42), closed=True, fc=colour, ec=LIGAND_EDGE, lw=c.lw * 0.7)
+            star.set_gid("legend-linked")
+            c.ax.add_patch(star)
         else:
             swatch = Rectangle((x, y - 0.3), 0.6, 0.6, fc=colour, ec=darken(colour), lw=c.lw * 0.8)
             c.ax.add_patch(swatch)

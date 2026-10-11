@@ -60,3 +60,12 @@ def test_reference_format(tmp_path):
 def test_agrees_with_mkdssp(name):
     n, bad = disagreements(name)
     assert not bad, f"{len(bad)} of {n} residues differ from mkdssp: " + "; ".join(bad[:10])
+
+
+def test_1ema_central_helix_is_helix_across_the_chromophore():
+    """The comparison skips residues within four of CRO66; mkdssp sees the chain broken there, foldmap does not.
+    Pin foldmap's own answer for A57-64 so that mask cannot hide a regression."""
+    bb = load_backbone(DATA / "1EMA.cif", "asu")
+    ss = assign_dssp(bb).ss
+    got = {l.seq: ss[k] for k, l in enumerate(bb.labels) if l.chain == "A" and 57 <= l.seq <= 64}
+    assert got == dict.fromkeys(range(57, 65), "H")

@@ -169,6 +169,21 @@ def test_only_peptide_linked_nonstandard_residues_join_the_chain(tmp_path):
     assert not bb.linked and all(l.name != "CRO" for l in bb.labels)
 
 
+@pytest.mark.parametrize("side", [-1, 1])
+def test_residue_bonded_to_one_neighbour_only_is_not_stood_in_for(tmp_path, side):
+    """The chromophore bonds to the residue before and the one after; moving one of them away leaves a residue
+    that only the neighbour-distance guard keeps out of the chain."""
+    st = gemmi.read_structure(str(DATA / "1EMA.cif"))
+    chain = st[0]["A"]
+    k = next(i for i, r in enumerate(chain) if r.name == "CRO")
+    for a in chain[k + side]:
+        a.pos = gemmi.Position(a.pos.x + 30, a.pos.y, a.pos.z)
+    path = tmp_path / "half.cif"
+    st.make_mmcif_document().write_file(str(path))
+    bb = load_backbone(path, "asu")
+    assert not bb.linked and all(l.name != "CRO" for l in bb.labels)
+
+
 def test_backbone_only_keeps_and_remaps_linked_residues():
     bb = load_backbone(DATA / "1EMA.cif", "asu")
     (k,) = bb.linked
