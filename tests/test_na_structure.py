@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 
 from foldmap.io import _nucleic_strands, load_backbone, load_nucleic, read_model
-from foldmap.model import NAStrand, ResLabel, nucleic_from_pairs
+from foldmap.model import AUTO_NT, NAStrand, ResLabel, crop_nucleic, nucleic_from_pairs
 from foldmap.nucleic import (
     BasePair,
     NARun,
@@ -17,6 +17,7 @@ from foldmap.nucleic import (
     stem_axis,
     straight_duplex,
 )
+from foldmap.style import THEMES, resolve_style
 
 NA = Path(__file__).parent / "data" / "na"
 DATA = Path(__file__).parent / "data"
@@ -267,3 +268,54 @@ def test_a_short_stem_axis_crosses_its_pairs_and_rises_with_them():
     assert np.all(np.abs(across @ axis) < 0.1)  # perpendicular to every C1'-C1' line
     rise = np.diff((a + b) / 2 @ axis)
     assert np.all((2.5 < rise) & (rise < 4.5))  # each pair one stacking step further along it (measured 2.8-3.5)
+
+
+def _touched(na):
+    return {(na.strands[s].labels[i].chain, na.strands[s].labels[i].seq) for v in na.contacts.values() for s, i in v}
+
+
+def test_auto_extent_crops_a_large_rna_to_the_touched_stems():
+    na = _na("4YBB")
+    assert na.size > AUTO_NT
+    cut = crop_nucleic(na, by="stems")
+    assert cut.size < na.size and cut.gaps
+    assert _touched(cut) == _touched(na)  # nothing the protein touches is cropped away
+    assert all(g.count > 0 for g in cut.gaps)
+    for st in cut.structure.stems:  # stems survive whole
+        assert len(st) >= 2
+
+
+def test_crop_by_contacts_is_unchanged():
+    na = _na("1LMB")
+    cut = crop_nucleic(na, flank=0)
+    assert len(cut.strands) == len(na.strands) and not cut.gaps
+
+
+def test_unknown_crop_mode_is_an_error():
+    with pytest.raises(ValueError, match="contacts or stems"):
+        crop_nucleic(_na("1LMB"), by="everything")
+
+
+def test_focus_keeps_only_the_nucleic_acid_the_subunit_holds():
+    from foldmap.model import nucleic_from_pairs, nucleic_touching
+
+    na = _na("1KX5")
+    first = {(0, i) for i in range(10)}
+    lone = nucleic_from_pairs(na.strands, [], {7: first}, {7: "A"})  # unpaired, touched only on strand I by A
+    kept = nucleic_touching(lone, ["A"])
+    assert [s.chain for s in kept.strands] == ["I"]
+    assert nucleic_touching(lone, ["B"]).strands == []
+    both = nucleic_touching(nucleic_from_pairs(na.strands, na.base_pairs, {7: first}, {7: "A"}), ["A"])
+    assert [s.chain for s in both.strands] == ["I", "J"]  # the paired strand comes along
+
+
+def test_theme_defaults_for_stems():
+    assert THEMES["publication"].na_style == "ladder"
+    assert THEMES["minimal"].na_style == THEMES["print"].na_style == "block"
+    assert THEMES["presentation"].na_style == THEMES["cartoon"].na_style == "ribbon"
+
+
+def test_dna_extent_is_still_accepted():
+    assert resolve_style(None, None, ["dna_extent=all"]).na_extent == "all"
+    with pytest.raises(ValueError, match="na_extent"):
+        resolve_style(None, None, ["na_extent=some"])

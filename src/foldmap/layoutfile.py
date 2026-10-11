@@ -25,7 +25,7 @@ import yaml
 
 from .layout import Layout, resolve
 from .model import SSE, res_ref
-from .style import THEMES, Style
+from .style import _KEY_ALIASES, THEMES, Style
 
 VERSION = 1
 TOP = ("foldmap", "structure", "theme", "style", "layout", "domains", "edits")
@@ -116,7 +116,7 @@ def load(path) -> dict:
     if doc.get("theme") is not None and doc["theme"] not in THEMES:
         raise ValueError(f"{path}: unknown theme {doc['theme']!r}")
     for key in doc.get("style") or {}:
-        if not hasattr(Style(), key):
+        if not hasattr(Style(), _KEY_ALIASES.get(key, key)):  # earlier key names are still read
             raise ValueError(f"{path}: unknown style key {key!r}")
     for key in doc.get("layout") or {}:
         if key not in LAYOUT:

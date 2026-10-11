@@ -171,50 +171,98 @@ def nucleic_from_pairs(strands, base_pairs, contacts, contact_chain, gaps=()) ->
     )
 
 
-def crop_nucleic(na: Nucleic, flank: int = 6) -> Nucleic:
-    """Only the stretches the protein touches, plus `flank` nucleotides each side (and their base-pair
-    partners, so duplexes stay whole); duplexes the protein never touches are dropped."""
-    window: dict[int, list[int]] = {}
-    for v in na.contacts.values():
-        for k, i in v:
+AUTO_NT = 300  # na_extent auto: larger nucleic acids are cropped to the stems the protein touches
+_MERGE_GAP = 12  # crop by stems: kept stretches of one strand closer than this many nucleotides are joined
+
+
+def _touched(na: Nucleic) -> set[tuple[int, int]]:
+    return {x for v in na.contacts.values() for x in v}
+
+
+def crop_nucleic(na: Nucleic, flank: int = 6, *, by: str = "contacts") -> Nucleic:
+    """Only what the protein touches. by="contacts": the touched stretch of each strand plus `flank`
+    nucleotides each side (and their base-pair partners, so duplexes stay whole); strands never touched are
+    dropped. by="stems": the stems with a touched nucleotide plus one stem either side in sequence, and the
+    short runs between them; each strand may fall into several pieces, with a gap recorded between them."""
+    if by == "contacts":
+        window: dict[int, list[int]] = {}
+        for k, i in _touched(na):
             lo, hi = window.get(k, [i, i])
             window[k] = [min(lo, i), max(hi, i)]
-    for k, w in window.items():
-        window[k] = [max(0, w[0] - flank), min(len(na.strands[k]) - 1, w[1] + flank)]
-    for _ in range(3):  # partners of every kept nucleotide are kept too
-        for a, i, b, j in na.pairs:
-            for x, y, u, v in ((a, i, b, j), (b, j, a, i)):
-                if x in window and window[x][0] <= y <= window[x][1]:
-                    lo, hi = window.get(u, [v, v])
-                    window[u] = [min(lo, v), max(hi, v)]
-    keep = sorted(window)
-    index = {k: n for n, k in enumerate(keep)}
-    strands = []
-    for k in keep:
-        s, (lo, hi) = na.strands[k], window[k]
-        strands.append(
-            NAStrand(
-                s.chain,
-                s.labels[lo : hi + 1],
-                s.p[lo : hi + 1],
-                s.c1[lo : hi + 1],
-                s.rna,
-                s.cut5 or lo > 0,
-                s.cut3 or hi < len(s) - 1,
+        for k, w in window.items():
+            window[k] = [max(0, w[0] - flank), min(len(na.strands[k]) - 1, w[1] + flank)]
+        for _ in range(3):  # partners of every kept nucleotide are kept too
+            for a, i, b, j in na.pairs:
+                for x, y, u, v in ((a, i, b, j), (b, j, a, i)):
+                    if x in window and window[x][0] <= y <= window[x][1]:
+                        lo, hi = window.get(u, [v, v])
+                        window[u] = [min(lo, v), max(hi, v)]
+        return _cut(na, {k: [tuple(w)] for k, w in window.items()})
+    if by != "stems":
+        raise ValueError(f"crop by contacts or stems; got {by!r}")
+    stems = na.structure.stems
+    touched = _touched(na)
+    hit = [n for n, st in enumerate(stems) if touched & set(st.nucleotides())]
+    keep = {m for n in hit for m in (n - 1, n, n + 1) if 0 <= m < len(stems)}
+    spans: dict[int, list[list[int]]] = {}
+    for n in sorted(keep):
+        for s, lo, hi in (stems[n].arm5, stems[n].arm3):
+            spans.setdefault(s, []).append([lo, hi])
+    for k, i in touched:  # touched single-stranded nucleotides stay too
+        spans.setdefault(k, []).append([i, i])
+    windows: dict[int, list[tuple[int, int]]] = {}
+    for k, found in spans.items():
+        merged: list[list[int]] = []
+        for lo, hi in sorted(found):
+            if merged and lo - merged[-1][1] <= _MERGE_GAP:
+                merged[-1][1] = max(merged[-1][1], hi)
+            else:
+                merged.append([lo, hi])
+        windows[k] = [(lo, hi) for lo, hi in merged]
+    return _cut(na, windows)
+
+
+def nucleic_touching(na: Nucleic, chains) -> Nucleic:
+    """Only the strands a protein chain in `chains` touches, with every strand base-paired to them."""
+    keep = {s for r, v in na.contacts.items() if na.contact_chain.get(r) in set(chains) for s, _ in v}
+    for _ in range(len(na.strands)):
+        grown = keep | {p.b for p in na.base_pairs if p.a in keep} | {p.a for p in na.base_pairs if p.b in keep}
+        if grown == keep:
+            break
+        keep = grown
+    return _cut(na, {s: [(0, len(na.strands[s]) - 1)] for s in sorted(keep)})
+
+
+def _cut(na: Nucleic, windows: dict[int, list[tuple[int, int]]]) -> Nucleic:
+    """The nucleotides inside the windows, each window its own strand piece, indices renumbered."""
+    strands, where, gaps = [], {}, []
+    for k in sorted(windows):
+        s = na.strands[k]
+        for n, (lo, hi) in enumerate(windows[k]):
+            if n:
+                gaps.append(NAGap(len(strands) - 1, len(strands), lo - windows[k][n - 1][1] - 1))
+            for i in range(lo, hi + 1):
+                where[(k, i)] = (len(strands), i - lo)
+            strands.append(
+                NAStrand(
+                    s.chain,
+                    s.labels[lo : hi + 1],
+                    s.p[lo : hi + 1],
+                    s.c1[lo : hi + 1],
+                    s.rna,
+                    s.cut5 or lo > 0,
+                    s.cut3 or hi < len(s) - 1,
+                )
             )
-        )
-
-    def inside(k: int, i: int) -> bool:
-        return k in window and window[k][0] <= i <= window[k][1]
-
-    pairs = [
-        (index[a], i - window[a][0], index[b], j - window[b][0])
-        for a, i, b, j in na.pairs
-        if inside(a, i) and inside(b, j)
-    ]
-    contacts = {r: {(index[k], i - window[k][0]) for k, i in v if inside(k, i)} for r, v in na.contacts.items()}
+    pairs = []
+    for p in na.base_pairs:
+        if (p.a, p.i) in where and (p.b, p.j) in where:
+            (a, i), (b, j) = sorted((where[(p.a, p.i)], where[(p.b, p.j)]))
+            pairs.append(BasePair(a, i, b, j, p.kind))
+    contacts = {r: {where[x] for x in v if x in where} for r, v in na.contacts.items()}
     contacts = {r: v for r, v in contacts.items() if v}
-    return Nucleic(strands, pairs, contacts, {r: c for r, c in na.contact_chain.items() if r in contacts})
+    chains = {r: c for r, c in na.contact_chain.items() if r in contacts}
+    return nucleic_from_pairs(strands, pairs, contacts, chains, gaps)
 
 
 def duplex_groups(na: Nucleic) -> list[list[int]]:

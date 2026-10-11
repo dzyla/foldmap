@@ -19,7 +19,7 @@ from foldmap.fetch import ALIGNMENT_SUFFIXES, fetch, keep_upload
 from foldmap.render import save, save_svg
 from foldmap.spec import FigureSpec, draw_spec, parse_flag, parse_protomers, parse_vector
 from foldmap.spec import layout_document as spec_document
-from foldmap.style import CHOICES, THEMES, Style
+from foldmap.style import _KEY_ALIASES, CHOICES, THEMES, Style
 from foldmap.symmetry import TOLERANCE
 
 STYLE_FIELDS = {f.name: f.type for f in fields(Style)}
@@ -195,7 +195,8 @@ def layout_document(path, settings: dict) -> dict:
 def settings_from_document(doc: dict) -> dict:
     """App settings from a layout file document: the theme, its style changes, layout options, edits as text."""
     theme = doc.get("theme") or "publication"
-    out = {"theme": theme, **vars(THEMES[theme]), **(doc.get("style") or {})}
+    style = {_KEY_ALIASES.get(k, k): v for k, v in (doc.get("style") or {}).items()}  # earlier key names too
+    out = {"theme": theme, **vars(THEMES[theme]), **style}
     lay = doc.get("layout") or {}
     for key, default in LAYOUT_DEFAULTS.items():
         out[key] = default

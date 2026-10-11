@@ -169,3 +169,16 @@ def test_invalid_yaml_is_a_readable_error(tmp_path):
     bad.write_text("layout: {rotate: 30\n", encoding="utf-8")
     with pytest.raises(ValueError, match=r"layout file bad\.yaml is not valid YAML"):
         layoutfile.load(bad)
+
+
+def test_na_extent_round_trips_and_dna_extent_is_read_as_its_old_name(tmp_path):
+    from foldmap.app import layout_document, settings_from_document
+    from foldmap.spec import figure_spec
+
+    doc = layout_document(DATA / "1UBQ.cif", {"theme": "publication", "na_extent": "contacts"})
+    assert doc["style"]["na_extent"] == "contacts"
+    assert settings_from_document(doc)["na_extent"] == "contacts"
+    lf = tmp_path / "old.yaml"
+    lf.write_text("foldmap: 1\nstyle:\n  dna_extent: all\n")
+    assert figure_spec(DATA / "1UBQ.cif", layout_file=lf).look.na_extent == "all"
+    assert settings_from_document(layoutfile.load(lf))["na_extent"] == "all"

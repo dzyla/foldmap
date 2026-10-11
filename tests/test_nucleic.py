@@ -410,8 +410,8 @@ def test_cropped_ends_are_marked_and_full_dna_on_request():
     texts = lambda fig: [t.get_text() for t in fig.axes[0].texts]  # noqa: E731
     from foldmap.style import Style
 
-    cropped = make_figure(DATA / "1LMB.cif", look=Style(dna_extent="contacts"))
-    full = make_figure(DATA / "1LMB.cif", look=Style(dna_extent="all"))
+    cropped = make_figure(DATA / "1LMB.cif", look=Style(na_extent="contacts"))
+    full = make_figure(DATA / "1LMB.cif", look=Style(na_extent="all"))
     assert "5′" in texts(full) and texts(full).count("5′") >= 2
     assert len(texts(cropped)) <= len(texts(full))
 

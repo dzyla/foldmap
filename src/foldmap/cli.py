@@ -19,7 +19,7 @@ from .features import sse_contacts
 from .frame import dna_radial_frame, dna_view_frame, symmetric_frame, view_frame
 from .io import load_backbone, load_links, load_nucleic, read_model
 from .layout import build_layout, resolve
-from .model import res_ref
+from .model import AUTO_NT, crop_nucleic, nucleic_touching, res_ref
 from .palette import PALETTES
 from .render import LOOP_STYLES, STYLES, draw, save
 from .route import route_loops
@@ -86,6 +86,15 @@ CONSERVATION_LEGEND = "conservation (entropy-based, ConSurf colour scale)"
 CONSURF_LEGEND = "conservation (ConSurf grades)"
 
 
+def _na_extent(na, extent: str):
+    """(the nucleic acid to draw, whether `auto` cropped a large one to the stems the protein touches)."""
+    if extent == "contacts":
+        return crop_nucleic(na), False
+    if extent == "auto" and na.size > AUTO_NT and na.contacts:
+        return crop_nucleic(na, by="stems"), True
+    return na, False
+
+
 def make_layout(
     path,
     mode: str = "projected",
@@ -124,15 +133,16 @@ def make_layout(
     sses = build_sses(bb, dssp.ss, short_helices=(look or Style()).helices_310, bridges=dssp.bridges)
     sheets = build_sheets(sses, dssp.bridges)
     nucleic = load_nucleic(path, bb, assembly, model=model) if dna else None
-    if nucleic is not None and (look or Style()).dna_extent == "contacts":
-        from .model import crop_nucleic
-
-        nucleic = crop_nucleic(nucleic)
+    na_cropped = False  # Task 6 stores it on the layout
+    if nucleic is not None and nucleic.strands:
+        nucleic, na_cropped = _na_extent(nucleic, (look or Style()).na_extent)
     sym = detect_symmetry(bb, sses, symmetry, protomers, symmetry_tol) if sses else None
     shared = _homolog_labels(bb, sses)  # copies of one protein share labels, however much of each is modelled
     if focus == "auto" and (look or Style()).highlight != "none":
         focus = "none"  # highlighting the asymmetric unit or a protomer asks for the whole assembly
     focus_chains = _focus_chains(focus, sym, bb, sses)
+    if focus_chains and nucleic is not None and nucleic.strands:  # one subunit: the nucleic acid it holds
+        nucleic = nucleic_touching(nucleic, focus_chains)
     partial, context, unjoined = set(), None, set()
     if focus_chains:  # a large assembly: one subunit in full, plus what its neighbours lend to its fold
         from .layout import provisional

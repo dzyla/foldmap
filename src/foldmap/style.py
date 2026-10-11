@@ -18,7 +18,8 @@ from .palette import PALETTES
 CHOICES = {
     "palette": tuple(PALETTES),
     "fill": ("bold", "pale", "outline"),  # solid colour / pale fills / white fills with coloured edges
-    "dna_extent": ("contacts", "all"),
+    "na_extent": ("auto", "contacts", "all"),
+    "na_style": ("ladder", "ribbon", "block", "letters"),
     "color_by": (
         "chain",
         "sequence",
@@ -42,13 +43,14 @@ CHOICES = {
     "helix_angle": ("snap", "upright", "tilted"),  # nearest of vertical/horizontal / always vertical / as in 3D
 }
 _ALIASES = {"fill": {"classic": "bold", "flat": "pale"}}
+_KEY_ALIASES = {"dna_extent": "na_extent"}  # earlier names of style keys
 LAYOUT_KEYS = (
     "helix_angle",
     "helix_scale",
     "strand_scale",
     "dna_scale",
     "helices_310",
-    "dna_extent",
+    "na_extent",
 )  # these move elements
 SCALES = ("helix_scale", "strand_scale", "dna_scale", "loop_width", "font_scale")
 
@@ -70,7 +72,9 @@ class Style:
     color_by: str = "chain"
     sequence_map: str = "turbo"  # blue (N) -> red (C), like PyMOL's spectrum
     nucleotide_labels: bool = True  # base letters on DNA/RNA
-    dna_extent: str = "contacts"  # DNA/RNA drawn: contacts (the stretch the protein touches, +6 nt) or all
+    na_extent: str = "auto"  # DNA/RNA drawn: auto (all up to 300 nt, else the stems the protein touches),
+    # contacts (the stretch the protein touches, +6 nt) or all
+    na_style: str = "ladder"  # stems as ladder (rails and rungs), ribbon (double helix), block (bars) or letters
     helices_310: bool = True  # short 3-10 helices as small boxes (η1, η2...)
     sheet_panels: bool = True  # a light panel behind each β-sheet, so sandwiches read as two sheets
     loop_color: str = "black"
@@ -110,10 +114,10 @@ class Style:
 
 THEMES = {
     "publication": Style(),
-    "minimal": Style(fill="outline", helix_shading="none", loop_width=0.8),
-    "print": Style(palette="greys", fill="pale", helix_shading="none"),
-    "presentation": Style(loop_width=1.6, font_scale=1.4, helix_shading="gloss", loops="curved"),
-    "cartoon": Style(loops="curved", helix_shading="gloss", palette="tol-bright"),
+    "minimal": Style(fill="outline", helix_shading="none", loop_width=0.8, na_style="block"),
+    "print": Style(palette="greys", fill="pale", helix_shading="none", na_style="block"),
+    "presentation": Style(loop_width=1.6, font_scale=1.4, helix_shading="gloss", loops="curved", na_style="ribbon"),
+    "cartoon": Style(loops="curved", helix_shading="gloss", palette="tol-bright", na_style="ribbon"),
     "rainbow": Style(color_by="sequence", helix_shading="gloss"),
     "shaded": Style(color_by="shade"),
     "richardson": Style(color_by="sstype", helix_shading="depth", loops="curved"),
@@ -139,6 +143,7 @@ THEME_KEYS = tuple(k for k in _TYPES if k not in LAYOUT_KEYS)
 
 
 def _coerce(key: str, value):
+    key = _KEY_ALIASES.get(key, key)
     if key not in _TYPES:
         raise ValueError(f"unknown style key {key!r}; valid keys: {', '.join(_TYPES)}")
     kind = _TYPES[key]
@@ -172,7 +177,7 @@ def resolve_style(
         named = loaded.pop("theme", None) or loaded.pop("preset", None)
         loaded.pop("preset", None)
         theme = theme or named
-        settings.update({k: _coerce(k, v) for k, v in loaded.items()})
+        settings.update({_KEY_ALIASES.get(k, k): _coerce(k, v) for k, v in loaded.items()})
     name = theme or "publication"
     if name not in THEMES:
         raise ValueError(f"unknown theme {name!r}; choose from {', '.join(THEMES)}")
@@ -180,7 +185,7 @@ def resolve_style(
         if "=" not in item:
             raise ValueError(f"style override {item!r} must be key=value")
         key, value = item.split("=", 1)
-        settings[key.strip()] = _coerce(key.strip(), value.strip())
+        settings[_KEY_ALIASES.get(key.strip(), key.strip())] = _coerce(key.strip(), value.strip())
     return replace(THEMES[name], **settings).validate()
 
 
