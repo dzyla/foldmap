@@ -370,3 +370,38 @@ def test_dna_extent_is_still_accepted():
     assert resolve_style(None, None, ["dna_extent=all"]).na_extent == "all"
     with pytest.raises(ValueError, match="na_extent"):
         resolve_style(None, None, ["na_extent=some"])
+
+
+def _duplex(n, splay=()):
+    """Two antiparallel DNA strands A, B of n nucleotides, B[n-1-k] paired across from A[k] (C1' 10.5 Å apart, 3.4 Å
+    rise); the nucleotides of B in `splay` swung 8 Å further out (not in the helix)."""
+    a = np.array([[0.0, 0.0, 3.4 * k] for k in range(n)])
+    b = np.array([[10.5 + (8.0 if n - 1 - k in splay else 0.0), 0.0, 3.4 * (n - 1 - k)] for k in range(n)])
+    return [
+        NAStrand(c, [ResLabel(c, k + 1, "", "A") for k in range(n)], xyz, xyz, False) for c, xyz in (("A", a), ("B", b))
+    ]
+
+
+@pytest.mark.parametrize("gap", [1, 2])
+def test_a_duplex_stays_whole_across_unpaired_steps_in_register(gap):
+    # A[k]·B[n-1-k] paired, but A[5..5+gap) unpaired on both strands: the same helix either side (1AOI I20-21)
+    n = 14
+    pairs = [BasePair(0, k, 1, n - 1 - k, "WC") for k in range(n) if not 5 <= k < 5 + gap]
+    ss = secondary_structure(_duplex(n), pairs)
+    assert [len(st) for st in ss.stems] == [n - gap] and not ss.ties
+
+
+def test_a_two_by_two_loop_whose_steps_leave_the_helix_splits_the_duplex():
+    n = 14
+    pairs = [BasePair(0, k, 1, n - 1 - k, "WC") for k in range(n) if k not in (5, 6)]
+    ss = secondary_structure(_duplex(n, splay=(5, 6)), pairs)
+    assert [len(st) for st in ss.stems] == [5, 7]
+
+
+def test_the_1aoi_nucleosome_dna_is_one_duplex_cut_only_where_it_bends():
+    na = _na("1AOI")
+    (st,) = na.structure.stems  # I20-21 and J272-273 unpaired in register: inside the stem
+    assert len(st) >= 140 and st.name == "DNA 1"
+    assert {(0, 20 - 1), (0, 21 - 1)} <= set(st.bulges)
+    pieces = segment_stem(st, na.strands)
+    assert len(pieces) > 1 and all(p.parent == st.id for p in pieces)

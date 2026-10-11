@@ -254,27 +254,37 @@ class NAStructure:
     ties: list[BasePair] = field(default_factory=list)  # isolated pairs: drawn as a bar, not a stem
 
 
-def _stacks(p: BasePair, q: BasePair, paired: set[tuple[int, int]]) -> bool:
-    """q continues p's stem: the next step, a bulge of up to 2 nt on one side, or a 1x1 mismatch. A nucleotide
-    the step skips must be unpaired (`paired`: every paired (strand, nucleotide)), else it would sit in the stem
-    and in another pair."""
+def _stacks(p: BasePair, q: BasePair, paired: set[tuple[int, int]], strands=None) -> bool:
+    """q continues p's stem: the next step, a bulge of up to 2 nt on one side, a 1x1 mismatch, or (given the
+    strands) a 2x2 loop in register whose two unpaired steps still sit across the helix (their C1' atoms within
+    C1_PAIR: non-canonical or stretched pairs of the same duplex, as in the nucleosome's 1AOI I20-21). A
+    nucleotide the step skips must be unpaired (`paired`: every paired (strand, nucleotide)), else it would sit
+    in the stem and in another pair."""
     if (p.a, p.b) != (q.a, q.b):
         return False
     gi, gj = q.i - p.i - 1, p.j - q.j - 1
     if gi < 0 or gj < 0:
         return False
-    if not ((gi == 0 and gj <= 2) or (gj == 0 and gi <= 2) or (gi == gj == 1)):
+    across = (
+        gi == gj == 2
+        and strands is not None
+        and all(
+            C1_PAIR[0] <= float(np.linalg.norm(strands[p.a].c1[p.i + k] - strands[p.b].c1[p.j - k])) <= C1_PAIR[1]
+            for k in (1, 2)
+        )
+    )
+    if not ((gi == 0 and gj <= 2) or (gj == 0 and gi <= 2) or (gi == gj == 1) or across):
         return False
     skipped = [(p.a, i) for i in range(p.i + 1, q.i)] + [(p.b, j) for j in range(q.j + 1, p.j)]
     return not any(n in paired for n in skipped)
 
 
-def _group_stems(pairs: list[BasePair]) -> list[list[BasePair]]:
+def _group_stems(pairs: list[BasePair], strands=None) -> list[list[BasePair]]:
     paired = {(p.a, p.i) for p in pairs} | {(p.b, p.j) for p in pairs}
     stems: list[list[BasePair]] = []
     for p in sorted(pairs, key=lambda p: (p.a, p.b, p.i, -p.j)):
         for st in stems:
-            if _stacks(st[-1], p, paired):
+            if _stacks(st[-1], p, paired, strands):
                 st.append(p)
                 break
         else:
@@ -282,10 +292,11 @@ def _group_stems(pairs: list[BasePair]) -> list[list[BasePair]]:
     return stems
 
 
-def _nested(pairs: list[BasePair]) -> list[BasePair]:
-    """Intra-strand pairs without crossings, keeping the pairs of the longest stems first."""
+def _nested(groups: list[list[BasePair]]) -> list[BasePair]:
+    """The pairs of the intra-strand stems (`groups`, each a stem's pairs, in 5'->3' order) that cross no other,
+    keeping the pairs of the longest stems first."""
     keep: list[BasePair] = []
-    for st in sorted(_group_stems([p for p in pairs if p.a == p.b]), key=len, reverse=True):
+    for st in sorted([g for g in groups if g[0].a == g[0].b], key=len, reverse=True):
         if all(not (p.a == q.a and (p.i < q.i < p.j < q.j or q.i < p.i < q.j < p.j)) for p in st for q in keep):
             keep += st
     return keep
@@ -307,7 +318,7 @@ def secondary_structure(strands, pairs: list[BasePair]) -> NAStructure:
     """Stems (two or more stacked pairs), ties (an isolated pair) and the single-stranded runs between them.
     Stems are named P1, P2 ... (RNA) or DNA 1, DNA 2 ... in 5'->3' order of their first arm."""
     out = NAStructure()
-    for group in _group_stems(pairs):
+    for group in _group_stems(pairs, strands):
         if len(group) < 2:
             out.ties += group
             continue
@@ -329,7 +340,7 @@ def secondary_structure(strands, pairs: list[BasePair]) -> NAStructure:
             dna += 1
             st.name = f"DNA {dna}"
     inside = {n for st in out.stems for n in st.nucleotides()}
-    nested = _nested([p for st in out.stems for p in st.pairs])
+    nested = _nested([st.pairs for st in out.stems])
     for s, strand in enumerate(strands):
         i, n = 0, len(strand)
         while i < n:

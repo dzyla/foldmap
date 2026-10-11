@@ -287,7 +287,8 @@ def test_stems_seen_clearly_keep_their_side_and_none_is_drawn_mirrored(pdb):
 
 def test_internal_loop_sides_cross_less_on_the_ribosome():
     """The two sides of an internal loop are bowed apart; their chords crossed at 7 of 11 such loops on 4YBB when
-    every stem took the side it is seen on. A regression bound: the crossings left join stems seen clearly."""
+    every stem took the side it is seen on. A regression bound: the crossings left join stems seen clearly. (10
+    loops since AA:454-462/470-479's 2x2 loop in register stays inside its stem.)"""
     lay, _, _, _ = _routed("4YBB")
     at = {key: d for d in lay.stems for key in d.axial}
     kind = {(r.strand, r.lo): r.kind for r in lay.nucleic.structure.runs}
@@ -298,7 +299,7 @@ def test_internal_loop_sides_cross_less_on_the_ribosome():
         for q in sides[n + 1 :]
         if {at[k].id for k in p.between} == {at[k].id for k in q.between}
     ]
-    assert len(loops) == 11
+    assert len(loops) == 10
     assert sum(_segments_cross(p.points[0], p.points[-1], q.points[0], q.points[-1]) for p, q in loops) <= 6
 
 

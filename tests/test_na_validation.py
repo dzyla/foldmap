@@ -42,7 +42,7 @@ LIMITS = {  # metric: (lowest or highest allowed, "min" or "max")
 # beside a strand); 4OO8's, where the two sides of the P2-P3 internal loop cross (a run's nucleotides slide along it
 # off other strands').
 CAMPAIGN = {
-    "na_crossings": {"4YBB": 1},
+    "na_crossings": {},  # every fixture at 0
     "bead_overlaps": {},  # every fixture at 0
     "gap_label_collisions": {"4YBB": 2},
 }
