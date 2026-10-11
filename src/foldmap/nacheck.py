@@ -561,8 +561,10 @@ def na_crossings(lay, loops) -> dict:
     )
     at = {key: d.id for d in lay.stems for key in d.axial}
 
-    def joins(p):  # the two pieces a joint joins
-        return frozenset(at.get(k) for k in p.between) if p.kind == "joint" else None
+    def joins(p):  # the two pieces a joint joins; None (no exemption) for anything else or a joint not placed
+        if p.kind != "joint" or len(p.between) != 2 or any(k not in at for k in p.between):
+            return None
+        return frozenset(at[k] for k in p.between)
 
     runs = sum(
         1

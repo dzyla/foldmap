@@ -233,6 +233,35 @@ def test_runs_crossing_runs_are_counted_and_reported_only():
     assert THRESHOLDS["na_run_crossings"] is None and not judge({"na_run_crossings": 99})
 
 
+def test_the_two_strands_of_one_joint_may_cross_without_counting():
+    """na_run_crossings excepts the two strands of one joint (they cross where the duplex carries on), but not two
+    joints whose pieces are not placed: a missing piece must not make two joints look like the same one."""
+    import copy
+
+    lay, _, _, loops, _, _ = _drawn("1KX5")
+    base = na_crossings(lay, loops)["na_run_crossings"]
+    joint = next(p for p in lay.na_paths if p.kind == "joint")
+    a, b = np.asarray(joint.points[1]), np.asarray(joint.points[2])  # its first segment between the faces
+    mid, normal = (a + b) / 2, np.array([a[1] - b[1], b[0] - a[0]]) / max(np.hypot(*(b - a)), 1e-9)
+
+    def across(path, centre, n):  # a copy of path drawn as a short stroke across centre along n
+        out = copy.copy(path)
+        p, q = tuple(centre - 0.05 * n), tuple(centre + 0.05 * n)
+        out.points = [p, p, q, q]
+        return out
+
+    lay.na_paths.append(across(joint, mid, normal))  # the same two pieces: exempt
+    assert na_crossings(lay, loops)["na_run_crossings"] == base
+    lay.na_paths.pop()
+    far, e = np.array([1e3, 1e3]), np.array([1.0, 0.0])
+    one, two = across(joint, far, e), across(joint, far, e[::-1])
+    one.between = two.between = ((99, 0), (99, 1))  # pieces not placed
+    lay.na_paths += [one, two]
+    after = na_crossings(lay, loops)["na_run_crossings"]
+    del lay.na_paths[-2:]
+    assert after == base + 1
+
+
 def test_a_run_through_its_own_stem_is_counted():
     """A run is trimmed only by its two rail stretches (its first and last segments), so a drawing that leaves its
     rail straight into its own stem's core and out of the far side counts as a pass through that stem. Trimmed by
