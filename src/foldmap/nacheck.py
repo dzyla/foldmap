@@ -442,10 +442,18 @@ def contacts(lay, sses) -> dict:
     with both kinds: the AUC of the box gaps (a touching element nearer than a non-touching one; ties count half)
     and the precision of the k nearest elements, k the number touching (elements tied at the k-th gap share the
     remaining places); both averaged over the stems. stems_nearer_frac: the fraction of the stems any element
-    touches whose mean gap to those elements is below their median gap to every element (the spec's criterion)."""
+    touches whose mean gap to those elements is below their median gap to every element (the spec's criterion).
+    ss_contacts_nearer (reported, not judged): the same for each touched single-stranded nucleotide as drawn (a
+    free end, hairpin loop, run or trace; 1URN's loop held by U1A), its gap from its drawn place to the element
+    boxes; None before routing or when no such nucleotide is touched."""
     na = lay.nucleic
     if na is None:
-        return {"contact_auc": None, "contact_precision_at_k": None, "stems_nearer_frac": None}
+        return {
+            "contact_auc": None,
+            "contact_precision_at_k": None,
+            "stems_nearer_frac": None,
+            "ss_contacts_nearer": None,
+        }
     drawn = [s for s in sses if s.id in lay.placed]
     aucs, precs, nearer = [], [], []
     for d in lay.stems:
@@ -469,7 +477,42 @@ def contacts(lay, sses) -> dict:
         "contact_auc": round(float(np.mean(aucs)), 3) if aucs else None,
         "contact_precision_at_k": round(float(np.mean(precs)), 3) if precs else None,
         "stems_nearer_frac": round(sum(nearer) / len(nearer), 3) if nearer else None,
+        "ss_contacts_nearer": _ss_contacts_nearer(lay, drawn),
     }
+
+
+def ss_drawn(lay) -> dict[tuple[int, int], tuple[float, float]]:
+    """Where each single-stranded nucleotide is drawn: (strand, nucleotide) -> page point, from the routed paths
+    (route_loops) and the traces."""
+    out = {}
+    for p in lay.na_paths:
+        for k, xy in zip(p.nts, p.nt_xy):
+            out[(p.strand, k)] = (float(xy[0]), float(xy[1]))
+    for s, pts in lay.na_traces.items():
+        for k, xy in enumerate(pts):
+            out[(s, k)] = (float(xy[0]), float(xy[1]))
+    return out
+
+
+def _ss_contacts_nearer(lay, drawn) -> float | None:
+    """The fraction of touched single-stranded nucleotides drawn nearer their touching elements (mean box gap)
+    than the median element (contacts)."""
+    na = lay.nucleic
+    where = ss_drawn(lay)
+    touchers: dict[tuple[int, int], set[str]] = {}
+    for s in drawn:
+        for r in range(s.start, s.end + 1):
+            for x in na.contacts.get(r, ()):
+                if x in where:
+                    touchers.setdefault(x, set()).add(s.id)
+    if not touchers or len(drawn) < 2:
+        return None
+    nearer = []
+    for x, ids in sorted(touchers.items()):
+        pt = (*where[x], *where[x])
+        gap = {s.id: _gap(lay.placed[s.id].rect, pt) for s in drawn}
+        nearer.append(float(np.mean([gap[i] for i in sorted(ids)])) < float(np.median(list(gap.values()))))
+    return round(sum(nearer) / len(nearer), 3)
 
 
 def _segments(pts) -> np.ndarray:

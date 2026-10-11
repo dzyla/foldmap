@@ -18,8 +18,9 @@ For every entry it measures
   shape     drawn stem centres against the 3D centres: Spearman rho of pairwise distances, similarity-Procrustes
             RMSD (no reflection) normalised by the spread; stem angle against the projected 3D axis; bends between
             the pieces of a bent duplex; whether any stem's arms are drawn mirrored
-  contacts  whether the protein elements touching a stem are drawn nearest it (AUC, precision at k); beads drawn
-            for every touched nucleotide, in the touching chain's colour
+  contacts  whether the protein elements touching a stem are drawn nearest it (AUC, precision at k); whether
+            touched single-stranded nucleotides are (ss_contacts_nearer, reported); beads drawn for every touched
+            nucleotide, in the touching chain's colour
   render    overlapping boxes, text off the page, overlapping base letters, routing fallbacks, run time
 Pairing is measured on the pairs the figure draws (assembly copies mapped back to their deposited chains by
 stripping the copy number; a cropped figure against the reference pairs it draws both nucleotides of), and is
@@ -607,6 +608,7 @@ def main(argv=None) -> int:
         "contact_auc",
         "contact_precision_at_k",
         "stems_nearer_frac",
+        "ss_contacts_nearer",
         "beads_missing",
         "bead_colour_wrong",
         "beads_false",

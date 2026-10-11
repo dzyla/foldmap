@@ -561,3 +561,15 @@ def test_the_contact_sheet_of_an_unrolled_frame_draws_no_seam_and_fits_its_title
     renderer = sheet.canvas.get_renderer()
     for a in (a0, a1, a2):
         assert a.title.get_window_extent(renderer).width <= a.get_window_extent(renderer).width * 1.05 + 1
+
+
+def test_single_stranded_contacts_are_reported_not_judged():
+    """ss_contacts_nearer: the fraction of touched single-stranded nucleotides (free ends, loops, runs, traces) drawn
+    nearer their touching elements than the median element; reported, not judged (no stem metric saw 1URN's loop
+    drawn away from U1A)."""
+    lay, sses, bb = make_layout(NA / "1URN.cif.gz")
+    assert contacts(lay, sses)["ss_contacts_nearer"] is None  # not routed: nothing drawn single-stranded yet
+    route_loops(lay, sses, bb)
+    m = contacts(lay, sses)
+    assert 0.0 < m["ss_contacts_nearer"] <= 1.0
+    assert "ss_contacts_nearer" not in THRESHOLDS and not judge({"ss_contacts_nearer": 0.0})
