@@ -209,7 +209,8 @@ def test_runs_go_round_the_other_elements():
 def test_joints_and_runs_cross_no_stem_or_element(pdb):
     """Every run and every joint between two pieces of a bent duplex, as drawn from where it leaves its own stems'
     bodies, passes the router's own final check (route._clear) against every element and stem."""
-    from foldmap.route import _clear, _element_obstacles, _outside
+    from foldmap.route import _clear, _element_obstacles
+    from foldmap.route_na import _outside
 
     lay, _, _, _ = _routed(pdb)
     at = {key: d for d in lay.stems for key in d.axial}
@@ -227,7 +228,7 @@ def test_joints_and_runs_cross_no_stem_or_element(pdb):
 @pytest.mark.parametrize("pdb", FIXTURES)
 def test_runs_keep_off_the_stem_names(pdb):
     from foldmap.layout import label_boxes
-    from foldmap.route import _outside
+    from foldmap.route_na import _outside
 
     lay, sses, _, _ = _routed(pdb)
     at = {key: d for d in lay.stems for key in d.axial}

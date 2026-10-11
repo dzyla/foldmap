@@ -51,7 +51,8 @@ from .layout import (
 )
 from .model import SSE, group_by_chain
 from .palette import chain_colors, darken, text_color_on, tint
-from .route import Loop, midway
+from .route import Loop
+from .route_na import midway
 from .style import _ALIASES, CHOICES, Style
 
 _IN_PER_UNIT = 0.30
