@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import numpy as np
 
 from foldmap.dssp import assign_dssp
@@ -127,3 +129,16 @@ def test_single_bridges_do_not_close_ordinary_sheets():
         bb = load_backbone(Path(__file__).parent / "data" / f"{name}.cif", "asu")
         d = assign_dssp(bb)
         assert not any(sh.closed for sh in build_sheets(build_sses(bb, d.ss), d.bridges)), name
+
+
+def test_bulged_strands_take_their_true_place_in_the_sheet():
+    from helpers import FID, pipeline
+
+    _, _, sheets = pipeline(FID / "1TEN.cif.gz")
+    sh = next(s for s in sheets if any(x.id == "A:868-877" for x in s.strands))
+    known = ["A:847-852", "A:832-839", "A:868-877", "A:880-890"]  # C' C F G, as Lappalainen 2008 Fig 3
+    assert [s.id for s in sh.strands] in (known, known[::-1]) and not sh.ambiguous
+    _, _, sheets = pipeline(Path(__file__).parent / "data" / "5NKT.cif")
+    sh = next(s for s in sheets if any(x.id == "A:68-74" for x in s.strands))
+    known = ["A:29-35", "A:8-14", "A:149-158", "A:68-74", "A:114-123"]  # B'/B'' one strand, beside 68-74
+    assert [s.id for s in sh.strands] in (known, known[::-1]) and not sh.ambiguous

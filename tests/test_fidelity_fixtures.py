@@ -35,3 +35,7 @@ def test_loop_crossings_counts_proper_crossings_only():
     plus = [L([(0, -1), (0, 1)]), L([(-1, 0), (1, 0)])]
     touch = [L([(0, 0), (0, 1)]), L([(0, 0), (1, 0)])]  # sharing an end point is not a crossing
     assert loop_crossings(plus) == 1 and loop_crossings(touch) == 0
+    zigzag = [L([(0, -1), (0, 1), (2, 1), (2, -1)]), L([(-1, 0), (3, 0)])]  # one segment pair per leg it cuts
+    assert loop_crossings(zigzag) == 2
+    collinear = [L([(0, 0), (2, 0)]), L([(1, 0), (3, 0)])]  # overlapping on one line is not a proper crossing
+    assert loop_crossings(collinear) == 0

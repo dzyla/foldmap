@@ -4,7 +4,9 @@ import numpy as np
 
 from foldmap.dssp import assign_dssp
 from foldmap.io import load_backbone
+from foldmap.model import Bridge
 from foldmap.ss import build_sses
+from helpers import FID, pipeline
 
 
 def test_ubiquitin_sses(ubq):
@@ -53,27 +55,37 @@ def test_bulge_split_strand_is_one_strand(zya):
     assert "A:499-503" not in ids and "A:505-509" not in ids
 
 
-def test_strands_one_residue_apart_merge_two_apart_do_not(ubq):
+def _same_side(x, y):
+    """Three bridges each from strands starting at x and y to residues 51-49 and 47-45 of one partner strand."""
+    return [Bridge(x + t, 51 - t, "A") for t in range(3)] + [Bridge(y + t, 47 - t, "A") for t in range(3)]
+
+
+def test_strands_one_residue_apart_join_only_with_their_bridges(ubq):
     bb = load_backbone(ubq)
     one = list("-" * len(bb))
     one[10:14] = "EEEE"
     one[15:19] = "EEEE"  # one residue (index 14) between
-    (merged,) = build_sses(bb, "".join(one))
-    assert (merged.start, merged.end) == (10, 18)
-    two = list("-" * len(bb))
-    two[10:14] = "EEEE"
-    two[16:20] = "EEEE"  # a 2-residue gap can be a hairpin turn
-    assert [(s.start, s.end) for s in build_sses(bb, "".join(two))] == [(10, 13), (16, 19)]
+    one[40:52] = "E" * 12  # their partner
+    pieces = lambda bridges: [(s.start, s.end) for s in build_sses(bb, "".join(one), bridges=bridges)]  # noqa: E731
+    assert pieces(_same_side(10, 15)) == [(10, 18), (40, 51)]
+    assert pieces(None) == [(10, 13), (15, 18), (40, 51)]  # without bridges, strands stay as DSSP runs
 
 
-def test_merge_never_crosses_chain_break(zs5):
+def test_merge_never_crosses_chain_break(zs5, ubq):
     bb = load_backbone(zs5)
     i = next(k for k in range(1, len(bb)) if not bb.prev[k])  # first break
     ss = list("-" * len(bb))
     ss[i - 3 : i] = "EEE"
     ss[i + 1 : i + 4] = "EEE"  # break sits between, one residue (i) in the gap
-    for s in build_sses(bb, "".join(ss)):
+    ss[40:52] = "E" * 12  # their partner, before the break
+    for s in build_sses(bb, "".join(ss), bridges=_same_side(i - 3, i + 1)):
         assert all(bb.prev[k] for k in range(s.start + 1, s.end + 1))
+    bb = load_backbone(ubq)
+    bb.prev[15] = False  # a break inside one chain, at the end of the one-residue gap joined above
+    one = list("-" * len(bb))
+    one[10:14], one[15:19], one[40:52] = "EEEE", "EEEE", "E" * 12
+    pieces = [(s.start, s.end) for s in build_sses(bb, "".join(one), bridges=_same_side(10, 15))]
+    assert pieces == [(10, 13), (15, 18), (40, 51)]
 
 
 def test_strands_one_residue_apart_join_only_when_they_share_a_partner():
@@ -83,4 +95,36 @@ def test_strands_one_residue_apart_join_only_when_they_share_a_partner():
     assert {"A:419-428", "A:430-434"} <= ids and "A:419-434" not in ids  # each half pairs with another sheet
     r74 = load_backbone(Path(__file__).parent / "data" / "6R74.cif", "asu")
     d = assign_dssp(r74)
-    assert "A:127-147" in {s.id for s in build_sses(r74, d.ss, bridges=d.bridges)}  # one partner: still one strand
+    ids = {s.id for s in build_sses(r74, d.ss, bridges=d.bridges)}
+    assert {"A:114-123", "A:146-158"} <= ids  # 146-147 and 150-158 pair with 3-14 in register, across a 2-residue bulge
+    assert "A:127-144" in ids  # pairs with 52-61 and 97-105 only (147-95 is one bridge): another sheet, as in 5NKT
+
+
+def test_tenascin_g_strand_split_by_a_bulge_is_one_strand():
+    """1TEN: DSSP breaks G at a 3-residue bulge (880-881 | 885-890); both pieces pair with F on the same side."""
+    _, sses, _ = pipeline(FID / "1TEN.cif.gz")
+    ids = [s.id for s in sses if s.kind == "E"]
+    assert "A:880-890" in ids and "A:880-881" not in ids and "A:885-890" not in ids
+    assert len(ids) == 7  # A B C C' E F G
+
+
+def test_bulge_join_follows_the_partner_register():
+    bb = load_backbone(Path(__file__).parent / "data" / "1UBQ.cif")
+    ss = ["-"] * len(bb)
+    ss[10:14] = "EEEE"  # x: 10-13
+    ss[17:21] = "EEEE"  # y: 17-20, three residues (14-16) later
+    ss[40:52] = "E" * 12  # k: 40-51
+    same_side = [Bridge(10 + t, 51 - t, "A") for t in range(3)] + [Bridge(17 + t, 46 - t, "A") for t in range(3)]
+    joined = build_sses(bb, "".join(ss), bridges=same_side)
+    assert [(s.start, s.end) for s in joined if s.kind == "E"] == [(10, 20), (40, 51)]
+
+
+def test_hairpin_and_opposite_sides_are_not_joined():
+    bb = load_backbone(Path(__file__).parent / "data" / "1UBQ.cif")
+    ss = ["-"] * len(bb)
+    ss[10:14], ss[17:21], ss[40:52] = "EEEE", "EEEE", "E" * 12
+    hairpin = [Bridge(10 + t, 20 - t, "A") for t in range(4)]
+    opposite = [Bridge(10 + t, 45 - t, "A") for t in range(3)] + [Bridge(17 + t, 45 - t, "A") for t in range(3)]
+    for bridges in (hairpin, opposite):  # opposite: k residues 43-45 pair with both, one on each face
+        pieces = [(s.start, s.end) for s in build_sses(bb, "".join(ss), bridges=bridges) if s.kind == "E"]
+        assert (10, 13) in pieces and (17, 20) in pieces
