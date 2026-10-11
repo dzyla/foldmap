@@ -33,6 +33,7 @@ MIN_RES = 10  # chains shorter than this are left out
 MIN_TURN = np.radians(10)  # smaller rotations are lattice-like translations, not symmetry
 MIN_RISE = 2.0  # Å along the axis per copy for a helical filament
 MIN_TWIST = np.radians(3.0)  # a helical filament turns at least this much per copy (less: a translation)
+MIN_HELIX_COPIES = 4  # copies on a screw before auto calls it helical (three: crystal packing, as in 1URN)
 _PSEUDO_21 = 170.0  # degrees: a helix turning more than this per copy is a pseudo-2₁ screw, its hand not named
 MAX_ORDER = 24
 _NEAREST = 3  # copies tried as the image of each subunit: those whose centroids land closest
@@ -321,8 +322,9 @@ def _dihedral(asm: _Assembly, axis: np.ndarray, centre: np.ndarray, tol: float) 
     return False
 
 
-def _helical(asm: _Assembly, tol: float):
-    """A screw that walks each copy onto the next, chaining every clustered subunit along one axis."""
+def _helical(asm: _Assembly, tol: float, min_copies: int):
+    """A screw that walks each copy onto the next, chaining every clustered subunit along one axis in paths of at
+    least `min_copies`."""
     best = None
     for cl in asm.clusters:
         for i, a in enumerate(cl):
@@ -344,7 +346,7 @@ def _helical(asm: _Assembly, tol: float):
                         if len(pp) >= MIN_RES and np.sqrt(((pp @ r.T + t - qq) ** 2).sum(axis=1).mean()) <= tol:
                             step[c] = d
                             break
-                chains = _helix_chains(step, _within(asm))
+                chains = _helix_chains(step, _within(asm), min_copies)
                 if chains is None:
                     continue
                 score = (len(chains[0]), -abs(rise))
@@ -353,8 +355,9 @@ def _helical(asm: _Assembly, tol: float):
     return best
 
 
-def _helix_chains(step: dict[str, str], members: list[str]) -> list[list[str]] | None:
-    """Follow the screw from every chain that nothing steps onto; each cluster must form one path, all equal."""
+def _helix_chains(step: dict[str, str], members: list[str], min_copies: int) -> list[list[str]] | None:
+    """Follow the screw from every chain that nothing steps onto; each cluster must form one path, all equal, of at
+    least `min_copies` chains."""
     starts = [c for c in members if c not in step.values()]
     paths = []
     for s in starts:
@@ -364,7 +367,7 @@ def _helix_chains(step: dict[str, str], members: list[str]) -> list[list[str]] |
         paths.append(path)
     if not paths or sorted(c for p in paths for c in p) != sorted(members) or len({len(p) for p in paths}) != 1:
         return None
-    if len(paths[0]) < 3:
+    if len(paths[0]) < min_copies:
         return None
     return paths
 
@@ -432,7 +435,8 @@ def detect_symmetry(
     protomers: list[list[str]] | None = None,
     tolerance: float = TOLERANCE,
 ) -> Symmetry | None:
-    """The assembly's symmetry, or None. `request`: auto, off, Cn, Dn or helical (an error if absent);
+    """The assembly's symmetry, or None. `request`: auto, off, Cn, Dn or helical (an error if absent; auto calls
+    a screw helical from MIN_HELIX_COPIES copies, an explicit helical from three);
     `protomers`: the user's own grouping, in order; `tolerance`: CA RMSD in Å between copies."""
     kind, n = _parse(request)
     if kind == "off":
@@ -459,7 +463,7 @@ def detect_symmetry(
                 if kind == "C" and found.kind == "D":
                     found.kind = "C"  # asked for the cyclic part only
     if found is None and kind in ("auto", "H"):
-        best = _helical(asm, tolerance)
+        best = _helical(asm, tolerance, MIN_HELIX_COPIES if kind == "auto" else 3)
         if best is not None:
             _, twist, axis, centre, rise, paths, rmsd = best
             groups = [list(g) for g in zip(*paths)]

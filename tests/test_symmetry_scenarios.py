@@ -232,7 +232,7 @@ def test_peptide_outside_every_protomer_does_not_break_the_layout():
 
     from foldmap.cli import make_layout
 
-    lay, sses, _ = make_layout(Path(__file__).parent / "data" / "4CH9.cif")
+    lay, sses, _ = make_layout(Path(__file__).parent / "data" / "4CH9.cif", assembly="asu")
     assert lay.placed and {s.chain for s in sses} >= {"A", "B"}
 
 

@@ -114,7 +114,7 @@ def test_separation_keeps_every_copy_where_its_mate_is(name, monkeypatch):
         return seen["ties"]
 
     monkeypatch.setattr(layout, "_symmetry_ties", spy)
-    make_layout(DATA / f"{name}.cif")
+    make_layout(DATA / f"{name}.cif", assembly="asu" if name == "4CH9" else "auto")
     items, ties = seen["items"], seen["ties"]
     offsets: dict[int, list[tuple[float, float]]] = {}
     for i, (j, k) in ties.items():

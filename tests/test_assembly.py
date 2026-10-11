@@ -335,25 +335,40 @@ def test_crystal_packing_of_copies_in_the_asymmetric_unit_is_not_reported_as_sym
 
     path = _copies_in_asu(tmp_path, 3)
     asu = load_backbone(path, assembly="asu")
-    assert detect_symmetry(asu) is not None  # the copies do lie on a screw: only the assembly says it is packing
+    assert detect_symmetry(asu) is None  # three copies on a screw: crystal packing, not a filament
+    assert detect_symmetry(asu, request="helical").kind == "H"  # still found when asked for
     assert detect_symmetry(load_backbone(path)) is None
     lay, sses, bb = make_layout(path)
     assert {s.chain for s in lay.nucleic.strands} == {"R"} and {s.chain for s in sses} == {"C"}
 
 
-def test_one_protein_complex_of_several_in_the_asymmetric_unit_is_drawn_as_before(tmp_path):
-    """The biological-assembly choice is made for structures holding nucleic acid only: protein-only figures
-    (4CH9: two copies of a dimer, assembly 1 = B, D) stay as they were."""
+def test_one_protein_complex_of_several_draws_assembly_one(tmp_path):
+    """Protein-only now as for nucleic acid (COMPARE #4): two copies of one complex deposited together, assembly 1
+    the first of them (the identity operator, a strict subset): auto draws that one; asu still draws both."""
     from foldmap.io import read_model
 
     path = _copies_in_asu(tmp_path, 2, keep={"C"})
     model, deposited = read_model(path)
-    assert sorted(c.name for c in model) == ["C", "D"] and deposited == {"C", "D"}
+    assert [c.name for c in model] == ["C"] and deposited == {"C"}
+    model, _ = read_model(path, "asu")
+    assert sorted(c.name for c in model) == ["C", "D"]
 
 
-def test_nucleic_acid_outside_assembly_one_does_not_choose_it(tmp_path):
-    """_one_complex_of_several asks whether the assembly's own chains hold nucleic acid: two protein copies whose
-    assembly 1 is one of them, beside an RNA that no assembly holds, keep the asymmetric unit (protein rule)."""
+def test_kelch_dimer_asu_draws_its_biological_assembly():
+    from foldmap.cli import make_layout
+    from foldmap.io import read_model
+    from foldmap.symmetry import detect_symmetry
+
+    model, _ = read_model(DATA / "4CH9.cif")
+    assert [c.name for c in model] == ["B", "D"]  # assembly 1: one Kelch domain and its WNK4 peptide
+    lay, sses, bb = make_layout(DATA / "4CH9.cif")
+    assert {l.chain for l in bb.labels} == {"B", "D"} and detect_symmetry(bb) is None
+
+
+def test_assembly_one_is_judged_by_its_own_chains(tmp_path):
+    """_one_complex_of_several looks at the assembly's own chains (with the nucleic-acid gate gone, an RNA that no
+    assembly holds no longer decides anything): two protein copies whose assembly 1 is one of them, beside that
+    RNA, draw assembly 1 under auto; asu still draws every chain."""
     import gemmi
 
     from foldmap.io import read_model
@@ -365,4 +380,6 @@ def test_nucleic_acid_outside_assembly_one_does_not_choose_it(tmp_path):
     out = tmp_path / "with_rna.cif"
     st.make_mmcif_document().write_file(str(out))
     model, deposited = read_model(out)
+    assert [c.name for c in model] == ["C"] and deposited == {"C"}
+    model, deposited = read_model(out, "asu")
     assert sorted(c.name for c in model) == ["C", "D", "R"] and deposited == {"C", "D", "R"}

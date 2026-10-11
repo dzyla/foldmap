@@ -163,10 +163,10 @@ def _polymer_entities(st, chains) -> list[str]:
 
 def _one_complex_of_several(st, assembly, model) -> bool:
     """`assembly` is one of several copies of a complex deposited in the asymmetric unit (4OO8: two Cas9
-    complexes, assembly 1 = A, B, C; 1URN: three U1A–RNA complexes): every operator the identity, a strict subset of
-    the deposited chains, each of its polymer entities deposited at least twice as often as it holds it. The other
-    copies lie next to it by crystal packing, not by biology. Taken only for an assembly holding nucleic acid (a
-    protein-only figure keeps the asymmetric unit, as before)."""
+    complexes, assembly 1 = A, B, C; 1URN: three U1A–RNA complexes; 4CH9: two Kelch domains with their WNK4
+    peptides, assembly 1 = B, D): every operator the identity, a strict subset of the deposited chains, each of its
+    polymer entities deposited at least twice as often as it holds it. The other copies lie next to it by crystal
+    packing, not by biology."""
     if not all(op.transform.is_identity() for g in assembly.generators for op in g.operators):
         return False
     subchains = {s for g in assembly.generators for s in g.subchains}
@@ -177,15 +177,13 @@ def _one_complex_of_several(st, assembly, model) -> bool:
     held, deposited = _polymer_entities(st, members), _polymer_entities(st, model)
     if not held or "" in held + deposited:
         return False
-    if any(deposited.count(e) < 2 * held.count(e) for e in set(held)):
-        return False
-    return any(_is_nucleotide(chain, k) for chain in members for k in range(len(chain)))
+    return all(deposited.count(e) >= 2 * held.count(e) for e in set(held))
 
 
 def read_model(path: str | Path, assembly: str = "auto"):
     """(model, deposited chain names). assembly: 'asu' as deposited; an assembly id from the file; or 'auto':
     the first assembly when it adds copies and stays within AUTO_MAX chains, or when it is one of several copies
-    of a nucleic-acid complex the asymmetric unit holds (_one_complex_of_several; drawn under the deposited chain
+    of a complex the asymmetric unit holds (_one_complex_of_several; drawn under the deposited chain
     names, and only its copies are looked at for symmetry). A copy the assembly lays exactly on a chain already
     present is dropped (_drop_coincident); under 'auto', when that drops every copy it adds, the model is returned
     as deposited, with its deposited chain names."""

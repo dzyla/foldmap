@@ -286,7 +286,7 @@ def test_overlapping_bars_are_drawn_as_brackets_that_keep_their_cysteines(monkey
 
 
 def test_4ch9_bond_lying_on_another_detours_in_a_bracket():
-    fig = make_figure(DATA / "4CH9.cif")
+    fig = make_figure(DATA / "4CH9.cif", assembly="asu")
     bars = {b.get_gid(): b.get_path().vertices for b in _gids(fig, "disulfide:")}
     assert [len(v) for _, v in sorted(bars.items())].count(4) == 1
     assert len(bars["disulfide:249-512"]) == 4  # nested under the longer bar, ends still on its cysteines
