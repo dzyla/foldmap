@@ -194,3 +194,67 @@ def test_an_assembly_whose_every_added_copy_is_dropped_keeps_the_deposited_names
     assert [c.name for c in model] == ["A"] and deposited == {"A"}
     bb = load_backbone(path, model=(model, deposited))
     assert bb.asu_chains <= {"A"}
+
+
+def test_a_deposited_chain_is_never_dropped_and_one_operator_never_drops_its_own_copies():
+    """Only copies made by another operator are the same molecule seen twice. Chains of one operator that lie on
+    each other were deposited that way (alternative conformations: 1C7Y's DNA chains B/D, C/E ...); the
+    identity copy of a deposited chain is kept whatever it lies on."""
+    from foldmap.io import _drop_coincident
+
+    rng = np.random.default_rng(1)
+    a = rng.uniform(0, 40, (20, 3))
+    model = _model({"A1": a, "B1": a + 0.3, "A2": a + 100.0, "B2": a + 100.3, "C2": a + 0.2})
+    assert _drop_coincident(model, keep={"A1", "B1"}, tags=[1, 1, 2, 2, 2]) == ["C2"]
+    assert [c.name for c in model] == ["A1", "B1", "A2", "B2"]
+    model = _model({"A1": a, "B1": a + 0.3})
+    assert _drop_coincident(model, keep={"A1", "B1"}) == []  # without operator tags: the identity copies stay
+
+
+def _with_assembly(st, ops, tmp_path, name="asm.cif"):
+    """Write st with one assembly applying the (rotation, translation) operators to every chain."""
+    import gemmi
+
+    gen = gemmi.Assembly.Gen()
+    gen.subchains = sorted({r.subchain for c in st[0] for r in c})
+    for k, (rot, shift) in enumerate(ops):
+        op = gemmi.Assembly.Operator()
+        op.name = str(k + 1)
+        op.transform = gemmi.Transform(gemmi.Mat33(rot), gemmi.Vec3(*shift))
+        gen.operators.append(op)
+    assembly = gemmi.Assembly("1")
+    assembly.generators.append(gen)
+    st.assemblies.clear()
+    st.assemblies.append(assembly)
+    path = tmp_path / name
+    st.make_mmcif_document().write_file(str(path))
+    return path
+
+
+def test_chains_deposited_on_each_other_are_kept_in_every_copy(tmp_path):
+    """1C7Y-like: two DNA chains deposited on top of each other (B a copy of A), an assembly of two copies far
+    apart. All four chains stay (C5 dropped the deposited B1, and B2 with it)."""
+    import gemmi
+
+    from foldmap.io import read_model
+
+    st = gemmi.read_structure(str(DATA / "na" / "1EHZ.cif.gz"))
+    st.setup_entities()
+    twin = st[0]["A"].clone()
+    twin.name = "B"
+    for r in twin:
+        r.subchain = "Z"
+    st[0].add_chain(twin)
+    eye = [[1.0, 0, 0], [0, 1.0, 0], [0, 0, 1.0]]
+    path = _with_assembly(st, [(eye, (0, 0, 0)), (eye, (150.0, 0, 0))], tmp_path)
+    model, asu = read_model(path)
+    assert [c.name for c in model] == ["A1", "B1", "A2", "B2"]
+    assert asu == {"A1", "B1"}
+
+
+def test_holliday_junction_drops_exactly_the_copies_of_the_second_operator():
+    from foldmap.io import read_model
+
+    model, asu = read_model(DATA / "na" / "3CRX.cif.gz")
+    assert sorted(c.name for c in model) == ["A1", "A2", "B1", "B2", "C1", "D1", "E1", "F1"]
+    assert asu == {"A1", "B1", "C1", "D1", "E1", "F1"}

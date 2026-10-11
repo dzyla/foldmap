@@ -88,21 +88,28 @@ COINCIDENT_FRAC = 0.90  # of a copy's atoms ...
 COINCIDENT_DIST = 1.0  # ... within this many Å of one chain already present: the same molecule seen twice
 
 
-def _drop_coincident(model) -> list[str]:
+def _drop_coincident(model, keep=frozenset(), tags=None) -> list[str]:
     """Remove, in place, every chain with COINCIDENT_FRAC of its atoms within COINCIDENT_DIST Å of one chain kept
     before it: an assembly operator that maps a molecule on a special position (DNA on a crystallographic
-    two-fold) onto itself or its partner copies it exactly on top. Returns the names dropped, in model order."""
-    kept: list[tuple[np.ndarray, np.ndarray, cKDTree]] = []  # (low corner, high corner, tree) per kept chain
+    two-fold) onto itself or its partner copies it exactly on top. `keep`: chains never dropped (the identity
+    copy of each deposited chain), compared against first. `tags`: the operator that made each chain, in model
+    order; chains of one operator are never compared (lying on each other, they were deposited so: alternative
+    conformations). Returns the names dropped, in model order."""
+    chains = list(model)
+    tags = list(tags) if tags is not None else list(range(len(chains)))
+    kept: list[tuple[np.ndarray, np.ndarray, cKDTree, object]] = []  # (low, high corner, tree, tag) per chain
     dropped = []
-    for chain in model:
+    order = sorted(range(len(chains)), key=lambda k: chains[k].name not in keep)  # stable: kept chains first
+    for k in order:
+        chain = chains[k]
         xyz = np.array([a.pos.tolist() for r in chain for a in r], float).reshape(-1, 3)
         if not len(xyz):
             continue
         lo, hi = xyz.min(axis=0), xyz.max(axis=0)
         on_top = False
-        for klo, khi, tree in kept:
-            if (lo > khi + COINCIDENT_DIST).any() or (hi < klo - COINCIDENT_DIST).any():
-                continue  # boxes apart: no atom can be that close
+        for klo, khi, tree, tag in [] if chain.name in keep else kept:
+            if tag == tags[k] or (lo > khi + COINCIDENT_DIST).any() or (hi < klo - COINCIDENT_DIST).any():
+                continue  # one operator's copies, or boxes apart: no atom can be that close
             d, _ = tree.query(xyz, distance_upper_bound=COINCIDENT_DIST)
             if (d <= COINCIDENT_DIST).mean() >= COINCIDENT_FRAC:
                 on_top = True
@@ -110,10 +117,37 @@ def _drop_coincident(model) -> list[str]:
         if on_top:
             dropped.append(chain.name)
         else:
-            kept.append((lo, hi, cKDTree(xyz)))
+            kept.append((lo, hi, cKDTree(xyz), tags[k]))
+    dropped.sort(key=[c.name for c in chains].index)
     for name in dropped:
         model.remove_chain(name)
     return dropped
+
+
+def _operator_tags(assembly, model, built) -> list[int] | None:
+    """The operator (serial number over the generators) that made each chain of `built` =
+    gemmi.make_assembly(assembly, model): it builds generator by generator, operator by operator, the model's
+    chains in order. Checked atom by atom on each chain's first atom; None when the order is not that."""
+    tags, expect = [], []
+    serial = 0
+    for g in assembly.generators:
+        subchains, names = set(g.subchains), set(g.chains)
+        members = []
+        for c in model:
+            first = next((r for r in c if r.subchain in subchains or c.name in names), None)
+            if first is not None and len(first):
+                members.append(first[0].pos)
+        for op in g.operators:
+            tags += [serial] * len(members)
+            expect += [gemmi.Position(op.transform.apply(p)) for p in members]
+            serial += 1
+    chains = list(built)
+    if len(tags) != len(chains):
+        return None
+    for c, p in zip(chains, expect):
+        if not len(c) or not len(c[0]) or c[0][0].pos.dist(p) > 1e-3:
+            return None
+    return tags
 
 
 def read_model(path: str | Path, assembly: str = "auto"):
@@ -146,13 +180,17 @@ def read_model(path: str | Path, assembly: str = "auto"):
             )
         chosen = found[0]
     built = gemmi.make_assembly(chosen, model, gemmi.HowToNameCopiedChain.AddNumber)
-    _drop_coincident(built)
-    original = {c.name: np.array([a.pos.tolist() for r in c for a in r][:20]) for c in model}
-    asu = set()
-    for c in built:  # the copy made by the identity operator sits exactly on a deposited chain
+    tags = _operator_tags(chosen, model, built)
+    original = [(c.name, np.array([a.pos.tolist() for r in c for a in r][:20])) for c in model]
+    asu, claimed = set(), set()
+    for c in built:  # the copy made by the identity operator sits exactly on a deposited chain (one per chain)
         xyz = np.array([a.pos.tolist() for r in c for a in r][:20])
-        if any(len(o) == len(xyz) and np.allclose(o, xyz, atol=1e-3) for o in original.values()):
-            asu.add(c.name)
+        for name, o in original:
+            if name not in claimed and len(o) == len(xyz) and np.allclose(o, xyz, atol=1e-3):
+                asu.add(c.name)
+                claimed.add(name)
+                break
+    _drop_coincident(built, keep=asu, tags=tags)
     if assembly == "auto" and len(asu) == len(built) == len(model):  # every added copy dropped: as deposited
         return model, deposited
     return built, asu
