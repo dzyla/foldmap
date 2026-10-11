@@ -1102,3 +1102,12 @@ def test_summary_lists_the_stems(capsys):
     assert main(["summary", str(_path("30QM"))]) == 0
     out = capsys.readouterr().out
     assert "32 base pairs" in out and "P1" in out and "1:1-7 · 1:112-118" in out
+
+
+@pytest.mark.parametrize("pdb", SMALL)
+def test_stems_sit_nearer_the_elements_that_touch_them(pdb):
+    from foldmap.nacheck import contacts
+
+    lay, sses, _ = make_layout(_path(pdb))
+    m = contacts(lay, sses)
+    assert m["contact_auc"] is None or m["contact_auc"] >= 0.55  # IHF, wrapped by its arms, is the lowest
