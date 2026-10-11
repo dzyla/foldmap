@@ -360,9 +360,14 @@ def contact_sheet(name, lay, sses, bb, fig, metrics, out: Path) -> Path:
     seen_box = _bounds(seen_pts)
     boxes = [(0, img.shape[1], 0, img.shape[0]), drawn_box, seen_box]
     aspects = [min(max((b[1] - b[0]) / max(b[3] - b[2], 1e-9), 0.4), 2.5) for b in boxes]
-    panel_h, gap, text_h = 6.0, 0.25, 1.5
+    panel_h, gap = 6.0, 0.25
     widths = [panel_h * a for a in aspects]
     total_w = sum(widths) + gap * (len(widths) + 1)
+    items = [f"{k}={v}" for k, v in metrics.items() if k not in ("missed_pairs", "extra_pairs", "failed", "note")]
+    size = 9
+    chars = int((total_w - 0.4) / (size * 0.62 / 72))  # monospace glyph width in inches
+    lines = wrap_metrics(items, chars)
+    text_h = max(1.5, 0.45 + len(lines) * size * 1.25 / 72)  # the metric lines, then the "failed:" line above them
     sheet = plt.figure(figsize=(total_w, panel_h + text_h + 0.5))
     axes, x = [], gap
     for w in widths:
@@ -423,14 +428,10 @@ def contact_sheet(name, lay, sses, bb, fig, metrics, out: Path) -> Path:
         a.set_aspect("equal", adjustable="box")
     for a in axes:
         a.set_axis_off()
-    items = [f"{k}={v}" for k, v in metrics.items() if k not in ("missed_pairs", "extra_pairs", "failed", "note")]
     fails = "; ".join(metrics.get("failed", [])) or "none"
-    size = 9
-    chars = int((total_w - 0.4) / (size * 0.62 / 72))  # monospace glyph width in inches
-    lines = wrap_metrics(items, chars)
     sheet.text(
         0.15 / total_w,
-        1.25 / (panel_h + text_h + 0.5),
+        (text_h - 0.25) / (panel_h + text_h + 0.5),
         f"failed: {fails}"[: chars * 2],
         fontsize=10,
         color="red" if metrics.get("failed") else "green",
