@@ -6,9 +6,10 @@ import numpy as np
 import pytest
 
 from foldmap.io import load_backbone, load_nucleic
-from foldmap.model import AUTO_NT, NAStrand, ResLabel, crop_nucleic, nucleic_from_pairs
+from foldmap.model import AUTO_NT, NAStrand, ResLabel, crop_nucleic, nucleic_from_pairs, nucleic_touching
 from foldmap.nucleic import (
     BasePair,
+    NAGap,
     NARun,
     bend,
     secondary_structure,
@@ -468,3 +469,59 @@ def test_pieces_of_a_bent_stem_are_lettered_or_numbered_after_a_letter(name, mar
     st.name = name
     pieces = segment_stem(st, strands)
     assert len(pieces) > 1 and [p.name for p in pieces] == [name + m for m in marks[: len(pieces)]]
+
+
+def test_a_chain_broken_inside_itself_keeps_one_molecule_with_a_gap():
+    # 1URN: the hairpin loop's U13 has no sugar modelled and C14 is missing; the chain is one RNA, not two strands
+    na = _na("1URN")
+    assert [s.id for s in na.strands] == ["R:1-12", "R:15-20"]
+    assert na.gaps == [NAGap(0, 1, 2)]
+    assert na.strands[0].cut3 and na.strands[1].cut5  # the molecule goes on: no 5'/3' end there
+    assert not na.strands[0].cut5 and not na.strands[1].cut3
+    assert straight_duplex(na.structure, na.strands) is None  # a hairpin: never the classic two-strand picture
+
+
+def test_a_break_counts_the_nucleotides_left_out_by_sequence_position():
+    from types import SimpleNamespace
+
+    from foldmap.io import _breaks
+
+    def res(num, seq):
+        return SimpleNamespace(seqid=SimpleNamespace(num=num), label_seq=seq)
+
+    a, b, c = _strands(3, 3, 3)
+    b.chain = "A"  # A, A, C: one break inside chain A
+    found = [(a, [res(20, 20), res(21, 21), res(22, 22)]), (b, [res(216, 24), res(217, 25), res(218, 26)])]
+    found.append((c, [res(1, None), res(2, None), res(3, None)]))
+    assert _breaks(found) == [NAGap(0, 1, 1)]  # 4P9R: numbered 22 -> 216, one nucleotide missing in sequence
+    found[1] = (b, [res(30, None), res(31, None), res(32, None)])
+    assert _breaks(found) == [NAGap(0, 1, 7)]  # no sequence positions (a PDB file): by number
+
+
+def _chain(*lengths, counts):
+    """One chain cut into strands of these lengths, joined by gaps of `counts` nucleotides."""
+    strands = _strands(*lengths)
+    for s in strands:
+        s.chain = "A"
+    gaps = [NAGap(k, k + 1, n) for k, n in enumerate(counts)]
+    return nucleic_from_pairs(strands, [], {}, {}, gaps)
+
+
+def test_cropping_keeps_a_chain_break_and_counts_what_it_leaves_out():
+    from foldmap.model import _cut
+
+    na = _chain(10, 8, counts=[2])
+    cut = _cut(na, {0: [(0, 4)], 1: [(3, 6)]})
+    assert cut.gaps == [NAGap(0, 1, 5 + 2 + 3)]  # 5 cropped, 2 unmodelled, 3 cropped
+    na = _chain(10, 8, 6, counts=[2, 1])
+    cut = _cut(na, {0: [(0, 9)], 2: [(0, 5)]})  # the middle piece dropped: one gap across it
+    assert cut.gaps == [NAGap(0, 1, 2 + 8 + 1)]
+    cut = _cut(na, {0: [(0, 9)]})  # nothing after it kept: its 3' end is not the molecule's
+    assert not cut.gaps and cut.strands[0].cut3
+
+
+def test_focus_keeps_the_break_of_a_hairpin_it_holds():
+    path = NA / "1URN.cif.gz"
+    na = load_nucleic(path, load_backbone(path, "asu"), "asu")
+    held = nucleic_touching(na, ["C"])
+    assert len(held.strands) == 2 and held.gaps == [NAGap(0, 1, 2)]

@@ -11,7 +11,7 @@ import numpy as np
 from scipy.spatial import cKDTree
 
 from .model import Backbone, Ligand, Links, NAStrand, Nucleic, ResLabel, nucleic_from_pairs
-from .nucleic import pair_nucleotides
+from .nucleic import NAGap, pair_nucleotides
 
 _BB_ATOMS = ("N", "CA", "C", "O")
 _PEPTIDE_BOND_MAX = 2.5  # Å, C(i-1)-N(i), as in DSSP
@@ -333,7 +333,26 @@ def load_nucleic(
                         contacts.setdefault(k, set()).add((s, i))
     strands = [s for s, _ in found]
     pairs = pair_nucleotides([run for _, run in found])
-    return nucleic_from_pairs(strands, pairs, contacts, {k: bb.labels[k].chain for k in contacts})
+    return nucleic_from_pairs(strands, pairs, contacts, {k: bb.labels[k].chain for k in contacts}, _breaks(found))
+
+
+def _breaks(found) -> list[NAGap]:
+    """Where a chain is broken inside itself (unmodelled nucleotides, or an O3'-P link too long): a gap from one
+    strand piece's 3' end to the next one's 5' end, counting the nucleotides left out by sequence position
+    (label_seq), else by residue number (4P9R is numbered 22 -> 216 with one nucleotide missing). The pieces' ends
+    there are marked cut: the molecule goes on beyond them."""
+    gaps = []
+    for k, ((a, ra), (b, rb)) in enumerate(zip(found, found[1:])):
+        if a.chain != b.chain:
+            continue
+        x, y = ra[-1], rb[0]
+        if x.label_seq is not None and y.label_seq is not None:
+            count = y.label_seq - x.label_seq - 1
+        else:
+            count = y.seqid.num - x.seqid.num - 1
+        gaps.append(NAGap(k, k + 1, max(count, 0)))
+        a.cut3 = b.cut5 = True
+    return gaps
 
 
 SUGARS = {

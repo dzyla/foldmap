@@ -126,7 +126,7 @@ class NAStrand:
     p: np.ndarray  # (n, 3)
     c1: np.ndarray  # (n, 3)
     rna: bool
-    cut5: bool = False  # cropped: the strand continues beyond its 5' end
+    cut5: bool = False  # cropped, or a chain break: the molecule continues beyond its 5' end
     cut3: bool = False  # ... beyond its 3' end
 
     @property
@@ -258,13 +258,21 @@ def nucleic_touching(na: Nucleic, chains) -> Nucleic:
 
 
 def _cut(na: Nucleic, windows: dict[int, list[tuple[int, int]]]) -> Nucleic:
-    """The nucleotides inside the windows, each window its own strand piece, indices renumbered."""
+    """The nucleotides inside the windows, each window its own strand piece, indices renumbered. A gap joins
+    consecutive pieces of one molecule (one strand, or strands joined by na.gaps at a chain break), counting every
+    nucleotide left out between them; a piece's end is cut where the molecule goes on beyond it."""
+    after = {g.before: g for g in na.gaps}  # strand k's 3' end goes on, after g.count nucleotides, in strand k + 1
+    joined = {g.after for g in na.gaps}
     strands, where, gaps = [], {}, []
-    for k in sorted(windows):
-        s = na.strands[k]
-        for n, (lo, hi) in enumerate(windows[k]):
-            if n:
-                gaps.append(NAGap(len(strands) - 1, len(strands), lo - windows[k][n - 1][1] - 1))
+    last, left_out = None, 0  # the molecule's last piece kept so far, and the nucleotides left out since
+    for k, s in enumerate(na.strands):
+        if k not in joined:  # a new molecule
+            last, left_out = None, 0
+        pos = 0
+        for lo, hi in windows.get(k, []):
+            left_out += lo - pos
+            if last is not None:
+                gaps.append(NAGap(last, len(strands), left_out))
             for i in range(lo, hi + 1):
                 where[(k, i)] = (len(strands), i - lo)
             strands.append(
@@ -274,10 +282,12 @@ def _cut(na: Nucleic, windows: dict[int, list[tuple[int, int]]]) -> Nucleic:
                     s.p[lo : hi + 1],
                     s.c1[lo : hi + 1],
                     s.rna,
-                    s.cut5 or lo > 0,
-                    s.cut3 or hi < len(s) - 1,
+                    s.cut5 or lo > 0 or k in joined,
+                    s.cut3 or hi < len(s) - 1 or k in after,
                 )
             )
+            last, left_out, pos = len(strands) - 1, 0, hi + 1
+        left_out += len(s) - pos + (after[k].count if k in after else 0)
     pairs = []
     for p in na.base_pairs:
         if (p.a, p.i) in where and (p.b, p.j) in where:

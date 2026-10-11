@@ -1638,3 +1638,16 @@ def test_stems_sit_nearer_the_elements_that_touch_them(pdb):
     lay, sses, _ = make_layout(_path(pdb))
     m = contacts(lay, sses)
     assert m["contact_auc"] is None or m["contact_auc"] >= 0.55  # IHF, wrapped by its arms, is the lowest
+
+
+def test_a_chain_break_is_drawn_as_a_gap_with_no_ends_at_it():
+    """1URN: the unmodelled U13-C14 of the hairpin loop is a dashed gap from R:12 to R:15, with no 5'/3' labels
+    there; the hairpin is not drawn as the classic straight two-strand duplex."""
+    from foldmap.frame import RadialFrame
+
+    lay, _, _, _ = _routed("1URN")
+    assert [s.id for s in lay.nucleic.strands] == ["R:1-12", "R:15-20"]
+    assert sorted((s, e) for s, e, _ in lay.na_ends) == [(0, "5′"), (1, "3′")]
+    (gap,) = [p for p in lay.na_paths if p.kind == "gap"]
+    assert gap.strand == 0 and gap.label == ""  # 2 nt: a bare dashed break
+    assert not isinstance(lay.frame, RadialFrame)

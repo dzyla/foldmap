@@ -492,12 +492,17 @@ def bend(pieces: list[Stem], strands) -> float:
 
 def straight_duplex(structure: NAStructure, strands) -> list[int] | None:
     """The two strands of the one long straight duplex that dominates the nucleic acid, or None. A protein-DNA
-    complex built around such a duplex keeps the classic picture: the duplex across the page, protein below."""
+    complex built around such a duplex keeps the classic picture: the duplex across the page, protein below.
+    Never two strands of one chain (a hairpin whose loop is not modelled, 1URN, is no two-strand duplex)."""
     if not structure.stems:
         return None
     biggest = max(structure.stems, key=len)
     total = sum(len(s) for s in structure.stems)
-    if biggest.a == biggest.b or len(biggest) < 0.8 * total or len(segment_stem(biggest, strands)) > 1:
+    if (
+        strands[biggest.a].chain == strands[biggest.b].chain
+        or len(biggest) < 0.8 * total
+        or len(segment_stem(biggest, strands)) > 1
+    ):
         return None
     return [biggest.a, biggest.b]
 
