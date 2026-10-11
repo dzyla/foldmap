@@ -291,7 +291,7 @@ _APP = r"""
       .observe(molDiv);
     return {
       name: 'molstar',
-      on(residues, het) {
+      on(residues, het = []) {
         if (!residues.length && !het.length) return base();
         const parts = runs(residues).map(r => Object.assign(query(r), { color: r.colour === LOOP ? LOOP_ON : r.colour,
                                                                          sideChain: true }));
@@ -299,7 +299,7 @@ _APP = r"""
                                                    representation: 'ball-and-stick', representationColor: HET }));
         apply({ data: parts, nonSelectedColor: PALE });
       },
-      async fly(residues, het) {  // focus, then step back so the element sits in its surroundings
+      async fly(residues, het = []) {  // focus, then step back so the element sits in its surroundings
         if (!ready || !(residues.length || het.length)) return;
         await plugin.visual.focus(runs(residues).map(query).concat(het.map(([chain, seq]) => ({ auth_asym_id: chain, auth_seq_id: seq }))));
         setTimeout(() => {
@@ -335,11 +335,11 @@ _APP = r"""
       const k = residueOf(atom);
       if (k !== undefined && hooks.click) hooks.click(k);
     });
-    const sel = (residues, het) => ({ or: residues.map(k => ({ chain: data.residues[k].c, resi: data.residues[k].n }))
+    const sel = (residues, het = []) => ({ or: residues.map(k => ({ chain: data.residues[k].c, resi: data.residues[k].n }))
                                          .concat(het.map(([chain, seq]) => ({ chain, resi: seq }))) });
     return {
       name: '3dmol',
-      on(residues, het) {  // like the topology: the selection in its figure colours, everything else pale
+      on(residues, het = []) {  // like the topology: the selection in its figure colours, everything else pale
         if (!residues.length && !het.length) { base(); viewer.render(); return; }
         viewer.setStyle({}, { cartoon: { color: PALE, opacity: 0.85 } });
         if (residues.length) {
@@ -349,7 +349,7 @@ _APP = r"""
                                                                               sphere: { scale: 0.3, color: HET } }));
         viewer.render();
       },
-      fly(residues, het) {
+      fly(residues, het = []) {
         if (residues.length || het.length) { viewer.zoomTo(sel(residues, het)); viewer.zoom(0.35); viewer.render(); }
       },
       reset() { viewer.zoomTo({}, 400); viewer.render(); },
@@ -641,6 +641,11 @@ def _nucleics(layout) -> list[dict]:
         for x in nts:
             toucher.setdefault(x, set()).add(r)
 
+    def span(first, last):  # "C -49 … 49", across chains "C -49 … E 49", one nucleotide "C -50"
+        if (first.chain, first.tag) == (last.chain, last.tag):
+            return f"{first.chain} {first.tag}"
+        return f"{first.chain} {first.tag} \u2026 {'' if last.chain == first.chain else last.chain + ' '}{last.tag}"
+
     def entry(key, nts, text):
         labels = [na.strands[s].labels[i] for s, i in nts]
         residues = sorted({r for x in nts for r in toucher.get(x, ())})
@@ -649,13 +654,12 @@ def _nucleics(layout) -> list[dict]:
     out = []
     for k, d in enumerate(layout.stems):
         keys = sorted(d.axial)
-        first, last = na.strands[keys[0][0]].labels, na.strands[keys[-1][0]].labels
-        span = f"{first[keys[0][1]].chain} {first[keys[0][1]].tag}\u2013{last[keys[-1][1]].tag}"
-        out.append(entry(f"stem:{k}", keys, f"{d.name} \u00b7 {len(d.pairs)} bp \u00b7 {span}"))
+        ends = span(na.strands[keys[0][0]].labels[keys[0][1]], na.strands[keys[-1][0]].labels[keys[-1][1]])
+        out.append(entry(f"stem:{k}", keys, f"{d.name} \u00b7 {len(d.pairs)} bp \u00b7 {ends}"))
     for n, p in enumerate(layout.na_paths):
         if p.nts:
             lab = na.strands[p.strand].labels
-            text = f"{p.kind} {lab[p.nts[0]].chain} {lab[p.nts[0]].tag}\u2013{lab[p.nts[-1]].tag} ({len(p.nts)} nt)"
+            text = f"{p.kind} {span(lab[p.nts[0]], lab[p.nts[-1]])} ({len(p.nts)} nt)"
             out.append(entry(f"run:{n}", [(p.strand, i) for i in p.nts], text))
     return out
 
@@ -823,14 +827,22 @@ def build_page(
     blob = _script_json(data)
     name = html.escape(data["title"])
     n_res, n_el = len(data["residues"]), len(data["elements"])
-    chains = len({r["c"] for r in data["residues"]})
+    nucleic = layout.nucleic.strands if layout.nucleic is not None else []
+    n_nt = sum(len(st.labels) for st in nucleic)
+    chains = len({r["c"] for r in data["residues"]} | {lab.chain for st in nucleic for lab in st.labels})
+    counts = " · ".join(
+        [f"{chains} chain{'s' if chains != 1 else ''}"]
+        + ([f"{n_res} residues"] if n_res or not n_nt else [])
+        + ([f"{n_nt} nt"] if n_nt else [])
+        + ([f"{n_el} helices and strands"] if n_el or not n_nt else [])
+    )
     return f"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{name} · topology explorer</title>
 <style>{_CSS}</style>
 {_viewer_head(viewer)}
 </head><body>
-<header><h1>{name}</h1><p>{chains} chain(s) · {n_res} residues · {n_el} helices and strands · hover anything: the
+<header><h1>{name}</h1><p>{counts} · hover anything: the
 same residues light up in all three views · click an element to fly the 3D view to it</p></header>
 <main>
   <section class="panel" id="topology"><h2>Topology <span class="tools"><button id="zin" title="zoom in">+</button>

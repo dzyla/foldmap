@@ -922,4 +922,169 @@ def test_explorer_page_of_a_nucleic_acid_only_file_has_no_contact_map():
     assert data["links"]["nucleics"][0]["key"] == "stem:0" and data["links"]["nucleics"][0]["het"]
     app = page.split('<script id="topo-app">', 1)[1]
     assert "data.ca.length > 0" in app and "if (!hasMap) return;" in app
-    assert "fly(residues, het)" in app  # a selection with no protein residues still frames its nucleotides
+
+
+_HARNESS = r"""
+// Runs the explorer's app script against stub DOM and viewer objects; drives viewer.on / viewer.fly.
+const fs = require('fs');
+const job = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
+const calls = [];
+const generic = () => new Proxy(function () {}, {
+  get(_, k) {
+    if (k === 'getAttribute') return () => '0 0 10 10';
+    if (k === 'textContent') return '';
+    if (k === 'dataset') return {};
+    if (k === 'style') return {};
+    if (k === 'classList') return { add() {}, remove() {}, toggle() {} };
+    if (k === 'querySelectorAll') return () => [];
+    if (k === 'getContext') return () => ({ createImageData: () => ({ data: { set() {} } }), putImageData() {},
+                                            fillRect() {},
+                                            clearRect() {} });
+    if (k === 'Symbol.toPrimitive') return undefined;
+    return generic();
+  },
+  set() { return true; },
+  apply() { return generic(); },
+});
+const elements = {};
+globalThis.document = {
+  getElementById: id => id === 'topo-data' ? { textContent: job.blob } : (elements[id] = elements[id] || generic()),
+  querySelector: () => generic(), querySelectorAll: () => [], addEventListener() {},
+};
+globalThis.window = globalThis;
+globalThis.addEventListener = () => {};
+globalThis.ResizeObserver = class { observe() {} };
+globalThis.URL.createObjectURL = () => 'blob:x';
+globalThis.$3Dmol = { createViewer: () => new Proxy({
+  setStyle: (s, st) => calls.push(['setStyle', s, st]), zoomTo: s => calls.push(['zoomTo', s]),
+}, { get: (t, k) => k in t ? t[k] : () => {} }) };
+globalThis.PDBeMolstarPlugin = class {
+  constructor() {
+    this.events = { loadComplete: { subscribe: cb => { this.done = cb; } } };
+    this.visual = { select: async p => { calls.push(['select', p]); }, focus: async q => { calls.push(['focus', q]); },
+                    reset() {} };
+    this.plugin = { canvas3d: { handleResize() {},
+                                camera: { getSnapshot: () => ({ target: [0, 0, 0], position: [1, 1, 1],
+                                                                                  radius: 1 }), setState() {} } } };
+  }
+  render() { setTimeout(() => this.done(true), 0); }
+};
+eval(job.lib);
+eval(job.app);
+setTimeout(async () => {
+  const out = [];
+  for (const c of job.cases) {
+    for (const op of ['on', 'fly']) {
+      calls.length = 0;
+      let error = null;
+      const het = c.het === null ? undefined : c.het;
+      try { await window.foldmapViewer[op](c.residues, het); } catch (e) { error = String(e); }
+      await new Promise(r => setTimeout(r, 600));
+      out.push({ case: c.name, op, error, calls: JSON.parse(JSON.stringify(calls)) });
+    }
+  }
+  console.log(JSON.stringify(out));
+  process.exit(0);
+}, 100);
+"""
+
+
+def _explorer_cases(pdb, viewer):
+    from foldmap.interactive import _APP, _LIB, build_page
+
+    page = build_page(_path(pdb), viewer=viewer)
+    blob = page.split('<script type="application/json" id="topo-data">', 1)[1].split("</script>", 1)[0]
+    # the blob is HTML-safe JSON (< escapes); the script reads it back through JSON.parse unchanged
+    return json.loads(blob), blob, _LIB, _APP
+
+
+def _drive(tmp_path, pdb, viewer, cases):
+    data, blob, lib, app = _explorer_cases(pdb, viewer)
+    job = {"blob": blob, "lib": lib, "app": app, "cases": cases(data)}
+    (tmp_path / "job.json").write_text(json.dumps(job), encoding="utf-8")
+    (tmp_path / "harness.js").write_text(_HARNESS, encoding="utf-8")
+    res = subprocess.run(
+        [node, str(tmp_path / "harness.js"), str(tmp_path / "job.json")], capture_output=True, text=True
+    )
+    assert res.returncode == 0, res.stderr
+    return data, {(r["case"], r["op"]): r for r in json.loads(res.stdout)}
+
+
+def _stem_with_contacts(data):
+    return next(x for x in data["links"]["nucleics"] if x["key"].startswith("stem:") and x["residues"])
+
+
+@pytest.mark.skipif(node is None, reason="node is not installed; the explorer's viewer code cannot be exercised")
+@pytest.mark.parametrize("viewer", ["3dmol", "molstar"])
+def test_explorer_viewers_take_protein_nucleic_and_mixed_selections(tmp_path, viewer):
+    def cases(data):
+        helix = data["elements"][0]
+        mixed = _stem_with_contacts(data)
+        return [
+            {"name": "protein", "residues": list(range(helix["start"], helix["end"] + 1)), "het": []},
+            {"name": "mixed", "residues": mixed["residues"], "het": mixed["het"]},
+            {"name": "protein-no-het-argument", "residues": [data["elements"][0]["start"]], "het": None},
+        ]
+
+    data, got = _drive(tmp_path, "1IHF", viewer, cases)
+    helix = data["elements"][0]
+    n = helix["end"] - helix["start"] + 1
+    mixed = _stem_with_contacts(data)
+    for r in got.values():
+        assert r["error"] is None, r
+    key = "setStyle" if viewer == "3dmol" else "select"
+    for op in ("on", "fly"):
+        assert got[("protein", op)]["calls"], op  # something was sent to the viewer
+    if viewer == "3dmol":
+        on = got[("protein", "on")]["calls"]
+        assert any(c[0] == "setStyle" and len(c[1].get("or", [])) == n for c in on)
+        assert not any("stick" in c[2] and c[2]["stick"].get("color") for c in on)  # no nucleotide styling
+        assert len(got[("protein", "fly")]["calls"][0][1]["or"]) == n
+        on = got[("mixed", "on")]["calls"]
+        assert any(len(c[1].get("or", [])) == len(mixed["residues"]) for c in on if c[0] == key)
+        assert sum(1 for c in on if c[0] == key and "resi" in c[1]) == len(mixed["het"])
+        assert len(got[("mixed", "fly")]["calls"][0][1]["or"]) == len(mixed["residues"]) + len(mixed["het"])
+        assert got[("protein-no-het-argument", "fly")]["calls"][0][1]["or"]
+    else:
+        parts = got[("protein", "on")]["calls"][0][1]["data"]
+        assert sum(p["end_auth_seq_id"] - p["beg_auth_seq_id"] + 1 for p in parts) >= n
+        assert not any(p.get("representation") for p in parts)
+        parts = got[("mixed", "on")]["calls"][0][1]["data"]
+        assert sum(1 for p in parts if p.get("representation") == "ball-and-stick") == len(mixed["het"])
+        focus = got[("mixed", "fly")]["calls"][0][1]
+        assert sum(1 for q in focus if "auth_seq_id" in q) == len(mixed["het"])
+        assert got[("protein-no-het-argument", "fly")]["calls"]
+
+
+@pytest.mark.skipif(node is None, reason="node is not installed; the explorer's viewer code cannot be exercised")
+@pytest.mark.parametrize("viewer", ["3dmol", "molstar"])
+def test_explorer_viewers_take_a_nucleic_acid_only_selection(tmp_path, viewer):
+    def cases(data):
+        stem = data["links"]["nucleics"][0]
+        return [{"name": "rna", "residues": [], "het": stem["het"]}]
+
+    data, got = _drive(tmp_path, "1EHZ", viewer, cases)
+    het = data["links"]["nucleics"][0]["het"]
+    assert got[("rna", "on")]["error"] is None and got[("rna", "fly")]["error"] is None
+    if viewer == "3dmol":
+        styled = [c for c in got[("rna", "on")]["calls"] if c[0] == "setStyle" and "resi" in c[1]]
+        assert len(styled) == len(het)
+        assert len(got[("rna", "fly")]["calls"][0][1]["or"]) == len(het)
+    else:
+        assert len(got[("rna", "on")]["calls"][0][1]["data"]) == len(het)
+        assert len(got[("rna", "fly")]["calls"][0][1]) == len(het)
+
+
+def test_explorer_texts_name_both_chains_and_single_nucleotides():
+    from foldmap.interactive import build_page
+
+    for pdb in ("3CRX", "1IHF"):
+        data = json.loads(
+            build_page(_path(pdb))
+            .split('<script type="application/json" id="topo-data">', 1)[1]
+            .split("</script>", 1)[0]
+        )
+        for x in data["links"]["nucleics"]:
+            assert "–-" not in x["text"], x["text"]  # never "C -50–-50"
+    rna = build_page(_path("1EHZ"))
+    assert "<p>1 chain · 76 nt · hover" in rna
