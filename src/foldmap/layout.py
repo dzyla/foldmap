@@ -243,13 +243,16 @@ class _Item:
 
 
 def _footprint(m) -> tuple[float, float, float, float]:
-    """A member's box relative to its own centre; a helix's includes the room its label needs."""
+    """A member's box relative to its own centre; a helix's or a stem's includes the room its label needs."""
     x0, y0, x1, y1 = m.rect
     box = (x0 - m.cx, y0 - m.cy, x1 - m.cx, y1 - m.cy)
     if isinstance(m, Placed) and m.sse.kind in ("H", "G"):
         lx, ly = helix_label_pos(Placed(m.sse, 0.0, 0.0, m.length, m.angle, m.width))
         hx, hy = _GLYPH_W * 1.5 + 0.05, _GLYPH_H / 2  # up to three glyphs: α10
         box = (min(box[0], lx - hx), min(box[1], ly - hy), max(box[2], lx + hx), max(box[3], ly + hy))
+    if isinstance(m, PlacedStem):  # a stem's name beside it
+        x0, y0, x1, y1 = _stem_label_box(m)
+        box = (min(box[0], x0 - m.cx), min(box[1], y0 - m.cy), max(box[2], x1 - m.cx), max(box[3], y1 - m.cy))
     if isinstance(m, Placed) and m.ends:
         d = m.direction
         for end in m.ends:
@@ -879,22 +882,23 @@ _MIN_RISE = 2.6  # Å per base pair, the least a stem is drawn with (A-form rise
 
 
 def _rungs(piece: Stem, na: Nucleic, centre: np.ndarray, axis: np.ndarray) -> dict[tuple[int, int], float]:
-    """Each nucleotide's place along the drawn stem, centred: the pairs evenly spaced over the stem's length
-    along its axis (so a curved stem's ends never crowd), one straight rung per pair, bulged nucleotides
-    spaced between their neighbours on their own arm."""
-    proj = [
-        float(((na.strands[p.a].c1[p.i] + na.strands[p.b].c1[p.j]) / 2 - centre) @ axis) * SCALE for p in piece.pairs
-    ]
-    n = len(piece.pairs)
-    span = max(abs(proj[-1] - proj[0]), (n - 1) * _MIN_RISE * SCALE)
+    """Each nucleotide's place along the drawn stem, centred: one straight rung per pair, the pairs spread over
+    the stem's length along its axis (so a curved stem's ends never crowd), each step between two pairs at
+    least (1 + the most nucleotides bulged out on either arm there) * _MIN_RISE long, bulged nucleotides spaced
+    evenly between their neighbours on their own arm."""
+    pairs = piece.pairs
+    proj = [float(((na.strands[p.a].c1[p.i] + na.strands[p.b].c1[p.j]) / 2 - centre) @ axis) * SCALE for p in pairs]
+    steps = [1 + max(q.i - p.i - 1, p.j - q.j - 1) for p, q in zip(pairs, pairs[1:])]
+    span = max(abs(proj[-1] - proj[0]), sum(steps) * _MIN_RISE * SCALE)
+    at = np.concatenate([[0], np.cumsum(steps)]) / max(sum(steps), 1)  # each pair's fraction of the way along
     out: dict[tuple[int, int], float] = {}
-    for k, p in enumerate(piece.pairs):
-        out[(p.a, p.i)] = out[(p.b, p.j)] = -span / 2 + span * k / max(n - 1, 1)
-    for p, q in zip(piece.pairs, piece.pairs[1:]):  # bulges: evenly between the two pairs around them
+    for k, p in enumerate(pairs):
+        out[(p.a, p.i)] = out[(p.b, p.j)] = -span / 2 + span * float(at[k])
+    for p, q in zip(pairs, pairs[1:]):  # bulges: evenly between the two pairs around them, on their own arm
         x0, x1 = out[(p.a, p.i)], out[(q.a, q.i)]
-        for s, lo, hi in ((p.a, p.i, q.i), (p.b, q.j, p.j)):
-            inner = range(lo + 1, hi)
-            for m, i in enumerate(inner if s == p.a else reversed(inner)):
+        for arm, (s, lo, hi) in enumerate(((p.a, p.i, q.i), (p.b, q.j, p.j))):
+            inner = range(lo + 1, hi)  # the second arm runs back along the stem (also in a hairpin, a == b)
+            for m, i in enumerate(reversed(inner) if arm else inner):
                 out[(s, i)] = x0 + (x1 - x0) * (m + 1) / (len(inner) + 1)
     return out
 
@@ -910,7 +914,9 @@ def _stem_item(piece: Stem, na: Nucleic, frame: Frame, flat: bool, width: float 
     length = float(_snap(max(along.values()) - min(along.values()) + DNA_RISE * SCALE))  # half a step beyond each end
     a2 = frame.direction(centre, axis)
     angle = 0.0 if flat or np.linalg.norm(a2) < 1e-6 else float(_snap(np.arctan2(a2[1], a2[0])))
-    # the first arm on the side it is seen on: the drawing turns the stem, never mirrors it
+    # the first arm on the side it is seen on: its mean C1' against the second arm's, the side that fits the
+    # projection best, so the drawing turns the stem, never mirrors it (seen nearly on top of each other, the
+    # two arms fit about equally either way)
     across = np.mean([na.strands[a].c1[i] for i in range(i0, i1 + 1)], axis=0) - np.mean(
         [na.strands[b].c1[j] for j in range(j0, j1 + 1)], axis=0
     )
@@ -1388,6 +1394,19 @@ def dna_to_page(d: PlacedStem, x, y) -> np.ndarray:
 NT_ROW = 0.55  # a base letter sits this far out from its nucleotide
 
 
+def stem_label_pos(d: PlacedStem) -> tuple[float, float]:
+    """Where a stem's name goes: beside it on its first rail's side, a glyph beyond its base letters."""
+    p = np.array([d.cx, d.cy]) + d.normal * (d.width / 2 + NT_ROW + _GLYPH_H)
+    return float(p[0]), float(p[1])
+
+
+def _stem_label_box(d: PlacedStem) -> tuple[float, float, float, float]:
+    """The box around a stem's name, written along the stem."""
+    along, across = _GLYPH_W * len(d.name) / 2 + 0.05, _GLYPH_H / 2
+    c, s = abs(np.cos(d.angle)), abs(np.sin(d.angle))
+    return centred_box(*stem_label_pos(d), c * along + s * across, s * along + c * across)
+
+
 def label_boxes(layout: Layout, sses: list[SSE]) -> list[tuple[str, tuple[float, float, float, float]]]:
     """Keep-out boxes for text and chain-end stubs: loops route around them, the page bounds include them."""
     out = []
@@ -1409,6 +1428,8 @@ def label_boxes(layout: Layout, sses: list[SSE]) -> list[tuple[str, tuple[float,
         )
         t = np.add(port, ex * END_LABEL)
         out.append((f"{end}:{chain}", centred_box(float(t[0]), float(t[1]), _GLYPH_W / 2 + 0.05, _GLYPH_H / 2)))
+    for k, d in enumerate(layout.stems):
+        out.append((f"stem-label:{k}", _stem_label_box(d)))
     for name, ids in layout.domains:  # a domain's name, top left inside its panel
         if ids:
             x0, _, _, y1 = domain_panel(layout, name)

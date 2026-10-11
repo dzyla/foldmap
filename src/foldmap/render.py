@@ -46,6 +46,7 @@ from .layout import (
     label_boxes,
     overlaps_any,
     resolve,
+    stem_label_pos,
     termini,
 )
 from .model import SSE, group_by_chain
@@ -286,7 +287,7 @@ def _ladder(ink: _NAInk, k: int, d: PlacedStem, where: dict, letters: dict) -> N
 
 def _draw_stem_label(ink: _NAInk, k: int, d: PlacedStem) -> None:
     t = ink.ax.text(
-        *(np.array([d.cx, d.cy]) + d.normal * (d.width / 2 + NT_ROW)),
+        *stem_label_pos(d),
         d.name,
         ha="center",
         va="center",

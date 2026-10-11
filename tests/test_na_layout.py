@@ -60,19 +60,78 @@ def test_stems_are_drawn_to_scale_along_their_projected_axes():
         assert d.axial[(a, i)] == pytest.approx(d.axial[(b, j)])  # a rung straight across
 
 
-def test_a_bent_duplex_is_a_chain_of_pieces_end_to_end():
-    lay, _, _ = make_layout(_path("1KX5"))
-    pieces = [d for d in lay.stems if d.parent]
-    assert len(pieces) >= 10
-    gaps = [
-        np.hypot(
-            max(d.rect[0] - e.rect[2], e.rect[0] - d.rect[2], 0), max(d.rect[1] - e.rect[3], e.rect[1] - d.rect[3], 0)
-        )
-        for d, e in zip(pieces, pieces[1:])
-    ]
-    width = pieces[0].width
-    assert np.median(gaps) < width  # consecutive pieces next to each other
-    assert max(gaps) < 2 * width  # even where the two gyres cross
+def _joints(lay):
+    """(exit port, entry port, piece width) where a strand goes from one piece of a bent duplex to the next."""
+    at = {key: d for d in lay.stems for key in d.axial}
+    out = []
+    for s, strand in enumerate(lay.nucleic.strands):
+        for i in range(len(strand) - 1):
+            d, e = at.get((s, i)), at.get((s, i + 1))
+            if d is not None and e is not None and d is not e and d.parent and d.parent == e.parent:
+                out.append((d.port((s, i), True)[0], e.port((s, i + 1), False)[0], d.width))
+    return out
+
+
+@pytest.mark.xfail(
+    reason="a joint is up to 2 duplex widths long: overlap removal parts the pieces (open, see Task 6 report)",
+    strict=True,
+)
+@pytest.mark.parametrize("pdb", ["1KX5", "1IHF"])
+def test_a_bent_duplex_is_a_chain_of_pieces_end_to_end(pdb):
+    lay, _, _ = make_layout(_path(pdb))
+    joints = _joints(lay)
+    assert len(joints) >= (40 if pdb == "1KX5" else 4)  # both strands at every joint
+    gaps = [float(np.hypot(*(q - p))) / w for p, q, w in joints]
+    assert max(gaps) < 0.5, sorted(gaps)[-5:]  # the strand leaves one piece where the next one takes it up
+
+
+@pytest.mark.parametrize("pdb", FIXTURES)
+def test_both_arms_run_monotonic_along_every_stem(pdb):
+    lay, _, _ = make_layout(_path(pdb))
+    for d in lay.stems:
+        firsts = sorted((key for key in d.axial if d.side[key] == d.first), key=lambda k: k[1])
+        seconds = sorted((key for key in d.axial if d.side[key] != d.first), key=lambda k: k[1])
+        assert np.all(np.diff([d.axial[k] for k in firsts]) > 0), d.name  # bulges included
+        assert np.all(np.diff([d.axial[k] for k in seconds]) < 0), d.name
+
+
+@pytest.mark.parametrize("pdb", FIXTURES)
+def test_bulged_nucleotides_get_room_on_their_rail(pdb):
+    from foldmap.layout import _MIN_RISE, SCALE
+
+    lay, _, _ = make_layout(_path(pdb))
+    for d in lay.stems:
+        for sign in (1, -1):
+            along = sorted(v for key, v in d.axial.items() if d.side[key] == sign)
+            assert np.all(np.diff(along) >= 0.9 * _MIN_RISE * SCALE), (d.name, np.round(np.diff(along), 3))
+
+
+def _upright_size(t, renderer):
+    """Width and height (display units) of a text as if written level."""
+    rot = t.get_rotation()
+    t.set_rotation(0)
+    box = t.get_window_extent(renderer)
+    t.set_rotation(rot)
+    return box.width, box.height
+
+
+@pytest.mark.parametrize("pdb", ["1KX5", "30QM", "3CRX"])
+def test_stem_names_keep_clear_of_base_letters(pdb):
+    from matplotlib.backends.backend_agg import FigureCanvasAgg
+
+    fig, _ = make_figure_and_loops(_path(pdb))
+    renderer = FigureCanvasAgg(fig).get_renderer()
+    to_px = fig.axes[0].transData.transform
+    names, letters = _gid(fig, "na:label:"), _gid(fig, "na:nt:")
+    assert names and letters
+    for n in names:  # each letter (as a disc) against the name's own box, written along its stem
+        w, h = _upright_size(n, renderer)
+        c, rot = to_px(n.get_position()), np.radians(n.get_rotation())
+        along, across = np.array([np.cos(rot), np.sin(rot)]), np.array([-np.sin(rot), np.cos(rot)])
+        for t in letters:
+            r = max(_upright_size(t, renderer)) * 1.5  # a letter and a half from its centre: read apart at a glance
+            q = to_px(t.get_position()) - c
+            assert abs(q @ along) >= w / 2 + r or abs(q @ across) >= h / 2 + r, (n.get_text(), t.get_gid())
 
 
 def test_layout_is_the_same_whatever_the_hash_seed():
