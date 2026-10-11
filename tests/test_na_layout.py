@@ -1838,6 +1838,23 @@ def test_a_single_strand_wrapped_over_its_protein_keeps_the_protein_under_it():
     assert not [p.strand for p in lay.na_paths if p.kind == "trace" and p.fallback]
 
 
+def test_a_ghost_of_a_strand_holding_a_trace_is_that_strand():
+    """A ghost is the strand it copies: where that strand holds a single strand's nucleotides, the trace may lie
+    on the ghost as on the strand. 1EYG: B:2051-2060 holds nucleotides 1-5 and 8 of strand 1; a ghost of it laid
+    on that trace at nucleotide 3 is clear. A ghost of an element holding none of it still blocks."""
+    from dataclasses import replace
+
+    def fallbacks(ghost_of):
+        lay, sses, bb = make_layout(_path("1EYG"))
+        x, y = np.asarray(lay.na_traces[1])[3, :2]
+        lay.ghosts.append(replace(lay.placed[ghost_of], cx=float(x), cy=float(y), ghost=True))
+        route_loops(lay, sses, bb)
+        return [q.strand for q in lay.na_paths if q.kind == "trace" and q.fallback]
+
+    assert fallbacks("B:2051-2060") == []
+    assert 1 in fallbacks("A:1061-1070")  # this helix, in no sheet, holds nothing of strand 1
+
+
 def test_a_chain_break_with_one_end_not_drawn_is_a_short_break_mark(monkeypatch):
     """1URN with the piece after the break cut to its last nucleotide (no stem, too short for a trace): it has no
     end to route to, so the break is marked by a short dashed stub at the end that is drawn, not left unmarked."""
@@ -1902,7 +1919,10 @@ def test_a_trace_is_exempt_from_an_element_only_near_the_nucleotides_it_touches(
         el = SimpleNamespace(sse=SimpleNamespace(id="H1", start=5, end=5))
         other = SimpleNamespace(sse=SimpleNamespace(id="E1", start=6, end=6))
         layout = SimpleNamespace(
-            nucleic=SimpleNamespace(contacts={5: {(0, touched)}}), placed={"H1": el, "E1": other}, sheets=list(sheets)
+            nucleic=SimpleNamespace(contacts={5: {(0, touched)}}),
+            placed={"H1": el, "E1": other},
+            ghosts=[],
+            sheets=list(sheets),
         )
         rects = np.array([[14.2], [-1.0], [15.8], [1.0]])  # crossed by the segments of nucleotides 14-16
         router = SimpleNamespace(elements=(rects, ["E1" if sheets else "H1"]))

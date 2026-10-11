@@ -311,10 +311,10 @@ def _trace_clear(router: _Router, layout: Layout, s: int, pts) -> bool:
     """Is strand s's trace (drawn at its projected place) clear of every element, each segment but of the
     elements touching its own nucleotides or a neighbour's (_TRACE_NEAR) and the sheets holding them? A single
     strand lies on the protein it wraps where it holds it (1EYG's ssDNA over the SSB tetramer; layout keeps the
-    others off it), not along the whole trace."""
+    others off it), not along the whole trace. A ghost is the strand it copies, so it is exempt where that is."""
     na = layout.nucleic
     holds: dict[str, set[int]] = {}  # element -> the nucleotides of strand s it touches
-    for p in layout.placed.values():
+    for p in [*layout.placed.values(), *layout.ghosts]:
         got = {x[1] for r in range(p.sse.start, p.sse.end + 1) for x in na.contacts.get(r, ()) if x[0] == s}
         if got:
             holds[p.sse.id] = got
@@ -323,6 +323,8 @@ def _trace_clear(router: _Router, layout: Layout, s: int, pts) -> bool:
         for e in block if got else ():
             holds[e] = got
     rects, owners = router.elements
+    n = len(layout.placed)  # route._element_obstacles: elements, then ghosts (owner None), then stems
+    owners = [*owners[:n], *(g.sse.id for g in layout.ghosts), *owners[n + len(layout.ghosts) :]]
     xy = _xy(pts)
     free = [k for k, o in enumerate(owners) if o not in holds]  # never exempt: the whole trace at once
     if not _clear(xy, (), rects[:, free], [owners[k] for k in free], own_body=True):
