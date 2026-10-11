@@ -15,7 +15,7 @@ from foldmap.render import draw
 from foldmap.route import route_loops
 
 NA = Path(__file__).parent / "data" / "na"
-FIXTURES = ["30QM", "1EHZ", "4OO8", "1KX5", "1IHF", "3CRX", "4YBB"]
+FIXTURES = ["30QM", "1EHZ", "4OO8", "1KX5", "1IHF", "3CRX", "4YBB", "1RVA", "4LD0"]
 LIMITS = {  # metric: (lowest or highest allowed, "min" or "max")
     "spearman": (0.6, "min"),
     "procrustes": (0.8, "max"),
@@ -42,11 +42,12 @@ CAMPAIGN = {
     "bead_overlaps": {"4YBB": 2},
     "gap_label_collisions": {"4YBB": 2},
 }
-# stems_nearer_frac (target 1.0) held at its measured value (absent: 1.0): on 30QM one contacted stem of six
-NEARER = {"30QM": 0.833}
+# stems_nearer_frac (target 1.0) held at its measured value (absent: 1.0)
+NEARER: dict[str, float] = {}
 # LIMITS held at a fixture's measured value until a later step: 3CRX's four-Cre assembly (C5) is seen edge-on to
-# the junction plane (arms 3, 4, 1, 2 in a row), drawn as an X
-HELD = {("3CRX", "procrustes"): 0.817}
+# the junction plane (arms 3, 4, 1, 2 in a row), drawn as an X; 1RVA's duplex, projected (C4) instead of unrolled,
+# is seen nearly end-on and drawn beside the dimer rather than in its cleft
+HELD = {("3CRX", "procrustes"): 0.817, ("1RVA", "contact_auc"): 0.58}
 # what each fixture cannot measure (None): Spearman under 5 stems, contacts without protein, bends without a
 # split duplex; every other metric must be there, so a check that stops measuring fails
 BENDS = {"bend_3d", "bend_drawn", "joint_error_max"}
@@ -59,6 +60,8 @@ UNMEASURED = {
     "1IHF": {"spearman"},
     "3CRX": {"spearman"} | BENDS,
     "4YBB": set(),
+    "1RVA": {"spearman", "procrustes"},
+    "4LD0": {"spearman"} | BENDS,
 }
 METRICS = sorted(set(LIMITS) | set(CAMPAIGN) | BENDS | CONTACT | {"stems_drawn", "procrustes", "na_protein_crossings"})
 

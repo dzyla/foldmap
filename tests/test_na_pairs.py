@@ -12,7 +12,7 @@ from foldmap.io import _nucleic_strands, load_backbone, load_nucleic, read_model
 from foldmap.nucleic import BasePair, pair_nucleotides, parent_base
 
 NA = Path(__file__).parent / "data" / "na"
-FIXTURES = ["30QM", "1EHZ", "4OO8", "1KX5", "1IHF", "3CRX", "4YBB"]
+FIXTURES = ["30QM", "1EHZ", "4OO8", "1KX5", "1IHF", "3CRX", "4YBB", "1RVA", "4LD0"]
 REFERENCE = json.loads((NA / "reference.json").read_text(encoding="utf-8"))
 
 

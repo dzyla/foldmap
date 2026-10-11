@@ -244,6 +244,71 @@ def test_trna_keeps_its_cloverleaf_junction_compact():
     assert out4 @ towards < np.cos(np.radians(60))
 
 
+@pytest.mark.parametrize(
+    "pdb",
+    [
+        "30QM",
+        pytest.param(
+            "1RVA",
+            marks=pytest.mark.xfail(
+                strict=True,
+                reason="the projected frame sees the duplex nearly end-on: its 39° kink is drawn as its 102° "
+                "projection (Task 13b step 1 report: needs a ruling on the frame's orientation)",
+            ),
+        ),
+        "4LD0",
+    ],
+)
+def test_nucleic_acid_held_by_two_protomers_is_drawn_near_what_touches_it(pdb):
+    """A symmetric dimer is unrolled one protomer beside the other, which tears apart a nucleic acid lying across
+    the axis (30QM's P3, 1RVA's kinked site, 4LD0's junction). When some strand is touched by two protomers the
+    projected frame is used instead, so each stem lands next to what touches it."""
+    from foldmap.frame import Frame
+    from foldmap.nacheck import contacts, shape
+
+    lay, sses, _ = make_layout(_path(pdb))
+    assert type(lay.frame) is Frame
+    m = {**shape(lay), **contacts(lay, sses)}
+    if pdb == "30QM":  # P3 (touched by A:288-306, A:346-362, B:37-57) was drawn 18-24 away from all three
+        assert m["stems_nearer_frac"] == 1.0
+    if pdb == "1RVA":  # a kink, drawn as a 180° hairpin when unrolled
+        assert abs(m["bend_drawn"]) < 90
+    if pdb == "4LD0":  # each arm was drawn under the protomer that does not touch it (AUC 0.506)
+        assert m["contact_auc"] >= 0.6
+
+
+def test_a_kinked_duplex_across_a_dimer_is_no_longer_a_hairpin():
+    """1RVA: unrolled, the two half-sites were drawn antiparallel side by side (bend 179.7°); projected, the drawn
+    bend is the bend seen in the frame."""
+    from foldmap.frame import Frame
+    from foldmap.nacheck import shape
+
+    lay, _, _ = make_layout(_path("1RVA"))
+    assert type(lay.frame) is Frame
+    m = shape(lay)
+    assert abs(m["bend_drawn"]) < 150 and m["joint_error_max"] <= 5.0
+
+
+def test_unrolled_frame_kept_when_each_strand_is_held_by_one_protomer():
+    """The plain frame only for a nucleic acid with stems that some strand ties to two protomers."""
+    from types import SimpleNamespace
+
+    from foldmap.cli import _na_across_protomers
+    from foldmap.model import ResLabel
+
+    bb = SimpleNamespace(labels=[ResLabel(c, 1, "", "ALA") for c in "ABAB"])
+    sym = SimpleNamespace(protomers=[["A"], ["B"]])
+    stems = SimpleNamespace(stems=[object()])
+    one_each = SimpleNamespace(structure=stems, contacts={0: {(0, 1)}, 2: {(0, 2)}, 1: {(1, 4)}, 3: {(1, 5)}})
+    shared = SimpleNamespace(structure=stems, contacts={0: {(0, 1)}, 1: {(0, 9)}})
+    unpaired = SimpleNamespace(structure=SimpleNamespace(stems=[]), contacts=shared.contacts)
+    assert not _na_across_protomers(one_each, sym, bb)
+    assert _na_across_protomers(shared, sym, bb)
+    assert not _na_across_protomers(unpaired, sym, bb)
+    assert not _na_across_protomers(shared, None, bb)
+    assert not _na_across_protomers(None, sym, bb)
+
+
 def test_holliday_junction_reads_as_four_arms():
     """3CRX: the arms' inner ends gather at the junction (DNA 2, touching no protein, was 2.8 widths away), the
     arms lie in four quadrants around it (DNA 2 shared one with DNA 1), and the strand exchanges are short.

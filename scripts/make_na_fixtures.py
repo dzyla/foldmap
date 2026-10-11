@@ -38,6 +38,8 @@ ENTRIES = {
     "1KX5": (None, {}, None),  # nucleosome core particle: 147 bp wrapped DNA
     "1IHF": (None, {}, None),  # IHF-DNA: DNA bent by more than 160 degrees
     "3CRX": (None, {}, None),  # Cre-Holliday junction: four arms
+    "1RVA": (None, {}, None),  # EcoRV dimer kinking its site by about 50°: the duplex lies across the dimer axis
+    "4LD0": (None, {}, None),  # RuvC dimer on a Holliday junction: each arm held by one protomer
     # E. coli 30S subunit: 16S rRNA 1-1000 (5' and central domains) and six proteins that bind them
     # (S4 AD, S8 AH, S15 AO, S16 AP, S17 AQ, S20 AT)
     "4YBB": (["AA"], {"AA": (1, 1000)}, ["AD", "AH", "AO", "AP", "AQ", "AT"]),

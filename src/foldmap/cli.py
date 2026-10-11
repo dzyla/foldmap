@@ -102,6 +102,21 @@ def _any_centre(bb, nucleic) -> np.ndarray:
     return np.zeros(3)  # nothing to draw (a nucleic acid with --no-dna)
 
 
+def _na_across_protomers(nucleic, sym, bb) -> bool:
+    """Whether a nucleic acid with stems has a strand touched by two or more protomers of `sym`. Unrolling the
+    assembly one protomer beside the next would tear that strand apart, so it is drawn in a projected frame."""
+    if nucleic is None or sym is None or not nucleic.structure.stems:
+        return False
+    sector = {c: k for k, chains in enumerate(sym.protomers) for c in chains}
+    holders: dict[int, set[int]] = {}  # strand -> protomers touching it
+    for r, touched in sorted(nucleic.contacts.items()):
+        k = sector.get(bb.labels[r].chain)
+        if k is not None:
+            for s, _ in sorted(touched):
+                holders.setdefault(s, set()).add(k)
+    return any(len(ks) >= 2 for ks in holders.values())
+
+
 def _na_extent(na, extent: str):
     """(the nucleic acid to draw, whether `auto` cropped a large one to the stems the protein touches)."""
     if extent == "contacts":
@@ -207,9 +222,14 @@ def make_layout(
             if not rotate and not flip_v
             else dna_view_frame(sses, nucleic, rotate, flip_v)
         )
-    elif (
-        sym is not None and not rotate and not flip_v and up is None and view is None
-    ):  # an assembly: every protomer drawn alike, side by side
+    elif (  # an assembly: every protomer drawn alike, side by side (unless that tears a nucleic acid apart)
+        sym is not None
+        and not rotate
+        and not flip_v
+        and up is None
+        and view is None
+        and not _na_across_protomers(nucleic, sym, bb)
+    ):
         frame = symmetric_frame(sses, sym)
     else:  # stem axes differ in the last bit between BLAS kernels: snapped before they choose the page axes
         stems = stem_views(nucleic.structure, nucleic.strands) if nucleic is not None else []
