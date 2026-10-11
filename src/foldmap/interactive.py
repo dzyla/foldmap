@@ -47,10 +47,14 @@ _LIB = r"""
         case 'loop': return 'loop:' + item.a + '>' + item.b;
         case 'chain': return 'chain:' + item.chain;
         case 'pair': return 'pair:' + item.i + '-' + item.j;
-        case 'disulfide': case 'glycan': case 'ligand': case 'feature': return item.type + ':' + item.key;
+        case 'disulfide': case 'glycan': case 'ligand': case 'feature': case 'nucleic': return item.type + ':' + item.key;
         case 'bead': return 'bead:' + (item.mark || item.chain + ':' + item.idx);
         default: return 'residue:' + item.k;
       }
+    },
+    nucleicKey(id) {  // na:stem:3, na:stem:3:rails, na:label:3 -> 'stem:3'; na:run:5 -> 'run:5'; anything else -> null
+      const m = /^na:(stem|label|run):(\d+)(?::|$)/.exec(id || '');
+      return m ? (m[1] === 'run' ? 'run:' : 'stem:') + m[2] : null;
     },
     toggle(pinned, item, additive) {  // click: pin it (or clear if it is the only pin); shift-click: add/remove
       const key = TopoLib.itemKey(item), has = pinned.some(p => TopoLib.itemKey(p) === key);
@@ -177,8 +181,10 @@ _APP = r"""
     const key = 'loop ' + a + '>' + b;
     (parts[key] = parts[key] || []).push(node);
   });
-  svg.querySelectorAll('[id^="disulfide:"], [id^="ss-dot:"], [id^="glycan:"], [id^="ligand"], [id^="feature"]').forEach(node => {
+  svg.querySelectorAll('[id^="disulfide:"], [id^="ss-dot:"], [id^="glycan:"], [id^="ligand"], [id^="feature"], [id^="na:"]').forEach(node => {
     let m = node.id.match(/^(disulfide|ss-dot):(.+)$/), key = null;
+    const na = lib.nucleicKey(node.id);
+    if (na) key = 'nucleic ' + na;
     if (m) key = 'disulfide ' + m[2];
     else if ((m = node.id.match(/^glycan:(\d+):/))) key = 'glycan ' + m[1];
     else if ((m = node.id.match(/^feature(?:-ring)?:(\d+)$/))) key = 'feature ' + m[1];
@@ -396,12 +402,13 @@ _APP = r"""
       const x = data.hbonds.find(h => h.key === item.key);
       return { keys: [], residues: x.residues, label: 'H-bond', text: x.text };
     }
-    if (['disulfide', 'glycan', 'ligand', 'feature'].includes(item.type)) {
+    if (['disulfide', 'glycan', 'ligand', 'feature', 'nucleic'].includes(item.type)) {
       const list = data.links[item.type === 'disulfide' ? 'disulfides' : item.type + 's'];
       const x = list.find(d => d.key === item.key);
       const keys = [item.type + ' ' + item.key].concat(x.residues.map(k => data.residues[k].e).filter(Boolean));
-      return { keys: item.type === 'ligand' ? [keys[0]] : keys, residues: x.residues, het: x.het || [],
-               label: item.type === 'ligand' ? x.text.split(',')[0] : item.type, text: x.text };
+      return { keys: ['ligand', 'nucleic'].includes(item.type) ? [keys[0]] : keys, residues: x.residues, het: x.het || [],
+               label: item.type === 'ligand' ? x.text.split(',')[0] : item.type === 'nucleic' ? x.text.split(' · ')[0] : item.type,
+               text: x.text };
     }
     return { keys: [], residues: [item.k], label: name(item.k), text: name(item.k) + ' (loop)' };
   }
@@ -468,6 +475,8 @@ _APP = r"""
       if ((l = n.id.match(/^hbond:(.+)$/)) && data.hbonds.some(h => h.key === l[1])) return { type: 'hbond', key: l[1] };
       if ((l = n.id.match(/^feature(?:-ring)?:(\d+)$/))) return { type: 'feature', key: l[1] };
       if ((l = n.id.match(/^ligand(?:-label|-tether)?:(.+?)(?::\d+)?$/))) return { type: 'ligand', key: l[1] };
+      const na = lib.nucleicKey(n.id);
+      if (na && data.links.nucleics.some(x => x.key === na)) return { type: 'nucleic', key: na };
     }
     return null;
   }
@@ -533,8 +542,10 @@ main { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1
 #stage svg.focus [id^="ghost:"]:not(.on),
 #stage svg.focus [id^="disulfide:"]:not(.on), #stage svg.focus [id^="ss-dot:"]:not(.on),
 #stage svg.focus [id^="glycan:"]:not(.on), #stage svg.focus [id^="ligand"]:not(.on),
-#stage svg.focus [id^="feature"]:not(.on) { opacity: .2; transition: opacity .12s }
-#stage svg [id^="disulfide:"], #stage svg [id^="ss-dot:"], #stage svg [id^="glycan:"], #stage svg [id^="ligand"] { cursor: pointer }
+#stage svg.focus [id^="feature"]:not(.on), #stage svg.focus [id^="na:stem:"]:not(.on),
+#stage svg.focus [id^="na:label:"]:not(.on), #stage svg.focus [id^="na:run:"]:not(.on) { opacity: .2; transition: opacity .12s }
+#stage svg [id^="disulfide:"], #stage svg [id^="ss-dot:"], #stage svg [id^="glycan:"], #stage svg [id^="ligand"],
+#stage svg [id^="na:stem:"], #stage svg [id^="na:label:"], #stage svg [id^="na:run:"] { cursor: pointer }
 #molpanel { flex: 1.15 }
 #mol { flex: 1; min-height: 200px; position: relative; border-radius: 6px; overflow: hidden; background: #fff }
 #mappanel { flex: 1 }
@@ -612,13 +623,43 @@ def _component_type(name: str) -> str:
     return "non-polymer"
 
 
+def _nucleics(layout) -> list[dict]:
+    """Stems and single-stranded stretches as drawn: their nucleotides (for the 3D view) and the protein
+    residues touching them."""
+    na = layout.nucleic
+    if na is None:
+        return []
+    toucher: dict[tuple[int, int], set[int]] = {}
+    for r, nts in na.contacts.items():
+        for x in nts:
+            toucher.setdefault(x, set()).add(r)
+
+    def entry(key, nts, text):
+        labels = [na.strands[s].labels[i] for s, i in nts]
+        residues = sorted({r for x in nts for r in toucher.get(x, ())})
+        return {"key": key, "residues": residues, "het": [[lab.chain, lab.seq] for lab in labels], "text": text}
+
+    out = []
+    for k, d in enumerate(layout.stems):
+        keys = sorted(d.axial)
+        first, last = na.strands[keys[0][0]].labels, na.strands[keys[-1][0]].labels
+        span = f"{first[keys[0][1]].chain} {first[keys[0][1]].tag}\u2013{last[keys[-1][1]].tag}"
+        out.append(entry(f"stem:{k}", keys, f"{d.name} \u00b7 {len(d.pairs)} bp \u00b7 {span}"))
+    for n, p in enumerate(layout.na_paths):
+        if p.nts:
+            lab = na.strands[p.strand].labels
+            text = f"{p.kind} {lab[p.nts[0]].chain} {lab[p.nts[0]].tag}\u2013{lab[p.nts[-1]].tag} ({len(p.nts)} nt)"
+            out.append(entry(f"run:{n}", [(p.strand, i) for i in p.nts], text))
+    return out
+
+
 def _links(layout, loops, sses, bb, look) -> dict:
     """Disulfides, glycans and ligands as drawn, each with its protein residues (Backbone indices) and, for
     glycans and ligands, their own residues (chain, number) for the 3D view."""
     from .render import ligand_marks
 
     links = layout.links
-    out = {"disulfides": [], "glycans": [], "ligands": [], "features": []}
+    out = {"disulfides": [], "glycans": [], "ligands": [], "features": [], "nucleics": _nucleics(layout)}
     if links is None and getattr(layout, "uniprot", None) is None:
         return out
     shown = lambda r: not layout.partial or layout.res_chain[r] not in layout.partial  # noqa: E731

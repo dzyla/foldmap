@@ -1,6 +1,8 @@
 """Nucleic acids on the page: stems placed like elements, strands routed, four drawing styles, the explorer."""
 
+import json
 import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -874,3 +876,38 @@ def test_a_cropped_large_rna_switches_ladder_to_block():
     fig, _ = make_figure_and_loops(_path("4YBB"))
     assert any(a.get_gid().endswith(":block") for a in _gid(fig, "na:stem:"))
     assert _gid(fig, "na:gap:")
+
+
+node = shutil.which("node")
+
+
+def test_explorer_lists_stems_and_strands():
+    from foldmap.interactive import build_page
+
+    page = build_page(_path("30QM"))
+    blob = page.split('<script type="application/json" id="topo-data">', 1)[1].split("</script>", 1)[0]
+    data = json.loads(blob)
+    keys = [x["key"] for x in data["links"]["nucleics"]]
+    assert keys[:6] == [f"stem:{k}" for k in range(6)]
+    p1 = data["links"]["nucleics"][0]
+    assert p1["text"].startswith("P1 \u00b7 7 bp") and p1["het"] and p1["residues"]
+    assert 'id="na:stem:0:rails"' in page
+
+
+@pytest.mark.skipif(node is None, reason="node not installed")
+def test_explorer_maps_stem_artists_to_their_stem(tmp_path):
+    from foldmap.interactive import _LIB
+
+    probe = tmp_path / "probe.js"
+    probe.write_text(
+        _LIB
+        + """
+const lib = globalThis.TopoLib;
+console.log(JSON.stringify(['na:stem:3', 'na:stem:3:rails', 'na:label:3', 'na:run:5', 'na:nt:A:12', 'helix:A:1-9']
+  .map(lib.nucleicKey)));
+""",
+        encoding="utf-8",
+    )
+    res = subprocess.run([node, str(probe)], capture_output=True, text=True)
+    assert res.returncode == 0, res.stderr
+    assert json.loads(res.stdout) == ["stem:3", "stem:3", "stem:3", "run:5", None, None]
