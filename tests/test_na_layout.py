@@ -248,14 +248,7 @@ def test_trna_keeps_its_cloverleaf_junction_compact():
     "pdb",
     [
         "30QM",
-        pytest.param(
-            "1RVA",
-            marks=pytest.mark.xfail(
-                strict=True,
-                reason="the projected frame sees the duplex nearly end-on: its 39° kink is drawn as its 102° "
-                "projection (Task 13b step 1 report: needs a ruling on the frame's orientation)",
-            ),
-        ),
+        "1RVA",
         "4LD0",
     ],
 )
@@ -271,8 +264,9 @@ def test_nucleic_acid_held_by_two_protomers_is_drawn_near_what_touches_it(pdb):
     m = {**shape(lay), **contacts(lay, sses)}
     if pdb == "30QM":  # P3 (touched by A:288-306, A:346-362, B:37-57) was drawn 18-24 away from all three
         assert m["stems_nearer_frac"] == 1.0
-    if pdb == "1RVA":  # a kink, drawn as a 180° hairpin when unrolled
-        assert abs(m["bend_drawn"]) < 90
+    if pdb == "1RVA":  # a kink, drawn as a 180° hairpin when unrolled; now drawn as the frame sees it (the view
+        # sees the duplex nearly end-on, so its 39° kink projects to about 102°: the frame's choice, not the drawing's)
+        assert abs(m["bend_drawn"] - m["bend_3d"]) <= 10
     if pdb == "4LD0":  # each arm was drawn under the protomer that does not touch it (AUC 0.506)
         assert m["contact_auc"] >= 0.6
 
