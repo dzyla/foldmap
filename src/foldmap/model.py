@@ -190,8 +190,9 @@ def crop_nucleic(na: Nucleic, flank: int = 6, *, by: str = "contacts") -> Nuclei
     dropped. by="stems": the stems with a touched nucleotide plus one stem either side in sequence, and the
     short runs between them; each strand may fall into several pieces, with a gap recorded between them. A stem
     or isolated pair only partly inside goes into the gap whole, so no half stem and no paired nucleotide drawn
-    as single-stranded; a piece left holding no stem nor an end of an isolated pair goes into the gap too (unless
-    no piece holds one), its touchers then cropped like the rest."""
+    as single-stranded; a piece left holding no stem nor an end of an isolated pair goes into the gap too, as does
+    a strand of one nucleotide (ignored when drawn)
+    (unless no piece holds a stem), its touchers then cropped like the rest."""
     if by == "contacts":
         window: dict[int, list[int]] = {}
         for k, i in _touched(na):
@@ -239,7 +240,8 @@ def crop_nucleic(na: Nucleic, flank: int = 6, *, by: str = "contacts") -> Nuclei
     held = {x for st in stems for x in st.nucleotides() if x in inside}  # stems, and isolated pairs kept whole
     held |= {x for p in na.structure.ties for x in ((p.a, p.i), (p.b, p.j)) if x in inside}
     stemmed = {
-        k: [(lo, hi) for lo, hi in w if any((k, i) in held for i in range(lo, hi + 1))] for k, w in pieces.items()
+        k: [(lo, hi) for lo, hi in w if any((k, i) in held for i in range(lo, hi + 1)) and len(na.strands[k]) > 1]
+        for k, w in pieces.items()
     }
     if any(stemmed.values()):  # a piece holding no stem (a touched single nucleotide far from them) goes into a gap
         pieces = {k: w for k, w in stemmed.items() if w}

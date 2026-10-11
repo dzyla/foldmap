@@ -556,3 +556,17 @@ def test_the_crop_to_stems_keeps_a_piece_holding_one_end_of_a_tie():
     cut = crop_nucleic(na, by="stems")
     assert [s.id for s in cut.strands] == ["A:11-26", "A:201-201"]
     assert len(cut.structure.ties) == 1  # drawn as the isolated pair it is
+
+
+def test_crop_drops_a_one_nucleotide_piece_that_only_ends_a_tie():
+    # a strand of one nucleotide is ignored when drawn (spec); a tie to it must not keep it in the crop (5LJ3 I:10)
+    n = 30
+    labels = [ResLabel("R", k + 1, "", "G" if k % 2 else "C") for k in range(n)]
+    r = NAStrand("R", labels, np.zeros((n, 3)), np.zeros((n, 3)), True)
+    s = NAStrand("S", [ResLabel("S", 10, "", "A")], np.zeros((1, 3)), np.zeros((1, 3)), True)
+    pairs = [BasePair(0, 0, 0, 9, "WC"), BasePair(0, 1, 0, 8, "WC"), BasePair(0, 15, 1, 0, "WC")]
+    na = nucleic_from_pairs([r, s], pairs, {5: {(1, 0)}, 6: {(0, 0)}}, {5: "A", 6: "A"})
+    assert len(na.structure.stems) == 1 and len(na.structure.ties) == 1
+    cut = crop_nucleic(na, by="stems")
+    assert [st.chain for st in cut.strands] == ["R"] and not cut.structure.ties
+    assert cut.contacts and all(x[0] == 0 for v in cut.contacts.values() for x in v)
