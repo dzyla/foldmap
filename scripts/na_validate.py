@@ -20,6 +20,10 @@ For every entry it measures
   contacts  whether the protein elements touching a stem are drawn nearest it (AUC, precision at k); beads drawn
             for every touched nucleotide, in the touching chain's colour
   render    overlapping boxes, text off the page, overlapping base letters, routing fallbacks, run time
+Pairing is measured on the model as deposited (the asymmetric unit); the figure may be drawn from an assembly.
+With --require-rnapolis an entry whose pairing cannot be measured fails; without it a warning is printed and the
+report says how many entries were not validated. The exit code is 0 only if every entry passes. The run time
+(`seconds`) is gated but is a timing, not a deterministic quantity.
 and writes a contact sheet per entry (the figure, the drawn layout with stems coloured, the 3D structure projected
 the same way with the same colours) plus report.md and report.json with pass/fail against THRESHOLDS.
 """
@@ -110,7 +114,8 @@ from rnapolis.parser import read_3d_structure
 from rnapolis.util import handle_input_file
 src = Path(sys.argv[1])
 with tempfile.TemporaryDirectory() as tmp:
-    path = Path(tmp) / "model.cif"
+    name = src.name[:-3] if src.suffix == ".gz" else src.name
+    path = Path(tmp) / ("model.pdb" if name.lower().endswith((".pdb", ".ent")) else "model.cif")
     path.write_bytes(gzip.decompress(src.read_bytes()) if src.suffix == ".gz" else src.read_bytes())
     found = find_pairs(read_3d_structure(handle_input_file(str(path)), 1), 1)[0]
 out = []
@@ -121,6 +126,7 @@ for bp in found:
 print(json.dumps(out))
 """
 RNAPOLIS_PYTHON = os.environ.get("NA_RNAPOLIS_PYTHON", "")
+REQUIRE_RNAPOLIS = False
 
 
 def reference_pairs(path: Path) -> set[frozenset]:
@@ -183,8 +189,28 @@ def pairing(path) -> dict:
     }
 
 
+def _bounds(points, margin: float = 0.06):
+    """(x0, x1, y0, y1) of the points, widened by a fraction of the larger side."""
+    q = np.vstack([np.atleast_2d(p) for p in points])
+    (x0, y0), (x1, y1) = q.min(axis=0), q.max(axis=0)
+    pad = margin * max(x1 - x0, y1 - y0, 1e-6)
+    return x0 - pad, x1 + pad, y0 - pad, y1 + pad
+
+
+def wrap_metrics(items: list[str], width: int) -> list[str]:
+    """Lines of at most `width` characters (more only for a single longer item), broken between items."""
+    lines, line = [], ""
+    for item in items:
+        if line and len(line) + 2 + len(item) > width:
+            lines.append(line)
+            line = ""
+        line = f"{line}  {item}" if line else item
+    return lines + ([line] if line else [])
+
+
 def contact_sheet(name, lay, sses, bb, fig, metrics, out: Path) -> Path:
-    """Figure | drawn layout with each stem in its own colour | 3D projected through the same page axes."""
+    """Figure | drawn layout with each stem in its own colour | 3D seen through the figure's own frame, cropped to
+    the nucleic acid. The sheet's shape follows the panels' content."""
     import io
 
     na = lay.nucleic
@@ -194,37 +220,54 @@ def contact_sheet(name, lay, sses, bb, fig, metrics, out: Path) -> Path:
     img = plt.imread(buf)
     cmap = plt.get_cmap("tab20")
     colour = {d.id: cmap(k % 20) for k, d in enumerate(lay.stems)}
-    sheet = plt.figure(figsize=(18, 7.5))
-    a0 = sheet.add_axes([0.0, 0.18, 0.36, 0.8])
+    frame = lay.frame  # unrolled symmetric and radial views are projected as drawn
+
+    def proj(xyz):
+        return frame.project(np.atleast_2d(xyz)) * SCALE
+
+    corners = {
+        d.id: [
+            np.array([d.cx, d.cy]) + sx * d.direction * d.length / 2 + sy * d.normal * d.width / 2
+            for sx, sy in ((-1, -1), (1, -1), (1, 1), (-1, 1))
+        ]
+        for d in lay.stems
+    }
+    drawn_pts = [np.array([[p.rect[0], p.rect[1]], [p.rect[2], p.rect[3]]]) for p in lay.placed.values()]
+    drawn_pts += [np.array(c) for c in corners.values()] + [np.asarray(p.points)[:, :2] for p in lay.na_paths]
+    drawn_box = _bounds(drawn_pts) if drawn_pts else (0, 1, 0, 1)
+    seen_pts = [proj(s.p) for s in na.strands] + [proj(s.c1) for s in na.strands]
+    seen_box = _bounds(seen_pts)
+    boxes = [(0, img.shape[1], 0, img.shape[0]), drawn_box, seen_box]
+    aspects = [min(max((b[1] - b[0]) / max(b[3] - b[2], 1e-9), 0.4), 2.5) for b in boxes]
+    panel_h, gap, text_h = 6.0, 0.25, 1.5
+    widths = [panel_h * a for a in aspects]
+    total_w = sum(widths) + gap * (len(widths) + 1)
+    sheet = plt.figure(figsize=(total_w, panel_h + text_h + 0.5))
+    axes, x = [], gap
+    for w in widths:
+        axes.append(
+            sheet.add_axes(
+                [x / total_w, text_h / (panel_h + text_h + 0.5), w / total_w, panel_h / (panel_h + text_h + 0.5)]
+            )
+        )
+        x += w + gap
+    a0, a1, a2 = axes
     a0.imshow(img)
-    a0.set_axis_off()
-    a0.set_title(f"{name}: foldmap", loc="left")
-    a1 = sheet.add_axes([0.37, 0.18, 0.3, 0.8])
+    a0.set_title(f"{name}: foldmap", loc="left", fontsize=10)
     for p in lay.placed.values():
         x0, y0, x1, y1 = p.rect
         a1.add_patch(plt.Rectangle((x0, y0), x1 - x0, y1 - y0, fc="#dddddd", ec="#999999", lw=0.5))
     for d in lay.stems:
-        corners = [
-            np.array([d.cx, d.cy]) + sx * d.direction * d.length / 2 + sy * d.normal * d.width / 2
-            for sx, sy in ((-1, -1), (1, -1), (1, 1), (-1, 1))
-        ]
-        a1.add_patch(plt.Polygon(corners, fc=colour[d.id], ec="k", lw=0.5, alpha=0.85))
+        a1.add_patch(plt.Polygon(corners[d.id], fc=colour[d.id], ec="k", lw=0.5, alpha=0.85))
         a1.annotate(d.name, (d.cx, d.cy), ha="center", va="center", fontsize=7)
         tip = np.array([d.cx, d.cy]) + d.direction * d.length / 2
         a1.annotate("", tip, (d.cx, d.cy), arrowprops={"arrowstyle": "->", "lw": 0.8})
     for p in lay.na_paths:
         q = np.asarray(p.points)
         a1.plot(q[:, 0], q[:, 1], lw=0.6, color="#555555")
-    a1.set_aspect("equal")
-    a1.autoscale()
-    a1.set_title("drawn layout (stems coloured, arrows: first arm 5'→3')", loc="left", fontsize=9)
-    a1.set_axis_off()
-    a2 = sheet.add_axes([0.69, 0.18, 0.3, 0.8])
-    frame = lay.frame  # the figure's own frame, so unrolled symmetric and radial views are projected as drawn
-
-    def proj(xyz):
-        return frame.project(np.atleast_2d(xyz)) * SCALE
-
+    a1.set_xlim(*drawn_box[:2])
+    a1.set_ylim(*drawn_box[2:])
+    a1.set_title("drawn layout (stems coloured, arrows: first arm 5'->3')", loc="left", fontsize=9)
     if len(bb):
         q = proj(bb.ca)
         chains = np.array([l.chain for l in bb.labels])
@@ -248,19 +291,31 @@ def contact_sheet(name, lay, sses, bb, fig, metrics, out: Path) -> Path:
         q1 = q0 + frame.direction(c, ax) * 8 * SCALE
         a2.annotate(d.name, q0, fontsize=7)
         a2.annotate("", q1, q0, arrowprops={"arrowstyle": "->", "lw": 0.8, "color": colour[d.id]})
-    touched = {x for v in na.contacts.values() for x in v}
+    touched = sorted({x for v in na.contacts.values() for x in v})
     if touched:
         q = proj(np.array([na.strands[k].c1[i] for k, i in touched]))
         a2.scatter(q[:, 0], q[:, 1], s=3, color="red", zorder=5)
-    a2.set_aspect("equal")
-    a2.set_title("3D, same page axes (red: touched nucleotides)", loc="left", fontsize=9)
-    a2.set_axis_off()
-
-    text = "  ".join(f"{k}={v}" for k, v in metrics.items() if k not in ("missed_pairs", "extra_pairs", "failed"))
-    fails = ", ".join(metrics.get("failed", [])) or "none"
-    sheet.text(0.01, 0.1, f"failed: {fails}", fontsize=10, color="red" if metrics.get("failed") else "green")
+    a2.set_xlim(*seen_box[:2])
+    a2.set_ylim(*seen_box[2:])
+    a2.set_title("3D, figure's frame (red: touched nucleotides)", loc="left", fontsize=9)
+    for a in (a1, a2):
+        a.set_aspect("equal", adjustable="box")
+    for a in axes:
+        a.set_axis_off()
+    items = [f"{k}={v}" for k, v in metrics.items() if k not in ("missed_pairs", "extra_pairs", "failed", "note")]
+    fails = "; ".join(metrics.get("failed", [])) or "none"
+    size = 9
+    chars = int((total_w - 0.4) / (size * 0.62 / 72))  # monospace glyph width in inches
+    lines = wrap_metrics(items, chars)
     sheet.text(
-        0.01, 0.02, "\n".join(text[i : i + 230] for i in range(0, len(text), 230)), fontsize=7, family="monospace"
+        0.15 / total_w,
+        1.25 / (panel_h + text_h + 0.5),
+        f"failed: {fails}"[: chars * 2],
+        fontsize=10,
+        color="red" if metrics.get("failed") else "green",
+    )
+    sheet.text(
+        0.15 / total_w, 0.1 / (panel_h + text_h + 0.5), "\n".join(lines), fontsize=size, family="monospace", va="bottom"
     )
     path = out / f"{name}.png"
     sheet.savefig(path, dpi=90)
@@ -289,6 +344,10 @@ def run(name: str, path: Path, out: Path, options: dict | None = None) -> dict:
         m.update(contacts(lay, sses))
         m.update(render_checks(lay, loops, fig, sses, model=model, bb=bb))
     m["failed"] = judge(m)
+    if lay.nucleic is None:  # nothing to validate is not a pass
+        m["failed"].append("no nucleic acid drawn")
+    if REQUIRE_RNAPOLIS and m.get("pair_f1") is None:
+        m["failed"].append(f"pairing not measured ({m.get('note', 'no reason given')})")
     save(fig, out / f"{name}-figure.svg")
     if lay.nucleic is not None:
         contact_sheet(name, lay, sses, bb, fig, m, out)
@@ -313,12 +372,18 @@ def _isolated(name: str, path: Path, out: Path, options: dict | None = None) -> 
     queue = mp.get_context("fork").Queue()
     child = mp.get_context("fork").Process(target=_one, args=(name, path, out, options, queue))
     child.start()
-    child.join(TIMEOUT)
-    if child.is_alive():
+    try:  # read before join: a child blocked on a full pipe cannot exit
+        result = queue.get(timeout=TIMEOUT)
+    except Exception:
+        result = None
+    if result is None:
         child.terminate()
-        child.join()
+    child.join()
+    if result is not None:
+        return result
+    if child.exitcode in (None, -15):
         return {"entry": name, "failed": [f"timed out after {TIMEOUT} s"]}
-    return queue.get() if not queue.empty() else {"entry": name, "failed": [f"died (exit code {child.exitcode})"]}
+    return {"entry": name, "failed": [f"died (exit code {child.exitcode})"]}
 
 
 def main(argv=None) -> int:
@@ -327,18 +392,29 @@ def main(argv=None) -> int:
     ap.add_argument("--files", nargs="*", type=Path, help="local files instead of downloaded entries")
     ap.add_argument("--out", type=Path, default=Path("na-report"))
     ap.add_argument("--rnapolis-python", help="Python of a venv that has rnapolis (default: $NA_RNAPOLIS_PYTHON)")
+    ap.add_argument("--require-rnapolis", action="store_true", help="fail entries whose pairing is not measured")
     args = ap.parse_args(argv)
-    global RNAPOLIS_PYTHON
+    global RNAPOLIS_PYTHON, REQUIRE_RNAPOLIS
     RNAPOLIS_PYTHON = args.rnapolis_python or RNAPOLIS_PYTHON
+    REQUIRE_RNAPOLIS = args.require_rnapolis
     args.out.mkdir(parents=True, exist_ok=True)
-    jobs = (
-        [(f.name.split(".")[0], f) for f in args.files]
-        if args.files
-        else [(i, Path(fetch(i))) for i in (args.ids.split(",") if args.ids else BENCHMARK)]
-    )
+    if args.files is not None:
+        jobs = [(f.name.split(".")[0], f) for f in args.files]
+    else:
+        jobs = [(i, None) for i in (args.ids.split(",") if args.ids else BENCHMARK)]
+    if not RNAPOLIS_PYTHON:
+        print("warning: no --rnapolis-python; pairing is not validated", file=sys.stderr)
     rows = []
     for name, path in jobs:
-        m = _isolated(name, path, args.out, None if args.files else OPTIONS.get(name))
+        if path is None:
+            try:
+                path = Path(fetch(name))
+            except Exception as err:  # a failed download fails that entry, not the campaign
+                m = {"entry": name, "failed": [f"download failed: {type(err).__name__}: {err}"]}
+            else:
+                m = _isolated(name, path, args.out, OPTIONS.get(name))
+        else:
+            m = _isolated(name, path, args.out, None)
         rows.append(m)
         print(f"{name}: {'PASS' if not m['failed'] else 'FAIL ' + '; '.join(m['failed'])}", flush=True)
     (args.out / "report.json").write_text(json.dumps(rows, indent=1, default=str), encoding="utf-8")
@@ -387,8 +463,12 @@ def main(argv=None) -> int:
     why = [f"- **{k}** ({c}): {w}" for k, (c, w) in BENCHMARK.items()]
     passed = sum(not m["failed"] for m in rows)
     notes = [f"- {m['entry']}: {m['note']}" for m in rows if m.get("note")]
+    unvalidated = sum(1 for m in rows if m.get("pair_f1") is None)
+    if unvalidated:
+        print(f"warning: pairing not validated for {unvalidated} entries", file=sys.stderr)
     (args.out / "report.md").write_text(
         f"# foldmap nucleic-acid validation\n\n{passed} of {len(rows)} entries pass.\n\n"
+        + (f"pairing not validated for {unvalidated} entries\n\n" if unvalidated else "")
         + "\n".join(lines)
         + "\n\nThresholds: "
         + ", ".join(f"{k} {v}" for k, v in THRESHOLDS.items())
