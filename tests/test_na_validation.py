@@ -43,6 +43,7 @@ LIMITS = {  # metric: (lowest or highest allowed, "min" or "max")
 # off other strands').
 CAMPAIGN = {
     "na_crossings": {"4YBB": 1},
+    "bead_overlaps": {},  # every fixture at 0
     "gap_label_collisions": {"4YBB": 2},
 }
 # stems_nearer_frac (target 1.0) held at its measured value (absent: 1.0)
