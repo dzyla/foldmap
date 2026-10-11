@@ -91,6 +91,7 @@ MARK_DEFAULT = "#d1495b"  # a marked element without its own colour
 MATE_GREY = "#c4c9cf"  # symmetry mates (or other chains) when one part is highlighted
 _MATE_LINE = "#aab0b7"
 _LEGEND_ROW = 1.0
+_LOOP_ROOM = 0.25  # page units kept between a loop point and the page edge: the casing at the largest line width
 STYLES = CHOICES["fill"]
 LOOP_STYLES = CHOICES["loops"]
 
@@ -1862,6 +1863,8 @@ def _legend_entries(
     linked: list[dict] = (),
 ) -> list:
     entries = [(colors[c], f"Chain {c}") for c in chains]
+    if len(chains) == 1 and layout.focus is None and look.color_by == "chain":
+        entries = []  # one chain in its own colour: a "Chain A" box says nothing
     if layout.focus is not None:
         entries = [(colors[c], f"Chain {c}") for c in chains if c in layout.focus]
         if layout.focus_chains:
@@ -1902,7 +1905,18 @@ def _legend_entries(
 
 
 def _canvas(
-    layout: Layout, look: Style, title, chains, colors, element_colour, residue_colour, marks, umarks, hb, linked=()
+    layout: Layout,
+    look: Style,
+    title,
+    chains,
+    colors,
+    element_colour,
+    residue_colour,
+    marks,
+    umarks,
+    hb,
+    linked=(),
+    loops: list[Loop] = (),
 ) -> tuple[_Canvas, _Legend]:
     """The figure, its axes and every size the steps share; also lays the legend out, as it sets the page width."""
     x0, y0, x1, y1 = layout.bounds
@@ -1910,6 +1924,13 @@ def _canvas(
         (cx, cy), (hw, hh) = m["centre"], m["half"]  # markers may sit just outside the elements' bounds
         x0, y0, x1, y1 = min(x0, cx - hw), min(y0, cy - hh), max(x1, cx + hw), max(y1, cy + hh)
     pad = 1.0
+    # a loop routed around the outermost elements may leave the bounds: the page (bounds + pad, the legend below)
+    # holds every loop point with _LOOP_ROOM to spare, so no loop is clipped at the edge or runs into the legend
+    pts = np.concatenate([np.asarray(lp.points, float).reshape(-1, 2) for lp in loops] or [np.empty((0, 2))])
+    if len(pts):
+        (lx0, ly0), (lx1, ly1) = pts.min(axis=0), pts.max(axis=0)
+        room = _LOOP_ROOM - pad
+        x0, y0, x1, y1 = min(x0, lx0 - room), min(y0, ly0 - room), max(x1, lx1 + room), max(y1, ly1 + room)
     top = 1.9 if title else 0.0
     backbone = backbone_colours(layout, chains, look, colors)  # once per figure
     entries = _legend_entries(layout, look, chains, colors, umarks, backbone[0], hb, linked)
@@ -1919,7 +1940,10 @@ def _canvas(
         font_u = _font_pt(scale) * look.font_scale / (scale * 72)  # text drawn at that size, in page units
         # the unhinted advance width, which is what is drawn (ink extents differ between matplotlib versions);
         # measured at a size matplotlib does not clamp (it floors font sizes at 1 pt) and scaled to font_u
-        widest = max(text_to_path.get_text_width_height_descent(text, _MEASURE, ismath=False)[0] for _, text in entries)
+        widest = max(
+            (text_to_path.get_text_width_height_descent(text, _MEASURE, ismath=False)[0] for _, text in entries),
+            default=0.0,
+        )
         return 0.85 + widest * font_u / _MEASURE.get_size_in_points() + 0.9
 
     entry = legend_entry(x1)
@@ -2430,7 +2454,9 @@ def _draw(
     linked = linked_marks(layout, loops, sses, marks)
     umarks = uniprot_marks(layout, loops, sses, look)
     hb = hbond_overlay(layout, loops, sses, look, model)
-    c, legend = _canvas(layout, look, title, chains, colors, element_colour, residue_colour, marks, umarks, hb, linked)
+    c, legend = _canvas(
+        layout, look, title, chains, colors, element_colour, residue_colour, marks, umarks, hb, linked, loops
+    )
     _draw_loops(c, layout, loops, sses)
     _draw_membrane(c, layout)
     _draw_domains(c, layout)

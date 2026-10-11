@@ -164,31 +164,6 @@
     "E"
    ]
   },
-  "legend-chain-label:A": {
-   "bbox": [
-    40.0,
-    209.6,
-    40.0,
-    209.6
-   ],
-   "colours": [],
-   "text": [
-    "Chain A"
-   ]
-  },
-  "legend-chain:A": {
-   "bbox": [
-    21.6,
-    201.2,
-    34.6,
-    214.2
-   ],
-   "colours": [
-    "fill:#0072b2",
-    "stroke:#00446b"
-   ],
-   "text": []
-  },
   "loop:A:12-16>A:23-34": {
    "bbox": [
     103.6,
@@ -501,7 +476,7 @@
  },
  "size": [
   300.2,
-  222.8
+  190.4
  ],
  "unnamed": {
   "patch": 1

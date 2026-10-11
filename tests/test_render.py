@@ -387,3 +387,35 @@ def test_chromophore_star_is_easy_to_see():
     assert label.get_fontsize() >= 7
     (swatch,) = [a for a in ax.get_children() if a.get_gid() == "legend-linked"]
     assert len(swatch.get_xy()) >= 10  # a star, not the plain square of the other entries
+
+
+@pytest.mark.parametrize("name", ["5NKT", "25IN", "6Y7S"])
+def test_every_loop_lies_inside_the_page(name):
+    """5NKT: a loop ran past the canvas edge and was clipped. Since the bulge join (Task 1) 5NKT's loops keep
+    0.53 units of page; 25IN A:54-74>A:79-105 (0.13) and 6Y7S D:122-123>D:127-139 (0.19) still came this close."""
+    fig = make_figure(DATA / f"{name}.cif")
+    ax = fig.axes[0]
+    (x0, x1), (y0, y1) = ax.get_xlim(), ax.get_ylim()
+    for p in ax.patches:
+        if (p.get_gid() or "").startswith("loop:"):
+            v = p.get_path().vertices
+            assert v[:, 0].min() >= x0 + 0.2 and v[:, 0].max() <= x1 - 0.2, p.get_gid()
+            assert v[:, 1].min() >= y0 + 0.2 and v[:, 1].max() <= y1 - 0.2, p.get_gid()
+
+
+@pytest.mark.parametrize("name, legend", [("1UBQ", set()), ("2HHB", {"Chain A", "Chain B", "Chain C", "Chain D"})])
+def test_chain_legend_only_when_there_is_more_than_one_chain(name, legend):
+    texts = {t.get_text() for t in make_figure(DATA / f"{name}.cif").axes[0].texts}
+    assert {t for t in texts if t.startswith("Chain ")} == legend
+
+
+def test_one_protein_chain_with_nucleic_acid_keeps_the_nucleic_acid_legend():
+    """The single-chain rule drops only the "Chain X" box: the RNA backbone and H-bond swatches stay (1URN)."""
+    from foldmap.style import Style
+
+    fig = make_figure(DATA / "na" / "1URN.cif.gz", look=Style(hbonds="na"))
+    gids = sorted(a.get_gid() for a in [*fig.axes[0].patches, *fig.axes[0].lines] if a.get_gid())
+    texts = {t.get_text() for t in fig.axes[0].texts}
+    assert {"legend-na", "legend-hbond"} <= set(gids) and not any(g.startswith("legend-chain") for g in gids)
+    assert "RNA (R)" in texts and any(t.startswith("H-bonds (") for t in texts)
+    assert not any(t.startswith("Chain ") for t in texts)

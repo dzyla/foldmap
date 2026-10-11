@@ -22,8 +22,11 @@ def test_unknown_chain_is_explained():
 
 def test_cli_chains(tmp_path):
     out = tmp_path / "ab.svg"
-    assert main(["plot", str(DATA / "2HHB.cif"), "--assembly", "asu", "--chains", "A", "-o", str(out)]) == 0
-    assert "Chain A" in out.read_text() and "Chain B" not in out.read_text()
+    assert main(["plot", str(DATA / "2HHB.cif"), "--assembly", "asu", "--chains", "A,C", "-o", str(out)]) == 0
+    assert "Chain A" in out.read_text() and "Chain C" in out.read_text() and "Chain B" not in out.read_text()
+    one = tmp_path / "a.svg"  # one chain drawn: no chain legend at all
+    assert main(["plot", str(DATA / "2HHB.cif"), "--assembly", "asu", "--chains", "A", "-o", str(one)]) == 0
+    assert "Chain " not in one.read_text()
 
 
 NA = DATA / "na"
