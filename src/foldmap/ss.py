@@ -4,6 +4,8 @@
 
 from __future__ import annotations
 
+import re
+
 import numpy as np
 
 from .model import SSE, Backbone, Bridge
@@ -14,6 +16,7 @@ _MIN_HELIX_H = 4  # an alpha run needs this many H residues ...
 _MIN_HELIX_ANY = 6  # ... or this many helix-class residues in total (3-10 / pi)
 _MIN_310 = 3  # an isolated 3-10 run this long becomes its own small element (kind G) when asked for
 _PARTNER_GAP = 4  # residues of a partner strand this close pair with the same side of it
+KINK_SPLIT = 30.0  # degrees: alpha segments of one helix run meeting at a 3-10/pi kink sharper than this split it
 
 
 def _runs(ss: str, classes: str, prev: np.ndarray):
@@ -88,11 +91,35 @@ def _fit_axis(ca: np.ndarray) -> np.ndarray:
     return axis / np.linalg.norm(axis)
 
 
+def _angle(u: np.ndarray, v: np.ndarray) -> float:
+    return float(np.degrees(np.arccos(np.clip(u @ v, -1.0, 1.0))))
+
+
+def _split_kinks(a: int, b: int, ss: str, bb: Backbone) -> tuple[list[tuple[int, int]], list[int]]:
+    """The pieces of helix run a..b cut where two of its alpha segments (H runs of _MIN_HELIX_H or more) meet
+    through 3-10/pi residues only at more than KINK_SPLIT degrees (the globin AB corner), and the corner residues
+    between them, which belong to neither piece."""
+    hs = [(m.start() + a, m.end() - 1 + a) for m in re.finditer(f"H{{{_MIN_HELIX_H},}}", ss[a : b + 1])]
+    pieces, corners, start = [], [], a
+    for (x0, x1), (y0, y1) in zip(hs, hs[1:]):
+        if (
+            set(ss[x1 + 1 : y0]) <= set("GI")
+            and _angle(_fit_axis(bb.ca[x0 : x1 + 1]), _fit_axis(bb.ca[y0 : y1 + 1])) > KINK_SPLIT
+        ):
+            pieces.append((start, x1))
+            corners.extend(range(x1 + 1, y0))
+            start = y0
+    pieces.append((start, b))
+    return pieces, corners
+
+
 def build_sses(bb: Backbone, ss: str, short_helices: bool = False, bridges: list[Bridge] | None = None) -> list[SSE]:
     """Strands (E) and helices (H); with short_helices, isolated 3-10 runs too short to count as helices
     become their own kind G (drawn as small boxes, labelled η). Pass the DSSP bridges so that strand pieces
-    split at a beta-bulge are joined into one strand (without them, strands stay as DSSP runs)."""
+    split at a beta-bulge are joined into one strand (without them, strands stay as DSSP runs). A helix run
+    whose alpha segments turn sharply at a 3-10/pi kink is split there (_split_kinks)."""
     out: list[SSE] = []
+    corners: list[int] = []  # residues of a kink between two helix pieces: no element of their own
     for kind, classes in (("E", "E"), ("H", "HGI")):
         for a, b in _runs(ss, classes, bb.prev):
             n = b - a + 1
@@ -100,12 +127,19 @@ def build_sses(bb: Backbone, ss: str, short_helices: bool = False, bridges: list
                 continue
             if kind == "H" and not (ss[a : b + 1].count("H") >= _MIN_HELIX_H or n >= _MIN_HELIX_ANY):
                 continue
-            ca = bb.ca[a : b + 1]
-            out.append(SSE(kind, bb.labels[a].chain, a, b, bb.labels[a], bb.labels[b], ca.mean(axis=0), _fit_axis(ca)))
+            pieces = [(a, b)]
+            if kind == "H":
+                pieces, cut = _split_kinks(a, b, ss, bb)
+                corners += cut
+            for p, q in pieces:
+                ca = bb.ca[p : q + 1]
+                out.append(
+                    SSE(kind, bb.labels[p].chain, p, q, bb.labels[p], bb.labels[q], ca.mean(axis=0), _fit_axis(ca))
+                )
     if bridges is not None:
         out = _join_bulged_pieces(out, ss, bb, bridges)
     if short_helices:
-        taken = {k for s in out for k in range(s.start, s.end + 1)}
+        taken = {k for s in out for k in range(s.start, s.end + 1)} | set(corners)
         for a, b in _runs(ss, "G", bb.prev):
             if b - a + 1 >= _MIN_310 and not taken & set(range(a, b + 1)):
                 ca = bb.ca[a : b + 1]

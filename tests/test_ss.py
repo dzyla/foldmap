@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import numpy as np
+import pytest
 
 from foldmap.dssp import assign_dssp
 from foldmap.io import load_backbone
@@ -128,3 +129,36 @@ def test_hairpin_and_opposite_sides_are_not_joined():
     for bridges in (hairpin, opposite):  # opposite: k residues 43-45 pair with both, one on each face
         pieces = [(s.start, s.end) for s in build_sses(bb, "".join(ss), bridges=bridges) if s.kind == "E"]
         assert (10, 13) in pieces and (17, 20) in pieces
+
+
+def test_globin_ab_corner_splits_the_alpha_chain_helix():
+    """2HHB α: DSSP H 4-17, G 18-20, H 21-35 with the axes 96° apart (deposited HELX_P: A 3-18, B 20-35)."""
+    bb, sses, _ = pipeline(Path(__file__).parent / "data" / "2HHB.cif")
+    ids = {s.id for s in sses}
+    for c in "AC":
+        assert {f"{c}:4-17", f"{c}:21-35"} <= ids and f"{c}:4-35" not in ids
+    d = assign_dssp(bb)
+    with310 = build_sses(bb, d.ss, short_helices=True, bridges=d.bridges)
+    assert not any(s.kind == "G" and s.chain == "A" and s.first.seq == 18 for s in with310)  # no η at the corner
+
+
+def test_pi_bulge_of_a_tm_helix_stays_one_helix():
+    _, sses, _ = pipeline(Path(__file__).parent / "data" / "1C3W.cif")  # helix G: I-bulge 214-218, 22°
+    assert "A:201-225" in {s.id for s in sses}
+
+
+@pytest.mark.parametrize("name", ["2HHB", "1C3W", "1TIM", "2LZM", "8UTF"])
+def test_no_helix_hides_a_kink_of_more_than_30_degrees(name):
+    import re
+
+    from foldmap.ss import KINK_SPLIT, _fit_axis
+
+    bb = load_backbone(Path(__file__).parent / "data" / f"{name}.cif", "asu")
+    d = assign_dssp(bb)
+    for s in build_sses(bb, d.ss, bridges=d.bridges):
+        seg = d.ss[s.start : s.end + 1]
+        hs = [(m.start() + s.start, m.end() - 1 + s.start) for m in re.finditer(r"H{4,}", seg)]
+        for (x0, x1), (y0, y1) in zip(hs, hs[1:]):
+            if set(d.ss[x1 + 1 : y0]) <= set("GI"):
+                cos = _fit_axis(bb.ca[x0 : x1 + 1]) @ _fit_axis(bb.ca[y0 : y1 + 1])
+                assert np.degrees(np.arccos(np.clip(cos, -1, 1))) <= KINK_SPLIT, s.id
