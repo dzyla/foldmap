@@ -570,3 +570,20 @@ def test_crop_drops_a_one_nucleotide_piece_that_only_ends_a_tie():
     cut = crop_nucleic(na, by="stems")
     assert [st.chain for st in cut.strands] == ["R"] and not cut.structure.ties
     assert cut.contacts and all(x[0] == 0 for v in cut.contacts.values() for x in v)
+
+
+def test_stem_letters_run_on_past_z_without_turning_into_numbers():
+    from foldmap.nucleic import _letter
+
+    assert [_letter(n) for n in (0, 1, 25, 26, 27, 51, 52, 701, 702)] == [
+        "a",
+        "b",
+        "z",
+        "aa",
+        "ab",
+        "az",
+        "ba",
+        "zz",
+        "aaa",
+    ]
+    assert len({_letter(n) for n in range(1000)}) == 1000

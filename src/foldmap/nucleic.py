@@ -483,8 +483,13 @@ def segment_stem(stem: Stem, strands, max_turn: float = SEGMENT_TURN) -> list[St
 
 
 def _letter(n: int) -> str:
-    """a, b, ... z, then 27, 28 ..."""
-    return "abcdefghijklmnopqrstuvwxyz"[n] if n < 26 else str(n + 1)
+    """a, b, ... z, aa, ab, ... (n counts from 0): a name never reads as a number, so P2 + 'aa' is no P227."""
+    out = ""
+    n += 1
+    while n:
+        n, r = divmod(n - 1, 26)
+        out = "abcdefghijklmnopqrstuvwxyz"[r] + out
+    return out
 
 
 def _between(x: tuple[int, int], part: list[BasePair]) -> bool:
