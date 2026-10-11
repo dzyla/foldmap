@@ -133,3 +133,45 @@ def test_glycans_of_chains_left_out_are_not_ligands():
         assert not links.ligands, (name, [lg.symbol for lg in links.ligands])
     lay, _, _ = make_layout(DATA / "6ZYA.cif", chains=["A1"])
     assert not lay.links.ligands
+
+
+def _home_of(lay, g):
+    """The ligand's own chain when it touches it, else the chain it touches most (ties: alphabetically first)."""
+    chains = [lay.res_chain[r] for r in g.contacts]
+    if g.chain in chains:
+        return g.chain
+    return max(sorted(set(chains)), key=chains.count)
+
+
+@pytest.mark.parametrize("kw", [{}, {"focus": "protomer"}])
+def test_ligand_tethers_stay_in_their_own_pocket(kw):
+    """1LDM tetramer: OXM between A1 and A3 was tethered across the figure (11.2 page units)."""
+    import numpy as np
+
+    from foldmap.render import _SPOT_RADIUS, _TETHER_REACH, TETHER_CAP, ligand_marks
+    from foldmap.route import route_loops
+    from helpers import FID
+
+    lay, sses, bb = make_layout(FID / "1LDM.cif.gz", **kw)
+    marks = ligand_marks(lay, route_loops(lay, sses, bb), sses, Style())
+    assert len(marks) >= 4  # NAD and OXM of every drawn subunit
+    assert TETHER_CAP == _TETHER_REACH + _SPOT_RADIUS  # the formula, see the comment at _TETHER_REACH
+    for m in marks:
+        home = _home_of(lay, m["ligand"])
+        chains = {lay.res_chain[r] for r in m["residues"]}
+        assert len(m["residues"]) == len(m["targets"])
+        # the home chain is always tethered; with the focus on one protomer an undrawn home falls back to the drawn one
+        assert home in chains or kw  # unfocused, the home chain is always tethered
+        c = np.array(m["centre"])
+        far = max(float(np.hypot(*(np.array(t) - c))) for t in m["targets"])
+        assert far <= TETHER_CAP, far  # measured: 6.7 at most (was 11.2)
+
+
+def test_haem_tethers_keep_to_the_pocket():
+    """2HHB: every haem keeps its four tethers (its own chain's targets are never dropped)."""
+    from foldmap.render import ligand_marks
+    from foldmap.route import route_loops
+
+    lay, sses, bb = make_layout(DATA / "2HHB.cif")
+    marks = ligand_marks(lay, route_loops(lay, sses, bb), sses, Style())
+    assert [(m["ligand"].chain, len(m["targets"])) for m in marks] == [("A", 4), ("B", 4), ("C", 4), ("D", 4)]

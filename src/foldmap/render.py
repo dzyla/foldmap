@@ -1017,11 +1017,77 @@ METAL_COLOURS = {  # Jmol-like element colours, darkened enough to carry a white
 }
 LIGAND_FILL, LIGAND_EDGE = "#fff1c1", "#b8860b"
 _LIGAND_TETHERS = 4  # a ligand is tethered to the elements it touches most, at most this many
+_TETHER_REACH = 6.5  # page units: a tether target farther than this from the heaviest one is another pocket
+_SPOT_RADIUS = 3.0  # the spot search stops at this ring radius
+# A tether to another chain's residue is at most _TETHER_REACH from the home chain's heaviest target, and the marker
+# is within _SPOT_RADIUS of the anchor (an average of the targets): TETHER_CAP bounds the cross-chain tethers
+# measured from the marker when the home targets are close to the heaviest.
+TETHER_CAP = _TETHER_REACH + _SPOT_RADIUS
+
+
+def _home_chain(layout: Layout, g) -> str:
+    """The chain a ligand is drawn with: its own when it touches it, else the one it touches most (ties go to the
+    alphabetically first)."""
+    count: dict[str, int] = {}
+    for r in g.contacts:
+        count[layout.res_chain[r]] = count.get(layout.res_chain[r], 0) + 1
+    if g.chain in count:
+        return g.chain
+    return max(sorted(count), key=count.__getitem__)
+
+
+def _tether_targets(layout: Layout, loops: list[Loop], sses: list[SSE], g, chain: str | None):
+    """Page points the ligand is tethered to, their weights, and their residues; only `chain`'s contacts when given."""
+    groups: dict[str, list[int]] = {}  # contacts by the element (or loop) they belong to
+    for r in g.contacts:
+        if chain is not None and layout.res_chain[r] != chain:
+            continue
+        home = next((s.id for s in sses if s.start <= r <= s.end and s.id in layout.placed), None)
+        if home is None:
+            home = "loop:" + str(max((s.end for s in sses if s.end < r), default=-1))
+        groups.setdefault(home, []).append(r)
+    ranked = sorted(groups.values(), key=len, reverse=True)
+    if not g.metal:  # a ligand: one tether per element it sits on, the four it touches most
+        ranked = [[sorted(rs)[len(rs) // 2]] for rs in ranked[:_LIGAND_TETHERS]]
+    targets, weights, residues = [], [], []
+    for rs in ranked:
+        for r in rs:
+            at = residue_point(layout, loops, sses, layout.res_chain, r)
+            if at is not None and all(np.hypot(at[0] - t[0], at[1] - t[1]) > 0.3 for t in targets):
+                targets.append(at)
+                weights.append(len(groups.get(next(k for k, v in groups.items() if r in v), [])))
+                residues.append(r)
+    return targets, weights, residues
+
+
+def _local_targets(layout: Layout, loops: list[Loop], sses: list[SSE], g, metal: bool):
+    """The tether targets of a ligand: all of its home chain's, then those of other chains that lie within
+    _TETHER_REACH of the home chain's heaviest target (the heaviest of the others when the home chain is not drawn,
+    and then that chain is the home). Never fewer than the home chain's."""
+    home = _home_chain(layout, g)
+    targets, weights, residues = _tether_targets(layout, loops, sses, g, home)
+    all_t, all_w, all_r = _tether_targets(layout, loops, sses, g, None)
+    if not targets:
+        if not all_t:
+            return [], [], []
+        home = layout.res_chain[all_r[int(np.argmax(all_w))]]
+        targets, weights, residues = _tether_targets(layout, loops, sses, g, home)
+    ref = targets[int(np.argmax(weights))]  # the heaviest; ties go to the first
+    for t, w, r in zip(all_t, all_w, all_r):
+        if layout.res_chain[r] == home or (not metal and len(targets) >= _LIGAND_TETHERS):
+            continue
+        if np.hypot(t[0] - ref[0], t[1] - ref[1]) <= _TETHER_REACH and all(
+            np.hypot(t[0] - u[0], t[1] - u[1]) > 0.3 for u in targets
+        ):
+            targets.append(t)
+            weights.append(w)
+            residues.append(r)
+    return targets, weights, residues
 
 
 def ligand_marks(layout: Layout, loops: list[Loop], sses: list[SSE], look: Style) -> list[dict]:
     """Where each shown ligand/ion goes: as close as possible to the residues holding it, clear of elements,
-    labels and other markers. Each mark: ligand, centre, half size, tether targets."""
+    labels and other markers. Each mark: ligand, centre, half size, tether targets, tethered residues."""
     links = layout.links
     if links is None or look.ligands == "none" or not getattr(links, "ligands", None):
         return []
@@ -1038,28 +1104,13 @@ def ligand_marks(layout: Layout, loops: list[Loop], sses: list[SSE], look: Style
     taken += [box for _, box in label_boxes(layout, sses)]
     out = []
     for g in sorted(chosen, key=lambda g: g.contacts[0]):
-        groups: dict[str, list[int]] = {}  # contacts by the element (or loop) they belong to
-        for r in g.contacts:
-            home = next((s.id for s in sses if s.start <= r <= s.end and s.id in layout.placed), None)
-            if home is None:
-                home = "loop:" + str(max((s.end for s in sses if s.end < r), default=-1))
-            groups.setdefault(home, []).append(r)
-        ranked = sorted(groups.values(), key=len, reverse=True)
-        if not g.metal:  # a ligand: one tether per element it sits on, the four it touches most
-            ranked = [[sorted(rs)[len(rs) // 2]] for rs in ranked[:_LIGAND_TETHERS]]
-        targets, weights = [], []
-        for rs in ranked:
-            for r in rs:
-                at = residue_point(layout, loops, sses, layout.res_chain, r)
-                if at is not None and all(np.hypot(at[0] - t[0], at[1] - t[1]) > 0.3 for t in targets):
-                    targets.append(at)
-                    weights.append(len(groups.get(next(k for k, v in groups.items() if r in v), [])))
+        targets, weights, tethered = _local_targets(layout, loops, sses, g, g.metal)
         if not targets:
             continue
         anchor = np.average(np.asarray(targets), axis=0, weights=weights)
         half = (0.3, 0.3) if g.metal else (0.12 * len(g.name) + 0.2, 0.27)
         spot = None
-        for ring in np.arange(0.0, 12.0, 0.35):
+        for ring in np.arange(0.0, _SPOT_RADIUS, 0.35):
             for angle in np.linspace(0, 2 * np.pi, max(1, int(ring * 10)), endpoint=False):
                 c = anchor + ring * np.array([np.cos(angle), np.sin(angle)])
                 box = (c[0] - half[0] - 0.08, c[1] - half[1] - 0.08, c[0] + half[0] + 0.08, c[1] + half[1] + 0.08)
@@ -1071,7 +1122,15 @@ def ligand_marks(layout: Layout, loops: list[Loop], sses: list[SSE], look: Style
         if spot is None:
             continue
         taken.append((spot[0] - half[0], spot[1] - half[1], spot[0] + half[0], spot[1] + half[1]))
-        out.append({"ligand": g, "centre": (float(spot[0]), float(spot[1])), "half": half, "targets": targets})
+        out.append(
+            {
+                "ligand": g,
+                "centre": (float(spot[0]), float(spot[1])),
+                "half": half,
+                "targets": targets,
+                "residues": tethered,
+            }
+        )
     return out
 
 
