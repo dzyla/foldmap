@@ -7,6 +7,7 @@ from pathlib import Path
 
 import numpy as np
 import pytest
+from matplotlib.colors import to_hex
 
 from foldmap.cli import make_figure_and_loops, make_layout
 from foldmap.layout import PlacedStem
@@ -298,6 +299,11 @@ def test_a_long_tie_is_two_labelled_marks():
     fig, _ = make_figure_and_loops(_path("1EHZ"))
     marks, labels = _gid(fig, "na:tie:19-56:mark"), _gid(fig, "na:tie:19-56:label")
     assert len(marks) == 2 and [t.get_text() for t in labels] == ["a", "a"]
+    for t in labels:  # not a base: smaller than the letters, upright, in the rung grey
+        base = _gid(fig, "na:nt:")[0]
+        assert t.get_fontsize() == pytest.approx(0.75 * base.get_fontsize())
+        assert t.get_fontstyle() == "normal" and base.get_fontstyle() == "normal"
+        assert to_hex(t.get_color()) != to_hex(base.get_color())
     assert not [a for a in _gid(fig, "na:tie:") if not a.get_gid().endswith((":mark", ":label"))]
 
 
@@ -661,3 +667,147 @@ def test_letters_are_placed_quickly_on_a_whole_ribosomal_rna(monkeypatch):
     monkeypatch.setattr(route_na, "_place_letters", timed)
     route_loops(lay, sses, bb)
     assert len(lay.na_letters) > 400 and spent[0] < 1.5, spent
+
+
+def test_unlabelled_ties_are_drawn_like_rungs_solid_for_watson_crick_dotted_for_gu():
+    """The rung convention holds for tie lines: a WC tie is a thin solid line, a G·U tie dotted, both rung grey."""
+    from foldmap import render
+    from foldmap.route_na import NATie
+
+    lay, sses, _, loops = _routed("1EHZ")
+    pairs = lay.nucleic.base_pairs
+    wc = next(p for p in pairs if p.kind == "WC")
+    gu = next(p for p in pairs if p.kind == "GU")
+    ties = []
+    for p in (wc, gu):
+        a, b = (p.a, p.i), (p.b, p.j)
+        ties.append(NATie(a, b, [(0.0, 0.0), (1.0, 0.0)]))
+    lay.na_ties = [*lay.na_ties, *ties]
+    fig = render.draw(lay, loops, sses)
+    drawn = {t.get_gid(): t for t in _gid(fig, "na:tie:") if not t.get_gid().endswith((":mark", ":label"))}
+    tag = lambda p: f"na:tie:{lay.nucleic.strands[p.a].labels[p.i].tag}-{lay.nucleic.strands[p.b].labels[p.j].tag}"  # noqa: E731
+    line_wc, line_gu = drawn[tag(wc)], drawn[tag(gu)]
+    assert line_wc.get_linestyle() == "-"
+    assert line_gu.get_linestyle() != "-"  # dotted, as the G·U rungs
+    rung = _gid(fig, "na:stem:0:rung")[0].get_color()
+    assert line_wc.get_color() == line_gu.get_color() == rung
+
+
+# ---- backbone colours: modality, chain, override -------------------------------------------------------------
+
+LMB = Path(__file__).parent / "data" / "1LMB.cif"
+
+
+def _backbone(fig):
+    """Colours of everything drawn as nucleic-acid backbone: stem rails and single-strand paths."""
+    ax = fig.axes[0]
+    rails = [
+        to_hex(p.get_edgecolor())
+        for p in ax.patches
+        if (p.get_gid() or "").startswith("na:stem:") and "rails" in p.get_gid()
+    ]
+    runs = [to_hex(a.get_color()) for a in ax.lines if (a.get_gid() or "").startswith("na:run:")]
+    return rails, runs
+
+
+def _fig(path, *sets):
+    from foldmap.style import resolve_style
+
+    return make_figure_and_loops(path, look=resolve_style(None, None, [f"{s}" for s in sets]))[0]
+
+
+def _loop_colours(fig):
+    return {to_hex(p.get_edgecolor()) for p in fig.axes[0].patches if (p.get_gid() or "").startswith("loop:")}
+
+
+def test_dna_and_rna_backbones_have_their_own_colours_and_protein_loops_stay_ink():
+    rails, runs = _backbone(_fig(LMB))
+    assert rails and set(rails + runs) == {"#8c564b"}
+    assert _loop_colours(_fig(LMB)) == {"#000000"}
+    rails, runs = _backbone(_fig(_path("1EHZ")))
+    assert rails and set(rails + runs) == {"#6a3d9a"}
+
+
+def test_every_backbone_piece_takes_the_backbone_colour_and_letters_stay_ink():
+    fig = _fig(_path("1EHZ"))
+    ax = fig.axes[0]
+    pieces = [a for a in [*ax.patches, *ax.lines] if (a.get_gid() or "").startswith(("na:stem:", "na:run:", "na:tie:"))]
+    coloured = {
+        to_hex(a.get_edgecolor() if hasattr(a, "get_edgecolor") else a.get_color())
+        for a in pieces
+        if not a.get_gid().endswith(("rung", ":label")) and a.get_gid().count(":") >= 2
+    }
+    assert "#6a3d9a" in coloured
+    assert {to_hex(t.get_color()) for t in _gid(fig, "na:nt:") if t.get_fontweight() == "normal"} == {"#3d4852"}
+    assert {to_hex(a.get_color()) for a in _gid(fig, "na:stem:0:rung")} == {"#c3cad1"}
+
+
+def test_na_backbone_ink_reproduces_the_old_look():
+    rails, runs = _backbone(_fig(LMB, "na_backbone=ink"))
+    assert set(rails + runs) == {"#3d4852"}
+
+
+def test_na_backbone_colour_paints_all_nucleic_acid():
+    rails, runs = _backbone(_fig(_path("1EHZ"), "na_backbone=#123456"))
+    assert set(rails + runs) == {"#123456"}
+
+
+def test_na_backbone_chain_gives_each_chain_its_own_colour_avoiding_protein_chains():
+    from foldmap.palette import chain_colors, delta_e
+
+    rails, _ = _backbone(_fig(LMB, "na_backbone=chain"))
+    assert len(set(rails)) == 2  # chains 1 and 2
+    protein = list(chain_colors(["3", "4"]).values())
+    assert all(delta_e(c, p) >= 15 for c in rails for p in protein)
+
+
+def test_backbone_colors_chain_beats_modality_and_recolours_protein_loops():
+    fig = _fig(LMB, "backbone_colors=3=#1f77b4,dna=#555555,2=crimson")
+    ax = fig.axes[0]
+    by_chain = {}
+    for p in ax.patches:
+        if (p.get_gid() or "").endswith(":rails"):
+            by_chain[p.get_gid()] = to_hex(p.get_edgecolor())
+    assert set(by_chain.values()) <= {"#555555", "#dc143c"} and {"#555555", "#dc143c"} <= set(
+        to_hex(a.get_color()) for a in ax.lines if (a.get_gid() or "").startswith("na:run:")
+    ) | set(by_chain.values())
+    assert "#1f77b4" in _loop_colours(fig) and "#000000" in _loop_colours(fig)  # chain 3 blue, chain 4 untouched
+
+
+def test_backbone_colors_protein_key_recolours_every_protein_chain():
+    assert _loop_colours(_fig(LMB, "backbone_colors=protein=#1f77b4")) == {"#1f77b4"}
+
+
+@pytest.mark.parametrize(
+    "text,named",
+    [("Z=red", "Z"), ("3=notacolour", "3"), ("dna=#12", "dna"), ("justakey", "justakey")],
+)
+def test_bad_backbone_colors_name_the_key(text, named):
+    with pytest.raises(ValueError, match="backbone_colors") as err:
+        _fig(LMB, f"backbone_colors={text}")
+    assert named in str(err.value)
+
+
+def test_bad_na_backbone_is_explained():
+    with pytest.raises(ValueError, match="na_backbone must be"):
+        _fig(LMB, "na_backbone=nonsense")
+
+
+def test_the_legend_entry_for_nucleic_acid_uses_the_backbone_colour():
+    from foldmap import render
+    from foldmap.palette import chain_colors
+    from foldmap.style import Style, resolve_style
+
+    lay, _, _ = make_layout(LMB)
+    colors = chain_colors(["3", "4"])
+    assert ("#8c564b", "DNA (1, 2)") in render._legend_entries(lay, Style(), ["3", "4"], colors, [])
+    look = resolve_style(None, None, ["backbone_colors=dna=#555555"])
+    assert ("#555555", "DNA (1, 2)") in render._legend_entries(lay, look, ["3", "4"], colors, [])
+
+
+def test_colours_never_move_the_layout():
+    a, _, _ = make_layout(LMB)
+    from foldmap.style import resolve_style
+
+    b, _, _ = make_layout(LMB, look=resolve_style(None, None, ["na_backbone=chain", "backbone_colors=3=red"]))
+    assert a.bounds == b.bounds and [d.rect for d in a.stems] == [d.rect for d in b.stems]

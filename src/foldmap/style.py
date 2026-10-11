@@ -52,6 +52,27 @@ LAYOUT_KEYS = (
     "helices_310",
     "na_extent",
 )  # these move elements
+NA_BACKBONES = ("modality", "chain", "ink")
+MODALITIES = ("protein", "dna", "rna")
+
+
+def backbone_overrides(text: str) -> dict[str, str]:
+    """`backbone_colors` as {key: colour}: keys are chain ids or protein / dna / rna; ValueError names the key."""
+    from matplotlib.colors import is_color_like
+
+    out: dict[str, str] = {}
+    for entry in filter(None, (e.strip() for e in text.split(","))):
+        key, eq, colour = (part.strip() for part in entry.partition("="))
+        if not eq or not re.fullmatch(r"[A-Za-z0-9]+", key):
+            raise ValueError(
+                f"backbone_colors entries are KEY=COLOUR, KEY a chain id or protein/dna/rna; got {entry!r}"
+            )
+        if not is_color_like(colour):
+            raise ValueError(f"backbone_colors: {key} has {colour!r}, which is not a colour (use a name or #rrggbb)")
+        out[key.lower() if key.lower() in MODALITIES else key] = colour
+    return out
+
+
 SCALES = ("helix_scale", "strand_scale", "dna_scale", "loop_width", "font_scale")
 
 
@@ -87,6 +108,11 @@ class Style:
     ink: str = "#000000"  # text and plain loops
     uniprot_sites: str = "auto"  # with --uniprot: auto (active + binding sites), all, none, or types "active,modified"
     ligands: str = "auto"  # bound ligands/metal ions: auto (skip buffer additives), all, none, or codes "HEM,ZN"
+    na_backbone: str = "modality"  # DNA/RNA backbones: modality (dna_color / rna_color), chain (one colour per chain),
+    # ink (as loops) or one colour (#rrggbb or a name) for all nucleic acid
+    dna_color: str = "#8c564b"  # DNA backbone with na_backbone=modality
+    rna_color: str = "#6a3d9a"  # RNA backbone with na_backbone=modality
+    backbone_colors: str = ""  # overrides, "A=#1f77b4,dna=#555555,I=crimson": a chain id or protein / dna / rna
     mark: str = ""  # elements in a colour of their own: "G", "A:G=#2ca02c", "#3", "res:150-159=red", comma-separated
 
     def validate(self) -> Style:
@@ -98,6 +124,14 @@ class Style:
         for key in ("background", "ink"):
             if not is_color_like(getattr(self, key)):
                 raise ValueError(f"{key} must be a colour such as #0d2a4a or white; got {getattr(self, key)!r}")
+        for key in ("dna_color", "rna_color"):
+            if not is_color_like(getattr(self, key)):
+                raise ValueError(f"{key} must be a colour such as #8c564b or brown; got {getattr(self, key)!r}")
+        if self.na_backbone not in NA_BACKBONES and not is_color_like(self.na_backbone):
+            raise ValueError(
+                f"na_backbone must be {', '.join(NA_BACKBONES)} or a colour such as #8c564b; got {self.na_backbone!r}"
+            )
+        backbone_overrides(self.backbone_colors)
         if not re.fullmatch(r"auto|all|none|[a-z-]+(,[a-z-]+)*", self.uniprot_sites):
             raise ValueError(
                 f"uniprot_sites must be auto, all, none or types like active,binding; got {self.uniprot_sites!r}"
@@ -130,11 +164,13 @@ THEMES = {
         fill="outline",
         helix_shading="none",
         loop_width=0.9,
+        dna_color="#e8743b",
+        rna_color="#a06cd5",
     ),
     "conservation": Style(color_by="conservation", loop_color="residue"),
     "alphafold": Style(color_by="plddt", loop_color="residue", loop_width=1.3),
     "goodsell": Style(palette="tol-bright", fill="pale", helix_shading="none", loop_width=1.3, sheet_panels=False),
-    "journal": Style(palette="tol-muted", loop_width=0.8, font_scale=0.9),
+    "journal": Style(palette="tol-muted", loop_width=0.8, font_scale=0.9, rna_color="#0070a0"),
     "trace": Style(color_by="shade", loop_color="element", loop_arrows=True),
 }
 PRESETS = THEMES  # earlier name

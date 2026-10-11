@@ -37,3 +37,60 @@ def tint(hex_color: str, amount: float = 0.6) -> str:
 def text_color_on(hex_color: str) -> str:
     r, g, b = _rgb(hex_color)
     return "black" if 0.2126 * r + 0.7152 * g + 0.0722 * b > 0.6 else "white"
+
+
+def _lab(colour: str) -> tuple[float, float, float]:
+    """CIE L*a*b* (D65) of a colour matplotlib can read."""
+    from matplotlib.colors import to_rgb
+
+    lin = [c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4 for c in to_rgb(colour)]
+    x = (0.4124564 * lin[0] + 0.3575761 * lin[1] + 0.1804375 * lin[2]) / 0.95047
+    y = 0.2126729 * lin[0] + 0.7151522 * lin[1] + 0.0721750 * lin[2]
+    z = (0.0193339 * lin[0] + 0.1191920 * lin[1] + 0.9503041 * lin[2]) / 1.08883
+
+    def f(t: float) -> float:
+        return t ** (1 / 3) if t > 216 / 24389 else (24389 / 27 * t + 16) / 116
+
+    fx, fy, fz = f(x), f(y), f(z)
+    return 116 * fy - 16, 500 * (fx - fy), 200 * (fy - fz)
+
+
+def delta_e(a: str, b: str) -> float:
+    """CIEDE2000 colour difference between two colours (Sharma, Wu, Dalal 2005)."""
+    import math
+
+    l1, a1, b1 = _lab(a)
+    l2, a2, b2 = _lab(b)
+    c1, c2 = math.hypot(a1, b1), math.hypot(a2, b2)
+    g = 0.5 * (1 - math.sqrt(((c1 + c2) / 2) ** 7 / (((c1 + c2) / 2) ** 7 + 25**7)))
+    a1p, a2p = (1 + g) * a1, (1 + g) * a2
+    c1p, c2p = math.hypot(a1p, b1), math.hypot(a2p, b2)
+    h1p = math.degrees(math.atan2(b1, a1p)) % 360 if c1p else 0.0
+    h2p = math.degrees(math.atan2(b2, a2p)) % 360 if c2p else 0.0
+    dl, dc = l2 - l1, c2p - c1p
+    if not c1p * c2p:
+        dh = 0.0
+    elif abs(h2p - h1p) <= 180:
+        dh = h2p - h1p
+    else:
+        dh = h2p - h1p + (360 if h2p <= h1p else -360)
+    dhh = 2 * math.sqrt(c1p * c2p) * math.sin(math.radians(dh) / 2)
+    lm, cm = (l1 + l2) / 2, (c1p + c2p) / 2
+    if not c1p * c2p:
+        hm = h1p + h2p
+    elif abs(h1p - h2p) <= 180:
+        hm = (h1p + h2p) / 2
+    else:
+        hm = (h1p + h2p + (360 if h1p + h2p < 360 else -360)) / 2
+    t = (
+        1
+        - 0.17 * math.cos(math.radians(hm - 30))
+        + 0.24 * math.cos(math.radians(2 * hm))
+        + 0.32 * math.cos(math.radians(3 * hm + 6))
+        - 0.20 * math.cos(math.radians(4 * hm - 63))
+    )
+    sl = 1 + 0.015 * (lm - 50) ** 2 / math.sqrt(20 + (lm - 50) ** 2)
+    sc, sh = 1 + 0.045 * cm, 1 + 0.015 * cm * t
+    rc = 2 * math.sqrt(cm**7 / (cm**7 + 25**7))
+    rt = -math.sin(math.radians(60 * math.exp(-(((hm - 275) / 25) ** 2)))) * rc
+    return math.sqrt((dl / sl) ** 2 + (dc / sc) ** 2 + (dhh / sh) ** 2 + rt * (dc / sc) * (dhh / sh))

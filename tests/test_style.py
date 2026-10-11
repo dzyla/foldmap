@@ -379,3 +379,55 @@ def test_pale_fill_reaches_strands_too(ubq):
     pale = make_figure(ubq, look=Style(fill="pale"))
     s = "strand:A:2-7"
     assert _lum(_hex(_artists(pale, s)[0].get_facecolor())) > _lum(_hex(_artists(bold, s)[0].get_facecolor())) + 0.15
+
+
+def test_backbone_colour_delta_e_matches_published_reference_pairs():
+    """CIEDE2000 on Sharma et al.'s pairs (black/white 100, red/green 86.6)."""
+    from foldmap.palette import delta_e
+
+    assert delta_e("#ffffff", "#ffffff") == 0
+    assert delta_e("#ffffff", "#000000") == pytest.approx(100.0, abs=0.01)
+    assert delta_e("#ff0000", "#00ff00") == pytest.approx(86.6, abs=0.5)
+
+
+@pytest.mark.parametrize("theme", list(THEMES))
+def test_every_theme_backbone_default_is_distinct_from_ink_and_the_first_eight_chain_colours(theme):
+    from foldmap.palette import PALETTES, delta_e
+
+    look = THEMES[theme]
+    chains = [PALETTES[look.palette][i % len(PALETTES[look.palette])] for i in range(8)]
+    for colour in (look.dna_color, look.rna_color):
+        assert min(delta_e(colour, other) for other in [look.ink, *chains]) >= 15, (theme, colour)
+    assert delta_e(look.dna_color, look.rna_color) >= 15
+
+
+def test_backbone_keys_round_trip_through_set_style_file_and_layout_file(tmp_path):
+    from foldmap import layoutfile
+    from foldmap.spec import figure_spec
+
+    pdb = "tests/data/1LMB.cif"
+    look = resolve_style(None, None, ["na_backbone=chain", "backbone_colors=A=red,dna=#555555"])
+    assert (look.na_backbone, look.backbone_colors) == ("chain", "A=red,dna=#555555")
+    sf = tmp_path / "s.yaml"
+    sf.write_text("na_backbone: '#123456'\nbackbone_colors: 'rna=teal'\n")
+    look = resolve_style(None, sf)
+    assert (look.na_backbone, look.backbone_colors) == ("#123456", "rna=teal")
+    lf = tmp_path / "l.yaml"
+    lf.write_text("foldmap: 1\nstyle:\n  na_backbone: chain\n  backbone_colors: '3=red'\n")
+    spec = figure_spec(pdb, layout_file=lf)
+    assert (spec.look.na_backbone, spec.look.backbone_colors) == ("chain", "3=red")
+    assert layoutfile.load(lf)["style"]["na_backbone"] == "chain"
+    from foldmap.app import layout_document, settings_from_document
+
+    doc = layout_document(pdb, {"theme": "publication", "na_backbone": "ink", "backbone_colors": "3=red"})
+    assert doc["style"]["na_backbone"] == "ink"
+    assert settings_from_document(doc)["backbone_colors"] == "3=red"
+
+
+def test_backbone_keys_are_listed_and_validated_with_clear_errors(capsys):
+    from foldmap.cli import styles_help
+
+    text = styles_help()
+    assert all(k in text for k in ("na_backbone", "backbone_colors", "dna_color", "rna_color"))
+    with pytest.raises(ValueError, match="dna_color"):
+        resolve_style(None, None, ["dna_color=nope"])

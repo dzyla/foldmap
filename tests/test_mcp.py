@@ -321,3 +321,19 @@ def test_error_messages_keep_their_quotes(tmp_path):
     with pytest.raises(ToolError) as err:
         call("draw_sequence", {"source": UBQ, "output_path": str(tmp_path / "fig.txt")})
     assert "'fig.txt' must end in" in str(err.value)  # the repr's opening quote is not stripped
+
+
+def test_backbone_colour_keys_reach_the_figure_through_the_tool(tmp_path):
+    out = tmp_path / "lmb.svg"
+    call(
+        "draw_topology",
+        {"source": str(DATA / "1LMB.cif"), "output_path": str(out), "style": {"na_backbone": "#123456"}},
+    )
+    assert "#123456" in out.read_text()
+    from mcp.server.mcpserver.exceptions import ToolError
+
+    with pytest.raises(ToolError, match="backbone_colors"):
+        call(
+            "draw_topology",
+            {"source": str(DATA / "1LMB.cif"), "output_path": str(out), "style": {"backbone_colors": "Z=red"}},
+        )

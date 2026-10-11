@@ -431,6 +431,14 @@ def main() -> None:
             st.checkbox("Residue numbers", key="residue_numbers")
             st.checkbox("Legend", key="legend")
             st.checkbox("Base letters (DNA/RNA)", key="nucleotide_labels")
+            st.text_input(
+                "DNA/RNA backbone", key="na_backbone", help="modality, chain, ink, or one colour such as #8c564b"
+            )
+            st.text_input(
+                "Backbone colours",
+                key="backbone_colors",
+                help="e.g. A=#1f77b4, dna=#555555, I=crimson (chain or protein/dna/rna)",
+            )
             st.slider("Text size", 0.6, 2.0, step=0.1, key="font_scale")
             st.text_input("Title", key="title")
         with st.expander("Features"):

@@ -688,6 +688,12 @@ def styles_help() -> str:
             return "one of " + ", ".join(CHOICES[key])
         if key in SCALES:
             return "positive number, 1 = default size"
+        if key == "na_backbone":
+            return "modality, chain, ink or a colour"
+        if key in ("dna_color", "rna_color", "background", "ink"):
+            return "a colour (#rrggbb or a name)"
+        if key == "backbone_colors":
+            return "KEY=COLOUR,... (KEY: a chain id, protein, dna or rna)"
         return "true/false"
 
     lines = ["Themes (--theme NAME) change only how things are drawn:"]

@@ -50,10 +50,10 @@ from .layout import (
     termini,
 )
 from .model import SSE, group_by_chain
-from .palette import chain_colors, darken, text_color_on, tint
+from .palette import chain_colors, darken, delta_e, text_color_on, tint
 from .route import Loop
 from .route_na import midway
-from .style import _ALIASES, CHOICES, Style
+from .style import _ALIASES, CHOICES, MODALITIES, Style, backbone_overrides
 
 _IN_PER_UNIT = 0.30
 _MAX_WIDTH_IN = 7.2  # double-column width
@@ -154,6 +154,50 @@ def _dna_colours(style: str) -> tuple[str, str, str]:
     return _DNA_DARK if _luminance(_BACKGROUND.get()) < 0.5 else _DNA[style]
 
 
+_CHAIN_POOL = (  # na_backbone=chain: colours for nucleic-acid chains, the one furthest from those already used first
+    "#8c564b",
+    "#6a3d9a",
+    "#1b7f79",
+    "#b15928",
+    "#4d6b1f",
+    "#a6275a",
+    "#2b5c9e",
+    "#7a6a00",
+)
+
+
+def backbone_colours(
+    layout: Layout, protein: list[str], look: Style, colors: dict[str, str]
+) -> tuple[dict[str, str], dict[str, str]]:
+    """(nucleic-acid chain -> backbone colour, protein chain -> loop colour override) for this figure: the
+    na_backbone mode, then `backbone_colors` (a modality key, then a chain key). Shared by every nucleic-acid
+    style and the protein loops. Raises ValueError naming backbone_colors for a chain the figure lacks."""
+    over = backbone_overrides(look.backbone_colors)
+    strands = layout.nucleic.strands if layout.nucleic is not None else []
+    rna = {s.chain: s.rna for s in reversed(strands)}  # a chain's first strand decides its modality
+    known = {*protein, *rna, *layout.res_chain}
+    for key in over:
+        if key not in MODALITIES and key not in known:
+            raise ValueError(f"backbone_colors: unknown chain {key!r}; this figure has {', '.join(sorted(known))}")
+    mode = look.na_backbone
+    taken = [look.ink, *(colors[c] for c in protein if c in colors)]
+    na: dict[str, str] = {}
+    for chain, is_rna in rna.items():
+        if mode == "ink":
+            colour = _dna_colours(look.fill)[0]
+        elif mode == "chain":
+            colour = max(_CHAIN_POOL, key=lambda c: min(delta_e(c, t) for t in taken))
+            taken.append(colour)
+        elif mode == "modality":
+            colour = look.rna_color if is_rna else look.dna_color
+        else:
+            colour = mode
+        colour = over.get("rna" if is_rna else "dna", colour)
+        na[chain] = _legible(over.get(chain, colour))
+    loops = {c: _legible(over[c] if c in over else over["protein"]) for c in protein if c in over or "protein" in over}
+    return na, loops
+
+
 _DNA_TUBE = 0.42  # backbone tube width, page units
 _DNA_SEG = 16  # points along each half-turn
 
@@ -215,6 +259,12 @@ class _NAInk(NamedTuple):
     lw: float
     font: float
     gu: set  # (a, i, b, j) of the G·U pairs, drawn dotted
+    chains: list  # chain of each strand
+    backbone: dict  # chain -> backbone colour (the shared nucleic-acid backbone helper's answer)
+
+    def colour(self, strand: int) -> str:
+        """The backbone colour of a strand: stem rails, ribbons, blocks, paths, hairpins, ties."""
+        return self.backbone[self.chains[strand]]
 
 
 def _upright(angle: float) -> float:
@@ -240,21 +290,26 @@ def _rung_lines(ink: _NAInk, k: int, d: PlacedStem, inset: float = 0.0) -> None:
 
 def _ladder(ink: _NAInk, k: int, d: PlacedStem, where: dict, letters: dict) -> None:
     """Two rails (a bulged nucleotide pushed out a little) and a rung per pair; letters outside the rails."""
-    rails = []
+    rails: dict[str, list] = {}  # backbone colour -> its rails (one colour unless a duplex mixes chains)
     for sign in (1, -1):
         keys = sorted((key for key in d.axial if d.side[key] == sign), key=lambda key: d.axial[key])
-        rails.append(np.array([d.point(key, 0.3 if key in d.bulges else 0.0) for key in keys]))
-    rail = PathPatch(
-        _compound([r for r in rails if len(r) > 1], closed=False),
-        fc="none",
-        ec=ink.front,
-        lw=ink.lw * 2.2,
-        capstyle="round",
-        joinstyle="round",
-        zorder=2.2,
-    )
-    rail.set_gid(f"na:stem:{k}:rails")
-    ink.ax.add_patch(rail)
+        for colour in dict.fromkeys(ink.colour(key[0]) for key in keys):
+            mine = [key for key in keys if ink.colour(key[0]) == colour]
+            rails.setdefault(colour, []).append(
+                np.array([d.point(key, 0.3 if key in d.bulges else 0.0) for key in mine])
+            )
+    for n, (colour, parts) in enumerate(rails.items()):
+        rail = PathPatch(
+            _compound([r for r in parts if len(r) > 1], closed=False),
+            fc="none",
+            ec=colour,
+            lw=ink.lw * 2.2,
+            capstyle="round",
+            joinstyle="round",
+            zorder=2.2,
+        )
+        rail.set_gid(f"na:stem:{k}:rails" if n == 0 else f"na:stem:{k}:rails:{n + 1}")
+        ink.ax.add_patch(rail)
     _rung_lines(ink, k, d)
     for key in d.axial:
         letters[key] = (d.point(key, NT_ROW), _upright(d.angle))
@@ -287,7 +342,7 @@ def _draw_strands(ink: _NAInk, layout: Layout, style: str, where: dict, letters:
         (line,) = ink.ax.plot(
             pts[:, 0],
             pts[:, 1],
-            color=ink.front,
+            color=ink.colour(path.strand),
             lw=ink.lw * (1.0 if gap else 1.4),
             ls=((0, (2, 2)) if path.label else (0, (1, 1.5))) if gap else "-",
             solid_capstyle="round",
@@ -306,29 +361,38 @@ def _draw_strands(ink: _NAInk, layout: Layout, style: str, where: dict, letters:
             letters[key] = (np.asarray(xy if style == "letters" else layout.na_letters[key]), 0.0)
 
 
+_TIE_LABEL = 0.75 * 0.75  # a tie label's size: three quarters of a base letter's (0.75 of the text size)
+
+
 def _draw_na_marks(ink: _NAInk, layout: Layout, style: str, residue_colour, pt_per_unit, look, where, letters):
     """Isolated pairs as bars, base letters (touched ones in the toucher's colour), beads on the touched
     nucleotides in the protein chain's colour, and the strands' 5' and 3' ends."""
     na = layout.nucleic
     for tie in layout.na_ties:  # a short clear tie as a dotted line; a long or crossing one as two labelled marks
         gid = f"na:tie:{na.strands[tie.a[0]].labels[tie.a[1]].tag}-{na.strands[tie.b[0]].labels[tie.b[1]].tag}"
-        if not tie.label:
+        if not tie.label:  # as the rungs: Watson-Crick solid, G·U dotted
+            wobble = (*tie.a, *tie.b) in ink.gu
             (line,) = ink.ax.plot(
-                *np.c_[tie.ends[0], tie.ends[1]], color=ink.rung, lw=ink.lw, ls=(0, (1, 1.5)), zorder=1.8
+                *np.c_[tie.ends[0], tie.ends[1]],
+                color=ink.rung,
+                lw=ink.lw,
+                ls=(0, (1, 1.5)) if wobble else "-",
+                zorder=1.8,
             )
             line.set_gid(gid)
             continue
         for a, b, at in tie.marks:
-            (tick,) = ink.ax.plot(*np.c_[a, b], color=ink.front, lw=ink.lw * 1.2, solid_capstyle="round", zorder=2.4)
+            (tick,) = ink.ax.plot(
+                *np.c_[a, b], color=ink.colour(tie.a[0]), lw=ink.lw * 1.2, solid_capstyle="round", zorder=2.4
+            )
             tick.set_gid(f"{gid}:mark")
             t = ink.ax.text(
                 *at,
                 tie.label,
                 ha="center",
                 va="center",
-                fontsize=ink.font * 0.75,
-                style="italic",
-                color=ink.front,
+                fontsize=ink.font * _TIE_LABEL,  # smaller than the base letters, upright and grey: not a base
+                color=_legible(ink.rung),
                 zorder=4,
             )
             t.set_gid(f"{gid}:label")
@@ -390,12 +454,22 @@ def _draw_nucleic(
     font: float,
     pt_per_unit: float,
     look: Style,
+    colors: dict[str, str],
 ) -> None:
     """Stems in the chosen na_style, single strands along their drawn paths, base letters, contact beads in
     the touching protein chain's colour, isolated pairs as bars, cropped gaps and the 5'/3' ends."""
     na = layout.nucleic
     gu = {(p.a, p.i, p.b, p.j) for p in na.base_pairs if p.kind == "GU"}
-    ink = _NAInk(ax, *_dna_colours(fill), fill, lw, font, gu)
+    ink = _NAInk(
+        ax,
+        *_dna_colours(fill),
+        fill,
+        lw,
+        font,
+        gu,
+        [s.chain for s in na.strands],
+        backbone_colours(layout, _chains_in_order(sses), look, colors)[0],
+    )
     style = _na_style(layout, look)
     where: dict[tuple[int, int], np.ndarray] = {}  # nucleotide -> where it is drawn (its bead goes there)
     letters: dict[tuple[int, int], tuple[np.ndarray, float]] = {}  # nucleotide -> letter position, rotation
@@ -1400,8 +1474,14 @@ def _legend_entries(layout: Layout, look: Style, chains: list[str], colors: dict
     if layout.nucleic is not None and layout.nucleic.strands and look.legend:
         strands = layout.nucleic.strands
         ids = sorted({s.chain for s in strands})
-        kind = "RNA" if all(s.rna for s in strands) else "DNA" if not any(s.rna for s in strands) else "DNA/RNA"
-        entries.append((_dna_colours(look.fill)[0], f"{kind} ({', '.join(ids)})"))
+        na_colours = backbone_colours(layout, chains, look, colors)[0]
+        groups: dict[str, list] = {}  # one entry per backbone colour: the chains drawn in it
+        for chain in ids:
+            groups.setdefault(na_colours[chain], []).append(chain)
+        for colour, mine in groups.items():
+            rna = [any(s.rna for s in strands if s.chain == c) for c in mine]
+            kind = "RNA" if all(rna) else "DNA" if not any(rna) else "DNA/RNA"
+            entries.append((colour, f"{kind} ({', '.join(mine)})"))
 
     return entries
 
@@ -1471,6 +1551,7 @@ def _draw_loops(c: _Canvas, layout: Layout, loops: list[Loop], sses: list[SSE]) 
     boxes = np.array([p.rect for p in [*layout.placed.values(), *layout.ghosts]]).reshape(-1, 4)  # none: DNA only
     boxes = boxes + [1e-6, 1e-6, -1e-6, -1e-6]
     sse_by_id = {s.id: s for s in sses}
+    over = backbone_colours(layout, _chains_in_order(sses), c.look, c.colors)[1]
     for i, loop in enumerate(loops):
         if loop.fallback:  # already a smooth curve
             path = _polyline(loop.points)
@@ -1498,6 +1579,9 @@ def _draw_loops(c: _Canvas, layout: Layout, loops: list[Loop], sses: list[SSE]) 
             "residue": c.look.ink,  # replaced by per-residue runs below
         }[c.look.loop_color]
         loop_c = _legible(loop_c)
+        mine = over.get(a_sse.chain) if a_sse else None  # backbone_colors for this protein chain
+        if mine:
+            loop_c = mine
         if layout.focus is not None and a_sse is not None and a_sse.chain not in layout.focus:
             loop_c = _MATE_LINE
         if c.look.loop_arrows:
@@ -1544,7 +1628,7 @@ def _draw_loops(c: _Canvas, layout: Layout, loops: list[Loop], sses: list[SSE]) 
                 rotation=0,
             )
             t.set_gid(f"loop-length:{name}")
-        if c.look.loop_color == "residue" and loop_c != _MATE_LINE and a_sse is not None:
+        if c.look.loop_color == "residue" and loop_c != _MATE_LINE and a_sse is not None and not mine:
             b_sse = sse_by_id.get(loop.b_id)
             span = range(a_sse.end + 1, b_sse.start) if b_sse is not None else range(0)
             ends = [a_sse.end, b_sse.start] if b_sse is not None else [a_sse.end]
@@ -1793,16 +1877,19 @@ def _draw_ghosts(c: _Canvas, layout: Layout) -> None:
 def _draw_termini(c: _Canvas, layout: Layout, sses: list[SSE]) -> None:
     """The N and C terminal stubs, their letters and long-tail lengths."""
     groups = group_by_chain(sses)
+    over = backbone_colours(layout, _chains_in_order(sses), c.look, c.colors)[1]
     for end, chain, port, ex in termini(layout, sses):
         tip = (port[0] + ex[0] * END_STUB, port[1] + ex[1] * END_STUB)
-        ink = c.look.ink
-        if c.look.loop_color == "residue" and layout.res_chain:  # a terminal tail: its typical colour
+        ink = over.get(chain, c.look.ink)
+        if (
+            c.look.loop_color == "residue" and layout.res_chain and chain not in over
+        ):  # a terminal tail: its typical colour
             mine = groups.get(chain, [])
             ours = [r for r, ch in enumerate(layout.res_chain) if ch == chain]
             if mine and ours:
                 tail = range(ours[0], mine[0].start) if end == "N" else range(mine[-1].end + 1, ours[-1] + 1)
                 ink = _typical([c.residue_colour(r, chain) for r in tail]) or c.look.ink
-        if ink != c.look.ink:
+        if ink != c.look.ink and chain not in over:
             edge = PathPatch(Path([port, tip]), fc="none", ec=_RUN_EDGE, lw=c.loop_lw * _RUN_EDGE_W, zorder=1.99)
             edge.set_gid(f"stub-edge:{end}:{chain}")
             c.ax.add_patch(edge)
@@ -1916,7 +2003,7 @@ def _draw(
     _draw_domains(c, layout)
     _draw_sheet_panels(c, layout)
     if layout.stems or layout.na_paths:
-        _draw_nucleic(c.ax, layout, sses, c.residue_colour, c.look.fill, c.lw, c.font, c.pt_per_unit, c.look)
+        _draw_nucleic(c.ax, layout, sses, c.residue_colour, c.look.fill, c.lw, c.font, c.pt_per_unit, c.look, c.colors)
     _draw_elements(c, layout)
     _draw_links(c.ax, layout, loops, sses, look, c.lw, c.pt_per_unit)
     _draw_ligands(c.ax, marks, c.lw, c.font)
