@@ -911,3 +911,15 @@ console.log(JSON.stringify(['na:stem:3', 'na:stem:3:rails', 'na:label:3', 'na:ru
     res = subprocess.run([node, str(probe)], capture_output=True, text=True)
     assert res.returncode == 0, res.stderr
     assert json.loads(res.stdout) == ["stem:3", "stem:3", "stem:3", "run:5", None, None]
+
+
+def test_explorer_page_of_a_nucleic_acid_only_file_has_no_contact_map():
+    from foldmap.interactive import build_page
+
+    page = build_page(_path("1EHZ"))
+    data = json.loads(page.split('<script type="application/json" id="topo-data">', 1)[1].split("</script>", 1)[0])
+    assert data["residues"] == [] and data["ca"] == []
+    assert data["links"]["nucleics"][0]["key"] == "stem:0" and data["links"]["nucleics"][0]["het"]
+    app = page.split('<script id="topo-app">', 1)[1]
+    assert "data.ca.length > 0" in app and "if (!hasMap) return;" in app
+    assert "fly(residues, het)" in app  # a selection with no protein residues still frames its nucleotides

@@ -199,14 +199,16 @@ _APP = r"""
 
   // ---- contact map
   const base = document.getElementById('map'), over = document.getElementById('map-over');
-  const M = lib.matrix(data.ca, MAX);
+  const hasMap = data.ca.length > 0;  // a nucleic-acid-only file has no protein residues: no map
+  if (!hasMap) document.getElementById('mappanel').hidden = true;
+  const M = hasMap ? lib.matrix(data.ca, MAX) : { count: 0, size: 1, values: [] };
   [base, over].forEach(c => { c.width = M.count; c.height = M.count; });
-  const ctx = base.getContext('2d'), img = ctx.createImageData(M.count, M.count);
+  const ctx = base.getContext('2d'), img = hasMap ? ctx.createImageData(M.count, M.count) : null;
   for (let p = 0; p < M.values.length; p++) {
     const [r, g, b] = lib.ramp(M.values[p] / 30);
     img.data.set([r, g, b, 255], p * 4);
   }
-  ctx.putImageData(img, 0, 0);
+  if (hasMap) ctx.putImageData(img, 0, 0);
   const strip = document.getElementById('strip');
   strip.width = M.count; strip.height = 1;
   const sctx = strip.getContext('2d');
@@ -216,6 +218,7 @@ _APP = r"""
   });
   const octx = over.getContext('2d');
   function mapOn(ranges, pair) {
+    if (!hasMap) return;
     octx.clearRect(0, 0, M.count, M.count);
     octx.fillStyle = 'rgba(255, 106, 0, 0.28)';
     ranges.forEach(([a, b]) => {
@@ -296,9 +299,9 @@ _APP = r"""
                                                    representation: 'ball-and-stick', representationColor: HET }));
         apply({ data: parts, nonSelectedColor: PALE });
       },
-      async fly(residues) {  // focus, then step back so the element sits in its surroundings
-        if (!ready || !residues.length) return;
-        await plugin.visual.focus(runs(residues).map(query));
+      async fly(residues, het) {  // focus, then step back so the element sits in its surroundings
+        if (!ready || !(residues.length || het.length)) return;
+        await plugin.visual.focus(runs(residues).map(query).concat(het.map(([chain, seq]) => ({ auth_asym_id: chain, auth_seq_id: seq }))));
         setTimeout(() => {
           const c = plugin.plugin && plugin.plugin.canvas3d;
           if (!c) return;
@@ -332,7 +335,8 @@ _APP = r"""
       const k = residueOf(atom);
       if (k !== undefined && hooks.click) hooks.click(k);
     });
-    const sel = residues => ({ or: residues.map(k => ({ chain: data.residues[k].c, resi: data.residues[k].n })) });
+    const sel = (residues, het) => ({ or: residues.map(k => ({ chain: data.residues[k].c, resi: data.residues[k].n }))
+                                         .concat(het.map(([chain, seq]) => ({ chain, resi: seq }))) });
     return {
       name: '3dmol',
       on(residues, het) {  // like the topology: the selection in its figure colours, everything else pale
@@ -345,7 +349,9 @@ _APP = r"""
                                                                               sphere: { scale: 0.3, color: HET } }));
         viewer.render();
       },
-      fly(residues) { if (residues.length) { viewer.zoomTo(sel(residues)); viewer.zoom(0.35); viewer.render(); } },
+      fly(residues, het) {
+        if (residues.length || het.length) { viewer.zoomTo(sel(residues, het)); viewer.zoom(0.35); viewer.render(); }
+      },
       reset() { viewer.zoomTo({}, 400); viewer.render(); },
       viewer,
     };
@@ -355,7 +361,7 @@ _APP = r"""
   window.foldmapViewer = mol;
   document.getElementById('molreset').onclick = () => mol.reset();
   const molOn = (residues, het) => mol.on(residues, het || []);
-  const fly = residues => mol.fly(residues);
+  const fly = (residues, het) => mol.fly(residues, het || []);
 
   // ---- linking: hover previews, click pins (shift-click adds), chains via legend or termini
   function range(a, b) { const out = []; for (let k = a; k <= b; k++) out.push(k); return out; }
@@ -438,9 +444,9 @@ _APP = r"""
     hovered = null;
     render();
     if (pinned.length) {
-      const ks = new Set();
-      pinned.forEach(p => stateOf(p).residues.forEach(k => ks.add(k)));
-      fly(Array.from(ks));
+      const ks = new Set(), het = [];
+      pinned.forEach(p => { const st = stateOf(p); st.residues.forEach(k => ks.add(k)); (st.het || []).forEach(h => het.push(h)); });
+      fly(Array.from(ks), het);
     }
   }
   function clearPins() { pinned = []; hovered = null; render(); }
@@ -549,6 +555,7 @@ main { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1
 #molpanel { flex: 1.15 }
 #mol { flex: 1; min-height: 200px; position: relative; border-radius: 6px; overflow: hidden; background: #fff }
 #mappanel { flex: 1 }
+[hidden] { display: none !important }
 .mapwrap { flex: 1; min-height: 0; display: flex; flex-direction: column; align-items: center }
 .map { position: relative; height: 100%; max-width: 100%; aspect-ratio: 1 }
 .map canvas { position: absolute; inset: 0; width: 100%; height: 100%; image-rendering: pixelated; border-radius: 3px }
