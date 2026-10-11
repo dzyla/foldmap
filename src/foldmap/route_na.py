@@ -17,7 +17,6 @@ from .na_paths import (
     NAPath,
     NATie,
     _face,
-    _na_clear,
     _Strands,
     _xy,
     among,
@@ -73,15 +72,10 @@ def route_nucleic(layout: Layout, router: _Router | None = None, loops=()) -> li
     if router is None:
         keep_out = [b for _, b in label_boxes(layout, [])]
         router = _Router(_Grid(layout, keep_out), _element_obstacles(layout), keep_out)
-    elements = router.elements
     at = {key: d for d in layout.stems for key in d.axial}
     kind_of = {(r.strand, r.lo): r.kind for r in na.structure.runs}
     ends: list[tuple[int, str, tuple[float, float]]] = []
     exits: dict[tuple[int, int], tuple] = {}  # strand end -> (port, outward direction, owner) a gap leaves from
-
-    def checked(path: NAPath, own) -> NAPath:
-        path.fallback = path.fallback or not _na_clear(path.points, own, elements)
-        return path
 
     gapped = {(g.before, "3′") for g in na.gaps} | {(g.after, "5′") for g in na.gaps}
     labels: list[tuple[float, float]] = []  # the end labels placed so far (a cropped end into a gap has none)

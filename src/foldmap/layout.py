@@ -183,7 +183,6 @@ class Layout:
     nucleic: Nucleic | None = None
     sheets: list[list[str]] = field(default_factory=list)  # strand ids of each sheet block, in layout order
     domains: list[tuple[str, list[str]]] = field(default_factory=list)  # named domains and their element ids
-    nt_letters: bool = False  # base letters drawn beside the nucleotides
     na_paths: list = field(default_factory=list)  # route.NAPath: single strands as drawn (filled by route_loops)
     na_traces: dict = field(default_factory=dict)  # strand -> projected backbone (page units), for unpaired strands
     na_ends: list = field(default_factory=list)  # (strand, "5′" or "3′", label position), filled by route_loops

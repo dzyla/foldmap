@@ -301,11 +301,6 @@ def _curve(pa, ea, pb, eb, n=24):
     return [(float(x), float(y)) for x, y in pts]
 
 
-def _route_pair(grid: _Grid, a: Placed, b: Placed):
-    """Grid cells of the cheapest orthogonal route from a's C port to b's N port, or None."""
-    return _route_ports(grid, a.c_port, a.exit_c, a, b.n_port, b.exit_n, b)
-
-
 def _route_ports(grid: _Grid, pa, ea, own_a, pb, eb, own_b, loose=False, max_nodes: int = _MAX_NODES):
     """Grid cells of the cheapest orthogonal route from port pa (leaving along ea) to port pb (entered against
     eb), or None; own_a and own_b (anything with a rect) are what the ports belong to. `loose`: see
