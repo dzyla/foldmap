@@ -525,3 +525,22 @@ def test_focus_keeps_the_break_of_a_hairpin_it_holds():
     na = load_nucleic(path, load_backbone(path, "asu"), "asu")
     held = nucleic_touching(na, ["C"])
     assert len(held.strands) == 2 and held.gaps == [NAGap(0, 1, 2)]
+
+
+def test_the_crop_to_stems_drops_pieces_holding_no_stem_and_merges_their_gaps():
+    # two touched hairpins far apart and a touched single nucleotide between them: that nucleotide would be a piece
+    # of its own with no stem (2NZ4's R:U110: never drawn, its toucher beadless; 4YBB AA:1010-1015: a stray trace)
+    first = _pairs(*[(k, 35 - k) for k in range(10, 14)])  # 10-13 / 22-25
+    second = _pairs(*[(k, 675 - k) for k in range(330, 334)])  # 330-333 / 342-345
+    touched = {1: {(0, 11)}, 2: {(0, 200)}, 3: {(0, 331)}}
+    na = nucleic_from_pairs(_strands(400), first + second, touched, dict.fromkeys(touched, "X"))
+    cut = crop_nucleic(na, by="stems")
+    assert [s.id for s in cut.strands] == ["A:11-26", "A:331-346"]
+    assert cut.gaps == [NAGap(0, 1, 330 - 26)]  # what lay between them, the dropped piece with it
+    assert sorted(cut.contacts) == [1, 3]  # the dropped nucleotide's toucher is cropped, not missing a bead
+
+
+def test_the_crop_keeps_stemless_pieces_when_no_stem_is_touched():
+    na = nucleic_from_pairs(_strands(400), _pairs((10, 25), (11, 24)), {2: {(0, 200)}}, {2: "X"})
+    cut = crop_nucleic(na, by="stems")
+    assert [s.id for s in cut.strands] == ["A:201-201"]
