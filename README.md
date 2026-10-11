@@ -66,7 +66,7 @@ alt="Topology of the lambda repressor dimer bound to its operator DNA">
 <td><img src="https://raw.githubusercontent.com/dzyla/foldmap/main/docs/images/ncrna-30qm.png" alt="DRT10 RT-ncRNA complex with six RNA stems drawn as ladders between the two protomers"><br>
 <sub><b>RNA folds.</b> DRT10 RT–ncRNA (30QM): six stems as ladders between the two RT protomers, contacts as beads.</sub></td>
 <td><img src="https://raw.githubusercontent.com/dzyla/foldmap/main/docs/images/nucleosome-1kx5.png" alt="Nucleosome core particle with the DNA as a chain of straight duplex pieces round the histones"><br>
-<sub><b>Bent DNA.</b> Nucleosome (1KX5): 147 bp in 22 straight pieces round the histones.</sub></td>
+<sub><b>Bent DNA.</b> Nucleosome (1KX5): 146 base pairs in 22 straight pieces round the histones.</sub></td>
 </tr>
 </table>
 
