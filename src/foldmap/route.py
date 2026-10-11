@@ -372,6 +372,10 @@ class _Router:
 
 
 def route_loops(layout: Layout, sses: list[SSE], bb) -> list[Loop]:
+    """The loop between each pair of sequence-adjacent elements, routed around everything placed. When the layout
+    holds nucleic acid it also routes the single strands (route_na.route_nucleic): that sets layout.na_paths,
+    na_ends and na_letters and widens layout.bounds to hold them, so call it once per layout (a second call
+    routes again on top of the widened page)."""
     unjoined = getattr(layout, "unjoined", set())  # neighbours' fragments with unshown elements between
     pairs = [
         (a, b)
