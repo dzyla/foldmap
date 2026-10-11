@@ -366,6 +366,16 @@ def _draw_strands(ink: _NAInk, layout: Layout, style: str, where: dict, letters:
 _TIE_LABEL = 0.75 * 0.75  # a tie label's size: three quarters of a base letter's (0.75 of the text size)
 
 
+@dataclass
+class ContactBeads:
+    """The contact marks of a drawn figure (left on the figure as `foldmap_beads`): chain -> [(nucleotide
+    (strand, index), toucher residue (Backbone index), colour)] in drawing order, and the function that
+    coloured them."""
+
+    marks: dict
+    colour: Callable[[int, str], str | None]
+
+
 def _draw_na_marks(ink: _NAInk, layout: Layout, style: str, residue_colour, pt_per_unit, look, where, letters):
     """Isolated pairs as bars, base letters (touched ones in the toucher's colour), beads on the touched
     nucleotides in the protein chain's colour, and the strands' 5' and 3' ends."""
@@ -407,13 +417,13 @@ def _draw_na_marks(ink: _NAInk, layout: Layout, style: str, residue_colour, pt_p
             if colour is not None and key not in touched:
                 touched[key] = (chain, colour)
                 toucher[key] = r
-    layout.na_beads = {}  # what is marked as touched, for nacheck and the explorer's hover
+    marks: dict[str, list] = {}  # chain -> [(nucleotide, toucher, colour)] as marked, for nacheck and the hover
     if look.nucleotide_labels and style != "block":
         for key, (xy, rot) in sorted(letters.items()):
             hit = touched.get(key)
             lab = na.strands[key[0]].labels[key[1]]
             if hit and style == "letters":  # the bold coloured letter is the mark
-                layout.na_beads.setdefault(hit[0], []).append((key, toucher[key], hit[1]))
+                marks.setdefault(hit[0], []).append((key, toucher[key], hit[1]))
             t = ink.ax.text(
                 *xy,
                 _base_letter(lab.name),
@@ -431,7 +441,7 @@ def _draw_na_marks(ink: _NAInk, layout: Layout, style: str, residue_colour, pt_p
         for chain in sorted({c for c, _ in touched.values()}):
             keys = [key for key, (c, _) in sorted(touched.items()) if c == chain and key in where]
             if keys:
-                layout.na_beads[chain] = [(key, toucher[key], touched[key][1]) for key in keys]  # scatter order
+                marks[chain] = [(key, toucher[key], touched[key][1]) for key in keys]  # scatter order
                 xy = np.array([where[key] for key in keys])
                 sc = ink.ax.scatter(
                     xy[:, 0],
@@ -450,6 +460,7 @@ def _draw_na_marks(ink: _NAInk, layout: Layout, style: str, residue_colour, pt_p
             x, y, "…" if cut else end, ha="center", va="center", fontsize=ink.font, fontweight="bold", color=ink.front
         )
         t.set_gid(f"na:end:{strand.id}:{end}")
+    ink.ax.figure.foldmap_beads = ContactBeads(marks, residue_colour)
 
 
 def _draw_nucleic(

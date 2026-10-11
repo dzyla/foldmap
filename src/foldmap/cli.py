@@ -127,8 +127,9 @@ def make_layout(
     chains: list[str] | None = None,
     focus: str = "auto",
     uniprot: str | None = None,
+    model=None,
 ):
-    model = read_model(path, assembly)  # once, for every loader below
+    model = model or read_model(path, assembly)  # once, for every loader below (`model`: already read, same assembly)
     bb = load_backbone(path, assembly, model=model)
     if chains:
         present = list(dict.fromkeys(l.chain for l in bb.labels))

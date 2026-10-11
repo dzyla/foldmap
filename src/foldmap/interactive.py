@@ -48,7 +48,7 @@ _LIB = r"""
         case 'chain': return 'chain:' + item.chain;
         case 'pair': return 'pair:' + item.i + '-' + item.j;
         case 'disulfide': case 'glycan': case 'ligand': case 'feature': return item.type + ':' + item.key;
-        case 'bead': return 'bead:' + item.chain + ':' + item.idx;
+        case 'bead': return 'bead:' + (item.mark || item.chain + ':' + item.idx);
         default: return 'residue:' + item.k;
       }
     },
@@ -389,7 +389,7 @@ _APP = r"""
                text: name(item.i) + ' · ' + name(item.j) + ' — ' + d.toFixed(1) + ' Å' + (d <= CUT ? ' (contact)' : '') };
     }
     if (item.type === 'bead') {  // a nucleotide the protein touches: who touches it, and how closely
-      const x = data.beads[item.chain][item.idx];
+      const x = item.mark ? data.beads.marks[item.mark] : data.beads.chains[item.chain][item.idx];
       return { keys: [], residues: [x.k], label: x.text, text: x.text };
     }
     if (['disulfide', 'glycan', 'ligand', 'feature'].includes(item.type)) {
@@ -448,13 +448,14 @@ _APP = r"""
         const [a, b] = body.split('>'), s = lib.loopSpan(data, a, b);
         if (s && s[1] >= s[0]) return { type: 'loop', a, b };
       }
-      const b = n.id.match(/^na:contact:(.+)$/);
-      if (b && data.beads && data.beads[b[1]]) {
+      const b = n.id.match(/^na:contact:(.+)$/), t = n.id.match(/^na:nt:(.+)$/);
+      if (b && data.beads.chains[b[1]]) {
         let u = target;
         while (u && u !== n && u.tagName !== 'use') u = u.parentNode;
         const idx = u && u !== n ? Array.prototype.indexOf.call(n.querySelectorAll('use'), u) : -1;
-        if (idx >= 0 && data.beads[b[1]][idx]) return { type: 'bead', chain: b[1], idx };
+        if (idx >= 0 && data.beads.chains[b[1]][idx]) return { type: 'bead', chain: b[1], idx };
       }
+      if (t && data.beads.marks[t[1]]) return { type: 'bead', mark: t[1] };  // the bold letter of a touched nucleotide
       const c = n.id.match(/^(legend-chain|legend-chain-label|terminus:[NC]|stub:[NC]):(.+)$/);
       if (c) return { type: 'chain', chain: c[2] };
       let l = n.id.match(/^(?:disulfide|ss-dot):(.+)$/);
@@ -562,10 +563,10 @@ def _residues(bb, sses) -> list[dict]:
     ]
 
 
-def _model_cif(path, assembly: str, axes=None, centre=None) -> str:
+def _model_cif(path, assembly: str, axes=None, centre=None, model=None) -> str:
     """The model as mmCIF; with axes (rows: page-right, page-up, toward viewer) turned into page coordinates, so
     the 3D viewer's default camera sees it the way the figure shows it."""
-    model, _ = read_model(path, assembly)
+    model = (model or read_model(path, assembly))[0].clone()  # moved below: a given model stays as read
     if axes is not None:
         rot = np.asarray(axes, float)
         shift = -rot @ np.asarray(centre, float)
@@ -657,20 +658,26 @@ def _links(layout, loops, sses, bb, look) -> dict:
     return out
 
 
-def _beads(layout, bb, model) -> dict:
-    """Per chain, the contact beads in the order they are drawn: the toucher (Backbone index) and the hover
-    note, e.g. "DG7 – contacted by A:Arg42 (2.9 Å)", the distance being the closest heavy-atom pair."""
+def _beads(fig, layout, bb, model) -> dict:
+    """The contact beads as drawn: `chains`, per chain in drawing order, and `marks`, by nucleotide ("A:DG7",
+    the id of its letter), each with the toucher (Backbone index) and the hover note "DG7 – contacted by
+    A:Arg42 (2.9 Å)", the distance being the closest heavy-atom pair."""
     from .nacheck import verify_contacts
 
-    pairs = {b.key: b.pair for b in verify_contacts(model, layout, bb).beads}
-    out = {}
-    for chain, items in layout.na_beads.items():
-        out[chain] = []
+    drawn = getattr(fig, "foldmap_beads", None)
+    out = {"chains": {}, "marks": {}}
+    if drawn is None or not drawn.marks:
+        return out
+    pairs = {b.key: b.pair for b in verify_contacts(model, drawn, layout, bb).beads}
+    for chain, items in drawn.marks.items():
+        out["chains"][chain] = []
         for key, r, _ in items:
             lab, who = layout.nucleic.strands[key[0]].labels[key[1]], bb.labels[r]
-            text = f"{lab.name}{lab.seq}{lab.icode} – contacted by {who.chain}:{who.name.title()}{who.seq}{who.icode}"
+            text = f"{lab.name}{lab.tag} – contacted by {who.chain}:{who.name.title()}{who.tag}"
             pair = pairs.get(key)
-            out[chain].append({"k": r, "text": text + (f" ({pair.dist:.1f} Å)" if pair else "")})
+            x = {"k": r, "text": text + (f" ({pair.dist:.1f} Å)" if pair else "")}
+            out["chains"][chain].append(x)
+            out["marks"][f"{lab.chain}:{lab.tag}"] = x
     return out
 
 
@@ -706,9 +713,11 @@ def build_page(
         raise ValueError(f"unknown 3D viewer {viewer!r}; choose from {', '.join(VIEWERS)}")
 
     look = look or Style()
-    layout, sses, bb = make_layout(path, mode, look=look, **layout_options)
+    model = read_model(path, layout_options.get("assembly", "auto"))  # once: layout, hover notes and 3D model
+    layout, sses, bb = make_layout(path, mode, look=look, model=model, **layout_options)
     loops = route_loops(layout, sses, bb)
-    svg = save_svg(draw(layout, loops, sses, title, look=look))
+    fig = draw(layout, loops, sses, title, look=look)
+    svg = save_svg(fig)
     colours, _ = element_colours(layout, sses, look)
     data = {
         "title": title or Path(path).stem,
@@ -729,10 +738,10 @@ def build_page(
             for s in sses
             if s.id in layout.placed
         ],
-        "model": _model_cif(path, layout_options.get("assembly", "auto"), layout.page_axes, layout.page_centre),
+        "model": _model_cif(path, "", layout.page_axes, layout.page_centre, model),
         "viewer": viewer,
         "links": _links(layout, loops, sses, bb, look),
-        "beads": _beads(layout, bb, read_model(path, layout_options.get("assembly", "auto"))),
+        "beads": _beads(fig, layout, bb, model),
     }
     blob = _script_json(data)
     name = html.escape(data["title"])

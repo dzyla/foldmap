@@ -162,7 +162,8 @@ def load_backbone(
 
 
 _NA_LINK_MAX = 2.0  # Å, O3'(i-1)-P(i)
-_CONTACT = 4.0  # Å, heavy atoms of a protein residue and a nucleotide
+CONTACT = 4.0  # Å, heavy atoms of a protein residue and a nucleotide
+_CONTACT = CONTACT  # earlier name
 
 
 def _linked(a, b) -> bool:
@@ -249,7 +250,7 @@ def load_nucleic(
             for atom in r:
                 if atom.element.name == "H":
                     continue
-                for mark in ns.find_atoms(atom.pos, "\0", radius=_CONTACT):
+                for mark in ns.find_atoms(atom.pos, "\0", radius=CONTACT):
                     cra = mark.to_cra(model)
                     if cra.atom.element.name == "H":
                         continue

@@ -235,6 +235,18 @@ class Drawn:
     layout: Any  # layout.Layout
     sses: list
     bb: Any  # model.Backbone
+    model: Any = None  # io.read_model result the figure was built from
+
+    @property
+    def beads(self):
+        """render.ContactBeads: the contact marks drawn (for nacheck.verify_contacts), None without any."""
+        return getattr(self.figure, "foldmap_beads", None)
+
+    def verify_contacts(self):
+        """nacheck.ContactReport of the drawn contact beads against the coordinates."""
+        from .nacheck import verify_contacts
+
+        return verify_contacts(self.model, self.beads, self.layout, self.bb) if self.beads else None
 
     @property
     def stuck(self) -> list[str]:
@@ -249,10 +261,14 @@ class Drawn:
 def draw_spec(spec: FigureSpec) -> Drawn:
     """Lay out, route and draw the figure once."""
     from .cli import make_layout
+    from .io import read_model
 
-    layout, sses, bb = make_layout(spec.structure, spec.mode, spec.rotate, spec.flip_v, **spec.layout_kwargs())
+    model = read_model(spec.structure, spec.assembly)
+    layout, sses, bb = make_layout(
+        spec.structure, spec.mode, spec.rotate, spec.flip_v, model=model, **spec.layout_kwargs()
+    )
     loops = route_loops(layout, sses, bb)
-    return Drawn(draw(layout, loops, sses, spec.title, look=spec.look), loops, layout, sses, bb)
+    return Drawn(draw(layout, loops, sses, spec.title, look=spec.look), loops, layout, sses, bb, model)
 
 
 def layout_document(spec: FigureSpec, structure_name: str | None = None) -> dict:
