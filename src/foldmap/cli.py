@@ -283,6 +283,7 @@ def make_layout(
         rename=rename,
         swap=swap,
         move=move,
+        keep_depth=mem is not None and mode == "stack",
     )
     lay.focus = _focus((look or Style()).highlight, bb, sym)
     if focus_chains:

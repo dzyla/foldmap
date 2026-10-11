@@ -1003,9 +1003,17 @@ def _collide(a: _Item, ha, ma, b: _Item, hb, mb) -> bool:
     return ha[0] + hb[0] + MARGIN - abs(dx) > 1e-9 and ha[1] + hb[1] + MARGIN - abs(dy) > 1e-9
 
 
-def _stack(items: list[_Item]) -> None:
-    """Rows in sequence order, one row break per chain and when a row is full."""
+def _stack(items: list[_Item], depth: bool = False) -> None:
+    """Rows in sequence order, one row break per chain and when a row is full. With `depth` (a membrane is
+    drawn) there is one row, chains side by side, and every item keeps its height along the frame's up."""
     items.sort(key=lambda it: (it.chain, it.order))
+    if depth:
+        x = 0.0
+        for it in items:
+            it.cx = x - it.box[0]
+            it.cy = float(_snap(it.home[1]))
+            x += it.box[2] - it.box[0] + _ROW_GAP
+        return
     rows: list[list[_Item]] = []
     width = 0.0
     for it in items:
@@ -1667,8 +1675,10 @@ def build_layout(
     rename: dict[str, str] | None = None,
     swap: list[tuple[str, str]] | None = None,
     move: list[tuple[str, tuple[float, float]]] | None = None,
+    keep_depth: bool = False,
 ) -> Layout:
-    """`attract` (projected mode) pulls loop-joined and touching elements together before overlaps
+    """`keep_depth` (stack mode with a membrane): each element stays at its height along the frame's up.
+    `attract` (projected mode) pulls loop-joined and touching elements together before overlaps
     are removed; `contacts` comes from features.sse_contacts. `nucleic` adds its stems (straight pieces of
     base-paired DNA/RNA), placed like any element and pulling the elements that touch them; strands with no pair
     at all are kept as projected traces."""
@@ -1709,7 +1719,7 @@ def build_layout(
     joints = _joints(items, nucleic) if pieces else set()
     walls = _trace_walls(items, traces, nucleic) if traces else None  # traces stay: items keep off them
     if mode == "stack":
-        _stack(items)
+        _stack(items, keep_depth)
         _centre_dna_over_binders(items, contacts)
     else:
         ties = _symmetry_ties(items, frame)

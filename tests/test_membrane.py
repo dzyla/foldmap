@@ -172,3 +172,16 @@ def test_membrane_flip_round_trips_through_a_layout_file(tmp_path):
     assert "membrane: flip" in saved.read_text(encoding="utf-8")
     assert main(["plot", str(DATA / "1C3W.cif"), "--layout-file", str(saved), "-o", str(tmp_path / "b.svg")]) == 0
     assert (tmp_path / "a.svg").read_bytes() == (tmp_path / "b.svg").read_bytes()
+
+
+@pytest.mark.parametrize("assembly", ["asu", "auto"])
+def test_stack_mode_keeps_every_tm_helix_in_the_bilayer(assembly):
+    """1C3W --mode stack --membrane auto drew the band at one height while the rows wrapped: helix G sat below it."""
+    lay, sses, bb = make_layout(DATA / "1C3W.cif", mode="stack", membrane="auto", assembly=assembly)
+    y0, y1 = lay.membrane["y"]
+    tm = [s for s in sses if s.kind == "H" and len(s) >= 15]  # the seven TM helices of each chain
+    assert len(tm) == 7 * len({s.chain for s in sses})
+    for s in tm:
+        p = lay.placed[s.id]
+        lo, hi = sorted((p.n_port[1], p.c_port[1]))
+        assert min(hi, y1) - max(lo, y0) >= 0.75 * (y1 - y0), s.id  # measured worst: α3, 0.83
