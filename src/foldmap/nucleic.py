@@ -296,7 +296,10 @@ def _group_stems(pairs: list[BasePair], strands=None) -> list[list[BasePair]]:
 def _knots(stems: list[Stem], strands) -> set[int]:
     """The pseudoknotted stems (their indices): taken longest first (of equal ones the earlier in `stems`, which are
     in 5'->3' order), a stem whose arms lie in one chain is a knot if one of its pairs crosses a pair of a stem
-    already kept nested. Along a chain cut into several strands, nucleotides are in (strand, index) order."""
+    already kept nested. Along a chain cut into several strands, nucleotides are in (strand, index) order.
+    A greedy choice, not the largest nested set (which dynamic programming would find): a long stem is kept even
+    when two shorter ones it crosses would hold more pairs together; it is the one a reader sees as the helix, and
+    the choice depends only on lengths and 5' order, so it is the same on every run."""
     kept: dict[str, list[tuple]] = {}  # chain -> the (5' end, 3' end) of every pair kept nested
     out = set()
     for k in sorted(range(len(stems)), key=lambda k: -len(stems[k])):

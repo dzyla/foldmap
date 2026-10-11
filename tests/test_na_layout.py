@@ -1808,6 +1808,19 @@ def test_a_single_strand_wrapped_over_its_protein_keeps_the_protein_under_it():
     assert not far
 
 
+def test_a_chain_break_with_one_end_not_drawn_is_a_short_break_mark(monkeypatch):
+    """1URN with the piece after the break cut to its last nucleotide (no stem, too short for a trace): it has no
+    end to route to, so the break is marked by a short dashed stub at the end that is drawn, not left unmarked."""
+    import foldmap.cli as cli
+    from foldmap.model import _cut
+
+    monkeypatch.setattr(cli, "_na_extent", lambda na, extent: (_cut(na, {0: [(0, 11)], 1: [(5, 5)]}), False))
+    lay, _, _, _ = _routed("1URN")
+    assert lay.nucleic.gaps and 0 in lay.na_traces
+    (gap,) = [p for p in lay.na_paths if p.kind == "gap"]
+    assert len(gap.points) == 2 and not gap.fallback
+
+
 def _piece(cx, cy, angle, length=4.0, width=2.0, ident="p"):
     from types import SimpleNamespace
 

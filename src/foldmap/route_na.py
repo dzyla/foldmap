@@ -664,6 +664,11 @@ def route_nucleic(layout: Layout, router: _Router | None = None, loops=()) -> li
         a, b = exits.get((g.before, len(na.strands[g.before]) - 1)), exits.get((g.after, 0))
         if a is not None and b is not None:
             out.append(_gap(router, g, a, b))
+        elif a is not None or b is not None:  # one end drawn only (a piece too short to draw): a short break mark
+            p, e, _ = a if a is not None else b
+            mark = _xy([p, np.add(p, np.multiply(e, NT_STEP))])
+            label = f"… {g.count} nt …" if g.count >= SHORT_GAP else ""
+            out.append(NAPath("gap", g.before, [], mark, [], label))
     _unbunch(layout, out)
     layout.na_ends = [e for e in ends if (e[0], e[1]) not in gapped]
     layout.na_letters = _place_letters(layout, out)

@@ -544,3 +544,15 @@ def test_the_crop_keeps_stemless_pieces_when_no_stem_is_touched():
     na = nucleic_from_pairs(_strands(400), _pairs((10, 25), (11, 24)), {2: {(0, 200)}}, {2: "X"})
     cut = crop_nucleic(na, by="stems")
     assert [s.id for s in cut.strands] == ["A:201-201"]
+
+
+def test_the_crop_to_stems_keeps_a_piece_holding_one_end_of_a_tie():
+    # a touched hairpin, and a touched nucleotide far from it that pairs, alone, with one in the hairpin's loop
+    hairpin = _pairs(*[(k, 35 - k) for k in range(10, 14)])  # 10-13 / 22-25, loop 14-21
+    tie = _pairs((17, 200))
+    touched = {1: {(0, 11)}, 2: {(0, 200)}}
+    na = nucleic_from_pairs(_strands(400), hairpin + tie, touched, dict.fromkeys(touched, "X"))
+    assert na.structure.ties == tie
+    cut = crop_nucleic(na, by="stems")
+    assert [s.id for s in cut.strands] == ["A:11-26", "A:201-201"]
+    assert len(cut.structure.ties) == 1  # drawn as the isolated pair it is
