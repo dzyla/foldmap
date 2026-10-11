@@ -56,9 +56,9 @@ from .layout import (
     termini,
 )
 from .model import SSE, group_by_chain
+from .na_paths import midway
 from .palette import chain_colors, darken, delta_e, text_color_on, tint
 from .route import Loop
-from .route_na import midway
 from .style import _ALIASES, CHOICES, MODALITIES, Style, backbone_overrides
 
 _IN_PER_UNIT = IN_PER_UNIT

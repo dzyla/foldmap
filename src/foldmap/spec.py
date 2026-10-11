@@ -251,7 +251,7 @@ class Drawn:
     @property
     def stuck(self) -> list[str]:
         """Loops with no clear route, drawn as plain curves, then nucleic-acid strands drawn with no clear way."""
-        from .route_na import path_name
+        from .na_paths import path_name
 
         out = [f"{l.a_id}>{l.b_id}" for l in self.loops if l.fallback]
         na = getattr(self.layout, "nucleic", None)

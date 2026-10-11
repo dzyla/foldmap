@@ -22,9 +22,9 @@ from scipy.stats import spearmanr
 from .frame import Frame
 from .io import CONTACT
 from .layout import SCALE, joined_pieces, stem_pieces
+from .na_paths import _BEAD, among, crosses_body, graze, in_body
 from .nucleic import stem_axis
 from .route import clip_len
-from .route_na import _BEAD, among, crosses_body, graze, in_body
 
 
 @dataclass(frozen=True)
@@ -588,7 +588,7 @@ def _box_meets_body(box, d) -> bool:
 
 
 def _trimmed(lay) -> list[np.ndarray]:
-    """Each nucleic-acid path's segments as drawn among the elements (route_na.among): a run or joint without the
+    """Each nucleic-acid path's segments as drawn among the elements (na_paths.among): a run or joint without the
     two known rail stretches it runs along to its stems' end faces, so a pass through its own stem counts; any other
     path without its first and last stretches inside its own stems."""
     at = {key: d for d in lay.stems for key in d.axial}

@@ -525,7 +525,7 @@ def test_a_long_tie_is_two_labelled_marks():
 @pytest.mark.parametrize("pdb", FIXTURES)
 def test_tie_lines_cross_no_stem_and_tie_labels_count_as_text(pdb):
     from foldmap.layout import label_boxes
-    from foldmap.route_na import crosses_body
+    from foldmap.na_paths import crosses_body
 
     lay, sses, _, _ = _routed(pdb)
     names = [n for n, _ in label_boxes(lay, sses)]
@@ -663,8 +663,8 @@ def test_joints_and_runs_cross_no_stem_or_element(pdb):
     bodies, passes the router's own final check (route._clear) against every element and stem. A joint drawn
     straight from face to face (two pieces that touch or overlap, which no overlap term keeps apart) is checked as a
     kink: clear by _INFLATE of every element and stem but its own two."""
+    from foldmap.na_paths import among
     from foldmap.route import _INFLATE, _clear, _element_obstacles
-    from foldmap.route_na import among
 
     lay, _, _, _ = _routed(pdb)
     at = {key: d for d in lay.stems for key in d.axial}
@@ -690,7 +690,7 @@ OVER_NAMES: dict = {}
 @pytest.mark.parametrize("pdb", FIXTURES)
 def test_runs_keep_off_the_stem_names(pdb):
     from foldmap.layout import label_boxes
-    from foldmap.route_na import among
+    from foldmap.na_paths import among
 
     lay, sses, _, _ = _routed(pdb)
     at = {key: d for d in lay.stems for key in d.axial}
@@ -709,7 +709,7 @@ def test_a_run_goes_round_a_stem_name_it_could_cross():
     lettered) was bowed across P27's name. Stem names are hard obstacles for a run's first drawing; one that crosses
     a name is drawn only when nothing else is clear of the elements."""
     from foldmap.layout import label_boxes
-    from foldmap.route_na import among
+    from foldmap.na_paths import among
 
     lay, sses, _, _ = _routed("4YBB")
     at = {key: d for d in lay.stems for key in d.axial}
@@ -722,8 +722,8 @@ def test_a_run_goes_round_a_stem_name_it_could_cross():
 
 def test_a_run_over_a_stem_name_is_drawn_when_nothing_else_is_clear():
     """The names are hard only in the first pass: with every drawing over a name, each run is drawn as without."""
+    from foldmap.na_runs import _strand_between
     from foldmap.route import _element_obstacles, _Grid, _Router
-    from foldmap.route_na import _strand_between
 
     lay, _, _, _ = _routed("1EHZ")
     at = {key: d for d in lay.stems for key in d.axial}
@@ -745,8 +745,10 @@ def test_an_internal_loop_side_keeps_its_bow_when_every_drawing_meets_a_name():
     name, the bow is still the drawing taken (the soft choice), not a route nor a fallback (2GIS's P3a-P3b loop;
     4OO8's P2a-P2b sides, pinned here before, are routed since its helix is held together: their faces no longer
     see each other across the loop)."""
+    from foldmap.layout import NT_STEP
+    from foldmap.na_paths import _face
+    from foldmap.na_runs import _side_bow, _strand_between
     from foldmap.route import _element_obstacles, _Grid, _Router
-    from foldmap.route_na import NT_STEP, _face, _side_bow, _strand_between
 
     lay, _, _, _ = _routed("2GIS")
     at = {key: d for d in lay.stems for key in d.axial}
@@ -779,8 +781,9 @@ def test_a_straight_joint_may_cross_its_partner_strand_but_no_other():
     """A joint no route reaches is drawn straight across the meeting corner of two touching pieces only if it
     crosses no strand drawn so far, except the other strand of the same joint (3D0U's P3b-P3a: the two strands
     cross there as they do along a helix)."""
+    from foldmap.na_paths import _face, _Strands
+    from foldmap.na_runs import _straight_joint
     from foldmap.route import _element_obstacles, _Grid, _Router
-    from foldmap.route_na import _face, _straight_joint, _Strands
 
     lay, _, _, _ = _routed("1RVA")
     at = {key: d for d in lay.stems for key in d.axial}
@@ -955,7 +958,7 @@ def _segments_cross(p, q, a, b) -> bool:
 def test_runs_steer_round_hairpin_loops_and_free_ends(pdb):
     """Hairpin loops and free ends are hard obstacles for a run's first routing pass (4LD0: the run C:24-25 crossed
     the free end D:13 when they were only a cost to cross)."""
-    from foldmap.route_na import among
+    from foldmap.na_paths import among
 
     lay, _, _, _ = _routed(pdb)
     at = {key: d for d in lay.stems for key in d.axial}
@@ -978,8 +981,9 @@ def test_a_long_free_end_is_routed_round_what_blocks_it(monkeypatch):
     """A free end of more than six nucleotides that no straight drawing keeps clear of the elements is routed out to
     free space (5W1H's 17-nt spacer was drawn straight through three helices). 4YBB's 10-nt end AA:557-566, with
     only the straight drawing allowed and an element planted across it."""
-    import foldmap.route_na as route_na
+    import foldmap.na_ends as na_ends
     from foldmap.layout import NT_STEP
+    from foldmap.na_paths import outside_own
     from foldmap.route import _clear, _element_obstacles, _Grid, _Router
 
     lay, _, _, _ = _routed("4YBB")
@@ -998,10 +1002,10 @@ def test_a_long_free_end_is_routed_round_what_blocks_it(monkeypatch):
     grid = _Grid(lay)
     grid.blocked |= grid._mask([block])
     router = _Router(grid, elements)
-    monkeypatch.setattr(route_na, "_TURNS", (0.0,))  # the straight drawing only
-    path, tip, _ = route_na._tail(router, lay, d, key[0], key, tail.nts, five, None)
+    monkeypatch.setattr(na_ends, "_TURNS", (0.0,))  # the straight drawing only
+    path, tip, _ = na_ends._tail(router, lay, d, key[0], key, tail.nts, five, None)
     assert not path.fallback and path.nts == tail.nts and len(path.nt_xy) == 10
-    assert _clear(route_na.outside_own(path.points, (d,)), (d,), *elements, own_body=True)
+    assert _clear(outside_own(path.points, (d,)), (d,), *elements, own_body=True)
     steps = np.hypot(*np.diff(np.asarray(path.nt_xy), axis=0).T)
     assert np.all(steps <= NT_STEP + 1e-6) and np.all(steps > 0.5 * NT_STEP)
 
@@ -1011,7 +1015,8 @@ def test_a_free_end_keeps_out_of_its_partners_doorway(monkeypatch):
     another drawing is clear (5F9R: the non-target strand's free end D:12-20, turned across the face of DNA 1, closed
     off the run from P1b, which had to cross it). 4YBB's 10-nt end AA:557-566, offered first a turn across the
     doorway."""
-    import foldmap.route_na as route_na
+    import foldmap.na_ends as na_ends
+    from foldmap.na_paths import _crosses_segment
     from foldmap.route import _element_obstacles, _Grid, _Router
 
     lay, _, _, _ = _routed("4YBB")
@@ -1019,23 +1024,19 @@ def test_a_free_end_keeps_out_of_its_partners_doorway(monkeypatch):
     tail = next(p for p in lay.na_paths if p.kind == "tail" and len(p.nts) == 10)
     (key,) = tail.between
     d, five = at[key], tail.nts[-1] < key[1]
-    door = route_na._doorway(d, key, five)
-    turns = [
-        t
-        for t in (np.pi / 2, -np.pi / 2)
-        if route_na._crosses_segment(route_na._free_end(d, key, 10, five, t)[0], *door)
-    ]
+    door = na_ends._doorway(d, key, five)
+    turns = [t for t in (np.pi / 2, -np.pi / 2) if _crosses_segment(na_ends._free_end(d, key, 10, five, t)[0], *door)]
     assert len(turns) == 1  # the turn towards the partner runs across its doorway
-    monkeypatch.setattr(route_na, "_TURNS", (turns[0], 0.0))
+    monkeypatch.setattr(na_ends, "_TURNS", (turns[0], 0.0))
     router = _Router(_Grid(lay), _element_obstacles(lay))
-    path, _, _ = route_na._tail(router, lay, d, key[0], key, tail.nts, five, None)
-    assert not path.fallback and not route_na._crosses_segment(path.points, *door)
+    path, _, _ = na_ends._tail(router, lay, d, key[0], key, tail.nts, five, None)
+    assert not path.fallback and not _crosses_segment(path.points, *door)
 
 
 @pytest.mark.parametrize("pdb, runs, protein", [("2GIS", 6, 0), ("4OO8", 4, 13)])
 def test_runs_keep_off_the_strands_drawn_before_them(pdb, runs, protein):
     """A run with nucleotides on it is routed off every strand drawn before it, and every protein loop, unless that
-    is a long detour (route_na._DETOUR); failing that it pays for the cells beside them too (_BESIDE_DETOUR), else
+    is a long detour (na_runs._DETOUR); failing that it pays for the cells beside them too (_BESIDE_DETOUR), else
     crossing them is only a cost; neither detour more than _DETOUR_STEPS steps per nucleotide longer. Measured with
     crossing them only a cost: run-run crossings 2GIS 8, 4OO8 5 (protein loops crossed 15). (30QM, pinned here while
     drawn in the plain frame, is drawn unrolled since the C4 revision.) 4OO8 protein 12 -> 13 when its helices were
@@ -1059,7 +1060,7 @@ def test_no_nucleotide_sits_on_another_strands(pdb):
     """No nucleotide is drawn within a contact bead's width of a nucleotide of another strand or stem: where two runs
     cross or pass close (4OO8: the two sides of the P2-P3 internal loop cross where the stems are seen to), a run's
     nucleotides slide along it (4OO8's B:27 and B:42 were 0.25 apart, their beads on top of each other)."""
-    from foldmap.route_na import _BEAD
+    from foldmap.na_paths import _BEAD
 
     lay, _, _, _ = _routed(pdb)
     owner = [("stem", d.id) for d in lay.stems for _ in d.axial] + [
@@ -1086,7 +1087,8 @@ def test_a_crowded_letter_looks_further_out_and_along_its_strand():
     from types import SimpleNamespace
 
     from foldmap.layout import NT_ROW
-    from foldmap.route_na import _LETTER_GAP, _near, _place_letters
+    from foldmap.na_labels import _LETTER_GAP, _place_letters
+    from foldmap.na_paths import _near
 
     lay, _, _, _ = _routed("1EHZ")
     tail = next(p for p in lay.na_paths if p.kind == "tail")
@@ -1103,7 +1105,7 @@ def test_a_crowded_letter_looks_further_out_and_along_its_strand():
 
 
 def _straight(length):
-    from foldmap.route_na import NAPath
+    from foldmap.na_paths import NAPath
 
     return NAPath("run", 0, [1, 2], [(0.0, 0.0), (0.0, 0.0), (length, 0.0), (length, 0.0)], [])
 
@@ -1114,7 +1116,9 @@ def test_a_later_stage_takes_over_only_within_its_detour_caps(stage):
     the drawing off every strand and loop, _BESIDE_DETOUR for the one paying for the cells beside them) and at most
     _DETOUR_STEPS nucleotide steps longer per nucleotide and end (4YBB's P72->P71 went 5.7 times its direct distance
     round a cluster of stems)."""
-    from foldmap.route_na import _BESIDE_DETOUR, _DETOUR, _DETOUR_STEPS, NT_STEP, _length, _takes_over
+    from foldmap.layout import NT_STEP
+    from foldmap.na_paths import _length
+    from foldmap.na_runs import _BESIDE_DETOUR, _DETOUR, _DETOUR_STEPS, _takes_over
 
     bound = _DETOUR if stage == "first" else _BESIDE_DETOUR
     m, plain = 2, _straight(20.0)
@@ -1127,7 +1131,7 @@ def test_a_later_stage_takes_over_only_within_its_detour_caps(stage):
 
 
 def test_a_later_stage_never_replaces_a_clean_drawing_with_a_fallback():
-    from foldmap.route_na import _DETOUR, _takes_over
+    from foldmap.na_runs import _DETOUR, _takes_over
 
     plain, staged = _straight(10.0), _straight(10.5)
     staged.fallback = True
@@ -1139,7 +1143,8 @@ def test_a_later_stage_never_replaces_a_clean_drawing_with_a_fallback():
 def test_a_staged_strand_counts_the_router_debug_counts_of_its_drawing_only(monkeypatch):
     """router.tight and router.rejected count once per strand routed: the attempts a later stage discards (here
     the plain drawing and the first stage) leave no count behind."""
-    import foldmap.route_na as route_na
+    import foldmap.na_runs as na_runs
+    from foldmap.na_paths import _Strands
     from foldmap.route import _element_obstacles, _Grid, _Router
 
     lay, _, _, _ = _routed("1EHZ")
@@ -1158,13 +1163,13 @@ def test_a_staged_strand_counts_the_router_debug_counts_of_its_drawing_only(monk
         calls.append(args[-1])
         return None if args[-1] == 2 else plain if len(calls) == 1 else staged
 
-    monkeypatch.setattr(route_na, "_drawing", drawing)
-    strands = route_na._Strands(router.grid)
+    monkeypatch.setattr(na_runs, "_drawing", drawing)
+    strands = _Strands(router.grid)
     a, b = np.asarray(plain.points[1]), np.asarray(plain.points[2])
     mid, normal = (a + b) / 2, np.array([a[1] - b[1], b[0] - a[0]])
     strands.add([tuple(mid - normal), tuple(mid + normal)])  # a strand across the plain drawing
     extra = np.zeros_like(router.grid.used)
-    got = route_na._strand_between(router, s, i, j, at[(s, i)], at[(s, j)], None, (), strands, None, extra)
+    got = na_runs._strand_between(router, s, i, j, at[(s, i)], at[(s, j)], None, (), strands, None, extra)
     assert calls == [1, 2, 1] and got is staged and (router.tight, router.rejected) == (1, 1)
 
 
@@ -1219,7 +1224,7 @@ def test_letters_are_placed_quickly_on_a_whole_ribosomal_rna(monkeypatch):
 def test_unlabelled_ties_are_drawn_like_rungs_solid_for_watson_crick_dotted_for_gu():
     """The rung convention holds for tie lines: a WC tie is a thin solid line, a G·U tie dotted, both rung grey."""
     from foldmap import render
-    from foldmap.route_na import NATie
+    from foldmap.na_paths import NATie
 
     lay, sses, _, loops = _routed("1EHZ")
     pairs = lay.nucleic.base_pairs
@@ -1730,7 +1735,7 @@ def test_the_trace_boxes_reach_the_optimiser_on_the_grid(monkeypatch):
 
 
 def _gap_label_box(p, lay):
-    from foldmap.route_na import _em, _gap_box
+    from foldmap.na_labels import _em, _gap_box
 
     return _gap_box(p, _em(lay))
 
@@ -1738,8 +1743,8 @@ def _gap_label_box(p, lay):
 def test_a_gap_label_is_placed_clear_of_letters_beads_bodies_and_strands():
     """4YBB: "... 21 nt ..." sat at its gap's midpoint on element AC:26-46 and two runs (C10). A gap label is placed
     along its gap, either side, where its box keeps clear of bodies, strands, letters and nucleotides."""
+    from foldmap.na_paths import crosses_body
     from foldmap.route import clip_len
-    from foldmap.route_na import crosses_body
 
     lay, _, _, loops = _routed("4YBB")
     labelled = [p for p in lay.na_paths if p.kind == "gap" and p.label]
@@ -1757,7 +1762,7 @@ def test_a_gap_label_is_placed_clear_of_letters_beads_bodies_and_strands():
 
 
 def test_a_gap_label_moves_off_a_letter_planted_on_its_first_spot():
-    from foldmap.route_na import _label_gaps
+    from foldmap.na_labels import _label_gaps
 
     lay, _, _, loops = _routed("4YBB")
     p = next(p for p in lay.na_paths if p.kind == "gap" and p.label)
@@ -1774,7 +1779,8 @@ def test_a_gap_with_no_way_on_the_grid_is_curved_before_it_is_a_fallback():
     that keeps clear; only then straight."""
     from types import SimpleNamespace
 
-    from foldmap.route_na import _element_obstacles, _gap
+    from foldmap.na_ends import _gap
+    from foldmap.route import _element_obstacles
 
     lay, _, _, _ = _routed("1URN")
     (p,) = [q for q in lay.na_paths if q.kind == "gap"]
@@ -1792,8 +1798,8 @@ def test_a_gap_label_is_drawn_inside_the_box_placement_kept_clear():
     no clear spot between P2 and its gap and put "... 6 nt ..." on the stem)."""
     from matplotlib.backends.backend_agg import FigureCanvasAgg
 
+    from foldmap.na_labels import _em, _gap_box
     from foldmap.render import draw
-    from foldmap.route_na import _em, _gap_box
 
     lay, sses, _, loops = _routed("4YBB")
     fig = draw(lay, loops, sses)
@@ -1828,7 +1834,7 @@ def test_a_single_strand_wrapped_over_its_protein_keeps_the_protein_under_it():
         if gap.min() > 6.0:
             far.append((p.sse.id, round(float(gap.min()), 1)))
     assert not far
-    # and the traces lying on the protein they touch are no routing fallbacks (route_na._trace_clear)
+    # and the traces lying on the protein they touch are no routing fallbacks (na_ends._trace_clear)
     assert not [p.strand for p in lay.na_paths if p.kind == "trace" and p.fallback]
 
 
@@ -1854,10 +1860,11 @@ def _piece(cx, cy, angle, length=4.0, width=2.0, ident="p"):
 def test_a_straight_joint_along_its_own_piece_turns_an_elbow_round_it():
     """4YBB's P11b2 -> P11b1: the straight line from one piece's face to the next one's ran along the second piece's
     body. A joint whose straight line runs into its own piece deeper than a bead's radius is drawn out of the one
-    face and into the other round a corner (route_na._elbow), clear of both; a shallow graze of a corner is kept."""
+    face and into the other round a corner (na_runs._elbow), clear of both; a shallow graze of a corner is kept."""
     from types import SimpleNamespace
 
-    from foldmap.route_na import _BEAD, _elbow, _grazes, graze
+    from foldmap.na_paths import _BEAD, graze
+    from foldmap.na_runs import _elbow, _grazes
 
     da, db = _piece(0.0, 0.0, 0.0, ident="a"), _piece(3.5, 0.5, np.pi / 2, ident="b")  # b stands right of a's face
     fa, ea, fb, eb = (2.0, 0.5), (1.0, 0.0), (4.0, 2.5), (0.0, 1.0)  # out of a's end, into b's top
@@ -1885,11 +1892,11 @@ def test_a_shallow_graze_at_a_path_end_is_not_counted_as_through_a_stem():
 
 
 def test_a_trace_is_exempt_from_an_element_only_near_the_nucleotides_it_touches():
-    """route_na._trace_clear: an element touching a trace may lie under it where it holds it, not anywhere along
+    """na_ends._trace_clear: an element touching a trace may lie under it where it holds it, not anywhere along
     it (an element touching the 5' end, crossed by the trace twenty nucleotides on, makes a fallback)."""
     from types import SimpleNamespace
 
-    from foldmap.route_na import _trace_clear
+    from foldmap.na_ends import _trace_clear
 
     def check(touched: int, sheets=()) -> bool:
         el = SimpleNamespace(sse=SimpleNamespace(id="H1", start=5, end=5))
@@ -1915,7 +1922,7 @@ def test_trace_nucleotides_drawn_on_one_spot_are_nudged_apart():
     from foldmap.frame import Frame
     from foldmap.layout import SCALE, _traces
     from foldmap.model import NAStrand, ResLabel
-    from foldmap.route_na import _BEAD
+    from foldmap.na_paths import _BEAD
 
     def strand(chain, xyz):
         labels = [ResLabel(chain, k + 1, "", "DT") for k in range(len(xyz))]
@@ -1945,7 +1952,7 @@ def test_a_free_end_is_never_drawn_into_another_stems_hairpin_loop(monkeypatch):
     """4YBB (step 4 campaign): a free end was drawn inside another stem's hairpin circle, and the gap leaving it
     crossed the loop. A free end's drawing keeps out of every other stem's hairpin circle when another drawing does.
     4YBB's 10-nt end AA:557-566 with a hairpin circle planted over its straight drawing."""
-    import foldmap.route_na as route_na
+    import foldmap.na_ends as na_ends
     from foldmap.route import _element_obstacles, _Grid, _Router
 
     lay, _, _, _ = _routed("4YBB")
@@ -1953,15 +1960,15 @@ def test_a_free_end_is_never_drawn_into_another_stems_hairpin_loop(monkeypatch):
     tail = next(p for p in lay.na_paths if p.kind == "tail" and len(p.nts) == 10)
     (key,) = tail.between
     d, five = at[key], tail.nts[-1] < key[1]
-    straight = np.asarray(route_na._free_end(d, key, 10, five, 0.0)[1])
+    straight = np.asarray(na_ends._free_end(d, key, 10, five, 0.0)[1])
     other = next(s for s in lay.stems if s is not d)
     circle = (straight.mean(axis=0), 1.0, other)
-    assert route_na._enters(straight, [circle], d)
-    monkeypatch.setattr(route_na, "_TURNS", (0.0, np.pi / 2, -np.pi / 2))
+    assert na_ends._enters(straight, [circle], d)
+    monkeypatch.setattr(na_ends, "_TURNS", (0.0, np.pi / 2, -np.pi / 2))
     router = _Router(_Grid(lay), _element_obstacles(lay))
-    path, _, _ = route_na._tail(router, lay, d, key[0], key, tail.nts, five, None, circles=[circle])
-    assert not path.fallback and not route_na._enters(path.points, [circle], d)
-    assert not route_na._enters(straight, [(circle[0], 1.0, d)], d)  # its own stem's loop is not another's
+    path, _, _ = na_ends._tail(router, lay, d, key[0], key, tail.nts, five, None, circles=[circle])
+    assert not path.fallback and not na_ends._enters(path.points, [circle], d)
+    assert not na_ends._enters(straight, [(circle[0], 1.0, d)], d)  # its own stem's loop is not another's
 
 
 def test_a_free_end_the_protein_holds_lies_toward_it():
@@ -1996,7 +2003,7 @@ def test_a_trace_seen_straight_end_on_is_nudged_apart_too():
     from foldmap.frame import Frame
     from foldmap.layout import _traces
     from foldmap.model import NAStrand, ResLabel
-    from foldmap.route_na import _BEAD
+    from foldmap.na_paths import _BEAD
 
     p = np.array([[0.0, 0.0, z * 6.0] for z in range(3)])
     strand = NAStrand("S", [ResLabel("S", k + 1, "", "DT") for k in range(3)], p, p, False)

@@ -188,7 +188,7 @@ class Layout:
     na_traces: dict = field(default_factory=dict)  # strand -> projected backbone (page units), for unpaired strands
     na_ends: list = field(default_factory=list)  # (strand, "5′" or "3′", label position), filled by route_loops
     na_letters: dict = field(default_factory=dict)  # single-stranded (strand, nt) -> its letter's place (route_loops)
-    na_ties: list = field(default_factory=list)  # route_na.NATie: isolated pairs as drawn (route_loops)
+    na_ties: list = field(default_factory=list)  # na_paths.NATie: isolated pairs as drawn (route_loops)
     na_cropped: bool = False  # na_extent auto cropped a large nucleic acid to the stems the protein touches
     frame: object = None  # the frame.Frame (or RadialFrame, CylinderFrame) that took 3D to the page
     focus: set[str] | None = None  # chains drawn in colour when highlighting; the rest in grey
@@ -1279,7 +1279,7 @@ def _two_colour(group, links, nbr, fixed, stems) -> dict[int, int]:
     return out
 
 
-_TRACE_HALF = 0.45  # page units: a trace nucleotide's box reaches a bead (route_na._BEAD) either side of it
+_TRACE_HALF = 0.45  # page units: a trace nucleotide's box reaches a bead (na_paths._BEAD) either side of it
 
 
 def _trace_walls(items: list[_Item], traces: dict[int, np.ndarray], na: Nucleic) -> Walls:
