@@ -284,20 +284,25 @@ def test_a_kinked_duplex_across_a_dimer_is_no_longer_a_hairpin():
 
 
 def test_unrolled_frame_kept_when_each_strand_is_held_by_one_protomer():
-    """The plain frame only for a nucleic acid with stems that some strand ties to two protomers."""
+    """The plain frame only for a nucleic acid with stems that some strand ties to two protomers, each touching
+    it with at least NA_HOLD_MIN (3) residues: a glancing contact from the other protomer does not count."""
     from types import SimpleNamespace
 
     from foldmap.cli import _na_across_protomers
     from foldmap.model import ResLabel
 
-    bb = SimpleNamespace(labels=[ResLabel(c, 1, "", "ALA") for c in "ABAB"])
+    bb = SimpleNamespace(labels=[ResLabel(c, k, "", "ALA") for k, c in enumerate("AAABBBAB")])
     sym = SimpleNamespace(protomers=[["A"], ["B"]])
     stems = SimpleNamespace(stems=[object()])
-    one_each = SimpleNamespace(structure=stems, contacts={0: {(0, 1)}, 2: {(0, 2)}, 1: {(1, 4)}, 3: {(1, 5)}})
-    shared = SimpleNamespace(structure=stems, contacts={0: {(0, 1)}, 1: {(0, 9)}})
+    one_each = SimpleNamespace(structure=stems, contacts={r: {(0 if r in (0, 1, 2, 6) else 1, r)} for r in range(8)})
+    shared = SimpleNamespace(structure=stems, contacts={r: {(0, r)} for r in range(6)})
+    glancing = SimpleNamespace(structure=stems, contacts={0: {(0, 1)}, 1: {(0, 2)}, 2: {(0, 3)}, 3: {(0, 9)}})
+    two_two = SimpleNamespace(structure=stems, contacts={0: {(0, 1)}, 1: {(0, 2)}, 3: {(0, 3)}, 4: {(0, 9)}})
     unpaired = SimpleNamespace(structure=SimpleNamespace(stems=[]), contacts=shared.contacts)
     assert not _na_across_protomers(one_each, sym, bb)
     assert _na_across_protomers(shared, sym, bb)
+    assert not _na_across_protomers(glancing, sym, bb)
+    assert not _na_across_protomers(two_two, sym, bb)
     assert not _na_across_protomers(unpaired, sym, bb)
     assert not _na_across_protomers(shared, None, bb)
     assert not _na_across_protomers(None, sym, bb)

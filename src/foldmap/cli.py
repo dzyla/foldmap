@@ -102,19 +102,23 @@ def _any_centre(bb, nucleic) -> np.ndarray:
     return np.zeros(3)  # nothing to draw (a nucleic acid with --no-dna)
 
 
+NA_HOLD_MIN = 3  # residues of one protomer touching a strand for that protomer to hold it
+
+
 def _na_across_protomers(nucleic, sym, bb) -> bool:
-    """Whether a nucleic acid with stems has a strand touched by two or more protomers of `sym`. Unrolling the
-    assembly one protomer beside the next would tear that strand apart, so it is drawn in a projected frame."""
+    """Whether a nucleic acid with stems has a strand held by two or more protomers of `sym`, each touching it
+    with at least NA_HOLD_MIN residues. Unrolling the assembly one protomer beside the next would tear that
+    strand apart, so it is drawn in a projected frame."""
     if nucleic is None or sym is None or not nucleic.structure.stems:
         return False
     sector = {c: k for k, chains in enumerate(sym.protomers) for c in chains}
-    holders: dict[int, set[int]] = {}  # strand -> protomers touching it
+    holders: dict[int, dict[int, set[int]]] = {}  # strand -> protomer -> residues touching it
     for r, touched in sorted(nucleic.contacts.items()):
         k = sector.get(bb.labels[r].chain)
         if k is not None:
             for s, _ in sorted(touched):
-                holders.setdefault(s, set()).add(k)
-    return any(len(ks) >= 2 for ks in holders.values())
+                holders.setdefault(s, {}).setdefault(k, set()).add(r)
+    return any(sum(len(rs) >= NA_HOLD_MIN for rs in by.values()) >= 2 for by in holders.values())
 
 
 def _na_extent(na, extent: str):
