@@ -298,12 +298,14 @@ def test_overlap_fallback_slide_runs_and_separates(monkeypatch):
     assert not any(overlaps(a, b) for i, a in enumerate(items) for b in items[i + 1 :])
 
 
-@pytest.mark.parametrize("pdb, member", [("8UUP", "D:456-472"), ("1LMB", "3:78-88")])
-def test_bundled_helices_are_drawn_side_by_side(pdb, member):
+# 1LMB without its symmetry: under auto its dyad lies in the page and the two α5 copies are drawn as mirror images
+# of each other instead, at one height (test_symmetry_scenarios::test_dimer_on_dna_is_an_exact_mirror_image)
+@pytest.mark.parametrize("pdb, member, kw", [("8UUP", "D:456-472", {}), ("1LMB", "3:78-88", {"symmetry": "off"})])
+def test_bundled_helices_are_drawn_side_by_side(pdb, member, kw):
     from foldmap.cli import make_layout
     from foldmap.features import helix_bundles
 
-    lay, sses, _ = make_layout(Path(__file__).parent / "data" / f"{pdb}.cif")
+    lay, sses, _ = make_layout(Path(__file__).parent / "data" / f"{pdb}.cif", **kw)
     group = next(g for g in helix_bundles(sses) if member in g)
     pl = [lay.placed[k] for k in group]
     d = pl[0].direction

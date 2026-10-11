@@ -16,9 +16,9 @@ import numpy as np
 from . import layoutfile
 from .dssp import assign_dssp
 from .features import sse_contacts
-from .frame import dna_radial_frame, dna_view_frame, symmetric_frame, view_frame
+from .frame import Frame, RadialFrame, dna_radial_frame, dna_view_frame, protomer_maps, symmetric_frame, view_frame
 from .io import load_backbone, load_links, load_nucleic, read_model
-from .layout import _snap, build_layout, na_torn_by_unrolling, resolve
+from .layout import SCALE, _snap, build_layout, na_torn_by_unrolling, resolve
 from .model import AUTO_NT, crop_nucleic, nucleic_of_chains, nucleic_touching, res_ref
 from .nucleic import StemView, stem_views, straight_duplex
 from .palette import PALETTES
@@ -123,6 +123,23 @@ def _na_across_protomers(nucleic, sym, bb) -> bool:
             for s, _ in sorted(touched):
                 holders.setdefault(s, {}).setdefault(k, set()).add(r)
     return any(sum(len(rs) >= NA_HOLD_MIN for rs in by.values()) >= 2 for by in holders.values())
+
+
+DYAD_IN_PAGE = np.radians(10)  # a two-fold axis within this of the page plane is drawn as a mirror line
+
+
+def _mirror_frame(frame, sym) -> None:
+    """A dimer whose dyad lies in the page (perpendicular to the duplex of a RadialFrame, along page-up of a
+    Frame) is drawn as one protomer and its mirror image: the frame learns the protomers (sector, classes, as
+    symmetric_frame gives them) and the page x of the mirror line, where the dyad projects (snapped)."""
+    if isinstance(frame, RadialFrame):
+        in_page = abs(float(sym.axis @ frame.axis)) < np.sin(DYAD_IN_PAGE)
+    else:
+        in_page = abs(float(sym.axis @ frame.v)) > np.cos(DYAD_IN_PAGE)
+    if not in_page:
+        return
+    frame.sector, frame.classes = protomer_maps(sym)
+    frame.mirror_x = float(_snap(frame.project(sym.centre)[0, 0] * SCALE))
 
 
 def _na_extent(na, extent: str):
@@ -250,6 +267,8 @@ def make_layout(
         stems = stem_views(nucleic.structure, nucleic.strands) if nucleic is not None else []
         stems = [StemView(_snap(v.centroid), _snap(v.axis), v.n) for v in stems]
         frame = view_frame(sses + stems, rotate, flip_v, up, view)
+    if sym is not None and sym.kind == "C" and sym.n == 2 and isinstance(frame, (RadialFrame, Frame)):
+        _mirror_frame(frame, sym)
     links = load_links(path, bb, assembly, model=model)
     contacts = sse_contacts(bb, sses)
     for key, n in _bridge_contacts(bb, sses, links).items():

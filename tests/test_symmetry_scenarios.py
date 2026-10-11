@@ -396,3 +396,78 @@ def test_three_copies_on_a_screw_are_helical_only_when_asked(tmp_path):
     path = build(tmp_path, ops, offset=(15.0, 0.0, 0.0))
     assert found(path) is None  # crystal packing, as the three copies of 1URN
     assert found(path, request="helical").kind == "H"
+
+
+def test_dimer_on_dna_is_an_exact_mirror_image():
+    """1LMB: the dyad lies in the page (perpendicular to the duplex), so protomer 2 is protomer 1 mirrored;
+    alpha5 sat at -11.87 and -9.67 before."""
+    from foldmap.cli import make_layout
+
+    lay, sses, _ = make_layout(DATA / "1LMB.cif")
+    mx = lay.frame.mirror_x
+    assert mx is not None
+    one = {s.first.seq: lay.placed[s.id] for s in sses if s.chain == "3"}
+    two = {s.first.seq: lay.placed[s.id] for s in sses if s.chain == "4"}
+    assert sorted(one) == sorted(two)
+    for k, p in one.items():
+        q = two[k]
+        assert abs(p.cx + q.cx - 2 * mx) < 1e-6 and abs(p.cy - q.cy) < 1e-6, k
+        assert np.cos(q.angle - (np.pi - p.angle)) > 1 - 1e-9, k
+
+
+def test_mirror_energy_gradient_is_exact(monkeypatch):
+    from foldmap import layout
+
+    seen = {}
+    real = layout._lbfgs
+
+    def spy(fun, x0, *a, **k):
+        seen.setdefault("f", (fun, np.array(x0, float)))
+        return real(fun, x0, *a, **k)
+
+    monkeypatch.setattr(layout, "_lbfgs", spy)
+    from foldmap.cli import make_layout
+
+    make_layout(DATA / "1LMB.cif")
+    fun, x = seen["f"]
+    x = x + 1e-3 * np.sin(np.arange(len(x)))  # off any overlap edge, where the energy has a kink
+    _, g = fun(x)
+    h = 1e-6
+    num = [(fun(x + h * e)[0] - fun(x - h * e)[0]) / (2 * h) for e in np.eye(len(x))]
+    assert np.allclose(g, num, atol=1e-5)
+
+
+def test_cylinder_frames_are_not_mirrored():
+    from foldmap.cli import make_layout
+
+    lay, _, _ = make_layout(DATA / "1TIM.cif")
+    assert getattr(lay.frame, "mirror_x", None) is None
+
+
+def test_a_mirror_copy_overlapping_its_mate_is_pushed_apart_sideways_about_the_line():
+    """Stacked pair (least overlap in y): with a mirror line the two are parted in x only, symmetrically."""
+    from foldmap.layout import _push_apart
+
+    xy = np.array([[-0.2, 0.0], [0.2, 0.0]])
+    halves = np.array([[1.0, 0.3], [1.0, 0.3]])
+    assert _push_apart(xy, halves, np.zeros((2, 2)), xy.copy(), {1: (0, 1)}, 200, mirror=0.0)
+    assert abs(xy[0, 0] + xy[1, 0]) < 1e-12 and xy[0, 0] < -1.0
+    assert xy[0, 1] == xy[1, 1] == 0.0
+
+
+def test_only_a_dyad_in_the_page_makes_a_mirror_line():
+    from types import SimpleNamespace
+
+    from foldmap.cli import _mirror_frame
+    from foldmap.frame import Frame
+
+    def frame():
+        return Frame(np.zeros(3), np.array([1.0, 0, 0]), np.array([0, 1.0, 0]), np.array([0, 0, 1.0]))
+
+    sym = SimpleNamespace(axis=np.array([0.0, 1.0, 0.0]), centre=np.array([4.0, 2.0, 1.0]), protomers=[["A"], ["B"]])
+    f = frame()
+    _mirror_frame(f, sym)  # the dyad along page-up: a vertical mirror line through its projection
+    assert f.mirror_x == pytest.approx(4.0 * 0.23) and f.sector == {"A": 0, "B": 1} and f.classes == {"A": 0, "B": 0}
+    f = frame()
+    _mirror_frame(f, SimpleNamespace(**(vars(sym) | {"axis": np.array([0.0, 0.0, 1.0])})))  # seen end on: a turn
+    assert f.mirror_x is None and f.sector is None

@@ -424,6 +424,7 @@ def _separate(
     ties: dict[int, tuple[int, int]] | None = None,
     joints: set[tuple[int, int]] = frozenset(),
     fixed: Walls | None = None,
+    mirror: float | None = None,
 ) -> None:
     """Push overlapping items apart, then slide any left over clear. With `ties` (_symmetry_ties) the pushes
     keep every protomer drawn alike (_push_apart), and that result is kept if it clears every overlap within
@@ -431,7 +432,7 @@ def _separate(
     one from the same start (widening the spread can otherwise cost far more room); else the one-by-one
     result is used. Consecutive pieces of one bent duplex (`joints`, _joints) in a short chain (_rigid_joints)
     are moved together and never pushed apart. Items are pushed off the `fixed` boxes they must keep off (Walls),
-    which stay where they are."""
+    which stay where they are. `mirror`: the copies are their mates' mirror images about that page x (_push_apart)."""
     halves = np.array([it.half for it in items], float).reshape(-1, 2)
     mids = np.array([it.mid for it in items], float).reshape(-1, 2)
     start = np.array([(it.cx, it.cy) for it in items], float).reshape(-1, 2)
@@ -441,7 +442,7 @@ def _separate(
     xy = start.copy()
     alone = start.copy()
     _push_apart(alone, halves, mids, home, {}, _SEP_SWEEPS, apart, fixed)
-    together = ties and _push_apart(xy, halves, mids, home, ties, _SEP_ORBIT_SWEEPS, apart, fixed)
+    together = ties and _push_apart(xy, halves, mids, home, ties, _SEP_ORBIT_SWEEPS, apart, fixed, mirror)
     if not together or _box_area(xy, halves, mids) > _SEP_SYM_ROOM * _box_area(alone, halves, mids):
         xy = alone
     for it, (x, y) in zip(items, xy.tolist()):
@@ -523,6 +524,7 @@ def _push_apart(
     sweeps: int,
     apart: np.ndarray | None = None,
     fixed: Walls | None = None,
+    mirror: float | None = None,
 ) -> bool:
     """Push overlapping footprints apart in place (axis of least penetration); spring back to home early on.
     Each sweep finds the overlapping pairs at once and resolves them in order. With `ties` a push moves an
@@ -532,7 +534,9 @@ def _push_apart(
     part, move alone. Items joined by `apart` (consecutive pieces of one bent duplex) are never pushed apart: a push
     moves the whole chain of pieces (with their orbits); two items of one such group that overlap move alone.
     An item overlapping a `fixed` box it must keep off (Walls) is pushed (with its group) the whole way off it.
-    True if no overlap is left."""
+    With `mirror` (page x of a dyad in the page) each copy is its mate's mirror image: a sideways push moves the
+    copies of a group the other way, an item and its own copy are pushed apart sideways only, symmetrically about
+    the mirror line, and the spread is never widened. True if no overlap is left."""
     n = len(xy)
     root = list(range(n))  # the protomer-0 item of each item's orbit
     copy_k = np.zeros(n)  # protomer of each copy (0 for everything else)
@@ -547,6 +551,7 @@ def _push_apart(
     group = [members[c] for c in cid.tolist()]
     protomer = [copy_k[i] if len(orbits[root[i]]) > 1 else None for i in range(n)]  # None: item has no copies
     widen = np.sign(sum((xy[i, 0] - xy[j, 0]) / k for i, (j, k) in ties.items())) or 1.0  # protomer k lies this way
+    sx = np.where((copy_k > 0) & (mirror is not None), -1.0, 1.0)  # a mirrored copy moves against its mate in x
     walls = fixed
     for sweep in range(sweeps):
         pairs = _overlapping(xy, halves, mids, apart)
@@ -560,29 +565,32 @@ def _push_apart(
             if px <= 1e-9 or py <= 1e-9:  # an earlier push this sweep already cleared it
                 continue
             gi, gj = (group[i], group[j]) if cid[i] != cid[j] else (i, j)
+            if mirror is not None and cid[i] == cid[j] and root[i] == root[j]:  # an item and its own mirror copy
+                py = np.inf
             if px < py:
                 s = (1 if dx > 0 else -1) if dx != 0 else 1
-                if None not in (protomer[i], protomer[j]) and protomer[i] != protomer[j]:
+                if mirror is None and None not in (protomer[i], protomer[j]) and protomer[i] != protomer[j]:
                     wider = s * (px + 2 * _SEP_PUSH) / (protomer[j] - protomer[i])
                     if wider * widen > 0:  # items without copies (copy_k 0) stay put, whichever protomer
                         xy[:, 0] += copy_k * wider
                         continue
-                xy[gi, 0] -= s * (px / 2 + _SEP_PUSH)
-                xy[gj, 0] += s * (px / 2 + _SEP_PUSH)
+                xy[gi, 0] -= sx[gi] * sx[i] * s * (px / 2 + _SEP_PUSH)
+                xy[gj, 0] += sx[gj] * sx[j] * s * (px / 2 + _SEP_PUSH)
             else:
                 s = (1 if dy > 0 else -1) if dy != 0 else 1
                 xy[gi, 1] -= s * (py / 2 + _SEP_PUSH)
                 xy[gj, 1] += s * (py / 2 + _SEP_PUSH)
-        _off_walls(xy, halves, mids, walls, group)
+        _off_walls(xy, halves, mids, walls, group, sx=sx)
         if sweep < 100:
             xy += 0.03 * (home - xy)
     return not len(_overlapping(xy, halves, mids, apart)) and not _off_walls(xy, halves, mids, walls, group, move=False)
 
 
-def _off_walls(xy, halves, mids, walls: Walls | None, group, move: bool = True) -> bool:
+def _off_walls(xy, halves, mids, walls: Walls | None, group, move: bool = True, sx: np.ndarray | None = None) -> bool:
     """Push each footprint overlapping a fixed box it must keep off (Walls), MARGIN kept, the whole way off it
-    along the axis of least overlap, moving its group (`group[i]`, the items moved with item i) in place. True if
-    any overlapped (with move=False, only that is reported)."""
+    along the axis of least overlap, moving its group (`group[i]`, the items moved with item i) in place; `sx`
+    (-1 for a mirrored copy, _push_apart) turns a sideways move of a group's copies the other way. True if any
+    overlapped (with move=False, only that is reported)."""
     if walls is None or not len(walls.boxes):
         return False
     boxes = np.asarray(walls.boxes, float)
@@ -599,7 +607,8 @@ def _off_walls(xy, halves, mids, walls: Walls | None, group, move: bool = True) 
         if px <= 1e-9 or py <= 1e-9:
             continue
         if px < py:
-            xy[group[i], 0] -= ((1 if dx > 0 else -1) if dx != 0 else 1) * (px + _SEP_PUSH)
+            turn = 1.0 if sx is None else sx[group[i]] * sx[i]
+            xy[group[i], 0] -= turn * ((1 if dx > 0 else -1) if dx != 0 else 1) * (px + _SEP_PUSH)
         else:
             xy[group[i], 1] -= ((1 if dy > 0 else -1) if dy != 0 else 1) * (py + _SEP_PUSH)
     return True
@@ -881,6 +890,7 @@ def _attract(
     extra: list[tuple[int, np.ndarray, int, np.ndarray, float, float]] = (),
     joints: set[tuple[int, int]] = frozenset(),
     fixed: Walls | None = None,
+    mirror: float | None = None,
 ) -> None:
     """Minimise the layout energy (_energy) from the projected positions, raising the overlap penalty in
     stages. The result becomes each item's new home; _separate then guarantees no overlap remains. Every input
@@ -889,7 +899,8 @@ def _attract(
     from stem to stem (_stem_springs). `joints` (_joints): pairs of items kept apart without MARGIN, so their
     boxes may touch and no element fits between them for long. `fixed` (Walls): boxes that stay where they are (the
     nucleotides of unpaired strands' traces), the items kept MARGIN off them, firmly or (an element touching that
-    trace) not at all."""
+    trace) not at all. `mirror` (page x of a dyad in the page): each copy of `ties` sits at its mate's mirror image
+    about it, at the same height, instead of `spread` along."""
     n = len(items)
     W = _contact_weights(items, contacts)
     ci, cj = np.nonzero(np.triu(W > 0, 1))
@@ -938,14 +949,19 @@ def _attract(
     weight = fixed.hard.astype(float) if fixed is not None else np.ones((n, 0))
     walls = (centres, h[:, None, :] + halves[None, :, :] + MARGIN, weight)
     spread, lift = float(_snap(spread)), float(_snap(lift))
+    mirror = None if mirror is None else float(_snap(mirror))
     ties = ties or {}
     free = [i for i in range(n) if i not in ties]
     slot = {i: k for k, i in enumerate(free)}
     base = np.array([slot[ties[i][0]] if i in ties else slot[i] for i in range(n)])
     copy_k = np.array([ties[i][1] if i in ties else 0 for i in range(n)], float)
+    flip = np.stack([np.where(copy_k > 0, -1.0, 1.0), np.ones(n)], axis=1)  # a mirrored copy: x against its mate
 
     def expand(z):
         P = z[:-1].reshape(-1, 2)[base].copy()
+        if mirror is not None:  # protomer 1 is protomer 0 seen in the mirror line
+            P[copy_k > 0, 0] = 2 * mirror - P[copy_k > 0, 0]
+            return P
         P[:, 0] += copy_k * z[-1]  # protomer k sits k spreads to the right of protomer 0
         P[:, 1] += copy_k * lift  # and, along a filament, k rises higher
         return P
@@ -957,6 +973,9 @@ def _attract(
             E, g = _energy_dense(expand(z).ravel(), home, anchor_w, want, W, loops, lam, mids, walls)
         g = g.reshape(-1, 2)
         gz = np.zeros((len(free), 2))
+        if mirror is not None:  # the spread is fixed at 0 (no gradient)
+            np.add.at(gz, base, g * flip)
+            return E, np.append(gz.ravel(), 0.0)
         np.add.at(gz, base, g)
         return E, np.append(gz.ravel(), float((g[:, 0] * copy_k).sum()))
 
@@ -1492,12 +1511,34 @@ def _short_loops(na: Nucleic) -> set[frozenset[str]]:
     return out
 
 
+def _within_protomers(bundles: list[list[str]], by_id: dict[str, SSE], sector: dict) -> list[list[str]]:
+    """Helix bundles (features.helix_bundles) cut at protomer boundaries: the part of a bundle in one protomer
+    stays a bundle if it still spans two chains, else its helices are drawn alone. A bundle of a dimer's two
+    copies of one helix (1LMB α5) would hold them in one item, side by side across their axis, where no mirror
+    line can pass between them; apart, each copy can sit at its mate's mirror image."""
+    out = []
+    for g in bundles:
+        parts: dict[int, list[str]] = {}
+        for k in g:
+            parts.setdefault(sector.get(by_id[k].chain, -1), []).append(k)
+        out += [parts[p] for p in sorted(parts) if len({by_id[k].chain for k in parts[p]}) > 1]
+    return out
+
+
+def _mirrored(angle: float) -> float:
+    """An element's angle seen in a vertical mirror (pi - angle), in (-pi, pi]."""
+    return float(-((angle - 2 * np.pi) % (2 * np.pi) - np.pi)) + 0.0  # + 0.0: never -0.0
+
+
 def _symmetry_ties(items: list[_Item], frame) -> dict[int, tuple[int, int]]:
     """Copy item -> (its protomer-0 mate, protomer index k): matched by chain class and shared residue numbers.
-    The copy also takes the mate's shape and orientation, so every protomer is drawn the same."""
+    The copy also takes the mate's shape and orientation, so every protomer is drawn the same; in a frame with a
+    mirror line (`mirror_x`, a dyad in the page) it takes them mirrored, protomer 1 drawn as protomer 0's mirror
+    image."""
     sector, classes = getattr(frame, "sector", None), getattr(frame, "classes", None)
     if not sector or not classes:
         return {}
+    mirror = getattr(frame, "mirror_x", None) is not None
 
     def residues(it):  # chains outside every protomer (bound peptides, unpaired chains) take no part
         return {
@@ -1537,11 +1578,12 @@ def _symmetry_ties(items: list[_Item], frame) -> dict[int, tuple[int, int]]:
         ]
         if len(mate.members) == len(it.members) and sorted(pairs) == list(range(len(pairs))):
             for m, q in zip(it.members, pairs):  # one-to-one: take the mate's shape member by member
-                m.angle, m.length = mate.members[q].angle, mate.members[q].length
-            it.offsets = [mate.offsets[q] for q in pairs]
+                a = mate.members[q].angle
+                m.angle, m.length = (_mirrored(a) if mirror else a), mate.members[q].length
+            it.offsets = [(-mate.offsets[q][0], mate.offsets[q][1]) if mirror else mate.offsets[q] for q in pairs]
         else:  # DSSP split or merged an element in one copy: keep the shape, match the orientation
             votes = [
-                np.cos(m.angle - mate.members[q].angle)
+                np.cos(m.angle - (np.pi - mate.members[q].angle if mirror else mate.members[q].angle))
                 for m, q in zip(it.members, pairs)
                 if span(m) & span(mate.members[q])
             ]
@@ -1687,9 +1729,11 @@ def build_layout(
     style = style or Style()
     angle_mode = "upright" if mode == "stack" else style.helix_angle
     items = [_sheet_item(sh, frame, PITCH * style.strand_scale) for sh in sheets]
-    bundles = helix_bundles(sses)
-    bundled = {k for g in bundles for k in g}
     by_id = {s.id: s for s in sses}
+    bundles = helix_bundles(sses)
+    if getattr(frame, "mirror_x", None) is not None and getattr(frame, "sector", None):
+        bundles = _within_protomers(bundles, by_id, frame.sector)
+    bundled = {k for g in bundles for k in g}
     items += [_bundle_item([by_id[k] for k in g], frame, angle_mode, HELIX_W * style.helix_scale) for g in bundles]
     items += [
         _helix_item(s, frame, angle_mode, HELIX_W * style.helix_scale)
@@ -1724,13 +1768,19 @@ def build_layout(
     else:
         ties = _symmetry_ties(items, frame)
         spread, lift = 0.0, 0.0
-        if ties:  # protomers side by side at least one protomer's width apart; copies start on their mates
+        mirror = getattr(frame, "mirror_x", None)
+        if ties and mirror is not None:  # a dyad in the page: each copy starts at its mate's mirror image
+            for i, (j, _) in ties.items():
+                items[i].cx, items[i].cy = 2 * mirror - items[j].cx, items[j].cy
+                items[i].home = (2 * mirror - items[j].home[0], items[j].home[1])
+        elif ties:  # protomers side by side at least one protomer's width apart; copies start on their mates
             mates = {j for j, _ in ties.values()}
             x0 = min(items[j].cx + items[j].box[0] for j in mates)
             x1 = max(items[j].cx + items[j].box[2] for j in mates)
             # protomer k sits k spreads along: rightwards when the copies turn anticlockwise seen from the top
             # of the axis, leftwards for a left-handed filament (or an assembly turned over), as projected
-            spread = float(np.sign(frame.period) or 1.0) * max(abs(frame.period) * SCALE, x1 - x0 + 2 * MARGIN)
+            period = getattr(frame, "period", 0.0)  # a CylinderFrame's; a Frame with ties always has a mirror line
+            spread = float(np.sign(period) or 1.0) * max(abs(period) * SCALE, x1 - x0 + 2 * MARGIN)
             lift = getattr(frame, "rise", 0.0) * SCALE
             for i, (j, k) in ties.items():
                 items[i].cx, items[i].cy = items[j].cx + k * spread, items[j].cy + k * lift
@@ -1738,10 +1788,22 @@ def build_layout(
         if attract and len(items) > 1:
             extra = _stem_springs(items, nucleic) if pieces else []
             rise = getattr(frame, "rise", 0.0) * SCALE
-            _attract(items, sses, contacts, ties, spread, rise, bridges or [], extra=extra, joints=joints, fixed=walls)
-        _separate(items, ties, joints, walls)
+            _attract(
+                items,
+                sses,
+                contacts,
+                ties,
+                spread,
+                rise,
+                bridges or [],
+                extra=extra,
+                joints=joints,
+                fixed=walls,
+                mirror=mirror if ties else None,
+            )
+        _separate(items, ties, joints, walls, mirror=mirror if ties else None)
         if domains and _part_domains(items, domains):
-            _separate(items, ties, joints, walls)
+            _separate(items, ties, joints, walls, mirror=mirror if ties else None)
     for it in items:
         it.apply()
     dna = [m for it in items for m in it.members if isinstance(m, PlacedStem)]

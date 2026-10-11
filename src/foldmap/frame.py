@@ -17,6 +17,9 @@ class Frame:
     u: np.ndarray  # page x
     v: np.ndarray  # page y (up)
     w: np.ndarray  # towards the viewer
+    sector: dict | None = None  # chain -> protomer index, for a dimer drawn as a mirror image (mirror_x)
+    classes: dict | None = None  # chain -> chain class (its position within a protomer)
+    mirror_x: float | None = None  # page x of the line protomer 1 mirrors protomer 0 about (a dyad in the page)
 
     def project(self, points: np.ndarray, chains=None) -> np.ndarray:
         rel = np.atleast_2d(points) - self.origin
@@ -93,6 +96,14 @@ class CylinderFrame:
         return np.array([float(vec @ u), float(vec @ v)])
 
 
+def protomer_maps(sym) -> tuple[dict, dict]:
+    """(sector, classes): each protomer chain's protomer index, and its chain class (its position within its
+    protomer), which _symmetry_ties matches copies by."""
+    sector = {c: k for k, p in enumerate(sym.protomers) for c in p}
+    classes = {c: i for p in sym.protomers for i, c in enumerate(p)}
+    return sector, classes
+
+
 def symmetric_frame(sses: list[SSE], sym) -> CylinderFrame:
     cents = np.array([s.centroid for s in sses])
     rel = cents - sym.centre
@@ -102,8 +113,7 @@ def symmetric_frame(sses: list[SSE], sym) -> CylinderFrame:
     first = np.mean(own, axis=0) - sym.centre if own else np.zeros(3)
     ref = first - (first @ sym.axis) * sym.axis
     ref = ref / np.linalg.norm(ref) if np.linalg.norm(ref) > 1e-6 else _any_perpendicular(sym.axis)
-    sector = {c: k for k, p in enumerate(sym.protomers) for c in p}
-    classes = {c: i for p in sym.protomers for i, c in enumerate(p)}
+    sector, classes = protomer_maps(sym)
     return CylinderFrame(
         sym.centre,
         sym.axis,
@@ -218,6 +228,9 @@ class RadialFrame:
     origin: np.ndarray  # duplex centre
     axis: np.ndarray  # page right
     down: np.ndarray  # fallback outward direction on the axis itself (toward the protein)
+    sector: dict | None = None  # as Frame: set with mirror_x for a dimer whose dyad lies in the page
+    classes: dict | None = None
+    mirror_x: float | None = None
 
     def _outward(self, p: np.ndarray) -> np.ndarray:
         rel = np.asarray(p, float) - self.origin
