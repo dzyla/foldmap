@@ -143,28 +143,46 @@ def _home_of(lay, g):
     return max(sorted(set(chains)), key=chains.count)
 
 
-@pytest.mark.parametrize("kw", [{}, {"focus": "protomer"}])
-def test_ligand_tethers_stay_in_their_own_pocket(kw):
-    """1LDM tetramer: OXM between A1 and A3 was tethered across the figure (11.2 page units)."""
+def test_ligand_tethers_stay_in_their_own_pocket():
+    """1LDM tetramer: OXM between A1 and A3 was tethered across the figure, to an A3 residue 11.0 page units away.
+    The home chain is always tethered (its targets are unbounded: true contact information); a target on another
+    chain is kept only within reach of the pocket."""
     import numpy as np
 
     from foldmap.render import _SPOT_RADIUS, _TETHER_REACH, TETHER_CAP, ligand_marks
     from foldmap.route import route_loops
     from helpers import FID
 
-    lay, sses, bb = make_layout(FID / "1LDM.cif.gz", **kw)
+    lay, sses, bb = make_layout(FID / "1LDM.cif.gz")
     marks = ligand_marks(lay, route_loops(lay, sses, bb), sses, Style())
-    assert len(marks) >= 4  # NAD and OXM of every drawn subunit
+    assert len(marks) >= 4  # NAD and OXM of every subunit
     assert TETHER_CAP == _TETHER_REACH + _SPOT_RADIUS  # the formula, see the comment at _TETHER_REACH
+    assert TETHER_CAP < 11.0  # shorter than the cross-pocket tether it removed
+    shared = [m for m in marks if len({lay.res_chain[r] for r in m["ligand"].contacts}) > 1]
+    assert len(shared) == 4  # the OXMs between A1/A3 and A2/A4: the case the cap is about
     for m in marks:
         home = _home_of(lay, m["ligand"])
-        chains = {lay.res_chain[r] for r in m["residues"]}
+        chains = [lay.res_chain[r] for r in m["residues"]]
         assert len(m["residues"]) == len(m["targets"])
-        # the home chain is always tethered; with the focus on one protomer an undrawn home falls back to the drawn one
-        assert home in chains or kw  # unfocused, the home chain is always tethered
+        assert home in chains
         c = np.array(m["centre"])
-        far = max(float(np.hypot(*(np.array(t) - c))) for t in m["targets"])
-        assert far <= TETHER_CAP, far  # measured: 6.7 at most (was 11.2)
+        for t, chain in zip(m["targets"], chains):
+            if chain != home:
+                assert float(np.hypot(*(np.array(t) - c))) <= TETHER_CAP, (m["ligand"].name, chain)
+
+
+def test_a_ligand_whose_home_chain_is_not_drawn_is_tethered_to_the_drawn_one():
+    """Focus on one protomer of 1LDM: the OXM of chain A3 touches A1 as well; A3 is not drawn, so it is tethered to
+    A1 alone (_local_targets falls back to the drawn chain rather than dropping the ligand)."""
+    from foldmap.render import ligand_marks
+    from foldmap.route import route_loops
+    from helpers import FID
+
+    lay, sses, bb = make_layout(FID / "1LDM.cif.gz", focus="protomer")
+    marks = ligand_marks(lay, route_loops(lay, sses, bb), sses, Style())
+    a3 = [m for m in marks if m["ligand"].name == "OXM" and m["ligand"].chain == "A3"]
+    assert len(a3) == 1 and a3[0]["targets"]
+    assert {lay.res_chain[r] for r in a3[0]["residues"]} == {"A1"}
 
 
 def test_haem_tethers_keep_to_the_pocket():
