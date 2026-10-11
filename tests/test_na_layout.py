@@ -1806,3 +1806,42 @@ def test_a_single_strand_wrapped_over_its_protein_keeps_the_protein_under_it():
         if gap.min() > 6.0:
             far.append((p.sse.id, round(float(gap.min()), 1)))
     assert not far
+
+
+def _piece(cx, cy, angle, length=4.0, width=2.0, ident="p"):
+    from types import SimpleNamespace
+
+    return SimpleNamespace(cx=cx, cy=cy, angle=angle, length=length, width=width, id=ident)
+
+
+def test_a_straight_joint_along_its_own_piece_turns_an_elbow_round_it():
+    """4YBB's P11b2 -> P11b1: the straight line from one piece's face to the next one's ran along the second piece's
+    body. A joint whose straight line runs into its own piece deeper than a bead's radius is drawn out of the one
+    face and into the other round a corner (route_na._elbow), clear of both; a shallow graze of a corner is kept."""
+    from types import SimpleNamespace
+
+    from foldmap.route_na import _BEAD, _elbow, _grazes, graze
+
+    da, db = _piece(0.0, 0.0, 0.0, ident="a"), _piece(3.5, 0.5, np.pi / 2, ident="b")  # b stands right of a's face
+    fa, ea, fb, eb = (2.0, 0.5), (1.0, 0.0), (4.0, 2.5), (0.0, 1.0)  # out of a's end, into b's top
+    assert _grazes([fa, fb], (da, db))  # straight, it cuts through b
+    router = SimpleNamespace(elements=(np.empty((4, 0)), []))
+    pts = _elbow(router, da, db, fa, ea, fb, eb)
+    assert pts is not None and pts[0] == fa and pts[-1] == fb and len(pts) > 2
+    assert not _grazes(pts, (da, db))
+    corner = _piece(0.0, 0.0, 0.0)  # a line clipping a corner by less than a bead's radius is no graze
+    assert 0 < graze((1.7, -1.2), (2.2, -0.7), corner) < _BEAD / 2 and not _grazes(
+        [(1.7, -1.2), (2.2, -0.7)], (corner,)
+    )
+
+
+def test_a_shallow_graze_at_a_path_end_is_not_counted_as_through_a_stem():
+    from foldmap.nacheck import _through_stem
+
+    d = _piece(0.0, 0.0, 0.0)
+    shallow = np.array([[1.7, -1.2, 2.2, -0.7]])  # one segment (first and last), clipping a corner by 0.1
+    assert not _through_stem(shallow, d)
+    deep = np.array([[-3.0, 0.0, 3.0, 0.0]])
+    assert _through_stem(deep, d)
+    middle = np.array([[-3.0, -3.0, 1.7, -1.2], [1.7, -1.2, 2.2, -0.7], [2.2, -0.7, 4.0, -3.0]])
+    assert _through_stem(middle, d)  # inside a path, even a graze counts

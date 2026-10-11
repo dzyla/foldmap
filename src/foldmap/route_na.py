@@ -779,11 +779,51 @@ def _unbunch(layout: Layout, paths: list[NAPath]) -> None:
             taken.add(xy)
 
 
+def graze(p, q, d) -> float:
+    """How deep segment p-q runs into the stem's (or element's) true, tilted body, page units: 0 when it misses."""
+    (u0, v0), (u1, v1) = _local(p, d), _local(q, d)
+    t = np.linspace(0.0, 1.0, 33)
+    u, v = u0 + t * (u1 - u0), v0 + t * (v1 - v0)
+    return float(max(0.0, np.max(np.minimum(d.length / 2 - np.abs(u), d.width / 2 - np.abs(v)))))
+
+
+def _grazes(pts, own) -> bool:
+    """Does the polyline run more than a bead's radius (_BEAD / 2) into either of its own pieces?"""
+    return any(graze(p, q, d) > _BEAD / 2 for d in own for p, q in zip(pts, pts[1:]))
+
+
+def _elbow(router: _Router, da: PlacedStem, db: PlacedStem, fa, ea, fb, eb, strands=None):
+    """A joint the straight line cannot take (it runs along one of its own pieces): out of face fa along ea, then
+    into face fb against its outward eb, a short way each (half, one, two nucleotide steps), joined straight or
+    round one corner (where the two arms' lines meet ahead of both, or either axis-aligned corner). The first clear
+    by _INFLATE of every element and stem but its own two, into neither of those beyond a bead's radius, and
+    crossing no strand but its partner; None if none is."""
+    fa, ea, fb, eb = (np.asarray(v, float) for v in (fa, ea, fb, eb))
+    for h in (0.5 * NT_STEP, NT_STEP, 2 * NT_STEP):
+        a, b = fa + ea * h, fb + eb * h
+        corners = [[]]
+        det = ea[0] * -eb[1] + eb[0] * ea[1]
+        if abs(det) > 1e-9:  # a + ea t = b + eb u, both ahead
+            t = ((b - a)[0] * -eb[1] + eb[0] * (b - a)[1]) / det
+            u = (ea[0] * (b - a)[1] - ea[1] * (b - a)[0]) / det
+            if t > 0 and u > 0:
+                corners.append([a + ea * t])
+        corners += [[np.array([a[0], b[1]])], [np.array([b[0], a[1]])]]
+        for c in corners:
+            pts = _xy([fa, a, *c, b, fb])
+            if _grazes(pts, (da, db)) or not _clear(pts, (da, db), *router.elements, grow=_INFLATE, kink=True):
+                continue
+            if strands is None or not strands.crosses(pts, skip=frozenset((da.id, db.id))):
+                return pts
+    return None
+
+
 def _straight_joint(router: _Router, da: PlacedStem, db: PlacedStem, fa, ea, fb, strands=None) -> bool:
     """May a joint no route reaches be drawn straight from face fa to face fb, as a kink joins two pieces of one
     helix? Only between pieces that are near (faces closer than _JOINT_STRAIGHT) or whose boxes touch, going on
-    forward (along fa's outward direction ea), clear by _INFLATE of every element and stem but its own two, and
-    crossing no nucleic-acid strand drawn so far (`strands`, a _Strands) other than the partner strand of this
+    forward (along fa's outward direction ea), clear by _INFLATE of every element and stem but its own two (a
+    line that runs into one of those beyond a bead's radius is drawn as an _elbow instead where one is clear),
+    and crossing no nucleic-acid strand drawn so far (`strands`, a _Strands) other than the partner strand of this
     same joint (two strands may cross where the duplex carries on, as in a helix)."""
     a, b = da.rect, db.rect
     touching = min(a[2], b[2]) - max(a[0], b[0]) >= -1e-9 and min(a[3], b[3]) - max(a[1], b[1]) >= -1e-9
@@ -949,10 +989,15 @@ def _drawing(router: _Router, s, nts, between, da, db, ends, need, joint, kind, 
         route, _ = router.route(fa, ea, da, fb, eb, db, own_body=True)
     if route is None and joint and _straight_joint(router, da, db, fa, ea, fb, strands):
         # pieces that touch (no margin is kept between them): the duplex carries on straight across their meeting
-        # corner, as a kink joins two pieces of one helix
-        for c in grid.cells_along(fa, fb):
-            grid.used[c] += 1
-        return NAPath("joint", s, [], on_rails([fa, fb]), [], between=between)
+        # corner, as a kink joins two pieces of one helix; past one of them, not through it (a shallow graze of a
+        # corner by the line leaving its face, as 4OO8 P6b -> P6a, is kept), round an elbow where one is clear
+        line = [fa, fb]
+        if _grazes(line, (da, db)):
+            line = _elbow(router, da, db, fa, ea, fb, eb, strands) or line
+        for a, b in zip(line, line[1:]):
+            for c in grid.cells_along(a, b):
+                grid.used[c] += 1
+        return NAPath("joint", s, [], on_rails(line), [], between=between)
     fallback = route is None
     if fallback and hard and bowed is None:
         return None

@@ -24,7 +24,7 @@ from .io import CONTACT
 from .layout import SCALE, joined_pieces, stem_pieces
 from .nucleic import stem_axis
 from .route import clip_len
-from .route_na import among, crosses_body, in_body
+from .route_na import _BEAD, among, crosses_body, graze, in_body
 
 
 @dataclass(frozen=True)
@@ -513,8 +513,13 @@ def _cross_count(xs: list, ys: list) -> int:
 
 
 def _through_stem(seg: np.ndarray, d) -> bool:
-    """Does any segment run through the stem's true, tilted body?"""
-    return any(crosses_body(s[:2], s[2:], d) for s in seg)
+    """Does any segment run through the stem's true, tilted body? A first or last segment that only grazes it, no
+    deeper than a bead's radius (a joint leaving its face past a corner of its own piece), does not count."""
+    last = len(seg) - 1
+    return any(
+        crosses_body(s[:2], s[2:], d) and (0 < k < last or graze(s[:2], s[2:], d) > _BEAD / 2)
+        for k, s in enumerate(seg)
+    )
 
 
 def _box_hits(box, seg: np.ndarray) -> bool:
