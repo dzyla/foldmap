@@ -18,8 +18,9 @@ from .dssp import assign_dssp
 from .features import sse_contacts
 from .frame import dna_radial_frame, dna_view_frame, symmetric_frame, view_frame
 from .io import load_backbone, load_links, load_nucleic, read_model
-from .layout import build_layout, resolve
+from .layout import _snap, build_layout, resolve
 from .model import AUTO_NT, crop_nucleic, nucleic_touching, res_ref
+from .nucleic import StemView, stem_views, straight_duplex
 from .palette import PALETTES
 from .render import LOOP_STYLES, STYLES, draw, save
 from .route import route_loops
@@ -86,6 +87,14 @@ CONSERVATION_LEGEND = "conservation (entropy-based, ConSurf colour scale)"
 CONSURF_LEGEND = "conservation (ConSurf grades)"
 
 
+def _any_centre(bb, nucleic) -> np.ndarray:
+    if len(bb):
+        return bb.ca.mean(axis=0)
+    if nucleic is not None and nucleic.strands:
+        return np.vstack([s.p for s in nucleic.strands]).mean(axis=0)
+    return np.zeros(3)  # nothing to draw (a nucleic acid with --no-dna)
+
+
 def _na_extent(na, extent: str):
     """(the nucleic acid to draw, whether `auto` cropped a large one to the stems the protein touches)."""
     if extent == "contacts":
@@ -140,7 +149,7 @@ def make_layout(
     focus_chains = _focus_chains(focus, sym, bb, sses)
     if focus_chains and nucleic is not None and nucleic.strands:  # one subunit: the nucleic acid it holds
         nucleic = nucleic_touching(nucleic, focus_chains)
-    na_cropped = False  # Task 6 stores it on the layout
+    na_cropped = False
     if nucleic is not None and nucleic.strands:  # after focus: auto crops to the stems the subunit touches
         nucleic, na_cropped = _na_extent(nucleic, (look or Style()).na_extent)
     partial, context, unjoined = set(), None, set()
@@ -184,8 +193,8 @@ def make_layout(
                 sym = dataclasses.replace(
                     sym, axis=-sym.axis, angles=[-a for a in sym.angles], rise=-sym.rise, twist=-sym.twist
                 )
-    if nucleic is not None and nucleic.strands:
-        frame = (
+    if nucleic is not None and straight_duplex(nucleic.structure, nucleic.strands):
+        frame = (  # protein on a straight duplex: the duplex across the page, the protein below it
             dna_radial_frame(sses, nucleic)
             if not rotate and not flip_v
             else dna_view_frame(sses, nucleic, rotate, flip_v)
@@ -194,8 +203,10 @@ def make_layout(
         sym is not None and not rotate and not flip_v and up is None and view is None
     ):  # an assembly: every protomer drawn alike, side by side
         frame = symmetric_frame(sses, sym)
-    else:
-        frame = view_frame(sses, rotate, flip_v, up, view)
+    else:  # stem axes differ in the last bit between BLAS kernels: snapped before they choose the page axes
+        stems = stem_views(nucleic.structure, nucleic.strands) if nucleic is not None else []
+        stems = [StemView(_snap(v.centroid), _snap(v.axis), v.n) for v in stems]
+        frame = view_frame(sses + stems, rotate, flip_v, up, view)
     links = load_links(path, bb, assembly, model=model)
     contacts = sse_contacts(bb, sses)
     for key, n in _bridge_contacts(bb, sses, links).items():
@@ -234,15 +245,16 @@ def make_layout(
     if focus_chains:
         lay.focus, lay.focus_chains, lay.context = set(focus_chains), set(focus_chains), context
         lay.unjoined = unjoined
+    lay.na_cropped = na_cropped
     lay.links = links
     lay.res_chain = [l.chain for l in bb.labels]
     lay.res_name = [l.name for l in bb.labels]
     lay.res_b = [float(x) for x in bb.b] if bb.b is not None else []
     lay.uniprot = ann
-    first = [s.centroid for s in sses if s.chain == sses[0].chain] if sses else [bb.ca.mean(axis=0)]
+    first = [s.centroid for s in sses if s.chain == sses[0].chain] if sses else [_any_centre(bb, nucleic)]
     centre = np.mean(first, axis=0)
     lay.page_axes = [list(map(float, a)) for a in frame.basis(centre)]
-    lay.page_centre = list(map(float, bb.ca.mean(axis=0)))
+    lay.page_centre = list(map(float, bb.ca.mean(axis=0) if len(bb) else centre))
     if mem is not None:
         lay.membrane = _membrane_band(lay, sses, bb, mem)
     if msa:

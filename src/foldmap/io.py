@@ -149,6 +149,8 @@ def load_backbone(
                 f"{path}: only Cα atoms; foldmap needs the N, CA and C atoms of each residue to assign secondary "
                 "structure (rebuild the backbone first, e.g. with PULCHRA or modeller)"
             )
+        if any(_is_nucleotide(chain, k) for chain in model for k in range(len(chain))):  # nucleic acid only:
+            return Backbone([], np.zeros((0, 4, 3)), np.zeros(0, bool), set(), np.zeros(0))  # drawn on its own
         raise ValueError(f"{path}: no protein residues with a complete backbone")
     xyz = np.asarray(coords, float)
     prev = np.zeros(len(labels), bool)

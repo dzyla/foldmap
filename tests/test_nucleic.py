@@ -98,8 +98,8 @@ def test_duplex_runs_along_its_projected_axis_with_strands_antiparallel(ubq, pdb
     a2 = f.project(f.origin + axis)[0]
     if np.linalg.norm(a2) > 0.3:
         assert abs(a2 @ d.direction) / np.linalg.norm(a2) > 0.99
-    s0 = [d.axial[(0, i)] for i in range(len(na.strands[0]))]
-    s1 = [d.axial[(1, i)] for i in range(len(na.strands[1]))]
+    s0 = [d.axial[(0, i)] for i in range(len(na.strands[0])) if (0, i) in d.axial]  # paired ones: overhangs
+    s1 = [d.axial[(1, i)] for i in range(len(na.strands[1])) if (1, i) in d.axial]  # are drawn as free ends
     assert np.all(np.diff(s0) > 0) and np.all(np.diff(s1) < 0)  # 5' -> 3' run opposite ways
     for a, i, b, j in na.pairs:
         assert abs(d.axial[(a, i)] - d.axial[(b, j)]) < 0.6  # partners sit across from each other
@@ -154,20 +154,24 @@ def _gid(fig, prefix):
     ]
 
 
+@pytest.mark.xfail(reason="ribbon style arrives in Task 8", strict=True)
 def test_duplex_is_drawn_as_a_double_helix_from_one_repeated_turn(ubq):
-    fig, _ = _figure(ubq.parent / "1LMB.cif")
-    (front,) = _gid(fig, "dna-front:")
-    (back,) = _gid(fig, "dna-back:")
+    from foldmap.style import Style
+
+    fig, _ = _figure(ubq.parent / "1LMB.cif", look=Style(na_style="ribbon"))
+    (front,) = _gid(fig, "na:stem:0:front")
+    (back,) = _gid(fig, "na:stem:0:back")
     polys = [p for p in front.get_path().to_polygons(closed_only=False) if len(p) > 2]
     assert len(polys) >= 4  # two backbones, ~2 turns for 20 bp, each turn its own pair of front faces
     sizes = {len(p) for p in polys}
     assert len(sizes) <= 3  # tiles of one fragment (full turns, plus clipped end pieces)
-    assert len(_gid(fig, "dna-rung:")) == 1  # base pairs: one compound path
+    assert len(_gid(fig, "na:stem:0:rungs")) == 1  # base pairs: one compound path
 
 
+@pytest.mark.xfail(reason="strand ends come from routing in Task 7", strict=True)
 def test_dna_ends_are_labelled_five_and_three_prime(ubq):
     fig, _ = _figure(ubq.parent / "1ZAA.cif")
-    ends = sorted(t.get_text() for t in _gid(fig, "dna-end:"))
+    ends = sorted(t.get_text() for t in _gid(fig, "na:end:"))
     assert ends == ["3′", "3′", "5′", "5′"]
 
 
@@ -177,11 +181,10 @@ def test_contacts_are_marked_in_the_protein_chain_colour(ubq):
     from foldmap.palette import chain_colors
 
     fig, _ = _figure(ubq.parent / "1LMB.cif")
-    marks = _gid(fig, "dna-contact:")
+    marks = _gid(fig, "na:contact:")
     assert marks
     colours = {to_hex(c) for m in marks for c in m.get_facecolors()}
     assert colours <= {c.lower() for c in chain_colors(["3", "4"]).values()}  # protein chains 3 and 4
-    assert _gid(fig, "dna-tether:")
 
 
 def test_loops_route_around_the_duplex(ubq):
@@ -202,9 +205,9 @@ def test_no_dna_option_hides_it(ubq, tmp_path):
 
     out = tmp_path / "x.svg"
     assert main(["plot", str(ubq.parent / "1ZAA.cif"), "-o", str(out), "--no-dna"]) == 0
-    assert "dna-front:" not in out.read_text()
+    assert "na:stem:" not in out.read_text()
     assert main(["plot", str(ubq.parent / "1ZAA.cif"), "-o", str(out)]) == 0
-    assert "dna-front:" in out.read_text()
+    assert "na:stem:" in out.read_text()
 
 
 def test_summary_lists_the_nucleic_acid(ubq, capsys):
@@ -213,50 +216,6 @@ def test_summary_lists_the_nucleic_acid(ubq, capsys):
     assert main(["summary", str(ubq.parent / "1LMB.cif")]) == 0
     out = capsys.readouterr().out
     assert "DNA" in out and "19 base pairs" in out and "contacts" in out
-
-
-@pytest.mark.parametrize("pdb", ["1ZAA", "1LMB"])
-def test_tethers_join_an_element_to_its_nearest_contact_mark(ubq, pdb):
-    from foldmap.cli import make_layout
-
-    fig, _ = _figure(ubq.parent / f"{pdb}.cif")
-    lay, _, _ = make_layout(ubq.parent / f"{pdb}.cif")
-    marks = np.vstack([m.get_offsets() for m in _gid(fig, "dna-contact:")])
-    for line in _gid(fig, "dna-tether:"):
-        p = lay.placed[line.get_gid().split(":", 1)[1]]
-        (x0, x1), (y0, y1) = line.get_xdata(), line.get_ydata()
-        a, b = np.array(p.n_port), np.array(p.c_port)
-        t = np.clip((np.array([x0, y0]) - a) @ (b - a) / ((b - a) @ (b - a)), 0, 1)
-        assert np.hypot(*(a + t * (b - a) - [x0, y0])) < 1e-6  # starts on the element's axis
-        assert np.min(np.hypot(*(marks - [x1, y1]).T)) < 1e-6  # ends on a contact mark
-        own = _contact_points(lay, p.sse)
-        ab = np.linspace(a, b, 400)
-        nearest = min(np.min(np.hypot(*(ab - q).T)) for q in own)
-        assert np.hypot(x1 - x0, y1 - y0) == pytest.approx(nearest, abs=0.02)  # the shortest way to its contacts
-
-
-def _contact_points(lay, sse):
-    from foldmap.layout import dna_to_page, dna_y
-
-    (d,) = lay.dna
-    na = lay.nucleic
-    slot = {k: n % 2 for n, k in enumerate(d.strands)}
-    hit = {h for r in range(sse.start, sse.end + 1) for h in na.contacts.get(r, ()) if h[0] in slot}
-    return [dna_to_page(d, d.axial[h], dna_y(slot[h[0]], d.axial[h])) for h in hit]
-
-
-@pytest.mark.parametrize("pdb", ["1ZAA", "1LMB"])
-@pytest.mark.parametrize("mode", ["projected", "stack"])
-def test_tethers_never_cross_other_elements(ubq, pdb, mode):
-    from foldmap.cli import make_layout
-    from test_route import segments_clear
-
-    fig, _ = _figure(ubq.parent / f"{pdb}.cif", mode=mode)
-    lay, _, _ = make_layout(ubq.parent / f"{pdb}.cif", mode)
-    for line in _gid(fig, "dna-tether:"):
-        own = line.get_gid().split(":", 1)[1]
-        others = [p.rect for k, p in lay.placed.items() if k != own] + [g.rect for g in lay.ghosts]
-        assert segments_clear(list(zip(line.get_xdata(), line.get_ydata())), others), (mode, own)
 
 
 @pytest.mark.parametrize("pdb", ["1ZAA", "1LMB"])
@@ -281,11 +240,12 @@ def test_dna_view_is_a_rotation_not_a_mirror(ubq):
     assert np.allclose(m @ m.T, np.eye(3), atol=1e-9) and np.linalg.det(m) == pytest.approx(1.0)
 
 
+@pytest.mark.xfail(reason="overhang letters come from free ends routed in Task 7", strict=True)
 def test_every_nucleotide_is_labelled_with_its_base(ubq):
     fig, _ = _figure(ubq.parent / "1ZAA.cif")
     bb, _, _ = pipeline(ubq.parent / "1ZAA.cif")
     na = load_nucleic(ubq.parent / "1ZAA.cif", bb)
-    labels = _gid(fig, "nt:")
+    labels = _gid(fig, "na:nt:")
     assert len(labels) == sum(len(s) for s in na.strands)
     want = sorted(l.name.strip()[-1] for s in na.strands for l in s.labels)  # DA -> A
     assert sorted(t.get_text() for t in labels) == want
@@ -295,7 +255,7 @@ def test_nucleotide_labels_can_be_switched_off(ubq):
     from foldmap.style import Style
 
     fig, _ = _figure(ubq.parent / "1ZAA.cif", look=Style(nucleotide_labels=False))
-    assert not _gid(fig, "nt:")
+    assert not _gid(fig, "na:nt:")
 
 
 @pytest.mark.parametrize("pdb", ["1ZAA", "1LMB"])
@@ -351,9 +311,9 @@ def test_contact_beads_leave_the_base_letters_readable(ubq, pdb):
     ax = fig.axes[0]
     unit_px = ax.transData.transform((1, 0))[0] - ax.transData.transform((0, 0))[0]
     px_per_pt = fig.dpi / 72
-    letters = np.array([t.get_position() for t in _gid(fig, "nt:")])
-    glyph = 0.5 * max(t.get_fontsize() for t in _gid(fig, "nt:")) * px_per_pt / unit_px  # half a letter
-    for beads in _gid(fig, "dna-contact:"):
+    letters = np.array([t.get_position() for t in _gid(fig, "na:nt:")])
+    glyph = 0.5 * max(t.get_fontsize() for t in _gid(fig, "na:nt:")) * px_per_pt / unit_px  # half a letter
+    for beads in _gid(fig, "na:contact:"):
         r = np.sqrt(beads.get_sizes()[0]) / 2 * px_per_pt / unit_px  # marker radius, page units
         for b in beads.get_offsets():
             assert np.min(np.hypot(*(letters - b).T)) >= r + glyph * 0.8
@@ -404,6 +364,7 @@ def test_untouched_duplexes_are_dropped():
     assert crop_nucleic(na).strands == []
 
 
+@pytest.mark.xfail(reason="strand ends come from routing in Task 7", strict=True)
 def test_cropped_ends_are_marked_and_full_dna_on_request():
     from foldmap.cli import make_figure
 

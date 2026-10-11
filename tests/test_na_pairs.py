@@ -154,7 +154,7 @@ def test_no_nucleotides_no_pairs():
 
 
 def test_load_nucleic_keeps_four_tuple_pairs_and_the_kinds():
-    path = NA / "30QM.cif.gz"  # protein and G·U wobbles (1EHZ, RNA only, has no Backbone to load against)
+    path = NA / "1EHZ.cif.gz"
     na = load_nucleic(path, load_backbone(path, "asu"), "asu")
     assert na.pairs == [tuple(p[:4]) for p in na.base_pairs]
     assert {p.kind for p in na.base_pairs} == {"WC", "GU"}

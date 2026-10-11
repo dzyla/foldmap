@@ -183,13 +183,18 @@ def view_frame(
     return Frame(origin, u, v, w)
 
 
+def _duplex_axis(nucleic) -> tuple[np.ndarray, np.ndarray]:
+    """(centre, axis) of the longest stem: the duplex a protein-DNA picture is drawn around."""
+    from .nucleic import stem_axis
+
+    biggest = max(nucleic.structure.stems, key=len)
+    return stem_axis(biggest, nucleic.strands)
+
+
 def dna_view_frame(sses: list[SSE], nucleic, rotate: float = 0.0, flip_v: bool = False) -> Frame:
     """The usual picture of a protein-DNA complex: the longest duplex runs across the page (5' of its first
     strand on the left) and the protein sits below it. A rotation, never a mirror (unless flip_v)."""
-    from .model import duplex_axis, duplex_groups
-
-    biggest = max(duplex_groups(nucleic), key=lambda g: sum(len(nucleic.strands[k]) for k in g))
-    dna_c, u = duplex_axis(nucleic, biggest)  # the same axis the layout draws the duplex along
+    dna_c, u = _duplex_axis(nucleic)  # the same axis the layout draws the duplex along
     pts = np.vstack([s.p for s in nucleic.strands])
     prot = np.array([s.centroid for s in sses]).mean(axis=0) if sses else dna_c
     up = dna_c - prot  # from the protein toward the DNA
@@ -235,10 +240,7 @@ class RadialFrame:
 
 
 def dna_radial_frame(sses: list[SSE], nucleic, rotate: float = 0.0, flip_v: bool = False) -> RadialFrame:
-    from .model import duplex_axis, duplex_groups
-
-    biggest = max(duplex_groups(nucleic), key=lambda g: sum(len(nucleic.strands[k]) for k in g))
-    centre, axis = duplex_axis(nucleic, biggest)
+    centre, axis = _duplex_axis(nucleic)
     prot = np.array([s.centroid for s in sses]).mean(axis=0) if sses else centre + _any_perpendicular(axis)
     down = prot - centre
     down = down - (down @ axis) * axis

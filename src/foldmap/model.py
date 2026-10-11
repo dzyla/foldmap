@@ -289,35 +289,6 @@ def _cut(na: Nucleic, windows: dict[int, list[tuple[int, int]]]) -> Nucleic:
     return nucleic_from_pairs(strands, pairs, contacts, chains, gaps)
 
 
-def duplex_groups(na: Nucleic) -> list[list[int]]:
-    """Strands joined by base pairs, as sorted groups (a lone strand is its own group)."""
-    group = list(range(len(na.strands)))
-
-    def root(x: int) -> int:
-        while group[x] != x:
-            x = group[x]
-        return x
-
-    for a, _, b, _ in na.pairs:
-        group[root(a)] = root(b)
-    out: dict[int, list[int]] = {}
-    for k in range(len(na.strands)):
-        out.setdefault(root(k), []).append(k)
-    return sorted(out.values())
-
-
-def duplex_axis(na: Nucleic, strands: list[int]) -> tuple[np.ndarray, np.ndarray]:
-    """(centre, unit axis) of a duplex: principal axis of all its backbone points, signed so the first
-    strand runs 5' -> 3' along it."""
-    pts = np.vstack([na.strands[s].p for s in strands])
-    centre = pts.mean(axis=0)
-    axis = np.linalg.svd(pts - centre)[2][0]
-    first = na.strands[strands[0]].p
-    if (first[-1] - first[0]) @ axis < 0:
-        axis = -axis
-    return centre, axis
-
-
 @dataclass
 class Ligand:
     """A small molecule or ion bound to the protein. contacts: Backbone indices of the residues holding it

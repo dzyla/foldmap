@@ -33,15 +33,13 @@ from .layout import (
     END_LABEL,
     END_STUB,
     HEAD,
+    NT_ROW,
     PITCH,
     SHAFT,
     Layout,
     Placed,
-    PlacedDNA,
+    PlacedStem,
     centred_box,
-    dna_end_labels,
-    dna_letter_pos,
-    dna_to_page,
     dna_y,
     domain_panel,
     helix_label_pos,
@@ -156,7 +154,6 @@ def _dna_colours(style: str) -> tuple[str, str, str]:
 
 _DNA_TUBE = 0.42  # backbone tube width, page units
 _DNA_SEG = 16  # points along each half-turn
-_TETHER_MIN = 2  # residues an element must have touching the DNA to get a tether
 
 
 def _tube(pts: np.ndarray, width: float) -> np.ndarray:
@@ -167,7 +164,7 @@ def _tube(pts: np.ndarray, width: float) -> np.ndarray:
     return np.vstack([pts + n, (pts - n)[::-1]])
 
 
-def _dna_turns(d: PlacedDNA, slot: int) -> tuple[list[np.ndarray], list[np.ndarray]]:
+def _dna_turns(d: PlacedStem, slot: int) -> tuple[list[np.ndarray], list[np.ndarray]]:
     """Front and back half-turns of one backbone in duplex-local coordinates: the same half-turn fragment
     repeated every turn (shifted by the minor groove for the second backbone), clipped to the duplex ends."""
     x0, x1 = -d.length / 2, d.length / 2
@@ -194,161 +191,237 @@ def _compound(polys: list[np.ndarray], closed: bool = True) -> Path:
     return Path(verts, codes)
 
 
-def _segment_hits(p0, p1, rect, shrink: float = 0.05) -> bool:
-    """Does the segment p0-p1 pass through the inside of rect (Liang-Barsky clip)?"""
-    x0, y0, x1, y1 = rect[0] + shrink, rect[1] + shrink, rect[2] - shrink, rect[3] - shrink
-    dx, dy = p1[0] - p0[0], p1[1] - p0[1]
-    lo, hi = 0.0, 1.0
-    for q, r in ((-dx, p0[0] - x0), (dx, x1 - p0[0]), (-dy, p0[1] - y0), (dy, y1 - p0[1])):
-        if abs(q) < 1e-12:
-            if r < 0:
-                return False
-            continue
-        t = r / q
-        if q < 0:
-            lo = max(lo, t)
-        else:
-            hi = min(hi, t)
-        if lo > hi:
-            return False
-    return True
-
-
 def _base_letter(name: str) -> str:
     """DA -> A, U -> U; anything unusual -> N."""
     letter = name.strip()[-1:].upper()
     return letter if letter in "ACGTUI" else "N"
 
 
-def _draw_dna(
+def _na_style(layout: Layout, look: Style) -> str:
+    """The stem style drawn: a large nucleic acid cropped by na_extent auto goes from ladder to block."""
+    return "block" if look.na_style == "ladder" and layout.na_cropped else look.na_style
+
+
+_LETTER_GAP = 0.38  # page units: closest two base letters (or a letter and a bead) may sit
+
+
+def _place_run_letters(letters: dict, pending: list, where: dict, layout: Layout) -> None:
+    """A letter for each single-stranded nucleotide beside its strand: the left side, else the right, else
+    further out on either side, or a little along the strand, whichever first keeps clear of other letters,
+    beads and elements; when none is clear, the one furthest from the others."""
+    taken = [xy for xy, _ in letters.values()] + list(where.values())
+    boxes = [p.rect for p in layout.placed.values()] + [d.rect for d in layout.stems]
+
+    def room(q, own) -> float:
+        if any(x0 < q[0] < x1 and y0 < q[1] < y1 for x0, y0, x1, y1 in boxes):
+            return 0.0
+        return min((float(np.hypot(*(q - t))) for t in taken if t is not own), default=np.inf)
+
+    for key, xy, side in pending:
+        ahead = np.array([side[1], -side[0]])
+        options = [xy + side * NT_ROW * f for f in (1.0, -1.0, 1.7, -1.7, 2.4, -2.4)]
+        options += [xy + side * NT_ROW * f + ahead * t for f in (1.0, -1.0) for t in (0.4, -0.4)]
+        spaces = [room(q, where[key]) for q in options]
+        clear = [q for q, r in zip(options, spaces) if r >= _LETTER_GAP]
+        spot = clear[0] if clear else options[int(np.argmax(spaces))]
+        letters[key] = (spot, 0.0)
+        taken.append(spot)
+
+
+class _NAInk(NamedTuple):
+    """What every nucleic-acid drawing step shares."""
+
+    ax: object
+    front: str  # backbone and text colour
+    back: str  # the far backbone of a double helix
+    rung: str  # base pairs
+    fill: str
+    lw: float
+    font: float
+    gu: set  # (a, i, b, j) of the G·U pairs, drawn dotted
+
+
+def _upright(angle: float) -> float:
+    rot = float(np.degrees(angle))
+    return rot - 180 if rot > 90 else rot + 180 if rot < -90 else rot
+
+
+def _rung_lines(ink: _NAInk, k: int, d: PlacedStem, inset: float = 0.0) -> None:
+    for pair in d.pairs:
+        a, i, b, j = pair
+        p, q = d.point((a, i)), d.point((b, j))
+        v = (q - p) / max(float(np.hypot(*(q - p))), 1e-9)
+        (line,) = ink.ax.plot(
+            *np.c_[p + v * inset, q - v * inset],
+            color=ink.rung,
+            lw=ink.lw * 1.4,
+            ls=(0, (1, 1.5)) if pair in ink.gu else "-",
+            solid_capstyle="round",
+            zorder=2.1,
+        )
+        line.set_gid(f"na:stem:{k}:rung")
+
+
+def _ladder(ink: _NAInk, k: int, d: PlacedStem, where: dict, letters: dict) -> None:
+    """Two rails (a bulged nucleotide pushed out a little) and a rung per pair; letters outside the rails."""
+    rails = []
+    for sign in (1, -1):
+        keys = sorted((key for key in d.axial if d.side[key] == sign), key=lambda key: d.axial[key])
+        rails.append(np.array([d.point(key, 0.3 if key in d.bulges else 0.0) for key in keys]))
+    rail = PathPatch(
+        _compound([r for r in rails if len(r) > 1], closed=False),
+        fc="none",
+        ec=ink.front,
+        lw=ink.lw * 2.2,
+        capstyle="round",
+        joinstyle="round",
+        zorder=2.2,
+    )
+    rail.set_gid(f"na:stem:{k}:rails")
+    ink.ax.add_patch(rail)
+    _rung_lines(ink, k, d)
+    for key in d.axial:
+        letters[key] = (d.point(key, NT_ROW), _upright(d.angle))
+
+
+def _draw_stem_label(ink: _NAInk, k: int, d: PlacedStem) -> None:
+    t = ink.ax.text(
+        *(np.array([d.cx, d.cy]) + d.normal * (d.width / 2 + NT_ROW)),
+        d.name,
+        ha="center",
+        va="center",
+        rotation=_upright(d.angle),
+        fontsize=ink.font * 0.8,
+        fontweight="bold",
+        color=ink.front,
+        zorder=4,
+    )
+    t.set_gid(f"na:label:{k}")
+
+
+_STEM_STYLES = {"ladder": _ladder}  # na_style -> how a stem is drawn
+
+
+def _draw_strands(ink: _NAInk, layout: Layout, style: str, where: dict, letters: dict) -> None:
+    """Single strands along their drawn paths (gaps dashed and labelled); their letters beside them."""
+    pending = []  # single-stranded nucleotides whose letters still need a free spot
+    for n, path in enumerate(layout.na_paths):
+        pts = np.asarray(path.points, float)
+        (line,) = ink.ax.plot(
+            pts[:, 0],
+            pts[:, 1],
+            color=ink.front,
+            lw=ink.lw * (1.4 if path.kind != "gap" else 1.0),
+            ls=(0, (2, 2)) if path.kind == "gap" else "-",
+            solid_capstyle="round",
+            solid_joinstyle="round",
+            zorder=1.9,
+        )
+        line.set_gid(f"na:run:{n}")
+        if path.label:
+            t = ink.ax.text(
+                *pts.mean(axis=0), path.label, ha="center", va="bottom", fontsize=ink.font * 0.75, color=ink.front
+            )
+            t.set_gid(f"na:gap:{n}")
+        for m, (i, xy) in enumerate(zip(path.nts, path.nt_xy)):
+            where[(path.strand, i)] = np.asarray(xy)
+            if style == "letters":
+                letters[(path.strand, i)] = (np.asarray(xy), 0.0)
+                continue
+            ahead = np.asarray(path.nt_xy[min(m + 1, len(path.nt_xy) - 1)]) - np.asarray(path.nt_xy[max(m - 1, 0)])
+            if len(path.nt_xy) < 2:
+                ahead = pts[-1] - pts[0]
+            ahead = ahead / max(float(np.hypot(*ahead)), 1e-9)
+            pending.append(((path.strand, i), np.asarray(xy), np.array([-ahead[1], ahead[0]])))
+    _place_run_letters(letters, pending, where, layout)
+
+
+def _draw_na_marks(ink: _NAInk, layout: Layout, style: str, residue_colour, pt_per_unit, look, where, letters):
+    """Isolated pairs as bars, base letters (touched ones in the toucher's colour), beads on the touched
+    nucleotides in the protein chain's colour, and the strands' 5' and 3' ends."""
+    na = layout.nucleic
+    for p in na.structure.ties:
+        a, b = where.get((p.a, p.i)), where.get((p.b, p.j))
+        if a is not None and b is not None:
+            (line,) = ink.ax.plot(
+                *np.c_[a, b], color=ink.rung, lw=ink.lw * 1.2, ls=(0, (1, 1.5)) if p.kind == "GU" else "-", zorder=1.8
+            )
+            line.set_gid(f"na:tie:{na.strands[p.a].labels[p.i].tag}-{na.strands[p.b].labels[p.j].tag}")
+    touched: dict[tuple[int, int], tuple[str, str]] = {}  # nucleotide -> (chain, colour) of its first toucher
+    for r, nts in sorted(na.contacts.items()):
+        chain = na.contact_chain.get(r)
+        colour = residue_colour(r, chain)
+        for key in sorted(nts):
+            if colour is not None:
+                touched.setdefault(key, (chain, colour))
+    if look.nucleotide_labels and style != "block":
+        for key, (xy, rot) in sorted(letters.items()):
+            hit = touched.get(key)
+            lab = na.strands[key[0]].labels[key[1]]
+            t = ink.ax.text(
+                *xy,
+                _base_letter(lab.name),
+                ha="center",
+                va="center",
+                rotation=rot,
+                fontsize=ink.font * 0.75,
+                fontweight="bold" if hit else "normal",
+                color=hit[1] if hit else ink.front,
+                zorder=4,
+            )
+            t.set_gid(f"na:nt:{lab.chain}:{lab.tag}")
+    if style != "letters":
+        size = (_DNA_TUBE * 1.05 * pt_per_unit) ** 2
+        for chain in sorted({c for c, _ in touched.values()}):
+            keys = [key for key, (c, _) in sorted(touched.items()) if c == chain and key in where]
+            if keys:
+                xy = np.array([where[key] for key in keys])
+                sc = ink.ax.scatter(
+                    xy[:, 0],
+                    xy[:, 1],
+                    s=size,
+                    c=[touched[key][1] for key in keys],
+                    edgecolors="white",
+                    linewidths=ink.lw * 0.6,
+                    zorder=2.3,
+                )
+                sc.set_gid(f"na:contact:{chain}")
+    for s, end, (x, y) in layout.na_ends:
+        strand = na.strands[s]
+        cut = strand.cut5 if end == "5′" else strand.cut3
+        t = ink.ax.text(
+            x, y, "…" if cut else end, ha="center", va="center", fontsize=ink.font, fontweight="bold", color=ink.front
+        )
+        t.set_gid(f"na:end:{strand.id}:{end}")
+
+
+def _draw_nucleic(
     ax,
     layout: Layout,
     sses: list[SSE],
     residue_colour,
-    style: str,
+    fill: str,
     lw: float,
     font: float,
     pt_per_unit: float,
     look: Style,
 ) -> None:
+    """Stems in the chosen na_style, single strands along their drawn paths, base letters, contact beads in
+    the touching protein chain's colour, isolated pairs as bars, cropped gaps and the 5'/3' ends."""
     na = layout.nucleic
-    front_c, back_c, rung_c = _dna_colours(style)
-    for d in layout.dna:
-        slot = {k: n % 2 for n, k in enumerate(d.strands)}
-        fronts, backs = [], []
-        for n in range(min(2, len(d.strands))):
-            f, b = _dna_turns(d, n)
-            fronts += f
-            backs += b
-        page = lambda q, d=d: dna_to_page(d, q[:, 0], q[:, 1])  # noqa: E731
-        back = PathPatch(_compound([page(q) for q in backs]), fc=back_c, ec="none", zorder=2.0)
-        back.set_gid(f"dna-back:{d.id}")
-        ax.add_patch(back)
-        rungs, paired = [], set()
-        for a, i, b, j in na.pairs:
-            if a in slot and b in slot:
-                x = d.axial[(a, i)]
-                rungs.append(page(np.array([[x, dna_y(slot[a], x, d.width)], [x, dna_y(slot[b], x, d.width)]])))
-                paired |= {(a, i), (b, j)}
-        for k in d.strands:  # unpaired bases: a stub toward the axis
-            for i in range(len(na.strands[k])):
-                if (k, i) not in paired:
-                    x = d.axial[(k, i)]
-                    y = dna_y(slot[k], x, d.width)
-                    rungs.append(page(np.array([[x, y], [x, y * 0.35]])))
-        if rungs:
-            rung = PathPatch(
-                _compound(rungs, closed=False), fc="none", ec=rung_c, lw=lw * 2.2, capstyle="round", zorder=2.1
-            )
-            rung.set_gid(f"dna-rung:{d.id}")
-            ax.add_patch(rung)
-        front = PathPatch(
-            _compound([page(q) for q in fronts]),
-            fc="white" if style == "outline" else front_c,
-            ec=front_c if style == "outline" else "none",
-            lw=lw * 0.8,
-            zorder=2.2,
-        )
-        front.set_gid(f"dna-front:{d.id}")
-        ax.add_patch(front)
-        if look.nucleotide_labels:  # the sequence in two rows above the duplex; touched bases in the toucher's colour
-            touched: dict[tuple[int, int], str] = {}
-            for r, nts in sorted(na.contacts.items()):
-                colour = residue_colour(r, na.contact_chain.get(r))
-                for key in sorted(nts):
-                    if colour is not None:
-                        touched.setdefault(key, colour)
-            for row, k in enumerate(d.strands[:2]):
-                for i, lab in enumerate(na.strands[k].labels):
-                    px, py = dna_letter_pos(d, row, d.axial[(k, i)])
-                    hit = touched.get((k, i))
-                    t = ax.text(
-                        px,
-                        py,
-                        _base_letter(lab.name),
-                        ha="center",
-                        va="center",
-                        fontsize=font * 0.75,
-                        fontweight="bold" if hit else "normal",
-                        color=hit or front_c,
-                        zorder=4,
-                    )
-                    t.set_gid(f"nt:{na.strands[k].id}:{i}")
-        for sid, end, (x, y) in dna_end_labels(d, na):
-            t = ax.text(x, y, end, ha="center", va="center", fontsize=font, fontweight="bold", color=front_c, zorder=4)
-            t.set_gid(f"dna-end:{sid}:{end}")
-        # contacts: marks on the touched nucleotides in the protein chain's colour, dotted tethers to the elements
-        marks: dict[tuple, dict] = {}  # (chain, colour) -> {position: None}
-        for r, nts in sorted(na.contacts.items()):
-            chain = na.contact_chain.get(r)
-            colour = residue_colour(r, chain)
-            for k, i in sorted(nts):
-                if k in slot and colour is not None:
-                    x = d.axial[(k, i)]
-                    pos = tuple(np.round(page(np.array([[x, dna_y(slot[k], x, d.width)]]))[0], 6))
-                    if not any(pos in v for v in marks.values()):  # first touch wins the bead
-                        marks.setdefault((chain, colour), {})[pos] = None
-        size = (_DNA_TUBE * d.width / DNA_W * 1.05 * pt_per_unit) ** 2  # a bead on the backbone, not a balloon
-        for chain in sorted({c for c, _ in marks}):
-            pts = [(p, col) for (c, col), ps in sorted(marks.items()) if c == chain for p in ps]
-            xy = np.array([p for p, _ in pts])
-            sc = ax.scatter(
-                xy[:, 0],
-                xy[:, 1],
-                s=size,
-                c=[col for _, col in pts],
-                edgecolors="white",
-                linewidths=lw * 0.6,
-                zorder=2.3,
-            )
-            sc.set_gid(f"dna-contact:{d.id}:{chain}")
-        for s in sses:
-            if s.id not in layout.placed:
-                continue
-            residues = [r for r in range(s.start, s.end + 1) if any(k in slot for k, _ in na.contacts.get(r, ()))]
-            if len(residues) < _TETHER_MIN:
-                continue
-            hit = sorted({(k, i) for r in residues for k, i in na.contacts[r] if k in slot})
-            targets = np.array([page(np.array([[d.axial[h], dna_y(slot[h[0]], d.axial[h], d.width)]]))[0] for h in hit])
-            p = layout.placed[s.id]
-            a, b = np.array(p.n_port), np.array(p.c_port)
-            t = np.clip((targets - a) @ (b - a) / max((b - a) @ (b - a), 1e-12), 0.0, 1.0)
-            feet = a + t[:, None] * (b - a)  # closest point on the element's axis to each contact
-            k = int(np.argmin(np.hypot(*(targets - feet).T)))
-            blockers = [o.rect for key, o in layout.placed.items() if key != s.id] + [g.rect for g in layout.ghosts]
-            if any(_segment_hits(feet[k], targets[k], r) for r in blockers):
-                continue  # a tether through another element misleads more than it helps; the beads stay
-            (line,) = ax.plot(
-                [feet[k][0], targets[k][0]],
-                [feet[k][1], targets[k][1]],
-                ls=(0, (1, 2)),
-                lw=lw * 0.9,
-                color=front_c,
-                alpha=0.7,
-                zorder=0.8,
-                solid_capstyle="round",
-            )
-            line.set_gid(f"dna-tether:{s.id}")
+    gu = {(p.a, p.i, p.b, p.j) for p in na.base_pairs if p.kind == "GU"}
+    ink = _NAInk(ax, *_dna_colours(fill), fill, lw, font, gu)
+    style = _na_style(layout, look)
+    where: dict[tuple[int, int], np.ndarray] = {}  # nucleotide -> where it is drawn (its bead goes there)
+    letters: dict[tuple[int, int], tuple[np.ndarray, float]] = {}  # nucleotide -> letter position, rotation
+    for k, d in enumerate(layout.stems):
+        for key in d.axial:
+            where[key] = d.point(key)
+        _STEM_STYLES.get(style, _ladder)(ink, k, d, where, letters)
+        if style != "block" and look.labels:
+            _draw_stem_label(ink, k, d)
+    _draw_strands(ink, layout, style, where, letters)
+    _draw_na_marks(ink, layout, style, residue_colour, pt_per_unit, look, where, letters)
 
 
 def _arrow(p: Placed) -> np.ndarray:
@@ -1339,9 +1412,10 @@ def _legend_entries(layout: Layout, look: Style, chains: list[str], colors: dict
         ]
     for kind in dict.fromkeys(m["feature"].type for m in umarks):  # UniProt site types shown
         entries.append((SITE_COLOURS.get(kind, "#555555"), f"{kind.lower()} (UniProt)"))
-    if layout.dna and look.legend:
-        ids = sorted({layout.nucleic.strands[k].chain for d in layout.dna for k in d.strands})
-        kind = "RNA" if all(layout.nucleic.strands[k].rna for d in layout.dna for k in d.strands) else "DNA"
+    if layout.nucleic is not None and layout.nucleic.strands and look.legend:
+        strands = layout.nucleic.strands
+        ids = sorted({s.chain for s in strands})
+        kind = "RNA" if all(s.rna for s in strands) else "DNA" if not any(s.rna for s in strands) else "DNA/RNA"
         entries.append((_dna_colours(look.fill)[0], f"{kind} ({', '.join(ids)})"))
 
     return entries
@@ -1847,7 +1921,7 @@ def _draw(
     chains = _chains_in_order(sses)
     colors = chain_colors(chains, look.palette)
     element_colour, residue_colour = element_colours(layout, sses, look)
-    if not layout.placed and not layout.dna:
+    if not layout.placed and not layout.stems and not layout.na_paths:
         return _empty_figure()
     marks = ligand_marks(layout, loops, sses, look)
     umarks = uniprot_marks(layout, loops, sses, look)
@@ -1856,8 +1930,8 @@ def _draw(
     _draw_membrane(c, layout)
     _draw_domains(c, layout)
     _draw_sheet_panels(c, layout)
-    if layout.dna:
-        _draw_dna(c.ax, layout, sses, residue_colour, look.fill, c.lw, c.font, c.pt_per_unit, look)
+    if layout.stems or layout.na_paths:
+        _draw_nucleic(c.ax, layout, sses, c.residue_colour, c.look.fill, c.lw, c.font, c.pt_per_unit, c.look)
     _draw_elements(c, layout)
     _draw_links(c.ax, layout, loops, sses, look, c.lw, c.pt_per_unit)
     _draw_ligands(c.ax, marks, c.lw, c.font)

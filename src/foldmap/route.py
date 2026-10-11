@@ -68,7 +68,7 @@ class _Grid:
                 )
             return m
 
-        self.blocked = mask(p.rect for p in [*layout.placed.values(), *layout.ghosts, *layout.dna])
+        self.blocked = mask(p.rect for p in [*layout.placed.values(), *layout.ghosts, *layout.stems])
         self.soft = mask(keep_out) & ~self.blocked  # text and stubs: avoided, given up only if nothing else routes
         self.blocked |= self.soft
 
@@ -320,7 +320,7 @@ def route_loops(layout: Layout, sses: list[SSE], bb) -> list[Loop]:
     # (owner element id or None, rect): the elements every drawn loop must not cross, then the text and
     # stubs a kink link also keeps clear of
     obstacles = [(k, p.rect) for k, p in layout.placed.items()]
-    obstacles += [(None, o.rect) for o in [*layout.ghosts, *layout.dna]]
+    obstacles += [(None, o.rect) for o in [*layout.ghosts, *layout.stems]]
     n_elements = len(obstacles)
     obstacles += [(n.removeprefix("label:") if n.startswith("label:") else None, r) for n, r in keep_out]
     owners = [k for k, _ in obstacles]

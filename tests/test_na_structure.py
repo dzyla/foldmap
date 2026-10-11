@@ -5,13 +5,12 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from foldmap.io import _nucleic_strands, load_backbone, load_nucleic, read_model
+from foldmap.io import load_backbone, load_nucleic
 from foldmap.model import AUTO_NT, NAStrand, ResLabel, crop_nucleic, nucleic_from_pairs
 from foldmap.nucleic import (
     BasePair,
     NARun,
     bend,
-    pair_nucleotides,
     secondary_structure,
     segment_stem,
     stem_axis,
@@ -25,14 +24,7 @@ DATA = Path(__file__).parent / "data"
 
 def _na(pdb):
     path = NA / f"{pdb}.cif.gz" if (NA / f"{pdb}.cif.gz").is_file() else DATA / f"{pdb}.cif"
-    try:
-        bb = load_backbone(path, "asu")
-    except ValueError as e:  # nucleic acid only (1EHZ): no Backbone to load against until Task 6
-        if "no protein residues" not in str(e):
-            raise
-        found = _nucleic_strands(read_model(path, "asu")[0])
-        return nucleic_from_pairs([s for s, _ in found], pair_nucleotides([r for _, r in found]), {}, {})
-    return load_nucleic(path, bb, "asu")
+    return load_nucleic(path, load_backbone(path, "asu"), "asu")
 
 
 def _arms(na, st):

@@ -11,7 +11,8 @@ import numpy as np
 
 from .features import helix_bundles
 from .frame import Frame
-from .model import SSE, Nucleic, Sheet, duplex_axis, duplex_groups, group_by_chain
+from .model import SSE, Nucleic, Sheet, group_by_chain
+from .nucleic import Stem, segment_stem, stem_axis
 from .style import Style
 
 PITCH = 1.1  # distance between neighbouring strand centres
@@ -101,24 +102,58 @@ DNA_PITCH = 10.5 * DNA_RISE * SCALE  # one turn, page units
 DNA_MINOR = 0.37  # the second backbone trails the first by this fraction of a turn (minor groove)
 
 
+NA_W = DNA_W  # stem width: a double helix is about 20 Å across, A-form RNA as B-DNA
+RAIL_IN = 0.6  # ladder rails sit this far inside the stem's long sides, base letters outside them
+NT_STEP = 0.55  # spacing of unpaired nucleotides along a drawn single strand (schematic, not to scale)
+
+
 @dataclass(eq=False)
-class PlacedDNA:
-    """A duplex (or lone strand) drawn as a straight double helix. axial[(strand, nt)] is the nucleotide's
-    position along the drawn axis from the centre, in page units (positive = along `direction`)."""
+class PlacedStem:
+    """A stem (base-paired double helix: an RNA stem, a DNA duplex, or one straight piece of a bent duplex)
+    drawn as a rigid element. axial[(strand, nt)]: the nucleotide's position along the drawn axis from the
+    centre, page units, positive along `direction`. side[(strand, nt)]: +1 on the first arm's rail (left of
+    `direction`), -1 on the second arm's. The first arm runs 5'->3' along `direction`, the second back."""
 
     id: str
-    strands: list[int]
+    name: str
+    strands: list[int]  # [first arm's strand, second arm's]; equal for an RNA hairpin stem
+    pairs: list[tuple[int, int, int, int]]
     cx: float
     cy: float
     length: float
     angle: float
     width: float
     axial: dict[tuple[int, int], float]
+    side: dict[tuple[int, int], int]
+    bulges: set = field(default_factory=set)
+    parent: str = ""  # a piece of a bent duplex: the whole stem's id
+    first: int = 1  # the side the first arm's rail is on
     ghost: bool = False
 
     @property
     def direction(self) -> np.ndarray:
         return np.array([np.cos(self.angle), np.sin(self.angle)])
+
+    @property
+    def normal(self) -> np.ndarray:
+        return np.array([-np.sin(self.angle), np.cos(self.angle)])
+
+    @property
+    def rail(self) -> float:
+        """Distance of each ladder rail from the axis."""
+        return max(self.width / 2 - RAIL_IN, self.width / 4)
+
+    def point(self, key: tuple[int, int], off: float = 0.0) -> np.ndarray:
+        """Page position of a nucleotide on its rail, or `off` further out from the axis."""
+        r = (self.rail + off) * self.side[key]
+        return np.array([self.cx, self.cy]) + self.axial[key] * self.direction + r * self.normal
+
+    def port(self, key: tuple[int, int], leaving: bool) -> tuple[np.ndarray, np.ndarray]:
+        """Where the strand leaves (or enters) the stem at this nucleotide, and the outward direction there:
+        along the arm's own 5'->3' sense when leaving, against it when entering."""
+        sense = 1 if self.side[key] == self.first else -1  # the first arm runs along `direction`, the second back
+        along = self.direction * sense * (1 if leaving else -1)
+        return self.point(key) + along * NT_STEP / 2, along
 
     rect = Placed.rect
 
@@ -128,11 +163,16 @@ class Layout:
     placed: dict[str, Placed]
     bounds: tuple[float, float, float, float]
     ghosts: list[Placed] = field(default_factory=list)
-    dna: list[PlacedDNA] = field(default_factory=list)
+    stems: list[PlacedStem] = field(default_factory=list)
     nucleic: Nucleic | None = None
     sheets: list[list[str]] = field(default_factory=list)  # strand ids of each sheet block, in layout order
     domains: list[tuple[str, list[str]]] = field(default_factory=list)  # named domains and their element ids
-    nt_rows: bool = False  # base letters printed as sequence rows above each duplex
+    nt_letters: bool = False  # base letters drawn beside the nucleotides
+    na_paths: list = field(default_factory=list)  # route.NAPath: single strands as drawn (filled by route_loops)
+    na_traces: dict = field(default_factory=dict)  # strand -> projected backbone (page units), for unpaired strands
+    na_ends: list = field(default_factory=list)  # (strand, "5′" or "3′", label position), filled by route_loops
+    na_cropped: bool = False  # na_extent auto cropped a large nucleic acid to the stems the protein touches
+    frame: object = None  # the frame.Frame (or RadialFrame, CylinderFrame) that took 3D to the page
     focus: set[str] | None = None  # chains drawn in colour when highlighting; the rest in grey
     links: object = None  # model.Links: disulfides and glycans, residue indices in Backbone order
     res_chain: list[str] = field(default_factory=list)  # chain of each Backbone residue
@@ -149,6 +189,10 @@ class Layout:
     res_cons: list[float] = field(default_factory=list)  # alignment conservation of each residue (nan: none)
     res_grade: list[int] = field(default_factory=list)  # conservation grade 1..9 of each residue (0: none)
     cons_label: str = ""  # legend text saying where the grades come from
+
+    @property
+    def dna(self) -> list[PlacedStem]:  # earlier name
+        return self.stems
 
     @property
     def width(self) -> float:
@@ -428,7 +472,7 @@ def _slide_clear(items: list[_Item]) -> None:
 
 def _owner(items: list[_Item]) -> dict[str, tuple[int, Placed, tuple[float, float]]]:
     return {
-        (m.id if isinstance(m, PlacedDNA) else m.sse.id): (k, m, o)
+        (m.id if isinstance(m, PlacedStem) else m.sse.id): (k, m, o)
         for k, it in enumerate(items)
         for m, o in zip(it.members, it.offsets)
         if not m.ghost
@@ -465,7 +509,7 @@ def _loop_springs(items: list[_Item], sses: list[SSE]) -> list[tuple[int, np.nda
 def _mass(it: _Item) -> float:
     """How firmly an item holds its projected place: one per element; a duplex like a sheet of
     one strand per two base pairs (the protein moves around the DNA, not the DNA around the protein)."""
-    return sum(len(m.axial) / 4 if isinstance(m, PlacedDNA) else 1 for m in it.members)
+    return sum(len(m.axial) / 4 if isinstance(m, PlacedStem) else 1 for m in it.members)
 
 
 def _energy(flat, home, anchor_w, want, pull, loops, lam, mids=None):
@@ -656,10 +700,13 @@ def _attract(
     spread: float = 0.0,
     lift: float = 0.0,
     bridges: list[tuple[str, float, str, float]] = (),
+    extra: list[tuple[int, np.ndarray, int, np.ndarray, float, float]] = (),
 ) -> None:
     """Minimise the layout energy (_energy) from the projected positions, raising the overlap penalty in
     stages. The result becomes each item's new home; _separate then guarantees no overlap remains. Every input
-    is snapped to the grid (_snap) and _lbfgs runs without BLAS, so the minimum is the same on every machine."""
+    is snapped to the grid (_snap) and _lbfgs runs without BLAS, so the minimum is the same on every machine.
+    `extra`: further springs (item i, port offset, item j, port offset, weight, slack), the nucleic-acid strands
+    from stem to stem (_stem_springs)."""
     n = len(items)
     W = _contact_weights(items, contacts)
     ci, cj = np.nonzero(np.triu(W > 0, 1))
@@ -667,6 +714,10 @@ def _attract(
     springs = _loop_springs(items, sses)
     weight = [_W_SEQ] * len(springs)
     slack = [_LOOP_SLACK] * len(springs)
+    for i, oi, j, oj, w, sl in extra:  # nucleic-acid strands from stem to stem
+        springs.append((i, oi, j, oj))
+        weight.append(float(_snap(w)))
+        slack.append(float(_snap(sl)))
     owner = _owner(items)
     bridges_used = []
     for a, ta, b, tb in bridges:  # disulfides: the two cysteines themselves pulled together
@@ -784,14 +835,14 @@ def _stack(items: list[_Item]) -> None:
             it.cx = x - it.box[0]
             it.cy = y_top - height / 2 - it.mid[1]
             x += it.box[2] - it.box[0] + _ROW_GAP
-        dna_row = all(isinstance(m, PlacedDNA) for it in row for m in it.members)
+        dna_row = all(isinstance(m, PlacedStem) for it in row for m in it.members)
         y_top -= height + (MARGIN if dna_row else _ROW_SPACING)  # binders hang right under the DNA
 
 
 def _centre_dna_over_binders(items: list[_Item], contacts: dict[frozenset[str], int]) -> None:
     owner = _owner(items)
     for it in items:
-        dna = [m for m in it.members if isinstance(m, PlacedDNA)]
+        dna = [m for m in it.members if isinstance(m, PlacedStem)]
         if not dna:
             continue
         xs = [
@@ -819,39 +870,133 @@ def _assign_labels(placed: list[Placed]) -> None:
             p.label = f"α{n + 1}"
 
 
-def _duplexes(na: Nucleic) -> list[list[int]]:
-    return duplex_groups(na)
+def stem_pieces(na: Nucleic) -> list[Stem]:
+    """Every stem of the nucleic acid, long bent ones cut into straight pieces, in 5'->3' order."""
+    return [piece for st in na.structure.stems for piece in segment_stem(st, na.strands)]
 
 
-def _dna_item(k: int, strands: list[int], na: Nucleic, frame: Frame, flat: bool, width: float = DNA_W) -> _Item:
-    centre, axis = duplex_axis(na, strands)  # the first strand runs 5' -> 3' along the drawn direction
-    along = {
-        (s, i): float((na.strands[s].c1[i] - centre) @ axis) * SCALE  # C1' sits level across a base pair
-        for s in strands
-        for i in range(len(na.strands[s]))
-    }
-    for a, i, b, j in na.pairs:  # a base pair is drawn as one straight rung
-        if (a, i) in along and (b, j) in along:
-            along[(a, i)] = along[(b, j)] = (along[(a, i)] + along[(b, j)]) / 2
-    span = max(along.values()) - min(along.values())
-    mid = (max(along.values()) + min(along.values())) / 2
-    along = {key: float(_snap(v - mid)) for key, v in along.items()}  # on the grid, like positions
-    length = float(_snap(span + DNA_RISE * SCALE))  # half a step beyond the end base pairs on each side
+_MIN_RISE = 2.6  # Å per base pair, the least a stem is drawn with (A-form rises 2.8, B-form 3.4)
+
+
+def _rungs(piece: Stem, na: Nucleic, centre: np.ndarray, axis: np.ndarray) -> dict[tuple[int, int], float]:
+    """Each nucleotide's place along the drawn stem, centred: the pairs evenly spaced over the stem's length
+    along its axis (so a curved stem's ends never crowd), one straight rung per pair, bulged nucleotides
+    spaced between their neighbours on their own arm."""
+    proj = [
+        float(((na.strands[p.a].c1[p.i] + na.strands[p.b].c1[p.j]) / 2 - centre) @ axis) * SCALE for p in piece.pairs
+    ]
+    n = len(piece.pairs)
+    span = max(abs(proj[-1] - proj[0]), (n - 1) * _MIN_RISE * SCALE)
+    out: dict[tuple[int, int], float] = {}
+    for k, p in enumerate(piece.pairs):
+        out[(p.a, p.i)] = out[(p.b, p.j)] = -span / 2 + span * k / max(n - 1, 1)
+    for p, q in zip(piece.pairs, piece.pairs[1:]):  # bulges: evenly between the two pairs around them
+        x0, x1 = out[(p.a, p.i)], out[(q.a, q.i)]
+        for s, lo, hi in ((p.a, p.i, q.i), (p.b, q.j, p.j)):
+            inner = range(lo + 1, hi)
+            for m, i in enumerate(inner if s == p.a else reversed(inner)):
+                out[(s, i)] = x0 + (x1 - x0) * (m + 1) / (len(inner) + 1)
+    return out
+
+
+def _stem_item(piece: Stem, na: Nucleic, frame: Frame, flat: bool, width: float = NA_W) -> _Item:
+    """A stem piece as a rigid item at its projected place, turned onto the page (never mirrored). Its axis
+    differs in the last bit between BLAS kernels, so every number the layout takes from it is snapped (_snap)."""
+    centre, axis = stem_axis(piece, na.strands)
+    (a, i0, i1), (b, j0, j1) = piece.arm5, piece.arm3
+    keys = [(a, i) for i in range(i0, i1 + 1)] + [(b, j) for j in range(j0, j1 + 1)]
+    # on the grid; + 0.0 turns a -0.0 (a centre pair a hair below zero) into 0.0
+    along = {key: float(_snap(v)) + 0.0 for key, v in _rungs(piece, na, centre, axis).items()}
+    length = float(_snap(max(along.values()) - min(along.values()) + DNA_RISE * SCALE))  # half a step beyond each end
     a2 = frame.direction(centre, axis)
-    angle = 0.0 if flat or np.linalg.norm(a2) < 1e-6 else float(_snap(np.arctan2(a2[1], a2[0])))  # on the grid
-    pos = frame.project(centre)[0] * SCALE
-    d = PlacedDNA(f"dna:{k}", list(strands), 0.0, 0.0, length, angle, width, along)
-    return _Item([d], [(0.0, 0.0)], float(pos[0]), float(pos[1]), (float(pos[0]), float(pos[1])), -1, "")
+    angle = 0.0 if flat or np.linalg.norm(a2) < 1e-6 else float(_snap(np.arctan2(a2[1], a2[0])))
+    # the first arm on the side it is seen on: the drawing turns the stem, never mirrors it
+    across = np.mean([na.strands[a].c1[i] for i in range(i0, i1 + 1)], axis=0) - np.mean(
+        [na.strands[b].c1[j] for j in range(j0, j1 + 1)], axis=0
+    )
+    seen = frame.direction(centre, across)
+    first = 1 if np.cos(angle) * seen[1] - np.sin(angle) * seen[0] >= 0 else -1
+    side = {k: first if n <= i1 - i0 else -first for n, k in enumerate(keys)}  # keys: first arm, then second
+    x, y = (float(v) for v in _snap(frame.project(centre)[0] * SCALE))
+    d = PlacedStem(
+        piece.id,
+        piece.name,
+        [a, b],
+        [tuple(p[:4]) for p in piece.pairs],
+        0.0,
+        0.0,
+        length,
+        angle,
+        width,
+        along,
+        side,
+        set(piece.bulges),
+        piece.parent,
+        first,
+    )
+    return _Item([d], [(0.0, 0.0)], x, y, (x, y), -1, "")
 
 
-def _dna_contacts(sses: list[SSE], na: Nucleic, groups: list[list[int]]) -> dict[frozenset[str], int]:
-    """Residues of each element touching each duplex, as extra adjacency pull between them."""
+def _traces(na: Nucleic, frame: Frame) -> dict[int, np.ndarray]:
+    """Strands with no base pair at all, drawn along their projected backbone (page units, on the grid)."""
+    held = {n for st in na.structure.stems for n in st.nucleotides()}
+    return {
+        s: _snap(frame.project(strand.p) * SCALE)
+        for s, strand in enumerate(na.strands)
+        if len(strand) > 1 and not any((s, i) in held for i in range(len(strand)))
+    }
+
+
+def _nearest_piece(na: Nucleic, pieces: list[Stem]) -> dict[tuple[int, int], int]:
+    """Each nucleotide's stem piece: its own if paired (or bulged) in one, otherwise the piece of the nearest
+    such nucleotide along its strand, so a protein holding a loop or a free end is pulled to the stems beside it."""
+    own = {key: k for k, piece in enumerate(pieces) for key in piece.nucleotides()}
+    out = dict(own)
+    for s, strand in enumerate(na.strands):
+        held = [i for i in range(len(strand)) if (s, i) in own]
+        if not held:
+            continue
+        for i in range(len(strand)):
+            if (s, i) not in own:
+                out[(s, i)] = own[(s, min(held, key=lambda h: (abs(h - i), h)))]
+    return out
+
+
+def _stem_contacts(sses: list[SSE], na: Nucleic, pieces: list[Stem]) -> dict[frozenset[str], int]:
+    """Residues of each element touching each stem (or the single strands beside it), as extra adjacency pull."""
+    piece_of = _nearest_piece(na, pieces)
     out: dict[frozenset[str], int] = {}
-    for k, strands in enumerate(groups):
-        for s in sses:
-            n = sum(1 for r in range(s.start, s.end + 1) if any(x in strands for x, _ in na.contacts.get(r, ())))
+    for s in sses:
+        for k, piece in enumerate(pieces):
+            n = sum(1 for r in range(s.start, s.end + 1) if any(piece_of.get(x) == k for x in na.contacts.get(r, ())))
             if n:
-                out[frozenset((s.id, f"dna:{k}"))] = 4 * n  # one residue in the groove counts like several CA pairs
+                out[frozenset((s.id, piece.id))] = 4 * n  # one residue in the groove counts like several CA pairs
+    return out
+
+
+_W_JOINT = 4.0  # pull between consecutive pieces of one bent duplex: the chain follows the duplex
+_JOINT_SLACK = 0.3
+
+
+def _stem_springs(items: list[_Item], na: Nucleic) -> list[tuple[int, np.ndarray, int, np.ndarray, float, float]]:
+    """(item, port offset, item, port offset, weight, slack) along each strand from one stem to the next: a
+    single-stranded run pulls its two stems together like a loop (with slack for its nucleotides); the joint
+    between two pieces of a bent duplex holds them end to end."""
+    owner = _owner(items)
+    stems = [(k, m) for k, it in enumerate(items) for m in it.members if isinstance(m, PlacedStem)]
+    at = {key: (k, m) for k, m in stems for key in m.axial}
+    out = []
+    for s, strand in enumerate(na.strands):
+        held = [i for i in range(len(strand)) if (s, i) in at]
+        for i, j in zip(held, held[1:]):
+            (ki, mi), (kj, mj) = at[(s, i)], at[(s, j)]
+            if ki == kj:
+                continue
+            oi = np.subtract(mi.port((s, i), True)[0], (mi.cx, mi.cy)) + owner[mi.id][2]
+            oj = np.subtract(mj.port((s, j), False)[0], (mj.cx, mj.cy)) + owner[mj.id][2]
+            joint = j == i + 1 and mi.parent and mi.parent == mj.parent
+            w, slack = (_W_JOINT, _JOINT_SLACK) if joint else (_W_SEQ, max(_LOOP_SLACK, 0.5 * (j - i - 1) * NT_STEP))
+            out.append((ki, oi, kj, oj, w, slack))
     return out
 
 
@@ -1037,8 +1182,9 @@ def build_layout(
     move: list[tuple[str, tuple[float, float]]] | None = None,
 ) -> Layout:
     """`attract` (projected mode) pulls loop-joined and touching elements together before overlaps
-    are removed; `contacts` comes from features.sse_contacts. `nucleic` adds DNA/RNA duplexes, placed
-    like any element and pulling the elements that touch them."""
+    are removed; `contacts` comes from features.sse_contacts. `nucleic` adds its stems (straight pieces of
+    base-paired DNA/RNA), placed like any element and pulling the elements that touch them; strands with no pair
+    at all are kept as projected traces."""
     if mode not in ("projected", "stack"):
         raise ValueError(f"unknown layout mode {mode!r}")
     style = style or Style()
@@ -1056,17 +1202,14 @@ def build_layout(
     items += [
         _helix_item(s, frame, angle_mode, HELIX_W * ETA_W * style.helix_scale, TEN_RISE) for s in sses if s.kind == "G"
     ]
-    if nucleic is not None and nucleic.strands:
-        groups = _duplexes(nucleic)
-        items += [
-            _dna_item(k, g, nucleic, frame, mode == "stack", DNA_W * style.dna_scale) for k, g in enumerate(groups)
-        ]
-    if not items:
-        return Layout({}, (0.0, 0.0, 0.0, 0.0))
     contacts = dict(contacts or {})
-    if nucleic is not None and nucleic.strands:
-        for key, n in _dna_contacts(sses, nucleic, groups).items():
-            contacts[key] = contacts.get(key, 0) + n
+    pieces = stem_pieces(nucleic) if nucleic is not None and nucleic.strands else []
+    items += [_stem_item(p, nucleic, frame, mode == "stack", NA_W * style.dna_scale) for p in pieces]
+    for key, n in (_stem_contacts(sses, nucleic, pieces) if pieces else {}).items():
+        contacts[key] = contacts.get(key, 0) + n
+    traces = _traces(nucleic, frame) if nucleic is not None and nucleic.strands else {}
+    if not items and not traces:
+        return Layout({}, (0.0, 0.0, 0.0, 0.0))
     items.sort(key=lambda it: it.order)
     members = {m.sse.id: m for it in items for m in it.members if isinstance(m, Placed) and not m.ghost}
     for chain, mine in group_by_chain(sses, keep=members).items():
@@ -1091,13 +1234,14 @@ def build_layout(
                 items[i].cx, items[i].cy = items[j].cx + k * spread, items[j].cy + k * lift
                 items[i].home = (items[j].home[0] + k * spread, items[j].home[1] + k * lift)
         if attract and len(items) > 1:
-            _attract(items, sses, contacts, ties, spread, getattr(frame, "rise", 0.0) * SCALE, bridges or [])
+            extra = _stem_springs(items, nucleic) if pieces else []
+            _attract(items, sses, contacts, ties, spread, getattr(frame, "rise", 0.0) * SCALE, bridges or [], extra)
         _separate(items, ties)
         if domains and _part_domains(items, domains):
             _separate(items, ties)
     for it in items:
         it.apply()
-    dna = [m for it in items for m in it.members if isinstance(m, PlacedDNA)]
+    dna = [m for it in items for m in it.members if isinstance(m, PlacedStem)]
     placed = [m for it in items for m in it.members if isinstance(m, Placed) and not m.ghost]
     ghosts = [m for it in items for m in it.members if isinstance(m, Placed) and m.ghost]
     _assign_labels(placed)
@@ -1106,7 +1250,7 @@ def build_layout(
         _adjust(items, Layout(real, (0.0, 0.0, 0.0, 0.0)), sses, rename or {}, swap or [], move or [])
     for g in ghosts:
         g.label = real[g.sse.id].label
-    rects = np.array([p.rect for p in placed + ghosts + dna])
+    rects = np.array([p.rect for p in placed + ghosts + dna]).reshape(-1, 4)
     sheet_blocks = [
         [m.sse.id for m in it.members if not m.ghost]
         for it in items
@@ -1117,10 +1261,15 @@ def build_layout(
         (0.0, 0.0, 0.0, 0.0),
         ghosts,
         dna,
-        nucleic if dna else None,
+        nucleic if dna or traces else None,
         sheet_blocks,
-        bool(dna) and style.nucleotide_labels,
+        bool(dna or traces) and style.nucleotide_labels,
     )
+    lay.na_traces = traces
+    lay.frame = frame
+    if traces:
+        pts = np.vstack(list(traces.values()))
+        rects = np.vstack([rects, [[pts[:, 0].min(), pts[:, 1].min(), pts[:, 0].max(), pts[:, 1].max()]]])
     lay.partial = set(partial or ())
     lay.domains = [(name, [k for k in ids if k in real]) for name, ids in domains or []]
     rects = np.vstack([rects, *[[domain_panel(lay, name)] for name, _ in lay.domains]]) if lay.domains else rects
@@ -1229,37 +1378,14 @@ def dna_y(slot: int, x: np.ndarray | float, width: float = DNA_W) -> np.ndarray 
     return width / 2 * np.sin(2 * np.pi * (np.asarray(x) / DNA_PITCH - slot * DNA_MINOR))
 
 
-def dna_to_page(d: PlacedDNA, x, y) -> np.ndarray:
+def dna_to_page(d: PlacedStem, x, y) -> np.ndarray:
     """Duplex-local (axial, sideways) to page coordinates."""
     c, s = np.cos(d.angle), np.sin(d.angle)
     x, y = np.asarray(x, float), np.asarray(y, float)
     return np.stack([d.cx + x * c - y * s, d.cy + x * s + y * c], axis=-1)
 
 
-NT_ROW = 0.55  # page units between the two sequence rows (and from the duplex to the first)
-
-
-def dna_letter_pos(d: PlacedDNA, row: int, x: float) -> tuple[float, float]:
-    """Where a base letter goes: sequence rows just above the duplex, the first strand on top, its partner
-    under it, one column per base pair."""
-    p = dna_to_page(d, x, d.width / 2 + NT_ROW * (2 - row))
-    return float(p[0]), float(p[1])
-
-
-def dna_end_labels(d: PlacedDNA, na: Nucleic) -> list[tuple[str, str, tuple[float, float]]]:
-    """(strand id, 5′ or 3′, page position) just beyond each strand's terminal nucleotides."""
-    out = []
-    reach = DNA_RISE * SCALE / 2 + 0.5
-    for slot, k in enumerate(d.strands):
-        n = len(na.strands[k])
-        sign = 1 if slot % 2 == 0 else -1  # slot 0 runs 5' -> 3' along the drawn direction, slot 1 back
-        strand = na.strands[k]
-        for end, i in (("5′", 0), ("3′", n - 1)):
-            x = d.axial[(k, i)] + (reach if (end == "3′") == (sign > 0) else -reach)
-            pos = dna_to_page(d, x, dna_y(slot % 2, x, d.width))
-            cut = strand.cut5 if end == "5′" else strand.cut3
-            out.append((strand.id, "…" if cut else end, (float(pos[0]), float(pos[1]))))  # cropped: it goes on
-    return out
+NT_ROW = 0.55  # a base letter sits this far out from its nucleotide
 
 
 def label_boxes(layout: Layout, sses: list[SSE]) -> list[tuple[str, tuple[float, float, float, float]]]:
@@ -1283,24 +1409,6 @@ def label_boxes(layout: Layout, sses: list[SSE]) -> list[tuple[str, tuple[float,
         )
         t = np.add(port, ex * END_LABEL)
         out.append((f"{end}:{chain}", centred_box(float(t[0]), float(t[1]), _GLYPH_W / 2 + 0.05, _GLYPH_H / 2)))
-    for d in layout.dna:
-        if layout.nt_rows:
-            for row, k in enumerate(d.strands[:2]):
-                xs = [d.axial[(k, i)] for i in range(len(layout.nucleic.strands[k]))]
-                (x0, y0), (x1, y1) = dna_letter_pos(d, row, min(xs)), dna_letter_pos(d, row, max(xs))
-                out.append(
-                    (
-                        f"dna-seq:{k}",
-                        (
-                            min(x0, x1) - _GLYPH_W / 2,
-                            min(y0, y1) - _GLYPH_H / 2,
-                            max(x0, x1) + _GLYPH_W / 2,
-                            max(y0, y1) + _GLYPH_H / 2,
-                        ),
-                    )
-                )
-        for sid, end, (x, y) in dna_end_labels(d, layout.nucleic):
-            out.append((f"dna-end:{sid}:{end}", centred_box(x, y, _GLYPH_W + 0.05, _GLYPH_H / 2)))
     for name, ids in layout.domains:  # a domain's name, top left inside its panel
         if ids:
             x0, _, _, y1 = domain_panel(layout, name)

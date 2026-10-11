@@ -8,8 +8,9 @@ python scripts/bench.py --record before.json     # keep each layout (positions, 
 python scripts/bench.py --check before.json --exact      # fail unless every layout is bit-identical
 python scripts/bench.py --check before.json --area 1.01  # fail if a figure's area grew by more than 1 %
 
-A signature holds every placed element, ghost and duplex with all its geometry, plus sheets, domains, unjoined
-pairs and nt_rows. Loop points are derived from the layout at render time, so identical layouts give identical loops.
+A signature holds every placed element, ghost and nucleic-acid stem with all its geometry, plus sheets, domains,
+unjoined pairs and whether base letters are drawn (under the keys "_dna" and "_nt_rows" that older baselines use).
+Loop points are derived from the layout at render time, so identical layouts give identical loops.
 """
 
 from __future__ import annotations
@@ -107,14 +108,18 @@ def signature(lay) -> dict:
             d.width,
             d.ghost,
             sorted([list(k), v] for k, v in d.axial.items()),
+            d.name,
+            d.parent,
+            d.first,
+            sorted([list(k), v] for k, v in d.side.items()),
         ]
-        for d in lay.dna
+        for d in lay.stems
     ]
     sig["_bounds"] = list(lay.bounds)
     sig["_sheets"] = [list(x) for x in lay.sheets]
     sig["_domains"] = [[n, list(ids)] for n, ids in lay.domains]
     sig["_unjoined"] = sorted(sorted(pair) for pair in lay.unjoined)
-    sig["_nt_rows"] = lay.nt_rows
+    sig["_nt_rows"] = lay.nt_letters
     return sig
 
 

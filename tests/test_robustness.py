@@ -44,7 +44,7 @@ def test_peptides_on_dna_draw_the_dna(tmp_path):
     out = tmp_path / "f.svg"
     assert main(["plot", str(src), "-o", str(out), "--assembly", "asu"]) == 0
     svg = out.read_text(encoding="utf-8")
-    assert 'id="nt:' in svg and "no helices or strands found" not in svg
+    assert 'id="na:nt:' in svg and "no helices or strands found" not in svg
 
 
 def _strip(src, tmp_path, name, keep_atom):
@@ -172,5 +172,4 @@ def test_dna_with_a_calcium_ion_is_not_called_a_ca_only_trace(tmp_path):
     st.setup_entities()
     src = tmp_path / "dna_ca.cif"
     st.make_mmcif_document().write_file(str(src))
-    with pytest.raises(ValueError, match="no protein residues with a complete backbone"):
-        load_backbone(src, "asu")
+    assert len(load_backbone(src, "asu")) == 0  # nucleic acid only: drawn on its own, no Cα-only message
