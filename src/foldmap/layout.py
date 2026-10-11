@@ -1278,7 +1278,9 @@ def _two_colour(group, links, nbr, fixed, stems) -> dict[int, int]:
     return out
 
 
-_TRACE_HALF = 0.45  # page units: a trace nucleotide's box reaches a bead (na_paths._BEAD) either side of it
+_TRACE_HALF = (
+    0.45  # page units: a bead's width, which a trace nucleotide's box reaches either side of it (na_paths._BEAD)
+)
 
 
 def _trace_walls(items: list[_Item], traces: dict[int, np.ndarray], na: Nucleic) -> Walls:

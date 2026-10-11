@@ -11,7 +11,7 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
-from .layout import _GLYPH_W, PlacedStem
+from .layout import _GLYPH_W, _TRACE_HALF, PlacedStem
 from .route import _clear, _Grid, _simplify, clip_len
 
 
@@ -313,7 +313,9 @@ class _Strands:
         return int(crossed.sum())
 
 
-_BEAD = 0.45  # page units: a contact bead's width (render: 1.05 x the backbone tube); nearer nucleotides' beads meet
+_BEAD = (
+    _TRACE_HALF  # page units: a contact bead's width (render: 1.05 x the backbone tube); nearer nucleotides' beads meet
+)
 
 
 def graze(p, q, d) -> float:
