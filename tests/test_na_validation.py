@@ -231,10 +231,84 @@ def _reference(pdb) -> set[frozenset]:
 
 
 def test_drawn_chains_map_back_to_the_deposited_chains_they_copy():
+    """Each drawn chain maps to exactly one (deposited chain, copy), by its name, its residues and its shape; a
+    name that fits no deposited chain, or fits two (deposited names ending in digits, identical twins), is left
+    unmapped (the entry then fails)."""
+    from foldmap.model import ResLabel
+
     nv = _na_validate()
-    assert nv._chain_map(["C", "D"], {"C", "D", "A"}) == {"C": ("C", ""), "D": ("D", "")}
-    assert nv._chain_map(["C1", "C2", "D1", "X1"], {"C", "D"}) == {"C1": ("C", "1"), "C2": ("C", "2"), "D1": ("D", "1")}
-    assert nv._chain_map(["111", "12"], {"1", "11"}) == {"111": ("11", "1"), "12": ("1", "2")}
+    rng = np.random.default_rng(2)
+    xyz = {"A": rng.uniform(0, 30, (4, 3)), "B": rng.uniform(0, 30, (4, 3))}
+    res = {c: {(k, "", "G") for k in range(1, 5)} for c in xyz}
+    c1 = {(c, k, ""): xyz[c][k - 1] for c in xyz for k in range(1, 5)}
+
+    def drawn(name, src, shift=0.0):
+        return {name: [(ResLabel(name, k, "", "G"), xyz[src][k - 1] + shift) for k in range(1, 5)]}
+
+    assert nv._chain_map({**drawn("A", "A"), **drawn("B", "B")}, res, c1, True) == (
+        {"A": ("A", ""), "B": ("B", "")},
+        [],
+    )
+    got = nv._chain_map({**drawn("A1", "A"), **drawn("A2", "A", 40.0), **drawn("X1", "A")}, res, c1, False)
+    assert got == ({"A1": ("A", "1"), "A2": ("A", "2")}, ["X1"])
+    assert nv._chain_map(drawn("B1", "A"), res, c1, False) == ({}, ["B1"])  # B's residues, A's shape
+    # deposited A and A1: drawn A11 is A copy 11 or A1 copy 1; by shape it is A1's copy, A's twin is ambiguous
+    res1, c11 = {**res, "A1": res["A"]}, {**c1, **{("A1", k, ""): xyz["B"][k - 1] for k in range(1, 5)}}
+    assert nv._chain_map(drawn("A11", "B"), res1, c11, False) == ({"A11": ("A1", "1")}, [])
+    twins = {**c1, **{("A1", k, ""): xyz["A"][k - 1] + 5.0 for k in range(1, 5)}}
+    assert nv._chain_map(drawn("A11", "A"), res1, twins, False) == ({}, ["A11"])
+
+
+def _moved(strand, chain, shift):
+    """The strand as copy `chain`, moved by `shift` Å."""
+    from dataclasses import replace
+
+    labels = [l._replace(chain=chain) for l in strand.labels]
+    return replace(strand, chain=chain, labels=labels, p=strand.p + shift, c1=strand.c1 + shift)
+
+
+def _two_copies(na, shift):
+    """na drawn twice, as copy 1 and copy 2 (moved by `shift` Å), each with its own pairs."""
+    n = len(na.strands)
+    strands = [*na.strands, *(_moved(s, s.chain[:-1] + "2", shift) for s in na.strands)]
+    pairs = [*na.base_pairs, *(p._replace(a=p.a + n, b=p.b + n) for p in na.base_pairs)]
+    return strands, pairs
+
+
+def test_a_pair_counts_only_within_one_copy_or_one_operator():
+    """3CRX drawn as two copies. A pair rewired from C1·D1 to C1·D2 joins C to D, as the deposited model does,
+    but to the twin of D in the other copy: wrong. Copy 2 drawn on top of copy 1 (one operator under two
+    numbers, as gemmi numbers one operator's copies in two generators) pairs the same molecule: right."""
+    from foldmap.model import nucleic_from_pairs
+
+    nv = _na_validate()
+    path, theirs = NA / "3CRX.cif.gz", _reference("3CRX")
+    asu = read_model(path, "asu")[0]
+    na = make_layout(path)[0].nucleic
+    n = len(na.strands)
+    strands, pairs = _two_copies(na, 60.0)
+    d = next(k for k, s in enumerate(na.strands) if s.chain == "D1")
+    k = next(k for k, p in enumerate(pairs) if p.b == d and strands[p.a].chain == "C1")
+    pairs[k] = pairs[k]._replace(b=d + n)  # C1 paired with D2
+    m = nv.drawn_pairing(nucleic_from_pairs(strands, pairs, {}, {}), theirs, asu, False)
+    assert m["unmapped_chains"] == [] and m["pairs_foldmap"] == len(pairs)
+    assert m["pair_precision"] == round(1 - 1 / len(pairs), 3), m
+    assert len(m["extra_pairs"]) == 1 and {x[0] for x in m["extra_pairs"][0]} == {"C1", "D2"}, m
+    d2 = next(k for k, s in enumerate(strands) if s.chain == "D2")
+    strands[d2] = _moved(na.strands[d], "D2", 0.0)  # D2 is D1's molecule: one operator, two numbers
+    m = nv.drawn_pairing(nucleic_from_pairs(strands, pairs, {}, {}), theirs, asu, False)
+    assert m["pair_precision"] == 1.0, m
+
+
+def test_a_copy_holding_one_nucleotide_twice_is_unmapped():
+    from dataclasses import replace
+
+    nv = _na_validate()
+    path, theirs = NA / "3CRX.cif.gz", _reference("3CRX")
+    na = make_layout(path)[0].nucleic
+    twice = replace(na, strands=[*na.strands, na.strands[0]])
+    m = nv.drawn_pairing(twice, theirs, read_model(path, "asu")[0], False)
+    assert m["unmapped_chains"] == [na.strands[0].chain]
 
 
 def test_pairing_is_scored_on_the_pairs_the_figure_draws(monkeypatch):
@@ -245,15 +319,15 @@ def test_pairing_is_scored_on_the_pairs_the_figure_draws(monkeypatch):
 
     nv = _na_validate()
     path, theirs = NA / "3CRX.cif.gz", _reference("3CRX")
-    deposited = read_model(path, "asu")[1]
+    asu = read_model(path, "asu")[0]
     assert nv.pairing(path, theirs)["deposited_pair_f1"] == 1.0
     lay, _, _ = make_layout(path)
-    m = nv.drawn_pairing(lay.nucleic, theirs, deposited)
-    assert (m["pair_f1"], m["stem_recall"], m["stems_foldmap"]) == (1.0, 1.0, 4)
-    monkeypatch.setattr(fio, "_drop_coincident", lambda model: [])
+    m = nv.drawn_pairing(lay.nucleic, theirs, asu, False)
+    assert (m["pair_f1"], m["stem_recall"], m["stems_foldmap"], m["unmapped_chains"]) == (1.0, 1.0, 4, [])
+    monkeypatch.setattr(fio, "_drop_coincident", lambda model, **kw: [])
     lay, _, _ = make_layout(path)
     assert len(lay.nucleic.strands) == 8
-    m = nv.drawn_pairing(lay.nucleic, theirs, deposited)
+    m = nv.drawn_pairing(lay.nucleic, theirs, asu, False)
     assert m["pair_precision"] < 0.9 and m["stem_recall"] < 0.5, m
 
 
@@ -262,10 +336,10 @@ def test_a_cropped_figure_is_scored_on_the_pairs_it_draws_both_nucleotides_of():
     nv = _na_validate()
     path, theirs = NA / "4YBB.cif.gz", _reference("4YBB")
     lay, _, _ = make_layout(path)
-    m = nv.drawn_pairing(lay.nucleic, theirs, read_model(path, "asu")[1])
+    m = nv.drawn_pairing(lay.nucleic, theirs, read_model(path, "asu")[0], True)
     whole = nv.pairing(path, theirs)  # 0.977 precision, 0.981 recall on the whole deposited fixture
     assert m["pairs_reference"] < len(theirs) and m["pair_recall"] >= whole["deposited_pair_recall"], m
-    assert m["pair_precision"] >= 0.97, m
+    assert m["pair_precision"] >= 0.97 and m["unmapped_chains"] == [], m
 
 
 def test_an_unrolled_frame_is_measured_against_the_plain_projection(monkeypatch):

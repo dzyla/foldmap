@@ -144,43 +144,83 @@ def reference_pairs(path: Path) -> set[frozenset]:
     return {frozenset(tuple(x) for x in pair) for pair in json.loads(done.stdout)}
 
 
-def _chain_map(names, deposited) -> dict[str, tuple[str, str]]:
-    """Drawn chain name -> (deposited chain, copy). A model read as deposited keeps the names (copy ""); an
-    assembly names each copy by its deposited chain plus the operator's number (gemmi AddNumber), stripped here
-    (the longest deposited name the drawn one extends by digits). Names that match no deposited chain are left
-    out."""
-    names = sorted(set(names))
-    if set(names) <= set(deposited):
-        return {c: (c, "") for c in names}
-    out = {}
-    for c in names:
-        stems = [d for d in deposited if c.startswith(d) and c[len(d) :].isdigit()]
-        if stems:
-            d = max(stems, key=len)
-            out[c] = (d, c[len(d) :])
-    return out
+def _same_shape(p: np.ndarray, q: np.ndarray, tol: float = 0.05) -> bool:
+    """Whether two point sets (same order) differ only by a rigid motion: every pairwise distance within tol Å."""
+    dp = np.sqrt(((p[:, None, :] - p[None, :, :]) ** 2).sum(-1))
+    dq = np.sqrt(((q[:, None, :] - q[None, :, :]) ** 2).sum(-1))
+    return bool(np.abs(dp - dq).max() <= tol) if len(p) else False
 
 
-def _score(strands, ours, theirs: set[frozenset], where: dict, drawn_only: bool) -> dict:
+def _rigid(src: np.ndarray, dst: np.ndarray):
+    """(R, t) of the proper rotation and translation taking src onto dst (Kabsch); None under 3 points."""
+    if len(src) < 3:
+        return None
+    a, b = src.mean(axis=0), dst.mean(axis=0)
+    u, _, vt = np.linalg.svd((src - a).T @ (dst - b))
+    d = np.sign(np.linalg.det(vt.T @ u.T)) or 1.0
+    r = vt.T @ np.diag([1.0, 1.0, d]) @ u.T
+    return r, b - r @ a
+
+
+def _chain_map(drawn: dict, residues: dict, c1: dict, as_deposited: bool):
+    """(drawn chain -> (deposited chain, copy), [drawn chains left unmapped]). drawn: chain -> [(ResLabel, C1'
+    xyz)]; residues: deposited chain -> {(number, icode, name)}; c1: deposited (chain, number, icode) -> C1' xyz.
+    A model as deposited keeps its names (copy ""). An assembly names each copy by its deposited chain plus the
+    operator's number (gemmi AddNumber): every split of the name into a deposited name and digits is a candidate,
+    kept only if that deposited chain holds every drawn residue (number, icode and name) in the same shape (a
+    rigid copy). Exactly one candidate maps the chain; none, or more than one (deposited names ending in digits,
+    identical twins), leaves it unmapped: the entry fails rather than guessing."""
+    out, unmapped = {}, []
+    for c, items in sorted(drawn.items()):
+        if as_deposited:
+            cands = [(c, "")] if c in residues else []
+        else:
+            cands = [(d, c[len(d) :]) for d in sorted(residues) if c[len(d) :].isdigit() and c.startswith(d)]
+        fits = []
+        for d, n in cands:
+            keys = [(d, l.seq, l.icode) for l, _ in items]
+            if all((l.seq, l.icode, l.name) in residues[d] for l, _ in items) and all(k in c1 for k in keys):
+                if _same_shape(np.array([x for _, x in items]), np.array([c1[k] for k in keys])):
+                    fits.append((d, n))
+        if len(fits) == 1:
+            out[c] = fits[0]
+        else:
+            unmapped.append(c)
+    return out, unmapped
+
+
+def _score(strands, ours, theirs: set[frozenset], where: dict, drawn_only: bool, same_operator=None) -> dict:
     """Pairs and stems of `ours` (BasePairs on `strands`) against the reference pairs `theirs` (frozensets of
-    deposited (chain, number, icode) keys). where: (strand, nucleotide) -> (copy, deposited key). drawn_only:
-    recall counts only the reference pairs whose two nucleotides are both drawn in one copy (a cropped figure is
-    not short of the pairs it leaves out)."""
-    index = {v: k for k, v in sorted(where.items())}
-    copies = sorted({c for c, _ in where.values()})
-    mine = {frozenset((where[(p.a, p.i)][1], where[(p.b, p.j)][1])) for p in ours}
-    scope = {p for p in theirs if any(all((c, k) in index for k in p) for c in copies)} if drawn_only else theirs
-    tp = len(mine & scope)
-    prec = tp / len(mine) if mine else 1.0
-    rec = tp / len(scope) if scope else 1.0
-    f1 = 2 * prec * rec / (prec + rec) if prec + rec else 0.0
-    # stems: group the reference pairs exactly as foldmap groups its own, then match arms within one nucleotide
-    ref_pairs = []
+    deposited (chain, number, icode) keys). where: (strand, nucleotide) -> (copy, deposited key), one nucleotide
+    per (copy, key). A reference pair is expected wherever both its nucleotides are drawn in one copy, or in two
+    copies that same_operator(x, y) says one operator made (gemmi numbers each generator's operators apart, so
+    one operator's copies may carry two numbers); a drawn pair counts only as such an expected pair, so a pair
+    drawn between a nucleotide and its partner's twin in another copy is wrong. drawn_only: recall counts only
+    the expected pairs (a cropped figure is not short of the pairs it leaves out); otherwise also every
+    reference pair not drawn at all."""
+    by_key: dict = {}
+    for x, (c, k) in sorted(where.items()):
+        by_key.setdefault(k, []).append((c, x))
+    expected: dict[frozenset, frozenset] = {}  # drawn nucleotide pair -> reference pair
     for pair in sorted(theirs, key=sorted):
-        for c in copies:  # the deposited pair, in every copy that holds both nucleotides
-            if all((c, k) in index for k in pair):
-                x, y = sorted(index[(c, k)] for k in pair)
-                ref_pairs.append(BasePair(x[0], x[1], y[0], y[1], "WC"))
+        k1, k2 = sorted(pair)
+        for c1_, x in by_key.get(k1, []):
+            for c2_, y in by_key.get(k2, []):
+                if c1_ == c2_ or (same_operator is not None and same_operator(x, y)):
+                    expected[frozenset((x, y))] = pair
+    mine = {frozenset(((p.a, p.i), (p.b, p.j))) for p in ours}
+    tp = len(mine & expected.keys())
+    shown = set(expected.values())
+    absent = 0 if drawn_only else len(theirs - shown)
+    prec = tp / len(mine) if mine else 1.0
+    rec = tp / (len(expected) + absent) if expected or absent else 1.0
+    f1 = 2 * prec * rec / (prec + rec) if prec + rec else 0.0
+    # stems: group the expected reference pairs exactly as foldmap groups its own, then match arms within one
+    # nucleotide
+    ref_pairs = []
+    for xy in sorted(expected, key=sorted):
+        x, y = sorted(xy)
+        ref_pairs.append(BasePair(x[0], x[1], y[0], y[1], "WC"))
     ref = secondary_structure(strands, ref_pairs).stems
     got = secondary_structure(strands, ours).stems
 
@@ -190,18 +230,24 @@ def _score(strands, ours, theirs: set[frozenset], where: dict, drawn_only: bool)
     def close(a, b):
         return all(x[0] == y[0] and abs(x[1] - y[1]) <= 1 and abs(x[2] - y[2]) <= 1 for x, y in zip(span(a), span(b)))
 
+    def named(xy):  # a drawn pair as [[chain, number, icode], ...], chains as drawn
+        return sorted([strands[s].chain, strands[s].labels[i].seq, strands[s].labels[i].icode] for s, i in xy)
+
     matched = sum(1 for r in ref if any(close(r, g) for g in got))
+    missed = sorted(named(xy) for xy in expected.keys() - mine)
+    if not drawn_only:  # reference pairs with a nucleotide foldmap has no strand for
+        missed += sorted(sorted(p) for p in theirs - shown)
     return {
         "pairs_foldmap": len(mine),
-        "pairs_reference": len(scope),
+        "pairs_reference": len(expected) + absent,
         "pair_precision": round(prec, 3),
         "pair_recall": round(rec, 3),
         "pair_f1": round(f1, 3),
         "stems_foldmap": len(got),
         "stems_reference": len(ref),
         "stem_recall": round(matched / len(ref), 3) if ref else 1.0,
-        "missed_pairs": sorted(sorted(p) for p in scope - mine)[:20],
-        "extra_pairs": sorted(sorted(p) for p in mine - scope)[:20],
+        "missed_pairs": missed[:20],
+        "extra_pairs": sorted(named(xy) for xy in mine - expected.keys())[:20],
     }
 
 
@@ -217,19 +263,51 @@ def pairing(path, theirs: set[frozenset]) -> dict:
     return {f"deposited_{k}": v for k, v in m.items() if k not in ("missed_pairs", "extra_pairs")}
 
 
-def drawn_pairing(na, theirs: set[frozenset], deposited) -> dict:
+def drawn_pairing(na, theirs: set[frozenset], asu_model, as_deposited: bool) -> dict:
     """The pairs and stems the figure draws (`na`, the layout's nucleic acid: assembly copies, cropped) against
-    RNApolis' on the deposited model, each drawn chain mapped back to the deposited one it copies. A pair drawn
-    between two copies that the deposited model pairs within one counts as wrong; the gate uses these values."""
-    chains = _chain_map([s.chain for s in na.strands], deposited)
-    where = {
-        (s, i): (chains[strand.chain][1], (chains[strand.chain][0], l.seq, l.icode))
-        for s, strand in enumerate(na.strands)
-        if strand.chain in chains
-        for i, l in enumerate(strand.labels)
-    }
+    RNApolis' on the deposited model `asu_model`, each drawn chain mapped back to the deposited one it copies
+    (_chain_map; as_deposited: the figure is drawn from the deposited model itself). A true pair joins two
+    nucleotides of one copy, or of two copies one operator made (the same rigid motion of their deposited
+    chains); a pair drawn between a nucleotide and its partner's twin in another copy is wrong. Drawn chains
+    that cannot be mapped (unmapped_chains), or a copy holding one deposited nucleotide twice, fail the entry."""
+    residues = {c.name: {(r.seqid.num, r.seqid.icode.strip(), r.name) for r in c} for c in asu_model}
+    c1 = {_key(l): s.c1[i] for s, _ in _nucleic_strands(asu_model) for i, l in enumerate(s.labels)}
+    drawn: dict = {}
+    for strand in na.strands:
+        drawn.setdefault(strand.chain, []).extend(zip(strand.labels, strand.c1))
+    chains, unmapped = _chain_map(drawn, residues, c1, as_deposited)
+    where, seen, twice = {}, {}, set()
+    for s, strand in enumerate(na.strands):
+        if strand.chain not in chains:
+            continue
+        d, n = chains[strand.chain]
+        for i, l in enumerate(strand.labels):
+            at = (n, (d, l.seq, l.icode))
+            if at in seen:
+                twice |= {strand.chain, na.strands[seen[at][0]].chain}
+            seen[at] = (s, i)
+            where[(s, i)] = at
+    if twice:  # one copy holding a deposited nucleotide twice: no single answer
+        where = {x: v for x, v in where.items() if na.strands[x[0]].chain not in twice}
+        unmapped = sorted(set(unmapped) | twice)
+    motion = {}  # drawn chain -> rigid motion of its deposited chain onto it
+    for c, items in drawn.items():
+        if c in chains and c not in twice:
+            d = chains[c][0]
+            motion[c] = _rigid(np.array([c1[(d, l.seq, l.icode)] for l, _ in items]), np.array([x for _, x in items]))
+
+    def same_operator(x, y) -> bool:
+        a, b = motion.get(na.strands[x[0]].chain), motion.get(na.strands[y[0]].chain)
+        return a is not None and b is not None and np.abs(a[0] - b[0]).max() < 1e-3 and _norm3(a[1] - b[1]) < 0.05
+
     ours = [p for p in na.base_pairs if (p.a, p.i) in where and (p.b, p.j) in where]
-    return _score(na.strands, ours, theirs, where, drawn_only=True)
+    m = _score(na.strands, ours, theirs, where, drawn_only=True, same_operator=same_operator)
+    m["unmapped_chains"] = unmapped
+    return m
+
+
+def _norm3(v) -> float:
+    return float(np.sqrt((np.asarray(v, float) ** 2).sum()))
 
 
 def _bounds(points, margin: float = 0.06):
@@ -388,7 +466,9 @@ def run(name: str, path: Path, out: Path, options: dict | None = None) -> dict:
     fig = draw(lay, loops, sses, name, model=model)
     m["seconds"] = round(time.time() - t, 1)
     if lay.nucleic is not None and theirs is not None:
-        m.update(drawn_pairing(lay.nucleic, theirs, read_model(path, "asu")[1]))
+        asu_model, deposited = read_model(path, "asu")
+        as_deposited = model[1] == deposited and {c.name for c in model[0]} == deposited
+        m.update(drawn_pairing(lay.nucleic, theirs, asu_model, as_deposited))
     if lay.nucleic is not None:
         m.update(shape(lay))
         m.update(contacts(lay, sses))
@@ -396,6 +476,10 @@ def run(name: str, path: Path, out: Path, options: dict | None = None) -> dict:
     m["failed"] = judge(m)
     if lay.nucleic is None:  # nothing to validate is not a pass
         m["failed"].append("no nucleic acid drawn")
+    if m.get("unmapped_chains"):  # drawn pairs that cannot be scored are not a pass
+        m["failed"].append(
+            f"pairing: drawn chains not mapped to the deposited model: {', '.join(m['unmapped_chains'])}"
+        )
     if REQUIRE_RNAPOLIS and m.get("pair_f1") is None:
         m["failed"].append(f"pairing not measured ({m.get('note', 'no reason given')})")
     save(fig, out / f"{name}-figure.svg")
@@ -480,6 +564,7 @@ def main(argv=None) -> int:
         "stem_recall",
         "deposited_pair_f1",
         "deposited_stem_recall",
+        "unmapped_chains",
         "stems_drawn",
         "spearman",
         "procrustes",
