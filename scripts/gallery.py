@@ -23,6 +23,8 @@ EXAMPLES = ROOT / "docs" / "examples"
 # (output name, structure, title, theme, style overrides, layout options)
 FIGURES = [
     ("lambda-repressor-dna", "1LMB.cif", "λ repressor on DNA (1LMB)", "publication", [], {"assembly": "asu"}),
+    ("ncrna-30qm", "na/30QM.cif.gz", "DRT10 RT–ncRNA (30QM) · stems P1–P6", "publication", [], {}),
+    ("nucleosome-1kx5", "na/1KX5.cif.gz", "Nucleosome core particle (1KX5)", "journal", [], {}),
     (
         "t4-lysozyme-domains",
         "2LZM.cif",

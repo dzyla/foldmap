@@ -62,6 +62,12 @@ alt="Topology of the lambda repressor dimer bound to its operator DNA">
 <td><img src="https://raw.githubusercontent.com/dzyla/foldmap/main/docs/images/ferritin-cage.png" alt="One apoferritin subunit with the neighbouring helices of the four-fold channel"><br>
 <sub><b>Cages.</b> Apoferritin (7A4M), 24 subunits: one chain in full, with the neighbours' α5 helices that line the four-fold channel.</sub></td>
 </tr>
+<tr>
+<td><img src="https://raw.githubusercontent.com/dzyla/foldmap/main/docs/images/ncrna-30qm.png" alt="DRT10 RT-ncRNA complex with six RNA stems drawn as ladders between the two protomers"><br>
+<sub><b>RNA folds.</b> DRT10 RT–ncRNA (30QM): six stems as ladders between the two RT protomers, contacts as beads.</sub></td>
+<td><img src="https://raw.githubusercontent.com/dzyla/foldmap/main/docs/images/nucleosome-1kx5.png" alt="Nucleosome core particle with the DNA as a chain of straight duplex pieces round the histones"><br>
+<sub><b>Bent DNA.</b> Nucleosome (1KX5): 147 bp in 22 straight pieces round the histones.</sub></td>
+</tr>
 </table>
 
 ### Large assemblies
@@ -148,8 +154,10 @@ foldmap styles                                    # every theme and style key
 - **Assemblies and symmetry**: biological assemblies are built from the file; cyclic, dihedral, cubic and helical
   symmetry is detected and every protomer drawn alike; highlight one protomer or the asymmetric unit; filaments,
   cages and large assemblies drawn as one subunit with the neighbouring parts that complete its fold.
-- **Protein–DNA/RNA**: duplexes drawn as double helices with base letters and contact beads, cropped to the
-  stretch the protein touches.
+- **DNA and RNA as their fold**: base pairs (Watson–Crick and G·U) from the coordinates, stems, hairpins, junctions
+  and single strands placed beside the protein that holds them; bent duplexes as chains of straight pieces;
+  `na_style` `ladder` (default), `ribbon`, `block` or `letters`; `na_extent` `auto` crops RNA over 300 nt to the
+  stems the protein touches.
 - **Annotations**: disulfides, glycans (SNFG symbols, sialic acids included), ligands and metal ions, membrane bands,
   named domain panels, residue numbers, marked elements.
 - **Colouring**: by chain, N→C, per-element shade, secondary-structure type, B-factor, hydropathy, AlphaFold pLDDT
@@ -177,8 +185,8 @@ Change any key with `--set KEY=VALUE` (repeatable) or a YAML file for `--style-f
 `color_by`, `palette`, `fill`, `loops`, `loop_color` (`residue` colours loops residue by residue),
 `residue_numbers`, `highlight` (`asu`, `protomer` or chains), `mark` (elements in a colour of their own),
 `ligands` (`auto`, `all`, `none` or codes like `HEM,ZN`), `na_backbone`, `backbone_colors`, `dna_color`, `rna_color`,
-`hbonds`, `hbond_color`, `hbond_max`, `disulfides`, `glycans`, `helices_310`, `dna_extent`
-(`contacts` or `all`), `background`, `ink`, `helix_scale`, `strand_scale`, `font_scale`.
+`hbonds`, `hbond_color`, `hbond_max`, `disulfides`, `glycans`, `helices_310`, `na_extent`, `na_style`,
+`background`, `ink`, `helix_scale`, `strand_scale`, `font_scale` (`dna_extent` still works on the command line and in style and layout files).
 
 ## Shaping a figure
 
@@ -201,6 +209,22 @@ Elements are named by label (`A`, `α2`, `η1`), `chain:label`, position (`#3`) 
 **Layout files.** `--save-layout fig.yaml` records everything that defines a figure: theme, style changes,
 layout options, domains and edits, with element references stored as residue ranges so they survive a new model.
 `foldmap plot model.cif --layout-file fig.yaml -o fig.svg` re-renders it; the command line overrides the file.
+
+**What the fold drawing shows.** Base pairs are found from the coordinates (Watson–Crick and G·U, with modified
+nucleotides paired by their parent base) and grouped into stems, named `P1`, `P2`, ... for RNA and `DNA 1`, ... for
+DNA. Each stem is placed as a rigid item beside the protein that holds it; a duplex that bends (nucleosome, IHF, TBP)
+is cut where its axis turns by 25° into straight pieces placed end to end. Single strands, hairpin loops (as arcs)
+and the links between stems are routed like protein loops, with both ends marked 5′ and 3′, base letters, and contact
+beads in the colour of the protein chain that touches them. A nucleic acid with no pairs at all (a G-quadruplex, one
+strand on a protein) is drawn as a projected trace with letters. `foldmap summary` lists each stem with its base
+pairs and ranges, e.g. `P1  7 bp  1:1-7 · 1:112-118`.
+
+`na_style` chooses how stems are drawn (layout is unaffected): `ladder` (rails and base-pair rungs; the default),
+`ribbon` (a double helix; the `presentation` and `cartoon` themes), `block` (bars; `minimal` and `print`) or
+`letters` (only the base letters). A large RNA cropped by `na_extent auto` switches `ladder` to `block`. `na_extent`
+chooses what is drawn and placed (a layout key): `auto` (everything up to 300 nt, otherwise the stems the protein
+touches, with gaps marked), `contacts` (the stretch the protein touches, with 6 nt beyond) or `all`. `dna_extent` is
+an alias of `na_extent`.
 
 **Nucleic-acid colours.** DNA backbones are brown (`dna_color`, `#8c564b`) and RNA backbones purple (`rna_color`,
 `#6a3d9a`), so they read apart from the black protein loops; contact beads keep the colour of the protein chain that
@@ -275,15 +299,17 @@ Every figure (command line, app, MCP or Python) goes through the same steps:
    from the ladder network, and a sheet whose ends pair is a closed barrel. Helices packed along their length
    across chains form bundles.
 4. **Context.** Symmetry (cyclic, dihedral, cubic, helical) is found by superposing chains of the same sequence;
-   disulfides, glycans and ligands are read from the atoms; a membrane is estimated on request.
+   disulfides, glycans and ligands are read from the atoms; a membrane is estimated on request. Nucleic acids:
+   base pairs grouped into stems; long bent duplexes cut where the axis turns by 25°.
 5. **Projection.** A frame turns 3D into page coordinates: the dominant element direction points up and the
    widest spread runs left–right (single chains); a symmetric assembly is unrolled around its axis, protein–DNA
    complexes around the DNA axis, membrane proteins with the bilayer horizontal. Never mirrored.
 6. **Layout.** Sheets (as rigid blocks), helices and DNA are placed by minimising one energy: springs to their
    projected positions, short loops between sequence neighbours, attraction between elements in contact, a pull
    between disulfide-bonded cysteines, and an overlap penalty; then any remaining overlaps are cleared.
-   Symmetry copies are tied to look identical.
-7. **Loops.** Each loop is routed on a grid with A* search: orthogonal lines that go around elements and labels.
+   Symmetry copies are tied to look identical; stems are placed as rigid items.
+7. **Loops.** Each loop is routed on a grid with A* search: orthogonal lines that go around elements and labels;
+   single strands are routed the same way, hairpin loops as arcs.
 8. **Drawing.** matplotlib draws the elements to scale (one helix turn tiled along each helix, arrows for
    strands), then loops, annotations, legend and title, and writes SVG (text kept as text), PNG or PDF.
 

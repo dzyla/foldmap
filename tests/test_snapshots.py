@@ -117,6 +117,9 @@ CASES = {
     "1UBQ-publication": ("1UBQ.cif", []),  # sheet panel, helix, terminus
     "1TIM-symmetry": ("1TIM.cif", []),  # symmetric assembly: protomer ghosts
     "1LMB-dna": ("1LMB.cif", []),  # DNA ladder, contacts, protein-DNA
+    "30QM-ncrna": ("na/30QM.cif.gz", []),  # RNA fold: stems P1-P6 between two RT protomers
+    "1EHZ-trna": ("na/1EHZ.cif.gz", []),  # nucleic-acid-only page: tRNA, no protein
+    "1KX5-nucleosome": ("na/1KX5.cif.gz", []),  # bent DNA as a chain of straight pieces
     "1C3W-membrane": ("1C3W.cif", ["--membrane", "auto"]),  # membrane slab and heads, ligands
     "6ZS5-disulfide-glycan": ("6ZS5.cif", []),  # disulfide lane brackets, glycans, ss-dots
     "2HHB-journal": ("2HHB.cif", ["--theme", "journal"]),  # journal colours and fonts

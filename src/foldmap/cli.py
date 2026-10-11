@@ -80,6 +80,13 @@ def summarize(path: str) -> str:
             f"{kind}: {len(na.strands)} strand(s) {', '.join(st.id for st in na.strands)}; "
             f"{len(na.pairs)} base pairs; {len(na.contacts)} protein residues make contacts"
         )
+        for st in na.structure.stems:
+            (a, i0, i1), (b, j0, j1) = st.arm5, st.arm3
+            la, lb = na.strands[a].labels, na.strands[b].labels
+            lines.append(
+                f"  {st.name:6s} {len(st):3d} bp  {la[i0].chain}:{la[i0].tag}-{la[i1].tag} · "
+                f"{lb[j0].chain}:{lb[j0].tag}-{lb[j1].tag}"
+            )
     return "\n".join(lines)
 
 

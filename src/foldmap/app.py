@@ -431,6 +431,18 @@ def main() -> None:
             st.checkbox("Residue numbers", key="residue_numbers")
             st.checkbox("Legend", key="legend")
             st.checkbox("Base letters (DNA/RNA)", key="nucleotide_labels")
+            st.selectbox(
+                "Stems (DNA/RNA)",
+                CHOICES["na_style"],
+                key="na_style",
+                help="ladder: rails and base-pair rungs · ribbon: double helix · block: bars · letters",
+            )
+            st.selectbox(
+                "DNA/RNA shown",
+                CHOICES["na_extent"],
+                key="na_extent",
+                help="auto: everything up to 300 nt, else the stems the protein touches",
+            )
             st.text_input(
                 "DNA/RNA backbone", key="na_backbone", help="modality, chain, ink, or one colour such as #8c564b"
             )

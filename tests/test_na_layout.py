@@ -1078,13 +1078,27 @@ def test_explorer_viewers_take_a_nucleic_acid_only_selection(tmp_path, viewer):
 def test_explorer_texts_name_both_chains_and_single_nucleotides():
     from foldmap.interactive import build_page
 
+    texts = {}
+    pages = {}
     for pdb in ("3CRX", "1IHF"):
+        pages[pdb] = build_page(_path(pdb))
         data = json.loads(
-            build_page(_path(pdb))
-            .split('<script type="application/json" id="topo-data">', 1)[1]
-            .split("</script>", 1)[0]
+            pages[pdb].split('<script type="application/json" id="topo-data">', 1)[1].split("</script>", 1)[0]
         )
-        for x in data["links"]["nucleics"]:
-            assert "–-" not in x["text"], x["text"]  # never "C -50–-50"
+        texts[pdb] = [x["text"] for x in data["links"]["nucleics"]]
+        for t in texts[pdb]:
+            assert "–-" not in t, t  # never "C -50–-50"
+    assert "DNA 1a · 9 bp · C -49 … E 49" in texts["1IHF"]  # a stem across two chains names both
+    assert "tail C -50 (1 nt)" in texts["1IHF"]  # a single nucleotide is not a range
+    assert "tail C 1 (1 nt)" in texts["3CRX"]
+    assert "<p>5 chains · 190 residues · 70 nt · " in pages["1IHF"]  # protein page header counts nucleotides
     rna = build_page(_path("1EHZ"))
     assert "<p>1 chain · 76 nt · hover" in rna
+
+
+def test_summary_lists_the_stems(capsys):
+    from foldmap.cli import main
+
+    assert main(["summary", str(_path("30QM"))]) == 0
+    out = capsys.readouterr().out
+    assert "32 base pairs" in out and "P1" in out and "1:1-7 · 1:112-118" in out
