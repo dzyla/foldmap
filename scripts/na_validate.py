@@ -14,7 +14,7 @@ Without it the pairing columns are empty and the other checks still run.
 For every entry it measures
   pairing   foldmap's canonical and wobble pairs against RNApolis (run from its own venv): precision, recall, F1;
             stems against stems grouped the same way from the RNApolis pairs (none closing a loop under
-            MIN_LOOP), each matched by a foldmap stem holding at least half its pairs
+            MIN_LOOP), matched one to one, recalled when the match holds two thirds of its pairs
   shape     drawn stem centres against the 3D centres: Spearman rho of pairwise distances, similarity-Procrustes
             RMSD (no reflection) normalised by the spread; stem angle against the projected 3D axis; bends between
             the pieces of a bent duplex; whether any stem's arms are drawn mirrored
@@ -217,8 +217,9 @@ def _score(strands, ours, theirs: set[frozenset], where: dict, drawn_only: bool,
     rec = tp / (len(expected) + absent) if expected or absent else 1.0
     f1 = 2 * prec * rec / (prec + rec) if prec + rec else 0.0
     # stems: group the expected reference pairs exactly as foldmap groups its own, leaving out a pair closing a loop
-    # foldmap may not (MIN_LOOP: 5F9R C73·G76 closes 2 nt), then match a reference stem by a foldmap stem holding
-    # at least half its pairs (an end rule failed a stem foldmap carries on across a 1x1 mismatch: 5F9R A29-38)
+    # foldmap may not (MIN_LOOP: 5F9R C73·G76 closes 2 nt), then match reference and foldmap stems one to one, most
+    # shared pairs first, a reference stem recalled when its match holds at least two thirds of its pairs (an end
+    # rule failed a stem foldmap carries on across a 1x1 mismatch: 5F9R A29-38)
     ref_pairs = []
     for xy in sorted(expected, key=sorted):
         x, y = sorted(xy)
@@ -230,13 +231,20 @@ def _score(strands, ours, theirs: set[frozenset], where: dict, drawn_only: bool,
     def steps(st):
         return {(p.a, p.i, p.b, p.j) for p in st.pairs}
 
-    def close(r, g):
-        return 2 * len(steps(r) & steps(g)) >= len(r)
+    shared = sorted(
+        ((-len(steps(r) & steps(g)), a, b) for a, r in enumerate(ref) for b, g in enumerate(got)),
+    )
+    taken_ref, taken_got, matched = set(), set(), 0
+    for n, a, b in shared:
+        if n == 0 or a in taken_ref or b in taken_got:
+            continue
+        taken_ref.add(a)
+        taken_got.add(b)
+        matched += 3 * -n >= 2 * len(ref[a])
 
     def named(xy):  # a drawn pair as [[chain, number, icode], ...], chains as drawn
         return sorted([strands[s].chain, strands[s].labels[i].seq, strands[s].labels[i].icode] for s, i in xy)
 
-    matched = sum(1 for r in ref if any(close(r, g) for g in got))
     missed = sorted(named(xy) for xy in expected.keys() - mine)
     if not drawn_only:  # reference pairs with a nucleotide foldmap has no strand for
         missed += sorted(sorted(p) for p in theirs - shown)

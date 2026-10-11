@@ -292,7 +292,7 @@ def verify_contacts(model, drawn, layout, bb, *, path=None) -> ContactReport:
 # pass/fail limits, set from the measured campaign (see the plan's Task 13); `None` disables a check
 THRESHOLDS = {
     "pair_f1": 0.90,  # canonical + wobble pairs against RNApolis (campaign v3: 0.92-1.00, median 1.00)
-    "stem_recall": 0.80,  # RNApolis stems (>= 2 pairs) matched by a foldmap stem holding at least half their pairs
+    "stem_recall": 0.80,  # RNApolis stems (>= 2 pairs) matched one to one by a foldmap stem holding >= 2/3 of their pairs
     "spearman": 0.60,  # pairwise stem-centre distances, drawn against 3D, entries with >= 5 stems (0.44-0.98)
     "procrustes": 0.80,  # normalised RMSD of drawn stem centres after a similarity fit, no reflection (0.07-0.86)
     # angle and joint errors: 0 by construction on a plain frame (regression guards), measured on unrolled ones

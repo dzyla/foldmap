@@ -488,12 +488,24 @@ def _score_synthetic(ours_ij, theirs_ij, n=80):
 def test_stem_recall_matches_a_stem_by_most_of_its_pairs():
     """M4, 5F9R: RNApolis' A29-36/51-58 against foldmap's A29-38/49-58, which carries on across a 1x1 mismatch
     (A38·A49, the better pair by its geometry): every reference pair is drawn, yet the old rule (both arms' ends
-    within one nucleotide) failed it. A stem is matched by a foldmap stem holding at least half its pairs."""
+    within one nucleotide) failed it. Stems are matched one to one, a reference stem recalled when its match holds
+    at least two thirds of its pairs."""
     stem = [(28 + k, 57 - k) for k in range(8)]
     m = _score_synthetic([*stem, (37, 48)], stem)
     assert (m["stems_reference"], m["stem_recall"]) == (1, 1.0)
-    m = _score_synthetic(stem[:3], stem)  # three of eight: not the same stem
+    m = _score_synthetic(stem[:5], stem)  # five of eight: under two thirds
     assert m["stem_recall"] == 0.0
+    m = _score_synthetic(stem[:6], stem)
+    assert m["stem_recall"] == 1.0
+
+
+def test_one_foldmap_stem_recalls_one_reference_stem_only():
+    # two reference stems split by a 3x3 loop, drawn by foldmap as one stem (as a merged helix would be)
+    outer, inner = [(10 + k, 69 - k) for k in range(6)], [(19 + k, 60 - k) for k in range(6)]
+    theirs = outer + inner
+    ours = outer + [(16, 63), (17, 62), (18, 61)] + inner  # carried on through what the reference leaves unpaired
+    m = _score_synthetic(ours, theirs)
+    assert (m["stems_reference"], m["stems_foldmap"], m["stem_recall"]) == (2, 1, 0.5)
 
 
 def test_stem_recall_leaves_out_reference_pairs_closing_too_short_a_loop():
