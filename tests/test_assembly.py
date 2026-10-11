@@ -167,3 +167,30 @@ def test_holliday_junction_assembly_keeps_each_dna_strand_once():
             d, _ = cKDTree(t.p).query(s.p)
             assert (d < 1.5).mean() < 0.5, (s.chain, t.chain)
     assert len(na.structure.stems) == 4
+
+
+def test_an_assembly_whose_every_added_copy_is_dropped_keeps_the_deposited_names(tmp_path):
+    """auto: when every copy the assembly adds lies exactly on a chain already present (C5 drops them all), the
+    result is the molecule as deposited, under its deposited chain names (A, not A1)."""
+    import gemmi
+
+    from foldmap.io import read_model
+
+    st = gemmi.read_structure(str(DATA / "na" / "1EHZ.cif.gz"))
+    gen = gemmi.Assembly.Gen()
+    gen.chains = [c.name for c in st[0]]
+    gen.subchains = sorted({r.subchain for c in st[0] for r in c})
+    for name in ("1", "2"):  # the second operator maps the tRNA onto itself
+        op = gemmi.Assembly.Operator()
+        op.name, op.transform = name, gemmi.Transform()
+        gen.operators.append(op)
+    assembly = gemmi.Assembly("1")
+    assembly.generators.append(gen)
+    st.assemblies.clear()
+    st.assemblies.append(assembly)
+    path = tmp_path / "twice.cif"
+    st.make_mmcif_document().write_file(str(path))
+    model, deposited = read_model(path)
+    assert [c.name for c in model] == ["A"] and deposited == {"A"}
+    bb = load_backbone(path, model=(model, deposited))
+    assert bb.asu_chains <= {"A"}

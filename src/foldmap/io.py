@@ -119,7 +119,8 @@ def _drop_coincident(model) -> list[str]:
 def read_model(path: str | Path, assembly: str = "auto"):
     """(model, deposited chain names). assembly: 'asu' as deposited; an assembly id from the file; or 'auto':
     the first assembly when it adds copies and stays within AUTO_MAX chains. A copy the assembly lays exactly on a
-    chain already present is dropped (_drop_coincident)."""
+    chain already present is dropped (_drop_coincident); under 'auto', when that drops every copy it adds, the
+    model is returned as deposited, with its deposited chain names."""
     path = Path(path)
     if not path.is_file():
         raise FileNotFoundError(path)
@@ -152,6 +153,8 @@ def read_model(path: str | Path, assembly: str = "auto"):
         xyz = np.array([a.pos.tolist() for r in c for a in r][:20])
         if any(len(o) == len(xyz) and np.allclose(o, xyz, atol=1e-3) for o in original.values()):
             asu.add(c.name)
+    if assembly == "auto" and len(asu) == len(built) == len(model):  # every added copy dropped: as deposited
+        return model, deposited
     return built, asu
 
 
