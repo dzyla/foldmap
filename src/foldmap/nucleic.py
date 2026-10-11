@@ -198,6 +198,7 @@ class Stem:
     id: str = ""
     name: str = ""
     parent: str = ""  # a straight piece of a bent stem: the whole stem's id
+    helix: int = -1  # the helix it belongs to (_helices: stems continued across internal loops); -1: a knot
 
     @property
     def a(self) -> int:
@@ -382,7 +383,11 @@ def secondary_structure(strands, pairs: list[BasePair]) -> NAStructure:
         if not (strands[st.a].rna or strands[st.b].rna) and k not in knots:
             dna += 1
             st.name = f"DNA {dna}"
-    rna = [h for h in _helices(out.stems, knots) if out.stems[h[0]].name == ""]
+    helices = _helices(out.stems, knots)
+    for n, helix in enumerate(helices):
+        for k in helix:
+            out.stems[k].helix = n
+    rna = [h for h in helices if out.stems[h[0]].name == ""]
     for n, helix in enumerate(rna):
         for m, k in enumerate(helix):
             out.stems[k].name = f"P{n + 1}" + (_letter(m) if len(helix) > 1 else "")
@@ -470,7 +475,7 @@ def segment_stem(stem: Stem, strands, max_turn: float = SEGMENT_TURN) -> list[St
         part = stem.pairs[lo:hi]
         inner = [x for x in stem.bulges if _between(x, part)]
         suffix = str(n + 1) if stem.name[-1:].islower() else _letter(n)  # P2a: P2a1, P2a2; P2: P2a, P2b
-        pieces.append(Stem(part, inner, f"{stem.id}#{n + 1}", f"{stem.name}{suffix}", stem.id))
+        pieces.append(Stem(part, inner, f"{stem.id}#{n + 1}", f"{stem.name}{suffix}", stem.id, stem.helix))
     return pieces
 
 

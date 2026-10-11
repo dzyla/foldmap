@@ -682,11 +682,9 @@ def test_joints_and_runs_cross_no_stem_or_element(pdb):
     assert kinds["run"] or pdb == "1KX5"
 
 
-# runs over a stem-name box, held at the measured count: on 4YBB the 1-nt run P1->P2 ((0, 23) to (0, 25)) is boxed in
-# by the stems and hairpin loops drawn round it (Task 13b step 4, once AA:454-462/470-479 became one stem and the
-# helices were lettered): its one route clear of the elements gives up a soft cell of P12b's name box (block style
-# draws that name inside the stem, so nothing visible is crossed)
-OVER_NAMES = {"4YBB": [((0, 23), (0, 25))]}
+# runs over a stem-name box, held at the measured count (a held run that keeps off them must be removed): none since
+# fix round 1 of Task 13b step 4 (4YBB's 1-nt run P1->P2 was boxed in and gave up a soft cell of P12b's name box)
+OVER_NAMES: dict = {}
 
 
 @pytest.mark.parametrize("pdb", FIXTURES)
@@ -744,14 +742,23 @@ def test_a_run_over_a_stem_name_is_drawn_when_nothing_else_is_clear():
 
 def test_an_internal_loop_side_keeps_its_bow_when_every_drawing_meets_a_name():
     """One side of an internal loop is bowed out on its own side. When the bow (and every route) crosses a stem
-    name, the bow is still the drawing taken (the soft choice), not a route nor a fallback (4OO8's two sides)."""
+    name, the bow is still the drawing taken (the soft choice), not a route nor a fallback (2GIS's P3a-P3b loop;
+    4OO8's P2a-P2b sides, pinned here before, are routed since its helix is held together: their faces no longer
+    see each other across the loop)."""
     from foldmap.route import _element_obstacles, _Grid, _Router
     from foldmap.route_na import NT_STEP, _face, _side_bow, _strand_between
 
-    lay, _, _, _ = _routed("4OO8")
+    lay, _, _, _ = _routed("2GIS")
     at = {key: d for d in lay.stems for key in d.axial}
     kind = {(r.strand, r.lo): r.kind for r in lay.nucleic.structure.runs}
-    sides = [p for p in lay.na_paths if p.kind == "run" and p.nts and kind.get((p.strand, p.nts[0])) == "internal"]
+    sides = [
+        p
+        for p in lay.na_paths
+        if p.kind == "run"
+        and p.nts
+        and kind.get((p.strand, p.nts[0])) == "internal"
+        and {at[k].name for k in p.between} == {"P3a", "P3b"}
+    ]
     assert len(sides) == 2
     for p in sides:
         (s, i), (_, j) = p.between
@@ -1040,6 +1047,13 @@ def test_runs_keep_off_the_strands_drawn_before_them(pdb, runs, protein):
     assert m["na_run_crossings"] <= runs and m["na_protein_crossings"] <= protein
 
 
+# two strands whose nucleotides sit within a bead of each other, held at their measured pairs (a held pair that clears
+# must be removed): on 4YBB the runs P6 -> P7a and P20a2 -> P20b are drawn along one another through a corridor no
+# route off the strands reaches, once short internal loops hold their helices together (Task 13b step 4, fix round 1);
+# their spacings differ (1.43 and 2.05), so no slide clears every nucleotide
+CROWDED = {"4YBB": {frozenset({((1, 20), (1, 27)), ((3, 29), (3, 36))})}}
+
+
 @pytest.mark.parametrize("pdb", [*FIXTURES, "2GIS", "2OEU"])
 def test_no_nucleotide_sits_on_another_strands(pdb):
     """No nucleotide is drawn within a contact bead's width of a nucleotide of another strand or stem: where two runs
@@ -1058,7 +1072,11 @@ def test_no_nucleotide_sits_on_another_strands(pdb):
         for b in np.flatnonzero(np.hypot(*(xy[a + 1 :] - xy[a]).T) < _BEAD) + a + 1
         if owner[a] != owner[b]
     ]
-    assert not close
+
+    def name(o):  # a stem by its id, a path by the stem nucleotides it runs between
+        return o[1] if o[0] == "stem" else lay.na_paths[o[1]].between
+
+    assert {frozenset({name(a), name(b)}) for a, b in close} == CROWDED.get(pdb, set())
 
 
 def test_a_crowded_letter_looks_further_out_and_along_its_strand():

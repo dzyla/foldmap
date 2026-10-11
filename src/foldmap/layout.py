@@ -1348,6 +1348,10 @@ _JOINT_SLACK = 0.3
 # in too. Not within one RNA chain: there it pulled a tRNA's T arm across its cloverleaf.
 _SHORT_RUN = 2
 _W_SHORT = 10.0
+# two stems of one helix (nucleic._helices) with at most this many nucleotides on either side of the loop between
+# them are held close like a strand exchange. Measured over the 39 campaign entries (NA x protein crossings, total and
+# 4YBB): none held 174/76, 2: 168/70, 3: 152/54, 4: 164/55 (5F9R 8 -> 20), 6: 148/39 (two joints through their pieces)
+_HELIX_LOOP = 3
 
 
 def _strand_steps(items: list[_Item], na: Nucleic):
@@ -1393,23 +1397,45 @@ def _joints(items: list[_Item], na: Nucleic) -> set[tuple[int, int]]:
 def _stem_springs(items: list[_Item], na: Nucleic) -> list[tuple[int, np.ndarray, int, np.ndarray, float, float]]:
     """(item, port offset, item, port offset, weight, slack) along each strand from one stem to the next: the
     joint between two pieces of a bent duplex holds them end to end; a strand exchange (at most _SHORT_RUN
-    nucleotides between stems of more than two strands) holds the two stem ends close (slack: its nucleotides'
-    steps); any other run pulls its two stems together like a loop, with slack for its nucleotides or, when longer,
-    the distance between its ends at the items' home (projected) places."""
+    nucleotides between stems of more than two strands), or a side of a short internal loop or bulge between two
+    stems of one helix (_short_loops), holds the two stem ends close (slack: its nucleotides' steps); any other
+    run pulls its two stems together like a loop, with slack for its nucleotides or, when longer, the distance
+    between its ends at the items' home (projected) places."""
     owner = _owner(items)
+    short = _short_loops(na)
     out = []
     for s, i, j, (ki, mi), (kj, mj) in _strand_steps(items, na):
         oi = np.subtract(mi.port((s, i), True)[0], (mi.cx, mi.cy)) + owner[mi.id][2]
         oj = np.subtract(mj.port((s, j), False)[0], (mj.cx, mj.cy)) + owner[mj.id][2]
         n = j - i - 1
+        mates = frozenset((mi.parent or mi.id, mj.parent or mj.id)) in short
         if _is_joint(n, mi, mj):  # a joint: the duplex carries on
             w, slack = _W_JOINT, _JOINT_SLACK
-        elif n <= _SHORT_RUN and len({*mi.strands, *mj.strands}) > 2:  # a strand exchange: ends held close
+        elif (n <= _SHORT_RUN and len({*mi.strands, *mj.strands}) > 2) or mates:  # ends held close
             w, slack = _W_SHORT, max(_JOINT_SLACK, n * NT_STEP)
         else:  # pulls only beyond the distance seen between its ends: the stems keep their 3D arrangement
             seen = np.add(items[kj].home, oj) - np.add(items[ki].home, oi)
             w, slack = _W_SEQ, max(_LOOP_SLACK, 0.5 * n * NT_STEP, float(_snap(np.hypot(*seen))))
         out.append((ki, oi, kj, oj, w, slack))
+    return out
+
+
+def _short_loops(na: Nucleic) -> set[frozenset[str]]:
+    """The ids of every two stems of one helix (nucleic._helices: the inner continuing the outer) between which
+    neither side of the internal loop or bulge holds more than _HELIX_LOOP nucleotides: one helix the drawing keeps
+    together (4YBB's h44 decoding site, 2GIS P3a/P3b)."""
+    out = set()
+    stems = na.structure.stems
+    by_helix: dict[int, list] = {}
+    for st in stems:
+        if st.helix >= 0:
+            by_helix.setdefault(st.helix, []).append(st)
+    for helix in by_helix.values():
+        helix.sort(key=lambda st: (st.a, st.pairs[0].i))  # outermost first
+        for a, b in zip(helix, helix[1:]):
+            x, y = a.pairs[-1], b.pairs[0]
+            if max(y.i - x.i - 1, x.j - y.j - 1) <= _HELIX_LOOP:
+                out.add(frozenset((a.id, b.id)))
     return out
 
 
