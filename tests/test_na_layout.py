@@ -312,7 +312,7 @@ def test_a_long_tie_is_two_labelled_marks():
 @pytest.mark.parametrize("pdb", FIXTURES)
 def test_tie_lines_cross_no_stem_and_tie_labels_count_as_text(pdb):
     from foldmap.layout import label_boxes
-    from foldmap.route_na import _crosses_body
+    from foldmap.route_na import crosses_body
 
     lay, sses, _, _ = _routed(pdb)
     names = [n for n, _ in label_boxes(lay, sses)]
@@ -320,7 +320,7 @@ def test_tie_lines_cross_no_stem_and_tie_labels_count_as_text(pdb):
         if tie.label:
             assert len(tie.marks) == 2 and {f"tie-label:{n}:0", f"tie-label:{n}:1"} <= set(names)
         else:
-            assert not any(_crosses_body(*tie.ends, e) for e in [*lay.stems, *lay.placed.values()])
+            assert not any(crosses_body(*tie.ends, e) for e in [*lay.stems, *lay.placed.values()])
 
 
 @pytest.mark.parametrize("pdb", FIXTURES)
@@ -449,7 +449,7 @@ def test_joints_and_runs_cross_no_stem_or_element(pdb):
     """Every run and every joint between two pieces of a bent duplex, as drawn from where it leaves its own stems'
     bodies, passes the router's own final check (route._clear) against every element and stem."""
     from foldmap.route import _clear, _element_obstacles
-    from foldmap.route_na import _outside
+    from foldmap.route_na import outside_own
 
     lay, _, _, _ = _routed(pdb)
     at = {key: d for d in lay.stems for key in d.axial}
@@ -458,7 +458,7 @@ def test_joints_and_runs_cross_no_stem_or_element(pdb):
     for p in lay.na_paths:
         if p.kind in kinds:
             own = tuple(at[key] for key in p.between)
-            assert _clear(_outside(p.points, own), own, rects, owners, own_body=True), (p.kind, p.strand, p.between)
+            assert _clear(outside_own(p.points, own), own, rects, owners, own_body=True), (p.kind, p.strand, p.between)
             kinds[p.kind] += 1
     assert kinds["joint"] >= (20 if pdb == "1KX5" else 2 if pdb == "1IHF" else 0)
     assert kinds["run"] or pdb == "1KX5"
@@ -467,14 +467,14 @@ def test_joints_and_runs_cross_no_stem_or_element(pdb):
 @pytest.mark.parametrize("pdb", FIXTURES)
 def test_runs_keep_off_the_stem_names(pdb):
     from foldmap.layout import label_boxes
-    from foldmap.route_na import _outside
+    from foldmap.route_na import outside_own
 
     lay, sses, _, _ = _routed(pdb)
     at = {key: d for d in lay.stems for key in d.axial}
     names = [b for n, b in label_boxes(lay, sses) if n.startswith("stem-label:")]
     for p in lay.na_paths:
         if p.kind in ("run", "joint"):
-            pts = _outside(p.points, tuple(at[key] for key in p.between))
+            pts = outside_own(p.points, tuple(at[key] for key in p.between))
             assert all(segment_clear(a, b, names) for a, b in zip(pts, pts[1:])), (p.kind, p.between)
 
 
@@ -604,11 +604,11 @@ def _segments_cross(p, q, a, b) -> bool:
 
 @pytest.mark.parametrize("pdb", ["1EHZ", "4OO8", "30QM"])
 def test_runs_steer_round_hairpin_loops_and_free_ends(pdb):
-    from foldmap.route_na import _outside
+    from foldmap.route_na import outside_own
 
     lay, _, _, _ = _routed(pdb)
     at = {key: d for d in lay.stems for key in d.axial}
-    drawn = {id(p): _outside(p.points, tuple(at[key] for key in p.between)) for p in lay.na_paths}
+    drawn = {id(p): outside_own(p.points, tuple(at[key] for key in p.between)) for p in lay.na_paths}
     fixed = [p for p in lay.na_paths if p.kind in ("hairpin", "tail")]
     for p in lay.na_paths:
         if p.kind in ("run", "joint", "gap"):

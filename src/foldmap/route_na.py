@@ -247,7 +247,8 @@ def _local(pt, d) -> tuple[float, float]:
     return x * c + y * s, y * c - x * s
 
 
-def _in_body(pt, d) -> bool:
+def in_body(pt, d) -> bool:
+    """Is pt strictly inside the element's (or stem's) tilted body?"""
     u, v = _local(pt, d)
     return abs(u) < d.length / 2 - 1e-9 and abs(v) < d.width / 2 - 1e-9
 
@@ -270,16 +271,16 @@ def _leaves_at(p, q, d) -> float:
     return max(0.0, t)
 
 
-def _outside(pts, own) -> list[tuple[float, float]]:
+def outside_own(pts, own) -> list[tuple[float, float]]:
     """The polyline without its first and last stretches inside its own stems' bodies (a strand runs along its
     rail to the stem's end face before it is drawn among the other elements)."""
 
     def trim(p):
         for i in range(len(p) - 1):
-            mine = [d for d in own if _in_body(p[i], d)]
+            mine = [d for d in own if in_body(p[i], d)]
             if not mine:
                 return p[i:]
-            if any(_in_body(p[i + 1], d) for d in own):
+            if any(in_body(p[i + 1], d) for d in own):
                 continue
             t = max(_leaves_at(p[i], p[i + 1], d) for d in mine)
             q = np.add(p[i], t * np.subtract(p[i + 1], p[i]))
@@ -292,7 +293,7 @@ def _outside(pts, own) -> list[tuple[float, float]]:
 
 def _na_clear(pts, own, elements) -> bool:
     """A strand drawn clear of every element and stem (by _clear), from where it leaves its own stems."""
-    return _clear(_outside(pts, own), own, *elements, own_body=True)
+    return _clear(outside_own(pts, own), own, *elements, own_body=True)
 
 
 def route_nucleic(layout: Layout, router: _Router | None = None) -> list[NAPath]:
@@ -509,7 +510,7 @@ def _seg_dist(q, a, b) -> float:
     return float(np.hypot(*(q - a - t * ab)))
 
 
-def _crosses_body(p, q, e) -> bool:
+def crosses_body(p, q, e) -> bool:
     """Does segment p-q pass through the element's (or stem's) true, tilted outline?"""
     (u0, v0), (u1, v1) = _local(p, e), _local(q, e)
     return clip_len((u0, v0), (u1, v1), (-e.length / 2, -e.width / 2, e.length / 2, e.width / 2)) > 1e-9
@@ -537,7 +538,7 @@ def _ties(layout: Layout, paths: list[NAPath]) -> list[NATie]:
     def clear(tick, at, own) -> bool:  # own: the tie's nucleotide, which the tick starts beside
         (a, b), (x, y) = tick, at
         box = (x - hw, y - hh, x + hw, y + hh)
-        if any(_near(at, e, 0.0) or _crosses_body(a, b, e) for e in bodies):
+        if any(_near(at, e, 0.0) or crosses_body(a, b, e) for e in bodies):
             return False
         near = [t for t in taken if math.dist(t, own) > 1e-9]
         if any(math.dist(at, t) < _LETTER_GAP + hh for t in near) or any(_seg_dist(t, a, b) < 0.2 for t in near):
@@ -554,7 +555,7 @@ def _ties(layout: Layout, paths: list[NAPath]) -> list[NATie]:
         pa, pb = where[ka], where[kb]
         tie = NATie(ka, kb, [tuple(map(float, pa)), tuple(map(float, pb))])
         long = math.dist(pa, pb) > _TIE_SHORT * width
-        hit = any(_crosses_body(pa, pb, e) for e in bodies) or any(
+        hit = any(crosses_body(pa, pb, e) for e in bodies) or any(
             _seg_dist(xy, pa, pb) < _GLYPH_H / 2 for key, xy in letters.items() if key not in (ka, kb)
         )
         if long or hit:

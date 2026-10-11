@@ -23,7 +23,7 @@ from .io import CONTACT
 from .layout import SCALE, stem_pieces
 from .nucleic import stem_axis
 from .route import clip_len
-from .route_na import _crosses_body, _in_body, _outside
+from .route_na import crosses_body, in_body, outside_own
 
 
 @dataclass(frozen=True)
@@ -295,8 +295,11 @@ THRESHOLDS = {
     "spearman": 0.60,  # pairwise stem-centre distances, drawn against 3D, entries with >= 5 stems (0.44-0.98)
     "procrustes": 0.80,  # normalised RMSD of drawn stem centres after a similarity fit, no reflection (0.07-0.86)
     "angle_median": 5.0,  # degrees, drawn stem direction against its projected 3D axis
-    "mirrored": 0,  # stems seen clearly (_SIDE_SEEN) drawn with their arms swapped
+    "angle_max": 5.0,  # degrees, the worst stem; fixtures 0.0 (stems drawn along their seen axes), plus a margin
+    "joint_error_max": 5.0,  # degrees, signed drawn bend against signed seen bend at the worst joint (fixtures 0.0)
+    "mirrored": 0,  # stems seen clearly (SIDE_SEEN) drawn with their arms swapped
     "contact_auc": 0.60,  # elements touching a stem drawn nearer it than the rest (0.42-1.00, median 0.83)
+    "stems_nearer_frac": 1.0,  # contacted stems drawn nearer their touching elements than the median element
     "beads_missing": 0,  # protein residues touching a drawn nucleotide with no bead (verify_contacts' missing)
     "bead_colour_wrong": 0,  # beads not in their toucher's chain colour (verify_contacts' wrong colour)
     "beads_false": 0,  # beads no heavy-atom pair of their chain backs (verify_contacts' false)
@@ -308,16 +311,16 @@ THRESHOLDS = {
     # targets; the fixture gate holds each fixture at its measured value until the campaign (Task 14 tightens)
     "na_crossings": 0,  # runs, joints and gaps crossing hairpin arcs, free ends or stem bodies
     "bead_overlaps": 0,  # contact beads overlapping one another
-    "gap_label_collisions": 0,  # "... N nt ..." labels on each other, a stem or a path
+    "gap_label_collisions": 0,  # "... N nt ..." labels on each other, a stem, element, letter, bead or path
     "na_protein_crossings": None,  # nucleic-acid paths crossing protein loops: reported, not judged
     "seconds": 120.0,
 }
-_HIGH_IS_GOOD = ("pair_f1", "stem_recall", "spearman", "contact_auc")
+_HIGH_IS_GOOD = ("pair_f1", "stem_recall", "spearman", "contact_auc", "stems_nearer_frac")
 # Å: a stem whose first arm is seen at least this far beside its second, across the drawn axis, has a side the
 # drawing must keep. Below it the arms are seen nearly on top of each other and both sides fit the projection
-# about equally (the plan-07 Task 7p ruling, which set the layout's own cut, layout._SIDE_CLEAR, at this value).
-# Kept separate from the layout's constant so that raising that one shows here as mirrored stems.
-_SIDE_SEEN = 2.75
+# about equally. Equal to the layout's own cut, layout._SIDE_CLEAR (τ, set by the plan-07 Task 7p ruling), but
+# kept separate so that raising that one shows here as mirrored stems.
+SIDE_SEEN = 2.75
 
 
 def _similarity_rmsd(a: np.ndarray, b: np.ndarray) -> float:
@@ -339,6 +342,16 @@ def _angle(u, v) -> float:
     return float(np.degrees(np.arccos(np.clip(cos, -1.0, 1.0))))
 
 
+def _turn(u, v) -> float:
+    """Signed degrees from u to v, counterclockwise positive, in (-180, 180]."""
+    return float(np.degrees(np.arctan2(u[0] * v[1] - u[1] * v[0], u[0] * v[0] + u[1] * v[1])))
+
+
+def _wrap(a: float) -> float:
+    """An angle in degrees brought into [-180, 180)."""
+    return (a + 180.0) % 360.0 - 180.0
+
+
 def _norm(v) -> float:
     return float(np.sqrt((np.asarray(v, float) ** 2).sum()))
 
@@ -347,16 +360,21 @@ def shape(lay) -> dict:
     """Drawn stems against the 3D structure seen through the figure's own frame (layout.frame, so unrolled
     symmetric and radial frames are compared as drawn). stems_drawn; spearman (pairwise stem-centre distances,
     drawn against 3D, >= 5 stems); procrustes (>= 3 stems); angle_median and angle_max (degrees, drawn direction
-    against the seen 3D axis, stems seen side-on enough); mirrored (stems seen clearly, _SIDE_SEEN, whose first
-    arm is drawn on the side opposite the one it is seen on); bend_3d, bend_drawn and joint_error_max (degrees)
-    when a duplex is split into pieces."""
+    against the seen 3D axis, stems seen side-on enough); mirrored (stems seen clearly, SIDE_SEEN, whose first
+    arm is drawn on the side opposite the one it is seen on); when a duplex is split into pieces, bend_3d and
+    bend_drawn (net signed turn from piece to piece, degrees, counterclockwise positive) and joint_error_max (the
+    largest difference of the signed drawn and seen turns at one joint, so a bend drawn the wrong way counts).
+    A drawn stem that is no piece of the structure's stems raises ValueError: no stem is left out unmeasured."""
     na, frame = lay.nucleic, lay.frame
     if na is None or frame is None:
         return {}
     pieces = {p.id: p for p in stem_pieces(na)}
-    stems = [d for d in lay.stems if d.id in pieces]
+    unknown = [d.id for d in lay.stems if d.id not in pieces]
+    if unknown:
+        raise ValueError(f"drawn stems that are no piece of the structure's stems: {unknown}")
+    stems = list(lay.stems)
     if not stems:
-        return {}
+        return {"stems_drawn": 0}
     axes = [stem_axis(pieces[d.id], na.strands) for d in stems]
     c3 = np.array([c for c, _ in axes])
     drawn = np.array([[d.cx, d.cy] for d in stems])
@@ -377,21 +395,21 @@ def shape(lay) -> dict:
         across = na.strands[a].c1[i0 : i1 + 1].mean(axis=0) - na.strands[b].c1[j0 : j1 + 1].mean(axis=0)
         s2 = frame.direction(centre, across)
         beside = float(d.direction[0] * s2[1] - d.direction[1] * s2[0])  # Å the first arm is seen left of the second
-        if abs(beside) >= _SIDE_SEEN:  # the arms are seen side by side across the drawn axis
+        if abs(beside) >= SIDE_SEEN:  # the arms are seen side by side across the drawn axis
             mirrored += (1 if beside > 0 else -1) != d.first
     out["angle_median"] = round(float(np.median(errors)), 1) if errors else None
     out["angle_max"] = round(float(np.max(errors)), 1) if errors else None
     out["mirrored"] = mirrored
-    joints = []  # (seen bend, drawn bend) between consecutive pieces of one duplex
+    joints = []  # (seen turn, drawn turn), signed, between consecutive pieces of one duplex
     for k in range(len(stems) - 1):
         d, e = stems[k], stems[k + 1]
         if d.parent and d.parent == e.parent:
             (ca, a3), (cb, b3) = axes[k], axes[k + 1]
-            joints.append((_angle(frame.direction(ca, a3), frame.direction(cb, b3)), _angle(d.direction, e.direction)))
+            joints.append((_turn(frame.direction(ca, a3), frame.direction(cb, b3)), _turn(d.direction, e.direction)))
     if joints:
         out["bend_3d"] = round(sum(j[0] for j in joints), 1)
         out["bend_drawn"] = round(sum(j[1] for j in joints), 1)
-        out["joint_error_max"] = round(max(abs(a - b) for a, b in joints), 1)
+        out["joint_error_max"] = round(max(abs(_wrap(a - b)) for a, b in joints), 1)
     return out
 
 
@@ -404,19 +422,23 @@ def contacts(lay, sses) -> dict:
     """Are the protein elements touching a stem drawn nearer to it than those that do not touch it? Per stem
     with both kinds: the AUC of the box gaps (a touching element nearer than a non-touching one; ties count half)
     and the precision of the k nearest elements, k the number touching (elements tied at the k-th gap share the
-    remaining places); both averaged over the stems."""
+    remaining places); both averaged over the stems. stems_nearer_frac: the fraction of the stems any element
+    touches whose mean gap to those elements is below their median gap to every element (the spec's criterion)."""
     na = lay.nucleic
     if na is None:
-        return {"contact_auc": None, "contact_precision_at_k": None}
+        return {"contact_auc": None, "contact_precision_at_k": None, "stems_nearer_frac": None}
     drawn = [s for s in sses if s.id in lay.placed]
-    aucs, precs = [], []
+    aucs, precs, nearer = [], [], []
     for d in lay.stems:
         mine = set(d.axial)
         touch = {s.id for s in drawn if any(mine & na.contacts.get(r, set()) for r in range(s.start, s.end + 1))}
         rest = [s.id for s in drawn if s.id not in touch]
-        if not touch or not rest:
+        if not touch:
             continue
         dist = {s.id: _gap(lay.placed[s.id].rect, d.rect) for s in drawn}
+        nearer.append(float(np.mean([dist[t] for t in sorted(touch)])) < float(np.median(list(dist.values()))))
+        if not rest:
+            continue
         wins = sum((dist[t] < dist[r]) + 0.5 * (dist[t] == dist[r]) for t in sorted(touch) for r in rest)
         aucs.append(wins / (len(touch) * len(rest)))
         kth = sorted(dist.values())[len(touch) - 1]
@@ -427,6 +449,7 @@ def contacts(lay, sses) -> dict:
     return {
         "contact_auc": round(float(np.mean(aucs)), 3) if aucs else None,
         "contact_precision_at_k": round(float(np.mean(precs)), 3) if precs else None,
+        "stems_nearer_frac": round(sum(nearer) / len(nearer), 3) if nearer else None,
     }
 
 
@@ -472,7 +495,7 @@ def _cross_count(xs: list, ys: list) -> int:
 
 def _through_stem(seg: np.ndarray, d) -> bool:
     """Does any segment run through the stem's true, tilted body?"""
-    return any(_crosses_body(s[:2], s[2:], d) for s in seg)
+    return any(crosses_body(s[:2], s[2:], d) for s in seg)
 
 
 def _box_hits(box, seg: np.ndarray) -> bool:
@@ -480,15 +503,22 @@ def _box_hits(box, seg: np.ndarray) -> bool:
     return any(clip_len(s[:2], s[2:], box) > 1e-9 for s in seg)
 
 
-def _box_meets_stem(box, d) -> bool:
-    """Does the box overlap the stem's tilted body: an edge of one through the other, or the box inside it?"""
+def _box_meets_body(box, d) -> bool:
+    """Does the box overlap the stem's (or element's) tilted body: an edge of one through the other, or the box
+    inside it?"""
     c, s = np.cos(d.angle), np.sin(d.angle)
     hl, hw = d.length / 2, d.width / 2
     corners = [(d.cx + x * c - y * s, d.cy + x * s + y * c) for x, y in ((-hl, -hw), (hl, -hw), (hl, hw), (-hl, hw))]
     if _box_hits(box, _segments(corners + corners[:1])):
         return True
     centre = ((box[0] + box[2]) / 2, (box[1] + box[3]) / 2)
-    return _crosses_body(centre, centre, d) or _in_body(centre, d)
+    return crosses_body(centre, centre, d) or in_body(centre, d)
+
+
+def _trimmed(lay) -> list[np.ndarray]:
+    """Each nucleic-acid path's segments, without its stretches inside its own stems (the rails it runs along)."""
+    at = {key: d for d in lay.stems for key in d.axial}
+    return [_segments(outside_own(p.points, tuple(at[k] for k in p.between if k in at))) for p in lay.na_paths]
 
 
 def na_crossings(lay, loops) -> dict:
@@ -496,8 +526,7 @@ def na_crossings(lay, loops) -> dict:
     drawn among the elements): na_crossings, (run, joint or gap path, hairpin arc or free end) pairs crossing at
     least once plus (such a path, stem) pairs where it runs through the stem's body; na_protein_crossings,
     (nucleic-acid path, protein loop) pairs crossing at least once."""
-    at = {key: d for d in lay.stems for key in d.axial}
-    drawn = [(p, _segments(_outside(p.points, tuple(at[k] for k in p.between if k in at)))) for p in lay.na_paths]
+    drawn = list(zip(lay.na_paths, _trimmed(lay)))
     moving = [seg for p, seg in drawn if p.kind in ("run", "joint", "gap")]
     fixed = [seg for p, seg in drawn if p.kind in ("hairpin", "tail")]
     through = sum(
@@ -516,8 +545,9 @@ def render_checks(lay, loops, fig, sses, *, model=None, bb=None) -> dict:
     counted as defects, beads not in their toucher's chain colour, beads no atoms back, beads naming a residue or
     nucleotide the model lacks), fallbacks (loop and nucleic-acid routes with no clear way), na_crossings and
     na_protein_crossings (see na_crossings), bead_overlaps (pairs of contact beads whose discs overlap at their
-    drawn size) and gap_label_collisions ("… N nt …" labels overlapping another one, a stem, a nucleic-acid path
-    other than their own or a protein loop: one per label and thing it meets).
+    drawn size) and gap_label_collisions ("… N nt …" labels overlapping another one, or meeting a stem's or an
+    element's body, a base letter, a contact bead, a nucleic-acid path other than their own (outside its own stems)
+    or a protein loop: one per label and thing it meets).
     The bead checks against the coordinates need the io.read_model result and the Backbone the figure was drawn
     from; without them they are None (not measured)."""
     from matplotlib.backends.backend_agg import FigureCanvasAgg
@@ -538,7 +568,7 @@ def render_checks(lay, loops, fig, sses, *, model=None, bb=None) -> dict:
     off = sum(
         1 for e in extents if e.x0 < page.x0 - 1 or e.y0 < page.y0 - 1 or e.x1 > page.x1 + 1 or e.y1 > page.y1 + 1
     )
-    letters = [e for t, e in zip(texts, extents) if (t.get_gid() or "").startswith("na:nt:")]
+    letters = [e for t, e in zip(texts, extents) if (t.get_gid() or "").startswith("na:nt:")]  # pixels
     bad = 0
     for a, b in combinations(letters, 2):
         w = min(a.x1, b.x1) - max(a.x0, b.x0)
@@ -557,20 +587,29 @@ def render_checks(lay, loops, fig, sses, *, model=None, bb=None) -> dict:
         for i, j in combinations(range(len(centres)), 2)
         if np.hypot(*(centres[i] - centres[j])) < radii[i] + radii[j] - 1e-6
     )
-    # gap labels, in page units
+    # gap labels: (path index, box in page units, box in pixels)
     to_page = ax.transData.inverted()
     gaps = [
-        (int(t.get_gid().rsplit(":", 1)[1]), tuple(to_page.transform_bbox(e).extents))
+        (int(t.get_gid().rsplit(":", 1)[1]), tuple(to_page.transform_bbox(e).extents), e)
         for t, e in zip(texts, extents)
         if (t.get_gid() or "").startswith("na:gap:")
     ]
-    paths = [_segments(p.points) for p in lay.na_paths]
+    paths = _trimmed(lay)
     protein = [_segments(l.points) for l in loops]
-    collisions = sum(1 for (_, a), (_, b) in combinations(gaps, 2) if _boxes_meet(a, b))
-    for n, box in gaps:
-        collisions += sum(1 for d in lay.stems if _boxes_meet(box, d.rect) and _box_meets_stem(box, d))
+    bodies = [*lay.stems, *lay.placed.values(), *lay.ghosts]
+    collisions = sum(1 for (_, a, _), (_, b, _) in combinations(gaps, 2) if _boxes_meet(a, b))
+    for n, box, px in gaps:
+        collisions += sum(1 for d in bodies if _boxes_meet(box, d.rect) and _box_meets_body(box, d))
         others = [seg for k, seg in enumerate(paths) if k != n] + protein
         collisions += sum(1 for seg in others if len(seg) and _boxes_meet(box, _span(seg)) and _box_hits(box, seg))
+        collisions += sum(
+            1 for e in letters if min(e.x1, px.x1) > max(e.x0, px.x0) and min(e.y1, px.y1) > max(e.y0, px.y0)
+        )
+        collisions += sum(
+            1
+            for c, r in zip(centres, radii)
+            if np.hypot(c[0] - np.clip(c[0], px.x0, px.x1), c[1] - np.clip(c[1], px.y0, px.y1)) < r
+        )
     beads: dict = dict.fromkeys(("beads_missing", "bead_colour_wrong", "beads_false", "beads_unmatched"))
     if model is not None and bb is not None:
         report = verify_contacts(model, getattr(fig, "foldmap_beads", None), lay, bb)
@@ -593,12 +632,12 @@ def render_checks(lay, loops, fig, sses, *, model=None, bb=None) -> dict:
 
 
 def judge(m: dict) -> list[str]:
-    """The metrics past their THRESHOLDS, as "name value (limit limit)"; unmeasured (None) ones pass."""
+    """The metrics past their THRESHOLDS, as "name value (limit limit)"; unmeasured (None) ones pass, NaN fails."""
     failed = []
     for key, limit in THRESHOLDS.items():
         v = m.get(key)
         if limit is None or v is None:
             continue
-        if (v < limit) if key in _HIGH_IS_GOOD else (v > limit):
+        if v != v or ((v < limit) if key in _HIGH_IS_GOOD else (v > limit)):
             failed.append(f"{key} {v} (limit {limit})")
     return failed
