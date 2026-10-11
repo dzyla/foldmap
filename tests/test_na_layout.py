@@ -1024,6 +1024,27 @@ def test_runs_keep_off_the_strands_drawn_before_them(pdb, runs, protein):
     assert m["na_run_crossings"] <= runs and m["na_protein_crossings"] <= protein
 
 
+@pytest.mark.parametrize("pdb", [*FIXTURES, "2GIS", "2OEU"])
+def test_no_nucleotide_sits_on_another_strands(pdb):
+    """No nucleotide is drawn within a contact bead's width of a nucleotide of another strand or stem: where two runs
+    cross or pass close (4OO8: the two sides of the P2-P3 internal loop cross where the stems are seen to), a run's
+    nucleotides slide along it (4OO8's B:27 and B:42 were 0.25 apart, their beads on top of each other)."""
+    from foldmap.route_na import _BEAD
+
+    lay, _, _, _ = _routed(pdb)
+    owner = [("stem", d.id) for d in lay.stems for _ in d.axial] + [
+        ("path", k) for k, p in enumerate(lay.na_paths) for _ in p.nt_xy
+    ]
+    xy = np.array([d.point(key) for d in lay.stems for key in d.axial] + [q for p in lay.na_paths for q in p.nt_xy])
+    close = [
+        (owner[a], owner[b])
+        for a in range(len(xy))
+        for b in np.flatnonzero(np.hypot(*(xy[a + 1 :] - xy[a]).T) < _BEAD) + a + 1
+        if owner[a] != owner[b]
+    ]
+    assert not close
+
+
 def _in_outline(pt, e) -> bool:
     c, s = np.cos(e.angle), np.sin(e.angle)
     x, y = pt[0] - e.cx, pt[1] - e.cy

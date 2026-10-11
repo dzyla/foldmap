@@ -122,15 +122,16 @@ def _length(pts) -> float:
     return float(np.hypot(*np.diff(p, axis=0).T).sum()) if len(p) > 1 else 0.0
 
 
-def _spaced(pts, m: int) -> list[tuple[float, float]]:
-    """m points evenly spaced along the polyline, ends excluded."""
+def _spaced(pts, m: int, shift: float = 0.0) -> list[tuple[float, float]]:
+    """m points evenly spaced along the polyline, ends excluded; `shift` (a fraction of their spacing, under a half)
+    slides them all along it."""
     p = np.asarray(pts, float)
     if m <= 0 or len(p) < 2:
         return []
     seg = np.hypot(*np.diff(p, axis=0).T)
     cum = np.concatenate([[0.0], np.cumsum(seg)])
     out = []
-    for t in np.arange(1, m + 1) / (m + 1) * cum[-1]:
+    for t in (np.arange(1, m + 1) + shift) / (m + 1) * cum[-1]:
         k = min(int(np.searchsorted(cum, t, side="right")) - 1, len(seg) - 1)
         f = 0.0 if seg[k] == 0 else (t - cum[k]) / seg[k]
         q = p[k] + f * (p[k + 1] - p[k])
@@ -644,6 +645,7 @@ def route_nucleic(layout: Layout, router: _Router | None = None, loops=()) -> li
         a, b = exits.get((g.before, len(na.strands[g.before]) - 1)), exits.get((g.after, 0))
         if a is not None and b is not None:
             out.append(_gap(router, g, a, b))
+    _unbunch(layout, out)
     layout.na_ends = [e for e in ends if (e[0], e[1]) not in gapped]
     layout.na_letters = _place_letters(layout, out)
     layout.na_ties = _ties(layout, out)
@@ -715,6 +717,46 @@ class _Strands:
 
         crossed = (turn(p0, p1, u) * turn(p0, p1, v) < -1e-12) & (turn(u, v, p0) * turn(u, v, p1) < -1e-12)
         return int(crossed.sum())
+
+
+_BEAD = 0.45  # page units: a contact bead's width (render: 1.05 x the backbone tube); nearer nucleotides' beads meet
+_SLIDES = tuple(f * k for k in (0.1, 0.2, 0.3, 0.4, 0.48) for f in (1, -1))  # spacings a run's nucleotides may slide
+
+
+def _unbunch(layout: Layout, paths: list[NAPath]) -> None:
+    """Slide each run's nucleotides along it, as little as keeps them a bead's width (_BEAD) from every nucleotide of
+    another strand or stem, where its own spacing puts one on top of another's (two runs crossing or passing close);
+    if no slide does, the one that keeps them furthest. Never into its own stems' bodies."""
+    at = {key: d for d in layout.stems for key in d.axial}
+    taken = _Points(_BEAD)
+    for d in layout.stems:
+        for key in d.axial:
+            taken.add(d.point(key))
+    runs = [p for p in paths if p.kind == "run" and p.nts]
+    for p in paths:
+        if p.kind != "run":
+            for xy in p.nt_xy:
+                taken.add(xy)
+
+    def room(xy, own) -> float:  # how near the nearest other nucleotide comes; -1 inside its own stems
+        if any(in_body(q, d) for q in xy for d in own):
+            return -1.0
+        return min(taken.nearest(q) for q in xy)
+
+    for p in runs:
+        own = [at[key] for key in p.between]
+
+        best, space = p.nt_xy, room(p.nt_xy, own)
+        for shift in _SLIDES if space < _BEAD else ():
+            xy = _spaced(p.points, len(p.nts), shift)
+            r = room(xy, own)
+            if r > space:
+                best, space = xy, r
+            if r >= _BEAD:
+                break
+        p.nt_xy = best
+        for xy in best:
+            taken.add(xy)
 
 
 def _straight_joint(router: _Router, da: PlacedStem, db: PlacedStem, fa, ea, fb, strands=None) -> bool:
