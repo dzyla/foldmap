@@ -9,6 +9,8 @@ from foldmap.model import Bridge
 from foldmap.ss import build_sses
 from helpers import FID, pipeline
 
+NA = Path(__file__).parent / "data" / "na"
+
 
 def test_ubiquitin_sses(ubq):
     bb = load_backbone(ubq)
@@ -162,3 +164,43 @@ def test_no_helix_hides_a_kink_of_more_than_30_degrees(name):
             if set(d.ss[x1 + 1 : y0]) <= set("GI"):
                 cos = _fit_axis(bb.ca[x0 : x1 + 1]) @ _fit_axis(bb.ca[y0 : y1 + 1])
                 assert np.degrees(np.arccos(np.clip(cos, -1, 1))) <= KINK_SPLIT, s.id
+
+
+def test_copies_of_one_protein_are_found_whatever_their_numbering():
+    from foldmap.model import homolog_chains
+
+    assert homolog_chains(load_backbone(NA / "1EYG.cif.gz")) == {
+        "A": ("A", 0),
+        "B": ("A", 1000),
+        "C": ("A", 2000),
+        "D": ("A", 3000),
+    }
+    assert homolog_chains(load_backbone(Path(__file__).parent / "data" / "2HHB.cif", "asu")) == {
+        "A": ("A", 0),
+        "B": ("B", 0),
+        "C": ("A", 0),
+        "D": ("B", 0),
+    }  # α2β2: the α chains are copies, and the β chains
+
+
+def test_a_bulge_joined_in_one_copy_is_joined_in_every_copy():
+    """1EYG SSB: β5 is split at a bulge in all four chains, 4 residues apart in A-C (joined) but 5 in D."""
+    _, sses, _ = pipeline(NA / "1EYG.cif.gz")
+    counts = {c: sum(s.chain == c for s in sses) for c in "ABCD"}
+    assert len(set(counts.values())) == 1, counts
+    ids = {s.id for s in sses}
+    assert "D:4096-4111" in ids and "D:4096-4102" not in ids
+
+
+def test_a_kink_split_in_one_copy_is_split_in_every_copy(monkeypatch):
+    """2HHB α: the AB corner turns by 95.6° in chain A and 95.4° in chain C. With the split angle between the two,
+    chain C is split as chain A is."""
+    import foldmap.ss
+
+    monkeypatch.setattr(foldmap.ss, "KINK_SPLIT", 95.5)
+    _, sses, _ = pipeline(Path(__file__).parent / "data" / "2HHB.cif")
+    ids = {s.id for s in sses}
+    assert {"A:4-17", "A:21-35", "C:4-17", "C:21-35"} <= ids
+    monkeypatch.setattr(foldmap.ss, "KINK_SPLIT", 96.0)  # neither copy is split
+    _, sses, _ = pipeline(Path(__file__).parent / "data" / "2HHB.cif")
+    assert {"A:4-35", "C:4-35"} <= {s.id for s in sses}

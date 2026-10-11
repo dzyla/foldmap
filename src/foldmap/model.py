@@ -105,6 +105,30 @@ def group_by_chain(sses, keep=None) -> dict[str, list[SSE]]:
     return out
 
 
+def homolog_chains(bb: Backbone) -> dict[str, tuple[str, int]]:
+    """Copies of one protein, however much of each is modelled: chain -> (the first chain of its group of copies,
+    the offset that takes its residue numbers to that chain's). Two chains are copies when at least 20 residues
+    sit at the same numbers and at least 90 % of those have the same name; the numbers may also be shifted by the
+    difference of the chains' first numbers (1EYG numbers chain k from 1000 k + 1)."""
+    residues: dict[str, dict[tuple[int, str], str]] = {}
+    for l in bb.labels:
+        residues.setdefault(l.chain, {})[(l.seq, l.icode)] = l.name
+
+    def alike(a: str, b: str, shift: int) -> bool:  # b's residue n is a's residue n - shift
+        ra, rb = residues[a], residues[b]
+        common = [k for k in rb if (k[0] - shift, k[1]) in ra]
+        same = sum(rb[k] == ra[(k[0] - shift, k[1])] for k in common)
+        return len(common) >= 20 and same >= 0.9 * len(common)
+
+    first = {c: next(iter(r))[0] for c, r in residues.items()}
+    out: dict[str, tuple[str, int]] = {}
+    for b in residues:
+        tries = ((a, shift) for a in out for shift in dict.fromkeys((0, first[b] - first[a])))
+        a, shift = next(((a, shift) for a, shift in tries if alike(a, b, shift)), (b, 0))
+        out[b] = (b, 0) if a == b else (out[a][0], out[a][1] + shift)
+    return out
+
+
 @dataclass(eq=False)
 class Sheet:
     """Strands in sheet order. directions[k] is +1 if strands[k] runs the same way as

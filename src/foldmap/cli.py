@@ -463,33 +463,26 @@ def _homolog_labels(bb, sses) -> dict[str, str]:
     """Labels for elements of partial copies of a protein (e.g. a chain modelled from its second domain only):
     the label of the overlapping element in the fullest copy, so the same helix is called the same everywhere."""
     from .layout import provisional
+    from .model import homolog_chains
 
     labels = {k: p.label for k, p in provisional(sses).placed.items()}
-    residues: dict[str, dict] = {}
-    for l in bb.labels:
-        residues.setdefault(l.chain, {})[(l.seq, l.icode)] = l.name
-    chains = list(residues)
+    copies = homolog_chains(bb)
+    chains = list(copies)
     count = {c: sum(s.chain == c for s in sses) for c in chains}
-    group = {c: c for c in chains}
-    for i, a in enumerate(chains):
-        for b in chains[i + 1 :]:
-            common = residues[a].keys() & residues[b].keys()
-            same = sum(residues[a][k] == residues[b][k] for k in common)
-            if len(common) >= 20 and same >= 0.9 * len(common):
-                group[b] = group[a] if group[a] == a else group[a]
     out = {}
     for c in chains:
-        members = [m for m in chains if group[m] == group[c]]
+        members = [m for m in chains if copies[m][0] == copies[c][0]]
         ref = max(members, key=lambda m: (count[m], -chains.index(m)))
         if ref == c:
             continue
+        shift = copies[c][1] - copies[ref][1]  # c's residue n is ref's residue n - shift
         theirs = [s for s in sses if s.chain == ref]
         for s in (s for s in sses if s.chain == c):
             best, overlap = None, 0
             for t in theirs:
                 if t.kind != s.kind:
                     continue
-                o = min(s.last.seq, t.last.seq) - max(s.first.seq, t.first.seq) + 1
+                o = min(s.last.seq - shift, t.last.seq) - max(s.first.seq - shift, t.first.seq) + 1
                 if o > overlap:
                     best, overlap = t, o
             if best is not None and overlap >= 0.5 * (s.last.seq - s.first.seq + 1) and labels[best.id] != labels[s.id]:
