@@ -494,3 +494,16 @@ def test_stacked_loops_stay_out_of_the_slab_except_at_a_port_inside_it(assembly)
                 at_port = (k <= 1 and inside(lp.points[0][1])) or (k >= n - 3 and inside(lp.points[-1][1]))
                 assert at_port, (lp.a_id, lp.b_id, ya)
         assert not lp.fallback
+
+
+def test_the_router_goes_over_the_slab_rather_than_along_it():
+    """Two ports below a thin band, an element between them reaching up to the band's lower face: the shortest
+    way runs sideways just inside the slab; with the slab cost the path climbs over the band instead."""
+    lay = Layout({}, (0.0, 0.0, 20.0, 12.0))
+    lay.membrane = {"y": (5.0, 6.5), "inside": "below"}
+    grid = _Grid(lay, [(6.0, -5.0, 14.0, 5.0)])  # the element between the two ports, up to the lower face
+    path = route._astar(grid, grid.cell((2.0, 4.5)), 0, grid.cell((18.0, 4.5)), 0)
+    assert path is not None
+    sideways = [a for a, b in zip(path, path[1:]) if a[1] == b[1] and grid.slab[a] and grid.slab[b]]
+    assert not sideways, [grid.center(c) for c in sideways[:3]]
+    assert max(grid.center(c)[1] for c in path) > 6.5  # over the band
