@@ -163,7 +163,6 @@ def load_backbone(
 
 _NA_LINK_MAX = 2.0  # Å, O3'(i-1)-P(i)
 CONTACT = 4.0  # Å, heavy atoms of a protein residue and a nucleotide
-_CONTACT = CONTACT  # earlier name
 
 
 def _linked(a, b) -> bool:

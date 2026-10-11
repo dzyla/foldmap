@@ -106,7 +106,9 @@ def test_a_bead_that_does_not_name_the_first_toucher_is_reported():
     r = next(k for k, l in enumerate(bb.labels) if f"{l.chain}:{l.name}{l.seq}{l.icode}" == later.pair.residue)
     chain = next(c for c, v in drawn.marks.items() for b in v if _nt(built, b[0]) == later.nucleotide)
     drawn.marks[chain] = [(k, r if _nt(built, k) == later.nucleotide else x, c) for k, x, c in drawn.marks[chain]]
-    assert later.nucleotide in {b.nucleotide for b in _check(built).not_first + _check(built).wrong_colour}
+    report = _check(built)
+    assert [b.nucleotide for b in report.not_first] == [later.nucleotide]
+    assert report.false == [] and report.wrong_colour == []
 
 
 def _nt(built, key):
