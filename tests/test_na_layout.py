@@ -1917,3 +1917,26 @@ def test_trace_nucleotides_drawn_on_one_spot_are_nudged_apart():
     pts = _traces(SimpleNamespace(strands=[end_on], structure=SimpleNamespace(stems=[])), frame)[0]
     d = np.hypot(*(pts[:, None] - pts[None]).transpose(2, 0, 1))
     assert d[np.triu_indices(len(pts), 1)].min() >= _BEAD - 1e-3
+
+
+def test_a_free_end_is_never_drawn_into_another_stems_hairpin_loop(monkeypatch):
+    """4YBB (step 4 campaign): a free end was drawn inside another stem's hairpin circle, and the gap leaving it
+    crossed the loop. A free end's drawing keeps out of every other stem's hairpin circle when another drawing does.
+    4YBB's 10-nt end AA:557-566 with a hairpin circle planted over its straight drawing."""
+    import foldmap.route_na as route_na
+    from foldmap.route import _element_obstacles, _Grid, _Router
+
+    lay, _, _, _ = _routed("4YBB")
+    at = {key: d for d in lay.stems for key in d.axial}
+    tail = next(p for p in lay.na_paths if p.kind == "tail" and len(p.nts) == 10)
+    (key,) = tail.between
+    d, five = at[key], tail.nts[-1] < key[1]
+    straight = np.asarray(route_na._free_end(d, key, 10, five, 0.0)[1])
+    other = next(s for s in lay.stems if s is not d)
+    circle = (straight.mean(axis=0), 1.0, other)
+    assert route_na._enters(straight, [circle], d)
+    monkeypatch.setattr(route_na, "_TURNS", (0.0, np.pi / 2, -np.pi / 2))
+    router = _Router(_Grid(lay), _element_obstacles(lay))
+    path, _, _ = route_na._tail(router, lay, d, key[0], key, tail.nts, five, None, circles=[circle])
+    assert not path.fallback and not route_na._enters(path.points, [circle], d)
+    assert not route_na._enters(straight, [(circle[0], 1.0, d)], d)  # its own stem's loop is not another's

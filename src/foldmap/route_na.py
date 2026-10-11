@@ -234,14 +234,39 @@ def _free_end(d: PlacedStem, key, m: int, five: bool, turn: float = 0.0):
     return _xy(pts), _xy(xy), (float(tip[0]), float(tip[1]))
 
 
+def _enters(pts, circles, d: PlacedStem) -> bool:
+    """Does the polyline come inside any of `circles` ((centre, radius, stem) of hairpin loops) but stem d's own?"""
+    p = np.asarray(pts, float).reshape(-1, 2)
+    a, b = (p[:-1], p[1:]) if len(p) > 1 else (p, p)
+    ab = b - a
+    for centre, r, owner in circles:
+        if owner is d:
+            continue
+        t = np.clip(((centre - a) * ab).sum(axis=1) / np.maximum((ab * ab).sum(axis=1), 1e-12), 0.0, 1.0)
+        if (np.hypot(*(a + ab * t[:, None] - centre).T) < r).any():
+            return True
+    return False
+
+
 def _tail(
-    router: _Router, layout: Layout, d: PlacedStem, s: int, key, nts: list[int], five: bool, labels, strands=None
+    router: _Router,
+    layout: Layout,
+    d: PlacedStem,
+    s: int,
+    key,
+    nts: list[int],
+    five: bool,
+    labels,
+    strands=None,
+    circles=(),
 ):
     """A free end drawn straight on, or bent after its first nucleotide when that is what keeps it (and its end
     label) clear of the elements, and its label clear of loops and other text; one of more than _TAIL_ROUTED
     nucleotides that no such drawing keeps clear is routed out to free space (_routed_end), keeping off the strands
     drawn so far (`strands`); else it is drawn straight, a fallback. A drawing that keeps out of its partner's
-    doorway (_doorway) comes first: (path, end label position, outward direction at its tip)."""
+    doorway (_doorway) comes first: (path, end label position, outward direction at its tip). No drawing comes into
+    another stem's hairpin loop (`circles`: (centre, radius, stem) of every hairpin loop, _enters): a gap leaving
+    the end from there would cross the loop (4YBB)."""
     found = None
     tries = (True, False) if labels is not None else (False,)
     door = _doorway(d, key, five)
@@ -252,6 +277,7 @@ def _tail(
                 drawn = [*(pts[::-1] if five else pts), tip]
                 if (
                     _na_clear(drawn, (d,), router.elements)
+                    and not _enters(drawn, circles, d)
                     and not (keep_door and door is not None and _crosses_segment(drawn[:-1], *door))
                     and (not need_label or _label_room(router, layout, tip, labels))
                 ):
@@ -267,6 +293,8 @@ def _tail(
             found = _routed_end(
                 router, layout, d, key, len(nts), five, room, strands, door if keep_door else None, strict
             )
+            if found is not None and _enters([*found[0], found[2]], circles, d):
+                found = None
         if found:
             break
     pts, xy, tip = found or _free_end(d, key, len(nts), five)
@@ -628,6 +656,13 @@ def route_nucleic(layout: Layout, router: _Router | None = None, loops=()) -> li
         strands.add(among(path, at), fixed=path.kind in ("hairpin", "tail"))
 
     between: list[tuple] = []  # strands from stem to stem still to route, once the fixed shapes are known
+    circles = []  # every hairpin loop's circle, with its stem: no free end is drawn into another stem's (_tail)
+    for s, strand in enumerate(na.strands):
+        held = [i for i in range(len(strand)) if (s, i) in at]
+        for i, j in zip(held, held[1:]):
+            loop = at[(s, i)]
+            if loop is at[(s, j)] and loop.side[(s, i)] != loop.side[(s, j)]:
+                circles.append((*loop.hairpin_circle((s, i), (s, j), j - i - 1), loop))
     for s, strand in enumerate(na.strands):
         n = len(strand)
         if s in layout.na_traces:
@@ -646,7 +681,9 @@ def route_nucleic(layout: Layout, router: _Router | None = None, loops=()) -> li
         first, last = held[0], held[-1]
         d0 = at[(s, first)]
         if first > 0:
-            path, tip, v = _tail(router, layout, d0, s, (s, first), list(range(first)), True, room(s, "5′"), strands)
+            path, tip, v = _tail(
+                router, layout, d0, s, (s, first), list(range(first)), True, room(s, "5′"), strands, circles
+            )
             fix((s, -1), path)
             exits[(s, 0)] = (np.add(path.nt_xy[0], v * NT_STEP / 2), v, d0)
         else:
@@ -664,7 +701,7 @@ def route_nucleic(layout: Layout, router: _Router | None = None, loops=()) -> li
         dn = at[(s, last)]
         if last < n - 1:
             path, tip, v = _tail(
-                router, layout, dn, s, (s, last), list(range(last + 1, n)), False, room(s, "3′"), strands
+                router, layout, dn, s, (s, last), list(range(last + 1, n)), False, room(s, "3′"), strands, circles
             )
             fix((s, last), path)
             exits[(s, n - 1)] = (np.add(path.nt_xy[-1], v * NT_STEP / 2), v, dn)
