@@ -69,29 +69,38 @@ def test_stems_are_drawn_to_scale_along_their_projected_axes():
         assert d.axial[(a, i)] == pytest.approx(d.axial[(b, j)])  # a rung straight across
 
 
-def _joints(lay):
-    """(exit port, entry port, piece width) where a strand goes from one piece of a bent duplex to the next."""
+def _joint_steps(lay):
+    """(piece, next piece, exit port, entry port) where a strand goes from one piece of a bent duplex to the next
+    (layout.joined_pieces)."""
+    from foldmap.layout import joined_pieces
+
+    joined = joined_pieces(lay.stems, lay.nucleic)
     at = {key: d for d in lay.stems for key in d.axial}
     out = []
     for s, strand in enumerate(lay.nucleic.strands):
         for i in range(len(strand) - 1):
             d, e = at.get((s, i)), at.get((s, i + 1))
-            if d is not None and e is not None and d is not e and d.parent and d.parent == e.parent:
-                out.append((d.port((s, i), True)[0], e.port((s, i + 1), False)[0], d.width))
+            if d is not None and e is not None and frozenset((d.id, e.id)) in joined:
+                out.append((d, e, d.port((s, i), True)[0], e.port((s, i + 1), False)[0]))
     return out
+
+
+def _joints(lay):
+    """(exit port, entry port, piece width) where a strand goes from one piece of a bent duplex to the next."""
+    return [(p, q, d.width) for d, _, p, q in _joint_steps(lay)]
 
 
 @pytest.mark.parametrize("pdb", ["1KX5", "1IHF"])
 def test_a_bent_duplex_is_a_chain_of_pieces_end_to_end(pdb):
     """Consecutive pieces stay near each other. Box separation parts tilted pieces, so a joint can be a couple of
     duplex widths long; Task 7 routes joints as loops between stem ends (route_nucleic, _clear). With no margin
-    kept between consecutive pieces (C3) this bounds the current lengths (1KX5 at most 2.13 widths, 1IHF 2.27; were
-    2.47 and 2.42) against regressions."""
+    kept between consecutive pieces (C3) this bounds the current lengths (1KX5 at most 2.34 widths, its 22 pieces
+    separated one by one; 1IHF 2.27; were 2.47 and 2.42) against regressions."""
     lay, _, _ = make_layout(_path(pdb))
     joints = _joints(lay)
     assert len(joints) >= (40 if pdb == "1KX5" else 4)  # both strands at every joint
     gaps = [float(np.hypot(*(q - p))) / w for p, q, w in joints]
-    assert max(gaps) <= 2.3, sorted(gaps)[-5:]
+    assert max(gaps) <= 2.4, sorted(gaps)[-5:]
 
 
 def _crosses_box(p, q, box) -> bool:
@@ -105,18 +114,13 @@ def test_few_elements_are_placed_between_consecutive_pieces_of_a_bent_duplex():
     """1IHF: the joint springs held the pieces' ends together but the overlap term pushed their boxes a margin
     apart, so six of the protein's elements came between DNA 1b and DNA 1c (on a joint, or on the line between the
     middles of its two strands' steps). Consecutive pieces of one duplex keep no margin between them and are
-    separated together; two elements remain, a regression bound: IHF's arms wrap the DNA in 3D, so in projection
-    they lie over it between its pieces (review.md; making the joints firmer collapses the nucleosome ring)."""
+    separated together (chains of at most four pieces); two elements remain, a regression bound: IHF's arms wrap
+    the DNA in 3D, so in projection they lie over it between its pieces (review.md; making the joints firmer
+    collapses the nucleosome ring)."""
     lay, _, _ = make_layout(_path("1IHF"))
-    at = {key: d for d in lay.stems for key in d.axial}
     steps: dict[tuple[str, str], list] = {}
-    for s, strand in enumerate(lay.nucleic.strands):
-        for i in range(len(strand) - 1):
-            d, e = at.get((s, i)), at.get((s, i + 1))
-            if d is not None and e is not None and d is not e and d.parent and d.parent == e.parent:
-                steps.setdefault(tuple(sorted((d.id, e.id))), []).append(
-                    (d, e, d.port((s, i), True)[0], e.port((s, i + 1), False)[0])
-                )
+    for d, e, p, q in _joint_steps(lay):
+        steps.setdefault(tuple(sorted((d.id, e.id))), []).append((d, e, p, q))
     assert len(steps) == 2 and all(len(v) == 2 for v in steps.values())
     between = []
     for (d, e, p0, q0), (_, _, p1, q1) in steps.values():
@@ -126,6 +130,64 @@ def test_few_elements_are_placed_between_consecutive_pieces_of_a_bent_duplex():
         ]
         between += [name for name, box in others if any(_crosses_box(a, b, box) for a, b in lines)]
     assert len(between) <= 2, between  # A:50-57 and A:76-83 (six before)
+
+
+@pytest.mark.parametrize("pdb", ["1KX5", "1IHF", "1RVA", "4YBB"])
+def test_consecutive_pieces_overlap_by_at_most_a_quarter_width(pdb):
+    """Consecutive pieces of a duplex may touch, but their bodies overlap by at most a quarter of a duplex width
+    (layout._JOINT_OVERLAP): with no overlap term between them at all, 1RVA's two pieces were drawn half on top of
+    each other at the kink."""
+    from foldmap.layout import body_overlap, joined_pieces
+
+    lay, _, _ = make_layout(_path(pdb))
+    stems = {d.id: d for d in lay.stems}
+    pairs = sorted(tuple(sorted(p)) for p in joined_pieces(lay.stems, lay.nucleic))
+    assert pairs
+    for a, b in pairs:
+        d, e = stems[a], stems[b]
+        assert body_overlap(d, e) <= 0.25 * d.width, (d.name, e.name, body_overlap(d, e))
+
+
+def test_the_nucleosome_dna_wraps_the_histones():
+    """The 22 pieces of the nucleosome DNA moved as one group carried 12 histone elements out of the ring, whose
+    loops then crossed the DNA (54 crossings). Chains of more than four pieces are separated piece by piece: every
+    element lies inside the DNA's hull, and at most two protein loops cross a strand."""
+    from foldmap.nacheck import na_crossings
+    from foldmap.route import route_loops
+
+    lay, sses, bb = make_layout(_path("1KX5"))
+    loops = route_loops(lay, sses, bb)
+    corners = np.array([(r[x], r[y]) for d in lay.stems for r in [d.rect] for x in (0, 2) for y in (1, 3)])
+    hull = _convex_hull(corners)
+    outside = [
+        p.sse.id
+        for p in lay.placed.values()
+        if not _in_hull(hull, ((p.rect[0] + p.rect[2]) / 2, (p.rect[1] + p.rect[3]) / 2))
+    ]
+    assert not outside, outside
+    assert na_crossings(lay, loops)["na_protein_crossings"] <= 2
+
+
+def _convex_hull(pts):
+    pts = sorted(set(map(tuple, pts.tolist())))
+
+    def half(seq):
+        out = []
+        for p in seq:
+            while len(out) >= 2 and _cross2(np.subtract(out[-1], out[-2]), np.subtract(p, out[-2])) <= 0:
+                out.pop()
+            out.append(p)
+        return out[:-1]
+
+    return half(pts) + half(pts[::-1])
+
+
+def _in_hull(hull, p) -> bool:
+    return all(_cross2(np.subtract(b, a), np.subtract(p, a)) >= 0 for a, b in zip(hull, hull[1:] + hull[:1]))
+
+
+def _cross2(u, v) -> float:
+    return float(u[0] * v[1] - u[1] * v[0])
 
 
 def _joined_both_ways(lay):
@@ -272,13 +334,14 @@ def _seen(lay):
     return {d.name: np.asarray(c)[:2] * SCALE for d, c in zip(lay.stems, lay.frame.project(centres))}
 
 
-def test_trna_keeps_its_cloverleaf_junction_compact():
+def test_trna_variable_loop_spans_what_its_l_shape_shows():
     """1EHZ: the variable loop (5 nt from the anticodon stem P3 to the T stem P4) is a short run, and the T loop
     does not point at the anticodon loop (with every short run held like a strand exchange, P4 was pulled across
     the cloverleaf: the variable loop ran 20.7 units and the T loop pointed 32 degrees off the anticodon loop).
     The tRNA is drawn in its L shape (runs pull only beyond the distance 3D shows), so the variable loop spans what
     3D shows between P3 and P4 rather than a cloverleaf's 6 units: its ends lie no farther apart than 1.35 times
-    their distance at the stems' projected places (measured 1.27)."""
+    their distance at the stems' projected places (measured 1.27), and the path drawn round the stems is at most
+    2.1 times that distance long (measured 1.98)."""
     import math
 
     lay, _, _, _ = _routed("1EHZ")
@@ -292,6 +355,8 @@ def test_trna_keeps_its_cloverleaf_junction_compact():
         da.port(a, True)[0] - (da.cx, da.cy) + seen["P3"], db.port(b, False)[0] - (db.cx, db.cy) + seen["P4"]
     )
     assert drawn <= 1.35 * there, (drawn, there)
+    path = sum(math.dist(p, q) for p, q in zip(variable[0].points, variable[0].points[1:]))
+    assert path <= 2.1 * there, (path, there)
 
     def loop(d):
         a, i, b, j = d.pairs[-1]
@@ -593,8 +658,8 @@ def test_joints_and_runs_cross_no_stem_or_element(pdb):
     """Every run and every joint between two pieces of a bent duplex, as drawn from where it leaves its own stems'
     bodies, passes the router's own final check (route._clear) against every element and stem. A joint drawn
     straight from face to face (two pieces that touch or overlap, which no overlap term keeps apart) is checked as a
-    kink: clear of every element and stem but its own two."""
-    from foldmap.route import _clear, _element_obstacles
+    kink: clear by _INFLATE of every element and stem but its own two."""
+    from foldmap.route import _INFLATE, _clear, _element_obstacles
     from foldmap.route_na import outside_own
 
     lay, _, _, _ = _routed(pdb)
@@ -605,7 +670,7 @@ def test_joints_and_runs_cross_no_stem_or_element(pdb):
         if p.kind in kinds:
             own = tuple(at[key] for key in p.between)
             if p.kind == "joint" and len(p.points) == 4:
-                assert _clear(p.points[1:3], own, rects, owners, kink=True), (p.kind, p.strand, p.between)
+                assert _clear(p.points[1:3], own, rects, owners, grow=_INFLATE, kink=True), (p.kind, p.between)
             else:
                 assert _clear(outside_own(p.points, own), own, rects, owners, own_body=True), (p.kind, p.between)
             kinds[p.kind] += 1
@@ -661,6 +726,27 @@ def test_a_run_over_a_stem_name_is_drawn_when_nothing_else_is_clear():
     for p in runs:
         plain, covered = drawn(p, ()), drawn(p, [(-1e3, -1e3, 1e3, 1e3)])
         assert covered.points == plain.points and covered.fallback == plain.fallback
+
+
+def test_an_internal_loop_side_keeps_its_bow_when_every_drawing_meets_a_name():
+    """One side of an internal loop is bowed out on its own side. When the bow (and every route) crosses a stem
+    name, the bow is still the drawing taken (the soft choice), not a route nor a fallback (4OO8's two sides)."""
+    from foldmap.route import _element_obstacles, _Grid, _Router
+    from foldmap.route_na import NT_STEP, _bow, _strand_between
+
+    lay, _, _, _ = _routed("4OO8")
+    at = {key: d for d in lay.stems for key in d.axial}
+    kind = {(r.strand, r.lo): r.kind for r in lay.nucleic.structure.runs}
+    sides = [p for p in lay.na_paths if p.kind == "run" and p.nts and kind.get((p.strand, p.nts[0])) == "internal"]
+    assert len(sides) == 2
+    for p in sides:
+        (s, i), (_, j) = p.between
+        da, db = at[(s, i)], at[(s, j)]
+        bow = _bow(da.point((s, i)), db.point((s, j)), (j - i) * NT_STEP, out=da.normal * da.side[(s, i)])
+        assert p.points == bow  # drawn as its bow
+        router = _Router(_Grid(lay), _element_obstacles(lay))
+        covered = _strand_between(router, s, i, j, da, db, "internal", [(-1e3, -1e3, 1e3, 1e3)])
+        assert covered.points == bow and not covered.fallback and covered.kind == "run"
 
 
 def segment_clear(p, q, rects):

@@ -413,11 +413,13 @@ def _separate(
     keep every protomer drawn alike (_push_apart), and that result is kept if it clears every overlap within
     _SEP_ORBIT_SWEEPS sweeps and its box takes at most _SEP_SYM_ROOM times the area of moving the items one by
     one from the same start (widening the spread can otherwise cost far more room); else the one-by-one
-    result is used. Consecutive pieces of one bent duplex (`joints`, _joints) are never pushed apart."""
+    result is used. Consecutive pieces of one bent duplex (`joints`, _joints) in a short chain (_rigid_joints)
+    are moved together and never pushed apart."""
     halves = np.array([it.half for it in items], float).reshape(-1, 2)
     mids = np.array([it.mid for it in items], float).reshape(-1, 2)
     start = np.array([(it.cx, it.cy) for it in items], float).reshape(-1, 2)
     home = np.array([it.home for it in items], float).reshape(-1, 2)
+    joints = _rigid_joints(items, joints)
     apart = _joint_matrix(len(items), joints)
     xy = start.copy()
     alone = start.copy()
@@ -428,6 +430,64 @@ def _separate(
     for it, (x, y) in zip(items, xy.tolist()):
         it.cx, it.cy = x, y
     _slide_clear(items, joints)
+
+
+def _components(n: int, links) -> np.ndarray:
+    """Component id (its least member) of each of n items, linked pairwise by `links` (union-find)."""
+    parent = list(range(n))
+
+    def find(i):
+        while parent[i] != i:
+            i = parent[i]
+        return i
+
+    for i, j in links:
+        a, b = find(i), find(j)
+        if a != b:
+            parent[max(a, b)] = min(a, b)
+    return np.array([find(i) for i in range(n)], int)
+
+
+def _body_overlap(ca, a: PlacedStem, cb, b: PlacedStem) -> float:
+    """How deep the bodies (length x width rectangles turned by their angles) of stems a and b, centred at ca and
+    cb, overlap: the least penetration over the four separating axes; 0 when they do not."""
+    d = np.subtract(cb, ca)
+    depth = np.inf
+    for axis in (a.direction, a.normal, b.direction, b.normal):
+        ra = abs(axis @ a.direction) * a.length / 2 + abs(axis @ a.normal) * a.width / 2
+        rb = abs(axis @ b.direction) * b.length / 2 + abs(axis @ b.normal) * b.width / 2
+        depth = min(depth, ra + rb - abs(axis @ d))
+    return max(float(depth), 0.0)
+
+
+def body_overlap(a: PlacedStem, b: PlacedStem) -> float:
+    """How deep two placed stems' bodies overlap (_body_overlap), page units."""
+    return _body_overlap((a.cx, a.cy), a, (b.cx, b.cy), b)
+
+
+_JOINT_GROUP = 4  # at most this many consecutive pieces of a duplex are separated as one group
+_JOINT_OVERLAP = 0.25  # widths two joined pieces' bodies may overlap and still be moved together
+
+
+def _rigid_joints(items: list[_Item], joints: set[tuple[int, int]]) -> set[tuple[int, int]]:
+    """The joints (_joints) whose pieces _separate moves together: those in chains of at most _JOINT_GROUP pieces (a
+    longer chain moved as one, as the nucleosome's 22 pieces, carries the protein it wraps out of its ring), and of
+    those only pairs whose bodies overlap by at most _JOINT_OVERLAP widths. The other joined pieces are pushed
+    apart like any two items."""
+    if not joints:
+        return set()
+    cid = _components(len(items), sorted(joints))
+    size = np.bincount(cid, minlength=len(items))
+    rigid = set()
+    for i, j in sorted(joints):
+        if size[cid[i]] > _JOINT_GROUP:
+            continue
+        a, b = items[i].members[0], items[j].members[0]
+        if _body_overlap((items[i].cx, items[i].cy), a, (items[j].cx, items[j].cy), b) <= _JOINT_OVERLAP * max(
+            a.width, b.width
+        ):
+            rigid.add((i, j))
+    return rigid
 
 
 def _box_area(xy: np.ndarray, halves: np.ndarray, mids: np.ndarray) -> float:
@@ -462,19 +522,10 @@ def _push_apart(
     orbits: dict[int, list[int]] = {}
     for i, r in enumerate(root):
         orbits.setdefault(r, []).append(i)
-    chain = list(range(n))  # a representative of each item's chain of joined pieces (union-find)
-
-    def find(i):
-        while chain[i] != i:
-            i = chain[i]
-        return i
-
-    for i, j in np.argwhere(np.triu(apart, 1)).tolist() if apart is not None else []:
-        chain[max(find(i), find(j))] = min(find(i), find(j))
-    pieces: dict[int, list[int]] = {}
-    for i in range(n):
-        pieces.setdefault(find(i), []).append(i)
-    group = [np.array(sorted({p for m in orbits[r] for p in pieces[find(m)]})) for r in root]
+    joined = np.argwhere(np.triu(apart, 1)).tolist() if apart is not None else []
+    cid = _components(n, [(i, r) for i, r in enumerate(root)] + joined)  # orbits and joined pieces move as one
+    members = {c: np.flatnonzero(cid == c) for c in sorted(set(cid.tolist()))}
+    group = [members[c] for c in cid.tolist()]
     protomer = [copy_k[i] if len(orbits[root[i]]) > 1 else None for i in range(n)]  # None: item has no copies
     widen = np.sign(sum((xy[i, 0] - xy[j, 0]) / k for i, (j, k) in ties.items())) or 1.0  # protomer k lies this way
     for sweep in range(sweeps):
@@ -488,7 +539,7 @@ def _push_apart(
             py = halves[i, 1] + halves[j, 1] + MARGIN - abs(dy)
             if px <= 1e-9 or py <= 1e-9:  # an earlier push this sweep already cleared it
                 continue
-            gi, gj = (group[i], group[j]) if not np.isin(group[i], group[j]).any() else (i, j)
+            gi, gj = (group[i], group[j]) if cid[i] != cid[j] else (i, j)
             if px < py:
                 s = (1 if dx > 0 else -1) if dx != 0 else 1
                 if None not in (protomer[i], protomer[j]) and protomer[i] != protomer[j]:
@@ -1227,14 +1278,12 @@ def joined_pieces(stems: list[PlacedStem], na: Nucleic) -> set[frozenset[str]]:
 
 
 def _joints(items: list[_Item], na: Nucleic) -> set[tuple[int, int]]:
-    """(i, j), i < j: the items of two consecutive pieces of one bent duplex. _attract keeps no MARGIN between
-    them (their boxes may touch, the joint spring holding them end to end), and _separate and _slide_clear never
-    part them (a push moves the chain of pieces together): no margin is kept open for an element to fill."""
-    return {
-        (min(ki, kj), max(ki, kj))
-        for s, i, j, (ki, mi), (kj, mj) in _strand_steps(items, na)
-        if _is_joint(j - i - 1, mi, mj)
-    }
+    """(i, j), i < j: the items of two consecutive pieces of one bent duplex (joined_pieces). _attract keeps no
+    MARGIN between them (their boxes may touch, the joint spring holding them end to end), and _separate moves a
+    short chain of them together (_rigid_joints): no margin is kept open for an element to fill."""
+    item = {m.id: k for k, it in enumerate(items) for m in it.members if isinstance(m, PlacedStem)}
+    stems = [m for it in items for m in it.members if isinstance(m, PlacedStem)]
+    return {tuple(sorted(item[x] for x in pair)) for pair in joined_pieces(stems, na)}
 
 
 def _stem_springs(items: list[_Item], na: Nucleic) -> list[tuple[int, np.ndarray, int, np.ndarray, float, float]]:

@@ -11,7 +11,7 @@ from dataclasses import dataclass, field
 import numpy as np
 
 from .layout import _GLYPH_H, _GLYPH_W, NT_ROW, NT_STEP, Layout, PlacedStem, _stem_label_box, label_boxes
-from .route import _clear, _curve, _element_obstacles, _Grid, _Router, _simplify, clip_len
+from .route import _INFLATE, _clear, _curve, _element_obstacles, _Grid, _Router, _simplify, clip_len
 
 log = logging.getLogger(__name__)
 
@@ -378,7 +378,11 @@ def route_nucleic(layout: Layout, router: _Router | None = None) -> list[NAPath]
         if p.kind in ("hairpin", "tail"):
             _use(router.grid, p.points)
     names = [_stem_label_box(d) for d in layout.stems]
-    routed = {(s, i): _strand_between(router, s, i, j, da, db, kind, names) for s, i, j, da, db, kind in between}
+    drawn = [p.points for p in fixed.values()]  # strands drawn so far: a straight joint must cross none
+    routed = {}
+    for s, i, j, da, db, kind in between:
+        routed[(s, i)] = _strand_between(router, s, i, j, da, db, kind, names, drawn)
+        drawn.append(routed[(s, i)].points)
     out = [p for _, p in sorted({**fixed, **routed}.items())]
     for g in na.gaps:  # cropped away: the 3' end of one piece to the 5' end of the next, dashed
         a, b = exits.get((g.before, len(na.strands[g.before]) - 1)), exits.get((g.after, 0))
@@ -393,7 +397,33 @@ def route_nucleic(layout: Layout, router: _Router | None = None) -> list[NAPath]
     return out
 
 
-def _strand_between(router: _Router, s: int, i: int, j: int, da: PlacedStem, db: PlacedStem, kind, names=()) -> NAPath:
+def _straight_joint(router: _Router, da: PlacedStem, db: PlacedStem, fa, ea, fb, drawn=()) -> bool:
+    """May a joint no route reaches be drawn straight from face fa to face fb, as a kink joins two pieces of one
+    helix? Only between pieces that are near (faces closer than _JOINT_STRAIGHT) or whose boxes touch, going on
+    forward (along fa's outward direction ea), clear by _INFLATE of every element and stem but its own two, and
+    crossing no nucleic-acid strand drawn so far (`drawn`, polylines)."""
+    a, b = da.rect, db.rect
+    touching = min(a[2], b[2]) - max(a[0], b[0]) >= -1e-9 and min(a[3], b[3]) - max(a[1], b[1]) >= -1e-9
+    if not (math.dist(fa, fb) < _JOINT_STRAIGHT or touching) or _dot(np.subtract(fb, fa), ea) <= 0:
+        return False
+    if not _clear(_xy([fa, fb]), (da, db), *router.elements, grow=_INFLATE, kink=True):
+        return False
+    return not any(_cross(fa, fb, p, q) for pts in drawn for p, q in zip(pts, pts[1:]))
+
+
+def _cross(p, q, a, b) -> bool:
+    """Do segments p-q and a-b cross (properly, not merely touch)?"""
+
+    def turn(o, u, v) -> float:
+        return (u[0] - o[0]) * (v[1] - o[1]) - (u[1] - o[1]) * (v[0] - o[0])
+
+    d1, d2, d3, d4 = turn(p, q, a), turn(p, q, b), turn(a, b, p), turn(a, b, q)
+    return d1 * d2 < -1e-12 and d3 * d4 < -1e-12
+
+
+def _strand_between(
+    router: _Router, s: int, i: int, j: int, da: PlacedStem, db: PlacedStem, kind, names=(), drawn=()
+) -> NAPath:
     """The single strand from stem nucleotide i to stem nucleotide j (the m nucleotides between drawn on it).
     `names` (the stem-label boxes) are hard obstacles for a run's first choice of drawing: the first one clear of
     the elements that also keeps off every name; only when none does, the first one clear of the elements."""
@@ -426,9 +456,9 @@ def _strand_between(router: _Router, s: int, i: int, j: int, da: PlacedStem, db:
         elif off_names(bowed):
             return NAPath("run", s, nts, bowed, _spaced(bowed, m), between=between)
     route, _ = router.route(fa, ea, da, fb, eb, db, own_body=True)
-    if route is None and joint and _clear(_xy([fa, fb]), own, *router.elements, kink=True):
-        # pieces that touch or overlap (no overlap is kept between them): the duplex carries on straight across
-        # their meeting corner, as a kink joins two pieces of one helix
+    if route is None and joint and _straight_joint(router, da, db, fa, ea, fb, drawn):
+        # pieces that touch (no margin is kept between them): the duplex carries on straight across their meeting
+        # corner, as a kink joins two pieces of one helix
         for c in router.grid.cells_along(fa, fb):
             router.grid.used[c] += 1
         return NAPath("joint", s, [], _xy([ra, fa, fb, rb]), [], between=between)

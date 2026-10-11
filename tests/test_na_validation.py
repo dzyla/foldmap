@@ -38,10 +38,9 @@ LIMITS = {  # metric: (lowest or highest allowed, "min" or "max")
 # campaign (Task 13). 4YBB: run AA:26 across the free ends AA:2-8 and AA:557-566; two contact beads overlapping;
 # the "... 36 nt ..." label on stem P34 and on a run.
 # Routing, step 3: with the stems where 3D has them (C2), 4LD0's run from DNA 4 to DNA 2 crosses near the junction
-# and two of 4OO8's contact beads overlap; with no margin between consecutive pieces (C3), two of 1KX5's joints
-# cross other strands where the two gyres' pieces now meet. Held until the routing step (C1, C8, C12) is in.
+# and two of 4OO8's contact beads overlap. Held until the routing step (C1, C8, C12) is in.
 CAMPAIGN = {
-    "na_crossings": {"4YBB": 2, "4LD0": 1, "1KX5": 2},
+    "na_crossings": {"4YBB": 2, "4LD0": 1},
     "bead_overlaps": {"4YBB": 2, "4OO8": 1},
     "gap_label_collisions": {"4YBB": 2},
 }
