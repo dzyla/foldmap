@@ -1913,24 +1913,28 @@ def test_a_trace_is_exempt_from_an_element_only_near_the_nucleotides_it_touches(
     it (an element touching the 5' end, crossed by the trace twenty nucleotides on, makes a fallback)."""
     from types import SimpleNamespace
 
+    from foldmap.layout import Placed
     from foldmap.na_ends import _trace_clear
+    from helpers import fake_sse
 
-    def check(touched: int, sheets=()) -> bool:
-        el = SimpleNamespace(sse=SimpleNamespace(id="H1", start=5, end=5))
-        other = SimpleNamespace(sse=SimpleNamespace(id="E1", start=6, end=6))
+    def check(touched: int, crossed: str = "H") -> bool:
+        """The trace's nucleotides 14-16 cross whichever of the helix (H), the strand beside it in a sheet (E) or a
+        ghost of the helix (ghost) sits at y = 0; the others sit clear of it at y = 6."""
+        h, e = fake_sse("H", 5, 5), fake_sse("E", 6, 6)
+        y = lambda k: 0.0 if crossed == k else 6.0  # noqa: E731
         layout = SimpleNamespace(
             nucleic=SimpleNamespace(contacts={5: {(0, touched)}}),
-            placed={"H1": el, "E1": other},
-            ghosts=[],
-            sheets=list(sheets),
+            placed={h.id: Placed(h, 15.0, y("H"), 1.6, 0.0, 2.0), e.id: Placed(e, 15.0, y("E"), 1.6, 0.0, 2.0)},
+            ghosts=[Placed(h, 15.0, y("ghost"), 1.6, 0.0, 2.0, ghost=True)],
+            stems=[],
+            sheets=[[h.id, e.id]] if crossed == "E" else [],
         )
-        rects = np.array([[14.2], [-1.0], [15.8], [1.0]])  # crossed by the segments of nucleotides 14-16
-        router = SimpleNamespace(elements=(rects, ["E1" if sheets else "H1"]))
-        return _trace_clear(router, layout, 0, [(float(x), 0.0) for x in range(21)])
+        return _trace_clear(layout, 0, [(float(x), 0.0) for x in range(21)])
 
     assert check(15) and check(13)  # it holds the nucleotides there (or a neighbour's)
     assert not check(0)  # it holds the 5' end only: the trace crossing it far on is not clear
-    assert check(15, sheets=[["H1", "E1"]]) and not check(0, sheets=[["H1", "E1"]])  # its sheet likewise
+    assert check(15, "E") and not check(0, "E")  # its sheet likewise
+    assert check(15, "ghost") and not check(0, "ghost")  # and a ghost of it
 
 
 def test_trace_nucleotides_drawn_on_one_spot_are_nudged_apart():

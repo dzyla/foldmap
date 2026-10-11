@@ -24,7 +24,19 @@ from .na_paths import (
     _upto,
     _xy,
 )
-from .route import _DIRS, _REUSE, _TURN, _clear, _corners, _curve, _Grid, _Router, _simplify, _snap_to_port
+from .route import (
+    _DIRS,
+    _REUSE,
+    _TURN,
+    _clear,
+    _corners,
+    _curve,
+    _element_obstacles,
+    _Grid,
+    _Router,
+    _simplify,
+    _snap_to_port,
+)
 
 SHORT_GAP = 3  # a cropped gap of fewer nucleotides is drawn as a bare break, without its "… N nt …" label
 _TAIL_ROUTED = 6  # a free end of more nucleotides that no straight drawing keeps clear is routed out to free space
@@ -307,7 +319,7 @@ def _label_room(router: _Router, layout: Layout, xy, labels: list) -> bool:
 _TRACE_NEAR = 2  # nucleotides: an element touching a trace lies under it this far either side of what it holds
 
 
-def _trace_clear(router: _Router, layout: Layout, s: int, pts) -> bool:
+def _trace_clear(layout: Layout, s: int, pts) -> bool:
     """Is strand s's trace (drawn at its projected place) clear of every element, each segment but of the
     elements touching its own nucleotides or a neighbour's (_TRACE_NEAR) and the sheets holding them? A single
     strand lies on the protein it wraps where it holds it (1EYG's ssDNA over the SSB tetramer; layout keeps the
@@ -322,9 +334,7 @@ def _trace_clear(router: _Router, layout: Layout, s: int, pts) -> bool:
         got = set().union(*(holds.get(e, set()) for e in block))
         for e in block if got else ():
             holds[e] = got
-    rects, owners = router.elements
-    n = len(layout.placed)  # route._element_obstacles: elements, then ghosts (owner None), then stems
-    owners = [*owners[:n], *(g.sse.id for g in layout.ghosts), *owners[n + len(layout.ghosts) :]]
+    rects, owners = _element_obstacles(layout, ghost_owner=True)  # the router's obstacles; a ghost is its strand's
     xy = _xy(pts)
     free = [k for k, o in enumerate(owners) if o not in holds]  # never exempt: the whole trace at once
     if not _clear(xy, (), rects[:, free], [owners[k] for k in free], own_body=True):

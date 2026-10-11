@@ -110,7 +110,7 @@ def route_nucleic(layout: Layout, router: _Router | None = None, loops=()) -> li
         n = len(strand)
         if s in layout.na_traces:
             pts = _xy(layout.na_traces[s])
-            trace = NAPath("trace", s, list(range(n)), pts, pts, fallback=not _trace_clear(router, layout, s, pts))
+            trace = NAPath("trace", s, list(range(n)), pts, pts, fallback=not _trace_clear(layout, s, pts))
             fix((s, -1), trace)
             for label, a, b in (("5′", pts[0], pts[1]), ("3′", pts[-1], pts[-2])):
                 v = np.subtract(a, b)

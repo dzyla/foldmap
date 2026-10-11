@@ -48,10 +48,11 @@ def _oid(e) -> str:
     return e.sse.id if isinstance(e, Placed) else f"stem:{e.id}"
 
 
-def _element_obstacles(layout: Layout) -> tuple[np.ndarray, list]:
+def _element_obstacles(layout: Layout, ghost_owner: bool = False) -> tuple[np.ndarray, list]:
     """The rects every drawn connector must keep clear of (elements, ghosts, stems) as a (4, n) array of x0, y0,
-    x1, y1 rows, and the owner id of each (None for a ghost)."""
-    own = [(_oid(p), p.rect) for p in layout.placed.values()] + [(None, g.rect) for g in layout.ghosts]
+    x1, y1 rows, and the owner id of each: None for a ghost, or with ghost_owner the id of the element it copies."""
+    ghost = lambda g: g.sse.id if ghost_owner else None  # noqa: E731
+    own = [(_oid(p), p.rect) for p in layout.placed.values()] + [(ghost(g), g.rect) for g in layout.ghosts]
     own += [(_oid(d), d.rect) for d in layout.stems]
     return np.array([r for _, r in own], float).reshape(-1, 4).T.copy(), [k for k, _ in own]
 

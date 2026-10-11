@@ -51,11 +51,16 @@ def test_short_runs_filtered(ubq):
     assert build_sses(bb, "".join(ss)) == []
 
 
-def test_bulge_split_strand_is_one_strand(zya):
+def test_a_classic_bulge_stays_inside_one_dssp_strand(zya):
+    """6ZYA A:499-509, deposited as one strand, pairs with 563-572 except at 504 (503-568, 505-567): a classic
+    β-bulge, which DSSP's own bulge rule labels E. It is one strand with no join (no bridges passed), and stays one
+    with them."""
     bb = load_backbone(zya, "asu")
-    ids = {s.id for s in build_sses(bb, assign_dssp(bb).ss)}
-    assert "A:499-509" in ids  # deposited as one strand; DSSP splits it around a bulge at 504
-    assert "A:499-503" not in ids and "A:505-509" not in ids
+    d = assign_dssp(bb)
+    for bridges in (None, d.bridges):
+        ids = {s.id for s in build_sses(bb, d.ss, bridges=bridges)}
+        assert "A:499-509" in ids
+        assert "A:499-503" not in ids and "A:505-509" not in ids
 
 
 def _same_side(x, y):
