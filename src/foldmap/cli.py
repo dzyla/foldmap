@@ -915,7 +915,8 @@ def build_parser() -> argparse.ArgumentParser:
         q.add_argument(
             "--assembly",
             metavar="auto|asu|ID",
-            help="auto builds the file's first biological assembly when it adds copies (up to 24 chains); "
+            help="auto builds the file's first biological assembly when it adds copies (up to 24 chains), or, "
+            "for nucleic acid, when it is one of several complexes deposited together; "
             "asu keeps the file as deposited; or give an assembly id from the file",
         )
         q.add_argument(

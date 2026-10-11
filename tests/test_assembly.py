@@ -258,3 +258,94 @@ def test_holliday_junction_drops_exactly_the_copies_of_the_second_operator():
     model, asu = read_model(DATA / "na" / "3CRX.cif.gz")
     assert sorted(c.name for c in model) == ["A1", "A2", "B1", "B2", "C1", "D1", "E1", "F1"]
     assert asu == {"A1", "B1", "C1", "D1", "E1", "F1"}
+
+
+def _copies_in_asu(tmp_path, n, *, keep=None, name="ncs.cif"):
+    """1URN-like: the U1A–RNA complex of the 1URN fixture (RNA R, protein C) deposited `n` times in the asymmetric
+    unit, each copy turned 120° about z and raised 25 Å (a screw, as crystal packing lays them), one assembly per
+    copy built by the identity operator (assembly 1 = the first copy). keep: chain names of the fixture kept."""
+    import gemmi
+
+    st = gemmi.read_structure(str(DATA / "na" / "1URN.cif.gz"))
+    st.setup_entities()
+    model = st[0]
+    for c in [c.name for c in model if keep is not None and c.name not in keep]:
+        model.remove_chain(c)
+    base = [c.clone() for c in model]
+    entity_of = {sub: e for e in st.entities for sub in e.subchains}
+    names = {"R": "RSTU", "C": "CDEF"}
+    assemblies = []
+    for k in range(n):
+        turn = np.radians(120.0 * k)
+        rot = [[np.cos(turn), -np.sin(turn), 0.0], [np.sin(turn), np.cos(turn), 0.0], [0.0, 0.0, 1.0]]
+        subchains = []
+        for c in base:
+            copy = c.clone()
+            copy.name = names[c.name][k]
+            for r in copy:
+                old = r.subchain
+                r.subchain = f"{old}{k}" if k else old
+                if k and r.subchain not in entity_of[old].subchains:
+                    entity_of[old].subchains = [*entity_of[old].subchains, r.subchain]  # a copy is no new entity
+                subchains.append(r.subchain)
+                for a in r:
+                    p = np.array(a.pos.tolist())
+                    a.pos = gemmi.Position(*(np.array(rot) @ p + (0.0, 0.0, 25.0 * k)))
+            if k:
+                model.add_chain(copy)
+            else:
+                model.remove_chain(c.name)
+                model.add_chain(copy)
+        gen = gemmi.Assembly.Gen()
+        gen.subchains = sorted(set(subchains))
+        op = gemmi.Assembly.Operator()
+        op.name, op.transform = "1", gemmi.Transform()
+        gen.operators.append(op)
+        assembly = gemmi.Assembly(str(k + 1))
+        assembly.generators.append(gen)
+        assemblies.append(assembly)
+    st.assemblies.clear()
+    for a in assemblies:
+        st.assemblies.append(a)
+    path = tmp_path / name
+    st.make_mmcif_document().write_file(str(path))
+    return path
+
+
+def test_auto_draws_one_complex_when_the_asymmetric_unit_holds_several(tmp_path):
+    """4OO8, 1URN: the asymmetric unit holds two or three copies of a protein–nucleic-acid complex and assembly 1
+    is one of them (a strict subset, the identity operator). auto draws that biological assembly, under the
+    deposited chain names; asu still draws every copy."""
+    from foldmap.io import read_model
+
+    path = _copies_in_asu(tmp_path, 3)
+    model, deposited = read_model(path)
+    assert [c.name for c in model] == ["R", "C"] and deposited == {"R", "C"}
+    model, deposited = read_model(path, "asu")
+    assert sorted(c.name for c in model) == ["C", "D", "E", "R", "S", "T"]
+    bb = load_backbone(path)
+    assert {l.chain for l in bb.labels} == {"C"} and bb.asu_chains == {"C"}
+
+
+def test_crystal_packing_of_copies_in_the_asymmetric_unit_is_not_reported_as_symmetry(tmp_path):
+    """1URN reported its three U1A–RNA copies, related by crystal packing (a 120° screw), as a helical assembly.
+    Symmetry is looked for among the copies the chosen assembly holds: under auto, one complex, no symmetry."""
+    from foldmap.cli import make_layout
+    from foldmap.symmetry import detect_symmetry
+
+    path = _copies_in_asu(tmp_path, 3)
+    asu = load_backbone(path, assembly="asu")
+    assert detect_symmetry(asu) is not None  # the copies do lie on a screw: only the assembly says it is packing
+    assert detect_symmetry(load_backbone(path)) is None
+    lay, sses, bb = make_layout(path)
+    assert {s.chain for s in lay.nucleic.strands} == {"R"} and {s.chain for s in sses} == {"C"}
+
+
+def test_one_protein_complex_of_several_in_the_asymmetric_unit_is_drawn_as_before(tmp_path):
+    """The biological-assembly choice is made for structures holding nucleic acid only: protein-only figures
+    (4CH9: two copies of a dimer, assembly 1 = B, D) stay as they were."""
+    from foldmap.io import read_model
+
+    path = _copies_in_asu(tmp_path, 2, keep={"C"})
+    model, deposited = read_model(path)
+    assert sorted(c.name for c in model) == ["C", "D"] and deposited == {"C", "D"}

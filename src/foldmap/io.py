@@ -150,11 +150,45 @@ def _operator_tags(assembly, model, built) -> list[int] | None:
     return tags
 
 
+def _polymer_entities(st, chains) -> list[str]:
+    """The polymer entity of each chain's polymer, in order ('' where the file names none)."""
+    out = []
+    for c in chains:
+        polymer = c.get_polymer()
+        if len(polymer):
+            entity = st.get_entity_of(polymer)
+            out.append(entity.name if entity is not None else "")
+    return out
+
+
+def _one_complex_of_several(st, assembly, model) -> bool:
+    """`assembly` is one of several copies of a complex deposited in the asymmetric unit (4OO8: two Cas9
+    complexes, assembly 1 = A, B, C; 1URN: three U1A–RNA complexes): every operator the identity, a strict subset of
+    the deposited chains, each of its polymer entities deposited at least twice as often as it holds it. The other
+    copies lie next to it by crystal packing, not by biology. Taken only for a model holding nucleic acid (a
+    protein-only figure keeps the asymmetric unit, as before)."""
+    if not all(op.transform.is_identity() for g in assembly.generators for op in g.operators):
+        return False
+    subchains = {s for g in assembly.generators for s in g.subchains}
+    names = {n for g in assembly.generators for n in g.chains}
+    members = [c for c in model if c.name in names or any(r.subchain in subchains for r in c)]
+    if not members or len(members) >= len(model):
+        return False
+    held, deposited = _polymer_entities(st, members), _polymer_entities(st, model)
+    if not held or "" in held + deposited:
+        return False
+    if any(deposited.count(e) < 2 * held.count(e) for e in set(held)):
+        return False
+    return any(_is_nucleotide(chain, k) for chain in model for k in range(len(chain)))
+
+
 def read_model(path: str | Path, assembly: str = "auto"):
     """(model, deposited chain names). assembly: 'asu' as deposited; an assembly id from the file; or 'auto':
-    the first assembly when it adds copies and stays within AUTO_MAX chains. A copy the assembly lays exactly on a
-    chain already present is dropped (_drop_coincident); under 'auto', when that drops every copy it adds, the
-    model is returned as deposited, with its deposited chain names."""
+    the first assembly when it adds copies and stays within AUTO_MAX chains, or when it is one of several copies
+    of a nucleic-acid complex the asymmetric unit holds (_one_complex_of_several; drawn under the deposited chain
+    names, and only its copies are looked at for symmetry). A copy the assembly lays exactly on a chain already
+    present is dropped (_drop_coincident); under 'auto', when that drops every copy it adds, the model is returned
+    as deposited, with its deposited chain names."""
     path = Path(path)
     if not path.is_file():
         raise FileNotFoundError(path)
@@ -170,6 +204,9 @@ def read_model(path: str | Path, assembly: str = "auto"):
     if assembly == "auto":
         chosen = st.assemblies[0]
         copies = _copies(chosen, model)
+        if copies < len(deposited) and _one_complex_of_several(st, chosen, model):
+            one = gemmi.make_assembly(chosen, model, gemmi.HowToNameCopiedChain.Dup)  # identity: names kept
+            return one, {c.name for c in one}
         if copies <= len(deposited) or copies > AUTO_MAX:
             return model, deposited
     else:

@@ -277,7 +277,7 @@ def pairing(path, theirs: set[frozenset]) -> dict:
 def drawn_pairing(na, theirs: set[frozenset], asu_model, as_deposited: bool) -> dict:
     """The pairs and stems the figure draws (`na`, the layout's nucleic acid: assembly copies, cropped) against
     RNApolis' on the deposited model `asu_model`, each drawn chain mapped back to the deposited one it copies
-    (_chain_map; as_deposited: the figure is drawn from the deposited model itself). A true pair joins two
+    (_chain_map; as_deposited: the figure is drawn from deposited chains under their own names). A true pair joins two
     nucleotides of one copy, or of two copies one operator made (the same rigid motion of their deposited
     chains); a pair drawn between a nucleotide and its partner's twin in another copy is wrong. Drawn chains
     that cannot be mapped (unmapped_chains), or a copy holding one deposited nucleotide twice, fail the entry."""
@@ -479,7 +479,8 @@ def run(name: str, path: Path, out: Path, options: dict | None = None) -> dict:
     m["seconds"] = round(time.time() - t, 1)
     if lay.nucleic is not None and theirs is not None:
         asu_model, deposited = read_model(path, "asu")
-        as_deposited = model[1] == deposited and {c.name for c in model[0]} == deposited
+        # drawn under deposited names: the model as deposited, or one complex of several it holds (assembly 1)
+        as_deposited = model[1] <= deposited and {c.name for c in model[0]} == model[1]
         m.update(drawn_pairing(lay.nucleic, theirs, asu_model, as_deposited))
     if lay.nucleic is not None:
         m.update(shape(lay))
