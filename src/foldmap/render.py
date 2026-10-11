@@ -29,6 +29,7 @@ from matplotlib.transforms import Affine2D
 
 from .hbonds import find_hbonds, parse_selection
 from .layout import (
+    _GLYPH_W,
     DNA_MINOR,
     DNA_PITCH,
     DNA_W,
@@ -266,6 +267,7 @@ class _NAInk(NamedTuple):
     gu: set  # (a, i, b, j) of the G·U pairs, drawn dotted
     chains: list  # chain of each strand
     backbone: dict  # chain -> backbone colour (the shared nucleic-acid backbone helper's answer)
+    seqs: list  # per strand, the residue number of each nucleotide as the structure file writes it
 
     def colour(self, strand: int) -> str:
         """The backbone colour of a strand: stem rails, ribbons, blocks, paths, hairpins, ties."""
@@ -424,6 +426,22 @@ def _block(ink: _NAInk, k: int, d: PlacedStem, where: dict, letters: dict) -> No
         zorder=4,
     )
     t.set_gid(f"na:label:{k}")
+    a, i, b, j = d.pairs[0]  # the first pair (outermost): its two residue numbers, just past its end
+    first = f"{ink.seqs[a][i]}\u00b7{ink.seqs[b][j]}"
+    side = 1 if d.axial[(a, i)] >= 0 else -1
+    reach = _GLYPH_W * 0.75 * len(first) / 2  # half the number's width along the bar, so it clears the end
+    num = dna_to_page(d, side * (d.length / 2 + 0.1 + reach), 0.0)
+    t = ink.ax.text(
+        *num,
+        first,
+        ha="center",
+        va="center",
+        rotation=_upright(d.angle),
+        fontsize=ink.font * 0.75 * 0.75,  # three quarters of a base letter's size, upright like the letters
+        color=ink.front,
+        zorder=4,
+    )
+    t.set_gid(f"na:stem:{k}:first")
 
 
 def _letters(ink: _NAInk, k: int, d: PlacedStem, where: dict, letters: dict) -> None:
@@ -588,6 +606,7 @@ def _draw_nucleic(
         gu,
         [s.chain for s in na.strands],
         backbone,
+        [[lab.seq for lab in s.labels] for s in na.strands],
     )
     style = _na_style(layout, look)
     where = nucleotide_points(layout, style)  # nucleotide -> where it is drawn (bead and hydrogen bonds go there)

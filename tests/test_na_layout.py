@@ -830,9 +830,39 @@ def test_each_stem_style_draws_its_own_parts(style, parts):
     if style == "block":
         assert not letters
     elif style == "ribbon":
-        assert 0 < len(letters) < 121  # single strands only: the double helix carries no letters
+        assert len(letters) == 121 - 2 * 32  # single strands only: the double helix carries no letters
     else:
         assert len(letters) == 121
+
+
+def test_every_block_bar_numbers_its_first_pair_beside_it():
+    from foldmap.style import Style
+
+    look = Style(na_style="block")
+    fig, _ = make_figure_and_loops(_path("30QM"), look=look)
+    lay, _, _ = make_layout(_path("30QM"), look=look)
+    firsts = {a.get_gid(): a for a in _gid(fig, "na:stem:") if a.get_gid().endswith(":first")}
+    ladder, _ = make_figure_and_loops(_path("30QM"), look=Style(na_style="ladder"))
+    letter = _gid(ladder, "na:nt:")[0].get_fontsize()  # block draws no letters: the size they would have
+    assert len(firsts) == len(lay.stems) == 6
+    for k, d in enumerate(lay.stems):
+        a, i, b, j = d.pairs[0]
+        text = firsts[f"na:stem:{k}:first"]
+        assert text.get_text() == f"{lay.nucleic.strands[a].labels[i].seq}\u00b7{lay.nucleic.strands[b].labels[j].seq}"
+        assert text.get_fontsize() == pytest.approx(0.75 * letter)
+        assert text.get_rotation() % 360 < 90 or text.get_rotation() % 360 > 270  # reads left to right
+
+
+def test_the_layout_does_not_depend_on_na_style():
+    from foldmap.style import Style
+
+    layouts = {
+        s: make_layout(_path("30QM"), look=Style(na_style=s))[0] for s in ("ladder", "ribbon", "block", "letters")
+    }
+    base = layouts["ladder"]
+    for s, lay in layouts.items():
+        assert [d.rect for d in lay.stems] == [d.rect for d in base.stems], s
+        assert {k: (p.cx, p.cy) for k, p in lay.placed.items()} == {k: (p.cx, p.cy) for k, p in base.placed.items()}, s
 
 
 def test_a_cropped_large_rna_switches_ladder_to_block():
