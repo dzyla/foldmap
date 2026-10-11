@@ -61,8 +61,8 @@ def big_complex(path: Path, copies: int = 8) -> Path:
     model = st[0]
     base = [c.clone() for c in model]
     names = iter(a + b for a in string.ascii_uppercase for b in string.ascii_uppercase)
-    for c in list(model):
-        model.remove_chain(c.name)
+    while len(model):  # by position: chain names can repeat, and remove_chain(name) drops only the first match
+        del model[0]
     for k in range(copies):
         for c in base:
             new = c.clone()

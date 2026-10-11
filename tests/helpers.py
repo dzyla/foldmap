@@ -1,5 +1,7 @@
 """Shared test helpers: run the step-1 pipeline, build synthetic SSEs."""
 
+from pathlib import Path
+
 import numpy as np
 
 from foldmap.dssp import assign_dssp
@@ -7,6 +9,8 @@ from foldmap.io import load_backbone
 from foldmap.model import SSE, ResLabel
 from foldmap.sheets import build_sheets
 from foldmap.ss import build_sses
+
+FID = Path(__file__).parent / "data" / "fidelity"  # plan-11 protein fixtures (.cif.gz, outside the bench)
 
 
 def pipeline(path, assembly="asu"):
@@ -34,3 +38,22 @@ def tripeptide(src, tmp_path):
     out = tmp_path / "tri.pdb"
     out.write_text("\n".join(keep) + "\nEND\n")
     return out
+
+
+def loop_crossings(loops) -> int:
+    """Proper crossings between the polylines of different loops (shared end points do not count)."""
+
+    def cross(p, q, r, s) -> bool:
+        def side(a, b, c):
+            return (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0])
+
+        return side(r, s, p) * side(r, s, q) < 0 and side(p, q, r) * side(p, q, s) < 0
+
+    segs = [list(zip(lp.points, lp.points[1:])) for lp in loops]
+    return sum(
+        cross(p, q, r, s)
+        for i in range(len(segs))
+        for j in range(i + 1, len(segs))
+        for p, q in segs[i]
+        for r, s in segs[j]
+    )

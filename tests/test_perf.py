@@ -250,3 +250,15 @@ def test_bench_leaves_no_temp_dir_behind(monkeypatch, tmp_path):
     monkeypatch.setattr(tempfile, "tempdir", str(tmp_path))
     assert bench.main(["2HHB"]) == 0
     assert list(tmp_path.iterdir()) == []
+
+
+def test_big_complex_has_no_duplicated_chain(tmp_path):
+    sys.path.insert(0, str(ROOT / "scripts"))
+    try:
+        from bench import big_complex
+    finally:
+        sys.path.pop(0)
+    import gemmi
+
+    names = [c.name for c in gemmi.read_structure(str(big_complex(tmp_path / "big.cif", copies=2)))[0]]
+    assert len(names) == 8 and len(set(names)) == 8 and not {"B", "D"} & set(names)
