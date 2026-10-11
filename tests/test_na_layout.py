@@ -1964,3 +1964,21 @@ def test_a_free_end_the_protein_holds_lies_toward_it():
         assert min(_gap(lay.placed[s.id].rect, pt) for s in strands) < np.median(gaps), x
         checked += 1
     assert checked >= 4
+
+
+def test_a_trace_seen_straight_end_on_is_nudged_apart_too():
+    """Three nucleotides projected onto one spot: the middle one's neighbours coincide, so its trace has no
+    direction there; it is nudged off its 5' neighbour's way, or along a fixed axis."""
+    from types import SimpleNamespace
+
+    from foldmap.frame import Frame
+    from foldmap.layout import _traces
+    from foldmap.model import NAStrand, ResLabel
+    from foldmap.route_na import _BEAD
+
+    p = np.array([[0.0, 0.0, z * 6.0] for z in range(3)])
+    strand = NAStrand("S", [ResLabel("S", k + 1, "", "DT") for k in range(3)], p, p, False)
+    frame = Frame(np.zeros(3), np.array([1.0, 0, 0]), np.array([0, 1.0, 0]), np.array([0, 0, 1.0]))
+    pts = _traces(SimpleNamespace(strands=[strand], structure=SimpleNamespace(stems=[])), frame)[0]
+    d = np.hypot(*(pts[:, None] - pts[None]).transpose(2, 0, 1))
+    assert d[np.triu_indices(3, 1)].min() >= _BEAD - 1e-3

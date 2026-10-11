@@ -1320,17 +1320,25 @@ def _traces(na: Nucleic, frame: Frame) -> dict[int, np.ndarray]:
     on each other."""
     held = {n for st in na.structure.stems for n in st.nucleotides()}
     out: dict[int, np.ndarray] = {}
-    taken: list[np.ndarray] = []  # every trace nucleotide placed so far
-    for s, strand in enumerate(na.strands):
-        if len(strand) < 2 or any((s, i) in held for i in range(len(strand))):
-            continue
-        pts = _snap(frame.project(strand.p) * SCALE)
+    traced = [
+        s
+        for s, strand in enumerate(na.strands)
+        if len(strand) > 1 and not any((s, i) in held for i in range(len(strand)))
+    ]
+    taken = np.zeros((sum(len(na.strands[s]) for s in traced), 2))  # every trace nucleotide placed so far
+    count = 0
+    for s in traced:
+        pts = _snap(frame.project(na.strands[s].p) * SCALE)
         for i in range(len(pts)):
-            others = np.array(taken).reshape(-1, 2)
+            others = taken[:count]
             space = _room(others, pts[i])
             if space < _TRACE_HALF:
                 along = pts[min(i + 1, len(pts) - 1)] - pts[max(i - 1, 0)]
-                side = np.array([-along[1], along[0]]) / max(float(np.hypot(*along)), 1e-9)
+                if float(np.hypot(*along)) < 1e-9:  # its neighbours on one spot: its 5' neighbour's way, or across
+                    along = pts[i] - pts[i - 1] if i > 0 else np.zeros(2)
+                if float(np.hypot(*along)) < 1e-9:
+                    along = np.array([0.0, 1.0])
+                side = np.array([-along[1], along[0]]) / float(np.hypot(*along))
                 for k in _NUDGES:
                     xy = _snap(pts[i] + side * k * _TRACE_HALF)
                     r = _room(others, xy)
@@ -1338,7 +1346,8 @@ def _traces(na: Nucleic, frame: Frame) -> dict[int, np.ndarray]:
                         pts[i], space = xy, r
                     if r >= _TRACE_HALF:
                         break
-            taken.append(pts[i])
+            taken[count] = pts[i]
+            count += 1
         out[s] = pts
     return out
 
