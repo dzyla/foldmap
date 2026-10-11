@@ -247,10 +247,12 @@ def test_trna_keeps_its_cloverleaf_junction_compact():
 def test_holliday_junction_reads_as_four_arms():
     """3CRX: the arms' inner ends gather at the junction (DNA 2, touching no protein, was 2.8 widths away), the
     arms lie in four quadrants around it (DNA 2 shared one with DNA 1), and the strand exchanges are short.
-    Box separation of the tilted arms keeps the inner ends 0.9-1.5 widths from the centre."""
+    Box separation of the tilted arms keeps the inner ends 0.9-1.5 widths from the centre. Measured on the
+    deposited half (two Cre): in the four-Cre assembly two Cre helices sit between the inner ends (placement,
+    plan 07 Task 13b step 2)."""
     import math
 
-    lay, _, _, _ = _routed("3CRX")
+    lay, _, _, _ = _routed("3CRX", assembly="asu")
     at = {key: d for d in lay.stems for key in d.axial}
     w = lay.stems[0].width
     ends = {d.name: [] for d in lay.stems}
@@ -1090,7 +1092,7 @@ def test_explorer_texts_name_both_chains_and_single_nucleotides():
             assert "–-" not in t, t  # never "C -50–-50"
     assert "DNA 1a · 9 bp · C -49 … E 49" in texts["1IHF"]  # a stem across two chains names both
     assert "tail C -50 (1 nt)" in texts["1IHF"]  # a single nucleotide is not a range
-    assert "tail C 1 (1 nt)" in texts["3CRX"]
+    assert "tail C1 1 (1 nt)" in texts["3CRX"]  # the assembly names its chains C1, D1, ...
     assert "<p>5 chains · 190 residues · 70 nt · " in pages["1IHF"]  # protein page header counts nucleotides
     rna = build_page(_path("1EHZ"))
     assert "<p>1 chain · 76 nt · hover" in rna

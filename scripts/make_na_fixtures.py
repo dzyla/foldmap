@@ -7,8 +7,9 @@
     python scripts/make_na_fixtures.py 1ATP 4YBB-psi   # only these fixtures (reference.json keeps the others)
 
 Each entry keeps its nucleic-acid chains (optionally a residue window of them), every protein chain with an atom
-within 8 Å of the kept nucleic acid (whole chains, so their secondary structure is intact), no waters and no
-assemblies (the fixtures are read as deposited). Files are written gzipped; gemmi reads them directly.
+within 8 Å of the kept nucleic acid (whole chains, so their secondary structure is intact) and no waters. Only the
+entries in ASSEMBLIES keep their assembly records (`_pdbx_struct_assembly`, `_oper_list`, `_assembly_gen`), so
+`auto` builds their assembly; the others are read as deposited. Files are written gzipped; gemmi reads them directly.
 reference.json holds the canonical and wobble pairs RNApolis finds in each deposited entry (pip install rnapolis),
 the independent reference tests/test_na_pairs.py checks foldmap's pairing against. CONTROLS are fixtures for one
 property each, with no reference pairs: chains and residue windows kept as listed, waters dropped.
@@ -41,6 +42,9 @@ ENTRIES = {
     # (S4 AD, S8 AH, S15 AO, S16 AP, S17 AQ, S20 AT)
     "4YBB": (["AA"], {"AA": (1, 1000)}, ["AD", "AH", "AO", "AP", "AQ", "AT"]),
 }
+# entries whose assembly is kept: 3CRX's operator lays a copy of every DNA strand on a deposited one (the junction
+# sits on the crystallographic two-fold), which io.read_model must drop
+ASSEMBLIES = {"3CRX"}
 # fixture name -> (id, chains to keep or None for all, {chain: (first, last)} residue windows)
 CONTROLS = {
     "1ATP": ("1ATP", None, {}),  # protein kinase A with ATP: a nucleotide ligand, never a strand
@@ -71,9 +75,14 @@ def _first_model(st: gemmi.Structure, windows) -> gemmi.Model:
     return model
 
 
-def _finish(st: gemmi.Structure) -> gemmi.Structure:
-    st.assemblies.clear()
+def _finish(st: gemmi.Structure, keep_assemblies: bool = False) -> gemmi.Structure:
+    if not keep_assemblies:
+        st.assemblies.clear()
     st.remove_empty_chains()
+    kept = {r.subchain for c in st[0] for r in c}
+    for assembly in st.assemblies:  # gemmi refuses to build from a subchain the file no longer has (waters)
+        for g in assembly.generators:
+            g.subchains = [s for s in g.subchains if s in kept]
     st.setup_entities()
     return st
 
@@ -95,7 +104,7 @@ def control(st: gemmi.Structure, chains, windows) -> gemmi.Structure:
     return st
 
 
-def trim(st: gemmi.Structure, na_chains, windows, allowed) -> gemmi.Structure:
+def trim(st: gemmi.Structure, na_chains, windows, allowed, keep_assemblies: bool = False) -> gemmi.Structure:
     model = _first_model(st, windows)
     keep_na = [c.name for c in model if _is_nucleic(c) and (na_chains is None or c.name in na_chains)]
     ns = gemmi.NeighborSearch(model, st.cell, NEAR + 1).populate()
@@ -115,7 +124,7 @@ def trim(st: gemmi.Structure, na_chains, windows, allowed) -> gemmi.Structure:
     for name in [c.name for c in model]:
         if name not in keep_na and name not in proteins:
             model.remove_chain(name)
-    return _finish(st)
+    return _finish(st, keep_assemblies)
 
 
 def _reference_pairs(text: str) -> list:
@@ -176,7 +185,7 @@ def main(argv=None) -> int:
         if pdb not in wanted:
             continue
         text = _fetch(pdb, args.src)
-        st = trim(gemmi.read_structure_string(text), na_chains, windows, allowed)
+        st = trim(gemmi.read_structure_string(text), na_chains, windows, allowed, pdb in ASSEMBLIES)
         kept = {(c.name, r.seqid.num, r.seqid.icode.strip()) for c in st[0] for r in c}
         reference[pdb] = [p for p in _reference_pairs(text) if tuple(p[0]) in kept and tuple(p[1]) in kept]
         total += _write(pdb, st)

@@ -112,3 +112,58 @@ def test_cli_assembly_and_highlight(tmp_path, capsys):
     assert main(["summary", str(APO)]) == 0
     text = capsys.readouterr().out
     assert "24 chain(s)" in text and "symmetry: O" in text
+
+
+def _model(chains):
+    """A gemmi Model of one-atom residues: {chain name: [xyz, ...]}."""
+    import gemmi
+
+    model = gemmi.Model("1")
+    for name, xyz in chains.items():
+        chain = gemmi.Chain(name)
+        for k, p in enumerate(xyz):
+            res = gemmi.Residue()
+            res.name, res.seqid = "ALA", gemmi.SeqId(k + 1, " ")
+            atom = gemmi.Atom()
+            atom.name, atom.element, atom.pos = "CA", gemmi.Element("C"), gemmi.Position(*p)
+            res.add_atom(atom)
+            chain.add_residue(res)
+        model.add_chain(chain)
+    return model
+
+
+def test_a_copy_lying_on_a_chain_already_present_is_dropped():
+    """A copy with >= 90 % of its atoms within 1 Å of one chain already present is the same molecule seen twice
+    (an operator mapping a chain on a special position onto itself or its partner); a copy that only partly
+    overlaps, or lies on the union of two chains, is kept."""
+    from foldmap.io import _drop_coincident
+
+    rng = np.random.default_rng(0)
+    a = rng.uniform(0, 40, (20, 3))
+    b = a + 20.0
+    on_a = a + 0.4  # every atom 0.69 Å from its twin
+    half = np.vstack([a[:10] + 0.4, a[10:] + 6.0])  # half of it coincides: a real neighbour, kept
+    split = np.vstack([a[:9] + 0.4, b[9:] + 0.4])  # 45 % on A and 55 % on B: on no single chain
+    model = _model({"A1": a, "B1": b, "A2": on_a, "C2": half, "D2": split})
+    assert _drop_coincident(model) == ["A2"]
+    assert [c.name for c in model] == ["A1", "B1", "C2", "D2"]
+
+
+def test_holliday_junction_assembly_keeps_each_dna_strand_once():
+    """3CRX: the two-fold operator lays a copy of every DNA strand on a deposited one (C2 on E1, D2 on F1, ...).
+    The assembly keeps the four Cre and the four strands, which pair into the junction's four arms."""
+    from scipy.spatial import cKDTree
+
+    from foldmap.io import load_nucleic, read_model
+
+    path = DATA / "na" / "3CRX.cif.gz"
+    model = read_model(path)
+    bb = load_backbone(path, model=model)
+    assert len({l.chain for l in bb.labels}) == 4  # four Cre
+    na = load_nucleic(path, bb, model=model)
+    assert len(na.strands) == 4
+    for i, s in enumerate(na.strands):
+        for t in na.strands[:i]:
+            d, _ = cKDTree(t.p).query(s.p)
+            assert (d < 1.5).mean() < 0.5, (s.chain, t.chain)
+    assert len(na.structure.stems) == 4

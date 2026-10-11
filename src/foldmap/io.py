@@ -84,9 +84,42 @@ def _copies(assembly, model) -> int:
     return total
 
 
+COINCIDENT_FRAC = 0.90  # of a copy's atoms ...
+COINCIDENT_DIST = 1.0  # ... within this many Å of one chain already present: the same molecule seen twice
+
+
+def _drop_coincident(model) -> list[str]:
+    """Remove, in place, every chain with COINCIDENT_FRAC of its atoms within COINCIDENT_DIST Å of one chain kept
+    before it: an assembly operator that maps a molecule on a special position (DNA on a crystallographic
+    two-fold) onto itself or its partner copies it exactly on top. Returns the names dropped, in model order."""
+    kept: list[tuple[np.ndarray, np.ndarray, cKDTree]] = []  # (low corner, high corner, tree) per kept chain
+    dropped = []
+    for chain in model:
+        xyz = np.array([a.pos.tolist() for r in chain for a in r], float).reshape(-1, 3)
+        if not len(xyz):
+            continue
+        lo, hi = xyz.min(axis=0), xyz.max(axis=0)
+        on_top = False
+        for klo, khi, tree in kept:
+            if (lo > khi + COINCIDENT_DIST).any() or (hi < klo - COINCIDENT_DIST).any():
+                continue  # boxes apart: no atom can be that close
+            d, _ = tree.query(xyz, distance_upper_bound=COINCIDENT_DIST)
+            if (d <= COINCIDENT_DIST).mean() >= COINCIDENT_FRAC:
+                on_top = True
+                break
+        if on_top:
+            dropped.append(chain.name)
+        else:
+            kept.append((lo, hi, cKDTree(xyz)))
+    for name in dropped:
+        model.remove_chain(name)
+    return dropped
+
+
 def read_model(path: str | Path, assembly: str = "auto"):
     """(model, deposited chain names). assembly: 'asu' as deposited; an assembly id from the file; or 'auto':
-    the first assembly when it adds copies and stays within AUTO_MAX chains."""
+    the first assembly when it adds copies and stays within AUTO_MAX chains. A copy the assembly lays exactly on a
+    chain already present is dropped (_drop_coincident)."""
     path = Path(path)
     if not path.is_file():
         raise FileNotFoundError(path)
@@ -112,6 +145,7 @@ def read_model(path: str | Path, assembly: str = "auto"):
             )
         chosen = found[0]
     built = gemmi.make_assembly(chosen, model, gemmi.HowToNameCopiedChain.AddNumber)
+    _drop_coincident(built)
     original = {c.name: np.array([a.pos.tolist() for r in c for a in r][:20]) for c in model}
     asu = set()
     for c in built:  # the copy made by the identity operator sits exactly on a deposited chain
