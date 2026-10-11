@@ -516,7 +516,11 @@ def main() -> None:
         with st.expander("Symmetry and assembly"):
             st.text_input("Symmetry", key="symmetry", help="auto, off, C2, D3, helical")
             st.text_input("Assembly", key="assembly", help="auto, asu, or an assembly id")
-            st.text_input("Chains", key="chains", help="draw only these chains, e.g. A,B (empty: all)")
+            st.text_input(
+                "Chains",
+                key="chains",
+                help="draw only these chains, e.g. A,B (empty: all; protein and nucleic acid each restricted if named)",
+            )
             st.text_input(
                 "Large assemblies",
                 key="focus",

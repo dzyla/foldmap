@@ -266,6 +266,12 @@ def nucleic_touching(na: Nucleic, chains) -> Nucleic:
     return _cut(held, {s: [(0, len(na.strands[s]) - 1)] for s in sorted(keep)})
 
 
+def nucleic_of_chains(na: Nucleic, chains) -> Nucleic:
+    """Only the strands of the nucleic-acid chains named (a chain's pieces and the gaps between them kept)."""
+    chosen = set(chains)
+    return _cut(na, {s: [(0, len(st) - 1)] for s, st in enumerate(na.strands) if st.chain in chosen})
+
+
 def _cut(na: Nucleic, windows: dict[int, list[tuple[int, int]]]) -> Nucleic:
     """The nucleotides inside the windows, each window its own strand piece, indices renumbered. A gap joins
     consecutive pieces of one molecule (one strand, or strands joined by na.gaps at a chain break), counting every

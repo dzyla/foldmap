@@ -19,7 +19,7 @@ from .features import sse_contacts
 from .frame import dna_radial_frame, dna_view_frame, symmetric_frame, view_frame
 from .io import load_backbone, load_links, load_nucleic, read_model
 from .layout import _snap, build_layout, resolve
-from .model import AUTO_NT, crop_nucleic, nucleic_touching, res_ref
+from .model import AUTO_NT, crop_nucleic, nucleic_of_chains, nucleic_touching, res_ref
 from .nucleic import StemView, stem_views, straight_duplex
 from .palette import PALETTES
 from .render import LOOP_STYLES, STYLES, draw, save
@@ -219,18 +219,25 @@ def make_layout(
 ):
     model = model or read_model(path, assembly)  # once, for every loader below (`model`: already read, same assembly)
     bb = load_backbone(path, assembly, model=model)
-    if chains:
-        present = list(dict.fromkeys(l.chain for l in bb.labels))
-        missing = [c for c in chains if c not in present]
-        if missing:
-            raise ValueError(f"no protein chain {', '.join(missing)}; the structure has {', '.join(present)}")
-        bb = bb.only(chains)
+    present = list(dict.fromkeys(l.chain for l in bb.labels))
+    if chains and any(c in present for c in chains):  # protein chains named: only those (else every one)
+        bb = bb.only([c for c in chains if c in present])
     if (look or Style()).color_by == "conservation" and not msa:
         raise ValueError("conservation colouring needs an alignment: add --msa ALIGNMENT")
     dssp = assign_dssp(bb)
     sses = build_sses(bb, dssp.ss, short_helices=(look or Style()).helices_310, bridges=dssp.bridges)
     sheets = build_sheets(sses, dssp.bridges)
     nucleic = load_nucleic(path, bb, assembly, model=model) if dna else None
+    if chains:
+        held = list(dict.fromkeys(st.chain for st in nucleic.strands)) if nucleic is not None else []
+        missing = [c for c in chains if c not in present and c not in held]
+        if missing:
+            have = f"protein chains {', '.join(present) or 'none'}" + (
+                f", nucleic-acid chains {', '.join(held)}" if held else ""
+            )
+            raise ValueError(f"no chain {', '.join(missing)}; the structure has {have}")
+        if any(c in held for c in chains):  # nucleic-acid chains named: only those (else every strand)
+            nucleic = nucleic_of_chains(nucleic, chains)
     sym = detect_symmetry(bb, sses, symmetry, protomers, symmetry_tol) if sses else None
     shared = _homolog_labels(bb, sses)  # copies of one protein share labels, however much of each is modelled
     if focus == "auto" and (look or Style()).highlight != "none":
@@ -969,7 +976,12 @@ def build_parser() -> argparse.ArgumentParser:
             help="large assemblies: draw one subunit in full plus what its neighbours add to its fold "
             "(auto: helical filaments, cages and assemblies over 6 chains / 160 elements)",
         )
-        q.add_argument("--chains", metavar="A,B", help="draw only these chains (e.g. one subunit of a big complex)")
+        q.add_argument(
+            "--chains",
+            metavar="A,B",
+            help="draw only these chains (e.g. one subunit of a big complex); protein and nucleic-acid chains are "
+            "each restricted only if some are named",
+        )
         q.add_argument(
             "--msa",
             metavar="ALIGNMENT",

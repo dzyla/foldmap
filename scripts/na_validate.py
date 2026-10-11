@@ -457,8 +457,8 @@ def contact_sheet(name, lay, sses, bb, fig, metrics, out: Path) -> Path:
 
 
 # per-entry make_layout options, for downloaded entries only (--files are cropped already): the ribosome is
-# drawn as its small subunit (16S rRNA and its proteins)
-OPTIONS = {"4YBB": {"assembly": "asu", "chains": [f"A{c}" for c in "BCDEFGHIJKLMNOPQRSTU"]}}
+# drawn as its small subunit (16S rRNA AA and its proteins), not the neighbouring ribosome's 23S it touches (DA)
+OPTIONS = {"4YBB": {"assembly": "asu", "chains": [f"A{c}" for c in "ABCDEFGHIJKLMNOPQRSTU"]}}
 TIMEOUT = 900  # seconds an entry may take before it is reported as a failure
 
 
