@@ -5,7 +5,7 @@ import pytest
 
 from foldmap.dssp import assign_dssp
 from foldmap.io import load_backbone
-from foldmap.model import Bridge
+from foldmap.model import Backbone, Bridge, ResLabel
 from foldmap.ss import build_sses
 from helpers import FID, pipeline
 
@@ -139,7 +139,7 @@ def test_hairpin_and_opposite_sides_are_not_joined():
 
 
 def test_globin_ab_corner_splits_the_alpha_chain_helix():
-    """2HHB α: DSSP H 4-17, G 18-20, H 21-35 with the axes 96° apart (deposited HELX_P: A 3-18, B 20-35)."""
+    """2HHB α: DSSP H 4-17, G 18-20, H 21-35 with the local axes 105° apart (deposited HELX_P: A 3-18, B 20-35)."""
     bb, sses, _ = pipeline(Path(__file__).parent / "data" / "2HHB.cif")
     ids = {s.id for s in sses}
     for c in "AC":
@@ -150,25 +150,71 @@ def test_globin_ab_corner_splits_the_alpha_chain_helix():
 
 
 def test_pi_bulge_of_a_tm_helix_stays_one_helix():
-    _, sses, _ = pipeline(Path(__file__).parent / "data" / "1C3W.cif")  # helix G: I-bulge 214-218, 22°
+    _, sses, _ = pipeline(Path(__file__).parent / "data" / "1C3W.cif")  # helix G: 201-213, I 214-218, 219-225, 9°
     assert "A:201-225" in {s.id for s in sses}
 
 
-@pytest.mark.parametrize("name", ["2HHB", "1C3W", "1TIM", "2LZM", "8UTF"])
-def test_no_helix_hides_a_kink_of_more_than_30_degrees(name):
-    import re
+def _ideal_helix(n: int, bend_after: int | None = None, bend: float = 0.0) -> Backbone:
+    """CAs of an ideal alpha helix (radius 2.3 Å, rise 1.5 Å, 100° a residue) along z; residues after bend_after
+    turned by `bend` degrees about the x axis through that residue's point on the helix axis."""
+    t = np.radians(100.0) * np.arange(n)
+    ca = np.stack([2.3 * np.cos(t), 2.3 * np.sin(t), 1.5 * np.arange(n)], axis=1)
+    if bend_after is not None:
+        c, s = np.cos(np.radians(bend)), np.sin(np.radians(bend))
+        pivot = np.array([0.0, 0.0, 1.5 * bend_after])
+        ca[bend_after + 1 :] = (ca[bend_after + 1 :] - pivot) @ np.array([[1, 0, 0], [0, c, -s], [0, s, c]]).T + pivot
+    labels = [ResLabel("A", i + 1, "", "ALA") for i in range(n)]
+    return Backbone(labels, np.repeat(ca[:, None, :], 4, axis=1), np.arange(n) > 0)
 
-    from foldmap.ss import KINK_SPLIT, _fit_axis
 
-    bb = load_backbone(Path(__file__).parent / "data" / f"{name}.cif", "asu")
-    d = assign_dssp(bb)
-    for s in build_sses(bb, d.ss, bridges=d.bridges):
-        seg = d.ss[s.start : s.end + 1]
-        hs = [(m.start() + s.start, m.end() - 1 + s.start) for m in re.finditer(r"H{4,}", seg)]
-        for (x0, x1), (y0, y1) in zip(hs, hs[1:]):
-            if set(d.ss[x1 + 1 : y0]) <= set("GI"):
-                cos = _fit_axis(bb.ca[x0 : x1 + 1]) @ _fit_axis(bb.ca[y0 : y1 + 1])
-                assert np.degrees(np.arccos(np.clip(cos, -1, 1))) <= KINK_SPLIT, s.id
+@pytest.mark.parametrize("arm", [4, 5, 8, 12])
+def test_a_pi_bulge_in_a_straight_helix_is_no_kink(arm):
+    """A straight fit through 4-5 CAs is off by up to 40°, so short arms of a straight helix looked kinked."""
+    ss = "H" * arm + "IIIII" + "H" * arm
+    assert [s.id for s in build_sses(_ideal_helix(len(ss)), ss)] == [f"A:1-{len(ss)}"]
+
+
+@pytest.mark.parametrize("bend, pieces", [(15.0, ["A:1-25"]), (45.0, ["A:1-10", "A:16-25"])])
+def test_a_bent_helix_splits_above_kink_split_only(bend, pieces):
+    ss = "H" * 10 + "IIIII" + "H" * 10
+    assert [s.id for s in build_sses(_ideal_helix(len(ss), 12, bend), ss)] == pieces
+
+
+def test_a_pi_bulge_with_short_arms_in_a_tm_helix_stays_one_helix():
+    """1PV7 B (window 70-115): H 87-90, I 91-95, H 96-100. A straight fit through the CAs puts the two arms 58°
+    apart; their local axes are 8° apart, and arms of 4-5 residues are too short to measure a kink by anyway."""
+    from foldmap.ss import KINK_SPLIT, _angle, _helix_axis
+
+    bb, sses, _ = pipeline(FID / "1PV7.cif.gz")
+    seq = {l.seq: k for k, l in enumerate(bb.labels)}
+    assert assign_dssp(bb).ss[seq[87] : seq[100] + 1] == "HHHHIIIIIHHHHH"
+    assert "B:87-100" in {s.id for s in sses}  # one helix
+    x, y = bb.ca[seq[87] : seq[90] + 1], bb.ca[seq[96] : seq[100] + 1]
+    assert _angle(_helix_axis(x), _helix_axis(y)) < KINK_SPLIT
+
+
+@pytest.mark.parametrize(
+    "path, splits",
+    [
+        ("2HHB.cif", {"A:4-17 A:21-35", "C:4-17 C:21-35"}),  # the globin AB corner, 105° and 104°
+        ("1C3W.cif", set()),  # helix G's π-bulge, 9°
+        ("8UTF.cif", set()),  # a/b/c 142-181 + 187-222 across a π-bulge, 11-12°
+        ("1TIM.cif", set()),
+        ("2LZM.cif", set()),
+        ("fidelity/1MBN.cif.gz", set()),
+        ("fidelity/1PV7.cif.gz", set()),
+    ],
+)
+def test_helix_runs_are_split_at_these_kinks_only(path, splits):
+    bb, sses, _ = pipeline(Path(__file__).parent / "data" / path)
+    ss = assign_dssp(bb).ss
+    hs = [s for s in sses if s.kind == "H"]
+    cut = {
+        f"{x.id} {y.id}"
+        for x, y in zip(hs, hs[1:])
+        if x.chain == y.chain and y.start > x.end + 1 and set(ss[x.end + 1 : y.start]) <= set("GI")
+    }
+    assert cut == splits
 
 
 def test_copies_of_one_protein_are_found_whatever_their_numbering():
@@ -198,14 +244,14 @@ def test_a_bulge_joined_in_one_copy_is_joined_in_every_copy():
 
 
 def test_a_kink_split_in_one_copy_is_split_in_every_copy(monkeypatch):
-    """2HHB α: the AB corner turns by 95.6° in chain A and 95.4° in chain C. With the split angle between the two,
-    chain C is split as chain A is."""
+    """2HHB α: the AB corner turns by 105.6° in chain A and 104.0° in chain C. With the split angle between the
+    two, chain C is split as chain A is."""
     import foldmap.ss
 
-    monkeypatch.setattr(foldmap.ss, "KINK_SPLIT", 95.5)
+    monkeypatch.setattr(foldmap.ss, "KINK_SPLIT", 104.8)
     _, sses, _ = pipeline(Path(__file__).parent / "data" / "2HHB.cif")
     ids = {s.id for s in sses}
     assert {"A:4-17", "A:21-35", "C:4-17", "C:21-35"} <= ids
-    monkeypatch.setattr(foldmap.ss, "KINK_SPLIT", 96.0)  # neither copy is split
+    monkeypatch.setattr(foldmap.ss, "KINK_SPLIT", 106.0)  # neither copy is split
     _, sses, _ = pipeline(Path(__file__).parent / "data" / "2HHB.cif")
     assert {"A:4-35", "C:4-35"} <= {s.id for s in sses}

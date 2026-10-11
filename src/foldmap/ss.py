@@ -18,6 +18,7 @@ _MIN_HELIX_ANY = 6  # ... or this many helix-class residues in total (3-10 / pi)
 _MIN_310 = 3  # an isolated 3-10 run this long becomes its own small element (kind G) when asked for
 _PARTNER_GAP = 4  # residues of a partner strand this close pair with the same side of it
 KINK_SPLIT = 30.0  # degrees: alpha segments of one helix run meeting at a 3-10/pi kink sharper than this split it
+_MIN_KINK_ARM = 7  # residues: an alpha segment shorter than this has no axis precise enough to measure a kink by
 
 
 def _runs(ss: str, classes: str, prev: np.ndarray):
@@ -89,8 +90,8 @@ def _alike(u: tuple, v: tuple) -> bool:
 
 def _join_bulged_pieces(sses: list[SSE], ss: str, bb: Backbone, bridges: list[Bridge], copies) -> list[SSE]:
     """Join strand pieces split at a beta-bulge into one strand (see _bulged), until nothing joins. Then join the
-    matching pieces of every other copy of the protein (copies() as in model.homolog_chains) whatever their gap,
-    so that identical chains are drawn alike (1EYG chain D's 4096-4102 + 4108-4111, 5 residues apart)."""
+    matching pieces of every other copy of the protein (copies() as in model.homolog_chains) up to two residues
+    further apart, so that identical chains are drawn alike (1EYG chain D's 4096-4102 + 4108-4111, 5 apart)."""
     partners = _partners(bridges)
     joined: list[tuple] = []  # the pairs of pieces joined so far, as _span
     for shared in (False, True):
@@ -104,7 +105,7 @@ def _join_bulged_pieces(sses: list[SSE], ss: str, bb: Backbone, bridges: list[Br
                     i
                     for i in pairs
                     if any(_alike(_span(bb, copies(), *_ends(strands[i : i + 2])), u) for u in joined)
-                    and _bulged(i, strands, table, ss, bb, partners, max_gap=len(ss))
+                    and _bulged(i, strands, table, ss, bb, partners, max_gap=_SPLIT_GAP + 2)
                 )
             else:
                 found = (i for i in pairs if _bulged(i, strands, table, ss, bb, partners))
@@ -135,12 +136,27 @@ def _angle(u: np.ndarray, v: np.ndarray) -> float:
     return float(np.degrees(np.arccos(np.clip(u @ v, -1.0, 1.0))))
 
 
+def _helix_axis(ca: np.ndarray) -> np.ndarray:
+    """The local axis of an alpha segment, N -> C (Kahn 1989): at each inner CA the bisector of its two CA-CA
+    vectors points at the axis, so the cross product of successive bisectors runs along it; their mean. A straight
+    fit through the CAs of a short segment is off by up to 40 degrees."""
+    b = (ca[:-2] - ca[1:-1]) + (ca[2:] - ca[1:-1])
+    along = np.cross(b[:-1], b[1:])
+    along /= np.linalg.norm(along, axis=1)[:, None]
+    along *= np.where(along @ (ca[-1] - ca[0]) < 0, -1.0, 1.0)[:, None]
+    m = along.mean(axis=0)
+    return m / np.linalg.norm(m)
+
+
 def _kinks(a: int, b: int, ss: str, bb: Backbone) -> list[tuple[tuple[int, int], tuple[int, int], float]]:
-    """Consecutive alpha segments (H runs of _MIN_HELIX_H or more) of helix run a..b that meet through 3-10/pi
-    residues only, with the angle between their axes in degrees."""
-    hs = [(m.start() + a, m.end() - 1 + a) for m in re.finditer(f"H{{{_MIN_HELIX_H},}}", ss[a : b + 1])]
-    axis = lambda h: _fit_axis(bb.ca[h[0] : h[1] + 1])  # noqa: E731
-    return [(x, y, _angle(axis(x), axis(y))) for x, y in zip(hs, hs[1:]) if set(ss[x[1] + 1 : y[0]]) <= set("GI")]
+    """Consecutive alpha segments (H runs) of helix run a..b, both at least _MIN_KINK_ARM long, that meet through
+    3-10/pi residues only, with the angle between their local axes in degrees (snapped to 1e-4, so noise in the
+    fit never decides a comparison with KINK_SPLIT)."""
+    hs = [(m.start() + a, m.end() - 1 + a) for m in re.finditer(f"H{{{_MIN_KINK_ARM},}}", ss[a : b + 1])]
+    axis = lambda h: _helix_axis(bb.ca[h[0] : h[1] + 1])  # noqa: E731
+    return [
+        (x, y, round(_angle(axis(x), axis(y)), 4)) for x, y in zip(hs, hs[1:]) if set(ss[x[1] + 1 : y[0]]) <= set("GI")
+    ]
 
 
 def _split_kinks(a: int, b: int, cuts) -> tuple[list[tuple[int, int]], list[int]]:
@@ -161,7 +177,7 @@ def build_sses(bb: Backbone, ss: str, short_helices: bool = False, bridges: list
     split at a beta-bulge are joined into one strand (without them, strands stay as DSSP runs). A helix run is
     split where two of its alpha segments meet through 3-10/pi residues at more than KINK_SPLIT degrees (the
     globin AB corner; _kinks). A kink split or a bulge join in one copy of a protein is made in its other copies
-    too, whatever their angle or gap, so that identical chains are drawn alike."""
+    too, whatever their angle and up to two residues further apart, so that identical chains are drawn alike."""
     copies = functools.cache(lambda: homolog_chains(bb))  # computed only when some copy splits or joins
     out = [_sse("E", bb, a, b) for a, b in _runs(ss, "E", bb.prev) if b - a + 1 >= _MIN_STRAND]
     helices = [

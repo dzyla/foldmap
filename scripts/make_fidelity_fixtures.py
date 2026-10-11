@@ -7,7 +7,8 @@
     python scripts/make_fidelity_fixtures.py 1TEN 7TIM     # only these fixtures
 
 Waters and hydrogens are dropped, and the water subchains leave the assembly generators (gemmi cannot build from a
-subchain the file lacks); nothing else is trimmed (chains, ligands, assembly records, helix and sheet records stay).
+subchain the file lacks); nothing else is trimmed (chains, ligands, assembly records, helix and sheet records stay),
+except for the entries in WINDOWS, cut down to one stretch of one chain.
 Files are written gzipped, outside tests/data/*.cif, so scripts/bench.py never reads them.
 """
 
@@ -28,7 +29,9 @@ ENTRIES = {
     "2ACY": "acylphosphatase: a ferredoxin-like fold with a helix over the sheet",
     "1MBN": "myoglobin: all helical, with a haem",
     "7TIM": "triosephosphate isomerase: a TIM barrel",
+    "1PV7": "lactose permease, chain B 70-115 only: a pi-bulge in a straight TM helix (H 87-90, I 91-95, H 96-100)",
 }
+WINDOWS = {"1PV7": ("B", 70, 115)}  # chain, first and last residue kept (DSSP of the window matches the full chain)
 
 
 def _fetch(pdb: str, src: Path | None) -> str:
@@ -38,10 +41,19 @@ def _fetch(pdb: str, src: Path | None) -> str:
         return r.read().decode("utf-8")
 
 
-def build(text: str) -> bytes:
+def build(text: str, window: tuple[str, int, int] | None = None) -> bytes:
     st = gemmi.read_structure_string(text)
     st.remove_waters()
     st.remove_hydrogens()
+    if window:
+        chain, lo, hi = window
+        for model in st:
+            for name in [c.name for c in model if c.name != chain]:
+                model.remove_chain(name)
+            for c in model:
+                for i in reversed(range(len(c))):
+                    if not lo <= c[i].seqid.num <= hi:
+                        del c[i]
     kept = {r.subchain for c in st[0] for r in c}
     for assembly in st.assemblies:  # gemmi refuses to build from a subchain the file no longer has (the waters)
         for g in assembly.generators:
@@ -60,7 +72,7 @@ def main(argv=None) -> int:
     OUT.mkdir(parents=True, exist_ok=True)
     total = 0
     for pdb in args.names or ENTRIES:
-        data = build(_fetch(pdb, args.src))
+        data = build(_fetch(pdb, args.src), WINDOWS.get(pdb))
         (OUT / f"{pdb}.cif.gz").write_bytes(data)
         total += len(data)
         print(f"{pdb}.cif.gz: {len(data) / 1024:.0f} KB")
