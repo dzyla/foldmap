@@ -548,6 +548,24 @@ def outside_own(pts, own) -> list[tuple[float, float]]:
     return out if len(out) > 1 else [out[0], out[0]]
 
 
+def _trace_clear(router: _Router, layout: Layout, s: int, pts) -> bool:
+    """Is strand s's trace (drawn at its projected place) clear of every element but those that touch it, and the
+    sheets holding them? A single strand lies on the protein it wraps (1EYG's ssDNA over the SSB tetramer; layout
+    keeps the others off it)."""
+    na = layout.nucleic
+    touching = {
+        p.sse.id
+        for p in layout.placed.values()
+        if any(x[0] == s for r in range(p.sse.start, p.sse.end + 1) for x in na.contacts.get(r, ()))
+    }
+    for block in layout.sheets:  # a sheet is placed whole: all its strands lie where its touching ones do
+        if touching & set(block):
+            touching |= set(block)
+    rects, owners = router.elements
+    keep = [k for k, o in enumerate(owners) if o not in touching]
+    return _clear(_xy(pts), (), rects[:, keep], [owners[k] for k in keep], own_body=True)
+
+
 def _na_clear(pts, own, elements) -> bool:
     """A strand drawn clear of every element and stem (by _clear), from where it leaves its own stems."""
     return _clear(outside_own(pts, own), own, *elements, own_body=True)
@@ -600,7 +618,8 @@ def route_nucleic(layout: Layout, router: _Router | None = None, loops=()) -> li
         n = len(strand)
         if s in layout.na_traces:
             pts = _xy(layout.na_traces[s])
-            fix((s, -1), checked(NAPath("trace", s, list(range(n)), pts, pts), ()))
+            trace = NAPath("trace", s, list(range(n)), pts, pts, fallback=not _trace_clear(router, layout, s, pts))
+            fix((s, -1), trace)
             for label, a, b in (("5′", pts[0], pts[1]), ("3′", pts[-1], pts[-2])):
                 v = np.subtract(a, b)
                 v = v / max(float(np.hypot(*v)), 1e-9)

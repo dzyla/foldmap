@@ -1806,6 +1806,8 @@ def test_a_single_strand_wrapped_over_its_protein_keeps_the_protein_under_it():
         if gap.min() > 6.0:
             far.append((p.sse.id, round(float(gap.min()), 1)))
     assert not far
+    # and the traces lying on the protein they touch are no routing fallbacks (route_na._trace_clear)
+    assert not [p.strand for p in lay.na_paths if p.kind == "trace" and p.fallback]
 
 
 def test_a_chain_break_with_one_end_not_drawn_is_a_short_break_mark(monkeypatch):
