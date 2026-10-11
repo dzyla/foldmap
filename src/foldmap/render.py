@@ -171,7 +171,9 @@ def backbone_colours(
 ) -> tuple[dict[str, str], dict[str, str]]:
     """(nucleic-acid chain -> backbone colour, protein chain -> loop colour override) for this figure: the
     na_backbone mode, then `backbone_colors` (a modality key, then a chain key). Shared by every nucleic-acid
-    style and the protein loops. Raises ValueError naming backbone_colors for a chain the figure lacks."""
+    style and the protein loops. Raises ValueError naming backbone_colors for a chain the figure lacks.
+    Every colour goes through `_legible`: on a dark page a user-given colour that is too dark is lightened (on a
+    light page one that is too pale is darkened); colours that already stand out are used exactly as given."""
     over = backbone_overrides(look.backbone_colors)
     strands = layout.nucleic.strands if layout.nucleic is not None else []
     rna = {s.chain: s.rna for s in reversed(strands)}  # a chain's first strand decides its modality
@@ -454,7 +456,7 @@ def _draw_nucleic(
     font: float,
     pt_per_unit: float,
     look: Style,
-    colors: dict[str, str],
+    backbone: dict[str, str],
 ) -> None:
     """Stems in the chosen na_style, single strands along their drawn paths, base letters, contact beads in
     the touching protein chain's colour, isolated pairs as bars, cropped gaps and the 5'/3' ends."""
@@ -468,7 +470,7 @@ def _draw_nucleic(
         font,
         gu,
         [s.chain for s in na.strands],
-        backbone_colours(layout, _chains_in_order(sses), look, colors)[0],
+        backbone,
     )
     style = _na_style(layout, look)
     where: dict[tuple[int, int], np.ndarray] = {}  # nucleotide -> where it is drawn (its bead goes there)
@@ -1418,6 +1420,7 @@ class _Canvas:
     pad: float
     content: tuple[float, float, float, float]  # x0, y0, x1, y1: elements, marks, at least one legend entry wide
     page: tuple[float, float, float, float]  # xmin, xmax, ymin, ymax
+    backbone: tuple[dict[str, str], dict[str, str]]  # backbone_colours: nucleic-acid chains, protein loop overrides
 
 
 class _Legend(NamedTuple):
@@ -1447,7 +1450,9 @@ def _empty_figure() -> Figure:
     return fig
 
 
-def _legend_entries(layout: Layout, look: Style, chains: list[str], colors: dict[str, str], umarks) -> list:
+def _legend_entries(
+    layout: Layout, look: Style, chains: list[str], colors: dict[str, str], umarks, na_colours: dict[str, str]
+) -> list:
     entries = [(colors[c], f"Chain {c}") for c in chains]
     if layout.focus is not None:
         entries = [(colors[c], f"Chain {c}") for c in chains if c in layout.focus]
@@ -1474,7 +1479,6 @@ def _legend_entries(layout: Layout, look: Style, chains: list[str], colors: dict
     if layout.nucleic is not None and layout.nucleic.strands and look.legend:
         strands = layout.nucleic.strands
         ids = sorted({s.chain for s in strands})
-        na_colours = backbone_colours(layout, chains, look, colors)[0]
         groups: dict[str, list] = {}  # one entry per backbone colour: the chains drawn in it
         for chain in ids:
             groups.setdefault(na_colours[chain], []).append(chain)
@@ -1496,7 +1500,8 @@ def _canvas(
         x0, y0, x1, y1 = min(x0, cx - hw), min(y0, cy - hh), max(x1, cx + hw), max(y1, cy + hh)
     pad = 1.0
     top = 1.9 if title else 0.0
-    entries = _legend_entries(layout, look, chains, colors, umarks)
+    backbone = backbone_colours(layout, chains, look, colors)  # once per figure
+    entries = _legend_entries(layout, look, chains, colors, umarks, backbone[0])
 
     def legend_entry(x1: float) -> float:  # one legend entry's width in page units: swatch, text, gap
         scale = min(_IN_PER_UNIT, _MAX_WIDTH_IN / (x1 - x0 + 2 * pad))  # as the figure below
@@ -1542,6 +1547,7 @@ def _canvas(
         pad,
         (x0, y0, x1, y1),
         (xmin, xmax, ymin, ymax),
+        backbone,
     )
     return canvas, _Legend(entries, entry, per_row, legend_h)
 
@@ -1551,7 +1557,7 @@ def _draw_loops(c: _Canvas, layout: Layout, loops: list[Loop], sses: list[SSE]) 
     boxes = np.array([p.rect for p in [*layout.placed.values(), *layout.ghosts]]).reshape(-1, 4)  # none: DNA only
     boxes = boxes + [1e-6, 1e-6, -1e-6, -1e-6]
     sse_by_id = {s.id: s for s in sses}
-    over = backbone_colours(layout, _chains_in_order(sses), c.look, c.colors)[1]
+    over = c.backbone[1]
     for i, loop in enumerate(loops):
         if loop.fallback:  # already a smooth curve
             path = _polyline(loop.points)
@@ -1877,7 +1883,7 @@ def _draw_ghosts(c: _Canvas, layout: Layout) -> None:
 def _draw_termini(c: _Canvas, layout: Layout, sses: list[SSE]) -> None:
     """The N and C terminal stubs, their letters and long-tail lengths."""
     groups = group_by_chain(sses)
-    over = backbone_colours(layout, _chains_in_order(sses), c.look, c.colors)[1]
+    over = c.backbone[1]
     for end, chain, port, ex in termini(layout, sses):
         tip = (port[0] + ex[0] * END_STUB, port[1] + ex[1] * END_STUB)
         ink = over.get(chain, c.look.ink)
@@ -2003,7 +2009,9 @@ def _draw(
     _draw_domains(c, layout)
     _draw_sheet_panels(c, layout)
     if layout.stems or layout.na_paths:
-        _draw_nucleic(c.ax, layout, sses, c.residue_colour, c.look.fill, c.lw, c.font, c.pt_per_unit, c.look, c.colors)
+        _draw_nucleic(
+            c.ax, layout, sses, c.residue_colour, c.look.fill, c.lw, c.font, c.pt_per_unit, c.look, c.backbone[0]
+        )
     _draw_elements(c, layout)
     _draw_links(c.ax, layout, loops, sses, look, c.lw, c.pt_per_unit)
     _draw_ligands(c.ax, marks, c.lw, c.font)

@@ -382,15 +382,21 @@ def test_pale_fill_reaches_strands_too(ubq):
 
 
 def test_backbone_colour_delta_e_matches_published_reference_pairs():
-    """CIEDE2000 on Sharma et al.'s pairs (black/white 100, red/green 86.6)."""
-    from foldmap.palette import delta_e
+    """CIEDE2000 on Sharma, Wu and Dalal (2005), Lab inputs from their table (pairs 1, 2 and 7), plus sRGB ends."""
+    from foldmap.palette import delta_e, delta_e_lab
 
+    assert delta_e_lab((50, 2.6772, -79.7751), (50, 0, -82.7485)) == pytest.approx(2.0425, abs=1e-4)
+    assert delta_e_lab((50, 3.1571, -77.2803), (50, 0, -82.7485)) == pytest.approx(2.8615, abs=1e-4)
+    assert delta_e_lab((50, 2.5, 0), (73, 25, -18)) == pytest.approx(27.1492, abs=1e-4)
     assert delta_e("#ffffff", "#ffffff") == 0
     assert delta_e("#ffffff", "#000000") == pytest.approx(100.0, abs=0.01)
     assert delta_e("#ff0000", "#00ff00") == pytest.approx(86.6, abs=0.5)
 
 
-@pytest.mark.parametrize("theme", list(THEMES))
+GREYSCALE = [t for t, look in THEMES.items() if look.palette == "greys"]
+
+
+@pytest.mark.parametrize("theme", [t for t in THEMES if t not in GREYSCALE])
 def test_every_theme_backbone_default_is_distinct_from_ink_and_the_first_eight_chain_colours(theme):
     from foldmap.palette import PALETTES, delta_e
 
@@ -399,6 +405,21 @@ def test_every_theme_backbone_default_is_distinct_from_ink_and_the_first_eight_c
     for colour in (look.dna_color, look.rna_color):
         assert min(delta_e(colour, other) for other in [look.ink, *chains]) >= 15, (theme, colour)
     assert delta_e(look.dna_color, look.rna_color) >= 15
+
+
+@pytest.mark.parametrize("theme", GREYSCALE)
+def test_greyscale_themes_keep_nucleic_acid_in_two_distinct_greys(theme):
+    """A grey palette cannot keep a grey clear of all its chain greys, so such themes ask only that the two
+    nucleic-acid greys differ from the ink and from each other, and stay grey."""
+    from foldmap.palette import delta_e
+
+    look = THEMES[theme]
+    for colour in (look.dna_color, look.rna_color):
+        r, g, b = (int(colour[i : i + 2], 16) for i in (1, 3, 5))
+        assert r == g == b, (theme, colour)
+        assert delta_e(colour, look.ink) >= 15
+    assert delta_e(look.dna_color, look.rna_color) >= 15
+    assert (THEMES["print"].dna_color, THEMES["print"].rna_color) == ("#4d4d4d", "#808080")
 
 
 def test_backbone_keys_round_trip_through_set_style_file_and_layout_file(tmp_path):

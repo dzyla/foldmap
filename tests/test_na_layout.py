@@ -763,15 +763,14 @@ def test_na_backbone_chain_gives_each_chain_its_own_colour_avoiding_protein_chai
 
 def test_backbone_colors_chain_beats_modality_and_recolours_protein_loops():
     fig = _fig(LMB, "backbone_colors=3=#1f77b4,dna=#555555,2=crimson")
-    ax = fig.axes[0]
-    by_chain = {}
-    for p in ax.patches:
-        if (p.get_gid() or "").endswith(":rails"):
-            by_chain[p.get_gid()] = to_hex(p.get_edgecolor())
-    assert set(by_chain.values()) <= {"#555555", "#dc143c"} and {"#555555", "#dc143c"} <= set(
-        to_hex(a.get_color()) for a in ax.lines if (a.get_gid() or "").startswith("na:run:")
-    ) | set(by_chain.values())
-    assert "#1f77b4" in _loop_colours(fig) and "#000000" in _loop_colours(fig)  # chain 3 blue, chain 4 untouched
+    lay, sses, bb = make_layout(LMB)
+    route_loops(lay, sses, bb)  # routes the strands: lay.na_paths
+    chain_of = {i: s.chain for i, s in enumerate(lay.nucleic.strands)}
+    runs = {chain_of[p.strand]: to_hex(a.get_color()) for p, a in zip(lay.na_paths, _gid(fig, "na:run:"))}
+    assert runs == {"1": "#555555", "2": "#dc143c"}  # chain 2 beats dna; chain 1 takes the modality colour
+    rails = {to_hex(p.get_edgecolor()) for p in _gid(fig, "na:stem:") if ":rails" in p.get_gid()}
+    assert rails == {"#555555", "#dc143c"}
+    assert _loop_colours(fig) == {"#1f77b4", "#000000"}  # chain 3 blue, chain 4 untouched
 
 
 def test_backbone_colors_protein_key_recolours_every_protein_chain():
@@ -800,9 +799,13 @@ def test_the_legend_entry_for_nucleic_acid_uses_the_backbone_colour():
 
     lay, _, _ = make_layout(LMB)
     colors = chain_colors(["3", "4"])
-    assert ("#8c564b", "DNA (1, 2)") in render._legend_entries(lay, Style(), ["3", "4"], colors, [])
+    assert ("#8c564b", "DNA (1, 2)") in render._legend_entries(
+        lay, Style(), ["3", "4"], colors, [], {"1": "#8c564b", "2": "#8c564b"}
+    )
     look = resolve_style(None, None, ["backbone_colors=dna=#555555"])
-    assert ("#555555", "DNA (1, 2)") in render._legend_entries(lay, look, ["3", "4"], colors, [])
+    assert ("#555555", "DNA (1, 2)") in render._legend_entries(
+        lay, look, ["3", "4"], colors, [], {"1": "#555555", "2": "#555555"}
+    )
 
 
 def test_colours_never_move_the_layout():

@@ -57,10 +57,15 @@ def _lab(colour: str) -> tuple[float, float, float]:
 
 def delta_e(a: str, b: str) -> float:
     """CIEDE2000 colour difference between two colours (Sharma, Wu, Dalal 2005)."""
+    return delta_e_lab(_lab(a), _lab(b))
+
+
+def delta_e_lab(lab1: tuple[float, float, float], lab2: tuple[float, float, float]) -> float:
+    """CIEDE2000 between two L*a*b* colours."""
     import math
 
-    l1, a1, b1 = _lab(a)
-    l2, a2, b2 = _lab(b)
+    l1, a1, b1 = lab1
+    l2, a2, b2 = lab2
     c1, c2 = math.hypot(a1, b1), math.hypot(a2, b2)
     g = 0.5 * (1 - math.sqrt(((c1 + c2) / 2) ** 7 / (((c1 + c2) / 2) ** 7 + 25**7)))
     a1p, a2p = (1 + g) * a1, (1 + g) * a2

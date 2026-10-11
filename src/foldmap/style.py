@@ -149,7 +149,9 @@ class Style:
 THEMES = {
     "publication": Style(),
     "minimal": Style(fill="outline", helix_shading="none", loop_width=0.8, na_style="block"),
-    "print": Style(palette="greys", fill="pale", helix_shading="none", na_style="block"),
+    "print": Style(
+        palette="greys", fill="pale", helix_shading="none", na_style="block", dna_color="#4d4d4d", rna_color="#808080"
+    ),
     "presentation": Style(loop_width=1.6, font_scale=1.4, helix_shading="gloss", loops="curved", na_style="ribbon"),
     "cartoon": Style(loops="curved", helix_shading="gloss", palette="tol-bright", na_style="ribbon"),
     "rainbow": Style(color_by="sequence", helix_shading="gloss"),
