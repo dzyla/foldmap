@@ -66,7 +66,13 @@ UNMEASURED = {
     "1RVA": {"spearman", "procrustes"},
     "4LD0": {"spearman"} | BENDS,
 }
-METRICS = sorted(set(LIMITS) | set(CAMPAIGN) | BENDS | CONTACT | {"stems_drawn", "procrustes", "na_protein_crossings"})
+METRICS = sorted(
+    set(LIMITS)
+    | set(CAMPAIGN)
+    | BENDS
+    | CONTACT
+    | {"stems_drawn", "procrustes", "na_protein_crossings", "na_run_crossings"}
+)
 
 
 @pytest.fixture(scope="module", params=FIXTURES)
@@ -203,6 +209,27 @@ def test_planted_crossings_are_counted():
         lay.na_paths.append(planted)
         assert na_crossings(lay, loops)["na_crossings"] == base + 1
         lay.na_paths.pop()
+
+
+def test_runs_crossing_runs_are_counted_and_reported_only():
+    """na_run_crossings: pairs of runs, joints and gaps that cross at least once (the two strands of one joint, which
+    may cross where the duplex carries on, excepted). Reported, not judged (THRESHOLDS None)."""
+    import copy
+
+    lay, _, _, loops, _, _ = _drawn("4OO8")
+    base = na_crossings(lay, loops)
+    run = next(p for p in lay.na_paths if p.kind == "run" and len(p.points) > 3)
+    a, b = np.asarray(run.points[1]), np.asarray(run.points[2])
+    mid, normal = (a + b) / 2, np.array([a[1] - b[1], b[0] - a[0]]) / np.hypot(*(b - a))
+    planted = copy.copy(run)
+    end = tuple(mid + 0.2 * normal)
+    planted.points, planted.between = [tuple(mid - 0.2 * normal), tuple(mid - 0.1 * normal), end, end], ()
+    lay.na_paths.append(planted)
+    after = na_crossings(lay, loops)
+    lay.na_paths.pop()
+    assert after["na_run_crossings"] == base["na_run_crossings"] + 1
+    assert after["na_crossings"] == base["na_crossings"]
+    assert THRESHOLDS["na_run_crossings"] is None and not judge({"na_run_crossings": 99})
 
 
 def test_a_run_through_its_own_stem_is_counted():

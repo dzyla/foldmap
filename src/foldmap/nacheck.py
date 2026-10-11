@@ -314,6 +314,7 @@ THRESHOLDS = {
     "na_crossings": 0,  # runs, joints and gaps crossing hairpin arcs, free ends or stem bodies
     "bead_overlaps": 0,  # contact beads overlapping one another
     "gap_label_collisions": 0,  # "... N nt ..." labels on each other, a stem, element, letter, bead or path
+    "na_run_crossings": None,  # runs, joints and gaps crossing one another: reported, not judged
     "na_protein_crossings": None,  # nucleic-acid paths crossing protein loops: reported, not judged
     "seconds": 120.0,
 }
@@ -542,18 +543,40 @@ def _trimmed(lay) -> list[np.ndarray]:
 
 
 def na_crossings(lay, loops) -> dict:
-    """Crossings of the drawn nucleic-acid strands, each strand trimmed to where it leaves its own stems (as
-    drawn among the elements): na_crossings, (run, joint or gap path, hairpin arc or free end) pairs crossing at
-    least once plus (such a path, stem) pairs where it runs through the stem's body; na_protein_crossings,
-    (nucleic-acid path, protein loop) pairs crossing at least once."""
+    """Crossings of the drawn nucleic-acid strands, each strand as drawn among the elements (_trimmed: a run or joint
+    from its stems' end faces): na_crossings, (run, joint or gap path, hairpin arc or free end) pairs crossing at
+    least once plus (such a path, stem) pairs where it runs through the stem's body, its own stems included;
+    na_run_crossings, pairs of runs, joints and gaps crossing at least once, except the two strands of one joint
+    (they may cross where the duplex carries on, as along a helix); na_protein_crossings, (nucleic-acid path,
+    protein loop) pairs crossing at least once."""
     drawn = list(zip(lay.na_paths, _trimmed(lay)))
-    moving = [seg for p, seg in drawn if p.kind in ("run", "joint", "gap")]
+    moving = [(p, seg) for p, seg in drawn if p.kind in ("run", "joint", "gap")]
     fixed = [seg for p, seg in drawn if p.kind in ("hairpin", "tail")]
     through = sum(
-        1 for seg in moving if len(seg) for d in lay.stems if _boxes_meet(_span(seg), d.rect) and _through_stem(seg, d)
+        1
+        for _, seg in moving
+        if len(seg)
+        for d in lay.stems
+        if _boxes_meet(_span(seg), d.rect) and _through_stem(seg, d)
+    )
+    at = {key: d.id for d in lay.stems for key in d.axial}
+
+    def joins(p):  # the two pieces a joint joins
+        return frozenset(at.get(k) for k in p.between) if p.kind == "joint" else None
+
+    runs = sum(
+        1
+        for k, (p, a) in enumerate(moving)
+        for q, b in moving[k + 1 :]
+        if len(a)
+        and len(b)
+        and (joins(p) is None or joins(p) != joins(q))
+        and _boxes_meet(_span(a), _span(b))
+        and _crossings(a, b)
     )
     return {
-        "na_crossings": _cross_count(moving, fixed) + through,
+        "na_crossings": _cross_count([seg for _, seg in moving], fixed) + through,
+        "na_run_crossings": runs,
         "na_protein_crossings": _cross_count([seg for _, seg in drawn], [_segments(l.points) for l in loops]),
     }
 
@@ -564,11 +587,11 @@ def render_checks(lay, loops, fig, sses, *, model=None, bb=None) -> dict:
     letter_overlaps (base letters overlapping by more than a third of the smaller glyph box), beads_missing,
     bead_colour_wrong, beads_false and beads_unmatched (verify_contacts on the figure's beads: unbeaded contacts
     counted as defects, beads not in their toucher's chain colour, beads no atoms back, beads naming a residue or
-    nucleotide the model lacks), fallbacks (loop and nucleic-acid routes with no clear way), na_crossings and
-    na_protein_crossings (see na_crossings), bead_overlaps (pairs of contact beads whose discs overlap at their
-    drawn size) and gap_label_collisions ("… N nt …" labels overlapping another one, or meeting a stem's or an
-    element's body, a base letter, a contact bead, a nucleic-acid path other than their own (outside its own stems)
-    or a protein loop: one per label and thing it meets).
+    nucleotide the model lacks), fallbacks (loop and nucleic-acid routes with no clear way), na_crossings,
+    na_run_crossings and na_protein_crossings (see na_crossings), bead_overlaps (pairs of contact beads whose discs
+    overlap at their drawn size) and gap_label_collisions ("… N nt …" labels overlapping another one, or meeting a
+    stem's or an element's body, a base letter, a contact bead, a nucleic-acid path other than their own (outside its
+    own stems) or a protein loop: one per label and thing it meets).
     The bead checks against the coordinates need the io.read_model result and the Backbone the figure was drawn
     from; without them they are None (not measured)."""
     from matplotlib.backends.backend_agg import FigureCanvasAgg

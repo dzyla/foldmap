@@ -586,6 +586,7 @@ def main(argv=None) -> int:
         "letter_overlaps",
         "fallbacks",
         "na_crossings",
+        "na_run_crossings",
         "na_protein_crossings",
         "bead_overlaps",
         "gap_label_collisions",
