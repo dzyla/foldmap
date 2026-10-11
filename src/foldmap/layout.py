@@ -916,7 +916,8 @@ def _stem_item(piece: Stem, na: Nucleic, frame: Frame, flat: bool, width: float 
     angle = 0.0 if flat or np.linalg.norm(a2) < 1e-6 else float(_snap(np.arctan2(a2[1], a2[0])))
     # the first arm on the side it is seen on: its mean C1' against the second arm's, the side that fits the
     # projection best, so the drawing turns the stem, never mirrors it (seen nearly on top of each other, the
-    # two arms fit about equally either way)
+    # two arms fit about equally either way). Not the outermost pair's C1'-C1' line: it turns with the helical
+    # twist, so its side depends on where in the turn the stem starts.
     across = np.mean([na.strands[a].c1[i] for i in range(i0, i1 + 1)], axis=0) - np.mean(
         [na.strands[b].c1[j] for j in range(j0, j1 + 1)], axis=0
     )
