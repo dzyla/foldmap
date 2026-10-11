@@ -471,3 +471,35 @@ def test_a_plain_frame_is_measured_as_drawn():
     from foldmap.nacheck import measuring_frame
 
     assert measuring_frame(lay) is lay.frame
+
+
+def _score_synthetic(ours_ij, theirs_ij, n=80):
+    from foldmap.model import NAStrand, ResLabel
+    from foldmap.nucleic import BasePair
+
+    nv = _na_validate()
+    strand = NAStrand("A", [ResLabel("A", k + 1, "", "G") for k in range(n)], np.zeros((n, 3)), np.zeros((n, 3)), True)
+    where = {(0, i): ("", ("A", i + 1, "")) for i in range(n)}
+    ours = [BasePair(0, i, 0, j, "WC") for i, j in ours_ij]
+    theirs = {frozenset((("A", i + 1, ""), ("A", j + 1, ""))) for i, j in theirs_ij}
+    return nv._score([strand], ours, theirs, where, drawn_only=True)
+
+
+def test_stem_recall_matches_a_stem_by_most_of_its_pairs():
+    """M4, 5F9R: RNApolis' A29-36/51-58 against foldmap's A29-38/49-58, which carries on across a 1x1 mismatch
+    (A38·A49, the better pair by its geometry): every reference pair is drawn, yet the old rule (both arms' ends
+    within one nucleotide) failed it. A stem is matched by a foldmap stem holding at least half its pairs."""
+    stem = [(28 + k, 57 - k) for k in range(8)]
+    m = _score_synthetic([*stem, (37, 48)], stem)
+    assert (m["stems_reference"], m["stem_recall"]) == (1, 1.0)
+    m = _score_synthetic(stem[:3], stem)  # three of eight: not the same stem
+    assert m["stem_recall"] == 0.0
+
+
+def test_stem_recall_leaves_out_reference_pairs_closing_too_short_a_loop():
+    """M4, 5F9R: C73·G76 closes a 2-nt loop, which no foldmap pair may (MIN_LOOP): it does not make a reference
+    stem of the isolated pair stacked on it."""
+    m = _score_synthetic([], [(70, 76), (72, 75)])
+    assert m["stems_reference"] == 0 and m["pairs_reference"] == 2
+    m = _score_synthetic([(20, 40), (21, 39)], [(20, 40), (21, 39), (70, 76), (72, 75)])
+    assert (m["stems_reference"], m["stem_recall"]) == (1, 1.0)

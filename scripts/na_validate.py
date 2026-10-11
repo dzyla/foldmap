@@ -13,7 +13,8 @@ Without it the pairing columns are empty and the other checks still run.
 
 For every entry it measures
   pairing   foldmap's canonical and wobble pairs against RNApolis (run from its own venv): precision, recall, F1;
-            stems against stems grouped the same way from the RNApolis pairs
+            stems against stems grouped the same way from the RNApolis pairs (none closing a loop under
+            MIN_LOOP), each matched by a foldmap stem holding at least half its pairs
   shape     drawn stem centres against the 3D centres: Spearman rho of pairwise distances, similarity-Procrustes
             RMSD (no reflection) normalised by the spread; stem angle against the projected 3D axis; bends between
             the pieces of a bent duplex; whether any stem's arms are drawn mirrored
@@ -53,7 +54,7 @@ from foldmap.fetch import fetch  # noqa: E402
 from foldmap.io import _nucleic_strands, read_model  # noqa: E402
 from foldmap.layout import SCALE, stem_pieces  # noqa: E402
 from foldmap.nacheck import THRESHOLDS, contacts, judge, render_checks, shape  # noqa: E402
-from foldmap.nucleic import BasePair, pair_nucleotides, secondary_structure, stem_axis  # noqa: E402
+from foldmap.nucleic import MIN_LOOP, BasePair, pair_nucleotides, secondary_structure, stem_axis  # noqa: E402
 from foldmap.palette import chain_colors  # noqa: E402
 from foldmap.render import draw, save  # noqa: E402
 from foldmap.route import route_loops  # noqa: E402
@@ -215,20 +216,22 @@ def _score(strands, ours, theirs: set[frozenset], where: dict, drawn_only: bool,
     prec = tp / len(mine) if mine else 1.0
     rec = tp / (len(expected) + absent) if expected or absent else 1.0
     f1 = 2 * prec * rec / (prec + rec) if prec + rec else 0.0
-    # stems: group the expected reference pairs exactly as foldmap groups its own, then match arms within one
-    # nucleotide
+    # stems: group the expected reference pairs exactly as foldmap groups its own, leaving out a pair closing a loop
+    # foldmap may not (MIN_LOOP: 5F9R C73·G76 closes 2 nt), then match a reference stem by a foldmap stem holding
+    # at least half its pairs (an end rule failed a stem foldmap carries on across a 1x1 mismatch: 5F9R A29-38)
     ref_pairs = []
     for xy in sorted(expected, key=sorted):
         x, y = sorted(xy)
-        ref_pairs.append(BasePair(x[0], x[1], y[0], y[1], "WC"))
+        if x[0] != y[0] or y[1] - x[1] > MIN_LOOP:
+            ref_pairs.append(BasePair(x[0], x[1], y[0], y[1], "WC"))
     ref = secondary_structure(strands, ref_pairs).stems
     got = secondary_structure(strands, ours).stems
 
-    def span(st):
-        return st.arm5, st.arm3
+    def steps(st):
+        return {(p.a, p.i, p.b, p.j) for p in st.pairs}
 
-    def close(a, b):
-        return all(x[0] == y[0] and abs(x[1] - y[1]) <= 1 and abs(x[2] - y[2]) <= 1 for x, y in zip(span(a), span(b)))
+    def close(r, g):
+        return 2 * len(steps(r) & steps(g)) >= len(r)
 
     def named(xy):  # a drawn pair as [[chain, number, icode], ...], chains as drawn
         return sorted([strands[s].chain, strands[s].labels[i].seq, strands[s].labels[i].icode] for s, i in xy)
