@@ -1,6 +1,7 @@
 """Hydrogen bonds from the coordinates (foldmap.hbonds): known interactions found, selections honoured, waters
 ignored, output deterministic and fast."""
 
+import math
 import os
 import subprocess
 import sys
@@ -11,6 +12,7 @@ from pathlib import Path
 import gemmi
 import pytest
 
+from foldmap import hbonds
 from foldmap.hbonds import HBond, Selection, find_hbonds, parse_selection
 from foldmap.io import read_model
 
@@ -52,6 +54,7 @@ LAMBDA_SIDE_CHAIN_TO_BASE = {
     ("3:SER45 OG", "2:DG36 O6", 2.60),
     ("3:SER45 OG", "2:DG37 O6", 2.99),
     ("1:DC5 N4", "3:SER45 OG", 3.04),
+    ("4:SER45 OG", "1:DG16 O6", 2.88),
     ("4:SER45 OG", "1:DG16 N7", 3.18),
     ("3:ASN55 ND2", "2:DG34 N7", 3.06),
     ("4:ASN55 ND2", "1:DG14 N7", 2.91),
@@ -74,16 +77,16 @@ def test_lambda_repressor_side_chains_bond_the_major_groove_bases():
     - Gln44 to the adenine of base pair 2: Gln44 OE1 accepts from DA N6 and Gln44 NE2 donates to DA N7, in both
       half-sites (3:GLN44 with 1:DA4; 4:GLN44 with 2:DA24).
     - Ser45 OG to guanine O6/N7 (3:SER45 with 2:DG36, 2:DG37 and, as acceptor, 1:DC5 N4; 4:SER45 with 1:DG16).
-      4:SER45 OG is also 2.88 Å from 1:DG16 O6, but at a CB-OG-O6 angle of 86.6°, under the 90° rule, so of that
-      pair only N7 counts.
+      4:SER45 OG to 1:DG16 O6 (2.88 Å) has a CB-OG-O6 angle of 86.6°: found because a hydroxyl donor, whose H
+      rotates, needs only 60°.
     - Asn55 ND2 to guanine N7 (3:ASN55 with 2:DG34; 4:ASN55 with 1:DG14).
     - Lys4 NZ of the N-terminal arm to guanine O6/N7 (4:LYS4 with 1:DG13 and 1:DG14; the arm of chain 3 starts
       at residue 6 and is not ordered), and Lys3 NZ to guanine O6 (4:LYS3 with 1:DG11 and 2:DG30).
     - Gln33 reaches the phosphate backbone, not a base: its main-chain N and side-chain NE2 donate to OP2
       (3:GLN33 with 1:DT3 and 1:DA4; 4:GLN33 with 2:DT23 and 2:DA24).
 
-    With that one O6 pair left out, these are every side-chain N/O/S to base N/O pair of the file within
-    2.5-3.5 Å (each a donor with an acceptor), so the side-chain to base bonds found must be exactly this set."""
+    These are every side-chain N/O/S to base N/O pair of the file within 2.5-3.5 Å (each a donor with an
+    acceptor), so the side-chain to base bonds found must be exactly this set."""
     found = _found("1LMB", "na")
     side_to_base = set()
     for b in found:
@@ -178,7 +181,11 @@ def test_ribosome_fixture_is_fast(select):
         (" interchain ", "interchain"),
         ("chains:A+B", "chains:A+B"),
         ("chains: A+B , C+D", "chains:A+B,C+D"),
-        ("chains:B+A", "chains:B+A"),
+        ("chains:B+A", "chains:A+B"),
+        ("chains:A+B,B+A,C+D", "chains:A+B,C+D"),
+        ("NA", "na"),
+        ("Interchain", "interchain"),
+        ("CHAINS:a+B", "chains:B+a"),
     ],
 )
 def test_selection_parses_and_prints_back(text, canonical):
@@ -213,3 +220,130 @@ def test_a_chain_the_model_lacks_is_named():
 def test_hbond_carries_donor_acceptor_distance():
     b = _found("1LMB", "na")[0]
     assert isinstance(b, HBond) and b == HBond(b.donor, b.acceptor, b.distance)
+
+
+def test_selection_equality_ignores_pair_order_and_kind_is_checked():
+    assert parse_selection("chains:A+B") == parse_selection("chains:B+A") == Selection("chains", (("B", "A"),))
+    with pytest.raises(ValueError, match="hbonds"):
+        Selection("bogus")
+    with pytest.raises(ValueError, match="hbonds"):
+        Selection("chains")
+    with pytest.raises(ValueError, match="hbonds"):
+        Selection("na", (("A", "B"),))
+
+
+def _roles(model, chain, seq):
+    """atom name -> "D", "A" or "DA" for the donor and acceptor atoms of one residue."""
+    sites = hbonds._sites(model[0] if isinstance(model, tuple) else model, None)
+    out = {}
+    for k, name in enumerate(sites.names):
+        lab = sites.labels[sites.owner[k]]
+        if (lab.chain, lab.seq) == (chain, seq):
+            out[name] = ("D" if sites.donor[k] else "") + ("A" if sites.acceptor[k] else "")
+    return out
+
+
+def test_modified_nucleotides_keep_only_the_roles_their_chemistry_allows():
+    """1EHZ, tRNA-Phe. A methyl on an amino N leaves one H (2MG N2 donates), two leave none (M2G N2); a methyl on a
+    ring N takes its lone pair (7MG N7, 1MA N1 accept nothing); 2'-O-methyl leaves O2' an acceptor only (OMC);
+    wybutosine (YYG) has N1, N2 and N3 all substituted: N1 (a bridgehead) and N3 (methylated) neither donate nor
+    accept, and N2, closed into the extra imidazole ring as an imine, only accepts."""
+    model = _model("1EHZ")
+    assert _roles(model, "A", 10)["N2"] == "D"  # 2MG
+    assert "N2" not in _roles(model, "A", 26)  # M2G
+    assert "N7" not in _roles(model, "A", 46) and _roles(model, "A", 46)["N2"] == "D"  # 7MG
+    assert "N1" not in _roles(model, "A", 58) and _roles(model, "A", 58)["N6"] == "D"  # 1MA
+    assert _roles(model, "A", 32)["O2'"] == "A"  # OMC
+    assert _roles(model, "A", 31)["O2'"] == "DA"  # an unmodified neighbour
+    yyg = _roles(model, "A", 37)
+    assert {n: r for n, r in yyg.items() if n in ("N1", "N2", "N3", "N7", "O6")} == {"N2": "A", "N7": "A", "O6": "A"}
+
+
+def test_pseudouridine_n1_donates_and_uridine_n1_does_not():
+    model = _model("4YBB-psi")
+    sites = hbonds._sites(model[0], None)
+    by_name = {}
+    for k, name in enumerate(sites.names):
+        by_name.setdefault(sites.labels[sites.owner[k]].name, {})[name] = bool(sites.donor[k])
+    assert by_name["PSU"]["N1"] and by_name["PSU"]["N3"]
+    assert "N1" not in by_name["U"] and by_name["U"]["N3"]
+
+
+def test_terminal_hydroxyls_donate_and_linked_ones_only_accept():
+    model = _model("1LMB")
+    first, last = _roles(model, "1", 1), _roles(model, "1", 20)
+    middle = _roles(model, "1", 10)
+    assert first["O5'"] == "DA" and last["O3'"] == "DA"
+    assert middle["O5'"] == "A" and middle["O3'"] == "A"
+
+
+def _model_of(*residues):
+    """A model from (chain, seq, name, {atom: (x, y, z)}), each a polymer residue, in that order."""
+    model = gemmi.Model("1")
+    for chain, seq, name, atoms in residues:
+        if chain not in [c.name for c in model]:
+            model.add_chain(gemmi.Chain(chain))
+        res = gemmi.Residue()
+        res.name, res.seqid, res.entity_type = name, gemmi.SeqId(seq, " "), gemmi.EntityType.Polymer
+        for atom_name, xyz in atoms.items():
+            atom = gemmi.Atom()
+            atom.name, atom.element, atom.pos = atom_name, gemmi.Element(atom_name[0]), gemmi.Position(*xyz)
+            res.add_atom(atom)
+        model[chain].add_residue(res)
+    return model
+
+
+def _at(angle, dist=3.0):
+    """A point `dist` from the origin at `angle` degrees from the -x axis (where antecedents sit)."""
+    t = math.radians(angle)
+    return (-dist * math.cos(t), dist * math.sin(t), 0.0)
+
+
+@pytest.mark.parametrize("angle, found", [(100, True), (75, True), (50, False)])
+def test_a_hydroxyl_donor_needs_60_degrees(angle, found):
+    model = _model_of(("A", 1, "SER", {"CB": (-1.43, 0, 0), "OG": (0, 0, 0)}), ("B", 1, "ASP", {"OD1": _at(angle)}))
+    assert bool(find_hbonds(model, "interchain")) == found
+
+
+@pytest.mark.parametrize("angle, found", [(100, True), (75, False)])
+def test_an_sp2_donor_needs_90_degrees(angle, found):
+    model = _model_of(
+        ("A", 1, "TRP", {"CD1": (-0.7, 1.1, 0), "CE2": (-0.7, -1.1, 0), "NE1": (0, 0, 0)}),
+        ("B", 1, "ASP", {"OD1": _at(angle)}),
+    )
+    assert bool(find_hbonds(model, "interchain")) == found
+
+
+def test_an_unknown_antecedent_passes():
+    cb = {"CB": (-1.43, 0, 0)}
+    acceptor = ("B", 1, "ASP", {"OD1": _at(30)})
+    assert find_hbonds(_model_of(("A", 1, "SER", {**cb, "OG": (0, 0, 0)}), acceptor), "interchain") == []
+    found = find_hbonds(_model_of(("A", 1, "SER", {"OG": (0, 0, 0)}), acceptor), "interchain")
+    assert [(str(b.donor), str(b.acceptor)) for b in found] == [("A:SER1 OG", "B:ASP1 OD1")]
+
+
+def test_a_pair_where_both_atoms_can_donate_is_counted_once():
+    model = _model_of(
+        ("A", 1, "SER", {"CB": (-1.43, 0, 0), "OG": (0, 0, 0)}),
+        ("B", 1, "THR", {"CB": (2.8 + 1.43, 0, 0), "OG1": (2.8, 0, 0)}),
+    )
+    found = find_hbonds(model, "interchain")
+    assert [(str(b.donor), str(b.acceptor), round(b.distance, 2)) for b in found] == [("A:SER1 OG", "B:THR1 OG1", 2.8)]
+
+
+def test_microheterogeneity_keeps_the_first_residue_of_a_number():
+    ser = ("A", 1, "SER", {"CB": (-1.43, 0, 0), "OG": (0, 0, 0)})
+    acceptor = ("B", 1, "ASP", {"OD1": (10.0, 0, 0)})
+    thr = {"CB": (10 - 2.9 - 1.43, 0, 0), "OG1": (10 - 2.9, 0, 0)}
+    assert find_hbonds(_model_of(ser, ("A", 2, "THR", thr), acceptor), "interchain")  # its own number: found
+    assert find_hbonds(_model_of(ser, ("A", 1, "THR", thr), acceptor), "interchain") == []  # second at 1: dropped
+
+
+def test_a_polymer_residue_type_bound_as_a_ligand_is_left_out():
+    model = _model("1LMB")[0].clone()
+    for res in model["4"]:
+        if res.seqid.num == 44:
+            res.entity_type = gemmi.EntityType.NonPolymer
+    tags = {str(a) for b in find_hbonds(model, "na") for a in (b.donor, b.acceptor)}
+    assert tags and not any(t.startswith("4:GLN44 ") for t in tags)
+    assert any(str(a).startswith("4:GLN44 ") for b in _found("1LMB", "na") for a in (b.donor, b.acceptor))
