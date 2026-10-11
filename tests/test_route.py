@@ -482,7 +482,7 @@ def test_stacked_loops_stay_out_of_the_slab_except_at_a_port_inside_it(assembly)
 
     lay, sses, bb = make_layout(DATA / "1C3W.cif", mode="stack", membrane="auto", assembly=assembly)
     bands = lay.membrane["bands"]
-    assert len(bands) == len({s.chain for s in sses})  # the trimer wraps one chain per row
+    assert len(bands) == len({s.chain for s in sses})  # each protomer wider than _MAX_ROW: a row each
 
     def inside(y):
         return any(lo + 0.3 < y < hi - 0.3 for lo, hi in bands)

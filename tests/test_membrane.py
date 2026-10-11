@@ -188,34 +188,35 @@ def test_stack_mode_keeps_every_tm_helix_in_the_bilayer(assembly):
     assert len(tm) == 7 * len({s.chain for s in sses})
     for s in tm:
         p = lay.placed[s.id]
-        y0, y1 = _row_band(lay, p)  # the trimer wraps one chain per row, each row with its band
+        y0, y1 = _row_band(lay, p)  # each protomer (36.5 wide) has a row and a band of its own
         lo, hi = sorted((p.n_port[1], p.c_port[1]))
         assert min(hi, y1) - max(lo, y0) >= 0.75 * (y1 - y0), s.id  # measured worst: α3, 0.83
 
 
 @pytest.mark.parametrize(
-    "path, chains",
-    [(DATA / "1C3W.cif", ["A1", "A2"]), (OPM, None)],
+    "path, chains, rows",
+    [(DATA / "1C3W.cif", ["A1", "A2"], [["A1"], ["A2"]]), (OPM, None, [["A", "B"], ["C", "D"]])],
     ids=["1C3W-two-chains", "1BL8-opm"],
 )
-def test_a_wide_depth_keeping_stack_wraps_one_chain_per_row_each_with_its_band(path, chains, monkeypatch):
+def test_a_wide_depth_keeping_stack_packs_whole_chains_into_rows_each_with_its_band(path, chains, rows, monkeypatch):
     """1PV7 --mode stack --membrane auto put 21 helices in one row 2160 px wide. A row wider than _MAX_ROW wraps:
-    one chain per row, each row with its own band, and each element at its depth: a whole row moves as one."""
+    whole chains packed into rows in chain order up to _MAX_ROW (a chain wider than that alone in its row), each
+    row with its own band, and each element at its depth: a whole row moves as one. KcsA: two rows of two."""
     from foldmap import layout as layout_mod
 
     lay, sses, _ = make_layout(path, mode="stack", membrane="auto", chains=chains)
-    names = sorted({s.chain for s in sses})
-    assert len(names) >= 2 and len(lay.membrane["bands"]) == len(names)
-    assert lay.membrane["y"] == lay.membrane["bands"][0]
-    span = {
-        c: (
-            min(p.rect[1] for p in lay.placed.values() if p.sse.chain == c),
-            max(p.rect[3] for p in lay.placed.values() if p.sse.chain == c),
-        )
-        for c in names
-    }
-    rows = sorted(span.values(), reverse=True)
-    assert all(lo > hi for (lo, _), (_, hi) in zip(rows, rows[1:]))  # one chain per row, rows apart
+    by_row = [sorted({lay.placed[k].sse.chain for k in ids if k in lay.placed}) for ids in lay.stack_rows]
+    assert by_row == rows
+    assert len(lay.membrane["bands"]) == len(rows) and lay.membrane["y"] == lay.membrane["bands"][0]
+    span = [
+        (min(lay.placed[k].rect[1] for k in ids), max(lay.placed[k].rect[3] for k in ids), ids)
+        for ids in lay.stack_rows
+    ]
+    assert all(lo > hi for (lo, _, _), (_, hi, _) in zip(span, span[1:]))  # rows top to bottom, apart
+    for _, _, ids in span:
+        x0 = min(lay.placed[k].rect[0] for k in ids)
+        x1 = max(lay.placed[k].rect[2] for k in ids)
+        assert x1 - x0 <= layout_mod._MAX_ROW or len({lay.placed[k].sse.chain for k in ids}) == 1
     for p in lay.placed.values():
         if p.sse.kind == "H" and len(p.sse) >= 20:  # TM helices cross their own row's band
             y0, y1 = _row_band(lay, p)
@@ -223,12 +224,12 @@ def test_a_wide_depth_keeping_stack_wraps_one_chain_per_row_each_with_its_band(p
             assert min(hi, y1) - max(lo, y0) >= 0.75 * (y1 - y0), p.sse.id
     fig = make_figure(path, mode="stack", membrane="auto", chains=chains)
     drawn = [a for a in fig.axes[0].patches if (a.get_gid() or "").split(":")[0] == "membrane"]
-    assert len(drawn) == len(names)
+    assert len(drawn) == len(rows)
     monkeypatch.setattr(layout_mod, "_MAX_ROW", 1e9)  # the same figure in one row: every element's depth
     one, _, _ = make_layout(path, mode="stack", membrane="auto", chains=chains)
-    for c in names:
-        shift = {round(p.cy - one.placed[k].cy, 6) for k, p in lay.placed.items() if p.sse.chain == c}
-        assert len(shift) == 1, c
+    for ids in lay.stack_rows:
+        shift = {round(lay.placed[k].cy - one.placed[k].cy, 6) for k in ids if k in lay.placed}
+        assert len(shift) == 1, ids
 
 
 def test_a_narrow_depth_keeping_stack_stays_one_row():

@@ -1026,14 +1026,23 @@ def _collide(a: _Item, ha, ma, b: _Item, hb, mb) -> bool:
 
 def _stack(items: list[_Item], depth: bool = False) -> list[list[_Item]]:
     """Rows in sequence order, one row break per chain and when a row is full. With `depth` (a membrane is
-    drawn) every item keeps its height along the frame's up: the chains side by side in one row, or, when that
-    row would be wider than _MAX_ROW, one chain per row, each row moved down as a whole. The rows are returned."""
+    drawn) every item keeps its height along the frame's up: whole chains side by side, packed in chain order
+    into rows no wider than _MAX_ROW, each row moved down as a whole. The rows are returned."""
     items.sort(key=lambda it: (it.chain, it.order))
     if depth:
-        width = sum(it.box[2] - it.box[0] for it in items) + _ROW_GAP * (len(items) - 1)
-        chains = list(dict.fromkeys(it.chain for it in items))
-        # a single chain wider than _MAX_ROW stays one row: its elements keep their depth, so it cannot fold back
-        rows = [items] if width <= _MAX_ROW else [[it for it in items if it.chain == c] for c in chains]
+
+        def width(row: list[_Item]) -> float:
+            return sum(it.box[2] - it.box[0] for it in row) + _ROW_GAP * (len(row) - 1)
+
+        rows = []
+        for c in dict.fromkeys(it.chain for it in items):
+            mine = [it for it in items if it.chain == c]
+            # a single chain wider than _MAX_ROW has a row of its own: its elements keep their depth, so it
+            # cannot fold back
+            if rows and width(rows[-1] + mine) <= _MAX_ROW:
+                rows[-1] += mine
+            else:
+                rows.append(mine)
         bottom = None
         for row in rows:
             ys = [float(_snap(it.home[1])) for it in row]
@@ -1852,7 +1861,7 @@ def build_layout(
     )
     lay.na_traces = traces
     lay.frame = frame
-    if keep_depth and len(rows) > 1:  # wrapped one chain per row: each row gets its own membrane band
+    if keep_depth and len(rows) > 1:  # wrapped into rows of whole chains: each row gets its own band
         lay.stack_rows = [[m.sse.id for it in row for m in it.members if isinstance(m, Placed)] for row in rows]
     if traces:
         pts = np.vstack(list(traces.values()))
