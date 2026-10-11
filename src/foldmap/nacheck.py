@@ -293,15 +293,19 @@ def verify_contacts(model, drawn, layout, bb, *, path=None) -> ContactReport:
 THRESHOLDS = {
     "pair_f1": 0.95,  # canonical + wobble pairs against RNApolis (final campaign: 0.96-1.00; started at 0.90)
     "stem_recall": 0.85,  # RNApolis stems matched one to one by a stem holding 2/3 of their pairs (0.857-1)
-    "spearman": 0.60,  # pairwise stem-centre distances, drawn against 3D, entries with >= 5 stems (0.601-0.96)
-    "procrustes": 0.50,  # normalised RMSD of drawn stem centres after a similarity fit, no reflection (0.09-0.499)
-    # angle and joint errors: 0 by construction on a plain frame (regression guards), measured on unrolled ones; the
-    # final campaign has 0.0 on every entry but 30QM, so the limit is one rounding step (reports show 0.1 degrees)
+    # pairwise stem-centre distances, drawn against 3D, entries with >= 5 stems (0.601-0.96; thin: 1GID 0.601)
+    "spearman": 0.60,
+    # normalised RMSD of drawn stem centres after a similarity fit, no reflection (0.09-0.499; thin: 4LD0 0.499)
+    "procrustes": 0.50,
+    # angle and joint errors: 0 by construction on a plain frame: a regression guard on plain frames, vacuous as
+    # fidelity (M2). The final campaign has 0.0 on every entry but 30QM, so the limit is one rounding step
     "angle_median": 0.05,  # degrees, drawn stem direction against its projected 3D axis
     "angle_max": 0.05,  # degrees, the worst stem; campaign 0.0 (stems drawn along their seen axes)
     "joint_error_max": 0.05,  # degrees, signed drawn bend against signed seen bend at the worst joint (campaign 0.0)
     "mirrored": 0,  # stems seen clearly (SIDE_SEEN) drawn with their arms swapped
-    "contact_auc": 0.60,  # elements touching a stem drawn nearer it than the rest (0.609-1.00)
+    # elements touching a stem drawn nearer it than the rest (0.609-1.00). It does not respond to the contact pull:
+    # tests/test_na_layout.py's displacement test is the guard
+    "contact_auc": 0.60,
     "stems_nearer_frac": 1.0,  # contacted stems drawn nearer their touching elements than the median element
     "beads_missing": 0,  # protein residues touching a drawn nucleotide with no bead (verify_contacts' missing)
     "bead_colour_wrong": 0,  # beads not in their toucher's chain colour (verify_contacts' wrong colour)

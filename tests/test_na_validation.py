@@ -16,7 +16,11 @@ from foldmap.route import route_loops
 
 NA = Path(__file__).parent / "data" / "na"
 FIXTURES = ["30QM", "1EHZ", "4OO8", "1KX5", "1IHF", "3CRX", "4YBB", "1RVA", "4LD0"]
-LIMITS = {  # metric: (lowest or highest allowed, "min" or "max"): the worst fixture value, rounded safe (Task 14)
+# Thin margins: procrustes 0.5 against 4LD0's 0.499, spearman 0.85 against 4OO8 and 1KX5 at 0.85.
+# contact_auc does not respond to the contact pull (layout._W_CONTACT): test_na_layout.py's displacement test is
+# the guard. The angle limits are a regression guard on plain frames, vacuous as fidelity (M2).
+# metric: (lowest or highest allowed, "min" or "max"): the worst fixture value, rounded safe (Task 14)
+LIMITS = {
     "spearman": (0.85, "min"),
     "procrustes": (0.5, "max"),
     "angle_median": (0.05, "max"),

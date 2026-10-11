@@ -1658,6 +1658,20 @@ def test_stems_sit_nearer_the_elements_that_touch_them(pdb):
     assert m["contact_auc"] is None or m["contact_auc"] >= 0.55  # IHF, wrapped by its arms, is the lowest
 
 
+def test_the_contact_pull_moves_the_stems_of_30qm(monkeypatch):
+    """Guard for layout._W_CONTACT: contact_auc does not respond to the pull (30QM scores 0.823 with it and 0.865
+    without), so this displacement test is the guard. Without the pull 30QM's stems move by 8.9 page units at most
+    (1RVA 2.8, 1IHF 0.9, 4LD0 0.7)."""
+    import foldmap.layout as layout
+
+    with_pull, _, _ = make_layout(_path("30QM"))
+    monkeypatch.setattr(layout, "_W_CONTACT", 0.0)
+    without, _, _ = make_layout(_path("30QM"))
+    assert [d.id for d in with_pull.stems] == [d.id for d in without.stems]
+    shift = max(np.hypot(a.cx - b.cx, a.cy - b.cy) for a, b in zip(with_pull.stems, without.stems, strict=True))
+    assert shift > 3.0, shift
+
+
 def test_a_chain_break_is_drawn_as_a_gap_with_no_ends_at_it():
     """1URN: the unmodelled U13-C14 of the hairpin loop is a dashed gap from R:12 to R:15, with no 5'/3' labels
     there; the hairpin is not drawn as the classic straight two-strand duplex."""
