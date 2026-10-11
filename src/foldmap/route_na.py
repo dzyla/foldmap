@@ -34,12 +34,19 @@ _BOW_MAX = 8  # internal-loop sides up to this many nucleotides are drawn as bow
 SHORT_GAP = 3  # a cropped gap of fewer nucleotides is drawn as a bare break, without its "… N nt …" label
 _JOINT_STRAIGHT = 1.5  # a joint between two pieces of a bent duplex shorter than this may be drawn straight
 _TAIL_ROUTED = 6  # a free end of more nucleotides that no straight drawing keeps clear is routed out to free space
-# a run keeps off every strand drawn before it (and every protein loop) by a detour at most this many times as long
-# as its drawing that keeps off the hairpin loops and free ends only. Measured on 24 campaign entries: run-run
-# crossings 250 -> 239, protein loops crossed 178 -> 175, no entry worse in either (bound 2: 245; unbounded: 250,
-# with 4YBB, 2GIS and 4P9R worse)
+# a run keeps off every strand drawn before it (and every protein loop) by a detour at most this many times as
+# long as its plain drawing, which keeps off the hairpin loops and free ends only. Measured on 24 campaign entries,
+# crossing a strand only a cost: run-run crossings 250 -> 239, protein loops crossed 178 -> 175, no entry worse in
+# either (bound 2: 245; unbounded: 250, with 4YBB, 2GIS and 4P9R worse)
 _DETOUR = 3.0
 _FIRST_NODES = 20_000  # the A* budget of that first stage (route._MAX_NODES for any other route)
+# failing that, a strand pays for the cells beside the strands (a run with nucleotides) and protein loops it passes
+# as well, where its nucleotides would touch theirs, and that makes crossing them cost more than a cell; taken when
+# at most this many times as long as its plain drawing. Measured on all 39 campaign entries with the first stage:
+# run-run crossings 255 -> 237, protein loops crossed 188 -> 158, no entry's protein-loop crossings worse (1.25 and
+# 1.5 with the beside cells in the first stage too: 4YBB and 5B43 worse; 3: 3CRX's strand exchange C:18-19 goes
+# round a whole arm; without the cells beside protein loops: 4YBB 51 -> 58)
+_BESIDE_DETOUR = 2.0
 
 
 @dataclass(eq=False)
@@ -87,11 +94,18 @@ def path_name(path: NAPath, na) -> str:
     return f"strand {first.chain}:{first.tag}-{last.tag}"
 
 
-def _use(grid: _Grid, pts) -> None:
-    """Mark the cells under a drawn strand as used, so later routes avoid crossing it (at the reuse cost)."""
-    cells = sorted({c for a, b in zip(pts, pts[1:]) for c in grid.cells_along(a, b)})
-    for c in cells:
+def _use(grid: _Grid, pts, beside: np.ndarray | None = None) -> None:
+    """Mark the cells under a drawn strand as used, so later routes avoid crossing it (at the reuse cost); and in
+    `beside` the cells beside them, which a run with nucleotides on it pays to pass through as well (there its
+    nucleotides would touch the strand's, and crossing the strand costs more than crossing a cell)."""
+    under = {c for a, b in zip(pts, pts[1:]) for c in grid.cells_along(a, b)}
+    for c in sorted(under):
         grid.used[c] += 1
+    if beside is not None:
+        near = {(x + dx, y + dy) for x, y in under for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1))} - under
+        for c in sorted(near):
+            if 0 <= c[0] < grid.nx and 0 <= c[1] < grid.ny:
+                beside[c] += 1
 
 
 def _dot(a, b) -> float:
@@ -608,15 +622,23 @@ def route_nucleic(layout: Layout, router: _Router | None = None, loops=()) -> li
     # routes keep off the strands' end labels (as a protein loop keeps off its chain's N and C)
     g = _GLYPH_H / 2 + 0.05
     router.grid.keep_off([(x - g, y - g, x + g, y + g) for s, e, (x, y) in ends if (s, e) not in gapped])
-    # and pay to cross a hairpin loop or a free end, as a loop pays to share an earlier loop's cells
+    # and pay to cross a hairpin loop or a free end, as a loop pays to share an earlier loop's cells, or to run
+    # beside one; beside a protein loop costs the same, so crossing one costs as much as crossing a strand
+    beside, beside_loops = np.zeros_like(router.grid.used), np.zeros_like(router.grid.used)
     for p in fixed.values():
         if p.kind in ("hairpin", "tail"):
-            _use(router.grid, p.points)
+            _use(router.grid, p.points, beside)
+    for pts in loops:
+        _use(router.grid, pts, beside_loops)
     names = [_stem_label_box(d) for d in layout.stems]
     routed = {}
     for s, i, j, da, db, kind in between:
-        p = routed[(s, i)] = _strand_between(router, s, i, j, da, db, kind, names, strands, crossed)
+        # a run with nucleotides may pay for the cells beside strands and protein loops too, one without
+        # nucleotides for those beside protein loops
+        extra = beside + beside_loops if j - i > 1 else beside_loops
+        p = routed[(s, i)] = _strand_between(router, s, i, j, da, db, kind, names, strands, crossed, extra)
         strands.add(among(p, at), frozenset((da.id, db.id)) if p.kind == "joint" else None)
+        _use(router.grid, among(p, at), beside)
     out = [p for _, p in sorted({**fixed, **routed}.items())]
     for g in na.gaps:  # cropped away: the 3' end of one piece to the 5' end of the next, dashed
         a, b = exits.get((g.before, len(na.strands[g.before]) - 1)), exits.get((g.after, 0))
@@ -721,19 +743,29 @@ def among(path: NAPath, at: dict) -> list[tuple[float, float]]:
 
 
 def _strand_between(
-    router: _Router, s: int, i: int, j: int, da: PlacedStem, db: PlacedStem, kind, names=(), strands=None, loops=None
+    router: _Router,
+    s: int,
+    i: int,
+    j: int,
+    da: PlacedStem,
+    db: PlacedStem,
+    kind,
+    names=(),
+    strands=None,
+    loops=None,
+    extra=None,
 ) -> NAPath:
     """The single strand from stem nucleotide i to stem nucleotide j (the m nucleotides between drawn on it): along
     its rail from i to its stem's end face, from that face to the next stem's end face, along the rail to j. Between
     the faces it is checked against every element and stem, its own two by their true bodies (_clear, own_body).
-    Two stages (_drawing) for a run with nucleotides on it: first every strand drawn so far (`strands`, a _Strands:
-    hairpin loops, free ends, traces and the runs and joints routed before it, but a joint's partner strand) and
-    every protein loop (`loops`) is an obstacle, their grid cells blocked and no drawing crossing them taken; that
-    drawing is taken when it is at most _DETOUR times as long as the second stage's and keeps off the stem names if
-    that does. The second (the only one for a strand exchange or joint): the hairpin loops and free ends are such
-    obstacles, or, when that draws nothing, crossing them is only a cost. In each pass `names` (the stem-label boxes)
-    are hard obstacles for the first choice of drawing: the first one clear that also keeps off every name; only
-    when none does, the first one clear."""
+    Its plain drawing keeps off the hairpin loops and free ends drawn so far (`strands`, a _Strands), or, when none
+    does, pays to cross them (_drawing levels 1, 0). When that crosses any strand (but a joint's partner) or protein
+    loop (`loops`, a _Strands), two other drawings are tried, the first taken that is at most so many times as long
+    as the plain one and keeps off the stem names if that does: for a run with nucleotides, one off every strand and
+    protein loop, their grid cells blocked and no drawing crossing them taken (level 2; _DETOUR); then one that also
+    pays for the cells in `extra`, beside strands and protein loops (_BESIDE_DETOUR). In each pass `names` (the
+    stem-label boxes) are hard obstacles for the first choice of drawing: the first one clear that also keeps off
+    every name; only when none does, the first one clear."""
     m, nts, between = j - i - 1, list(range(i + 1, j)), ((s, i), (s, j))
     own, need = (da, db), (j - i) * NT_STEP
     ra, rb = da.point((s, i)), db.point((s, j))
@@ -748,26 +780,34 @@ def _strand_between(
     if strands is None:
         return _drawing(*args, 0)
     grid = router.grid
-    before = grid.used.copy()
-    base = _drawing(*args, 1)  # off the hairpin loops and free ends
-    if base is None:
-        grid.used = before.copy()
-        base = _drawing(*args, 0)  # crossing them only a cost
+    start = grid.used
+
+    def attempt(levels, cost):  # the first of these passes that draws, with this extra cost: (path, cells used)
+        for level in levels:
+            grid.used = start + cost if cost is not None else start.copy()
+            path = _drawing(*args, level)
+            if path is not None:
+                return path, (grid.used - cost if cost is not None else grid.used)
+        return None, None
+
+    plain, used = attempt((1, 0), None)  # off the hairpin loops and free ends, else crossing them only a cost
     skip = frozenset((da.id, db.id)) if joint else None
-    if not nts or (
-        not strands.crosses(base.points[1:-1], skip) and (loops is None or not loops.crosses(base.points[1:-1]))
-    ):
-        return base  # a strand exchange or joint (no nucleotides) keeps its shortest way; or it crosses nothing
-    after, grid.used = grid.used, before  # the first stage starts from where the strand started
-    path = _drawing(*args, 2)
-    if (
-        path is not None
-        and _length(path.points) <= _DETOUR * _length(base.points) + 1e-9
-        and (_off_names(path.points, names) or not _off_names(base.points, names))
-    ):
-        return path
-    grid.used = after
-    return base
+    grid.used = used
+    if not strands.crosses(plain.points[1:-1], skip) and (loops is None or not loops.crosses(plain.points[1:-1])):
+        return plain  # it crosses nothing: no other drawing can do better
+    stages = [((2,), None, _DETOUR)] if nts else []  # off every strand and loop: a run with nucleotides only
+    stages += [((1, 0), extra, _BESIDE_DETOUR)] if extra is not None else []  # paying for the cells beside them
+    for levels, cost, bound in stages:
+        path, marked = attempt(levels, cost)
+        if (
+            path is not None
+            and _length(path.points) <= bound * _length(plain.points) + 1e-9
+            and (_off_names(path.points, names) or not _off_names(plain.points, names))
+        ):
+            grid.used = marked
+            return path
+    grid.used = used
+    return plain
 
 
 def _off_names(pts, names) -> bool:
