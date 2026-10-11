@@ -1304,14 +1304,43 @@ def _trace_walls(items: list[_Item], traces: dict[int, np.ndarray], na: Nucleic)
     return Walls(np.asarray(boxes, float).reshape(-1, 4), hard)
 
 
+_NUDGES = tuple(f * k for k in (1.05, 1.25, 1.5, 2.0) for f in (1, -1))  # sideways steps, in beads (_TRACE_HALF)
+
+
+def _room(others: np.ndarray, xy) -> float:
+    """How near the nearest of `others` ((n, 2) page points) comes to xy."""
+    return float(np.hypot(*(others - xy).T).min()) if len(others) else np.inf
+
+
 def _traces(na: Nucleic, frame: Frame) -> dict[int, np.ndarray]:
-    """Strands with no base pair at all, drawn along their projected backbone (page units, on the grid)."""
+    """Strands with no base pair at all, drawn along their projected backbone (page units, on the grid). A
+    nucleotide projected within a bead's width (_TRACE_HALF) of one drawn before it (another strand's, or its own,
+    its 5' neighbour seen end-on included) is nudged sideways off its trace, as little as clears it (else as far as
+    it can): two strands crossing in projection, or one running toward the viewer (1EYG), would draw their beads
+    on each other."""
     held = {n for st in na.structure.stems for n in st.nucleotides()}
-    return {
-        s: _snap(frame.project(strand.p) * SCALE)
-        for s, strand in enumerate(na.strands)
-        if len(strand) > 1 and not any((s, i) in held for i in range(len(strand)))
-    }
+    out: dict[int, np.ndarray] = {}
+    taken: list[np.ndarray] = []  # every trace nucleotide placed so far
+    for s, strand in enumerate(na.strands):
+        if len(strand) < 2 or any((s, i) in held for i in range(len(strand))):
+            continue
+        pts = _snap(frame.project(strand.p) * SCALE)
+        for i in range(len(pts)):
+            others = np.array(taken).reshape(-1, 2)
+            space = _room(others, pts[i])
+            if space < _TRACE_HALF:
+                along = pts[min(i + 1, len(pts) - 1)] - pts[max(i - 1, 0)]
+                side = np.array([-along[1], along[0]]) / max(float(np.hypot(*along)), 1e-9)
+                for k in _NUDGES:
+                    xy = _snap(pts[i] + side * k * _TRACE_HALF)
+                    r = _room(others, xy)
+                    if r > space:
+                        pts[i], space = xy, r
+                    if r >= _TRACE_HALF:
+                        break
+            taken.append(pts[i])
+        out[s] = pts
+    return out
 
 
 def _nearest_piece(na: Nucleic, pieces: list[Stem]) -> dict[tuple[int, int], int]:

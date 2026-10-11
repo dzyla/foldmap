@@ -1882,3 +1882,38 @@ def test_a_trace_is_exempt_from_an_element_only_near_the_nucleotides_it_touches(
     assert check(15) and check(13)  # it holds the nucleotides there (or a neighbour's)
     assert not check(0)  # it holds the 5' end only: the trace crossing it far on is not clear
     assert check(15, sheets=[["H1", "E1"]]) and not check(0, sheets=[["H1", "E1"]])  # its sheet likewise
+
+
+def test_trace_nucleotides_drawn_on_one_spot_are_nudged_apart():
+    """1EYG: two single strands over the SSB tetramer project two nucleotides onto one spot, their contact beads on
+    each other; Q:16-17 runs toward the viewer, its steps shorter than a bead (bead_overlaps 1). The later
+    nucleotide moves sideways off its trace, as little as clears a bead's width."""
+    from types import SimpleNamespace
+
+    from foldmap.frame import Frame
+    from foldmap.layout import SCALE, _traces
+    from foldmap.model import NAStrand, ResLabel
+    from foldmap.route_na import _BEAD
+
+    def strand(chain, xyz):
+        labels = [ResLabel(chain, k + 1, "", "DT") for k in range(len(xyz))]
+        p = np.asarray(xyz, float)
+        return NAStrand(chain, labels, p, p, False)
+
+    a = strand("Q", [[x * 6.0, 0.0, 0.0] for x in range(5)])  # along x
+    b = strand("R", [[12.0, y * 6.0 - 12.0, 3.0] for y in range(5)])  # along y, its middle on a's (12, 0)
+    na = SimpleNamespace(strands=[a, b], structure=SimpleNamespace(stems=[]))
+    frame = Frame(np.zeros(3), np.array([1.0, 0, 0]), np.array([0, 1.0, 0]), np.array([0, 0, 1.0]))
+    tr = _traces(na, frame)
+    assert np.allclose(tr[0], a.p[:, :2] * SCALE)  # the first strand stays where it is seen
+    pts = np.vstack(list(tr.values()))
+    d = np.hypot(*(pts[:, None] - pts[None]).transpose(2, 0, 1))
+    assert d[np.triu_indices(len(pts), 1)].min() >= _BEAD - 1e-3  # on the grid
+    moved = tr[1][2] - b.p[2, :2] * SCALE
+    assert abs(moved[1]) < 1e-3 and _BEAD - 1e-3 <= abs(moved[0]) <= _BEAD + 0.05  # sideways, by a bead
+    assert np.allclose(np.delete(tr[1], 2, axis=0), np.delete(b.p[:, :2], 2, axis=0) * SCALE)
+    end_on = strand("S", [[30.0, 30.0, z * 6.0] for z in range(4)])  # seen end-on: one spot, steps 1.5 Å apart
+    end_on.p[:, 0] += np.arange(4) * 1.5
+    pts = _traces(SimpleNamespace(strands=[end_on], structure=SimpleNamespace(stems=[])), frame)[0]
+    d = np.hypot(*(pts[:, None] - pts[None]).transpose(2, 0, 1))
+    assert d[np.triu_indices(len(pts), 1)].min() >= _BEAD - 1e-3
