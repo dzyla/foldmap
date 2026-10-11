@@ -388,31 +388,33 @@ def test_stems_joined_by_runs_keep_the_order_they_are_seen_in():
     assert (drawn["P3"] - drawn["P2"]) @ (seen["P3"] - seen["P2"]) > 0
 
 
-@pytest.mark.parametrize(
-    "pdb",
-    [
-        "30QM",
-        "1RVA",
-        "4LD0",
-    ],
-)
-def test_nucleic_acid_held_by_two_protomers_is_drawn_near_what_touches_it(pdb):
-    """A symmetric dimer is unrolled one protomer beside the other, which tears apart a nucleic acid lying across
-    the axis (30QM's P3, 1RVA's kinked site, 4LD0's junction). When some strand is touched by two protomers the
-    projected frame is used instead, so each stem lands next to what touches it."""
+@pytest.mark.parametrize("pdb", ["1RVA", "4LD0"])
+def test_nucleic_acid_torn_by_unrolling_is_drawn_in_the_plain_frame(pdb):
+    """A symmetric dimer is unrolled one protomer beside the other. When that would tear a nucleic acid held by
+    both protomers apart (1RVA: the two pieces of its kinked duplex land on either side of the seam, drawn as a
+    180° hairpin; 4LD0: the junction's arms turn against one another by up to 139°), the plain frame is used, so each
+    stem lands next to what touches it."""
     from foldmap.frame import Frame
     from foldmap.nacheck import contacts, shape
 
     lay, sses, _ = make_layout(_path(pdb))
     assert type(lay.frame) is Frame
     m = {**shape(lay), **contacts(lay, sses)}
-    if pdb == "30QM":  # P3 (touched by A:288-306, A:346-362, B:37-57) was drawn 18-24 away from all three
-        assert m["stems_nearer_frac"] == 1.0
     if pdb == "1RVA":  # a kink, drawn as a 180° hairpin when unrolled; now drawn as the frame sees it (the view
         # sees the duplex nearly end-on, so its 39° kink projects to about 102°: the frame's choice, not the drawing's)
         assert abs(m["bend_drawn"] - m["bend_3d"]) <= 10
     if pdb == "4LD0":  # each arm was drawn under the protomer that does not touch it (AUC 0.506)
         assert m["contact_auc"] >= 0.6
+
+
+def test_a_nucleic_acid_the_unrolling_does_not_tear_keeps_the_side_by_side_frame():
+    """30QM: one strand is held by both protomers, but unrolling tears none of its duplexes (each stem is drawn
+    whole where its centre is seen) and turns no linked stems against one another by more than 57°, so the two
+    protomers stay side by side, the figure the author chose (the plain frame interleaved them into one tangle)."""
+    from foldmap.frame import CylinderFrame
+
+    lay, _, _ = make_layout(_path("30QM"))
+    assert type(lay.frame) is CylinderFrame
 
 
 def test_a_kinked_duplex_across_a_dimer_is_no_longer_a_hairpin():
@@ -1012,13 +1014,13 @@ def test_a_free_end_keeps_out_of_its_partners_doorway(monkeypatch):
     assert not path.fallback and not route_na._crosses_segment(path.points, *door)
 
 
-@pytest.mark.parametrize("pdb, runs, protein", [("2GIS", 6, 0), ("30QM", 2, 10)])
+@pytest.mark.parametrize("pdb, runs, protein", [("2GIS", 6, 0), ("4OO8", 4, 12)])
 def test_runs_keep_off_the_strands_drawn_before_them(pdb, runs, protein):
     """A run with nucleotides on it is routed off every strand drawn before it, and every protein loop, unless that
     is a long detour (route_na._DETOUR); failing that it pays for the cells beside them too (_BESIDE_DETOUR), else
     crossing them is only a cost; neither detour more than _DETOUR_STEPS steps per nucleotide longer. Measured with
-    crossing them only a cost: run-run crossings 2GIS 8, 30QM 3 (protein loops crossed 17; 6 with no step cap, which
-    drew the P2->P1 run boxing P1 in)."""
+    crossing them only a cost: run-run crossings 2GIS 8, 4OO8 5 (protein loops crossed 15). (30QM, pinned here while
+    drawn in the plain frame, is drawn unrolled since the C4 revision.)"""
     from foldmap.nacheck import na_crossings
 
     lay, _, _, loops = _routed(pdb)

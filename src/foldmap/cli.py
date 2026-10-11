@@ -107,8 +107,8 @@ NA_HOLD_MIN = 3  # residues of one protomer touching a strand for that protomer 
 
 def _na_across_protomers(nucleic, sym, bb) -> bool:
     """Whether a nucleic acid with stems has a strand held by two or more protomers of `sym`, each touching it
-    with at least NA_HOLD_MIN residues. Unrolling the assembly one protomer beside the next would tear that
-    strand apart, so it is drawn in a projected frame."""
+    with at least NA_HOLD_MIN residues: the precondition for drawing it in a projected frame (unrolling the assembly
+    one protomer beside the next may tear that strand apart; _na_torn_by_unrolling decides)."""
     if nucleic is None or sym is None or not nucleic.structure.stems:
         return False
     sector = {c: k for k, chains in enumerate(sym.protomers) for c in chains}
@@ -119,6 +119,68 @@ def _na_across_protomers(nucleic, sym, bb) -> bool:
             for s, _ in sorted(touched):
                 holders.setdefault(s, {}).setdefault(k, set()).add(r)
     return any(sum(len(rs) >= NA_HOLD_MIN for rs in by.values()) >= 2 for by in holders.values())
+
+
+NA_TORN_TURN = 90.0  # degrees: linked stems turned against one another by more than this when unrolled are torn
+
+
+def _na_torn_by_unrolling(nucleic, sses, sym) -> bool:
+    """Would unrolling the assembly (symmetric_frame) tear the nucleic acid apart, against the plain projected frame
+    (view_frame) the figure would otherwise use? Each stem is drawn whole where its centre is seen, so a single stem
+    cannot be torn; what can: (a) a duplex split into pieces whose consecutive pieces' centres face different
+    protomers (they land on either side of a seam: 1RVA's kinked site, drawn as a 180° hairpin), or (b) a group of
+    stems linked through at most two nucleotides (a junction, a bent duplex, coaxial stacks) whose axes, after the
+    best common turn, are turned against one another by more than NA_TORN_TURN between the two frames (4LD0's
+    junction arms: 139°; 30QM's linked stems at most 57°)."""
+    import math
+
+    from .layout import stem_pieces
+    from .nucleic import stem_axis
+
+    cyl = symmetric_frame(sses, sym)
+    stems = [StemView(_snap(v.centroid), _snap(v.axis), v.n) for v in stem_views(nucleic.structure, nucleic.strands)]
+    plain = view_frame(sses + stems, False, False, None, None)
+    pieces = stem_pieces(nucleic)
+    axes = [tuple(_snap(x) for x in stem_axis(p, nucleic.strands)) for p in pieces]
+
+    def wrap(a: float) -> float:
+        return (a + math.pi) % (2 * math.pi) - math.pi
+
+    def facing(point) -> int:  # the protomer whose sector the point is unrolled into (as CylinderFrame places it)
+        th = cyl._theta(point)
+        return min(range(len(cyl.angles)), key=lambda k: (abs(wrap(th - cyl.angles[k])), k))
+
+    for k in range(len(pieces) - 1):
+        a, b = pieces[k], pieces[k + 1]
+        if a.parent and a.parent == b.parent and facing(axes[k][0]) != facing(axes[k + 1][0]):
+            return True
+    at = {key: k for k, p in enumerate(pieces) for key in p.nucleotides()}
+    group = list(range(len(pieces)))
+
+    def root(x: int) -> int:
+        while group[x] != x:
+            x = group[x]
+        return x
+
+    for s, strand in enumerate(nucleic.strands):
+        held = [i for i in range(len(strand)) if (s, i) in at]
+        for i, j in zip(held, held[1:]):
+            if at[(s, i)] != at[(s, j)] and j - i - 1 <= 2:
+                group[root(at[(s, i)])] = root(at[(s, j)])
+    groups: dict[int, list[int]] = {}
+    for k in range(len(pieces)):
+        groups.setdefault(root(k), []).append(k)
+    for members in groups.values():
+        if len(members) < 2:
+            continue
+        turns = []
+        for k in members:
+            (cx, cy), (px, py) = cyl.direction(*axes[k]), plain.direction(*axes[k])
+            turns.append(wrap(math.atan2(cy, cx) - math.atan2(py, px)))
+        common = math.atan2(sum(math.sin(t) for t in turns), sum(math.cos(t) for t in turns))
+        if max(abs(wrap(t - common)) for t in turns) > math.radians(NA_TORN_TURN):
+            return True
+    return False
 
 
 def _na_extent(na, extent: str):
@@ -232,7 +294,7 @@ def make_layout(
         and not flip_v
         and up is None
         and view is None
-        and not _na_across_protomers(nucleic, sym, bb)
+        and not (_na_across_protomers(nucleic, sym, bb) and _na_torn_by_unrolling(nucleic, sses, sym))
     ):
         frame = symmetric_frame(sses, sym)
     else:  # stem axes differ in the last bit between BLAS kernels: snapped before they choose the page axes

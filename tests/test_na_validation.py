@@ -46,12 +46,22 @@ CAMPAIGN = {
     "bead_overlaps": {},  # every fixture at 0
     "gap_label_collisions": {"4YBB": 2},
 }
-# stems_nearer_frac (target 1.0) held at its measured value (absent: 1.0)
-NEARER: dict[str, float] = {}
+# stems_nearer_frac (target 1.0) held at its measured value (absent: 1.0). 30QM is drawn unrolled, its two protomers
+# side by side (the C4 revision of Task 13b step 3: unrolling tears none of its duplexes): one stem held by both
+# protomers (P3, touched by A:288-306, A:346-362 and B:37-57) sits between them, nearer neither than the median.
+NEARER: dict[str, float] = {"30QM": 0.833}
 # LIMITS held at a fixture's measured value until a later step: 3CRX's four-Cre assembly (C5) is seen edge-on to
 # the junction plane (arms 3, 4, 1, 2 in a row), drawn as an X (C2 and C3 leave it at 0.817: it has no runs or
 # joints). 1RVA's contact_auc hold (0.58) went with C3: its two pieces meet across the kink (0.609).
-HELD = {("3CRX", "procrustes"): 0.817}
+# 30QM, unrolled side by side (see NEARER): its stems are measured against the plain projection of the same
+# orientation (nacheck.measuring_frame), so the angles and the distance ranks measure the unrolling itself, which
+# turns each protomer's half to face the viewer (angle_median 35.7, angle_max 109.6, spearman 0.521).
+HELD = {
+    ("3CRX", "procrustes"): 0.817,
+    ("30QM", "angle_median"): 35.7,
+    ("30QM", "angle_max"): 109.6,
+    ("30QM", "spearman"): 0.521,
+}
 # what each fixture cannot measure (None): Spearman under 5 stems, contacts without protein, bends without a
 # split duplex; every other metric must be there, so a check that stops measuring fails
 BENDS = {"bend_3d", "bend_drawn", "joint_error_max"}
