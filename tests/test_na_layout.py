@@ -10,7 +10,7 @@ import pytest
 from matplotlib.colors import to_hex
 
 from foldmap.cli import make_figure_and_loops, make_layout
-from foldmap.layout import PlacedStem
+from foldmap.layout import PlacedStem, label_boxes
 from foldmap.route import route_loops
 
 NA = Path(__file__).parent / "data" / "na"
@@ -844,12 +844,17 @@ def test_every_block_bar_numbers_its_first_pair_beside_it():
     firsts = {a.get_gid(): a for a in _gid(fig, "na:stem:") if a.get_gid().endswith(":first")}
     ladder, _ = make_figure_and_loops(_path("30QM"), look=Style(na_style="ladder"))
     letter = _gid(ladder, "na:nt:")[0].get_fontsize()  # block draws no letters: the size they would have
+    lay, sses, _ = make_layout(_path("30QM"), look=Style(na_style="block"))
+    boxes = dict(label_boxes(lay, sses))
     assert len(firsts) == len(lay.stems) == 6
     for k, d in enumerate(lay.stems):
         a, i, b, j = d.pairs[0]
         text = firsts[f"na:stem:{k}:first"]
         assert text.get_text() == f"{lay.nucleic.strands[a].labels[i].seq}\u00b7{lay.nucleic.strands[b].labels[j].seq}"
-        assert text.get_fontsize() == pytest.approx(0.75 * letter)
+        assert text.get_fontsize() == pytest.approx(letter)
+        x0, y0, x1, y1 = boxes[f"stem-label:{k}"]  # the slot the layout reserves beside the stem
+        x, y = text.get_position()
+        assert x0 <= x <= x1 and y0 <= y <= y1
         assert text.get_rotation() % 360 < 90 or text.get_rotation() % 360 > 270  # reads left to right
 
 
