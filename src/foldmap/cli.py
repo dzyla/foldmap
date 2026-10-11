@@ -251,7 +251,6 @@ def make_layout(
     lay.res_chain = [l.chain for l in bb.labels]
     lay.res_name = [l.name for l in bb.labels]
     lay.res_labels = list(bb.labels)
-    lay.model = model
     lay.res_b = [float(x) for x in bb.b] if bb.b is not None else []
     lay.uniprot = ann
     first = [s.centroid for s in sses if s.chain == sses[0].chain] if sses else [_any_centre(bb, nucleic)]
@@ -597,11 +596,13 @@ def make_figure_and_loops(
     assembly: str = "auto",
     **adjust,
 ):
+    model = read_model(path, assembly)  # once: the layout and the hydrogen-bond overlay
     layout, sses, bb = make_layout(
-        path, mode, rotate, flip_v, dna, look, symmetry, protomers, symmetry_tol, assembly, **adjust
+        path, mode, rotate, flip_v, dna, look, symmetry, protomers, symmetry_tol, assembly, model=model, **adjust
     )
     routed = route_loops(layout, sses, bb)
-    return draw(layout, routed, sses, title, look=look, palette=palette, style=style, loop_style=loops), routed
+    fig = draw(layout, routed, sses, title, model=model, look=look, palette=palette, style=style, loop_style=loops)
+    return fig, routed
 
 
 def make_figure(path, *args, **kwargs):
@@ -700,7 +701,7 @@ def styles_help() -> str:
         if key == "hbond_color":
             return "a colour (#rrggbb or a name)"
         if key == "hbond_max":
-            return "whole number, at most this many lines (the shortest kept)"
+            return "whole number, at most this many lines (the shortest on the page kept, not the shortest in Å)"
         if key == "backbone_colors":
             return "KEY=COLOUR,... (KEY: a chain id, protein, dna or rna)"
         return "true/false"
@@ -762,10 +763,23 @@ def build_parser() -> argparse.ArgumentParser:
     q = sub.add_parser("plot", help="draw the topology figure")
     iq = sub.add_parser("interactive", help="an HTML page linking the topology, the contact map and the 3D model")
     iq.add_argument("--viewer", choices=["molstar", "3dmol"], default="molstar", help="3D viewer (default Mol*)")
-    for cmd in (q, iq):
+    cq = sub.add_parser(
+        "contacts",
+        help="check the contact beads of the figure against the coordinates (exit 1 on a false, unmatched or "
+        "wrong-colour bead)",
+    )
+    for cmd in (q, iq, cq):
         q = cmd
         q.add_argument("structure")
-        q.add_argument("-o", "--output", action="append", required=True, help=".svg, .pdf or .png (repeatable)")
+        q.add_argument(
+            "-o",
+            "--output",
+            action="append",
+            required=cmd is not cq,
+            default=[],
+            help=".svg, .pdf or .png (repeatable)"
+            + ("; optional here: also save the figure checked" if cmd is cq else ""),
+        )
         q.add_argument("--mode", choices=["projected", "stack"], help="projected (default) or stack")
         q.add_argument("--rotate", type=float, help="turn the picture counter-clockwise (degrees)")
         q.add_argument("--layout-file", metavar="YAML", help="start from a saved layout (theme, style, edits)")
@@ -977,6 +991,35 @@ def _cmd_figure(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_contacts(args: argparse.Namespace) -> int:
+    """Draw the figure `plot` would, check every contact bead against the coordinates (nacheck.verify_contacts) and
+    print the counts and one line per problem bead. Exit 1 when a bead is false, unmatched or the wrong colour."""
+    drawn = draw_spec(_spec_of(args))
+    report = drawn.verify_contacts()
+    for out in args.output:
+        print(f"wrote {save(drawn.figure, out)}")
+    if report is None:
+        print("contact beads drawn: 0 (no nucleic acid touched by protein in this figure)")
+        return 0
+    counts = (
+        ("beads drawn", len(report.beads)),
+        ("verified", len(report.verified)),
+        ("false", len(report.false)),
+        ("missing", len(report.missing)),
+        ("unmatched", len(report.unmatched)),
+        ("wrong colour", len(report.wrong_colour)),
+        ("not first", len(report.not_first)),
+    )
+    print("contact beads: " + ", ".join(f"{name} {n}" for name, n in counts))
+    for bead in report.beads:
+        if bead.problem:
+            where = f" ({bead.pair})" if bead.pair else ""
+            print(f"  {bead.problem}: {bead.nucleotide} <- {bead.residue}{where}")
+    for miss in report.missing:
+        print(f"  missing: {miss.nucleotide} <- {miss.pair}")
+    return 1 if report.false or report.unmatched or report.wrong_colour else 0
+
+
 _COMMANDS: dict[str, Callable[[argparse.Namespace], int]] = {
     "summary": _cmd_summary,
     "styles": _cmd_styles,
@@ -986,6 +1029,7 @@ _COMMANDS: dict[str, Callable[[argparse.Namespace], int]] = {
     "sequence": _cmd_sequence,
     "plot": _cmd_figure,
     "interactive": _cmd_figure,
+    "contacts": _cmd_contacts,
 }
 
 

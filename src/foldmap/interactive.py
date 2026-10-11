@@ -744,7 +744,7 @@ def build_page(
     model = read_model(path, layout_options.get("assembly", "auto"))  # once: layout, hover notes and 3D model
     layout, sses, bb = make_layout(path, mode, look=look, model=model, **layout_options)
     loops = route_loops(layout, sses, bb)
-    fig = draw(layout, loops, sses, title, look=look)
+    fig = draw(layout, loops, sses, title, model=model, look=look)
     svg = save_svg(fig)
     colours, _ = element_colours(layout, sses, look)
     data = {

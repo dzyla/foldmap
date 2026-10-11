@@ -364,7 +364,7 @@ def _drawn(name, *settings):
     look = resolve_style(None, None, list(settings))
     lay, sses, bb = make_layout(_path(name), look=look, model=_model(name))
     loops = route_loops(lay, sses, bb)
-    return draw(lay, loops, sses, look=look), lay, loops, sses, bb, look
+    return draw(lay, loops, sses, look=look, model=_model(name)), lay, loops, sses, bb, look
 
 
 def _lines(fig):
@@ -417,11 +417,54 @@ def test_the_legend_counts_the_lines_and_says_when_the_cap_cut_some():
 
 
 def test_hbond_max_keeps_the_shortest_lines():
-    all_ = hbond_overlay(*_drawn("1LMB", "hbonds=na", "hbond_max=1000")[1:4], Style(hbonds="na", hbond_max=1000))
-    few = hbond_overlay(*_drawn("1LMB", "hbonds=na", "hbond_max=1000")[1:4], Style(hbonds="na", hbond_max=7))
+    all_ = hbond_overlay(
+        *_drawn("1LMB", "hbonds=na", "hbond_max=1000")[1:4], Style(hbonds="na", hbond_max=1000), _model("1LMB")
+    )
+    few = hbond_overlay(
+        *_drawn("1LMB", "hbonds=na", "hbond_max=1000")[1:4], Style(hbonds="na", hbond_max=7), _model("1LMB")
+    )
     assert [l.gid for l in few.lines] == [l.gid for l in all_.lines[:7]]
     lengths = [l.length for l in all_.lines]
     assert lengths == sorted(lengths) and few.total == len(all_.lines)
+
+
+def test_hbonds_without_the_structure_is_an_error_not_an_empty_figure():
+    _, lay, loops, sses, _, look = _drawn("1LMB", "hbonds=na")
+    with pytest.raises(ValueError, match="model="):
+        draw(lay, loops, sses, look=look)
+    draw(lay, loops, sses, look=Style(hbonds="off"))  # no model needed when nothing is asked
+    assert not hasattr(lay, "model")
+
+
+def test_the_legend_counts_pairs_that_are_not_drawn():
+    from foldmap.render import HBondOverlay
+
+    assert HBondOverlay([1] * 5, 5).legend() == "H-bonds (5)"
+    assert HBondOverlay([1] * 5, 9).legend() == "H-bonds (5 of 9)"
+    assert HBondOverlay([1] * 5, 5, 3).legend() == "H-bonds (5, 3 not shown)"
+    assert HBondOverlay([1] * 5, 9, 2).legend() == "H-bonds (5 of 9, 2 not shown)"
+    look = resolve_style(None, None, ["hbonds=interchain", "hbond_max=1000"])  # only chains A and B are drawn
+    lay, sses, bb = make_layout(_path("2HHB"), look=look, model=_model("2HHB"), chains=["A", "B"])
+    overlay = hbond_overlay(lay, route_loops(lay, sses, bb), sses, look, _model("2HHB"))
+    assert overlay.unplaced > 0 and overlay.legend() == f"H-bonds ({len(overlay.lines)}, {overlay.unplaced} not shown)"
+
+
+def test_long_lines_fade_and_short_ones_do_not():
+    from foldmap.render import hbond_alpha
+
+    assert hbond_alpha(0.0, 100.0) == 1.0 and hbond_alpha(15.0, 100.0) == 1.0
+    assert hbond_alpha(50.0, 100.0) == pytest.approx(0.4) == hbond_alpha(400.0, 100.0)
+    assert 0.4 < hbond_alpha(30.0, 100.0) < 1.0
+    fig = _drawn("30QM", "hbonds=na")[0]
+    alphas = [l.get_alpha() for l in _lines(fig)]
+    assert max(alphas) == 1.0 and min(alphas) < 0.9 and min(alphas) >= 0.4
+
+
+def test_lines_sit_below_the_beads_and_the_rails():
+    fig = _drawn("1LMB", "hbonds=na")[0]
+    assert {l.get_zorder() for l in _lines(fig)} == {2.15}
+    beads = [a for a in fig.axes[0].collections + fig.axes[0].patches if a.get_zorder() >= 2.2]
+    assert beads  # the beads and rails draw above the dashes
 
 
 def test_off_draws_nothing_and_the_overlay_moves_no_element():

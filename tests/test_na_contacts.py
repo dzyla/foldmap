@@ -5,13 +5,14 @@ from pathlib import Path
 
 import gemmi
 import pytest
+from matplotlib.colors import to_hex
 
 from foldmap.cli import make_layout
 from foldmap.io import read_model
 from foldmap.nacheck import CONTACT, verify_contacts
 from foldmap.render import draw
 from foldmap.route import route_loops
-from foldmap.style import Style
+from foldmap.style import THEMES, Style
 
 DATA = Path(__file__).parent / "data"
 WITH_PROTEIN = ["30QM", "4OO8", "1KX5", "1IHF", "3CRX", "4YBB", "1LMB", "1ZAA"]
@@ -207,3 +208,56 @@ def test_letters_style_beads_have_the_hover_too():
     for mark in data["beads"]["marks"]:
         assert f'id="na:nt:{mark}"' in page
     assert "na:nt:" in page.split("itemAt")[1]  # the page script maps those letters to the note
+
+
+def test_the_nucleic_acid_legend_entry_is_a_thick_stroke_in_the_backbone_colour_not_a_square():
+    for theme in ("publication", "print", "blueprint"):
+        look = THEMES[theme]
+        fig = _build(
+            "1LMB",
+            palette=look.palette,
+            dna_color=look.dna_color,
+            fill=look.fill,
+            background=look.background,
+            ink=look.ink,
+        )[3]
+        ax = fig.axes[0]
+        (rail,) = [l for l in ax.lines if l.get_gid() == "legend-na"]
+        if theme != "blueprint":  # there the colour is lightened to read on the dark page
+            assert to_hex(rail.get_color()) == look.dna_color
+        assert rail.get_linewidth() > 2
+        assert [p for p in ax.patches if (p.get_gid() or "").startswith("legend-chain:")]  # chains keep their squares
+
+
+def test_contacts_command_is_clean_on_1lmb(capsys):
+    from foldmap.cli import main
+
+    assert main(["contacts", str(_path("1LMB"))]) == 0
+    out = capsys.readouterr().out
+    assert "beads drawn 21, verified 21, false 0, missing 0, unmatched 0, wrong colour 0, not first 0" in out
+    assert "\n  " not in out  # no problem lines
+
+
+def test_contacts_command_names_a_false_bead_and_exits_1(monkeypatch, capsys):
+    import foldmap.cli as cli
+    from foldmap.cli import main
+
+    real = cli.make_layout
+    planted = {}
+
+    def plant(*a, **kw):  # a residue that touches nothing is made the toucher of the first nucleotide
+        lay, sses, bb = real(*a, **kw)
+        na = lay.nucleic
+        far = next(r for r in range(len(bb)) if r not in na.contacts)
+        for v in na.contacts.values():
+            v.discard((0, 0))
+        na.contacts = {r: v for r, v in na.contacts.items() if v}
+        na.contacts[far] = {(0, 0)}
+        na.contact_chain[far] = bb.labels[far].chain
+        planted["residue"] = f"{bb.labels[far].chain}:{bb.labels[far].name}{bb.labels[far].seq}"
+        return lay, sses, bb
+
+    monkeypatch.setattr(cli, "make_layout", plant)
+    assert main(["contacts", str(_path("1ZAA"))]) == 1
+    out = capsys.readouterr().out
+    assert "false 1" in out and "false: " in out and planted["residue"] in out

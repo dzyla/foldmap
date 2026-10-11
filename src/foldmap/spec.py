@@ -268,7 +268,7 @@ def draw_spec(spec: FigureSpec) -> Drawn:
         spec.structure, spec.mode, spec.rotate, spec.flip_v, model=model, **spec.layout_kwargs()
     )
     loops = route_loops(layout, sses, bb)
-    return Drawn(draw(layout, loops, sses, spec.title, look=spec.look), loops, layout, sses, bb, model)
+    return Drawn(draw(layout, loops, sses, spec.title, model=model, look=spec.look), loops, layout, sses, bb, model)
 
 
 def layout_document(spec: FigureSpec, structure_name: str | None = None) -> dict:

@@ -176,7 +176,8 @@ Themes change only how things are drawn, never where. `foldmap styles` lists the
 Change any key with `--set KEY=VALUE` (repeatable) or a YAML file for `--style-file`. Commonly used keys:
 `color_by`, `palette`, `fill`, `loops`, `loop_color` (`residue` colours loops residue by residue),
 `residue_numbers`, `highlight` (`asu`, `protomer` or chains), `mark` (elements in a colour of their own),
-`ligands` (`auto`, `all`, `none` or codes like `HEM,ZN`), `disulfides`, `glycans`, `helices_310`, `dna_extent`
+`ligands` (`auto`, `all`, `none` or codes like `HEM,ZN`), `na_backbone`, `backbone_colors`, `dna_color`, `rna_color`,
+`hbonds`, `hbond_color`, `hbond_max`, `disulfides`, `glycans`, `helices_310`, `dna_extent`
 (`contacts` or `all`), `background`, `ink`, `helix_scale`, `strand_scale`, `font_scale`.
 
 ## Shaping a figure
@@ -201,13 +202,38 @@ Elements are named by label (`A`, `α2`, `η1`), `chain:label`, position (`#3`) 
 layout options, domains and edits, with element references stored as residue ranges so they survive a new model.
 `foldmap plot model.cif --layout-file fig.yaml -o fig.svg` re-renders it; the command line overrides the file.
 
+**Nucleic-acid colours.** DNA backbones are brown (`dna_color`, `#8c564b`) and RNA backbones purple (`rna_color`,
+`#6a3d9a`), so they read apart from the black protein loops; contact beads keep the colour of the protein chain that
+touches them. `na_backbone` chooses the scheme: `modality` (the default: `dna_color` and `rna_color`), `chain` (one
+colour per nucleic-acid chain), `ink` (as the loops) or a single colour for all nucleic acid (`#rrggbb` or a name).
+`backbone_colors` overrides single backbones: a comma-separated list of `KEY=COLOUR`, where KEY is a chain id, or
+`protein`, `dna` or `rna`. A chain key beats a modality key, and `protein` or a protein chain id recolours the loops.
+Chain ids must exist in the figure (an unknown one is an error that lists the chains). Example, on a figure with
+protein chain A and DNA chains I and J (1KX5):
+
+```bash
+foldmap plot 1KX5 --set 'backbone_colors=A=#1f77b4,dna=#555555,I=crimson' -o 1kx5.svg
+```
+
 **Hydrogen bonds.** `--set hbonds=na` draws dashed lines for the hydrogen bonds between protein and DNA/RNA,
 `interchain` between all different chains, `chains:A+B,C+D` between the listed chain pairs (default `off`). Bonds are
 found from the heavy atoms (donor and acceptor 2.5-3.5 Å apart, with the donor's hydrogen able to point at the
 acceptor), then drawn as one thin line per residue pair, from the residue's point on its element or loop to the
-nucleotide's (or partner residue's) point, under the elements and letters. At most `hbond_max` lines are drawn
-(default 200, the shortest kept) and the legend counts them; `hbond_color` sets the colour. Only drawing changes, never
-the layout. Example: `foldmap plot 1LMB.cif --set hbonds=na -o 1lmb.svg`.
+nucleotide's (or partner residue's) point, under the contact beads, elements and letters. Long lines fade (down to
+40% opacity beyond half the page diagonal). At most `hbond_max` lines are drawn (default 200); when more are found
+the shortest *on the page* are kept (not the shortest in Å) and the legend reads "H-bonds (n of m)", with
+", k not shown" for pairs whose residue is not drawn (cropped nucleic acid, other chains). `hbond_color` sets the
+colour (the default is chosen per theme to stand clear of the chain colours, the backbones and the ink). Only drawing
+changes, never the layout. Example: `foldmap plot 1LMB.cif --set hbonds=na -o 1lmb.svg`.
+
+On large complexes the lines can pile up into a hairball (30QM with `hbonds=na` draws 79). Restrict them with
+`chains:` (`--set hbonds=chains:A+B`) or lower `hbond_max` (`--set hbond_max=30`).
+
+**Checking the contact beads.** `foldmap contacts 1LMB.cif` draws the figure `plot` would (it takes the same options),
+checks every contact bead against the deposited atoms with an independent search, and prints how many beads were
+drawn, verified, false, missing, unmatched, in the wrong colour or not on the first toucher, plus a line for each
+problem bead. It exits 0 when clean and 1 on any false, unmatched or wrong-colour bead; `-o fig.svg` also saves the
+figure.
 
 ## UniProt annotation
 
