@@ -38,18 +38,19 @@ LIMITS = {  # metric: (lowest or highest allowed, "min" or "max")
 # campaign (Task 13). 4YBB: run AA:26 across the free ends AA:2-8 and AA:557-566; two contact beads overlapping;
 # the "... 36 nt ..." label on stem P34 and on a run.
 # Routing, step 3: with the stems where 3D has them (C2), 4LD0's run from DNA 4 to DNA 2 crosses near the junction
-# and two of 4OO8's contact beads overlap; held until the routing step (C1, C8, C12) is in.
+# and two of 4OO8's contact beads overlap; with no margin between consecutive pieces (C3), two of 1KX5's joints
+# cross other strands where the two gyres' pieces now meet. Held until the routing step (C1, C8, C12) is in.
 CAMPAIGN = {
-    "na_crossings": {"4YBB": 2, "4LD0": 1},
+    "na_crossings": {"4YBB": 2, "4LD0": 1, "1KX5": 2},
     "bead_overlaps": {"4YBB": 2, "4OO8": 1},
     "gap_label_collisions": {"4YBB": 2},
 }
 # stems_nearer_frac (target 1.0) held at its measured value (absent: 1.0)
 NEARER: dict[str, float] = {}
 # LIMITS held at a fixture's measured value until a later step: 3CRX's four-Cre assembly (C5) is seen edge-on to
-# the junction plane (arms 3, 4, 1, 2 in a row), drawn as an X; 1RVA's duplex, projected (C4) instead of unrolled,
-# is seen nearly end-on and drawn beside the dimer rather than in its cleft
-HELD = {("3CRX", "procrustes"): 0.817, ("1RVA", "contact_auc"): 0.58}
+# the junction plane (arms 3, 4, 1, 2 in a row), drawn as an X (C2 and C3 leave it at 0.817: it has no runs or
+# joints). 1RVA's contact_auc hold (0.58) went with C3: its two pieces meet across the kink (0.609).
+HELD = {("3CRX", "procrustes"): 0.817}
 # what each fixture cannot measure (None): Spearman under 5 stems, contacts without protein, bends without a
 # split duplex; every other metric must be there, so a check that stops measuring fails
 BENDS = {"bend_3d", "bend_drawn", "joint_error_max"}

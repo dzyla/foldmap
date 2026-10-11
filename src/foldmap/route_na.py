@@ -426,6 +426,12 @@ def _strand_between(router: _Router, s: int, i: int, j: int, da: PlacedStem, db:
         elif off_names(bowed):
             return NAPath("run", s, nts, bowed, _spaced(bowed, m), between=between)
     route, _ = router.route(fa, ea, da, fb, eb, db, own_body=True)
+    if route is None and joint and _clear(_xy([fa, fb]), own, *router.elements, kink=True):
+        # pieces that touch or overlap (no overlap is kept between them): the duplex carries on straight across
+        # their meeting corner, as a kink joins two pieces of one helix
+        for c in router.grid.cells_along(fa, fb):
+            router.grid.used[c] += 1
+        return NAPath("joint", s, [], _xy([ra, fa, fb, rb]), [], between=between)
     fallback = route is None
     if route is None:
         route = _curve(fa, ea, fb, eb)

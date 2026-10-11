@@ -41,11 +41,17 @@ def _gid(fig, prefix):
 
 @pytest.mark.parametrize("pdb", FIXTURES)
 def test_every_stem_piece_is_placed_without_overlap(pdb):
+    from foldmap.layout import joined_pieces
+
     lay, _, _ = make_layout(_path(pdb))
     pieces = len(lay.stems)
     assert pieces >= len(lay.nucleic.structure.stems) > 0
-    boxes = [p.rect for p in lay.placed.values()] + [d.rect for d in lay.stems]
-    assert not any(_overlap(a, b) for k, a in enumerate(boxes) for b in boxes[k + 1 :])
+    joined = joined_pieces(lay.stems, lay.nucleic)  # consecutive pieces of a bent duplex meet at their joint
+    boxes = [(p.sse.id, p.rect) for p in lay.placed.values()] + [(d.id, d.rect) for d in lay.stems]
+    assert not any(
+        _overlap(a, b) and frozenset((i, j)) not in joined for k, (i, a) in enumerate(boxes) for j, b in boxes[k + 1 :]
+    )
+    boxes = [b for _, b in boxes]
     x0, y0, x1, y1 = lay.bounds
     assert all(x0 <= r[0] and r[2] <= x1 and y0 <= r[1] and r[3] <= y1 for r in boxes)
 
@@ -78,13 +84,48 @@ def _joints(lay):
 @pytest.mark.parametrize("pdb", ["1KX5", "1IHF"])
 def test_a_bent_duplex_is_a_chain_of_pieces_end_to_end(pdb):
     """Consecutive pieces stay near each other. Box separation parts tilted pieces, so a joint can be a couple of
-    duplex widths long; Task 7 routes joints as loops between stem ends (route_nucleic, _clear). This bounds the
-    current lengths (1KX5 at most 2.47 widths, 1IHF 1.60) against regressions."""
+    duplex widths long; Task 7 routes joints as loops between stem ends (route_nucleic, _clear). With no margin
+    kept between consecutive pieces (C3) this bounds the current lengths (1KX5 at most 2.13 widths, 1IHF 2.27; were
+    2.47 and 2.42) against regressions."""
     lay, _, _ = make_layout(_path(pdb))
     joints = _joints(lay)
     assert len(joints) >= (40 if pdb == "1KX5" else 4)  # both strands at every joint
     gaps = [float(np.hypot(*(q - p))) / w for p, q, w in joints]
-    assert max(gaps) <= 2.6, sorted(gaps)[-5:]
+    assert max(gaps) <= 2.3, sorted(gaps)[-5:]
+
+
+def _crosses_box(p, q, box) -> bool:
+    """Does the segment p-q pass through the inside of box (x0, y0, x1, y1)?"""
+    from foldmap.route import clip_len
+
+    return clip_len(np.asarray(p, float), np.asarray(q, float), box) > 1e-9
+
+
+def test_few_elements_are_placed_between_consecutive_pieces_of_a_bent_duplex():
+    """1IHF: the joint springs held the pieces' ends together but the overlap term pushed their boxes a margin
+    apart, so six of the protein's elements came between DNA 1b and DNA 1c (on a joint, or on the line between the
+    middles of its two strands' steps). Consecutive pieces of one duplex keep no margin between them and are
+    separated together; two elements remain, a regression bound: IHF's arms wrap the DNA in 3D, so in projection
+    they lie over it between its pieces (review.md; making the joints firmer collapses the nucleosome ring)."""
+    lay, _, _ = make_layout(_path("1IHF"))
+    at = {key: d for d in lay.stems for key in d.axial}
+    steps: dict[tuple[str, str], list] = {}
+    for s, strand in enumerate(lay.nucleic.strands):
+        for i in range(len(strand) - 1):
+            d, e = at.get((s, i)), at.get((s, i + 1))
+            if d is not None and e is not None and d is not e and d.parent and d.parent == e.parent:
+                steps.setdefault(tuple(sorted((d.id, e.id))), []).append(
+                    (d, e, d.port((s, i), True)[0], e.port((s, i + 1), False)[0])
+                )
+    assert len(steps) == 2 and all(len(v) == 2 for v in steps.values())
+    between = []
+    for (d, e, p0, q0), (_, _, p1, q1) in steps.values():
+        lines = [(p0, q0), (p1, q1), ((p0 + q1) / 2, (q0 + p1) / 2)]
+        others = [(p.sse.id, p.rect) for p in lay.placed.values()] + [
+            (x.name, x.rect) for x in lay.stems if x not in (d, e)
+        ]
+        between += [name for name, box in others if any(_crosses_box(a, b, box) for a, b in lines)]
+    assert len(between) <= 2, between  # A:50-57 and A:76-83 (six before)
 
 
 def _joined_both_ways(lay):
@@ -550,7 +591,9 @@ def test_runs_go_round_the_other_elements():
 @pytest.mark.parametrize("pdb", ["1KX5", "1IHF", "3CRX", "30QM", "4OO8"])
 def test_joints_and_runs_cross_no_stem_or_element(pdb):
     """Every run and every joint between two pieces of a bent duplex, as drawn from where it leaves its own stems'
-    bodies, passes the router's own final check (route._clear) against every element and stem."""
+    bodies, passes the router's own final check (route._clear) against every element and stem. A joint drawn
+    straight from face to face (two pieces that touch or overlap, which no overlap term keeps apart) is checked as a
+    kink: clear of every element and stem but its own two."""
     from foldmap.route import _clear, _element_obstacles
     from foldmap.route_na import outside_own
 
@@ -561,7 +604,10 @@ def test_joints_and_runs_cross_no_stem_or_element(pdb):
     for p in lay.na_paths:
         if p.kind in kinds:
             own = tuple(at[key] for key in p.between)
-            assert _clear(outside_own(p.points, own), own, rects, owners, own_body=True), (p.kind, p.strand, p.between)
+            if p.kind == "joint" and len(p.points) == 4:
+                assert _clear(p.points[1:3], own, rects, owners, kink=True), (p.kind, p.strand, p.between)
+            else:
+                assert _clear(outside_own(p.points, own), own, rects, owners, own_body=True), (p.kind, p.between)
             kinds[p.kind] += 1
     assert kinds["joint"] >= (20 if pdb == "1KX5" else 2 if pdb == "1IHF" else 0)
     assert kinds["run"] or pdb == "1KX5"

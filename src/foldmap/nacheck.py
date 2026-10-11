@@ -21,7 +21,7 @@ from scipy.stats import spearmanr
 
 from .frame import Frame
 from .io import CONTACT
-from .layout import SCALE, stem_pieces
+from .layout import SCALE, joined_pieces, stem_pieces
 from .nucleic import stem_axis
 from .route import clip_len
 from .route_na import crosses_body, in_body, outside_own
@@ -557,7 +557,8 @@ def na_crossings(lay, loops) -> dict:
 
 
 def render_checks(lay, loops, fig, sses, *, model=None, bb=None) -> dict:
-    """Rendering defects of a drawn figure: overlaps (element or stem boxes overlapping), text_off_page,
+    """Rendering defects of a drawn figure: overlaps (element or stem boxes overlapping, except two consecutive
+    pieces of one bent duplex, which meet at their joint: layout.joined_pieces), text_off_page,
     letter_overlaps (base letters overlapping by more than a third of the smaller glyph box), beads_missing,
     bead_colour_wrong, beads_false and beads_unmatched (verify_contacts on the figure's beads: unbeaded contacts
     counted as defects, beads not in their toucher's chain colour, beads no atoms back, beads naming a residue or
@@ -570,11 +571,14 @@ def render_checks(lay, loops, fig, sses, *, model=None, bb=None) -> dict:
     from; without them they are None (not measured)."""
     from matplotlib.backends.backend_agg import FigureCanvasAgg
 
-    boxes = [p.rect for p in lay.placed.values()] + [d.rect for d in lay.stems]
+    joined = joined_pieces(lay.stems, lay.nucleic) if lay.nucleic is not None else set()
+    boxes = [(p.sse.id, p.rect) for p in lay.placed.values()] + [(d.id, d.rect) for d in lay.stems]
     overlaps = sum(
         1
-        for a, b in combinations(boxes, 2)
-        if min(a[2], b[2]) - max(a[0], b[0]) > 1e-6 and min(a[3], b[3]) - max(a[1], b[1]) > 1e-6
+        for (i, a), (j, b) in combinations(boxes, 2)
+        if min(a[2], b[2]) - max(a[0], b[0]) > 1e-6
+        and min(a[3], b[3]) - max(a[1], b[1]) > 1e-6
+        and frozenset((i, j)) not in joined
     )
     canvas = FigureCanvasAgg(fig)
     canvas.draw()

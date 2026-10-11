@@ -152,7 +152,7 @@ def _pushed_apart(monkeypatch, items, ties):
 
     left = []
     real = layout._slide_clear
-    monkeypatch.setattr(layout, "_slide_clear", lambda its: left.append(_overlaps(its)) or real(its))
+    monkeypatch.setattr(layout, "_slide_clear", lambda its, *a: left.append(_overlaps(its)) or real(its, *a))
     layout._separate(items, ties)
     assert _overlaps(items) == 0
     return left[0]

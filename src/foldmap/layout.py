@@ -387,32 +387,47 @@ def _bundle_item(group: list[SSE], frame: Frame, angle_mode: str, width: float) 
     )
 
 
-def _overlapping(xy: np.ndarray, halves: np.ndarray, mids: np.ndarray) -> np.ndarray:
-    """(i, j) with i < j, in row order, for every pair of footprints (plus MARGIN) that overlap."""
+def _overlapping(xy: np.ndarray, halves: np.ndarray, mids: np.ndarray, apart: np.ndarray | None = None) -> np.ndarray:
+    """(i, j) with i < j, in row order, for every pair of footprints (plus MARGIN) that overlap; pairs marked in
+    the boolean matrix `apart` (_joint_matrix) are never counted."""
     q = xy + mids
     depth = halves[:, None, :] + halves[None, :, :] + MARGIN - np.abs(q[None, :, :] - q[:, None, :])
-    return np.argwhere(np.triu((depth[..., 0] > 1e-9) & (depth[..., 1] > 1e-9), 1))
+    hit = (depth[..., 0] > 1e-9) & (depth[..., 1] > 1e-9)
+    if apart is not None:
+        hit &= ~apart
+    return np.argwhere(np.triu(hit, 1))
 
 
-def _separate(items: list[_Item], ties: dict[int, tuple[int, int]] | None = None) -> None:
+def _joint_matrix(n: int, joints) -> np.ndarray:
+    """Boolean n x n matrix, True for both orders of every item pair in `joints` (_joints)."""
+    m = np.zeros((n, n), bool)
+    for i, j in joints:
+        m[i, j] = m[j, i] = True
+    return m
+
+
+def _separate(
+    items: list[_Item], ties: dict[int, tuple[int, int]] | None = None, joints: set[tuple[int, int]] = frozenset()
+) -> None:
     """Push overlapping items apart, then slide any left over clear. With `ties` (_symmetry_ties) the pushes
     keep every protomer drawn alike (_push_apart), and that result is kept if it clears every overlap within
     _SEP_ORBIT_SWEEPS sweeps and its box takes at most _SEP_SYM_ROOM times the area of moving the items one by
     one from the same start (widening the spread can otherwise cost far more room); else the one-by-one
-    result is used."""
+    result is used. Consecutive pieces of one bent duplex (`joints`, _joints) are never pushed apart."""
     halves = np.array([it.half for it in items], float).reshape(-1, 2)
     mids = np.array([it.mid for it in items], float).reshape(-1, 2)
     start = np.array([(it.cx, it.cy) for it in items], float).reshape(-1, 2)
     home = np.array([it.home for it in items], float).reshape(-1, 2)
+    apart = _joint_matrix(len(items), joints)
     xy = start.copy()
     alone = start.copy()
-    _push_apart(alone, halves, mids, home, {}, _SEP_SWEEPS)
-    together = ties and _push_apart(xy, halves, mids, home, ties, _SEP_ORBIT_SWEEPS)
+    _push_apart(alone, halves, mids, home, {}, _SEP_SWEEPS, apart)
+    together = ties and _push_apart(xy, halves, mids, home, ties, _SEP_ORBIT_SWEEPS, apart)
     if not together or _box_area(xy, halves, mids) > _SEP_SYM_ROOM * _box_area(alone, halves, mids):
         xy = alone
     for it, (x, y) in zip(items, xy.tolist()):
         it.cx, it.cy = x, y
-    _slide_clear(items)
+    _slide_clear(items, joints)
 
 
 def _box_area(xy: np.ndarray, halves: np.ndarray, mids: np.ndarray) -> float:
@@ -429,13 +444,16 @@ def _push_apart(
     home: np.ndarray,
     ties: dict[int, tuple[int, int]],
     sweeps: int,
+    apart: np.ndarray | None = None,
 ) -> bool:
     """Push overlapping footprints apart in place (axis of least penetration); spring back to home early on.
     Each sweep finds the overlapping pairs at once and resolves them in order. With `ties` a push moves an
     item's whole orbit (it and its symmetry copies) by the same amount, and a sideways push between two
     protomers moves protomer k by k times the amount when that widens the spread between protomers (also
     between two copies of one element); otherwise two copies of one element, which no orbit-wide move can
-    part, move alone. True if no overlap is left."""
+    part, move alone. Items joined by `apart` (consecutive pieces of one bent duplex) are never pushed apart: a push
+    moves the whole chain of pieces (with their orbits); two items of one such group that overlap move alone.
+    True if no overlap is left."""
     n = len(xy)
     root = list(range(n))  # the protomer-0 item of each item's orbit
     copy_k = np.zeros(n)  # protomer of each copy (0 for everything else)
@@ -444,11 +462,23 @@ def _push_apart(
     orbits: dict[int, list[int]] = {}
     for i, r in enumerate(root):
         orbits.setdefault(r, []).append(i)
-    group = [np.array(orbits[r]) for r in root]
+    chain = list(range(n))  # a representative of each item's chain of joined pieces (union-find)
+
+    def find(i):
+        while chain[i] != i:
+            i = chain[i]
+        return i
+
+    for i, j in np.argwhere(np.triu(apart, 1)).tolist() if apart is not None else []:
+        chain[max(find(i), find(j))] = min(find(i), find(j))
+    pieces: dict[int, list[int]] = {}
+    for i in range(n):
+        pieces.setdefault(find(i), []).append(i)
+    group = [np.array(sorted({p for m in orbits[r] for p in pieces[find(m)]})) for r in root]
     protomer = [copy_k[i] if len(orbits[root[i]]) > 1 else None for i in range(n)]  # None: item has no copies
     widen = np.sign(sum((xy[i, 0] - xy[j, 0]) / k for i, (j, k) in ties.items())) or 1.0  # protomer k lies this way
     for sweep in range(sweeps):
-        pairs = _overlapping(xy, halves, mids)
+        pairs = _overlapping(xy, halves, mids, apart)
         if not len(pairs) and sweep >= 100:
             return True
         for i, j in pairs.tolist():
@@ -458,7 +488,7 @@ def _push_apart(
             py = halves[i, 1] + halves[j, 1] + MARGIN - abs(dy)
             if px <= 1e-9 or py <= 1e-9:  # an earlier push this sweep already cleared it
                 continue
-            gi, gj = (group[i], group[j]) if root[i] != root[j] else (i, j)
+            gi, gj = (group[i], group[j]) if not np.isin(group[i], group[j]).any() else (i, j)
             if px < py:
                 s = (1 if dx > 0 else -1) if dx != 0 else 1
                 if None not in (protomer[i], protomer[j]) and protomer[i] != protomer[j]:
@@ -474,22 +504,24 @@ def _push_apart(
                 xy[gj, 1] += s * (py / 2 + _SEP_PUSH)
         if sweep < 100:
             xy += 0.03 * (home - xy)
-    return not len(_overlapping(xy, halves, mids))
+    return not len(_overlapping(xy, halves, mids, apart))
 
 
-def _slide_clear(items: list[_Item]) -> None:
-    """Guarantee: each item in turn, if it still overlaps one already settled, takes the nearest clear spot
-    straight right, left, up or down (in that order on a tie), in _SLIDE_STEP steps."""
+def _slide_clear(items: list[_Item], joints: set[tuple[int, int]] = frozenset()) -> None:
+    """Guarantee: each item in turn, if it still overlaps one already settled (other than a piece it is joined
+    to, `joints`), takes the nearest clear spot straight right, left, up or down (in that order on a tie), in
+    _SLIDE_STEP steps."""
     halves = [it.half for it in items]
     mids = [it.mid for it in items]
     for i, it in enumerate(items):
         x0, y0 = it.cx, it.cy
+        settled = [(items[j], halves[j], mids[j]) for j in range(i) if (j, i) not in joints]
         k = 0
-        while any(_collide(it, halves[i], mids[i], items[j], halves[j], mids[j]) for j in range(i)):
+        while any(_collide(it, halves[i], mids[i], *other) for other in settled):
             k += 1
             for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
                 it.cx, it.cy = x0 + k * dx * _SLIDE_STEP, y0 + k * dy * _SLIDE_STEP
-                if not any(_collide(it, halves[i], mids[i], items[j], halves[j], mids[j]) for j in range(i)):
+                if not any(_collide(it, halves[i], mids[i], *other) for other in settled):
                     break
 
 
@@ -724,12 +756,14 @@ def _attract(
     lift: float = 0.0,
     bridges: list[tuple[str, float, str, float]] = (),
     extra: list[tuple[int, np.ndarray, int, np.ndarray, float, float]] = (),
+    joints: set[tuple[int, int]] = frozenset(),
 ) -> None:
     """Minimise the layout energy (_energy) from the projected positions, raising the overlap penalty in
     stages. The result becomes each item's new home; _separate then guarantees no overlap remains. Every input
     is snapped to the grid (_snap) and _lbfgs runs without BLAS, so the minimum is the same on every machine.
     `extra`: further springs (item i, port offset, item j, port offset, weight, slack), the nucleic-acid strands
-    from stem to stem (_stem_springs)."""
+    from stem to stem (_stem_springs). `joints` (_joints): pairs of items kept apart without MARGIN, so their
+    boxes may touch and no element fits between them for long."""
     n = len(items)
     W = _contact_weights(items, contacts)
     ci, cj = np.nonzero(np.triu(W > 0, 1))
@@ -769,6 +803,8 @@ def _attract(
     home = _snap([it.home for it in items])
     h = _snap([it.half for it in items])
     want = h[:, None, :] + h[None, :, :] + MARGIN
+    joined = _joint_matrix(n, joints)  # consecutive pieces of a bent duplex: they may touch, with no margin between
+    want[joined] = (h[:, None, :] + h[None, :, :])[joined]
     anchor_w = _K_HOME * np.array([[_mass(it)] for it in items], float)
     mids = _snap([it.mid for it in items])
     spread, lift = float(_snap(spread)), float(_snap(lift))
@@ -1159,6 +1195,48 @@ _SHORT_RUN = 2
 _W_SHORT = 10.0
 
 
+def _strand_steps(items: list[_Item], na: Nucleic):
+    """(strand, nucleotide i, next held nucleotide j, (item, stem) of i, (item, stem) of j) for each step of a
+    strand from one stem item to another."""
+    at = {key: (k, m) for k, it in enumerate(items) for m in it.members if isinstance(m, PlacedStem) for key in m.axial}
+    for s, strand in enumerate(na.strands):
+        held = [i for i in range(len(strand)) if (s, i) in at]
+        for i, j in zip(held, held[1:]):
+            if at[(s, i)][0] != at[(s, j)][0]:
+                yield s, i, j, at[(s, i)], at[(s, j)]
+
+
+def _is_joint(n: int, a: PlacedStem, b: PlacedStem) -> bool:
+    """A step through n nucleotides from piece a to piece b is a joint of one bent duplex."""
+    return n == 0 and bool(a.parent) and a.parent == b.parent
+
+
+def joined_pieces(stems: list[PlacedStem], na: Nucleic) -> set[frozenset[str]]:
+    """The ids of every two consecutive pieces of one bent duplex (a strand steps from one to the next with no
+    nucleotide between): they may meet or overlap on the page (_joints)."""
+    at = {key: d for d in stems for key in d.axial}
+    return {
+        frozenset((d.id, e.id))
+        for s, strand in enumerate(na.strands)
+        for i in range(len(strand) - 1)
+        if (d := at.get((s, i))) is not None
+        and (e := at.get((s, i + 1))) is not None
+        and d is not e
+        and _is_joint(0, d, e)
+    }
+
+
+def _joints(items: list[_Item], na: Nucleic) -> set[tuple[int, int]]:
+    """(i, j), i < j: the items of two consecutive pieces of one bent duplex. _attract keeps no MARGIN between
+    them (their boxes may touch, the joint spring holding them end to end), and _separate and _slide_clear never
+    part them (a push moves the chain of pieces together): no margin is kept open for an element to fill."""
+    return {
+        (min(ki, kj), max(ki, kj))
+        for s, i, j, (ki, mi), (kj, mj) in _strand_steps(items, na)
+        if _is_joint(j - i - 1, mi, mj)
+    }
+
+
 def _stem_springs(items: list[_Item], na: Nucleic) -> list[tuple[int, np.ndarray, int, np.ndarray, float, float]]:
     """(item, port offset, item, port offset, weight, slack) along each strand from one stem to the next: the
     joint between two pieces of a bent duplex holds them end to end; a strand exchange (at most _SHORT_RUN
@@ -1166,26 +1244,19 @@ def _stem_springs(items: list[_Item], na: Nucleic) -> list[tuple[int, np.ndarray
     steps); any other run pulls its two stems together like a loop, with slack for its nucleotides or, when longer,
     the distance between its ends at the items' home (projected) places."""
     owner = _owner(items)
-    stems = [(k, m) for k, it in enumerate(items) for m in it.members if isinstance(m, PlacedStem)]
-    at = {key: (k, m) for k, m in stems for key in m.axial}
     out = []
-    for s, strand in enumerate(na.strands):
-        held = [i for i in range(len(strand)) if (s, i) in at]
-        for i, j in zip(held, held[1:]):
-            (ki, mi), (kj, mj) = at[(s, i)], at[(s, j)]
-            if ki == kj:
-                continue
-            oi = np.subtract(mi.port((s, i), True)[0], (mi.cx, mi.cy)) + owner[mi.id][2]
-            oj = np.subtract(mj.port((s, j), False)[0], (mj.cx, mj.cy)) + owner[mj.id][2]
-            n = j - i - 1
-            if n == 0 and mi.parent and mi.parent == mj.parent:  # a joint: the duplex carries on
-                w, slack = _W_JOINT, _JOINT_SLACK
-            elif n <= _SHORT_RUN and len({*mi.strands, *mj.strands}) > 2:  # a strand exchange: ends held close
-                w, slack = _W_SHORT, max(_JOINT_SLACK, n * NT_STEP)
-            else:  # pulls only beyond the distance seen between its ends: the stems keep their 3D arrangement
-                seen = np.add(items[kj].home, oj) - np.add(items[ki].home, oi)
-                w, slack = _W_SEQ, max(_LOOP_SLACK, 0.5 * n * NT_STEP, float(_snap(np.hypot(*seen))))
-            out.append((ki, oi, kj, oj, w, slack))
+    for s, i, j, (ki, mi), (kj, mj) in _strand_steps(items, na):
+        oi = np.subtract(mi.port((s, i), True)[0], (mi.cx, mi.cy)) + owner[mi.id][2]
+        oj = np.subtract(mj.port((s, j), False)[0], (mj.cx, mj.cy)) + owner[mj.id][2]
+        n = j - i - 1
+        if _is_joint(n, mi, mj):  # a joint: the duplex carries on
+            w, slack = _W_JOINT, _JOINT_SLACK
+        elif n <= _SHORT_RUN and len({*mi.strands, *mj.strands}) > 2:  # a strand exchange: ends held close
+            w, slack = _W_SHORT, max(_JOINT_SLACK, n * NT_STEP)
+        else:  # pulls only beyond the distance seen between its ends: the stems keep their 3D arrangement
+            seen = np.add(items[kj].home, oj) - np.add(items[ki].home, oi)
+            w, slack = _W_SEQ, max(_LOOP_SLACK, 0.5 * n * NT_STEP, float(_snap(np.hypot(*seen))))
+        out.append((ki, oi, kj, oj, w, slack))
     return out
 
 
@@ -1318,8 +1389,10 @@ def _adjust(
     rename: dict[str, str],
     swap: list[tuple[str, str]],
     move: list[tuple[str, tuple[float, float]]],
+    joints: set[tuple[int, int]] = frozenset(),
 ) -> None:
-    """The user's own hand on the layout: new labels, exchanged places, nudges; then overlaps are cleared."""
+    """The user's own hand on the layout: new labels, exchanged places, nudges; then overlaps are cleared
+    (consecutive pieces of a bent duplex, `joints`, may still meet)."""
     where = {
         m.sse.id: (it, k) for it in items for k, m in enumerate(it.members) if isinstance(m, Placed) and not m.ghost
     }
@@ -1348,7 +1421,7 @@ def _adjust(
     if moved:
         for it in items:
             it.home = (it.cx, it.cy)
-        _separate(items)
+        _separate(items, None, joints)
         for it in items:
             it.apply()
 
@@ -1408,6 +1481,7 @@ def build_layout(
         if chain not in (partial or ()):  # fragments of neighbours have no termini of their own
             members[mine[0].id].ends += "N"
             members[mine[-1].id].ends += "C"
+    joints = _joints(items, nucleic) if pieces else set()
     if mode == "stack":
         _stack(items)
         _centre_dna_over_binders(items, contacts)
@@ -1427,12 +1501,11 @@ def build_layout(
                 items[i].home = (items[j].home[0] + k * spread, items[j].home[1] + k * lift)
         if attract and len(items) > 1:
             extra = _stem_springs(items, nucleic) if pieces else []
-            _attract(
-                items, sses, contacts, ties, spread, getattr(frame, "rise", 0.0) * SCALE, bridges or [], extra=extra
-            )
-        _separate(items, ties)
+            rise = getattr(frame, "rise", 0.0) * SCALE
+            _attract(items, sses, contacts, ties, spread, rise, bridges or [], extra=extra, joints=joints)
+        _separate(items, ties, joints)
         if domains and _part_domains(items, domains):
-            _separate(items, ties)
+            _separate(items, ties, joints)
     for it in items:
         it.apply()
     dna = [m for it in items for m in it.members if isinstance(m, PlacedStem)]
@@ -1441,7 +1514,7 @@ def build_layout(
     _assign_labels(placed)
     real = {p.sse.id: p for p in placed}
     if rename or swap or move:
-        _adjust(items, Layout(real, (0.0, 0.0, 0.0, 0.0)), sses, rename or {}, swap or [], move or [])
+        _adjust(items, Layout(real, (0.0, 0.0, 0.0, 0.0)), sses, rename or {}, swap or [], move or [], joints)
     for g in ghosts:
         g.label = real[g.sse.id].label
     rects = np.array([p.rect for p in placed + ghosts + dna]).reshape(-1, 4)
