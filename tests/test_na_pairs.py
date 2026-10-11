@@ -12,7 +12,7 @@ from foldmap.io import _nucleic_strands, load_backbone, load_nucleic, read_model
 from foldmap.nucleic import BasePair, pair_nucleotides, parent_base
 
 NA = Path(__file__).parent / "data" / "na"
-FIXTURES = ["30QM", "1EHZ", "4OO8", "1KX5", "1IHF", "3CRX", "4YBB", "1RVA", "4LD0"]
+FIXTURES = ["30QM", "1EHZ", "4OO8", "1KX5", "1IHF", "3CRX", "4YBB", "1RVA", "4LD0", "1HYS", "1AOI"]
 REFERENCE = json.loads((NA / "reference.json").read_text(encoding="utf-8"))
 
 
@@ -159,3 +159,38 @@ def test_load_nucleic_keeps_four_tuple_pairs_and_the_kinds():
     assert na.pairs == [tuple(p[:4]) for p in na.base_pairs]
     assert {p.kind for p in na.base_pairs} == {"WC", "GU"}
     assert all(len(p) == 4 for p in na.pairs)
+
+
+@pytest.mark.parametrize("pdb", FIXTURES)
+def test_pair_precision_against_rnapolis_is_at_least_098_where_it_was(pdb):
+    # the stretched-bond second pass (C11) adds no pair RNApolis does not call; 4YBB's window held 0.977 before it
+    found = _found(pdb)
+    strands = [s for s, _ in found]
+    ours = _named(strands, pair_nucleotides([run for _, run in found]))
+    theirs = {frozenset((tuple(a), tuple(b))) for a, b, _ in REFERENCE[pdb]}
+    assert len(set(ours) & theirs) / len(ours) >= (0.977 if pdb == "4YBB" else 0.98)
+
+
+def _hys():
+    found = _found("1HYS")
+    return [s for s, _ in found], [run for _, run in found]
+
+
+def test_an_in_register_pair_with_one_stretched_bond_is_accepted():
+    # E868·F886: N1-N3 3.6 Å but N6-O4 3.98 Å, stacked in register on the strict pair E867·F887
+    strands, runs = _hys()
+    pairs = _named(strands, pair_nucleotides(runs))
+    assert pairs[frozenset((("E", 868, ""), ("F", 886, "")))] == "WC"
+    assert frozenset((("E", 875, ""), ("F", 879, ""))) not in pairs  # N6-O4 4.51 Å: beyond the stretch
+
+
+def test_a_stretched_pair_needs_a_strict_neighbour_in_register():
+    # break E867·F887's N1-N3 bond: E868·F886 then stacks on no strict pair (E869 is a bulge) and is not taken
+    strands, runs = _hys()
+    (e867,) = [r for r in runs[0] if r.seqid.num == 867]
+    n1 = e867.find_atom("N1", "*")
+    n1.pos = gemmi.Position(n1.pos.x + 3.0, n1.pos.y, n1.pos.z)
+    pairs = _named(strands, pair_nucleotides(runs))
+    assert frozenset((("E", 867, ""), ("F", 887, ""))) not in pairs
+    assert frozenset((("E", 868, ""), ("F", 886, ""))) not in pairs
+    assert frozenset((("E", 866, ""), ("F", 888, ""))) in pairs  # the strict pairs around are untouched

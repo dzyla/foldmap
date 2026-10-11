@@ -14,6 +14,7 @@ import numpy as np
 from scipy.spatial import cKDTree
 
 HBOND_MAX = 3.8  # Å, donor-acceptor distance of a base-pair hydrogen bond (stretched pairs at 2-3 Å resolution)
+HBOND_STRETCH = 4.0  # Å, the one longer bond a pair stacked in register on a strict pair may have (1HYS, 1AOI)
 C1_PAIR = (9.0, 12.0)  # Å, C1'-C1' across a Watson-Crick or wobble pair (10.5 +- 1.5)
 PLANE_MAX = 45.0  # degrees between the two base planes (TBP and nucleosome DNA reach 40 of propeller twist)
 MIN_LOOP = 3  # a hairpin closes at least this many unpaired nucleotides
@@ -103,10 +104,13 @@ def _normal(res) -> np.ndarray | None:
 def pair_nucleotides(runs: list[list]) -> list[BasePair]:
     """Watson-Crick and G·U wobble pairs among the gemmi residues of each strand (runs[strand][nucleotide]).
 
-    A pair needs its hydrogen bonds (two of the three for G-C), the C1'-C1' span of a paired duplex, roughly
-    coplanar bases in the cis orientation of a double helix and, on one strand, partners more than MIN_LOOP apart
-    (at least MIN_LOOP unpaired nucleotides between them). Each nucleotide keeps its best pair (more bonds, then
-    shorter ones); only mutual best pairs are kept."""
+    A pair needs its hydrogen bonds within HBOND_MAX (two of the three for G-C), the C1'-C1' span of a paired
+    duplex, roughly coplanar bases in the cis orientation of a double helix and, on one strand, partners more
+    than MIN_LOOP apart (at least MIN_LOOP unpaired nucleotides between them). Each nucleotide keeps its best
+    pair (more bonds, then shorter ones); only mutual best pairs are kept. A second pass, among the nucleotides
+    still unpaired, takes a pair whose one bond is within HBOND_MAX and whose other is stretched to at most
+    HBOND_STRETCH, but only where it stacks in register on a pair of the first pass (the next step of the same
+    helix): stretched A·T and A·U pairs inside a duplex at 2-3 Å resolution, never an isolated one."""
     bases = []  # (strand, index, parent, residue, C1' position)
     for s, run in enumerate(runs):
         for i, r in enumerate(run):
@@ -118,7 +122,8 @@ def pair_nucleotides(runs: list[list]) -> list[BasePair]:
         return []
     tree = cKDTree(np.array([b[4] for b in bases]))
     normals: dict[int, np.ndarray | None] = {}
-    best: dict[tuple[int, int], tuple[tuple[int, float], tuple[int, int], str]] = {}
+    strict: list[tuple] = []  # (key, other key, score, kind) per candidate, both orders
+    stretched: list[tuple] = []
     for x, y in sorted(tree.query_pairs(C1_PAIR[1])):
         bx, by = bases[x], bases[y]
         if bx[0] == by[0] and abs(bx[1] - by[1]) <= MIN_LOOP:
@@ -132,13 +137,17 @@ def pair_nucleotides(runs: list[list]) -> list[BasePair]:
         bonds, need, kind = rule
         glycosidic = _base_atom(pyr[3])
         turned = glycosidic is not None and glycosidic.name == "C5"  # pseudouridine
-        found = []
+        lengths = []
         for p_atom, q_atom in bonds:
             q_atom = _PSEUDO.get(q_atom, q_atom) if turned else q_atom
             p, q = pur[3].find_atom(p_atom, "*"), pyr[3].find_atom(q_atom, "*")
-            if p is not None and q is not None and p.pos.dist(q.pos) <= HBOND_MAX:
-                found.append(p.pos.dist(q.pos))
-        if len(found) < need:
+            if p is not None and q is not None:
+                lengths.append(p.pos.dist(q.pos))
+        lengths.sort()
+        found = [d for d in lengths if d <= HBOND_MAX]
+        tight = len(found) >= need
+        loose = len(lengths) >= need and lengths[need - 2] <= HBOND_MAX and lengths[need - 1] <= HBOND_STRETCH
+        if not tight and not loose:  # all but one bond within HBOND_MAX, that one within HBOND_STRETCH
             continue
         for k in (x, y):
             if k not in normals:
@@ -148,17 +157,35 @@ def pair_nucleotides(runs: list[list]) -> list[BasePair]:
             continue
         if not _cis(bx[4], _glycosidic(bx[3]), by[4], _glycosidic(by[3])):
             continue
-        score = (len(found), -float(np.mean(found)))
+        held = found if tight else [d for d in lengths if d <= HBOND_STRETCH]
+        score = (len(held), -float(np.mean(held)))
         for me, other in ((bx, by), (by, bx)):
-            key = (me[0], me[1])
-            if key not in best or score > best[key][0]:
-                best[key] = (score, (other[0], other[1]), kind)
+            (strict if tight else stretched).append(((me[0], me[1]), (other[0], other[1]), score, kind))
+    out = _mutual_best(strict)
+    paired = {key for p in out for key in ((p.a, p.i), (p.b, p.j))}
+    steps = {(p.a, p.i, p.b, p.j) for p in out}
+
+    def in_register(key, other) -> bool:  # stacks on a strict pair: the helix's next step either way
+        (a, i), (b, j) = sorted((key, other))
+        return (a, i - 1, b, j + 1) in steps or (a, i + 1, b, j - 1) in steps
+
+    out |= _mutual_best([c for c in stretched if not {c[0], c[1]} & paired and in_register(c[0], c[1])])
+    return sorted(out)
+
+
+def _mutual_best(candidates: list[tuple]) -> set[BasePair]:
+    """The pairs of (key, other key, score, kind) candidates (both orders listed) that are each nucleotide's best
+    (highest score; the first listed on a tie) for both of its nucleotides."""
+    best: dict[tuple[int, int], tuple] = {}
+    for key, other, score, kind in candidates:
+        if key not in best or score > best[key][0]:
+            best[key] = (score, other, kind)
     out = set()
     for key, (_, other, kind) in best.items():
         if best.get(other, (None, None))[1] == key:
             (a, i), (b, j) = sorted((key, other))
             out.add(BasePair(a, i, b, j, kind))
-    return sorted(out)
+    return out
 
 
 @dataclass(eq=False)

@@ -43,6 +43,9 @@ ENTRIES = {
     # E. coli 30S subunit: 16S rRNA 1-1000 (5' and central domains) and six proteins that bind them
     # (S4 AD, S8 AH, S15 AO, S16 AP, S17 AQ, S20 AT)
     "4YBB": (["AA"], {"AA": (1, 1000)}, ["AD", "AH", "AO", "AP", "AQ", "AT"]),
+    # HIV-1 RT polypurine-tract RNA:DNA hybrid alone, around E868·F886 (one stretched hydrogen bond)
+    "1HYS": (["E", "F"], {"E": (863, 876), "F": (878, 891)}, []),
+    "1AOI": (["I", "J"], {}, []),  # nucleosome DNA alone: one 146-bp duplex with unpaired steps at I20-21, I24-25
 }
 # entries whose assembly is kept: 3CRX's operator lays a copy of every DNA strand on a deposited one (the junction
 # sits on the crystallographic two-fold), which io.read_model must drop
@@ -53,6 +56,8 @@ CONTROLS = {
     "4YBB-psi": ("4YBB", ["DA"], {"DA": (2586, 2608)}),  # 23S rRNA hairpin: pseudouridine 2604 pairs with A2590
     "2OEU": ("2OEU", None, {}),  # hammerhead ribozyme: three stems placed by the strands between them (P2 and P3)
     "2GIS": ("2GIS", ["A"], {}),  # SAM-I riboswitch, RNA only: internal loops and runs between seven stems
+    "1URN": ("1URN", ["C", "R"], {}),  # U1A on an RNA hairpin whose loop is not modelled (U13-C14): a chain break
+    "1QBJ": ("1QBJ", None, {}),  # Zalpha on Z-DNA: strand F pairs only with a crystal mate, drawn as a trace
 }
 
 
