@@ -767,6 +767,9 @@ def build_parser() -> argparse.ArgumentParser:
         "contacts",
         help="check the contact beads of the figure against the coordinates (exit 1 on a false, unmatched or "
         "wrong-colour bead)",
+        description="Draw the figure as `plot` would and check every protein-nucleic acid contact bead against the "
+        "deposited atoms (an independent atom search). Prints a summary and one line per problem bead; exits 1 "
+        "on a false, unmatched or wrong-colour bead, 0 otherwise.",
     )
     for cmd in (q, iq, cq):
         q = cmd
