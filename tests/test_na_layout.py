@@ -2040,3 +2040,15 @@ def test_a_block_bars_first_pair_names_the_partners_chain_when_it_is_another_cha
             across += 1
             assert firsts[f"na:stem:{k}:first"] == f"{own.seq}·{other.chain}:{other.seq}"
     assert across
+
+
+def test_only_traces_of_three_nucleotides_or_more_are_walls():
+    from types import SimpleNamespace
+
+    from foldmap.layout import _trace_walls
+
+    na = SimpleNamespace(contacts={})
+    short = np.array([[0.0, 0.0], [1.0, 0.0]])
+    long = np.array([[5.0, 0.0], [6.0, 0.0], [7.0, 0.0]])
+    assert len(_trace_walls([], {0: short}, na).boxes) == 0
+    assert len(_trace_walls([], {0: short, 1: long}, na).boxes) == 3
