@@ -18,8 +18,8 @@ C1_PAIR = (9.0, 12.0)  # Å, C1'-C1' across a Watson-Crick or wobble pair (10.5 
 PLANE_MAX = 45.0  # degrees between the two base planes (TBP and nucleosome DNA reach 40 of propeller twist)
 MIN_LOOP = 3  # a hairpin closes at least this many unpaired nucleotides
 SEGMENT_TURN = 25.0  # degrees the duplex axis may turn before a new straight piece starts
-SEGMENT_MIN = 8  # stems shorter than this (base pairs) are never split
 PIECE_MIN = 5  # base pairs in the shortest straight piece
+SEGMENT_MIN = 2 * PIECE_MIN  # base pairs in the shortest stem that can split (into two shortest pieces)
 AXIS_WINDOW = 11  # base pairs (about one helical turn) whose C1' atoms give the local duplex axis
 
 # (purine, pyrimidine) parent bases -> the hydrogen bonds checked, how many must hold, the pair kind.
@@ -325,13 +325,15 @@ def stem_axis(stem: Stem, strands) -> tuple[np.ndarray, np.ndarray]:
 
     A stem of a helical turn or more: the principal axis of its backbone points (longer than it is wide).
     A shorter one: the direction perpendicular to every pair's C1'-C1' line, since the pairs turn about the
-    axis; this holds down to two pairs, where a principal axis would point across the stem instead."""
+    axis; this holds down to two pairs, where a principal axis would point across the stem instead. With only
+    two or three pairs whose C1'-C1' lines are nearly parallel (little twist between them), that direction is
+    poorly defined and the axis can tilt far from the true one."""
     a_pts = np.array([strands[p.a].c1[p.i] for p in stem.pairs])
     b_pts = np.array([strands[p.b].c1[p.j] for p in stem.pairs])
     centre = np.vstack([a_pts, b_pts]).mean(axis=0)
     if len(stem) >= AXIS_WINDOW:
         backbone = np.array([strands[s].p[i] for s, i in stem.nucleotides()])
-        axis = np.linalg.svd(backbone - backbone.mean(axis=0))[2][0]
+        axis = np.linalg.svd(backbone - backbone.mean(axis=0), full_matrices=False)[2][0]
     else:
         axis = np.linalg.svd(b_pts - a_pts)[2][2]
     run = (a_pts[-1] + b_pts[-1]) / 2 - (a_pts[0] + b_pts[0]) / 2  # from the outermost pair inward
@@ -358,12 +360,16 @@ def _local_axes(stem: Stem, strands) -> np.ndarray:
 
 def segment_stem(stem: Stem, strands, max_turn: float = SEGMENT_TURN) -> list[Stem]:
     """A long stem cut into straight pieces wherever its axis has turned more than max_turn degrees from the
-    start of the current piece (pieces at least PIECE_MIN pairs). Stems under SEGMENT_MIN pairs stay whole."""
+    start of the current piece (pieces at least PIECE_MIN pairs). Stems under SEGMENT_MIN pairs stay whole.
+    A cut falls only between two pairs that stack directly, so a bulge or mismatch stays inside a piece."""
     if len(stem) < SEGMENT_MIN:
         return [stem]
     axes = _local_axes(stem, strands)
     cuts, start = [0], 0
     for k in range(1, len(stem)):
+        p, q = stem.pairs[k - 1], stem.pairs[k]
+        if q.i != p.i + 1 or q.j != p.j - 1:  # a bulge or mismatch between them: the next plain step takes the cut
+            continue
         turned = np.degrees(np.arccos(np.clip(axes[k] @ axes[start], -1.0, 1.0)))
         if turned > max_turn and k - start >= PIECE_MIN:
             cuts.append(k)
@@ -420,7 +426,7 @@ class StemView:
 def stem_views(structure: NAStructure, strands) -> list[StemView]:
     """Each straight stem piece, weighted by its nucleotides, for choosing the page axes."""
     return [
-        StemView(*stem_axis(piece, strands), 2 * len(piece))
+        StemView(*stem_axis(piece, strands), len(piece.nucleotides()))
         for st in structure.stems
         for piece in segment_stem(st, strands)
     ]

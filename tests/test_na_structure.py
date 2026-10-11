@@ -222,7 +222,8 @@ def test_nucleosome_dna_follows_the_superhelix_in_straight_pieces():
     assert sum(len(p) for p in pieces) == len(st)
     axes = [stem_axis(p, na.strands)[1] for p in pieces]
     turns = [np.degrees(np.arccos(np.clip(a @ b, -1, 1))) for a, b in zip(axes, axes[1:])]
-    assert sum(turns) > 300  # 1.65 turns of superhelix: well over a full circle of bending
+    assert 500 < sum(turns) < 700  # 1.65 turns of superhelix (594 deg), not doubled back by a flipped axis
+    assert max(turns) < 60  # neighbouring pieces turn gently
     assert [p.name for p in pieces[:3]] == ["DNA 1a", "DNA 1b", "DNA 1c"]
     assert all(p.parent == st.id for p in pieces)
     assert straight_duplex(na.structure, na.strands) is None  # bent: not the classic straight picture
@@ -230,6 +231,39 @@ def test_nucleosome_dna_follows_the_superhelix_in_straight_pieces():
 
 def test_ihf_bends_its_dna_by_more_than_150_degrees():
     na = _na("1IHF")
+    assert len({st.a for st in na.structure.stems}) == 1  # both stems run 5'->3' along strand C: axes comparable
     pieces = [p for st in na.structure.stems for p in segment_stem(st, na.strands)]
     assert len(pieces) >= 2
     assert bend([pieces[0], pieces[-1]], na.strands) > 150
+
+
+@pytest.mark.parametrize("max_turn", [25.0, 10.0])
+@pytest.mark.parametrize("pdb", ["1IHF", "1KX5", "30QM", "4OO8", "4YBB"])
+def test_pieces_keep_every_nucleotide_and_bulge_of_their_stem(pdb, max_turn):
+    na = _na(pdb)
+    for st in na.structure.stems:
+        pieces = segment_stem(st, na.strands, max_turn)
+        assert sorted(n for p in pieces for n in p.nucleotides()) == sorted(st.nucleotides())
+        assert sorted(x for p in pieces for x in p.bulges) == st.bulges
+
+
+@pytest.mark.parametrize("pdb", ["1EHZ", "1IHF", "1KX5", "1LMB", "30QM", "4YBB"])
+def test_stem_and_piece_axes_point_along_the_first_arm(pdb):
+    na = _na(pdb)
+    for st in na.structure.stems:
+        for p in [st] + segment_stem(st, na.strands):
+            a, i0, i1 = p.arm5
+            c1 = na.strands[a].c1
+            assert stem_axis(p, na.strands)[1] @ (c1[i1] - c1[i0]) > 0, (p.id, len(p))
+
+
+def test_a_short_stem_axis_crosses_its_pairs_and_rises_with_them():
+    na = _na("1EHZ")
+    (st,) = [s for s in na.structure.stems if s.name == "P3"]  # 4-bp anticodon stem: the cross-vector axis
+    a = np.array([na.strands[p.a].c1[p.i] for p in st.pairs])
+    b = np.array([na.strands[p.b].c1[p.j] for p in st.pairs])
+    _, axis = stem_axis(st, na.strands)
+    across = (b - a) / np.linalg.norm(b - a, axis=1)[:, None]
+    assert np.all(np.abs(across @ axis) < 0.1)  # perpendicular to every C1'-C1' line
+    rise = np.diff((a + b) / 2 @ axis)
+    assert np.all((2.5 < rise) & (rise < 4.5))  # each pair one stacking step further along it (measured 2.8-3.5)
