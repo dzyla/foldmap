@@ -515,3 +515,49 @@ def test_stem_recall_leaves_out_reference_pairs_closing_too_short_a_loop():
     assert m["stems_reference"] == 0 and m["pairs_reference"] == 2
     m = _score_synthetic([(20, 40), (21, 39)], [(20, 40), (21, 39), (70, 76), (72, 75)])
     assert (m["stems_reference"], m["stem_recall"]) == (1, 1.0)
+
+
+def test_a_polyline_is_broken_where_it_jumps_across_an_unrolled_seam():
+    nv = _na_validate()
+    q = np.array([[0.0, 0.0], [3.0, 0.0], [90.0, 1.0], [93.0, 1.0]])
+    out = nv.seam_breaks(q, 40.0)
+    assert out.shape == (5, 2) and np.isnan(out[2]).all()
+    assert np.array_equal(out[[0, 1, 3, 4]], q)
+    assert np.array_equal(nv.seam_breaks(q, None), q)  # a plain frame has no seam
+
+
+def test_a_panel_title_is_wrapped_to_its_panel():
+    nv = _na_validate()
+    title = "drawn layout (stems coloured, arrows: first arm 5'->3')"
+    lines = nv.wrap_title(title, 2.4, 9).split("\n")
+    assert len(lines) > 1 and all(len(s) <= 2.4 / (9 * 0.6 / 72) for s in lines)
+    assert nv.wrap_title(title, 8.0, 9) == title
+
+
+def test_the_contact_sheet_of_an_unrolled_frame_draws_no_seam_and_fits_its_titles(monkeypatch, tmp_path):
+    """C14: an unrolled (CylinderFrame) figure's 3D panel joined points on either side of the unrolling's seam by
+    long lines across the panel (30QM, 1RVA, 4LD0); its titles ran into each other on narrow panels (4LVV)."""
+    import matplotlib.pyplot as plt
+
+    import foldmap.cli as cli
+    from foldmap.frame import CylinderFrame
+    from foldmap.layout import SCALE
+
+    nv = _na_validate()
+    monkeypatch.setattr(cli, "_na_across_protomers", lambda *a: False)
+    lay, sses, bb = make_layout(NA / "1RVA.cif.gz")
+    assert isinstance(lay.frame, CylinderFrame)
+    fig = draw(lay, route_loops(lay, sses, bb), sses, "1RVA")
+    made, figure = [], plt.figure
+    monkeypatch.setattr(plt, "figure", lambda *a, **k: made.append(figure(*a, **k)) or made[-1])
+    monkeypatch.setattr(plt, "close", lambda *a: None)
+    assert nv.contact_sheet("1RVA", lay, sses, bb, fig, {"failed": []}, tmp_path).is_file()
+    sheet = made[-1]
+    a0, a1, a2 = sheet.axes
+    for line in a2.get_lines():
+        q = np.asarray(line.get_xydata(), float)
+        step = np.linalg.norm(np.diff(q, axis=0), axis=1)
+        assert not (step[np.isfinite(step)] > lay.frame.period * SCALE / 2).any()
+    renderer = sheet.canvas.get_renderer()
+    for a in (a0, a1, a2):
+        assert a.title.get_window_extent(renderer).width <= a.get_window_extent(renderer).width * 1.05 + 1

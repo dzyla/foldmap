@@ -340,6 +340,22 @@ def wrap_metrics(items: list[str], width: int) -> list[str]:
     return lines + ([line] if line else [])
 
 
+def seam_breaks(q: np.ndarray, gap: float | None) -> np.ndarray:
+    """The polyline q with a NaN row (a break) wherever one step is longer than gap: where an unrolled frame
+    sends consecutive points to either side of its seam. gap None: q as it is (a plain frame has no seam)."""
+    if gap is None or len(q) < 2:
+        return q
+    jump = np.flatnonzero(np.linalg.norm(np.diff(q, axis=0), axis=1) > gap) + 1
+    return np.insert(np.asarray(q, float), jump, np.nan, axis=0)
+
+
+def wrap_title(text: str, width_in: float, size: float) -> str:
+    """The title broken into lines that fit a panel width_in inches wide at `size` points."""
+    import textwrap
+
+    return textwrap.fill(text, max(10, int(width_in / (size * 0.6 / 72))))
+
+
 def contact_sheet(name, lay, sses, bb, fig, metrics, out: Path) -> Path:
     """Figure | drawn layout with each stem in its own colour | 3D seen through the figure's own frame, cropped to
     the nucleic acid. The sheet's shape follows the panels' content."""
@@ -352,10 +368,11 @@ def contact_sheet(name, lay, sses, bb, fig, metrics, out: Path) -> Path:
     img = plt.imread(buf)
     cmap = plt.get_cmap("tab20")
     colour = {d.id: cmap(k % 20) for k, d in enumerate(lay.stems)}
-    frame = lay.frame  # unrolled symmetric and radial views are projected as drawn
+    frame = lay.frame  # unrolled symmetric and radial views are projected as drawn (protein by its protomer)
+    seam = frame.period * SCALE / 2 if hasattr(frame, "period") else None  # unrolled: a longer step is the seam
 
-    def proj(xyz):
-        return frame.project(np.atleast_2d(xyz)) * SCALE
+    def proj(xyz, chains=None):
+        return frame.project(np.atleast_2d(xyz), chains) * SCALE
 
     corners = {
         d.id: [
@@ -374,23 +391,27 @@ def contact_sheet(name, lay, sses, bb, fig, metrics, out: Path) -> Path:
     panel_h, gap = 6.0, 0.25
     widths = [panel_h * a for a in aspects]
     total_w = sum(widths) + gap * (len(widths) + 1)
+    titles = [
+        (wrap_title(f"{name}: foldmap", widths[0], 10), 10),
+        (wrap_title("drawn layout (stems coloured, arrows: first arm 5'->3')", widths[1], 9), 9),
+        (wrap_title("3D, figure's frame (red: touched nucleotides)", widths[2], 9), 9),
+    ]
+    top = 0.2 + max((t.count("\n") + 1) * fs * 1.3 / 72 for t, fs in titles)
     items = [f"{k}={v}" for k, v in metrics.items() if k not in ("missed_pairs", "extra_pairs", "failed", "note")]
     size = 9
     chars = int((total_w - 0.4) / (size * 0.62 / 72))  # monospace glyph width in inches
     lines = wrap_metrics(items, chars)
     text_h = max(1.5, 0.45 + len(lines) * size * 1.25 / 72)  # the metric lines, then the "failed:" line above them
-    sheet = plt.figure(figsize=(total_w, panel_h + text_h + 0.5))
+    high = panel_h + text_h + top
+    sheet = plt.figure(figsize=(total_w, high))
     axes, x = [], gap
     for w in widths:
-        axes.append(
-            sheet.add_axes(
-                [x / total_w, text_h / (panel_h + text_h + 0.5), w / total_w, panel_h / (panel_h + text_h + 0.5)]
-            )
-        )
+        axes.append(sheet.add_axes([x / total_w, text_h / high, w / total_w, panel_h / high]))
         x += w + gap
     a0, a1, a2 = axes
+    for a, (title, fs) in zip(axes, titles):
+        a.set_title(title, loc="left", fontsize=fs)
     a0.imshow(img)
-    a0.set_title(f"{name}: foldmap", loc="left", fontsize=10)
     for p in lay.placed.values():
         x0, y0, x1, y1 = p.rect
         a1.add_patch(plt.Rectangle((x0, y0), x1 - x0, y1 - y0, fc="#dddddd", ec="#999999", lw=0.5))
@@ -404,17 +425,16 @@ def contact_sheet(name, lay, sses, bb, fig, metrics, out: Path) -> Path:
         a1.plot(q[:, 0], q[:, 1], lw=0.6, color="#555555")
     a1.set_xlim(*drawn_box[:2])
     a1.set_ylim(*drawn_box[2:])
-    a1.set_title("drawn layout (stems coloured, arrows: first arm 5'->3')", loc="left", fontsize=9)
     if len(bb):
-        q = proj(bb.ca)
         chains = np.array([l.chain for l in bb.labels])
+        q = proj(bb.ca, list(chains))
         cc = chain_colors(list(dict.fromkeys(chains)), "okabe-ito")
         for c in dict.fromkeys(chains):
-            m = chains == c
-            a2.plot(q[m, 0], q[m, 1], lw=0.5, color=cc[c], alpha=0.5)
+            line = seam_breaks(q[chains == c], seam)
+            a2.plot(line[:, 0], line[:, 1], lw=0.5, color=cc[c], alpha=0.5)
     for strand in na.strands:
-        q = proj(strand.p)
-        a2.plot(q[:, 0], q[:, 1], lw=0.8, color="#333333")
+        line = seam_breaks(proj(strand.p), seam)
+        a2.plot(line[:, 0], line[:, 1], lw=0.8, color="#333333")
     pieces = {p.id: p for p in stem_pieces(na)}
     for d in lay.stems:
         piece = pieces.get(d.id)
@@ -434,7 +454,6 @@ def contact_sheet(name, lay, sses, bb, fig, metrics, out: Path) -> Path:
         a2.scatter(q[:, 0], q[:, 1], s=3, color="red", zorder=5)
     a2.set_xlim(*seen_box[:2])
     a2.set_ylim(*seen_box[2:])
-    a2.set_title("3D, figure's frame (red: touched nucleotides)", loc="left", fontsize=9)
     for a in (a1, a2):
         a.set_aspect("equal", adjustable="box")
     for a in axes:
@@ -442,14 +461,12 @@ def contact_sheet(name, lay, sses, bb, fig, metrics, out: Path) -> Path:
     fails = "; ".join(metrics.get("failed", [])) or "none"
     sheet.text(
         0.15 / total_w,
-        (text_h - 0.25) / (panel_h + text_h + 0.5),
+        (text_h - 0.25) / high,
         f"failed: {fails}"[: chars * 2],
         fontsize=10,
         color="red" if metrics.get("failed") else "green",
     )
-    sheet.text(
-        0.15 / total_w, 0.1 / (panel_h + text_h + 0.5), "\n".join(lines), fontsize=size, family="monospace", va="bottom"
-    )
+    sheet.text(0.15 / total_w, 0.1 / high, "\n".join(lines), fontsize=size, family="monospace", va="bottom")
     path = out / f"{name}.png"
     sheet.savefig(path, dpi=90)
     plt.close(sheet)
