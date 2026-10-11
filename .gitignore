@@ -21,3 +21,9 @@ docs/superpowers/
 
 # website build output
 _site/
+
+# nucleic-acid validation campaign: contact sheets, figures and intermediate step reports stay local (regenerate with scripts/na_validate.py)
+docs/validation/na/*.png
+docs/validation/na/*.svg
+docs/validation/na/report-step*
+docs/validation/na/run-step*

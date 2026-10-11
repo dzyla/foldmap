@@ -1,0 +1,40 @@
+1EHZ: PASS
+1QTQ: PASS
+4LVV: PASS
+2GIS: PASS
+3D0U: PASS
+2GDI: PASS
+1Y26: PASS
+1GID: PASS
+3IGI: PASS
+4P9R: PASS
+2OEU: PASS
+2NZ4: PASS
+4OO8: PASS
+5B43: PASS
+5W1H: PASS
+5F9R: PASS
+30QM: FAIL spearman 0.521 (limit 0.6); angle_median 35.7 (limit 5.0); angle_max 109.6 (limit 5.0); stems_nearer_frac 0.833 (limit 1.0)
+1URN: PASS
+4PJO: FAIL stems_nearer_frac 0.5 (limit 1.0)
+1HQ1: PASS
+1RLG: PASS
+1ZDI: PASS
+1HYS: PASS
+1MSW: PASS
+3KTQ: FAIL contact_auc 0.582 (limit 0.6)
+4YBB: FAIL fallbacks 2 (limit 0); na_crossings 1 (limit 0); bead_overlaps 1 (limit 0)
+1KX5: PASS
+1IHF: PASS
+1YTB: FAIL contact_auc 0.544 (limit 0.6); stems_nearer_frac 0.5 (limit 1.0)
+1LMB: PASS
+1ZAA: PASS
+1RVA: PASS
+3CRX: FAIL procrustes 0.817 (limit 0.8)
+4LD0: PASS
+1ZBI: PASS
+1KF1: PASS
+4PLX: PASS
+1QBJ: PASS
+1BNA: PASS
+33/39 pass; report in docs/validation/na/report.md
