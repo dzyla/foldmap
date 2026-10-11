@@ -39,6 +39,15 @@ class NAPath:
     between: tuple = ()
 
 
+def path_name(path: NAPath, na) -> str:
+    """How a warning names a drawn strand: "strand <chain>:<first>-<last>" by the nucleotides on it (or, with
+    none, the stem nucleotides it joins; a gap by the strand piece before it)."""
+    labels = na.strands[path.strand].labels
+    idx = path.nts or [i for _, i in path.between] or [len(labels) - 1]
+    first, last = labels[idx[0]], labels[idx[-1]]
+    return f"strand {first.chain}:{first.tag}-{last.tag}"
+
+
 def _dot(a, b) -> float:
     """a . b of two 2-vectors, written out: numpy's dot goes through BLAS, whose kernels differ in the last bit."""
     return float(a[0]) * float(b[0]) + float(a[1]) * float(b[1])

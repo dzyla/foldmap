@@ -944,8 +944,8 @@ def _cmd_figure(args: argparse.Namespace) -> int:
         drawn = draw_spec(spec)
         if drawn.stuck:
             print(
-                f"foldmap: warning: no clear route for {len(drawn.stuck)} loop(s), drawn as plain curves "
-                f"that may cross elements: {', '.join(drawn.stuck)}",
+                f"foldmap: warning: no clear route for {len(drawn.stuck)} loop(s) or strand(s), drawn as plain "
+                f"curves that may cross elements: {', '.join(drawn.stuck)}",
                 file=sys.stderr,
             )
         for out in args.output:

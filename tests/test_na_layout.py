@@ -314,3 +314,41 @@ def test_strands_without_pairs_are_traced(monkeypatch):
     assert [p.kind for p in lay.na_paths] == ["trace"] * 3
     assert len(_gid(fig, "na:nt:")) == 70 and len(_gid(fig, "na:end:")) == 6
     assert any("DNA (C, D, E)" in t.get_text() for t in fig.axes[0].texts)
+
+
+def test_plot_warns_about_strands_drawn_as_fallbacks(tmp_path, capsys, monkeypatch):
+    import foldmap.route_na as route_na
+    from foldmap.cli import main
+
+    real = route_na.route_nucleic
+
+    def one_stuck(layout, *a, **k):  # every fixture routes cleanly; mark one run as a fallback
+        paths = real(layout, *a, **k)
+        next(p for p in paths if p.kind == "run").fallback = True
+        return paths
+
+    monkeypatch.setattr(route_na, "route_nucleic", one_stuck)
+    assert main(["plot", str(_path("1EHZ")), "-o", str(tmp_path / "t.svg")]) == 0
+    err = capsys.readouterr().err
+    lay, _, _, _ = _routed("1EHZ")
+    run = next(p for p in lay.na_paths if p.kind == "run")
+    labels = lay.nucleic.strands[run.strand].labels
+    name = f"strand {labels[run.nts[0]].chain}:{labels[run.nts[0]].tag}-{labels[run.nts[-1]].tag}"
+    assert "no clear route" in err and name in err, err
+
+
+def test_app_and_spec_report_stuck_strands(monkeypatch):
+    import foldmap.route_na as route_na
+    from foldmap.spec import FigureSpec, draw_spec
+
+    real = route_na.route_nucleic
+
+    def all_stuck(layout, *a, **k):
+        paths = real(layout, *a, **k)
+        for p in paths:
+            p.fallback = p.kind == "hairpin"
+        return paths
+
+    monkeypatch.setattr(route_na, "route_nucleic", all_stuck)
+    drawn = draw_spec(FigureSpec(_path("1EHZ")))
+    assert len([s for s in drawn.stuck if s.startswith("strand A:")]) == 3  # 1EHZ's three hairpin loops

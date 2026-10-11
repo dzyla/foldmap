@@ -238,8 +238,12 @@ class Drawn:
 
     @property
     def stuck(self) -> list[str]:
-        """Loops with no clear route, drawn as plain curves."""
-        return [f"{l.a_id}>{l.b_id}" for l in self.loops if l.fallback]
+        """Loops with no clear route, drawn as plain curves, then nucleic-acid strands drawn with no clear way."""
+        from .route_na import path_name
+
+        out = [f"{l.a_id}>{l.b_id}" for l in self.loops if l.fallback]
+        na = getattr(self.layout, "nucleic", None)
+        return out + [path_name(p, na) for p in getattr(self.layout, "na_paths", []) if p.fallback]
 
 
 def draw_spec(spec: FigureSpec) -> Drawn:

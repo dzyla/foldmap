@@ -270,10 +270,8 @@ def main() -> None:
 
     @st.cache_data(show_spinner=False, max_entries=32)
     def render(path: str, settings_json: str) -> tuple[str, dict]:
-        settings = json.loads(settings_json)
-        fig, loops = figure(path, settings)
-        warn = [f"{l.a_id}>{l.b_id}" for l in loops if l.fallback]
-        return save_svg(fig), {"fallback": warn}
+        drawn = draw_spec(spec_of(path, json.loads(settings_json)))
+        return save_svg(drawn.figure), {"fallback": drawn.stuck}  # loops and strands with no clear route
 
     @st.cache_data(show_spinner=False, max_entries=16)
     def files(path: str, settings_json: str) -> dict:
