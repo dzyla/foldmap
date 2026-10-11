@@ -1003,6 +1003,11 @@ def _place_letters(layout: Layout, paths: list[NAPath]) -> dict[tuple[int, int],
             options = [xy + side * NT_ROW * f for f in (1.0, -1.0, 1.7, -1.7, 2.4, -2.4)]
             options += [xy + side * NT_ROW * f + ahead * t for f in (1.0, -1.0) for t in (0.4, -0.4)]
             spaces = [room(q, index[(p.strand, i)]) for q in options]
+            if max(spaces) < _LETTER_GAP:  # crowded: further out, and further along the strand
+                more = [xy + side * NT_ROW * f for f in (3.1, -3.1)]
+                more += [xy + side * NT_ROW * f + ahead * t for f in (1.0, -1.0, 1.7, -1.7) for t in (0.8, -0.8)]
+                options += more
+                spaces += [room(q, index[(p.strand, i)]) for q in more]
             clear = [q for q, r in zip(options, spaces) if r >= _LETTER_GAP]
             spot = clear[0] if clear else options[int(np.argmax(spaces))]
             out[(p.strand, i)] = (float(spot[0]), float(spot[1]))

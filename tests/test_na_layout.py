@@ -1045,6 +1045,29 @@ def test_no_nucleotide_sits_on_another_strands(pdb):
     assert not close
 
 
+def test_a_crowded_letter_looks_further_out_and_along_its_strand():
+    """A base letter with no clear spot beside its strand looks further out and further along it before settling on
+    the least bad spot (5B43: the 5' end B:-19--16 squeezed between its stem and a sheet; B:-17's letter landed
+    0.15 from B:-18's). 1EHZ's acceptor end with an element planted over every nearer spot of its second letter."""
+    from types import SimpleNamespace
+
+    from foldmap.layout import NT_ROW
+    from foldmap.route_na import _LETTER_GAP, _near, _place_letters
+
+    lay, _, _, _ = _routed("1EHZ")
+    tail = next(p for p in lay.na_paths if p.kind == "tail")
+    key = (tail.strand, tail.nts[1])
+    xy = np.asarray(tail.nt_xy[1])
+    ahead = np.subtract(tail.nt_xy[2], tail.nt_xy[0])
+    angle = float(np.arctan2(ahead[1], ahead[0]))
+    block = SimpleNamespace(cx=xy[0], cy=xy[1], length=0.5, width=2 * 2.4 * NT_ROW + 0.4, angle=angle)
+    lay.placed = {**lay.placed, "block": block}
+    letters = _place_letters(lay, lay.na_paths)
+    spot = letters[key]
+    others = [q for k, q in letters.items() if k != key]
+    assert not _near(spot, block) and min(np.hypot(*(np.subtract(others, spot)).T)) >= _LETTER_GAP
+
+
 def _in_outline(pt, e) -> bool:
     c, s = np.cos(e.angle), np.sin(e.angle)
     x, y = pt[0] - e.cx, pt[1] - e.cy
