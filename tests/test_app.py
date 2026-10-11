@@ -63,6 +63,21 @@ def test_controls_change_the_figure():
     assert not at.exception and "<svg" in _svg(at)
 
 
+def test_nucleic_acid_style_control_redraws_the_stems():
+    from foldmap.style import CHOICES
+
+    at = _load(_app(), DATA / "1LMB.cif")
+    at.button(key="pick_publication").click()
+    at.run()
+    style = at.selectbox(key="na_style")
+    assert list(style.options) == list(CHOICES["na_style"]) and style.value == "ladder"
+    assert 'id="na:stem:0:rails"' in _svg(at) and ":block" not in _svg(at)
+    style.select("block")
+    at.run()
+    assert not at.exception
+    assert 'id="na:stem:0:block"' in _svg(at) and ":rails" not in _svg(at)
+
+
 def test_bad_input_is_reported_not_raised():
     at = _load(_app(), "/nowhere/missing.cif")
     assert not at.exception and at.session_state["stage"] == "load" and at.error
