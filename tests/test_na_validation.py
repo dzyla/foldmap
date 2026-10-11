@@ -27,7 +27,18 @@ LIMITS = {  # metric: (lowest or highest allowed, "min" or "max")
     "letter_overlaps": (0, "max"),
     "beads_missing": (0, "max"),
     "bead_colour_wrong": (0, "max"),
+    "beads_false": (0, "max"),
+    "beads_unmatched": (0, "max"),
     "fallbacks": (0, "max"),
+}
+# Campaign defects whose target (nacheck.THRESHOLDS) is 0 but which some fixtures still show: each fixture is held
+# at its value measured when the metric came in (absent: 0), a regression bound. Task 14 tightens them after the
+# campaign (Task 13). 4YBB: run AA:26 across the free ends AA:2-8 and AA:557-566; two contact beads overlapping;
+# the "... 36 nt ..." label on stem P34 and on a run.
+CAMPAIGN = {
+    "na_crossings": {"4YBB": 2},
+    "bead_overlaps": {"4YBB": 2},
+    "gap_label_collisions": {"4YBB": 2},
 }
 
 
@@ -50,6 +61,22 @@ def test_fixture_is_drawn_true_to_its_structure(measured, metric):
         return
     limit, kind = LIMITS[metric]
     assert value >= limit if kind == "min" else value <= limit, f"{pdb}: {metric} {value} (limit {limit})"
+
+
+@pytest.mark.parametrize("metric", sorted(CAMPAIGN))
+def test_fixture_has_no_more_campaign_defects_than_when_measured(measured, metric):
+    pdb, m = measured
+    bound = CAMPAIGN[metric].get(pdb, 0)
+    assert m[metric] <= bound, f"{pdb}: {metric} {m[metric]} (held at {bound} until Task 14)"
+
+
+def test_crossings_count_proper_crossings_only():
+    from foldmap.nacheck import _crossings, _segments
+
+    x = _segments([(0, 0), (2, 2)])
+    assert _crossings(x, _segments([(0, 2), (2, 0)])) == 1
+    assert _crossings(x, _segments([(2, 2), (3, 0)])) == 0  # meeting at an end is not a crossing
+    assert _crossings(x, _segments([(0, 1), (2, 1), (2, 3), (0, 3)])) == 1
 
 
 def test_judge_names_each_metric_past_its_limit():

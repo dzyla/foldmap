@@ -22,6 +22,8 @@ from scipy.stats import spearmanr
 from .io import CONTACT
 from .layout import SCALE, stem_pieces
 from .nucleic import stem_axis
+from .route import clip_len
+from .route_na import _crosses_body, _in_body, _outside
 
 
 @dataclass(frozen=True)
@@ -297,10 +299,17 @@ THRESHOLDS = {
     "contact_auc": 0.60,  # elements touching a stem drawn nearer it than the rest (0.42-1.00, median 0.83)
     "beads_missing": 0,  # protein residues touching a drawn nucleotide with no bead (verify_contacts' missing)
     "bead_colour_wrong": 0,  # beads not in their toucher's chain colour (verify_contacts' wrong colour)
+    "beads_false": 0,  # beads no heavy-atom pair of their chain backs (verify_contacts' false)
+    "beads_unmatched": 0,  # beads naming a nucleotide or residue the model lacks (verify_contacts' unmatched)
     "overlaps": 0,  # element or stem boxes overlapping
     "text_off_page": 0,
     "letter_overlaps": 0,  # base letters overlapping each other by more than a third of a glyph box
     "fallbacks": 0,  # strand or loop routes that fell back to a curve
+    # targets; the fixture gate holds each fixture at its measured value until the campaign (Task 14 tightens)
+    "na_crossings": 0,  # runs, joints and gaps crossing hairpin arcs, free ends or stem bodies
+    "bead_overlaps": 0,  # contact beads overlapping one another
+    "gap_label_collisions": 0,  # "... N nt ..." labels on each other, a stem or a path
+    "na_protein_crossings": None,  # nucleic-acid paths crossing protein loops: reported, not judged
     "seconds": 120.0,
 }
 _HIGH_IS_GOOD = ("pair_f1", "stem_recall", "spearman", "contact_auc")
@@ -421,13 +430,96 @@ def contacts(lay, sses) -> dict:
     }
 
 
+def _segments(pts) -> np.ndarray:
+    """(n, 4) array of a polyline's segments: x0, y0, x1, y1."""
+    a = np.asarray(pts, float).reshape(-1, 2)
+    return np.hstack([a[:-1], a[1:]])
+
+
+def _crossings(a: np.ndarray, b: np.ndarray) -> int:
+    """Segment pairs of two polylines (as _segments) that cross properly (not just touch at an end). Products
+    written out elementwise, never through BLAS."""
+    if not len(a) or not len(b):
+        return 0
+    p, q = a[:, None, 0:2], a[:, None, 2:4]
+    u, v = b[None, :, 0:2], b[None, :, 2:4]
+
+    def turn(o, e, w):
+        return (e[..., 0] - o[..., 0]) * (w[..., 1] - o[..., 1]) - (e[..., 1] - o[..., 1]) * (w[..., 0] - o[..., 0])
+
+    return int(((turn(u, v, p) * turn(u, v, q) < 0) & (turn(p, q, u) * turn(p, q, v) < 0)).sum())
+
+
+def _span(seg: np.ndarray) -> tuple[float, float, float, float]:
+    """The box (x0, y0, x1, y1) around a polyline's segments."""
+    xs, ys = seg[:, 0::2], seg[:, 1::2]
+    return float(xs.min()), float(ys.min()), float(xs.max()), float(ys.max())
+
+
+def _boxes_meet(a, b) -> bool:
+    return a[0] <= b[2] and b[0] <= a[2] and a[1] <= b[3] and b[1] <= a[3]
+
+
+def _cross_count(xs: list, ys: list) -> int:
+    """Pairs (x, y) of segment sets that cross at least once, after a box test."""
+    spans = [_span(y) for y in ys]
+    n = 0
+    for x in xs:
+        sx = _span(x)
+        n += sum(1 for y, sy in zip(ys, spans) if _boxes_meet(sx, sy) and _crossings(x, y))
+    return n
+
+
+def _through_stem(seg: np.ndarray, d) -> bool:
+    """Does any segment run through the stem's true, tilted body?"""
+    return any(_crosses_body(s[:2], s[2:], d) for s in seg)
+
+
+def _box_hits(box, seg: np.ndarray) -> bool:
+    """Does any segment run into the box (x0, y0, x1, y1)?"""
+    return any(clip_len(s[:2], s[2:], box) > 1e-9 for s in seg)
+
+
+def _box_meets_stem(box, d) -> bool:
+    """Does the box overlap the stem's tilted body: an edge of one through the other, or the box inside it?"""
+    c, s = np.cos(d.angle), np.sin(d.angle)
+    hl, hw = d.length / 2, d.width / 2
+    corners = [(d.cx + x * c - y * s, d.cy + x * s + y * c) for x, y in ((-hl, -hw), (hl, -hw), (hl, hw), (-hl, hw))]
+    if _box_hits(box, _segments(corners + corners[:1])):
+        return True
+    centre = ((box[0] + box[2]) / 2, (box[1] + box[3]) / 2)
+    return _crosses_body(centre, centre, d) or _in_body(centre, d)
+
+
+def na_crossings(lay, loops) -> dict:
+    """Crossings of the drawn nucleic-acid strands, each strand trimmed to where it leaves its own stems (as
+    drawn among the elements): na_crossings, (run, joint or gap path, hairpin arc or free end) pairs crossing at
+    least once plus (such a path, stem) pairs where it runs through the stem's body; na_protein_crossings,
+    (nucleic-acid path, protein loop) pairs crossing at least once."""
+    at = {key: d for d in lay.stems for key in d.axial}
+    drawn = [(p, _segments(_outside(p.points, tuple(at[k] for k in p.between if k in at)))) for p in lay.na_paths]
+    moving = [seg for p, seg in drawn if p.kind in ("run", "joint", "gap")]
+    fixed = [seg for p, seg in drawn if p.kind in ("hairpin", "tail")]
+    through = sum(
+        1 for seg in moving if len(seg) for d in lay.stems if _boxes_meet(_span(seg), d.rect) and _through_stem(seg, d)
+    )
+    return {
+        "na_crossings": _cross_count(moving, fixed) + through,
+        "na_protein_crossings": _cross_count([seg for _, seg in drawn], [_segments(l.points) for l in loops]),
+    }
+
+
 def render_checks(lay, loops, fig, sses, *, model=None, bb=None) -> dict:
     """Rendering defects of a drawn figure: overlaps (element or stem boxes overlapping), text_off_page,
-    letter_overlaps (base letters overlapping by more than a third of the smaller glyph box), beads_missing and
-    bead_colour_wrong (verify_contacts on the figure's beads: unbeaded contacts counted as defects, beads not in
-    their toucher's chain colour), fallbacks (loop and nucleic-acid routes with no clear way).
-    The bead checks need the io.read_model result and the Backbone the figure was drawn from; without them they
-    are None (not measured)."""
+    letter_overlaps (base letters overlapping by more than a third of the smaller glyph box), beads_missing,
+    bead_colour_wrong, beads_false and beads_unmatched (verify_contacts on the figure's beads: unbeaded contacts
+    counted as defects, beads not in their toucher's chain colour, beads no atoms back, beads naming a residue or
+    nucleotide the model lacks), fallbacks (loop and nucleic-acid routes with no clear way), na_crossings and
+    na_protein_crossings (see na_crossings), bead_overlaps (pairs of contact beads whose discs overlap at their
+    drawn size) and gap_label_collisions ("… N nt …" labels overlapping another one, a stem, a nucleic-acid path
+    other than their own or a protein loop: one per label and thing it meets).
+    The bead checks against the coordinates need the io.read_model result and the Backbone the figure was drawn
+    from; without them they are None (not measured)."""
     from matplotlib.backends.backend_agg import FigureCanvasAgg
 
     boxes = [p.rect for p in lay.placed.values()] + [d.rect for d in lay.stems]
@@ -440,7 +532,8 @@ def render_checks(lay, loops, fig, sses, *, model=None, bb=None) -> dict:
     canvas.draw()
     renderer = canvas.get_renderer()
     page = fig.bbox
-    texts = [t for t in fig.axes[0].texts if t.get_text().strip()]
+    ax = fig.axes[0]
+    texts = [t for t in ax.texts if t.get_text().strip()]
     extents = [t.get_window_extent(renderer) for t in texts]
     off = sum(
         1 for e in extents if e.x0 < page.x0 - 1 or e.y0 < page.y0 - 1 or e.x1 > page.x1 + 1 or e.y1 > page.y1 + 1
@@ -452,17 +545,50 @@ def render_checks(lay, loops, fig, sses, *, model=None, bb=None) -> dict:
         h = min(a.y1, b.y1) - max(a.y0, b.y0)
         if w > 0 and h > 0 and w * h > min(a.width * a.height, b.width * b.height) / 3:
             bad += 1
-    missing = wrong = None
+    # contact beads: centres and radii on the page, in pixels
+    centres, radii = [], []
+    for c in ax.collections:
+        if (c.get_gid() or "").startswith("na:contact:"):
+            xy = ax.transData.transform(c.get_offsets())
+            centres += list(xy)
+            radii += [float(np.sqrt(c.get_sizes()[0])) / 2 * fig.dpi / 72] * len(xy)
+    bead_overlaps = sum(
+        1
+        for i, j in combinations(range(len(centres)), 2)
+        if np.hypot(*(centres[i] - centres[j])) < radii[i] + radii[j] - 1e-6
+    )
+    # gap labels, in page units
+    to_page = ax.transData.inverted()
+    gaps = [
+        (int(t.get_gid().rsplit(":", 1)[1]), tuple(to_page.transform_bbox(e).extents))
+        for t, e in zip(texts, extents)
+        if (t.get_gid() or "").startswith("na:gap:")
+    ]
+    paths = [_segments(p.points) for p in lay.na_paths]
+    protein = [_segments(l.points) for l in loops]
+    collisions = sum(1 for (_, a), (_, b) in combinations(gaps, 2) if _boxes_meet(a, b))
+    for n, box in gaps:
+        collisions += sum(1 for d in lay.stems if _boxes_meet(box, d.rect) and _box_meets_stem(box, d))
+        others = [seg for k, seg in enumerate(paths) if k != n] + protein
+        collisions += sum(1 for seg in others if len(seg) and _boxes_meet(box, _span(seg)) and _box_hits(box, seg))
+    beads: dict = dict.fromkeys(("beads_missing", "bead_colour_wrong", "beads_false", "beads_unmatched"))
     if model is not None and bb is not None:
         report = verify_contacts(model, getattr(fig, "foldmap_beads", None), lay, bb)
-        missing, wrong = len(report.missing), len(report.wrong_colour)
+        beads = {
+            "beads_missing": len(report.missing),
+            "bead_colour_wrong": len(report.wrong_colour),
+            "beads_false": len(report.false),
+            "beads_unmatched": len(report.unmatched),
+        }
     return {
         "overlaps": overlaps,
         "text_off_page": off,
         "letter_overlaps": bad,
-        "beads_missing": missing,
-        "bead_colour_wrong": wrong,
+        **beads,
         "fallbacks": sum(p.fallback for p in lay.na_paths) + sum(l.fallback for l in loops),
+        **na_crossings(lay, loops),
+        "bead_overlaps": bead_overlaps,
+        "gap_label_collisions": collisions,
     }
 
 
