@@ -19,6 +19,7 @@ import numpy as np
 from scipy.spatial import cKDTree
 from scipy.stats import spearmanr
 
+from .frame import Frame
 from .io import CONTACT
 from .layout import SCALE, stem_pieces
 from .nucleic import stem_axis
@@ -294,6 +295,7 @@ THRESHOLDS = {
     "stem_recall": 0.80,  # RNApolis stems (>= 2 pairs) matched by a foldmap stem, arms within one nucleotide
     "spearman": 0.60,  # pairwise stem-centre distances, drawn against 3D, entries with >= 5 stems (0.44-0.98)
     "procrustes": 0.80,  # normalised RMSD of drawn stem centres after a similarity fit, no reflection (0.07-0.86)
+    # angle and joint errors: 0 by construction on a plain frame (regression guards), measured on unrolled ones
     "angle_median": 5.0,  # degrees, drawn stem direction against its projected 3D axis
     "angle_max": 5.0,  # degrees, the worst stem; fixtures 0.0 (stems drawn along their seen axes), plus a margin
     "joint_error_max": 5.0,  # degrees, signed drawn bend against signed seen bend at the worst joint (fixtures 0.0)
@@ -356,16 +358,32 @@ def _norm(v) -> float:
     return float(np.sqrt((np.asarray(v, float) ** 2).sum()))
 
 
+def measuring_frame(lay):
+    """The projection shape() measures through. A plain projected Frame is the layout's own. An unrolled frame
+    (a symmetric CylinderFrame, a protein-DNA RadialFrame) bends space so that it agrees with whatever it draws;
+    it is replaced by the plain Frame with its orientation (page-right, page-up, toward the viewer) at the
+    nucleic acid's centre, so the distortion of unrolling is measured instead of agreed with."""
+    frame = lay.frame
+    if frame is None or isinstance(frame, Frame) or lay.nucleic is None or not lay.nucleic.strands:
+        return frame
+    centre = np.vstack([s.p for s in lay.nucleic.strands]).mean(axis=0)
+    u, v, w = frame.basis(centre)
+    return Frame(centre, np.asarray(u, float), np.asarray(v, float), np.asarray(w, float))
+
+
 def shape(lay) -> dict:
-    """Drawn stems against the 3D structure seen through the figure's own frame (layout.frame, so unrolled
-    symmetric and radial frames are compared as drawn). stems_drawn; spearman (pairwise stem-centre distances,
-    drawn against 3D, >= 5 stems); procrustes (>= 3 stems); angle_median and angle_max (degrees, drawn direction
-    against the seen 3D axis, stems seen side-on enough); mirrored (stems seen clearly, SIDE_SEEN, whose first
+    """Drawn stems against the 3D structure seen through measuring_frame(lay): the figure's own plain frame, or
+    for an unrolled frame the plain projection of the same orientation. Stems are drawn along their axes as seen
+    in the layout's frame, so on a plain frame angle_median, angle_max and joint_error_max are 0 by construction:
+    regression guards there, not fidelity checks; on an unrolled frame they measure the unrolling.
+    stems_drawn; spearman (pairwise stem-centre distances, drawn against 3D, >= 5 stems); procrustes (>= 3
+    stems); angle_median and angle_max (degrees, drawn direction against the seen 3D axis, stems seen side-on
+    enough); mirrored (stems seen clearly, SIDE_SEEN, whose first
     arm is drawn on the side opposite the one it is seen on); when a duplex is split into pieces, bend_3d and
     bend_drawn (net signed turn from piece to piece, degrees, counterclockwise positive) and joint_error_max (the
     largest difference of the signed drawn and seen turns at one joint, so a bend drawn the wrong way counts).
     A drawn stem that is no piece of the structure's stems raises ValueError: no stem is left out unmeasured."""
-    na, frame = lay.nucleic, lay.frame
+    na, frame = lay.nucleic, measuring_frame(lay)
     if na is None or frame is None:
         return {}
     pieces = {p.id: p for p in stem_pieces(na)}

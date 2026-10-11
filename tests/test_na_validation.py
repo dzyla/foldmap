@@ -266,3 +266,32 @@ def test_a_cropped_figure_is_scored_on_the_pairs_it_draws_both_nucleotides_of():
     whole = nv.pairing(path, theirs)  # 0.977 precision, 0.981 recall on the whole deposited fixture
     assert m["pairs_reference"] < len(theirs) and m["pair_recall"] >= whole["deposited_pair_recall"], m
     assert m["pair_precision"] >= 0.97, m
+
+
+def test_an_unrolled_frame_is_measured_against_the_plain_projection(monkeypatch):
+    """1RVA drawn unrolled (as before C4): its kinked duplex becomes an antiparallel hairpin, bend -179.7°. Seen
+    through the unrolled frame itself the 3D bend agreed (-179.7°, joint error 0). Shape is measured through a
+    plain Frame of the same orientation at the nucleic acid, which sees the kink as it is and the hairpin as an
+    error (the duplex is seen foreshortened, its kink as about 104°)."""
+    import foldmap.cli as cli
+    from foldmap.frame import CylinderFrame, Frame
+    from foldmap.nacheck import measuring_frame
+
+    monkeypatch.setattr(cli, "_na_across_protomers", lambda *a: False)
+    lay, _, _ = make_layout(NA / "1RVA.cif.gz")
+    assert isinstance(lay.frame, CylinderFrame)
+    plain = measuring_frame(lay)
+    assert type(plain) is Frame
+    centre = np.vstack([s.p for s in lay.nucleic.strands]).mean(axis=0)
+    assert np.allclose([plain.u, plain.v, plain.w], lay.frame.basis(centre))
+    m = shape(lay)
+    assert abs(m["bend_drawn"]) > 170
+    assert abs(m["bend_3d"]) < 110 and m["joint_error_max"] > 60, m  # measured: -104.0 seen, error 75.7
+    assert any(f.startswith("joint_error_max") for f in judge(m))
+
+
+def test_a_plain_frame_is_measured_as_drawn():
+    lay, _, _ = make_layout(NA / "1EHZ.cif.gz")
+    from foldmap.nacheck import measuring_frame
+
+    assert measuring_frame(lay) is lay.frame
