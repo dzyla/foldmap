@@ -1860,3 +1860,25 @@ def test_a_shallow_graze_at_a_path_end_is_not_counted_as_through_a_stem():
     assert _through_stem(deep, d)
     middle = np.array([[-3.0, -3.0, 1.7, -1.2], [1.7, -1.2, 2.2, -0.7], [2.2, -0.7, 4.0, -3.0]])
     assert _through_stem(middle, d)  # inside a path, even a graze counts
+
+
+def test_a_trace_is_exempt_from_an_element_only_near_the_nucleotides_it_touches():
+    """route_na._trace_clear: an element touching a trace may lie under it where it holds it, not anywhere along
+    it (an element touching the 5' end, crossed by the trace twenty nucleotides on, makes a fallback)."""
+    from types import SimpleNamespace
+
+    from foldmap.route_na import _trace_clear
+
+    def check(touched: int, sheets=()) -> bool:
+        el = SimpleNamespace(sse=SimpleNamespace(id="H1", start=5, end=5))
+        other = SimpleNamespace(sse=SimpleNamespace(id="E1", start=6, end=6))
+        layout = SimpleNamespace(
+            nucleic=SimpleNamespace(contacts={5: {(0, touched)}}), placed={"H1": el, "E1": other}, sheets=list(sheets)
+        )
+        rects = np.array([[14.2], [-1.0], [15.8], [1.0]])  # crossed by the segments of nucleotides 14-16
+        router = SimpleNamespace(elements=(rects, ["E1" if sheets else "H1"]))
+        return _trace_clear(router, layout, 0, [(float(x), 0.0) for x in range(21)])
+
+    assert check(15) and check(13)  # it holds the nucleotides there (or a neighbour's)
+    assert not check(0)  # it holds the 5' end only: the trace crossing it far on is not clear
+    assert check(15, sheets=[["H1", "E1"]]) and not check(0, sheets=[["H1", "E1"]])  # its sheet likewise
