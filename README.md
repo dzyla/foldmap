@@ -201,6 +201,14 @@ Elements are named by label (`A`, `α2`, `η1`), `chain:label`, position (`#3`) 
 layout options, domains and edits, with element references stored as residue ranges so they survive a new model.
 `foldmap plot model.cif --layout-file fig.yaml -o fig.svg` re-renders it; the command line overrides the file.
 
+**Hydrogen bonds.** `--set hbonds=na` draws dashed lines for the hydrogen bonds between protein and DNA/RNA,
+`interchain` between all different chains, `chains:A+B,C+D` between the listed chain pairs (default `off`). Bonds are
+found from the heavy atoms (donor and acceptor 2.5-3.5 Å apart, with the donor's hydrogen able to point at the
+acceptor), then drawn as one thin line per residue pair, from the residue's point on its element or loop to the
+nucleotide's (or partner residue's) point, under the elements and letters. At most `hbond_max` lines are drawn
+(default 200, the shortest kept) and the legend counts them; `hbond_color` sets the colour. Only drawing changes, never
+the layout. Example: `foldmap plot 1LMB.cif --set hbonds=na -o 1lmb.svg`.
+
 ## UniProt annotation
 
 `--uniprot auto` finds each chain's UniProt entry (PDBe SIFTS mapping for PDB entries, the accession for AlphaFold

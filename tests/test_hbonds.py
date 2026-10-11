@@ -347,3 +347,171 @@ def test_a_polymer_residue_type_bound_as_a_ligand_is_left_out():
     tags = {str(a) for b in find_hbonds(model, "na") for a in (b.donor, b.acceptor)}
     assert tags and not any(t.startswith("4:GLN44 ") for t in tags)
     assert any(str(a).startswith("4:GLN44 ") for b in _found("1LMB", "na") for a in (b.donor, b.acceptor))
+
+
+# ---- the overlay: dashed lines between the residues' points on the page --------------------------------------------
+
+from foldmap.cli import make_layout  # noqa: E402
+from foldmap.nacheck import deposited_hydrog  # noqa: E402
+from foldmap.render import draw, hbond_overlay, nucleotide_points, residue_point  # noqa: E402
+from foldmap.route import route_loops  # noqa: E402
+from foldmap.style import Style, resolve_style  # noqa: E402
+
+
+@lru_cache(maxsize=None)
+def _drawn(name, *settings):
+    """(figure, layout, loops, sses, bb, look) of the figure drawn with these style settings."""
+    look = resolve_style(None, None, list(settings))
+    lay, sses, bb = make_layout(_path(name), look=look, model=_model(name))
+    loops = route_loops(lay, sses, bb)
+    return draw(lay, loops, sses, look=look), lay, loops, sses, bb, look
+
+
+def _lines(fig):
+    return [l for l in fig.axes[0].lines if (l.get_gid() or "").startswith("hbond:")]
+
+
+def _legend_texts(fig):
+    return [t.get_text() for t in fig.axes[0].texts if t.get_text().startswith("H-bonds")]
+
+
+def test_na_overlay_draws_a_line_per_bonded_pair_between_the_residue_and_the_nucleotide():
+    fig, lay, loops, sses, bb, look = _drawn("1LMB", "hbonds=na", "hbond_max=1000")
+    lines = {l.get_gid(): l for l in _lines(fig)}
+    index = {(l.chain, l.seq, l.icode): k for k, l in enumerate(bb.labels)}
+    where = nucleotide_points(lay)
+    nt = {
+        (lab.chain, lab.seq, lab.icode): where[(s, i)]
+        for s, strand in enumerate(lay.nucleic.strands)
+        for i, lab in enumerate(strand.labels)
+        if (s, i) in where
+    }
+    pairs = {}
+    for b in find_hbonds(_model("1LMB"), "na"):
+        res, base = (b.donor.res, b.acceptor.res) if _protein(b.donor) else (b.acceptor.res, b.donor.res)
+        pairs.setdefault((res, base), []).append(b)
+    assert len(pairs) > 20
+    drawn = 0
+    for res, base in pairs:
+        gid = f"hbond:{res.chain}:{res.tag}-{base.chain}:{base.tag}"
+        point = residue_point(lay, loops, sses, lay.res_chain, index[(res.chain, res.seq, res.icode)])
+        if point is None or (base.chain, base.seq, base.icode) not in nt:
+            assert gid not in lines
+            continue
+        xs, ys = lines[gid].get_data()
+        assert (xs[0], ys[0]) == pytest.approx(point)
+        assert (xs[-1], ys[-1]) == pytest.approx(tuple(nt[(base.chain, base.seq, base.icode)]))
+        drawn += 1
+    assert drawn == len(lines) >= 20
+    assert all(l.get_linestyle() != "-" for l in lines.values())  # dashed
+
+
+def test_the_legend_counts_the_lines_and_says_when_the_cap_cut_some():
+    fig = _drawn("1LMB", "hbonds=na", "hbond_max=1000")[0]
+    n = len(_lines(fig))
+    assert _legend_texts(fig) == [f"H-bonds ({n})"]
+    assert any(l.get_gid() == "legend-hbond" for l in fig.axes[0].lines)
+    capped = _drawn("1LMB", "hbonds=na", "hbond_max=10")[0]
+    assert len(_lines(capped)) == 10
+    assert _legend_texts(capped) == [f"H-bonds (10 of {n})"]
+
+
+def test_hbond_max_keeps_the_shortest_lines():
+    all_ = hbond_overlay(*_drawn("1LMB", "hbonds=na", "hbond_max=1000")[1:4], Style(hbonds="na", hbond_max=1000))
+    few = hbond_overlay(*_drawn("1LMB", "hbonds=na", "hbond_max=1000")[1:4], Style(hbonds="na", hbond_max=7))
+    assert [l.gid for l in few.lines] == [l.gid for l in all_.lines[:7]]
+    lengths = [l.length for l in all_.lines]
+    assert lengths == sorted(lengths) and few.total == len(all_.lines)
+
+
+def test_off_draws_nothing_and_the_overlay_moves_no_element():
+    off, lay_off = _drawn("1LMB", "hbonds=off")[:2]
+    on, lay_on = _drawn("1LMB", "hbonds=na")[:2]
+    assert not _lines(off) and not _legend_texts(off) and _lines(on)
+    assert lay_off.bounds == lay_on.bounds
+    assert {k: (p.n_port, p.c_port) for k, p in lay_off.placed.items()} == {
+        k: (p.n_port, p.c_port) for k, p in lay_on.placed.items()
+    }
+    assert [(d.axial, d.point(next(iter(d.axial))).tolist()) for d in lay_off.stems] == [
+        (d.axial, d.point(next(iter(d.axial))).tolist()) for d in lay_on.stems
+    ]
+
+
+def test_chain_pairs_draw_only_lines_between_those_chains():
+    fig, lay, *_ = _drawn("2HHB", "hbonds=chains:A+B")
+    lines = _lines(fig)
+    assert len(lines) > 3
+    for l in lines:
+        a, b = l.get_gid()[len("hbond:") :].split("-")
+        assert {a.split(":")[0], b.split(":")[0]} == {"A", "B"}
+
+
+def test_the_interactive_page_lists_the_bonds_of_each_line():
+    from foldmap.interactive import _hbonds
+
+    fig = _drawn("1LMB", "hbonds=na", "hbond_max=1000")[0]
+    notes = _hbonds(fig)
+    assert len(notes) == len(_lines(fig))
+    by_key = {n["key"]: n for n in notes}
+    gln = next(n for k, n in by_key.items() if k.startswith("3:44-1:4"))
+    assert "Gln44" in gln["text"] and "DA4" in gln["text"] and "Å" in gln["text"] and len(gln["residues"]) == 1
+
+
+def test_bad_hbond_keys_are_explained():
+    for text, match in (
+        ("hbonds=sometimes", "hbonds"),
+        ("hbonds=chains:A", "chain pair"),
+        ("hbond_max=0", "hbond_max"),
+        ("hbond_max=lots", "hbond_max"),
+        ("hbond_max=2.5", "hbond_max"),
+        ("hbond_color=notacolour", "hbond_color"),
+    ):
+        with pytest.raises(ValueError, match=match):
+            resolve_style(None, None, [text])
+    assert resolve_style(None, None, ["hbonds=NA", "hbond_max=50"]).hbond_max == 50
+
+
+def test_hbond_keys_travel_through_style_layout_files_and_the_app():
+    from foldmap.spec import figure_spec, layout_document
+
+    look = resolve_style(None, None, ["hbonds=chains:A+B", "hbond_color=#112233", "hbond_max=40"])
+    assert (look.hbonds, look.hbond_color, look.hbond_max) == ("chains:A+B", "#112233", 40)
+    doc = layout_document(figure_spec(_path("1LMB"), style=["hbonds=na", "hbond_max=40"]))
+    assert doc["style"]["hbonds"] == "na" and doc["style"]["hbond_max"] == 40
+    from foldmap.app import look_of
+
+    assert look_of({"hbonds": "interchain", "hbond_max": 12}).hbond_max == 12
+
+
+def test_the_overlay_agrees_with_the_deposited_hydrogen_bonds_where_the_file_has_them(capsys):
+    """Reported, not a gate. Of the file's `hydrog` records: those between protein and nucleic acid, how many the
+    overlay draws as a residue pair; and, as a check of the detector, those between two chains (base pairs), how many
+    atom pairs `interchain` finds. Today's files annotate base pairs only, so the first count is 0 of 0."""
+    rows = []
+    for name in ("1LMB", "30QM", "1ZAA", "1KX5", "1IHF", "3CRX"):
+        records = deposited_hydrog(_path(name))
+        found = {
+            frozenset((_tag(b.donor).split()[0], _tag(b.acceptor).split()[0])) for b in _found(name, Selection("na"))
+        }
+        protein_na = {frozenset((r.a.split()[0], r.b.split()[0])) for r in records if _is_protein_tag(r)}
+        atoms = {frozenset((_tag(b.donor), _tag(b.acceptor))) for b in _found(name, Selection("interchain"))}
+        across = {frozenset((r.a, r.b)) for r in records if r.a.split(":")[0] != r.b.split(":")[0]}
+        rows.append(
+            f"{name}: protein-NA {len(protein_na & found)} of {len(protein_na)} drawn; "
+            f"base-pair atoms {len(across & atoms)} of {len(across)} found"
+        )
+    with capsys.disabled():
+        print("\ndeposited hydrog vs overlay:\n  " + "\n  ".join(rows))
+
+
+def _is_protein_tag(record) -> bool:
+    names = [r.split()[0].split(":")[1].rstrip("-0123456789") for r in (record.a, record.b)]
+    infos = [gemmi.find_tabulated_residue(n) for n in names]
+    return any(i is not None and i.is_amino_acid() for i in infos)
+
+
+def test_the_default_cap_holds_on_a_nucleosome():
+    """1KX5 `interchain` has ~480 bonded residue pairs: 200 drawn, the legend says of how many."""
+    fig = _drawn("1KX5", "hbonds=interchain")[0]
+    assert len(_lines(fig)) == 200
+    assert _legend_texts(fig)[0].startswith("H-bonds (200 of ")

@@ -22,6 +22,11 @@ terminal O3' or O5' (no phosphate on it) is a hydroxyl, donor and acceptor. Base
 atoms (O6 guanine, N6 adenine, N4 cytosine, O4 uracil and thymine), so a modified nucleotide uses its parent's
 table. Of residues sharing a number (microheterogeneity) the first is kept, and of each atom its first conformer.
 Waters and ligands (any non-polymer entity) are left out.
+
+Known limits: the ring-closed amino rule (an amino N bonded into a ring accepts only) assumes an aromatic fusion, as
+in etheno bases and wyosine; a saturated ring closure would be misjudged. An atom at a mid-chain gap (a missing
+residue, a chain break: the O3' before it, the N of the residue after it) is classed as terminal, so it is taken for
+a free hydroxyl or amine and may donate.
 """
 
 from __future__ import annotations

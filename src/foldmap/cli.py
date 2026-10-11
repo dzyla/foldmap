@@ -250,6 +250,8 @@ def make_layout(
     lay.links = links
     lay.res_chain = [l.chain for l in bb.labels]
     lay.res_name = [l.name for l in bb.labels]
+    lay.res_labels = list(bb.labels)
+    lay.model = model
     lay.res_b = [float(x) for x in bb.b] if bb.b is not None else []
     lay.uniprot = ann
     first = [s.centroid for s in sses if s.chain == sses[0].chain] if sses else [_any_centre(bb, nucleic)]
@@ -693,6 +695,12 @@ def styles_help() -> str:
             return "modality, chain, ink or a colour"
         if key in ("dna_color", "rna_color", "background", "ink"):
             return "a colour (#rrggbb or a name)"
+        if key == "hbonds":
+            return "off, na, interchain or chains:A+B,C+D"
+        if key == "hbond_color":
+            return "a colour (#rrggbb or a name)"
+        if key == "hbond_max":
+            return "whole number, at most this many lines (the shortest kept)"
         if key == "backbone_colors":
             return "KEY=COLOUR,... (KEY: a chain id, protein, dna or rna)"
         return "true/false"

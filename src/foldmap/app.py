@@ -439,6 +439,11 @@ def main() -> None:
                 key="backbone_colors",
                 help="e.g. A=#1f77b4, dna=#555555, I=crimson (chain or protein/dna/rna)",
             )
+            st.text_input(
+                "Hydrogen bonds", key="hbonds", help="off, na (protein with DNA/RNA), interchain, or chains:A+B,C+D"
+            )
+            st.color_picker("H-bond colour", key="hbond_color")
+            st.number_input("Most H-bond lines", min_value=1, step=50, key="hbond_max")
             st.slider("Text size", 0.6, 2.0, step=0.1, key="font_scale")
             st.text_input("Title", key="title")
         with st.expander("Features"):

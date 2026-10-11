@@ -26,6 +26,7 @@ from matplotlib.text import Text
 from matplotlib.textpath import text_to_path
 from matplotlib.transforms import Affine2D
 
+from .hbonds import find_hbonds, parse_selection
 from .layout import (
     DNA_MINOR,
     DNA_PITCH,
@@ -1420,6 +1421,111 @@ def draw(layout: Layout, loops: list[Loop], sses: list[SSE], title: str | None =
         return pin_fonts(_draw(layout, loops, sses, title, **kw))
 
 
+class HBondLine(NamedTuple):
+    """One drawn hydrogen-bond line: a residue (or nucleotide) pair carrying at least one bond."""
+
+    gid: str  # hbond:A:42-1:DG16
+    ends: tuple  # ((x, y), (x, y)): page points of the first and second residue
+    length: float  # page units
+    bonds: tuple  # hbonds.HBond, the donor-acceptor atom pairs between the two, shortest first
+    residues: tuple  # Backbone indices of the protein ends
+    labels: tuple = ()  # model.ResLabel of the two ends, in the order of `ends`
+
+
+class HBondOverlay(NamedTuple):
+    lines: list  # HBondLine drawn, shortest first
+    total: int  # residue pairs with a bond before the hbond_max cap
+
+    def legend(self) -> str:
+        n = len(self.lines)
+        return f"H-bonds ({n})" if n == self.total else f"H-bonds ({n} of {self.total})"
+
+
+def nucleotide_points(layout: Layout) -> dict[tuple[int, int], np.ndarray]:
+    """Where each drawn nucleotide (strand, index) sits: its rail point on a stem, its run point on a path."""
+    where: dict[tuple[int, int], np.ndarray] = {}
+    for d in layout.stems:
+        for key in d.axial:
+            where[key] = d.point(key)
+    for path in layout.na_paths:
+        for i, xy in zip(path.nts, path.nt_xy):
+            where[(path.strand, i)] = np.asarray(xy)
+    return where
+
+
+def hbond_overlay(layout: Layout, loops: list[Loop], sses: list[SSE], look: Style) -> HBondOverlay:
+    """The hydrogen-bond lines `look.hbonds` asks for, from the model the layout was built from: one per residue
+    pair (protein before nucleotide, else by tag), between their points on the page. Bonds with an end that is not
+    drawn (cropped nucleic acid, chains outside the focus, residues past a chain's elements) are left out. At most
+    `look.hbond_max` lines, the shortest kept."""
+    sel = parse_selection(look.hbonds)
+    if sel.kind == "off" or layout.model is None:
+        return HBondOverlay([], 0)
+    protein = {(l.chain, l.seq, l.icode): (k, l.name) for k, l in enumerate(layout.res_labels)}
+    nts = {}
+    if layout.nucleic is not None:
+        nts = {
+            (lab.chain, lab.seq, lab.icode): ((s, i), lab.name)
+            for s, strand in enumerate(layout.nucleic.strands)
+            for i, lab in enumerate(strand.labels)
+        }
+    where = nucleotide_points(layout)
+    cache: dict = {}
+
+    def locate(lab):
+        """(sort key, page point, Backbone index or None) of a residue label, or None when it is not drawn."""
+        ident = (lab.chain, lab.seq, lab.icode)
+        if ident not in cache:
+            cache[ident] = None
+            hit = protein.get(ident)
+            shown = lab.chain not in layout.partial and not (
+                layout.focus_chains and lab.chain not in layout.focus_chains
+            )
+            if hit is not None and hit[1] == lab.name:
+                at = residue_point(layout, loops, sses, layout.res_chain, hit[0]) if shown else None
+                if at is not None:
+                    cache[ident] = ((0, *ident), at, hit[0], lab)
+            elif ident in nts and nts[ident][1] == lab.name and nts[ident][0] in where:
+                cache[ident] = ((1, *ident), tuple(float(v) for v in where[nts[ident][0]]), None, lab)
+        return cache[ident]
+
+    pairs: dict[str, list] = {}
+    for bond in find_hbonds(layout.model, sel):
+        a, b = locate(bond.donor.res), locate(bond.acceptor.res)
+        if a is None or b is None:
+            continue
+        a, b = sorted((a, b), key=lambda e: e[0])
+        gid = f"hbond:{a[0][1]}:{a[0][2]}{a[0][3]}-{b[0][1]}:{b[0][2]}{b[0][3]}"
+        pairs.setdefault(gid, [a, b, []])[2].append(bond)
+    lines = []
+    for gid, (a, b, bonds) in pairs.items():
+        length = float(np.hypot(a[1][0] - b[1][0], a[1][1] - b[1][1]))
+        if length > 0:
+            residues = tuple(e[2] for e in (a, b) if e[2] is not None)
+            lines.append(
+                HBondLine(
+                    gid, (a[1], b[1]), length, tuple(sorted(bonds, key=lambda x: x.distance)), residues, (a[3], b[3])
+                )
+            )
+    lines.sort(key=lambda l: (l.length, l.gid))
+    return HBondOverlay(lines[: look.hbond_max], len(lines))
+
+
+def _draw_hbonds(c: _Canvas, overlay: HBondOverlay) -> None:
+    """Thin dashed lines between the residues of each hydrogen-bonded pair: over the panels and the nucleic-acid
+    backbone, under the elements and letters (gid hbond:<a>-<b>)."""
+    for line in overlay.lines:
+        (artist,) = c.ax.plot(
+            *np.c_[line.ends[0], line.ends[1]],
+            color=c.look.hbond_color,
+            lw=c.loop_lw * 0.6,
+            ls=(0, (3, 2)),
+            solid_capstyle="butt",
+            zorder=2.5,
+        )
+        artist.set_gid(line.gid)
+
+
 @dataclass
 class _Canvas:
     """What every drawing step shares: the axes, the resolved look, colours and the page geometry."""
@@ -1468,7 +1574,13 @@ def _empty_figure() -> Figure:
 
 
 def _legend_entries(
-    layout: Layout, look: Style, chains: list[str], colors: dict[str, str], umarks, na_colours: dict[str, str]
+    layout: Layout,
+    look: Style,
+    chains: list[str],
+    colors: dict[str, str],
+    umarks,
+    na_colours: dict[str, str],
+    hb: HBondOverlay | None = None,
 ) -> list:
     entries = [(colors[c], f"Chain {c}") for c in chains]
     if layout.focus is not None:
@@ -1503,12 +1615,13 @@ def _legend_entries(
             rna = [any(s.rna for s in strands if s.chain == c) for c in mine]
             kind = "RNA" if all(rna) else "DNA" if not any(rna) else "DNA/RNA"
             entries.append((colour, f"{kind} ({', '.join(mine)})"))
-
+    if hb is not None and hb.lines and look.legend:
+        entries.append((look.hbond_color, hb.legend()))
     return entries
 
 
 def _canvas(
-    layout: Layout, look: Style, title, chains, colors, element_colour, residue_colour, marks, umarks
+    layout: Layout, look: Style, title, chains, colors, element_colour, residue_colour, marks, umarks, hb
 ) -> tuple[_Canvas, _Legend]:
     """The figure, its axes and every size the steps share; also lays the legend out, as it sets the page width."""
     x0, y0, x1, y1 = layout.bounds
@@ -1518,7 +1631,7 @@ def _canvas(
     pad = 1.0
     top = 1.9 if title else 0.0
     backbone = backbone_colours(layout, chains, look, colors)  # once per figure
-    entries = _legend_entries(layout, look, chains, colors, umarks, backbone[0])
+    entries = _legend_entries(layout, look, chains, colors, umarks, backbone[0], hb)
 
     def legend_entry(x1: float) -> float:  # one legend entry's width in page units: swatch, text, gap
         scale = min(_IN_PER_UNIT, _MAX_WIDTH_IN / (x1 - x0 + 2 * pad))  # as the figure below
@@ -1970,6 +2083,9 @@ def _draw_legend(c: _Canvas, layout: Layout, legend: _Legend) -> None:
                         (x + q * 0.1, y - 0.3), 0.1, 0.6, fc=sequence_colour(q / 5, c.look.sequence_map), ec="none"
                     )
                 )
+        elif text.startswith("H-bonds"):  # a short dashed line, as drawn
+            (dash,) = c.ax.plot([x, x + 0.6], [y, y], color=colour, lw=c.loop_lw * 0.6, ls=(0, (3, 2)))
+            dash.set_gid("legend-hbond")
         else:
             swatch = Rectangle((x, y - 0.3), 0.6, 0.6, fc=colour, ec=darken(colour), lw=c.lw * 0.8)
             c.ax.add_patch(swatch)
@@ -2020,11 +2136,14 @@ def _draw(
         return _empty_figure()
     marks = ligand_marks(layout, loops, sses, look)
     umarks = uniprot_marks(layout, loops, sses, look)
-    c, legend = _canvas(layout, look, title, chains, colors, element_colour, residue_colour, marks, umarks)
+    hb = hbond_overlay(layout, loops, sses, look)
+    c, legend = _canvas(layout, look, title, chains, colors, element_colour, residue_colour, marks, umarks, hb)
     _draw_loops(c, layout, loops, sses)
     _draw_membrane(c, layout)
     _draw_domains(c, layout)
     _draw_sheet_panels(c, layout)
+    _draw_hbonds(c, hb)
+    c.fig.foldmap_hbonds = hb  # for the interactive page's hover notes
     if layout.stems or layout.na_paths:
         _draw_nucleic(
             c.ax, layout, sses, c.residue_colour, c.look.fill, c.lw, c.font, c.pt_per_unit, c.look, c.backbone[0]

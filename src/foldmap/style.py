@@ -13,6 +13,7 @@ from pathlib import Path
 
 import yaml
 
+from .hbonds import parse_selection
 from .palette import PALETTES
 
 CHOICES = {
@@ -113,6 +114,11 @@ class Style:
     dna_color: str = "#8c564b"  # DNA backbone with na_backbone=modality
     rna_color: str = "#6a3d9a"  # RNA backbone with na_backbone=modality
     backbone_colors: str = ""  # overrides, "A=#1f77b4,dna=#555555,I=crimson": a chain id or protein / dna / rna
+    hbonds: str = (
+        "off"  # dashed lines for hydrogen bonds: off, na (protein with nucleic acid), interchain or chains:A+B,C+D
+    )
+    hbond_color: str = "#2a9d8f"  # the dashed lines
+    hbond_max: int = 200  # at most this many lines, the shortest kept
     mark: str = ""  # elements in a colour of their own: "G", "A:G=#2ca02c", "#3", "res:150-159=red", comma-separated
 
     def validate(self) -> Style:
@@ -132,6 +138,11 @@ class Style:
                 f"na_backbone must be {', '.join(NA_BACKBONES)} or a colour such as #8c564b; got {self.na_backbone!r}"
             )
         backbone_overrides(self.backbone_colors)
+        parse_selection(self.hbonds)
+        if not is_color_like(self.hbond_color):
+            raise ValueError(f"hbond_color must be a colour such as #2a9d8f or teal; got {self.hbond_color!r}")
+        if isinstance(self.hbond_max, bool) or not isinstance(self.hbond_max, int) or self.hbond_max < 1:
+            raise ValueError(f"hbond_max must be a whole number of 1 or more; got {self.hbond_max!r}")
         if not re.fullmatch(r"auto|all|none|[a-z-]+(,[a-z-]+)*", self.uniprot_sites):
             raise ValueError(
                 f"uniprot_sites must be auto, all, none or types like active,binding; got {self.uniprot_sites!r}"
@@ -195,6 +206,14 @@ def _coerce(key: str, value):
         if text in ("false", "no", "off", "0"):
             return False
         raise ValueError(f"{key} must be true or false; got {value!r}")
+    if kind == "int":
+        try:
+            number = float(value)
+            if number != int(number):
+                raise ValueError
+        except (TypeError, ValueError, OverflowError):
+            raise ValueError(f"{key} must be a whole number; got {value!r}") from None
+        return int(number)
     if kind == "float":
         try:
             return float(value)

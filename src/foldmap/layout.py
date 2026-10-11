@@ -192,6 +192,8 @@ class Layout:
     res_chain: list[str] = field(default_factory=list)  # chain of each Backbone residue
     res_name: list[str] = field(default_factory=list)  # residue type of each Backbone residue
     res_b: list[float] = field(default_factory=list)  # CA B-factor of each Backbone residue
+    res_labels: list = field(default_factory=list)  # model.ResLabel of each Backbone residue
+    model: object = field(default=None, repr=False, compare=False)  # the io.read_model result this was built from
     focus_chains: set | None = None  # large assemblies: the subunit drawn in full (None: everything drawn)
     unjoined: set = field(default_factory=set)  # (a, b) element pairs shown side by side but not adjacent in sequence
     partial: set = field(default_factory=set)  # chains present only as the elements that complete its fold

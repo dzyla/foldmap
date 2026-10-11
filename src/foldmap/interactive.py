@@ -392,6 +392,10 @@ _APP = r"""
       const x = item.mark ? data.beads.marks[item.mark] : data.beads.chains[item.chain][item.idx];
       return { keys: [], residues: [x.k], label: x.text, text: x.text };
     }
+    if (item.type === 'hbond') {  // a hydrogen-bonded pair: the atoms and their distances
+      const x = data.hbonds.find(h => h.key === item.key);
+      return { keys: [], residues: x.residues, label: 'H-bond', text: x.text };
+    }
     if (['disulfide', 'glycan', 'ligand', 'feature'].includes(item.type)) {
       const list = data.links[item.type === 'disulfide' ? 'disulfides' : item.type + 's'];
       const x = list.find(d => d.key === item.key);
@@ -461,6 +465,7 @@ _APP = r"""
       let l = n.id.match(/^(?:disulfide|ss-dot):(.+)$/);
       if (l) return { type: 'disulfide', key: l[1] };
       if ((l = n.id.match(/^glycan:(\d+):/))) return { type: 'glycan', key: l[1] };
+      if ((l = n.id.match(/^hbond:(.+)$/)) && data.hbonds.some(h => h.key === l[1])) return { type: 'hbond', key: l[1] };
       if ((l = n.id.match(/^feature(?:-ring)?:(\d+)$/))) return { type: 'feature', key: l[1] };
       if ((l = n.id.match(/^ligand(?:-label|-tether)?:(.+?)(?::\d+)?$/))) return { type: 'ligand', key: l[1] };
     }
@@ -681,6 +686,29 @@ def _beads(fig, layout, bb, model) -> dict:
     return out
 
 
+def _hbonds(fig) -> list:
+    """The hydrogen-bond lines as drawn, for the hover: `key` (the gid after "hbond:"), the protein residues
+    (Backbone indices) and the note "H-bond A:Gln44 – 1:DA4: NE2 – N7 3.3 Å; ..." (atoms in the order of the residues)."""
+    overlay = getattr(fig, "foldmap_hbonds", None)
+    out = []
+    for line in overlay.lines if overlay else []:
+        first, second = line.labels
+        name = lambda lab: f"{lab.chain}:{lab.name.title() if len(lab.name) == 3 else lab.name}{lab.tag}"  # noqa: E731
+        atoms = "; ".join(
+            " – ".join((x.donor.name, x.acceptor.name) if x.donor.res == first else (x.acceptor.name, x.donor.name))
+            + f" {x.distance:.1f} Å"
+            for x in line.bonds
+        )
+        out.append(
+            {
+                "key": line.gid[len("hbond:") :],
+                "residues": list(line.residues),
+                "text": f"H-bond {name(first)} – {name(second)}: {atoms}",
+            }
+        )
+    return out
+
+
 def _viewer_head(viewer: str) -> str:
     def script(url: str) -> str:
         return f'<script src="{url}" integrity="{SRI[url]}" crossorigin="anonymous"></script>'
@@ -742,6 +770,7 @@ def build_page(
         "viewer": viewer,
         "links": _links(layout, loops, sses, bb, look),
         "beads": _beads(fig, layout, bb, model),
+        "hbonds": _hbonds(fig),
     }
     blob = _script_json(data)
     name = html.escape(data["title"])
