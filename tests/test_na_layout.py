@@ -1655,12 +1655,19 @@ def test_a_chain_break_is_drawn_as_a_gap_with_no_ends_at_it():
 
 def test_a_trace_is_an_obstacle_the_protein_keeps_off():
     """1QBJ: hexamer F pairs only with a crystal mate, so it is drawn as a trace at its projected place; chain C's
-    alpha1 was placed on it (the trace a routing fallback). The trace's box is a fixed obstacle in placement."""
+    alpha1 was placed on it (the trace a routing fallback). Each trace nucleotide is a fixed obstacle in placement
+    for every element that does not touch the trace."""
+    from foldmap.layout import _TRACE_HALF
+
     lay, _, _, _ = _routed("1QBJ")
-    (pts,) = lay.na_traces.values()
-    box = (*np.min(pts, axis=0), *np.max(pts, axis=0))
-    assert not [p.sse.id for p in lay.placed.values() if _overlap(p.rect, box)]
-    assert not [d.id for d in lay.stems if _overlap(d.rect, box)]
+    ((s, pts),) = lay.na_traces.items()
+    touching = {r for r, v in lay.nucleic.contacts.items() if any(x[0] == s for x in v)}
+    for x, y in np.asarray(pts).tolist():
+        box = (x - _TRACE_HALF, y - _TRACE_HALF, x + _TRACE_HALF, y + _TRACE_HALF)
+        on = [p.sse.id for p in lay.placed.values() if _overlap(p.rect, box)]
+        on = [i for i in on if not touching & set(range(lay.placed[i].sse.start, lay.placed[i].sse.end + 1))]
+        assert not on
+        assert not [d.id for d in lay.stems if _overlap(d.rect, box)]
     assert not [p.kind for p in lay.na_paths if p.fallback]
 
 
@@ -1675,8 +1682,8 @@ def test_the_trace_boxes_reach_the_optimiser_on_the_grid(monkeypatch):
 
     monkeypatch.setattr(L, "_energy_dense", dense)
     make_layout(_path("1QBJ"))
-    centres, want = seen[0]
-    assert len(centres) == 1
+    centres, want, _ = seen[0]
+    assert len(centres) == 6  # one box per nucleotide of hexamer F
     for v in (centres, want):
         v = np.asarray(v) * 1e4
         assert np.all(np.abs(v - np.round(v)) < 1e-6)
@@ -1760,3 +1767,24 @@ def test_a_gap_label_is_drawn_inside_the_box_placement_kept_clear():
         b = _gap_box(lay.na_paths[int(t.get_gid().rsplit(":", 1)[1])], _em(lay))
         assert b[0] <= x0 and x1 <= b[2] and b[1] <= y0 and y1 <= b[3]
         assert (b[2] - b[0]) < 1.6 * (x1 - x0)
+
+
+def test_a_single_strand_wrapped_over_its_protein_keeps_the_protein_under_it():
+    """1EYG: the ssDNA wraps over the SSB tetramer. As one bounding box the traces pushed the tetramer apart and
+    below them (touching elements up to 13.4 from the nearest nucleotide, two dimers split); elements touching a
+    trace are exempt from it, so every touching element stays within reach of the strand it holds."""
+    lay, _, _, _ = _routed("1EYG")
+    pts = np.vstack([np.asarray(v) for v in lay.na_traces.values()])
+    traced = set(lay.na_traces)
+    far = []
+    for p in lay.placed.values():
+        if not any(x[0] in traced for r in range(p.sse.start, p.sse.end + 1) for x in lay.nucleic.contacts.get(r, ())):
+            continue
+        x0, y0, x1, y1 = p.rect
+        gap = np.hypot(
+            np.clip(np.maximum(x0 - pts[:, 0], pts[:, 0] - x1), 0, None),
+            np.clip(np.maximum(y0 - pts[:, 1], pts[:, 1] - y1), 0, None),
+        )
+        if gap.min() > 6.0:
+            far.append((p.sse.id, round(float(gap.min()), 1)))
+    assert not far

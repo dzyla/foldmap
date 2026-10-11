@@ -58,6 +58,7 @@ CONTROLS = {
     "2GIS": ("2GIS", ["A"], {}),  # SAM-I riboswitch, RNA only: internal loops and runs between seven stems
     "1URN": ("1URN", ["C", "R"], {}),  # U1A on an RNA hairpin whose loop is not modelled (U13-C14): a chain break
     "1QBJ": ("1QBJ", None, {}),  # Zalpha on Z-DNA: strand F pairs only with a crystal mate, drawn as a trace
+    "1EYG": ("1EYG", None, {}),  # E. coli SSB tetramer with ssDNA wrapped over it: unpaired traces on their protein
 }
 
 
