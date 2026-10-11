@@ -405,3 +405,66 @@ def test_the_1aoi_nucleosome_dna_is_one_duplex_cut_only_where_it_bends():
     assert {(0, 20 - 1), (0, 21 - 1)} <= set(st.bulges)
     pieces = segment_stem(st, na.strands)
     assert len(pieces) > 1 and all(p.parent == st.id for p in pieces)
+
+
+def test_the_sam_i_riboswitch_is_named_as_in_the_literature():
+    # Roy 2019 Fig 1A: P1 1-8/86-94, P2 13-41 (kink-turn inside), P3 42-60, P4 69-82, and the pseudoknot between
+    # the P2 loop and J3/4 (25-28·65-68)
+    ss = _na("2GIS").structure
+    assert [(st.name, st.id) for st in ss.stems] == [
+        ("P1", "A:1-8/A:86-93"),
+        ("P2a", "A:13-17/A:38-41"),
+        ("P2b", "A:21-23/A:29-31"),
+        ("PK", "A:25-28/A:65-68"),
+        ("P3a", "A:42-44/A:58-60"),
+        ("P3b", "A:47-49/A:54-56"),
+        ("P4", "A:69-73/A:78-82"),
+    ]
+
+
+def test_a_helix_continued_across_an_internal_loop_keeps_its_number():
+    ss = secondary_structure(_strands(30), _pairs((0, 29), (1, 28), (2, 27), (6, 23), (7, 22), (8, 21)))
+    assert [st.name for st in ss.stems] == ["P1a", "P1b"]
+
+
+def test_stems_branching_from_a_junction_are_numbered_apart():
+    pairs = _pairs((0, 39), (1, 38), (4, 14), (5, 13), (20, 32), (21, 31))
+    ss = secondary_structure(_strands(40), pairs)
+    assert [st.name for st in ss.stems] == ["P1", "P2", "P3"]
+
+
+@pytest.mark.parametrize("first, names", [(3, ["P1", "PK"]), (2, ["PK", "P1"])])
+def test_a_pseudoknot_is_the_shorter_of_two_crossing_stems_or_the_later_one(first, names):
+    # a hairpin from 0 crossed by the 3-bp stem 10-12/26-28: of equal stems the 5' one nests, a shorter one is the knot
+    hairpin = _pairs(*[(k, 20 - k) for k in range(first)])
+    knot = _pairs((10, 28), (11, 27), (12, 26))
+    ss = secondary_structure(_strands(30), hairpin + knot)
+    assert [st.name for st in ss.stems] == names
+    kinds = {r.lo: r.kind for r in ss.runs}
+    assert kinds[first] == ("hairpin" if first == 3 else "linker")  # the loop the nested stem closes
+
+
+def _bent(n, at, degrees):
+    """A synthetic n-bp duplex (strands A, B) whose axis turns by `degrees` about x after pair `at`."""
+    t = np.radians(degrees)
+    turn = np.array([[1, 0, 0], [0, np.cos(t), -np.sin(t)], [0, np.sin(t), np.cos(t)]])
+    a, b, mid = np.zeros((n, 3)), np.zeros((n, 3)), np.zeros(3)
+    for k in range(n):
+        frame = turn if k >= at else np.eye(3)
+        u, e1, e2 = frame @ [0, 0, 1], frame @ [1, 0, 0], frame @ [0, 1, 0]
+        if k:
+            mid = mid + 3.4 * u
+        r = 5.25 * (np.cos(np.radians(36 * k)) * e1 + np.sin(np.radians(36 * k)) * e2)
+        a[k], b[n - 1 - k] = mid - r, mid + r
+    return [
+        NAStrand(c, [ResLabel(c, k + 1, "", "A") for k in range(n)], xyz, xyz, False) for c, xyz in (("A", a), ("B", b))
+    ]
+
+
+@pytest.mark.parametrize("name, marks", [("DNA 1", "abc"), ("P2a", "123")])
+def test_pieces_of_a_bent_stem_are_lettered_or_numbered_after_a_letter(name, marks):
+    strands = _bent(20, 10, 60)
+    (st,) = secondary_structure(strands, [BasePair(0, k, 1, 19 - k, "WC") for k in range(20)]).stems
+    st.name = name
+    pieces = segment_stem(st, strands)
+    assert len(pieces) > 1 and [p.name for p in pieces] == [name + m for m in marks[: len(pieces)]]

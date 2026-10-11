@@ -292,14 +292,57 @@ def _group_stems(pairs: list[BasePair], strands=None) -> list[list[BasePair]]:
     return stems
 
 
-def _nested(groups: list[list[BasePair]]) -> list[BasePair]:
-    """The pairs of the intra-strand stems (`groups`, each a stem's pairs, in 5'->3' order) that cross no other,
-    keeping the pairs of the longest stems first."""
-    keep: list[BasePair] = []
-    for st in sorted([g for g in groups if g[0].a == g[0].b], key=len, reverse=True):
-        if all(not (p.a == q.a and (p.i < q.i < p.j < q.j or q.i < p.i < q.j < p.j)) for p in st for q in keep):
-            keep += st
-    return keep
+def _knots(stems: list[Stem], strands) -> set[int]:
+    """The pseudoknotted stems (their indices): taken longest first (of equal ones the earlier in `stems`, which are
+    in 5'->3' order), a stem whose arms lie in one chain is a knot if one of its pairs crosses a pair of a stem
+    already kept nested. Along a chain cut into several strands, nucleotides are in (strand, index) order."""
+    kept: dict[str, list[tuple]] = {}  # chain -> the (5' end, 3' end) of every pair kept nested
+    out = set()
+    for k in sorted(range(len(stems)), key=lambda k: -len(stems[k])):
+        st = stems[k]
+        chain = strands[st.a].chain
+        if strands[st.b].chain != chain:
+            continue
+        spans = [((p.a, p.i), (p.b, p.j)) for p in st.pairs]
+        mine = kept.setdefault(chain, [])
+        if any(x0 < y0 < x1 < y1 or y0 < x0 < y1 < x1 for x0, x1 in spans for y0, y1 in mine):
+            out.add(k)
+        else:
+            mine += spans
+    return out
+
+
+def _helices(stems: list[Stem], knots: set[int]) -> list[list[int]]:
+    """Stems (indices, outermost first) that make one helix: each continues the one before it inward across an
+    internal loop or bulge, with no other stem (a knot aside) branching off between them. In 5'->3' order of
+    their outermost stem."""
+    owner = {n: k for k, st in enumerate(stems) if k not in knots for n in st.nucleotides()}
+    inner: dict[int, int] = {}
+    for k, p in enumerate(stems):
+        if k in knots:
+            continue
+        last = p.pairs[-1]
+        inside = [
+            m
+            for m, q in enumerate(stems)
+            if m not in knots and (q.a, q.b) == (p.a, p.b) and q.pairs[0].i > last.i and q.pairs[0].j < last.j
+        ]
+        if not inside:
+            continue
+        m = min(inside, key=lambda m: stems[m].pairs[0].i)
+        first = stems[m].pairs[0]
+        loop = [(p.a, i) for i in range(last.i + 1, first.i)] + [(p.b, j) for j in range(first.j + 1, last.j)]
+        if all(owner.get(n) is None for n in loop):
+            inner[k] = m
+    out = []
+    for k in range(len(stems)):
+        if k in knots or k in inner.values():
+            continue
+        chain = [k]
+        while chain[-1] in inner:
+            chain.append(inner[chain[-1]])
+        out.append(chain)
+    return out
 
 
 def _loop_kind(strand: int, lo: int, hi: int, nested: list[BasePair]) -> str:
@@ -316,7 +359,9 @@ def _loop_kind(strand: int, lo: int, hi: int, nested: list[BasePair]) -> str:
 
 def secondary_structure(strands, pairs: list[BasePair]) -> NAStructure:
     """Stems (two or more stacked pairs), ties (an isolated pair) and the single-stranded runs between them.
-    Stems are named P1, P2 ... (RNA) or DNA 1, DNA 2 ... in 5'->3' order of their first arm."""
+    Stems are named in 5'->3' order of their first arm: DNA 1, DNA 2 ...; RNA helices P1, P2 ..., the stems of one
+    helix (continued across an internal loop or bulge) lettered P2a, P2b ... from the outermost in, as RNA
+    secondary structures are numbered by their nesting; pseudoknotted stems (_knots) apart, PK (or PK1, PK2 ...)."""
     out = NAStructure()
     for group in _group_stems(pairs, strands):
         if len(group) < 2:
@@ -328,19 +373,23 @@ def secondary_structure(strands, pairs: list[BasePair]) -> NAStructure:
         stem.bulges.sort()
         out.stems.append(stem)
     out.stems.sort(key=lambda s: (s.a, s.pairs[0].i))
-    rna = dna = 0
-    for st in out.stems:
+    knots = _knots(out.stems, strands)
+    dna = 0
+    for k, st in enumerate(out.stems):
         la, lb = strands[st.a].labels, strands[st.b].labels
         (_, i0, i1), (_, j0, j1) = st.arm5, st.arm3
         st.id = f"{la[i0].chain}:{la[i0].tag}-{la[i1].tag}/{lb[j0].chain}:{lb[j0].tag}-{lb[j1].tag}"
-        if strands[st.a].rna or strands[st.b].rna:
-            rna += 1
-            st.name = f"P{rna}"
-        else:
+        if not (strands[st.a].rna or strands[st.b].rna) and k not in knots:
             dna += 1
             st.name = f"DNA {dna}"
+    rna = [h for h in _helices(out.stems, knots) if out.stems[h[0]].name == ""]
+    for n, helix in enumerate(rna):
+        for m, k in enumerate(helix):
+            out.stems[k].name = f"P{n + 1}" + (_letter(m) if len(helix) > 1 else "")
+    for n, k in enumerate(sorted(knots)):
+        out.stems[k].name = "PK" if len(knots) == 1 else f"PK{n + 1}"
     inside = {n for st in out.stems for n in st.nucleotides()}
-    nested = _nested([st.pairs for st in out.stems])
+    nested = [p for k, st in enumerate(out.stems) if k not in knots and st.a == st.b for p in st.pairs]
     for s, strand in enumerate(strands):
         i, n = 0, len(strand)
         while i < n:
@@ -416,14 +465,18 @@ def segment_stem(stem: Stem, strands, max_turn: float = SEGMENT_TURN) -> list[St
         cuts.pop()
     if len(cuts) == 1:
         return [stem]
-    letters = "abcdefghijklmnopqrstuvwxyz"
     pieces = []
     for n, (lo, hi) in enumerate(zip(cuts, cuts[1:] + [len(stem)])):
         part = stem.pairs[lo:hi]
         inner = [x for x in stem.bulges if _between(x, part)]
-        suffix = letters[n] if n < len(letters) else str(n + 1)
+        suffix = str(n + 1) if stem.name[-1:].islower() else _letter(n)  # P2a: P2a1, P2a2; P2: P2a, P2b
         pieces.append(Stem(part, inner, f"{stem.id}#{n + 1}", f"{stem.name}{suffix}", stem.id))
     return pieces
+
+
+def _letter(n: int) -> str:
+    """a, b, ... z, then 27, 28 ..."""
+    return "abcdefghijklmnopqrstuvwxyz"[n] if n < 26 else str(n + 1)
 
 
 def _between(x: tuple[int, int], part: list[BasePair]) -> bool:

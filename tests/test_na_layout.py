@@ -682,6 +682,13 @@ def test_joints_and_runs_cross_no_stem_or_element(pdb):
     assert kinds["run"] or pdb == "1KX5"
 
 
+# runs over a stem-name box, held at the measured count: on 4YBB the 1-nt run P1->P2 ((0, 23) to (0, 25)) is boxed in
+# by the stems and hairpin loops drawn round it (Task 13b step 4, once AA:454-462/470-479 became one stem and the
+# helices were lettered): its one route clear of the elements gives up a soft cell of P12b's name box (block style
+# draws that name inside the stem, so nothing visible is crossed)
+OVER_NAMES = {"4YBB": [((0, 23), (0, 25))]}
+
+
 @pytest.mark.parametrize("pdb", FIXTURES)
 def test_runs_keep_off_the_stem_names(pdb):
     from foldmap.layout import label_boxes
@@ -690,16 +697,19 @@ def test_runs_keep_off_the_stem_names(pdb):
     lay, sses, _, _ = _routed(pdb)
     at = {key: d for d in lay.stems for key in d.axial}
     names = [b for n, b in label_boxes(lay, sses) if n.startswith("stem-label:")]
-    for p in lay.na_paths:
-        if p.kind in ("run", "joint"):
-            pts = among(p, at)
-            assert all(segment_clear(a, b, names) for a, b in zip(pts, pts[1:])), (p.kind, p.between)
+    over = [
+        p.between
+        for p in lay.na_paths
+        if p.kind in ("run", "joint")
+        and not all(segment_clear(a, b, names) for a, b in zip(among(p, at), among(p, at)[1:]))
+    ]
+    assert over == OVER_NAMES.get(pdb, [])  # a held run that keeps off the names now: remove its hold
 
 
 def test_a_run_goes_round_a_stem_name_it_could_cross():
-    """4YBB: with the stems where 3D has them (C2), the 1-nt run from P27 to P26 was bowed across P27's name. Stem
-    names are hard obstacles for a run's first drawing; one that crosses a name is drawn only when nothing else
-    is clear of the elements."""
+    """4YBB: with the stems where 3D has them (C2), the 1-nt run from P27 to P26 (P17b to P17a since helices are
+    lettered) was bowed across P27's name. Stem names are hard obstacles for a run's first drawing; one that crosses
+    a name is drawn only when nothing else is clear of the elements."""
     from foldmap.layout import label_boxes
     from foldmap.route_na import among
 
@@ -707,7 +717,7 @@ def test_a_run_goes_round_a_stem_name_it_could_cross():
     at = {key: d for d in lay.stems for key in d.axial}
     names = [b for n, b in label_boxes(lay, sses) if n.startswith("stem-label:")]
     run = next(p for p in lay.na_paths if p.between == ((1, 391), (1, 393)))
-    assert [at[k].name for k in run.between] == ["P27", "P26"] and not run.fallback
+    assert [at[k].name for k in run.between] == ["P17b", "P17a"] and not run.fallback
     pts = among(run, at)
     assert all(segment_clear(a, b, names) for a, b in zip(pts, pts[1:]))
 
@@ -1015,13 +1025,14 @@ def test_a_free_end_keeps_out_of_its_partners_doorway(monkeypatch):
     assert not path.fallback and not route_na._crosses_segment(path.points, *door)
 
 
-@pytest.mark.parametrize("pdb, runs, protein", [("2GIS", 6, 0), ("4OO8", 4, 12)])
+@pytest.mark.parametrize("pdb, runs, protein", [("2GIS", 6, 0), ("4OO8", 4, 13)])
 def test_runs_keep_off_the_strands_drawn_before_them(pdb, runs, protein):
     """A run with nucleotides on it is routed off every strand drawn before it, and every protein loop, unless that
     is a long detour (route_na._DETOUR); failing that it pays for the cells beside them too (_BESIDE_DETOUR), else
     crossing them is only a cost; neither detour more than _DETOUR_STEPS steps per nucleotide longer. Measured with
     crossing them only a cost: run-run crossings 2GIS 8, 4OO8 5 (protein loops crossed 15). (30QM, pinned here while
-    drawn in the plain frame, is drawn unrolled since the C4 revision.)"""
+    drawn in the plain frame, is drawn unrolled since the C4 revision.) 4OO8 protein 12 -> 13 when its helices were
+    lettered (P2a/P2b: the longer names move the placement)."""
     from foldmap.nacheck import na_crossings
 
     lay, _, _, loops = _routed(pdb)

@@ -44,7 +44,7 @@ LIMITS = {  # metric: (lowest or highest allowed, "min" or "max")
 CAMPAIGN = {
     "na_crossings": {},  # every fixture at 0
     "bead_overlaps": {},  # every fixture at 0
-    "gap_label_collisions": {"4YBB": 2},
+    "gap_label_collisions": {},  # every fixture at 0
 }
 # stems_nearer_frac (target 1.0) held at its measured value (absent: 1.0). 30QM is drawn unrolled, its two protomers
 # side by side (the C4 revision of Task 13b step 3: unrolling tears none of its duplexes): one stem held by both
@@ -213,7 +213,7 @@ def test_planted_crossings_are_counted():
     d = lay.stems[0]
     for pts in (
         [tuple((a + b) / 2 - 3 * normal), tuple((a + b) / 2 + 3 * normal)],  # across the free end
-        [tuple(np.add((d.cx, d.cy), -50 * d.normal)), tuple(np.add((d.cx, d.cy), 50 * d.normal))],  # a stem's body
+        [tuple(np.add((d.cx, d.cy), -d.width * d.normal)), tuple(np.add((d.cx, d.cy), d.width * d.normal))],  # a body
     ):
         planted = copy.copy(run)
         planted.points, planted.between = pts, ()
