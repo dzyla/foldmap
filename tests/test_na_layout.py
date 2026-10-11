@@ -1011,6 +1011,19 @@ def test_a_free_end_keeps_out_of_its_partners_doorway(monkeypatch):
     assert not path.fallback and not route_na._crosses_segment(path.points, *door)
 
 
+@pytest.mark.parametrize("pdb, runs, protein", [("2GIS", 7, 0), ("30QM", 2, 15)])
+def test_runs_keep_off_the_strands_drawn_before_them(pdb, runs, protein):
+    """A run with nucleotides on it is first routed with every strand drawn before it, and every protein loop, as
+    an obstacle, and that drawing is taken unless it is a long detour (route_na._DETOUR); crossing them is otherwise
+    only a cost. Measured with crossing them only a cost: run-run crossings 2GIS 8, 30QM 3 (protein loops crossed
+    17)."""
+    from foldmap.nacheck import na_crossings
+
+    lay, _, _, loops = _routed(pdb)
+    m = na_crossings(lay, loops)
+    assert m["na_run_crossings"] <= runs and m["na_protein_crossings"] <= protein
+
+
 def _in_outline(pt, e) -> bool:
     c, s = np.cos(e.angle), np.sin(e.angle)
     x, y = pt[0] - e.cx, pt[1] - e.cy

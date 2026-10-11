@@ -358,7 +358,9 @@ def test_a_route_through_an_element_that_cannot_be_redrawn_is_marked_fallback(mo
     wall = bar(40, 2, 1.0, 6.0, np.pi / 2)  # stands between the strands, up past their tops
     a, b, lay = strands_over_the_top(wall)
     monkeypatch.setattr(
-        route, "_astar", lambda grid, start, sd, goal, gd: [(x, start[1]) for x in range(start[0], goal[0] + 1)]
+        route,
+        "_astar",
+        lambda grid, start, sd, goal, gd, *budget: [(x, start[1]) for x in range(start[0], goal[0] + 1)],
     )
     caplog.set_level(logging.DEBUG, logger="foldmap.route")
     (loop,) = route_loops(lay, [a.sse, b.sse], stub_bb())

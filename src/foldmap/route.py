@@ -203,7 +203,7 @@ def _axis(vec) -> int:
     return 1 if y > 0 else 3
 
 
-def _astar(grid: _Grid, start, start_dir, goal, goal_dir):
+def _astar(grid: _Grid, start, start_dir, goal, goal_dir, max_nodes: int = _MAX_NODES):
     """Cheapest orthogonal path. Either end may be taken in any heading but one pointing back into its
     element, paying a turn when it is not the port's own axis; the goal pushes a terminal node. (Insisting
     on the port's heading made paths circle the end cell to take it: a visible curl.)"""
@@ -235,7 +235,7 @@ def _astar(grid: _Grid, start, start_dir, goal, goal_dir):
             heapq.heappush(heap, (g + (_TURN if d != goal_dir else 0), tie, g, x, y, d, True))
             continue
         nodes += 1
-        if nodes > _MAX_NODES:
+        if nodes > max_nodes:
             return None
         for nd in range(4):
             if nd == (d + 2) % 4:
@@ -306,7 +306,7 @@ def _route_pair(grid: _Grid, a: Placed, b: Placed):
     return _route_ports(grid, a.c_port, a.exit_c, a, b.n_port, b.exit_n, b)
 
 
-def _route_ports(grid: _Grid, pa, ea, own_a, pb, eb, own_b, loose=False):
+def _route_ports(grid: _Grid, pa, ea, own_a, pb, eb, own_b, loose=False, max_nodes: int = _MAX_NODES):
     """Grid cells of the cheapest orthogonal route from port pa (leaving along ea) to port pb (entered against
     eb), or None; own_a and own_b (anything with a rect) are what the ports belong to. `loose`: see
     _Grid.free_cell_along."""
@@ -317,7 +317,7 @@ def _route_ports(grid: _Grid, pa, ea, own_a, pb, eb, own_b, loose=False):
     stubs = grid.stub_cells(pa, start) | grid.stub_cells(pb, goal)  # the straight ends drawn to each port
     for c in stubs:
         grid.blocked[c] = True
-    cells = _astar(grid, start, _axis(ea), goal, _axis(-np.asarray(eb)))
+    cells = _astar(grid, start, _axis(ea), goal, _axis(-np.asarray(eb)), max_nodes)
     for c in stubs:
         grid.blocked[c] = False
     return cells
@@ -339,12 +339,13 @@ class _Router:
         self.grid, self.elements = grid, elements
         self.keep_out = list(keep_out)  # the text and stub boxes the grid's soft cells were made from
         self.tight = self.rejected = 0
+        self.max_nodes = _MAX_NODES  # the A* search's budget
 
     def drawn(self, pa, ea, own_a, pb, eb, own_b, own_body=False, loose=False):
         """The A* route from port pa to port pb as drawn, snapped to the ports or else unsnapped; None if there
         is no route or every drawing of it crosses an element."""
         grid = self.grid
-        cells = _route_ports(grid, pa, ea, own_a, pb, eb, own_b, loose)
+        cells = _route_ports(grid, pa, ea, own_a, pb, eb, own_b, loose, self.max_nodes)
         if cells is None:
             return None
         for snap in (True, False):
@@ -433,5 +434,5 @@ def route_loops(layout: Layout, sses: list[SSE], bb) -> list[Loop]:
     if layout.nucleic is not None:  # after the loops, so strands see the cells they use
         from .route_na import route_nucleic
 
-        layout.na_paths = route_nucleic(layout, router)
+        layout.na_paths = route_nucleic(layout, router, [pts for pts, _, _ in routed.values()])
     return out

@@ -34,6 +34,12 @@ _BOW_MAX = 8  # internal-loop sides up to this many nucleotides are drawn as bow
 SHORT_GAP = 3  # a cropped gap of fewer nucleotides is drawn as a bare break, without its "… N nt …" label
 _JOINT_STRAIGHT = 1.5  # a joint between two pieces of a bent duplex shorter than this may be drawn straight
 _TAIL_ROUTED = 6  # a free end of more nucleotides that no straight drawing keeps clear is routed out to free space
+# a run keeps off every strand drawn before it (and every protein loop) by a detour at most this many times as long
+# as its drawing that keeps off the hairpin loops and free ends only. Measured on 24 campaign entries: run-run
+# crossings 250 -> 239, protein loops crossed 178 -> 175, no entry worse in either (bound 2: 245; unbounded: 250,
+# with 4YBB, 2GIS and 4P9R worse)
+_DETOUR = 3.0
+_FIRST_NODES = 20_000  # the A* budget of that first stage (route._MAX_NODES for any other route)
 
 
 @dataclass(eq=False)
@@ -513,10 +519,11 @@ def _na_clear(pts, own, elements) -> bool:
     return _clear(outside_own(pts, own), own, *elements, own_body=True)
 
 
-def route_nucleic(layout: Layout, router: _Router | None = None) -> list[NAPath]:
+def route_nucleic(layout: Layout, router: _Router | None = None, loops=()) -> list[NAPath]:
     """Every single-stranded stretch as drawn: runs routed around the elements like loops (as are the joints
     between pieces of a bent duplex), hairpin loops as arcs, free ends straight on, strands without pairs along
     their projection, cropped gaps dashed. Every drawing is checked by _clear; one that fails is a fallback.
+    `loops`: the protein loops already drawn (polylines), whose crossings a run weighs against crossing strands.
     Also fills layout.na_ends (where each strand's 5' and 3' labels go) and layout.na_letters (where each
     single-stranded nucleotide's letter goes), and widens layout.bounds to hold it all."""
     na = layout.nucleic
@@ -544,12 +551,15 @@ def route_nucleic(layout: Layout, router: _Router | None = None) -> list[NAPath]
         if (s, e) not in gapped:
             labels.append(xy)
 
-    strands = _Strands(router.grid)  # the strands drawn so far; hairpin loops and free ends are hard obstacles
+    strands = _Strands(router.grid)  # the strands drawn so far: hard obstacles for a run's first routing pass
+    crossed = _Strands(None)  # the protein loops, which a run keeps off the strands only if it crosses no more
+    for pts in loops:
+        crossed.add(pts)
     fixed: dict[tuple[int, int], NAPath] = {}  # (strand, nucleotide before it) -> a path of fixed shape
 
     def fix(key, path: NAPath) -> None:
         fixed[key] = path
-        strands.add(among(path, at), hard=path.kind in ("hairpin", "tail"))
+        strands.add(among(path, at), fixed=path.kind in ("hairpin", "tail"))
 
     between: list[tuple] = []  # strands from stem to stem still to route, once the fixed shapes are known
     for s, strand in enumerate(na.strands):
@@ -605,8 +615,8 @@ def route_nucleic(layout: Layout, router: _Router | None = None) -> list[NAPath]
     names = [_stem_label_box(d) for d in layout.stems]
     routed = {}
     for s, i, j, da, db, kind in between:
-        p = routed[(s, i)] = _strand_between(router, s, i, j, da, db, kind, names, strands)
-        strands.add(among(p, at), frozenset((da.id, db.id)) if p.kind == "joint" else None, hard=False)
+        p = routed[(s, i)] = _strand_between(router, s, i, j, da, db, kind, names, strands, crossed)
+        strands.add(among(p, at), frozenset((da.id, db.id)) if p.kind == "joint" else None)
     out = [p for _, p in sorted({**fixed, **routed}.items())]
     for g in na.gaps:  # cropped away: the 3' end of one piece to the 5' end of the next, dashed
         a, b = exits.get((g.before, len(na.strands[g.before]) - 1)), exits.get((g.after, 0))
@@ -623,48 +633,57 @@ def route_nucleic(layout: Layout, router: _Router | None = None) -> list[NAPath]
 
 class _Strands:
     """The nucleic-acid strands drawn so far, each as it lies among the elements (among): their segments, for an
-    exact crossing test, and the grid cells under the hard ones, which a strand's first routing pass may not
-    enter. A joint's segments carry the ids of the two pieces it joins (its partner strand may cross it)."""
+    exact crossing test, and (given the grid) the grid cells under them, which a strand's first routing pass may not
+    enter. A joint's segments carry the ids of the two pieces it joins (its partner strand may cross it). Without a
+    grid it holds other lines to count crossings with (the protein loops)."""
 
-    def __init__(self, grid: _Grid):
+    def __init__(self, grid: _Grid | None):
         self.grid = grid
-        self.cells = np.zeros(grid.blocked.shape, bool)
-        self._parts: list[tuple[np.ndarray, object, bool]] = []  # (segments, joined ids or None, hard)
-        self._all = None  # (segments, ids, hard) of every part, concatenated when first needed
+        self.cells = np.zeros(grid.blocked.shape, bool) if grid is not None else None
+        self.fixed_cells = np.zeros(grid.blocked.shape, bool) if grid is not None else None
+        self._parts: list[tuple[np.ndarray, int, bool]] = []  # (segments, joint number (0: not a joint), fixed)
+        self._joints: dict[frozenset, int] = {}  # the ids of two pieces -> their joint number
+        self._all = None  # (segments, joint numbers) of every part, concatenated when first needed
 
-    def add(self, pts, ids=None, hard: bool = True) -> None:
+    def add(self, pts, ids=None, fixed: bool = False) -> None:
+        """Add a polyline: `ids`, the two pieces a joint joins; `fixed`, a hairpin loop or free end."""
         p = np.asarray(pts, float).reshape(-1, 2)
         if len(p) < 2:
             return
-        self._parts.append((np.hstack([p[:-1], p[1:]]), ids, hard))
+        joint = self._joints.setdefault(ids, len(self._joints) + 1) if ids is not None else 0
+        self._parts.append((np.hstack([p[:-1], p[1:]]), joint, fixed))
         self._all = None
-        if hard:
-            for a, b in zip(pts, pts[1:]):
-                for c in self.grid.cells_along(a, b):
-                    self.cells[c] = True
+        for a, b in zip(pts, pts[1:]) if self.grid is not None else ():
+            for c in self.grid.cells_along(a, b):
+                self.cells[c] = True
+                self.fixed_cells[c] |= fixed
 
-    def crosses(self, pts, skip=None, hard_only: bool = False) -> bool:
-        """Does the polyline cross (properly, not merely touch) a strand drawn so far: any but a joint between the
-        pieces `skip` (ids), or with `hard_only` only the hard ones?"""
+    def crosses(self, pts, skip=None, fixed_only: bool = False) -> bool:
+        """Does the polyline cross (properly, not merely touch) a strand drawn so far (a hairpin loop or free end
+        only, with `fixed_only`), but a joint between the pieces `skip` (ids)?"""
+        return self.crossings(pts, skip, fixed_only) > 0
+
+    def crossings(self, pts, skip=None, fixed_only: bool = False) -> int:
+        """How many (segment, strand segment) pairs cross properly, a joint between the pieces `skip` (ids) left
+        out."""
         q = np.asarray(pts, float).reshape(-1, 2)
         if len(q) < 2 or not self._parts:
-            return False
+            return 0
         if self._all is None:
             segs = np.vstack([seg for seg, _, _ in self._parts])
-            ids = [i for seg, i, _ in self._parts for _ in range(len(seg))]
-            hard = np.concatenate([np.full(len(seg), h) for seg, _, h in self._parts])
-            self._all = segs, ids, hard
-        segs, ids, hard = self._all
-        keep = np.ones(len(segs), bool) if not hard_only else hard.copy()
-        if skip is not None:
-            keep &= np.array([i != skip for i in ids])
+            joints = np.concatenate([np.full(len(seg), j) for seg, j, _ in self._parts])
+            self._all = segs, joints, np.concatenate([np.full(len(seg), f) for seg, _, f in self._parts])
+        segs, joints, fixed = self._all
+        keep = fixed.copy() if fixed_only else np.ones(len(segs), bool)
+        if skip is not None and skip in self._joints:
+            keep &= joints != self._joints[skip]
         x0, y0 = q.min(axis=0)
         x1, y1 = q.max(axis=0)
         keep &= (np.minimum(segs[:, 0], segs[:, 2]) <= x1) & (np.maximum(segs[:, 0], segs[:, 2]) >= x0)
         keep &= (np.minimum(segs[:, 1], segs[:, 3]) <= y1) & (np.maximum(segs[:, 1], segs[:, 3]) >= y0)
         other = segs[keep]
         if not len(other):
-            return False
+            return 0
         a = np.hstack([q[:-1], q[1:]])
         p0, p1 = a[:, None, 0:2], a[:, None, 2:4]
         u, v = other[None, :, 0:2], other[None, :, 2:4]
@@ -673,7 +692,7 @@ class _Strands:
             return (e[..., 0] - o[..., 0]) * (w[..., 1] - o[..., 1]) - (e[..., 1] - o[..., 1]) * (w[..., 0] - o[..., 0])
 
         crossed = (turn(p0, p1, u) * turn(p0, p1, v) < -1e-12) & (turn(u, v, p0) * turn(u, v, p1) < -1e-12)
-        return bool(crossed.any())
+        return int(crossed.sum())
 
 
 def _straight_joint(router: _Router, da: PlacedStem, db: PlacedStem, fa, ea, fb, strands=None) -> bool:
@@ -702,16 +721,19 @@ def among(path: NAPath, at: dict) -> list[tuple[float, float]]:
 
 
 def _strand_between(
-    router: _Router, s: int, i: int, j: int, da: PlacedStem, db: PlacedStem, kind, names=(), strands=None
+    router: _Router, s: int, i: int, j: int, da: PlacedStem, db: PlacedStem, kind, names=(), strands=None, loops=None
 ) -> NAPath:
     """The single strand from stem nucleotide i to stem nucleotide j (the m nucleotides between drawn on it): along
     its rail from i to its stem's end face, from that face to the next stem's end face, along the rail to j. Between
     the faces it is checked against every element and stem, its own two by their true bodies (_clear, own_body).
-    Two passes: in the first the hard strands drawn so far (`strands`, a _Strands: hairpin loops and free ends) are
-    obstacles, their grid cells blocked and no drawing crossing them taken; only when that finds nothing, the second
-    pass, where crossing them is only a cost. In each pass `names` (the stem-label boxes) are hard obstacles for the
-    first choice of drawing: the first one clear that also keeps off every name; only when none does, the first one
-    clear."""
+    Two stages (_drawing) for a run with nucleotides on it: first every strand drawn so far (`strands`, a _Strands:
+    hairpin loops, free ends, traces and the runs and joints routed before it, but a joint's partner strand) and
+    every protein loop (`loops`) is an obstacle, their grid cells blocked and no drawing crossing them taken; that
+    drawing is taken when it is at most _DETOUR times as long as the second stage's and keeps off the stem names if
+    that does. The second (the only one for a strand exchange or joint): the hairpin loops and free ends are such
+    obstacles, or, when that draws nothing, crossing them is only a cost. In each pass `names` (the stem-label boxes)
+    are hard obstacles for the first choice of drawing: the first one clear that also keeps off every name; only
+    when none does, the first one clear."""
     m, nts, between = j - i - 1, list(range(i + 1, j)), ((s, i), (s, j))
     own, need = (da, db), (j - i) * NT_STEP
     ra, rb = da.point((s, i)), db.point((s, j))
@@ -722,33 +744,57 @@ def _strand_between(
         )
     (fa, ea), (fb, eb) = _face(da, (s, i), True), _face(db, (s, j), False)
     joint = m == 0 and da.parent and da.parent == db.parent
-    for hard in (True, False) if strands is not None else (False,):
-        used = router.grid.used.copy() if hard else None
-        path = _drawing(
-            router, s, nts, between, da, db, (ra, fa, ea, fb, eb, rb), need, joint, kind, names, strands, hard
-        )
-        if path is not None:
-            return path
-        router.grid.used = used  # the first pass drew nothing: as if it had never run
-    raise AssertionError("the second pass always draws")  # pragma: no cover
+    args = (router, s, nts, between, da, db, (ra, fa, ea, fb, eb, rb), need, joint, kind, names, strands, loops)
+    if strands is None:
+        return _drawing(*args, 0)
+    grid = router.grid
+    before = grid.used.copy()
+    base = _drawing(*args, 1)  # off the hairpin loops and free ends
+    if base is None:
+        grid.used = before.copy()
+        base = _drawing(*args, 0)  # crossing them only a cost
+    skip = frozenset((da.id, db.id)) if joint else None
+    if not nts or (
+        not strands.crosses(base.points[1:-1], skip) and (loops is None or not loops.crosses(base.points[1:-1]))
+    ):
+        return base  # a strand exchange or joint (no nucleotides) keeps its shortest way; or it crosses nothing
+    after, grid.used = grid.used, before  # the first stage starts from where the strand started
+    path = _drawing(*args, 2)
+    if (
+        path is not None
+        and _length(path.points) <= _DETOUR * _length(base.points) + 1e-9
+        and (_off_names(path.points, names) or not _off_names(base.points, names))
+    ):
+        return path
+    grid.used = after
+    return base
 
 
-def _drawing(router: _Router, s, nts, between, da, db, ends, need, joint, kind, names, strands, hard):
-    """One pass of _strand_between: the strand as drawn, or None when `hard` and no drawing clear of the elements
-    keeps off the hard strands drawn so far."""
+def _off_names(pts, names) -> bool:
+    """Does a run's drawing keep off every stem-label box (`names`) between its faces?"""
+    return not any(clip_len(p, q, b) > 1e-9 for b in names for p, q in zip(pts[1:-1], pts[2:-1]))
+
+
+def _drawing(router: _Router, s, nts, between, da, db, ends, need, joint, kind, names, strands, loops, level):
+    """One pass of _strand_between: the strand as drawn, or None when no drawing clear of the elements keeps off
+    what the pass makes hard: (level 2) every strand drawn so far and every protein loop; (1) the hairpin loops and
+    free ends; (0) nothing, crossing them is only a cost."""
+    hard = level > 0
     ra, fa, ea, fb, eb, rb = ends
     m, own = len(nts), (da, db)
     grid = router.grid
     on_rails = lambda mid: _xy([ra, *mid, rb])  # noqa: E731
     skip = frozenset((da.id, db.id)) if joint else None  # a joint's partner strand may cross it
 
-    def ok(pts) -> bool:  # clear between the faces, and off the hard strands in the first pass
+    def ok(pts) -> bool:  # clear between the faces, and off what this pass makes hard
         if not _clear(pts[1:-1], own, *router.elements, own_body=True):
             return False
-        return not (hard and strands.crosses(pts[1:-1], skip, hard_only=True))
+        if level == 2 and (strands.crosses(pts[1:-1], skip) or (loops is not None and loops.crosses(pts[1:-1]))):
+            return False
+        return not (level == 1 and strands.crosses(pts[1:-1], skip, fixed_only=True))
 
     def off_names(pts) -> bool:
-        return not any(clip_len(p, q, b) > 1e-9 for b in names for p, q in zip(pts[1:-1], pts[2:-1]))
+        return _off_names(pts, names)
 
     reach = max(need - math.dist(ra, fa) - math.dist(fb, rb), 0.0)  # what the part between the faces must hold
     if joint and math.dist(fa, fb) < _JOINT_STRAIGHT and _dot(fb - fa, ea) > 0:
@@ -766,12 +812,14 @@ def _drawing(router: _Router, s, nts, between, da, db, ends, need, joint, kind, 
         elif off_names(bowed):
             return NAPath("run", s, nts, bowed, _spaced(bowed, m), between=between)
     if hard:
-        saved = grid.blocked.copy()
-        grid.blocked |= strands.cells
+        saved, budget = grid.blocked.copy(), router.max_nodes
+        grid.blocked |= (strands.cells | (grid.used > 0)) if level == 2 else strands.fixed_cells
+        if level == 2:  # a detour longer than _DETOUR times the second stage's is not taken: no need to search far
+            router.max_nodes = _FIRST_NODES
         try:
             route, _ = router.route(fa, ea, da, fb, eb, db, own_body=True)
         finally:
-            grid.blocked = saved
+            grid.blocked, router.max_nodes = saved, budget
     else:
         route, _ = router.route(fa, ea, da, fb, eb, db, own_body=True)
     if route is None and joint and _straight_joint(router, da, db, fa, ea, fb, strands):
