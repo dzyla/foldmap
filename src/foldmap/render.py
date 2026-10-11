@@ -42,6 +42,7 @@ from .layout import (
     Placed,
     PlacedStem,
     centred_box,
+    dna_to_page,
     dna_y,
     domain_panel,
     helix_label_pos,
@@ -334,7 +335,105 @@ def _draw_stem_label(ink: _NAInk, k: int, d: PlacedStem) -> None:
     t.set_gid(f"na:label:{k}")
 
 
-_STEM_STYLES = {"ladder": _ladder}  # na_style -> how a stem is drawn
+def _ribbon_side(d: PlacedStem, key: tuple[int, int]) -> int:
+    """Which backbone of a drawn double helix a nucleotide sits on: 0 for the first arm's, else 1."""
+    return 0 if d.side[key] > 0 else 1
+
+
+def _ribbon_point(d: PlacedStem, key: tuple[int, int]) -> np.ndarray:
+    """Where a nucleotide sits on the helix backbone it belongs to."""
+    x = d.axial[key]
+    return dna_to_page(d, x, dna_y(_ribbon_side(d, key), x, d.width))
+
+
+def _ribbon(ink: _NAInk, k: int, d: PlacedStem, where: dict, letters: dict) -> None:
+    """The double helix, front and back backbones from one repeated turn, a rung per pair; no stem letters
+    (the helix itself is the drawing). Beads sit on the backbone, in the strand's backbone colour."""
+    colour = {}  # backbone slot -> colour of the strand drawn there
+    for key in sorted(d.axial):
+        colour.setdefault(_ribbon_side(d, key), ink.colour(key[0]))
+    slots: dict[str, list[int]] = {}  # colour -> its backbones (one colour unless a duplex mixes chains)
+    for slot, c in sorted(colour.items()):
+        slots.setdefault(c, []).append(slot)
+
+    def page(q: np.ndarray) -> np.ndarray:
+        return dna_to_page(d, q[:, 0], q[:, 1])
+
+    outline = ink.fill == "outline"
+    for n, (c, group) in enumerate(slots.items()):
+        fronts, backs = [], []
+        for slot in group:
+            f, b = _dna_turns(d, slot)
+            fronts += f
+            backs += b
+        suffix = "" if n == 0 else f":{n + 1}"
+        back = PathPatch(_compound([page(q) for q in backs]), fc=tint(c, 0.5), ec="none", zorder=2.0)
+        back.set_gid(f"na:stem:{k}:back{suffix}")
+        ink.ax.add_patch(back)
+        front = PathPatch(
+            _compound([page(q) for q in fronts]),
+            fc="white" if outline else c,
+            ec=c if outline else "none",
+            lw=ink.lw * 0.8,
+            zorder=2.2,
+        )
+        front.set_gid(f"na:stem:{k}:front{suffix}")
+        ink.ax.add_patch(front)
+    rungs = [
+        dna_to_page(d, [x, x], [dna_y(0, x, d.width), dna_y(1, x, d.width)])
+        for x in (d.axial[(a, i)] for a, i, _, _ in d.pairs)
+    ]
+    rung = PathPatch(
+        _compound(rungs, closed=False), fc="none", ec=ink.rung, lw=ink.lw * 2.2, capstyle="round", zorder=2.1
+    )
+    rung.set_gid(f"na:stem:{k}:rungs")
+    ink.ax.add_patch(rung)
+
+
+def _block(ink: _NAInk, k: int, d: PlacedStem, where: dict, letters: dict) -> None:
+    """A bar between the two rails, named inside (P1, DNA 1a ...); no letters. A duplex of two colours is two
+    half bars."""
+    colour = {}  # side -> colour of the strand on it
+    for key in sorted(d.axial):
+        colour.setdefault(d.side[key], ink.colour(key[0]))
+    halves = [colour.get(1, colour.get(-1)), colour.get(-1, colour.get(1))]
+    r = d.rail
+    shown = [halves[0]] if halves[0] == halves[1] else halves
+    for n, c in enumerate(shown):
+        lo, hi = (-r, r) if len(shown) == 1 else ((0.0, r) if n == 0 else (-r, 0.0))
+        corners = [
+            dna_to_page(d, x, y)
+            for x, y in ((-d.length / 2, lo), (d.length / 2, lo), (d.length / 2, hi), (-d.length / 2, hi))
+        ]
+        body = Polygon(
+            corners, closed=True, fc="white" if ink.fill == "outline" else c, ec=c, lw=ink.lw * 1.2, zorder=2.2
+        )
+        body.set_gid(f"na:stem:{k}:block" if n == 0 else f"na:stem:{k}:block:{n + 1}")
+        ink.ax.add_patch(body)
+    mixed = _mix(shown[0], shown[-1], 0.5)
+    t = ink.ax.text(
+        d.cx,
+        d.cy,
+        d.name,
+        ha="center",
+        va="center",
+        rotation=_upright(d.angle),
+        fontsize=ink.font * 0.9,
+        fontweight="bold",
+        color=_legible(mixed) if ink.fill == "outline" else text_color_on(mixed),
+        zorder=4,
+    )
+    t.set_gid(f"na:label:{k}")
+
+
+def _letters(ink: _NAInk, k: int, d: PlacedStem, where: dict, letters: dict) -> None:
+    """The classic secondary-structure look: each nucleotide's letter on its rail, a dash per pair."""
+    _rung_lines(ink, k, d, inset=0.3)
+    for key in d.axial:
+        letters[key] = (d.point(key), _upright(d.angle))
+
+
+_STEM_STYLES = {"ladder": _ladder, "ribbon": _ribbon, "block": _block, "letters": _letters}  # na_style -> drawing
 
 
 def _draw_strands(ink: _NAInk, layout: Layout, style: str, where: dict, letters: dict) -> None:
@@ -433,7 +532,7 @@ def _draw_na_marks(ink: _NAInk, layout: Layout, style: str, residue_colour, pt_p
                 rotation=rot,
                 fontsize=ink.font * 0.75,
                 fontweight="bold" if hit else "normal",
-                color=hit[1] if hit else ink.front,
+                color=hit[1] if hit else ink.colour(key[0]) if style == "letters" else ink.front,
                 zorder=4,
             )
             t.set_gid(f"na:nt:{lab.chain}:{lab.tag}")
@@ -491,7 +590,7 @@ def _draw_nucleic(
         backbone,
     )
     style = _na_style(layout, look)
-    where = nucleotide_points(layout)  # nucleotide -> where it is drawn (its bead and its hydrogen bonds go there)
+    where = nucleotide_points(layout, style)  # nucleotide -> where it is drawn (bead and hydrogen bonds go there)
     letters: dict[tuple[int, int], tuple[np.ndarray, float]] = {}  # nucleotide -> letter position, rotation
     for k, d in enumerate(layout.stems):
         _STEM_STYLES.get(style, _ladder)(ink, k, d, where, letters)
@@ -1442,12 +1541,14 @@ class HBondOverlay(NamedTuple):
         return f"H-bonds ({text}{f', {self.unplaced} not shown' if self.unplaced else ''})"
 
 
-def nucleotide_points(layout: Layout) -> dict[tuple[int, int], np.ndarray]:
-    """Where each drawn nucleotide (strand, index) sits: its rail point on a stem, its run point on a path."""
+def nucleotide_points(layout: Layout, style: str = "ladder") -> dict[tuple[int, int], np.ndarray]:
+    """Where each drawn nucleotide (strand, index) sits in the stem `style` (as `_na_style` resolved it): its rail
+    point on a stem (its helix backbone point in the ribbon style), its run point on a path. Beads, letters and
+    hydrogen-bond ends all go here."""
     where: dict[tuple[int, int], np.ndarray] = {}
     for d in layout.stems:
         for key in d.axial:
-            where[key] = d.point(key)
+            where[key] = _ribbon_point(d, key) if style == "ribbon" else d.point(key)
     for path in layout.na_paths:
         for i, xy in zip(path.nts, path.nt_xy):
             where[(path.strand, i)] = np.asarray(xy)
@@ -1473,7 +1574,7 @@ def hbond_overlay(layout: Layout, loops: list[Loop], sses: list[SSE], look: Styl
             for s, strand in enumerate(layout.nucleic.strands)
             for i, lab in enumerate(strand.labels)
         }
-    where = nucleotide_points(layout)
+    where = nucleotide_points(layout, _na_style(layout, look))
     cache: dict = {}
 
     def locate(lab):

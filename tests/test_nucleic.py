@@ -154,7 +154,6 @@ def _gid(fig, prefix):
     ]
 
 
-@pytest.mark.xfail(reason="ribbon style arrives in Task 8", strict=True)
 def test_duplex_is_drawn_as_a_double_helix_from_one_repeated_turn(ubq):
     from foldmap.style import Style
 

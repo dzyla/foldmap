@@ -814,3 +814,28 @@ def test_colours_never_move_the_layout():
 
     b, _, _ = make_layout(LMB, look=resolve_style(None, None, ["na_backbone=chain", "backbone_colors=3=red"]))
     assert a.bounds == b.bounds and [d.rect for d in a.stems] == [d.rect for d in b.stems]
+
+
+@pytest.mark.parametrize(
+    "style, parts", [("ladder", ":rails"), ("ribbon", ":front"), ("block", ":block"), ("letters", ":rung")]
+)
+def test_each_stem_style_draws_its_own_parts(style, parts):
+    from foldmap.style import Style
+
+    fig, _ = make_figure_and_loops(_path("30QM"), look=Style(na_style=style))
+    found = _gid(fig, "na:stem:")
+    assert {a.get_gid().split(":")[2] for a in found} == {str(k) for k in range(6)}
+    assert any(a.get_gid().endswith(parts) for a in found)
+    letters = _gid(fig, "na:nt:")
+    if style == "block":
+        assert not letters
+    elif style == "ribbon":
+        assert 0 < len(letters) < 121  # single strands only: the double helix carries no letters
+    else:
+        assert len(letters) == 121
+
+
+def test_a_cropped_large_rna_switches_ladder_to_block():
+    fig, _ = make_figure_and_loops(_path("4YBB"))
+    assert any(a.get_gid().endswith(":block") for a in _gid(fig, "na:stem:"))
+    assert _gid(fig, "na:gap:")

@@ -10,6 +10,7 @@ from functools import lru_cache
 from pathlib import Path
 
 import gemmi
+import numpy as np
 import pytest
 
 from foldmap import hbonds
@@ -558,3 +559,19 @@ def test_the_default_cap_holds_on_a_nucleosome():
     fig = _drawn("1KX5", "hbonds=interchain")[0]
     assert len(_lines(fig)) == 200
     assert _legend_texts(fig)[0].startswith("H-bonds (200 of ")
+
+
+@pytest.mark.parametrize("pdb", ["30QM", "1LMB"])
+@pytest.mark.parametrize("style", ["ladder", "ribbon", "block", "letters"])
+def test_the_nucleotide_end_of_every_line_is_a_drawn_bead_or_letter_in_every_style(pdb, style):
+    fig = _drawn(pdb, "hbonds=na", "hbond_max=1000", f"na_style={style}")[0]
+    ax = fig.axes[0]
+    marks = [xy for c in ax.collections if (c.get_gid() or "").startswith("na:contact:") for xy in c.get_offsets()]
+    marks += [t.get_position() for t in ax.texts if (t.get_gid() or "").startswith("na:nt:")]
+    marks = np.array(marks, float)
+    lines = _lines(fig)
+    assert lines and len(marks)
+    for line in lines:
+        ends = np.column_stack([line.get_xdata(), line.get_ydata()])
+        near = [np.hypot(*(marks - e).T).min() for e in ends]
+        assert min(near) < 1e-6, (line.get_gid(), near)
