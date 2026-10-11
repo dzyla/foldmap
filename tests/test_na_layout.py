@@ -1682,12 +1682,10 @@ def test_the_trace_boxes_reach_the_optimiser_on_the_grid(monkeypatch):
         assert np.all(np.abs(v - np.round(v)) < 1e-6)
 
 
-def _gap_label_box(p):
-    from foldmap.layout import _GLYPH_H, _GLYPH_W
+def _gap_label_box(p, lay):
+    from foldmap.route_na import _em, _gap_box
 
-    x, y = p.label_xy
-    hw = _GLYPH_W * len(p.label) / 2 + 0.05
-    return (x - hw, y - _GLYPH_H / 2, x + hw, y + _GLYPH_H / 2)
+    return _gap_box(p, _em(lay))
 
 
 def test_a_gap_label_is_placed_clear_of_letters_beads_bodies_and_strands():
@@ -1703,7 +1701,7 @@ def test_a_gap_label_is_placed_clear_of_letters_beads_bodies_and_strands():
     segments = [(a, b) for q in lay.na_paths for a, b in zip(q.points, q.points[1:])]
     segments += [(a, b) for loop in loops for a, b in zip(loop.points, loop.points[1:])]
     for p in labelled:
-        x0, y0, x1, y1 = box = _gap_label_box(p)
+        x0, y0, x1, y1 = box = _gap_label_box(p, lay)
         edges = [((x0, y0), (x1, y0)), ((x1, y0), (x1, y1)), ((x1, y1), (x0, y1)), ((x0, y1), (x0, y0))]
         assert not any(x0 < x < x1 and y0 < y < y1 for x, y in letters)
         assert not any(clip_len(a, b, box) > 1e-9 for a, b in segments)
@@ -1719,5 +1717,46 @@ def test_a_gap_label_moves_off_a_letter_planted_on_its_first_spot():
     first = p.label_xy
     lay.na_letters[(-1, -1)] = first  # a letter where the label went
     _label_gaps(lay, lay.na_paths, [loop.points for loop in loops])
-    x0, y0, x1, y1 = _gap_label_box(p)
+    x0, y0, x1, y1 = _gap_label_box(p, lay)
     assert p.label_xy != first and not (x0 < first[0] < x1 and y0 < first[1] < y1)
+
+
+def test_a_gap_with_no_way_on_the_grid_is_curved_before_it_is_a_fallback():
+    """4PLX: the 3-nt chain break B:55-59 found no way on the grid and was drawn straight through PK2 (a
+    fallback, an na_crossing). A gap the grid cannot route is curved along its ends, or bowed either side, when
+    that keeps clear; only then straight."""
+    from types import SimpleNamespace
+
+    from foldmap.route_na import _element_obstacles, _gap
+
+    lay, _, _, _ = _routed("1URN")
+    (p,) = [q for q in lay.na_paths if q.kind == "gap"]
+    pts = np.asarray(p.points, float)
+    ea, eb = pts[1] - pts[0], pts[-2] - pts[-1]
+    ea, eb = ea / np.hypot(*ea), eb / np.hypot(*eb)
+    (own,) = lay.stems  # both free ends leave the hairpin's one stem
+    stuck = SimpleNamespace(route=lambda *a, **k: (None, None), elements=_element_obstacles(lay))
+    drawn = _gap(stuck, lay.nucleic.gaps[0], (pts[0], ea, own), (pts[-1], -eb, own))
+    assert not drawn.fallback and len(drawn.points) > 2
+
+
+def test_a_gap_label_is_drawn_inside_the_box_placement_kept_clear():
+    """The box _label_gaps keeps clear holds the drawn text, and not much more (2NZ4: a box 2.6 times too wide found
+    no clear spot between P2 and its gap and put "... 6 nt ..." on the stem)."""
+    from matplotlib.backends.backend_agg import FigureCanvasAgg
+
+    from foldmap.render import draw
+    from foldmap.route_na import _em, _gap_box
+
+    lay, sses, _, loops = _routed("4YBB")
+    fig = draw(lay, loops, sses)
+    canvas = FigureCanvasAgg(fig)
+    canvas.draw()
+    to_page = fig.axes[0].transData.inverted()
+    texts = _gid(fig, "na:gap:")
+    assert texts
+    for t in texts:
+        x0, y0, x1, y1 = to_page.transform_bbox(t.get_window_extent(canvas.get_renderer())).extents
+        b = _gap_box(lay.na_paths[int(t.get_gid().rsplit(":", 1)[1])], _em(lay))
+        assert b[0] <= x0 and x1 <= b[2] and b[1] <= y0 and y1 <= b[3]
+        assert (b[2] - b[0]) < 1.6 * (x1 - x0)

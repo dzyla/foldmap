@@ -33,6 +33,8 @@ LABEL_GAP = 0.3  # a helix label's centre sits this far beyond the side of the e
 END_STUB = 0.7  # chain-end stub length
 END_LABEL = 1.15  # distance from a chain-end port to its N/C letter
 _GLYPH_W, _GLYPH_H = 0.32, 0.42  # rough label glyph size in page units, for keep-out boxes
+IN_PER_UNIT = 0.30  # render: inches per page unit, at most
+MAX_WIDTH_IN = 7.2  # render: the widest figure (double-column width), inches
 _MAX_ROW = 30.0
 _MIN_STRAND = 1.0  # shortest drawn strand (room for the arrow head)
 # items: at or below it the dense energy keeps recorded layouts bit-identical (the pair-list summation order
@@ -1818,3 +1820,16 @@ def label_boxes(layout: Layout, sses: list[SSE]) -> list[tuple[str, tuple[float,
                 )
             )
     return out
+
+
+def font_pt(scale: float) -> float:
+    """The figure's text size in points (before Style.font_scale) at `scale` inches per page unit."""
+    return float(np.clip(0.55 * SHAFT * scale * 72, 4.0, 9.0))
+
+
+def text_em(width: float) -> float:
+    """How many page units one em of the figure's text takes on a page `width` units wide, as render sizes it
+    (before Style.font_scale): a wide page is scaled down to MAX_WIDTH_IN and its text, held at 4 pt or more,
+    takes more page units."""
+    scale = min(IN_PER_UNIT, MAX_WIDTH_IN / width)
+    return font_pt(scale) / (scale * 72)

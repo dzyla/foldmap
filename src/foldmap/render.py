@@ -35,6 +35,8 @@ from .layout import (
     END_LABEL,
     END_STUB,
     HEAD,
+    IN_PER_UNIT,
+    MAX_WIDTH_IN,
     NT_ROW,
     PITCH,
     SHAFT,
@@ -45,6 +47,7 @@ from .layout import (
     dna_to_page,
     dna_y,
     domain_panel,
+    font_pt,
     helix_label_pos,
     label_boxes,
     overlaps_any,
@@ -58,8 +61,8 @@ from .route import Loop
 from .route_na import midway
 from .style import _ALIASES, CHOICES, MODALITIES, Style, backbone_overrides
 
-_IN_PER_UNIT = 0.30
-_MAX_WIDTH_IN = 7.2  # double-column width
+_IN_PER_UNIT = IN_PER_UNIT
+_MAX_WIDTH_IN = MAX_WIDTH_IN  # double-column width
 _HEAD_HALF = HEAD / 2
 _HEAD_LEN = 0.7
 _CORNER = 0.3
@@ -92,9 +95,7 @@ STYLES = CHOICES["fill"]
 LOOP_STYLES = CHOICES["loops"]
 
 
-def _font_pt(scale: float) -> float:
-    """The figure's text size in points (before Style.font_scale) at `scale` inches per page unit."""
-    return float(np.clip(0.55 * SHAFT * scale * 72, 4.0, 9.0))
+_font_pt = font_pt
 
 
 _RES_PER_TURN = 3.6
