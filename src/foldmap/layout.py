@@ -13,9 +13,9 @@ from typing import NamedTuple
 import numpy as np
 
 from .features import helix_bundles
-from .frame import Frame
+from .frame import Frame, symmetric_frame, view_frame
 from .model import SSE, Nucleic, Sheet, group_by_chain
-from .nucleic import Stem, segment_stem, stem_axis
+from .nucleic import Stem, StemView, segment_stem, stem_axis, stem_views
 from .style import Style
 
 PITCH = 1.1  # distance between neighbouring strand centres
@@ -1935,3 +1935,53 @@ def text_em(width: float) -> float:
     takes more page units."""
     scale = min(IN_PER_UNIT, MAX_WIDTH_IN / width)
     return font_pt(scale) / (scale * 72)
+
+
+NA_TORN_TURN = 90.0  # degrees: linked stems turned against one another by more than this when unrolled are torn
+
+
+def na_torn_by_unrolling(nucleic, sses, sym) -> bool:
+    """Would unrolling the assembly (symmetric_frame) tear the nucleic acid apart, against the plain projected frame
+    (view_frame) the figure would otherwise use? Each stem is drawn whole where its centre is seen, so a single stem
+    cannot be torn; what can: (a) a duplex split into pieces whose consecutive pieces' centres face different
+    protomers (they land on either side of a seam: 1RVA's kinked site, drawn as a 180° hairpin), or (b) a group of
+    stems linked through at most _SHORT_RUN nucleotides (a junction, a bent duplex, coaxial stacks) whose axes, after
+    the best common turn, are turned against one another by more than NA_TORN_TURN between the two frames (4LD0's
+    junction arms: 139°; 30QM's linked stems at most 57°)."""
+    import math
+
+    cyl = symmetric_frame(sses, sym)
+    stems = [StemView(_snap(v.centroid), _snap(v.axis), v.n) for v in stem_views(nucleic.structure, nucleic.strands)]
+    plain = view_frame(sses + stems, False, False, None, None)
+    pieces = stem_pieces(nucleic)
+    axes = [tuple(_snap(x) for x in stem_axis(p, nucleic.strands)) for p in pieces]
+
+    def wrap(a: float) -> float:
+        return (a + math.pi) % (2 * math.pi) - math.pi
+
+    def facing(point) -> int:  # the protomer whose sector the point is unrolled into (as CylinderFrame places it)
+        th = cyl._theta(point)
+        return min(range(len(cyl.angles)), key=lambda k: (abs(wrap(th - cyl.angles[k])), k))
+
+    for k in range(len(pieces) - 1):
+        a, b = pieces[k], pieces[k + 1]
+        if a.parent and a.parent == b.parent and facing(axes[k][0]) != facing(axes[k + 1][0]):
+            return True
+    at = {key: k for k, p in enumerate(pieces) for key in p.nucleotides()}
+    links = []  # pieces a strand steps between through at most _SHORT_RUN nucleotides
+    for s, strand in enumerate(nucleic.strands):
+        held = [i for i in range(len(strand)) if (s, i) in at]
+        links += [(at[(s, i)], at[(s, j)]) for i, j in zip(held, held[1:]) if j - i - 1 <= _SHORT_RUN]
+    group = _components(len(pieces), links)
+    for g in sorted(set(group)):
+        members = [k for k in range(len(pieces)) if group[k] == g]
+        if len(members) < 2:
+            continue
+        turns = []
+        for k in members:
+            (cx, cy), (px, py) = cyl.direction(*axes[k]), plain.direction(*axes[k])
+            turns.append(wrap(math.atan2(cy, cx) - math.atan2(py, px)))
+        common = math.atan2(sum(math.sin(t) for t in turns), sum(math.cos(t) for t in turns))
+        if max(abs(wrap(t - common)) for t in turns) > math.radians(NA_TORN_TURN):
+            return True
+    return False
