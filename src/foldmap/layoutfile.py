@@ -110,6 +110,8 @@ def load(path) -> dict:
         doc = yaml.safe_load(Path(path).read_text(encoding="utf-8"))
     except yaml.YAMLError as err:
         raise ValueError(f"layout file {Path(path).name} is not valid YAML: {err}") from err
+    except RecursionError:  # brackets nested thousands deep: the YAML reader recurses once per level
+        raise ValueError(f"{path}: nested too deeply") from None
     if not isinstance(doc, dict):
         raise ValueError(f"{path}: a layout file is a mapping of keys (foldmap, theme, style, layout, edits)")
     if doc.get("foldmap", VERSION) != VERSION:

@@ -12,6 +12,7 @@ Names are given after the layout is placed and labelled, before the user's own r
 
 from __future__ import annotations
 
+import datetime
 import gzip
 import re
 from pathlib import Path
@@ -214,6 +215,8 @@ def parse_names(text: str, where: str) -> dict:
         doc = yaml.safe_load(text) or {}
     except yaml.YAMLError as err:
         raise ValueError(f"{where}: not valid YAML: {err}") from err
+    except RecursionError:  # brackets nested thousands deep: the YAML reader recurses once per level
+        raise ValueError(f"{where}: nested too deeply") from None
     if not isinstance(doc, dict):
         raise ValueError(f"{where}: a names file is a mapping with the keys elements and stems")
     for key in doc:
@@ -224,6 +227,11 @@ def parse_names(text: str, where: str) -> dict:
         if not isinstance(part, dict):
             raise ValueError(f"{where}: {key} is a mapping of reference to name, e.g. res:A:3-18: A")
         for ref, name in part.items():
+            if isinstance(name, datetime.date):  # YAML reads 2001-01-01 as a date
+                raise ValueError(
+                    f"{where}: the name of {str(ref)[:80]!r} reads as a date; give a name as text, e.g. quote it: "
+                    f"'{name.isoformat()}'"
+                )
             if not isinstance(ref, _SCALAR) or not isinstance(name, _SCALAR):
                 raise ValueError(f"{where}: {str(ref)[:80]!r} is not a name (give each reference one name)")
     return doc

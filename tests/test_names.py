@@ -319,6 +319,21 @@ def test_a_names_file_is_read_as_untrusted_text():
         ("elements: [A, B]\n", "x.yaml: elements is a mapping of reference to name"),
         ("elements:\n  res:A:3-18:\n", "x.yaml: 'res:A:3-18' is not a name"),
         ("stems:\n  A:1: {x: 1}\n", "x.yaml: 'A:1' is not a name"),
+        ("elements: " + "[" * 2000 + "]" * 2000 + "\n", "x.yaml: nested too deeply"),
+        (
+            "elements:\n  res:A:3-18: 2001-01-01\n",
+            "x.yaml: the name of 'res:A:3-18' reads as a date; give a name as text, e.g. quote it: '2001-01-01'",
+        ),
     ):
         with pytest.raises(ValueError, match=re.escape(said)):
             parse_names(text, "x.yaml")
+
+
+def test_a_names_file_nested_too_deeply_is_a_command_line_error(tmp_path, capsys):
+    from foldmap.cli import main
+
+    deep = tmp_path / "deep.yaml"
+    deep.write_text("elements: " + "[" * 2000 + "]" * 2000 + "\n")
+    assert main(["plot", str(DATA / "2HHB.cif"), "-o", str(tmp_path / "x.svg"), "--names", str(deep)]) == 1
+    err = capsys.readouterr().err
+    assert "nested too deeply" in err and "Traceback" not in err

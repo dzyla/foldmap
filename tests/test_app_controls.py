@@ -421,6 +421,8 @@ def test_a_names_file_keeps_the_keyword_shows_its_name_and_can_be_removed():
         (b"elements:\n  r1: &a [x, x, x]\n  r2: &b [*a, *a, *a]\n  r3: [*b, *b, *b]\n", "'r1' is not a name"),
         (b"#" * 200_001, "at most 100 kB"),
         (b"\xff\xfe", "UTF-8"),
+        (b"elements: " + b"[" * 2000 + b"]" * 2000 + b"\n", "nested too deeply"),  # 4 kB, no RecursionError
+        (b"elements:\n  res:A:3-18: 2001-01-01\n", "reads as a date; give a name as text"),
     ],
 )
 def test_an_upload_that_is_not_a_names_file_is_an_error_and_changes_nothing(data, said):

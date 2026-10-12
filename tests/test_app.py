@@ -1065,3 +1065,10 @@ def test_the_popover_shows_the_share_link_of_an_id_only(monkeypatch, tmp_path):
     assert any(c.value == "Link to this figure" for c in at.caption)
     at = opened(DATA / "1UBQ.cif")
     assert not at.code
+
+
+def test_a_layout_file_nested_too_deeply_is_a_message():
+    at = load(app_test(), DATA / "1UBQ.cif")
+    deep = ("names: " + "[" * 3000 + "]" * 3000 + "\n").encode()
+    at.file_uploader(key="layout_upload").set_value(("deep.yaml", deep, "application/x-yaml")).run()
+    assert not at.exception and any("nested too deeply" in _visible(e.value) for e in at.error)

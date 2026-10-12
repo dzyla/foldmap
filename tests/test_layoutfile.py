@@ -103,7 +103,13 @@ def test_edits_from_file_and_command_line_add_up(tmp_path):
 
 
 @pytest.mark.parametrize(
-    "text, msg", [("foldmap: 1\ncolour: red\n", "colour"), ("foldmap: 9\n", "version"), ("- a\n- b\n", "mapping")]
+    "text, msg",
+    [
+        ("foldmap: 1\ncolour: red\n", "colour"),
+        ("foldmap: 9\n", "version"),
+        ("- a\n- b\n", "mapping"),
+        ("names: " + "[" * 3000 + "]" * 3000 + "\n", "nested too deeply"),  # not a RecursionError traceback
+    ],
 )
 def test_bad_layout_files_are_explained(tmp_path, text, msg, capsys):
     lf = tmp_path / "bad.yaml"
