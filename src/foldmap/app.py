@@ -454,8 +454,8 @@ def main() -> None:
         return app_jobs.run_job(app_jobs.page_job, path, blob, limits=lim)
 
     @st.cache_data(show_spinner=False, max_entries=16)
-    def contacts(path: str, blob: str) -> dict | None:
-        return app_jobs.run_job(app_jobs.contacts_job, path, blob, limits=lim)
+    def contacts(path: str, key: str, _blob: str) -> dict | None:  # key: app_jobs.contacts_key; _blob not hashed
+        return app_jobs.run_job(app_jobs.contacts_job, path, _blob, limits=lim)
 
     def store_alignment() -> None:
         ss["last_changed"] = "msa_path"

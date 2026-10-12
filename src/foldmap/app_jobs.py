@@ -386,6 +386,37 @@ def contacts_job(path, settings_json: str) -> dict | None:
     }
 
 
+# The settings that decide the contacts check's answer: what is drawn (chains, assembly, symmetry and the subunit
+# shown, which nucleic acid, the elements), whether the beads are drawn (letters or beads) and which residues have a
+# colour (the colouring and the data behind it). The bead colours themselves are checked against the figure's own
+# colouring, so a palette, a theme's colours or a position change gives the same answer.
+CONTACT_KEYS = (
+    "chains",
+    "assembly",
+    "symmetry",
+    "symmetry_tol",
+    "protomers",
+    "focus",
+    "highlight",
+    "dna",
+    "na_extent",
+    "na_style",
+    "nucleotide_labels",
+    "helices_310",
+    "color_by",
+    "msa_path",
+    "msa_reference",
+    "domains",
+    "uniprot",
+    "uniprot_domains",
+)
+
+
+def contacts_key(settings: dict) -> str:
+    """The settings of CONTACT_KEYS as JSON: the key of the app's contacts check cache."""
+    return json.dumps({k: settings[k] for k in CONTACT_KEYS if k in settings}, sort_keys=True, default=str)
+
+
 def size_job(path) -> dict:
     """What the file holds, read before any drawing: polymer residues and chains of its first model (as
     deposited), and its assemblies."""

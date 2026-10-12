@@ -70,7 +70,7 @@ class Workspace:
     render: Callable[[str, str], dict]
     sequence_svg: Callable[[str, str, str], bytes]
     page: Callable[[str, str], str]
-    contacts: Callable[[str, str], dict | None]
+    contacts: Callable[[str, str, str], dict | None]  # (path, app_jobs.contacts_key, blob)
     status: Any
 
 
@@ -158,7 +158,8 @@ def contacts_check(ws: Workspace, blob: str) -> None:
     st = ws.st
     try:
         with ws.status, st.spinner("Checking contacts…"):
-            report = guarded(ws, "contacts", blob, lambda: ws.contacts(ws.path, blob))
+            key = app_jobs.contacts_key(json.loads(blob))  # a colour or theme change does not check again
+            report = guarded(ws, "contacts", blob, lambda: ws.contacts(ws.path, key, blob))
     except Exception as err:
         message = app_jobs.explain(err, ws.name, ws.lim)[0]
         st.warning("Contacts check: " + said(message, path=ws.path, name=ws.name, paths=not local_files()))

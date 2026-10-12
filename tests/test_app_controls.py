@@ -175,3 +175,31 @@ def test_contact_lines():
         "Contacts checked against the coordinates: 2 of 3 confirmed.",
         "missing: DA1 <- LYS2",
     ]
+
+
+def test_contacts_check_reruns_only_for_what_changes_the_contacts(monkeypatch):
+    """The contacts check is cached on the settings that change the contacts drawn (chains, assembly, what DNA is
+    shown, ...): a palette change redraws the figure but does not check the contacts again."""
+    from foldmap import app_jobs
+
+    fresh_caches()
+    try:
+        at = opened(DATA / "1LMB.cif")
+        calls = count_calls(monkeypatch, app_jobs, "contacts_job")
+        at.toggle(key="check_contacts").set_value(True).run()
+        assert calls == [1] and at.session_state["last_changed"] == "check_contacts"
+        before = svg_of(at)
+        at.selectbox(key="palette").select("tol-bright").run()
+        assert not at.exception and svg_of(at) != before and calls == [1]
+        at.segmented_control(key="na_extent").set_value("all").run()
+        assert not at.exception and calls == [1, 1]
+    finally:
+        fresh_caches()
+
+
+def test_protein_dna_hbonds_offered_only_with_nucleic_acid():
+    from foldmap.app_controls import HBONDS
+
+    shown = opened(DATA / "2HHB.cif").segmented_control(key="hbonds__mode").options  # the labels
+    assert list(shown) == [HBONDS[k] for k in ("off", "interchain", "chains")]
+    assert list(opened(DATA / "1LMB.cif").segmented_control(key="hbonds__mode").options) == list(HBONDS.values())

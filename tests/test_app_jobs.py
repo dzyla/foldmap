@@ -418,3 +418,13 @@ def test_limits_point_at_chains_and_assembly():
     for kind in ("time", "memory"):
         assert app_jobs.explain(JobLimit(kind, ""), "8C3A", lim)[1] == "Chains (Chains & assembly)"
     assert app_jobs.explain(JobLimit("busy", ""), "8C3A", lim)[1] is None
+
+
+def test_contacts_key_names_only_what_changes_the_contacts():
+    from foldmap.app_jobs import contacts_key
+
+    base = {"chains": "", "na_extent": "auto", "palette": "okabe-ito", "theme": "publication"}
+    look = {"palette": "tol-bright", "theme": "trace", "background": "#000000", "rotate": 30.0}
+    assert contacts_key(base) == contacts_key({**base, **look})
+    assert contacts_key(base) != contacts_key({**base, "chains": "A"})
+    assert contacts_key(base) != contacts_key({**base, "na_extent": "all"})

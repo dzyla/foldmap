@@ -124,10 +124,11 @@ def show_section(st, ss: MutableMapping) -> None:
 
 
 def hbonds_block(st, ss: MutableMapping) -> None:
-    """Hydrogen bonds: which (none, protein with DNA/RNA, between chains, chosen chain pairs), their colour and the
-    most lines drawn."""
-    segmented(st, "Hydrogen bonds", HBONDS, part(ss, "hbonds__mode", "hbonds"), format_func=HBONDS.get)
+    """Hydrogen bonds: which (none, protein with DNA/RNA where the structure has nucleic acid, between chains,
+    chosen chain pairs), their colour and the most lines drawn."""
     mode = ss.get("hbonds__mode", "off")
+    options = [k for k in HBONDS if k != "na" or ss.get("na_chains") or mode == "na"]  # a layout file's na stays
+    segmented(st, "Hydrogen bonds", options, part(ss, "hbonds__mode", "hbonds"), format_func=HBONDS.get)
     if mode == "chains":
         st.text_input(
             "Chain pairs", placeholder="A+B, C+D", label_visibility="collapsed", **part(ss, "hbonds__pairs", "hbonds")
@@ -170,7 +171,7 @@ def nucleic_block(st, ss: MutableMapping) -> None:
             colour(st, "RNA colour", ss, "rna_color")
     elif mode == "colour":
         st.color_picker("Backbone colour", **part(ss, "na_backbone__colour", "na_backbone"))
-    st.toggle("Check contacts against the coordinates", key="check_contacts", persist_state="session")
+    st.toggle("Check contacts against the coordinates", **setting(ss, "check_contacts"))
 
 
 def contact_lines(report: dict | None, most: int = 10) -> list[str]:
