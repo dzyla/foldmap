@@ -35,7 +35,7 @@ from foldmap.app_controls import (
 from foldmap.app_edits import chain_choices, shown, upload_name
 from foldmap.app_views import Workspace, download_menu, explorer_view, figure_view, said, sequence_view
 from foldmap.cli import _adjustments, _domain_spec
-from foldmap.fetch import fetch, source_id
+from foldmap.fetch import DOWNLOAD_MAX, fetch, source_id
 from foldmap.names import KEYWORDS as NAME_KEYWORDS
 from foldmap.spec import MEMBRANES, MODES, FigureSpec, SavedDomains, parse_flag, parse_protomers
 from foldmap.spec import layout_document as spec_document
@@ -844,7 +844,7 @@ def main() -> None:
         if "theme" not in ss:  # the first structure of this visit
             apply_theme(ss, "publication")
         try:
-            path = fetch(text, file, local=local_files())
+            path = fetch(text, file, local=local_files(), max_bytes=DOWNLOAD_MAX)  # the command line: any size
         except ValueError as err:  # not an id, or the download failed
             ss["load_error"] = shown(err, paths=not local_files())
             return

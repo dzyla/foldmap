@@ -1349,6 +1349,33 @@ def test_the_command_line_says_a_binary_alignment_is_not_one(tmp_path):
         read_alignment(f)
 
 
+@pytest.mark.parametrize("hosted", ["0", "1"])
+def test_the_app_downloads_at_most_100_mb_and_says_how_to_draw_more(monkeypatch, hosted):
+    import foldmap.fetch as fetch_mod
+
+    class Huge:  # 3J3Q as the PDB serves it: 242 MB, stated
+        headers = {"Content-Length": str(242 * 1024 * 1024)}
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+        def read(self, size=-1):
+            raise AssertionError("refused unread")
+
+    monkeypatch.setenv("FOLDMAP_APP_LOCAL_FILES", hosted)
+    monkeypatch.setattr(fetch_mod.urllib.request, "urlopen", lambda request, timeout=0: Huge())
+    at = load(app_test(), "3J3Q")
+    assert not at.exception and at.session_state["stage"] == "load"
+    said = [_visible(e.value) for e in at.error]
+    assert said == [
+        "3J3Q from the PDB is larger than 100 MB, more than this app downloads. Draw it on your own computer: "
+        "pip install foldmap, then foldmap plot 3J3Q -o 3J3Q.svg"
+    ]
+
+
 def test_a_hosted_layout_download_names_uploads_by_their_own_names(monkeypatch, tmp_path):
     """Hosted, a layout file never carries the server's copy of an upload (names file, alignment): each is named as
     uploaded, and a comment asks for it to be attached."""

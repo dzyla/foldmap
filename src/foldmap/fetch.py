@@ -1,8 +1,8 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 # Copyright (C) 2026 Dawid Zyla. Additional terms (AGPL-3.0 section 7(b)): see NOTICE.
 """Structures by name: PDB IDs from RCSB, UniProt accessions / AlphaFold DB ids from the AlphaFold DB, local
-paths, or uploaded bytes. Downloads are cached in ~/.cache/foldmap: at most DOWNLOAD_MAX bytes each, kept a week
-after their last use and DOWNLOAD_CACHE_MAX bytes in all."""
+paths, or uploaded bytes. Downloads are cached in ~/.cache/foldmap, kept a week after their last use and
+DOWNLOAD_CACHE_MAX bytes in all; the app downloads at most DOWNLOAD_MAX bytes each, the command line any size."""
 
 from __future__ import annotations
 
@@ -24,7 +24,7 @@ STRUCTURE_SUFFIXES = (".cif", ".mmcif", ".pdb", ".ent")
 ALIGNMENT_SUFFIXES = (".fasta", ".fa", ".aln", ".sto", ".txt")
 UPLOAD_MAX_AGE = 24 * 3600  # seconds an uploaded file is kept in the cache
 MB = 1024 * 1024
-DOWNLOAD_MAX = 100 * MB  # bytes a download may take (the largest PDB entry, 3J3Q, is 242 MB as mmCIF)
+DOWNLOAD_MAX = 100 * MB  # bytes the app downloads at most (fetch max_bytes; 3J3Q, the largest entry, is 242 MB)
 CHUNK = MB  # bytes read at a time: a download is never held whole in memory
 DOWNLOAD_MAX_AGE = 7 * 24 * 3600  # seconds a downloaded structure is kept unused in the cache
 DOWNLOAD_CACHE_MAX = 2 * 1024 * MB  # bytes of downloaded structures kept; the oldest go first
@@ -56,10 +56,11 @@ def _complete(data: bytes) -> bool:
     return data.rstrip().endswith(b"#")
 
 
-def _download(url: str, path: Path, what: str) -> Path:
+def _download(url: str, path: Path, what: str, name: str, max_bytes: int | None = None) -> Path:
     """`url` into the cache at `path`, unless a whole copy is already there (a cut-off one is fetched again). The
-    download streams to a file beside `path`, stopped past DOWNLOAD_MAX bytes; only a whole file takes its place.
-    The cache is pruned first, at most once an hour (prune_downloads)."""
+    download streams to a file beside `path`, stopped past `max_bytes` (None: no cap); only a whole file takes its
+    place. `what` and `name` (the id to draw it by) are for the messages. The cache is pruned first, at most once
+    an hour (prune_downloads)."""
     maybe_prune()
     if path.is_file():
         with path.open("rb") as f:
@@ -71,7 +72,7 @@ def _download(url: str, path: Path, what: str) -> Path:
     fd, part = tempfile.mkstemp(dir=path.parent, prefix=f".{path.name}.", suffix=".part")
     try:
         with os.fdopen(fd, "wb") as out:
-            tail = _stream(url, out, what)
+            tail = _stream(url, out, what, name, max_bytes)
         if not _complete(tail):
             raise ValueError(f"could not download {what} (the file arrived incomplete; try again)")
         os.replace(part, path)
@@ -81,22 +82,23 @@ def _download(url: str, path: Path, what: str) -> Path:
     return path
 
 
-def _stream(url: str, out, what: str) -> bytes:
+def _stream(url: str, out, what: str, name: str, max_bytes: int | None) -> bytes:
     """The download of `url` written to `out`, a chunk at a time; its last bytes. ValueError when it fails or
-    passes DOWNLOAD_MAX bytes (told by its Content-Length at once, else counted as it arrives)."""
+    passes `max_bytes` (told by its Content-Length at once, else counted as it arrives; None: no cap)."""
+    cap = max_bytes if max_bytes is not None else float("inf")
     too_big = (
-        f"could not download {what}: it is larger than {DOWNLOAD_MAX // MB} MB, more than foldmap downloads. "
-        "Download the file yourself and draw it on your own computer: foldmap plot FILE"
+        f"{what} is larger than {(max_bytes or 0) // MB} MB, more than this app downloads. Draw it on your own "
+        f"computer: pip install foldmap, then foldmap plot {name} -o {name}.svg"
     )
     tail, size = b"", 0
     try:
         with urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": AGENT}), timeout=30) as r:
             length = (getattr(r, "headers", None) or {}).get("Content-Length")
-            if length and length.isdigit() and int(length) > DOWNLOAD_MAX:
+            if length and length.isdigit() and int(length) > cap:
                 raise ValueError(too_big)
             while chunk := r.read(CHUNK):
                 size += len(chunk)
-                if size > DOWNLOAD_MAX:
+                if size > cap:
                     raise ValueError(too_big)
                 out.write(chunk)
                 tail = (tail + chunk)[-64:]
@@ -179,10 +181,13 @@ def keep_upload(name: str, data: bytes, suffixes: tuple[str, ...] = STRUCTURE_SU
     return target
 
 
-def fetch(source: str, upload: tuple[str, bytes] | None = None, *, local: bool = True) -> Path:
+def fetch(
+    source: str, upload: tuple[str, bytes] | None = None, *, local: bool = True, max_bytes: int | None = None
+) -> Path:
     """A local structure file from an upload, a path, a PDB ID (from RCSB) or a UniProt accession / AlphaFold DB
     id (the AlphaFold model); downloads are cached. local=False never reads a path given as source (for a hosted
-    app, whose visitors must not read the server's files)."""
+    app, whose visitors must not read the server's files). max_bytes: a download larger than this is stopped (the
+    app passes DOWNLOAD_MAX); None, the command line's, downloads any size."""
     if upload is not None:
         return keep_upload(*upload)
     text = (source or "").strip()
@@ -193,10 +198,12 @@ def fetch(source: str, upload: tuple[str, bytes] | None = None, *, local: bool =
         acc = af.group(1)
         url = f"https://alphafold.ebi.ac.uk/files/AF-{acc}-F1-model_v{AFDB_VERSION}.cif"
         folder = CACHE / f"afdb-v{AFDB_VERSION}"  # a new AlphaFold DB release is a new download
-        return _download(url, folder / f"AF-{acc}-F1.cif", f"AF-{acc} from the AlphaFold DB")
+        what = f"AF-{acc} from the AlphaFold DB"
+        return _download(url, folder / f"AF-{acc}-F1.cif", what, f"AF-{acc}-F1", max_bytes)
     if _PDB.fullmatch(text):
         pdb = text.upper()
-        return _download(f"https://files.rcsb.org/download/{pdb}.cif", CACHE / f"{pdb}.cif", f"{pdb} from the PDB")
+        url = f"https://files.rcsb.org/download/{pdb}.cif"
+        return _download(url, CACHE / f"{pdb}.cif", f"{pdb} from the PDB", pdb, max_bytes)
     what = "a structure file, a PDB ID" if local else "a PDB ID"
     raise ValueError(f"{text!r} is not {what} (e.g. 1LMB) or a UniProt accession (e.g. P04637)")
 

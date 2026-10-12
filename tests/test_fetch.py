@@ -235,22 +235,52 @@ class _Endless:
 def test_a_download_past_the_cap_is_stopped_and_leaves_no_file(monkeypatch, tmp_path):
     server = _Endless()
     monkeypatch.setattr(fetch_mod, "CACHE", tmp_path)
-    monkeypatch.setattr(fetch_mod, "DOWNLOAD_MAX", 1_000_000)
     monkeypatch.setattr(fetch_mod.urllib.request, "urlopen", lambda request, timeout=0: server)
-    with pytest.raises(ValueError, match=r"could not download 3J3Q from the PDB: it is larger than 0 MB"):
-        fetch("3J3Q")
-    assert server.sent <= 1_000_000 + fetch_mod.CHUNK  # stopped at the cap, not read to the end
+    with pytest.raises(ValueError, match=r"3J3Q from the PDB is larger than 1 MB, more than this app downloads"):
+        fetch("3J3Q", max_bytes=1024 * 1024)
+    assert server.sent <= 1024 * 1024 + fetch_mod.CHUNK  # stopped at the cap, not read to the end
     assert list(tmp_path.iterdir()) == []  # the partial file is gone
 
 
-def test_the_download_cap_is_100_mb_and_a_stated_length_over_it_is_refused_unread(monkeypatch, tmp_path):
+def test_the_apps_cap_is_100_mb_and_a_stated_length_over_it_is_refused_unread(monkeypatch, tmp_path):
     assert fetch_mod.DOWNLOAD_MAX == 100 * 1024 * 1024
     server = _Endless()
     server.headers = {"Content-Length": str(242 * 1024 * 1024)}  # 3J3Q's size
     monkeypatch.setattr(fetch_mod.urllib.request, "urlopen", lambda request, timeout=0: server)
-    with pytest.raises(ValueError, match="larger than 100 MB, more than foldmap downloads"):
-        fetch("3J3Q")
+    with pytest.raises(ValueError) as info:
+        fetch("3J3Q", max_bytes=fetch_mod.DOWNLOAD_MAX)
+    assert str(info.value) == (
+        "3J3Q from the PDB is larger than 100 MB, more than this app downloads. Draw it on your own computer: "
+        "pip install foldmap, then foldmap plot 3J3Q -o 3J3Q.svg"
+    )
     assert server.sent == 0 and not list((tmp_path / "cache").iterdir())
+
+
+class _Large(_Endless):
+    """A whole mmCIF file of `total` bytes (ending with its '#' line), stating its length."""
+
+    def __init__(self, total: int):
+        super().__init__()
+        self.total, self.headers = total, {"Content-Length": str(total)}
+
+    def read(self, size=-1):
+        n = min(size, self.total - self.sent)
+        if n <= 0:
+            return b""
+        self.sent += n
+        return b"#" * n if self.sent < self.total else b"#" * (n - 2) + b"\n#"
+
+
+def test_the_command_line_downloads_entries_of_any_size(monkeypatch, tmp_path):
+    """No cap outside the app: its size message sends visitors to `foldmap plot 3J3Q`, which must download it."""
+    from foldmap.cli import _resolve_structure
+
+    server = _Large(150 * 1024 * 1024)
+    monkeypatch.setattr(fetch_mod, "CACHE", tmp_path)
+    monkeypatch.setattr(fetch_mod.urllib.request, "urlopen", lambda request, timeout=0: server)
+    path = Path(_resolve_structure("3J3Q"))
+    assert path == tmp_path / "3J3Q.cif" and path.stat().st_size == 150 * 1024 * 1024
+    assert server.sent == server.total
 
 
 def _aged(path: Path, days: float, size: int = 10) -> Path:
