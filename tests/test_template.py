@@ -261,3 +261,21 @@ def test_a_row_holds_at_most_ten_strands(n, applies):
     helices = [fake_sse("H", 20 * k + 7, 20 * k + 16) for k in range(n - 1)]
     sheet = Sheet(strands, [1] * n, ["P"] * (n - 1))
     assert template_applies(sheet, sorted(strands + helices, key=lambda s: s.start)) is applies
+
+
+def test_template_choices_do_not_depend_on_the_order_of_the_sheets(monkeypatch):
+    """Two sheets of copies of one protein are linked when at least half the strands of the smaller overlap, counted
+    from both sheets: A's first two strands both overlap B's first, but only one of B's strands overlaps any of A's.
+    Counted from one side only, the link (and so B's choice) changed with the order the sheets came in."""
+    from foldmap import layout
+    from foldmap.model import Sheet
+    from helpers import fake_sse
+
+    a = Sheet([fake_sse("E", s, s + 2, chain="A") for s in (1, 5, 30, 40)], [1] * 4, ["P"] * 3)
+    b = Sheet([fake_sse("E", s, e, chain="B") for s, e in ((1, 8), (50, 52), (60, 62), (70, 72))], [1] * 4, ["P"] * 3)
+    monkeypatch.setattr(layout, "template_applies", lambda sh, sses: sh is a)
+    monkeypatch.setattr(layout, "_row_shape", lambda sh: True)
+    copies = {"A": ("A", 0), "B": ("A", 0)}
+    forward = layout.template_choices([a, b], [], copies)
+    backward = layout.template_choices([b, a], [], copies)
+    assert forward == backward[::-1] == [True, False]

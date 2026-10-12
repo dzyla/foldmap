@@ -414,10 +414,16 @@ def template_applies(sheet: Sheet, sses: list[SSE]) -> bool:
     return bool(units) and _BA_SHARE[1] * sum(u.inrow for u in units) >= _BA_SHARE[0] * len(units)
 
 
+def _ranges_meeting(xs: list[tuple[int, int]], ys: list[tuple[int, int]]) -> int:
+    """How many of the residue ranges xs overlap any of ys."""
+    return sum(any(min(x1, y1) >= max(x0, y0) for y0, y1 in ys) for x0, x1 in xs)
+
+
 def template_choices(sheets: list[Sheet], sses: list[SSE], copies: dict[str, tuple[str, int]]) -> list[bool]:
     """Which sheets are drawn as βα rows, copies of one protein alike. `copies` (model.homolog_chains): chain ->
     (first chain of its copies, residue-number offset). Sheets of one chain each match when they belong to copies of
-    one protein and at least half the strands of the smaller overlap (residue numbers taken to the first copy's).
+    one protein and at least half the strands of the smaller overlap the other sheet's, counted from each sheet and the
+    smaller count taken (residue numbers taken to the first copy's).
     In each group of matching sheets: if any takes the template on its own (template_applies) and every one can be a
     row (_row_shape), all of them take it (a copy missing a helix or two is drawn as its mates are); if any cannot
     be a row, none takes it, so the copies stay alike. Pure."""
@@ -437,7 +443,7 @@ def template_choices(sheets: list[Sheet], sses: list[SSE], copies: dict[str, tup
         a, b = keys[i], keys[j]
         if a is None or b is None or a[0] != b[0] or a[1] == b[1]:
             continue
-        hits = sum(any(min(x1, y1) >= max(x0, y0) for y0, y1 in b[2]) for x0, x1 in a[2])
+        hits = min(_ranges_meeting(a[2], b[2]), _ranges_meeting(b[2], a[2]))  # both ways: sheet order is moot
         if 2 * hits >= min(len(a[2]), len(b[2])):
             links.append((i, j))
     group = _components(len(sheets), links)
