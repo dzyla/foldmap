@@ -138,14 +138,18 @@ class _Grid:
         (a tilted helix end can sit inside it) may be skipped; any other obstacle in the way means no route.
         `loose` (a strand's loose end, which may sit in another element's clearance margin; any end of a helix
         drawn over a sheet, which lies on the strands): any blocked cell may be skipped, and the drawn route's
-        final check decides. From a helix over a sheet the way out runs on to the sheet's edge (_PUSH_OVER)."""
+        final check decides. From a helix over a sheet the way out runs over the strands to the sheet's edge
+        (_PUSH_OVER) and stops there: a soft cell (text, another helix) next means no way out this side."""
         g = _INFLATE + self.reach
         rx0, ry0, rx1, ry1 = own.rect
-        for t in _PUSH_OVER if loose and getattr(own, "over", False) else _PUSH:
+        over = loose and getattr(own, "over", False)
+        for t in _PUSH_OVER if over else _PUSH:
             pt = (port[0] + exit_vec[0] * t, port[1] + exit_vec[1] * t)
             c = self.cell(pt)
             if self.free(c):
                 return c
+            if over and 0 <= c[0] < self.nx and 0 <= c[1] < self.ny and self.soft[c]:
+                return None  # past the strands, text or another helix: the walk stops at the sheet's edge
             cx, cy = self.center(c)
             if not (loose or (rx0 - g < cx < rx1 + g and ry0 - g < cy < ry1 + g)):
                 return None

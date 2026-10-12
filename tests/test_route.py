@@ -593,3 +593,17 @@ def test_a_helix_over_a_sheet_keeps_its_box_as_a_soft_obstacle():
     inside = np.outer((grid.xs > x0) & (grid.xs < x1), (grid.ys > y0) & (grid.ys < y1))
     hard = _Grid(Layout({k: p for k, p in lay.placed.items() if not p.over}, lay.bounds)).blocked
     assert (inside & ~hard).any() and np.all(grid.soft[inside & ~hard]) and np.all(grid.blocked[inside])
+
+
+def test_a_loop_out_of_a_helix_over_a_sheet_keeps_off_text_unless_flagged():
+    """2ACY α2's N port lies on β1 just above β1's N-terminal letter: the walk out of the sheet stops at its edge, so
+    the loop into it crosses that text only as a last resort, flagged (Loop.crosses_labels), never silently."""
+    from foldmap.cli import make_layout
+    from foldmap.style import Style
+    from helpers import FID
+
+    lay, sses, bb = make_layout(FID / "2ACY.cif.gz", look=Style(helix_on_sheet="auto"))
+    boxes = [b for _, b in label_boxes(lay, sses)]
+    for lp in route_loops(lay, sses, bb):
+        if not lp.fallback and not lp.crosses_labels:
+            assert segments_clear(lp.points, boxes), (lp.a_id, lp.b_id)
