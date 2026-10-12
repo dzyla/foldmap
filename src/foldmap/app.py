@@ -236,7 +236,14 @@ def settings_from_document(doc: dict) -> dict:
     e = doc.get("edits") or {}
     out["rename"] = "; ".join(f"{k}={v}" for k, v in (e.get("rename") or {}).items())
     out["swap"] = "; ".join(f"{a},{b}" for a, b in e.get("swap") or [])
-    out["domains"] = "\n".join(f"{name}={','.join(refs)}" for name, refs in (doc.get("domains") or {}).items())
+    domains = doc.get("domains") or {}
+    if domains == "uniprot":  # the app's UniProt domains switch
+        out["uniprot_domains"], domains = True, {}
+    if isinstance(domains, str):  # auto
+        out["domains"] = domains
+    else:
+        pairs = domains.items() if isinstance(domains, dict) else domains
+        out["domains"] = "\n".join(f"{name}={','.join(refs)}" for name, refs in pairs)
     out["move"] = "; ".join(f"{k}={d[0]:g},{d[1]:g}" for k, d in (e.get("move") or {}).items())
     return out
 

@@ -1,5 +1,6 @@
 """Domain panels: named groups of elements drawn on a soft panel with their name."""
 
+import re
 from pathlib import Path
 
 import numpy as np
@@ -627,3 +628,28 @@ def test_copies_of_a_domain_share_one_tone():
     chains = ["A1", "A2", "A3", "A4"]
     entries = _legend_entries(lay, Style(), chains, dict.fromkeys(chains, "#000000"), [], {})
     assert [e for e in entries if e[0] in _DOMAIN_TONES] == [(_DOMAIN_TONES[0], "D1"), (_DOMAIN_TONES[1], "D2")]
+
+
+@pytest.mark.parametrize(
+    "domains, panels",
+    [
+        ("auto", None),  # found by the layout: at least two for T4 lysozyme
+        ("[[N, [res:A:13-59]], [C, [res:A:1-12, res:A:60-164]]]", {"N", "C"}),
+    ],
+)
+def test_a_layout_file_may_give_domains_as_auto_or_a_list(tmp_path, domains, panels):
+    lf, out = tmp_path / "t4l.yaml", tmp_path / "t4l.svg"
+    lf.write_text(f"foldmap: 1\ndomains: {domains}\n")
+    assert main(["plot", str(T4L), "-o", str(out), "--layout-file", str(lf)]) == 0
+    drawn = set(re.findall(r'id="domain:([^"]+)"', out.read_text()))
+    assert drawn == panels if panels else len(drawn) >= 2
+
+
+def test_app_reads_a_layout_file_with_auto_or_uniprot_domains():
+    from foldmap.app import settings_from_document
+
+    assert settings_from_document({"domains": "auto"})["domains"] == "auto"
+    back = settings_from_document({"domains": "uniprot", "layout": {"uniprot": "auto"}})
+    assert back["domains"] == "" and back["uniprot_domains"] is True
+    pairs = settings_from_document({"domains": [["N", ["res:A:13-59"]], ["C", ["res:A:1-12", "res:A:60-164"]]]})
+    assert pairs["domains"] == "N=res:A:13-59\nC=res:A:1-12,res:A:60-164"

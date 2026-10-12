@@ -139,11 +139,11 @@ def figure_spec(
     membrane = str(pick("membrane"))
     if membrane not in MEMBRANES:
         raise ValueError(f"unknown membrane {membrane!r}; choose from {', '.join(MEMBRANES)}")
-    domains = given.get("domains") or None
-    if domains is None and doc.get("domains"):
-        domains = SavedDomains((name, list(refs)) for name, refs in doc["domains"].items())
-    elif isinstance(domains, dict):
-        domains = [(name, list(refs)) for name, refs in domains.items()]
+    saved = doc.get("domains")
+    domains = given.get("domains") or saved or None
+    if isinstance(domains, dict):  # {name: [refs]}; auto, uniprot and [(name, [refs])] are taken as they are
+        pairs = [(name, list(refs)) for name, refs in domains.items()]
+        domains = SavedDomains(pairs) if domains is saved else pairs
     edits = layoutfile.edits_of(doc)
     edits["rename"].update(given.get("rename") or {})
     edits["swap"] += [_pair(p) for p in given.get("swap") or []]
