@@ -13,11 +13,13 @@ import logging
 import os
 import re
 import tempfile
-from collections.abc import MutableMapping
-from dataclasses import fields, replace
+from collections.abc import Callable, MutableMapping
+from dataclasses import dataclass, fields, replace
+from functools import partial
 from pathlib import Path
+from typing import Any, NamedTuple
 
-from foldmap import CREDIT, app_edits
+from foldmap import CREDIT, app_edits, app_jobs
 from foldmap.app_edits import shown, sync_composites
 from foldmap.cli import _adjustments, _domain_spec
 from foldmap.fetch import ALIGNMENT_SUFFIXES, fetch, keep_upload, source_id
@@ -254,17 +256,21 @@ def settings_from_document(doc: dict) -> dict:
     return out
 
 
-def figure_card(svg: str, background: str, name: str) -> str:
-    """The figure as HTML for the canvas: a card on the figure's own background, the SVG named for screen readers.
-    A figure more than three times as wide as tall keeps its height and scrolls inside the card."""
+def figure_card(svg: str, background: str, name: str, kind: str = "Topology diagram", natural: bool = False) -> str:
+    """The figure as HTML for the canvas: a card on the figure's own background, the SVG named for screen readers
+    ("{kind} of {name}"). A figure more than three times as wide as tall keeps its height and scrolls inside the
+    card; natural: the figure keeps its own size (the sequence figure, so its letters stay readable) and scrolls
+    inside the card when wider."""
     root = re.search(r"<svg\b[^>]*>", svg)
     tag = root.group() if root else ""
     attrs = {  # CSS px; matplotlib writes pt (4/3 px)
         k: float(v) * (4 / 3 if unit == "pt" else 1)
         for k, v, unit in re.findall(r'\s(width|height)="([\d.]+)(pt|px)?"', tag)
     }
-    extra = f' role="img" aria-label="Topology diagram of {html.escape(name, quote=True)}"'
-    if attrs.get("height") and attrs.get("width", 0) / attrs["height"] > 3:
+    extra = f' role="img" aria-label="{html.escape(kind, quote=True)} of {html.escape(name, quote=True)}"'
+    if natural and attrs.get("height") and attrs.get("width"):
+        extra += f' style="width:{attrs["width"]:.0f}px;max-width:none;height:{attrs["height"]:.0f}px;max-height:none"'
+    elif attrs.get("height") and attrs.get("width", 0) / attrs["height"] > 3:
         extra += f' style="width:auto;max-width:none;height:min(60vh,{attrs["height"]:.0f}px)"'
     if root:
         svg = svg[: root.start()] + "<svg" + extra + tag[4:] + svg[root.end() :]
@@ -350,7 +356,15 @@ def reset_structure(ss: MutableMapping) -> None:
 
     for kind in EDITORS:  # a new table key: no edit of the last structure's table is applied to this one
         ss[f"{kind}__ver"] = ss.get(f"{kind}__ver", 0) + 1
-    for key in (*STRUCTURE_WIDGETS, "drawn_blob", "slow_noted", "slow_seconds", "last_good", "last_changed"):
+    for key in (
+        *STRUCTURE_WIDGETS,
+        "drawn_blob",
+        "slow_noted",
+        "slow_seconds",
+        "last_good",
+        "last_changed",
+        "figure_failed",
+    ):
         ss.pop(key, None)
     ss["auto_redraw"] = True
     ss["pane"] = "Figure"
@@ -364,12 +378,300 @@ def picked_row(table: dict | None, choices: list[tuple[str, str]]) -> str | None
     return row_source(list(rows), choices)
 
 
+# ---------------------------------------------------------------------------------------------- views
+@dataclass
+class Workspace:
+    """What the views of one workspace run share: Streamlit, the session, the structure, the settings JSON (the
+    cache key), the job limits, the app's caches (render, sequence_svg, page) and where the spinner shows."""
+
+    st: Any
+    ss: MutableMapping
+    path: str
+    name: str
+    blob: str
+    lim: app_jobs.Limits
+    render: Callable[[str, str], dict]
+    sequence_svg: Callable[[str, str, str], bytes]
+    page: Callable[[str, str], str]
+    status: Any
+
+
+def problem(ws: Workspace, err: Exception) -> str:
+    """The callout for a failed job (app_jobs.explain), naming the control to check; a limit's message names its
+    own."""
+    message, control = app_jobs.explain(err, ws.name, ws.lim, ws.ss.get("last_changed"))
+    hint = f" Check {control}." if control and not isinstance(err, app_jobs.JobLimit) else ""
+    if hint and not message.rstrip().endswith((".", "!", "?")):  # the hint is a sentence of its own
+        message = message.rstrip() + "."
+    return said(message, path=ws.path, name=ws.name, paths=not local_files()) + hint
+
+
+def guarded(ws: Workspace, job: str, blob: str, make: Callable, view_json: str = ""):
+    """make() for a job ('figure', 'sequence' or 'page'), unless the same request went over a limit before: then
+    that JobLimit at once. A JobLimit is remembered for this job (and sequence view) only; a bug is logged."""
+    settings = json.loads(blob)
+    failed = app_jobs.known_failure(ws.path, settings, job, view_json)
+    if failed is not None:
+        raise failed
+    try:
+        return make()
+    except app_jobs.JobLimit as err:
+        app_jobs.remember_failure(ws.path, settings, err, job, view_json)
+        raise
+    except (ValueError, OSError, RuntimeError):
+        raise
+    except Exception:  # a pipeline bug: a message for the visitor, the traceback for the server
+        _LOG.exception("drawing %s failed", ws.name)
+        raise
+
+
+def figure_view(ws: Workspace) -> None:
+    """The figure in its card; on a failure the error above the last good figure (`figure_failed` names the
+    settings that failed, for the Download popover)."""
+    st, ss = ws.st, ws.ss
+    target = ws.blob if ss["auto_redraw"] else ss.get("drawn_blob", ws.blob)
+    result = None
+    try:
+        with ws.status, st.spinner("Drawing…"):
+            result = guarded(ws, "figure", target, lambda: ws.render(ws.path, target))
+    except Exception as err:  # the canvas keeps the last good figure
+        ss["figure_failed"] = target
+        st.error(problem(ws, err))
+    if result is not None:
+        ss.pop("figure_failed", None)
+        ss.update(
+            drawn_blob=target,
+            last_good={
+                "path": ws.path,
+                "blob": target,
+                "svg": result["svg"],
+                "files": tuple(sorted(result["files"].items())) or None,
+            },
+            elements=result["elements"],
+            protein_chains=result["chains"],
+            na_chains=result["na_chains"],
+            all_chains=list(dict.fromkeys([*result["chains"], *result["na_chains"]])),
+        )
+        slow = result["seconds"]  # the drawing itself, as at load (not the job's start-up or a cache hit)
+        if slow > ws.lim.slow and ss.get("slow_noted") != ws.path:  # the toggle is created later in this run
+            ss.update(auto_redraw=False, slow_noted=ws.path, slow_seconds=slow)
+    good = ss.get("last_good") or {}
+    if good.get("path") != ws.path:
+        return
+    with st.container(key="canvas"):
+        background = json.loads(good["blob"]).get("background", "#ffffff")
+        st.markdown(figure_card(good["svg"], background, ws.name), unsafe_allow_html=True)
+        notes = app_edits.notes_text(result["fallback"], result["over_labels"]) if result else ""
+        if notes:
+            st.caption(shown(notes))
+
+
+def sequence_options(ss: MutableMapping) -> dict:
+    """The Sequence view's options: its widgets' values (their defaults before it was first shown) and the chain
+    picked, else the first protein chain."""
+    chains = ss.get("protein_chains") or []
+    chain = ss.get("seq_chain")
+    return {
+        "columns": int(ss.get("seq_columns", 60)),
+        "ss_colour": ss.get("seq_ss_colour") or "figure",
+        "full_sequence": bool(ss.get("seq_full", False)),
+        "chain": chain if chain in chains else (chains[0] if chains else None),
+    }
+
+
+def sequence_json(ss: MutableMapping) -> str:
+    """sequence_options as JSON: the key of the sequence caches and of its failures."""
+    return json.dumps(sequence_options(ss), sort_keys=True)
+
+
+def sequence_view(ws: Workspace) -> None:
+    """The sequence figure, its options in one row above it (a chain picker when there are several chains)."""
+    st, ss = ws.st, ws.ss
+    chains = ss.get("protein_chains") or []
+    if ss.get("seq_chain") not in chains:  # the chain of another structure, or of other chain settings
+        ss.pop("seq_chain", None)
+    with st.container(horizontal=True, vertical_alignment="bottom", key="seq_options"):
+        st.slider("Columns per row", 20, 150, 60, step=5, key="seq_columns", width=300, persist_state="session")
+        st.segmented_control(
+            "Element colours",
+            ["figure", "black"],
+            default="figure",
+            required=True,
+            key="seq_ss_colour",
+            persist_state="session",
+        )
+        st.toggle("Unmodelled ends", key="seq_full", persist_state="session")
+        if len(chains) > 1:
+            st.selectbox("Chain", chains, key="seq_chain", width=160, persist_state="session")
+    view_json = sequence_json(ss)
+    try:
+        with ws.status, st.spinner("Drawing…"):
+            svg = guarded(ws, "sequence", ws.blob, lambda: ws.sequence_svg(ws.path, ws.blob, view_json), view_json)
+    except Exception as err:
+        st.error(problem(ws, err))
+        return
+    with st.container(key="canvas"):
+        background = json.loads(ws.blob).get("background", "#ffffff")
+        st.markdown(
+            figure_card(svg.decode(), background, ws.name, kind="Sequence", natural=True), unsafe_allow_html=True
+        )
+
+
+PDB_ID = re.compile(r"[0-9][A-Za-z0-9]{3}")
+
+
+def explorer_view(ws: Workspace) -> None:
+    """The interactive page (figure beside the 3D structure), embedded unless larger than PAGE_EMBED_MAX."""
+    st, ss = ws.st, ws.ss
+    try:
+        with ws.status, st.spinner("Building the 3D page…"):
+            page = guarded(ws, "page", ws.blob, lambda: ws.page(ws.path, ws.blob))
+    except Exception as err:
+        st.error(problem(ws, err))
+        return
+    size = len(page.encode("utf-8"))
+    with st.container(key="explorer"):
+        if size > app_jobs.PAGE_EMBED_MAX:
+            share_id = ss.get("share_id") or ""
+            rcsb = (
+                f" or open {shown(share_id)} at https://www.rcsb.org/3d-view/{share_id}"
+                if PDB_ID.fullmatch(share_id)
+                else ""
+            )
+            st.info(
+                f"The 3D page is {size / 1e6:.0f} MB, too large to show here. Download it (Download ▸ 3D page){rcsb}."
+            )
+        else:
+            st.iframe(page, height=1100)  # foldmap's own page
+
+
+# ---------------------------------------------------------------------------------------------- downloads
+class Download(NamedTuple):
+    """One button of the Download popover; data is called only when the button is clicked."""
+
+    key: str
+    label: str
+    data: Callable[[], bytes]
+    file_name: str
+    mime: str
+
+
+FORMATS = (
+    ("svg", "SVG · editable", "image/svg+xml"),
+    ("png", "PNG · 300 dpi", "image/png"),
+    ("pdf", "PDF", "application/pdf"),
+)
+FORMATS_NOTE = (
+    "SVG: edit in Illustrator or Inkscape · PNG: slides and web · PDF: print · Layout file: re-render this figure "
+    "later with `foldmap plot --layout-file`"
+)
+
+
+def layout_yaml(path, blob: str) -> bytes:
+    """The layout file of these settings (YAML)."""
+    import yaml
+
+    doc = layout_document(path, json.loads(blob))
+    return yaml.safe_dump(doc, sort_keys=False, allow_unicode=True).encode()
+
+
+def share_url(base: str | None, share_id: str, theme: str) -> str:
+    """The link that opens this structure in this theme: the app's address (its query string dropped) with ?id and
+    ?theme only."""
+    return (base or "").split("?", 1)[0] + f"?id={share_id}&theme={theme}"
+
+
+def figure_downloads(
+    path: str, blob: str, stem: str, lim: app_jobs.Limits, eager: tuple | None = None
+) -> list[Download]:
+    """The figure's files (eager: the render's files as sorted (ext, bytes) items) and its layout file."""
+    out = [
+        Download(f"dl_{ext}", label, partial(app_jobs.figure_file, path, blob, ext, lim, eager), f"{stem}.{ext}", mime)
+        for ext, label, mime in FORMATS
+    ]
+    out.append(
+        Download(
+            "dl_layout", "Layout file", partial(layout_yaml, path, blob), f"{stem}-layout.yaml", "application/x-yaml"
+        )
+    )
+    return out
+
+
+def sequence_downloads(path: str, blob: str, view_json: str, stem: str, lim: app_jobs.Limits) -> list[Download]:
+    """The sequence figure's files, with the Sequence view's options."""
+    return [
+        Download(
+            f"dl_seq_{ext}",
+            label,
+            partial(app_jobs.sequence_file, path, blob, view_json, ext, lim),
+            f"{stem}-sequence.{ext}",
+            mime,
+        )
+        for ext, label, mime in FORMATS
+    ]
+
+
+def page_downloads(path: str, blob: str, stem: str, lim: app_jobs.Limits) -> list[Download]:
+    """The interactive page."""
+    page = partial(app_jobs.page_file, path, blob, lim)
+    return [Download("dl_html", "Interactive page", page, f"{stem}-explorer.html", "text/html")]
+
+
+def figure_offered(ss: MutableMapping, path: str, blob: str) -> tuple[str, tuple | None, bool] | None:
+    """The figure the Download popover offers, as (settings JSON, eager files, whether it is the previous figure):
+    the one on screen (or, in another view, the one these settings draw); when these settings failed to draw, the
+    last good figure of this structure, else None."""
+    target = blob if ss.get("auto_redraw", True) else ss.get("drawn_blob", blob)
+    good = ss.get("last_good") or {}
+    if good.get("path") != path:
+        good = {}
+    if ss.get("figure_failed") == target:
+        return (good["blob"], good.get("files"), True) if good else None
+    return target, good.get("files") if good.get("blob") == target else None, False
+
+
+def download_menu(ws: Workspace) -> None:
+    """The Download popover's body: the figure, sequence and 3D files (each built when clicked), what the formats
+    are for, and the share link."""
+    st, ss = ws.st, ws.ss
+    settings = json.loads(ws.blob)
+
+    def buttons(files: list[Download]) -> None:
+        with st.container(horizontal=True):
+            for d in files:
+                st.download_button(d.label, d.data, d.file_name, d.mime, key=d.key, on_click="ignore")
+
+    st.markdown("**Figure**")
+    offered = figure_offered(ss, ws.path, ws.blob)
+    if offered is None:
+        st.caption("Nothing to download until the figure draws.")
+    else:
+        blob, eager, previous = offered
+        if previous:
+            st.caption("These are the previous figure's files: the current settings do not draw.")
+        buttons(figure_downloads(ws.path, blob, ws.name, ws.lim, eager))
+    view_json = sequence_json(ss)
+    for title, job, files in (
+        ("Sequence", "sequence", lambda: sequence_downloads(ws.path, ws.blob, view_json, ws.name, ws.lim)),
+        ("3D", "page", lambda: page_downloads(ws.path, ws.blob, ws.name, ws.lim)),
+    ):
+        st.markdown(f"**{title}**")
+        failed = app_jobs.known_failure(ws.path, settings, job, view_json if job == "sequence" else "")
+        if failed is not None:  # over a limit before: say so rather than try again on a click
+            st.caption(f"{title}: {problem(ws, failed)}")
+        else:
+            buttons(files())
+    st.caption(FORMATS_NOTE)
+    if ss.get("share_id"):
+        st.caption("Link to this figure")
+        st.code(share_url(st.context.url, ss["share_id"], ss["theme"]), language=None)
+
+
 # ---------------------------------------------------------------------------------------------- UI
 def main() -> None:
     import streamlit as st
-    import streamlit.components.v1 as components
 
-    from foldmap import app_jobs, uniprot
+    from foldmap import uniprot
 
     st.set_page_config(page_title="Foldmap", page_icon="🧬", layout="wide")
     ss = st.session_state
@@ -389,8 +691,12 @@ def main() -> None:
         return structure_choices(accession)
 
     @st.cache_data(show_spinner=False, max_entries=16)
-    def sequence(path: str, settings_json: str, view_json: str) -> dict:
-        return sequence_files(path, json.loads(settings_json), json.loads(view_json))
+    def sequence_svg(path: str, blob: str, view_json: str) -> bytes:
+        return app_jobs.run_job(app_jobs.sequence_job, path, blob, view_json, "svg", limits=lim)
+
+    @st.cache_data(show_spinner=False, max_entries=4)
+    def page(path: str, blob: str) -> str:
+        return app_jobs.run_job(app_jobs.page_job, path, blob, limits=lim)
 
     def store_alignment() -> None:
         ss["last_changed"] = "msa_path"
@@ -411,13 +717,6 @@ def main() -> None:
             ss["msa_path"] = ""
             return
         ss["msa_error"], ss["msa_path"] = "", str(target)
-
-    @st.cache_data(show_spinner=False, max_entries=8)
-    def interactive(path: str, settings_json: str) -> str:
-        from foldmap.interactive import build_page
-
-        settings = json.loads(settings_json)
-        return build_page(path, **spec_of(path, settings).page_kwargs())
 
     def load(source: str | None = None, upload: bool = False) -> None:
         """Load a structure and draw its first figure; the workspace opens only when that succeeds. upload: the
@@ -599,143 +898,18 @@ def main() -> None:
 
     # ---- workspace: top bar, the active view, then the sidebar (a view may switch auto-redraw off first)
     sync_composites(ss)
-    path, name = ss["path"], ss["name"]
-    settings, blob = settings_of(ss), current_blob(ss)
-    stem = name
     st.html(f"<style>{STYLESHEET}</style>")
     top = st.container(key="topbar")
     with top:
         status = st.empty()
+    ws = Workspace(st, ss, ss["path"], ss["name"], current_blob(ss), lim, render, sequence_svg, page, status)
 
-    def problem(err: Exception) -> str:
-        """The callout for a failed job (app_jobs.explain), naming the control to check; a limit's message names
-        its own."""
-        message, control = app_jobs.explain(err, name, lim, ss.get("last_changed"))
-        hint = f" Check {control}." if control and not isinstance(err, app_jobs.JobLimit) else ""
-        if hint and not message.rstrip().endswith((".", "!", "?")):  # the hint is a sentence of its own
-            message = message.rstrip() + "."
-        return said(message, path=path, name=name, paths=not local_files()) + hint
-
-    def figure_view():
-        """The figure in its card; on a failure the error above the last good figure. Returns what fills the
-        Download popover (None: nothing to download)."""
-        target = blob if ss["auto_redraw"] else ss.get("drawn_blob", blob)
-        drawn = json.loads(target)
-        result = None
-        try:
-            failed = app_jobs.known_failure(path, drawn)
-            if failed is not None:
-                raise failed
-            with status, st.spinner("Drawing…"):
-                result = render(path, target)
-        except Exception as err:  # a pipeline bug too (logged for the server): the canvas keeps the last good figure
-            if isinstance(err, app_jobs.JobLimit):
-                app_jobs.remember_failure(path, drawn, err)
-            elif not isinstance(err, (ValueError, OSError, RuntimeError)):
-                _LOG.exception("drawing %s failed", name)
-            st.error(problem(err))
-        if result is not None:
-            ss.update(
-                drawn_blob=target,
-                last_good={"path": path, "blob": target, "svg": result["svg"]},
-                elements=result["elements"],
-                protein_chains=result["chains"],
-                na_chains=result["na_chains"],
-                all_chains=list(dict.fromkeys([*result["chains"], *result["na_chains"]])),
-            )
-            slow = result["seconds"]  # the drawing itself, as at load (not the job's start-up or a cache hit)
-            if slow > lim.slow and ss.get("slow_noted") != path:  # the toggle is created later in this run
-                ss.update(auto_redraw=False, slow_noted=path, slow_seconds=slow)
-        good = ss.get("last_good") or {}
-        if good.get("path") != path:
-            return None
-        with st.container(key="canvas"):
-            background = json.loads(good["blob"]).get("background", "#ffffff")
-            st.markdown(figure_card(good["svg"], background, name), unsafe_allow_html=True)
-            notes = app_edits.notes_text(result["fallback"], result["over_labels"]) if result else ""
-            if notes:
-                st.caption(shown(notes))
-        if result is None:
-            return None
-
-        def downloads() -> None:
-            eager = tuple(sorted(result["files"].items()))
-            for ext, label, mime in (
-                ("svg", "SVG (editable)", "image/svg+xml"),
-                ("png", "PNG (300 dpi)", "image/png"),
-                ("pdf", "PDF", "application/pdf"),
-            ):
-                try:
-                    data = app_jobs.figure_file(path, target, ext, lim, eager)
-                except (ValueError, OSError, RuntimeError, app_jobs.JobLimit) as err:
-                    st.caption(f"{ext.upper()} unavailable: {problem(err)}")
-                else:
-                    st.download_button(label, data, f"{stem}.{ext}", mime, key=f"dl_{ext}")
-            try:
-                import yaml
-
-                doc = layout_document(path, drawn)
-                st.download_button(
-                    "Layout file (YAML): re-render this figure later",
-                    yaml.safe_dump(doc, sort_keys=False, allow_unicode=True).encode(),
-                    f"{stem}-layout.yaml",
-                    "application/x-yaml",
-                    key="dl_layout",
-                )
-            except (ValueError, OSError, RuntimeError) as err:
-                st.caption(f"Layout file unavailable: {problem(err)}")
-
-        return downloads
-
-    def sequence_view():
-        c1, c2, c3 = st.columns(3)
-        c1.slider("Columns per row", 20, 150, 60, step=5, key="seq_columns")
-        c2.selectbox("Element colours", ["figure", "black"], key="seq_ss_colour")
-        c3.checkbox("Include unmodelled ends", key="seq_full")
-        view = {"columns": ss["seq_columns"], "ss_colour": ss["seq_ss_colour"], "full_sequence": ss["seq_full"]}
-        try:
-            seq = sequence(path, blob, json.dumps(view, sort_keys=True))
-        except (ValueError, OSError, RuntimeError) as err:
-            st.error(problem(err))
-            return None
-        page_bg = html.escape(settings.get("background", "#ffffff"), quote=True)
-        st.markdown(
-            f'<div style="background:{page_bg};border-radius:6px;padding:8px;overflow-x:auto">'
-            f"{seq['svg'].decode()}</div>",
-            unsafe_allow_html=True,
-        )
-
-        def downloads() -> None:
-            st.download_button("SVG", seq["svg"], f"{stem}-sequence.svg", "image/svg+xml", key="dl_seq_svg")
-            st.download_button("PNG (300 dpi)", seq["png"], f"{stem}-sequence.png", "image/png", key="dl_seq_png")
-            st.download_button("PDF", seq["pdf"], f"{stem}-sequence.pdf", "application/pdf", key="dl_seq_pdf")
-
-        return downloads
-
-    def explorer_view():
-        try:
-            page = interactive(path, blob)
-        except (ValueError, OSError, RuntimeError) as err:
-            st.error(problem(err))
-            return None
-        if hasattr(st, "iframe"):  # Streamlit >= 1.52; the page is foldmap's own output
-            st.iframe(page, height=1100)
-        else:
-            components.html(page, height=1100, scrolling=True)
-
-        def downloads() -> None:
-            st.download_button(
-                "Interactive page (HTML)", page.encode(), f"{stem}-explorer.html", "text/html", key="dl_html"
-            )
-
-        return downloads
-
-    def top_bar(downloads) -> None:
+    def top_bar() -> None:
         """Name and summary; on the right the view switch, Download and New structure (Redraw and the auto-redraw
         switch too, after a slow figure)."""
         with top:
             with st.container(horizontal=True, vertical_alignment="center"):
-                st.markdown(f"**{shown(name, limit=80)}**", width="content")
+                st.markdown(f"**{shown(ws.name, limit=80)}**", width="content")
                 with st.container(key="summary"):
                     st.caption(ss.get("info", ""))
                 if not ss["auto_redraw"]:
@@ -750,10 +924,7 @@ def main() -> None:
                     persist_state="session",
                 )
                 with st.popover("Download", key="downloads"):
-                    if downloads is None:
-                        st.caption("Nothing to download until this view draws.")
-                    else:
-                        downloads()
+                    download_menu(ws)
                 st.button("New structure", key="new_structure", type="tertiary", on_click=new_structure)
             if not ss["auto_redraw"]:
                 st.caption(
@@ -764,8 +935,8 @@ def main() -> None:
     ss.setdefault("auto_redraw", True)
     if ss.get("pane") not in VIEWS:
         ss["pane"] = "Figure"
-    view = {"Figure": figure_view, "Sequence": sequence_view, "3D": explorer_view}[ss["pane"]]
-    top_bar(view())  # only the active view is built
+    {"Figure": figure_view, "Sequence": sequence_view, "3D": explorer_view}[ss["pane"]](ws)  # only this view
+    top_bar()
 
     # ---- sidebar (Tasks 6-11 replace these expanders)
     with st.sidebar:
