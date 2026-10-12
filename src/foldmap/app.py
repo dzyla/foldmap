@@ -727,18 +727,21 @@ def apply_layout_file(ss: MutableMapping) -> None:
     if len(data) > LAYOUT_FILE_MAX:
         ss["layout_error"] = f"{upload_name(up.name)}: a layout file is at most {LAYOUT_FILE_MAX // MB} MB"
         return
+    name, kept = upload_name(up.name), ""
     try:
         with tempfile.TemporaryDirectory() as tmp:
             f = Path(tmp) / "layout.yaml"
+            kept = str(f)
             f.write_bytes(data)
             doc = layoutfile.load(f)
         settings = settings_from_document(doc)
     except (ValueError, OSError) as err:
-        ss["layout_error"] = str(err)
+        said = str(err).replace(kept, name) if kept else str(err)  # the upload's name, never the server's copy
+        ss["layout_error"] = said if said.startswith(name) else f"{name}: {said}"
         return
     except Exception:  # a bug (or a file no check foresaw): a message, never a traceback on the page
-        _LOG.exception("reading layout file %s failed", upload_name(up.name))
-        ss["layout_error"] = f"{upload_name(up.name)} could not be read as a layout file"
+        _LOG.exception("reading layout file %s failed", name)
+        ss["layout_error"] = f"{name} could not be read as a layout file"
         return
     ss["layout_error"] = ""
     apply_document(ss, settings)

@@ -1257,7 +1257,8 @@ def test_the_laughs_layout_file_is_refused_at_once_and_the_app_does_not_grow():
     finally:
         tracemalloc.stop()
     assert peak < 100_000_000, peak  # bytes; expanded, its 10**8 items held 2.9 GB in the app's process
-    assert not at.exception and any("aliases are not allowed in a layout file" in _visible(e.value) for e in at.error)
+    said = "laughs8.yaml: aliases are not allowed in a layout file (no &anchor or *alias)"
+    assert not at.exception and [_visible(e.value) for e in at.error] == [said]
     assert current_blob(at.session_state) == before
 
 
@@ -1266,10 +1267,14 @@ def test_wrong_typed_layout_files_are_messages_in_the_app():
 
     at = load(app_test(), DATA / "1UBQ.cif")
     before = current_blob(at.session_state)
-    for text, key in [("theme: [1]\n", "theme"), ("layout: {rotate: [1]}\n", "rotate"), ("style: 5\n", "style")]:
+    for text, key in [
+        ("theme: [1]\n", "unknown theme"),
+        ("layout: {rotate: [1]}\n", "rotate"),
+        ("style: 5\n", "style"),
+    ]:
         up = ("bad.yaml", f"foldmap: 1\n{text}".encode(), "application/x-yaml")
         at.file_uploader(key="layout_upload").set_value(up).run()
-        assert not at.exception and any(key in _visible(e.value) for e in at.error), text
+        assert not at.exception and any(_visible(e.value).startswith(f"bad.yaml: {key}") for e in at.error), text
         assert current_blob(at.session_state) == before
 
 
