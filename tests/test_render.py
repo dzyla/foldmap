@@ -453,16 +453,21 @@ def test_one_protein_chain_with_nucleic_acid_keeps_the_nucleic_acid_legend():
 
 
 def test_helix_over_a_sheet_is_drawn_on_top_see_through_with_its_loops_and_a_readable_name():
-    """1UBQ α1 lies over the sheet (Task 14): drawn above the strands at alpha 0.6 (fill and edge), its loops above
-    the strands and below it, its name on a plate of the page colour, clear of every strand letter."""
+    """1UBQ α1 lies over the sheet (Task 14): drawn above the strands, its loops above the strands and below it, its
+    name on a plate of the page colour, clear of every strand letter. Its colour is the strands' (one chain), so it
+    takes a darker tone of it, fill at alpha 0.8, edge opaque, to stand apart from them (Task 14 review)."""
+    from matplotlib.colors import to_hex
+
     from foldmap.style import Style
 
     fig = make_figure(DATA / "1UBQ.cif", look=Style(helix_on_sheet="auto"))
     ax = fig.axes[0]
     by = {a.get_gid(): a for a in [*ax.patches, *ax.texts] if a.get_gid()}
-    helix, strand = by["helix:A:23-34"], by["strand:A:2-7"]
-    assert helix.get_alpha() == 0.6 and by["helix-back:A:23-34"].get_alpha() == 0.6
-    assert helix.get_zorder() > by["helix-back:A:23-34"].get_zorder() > strand.get_zorder()
+    helix, back, strand = by["helix:A:23-34"], by["helix-back:A:23-34"], by["strand:A:2-7"]
+    assert to_hex(helix.get_facecolor()) != to_hex(strand.get_facecolor())
+    for part in (helix, back):
+        assert part.get_facecolor()[3] == pytest.approx(0.8) and part.get_edgecolor()[3] == 1.0
+    assert helix.get_zorder() > back.get_zorder() > strand.get_zorder()
     for gid in ("loop:A:12-16>A:23-34", "loop:A:23-34>A:38-40"):
         assert strand.get_zorder() < by[gid].get_zorder() < helix.get_zorder(), gid
     assert by["loop:A:2-7>A:12-16"].get_zorder() < strand.get_zorder()  # every other loop stays below
@@ -473,3 +478,16 @@ def test_helix_over_a_sheet_is_drawn_on_top_see_through_with_its_loops_and_a_rea
     for k, t in by.items():
         if k.startswith("label:") and k != "label:A:23-34":
             assert not box.overlaps(t.get_window_extent()), k
+
+
+def test_helix_over_a_sheet_of_another_colour_is_see_through_at_0_6():
+    """Coloured unlike its strands (sstype: helices and strands apart), the helix keeps its colour at alpha 0.6."""
+    from matplotlib.colors import to_hex
+
+    from foldmap.style import Style
+
+    fig = make_figure(DATA / "1UBQ.cif", look=Style(helix_on_sheet="auto", color_by="sstype"))
+    by = {a.get_gid(): a for a in fig.axes[0].patches if a.get_gid()}
+    helix, strand = by["helix:A:23-34"], by["strand:A:2-7"]
+    assert to_hex(helix.get_facecolor()) != to_hex(strand.get_facecolor())
+    assert helix.get_alpha() == 0.6 and by["helix-back:A:23-34"].get_alpha() == 0.6

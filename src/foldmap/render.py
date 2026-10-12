@@ -18,7 +18,7 @@ from typing import NamedTuple
 import numpy as np
 from matplotlib import colormaps, rc_context
 from matplotlib.axes import Axes
-from matplotlib.colors import to_hex
+from matplotlib.colors import to_hex, to_rgba
 from matplotlib.figure import Figure
 from matplotlib.font_manager import FontProperties
 from matplotlib.patches import Circle, FancyBboxPatch, PathPatch, Polygon, Rectangle
@@ -35,6 +35,7 @@ from .layout import (
     END_LABEL,
     END_STUB,
     HEAD,
+    HEAD_LEN,
     IN_PER_UNIT,
     MAX_WIDTH_IN,
     NT_ROW,
@@ -64,7 +65,7 @@ from .style import _ALIASES, CHOICES, MODALITIES, Style, backbone_overrides
 _IN_PER_UNIT = IN_PER_UNIT
 _MAX_WIDTH_IN = MAX_WIDTH_IN  # double-column width
 _HEAD_HALF = HEAD / 2
-_HEAD_LEN = 0.7
+_HEAD_LEN = HEAD_LEN
 _CORNER = 0.3
 _EXT = {".svg": "svg", ".pdf": "pdf", ".png": "png"}
 _FONTS = ["Arial", "Helvetica", "Liberation Sans", "Nimbus Sans", "DejaVu Sans"]  # journal sans first
@@ -1998,6 +1999,8 @@ def _canvas(
 
 _OVER_Z = 3.5  # a helix over a sheet (Placed.over): above the strands (3), below their letters (4); its name at 4.5
 _OVER_ALPHA = 0.6  # its fill and edge: the strands beneath show through
+_OVER_TONE = 0.7  # coloured as its strands: darkened this much, to stand apart from them ...
+_OVER_SAME_ALPHA = 0.8  # ... its fill at this alpha, its edge (darker still) opaque
 _OVER_LOOP_Z = 3.2  # the loops of a helix over a sheet: above the strands, below the helix
 
 
@@ -2257,12 +2260,18 @@ def _draw_elements(c: _Canvas, layout: Layout) -> None:
                 shade = fill
             front, back, shine = _coil(p, len(p.sse))
             lift, alpha = (_OVER_Z - 3, _OVER_ALPHA) if p.over else (0.0, None)  # over a sheet: on top, see-through
+            fc_fill, fc_shade = fill, shade
+            if p.over and all(c.element_colour.get(k) == color for k in layout.on_sheet.get(p.sse.id, ())):
+                # the strands' own colour: a darker tone, fill partly see-through, edge opaque and darker still
+                fill, shade, alpha = darken(fill, _OVER_TONE), darken(shade, _OVER_TONE), None
+                fc_fill, fc_shade = to_rgba(fill, _OVER_SAME_ALPHA), to_rgba(shade, _OVER_SAME_ALPHA)
+                edge = to_rgba(darken(color, 0.45), 1.0)
             behind = PathPatch(
-                back, fc=shade, ec=edge, lw=edge_w * 0.8, joinstyle="round", zorder=2.9 + lift, alpha=alpha
+                back, fc=fc_shade, ec=edge, lw=edge_w * 0.8, joinstyle="round", zorder=2.9 + lift, alpha=alpha
             )
             behind.set_gid(f"helix-back:{p.sse.id}")
             c.ax.add_patch(behind)
-            bar = PathPatch(front, fc=fill, ec=edge, lw=edge_w, joinstyle="round", zorder=3 + lift, alpha=alpha)
+            bar = PathPatch(front, fc=fc_fill, ec=edge, lw=edge_w, joinstyle="round", zorder=3 + lift, alpha=alpha)
             bar.set_gid(f"helix:{p.sse.id}")
             c.ax.add_patch(bar)
             if shine is not None and c.look.helix_shading == "gloss" and c.look.fill != "outline":

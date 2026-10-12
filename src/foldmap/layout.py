@@ -24,6 +24,7 @@ PITCH = 1.1  # distance between neighbouring strand centres
 SHAFT = 0.62  # arrow shaft width
 SCALE = 0.23  # page units per Å (PITCH / 4.8 Å strand spacing)
 HEAD = 1.0  # strand arrowhead width
+HEAD_LEN = 0.7  # strand arrowhead length (at most 0.45 of a short strand)
 HELIX_W = 1.0  # helix ribbon diameter, ~4.4 Å: one arrowhead wide, as in a cartoon (Style.helix_scale)
 STRAND_RISE = 3.3  # Å per residue along a strand
 HELIX_RISE = 1.5  # Å per residue along a helix
@@ -2567,9 +2568,9 @@ def _box_overlap(a, b) -> float:
 
 def _over_label_sides(layout: Layout) -> None:
     """A helix drawn over a sheet lies on its strands: its name goes beside it where it meets the fewest strand ends
-    (a loop leaves each strand straight out of its end), then covers least of the strands' letters and of the other
-    names, then lies nearest the middle (_OVER_ALONG: the middle, or a third of the way to either end), upper side
-    first on a tie; so the name stays readable and clear of the loops."""
+    (a loop leaves each strand straight out of its end) and arrowheads, then covers least of the strands' letters
+    and of the other names, then lies nearest the middle (_OVER_ALONG: the middle, or a third of the way to either
+    end), upper side first on a tie; so the name stays readable and clear of the loops."""
     strands = [q for q in [*layout.placed.values(), *layout.ghosts] if q.sse.kind == "E"]
     letters = [centred_box(q.cx, q.cy, _GLYPH_W * len(q.label) / 2 + 0.05, _GLYPH_H / 2) for q in strands]
     ends = []
@@ -2577,6 +2578,10 @@ def _over_label_sides(layout: Layout) -> None:
         for port, out in ((q.n_port, q.exit_n), (q.c_port, q.exit_c)):
             (ax, ay), (bx, by) = port, np.add(port, out * _OVER_STUB)
             ends.append((min(ax, bx) - 0.15, min(ay, by) - 0.15, max(ax, bx) + 0.15, max(ay, by) + 0.15))
+        tip, side = np.array(q.c_port), np.array([-q.direction[1], q.direction[0]]) * HEAD / 2 * q.width / PITCH
+        base = tip - q.direction * min(HEAD_LEN, q.length * 0.45)
+        xs, ys = zip(tip, base + side, base - side)  # its arrowhead
+        ends.append((min(xs), min(ys), max(xs), max(ys)))
     for p in layout.placed.values():
         if not p.over:
             continue

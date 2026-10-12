@@ -587,3 +587,25 @@ def test_copies_of_a_protein_draw_a_helix_over_their_sheets_alike():
     assert _over_alike({h_a.id: 0}, [h_a, h_b], rowed, set(), {}) == {h_a.id: 0}  # unrelated chains: each its own
     assert _over_alike(both, sses, [False, True, False], set(), copies) == {}  # B's sheet is a βα row
     assert _over_alike(both, sses, rowed, {h_b.id}, copies) == {}  # B's helix is held by a bundle or a kink
+
+
+@pytest.mark.parametrize("path", ["1UBQ.cif", "fidelity/2ACY.cif.gz", "2LZM.cif"])
+def test_the_name_of_a_helix_over_a_sheet_keeps_off_arrowheads(path):
+    """Its name's plate covers no strand's arrowhead, nor the straight start of a loop out of a strand's end (Task 14
+    review: 1UBQ α1's name sat on β1's head)."""
+    from foldmap.cli import make_layout
+    from foldmap.layout import HEAD, HEAD_LEN, _element_label_box
+
+    lay, _, _ = make_layout(DATA / path, look=ON_SHEET)
+    for h in lay.on_sheet:
+        box = _element_label_box(lay.placed[h])
+        for q in [*lay.placed.values(), *lay.ghosts]:
+            if q.sse.kind != "E":
+                continue
+            tip = np.array(q.c_port)
+            head = [
+                tip - q.direction * HEAD_LEN + n * HEAD / 2 * q.width / PITCH
+                for n in (q.direction[::-1] * (1, -1), -q.direction[::-1] * (1, -1))
+            ]
+            xs, ys = zip(tip, *head)
+            assert not (box[0] < max(xs) and min(xs) < box[2] and box[1] < max(ys) and min(ys) < box[3]), (h, q.sse.id)
