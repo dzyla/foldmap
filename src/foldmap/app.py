@@ -101,10 +101,38 @@ VIEWS = ["Figure", "Sequence", "3D"]  # the workspace view switch (key "pane")
 HIDDEN_LAYOUT = ("flip_v", "dna", "symmetry_tol", "protomers", "up", "view")  # in layout files, no app control
 
 
+CLOUD_ROOT = Path("/mount/src")  # where Streamlit Community Cloud checks out an app's repository and runs it
+
+
+def on_community_cloud() -> bool:
+    """Whether the app runs from a Streamlit Community Cloud checkout (its working folder, or this file, is under
+    CLOUD_ROOT)."""
+    return any(p == CLOUD_ROOT or CLOUD_ROOT in p.parents for p in (Path.cwd(), Path(__file__).resolve()))
+
+
 def local_files() -> bool:
-    """Whether the app may open files by path: yes on your own machine; set FOLDMAP_APP_LOCAL_FILES=0 when the
-    app is hosted for others, so visitors can only load PDB IDs, UniProt accessions and uploads."""
-    return os.environ.get("FOLDMAP_APP_LOCAL_FILES", "1").strip().lower() not in ("0", "false", "no", "off")
+    """Whether the app may open files by path: yes on your own machine; no when it is hosted for others, so
+    visitors can only load PDB IDs, UniProt accessions and uploads. FOLDMAP_APP_LOCAL_FILES=0 or 1 says which;
+    unset, the app is hosted on Community Cloud (fail closed: a missing secret never opens the server's files) and
+    local elsewhere."""
+    given = os.environ.get("FOLDMAP_APP_LOCAL_FILES", "").strip().lower()
+    if given in ("1", "true", "yes", "on"):
+        return True
+    if given in ("0", "false", "no", "off"):
+        return False
+    return not on_community_cloud()
+
+
+def log_mode(lim) -> None:
+    """Say once per server process which mode the app runs in (app_jobs.Limits `lim`), for the server's log."""
+    if local_files():
+        text = "foldmap app: local (opens file paths; jobs without limits)"
+    else:
+        text = (
+            f"foldmap app: hosted (no file paths; jobs in their own process, {lim.timeout:g} s, {lim.memory_mb} MB, "
+            f"{lim.jobs} at a time, at most {lim.max_residues:,} residues)"
+        )
+    app_jobs._warn_once("mode", text)
 
 
 EXAMPLES = {"1LMB": "λ repressor–DNA", "5NKT": "FimA", "8UTF": "measles F", "1UBQ": "ubiquitin"}
@@ -783,6 +811,7 @@ def main() -> None:
     ss = st.session_state
     ss.setdefault("stage", "load")
     lim = app_jobs.limits(hosted=not local_files())
+    log_mode(lim)
 
     @st.cache_data(show_spinner=False, max_entries=32)
     def render(path: str, blob: str) -> dict:

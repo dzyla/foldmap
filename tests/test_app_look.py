@@ -107,3 +107,44 @@ def test_hosting_installs_foldmap_with_the_app_extra():
     pulls each push into its checkout without reinstalling, so a copied install would run the code of the first."""
     lines = (ROOT / "requirements.txt").read_text(encoding="utf-8").splitlines()
     assert [ln.strip() for ln in lines if ln.strip() and not ln.lstrip().startswith("#")] == ["-e .[app]"]
+
+
+@pytest.mark.parametrize(
+    "where, given, local",
+    [
+        ("cloud", None, False),  # Community Cloud with the secret missing: hosted all the same
+        ("cloud", "0", False),
+        ("cloud", "1", True),  # only said outright
+        ("cloud", "", False),
+        ("here", None, True),  # your own machine
+        ("here", "0", False),
+    ],
+)
+def test_the_app_is_hosted_on_community_cloud_unless_told_otherwise(monkeypatch, tmp_path, where, given, local):
+    """Fail closed: under Cloud's checkout folder (/mount/src) the app is hosted (no file paths, every job within
+    limits) unless FOLDMAP_APP_LOCAL_FILES=1 says otherwise."""
+    from foldmap import app
+
+    monkeypatch.setattr(app, "CLOUD_ROOT", tmp_path / "mount" / "src")
+    checkout = (tmp_path / "mount" / "src" / "foldmap") if where == "cloud" else tmp_path / "work"
+    checkout.mkdir(parents=True)
+    monkeypatch.chdir(checkout)
+    if given is None:
+        monkeypatch.delenv("FOLDMAP_APP_LOCAL_FILES", raising=False)
+    else:
+        monkeypatch.setenv("FOLDMAP_APP_LOCAL_FILES", given)
+    assert app.local_files() is local
+
+
+def test_the_app_logs_its_mode_once(monkeypatch, caplog):
+    from foldmap import app, app_jobs
+
+    monkeypatch.setattr(app_jobs, "_WARNED", set())
+    monkeypatch.setenv("FOLDMAP_APP_LOCAL_FILES", "0")
+    lim = app_jobs.limits(hosted=True)
+    with caplog.at_level("INFO"):
+        app.log_mode(lim)
+        app.log_mode(lim)
+    said = [r.getMessage() for r in caplog.records if r.name.startswith("foldmap")]
+    assert len(said) == 1 and said[0].startswith("foldmap app: hosted")
+    assert "no file paths" in said[0] and f"{lim.memory_mb} MB" in said[0]

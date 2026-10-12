@@ -479,8 +479,10 @@ and Python 3.11 or newer. Cloud runs it from the repository root and reads these
 - `packages.txt` installs `fonts-liberation`: Liberation Sans, the font the figures and the layout's text
   metrics are made for.
 
-Set `FOLDMAP_APP_LOCAL_FILES = "0"` as a root-level secret in the app's settings (Cloud passes root-level secrets
-to the app as environment variables). Without it the app treats the server as your own machine. With it:
+On Community Cloud (the app runs from `/mount/src`) the app is hosted unless told otherwise; elsewhere set
+`FOLDMAP_APP_LOCAL_FILES = "0"` (on Cloud, as a root-level secret in the app's settings: Cloud passes root-level
+secrets to the app as environment variables). Only `FOLDMAP_APP_LOCAL_FILES = "1"` makes a Cloud app open server
+paths. The server's log says which mode it runs in. Hosted:
 
 - the app never opens a file path on the server, including alignment and names paths inside uploaded layout
   files, and files it offers for download name uploads, never server paths;
