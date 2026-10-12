@@ -422,10 +422,22 @@ def test_every_loop_lies_inside_the_page(name):
             assert v[:, 1].min() >= y0 + 0.2 and v[:, 1].max() <= y1 - 0.2, p.get_gid()
 
 
-@pytest.mark.parametrize("name, legend", [("1UBQ", set()), ("2HHB", {"Chain A", "Chain B", "Chain C", "Chain D"})])
+@pytest.mark.parametrize(
+    "name, legend",
+    [
+        ("1UBQ.cif", set()),
+        ("2HHB.cif", {"Chain A", "Chain B", "Chain C", "Chain D"}),
+        ("fidelity/1TEN.cif.gz", set()),  # one chain each: no legend at all (COMPARE §2: wasted legends)
+        ("fidelity/2ACY.cif.gz", set()),
+        ("fidelity/1MBN.cif.gz", set()),
+    ],
+)
 def test_chain_legend_only_when_there_is_more_than_one_chain(name, legend):
-    texts = {t.get_text() for t in make_figure(DATA / f"{name}.cif").axes[0].texts}
+    ax = make_figure(DATA / name).axes[0]
+    texts = {t.get_text() for t in ax.texts}
     assert {t for t in texts if t.startswith("Chain ")} == legend
+    if not legend:  # nothing else to explain on these: no legend artist of any kind
+        assert not [a for a in [*ax.patches, *ax.lines, *ax.texts] if (a.get_gid() or "").startswith("legend")]
 
 
 def test_one_protein_chain_with_nucleic_acid_keeps_the_nucleic_acid_legend():

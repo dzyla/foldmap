@@ -89,6 +89,7 @@ class SSE:
     last: ResLabel
     centroid: np.ndarray
     axis: np.ndarray  # unit vector, points N-terminal -> C-terminal end
+    kinked: bool = False  # a helix piece continuing the one before it past a 3-10/pi kink (ss.build_sses split them)
 
     @property
     def id(self) -> str:

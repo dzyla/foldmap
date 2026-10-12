@@ -346,6 +346,51 @@ def _helix_item(
     )
 
 
+def _kink_groups(sses: list[SSE], skip: set[str]) -> list[list[SSE]]:
+    """The pieces of each helix split at a kink (SSE.kinked: build_sses cut it at a 3-10/pi corner), in order; none
+    of whose pieces is in `skip` (a bundle holds them already)."""
+    groups: list[list[SSE]] = []
+    for a, b in zip(sses, sses[1:]):
+        if b.kinked and a.kind == "H" and a.chain == b.chain:
+            if groups and groups[-1][-1] is a:
+                groups[-1].append(b)
+            else:
+                groups.append([a, b])
+    return [g for g in groups if not any(s.id in skip for s in g)]
+
+
+_KINK_ROOM = 0.25  # one routing cell (route.RES): the corner loop's room on each leg between two kinked pieces
+
+
+def _kink_item(group: list[SSE], frame: Frame, angle_mode: str, width: float = HELIX_W) -> _Item:
+    """The pieces of a kinked helix as one unit, end to end, so the corner reads as one helix turning (2HHB α's AB
+    corner, which an element seen between the pieces kept five widths apart): each piece as _helix_item draws it
+    (true length, its own angle). Each next piece starts where the loop from the last one's C port turns once into
+    it: a piece across the last starts just beyond its end and just off its axis, both legs a routing cell clear of
+    the two bodies (_KINK_ROOM); a piece running on starts a little further along; a piece turned back runs beside
+    the last, MARGIN apart, on the side it is seen. The unit sits at the mean of the pieces' projected places,
+    offsets on the grid."""
+    parts = [_helix_item(s, frame, angle_mode, width) for s in group]
+    members = [p.members[0] for p in parts]
+    at = [np.zeros(2)]
+    for k, (a, b) in enumerate(zip(members, members[1:])):
+        end = at[-1] + a.direction * a.length / 2
+        turn = float(a.direction @ b.direction)
+        if turn < -0.5:  # turned back: a hairpin beside the last piece
+            normal = np.array([-a.direction[1], a.direction[0]])
+            seen = np.subtract((parts[k + 1].cx, parts[k + 1].cy), (parts[k].cx, parts[k].cy)) @ normal
+            start = end + normal * (1 if seen >= 0 else -1) * ((a.width + b.width) / 2 + MARGIN)
+        elif turn > 0.5:  # running on
+            start = end + a.direction * 4 * _KINK_ROOM
+        else:  # across: one turn of the loop between the two
+            start = end + a.direction * (b.width / 2 + _KINK_ROOM) + b.direction * (a.width / 2 + _KINK_ROOM)
+        at.append(start + b.direction * b.length / 2)
+    mean = np.mean(at, axis=0)
+    offsets = [tuple(float(v) for v in _snap(x - mean)) for x in at]
+    x, y = (float(v) for v in _snap(np.mean([(p.cx, p.cy) for p in parts], axis=0)))
+    return _Item(members, offsets, x, y, (x, y), group[0].start, group[0].chain)
+
+
 def _angle(seen: float, av: float, mode: str) -> float:
     if mode == "upright":
         return np.pi / 2 if av >= 0 else -np.pi / 2
@@ -1769,10 +1814,13 @@ def build_layout(
         bundles = _within_protomers(bundles, by_id, frame.sector)
     bundled = {k for g in bundles for k in g}
     items += [_bundle_item([by_id[k] for k in g], frame, angle_mode, HELIX_W * style.helix_scale) for g in bundles]
+    kinked = _kink_groups(sses, bundled) if mode == "projected" else []  # a stack row draws each piece on its own
+    items += [_kink_item(g, frame, angle_mode, HELIX_W * style.helix_scale) for g in kinked]
+    grouped = bundled | {s.id for g in kinked for s in g}
     items += [
         _helix_item(s, frame, angle_mode, HELIX_W * style.helix_scale)
         for s in sses
-        if s.kind == "H" and s.id not in bundled
+        if s.kind == "H" and s.id not in grouped
     ]
     items += [
         _helix_item(s, frame, angle_mode, HELIX_W * ETA_W * style.helix_scale, TEN_RISE) for s in sses if s.kind == "G"

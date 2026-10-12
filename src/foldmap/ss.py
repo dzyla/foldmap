@@ -192,7 +192,9 @@ def build_sses(bb: Backbone, ss: str, short_helices: bool = False, bridges: list
         cuts = [(x, y) for x, y, _ in kinks[(a, b)] if any(_alike(_span(bb, copies(), x, y), u) for u in sharp)]
         pieces, cut = _split_kinks(a, b, cuts)
         corners += cut
-        out += [_sse("H", bb, p, q) for p, q in pieces]
+        for k, (p, q) in enumerate(pieces):
+            out.append(_sse("H", bb, p, q))
+            out[-1].kinked = k > 0
     if bridges is not None:
         out = _join_bulged_pieces(out, ss, bb, bridges, copies)
     if short_helices:

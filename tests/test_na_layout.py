@@ -2119,10 +2119,11 @@ def test_stem_labels_sit_by_their_own_stem_clear_of_other_text(pdb):
             assert not [h for h, b in texts if h != g and box.overlaps(b)], (pdb, g)  # 1KX5 labels 6, 9, 12, 15 did
 
 
-def test_tie_letters_are_base_letter_size_and_explained():
+@pytest.mark.parametrize("pdb", ["1EHZ", "2GIS"])
+def test_tie_letters_are_base_letter_size_and_explained(pdb):
     from foldmap.cli import make_figure
 
-    ax = make_figure(NA / "1EHZ.cif.gz").axes[0]
+    ax = make_figure(NA / f"{pdb}.cif.gz").axes[0]
     ties = [t for t in ax.texts if (t.get_gid() or "").endswith(":label") and (t.get_gid() or "").startswith("na:tie:")]
     letters = [t for t in ax.texts if (t.get_gid() or "").startswith("na:nt:")]
     assert ties and {t.get_fontsize() for t in ties} == {letters[0].get_fontsize()}

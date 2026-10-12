@@ -343,3 +343,34 @@ def test_centred_box_and_overlaps_any():
     assert overlaps_any(box, [(5, 5, 6, 6), (0.5, 0.5, 2.0, 2.0)])
     assert not overlaps_any(box, [(1.0, 0.0, 2.0, 1.0), (0.0, 1.0, 1.0, 2.0)])  # edges only touch
     assert not overlaps_any(box, [])
+
+
+def test_kink_split_pieces_are_held_end_to_end():
+    """2HHB α: helices A (4-17) and B (21-35) are one helix run split at its 3₁₀ corner (Task 2). They were drawn
+    5 helix widths apart (α E, seen between them, wedged itself in even against a strong joint spring), so the AB
+    corner did not read as one. The pieces are now one unit, B starting where the loop from A turns once into it."""
+    from foldmap.cli import make_layout
+    from foldmap.route import route_loops
+
+    lay, sses, bb = make_layout(Path(__file__).parent / "data" / "2HHB.cif")
+    assert [s.id for s in sses if s.kinked] == ["A:21-35", "C:21-35"]  # each piece that continues a kinked helix
+    loops = {(lp.a_id, lp.b_id): lp for lp in route_loops(lay, sses, bb)}
+    for c in "AC":
+        a, b = lay.placed[f"{c}:4-17"], lay.placed[f"{c}:21-35"]
+        assert np.hypot(*np.subtract(a.c_port, b.n_port)) <= 1.5 * a.width, c  # 4.96 widths at 2d08b75
+        assert not overlaps(a, b), c
+        corner = loops[(a.sse.id, b.sse.id)]
+        assert not corner.fallback and len(corner.points) <= 3, c  # one turn
+
+
+@pytest.mark.parametrize("turn", [0.0, 90.0, 180.0])  # running on, across, turned back
+def test_kinked_pieces_never_overlap_and_meet_end_to_end(turn):
+    f = Frame(np.zeros(3), np.array([1.0, 0, 0]), np.array([0, 1.0, 0]), np.array([0, 0, 1.0]))
+    t = np.radians(turn)
+    a = fake_sse("H", 1, 14, centroid=(0, 0, 0), axis=(1, 0, 0))
+    b = fake_sse("H", 18, 31, centroid=(30, 5, 0), axis=(np.cos(t), np.sin(t), 0))
+    b.kinked = True
+    lay = build_layout([a, b], [], f, "projected")
+    pa, pb = lay.placed[a.id], lay.placed[b.id]
+    assert not overlaps(pa, pb)
+    assert np.hypot(*np.subtract(pa.c_port, pb.n_port)) <= 2.0 * pa.width  # held together, not where projected
