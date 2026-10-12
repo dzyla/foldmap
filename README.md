@@ -4,24 +4,39 @@
 [![license: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](LICENSE)
 ![python](https://img.shields.io/badge/python-3.11%2B-blue.svg)
 
-**Publication-grade protein topology diagrams, straight from a PDB/mmCIF file, a PDB ID or an AlphaFold model.**
+**Publication-grade topology diagrams of proteins, DNA and RNA, straight from a PDB/mmCIF file, a PDB ID or an
+AlphaFold model.**
 
-**Website, live theme gallery and interactive examples: <https://dzyla.github.io/foldmap/>**
+**Try it in the browser: <https://foldmap.streamlit.app>** · **Website and theme gallery:
+<https://dzyla.github.io/foldmap/>**
 
 ```bash
 pip install git+https://github.com/dzyla/foldmap.git
 foldmap plot 1LMB -o lambda.svg
 ```
 
-foldmap reads the structure, assigns secondary structure, finds β-sheets, helix bundles and symmetry, and lays the
-elements out as a clean 2D map: coiled-ribbon helices, strand arrows and 3₁₀ helices on one consistent scale,
-with loops routed around everything else. It also draws the sequence with the secondary structure on top,
-alone or over a multiple sequence alignment.
+foldmap reads the structure, assigns secondary structure, finds β-sheets, helix bundles, base pairs and symmetry,
+and lays the elements out as a clean 2D map: coiled-ribbon helices, strand arrows and 3₁₀ helices on one consistent
+scale, DNA and RNA as stems and ladders beside the protein that holds them, with loops and strands routed around
+everything else. The same input always gives the same figure. It also draws the sequence with the secondary
+structure on top, alone or over a multiple sequence alignment.
 
-<p align="center">
-<img src="https://raw.githubusercontent.com/dzyla/foldmap/main/docs/images/lambda-repressor-dna.png" width="560"
-alt="Topology of the lambda repressor dimer bound to its operator DNA">
-</p>
+New in this version:
+
+- **DNA and RNA drawn as their fold**: stems, hairpins, pseudoknots and junctions, nucleosome DNA round its histones,
+  contact beads checked against the file, and protein–nucleic acid hydrogen bonds on request.
+- **Figures that follow the published conventions**: TIM barrels and Rossmann folds as a βα row, kinked helices
+  split (globin A/B), bulged strands kept whole, chromophores kept in the chain, symmetric dimers drawn as mirror
+  images, conventional names (`--names`) and domain colours with a domain bar.
+- **A redesigned app** at <https://foldmap.streamlit.app>: one box to start, share links, light and dark themes,
+  every option in tidy sections, downloads built from the figure on screen.
+
+<table>
+<tr>
+<td width="50%"><img src="https://raw.githubusercontent.com/dzyla/foldmap/main/docs/images/lambda-repressor-dna.png" alt="Topology of the lambda repressor dimer bound to its operator DNA"></td>
+<td width="50%"><img src="https://raw.githubusercontent.com/dzyla/foldmap/main/docs/images/ncrna-30qm.png" alt="DRT10 reverse transcriptase with its non-coding RNA drawn as six stems"></td>
+</tr>
+</table>
 
 ## Gallery
 
