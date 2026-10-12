@@ -7,8 +7,8 @@
     python scripts/make_fidelity_fixtures.py 1TEN 7TIM     # only these fixtures
 
 Waters and hydrogens are dropped, and the water subchains leave the assembly generators (gemmi cannot build from a
-subchain the file lacks); nothing else is trimmed (chains, ligands, assembly records, helix and sheet records stay),
-except for the entries in WINDOWS, cut down to one stretch of one chain.
+subchain the file lacks); nothing else is trimmed (chains, ligands, assembly records, helix and sheet records stay,
+the helices with their deposited ids), except for the entries in WINDOWS, cut down to one stretch of one chain.
 Files are written gzipped, outside tests/data/*.cif, so scripts/bench.py never reads them.
 """
 
@@ -58,7 +58,20 @@ def build(text: str, window: tuple[str, int, int] | None = None) -> bytes:
     for assembly in st.assemblies:  # gemmi refuses to build from a subchain the file no longer has (the waters)
         for g in assembly.generators:
             g.subchains = [s for s in g.subchains if s in kept]
-    return gzip.compress(st.make_mmcif_document().as_string().encode("utf-8"), 9, mtime=0)
+    doc = st.make_mmcif_document()
+    _keep_helix_ids(gemmi.cif.read_string(text).sole_block(), doc.sole_block(), {c.name for c in st[0]})
+    return gzip.compress(doc.as_string().encode("utf-8"), 9, mtime=0)
+
+
+def _keep_helix_ids(src, out, chains: set[str]) -> None:
+    """The deposited _struct_conf rows (of the chains kept) in place of the ones gemmi writes: gemmi renumbers the
+    helices H1, H2 ... and drops pdbx_PDB_helix_id, the deposited names (myoglobin's A-H) that --names reads."""
+    table = src.find_mmcif_category("_struct_conf.")
+    if not table:
+        return
+    tags = [tag.split(".", 1)[1] for tag in table.tags]
+    rows = [list(row) for row in table if row[tags.index("beg_auth_asym_id")] in chains]
+    out.set_mmcif_category("_struct_conf.", {tag: [r[k] for r in rows] for k, tag in enumerate(tags)}, raw=True)
 
 
 def main(argv=None) -> int:
