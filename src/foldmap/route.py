@@ -389,6 +389,38 @@ class _Router:
         return pts, pts is not None
 
 
+def _cardinal(v) -> np.ndarray:
+    """The page direction (right, up, left or down) nearest v."""
+    x, y = float(v[0]), float(v[1])
+    return np.array([np.sign(x) or 1.0, 0.0]) if abs(x) >= abs(y) else np.array([0.0, np.sign(y)])
+
+
+def _over_exits(pa: Placed, pb: Placed) -> list[tuple[np.ndarray, np.ndarray]]:
+    """The exits a loop between pa and pb may take. A helix drawn over a sheet is left straight in the page
+    direction nearest its own (a stub across the strand its port lies on, out past the sheet's edge); when that
+    direction is across the page, the stub up or down (its side of the helix's) is tried next: across, it would
+    cross the next strands. Any other element is left along its axis."""
+
+    def ways(p: Placed, out: np.ndarray) -> list[np.ndarray]:
+        if not p.over:
+            return [out]
+        first = _cardinal(out)
+        return [first] if first[0] == 0 else [first, np.array([0.0, np.sign(out[1]) or 1.0])]
+
+    return [(ea, eb) for ea in ways(pa, pa.exit_c) for eb in ways(pb, pb.exit_n)]
+
+
+def _strands_under(layout: Layout, sid: str, port) -> set[str]:
+    """The strands of the sheet a helix is drawn over (Layout.on_sheet) whose box holds the helix's port: the only
+    ones its loop's stub may cross."""
+    out = set()
+    for k in layout.on_sheet.get(sid, ()):
+        x0, y0, x1, y1 = layout.placed[k].rect
+        if x0 <= port[0] <= x1 and y0 <= port[1] <= y1:
+            out.add(k)
+    return out
+
+
 def route_loops(layout: Layout, sses: list[SSE], bb) -> list[Loop]:
     """The loop between each pair of sequence-adjacent elements, routed around everything placed. When the layout
     holds nucleic acid it also routes the single strands (route_na.route_nucleic): that sets layout.na_paths,
@@ -413,7 +445,6 @@ def route_loops(layout: Layout, sses: list[SSE], bb) -> list[Loop]:
     owners = elements[1] + [n.removeprefix("label:") if n.startswith("label:") else None for n, _ in keep_out]
     rects = np.hstack([elements[0], np.array([r for _, r in keep_out], float).reshape(-1, 4).T])
     router = _Router(grid, elements, [b for _, b in keep_out])
-    on_sheet = {h: set(ids) for h, ids in layout.on_sheet.items()}
 
     dist = lambda ab: math.dist(layout.placed[ab[0].id].c_port, layout.placed[ab[1].id].n_port)  # noqa: E731
     routed: dict[tuple[str, str], tuple[list, bool, bool]] = {}  # points, fallback curve, over labels
@@ -431,14 +462,17 @@ def route_loops(layout: Layout, sses: list[SSE], bb) -> list[Loop]:
                 grid.used[c] += 1
             routed[(a.id, b.id)] = ([pa.c_port, pb.n_port], False, False)  # a kink: the helix just carries on
             continue
-        # a helix over a sheet: its loops leave it over the sheet's strands, and reach the other end under it
+        # a helix over a sheet: its loops leave it straight across the strand its port lies on, and reach the other
+        # end under it
         under = (
-            on_sheet.get(a.id, set()) | ({b.id} if pb.over else set()),
-            on_sheet.get(b.id, set()) | ({a.id} if pa.over else set()),
+            _strands_under(layout, a.id, pa.c_port) | ({b.id} if pb.over else set()),
+            _strands_under(layout, b.id, pb.n_port) | ({a.id} if pa.over else set()),
         )
-        pts, over = router.route(
-            pa.c_port, pa.exit_c, pa, pb.n_port, pb.exit_n, pb, loose=(pa.over, pb.over), under=under
-        )
+        pts, over = None, False
+        for ea, eb in _over_exits(pa, pb):
+            pts, over = router.route(pa.c_port, ea, pa, pb.n_port, eb, pb, loose=(pa.over, pb.over), under=under)
+            if pts is not None:
+                break
         if pts is None:
             routed[(a.id, b.id)] = (_curve(pa.c_port, pa.exit_c, pb.n_port, pb.exit_n), True, False)
         else:

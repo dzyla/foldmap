@@ -527,3 +527,31 @@ def test_only_the_over_helix_port_walks_loose(monkeypatch):
     route_loops(lay, sses, bb)
     assert any(over for _, over, _ in calls)
     assert all(loose == over for _, over, loose in calls), [c for c in calls if c[1] != c[2]]
+
+
+@pytest.mark.parametrize("path", ["1UBQ.cif", "fidelity/2ACY.cif.gz"])
+def test_a_loop_leaves_a_helix_over_a_sheet_straight_across_only_the_strand_under_its_port(path):
+    """From a helix drawn over a sheet, a loop leaves its port in the page direction nearest the helix's own and runs
+    straight out past the sheet's edge, crossing no strand but the one its port lies on (Task 14 review)."""
+    from foldmap.cli import make_layout
+    from foldmap.route import _crosses_body
+    from foldmap.style import Style
+
+    lay, sses, bb = make_layout(DATA / path, look=Style(helix_on_sheet="auto"))
+    loops = route_loops(lay, sses, bb)
+    checked = 0
+    for lp in loops:
+        assert not lp.fallback, (lp.a_id, lp.b_id)
+        for helix, (p, q), port in (
+            (lay.placed[lp.a_id], lp.points[:2], lp.points[0]),
+            (lay.placed[lp.b_id], lp.points[-2:][::-1], lp.points[-1]),
+        ):
+            if not helix.over:
+                continue
+            checked += 1
+            assert abs(p[0] - q[0]) < 1e-9 or abs(p[1] - q[1]) < 1e-9, (lp.a_id, lp.b_id, p, q)  # straight out
+            for k in lay.on_sheet[helix.sse.id]:
+                x0, y0, x1, y1 = lay.placed[k].rect
+                if _crosses_body(p, q, lay.placed[k]):
+                    assert x0 <= port[0] <= x1 and y0 <= port[1] <= y1, (lp.a_id, lp.b_id, k)
+    assert checked >= 2
