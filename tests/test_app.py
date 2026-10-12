@@ -1263,6 +1263,26 @@ def test_an_oversized_layout_file_is_refused_unread(monkeypatch):
     assert any(_visible(e.value) == "big.yaml: a layout file is at most 1 MB" for e in at.error)
 
 
+@pytest.mark.parametrize("error", [TypeError("unhashable type: 'list'"), KeyError("x"), RecursionError()])
+def test_any_failure_reading_a_layout_file_is_a_message(monkeypatch, error):
+    """Whatever reading or checking a layout file raises (a bug included), the page shows a message, not a
+    traceback, and nothing changes."""
+    from foldmap import layoutfile
+    from foldmap.app import current_blob
+
+    at = load(app_test(), DATA / "1UBQ.cif")
+    before = current_blob(at.session_state)
+
+    def broken(doc):
+        raise error
+
+    monkeypatch.setattr(layoutfile, "edits_of", broken)
+    at.file_uploader(key="layout_upload").set_value(("odd.yaml", b"foldmap: 1\n", "application/x-yaml")).run()
+    assert not at.exception and current_blob(at.session_state) == before
+    said = at.session_state["layout_error"]
+    assert said == "odd.yaml could not be read as a layout file" and any(_visible(e.value) == said for e in at.error)
+
+
 def test_an_oversized_alignment_is_refused_unstored_and_unread(monkeypatch):
     from app_helpers import count_calls
     from foldmap import fetch, sequence

@@ -716,7 +716,7 @@ LAYOUT_FILE_MAX = MB  # the layout file uploader's cap (a layout file is a few k
 def apply_layout_file(ss: MutableMapping) -> None:
     """The layout file uploader's callback: the file, size-capped, read (layoutfile.load: YAML, checked) and its
     settings in place of the session's (apply_document), with the rows of the alignment it names; else
-    layout_error, and nothing changes."""
+    layout_error (whatever reading it raised), and nothing changes."""
     up = ss.get("layout_upload")
     if up is None:
         return
@@ -732,6 +732,10 @@ def apply_layout_file(ss: MutableMapping) -> None:
         settings = settings_from_document(doc)
     except (ValueError, OSError) as err:
         ss["layout_error"] = str(err)
+        return
+    except Exception:  # a bug (or a file no check foresaw): a message, never a traceback on the page
+        _LOG.exception("reading layout file %s failed", upload_name(up.name))
+        ss["layout_error"] = f"{upload_name(up.name)} could not be read as a layout file"
         return
     ss["layout_error"] = ""
     apply_document(ss, settings)
