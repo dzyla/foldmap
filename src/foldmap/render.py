@@ -766,6 +766,39 @@ def _mix(a: str, b: str, t: float) -> str:
     return to_hex([x + (y - x) * t for x, y in zip(to_rgb(a), to_rgb(b))])
 
 
+def _relative_luminance(colour) -> float:
+    """WCAG 2 relative luminance (linear-light sRGB)."""
+    from matplotlib.colors import to_rgb
+
+    lin = [c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4 for c in to_rgb(colour)]
+    return 0.2126 * lin[0] + 0.7152 * lin[1] + 0.0722 * lin[2]
+
+
+def contrast_ratio(a, b) -> float:
+    """WCAG 2 contrast ratio of two colours, 1 to 21 (4.5 is the AA level for normal text)."""
+    la, lb = sorted((_relative_luminance(a), _relative_luminance(b)), reverse=True)
+    return (la + 0.05) / (lb + 0.05)
+
+
+_NAME_CONTRAST = 4.5  # WCAG AA for normal text: a domain's name against what it is drawn on
+
+
+def ink_on(fill: str) -> str:
+    """Black or white, whichever stands out more on `fill` (always 4.5:1 or more)."""
+    return "#000000" if contrast_ratio("#000000", fill) >= contrast_ratio("#ffffff", fill) else "#ffffff"
+
+
+def domain_name_colour(tone: str, on: str) -> str:
+    """A domain's name in its own hue as drawn on `on` (its panel's tint, or the page): a deeper shade on a light
+    fill, the tone itself on a dark one, moved toward black (or white) until it reaches _NAME_CONTRAST."""
+    start = darken(tone, 0.75) if ink_on(on) == "#000000" else tone
+    for k in range(21):
+        colour = _mix(start, ink_on(on), k / 20)
+        if contrast_ratio(colour, on) >= _NAME_CONTRAST:
+            return colour
+    return ink_on(on)
+
+
 def _label_ink(colour: str) -> str:
     """Text in an element's own hue: a deeper shade on light pages, the colour itself on dark ones."""
     if _luminance(_BACKGROUND.get()) < 0.5:
@@ -2213,12 +2246,13 @@ def _draw_domains(c: _Canvas, layout: Layout) -> None:
             continue
         x0, y0, x1, y1 = domain_panel(layout, name)
         tone = domain_tone(k)
+        fill = _mix(tone, c.look.background, 0.86)
         panel = FancyBboxPatch(
             (x0, y0),
             x1 - x0,
             y1 - y0,
             boxstyle="round,pad=0,rounding_size=0.6",
-            fc=_mix(tone, c.look.background, 0.86),
+            fc=fill,
             ec=_mix(tone, c.look.background, 0.55),
             lw=c.lw * 0.6,
             zorder=0.2,
@@ -2233,7 +2267,7 @@ def _draw_domains(c: _Canvas, layout: Layout) -> None:
             va="top",
             fontsize=c.font * 1.05,
             fontweight="bold",
-            color=darken(tone, 0.75),
+            color=domain_name_colour(tone, fill),
             zorder=0.25,
         )
         t.set_gid(f"domain-label:{name}")
@@ -2343,7 +2377,7 @@ def _draw_domain_bar(c: _Canvas, layout: Layout) -> None:
                     ha="center",
                     va="center",
                     fontsize=c.font * 0.7,
-                    color=text_color_on(seg.tone),
+                    color=ink_on(seg.tone),
                     zorder=2.1,
                 )
                 t.set_gid(seg.gid.replace("domain-bar:", "domain-bar-label:", 1))
@@ -2360,7 +2394,7 @@ def _draw_domain_bar(c: _Canvas, layout: Layout) -> None:
                 ha="center",
                 va="top",
                 fontsize=c.font * 0.7,
-                color=darken(seg.tone, 0.75),
+                color=domain_name_colour(seg.tone, c.look.background),
             )
             t.set_gid(seg.gid.replace("domain-bar:", "domain-bar-label:", 1))
 

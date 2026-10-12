@@ -382,3 +382,45 @@ def test_print_and_blueprint_keep_their_palettes_unless_domain_colours_is_set():
         assert colours(theme, "domain_colours=true") <= tones, theme
     for theme in ("publication", "minimal", "presentation", "cartoon", "goodsell", "journal"):
         assert colours(theme) <= tones, theme
+
+
+def test_domain_names_read_on_their_panels_and_on_the_page():
+    """A panel's name, and a bar name drawn below the bar, keep a WCAG contrast of 4.5 or more on what they sit on
+    (the panel's tint; the page), for all eight tones, on a light page and on a dark one (blueprint's)."""
+    from foldmap.render import _DOMAIN_TONES, _mix, contrast_ratio, domain_name_colour
+    from foldmap.style import THEMES
+
+    for page in ("#ffffff", THEMES["blueprint"].background):
+        for tone in _DOMAIN_TONES:
+            panel = _mix(tone, page, 0.86)
+            assert contrast_ratio(domain_name_colour(tone, panel), panel) >= 4.5, (page, tone)
+            assert contrast_ratio(domain_name_colour(tone, page), page) >= 4.5, (page, tone)
+
+
+def test_drawn_domain_names_have_contrast():
+    """As drawn: Cas9's eight panel names on their panels, the bar names in their segments or on the page below,
+    on the default page and on blueprint's dark page with domain colours asked for."""
+    from matplotlib.colors import to_hex
+
+    from foldmap.render import contrast_ratio
+    from foldmap.style import resolve_style
+
+    for look in (resolve_style("publication"), resolve_style("blueprint", overrides=["domain_colours=true"])):
+        fig = make_figure(DATA / "na" / "4OO8.cif.gz", chains=["A"], domains=_flag_file(CAS9_FILE), look=look)
+        ax = fig.axes[0]
+        panels = {p.get_gid().split(":", 1)[1]: to_hex(p.get_facecolor()) for p in _gids(fig, "domain:")}
+        segs = {p.get_gid(): (p, to_hex(p.get_facecolor())) for p in _gids(fig, "domain-bar:")}
+        checked = 0
+        for t in ax.texts:
+            gid, ink = t.get_gid() or "", to_hex(t.get_color())
+            if gid.startswith("domain-label:"):
+                under = panels[gid.split(":", 1)[1]]
+            elif gid.startswith("domain-bar-label:"):
+                seg, fill = segs[gid.replace("domain-bar-label:", "domain-bar:", 1)]
+                inside = seg.get_y() <= t.get_position()[1] <= seg.get_y() + seg.get_height()
+                under = fill if inside else look.background
+            else:
+                continue
+            assert contrast_ratio(ink, under) >= 4.5, (look.background, gid, ink, under)
+            checked += 1
+        assert checked >= 16
