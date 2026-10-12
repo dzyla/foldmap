@@ -1142,6 +1142,112 @@ def test_a_layout_file_nested_too_deeply_is_a_message():
     assert "nested too deeply" in at.session_state["layout_error"] and current_blob(at.session_state) == before
 
 
+LAUGHS8 = (  # the final review's laughs8.yaml: 415 bytes, 10**8 list items once its aliases are expanded
+    "foldmap: 1\nlayout:\n  protomers: &a7 [&a6 [&a5 [&a4 [&a3 [&a2 [&a1 [&a0 [1,1,1,1,1,1,1,1,1,1], "
+    + ", ".join(["*a0"] * 9)
+    + "], "
+    + "], ".join(", ".join([f"*a{i}"] * 9) for i in range(1, 7))
+    + "]\n"
+)
+WRONG_TYPES = {  # the final review's crafted layout files (scripts/crafted.py): text -> the key the message names
+    "theme: [1]\n": "theme",
+    "layout: {rotate: [1]}\n": "rotate",
+    "layout: {rotate: .inf}\n": "rotate",
+    "layout: {rotate: 1e308}\n": "rotate",
+    "layout: {chains: [[1]]}\n": "chains",
+    "layout: {protomers: [[[1]]]}\n": "protomers",
+    "layout: {protomers: 5}\n": "protomers",
+    "layout: {title: {a: 1}}\n": "title",
+    "layout: {title: " + "T" * 201 + "}\n": "title",
+    "layout: {up: [1, 2]}\n": "up",
+    "layout: {view: [.nan, 0, 1]}\n": "view",
+    "layout: {mode: [1]}\n": "mode",
+    "layout: {mode: sideways}\n": "mode",
+    "layout: {flip_v: [1]}\n": "flip_v",
+    "layout: {symmetry_tol: -1}\n": "symmetry_tol",
+    "layout: {msa: {a: 1}}\n": "msa",
+    "layout: [1]\n": "layout",
+    "edits: [1]\n": "edits",
+    "edits: {move: {x: 5}}\n": "move",
+    "edits: {move: {x: [1e308, 0]}}\n": "move",
+    "edits: {rename: [1, 2]}\n": "rename",
+    "edits: {rename: {x: " + "W" * 81 + "}}\n": "rename",
+    "edits: {swap: [1, 2]}\n": "swap",
+    "edits: {swap: [[a, [b]]]}\n": "swap",
+    "domains: 5\n": "domains",
+    "domains: {N: [[1]]}\n": "domains",
+    "style: 5\n": "style",
+    "style: {1: 2}\n": "style key",
+    "style: {mark: [5]}\n": "mark",
+    "style: {labels: maybe}\n": "labels",
+    "style: {font_scale: 1e300}\n": "font_scale",
+    "style: {font_scale: .inf}\n": "font_scale",
+    "style: {hbond_max: 2.5}\n": "hbond_max",
+    "style: {fill: neon}\n": "fill",
+}
+
+
+@pytest.mark.parametrize("text, key", list(WRONG_TYPES.items()))
+def test_a_wrong_typed_layout_file_value_is_a_message_naming_its_key(tmp_path, monkeypatch, text, key):
+    from foldmap import layoutfile
+    from foldmap.app import settings_from_document
+
+    monkeypatch.setenv("FOLDMAP_APP_LOCAL_FILES", "0")
+    f = tmp_path / "layout.yaml"
+    f.write_text("foldmap: 1\n" + text)
+    with pytest.raises(ValueError, match=key):
+        settings_from_document(layoutfile.load(f))
+
+
+def test_layout_file_values_of_the_right_kind_still_read():
+    from foldmap.app import settings_from_document
+
+    out = settings_from_document(
+        {
+            "style": {"font_scale": 1.5, "labels": False, "hbond_max": 50, "mark": "G=#2ca02c", "dna_extent": "all"},
+            "layout": {"rotate": 30, "assembly": 1, "chains": ["A", 1], "protomers": "A,B;C,D", "up": "0,0,1"},
+            "edits": {"rename": {"res:A:1-7": 1}},
+            "domains": [["N", "res:A:1-30"]],
+        }
+    )
+    assert out["font_scale"] == 1.5 and out["labels"] is False and out["hbond_max"] == 50 and out["na_extent"] == "all"
+    assert out["rotate"] == 30.0 and out["assembly"] == "1" and out["chains"] == "A,1"
+    assert out["protomers"] == [["A", "B"], ["C", "D"]] and out["up"] == [0.0, 0.0, 1.0]
+    assert out["rename"] == "res:A:1-7=1" and out["domains"] == "N=res:A:1-30"
+
+
+def test_the_laughs_layout_file_is_refused_at_once_and_the_app_does_not_grow():
+    import tracemalloc
+
+    from foldmap.app import current_blob
+
+    assert len(LAUGHS8) == 415 and "*a6" in LAUGHS8
+    at = load(app_test(), DATA / "1UBQ.cif")
+    before = current_blob(at.session_state)
+    tracemalloc.start()
+    try:
+        at.file_uploader(key="layout_upload").set_value(("laughs8.yaml", LAUGHS8.encode(), "application/x-yaml"))
+        at.run()
+        peak = tracemalloc.get_traced_memory()[1]
+    finally:
+        tracemalloc.stop()
+    assert peak < 100_000_000, peak  # bytes; expanded, its 10**8 items held 2.9 GB in the app's process
+    assert not at.exception and any("aliases are not allowed in a layout file" in _visible(e.value) for e in at.error)
+    assert current_blob(at.session_state) == before
+
+
+def test_wrong_typed_layout_files_are_messages_in_the_app():
+    from foldmap.app import current_blob
+
+    at = load(app_test(), DATA / "1UBQ.cif")
+    before = current_blob(at.session_state)
+    for text, key in [("theme: [1]\n", "theme"), ("layout: {rotate: [1]}\n", "rotate"), ("style: 5\n", "style")]:
+        up = ("bad.yaml", f"foldmap: 1\n{text}".encode(), "application/x-yaml")
+        at.file_uploader(key="layout_upload").set_value(up).run()
+        assert not at.exception and any(key in _visible(e.value) for e in at.error), text
+        assert current_blob(at.session_state) == before
+
+
 def test_an_oversized_layout_file_is_refused_unread(monkeypatch):
     from app_helpers import count_calls
     from foldmap import layoutfile

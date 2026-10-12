@@ -19,6 +19,8 @@ a model gains or loses an element, residue ranges keep pointing at the same stre
 
 from __future__ import annotations
 
+import math
+import reprlib
 from dataclasses import asdict
 from pathlib import Path
 
@@ -27,6 +29,7 @@ import yaml
 from .layout import Layout, resolve
 from .model import SSE, res_ref
 from .style import _KEY_ALIASES, THEMES, Style
+from .yamlfile import read_yaml
 
 VERSION = 1
 TOP = ("foldmap", "structure", "theme", "style", "layout", "domains", "names", "edits")
@@ -105,44 +108,91 @@ def save(path, doc: dict) -> Path:
 
 
 def load(path) -> dict:
-    """The document, checked: unknown keys and other versions are errors that say what is wrong."""
-    try:
-        doc = yaml.safe_load(Path(path).read_text(encoding="utf-8"))
-    except yaml.YAMLError as err:
-        raise ValueError(f"layout file {Path(path).name} is not valid YAML: {err}") from err
-    except RecursionError:  # brackets nested thousands deep: the YAML reader recurses once per level
-        raise ValueError(f"{path}: nested too deeply") from None
+    """The document, checked: unknown keys and other versions are errors that say what is wrong, and so is a
+    section of the wrong kind (style, layout and edits are mappings, names a list of text). The values are the
+    reader's to check (spec.figure_spec, app.settings_from_document)."""
+    doc = read_yaml(Path(path).read_text(encoding="utf-8"), "layout", str(path))
     if not isinstance(doc, dict):
         raise ValueError(f"{path}: a layout file is a mapping of keys (foldmap, theme, style, layout, edits)")
     if doc.get("foldmap", VERSION) != VERSION:
         raise ValueError(
-            f"{path}: layout file version {doc.get('foldmap')} is not supported (this is version {VERSION})"
+            f"{path}: layout file version {_brief(doc.get('foldmap'))} is not supported (this is version {VERSION})"
         )
     for key in doc:
         if key not in TOP:
-            raise ValueError(f"{path}: unknown key {key!r}; a layout file has {', '.join(TOP)}")
-    if doc.get("theme") is not None and doc["theme"] not in THEMES:
-        raise ValueError(f"{path}: unknown theme {doc['theme']!r}")
+            raise ValueError(f"{path}: unknown key {_brief(key)}; a layout file has {', '.join(TOP)}")
+    theme = doc.get("theme")
+    if theme is not None and not (isinstance(theme, str) and theme in THEMES):
+        raise ValueError(f"{path}: unknown theme {_brief(theme)}")
+    for section, what in (("style", "style key: value"), ("layout", "option: value"), ("edits", "rename, swap, move")):
+        if not isinstance(doc.get(section) or {}, dict):
+            raise ValueError(f"{path}: {section} is a mapping ({what}); got {_brief(doc[section])}")
     for key in doc.get("style") or {}:
-        if not hasattr(Style(), _KEY_ALIASES.get(key, key)):  # earlier key names are still read
-            raise ValueError(f"{path}: unknown style key {key!r}")
+        if not (isinstance(key, str) and hasattr(Style(), _KEY_ALIASES.get(key, key))):  # earlier names are read too
+            raise ValueError(f"{path}: unknown style key {_brief(key)}")
     for key in doc.get("layout") or {}:
         if key not in LAYOUT:
-            raise ValueError(f"{path}: unknown layout key {key!r}; use {', '.join(LAYOUT)}")
+            raise ValueError(f"{path}: unknown layout key {_brief(key)}; use {', '.join(LAYOUT)}")
     names = doc.get("names")
     if names is not None and not (isinstance(names, list) and all(isinstance(n, str) for n in names)):
         raise ValueError(f"{path}: names is a list, e.g. [deposited] or [beta, my-names.yaml]")
     for key in doc.get("edits") or {}:
         if key not in EDITS:
-            raise ValueError(f"{path}: unknown edit {key!r}; use {', '.join(EDITS)}")
+            raise ValueError(f"{path}: unknown edit {_brief(key)}; use {', '.join(EDITS)}")
     return doc
 
 
+NAME_MAX = 80  # characters of an element's name (edits: rename)
+REF_MAX = 200  # characters of an element reference (res:A:3-18, α3, A:G)
+MOVE_MAX = 100.0  # page units an edit may move an element by, each way (one strand spacing is about 1.1)
+
+
+def _brief(value) -> str:
+    """A value as a message shows it: its repr, shortened (and never deeper than a few levels)."""
+    return reprlib.repr(value)
+
+
+def _word(edit: str, value, limit: int) -> str:
+    """A reference or a name in the edits: text (YAML may read 1 or 1.5 as a number), at most `limit` characters."""
+    if isinstance(value, bool) or not isinstance(value, (str, int, float)):
+        raise ValueError(f"edits: {edit} takes element references and names as text; got {_brief(value)}")
+    text = str(value)
+    if len(text) > limit:
+        raise ValueError(f"edits: {edit} has a value of {len(text)} characters; at most {limit}")
+    return text
+
+
+def _offset(ref: str, d) -> float:
+    if isinstance(d, bool) or not isinstance(d, (int, float)) or not math.isfinite(d) or abs(d) > MOVE_MAX:
+        raise ValueError(
+            f"edits: move of {ref} must be two numbers from -{MOVE_MAX:g} to {MOVE_MAX:g}; got {_brief(d)}"
+        )
+    return float(d)
+
+
 def edits_of(doc: dict) -> dict:
-    """The document's edits in the form the layout takes (rename dict, swap pairs, move list)."""
+    """The document's edits in the form the layout takes (rename dict, swap pairs, move list), checked: a value of
+    the wrong kind is a ValueError naming the edit."""
     e = doc.get("edits") or {}
+    if not isinstance(e, dict):
+        raise ValueError(f"edits is a mapping (rename, swap, move); got {_brief(e)}")
+    rename, swap, move = e.get("rename") or {}, e.get("swap") or [], e.get("move") or {}
+    if not isinstance(rename, dict):
+        raise ValueError(f"edits: rename is a mapping of element to name, e.g. res:A:167-182: Gd; got {_brief(rename)}")
+    if not (isinstance(swap, list) and all(isinstance(p, list) and len(p) == 2 for p in swap)):
+        raise ValueError(
+            f"edits: swap is a list of element pairs, e.g. [[res:A:3-11, res:A:60-79]]; got {_brief(swap)}"
+        )
+    if not (isinstance(move, dict) and all(isinstance(d, list) and len(d) == 2 for d in move.values())):
+        raise ValueError(
+            f"edits: move is a mapping of element to [dx, dy], e.g. res:A:39-50: [1.0, -2.0]; got {_brief(move)}"
+        )
+    moves = []
+    for ref, d in move.items():
+        ref = _word("move", ref, REF_MAX)
+        moves.append((ref, (_offset(ref, d[0]), _offset(ref, d[1]))))
     return {
-        "rename": dict(e.get("rename") or {}),
-        "swap": [tuple(p) for p in e.get("swap") or []],
-        "move": [(ref, (float(d[0]), float(d[1]))) for ref, d in (e.get("move") or {}).items()],
+        "rename": {_word("rename", k, REF_MAX): _word("rename", v, NAME_MAX) for k, v in rename.items()},
+        "swap": [(_word("swap", a, REF_MAX), _word("swap", b, REF_MAX)) for a, b in swap],
+        "move": moves,
     }

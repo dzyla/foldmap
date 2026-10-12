@@ -10,6 +10,7 @@ import base64
 import copy
 import json
 import logging
+import math
 import os
 import re
 import tempfile
@@ -37,7 +38,7 @@ from foldmap.cli import _adjustments, _domain_spec
 from foldmap.fetch import fetch, source_id
 from foldmap.names import KEYWORDS as NAME_KEYWORDS
 from foldmap.render import save, save_svg
-from foldmap.spec import FigureSpec, SavedDomains, draw_spec, parse_flag, parse_protomers, parse_vector
+from foldmap.spec import MEMBRANES, MODES, FigureSpec, SavedDomains, draw_spec, parse_flag, parse_protomers
 from foldmap.spec import layout_document as spec_document
 from foldmap.style import _KEY_ALIASES, CHOICES, THEMES, Style
 from foldmap.symmetry import TOLERANCE
@@ -243,43 +244,145 @@ def uploaded_files(doc: dict) -> list[str]:
     return [n for n in doc.get("names") or [] if n not in NAME_KEYWORDS] + ([msa] if msa else [])
 
 
+TITLE_MAX = 200  # characters of a layout file's title
+TEXT_MAX = 2000  # characters of any other text a layout file gives (a path, a mark list, a reference)
+IDS_MAX = 20_000  # characters of a list of chain ids, joined (a capsid has hundreds of chains)
+ROTATE_MAX = 360.0  # degrees, each way
+VECTOR_MAX = 1000.0  # each number of up and view
+STYLE_NUMBERS = {"float": (0.0, 10.0), "int": (1, 100_000)}  # scales and line widths; hbond_max
+
+
+def _text(key: str, value, limit: int = TEXT_MAX) -> str:
+    """A layout file's value that is text (YAML may read 1 or 1.5 as a number), at most `limit` characters."""
+    if isinstance(value, bool) or not isinstance(value, (str, int, float)):
+        raise ValueError(f"{key} must be text; got {layoutfile._brief(value)}")
+    text = str(value)
+    if len(text) > limit:
+        raise ValueError(f"{key} is at most {limit:,} characters; got {len(text):,}")
+    return text
+
+
+def _number(key: str, value, low: float, high: float) -> float:
+    """A layout file's number: finite, from `low` to `high` (numeric text too: YAML reads 1e3 as text)."""
+    try:
+        if isinstance(value, bool) or not isinstance(value, (int, float, str)):
+            raise ValueError
+        number = float(value)
+    except (ValueError, OverflowError):
+        raise ValueError(f"{key} must be a number; got {layoutfile._brief(value)}") from None
+    if not (math.isfinite(number) and low <= number <= high):
+        raise ValueError(f"{key} must be a number from {low:g} to {high:g}; got {layoutfile._brief(value)}")
+    return number
+
+
+def _style_value(key: str, value):
+    """A style value of a layout file, of its Style field's type."""
+    kind = STYLE_FIELDS[key]
+    if kind == "bool":
+        if not isinstance(value, bool):
+            raise ValueError(f"{key} must be true or false; got {layoutfile._brief(value)}")
+        return value
+    if kind in STYLE_NUMBERS:
+        number = _number(key, value, *STYLE_NUMBERS[kind])
+        if kind == "int" and number != int(number):
+            raise ValueError(f"{key} must be a whole number; got {layoutfile._brief(value)}")
+        return int(number) if kind == "int" else number
+    return _text(key, value)
+
+
+def _ids(key: str, value) -> list[str]:
+    """Chain ids: a list of them (a chain may be named 1) or comma-separated text."""
+    if isinstance(value, str):
+        value = value.split(",")
+    if not isinstance(value, list):
+        raise ValueError(f"{key} must be chain ids, like [A, B] or A,B; got {layoutfile._brief(value)}")
+    ids = [_text(key, v, TEXT_MAX).strip() for v in value]
+    if sum(len(i) + 1 for i in ids) > IDS_MAX:
+        raise ValueError(f"{key} is at most {IDS_MAX:,} characters of chain ids")
+    return [i for i in ids if i]
+
+
+def _vector(key: str, value) -> list[float] | None:
+    """up / view: three numbers, as a list or X,Y,Z text; None stays None."""
+    if value is None:
+        return None
+    parts = _text(key, value).split(",") if isinstance(value, str) else value
+    if not isinstance(parts, list) or len(parts) != 3:
+        raise ValueError(f"{key} needs three numbers like 0,0,1; got {layoutfile._brief(value)}")
+    return [_number(key, x, -VECTOR_MAX, VECTOR_MAX) for x in parts]
+
+
+def _domains(value) -> list[tuple[str, list[str]]]:
+    """A layout file's domains, {name: [refs]} or [[name, [refs]]], as (name, refs) pairs of text."""
+    if not isinstance(value, (dict, list)):
+        raise ValueError(f"domains must be a mapping of name to element references; got {layoutfile._brief(value)}")
+    pairs = list(value.items()) if isinstance(value, dict) else value
+    out = []
+    for pair in pairs:
+        if not (isinstance(pair, (list, tuple)) and len(pair) == 2):
+            raise ValueError(
+                f"domains: each domain is a name and its element references; got {layoutfile._brief(pair)}"
+            )
+        name, refs = pair
+        refs = [refs] if isinstance(refs, str) else refs
+        if not isinstance(refs, list):
+            raise ValueError(f"domains: {layoutfile._brief(name)} must list element references")
+        out.append(
+            (_text("domains", name, layoutfile.NAME_MAX), [_text("domains", r, layoutfile.REF_MAX) for r in refs])
+        )
+    return out
+
+
 def settings_from_document(doc: dict) -> dict:
-    """App settings from a layout file document: the theme, its style changes, layout options, edits as text."""
+    """App settings from a layout file document (layoutfile.load: its keys checked): the theme, its style changes,
+    layout options, edits as text. A visitor's file may hold anything, so every value is checked for its kind (text
+    capped in length, numbers finite and within bounds) and the style for its values (Style.validate): a wrong one is
+    a ValueError naming its key."""
     theme = doc.get("theme") or "publication"
-    style = {_KEY_ALIASES.get(k, k): v for k, v in (doc.get("style") or {}).items()}  # earlier key names too
-    out = {"theme": theme, **vars(THEMES[theme]), **style}
+    if not (isinstance(theme, str) and theme in THEMES):
+        raise ValueError(f"unknown theme {layoutfile._brief(theme)}")
+    style = doc.get("style") or {}
     lay = doc.get("layout") or {}
+    for section, given in (("style", style), ("layout", lay)):
+        if not isinstance(given, dict):
+            raise ValueError(f"{section} is a mapping of key: value; got {layoutfile._brief(given)}")
+    out = {"theme": theme, **vars(THEMES[theme])}
+    for key, value in style.items():
+        key = _KEY_ALIASES.get(key, key) if isinstance(key, str) else key  # earlier key names too
+        if key not in STYLE_FIELDS:
+            raise ValueError(f"unknown style key {layoutfile._brief(key)}")
+        out[key] = _style_value(key, value)
     for key, default in LAYOUT_DEFAULTS.items():
         out[key] = copy.deepcopy(default)  # no list shared between sessions
-    for key in (
-        "mode",
-        "rotate",
-        "symmetry",
-        "assembly",
-        "title",
-        "membrane",
-        "focus",
-        "msa_reference",
-        *HIDDEN_LAYOUT,
-    ):
-        if lay.get(key) is not None:
-            out[key] = lay[key]
-    for key in ("symmetry", "membrane"):  # unquoted `off` in YAML is False
-        if out[key] is False:
-            out[key] = "off"
+    given = {k: v for k, v in lay.items() if v is not None}
+    for key in ("mode", "symmetry", "assembly", "membrane", "focus", "msa_reference", "uniprot"):
+        if key in given:  # unquoted `off` in YAML is False
+            out[key] = (
+                "off" if given[key] is False and key in ("symmetry", "membrane", "uniprot") else _text(key, given[key])
+            )
+    if out["mode"] not in MODES:
+        raise ValueError(f"unknown mode {layoutfile._brief(out['mode'])}; choose from {', '.join(MODES)}")
+    if out["membrane"] not in MEMBRANES:
+        raise ValueError(f"unknown membrane {layoutfile._brief(out['membrane'])}; choose from {', '.join(MEMBRANES)}")
     out["assembly"] = out["assembly"] or "auto"  # `assembly: ""` draws as auto: the picker shows it so
-    out["up"], out["view"] = parse_vector(out["up"], "up"), parse_vector(out["view"], "view")
-    if isinstance(out["protomers"], str):
-        out["protomers"] = parse_protomers(out["protomers"])
-    out["flip_v"], out["dna"] = parse_flag(out["flip_v"], "flip_v"), parse_flag(out["dna"], "dna")
-    out["uniprot"] = lay.get("uniprot") or "off"
-    chains = lay.get("chains")
-    out["chains"] = ",".join(chains) if isinstance(chains, list) else (chains or "")
-    msa = lay.get("msa")
+    out["uniprot"] = out["uniprot"] or "off"
+    out["title"] = _text("title", given.get("title", ""), TITLE_MAX)
+    out["rotate"] = _number("rotate", given.get("rotate", 0.0), -ROTATE_MAX, ROTATE_MAX)
+    out["symmetry_tol"] = _number("symmetry_tol", given.get("symmetry_tol", TOLERANCE), 0.0, 100.0)
+    out["up"], out["view"] = _vector("up", given.get("up")), _vector("view", given.get("view"))
+    for key in ("flip_v", "dna"):
+        out[key] = parse_flag(given.get(key, LAYOUT_DEFAULTS[key]), key)
+    protomers = given.get("protomers")
+    if isinstance(protomers, str):
+        out["protomers"] = parse_protomers(_text("protomers", protomers, IDS_MAX))
+    elif protomers is not None:
+        if not isinstance(protomers, list):
+            raise ValueError(f"protomers must be groups of chain ids, like A,B;C,D; got {layoutfile._brief(protomers)}")
+        out["protomers"] = [_ids("protomers", group) for group in protomers]
+    out["chains"] = ",".join(_ids("chains", given.get("chains", "")))
+    msa = _text("msa", given.get("msa", ""))
     out["msa_path"] = msa if msa and local_files() and Path(msa).is_file() else ""  # no server paths when hosted
     out["msa_missing"] = msa if msa and not out["msa_path"] else ""  # saved on another machine
-    out["title"] = out["title"] or ""
-    out["rotate"] = float(out["rotate"])
     edits = layoutfile.edits_of(doc)  # the CLI's reading of them, as the editors' text
     out["rename"] = "; ".join(f"{k}={v}" for k, v in edits["rename"].items())
     out["swap"] = "; ".join(f"{a},{b}" for a, b in edits["swap"])
@@ -288,14 +391,14 @@ def settings_from_document(doc: dict) -> dict:
     if domains == "uniprot":  # the app's UniProt domains switch
         out["uniprot_domains"], domains = True, {}
     if isinstance(domains, str):  # auto
-        out["domains"] = domains
+        out["domains"] = _text("domains", domains)
     else:
-        pairs = domains.items() if isinstance(domains, dict) else domains
-        out["domains"] = "\n".join(f"{name}={','.join(refs)}" for name, refs in pairs)
+        out["domains"] = "\n".join(f"{name}={','.join(refs)}" for name, refs in _domains(domains))
         out["domains_from_file"] = out["domains"]
-    names = [str(n) for n in doc.get("names") or []]
+    names = [_text("names", n) for n in doc.get("names") or []]
     out["names"] = [n for n in names if n in NAME_KEYWORDS or (local_files() and Path(n).is_file())]
     out["names_missing"] = [n for n in names if n not in out["names"]]  # saved elsewhere; never a server path hosted
+    look_of(out)  # the style's values: a colour that is none, a choice not offered
     return out
 
 

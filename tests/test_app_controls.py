@@ -418,7 +418,10 @@ def test_a_names_file_keeps_the_keyword_shows_its_name_and_can_be_removed():
         (b"elements: [A, B\n", "not valid YAML"),
         (b"helices:\n  res:A:3-18: A\n", "unknown key 'helices'"),
         (b"elements:\n  res:A:3-18: [A, B]\n", "'res:A:3-18' is not a name"),
-        (b"elements:\n  r1: &a [x, x, x]\n  r2: &b [*a, *a, *a]\n  r3: [*b, *b, *b]\n", "'r1' is not a name"),
+        (
+            b"elements:\n  r1: &a [x, x, x]\n  r2: &b [*a, *a, *a]\n  r3: [*b, *b, *b]\n",
+            "aliases are not allowed in a names file",
+        ),
         (b"#" * 200_001, "at most 100 kB"),
         (b"\xff\xfe", "UTF-8"),
         (b"elements: " + b"[" * 2000 + b"]" * 2000 + b"\n", "nested too deeply"),  # 4 kB, no RecursionError

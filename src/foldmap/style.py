@@ -11,10 +11,9 @@ import re
 from dataclasses import asdict, dataclass, fields, replace
 from pathlib import Path
 
-import yaml
-
 from .hbonds import parse_selection
 from .palette import PALETTES
+from .yamlfile import read_yaml
 
 CHOICES = {
     "palette": tuple(PALETTES),
@@ -252,10 +251,7 @@ def resolve_style(
     """Theme (or the file's `theme:`), then the file's keys, then key=value overrides; validated."""
     settings: dict = {}
     if style_file is not None:
-        try:
-            loaded = yaml.safe_load(Path(style_file).read_text(encoding="utf-8")) or {}
-        except RecursionError:  # brackets nested thousands deep: the YAML reader recurses once per level
-            raise ValueError(f"{style_file}: nested too deeply") from None
+        loaded = read_yaml(Path(style_file).read_text(encoding="utf-8"), "style", str(style_file)) or {}
         if not isinstance(loaded, dict):
             raise ValueError(f"{style_file}: a style file is a mapping of key: value")
         named = loaded.pop("theme", None) or loaded.pop("preset", None)

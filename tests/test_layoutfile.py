@@ -173,7 +173,7 @@ def test_app_credits_foldmap():
 def test_invalid_yaml_is_a_readable_error(tmp_path):
     bad = tmp_path / "bad.yaml"
     bad.write_text("layout: {rotate: 30\n", encoding="utf-8")
-    with pytest.raises(ValueError, match=r"layout file bad\.yaml is not valid YAML"):
+    with pytest.raises(ValueError, match=r"bad\.yaml: not valid YAML"):
         layoutfile.load(bad)
 
 

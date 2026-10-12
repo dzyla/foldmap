@@ -17,10 +17,9 @@ import gzip
 import re
 from pathlib import Path
 
-import yaml
-
 from .layout import Layout, provisional, resolve
 from .model import SSE, Nucleic, copy_classes, group_by_chain, pair_places, res_ref
+from .yamlfile import read_yaml
 
 KEYWORDS = ("deposited", "beta")
 _GENERIC = re.compile(r"(HELX_P)?\d+|H\d+")  # numbered helices name nothing
@@ -209,14 +208,9 @@ _SCALAR = (str, int, float)  # a reference or a name: YAML may read `1` or `1.5`
 
 def parse_names(text: str, where: str) -> dict:
     """A names file's text as its mapping ({} when empty), checked: the keys elements and stems only, each a mapping
-    of a reference to a name (a single value, never a list or a mapping, so YAML aliases expand nothing). `where`
+    of a reference to a name (a single value, never a list or a mapping; read with no YAML anchors or aliases). `where`
     names the file in the messages. The references are checked against the figure later (load_names)."""
-    try:
-        doc = yaml.safe_load(text) or {}
-    except yaml.YAMLError as err:
-        raise ValueError(f"{where}: not valid YAML: {err}") from err
-    except RecursionError:  # brackets nested thousands deep: the YAML reader recurses once per level
-        raise ValueError(f"{where}: nested too deeply") from None
+    doc = read_yaml(text, "names", where) or {}
     if not isinstance(doc, dict):
         raise ValueError(f"{where}: a names file is a mapping with the keys elements and stems")
     for key in doc:
