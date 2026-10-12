@@ -683,6 +683,7 @@ def store_alignment(ss: MutableMapping) -> None:
     if up is None:
         ss.update(msa_path="", msa_rows=[])
         return
+    target = None
     try:
         data = up.getvalue()
         if len(data) > ALIGNMENT_MAX:
@@ -690,7 +691,8 @@ def store_alignment(ss: MutableMapping) -> None:
         target = keep_upload(up.name, data, ALIGNMENT_SUFFIXES)
         rows = row_names(target)
     except (ValueError, OSError) as err:
-        ss["msa_error"] = str(err) if isinstance(err, ValueError) else "the alignment could not be stored; try again"
+        said = str(err) if isinstance(err, ValueError) else "the alignment could not be stored; try again"
+        ss["msa_error"] = said.replace(str(target), upload_name(up.name)) if target else said  # the upload's name
         ss.update(msa_path="", msa_rows=[])
         return
     if ss.get("msa_reference") and ss["msa_reference"] not in rows:

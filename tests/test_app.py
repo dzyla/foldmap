@@ -1312,6 +1312,27 @@ def test_an_oversized_alignment_is_refused_unstored_and_unread(monkeypatch):
     assert any(_visible(e.value) == "big.fasta: an alignment is at most 10 MB" for e in at.error)
 
 
+@pytest.mark.parametrize("data", [bytes(range(256)) * 20, b"\xff\xfe>a\nAC\n"])
+def test_an_alignment_that_is_not_text_says_so_plainly(monkeypatch, tmp_path, data):
+    monkeypatch.setenv("FOLDMAP_APP_LOCAL_FILES", "0")
+    seed_cache(monkeypatch, tmp_path, "1UBQ")
+    at = opened("1UBQ")
+    at.file_uploader(key="msa_upload").set_value(("g.fasta", data, "text/plain")).run()
+    ss = at.session_state
+    said = "g.fasta: not a text alignment (FASTA, Clustal or Stockholm)"
+    assert not at.exception and ss["msa_path"] == "" and ss["msa_error"] == said
+    assert [_visible(e.value) for e in at.error] == [said]
+
+
+def test_the_command_line_says_a_binary_alignment_is_not_one(tmp_path):
+    from foldmap.sequence import read_alignment
+
+    f = tmp_path / "g.fasta"
+    f.write_bytes(b"\xff\xfe>a\nAC\n")
+    with pytest.raises(ValueError, match=r"g\.fasta: not a text alignment \(FASTA, Clustal or Stockholm\)$"):
+        read_alignment(f)
+
+
 def test_a_hosted_layout_download_names_uploads_by_their_own_names(monkeypatch, tmp_path):
     """Hosted, a layout file never carries the server's copy of an upload (names file, alignment): each is named as
     uploaded, and a comment asks for it to be attached."""

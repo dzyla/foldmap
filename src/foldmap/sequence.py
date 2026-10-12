@@ -141,7 +141,10 @@ def read_alignment(path) -> Alignment:
             f"{path} is a ConSurf grades table, not an alignment: it colours the topology (plot --msa), "
             "not the sequence view"
         )
-    text = Path(path).read_text(encoding="utf-8")
+    try:
+        text = Path(path).read_text(encoding="utf-8")
+    except UnicodeDecodeError:
+        raise ValueError(f"{path}: not a text alignment (FASTA, Clustal or Stockholm)") from None
     lines = [l.rstrip() for l in text.splitlines()]
     first = next((l for l in lines if l.strip()), "")
     order: list[str] = []
