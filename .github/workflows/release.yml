@@ -26,6 +26,8 @@ jobs:
 
   publish:
     needs: build
+    # opt in once the PyPI trusted publisher exists: repository variable PUBLISH_PYPI = true
+    if: vars.PUBLISH_PYPI == 'true'
     runs-on: ubuntu-latest
     environment: pypi
     permissions:
