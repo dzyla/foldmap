@@ -138,7 +138,21 @@ def test_an_upload_that_is_not_a_structure_names_no_server_path(monkeypatch):
     at.file_uploader(key="upload").set_value(("notes.pdb", b"just some notes\n", "chemical/x-pdb")).run()
     assert not at.exception and at.session_state["stage"] == "load"
     text = at.error[0].value
-    assert _visible(text) == "notes: no protein residues with a complete backbone" and "uploads" not in text
+    assert _visible(text) == "notes: no structure in this file (no protein, DNA or RNA chain)" and "uploads" not in text
+
+
+@pytest.mark.parametrize("hosted", ["0", "1"])
+@pytest.mark.parametrize(
+    "name, data", [("empty.cif", b""), ("empty.pdb", b""), ("empty.cif", b"data_x\n#\n"), ("empty.pdb", b"END\n")]
+)
+def test_an_upload_with_no_structure_says_so_plainly(monkeypatch, hosted, name, data):
+    """An empty file, or one with no chain, is a plain message: never a bug report (gemmi: IndexError)."""
+    monkeypatch.setenv("FOLDMAP_APP_LOCAL_FILES", hosted)
+    at = app_test()
+    at.run()
+    at.file_uploader(key="upload").set_value((name, data, "chemical/x-cif")).run()
+    assert not at.exception and at.session_state["stage"] == "load"
+    assert [_visible(e.value) for e in at.error] == ["empty: no structure in this file (no protein, DNA or RNA chain)"]
 
 
 def test_app_offers_flip_for_the_membrane():

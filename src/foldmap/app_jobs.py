@@ -428,13 +428,20 @@ def contacts_key(settings: dict) -> str:
 
 def size_job(path) -> dict:
     """What the file holds, read before any drawing: polymer residues and chains of its first model (as
-    deposited; `chain_ids` in the file's order, nucleic acid too), and its assemblies."""
+    deposited; `chain_ids` in the file's order, nucleic acid too), and its assemblies. A file with no chain (an
+    empty one too) is a ValueError that says so."""
     import gemmi
 
-    st = gemmi.read_structure(str(path))
+    nothing = f"{path}: no structure in this file (no protein, DNA or RNA chain)"
+    try:
+        st = gemmi.read_structure(str(path))
+    except IndexError:  # gemmi on an empty file
+        raise ValueError(nothing) from None
     st.setup_entities()
     polymers = [(chain.name, len(chain.get_polymer())) for chain in st[0]] if len(st) else []
     polymers = [(name, n) for name, n in polymers if n]
+    if not polymers:
+        raise ValueError(nothing)
     return {
         "residues": sum(n for _, n in polymers),
         "chains": len(polymers),
