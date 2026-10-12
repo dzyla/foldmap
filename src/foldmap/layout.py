@@ -493,14 +493,22 @@ def _kink_item(group: list[SSE], frame: Frame, angle_mode: str, width: float = H
     for k, (a, b) in enumerate(zip(members, members[1:])):
         end = at[-1] + a.direction * a.length / 2
         turn = float(a.direction @ b.direction)
-        if turn < -0.5:  # turned back: a hairpin beside the last piece
-            normal = np.array([-a.direction[1], a.direction[0]])
-            seen = np.subtract((parts[k + 1].cx, parts[k + 1].cy), (parts[k].cx, parts[k].cy)) @ normal
-            start = end + normal * (1 if seen >= 0 else -1) * ((a.width + b.width) / 2 + MARGIN)
+        normal = np.array([-a.direction[1], a.direction[0]])
+        if turn < -0.5:  # turned back: a hairpin beside the last piece, on the side the piece turns to
+            out = float(_snap(b.direction @ normal))
+            if out == 0.0:  # straight back (snapped angles): the side it is seen on
+                out = float(np.subtract((parts[k + 1].cx, parts[k + 1].cy), (parts[k].cx, parts[k].cy)) @ normal)
+            start = end + normal * (1 if out >= 0 else -1) * ((a.width + b.width) / 2 + MARGIN)
         elif turn > 0.5:  # running on
             start = end + a.direction * 4 * _KINK_ROOM
         else:  # across: one turn of the loop between the two
             start = end + a.direction * (b.width / 2 + _KINK_ROOM) + b.direction * (a.width / 2 + _KINK_ROOM)
+            # a piece turned more than 90 degrees (drawn tilted) leans back over the last one's end: its near
+            # corners kept _KINK_ROOM beyond that end
+            side = np.array([-b.direction[1], b.direction[0]]) * b.width / 2
+            back = max(float((end - c) @ a.direction) for c in (start + side, start - side)) + _KINK_ROOM
+            if back > 1e-9:
+                start = start + a.direction * back
         at.append(start + b.direction * b.length / 2)
     mean = np.mean(at, axis=0)
     offsets = [tuple(float(v) for v in _snap(x - mean)) for x in at]

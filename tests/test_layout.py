@@ -374,3 +374,43 @@ def test_kinked_pieces_never_overlap_and_meet_end_to_end(turn):
     pa, pb = lay.placed[a.id], lay.placed[b.id]
     assert not overlaps(pa, pb)
     assert np.hypot(*np.subtract(pa.c_port, pb.n_port)) <= 2.0 * pa.width  # held together, not where projected
+
+
+def _body(p):
+    """The four corners of an element's body (length x width, turned by its angle)."""
+    d = np.array([np.cos(p.angle), np.sin(p.angle)])
+    n = np.array([-d[1], d[0]])
+    c = np.array([p.cx, p.cy])
+    return [c + sx * d * p.length / 2 + sy * n * p.width / 2 for sx, sy in ((1, 1), (1, -1), (-1, -1), (-1, 1))]
+
+
+def _bodies_overlap(p, q) -> bool:
+    """Separating axes: do two turned bodies overlap (touching excluded)?"""
+    P, Q = _body(p), _body(q)
+    for corners in (P, Q):
+        for i in range(4):
+            e = corners[(i + 1) % 4] - corners[i]
+            axis = np.array([-e[1], e[0]])
+            a, b = [v @ axis for v in P], [v @ axis for v in Q]
+            if max(a) <= min(b) + 1e-6 or max(b) <= min(a) + 1e-6:
+                return False
+    return True
+
+
+@pytest.mark.parametrize("mode", ["snap", "tilted"])
+@pytest.mark.parametrize("turn", [105.0, 115.0, 125.0, 150.0])
+@pytest.mark.parametrize("side", [1, -1])
+def test_a_kinked_helix_drawn_tilted_never_cuts_into_itself(mode, turn, side):
+    """Drawn as seen (tilted), a piece turned by 114-118° started 'across' and cut into the last piece's end; from
+    120° the hairpin side came from the projected centres, not the piece's own direction (Task 12 review)."""
+    from foldmap.style import Style
+
+    f = Frame(np.zeros(3), np.array([1.0, 0, 0]), np.array([0, 1.0, 0]), np.array([0, 0, 1.0]))
+    t = np.radians(turn)
+    a = fake_sse("H", 1, 14, centroid=(0, 0, 0), axis=(1, 0, 0))
+    b = fake_sse("H", 18, 31, centroid=(5, -side * 3, 0), axis=(np.cos(t), side * np.sin(t), 0))  # seen on the far side
+    b.kinked = True
+    lay = build_layout([a, b], [], f, "projected", style=Style(helix_angle=mode))
+    pa, pb = lay.placed[a.id], lay.placed[b.id]
+    assert not _bodies_overlap(pa, pb)
+    assert np.hypot(*np.subtract(pa.c_port, pb.n_port)) <= 2.5 * pa.width
