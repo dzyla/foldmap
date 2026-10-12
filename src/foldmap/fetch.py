@@ -1,7 +1,8 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 # Copyright (C) 2026 Dawid Zyla. Additional terms (AGPL-3.0 section 7(b)): see NOTICE.
 """Structures by name: PDB IDs from RCSB, UniProt accessions / AlphaFold DB ids from the AlphaFold DB, local
-paths, or uploaded bytes. Downloads are cached in ~/.cache/foldmap."""
+paths, or uploaded bytes. Downloads are cached in ~/.cache/foldmap: at most DOWNLOAD_MAX bytes each, kept a week
+after their last use and DOWNLOAD_CACHE_MAX bytes in all."""
 
 from __future__ import annotations
 
@@ -11,6 +12,7 @@ import os
 import re
 import stat
 import tempfile
+import threading
 import time
 import urllib.request
 from pathlib import Path
@@ -21,9 +23,16 @@ AGENT = "foldmap (https://pypi.org/project/foldmap)"  # the AlphaFold DB refuses
 STRUCTURE_SUFFIXES = (".cif", ".mmcif", ".pdb", ".ent")
 ALIGNMENT_SUFFIXES = (".fasta", ".fa", ".aln", ".sto", ".txt")
 UPLOAD_MAX_AGE = 24 * 3600  # seconds an uploaded file is kept in the cache
+MB = 1024 * 1024
+DOWNLOAD_MAX = 100 * MB  # bytes a download may take (the largest PDB entry, 3J3Q, is 242 MB as mmCIF)
+CHUNK = MB  # bytes read at a time: a download is never held whole in memory
+DOWNLOAD_MAX_AGE = 7 * 24 * 3600  # seconds a downloaded structure is kept unused in the cache
+DOWNLOAD_CACHE_MAX = 2 * 1024 * MB  # bytes of downloaded structures kept; the oldest go first
+PRUNE_EVERY = 3600  # seconds: the cache is pruned at most this often, from the download path
 _UPLOAD_NAME = re.compile(r"upload-[0-9a-f]{12}\.[a-z]+")
 _AF = re.compile(r"(?:AF-)?([OPQ][0-9][A-Z0-9]{3}[0-9]|[A-NR-Z][0-9](?:[A-Z][A-Z0-9]{2}[0-9]){1,2})(?:-F1)?")
 _PDB = re.compile(r"[0-9][A-Za-z0-9]{3}")
+_DOWNLOADED = re.compile(r"[0-9][A-Z0-9]{3}\.cif|AF-[A-Z0-9]+-F1\.cif")  # the cache's names for downloads
 
 
 def atomic_write(path: Path, data: bytes | str) -> None:
@@ -48,21 +57,97 @@ def _complete(data: bytes) -> bool:
 
 
 def _download(url: str, path: Path, what: str) -> Path:
-    """`url` into the cache at `path`, unless a whole copy is already there (a cut-off one is fetched again)."""
+    """`url` into the cache at `path`, unless a whole copy is already there (a cut-off one is fetched again). The
+    download streams to a file beside `path`, stopped past DOWNLOAD_MAX bytes; only a whole file takes its place.
+    The cache is pruned first, at most once an hour (prune_downloads)."""
+    maybe_prune()
     if path.is_file():
         with path.open("rb") as f:
             f.seek(max(0, path.stat().st_size - 64))
             if _complete(f.read()):
+                os.utime(path)  # used now: pruned last
                 return path
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, part = tempfile.mkstemp(dir=path.parent, prefix=f".{path.name}.", suffix=".part")
+    try:
+        with os.fdopen(fd, "wb") as out:
+            tail = _stream(url, out, what)
+        if not _complete(tail):
+            raise ValueError(f"could not download {what} (the file arrived incomplete; try again)")
+        os.replace(part, path)
+    except BaseException:
+        Path(part).unlink(missing_ok=True)
+        raise
+    return path
+
+
+def _stream(url: str, out, what: str) -> bytes:
+    """The download of `url` written to `out`, a chunk at a time; its last bytes. ValueError when it fails or
+    passes DOWNLOAD_MAX bytes (told by its Content-Length at once, else counted as it arrives)."""
+    too_big = (
+        f"could not download {what}: it is larger than {DOWNLOAD_MAX // MB} MB, more than foldmap downloads. "
+        "Download the file yourself and draw it on your own computer: foldmap plot FILE"
+    )
+    tail, size = b"", 0
     try:
         with urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": AGENT}), timeout=30) as r:
-            data = r.read()
+            length = (getattr(r, "headers", None) or {}).get("Content-Length")
+            if length and length.isdigit() and int(length) > DOWNLOAD_MAX:
+                raise ValueError(too_big)
+            while chunk := r.read(CHUNK):
+                size += len(chunk)
+                if size > DOWNLOAD_MAX:
+                    raise ValueError(too_big)
+                out.write(chunk)
+                tail = (tail + chunk)[-64:]
     except (OSError, http.client.HTTPException) as err:
         raise ValueError(f"could not download {what} ({err})") from None
-    if not _complete(data):
-        raise ValueError(f"could not download {what} (the file arrived incomplete; try again)")
-    atomic_write(path, data)
-    return path
+    return tail
+
+
+def _downloads() -> list[Path]:
+    """The structures foldmap downloaded into the cache (PDB entries, AlphaFold models): regular files only."""
+    found = [*CACHE.glob("*.cif"), *CACHE.glob("afdb-v*/AF-*-F1.cif")]
+    return [p for p in found if _DOWNLOADED.fullmatch(p.name) and p.is_file() and not p.is_symlink()]
+
+
+def prune_downloads(now: float | None = None) -> list[Path]:
+    """Remove downloads older than DOWNLOAD_MAX_AGE (since last used), then the oldest until the rest take at
+    most DOWNLOAD_CACHE_MAX bytes; what was removed. Uploads have their own pruning (keep_upload)."""
+    now = time.time() if now is None else now
+    files = []
+    for p in _downloads():
+        try:
+            info = p.stat()
+        except OSError:
+            continue
+        files.append((info.st_mtime, info.st_size, p))
+    files.sort()  # oldest first
+    total = sum(size for _, size, _ in files)
+    removed = []
+    for mtime, size, p in files:
+        if now - mtime <= DOWNLOAD_MAX_AGE and total <= DOWNLOAD_CACHE_MAX:
+            break  # this and every newer file stay
+        p.unlink(missing_ok=True)
+        total -= size
+        removed.append(p)
+    return removed
+
+
+_PRUNED = [0.0]  # when the download cache was last pruned (time.monotonic), process-wide
+_PRUNE_LOCK = threading.Lock()
+
+
+def maybe_prune() -> None:
+    """prune_downloads, unless this process pruned in the last PRUNE_EVERY seconds."""
+    with _PRUNE_LOCK:
+        if _PRUNED[0] and time.monotonic() - _PRUNED[0] < PRUNE_EVERY:
+            return
+        _PRUNED[0] = time.monotonic()
+    try:
+        prune_downloads()
+    except OSError:  # a cache that cannot be listed: the download goes ahead
+        pass
 
 
 def _prune_uploads(folder: Path) -> None:

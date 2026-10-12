@@ -1,5 +1,6 @@
 """AlphaFold confidence colouring: pLDDT (stored in the B-factor column) in AlphaFold's four fixed bands."""
 
+import io
 from pathlib import Path
 
 import numpy as np
@@ -75,19 +76,9 @@ def test_app_fetches_alphafold_models(text, url, monkeypatch, tmp_path):
 
     asked = []
 
-    class Reply:
-        def __enter__(self):
-            return self
-
-        def __exit__(self, *a):
-            return False
-
-        def read(self):
-            return P53.read_bytes()
-
     def fake(request, timeout=0):
         asked.append(getattr(request, "full_url", request))
-        return Reply()
+        return io.BytesIO(P53.read_bytes())  # read whole or a chunk at a time, as a server's answer
 
     monkeypatch.setattr(app, "CACHE", tmp_path)
     monkeypatch.setattr(app.urllib.request, "urlopen", fake)

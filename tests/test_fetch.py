@@ -1,7 +1,10 @@
 """Downloads and the cache: only whole files are kept, and a broken cache entry is fetched again. Offline."""
 
 import http.client
+import io
 import json
+import os
+import time
 from pathlib import Path
 
 import pytest
@@ -14,18 +17,12 @@ DATA = Path(__file__).parent / "data"
 UBQ = (DATA / "1UBQ.cif").read_bytes()
 
 
-class _Reply:
-    def __init__(self, payload: bytes):
-        self.payload = payload
+class _Reply(io.BytesIO):
+    """A server's answer: `payload`, read whole or a chunk at a time (headers: what the server said)."""
 
-    def __enter__(self):
-        return self
-
-    def __exit__(self, *a):
-        return False
-
-    def read(self):
-        return self.payload
+    def __init__(self, payload: bytes, headers: dict | None = None):
+        super().__init__(payload)
+        self.headers = headers or {}
 
 
 def _serve(monkeypatch, cache: Path, payload: bytes) -> list[str]:
@@ -116,7 +113,7 @@ class _Dropped:
     def __exit__(self, *a):
         return False
 
-    def read(self):
+    def read(self, size=-1):
         raise http.client.IncompleteRead(b"abc", 100)
 
 
@@ -191,19 +188,9 @@ P53 = DATA / "AF-P04637.cif"
 
 
 def _offline(monkeypatch, tmp_path, asked: list):
-    class Reply:
-        def __enter__(self):
-            return self
-
-        def __exit__(self, *a):
-            return False
-
-        def read(self):
-            return P53.read_bytes()
-
     def fake(request, timeout=0):
         asked.append(getattr(request, "full_url", request))
-        return Reply()
+        return _Reply(P53.read_bytes())
 
     monkeypatch.setattr(fetch_mod, "CACHE", tmp_path)
     monkeypatch.setattr(fetch_mod.urllib.request, "urlopen", fake)
@@ -225,3 +212,94 @@ def test_share_ids_are_ids_only():
     assert source_id(" 1lmb ") == "1LMB" and source_id("p04637") == "P04637"
     assert source_id("AF-P04637-F1") == "AF-P04637-F1"
     assert source_id("/tmp/x.cif") is None and source_id("hello") is None and source_id("") is None
+
+
+class _Endless:
+    """A server that sends `chunk` for ever (and says nothing of the length)."""
+
+    def __init__(self, chunk: bytes = b"x" * 65536):
+        self.chunk, self.sent, self.headers = chunk, 0, {}
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *a):
+        return False
+
+    def read(self, size=-1):
+        assert size > 0, "a download is read a chunk at a time, never whole"
+        self.sent += len(self.chunk[:size])
+        return self.chunk[:size]
+
+
+def test_a_download_past_the_cap_is_stopped_and_leaves_no_file(monkeypatch, tmp_path):
+    server = _Endless()
+    monkeypatch.setattr(fetch_mod, "CACHE", tmp_path)
+    monkeypatch.setattr(fetch_mod, "DOWNLOAD_MAX", 1_000_000)
+    monkeypatch.setattr(fetch_mod.urllib.request, "urlopen", lambda request, timeout=0: server)
+    with pytest.raises(ValueError, match=r"could not download 3J3Q from the PDB: it is larger than 0 MB"):
+        fetch("3J3Q")
+    assert server.sent <= 1_000_000 + fetch_mod.CHUNK  # stopped at the cap, not read to the end
+    assert list(tmp_path.iterdir()) == []  # the partial file is gone
+
+
+def test_the_download_cap_is_100_mb_and_a_stated_length_over_it_is_refused_unread(monkeypatch, tmp_path):
+    assert fetch_mod.DOWNLOAD_MAX == 100 * 1024 * 1024
+    server = _Endless()
+    server.headers = {"Content-Length": str(242 * 1024 * 1024)}  # 3J3Q's size
+    monkeypatch.setattr(fetch_mod.urllib.request, "urlopen", lambda request, timeout=0: server)
+    with pytest.raises(ValueError, match="larger than 100 MB, more than foldmap downloads"):
+        fetch("3J3Q")
+    assert server.sent == 0 and not list((tmp_path / "cache").iterdir())
+
+
+def _aged(path: Path, days: float, size: int = 10) -> Path:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(b"#" * size)
+    t = time.time() - days * 86400
+    os.utime(path, (t, t))
+    return path
+
+
+def test_downloads_unused_for_a_week_are_pruned(monkeypatch, tmp_path):
+    monkeypatch.setattr(fetch_mod, "CACHE", tmp_path)
+    old = _aged(tmp_path / "1OLD.cif", 8)
+    old_af = _aged(tmp_path / "afdb-v6" / "AF-P04637-F1.cif", 8)
+    fresh = _aged(tmp_path / "1NEW.cif", 1)
+    upload = _aged(tmp_path / "uploads" / "upload-0123456789ab.cif", 30)  # uploads are pruned on their own
+    other = _aged(tmp_path / "notes.cif", 30)  # not a name foldmap downloads to
+    entry = _aged(tmp_path / "uniprot" / "P04637.json", 30)
+    assert sorted(fetch_mod.prune_downloads()) == sorted([old, old_af])
+    assert all(p.exists() for p in (fresh, upload, other, entry))
+
+
+def test_downloads_past_2_gb_are_pruned_oldest_first(monkeypatch, tmp_path):
+    assert fetch_mod.DOWNLOAD_CACHE_MAX == 2 * 1024**3
+    monkeypatch.setattr(fetch_mod, "CACHE", tmp_path)
+    monkeypatch.setattr(fetch_mod, "DOWNLOAD_CACHE_MAX", 250)
+    files = [_aged(tmp_path / f"{k}ABC.cif", days, 100) for k, days in ((1, 3), (2, 2), (3, 1))]
+    assert fetch_mod.prune_downloads() == [files[0]]  # 300 bytes: the oldest goes, 200 stay
+    assert files[1].exists() and files[2].exists()
+
+
+def test_a_cached_download_used_again_is_kept_longer(monkeypatch, tmp_path):
+    _serve(monkeypatch, tmp_path, UBQ)
+    path = fetch("1UBQ")
+    t = time.time() - 8 * 86400
+    os.utime(path, (t, t))
+    assert fetch("1UBQ") == path and time.time() - path.stat().st_mtime < 60  # a hit counts as use
+    assert fetch_mod.prune_downloads() == []
+
+
+def test_the_cache_is_pruned_from_the_download_path_at_most_hourly(monkeypatch, tmp_path):
+    _serve(monkeypatch, tmp_path, UBQ)
+    monkeypatch.setattr(fetch_mod, "_PRUNED", [0.0])
+    old = _aged(tmp_path / "1OLD.cif", 8)
+    fetch("1UBQ")
+    assert not old.exists()
+    old = _aged(tmp_path / "2OLD.cif", 8)
+    fetch("1UBQ")
+    assert old.exists()  # pruned less than an hour ago
+    monkeypatch.setattr(fetch_mod, "_PRUNED", [time.monotonic() - 3601])
+    fetch("1UBQ")
+    assert not old.exists()
