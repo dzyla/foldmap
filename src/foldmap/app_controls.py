@@ -74,25 +74,28 @@ def segmented(st, label: str, options, kw: dict, **more):
 def style_section(st, ss: MutableMapping) -> None:
     """Style: how the elements and loops are drawn, and the figure's two colours."""
     with st.expander("Style", key="sec_style"):
-        segmented(st, "Fill", CHOICES["fill"], setting(ss, "fill"))
-        segmented(st, "Helix shading", CHOICES["helix_shading"], setting(ss, "helix_shading"))
-        segmented(
-            st,
-            "Helix angle",
-            CHOICES["helix_angle"],
-            setting(ss, "helix_angle"),
-            help="snap: nearest of vertical or horizontal · upright: always vertical · tilted: as in 3D",
-        )
-        segmented(st, "Loop shape", CHOICES["loops"], setting(ss, "loops"))
-        st.selectbox("Loop colour", CHOICES["loop_color"], **setting(ss, "loop_color"))
-        st.toggle("Loop arrows, N → C", **setting(ss, "loop_arrows"))
-        st.slider("Loop weight", 0.4, 3.0, step=0.1, **setting(ss, "loop_width"))
-        with st.container(horizontal=True, key="style_colours"):
+        with st.container(horizontal=True, key="style_shapes"):  # two short choices a row
+            segmented(st, "Fill", CHOICES["fill"], setting(ss, "fill"))
+            segmented(st, "Helix shading", CHOICES["helix_shading"], setting(ss, "helix_shading"))
+        with st.container(horizontal=True, key="style_angles"):
+            segmented(
+                st,
+                "Helix angle",
+                CHOICES["helix_angle"],
+                setting(ss, "helix_angle"),
+                help="snap: nearest of vertical or horizontal · upright: always vertical · tilted: as in 3D",
+            )
+            segmented(st, "Loop shape", CHOICES["loops"], setting(ss, "loops"))
+        with st.container(horizontal=True, vertical_alignment="bottom", key="style_colours"):
+            st.selectbox("Loop colour", CHOICES["loop_color"], **setting(ss, "loop_color"))
             colour(st, "Background", ss, "background")
             colour(st, "Ink", ss, "ink")
+        with st.container(horizontal=True, vertical_alignment="center", key="style_loops"):
+            st.toggle("Loop arrows, N → C", **setting(ss, "loop_arrows"))
+            st.slider("Loop weight", 0.4, 3.0, step=0.1, **setting(ss, "loop_width"))
 
 
-HBONDS = {"off": "off", "na": "protein–DNA/RNA", "interchain": "interchain", "chains": "chosen pairs"}
+HBONDS = {"off": "off", "na": "protein–DNA/RNA", "interchain": "interchain", "chains": "pairs"}
 
 
 def show_section(st, ss: MutableMapping) -> None:
@@ -109,13 +112,21 @@ def show_section(st, ss: MutableMapping) -> None:
                 **setting(ss, "sheet_panels"),
             )
             st.toggle("3₁₀ helices as boxes", **setting(ss, "helices_310"))
-        segmented(
-            st,
-            "Ligands and ions",
-            ("auto", "all", "none", "codes"),
-            part(ss, "ligands__mode", "ligands"),
-            help="auto: bound ligands and ions, without buffer additives · codes: only these",
-        )
+        with st.container(horizontal=True, key="show_choices"):  # the membrane's three beside the ligands' four
+            segmented(
+                st,
+                "Ligands and ions",
+                ("auto", "all", "none", "codes"),
+                part(ss, "ligands__mode", "ligands"),
+                help="auto: bound ligands and ions, without buffer additives · codes: only these",
+            )
+            segmented(
+                st,
+                "Membrane",
+                ("off", "auto", "flip"),
+                setting(ss, "membrane"),
+                help="auto: find the bilayer and draw it; flip: the same, other side on top",
+            )
         if ss.get("ligands__mode") == "codes":
             st.text_input(
                 "Ligand codes",
@@ -123,13 +134,6 @@ def show_section(st, ss: MutableMapping) -> None:
                 label_visibility="collapsed",
                 **part(ss, "ligands__codes", "ligands"),
             )
-        segmented(
-            st,
-            "Membrane",
-            ("off", "auto", "flip"),
-            setting(ss, "membrane"),
-            help="auto: find the bilayer and draw it; flip: the same, other side on top",
-        )
         hbonds_block(st, ss)
         st.text_input(
             "Per-chain colours",
@@ -160,7 +164,6 @@ def hbonds_block(st, ss: MutableMapping) -> None:
 def nucleic_block(st, ss: MutableMapping) -> None:
     """DNA and RNA: base letters, the stems' style, what is shown, the backbone's colours and the contacts check."""
     st.markdown("**DNA and RNA**")
-    st.toggle("Base letters", **setting(ss, "nucleotide_labels"))
     segmented(
         st,
         "Stems",
@@ -183,12 +186,13 @@ def nucleic_block(st, ss: MutableMapping) -> None:
         help="modality: DNA and RNA colours · chain: each strand's chain colour · ink · colour: one colour",
     )
     mode = ss.get("na_backbone__mode", "modality")
-    if mode == "modality":
-        with st.container(horizontal=True, key="na_colours"):
+    with st.container(horizontal=True, vertical_alignment="bottom", key="na_colours"):  # beside the base letters
+        st.toggle("Base letters", **setting(ss, "nucleotide_labels"))
+        if mode == "modality":
             colour(st, "DNA colour", ss, "dna_color")
             colour(st, "RNA colour", ss, "rna_color")
-    elif mode == "colour":
-        st.color_picker("Backbone colour", **part(ss, "na_backbone__colour", "na_backbone"))
+        elif mode == "colour":
+            st.color_picker("Backbone colour", **part(ss, "na_backbone__colour", "na_backbone"))
     st.toggle("Check contacts against the coordinates", **setting(ss, "check_contacts"))
 
 
@@ -214,33 +218,35 @@ def chains_section(st, ss: MutableMapping) -> None:
     what a large assembly shows in full. Chains are picked from the structure's own; "as text" types the
     command line's syntax instead."""
     with st.expander("Chains & assembly", key="sec_chains"):
+        chains_help = "draw only these chains (protein and nucleic acid each restricted only if some are named)"
+        heading(st, "Chains", "chains__as_text", chains_help)
         if ss.get("chains__as_text"):
-            st.text_input("Chains", placeholder="A,B", **setting(ss, "chains"))
+            st.text_input("Chains", placeholder="A,B", label_visibility="collapsed", **setting(ss, "chains"))
         else:
             st.multiselect(
                 "Chains",
                 listed(ss.get("all_chains") or [], ss.get("chains__pick")),
                 placeholder="All chains",
                 format_func=capped,
-                help="draw only these chains (protein and nucleic acid each restricted only if some are named)",
+                label_visibility="collapsed",
                 **part(ss, "chains__pick", "chains"),
             )
-        st.toggle("Chains as text", key="chains__as_text", persist_state="session")
         highlight_block(st, ss)
-        st.selectbox(
-            "Assembly",
-            listed(["auto", "asu", *(ss.get("assemblies") or [])], ss.get("assembly")),
-            format_func=capped,
-            help="auto: the file's first biological assembly when it adds copies · asu: as deposited · or an "
-            "assembly of the file",
-            **setting(ss, "assembly"),
-        )
-        st.selectbox(
-            "Symmetry",
-            listed(SYMMETRIES, ss.get("symmetry")),
-            help="auto: found, every protomer drawn alike · off: ignored · or the symmetry to insist on",
-            **setting(ss, "symmetry"),
-        )
+        with st.container(horizontal=True, key="assembly_row"):
+            st.selectbox(
+                "Assembly",
+                listed(["auto", "asu", *(ss.get("assemblies") or [])], ss.get("assembly")),
+                format_func=capped,
+                help="auto: the file's first biological assembly when it adds copies · asu: as deposited · or an "
+                "assembly of the file",
+                **setting(ss, "assembly"),
+            )
+            st.selectbox(
+                "Symmetry",
+                listed(SYMMETRIES, ss.get("symmetry")),
+                help="auto: found, every protomer drawn alike · off: ignored · or the symmetry to insist on",
+                **setting(ss, "symmetry"),
+            )
         segmented(
             st,
             "Large assemblies",
@@ -264,17 +270,20 @@ def chains_section(st, ss: MutableMapping) -> None:
 def highlight_block(st, ss: MutableMapping) -> None:
     """Highlight: the chains in colour, the rest grey (none, the asymmetric unit, one protomer or chains picked),
     or as text."""
+    highlight_help = (
+        "what stays in colour, the rest in grey · none: everything · asu: the chains as deposited · protomer: the "
+        "first protomer · chains: the chains picked"
+    )
+    heading(st, "Highlight", "highlight__as_text", highlight_help)
     if ss.get("highlight__as_text"):
-        st.text_input("Highlight", placeholder="none, asu, protomer or A,B", **setting(ss, "highlight"))
-    else:
-        segmented(
-            st,
+        st.text_input(
             "Highlight",
-            HIGHLIGHT,
-            part(ss, "highlight__mode", "highlight"),
-            help="what stays in colour, the rest in grey · none: everything · asu: the chains as deposited · "
-            "protomer: the first protomer · chains: the chains picked",
+            placeholder="none, asu, protomer or A,B",
+            label_visibility="collapsed",
+            **setting(ss, "highlight"),
         )
+    else:
+        segmented(st, "Highlight", HIGHLIGHT, part(ss, "highlight__mode", "highlight"), label_visibility="collapsed")
         if ss.get("highlight__mode") == "chains":
             st.multiselect(
                 "Highlighted chains",
@@ -284,9 +293,16 @@ def highlight_block(st, ss: MutableMapping) -> None:
                 label_visibility="collapsed",
                 **part(ss, "highlight__chains", "highlight"),
             )
-    st.toggle("Highlight as text", key="highlight__as_text", persist_state="session")
 
 
+def heading(st, label: str, as_text: str, help: str) -> None:
+    """A control's label with its "as text" switch on the right (the control below shows no label of its own)."""
+    with st.container(horizontal=True, vertical_alignment="center", key=f"{as_text}_head"):
+        st.markdown(label, help=help, width="stretch")
+        st.toggle("as text", key=as_text, persist_state="session")
+
+
+EDITOR_TABS = ["Swap", "Move", "Rename", "Mark", "Domains"]
 FOLD_TEMPLATE = {"auto": "βα row", "off": "as projected"}
 HELIX_ON_SHEET = {"off": "beside the sheet", "auto": "over the sheet"}
 EXAMPLE = {  # the syntax, as text
@@ -312,27 +328,23 @@ def layout_section(st, ss: MutableMapping) -> None:
     editors: a rename wins over them), then the editors (swap, move, rename, mark), each a table of drawn elements
     or, "as text", the command line's syntax, and the domains."""
     with st.expander("Edit layout", key="sec_layout"):
-        segmented(
-            st,
-            "Arrangement",
-            ("projected", "stack"),
-            setting(ss, "mode"),
-            help="projected: as in 3D, flattened · stack: elements in sequence order",
-        )
-        st.slider("Rotate (°)", -180.0, 180.0, step=0.5, **setting(ss, "rotate"))
-        st.slider("Helix size", 0.5, 2.0, step=0.05, **setting(ss, "helix_scale"))
-        st.slider("Strand size", 0.5, 2.0, step=0.05, **setting(ss, "strand_scale"))
-        if ss.get("na_chains"):
-            st.slider("DNA size", 0.5, 2.0, step=0.05, **setting(ss, "dna_scale"))
-        segmented(
-            st,
-            "Parallel α/β sheets",
-            CHOICES["fold_template"],
-            setting(ss, "fold_template"),
-            format_func=FOLD_TEMPLATE.get,
-            help="an all-parallel α/β sheet (TIM barrel, Rossmann fold) drawn as one row of strands, its helices "
-            "above and below · or as projected",
-        )
+        with st.container(horizontal=True, key="layout_shape"):  # two short choices a row
+            segmented(
+                st,
+                "Arrangement",
+                ("projected", "stack"),
+                setting(ss, "mode"),
+                help="projected: as in 3D, flattened · stack: elements in sequence order",
+            )
+            segmented(
+                st,
+                "Parallel α/β sheets",
+                CHOICES["fold_template"],
+                setting(ss, "fold_template"),
+                format_func=FOLD_TEMPLATE.get,
+                help="an all-parallel α/β sheet (TIM barrel, Rossmann fold) drawn as one row of strands, its helices "
+                "above and below · or as projected",
+            )
         segmented(
             st,
             "Helices packed on a sheet",
@@ -341,23 +353,36 @@ def layout_section(st, ss: MutableMapping) -> None:
             format_func=HELIX_ON_SHEET.get,
             help="a helix packed on a sheet's face stays beside the sheet, or is drawn over it",
         )
+        with st.container(horizontal=True, key="layout_rotate"):  # two sliders a row
+            st.slider("Rotate (°)", -180.0, 180.0, step=0.5, **setting(ss, "rotate"))
+            st.slider("Helix size", 0.5, 2.0, step=0.05, **setting(ss, "helix_scale"))
+        with st.container(horizontal=True, key="layout_sizes"):
+            st.slider("Strand size", 0.5, 2.0, step=0.05, **setting(ss, "strand_scale"))
+            if ss.get("na_chains"):
+                st.slider("DNA size", 0.5, 2.0, step=0.05, **setting(ss, "dna_scale"))
         names_block(st, ss)
-        editor(st, ss, "swap", "Swap", {"a": "Element", "b": "with"})
         number, text = st.column_config.NumberColumn, st.column_config.TextColumn
         offsets = {"dx": number("dx", step=0.5, width=NARROW), "dy": number("dy", step=0.5, width=NARROW)}
-        editor(st, ss, "move", "Move", {"element": "Element", **offsets}, element_width=CELL - 10)
-        editor(st, ss, "rename", "Rename", {"element": "Element", "name": text("Name", width=CELL)})
         colour_column = text("Colour", validate=r"^(#[0-9a-fA-F]{6}|[a-z]+)?$", width=CELL)
-        editor(st, ss, "mark", "Mark", {"element": "Element", "colour": colour_column})
-        domains_block(st, ss)
+        swap, move, rename, mark, domains = st.tabs(EDITOR_TABS, key="editors")  # one editor in view at a time
+        with swap:
+            editor(st, ss, "swap", "Swap", {"a": "Element", "b": "with"})
+        with move:
+            editor(st, ss, "move", "Move", {"element": "Element", **offsets})
+        with rename:
+            editor(st, ss, "rename", "Rename", {"element": "Element", "name": text("Name", width=CELL)})
+        with mark:
+            editor(st, ss, "mark", "Mark", {"element": "Element", "colour": colour_column})
+        with domains:
+            domains_block(st, ss)
 
 
-NAMES = {"generic": "generic (α1, A)", "deposited": "deposited (file's own)", "beta": "β1…βn"}
+NAMES = {"generic": "generic", "deposited": "deposited", "beta": "β1…βn"}  # NAMES_HELP says what each is
 NAMES_HELP = (
-    "conventional names · generic: foldmap's own labels · deposited: the helix ids the file itself gives (a globin's "
-    "A–H) · β1…βn: strands numbered in sequence, each helix of a βα row named after the strand before it · a names "
-    "file (YAML) names elements by residue range and nucleic-acid stems by one nucleotide they pair, and wins over "
-    "the choice above; a rename wins over both"
+    "conventional names · generic: foldmap's own labels (α1, A) · deposited: the helix ids the file itself gives "
+    "(a globin's A–H) · β1…βn: strands numbered in sequence, each helix of a βα row named after the strand before "
+    "it · a names file (YAML) names elements by residue range and nucleic-acid stems by one nucleotide they pair, "
+    "and wins over the choice above; a rename wins over both"
 )
 NAMES_FILE_MAX = 100_000  # bytes: a names file is a few kB
 
@@ -470,7 +495,7 @@ def domains_block(st, ss: MutableMapping) -> None:
         )
 
 
-CELL, NARROW = 80, 50  # column widths (px): two cells, or a narrower element and two numbers, fit the sidebar
+CELL, NARROW = 130, 60  # column widths (px): two cells, or an element and two numbers, fit the sidebar
 ELEMENT_COLUMNS = {  # domains: names and ranges are typed
     "swap": ("a", "b"),
     "move": ("element",),
@@ -499,7 +524,7 @@ def editor_frame(kind: str, rows: list[dict]):
     return frame
 
 
-def editor(st, ss: MutableMapping, kind: str, label: str, columns: dict, element_width: int = CELL) -> None:
+def editor(st, ss: MutableMapping, kind: str, label: str, columns: dict) -> None:
     """One editor: its label and "as text" switch, then a table (rows of the text, element cells picked from the
     drawn elements) or the text itself, and under it the exact text it writes. `columns`: each column's config; a
     str is an element column of that label. A table edit is applied by app_edits.apply_table."""
@@ -515,7 +540,7 @@ def editor(st, ss: MutableMapping, kind: str, label: str, columns: dict, element
         options = element_options(kind, rows, choices)
         config = {
             column: st.column_config.SelectboxColumn(
-                spec, options=options, format_func=lambda ref: display(ref, choices), width=element_width
+                spec, options=options, format_func=lambda ref: display(ref, choices), width=CELL
             )
             if isinstance(spec, str)
             else spec
@@ -537,9 +562,10 @@ def editor(st, ss: MutableMapping, kind: str, label: str, columns: dict, element
 
 UNIPROT = ("off", "auto", "accession")
 SITES = ("auto", "all", "none", "types")
-CONSERVATION_NOTE = (
-    "With an alignment: colour by 'conservation', and the Sequence view shows the alignment. A ConSurf grades table "
-    "(consurf_grades.txt) colours by ConSurf's own grades."
+CONSERVATION_NOTE = "Then colour by 'conservation' (ConSurf: its own grades)."
+ALIGNMENT_HELP = (
+    "an alignment with the structure's sequence among its rows: colour by 'conservation', and the Sequence view "
+    "shows the alignment · a ConSurf grades table (consurf_grades.txt) colours by ConSurf's own grades"
 )
 
 
@@ -555,6 +581,7 @@ def conservation_section(st, ss: MutableMapping) -> None:
             on_change=store_alignment,
             args=(ss,),
             max_upload_size=ALIGNMENT_MAX // MB,
+            help=ALIGNMENT_HELP,
         )
         if ss.get("msa_error"):
             st.error(shown(ss["msa_error"]))

@@ -1,0 +1,31 @@
+# Generated from foldmap.app.APP_CONFIG: python -c "from foldmap.app import config_toml; print(config_toml(), end='')" > .streamlit/config.toml
+
+[client]
+toolbarMode = "viewer"
+showErrorDetails = "none"
+
+[server]
+maxUploadSize = 50
+
+[browser]
+gatherUsageStats = false
+
+[theme.light]
+primaryColor = "#0072B2"
+backgroundColor = "#FFFFFF"
+secondaryBackgroundColor = "#F5F7FA"
+textColor = "#1F2933"
+borderColor = "#848D97"
+baseRadius = "8px"
+showWidgetBorder = true
+headingFontWeights = 600
+
+[theme.dark]
+primaryColor = "#56B4E9"
+backgroundColor = "#0F1419"
+secondaryBackgroundColor = "#1A2129"
+textColor = "#E6EAEE"
+borderColor = "#6B7682"
+baseRadius = "8px"
+showWidgetBorder = true
+headingFontWeights = 600

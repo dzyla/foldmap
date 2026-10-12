@@ -6,6 +6,7 @@ Run with `foldmap app` (or `streamlit run src/foldmap/app.py`)."""
 
 from __future__ import annotations
 
+import base64
 import copy
 import json
 import logging
@@ -59,7 +60,8 @@ PREVIEW_THEMES = [  # shown in the style picker as static thumbnails (scripts/ma
     "goodsell",
     "blueprint",
 ]
-PREVIEWS = Path(__file__).parent / "assets" / "previews"
+ASSETS = Path(__file__).parent / "assets"  # icon.png, icon.svg (scripts/make_app_icon.py), previews/
+PREVIEWS = ASSETS / "previews"
 
 
 def preview_image(theme: str) -> bytes:
@@ -297,14 +299,134 @@ def settings_from_document(doc: dict) -> dict:
     return out
 
 
-# interim: Task 12 completes the stylesheet (theme colours, top bar, Start width, sidebar spacing)
-STYLESHEET = """
-@media (min-width:640px) {[data-testid="stMainBlockContainer"] {padding:4rem 1.5rem 2rem}}
-.st-key-canvas .fm-card {border-radius:8px;padding:12px;overflow-x:auto}
-.st-key-canvas .fm-card > svg {display:block;width:100%;height:auto;max-height:80vh}
-.st-key-seq_options .st-key-seq_full {padding-top:2.25rem}
-[data-testid="stSidebarUserContent"] {padding-bottom:0.5rem}
+# ---------------------------------------------------------------------------------------------- look
+APP_THEME = {  # Okabe-Ito blue on white, and its dark twin; every colour pair is checked in tests/test_app_look.py
+    "theme.light": {
+        "primaryColor": "#0072B2",
+        "backgroundColor": "#FFFFFF",
+        "secondaryBackgroundColor": "#F5F7FA",
+        "textColor": "#1F2933",
+        "borderColor": "#848D97",  # widget boundaries need 3:1 (Q-A18)
+        "baseRadius": "8px",
+        "showWidgetBorder": True,
+        "headingFontWeights": 600,
+    },
+    "theme.dark": {
+        "primaryColor": "#56B4E9",
+        "backgroundColor": "#0F1419",
+        "secondaryBackgroundColor": "#1A2129",
+        "textColor": "#E6EAEE",
+        "borderColor": "#6B7682",
+        "baseRadius": "8px",
+        "showWidgetBorder": True,
+        "headingFontWeights": 600,
+    },
+}
+MUTED = {"light": "#5B6670", "dark": "#9AA5B1"}  # captions, upload limits, placeholders (the stylesheet)
+CARD_BORDER = {"light": "#E3E7EC", "dark": "#2A333D"}  # the figure card's edge (decorative)
+BUTTON_LABEL = {"light": "#FFFFFF", "dark": "#0F1419"}  # on the primary colour: white on #56B4E9 is only 2.31:1
+APP_CONFIG = {  # what `foldmap app` passes and .streamlit/config.toml holds (Streamlit Community Cloud reads it)
+    "client": {"toolbarMode": "viewer", "showErrorDetails": "none"},  # no Deploy menu; visitors see no traceback
+    "server": {"maxUploadSize": 50},  # MB, every uploader (the layout file and alignment ones cap lower)
+    "browser": {"gatherUsageStats": False},
+    **APP_THEME,
+}
+SIDEBAR_WIDTH = 440  # px: the sidebar's segmented choices and toggle rows fit on one line (Streamlit's own: 336)
+
+
+def _toml(value) -> str:
+    return str(value).lower() if isinstance(value, bool) else f'"{value}"' if isinstance(value, str) else str(value)
+
+
+def config_toml() -> str:
+    """APP_CONFIG as .streamlit/config.toml: a section per entry, in order."""
+    out = [
+        '# Generated from foldmap.app.APP_CONFIG: python -c "from foldmap.app import config_toml; '
+        "print(config_toml(), end='')\" > .streamlit/config.toml"
+    ]
+    for section, values in APP_CONFIG.items():
+        out += ["", f"[{section}]", *(f"{key} = {_toml(value)}" for key, value in values.items())]
+    return "\n".join(out) + "\n"
+
+
+def run_args(app_path) -> list[str]:
+    """The `streamlit run` command of `foldmap app`: APP_CONFIG as flags (the same values as the config file)."""
+    import sys
+
+    flags = [
+        f"--{section}.{key}={str(value).lower() if isinstance(value, bool) else value}"
+        for section, values in APP_CONFIG.items()
+        for key, value in values.items()
+    ]
+    return [sys.executable, "-m", "streamlit", "run", str(app_path), *flags]
+
+
+SIDE, PAIR = '[data-testid="stSidebarUserContent"]', '[data-testid="stElementContainer"]'  # PAIR: two a row, or
+# one a row where the sidebar is too narrow for two (a phone)
+
+
+def _colours(mode: str) -> str:
+    """The stylesheet's colours of one theme: muted text (captions, upload limits, input hints, placeholders:
+    Streamlit fades them below 4.5:1), the chosen option of a segmented control in the text colour (the primary
+    colour on its tinted background is 4.22:1 in light), a switch's track when off in the border colour (Streamlit's
+    grey is 1.5:1) and its knob when on in the background colour (light grey on #56B4E9 is 1.9:1), the figure
+    card's edge."""
+    theme = APP_THEME[f"theme.{mode}"]
+    switch = '[data-testid="stCheckbox"] label:has(input[role="switch"]'
+    return f"""
+[data-testid="stCaptionContainer"], [data-testid="stFileUploaderDropzoneInstructions"] span,
+[data-testid="InputInstructions"],
+[data-testid="stApp"] input::placeholder, [data-testid="stApp"] textarea::placeholder {{opacity:1;color:{MUTED[mode]}}}
+[data-testid="stButtonGroup"] button[aria-checked="true"] p {{color:{theme["textColor"]}}}
+{switch}:not(:checked)) > div:not([data-testid]) {{background:{theme["borderColor"]}}}
+{switch}:checked) > div:not([data-testid]) > div {{background:{theme["backgroundColor"]}}}
+.st-key-canvas .fm-card {{border:1px solid {CARD_BORDER[mode]}}}
 """
+
+
+STYLESHEET = f"""
+.st-key-start {{max-width:640px;margin:0 auto}}
+@media (min-width:640px) {{[data-testid="stMainBlockContainer"] {{padding:4rem 1.5rem 2rem}}}}
+.st-key-topbar {{row-gap:0.25rem}}
+.st-key-canvas .fm-card {{border-radius:8px;padding:12px;overflow-x:auto}}
+.st-key-canvas svg {{display:block;width:100%;height:auto;max-height:80vh}}
+[data-testid="stMainBlockContainer"]:has([data-testid="stAlert"]) .st-key-canvas svg {{max-height:calc(80vh - 5rem)}}
+.st-key-seq_options .st-key-seq_full {{padding-top:2.25rem}}
+.st-key-explorer iframe {{height:min(1100px,85vh)!important}}
+{SIDE} {{padding-bottom:0.5rem}}
+{SIDE} [data-testid="stVerticalBlock"] {{gap:0.375rem}}
+{SIDE} [data-testid="stExpanderDetails"] {{padding-top:0.5rem;padding-bottom:0.75rem}}
+{SIDE} [data-testid="stExpanderDetails"] [data-testid="stMarkdownContainer"] p {{font-size:14px}}
+{SIDE} [data-testid="stButtonGroup"] button {{padding-left:0.5rem;padding-right:0.5rem;min-width:0}}
+{SIDE} [data-testid="stFileUploaderDropzone"] {{padding:0.375rem 0.5rem;min-height:0;
+  flex-direction:row;align-items:center}}
+{SIDE} [data-testid="stFileUploaderDropzone"] button {{min-height:2rem}}
+{SIDE} [data-testid="stFileUploaderDropzoneInstructions"] {{height:auto}}
+.st-key-style_shapes {PAIR}, .st-key-style_angles {PAIR},
+.st-key-layout_shape {PAIR}, .st-key-show_choices {PAIR} {{flex:1 1 9.5rem}}
+.st-key-show_choices .st-key-ligands__mode {{flex-basis:11.5rem}}
+.st-key-show_choices .st-key-membrane {{flex-basis:8.5rem}}
+.st-key-reset_theme button {{min-height:0}}
+.st-key-credit p {{font-size:12px}}
+.st-key-phone_hint {{display:none}}
+@media (max-width:640px) {{.st-key-phone_hint {{display:flex}}}}
+{_colours("light")}"""
+DARK_EXTRA = f"""{_colours("dark")}
+.st-key-load button p, .st-key-redraw button p {{color:{BUTTON_LABEL["dark"]}}}
+"""
+
+
+MARK = (  # the icon (scripts/make_app_icon.py) as the Start screen's mark
+    '<img src="data:image/png;base64,{}" width="44" height="44" alt="">'.format(
+        base64.b64encode((ASSETS / "icon.png").read_bytes()).decode()
+    )
+)
+PHONE_HINT = "Settings: open the panel with » at the top left."  # Streamlit's button shows »
+
+
+def page_css(kind: str | None) -> str:
+    """The stylesheet for the theme in use (st.context.theme.type): DARK_EXTRA added in the dark theme."""
+    return STYLESHEET + (DARK_EXTRA if kind == "dark" else "")
 
 
 def trouble(err: Exception) -> str:
@@ -403,7 +525,7 @@ def essentials(st, ss: MutableMapping) -> None:
             st.selectbox(
                 "Theme", list(THEMES), key="theme", on_change=theme_changed, args=(ss,), persist_state="session"
             )
-            if st.button("Browse themes", key="theme_browse", type="tertiary"):
+            if st.button("Browse themes", key="theme_browse", type="tertiary", icon=":material/palette:"):
                 browse_themes(st, ss)
         companions = [  # beside Colour by: the palette where it colours something, the N → C ramp of `sequence`
             ("palette", "Palette", palette_used(ss["color_by"], ss["loop_color"])),
@@ -418,9 +540,18 @@ def essentials(st, ss: MutableMapping) -> None:
             st.toggle("Labels", **setting(ss, "labels"))
             st.toggle("Residue numbers", **setting(ss, "residue_numbers"))
             st.toggle("Legend", **setting(ss, "legend"))
-        st.slider("Text size", 0.6, 2.0, step=0.1, **setting(ss, "font_scale"))
-        st.text_input("Title", placeholder="No title", **setting(ss, "title"))
-        st.button("Reset to theme", key="reset_theme", type="tertiary", on_click=reset_theme, args=(ss,))
+        with st.container(horizontal=True, key="text_row"):
+            st.slider("Text size", 0.6, 2.0, step=0.1, **setting(ss, "font_scale"))
+            st.text_input("Title", placeholder="No title", **setting(ss, "title"))
+        st.button(
+            "Reset to theme",
+            key="reset_theme",
+            type="tertiary",
+            icon=":material/restart_alt:",
+            on_click=reset_theme,
+            args=(ss,),
+            help="every style value back to the theme's own (marks, highlight, H-bond pairs and the layout stay)",
+        )
 
 
 def reset_structure(ss: MutableMapping) -> None:
@@ -534,7 +665,13 @@ def main() -> None:
 
     from foldmap import uniprot
 
-    st.set_page_config(page_title="Foldmap", page_icon="🧬", layout="wide")
+    st.set_page_config(
+        page_title="foldmap",
+        page_icon=str(ASSETS / "icon.png"),
+        layout="wide",
+        initial_sidebar_state=SIDEBAR_WIDTH,  # "auto" (collapsed on a phone), this wide
+    )
+    st.html(f"<style>{page_css(st.context.theme.type)}</style>")  # once per run, both screens
     ss = st.session_state
     ss.setdefault("stage", "load")
     lim = app_jobs.limits(hosted=not local_files())
@@ -667,7 +804,9 @@ def main() -> None:
 
     if ss["stage"] == "load":  # the look's widgets keep their values while Start shows (persist_state)
         with st.container(key="start"):
-            st.header("foldmap", anchor=False)
+            with st.container(horizontal=True, vertical_alignment="center", gap="small", key="wordmark"):
+                st.html(MARK, width="content")  # the mark beside the name: decorative (no image toolbar to tab to)
+                st.header("foldmap", anchor=False, width="content")
             st.caption("Protein topology diagrams from structures")
             with st.form("start", border=False, enter_to_submit=True):
                 hint = "PDB ID, UniProt accession, or file path" if local_files() else "PDB ID or UniProt accession"
@@ -707,12 +846,14 @@ def main() -> None:
                         )
                     else:
                         st.caption(f"UniProt lists no structure or AlphaFold model for {shown(acc)}.")
-            st.caption(CREDIT)
+            with st.container(key="credit"):
+                st.caption(CREDIT)
         return
 
     # ---- workspace: top bar, the active view, then the sidebar (a view may switch auto-redraw off first)
     prepare(ss)
-    st.html(f"<style>{STYLESHEET}</style>")
+    with st.container(key="phone_hint"):  # shown under 640 px only (the stylesheet), where the sidebar starts closed
+        st.caption(PHONE_HINT)
     top = st.container(key="topbar")
     with top:
         status = st.empty()
@@ -765,15 +906,15 @@ def main() -> None:
             layout_section(st, ss)
             conservation_section(st, ss)
             layout_file_section(st, ss)
-    st.sidebar.caption(CREDIT)
+        with st.container(key="credit"):
+            st.caption(CREDIT)
 
 
 def run() -> None:
     """Entry point for `foldmap app`."""
     import subprocess
-    import sys
 
-    raise SystemExit(subprocess.call([sys.executable, "-m", "streamlit", "run", __file__]))
+    raise SystemExit(subprocess.call(run_args(__file__)))
 
 
 if __name__ == "__main__":

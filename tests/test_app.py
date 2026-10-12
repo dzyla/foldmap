@@ -662,7 +662,7 @@ def test_a_link_to_an_accession_lists_its_structures(monkeypatch):
 def test_workspace_top_bar_and_one_view():
     at = opened(DATA / "1LMB.cif")
     assert at.segmented_control(key="pane").options == ["Figure", "Sequence", "3D"]
-    assert at.segmented_control(key="pane").value == "Figure" and not at.tabs
+    assert at.segmented_control(key="pane").value == "Figure" and not at.main.tabs  # views: no tabs (the editors are)
     assert "new_structure" in [b.key for b in at.button] and at.session_state["auto_redraw"] is True
     assert any(m.value == "**1LMB**" for m in at.markdown)
     assert any(c.value.startswith("2 chains · 179 residues") for c in at.caption)

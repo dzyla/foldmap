@@ -41,8 +41,8 @@ Issues = "https://github.com/dzyla/foldmap/issues"
 
 [project.optional-dependencies]
 test = ["pytest"]
-dev = ["pytest", "ruff", "mcp>=2.2,<3", "streamlit>=1.40"]
-app = ["streamlit>=1.40"]
+dev = ["pytest", "ruff", "mcp>=2.2,<3", "streamlit>=1.65"]
+app = ["streamlit>=1.65"]
 mcp = ["mcp>=2.2,<3"]
 
 [project.scripts]
@@ -52,7 +52,7 @@ foldmap = "foldmap.cli:main"
 where = ["src"]
 
 [tool.setuptools.package-data]
-foldmap = ["assets/previews/*.png"]
+foldmap = ["assets/previews/*.png", "assets/*.svg", "assets/*.png"]
 
 [tool.setuptools.dynamic]
 version = { attr = "foldmap.__version__" }

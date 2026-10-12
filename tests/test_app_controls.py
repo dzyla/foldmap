@@ -550,6 +550,21 @@ def test_the_sidebar_is_the_essentials_then_six_sections():
     assert at.sidebar.caption[-1].value == CREDIT  # the credit closes it
 
 
+def test_the_editors_are_tabs_in_edit_layout():
+    """One editor in view at a time (the all-open sidebar stays short); every editor is still built, so each keeps
+    its table and "as text" switch."""
+    at = opened(DATA / "2LZM.cif")
+    assert [t.label for t in at.sidebar.tabs] == ["Swap", "Move", "Rename", "Mark", "Domains"] and not at.main.tabs
+    assert all(at.toggle(key=f"{kind}__as_text") for kind in ("swap", "move", "rename", "mark", "domains"))
+
+
+def test_credit_stays_visible_in_the_workspace():
+    from foldmap import CREDIT
+
+    at = opened(DATA / "1UBQ.cif")
+    assert any(c.value == CREDIT for c in at.sidebar.caption)
+
+
 def test_a_consurf_table_has_no_reference_row_and_clears_the_old_one():
     at = opened(DATA / "1UBQ.cif")
     at.file_uploader(key="msa_upload").set_value(
