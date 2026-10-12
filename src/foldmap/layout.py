@@ -211,7 +211,7 @@ class Layout:
     membrane: dict | None = None  # {"y": (bottom, top) of the band, "inside": "below"|"above", "source": ...}
     # with "bands": one (bottom, top) per stack row ("y" is the first)
     stack_rows: list[list[str]] = field(default_factory=list)  # a depth-keeping stack wrapped: each row's ids
-    ba_rows: list[list[str]] = field(default_factory=list)  # each βα template row's elements (no ghost), as built
+    ba_rows: list[list[str]] = field(default_factory=list)  # each βα template row's elements (no ghost), as drawn
     # left to right: the strands and the helices between them (_ba_template)
     res_cons: list[float] = field(default_factory=list)  # alignment conservation of each residue (nan: none)
     res_grade: list[int] = field(default_factory=list)  # conservation grade 1..9 of each residue (0: none)
@@ -2015,9 +2015,6 @@ def build_layout(
         for sh, row in zip(sheets, template_choices(sheets, sses, copies or {}) if as_rows else [False] * len(sheets))
     ]
     in_rows = {m.sse.id for it in items for m in it.members if m.sse.kind == "H"}  # helices of βα rows
-    ba_rows = [
-        [m.sse.id for m in it.members if not m.ghost] for it in items if any(m.sse.kind == "H" for m in it.members)
-    ]
     mirror = getattr(frame, "mirror_x", None)  # a dyad in the page: protomer 1 drawn as protomer 0's mirror image
     rows_x = [(it.cx + it.box[0], it.cx + it.box[2]) for it in items if any(m.sse.kind == "H" for m in it.members)]
     if mirror is not None and any(x0 < mirror < x1 for x0, x1 in rows_x):
@@ -2134,7 +2131,12 @@ def build_layout(
     )
     lay.na_traces = traces
     lay.frame = frame
-    lay.ba_rows = ba_rows
+    lay.ba_rows = [  # each βα row as drawn, left to right
+        [m.sse.id for m in sorted((m for m in it.members if not m.ghost), key=lambda m: m.cx)]
+        for it in items
+        if any(isinstance(m, Placed) and m.sse.kind == "E" for m in it.members)
+        and any(isinstance(m, Placed) and m.sse.kind == "H" for m in it.members)
+    ]
     if keep_depth and len(rows) > 1:  # wrapped into rows of whole chains: each row gets its own band
         lay.stack_rows = [[m.sse.id for it in row for m in it.members if isinstance(m, Placed)] for row in rows]
     if traces:

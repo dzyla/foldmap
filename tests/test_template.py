@@ -224,3 +224,25 @@ def test_copies_of_one_protein_share_the_template_decision():
     assert template_choices(twisted, sses, copies) == [False, False]
     lay = build_layout(sses, sheets, view_frame(sses), "projected", attract=False, copies=copies)
     assert len(lay.ba_rows) == 2
+
+
+@pytest.mark.parametrize("kw", [{"chains": ["A"]}, {}, {"up": np.array([0.927, 0.051, -0.371])}])
+def test_ba_rows_list_each_row_left_to_right_as_drawn(kw):
+    """Layout.ba_rows reads each row as drawn, left to right, also for a copy that took its mate's offsets."""
+    lay = make_layout(DATA / "1TIM.cif", **kw)[0]
+    assert lay.ba_rows
+    for row in lay.ba_rows:
+        assert row == sorted(row, key=lambda k: lay.placed[k].cx)
+
+
+def test_open_at_ends_leaves_a_barrel_of_two_chains_as_it_is():
+    from foldmap.layout import _open_at_ends
+    from foldmap.model import Sheet
+    from helpers import fake_sse
+
+    strands = [fake_sse("E", 10 * k, 10 * k + 4, chain="AB"[k % 2]) for k in range(6)]
+    sheet = Sheet(strands, [1] * 6, ["P"] * 5, closed=True)
+    assert _open_at_ends(sheet) is sheet
+    one = Sheet([fake_sse("E", s, s + 4) for s in (30, 20, 10, 0, 50, 40)], [1] * 6, ["P"] * 5, closed=True)
+    opened = _open_at_ends(one)  # first (0) and last (50) in sequence are neighbours in the ring: opened there
+    assert [s.start for s in opened.strands] == [50, 40, 30, 20, 10, 0] and opened.closed
