@@ -554,6 +554,7 @@ def conservation_section(st, ss: MutableMapping) -> None:
             key="msa_upload",
             on_change=store_alignment,
             args=(ss,),
+            max_upload_size=ALIGNMENT_MAX // MB,
         )
         if ss.get("msa_error"):
             st.error(shown(ss["msa_error"]))
@@ -620,25 +621,34 @@ def missing_alignment(ss: MutableMapping) -> str:
     return shown(ss["msa_missing"], paths=not local_files())
 
 
-def alignment_rows(path: str) -> list[str]:
-    """The names of an alignment's rows, for the Reference row picker; [] for a ConSurf grades table, no file or a
-    file that is not an alignment (its error is shown when it is read)."""
+def row_names(path) -> list[str]:
+    """The names of an alignment's rows, read (ValueError for a file that is not an alignment); [] for a ConSurf
+    grades table, which has none (the pipeline reads it as it is)."""
     from foldmap.sequence import is_consurf, read_alignment
 
+    return [] if is_consurf(path) else list(read_alignment(path).names)
+
+
+def alignment_rows(path: str) -> list[str]:
+    """The Reference row picker's rows for an alignment named by a layout file (row_names); [] for no file or a
+    file that is not an alignment (its error is shown when the figure reads it)."""
     if not path:
         return []
     try:
-        return [] if is_consurf(path) else list(read_alignment(path).names)
+        return row_names(path)
     except (ValueError, OSError):
         return []
 
 
+MB = 1024 * 1024  # bytes in Streamlit's upload megabyte (max_upload_size)
+ALIGNMENT_MAX = 10 * MB  # the alignment uploader's cap, checked again before the file is kept or read
+
+
 def store_alignment(ss: MutableMapping) -> None:
-    """The alignment uploader's callback: an uploaded alignment, read (a ConSurf grades table is used as it is: the
-    pipeline reads it) before it is kept (fetch.keep_upload) and used, with its rows for the Reference row picker
-    (a reference the new rows lack goes back to best match). Else msa_error, and no alignment."""
+    """The alignment uploader's callback: an uploaded alignment, size-capped, kept (fetch.keep_upload) and read (a
+    ConSurf grades table is used as it is: the pipeline reads it), with its rows for the Reference row picker (a
+    reference the new rows lack goes back to best match). Else msa_error, and no alignment."""
     from foldmap.fetch import ALIGNMENT_SUFFIXES, keep_upload
-    from foldmap.sequence import is_consurf, read_alignment
 
     ss["last_changed"] = "msa_path"
     up = ss.get("msa_upload")
@@ -646,8 +656,11 @@ def store_alignment(ss: MutableMapping) -> None:
         ss.update(msa_path="", msa_rows=[])
         return
     try:
-        target = keep_upload(up.name, up.getvalue(), ALIGNMENT_SUFFIXES)
-        rows = [] if is_consurf(target) else list(read_alignment(target).names)
+        data = up.getvalue()
+        if len(data) > ALIGNMENT_MAX:
+            raise ValueError(f"{upload_name(up.name)}: an alignment is at most {ALIGNMENT_MAX // MB} MB")
+        target = keep_upload(up.name, data, ALIGNMENT_SUFFIXES)
+        rows = row_names(target)
     except (ValueError, OSError) as err:
         ss["msa_error"] = str(err) if isinstance(err, ValueError) else "the alignment could not be stored; try again"
         ss.update(msa_path="", msa_rows=[])

@@ -18,6 +18,7 @@ from pathlib import Path
 
 from foldmap import CREDIT, app_jobs
 from foldmap.app_controls import (
+    MB,
     alignment_rows,
     chains_section,
     conservation_section,
@@ -29,7 +30,7 @@ from foldmap.app_controls import (
     style_section,
     touched,
 )
-from foldmap.app_edits import chain_choices, shown
+from foldmap.app_edits import chain_choices, shown, upload_name
 from foldmap.app_views import Workspace, download_menu, explorer_view, figure_view, said, sequence_view
 from foldmap.cli import _adjustments, _domain_spec
 from foldmap.fetch import fetch, source_id
@@ -472,19 +473,26 @@ def apply_document(ss: MutableMapping, settings: dict) -> None:
     ss["_synced"] = {k: v for k, v in (ss.get("_synced") or {}).items() if k not in ("names", "domains")}
 
 
+LAYOUT_FILE_MAX = MB  # the layout file uploader's cap (a layout file is a few kB), checked again before it is read
+
+
 def apply_layout_file(ss: MutableMapping) -> None:
-    """The layout file uploader's callback: the file read (layoutfile.load: YAML, checked) and its settings in place
-    of the session's (apply_document), with the rows of the alignment it names; else layout_error, and nothing
-    changes."""
+    """The layout file uploader's callback: the file, size-capped, read (layoutfile.load: YAML, checked) and its
+    settings in place of the session's (apply_document), with the rows of the alignment it names; else
+    layout_error, and nothing changes."""
     from foldmap import layoutfile
 
     up = ss.get("layout_upload")
     if up is None:
         return
+    data = up.getvalue()
+    if len(data) > LAYOUT_FILE_MAX:
+        ss["layout_error"] = f"{upload_name(up.name)}: a layout file is at most {LAYOUT_FILE_MAX // MB} MB"
+        return
     try:
         with tempfile.TemporaryDirectory() as tmp:
             f = Path(tmp) / "layout.yaml"
-            f.write_bytes(up.getvalue())
+            f.write_bytes(data)
             doc = layoutfile.load(f)
         settings = settings_from_document(doc)
     except (ValueError, OSError) as err:
@@ -504,6 +512,7 @@ def layout_file_section(st, ss: MutableMapping) -> None:
             key="layout_upload",
             on_change=apply_layout_file,
             args=(ss,),
+            max_upload_size=LAYOUT_FILE_MAX // MB,
             help="a layout file saved from the Download menu (or the command line's --save-layout): the theme, "
             "style, layout options and edits it holds replace the current ones",
         )

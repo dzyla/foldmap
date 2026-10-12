@@ -1080,10 +1080,44 @@ def test_the_popover_shows_the_share_link_of_an_id_only(monkeypatch, tmp_path):
 
 
 def test_a_layout_file_nested_too_deeply_is_a_message():
+    from foldmap.app import current_blob
+
     at = load(app_test(), DATA / "1UBQ.cif")
+    before = current_blob(at.session_state)
     deep = ("names: " + "[" * 3000 + "]" * 3000 + "\n").encode()
     at.file_uploader(key="layout_upload").set_value(("deep.yaml", deep, "application/x-yaml")).run()
     assert not at.exception and any("nested too deeply" in _visible(e.value) for e in at.error)
+    assert "nested too deeply" in at.session_state["layout_error"] and current_blob(at.session_state) == before
+
+
+def test_an_oversized_layout_file_is_refused_unread(monkeypatch):
+    from app_helpers import count_calls
+    from foldmap import layoutfile
+    from foldmap.app import LAYOUT_FILE_MAX, current_blob
+
+    at = load(app_test(), DATA / "1UBQ.cif")
+    before = current_blob(at.session_state)
+    calls = count_calls(monkeypatch, layoutfile, "load")
+    big = b"foldmap: 1\n" + b"#" * LAYOUT_FILE_MAX
+    at.file_uploader(key="layout_upload").set_value(("big.yaml", big, "application/x-yaml")).run()
+    assert not at.exception and calls == [] and current_blob(at.session_state) == before
+    assert at.session_state["layout_error"] == "big.yaml: a layout file is at most 1 MB"
+    assert any(_visible(e.value) == "big.yaml: a layout file is at most 1 MB" for e in at.error)
+
+
+def test_an_oversized_alignment_is_refused_unstored_and_unread(monkeypatch):
+    from app_helpers import count_calls
+    from foldmap import fetch, sequence
+    from foldmap.app_controls import ALIGNMENT_MAX
+
+    at = load(app_test(), DATA / "1UBQ.cif")
+    kept, read = count_calls(monkeypatch, fetch, "keep_upload"), count_calls(monkeypatch, sequence, "read_alignment")
+    big = b">a\n" + b"A" * ALIGNMENT_MAX
+    at.file_uploader(key="msa_upload").set_value(("big.fasta", big, "text/plain")).run()
+    ss = at.session_state
+    assert not at.exception and kept == [] and read == [] and ss["msa_path"] == "" and ss["msa_rows"] == []
+    assert ss["msa_error"] == "big.fasta: an alignment is at most 10 MB"
+    assert any(_visible(e.value) == "big.fasta: an alignment is at most 10 MB" for e in at.error)
 
 
 def test_a_hosted_layout_download_names_uploads_by_their_own_names(monkeypatch, tmp_path):
