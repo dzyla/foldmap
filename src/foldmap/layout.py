@@ -17,7 +17,7 @@ from .features import helix_bundles
 from .frame import Frame, symmetric_frame, view_frame
 from .model import SSE, Nucleic, Sheet, group_by_chain
 from .nucleic import Stem, StemView, segment_stem, stem_axis, stem_views
-from .style import Style
+from .style import CHOICES, Style
 
 PITCH = 1.1  # distance between neighbouring strand centres
 SHAFT = 0.62  # arrow shaft width
@@ -211,6 +211,8 @@ class Layout:
     membrane: dict | None = None  # {"y": (bottom, top) of the band, "inside": "below"|"above", "source": ...}
     # with "bands": one (bottom, top) per stack row ("y" is the first)
     stack_rows: list[list[str]] = field(default_factory=list)  # a depth-keeping stack wrapped: each row's ids
+    ba_rows: list[list[str]] = field(default_factory=list)  # each βα template row's elements (no ghost), as built
+    # left to right: the strands and the helices between them (_ba_template)
     res_cons: list[float] = field(default_factory=list)  # alignment conservation of each residue (nan: none)
     res_grade: list[int] = field(default_factory=list)  # conservation grade 1..9 of each residue (0: none)
     cons_label: str = ""  # legend text saying where the grades come from
@@ -302,7 +304,9 @@ def _anchor(strands: list[SSE]) -> tuple[int, str]:
     return first.start, first.chain
 
 
-def _sheet_item(sheet: Sheet, frame: Frame, pitch: float = PITCH) -> _Item:
+def _sheet_order(sheet: Sheet, frame: Frame) -> tuple[list[int], int, np.ndarray]:
+    """How a sheet is drawn: the strands' indices left to right, s = +1 when strands[0] points up (else -1), and
+    the strands' projected centroids (Å)."""
     strands = sheet.strands
     cents = frame.project(np.array([s.centroid for s in strands]), [s.chain for s in strands])
     mean_dir = sum(d * s.axis for d, s in zip(sheet.directions, strands))
@@ -316,6 +320,12 @@ def _sheet_item(sheet: Sheet, frame: Frame, pitch: float = PITCH) -> _Item:
     order = list(range(len(strands)))
     if len(strands) > 1 and (cents[-1] - cents[0]) @ right < 0:
         order.reverse()
+    return order, s, cents
+
+
+def _sheet_item(sheet: Sheet, frame: Frame, pitch: float = PITCH) -> _Item:
+    strands = sheet.strands
+    order, s, cents = _sheet_order(sheet, frame)
     members, offsets = [], []
     slots = len(order) + (1 if sheet.closed else 0)
     for slot, k in enumerate(order):
@@ -327,6 +337,90 @@ def _sheet_item(sheet: Sheet, frame: Frame, pitch: float = PITCH) -> _Item:
         f = members[0]
         members.append(Placed(f.sse, 0, 0, f.length, f.angle, f.width, ghost=True))
         offsets.append(((slots - 1) / 2 * pitch, 0.0))
+    home = tuple(cents.mean(axis=0) * SCALE)
+    return _Item(members, offsets, home[0], home[1], home, *_anchor(strands))
+
+
+_BA_GAP = 0.3  # page units between the footprints of neighbours in a βα template row
+_BA_SHARE = (3, 5)  # the template applies when at least this share of a sheet's βα units are in its row
+
+
+class BAUnit(NamedTuple):
+    """Two strands of one chain consecutive in sequence among a sheet's strands, and the helices between them."""
+
+    p: SSE
+    q: SSE
+    slots: tuple[int, int]  # their places in sheet.strands; in a barrel's closing unit, the first's is len(strands)
+    helices: list[SSE]  # the H elements of the chain between p.end and q.start, in sequence
+    inrow: bool  # the strands are neighbours in the sheet (or close the barrel) and a helix joins them
+
+
+def _ba_units(sheet: Sheet, sses: list[SSE]) -> list[BAUnit]:
+    """The βα units of a sheet, chain by chain in sequence. A closed sheet's ghost counts as slot len(strands): the
+    unit joining its first and last slots (the closing unit) is in its row, between the last strand and the
+    ghost."""
+    slot = {s.id: k for k, s in enumerate(sheet.strands)}
+    n = len(sheet.strands)
+    out = []
+    for chain in sorted({s.chain for s in sheet.strands}):
+        mine = sorted((s for s in sheet.strands if s.chain == chain), key=lambda s: s.start)
+        for p, q in zip(mine, mine[1:]):
+            sp, sq = slot[p.id], slot[q.id]
+            if sheet.closed and n > 2 and {sp, sq} == {0, n - 1}:
+                sp, sq = (n if sp == 0 else sp), (n if sq == 0 else sq)
+            hs = [s for s in sses if s.chain == chain and s.kind == "H" and p.end < s.start and s.end < q.start]
+            out.append(BAUnit(p, q, (sp, sq), hs, abs(sp - sq) == 1 and bool(hs)))
+    return out
+
+
+def template_applies(sheet: Sheet, sses: list[SSE]) -> bool:
+    """Is the sheet drawn as a βα row (_ba_template)? An all-parallel sheet of at least four strands, its order not
+    a guess, with at least 3/5 of its βα units in the row (1TIM: 7 of 7, 1LDM: 4 of 5). Mixed and antiparallel
+    sheets never are. Pure: it changes nothing."""
+    if len(sheet.strands) < 4 or sheet.ambiguous or any(k != "P" for k in sheet.pair_kinds):
+        return False
+    units = _ba_units(sheet, sses)
+    return bool(units) and _BA_SHARE[1] * sum(u.inrow for u in units) >= _BA_SHARE[0] * len(units)
+
+
+def _ba_template(
+    sheet: Sheet, units: list[BAUnit], frame: Frame, pitch: float = PITCH, helix_w: float = HELIX_W
+) -> _Item:
+    """An all-parallel α/β sheet (template_applies) as one row, as the hand-drawn TIM barrel and Rossmann figures
+    draw it: the strands in sheet order and pointing as _sheet_item draws them (the front face), and after each
+    strand, when an in-row unit joins it to the next, that unit's longest helix (the first on a tie), true length,
+    running against the strands; a barrel's closing helix between the last strand and the ghost. Each footprint
+    (labels included) starts _BA_GAP after the last one ends, all centred on one line, the row centred on the item.
+    Other helices are placed as free helices. Home: the strands' projected mean, as _sheet_item."""
+    strands = sheet.strands
+    order, s, cents = _sheet_order(sheet, frame)
+    n = len(order)
+    drawn = {k: d for d, k in enumerate(order)}
+    after: dict[int, SSE] = {}  # drawn slot -> the helix drawn right of it
+    for u in units:
+        if u.inrow:
+            gap = n - 1 if n in u.slots else min(drawn[u.slots[0]], drawn[u.slots[1]])
+            after[gap] = max(u.helices, key=lambda h: (len(h), -h.start))
+    members: list[Placed] = []
+    for d, k in enumerate(order):
+        up = sheet.directions[k] * s > 0
+        sse = strands[k]
+        members.append(Placed(sse, 0, 0, _strand_length(sse), np.pi / 2 if up else -np.pi / 2, pitch))
+        if d in after:
+            h = after[d]
+            length = max(helix_w, (len(h) - 1) * HELIX_RISE * SCALE)
+            members.append(Placed(h, 0, 0, length, -np.pi / 2 if up else np.pi / 2, helix_w))
+    if sheet.closed:
+        f = members[0]
+        members.append(Placed(f.sse, 0, 0, f.length, f.angle, f.width, ghost=True))
+    xs, right = [], None
+    for m in members:
+        fp = _footprint(m)
+        x = -fp[0] if right is None else right + _BA_GAP - fp[0]
+        xs.append(x)
+        right = x + fp[2]
+    mid = (_footprint(members[0])[0] + right) / 2
+    offsets = [(float(_snap(x - mid)), 0.0) for x in xs]
     home = tuple(cents.mean(axis=0) * SCALE)
     return _Item(members, offsets, home[0], home[1], home, *_anchor(strands))
 
@@ -1796,10 +1890,12 @@ def build_layout(
     move: list[tuple[str, tuple[float, float]]] | None = None,
     keep_depth: bool = False,
     na_cropped: bool = False,
+    template: str | None = None,
 ) -> Layout:
-    """`keep_depth` (stack mode with a membrane): each element stays at its height along the frame's up.
-    `na_cropped` (na_extent auto cropped the nucleic acid): drawn as blocks, without base letters.
-    `attract` (projected mode) pulls loop-joined and touching elements together before overlaps
+    """`template` (Style.fold_template, the style's when None): "auto" draws each sheet that template_applies to as
+    a βα row (_ba_template), in projected mode. `keep_depth` (stack mode with a membrane): each element stays at its
+    height along the frame's up. `na_cropped` (na_extent auto cropped the nucleic acid): drawn as blocks, without
+    base letters. `attract` (projected mode) pulls loop-joined and touching elements together before overlaps
     are removed; `contacts` comes from features.sse_contacts. `nucleic` adds its stems (straight pieces of
     base-paired DNA/RNA), placed like any element and pulling the elements that touch them; strands with no pair
     at all are kept as projected traces."""
@@ -1807,16 +1903,31 @@ def build_layout(
         raise ValueError(f"unknown layout mode {mode!r}")
     style = style or Style()
     angle_mode = "upright" if mode == "stack" else style.helix_angle
-    items = [_sheet_item(sh, frame, PITCH * style.strand_scale) for sh in sheets]
+    template = style.fold_template if template is None else template
+    if template not in CHOICES["fold_template"]:
+        raise ValueError(f"fold_template must be one of {', '.join(CHOICES['fold_template'])}; got {template!r}")
+    as_rows = mode == "projected" and template == "auto"  # a stack row draws elements in sequence instead
+    items = [
+        _ba_template(sh, _ba_units(sh, sses), frame, PITCH * style.strand_scale, HELIX_W * style.helix_scale)
+        if as_rows and template_applies(sh, sses)
+        else _sheet_item(sh, frame, PITCH * style.strand_scale)
+        for sh in sheets
+    ]
+    in_rows = {m.sse.id for it in items for m in it.members if m.sse.kind == "H"}  # helices of βα rows
+    ba_rows = [
+        [m.sse.id for m in it.members if not m.ghost] for it in items if any(m.sse.kind == "H" for m in it.members)
+    ]
     by_id = {s.id: s for s in sses}
-    bundles = helix_bundles(sses)
+    bundles = helix_bundles([s for s in sses if s.id not in in_rows])  # bundles are coiled coils, never a row's
     if getattr(frame, "mirror_x", None) is not None and getattr(frame, "sector", None):
         bundles = _within_protomers(bundles, by_id, frame.sector)
     bundled = {k for g in bundles for k in g}
     items += [_bundle_item([by_id[k] for k in g], frame, angle_mode, HELIX_W * style.helix_scale) for g in bundles]
-    kinked = _kink_groups(sses, bundled) if mode == "projected" else []  # a stack row draws each piece on its own
+    kinked = (
+        _kink_groups(sses, bundled | in_rows) if mode == "projected" else []
+    )  # a stack row draws each piece on its own
     items += [_kink_item(g, frame, angle_mode, HELIX_W * style.helix_scale) for g in kinked]
-    grouped = bundled | {s.id for g in kinked for s in g}
+    grouped = bundled | in_rows | {s.id for g in kinked for s in g}
     items += [
         _helix_item(s, frame, angle_mode, HELIX_W * style.helix_scale)
         for s in sses
@@ -1903,10 +2014,10 @@ def build_layout(
     for g in ghosts:
         g.label = real[g.sse.id].label
     rects = np.array([p.rect for p in placed + ghosts + dna]).reshape(-1, 4)
-    sheet_blocks = [
-        [m.sse.id for m in it.members if not m.ghost]
+    sheet_blocks = [  # the strands of each item holding any: a βα row's helices lie between them, on its panel
+        ids
         for it in items
-        if it.members and all(isinstance(m, Placed) and m.sse.kind == "E" for m in it.members)
+        if (ids := [m.sse.id for m in it.members if isinstance(m, Placed) and m.sse.kind == "E" and not m.ghost])
     ]
     lay = Layout(
         real,
@@ -1919,6 +2030,7 @@ def build_layout(
     )
     lay.na_traces = traces
     lay.frame = frame
+    lay.ba_rows = ba_rows
     if keep_depth and len(rows) > 1:  # wrapped into rows of whole chains: each row gets its own band
         lay.stack_rows = [[m.sse.id for it in row for m in it.members if isinstance(m, Placed)] for row in rows]
     if traces:

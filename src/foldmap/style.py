@@ -42,6 +42,7 @@ CHOICES = {
     "loops": ("orthogonal", "curved"),
     "helix_shading": ("depth", "none", "gloss"),  # back face darker / no shading / darker back + glint
     "helix_angle": ("snap", "upright", "tilted"),  # nearest of vertical/horizontal / always vertical / as in 3D
+    "fold_template": ("auto", "off"),  # all-parallel α/β sheets as one βα row (TIM, Rossmann) / as projected
 }
 _ALIASES = {"fill": {"classic": "bold", "flat": "pale"}}
 _KEY_ALIASES = {"dna_extent": "na_extent"}  # earlier names of style keys
@@ -52,6 +53,7 @@ LAYOUT_KEYS = (
     "dna_scale",
     "helices_310",
     "na_extent",
+    "fold_template",
 )  # these move elements
 NA_BACKBONES = ("modality", "chain", "ink")
 MODALITIES = ("protein", "dna", "rna")
@@ -84,6 +86,8 @@ class Style:
     loops: str = "orthogonal"
     helix_shading: str = "depth"
     helix_angle: str = "snap"
+    fold_template: str = "auto"  # auto: an all-parallel α/β sheet (TIM barrel, Rossmann fold) is drawn as one row,
+    # each crossover helix between the two strands it joins; off: helices where the projection puts them
     helix_scale: float = 1.0  # helix ribbon diameter
     strand_scale: float = 1.0  # arrow width and the spacing of strands in a sheet
     dna_scale: float = 1.0  # duplex diameter

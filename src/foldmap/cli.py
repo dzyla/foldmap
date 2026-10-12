@@ -309,6 +309,7 @@ def make_layout(
         move=move,
         keep_depth=mem is not None and mode == "stack",
         na_cropped=na_cropped,
+        template=(look or Style()).fold_template,
     )
     lay.focus = _focus((look or Style()).highlight, bb, sym)
     if focus_chains:
