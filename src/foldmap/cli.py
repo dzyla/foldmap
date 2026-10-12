@@ -19,7 +19,7 @@ from .features import sse_contacts
 from .frame import Frame, RadialFrame, dna_radial_frame, dna_view_frame, protomer_maps, symmetric_frame, view_frame
 from .io import load_backbone, load_links, load_nucleic, read_model
 from .layout import SCALE, _snap, build_layout, na_torn_by_unrolling, resolve
-from .model import AUTO_NT, crop_nucleic, nucleic_of_chains, nucleic_touching, res_ref
+from .model import AUTO_NT, crop_nucleic, homolog_chains, nucleic_of_chains, nucleic_touching, res_ref
 from .nucleic import StemView, stem_views, straight_duplex
 from .palette import PALETTES
 from .render import LOOP_STYLES, STYLES, draw, save
@@ -310,6 +310,7 @@ def make_layout(
         keep_depth=mem is not None and mode == "stack",
         na_cropped=na_cropped,
         template=(look or Style()).fold_template,
+        copies=homolog_chains(bb),
     )
     lay.focus = _focus((look or Style()).highlight, bb, sym)
     if focus_chains:

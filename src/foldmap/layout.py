@@ -396,14 +396,54 @@ def _open_at_ends(sheet: Sheet) -> Sheet:
     )
 
 
+def _row_shape(sheet: Sheet) -> bool:
+    """Can the sheet be a βα row at all: all parallel, at least four strands, its order not a guess?"""
+    return len(sheet.strands) >= 4 and not sheet.ambiguous and all(k == "P" for k in sheet.pair_kinds)
+
+
 def template_applies(sheet: Sheet, sses: list[SSE]) -> bool:
-    """Is the sheet drawn as a βα row (_ba_template)? An all-parallel sheet of at least four strands, its order not
-    a guess, with at least 3/5 of its βα units in the row (1TIM: 7 of 7, 1LDM: 4 of 5). Mixed and antiparallel
-    sheets never are. Pure: it changes nothing."""
-    if len(sheet.strands) < 4 or sheet.ambiguous or any(k != "P" for k in sheet.pair_kinds):
+    """Is the sheet, on its own, drawn as a βα row (_ba_template)? An all-parallel sheet of at least four strands, its
+    order not a guess, with at least 3/5 of its βα units in the row (1TIM: 7 of 7, 1LDM: 4 of 5). Mixed and
+    antiparallel sheets never are. Pure: it changes nothing. Copies of a protein share the decision: see
+    template_choices."""
+    if not _row_shape(sheet):
         return False
     units = _ba_units(sheet, sses)
     return bool(units) and _BA_SHARE[1] * sum(u.inrow for u in units) >= _BA_SHARE[0] * len(units)
+
+
+def template_choices(sheets: list[Sheet], sses: list[SSE], copies: dict[str, tuple[str, int]]) -> list[bool]:
+    """Which sheets are drawn as βα rows, copies of one protein alike. `copies` (model.homolog_chains): chain ->
+    (first chain of its copies, residue-number offset). Sheets of one chain each match when they belong to copies of
+    one protein and at least half the strands of the smaller overlap (residue numbers taken to the first copy's).
+    In each group of matching sheets: if any takes the template on its own (template_applies) and every one can be a
+    row (_row_shape), all of them take it (a copy missing a helix or two is drawn as its mates are); if any cannot
+    be a row, none takes it, so the copies stay alike. Pure."""
+    own = [template_applies(sh, sses) for sh in sheets]
+
+    def mapped(sh):
+        chains = {s.chain for s in sh.strands}
+        if len(chains) != 1:
+            return None
+        (c,) = chains
+        root, shift = copies.get(c, (c, 0))
+        return root, c, [(s.first.seq - shift, s.last.seq - shift) for s in sh.strands]
+
+    keys = [mapped(sh) for sh in sheets]
+    links = []
+    for i, j in itertools.combinations(range(len(sheets)), 2):
+        a, b = keys[i], keys[j]
+        if a is None or b is None or a[0] != b[0] or a[1] == b[1]:
+            continue
+        hits = sum(any(min(x1, y1) >= max(x0, y0) for y0, y1 in b[2]) for x0, x1 in a[2])
+        if 2 * hits >= min(len(a[2]), len(b[2])):
+            links.append((i, j))
+    group = _components(len(sheets), links)
+    out = []
+    for i in range(len(sheets)):
+        mine = [k for k in range(len(sheets)) if group[k] == group[i]]
+        out.append(any(own[k] for k in mine) and all(_row_shape(sheets[k]) for k in mine))
+    return out
 
 
 def _ba_template(
@@ -1944,9 +1984,11 @@ def build_layout(
     keep_depth: bool = False,
     na_cropped: bool = False,
     template: str | None = None,
+    copies: dict[str, tuple[str, int]] | None = None,
 ) -> Layout:
     """`template` (Style.fold_template, the style's when None): "auto" draws each sheet that template_applies to as
-    a βα row (_ba_template), in projected mode. `keep_depth` (stack mode with a membrane): each element stays at its
+    a βα row (_ba_template), in projected mode; `copies` (model.homolog_chains) makes copies of a protein share that
+    choice (template_choices). `keep_depth` (stack mode with a membrane): each element stays at its
     height along the frame's up. `na_cropped` (na_extent auto cropped the nucleic acid): drawn as blocks, without
     base letters. `attract` (projected mode) pulls loop-joined and touching elements together before overlaps
     are removed; `contacts` comes from features.sse_contacts. `nucleic` adds its stems (straight pieces of
@@ -1968,9 +2010,9 @@ def build_layout(
             PITCH * style.strand_scale,
             HELIX_W * style.helix_scale,
         )
-        if as_rows and template_applies(sh, sses)
+        if row
         else _sheet_item(sh, frame, PITCH * style.strand_scale)
-        for sh in sheets
+        for sh, row in zip(sheets, template_choices(sheets, sses, copies or {}) if as_rows else [False] * len(sheets))
     ]
     in_rows = {m.sse.id for it in items for m in it.members if m.sse.kind == "H"}  # helices of βα rows
     ba_rows = [

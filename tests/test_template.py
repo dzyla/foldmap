@@ -198,3 +198,29 @@ def test_a_template_row_across_the_mirror_line_takes_side_by_side_copies():
     assert sorted(a, key=lambda p: p.sse.start).index(lay.placed[ga.sse.id]) == sorted(
         b, key=lambda p: p.sse.start
     ).index(lay.placed[gb.sse.id])
+
+
+def test_copies_of_one_protein_share_the_template_decision():
+    """Copies of one protein (model.homolog_chains) are drawn alike: when one copy's sheet takes the template, the
+    matching sheets of the other copies take it too (here B lacks three of its row helices, 4 of 7 units: alone it
+    would not qualify); when a matching sheet cannot be a row at all (ambiguous, mixed), none of them is one."""
+    import dataclasses
+
+    from foldmap.frame import view_frame
+    from foldmap.layout import build_layout, template_choices
+    from foldmap.model import homolog_chains
+
+    bb, sses, sheets = pipeline(DATA / "1TIM.cif")
+    copies = homolog_chains(bb)
+    gone = {"B:18-30", "B:45-54", "B:80-86"}
+    sses = [s for s in sses if s.id not in gone]
+    big = [sh for sh in sheets if len(sh.strands) == 8]
+    from foldmap.layout import template_applies
+
+    assert [template_applies(sh, sses) for sh in big] == [True, False]
+    assert template_choices(big, sses, copies) == [True, True]
+    assert template_choices(big, sses, {}) == [True, False]  # without copies, each sheet alone
+    twisted = [big[0], dataclasses.replace(big[1], ambiguous=True)]
+    assert template_choices(twisted, sses, copies) == [False, False]
+    lay = build_layout(sses, sheets, view_frame(sses), "projected", attract=False, copies=copies)
+    assert len(lay.ba_rows) == 2
