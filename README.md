@@ -210,6 +210,11 @@ Elements are named by label (`A`, `α2`, `η1`), `chain:label`, position (`#3`) 
 A label reference reads the labels the figure shows: the label copies of one protein share, the primed labels of
 elements a neighbour lends in focus mode (`α2′`) and any `--names`; `--rename` is applied last and wins over all of them.
 
+**Domains and βα rows.** `--domains auto` never splits a sheet drawn as a βα row (a TIM barrel, a Rossmann fold):
+the row and its helices fall in one domain. A `--domain` set of your own that splits a row is drawn as given, but the
+row is drawn as one unit, so its domains' panels overlap it. To let the parts move apart, draw the sheet as
+projected with `--set fold_template=off`.
+
 **Layout files.** `--save-layout fig.yaml` records everything that defines a figure: theme, style changes,
 layout options, domains and edits, with element references stored as residue ranges so they survive a new model.
 `foldmap plot model.cif --layout-file fig.yaml -o fig.svg` re-renders it; the command line overrides the file.
