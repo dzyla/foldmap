@@ -263,6 +263,11 @@ class Drawn:
         na = getattr(self.layout, "nucleic", None)
         return out + [path_name(p, na) for p in getattr(self.layout, "na_paths", []) if p.fallback]
 
+    @property
+    def over_labels(self) -> list[str]:
+        """Loops routed over a label or a chain-end stub, the only route found (route.Loop.crosses_labels)."""
+        return [f"{l.a_id}>{l.b_id}" for l in self.loops if l.crosses_labels and not l.fallback]
+
 
 def draw_spec(spec: FigureSpec) -> Drawn:
     """Lay out, route and draw the figure once."""

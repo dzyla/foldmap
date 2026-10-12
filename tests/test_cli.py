@@ -125,3 +125,20 @@ def test_every_subcommand_has_a_handler():
 
     sub = next(a for a in build_parser()._actions if a.dest == "command")
     assert set(sub.choices) == set(_COMMANDS)
+
+
+def test_loops_drawn_over_text_are_listed_and_warned(tmp_path, capsys):
+    """A loop routed over a label or chain-end stub as a last resort (Loop.crosses_labels) is listed like a loop with
+    no clear route (Drawn.over_labels, beside Drawn.stuck) and warned about. 2ACY with helix_on_sheet=auto: the loop
+    into α2, whose port lies on β1 by β1's letter."""
+    from foldmap.spec import draw_spec, figure_spec
+    from helpers import FID
+
+    drawn = draw_spec(figure_spec(FID / "2ACY.cif.gz", style=["helix_on_sheet=auto"]))
+    assert drawn.over_labels == ["A:47-54>A:55-67"] and not drawn.stuck
+    out = tmp_path / "a.svg"
+    assert main(["plot", str(FID / "2ACY.cif.gz"), "-o", str(out), "--set", "helix_on_sheet=auto"]) == 0
+    err = capsys.readouterr().err
+    assert "warning" in err and "over a label" in err and "A:47-54>A:55-67" in err
+    assert main(["plot", str(FID / "2ACY.cif.gz"), "-o", str(out)]) == 0
+    assert "over a label" not in capsys.readouterr().err

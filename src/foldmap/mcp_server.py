@@ -234,6 +234,8 @@ def draw_topology(
             note += f" and layout file {layoutfile.save(keep, layout_document(spec))}"
         if drawn.stuck:
             note += f"; no clear route for {', '.join(drawn.stuck)} (drawn as plain curves)"
+        if drawn.over_labels:
+            note += f"; drawn over a label or chain end: {', '.join(drawn.over_labels)}"
         return [note, _preview(drawn.figure)]
 
 

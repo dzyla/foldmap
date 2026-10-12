@@ -271,7 +271,8 @@ def main() -> None:
     @st.cache_data(show_spinner=False, max_entries=32)
     def render(path: str, settings_json: str) -> tuple[str, dict]:
         drawn = draw_spec(spec_of(path, json.loads(settings_json)))
-        return save_svg(drawn.figure), {"fallback": drawn.stuck}  # loops and strands with no clear route
+        # loops and strands with no clear route; loops whose only route runs over a label or chain end
+        return save_svg(drawn.figure), {"fallback": drawn.stuck, "over_labels": drawn.over_labels}
 
     @st.cache_data(show_spinner=False, max_entries=16)
     def files(path: str, settings_json: str) -> dict:
@@ -548,6 +549,8 @@ def main() -> None:
             return
         if notes["fallback"]:
             st.warning("No clear route for: " + ", ".join(notes["fallback"]) + " (drawn as plain curves).")
+        if notes.get("over_labels"):
+            st.warning(f"Drawn over a label or chain end (the only route found): {', '.join(notes['over_labels'])}.")
         page_bg = settings.get("background", "#ffffff")
         st.markdown(
             f'<div style="background:{page_bg};border-radius:6px;padding:8px">{svg}</div>', unsafe_allow_html=True

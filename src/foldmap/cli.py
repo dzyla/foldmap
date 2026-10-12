@@ -1096,6 +1096,12 @@ def _cmd_figure(args: argparse.Namespace) -> int:
                 f"curves that may cross elements: {', '.join(drawn.stuck)}",
                 file=sys.stderr,
             )
+        if drawn.over_labels:
+            print(
+                f"foldmap: warning: {len(drawn.over_labels)} loop(s) drawn over a label or chain end, the only route "
+                f"found: {', '.join(drawn.over_labels)}",
+                file=sys.stderr,
+            )
         for out in args.output:
             print(f"wrote {save(drawn.figure, out)}")
     method = experimental_method(spec.structure) if spec.look.color_by == "plddt" else None
