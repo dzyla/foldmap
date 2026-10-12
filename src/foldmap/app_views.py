@@ -292,14 +292,28 @@ FORMATS_NOTE = (
 )
 
 
-def layout_yaml(path, blob: str) -> bytes:
-    """The layout file of these settings (YAML)."""
+UPLOADS_NOTE = (
+    "# Files uploaded to the app, named here as uploaded: {files}.\n"
+    "# To draw this layout again, put them beside it (or write their paths); in the app, upload them again.\n"
+)
+
+
+def uploads_of(ss: MutableMapping) -> dict[str, str]:
+    """Kept path -> uploaded name of this structure's uploads that a layout file names (names file, alignment)."""
+    return dict(v for v in (ss.get("names_uploaded"), ss.get("msa_uploaded")) if v)
+
+
+def layout_yaml(path, blob: str, uploads: dict[str, str] | None = None) -> bytes:
+    """The layout file of these settings (YAML). Hosted, uploads are named as uploaded (app.layout_document), and
+    a comment above asks for them."""
     import yaml
 
-    from foldmap.app import layout_document
+    from foldmap.app import layout_document, local_files, uploaded_files
 
-    doc = layout_document(path, json.loads(blob))
-    return yaml.safe_dump(doc, sort_keys=False, allow_unicode=True).encode()
+    doc = layout_document(path, json.loads(blob), uploads)
+    text = yaml.safe_dump(doc, sort_keys=False, allow_unicode=True)
+    files = [] if local_files() else uploaded_files(doc)
+    return ((UPLOADS_NOTE.format(files=", ".join(files)) if files else "") + text).encode()
 
 
 def share_url(base: str | None, share_id: str, theme: str) -> str:
@@ -309,16 +323,26 @@ def share_url(base: str | None, share_id: str, theme: str) -> str:
 
 
 def figure_downloads(
-    path: str, blob: str, stem: str, lim: app_jobs.Limits, eager: tuple | None = None
+    path: str,
+    blob: str,
+    stem: str,
+    lim: app_jobs.Limits,
+    eager: tuple | None = None,
+    uploads: dict[str, str] | None = None,
 ) -> list[Download]:
-    """The figure's files (eager: the render's files as sorted (ext, bytes) items) and its layout file."""
+    """The figure's files (eager: the render's files as sorted (ext, bytes) items) and its layout file (uploads:
+    uploads_of the session)."""
     out = [
         Download(f"dl_{ext}", label, partial(app_jobs.figure_file, path, blob, ext, lim, eager), f"{stem}.{ext}", mime)
         for ext, label, mime in FORMATS
     ]
     out.append(
         Download(
-            "dl_layout", "Layout file", partial(layout_yaml, path, blob), f"{stem}-layout.yaml", "application/x-yaml"
+            "dl_layout",
+            "Layout file",
+            partial(layout_yaml, path, blob, uploads),
+            f"{stem}-layout.yaml",
+            "application/x-yaml",
         )
     )
     return out
@@ -385,7 +409,7 @@ def download_menu(ws: Workspace) -> None:
         blob, eager, note = offered
         if note:
             st.caption(note)
-        buttons(figure_downloads(ws.path, blob, ws.name, ws.lim, eager))
+        buttons(figure_downloads(ws.path, blob, ws.name, ws.lim, eager, uploads_of(ss)))
     st.markdown("**Sequence**")
     if ss.get("seq_drawn"):
         blob, view_json = ss["seq_drawn"]

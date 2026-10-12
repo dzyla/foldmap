@@ -213,9 +213,27 @@ def figure_files(path, settings: dict) -> dict[str, bytes]:
     return out
 
 
-def layout_document(path, settings: dict) -> dict:
-    """The app's settings as a layout file document (element references saved as residue ranges)."""
-    return spec_document(spec_of(path, settings), structure_name=Path(path).name)
+def layout_document(path, settings: dict, uploads: dict[str, str] | None = None) -> dict:
+    """The app's settings as a layout file document (element references saved as residue ranges). Hosted, the files
+    it names (names files, the alignment) can only be the server's copies of uploads: each is named as uploaded
+    (`uploads`: kept path -> uploaded name; else its file name), never by its server path."""
+    doc = spec_document(spec_of(path, settings), structure_name=Path(path).name)
+    if not local_files():
+
+        def own(p: str) -> str:
+            return (uploads or {}).get(p) or Path(p).name
+
+        if doc.get("names"):
+            doc["names"] = [n if n in NAME_KEYWORDS else own(n) for n in doc["names"]]
+        if (doc.get("layout") or {}).get("msa"):
+            doc["layout"]["msa"] = own(doc["layout"]["msa"])
+    return doc
+
+
+def uploaded_files(doc: dict) -> list[str]:
+    """The files a hosted layout document names (they were uploads): names files, then the alignment."""
+    msa = (doc.get("layout") or {}).get("msa")
+    return [n for n in doc.get("names") or [] if n not in NAME_KEYWORDS] + ([msa] if msa else [])
 
 
 def settings_from_document(doc: dict) -> dict:
@@ -437,6 +455,7 @@ def reset_structure(ss: MutableMapping) -> None:
         "figure_failed",
         "seq_drawn",
         "page_drawn",
+        "msa_uploaded",
     ):
         ss.pop(key, None)
     ss["auto_redraw"] = True
@@ -520,7 +539,7 @@ def main() -> None:
             )
             ss["msa_path"] = ""
             return
-        ss["msa_error"], ss["msa_path"] = "", str(target)
+        ss.update(msa_error="", msa_path=str(target), msa_uploaded=(str(target), up.name[:120]))
 
     def load(source: str | None = None, upload: bool = False) -> None:
         """Load a structure and draw its first figure; the workspace opens only when that succeeds. upload: the

@@ -1072,3 +1072,29 @@ def test_a_layout_file_nested_too_deeply_is_a_message():
     deep = ("names: " + "[" * 3000 + "]" * 3000 + "\n").encode()
     at.file_uploader(key="layout_upload").set_value(("deep.yaml", deep, "application/x-yaml")).run()
     assert not at.exception and any("nested too deeply" in _visible(e.value) for e in at.error)
+
+
+def test_a_hosted_layout_download_names_uploads_by_their_own_names(monkeypatch, tmp_path):
+    """Hosted, a layout file never carries the server's copy of an upload (names file, alignment): each is named as
+    uploaded, and a comment asks for it to be attached."""
+    from foldmap.app_views import layout_yaml, uploads_of
+
+    monkeypatch.setenv("FOLDMAP_APP_LOCAL_FILES", "0")
+    seed_cache(monkeypatch, tmp_path, "1UBQ")
+    at = opened("1UBQ")
+    at.file_uploader(key="names_upload").set_value(("my-names.yaml", b"elements:\n  res:A:23-34: Hx\n", "x")).run()
+    at.file_uploader(key="msa_upload").set_value(
+        ("ubq.fasta", (DATA / "ubq_family.fasta").read_bytes(), "text/plain")
+    ).run()
+    ss = at.session_state
+    assert not at.exception and not at.error and ss["msa_path"] and len(ss["names"]) == 1
+    text = layout_yaml(ss["path"], ss["last_good"]["blob"], uploads_of(ss)).decode()
+    for server in ("uploads", ".cache", str(Path.home()), str(tmp_path), "/tmp"):
+        assert server not in text, server
+    import yaml
+
+    doc = yaml.safe_load(text)
+    assert doc["names"] == ["my-names.yaml"] and doc["layout"]["msa"] == "ubq.fasta"
+    assert text.startswith("# ") and "my-names.yaml, ubq.fasta" in text.split("\nfoldmap:")[0]
+    monkeypatch.setenv("FOLDMAP_APP_LOCAL_FILES", "1")  # on your own machine the paths stay: they open again
+    assert ss["msa_path"] in layout_yaml(ss["path"], ss["last_good"]["blob"], uploads_of(ss)).decode()
