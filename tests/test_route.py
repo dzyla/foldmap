@@ -555,3 +555,41 @@ def test_a_loop_leaves_a_helix_over_a_sheet_straight_across_only_the_strand_unde
                 if _crosses_body(p, q, lay.placed[k]):
                     assert x0 <= port[0] <= x1 and y0 <= port[1] <= y1, (lp.a_id, lp.b_id, k)
     assert checked >= 2
+
+
+@pytest.mark.parametrize(
+    "path, kw", [("1UBQ.cif", {}), ("fidelity/2ACY.cif.gz", {}), ("2LZM.cif", {}), ("na/4OO8.cif.gz", {"dna": False})]
+)
+def test_a_helix_over_a_sheet_is_an_obstacle_to_every_other_loop(path, kw):
+    """A helix drawn over a sheet is still in the way of loops that neither join it nor a strand of its sheet: they
+    go round its box, never under it (Task 14 review)."""
+    from foldmap.cli import make_layout
+    from foldmap.style import Style
+
+    lay, sses, bb = make_layout(DATA / path, look=Style(helix_on_sheet="auto"), **kw)
+    assert lay.on_sheet
+    for lp in route_loops(lay, sses, bb):
+        if lp.fallback:
+            continue
+        for h, ids in lay.on_sheet.items():
+            if {lp.a_id, lp.b_id} & {h, *ids}:
+                continue
+            assert segments_clear(lp.points, [lay.placed[h].rect]), (lp.a_id, lp.b_id, h)
+
+
+def test_a_helix_over_a_sheet_keeps_its_box_as_a_soft_obstacle():
+    """Its box is an obstacle owned by the helix (route._element_obstacles); in the grid the cells it covers beyond
+    the strands are soft, not free: given up to a loop only when nothing else routes (Task 14 review)."""
+    from foldmap.cli import make_layout
+    from foldmap.route import _element_obstacles
+    from foldmap.style import Style
+
+    lay, _, _ = make_layout(DATA / "1UBQ.cif", look=Style(helix_on_sheet="auto"))
+    rects, owners = _element_obstacles(lay)
+    assert "A:23-34" in owners
+    assert tuple(rects[:, owners.index("A:23-34")]) == lay.placed["A:23-34"].rect
+    grid = _Grid(lay)
+    x0, y0, x1, y1 = lay.placed["A:23-34"].rect
+    inside = np.outer((grid.xs > x0) & (grid.xs < x1), (grid.ys > y0) & (grid.ys < y1))
+    hard = _Grid(Layout({k: p for k, p in lay.placed.items() if not p.over}, lay.bounds)).blocked
+    assert (inside & ~hard).any() and np.all(grid.soft[inside & ~hard]) and np.all(grid.blocked[inside])

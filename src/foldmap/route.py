@@ -53,9 +53,10 @@ def _oid(e) -> str:
 def _element_obstacles(layout: Layout, ghost_owner: bool = False) -> tuple[np.ndarray, list]:
     """The rects every drawn connector must keep clear of (elements, ghosts, stems) as a (4, n) array of x0, y0,
     x1, y1 rows, and the owner id of each: None for a ghost, or with ghost_owner the id of the element it copies. A
-    helix drawn over a sheet (Placed.over) is none: it lies on the strands, and loops pass under it."""
+    helix drawn over a sheet (Placed.over) is one too: only its own loops and its sheet's strands' may pass under it
+    (_clear's `exempt`, from _over_exempt)."""
     ghost = lambda g: g.sse.id if ghost_owner else None  # noqa: E731
-    own = [(_oid(p), p.rect) for p in layout.placed.values() if not p.over]
+    own = [(_oid(p), p.rect) for p in layout.placed.values()]
     own += [(ghost(g), g.rect) for g in layout.ghosts]
     own += [(_oid(d), d.rect) for d in layout.stems]
     return np.array([r for _, r in own], float).reshape(-1, 4).T.copy(), [k for k, _ in own]
@@ -78,8 +79,13 @@ class _Grid:
         self.reach = (self.res - RES) / 2
         self.blocked = self._mask(
             p.rect for p in [*layout.placed.values(), *layout.ghosts, *layout.stems] if not getattr(p, "over", False)
-        )  # a helix over a sheet lies on its strands, which block those cells; loops may pass under the rest
+        )
+        # a helix over a sheet: the cells it covers beyond the strands are soft, opened to its own loops and its
+        # sheet's (route_loops) and to any loop only when nothing else routes
+        self.over = {k: self._mask([p.rect]) & ~self.blocked for k, p in sorted(layout.placed.items()) if p.over}
         self.soft = self._mask(keep_out) & ~self.blocked  # text, stubs: avoided, given up only if nothing else routes
+        for cells in self.over.values():
+            self.soft |= cells
         self.blocked |= self.soft
         self.slab = np.zeros((self.nx, self.ny), bool)  # cells strictly inside the membrane band (one per row)
         if layout.membrane:
@@ -176,7 +182,15 @@ def _crosses_body(p, q, e: Placed) -> bool:
 
 
 def _clear(
-    path, own: tuple, rects: np.ndarray, owners: list, grow=_TOUCH, kink=False, own_body=False, under=((), ())
+    path,
+    own: tuple,
+    rects: np.ndarray,
+    owners: list,
+    grow=_TOUCH,
+    kink=False,
+    own_body=False,
+    under=((), ()),
+    exempt=(),
 ) -> bool:
     """True when the connector `path` between its own two elements comes no nearer than `grow` to any of
     `rects` (a (4, n) array of x0, y0, x1, y1 rows; owners[k] is the element id owning rect k, or None), by
@@ -187,7 +201,8 @@ def _clear(
     `own_body` (a nucleic-acid strand, drawn from where it leaves its own stems' bodies, curved or not): no
     segment may enter an own element's (possibly tilted) body, and its bounding box does not count. `under`: the
     owners the first and the last segment may cross (from a helix drawn over a sheet: its sheet's strands, which its
-    ports lie on; into the other end: that helix, whose body may cover the end's port)."""
+    ports lie on; into the other end: that helix, whose body may cover the end's port). `exempt`: owners the whole
+    path may cross (the helices over a sheet the path's elements belong to: _over_exempt)."""
     skip = tuple(_oid(e) for e in own)
     xs, ys = [p[0] for p in path], [p[1] for p in path]
     x0, y0, x1, y1 = min(xs) - grow, min(ys) - grow, max(xs) + grow, max(ys) + grow
@@ -196,6 +211,8 @@ def _clear(
     last = len(segs) - 1
     for k in np.flatnonzero((rx0 <= x1) & (rx1 >= x0) & (ry0 <= y1) & (ry1 >= y0)).tolist():
         box = (rx0[k] - grow, ry0[k] - grow, rx1[k] + grow, ry1[k] + grow)
+        if owners[k] in exempt:
+            continue
         mine = owners[k] in skip
         for i, (p, q) in enumerate(segs):
             if mine and (own_body or i == 0 or i == last):
@@ -358,7 +375,7 @@ class _Router:
         self.tight = self.rejected = 0  # debug counts: routes drawn tight, drawings rejected as crossing
         self.max_nodes = _MAX_NODES  # the A* search's budget
 
-    def drawn(self, pa, ea, own_a, pb, eb, own_b, own_body=False, loose=False, under=((), ())):
+    def drawn(self, pa, ea, own_a, pb, eb, own_b, own_body=False, loose=False, under=((), ()), exempt=()):
         """The A* route from port pa to port pb as drawn, snapped to the ports or else unsnapped; None if there
         is no route or every drawing of it crosses an element (`under`: see _clear)."""
         grid = self.grid
@@ -367,24 +384,26 @@ class _Router:
             return None
         for snap in (True, False):
             pts = _polyline(grid, cells, pa, ea, pb, eb, snap)
-            if _clear(pts, (own_a, own_b), *self.elements, own_body=own_body, under=under):
+            if _clear(pts, (own_a, own_b), *self.elements, own_body=own_body, under=under, exempt=exempt):
                 for c in cells:
                     grid.used[c] += 1
                 if log.isEnabledFor(logging.DEBUG):
-                    self.tight += not _clear(pts, (own_a, own_b), *self.elements, grow=_INFLATE - 1e-6, under=under)
+                    self.tight += not _clear(
+                        pts, (own_a, own_b), *self.elements, grow=_INFLATE - 1e-6, under=under, exempt=exempt
+                    )
                 return pts
             self.rejected += 1
         return None
 
-    def route(self, pa, ea, own_a, pb, eb, own_b, own_body=False, loose=False, under=((), ())):
+    def route(self, pa, ea, own_a, pb, eb, own_b, own_body=False, loose=False, under=((), ()), exempt=()):
         """(points, over labels): a drawn route, kept off text and stubs unless nothing else routes; None
         points if there is no clear route at all."""
         grid = self.grid
-        pts = self.drawn(pa, ea, own_a, pb, eb, own_b, own_body, loose, under)
+        pts = self.drawn(pa, ea, own_a, pb, eb, own_b, own_body, loose, under, exempt)
         if pts is not None or not grid.soft.any():
             return pts, False
         grid.blocked &= ~grid.soft
-        pts = self.drawn(pa, ea, own_a, pb, eb, own_b, own_body, loose, under)
+        pts = self.drawn(pa, ea, own_a, pb, eb, own_b, own_body, loose, under, exempt)
         grid.blocked |= grid.soft
         return pts, pts is not None
 
@@ -408,6 +427,12 @@ def _over_exits(pa: Placed, pb: Placed) -> list[tuple[np.ndarray, np.ndarray]]:
         return [first] if first[0] == 0 else [first, np.array([0.0, np.sign(out[1]) or 1.0])]
 
     return [(ea, eb) for ea in ways(pa, pa.exit_c) for eb in ways(pb, pb.exit_n)]
+
+
+def _over_exempt(layout: Layout, a: str, b: str) -> list[str]:
+    """The helices drawn over a sheet that a loop between elements a and b may pass under: the one it joins, and
+    any over the sheet of a strand it joins."""
+    return [h for h, ids in sorted(layout.on_sheet.items()) if {a, b} & {h, *ids}]
 
 
 def _strands_under(layout: Layout, sid: str, port) -> set[str]:
@@ -456,7 +481,15 @@ def route_loops(layout: Layout, sses: list[SSE], bb) -> list[Loop]:
             b.start - a.end - 1 <= KINK_GAP
             and np.hypot(*gap) < 1.5
             and gap @ pa.exit_c > 0
-            and _clear([pa.c_port, pb.n_port], (pa, pb), rects, owners, grow=_INFLATE, kink=True)  # and labels
+            and _clear(  # and labels
+                [pa.c_port, pb.n_port],
+                (pa, pb),
+                rects,
+                owners,
+                grow=_INFLATE,
+                kink=True,
+                exempt=_over_exempt(layout, a.id, b.id),
+            )
         ):
             for c in grid.cells_along(pa.c_port, pb.n_port):
                 grid.used[c] += 1
@@ -468,11 +501,18 @@ def route_loops(layout: Layout, sses: list[SSE], bb) -> list[Loop]:
             _strands_under(layout, a.id, pa.c_port) | ({b.id} if pb.over else set()),
             _strands_under(layout, b.id, pb.n_port) | ({a.id} if pa.over else set()),
         )
+        exempt = _over_exempt(layout, a.id, b.id)
+        for h in exempt:  # its cells open to this loop
+            grid.blocked &= ~grid.over[h]
         pts, over = None, False
         for ea, eb in _over_exits(pa, pb):
-            pts, over = router.route(pa.c_port, ea, pa, pb.n_port, eb, pb, loose=(pa.over, pb.over), under=under)
+            pts, over = router.route(
+                pa.c_port, ea, pa, pb.n_port, eb, pb, loose=(pa.over, pb.over), under=under, exempt=exempt
+            )
             if pts is not None:
                 break
+        for h in exempt:
+            grid.blocked |= grid.over[h]
         if pts is None:
             routed[(a.id, b.id)] = (_curve(pa.c_port, pa.exit_c, pb.n_port, pb.exit_n), True, False)
         else:
