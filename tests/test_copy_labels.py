@@ -24,11 +24,11 @@ def _repeats(lay) -> dict[str, list[str]]:
 @pytest.mark.parametrize("focus", ["auto", "none", "first"])
 @pytest.mark.parametrize("path", FIXTURES, ids=lambda p: p.name.split(".")[0])
 def test_no_chain_draws_one_label_twice(path, focus):
+    """Every fixture in its default view, whole, and focused on its first protein chain (a structure without
+    protein: whole)."""
     if focus == "first":
-        lay, sses, _ = make_layout(path, focus="none")
-        if len({s.chain for s in sses}) < 2:
-            pytest.skip("one protein chain: the default view is the focus view")
-        focus = sses[0].chain
+        _, sses, _ = make_layout(path, focus="none")
+        focus = sses[0].chain if sses else "none"
     lay, _, _ = make_layout(path, focus=focus)
     assert _repeats(lay) == {}
 

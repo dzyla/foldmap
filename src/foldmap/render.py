@@ -1708,6 +1708,12 @@ def domain_tone(k: int) -> str:
     return _DOMAIN_TONES[k % len(_DOMAIN_TONES)]
 
 
+def tone_of(layout: Layout, d: int) -> int:
+    """The tone index of the d-th domain (Layout.domains order): copies of one domain share one
+    (Layout.domain_tones), else its place."""
+    return layout.domain_tones[d] if d < len(layout.domain_tones) else d
+
+
 _GREY_FILLS = (PALETTES["greys"][2].lower(), PALETTES["greys"][1].lower())  # print's bar: two light greys, alternating
 _HATCHES = ("", "////", "\\\\\\\\", "xxx", "....", "||||", "----", "++")  # ... and a hatch per domain
 
@@ -1724,6 +1730,16 @@ def domain_paint(k: int, look: Style) -> tuple[str, str]:
     return colours[k % len(colours)].lower(), ""
 
 
+def _domain_entries(layout: Layout) -> list[tuple[str, str]]:
+    """One legend entry per domain tone: the domain's name, or for copies of one domain in several chains the name
+    without its chain (D1 · A1, D1 · A2 -> D1)."""
+    names: dict[int, list[str]] = {}
+    for d, (name, ids) in enumerate(layout.domains):
+        if ids:
+            names.setdefault(tone_of(layout, d), []).append(name)
+    return [(domain_tone(k), ns[0] if len(ns) == 1 else ns[0].split(" · ")[0]) for k, ns in names.items()]
+
+
 def domain_coloured(look: Style, layout: Layout | None) -> bool:
     """Are elements coloured by domain: with a domain named and drawn, and color_by=domain, or color_by=chain (the
     default) with domain_colours on. Any other colouring (a theme's or the user's) is kept."""
@@ -1735,7 +1751,7 @@ def domain_coloured(look: Style, layout: Layout | None) -> bool:
 def _by_domain(sses: list[SSE], layout: Layout):
     """Each element in its domain's tone, an element in no domain grey; a loop residue in the colour of the nearer
     element it joins (a loop is split at its middle, as the domain bar splits it)."""
-    tone = {k: domain_tone(d) for d, (_, ids) in enumerate(layout.domains) for k in ids}
+    tone = {k: domain_tone(tone_of(layout, d)) for d, (_, ids) in enumerate(layout.domains) for k in ids}
     out = {s.id: tone.get(s.id, MATE_GREY) for s in sses}
     runs: dict[str, list[tuple[int, int, str]]] = {}
     for s in sorted(sses, key=lambda s: s.start):
@@ -1999,7 +2015,7 @@ def _legend_entries(
         dim = set(chains) - layout.focus if layout.focus is not None else set()
         if any(k not in named and p.sse.chain not in dim for k, p in layout.placed.items()):
             grey.append((MATE_GREY, "no named domain"))
-        entries = [(domain_tone(d), name) for d, (name, ids) in enumerate(layout.domains) if ids] + grey
+        entries = _domain_entries(layout) + grey
     for kind in dict.fromkeys(m["feature"].type for m in umarks):  # UniProt site types shown
         entries.append((SITE_COLOURS.get(kind, "#555555"), f"{kind.lower()} (UniProt)"))
     if layout.nucleic is not None and layout.nucleic.strands and look.legend:
@@ -2261,7 +2277,7 @@ def _draw_domains(c: _Canvas, layout: Layout) -> None:
         if not ids:
             continue
         x0, y0, x1, y1 = domain_panel(layout, name)
-        tone = domain_paint(k, c.look)[0]
+        tone = domain_paint(tone_of(layout, k), c.look)[0]
         fill = _mix(tone, c.look.background, 0.86)
         panel = FancyBboxPatch(
             (x0, y0),
@@ -2334,7 +2350,7 @@ def domain_bars(layout: Layout, look: Style | None = None) -> list[tuple[str, fl
             name = layout.domains[d][0]
             seen[name] += 1
             gid = f"domain-bar:{chain}:{name}" + (f"#{seen[name]}" if seen[name] > 1 else "")
-            segments.append(BarSegment(name, gid, lo, hi, *domain_paint(d, look or Style())))
+            segments.append(BarSegment(name, gid, lo, hi, *domain_paint(tone_of(layout, d), look or Style())))
         out.append((chain, first, last, segments))
     return out
 

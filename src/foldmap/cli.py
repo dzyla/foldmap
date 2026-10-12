@@ -335,6 +335,10 @@ def make_layout(
         else None,
         over=over,
     )
+    if lay.domains:  # copies of one domain share a tone
+        from .features import domain_tones
+
+        lay.domain_tones = domain_tones(lay.domains, sses, copies)
     lay.focus = _focus((look or Style()).highlight, bb, sym)
     if focus_chains:
         lay.focus, lay.focus_chains, lay.context = set(focus_chains), set(focus_chains), context

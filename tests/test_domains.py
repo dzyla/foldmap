@@ -569,3 +569,30 @@ def test_auto_domains_fold_the_small_ones_after_the_ba_row_is_kept_whole():
     smallest domains are folded after the merge now, so neither chain is split: a TIM barrel is one domain."""
     lay = _auto_domains_alike(DATA / "1TIM.cif")
     assert lay.domains == []
+
+
+def test_copies_of_a_domain_share_one_tone():
+    """1LDM --domains auto: four copies of the chain, each split into D1 (the NAD-binding domain) and D2 (the
+    catalytic one). Every copy of D1 is drawn in one tone and every copy of D2 in another: panels, bar segments,
+    elements and one legend entry each."""
+    from matplotlib.colors import to_hex
+
+    from foldmap.render import _DOMAIN_TONES, _legend_entries, domain_bars, element_colours
+    from foldmap.style import Style
+
+    lay, sses, _ = make_layout(FID / "1LDM.cif.gz", domains="auto")
+    stem = {name: name.split(" · ")[0] for name, _ in lay.domains}
+    assert sorted(set(stem.values())) == ["D1", "D2"] and len(lay.domains) == 8
+    bar = {seg.name: seg.tone for *_, segs in domain_bars(lay, Style()) for seg in segs}
+    colours, _ = element_colours(lay, sses, Style())
+    element = {name: {colours[k] for k in ids} for name, ids in lay.domains}
+    fig = make_figure(FID / "1LDM.cif.gz", domains="auto")
+    panel = {a.get_gid()[len("domain:") :]: to_hex(a.get_edgecolor()) for a in _gids(fig, "domain:")}
+    for tones in (bar, {name: next(iter(c)) for name, c in element.items()}, panel):
+        by_stem = {s: {tones[n] for n in stem if stem[n] == s} for s in ("D1", "D2")}
+        assert all(len(t) == 1 for t in by_stem.values()) and by_stem["D1"] != by_stem["D2"], by_stem
+    assert all(len(c) == 1 for c in element.values())
+    assert {bar[n] for n in stem} == set(_DOMAIN_TONES[:2])
+    chains = ["A1", "A2", "A3", "A4"]
+    entries = _legend_entries(lay, Style(), chains, dict.fromkeys(chains, "#000000"), [], {})
+    assert [e for e in entries if e[0] in _DOMAIN_TONES] == [(_DOMAIN_TONES[0], "D1"), (_DOMAIN_TONES[1], "D2")]

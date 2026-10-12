@@ -193,6 +193,7 @@ class Layout:
     sheets: list[list[str]] = field(default_factory=list)  # strand ids of each sheet block, in layout order
     domains: list[tuple[str, list[str]]] = field(default_factory=list)  # named domains and their element ids
     domain_name_right: set[str] = field(default_factory=set)  # domains named at their panel's top right, not left
+    domain_tones: list[int] = field(default_factory=list)  # tone of each domain (features.domain_tones; [] by order)
     na_paths: list = field(default_factory=list)  # route.NAPath: single strands as drawn (filled by route_loops)
     na_traces: dict = field(default_factory=dict)  # strand -> projected backbone (page units), for unpaired strands
     na_ends: list = field(default_factory=list)  # (strand, "5′" or "3′", label position), filled by route_loops

@@ -205,6 +205,30 @@ def auto_domains(
     return out
 
 
+def domain_tones(
+    domains: list[tuple[str, list[str]]], sses: list[SSE], copies: dict[str, tuple[str, int]]
+) -> list[int]:
+    """The tone (index into the domain tones) of each domain: copies of one domain in copies of a protein share one,
+    distinct domains take the next, in domain order. A domain is a copy of the one holding most of its elements'
+    mates (model.copy_classes); a domain whose mates lie in no domain, or in itself, is its own."""
+    mate = copy_classes(sses, copies).mate
+    owner = {k: d for d, (_, ids) in enumerate(domains) for k in ids}
+    rep = []
+    for d, (_, ids) in enumerate(domains):
+        votes = Counter(owner[m] for m in (mate.get(k, k) for k in ids) if m in owner)
+        rep.append(max(votes, key=lambda e: (votes[e], e == d, -e)) if votes else d)
+
+    def root(d: int) -> int:
+        seen = set()
+        while rep[d] != d and d not in seen:
+            seen.add(d)
+            d = rep[d]
+        return d
+
+    tone: dict[int, int] = {}
+    return [tone.setdefault(root(d), len(tone)) for d in range(len(domains))]
+
+
 def _chain_domains(sses: list[SSE], contacts: dict[frozenset[str], int], together=()) -> list[list[str]]:
     """One chain's domains, in sequence order: communities of its element contact graph (plus chain connectivity),
     each with at least DOMAIN_MIN_SSE_RESIDUES residues of elements (smaller ones fold into their best-connected
