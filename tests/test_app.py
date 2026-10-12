@@ -768,7 +768,7 @@ def test_a_slow_setting_turns_auto_redraw_off_after_a_fast_first_draw(monkeypatc
 
 
 def test_figure_card_is_accessible_and_scrolls_only_when_very_wide():
-    from foldmap.app import figure_card
+    from foldmap.app_views import figure_card
 
     card = figure_card('<svg width="400pt" height="300pt" viewBox="0 0 400 300"></svg>', "#ffffff", "1UBQ")
     assert 'role="img"' in card and 'aria-label="Topology diagram of 1UBQ"' in card and "max-width:none" not in card
@@ -922,7 +922,7 @@ def test_every_download_makes_its_whole_file():
     import json
 
     from foldmap import app_jobs
-    from foldmap.app import figure_downloads, page_downloads, sequence_downloads
+    from foldmap.app_views import figure_downloads, page_downloads, sequence_downloads
 
     path, blob, lim = str(DATA / "1UBQ.cif"), json.dumps({"theme": "publication"}), app_jobs.Limits()
     built = []  # the 3D page: the one the view built (its cache), not built again
@@ -971,7 +971,7 @@ def test_download_files_are_whole():
     import json
 
     from foldmap import app_jobs
-    from foldmap.app import layout_yaml
+    from foldmap.app_views import layout_yaml
 
     blob = json.dumps({"theme": "publication"})
     png = app_jobs.figure_file(str(DATA / "1UBQ.cif"), blob, "png", app_jobs.Limits())
@@ -983,7 +983,7 @@ def test_download_files_are_whole():
 
 def test_a_failing_setting_offers_the_last_good_figure():
     """The canvas keeps the last good figure, and so does the Download popover, which says so."""
-    from foldmap.app import figure_offered
+    from foldmap.app_views import figure_offered
 
     at = opened(DATA / "2LZM.cif")
     good = at.session_state["last_good"]["blob"]
@@ -999,7 +999,7 @@ def test_a_failing_setting_offers_the_last_good_figure():
 
 
 def test_figure_offered_is_the_figure_on_screen():
-    from foldmap.app import figure_offered
+    from foldmap.app_views import figure_offered
 
     files = (("pdf", b"%PDF"), ("png", b"\x89PNG"))
     ss = {"auto_redraw": True, "last_good": {"path": "p", "blob": "B1", "svg": "<svg/>", "files": files}}
@@ -1013,7 +1013,7 @@ def test_figure_offered_is_the_figure_on_screen():
 
 
 def test_share_url_carries_id_and_theme_only():
-    from foldmap.app import share_url
+    from foldmap.app_views import share_url
 
     assert share_url("https://foldmap.streamlit.app/?id=X", "1LMB", "journal") == (
         "https://foldmap.streamlit.app/?id=1LMB&theme=journal"
