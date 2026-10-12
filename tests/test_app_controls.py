@@ -209,6 +209,20 @@ def test_top_bar_says_how_many_chains_are_drawn():
     assert summary().startswith("4 chains · ")
 
 
+def test_chain_count_of_the_summary_follows_the_assembly():
+    """ "n of N chains" counts N under the assembly the figure is drawn in; until a figure of every chain has been
+    drawn in a new assembly, the summary gives the count drawn only."""
+    at = opened(DATA / "2HHB.cif")
+    at.multiselect(key="chains__pick").set_value(["B", "D"]).run()
+    assert at.session_state["info"].startswith("2 of 4 chains · ")
+    at.selectbox(key="assembly").select("asu").run()
+    assert not at.exception and at.session_state["info"].startswith("2 chains · ")  # N not counted in asu yet
+    at.multiselect(key="chains__pick").set_value([]).run()
+    assert at.session_state["protein_chains_total"] == {"assembly": "asu", "count": 4}
+    at.multiselect(key="chains__pick").set_value(["B"]).run()
+    assert at.session_state["info"].startswith("1 of 4 chains · ")
+
+
 def test_long_chain_and_assembly_ids_are_cut_in_the_pickers():
     from foldmap.app_controls import capped
 
@@ -298,6 +312,20 @@ def test_layout_mode_and_sizes():
     assert at.segmented_control(key="fold_template").value == "auto"
     at.segmented_control(key="helix_on_sheet").set_value("auto").run()
     assert at.session_state["helix_on_sheet"] == "auto" and not at.exception
+
+
+def test_helices_stay_beside_the_sheet_unless_asked():
+    at = opened(DATA / "1UBQ.cif")
+    assert at.session_state["helix_on_sheet"] == "off" and at.segmented_control(key="helix_on_sheet").value == "off"
+
+
+def test_a_layout_file_drops_the_rows_waiting_in_the_tables():
+    at = opened(DATA / "2LZM.cif")
+    at.session_state["swap__blank"] = [{"a": "res:A:3-11", "b": ""}]  # a swap row half made in the table
+    up = ("layout.yaml", b"foldmap: 1\nedits: {swap: [[res:A:39-50, res:A:60-79]]}\n", "application/x-yaml")
+    at.file_uploader(key="layout_upload").set_value(up).run()
+    assert not at.exception and "swap__blank" not in at.session_state
+    assert at.session_state["swap"] == "res:A:39-50,res:A:60-79"
 
 
 def test_layout_section_holds_the_editors_and_dna_size_only_with_nucleic_acid():

@@ -137,6 +137,28 @@ def test_a_row_added_empty_stays_until_it_is_filled_in():
     apply_table(ss, "swap")
     assert table_rows(ss, "swap") == rows_of("swap", "α1,α3; res:A:39-50,res:A:60-79")
 
+    ss = {"rename": "", "rename__ver": 0}  # a rename with no name yet would be `--rename needs REF=NAME`
+    ss["rename__table_0"] = {"edited_rows": {}, "added_rows": [{"element": "res:A:3-11"}], "deleted_rows": []}
+    apply_table(ss, "rename")
+    assert ss["rename"] == "" and ss["rename__blank"] == [{"element": "res:A:3-11", "name": ""}]
+    ss["rename__table_1"] = {"edited_rows": {0: {"name": "Gd"}}, "added_rows": [], "deleted_rows": []}
+    apply_table(ss, "rename")
+    assert ss["rename"] == "res:A:3-11=Gd" and ss["rename__blank"] == []
+
+
+def test_text_typed_while_rows_wait_keeps_both():
+    """Typing "as text" replaces the text's rows; the rows still waiting stay after them, and a table edit then
+    indexes that same list."""
+    from foldmap.app_edits import table_rows
+
+    ss = {"swap": "α1,α3", "swap__ver": 0, "swap__blank": [{"a": "res:A:39-50", "b": ""}]}
+    ss["swap"] = "α2,α4; α5,α6"  # typed
+    assert table_rows(ss, "swap") == [*rows_of("swap", "α2,α4; α5,α6"), {"a": "res:A:39-50", "b": ""}]
+    ss["swap__table_0"] = {"edited_rows": {2: {"b": "α7"}, 0: {"b": "α8"}}, "added_rows": [], "deleted_rows": []}
+    apply_table(ss, "swap")
+    assert ss["swap"] == "α2,α8; α5,α6; res:A:39-50,α7" and ss["swap__blank"] == []
+    assert table_rows(ss, "swap") == rows_of("swap", ss["swap"])
+
 
 @pytest.mark.parametrize(
     "kind, typed, rows",

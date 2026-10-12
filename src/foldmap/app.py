@@ -549,7 +549,7 @@ def main() -> None:
             protein_chains=result["chains"],
             na_chains=result["na_chains"],
             all_chains=chain_choices(size["chain_ids"], [*result["chains"], *result["na_chains"]]),
-            chains_total=len(result["chains"]),  # protein chains, as the summary counts them
+            protein_chains_total={"assembly": "auto", "count": len(result["chains"])},  # reset_structure: auto
             assemblies=size["assemblies"],
             share_id="" if file or local_path else source_id(text) or "",
             stage="edit",
@@ -596,6 +596,10 @@ def main() -> None:
         ss.pop("last_changed", None)  # many settings at once: no one control to blame
         for key, value in settings.items():
             ss[key] = value
+        from foldmap.app_edits import EDITORS
+
+        for kind in EDITORS:  # rows half made in a table belong to the edits the file replaces
+            ss.pop(f"{kind}__blank", None)
 
     if ss["stage"] == "load":  # a share link (?id=…&theme=…) opens its structure once
         qid = st.query_params.get("id")

@@ -156,7 +156,8 @@ EDITORS = {
     "mark": ("element", "colour"),
     "domains": ("name", "ranges"),
 }
-NEEDED = {"swap": ("a", "b")}  # a table row is written once these cells are filled (else its first column)
+NEEDED = {"swap": ("a", "b"), "rename": ("element", "name")}  # a table row is written once these are filled
+# (else its first column): a swap of one element or a rename with no name would be an error
 _RANGE_IN_CHAIN = re.compile(r"[A-Za-z0-9]+:-?\d+[A-Z]?(--?\d+[A-Z]?)?")
 _RANGE = re.compile(r"-?\d+[A-Z]?(--?\d+[A-Z]?)?")
 

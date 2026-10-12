@@ -133,10 +133,7 @@ def figure_view(ws: Workspace) -> None:
             protein_chains=result["chains"],
             na_chains=result["na_chains"],
         )
-        summary = result["summary"]  # the top bar describes the figure drawn
-        if json.loads(target).get("chains"):
-            summary = app_jobs.restricted_summary(summary, ss.get("chains_total", 0))
-        ss["info"] = summary
+        ss["info"] = drawn_summary(ss, json.loads(target), result)
         slow = result["seconds"]  # the drawing itself, as at load (not the job's start-up or a cache hit)
         if slow > ws.lim.slow and ss.get("slow_noted") != ws.path:  # the toggle is created later in this run
             ss.update(auto_redraw=False, slow_noted=ws.path, slow_seconds=slow)
@@ -151,6 +148,19 @@ def figure_view(ws: Workspace) -> None:
             st.caption(shown(notes))
         if ss.get("check_contacts") and ss.get("na_chains"):
             contacts_check(ws, good["blob"])
+
+
+def drawn_summary(ss: MutableMapping, settings: dict, result: dict) -> str:
+    """The top bar's line for the figure drawn. A figure of every chain counts the protein chains of its assembly
+    (`protein_chains_total`); one of some chains says "2 of 6 chains" when that count is of the same assembly."""
+    assembly = settings.get("assembly") or "auto"
+    if not settings.get("chains"):
+        ss["protein_chains_total"] = {"assembly": assembly, "count": len(result["chains"])}
+        return result["summary"]
+    total = ss.get("protein_chains_total") or {}
+    if total.get("assembly") != assembly:  # not counted in this assembly yet
+        return result["summary"]
+    return app_jobs.restricted_summary(result["summary"], total["count"])
 
 
 def contacts_check(ws: Workspace, blob: str) -> None:
