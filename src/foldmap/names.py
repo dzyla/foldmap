@@ -1,0 +1,324 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Dawid Zyla. Additional terms (AGPL-3.0 section 7(b)): see NOTICE.
+"""Conventional names (--names): the helix ids the file itself gives (`deposited`: globin A-H), strands numbered
+β1…βn with each βα-row helix named after its strand (`beta`), or a YAML file naming elements and stems:
+
+    elements:            # element ref -> name (refs as in --rename: label, chain:label, #k, res:a-b, res:chain:a-b)
+      res:A:3-18: A
+    stems:               # a nucleotide (chain:number) held by the stem -> name
+      A:1: acceptor
+
+Names are given after the layout is placed and labelled, before the user's own renames (layout.build_layout)."""
+
+from __future__ import annotations
+
+import gzip
+import re
+from pathlib import Path
+
+import yaml
+
+from .layout import Layout, provisional, resolve
+from .model import SSE, Nucleic, group_by_chain, res_ref
+
+KEYWORDS = ("deposited", "beta")
+_GENERIC = re.compile(r"(HELX_P)?\d+|H\d+")  # numbered helices name nothing
+_PRIMES = ("", "′", "″", "‴")
+
+
+def check_spec(spec: str) -> None:
+    """A names spec is a keyword or an existing YAML file."""
+    if spec not in KEYWORDS and not Path(spec).is_file():
+        raise ValueError(f"--names {spec!r}: use deposited, beta or a YAML file (no such file)")
+
+
+def load_names(
+    spec: str,
+    path,
+    layout: Layout,
+    sses: list[SSE],
+    nucleic: Nucleic | None,
+    *,
+    whole: list[SSE] | None = None,
+    chains: set[str] | None = None,
+) -> tuple[dict[str, str], dict[int, str]]:
+    """(element renames, ref -> name as --rename takes them; stem renames, index in layout.stems -> name) for one
+    spec: `deposited`, `beta` or a YAML file. `path`: the structure file. `whole` (the elements of the chains read,
+    before focus left some out) and `chains` (every protein chain of the file) let a file name elements this figure
+    leaves out: those refs are skipped, any other ref that names nothing is an error."""
+    drawn = [s for s in sses if s.id in layout.placed]
+    if spec == "deposited":
+        return deposited_names(path, drawn), {}
+    if spec == "beta":
+        return beta_names(layout, drawn, whole), {}
+    return _file_names(Path(spec), layout, drawn, nucleic, whole, chains)
+
+
+# ---------------------------------------------------------------------------------------------- deposited
+
+
+def deposited_names(path, sses: list[SSE]) -> dict[str, str]:
+    """Each helix (H or G) named after the deposited helix record (mmCIF _struct_conf, PDB HELIX) overlapping it
+    most, when that covers at least half of it and its id is a name (helix_names). Strands keep their letters (the
+    sheet records are numbered in every file checked)."""
+    rows = _helix_rows(path)
+    names = helix_names([(hid, chain) for hid, chain, _, _ in rows])
+    named = [(chain, lo, hi, name) for (_, chain, lo, hi), name in zip(rows, names) if name]
+    files = {chain for chain, _, _, _ in named}
+    out = {}
+    for s in sses:
+        if s.kind not in ("H", "G"):
+            continue
+        chain = _deposited_chain(s.chain, files)
+        lo, hi = sorted((s.first.seq, s.last.seq))
+        best, most = None, 0
+        for c, a, b, name in named:
+            o = min(hi, b) - max(lo, a) + 1
+            if c == chain and o > most:
+                best, most = name, o
+        if best is not None and 2 * most >= hi - lo + 1:
+            out[res_ref(s.chain, s.first, s.last)] = best
+    return out
+
+
+def helix_names(rows: list[tuple[str, str]]) -> list[str | None]:
+    """The name each helix record (id, chain) gives, or None. A chain's ids lose the chain id when every one of them
+    starts with it and something is left (2HHB AA, AB -> A, B; 7TIM AH1 -> H1). Numbered ids (1, HELX_P1, H1; A1
+    once the chain is gone), the wwPDB serial ids (AA1, AA2 … AA9, AB1 … across the whole file) and ids used twice
+    in one chain name nothing."""
+    if [hid for hid, _ in rows] == [_serial(k) for k in range(len(rows))]:
+        return [None] * len(rows)
+    ids: dict[str, list[str]] = {}
+    for hid, chain in rows:
+        ids.setdefault(chain, []).append(hid)
+    strip = {c: all(h.startswith(c) and len(h) > len(c) for h in hs) for c, hs in ids.items()}
+    out = []
+    for hid, chain in rows:
+        name = hid[len(chain) :] if strip[chain] else hid
+        generic = _GENERIC.fullmatch(hid) or name.isdigit() or ids[chain].count(hid) > 1
+        out.append(None if generic else name)
+    return out
+
+
+def _serial(k: int) -> str:
+    """The k-th wwPDB serial helix id: AA1 … AA9, AB1 … AZ9, BA1 …"""
+    letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    return f"{letters[k // 234 % 26]}{letters[k // 9 % 26]}{k % 9 + 1}"
+
+
+def _deposited_chain(chain: str, files: set[str]) -> str:
+    """The deposited chain a drawn chain is (an assembly copy is named after it plus a number: A -> A1, A2)."""
+    if chain in files:
+        return chain
+    found = [c for c in files if chain.startswith(c) and chain[len(c) :].isdigit()]
+    return max(found, key=len) if found else chain
+
+
+def _helix_rows(path) -> list[tuple[str, str, int, int]]:
+    """(id, chain, first, last residue number) of each deposited helix, in file order."""
+    import gemmi
+
+    try:
+        block = gemmi.cif.read(str(path)).sole_block()
+    except (RuntimeError, ValueError):  # not mmCIF: a PDB file's HELIX records
+        return _pdb_helix_rows(path)
+    table = block.find(
+        "_struct_conf.",
+        ["pdbx_PDB_helix_id", "beg_auth_asym_id", "beg_auth_seq_id", "end_auth_seq_id", "?conf_type_id"],
+    )
+    out = []
+    for row in table:
+        if row.has(4) and not row[4].startswith("HELX"):
+            continue  # a turn record
+        try:
+            out.append((*map(gemmi.cif.as_string, (row[0], row[1])), int(row[2]), int(row[3])))
+        except ValueError:
+            continue
+    return out
+
+
+def _pdb_helix_rows(path) -> list[tuple[str, str, int, int]]:
+    opener = gzip.open if str(path).endswith(".gz") else open
+    with opener(path, "rt", encoding="utf-8", errors="replace") as f:
+        lines = [line for line in f if line.startswith("HELIX ")]
+    out = []
+    for line in lines:
+        try:
+            out.append((line[11:14].strip(), line[19].strip(), int(line[21:25]), int(line[33:37])))
+        except (ValueError, IndexError):
+            continue
+    return out
+
+
+# ---------------------------------------------------------------------------------------------- beta
+
+
+def beta_names(layout: Layout, sses: list[SSE], whole: list[SSE] | None = None) -> dict[str, str]:
+    """The strands of each chain become β1…βn in sequence (numbered over `whole`, the chain as read, when focus
+    left some out). In a chain with a βα row (layout.ba_rows), the row helix after βn becomes αn; its other helices
+    are named after the strand before them, in sequence: αn while that name is free, then αn′, αn″ … (n = 0
+    before the first strand). Without a row the helices keep their labels; 3-10 helices always do."""
+    rows = {k for row in layout.ba_rows for k in row}
+    drawn = {s.id for s in sses}
+    out: dict[str, str] = {}
+    for _, mine in group_by_chain(whole or sses).items():
+        mine = sorted(mine, key=lambda s: s.start)
+        strands = [s for s in mine if s.kind == "E"]
+        number = {s.id: n for n, s in enumerate(strands, 1)}
+        names = {s.id: f"β{number[s.id]}" for s in strands}
+        if any(s.id in rows for s in strands):
+            names.update(_row_helices(mine, strands, number, rows))
+        out.update({res_ref(s.chain, s.first, s.last): names[s.id] for s in mine if s.id in names and s.id in drawn})
+    return out
+
+
+def _row_helices(mine: list[SSE], strands: list[SSE], number: dict[str, int], rows: set[str]) -> dict[str, str]:
+    """The helices of a chain with a βα row: each row helix after βn is αn; the others, in sequence, αn, αn′ …
+    after the last strand before them, the first name not taken."""
+
+    def after(h: SSE, pool: list[SSE]) -> int:  # the number of the pool's last strand before the helix (0: none)
+        return max((number[s.id] for s in pool if s.start < h.start), default=0)
+
+    helices = [s for s in mine if s.kind == "H"]
+    in_row = [s for s in strands if s.id in rows]
+    out = {h.id: f"α{after(h, in_row)}" for h in helices if h.id in rows}
+    taken = set(out.values())
+    for h in (h for h in helices if h.id not in rows):
+        n, k = after(h, strands), 0
+        while _primed(f"α{n}", k) in taken:
+            k += 1
+        out[h.id] = _primed(f"α{n}", k)
+        taken.add(out[h.id])
+    return out
+
+
+def _primed(name: str, k: int) -> str:
+    return name + (_PRIMES[k] if k < len(_PRIMES) else "′" * k)
+
+
+# ---------------------------------------------------------------------------------------------- YAML files
+
+
+def _file_names(path: Path, layout: Layout, sses, nucleic, whole, chains) -> tuple[dict[str, str], dict[int, str]]:
+    try:
+        doc = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    except yaml.YAMLError as err:
+        raise ValueError(f"{path}: not valid YAML: {err}") from err
+    if not isinstance(doc, dict):
+        raise ValueError(f"{path}: a names file is a mapping with the keys elements and stems")
+    for key in doc:
+        if key not in ("elements", "stems"):
+            raise ValueError(f"{path}: unknown key {key!r}; a names file has elements and stems")
+    elements: dict[str, str] = {}
+    for ref, name in (doc.get("elements") or {}).items():
+        ref = str(ref)
+        if _resolves(layout, sses, ref):
+            elements[ref] = str(name)
+        elif not _left_out(ref, sses, whole, chains):
+            raise ValueError(
+                f"{path}: no element {ref!r} in the figure; use a label such as A or α1, chain:label, #k or res:a-b"
+            )
+    stems: dict[int, str] = {}
+    for key, name in (doc.get("stems") or {}).items():
+        stems.update(_stem_names(path, str(key), str(name), layout, nucleic))
+    return elements, stems
+
+
+def _resolves(layout: Layout, sses: list[SSE], ref: str) -> list[str]:
+    try:
+        return resolve(layout, sses, ref)
+    except ValueError:
+        return []
+
+
+def _left_out(ref: str, sses: list[SSE], whole: list[SSE] | None, chains: set[str] | None) -> bool:
+    """Does the ref name an element of the structure this figure does not draw (another chain, or a part focus
+    left out)?"""
+    body = ref[4:] if ref.startswith("res:") else ref
+    chain = body.split(":", 1)[0] if body.count(":") == 1 and not ref.startswith("#") else None
+    if chain is not None and chain not in {s.chain for s in sses}:
+        return chains is None or chain in chains
+    return bool(whole) and ref.startswith("res:") and bool(_resolves(provisional(whole), whole, ref))
+
+
+def _stem_names(path: Path, key: str, name: str, layout: Layout, nucleic: Nucleic | None) -> dict[int, str]:
+    """The stems (pieces of one drawn stem) holding the nucleotide `key` (chain:number) -> their names: the name, or
+    the name plus the piece's suffix when the stem is drawn in straight pieces (nucleic.piece_name)."""
+    from .nucleic import piece_name
+
+    chain = key.rsplit(":", 1)[0] if ":" in key else None
+    drawn = {st.chain for st in nucleic.strands} if nucleic is not None else set()
+    if chain not in drawn:
+        if drawn and chain is None:
+            raise ValueError(f"{path}: stem key {key!r} must name a nucleotide as chain:number, e.g. A:1")
+        return {}  # no nucleic acid drawn, or not this chain: nothing to name
+
+    def holds(d) -> bool:
+        return any(
+            f"{lab.chain}:{lab.tag}" == key
+            for a, i, b, j in d.pairs
+            for lab in (nucleic.strands[a].labels[i], nucleic.strands[b].labels[j])
+        )
+
+    hit = next((d for d in layout.stems if holds(d)), None)
+    if hit is None:
+        raise ValueError(f"{path}: no stem holds nucleotide {key!r}; a stem key is a paired nucleotide (chain:number)")
+    pieces = [k for k, d in enumerate(layout.stems) if d is hit or (hit.parent and d.parent == hit.parent)]
+    if len(pieces) == 1:
+        return {pieces[0]: name}
+    return {k: piece_name(name, n) for n, k in enumerate(pieces)}
+
+
+# ---------------------------------------------------------------------------------------------- applying them
+
+
+def apply_names(
+    specs: list[str],
+    path,
+    layout: Layout,
+    sses: list[SSE],
+    *,
+    whole: list[SSE] | None = None,
+    chains: set[str] | None = None,
+    copies: dict[str, tuple[str, int]] | None = None,
+    primes: dict[str, str] | None = None,
+) -> None:
+    """Name the placed elements and stems of `layout` in place, spec after spec (a later one wins; a file's label
+    refs read the names given before it). Then copies of one protein (`copies`, model.homolog_chains) share names:
+    an element no spec named takes the name of the overlapping element of a named copy, so mirror images and other
+    copies read alike. Elements lent by neighbouring chains (focus mode) keep their chain's prime (`primes`)."""
+    named: dict[str, str] = {}
+    for spec in specs:
+        elements, stems = load_names(spec, path, layout, sses, layout.nucleic, whole=whole, chains=chains)
+        for ref, name in elements.items():
+            for sid in resolve(layout, sses, ref):
+                layout.placed[sid].label = named[sid] = name
+        for k, name in stems.items():
+            layout.stems[k].name = name
+    shared = _shared(layout, sses, named, copies or {})
+    for sid, name in shared.items():
+        layout.placed[sid].label = name
+    for sid in sorted({*named, *shared}):
+        layout.placed[sid].label += (primes or {}).get(layout.placed[sid].sse.chain, "")
+
+
+def _shared(layout: Layout, sses: list[SSE], named: dict[str, str], copies: dict[str, tuple[str, int]]):
+    """sid -> name for each unnamed element of a copy whose overlapping element (same kind, at least half of it,
+    residue numbers taken to the first copy's) in another copy was named; the largest overlap wins."""
+    drawn = [s for s in sses if s.id in layout.placed]
+    out = {}
+    for s in drawn:
+        if s.id in named or s.chain not in copies:
+            continue
+        root, shift = copies[s.chain]
+        lo, hi = s.first.seq - shift, s.last.seq - shift
+        best, most = None, 0
+        for t in drawn:
+            if t.id not in named or t.chain == s.chain or t.kind != s.kind or copies.get(t.chain, ("",))[0] != root:
+                continue
+            o = min(hi, t.last.seq - copies[t.chain][1]) - max(lo, t.first.seq - copies[t.chain][1]) + 1
+            if o > most:
+                best, most = named[t.id], o
+        if best is not None and 2 * most >= hi - lo + 1:
+            out[s.id] = best
+    return out

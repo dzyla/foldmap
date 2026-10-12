@@ -1,0 +1,44 @@
+# Histone-fold helix names (Sato, Dacher & Kurumizaka 2022, Epigenomes 6:22, Fig. 1A) for the nucleosome core 1KX5:
+# H3 (chains A, E): αN α1 α2 α3; H4 (B, F): α1 α2 α3; H2A (C, G) and H2B (D, H): α1 α2 α3 αC.
+# Source of every range: the helices foldmap's DSSP finds in 1KX5 (listed per chain below), each matched to the box
+# of the same order in Sato Fig. 1A. Short helices Sato draws unnamed (H4 25-28, H2A 17-21) keep their labels.
+# Use: foldmap plot 1KX5 --focus A,B --names docs/names/1KX5-histones.yaml
+elements:
+  # H3, chain A (DSSP: 45-56, 64-76, 86-113, 121-131)
+  res:A:45-56: αN
+  res:A:64-76: α1
+  res:A:86-113: α2
+  res:A:121-131: α3
+  # H3, chain E (DSSP: 45-56, 64-78, 86-113, 121-131)
+  res:E:45-56: αN
+  res:E:64-78: α1
+  res:E:86-113: α2
+  res:E:121-131: α3
+  # H4, chain B (DSSP: 31-40, 50-75, 83-92)
+  res:B:31-40: α1
+  res:B:50-75: α2
+  res:B:83-92: α3
+  # H4, chain F (DSSP: 31-40, 50-75, 83-92)
+  res:F:31-40: α1
+  res:F:50-75: α2
+  res:F:83-92: α3
+  # H2A, chain C (DSSP: 27-36, 46-72, 80-88, 91-96)
+  res:C:27-36: α1
+  res:C:46-72: α2
+  res:C:80-88: α3
+  res:C:91-96: αC
+  # H2A, chain G (DSSP: 27-36, 47-72, 80-88, 91-96)
+  res:G:27-36: α1
+  res:G:47-72: α2
+  res:G:80-88: α3
+  res:G:91-96: αC
+  # H2B, chain D (DSSP: 35-45, 53-80, 88-98, 101-119)
+  res:D:35-45: α1
+  res:D:53-80: α2
+  res:D:88-98: α3
+  res:D:101-119: αC
+  # H2B, chain H (DSSP: 35-45, 53-80, 88-98, 101-119)
+  res:H:35-45: α1
+  res:H:53-80: α2
+  res:H:88-98: α3
+  res:H:101-119: αC

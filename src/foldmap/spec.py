@@ -46,6 +46,7 @@ class FigureSpec:
     rename: dict[str, str] = field(default_factory=dict)
     swap: list[tuple[str, str]] = field(default_factory=list)
     move: list[tuple[str, tuple[float, float]]] = field(default_factory=list)
+    names: list[str] = field(default_factory=list)  # --names: deposited, beta or YAML files, later ones winning
 
     def layout_kwargs(self, edits: bool = True) -> dict:
         """Keyword arguments for cli.make_layout after (path, mode, rotate, flip_v)."""
@@ -65,6 +66,7 @@ class FigureSpec:
             "uniprot": self.uniprot,
             "chains": self.chains,
             "focus": self.focus,
+            "names": list(self.names),  # not an edit: the user's renames are written for the names
         }
         if edits:
             kw.update(self.edits())
@@ -106,7 +108,8 @@ def figure_spec(
     """The figure for `structure`: the layout file (if any), overlaid by every value in `given` that is not None,
     then the defaults. style: KEY=VALUE overrides, applied over the layout file's style (palette, fill and loops
     are shorthands for the style keys of those names, applied before them). Edits (rename, swap,
-    move) from the layout file and from `given` are combined, the given ones last."""
+    move) from the layout file and from `given` are combined, the given ones last; so are names (a spec given twice
+    keeps its last place)."""
     unknown = sorted(set(given) - _GIVEN)
     if unknown:
         raise ValueError(f"unknown figure option(s): {', '.join(unknown)}")
@@ -148,6 +151,8 @@ def figure_spec(
             raise ValueError(f"a move needs two numbers (dx, dy), got {d!r} for {ref!r}")
         edits["move"].append((ref, (float(d[0]), float(d[1]))))
     protomers, chains = pick("protomers"), pick("chains")
+    names = [*(doc.get("names") or []), *(given.get("names") or [])]
+    names = [n for k, n in enumerate(names) if n not in names[k + 1 :]]
     return FigureSpec(
         structure=Path(structure),
         theme=theme,
@@ -170,6 +175,7 @@ def figure_spec(
         uniprot=pick("uniprot"),
         chains=[c.strip() for c in chains.split(",") if c.strip()] if isinstance(chains, str) else chains,
         focus=str(pick("focus")),
+        names=names,
         **edits,
     )
 
@@ -280,5 +286,12 @@ def layout_document(spec: FigureSpec, structure_name: str | None = None) -> dict
         spec.structure, spec.mode, spec.rotate, spec.flip_v, **spec.layout_kwargs(edits=False)
     )
     return layoutfile.document(
-        structure_name or str(spec.structure), spec.theme, spec.look, spec.options(), spec.edits(), layout, sses
+        structure_name or str(spec.structure),
+        spec.theme,
+        spec.look,
+        spec.options(),
+        spec.edits(),
+        layout,
+        sses,
+        names=spec.names,
     )

@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import argparse
 import dataclasses
+import functools
 import re
 import sys
 from collections.abc import Callable
@@ -20,6 +21,7 @@ from .frame import Frame, RadialFrame, dna_radial_frame, dna_view_frame, protome
 from .io import load_backbone, load_links, load_nucleic, read_model
 from .layout import SCALE, _snap, build_layout, na_torn_by_unrolling, resolve
 from .model import AUTO_NT, crop_nucleic, homolog_chains, nucleic_of_chains, nucleic_touching, res_ref
+from .names import apply_names, check_spec
 from .nucleic import StemView, stem_views, straight_duplex
 from .palette import PALETTES
 from .render import LOOP_STYLES, STYLES, draw, save
@@ -180,7 +182,12 @@ def make_layout(
     focus: str = "auto",
     uniprot: str | None = None,
     model=None,
+    names: list[str] | None = None,
 ):
+    """`names` (--names): conventional names, each `deposited`, `beta` or a YAML file (names.apply_names), applied
+    over the generic labels in order; `rename` wins over all of them."""
+    for spec in names or []:
+        check_spec(spec)
     model = model or read_model(path, assembly)  # once, for every loader below (`model`: already read, same assembly)
     bb = load_backbone(path, assembly, model=model)
     present = list(dict.fromkeys(l.chain for l in bb.labels))
@@ -204,6 +211,7 @@ def make_layout(
             nucleic = nucleic_of_chains(nucleic, chains)
     sym = detect_symmetry(bb, sses, symmetry, protomers, symmetry_tol) if sses else None
     shared = _homolog_labels(bb, sses)  # copies of one protein share labels, however much of each is modelled
+    copies = homolog_chains(bb)
     if focus == "auto" and (look or Style()).highlight != "none":
         focus = "none"  # highlighting the asymmetric unit or a protomer asks for the whole assembly
     focus_chains = _focus_chains(focus, sym, bb, sses)
@@ -213,6 +221,7 @@ def make_layout(
     if nucleic is not None and nucleic.strands:  # after focus: auto crops to the stems the subunit touches
         nucleic, na_cropped = _na_extent(nucleic, (look or Style()).na_extent)
     partial, context, unjoined = set(), None, set()
+    whole, primes, relabel = sses, {}, {}  # every element read; labels shared by copies and primes of lent elements
     if focus_chains:  # a large assembly: one subunit in full, plus what its neighbours lend to its fold
         from .layout import provisional
 
@@ -224,17 +233,15 @@ def make_layout(
         sheets = build_sheets(sses, dssp.bridges)
         order = sorted(partial, key=lambda c: min(s.start for s in sses if s.chain == c))
         primes = {c: "′″‴"[min(n, 2)] for n, c in enumerate(order)}
-        rename = dict(rename or {})
         for s in sses:
             if s.chain in partial:
-                rename.setdefault(res_ref(s.chain, s.first, s.last), labels[s.id] + primes[s.chain])
+                relabel[res_ref(s.chain, s.first, s.last)] = labels[s.id] + primes[s.chain]
         context = _context(sym, focus_chains, bb, bool(partial))
         sym = None  # one subunit: no copies to draw alike
     if shared:  # applied to the elements actually drawn (focus mode may have left some out)
-        rename = dict(rename or {})
         for s in sses:
             if s.id in shared and s.chain not in partial:
-                rename.setdefault(res_ref(s.chain, s.first, s.last), shared[s.id])
+                relabel[res_ref(s.chain, s.first, s.last)] = shared[s.id]
     mem = None
     if membrane not in ("off", None):
         from .membrane import find_membrane
@@ -310,7 +317,13 @@ def make_layout(
         keep_depth=mem is not None and mode == "stack",
         na_cropped=na_cropped,
         template=(look or Style()).fold_template,
-        copies=homolog_chains(bb),
+        copies=copies,
+        relabel=relabel,
+        names=functools.partial(
+            apply_names, list(names), path, whole=whole, chains=set(present), copies=copies, primes=primes
+        )
+        if names
+        else None,
     )
     lay.focus = _focus((look or Style()).highlight, bb, sym)
     if focus_chains:
@@ -745,6 +758,7 @@ def _spec_of(args) -> FigureSpec:
         rename=edits["rename"],
         swap=edits["swap"],
         move=edits["move"],
+        names=args.names,
     )
 
 
@@ -901,6 +915,15 @@ def build_parser() -> argparse.ArgumentParser:
             help="auto builds the file's first biological assembly when it adds copies (up to 24 chains), or "
             "when it is one of several complexes deposited together; "
             "asu keeps the file as deposited; or give an assembly id from the file",
+        )
+        q.add_argument(
+            "--names",
+            action="append",
+            default=[],
+            metavar="SPEC",
+            help="conventional names: deposited (the file's own helix ids, e.g. globin A-H), beta (strands "
+            "β1…βn, and αn after βn in a βα row) or a YAML file of element and stem names (examples in docs/names); "
+            "repeatable, later ones win, --rename wins over all",
         )
         q.add_argument(
             "--rename",

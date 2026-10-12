@@ -8,6 +8,7 @@ re-rendered later, after the model changes, or shared.
     theme: trace
     style: {residue_numbers: true}    # only what differs from the theme
     layout: {mode: projected, rotate: 0, symmetry: auto, assembly: auto}
+    names: [deposited, my-names.yaml]  # --names, as given
     edits:
       rename: {res:A:167-182: Gd}
       swap: [[res:A:3-11, res:A:60-79]]
@@ -28,7 +29,7 @@ from .model import SSE, res_ref
 from .style import _KEY_ALIASES, THEMES, Style
 
 VERSION = 1
-TOP = ("foldmap", "structure", "theme", "style", "layout", "domains", "edits")
+TOP = ("foldmap", "structure", "theme", "style", "layout", "domains", "names", "edits")
 LAYOUT = (
     "mode",
     "rotate",
@@ -56,8 +57,11 @@ def canonical(layout: Layout, sses: list[SSE], ref: str) -> list[str]:
     return [_range(by_id[k]) for k in resolve(layout, sses, ref)]
 
 
-def document(structure, theme: str, look: Style, options: dict, edits: dict, layout: Layout, sses: list[SSE]) -> dict:
-    """The layout document for a figure: theme, style changes, layout options, edits in residue form."""
+def document(
+    structure, theme: str, look: Style, options: dict, edits: dict, layout: Layout, sses: list[SSE], names=()
+) -> dict:
+    """The layout document for a figure: theme, style changes, layout options, names (--names, as given), edits in
+    residue form."""
     base = THEMES[theme]
     style = {k: v for k, v in asdict(look).items() if v != getattr(base, k)}
     if style.get("mark"):
@@ -82,6 +86,8 @@ def document(structure, theme: str, look: Style, options: dict, edits: dict, lay
     if layout.domains:  # saved as resolved element ranges, so 'auto' domains are frozen as found
         by_id = {s.id: s for s in sses}
         doc["domains"] = {name: [_range(by_id[k]) for k in ids] for name, ids in layout.domains}
+    if names:
+        doc["names"] = [str(n) for n in names]
     doc["edits"] = {"rename": rename, "swap": swap, "move": move}
     return doc
 
@@ -121,6 +127,9 @@ def load(path) -> dict:
     for key in doc.get("layout") or {}:
         if key not in LAYOUT:
             raise ValueError(f"{path}: unknown layout key {key!r}; use {', '.join(LAYOUT)}")
+    names = doc.get("names")
+    if names is not None and not (isinstance(names, list) and all(isinstance(n, str) for n in names)):
+        raise ValueError(f"{path}: names is a list, e.g. [deposited] or [beta, my-names.yaml]")
     for key in doc.get("edits") or {}:
         if key not in EDITS:
             raise ValueError(f"{path}: unknown edit {key!r}; use {', '.join(EDITS)}")

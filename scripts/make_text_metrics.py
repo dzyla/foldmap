@@ -20,7 +20,7 @@ HEADER = (
     "# SPDX-License-Identifier: AGPL-3.0-or-later\n"
     "# Copyright (C) 2026 Dawid Zyla. Additional terms (AGPL-3.0 section 7(b)): see NOTICE.\n"
 )
-CHARS = "".join(chr(c) for c in range(0x20, 0x7F)) + "′″·–—αβγδεηθλπστω"  # what names are written with
+CHARS = "".join(chr(c) for c in range(0x20, 0x7F)) + "′″‴·–—αβγδεηθλπστω"  # what names are written with
 
 
 def _quote(s: str) -> str:

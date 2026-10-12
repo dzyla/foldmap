@@ -1,0 +1,9 @@
+# tRNA arm names (acceptor, D, anticodon, T; the cloverleaf as drawn in textbooks and on Wikimedia Commons,
+# "TRNA-Phe yeast 1ehz") for yeast tRNA-Phe 1EHZ. Each stem is named by one nucleotide it pairs:
+# acceptor G1-C72, D stem G10-C25, anticodon stem C27-G43, T stem G49-C65.
+# Use: foldmap plot 1EHZ --names docs/names/1EHZ-trna.yaml
+stems:
+  A:1: acceptor
+  A:10: D
+  A:27: anticodon
+  A:49: T

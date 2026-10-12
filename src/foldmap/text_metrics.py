@@ -102,6 +102,7 @@ ADVANCE = {  # character: advance width, font units
     "~": 1196,
     "′": 491,
     "″": 981,
+    "‴": 981,
     "·": 682,
     "–": 1139,
     "—": 2048,

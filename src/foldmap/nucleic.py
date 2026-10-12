@@ -477,9 +477,13 @@ def segment_stem(stem: Stem, strands, max_turn: float = SEGMENT_TURN) -> list[St
     for n, (lo, hi) in enumerate(zip(cuts, cuts[1:] + [len(stem)])):
         part = stem.pairs[lo:hi]
         inner = [x for x in stem.bulges if _between(x, part)]
-        suffix = str(n + 1) if stem.name[-1:].islower() else _letter(n)  # P2a: P2a1, P2a2; P2: P2a, P2b
-        pieces.append(Stem(part, inner, f"{stem.id}#{n + 1}", f"{stem.name}{suffix}", stem.id, stem.helix))
+        pieces.append(Stem(part, inner, f"{stem.id}#{n + 1}", piece_name(stem.name, n), stem.id, stem.helix))
     return pieces
+
+
+def piece_name(name: str, n: int) -> str:
+    """The name of the n-th straight piece (from 0) of a stem called `name`: P2a: P2a1, P2a2; P2: P2a, P2b."""
+    return name + (str(n + 1) if name[-1:].islower() else _letter(n))
 
 
 def _letter(n: int) -> str:

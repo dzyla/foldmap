@@ -1,0 +1,37 @@
+# Globin helix letters A-H (Perutz; Richardson 1981 Fig. 89) for human deoxyhaemoglobin 2HHB, chains A-D.
+# Source: the residue ranges of the entry's own helix records (_struct_conf AA-AH, BA-BH, CA-CH, DA-DH); the same
+# names come from `--names deposited`. Use: foldmap plot 2HHB --names docs/names/2HHB-globin.yaml
+# The alpha chains (A, C) have no D helix: their record AD (50-51, two residues) covers no element and is left out.
+elements:
+  # alpha chains
+  res:A:3-18: A
+  res:A:20-35: B
+  res:A:36-42: C
+  res:A:52-71: E
+  res:A:80-88: F
+  res:A:94-112: G
+  res:A:118-138: H
+  res:C:3-18: A
+  res:C:20-35: B
+  res:C:36-42: C
+  res:C:52-71: E
+  res:C:80-88: F
+  res:C:94-112: G
+  res:C:118-138: H
+  # beta chains
+  res:B:4-18: A
+  res:B:19-34: B
+  res:B:35-41: C
+  res:B:50-56: D
+  res:B:57-76: E
+  res:B:85-93: F
+  res:B:99-117: G
+  res:B:123-143: H
+  res:D:4-18: A
+  res:D:19-34: B
+  res:D:35-41: C
+  res:D:50-56: D
+  res:D:57-76: E
+  res:D:85-93: F
+  res:D:99-117: G
+  res:D:123-143: H

@@ -171,6 +171,7 @@ def draw_topology(
     swap: list[list[str]] | None = None,
     move: dict[str, list[float]] | None = None,
     rename: dict[str, str] | None = None,
+    names: list[str] | None = None,
     msa_path: str | None = None,
     rotate: float | None = None,
     mode: str | None = None,
@@ -185,6 +186,8 @@ def draw_topology(
     style: style keys to change, e.g. {"color_by": "sequence", "residue_numbers": "true", "mark": "α2=#d1495b"}.
     domains: named domain panels, e.g. {"N-lobe": ["res:A:13-59"]}. swap: pairs of elements to exchange, e.g.
     [["α1", "α3"]]. move: nudges in page units, e.g. {"α2": [1, -2]}. rename: {"res:A:167-182": "Gd"}.
+    names: conventional names, in order (later win, rename wins over all): "deposited" (the file's own helix ids,
+    e.g. globin A-H), "beta" (strands β1…βn, αn after βn in a βα row) or a YAML file of element and stem names.
     membrane: off, auto (draw the lipid bilayer) or flip (the same, the two sides swapped). focus: auto draws
     filaments, cages and large assemblies as one subunit plus the neighbouring parts of its fold; none draws the
     whole assembly; or chains, e.g. "B".
@@ -220,6 +223,7 @@ def draw_topology(
             domains=[(n, list(r)) for n, r in (domains or {}).items()] or ("uniprot" if uniprot_domains else None),
             msa=msa_path,
             rename=rename,
+            names=names,
             swap=[tuple(p) for p in swap or []],
             move=[(ref, (d[0], d[1])) for ref, d in (move or {}).items()],
         )

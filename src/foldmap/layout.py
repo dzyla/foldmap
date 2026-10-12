@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import itertools
 import re
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from types import SimpleNamespace
 from typing import NamedTuple
@@ -1993,8 +1994,14 @@ def build_layout(
     na_cropped: bool = False,
     template: str | None = None,
     copies: dict[str, tuple[str, int]] | None = None,
+    relabel: dict[str, str] | None = None,
+    names: Callable[[Layout, list[SSE]], None] | None = None,
 ) -> Layout:
-    """`template` (Style.fold_template, the style's when None): "auto" draws each sheet that template_applies to as
+    """Labels: the generic ones (_assign_labels), then `relabel` (ref -> label: copies' shared labels, primes of
+    elements lent by neighbours), then `names` (names.apply_names: --names, given the placed layout with its stems
+    and ba_rows), then `rename` (the user's own, through _adjust like `swap` and `move`); the label sides and boxes
+    are chosen after (_choose_label_sides).
+    `template` (Style.fold_template, the style's when None): "auto" draws each sheet that template_applies to as
     a βα row (_ba_template), in projected mode; `copies` (model.homolog_chains) makes copies of a protein share that
     choice (template_choices). `keep_depth` (stack mode with a membrane): each element stays at its
     height along the frame's up. `na_cropped` (na_extent auto cropped the nucleic acid): drawn as blocks, without
@@ -2118,8 +2125,14 @@ def build_layout(
     ghosts = [m for it in items for m in it.members if isinstance(m, Placed) and m.ghost]
     _assign_labels(placed)
     real = {p.sse.id: p for p in placed}
+    named = Layout(real, (0.0, 0.0, 0.0, 0.0), stems=dna, nucleic=nucleic if dna else None)
+    named.ba_rows = _ba_rows(items)
+    if relabel:  # labels shared by copies, primes of lent elements: before any name
+        _adjust(items, named, sses, relabel, [], [])
+    if names is not None:  # conventional names (names.apply_names): before the user's own
+        names(named, sses)
     if rename or swap or move:
-        _adjust(items, Layout(real, (0.0, 0.0, 0.0, 0.0)), sses, rename or {}, swap or [], move or [], joints, walls)
+        _adjust(items, named, sses, rename or {}, swap or [], move or [], joints, walls)
     for g in ghosts:
         g.label = real[g.sse.id].label
     rects = np.array([p.rect for p in placed + ghosts + dna]).reshape(-1, 4)
@@ -2139,12 +2152,7 @@ def build_layout(
     )
     lay.na_traces = traces
     lay.frame = frame
-    lay.ba_rows = [  # each βα row as drawn, left to right
-        [m.sse.id for m in sorted((m for m in it.members if not m.ghost), key=lambda m: m.cx)]
-        for it in items
-        if any(isinstance(m, Placed) and m.sse.kind == "E" for m in it.members)
-        and any(isinstance(m, Placed) and m.sse.kind == "H" for m in it.members)
-    ]
+    lay.ba_rows = _ba_rows(items)  # after the user's swaps
     if keep_depth and len(rows) > 1:  # wrapped into rows of whole chains: each row gets its own band
         lay.stack_rows = [[m.sse.id for it in row for m in it.members if isinstance(m, Placed)] for row in rows]
     if traces:
@@ -2163,6 +2171,16 @@ def build_layout(
         float(rects[:, 3].max()),
     )
     return lay
+
+
+def _ba_rows(items: list[_Item]) -> list[list[str]]:
+    """Each βα row's elements (no ghost) as drawn, left to right: the items holding strands and helices."""
+    return [
+        [m.sse.id for m in sorted((m for m in it.members if not m.ghost), key=lambda m: m.cx)]
+        for it in items
+        if any(isinstance(m, Placed) and m.sse.kind == "E" for m in it.members)
+        and any(isinstance(m, Placed) and m.sse.kind == "H" for m in it.members)
+    ]
 
 
 DOMAIN_PAD = 0.7  # panel margin around a domain's elements

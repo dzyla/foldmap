@@ -337,3 +337,14 @@ def test_backbone_colour_keys_reach_the_figure_through_the_tool(tmp_path):
             "draw_topology",
             {"source": str(DATA / "1LMB.cif"), "output_path": str(out), "style": {"backbone_colors": "Z=red"}},
         )
+
+
+def test_draw_topology_takes_names(tmp_path, monkeypatch):
+    from foldmap import spec as spec_module
+
+    seen = []
+    real = spec_module.draw_spec
+    monkeypatch.setattr(spec_module, "draw_spec", lambda s: seen.append(s.names) or real(s))
+    out = tmp_path / "ubq.svg"
+    r = call("draw_topology", {"source": UBQ, "output_path": str(out), "names": ["beta"]})
+    assert out.is_file() and str(out) in r.content[0].text and seen == [["beta"]]

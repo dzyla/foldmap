@@ -1,0 +1,11 @@
+# Fibronectin type III strand letters A B C C' E F G (Lappalainen 2008 Fig. 3) for the tenascin FN3 domain 1TEN.
+# Source: the strands as foldmap draws them (G is one strand across its bulge, 880-890). The FN3 fold has no D strand.
+# Use: foldmap plot 1TEN --names docs/names/1TEN-fn3.yaml
+elements:
+  res:A:807-812: A
+  res:A:819-824: B
+  res:A:832-839: C
+  res:A:847-852: C′
+  res:A:857-860: E
+  res:A:868-877: F
+  res:A:880-890: G
