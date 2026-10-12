@@ -1151,13 +1151,19 @@ def _cmd_contacts(args: argparse.Namespace) -> int:
         ("not first", len(report.not_first)),
     )
     print("contact beads: " + ", ".join(f"{name} {n}" for name, n in counts))
+    for line in contact_problems(report):
+        print(f"  {line}")
+    return 1 if report.false or report.unmatched or report.wrong_colour else 0
+
+
+def contact_problems(report) -> list[str]:
+    """One line per problem of a nacheck.ContactReport: each bead with a problem, then each missing contact."""
+    lines = []
     for bead in report.beads:
         if bead.problem:
             where = f" ({bead.pair})" if bead.pair else ""
-            print(f"  {bead.problem}: {bead.nucleotide} <- {bead.residue}{where}")
-    for miss in report.missing:
-        print(f"  missing: {miss.nucleotide} <- {miss.pair}")
-    return 1 if report.false or report.unmatched or report.wrong_colour else 0
+            lines.append(f"{bead.problem}: {bead.nucleotide} <- {bead.residue}{where}")
+    return lines + [f"missing: {miss.nucleotide} <- {miss.pair}" for miss in report.missing]
 
 
 _COMMANDS: dict[str, Callable[[argparse.Namespace], int]] = {

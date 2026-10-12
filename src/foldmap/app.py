@@ -147,14 +147,14 @@ def structure_choices(source: str, limit: int = 12) -> list[tuple[str, str]]:
     return out
 
 
-def sequence_files(path, settings: dict, view: dict) -> dict[str, bytes]:
-    """The sequence figure (with the alignment, if one is loaded) as SVG, PNG and PDF. A ConSurf grades table
-    colours the topology only: the sequence is drawn without an alignment."""
+def sequence_figure(path, settings: dict, view: dict):
+    """The sequence figure (with the alignment, if one is loaded). A ConSurf grades table colours the topology
+    only: the sequence is drawn without an alignment. view: chain, columns, full_sequence, ss_colour."""
     from foldmap.seqplot import draw_sequence
     from foldmap.sequence import is_consurf, read_alignment
 
     msa = settings.get("msa_path")
-    fig = draw_sequence(
+    return draw_sequence(
         path,
         chain=view.get("chain") or None,
         alignment=read_alignment(msa) if msa and not is_consurf(msa) else None,
@@ -166,6 +166,11 @@ def sequence_files(path, settings: dict, view: dict) -> dict[str, bytes]:
         title=settings.get("title") or None,
         msa=msa or None,
     )
+
+
+def sequence_files(path, settings: dict, view: dict) -> dict[str, bytes]:
+    """The sequence figure (sequence_figure) as SVG, PNG and PDF."""
+    fig = sequence_figure(path, settings, view)
     out = {"svg": save_svg(fig).encode()}
     with tempfile.TemporaryDirectory() as tmp:
         for ext in ("png", "pdf"):
