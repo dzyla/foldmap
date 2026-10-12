@@ -30,20 +30,17 @@ def test_loading_draws_at_once():
 
 
 def test_picking_a_theme_redraws_with_it():
-    """Was test_picking_a_style_opens_the_editor_with_that_theme (the dialog arrives in Task 6)."""
+    """Was test_picking_a_style_opens_the_editor_with_that_theme (the dialog: test_app_controls.py)."""
     at = opened(DATA / "1LMB.cif")
     at.selectbox(key="theme").select("trace").run()
     assert not at.exception and at.session_state["loop_arrows"] is True and "<svg" in svg_of(at)
 
 
-def test_controls_change_the_figure():
-    at = load(app_test(), DATA / "1UBQ.cif")
-    assert "resnum:" not in svg_of(at)
-    at.checkbox(key="residue_numbers").check()
-    at.run()
-    assert "resnum:" in svg_of(at)
-    at.selectbox(key="mode").select("stack")
-    at.run()
+def test_mode_control_redraws():
+    """The mode half of test_controls_change_the_figure (its residue-numbers half is in test_app_controls.py);
+    Task 9 restates it as test_layout_mode_and_sizes."""
+    at = opened(DATA / "1UBQ.cif")
+    at.selectbox(key="mode").select("stack").run()
     assert not at.exception and "<svg" in svg_of(at)
 
 
