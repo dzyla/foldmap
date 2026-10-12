@@ -414,3 +414,22 @@ def test_a_kinked_helix_drawn_tilted_never_cuts_into_itself(mode, turn, side):
     pa, pb = lay.placed[a.id], lay.placed[b.id]
     assert not _bodies_overlap(pa, pb)
     assert np.hypot(*np.subtract(pa.c_port, pb.n_port)) <= 2.5 * pa.width
+
+
+def test_kinked_pieces_join_only_across_a_corner_of_their_own_chain():
+    """A piece marked kinked joins the helix piece of its own chain that ends just before it (a 3₁₀/π corner of at
+    most _KINK_CORNER residues), never merely the previous element in the list: a focus subset can leave its real
+    predecessor out (Task 12 review)."""
+    from foldmap.layout import _KINK_CORNER, _kink_groups
+
+    a = fake_sse("H", 1, 14)
+    b = fake_sse("H", 18, 31)
+    b.kinked = True
+    far = fake_sse("H", 18 + 14 + _KINK_CORNER + 2, 60)
+    far.kinked = True
+    other = fake_sse("H", 33, 45, chain="B")
+    other.kinked = True
+    assert _kink_groups([a, b], set()) == [[a, b]]
+    assert _kink_groups([a, far], set()) == []  # its predecessor left out: the helix before is too far
+    assert _kink_groups([b, other], set()) == []  # another chain
+    assert _kink_groups([a, other, b], set()) == [[a, b]]  # a chain's pieces, whatever lies between in the list

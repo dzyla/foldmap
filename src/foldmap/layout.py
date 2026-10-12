@@ -463,16 +463,24 @@ def _helix_item(
     )
 
 
+_KINK_CORNER = 5  # residues: the longest corner between two pieces of a kinked helix (a π turn)
+
+
 def _kink_groups(sses: list[SSE], skip: set[str]) -> list[list[SSE]]:
-    """The pieces of each helix split at a kink (SSE.kinked: build_sses cut it at a 3-10/pi corner), in order; none
-    of whose pieces is in `skip` (a bundle holds them already)."""
+    """The pieces of each helix split at a kink (SSE.kinked: build_sses cut it at a 3-10/pi corner), in order: each
+    kinked piece with the helix piece of its chain that ends at most _KINK_CORNER residues before it (a subset of the
+    elements may leave that piece out). Groups any of whose pieces is in `skip` (a bundle holds them) are left out."""
     groups: list[list[SSE]] = []
-    for a, b in zip(sses, sses[1:]):
-        if b.kinked and a.kind == "H" and a.chain == b.chain:
+    last: dict[str, SSE] = {}  # each chain's last helix so far
+    for b in sorted(sses, key=lambda s: s.start):
+        a = last.get(b.chain)
+        if b.kind == "H" and b.kinked and a is not None and 0 <= b.start - a.end - 1 <= _KINK_CORNER:
             if groups and groups[-1][-1] is a:
                 groups[-1].append(b)
             else:
                 groups.append([a, b])
+        if b.kind == "H":
+            last[b.chain] = b
     return [g for g in groups if not any(s.id in skip for s in g)]
 
 
