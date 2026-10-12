@@ -18,18 +18,21 @@ from pathlib import Path
 
 from foldmap import CREDIT, app_jobs
 from foldmap.app_controls import (
+    alignment_rows,
     chains_section,
+    conservation_section,
     layout_section,
+    missing_alignment,
     prepare,
     setting,
     show_section,
     style_section,
     touched,
 )
-from foldmap.app_edits import chain_choices, shown, upload_name
+from foldmap.app_edits import chain_choices, shown
 from foldmap.app_views import Workspace, download_menu, explorer_view, figure_view, said, sequence_view
 from foldmap.cli import _adjustments, _domain_spec
-from foldmap.fetch import ALIGNMENT_SUFFIXES, fetch, keep_upload, source_id
+from foldmap.fetch import fetch, source_id
 from foldmap.names import KEYWORDS as NAME_KEYWORDS
 from foldmap.render import save, save_svg
 from foldmap.spec import FigureSpec, SavedDomains, draw_spec, parse_flag, parse_protomers, parse_vector
@@ -348,16 +351,6 @@ def apply_theme(ss: MutableMapping, name: str | None = None) -> None:
         ss.setdefault(key, copy.deepcopy(value))
 
 
-# interim: remove when the look widgets use persist_state="session" (Task 11)
-def keep_look(ss: MutableMapping) -> None:
-    """Keep the theme and its style values while their widgets are not shown (the Start screen): the next structure
-    is drawn in the visitor's look. Streamlit forgets a widget's value one run after the widget stops rendering,
-    unless the value is set again."""
-    for key in ("theme", *STYLE_FIELDS):
-        if key in ss:
-            ss[key] = ss[key]
-
-
 # ---------------------------------------------------------------------------------------------- sidebar
 THEMES_NOTE = "Shown on ubiquitin, the reference structure (alphafold on p53). Pick one to apply it to your structure."
 
@@ -439,7 +432,7 @@ def reset_structure(ss: MutableMapping) -> None:
         ss[key] = getattr(look, key)
     for key in ("msa_path", "msa_error", "msa_reference", "msa_missing", "layout_error"):
         ss[key] = ""
-    ss["names_missing"] = []
+    ss["names_missing"], ss["msa_rows"] = [], []
     ss["_synced"] = {}
     from foldmap.app_edits import EDITORS
 
@@ -477,6 +470,45 @@ def apply_document(ss: MutableMapping, settings: dict) -> None:
     for key in NAMES_AND_DOMAINS:
         ss.pop(key, None)
     ss["_synced"] = {k: v for k, v in (ss.get("_synced") or {}).items() if k not in ("names", "domains")}
+
+
+def apply_layout_file(ss: MutableMapping) -> None:
+    """The layout file uploader's callback: the file read (layoutfile.load: YAML, checked) and its settings in place
+    of the session's (apply_document), with the rows of the alignment it names; else layout_error, and nothing
+    changes."""
+    from foldmap import layoutfile
+
+    up = ss.get("layout_upload")
+    if up is None:
+        return
+    try:
+        with tempfile.TemporaryDirectory() as tmp:
+            f = Path(tmp) / "layout.yaml"
+            f.write_bytes(up.getvalue())
+            doc = layoutfile.load(f)
+        settings = settings_from_document(doc)
+    except (ValueError, OSError) as err:
+        ss["layout_error"] = str(err)
+        return
+    ss["layout_error"] = ""
+    apply_document(ss, settings)
+    ss["msa_rows"] = alignment_rows(ss.get("msa_path", ""))
+
+
+def layout_file_section(st, ss: MutableMapping) -> None:
+    """Layout file: load one (its settings replace the session's); saving one is in the Download popover."""
+    with st.expander("Layout file", key="sec_layoutfile"):
+        st.file_uploader(
+            "Load a layout file",
+            type=["yaml", "yml"],
+            key="layout_upload",
+            on_change=apply_layout_file,
+            args=(ss,),
+            help="a layout file saved from the Download menu (or the command line's --save-layout): the theme, "
+            "style, layout options and edits it holds replace the current ones",
+        )
+        if ss.get("layout_error"):
+            st.error(shown(ss["layout_error"]))
 
 
 def picked_row(table: dict | None, choices: list[tuple[str, str]]) -> str | None:
@@ -521,26 +553,6 @@ def main() -> None:
     @st.cache_data(show_spinner=False, max_entries=16)
     def contacts(path: str, key: str, _blob: str) -> dict | None:  # key: app_jobs.contacts_key; _blob not hashed
         return app_jobs.run_job(app_jobs.contacts_job, path, _blob, limits=lim)
-
-    def store_alignment() -> None:
-        ss["last_changed"] = "msa_path"
-        up = ss.get("msa_upload")
-        if up is None:
-            ss["msa_path"] = ""
-            return
-        try:
-            target = keep_upload(up.name, up.getvalue(), ALIGNMENT_SUFFIXES)
-            from foldmap.sequence import is_consurf, read_alignment
-
-            if not is_consurf(target):  # a ConSurf grades table is used as it is (make_layout reads it)
-                read_alignment(target)
-        except (ValueError, OSError) as err:
-            ss["msa_error"] = (
-                str(err) if isinstance(err, ValueError) else "the alignment could not be stored; try again"
-            )
-            ss["msa_path"] = ""
-            return
-        ss.update(msa_error="", msa_path=str(target), msa_uploaded=(str(target), upload_name(up.name)))
 
     def load(source: str | None = None, upload: bool = False) -> None:
         """Load a structure and draw its first figure; the workspace opens only when that succeeds. upload: the
@@ -626,29 +638,8 @@ def main() -> None:
     def new_structure() -> None:
         ss["stage"], ss["share_id"], ss["source"] = "load", "", ""
 
-    def tracked(key: str) -> dict:  # interim: the sections of Tasks 7-11 use setting() (kept while hidden)
-        return {"key": key, "on_change": touched, "args": (ss, key)}
-
     def redraw() -> None:
         ss["drawn_blob"] = current_blob(ss)
-
-    def apply_layout_file() -> None:
-        from foldmap import layoutfile
-
-        up = ss.get("layout_upload")
-        if up is None:
-            return
-        try:
-            with tempfile.TemporaryDirectory() as tmp:
-                f = Path(tmp) / "layout.yaml"
-                f.write_bytes(up.getvalue())
-                doc = layoutfile.load(f)
-            settings = settings_from_document(doc)
-        except (ValueError, OSError) as err:
-            ss["layout_error"] = str(err)
-            return
-        ss["layout_error"] = ""
-        apply_document(ss, settings)
 
     if ss["stage"] == "load":  # a share link (?id=…&theme=…) opens its structure once
         qid = st.query_params.get("id")
@@ -665,8 +656,7 @@ def main() -> None:
     if st.query_params.to_dict() != desired:  # uploads and paths never enter the link
         st.query_params.from_dict(desired)
 
-    if ss["stage"] == "load":
-        keep_look(ss)
+    if ss["stage"] == "load":  # the look's widgets keep their values while Start shows (persist_state)
         with st.container(key="start"):
             st.header("foldmap", anchor=False)
             st.caption("Protein topology diagrams from structures")
@@ -747,6 +737,8 @@ def main() -> None:
                     f"Auto-redraw is off for this structure: drawing took {ss.get('slow_seconds', 0.0):.1f} s. "
                     "Press Redraw after your changes."
                 )
+            if missing_alignment(ss):
+                st.caption(f"⚠ Alignment {missing_alignment(ss)} is not on this machine (Conservation & UniProt).")
 
     ss.setdefault("auto_redraw", True)
     if ss.get("pane") not in VIEWS:
@@ -754,7 +746,7 @@ def main() -> None:
     {"Figure": figure_view, "Sequence": sequence_view, "3D": explorer_view}[ss["pane"]](ws)  # only this view
     top_bar()
 
-    # ---- sidebar: the essentials, then six sections (Tasks 10-11 finish the interim ones)
+    # ---- sidebar: the essentials, then six sections, then the credit
     with st.sidebar:
         essentials(st, ss)
         with st.container(gap="xxsmall", key="sections"):
@@ -762,46 +754,8 @@ def main() -> None:
             show_section(st, ss)
             chains_section(st, ss)
             layout_section(st, ss)
-            with st.expander("Conservation & UniProt"):  # interim: Task 11 finishes this section
-                st.file_uploader(
-                    "Multiple sequence alignment or ConSurf grades table",
-                    type=["fasta", "fa", "aln", "sto", "txt"],
-                    key="msa_upload",
-                    on_change=store_alignment,
-                )
-                if ss.get("msa_error"):
-                    st.error(shown(ss["msa_error"]))
-                st.text_input(
-                    "Reference row",
-                    help="name of the structure's row (default: best match)",
-                    **tracked("msa_reference"),
-                )
-                st.caption(
-                    "With an alignment: colour by 'conservation', and the Sequence view shows the alignment. "
-                    "A ConSurf grades table (consurf_grades.txt) colours by ConSurf's own grades."
-                )
-                st.text_input(
-                    "UniProt",
-                    help="off, auto (each chain's entry via SIFTS / AlphaFold), or an accession",
-                    **tracked("uniprot"),
-                )
-                st.checkbox("UniProt domains as panels", **tracked("uniprot_domains"))
-                st.text_input(
-                    "Sites shown",
-                    help="auto (active + binding), all, none, or types: active,binding,modified",
-                    **tracked("uniprot_sites"),
-                )
-            with st.expander("Layout file"):  # Task 11 finishes this section
-                st.file_uploader(
-                    "Load a layout file", type=["yaml", "yml"], key="layout_upload", on_change=apply_layout_file
-                )
-        if ss.get("layout_error"):
-            st.error(shown(ss["layout_error"]))
-        if ss.get("msa_missing") and not ss.get("msa_path"):
-            st.warning(
-                f"The layout file's alignment {shown(ss['msa_missing'], paths=not local_files())} is not on this "
-                "machine; upload it under Conservation & UniProt."
-            )
+            conservation_section(st, ss)
+            layout_file_section(st, ss)
     st.sidebar.caption(CREDIT)
 
 

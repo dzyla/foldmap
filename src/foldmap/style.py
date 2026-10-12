@@ -252,7 +252,10 @@ def resolve_style(
     """Theme (or the file's `theme:`), then the file's keys, then key=value overrides; validated."""
     settings: dict = {}
     if style_file is not None:
-        loaded = yaml.safe_load(Path(style_file).read_text(encoding="utf-8")) or {}
+        try:
+            loaded = yaml.safe_load(Path(style_file).read_text(encoding="utf-8")) or {}
+        except RecursionError:  # brackets nested thousands deep: the YAML reader recurses once per level
+            raise ValueError(f"{style_file}: nested too deeply") from None
         if not isinstance(loaded, dict):
             raise ValueError(f"{style_file}: a style file is a mapping of key: value")
         named = loaded.pop("theme", None) or loaded.pop("preset", None)

@@ -484,3 +484,80 @@ def test_domain_colours_and_bar_only_with_domains():
     at.toggle(key="domains__auto").set_value(True).run()
     keys = widget_keys(at.sidebar, skip=())
     assert {"domain_bar", "domain_colours"} <= set(keys) and "domains__as_text" not in keys
+
+
+def test_every_setting_is_reachable():
+    """Every figure setting has a control in the sidebar (expanders render their contents): on 1LMB with every
+    "as text" switch off and every composite in its widest mode, then on 1UBQ with an alignment."""
+    from foldmap.app import HIDDEN_LAYOUT, LAYOUT_DEFAULTS, STYLE_FIELDS
+    from foldmap.app_edits import CONTROLS
+
+    def shown(at):  # expanders render their contents, so skip nothing
+        return set(widget_keys(at.sidebar, skip=()))
+
+    at = opened(DATA / "1LMB.cif")  # nucleic acid: the DNA/RNA block is shown
+    seen = shown(at)
+    for key, value in (("hbonds__mode", "chains"), ("na_backbone__mode", "modality"), ("ligands__mode", "codes")):
+        at.segmented_control(key=key).set_value(value).run()
+        seen |= shown(at)
+    at.selectbox(key="color_by").select("sequence").run()  # sequence_map instead of palette
+    seen |= shown(at)
+    at.toggle(key="domains__auto").set_value(True).run()  # with domains: colour by domain and the domain bar
+    seen |= shown(at)
+    at = opened(DATA / "1UBQ.cif")  # an alignment: the reference row picker is shown
+    at.file_uploader(key="msa_upload").set_value(
+        ("ubq.fasta", (DATA / "ubq_family.fasta").read_bytes(), "text/plain")
+    ).run()
+    seen |= shown(at)
+    wanted = {*STYLE_FIELDS, *LAYOUT_DEFAULTS, "theme"} - set(HIDDEN_LAYOUT)
+    missing = sorted(k for k in wanted if not seen & set(CONTROLS[k][2]))
+    assert missing == []
+
+
+def test_alignment_reference_is_picked_from_the_rows():
+    at = opened(DATA / "1UBQ.cif")
+    at.file_uploader(key="msa_upload").set_value(
+        ("ubq.fasta", (DATA / "ubq_family.fasta").read_bytes(), "text/plain")
+    ).run()
+    ref = at.selectbox(key="msa_reference")
+    assert ref.options[0] == "best match" and "yeast_UBI4" in ref.options  # formatted labels
+    ref.select("yeast_UBI4").run()
+    assert at.session_state["msa_reference"] == "yeast_UBI4" and not at.exception
+
+
+def test_uniprot_controls_write_the_option(monkeypatch):
+    import json
+
+    from foldmap import uniprot
+
+    e = uniprot.parse_entry(json.loads((DATA / "uniprot" / "P07911.json").read_text()))
+    monkeypatch.setattr(uniprot, "entry", lambda acc, cache_dir=None: e)
+    at = opened(DATA / "1UBQ.cif")
+    at.segmented_control(key="uniprot__mode").set_value("accession").run()
+    at.text_input(key="uniprot__acc").input("p07911").run()
+    assert at.session_state["uniprot"] == "P07911" and not at.exception
+    at.segmented_control(key="uniprot_sites__mode").set_value("types").run()
+    at.multiselect(key="uniprot_sites__types").set_value(["active", "binding"]).run()
+    assert at.session_state["uniprot_sites"] == "active,binding"
+
+
+def test_the_sidebar_is_the_essentials_then_six_sections():
+    from foldmap import CREDIT
+
+    at = opened(DATA / "1UBQ.cif")
+    labels = [e.label for e in at.sidebar.expander]
+    assert labels == ["Style", "Show", "Chains & assembly", "Edit layout", "Conservation & UniProt", "Layout file"]
+    assert at.sidebar.caption[-1].value == CREDIT  # the credit closes it
+
+
+def test_a_consurf_table_has_no_reference_row_and_clears_the_old_one():
+    at = opened(DATA / "1UBQ.cif")
+    at.file_uploader(key="msa_upload").set_value(
+        ("ubq.fasta", (DATA / "ubq_family.fasta").read_bytes(), "text/plain")
+    ).run()
+    at.selectbox(key="msa_reference").select("yeast_UBI4").run()
+    table = DATA / "consurf" / "1TIM_A_grades.txt"
+    at.file_uploader(key="msa_upload").set_value(("1TIM_A_grades.txt", table.read_bytes(), "text/plain")).run()
+    ss = at.session_state
+    assert not at.exception and ss["msa_path"].endswith(".txt") and ss["msa_reference"] == ""
+    assert "msa_reference" not in widget_keys(at.sidebar, skip=())

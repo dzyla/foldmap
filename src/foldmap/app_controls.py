@@ -1,8 +1,8 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 # Copyright (C) 2026 Dawid Zyla. Additional terms (AGPL-3.0 section 7(b)): see NOTICE.
 """The app's sidebar sections: how each settings widget is made (its key, kept while hidden, the setting it names
-when the figure fails) and the sections Style, Show, Chains & assembly and Edit layout (with the element names and
-the domains).
+when the figure fails) and the sections Style, Show, Chains & assembly, Edit layout (with the element names and the
+domains) and Conservation & UniProt (with the alignment upload).
 
 Streamlit comes in as an argument (app.main imports it); pandas only inside editor_frame (Streamlit's own
 dependency, for the editors' tables)."""
@@ -27,6 +27,7 @@ from foldmap.app_edits import (
     table_rows,
     upload_name,
 )
+from foldmap.render import SITE_GROUPS
 from foldmap.style import CHOICES, THEMES
 
 
@@ -532,6 +533,128 @@ def editor(st, ss: MutableMapping, kind: str, label: str, columns: dict, element
         )
     if ss.get(kind):
         st.caption(f"Writes: {shown(ss[kind])}".replace("\n", "  \n"))  # a line each (domains)
+
+
+UNIPROT = ("off", "auto", "accession")
+SITES = ("auto", "all", "none", "types")
+CONSERVATION_NOTE = (
+    "With an alignment: colour by 'conservation', and the Sequence view shows the alignment. A ConSurf grades table "
+    "(consurf_grades.txt) colours by ConSurf's own grades."
+)
+
+
+def conservation_section(st, ss: MutableMapping) -> None:
+    """Conservation & UniProt: the alignment (or ConSurf grades table) upload, the alignment's row that is the
+    structure's (picked from its rows), then the UniProt annotation: which entry, its domains as panels and the
+    sites drawn. A layout file's alignment that is not on this machine is asked for here (and in the top bar)."""
+    with st.expander("Conservation & UniProt", key="sec_conservation"):
+        st.file_uploader(
+            "Multiple sequence alignment or ConSurf grades table",
+            type=["fasta", "fa", "aln", "sto", "txt"],
+            key="msa_upload",
+            on_change=store_alignment,
+            args=(ss,),
+        )
+        if ss.get("msa_error"):
+            st.error(shown(ss["msa_error"]))
+        missing = missing_alignment(ss)
+        if missing:
+            st.warning(
+                f"The layout file's alignment {missing} is not on this machine; upload it under Conservation & UniProt."
+            )
+        st.caption(CONSERVATION_NOTE)
+        rows = ss.get("msa_rows") or []
+        if ss.get("msa_path") and rows:  # an alignment (a ConSurf table has no rows to pick)
+            st.selectbox(
+                "Reference row",
+                listed(["", *rows], ss.get("msa_reference")),
+                format_func=lambda row: capped(row) if row else "best match",
+                help="the alignment's row that is the structure's sequence · best match: the row most like it",
+                **setting(ss, "msa_reference"),
+            )
+        segmented(
+            st,
+            "UniProt",
+            UNIPROT,
+            part(ss, "uniprot__mode", "uniprot"),
+            help="off · auto: each chain's entry, found through SIFTS (or the AlphaFold model's own) · accession: "
+            "this entry for every chain",
+        )
+        if ss.get("uniprot__mode") == "accession":
+            st.text_input(
+                "UniProt accession",
+                placeholder="P0CG48",
+                label_visibility="collapsed",
+                **part(ss, "uniprot__acc", "uniprot"),
+            )
+        st.toggle(
+            "UniProt domains as panels",
+            help="the entry's domains, each a panel with its name (in place of the domains under Edit layout)",
+            **setting(ss, "uniprot_domains"),
+        )
+        segmented(
+            st,
+            "UniProt sites",
+            SITES,
+            part(ss, "uniprot_sites__mode", "uniprot_sites"),
+            help="the entry's sites marked on the figure · auto: active and binding sites · types: the kinds picked",
+        )
+        if ss.get("uniprot_sites__mode") == "types":
+            st.multiselect(
+                "Site types",
+                list(SITE_GROUPS),
+                format_func=SITE_GROUPS.get,
+                placeholder="Pick site types",
+                label_visibility="collapsed",
+                **part(ss, "uniprot_sites__types", "uniprot_sites"),
+            )
+
+
+def missing_alignment(ss: MutableMapping) -> str:
+    """A layout file's alignment that is not on this machine, as shown (hosted: never a server path); '' when there
+    is none or an alignment has been uploaded since."""
+    from foldmap.app import local_files
+
+    if not ss.get("msa_missing") or ss.get("msa_path"):
+        return ""
+    return shown(ss["msa_missing"], paths=not local_files())
+
+
+def alignment_rows(path: str) -> list[str]:
+    """The names of an alignment's rows, for the Reference row picker; [] for a ConSurf grades table, no file or a
+    file that is not an alignment (its error is shown when it is read)."""
+    from foldmap.sequence import is_consurf, read_alignment
+
+    if not path:
+        return []
+    try:
+        return [] if is_consurf(path) else list(read_alignment(path).names)
+    except (ValueError, OSError):
+        return []
+
+
+def store_alignment(ss: MutableMapping) -> None:
+    """The alignment uploader's callback: an uploaded alignment, read (a ConSurf grades table is used as it is: the
+    pipeline reads it) before it is kept (fetch.keep_upload) and used, with its rows for the Reference row picker
+    (a reference the new rows lack goes back to best match). Else msa_error, and no alignment."""
+    from foldmap.fetch import ALIGNMENT_SUFFIXES, keep_upload
+    from foldmap.sequence import is_consurf, read_alignment
+
+    ss["last_changed"] = "msa_path"
+    up = ss.get("msa_upload")
+    if up is None:
+        ss.update(msa_path="", msa_rows=[])
+        return
+    try:
+        target = keep_upload(up.name, up.getvalue(), ALIGNMENT_SUFFIXES)
+        rows = [] if is_consurf(target) else list(read_alignment(target).names)
+    except (ValueError, OSError) as err:
+        ss["msa_error"] = str(err) if isinstance(err, ValueError) else "the alignment could not be stored; try again"
+        ss.update(msa_path="", msa_rows=[])
+        return
+    if ss.get("msa_reference") and ss["msa_reference"] not in rows:
+        ss["msa_reference"] = ""
+    ss.update(msa_error="", msa_path=str(target), msa_rows=rows, msa_uploaded=(str(target), upload_name(up.name)))
 
 
 def contact_lines(report: dict | None, most: int = 10) -> list[str]:

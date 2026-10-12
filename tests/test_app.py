@@ -194,6 +194,7 @@ def test_app_layout_file_round_trips_through_the_app():
     ss = at.session_state
     assert ss["theme"] == "trace" and ss["membrane"] == "flip" and ss["focus"] == "none" and ss["chains"] == "A"
     assert ss["msa_path"] == msa and ss["msa_reference"] == "1UBQ_A" and ss["dna"] is False
+    assert "yeast_UBI4" in at.selectbox(key="msa_reference").options  # the alignment's rows, as for an upload
     assert ss["rotate"] == 30 and ss["title"] == "Round trip" and "Hx" in ss["rename"] and "N=" in ss["domains"]
     assert ss["names"] == ["beta"]
     from foldmap.app import LAYOUT_DEFAULTS, STYLE_FIELDS
@@ -279,12 +280,13 @@ def test_app_layout_file_options_without_a_control_do_not_carry_to_the_next_stru
     at.file_uploader(key="layout_upload").set_value(up).run()
     assert at.session_state["flip_v"] is True and at.session_state["protomers"] == [["A", "B"], ["C", "D"]]
     assert any("/nowhere/x.fasta" in w.value for w in at.warning)
+    assert any("/nowhere/x.fasta" in c.value for c in at.caption)  # the top-bar note
     at.button(key="new_structure").click().run()
     at.text_input(key="source").input(str(DATA / "1UBQ.cif"))
     at.button(key="load").click().run()
     assert not at.exception and not at.error
     assert at.session_state["flip_v"] is False and at.session_state["protomers"] is None
-    assert not at.warning and "<svg" in svg_of(at)
+    assert not at.warning and not any("not on this machine" in c.value for c in at.caption) and "<svg" in svg_of(at)
 
 
 def test_app_edits_of_one_structure_do_not_carry_to_the_next():
@@ -500,13 +502,21 @@ def test_the_look_carries_to_the_next_structure_and_its_parts_do_not():
     assert at.session_state["figure_failed"]
     at.segmented_control(key="names__kw").set_value("beta").run()
     assert at.session_state["names"] == ["beta"]
+    look = {"fill": "outline", "loop_width": 2.2, "disulfides": False, "ligands": "none", "uniprot_sites": "all"}
+    at.segmented_control(key="fill").set_value("outline").run()  # Style
+    at.slider(key="loop_width").set_value(2.2).run()
+    at.toggle(key="disulfides").set_value(False).run()  # Show
+    at.segmented_control(key="ligands__mode").set_value("none").run()
+    at.segmented_control(key="uniprot_sites__mode").set_value("all").run()  # Conservation & UniProt
     at.button(key="new_structure").click().run()
     assert at.session_state["stage"] == "load" and "id" not in at.query_params
+    at.run()  # Start shows no look widget for two runs: the widgets keep their values (persist_state)
     at.text_input(key="source").input(str(DATA / "1UBQ.cif"))
     at.button(key="load").click().run()
     ss = at.session_state
     assert not at.exception and ss["stage"] == "edit" and ss["name"] == "1UBQ"
     assert ss["theme"] == "trace" and ss["font_scale"] == 1.4 and ss["mark"] == ""
+    assert {k: ss[k] for k in look} == look and ss["ligands__mode"] == "none" and ss["fill"] == "outline"
     assert "seq_chain" not in ss and ss["names__kw"] == "generic" and ss["names"] == [] and ss["auto_redraw"] is True
     assert "figure_failed" not in ss and "seq_drawn" not in ss and "page_drawn" not in ss and ss["pane"] == "Figure"
     at.segmented_control(key="pane").set_value("Sequence").run()

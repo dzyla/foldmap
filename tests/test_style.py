@@ -58,6 +58,13 @@ def test_style_file_with_unknown_key_fails(tmp_path):
         resolve_style(style_file=f)
 
 
+def test_style_file_nested_too_deeply_is_an_error_not_a_traceback(tmp_path):
+    f = tmp_path / "deep.yaml"
+    f.write_text("fill: " + "[" * 3000 + "]" * 3000 + "\n")  # the YAML reader recurses once per level
+    with pytest.raises(ValueError, match="deep.yaml: nested too deeply"):
+        resolve_style(style_file=f)
+
+
 # --- the style reaching the figure ---------------------------------------------------------------
 import numpy as np  # noqa: E402
 
