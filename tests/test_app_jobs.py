@@ -159,7 +159,7 @@ def test_a_restricted_figure_says_how_many_chains_it_shows():
 def test_limits_come_from_the_environment(monkeypatch):
     for name in ENV:
         monkeypatch.delenv(name, raising=False)
-    assert app_jobs.limits(hosted=True) == Limits(timeout=90, memory_mb=2048, max_residues=30_000, jobs=2)
+    assert app_jobs.limits(hosted=True) == Limits(timeout=90, memory_mb=1024, max_residues=30_000, jobs=2)
     assert app_jobs.limits(hosted=False) == Limits()
     monkeypatch.setenv("FOLDMAP_APP_TIMEOUT", "30")
     monkeypatch.setenv("FOLDMAP_APP_MAX_RESIDUES", "nonsense")
@@ -286,7 +286,7 @@ def test_limit_messages_say_what_to_do():
         "8C3A took longer than 90 s to draw, the limit of this app."
     )
     assert app_jobs.limit_message("8C3A", JobLimit("memory", ""), lim) == (
-        "8C3A needs more memory than this app allows (2048 MB). Draw part of it (Chains & assembly), or on your "
+        "8C3A needs more memory than this app allows (1024 MB). Draw part of it (Chains & assembly), or on your "
         "own computer: pip install foldmap, then foldmap plot 8C3A -o 8C3A.svg."
     )
     assert app_jobs.limit_message("8C3A", JobLimit("busy", ""), lim) == (

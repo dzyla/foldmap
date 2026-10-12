@@ -492,7 +492,7 @@ paths. The server's log says which mode it runs in. Hosted:
 | Variable | Hosted default | |
 | --- | --- | --- |
 | `FOLDMAP_APP_TIMEOUT` | 90 | seconds a drawing may take |
-| `FOLDMAP_APP_MEMORY_MB` | 2048 | memory of one drawing, MB |
+| `FOLDMAP_APP_MEMORY_MB` | 1024 | memory of one drawing, MB (two drawings and the app fit Community Cloud's memory) |
 | `FOLDMAP_APP_MAX_RESIDUES` | 30,000 | larger structures are refused before any wait, with the command to draw them locally |
 | `FOLDMAP_APP_JOBS` | 2 | drawings at a time |
 | `FOLDMAP_APP_SLOW` | 4 | seconds; a figure slower than this turns automatic redrawing off |

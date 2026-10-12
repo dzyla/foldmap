@@ -82,7 +82,8 @@ class Limits:
         return (self.timeout > 0 or self.memory_mb > 0) and _CAN_FORK
 
 
-HOSTED = Limits(timeout=90, memory_mb=2048, max_residues=30_000, jobs=2)  # Q-A11
+HOSTED = Limits(timeout=90, memory_mb=1024, max_residues=30_000, jobs=2)  # Q-A11; memory: 2 jobs x 1 GB and the
+# app's own process (about 300 MB, its caches included: app.main) fit Community Cloud's memory
 
 
 def limits(hosted: bool) -> Limits:
