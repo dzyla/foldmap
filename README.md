@@ -188,7 +188,9 @@ foldmap styles                                    # every theme and style key
   (up to 24 chains) or when the file holds several copies of one complex, and never one that leaves out the DNA or
   RNA; cyclic, dihedral, cubic and helical symmetry is detected and the protomers are placed alike (two copies across a
   dyad in the page as mirror images; large, interleaved protomers such as the measles F trimer can still differ); highlight one protomer or the asymmetric unit; filaments, cages and large
-  assemblies drawn as one subunit with the neighbouring parts that complete its fold.
+  assemblies drawn as one subunit with the neighbouring parts that complete its fold. When either automatic choice
+  draws part of the file, foldmap says so (a note on stderr, a bar in the app, a line in the MCP result) and names
+  the setting that draws everything (`--assembly asu`, `--focus none`).
 - **DNA and RNA as their fold**: base pairs from the coordinates, stems, hairpins, pseudoknots, junctions and single
   strands placed beside the protein that holds them; bent duplexes as chains of straight pieces; protein–DNA/RNA
   hydrogen bonds on request; see [RNA and DNA](#rna-and-dna).
@@ -470,6 +472,12 @@ title. The rest is in sections:
   and mark (as tables or as text), element names, and domains with their colours and bar.
 - **Conservation & UniProt**: an alignment for conservation colours, and UniProt sites and domains.
 - **Layout file**: load one saved from Download (or by `foldmap plot --save-layout`) to restore every setting.
+
+**Part of the file.** When foldmap draws part of the file on its own (assembly 1 when the file holds several
+copies of a complex, or one subunit of a cage, a filament or a large symmetric assembly such as a nucleosome's
+histone octamer), a bar above the figure says what was drawn and how many of the file's chains, as in "Drawn: one of
+2 subunits (C2 symmetry) — 6 of 10 chains." **Show all chains** draws every chain; **Keep this** hides the bar for
+that structure. When every chain is too large for the online app, the bar gives the command that draws it instead.
 
 **Share links.** A structure loaded by PDB ID or accession puts its id and theme in the address, as in
 `https://foldmap.streamlit.app/?id=1LMB&theme=journal`, so the link opens the same structure in the same theme.
