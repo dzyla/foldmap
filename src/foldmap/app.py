@@ -17,7 +17,7 @@ from dataclasses import fields, replace
 from pathlib import Path
 
 from foldmap import CREDIT, app_jobs
-from foldmap.app_controls import prepare, setting, show_section, style_section, touched
+from foldmap.app_controls import chains_section, prepare, setting, show_section, style_section, touched
 from foldmap.app_edits import shown
 from foldmap.app_views import Workspace, download_menu, explorer_view, figure_view, said, sequence_view
 from foldmap.cli import _adjustments, _domain_spec
@@ -696,22 +696,7 @@ def main() -> None:
         with st.container(gap="xxsmall", key="sections"):
             style_section(st, ss)
             show_section(st, ss)
-            with st.expander("Symmetry and assembly"):  # interim: Task 8's Chains & assembly
-                st.text_input("Symmetry", help="auto, off, C2, D3, helical", **tracked("symmetry"))
-                st.text_input("Assembly", help="auto, asu, or an assembly id", **tracked("assembly"))
-                st.text_input(
-                    "Chains",
-                    help="draw only these chains, e.g. A,B "
-                    "(empty: all; protein and nucleic acid each restricted if named)",
-                    **tracked("chains"),
-                )
-                st.text_input("Highlight", help="none, asu, protomer, or chains like A,B", **tracked("highlight"))
-                st.text_input(
-                    "Large assemblies",
-                    help="auto: filaments, cages and big assemblies as one subunit plus the neighbouring parts of its "
-                    "fold; none: draw everything; or chains to show in full, e.g. B",
-                    **tracked("focus"),
-                )
+            chains_section(st, ss)
             with st.expander("Sizes and layout"):  # interim: Task 9's Edit layout
                 st.selectbox("Mode", ["projected", "stack"], **tracked("mode"))
                 st.slider("Helix size", 0.5, 2.0, step=0.05, **tracked("helix_scale"))

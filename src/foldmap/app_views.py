@@ -131,8 +131,9 @@ def figure_view(ws: Workspace) -> None:
             elements=result["elements"],
             protein_chains=result["chains"],
             na_chains=result["na_chains"],
-            all_chains=list(dict.fromkeys([*result["chains"], *result["na_chains"]])),
         )
+        if not json.loads(target).get("chains"):  # the chain picker offers every chain, also while some are drawn
+            ss["all_chains"] = list(dict.fromkeys([*result["chains"], *result["na_chains"]]))
         slow = result["seconds"]  # the drawing itself, as at load (not the job's start-up or a cache hit)
         if slow > ws.lim.slow and ss.get("slow_noted") != ws.path:  # the toggle is created later in this run
             ss.update(auto_redraw=False, slow_noted=ws.path, slow_seconds=slow)

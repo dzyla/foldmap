@@ -252,7 +252,7 @@ def test_app_layout_file_options_without_a_control_do_not_carry_to_the_next_stru
 def test_app_edits_of_one_structure_do_not_carry_to_the_next():
     at = load(app_test(), DATA / "2HHB.cif")
     at.text_input(key="rename").set_value("res:B:1-10=Zz")
-    at.text_input(key="chains").set_value("B,D").run()
+    at.multiselect(key="chains__pick").set_value(["B", "D"]).run()
     assert not at.exception and not at.error
     at.button(key="new_structure").click().run()
     at.text_input(key="source").input(str(DATA / "1UBQ.cif"))
@@ -260,6 +260,7 @@ def test_app_edits_of_one_structure_do_not_carry_to_the_next():
     assert not at.exception and not at.error
     ss = at.session_state
     assert ss["rename"] == "" and ss["chains"] == "" and ss["domains"] == "" and "<svg" in svg_of(at)
+    assert ss["chains__pick"] == []
 
 
 def test_hosted_app_refuses_file_paths(monkeypatch):

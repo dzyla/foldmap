@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 # Copyright (C) 2026 Dawid Zyla. Additional terms (AGPL-3.0 section 7(b)): see NOTICE.
 """The app's sidebar sections: how each settings widget is made (its key, kept while hidden, the setting it names
-when the figure fails) and the sections Style and Show.
+when the figure fails) and the sections Style, Show and Chains & assembly.
 
 Streamlit comes in as an argument (app.main imports it); no pandas."""
 
@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from collections.abc import MutableMapping
 
-from foldmap.app_edits import compose_into, hex_colour, sync_composites
+from foldmap.app_edits import SYMMETRIES, compose_into, hex_colour, sync_composites
 from foldmap.style import CHOICES, THEMES
 
 
@@ -172,6 +172,91 @@ def nucleic_block(st, ss: MutableMapping) -> None:
     elif mode == "colour":
         st.color_picker("Backbone colour", **part(ss, "na_backbone__colour", "na_backbone"))
     st.toggle("Check contacts against the coordinates", **setting(ss, "check_contacts"))
+
+
+def listed(options, current) -> list:
+    """A picker's options, then what the setting holds that they lack (a layout file may name anything): a widget
+    never holds a value it does not offer."""
+    current = [current] if isinstance(current, str) else list(current or [])
+    return [*options, *(c for c in current if c not in options)]
+
+
+HIGHLIGHT = ("none", "asu", "protomer", "chains")
+FOCUS = {"auto": "auto", "none": "none", "chains": "these chains in full"}
+
+
+def chains_section(st, ss: MutableMapping) -> None:
+    """Chains & assembly: the chains drawn, the chains in colour (the rest grey), the assembly, the symmetry and
+    what a large assembly shows in full. Chains are picked from the structure's own; "as text" types the
+    command line's syntax instead."""
+    with st.expander("Chains & assembly", key="sec_chains"):
+        if ss.get("chains__as_text"):
+            st.text_input("Chains", placeholder="A,B", **setting(ss, "chains"))
+        else:
+            st.multiselect(
+                "Chains",
+                listed(ss.get("all_chains") or [], ss.get("chains__pick")),
+                placeholder="All chains",
+                help="draw only these chains (protein and nucleic acid each restricted only if some are named)",
+                **part(ss, "chains__pick", "chains"),
+            )
+        st.toggle("Chains as text", key="chains__as_text", persist_state="session")
+        highlight_block(st, ss)
+        st.selectbox(
+            "Assembly",
+            listed(["auto", "asu", *(ss.get("assemblies") or [])], ss.get("assembly")),
+            help="auto: the file's first biological assembly when it adds copies · asu: as deposited · or an "
+            "assembly of the file",
+            **setting(ss, "assembly"),
+        )
+        st.selectbox(
+            "Symmetry",
+            listed(SYMMETRIES, ss.get("symmetry")),
+            help="auto: found, every protomer drawn alike · off: ignored · or the symmetry to insist on",
+            **setting(ss, "symmetry"),
+        )
+        segmented(
+            st,
+            "Large assemblies",
+            FOCUS,
+            part(ss, "focus__mode", "focus"),
+            format_func=FOCUS.get,
+            help="auto: filaments, cages and big assemblies as one subunit plus what its neighbours add to its "
+            "fold · none: everything",
+        )
+        if ss.get("focus__mode") == "chains":
+            st.multiselect(
+                "Chains in full",
+                listed(ss.get("protein_chains") or [], ss.get("focus__chains")),
+                placeholder="Pick chains",
+                label_visibility="collapsed",
+                **part(ss, "focus__chains", "focus"),
+            )
+
+
+def highlight_block(st, ss: MutableMapping) -> None:
+    """Highlight: the chains in colour, the rest grey (none, the asymmetric unit, one protomer or chains picked),
+    or as text."""
+    if ss.get("highlight__as_text"):
+        st.text_input("Highlight", placeholder="none, asu, protomer or A,B", **setting(ss, "highlight"))
+    else:
+        segmented(
+            st,
+            "Highlight",
+            HIGHLIGHT,
+            part(ss, "highlight__mode", "highlight"),
+            help="what stays in colour, the rest in grey · none: everything · asu: the chains as deposited · "
+            "protomer: the first protomer · chains: the chains picked",
+        )
+        if ss.get("highlight__mode") == "chains":
+            st.multiselect(
+                "Highlighted chains",
+                listed(ss.get("protein_chains") or [], ss.get("highlight__chains")),
+                placeholder="Pick chains",
+                label_visibility="collapsed",
+                **part(ss, "highlight__chains", "highlight"),
+            )
+    st.toggle("Highlight as text", key="highlight__as_text", persist_state="session")
 
 
 def contact_lines(report: dict | None, most: int = 10) -> list[str]:

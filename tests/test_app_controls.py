@@ -71,8 +71,12 @@ def test_reset_keeps_what_names_this_structure():
         "highlight": "A",
         "backbone_colors": "A=#1f77b4",
     }
-    for key, value in kept.items():
-        (at.text_area(key=key) if key == "domains" else at.text_input(key=key)).set_value(value)
+    for key in ("rename", "domains", "mark", "backbone_colors"):
+        (at.text_area(key=key) if key == "domains" else at.text_input(key=key)).set_value(kept[key])
+    at.multiselect(key="chains__pick").set_value(["A", "B"])
+    at.selectbox(key="assembly").select("asu")
+    at.segmented_control(key="highlight__mode").set_value("chains").run()
+    at.multiselect(key="highlight__chains").set_value(["A"])
     at.segmented_control(key="hbonds__mode").set_value("interchain").run()
     at.toggle(key="legend").set_value(False).run()
     assert not at.exception
@@ -164,6 +168,52 @@ def test_contacts_check_that_fails_keeps_the_figure(monkeypatch):
         fresh_caches()
     assert not at.exception and "<svg" in svg_of(at)
     assert [w.value for w in at.warning] == ["Contacts check: no beads to read"]
+
+
+def test_chains_are_picked_not_typed():
+    at = opened(DATA / "2HHB.cif")
+    pick = at.multiselect(key="chains__pick")
+    assert pick.options == ["A", "B", "C", "D"] and pick.value == []
+    pick.set_value(["B", "D"]).run()
+    assert not at.exception and at.session_state["chains"] == "B,D"
+    at.toggle(key="chains__as_text").set_value(True).run()
+    assert at.text_input(key="chains").value == "B,D"
+
+
+def test_chain_picker_keeps_every_chain_while_some_are_drawn():
+    """The figure of chains B, D names only B and D; the picker still offers all four."""
+    at = opened(DATA / "2HHB.cif")
+    at.multiselect(key="chains__pick").set_value(["B", "D"]).run()
+    assert at.multiselect(key="chains__pick").options == ["A", "B", "C", "D"]
+    assert at.session_state["protein_chains"] == ["B", "D"]  # what the highlight and Sequence pickers offer
+
+
+def test_highlight_symmetry_assembly_and_focus():
+    from foldmap.app_edits import SYMMETRIES
+
+    at = opened(DATA / "2HHB.cif")
+    at.segmented_control(key="highlight__mode").set_value("chains").run()
+    at.multiselect(key="highlight__chains").set_value(["A"]).run()
+    assert at.session_state["highlight"] == "A" and not at.exception
+    assert list(at.selectbox(key="symmetry").options) == list(SYMMETRIES)
+    assert at.selectbox(key="assembly").options[:2] == ["auto", "asu"]
+    at.segmented_control(key="focus__mode").set_value("none").run()
+    assert at.session_state["focus"] == "none"
+
+
+def test_highlighted_chains_grey_the_rest_and_read_back_as_text():
+    from foldmap.render import MATE_GREY
+
+    at = opened(DATA / "2HHB.cif")
+    assert MATE_GREY not in svg_of(at)
+    at.segmented_control(key="highlight__mode").set_value("chains").run()
+    at.multiselect(key="highlight__chains").set_value(["A", "C"]).run()
+    assert not at.exception and MATE_GREY in svg_of(at)
+    at.toggle(key="highlight__as_text").set_value(True).run()
+    assert at.text_input(key="highlight").value == "A,C"
+    at.text_input(key="highlight").set_value("protomer").run()
+    at.toggle(key="highlight__as_text").set_value(False).run()
+    assert not at.exception and at.segmented_control(key="highlight__mode").value == "protomer"
 
 
 def test_contact_lines():
