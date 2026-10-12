@@ -325,9 +325,10 @@ def _curve(pa, ea, pb, eb, n=24):
 def _route_ports(grid: _Grid, pa, ea, own_a, pb, eb, own_b, loose=False, max_nodes: int = _MAX_NODES):
     """Grid cells of the cheapest orthogonal route from port pa (leaving along ea) to port pb (entered against
     eb), or None; own_a and own_b (anything with a rect) are what the ports belong to. `loose`: see
-    _Grid.free_cell_along."""
-    start = grid.free_cell_along(pa, ea, own_a, loose)
-    goal = grid.free_cell_along(pb, eb, own_b, loose)
+    _Grid.free_cell_along; a pair (for pa, for pb) or one value for both."""
+    la, lb = loose if isinstance(loose, tuple) else (loose, loose)
+    start = grid.free_cell_along(pa, ea, own_a, la)
+    goal = grid.free_cell_along(pb, eb, own_b, lb)
     if start is None or goal is None:
         return None
     stubs = grid.stub_cells(pa, start) | grid.stub_cells(pb, goal)  # the straight ends drawn to each port
@@ -436,7 +437,7 @@ def route_loops(layout: Layout, sses: list[SSE], bb) -> list[Loop]:
             on_sheet.get(b.id, set()) | ({a.id} if pa.over else set()),
         )
         pts, over = router.route(
-            pa.c_port, pa.exit_c, pa, pb.n_port, pb.exit_n, pb, loose=pa.over or pb.over, under=under
+            pa.c_port, pa.exit_c, pa, pb.n_port, pb.exit_n, pb, loose=(pa.over, pb.over), under=under
         )
         if pts is None:
             routed[(a.id, b.id)] = (_curve(pa.c_port, pa.exit_c, pb.n_port, pb.exit_n), True, False)

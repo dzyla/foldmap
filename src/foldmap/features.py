@@ -114,11 +114,6 @@ ON_SHEET_HEIGHT = (6.0, 14.0)  # Å from the sheet plane to the helix centroid: 
 ON_SHEET_EDGE = 2.0  # Å: the centroid, projected on the sheet plane, lies within the sheet's extent plus this
 
 
-def _grid(v) -> np.ndarray:
-    """Rounded to the 1e-4 grid of layout._snap: a threshold never sees noise from BLAS kernels (np.linalg.svd)."""
-    return np.round(np.asarray(v, float) * 1e4) / 1e4
-
-
 def helices_on_sheets(bb: Backbone, sses: list[SSE], sheets: list[Sheet]) -> dict[str, int]:
     """Helices packed on a sheet face: helix id -> index of the sheet in `sheets`. A helix of >= ON_SHEET_MIN residues
     packs on a sheet of >= ON_SHEET_STRANDS strands, one of them of the helix's chain, when >= ON_SHEET_TOUCH of its
@@ -126,7 +121,9 @@ def helices_on_sheets(bb: Backbone, sses: list[SSE], sheets: list[Sheet]) -> dic
     normal: the smallest singular vector of the sheet's CAs), its centroid sits ON_SHEET_HEIGHT from the sheet plane
     and, projected on that plane, within the sheet CAs' in-plane extent + ON_SHEET_EDGE. A helix on several sheets
     goes to the one most of its CAs touch (the first on a tie). Coordinates, axes and the plane are snapped before
-    any threshold sees them. Plan 11 measured: 1UBQ α1, 2ACY A:22-32 and A:55-67, 2LZM A:39-50."""
+    any threshold sees them (layout._snap). Plan 11 measured: 1UBQ α1, 2ACY A:22-32 and A:55-67, 2LZM A:39-50."""
+    from .layout import _snap as _grid  # layout imports this module: imported when called
+
     ca = _grid(bb.ca)
     faces = []
     for k, sh in enumerate(sheets):

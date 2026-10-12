@@ -507,3 +507,23 @@ def test_the_router_goes_over_the_slab_rather_than_along_it():
     sideways = [a for a, b in zip(path, path[1:]) if a[1] == b[1] and grid.slab[a] and grid.slab[b]]
     assert not sideways, [grid.center(c) for c in sideways[:3]]
     assert max(grid.center(c)[1] for c in path) > 6.5  # over the band
+
+
+def test_only_the_over_helix_port_walks_loose(monkeypatch):
+    """A loop between a helix drawn over a sheet and another element: only the helix's own port may walk out over
+    blocked cells (loose); the other port leaves as any port does (Task 14 review)."""
+    from foldmap.cli import make_layout
+    from foldmap.style import Style
+
+    calls = []
+    walk = _Grid.free_cell_along
+
+    def spy(self, port, exit_vec, own, loose=False):
+        calls.append((own.sse.id, own.over, loose))
+        return walk(self, port, exit_vec, own, loose)
+
+    monkeypatch.setattr(_Grid, "free_cell_along", spy)
+    lay, sses, bb = make_layout(DATA / "1UBQ.cif", look=Style(helix_on_sheet="auto"))
+    route_loops(lay, sses, bb)
+    assert any(over for _, over, _ in calls)
+    assert all(loose == over for _, over, loose in calls), [c for c in calls if c[1] != c[2]]
