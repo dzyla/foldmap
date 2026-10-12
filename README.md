@@ -171,8 +171,8 @@ foldmap styles                                    # every theme and style key
   [Conventions of the published figures](#conventions-of-the-published-figures).
 - **Assemblies and symmetry**: `--assembly auto` builds the file's first biological assembly when it adds copies
   (up to 24 chains) or when the file holds several copies of one complex, and never one that leaves out the DNA or
-  RNA; cyclic, dihedral, cubic and helical symmetry is detected and every protomer drawn alike (two copies across a
-  dyad in the page as mirror images); highlight one protomer or the asymmetric unit; filaments, cages and large
+  RNA; cyclic, dihedral, cubic and helical symmetry is detected and the protomers are placed alike (two copies across a
+  dyad in the page as mirror images; large, interleaved protomers such as the measles F trimer can still differ); highlight one protomer or the asymmetric unit; filaments, cages and large
   assemblies drawn as one subunit with the neighbouring parts that complete its fold.
 - **DNA and RNA as their fold**: base pairs from the coordinates, stems, hairpins, pseudoknots, junctions and single
   strands placed beside the protein that holds them; bent duplexes as chains of straight pieces; protein–DNA/RNA
@@ -506,9 +506,7 @@ locally and open `_site/index.html`:
 .venv/bin/python scripts/build_site.py --out _site --quick    # a small subset
 ```
 
-The domain examples change with plan 11's domain colours and bar: the T4 lysozyme lobes (2LZM) and haemoglobin's
-UniProt domains (2HHB) now colour elements by domain and draw the domain bar. Look at both in the local build
-before the push that publishes them. The README images come from `scripts/gallery.py` (into `docs/images/`).
+The README images come from `scripts/gallery.py` (into `docs/images/`).
 
 ## Citing
 
