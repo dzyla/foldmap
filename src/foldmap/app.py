@@ -7,17 +7,19 @@ Run with `foldmap app` (or `streamlit run src/foldmap/app.py`)."""
 from __future__ import annotations
 
 import copy
+import html
 import json
 import logging
 import os
 import re
 import tempfile
+import time
 from collections.abc import MutableMapping
 from dataclasses import fields, replace
 from pathlib import Path
 
-from foldmap import CREDIT
-from foldmap.app_edits import shown
+from foldmap import CREDIT, app_edits
+from foldmap.app_edits import shown, sync_composites
 from foldmap.cli import _adjustments, _domain_spec
 from foldmap.fetch import ALIGNMENT_SUFFIXES, fetch, keep_upload, source_id
 from foldmap.render import save, save_svg
@@ -77,6 +79,7 @@ LAYOUT_DEFAULTS = {
     "up": None,
     "view": None,
 }
+VIEWS = ["Figure", "Sequence", "3D"]  # the workspace view switch (key "pane")
 HIDDEN_LAYOUT = ("flip_v", "dna", "symmetry_tol", "protomers", "up", "view")  # in layout files, no app control
 
 
@@ -252,6 +255,28 @@ def settings_from_document(doc: dict) -> dict:
     return out
 
 
+def figure_card(svg: str, background: str, name: str) -> str:
+    """The figure as HTML for the canvas: a card on the figure's own background, the SVG named for screen readers.
+    A figure more than three times as wide as tall keeps its height and scrolls inside the card."""
+    root = re.search(r"<svg\b[^>]*>", svg)
+    tag = root.group() if root else ""
+    attrs = {k: float(v) for k, v in re.findall(r'\s(width|height)="([\d.]+)(?:pt|px)?"', tag)}
+    extra = f' role="img" aria-label="Topology diagram of {html.escape(name, quote=True)}"'
+    if attrs.get("height") and attrs.get("width", 0) / attrs["height"] > 3:
+        extra += f' style="width:auto;max-width:none;height:min(60vh,{attrs["height"]:g}px)"'
+    if root:
+        svg = svg[: root.start()] + "<svg" + extra + tag[4:] + svg[root.end() :]
+    return f'<div class="fm-card" style="background:{html.escape(background, quote=True)}">{svg}</div>'
+
+
+# interim: Task 12 completes the stylesheet (theme colours, top bar, Start width, sidebar spacing)
+STYLESHEET = """
+@media (min-width:640px) {[data-testid="stMainBlockContainer"] {padding:4rem 1.5rem 2rem}}
+.st-key-canvas .fm-card {border-radius:8px;padding:12px;overflow-x:auto}
+.st-key-canvas svg {display:block;width:100%;height:auto;max-height:80vh}
+"""
+
+
 def trouble(err: Exception) -> str:
     """What to tell the visitor: a ValueError says what is wrong with the input; anything else means the structure
     file itself is gone or unreadable (an upload is removed after a day), and server paths stay out of the message."""
@@ -312,7 +337,7 @@ def reset_structure(ss: MutableMapping) -> None:
 
     for kind in EDITORS:  # a new table key: no edit of the last structure's table is applied to this one
         ss[f"{kind}__ver"] = ss.get(f"{kind}__ver", 0) + 1
-    for key in (*STRUCTURE_WIDGETS, "drawn_blob", "slow_noted", "last_good"):
+    for key in (*STRUCTURE_WIDGETS, "drawn_blob", "slow_noted", "slow_seconds", "last_good", "last_changed"):
         ss.pop(key, None)
     ss["auto_redraw"] = True
     ss["pane"] = "Figure"
@@ -355,6 +380,7 @@ def main() -> None:
         return sequence_files(path, json.loads(settings_json), json.loads(view_json))
 
     def store_alignment() -> None:
+        ss["last_changed"] = "msa_path"
         up = ss.get("msa_upload")
         if up is None:
             ss["msa_path"] = ""
@@ -449,7 +475,7 @@ def main() -> None:
             uniprot_for="",
         )
         if result["seconds"] > lim.slow:
-            ss["auto_redraw"], ss["slow_noted"] = False, str(path)
+            ss.update(auto_redraw=False, slow_noted=str(path), slow_seconds=result["seconds"])
 
     def load_example() -> None:
         if ss.get("example"):  # the pill stays selected: Start is not shown again until a new structure
@@ -461,7 +487,21 @@ def main() -> None:
             load(picked)
 
     def new_structure() -> None:
-        ss["stage"], ss["share_id"] = "load", ""
+        ss["stage"], ss["share_id"], ss["source"] = "load", "", ""
+
+    def touched(key: str) -> None:
+        """Every settings widget's callback: the setting changed last is the one to check when the figure fails."""
+        ss["last_changed"] = key
+
+    def tracked(key: str) -> dict:
+        return {"key": key, "on_change": touched, "args": (key,)}
+
+    def theme_changed() -> None:
+        apply_theme(ss)
+        touched("theme")
+
+    def redraw() -> None:
+        ss["drawn_blob"] = current_blob(ss)
 
     def apply_layout_file() -> None:
         from foldmap import layoutfile
@@ -543,74 +583,245 @@ def main() -> None:
             st.caption(CREDIT)
         return
 
+    # ---- workspace: top bar, the active view, then the sidebar (a view may switch auto-redraw off first)
+    sync_composites(ss)
     path, name = ss["path"], ss["name"]
-    st.caption(CREDIT)  # Task 4 moves it to the bottom of the sidebar
-    st.markdown("#### Foldmap · protein topology diagrams")
+    settings, blob = settings_of(ss), current_blob(ss)
+    stem = name
+    st.html(f"<style>{STYLESHEET}</style>")
+    top = st.container(key="topbar")
+    with top:
+        status = st.empty()
 
-    # ---- editor
+    def problem(err: Exception) -> str:
+        """The callout for a failed job (app_jobs.explain), naming the control to check; a limit's message names
+        its own."""
+        message, control = app_jobs.explain(err, name, lim, ss.get("last_changed"))
+        hint = f" Check {control}." if control and not isinstance(err, app_jobs.JobLimit) else ""
+        if hint and not message.rstrip().endswith((".", "!", "?")):  # the hint is a sentence of its own
+            message = message.rstrip() + "."
+        return shown(message, path=path, name=name) + hint
+
+    def figure_view():
+        """The figure in its card; on a failure the error above the last good figure. Returns what fills the
+        Download popover (None: nothing to download)."""
+        target = blob if ss["auto_redraw"] else ss.get("drawn_blob", blob)
+        drawn = json.loads(target)
+        result = None
+        try:
+            failed = app_jobs.known_failure(path, drawn)
+            if failed is not None:
+                raise failed
+            with status, st.spinner("Drawing…"):
+                t0 = time.perf_counter()
+                result = render(path, target)
+                wall = time.perf_counter() - t0
+        except Exception as err:  # a pipeline bug too (logged for the server): the canvas keeps the last good figure
+            if isinstance(err, app_jobs.JobLimit):
+                app_jobs.remember_failure(path, drawn, err)
+            elif not isinstance(err, (ValueError, OSError, RuntimeError)):
+                _LOG.exception("drawing %s failed", name)
+            st.error(problem(err))
+        if result is not None:
+            ss.update(
+                drawn_blob=target,
+                last_good={"path": path, "blob": target, "svg": result["svg"]},
+                elements=result["elements"],
+                protein_chains=result["chains"],
+                na_chains=result["na_chains"],
+                all_chains=list(dict.fromkeys([*result["chains"], *result["na_chains"]])),
+            )
+            if wall > lim.slow and ss.get("slow_noted") != path:  # the toggle is created later in this run
+                ss.update(auto_redraw=False, slow_noted=path, slow_seconds=wall)
+        good = ss.get("last_good") or {}
+        if good.get("path") != path:
+            return None
+        with st.container(key="canvas"):
+            background = json.loads(good["blob"]).get("background", "#ffffff")
+            st.markdown(figure_card(good["svg"], background, name), unsafe_allow_html=True)
+            notes = app_edits.notes_text(result["fallback"], result["over_labels"]) if result else ""
+            if notes:
+                st.caption(shown(notes))
+        if result is None:
+            return None
+
+        def downloads() -> None:
+            eager = tuple(sorted(result["files"].items()))
+            for ext, label, mime in (
+                ("svg", "SVG (editable)", "image/svg+xml"),
+                ("png", "PNG (300 dpi)", "image/png"),
+                ("pdf", "PDF", "application/pdf"),
+            ):
+                try:
+                    data = app_jobs.figure_file(path, target, ext, lim, eager)
+                except (ValueError, OSError, RuntimeError, app_jobs.JobLimit) as err:
+                    st.caption(f"{ext.upper()} unavailable: {problem(err)}")
+                else:
+                    st.download_button(label, data, f"{stem}.{ext}", mime, key=f"dl_{ext}")
+            try:
+                import yaml
+
+                doc = layout_document(path, drawn)
+                st.download_button(
+                    "Layout file (YAML): re-render this figure later",
+                    yaml.safe_dump(doc, sort_keys=False, allow_unicode=True).encode(),
+                    f"{stem}-layout.yaml",
+                    "application/x-yaml",
+                    key="dl_layout",
+                )
+            except (ValueError, OSError, RuntimeError) as err:
+                st.caption(f"Layout file unavailable: {problem(err)}")
+
+        return downloads
+
+    def sequence_view():
+        c1, c2, c3 = st.columns(3)
+        c1.slider("Columns per row", 20, 150, 60, step=5, key="seq_columns")
+        c2.selectbox("Element colours", ["figure", "black"], key="seq_ss_colour")
+        c3.checkbox("Include unmodelled ends", key="seq_full")
+        view = {"columns": ss["seq_columns"], "ss_colour": ss["seq_ss_colour"], "full_sequence": ss["seq_full"]}
+        try:
+            seq = sequence(path, blob, json.dumps(view, sort_keys=True))
+        except (ValueError, OSError, RuntimeError) as err:
+            st.error(problem(err))
+            return None
+        page_bg = settings.get("background", "#ffffff")
+        st.markdown(
+            f'<div style="background:{page_bg};border-radius:6px;padding:8px;overflow-x:auto">'
+            f"{seq['svg'].decode()}</div>",
+            unsafe_allow_html=True,
+        )
+
+        def downloads() -> None:
+            st.download_button("SVG", seq["svg"], f"{stem}-sequence.svg", "image/svg+xml", key="dl_seq_svg")
+            st.download_button("PNG (300 dpi)", seq["png"], f"{stem}-sequence.png", "image/png", key="dl_seq_png")
+            st.download_button("PDF", seq["pdf"], f"{stem}-sequence.pdf", "application/pdf", key="dl_seq_pdf")
+
+        return downloads
+
+    def explorer_view():
+        try:
+            page = interactive(path, blob)
+        except (ValueError, OSError, RuntimeError) as err:
+            st.error(problem(err))
+            return None
+        if hasattr(st, "iframe"):  # Streamlit >= 1.52; the page is foldmap's own output
+            st.iframe(page, height=1100)
+        else:
+            components.html(page, height=1100, scrolling=True)
+
+        def downloads() -> None:
+            st.download_button(
+                "Interactive page (HTML)", page.encode(), f"{stem}-explorer.html", "text/html", key="dl_html"
+            )
+
+        return downloads
+
+    def top_bar(downloads) -> None:
+        """Name and summary; on the right the view switch, Download and New structure (Redraw and the auto-redraw
+        switch too, after a slow figure)."""
+        with top:
+            with st.container(horizontal=True, vertical_alignment="center"):
+                st.markdown(f"**{shown(name, limit=80)}**", width="content")
+                with st.container(key="summary"):
+                    st.caption(ss.get("info", ""))
+                if not ss["auto_redraw"]:
+                    st.button("Redraw", key="redraw", type="primary", on_click=redraw)
+                    st.toggle("Auto-redraw", key="auto_redraw", persist_state="session")
+                st.segmented_control(
+                    "View",
+                    VIEWS,
+                    key="pane",
+                    required=True,
+                    label_visibility="collapsed",
+                    persist_state="session",
+                )
+                with st.popover("Download", key="downloads"):
+                    if downloads is None:
+                        st.caption("Nothing to download until this view draws.")
+                    else:
+                        downloads()
+                st.button("New structure", key="new_structure", type="tertiary", on_click=new_structure)
+            if not ss["auto_redraw"]:
+                st.caption(
+                    f"Auto-redraw is off for this structure: drawing took {ss.get('slow_seconds', 0.0):.1f} s. "
+                    "Press Redraw after your changes."
+                )
+
+    ss.setdefault("auto_redraw", True)
+    if ss.get("pane") not in VIEWS:
+        ss["pane"] = "Figure"
+    view = {"Figure": figure_view, "Sequence": sequence_view, "3D": explorer_view}[ss["pane"]]
+    top_bar(view())  # only the active view is built
+
+    # ---- sidebar (Tasks 6-11 replace these expanders)
     with st.sidebar:
-        st.selectbox("Theme", list(THEMES), key="theme", on_change=apply_theme, args=(ss,))
+        st.selectbox("Theme", list(THEMES), key="theme", on_change=theme_changed)
         with st.expander("Colours", expanded=True):
-            st.selectbox("Colour by", CHOICES["color_by"], key="color_by")
-            st.selectbox("Palette", CHOICES["palette"], key="palette")
+            st.selectbox("Colour by", CHOICES["color_by"], **tracked("color_by"))
+            st.selectbox("Palette", CHOICES["palette"], **tracked("palette"))
             if ss["color_by"] == "sequence":
-                st.selectbox("N → C ramp", CHOICES["sequence_map"], key="sequence_map")
-            st.selectbox("Fill", CHOICES["fill"], key="fill")
-            st.selectbox("Helix shading", CHOICES["helix_shading"], key="helix_shading")
-            st.text_input("Mark elements", key="mark", help="e.g. G, A:G=#2ca02c, #3, res:150-159=red")
-            st.text_input("Highlight", key="highlight", help="none, asu, protomer, or chains like A,B")
+                st.selectbox("N → C ramp", CHOICES["sequence_map"], **tracked("sequence_map"))
+            st.selectbox("Fill", CHOICES["fill"], **tracked("fill"))
+            st.selectbox("Helix shading", CHOICES["helix_shading"], **tracked("helix_shading"))
+            st.text_input("Mark elements", help="e.g. G, A:G=#2ca02c, #3, res:150-159=red", **tracked("mark"))
+            st.text_input("Highlight", help="none, asu, protomer, or chains like A,B", **tracked("highlight"))
             c_bg, c_ink = st.columns(2)
-            c_bg.color_picker("Background", key="background")
-            c_ink.color_picker("Ink", key="ink")
+            c_bg.color_picker("Background", **tracked("background"))
+            c_ink.color_picker("Ink", **tracked("ink"))
         with st.expander("Loops"):
-            st.selectbox("Loop shape", CHOICES["loops"], key="loops")
-            st.selectbox("Loop colour", CHOICES["loop_color"], key="loop_color")
-            st.checkbox("Direction arrows", key="loop_arrows")
-            st.slider("Loop weight", 0.4, 3.0, step=0.1, key="loop_width")
+            st.selectbox("Loop shape", CHOICES["loops"], **tracked("loops"))
+            st.selectbox("Loop colour", CHOICES["loop_color"], **tracked("loop_color"))
+            st.checkbox("Direction arrows", **tracked("loop_arrows"))
+            st.slider("Loop weight", 0.4, 3.0, step=0.1, **tracked("loop_width"))
         with st.expander("Labels"):
-            st.checkbox("Element labels", key="labels")
-            st.checkbox("Residue numbers", key="residue_numbers")
-            st.checkbox("Legend", key="legend")
-            st.checkbox("Base letters (DNA/RNA)", key="nucleotide_labels")
+            st.checkbox("Element labels", **tracked("labels"))
+            st.checkbox("Residue numbers", **tracked("residue_numbers"))
+            st.checkbox("Legend", **tracked("legend"))
+            st.checkbox("Base letters (DNA/RNA)", **tracked("nucleotide_labels"))
             st.selectbox(
                 "Stems (DNA/RNA)",
                 CHOICES["na_style"],
-                key="na_style",
                 help="ladder: rails and base-pair rungs · ribbon: double helix · block: bars · letters",
+                **tracked("na_style"),
             )
             st.selectbox(
                 "DNA/RNA shown",
                 CHOICES["na_extent"],
-                key="na_extent",
                 help="auto: everything up to 300 nt, else the stems the protein touches",
+                **tracked("na_extent"),
             )
             st.text_input(
-                "DNA/RNA backbone", key="na_backbone", help="modality, chain, ink, or one colour such as #8c564b"
+                "DNA/RNA backbone", help="modality, chain, ink, or one colour such as #8c564b", **tracked("na_backbone")
             )
             st.text_input(
                 "Backbone colours",
-                key="backbone_colors",
                 help="e.g. A=#1f77b4, dna=#555555, I=crimson (chain or protein/dna/rna)",
+                **tracked("backbone_colors"),
             )
             st.text_input(
-                "Hydrogen bonds", key="hbonds", help="off, na (protein with DNA/RNA), interchain, or chains:A+B,C+D"
+                "Hydrogen bonds",
+                help="off, na (protein with DNA/RNA), interchain, or chains:A+B,C+D",
+                **tracked("hbonds"),
             )
-            st.color_picker("H-bond colour", key="hbond_color")
-            st.number_input("Most H-bond lines", min_value=1, step=50, key="hbond_max")
-            st.slider("Text size", 0.6, 2.0, step=0.1, key="font_scale")
-            st.text_input("Title", key="title")
+            st.color_picker("H-bond colour", **tracked("hbond_color"))
+            st.number_input("Most H-bond lines", min_value=1, step=50, **tracked("hbond_max"))
+            st.slider("Text size", 0.6, 2.0, step=0.1, **tracked("font_scale"))
+            st.text_input("Title", **tracked("title"))
         with st.expander("Features"):
-            st.checkbox("Disulfides", key="disulfides")
-            st.checkbox("Glycans", key="glycans")
-            st.checkbox("Sheet panels", key="sheet_panels")
+            st.checkbox("Disulfides", **tracked("disulfides"))
+            st.checkbox("Glycans", **tracked("glycans"))
+            st.checkbox("Sheet panels", **tracked("sheet_panels"))
             st.text_input(
-                "Ligands and ions", key="ligands", help="auto (skips buffer additives), all, none, or codes like HEM,ZN"
+                "Ligands and ions",
+                help="auto (skips buffer additives), all, none, or codes like HEM,ZN",
+                **tracked("ligands"),
             )
             st.selectbox(
                 "Membrane",
                 ["off", "auto", "flip"],
-                key="membrane",
                 help="auto: find the bilayer and draw it; flip: the same, other side on top",
+                **tracked("membrane"),
             )
         with st.expander("Alignment (conservation)"):
             st.file_uploader(
@@ -622,51 +833,53 @@ def main() -> None:
             if ss.get("msa_error"):
                 st.error(shown(ss["msa_error"]))
             st.text_input(
-                "Reference row", key="msa_reference", help="name of the structure's row (default: best match)"
+                "Reference row", help="name of the structure's row (default: best match)", **tracked("msa_reference")
             )
             st.caption(
-                "With an alignment: colour by 'conservation', and the Sequence tab shows the alignment. "
+                "With an alignment: colour by 'conservation', and the Sequence view shows the alignment. "
                 "A ConSurf grades table (consurf_grades.txt) colours by ConSurf's own grades."
             )
         with st.expander("Sizes and layout"):
-            st.selectbox("Mode", ["projected", "stack"], key="mode")
-            st.selectbox("Helix angle", CHOICES["helix_angle"], key="helix_angle")
-            st.slider("Helix size", 0.5, 2.0, step=0.05, key="helix_scale")
-            st.slider("Strand size", 0.5, 2.0, step=0.05, key="strand_scale")
-            st.slider("DNA size", 0.5, 2.0, step=0.05, key="dna_scale")
-            st.slider("Rotate (°)", -180.0, 180.0, step=0.5, key="rotate")
-            st.text_input("Swap", key="swap", help="two elements, e.g. α1,α3 (several: separate with ;)")
-            st.text_input("Move", key="move", help="e.g. α2=1,-2 (page units)")
-            st.text_input("Rename", key="rename", help="e.g. res:167-182=Gd")
+            st.selectbox("Mode", ["projected", "stack"], **tracked("mode"))
+            st.selectbox("Helix angle", CHOICES["helix_angle"], **tracked("helix_angle"))
+            st.slider("Helix size", 0.5, 2.0, step=0.05, **tracked("helix_scale"))
+            st.slider("Strand size", 0.5, 2.0, step=0.05, **tracked("strand_scale"))
+            st.slider("DNA size", 0.5, 2.0, step=0.05, **tracked("dna_scale"))
+            st.slider("Rotate (°)", -180.0, 180.0, step=0.5, **tracked("rotate"))
+            st.text_input("Swap", help="two elements, e.g. α1,α3 (several: separate with ;)", **tracked("swap"))
+            st.text_input("Move", help="e.g. α2=1,-2 (page units)", **tracked("move"))
+            st.text_input("Rename", help="e.g. res:167-182=Gd", **tracked("rename"))
             st.text_area(
                 "Domains",
-                key="domains",
                 height=80,
                 help="one per line, NAME=REF[,REF...], e.g. ZPN=res:A:331-440; or just 'auto'",
+                **tracked("domains"),
             )
         with st.expander("UniProt annotation"):
             st.text_input(
-                "UniProt", key="uniprot", help="off, auto (each chain's entry via SIFTS / AlphaFold), or an accession"
+                "UniProt",
+                help="off, auto (each chain's entry via SIFTS / AlphaFold), or an accession",
+                **tracked("uniprot"),
             )
-            st.checkbox("UniProt domains as panels", key="uniprot_domains")
+            st.checkbox("UniProt domains as panels", **tracked("uniprot_domains"))
             st.text_input(
                 "Sites shown",
-                key="uniprot_sites",
                 help="auto (active + binding), all, none, or types: active,binding,modified",
+                **tracked("uniprot_sites"),
             )
         with st.expander("Symmetry and assembly"):
-            st.text_input("Symmetry", key="symmetry", help="auto, off, C2, D3, helical")
-            st.text_input("Assembly", key="assembly", help="auto, asu, or an assembly id")
+            st.text_input("Symmetry", help="auto, off, C2, D3, helical", **tracked("symmetry"))
+            st.text_input("Assembly", help="auto, asu, or an assembly id", **tracked("assembly"))
             st.text_input(
                 "Chains",
-                key="chains",
                 help="draw only these chains, e.g. A,B (empty: all; protein and nucleic acid each restricted if named)",
+                **tracked("chains"),
             )
             st.text_input(
                 "Large assemblies",
-                key="focus",
                 help="auto: filaments, cages and big assemblies as one subunit plus the neighbouring parts of its "
                 "fold; none: draw everything; or chains to show in full, e.g. B",
+                **tracked("focus"),
             )
         st.file_uploader("Load a layout file", type=["yaml", "yml"], key="layout_upload", on_change=apply_layout_file)
         if ss.get("layout_error"):
@@ -676,96 +889,7 @@ def main() -> None:
                 f"The layout file's alignment {shown(ss['msa_missing'], paths=False)} is not on this machine; "
                 "upload it under Alignment."
             )
-        st.button("← another structure", key="new_structure", on_click=new_structure)
-
-    settings, blob = settings_of(ss), current_blob(ss)
-    st.write(f"**{shown(name, limit=80)}** · {shown(ss.get('info', ''))}")
-    stem = name
-    tab_fig, tab_seq, tab_live = st.tabs(["Figure", "Sequence", "Interactive"])
-    with tab_fig:
-        try:
-            failed = app_jobs.known_failure(path, settings)
-            if failed is not None:
-                raise failed
-            result = render(path, blob)
-        except (ValueError, OSError, RuntimeError, app_jobs.JobLimit) as err:
-            if isinstance(err, app_jobs.JobLimit):
-                app_jobs.remember_failure(path, settings, err)
-            st.error(shown(app_jobs.explain(err, name, lim, ss.get("last_changed"))[0], path=path, name=name))
-            return
-        if result["fallback"]:
-            st.warning(f"No clear route for: {shown(', '.join(result['fallback']))} (drawn as plain curves).")
-        if result["over_labels"]:
-            st.warning(
-                f"Drawn over a label or chain end (the only route found): {shown(', '.join(result['over_labels']))}."
-            )
-        page_bg = settings.get("background", "#ffffff")
-        st.markdown(
-            f'<div style="background:{page_bg};border-radius:6px;padding:8px">{result["svg"]}</div>',
-            unsafe_allow_html=True,
-        )
-        eager = tuple(sorted(result["files"].items()))
-        c1, c2, c3 = st.columns(3)
-        for col, ext, label, mime in (
-            (c1, "svg", "SVG (editable)", "image/svg+xml"),
-            (c2, "png", "PNG (300 dpi)", "image/png"),
-            (c3, "pdf", "PDF", "application/pdf"),
-        ):
-            try:
-                data = app_jobs.figure_file(path, blob, ext, lim, eager)
-            except (ValueError, OSError, RuntimeError, app_jobs.JobLimit) as err:
-                col.caption(
-                    f"{ext.upper()} unavailable: {shown(app_jobs.explain(err, name, lim)[0], path=path, name=name)}"
-                )
-            else:
-                col.download_button(label, data, f"{stem}.{ext}", mime, key=f"dl_{ext}")
-        try:
-            import yaml
-
-            doc = layout_document(path, settings)
-            st.download_button(
-                "Layout file (YAML): re-render this figure later",
-                yaml.safe_dump(doc, sort_keys=False, allow_unicode=True).encode(),
-                f"{stem}-layout.yaml",
-                "application/x-yaml",
-                key="dl_layout",
-            )
-        except (ValueError, OSError, RuntimeError) as err:
-            st.caption(f"Layout file unavailable: {shown(app_jobs.explain(err, name, lim)[0], path=path, name=name)}")
-    with tab_seq:
-        c1, c2, c3 = st.columns(3)
-        c1.slider("Columns per row", 20, 150, 60, step=5, key="seq_columns")
-        c2.selectbox("Element colours", ["figure", "black"], key="seq_ss_colour")
-        c3.checkbox("Include unmodelled ends", key="seq_full")
-        view = {"columns": ss["seq_columns"], "ss_colour": ss["seq_ss_colour"], "full_sequence": ss["seq_full"]}
-        try:
-            seq = sequence(path, blob, json.dumps(view, sort_keys=True))
-        except (ValueError, OSError, RuntimeError) as err:
-            st.error(shown(app_jobs.explain(err, name, lim)[0], path=path, name=name))
-        else:
-            page_bg = settings.get("background", "#ffffff")
-            st.markdown(
-                f'<div style="background:{page_bg};border-radius:6px;padding:8px;overflow-x:auto">'
-                f"{seq['svg'].decode()}</div>",
-                unsafe_allow_html=True,
-            )
-            d1, d2, d3 = st.columns(3)
-            d1.download_button("SVG", seq["svg"], f"{stem}-sequence.svg", "image/svg+xml", key="dl_seq_svg")
-            d2.download_button("PNG (300 dpi)", seq["png"], f"{stem}-sequence.png", "image/png", key="dl_seq_png")
-            d3.download_button("PDF", seq["pdf"], f"{stem}-sequence.pdf", "application/pdf", key="dl_seq_pdf")
-    with tab_live:
-        try:
-            page = interactive(path, blob)
-        except (ValueError, OSError, RuntimeError) as err:
-            st.error(shown(app_jobs.explain(err, name, lim)[0], path=path, name=name))
-        else:
-            st.download_button(
-                "Interactive page (HTML)", page.encode(), f"{stem}-explorer.html", "text/html", key="dl_html"
-            )
-            if hasattr(st, "iframe"):  # Streamlit >= 1.52; the page is foldmap's own output
-                st.iframe(page, height=1100)
-            else:
-                components.html(page, height=1100, scrolling=True)
+    st.sidebar.caption(CREDIT)
 
 
 def run() -> None:

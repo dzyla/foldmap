@@ -100,14 +100,14 @@ def test_app_sequence_files():
     assert b"strict:" in msa["svg"]
 
 
-def test_app_shows_the_sequence_tab():
+def test_app_shows_the_sequence_view():
     at = app_test()
     at.run()
     at.text_input(key="source").set_value(str(DATA / "1UBQ.cif"))
     at.button(key="load").click().run()
     assert not at.exception
-    assert any(t.label == "Sequence" for t in at.tabs)
-    assert at.slider(key="seq_columns").value == 60
+    at.segmented_control(key="pane").set_value("Sequence").run()
+    assert not at.exception and at.slider(key="seq_columns").value == 60
 
 
 def test_app_passes_focus_to_the_layout():
@@ -231,13 +231,14 @@ def test_app_layout_file_round_trips_through_the_app():
     assert again["domains"] == first["domains"] and again["edits"] == first["edits"]
 
 
-def test_app_sequence_tab_with_the_conservation_theme(tmp_path):
+def test_app_sequence_view_with_the_conservation_theme(tmp_path):
     """The conservation theme colours the sequence view's elements from the same alignment as the figure."""
     at = load(app_test(), DATA / "1UBQ.cif")
     at.file_uploader(key="msa_upload").set_value(
         ("ubq.fasta", (DATA / "ubq_family.fasta").read_bytes(), "text/plain")
     ).run()
     at.selectbox(key="theme").select("conservation").run()
+    at.segmented_control(key="pane").set_value("Sequence").run()
     assert not at.exception and at.session_state["msa_path"]
     assert not at.error and any("strict:" in m.value for m in at.markdown)
 
@@ -315,10 +316,11 @@ def test_app_pruned_upload_is_a_message_not_a_traceback():
     assert any("load it again" in e.value and str(kept.parent) not in e.value for e in at.error)
 
 
-def test_app_pruned_upload_in_the_sequence_tab_is_a_message(monkeypatch):
+def test_app_pruned_upload_in_the_sequence_view_is_a_message(monkeypatch):
     at = app_test()
     at.run()
     at.file_uploader(key="upload").set_value(("ubq.cif", (DATA / "1UBQ.cif").read_bytes(), "chemical/x-cif")).run()
+    at.segmented_control(key="pane").set_value("Sequence").run()
     Path(at.session_state["path"]).unlink()
     at.slider(key="seq_columns").set_value(80).run()  # the figure is cached; the sequence is drawn again
     assert not at.exception and any("load it again" in e.value for e in at.error)
@@ -604,3 +606,91 @@ def test_a_link_to_an_accession_lists_its_structures(monkeypatch):
     at.run()
     assert not at.exception and at.session_state["stage"] == "load" and not at.error
     assert at.dataframe[0].value["id"].tolist()[0] == "AF-P07911-F1" and "id" not in at.query_params
+
+
+# ---------------------------------------------------------------------------------------------- workspace
+def test_workspace_top_bar_and_one_view():
+    at = opened(DATA / "1LMB.cif")
+    assert at.segmented_control(key="pane").options == ["Figure", "Sequence", "3D"]
+    assert at.segmented_control(key="pane").value == "Figure" and not at.tabs
+    assert "new_structure" in [b.key for b in at.button] and at.session_state["auto_redraw"] is True
+    assert any(m.value == "**1LMB**" for m in at.markdown)
+    assert any(c.value.startswith("2 chains · 179 residues") for c in at.caption)
+
+
+def test_only_the_active_view_is_built(monkeypatch):
+    import foldmap.interactive as interactive
+    import foldmap.seqplot as seqplot
+    from app_helpers import count_calls, fresh_caches
+
+    fresh_caches()
+    seq = count_calls(monkeypatch, seqplot, "draw_sequence")
+    page = count_calls(monkeypatch, interactive, "build_page")
+    at = opened(DATA / "1UBQ.cif")
+    at.run()  # a rerun in the Figure view
+    assert seq == [] and page == []
+    at.segmented_control(key="pane").set_value("Sequence").run()
+    assert not at.exception and len(seq) == 1 and page == []
+
+
+def test_a_failing_setting_keeps_the_last_figure_and_names_the_control():
+    at = opened(DATA / "2LZM.cif")
+    before = svg_of(at)
+    at.text_input(key="swap").input("α1").run()  # one element: not a swap (Task 9: as_text)
+    assert not at.exception
+    assert any("swap" in e.value and "Check Swap (Edit layout)." in e.value for e in at.error)
+    assert any(_visible(e.value).endswith("got 'α1'. Check Swap (Edit layout).") for e in at.error)  # two sentences
+    assert svg_of(at) == before
+
+
+def test_a_pipeline_crash_is_a_message_not_a_traceback(monkeypatch, caplog):
+    """A domain range without res: is a ValueError naming Domains (R2); a crash inside the pipeline (an IndexError
+    here, made on purpose) is a message too, logged for the server, and the last figure stays."""
+    from app_helpers import fresh_caches
+    from foldmap import app_jobs
+
+    fresh_caches()
+    at = opened(DATA / "2LZM.cif")
+    before = svg_of(at)
+    at.text_area(key="domains").set_value("N=A:1-60").run()
+    assert not at.exception and svg_of(at) == before
+    assert any("Check Domains (Edit layout)." in e.value for e in at.error)
+    real = app_jobs.draw_job
+
+    def crash(path, settings_json, *a, **k):
+        if "N=res:A:1-60" in settings_json:
+            raise IndexError("list index out of range")
+        return real(path, settings_json, *a, **k)
+
+    monkeypatch.setattr(app_jobs, "draw_job", crash)
+    at.text_area(key="domains").set_value("N=res:A:1-60").run()
+    assert not at.exception and svg_of(at) == before
+    text = _visible(at.error[0].value)
+    assert text.startswith("foldmap could not draw this setting (IndexError: list index out of range).")
+    assert "github.com/dzyla/foldmap/issues" in text and text.endswith(" Check Domains (Edit layout).")
+    assert "Traceback" not in text and any(r.exc_info and r.name == "foldmap.app" for r in caplog.records)
+
+
+def test_a_slow_structure_turns_auto_redraw_off(monkeypatch):
+    from app_helpers import fresh_caches
+    from foldmap import app_jobs
+
+    fresh_caches()
+    monkeypatch.setattr(app_jobs, "SLOW_SECONDS", 0.0)
+    at = opened(DATA / "1UBQ.cif")
+    assert at.session_state["auto_redraw"] is False and "redraw" in [b.key for b in at.button]
+    assert any(c.value.startswith("Auto-redraw is off for this structure") for c in at.caption)
+    before = svg_of(at)
+    at.selectbox(key="palette").select("tol-bright").run()
+    assert svg_of(at) == before  # not redrawn until asked
+    at.button(key="redraw").click().run()
+    assert svg_of(at) != before
+
+
+def test_figure_card_is_accessible_and_scrolls_only_when_very_wide():
+    from foldmap.app import figure_card
+
+    card = figure_card('<svg width="400pt" height="300pt" viewBox="0 0 400 300"></svg>', "#ffffff", "1UBQ")
+    assert 'role="img"' in card and 'aria-label="Topology diagram of 1UBQ"' in card and "max-width:none" not in card
+    wide = figure_card('<svg width="3000pt" height="500pt" viewBox="0 0 3000 500"></svg>', "#ffffff", "x")
+    assert "max-width:none" in wide and 'class="fm-card"' in wide
