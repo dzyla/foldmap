@@ -28,7 +28,7 @@ alt="Topology of the lambda repressor dimer bound to its operator DNA">
 <table>
 <tr>
 <td width="50%"><img src="https://raw.githubusercontent.com/dzyla/foldmap/main/docs/images/t4-lysozyme-domains.png" alt="T4 lysozyme with N- and C-lobe domain panels"><br>
-<sub><b>Domains.</b> T4 lysozyme (2LZM), journal theme: named domain panels, each kept together.</sub></td>
+<sub><b>Domains.</b> T4 lysozyme (2LZM), journal theme: named domain panels, each kept together, elements in domain colours and a domain bar in residue order.</sub></td>
 <td width="50%"><img src="https://raw.githubusercontent.com/dzyla/foldmap/main/docs/images/measles-f-trimer.png" alt="Measles fusion protein trimer with one protomer highlighted"><br>
 <sub><b>Symmetry.</b> Measles F trimer (8UTF): C3 found, protomers drawn alike, one highlighted, disulfides and glycans marked.</sub></td>
 </tr>
@@ -46,7 +46,7 @@ alt="Topology of the lambda repressor dimer bound to its operator DNA">
 </tr>
 <tr>
 <td><img src="https://raw.githubusercontent.com/dzyla/foldmap/main/docs/images/tim-barrel-rainbow.png" alt="TIM barrel dimer coloured N to C"><br>
-<sub><b>Barrels.</b> Triosephosphate isomerase (1TIM), rainbow theme: the closed (βα)₈ barrel, first strand repeated as a ghost.</sub></td>
+<sub><b>Barrels.</b> Triosephosphate isomerase (1TIM), rainbow theme: each closed (βα)₈ barrel drawn as one βα row, each helix between the strands it joins, the first strand repeated as a ghost.</sub></td>
 <td><img src="https://raw.githubusercontent.com/dzyla/foldmap/main/docs/images/haemoglobin-hemes.png" alt="Haemoglobin tetramer with hemes"><br>
 <sub><b>Ligands.</b> Haemoglobin (2HHB): each heme placed beside, and tethered to, the helices that hold it.</sub></td>
 </tr>
@@ -215,6 +215,61 @@ the row and its helices fall in one domain. A `--domain` set of your own that sp
 row is drawn as one unit, so its domains' panels overlap it. To let the parts move apart, draw the sheet as
 projected with `--set fold_template=off`.
 
+### Conventions of the published figures
+
+foldmap follows the conventions of the hand-drawn topology figures readers know (Richardson 1981, the TIM and
+Rossmann schematics, Burroughs 2007, Nishimasu 2014). Each is a layout or style key; the defaults are below.
+
+**Conventional names** (`--names`, opt-in). `--names deposited` takes the helix ids the file itself gives, so a
+globin's helices read A–H (an element the file gives no id keeps its generic label). `--names beta` numbers the
+strands β1…βn in sequence and names each helix of a βα row after the strand before it (β1 α1 β2 α2 …).
+`--names FILE.yaml` names elements by residue range and, under `stems:`, nucleic-acid stems by one nucleotide they
+pair. The option repeats, and a later spec wins. `docs/names/` ships four files: globin helices (2HHB), FN3
+strands (1TEN), histone-fold helices (1KX5) and tRNA arms (1EHZ). Each file says where its ranges come from.
+
+```bash
+foldmap plot 1MBN --names deposited -o myoglobin.svg
+foldmap plot 1TIM --names beta -o tim.svg
+foldmap plot 1KX5 --focus A,B --names docs/names/1KX5-histones.yaml -o nucleosome.svg
+```
+
+**The βα row** (`fold_template`, default `auto`). An all-parallel α/β sheet of 4 to 10 strands, such as a TIM
+barrel or a Rossmann fold, is drawn as one row, with each crossover helix between the two strands it joins. A barrel
+opens between its last and first strand and shows the first again as a dashed ghost. Copies of one protein share
+the choice. `--set fold_template=off` draws the sheet as projected.
+
+**Helices over a sheet** (`helix_on_sheet`, default `off`). With `--set helix_on_sheet=auto`, a helix that packs on
+a sheet's face is drawn over the sheet plate, semi-transparent, as it lies (ferredoxin-like folds, ubiquitin's α1),
+instead of beside it. The option is off for symmetric figures, for sheets drawn as a βα row and whenever nucleic acid
+is drawn. It suits small α/β folds; on others it can add crossings, so it is opt-in.
+
+```bash
+foldmap plot 2ACY --set helix_on_sheet=auto -o acylphosphatase.svg
+```
+
+**Domain colours and the domain bar.** When domains are named (`--domain`, `--domains auto` or `--domains uniprot`),
+elements are coloured by domain in eight colour-blind-safe tones. This replaces the default chain colouring
+(`domain_colours`, on by default); a theme with its own colouring (rainbow, conservation, ...) keeps it, and
+`--set color_by=domain` asks for the domain tones anyway. A linear bar under the figure shows each chain's domains in residue order, on one residue scale for
+every chain (`domain_bar`: `auto` draws it for 2 or more domains, `on` for any, `off` never). The print and blueprint
+themes keep their own palettes: greys with a hatch per domain, or the blueprint tints. `--set domain_colours=true`
+asks for the tones there. A domain's name sits at the top left of its panel, or at the top right when the left is
+taken. `docs/domains/` holds the `--domain` flags for Cas9 (4OO8, Nishimasu 2014 Fig 1A) and measles F (8UTF, Zyla 2024
+Fig 3A):
+
+```bash
+foldmap plot 4OO8 --assembly 1 $(grep -v '^#' docs/domains/4OO8-cas9.txt) -o cas9.svg
+foldmap plot 8UTF --focus protomer $(grep -v '^#' docs/domains/8UTF-measles-F.txt) -o measles-F.svg
+```
+
+**Chromophores and other residues fused into the chain.** A peptide-linked non-standard residue without the usual
+backbone atom names (GFP's CRO66) keeps the chain whole: no dashed "missing" loop, and the helix through it stays one
+element. It is marked with a star on the chain and the legend entry "chromophore / linked residue".
+
+**Mirrored dimers.** Two copies related by a two-fold axis lying in the page (λ repressor on its operator, 1LMB) are
+drawn as exact mirror images about that axis, names included. Other symmetric copies, and the unrolled cylinders of
+filaments, are drawn alike as before.
+
 **Layout files.** `--save-layout fig.yaml` records everything that defines a figure: theme, style changes,
 layout options, domains and edits, with element references stored as residue ranges so they survive a new model.
 `foldmap plot model.cif --layout-file fig.yaml -o fig.svg` re-renders it; the command line overrides the file.
@@ -316,7 +371,8 @@ Every figure (command line, app, MCP or Python) goes through the same steps:
 6. **Layout.** Sheets (as rigid blocks), helices and DNA are placed by minimising one energy: springs to their
    projected positions, short loops between sequence neighbours, attraction between elements in contact, a pull
    between disulfide-bonded cysteines, and an overlap penalty; then any remaining overlaps are cleared.
-   Symmetry copies are tied to look identical; stems are placed as rigid items.
+   Symmetry copies are tied to look identical (two copies across a dyad in the page as mirror images); an
+   all-parallel α/β sheet is placed as one βα row; stems are placed as rigid items.
 7. **Loops.** Each loop is routed on a grid with A* search: orthogonal lines that go around elements and labels;
    single strands are routed the same way, hairpin loops as arcs.
 8. **Drawing.** matplotlib draws the elements to scale (one helix turn tiled along each helix, arrows for
@@ -380,12 +436,26 @@ save(fig, "ubiquitin.pdf")
 
 ```bash
 python -m venv .venv && .venv/bin/pip install -e ".[dev,app,mcp]"
-.venv/bin/python -m pytest              # about 850 tests, ~1.5 min
+.venv/bin/python -m pytest              # about 2200 tests, ~5 min
 .venv/bin/ruff check . && .venv/bin/ruff format --check .
 .venv/bin/python scripts/gallery.py     # re-render the images above
 .venv/bin/python scripts/sweep.py --sample 60 --out sweep/   # render random PDB entries and check them
 .venv/bin/python scripts/bench.py                                # time layouts (add --record/--check to compare runs)
 ```
+
+**The website** (<https://dzyla.github.io/foldmap/>) is built by `scripts/build_site.py`, which renders every figure
+with foldmap itself, so the site shows what the current code draws. The `website` workflow
+(`.github/workflows/pages.yml`) rebuilds and publishes it on every push to `main`. To check it before a push, build it
+locally and open `_site/index.html`:
+
+```bash
+.venv/bin/python scripts/build_site.py --out _site            # the full site
+.venv/bin/python scripts/build_site.py --out _site --quick    # a small subset
+```
+
+The domain examples change with plan 11's domain colours and bar: the T4 lysozyme lobes (2LZM) and haemoglobin's
+UniProt domains (2HHB) now colour elements by domain and draw the domain bar. Look at both in the local build
+before the push that publishes them. The README images come from `scripts/gallery.py` (into `docs/images/`).
 
 ## Citing
 
