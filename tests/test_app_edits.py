@@ -11,6 +11,7 @@ from foldmap.app_edits import (
     compose_into,
     control_for,
     element_choices,
+    hex_colour,
     notes_text,
     palette_used,
     row_source,
@@ -36,6 +37,16 @@ def test_composites_round_trip_every_form(key):
     _, parts, text = COMPOSITES[key]
     for value in ROUND_TRIP[key]:
         assert text(*parts(value)) == value, (key, value)
+
+
+def test_named_colours_become_hex_for_the_pickers():
+    """st.color_picker takes #rrggbb only: a named colour (a layout file's teal) is converted, anything else is the
+    picker's default."""
+    _, parts, _ = COMPOSITES["na_backbone"]
+    assert parts("teal") == ("colour", "#008080") and parts("#ABCDEF") == ("colour", "#abcdef")
+    assert parts("nonsense") == ("colour", "#8c564b")
+    assert hex_colour("teal", "#000000") == "#008080" and hex_colour("#fff", "#000000") == "#ffffff"
+    assert hex_colour("", "#d020f8") == "#d020f8" and hex_colour(None, "#d020f8") == "#d020f8"
 
 
 def test_composites_normalise_what_people_type():

@@ -58,11 +58,20 @@ def _ligands_text(mode: str, codes: str) -> str:
     return ",".join(c.upper() for c in re.split(r"[,\s]+", codes or "") if c) or "auto"
 
 
+def hex_colour(value, default: str) -> str:
+    """A colour as st.color_picker takes it (#rrggbb): a named colour (teal) or #rgb converted, anything that is
+    not a colour gives `default`."""
+    from matplotlib.colors import is_color_like, to_hex
+
+    value = str(value or "").strip()
+    return to_hex(value) if value and is_color_like(value) else default
+
+
 def _na_backbone_parts(text: str) -> tuple:
     text = (text or "").strip()
     if text in ("", "modality", "chain", "ink"):
         return (text or "modality", NA_BACKBONE_COLOUR)
-    return ("colour", text)
+    return ("colour", hex_colour(text, NA_BACKBONE_COLOUR))
 
 
 def _na_backbone_text(mode: str, colour: str) -> str:

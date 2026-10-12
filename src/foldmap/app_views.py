@@ -58,7 +58,8 @@ def said(message: str, **kw) -> str:
 @dataclass
 class Workspace:
     """What the views of one workspace run share: Streamlit, the session, the structure, the settings JSON (the
-    cache key), the job limits, the app's caches (render, sequence_svg, page) and where the spinner shows."""
+    cache key), the job limits, the app's caches (render, sequence_svg, page, contacts) and where the spinner
+    shows."""
 
     st: Any
     ss: MutableMapping
@@ -69,6 +70,7 @@ class Workspace:
     render: Callable[[str, str], dict]
     sequence_svg: Callable[[str, str, str], bytes]
     page: Callable[[str, str], str]
+    contacts: Callable[[str, str], dict | None]
     status: Any
 
 
@@ -85,8 +87,9 @@ def problem(ws: Workspace, err: Exception) -> str:
 
 
 def guarded(ws: Workspace, job: str, blob: str, make: Callable, view_json: str = ""):
-    """make() for a job ('figure', 'sequence' or 'page'), unless the same request went over a limit before: then
-    that JobLimit at once. A JobLimit is remembered for this job (and sequence view) only; a bug is logged."""
+    """make() for a job ('figure', 'sequence', 'page' or 'contacts'), unless the same request went over a limit
+    before: then that JobLimit at once. A JobLimit is remembered for this job (and sequence view) only; a bug is
+    logged."""
     settings = json.loads(blob)
     failed = app_jobs.known_failure(ws.path, settings, job, view_json)
     if failed is not None:
@@ -142,6 +145,28 @@ def figure_view(ws: Workspace) -> None:
         notes = app_edits.notes_text(result["fallback"], result["over_labels"]) if result else ""
         if notes:
             st.caption(shown(notes))
+        if ss.get("check_contacts") and ss.get("na_chains"):
+            contacts_check(ws, good["blob"])
+
+
+def contacts_check(ws: Workspace, blob: str) -> None:
+    """The figure drawn (`blob`) checked against the coordinates, as captions under the card (only on request: a
+    second pass over the structure)."""
+    from foldmap.app import local_files
+    from foldmap.app_controls import contact_lines
+
+    st = ws.st
+    try:
+        with ws.status, st.spinner("Checking contacts…"):
+            report = guarded(ws, "contacts", blob, lambda: ws.contacts(ws.path, blob))
+    except Exception as err:
+        message = app_jobs.explain(err, ws.name, ws.lim)[0]
+        st.warning("Contacts check: " + said(message, path=ws.path, name=ws.name, paths=not local_files()))
+        return
+    first, *problems = contact_lines(report)
+    st.caption(first)
+    for line in problems:  # they name the file's residues
+        st.caption(shown(line))
 
 
 def sequence_options(ss: MutableMapping) -> dict:

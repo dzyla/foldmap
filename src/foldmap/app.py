@@ -17,7 +17,8 @@ from dataclasses import fields, replace
 from pathlib import Path
 
 from foldmap import CREDIT, app_jobs
-from foldmap.app_edits import shown, sync_composites
+from foldmap.app_controls import prepare, setting, show_section, style_section, touched
+from foldmap.app_edits import shown
 from foldmap.app_views import Workspace, download_menu, explorer_view, figure_view, said, sequence_view
 from foldmap.cli import _adjustments, _domain_spec
 from foldmap.fetch import ALIGNMENT_SUFFIXES, fetch, keep_upload, source_id
@@ -289,12 +290,14 @@ def current_blob(ss: MutableMapping) -> str:
 
 
 def apply_theme(ss: MutableMapping, name: str | None = None) -> None:
-    """Make `name` (default: the session's theme) the theme, with every style value of its own; layout settings
-    not yet in the session get their defaults."""
+    """Make `name` (default: the session's theme) the theme, with every style value of its own except those that
+    name this structure's parts (STRUCTURE_STYLE: marks, highlight, H-bond pairs, per-chain colours), which stay
+    once set; layout settings not yet in the session get their defaults."""
     name = name or ss["theme"]
     ss["theme"] = name
     for key, value in vars(THEMES[name]).items():
-        ss[key] = copy.deepcopy(value)
+        if key not in STRUCTURE_STYLE or key not in ss:
+            ss[key] = copy.deepcopy(value)
     for key, value in LAYOUT_DEFAULTS.items():
         ss.setdefault(key, copy.deepcopy(value))
 
@@ -313,16 +316,6 @@ def keep_look(ss: MutableMapping) -> None:
 THEMES_NOTE = "Shown on ubiquitin, the reference structure (alphafold on p53). Pick one to apply it to your structure."
 
 
-def touched(ss: MutableMapping, key: str) -> None:
-    """Every settings widget's callback: the setting changed last is the one to check when the figure fails."""
-    ss["last_changed"] = key
-
-
-def setting(ss: MutableMapping, key: str) -> dict:
-    """A settings widget's arguments: its key (the setting's own), kept while the widget is hidden, and touched."""
-    return {"key": key, "on_change": touched, "args": (ss, key), "persist_state": "session"}
-
-
 def theme_changed(ss: MutableMapping) -> None:
     apply_theme(ss)
     touched(ss, "theme")
@@ -335,8 +328,10 @@ def pick_theme(ss: MutableMapping, name: str) -> None:
 
 
 def reset_theme(ss: MutableMapping) -> None:
-    """Back to the theme's own values (every style value changed since it was picked)."""
+    """Back to the theme's own values (every style value changed since it was picked); what names this structure's
+    parts (STRUCTURE_STYLE) and the layout settings stay."""
     apply_theme(ss, ss["theme"])
+    ss["last_changed"] = "theme"
 
 
 def browse_themes(st, ss: MutableMapping) -> None:
@@ -457,6 +452,10 @@ def main() -> None:
     @st.cache_data(show_spinner=False, max_entries=4)
     def page(path: str, blob: str) -> str:
         return app_jobs.run_job(app_jobs.page_job, path, blob, limits=lim)
+
+    @st.cache_data(show_spinner=False, max_entries=16)
+    def contacts(path: str, blob: str) -> dict | None:
+        return app_jobs.run_job(app_jobs.contacts_job, path, blob, limits=lim)
 
     def store_alignment() -> None:
         ss["last_changed"] = "msa_path"
@@ -649,12 +648,12 @@ def main() -> None:
         return
 
     # ---- workspace: top bar, the active view, then the sidebar (a view may switch auto-redraw off first)
-    sync_composites(ss)
+    prepare(ss)
     st.html(f"<style>{STYLESHEET}</style>")
     top = st.container(key="topbar")
     with top:
         status = st.empty()
-    ws = Workspace(st, ss, ss["path"], ss["name"], current_blob(ss), lim, render, sequence_svg, page, status)
+    ws = Workspace(st, ss, ss["path"], ss["name"], current_blob(ss), lim, render, sequence_svg, page, contacts, status)
 
     def top_bar() -> None:
         """Name and summary; on the right the view switch, Download and New structure (Redraw and the auto-redraw
@@ -691,67 +690,45 @@ def main() -> None:
     {"Figure": figure_view, "Sequence": sequence_view, "3D": explorer_view}[ss["pane"]](ws)  # only this view
     top_bar()
 
-    # ---- sidebar: the essentials, then sections (Tasks 7-11 replace these expanders)
+    # ---- sidebar: the essentials, then six sections (Tasks 8-11 replace the interim expanders)
     with st.sidebar:
         essentials(st, ss)
         with st.container(gap="xxsmall", key="sections"):
-            with st.expander("More"):  # interim: what is left of Colours, Labels, Loops and Features (Task 7)
-                st.selectbox("Fill", CHOICES["fill"], **tracked("fill"))
-                st.selectbox("Helix shading", CHOICES["helix_shading"], **tracked("helix_shading"))
-                st.selectbox("Loop shape", CHOICES["loops"], **tracked("loops"))
-                st.selectbox("Loop colour", CHOICES["loop_color"], **tracked("loop_color"))
-                st.checkbox("Direction arrows", **tracked("loop_arrows"))
-                st.slider("Loop weight", 0.4, 3.0, step=0.1, **tracked("loop_width"))
-                st.text_input("Mark elements", help="e.g. G, A:G=#2ca02c, #3, res:150-159=red", **tracked("mark"))
+            style_section(st, ss)
+            show_section(st, ss)
+            with st.expander("Symmetry and assembly"):  # interim: Task 8's Chains & assembly
+                st.text_input("Symmetry", help="auto, off, C2, D3, helical", **tracked("symmetry"))
+                st.text_input("Assembly", help="auto, asu, or an assembly id", **tracked("assembly"))
+                st.text_input(
+                    "Chains",
+                    help="draw only these chains, e.g. A,B "
+                    "(empty: all; protein and nucleic acid each restricted if named)",
+                    **tracked("chains"),
+                )
                 st.text_input("Highlight", help="none, asu, protomer, or chains like A,B", **tracked("highlight"))
-                c_bg, c_ink = st.columns(2)
-                c_bg.color_picker("Background", **tracked("background"))
-                c_ink.color_picker("Ink", **tracked("ink"))
-                st.checkbox("Base letters (DNA/RNA)", **tracked("nucleotide_labels"))
-                st.selectbox(
-                    "Stems (DNA/RNA)",
-                    CHOICES["na_style"],
-                    help="ladder: rails and base-pair rungs · ribbon: double helix · block: bars · letters",
-                    **tracked("na_style"),
-                )
-                st.selectbox(
-                    "DNA/RNA shown",
-                    CHOICES["na_extent"],
-                    help="auto: everything up to 300 nt, else the stems the protein touches",
-                    **tracked("na_extent"),
-                )
                 st.text_input(
-                    "DNA/RNA backbone",
-                    help="modality, chain, ink, or one colour such as #8c564b",
-                    **tracked("na_backbone"),
+                    "Large assemblies",
+                    help="auto: filaments, cages and big assemblies as one subunit plus the neighbouring parts of its "
+                    "fold; none: draw everything; or chains to show in full, e.g. B",
+                    **tracked("focus"),
                 )
-                st.text_input(
-                    "Backbone colours",
-                    help="e.g. A=#1f77b4, dna=#555555, I=crimson (chain or protein/dna/rna)",
-                    **tracked("backbone_colors"),
+            with st.expander("Sizes and layout"):  # interim: Task 9's Edit layout
+                st.selectbox("Mode", ["projected", "stack"], **tracked("mode"))
+                st.slider("Helix size", 0.5, 2.0, step=0.05, **tracked("helix_scale"))
+                st.slider("Strand size", 0.5, 2.0, step=0.05, **tracked("strand_scale"))
+                st.slider("DNA size", 0.5, 2.0, step=0.05, **tracked("dna_scale"))
+                st.slider("Rotate (°)", -180.0, 180.0, step=0.5, **tracked("rotate"))
+                st.text_input("Swap", help="two elements, e.g. α1,α3 (several: separate with ;)", **tracked("swap"))
+                st.text_input("Move", help="e.g. α2=1,-2 (page units)", **tracked("move"))
+                st.text_input("Rename", help="e.g. res:167-182=Gd", **tracked("rename"))
+                st.text_input("Mark elements", help="e.g. G, A:G=#2ca02c, #3, res:150-159=red", **tracked("mark"))
+                st.text_area(
+                    "Domains",
+                    height=80,
+                    help="one per line, NAME=REF[,REF...], e.g. ZPN=res:A:331-440; or just 'auto'",
+                    **tracked("domains"),
                 )
-                st.text_input(
-                    "Hydrogen bonds",
-                    help="off, na (protein with DNA/RNA), interchain, or chains:A+B,C+D",
-                    **tracked("hbonds"),
-                )
-                st.color_picker("H-bond colour", **tracked("hbond_color"))
-                st.number_input("Most H-bond lines", min_value=1, step=50, **tracked("hbond_max"))
-                st.checkbox("Disulfides", **tracked("disulfides"))
-                st.checkbox("Glycans", **tracked("glycans"))
-                st.checkbox("Sheet panels", **tracked("sheet_panels"))
-                st.text_input(
-                    "Ligands and ions",
-                    help="auto (skips buffer additives), all, none, or codes like HEM,ZN",
-                    **tracked("ligands"),
-                )
-                st.selectbox(
-                    "Membrane",
-                    ["off", "auto", "flip"],
-                    help="auto: find the bilayer and draw it; flip: the same, other side on top",
-                    **tracked("membrane"),
-                )
-            with st.expander("Alignment (conservation)"):
+            with st.expander("Conservation & UniProt"):  # interim: Task 11 finishes this section
                 st.file_uploader(
                     "Multiple sequence alignment or ConSurf grades table",
                     type=["fasta", "fa", "aln", "sto", "txt"],
@@ -769,23 +746,6 @@ def main() -> None:
                     "With an alignment: colour by 'conservation', and the Sequence view shows the alignment. "
                     "A ConSurf grades table (consurf_grades.txt) colours by ConSurf's own grades."
                 )
-            with st.expander("Sizes and layout"):
-                st.selectbox("Mode", ["projected", "stack"], **tracked("mode"))
-                st.selectbox("Helix angle", CHOICES["helix_angle"], **tracked("helix_angle"))
-                st.slider("Helix size", 0.5, 2.0, step=0.05, **tracked("helix_scale"))
-                st.slider("Strand size", 0.5, 2.0, step=0.05, **tracked("strand_scale"))
-                st.slider("DNA size", 0.5, 2.0, step=0.05, **tracked("dna_scale"))
-                st.slider("Rotate (°)", -180.0, 180.0, step=0.5, **tracked("rotate"))
-                st.text_input("Swap", help="two elements, e.g. α1,α3 (several: separate with ;)", **tracked("swap"))
-                st.text_input("Move", help="e.g. α2=1,-2 (page units)", **tracked("move"))
-                st.text_input("Rename", help="e.g. res:167-182=Gd", **tracked("rename"))
-                st.text_area(
-                    "Domains",
-                    height=80,
-                    help="one per line, NAME=REF[,REF...], e.g. ZPN=res:A:331-440; or just 'auto'",
-                    **tracked("domains"),
-                )
-            with st.expander("UniProt annotation"):
                 st.text_input(
                     "UniProt",
                     help="off, auto (each chain's entry via SIFTS / AlphaFold), or an accession",
@@ -797,21 +757,6 @@ def main() -> None:
                     help="auto (active + binding), all, none, or types: active,binding,modified",
                     **tracked("uniprot_sites"),
                 )
-            with st.expander("Symmetry and assembly"):
-                st.text_input("Symmetry", help="auto, off, C2, D3, helical", **tracked("symmetry"))
-                st.text_input("Assembly", help="auto, asu, or an assembly id", **tracked("assembly"))
-                st.text_input(
-                    "Chains",
-                    help="draw only these chains, e.g. A,B "
-                    "(empty: all; protein and nucleic acid each restricted if named)",
-                    **tracked("chains"),
-                )
-                st.text_input(
-                    "Large assemblies",
-                    help="auto: filaments, cages and big assemblies as one subunit plus the neighbouring parts of its "
-                    "fold; none: draw everything; or chains to show in full, e.g. B",
-                    **tracked("focus"),
-                )
             with st.expander("Layout file"):  # Task 11 finishes this section
                 st.file_uploader(
                     "Load a layout file", type=["yaml", "yml"], key="layout_upload", on_change=apply_layout_file
@@ -821,7 +766,7 @@ def main() -> None:
         if ss.get("msa_missing") and not ss.get("msa_path"):
             st.warning(
                 f"The layout file's alignment {shown(ss['msa_missing'], paths=False)} is not on this machine; "
-                "upload it under Alignment."
+                "upload it under Conservation & UniProt."
             )
     st.sidebar.caption(CREDIT)
 

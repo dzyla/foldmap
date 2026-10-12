@@ -45,14 +45,14 @@ def test_mode_control_redraws():
 
 
 def test_nucleic_acid_style_control_redraws_the_stems():
+    """Was a selectbox; now the segmented "Stems" in Show."""
     from foldmap.style import CHOICES
 
-    at = load(app_test(), DATA / "1LMB.cif")
-    style = at.selectbox(key="na_style")
+    at = opened(DATA / "1LMB.cif")
+    style = at.segmented_control(key="na_style")
     assert list(style.options) == list(CHOICES["na_style"]) and style.value == "ladder"
     assert 'id="na:stem:0:rails"' in svg_of(at) and ":block" not in svg_of(at)
-    style.select("block")
-    at.run()
+    style.set_value("block").run()
     assert not at.exception
     assert 'id="na:stem:0:block"' in svg_of(at) and ":rails" not in svg_of(at)
 
