@@ -588,6 +588,38 @@ def _uniprot_domains(ann, sses) -> list[tuple[str, list[str]]]:
     return [(name, ids) for name, ids in out]
 
 
+def _element_ids(spec) -> bool:
+    """Are the domains given as element ids (A:3-11: UniProt domains, a layout file) rather than references?"""
+    return bool(spec) and all(
+        isinstance(ids, list) and all(":" in i and "-" in i and not i.startswith("res:") for i in ids)
+        for _, ids in spec
+    )
+
+
+def stale_domain_ids(spec, sses) -> list[tuple[str, str]]:
+    """(domain, element id) for each element id the domains name that `sses` lack: none unless the domains are given
+    as element ids. A layout file's (SavedDomains) are dropped with a warning; given otherwise, an error."""
+    if spec in (None, "auto", "uniprot") or not _element_ids(spec):
+        return []
+    known = {s.id for s in sses}
+    return [(name, i) for name, ids in spec for i in ids if i not in known]
+
+
+def stale_domains_note(spec, sses) -> str:
+    """The warning for a layout file's domains (SavedDomains) naming elements `sses` lack, '' when none: the command
+    line prints it, the app shows it."""
+    stale = stale_domain_ids(spec, sses) if isinstance(spec, SavedDomains) else []
+    if not stale:
+        return ""
+    known = {s.id for s in sses}
+    empty = [name for name, ids in spec if not any(i in known for i in ids)]
+    return (
+        "the layout file's domains name element(s) this structure does not have, "
+        f"dropped: {', '.join(i for _, i in stale)}"
+        + (f" (domain(s) left empty, not drawn: {', '.join(empty)})" if empty else "")
+    )
+
+
 def _domains(spec, sses, contacts, rows=(), copies=None, lent=frozenset()) -> list[tuple[str, list[str]]]:
     """[(name, element ids)] from 'auto' (chain by chain, copies of a protein (`copies`) alike, chains that only
     lend elements (`lent`) in their mates' domains, never splitting a βα row of `rows`) or [(name, [refs])]; every
@@ -599,12 +631,9 @@ def _domains(spec, sses, contacts, rows=(), copies=None, lent=frozenset()) -> li
         return []
     if spec == "auto":
         return auto_domains(sses, contacts, rows, copies, lent)
-    if spec and all(
-        isinstance(ids, list) and all(":" in i and "-" in i and not i.startswith("res:") for i in ids)
-        for _, ids in spec
-    ):
+    if _element_ids(spec):
         known = {s.id for s in sses}
-        stale = [(name, i) for name, ids in spec for i in ids if i not in known]
+        stale = stale_domain_ids(spec, sses)
         if stale and not isinstance(spec, SavedDomains):
             name, i = stale[0]
             raise ValueError(
@@ -613,13 +642,7 @@ def _domains(spec, sses, contacts, rows=(), copies=None, lent=frozenset()) -> li
             )
         kept = [(name, [i for i in ids if i in known]) for name, ids in spec]
         if stale:
-            empty = [name for name, ids in kept if not ids]
-            print(
-                "foldmap: warning: the layout file's domains name element(s) this structure does not have, "
-                f"dropped: {', '.join(i for _, i in stale)}"
-                + (f" (domain(s) left empty, not drawn: {', '.join(empty)})" if empty else ""),
-                file=sys.stderr,
-            )
+            print(f"foldmap: warning: {stale_domains_note(spec, sses)}", file=sys.stderr)
         return [(name, ids) for name, ids in kept if ids]  # already element ids (UniProt domains, a layout file)
     lay, out, seen = provisional(sses), [], set()
     for name, refs in spec:

@@ -81,6 +81,9 @@ def problem(ws: Workspace, err: Exception) -> str:
     from foldmap.app import local_files
 
     message, control = app_jobs.explain(err, ws.name, ws.lim, ws.ss.get("last_changed"))
+    kept, name = ws.ss.get("names_uploaded") or ("", "")
+    if kept:  # an uploaded names file's errors name it as uploaded, not by the copy kept on the server
+        message = message.replace(kept, name)
     hint = f" Check {control}." if control and not isinstance(err, app_jobs.JobLimit) else ""
     if hint and not message.rstrip().endswith((".", "!", "?")):  # the hint is a sentence of its own
         message = message.rstrip() + "."
@@ -146,6 +149,8 @@ def figure_view(ws: Workspace) -> None:
         notes = app_edits.notes_text(result["fallback"], result["over_labels"]) if result else ""
         if notes:
             st.caption(shown(notes))
+        if result and result.get("domains_note"):  # as the command line warns
+            st.warning(shown(result["domains_note"][0].upper() + result["domains_note"][1:] + "."))
         if ss.get("check_contacts") and ss.get("na_chains"):
             contacts_check(ws, good["blob"])
 

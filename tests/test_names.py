@@ -1,5 +1,6 @@
 """--names: conventional element and stem names (the file's own helix ids, β1…βn numbering, YAML name files)."""
 
+import re
 from pathlib import Path
 
 import pytest
@@ -302,3 +303,22 @@ def test_beta_names_a_helix_before_the_first_strand_alpha_n():
     strands = [mine[2]]
     named = _row_helices(mine, strands, {mine[2].id: 1}, {mine[2].id, mine[3].id})
     assert [named[s.id] for s in (mine[0], mine[1], mine[3])] == ["αN", "αN′", "α1"]
+
+
+def test_a_names_file_is_read_as_untrusted_text():
+    """parse_names: what the app checks an upload with before it is used (the figure checks the references)."""
+    from foldmap.names import parse_names
+
+    doc = parse_names((DOCS / "2HHB-globin.yaml").read_text(), "2HHB-globin.yaml")
+    assert doc["elements"]["res:A:3-18"] == "A"
+    assert parse_names("", "empty.yaml") == {}
+    for text, said in (
+        ("- A\n", "x.yaml: a names file is a mapping"),
+        ("elements: [A\n", "x.yaml: not valid YAML"),
+        ("helices: {}\n", "x.yaml: unknown key 'helices'"),
+        ("elements: [A, B]\n", "x.yaml: elements is a mapping of reference to name"),
+        ("elements:\n  res:A:3-18:\n", "x.yaml: 'res:A:3-18' is not a name"),
+        ("stems:\n  A:1: {x: 1}\n", "x.yaml: 'A:1' is not a name"),
+    ):
+        with pytest.raises(ValueError, match=re.escape(said)):
+            parse_names(text, "x.yaml")

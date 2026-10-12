@@ -126,11 +126,57 @@ COMPOSITES: dict[str, tuple[tuple[str, ...], Callable, Callable]] = {
 }
 
 
+NAME_KEYWORDS = ("deposited", "beta")  # names.KEYWORDS (the pipeline stays out of this module)
+
+
+def _names_parts(names) -> tuple:
+    keywords = [n for n in names or [] if n in NAME_KEYWORDS]
+    return (keywords[-1] if keywords else "generic",)  # a later spec wins
+
+
+def _domains_parts(text) -> tuple:
+    return (str(text or "").strip() == "auto",)
+
+
+DERIVED: dict[str, tuple[tuple[str, ...], Callable]] = {  # widget keys derived like a composite's, set by their
+    "names": (("names__kw",), _names_parts),  # own callbacks (choose_names, switch_domains)
+    "domains": (("domains__auto",), _domains_parts),
+}
+
+
+def _noted(ss: MutableMapping, key: str) -> None:
+    ss["_synced"] = {**(ss.get("_synced") or {}), key: ss[key]}
+    ss["last_changed"] = key
+
+
+def choose_names(ss: MutableMapping) -> None:
+    """The Element names choice (`names__kw`: generic, deposited or beta): that keyword (none for generic), then the
+    names files, which win over it."""
+    files = [n for n in ss.get("names") or [] if n not in NAME_KEYWORDS]
+    kw = ss.get("names__kw")
+    ss["names"] = ([kw] if kw in NAME_KEYWORDS else []) + files
+    _noted(ss, "names")
+
+
+def switch_domains(ss: MutableMapping) -> None:
+    """The Automatic domains switch (`domains__auto`): on, `auto` (the domains typed so far kept in
+    `domains__manual`); off, those domains back."""
+    if ss.get("domains__auto"):
+        if not _domains_parts(ss.get("domains"))[0]:
+            ss["domains__manual"] = ss.get("domains") or ""
+        ss["domains"] = "auto"
+    else:
+        ss["domains"] = ss.get("domains__manual", "")
+    _noted(ss, "domains")
+
+
 def sync_composites(ss: MutableMapping) -> None:
-    """Derive each composite's widget keys from its canonical value, but only when that value changed since it was
-    last derived or composed: a half-made choice (a mode picked, nothing typed yet) is never snapped back."""
+    """Derive each composite's widget keys (and DERIVED's) from its canonical value, but only when that value changed
+    since it was last derived or composed: a half-made choice (a mode picked, nothing typed yet) is never snapped
+    back."""
     synced = dict(ss.get("_synced") or {})
-    for key, (derived, parts, _) in COMPOSITES.items():
+    every = {**{key: (derived, parts) for key, (derived, parts, _) in COMPOSITES.items()}, **DERIVED}
+    for key, (derived, parts) in every.items():
         if key not in ss or (key in synced and synced[key] == ss[key]):
             continue
         for k, v in zip(derived, parts(ss[key])):
@@ -156,8 +202,9 @@ EDITORS = {
     "mark": ("element", "colour"),
     "domains": ("name", "ranges"),
 }
-NEEDED = {"swap": ("a", "b"), "rename": ("element", "name")}  # a table row is written once these are filled
-# (else its first column): a swap of one element or a rename with no name would be an error
+NEEDED = {"swap": ("a", "b"), "rename": ("element", "name"), "domains": ("name", "ranges")}  # a table row is
+# written once these are filled (else its first column): a swap of one element, a rename with no name or a domain
+# with no ranges would be an error
 _RANGE_IN_CHAIN = re.compile(r"[A-Za-z0-9]+:-?\d+[A-Z]?(--?\d+[A-Z]?)?")
 _RANGE = re.compile(r"-?\d+[A-Z]?(--?\d+[A-Z]?)?")
 
@@ -375,6 +422,7 @@ CONTROLS: dict[str, tuple[str, str, tuple[str, ...]]] = {
     "rename": ("Rename", _LAYOUT, ("rename__as_text", "rename")),
     "mark": ("Mark", _LAYOUT, ("mark__as_text", "mark")),
     "domains": ("Domains", _LAYOUT, ("domains__auto", "domains__as_text", "domains")),
+    "domains_from_file": ("Domains", _LAYOUT, ("domains__auto", "domains__as_text", "domains")),
     "domain_colours": ("Colour by domain", _LAYOUT, ("domain_colours",)),
     "domain_bar": ("Domain bar", _LAYOUT, ("domain_bar",)),
     # Conservation & UniProt

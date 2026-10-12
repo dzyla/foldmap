@@ -1,5 +1,7 @@
 """The sidebar: a short essentials list, then sections for everything else."""
 
+from pathlib import Path
+
 import pytest
 
 pytest.importorskip("streamlit")
@@ -73,7 +75,7 @@ def test_reset_keeps_what_names_this_structure():
     }
     for key in ("rename", "mark"):
         as_text(at, key, kept[key])
-    at.text_area(key="domains").set_value(kept["domains"])
+    as_text(at, "domains", kept["domains"])
     at.text_input(key="backbone_colors").set_value(kept["backbone_colors"])
     at.multiselect(key="chains__pick").set_value(["A", "B"])
     at.selectbox(key="assembly").select("asu")
@@ -360,3 +362,123 @@ def test_editor_tables_show_the_rows_of_the_text():
     choices = [("res:A:3-11", "α1 · A 3–11"), ("res:A:60-79", "α3 · A 60–79")]
     rows = [{"a": "α1", "b": "res:A:60-79"}]
     assert element_options("swap", rows, choices) == ["res:A:3-11", "res:A:60-79", "α1"]  # typed labels kept
+
+
+# ---------------------------------------------------------------------------------------------- names and domains
+GLOBIN = Path(__file__).parents[1] / "docs" / "names" / "2HHB-globin.yaml"
+
+
+def test_conventional_names_are_a_choice():
+    at = opened(DATA / "2HHB.cif")
+    generic = svg_of(at)
+    at.segmented_control(key="names__kw").set_value("deposited").run()
+    assert at.session_state["names"] == ["deposited"] and svg_of(at) != generic and not at.exception
+
+
+def test_a_names_file_can_be_uploaded():
+    from pathlib import Path
+
+    yaml_file = Path(__file__).parents[1] / "docs" / "names" / "2HHB-globin.yaml"
+    at = opened(DATA / "2HHB.cif")
+    generic = svg_of(at)
+    at.file_uploader(key="names_upload").set_value(("2HHB-globin.yaml", yaml_file.read_bytes(), "text/yaml")).run()
+    assert not at.exception and at.session_state["names"][-1].endswith(".yaml") and svg_of(at) != generic
+
+
+def test_domains_automatic_and_by_table():
+    at = opened(DATA / "2LZM.cif")
+    at.toggle(key="domains__auto").set_value(True).run()
+    assert at.session_state["domains"] == "auto" and not at.exception
+    at.toggle(key="domains__auto").set_value(False).run()
+    as_text(at, "domains", "N=res:A:1-60\nC=res:A:61-164")
+    assert at.session_state["domains"] == "N=res:A:1-60\nC=res:A:61-164"
+    assert 'id="domain-bar:' in svg_of(at)
+    at.segmented_control(key="domain_bar").set_value("off").run()
+    assert 'id="domain-bar:' not in svg_of(at)
+
+
+def test_a_names_file_keeps_the_keyword_shows_its_name_and_can_be_removed():
+    at = opened(DATA / "2HHB.cif")
+    at.segmented_control(key="names__kw").set_value("beta").run()
+    at.file_uploader(key="names_upload").set_value(("my globin.yaml", GLOBIN.read_bytes(), "text/yaml")).run()
+    names = at.session_state["names"]
+    assert names[0] == "beta" and Path(names[1]).is_file() and len(names) == 2 and not at.exception
+    assert "names_upload" not in widget_keys(at.sidebar, skip=())  # a file is set: its name and Remove instead
+    assert any(visible(c.value) == "Names file: my globin.yaml" for c in at.caption)
+    at.button(key="names_clear").click().run()
+    assert at.session_state["names"] == ["beta"] and "names_upload" in widget_keys(at.sidebar, skip=())
+    at.segmented_control(key="names__kw").set_value("generic").run()
+    assert at.session_state["names"] == [] and not at.exception
+
+
+@pytest.mark.parametrize(
+    "data, said",
+    [
+        (b"- A\n- B\n", "a names file is a mapping with the keys elements and stems"),
+        (b"elements: [A, B\n", "not valid YAML"),
+        (b"helices:\n  res:A:3-18: A\n", "unknown key 'helices'"),
+        (b"elements:\n  res:A:3-18: [A, B]\n", "'res:A:3-18' is not a name"),
+        (b"elements:\n  r1: &a [x, x, x]\n  r2: &b [*a, *a, *a]\n  r3: [*b, *b, *b]\n", "'r1' is not a name"),
+        (b"#" * 200_001, "at most 100 kB"),
+        (b"\xff\xfe", "UTF-8"),
+    ],
+)
+def test_an_upload_that_is_not_a_names_file_is_an_error_and_changes_nothing(data, said):
+    at = opened(DATA / "2HHB.cif")
+    at.segmented_control(key="names__kw").set_value("deposited").run()
+    before = svg_of(at)
+    at.file_uploader(key="names_upload").set_value(("bad.yaml", data, "text/yaml")).run()
+    assert not at.exception and at.session_state["names"] == ["deposited"] and svg_of(at) == before
+    assert any(said in visible(e.value) for e in at.error), [e.value for e in at.error]
+
+
+def test_a_names_file_s_keys_and_file_name_are_shown_as_plain_text(monkeypatch, tmp_path):
+    from app_helpers import rendered_text, seed_cache
+
+    monkeypatch.setenv("FOLDMAP_APP_LOCAL_FILES", "0")
+    seed_cache(monkeypatch, tmp_path, "2HHB")
+    at = opened("2HHB")
+    up = b"elements:\n  '[x](https://evil.example) ![i](https://evil.example/i.png)': A\n"
+    at.file_uploader(key="names_upload").set_value(("[n](https://evil.example).yaml", up, "text/yaml")).run()
+    text = rendered_text(at)
+    assert not at.exception and at.error and "](" not in text and "uploads" not in text
+
+
+def test_two_elements_of_a_chain_named_alike_is_an_error_naming_the_file():
+    """Duplicate names within a chain are the names module's error, shown with the uploaded file's own name."""
+    at = opened(DATA / "2HHB.cif")
+    before = svg_of(at)
+    dup = b"elements:\n  res:A:3-18: X\n  res:A:20-35: X\n"
+    at.file_uploader(key="names_upload").set_value(("dup.yaml", dup, "text/yaml")).run()
+    assert not at.exception and svg_of(at) == before
+    text = visible(at.error[0].value)
+    assert text.startswith("dup.yaml:") and "one name, one element" in text and "upload-" not in text
+    assert text.endswith("Check Element names (Edit layout).")
+
+
+def test_names_and_domains_controls_follow_a_layout_file_and_the_structure():
+    at = opened(DATA / "2LZM.cif")
+    at.segmented_control(key="names__kw").set_value("deposited").run()
+    at.toggle(key="domains__auto").set_value(True).run()
+    up = ("layout.yaml", b"foldmap: 1\nnames: [beta]\ndomains: {N: [res:A:1-60]}\n", "application/x-yaml")
+    at.file_uploader(key="layout_upload").set_value(up).run()
+    ss = at.session_state
+    assert not at.exception and ss["names"] == ["beta"] and ss["names__kw"] == "beta"
+    assert ss["domains"] == "N=res:A:1-60" and ss["domains__auto"] is False
+    at.toggle(key="domains__auto").set_value(True).run()
+    at.button(key="new_structure").click().run()
+    at.text_input(key="source").input(str(DATA / "1UBQ.cif"))
+    at.button(key="load").click().run()
+    ss = at.session_state
+    assert not at.exception and ss["names"] == [] and ss["names__kw"] == "generic"
+    assert ss["domains"] == "" and ss["domains__auto"] is False and "domains__manual" not in ss
+
+
+def test_domain_colours_and_bar_only_with_domains():
+    at = opened(DATA / "2LZM.cif")
+    keys = widget_keys(at.sidebar, skip=())
+    assert {"names__kw", "names_upload", "domains__auto", "domains__as_text"} <= set(keys)
+    assert "domain_bar" not in keys and "domain_colours" not in keys  # nothing to colour or bar without domains
+    at.toggle(key="domains__auto").set_value(True).run()
+    keys = widget_keys(at.sidebar, skip=())
+    assert {"domain_bar", "domain_colours"} <= set(keys) and "domains__as_text" not in keys

@@ -203,16 +203,34 @@ def _primed(name: str, k: int) -> str:
 # ---------------------------------------------------------------------------------------------- YAML files
 
 
-def _file_names(path: Path, layout: Layout, sses, nucleic, whole, chains) -> tuple[dict[str, str], dict[int, str]]:
+_SCALAR = (str, int, float)  # a reference or a name: YAML may read `1` or `1.5` as a number
+
+
+def parse_names(text: str, where: str) -> dict:
+    """A names file's text as its mapping ({} when empty), checked: the keys elements and stems only, each a mapping
+    of a reference to a name (a single value, never a list or a mapping, so YAML aliases expand nothing). `where`
+    names the file in the messages. The references are checked against the figure later (load_names)."""
     try:
-        doc = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+        doc = yaml.safe_load(text) or {}
     except yaml.YAMLError as err:
-        raise ValueError(f"{path}: not valid YAML: {err}") from err
+        raise ValueError(f"{where}: not valid YAML: {err}") from err
     if not isinstance(doc, dict):
-        raise ValueError(f"{path}: a names file is a mapping with the keys elements and stems")
+        raise ValueError(f"{where}: a names file is a mapping with the keys elements and stems")
     for key in doc:
         if key not in ("elements", "stems"):
-            raise ValueError(f"{path}: unknown key {key!r}; a names file has elements and stems")
+            raise ValueError(f"{where}: unknown key {key!r}; a names file has elements and stems")
+    for key in ("elements", "stems"):
+        part = doc.get(key) or {}
+        if not isinstance(part, dict):
+            raise ValueError(f"{where}: {key} is a mapping of reference to name, e.g. res:A:3-18: A")
+        for ref, name in part.items():
+            if not isinstance(ref, _SCALAR) or not isinstance(name, _SCALAR):
+                raise ValueError(f"{where}: {str(ref)[:80]!r} is not a name (give each reference one name)")
+    return doc
+
+
+def _file_names(path: Path, layout: Layout, sses, nucleic, whole, chains) -> tuple[dict[str, str], dict[int, str]]:
+    doc = parse_names(path.read_text(encoding="utf-8"), str(path))
     chain_of = {s.id: s.chain for s in sses}
     elements: dict[str, str] = {}
     given: dict[tuple[str, str], tuple[str, str]] = {}  # (chain, name) -> (ref, element) that took it

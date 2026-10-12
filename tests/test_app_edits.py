@@ -7,6 +7,7 @@ import pytest
 
 from foldmap.app_edits import (
     COMPOSITES,
+    DERIVED,
     EDITORS,
     apply_table,
     compose_into,
@@ -249,6 +250,8 @@ def test_every_setting_has_a_control_entry():
         assert (label == "" and section == "" and widgets == ()) == (key in HIDDEN_LAYOUT), key
     for key, (derived, _, _) in COMPOSITES.items():
         assert set(derived) <= set(CONTROLS[key][2]), key
+    for key, (derived, _) in DERIVED.items():
+        assert set(derived) <= set(CONTROLS[key][2]), key
     assert CONTROLS["swap"] == ("Swap", "Edit layout", ("swap__as_text", "swap"))
     assert CONTROLS["msa_path"] == ("Alignment", "Conservation & UniProt", ("msa_upload",))
     assert CONTROLS["names"] == ("Element names", "Edit layout", ("names__kw", "names_upload"))
@@ -298,3 +301,49 @@ def test_shown_text_cannot_autolink_show_icons_or_headings_and_names_no_file_url
     assert "\n===" not in shown("Title\n===") and "\n---" not in shown("Title\n---")
     assert _visible(shown("read file:///home/dzyla/x.cif and file:///C:/Users/me/y.cif")) == "read x.cif and y.cif"
     assert _visible(shown("at \\\\server\\share\\z.cif")) == "at z.cif"
+
+
+# ---------------------------------------------------------------------------------------------- names, domains
+def test_names_keyword_is_derived_and_chosen_before_the_files():
+    from foldmap import names
+    from foldmap.app_edits import NAME_KEYWORDS, choose_names
+
+    assert NAME_KEYWORDS == names.KEYWORDS  # hard-coded in app_edits (the pipeline stays out of it)
+    ss = {"names": ["/x/a.yaml", "deposited"]}
+    sync_composites(ss)
+    assert ss["names__kw"] == "deposited"
+    ss["names__kw"] = "beta"
+    choose_names(ss)
+    assert ss["names"] == ["beta", "/x/a.yaml"] and ss["last_changed"] == "names"
+    ss["names__kw"] = "generic"
+    choose_names(ss)
+    assert ss["names"] == ["/x/a.yaml"]
+    ss["names"] = []  # a layout file or a new structure
+    sync_composites(ss)
+    assert ss["names__kw"] == "generic"
+
+
+def test_automatic_domains_keep_the_text_typed_before():
+    from foldmap.app_edits import switch_domains
+
+    ss = {"domains": "N=res:A:1-60"}
+    sync_composites(ss)
+    assert ss["domains__auto"] is False
+    ss["domains__auto"] = True
+    switch_domains(ss)
+    assert ss["domains"] == "auto" and ss["domains__manual"] == "N=res:A:1-60" and ss["last_changed"] == "domains"
+    ss["domains__auto"] = False
+    switch_domains(ss)
+    assert ss["domains"] == "N=res:A:1-60"
+    ss["domains"] = "auto"  # a layout file
+    sync_composites(ss)
+    assert ss["domains__auto"] is True
+
+
+def test_a_domain_row_waits_for_its_name_and_its_ranges():
+    ss = {"domains": "", "domains__table_0": {"added_rows": [{"name": "N"}]}}
+    apply_table(ss, "domains")
+    assert ss["domains"] == "" and ss["domains__blank"] == [{"name": "N", "ranges": ""}]
+    ss["domains__table_1"] = {"edited_rows": {0: {"ranges": "A:1-60"}}}
+    apply_table(ss, "domains")
+    assert ss["domains"] == "N=res:A:1-60" and ss["domains__blank"] == []

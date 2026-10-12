@@ -318,9 +318,11 @@ def draw_job(path, settings_json: str, eager_after: float | None = None) -> dict
     `eager_after` seconds, its PNG and PDF come with it (a job process cannot hand back the figure itself)."""
     from . import app, render
     from . import spec as spec_mod
+    from .cli import stale_domains_note
 
     t0 = time.perf_counter()
-    drawn = spec_mod.draw_spec(app.spec_of(path, json.loads(settings_json)))
+    spec = app.spec_of(path, json.loads(settings_json))
+    drawn = spec_mod.draw_spec(spec)
     svg = render.save_svg(drawn.figure)
     seconds = time.perf_counter() - t0
     files = {}
@@ -337,6 +339,7 @@ def draw_job(path, settings_json: str, eager_after: float | None = None) -> dict
         "chains": chains,
         "na_chains": na_chains,
         "summary": summary_of(drawn),
+        "domains_note": stale_domains_note(spec.domains, drawn.sses),  # a layout file's stale ids, dropped
         "seconds": seconds,
         "files": files,
     }

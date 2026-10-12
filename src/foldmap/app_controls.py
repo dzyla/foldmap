@@ -1,7 +1,8 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 # Copyright (C) 2026 Dawid Zyla. Additional terms (AGPL-3.0 section 7(b)): see NOTICE.
 """The app's sidebar sections: how each settings widget is made (its key, kept while hidden, the setting it names
-when the figure fails) and the sections Style, Show, Chains & assembly and Edit layout.
+when the figure fails) and the sections Style, Show, Chains & assembly and Edit layout (with the element names and
+the domains).
 
 Streamlit comes in as an argument (app.main imports it); pandas only inside editor_frame (Streamlit's own
 dependency, for the editors' tables)."""
@@ -12,13 +13,16 @@ from collections.abc import MutableMapping
 
 from foldmap.app_edits import (
     EDITORS,
+    NAME_KEYWORDS,
     SYMMETRIES,
     apply_table,
+    choose_names,
     compose_into,
     display,
     element_choices,
     hex_colour,
     shown,
+    switch_domains,
     sync_composites,
     table_rows,
 )
@@ -283,19 +287,28 @@ def highlight_block(st, ss: MutableMapping) -> None:
 
 FOLD_TEMPLATE = {"auto": "βα row", "off": "as projected"}
 HELIX_ON_SHEET = {"off": "beside the sheet", "auto": "over the sheet"}
-EXAMPLE = {"swap": "α1,α3", "move": "α2=1,-2", "rename": "α1=Gd", "mark": "α3=#2ca02c, β1"}  # the syntax, as text
+EXAMPLE = {  # the syntax, as text
+    "swap": "α1,α3",
+    "move": "α2=1,-2",
+    "rename": "α1=Gd",
+    "mark": "α3=#2ca02c, β1",
+    "domains": "N=res:A:1-80\nC=α3,α4",
+}
 EDITOR_HELP = {
     "swap": "two elements trade places · as text: α1,α3 (several: separate with ;)",
     "move": "shift an element by dx, dy in page units · as text: α2=1,-2",
     "rename": "a new name for an element · as text: α1=Gd or res:A:167-182=Gd",
     "mark": "elements drawn in a colour, or the theme's mark colour when none is given · as text: "
     "G, A:G=#2ca02c, #3, res:150-159=red",
+    "domains": "a domain's elements are kept together, drawn on a panel with its name · as text: one per line, "
+    "NAME=REF[,REF...], e.g. N=res:A:1-80",
 }
 
 
 def layout_section(st, ss: MutableMapping) -> None:
-    """Edit layout: the arrangement, rotation and element sizes, the two fold options, then the editors (swap,
-    move, rename, mark), each a table of drawn elements or, "as text", the command line's syntax."""
+    """Edit layout: the arrangement, rotation and element sizes, the two fold options, the element names (before the
+    editors: a rename wins over them), then the editors (swap, move, rename, mark), each a table of drawn elements
+    or, "as text", the command line's syntax, and the domains."""
     with st.expander("Edit layout", key="sec_layout"):
         segmented(
             st,
@@ -326,6 +339,7 @@ def layout_section(st, ss: MutableMapping) -> None:
             format_func=HELIX_ON_SHEET.get,
             help="a helix packed on a sheet's face stays beside the sheet, or is drawn over it",
         )
+        names_block(st, ss)
         editor(st, ss, "swap", "Swap", {"a": "Element", "b": "with"})
         number, text = st.column_config.NumberColumn, st.column_config.TextColumn
         offsets = {"dx": number("dx", step=0.5, width=NARROW), "dy": number("dy", step=0.5, width=NARROW)}
@@ -333,16 +347,137 @@ def layout_section(st, ss: MutableMapping) -> None:
         editor(st, ss, "rename", "Rename", {"element": "Element", "name": text("Name", width=CELL)})
         colour_column = text("Colour", validate=r"^(#[0-9a-fA-F]{6}|[a-z]+)?$", width=CELL)
         editor(st, ss, "mark", "Mark", {"element": "Element", "colour": colour_column})
-        st.text_area(  # interim: Task 10's domains block
-            "Domains",
-            height=80,
-            help="one per line, NAME=REF[,REF...], e.g. ZPN=res:A:331-440; or just 'auto'",
-            **setting(ss, "domains"),
+        domains_block(st, ss)
+
+
+NAMES = {"generic": "generic (α1, A)", "deposited": "deposited (file's own)", "beta": "β1…βn"}
+NAMES_HELP = (
+    "conventional names · generic: foldmap's own labels · deposited: the helix ids the file itself gives (a globin's "
+    "A–H) · β1…βn: strands numbered in sequence, each helix of a βα row named after the strand before it · a names "
+    "file (YAML) names elements by residue range and nucleic-acid stems by one nucleotide they pair, and wins over "
+    "the choice above; a rename wins over both"
+)
+NAMES_FILE_MAX = 100_000  # bytes: a names file is a few kB
+
+
+def names_block(st, ss: MutableMapping) -> None:
+    """Element names (--names): a keyword, and a names file uploaded (then its name and Remove instead of the
+    uploader). A layout file's names file that is not on this machine is asked for here."""
+    segmented(
+        st,
+        "Element names",
+        NAMES,
+        {"key": "names__kw", "on_change": choose_names, "args": (ss,), "persist_state": "session"},
+        format_func=NAMES.get,
+        help=NAMES_HELP,
+    )
+    files = [n for n in ss.get("names") or [] if n not in NAME_KEYWORDS]
+    if files:
+        with st.container(horizontal=True, vertical_alignment="center", gap="small", key="names_file"):
+            st.caption(
+                f"Names file: {shown(', '.join(names_file_name(ss, f) for f in files), limit=80)}", width="content"
+            )
+            st.button("Remove", key="names_clear", type="tertiary", on_click=clear_names, args=(ss,), width="content")
+    else:
+        st.file_uploader(
+            "Names file (YAML)",
+            type=["yaml", "yml"],
+            key="names_upload",
+            on_change=store_names,
+            args=(ss,),
+            max_upload_size=1,
+            help="elements: {res:A:3-18: A, ...} and stems: {A:1: acceptor, ...} (docs/names has examples)",
+        )
+    if ss.get("names_error"):
+        st.error(shown(ss["names_error"]))
+    for p in ss.get("names_missing") or []:
+        st.warning(f"The layout file's names file {shown(p, paths=False)} is not on this machine; upload it here.")
+
+
+def names_file_name(ss: MutableMapping, path: str) -> str:
+    """What a names file is called: the name it was uploaded with, else its file name."""
+    kept, name = ss.get("names_uploaded") or ("", "")
+    return name if path == kept else path.replace("\\", "/").rsplit("/", 1)[-1]
+
+
+def store_names(ss: MutableMapping) -> None:
+    """The names uploader's callback: an uploaded names file, untrusted, is size-capped and read with
+    names.parse_names (yaml.safe_load, a mapping of references to names) before it is kept (fetch.keep_upload) and
+    used: the names are the keyword, then this file. Else names_error, and nothing changes."""
+    from foldmap.fetch import keep_upload
+    from foldmap.names import parse_names
+
+    ss["last_changed"], ss["names_error"] = "names", ""
+    up = ss.get("names_upload")
+    if up is None:
+        return
+    data = up.getvalue()
+    try:
+        if len(data) > NAMES_FILE_MAX:
+            raise ValueError(f"{up.name}: a names file is at most {NAMES_FILE_MAX // 1000} kB")
+        parse_names(data.decode("utf-8"), up.name)
+        kept = str(keep_upload(up.name, data, (".yaml", ".yml")))
+    except UnicodeDecodeError:
+        ss["names_error"] = f"{up.name}: a names file is UTF-8 text"
+        return
+    except ValueError as err:
+        ss["names_error"] = str(err)
+        return
+    except OSError:
+        ss["names_error"] = "The names file could not be stored on the server; try again."
+        return
+    ss["names"] = [*(n for n in ss.get("names") or [] if n in NAME_KEYWORDS), kept]
+    ss.update(names_uploaded=(kept, up.name[:120]), names_missing=[])
+    ss["_synced"] = {**(ss.get("_synced") or {}), "names": ss["names"]}
+
+
+def clear_names(ss: MutableMapping) -> None:
+    """Remove: the names file goes, the keyword stays."""
+    ss["names"] = [n for n in ss.get("names") or [] if n in NAME_KEYWORDS]
+    ss.pop("names_uploaded", None)
+    ss.update(names_error="", last_changed="names", _synced={**(ss.get("_synced") or {}), "names": ss["names"]})
+
+
+def domains_block(st, ss: MutableMapping) -> None:
+    """Domains: automatic, or a table of names and residue ranges (or, as text, the command line's lines); with
+    domains, colour by domain and the domain bar."""
+    st.toggle(
+        "Automatic domains",
+        key="domains__auto",
+        on_change=switch_domains,
+        args=(ss,),
+        persist_state="session",
+        help="found from how the elements pack, chain by chain (copies of a protein alike)",
+    )
+    if not ss.get("domains__auto"):
+        text = st.column_config.TextColumn
+        ranges = text("Ranges", width=CELL + 10, help="residue ranges and elements, e.g. A:1-80, α3")
+        editor(st, ss, "domains", "Domains", {"name": text("Name", width=CELL - 10), "ranges": ranges})
+    if ss.get("domains") or ss.get("uniprot_domains"):
+        st.toggle(
+            "Colour by domain",
+            help="elements in eight colour-blind-safe tones, one per domain, instead of the chain colours (a theme "
+            "with its own colouring keeps it)",
+            **setting(ss, "domain_colours"),
+        )
+        segmented(
+            st,
+            "Domain bar",
+            CHOICES["domain_bar"],
+            setting(ss, "domain_bar"),
+            help="a bar under the figure with each chain's domains in residue order · auto: for 2 or more domains · "
+            "on: for any · off: never",
         )
 
 
 CELL, NARROW = 80, 50  # column widths (px): two cells, or a narrower element and two numbers, fit the sidebar
-ELEMENT_COLUMNS = {"swap": ("a", "b"), "move": ("element",), "rename": ("element",), "mark": ("element",)}
+ELEMENT_COLUMNS = {  # domains: names and ranges are typed
+    "swap": ("a", "b"),
+    "move": ("element",),
+    "rename": ("element",),
+    "mark": ("element",),
+    "domains": (),
+}
 
 
 def element_options(kind: str, rows: list[dict], choices: list[tuple[str, str]]) -> list[str]:
@@ -372,7 +507,8 @@ def editor(st, ss: MutableMapping, kind: str, label: str, columns: dict, element
         st.markdown(f"**{label}**", help=EDITOR_HELP[kind], width="stretch")
         st.toggle("as text", key=f"{kind}__as_text", persist_state="session")
     if ss.get(f"{kind}__as_text"):
-        st.text_input(label, placeholder=EXAMPLE[kind], label_visibility="collapsed", **setting(ss, kind))
+        field = st.text_area if kind == "domains" else st.text_input  # domains: one per line
+        field(label, placeholder=EXAMPLE[kind], label_visibility="collapsed", **setting(ss, kind))
     else:
         rows = table_rows(ss, kind)
         choices = element_choices(ss.get("elements") or [])
@@ -396,7 +532,7 @@ def editor(st, ss: MutableMapping, kind: str, label: str, columns: dict, element
             args=(ss, kind),
         )
     if ss.get(kind):
-        st.caption(f"Writes: {shown(ss[kind])}")
+        st.caption(f"Writes: {shown(ss[kind])}".replace("\n", "  \n"))  # a line each (domains)
 
 
 def contact_lines(report: dict | None, most: int = 10) -> list[str]:

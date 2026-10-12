@@ -185,7 +185,7 @@ def test_app_layout_file_round_trips_through_the_app():
         "msa_reference": "1UBQ_A",
         "flip_v": True, "symmetry_tol": 2.5, "up": [0, 1, 0], "view": [0, 0, 1],
         "rename": "res:A:23-34=Hx", "swap": "", "move": "", "dna": False,
-        "domains": "N=res:A:1-30", "rotate": 30, "title": "Round trip",
+        "domains": "N=res:A:1-30", "rotate": 30, "title": "Round trip", "names": ["beta"],
     }  # fmt: skip
     text = yaml.safe_dump(layout_document(DATA / "1UBQ.cif", settings), sort_keys=False)
     at = load(app_test(), DATA / "1UBQ.cif")
@@ -195,6 +195,7 @@ def test_app_layout_file_round_trips_through_the_app():
     assert ss["theme"] == "trace" and ss["membrane"] == "flip" and ss["focus"] == "none" and ss["chains"] == "A"
     assert ss["msa_path"] == msa and ss["msa_reference"] == "1UBQ_A" and ss["dna"] is False
     assert ss["rotate"] == 30 and ss["title"] == "Round trip" and "Hx" in ss["rename"] and "N=" in ss["domains"]
+    assert ss["names"] == ["beta"]
     from foldmap.app import LAYOUT_DEFAULTS, STYLE_FIELDS
 
     again = layout_document(
@@ -204,6 +205,55 @@ def test_app_layout_file_round_trips_through_the_app():
     for key in ("membrane", "focus", "chains", "msa", "msa_reference", "dna", "flip_v", "symmetry_tol", "up", "view"):
         assert again["layout"][key] == first["layout"][key], key
     assert again["domains"] == first["domains"] and again["edits"] == first["edits"]
+    assert again["names"] == first["names"]
+
+
+def test_layout_file_names_survive_the_round_trip(monkeypatch):
+    from foldmap.app import layout_document, settings_from_document
+
+    doc = layout_document(DATA / "2HHB.cif", {"theme": "publication", "names": ["deposited"]})
+    assert doc["names"] == ["deposited"] and settings_from_document(doc)["names"] == ["deposited"]
+    monkeypatch.setenv("FOLDMAP_APP_LOCAL_FILES", "0")
+    back = settings_from_document({"names": ["deposited", "/srv/x.yaml"]})
+    assert back["names"] == ["deposited"] and back["names_missing"] == ["/srv/x.yaml"]
+
+
+def test_layout_file_settings_share_no_list_with_the_defaults():
+    from foldmap.app import LAYOUT_DEFAULTS, settings_from_document
+
+    out = settings_from_document({})
+    out["names"].append("beta")
+    assert LAYOUT_DEFAULTS["names"] == [] and settings_from_document({})["names"] == []
+
+
+def test_a_layout_file_names_file_missing_here_is_a_warning_in_the_names_block():
+    import yaml
+
+    at = load(app_test(), DATA / "2HHB.cif")
+    up = ("layout.yaml", yaml.safe_dump({"foldmap": 1, "names": ["deposited", "/nowhere/n.yaml"]}).encode(), "x")
+    at.file_uploader(key="layout_upload").set_value(up).run()
+    assert not at.exception and not at.error and at.session_state["names"] == ["deposited"]
+    assert any("names file /nowhere/n.yaml is not on this machine; upload it here." in _visible(w.value)
+               for w in at.warning)  # fmt: skip
+    at.file_uploader(key="names_upload").set_value(
+        ("2HHB-globin.yaml", (Path(__file__).parents[1] / "docs/names/2HHB-globin.yaml").read_bytes(), "text/yaml")
+    ).run()
+    assert not at.exception and not at.warning and len(at.session_state["names"]) == 2
+
+
+def test_layout_file_domains_naming_elements_the_structure_lacks_are_a_warning():
+    """A layout file outlives its structure: element ids it names that this one lacks are dropped with a warning
+    (as on the command line); typed in the app, the same ids are an error."""
+    import yaml
+
+    doc = {"foldmap": 1, "domains": {"N": ["A:3-11", "A:999-1005"], "C": ["A:60-79"]}}
+    at = load(app_test(), DATA / "2LZM.cif")
+    at.file_uploader(key="layout_upload").set_value(("layout.yaml", yaml.safe_dump(doc).encode(), "x")).run()
+    assert not at.exception and not at.error and 'id="domain-bar:' in svg_of(at)
+    warned = [_visible(w.value) for w in at.warning]
+    assert any("domains name element(s) this structure does not have, dropped: A:999-1005" in w for w in warned)
+    as_text(at, "domains", at.session_state["domains"] + " ")  # typed now: an error, as on the command line
+    assert any("'A:999-1005' is no element" in _visible(e.value) for e in at.error)
 
 
 def test_app_sequence_view_with_the_conservation_theme(tmp_path):
@@ -446,7 +496,8 @@ def test_the_look_carries_to_the_next_structure_and_its_parts_do_not():
     at.segmented_control(key="pane").set_value("Figure").run()
     as_text(at, "swap", "α1")  # a failing setting: the popover offers the last good figure
     assert at.session_state["figure_failed"]
-    at.session_state["names__kw"] = ["beta"]  # (Task 10)
+    at.segmented_control(key="names__kw").set_value("beta").run()
+    assert at.session_state["names"] == ["beta"]
     at.button(key="new_structure").click().run()
     assert at.session_state["stage"] == "load" and "id" not in at.query_params
     at.text_input(key="source").input(str(DATA / "1UBQ.cif"))
@@ -454,7 +505,7 @@ def test_the_look_carries_to_the_next_structure_and_its_parts_do_not():
     ss = at.session_state
     assert not at.exception and ss["stage"] == "edit" and ss["name"] == "1UBQ"
     assert ss["theme"] == "trace" and ss["font_scale"] == 1.4 and ss["mark"] == ""
-    assert "seq_chain" not in ss and "names__kw" not in ss and ss["auto_redraw"] is True
+    assert "seq_chain" not in ss and ss["names__kw"] == "generic" and ss["names"] == [] and ss["auto_redraw"] is True
     assert "figure_failed" not in ss and "seq_drawn" not in ss and "page_drawn" not in ss and ss["pane"] == "Figure"
     at.segmented_control(key="pane").set_value("Sequence").run()
     assert not at.exception and "seq_chain" not in [s.key for s in at.selectbox]
@@ -656,7 +707,7 @@ def test_a_pipeline_crash_is_a_message_not_a_traceback(monkeypatch, caplog):
     fresh_caches()
     at = opened(DATA / "2LZM.cif")
     before = svg_of(at)
-    at.text_area(key="domains").set_value("N=A:1-60").run()
+    as_text(at, "domains", "N=A:1-60")
     assert not at.exception and svg_of(at) == before
     assert any("Check Domains (Edit layout)." in e.value for e in at.error)
     real = app_jobs.draw_job
@@ -690,7 +741,7 @@ def test_a_long_crash_message_keeps_the_report_link_and_the_hint(monkeypatch):
 
     monkeypatch.setattr(app_jobs, "draw_job", crash)
     at = opened(DATA / "2LZM.cif")
-    at.text_area(key="domains").set_value("N=res:A:1-60").run()
+    as_text(at, "domains", "N=res:A:1-60")
     text = at.error[0].value
     assert not at.exception and "x" * 600 not in text
     assert text.endswith(

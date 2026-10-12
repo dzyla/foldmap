@@ -30,8 +30,9 @@ from foldmap.app_edits import chain_choices, shown
 from foldmap.app_views import Workspace, download_menu, explorer_view, figure_view, said, sequence_view
 from foldmap.cli import _adjustments, _domain_spec
 from foldmap.fetch import ALIGNMENT_SUFFIXES, fetch, keep_upload, source_id
+from foldmap.names import KEYWORDS as NAME_KEYWORDS
 from foldmap.render import save, save_svg
-from foldmap.spec import FigureSpec, draw_spec, parse_flag, parse_protomers, parse_vector
+from foldmap.spec import FigureSpec, SavedDomains, draw_spec, parse_flag, parse_protomers, parse_vector
 from foldmap.spec import layout_document as spec_document
 from foldmap.style import _KEY_ALIASES, CHOICES, THEMES, Style
 from foldmap.symmetry import TOLERANCE
@@ -78,7 +79,9 @@ LAYOUT_DEFAULTS = {
     "msa_path": "",
     "msa_reference": "",
     "domains": "",
+    "domains_from_file": "",  # the domains text a layout file gave, while unchanged: ids it names may be stale
     "chains": "",
+    "names": [],  # --names: deposited, beta or a YAML file (later ones win)
     # layout-file options the app has no control for: kept as loaded and saved again
     "flip_v": False,
     "dna": True,
@@ -115,6 +118,8 @@ def layout_options(settings: dict) -> dict:
 
     lines = [p.strip() for p in re.split(r"[;\n]", settings.get("domains", "") or "") if p.strip()]
     domains = "auto" if lines == ["auto"] else _domain_spec(lines) or None
+    if isinstance(domains, list) and settings.get("domains_from_file") == settings.get("domains"):
+        domains = SavedDomains(domains)  # a layout file's: element ids this structure lacks are dropped, with a note
     if settings.get("uniprot_domains") and (settings.get("uniprot") or "off") not in ("off", ""):
         domains = "uniprot"
     return {
@@ -141,6 +146,7 @@ def spec_of(path, settings: dict) -> FigureSpec:
         look=look_of(settings),
         title=settings.get("title") or None,
         mode=settings.get("mode", "projected"),
+        names=list(settings.get("names") or []),
         **layout_options(settings),
     )
 
@@ -219,7 +225,7 @@ def settings_from_document(doc: dict) -> dict:
     out = {"theme": theme, **vars(THEMES[theme]), **style}
     lay = doc.get("layout") or {}
     for key, default in LAYOUT_DEFAULTS.items():
-        out[key] = default
+        out[key] = copy.deepcopy(default)  # no list shared between sessions
     for key in (
         "mode",
         "rotate",
@@ -260,7 +266,11 @@ def settings_from_document(doc: dict) -> dict:
     else:
         pairs = domains.items() if isinstance(domains, dict) else domains
         out["domains"] = "\n".join(f"{name}={','.join(refs)}" for name, refs in pairs)
+        out["domains_from_file"] = out["domains"]
     out["move"] = "; ".join(f"{k}={d[0]:g},{d[1]:g}" for k, d in (e.get("move") or {}).items())
+    names = [str(n) for n in doc.get("names") or []]
+    out["names"] = [n for n in names if n in NAME_KEYWORDS or (local_files() and Path(n).is_file())]
+    out["names_missing"] = [n for n in names if n not in out["names"]]  # saved elsewhere; never a server path hosted
     return out
 
 
@@ -284,7 +294,15 @@ def trouble(err: Exception) -> str:
 
 # ---------------------------------------------------------------------------------------------- session
 STRUCTURE_STYLE = ("mark", "highlight", "hbonds", "backbone_colors")  # Style fields that name this structure's parts
-STRUCTURE_WIDGETS = ("seq_chain", "names__kw", "domains__auto", "names_upload")  # widget keys of one structure
+NAMES_AND_DOMAINS = (  # what the names and domains controls hold besides the settings (a layout file replaces it)
+    "names__kw",
+    "names_upload",
+    "names_uploaded",
+    "names_error",
+    "domains__auto",
+    "domains__manual",
+)
+STRUCTURE_WIDGETS = ("seq_chain", *NAMES_AND_DOMAINS)  # widget keys of one structure
 _LOG = logging.getLogger("foldmap.app")
 
 
@@ -400,8 +418,9 @@ def reset_structure(ss: MutableMapping) -> None:
     look = THEMES[ss.get("theme", "publication")]
     for key in STRUCTURE_STYLE:
         ss[key] = getattr(look, key)
-    for key in ("msa_path", "msa_error", "msa_reference", "msa_missing", "names_missing", "layout_error"):
+    for key in ("msa_path", "msa_error", "msa_reference", "msa_missing", "layout_error"):
         ss[key] = ""
+    ss["names_missing"] = []
     ss["_synced"] = {}
     from foldmap.app_edits import EDITORS
 
@@ -422,6 +441,22 @@ def reset_structure(ss: MutableMapping) -> None:
         ss.pop(key, None)
     ss["auto_redraw"] = True
     ss["pane"] = "Figure"
+
+
+def apply_document(ss: MutableMapping, settings: dict) -> None:
+    """A layout file's settings (settings_from_document) in place of the session's: no control is blamed for what
+    follows, and the rows waiting in the editors' tables and the names and domains controls' state belong to the
+    settings it replaced (those controls are derived from its settings again)."""
+    from foldmap.app_edits import EDITORS
+
+    ss.pop("last_changed", None)  # many settings at once: no one control to blame
+    for key, value in settings.items():
+        ss[key] = value
+    for kind in EDITORS:
+        ss.pop(f"{kind}__blank", None)
+    for key in NAMES_AND_DOMAINS:
+        ss.pop(key, None)
+    ss["_synced"] = {k: v for k, v in (ss.get("_synced") or {}).items() if k not in ("names", "domains")}
 
 
 def picked_row(table: dict | None, choices: list[tuple[str, str]]) -> str | None:
@@ -593,13 +628,7 @@ def main() -> None:
             ss["layout_error"] = str(err)
             return
         ss["layout_error"] = ""
-        ss.pop("last_changed", None)  # many settings at once: no one control to blame
-        for key, value in settings.items():
-            ss[key] = value
-        from foldmap.app_edits import EDITORS
-
-        for kind in EDITORS:  # rows half made in a table belong to the edits the file replaces
-            ss.pop(f"{kind}__blank", None)
+        apply_document(ss, settings)
 
     if ss["stage"] == "load":  # a share link (?id=…&theme=…) opens its structure once
         qid = st.query_params.get("id")
