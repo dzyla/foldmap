@@ -133,7 +133,8 @@ class Style:
     mark: str = ""  # elements in a colour of their own: "G", "A:G=#2ca02c", "#3", "res:150-159=red", comma-separated
     domain_bar: str = "auto"  # a linear bar of the named domains under the figure, one per chain, N to C (Nishimasu
     # 2014 Fig 1A): auto (2 or more domains drawn), on (any), off
-    domain_colours: bool = True  # with named domains and color_by=chain, colour elements by domain
+    domain_colours: bool = True  # with named domains and color_by=chain, colour elements by domain (the print and
+    # blueprint themes keep their own palettes: off unless set)
 
     def validate(self) -> Style:
         for key, allowed in CHOICES.items():
@@ -182,6 +183,7 @@ THEMES = {
         dna_color="#4d4d4d",
         rna_color="#808080",
         hbond_color="#b3b3b3",
+        domain_colours=False,  # greys stay greys; domain_colours=true asks for the domain tones
     ),
     "presentation": Style(loop_width=1.6, font_scale=1.4, helix_shading="gloss", loops="curved", na_style="ribbon"),
     "cartoon": Style(loops="curved", helix_shading="gloss", palette="tol-bright", na_style="ribbon"),
@@ -200,6 +202,7 @@ THEMES = {
         dna_color="#e8743b",
         rna_color="#a06cd5",
         hbond_color="#989890",
+        domain_colours=False,  # its pale palette for the dark page; domain_colours=true asks for the domain tones
     ),
     "conservation": Style(color_by="conservation", loop_color="residue"),
     "alphafold": Style(color_by="plddt", loop_color="residue", loop_width=1.3),

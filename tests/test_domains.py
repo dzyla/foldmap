@@ -363,3 +363,22 @@ def test_domain_tones_stay_apart_for_colour_blind_readers_and_from_nucleic_acid(
         assert worst >= 10, (name, worst)
     others = {Style().dna_color, Style().rna_color, THEMES["journal"].rna_color, Style().hbond_color, MATE_GREY}
     assert min(delta_e(a, b) for a in _DOMAIN_TONES for b in others) >= 10
+
+
+def test_print_and_blueprint_keep_their_palettes_unless_domain_colours_is_set():
+    """The print (greys) and blueprint (pale on dark) themes keep their own palettes with domains named; domain
+    colouring applies to them only when domain_colours is set. Colour themes colour by domain as before."""
+    from foldmap.render import _DOMAIN_TONES, element_colours
+    from foldmap.style import resolve_style
+
+    lay, sses, _ = make_layout(T4L, domains=T4L_DOMAINS)
+    tones = set(_DOMAIN_TONES)
+
+    def colours(theme, *overrides):
+        return set(element_colours(lay, sses, resolve_style(theme, overrides=list(overrides)))[0].values())
+
+    for theme in ("print", "blueprint"):
+        assert not colours(theme) & tones, theme
+        assert colours(theme, "domain_colours=true") <= tones, theme
+    for theme in ("publication", "minimal", "presentation", "cartoon", "goodsell", "journal"):
+        assert colours(theme) <= tones, theme
