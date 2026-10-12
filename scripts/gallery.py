@@ -19,11 +19,28 @@ ROOT = Path(__file__).resolve().parents[1]
 DATA, OUT = ROOT / "tests" / "data", ROOT / "docs" / "images"
 
 EXAMPLES = ROOT / "docs" / "examples"
+NAMES = ROOT / "docs" / "names"
 
 # (output name, structure, title, theme, style overrides, layout options)
 FIGURES = [
     ("lambda-repressor-dna", "1LMB.cif", "λ repressor on DNA (1LMB)", "publication", [], {"assembly": "asu"}),
+    (
+        "lambda-hbonds",
+        "1LMB.cif",
+        "λ repressor on DNA (1LMB) · protein–DNA hydrogen bonds",
+        "publication",
+        ["hbonds=na", "hbond_max=16"],
+        {},
+    ),
     ("ncrna-30qm", "na/30QM.cif.gz", "DRT10 RT–ncRNA (30QM) · stems P1–P6", "publication", [], {}),
+    (
+        "trna-1ehz",
+        "na/1EHZ.cif.gz",
+        "tRNA-Phe (1EHZ) · arms named from docs/names",
+        "publication",
+        [],
+        {"names": [str(NAMES / "1EHZ-trna.yaml")]},
+    ),
     ("nucleosome-1kx5", "na/1KX5.cif.gz", "Nucleosome core particle (1KX5)", "journal", [], {}),
     (
         "t4-lysozyme-domains",
@@ -34,7 +51,14 @@ FIGURES = [
         {"assembly": "asu", "domains": [("N-lobe", ["res:A:13-59"]), ("C-lobe", ["res:A:1-12", "res:A:60-164"])]},
     ),
     ("fima-richardson", "5NKT.cif", "FimA (5NKT) · richardson", "richardson", [], {"assembly": "asu"}),
-    ("p53-alphafold", "AF-P04637.cif", "p53 AlphaFold model (AF-P04637) · pLDDT", "alphafold", [], {}),
+    (
+        "p53-alphafold",
+        "AF-P04637.cif",
+        "p53 AlphaFold model (AF-P04637) · pLDDT",
+        "alphafold",
+        [],
+        {"move": [("α1", (4.0, -5.0)), ("α3", (0.0, 1.0))]},  # the N-terminal helix clear of the core's loops
+    ),
     (
         "fima-pilus-rod",
         "6Y7S.cif",
@@ -45,14 +69,30 @@ FIGURES = [
     ),
     ("ferritin-cage", "assemblies/7A4M.cif", "Apoferritin (7A4M) · 1 of 24 subunits", "journal", [], {}),
     (
-        "measles-f-trimer",
-        "8UTF.cif",
-        "Measles F trimer (8UTF) · C3, one protomer highlighted",
+        "kcsa-c4",
+        "1BL8.cif",
+        "KcsA K⁺ channel (1BL8) · C4, one protomer highlighted",
         "publication",
-        ["highlight=asu", "loop_color=chain"],
+        ["highlight=asu"],
         {},
     ),
-    ("tim-barrel-rainbow", "1TIM.cif", "TIM barrel (1TIM) · N→C", "rainbow", [], {"assembly": "asu"}),
+    (
+        "tim-barrel-rainbow",
+        "1TIM.cif",
+        "Triosephosphate isomerase (1TIM, chain A) · βα row, strands β1–β8",
+        "rainbow",
+        [],
+        {"assembly": "asu", "chains": ["A"], "names": ["beta"]},
+    ),
+    (
+        "myoglobin-names",
+        "fidelity/1MBN.cif.gz",
+        "Myoglobin (1MBN) · helices A–H from the file",
+        "publication",
+        [],
+        {"names": ["deposited"]},
+    ),
+    ("gfp-chromophore", "1EMA.cif", "GFP (1EMA) · chromophore in the chain", "publication", [], {}),
     (
         "bacteriorhodopsin-membrane",
         "1C3W.cif",
@@ -73,6 +113,9 @@ FIGURES = [
     ),
 ]
 
+# Large figures whose letters would be unreadable at the default 110 dpi
+DPI = {"ncrna-30qm": 160, "nucleosome-1kx5": 140, "trna-1ehz": 140}
+
 # (output name, structure, title, alignment or None, columns, theme)
 SEQUENCES = [
     ("ubiquitin-sequence", "1UBQ.cif", "Ubiquitin (1UBQ)", None, 40, "publication"),
@@ -92,7 +135,7 @@ def main() -> None:
     for name, structure, title, theme, overrides, options in FIGURES:
         fig = make_figure(DATA / structure, title=title, look=resolve_style(theme, None, overrides), **options)
         path = OUT / f"{name}.png"
-        save(fig, path, dpi=110)
+        save(fig, path, dpi=DPI.get(name, 110))
         print(f"wrote {path.relative_to(ROOT)} ({path.stat().st_size // 1024} KB)")
     from foldmap.seqplot import draw_sequence
     from foldmap.sequence import read_alignment
