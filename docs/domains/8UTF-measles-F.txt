@@ -1,0 +1,13 @@
+# Measles virus fusion protein, postfusion (PDB 8UTF; F2 is chain A, F1 chain a), domains in the order and colours
+# of Zyla et al. 2024, Science 384:eadm8693, Figure 3A (SP, F2, FP, HRN, DIII, DI, DII, HRC).
+# Ranges: DI 290-373 and DII 374-426 (then 434-446 and the DII-HRC linker 447-456) from that paper's text; DIII
+# runs from HRN's end to DI (its F1 part, 115-287 in the text, holds FP and HRN); HRN (HRA, 139-215) and HRC
+# (HRB, 445-494) from UniProt P69353, HRC taken from the linker's end. F2 is drawn whole (24-112, UniProt), its
+# DIII strands included as in Figure 3A. FP (113-140) is not modelled in 8UTF, so it has no domain here.
+# Use: foldmap plot 8UTF --focus protomer $(grep -v '^#' docs/domains/8UTF-measles-F.txt) -o measles-F.svg
+--domain F2=res:A:24-112
+--domain HRN=res:a:141-215
+--domain DIII=res:a:216-289
+--domain DI=res:a:290-373
+--domain DII=res:a:374-456
+--domain HRC=res:a:457-494

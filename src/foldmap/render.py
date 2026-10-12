@@ -44,6 +44,7 @@ from .layout import (
     Layout,
     Placed,
     PlacedStem,
+    _text_width,
     centred_box,
     dna_to_page,
     dna_y,
@@ -88,6 +89,8 @@ _RUN_EDGE, _RUN_EDGE_W = "#3a3a3a", 1.8  # dark edge under residue-coloured loop
 _SHORT_HELIX = 1.6  # helices/3-10 boxes shorter than this hold their residue numbers past the ends
 LONG_LOOP, LONG_TAIL = 25, 10  # loops / chain ends at least this many residues get a residue-count label
 _DOMAIN_TONES = ("#4c78a8", "#e45756", "#54a24b", "#b279a2", "#f58518", "#72b7b2")  # one hue per domain
+_DOMAIN_BAR_H = 1.1  # page units each chain's domain bar takes below the figure (at least; more for larger text)
+_BAR_TICK = 0.3  # page units from a narrow segment to its name below it
 MARK_DEFAULT = "#d1495b"  # a marked element without its own colour
 MATE_GREY = "#c4c9cf"  # symmetry mates (or other chains) when one part is highlighted
 _MATE_LINE = "#aab0b7"
@@ -1631,7 +1634,9 @@ def _colouring(sses: list[SSE], chains: list[str], colors: dict[str, str], look:
             return _shade(colors[chain], float(np.clip((r - a) / max(b - a, 1), 0.0, 1.0)))
 
         return out, by_shade
-    if look.color_by == "chain":
+    if domain_coloured(look, layout):
+        return _by_domain(sses, layout)
+    if look.color_by in ("chain", "domain"):  # by domain with no domain named: by chain
 
         def by_chain(r: int, chain: str | None = None) -> str | None:
             return colors.get(chain)
@@ -1652,6 +1657,43 @@ def _colouring(sses: list[SSE], chains: list[str], colors: dict[str, str], look:
         return sequence_colour((r - a) / max(b - a, 1), look.sequence_map)
 
     return out, by_residue
+
+
+def domain_tone(k: int) -> str:
+    """The colour of the k-th named domain (Layout.domains order): its panel's tint, its bar segment and, coloured by
+    domain, its elements. Six tones, used again from the seventh domain on (Cas9 has eight)."""
+    return _DOMAIN_TONES[k % len(_DOMAIN_TONES)]
+
+
+def domain_coloured(look: Style, layout: Layout | None) -> bool:
+    """Are elements coloured by domain: with a domain named and drawn, and color_by=domain, or color_by=chain (the
+    default) with domain_colours on. Any other colouring (a theme's or the user's) is kept."""
+    if layout is None or not any(ids for _, ids in layout.domains):
+        return False
+    return look.color_by == "domain" or (look.color_by == "chain" and look.domain_colours)
+
+
+def _by_domain(sses: list[SSE], layout: Layout):
+    """Each element in its domain's tone, an element in no domain grey; a loop residue in the colour of the nearer
+    element it joins (a loop is split at its middle, as the domain bar splits it)."""
+    tone = {k: domain_tone(d) for d, (_, ids) in enumerate(layout.domains) for k in ids}
+    out = {s.id: tone.get(s.id, MATE_GREY) for s in sses}
+    runs: dict[str, list[tuple[int, int, str]]] = {}
+    for s in sorted(sses, key=lambda s: s.start):
+        runs.setdefault(s.chain, []).append((s.start, s.end, out[s.id]))
+
+    def by_domain(r: int, chain: str | None = None) -> str | None:
+        mine = runs.get(chain)
+        if not mine:
+            return None
+        for (_, a1, ca), (b0, _, cb) in zip(mine, mine[1:]):
+            if r <= a1:
+                return ca
+            if r < b0:
+                return ca if r - a1 <= b0 - r else cb
+        return mine[-1][2]
+
+    return out, by_domain
 
 
 def element_colours(layout: Layout, sses: list[SSE], look: Style):
@@ -1829,6 +1871,7 @@ class _Canvas:
     content: tuple[float, float, float, float]  # x0, y0, x1, y1: elements, marks, at least one legend entry wide
     page: tuple[float, float, float, float]  # xmin, xmax, ymin, ymax
     backbone: tuple[dict[str, str], dict[str, str]]  # backbone_colours: nucleic-acid chains, protein loop overrides
+    bar_h: float = 0.0  # page units each domain bar takes, under the content (0: no bar)
 
 
 class _Legend(NamedTuple):
@@ -1891,6 +1934,13 @@ def _legend_entries(
         entries = [
             (_SSTYPE[k], name) for k, name in (("H", "helix"), ("E", "strand"), ("G", "3₁₀ helix")) if k in kinds
         ]
+    elif domain_coloured(look, layout):  # one entry per domain, in place of the chains; the greys kept
+        grey = [e for e in entries if e[0] == MATE_GREY]
+        named = {k for _, ids in layout.domains for k in ids}
+        dim = set(chains) - layout.focus if layout.focus is not None else set()
+        if any(k not in named and p.sse.chain not in dim for k, p in layout.placed.items()):
+            grey.append((MATE_GREY, "no named domain"))
+        entries = [(domain_tone(d), name) for d, (name, ids) in enumerate(layout.domains) if ids] + grey
     for kind in dict.fromkeys(m["feature"].type for m in umarks):  # UniProt site types shown
         entries.append((SITE_COLOURS.get(kind, "#555555"), f"{kind.lower()} (UniProt)"))
     if layout.nucleic is not None and layout.nucleic.strands and look.legend:
@@ -1966,7 +2016,10 @@ def _canvas(
     legend_h = 0.8 + _LEGEND_ROW * -(-len(entries) // per_row) if entries else 0.3
     if layout.context and look.legend:
         legend_h += 1.3
-    xmin, xmax, ymin, ymax = x0 - pad, x1 + pad, y0 - pad - legend_h, y1 + pad + top
+    bars = domain_bars(layout) if domain_bar_shown(look, layout) else []
+    scale = min(_IN_PER_UNIT, _MAX_WIDTH_IN / (x1 - x0 + 2 * pad))  # as the figure below
+    bar_h = max(_DOMAIN_BAR_H, 2.4 * _font_pt(scale) * look.font_scale / (scale * 72) + _BAR_TICK) if bars else 0.0
+    xmin, xmax, ymin, ymax = x0 - pad, x1 + pad, y0 - pad - len(bars) * bar_h - legend_h, y1 + pad + top
     w_u, h_u = xmax - xmin, ymax - ymin
     scale = min(_IN_PER_UNIT, _MAX_WIDTH_IN / w_u)
     fig = Figure(figsize=(w_u * scale, h_u * scale), facecolor=look.background)
@@ -1993,6 +2046,7 @@ def _canvas(
         (x0, y0, x1, y1),
         (xmin, xmax, ymin, ymax),
         backbone,
+        bar_h,
     )
     return canvas, _Legend(entries, entry, per_row, legend_h)
 
@@ -2148,7 +2202,7 @@ def _draw_domains(c: _Canvas, layout: Layout) -> None:
         if not ids:
             continue
         x0, y0, x1, y1 = domain_panel(layout, name)
-        tone = _DOMAIN_TONES[k % len(_DOMAIN_TONES)]
+        tone = domain_tone(k)
         panel = FancyBboxPatch(
             (x0, y0),
             x1 - x0,
@@ -2173,6 +2227,130 @@ def _draw_domains(c: _Canvas, layout: Layout) -> None:
             zorder=0.25,
         )
         t.set_gid(f"domain-label:{name}")
+
+
+class BarSegment(NamedTuple):
+    """One stretch of a chain's domain bar: residues lo..hi (a boundary may fall half way between two residues)."""
+
+    name: str
+    gid: str  # domain-bar:<chain>:<name>, then #2, #3 for the later stretches of a domain in pieces
+    lo: float
+    hi: float
+    tone: str
+
+
+def domain_bar_shown(look: Style, layout: Layout) -> bool:
+    """domain_bar on: whenever a named domain is drawn; auto: when two or more are; off: never."""
+    drawn = sum(bool(ids) for _, ids in layout.domains)
+    if look.domain_bar == "off":
+        return False
+    return drawn >= (1 if look.domain_bar == "on" else 2)
+
+
+def domain_bars(layout: Layout) -> list[tuple[str, float, float, list[BarSegment]]]:
+    """(chain, first residue, last residue, segments) for each chain holding domain elements (not the neighbours that
+    only lend a few, Layout.partial), in chain order. The domain elements in sequence make the segments: a run of
+    one domain's elements is one, from its first element's first residue to its last element's last; between two
+    runs the loop is split at its middle, and the end segments reach the chain's first and last drawn residues, so
+    the bar has no gap. Residue numbers as in the file."""
+    owner = {k: d for d, (_, ids) in enumerate(layout.domains) for k in ids}
+    elements = sorted((p.sse for k, p in layout.placed.items() if k in owner), key=lambda s: s.start)
+    out = []
+    for chain in dict.fromkeys(s.chain for s in elements if s.chain not in layout.partial):  # not a neighbour's few
+        runs: list[list] = []  # [domain, first residue, last residue]
+        for s in (s for s in elements if s.chain == chain):
+            if runs and runs[-1][0] == owner[s.id]:
+                runs[-1][2] = s.last.seq
+            else:
+                runs.append([owner[s.id], s.first.seq, s.last.seq])
+        seqs = [r.seq for r in layout.res_labels if r.chain == chain]
+        first, last = float(min([*seqs, runs[0][1]])), float(max([*seqs, runs[-1][2]]))
+        cuts = [first, *((a[2] + b[1]) / 2 for a, b in zip(runs, runs[1:])), last]
+        seen: Counter = Counter()
+        segments = []
+        for (d, _, _), lo, hi in zip(runs, cuts, cuts[1:]):
+            name = layout.domains[d][0]
+            seen[name] += 1
+            gid = f"domain-bar:{chain}:{name}" + (f"#{seen[name]}" if seen[name] > 1 else "")
+            segments.append(BarSegment(name, gid, lo, hi, domain_tone(d)))
+        out.append((chain, first, last, segments))
+    return out
+
+
+def _spread(centres: list[float], widths: list[float], lo: float, hi: float, gap: float) -> list[float]:
+    """Centres for texts of these widths, in order, as near the wanted ones as they can be while each keeps `gap`
+    from the next and all stay within lo..hi (when they fit)."""
+    xs = []
+    for x, w in zip(centres, widths):  # left to right: clear of the previous one and of lo
+        floor = lo + w / 2 if not xs else xs[-1] + (widths[len(xs) - 1] + w) / 2 + gap
+        xs.append(max(x, floor))
+    for k in range(len(xs) - 1, -1, -1):  # right to left: clear of the next one and of hi
+        ceiling = hi - widths[k] / 2 if k == len(xs) - 1 else xs[k + 1] - (widths[k + 1] + widths[k]) / 2 - gap
+        xs[k] = min(xs[k], ceiling)
+    return xs
+
+
+def _draw_domain_bar(c: _Canvas, layout: Layout) -> None:
+    """Under the figure, one bar per chain holding domain elements (domain_bars), each in a band of c.bar_h: residues
+    first..last across the content width, each segment in its domain's tone, named inside when the name fits at 0.7
+    of the text size, else below on a short tick; the chain's end residue numbers over its ends (and the chain's name
+    between them when there are several bars)."""
+    em = c.font / c.pt_per_unit  # page units of one em of the figure's text
+    x0, x1 = c.content[0], c.content[2]
+    bars = domain_bars(layout)
+    for k, (chain, first, last, segments) in enumerate(bars):
+        y = c.content[1] - c.pad - k * c.bar_h - 1.65 * em  # the bar's bottom; above it the residue numbers
+        small = {"fontsize": c.font * 0.6, "va": "bottom"}
+        for text, x, ha, end in ((first, x0, "left", "N"), (last, x1, "right", "C")):
+            t = c.ax.text(x, y + em + 0.08, f"{text:g}", ha=ha, color=c.look.ink, **small)
+            t.set_gid(f"domain-bar-end:{chain}:{end}")
+        if len(bars) > 1:
+            t = c.ax.text(
+                (x0 + x1) / 2,
+                y + em + 0.08,
+                f"chain {chain}",
+                ha="center",
+                style="italic",
+                color=_legible("#5d6877"),
+                **small,
+            )
+            t.set_gid(f"domain-bar-chain:{chain}")
+        below = []  # segments too narrow for their name: (segment centre, name width, segment)
+        for seg in segments:
+            xa = x0 + (seg.lo - first) / max(last - first, 1.0) * (x1 - x0)
+            xb = x0 + (seg.hi - first) / max(last - first, 1.0) * (x1 - x0)
+            rect = Rectangle((xa, y), xb - xa, em, fc=seg.tone, ec=darken(seg.tone), lw=c.lw * 0.6, zorder=2)
+            rect.set_gid(seg.gid)
+            c.ax.add_patch(rect)
+            width = _text_width(seg.name) * 0.7 * em  # bold metrics: a little wider than the regular text drawn
+            if width + 0.2 <= xb - xa:
+                t = c.ax.text(
+                    (xa + xb) / 2,
+                    y + em / 2,
+                    seg.name,
+                    ha="center",
+                    va="center",
+                    fontsize=c.font * 0.7,
+                    color=text_color_on(seg.tone),
+                    zorder=2.1,
+                )
+                t.set_gid(seg.gid.replace("domain-bar:", "domain-bar-label:", 1))
+            else:
+                below.append(((xa + xb) / 2, width, seg))
+        xs = _spread([b[0] for b in below], [b[1] for b in below], c.page[0] + 0.1, c.page[1] - 0.1, 0.2)
+        for (xc, _, seg), xt in zip(below, xs):
+            (tick,) = c.ax.plot([xc, xt], [y, y - _BAR_TICK], color=darken(seg.tone), lw=c.lw * 0.6)
+            tick.set_gid(seg.gid.replace("domain-bar:", "domain-bar-tick:", 1))
+            t = c.ax.text(
+                xt,
+                y - _BAR_TICK - 0.04,
+                seg.name,
+                ha="center",
+                va="top",
+                fontsize=c.font * 0.7,
+                color=darken(seg.tone, 0.75),
+            )
+            t.set_gid(seg.gid.replace("domain-bar:", "domain-bar-label:", 1))
 
 
 def _draw_sheet_panels(c: _Canvas, layout: Layout) -> None:
@@ -2529,6 +2707,8 @@ def _draw(
     _draw_residue_numbers(c, layout)
     _draw_ghosts(c, layout)
     _draw_termini(c, layout, sses)
+    if c.bar_h:
+        _draw_domain_bar(c, layout)
     _draw_legend(c, layout, legend)
     if title:
         _draw_title(c, title)

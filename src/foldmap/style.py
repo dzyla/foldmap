@@ -30,8 +30,10 @@ CHOICES = {
         "hydropathy",
         "plddt",
         "conservation",
+        "domain",
     ),  # chain / N->C ramp / chain hue
-    # light N -> dark C / helix vs strand (Richardson) / mean B-factor, rigid -> flexible / Kyte-Doolittle
+    # light N -> dark C / helix vs strand (Richardson) / mean B-factor, rigid -> flexible / Kyte-Doolittle /
+    # pLDDT bands / conservation grades / each named domain's tone (--domain, --domains; by chain without domains)
     "loop_color": (
         "black",
         "chain",
@@ -44,6 +46,7 @@ CHOICES = {
     "helix_angle": ("snap", "upright", "tilted"),  # nearest of vertical/horizontal / always vertical / as in 3D
     "fold_template": ("auto", "off"),  # all-parallel α/β sheets as one βα row (TIM, Rossmann) / as projected
     "helix_on_sheet": ("off", "auto"),  # a helix packed on a sheet face beside it, as projected / drawn over the sheet
+    "domain_bar": ("auto", "on", "off"),  # the linear domain bar: with 2+ named domains drawn / with any / never
 }
 _ALIASES = {"fill": {"classic": "bold", "flat": "pale"}}
 _KEY_ALIASES = {"dna_extent": "na_extent"}  # earlier names of style keys
@@ -128,6 +131,9 @@ class Style:
     hbond_color: str = "#d020f8"  # the dashed lines (a violet-magenta clear of every theme palette; see THEMES)
     hbond_max: int = 200  # at most this many lines, the shortest kept
     mark: str = ""  # elements in a colour of their own: "G", "A:G=#2ca02c", "#3", "res:150-159=red", comma-separated
+    domain_bar: str = "auto"  # a linear bar of the named domains under the figure, one per chain, N to C (Nishimasu
+    # 2014 Fig 1A): auto (2 or more domains drawn), on (any), off
+    domain_colours: bool = True  # with named domains and color_by=chain, colour elements by domain
 
     def validate(self) -> Style:
         for key, allowed in CHOICES.items():

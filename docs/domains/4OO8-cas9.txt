@@ -1,0 +1,13 @@
+# SpCas9 (PDB 4OO8) domains, residue ranges from Nishimasu et al. 2014, Cell 156:935, Figure 1A:
+# RuvC-I 1-59, bridge helix (BH) 60-93, REC1 94-179 and 308-717, REC2 180-307, RuvC-II 718-774, HNH 775-908,
+# RuvC-III 909-1098, PAM-interacting (PI) 1099-1368. No chain is named: draw one complex (--assembly 1, where Cas9
+# is chain A1) or name the chain (--chains), as the ASU holds two.
+# Use: foldmap plot 4OO8 --assembly 1 $(grep -v '^#' docs/domains/4OO8-cas9.txt) -o cas9.svg
+--domain RuvC-I=res:1-59
+--domain BH=res:60-93
+--domain REC1=res:94-179,res:308-717
+--domain REC2=res:180-307
+--domain RuvC-II=res:718-774
+--domain HNH=res:775-908
+--domain RuvC-III=res:909-1098
+--domain PI=res:1099-1368

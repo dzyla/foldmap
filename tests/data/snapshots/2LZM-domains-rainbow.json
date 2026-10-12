@@ -1,5 +1,83 @@
 {
  "items": {
+  "domain-bar-end:A:C": {
+   "bbox": [
+    456.5,
+    504.0,
+    456.5,
+    504.0
+   ],
+   "colours": [],
+   "text": [
+    "164"
+   ]
+  },
+  "domain-bar-end:A:N": {
+   "bbox": [
+    21.6,
+    504.0,
+    21.6,
+    504.0
+   ],
+   "colours": [],
+   "text": [
+    "1"
+   ]
+  },
+  "domain-bar-label:A:D1": {
+   "bbox": [
+    171.7,
+    511.7,
+    171.7,
+    511.7
+   ],
+   "colours": [
+    "fill:#ffffff"
+   ],
+   "text": [
+    "D1"
+   ]
+  },
+  "domain-bar-label:A:D2": {
+   "bbox": [
+    389.1,
+    511.7,
+    389.1,
+    511.7
+   ],
+   "colours": [
+    "fill:#ffffff"
+   ],
+   "text": [
+    "D2"
+   ]
+  },
+  "domain-bar:A:D1": {
+   "bbox": [
+    21.6,
+    506.7,
+    321.7,
+    514.1
+   ],
+   "colours": [
+    "fill:#4c78a8",
+    "stroke:#2e4865"
+   ],
+   "text": []
+  },
+  "domain-bar:A:D2": {
+   "bbox": [
+    321.7,
+    506.7,
+    456.5,
+    514.1
+   ],
+   "colours": [
+    "fill:#e45756",
+    "stroke:#893434"
+   ],
+   "text": []
+  },
   "domain-label:D1": {
    "bbox": [
     29.2,
@@ -1368,7 +1446,7 @@
  },
  "size": [
   478.1,
-  540.8
+  564.9
  ],
  "unnamed": {
   "patch": 7,

@@ -163,3 +163,138 @@ def test_a_ba_row_lies_in_one_domain_panel():
             for name, box in panels.items():
                 if name != owner.get(k):
                     assert not _meet(lay.placed[k].rect, box), (k, name)
+
+
+def test_domains_colour_elements_and_draw_a_bar():
+    from foldmap.cli import make_figure, make_layout
+    from foldmap.render import _DOMAIN_TONES, element_colours
+    from foldmap.style import Style
+
+    lay, sses, _ = make_layout(DATA / "2LZM.cif", domains="auto")
+    fig = make_figure(DATA / "2LZM.cif", domains="auto")
+    gids = [a.get_gid() or "" for a in fig.axes[0].get_children()]
+    bars = [g for g in gids if g.startswith("domain-bar:A:")]
+    assert len(bars) == len(lay.domains) >= 2
+    for look in (Style(color_by="domain"), Style()):  # chain colouring turns into domain colouring
+        colours, _ = element_colours(lay, sses, look)
+        for k, (_, ids) in enumerate(lay.domains):
+            assert {colours[i] for i in ids} == {_DOMAIN_TONES[k]}
+
+
+def test_other_colourings_win_over_domains():
+    from foldmap.cli import make_layout
+    from foldmap.render import _DOMAIN_TONES, element_colours
+    from foldmap.style import Style
+
+    lay, sses, _ = make_layout(DATA / "2LZM.cif", domains="auto")
+    for look in (Style(color_by="sstype"), Style(domain_colours=False)):
+        colours, _ = element_colours(lay, sses, look)
+        assert not set(colours.values()) & set(_DOMAIN_TONES), look
+
+
+CAS9_FILE = Path(__file__).parents[1] / "docs" / "domains" / "4OO8-cas9.txt"
+
+
+def _flag_file(path):
+    """The --domain flags of a docs/domains file, parsed as the CLI parses them."""
+    from foldmap.spec import parse_domains
+
+    words = " ".join(l for l in path.read_text().splitlines() if not l.startswith("#")).split()
+    return parse_domains([v for k, v in zip(words, words[1:]) if k == "--domain"])
+
+
+_LOOP_SLACK = 10  # residues: measured worst 10 (RuvC-III|PI, a boundary that falls in the loop from 1098 to PI's first
+# element); a boundary at a loop's middle sits off the published one by up to half that loop
+
+
+def _ranges(refs):
+    return [tuple(int(v) for v in r.removeprefix("res:").split(":")[-1].split("-")) for r in refs]
+
+
+def test_domain_bar_segments_end_at_the_domain_boundaries():
+    """Cas9 (4OO8 chain A) with Nishimasu 2014 Fig 1A's eight domains: the bar reads RuvC-I, BH, REC1, REC2, REC1,
+    RuvC-II, HNH, RuvC-III, PI, and each segment starts and ends at its domain range's ends, to within the half loop
+    the bar splits between two domains (_LOOP_SLACK residues), except at the chain's own ends."""
+    from foldmap.render import domain_bars
+
+    domains = _flag_file(CAS9_FILE)
+    assert [n for n, _ in domains] == ["RuvC-I", "BH", "REC1", "REC2", "RuvC-II", "HNH", "RuvC-III", "PI"]
+    lay, _, _ = make_layout(DATA / "na" / "4OO8.cif.gz", chains=["A"], domains=domains)
+    ((chain, first, last, segments),) = domain_bars(lay)
+    assert chain == "A"
+    names = [s.name for s in segments]
+    assert names == ["RuvC-I", "BH", "REC1", "REC2", "REC1", "RuvC-II", "HNH", "RuvC-III", "PI"]
+    assert [s.gid for s in segments][4] == "domain-bar:A:REC1#2"
+    ranges = {n: _ranges(refs) for n, refs in domains}
+    for seg in segments:
+        assert seg.lo < seg.hi
+        assert any(
+            (seg.lo == first or abs(seg.lo - a) <= _LOOP_SLACK) and (seg.hi == last or abs(seg.hi - b) <= _LOOP_SLACK)
+            for a, b in ranges[seg.name]
+        ), (seg, ranges[seg.name])
+    assert all(a.hi == b.lo for a, b in zip(segments, segments[1:]))  # no gap, no overlap
+
+
+def test_a_domain_in_pieces_gets_a_segment_for_each():
+    """T4 lysozyme's C lobe is residues 1-12 and 60-164: its two stretches are two segments, the second gid #2."""
+    from foldmap.render import domain_bars
+
+    lay, _, _ = make_layout(T4L, domains=T4L_DOMAINS)
+    ((_, _, _, segments),) = domain_bars(lay)
+    assert [s.gid for s in segments] == ["domain-bar:A:C", "domain-bar:A:N", "domain-bar:A:C#2"]
+    assert segments[0].tone == segments[2].tone != segments[1].tone
+
+
+def test_domain_bar_choice_and_legend():
+    from foldmap.style import Style
+
+    def bar_and_legend(look, domains=T4L_DOMAINS):
+        fig = make_figure(T4L, domains=domains, look=look)
+        texts = {t.get_text() for t in fig.axes[0].texts}
+        return bool(_gids(fig, "domain-bar:")), texts
+
+    on, texts = bar_and_legend(Style())
+    assert on and {"N", "C"} <= texts and "Chain A" not in texts  # one legend entry per domain
+    assert not bar_and_legend(Style(domain_bar="off"))[0]
+    one = [T4L_DOMAINS[0]]
+    assert not bar_and_legend(Style(), one)[0] and bar_and_legend(Style(domain_bar="on"), one)[0]
+    with pytest.raises(ValueError, match="domain_bar"):
+        Style(domain_bar="maybe").validate()
+
+
+def test_domain_bar_keeps_every_text_on_the_page():
+    """Cas9's eight domains and 8UTF's two chains: every bar text lies inside the figure, the bar under the content
+    and above the legend."""
+    from matplotlib.backends.backend_agg import FigureCanvasAgg
+
+    cases = [
+        (DATA / "na" / "4OO8.cif.gz", {"chains": ["A"], "domains": _flag_file(CAS9_FILE)}),
+        (DATA / "8UTF.cif", {"focus": "protomer", "domains": _flag_file(CAS9_FILE.parent / "8UTF-measles-F.txt")}),
+    ]
+    for path, kw in cases:
+        fig = make_figure(path, **kw)
+        renderer = FigureCanvasAgg(fig).get_renderer()
+        page = fig.bbox
+        bar = [
+            a
+            for a in [*fig.axes[0].patches, *fig.axes[0].texts, *fig.axes[0].lines]
+            if (a.get_gid() or "").startswith("domain-bar")
+        ]
+        assert bar
+        for a in bar:
+            box = a.get_window_extent(renderer)
+            assert page.x0 - 0.5 <= box.x0 and box.x1 <= page.x1 + 0.5, a.get_gid()
+            assert page.y0 - 0.5 <= box.y0 and box.y1 <= page.y1 + 0.5, a.get_gid()
+        legend = [t for t in fig.axes[0].texts if t.get_text() in ("F2", "RuvC-I") and not (t.get_gid() or "")]
+        lowest_bar = min(a.get_window_extent(renderer).y0 for a in bar)
+        assert all(t.get_window_extent(renderer).y1 <= lowest_bar for t in legend)
+
+
+def test_neighbours_lending_elements_get_no_bar():
+    """1LDM, one subunit with its neighbours' lent elements (A4's in D1): one bar, the subunit's own chain."""
+    from foldmap.render import domain_bars
+    from helpers import FID
+
+    lay, _, _ = make_layout(FID / "1LDM.cif.gz", focus="protomer", domains="auto")
+    assert any(k.startswith("A4:") for _, ids in lay.domains for k in ids) and lay.partial
+    assert [chain for chain, *_ in domain_bars(lay)] == ["A1"]
