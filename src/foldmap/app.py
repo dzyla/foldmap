@@ -17,7 +17,7 @@ from collections.abc import MutableMapping
 from dataclasses import fields, replace
 from pathlib import Path
 
-from foldmap import CREDIT, app_jobs
+from foldmap import CREDIT, app_jobs, layoutfile
 from foldmap.app_controls import (
     MB,
     alignment_rows,
@@ -280,9 +280,10 @@ def settings_from_document(doc: dict) -> dict:
     out["msa_missing"] = msa if msa and not out["msa_path"] else ""  # saved on another machine
     out["title"] = out["title"] or ""
     out["rotate"] = float(out["rotate"])
-    e = doc.get("edits") or {}
-    out["rename"] = "; ".join(f"{k}={v}" for k, v in (e.get("rename") or {}).items())
-    out["swap"] = "; ".join(f"{a},{b}" for a, b in e.get("swap") or [])
+    edits = layoutfile.edits_of(doc)  # the CLI's reading of them, as the editors' text
+    out["rename"] = "; ".join(f"{k}={v}" for k, v in edits["rename"].items())
+    out["swap"] = "; ".join(f"{a},{b}" for a, b in edits["swap"])
+    out["move"] = "; ".join(f"{ref}={dx:g},{dy:g}" for ref, (dx, dy) in edits["move"])
     domains = doc.get("domains") or {}
     if domains == "uniprot":  # the app's UniProt domains switch
         out["uniprot_domains"], domains = True, {}
@@ -292,7 +293,6 @@ def settings_from_document(doc: dict) -> dict:
         pairs = domains.items() if isinstance(domains, dict) else domains
         out["domains"] = "\n".join(f"{name}={','.join(refs)}" for name, refs in pairs)
         out["domains_from_file"] = out["domains"]
-    out["move"] = "; ".join(f"{k}={d[0]:g},{d[1]:g}" for k, d in (e.get("move") or {}).items())
     names = [str(n) for n in doc.get("names") or []]
     out["names"] = [n for n in names if n in NAME_KEYWORDS or (local_files() and Path(n).is_file())]
     out["names_missing"] = [n for n in names if n not in out["names"]]  # saved elsewhere; never a server path hosted
@@ -614,8 +614,6 @@ def apply_layout_file(ss: MutableMapping) -> None:
     """The layout file uploader's callback: the file, size-capped, read (layoutfile.load: YAML, checked) and its
     settings in place of the session's (apply_document), with the rows of the alignment it names; else
     layout_error, and nothing changes."""
-    from foldmap import layoutfile
-
     up = ss.get("layout_upload")
     if up is None:
         return

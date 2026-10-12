@@ -230,6 +230,20 @@ def test_layout_file_settings_share_no_list_with_the_defaults():
     assert LAYOUT_DEFAULTS["names"] == [] and settings_from_document({})["names"] == []
 
 
+def test_layout_file_edits_are_read_as_the_command_line_reads_them(monkeypatch):
+    """settings_from_document takes the edits from layoutfile.edits_of (one reading of them), as editor text."""
+    from app_helpers import count_calls
+    from foldmap import layoutfile
+    from foldmap.app import settings_from_document
+
+    calls = count_calls(monkeypatch, layoutfile, "edits_of")
+    edits = {"rename": {"res:A:1-7": "B1"}, "swap": [["res:A:1-7", "res:A:10-17"]], "move": {"res:A:23-34": [1, -2.5]}}
+    out = settings_from_document({"edits": edits})
+    assert calls == [1]
+    assert out["rename"] == "res:A:1-7=B1" and out["swap"] == "res:A:1-7,res:A:10-17"
+    assert out["move"] == "res:A:23-34=1,-2.5"
+
+
 def test_a_layout_file_names_file_missing_here_is_a_warning_under_the_figure():
     import yaml
 
