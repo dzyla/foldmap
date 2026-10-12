@@ -3,4 +3,6 @@ graft tests
 graft scripts
 graft site
 graft docs/examples
+graft docs/names
+graft docs/domains
 global-exclude *.py[cod] __pycache__
