@@ -609,3 +609,15 @@ def test_the_name_of_a_helix_over_a_sheet_keeps_off_arrowheads(path):
             ]
             xs, ys = zip(tip, *head)
             assert not (box[0] < max(xs) and min(xs) < box[2] and box[1] < max(ys) and min(ys) < box[3]), (h, q.sse.id)
+
+
+def test_layout_fields_after_bounds_are_keywords():
+    """Everything after placed and bounds is passed by name: build_layout once passed a bool by position into the
+    slot that is now `domains` (a field that had been removed), harmless only because domains was set again later."""
+    from foldmap.layout import Layout
+
+    with pytest.raises(TypeError):
+        Layout({}, (0.0, 0.0, 0.0, 0.0), [], [], None, [], True)
+    bb, sses, sheets = pipeline(DATA / "2LZM.cif")
+    lay = build_layout(sses, sheets, view_frame(sses))
+    assert lay.domains == [] and lay.sheets and lay.nucleic is None

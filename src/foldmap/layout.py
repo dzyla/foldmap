@@ -7,7 +7,7 @@ from __future__ import annotations
 import itertools
 import re
 from collections.abc import Callable
-from dataclasses import dataclass, field
+from dataclasses import KW_ONLY, dataclass, field
 from types import SimpleNamespace
 from typing import NamedTuple
 
@@ -186,6 +186,7 @@ class PlacedStem:
 class Layout:
     placed: dict[str, Placed]
     bounds: tuple[float, float, float, float]
+    _: KW_ONLY  # the rest by name only
     ghosts: list[Placed] = field(default_factory=list)
     stems: list[PlacedStem] = field(default_factory=list)
     nucleic: Nucleic | None = None
@@ -2240,11 +2241,10 @@ def build_layout(
     lay = Layout(
         real,
         (0.0, 0.0, 0.0, 0.0),
-        ghosts,
-        dna,
-        nucleic if dna or traces else None,
-        sheet_blocks,
-        bool(dna or traces) and style.nucleotide_labels,
+        ghosts=ghosts,
+        stems=dna,
+        nucleic=nucleic if dna or traces else None,
+        sheets=sheet_blocks,
     )
     lay.na_traces = traces
     lay.frame = frame
