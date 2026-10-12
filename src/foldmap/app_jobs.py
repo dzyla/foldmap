@@ -106,14 +106,30 @@ _LOCK = threading.Lock()
 _SLOTS: dict[int, threading.BoundedSemaphore] = {}
 
 
+_ONE_THREAD = {"OPENBLAS_NUM_THREADS": "1", "OMP_NUM_THREADS": "1"}
+
+
 def _context():
-    """The forkserver context, made once; the server starts at the first job with the pipeline imported."""
+    """The forkserver context, made once, with its server running (started again if it died). The server imports
+    the pipeline once for every job, with BLAS on one thread: OpenBLAS sets aside buffers per thread, which on a
+    many-core machine take much of a job's memory allowance before it starts. This process keeps its own settings."""
     global _CONTEXT
+    from multiprocessing import forkserver
+
     with _LOCK:
         if _CONTEXT is None:
-            ctx = multiprocessing.get_context("forkserver")
-            ctx.set_forkserver_preload(_PRELOAD)
-            _CONTEXT = ctx
+            _CONTEXT = multiprocessing.get_context("forkserver")
+            _CONTEXT.set_forkserver_preload(_PRELOAD)
+        saved = {k: os.environ.get(k) for k in _ONE_THREAD}
+        os.environ.update(_ONE_THREAD)  # the server inherits this environment when it starts
+        try:
+            forkserver.ensure_running()
+        finally:
+            for k, v in saved.items():
+                if v is None:
+                    os.environ.pop(k, None)
+                else:
+                    os.environ[k] = v
         return _CONTEXT
 
 
@@ -125,13 +141,23 @@ def _semaphore(jobs: int) -> threading.BoundedSemaphore:
         return _SLOTS[jobs]
 
 
+def _own_size() -> int:
+    """This process's address space in bytes (Linux /proc; 0 where there is none)."""
+    try:
+        import resource
+
+        return int(Path("/proc/self/statm").read_text().split()[0]) * resource.getpagesize()
+    except (ImportError, OSError, ValueError, IndexError):
+        return 0
+
+
 def _child(conn, fn, args, memory_mb: int) -> None:
     """In the job process: cap the address space, run, send ('ok', result), ('memory', '') or ('error', ...)."""
     if memory_mb:
         try:
             import resource
 
-            cap = memory_mb * 1024 * 1024
+            cap = _own_size() + memory_mb * 1024 * 1024  # memory_mb on top of what the job holds from the server
             resource.setrlimit(resource.RLIMIT_AS, (cap, cap))
         except (ImportError, ValueError, OSError):  # no resource module, or a cap the OS refuses (macOS)
             pass

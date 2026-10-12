@@ -45,6 +45,15 @@ def _gone():
     raise FileNotFoundError("the upload is gone")
 
 
+def _headroom():
+    """(MB the job may still take under its address-space cap, its BLAS thread settings)."""
+    import resource
+
+    size = int(Path("/proc/self/statm").read_text().split()[0]) * resource.getpagesize()
+    soft, _ = resource.getrlimit(resource.RLIMIT_AS)
+    return (soft - size) / 2**20, os.environ.get("OPENBLAS_NUM_THREADS"), os.environ.get("OMP_NUM_THREADS")
+
+
 def _killed():
     os.kill(os.getpid(), signal.SIGKILL)  # what the OS does to a process over its memory
 
@@ -168,6 +177,17 @@ def test_memory_cap_stops_the_job():
     with pytest.raises(JobLimit) as err:
         run_job(_hog, limits=Limits(timeout=30, memory_mb=2048))
     assert err.value.kind == "memory"
+
+
+@needs_fork
+@linux
+def test_a_job_has_its_whole_memory_allowance():
+    """The cap is the job's own size plus memory_mb, and the job server runs BLAS on one thread (per-thread buffers
+    of a many-core machine would otherwise eat the allowance); this process keeps its own settings."""
+    before = (os.environ.get("OPENBLAS_NUM_THREADS"), os.environ.get("OMP_NUM_THREADS"))
+    room, openblas, omp = run_job(_headroom, limits=Limits(timeout=60, memory_mb=1024))
+    assert room >= 0.9 * 1024 and (openblas, omp) == ("1", "1")
+    assert (os.environ.get("OPENBLAS_NUM_THREADS"), os.environ.get("OMP_NUM_THREADS")) == before
 
 
 @needs_fork
