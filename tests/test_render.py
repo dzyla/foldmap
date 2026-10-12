@@ -389,6 +389,25 @@ def test_chromophore_star_is_easy_to_see():
     assert len(swatch.get_xy()) >= 10  # a star, not the plain square of the other entries
 
 
+def test_chromophore_label_keeps_off_loops_and_ghosts():
+    """1EMA: CRO66's label sat on the loop running up beside ghost strand H; its ring search now skips spots
+    on a loop's path as well as on elements, ghosts and names."""
+    from matplotlib.backends.backend_agg import FigureCanvasAgg
+
+    from foldmap.cli import make_figure_and_loops
+    from foldmap.route import clip_len
+
+    fig, loops = make_figure_and_loops(DATA / "1EMA.cif")
+    FigureCanvasAgg(fig).draw()
+    ax = fig.axes[0]
+    (label,) = [t for t in ax.texts if t.get_gid() == "linked-label:A:66"]
+    b = label.get_window_extent(fig.canvas.get_renderer()).transformed(ax.transData.inverted())
+    box = (b.x0, b.y0, b.x1, b.y1)
+    assert not [lp.a_id for lp in loops for p, q in zip(lp.points, lp.points[1:]) if clip_len(p, q, box) > 1e-9]
+    ghosts = [a for a in ax.patches if (a.get_gid() or "").startswith("ghost:")]
+    assert ghosts and not [g.get_gid() for g in ghosts if g.get_window_extent().overlaps(label.get_window_extent())]
+
+
 @pytest.mark.parametrize("name", ["5NKT", "25IN", "6Y7S"])
 def test_every_loop_lies_inside_the_page(name):
     """5NKT: a loop ran past the canvas edge and was clipped. Since the bulge join (Task 1) 5NKT's loops keep

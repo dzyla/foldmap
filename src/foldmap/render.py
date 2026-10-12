@@ -58,7 +58,7 @@ from .layout import (
 from .model import SSE, group_by_chain
 from .na_paths import midway
 from .palette import chain_colors, darken, delta_e, text_color_on, tint
-from .route import Loop
+from .route import Loop, clip_len
 from .style import _ALIASES, CHOICES, MODALITIES, Style, backbone_overrides
 
 _IN_PER_UNIT = IN_PER_UNIT
@@ -1192,8 +1192,8 @@ _LINKED_LABEL_MIN = 7.0  # but never smaller than this (pt)
 
 def linked_marks(layout: Layout, loops: list[Loop], sses: list[SSE], marks: list[dict]) -> list[dict]:
     """A star on the chain at each peptide-linked non-standard residue (a chromophore: GFP's CRO66) of a drawn
-    chain, and its code and number beside it, in the first free spot on rings around it. Each mark: residue
-    label, star centre, label centre, label half size."""
+    chain, and its code and number beside it, in the first spot on rings around it clear of elements, ghosts,
+    names, other marks and loop paths. Each mark: residue label, star centre, label centre, label half size."""
     shown = [k for k in layout.res_linked if layout.res_chain[k] in {s.chain for s in sses if s.id in layout.placed}]
     if layout.focus_chains:
         shown = [k for k in shown if layout.res_chain[k] in layout.focus_chains]
@@ -1210,6 +1210,7 @@ def linked_marks(layout: Layout, loops: list[Loop], sses: list[SSE], marks: list
         )
         for m in marks
     ]
+    segments = [(p, q) for lp in loops for p, q in zip(lp.points, lp.points[1:])]
     out = []
     for k in shown:
         at = residue_point(layout, loops, sses, layout.res_chain, k)
@@ -1224,7 +1225,9 @@ def linked_marks(layout: Layout, loops: list[Loop], sses: list[SSE], marks: list
             for angle in np.linspace(0, 2 * np.pi, max(1, int(ring * 10)), endpoint=False):
                 c = np.asarray(at) + ring * np.array([np.cos(angle), np.sin(angle)])
                 box = (c[0] - half[0] - 0.12, c[1] - half[1] - 0.05, c[0] + half[0] + 0.12, c[1] + half[1] + 0.05)
-                if not any(box[0] < t[2] and t[0] < box[2] and box[1] < t[3] and t[1] < box[3] for t in taken):
+                if not any(
+                    box[0] < t[2] and t[0] < box[2] and box[1] < t[3] and t[1] < box[3] for t in taken
+                ) and not any(clip_len(p, q, box) > 1e-9 for p, q in segments):
                     spot = c
                     break
             if spot is not None:
