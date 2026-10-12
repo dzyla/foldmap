@@ -43,7 +43,7 @@ CHOICES = {
     "helix_shading": ("depth", "none", "gloss"),  # back face darker / no shading / darker back + glint
     "helix_angle": ("snap", "upright", "tilted"),  # nearest of vertical/horizontal / always vertical / as in 3D
     "fold_template": ("auto", "off"),  # all-parallel α/β sheets as one βα row (TIM, Rossmann) / as projected
-    "helix_on_sheet": ("auto", "off"),  # a helix packed on a sheet face drawn over the sheet / beside it, as projected
+    "helix_on_sheet": ("off", "auto"),  # a helix packed on a sheet face beside it, as projected / drawn over the sheet
 }
 _ALIASES = {"fill": {"classic": "bold", "flat": "pale"}}
 _KEY_ALIASES = {"dna_extent": "na_extent"}  # earlier names of style keys
@@ -90,8 +90,8 @@ class Style:
     helix_angle: str = "snap"
     fold_template: str = "auto"  # auto: an all-parallel α/β sheet (TIM barrel, Rossmann fold) is drawn as one row,
     # each crossover helix between the two strands it joins; off: helices where the projection puts them
-    helix_on_sheet: str = "auto"  # auto: a helix packed on a sheet face (ubiquitin's α1) is drawn over the sheet,
-    # semi-transparent, as it lies on it; off: beside the sheet, where the projection puts it
+    helix_on_sheet: str = "off"  # off: a helix packed on a sheet face stays beside the sheet, where the projection
+    # puts it; auto (opt-in): drawn over the sheet, as it lies on it (ubiquitin's α1, Burroughs 2007)
     helix_scale: float = 1.0  # helix ribbon diameter
     strand_scale: float = 1.0  # arrow width and the spacing of strands in a sheet
     dna_scale: float = 1.0  # duplex diameter

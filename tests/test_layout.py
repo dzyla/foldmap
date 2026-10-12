@@ -5,9 +5,11 @@ import pytest
 
 from foldmap.frame import Frame, view_frame
 from foldmap.layout import HELIX_RISE, HELIX_W, PITCH, SCALE, STRAND_RISE, build_layout
+from foldmap.style import Style
 from helpers import FID, fake_sse, loop_crossings, pipeline
 
 DATA = Path(__file__).parent / "data"
+ON_SHEET = Style(helix_on_sheet="auto")  # helices packed on a sheet drawn over it (opt-in, Task 14)
 
 MODES = ["projected", "stack"]
 NAMES = ["ubq", "zs5", "zya"]
@@ -461,7 +463,7 @@ def test_helix_packing_on_a_sheet_is_drawn_over_it(path, helices):
     from foldmap.cli import make_layout
     from foldmap.route import route_loops
 
-    lay, sses, bb = make_layout(DATA / path)
+    lay, sses, bb = make_layout(DATA / path, look=ON_SHEET)
     block = next(b for b in lay.sheets if len(b) >= 4)
     rects = np.array([lay.placed[k].rect for k in block])
     x0, y0, x1, y1 = rects[:, 0].min(), rects[:, 1].min(), rects[:, 2].max(), rects[:, 3].max()
@@ -478,7 +480,7 @@ def test_ferredoxin_helices_over_the_sheet_keep_crossings_low():
     from foldmap.cli import make_layout
     from foldmap.route import route_loops
 
-    lay, sses, bb = make_layout(FID / "2ACY.cif.gz")
+    lay, sses, bb = make_layout(FID / "2ACY.cif.gz", look=ON_SHEET)
     assert loop_crossings(route_loops(lay, sses, bb)) <= 2
 
 
@@ -486,14 +488,17 @@ def test_symmetric_and_template_sheets_have_no_helix_over_them():
     from foldmap.cli import make_layout
 
     for path in ("1TIM.cif", "8UUP.cif"):
-        lay, _, _ = make_layout(DATA / path)
+        lay, _, _ = make_layout(DATA / path, look=ON_SHEET)
         assert not any(p.over for p in lay.placed.values()), path
 
 
-def test_helix_on_sheet_off_keeps_the_side_placement():
+def test_helix_on_sheet_is_opt_in():
+    """Off by default (Task 14 ruling): a helix packed on a sheet stays beside it unless helix_on_sheet=auto."""
     from foldmap.cli import make_layout
-    from foldmap.style import Style
+    from foldmap.style import CHOICES, Style
 
+    assert Style().helix_on_sheet == "off" and CHOICES["helix_on_sheet"] == ("off", "auto")
+    assert not make_layout(DATA / "1UBQ.cif")[0].placed["A:23-34"].over
     lay, _, _ = make_layout(DATA / "1UBQ.cif", look=Style(helix_on_sheet="off"))
     assert not lay.placed["A:23-34"].over
 
@@ -505,7 +510,7 @@ def test_helix_over_a_sheet_lies_as_it_packs():
     from foldmap.layout import _snap
     from foldmap.style import Style
 
-    lay, _, _ = make_layout(DATA / "1UBQ.cif")
+    lay, _, _ = make_layout(DATA / "1UBQ.cif", look=ON_SHEET)
     p = lay.placed["A:23-34"]
     tilt = abs(np.degrees(p.angle)) % 180
     assert 15 < min(tilt, 180 - tilt) and abs(tilt - 90) > 15, tilt
@@ -542,7 +547,7 @@ def test_no_helix_is_drawn_over_a_sheet_beside_nucleic_acid():
 
     bb, sses, sheets = pipeline(DATA / "na" / "1URN.cif.gz", "auto")
     assert helices_on_sheets(bb, sses, sheets)
-    lay, _, _ = make_layout(DATA / "na" / "1URN.cif.gz")
+    lay, _, _ = make_layout(DATA / "na" / "1URN.cif.gz", look=ON_SHEET)
     assert lay.stems and not lay.on_sheet and not any(p.over for p in lay.placed.values())
 
 

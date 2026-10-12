@@ -1,6 +1,5 @@
 """Conservation colouring of the topology figure from a multiple sequence alignment (ConSurf's 9 grades)."""
 
-from dataclasses import replace
 from pathlib import Path
 
 import numpy as np
@@ -247,11 +246,8 @@ def test_borrowing_needs_enough_shared_residues(tmp_path, capsys):
 
 
 def test_legend_does_not_widen_the_figure_beyond_the_protein():
-    """The legend is sized from its measured text, not an over-estimate. Measured on 1UBQ with α1 beside the sheet
-    (helix_on_sheet=off): with α1 over the sheet (Task 14) the protein is narrower than the conservation legend's
-    one long line, which then sets the width as it must."""
-    wide = make_figure(UBQ, look=replace(THEMES["conservation"], helix_on_sheet="off"), msa=FAMILY)
-    plain = make_figure(UBQ, look=replace(THEMES["publication"], helix_on_sheet="off"))
+    wide = make_figure(UBQ, look=THEMES["conservation"], msa=FAMILY)
+    plain = make_figure(UBQ, look=THEMES["publication"])
     assert wide.get_size_inches()[0] <= plain.get_size_inches()[0] * 1.1
 
 

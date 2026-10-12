@@ -455,7 +455,9 @@ def test_one_protein_chain_with_nucleic_acid_keeps_the_nucleic_acid_legend():
 def test_helix_over_a_sheet_is_drawn_on_top_see_through_with_its_loops_and_a_readable_name():
     """1UBQ α1 lies over the sheet (Task 14): drawn above the strands at alpha 0.6 (fill and edge), its loops above
     the strands and below it, its name on a plate of the page colour, clear of every strand letter."""
-    fig = make_figure(DATA / "1UBQ.cif")
+    from foldmap.style import Style
+
+    fig = make_figure(DATA / "1UBQ.cif", look=Style(helix_on_sheet="auto"))
     ax = fig.axes[0]
     by = {a.get_gid(): a for a in [*ax.patches, *ax.texts] if a.get_gid()}
     helix, strand = by["helix:A:23-34"], by["strand:A:2-7"]
