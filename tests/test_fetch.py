@@ -162,7 +162,8 @@ def test_uploads_are_kept_by_content_and_old_ones_removed(monkeypatch, tmp_path)
     old = time.time() - fetch_mod.UPLOAD_MAX_AGE - 60
     for f in (a, stranger, tmp_path / "1UBQ.cif"):
         os.utime(f, (old, old))
-    os.utime(link, (old, old), follow_symlinks=False)
+    if os.utime in os.supports_follow_symlinks:  # not on Windows: the link keeps its own (new) time there
+        os.utime(link, (old, old), follow_symlinks=False)
     os.utime(outside, (old, old))
     fetch("", ("y.pdb", b"other"))
     assert not a.exists() and odd.exists()
