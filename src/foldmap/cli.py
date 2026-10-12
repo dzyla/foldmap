@@ -308,12 +308,12 @@ def make_layout(
         swap=swap,
         move=move,
         keep_depth=mem is not None and mode == "stack",
+        na_cropped=na_cropped,
     )
     lay.focus = _focus((look or Style()).highlight, bb, sym)
     if focus_chains:
         lay.focus, lay.focus_chains, lay.context = set(focus_chains), set(focus_chains), context
         lay.unjoined = unjoined
-    lay.na_cropped = na_cropped
     lay.links = links
     lay.res_chain = [l.chain for l in bb.labels]
     lay.res_name = [l.name for l in bb.labels]

@@ -1749,8 +1749,10 @@ def build_layout(
     swap: list[tuple[str, str]] | None = None,
     move: list[tuple[str, tuple[float, float]]] | None = None,
     keep_depth: bool = False,
+    na_cropped: bool = False,
 ) -> Layout:
     """`keep_depth` (stack mode with a membrane): each element stays at its height along the frame's up.
+    `na_cropped` (na_extent auto cropped the nucleic acid): drawn as blocks, without base letters.
     `attract` (projected mode) pulls loop-joined and touching elements together before overlaps
     are removed; `contacts` comes from features.sse_contacts. `nucleic` adds its stems (straight pieces of
     base-paired DNA/RNA), placed like any element and pulling the elements that touch them; strands with no pair
@@ -1876,7 +1878,8 @@ def build_layout(
     lay.partial = set(partial or ())
     lay.domains = [(name, [k for k in ids if k in real]) for name, ids in domains or []]
     rects = np.vstack([rects, *[[domain_panel(lay, name)] for name, _ in lay.domains]]) if lay.domains else rects
-    _choose_label_sides(lay, sses, style.font_scale, mirrored)  # after naming: a name's length sets its box
+    lay.na_cropped = na_cropped
+    _choose_label_sides(lay, sses, style, mirrored)  # after naming: a name's length sets its box
     rects = np.vstack([rects, [b for _, b in label_boxes(lay, sses)] or np.empty((0, 4))])
     lay.bounds = (
         float(rects[:, 0].min()),
@@ -2027,25 +2030,38 @@ def _body_distance(q, d) -> float:
 
 
 _SLOTS = (0.25, 0.5, 0.75)  # page units a stem's name may move further out, when neither side is clear beside it
-_INK_CHAR, _INK_LINE = 0.55, 1.0  # a bold label's mean character width and its line's height, in ems of its own size
-_INK_GLYPH = 0.6  # half a base letter's drawn box, in ems of its own size (measured on 1KX5: 0.49 x 0.46 at 0.42)
-_INK_ROOM = 1.15  # room for the page to grow after routing (its text then grows with it), as na_labels._GAP_ROOM
+TEXT_FONTS = ["Arial", "Helvetica", "Liberation Sans", "Nimbus Sans", "DejaVu Sans"]  # render's, journal sans first
+_INK_FIT = 0.93  # turned names are drawn 0.88-1.03 the size of their TextPath box (NA fixtures; hinting narrows small
+# text the most): the middle, so a name steps out only where its drawn text meets a letter
+_INK_GLYPH = 0.6  # half a base letter's drawn box, in ems of its own size (rendered: 0.59-0.62 on the NA fixtures)
+
+
+def _text_width(text: str, bold: bool) -> float:
+    """A text's advance width in ems of its own size, measured as render measures its legend (TextPath, unhinted;
+    within 5% of the drawn extent)."""
+    from matplotlib.font_manager import FontProperties
+    from matplotlib.textpath import text_to_path
+
+    font = FontProperties(family=TEXT_FONTS, size=10, weight="bold" if bold else "normal")
+    return text_to_path.get_text_width_height_descent(text, font, ismath=False)[0] / 10
 
 
 def _ink_em(layout: Layout, font_scale: float) -> float:
     """Page units of one em of the drawn text, from the page the placed elements, stems and traces span so far
-    (it only grows after routing: _INK_ROOM covers that)."""
+    (the drawn page is at most 4% wider on the NA fixtures drawn with letters, whose text then grows with it)."""
     rects = [p.rect for p in [*layout.placed.values(), *layout.ghosts, *layout.stems]]
     rects += [(*pts.min(axis=0), *pts.max(axis=0)) for pts in map(np.asarray, layout.na_traces.values())]
     if not rects:
         return 0.0
     r = np.asarray(rects, float)
-    return text_em(float(r[:, 2].max() - r[:, 0].min()) + 2.0) * font_scale * _INK_ROOM
+    return text_em(float(r[:, 2].max() - r[:, 0].min()) + 2.0) * font_scale
 
 
 def _stem_name_ink(d: PlacedStem, em: float) -> tuple[float, float, float, float]:
-    """The box a stem's name is drawn in (render: 0.8 em, bold, turned along the stem), one em being `em`."""
-    along, across = 0.8 * em * _INK_CHAR * len(d.name) / 2, 0.8 * em * _INK_LINE / 2
+    """The upright box a stem's name is drawn in (render: 0.8 em, bold, turned along the stem, one line high), one em
+    being `em`, fitted to the drawn extents (_INK_FIT)."""
+    size = 0.8 * em * _INK_FIT
+    along, across = size * _text_width(d.name, True) / 2, size / 2
     c, s = abs(np.cos(d.angle)), abs(np.sin(d.angle))
     return centred_box(*stem_label_pos(d), c * along + s * across, s * along + c * across)
 
@@ -2132,10 +2148,11 @@ def _mirror_sides(mirrored: list[tuple]) -> None:
             copy.label_side = -1
 
 
-def _choose_label_sides(layout: Layout, sses: list[SSE], font_scale: float = 1.0, mirrored: list[tuple] = ()) -> None:
+def _choose_label_sides(layout: Layout, sses: list[SSE], style: Style, mirrored: list[tuple] = ()) -> None:
     """Element names first (_element_label_sides). Then each stem's name beside its first rail (label_side 1) unless
     its box meets another stem's name decided before it, another stem's body, an element or an element's name, or
-    sits nearer another stem than its own, or its drawn text meets a base letter of any stem; then beside the second
+    sits nearer another stem than its own, or its drawn text meets a base letter of any stem (where the style draws
+    them); then beside the second
     rail if that is clear; then further out (_SLOTS), either side (the upright box of a name turned 30-60 degrees can
     reach its own stem's letters on both sides alike); else on the first side after all. A mirror copy's name (the
     (copy, mate) members in `mirrored`, of protomers drawn as mirror images) then takes the mirror of its mate's
@@ -2143,11 +2160,19 @@ def _choose_label_sides(layout: Layout, sses: list[SSE], font_scale: float = 1.0
     _element_label_sides(layout, sses)
     if mirrored:
         _mirror_sides([(a, b) for a, b in mirrored if isinstance(a, Placed)])
-    em = _ink_em(layout, font_scale)
+    em = _ink_em(layout, style.font_scale)
     g = 0.75 * em * _INK_GLYPH  # a base letter: render draws it at 0.75 em
     rects = [p.rect for p in [*layout.placed.values(), *layout.ghosts]]
     rects += [b for name, b in label_boxes(Layout(layout.placed, layout.bounds), []) if name.startswith("label:")]
-    letters = [(x - g, y - g, x + g, y + g) for d in layout.stems for x, y in (d.point(k, NT_ROW) for k in d.axial)]
+    na_style = "block" if style.na_style == "ladder" and layout.na_cropped else style.na_style  # as render draws it
+    row = {"ladder": NT_ROW, "letters": 0.0}.get(na_style) if style.nucleotide_labels else None  # stems' letters
+    letters = (
+        []
+        if row is None
+        else [
+            (x - g, y - g, x + g, y + g) for d in layout.stems for x, y in map(d.point, d.axial, [row] * len(d.axial))
+        ]
+    )
     named: list[tuple[float, float, float, float]] = []
     for d in layout.stems:
         others = [e for e in layout.stems if e is not d]
