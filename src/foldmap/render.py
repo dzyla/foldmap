@@ -59,7 +59,7 @@ from .layout import (
 )
 from .model import SSE, group_by_chain
 from .na_paths import midway
-from .palette import chain_colors, darken, delta_e, text_color_on, tint
+from .palette import PALETTES, chain_colors, darken, delta_e, text_color_on, tint
 from .route import Loop, clip_len
 from .style import _ALIASES, CHOICES, MODALITIES, Style, backbone_overrides
 
@@ -1708,6 +1708,22 @@ def domain_tone(k: int) -> str:
     return _DOMAIN_TONES[k % len(_DOMAIN_TONES)]
 
 
+_GREY_FILLS = (PALETTES["greys"][2].lower(), PALETTES["greys"][1].lower())  # print's bar: two light greys, alternating
+_HATCHES = ("", "////", "\\\\\\\\", "xxx", "....", "||||", "----", "++")  # ... and a hatch per domain
+
+
+def domain_paint(k: int, look: Style) -> tuple[str, str]:
+    """(fill, hatch) of the k-th domain's panel tint and bar segments. The domain tones (domain_tone), unless the
+    theme keeps its own palette (domain_colours off, as print and blueprint do, and no color_by=domain): then the
+    palette's colours, or for the greys palette two light greys alternating, each domain with a hatch of its own."""
+    if look.domain_colours or look.color_by == "domain":
+        return domain_tone(k), ""
+    if look.palette == "greys":
+        return _GREY_FILLS[k % 2], _HATCHES[k % len(_HATCHES)]
+    colours = PALETTES[look.palette]
+    return colours[k % len(colours)].lower(), ""
+
+
 def domain_coloured(look: Style, layout: Layout | None) -> bool:
     """Are elements coloured by domain: with a domain named and drawn, and color_by=domain, or color_by=chain (the
     default) with domain_colours on. Any other colouring (a theme's or the user's) is kept."""
@@ -2245,7 +2261,7 @@ def _draw_domains(c: _Canvas, layout: Layout) -> None:
         if not ids:
             continue
         x0, y0, x1, y1 = domain_panel(layout, name)
-        tone = domain_tone(k)
+        tone = domain_paint(k, c.look)[0]
         fill = _mix(tone, c.look.background, 0.86)
         panel = FancyBboxPatch(
             (x0, y0),
@@ -2281,6 +2297,7 @@ class BarSegment(NamedTuple):
     lo: float
     hi: float
     tone: str
+    hatch: str = ""  # with a theme's greys: each domain's own hatch (domain_paint)
 
 
 def domain_bar_shown(look: Style, layout: Layout) -> bool:
@@ -2291,7 +2308,7 @@ def domain_bar_shown(look: Style, layout: Layout) -> bool:
     return drawn >= (1 if look.domain_bar == "on" else 2)
 
 
-def domain_bars(layout: Layout) -> list[tuple[str, float, float, list[BarSegment]]]:
+def domain_bars(layout: Layout, look: Style | None = None) -> list[tuple[str, float, float, list[BarSegment]]]:
     """(chain, first residue, last residue, segments) for each chain holding domain elements (not the neighbours that
     only lend a few, Layout.partial), in chain order. The domain elements in sequence make the segments: a run of
     one domain's elements is one, from its first element's first residue to its last element's last; between two
@@ -2316,7 +2333,7 @@ def domain_bars(layout: Layout) -> list[tuple[str, float, float, list[BarSegment
             name = layout.domains[d][0]
             seen[name] += 1
             gid = f"domain-bar:{chain}:{name}" + (f"#{seen[name]}" if seen[name] > 1 else "")
-            segments.append(BarSegment(name, gid, lo, hi, domain_tone(d)))
+            segments.append(BarSegment(name, gid, lo, hi, *domain_paint(d, look or Style())))
         out.append((chain, first, last, segments))
     return out
 
@@ -2341,7 +2358,7 @@ def _draw_domain_bar(c: _Canvas, layout: Layout) -> None:
     size, else below on a short tick; the chain's end residue numbers over its ends (and the chain's name between
     them when there are several bars)."""
     em = c.font / c.pt_per_unit  # page units of one em of the figure's text
-    bars = domain_bars(layout)
+    bars = domain_bars(layout, c.look)
     x0 = c.content[0]
     unit = (c.content[2] - x0) / max(max(last - first for _, first, last, _ in bars), 1.0)  # page units per residue
     for k, (chain, first, last, segments) in enumerate(bars):
@@ -2365,7 +2382,11 @@ def _draw_domain_bar(c: _Canvas, layout: Layout) -> None:
         below = []  # segments too narrow for their name: (segment centre, name width, segment)
         for seg in segments:
             xa, xb = x0 + (seg.lo - first) * unit, x0 + (seg.hi - first) * unit
-            rect = Rectangle((xa, y), xb - xa, em, fc=seg.tone, ec=darken(seg.tone), lw=c.lw * 0.6, zorder=2)
+            rect = Rectangle(
+                (xa, y), xb - xa, em, fc=seg.tone, ec=darken(seg.tone), lw=c.lw * 0.6, hatch=seg.hatch or None, zorder=2
+            )
+            if seg.hatch and hasattr(rect, "set_hatchcolor"):  # matplotlib >= 3.11; earlier: the rc hatch colour
+                rect.set_hatchcolor(darken(seg.tone, 0.8))
             rect.set_gid(seg.gid)
             c.ax.add_patch(rect)
             width = _text_width(seg.name) * 0.7 * em  # bold metrics: a little wider than the regular text drawn
@@ -2379,6 +2400,7 @@ def _draw_domain_bar(c: _Canvas, layout: Layout) -> None:
                     fontsize=c.font * 0.7,
                     color=ink_on(seg.tone),
                     zorder=2.1,
+                    bbox={"boxstyle": "square,pad=0.15", "fc": seg.tone, "ec": "none"} if seg.hatch else None,
                 )
                 t.set_gid(seg.gid.replace("domain-bar:", "domain-bar-label:", 1))
             else:

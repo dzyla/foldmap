@@ -424,3 +424,51 @@ def test_drawn_domain_names_have_contrast():
             assert contrast_ratio(ink, under) >= 4.5, (look.background, gid, ink, under)
             checked += 1
         assert checked >= 16
+
+
+def _bar_segments(fig):
+    return sorted((p for p in _gids(fig, "domain-bar:")), key=lambda p: (p.get_y(), p.get_x()))
+
+
+def test_print_draws_domains_in_its_greys_with_hatches():
+    """print (domain_colours off): panels and bar in the theme's greys, never a domain tone; neighbouring bar
+    segments differ in grey or hatch, and their names are dark."""
+    from matplotlib.colors import to_hex
+
+    from foldmap.render import _DOMAIN_TONES, _mix, contrast_ratio, save_svg
+    from foldmap.style import resolve_style
+
+    look = resolve_style("print")
+    fig = make_figure(DATA / "na" / "4OO8.cif.gz", chains=["A"], domains=_flag_file(CAS9_FILE), look=look)
+    svg = save_svg(fig).lower()
+    for tone in _DOMAIN_TONES:
+        for shade in (tone, _mix(tone, look.background, 0.86), _mix(tone, look.background, 0.55)):
+            assert shade not in svg, shade
+    segs = _bar_segments(fig)
+    assert len(segs) == 9
+    for a, b in zip(segs, segs[1:]):
+        assert to_hex(a.get_facecolor()) != to_hex(b.get_facecolor()) or a.get_hatch() != b.get_hatch()
+    assert len({(to_hex(p.get_facecolor()), p.get_hatch()) for p in segs}) == 8  # one look per domain
+    fills = {p.get_gid(): to_hex(p.get_facecolor()) for p in segs}
+    for t in _gids(fig, "domain-bar-label:"):
+        seg = fills[t.get_gid().replace("domain-bar-label:", "domain-bar:", 1)]
+        assert contrast_ratio(to_hex(t.get_color()), seg) >= 4.5 and to_hex(t.get_color()) == "#000000"
+
+
+def test_blueprint_draws_domains_in_its_palette():
+    """blueprint (domain_colours off): panels tinted and bar segments filled from its own palette."""
+    from matplotlib.colors import to_hex
+
+    from foldmap.palette import PALETTES
+    from foldmap.render import _mix
+    from foldmap.style import resolve_style
+
+    look = resolve_style("blueprint")
+    fig = make_figure(T4L, domains=T4L_DOMAINS, look=look)
+    pale = [c.lower() for c in PALETTES["blueprint"]]
+    panels = {p.get_gid(): to_hex(p.get_facecolor()) for p in _gids(fig, "domain:")}
+    assert panels == {
+        "domain:N": _mix(pale[0], look.background, 0.86),
+        "domain:C": _mix(pale[1], look.background, 0.86),
+    }
+    assert [to_hex(p.get_facecolor()) for p in _bar_segments(fig)] == [pale[1], pale[0], pale[1]]  # C, N, C
