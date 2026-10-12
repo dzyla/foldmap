@@ -83,7 +83,7 @@ class Limits:
 
 
 HOSTED = Limits(timeout=90, memory_mb=1024, max_residues=30_000, jobs=2)  # Q-A11; memory: 2 jobs x 1 GB and the
-# app's own process (about 300 MB, its caches included: app.main) fit Community Cloud's memory
+# app's own process (about 300 MB, its caches included: app.CACHES) fit Community Cloud's memory
 
 
 def limits(hosted: bool) -> Limits:
@@ -507,7 +507,7 @@ def restricted_summary(summary: str, total: int) -> str:
 
 
 # ---------------------------------------------------------------------------------------------- downloads
-@functools.lru_cache(maxsize=24)
+@functools.lru_cache(maxsize=8)  # app.CACHES counts these too
 def figure_file(path: str, blob: str, ext: str, limits: Limits, eager: tuple | None = None) -> bytes:
     """A figure download: from `eager` (the render's files as sorted (ext, bytes) items) when it holds `ext`,
     else drawn by a job."""
@@ -517,7 +517,7 @@ def figure_file(path: str, blob: str, ext: str, limits: Limits, eager: tuple | N
     return run_job(files_job, path, blob, ext, limits=limits)
 
 
-@functools.lru_cache(maxsize=16)
+@functools.lru_cache(maxsize=8)
 def sequence_file(path: str, blob: str, view_json: str, ext: str, limits: Limits) -> bytes:
     """A sequence figure download."""
     return run_job(sequence_job, path, blob, view_json, ext, limits=limits)

@@ -770,6 +770,16 @@ def picked_row(table: dict | None, choices: list[tuple[str, str]]) -> str | None
     return row_source(list(rows), choices)
 
 
+CACHES = {  # the app process's figure caches: (entries, MB one entry holds at most for the largest hosted figure)
+    "render": (12, 12),  # the figure's SVG, with a slow one's PNG and PDF (6XII near the limits, 93 s: 6.6 MB)
+    "page": (2, 48),  # the 3D page (6XII: 29 MB; the largest assemblies 20-48 MB)
+    "sequence": (8, 2),  # the sequence view's SVG
+}
+# Worst case: 12 x 12 + 2 x 48 + 8 x 2 = 256 MB, and the downloads kept by app_jobs (figure_file 8 x 3 MB,
+# sequence_file 8 x 2 MB) 40 MB more: about 300 MB beside two 1 GB jobs (app_jobs.HOSTED). The other caches
+# (sizes, UniProt lists, contacts) hold a few kB an entry.
+
+
 # ---------------------------------------------------------------------------------------------- UI
 def main() -> None:
     import streamlit as st
@@ -788,7 +798,7 @@ def main() -> None:
     lim = app_jobs.limits(hosted=not local_files())
     log_mode(lim)
 
-    @st.cache_data(show_spinner=False, max_entries=32)
+    @st.cache_data(show_spinner=False, max_entries=CACHES["render"][0])
     def render(path: str, blob: str) -> dict:
         return app_jobs.run_job(app_jobs.draw_job, path, blob, lim.slow, limits=lim)
 
@@ -800,11 +810,11 @@ def main() -> None:
     def choices(accession: str) -> list[tuple[str, str]]:
         return structure_choices(accession)
 
-    @st.cache_data(show_spinner=False, max_entries=16)
+    @st.cache_data(show_spinner=False, max_entries=CACHES["sequence"][0])
     def sequence_svg(path: str, blob: str, view_json: str) -> bytes:
         return app_jobs.run_job(app_jobs.sequence_job, path, blob, view_json, "svg", limits=lim)
 
-    @st.cache_data(show_spinner=False, max_entries=4)
+    @st.cache_data(show_spinner=False, max_entries=CACHES["page"][0])
     def page(path: str, blob: str) -> str:
         return app_jobs.run_job(app_jobs.page_job, path, blob, limits=lim)
 

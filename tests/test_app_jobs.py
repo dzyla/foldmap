@@ -440,3 +440,18 @@ def test_contacts_key_names_only_what_changes_the_contacts():
     assert contacts_key(base) != contacts_key({**base, "chains": "A"})
     assert contacts_key(base) != contacts_key({**base, "na_extent": "all"})
     assert contacts_key(base) != contacts_key({**base, "mode": "stack"})
+
+
+def test_the_app_process_caches_hold_about_300_mb_at_most():
+    """Entries times the most one entry holds for the largest figure the hosted app draws (6XII, near its limits:
+    render 6.6 MB, 3D page 29 MB): the app's own process stays small beside two 1 GB jobs."""
+    from foldmap import app
+
+    files = {"figure": (app_jobs.figure_file, 3), "sequence": (app_jobs.sequence_file, 2)}  # MB per file
+    worst = sum(n * mb for n, mb in app.CACHES.values())
+    worst += sum(cached.cache_parameters()["maxsize"] * mb for cached, mb in files.values())
+    assert worst <= 300, worst
+    assert app.CACHES["render"][0] <= 12 and app.CACHES["page"][0] <= 2
+    source = Path(app.__file__).read_text(encoding="utf-8")
+    for name in app.CACHES:
+        assert f'max_entries=CACHES["{name}"][0]' in source, name
