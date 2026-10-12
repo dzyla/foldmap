@@ -639,6 +639,7 @@ SHORT_NAMES = {  # sugar residues by their usual short names (SNFG); other ligan
     "NGA": "GalNAc",
 }
 _BOND = 1.9  # Å between heavy atoms of two residues that are covalently joined
+_OPM_DUMMY = "DUM"  # OPM/PPM pseudo-atoms marking the membrane boundaries
 
 
 def _ligand_label(codes: list[str]) -> str:
@@ -712,8 +713,9 @@ def _ligands(model, where, skip: set | None = None) -> list[Ligand]:
 
 
 def _ligand_parts(model, skip: set | None = None) -> list[tuple[str, gemmi.Residue, list[gemmi.Atom], bool]]:
-    """(chain name, residue, heavy atoms, is a metal ion) for every residue outside the polymers, waters and
-    skipped glycan sugars: the pieces _ligands joins into ligands."""
+    """(chain name, residue, heavy atoms, is a metal ion) for every residue outside the polymers, waters,
+    skipped glycan sugars and OPM's DUM membrane-boundary markers (read by membrane._opm, not molecules): the
+    pieces _ligands joins into ligands."""
     skip = skip or set()
     parts = []
     for chain in model:
@@ -722,6 +724,7 @@ def _ligand_parts(model, skip: set | None = None) -> list[tuple[str, gemmi.Resid
             if (
                 (res.seqid.num, res.seqid.icode) in polymer
                 or res.is_water()
+                or res.name == _OPM_DUMMY
                 or (chain.name, res.seqid.num, res.seqid.icode.strip()) in skip
             ):
                 continue

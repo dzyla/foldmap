@@ -235,3 +235,16 @@ def test_a_wide_depth_keeping_stack_packs_whole_chains_into_rows_each_with_its_b
 def test_a_narrow_depth_keeping_stack_stays_one_row():
     lay, sses, _ = make_layout(OPM, mode="stack", membrane="auto", chains=["A", "B"])
     assert lay.width <= 30.0 and len(lay.membrane["bands"]) == 1
+
+
+@pytest.mark.parametrize("kw", [{}, {"membrane": "auto"}, {"mode": "stack", "membrane": "auto"}])
+def test_opm_dummy_atoms_are_never_drawn_as_ligands(kw):
+    """1BL8 from OPM drew 77 'DUM' ligand boxes: the membrane boundary markers are not molecules. They still give
+    the membrane (sides included); KcsA's K+ ions are still drawn."""
+    lay, _, _ = make_layout(OPM, **kw)
+    assert not any("DUM" in g.codes for g in lay.links.ligands)
+    assert any(g.metal and g.symbol == "K" for g in lay.links.ligands)
+    texts = [t.get_text() for t in make_figure(OPM, **kw).axes[0].texts]
+    assert "DUM" not in texts and "K" in texts
+    if kw:
+        assert lay.membrane["source"] == "opm" and lay.membrane["sides"]
