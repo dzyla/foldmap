@@ -16,7 +16,7 @@ import numpy as np
 from . import text_metrics
 from .features import helix_bundles
 from .frame import Frame, symmetric_frame, view_frame
-from .model import SSE, Nucleic, Sheet, group_by_chain
+from .model import SSE, Nucleic, Sheet, generic_label, group_by_chain, pair_places, same_place
 from .nucleic import Stem, StemView, segment_stem, stem_axis, stem_views
 from .style import CHOICES, Style
 
@@ -485,16 +485,11 @@ def template_applies(sheet: Sheet, sses: list[SSE]) -> bool:
     return bool(units) and _BA_SHARE[1] * sum(u.inrow for u in units) >= _BA_SHARE[0] * len(units)
 
 
-def _ranges_meeting(xs: list[tuple[int, int]], ys: list[tuple[int, int]]) -> int:
-    """How many of the residue ranges xs overlap any of ys."""
-    return sum(any(min(x1, y1) >= max(x0, y0) for y0, y1 in ys) for x0, x1 in xs)
-
-
 def template_choices(sheets: list[Sheet], sses: list[SSE], copies: dict[str, tuple[str, int]]) -> list[bool]:
     """Which sheets are drawn as βα rows, copies of one protein alike. `copies` (model.homolog_chains): chain ->
     (first chain of its copies, residue-number offset). Sheets of one chain each match when they belong to copies of
-    one protein and at least half the strands of the smaller overlap the other sheet's, counted from each sheet and the
-    smaller count taken (residue numbers taken to the first copy's).
+    one protein and at least half the strands of the smaller pair one-to-one with the other sheet's (model.pair_places,
+    residue numbers taken to the first copy's).
     In each group of matching sheets: if any takes the template on its own (template_applies) and every one can be a
     row (_row_shape), all of them take it (a copy missing a helix or two is drawn as its mates are); if any cannot
     be a row, none takes it, so the copies stay alike. Pure."""
@@ -506,7 +501,7 @@ def template_choices(sheets: list[Sheet], sses: list[SSE], copies: dict[str, tup
             return None
         (c,) = chains
         root, shift = copies.get(c, (c, 0))
-        return root, c, [(s.first.seq - shift, s.last.seq - shift) for s in sh.strands]
+        return root, c, [("E", s.first.seq - shift, s.last.seq - shift) for s in sh.strands]
 
     keys = [mapped(sh) for sh in sheets]
     links = []
@@ -514,8 +509,7 @@ def template_choices(sheets: list[Sheet], sses: list[SSE], copies: dict[str, tup
         a, b = keys[i], keys[j]
         if a is None or b is None or a[0] != b[0] or a[1] == b[1]:
             continue
-        hits = min(_ranges_meeting(a[2], b[2]), _ranges_meeting(b[2], a[2]))  # both ways: sheet order is moot
-        if 2 * hits >= min(len(a[2]), len(b[2])):
+        if 2 * len(pair_places(a[2], b[2])) >= min(len(a[2]), len(b[2])):
             links.append((i, j))
     group = _components(len(sheets), links)
     out = []
@@ -1409,17 +1403,11 @@ def _centre_dna_over_binders(items: list[_Item], contacts: dict[frozenset[str], 
 
 
 def _assign_labels(placed: list[Placed]) -> None:
-    letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
     counts: dict[tuple[str, str], int] = {}
     for p in sorted(placed, key=lambda p: (p.sse.chain, p.sse.start)):
         n = counts.get((p.sse.chain, p.sse.kind), 0)
         counts[(p.sse.chain, p.sse.kind)] = n + 1
-        if p.sse.kind == "E":
-            p.label = letters[n] if n < 26 else f"S{n + 1}"
-        elif p.sse.kind == "G":
-            p.label = f"η{n + 1}"
-        else:
-            p.label = f"α{n + 1}"
+        p.label = generic_label(p.sse.kind, n)
 
 
 def stem_pieces(na: Nucleic) -> list[Stem]:
@@ -2305,8 +2293,9 @@ def _over_alike(
 ) -> dict[str, int]:
     """The helices of `over` (helix id -> sheet index) that are drawn over their sheet: not on a βα row's sheet
     (`rowed`, template_choices), not `taken` by another unit (a row, a bundle, a kinked helix), and alike in every
-    copy of the protein: a helix whose copy in another chain (`copies`, model.homolog_chains; residue ranges that
-    overlap once numbered as the first copy's) is drawn but not over its sheet stays beside, as that copy does."""
+    copy of the protein: a helix whose copy in another chain (`copies`, model.homolog_chains; a helix at its place,
+    model.same_place, once numbered as the first copy's) is drawn but not over its sheet stays beside, as that copy
+    does."""
     by_id = {s.id: s for s in sses}
     keep = {h: k for h, k in sorted(over.items()) if h in by_id and not rowed[k] and h not in taken}
 
@@ -2319,7 +2308,7 @@ def _over_alike(
     for h, k in keep.items():
         root, a, b = key(by_id[h])
         mates = [
-            g for g, (r, ga, gb) in helices if g.chain != by_id[h].chain and r == root and min(b, gb) >= max(a, ga)
+            g for g, (r, ga, gb) in helices if g.chain != by_id[h].chain and r == root and same_place((a, b), (ga, gb))
         ]
         if all(g.id in keep for g in mates):
             out[h] = k

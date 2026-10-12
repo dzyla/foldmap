@@ -9,7 +9,7 @@ import re
 
 import numpy as np
 
-from .model import SSE, Backbone, Bridge, homolog_chains
+from .model import SSE, Backbone, Bridge, homolog_chains, same_place
 from .sheets import _MIN_PAIRS, _SPLIT_GAP, _edge_table
 
 _MIN_STRAND = 2
@@ -84,8 +84,9 @@ def _ends(sses: list[SSE]) -> list[tuple[int, int]]:
 
 
 def _alike(u: tuple, v: tuple) -> bool:
-    """Are two pairs of pieces (_span) the same place in copies of one protein: x over x and y over y?"""
-    return u[0] == v[0] and u[1] <= v[2] and v[1] <= u[2] and u[3] <= v[4] and v[3] <= u[4]
+    """Are two pairs of pieces (_span) the same place in copies of one protein: x at x's place and y at y's
+    (model.same_place)?"""
+    return u[0] == v[0] and same_place(u[1:3], v[1:3]) and same_place(u[3:5], v[3:5])
 
 
 def _join_bulged_pieces(sses: list[SSE], ss: str, bb: Backbone, bridges: list[Bridge], copies) -> list[SSE]:

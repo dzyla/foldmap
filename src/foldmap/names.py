@@ -19,7 +19,7 @@ from pathlib import Path
 import yaml
 
 from .layout import Layout, provisional, resolve
-from .model import SSE, Nucleic, group_by_chain, res_ref
+from .model import SSE, Nucleic, copy_classes, group_by_chain, pair_places, res_ref
 
 KEYWORDS = ("deposited", "beta")
 _GENERIC = re.compile(r"(HELX_P)?\d+|H\d+")  # numbered helices name nothing
@@ -58,26 +58,19 @@ def load_names(
 
 
 def deposited_names(path, sses: list[SSE]) -> dict[str, str]:
-    """Each helix (H or G) named after the deposited helix record (mmCIF _struct_conf, PDB HELIX) overlapping it
-    most, when that covers at least half of it and its id is a name (helix_names). Strands keep their letters (the
-    sheet records are numbered in every file checked)."""
+    """Each helix (H or G) named after the deposited helix record (mmCIF _struct_conf, PDB HELIX) at its place, when
+    that record's id is a name (helix_names): records and helices of a chain pair one-to-one as copies' elements do
+    (model.pair_places). Strands keep their letters (the sheet records are numbered in every file checked)."""
     rows = _helix_rows(path)
     names = helix_names([(hid, chain) for hid, chain, _, _ in rows])
-    named = [(chain, lo, hi, name) for (_, chain, lo, hi), name in zip(rows, names) if name]
+    named = [(chain, *sorted((lo, hi)), name) for (_, chain, lo, hi), name in zip(rows, names) if name]
     files = {chain for chain, _, _, _ in named}
     out = {}
-    for s in sses:
-        if s.kind not in ("H", "G"):
-            continue
-        chain = _deposited_chain(s.chain, files)
-        lo, hi = sorted((s.first.seq, s.last.seq))
-        best, most = None, 0
-        for c, a, b, name in named:
-            o = min(hi, b) - max(lo, a) + 1
-            if c == chain and o > most:
-                best, most = name, o
-        if best is not None and 2 * most >= hi - lo + 1:
-            out[res_ref(s.chain, s.first, s.last)] = best
+    for chain, mine in group_by_chain(s for s in sses if s.kind in ("H", "G")).items():
+        records = [(lo, hi, name) for c, lo, hi, name in named if c == _deposited_chain(chain, files)]
+        helices = [("H", *sorted((s.first.seq, s.last.seq))) for s in mine]
+        for i, j in pair_places(helices, [("H", lo, hi) for lo, hi, _ in records]).items():
+            out[res_ref(chain, mine[i].first, mine[i].last)] = records[j][2]
     return out
 
 
@@ -320,30 +313,32 @@ def apply_names(
                 layout.placed[sid].label = named[sid] = name
         for k, name in stems.items():
             layout.stems[k].name = name
-    shared = _shared(layout, sses, named, copies or {})
+    shared = _shared(layout, sses, named, copies or {}, whole or sses)
     for sid, name in shared.items():
         layout.placed[sid].label = name
     for sid in sorted({*named, *shared}):
         layout.placed[sid].label += (primes or {}).get(layout.placed[sid].sse.chain, "")
 
 
-def _shared(layout: Layout, sses: list[SSE], named: dict[str, str], copies: dict[str, tuple[str, int]]):
-    """sid -> name for each unnamed element of a copy whose overlapping element (same kind, at least half of it,
-    residue numbers taken to the first copy's) in another copy was named; the largest overlap wins."""
+def _shared(
+    layout: Layout, sses: list[SSE], named: dict[str, str], copies: dict[str, tuple[str, int]], whole: list[SSE]
+):
+    """sid -> name for each unnamed drawn element of a copy whose mate (model.copy_classes over `whole`, the chains
+    as read) in another copy was named: the reference copy's name, else the first named copy's, unless its chain
+    already uses that name."""
     drawn = [s for s in sses if s.id in layout.placed]
+    mate = copy_classes(whole, copies).mate
+    name: dict[str, str] = {}  # mate -> name
+    for s in sorted((s for s in drawn if s.id in named and s.id in mate), key=lambda s: s.id != mate[s.id]):
+        name.setdefault(mate[s.id], named[s.id])
+    used: dict[str, set[str]] = {}
+    for s in drawn:
+        used.setdefault(s.chain, set()).add(layout.placed[s.id].label)
     out = {}
     for s in drawn:
-        if s.id in named or s.chain not in copies:
+        given = name.get(mate.get(s.id, ""))
+        if s.id in named or given is None or given in used[s.chain]:
             continue
-        root, shift = copies[s.chain]
-        lo, hi = s.first.seq - shift, s.last.seq - shift
-        best, most = None, 0
-        for t in drawn:
-            if t.id not in named or t.chain == s.chain or t.kind != s.kind or copies.get(t.chain, ("",))[0] != root:
-                continue
-            o = min(hi, t.last.seq - copies[t.chain][1]) - max(lo, t.first.seq - copies[t.chain][1]) + 1
-            if o > most:
-                best, most = named[t.id], o
-        if best is not None and 2 * most >= hi - lo + 1:
-            out[s.id] = best
+        out[s.id] = given
+        used[s.chain].add(given)
     return out

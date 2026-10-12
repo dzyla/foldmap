@@ -524,34 +524,13 @@ def _focus_subset(sses, focus: set, bridges) -> tuple[list, set]:
 
 
 def _homolog_labels(bb, sses) -> dict[str, str]:
-    """Labels for elements of partial copies of a protein (e.g. a chain modelled from its second domain only):
-    the label of the overlapping element in the fullest copy, so the same helix is called the same everywhere."""
+    """Labels shared by copies of a protein, however much of each is modelled (model.shared_labels): one element,
+    one label, in every copy."""
     from .layout import provisional
-    from .model import homolog_chains
+    from .model import homolog_chains, shared_labels
 
     labels = {k: p.label for k, p in provisional(sses).placed.items()}
-    copies = homolog_chains(bb)
-    chains = list(copies)
-    count = {c: sum(s.chain == c for s in sses) for c in chains}
-    out = {}
-    for c in chains:
-        members = [m for m in chains if copies[m][0] == copies[c][0]]
-        ref = max(members, key=lambda m: (count[m], -chains.index(m)))
-        if ref == c:
-            continue
-        shift = copies[c][1] - copies[ref][1]  # c's residue n is ref's residue n - shift
-        theirs = [s for s in sses if s.chain == ref]
-        for s in (s for s in sses if s.chain == c):
-            best, overlap = None, 0
-            for t in theirs:
-                if t.kind != s.kind:
-                    continue
-                o = min(s.last.seq - shift, t.last.seq) - max(s.first.seq - shift, t.first.seq) + 1
-                if o > overlap:
-                    best, overlap = t, o
-            if best is not None and overlap >= 0.5 * (s.last.seq - s.first.seq + 1) and labels[best.id] != labels[s.id]:
-                out[s.id] = labels[best.id]
-    return out
+    return shared_labels(sses, homolog_chains(bb), labels)
 
 
 def _context(sym, focus: set, bb, neighbours: bool = True) -> str:

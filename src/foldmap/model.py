@@ -132,6 +132,121 @@ def homolog_chains(bb: Backbone) -> dict[str, tuple[str, int]]:
     return out
 
 
+# ---------------------------------------------------------------------------------------------- copies alike
+
+
+def overlap(a: tuple[int, int], b: tuple[int, int]) -> int:
+    """Residues two ranges (first, last residue number, in one numbering) share; 0 or less when they do not meet."""
+    return min(a[1], b[1]) - max(a[0], b[0]) + 1
+
+
+def same_place(a: tuple[int, int], b: tuple[int, int]) -> bool:
+    """Are two ranges one element's place: sharing at least half of the shorter one's residues?"""
+    o = overlap(a, b)
+    return o > 0 and 2 * o >= min(a[1] - a[0], b[1] - b[0]) + 1
+
+
+def pair_places(xs: list[tuple[str, int, int]], ys: list[tuple[str, int, int]]) -> dict[int, int]:
+    """One-to-one pairs (index in xs -> index in ys) of places (kind, first, last residue number, one numbering):
+    the same kind at the same place (same_place), the largest overlaps paired first, then the earliest."""
+    found = sorted(
+        (-overlap(x[1:], y[1:]), i, j)
+        for i, x in enumerate(xs)
+        for j, y in enumerate(ys)
+        if x[0] == y[0] and same_place(x[1:], y[1:])
+    )
+    out: dict[int, int] = {}
+    taken: set[int] = set()
+    for _, i, j in found:
+        if i not in out and j not in taken:
+            out[i] = j
+            taken.add(j)
+    return out
+
+
+@dataclass
+class CopyClasses:
+    """Elements of copies of one protein that are one element (copy_classes)."""
+
+    reference: dict[str, str]  # first chain of each group of copies (model.homolog_chains) -> its reference copy
+    mate: dict[str, str]  # element id -> the element it is: the reference copy's, else the first copy holding it
+    groups: dict[str, list[str]]  # first chain -> the copies holding elements, in chain order
+
+
+def copy_classes(sses: list[SSE], copies: dict[str, tuple[str, int]]) -> CopyClasses:
+    """Which elements of copies of one protein (`copies`, homolog_chains) are one element. Two copies' elements
+    pair one-to-one (pair_places, residue numbers taken to the first copy's). The reference is the copy pairing
+    most elements with the others (more elements, then the earlier chain, break ties): every element pairing
+    one of its elements is that element. The others, in chain order, pair one-to-one with those found so far
+    that the reference lacks, else start their own. Chains with no copy holding elements are left out."""
+    chains = list(dict.fromkeys([*copies, *(s.chain for s in sses)]))
+    mine = group_by_chain(sses)
+
+    def places(c: str) -> list[tuple[str, int, int]]:
+        shift = copies.get(c, (c, 0))[1]
+        return [(s.kind, s.first.seq - shift, s.last.seq - shift) for s in mine[c]]
+
+    groups: dict[str, list[str]] = {}
+    for c in chains:
+        if c in mine:
+            groups.setdefault(copies.get(c, (c, 0))[0], []).append(c)
+    groups = {root: members for root, members in groups.items() if len(members) > 1}
+    at = {c: places(c) for members in groups.values() for c in members}
+    out = CopyClasses({}, {}, groups)
+    for root, members in groups.items():
+        paired = {m: sum(len(pair_places(at[c], at[m])) for c in members if c != m) for m in members}
+        ref = max(members, key=lambda m: (paired[m], len(at[m]), -chains.index(m)))
+        out.reference[root] = ref
+        out.mate.update({s.id: s.id for s in mine[ref]})
+        extra: list[tuple[str, tuple[str, int, int]]] = []  # elements the reference lacks: (first holder's id, place)
+        for c in (c for c in members if c != ref):
+            found = pair_places(at[c], at[ref])
+            out.mate.update({mine[c][i].id: mine[ref][j].id for i, j in found.items()})
+            rest = [i for i in range(len(at[c])) if i not in found]
+            known = pair_places([at[c][i] for i in rest], [p for _, p in extra])
+            for k, i in enumerate(rest):
+                out.mate[mine[c][i].id] = extra[known[k]][0] if k in known else mine[c][i].id
+            extra += [(mine[c][i].id, at[c][i]) for k, i in enumerate(rest) if k not in known]
+    return out
+
+
+def generic_label(kind: str, n: int) -> str:
+    """The label of a chain's n-th (from 0) element of a kind: strands A…Z then S27…, 3-10 helices η1…, α1…"""
+    if kind == "E":
+        return "ABCDEFGHIJKLMNOPQRSTUVWXYZ"[n] if n < 26 else f"S{n + 1}"
+    return f"η{n + 1}" if kind == "G" else f"α{n + 1}"
+
+
+def shared_labels(sses: list[SSE], copies: dict[str, tuple[str, int]], labels: dict[str, str]) -> dict[str, str]:
+    """id -> label for the elements of copies of one protein (copy_classes) whose label (`labels`, id -> label)
+    changes so that one element has one label in every copy: the reference copy's. An element the reference lacks
+    keeps its label unless a copy before it (the reference among them) or its own chain uses that label; then it
+    takes the first free label of its kind (generic_label). The same element in later copies takes that label too."""
+    classes = copy_classes(sses, copies)
+    mine = group_by_chain(sses)
+    out: dict[str, str] = {}
+    for root, ref in classes.reference.items():
+        given = {s.id: labels[s.id] for s in mine[ref]}  # mate -> the label its copies take
+        taken, ours = set(given.values()), set(given)
+        for c in (c for c in classes.groups[root] if c != ref):
+            new = {s.id: given[classes.mate[s.id]] for s in mine[c] if classes.mate[s.id] in ours}
+            used = set(new.values())
+            for s in (s for s in mine[c] if s.id not in new):
+                key = classes.mate[s.id]
+                label = given.get(key)
+                if label is None or label in used:
+                    label = labels[s.id]
+                    n = 0
+                    while label in used or label in taken:
+                        label, n = generic_label(s.kind, n), n + 1
+                    given.setdefault(key, label)
+                new[s.id] = label
+                used.add(label)
+            taken |= used
+            out.update({k: v for k, v in new.items() if v != labels[k]})
+    return out
+
+
 @dataclass(eq=False)
 class Sheet:
     """Strands in sheet order. directions[k] is +1 if strands[k] runs the same way as
