@@ -24,6 +24,7 @@ from .model import SSE, Nucleic, copy_classes, group_by_chain, pair_places, res_
 KEYWORDS = ("deposited", "beta")
 _GENERIC = re.compile(r"(HELX_P)?\d+|H\d+")  # numbered helices name nothing
 _PRIMES = ("", "′", "″", "‴")
+_LETTER = re.compile(r"[A-Za-z]")  # a deposited name starting with a letter, as strand labels do
 
 
 def check_spec(spec: str) -> None:
@@ -48,7 +49,7 @@ def load_names(
     leaves out: those refs are skipped, any other ref that names nothing is an error."""
     drawn = [s for s in sses if s.id in layout.placed]
     if spec == "deposited":
-        return deposited_names(path, drawn), {}
+        return deposited_names(path, drawn, whole), {}
     if spec == "beta":
         return beta_names(layout, drawn, whole), {}
     return _file_names(Path(spec), layout, drawn, nucleic, whole, chains)
@@ -57,20 +58,26 @@ def load_names(
 # ---------------------------------------------------------------------------------------------- deposited
 
 
-def deposited_names(path, sses: list[SSE]) -> dict[str, str]:
+def deposited_names(path, sses: list[SSE], whole: list[SSE] | None = None) -> dict[str, str]:
     """Each helix (H or G) named after the deposited helix record (mmCIF _struct_conf, PDB HELIX) at its place, when
     that record's id is a name (helix_names): records and helices of a chain pair one-to-one as copies' elements do
-    (model.pair_places). Strands keep their letters (the sheet records are numbered in every file checked)."""
+    (model.pair_places). In a chain holding strands (in `whole`, the chain as read, when given) a name starting with
+    a letter takes an α (CheY's A-E: αA-αE), as the strands keep their letters (the sheet records are numbered in
+    every file checked)."""
     rows = _helix_rows(path)
     names = helix_names([(hid, chain) for hid, chain, _, _ in rows])
     named = [(chain, *sorted((lo, hi)), name) for (_, chain, lo, hi), name in zip(rows, names) if name]
     files = {chain for chain, _, _, _ in named}
+    stranded = {s.chain for s in whole or sses if s.kind == "E"}
     out = {}
     for chain, mine in group_by_chain(s for s in sses if s.kind in ("H", "G")).items():
         records = [(lo, hi, name) for c, lo, hi, name in named if c == _deposited_chain(chain, files)]
         helices = [("H", *sorted((s.first.seq, s.last.seq))) for s in mine]
         for i, j in pair_places(helices, [("H", lo, hi) for lo, hi, _ in records]).items():
-            out[res_ref(chain, mine[i].first, mine[i].last)] = records[j][2]
+            name = records[j][2]
+            out[res_ref(chain, mine[i].first, mine[i].last)] = (
+                f"α{name}" if chain in stranded and _LETTER.match(name) else name
+            )
     return out
 
 
@@ -308,16 +315,49 @@ def apply_names(
     named: dict[str, str] = {}
     for spec in specs:
         elements, stems = load_names(spec, path, layout, sses, layout.nucleic, whole=whole, chains=chains)
+        given = set()
         for ref, name in elements.items():
             for sid in resolve(layout, sses, ref):
                 layout.placed[sid].label = named[sid] = name
+                given.add(sid)
         for k, name in stems.items():
             layout.stems[k].name = name
+        _once_per_chain(spec, layout, sses, given)
     shared = _shared(layout, sses, named, copies or {}, whole or sses)
     for sid, name in shared.items():
         layout.placed[sid].label = name
     for sid in sorted({*named, *shared}):
         layout.placed[sid].label += (primes or {}).get(layout.placed[sid].sse.chain, "")
+
+
+def _once_per_chain(spec: str, layout: Layout, sses: list[SSE], given: set[str]) -> None:
+    """After a names spec, no two drawn elements of a chain carry one label. A file naming an element (`given`, the
+    ids this spec named) with a label another element of its chain carries is an error; a generated name
+    (deposited, beta) is told apart by primes: in sequence, the first element keeps it, each later one takes the
+    first prime its chain leaves free."""
+    for chain, mine in group_by_chain(
+        sorted((s for s in sses if s.id in layout.placed), key=lambda s: s.start)
+    ).items():
+        holders: dict[str, list[SSE]] = {}
+        for s in mine:
+            holders.setdefault(layout.placed[s.id].label, []).append(s)
+        used = set(holders)
+        for name, held in holders.items():
+            if len(held) < 2 or not any(s.id in given for s in held):
+                continue
+            if spec not in KEYWORDS:
+                ours = next(s for s in held if s.id in given)
+                other = next(s for s in held if s is not ours)
+                raise ValueError(
+                    f"{spec}: {name!r} names {ours.id} but {other.id} carries it in chain {chain} too; one name, one "
+                    "element (name that one too, or choose another name)"
+                )
+            for s in held[1:]:
+                k = 1
+                while _primed(name, k) in used:
+                    k += 1
+                layout.placed[s.id].label = _primed(name, k)
+                used.add(_primed(name, k))
 
 
 def _shared(

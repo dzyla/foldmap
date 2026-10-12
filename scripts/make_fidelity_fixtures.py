@@ -30,6 +30,7 @@ ENTRIES = {
     "1MBN": "myoglobin: all helical, with a haem",
     "7TIM": "triosephosphate isomerase: a TIM barrel",
     "1PV7": "lactose permease, chain B 70-115 only: a pi-bulge in a straight TM helix (H 87-90, I 91-95, H 96-100)",
+    "3CHY": "CheY: a flavodoxin-like fold whose deposited helices are lettered A-E, as its strands are drawn",
 }
 WINDOWS = {"1PV7": ("B", 70, 115)}  # chain, first and last residue kept (DSSP of the window matches the full chain)
 

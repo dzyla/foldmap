@@ -4,7 +4,7 @@ import gemmi
 
 from helpers import FID, loop_crossings
 
-IDS = ["1TEN", "1LDM", "2ACY", "1MBN", "7TIM", "1PV7"]
+IDS = ["1TEN", "1LDM", "2ACY", "1MBN", "7TIM", "1PV7", "3CHY"]
 
 
 def test_fixtures_are_small_and_complete():

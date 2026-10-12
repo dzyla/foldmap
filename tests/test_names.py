@@ -241,3 +241,49 @@ def test_a_name_is_measured_as_render_draws_it(text):
         pytest.skip("needs Liberation Sans Bold (fonts-liberation), the font render draws names in here")
     drawn = text_to_path.get_text_width_height_descent(text, prop, ismath=False)[0] / 100
     assert abs(_text_width(text) / drawn - 1) < 0.02
+
+
+# ---------------------------------------------------------------------------------------------- one name, one element
+
+
+def test_deposited_helix_letters_take_alpha_beside_lettered_strands():
+    """3CHY (CheY): the file letters its helices A-E, as the strands are drawn. In a chain holding strands, a
+    letter-named helix reads αA … αE; the strands keep A-E; nothing in the chain is named twice."""
+    lay, sses, _ = make_layout(FID / "3CHY.cif.gz", names=["deposited"])
+    label = {s.id: lay.placed[s.id].label for s in sses}
+    assert [label[s.id] for s in sses if s.kind == "H"] == ["αA", "αB", "αC", "αD", "αE"]
+    assert [label[s.id] for s in sses if s.kind == "E"] == list("ABCDE")
+    assert len(set(label.values())) == len(label)
+
+
+def test_tim_deposited_helices_take_alpha_and_every_name_is_once_per_chain():
+    """1TIM letters its helices after their βα unit (A, B, C, D1, D2 …); the strands are A-H."""
+    lay, sses, _ = make_layout(DATA / "1TIM.cif", names=["deposited"])
+    for chain in "AB":
+        mine = [lay.placed[s.id].label for s in sses if s.chain == chain]
+        assert len(set(mine)) == len(mine)
+    assert lay.placed["A:18-30"].label == "αA" and lay.placed["A:96-102"].label == "αD1"
+
+
+def test_a_names_file_may_not_give_a_name_another_element_of_the_chain_carries(tmp_path):
+    bad = tmp_path / "dup.yaml"
+    bad.write_text("elements:\n  res:A:23-34: B\n", encoding="utf-8")  # 1UBQ's second strand is B
+    with pytest.raises(ValueError, match=r"dup.yaml: 'B' names A:23-34 .*A:12-16 .*chain A.*one name, one element"):
+        make_layout(DATA / "1UBQ.cif", names=[str(bad)])
+
+
+def test_a_names_file_may_swap_two_labels(tmp_path):
+    swap = tmp_path / "swap.yaml"
+    swap.write_text("elements:\n  res:A:2-7: B\n  res:A:12-16: A\n", encoding="utf-8")
+    lay, _, _ = make_layout(DATA / "1UBQ.cif", names=[str(swap)])
+    assert (lay.placed["A:2-7"].label, lay.placed["A:12-16"].label) == ("B", "A")
+
+
+def test_a_deposited_name_another_element_carries_is_primed(tmp_path):
+    """A generated name that a chain already uses is told apart by a prime: 1UBQ's α1 record renamed η2 (its
+    57-59 3-10 helix's label) gives 23-34 η2 and 57-59 η2′."""
+    text = (DATA / "1UBQ.cif").read_text(encoding="utf-8").replace("HELX_P1 H1 ILE", "HELX_P1 'η2' ILE")
+    path = tmp_path / "1UBQ.cif"
+    path.write_text(text, encoding="utf-8")
+    lay, _, _ = make_layout(path, names=["deposited"])
+    assert (lay.placed["A:23-34"].label, lay.placed["A:57-59"].label) == ("η2", "η2′")
