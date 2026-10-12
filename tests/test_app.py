@@ -226,22 +226,22 @@ def test_layout_file_settings_share_no_list_with_the_defaults():
     assert LAYOUT_DEFAULTS["names"] == [] and settings_from_document({})["names"] == []
 
 
-def test_a_layout_file_names_file_missing_here_is_a_warning_in_the_names_block():
+def test_a_layout_file_names_file_missing_here_is_a_warning_under_the_figure():
     import yaml
 
     at = load(app_test(), DATA / "2HHB.cif")
     up = ("layout.yaml", yaml.safe_dump({"foldmap": 1, "names": ["deposited", "/nowhere/n.yaml"]}).encode(), "x")
     at.file_uploader(key="layout_upload").set_value(up).run()
     assert not at.exception and not at.error and at.session_state["names"] == ["deposited"]
-    assert any("names file /nowhere/n.yaml is not on this machine; upload it here." in _visible(w.value)
-               for w in at.warning)  # fmt: skip
+    said = "The layout file's names file /nowhere/n.yaml is not on this machine; upload it under Edit layout."
+    assert [_visible(w.value) for w in at.main.warning] == [said]  # under the figure, not in a closed section
     at.file_uploader(key="names_upload").set_value(
         ("2HHB-globin.yaml", (Path(__file__).parents[1] / "docs/names/2HHB-globin.yaml").read_bytes(), "text/yaml")
     ).run()
     assert not at.exception and not at.warning and len(at.session_state["names"]) == 2
 
 
-def test_layout_file_domains_naming_elements_the_structure_lacks_are_a_warning():
+def test_layout_file_domains_naming_elements_the_structure_lacks_are_a_warning(capsys):
     """A layout file outlives its structure: element ids it names that this one lacks are dropped with a warning
     (as on the command line); typed in the app, the same ids are an error."""
     import yaml
@@ -252,6 +252,8 @@ def test_layout_file_domains_naming_elements_the_structure_lacks_are_a_warning()
     assert not at.exception and not at.error and 'id="domain-bar:' in svg_of(at)
     warned = [_visible(w.value) for w in at.warning]
     assert any("domains name element(s) this structure does not have, dropped: A:999-1005" in w for w in warned)
+    assert any(w.endswith("Edit Domains to remove them; an edit there checks every range.") for w in warned)
+    assert "warning" not in capsys.readouterr().err  # the app shows it; the command line's print is not made
     as_text(at, "domains", at.session_state["domains"] + " ")  # typed now: an error, as on the command line
     assert any("'A:999-1005' is no element" in _visible(e.value) for e in at.error)
 
@@ -1098,3 +1100,15 @@ def test_a_hosted_layout_download_names_uploads_by_their_own_names(monkeypatch, 
     assert text.startswith("# ") and "my-names.yaml, ubq.fasta" in text.split("\nfoldmap:")[0]
     monkeypatch.setenv("FOLDMAP_APP_LOCAL_FILES", "1")  # on your own machine the paths stay: they open again
     assert ss["msa_path"] in layout_yaml(ss["path"], ss["last_good"]["blob"], uploads_of(ss)).decode()
+
+
+def test_hosted_missing_files_of_a_layout_file_are_named_without_their_path(monkeypatch, tmp_path):
+    import yaml
+
+    monkeypatch.setenv("FOLDMAP_APP_LOCAL_FILES", "0")
+    seed_cache(monkeypatch, tmp_path, "1UBQ")
+    at = opened("1UBQ")
+    doc = {"foldmap": 1, "names": ["/srv/a/n.yaml"], "layout": {"msa": "/srv/a/x.fasta"}}
+    at.file_uploader(key="layout_upload").set_value(("l.yaml", yaml.safe_dump(doc).encode(), "x")).run()
+    text = " ".join(_visible(w.value) for w in at.warning)
+    assert not at.exception and "names file n.yaml" in text and "alignment x.fasta" in text and "/srv" not in text

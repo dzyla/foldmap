@@ -205,7 +205,7 @@ EDITORS = {
 NEEDED = {"swap": ("a", "b"), "rename": ("element", "name"), "domains": ("name", "ranges")}  # a table row is
 # written once these are filled (else its first column): a swap of one element, a rename with no name or a domain
 # with no ranges would be an error
-_RANGE_IN_CHAIN = re.compile(r"[A-Za-z0-9]+:-?\d+[A-Z]?(--?\d+[A-Z]?)?")
+_RANGE_IN_CHAIN = re.compile(r"(?![A-Za-z]+\d+:)[A-Za-z0-9]+:-?\d+[A-Z]?(--?\d+[A-Z]?)?")  # not a copy's (A1:)
 _RANGE = re.compile(r"-?\d+[A-Z]?(--?\d+[A-Z]?)?")
 
 
@@ -233,7 +233,9 @@ def _float_or_text(text: str):
 
 
 def _residues(ref: str) -> str:
-    """A domain range cell item as a reference: A:1-80 -> res:A:1-80, 1-80 -> res:1-80; labels stay."""
+    """A domain range cell item as a reference: A:1-80 -> res:A:1-80, 1-80 -> res:1-80. Anything else stays as
+    written: labels, residue references, and the element ids of an assembly's copies (A1:3-7: a chain id with a
+    copy number), which stay element ids rather than become a guess at a residue range."""
     ref = ref.strip()
     return f"res:{ref}" if _RANGE_IN_CHAIN.fullmatch(ref) or _RANGE.fullmatch(ref) else ref
 

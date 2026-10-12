@@ -347,3 +347,8 @@ def test_a_domain_row_waits_for_its_name_and_its_ranges():
     ss["domains__table_1"] = {"edited_rows": {0: {"ranges": "A:1-60"}}}
     apply_table(ss, "domains")
     assert ss["domains"] == "N=res:A:1-60" and ss["domains__blank"] == []
+
+
+def test_domain_ranges_become_residue_ranges_only_where_they_map_exactly():
+    rows = [{"name": "N", "ranges": "A:1-80, 200-240, 1:5-20, A1:3-7, α3, res:B:1-9"}]
+    assert text_of("domains", rows) == "N=res:A:1-80,res:200-240,res:1:5-20,A1:3-7,α3,res:B:1-9"  # A1: a copy

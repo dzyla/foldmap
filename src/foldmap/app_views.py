@@ -150,9 +150,24 @@ def figure_view(ws: Workspace) -> None:
         if notes:
             st.caption(shown(notes))
         if result and result.get("domains_note"):  # as the command line warns
-            st.warning(shown(result["domains_note"][0].upper() + result["domains_note"][1:] + "."))
+            note = result["domains_note"]
+            st.warning(shown(f"{note[0].upper()}{note[1:]}. {DOMAINS_EDIT}"))
+        missing_files(ws)
         if ss.get("check_contacts") and ss.get("na_chains"):
             contacts_check(ws, good["blob"])
+
+
+DOMAINS_EDIT = "Edit Domains to remove them; an edit there checks every range."  # the layout file's domains are
+# read leniently only while unchanged (app.layout_options)
+
+
+def missing_files(ws: Workspace) -> None:
+    """Under the figure: a layout file's names files that are not on this machine (hosted: never read), to upload."""
+    from foldmap.app import local_files
+
+    for p in ws.ss.get("names_missing") or []:
+        name = shown(p, paths=not local_files())
+        ws.st.warning(f"The layout file's names file {name} is not on this machine; upload it under Edit layout.")
 
 
 def drawn_summary(ss: MutableMapping, settings: dict, result: dict) -> str:

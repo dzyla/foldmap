@@ -119,7 +119,8 @@ def layout_options(settings: dict) -> dict:
     lines = [p.strip() for p in re.split(r"[;\n]", settings.get("domains", "") or "") if p.strip()]
     domains = "auto" if lines == ["auto"] else _domain_spec(lines) or None
     if isinstance(domains, list) and settings.get("domains_from_file") == settings.get("domains"):
-        domains = SavedDomains(domains)  # a layout file's: element ids this structure lacks are dropped, with a note
+        domains = SavedDomains(domains, quiet=True)  # a layout file's: ids this structure lacks are dropped; the
+        # app shows the note (app_jobs.draw_job), so the pipeline prints none
     if settings.get("uniprot_domains") and (settings.get("uniprot") or "off") not in ("off", ""):
         domains = "uniprot"
     return {
@@ -798,8 +799,8 @@ def main() -> None:
             st.error(shown(ss["layout_error"]))
         if ss.get("msa_missing") and not ss.get("msa_path"):
             st.warning(
-                f"The layout file's alignment {shown(ss['msa_missing'], paths=False)} is not on this machine; "
-                "upload it under Conservation & UniProt."
+                f"The layout file's alignment {shown(ss['msa_missing'], paths=not local_files())} is not on this "
+                "machine; upload it under Conservation & UniProt."
             )
     st.sidebar.caption(CREDIT)
 

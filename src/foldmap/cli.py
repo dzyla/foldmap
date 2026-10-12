@@ -641,7 +641,7 @@ def _domains(spec, sses, contacts, rows=(), copies=None, lent=frozenset()) -> li
                 "or name elements by label (α1, A:G)"
             )
         kept = [(name, [i for i in ids if i in known]) for name, ids in spec]
-        if stale:
+        if stale and not getattr(spec, "quiet", False):
             print(f"foldmap: warning: {stale_domains_note(spec, sses)}", file=sys.stderr)
         return [(name, ids) for name, ids in kept if ids]  # already element ids (UniProt domains, a layout file)
     lay, out, seen = provisional(sses), [], set()

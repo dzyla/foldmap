@@ -362,7 +362,7 @@ NAMES_FILE_MAX = 100_000  # bytes: a names file is a few kB
 
 def names_block(st, ss: MutableMapping) -> None:
     """Element names (--names): a keyword, and a names file uploaded (then its name and Remove instead of the
-    uploader). A layout file's names file that is not on this machine is asked for here."""
+    uploader). A layout file's names file that is not on this machine is asked for under the figure."""
     segmented(
         st,
         "Element names",
@@ -390,8 +390,6 @@ def names_block(st, ss: MutableMapping) -> None:
         )
     if ss.get("names_error"):
         st.error(shown(ss["names_error"]))
-    for p in ss.get("names_missing") or []:
-        st.warning(f"The layout file's names file {shown(p, paths=False)} is not on this machine; upload it here.")
 
 
 def names_file_name(ss: MutableMapping, path: str) -> str:

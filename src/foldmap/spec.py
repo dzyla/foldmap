@@ -227,7 +227,12 @@ def parse_protomers(text: str | None) -> list[list[str]] | None:
 class SavedDomains(list):
     """Domains read from a layout file, [(name, [refs])]. A file outlives the structure it was saved from, so
     element ids it names that the structure no longer has are dropped with a warning (cli._domains); given on the
-    command line, they are an error."""
+    command line, they are an error. quiet: the caller shows the warning itself (cli.stale_domains_note); none is
+    printed."""
+
+    def __init__(self, items=(), quiet: bool = False):
+        super().__init__(items)
+        self.quiet = quiet
 
 
 def parse_domains(items: list[str]) -> list[tuple[str, list[str]]]:
