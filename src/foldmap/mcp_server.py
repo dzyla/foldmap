@@ -179,7 +179,9 @@ def draw_topology(
     save_layout: str | None = None,
 ) -> list:
     """Draw the topology diagram and write it to output_path (.svg, .png or .pdf; default: a temporary .svg).
-    Returns where it was written plus a PNG preview of the same figure.
+    Returns where it was written plus a PNG preview of the same figure; when assembly or focus auto drew part of
+    the file (one copy of a complex, one subunit of a large assembly), the note says so and which arguments draw
+    every chain.
 
     Options left out come from layout_file (if given), otherwise the defaults: theme publication, assembly auto,
     symmetry auto, membrane off, focus auto, mode projected, rotate 0.
@@ -198,6 +200,7 @@ def draw_topology(
     (save_layout must end in .yaml or .yml)."""
     from . import layoutfile
     from .render import save
+    from .scope import drawn_scope, scope_note
     from .spec import draw_spec, figure_spec, layout_document
 
     path = _structure(source)
@@ -236,6 +239,9 @@ def draw_topology(
             note += f"; no clear route for {', '.join(drawn.stuck)} (drawn as plain curves)"
         if drawn.over_labels:
             note += f"; drawn over a label or chain end: {', '.join(drawn.over_labels)}"
+        scope = scope_note(drawn_scope(drawn.model, drawn.layout, spec.assembly, spec.focus), how="mcp")
+        if scope:  # an automatic choice drew part of the file
+            note += f"; {scope}"
         return [note, _preview(drawn.figure)]
 
 

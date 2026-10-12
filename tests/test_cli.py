@@ -142,3 +142,22 @@ def test_loops_drawn_over_text_are_listed_and_warned(tmp_path, capsys):
     assert "warning" in err and "over a label" in err and "A:47-54>A:55-67" in err
     assert main(["plot", str(FID / "2ACY.cif.gz"), "-o", str(out)]) == 0
     assert "over a label" not in capsys.readouterr().err
+
+
+def test_plot_says_when_an_automatic_choice_drew_part_of_the_file(tmp_path, capsys):
+    """One stderr note naming what was drawn and the flags that draw everything; none when everything is drawn."""
+    from pathlib import Path
+
+    apo = Path(__file__).parent / "data" / "assemblies" / "7A4M.cif"
+    assert main(["plot", str(apo), "-o", str(tmp_path / "a.svg")]) == 0
+    err = capsys.readouterr().err
+    note = "foldmap: drew one of 24 subunits of an O cage: 1 of 24 chains; --focus none draws all of them"
+    assert err.count("foldmap: drew ") == 1 and note in err
+    assert main(["plot", str(apo), "-o", str(tmp_path / "b.svg"), "--focus", "none"]) == 0
+    assert "foldmap: drew " not in capsys.readouterr().err
+    kelch = Path(__file__).parent / "data" / "4CH9.cif"
+    assert main(["plot", str(kelch), "-o", str(tmp_path / "k.svg")]) == 0
+    assert (
+        "foldmap: drew assembly 1, one of 2 copies in the file: 2 of 4 chains; --assembly asu --focus none draws all "
+        "of them" in capsys.readouterr().err
+    )

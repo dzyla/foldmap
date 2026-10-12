@@ -26,6 +26,7 @@ from .nucleic import StemView, stem_views, straight_duplex
 from .palette import PALETTES
 from .render import LOOP_STYLES, STYLES, draw, save
 from .route import route_loops
+from .scope import drawn_scope, scope_note
 from .sheets import build_sheets
 from .spec import (
     FigureSpec,
@@ -1140,6 +1141,9 @@ def _cmd_figure(args: argparse.Namespace) -> int:
             print(f"wrote {write_page(spec.structure, out, viewer=args.viewer, **spec.page_kwargs())}")
     else:
         drawn = draw_spec(spec)
+        note = scope_note(drawn_scope(drawn.model, drawn.layout, spec.assembly, spec.focus))
+        if note:  # an automatic choice drew part of the file
+            print(f"foldmap: {note}", file=sys.stderr)
         if drawn.stuck:
             print(
                 f"foldmap: warning: no clear route for {len(drawn.stuck)} loop(s) or strand(s), drawn as plain "

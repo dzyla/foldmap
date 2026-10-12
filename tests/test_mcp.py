@@ -348,3 +348,11 @@ def test_draw_topology_takes_names(tmp_path, monkeypatch):
     out = tmp_path / "ubq.svg"
     r = call("draw_topology", {"source": UBQ, "output_path": str(out), "names": ["beta"]})
     assert out.is_file() and str(out) in r.content[0].text and seen == [["beta"]]
+
+
+def test_draw_topology_says_when_it_drew_part_of_the_file(tmp_path):
+    r = call("draw_topology", {"source": str(DATA / "6Y7S.cif"), "output_path": str(tmp_path / "one.svg")})
+    text = r.content[0].text
+    assert '; drew one of 6 subunits of a helical filament: 1 of 6 chains; focus="none" draws all of them' in text
+    r = call("draw_topology", {"source": UBQ, "output_path": str(tmp_path / "u.svg")})
+    assert "drew " not in r.content[0].text.replace("wrote", "")
