@@ -9,19 +9,31 @@ import pytest
 
 from foldmap.cli import make_layout
 from foldmap.route import route_loops
+from foldmap.style import Style
 from test_layout import overlaps
-from test_route import segments_clear, self_crossing
+from test_route import inside, segments_clear, self_crossing
 
 DATA = Path(__file__).parent / "data"
 STRUCTURES = sorted(p.stem for p in DATA.glob("*.cif"))
 
 
+OVER = ["1UBQ", "2LZM"]  # helix_on_sheet=auto draws a helix over their sheet (Task 14, opt-in): mode "over"
+
+
+def _layout(name, mode):
+    if mode == "over":
+        return make_layout(DATA / f"{name}.cif", look=Style(helix_on_sheet="auto"))
+    return make_layout(DATA / f"{name}.cif", mode)
+
+
 @pytest.fixture(
-    scope="module", params=[(s, m) for s in STRUCTURES for m in ("projected", "stack")], ids=lambda p: f"{p[0]}-{p[1]}"
+    scope="module",
+    params=[(s, m) for s in STRUCTURES for m in ("projected", "stack")] + [(s, "over") for s in OVER],
+    ids=lambda p: f"{p[0]}-{p[1]}",
 )
 def case(request):
     name, mode = request.param
-    lay, sses, bb = make_layout(DATA / f"{name}.cif", mode)
+    lay, sses, bb = _layout(name, mode)
     return name, mode, lay, sses, route_loops(lay, sses, bb)
 
 
@@ -56,14 +68,22 @@ def test_routed_loops_avoid_other_elements_and_themselves(case):
     for l in loops:
         if l.fallback:
             continue
-        # a helix drawn over a sheet is no obstacle (loops pass under it), and a loop leaves it over its sheet's
-        # strands: only its end segment there may cross them (Task 14)
-        under = set(lay.on_sheet.get(l.a_id, ())) | set(lay.on_sheet.get(l.b_id, ()))
-        others = [p.rect for k, p in lay.placed.items() if k not in (l.a_id, l.b_id) and not p.over and k not in under]
+        # a helix drawn over a sheet is in the way of every loop but its own and its sheet's strands' (Task 14), and
+        # its own loop's end segment there leaves across the strand its port lies on, and no other
+        mine = {h for h, ids in lay.on_sheet.items() if {l.a_id, l.b_id} & {h, *ids}}
+        ports = [p for k, p in ((l.a_id, l.points[0]), (l.b_id, l.points[-1])) if k in lay.on_sheet]
+        under = {
+            k
+            for h in {l.a_id, l.b_id} & set(lay.on_sheet)
+            for k in lay.on_sheet[h]
+            if any(inside(q, lay.placed[k].rect) for q in ports)
+        }
+        skip = {l.a_id, l.b_id} | mine | under
+        others = [p.rect for k, p in lay.placed.items() if k not in skip]
         others += [g.rect for g in lay.ghosts if g.sse.id not in (l.a_id, l.b_id)]
         assert segments_clear(l.points, others), (l.a_id, l.b_id)
         inner = l.points[int(l.a_id in lay.on_sheet) : len(l.points) - int(l.b_id in lay.on_sheet)]
-        assert segments_clear(inner, [lay.placed[k].rect for k in under if k not in (l.a_id, l.b_id)]), (l.a_id, l.b_id)
+        assert segments_clear(inner, [lay.placed[k].rect for k in under]), (l.a_id, l.b_id)
         assert not self_crossing(l.points), (l.a_id, l.b_id)
 
 
@@ -106,7 +126,7 @@ def test_label_keep_out_never_forces_a_fallback(case, monkeypatch):
 
     name, mode, lay, sses, loops = case
     monkeypatch.setattr(route, "label_boxes", lambda *a: [])
-    bb = make_layout(DATA / f"{name}.cif", mode)[2]
+    bb = _layout(name, mode)[2]
     without = {(l.a_id, l.b_id) for l in route.route_loops(lay, sses, bb) if l.fallback}
     assert {(l.a_id, l.b_id) for l in loops if l.fallback} <= without
 
