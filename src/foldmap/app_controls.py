@@ -427,8 +427,8 @@ def names_file_name(ss: MutableMapping, path: str) -> str:
 
 def store_names(ss: MutableMapping) -> None:
     """The names uploader's callback: an uploaded names file, untrusted, is size-capped and read with
-    names.parse_names (yaml.safe_load, a mapping of references to names) before it is kept (fetch.keep_upload) and
-    used: the names are the keyword, then this file. Else names_error, and nothing changes."""
+    names.parse_names (yamlfile.read_yaml: no anchors or aliases; a mapping of references to names) before it is kept
+    (fetch.keep_upload) and used: the names are the keyword, then this file. Else names_error, and nothing changes."""
     from foldmap.fetch import keep_upload
     from foldmap.names import parse_names
 

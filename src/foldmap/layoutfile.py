@@ -163,7 +163,7 @@ def _word(edit: str, value, limit: int) -> str:
 
 
 def _offset(ref: str, d) -> float:
-    if isinstance(d, bool) or not isinstance(d, (int, float)) or not math.isfinite(d) or abs(d) > MOVE_MAX:
+    if isinstance(d, bool) or not isinstance(d, (int, float)) or abs(d) > MOVE_MAX or not math.isfinite(d):
         raise ValueError(
             f"edits: move of {ref} must be two numbers from -{MOVE_MAX:g} to {MOVE_MAX:g}; got {_brief(d)}"
         )

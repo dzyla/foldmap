@@ -36,5 +36,7 @@ def read_yaml(text: str, kind: str, where: str):
         raise ValueError(f"{where}: not valid YAML: {err}") from None
     except RecursionError:  # brackets nested thousands deep: the YAML reader recurses once per level
         raise ValueError(f"{where}: nested too deeply") from None
+    except ValueError:  # the constructor's own limit, e.g. an integer of more than 4,300 digits
+        raise ValueError(f"{where}: a value is too long to read (e.g. a number of thousands of digits)") from None
     finally:
         loader.dispose()

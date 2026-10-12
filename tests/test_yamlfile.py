@@ -74,3 +74,17 @@ def test_plain_yaml_reads_as_before():
         read_yaml("a: [1\n", "layout", "w.yaml")
     with pytest.raises(ValueError, match="w.yaml: nested too deeply"):
         read_yaml("a: " + "[" * 3000 + "]" * 3000 + "\n", "layout", "w.yaml")
+
+
+def test_a_number_of_thousands_of_digits_is_a_message():
+    """PyYAML refuses an integer of more than 4,300 digits with Python's own wording; the reader says what is wrong.
+    A move offset past the float range is refused by its bound before isfinite sees it (no OverflowError)."""
+    import pytest
+
+    from foldmap.layoutfile import _offset
+    from foldmap.yamlfile import read_yaml
+
+    with pytest.raises(ValueError, match="too long to read"):
+        read_yaml("x: " + "9" * 5000, "layout", "layout.yaml")
+    with pytest.raises(ValueError, match="must be two numbers"):
+        _offset("α1", 10**4000)
