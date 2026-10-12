@@ -1,4 +1,5 @@
 # For Streamlit Community Cloud (foldmap.streamlit.app): foldmap from this repository with the app extra
-# (streamlit>=1.65). Cloud reads this file before pyproject.toml; it would give pyproject.toml to Poetry, which
+# (streamlit>=1.65), installed editable so the app runs the checkout's code: Cloud pulls each push into the checkout
+# without reinstalling. Cloud reads this file before pyproject.toml; it would give pyproject.toml to Poetry, which
 # refuses foldmap's dynamic version and never installs an extra. Elsewhere: pip install ".[app]".
-.[app]
+-e .[app]

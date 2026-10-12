@@ -468,9 +468,11 @@ structure: change what you want, then press Redraw (or switch Auto-redraw back o
 The live app runs on Streamlit Community Cloud from this repository, with `src/foldmap/app.py` as the main file
 and Python 3.11 or newer. Cloud runs it from the repository root and reads these files there:
 
-- `requirements.txt` installs foldmap from the repository with its `app` extra: Streamlit 1.65 or newer, which
-  the app needs (it sets the sidebar's width in pixels). Cloud reads this file before `pyproject.toml`, which it would give to Poetry. Poetry would not install
-  the `app` extra, and it refuses a version read from the code (`foldmap/__init__.py`).
+- `requirements.txt` installs foldmap from the repository, editable (`-e .[app]`), with its `app` extra:
+  Streamlit 1.65 or newer, which the app needs (it sets the sidebar's width in pixels). Editable, because Cloud
+  pulls each push into its checkout without reinstalling: the app then runs the code it was pushed with. Cloud
+  reads this file before `pyproject.toml`, which it would give to Poetry. Poetry would not install the `app` extra,
+  and it refuses a version read from the code (`foldmap/__init__.py`).
 - `.streamlit/config.toml` holds the app's theme, the viewer toolbar (no Deploy menu), 50 MB uploads and no error
   details for visitors. It is generated from `foldmap.app.APP_CONFIG` (the command is its first line), and
   `streamlit run` reads it when it starts from the repository root. `foldmap app` passes the same values as flags.
