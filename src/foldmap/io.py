@@ -248,13 +248,33 @@ def _one_complex_of_several(st, assembly, model) -> bool:
     return all(deposited.count(e) >= 2 * held.count(e) for e in set(held))
 
 
+class ModelRead(tuple):
+    """read_model's result: (model, deposited chain names), unpacked as a pair. `several`: when 'auto' drew assembly
+    1 as one of several copies of a complex the asymmetric unit holds, what the asymmetric unit holds (assembly
+    name, copies, polymer chains, polymer residues); else None."""
+
+    several: dict | None
+
+    def __new__(cls, model, names, several: dict | None = None):
+        out = super().__new__(cls, (model, names))
+        out.several = several
+        return out
+
+
+def _polymers(model) -> tuple[int, int]:
+    """(chains, residues) of the model's polymers: protein and nucleic acid."""
+    sizes = [len(c.get_polymer()) for c in model]
+    return sum(n > 0 for n in sizes), sum(sizes)
+
+
 def read_model(path: str | Path, assembly: str = "auto"):
     """(model, deposited chain names). assembly: 'asu' as deposited; an assembly id from the file; or 'auto':
     the first assembly when it adds copies and stays within AUTO_MAX chains, or when it is one of several copies
     of a complex the asymmetric unit holds (_one_complex_of_several; drawn under the deposited chain
     names, and only its copies are looked at for symmetry). A copy the assembly lays exactly on a chain already
     present is dropped (_drop_coincident); under 'auto', when that drops every copy it adds, the model is returned
-    as deposited, with its deposited chain names."""
+    as deposited, with its deposited chain names. A ModelRead: a (model, names) pair that also says when 'auto' left
+    copies of the complex out (`several`)."""
     path = Path(path)
     if not path.is_file():
         raise FileNotFoundError(path)
@@ -266,15 +286,17 @@ def read_model(path: str | Path, assembly: str = "auto"):
     if assembly == "asu" or not st.assemblies:
         if assembly not in ("asu", "auto"):
             raise ValueError(f"{path}: no assembly {assembly!r} in the file (it has none; use asu)")
-        return model, deposited
+        return ModelRead(model, deposited)
     if assembly == "auto":
         chosen = st.assemblies[0]
         copies = _copies(chosen, model)
         if copies < len(deposited) and _one_complex_of_several(st, chosen, model):
             one = gemmi.make_assembly(chosen, model, gemmi.HowToNameCopiedChain.Dup)  # identity: names kept
-            return one, {c.name for c in one}
+            (chains, residues), held = _polymers(model), _polymers(one)[0]
+            several = {"assembly": chosen.name, "copies": round(chains / max(held, 1)), "chains": chains}
+            return ModelRead(one, {c.name for c in one}, {**several, "residues": residues})
         if copies <= len(deposited) or copies > AUTO_MAX:
-            return model, deposited
+            return ModelRead(model, deposited)
     else:
         found = [a for a in st.assemblies if a.name == assembly]
         if not found:
@@ -295,8 +317,8 @@ def read_model(path: str | Path, assembly: str = "auto"):
                 break
     _drop_coincident(built, keep=asu, tags=tags)
     if assembly == "auto" and len(asu) == len(built) == len(model):  # every added copy dropped: as deposited
-        return model, deposited
-    return built, asu
+        return ModelRead(model, deposited)
+    return ModelRead(built, asu)
 
 
 def load_backbone(

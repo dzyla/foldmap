@@ -224,6 +224,11 @@ def make_layout(
     if focus == "auto" and (look or Style()).highlight != "none":
         focus = "none"  # highlighting the asymmetric unit or a protomer asks for the whole assembly
     focus_chains = _focus_chains(focus, sym, bb, sses)
+    strands = nucleic.strands if nucleic is not None else []
+    read = list(dict.fromkeys([l.chain for l in bb.labels] + [s.chain for s in strands]))
+    subunits = None
+    if focus_chains and sym is not None:  # what scope.drawn_scope says was left out
+        subunits = (_subunits(sym, focus_chains), "helical" if sym.kind == "H" else sym.label)
     if focus_chains and nucleic is not None and nucleic.strands:  # one subunit: the nucleic acid it holds
         nucleic = nucleic_touching(nucleic, focus_chains)
     na_cropped = False
@@ -351,7 +356,8 @@ def make_layout(
     lay.focus = _focus((look or Style()).highlight, bb, sym)
     if focus_chains:
         lay.focus, lay.focus_chains, lay.context = set(focus_chains), set(focus_chains), context
-        lay.unjoined = unjoined
+        lay.unjoined, lay.subunits = unjoined, subunits
+    lay.chains_read = read
     lay.links = links
     lay.res_chain = [l.chain for l in bb.labels]
     lay.res_name = [l.name for l in bb.labels]
@@ -546,6 +552,12 @@ def _homolog_labels(bb, sses) -> dict[str, str]:
     return shared_labels(sses, homolog_chains(bb), labels)
 
 
+def _subunits(sym, focus: set) -> int:
+    """How many subunits like the `focus` chains the assembly holds."""
+    copies = sum(len(p) for p in sym.protomers) / max(len(sym.protomers), 1) / max(len(focus), 1)
+    return int(round(len(sym.protomers) * copies))
+
+
 def _context(sym, focus: set, bb, neighbours: bool = True) -> str:
     """One line saying what the figure shows of the assembly."""
     total = len(set(l.chain for l in bb.labels))
@@ -553,7 +565,7 @@ def _context(sym, focus: set, bb, neighbours: bool = True) -> str:
     if sym is None:
         return f"chain {', '.join(sorted(focus))} of {total} shown in full" + grey
     copies = sum(len(p) for p in sym.protomers) / max(len(sym.protomers), 1) / max(len(focus), 1)
-    n = int(round(len(sym.protomers) * copies))
+    n = _subunits(sym, focus)
     if sym.kind == "H":
         step = "subunit" if copies <= 1 else f"repeat of {int(round(copies * len(focus)))} chains"
         twist = f"{np.degrees(abs(sym.twist)) * (-1 if sym.left_handed else 1):.1f}".replace("-", "−")

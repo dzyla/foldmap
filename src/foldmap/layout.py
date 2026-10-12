@@ -212,6 +212,10 @@ class Layout:
     unjoined: set = field(default_factory=set)  # (a, b) element pairs shown side by side but not adjacent in sequence
     partial: set = field(default_factory=set)  # chains present only as the elements that complete its fold
     context: str | None = None  # what the figure shows of the assembly, e.g. "1 of 6 subunits · helical ..."
+    subunits: tuple[int, str] | None = None  # focus on a symmetric assembly: its subunits and symmetry (sym.label,
+    # or "helical")
+    chains_read: list[str] = field(default_factory=list)  # every chain read and asked for (protein, then nucleic
+    # acid), before focus kept one subunit
     page_axes: list | None = None  # 3x3 rows: page-right, page-up, toward-viewer (for the first protomer)
     page_centre: list | None = None  # the 3D point those axes are taken around
     uniprot: object = None  # uniprot.Annotation when UniProt features were requested
