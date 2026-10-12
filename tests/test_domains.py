@@ -89,6 +89,26 @@ def test_a_domain_left_without_elements_is_an_error_naming_it():
         make_layout(DATA / "2LZM.cif", domains=[("N", ["α1"]), ("C", ["α1"])])
 
 
+def test_element_ids_of_the_structure_pass_the_check():
+    lay, _, _ = make_layout(T4L, domains=[("N", ["A:3-11", "A:14-19"]), ("C", ["A:60-79"])])
+    assert lay.domains == [("N", ["A:3-11", "A:14-19"]), ("C", ["A:60-79"])]
+
+
+def test_a_layout_file_naming_elements_the_structure_lacks_drops_them_with_a_warning(tmp_path, capsys):
+    """A saved file outlives its structure: stale element ids are dropped as before, now named in a warning; the
+    same id given with --domain is still an error."""
+    lf = tmp_path / "t4l.yaml"
+    lf.write_text("foldmap: 1\ndomains:\n  N: [A:3-11, A:999-1005]\n  C: [A:60-79]\n  X: [A:2000-2010]\n")
+    out = tmp_path / "t4l.svg"
+    assert main(["plot", str(T4L), "-o", str(out), "--layout-file", str(lf)]) == 0
+    err = capsys.readouterr().err
+    assert "foldmap: warning:" in err and "A:999-1005" in err and "A:2000-2010" in err
+    svg = out.read_text()
+    assert "domain:N" in svg and "domain:C" in svg and "domain:X" not in svg
+    assert main(["plot", str(T4L), "-o", str(out), "--domain", "N=A:3-11,A:999-1005"]) == 1
+    assert "'A:999-1005' is no element" in capsys.readouterr().err
+
+
 def test_cli_domains_and_layout_file(tmp_path):
     import yaml
 

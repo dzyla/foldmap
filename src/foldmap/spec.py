@@ -139,8 +139,10 @@ def figure_spec(
     membrane = str(pick("membrane"))
     if membrane not in MEMBRANES:
         raise ValueError(f"unknown membrane {membrane!r}; choose from {', '.join(MEMBRANES)}")
-    domains = given.get("domains") or doc.get("domains") or None
-    if isinstance(domains, dict):
+    domains = given.get("domains") or None
+    if domains is None and doc.get("domains"):
+        domains = SavedDomains((name, list(refs)) for name, refs in doc["domains"].items())
+    elif isinstance(domains, dict):
         domains = [(name, list(refs)) for name, refs in domains.items()]
     edits = layoutfile.edits_of(doc)
     edits["rename"].update(given.get("rename") or {})
@@ -220,6 +222,12 @@ def parse_protomers(text: str | None) -> list[list[str]] | None:
     if not text:
         return None
     return [[c.strip() for c in group.split(",") if c.strip()] for group in text.split(";") if group.strip()]
+
+
+class SavedDomains(list):
+    """Domains read from a layout file, [(name, [refs])]. A file outlives the structure it was saved from, so
+    element ids it names that the structure no longer has are dropped with a warning (cli._domains); given on the
+    command line, they are an error."""
 
 
 def parse_domains(items: list[str]) -> list[tuple[str, list[str]]]:

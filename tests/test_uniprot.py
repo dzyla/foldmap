@@ -99,8 +99,10 @@ def test_figure_marks_binding_sites_and_names_them_in_the_legend(cache):
 def test_uniprot_domains_become_panels(cache):
     from foldmap.cli import make_layout
 
-    lay, _, _ = make_layout(DATA / "2HHB.cif", assembly="asu", uniprot="auto", domains="uniprot")
+    lay, sses, _ = make_layout(DATA / "2HHB.cif", assembly="asu", uniprot="auto", domains="uniprot")
     assert sorted(name for name, _ in lay.domains) == ["Globin · A", "Globin · B", "Globin · C", "Globin · D"]
+    known = {s.id for s in sses}  # element ids, so they pass the check that refuses ids naming no element
+    assert all(k in known for _, ids in lay.domains for k in ids)
 
 
 def test_domains_uniprot_needs_the_annotation():

@@ -27,7 +27,16 @@ from .palette import PALETTES
 from .render import LOOP_STYLES, STYLES, draw, save
 from .route import route_loops
 from .sheets import build_sheets
-from .spec import FigureSpec, draw_spec, figure_spec, layout_document, parse_domains, parse_protomers, parse_vector
+from .spec import (
+    FigureSpec,
+    SavedDomains,
+    draw_spec,
+    figure_spec,
+    layout_document,
+    parse_domains,
+    parse_protomers,
+    parse_vector,
+)
 from .ss import build_sses
 from .style import CHOICES, LAYOUT_KEYS, SCALES, THEME_KEYS, THEMES, Style, describe, resolve_style
 from .symmetry import TOLERANCE, detect_symmetry
@@ -595,14 +604,23 @@ def _domains(spec, sses, contacts, rows=(), copies=None, lent=frozenset()) -> li
         for _, ids in spec
     ):
         known = {s.id for s in sses}
-        for name, ids in spec:
-            for i in ids:
-                if i not in known:
-                    raise ValueError(
-                        f"domain {name!r}: {i!r} is no element; write a residue range as res:{i}, "
-                        "or name elements by label (α1, A:G)"
-                    )
-        return [(name, list(ids)) for name, ids in spec]  # already element ids (UniProt domains)
+        stale = [(name, i) for name, ids in spec for i in ids if i not in known]
+        if stale and not isinstance(spec, SavedDomains):
+            name, i = stale[0]
+            raise ValueError(
+                f"domain {name!r}: {i!r} is no element; write a residue range as res:{i}, "
+                "or name elements by label (α1, A:G)"
+            )
+        kept = [(name, [i for i in ids if i in known]) for name, ids in spec]
+        if stale:
+            empty = [name for name, ids in kept if not ids]
+            print(
+                "foldmap: warning: the layout file's domains name element(s) this structure does not have, "
+                f"dropped: {', '.join(i for _, i in stale)}"
+                + (f" (domain(s) left empty, not drawn: {', '.join(empty)})" if empty else ""),
+                file=sys.stderr,
+            )
+        return [(name, ids) for name, ids in kept if ids]  # already element ids (UniProt domains, a layout file)
     lay, out, seen = provisional(sses), [], set()
     for name, refs in spec:
         ids = []

@@ -153,7 +153,9 @@ def test_symmetry_choices_are_the_ones_the_command_line_takes():
 
 def test_every_setting_has_a_control_entry():
     from foldmap.app import HIDDEN_LAYOUT, LAYOUT_DEFAULTS, STYLE_FIELDS
-    from foldmap.app_edits import CONTROLS
+    from foldmap.app_edits import CONTROLS, HIDDEN
+
+    assert HIDDEN == HIDDEN_LAYOUT  # hard-coded in app_edits (importing app there would be a cycle)
 
     assert set(CONTROLS) == {*STYLE_FIELDS, *LAYOUT_DEFAULTS, "theme", "names"}
     for key, (label, section, widgets) in CONTROLS.items():
