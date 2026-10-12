@@ -328,7 +328,10 @@ def layout_yaml(path, blob: str, uploads: dict[str, str] | None = None) -> bytes
     doc = layout_document(path, json.loads(blob), uploads)
     text = yaml.safe_dump(doc, sort_keys=False, allow_unicode=True)
     files = [] if local_files() else uploaded_files(doc)
-    return ((UPLOADS_NOTE.format(files=", ".join(files)) if files else "") + text).encode()
+    from foldmap.app_edits import upload_name
+
+    note = UPLOADS_NOTE.format(files=", ".join(upload_name(f) for f in files)) if files else ""
+    return (note + text).encode()
 
 
 def share_url(base: str | None, share_id: str, theme: str) -> str:

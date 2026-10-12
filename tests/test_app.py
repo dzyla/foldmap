@@ -1102,6 +1102,25 @@ def test_a_hosted_layout_download_names_uploads_by_their_own_names(monkeypatch, 
     assert ss["msa_path"] in layout_yaml(ss["path"], ss["last_good"]["blob"], uploads_of(ss)).decode()
 
 
+def test_a_crafted_upload_name_cannot_write_keys_into_a_layout_download(monkeypatch, tmp_path):
+    """A newline in an uploaded file's name would end the hosted layout file's comment and start live YAML keys; the
+    download stays one comment plus the real document."""
+    import yaml
+
+    from foldmap.app_views import layout_yaml, uploads_of
+
+    monkeypatch.setenv("FOLDMAP_APP_LOCAL_FILES", "0")
+    seed_cache(monkeypatch, tmp_path, "1UBQ")
+    at = opened("1UBQ")
+    crafted = "x\nlayout: {msa: /etc/passwd}\nfoo: 1\n.yaml"
+    at.file_uploader(key="names_upload").set_value((crafted, b"elements:\n  res:A:23-34: Hx\n", "x")).run()
+    ss = at.session_state
+    text = layout_yaml(ss["path"], ss["last_good"]["blob"], uploads_of(ss)).decode()
+    doc = yaml.safe_load(text)
+    assert "foo" not in doc and doc.get("layout", {}).get("msa") != "/etc/passwd"
+    assert all(line.startswith("#") for line in text.split("\nfoldmap:")[0].splitlines())
+
+
 def test_hosted_missing_files_of_a_layout_file_are_named_without_their_path(monkeypatch, tmp_path):
     import yaml
 

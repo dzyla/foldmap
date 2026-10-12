@@ -25,6 +25,7 @@ from foldmap.app_edits import (
     switch_domains,
     sync_composites,
     table_rows,
+    upload_name,
 )
 from foldmap.style import CHOICES, THEMES
 
@@ -425,7 +426,7 @@ def store_names(ss: MutableMapping) -> None:
         ss["names_error"] = "The names file could not be stored on the server; try again."
         return
     ss["names"] = [*(n for n in ss.get("names") or [] if n in NAME_KEYWORDS), kept]
-    ss.update(names_uploaded=(kept, up.name[:120]), names_missing=[])
+    ss.update(names_uploaded=(kept, upload_name(up.name)), names_missing=[])
     ss["_synced"] = {**(ss.get("_synced") or {}), "names": ss["names"]}
 
 

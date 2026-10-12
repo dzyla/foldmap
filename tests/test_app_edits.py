@@ -352,3 +352,14 @@ def test_a_domain_row_waits_for_its_name_and_its_ranges():
 def test_domain_ranges_become_residue_ranges_only_where_they_map_exactly():
     rows = [{"name": "N", "ranges": "A:1-80, 200-240, 1:5-20, A1:3-7, α3, res:B:1-9"}]
     assert text_of("domains", rows) == "N=res:A:1-80,res:200-240,res:1:5-20,A1:3-7,α3,res:B:1-9"  # A1: a copy
+
+
+def test_an_upload_name_cannot_carry_a_line_break():
+    """A newline (or a Unicode line or paragraph separator, or a control character) in an uploaded file's name would end
+    the YAML comment a hosted layout file starts with and write live keys below it; the kept name drops them."""
+    from foldmap.app_edits import upload_name
+
+    assert upload_name("x\nfoo: 1\r\n.yaml") == "xfoo: 1.yaml"
+    assert upload_name("a b c\x00d​e.yaml") == "abcde.yaml"
+    assert upload_name("ü names #1: a.yaml") == "ü names #1: a.yaml"
+    assert upload_name("\n\n") == "upload" and len(upload_name("n" * 500)) == 120

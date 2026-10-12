@@ -26,7 +26,7 @@ from foldmap.app_controls import (
     style_section,
     touched,
 )
-from foldmap.app_edits import chain_choices, shown
+from foldmap.app_edits import chain_choices, shown, upload_name
 from foldmap.app_views import Workspace, download_menu, explorer_view, figure_view, said, sequence_view
 from foldmap.cli import _adjustments, _domain_spec
 from foldmap.fetch import ALIGNMENT_SUFFIXES, fetch, keep_upload, source_id
@@ -540,7 +540,7 @@ def main() -> None:
             )
             ss["msa_path"] = ""
             return
-        ss.update(msa_error="", msa_path=str(target), msa_uploaded=(str(target), up.name[:120]))
+        ss.update(msa_error="", msa_path=str(target), msa_uploaded=(str(target), upload_name(up.name)))
 
     def load(source: str | None = None, upload: bool = False) -> None:
         """Load a structure and draw its first figure; the workspace opens only when that succeeds. upload: the

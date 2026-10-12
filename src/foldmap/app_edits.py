@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import math
 import re
+import unicodedata
 from collections.abc import Callable, MutableMapping
 
 # ------------------------------------------------------------------------------------------ composites
@@ -490,6 +491,13 @@ _MARKDOWN = re.compile(r"([\\`*_\[\]<>#|~$:=-])")
 _AUTOLINK = re.compile(
     r"(?<=www)(?=\.)|(?=@)|(?<=:)(?=//)", re.IGNORECASE
 )  # where a zero-width space keeps GFM from linking
+
+
+def upload_name(name, limit: int = 120) -> str:
+    """An uploaded file's name as the app keeps and writes it: control, format and line/paragraph-separator characters
+    dropped (a newline in a name would end a YAML comment and start live keys), at most `limit` characters."""
+    kept = "".join(c for c in str(name) if unicodedata.category(c) not in {"Cc", "Cf", "Zl", "Zp"})
+    return kept[:limit] or "upload"
 
 
 def shown(text, limit: int = 400, path=None, name: str = "", paths: bool = True) -> str:
