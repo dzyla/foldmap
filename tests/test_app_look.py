@@ -98,3 +98,11 @@ def test_icon_assets_ship_with_the_package():
 @in_repo
 def test_hosting_installs_the_figure_font():
     assert "fonts-liberation" in (ROOT / "packages.txt").read_text(encoding="utf-8").split()
+
+
+@in_repo
+def test_hosting_installs_foldmap_with_the_app_extra():
+    """Community Cloud reads requirements.txt before pyproject.toml (which it would give to Poetry: Poetry 2 refuses a
+    dynamic version and never installs an extra, so the streamlit>=1.65 floor would not hold)."""
+    lines = (ROOT / "requirements.txt").read_text(encoding="utf-8").splitlines()
+    assert [ln.strip() for ln in lines if ln.strip() and not ln.lstrip().startswith("#")] == [".[app]"]

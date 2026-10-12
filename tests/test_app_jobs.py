@@ -82,8 +82,9 @@ def test_app_figure_is_the_command_line_figure():
 
 @needs_fork
 def test_isolated_job_draws_the_same_figure():
-    """A figure drawn in a job process is the figure drawn in this one, byte for byte (protein; nucleic acid)."""
-    for name in ("2LZM", "1LMB"):
+    """A figure drawn in a job process is the figure drawn in this one, byte for byte (protein; nucleic acid;
+    a tetramer)."""
+    for name in ("2LZM", "1LMB", "2HHB"):
         here = app_jobs.draw_job(DATA / f"{name}.cif", _blob())
         there = run_job(app_jobs.draw_job, DATA / f"{name}.cif", _blob(), limits=Limits(timeout=120))
         assert there["svg"] == here["svg"], name

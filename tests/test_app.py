@@ -1,12 +1,15 @@
 """The Streamlit app, driven headlessly: Start, load (drawn at once), share links, edit, download."""
 
+import sys
 from pathlib import Path
 
 import pytest
 
 pytest.importorskip("streamlit")
-from app_helpers import DATA, app_test, as_text, load, opened, seed_cache, svg_of  # noqa: E402
+from app_helpers import DATA, app_test, as_text, fresh_caches, load, opened, seed_cache, svg_of  # noqa: E402
 from app_helpers import visible as _visible  # noqa: E402
+
+needs_fork = pytest.mark.skipif(sys.platform == "win32", reason="isolated jobs need forkserver")
 
 
 def test_first_screen_asks_for_a_structure():
@@ -308,6 +311,41 @@ def test_hosted_app_refuses_file_paths(monkeypatch):
     monkeypatch.setenv("FOLDMAP_APP_LOCAL_FILES", "0")
     at = load(app_test(), DATA / "1UBQ.cif")
     assert at.session_state["stage"] == "load" and "is not a PDB ID" in at.error[0].value
+
+
+@needs_fork
+def test_hosted_app_draws_in_an_isolated_job(monkeypatch, tmp_path):
+    from foldmap import app_jobs
+    from foldmap.app_views import figure_card
+
+    seed_cache(monkeypatch, tmp_path, "1UBQ")
+    local = app_jobs.draw_job(tmp_path / "1UBQ.cif", '{"theme": "publication"}')["svg"]
+    monkeypatch.setenv("FOLDMAP_APP_LOCAL_FILES", "0")
+    fresh_caches()
+    at = load(app_test(), "1UBQ")
+    assert not at.exception and at.session_state["stage"] == "edit"
+    assert at.session_state["info"] == "1 chain · 76 residues · 1 helix · 5 strands"
+    assert svg_of(at) == figure_card(local, "#ffffff", "1UBQ")  # the same figure across the process boundary
+    assert at.query_params["id"] == "1UBQ"
+
+
+@needs_fork
+def test_hosted_timeout_is_a_clear_message_and_remembered(monkeypatch, tmp_path):
+    import time
+
+    from foldmap import app_jobs
+
+    seed_cache(monkeypatch, tmp_path, "8UTF")
+    monkeypatch.setenv("FOLDMAP_APP_LOCAL_FILES", "0")
+    monkeypatch.setenv("FOLDMAP_APP_TIMEOUT", "1")  # 8UTF needs ~2 s through a job (measured 2.03 s)
+    fresh_caches()
+    at = load(app_test(), "8UTF")
+    assert at.session_state["stage"] == "load"
+    assert at.error[0].value.startswith("8UTF took longer than 1 s to draw, the limit of this app.")
+    assert len(app_jobs.FAILED) == 1
+    t0 = time.perf_counter()
+    at = load(app_test(), "8UTF")  # the next visitor: answered from memory, no second wait
+    assert at.error[0].value.startswith("8UTF took longer") and time.perf_counter() - t0 < 5
 
 
 def test_hosted_app_ignores_alignment_paths_in_layout_files(monkeypatch):

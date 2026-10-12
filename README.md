@@ -431,26 +431,70 @@ figure keeps its shape while you restyle it.
 
 ## App
 
-`foldmap app` opens a Streamlit app in the browser. It runs the same pipeline as the command line.
+`foldmap app` opens a Streamlit app in the browser. It runs the same pipeline as the command line, so a figure
+from the app is the figure `foldmap plot` draws with the same settings. It is also online at
+<https://foldmap.streamlit.app>.
 
-- **Start**: one box takes a PDB ID, a UniProt accession or, on your own machine, a file path; press Draw. An
-  accession lists its AlphaFold model and experimental structures (widest coverage first) to pick from. Examples
-  are one click, and a `.cif` or `.pdb` file can be dropped in.
-- **Workspace**: the top bar names the structure and switches between three views: Figure, Sequence (the sequence,
-  or an uploaded alignment, with secondary structure on top) and 3D (the interactive explorer). Only the chosen
-  view is drawn. The sidebar holds the theme and the options, in sections: Style, Show, Chains & assembly, Edit
-  layout, Conservation & UniProt and Layout file. A figure that takes over 4 s to draw turns automatic redrawing
-  off; press Redraw after your changes.
-- **Downloads**: the Download menu makes each file on demand from what was drawn: SVG, PNG (300 dpi), PDF and the
-  layout file for the figure, the sequence figure, and the 3D page as HTML.
-- **Share links**: a structure loaded by PDB ID or accession puts `?id=…&theme=…` in the address, so the link
-  opens the same structure in the same theme. Uploads and file paths never enter the link.
+**Start.** One box takes a PDB ID or a UniProt accession (and, on your own machine, a file path); press Enter or
+Draw. An accession lists its AlphaFold model and the experimental structures (widest coverage first); pick one to
+draw it. The examples are one click, and a `.cif` or `.pdb` file can be dropped in.
 
-Hosting the app for other people: set `FOLDMAP_APP_LOCAL_FILES=0`. The app then accepts PDB IDs, UniProt
-accessions and uploads but never opens a file path on the server (including alignment paths in uploaded layout
-files), and each drawing runs in its own process within limits: 90 s, 2 GB of memory, structures up to 30,000
-residues, two drawings at a time. `FOLDMAP_APP_TIMEOUT`, `FOLDMAP_APP_MEMORY_MB`, `FOLDMAP_APP_MAX_RESIDUES` and
-`FOLDMAP_APP_JOBS` change them. Uploads are kept in `~/.cache/foldmap/uploads` for a day.
+**Workspace.** The figure is drawn at once in the current theme. The top bar names the structure, summarises it,
+and switches between three views: Figure, Sequence (the sequence, or an uploaded alignment, with the secondary
+structure on top) and 3D (the interactive page). Only the chosen view is drawn. Download makes each file when you
+click it, from what was drawn: SVG, PNG (300 dpi), PDF and the layout file for the figure, the sequence figure,
+and the 3D page as HTML. A setting that fails keeps the last good figure on screen and names the control to check.
+
+The sidebar starts with the theme (Browse themes shows them all), the colouring, labels, legend, text size and
+title. The rest is in sections:
+
+- **Style**: fill, helix shading, loops, background and ink.
+- **Show**: ligands, disulfides, glycans, membrane, DNA and RNA, hydrogen bonds, and the contacts check.
+- **Chains & assembly**: chains to draw, highlight, assembly, symmetry, and how large assemblies are drawn.
+- **Edit layout**: arrangement, rotation, sizes, the βα template, helices packed on a sheet, swap, move, rename
+  and mark (as tables or as text), element names, and domains with their colours and bar.
+- **Conservation & UniProt**: an alignment for conservation colours, and UniProt sites and domains.
+- **Layout file**: load one saved from Download (or by `foldmap plot --save-layout`) to restore every setting.
+
+**Share links.** A structure loaded by PDB ID or accession puts its id and theme in the address, as in
+`https://foldmap.streamlit.app/?id=1LMB&theme=journal`, so the link opens the same structure in the same theme.
+Uploads and file paths never enter the link.
+
+**Slow structures.** A figure that takes longer than 4 s to draw turns automatic redrawing off for that
+structure: change what you want, then press Redraw (or switch Auto-redraw back on).
+
+### Hosting the app
+
+The live app runs on Streamlit Community Cloud from this repository, with `src/foldmap/app.py` as the main file
+and Python 3.11 or newer. Cloud runs it from the repository root and reads these files there:
+
+- `requirements.txt` installs foldmap from the repository with its `app` extra: Streamlit 1.65 or newer, which
+  the app needs (it sets the sidebar's width in pixels). Cloud reads this file before `pyproject.toml`, which it would give to Poetry. Poetry would not install
+  the `app` extra, and it refuses a version read from the code (`foldmap/__init__.py`).
+- `.streamlit/config.toml` holds the app's theme, the viewer toolbar (no Deploy menu), 50 MB uploads and no error
+  details for visitors. It is generated from `foldmap.app.APP_CONFIG` (the command is its first line), and
+  `streamlit run` reads it when it starts from the repository root. `foldmap app` passes the same values as flags.
+- `packages.txt` installs `fonts-liberation`: Liberation Sans, the font the figures and the layout's text
+  metrics are made for.
+
+Set `FOLDMAP_APP_LOCAL_FILES = "0"` as a root-level secret in the app's settings (Cloud passes root-level secrets
+to the app as environment variables). Without it the app treats the server as your own machine. With it:
+
+- the app never opens a file path on the server, including alignment and names paths inside uploaded layout
+  files, and files it offers for download name uploads, never server paths;
+- uploads are kept in `~/.cache/foldmap/uploads` for a day;
+- every drawing runs in its own process, within limits.
+
+| Variable | Hosted default | |
+| --- | --- | --- |
+| `FOLDMAP_APP_TIMEOUT` | 90 | seconds a drawing may take |
+| `FOLDMAP_APP_MEMORY_MB` | 2048 | memory of one drawing, MB |
+| `FOLDMAP_APP_MAX_RESIDUES` | 30,000 | larger structures are refused before any wait, with the command to draw them locally |
+| `FOLDMAP_APP_JOBS` | 2 | drawings at a time |
+| `FOLDMAP_APP_SLOW` | 4 | seconds; a figure slower than this turns automatic redrawing off |
+
+A structure that went over a limit is remembered, so the next visitor who asks for it gets the message at once.
+On your own machine there are no limits except `FOLDMAP_APP_SLOW`; each variable sets its limit there too.
 
 ## MCP server for AI agents
 
