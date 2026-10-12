@@ -298,3 +298,23 @@ def test_neighbours_lending_elements_get_no_bar():
     lay, _, _ = make_layout(FID / "1LDM.cif.gz", focus="protomer", domains="auto")
     assert any(k.startswith("A4:") for _, ids in lay.domains for k in ids) and lay.partial
     assert [chain for chain, *_ in domain_bars(lay)] == ["A1"]
+
+
+def test_domain_bars_share_one_residue_scale():
+    """8UTF's F2 (chain A, 72 residues drawn) and F1 (chain a, 344): one residue scale for every bar, as Zyla 2024
+    Fig 3A draws the precursor, so F2's bar is that much shorter than F1's; both start at the content's left edge."""
+    from foldmap.render import domain_bars
+
+    kw = {"focus": "protomer", "domains": _flag_file(CAS9_FILE.parent / "8UTF-measles-F.txt")}
+    lay, _, _ = make_layout(DATA / "8UTF.cif", **kw)
+    spans = {chain: last - first for chain, first, last, _ in domain_bars(lay)}
+    assert set(spans) == {"A", "a"} and spans["A"] < spans["a"] / 3
+    fig = make_figure(DATA / "8UTF.cif", **kw)
+    bars = {}
+    for p in _gids(fig, "domain-bar:"):
+        chain = p.get_gid().split(":")[1]
+        x0, x1 = bars.get(chain, (np.inf, -np.inf))
+        bars[chain] = (min(x0, p.get_x()), max(x1, p.get_x() + p.get_width()))
+    assert bars["A"][0] == pytest.approx(bars["a"][0])
+    width = {c: x1 - x0 for c, (x0, x1) in bars.items()}
+    assert width["A"] / width["a"] == pytest.approx(spans["A"] / spans["a"], rel=1e-6)

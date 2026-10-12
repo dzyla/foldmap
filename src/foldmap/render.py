@@ -2291,14 +2291,17 @@ def _spread(centres: list[float], widths: list[float], lo: float, hi: float, gap
 
 
 def _draw_domain_bar(c: _Canvas, layout: Layout) -> None:
-    """Under the figure, one bar per chain holding domain elements (domain_bars), each in a band of c.bar_h: residues
-    first..last across the content width, each segment in its domain's tone, named inside when the name fits at 0.7
-    of the text size, else below on a short tick; the chain's end residue numbers over its ends (and the chain's name
-    between them when there are several bars)."""
+    """Under the figure, one bar per chain holding domain elements (domain_bars), each in a band of c.bar_h, from the
+    content's left edge on one residue scale for every bar (the longest chain spans the content width; Zyla 2024 Fig
+    3A draws F2 and F1 so), each segment in its domain's tone, named inside when the name fits at 0.7 of the text
+    size, else below on a short tick; the chain's end residue numbers over its ends (and the chain's name between
+    them when there are several bars)."""
     em = c.font / c.pt_per_unit  # page units of one em of the figure's text
-    x0, x1 = c.content[0], c.content[2]
     bars = domain_bars(layout)
+    x0 = c.content[0]
+    unit = (c.content[2] - x0) / max(max(last - first for _, first, last, _ in bars), 1.0)  # page units per residue
     for k, (chain, first, last, segments) in enumerate(bars):
+        x1 = x0 + (last - first) * unit
         y = c.content[1] - c.pad - k * c.bar_h - 1.65 * em  # the bar's bottom; above it the residue numbers
         small = {"fontsize": c.font * 0.6, "va": "bottom"}
         for text, x, ha, end in ((first, x0, "left", "N"), (last, x1, "right", "C")):
@@ -2317,8 +2320,7 @@ def _draw_domain_bar(c: _Canvas, layout: Layout) -> None:
             t.set_gid(f"domain-bar-chain:{chain}")
         below = []  # segments too narrow for their name: (segment centre, name width, segment)
         for seg in segments:
-            xa = x0 + (seg.lo - first) / max(last - first, 1.0) * (x1 - x0)
-            xb = x0 + (seg.hi - first) / max(last - first, 1.0) * (x1 - x0)
+            xa, xb = x0 + (seg.lo - first) * unit, x0 + (seg.hi - first) * unit
             rect = Rectangle((xa, y), xb - xa, em, fc=seg.tone, ec=darken(seg.tone), lw=c.lw * 0.6, zorder=2)
             rect.set_gid(seg.gid)
             c.ax.add_patch(rect)
