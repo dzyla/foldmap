@@ -2507,6 +2507,8 @@ _INK_FIT = (
 )
 # text the most): the middle, so a name steps out only where its drawn text meets a letter
 _INK_GLYPH = 0.6  # half a base letter's drawn box, in ems of its own size (rendered: 0.59-0.62 on the NA fixtures)
+_INK_MARGIN = 0.25  # ems kept clear around a stem's name: rendered extents differ by font engine (matplotlib 3.10
+# drew 1KX5's name 0.9 px nearer a letter than 3.11 does, touching it)
 
 
 _FALLBACK_WIDTH = 0.6  # ems: a character the metric table lacks (about a bold lower-case letter)
@@ -2713,8 +2715,12 @@ def _name_clear(d: PlacedStem, slot, others, named, rects, letters, em: float) -
         overlaps_any(box, named)
         or overlaps_any(box, rects)
         or any(_box_meets_body(box, e) or _body_distance(at, e) <= own for e in others)
-        or overlaps_any(_stem_name_ink(d, em), letters)
+        or overlaps_any(_grown(_stem_name_ink(d, em), _INK_MARGIN * em), letters)
     )
+
+
+def _grown(box, pad: float) -> tuple[float, float, float, float]:
+    return box[0] - pad, box[1] - pad, box[2] + pad, box[3] + pad
 
 
 def _element_label_box(p: Placed) -> tuple[float, float, float, float]:
