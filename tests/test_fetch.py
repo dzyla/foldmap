@@ -217,3 +217,11 @@ def test_alphafold_models_are_cached_per_release(monkeypatch, tmp_path):
     monkeypatch.setattr(fetch_mod, "AFDB_VERSION", 7)
     second = fetch("P04637")
     assert second != first and len(asked) == 2 and asked[-1].endswith("-model_v7.cif")
+
+
+def test_share_ids_are_ids_only():
+    from foldmap.fetch import source_id
+
+    assert source_id(" 1lmb ") == "1LMB" and source_id("p04637") == "P04637"
+    assert source_id("AF-P04637-F1") == "AF-P04637-F1"
+    assert source_id("/tmp/x.cif") is None and source_id("hello") is None and source_id("") is None

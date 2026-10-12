@@ -1,21 +1,24 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 # Copyright (C) 2026 Dawid Zyla. Additional terms (AGPL-3.0 section 7(b)): see NOTICE.
-"""Streamlit app: load a structure, pick a style from previews of it, then fine-tune and download.
+"""Streamlit app: load a structure (drawn at once with the current theme), then fine-tune and download.
 
 Run with `foldmap app` (or `streamlit run src/foldmap/app.py`)."""
 
 from __future__ import annotations
 
+import copy
 import json
+import logging
 import os
 import re
 import tempfile
+from collections.abc import MutableMapping
 from dataclasses import fields, replace
 from pathlib import Path
 
 from foldmap import CREDIT
-from foldmap.cli import _adjustments, _domain_spec, make_layout
-from foldmap.fetch import ALIGNMENT_SUFFIXES, fetch, keep_upload
+from foldmap.cli import _adjustments, _domain_spec
+from foldmap.fetch import ALIGNMENT_SUFFIXES, fetch, keep_upload, source_id
 from foldmap.render import save, save_svg
 from foldmap.spec import FigureSpec, draw_spec, parse_flag, parse_protomers, parse_vector
 from foldmap.spec import layout_document as spec_document
@@ -82,7 +85,7 @@ def local_files() -> bool:
     return os.environ.get("FOLDMAP_APP_LOCAL_FILES", "1").strip().lower() not in ("0", "false", "no", "off")
 
 
-EXAMPLES = {"1LMB": "λ repressor on DNA", "5NKT": "FimA", "8UTF": "measles F trimer", "1UBQ": "ubiquitin"}
+EXAMPLES = {"1LMB": "λ repressor–DNA", "5NKT": "FimA", "8UTF": "measles F", "1UBQ": "ubiquitin"}
 
 
 # ---------------------------------------------------------------------------------------------- core
@@ -256,18 +259,75 @@ def trouble(err: Exception) -> str:
     return "this upload is no longer available (or cannot be read); load it again"
 
 
-def summary(path) -> str:
-    from foldmap.symmetry import detect_symmetry
+# ---------------------------------------------------------------------------------------------- session
+STRUCTURE_STYLE = ("mark", "highlight", "hbonds", "backbone_colors")  # Style fields that name this structure's parts
+STRUCTURE_WIDGETS = ("seq_chain", "names__kw", "domains__auto", "names_upload")  # widget keys of one structure
+_LOG = logging.getLogger("foldmap.app")
 
-    layout, sses, bb = make_layout(path)
-    chains = sorted({l.chain for l in bb.labels})
-    helices, strands = sum(s.kind == "H" for s in sses), sum(s.kind == "E" for s in sses)
-    try:
-        sym = detect_symmetry(bb, sses)
-    except ValueError:
-        sym = None
-    extra = f" · symmetry {sym.label}" if sym else ""
-    return f"{len(chains)} chain(s) · {len(bb)} residues · {helices} helices · {strands} strands{extra}"
+
+def settings_of(ss: MutableMapping) -> dict:
+    """The figure settings in the session: every Style field, every LAYOUT_DEFAULTS key and the theme."""
+    return {k: ss[k] for k in [*STYLE_FIELDS, *LAYOUT_DEFAULTS, "theme"] if k in ss}
+
+
+def current_blob(ss: MutableMapping) -> str:
+    """The settings as JSON: the key of the figure caches."""
+    return json.dumps(settings_of(ss), sort_keys=True, default=str)
+
+
+def apply_theme(ss: MutableMapping, name: str | None = None) -> None:
+    """Make `name` (default: the session's theme) the theme, with every style value of its own; layout settings
+    not yet in the session get their defaults."""
+    name = name or ss["theme"]
+    ss["theme"] = name
+    for key, value in vars(THEMES[name]).items():
+        ss[key] = copy.deepcopy(value)
+    for key, value in LAYOUT_DEFAULTS.items():
+        ss.setdefault(key, copy.deepcopy(value))
+
+
+def keep_look(ss: MutableMapping) -> None:
+    """Keep the theme and its style values while their widgets are not shown (the Start screen): the next structure
+    is drawn in the visitor's look. Streamlit forgets a widget's value one run after the widget stops rendering,
+    unless the value is set again."""
+    for key in ("theme", *STYLE_FIELDS):
+        if key in ss:
+            ss[key] = ss[key]
+
+
+def reset_structure(ss: MutableMapping) -> None:
+    """Forget everything that belonged to the last structure: layout settings, edits, marks, the alignment, notes,
+    editor tables and per-structure widgets. The theme and its other style values carry over."""
+    for key, value in LAYOUT_DEFAULTS.items():
+        ss[key] = copy.deepcopy(value)
+    look = THEMES[ss.get("theme", "publication")]
+    for key in STRUCTURE_STYLE:
+        ss[key] = getattr(look, key)
+    for key in ("msa_path", "msa_error", "msa_reference", "msa_missing", "names_missing", "layout_error"):
+        ss[key] = ""
+    ss["_synced"] = {}
+    from foldmap.app_edits import EDITORS
+
+    for kind in EDITORS:  # a new table key: no edit of the last structure's table is applied to this one
+        ss[f"{kind}__ver"] = ss.get(f"{kind}__ver", 0) + 1
+    for key in (*STRUCTURE_WIDGETS, "drawn_blob", "slow_noted", "last_good"):
+        ss.pop(key, None)
+    ss["auto_redraw"] = True
+    ss["pane"] = "Figure"
+
+
+def unpathed(message: str, path, name: str) -> str:
+    """A message about the loaded file with its path on this machine given as the structure's name (an upload's
+    place in the server's cache is nobody's business)."""
+    return message.replace(str(path), name)
+
+
+def picked_row(table: dict | None, choices: list[tuple[str, str]]) -> str | None:
+    """The id of the structure picked in the UniProt table (its selection state), else None."""
+    from foldmap.app_edits import row_source
+
+    rows = ((table or {}).get("selection") or {}).get("rows") or []
+    return row_source(list(rows), choices)
 
 
 # ---------------------------------------------------------------------------------------------- UI
@@ -275,20 +335,24 @@ def main() -> None:
     import streamlit as st
     import streamlit.components.v1 as components
 
+    from foldmap import app_jobs, uniprot
+
     st.set_page_config(page_title="Foldmap", page_icon="🧬", layout="wide")
-    st.caption(CREDIT)
     ss = st.session_state
     ss.setdefault("stage", "load")
+    lim = app_jobs.limits(hosted=not local_files())
 
     @st.cache_data(show_spinner=False, max_entries=32)
-    def render(path: str, settings_json: str) -> tuple[str, dict]:
-        drawn = draw_spec(spec_of(path, json.loads(settings_json)))
-        # loops and strands with no clear route; loops whose only route runs over a label or chain end
-        return save_svg(drawn.figure), {"fallback": drawn.stuck, "over_labels": drawn.over_labels}
+    def render(path: str, blob: str) -> dict:
+        return app_jobs.run_job(app_jobs.draw_job, path, blob, lim.slow, limits=lim)
 
-    @st.cache_data(show_spinner=False, max_entries=16)
-    def files(path: str, settings_json: str) -> dict:
-        return figure_files(path, json.loads(settings_json))
+    @st.cache_data(show_spinner=False, max_entries=64)
+    def sized(path: str) -> dict:
+        return app_jobs.run_job(app_jobs.size_job, path, limits=lim)
+
+    @st.cache_data(show_spinner=False, ttl=86400, max_entries=64)
+    def choices(accession: str) -> list[tuple[str, str]]:
+        return structure_choices(accession)
 
     @st.cache_data(show_spinner=False, max_entries=16)
     def sequence(path: str, settings_json: str, view_json: str) -> dict:
@@ -320,35 +384,81 @@ def main() -> None:
         settings = json.loads(settings_json)
         return build_page(path, **spec_of(path, settings).page_kwargs())
 
-    def apply_theme(name: str | None = None) -> None:
-        name = name or ss["theme"]
-        ss["theme"] = name
-        for key, value in vars(THEMES[name]).items():
-            ss[key] = value
-        for key, value in LAYOUT_DEFAULTS.items():
-            ss.setdefault(key, value)
-
-    def load(example: str | None = None) -> None:
-        up = ss.get("upload")
+    def load(source: str | None = None, upload: bool = False) -> None:
+        """Load a structure and draw its first figure; the workspace opens only when that succeeds. upload: the
+        file in the Start uploader (its callback); else `source`, or the text typed on Start."""
+        if upload:
+            up = ss.get("upload")
+            if up is None:  # the upload was removed
+                return
+            text, file, name = "", (up.name, up.getvalue()), re.sub(r"[^\w.-]+", "_", Path(up.name).stem)[:60]
+        else:
+            if source is None:  # typed: the last accession's list goes
+                ss["uniprot_for"] = ""
+            text, file = (source if source is not None else ss.get("source", "")).strip(), None
+            if uniprot.ACCESSION.fullmatch(text.upper()):  # its structures are listed to choose from
+                ss["uniprot_for"], ss["load_error"] = text.upper(), ""
+                return
+            name = ""
+        if "theme" not in ss:  # the first structure of this visit
+            apply_theme(ss, "publication")
         try:
-            upload = (up.name, up.getvalue()) if up and not example else None
-            path = fetch(example or ss.get("source", ""), upload, local=local_files())
-            ss["info"] = summary(path)
-        except (ValueError, FileNotFoundError, OSError, RuntimeError) as err:  # RuntimeError: gemmi cannot read it
-            ss["load_error"] = str(err)
+            path = fetch(text, file, local=local_files())
+            name = name or source_id(text) or path.stem
+            size = sized(str(path))
+        except (ValueError, OSError, RuntimeError, app_jobs.JobLimit) as err:
+            unreadable = isinstance(err, (OSError, RuntimeError)) and not isinstance(err, app_jobs.JobFailed)
+            if unreadable:  # gemmi cannot read it (its text may hold a server path)
+                ss["load_error"] = f"{name or 'this file'} could not be read as a structure (mmCIF or PDB)"
+            else:
+                ss["load_error"] = app_jobs.explain(err, name or text, lim)[0]
             return
-        ss["path"], ss["stage"], ss["load_error"] = str(path), "style", ""
-        for key in HIDDEN_LAYOUT:  # the last structure's are not this one's
-            ss[key] = LAYOUT_DEFAULTS[key]
-        for key in ("msa_path", "msa_error", "msa_reference", "msa_missing"):  # the last structure's alignment
-            ss[key] = ""
+        if lim.max_residues and size["residues"] > lim.max_residues:
+            ss["load_error"] = app_jobs.size_message(name, size, lim)
+            return
+        reset_structure(ss)
+        settings = settings_of(ss)
+        failed = app_jobs.known_failure(str(path), settings)
+        try:
+            if failed is not None:
+                raise failed
+            result = render(str(path), current_blob(ss))  # a structure that cannot be drawn never opens
+        except Exception as err:  # every failure is a message here (a pipeline bug too: logged for the server)
+            if isinstance(err, app_jobs.JobLimit):
+                app_jobs.remember_failure(str(path), settings, err)
+            elif not isinstance(err, (ValueError, OSError, RuntimeError)):
+                _LOG.exception("drawing %s failed", name)
+            ss["load_error"] = unpathed(app_jobs.explain(err, name, lim)[0], path, name)
+            return
+        local_path = local_files() and bool(text) and Path(text).expanduser().is_file()
+        ss.update(
+            path=str(path),
+            name=name,
+            info=result["summary"],
+            elements=result["elements"],
+            protein_chains=result["chains"],
+            na_chains=result["na_chains"],
+            all_chains=list(dict.fromkeys([*result["chains"], *result["na_chains"]])),
+            assemblies=size["assemblies"],
+            share_id="" if file or local_path else source_id(text) or "",
+            stage="edit",
+            load_error="",
+            uniprot_for="",
+        )
+        if result["seconds"] > lim.slow:
+            ss["auto_redraw"], ss["slow_noted"] = False, str(path)
 
-    def pick(theme: str) -> None:
-        apply_theme(theme)
-        ss["stage"] = "edit"
+    def load_example() -> None:
+        if ss.get("example"):  # the pill stays selected: Start is not shown again until a new structure
+            load(ss["example"])
 
-    def restart() -> None:
-        ss["stage"] = "load"
+    def pick_row() -> None:
+        picked = picked_row(ss.get("uniprot_table"), choices(ss["uniprot_for"]))
+        if picked:
+            load(picked)
+
+    def new_structure() -> None:
+        ss["stage"], ss["share_id"] = "load", ""
 
     def apply_layout_file() -> None:
         from foldmap import layoutfile
@@ -369,59 +479,74 @@ def main() -> None:
         for key, value in settings.items():
             ss[key] = value
 
-    st.markdown("#### Foldmap · protein topology diagrams")
+    if ss["stage"] == "load":  # a share link (?id=…&theme=…) opens its structure once
+        qid = st.query_params.get("id")
+        if qid and ss.get("qp_tried") != qid:
+            ss["qp_tried"] = qid
+            theme = st.query_params.get("theme")
+            if theme in THEMES:
+                apply_theme(ss, theme)
+            if source_id(qid):
+                load(source_id(qid))
+            else:
+                ss["load_error"] = f"{qid!r} in the link is not a PDB ID or UniProt accession"
+    desired = {"id": ss["share_id"], "theme": ss["theme"]} if ss["stage"] == "edit" and ss.get("share_id") else {}
+    if st.query_params.to_dict() != desired:  # uploads and paths never enter the link
+        st.query_params.from_dict(desired)
 
     if ss["stage"] == "load":
-        paths = local_files()
-        st.write(
-            "Start with a structure: a PDB ID, a UniProt accession (AlphaFold model), "
-            + ("a file path, or an upload." if paths else "or an upload.")
-        )
-        left, right = st.columns([3, 2])
-        with left:
-            label = "PDB ID, UniProt accession or file path" if paths else "PDB ID or UniProt accession"
-            st.text_input(label, key="source", placeholder="e.g. 1LMB or P04637")
-            st.button("Load structure", key="load", type="primary", on_click=load)
-            st.caption("Examples")
-            cols = st.columns(len(EXAMPLES))
-            for col, (pdb, what) in zip(cols, EXAMPLES.items()):
-                col.button(f"{pdb} · {what}", key=f"ex_{pdb}", on_click=load, args=(pdb,))
-        with right:
-            st.file_uploader("…or upload a file", type=["cif", "mmcif", "pdb", "ent"], key="upload")
-        if ss.get("load_error"):
-            st.error(ss["load_error"])
-        try:
-            choices = structure_choices(ss.get("source", ""))
-        except ValueError as err:
-            choices = []
-            st.caption(f"UniProt: {err}")
-        if choices:
-            st.write("**Structures of this protein** (UniProt): pick one, or load the AlphaFold model above.")
-            for sid, text in choices:
-                c1, c2 = st.columns([1, 5])
-                c1.button(sid, key=f"pdb_{sid}", on_click=load, args=(sid,))
-                c2.caption(text)
+        keep_look(ss)
+        with st.container(key="start"):
+            st.header("foldmap", anchor=False)
+            st.caption("Protein topology diagrams from structures")
+            with st.form("start", border=False, enter_to_submit=True):
+                hint = "PDB ID, UniProt accession, or file path" if local_files() else "PDB ID or UniProt accession"
+                st.text_input("Structure", key="source", placeholder=hint, label_visibility="collapsed")
+                st.form_submit_button("Draw", key="load", type="primary", on_click=load)
+            if ss.get("load_error"):
+                st.error(ss["load_error"])
+            st.pills(
+                "Examples",
+                list(EXAMPLES),
+                key="example",
+                format_func=lambda k: f"{k} · {EXAMPLES[k]}",
+                on_change=load_example,
+            )
+            st.file_uploader(
+                "or drop a .cif / .pdb file",
+                type=["cif", "mmcif", "pdb", "ent"],
+                key="upload",
+                on_change=load,
+                kwargs={"upload": True},
+            )
+            if ss.get("uniprot_for"):
+                acc = ss["uniprot_for"]
+                try:
+                    rows = choices(acc)
+                except ValueError as err:
+                    st.caption(f"UniProt: {err}")
+                else:
+                    if rows:
+                        st.caption(f"Structures of {acc} (UniProt): pick one to draw it.")
+                        st.dataframe(
+                            {"id": [r[0] for r in rows], "what": [r[1] for r in rows]},
+                            key="uniprot_table",
+                            on_select=pick_row,
+                            selection_mode="single-row",
+                            hide_index=True,
+                        )
+                    else:
+                        st.caption(f"UniProt lists no structure or AlphaFold model for {acc}.")
+            st.caption(CREDIT)
         return
 
-    path = ss["path"]
-    if ss["stage"] == "style":
-        st.write(f"**{Path(path).stem}** · {ss.get('info', '')}")
-        st.write(
-            "Pick a style to start from: the thumbnails show each theme on ubiquitin (AlphaFold confidence on "
-            "p53); your structure is drawn once you choose, and every control stays adjustable afterwards."
-        )
-        for start in range(0, len(PREVIEW_THEMES), 5):  # rows of five, so each row lines up
-            cols = st.columns(5)
-            for col, theme in zip(cols, PREVIEW_THEMES[start : start + 5]):
-                with col:
-                    st.image(preview_image(theme), caption=theme, width="stretch")
-                    st.button("Use this style", key=f"pick_{theme}", on_click=pick, args=(theme,))
-        st.button("← another structure", key="back_style", on_click=restart)
-        return
+    path, name = ss["path"], ss["name"]
+    st.caption(CREDIT)  # Task 4 moves it to the bottom of the sidebar
+    st.markdown("#### Foldmap · protein topology diagrams")
 
     # ---- editor
     with st.sidebar:
-        st.selectbox("Theme", list(THEMES), key="theme", on_change=apply_theme)
+        st.selectbox("Theme", list(THEMES), key="theme", on_change=apply_theme, args=(ss,))
         with st.expander("Colours", expanded=True):
             st.selectbox("Colour by", CHOICES["color_by"], key="color_by")
             st.selectbox("Palette", CHOICES["palette"], key="palette")
@@ -547,32 +672,45 @@ def main() -> None:
             st.warning(
                 f"The layout file's alignment {ss['msa_missing']} is not on this machine; upload it under Alignment."
             )
-        st.button("← another structure", key="back_edit", on_click=restart)
+        st.button("← another structure", key="new_structure", on_click=new_structure)
 
-    settings = {k: ss[k] for k in [*STYLE_FIELDS, *LAYOUT_DEFAULTS, "theme"] if k in ss}
-    blob = json.dumps(settings, sort_keys=True, default=str)
-    st.write(f"**{Path(path).stem}** · {ss.get('info', '')}")
+    settings, blob = settings_of(ss), current_blob(ss)
+    st.write(f"**{name}** · {ss.get('info', '')}")
+    stem = name
     tab_fig, tab_seq, tab_live = st.tabs(["Figure", "Sequence", "Interactive"])
     with tab_fig:
         try:
-            svg, notes = render(path, blob)
-        except (ValueError, OSError, RuntimeError) as err:
-            st.error(trouble(err))
+            failed = app_jobs.known_failure(path, settings)
+            if failed is not None:
+                raise failed
+            result = render(path, blob)
+        except (ValueError, OSError, RuntimeError, app_jobs.JobLimit) as err:
+            if isinstance(err, app_jobs.JobLimit):
+                app_jobs.remember_failure(path, settings, err)
+            st.error(unpathed(app_jobs.explain(err, name, lim, ss.get("last_changed"))[0], path, name))
             return
-        if notes["fallback"]:
-            st.warning("No clear route for: " + ", ".join(notes["fallback"]) + " (drawn as plain curves).")
-        if notes.get("over_labels"):
-            st.warning(f"Drawn over a label or chain end (the only route found): {', '.join(notes['over_labels'])}.")
+        if result["fallback"]:
+            st.warning("No clear route for: " + ", ".join(result["fallback"]) + " (drawn as plain curves).")
+        if result["over_labels"]:
+            st.warning(f"Drawn over a label or chain end (the only route found): {', '.join(result['over_labels'])}.")
         page_bg = settings.get("background", "#ffffff")
         st.markdown(
-            f'<div style="background:{page_bg};border-radius:6px;padding:8px">{svg}</div>', unsafe_allow_html=True
+            f'<div style="background:{page_bg};border-radius:6px;padding:8px">{result["svg"]}</div>',
+            unsafe_allow_html=True,
         )
-        out = files(path, blob)
-        stem = Path(path).stem
+        eager = tuple(sorted(result["files"].items()))
         c1, c2, c3 = st.columns(3)
-        c1.download_button("SVG (editable)", out["svg"], f"{stem}.svg", "image/svg+xml", key="dl_svg")
-        c2.download_button("PNG (300 dpi)", out["png"], f"{stem}.png", "image/png", key="dl_png")
-        c3.download_button("PDF", out["pdf"], f"{stem}.pdf", "application/pdf", key="dl_pdf")
+        for col, ext, label, mime in (
+            (c1, "svg", "SVG (editable)", "image/svg+xml"),
+            (c2, "png", "PNG (300 dpi)", "image/png"),
+            (c3, "pdf", "PDF", "application/pdf"),
+        ):
+            try:
+                data = app_jobs.figure_file(path, blob, ext, lim, eager)
+            except (ValueError, OSError, RuntimeError, app_jobs.JobLimit) as err:
+                col.caption(f"{ext.upper()} unavailable: {app_jobs.explain(err, name, lim)[0]}")
+            else:
+                col.download_button(label, data, f"{stem}.{ext}", mime, key=f"dl_{ext}")
         try:
             import yaml
 
@@ -585,7 +723,7 @@ def main() -> None:
                 key="dl_layout",
             )
         except (ValueError, OSError, RuntimeError) as err:
-            st.caption(f"Layout file unavailable: {trouble(err)}")
+            st.caption(f"Layout file unavailable: {app_jobs.explain(err, name, lim)[0]}")
     with tab_seq:
         c1, c2, c3 = st.columns(3)
         c1.slider("Columns per row", 20, 150, 60, step=5, key="seq_columns")
@@ -595,7 +733,7 @@ def main() -> None:
         try:
             seq = sequence(path, blob, json.dumps(view, sort_keys=True))
         except (ValueError, OSError, RuntimeError) as err:
-            st.error(trouble(err))
+            st.error(app_jobs.explain(err, name, lim)[0])
         else:
             page_bg = settings.get("background", "#ffffff")
             st.markdown(
@@ -603,7 +741,6 @@ def main() -> None:
                 f"{seq['svg'].decode()}</div>",
                 unsafe_allow_html=True,
             )
-            stem = Path(path).stem
             d1, d2, d3 = st.columns(3)
             d1.download_button("SVG", seq["svg"], f"{stem}-sequence.svg", "image/svg+xml", key="dl_seq_svg")
             d2.download_button("PNG (300 dpi)", seq["png"], f"{stem}-sequence.png", "image/png", key="dl_seq_png")
@@ -612,7 +749,7 @@ def main() -> None:
         try:
             page = interactive(path, blob)
         except (ValueError, OSError, RuntimeError) as err:
-            st.error(trouble(err))
+            st.error(app_jobs.explain(err, name, lim)[0])
         else:
             st.download_button(
                 "Interactive page (HTML)", page.encode(), f"{stem}-explorer.html", "text/html", key="dl_html"

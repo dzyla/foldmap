@@ -22,6 +22,8 @@ STRUCTURE_SUFFIXES = (".cif", ".mmcif", ".pdb", ".ent")
 ALIGNMENT_SUFFIXES = (".fasta", ".fa", ".aln", ".sto", ".txt")
 UPLOAD_MAX_AGE = 24 * 3600  # seconds an uploaded file is kept in the cache
 _UPLOAD_NAME = re.compile(r"upload-[0-9a-f]{12}\.[a-z]+")
+_AF = re.compile(r"(?:AF-)?([OPQ][0-9][A-Z0-9]{3}[0-9]|[A-NR-Z][0-9](?:[A-Z][A-Z0-9]{2}[0-9]){1,2})(?:-F1)?")
+_PDB = re.compile(r"[0-9][A-Za-z0-9]{3}")
 
 
 def atomic_write(path: Path, data: bytes | str) -> None:
@@ -101,16 +103,21 @@ def fetch(source: str, upload: tuple[str, bytes] | None = None, *, local: bool =
     text = (source or "").strip()
     if local and text and Path(text).expanduser().is_file():
         return Path(text).expanduser()
-    af = re.fullmatch(
-        r"(?:AF-)?([OPQ][0-9][A-Z0-9]{3}[0-9]|[A-NR-Z][0-9](?:[A-Z][A-Z0-9]{2}[0-9]){1,2})(?:-F1)?", text.upper()
-    )
+    af = _AF.fullmatch(text.upper())
     if af:  # a UniProt accession or AlphaFold DB id: the AlphaFold model
         acc = af.group(1)
         url = f"https://alphafold.ebi.ac.uk/files/AF-{acc}-F1-model_v{AFDB_VERSION}.cif"
         folder = CACHE / f"afdb-v{AFDB_VERSION}"  # a new AlphaFold DB release is a new download
         return _download(url, folder / f"AF-{acc}-F1.cif", f"AF-{acc} from the AlphaFold DB")
-    if re.fullmatch(r"[0-9][A-Za-z0-9]{3}", text):
+    if _PDB.fullmatch(text):
         pdb = text.upper()
         return _download(f"https://files.rcsb.org/download/{pdb}.cif", CACHE / f"{pdb}.cif", f"{pdb} from the PDB")
     what = "a structure file, a PDB ID" if local else "a PDB ID"
     raise ValueError(f"{text!r} is not {what} (e.g. 1LMB) or a UniProt accession (e.g. P04637)")
+
+
+def source_id(text: str) -> str | None:
+    """The id a share link may carry for this source: a PDB ID, UniProt accession or AlphaFold DB id (upper-cased,
+    as typed otherwise); None for anything else (a path, a file name, an upload)."""
+    text = (text or "").strip().upper()
+    return text if _AF.fullmatch(text) or _PDB.fullmatch(text) else None
