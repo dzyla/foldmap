@@ -334,8 +334,14 @@ APP_CONFIG = {  # what `foldmap app` passes and .streamlit/config.toml holds (St
 SIDEBAR_WIDTH = 440  # px: the sidebar's segmented choices and toggle rows fit on one line (Streamlit's own: 336)
 
 
+def _plain(value) -> str:
+    """A config value as Streamlit reads it in a flag: booleans lower-case."""
+    return str(value).lower() if isinstance(value, bool) else str(value)
+
+
 def _toml(value) -> str:
-    return str(value).lower() if isinstance(value, bool) else f'"{value}"' if isinstance(value, str) else str(value)
+    """A config value in TOML: strings quoted, the rest as in a flag."""
+    return f'"{value}"' if isinstance(value, str) else _plain(value)
 
 
 def config_toml() -> str:
@@ -350,45 +356,44 @@ def config_toml() -> str:
 
 
 def run_args(app_path) -> list[str]:
-    """The `streamlit run` command of `foldmap app`: APP_CONFIG as flags (the same values as the config file)."""
+    """The `streamlit run` command of `foldmap app`: APP_CONFIG as flags (the config file's values), except that on
+    your own machine (local_files) an error shows its full details; hosted, visitors see none."""
     import sys
 
+    def value(section: str, key: str, given):
+        if (section, key) == ("client", "showErrorDetails"):
+            return "full" if local_files() else "none"
+        return given
+
     flags = [
-        f"--{section}.{key}={str(value).lower() if isinstance(value, bool) else value}"
+        f"--{section}.{key}={_plain(value(section, key, given))}"
         for section, values in APP_CONFIG.items()
-        for key, value in values.items()
+        for key, given in values.items()
     ]
     return [sys.executable, "-m", "streamlit", "run", str(app_path), *flags]
 
 
+def _both(pair: dict) -> str:
+    """A colour of each theme as CSS light-dark(): the browser picks it from the color-scheme Streamlit sets on the
+    app (and changes live when the visitor switches theme), so one static stylesheet serves both themes."""
+    return f"light-dark({pair['light']}, {pair['dark']})"
+
+
 SIDE, PAIR = '[data-testid="stSidebarUserContent"]', '[data-testid="stElementContainer"]'  # PAIR: two a row, or
 # one a row where the sidebar is too narrow for two (a phone)
-
-
-def _colours(mode: str) -> str:
-    """The stylesheet's colours of one theme: muted text (captions, upload limits, input hints, placeholders:
-    Streamlit fades them below 4.5:1), the chosen option of a segmented control in the text colour (the primary
-    colour on its tinted background is 4.22:1 in light), a switch's track when off in the border colour (Streamlit's
-    grey is 1.5:1) and its knob when on in the background colour (light grey on #56B4E9 is 1.9:1), the figure
-    card's edge."""
-    theme = APP_THEME[f"theme.{mode}"]
-    switch = '[data-testid="stCheckbox"] label:has(input[role="switch"]'
-    return f"""
-[data-testid="stCaptionContainer"], [data-testid="stFileUploaderDropzoneInstructions"] span,
-[data-testid="InputInstructions"],
-[data-testid="stApp"] input::placeholder, [data-testid="stApp"] textarea::placeholder {{opacity:1;color:{MUTED[mode]}}}
-[data-testid="stButtonGroup"] button[aria-checked="true"] p {{color:{theme["textColor"]}}}
-{switch}:not(:checked)) > div:not([data-testid]) {{background:{theme["borderColor"]}}}
-{switch}:checked) > div:not([data-testid]) > div {{background:{theme["backgroundColor"]}}}
-.st-key-canvas .fm-card {{border:1px solid {CARD_BORDER[mode]}}}
-"""
-
-
+THEME_KEYS = ("textColor", "borderColor", "backgroundColor")  # the theme colours the stylesheet also sets
+APP, SWITCH = '[data-testid="stApp"]', '[data-testid="stCheckbox"] label:has(input[role="switch"]'
+TEXT, EDGE, BACK = ({m: APP_THEME[f"theme.{m}"][k] for m in ("light", "dark")} for k in THEME_KEYS)
+# Colours (each a light-dark pair, so a live theme switch needs no rerun): muted text (captions, upload limits, input
+# hints, placeholders: Streamlit fades them below 4.5:1; outside the app, in a dialog or popover where no
+# color-scheme reaches, a caption is only made opaque), the chosen segment's label in the text colour (the primary
+# colour on its tint is 4.22:1), a switch's track when off in the border colour (Streamlit's grey: 1.5:1) and its
+# knob when on in the background colour (1.9:1 on #56B4E9), the primary buttons' label (white on #56B4E9: 2.31:1).
 STYLESHEET = f"""
 .st-key-start {{max-width:640px;margin:0 auto}}
 @media (min-width:640px) {{[data-testid="stMainBlockContainer"] {{padding:4rem 1.5rem 2rem}}}}
 .st-key-topbar {{row-gap:0.25rem}}
-.st-key-canvas .fm-card {{border-radius:8px;padding:12px;overflow-x:auto}}
+.st-key-canvas .fm-card {{border-radius:8px;padding:12px;overflow-x:auto;border:1px solid {_both(CARD_BORDER)}}}
 .st-key-canvas svg {{display:block;width:100%;height:auto;max-height:80vh}}
 [data-testid="stMainBlockContainer"]:has([data-testid="stAlert"]) .st-key-canvas svg {{max-height:calc(80vh - 5rem)}}
 .st-key-seq_options .st-key-seq_full {{padding-top:2.25rem}}
@@ -410,23 +415,21 @@ STYLESHEET = f"""
 .st-key-credit p {{font-size:12px}}
 .st-key-phone_hint {{display:none}}
 @media (max-width:640px) {{.st-key-phone_hint {{display:flex}}}}
-{_colours("light")}"""
-DARK_EXTRA = f"""{_colours("dark")}
-.st-key-load button p, .st-key-redraw button p {{color:{BUTTON_LABEL["dark"]}}}
+[data-testid="stCaptionContainer"], [data-testid="InputInstructions"] {{opacity:1}}
+{APP} [data-testid="stCaptionContainer"], {APP} [data-testid="stFileUploaderDropzoneInstructions"] span,
+{APP} [data-testid="InputInstructions"], {APP} input::placeholder, {APP} textarea::placeholder {{
+  opacity:1;color:{_both(MUTED)}}}
+[data-testid="stButtonGroup"] button[aria-checked="true"] p {{color:{_both(TEXT)}}}
+{SWITCH}:not(:checked)) > div:not([data-testid]) {{background:{_both(EDGE)}}}
+{SWITCH}:checked) > div:not([data-testid]) > div {{background:{_both(BACK)}}}
+.st-key-load button p, .st-key-redraw button p {{color:{_both(BUTTON_LABEL)}}}
 """
-
-
 MARK = (  # the icon (scripts/make_app_icon.py) as the Start screen's mark
     '<img src="data:image/png;base64,{}" width="44" height="44" alt="">'.format(
         base64.b64encode((ASSETS / "icon.png").read_bytes()).decode()
     )
 )
 PHONE_HINT = "Settings: open the panel with » at the top left."  # Streamlit's button shows »
-
-
-def page_css(kind: str | None) -> str:
-    """The stylesheet for the theme in use (st.context.theme.type): DARK_EXTRA added in the dark theme."""
-    return STYLESHEET + (DARK_EXTRA if kind == "dark" else "")
 
 
 def trouble(err: Exception) -> str:
@@ -671,7 +674,7 @@ def main() -> None:
         layout="wide",
         initial_sidebar_state=SIDEBAR_WIDTH,  # "auto" (collapsed on a phone), this wide
     )
-    st.html(f"<style>{page_css(st.context.theme.type)}</style>")  # once per run, both screens
+    st.html(f"<style>{STYLESHEET}</style>")  # once per run, both screens; light-dark() follows the theme
     ss = st.session_state
     ss.setdefault("stage", "load")
     lim = app_jobs.limits(hosted=not local_files())
