@@ -74,6 +74,8 @@ class Placed:
     ghost: bool = False  # repeat of a barrel's first strand, drawn to show the sheet closes
     ends: str = ""  # "N", "C" or "NC" when the chain starts/ends here (its stub and letter need room)
     label_side: int = 1  # a helix's label: 1 on its upper side, -1 on the other (_choose_label_sides)
+    over: bool = False  # a helix packed on a sheet face, drawn over the sheet's strands (_over_sheet)
+    label_along: float = 0.0  # its name moved this far along its axis, N -> C (_over_label_sides)
 
     @property
     def direction(self) -> np.ndarray:
@@ -214,6 +216,7 @@ class Layout:
     stack_rows: list[list[str]] = field(default_factory=list)  # a depth-keeping stack wrapped: each row's ids
     ba_rows: list[list[str]] = field(default_factory=list)  # each βα template row's elements (no ghost), as drawn
     # left to right: the strands and the helices between them (_ba_template)
+    on_sheet: dict[str, list[str]] = field(default_factory=dict)  # a helix drawn over a sheet -> the sheet's strands
     res_cons: list[float] = field(default_factory=list)  # alignment conservation of each residue (nan: none)
     res_grade: list[int] = field(default_factory=list)  # conservation grade 1..9 of each residue (0: none)
     cons_label: str = ""  # legend text saying where the grades come from
@@ -324,7 +327,12 @@ def _sheet_order(sheet: Sheet, frame: Frame) -> tuple[list[int], int, np.ndarray
     return order, s, cents
 
 
-def _sheet_item(sheet: Sheet, frame: Frame, pitch: float = PITCH) -> _Item:
+def _sheet_item(
+    sheet: Sheet, frame: Frame, pitch: float = PITCH, over: list[SSE] = (), helix_w: float = HELIX_W
+) -> _Item:
+    """A sheet as one block of strands at `pitch`, each pointing as it runs relative to strands[0]; a closed
+    barrel's first strand repeated as a ghost after the last. `over` (helices packed on its face, in sequence): each
+    drawn over the strands where it packs (_over_sheet), unless it would lie on one drawn there before it."""
     strands = sheet.strands
     order, s, cents = _sheet_order(sheet, frame)
     members, offsets = [], []
@@ -338,8 +346,67 @@ def _sheet_item(sheet: Sheet, frame: Frame, pitch: float = PITCH) -> _Item:
         f = members[0]
         members.append(Placed(f.sse, 0, 0, f.length, f.angle, f.width, ghost=True))
         offsets.append(((slots - 1) / 2 * pitch, 0.0))
+    laid: list[tuple[float, float, float, float]] = []
+    for h in over:  # in sequence; one that would lie on a helix already over the sheet stays beside it
+        member, (ox, oy) = _over_sheet(
+            h, sheet, order, s, [o[0] for o in offsets[: len(order)]], members[: len(order)], helix_w
+        )
+        x0, y0, x1, y1 = member.rect
+        box = (x0 + ox, y0 + oy, x1 + ox, y1 + oy)
+        if overlaps_any(box, laid):
+            continue
+        laid.append(box)
+        members.append(member)
+        offsets.append((ox, oy))
     home = tuple(cents.mean(axis=0) * SCALE)
     return _Item(members, offsets, home[0], home[1], home, *_anchor(strands))
+
+
+def _unit(v) -> np.ndarray:
+    return _snap(np.asarray(v, float) / np.linalg.norm(v))
+
+
+def _over_sheet(
+    h: SSE, sheet: Sheet, order: list[int], s: int, xs: list[float], strands: list[Placed], width: float = HELIX_W
+) -> tuple[Placed, tuple[float, float]]:
+    """A helix packed on the sheet's face (features.helices_on_sheets), placed over the drawn strands as it packs on
+    them, true length: the member and its offset from the sheet item's centre. The sheet's drawn axes in 3D: up3,
+    the strands' mean direction (each by its sense) times the item's flip s, and across3, from the first drawn
+    strand's centroid to the last's, made orthogonal to up3; n = across3 x up3, the face as drawn.
+    x: between the two strands whose axis lines lie nearest the helix centroid in the plane of the face (both seen
+    along n), by inverse distance, from their drawn x (`xs`, in drawn order); beyond an end strand, that strand's x.
+    y: the centroid's height along up3 above the strands' mean centroid, scaled, within the strands' drawn extent.
+    Angle: atan2(axis . up3, axis . across3), not snapped to 90 degrees (Burroughs 2007 draws ubiquitin's α1 diagonal).
+    Every 3D vector and the results are snapped."""
+    cents = [_snap(sheet.strands[k].centroid) for k in order]
+    up3 = _unit(s * sum(d * x.axis for d, x in zip(sheet.directions, sheet.strands)))
+    across = cents[-1] - cents[0]
+    across3 = _unit(across - (across @ up3) * up3)
+    n = _snap(np.cross(across3, up3))
+    centre, axis = _snap(h.centroid), _snap(h.axis)
+    mid = _snap(np.mean(cents, axis=0))
+
+    def flat(v):  # seen along n: in the plane of the face
+        return v - (v @ n) * n
+
+    dist = []
+    for k, c in zip(order, cents):
+        a = _unit(flat(sheet.strands[k].axis))
+        v = flat(centre - c)
+        dist.append(float(_snap(np.linalg.norm(v - (v @ a) * a))))
+    t = float(_snap((centre - cents[0]) @ across3))
+    end = float(_snap((cents[-1] - cents[0]) @ across3))
+    ranked = sorted(range(len(order)), key=lambda i: (dist[i], i))
+    i, j = ranked[0], ranked[-1] if len(ranked) == 1 else ranked[1]
+    if (i == 0 and t <= 0) or (i == len(order) - 1 and t >= end) or dist[i] == 0:
+        x = xs[i]
+    else:
+        x = (xs[i] / dist[i] + xs[j] / dist[j]) / (1 / dist[i] + 1 / dist[j])
+    reach = max(m.length for m in strands if not m.ghost) / 2
+    y = float(np.clip((centre - mid) @ up3 * SCALE, -reach, reach))
+    angle = float(_snap(np.arctan2(axis @ up3, axis @ across3)))
+    length = max(width, (len(h) - 1) * HELIX_RISE * SCALE)
+    return Placed(h, 0, 0, length, angle, width, over=True), (float(_snap(x)), float(_snap(y)))
 
 
 _BA_GAP = 0.3  # page units between the footprints of neighbours in a βα template row
@@ -1696,6 +1763,12 @@ def _is_joint(n: int, a: PlacedStem, b: PlacedStem) -> bool:
     return n == 0 and bool(a.parent) and a.parent == b.parent
 
 
+def lying_over(layout: Layout) -> set[frozenset[str]]:
+    """The ids of each helix drawn over a sheet and each strand of that sheet (Layout.on_sheet): their boxes overlap
+    by design."""
+    return {frozenset((h, k)) for h, ids in layout.on_sheet.items() for k in ids}
+
+
 def joined_pieces(stems: list[PlacedStem], na: Nucleic) -> set[frozenset[str]]:
     """The ids of every two consecutive pieces of one bent duplex (a strand steps from one to the next with no
     nucleotide between): they may meet or overlap on the page (_joints)."""
@@ -1996,19 +2069,23 @@ def build_layout(
     copies: dict[str, tuple[str, int]] | None = None,
     relabel: dict[str, str] | None = None,
     names: Callable[[Layout, list[SSE]], None] | None = None,
+    over: dict[str, int] | None = None,
 ) -> Layout:
     """Labels: the generic ones (_assign_labels), then `relabel` (ref -> label: copies' shared labels, primes of
     elements lent by neighbours), then `names` (names.apply_names: --names, given the placed layout with its stems
     and ba_rows), then `rename` (the user's own, through _adjust like `swap` and `move`); the label sides and boxes
     are chosen after (_choose_label_sides).
-    `template` (Style.fold_template, the style's when None): "auto" draws each sheet that template_applies to as
-    a βα row (_ba_template), in projected mode; `copies` (model.homolog_chains) makes copies of a protein share that
-    choice (template_choices). `keep_depth` (stack mode with a membrane): each element stays at its
-    height along the frame's up. `na_cropped` (na_extent auto cropped the nucleic acid): drawn as blocks, without
-    base letters. `attract` (projected mode) pulls loop-joined and touching elements together before overlaps
-    are removed; `contacts` comes from features.sse_contacts. `nucleic` adds its stems (straight pieces of
-    base-paired DNA/RNA), placed like any element and pulling the elements that touch them; strands with no pair
-    at all are kept as projected traces."""
+    `template` (Style.fold_template, the style's when None): "auto" draws each sheet that template_applies to as a
+    βα row (_ba_template), in projected mode; `copies` (model.homolog_chains) makes copies of a protein share that
+    choice (template_choices). `over` (features.helices_on_sheets: helix id -> sheet index): each helix drawn over
+    its sheet's strands (_sheet_item, _over_sheet), in projected mode, unless the sheet is a βα row, the helix is a
+    row's, a bundle's or a piece of a kinked helix (a rigid unit drawn whole beside the sheet), or a copy of it in
+    another chain of the protein (`copies`) is drawn but not over its sheet (_over_alike). `keep_depth` (stack mode
+    with a membrane): each element stays at its height along the frame's up. `na_cropped` (na_extent auto cropped
+    the nucleic acid): drawn as blocks, without base letters. `attract` (projected mode) pulls loop-joined and
+    touching elements together before overlaps are removed; `contacts` comes from features.sse_contacts. `nucleic`
+    adds its stems (straight pieces of base-paired DNA/RNA), placed like any element and pulling the elements that
+    touch them; strands with no pair at all are kept as projected traces."""
     if mode not in ("projected", "stack"):
         raise ValueError(f"unknown layout mode {mode!r}")
     style = style or Style()
@@ -2017,21 +2094,21 @@ def build_layout(
     if template not in CHOICES["fold_template"]:
         raise ValueError(f"fold_template must be one of {', '.join(CHOICES['fold_template'])}; got {template!r}")
     as_rows = mode == "projected" and template == "auto"  # a stack row draws elements in sequence instead
-    items = [
-        _ba_template(
+    rowed = template_choices(sheets, sses, copies or {}) if as_rows else [False] * len(sheets)
+    templates = {
+        k: _ba_template(
             ring := _open_at_ends(sh),
             _ba_units(ring, sses),
             frame,
             PITCH * style.strand_scale,
             HELIX_W * style.helix_scale,
         )
+        for k, (sh, row) in enumerate(zip(sheets, rowed))
         if row
-        else _sheet_item(sh, frame, PITCH * style.strand_scale)
-        for sh, row in zip(sheets, template_choices(sheets, sses, copies or {}) if as_rows else [False] * len(sheets))
-    ]
-    in_rows = {m.sse.id for it in items for m in it.members if m.sse.kind == "H"}  # helices of βα rows
+    }
+    in_rows = {m.sse.id for it in templates.values() for m in it.members if m.sse.kind == "H"}  # helices of βα rows
     mirror = getattr(frame, "mirror_x", None)  # a dyad in the page: protomer 1 drawn as protomer 0's mirror image
-    rows_x = [(it.cx + it.box[0], it.cx + it.box[2]) for it in items if any(m.sse.kind == "H" for m in it.members)]
+    rows_x = [(it.cx + it.box[0], it.cx + it.box[2]) for it in templates.values()]
     if mirror is not None and any(x0 < mirror < x1 for x0, x1 in rows_x):
         mirror = None  # a βα row across the mirror line would meet its own image: the copies go side by side instead
     by_id = {s.id: s for s in sses}
@@ -2039,12 +2116,30 @@ def build_layout(
     if mirror is not None and getattr(frame, "sector", None):
         bundles = _within_protomers(bundles, by_id, frame.sector)
     bundled = {k for g in bundles for k in g}
-    items += [_bundle_item([by_id[k] for k in g], frame, angle_mode, HELIX_W * style.helix_scale) for g in bundles]
     kinked = (
         _kink_groups(sses, bundled | in_rows) if mode == "projected" else []
     )  # a stack row draws each piece on its own
+    on_sheet = (
+        _over_alike(over or {}, sses, rowed, bundled | in_rows | {s.id for g in kinked for s in g}, copies or {})
+        if mode == "projected"
+        else {}
+    )
+    items = [
+        templates[k]
+        if k in templates
+        else _sheet_item(
+            sh,
+            frame,
+            PITCH * style.strand_scale,
+            [by_id[h] for h, at in sorted(on_sheet.items(), key=lambda x: by_id[x[0]].start) if at == k],
+            HELIX_W * style.helix_scale,
+        )
+        for k, sh in enumerate(sheets)
+    ]
+    items += [_bundle_item([by_id[k] for k in g], frame, angle_mode, HELIX_W * style.helix_scale) for g in bundles]
     items += [_kink_item(g, frame, angle_mode, HELIX_W * style.helix_scale) for g in kinked]
-    grouped = bundled | in_rows | {s.id for g in kinked for s in g}
+    lying = {m.sse.id for it in items for m in it.members if m.over}  # over a sheet: on_sheet less any crowded out
+    grouped = bundled | in_rows | {s.id for g in kinked for s in g} | lying
     items += [
         _helix_item(s, frame, angle_mode, HELIX_W * style.helix_scale)
         for s in sses
@@ -2153,6 +2248,12 @@ def build_layout(
     lay.na_traces = traces
     lay.frame = frame
     lay.ba_rows = _ba_rows(items)  # after the user's swaps
+    lay.on_sheet = {
+        m.sse.id: [x.sse.id for x in it.members if x.sse.kind == "E" and not x.ghost]
+        for it in items
+        for m in it.members
+        if isinstance(m, Placed) and m.over
+    }
     if keep_depth and len(rows) > 1:  # wrapped into rows of whole chains: each row gets its own band
         lay.stack_rows = [[m.sse.id for it in row for m in it.members if isinstance(m, Placed)] for row in rows]
     if traces:
@@ -2174,13 +2275,40 @@ def build_layout(
 
 
 def _ba_rows(items: list[_Item]) -> list[list[str]]:
-    """Each βα row's elements (no ghost) as drawn, left to right: the items holding strands and helices."""
+    """Each βα row's elements (no ghost) as drawn, left to right: the items holding strands and helices in line
+    (a helix over a sheet is not in a row)."""
     return [
         [m.sse.id for m in sorted((m for m in it.members if not m.ghost), key=lambda m: m.cx)]
         for it in items
         if any(isinstance(m, Placed) and m.sse.kind == "E" for m in it.members)
-        and any(isinstance(m, Placed) and m.sse.kind == "H" for m in it.members)
+        and any(isinstance(m, Placed) and m.sse.kind == "H" and not m.over for m in it.members)
     ]
+
+
+def _over_alike(
+    over: dict[str, int], sses: list[SSE], rowed: list[bool], taken: set[str], copies: dict[str, tuple[str, int]]
+) -> dict[str, int]:
+    """The helices of `over` (helix id -> sheet index) that are drawn over their sheet: not on a βα row's sheet
+    (`rowed`, template_choices), not `taken` by another unit (a row, a bundle, a kinked helix), and alike in every
+    copy of the protein: a helix whose copy in another chain (`copies`, model.homolog_chains; residue ranges that
+    overlap once numbered as the first copy's) is drawn but not over its sheet stays beside, as that copy does."""
+    by_id = {s.id: s for s in sses}
+    keep = {h: k for h, k in sorted(over.items()) if h in by_id and not rowed[k] and h not in taken}
+
+    def key(s):
+        root, shift = copies.get(s.chain, (s.chain, 0))
+        return root, s.first.seq - shift, s.last.seq - shift
+
+    helices = [(s, key(s)) for s in sses if s.kind == "H"]
+    out = {}
+    for h, k in keep.items():
+        root, a, b = key(by_id[h])
+        mates = [
+            g for g, (r, ga, gb) in helices if g.chain != by_id[h].chain and r == root and min(b, gb) >= max(a, ga)
+        ]
+        if all(g.id in keep for g in mates):
+            out[h] = k
+    return out
 
 
 DOMAIN_PAD = 0.7  # panel margin around a domain's elements
@@ -2247,10 +2375,11 @@ def provisional(sses: list[SSE]) -> Layout:
 
 
 def helix_label_pos(p: Placed) -> tuple[float, float]:
-    """Beside the bar, on its upper side (the other with label_side -1), clear of the body."""
+    """Beside the bar, on its upper side (the other with label_side -1), clear of the body; label_along further
+    along it."""
     nx, ny = -np.sin(p.angle), np.cos(p.angle)
     side = (p.width / 2 + LABEL_GAP) * (1 if ny >= 0 else -1) * p.label_side
-    return float(p.cx + nx * side), float(p.cy + ny * side)
+    return float(p.cx + nx * side + ny * p.label_along), float(p.cy + ny * side - nx * p.label_along)
 
 
 def termini(layout: Layout, sses: list[SSE]) -> list[tuple[str, str, tuple[float, float], np.ndarray]]:
@@ -2428,6 +2557,45 @@ def _element_label_sides(layout: Layout, sses: list[SSE]) -> None:
             p.label_side = 1
 
 
+_OVER_STUB = 0.6  # page units: the straight run of a loop out of a strand's end, kept clear of a name over the sheet
+_OVER_ALONG = (0.0, -1 / 3, 1 / 3)  # where a name over a sheet may sit along its helix: helix lengths from its middle
+
+
+def _box_overlap(a, b) -> float:
+    return max(0.0, min(a[2], b[2]) - max(a[0], b[0])) * max(0.0, min(a[3], b[3]) - max(a[1], b[1]))
+
+
+def _over_label_sides(layout: Layout) -> None:
+    """A helix drawn over a sheet lies on its strands: its name goes beside it where it meets the fewest strand ends
+    (a loop leaves each strand straight out of its end), then covers least of the strands' letters and of the other
+    names, then lies nearest the middle (_OVER_ALONG: the middle, or a third of the way to either end), upper side
+    first on a tie; so the name stays readable and clear of the loops."""
+    strands = [q for q in [*layout.placed.values(), *layout.ghosts] if q.sse.kind == "E"]
+    letters = [centred_box(q.cx, q.cy, _GLYPH_W * len(q.label) / 2 + 0.05, _GLYPH_H / 2) for q in strands]
+    ends = []
+    for q in strands:
+        for port, out in ((q.n_port, q.exit_n), (q.c_port, q.exit_c)):
+            (ax, ay), (bx, by) = port, np.add(port, out * _OVER_STUB)
+            ends.append((min(ax, bx) - 0.15, min(ay, by) - 0.15, max(ax, bx) + 0.15, max(ay, by) + 0.15))
+    for p in layout.placed.values():
+        if not p.over:
+            continue
+        names = [_element_label_box(q) for q in layout.placed.values() if q is not p and q.sse.kind in ("H", "G")]
+        best = None
+        for k, along in enumerate(_OVER_ALONG):
+            for side in (1, -1):
+                p.label_side, p.label_along = side, float(_snap(along * p.length))
+                box = _element_label_box(p)
+                cost = (
+                    sum(_box_overlap(box, e) > 0 for e in ends),
+                    float(_snap(sum(_box_overlap(box, b) for b in letters + names))),
+                    k,
+                )
+                if best is None or cost < best[0]:
+                    best = (cost, side, p.label_along)
+        _, p.label_side, p.label_along = best
+
+
 def _mirror_sides(mirrored: list[tuple]) -> None:
     """Each mirror copy's name on the mirror image of its mate's side: its offset from its body points the way the
     mate's does, reflected in the page's (vertical) dyad line."""
@@ -2454,6 +2622,7 @@ def _choose_label_sides(layout: Layout, sses: list[SSE], style: Style, mirrored:
     all. A mirror copy's name (the (copy, mate) members in `mirrored`, of protomers drawn as mirror images) then
     takes the mirror of its mate's side (_mirror_sides). Runs once the names (and so the boxes' widths) are final."""
     _element_label_sides(layout, sses)
+    _over_label_sides(layout)
     if mirrored:
         _mirror_sides([(a, b) for a, b in mirrored if isinstance(a, Placed)])
     em = _ink_em(layout, style.font_scale)

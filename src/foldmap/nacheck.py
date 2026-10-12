@@ -21,7 +21,7 @@ from scipy.stats import spearmanr
 
 from .frame import Frame
 from .io import CONTACT
-from .layout import SCALE, joined_pieces, stem_pieces
+from .layout import SCALE, joined_pieces, lying_over, stem_pieces
 from .na_paths import _BEAD, among, crosses_body, graze, in_body
 from .nucleic import stem_axis
 from .route import clip_len
@@ -638,7 +638,8 @@ def na_crossings(lay, loops) -> dict:
 
 def render_checks(lay, loops, fig, sses, *, model=None, bb=None) -> dict:
     """Rendering defects of a drawn figure: overlaps (element or stem boxes overlapping, except two consecutive
-    pieces of one bent duplex, which meet at their joint: layout.joined_pieces), text_off_page,
+    pieces of one bent duplex, which meet at their joint: layout.joined_pieces, and a helix drawn over a sheet with
+    that sheet's strands: layout.lying_over), text_off_page,
     letter_overlaps (base letters overlapping by more than a third of the smaller glyph box), beads_missing,
     bead_colour_wrong, beads_false and beads_unmatched (verify_contacts on the figure's beads: unbeaded contacts
     counted as defects, beads not in their toucher's chain colour, beads no atoms back, beads naming a residue or
@@ -652,6 +653,7 @@ def render_checks(lay, loops, fig, sses, *, model=None, bb=None) -> dict:
     from matplotlib.backends.backend_agg import FigureCanvasAgg
 
     joined = joined_pieces(lay.stems, lay.nucleic) if lay.nucleic is not None else set()
+    joined |= lying_over(lay)  # a helix drawn over a sheet lies on its strands
     boxes = [(p.sse.id, p.rect) for p in lay.placed.values()] + [(d.id, d.rect) for d in lay.stems]
     overlaps = sum(
         1

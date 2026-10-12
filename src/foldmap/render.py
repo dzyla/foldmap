@@ -1996,13 +1996,20 @@ def _canvas(
     return canvas, _Legend(entries, entry, per_row, legend_h)
 
 
+_OVER_Z = 3.5  # a helix over a sheet (Placed.over): above the strands (3), below their letters (4); its name at 4.5
+_OVER_ALPHA = 0.6  # its fill and edge: the strands beneath show through
+_OVER_LOOP_Z = 3.2  # the loops of a helix over a sheet: above the strands, below the helix
+
+
 def _draw_loops(c: _Canvas, layout: Layout, loops: list[Loop], sses: list[SSE]) -> None:
     """Each loop: a casing in the background colour, its coloured line, arrows, residue runs and length labels."""
     boxes = np.array([p.rect for p in [*layout.placed.values(), *layout.ghosts]]).reshape(-1, 4)  # none: DNA only
     boxes = boxes + [1e-6, 1e-6, -1e-6, -1e-6]
     sse_by_id = {s.id: s for s in sses}
     over = c.backbone[1]
+    lifted = {k for k, p in layout.placed.items() if p.over}  # helices over a sheet: their loops lie on it too
     for i, loop in enumerate(loops):
+        z = (_OVER_LOOP_Z if lifted & {loop.a_id, loop.b_id} else 1) + i * 1e-3
         if loop.fallback:  # already a smooth curve
             path = _polyline(loop.points)
         elif c.look.loops == "curved":
@@ -2017,7 +2024,7 @@ def _draw_loops(c: _Canvas, layout: Layout, loops: list[Loop], sses: list[SSE]) 
             lw=c.loop_lw * 3.0,
             capstyle="round",
             joinstyle="round",
-            zorder=1 + i * 1e-3,
+            zorder=z,
         )
         casing.set_gid(f"loopcase:{name}")
         c.ax.add_patch(casing)
@@ -2044,7 +2051,7 @@ def _draw_loops(c: _Canvas, layout: Layout, loops: list[Loop], sses: list[SSE]) 
                     lw=c.loop_lw,
                     capstyle="round",
                     joinstyle="round",
-                    zorder=1 + i * 1e-3 + 7e-4,
+                    zorder=z + 7e-4,
                 )
                 head.set_gid(f"loop-arrow:{name}")
                 c.ax.add_patch(head)
@@ -2056,7 +2063,7 @@ def _draw_loops(c: _Canvas, layout: Layout, loops: list[Loop], sses: list[SSE]) 
             capstyle="round",
             joinstyle="round",
             ls=(0, (3, 2)) if loop.dashed else "-",
-            zorder=1 + i * 1e-3 + 5e-4,
+            zorder=z + 5e-4,
         )
         line.set_gid(f"loop:{name}")
         c.ax.add_patch(line)
@@ -2095,7 +2102,7 @@ def _draw_loops(c: _Canvas, layout: Layout, loops: list[Loop], sses: list[SSE]) 
                     capstyle="butt",
                     joinstyle="round",
                     ls=(0, (3, 2)) if loop.dashed else "-",
-                    zorder=1 + i * 1e-3 + 6e-4,
+                    zorder=z + 6e-4,
                 )
                 run.set_gid(f"loop-seg:{name}:{k}")
                 c.ax.add_patch(run)
@@ -2249,14 +2256,17 @@ def _draw_elements(c: _Canvas, layout: Layout) -> None:
             if c.look.helix_shading == "none":
                 shade = fill
             front, back, shine = _coil(p, len(p.sse))
-            behind = PathPatch(back, fc=shade, ec=edge, lw=edge_w * 0.8, joinstyle="round", zorder=2.9)
+            lift, alpha = (_OVER_Z - 3, _OVER_ALPHA) if p.over else (0.0, None)  # over a sheet: on top, see-through
+            behind = PathPatch(
+                back, fc=shade, ec=edge, lw=edge_w * 0.8, joinstyle="round", zorder=2.9 + lift, alpha=alpha
+            )
             behind.set_gid(f"helix-back:{p.sse.id}")
             c.ax.add_patch(behind)
-            bar = PathPatch(front, fc=fill, ec=edge, lw=edge_w, joinstyle="round", zorder=3)
+            bar = PathPatch(front, fc=fill, ec=edge, lw=edge_w, joinstyle="round", zorder=3 + lift, alpha=alpha)
             bar.set_gid(f"helix:{p.sse.id}")
             c.ax.add_patch(bar)
             if shine is not None and c.look.helix_shading == "gloss" and c.look.fill != "outline":
-                gloss = PathPatch(shine, fc=tint(fill, 0.4), ec="none", alpha=0.85, zorder=3.05)
+                gloss = PathPatch(shine, fc=tint(fill, 0.4), ec="none", alpha=0.85 * (alpha or 1.0), zorder=3.05 + lift)
                 gloss.set_gid(f"helix-shine:{p.sse.id}")
                 c.ax.add_patch(gloss)
             if c.look.labels:
@@ -2267,8 +2277,10 @@ def _draw_elements(c: _Canvas, layout: Layout) -> None:
                     va="center",
                     fontsize=c.font,
                     color=_label_ink(color),
-                    zorder=4,
+                    zorder=4 + lift,
                 )
+                if p.over:  # on the strands: a plate of the page colour keeps the name readable
+                    t.set_bbox({"boxstyle": "round,pad=0.12", "fc": c.look.background, "ec": "none", "alpha": 0.85})
                 t.set_gid(f"label:{p.sse.id}")
 
 

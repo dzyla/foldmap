@@ -117,7 +117,8 @@ def test_helix_angle_modes(ubq, pdb):
     snapped = make_layout(path)[0]
     upright = make_layout(path, look=Style(helix_angle="upright"))[0]
     tilted = make_layout(path, look=Style(helix_angle="tilted"))[0]
-    helices = [k for k, p in snapped.placed.items() if p.sse.kind == "H"]
+    # a helix drawn over a sheet lies as it packs on the strands, whatever the mode (Task 14)
+    helices = [k for k, p in snapped.placed.items() if p.sse.kind == "H" and not p.over]
     q = lambda a: abs(np.sin(2 * a))  # noqa: E731  # 0 on the axes
     assert all(q(snapped.placed[k].angle) < 1e-9 for k in helices)
     assert any(abs(np.cos(snapped.placed[k].angle)) > 0.5 for k in helices)  # some lie horizontal
@@ -133,7 +134,7 @@ def test_snapped_helix_keeps_the_nearest_axis_direction(ubq):
     f = view_frame(sses)
     lay = make_layout(path)[0]
     for s in sses:
-        if s.kind == "H":
+        if s.kind == "H" and not lay.placed[s.id].over:  # one over a sheet lies as it packs on the drawn strands
             d = np.array([s.axis @ f.u, s.axis @ f.v])
             if np.linalg.norm(d) > 0.3:
                 got = lay.placed[s.id].direction

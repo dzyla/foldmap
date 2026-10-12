@@ -16,7 +16,7 @@ import numpy as np
 
 from . import layoutfile
 from .dssp import assign_dssp
-from .features import sse_contacts
+from .features import helices_on_sheets, sse_contacts
 from .frame import Frame, RadialFrame, dna_radial_frame, dna_view_frame, protomer_maps, symmetric_frame, view_frame
 from .io import load_backbone, load_links, load_nucleic, read_model
 from .layout import SCALE, _snap, build_layout, na_torn_by_unrolling, resolve
@@ -300,6 +300,12 @@ def make_layout(
             for b in range(a + 1, len(ids)):
                 key = frozenset((ids[a], ids[b]))
                 contacts[key] = contacts.get(key, 0) + _DOMAIN_PULL
+    over = (  # helices packed on a sheet face, drawn over it; not in an assembly drawn alike by its symmetry, nor
+        # beside nucleic acid, whose stems and free ends are placed by the protein elements they touch (plan 11 T14)
+        helices_on_sheets(bb, sses, sheets)
+        if (look or Style()).helix_on_sheet == "auto" and sym is None and (nucleic is None or not nucleic.strands)
+        else {}
+    )
     lay = build_layout(
         sses,
         sheets,
@@ -324,6 +330,7 @@ def make_layout(
         )
         if names
         else None,
+        over=over,
     )
     lay.focus = _focus((look or Style()).highlight, bb, sym)
     if focus_chains:

@@ -450,3 +450,24 @@ def test_one_protein_chain_with_nucleic_acid_keeps_the_nucleic_acid_legend():
     assert {"legend-na", "legend-hbond"} <= set(gids) and not any(g.startswith("legend-chain") for g in gids)
     assert "RNA (R)" in texts and any(t.startswith("H-bonds (") for t in texts)
     assert not any(t.startswith("Chain ") for t in texts)
+
+
+def test_helix_over_a_sheet_is_drawn_on_top_see_through_with_its_loops_and_a_readable_name():
+    """1UBQ α1 lies over the sheet (Task 14): drawn above the strands at alpha 0.6 (fill and edge), its loops above
+    the strands and below it, its name on a plate of the page colour, clear of every strand letter."""
+    fig = make_figure(DATA / "1UBQ.cif")
+    ax = fig.axes[0]
+    by = {a.get_gid(): a for a in [*ax.patches, *ax.texts] if a.get_gid()}
+    helix, strand = by["helix:A:23-34"], by["strand:A:2-7"]
+    assert helix.get_alpha() == 0.6 and by["helix-back:A:23-34"].get_alpha() == 0.6
+    assert helix.get_zorder() > by["helix-back:A:23-34"].get_zorder() > strand.get_zorder()
+    for gid in ("loop:A:12-16>A:23-34", "loop:A:23-34>A:38-40"):
+        assert strand.get_zorder() < by[gid].get_zorder() < helix.get_zorder(), gid
+    assert by["loop:A:2-7>A:12-16"].get_zorder() < strand.get_zorder()  # every other loop stays below
+    name = by["label:A:23-34"]
+    assert name.get_bbox_patch() is not None and name.get_zorder() > by["label:A:2-7"].get_zorder()
+    fig.canvas.draw()
+    box = name.get_window_extent()
+    for k, t in by.items():
+        if k.startswith("label:") and k != "label:A:23-34":
+            assert not box.overlaps(t.get_window_extent()), k

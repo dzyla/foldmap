@@ -5,7 +5,9 @@ import pytest
 
 from foldmap.frame import Frame, view_frame
 from foldmap.layout import HELIX_RISE, HELIX_W, PITCH, SCALE, STRAND_RISE, build_layout
-from helpers import fake_sse, pipeline
+from helpers import FID, fake_sse, loop_crossings, pipeline
+
+DATA = Path(__file__).parent / "data"
 
 MODES = ["projected", "stack"]
 NAMES = ["ubq", "zs5", "zya"]
@@ -433,3 +435,130 @@ def test_kinked_pieces_join_only_across_a_corner_of_their_own_chain():
     assert _kink_groups([a, far], set()) == []  # its predecessor left out: the helix before is too far
     assert _kink_groups([b, other], set()) == []  # another chain
     assert _kink_groups([a, other, b], set()) == [[a, b]]  # a chain's pieces, whatever lies between in the list
+
+
+@pytest.mark.parametrize("path, hits", [("1UBQ.cif", ["A:23-34"]), ("2LZM.cif", ["A:39-50"])])
+def test_helices_on_sheets_finds_the_helix_packed_on_a_sheet_face(path, hits):
+    """A helix of >= 10 residues lying flat 6-14 Å over a sheet of >= 3 strands of its chain, its centroid over the
+    sheet (plan 11, measured: 1UBQ α1, 2LZM A:39-50); every other helix stays beside."""
+    from foldmap.features import helices_on_sheets
+
+    bb, sses, sheets = pipeline(DATA / path, "auto")
+    over = helices_on_sheets(bb, sses, sheets)
+    assert sorted(over) == hits
+    assert all(len(sheets[k].strands) >= 3 for k in over.values())
+
+
+def test_helices_on_sheets_takes_both_ferredoxin_helices():
+    from foldmap.features import helices_on_sheets
+
+    bb, sses, sheets = pipeline(FID / "2ACY.cif.gz", "auto")
+    assert sorted(helices_on_sheets(bb, sses, sheets)) == ["A:22-32", "A:55-67"]
+
+
+@pytest.mark.parametrize("path, helices", [("1UBQ.cif", ["A:23-34"]), ("fidelity/2ACY.cif.gz", ["A:22-32", "A:55-67"])])
+def test_helix_packing_on_a_sheet_is_drawn_over_it(path, helices):
+    from foldmap.cli import make_layout
+    from foldmap.route import route_loops
+
+    lay, sses, bb = make_layout(DATA / path)
+    block = next(b for b in lay.sheets if len(b) >= 4)
+    rects = np.array([lay.placed[k].rect for k in block])
+    x0, y0, x1, y1 = rects[:, 0].min(), rects[:, 1].min(), rects[:, 2].max(), rects[:, 3].max()
+    for h in helices:
+        p = lay.placed[h]
+        assert p.over and x0 <= p.cx <= x1 and y0 <= p.cy <= y1, h
+    loops = route_loops(lay, sses, bb)
+    assert not [lp for lp in loops if lp.fallback]
+
+
+def test_ferredoxin_helices_over_the_sheet_keep_crossings_low():
+    """2ACY with both helices over its sheet: at most the 2 loop crossings it had with them at its flanks (plan 11
+    Task 14 target, measured at b43695e)."""
+    from foldmap.cli import make_layout
+    from foldmap.route import route_loops
+
+    lay, sses, bb = make_layout(FID / "2ACY.cif.gz")
+    assert loop_crossings(route_loops(lay, sses, bb)) <= 2
+
+
+def test_symmetric_and_template_sheets_have_no_helix_over_them():
+    from foldmap.cli import make_layout
+
+    for path in ("1TIM.cif", "8UUP.cif"):
+        lay, _, _ = make_layout(DATA / path)
+        assert not any(p.over for p in lay.placed.values()), path
+
+
+def test_helix_on_sheet_off_keeps_the_side_placement():
+    from foldmap.cli import make_layout
+    from foldmap.style import Style
+
+    lay, _, _ = make_layout(DATA / "1UBQ.cif", look=Style(helix_on_sheet="off"))
+    assert not lay.placed["A:23-34"].over
+
+
+def test_helix_over_a_sheet_lies_as_it_packs():
+    """1UBQ α1 crosses the sheet diagonally, as Burroughs 2007 draws it (Fig 1B): neither upright nor flat, its
+    offsets and angle snapped; the sheet with it is narrower than the sheet with α1 at its side."""
+    from foldmap.cli import make_layout
+    from foldmap.layout import _snap
+    from foldmap.style import Style
+
+    lay, _, _ = make_layout(DATA / "1UBQ.cif")
+    p = lay.placed["A:23-34"]
+    tilt = abs(np.degrees(p.angle)) % 180
+    assert 15 < min(tilt, 180 - tilt) and abs(tilt - 90) > 15, tilt
+    assert p.angle == float(_snap(p.angle))
+    off = make_layout(DATA / "1UBQ.cif", look=Style(helix_on_sheet="off"))[0]
+    assert lay.width < off.width
+
+
+def test_over_helices_are_dropped_where_a_layout_cannot_hold_them():
+    """build_layout takes `over` (helix id -> sheet index) but never draws a helix over a βα template row, in stack
+    mode, or for a piece of a kinked helix (a rigid unit, 12a, kept whole beside the sheet)."""
+    from foldmap.style import Style
+
+    bb, sses, sheets = pipeline(DATA / "1UBQ.cif", "auto")
+    f = view_frame(sses)
+    over = {"A:23-34": 0}
+    assert build_layout(sses, sheets, f, over=over).placed["A:23-34"].over
+    assert not build_layout(sses, sheets, f, "stack", over=over).placed["A:23-34"].over
+    assert not build_layout(sses, sheets, f, style=Style(), over={}).placed["A:23-34"].over
+    h = next(s for s in sses if s.id == "A:23-34")
+    piece = fake_sse("H", h.end + 2, h.end + 4, centroid=h.centroid + 6 * h.axis, axis=h.axis)
+    piece.kinked = True  # α1 split at a kink: the two pieces are one rigid unit (12a), drawn beside the sheet
+    with_piece = sorted([*sses, piece], key=lambda s: (s.chain, s.start))
+    lay = build_layout(with_piece, sheets, f, over=over)
+    assert not lay.placed["A:23-34"].over and not lay.placed[piece.id].over
+
+
+def test_no_helix_is_drawn_over_a_sheet_beside_nucleic_acid():
+    """1URN's RRM α1 packs on its sheet, but the RNA's stems and free ends are placed by the protein elements they
+    touch (nacheck's stems_nearer_frac and the free-end pull were measured with the helix beside): no helix over a
+    sheet in a figure holding nucleic acid."""
+    from foldmap.cli import make_layout
+    from foldmap.features import helices_on_sheets
+
+    bb, sses, sheets = pipeline(DATA / "na" / "1URN.cif.gz", "auto")
+    assert helices_on_sheets(bb, sses, sheets)
+    lay, _, _ = make_layout(DATA / "na" / "1URN.cif.gz")
+    assert lay.stems and not lay.on_sheet and not any(p.over for p in lay.placed.values())
+
+
+def test_copies_of_a_protein_draw_a_helix_over_their_sheets_alike():
+    """A helix over its sheet in one copy is over it in every copy drawn (model.homolog_chains, residue numbers taken
+    to the first copy's); a copy whose helix is not over its sheet keeps the others beside too."""
+    from foldmap.layout import _over_alike
+
+    h_a, h_b, h_c = (fake_sse("H", 22, 33, chain=c) for c in "ABC")
+    h_c.first, h_c.last = type(h_c.first)("C", 123, "", "ALA"), type(h_c.last)("C", 134, "", "ALA")
+    sses = [h_a, h_b, h_c]
+    copies = {"A": ("A", 0), "B": ("A", 0), "C": ("A", 100)}
+    rowed = [False, False, False]
+    both = {h_a.id: 0, h_b.id: 1, h_c.id: 2}
+    assert _over_alike(both, sses, rowed, set(), copies) == both
+    assert _over_alike({h_a.id: 0, h_b.id: 1}, sses, rowed, set(), copies) == {}  # C's copy stays beside
+    assert _over_alike({h_a.id: 0}, [h_a, h_b], rowed, set(), {}) == {h_a.id: 0}  # unrelated chains: each its own
+    assert _over_alike(both, sses, [False, True, False], set(), copies) == {}  # B's sheet is a βα row
+    assert _over_alike(both, sses, rowed, {h_b.id}, copies) == {}  # B's helix is held by a bundle or a kink

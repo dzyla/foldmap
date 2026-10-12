@@ -9,7 +9,7 @@ from collections import Counter
 import numpy as np
 from scipy.spatial import cKDTree
 
-from .model import SSE, Backbone
+from .model import SSE, Backbone, Sheet
 
 CONTACT_CUTOFF = 8.0  # Å between CA atoms
 MIN_CONTACT_PAIRS = 3  # CA pairs needed to call two elements neighbours
@@ -103,6 +103,64 @@ def helix_bundles(sses: list[SSE]) -> list[list[str]]:
         out.setdefault(root(s.id), []).append(s.id)
     chain = {s.id: s.chain for s in helices}
     return sorted(sorted(g) for g in out.values() if len({chain[k] for k in g}) > 1 and linked & set(g))
+
+
+ON_SHEET_MIN = 10  # residues: a shorter helix is a turn at the sheet's edge, not one packed on its face
+ON_SHEET_STRANDS = 3  # strands: a smaller sheet has no face to pack on
+ON_SHEET_REACH = 10.0  # Å between a helix CA and the nearest sheet CA, counting it as touching the sheet
+ON_SHEET_TOUCH = 0.3  # fraction of the helix's CAs that must touch the sheet
+ON_SHEET_FLAT = 0.5  # |cos| between the helix axis and the sheet normal: the helix lies along the face
+ON_SHEET_HEIGHT = (6.0, 14.0)  # Å from the sheet plane to the helix centroid: one helix packed on the face
+ON_SHEET_EDGE = 2.0  # Å: the centroid, projected on the sheet plane, lies within the sheet's extent plus this
+
+
+def _grid(v) -> np.ndarray:
+    """Rounded to the 1e-4 grid of layout._snap: a threshold never sees noise from BLAS kernels (np.linalg.svd)."""
+    return np.round(np.asarray(v, float) * 1e4) / 1e4
+
+
+def helices_on_sheets(bb: Backbone, sses: list[SSE], sheets: list[Sheet]) -> dict[str, int]:
+    """Helices packed on a sheet face: helix id -> index of the sheet in `sheets`. A helix of >= ON_SHEET_MIN residues
+    packs on a sheet of >= ON_SHEET_STRANDS strands, one of them of the helix's chain, when >= ON_SHEET_TOUCH of its
+    CAs have a sheet CA within ON_SHEET_REACH, its axis lies along the face (|axis . n| < ON_SHEET_FLAT, n the sheet
+    normal: the smallest singular vector of the sheet's CAs), its centroid sits ON_SHEET_HEIGHT from the sheet plane
+    and, projected on that plane, within the sheet CAs' in-plane extent + ON_SHEET_EDGE. A helix on several sheets
+    goes to the one most of its CAs touch (the first on a tie). Coordinates, axes and the plane are snapped before
+    any threshold sees them. Plan 11 measured: 1UBQ α1, 2ACY A:22-32 and A:55-67, 2LZM A:39-50."""
+    ca = _grid(bb.ca)
+    faces = []
+    for k, sh in enumerate(sheets):
+        if len(sh.strands) < ON_SHEET_STRANDS:
+            continue
+        pts = np.vstack([ca[s.start : s.end + 1] for s in sh.strands])
+        c = _grid(pts.mean(axis=0))
+        _, _, vt = np.linalg.svd(pts - c)
+        e1, e2, n = _grid(vt[0]), _grid(vt[1]), _grid(vt[2])
+        flat = (pts - c) @ np.array([e1, e2]).T
+        faces.append((k, {s.chain for s in sh.strands}, cKDTree(pts), c, n, e1, e2, flat.min(0), flat.max(0)))
+    out = {}
+    for h in sses:
+        if h.kind != "H" or len(h) < ON_SHEET_MIN:
+            continue
+        own, axis, centre = ca[h.start : h.end + 1], _grid(h.axis), _grid(h.centroid)
+        best = None
+        for k, chains, tree, c, n, e1, e2, lo, hi in faces:
+            if h.chain not in chains:
+                continue
+            touch = sum(bool(hits) for hits in tree.query_ball_point(own, ON_SHEET_REACH))
+            at = _grid([(centre - c) @ e1, (centre - c) @ e2])
+            if (
+                touch >= ON_SHEET_TOUCH * len(h)
+                and abs(float(axis @ n)) < ON_SHEET_FLAT
+                and ON_SHEET_HEIGHT[0] < abs(float(_grid((centre - c) @ n))) < ON_SHEET_HEIGHT[1]
+                and np.all(at >= lo - ON_SHEET_EDGE)
+                and np.all(at <= hi + ON_SHEET_EDGE)
+                and (best is None or touch > best[1])
+            ):
+                best = (k, touch)
+        if best is not None:
+            out[h.id] = best[0]
+    return out
 
 
 DOMAIN_MIN_SSE_RESIDUES = 30  # residues in helices/strands an automatic domain needs

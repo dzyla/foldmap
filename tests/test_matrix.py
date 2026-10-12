@@ -30,12 +30,15 @@ def test_matrix_covers_the_test_structures():
 
 
 def test_every_element_placed_once_and_nothing_overlaps(case):
+    from foldmap.layout import lying_over
+
     _, _, lay, sses, _ = case
     assert sorted(lay.placed) == sorted(s.id for s in sses)
     items = [*lay.placed.values(), *lay.ghosts]
+    over = lying_over(lay)  # a helix drawn over a sheet lies on its strands (Task 14)
     for i, a in enumerate(items):
         for b in items[i + 1 :]:
-            assert not overlaps(a, b), (a.sse.id, b.sse.id)
+            assert not overlaps(a, b) or frozenset((a.sse.id, b.sse.id)) in over, (a.sse.id, b.sse.id)
 
 
 def test_one_loop_per_sequence_neighbour_pair(case):
@@ -53,9 +56,14 @@ def test_routed_loops_avoid_other_elements_and_themselves(case):
     for l in loops:
         if l.fallback:
             continue
-        others = [p.rect for k, p in lay.placed.items() if k not in (l.a_id, l.b_id)]
+        # a helix drawn over a sheet is no obstacle (loops pass under it), and a loop leaves it over its sheet's
+        # strands: only its end segment there may cross them (Task 14)
+        under = set(lay.on_sheet.get(l.a_id, ())) | set(lay.on_sheet.get(l.b_id, ()))
+        others = [p.rect for k, p in lay.placed.items() if k not in (l.a_id, l.b_id) and not p.over and k not in under]
         others += [g.rect for g in lay.ghosts if g.sse.id not in (l.a_id, l.b_id)]
         assert segments_clear(l.points, others), (l.a_id, l.b_id)
+        inner = l.points[int(l.a_id in lay.on_sheet) : len(l.points) - int(l.b_id in lay.on_sheet)]
+        assert segments_clear(inner, [lay.placed[k].rect for k in under if k not in (l.a_id, l.b_id)]), (l.a_id, l.b_id)
         assert not self_crossing(l.points), (l.a_id, l.b_id)
 
 

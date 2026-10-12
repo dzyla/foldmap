@@ -42,12 +42,13 @@ def _gid(fig, prefix):
 
 @pytest.mark.parametrize("pdb", FIXTURES)
 def test_every_stem_piece_is_placed_without_overlap(pdb):
-    from foldmap.layout import joined_pieces
+    from foldmap.layout import joined_pieces, lying_over
 
     lay, _, _ = make_layout(_path(pdb))
     pieces = len(lay.stems)
     assert pieces >= len(lay.nucleic.structure.stems) > 0
     joined = joined_pieces(lay.stems, lay.nucleic)  # consecutive pieces of a bent duplex meet at their joint
+    joined |= lying_over(lay)  # and a helix drawn over a sheet lies on its strands
     boxes = [(p.sse.id, p.rect) for p in lay.placed.values()] + [(d.id, d.rect) for d in lay.stems]
     assert not any(
         _overlap(a, b) and frozenset((i, j)) not in joined for k, (i, a) in enumerate(boxes) for j, b in boxes[k + 1 :]

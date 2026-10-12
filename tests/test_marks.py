@@ -7,6 +7,7 @@ import pytest
 from matplotlib.colors import to_hex
 
 from foldmap.cli import make_figure, make_layout
+from foldmap.layout import lying_over
 from foldmap.style import Style
 
 DATA = Path(__file__).parent / "data"
@@ -93,11 +94,12 @@ def test_move_shifts_an_element_and_nothing_overlaps():
     moved, _, _ = make_layout(DATA / "2LZM.cif", move=[(lay.placed[k].label, (0.0, 5.0))])
     assert moved.placed[k].cy - lay.placed[k].cy > 3.0
     items = list(moved.placed.values())
+    over = lying_over(moved)  # A:39-50 is drawn over the sheet's strands (Task 14)
     for i, p in enumerate(items):
         for q in items[i + 1 :]:
             x = min(p.rect[2], q.rect[2]) - max(p.rect[0], q.rect[0])
             y = min(p.rect[3], q.rect[3]) - max(p.rect[1], q.rect[1])
-            assert not (x > 1e-6 and y > 1e-6)
+            assert not (x > 1e-6 and y > 1e-6) or frozenset((p.sse.id, q.sse.id)) in over
 
 
 def test_cli_swap_move_and_view(tmp_path):

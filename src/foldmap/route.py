@@ -30,6 +30,7 @@ _MAX_NODES = 200_000
 _MAX_CELLS = 1_500_000
 _DIRS = [(1, 0), (0, 1), (-1, 0), (0, -1)]
 _PUSH = [0.4 + 0.25 * k for k in range(12)]  # how far out along the exit the path may start
+_PUSH_OVER = [0.4 + 0.25 * k for k in range(60)]  # from a helix drawn over a sheet: out past the sheet's edge
 
 log = logging.getLogger(__name__)
 
@@ -51,9 +52,11 @@ def _oid(e) -> str:
 
 def _element_obstacles(layout: Layout, ghost_owner: bool = False) -> tuple[np.ndarray, list]:
     """The rects every drawn connector must keep clear of (elements, ghosts, stems) as a (4, n) array of x0, y0,
-    x1, y1 rows, and the owner id of each: None for a ghost, or with ghost_owner the id of the element it copies."""
+    x1, y1 rows, and the owner id of each: None for a ghost, or with ghost_owner the id of the element it copies. A
+    helix drawn over a sheet (Placed.over) is none: it lies on the strands, and loops pass under it."""
     ghost = lambda g: g.sse.id if ghost_owner else None  # noqa: E731
-    own = [(_oid(p), p.rect) for p in layout.placed.values()] + [(ghost(g), g.rect) for g in layout.ghosts]
+    own = [(_oid(p), p.rect) for p in layout.placed.values() if not p.over]
+    own += [(ghost(g), g.rect) for g in layout.ghosts]
     own += [(_oid(d), d.rect) for d in layout.stems]
     return np.array([r for _, r in own], float).reshape(-1, 4).T.copy(), [k for k, _ in own]
 
@@ -73,7 +76,9 @@ class _Grid:
         # centres, the rect grown by _INFLATE and then by reach on each side, is w + res + 0.05 > res long on
         # each axis, so even a zero-width obstacle always blocks at least one cell.
         self.reach = (self.res - RES) / 2
-        self.blocked = self._mask(p.rect for p in [*layout.placed.values(), *layout.ghosts, *layout.stems])
+        self.blocked = self._mask(
+            p.rect for p in [*layout.placed.values(), *layout.ghosts, *layout.stems] if not getattr(p, "over", False)
+        )  # a helix over a sheet lies on its strands, which block those cells; loops may pass under the rest
         self.soft = self._mask(keep_out) & ~self.blocked  # text, stubs: avoided, given up only if nothing else routes
         self.blocked |= self.soft
         self.slab = np.zeros((self.nx, self.ny), bool)  # cells strictly inside the membrane band (one per row)
@@ -125,11 +130,12 @@ class _Grid:
     def free_cell_along(self, port, exit_vec, own: Placed, loose: bool = False):
         """First free cell on the way out of a port. Only the cells the element's own bounding box blocks
         (a tilted helix end can sit inside it) may be skipped; any other obstacle in the way means no route.
-        `loose` (a strand's loose end, which may sit in another element's clearance margin): any blocked cell
-        may be skipped, and the drawn route's final check decides."""
+        `loose` (a strand's loose end, which may sit in another element's clearance margin; any end of a helix
+        drawn over a sheet, which lies on the strands): any blocked cell may be skipped, and the drawn route's
+        final check decides. From a helix over a sheet the way out runs on to the sheet's edge (_PUSH_OVER)."""
         g = _INFLATE + self.reach
         rx0, ry0, rx1, ry1 = own.rect
-        for t in _PUSH:
+        for t in _PUSH_OVER if loose and getattr(own, "over", False) else _PUSH:
             pt = (port[0] + exit_vec[0] * t, port[1] + exit_vec[1] * t)
             c = self.cell(pt)
             if self.free(c):
@@ -169,7 +175,9 @@ def _crosses_body(p, q, e: Placed) -> bool:
     return clip_len((u0, v0), (u1, v1), (-hl, -hw, hl, hw)) > 1e-9
 
 
-def _clear(path, own: tuple, rects: np.ndarray, owners: list, grow=_TOUCH, kink=False, own_body=False) -> bool:
+def _clear(
+    path, own: tuple, rects: np.ndarray, owners: list, grow=_TOUCH, kink=False, own_body=False, under=((), ())
+) -> bool:
     """True when the connector `path` between its own two elements comes no nearer than `grow` to any of
     `rects` (a (4, n) array of x0, y0, x1, y1 rows; owners[k] is the element id owning rect k, or None), by
     exact clipping. The end segments leave from ports on the own elements' boxes (inside them when tilted),
@@ -177,7 +185,9 @@ def _clear(path, own: tuple, rects: np.ndarray, owners: list, grow=_TOUCH, kink=
     outside: its end segments may touch the own elements' true outlines but not enter them. A kink link
     (`kink`: the straight join of two pieces of one element) skips its own two elements and their labels.
     `own_body` (a nucleic-acid strand, drawn from where it leaves its own stems' bodies, curved or not): no
-    segment may enter an own element's (possibly tilted) body, and its bounding box does not count."""
+    segment may enter an own element's (possibly tilted) body, and its bounding box does not count. `under`: the
+    owners the first and the last segment may cross (from a helix drawn over a sheet: its sheet's strands, which its
+    ports lie on; into the other end: that helix, whose body may cover the end's port)."""
     skip = tuple(_oid(e) for e in own)
     xs, ys = [p[0] for p in path], [p[1] for p in path]
     x0, y0, x1, y1 = min(xs) - grow, min(ys) - grow, max(xs) + grow, max(ys) + grow
@@ -190,6 +200,8 @@ def _clear(path, own: tuple, rects: np.ndarray, owners: list, grow=_TOUCH, kink=
         for i, (p, q) in enumerate(segs):
             if mine and (own_body or i == 0 or i == last):
                 continue
+            if (i == 0 and owners[k] in under[0]) or (i == last and owners[k] in under[1]):
+                continue
             if (
                 max(p[0], q[0]) > box[0]
                 and min(p[0], q[0]) < box[2]
@@ -199,7 +211,9 @@ def _clear(path, own: tuple, rects: np.ndarray, owners: list, grow=_TOUCH, kink=
             ):
                 return False
     ends = range(len(segs)) if own_body else sorted({0, last})
-    return kink or not any(_crosses_body(*segs[i], e) for i in ends for e in own)
+    passes = {0: set(under[0])}  # an end over a sheet passes over its strands, its own among them
+    passes[last] = passes.get(last, set()) | set(under[1])
+    return kink or not any(_crosses_body(*segs[i], e) for i in ends for e in own if _oid(e) not in passes.get(i, ()))
 
 
 def _axis(vec) -> int:
@@ -343,33 +357,33 @@ class _Router:
         self.tight = self.rejected = 0  # debug counts: routes drawn tight, drawings rejected as crossing
         self.max_nodes = _MAX_NODES  # the A* search's budget
 
-    def drawn(self, pa, ea, own_a, pb, eb, own_b, own_body=False, loose=False):
+    def drawn(self, pa, ea, own_a, pb, eb, own_b, own_body=False, loose=False, under=((), ())):
         """The A* route from port pa to port pb as drawn, snapped to the ports or else unsnapped; None if there
-        is no route or every drawing of it crosses an element."""
+        is no route or every drawing of it crosses an element (`under`: see _clear)."""
         grid = self.grid
         cells = _route_ports(grid, pa, ea, own_a, pb, eb, own_b, loose, self.max_nodes)
         if cells is None:
             return None
         for snap in (True, False):
             pts = _polyline(grid, cells, pa, ea, pb, eb, snap)
-            if _clear(pts, (own_a, own_b), *self.elements, own_body=own_body):
+            if _clear(pts, (own_a, own_b), *self.elements, own_body=own_body, under=under):
                 for c in cells:
                     grid.used[c] += 1
                 if log.isEnabledFor(logging.DEBUG):
-                    self.tight += not _clear(pts, (own_a, own_b), *self.elements, grow=_INFLATE - 1e-6)
+                    self.tight += not _clear(pts, (own_a, own_b), *self.elements, grow=_INFLATE - 1e-6, under=under)
                 return pts
             self.rejected += 1
         return None
 
-    def route(self, pa, ea, own_a, pb, eb, own_b, own_body=False, loose=False):
+    def route(self, pa, ea, own_a, pb, eb, own_b, own_body=False, loose=False, under=((), ())):
         """(points, over labels): a drawn route, kept off text and stubs unless nothing else routes; None
         points if there is no clear route at all."""
         grid = self.grid
-        pts = self.drawn(pa, ea, own_a, pb, eb, own_b, own_body, loose)
+        pts = self.drawn(pa, ea, own_a, pb, eb, own_b, own_body, loose, under)
         if pts is not None or not grid.soft.any():
             return pts, False
         grid.blocked &= ~grid.soft
-        pts = self.drawn(pa, ea, own_a, pb, eb, own_b, own_body, loose)
+        pts = self.drawn(pa, ea, own_a, pb, eb, own_b, own_body, loose, under)
         grid.blocked |= grid.soft
         return pts, pts is not None
 
@@ -398,6 +412,7 @@ def route_loops(layout: Layout, sses: list[SSE], bb) -> list[Loop]:
     owners = elements[1] + [n.removeprefix("label:") if n.startswith("label:") else None for n, _ in keep_out]
     rects = np.hstack([elements[0], np.array([r for _, r in keep_out], float).reshape(-1, 4).T])
     router = _Router(grid, elements, [b for _, b in keep_out])
+    on_sheet = {h: set(ids) for h, ids in layout.on_sheet.items()}
 
     dist = lambda ab: math.dist(layout.placed[ab[0].id].c_port, layout.placed[ab[1].id].n_port)  # noqa: E731
     routed: dict[tuple[str, str], tuple[list, bool, bool]] = {}  # points, fallback curve, over labels
@@ -415,7 +430,14 @@ def route_loops(layout: Layout, sses: list[SSE], bb) -> list[Loop]:
                 grid.used[c] += 1
             routed[(a.id, b.id)] = ([pa.c_port, pb.n_port], False, False)  # a kink: the helix just carries on
             continue
-        pts, over = router.route(pa.c_port, pa.exit_c, pa, pb.n_port, pb.exit_n, pb)
+        # a helix over a sheet: its loops leave it over the sheet's strands, and reach the other end under it
+        under = (
+            on_sheet.get(a.id, set()) | ({b.id} if pb.over else set()),
+            on_sheet.get(b.id, set()) | ({a.id} if pa.over else set()),
+        )
+        pts, over = router.route(
+            pa.c_port, pa.exit_c, pa, pb.n_port, pb.exit_n, pb, loose=pa.over or pb.over, under=under
+        )
         if pts is None:
             routed[(a.id, b.id)] = (_curve(pa.c_port, pa.exit_c, pb.n_port, pb.exit_n), True, False)
         else:
