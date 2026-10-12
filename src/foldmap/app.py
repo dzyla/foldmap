@@ -32,7 +32,7 @@ from foldmap.app_controls import (
     style_section,
     touched,
 )
-from foldmap.app_edits import chain_choices, shown, upload_name
+from foldmap.app_edits import chain_choices, shown, upload_name, upload_types, wrong_upload
 from foldmap.app_views import Workspace, download_menu, explorer_view, figure_view, said, sequence_view
 from foldmap.cli import _adjustments, _domain_spec
 from foldmap.fetch import DOWNLOAD_MAX, fetch, source_id
@@ -730,6 +730,9 @@ def apply_layout_file(ss: MutableMapping) -> None:
     up = ss.get("layout_upload")
     if up is None:
         return
+    if wrong_upload(up.name, "layout"):
+        ss["layout_error"] = wrong_upload(up.name, "layout")
+        return
     data = up.getvalue()
     if len(data) > LAYOUT_FILE_MAX:
         ss["layout_error"] = f"{upload_name(up.name)}: a layout file is at most {LAYOUT_FILE_MAX // MB} MB"
@@ -760,7 +763,7 @@ def layout_file_section(st, ss: MutableMapping) -> None:
     with st.expander("Layout file", key="sec_layoutfile"):
         st.file_uploader(
             "Load a layout file",
-            type=["yaml", "yml"],
+            type=upload_types("layout"),
             key="layout_upload",
             on_change=apply_layout_file,
             args=(ss,),
@@ -838,6 +841,9 @@ def main() -> None:
         if upload:
             up = ss.get("upload")
             if up is None:  # the upload was removed
+                return
+            if wrong_upload(up.name, "structure"):
+                ss["load_error"] = shown(wrong_upload(up.name, "structure"))
                 return
             text, file, name = "", (up.name, up.getvalue()), re.sub(r"[^\w.-]+", "_", Path(up.name).stem)[:60]
         else:
@@ -955,7 +961,7 @@ def main() -> None:
             )
             st.file_uploader(
                 "or drop a .cif / .pdb file",
-                type=["cif", "mmcif", "pdb", "ent"],
+                type=upload_types("structure"),
                 key="upload",
                 on_change=load,
                 kwargs={"upload": True},

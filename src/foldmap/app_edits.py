@@ -14,6 +14,8 @@ import re
 import unicodedata
 from collections.abc import Callable, MutableMapping
 
+from foldmap.fetch import ALIGNMENT_SUFFIXES, STRUCTURE_SUFFIXES, upload_suffix
+
 # ------------------------------------------------------------------------------------------ composites
 NA_BACKBONE_COLOUR = "#8c564b"  # the picker's colour until one is chosen
 
@@ -491,6 +493,31 @@ _MARKDOWN = re.compile(r"([\\`*_\[\]<>#|~$:=-])")
 _AUTOLINK = re.compile(
     r"(?<=www)(?=\.)|(?=@)|(?<=:)(?=//)", re.IGNORECASE
 )  # where a zero-width space keeps GFM from linking
+
+
+UPLOADS = {  # kind -> (suffixes, the MIME type also named, what it is called): Streamlit checks no suffix of an
+    # uploader that names a MIME type (on Windows its check split a name at a colon and crashed the page), so the
+    # app checks it (wrong_upload)
+    "structure": (STRUCTURE_SUFFIXES, "chemical/x-cif", "a structure file"),
+    "layout": ((".yaml", ".yml"), "application/yaml", "a layout file"),
+    "names": ((".yaml", ".yml"), "application/yaml", "a names file"),
+    "alignment": (ALIGNMENT_SUFFIXES, "text/x-fasta", "an alignment"),
+}
+
+
+def upload_types(kind: str) -> list[str]:
+    """An uploader's `type`: its suffixes and a MIME type."""
+    suffixes, mime, _ = UPLOADS[kind]
+    return [s.lstrip(".") for s in suffixes] + [mime]
+
+
+def wrong_upload(name, kind: str) -> str:
+    """'' when the upload's suffix is one of its kind's, else what to tell the visitor."""
+    suffixes, _, what = UPLOADS[kind]
+    if upload_suffix(name) in suffixes:
+        return ""
+    listed = ", ".join(suffixes[:-1]) + f" or {suffixes[-1]}"
+    return f"{upload_name(name)} is not {what}: upload a {listed} file."
 
 
 def upload_name(name, limit: int = 120) -> str:

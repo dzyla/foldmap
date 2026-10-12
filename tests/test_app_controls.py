@@ -576,7 +576,8 @@ def test_option_labels_and_help_say_everything_in_full():
     at = opened(DATA / "1UBQ.cif")
     assert HBONDS["chains"] == "chain pairs" and "ConSurf grades file" in CONSERVATION_NOTE
     assert all(f".{t}" in at.file_uploader(key="msa_upload").proto.help for t in ALIGNMENT_TYPES)
-    assert list(at.file_uploader(key="msa_upload").proto.type) == [f".{t}" for t in ALIGNMENT_TYPES]
+    types = list(at.file_uploader(key="msa_upload").proto.type)  # the suffixes, and a MIME type: the app checks them
+    assert [t for t in types if t.startswith(".")] == [f".{t}" for t in ALIGNMENT_TYPES] and "text/x-fasta" in types
 
 
 def test_credit_stays_visible_in_the_workspace():

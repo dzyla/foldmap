@@ -169,13 +169,24 @@ def _prune_uploads(folder: Path) -> None:
             continue
 
 
+_SUFFIX = re.compile(r"\.[A-Za-z0-9]{1,10}\Z")
+
+
+def upload_suffix(name) -> str:
+    """An uploaded file's suffix, lower-cased ('' when none), read the same on every system: the letters and digits
+    after its last dot, never a path or drive a name may spell (Windows reads 'x:y.cif' as a drive)."""
+    m = _SUFFIX.search(str(name))
+    return m.group().lower() if m else ""
+
+
 def keep_upload(name: str, data: bytes, suffixes: tuple[str, ...] = STRUCTURE_SUFFIXES) -> Path:
     """An uploaded file, saved under the cache's uploads/ folder by content hash (so the same upload is the same
-    path). Old uploads are removed first. The name only lends its suffix, when allowed."""
+    path). Old uploads are removed first. The kept name is the hash and a suffix from `suffixes` only: the upload's
+    own when allowed (upload_suffix), else the first; no other character of the uploaded name reaches it."""
     folder = CACHE / "uploads"
     folder.mkdir(parents=True, exist_ok=True)
     _prune_uploads(folder)
-    suffix = Path(name).suffix.lower()
+    suffix = upload_suffix(name)
     target = folder / f"upload-{hashlib.sha1(data).hexdigest()[:12]}{suffix if suffix in suffixes else suffixes[0]}"
     atomic_write(target, data)
     return target

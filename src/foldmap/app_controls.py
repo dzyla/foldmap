@@ -15,6 +15,7 @@ from foldmap.app_edits import (
     EDITORS,
     NAME_KEYWORDS,
     SYMMETRIES,
+    UPLOADS,
     apply_table,
     choose_names,
     compose_into,
@@ -26,6 +27,8 @@ from foldmap.app_edits import (
     sync_composites,
     table_rows,
     upload_name,
+    upload_types,
+    wrong_upload,
 )
 from foldmap.render import SITE_GROUPS
 from foldmap.style import CHOICES, THEMES
@@ -408,7 +411,7 @@ def names_block(st, ss: MutableMapping) -> None:
     else:
         st.file_uploader(
             "Names file (YAML)",
-            type=["yaml", "yml"],
+            type=upload_types("names"),
             key="names_upload",
             on_change=store_names,
             args=(ss,),
@@ -435,6 +438,9 @@ def store_names(ss: MutableMapping) -> None:
     ss["last_changed"], ss["names_error"] = "names", ""
     up = ss.get("names_upload")
     if up is None:
+        return
+    if wrong_upload(up.name, "names"):
+        ss["names_error"] = wrong_upload(up.name, "names")
         return
     data = up.getvalue()
     try:
@@ -562,7 +568,7 @@ def editor(st, ss: MutableMapping, kind: str, label: str, columns: dict) -> None
 UNIPROT = ("off", "auto", "accession")
 SITES = ("auto", "all", "none", "types")
 CONSERVATION_NOTE = "Then colour by 'conservation'; a ConSurf grades file colours by its own grades."
-ALIGNMENT_TYPES = ("fasta", "fa", "aln", "sto", "txt")  # the uploader's accepted files (its help lists them in full)
+ALIGNMENT_TYPES = tuple(s.lstrip(".") for s in UPLOADS["alignment"][0])  # the uploader's files (its help lists them)
 ALIGNMENT_HELP = (
     "an alignment with the structure's sequence among its rows: colour by 'conservation', and the Sequence view "
     "shows the alignment · a ConSurf grades table (consurf_grades.txt) colours by ConSurf's own grades · files: "
@@ -577,7 +583,7 @@ def conservation_section(st, ss: MutableMapping) -> None:
     with st.expander("Conservation & UniProt", key="sec_conservation"):
         st.file_uploader(
             "Multiple sequence alignment or ConSurf grades table",
-            type=list(ALIGNMENT_TYPES),
+            type=upload_types("alignment"),
             key="msa_upload",
             on_change=store_alignment,
             args=(ss,),
@@ -682,6 +688,9 @@ def store_alignment(ss: MutableMapping) -> None:
     up = ss.get("msa_upload")
     if up is None:
         ss.update(msa_path="", msa_rows=[])
+        return
+    if wrong_upload(up.name, "alignment"):
+        ss.update(msa_error=wrong_upload(up.name, "alignment"), msa_path="", msa_rows=[])
         return
     target = None
     try:
