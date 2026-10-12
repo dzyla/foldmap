@@ -195,6 +195,7 @@ Change any key with `--set KEY=VALUE` (repeatable) or a YAML file for `--style-f
 | Swap two elements | `--swap α1,α3` |
 | Nudge an element | `--move α2=1,-2` |
 | Rename an element | `--rename res:A:167-182=Gd` |
+| Conventional names | `--names deposited` (the file's helix ids, e.g. globin A–H), `--names beta` (β1…βn) or `--names docs/names/2HHB-globin.yaml` (repeatable) |
 | Highlight elements | `--set mark=α4=#2ca02c` |
 | Named domain panels | `--domain N-lobe=res:A:13-59` (repeatable) or `--domains auto` |
 | Only some chains | `--chains A,B` |
@@ -205,6 +206,9 @@ Change any key with `--set KEY=VALUE` (repeatable) or a YAML file for `--style-f
 | Symmetry and assembly | `--symmetry auto\|off\|C3\|D2\|helical`, `--protomers "A,B;C,D"`, `--assembly auto\|asu\|ID` |
 
 Elements are named by label (`A`, `α2`, `η1`), `chain:label`, position (`#3`) or residue range (`res:A:10-25`). Negative numbers and insertion codes are written as in the file: `res:A:-7-4`, `res:H:100A-100K`.
+
+A label reference reads the labels the figure shows: the label copies of one protein share, the primed labels of
+elements a neighbour lends in focus mode (`α2′`) and any `--names`; `--rename` is applied last and wins over all of them.
 
 **Layout files.** `--save-layout fig.yaml` records everything that defines a figure: theme, style changes,
 layout options, domains and edits, with element references stored as residue ranges so they survive a new model.
