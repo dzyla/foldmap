@@ -472,3 +472,26 @@ def test_blueprint_draws_domains_in_its_palette():
         "domain:C": _mix(pale[1], look.background, 0.86),
     }
     assert [to_hex(p.get_facecolor()) for p in _bar_segments(fig)] == [pale[1], pale[0], pale[1]]  # C, N, C
+
+
+def test_tie_letters_and_a_domain_bar_share_the_page():
+    """4YBB (ribosome: tertiary pairs drawn as ties with letters, and their legend entry) with a domain on each of two
+    proteins: the ties' letters, the tie legend and the domain bar all lie in the page and none overlaps another."""
+    from matplotlib.backends.backend_agg import FigureCanvasAgg
+
+    fig = make_figure(DATA / "na" / "4YBB.cif.gz", domains=[("S4", ["res:AD:1-300"]), ("S8", ["res:AH:1-300"])])
+    renderer = FigureCanvasAgg(fig).get_renderer()
+    ax = fig.axes[0]
+    drawn = [a for a in [*ax.patches, *ax.texts, *ax.lines] if a.get_gid()]
+    ties = [a for a in drawn if a.get_gid().startswith(("legend-tie", "na:tie:"))]  # marks, letters, legend
+    bar = [a for a in drawn if a.get_gid().startswith("domain-bar")]
+    assert any(a.get_gid().startswith("na:tie:") for a in ties) and any("legend-tie" in a.get_gid() for a in ties)
+    assert len(_gids(fig, "domain-bar:")) == 2
+    page = fig.bbox
+    boxes = {id(a): a.get_window_extent(renderer) for a in ties + bar}
+    for a in ties + bar:
+        b = boxes[id(a)]
+        assert page.x0 - 0.5 <= b.x0 and b.x1 <= page.x1 + 0.5 and page.y0 - 0.5 <= b.y0 and b.y1 <= page.y1 + 0.5
+    for a in ties:
+        for b in bar:
+            assert not boxes[id(a)].overlaps(boxes[id(b)]), (a.get_gid(), b.get_gid())
