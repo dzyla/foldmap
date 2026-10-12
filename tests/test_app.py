@@ -740,7 +740,7 @@ def test_workspace_top_bar_and_one_view():
     assert at.segmented_control(key="pane").value == "Figure" and not at.main.tabs  # views: no tabs (the editors are)
     assert "new_structure" in [b.key for b in at.button] and at.session_state["auto_redraw"] is True
     assert any(m.value == "**1LMB**" for m in at.markdown)
-    assert any(c.value.startswith("2 chains · 179 residues") for c in at.caption)
+    assert any(c.value.startswith("4 chains · 179 residues") for c in at.caption)  # protein and DNA chains
 
 
 def test_only_the_active_view_is_built(monkeypatch):

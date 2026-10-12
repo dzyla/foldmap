@@ -96,3 +96,15 @@ def test_scoped_summary_counts_the_chains_drawn_of_the_file():
     assert scoped_summary("8 chains · 757 residues", 6, 10) == "6 of 10 chains · 757 residues"
     assert scoped_summary("1 chain · 76 residues", 1, 24) == "1 of 24 chains · 76 residues"
     assert scoped_summary("40 nucleotides", 1, 2) == "1 of 2 chains · 40 nucleotides"
+
+
+def test_the_summary_counts_the_chains_the_bar_counts():
+    """Protein and nucleic-acid chains, in the bar and in the top bar alike: a chain picked on 1LMB (protein 3 with
+    both DNA strands) is 3 of its 4 chains; 7A4M's one subunit is 1 of 24 in both."""
+    at = opened(DATA / "1LMB.cif")
+    assert at.session_state["info"].startswith("4 chains · ")
+    at.multiselect(key="chains__pick").set_value(["3"]).run()
+    assert not at.exception and at.session_state["info"].startswith("3 of 4 chains · ")
+    at = opened(APO)
+    assert at.session_state["info"].startswith("1 of 24 chains · ")
+    assert "— 1 of 24 chains." in visible(rendered_text(at))

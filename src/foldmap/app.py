@@ -894,7 +894,7 @@ def main() -> None:
             protein_chains=result["chains"],
             na_chains=result["na_chains"],
             all_chains=chain_choices(size["chain_ids"], [*result["chains"], *result["na_chains"]]),
-            protein_chains_total={"assembly": "auto", "count": len(result["chains"])},  # reset_structure: auto
+            chains_total={"assembly": "auto", "count": result["chain_count"]},  # reset_structure: auto
             assemblies=size["assemblies"],
             share_id="" if file or local_path else source_id(text) or "",
             stage="edit",

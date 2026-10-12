@@ -230,17 +230,18 @@ def scope_bar(ws: Workspace, scope: dict | None, blob: str) -> None:
 
 
 def drawn_summary(ss: MutableMapping, settings: dict, result: dict) -> str:
-    """The top bar's line for the figure drawn. A figure of every chain counts the protein chains of its assembly
-    (`protein_chains_total`); one of some chains says "2 of 6 chains" when that count is of the same assembly; one
-    that an automatic choice drew part of (scope.drawn_scope) says how many chains of the file it drew."""
+    """The top bar's line for the figure drawn, counting protein and nucleic-acid chains as the scope bar does. A
+    figure of every chain counts the chains of its assembly (`chains_total`); one of some chains says "2 of
+    6 chains" when that count is of the same assembly; one that an automatic choice drew part of
+    (scope.drawn_scope) says how many chains of the file it drew."""
     assembly = settings.get("assembly") or "auto"
     if not settings.get("chains"):
-        ss["protein_chains_total"] = {"assembly": assembly, "count": len(result["chains"])}
+        ss["chains_total"] = {"assembly": assembly, "count": result["chain_count"]}
         scope = result.get("scope") or {}
         if scope.get("reason"):
             return app_jobs.scoped_summary(result["summary"], scope["drawn_chains"], scope["file_chains"])
         return result["summary"]
-    total = ss.get("protein_chains_total") or {}
+    total = ss.get("chains_total") or {}
     if total.get("assembly") != assembly:  # not counted in this assembly yet
         return result["summary"]
     return app_jobs.restricted_summary(result["summary"], total["count"])

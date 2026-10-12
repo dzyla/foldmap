@@ -220,7 +220,7 @@ def test_chain_count_of_the_summary_follows_the_assembly():
     at.selectbox(key="assembly").select("asu").run()
     assert not at.exception and at.session_state["info"].startswith("2 chains · ")  # N not counted in asu yet
     at.multiselect(key="chains__pick").set_value([]).run()
-    assert at.session_state["protein_chains_total"] == {"assembly": "asu", "count": 4}
+    assert at.session_state["chains_total"] == {"assembly": "asu", "count": 4}
     at.multiselect(key="chains__pick").set_value(["B"]).run()
     assert at.session_state["info"].startswith("1 of 4 chains · ")
 

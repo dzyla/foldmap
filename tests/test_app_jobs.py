@@ -111,7 +111,7 @@ def test_draw_job_reports_what_the_pickers_need():
 
 def test_summary_never_reads_like_a_fault():
     out = app_jobs.draw_job(DATA / "1LMB.cif", _blob())
-    assert out["summary"] == "2 chains · 179 residues · 10 helices · 40 nucleotides · symmetry C2"
+    assert out["summary"] == "4 chains · 179 residues · 10 helices · 40 nucleotides · symmetry C2"  # DNA strands too
     assert out["chains"] == ["3", "4"] and out["na_chains"] == ["1", "2"]
 
 

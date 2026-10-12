@@ -341,6 +341,7 @@ def draw_job(path, settings_json: str, eager_after: float | None = None) -> dict
         "chains": chains,
         "na_chains": na_chains,
         "summary": summary_of(drawn),
+        "chain_count": len(chains_of(drawn)),  # what the summary counts: protein and nucleic-acid chains
         "domains_note": stale_domains_note(spec.domains, drawn.sses),  # a layout file's stale ids, dropped
         "scope": drawn_scope(drawn.model, drawn.layout, spec.assembly, spec.focus),  # what auto choices left out
         "seconds": seconds,
@@ -475,9 +476,15 @@ def _count(n: int, one: str, many: str) -> str:
     return f"{n:,} {one if n == 1 else many}"
 
 
+def chains_of(drawn) -> list[str]:
+    """The chains read and asked for, protein then nucleic acid (layout.chains_read): what the summary and the
+    scope bar both count."""
+    return list(getattr(drawn.layout, "chains_read", None) or dict.fromkeys(label.chain for label in drawn.bb.labels))
+
+
 def summary_of(drawn) -> str:
-    """One line about the drawn structure: chains, residues, helices, strands, nucleotides, symmetry; zero counts
-    left out."""
+    """One line about the drawn structure: chains (protein and nucleic acid), residues, helices, strands,
+    nucleotides, symmetry; zero counts left out."""
     from .symmetry import detect_symmetry
 
     bb, sses = drawn.bb, drawn.sses
@@ -487,7 +494,7 @@ def summary_of(drawn) -> str:
         sym = None
     nucleic = getattr(drawn.layout, "nucleic", None)
     counts = (
-        (len({label.chain for label in bb.labels}), "chain", "chains"),
+        (len(chains_of(drawn)), "chain", "chains"),
         (len(bb), "residue", "residues"),
         (sum(s.kind == "H" for s in sses), "helix", "helices"),
         (sum(s.kind == "E" for s in sses), "strand", "strands"),
@@ -500,7 +507,7 @@ def summary_of(drawn) -> str:
 
 
 def restricted_summary(summary: str, total: int) -> str:
-    """The summary of a figure drawn with only some of the structure's `total` protein chains: '2 of 6 chains · …'
+    """The summary of a figure drawn with only some of the structure's `total` chains: '2 of 6 chains · …'
     (unchanged when it names no chain count, or all of them)."""
     m = re.match(r"([\d,]+) chains?\b", summary)
     if not m or int(m.group(1).replace(",", "")) >= total:
