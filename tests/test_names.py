@@ -287,3 +287,18 @@ def test_a_deposited_name_another_element_carries_is_primed(tmp_path):
     path.write_text(text, encoding="utf-8")
     lay, _, _ = make_layout(path, names=["deposited"])
     assert (lay.placed["A:23-34"].label, lay.placed["A:57-59"].label) == ("η2", "η2′")
+
+
+def test_beta_names_a_helix_before_the_first_strand_alpha_n():
+    """1LDM A1 opens with the helix 3-7, before β1: αN (it was α0), as the textbooks name an N-terminal helix; a
+    second one would be αN′."""
+    from foldmap.names import _row_helices
+    from helpers import fake_sse
+
+    lay, sses, _ = make_layout(FID / "1LDM.cif.gz", focus="protomer", names=["beta"])
+    assert lay.placed["A1:3-7"].label == "αN"
+    assert not any(p.label.startswith("α0") for p in lay.placed.values())
+    mine = [fake_sse("H", 1, 5), fake_sse("H", 8, 12), fake_sse("E", 15, 19), fake_sse("H", 22, 30)]
+    strands = [mine[2]]
+    named = _row_helices(mine, strands, {mine[2].id: 1}, {mine[2].id, mine[3].id})
+    assert [named[s.id] for s in (mine[0], mine[1], mine[3])] == ["αN", "αN′", "α1"]

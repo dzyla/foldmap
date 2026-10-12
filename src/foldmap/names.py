@@ -156,7 +156,7 @@ def _pdb_helix_rows(path) -> list[tuple[str, str, int, int]]:
 def beta_names(layout: Layout, sses: list[SSE], whole: list[SSE] | None = None) -> dict[str, str]:
     """The strands of each chain become β1…βn in sequence (numbered over `whole`, the chain as read, when focus
     left some out). In a chain with a βα row (layout.ba_rows), the row helix after βn becomes αn; its other helices
-    are named after the strand before them, in sequence: αn while that name is free, then αn′, αn″ … (n = 0
+    are named after the strand before them, in sequence: αn while that name is free, then αn′, αn″ … (αN, αN′ …
     before the first strand). Without a row the helices keep their labels; 3-10 helices always do."""
     rows = {k for row in layout.ba_rows for k in row}
     drawn = {s.id for s in sses}
@@ -181,13 +181,17 @@ def _row_helices(mine: list[SSE], strands: list[SSE], number: dict[str, int], ro
 
     helices = [s for s in mine if s.kind == "H"]
     in_row = [s for s in strands if s.id in rows]
-    out = {h.id: f"α{after(h, in_row)}" for h in helices if h.id in rows}
+
+    def name(n: int) -> str:  # before the first strand: αN
+        return f"α{n or 'N'}"
+
+    out = {h.id: name(after(h, in_row)) for h in helices if h.id in rows}
     taken = set(out.values())
     for h in (h for h in helices if h.id not in rows):
         n, k = after(h, strands), 0
-        while _primed(f"α{n}", k) in taken:
+        while _primed(name(n), k) in taken:
             k += 1
-        out[h.id] = _primed(f"α{n}", k)
+        out[h.id] = _primed(name(n), k)
         taken.add(out[h.id])
     return out
 
