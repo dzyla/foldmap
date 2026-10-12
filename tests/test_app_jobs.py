@@ -49,9 +49,21 @@ def _headroom():
     """(MB the job may still take under its address-space cap, its BLAS thread settings)."""
     import resource
 
-    size = int(Path("/proc/self/statm").read_text().split()[0]) * resource.getpagesize()
+    size = int(Path("/proc/self/statm").read_text(encoding="utf-8").split()[0]) * resource.getpagesize()
     soft, _ = resource.getrlimit(resource.RLIMIT_AS)
     return (soft - size) / 2**20, os.environ.get("OPENBLAS_NUM_THREADS"), os.environ.get("OMP_NUM_THREADS")
+
+
+def _exits():
+    os._exit(3)  # dies without a word, but not killed for its memory
+
+
+def _large():
+    return "x" * 5000
+
+
+def _refuse_cap(memory_mb):
+    return False  # as on macOS, where the address-space cap is refused
 
 
 def _killed():
@@ -277,7 +289,7 @@ def test_one_handler_tells_every_failure_apart():
     explain = app_jobs.explain
     assert explain(JobLimit("time", ""), "8C3A", lim) == (
         app_jobs.limit_message("8C3A", JobLimit("time", ""), lim),
-        None,
+        "Chains (Chains & assembly)",
     )
     big = JobLimit("size", "8TOC is too large for this app")
     assert explain(big, "8TOC", lim) == ("8TOC is too large for this app", None)
@@ -345,3 +357,64 @@ def test_contact_problems_read_as_the_command_line_prints_them():
         "unmatched: 2:DG7 <- 4:SER3",
         "missing: 2:DC8 <- 4:ASN5-2:DC8",
     ]
+
+
+def test_a_memory_cap_always_comes_with_a_timeout(monkeypatch):
+    for name in ENV:
+        monkeypatch.delenv(name, raising=False)
+    assert Limits(memory_mb=512).timeout == app_jobs.ISOLATED_TIMEOUT == 90
+    monkeypatch.setenv("FOLDMAP_APP_TIMEOUT", "0")
+    assert app_jobs.limits(hosted=True).timeout == 90
+    assert Limits(timeout=0).timeout == 0  # no isolation asked for: runs here, untimed
+
+
+@needs_fork
+def test_a_job_dying_otherwise_is_a_failure_not_a_memory_limit():
+    with pytest.raises(app_jobs.JobFailed, match="exit code 3"):
+        run_job(_exits, limits=Limits(timeout=60))
+
+
+@needs_fork
+def test_a_result_too_large_to_hand_back_is_a_failure(monkeypatch):
+    monkeypatch.setattr(app_jobs, "RESULT_MAX", 1000)
+    with pytest.raises(app_jobs.JobFailed, match="larger than"):
+        run_job(_large, limits=Limits(timeout=60))
+    monkeypatch.setattr(app_jobs, "RESULT_MAX", 10_000)
+    assert run_job(_large, limits=Limits(timeout=60)) == "x" * 5000
+
+
+def test_no_isolation_is_said_once(monkeypatch, caplog):
+    monkeypatch.setattr(app_jobs, "_CAN_FORK", False)
+    monkeypatch.setattr(app_jobs, "_WARNED", set())
+    with caplog.at_level("WARNING", logger="foldmap.app_jobs"):
+        for _ in range(3):
+            assert run_job(_sleep, 0, limits=Limits(timeout=5)) == 0
+    assert len(caplog.records) == 1 and "no time or memory limit" in caplog.text
+
+
+@needs_fork
+def test_no_memory_cap_is_said_once(monkeypatch, caplog):
+    monkeypatch.setattr(app_jobs, "_set_cap", _refuse_cap)
+    monkeypatch.setattr(app_jobs, "_WARNED", set())
+    with caplog.at_level("WARNING", logger="foldmap.app_jobs"):
+        for _ in range(3):
+            assert run_job(_sleep, 0, limits=Limits(timeout=60, memory_mb=512)) == 0
+    assert len(caplog.records) == 1 and "no memory cap" in caplog.text
+
+
+def test_a_sequence_failure_is_kept_with_its_view():
+    app_jobs.clear()
+    slow = JobLimit("time", "slow")
+    app_jobs.remember_failure("/x/8TOC.cif", {}, slow, job="sequence", view_json='{"columns": 60}')
+    assert app_jobs.known_failure("/x/8TOC.cif", {}, job="sequence", view_json='{"columns": 60}') is slow
+    assert app_jobs.known_failure("/x/8TOC.cif", {}, job="sequence", view_json='{"columns": 30}') is None
+
+
+def test_limits_point_at_chains_and_assembly():
+    from foldmap.app_edits import control_for
+
+    assert control_for("", "chains") == "Chains (Chains & assembly)"
+    lim = app_jobs.HOSTED
+    for kind in ("time", "memory"):
+        assert app_jobs.explain(JobLimit(kind, ""), "8C3A", lim)[1] == "Chains (Chains & assembly)"
+    assert app_jobs.explain(JobLimit("busy", ""), "8C3A", lim)[1] is None

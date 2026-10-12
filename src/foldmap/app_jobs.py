@@ -18,8 +18,10 @@ from __future__ import annotations
 
 import functools
 import json
+import logging
 import multiprocessing
 import os
+import signal
 import sys
 import tempfile
 import threading
@@ -31,6 +33,8 @@ from pathlib import Path
 SLOW_SECONDS = 4.0  # a figure slower than this turns automatic redrawing off and brings its files with it (Q-A6)
 PAGE_EMBED_MAX = 10_000_000  # a 3D page larger than this is offered as a download only, never embedded
 BUSY_WAIT = 30.0  # seconds a job waits for a free slot before the app says it is busy
+ISOLATED_TIMEOUT = 90.0  # the timeout of a job given a memory cap and no timeout: an isolated job is always timed
+RESULT_MAX = 100_000_000  # bytes a job process may hand back (a giant's 3D page is 20-48 MB)
 
 _CAN_FORK = sys.platform != "win32" and "forkserver" in multiprocessing.get_all_start_methods()
 _PRELOAD = [
@@ -43,19 +47,32 @@ _PRELOAD = [
     "foldmap.seqplot",
 ]
 REPORT = "https://github.com/dzyla/foldmap/issues"
+_LOG = logging.getLogger("foldmap.app_jobs")
+_WARNED: set[str] = set()  # warnings already given in this process
+
+
+def _warn_once(key: str, message: str) -> None:
+    if key not in _WARNED:
+        _WARNED.add(key)
+        _LOG.warning(message)
 
 
 @dataclass(frozen=True)
 class Limits:
     """How a job runs: timeout (s) and memory_mb (address space) > 0 run it isolated, in its own process; jobs: at
     most this many at once (0: no cap); max_residues: larger structures are refused before drawing (0: none); slow:
-    seconds after which a figure counts as slow."""
+    seconds after which a figure counts as slow. A memory cap without a timeout gets ISOLATED_TIMEOUT: a job in
+    its own process is never waited on for ever."""
 
     timeout: float = 0.0
     memory_mb: int = 0
     max_residues: int = 0
     jobs: int = 0
     slow: float = SLOW_SECONDS
+
+    def __post_init__(self):
+        if self.memory_mb > 0 and self.timeout <= 0:
+            object.__setattr__(self, "timeout", ISOLATED_TIMEOUT)
 
     @property
     def isolated(self) -> bool:
@@ -146,27 +163,41 @@ def _own_size() -> int:
     try:
         import resource
 
-        return int(Path("/proc/self/statm").read_text().split()[0]) * resource.getpagesize()
+        return int(Path("/proc/self/statm").read_text(encoding="utf-8").split()[0]) * resource.getpagesize()
     except (ImportError, OSError, ValueError, IndexError):
         return 0
 
 
-def _child(conn, fn, args, memory_mb: int) -> None:
-    """In the job process: cap the address space, run, send ('ok', result), ('memory', '') or ('error', ...)."""
-    if memory_mb:
-        try:
-            import resource
-
-            cap = _own_size() + memory_mb * 1024 * 1024  # memory_mb on top of what the job holds from the server
-            resource.setrlimit(resource.RLIMIT_AS, (cap, cap))
-        except (ImportError, ValueError, OSError):  # no resource module, or a cap the OS refuses (macOS)
-            pass
+def _set_cap(memory_mb: int) -> bool:
+    """Cap this process's address space at its present size plus memory_mb; False where the OS refuses (macOS)."""
     try:
-        conn.send(("ok", fn(*args)))
+        import resource
+
+        cap = _own_size() + memory_mb * 1024 * 1024  # memory_mb on top of what the job holds from the server
+        resource.setrlimit(resource.RLIMIT_AS, (cap, cap))
+    except (ImportError, ValueError, OSError):
+        return False
+    return True
+
+
+def _child(conn, fn, args, memory_mb: int, max_bytes: int, set_cap=_set_cap) -> None:
+    """In the job process: cap the address space, run, send (kind, payload, capped): ('ok', result), ('memory',
+    ''), ('large', size in bytes) when the result is over max_bytes, or ('error', (type name, text, is ValueError,
+    is OSError))."""
+    from multiprocessing.reduction import ForkingPickler
+
+    capped = set_cap(memory_mb) if memory_mb else False
+    try:
+        message = ForkingPickler.dumps(("ok", fn(*args), capped))
+        if len(message) > max_bytes:
+            message = ForkingPickler.dumps(("large", len(message), capped))
     except MemoryError:
-        conn.send(("memory", ""))
+        message = ForkingPickler.dumps(("memory", "", capped))
     except Exception as err:  # every kind of error goes back to the app, which says what it means
-        conn.send(("error", (type(err).__name__, str(err), isinstance(err, ValueError), isinstance(err, OSError))))
+        what = (type(err).__name__, str(err), isinstance(err, ValueError), isinstance(err, OSError))
+        message = ForkingPickler.dumps(("error", what, capped))
+    try:
+        conn.send_bytes(message)
     finally:
         conn.close()
 
@@ -174,8 +205,11 @@ def _child(conn, fn, args, memory_mb: int) -> None:
 def run_job(fn, *args, limits: Limits):
     """fn(*args): here when `limits` sets no isolation, else in a job process under the time and memory caps,
     one of at most `limits.jobs` at once. Over a limit: JobLimit. A ValueError, OSError or RuntimeError in the job
-    is raised again as such (with its text); anything else as JobFailed."""
+    is raised again as such (with its text); anything else, a job process ending without an answer (other than
+    killed) or a result over RESULT_MAX, as JobFailed."""
     if not limits.isolated:
+        if limits.timeout > 0 or limits.memory_mb > 0:
+            _warn_once("fork", "jobs run in the app's own process, with no time or memory limit (no forkserver here)")
         return fn(*args)
     slots = _semaphore(limits.jobs) if limits.jobs > 0 else None
     if slots is not None and not slots.acquire(timeout=BUSY_WAIT):
@@ -190,7 +224,7 @@ def run_job(fn, *args, limits: Limits):
 def _isolated(fn, args, limits: Limits):
     ctx = _context()
     here, there = ctx.Pipe(duplex=False)
-    proc = ctx.Process(target=_child, args=(there, fn, args, limits.memory_mb), daemon=True)
+    proc = ctx.Process(target=_child, args=(there, fn, args, limits.memory_mb, RESULT_MAX, _set_cap), daemon=True)
     try:
         proc.start()
     except BaseException:
@@ -203,10 +237,13 @@ def _isolated(fn, args, limits: Limits):
         if not here.poll(limits.timeout or None):
             raise JobLimit("time", f"stopped after {limits.timeout:g} s")
         try:
-            kind, payload = here.recv()
-        except EOFError:  # ended without a word: killed by the OS, which takes it for its memory
-            raise JobLimit("memory", "the job process was killed") from None
-        answered = True
+            kind, payload, capped = here.recv()
+            answered = True
+        except EOFError:  # ended without a word
+            proc.join(5)
+            if proc.exitcode == -signal.SIGKILL:  # killed: by the OS, which takes it for its memory
+                raise JobLimit("memory", "the job process was killed") from None
+            raise JobFailed(f"the job process ended without a result (exit code {proc.exitcode})") from None
     finally:
         if answered:
             proc.join(5)  # it has answered and is closing
@@ -214,10 +251,16 @@ def _isolated(fn, args, limits: Limits):
             proc.kill()
             proc.join(5)
         here.close()
+    if limits.memory_mb and not capped:
+        _warn_once("cap", "jobs run with no memory cap: this system refuses an address-space limit (RLIMIT_AS)")
     if kind == "ok":
         return payload
     if kind == "memory":
         raise JobLimit("memory", f"stopped at {limits.memory_mb} MB")
+    if kind == "large":
+        raise JobFailed(
+            f"the result is {payload / 1e6:.0f} MB, larger than the {RESULT_MAX / 1e6:.0f} MB a job may hand back"
+        )
     name, text, is_value, is_os = payload
     if is_value:
         raise ValueError(text)
@@ -326,7 +369,9 @@ def contacts_job(path, settings_json: str) -> dict | None:
     problem; None when the figure has no beads."""
     from .cli import contact_problems
 
-    report = _drawn(path, settings_json).verify_contacts()
+    drawn = _drawn(path, settings_json)
+    with _FIGURES:  # the kept figure may be saved by a download thread meanwhile
+        report = drawn.verify_contacts()
     if report is None:
         return None
     return {
@@ -423,7 +468,7 @@ def page_file(path: str, blob: str, limits: Limits) -> bytes:
 
 
 # ---------------------------------------------------------------------------------------------- failures
-FAILED: OrderedDict = OrderedDict()  # (path, job, layout_key) -> JobLimit, process-wide, the latest 256
+FAILED: OrderedDict = OrderedDict()  # (path, job, layout_key, view_json) -> JobLimit, process-wide, the latest 256
 _FAILED_MAX = 256
 
 
@@ -437,12 +482,17 @@ def layout_key(settings: dict) -> str:
     return json.dumps({k: settings[k] for k in keys if k in settings}, sort_keys=True, default=str)
 
 
-def remember_failure(path, settings: dict, err: JobLimit, job: str = "figure") -> None:
+def _failure_key(path, settings: dict, job: str, view_json: str) -> tuple:
+    return (str(path), job, layout_key(settings), view_json)
+
+
+def remember_failure(path, settings: dict, err: JobLimit, job: str = "figure", view_json: str = "") -> None:
     """Remember a job over a limit, so the same request is answered at once. job: 'figure', 'sequence' or 'page'
-    (each remembered apart). A busy moment says nothing about the structure and is never remembered."""
+    (each remembered apart); view_json: the sequence view it was drawn with. A busy moment says nothing about the
+    structure and is never remembered."""
     if err.kind == "busy":
         return
-    key = (str(path), job, layout_key(settings))
+    key = _failure_key(path, settings, job, view_json)
     with _LOCK:
         FAILED[key] = err
         FAILED.move_to_end(key)
@@ -450,10 +500,10 @@ def remember_failure(path, settings: dict, err: JobLimit, job: str = "figure") -
             FAILED.popitem(last=False)
 
 
-def known_failure(path, settings: dict, job: str = "figure") -> JobLimit | None:
-    """The limit this job went over before for this layout, else None."""
+def known_failure(path, settings: dict, job: str = "figure", view_json: str = "") -> JobLimit | None:
+    """The limit this job went over before for this layout (and sequence view), else None."""
     with _LOCK:
-        return FAILED.get((str(path), job, layout_key(settings)))
+        return FAILED.get(_failure_key(path, settings, job, view_json))
 
 
 def _elsewhere(name: str) -> str:
@@ -480,17 +530,21 @@ def limit_message(name: str, err: JobLimit, limits: Limits) -> str:
     return err.message
 
 
+_CHAINS = "Chains (Chains & assembly)"  # app_edits.CONTROLS["chains"], as control_for names it
+
+
 def explain(err: Exception, name: str, limits: Limits, last_changed: str | None = None) -> tuple[str, str | None]:
     """The one handler for a failed job: (message for the visitor, control to point at, as 'Label (Section)', or
-    None). JobLimit: limit_message. ValueError: its text and the control it names (else the one changed last).
+    None). JobLimit: limit_message, and for time and memory the Chains control. ValueError: its text and the control
+    it names (else the one changed last).
     JobFailed (checked before RuntimeError) or any exception that is not ValueError, OSError or RuntimeError (a
     bug, in a job process or in this one): 'foldmap could not draw this setting', with a link to report it.
     OSError, RuntimeError: app.trouble (the file is gone or unreadable; no server path, no setting to blame)."""
     from . import app
     from .app_edits import control_for
 
-    if isinstance(err, JobLimit):
-        return limit_message(name, err, limits), None
+    if isinstance(err, JobLimit):  # time and memory: draw part of it, the message says
+        return limit_message(name, err, limits), _CHAINS if err.kind in ("time", "memory") else None
     if isinstance(err, ValueError):
         return str(err), control_for(str(err), last_changed)
     if isinstance(err, JobFailed) or not isinstance(err, (OSError, RuntimeError)):
