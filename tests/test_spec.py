@@ -121,7 +121,12 @@ def test_edit_shapes():
         figure_spec(UBQ, move=[("res:A:2-7", [1])])
 
 
-def test_round_trip_through_a_layout_file(tmp_path):
+def test_round_trip_through_a_layout_file(tmp_path, monkeypatch):
+    from foldmap import uniprot
+
+    ubiquitin = "MQIFVKTLTGKTITLEVEPSDTIENVKAKIQDKEGIPPDQQRLIFAGKQLEDGRTLSDYNIQKESTLHLVLRLRGG"
+    stub = uniprot.Entry("P0CG48", "UBC_HUMAN", "Polyubiquitin-C", "UBC", "Homo sapiens", ubiquitin)
+    monkeypatch.setattr(uniprot, "entry", lambda acc, cache_dir=None: stub)  # no network
     spec = figure_spec(
         UBQ,
         theme="blueprint",
