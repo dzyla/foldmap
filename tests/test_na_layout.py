@@ -2128,3 +2128,23 @@ def test_tie_letters_are_base_letter_size_and_explained():
     assert ties and {t.get_fontsize() for t in ties} == {letters[0].get_fontsize()}
     assert any("tertiary base pair" in t.get_text() for t in ax.texts)
     assert [ln for ln in ax.lines if ln.get_gid() == "legend-tie"]  # drawn as the two ticks
+
+
+def test_element_labels_keep_off_nucleic_acid_traces():
+    """1EYG: chain A's α1 name sat under an ssDNA trace's bead and line; an element's name takes its other side
+    when a trace, its beads or its letters lie on the first."""
+    from foldmap.layout import _GLYPH_H, _GLYPH_W
+    from foldmap.na_paths import _BEAD
+    from foldmap.route import clip_len
+
+    lay, sses, _, _ = _routed("1EYG")
+    beads = [xy for p in lay.na_paths for xy in p.nt_xy]
+    segs = [(a, b) for p in lay.na_paths for a, b in zip(p.points, p.points[1:])]
+    r, gw, gh = _BEAD / 2, _GLYPH_W / 2, _GLYPH_H / 2
+    boxes = [(n, b) for n, b in label_boxes(lay, sses) if n.startswith("label:")]
+    assert boxes and segs
+    for n, box in boxes:
+        x0, y0, x1, y1 = box
+        assert not [q for q in beads if x0 - r < q[0] < x1 + r and y0 - r < q[1] < y1 + r], n
+        assert not [s for s in segs if clip_len(*s, box) > 1e-9], n
+        assert not [q for q in lay.na_letters.values() if x0 - gw < q[0] < x1 + gw and y0 - gh < q[1] < y1 + gh], n

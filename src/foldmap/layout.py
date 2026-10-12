@@ -1864,7 +1864,6 @@ def build_layout(
     )
     lay.na_traces = traces
     lay.frame = frame
-    _choose_label_sides(lay, style.font_scale)  # after naming: a name's length sets its box
     if keep_depth and len(rows) > 1:  # wrapped into rows of whole chains: each row gets its own band
         lay.stack_rows = [[m.sse.id for it in row for m in it.members if isinstance(m, Placed)] for row in rows]
     if traces:
@@ -1873,6 +1872,7 @@ def build_layout(
     lay.partial = set(partial or ())
     lay.domains = [(name, [k for k in ids if k in real]) for name, ids in domains or []]
     rects = np.vstack([rects, *[[domain_panel(lay, name)] for name, _ in lay.domains]]) if lay.domains else rects
+    _choose_label_sides(lay, sses, style.font_scale)  # after naming: a name's length sets its box
     rects = np.vstack([rects, [b for _, b in label_boxes(lay, sses)] or np.empty((0, 4))])
     lay.bounds = (
         float(rects[:, 0].min()),
@@ -2046,12 +2046,79 @@ def _stem_name_ink(d: PlacedStem, em: float) -> tuple[float, float, float, float
     return centred_box(*stem_label_pos(d), c * along + s * across, s * along + c * across)
 
 
-def _choose_label_sides(layout: Layout, font_scale: float = 1.0) -> None:
-    """Each stem's name beside its first rail (label_side 1) unless its box meets another stem's name decided before
-    it, another stem's body, an element or an element's name, or sits nearer another stem than its own, or its
-    drawn text meets a base letter of any stem; then beside the second rail if that is clear; then further out
-    (_SLOTS), either side (the upright box of a name turned 30-60 degrees can reach its own stem's letters on both
-    sides alike); else on the first side after all. Runs once the names (and so the boxes' widths) are final."""
+def _trace_hits(box, traces: list[np.ndarray]) -> int:
+    """How many nucleotides of the traces (unpaired strands drawn along their projection) a name's box would sit on,
+    counting the room their letters take beside them, plus the trace segments it would cross."""
+    x0, y0, x1, y1 = box
+    reach = NT_ROW + _GLYPH_H / 2  # a nucleotide's bead and its letter beside it
+    n = 0
+    for pts in traces:
+        n += int(
+            np.count_nonzero(
+                (pts[:, 0] > x0 - reach)
+                & (pts[:, 0] < x1 + reach)
+                & (pts[:, 1] > y0 - reach)
+                & (pts[:, 1] < y1 + reach)
+            )
+        )
+        n += sum(1 for a, b in zip(pts, pts[1:]) if _segment_meets_box(a, b, box, _TRACE_HALF / 2))
+    return n
+
+
+def _segment_meets_box(a, b, box, pad: float) -> bool:
+    """Does segment a-b pass within `pad` of the box (Liang-Barsky on the box grown by pad)?"""
+    x0, y0, x1, y1 = box[0] - pad, box[1] - pad, box[2] + pad, box[3] + pad
+    t0, t1 = 0.0, 1.0
+    dx, dy = b[0] - a[0], b[1] - a[1]
+    for p, q in ((-dx, a[0] - x0), (dx, x1 - a[0]), (-dy, a[1] - y0), (dy, y1 - a[1])):
+        if p == 0:
+            if q < 0:
+                return False
+            continue
+        t = q / p
+        if p < 0:
+            t0 = max(t0, t)
+        else:
+            t1 = min(t1, t)
+        if t0 > t1:
+            return False
+    return True
+
+
+def _element_label_sides(layout: Layout, sses: list[SSE]) -> None:
+    """A helix's name beside its upper side (label_side 1) unless it lies on a nucleic-acid trace, its beads or its
+    letters (1EYG's ssDNA over chain A's α1): then on the other side, if that lies on fewer of them and meets no
+    element, stem, other name or chain end."""
+    traces = [np.asarray(pts, float).reshape(-1, 2) for _, pts in sorted(layout.na_traces.items())]
+    if not traces:
+        return
+    for p in layout.placed.values():
+        if p.sse.kind not in ("H", "G"):
+            continue
+        p.label_side = 1
+        first = _trace_hits(_element_label_box(p), traces)
+        if not first:
+            continue
+        p.label_side = -1
+        box = _element_label_box(p)
+        taken = [q.rect for q in [*layout.placed.values(), *layout.ghosts] if q is not p]
+        taken += [b for name, b in label_boxes(layout, sses) if name != f"label:{p.sse.id}"]
+        if (
+            _trace_hits(box, traces) >= first
+            or overlaps_any(box, taken)
+            or any(_box_meets_body(box, d) for d in layout.stems)
+        ):
+            p.label_side = 1
+
+
+def _choose_label_sides(layout: Layout, sses: list[SSE], font_scale: float = 1.0) -> None:
+    """Element names first (_element_label_sides). Then each stem's name beside its first rail (label_side 1) unless
+    its box meets another stem's name decided before it, another stem's body, an element or an element's name, or
+    sits nearer another stem than its own, or its drawn text meets a base letter of any stem; then beside the second
+    rail if that is clear; then further out (_SLOTS), either side (the upright box of a name turned 30-60 degrees can
+    reach its own stem's letters on both sides alike); else on the first side after all. Runs once the names (and so
+    the boxes' widths) are final."""
+    _element_label_sides(layout, sses)
     em = _ink_em(layout, font_scale)
     g = 0.75 * em * _INK_GLYPH  # a base letter: render draws it at 0.75 em
     rects = [p.rect for p in [*layout.placed.values(), *layout.ghosts]]
@@ -2080,17 +2147,17 @@ def _name_clear(d: PlacedStem, slot, others, named, rects, letters, em: float) -
     )
 
 
+def _element_label_box(p: Placed) -> tuple[float, float, float, float]:
+    """The box around a helix's name."""
+    return centred_box(*helix_label_pos(p), _GLYPH_W * len(p.label) / 2 + 0.05, _GLYPH_H / 2)
+
+
 def label_boxes(layout: Layout, sses: list[SSE]) -> list[tuple[str, tuple[float, float, float, float]]]:
     """Keep-out boxes for text and chain-end stubs: loops route around them, the page bounds include them."""
     out = []
     for p in layout.placed.values():
         if p.sse.kind in ("H", "G"):
-            out.append(
-                (
-                    f"label:{p.sse.id}",
-                    centred_box(*helix_label_pos(p), _GLYPH_W * len(p.label) / 2 + 0.05, _GLYPH_H / 2),
-                )
-            )
+            out.append((f"label:{p.sse.id}", _element_label_box(p)))
     for end, chain, port, ex in termini(layout, sses):
         a, b = np.add(port, ex * 0.15), np.add(port, ex * END_STUB)
         out.append(
