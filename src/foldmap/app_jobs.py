@@ -47,6 +47,7 @@ _PRELOAD = [
     "foldmap.seqplot",
 ]
 REPORT = "https://github.com/dzyla/foldmap/issues"
+REPORT_SENTENCE = f" Please report it at {REPORT}."  # ends every bug message (the app links it)
 _LOG = logging.getLogger("foldmap.app_jobs")
 _WARNED: set[str] = set()  # warnings already given in this process
 
@@ -549,7 +550,7 @@ def explain(err: Exception, name: str, limits: Limits, last_changed: str | None 
         return str(err), control_for(str(err), last_changed)
     if isinstance(err, JobFailed) or not isinstance(err, (OSError, RuntimeError)):
         text = str(err) if isinstance(err, JobFailed) else f"{type(err).__name__}: {err}"
-        message = f"foldmap could not draw this setting ({text}). Please report it at {REPORT}."
+        message = f"foldmap could not draw this setting ({text}).{REPORT_SENTENCE}"
         return message, control_for(text, last_changed)
     return app.trouble(err), None
 

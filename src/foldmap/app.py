@@ -13,7 +13,6 @@ import logging
 import os
 import re
 import tempfile
-import time
 from collections.abc import MutableMapping
 from dataclasses import fields, replace
 from pathlib import Path
@@ -260,10 +259,13 @@ def figure_card(svg: str, background: str, name: str) -> str:
     A figure more than three times as wide as tall keeps its height and scrolls inside the card."""
     root = re.search(r"<svg\b[^>]*>", svg)
     tag = root.group() if root else ""
-    attrs = {k: float(v) for k, v in re.findall(r'\s(width|height)="([\d.]+)(?:pt|px)?"', tag)}
+    attrs = {  # CSS px; matplotlib writes pt (4/3 px)
+        k: float(v) * (4 / 3 if unit == "pt" else 1)
+        for k, v, unit in re.findall(r'\s(width|height)="([\d.]+)(pt|px)?"', tag)
+    }
     extra = f' role="img" aria-label="Topology diagram of {html.escape(name, quote=True)}"'
     if attrs.get("height") and attrs.get("width", 0) / attrs["height"] > 3:
-        extra += f' style="width:auto;max-width:none;height:min(60vh,{attrs["height"]:g}px)"'
+        extra += f' style="width:auto;max-width:none;height:min(60vh,{attrs["height"]:.0f}px)"'
     if root:
         svg = svg[: root.start()] + "<svg" + extra + tag[4:] + svg[root.end() :]
     return f'<div class="fm-card" style="background:{html.escape(background, quote=True)}">{svg}</div>'
@@ -273,8 +275,19 @@ def figure_card(svg: str, background: str, name: str) -> str:
 STYLESHEET = """
 @media (min-width:640px) {[data-testid="stMainBlockContainer"] {padding:4rem 1.5rem 2rem}}
 .st-key-canvas .fm-card {border-radius:8px;padding:12px;overflow-x:auto}
-.st-key-canvas svg {display:block;width:100%;height:auto;max-height:80vh}
+.st-key-canvas .fm-card > svg {display:block;width:100%;height:auto;max-height:80vh}
 """
+
+
+def said(message: str, **kw) -> str:
+    """shown(message, **kw), but a bug message's closing request to report it keeps its link (outside the escaped,
+    shortened text, so a long exception text never cuts it away)."""
+    from foldmap.app_jobs import REPORT, REPORT_SENTENCE
+
+    if not message.endswith(REPORT_SENTENCE):
+        return shown(message, **kw)
+    link = REPORT.removeprefix("https://")
+    return shown(message[: -len(REPORT_SENTENCE)], **kw) + f" Please report it at [{link}]({REPORT})."
 
 
 def trouble(err: Exception) -> str:
@@ -427,7 +440,7 @@ def main() -> None:
         try:
             path = fetch(text, file, local=local_files())
         except ValueError as err:  # not an id, or the download failed
-            ss["load_error"] = shown(err)
+            ss["load_error"] = shown(err, paths=not local_files())
             return
         except OSError:  # an upload that could not be kept (a full disk): downloads fail as ValueError
             ss["load_error"] = "The file could not be stored on the server; try again."
@@ -440,7 +453,7 @@ def main() -> None:
                 message = f"{name} could not be read as a structure (mmCIF or PDB)"  # gemmi cannot read it
             else:
                 message = app_jobs.explain(err, name, lim)[0]
-            ss["load_error"] = shown(message, path=path, name=name)
+            ss["load_error"] = said(message, path=path, name=name, paths=not local_files())
             return
         if lim.max_residues and size["residues"] > lim.max_residues:
             ss["load_error"] = shown(app_jobs.size_message(name, size, lim))
@@ -457,7 +470,7 @@ def main() -> None:
                 app_jobs.remember_failure(str(path), settings, err)
             elif not isinstance(err, (ValueError, OSError, RuntimeError)):
                 _LOG.exception("drawing %s failed", name)
-            ss["load_error"] = shown(app_jobs.explain(err, name, lim)[0], path=path, name=name)
+            ss["load_error"] = said(app_jobs.explain(err, name, lim)[0], path=path, name=name, paths=not local_files())
             return
         local_path = local_files() and bool(text) and Path(text).expanduser().is_file()
         ss.update(
@@ -519,6 +532,7 @@ def main() -> None:
             ss["layout_error"] = str(err)
             return
         ss["layout_error"] = ""
+        ss.pop("last_changed", None)  # many settings at once: no one control to blame
         for key, value in settings.items():
             ss[key] = value
 
@@ -600,7 +614,7 @@ def main() -> None:
         hint = f" Check {control}." if control and not isinstance(err, app_jobs.JobLimit) else ""
         if hint and not message.rstrip().endswith((".", "!", "?")):  # the hint is a sentence of its own
             message = message.rstrip() + "."
-        return shown(message, path=path, name=name) + hint
+        return said(message, path=path, name=name, paths=not local_files()) + hint
 
     def figure_view():
         """The figure in its card; on a failure the error above the last good figure. Returns what fills the
@@ -613,9 +627,7 @@ def main() -> None:
             if failed is not None:
                 raise failed
             with status, st.spinner("Drawing…"):
-                t0 = time.perf_counter()
                 result = render(path, target)
-                wall = time.perf_counter() - t0
         except Exception as err:  # a pipeline bug too (logged for the server): the canvas keeps the last good figure
             if isinstance(err, app_jobs.JobLimit):
                 app_jobs.remember_failure(path, drawn, err)
@@ -631,8 +643,9 @@ def main() -> None:
                 na_chains=result["na_chains"],
                 all_chains=list(dict.fromkeys([*result["chains"], *result["na_chains"]])),
             )
-            if wall > lim.slow and ss.get("slow_noted") != path:  # the toggle is created later in this run
-                ss.update(auto_redraw=False, slow_noted=path, slow_seconds=wall)
+            slow = result["seconds"]  # the drawing itself, as at load (not the job's start-up or a cache hit)
+            if slow > lim.slow and ss.get("slow_noted") != path:  # the toggle is created later in this run
+                ss.update(auto_redraw=False, slow_noted=path, slow_seconds=slow)
         good = ss.get("last_good") or {}
         if good.get("path") != path:
             return None
@@ -685,7 +698,7 @@ def main() -> None:
         except (ValueError, OSError, RuntimeError) as err:
             st.error(problem(err))
             return None
-        page_bg = settings.get("background", "#ffffff")
+        page_bg = html.escape(settings.get("background", "#ffffff"), quote=True)
         st.markdown(
             f'<div style="background:{page_bg};border-radius:6px;padding:8px;overflow-x:auto">'
             f"{seq['svg'].decode()}</div>",

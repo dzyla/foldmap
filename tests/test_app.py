@@ -631,6 +631,23 @@ def test_only_the_active_view_is_built(monkeypatch):
     assert seq == [] and page == []
     at.segmented_control(key="pane").set_value("Sequence").run()
     assert not at.exception and len(seq) == 1 and page == []
+    at.segmented_control(key="pane").set_value("3D").run()
+    assert not at.exception and len(seq) == 1 and len(page) == 1
+
+
+def test_a_figure_setting_changed_in_another_view_draws_no_figure(monkeypatch):
+    from app_helpers import count_calls, fresh_caches
+    from foldmap import app_jobs
+
+    fresh_caches()
+    draws = count_calls(monkeypatch, app_jobs, "draw_job")
+    at = opened(DATA / "1UBQ.cif")
+    at.segmented_control(key="pane").set_value("Sequence").run()
+    drawn = len(draws)
+    at.selectbox(key="palette").select("tol-muted").run()
+    assert not at.exception and len(draws) == drawn
+    at.segmented_control(key="pane").set_value("Figure").run()
+    assert len(draws) == drawn + 1
 
 
 def test_a_failing_setting_keeps_the_last_figure_and_names_the_control():
@@ -669,6 +686,43 @@ def test_a_pipeline_crash_is_a_message_not_a_traceback(monkeypatch, caplog):
     assert text.startswith("foldmap could not draw this setting (IndexError: list index out of range).")
     assert "github.com/dzyla/foldmap/issues" in text and text.endswith(" Check Domains (Edit layout).")
     assert "Traceback" not in text and any(r.exc_info and r.name == "foldmap.app" for r in caplog.records)
+    assert "](https://github.com/dzyla/foldmap/issues)" in at.error[0].value  # a link, outside the escaped text
+
+
+def test_a_long_crash_message_keeps_the_report_link_and_the_hint(monkeypatch):
+    from app_helpers import fresh_caches
+    from foldmap import app_jobs
+
+    fresh_caches()
+    real = app_jobs.draw_job
+
+    def crash(path, settings_json, *a, **k):
+        if "N=res:A:1-60" in settings_json:
+            raise IndexError("x" * 600)
+        return real(path, settings_json, *a, **k)
+
+    monkeypatch.setattr(app_jobs, "draw_job", crash)
+    at = opened(DATA / "2LZM.cif")
+    at.text_area(key="domains").set_value("N=res:A:1-60").run()
+    text = at.error[0].value
+    assert not at.exception and "x" * 600 not in text
+    assert text.endswith(
+        " Please report it at [github.com/dzyla/foldmap/issues](https://github.com/dzyla/foldmap/issues)."
+        " Check Domains (Edit layout)."
+    )
+
+
+def test_local_mode_shows_the_visitors_own_path_in_full(monkeypatch, tmp_path):
+    """Locally the paths are the visitor's own (load, and a figure that fails); hosted they are cut to a name."""
+    monkeypatch.setenv("FOLDMAP_APP_LOCAL_FILES", "1")
+    at = load(app_test(), "/nowhere/missing.cif")
+    assert not at.exception and "/nowhere/missing.cif" in _visible(at.error[0].value)
+    junk = tmp_path / "family.fasta"
+    junk.write_text("not an alignment\n", encoding="utf-8")
+    at = opened(DATA / "1UBQ.cif")
+    at.session_state["msa_path"] = str(junk)
+    at.run()
+    assert not at.exception and _visible(at.error[0].value).startswith(f"{junk}: unknown alignment format")
 
 
 def test_a_slow_structure_turns_auto_redraw_off(monkeypatch):
@@ -687,6 +741,31 @@ def test_a_slow_structure_turns_auto_redraw_off(monkeypatch):
     assert svg_of(at) != before
 
 
+def test_a_slow_setting_turns_auto_redraw_off_after_a_fast_first_draw(monkeypatch):
+    from app_helpers import fresh_caches
+    from foldmap import app_jobs
+
+    fresh_caches()
+    real = app_jobs.draw_job
+
+    def slow_for_tol_muted(path, settings_json, *a, **k):
+        out = real(path, settings_json, *a, **k)
+        return {**out, "seconds": 9.5} if "tol-muted" in settings_json else out
+
+    monkeypatch.setattr(app_jobs, "draw_job", slow_for_tol_muted)
+    at = opened(DATA / "1UBQ.cif")
+    assert at.session_state["auto_redraw"] is True and "redraw" not in [b.key for b in at.button]
+    first = svg_of(at)
+    at.selectbox(key="palette").select("tol-muted").run()
+    slow = svg_of(at)
+    assert slow != first and at.session_state["auto_redraw"] is False  # the slow figure is shown, then auto stops
+    assert any(c.value.startswith("Auto-redraw is off for this structure: drawing took 9.5 s") for c in at.caption)
+    at.selectbox(key="palette").select("tol-bright").run()
+    assert svg_of(at) == slow
+    at.toggle(key="auto_redraw").set_value(True).run()  # back on: stays on for this structure
+    assert at.session_state["auto_redraw"] is True and svg_of(at) != slow
+
+
 def test_figure_card_is_accessible_and_scrolls_only_when_very_wide():
     from foldmap.app import figure_card
 
@@ -694,3 +773,15 @@ def test_figure_card_is_accessible_and_scrolls_only_when_very_wide():
     assert 'role="img"' in card and 'aria-label="Topology diagram of 1UBQ"' in card and "max-width:none" not in card
     wide = figure_card('<svg width="3000pt" height="500pt" viewBox="0 0 3000 500"></svg>', "#ffffff", "x")
     assert "max-width:none" in wide and 'class="fm-card"' in wide
+    assert "height:min(60vh,667px)" in wide  # 500 pt is 667 CSS px
+    assert "height:min(60vh,500px)" in figure_card('<svg width="3000px" height="500px"></svg>', "#fff", "x")
+    assert "background:#fff&quot;&gt;" in figure_card("<svg></svg>", '#fff">', "x")
+
+
+def test_a_layout_file_forgets_the_control_changed_last():
+    at = opened(DATA / "1UBQ.cif")
+    at.text_input(key="swap").input("α1").run()
+    assert at.session_state["last_changed"] == "swap"
+    up = ("layout.yaml", b"foldmap: 1\nlayout: {rotate: 30}\n", "application/x-yaml")
+    at.file_uploader(key="layout_upload").set_value(up).run()
+    assert not at.exception and "last_changed" not in at.session_state
