@@ -1376,6 +1376,26 @@ def test_the_app_downloads_at_most_100_mb_and_says_how_to_draw_more(monkeypatch,
     ]
 
 
+def test_a_layout_file_naming_server_files_shows_two_warnings_each_with_its_text(monkeypatch, tmp_path):
+    """The final review's etcpasswd.yaml, hosted: no alert is empty. The alignment's warning sits in the closed
+    Conservation & UniProt section (a browser's innerText reads "" for it while the section is closed: that was the
+    "empty alert" a probe reported); the names file's shows under the figure."""
+    monkeypatch.setenv("FOLDMAP_APP_LOCAL_FILES", "0")
+    seed_cache(monkeypatch, tmp_path, "1UBQ")
+    at = opened("1UBQ")
+    text = b"foldmap: 1\nstructure: /etc/passwd\ntheme: journal\nlayout: {msa: /etc/passwd}\n"
+    text += b"names: [/etc/passwd, deposited]\n"
+    at.file_uploader(key="layout_upload").set_value(("etcpasswd.yaml", text, "application/x-yaml")).run()
+    assert not at.exception and not at.error
+    alerts = [_visible(a.value) for kind in ("warning", "error", "info", "success") for a in getattr(at, kind)]
+    assert alerts == [
+        "The layout file's names file passwd is not on this machine; upload it under Edit layout.",
+        "The layout file's alignment passwd is not on this machine; upload it under Conservation & UniProt.",
+    ]
+    section = next(e for e in at.expander if e.label == "Conservation & UniProt")
+    assert [_visible(w.value) for w in section.warning] == [alerts[1]]
+
+
 def test_a_hosted_layout_download_names_uploads_by_their_own_names(monkeypatch, tmp_path):
     """Hosted, a layout file never carries the server's copy of an upload (names file, alignment): each is named as
     uploaded, and a comment asks for it to be attached."""
