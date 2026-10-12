@@ -1,11 +1,17 @@
 """The Streamlit app, driven headlessly: Start, load (drawn at once), share links, edit, download."""
 
+import re
 from pathlib import Path
 
 import pytest
 
 pytest.importorskip("streamlit")
 from app_helpers import DATA, app_test, load, opened, seed_cache, svg_of  # noqa: E402
+
+
+def _visible(text):
+    """What a reader sees of the app's Markdown-escaped text: escapes resolved, zero-width spaces gone."""
+    return re.sub(r"\\(.)", r"\1", text).replace("\u200b", "")
 
 
 def test_first_screen_asks_for_a_structure():
@@ -154,7 +160,7 @@ def test_an_upload_that_is_not_a_structure_names_no_server_path(monkeypatch):
     at.file_uploader(key="upload").set_value(("notes.pdb", b"just some notes\n", "chemical/x-pdb")).run()
     assert not at.exception and at.session_state["stage"] == "load"
     text = at.error[0].value
-    assert text == "notes: no protein residues with a complete backbone" and "uploads" not in text
+    assert _visible(text) == "notes: no protein residues with a complete backbone" and "uploads" not in text
 
 
 def test_app_offers_flip_for_the_membrane():
@@ -436,8 +442,8 @@ def test_a_giant_entry_is_refused_with_a_clear_message(monkeypatch):
     at = load(app_test(), DATA / "1UBQ.cif")
     assert at.session_state["stage"] == "load"
     text = at.error[0].value
-    assert text.startswith("1UBQ is too large for this app: 76 residues in 1 chain(s)")
-    assert "foldmap plot 1UBQ -o 1UBQ.svg" in text
+    assert _visible(text).startswith("1UBQ is too large for this app: 76 residues in 1 chain(s)")
+    assert "foldmap plot 1UBQ -o 1UBQ.svg" in _visible(text)
 
 
 def test_start_shows_the_credit_line():

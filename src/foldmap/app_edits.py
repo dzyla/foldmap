@@ -405,8 +405,12 @@ def row_source(rows: list[int], choices: list[tuple[str, str]]) -> str | None:
 
 
 # --------------------------------------------------------------------------------------------- shown text
-_PATH = re.compile(r"(?<![\w:/.~-])(?:~?/|[A-Za-z]:\\)[^\s'\"`<>|/\\]+(?:[/\\][^\s'\"`<>|/\\]*)*")
-_MARKDOWN = re.compile(r"([\\`*_\[\]<>#|~$])")
+_PATH = re.compile(r"(?<![\w:/.~-])(?:~?/|[A-Za-z]:\\|\\\\)[^\s'\"`<>|/\\]+(?:[/\\][^\s'\"`<>|/\\]*)*")
+_FILE_URL = re.compile(r"\bfile:/+", re.IGNORECASE)
+_MARKDOWN = re.compile(r"([\\`*_\[\]<>#|~$:=-])")
+_AUTOLINK = re.compile(
+    r"(?<=www)(?=\.)|(?=@)|(?<=:)(?=//)", re.IGNORECASE
+)  # where a zero-width space keeps GFM from linking
 
 
 def shown(text, limit: int = 400, path=None, name: str = "", paths: bool = True) -> str:
@@ -418,7 +422,7 @@ def shown(text, limit: int = 400, path=None, name: str = "", paths: bool = True)
     if path:
         text = text.replace(str(path), name)
     if paths:
-        text = _PATH.sub(lambda m: re.split(r"[/\\]", m.group().rstrip("/\\"))[-1], text)
+        text = _PATH.sub(lambda m: re.split(r"[/\\]", m.group().rstrip("/\\"))[-1], _FILE_URL.sub("/", text))
     if len(text) > limit:
         text = text[: limit - 1] + "…"
-    return _MARKDOWN.sub(r"\\\1", text).replace("](", "]\\(")
+    return _AUTOLINK.sub("​", _MARKDOWN.sub(r"\\\1", text).replace("](", "]\\("))

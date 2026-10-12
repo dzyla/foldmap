@@ -1,5 +1,7 @@
 """The app's structured controls write exactly the text the command line takes, and read it back."""
 
+import re
+
 import pytest
 
 from foldmap.app_edits import (
@@ -174,16 +176,40 @@ def test_a_failing_layout_option_names_its_control():
     assert control_for("something else", "not_a_setting") is None
 
 
+def _visible(text):
+    """What a reader sees of Markdown-escaped text: the escapes resolved, the zero-width spaces gone."""
+    return re.sub(r"\\(.)", r"\1", text).replace("\u200b", "")
+
+
 def test_shown_text_names_no_path_carries_no_markdown_and_is_short():
     from foldmap.app_edits import shown
 
     kept = "/home/someone/.cache/foldmap/uploads/upload-0123456789ab.cif"
-    assert shown(f"{kept}:1:0(0): expected block header", path=kept, name="bad") == "bad:1:0(0): expected block header"
+    text = shown(f"{kept}:1:0(0): expected block header", path=kept, name="bad")
+    assert _visible(text) == "bad:1:0(0): expected block header"
     text = shown("cannot open /srv/app/.cache/foldmap/x.cif or ~/.cache/y.cif (chain(s) A)")
-    assert text == "cannot open x.cif or y.cif (chain(s) A)"
+    assert _visible(text) == "cannot open x.cif or y.cif (chain(s) A)"
     crafted = shown("![x](https://example.invalid/p.png) [log in again](https://example.invalid) *b* `c` $x$ #h")
     assert "](" not in crafted and "![" not in crafted and "*b*" not in crafted and "$x$" not in crafted
-    assert shown("see https://github.com/dzyla/foldmap/issues.") == "see https://github.com/dzyla/foldmap/issues."
+    assert (
+        _visible(shown("see https://github.com/dzyla/foldmap/issues."))
+        == "see https://github.com/dzyla/foldmap/issues."
+    )
     assert shown("x" * 1000, limit=50) == "x" * 49 + "…"
-    assert shown("a/b and 1/2 and res:A:1-10 and α1") == "a/b and 1/2 and res:A:1-10 and α1"
-    assert shown("the alignment /nowhere/x.fasta", paths=False) == "the alignment /nowhere/x.fasta"
+    assert _visible(shown("a/b and 1/2 and res:A:1-10 and α1")) == "a/b and 1/2 and res:A:1-10 and α1"
+    assert _visible(shown("the alignment /nowhere/x.fasta", paths=False)) == "the alignment /nowhere/x.fasta"
+
+
+def test_shown_text_cannot_autolink_show_icons_or_headings_and_names_no_file_url():
+    """Bare URLs, www. and e-mail addresses are autolinked by GitHub-flavoured Markdown; a zero-width space breaks
+    each. ':' is escaped (no :material/…: icons, no :red[…]), '=' and '-' too (no setext headings). file:// URLs and UNC
+    paths are server paths like any other."""
+    from foldmap.app_edits import shown
+
+    for bare in ("http://evil.example/login", "www.evil.com", "a@b.com"):
+        out = shown(f"open {bare} now")
+        assert bare not in out and "\u200b" in out and _visible(out) == f"open {bare} now"
+    assert ":material/home:" not in shown("go :material/home: there")
+    assert "\n===" not in shown("Title\n===") and "\n---" not in shown("Title\n---")
+    assert _visible(shown("read file:///home/dzyla/x.cif and file:///C:/Users/me/y.cif")) == "read x.cif and y.cif"
+    assert _visible(shown("at \\\\server\\share\\z.cif")) == "at z.cif"
