@@ -29,8 +29,8 @@ alt="Topology of the lambda repressor dimer bound to its operator DNA">
 <tr>
 <td width="50%"><img src="https://raw.githubusercontent.com/dzyla/foldmap/main/docs/images/t4-lysozyme-domains.png" alt="T4 lysozyme with N- and C-lobe domain panels"><br>
 <sub><b>Domains.</b> T4 lysozyme (2LZM), journal theme: named domain panels, each kept together, elements in domain colours and a domain bar in residue order.</sub></td>
-<td width="50%"><img src="https://raw.githubusercontent.com/dzyla/foldmap/main/docs/images/measles-f-trimer.png" alt="Measles fusion protein trimer with one protomer highlighted"><br>
-<sub><b>Symmetry.</b> Measles F trimer (8UTF): C3 found, protomers drawn alike, one highlighted, disulfides and glycans marked.</sub></td>
+<td width="50%"><img src="https://raw.githubusercontent.com/dzyla/foldmap/main/docs/images/kcsa-c4.png" alt="KcsA potassium channel tetramer with one protomer highlighted"><br>
+<sub><b>Symmetry.</b> KcsA (1BL8): C4 found, the four protomers drawn alike, one highlighted, the K⁺ ions of the filter tethered to the chains that hold them.</sub></td>
 </tr>
 <tr>
 <td><img src="https://raw.githubusercontent.com/dzyla/foldmap/main/docs/images/bacteriorhodopsin-membrane.png" alt="Bacteriorhodopsin trimer in a membrane band"><br>
@@ -40,15 +40,21 @@ alt="Topology of the lambda repressor dimer bound to its operator DNA">
 </tr>
 <tr>
 <td><img src="https://raw.githubusercontent.com/dzyla/foldmap/main/docs/images/p53-alphafold.png" alt="p53 AlphaFold model coloured by pLDDT"><br>
-<sub><b>AlphaFold models.</b> p53 (AF-P04637), alphafold theme: elements, loops and tails in pLDDT confidence bands.</sub></td>
+<sub><b>AlphaFold models.</b> p53 (AF-P04637), alphafold theme: elements, loops and tails in pLDDT confidence bands; α1 moved clear of the core with <code>--move</code>.</sub></td>
 <td><img src="https://raw.githubusercontent.com/dzyla/foldmap/main/docs/images/ubiquitin-conservation.png" alt="Ubiquitin coloured by conservation"><br>
 <sub><b>Conservation.</b> Ubiquitin (1UBQ) coloured from an alignment of the ubiquitin-like family: weighted entropy, in ConSurf's colour scale.</sub></td>
 </tr>
 <tr>
-<td><img src="https://raw.githubusercontent.com/dzyla/foldmap/main/docs/images/tim-barrel-rainbow.png" alt="TIM barrel dimer coloured N to C"><br>
-<sub><b>Barrels.</b> Triosephosphate isomerase (1TIM), rainbow theme: each closed (βα)₈ barrel drawn as one βα row, each helix between the strands it joins, the first strand repeated as a ghost.</sub></td>
+<td><img src="https://raw.githubusercontent.com/dzyla/foldmap/main/docs/images/tim-barrel-rainbow.png" alt="TIM barrel chain A drawn as one beta-alpha row with strands named beta1 to beta8"><br>
+<sub><b>βα rows.</b> Triosephosphate isomerase (1TIM, chain A), rainbow theme, <code>--names beta</code>: the closed (βα)₈ barrel as one row, each helix between the strands it joins, opened between β8 and β1, β8 repeated as a ghost.</sub></td>
+<td><img src="https://raw.githubusercontent.com/dzyla/foldmap/main/docs/images/myoglobin-names.png" alt="Myoglobin with its helices named A to H"><br>
+<sub><b>Conventional names.</b> Myoglobin (1MBN), <code>--names deposited</code>: helices A–H as the file names them (a short helix it leaves unnamed keeps its generic α4), the heme tethered to the helices that hold it.</sub></td>
+</tr>
+<tr>
 <td><img src="https://raw.githubusercontent.com/dzyla/foldmap/main/docs/images/haemoglobin-hemes.png" alt="Haemoglobin tetramer with hemes"><br>
 <sub><b>Ligands.</b> Haemoglobin (2HHB): each heme placed beside, and tethered to, the helices that hold it.</sub></td>
+<td><img src="https://raw.githubusercontent.com/dzyla/foldmap/main/docs/images/gfp-chromophore.png" alt="Green fluorescent protein barrel with the chromophore starred"><br>
+<sub><b>Chromophores.</b> GFP (1EMA): the chromophore CRO66 kept in the chain and marked with a star; the 11-strand barrel closed by a ghost of strand H.</sub></td>
 </tr>
 <tr>
 <td><img src="https://raw.githubusercontent.com/dzyla/foldmap/main/docs/images/fima-richardson.png" alt="FimA pilin coloured by secondary structure type"><br>
@@ -63,8 +69,14 @@ alt="Topology of the lambda repressor dimer bound to its operator DNA">
 <sub><b>Cages.</b> Apoferritin (7A4M), 24 subunits: one chain in full, with the neighbours' α5 helices that line the four-fold channel.</sub></td>
 </tr>
 <tr>
-<td><img src="https://raw.githubusercontent.com/dzyla/foldmap/main/docs/images/ncrna-30qm.png" alt="DRT10 RT-ncRNA complex with six RNA stems drawn as ladders between the two protomers"><br>
-<sub><b>RNA folds.</b> DRT10 RT–ncRNA (30QM): six stems as ladders between the two RT protomers, contacts as beads.</sub></td>
+<td><img src="https://raw.githubusercontent.com/dzyla/foldmap/main/docs/images/trna-1ehz.png" alt="Yeast tRNA-Phe with its four arms as ladders, named acceptor, D, anticodon and T"><br>
+<sub><b>RNA folds.</b> tRNA-Phe (1EHZ), arms named from <code>docs/names/1EHZ-trna.yaml</code>: four stems as ladders with their loops and base letters, the tertiary pair marked by tie letters.</sub></td>
+<td><img src="https://raw.githubusercontent.com/dzyla/foldmap/main/docs/images/ncrna-30qm.png" alt="DRT10 RT-ncRNA complex with six RNA stems drawn as ladders under the two protomers"><br>
+<sub><b>RNA–protein complexes.</b> DRT10 RT–ncRNA (30QM): the 121-nt ncRNA's six stems (P1–P6) as ladders under the two RT protomers, contact beads in the colour of the chain that touches them.</sub></td>
+</tr>
+<tr>
+<td><img src="https://raw.githubusercontent.com/dzyla/foldmap/main/docs/images/lambda-hbonds.png" alt="Lambda repressor dimer on DNA with protein-DNA hydrogen bonds as dashed lines"><br>
+<sub><b>Hydrogen bonds.</b> λ repressor (1LMB), <code>--set hbonds=na --set hbond_max=16</code>: the 16 shortest of 30 protein–DNA hydrogen bonds as dashed lines.</sub></td>
 <td><img src="https://raw.githubusercontent.com/dzyla/foldmap/main/docs/images/nucleosome-1kx5.png" alt="Nucleosome core particle with the DNA as a chain of straight duplex pieces round the histones"><br>
 <sub><b>Bent DNA.</b> Nucleosome (1KX5): 146 base pairs in 22 straight pieces round the histones.</sub></td>
 </tr>
@@ -139,6 +151,7 @@ foldmap plot P04637 -o p53.svg --theme alphafold  # AlphaFold model, pLDDT colou
 foldmap sequence 1UBQ -o seq.svg --columns 50     # sequence with secondary structure
 foldmap sequence 1UBQ -o aln.svg --msa family.fasta
 foldmap interactive 8UTF -o explorer.html         # linked topology / 3D / contact map
+foldmap contacts 1LMB                             # check the contact beads against the atoms
 foldmap app                                       # the Streamlit app
 foldmap styles                                    # every theme and style key
 ```
@@ -147,21 +160,28 @@ foldmap styles                                    # every theme and style key
 
 - **Secondary structure** by a DSSP implementation that matches mkdssp 3.1.2 residue for residue on the test set:
   α-, 3₁₀- and π-helices (π before α, as in DSSP ≥ 2.1), β-strands with bulges, turns; β-sheets
-  with strand order and direction, closed barrels shown with a ghost of the first strand.
+  with strand order and direction, closed barrels shown with a ghost of the first strand. A helix kinked by more
+  than 30° is split into pieces drawn end to end; a strand that a bulge splits stays one strand when both pieces
+  pair with the same partner.
 - **Layout** from the 3D structure: elements projected onto the page, then arranged so sheets stay in order,
   contacting elements and disulfide partners stay close, and nothing overlaps; loops routed orthogonally around
-  elements and labels.
-- **Assemblies and symmetry**: biological assemblies are built from the file; cyclic, dihedral, cubic and helical
-  symmetry is detected and every protomer drawn alike; highlight one protomer or the asymmetric unit; filaments,
-  cages and large assemblies drawn as one subunit with the neighbouring parts that complete its fold.
-- **DNA and RNA as their fold**: base pairs (Watson–Crick and G·U) from the coordinates, stems, hairpins, junctions
-  and single strands placed beside the protein that holds them; bent duplexes as chains of straight pieces;
-  `na_style` `ladder` (default), `ribbon`, `block` or `letters`; `na_extent` `auto` crops RNA over 300 nt to the
-  stems the protein touches.
-- **Annotations**: disulfides, glycans (SNFG symbols, sialic acids included), ligands and metal ions, membrane bands,
-  named domain panels, residue numbers, marked elements.
-- **Colouring**: by chain, N→C, per-element shade, secondary-structure type, B-factor, hydropathy, AlphaFold pLDDT
-  or conservation from an alignment.
+  elements and labels. The layout is deterministic: the same figure on every machine.
+- **Fold conventions** of the published figures: all-parallel α/β sheets (TIM barrels, Rossmann folds) as one βα
+  row, conventional names (`--names`), helices drawn over the sheet they pack on (opt-in); see
+  [Conventions of the published figures](#conventions-of-the-published-figures).
+- **Assemblies and symmetry**: `--assembly auto` builds the file's first biological assembly when it adds copies
+  (up to 24 chains) or when the file holds several copies of one complex, and never one that leaves out the DNA or
+  RNA; cyclic, dihedral, cubic and helical symmetry is detected and every protomer drawn alike (two copies across a
+  dyad in the page as mirror images); highlight one protomer or the asymmetric unit; filaments, cages and large
+  assemblies drawn as one subunit with the neighbouring parts that complete its fold.
+- **DNA and RNA as their fold**: base pairs from the coordinates, stems, hairpins, pseudoknots, junctions and single
+  strands placed beside the protein that holds them; bent duplexes as chains of straight pieces; protein–DNA/RNA
+  hydrogen bonds on request; see [RNA and DNA](#rna-and-dna).
+- **Annotations**: disulfides, glycans (SNFG symbols, sialic acids included), ligands and metal ions, chromophores
+  and other residues fused into the chain (starred), membrane bands, named domain panels with a domain bar, residue
+  numbers, marked elements.
+- **Colouring**: by chain, N→C, per-element shade, secondary-structure type, domain, B-factor, hydropathy,
+  AlphaFold pLDDT or conservation from an alignment.
 
 ## Themes
 
@@ -184,9 +204,10 @@ Themes change only how things are drawn, never where. `foldmap styles` lists the
 Change any key with `--set KEY=VALUE` (repeatable) or a YAML file for `--style-file`. Commonly used keys:
 `color_by`, `palette`, `fill`, `loops`, `loop_color` (`residue` colours loops residue by residue),
 `residue_numbers`, `highlight` (`asu`, `protomer` or chains), `mark` (elements in a colour of their own),
-`ligands` (`auto`, `all`, `none` or codes like `HEM,ZN`), `na_backbone`, `backbone_colors`, `dna_color`, `rna_color`,
-`hbonds`, `hbond_color`, `hbond_max`, `disulfides`, `glycans`, `helices_310`, `na_extent`, `na_style`,
-`background`, `ink`, `helix_scale`, `strand_scale`, `font_scale` (`dna_extent` still works on the command line and in style and layout files).
+`ligands` (`auto`, `all`, `none` or codes like `HEM,ZN`), `fold_template`, `helix_on_sheet`, `domain_bar`,
+`domain_colours`, `na_backbone`, `backbone_colors`, `dna_color`, `rna_color`, `hbonds`, `hbond_color`, `hbond_max`,
+`disulfides`, `glycans`, `helices_310`, `na_extent`, `na_style`, `background`, `ink`, `helix_scale`,
+`strand_scale`, `font_scale` (`dna_extent` still works on the command line and in style and layout files).
 
 ## Shaping a figure
 
@@ -197,7 +218,11 @@ Change any key with `--set KEY=VALUE` (repeatable) or a YAML file for `--style-f
 | Rename an element | `--rename res:A:167-182=Gd` |
 | Conventional names | `--names deposited` (the file's helix ids, e.g. globin A–H), `--names beta` (β1…βn) or `--names docs/names/2HHB-globin.yaml` (repeatable) |
 | Highlight elements | `--set mark=α4=#2ca02c` |
-| Named domain panels | `--domain N-lobe=res:A:13-59` (repeatable) or `--domains auto` |
+| Named domain panels | `--domain N-lobe=res:A:13-59` (repeatable), `--domains auto` or `--domains uniprot` |
+| Domain colours and bar | `--set color_by=domain`, `--set domain_bar=on\|off`, `--set domain_colours=false` |
+| βα row | `--set fold_template=off` draws an all-parallel α/β sheet as projected |
+| Helices over a sheet | `--set helix_on_sheet=auto` (opt-in) |
+| Hydrogen bonds | `--set hbonds=na`, `interchain` or `chains:A+B`; `--set hbond_max=30` |
 | Only some chains | `--chains A,B` |
 | Large assemblies | `--focus auto\|none\|protomer\|B` (one subunit plus what its neighbours add to its fold) |
 | Membrane | `--membrane auto` (OPM dummy atoms if present, otherwise estimated); `--membrane flip` puts the other side on top |
@@ -250,12 +275,13 @@ foldmap plot 2ACY --set helix_on_sheet=auto -o acylphosphatase.svg
 **Domain colours and the domain bar.** When domains are named (`--domain`, `--domains auto` or `--domains uniprot`),
 elements are coloured by domain in eight colour-blind-safe tones. This replaces the default chain colouring
 (`domain_colours`, on by default); a theme with its own colouring (rainbow, conservation, ...) keeps it, and
-`--set color_by=domain` asks for the domain tones anyway. A linear bar under the figure shows each chain's domains in residue order, on one residue scale for
-every chain (`domain_bar`: `auto` draws it for 2 or more domains, `on` for any, `off` never). The print and blueprint
-themes keep their own palettes: greys with a hatch per domain, or the blueprint tints. `--set domain_colours=true`
-asks for the tones there. A domain's name sits at the top left of its panel, or at the top right when the left is
-taken. `docs/domains/` holds the `--domain` flags for Cas9 (4OO8, Nishimasu 2014 Fig 1A) and measles F (8UTF, Zyla 2024
-Fig 3A):
+`--set color_by=domain` asks for the domain tones anyway. A linear bar under the figure shows each chain's domains in
+residue order, on one residue scale for every chain (`domain_bar`: `auto` draws it for 2 or more domains, `on` for
+any, `off` never). The print and blueprint themes keep their own palettes: greys with a hatch per domain, or the
+blueprint tints. `--set domain_colours=true` asks for the tones there. A domain's name sits at the top left of its
+panel, or at the top right when the left is taken. Each domain is kept together, but when domains interleave in 3D
+(Cas9's RuvC parts, measles F's DI–DIII) their panels can overlap. `docs/domains/` holds the `--domain` flags for
+Cas9 (4OO8, Nishimasu 2014 Fig 1A) and measles F (8UTF, Zyla 2024 Fig 3A):
 
 ```bash
 foldmap plot 4OO8 --assembly 1 $(grep -v '^#' docs/domains/4OO8-cas9.txt) -o cas9.svg
@@ -268,20 +294,33 @@ element. It is marked with a star on the chain and the legend entry "chromophore
 
 **Mirrored dimers.** Two copies related by a two-fold axis lying in the page (λ repressor on its operator, 1LMB) are
 drawn as exact mirror images about that axis, names included. Other symmetric copies, and the unrolled cylinders of
-filaments, are drawn alike as before.
+filaments, are drawn alike.
 
 **Layout files.** `--save-layout fig.yaml` records everything that defines a figure: theme, style changes,
 layout options, domains and edits, with element references stored as residue ranges so they survive a new model.
 `foldmap plot model.cif --layout-file fig.yaml -o fig.svg` re-renders it; the command line overrides the file.
 
-**What the fold drawing shows.** Base pairs are found from the coordinates (Watson–Crick and G·U, with modified
-nucleotides paired by their parent base) and grouped into stems, named `P1`, `P2`, ... for RNA and `DNA 1`, ... for
-DNA. Each stem is placed as a rigid item beside the protein that holds it; a duplex that bends (nucleosome, IHF, TBP)
+### RNA and DNA
+
+DNA and RNA are drawn as their fold. Base pairs are found from the coordinates (Watson–Crick and G·U, with
+modified nucleotides paired by their parent base) and grouped into stems, named `P1`, `P2`, ... for RNA and `DNA 1`,
+... for DNA. Each stem is placed as a rigid item beside the protein that holds it; a duplex that bends (nucleosome, IHF, TBP)
 is cut where its axis turns by 25° into straight pieces placed end to end. Single strands, hairpin loops (as arcs)
 and the links between stems are routed like protein loops, with both ends marked 5′ and 3′, base letters, and contact
 beads in the colour of the protein chain that touches them. A nucleic acid with no pairs at all (a G-quadruplex, one
 strand on a protein) is drawn as a projected trace with letters. `foldmap summary` lists each stem with its base
 pairs and ranges, e.g. `P1  7 bp  1:1-7 · 1:112-118`.
+
+RNA stems are numbered by their nesting and lettered across internal loops (`P2a`, `P2b`); a stem that crosses a
+longer one is a pseudoknot, named `PK` (`PK1`, `PK2`, ... when there are several). A tertiary base pair outside the
+stems is marked at both ends by a tie letter (`a`…`a`). A chain break inside one molecule is drawn as a dashed gap
+labelled with the number of nucleotides left out, not as new 5′ and 3′ ends.
+
+```bash
+foldmap plot 1EHZ --names docs/names/1EHZ-trna.yaml -o trna.svg      # tRNA arms named acceptor, D, anticodon, T
+foldmap plot 30QM --set na_style=block -o 30qm.svg                   # stems as bars
+foldmap plot 1LMB --set hbonds=na --set hbond_max=16 -o 1lmb.svg     # protein–DNA hydrogen bonds
+```
 
 `na_style` chooses how stems are drawn (layout is unaffected): `ladder` (rails and base-pair rungs; the default),
 `ribbon` (a double helix; the `presentation` and `cartoon` themes), `block` (bars; `minimal` and `print`) or
@@ -322,6 +361,14 @@ checks every contact bead against the deposited atoms with an independent search
 drawn, verified, false, missing, unmatched, in the wrong colour or not on the first toucher, plus a line for each
 problem bead. It exits 0 when clean and 1 on any false, unmatched or wrong-colour bead; `-o fig.svg` also saves the
 figure.
+
+**Validation.** Thirty-nine DNA and RNA entries (tRNAs, riboswitches, ribozymes, CRISPR complexes, RNPs,
+polymerases, a ribosome, bent protein–DNA complexes, junctions and non-canonical structures) are drawn and scored
+by `scripts/na_validate.py`: base pairs and stems against RNApolis, the drawn layout against the 3D structure,
+contact beads against the atoms, and overlaps, crossings and text on the page. 33 of 39 pass every limit; each of
+the six that fail (30QM, 4PJO, 3KTQ, 4YBB, 1YTB, 3CRX) is explained with its cause in
+[docs/validation/na/review.md](docs/validation/na/review.md). The full table is in
+[docs/validation/na/report.md](docs/validation/na/report.md).
 
 ## UniProt annotation
 
@@ -372,7 +419,8 @@ Every figure (command line, app, MCP or Python) goes through the same steps:
    projected positions, short loops between sequence neighbours, attraction between elements in contact, a pull
    between disulfide-bonded cysteines, and an overlap penalty; then any remaining overlaps are cleared.
    Symmetry copies are tied to look identical (two copies across a dyad in the page as mirror images); an
-   all-parallel α/β sheet is placed as one βα row; stems are placed as rigid items.
+   all-parallel α/β sheet is placed as one βα row; stems are placed as rigid items. The optimiser is
+   deterministic, so a figure comes out the same on every machine.
 7. **Loops.** Each loop is routed on a grid with A* search: orthogonal lines that go around elements and labels;
    single strands are routed the same way, hairpin loops as arcs.
 8. **Drawing.** matplotlib draws the elements to scale (one helix turn tiled along each helix, arrows for
@@ -383,21 +431,26 @@ figure keeps its shape while you restyle it.
 
 ## App
 
-`foldmap app` opens a Streamlit app in the browser. It runs the same pipeline as the command line:
+`foldmap app` opens a Streamlit app in the browser. It runs the same pipeline as the command line.
 
-1. **Load**: type a PDB ID, a UniProt accession (the AlphaFold model) or a file path, upload a file, or pick an
-   example. A summary shows chains, residues, element counts and the symmetry found.
-2. **Pick a style**: previews of *your* structure in each theme; choose one to start from.
-3. **Edit**: every option sits in the sidebar (colours, loops, labels, features such as disulfides, glycans,
-   ligands and membranes, sizes and layout, symmetry and assembly, large-assembly focus, alignment upload). The
-   figure redraws as you change anything; results are cached, so switching back is instant.
-4. **Export**: the Figure tab downloads SVG, PNG (300 dpi), PDF and a layout file that recreates the figure; the
-   Sequence tab draws the sequence (or the uploaded alignment) with secondary structure on top; the Interactive
-   tab embeds the explorer page and downloads it as HTML.
+- **Start**: one box takes a PDB ID, a UniProt accession or, on your own machine, a file path; press Draw. An
+  accession lists its AlphaFold model and experimental structures (widest coverage first) to pick from. Examples
+  are one click, and a `.cif` or `.pdb` file can be dropped in.
+- **Workspace**: the top bar names the structure and switches between three views: Figure, Sequence (the sequence,
+  or an uploaded alignment, with secondary structure on top) and 3D (the interactive explorer). Only the chosen
+  view is drawn. The sidebar holds the theme and the options, in sections: Style, Show, Chains & assembly, Edit
+  layout, Conservation & UniProt and Layout file. A figure that takes over 4 s to draw turns automatic redrawing
+  off; press Redraw after your changes.
+- **Downloads**: the Download menu makes each file on demand from what was drawn: SVG, PNG (300 dpi), PDF and the
+  layout file for the figure, the sequence figure, and the 3D page as HTML.
+- **Share links**: a structure loaded by PDB ID or accession puts `?id=…&theme=…` in the address, so the link
+  opens the same structure in the same theme. Uploads and file paths never enter the link.
 
-Hosting the app for other people: set `FOLDMAP_APP_LOCAL_FILES=0` so the app accepts PDB IDs, UniProt accessions
-and uploads but never opens a file path on the server (including alignment paths in uploaded layout files).
-Uploads are kept in `~/.cache/foldmap/uploads` for a day.
+Hosting the app for other people: set `FOLDMAP_APP_LOCAL_FILES=0`. The app then accepts PDB IDs, UniProt
+accessions and uploads but never opens a file path on the server (including alignment paths in uploaded layout
+files), and each drawing runs in its own process within limits: 90 s, 2 GB of memory, structures up to 30,000
+residues, two drawings at a time. `FOLDMAP_APP_TIMEOUT`, `FOLDMAP_APP_MEMORY_MB`, `FOLDMAP_APP_MAX_RESIDUES` and
+`FOLDMAP_APP_JOBS` change them. Uploads are kept in `~/.cache/foldmap/uploads` for a day.
 
 ## MCP server for AI agents
 
