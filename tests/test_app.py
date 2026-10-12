@@ -480,3 +480,121 @@ def test_a_picked_table_row_is_the_structure_to_load():
     rows = [("AF-P07911-F1", "AlphaFold model"), ("1ABC", "X-ray")]
     assert picked_row({"selection": {"rows": [1], "columns": []}}, rows) == "1ABC"
     assert picked_row({"selection": {"rows": []}}, rows) is None and picked_row(None, rows) is None
+
+
+def test_a_hosted_upload_that_gemmi_refuses_names_no_server_path(monkeypatch):
+    from pathlib import Path as P
+
+    from app_helpers import rendered_text
+
+    monkeypatch.setenv("FOLDMAP_APP_LOCAL_FILES", "0")
+    for data in (b"garbage\n", b"data_a\n_cell.length_a 1\n_x\n"):
+        at = app_test()
+        at.run()
+        at.file_uploader(key="upload").set_value(("bad.cif", data, "chemical/x-cif")).run()
+        text = rendered_text(at)
+        assert not at.exception and at.session_state["stage"] == "load" and at.error
+        assert "uploads" not in text and str(P.home()) not in text and "pytest-of" not in text, text
+
+
+def test_crafted_ids_and_file_names_carry_no_markdown(monkeypatch):
+    from app_helpers import rendered_text
+
+    at = app_test()
+    at.query_params["id"] = "![x](https://example.invalid/p.png) [log in again](https://example.invalid)"
+    at.run()
+    assert [e.value for e in at.error] == ["The link's id is not a PDB ID or UniProt accession."]
+    assert "](" not in rendered_text(at) and "![" not in rendered_text(at)
+    monkeypatch.setenv("FOLDMAP_APP_LOCAL_FILES", "0")
+    for data in (b"garbage\n", (DATA / "1UBQ.cif").read_bytes()):
+        at = app_test()
+        at.run()
+        at.file_uploader(key="upload").set_value(("![x](http://e) [y](http://e).cif", data, "chemical/x-cif")).run()
+        assert not at.exception and at.error or at.session_state["stage"] == "edit"
+        assert "](" not in rendered_text(at) and "![" not in rendered_text(at)
+
+
+def test_an_upload_that_cannot_be_stored_says_so(monkeypatch):
+    import foldmap.fetch as fetch_mod
+
+    def full(*a, **k):
+        raise OSError(28, "No space left on device: /srv/secret")
+
+    monkeypatch.setattr(fetch_mod, "atomic_write", full)
+    at = app_test()
+    at.run()
+    at.file_uploader(key="upload").set_value(("ubq.cif", (DATA / "1UBQ.cif").read_bytes(), "chemical/x-cif")).run()
+    assert [e.value for e in at.error] == ["The file could not be stored on the server; try again."]
+
+
+def test_a_share_link_with_an_unknown_theme_opens_in_publication(monkeypatch, tmp_path):
+    seed_cache(monkeypatch, tmp_path, "1LMB")
+    at = app_test()
+    at.query_params["id"] = "1LMB"
+    at.query_params["theme"] = "nonsense"
+    at.run()
+    assert not at.exception and at.session_state["stage"] == "edit" and at.session_state["theme"] == "publication"
+    assert at.query_params["id"] == "1LMB" and at.query_params["theme"] == "publication"
+
+
+def test_an_app_made_link_opens_the_same_figure(monkeypatch, tmp_path):
+    seed_cache(monkeypatch, tmp_path, "1LMB")
+    at = app_test()
+    at.query_params["id"] = "1lmb"
+    at.query_params["theme"] = "journal"
+    at.run()
+    link = {k: at.query_params[k] for k in at.query_params}
+    assert link == {"id": "1LMB", "theme": "journal"}
+    again = app_test()
+    for k, v in link.items():
+        again.query_params[k] = v
+    again.run()
+    assert not again.exception and again.session_state["stage"] == "edit"
+    assert again.session_state["theme"] == "journal" and svg_of(again) == svg_of(at)
+    assert {k: again.query_params[k] for k in again.query_params} == link
+
+
+def test_a_capped_structure_is_never_drawn(monkeypatch):
+    from app_helpers import count_calls, fresh_caches
+    from foldmap import app_jobs
+
+    fresh_caches()
+    calls = count_calls(monkeypatch, app_jobs, "draw_job")
+    monkeypatch.setenv("FOLDMAP_APP_MAX_RESIDUES", "50")
+    at = load(app_test(), DATA / "1UBQ.cif")
+    assert at.session_state["stage"] == "load" and calls == []
+    monkeypatch.delenv("FOLDMAP_APP_MAX_RESIDUES")
+    at = load(app_test(), DATA / "1UBQ.cif")
+    assert at.session_state["stage"] == "edit" and len(calls) == 1
+
+
+def test_the_hosted_app_uses_the_hosted_size_cap(monkeypatch):
+    """No FOLDMAP_APP_MAX_RESIDUES: the cap comes from app_jobs.HOSTED because the app is hosted."""
+    from foldmap import app_jobs
+
+    monkeypatch.delenv("FOLDMAP_APP_MAX_RESIDUES", raising=False)
+    monkeypatch.setattr(app_jobs, "HOSTED", app_jobs.Limits(max_residues=50))  # in-process, small
+    upload = ("ubq.cif", (DATA / "1UBQ.cif").read_bytes(), "chemical/x-cif")
+    at = app_test()
+    at.run()
+    at.file_uploader(key="upload").set_value(upload).run()
+    assert at.session_state["stage"] == "edit"  # local: no cap
+    monkeypatch.setenv("FOLDMAP_APP_LOCAL_FILES", "0")
+    at = app_test()
+    at.run()
+    at.file_uploader(key="upload").set_value(upload).run()
+    assert at.session_state["stage"] == "load" and "too large for this app" in at.error[0].value
+
+
+def test_a_link_to_an_accession_lists_its_structures(monkeypatch):
+    import json
+
+    from foldmap import uniprot
+
+    e = uniprot.parse_entry(json.loads((DATA / "uniprot" / "P07911.json").read_text()))
+    monkeypatch.setattr(uniprot, "entry", lambda acc, cache_dir=None: e)
+    at = app_test()
+    at.query_params["id"] = "p07911"
+    at.run()
+    assert not at.exception and at.session_state["stage"] == "load" and not at.error
+    assert at.dataframe[0].value["id"].tolist()[0] == "AF-P07911-F1" and "id" not in at.query_params

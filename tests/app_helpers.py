@@ -73,3 +73,9 @@ def count_calls(monkeypatch, module, name) -> list:
     calls, real = [], getattr(module, name)
     monkeypatch.setattr(module, name, lambda *a, **k: (calls.append(1), real(*a, **k))[1])
     return calls
+
+
+def rendered_text(at) -> str:
+    """Every text the app put on the page (markdown, captions, callouts, headings, code), one per line."""
+    kinds = ("markdown", "caption", "error", "warning", "info", "success", "text", "title", "header", "subheader")
+    return "\n".join(str(e.value) for kind in (*kinds, "code") for e in getattr(at, kind))

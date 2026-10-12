@@ -402,3 +402,23 @@ def row_source(rows: list[int], choices: list[tuple[str, str]]) -> str | None:
     if not rows or not 0 <= rows[0] < len(choices):
         return None
     return choices[rows[0]][0]
+
+
+# --------------------------------------------------------------------------------------------- shown text
+_PATH = re.compile(r"(?<![\w:/.~-])(?:~?/|[A-Za-z]:\\)[^\s'\"`<>|/\\]+(?:[/\\][^\s'\"`<>|/\\]*)*")
+_MARKDOWN = re.compile(r"([\\`*_\[\]<>#|~$])")
+
+
+def shown(text, limit: int = 400, path=None, name: str = "", paths: bool = True) -> str:
+    """Text that came from a visitor or from an error (an id, a file name, a YAML key, an exception's message), made
+    safe to show in any Streamlit text element: the loaded file's `path` given as its `name`, any other absolute path
+    as its last part (paths=False keeps them: a path the visitor named on their own machine), at most `limit`
+    characters, and Markdown escaped, so it can neither link, embed nor style anything."""
+    text = str(text)
+    if path:
+        text = text.replace(str(path), name)
+    if paths:
+        text = _PATH.sub(lambda m: re.split(r"[/\\]", m.group().rstrip("/\\"))[-1], text)
+    if len(text) > limit:
+        text = text[: limit - 1] + "…"
+    return _MARKDOWN.sub(r"\\\1", text).replace("](", "]\\(")

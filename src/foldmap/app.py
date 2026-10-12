@@ -17,6 +17,7 @@ from dataclasses import fields, replace
 from pathlib import Path
 
 from foldmap import CREDIT
+from foldmap.app_edits import shown
 from foldmap.cli import _adjustments, _domain_spec
 from foldmap.fetch import ALIGNMENT_SUFFIXES, fetch, keep_upload, source_id
 from foldmap.render import save, save_svg
@@ -286,6 +287,7 @@ def apply_theme(ss: MutableMapping, name: str | None = None) -> None:
         ss.setdefault(key, copy.deepcopy(value))
 
 
+# interim: remove when the look widgets use persist_state="session" (Task 11)
 def keep_look(ss: MutableMapping) -> None:
     """Keep the theme and its style values while their widgets are not shown (the Start screen): the next structure
     is drawn in the visitor's look. Streamlit forgets a widget's value one run after the widget stops rendering,
@@ -314,12 +316,6 @@ def reset_structure(ss: MutableMapping) -> None:
         ss.pop(key, None)
     ss["auto_redraw"] = True
     ss["pane"] = "Figure"
-
-
-def unpathed(message: str, path, name: str) -> str:
-    """A message about the loaded file with its path on this machine given as the structure's name (an upload's
-    place in the server's cache is nobody's business)."""
-    return message.replace(str(path), name)
 
 
 def picked_row(table: dict | None, choices: list[tuple[str, str]]) -> str | None:
@@ -404,17 +400,24 @@ def main() -> None:
             apply_theme(ss, "publication")
         try:
             path = fetch(text, file, local=local_files())
-            name = name or source_id(text) or path.stem
+        except ValueError as err:  # not an id, or the download failed
+            ss["load_error"] = shown(err)
+            return
+        except OSError:  # an upload that could not be kept (a full disk): downloads fail as ValueError
+            ss["load_error"] = "The file could not be stored on the server; try again."
+            return
+        name = name or source_id(text) or path.stem
+        try:
             size = sized(str(path))
         except (ValueError, OSError, RuntimeError, app_jobs.JobLimit) as err:
-            unreadable = isinstance(err, (OSError, RuntimeError)) and not isinstance(err, app_jobs.JobFailed)
-            if unreadable:  # gemmi cannot read it (its text may hold a server path)
-                ss["load_error"] = f"{name or 'this file'} could not be read as a structure (mmCIF or PDB)"
+            if isinstance(err, (OSError, RuntimeError)) and not isinstance(err, app_jobs.JobFailed):
+                message = f"{name} could not be read as a structure (mmCIF or PDB)"  # gemmi cannot read it
             else:
-                ss["load_error"] = app_jobs.explain(err, name or text, lim)[0]
+                message = app_jobs.explain(err, name, lim)[0]
+            ss["load_error"] = shown(message, path=path, name=name)
             return
         if lim.max_residues and size["residues"] > lim.max_residues:
-            ss["load_error"] = app_jobs.size_message(name, size, lim)
+            ss["load_error"] = shown(app_jobs.size_message(name, size, lim))
             return
         reset_structure(ss)
         settings = settings_of(ss)
@@ -428,7 +431,7 @@ def main() -> None:
                 app_jobs.remember_failure(str(path), settings, err)
             elif not isinstance(err, (ValueError, OSError, RuntimeError)):
                 _LOG.exception("drawing %s failed", name)
-            ss["load_error"] = unpathed(app_jobs.explain(err, name, lim)[0], path, name)
+            ss["load_error"] = shown(app_jobs.explain(err, name, lim)[0], path=path, name=name)
             return
         local_path = local_files() and bool(text) and Path(text).expanduser().is_file()
         ss.update(
@@ -489,7 +492,7 @@ def main() -> None:
             if source_id(qid):
                 load(source_id(qid))
             else:
-                ss["load_error"] = f"{qid!r} in the link is not a PDB ID or UniProt accession"
+                ss["load_error"] = "The link's id is not a PDB ID or UniProt accession."
     desired = {"id": ss["share_id"], "theme": ss["theme"]} if ss["stage"] == "edit" and ss.get("share_id") else {}
     if st.query_params.to_dict() != desired:  # uploads and paths never enter the link
         st.query_params.from_dict(desired)
@@ -524,10 +527,10 @@ def main() -> None:
                 try:
                     rows = choices(acc)
                 except ValueError as err:
-                    st.caption(f"UniProt: {err}")
+                    st.caption(f"UniProt: {shown(err)}")
                 else:
                     if rows:
-                        st.caption(f"Structures of {acc} (UniProt): pick one to draw it.")
+                        st.caption(f"Structures of {shown(acc)} (UniProt): pick one to draw it.")
                         st.dataframe(
                             {"id": [r[0] for r in rows], "what": [r[1] for r in rows]},
                             key="uniprot_table",
@@ -536,7 +539,7 @@ def main() -> None:
                             hide_index=True,
                         )
                     else:
-                        st.caption(f"UniProt lists no structure or AlphaFold model for {acc}.")
+                        st.caption(f"UniProt lists no structure or AlphaFold model for {shown(acc)}.")
             st.caption(CREDIT)
         return
 
@@ -617,7 +620,7 @@ def main() -> None:
                 on_change=store_alignment,
             )
             if ss.get("msa_error"):
-                st.error(ss["msa_error"])
+                st.error(shown(ss["msa_error"]))
             st.text_input(
                 "Reference row", key="msa_reference", help="name of the structure's row (default: best match)"
             )
@@ -667,15 +670,16 @@ def main() -> None:
             )
         st.file_uploader("Load a layout file", type=["yaml", "yml"], key="layout_upload", on_change=apply_layout_file)
         if ss.get("layout_error"):
-            st.error(ss["layout_error"])
+            st.error(shown(ss["layout_error"]))
         if ss.get("msa_missing") and not ss.get("msa_path"):
             st.warning(
-                f"The layout file's alignment {ss['msa_missing']} is not on this machine; upload it under Alignment."
+                f"The layout file's alignment {shown(ss['msa_missing'], paths=False)} is not on this machine; "
+                "upload it under Alignment."
             )
         st.button("← another structure", key="new_structure", on_click=new_structure)
 
     settings, blob = settings_of(ss), current_blob(ss)
-    st.write(f"**{name}** · {ss.get('info', '')}")
+    st.write(f"**{shown(name, limit=80)}** · {shown(ss.get('info', ''))}")
     stem = name
     tab_fig, tab_seq, tab_live = st.tabs(["Figure", "Sequence", "Interactive"])
     with tab_fig:
@@ -687,12 +691,14 @@ def main() -> None:
         except (ValueError, OSError, RuntimeError, app_jobs.JobLimit) as err:
             if isinstance(err, app_jobs.JobLimit):
                 app_jobs.remember_failure(path, settings, err)
-            st.error(unpathed(app_jobs.explain(err, name, lim, ss.get("last_changed"))[0], path, name))
+            st.error(shown(app_jobs.explain(err, name, lim, ss.get("last_changed"))[0], path=path, name=name))
             return
         if result["fallback"]:
-            st.warning("No clear route for: " + ", ".join(result["fallback"]) + " (drawn as plain curves).")
+            st.warning(f"No clear route for: {shown(', '.join(result['fallback']))} (drawn as plain curves).")
         if result["over_labels"]:
-            st.warning(f"Drawn over a label or chain end (the only route found): {', '.join(result['over_labels'])}.")
+            st.warning(
+                f"Drawn over a label or chain end (the only route found): {shown(', '.join(result['over_labels']))}."
+            )
         page_bg = settings.get("background", "#ffffff")
         st.markdown(
             f'<div style="background:{page_bg};border-radius:6px;padding:8px">{result["svg"]}</div>',
@@ -708,7 +714,9 @@ def main() -> None:
             try:
                 data = app_jobs.figure_file(path, blob, ext, lim, eager)
             except (ValueError, OSError, RuntimeError, app_jobs.JobLimit) as err:
-                col.caption(f"{ext.upper()} unavailable: {app_jobs.explain(err, name, lim)[0]}")
+                col.caption(
+                    f"{ext.upper()} unavailable: {shown(app_jobs.explain(err, name, lim)[0], path=path, name=name)}"
+                )
             else:
                 col.download_button(label, data, f"{stem}.{ext}", mime, key=f"dl_{ext}")
         try:
@@ -723,7 +731,7 @@ def main() -> None:
                 key="dl_layout",
             )
         except (ValueError, OSError, RuntimeError) as err:
-            st.caption(f"Layout file unavailable: {app_jobs.explain(err, name, lim)[0]}")
+            st.caption(f"Layout file unavailable: {shown(app_jobs.explain(err, name, lim)[0], path=path, name=name)}")
     with tab_seq:
         c1, c2, c3 = st.columns(3)
         c1.slider("Columns per row", 20, 150, 60, step=5, key="seq_columns")
@@ -733,7 +741,7 @@ def main() -> None:
         try:
             seq = sequence(path, blob, json.dumps(view, sort_keys=True))
         except (ValueError, OSError, RuntimeError) as err:
-            st.error(app_jobs.explain(err, name, lim)[0])
+            st.error(shown(app_jobs.explain(err, name, lim)[0], path=path, name=name))
         else:
             page_bg = settings.get("background", "#ffffff")
             st.markdown(
@@ -749,7 +757,7 @@ def main() -> None:
         try:
             page = interactive(path, blob)
         except (ValueError, OSError, RuntimeError) as err:
-            st.error(app_jobs.explain(err, name, lim)[0])
+            st.error(shown(app_jobs.explain(err, name, lim)[0], path=path, name=name))
         else:
             st.download_button(
                 "Interactive page (HTML)", page.encode(), f"{stem}-explorer.html", "text/html", key="dl_html"

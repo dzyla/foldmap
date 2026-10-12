@@ -172,3 +172,18 @@ def test_a_failing_layout_option_names_its_control():
     assert control_for("domain 'N': 'A:1-60' is no element; ...", None) == "Domains (Edit layout)"
     assert control_for("something else", "ligands") == "Ligands and ions (Show)"
     assert control_for("something else", "not_a_setting") is None
+
+
+def test_shown_text_names_no_path_carries_no_markdown_and_is_short():
+    from foldmap.app_edits import shown
+
+    kept = "/home/someone/.cache/foldmap/uploads/upload-0123456789ab.cif"
+    assert shown(f"{kept}:1:0(0): expected block header", path=kept, name="bad") == "bad:1:0(0): expected block header"
+    text = shown("cannot open /srv/app/.cache/foldmap/x.cif or ~/.cache/y.cif (chain(s) A)")
+    assert text == "cannot open x.cif or y.cif (chain(s) A)"
+    crafted = shown("![x](https://example.invalid/p.png) [log in again](https://example.invalid) *b* `c` $x$ #h")
+    assert "](" not in crafted and "![" not in crafted and "*b*" not in crafted and "$x$" not in crafted
+    assert shown("see https://github.com/dzyla/foldmap/issues.") == "see https://github.com/dzyla/foldmap/issues."
+    assert shown("x" * 1000, limit=50) == "x" * 49 + "…"
+    assert shown("a/b and 1/2 and res:A:1-10 and α1") == "a/b and 1/2 and res:A:1-10 and α1"
+    assert shown("the alignment /nowhere/x.fasta", paths=False) == "the alignment /nowhere/x.fasta"
