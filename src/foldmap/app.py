@@ -282,6 +282,7 @@ STYLESHEET = """
 @media (min-width:640px) {[data-testid="stMainBlockContainer"] {padding:4rem 1.5rem 2rem}}
 .st-key-canvas .fm-card {border-radius:8px;padding:12px;overflow-x:auto}
 .st-key-canvas .fm-card > svg {display:block;width:100%;height:auto;max-height:80vh}
+.st-key-seq_options .st-key-seq_full {padding-top:2.25rem}
 """
 
 
@@ -364,6 +365,8 @@ def reset_structure(ss: MutableMapping) -> None:
         "last_good",
         "last_changed",
         "figure_failed",
+        "seq_drawn",
+        "page_drawn",
     ):
         ss.pop(key, None)
     ss["auto_redraw"] = True
@@ -490,7 +493,7 @@ def sequence_view(ws: Workspace) -> None:
     chains = ss.get("protein_chains") or []
     if ss.get("seq_chain") not in chains:  # the chain of another structure, or of other chain settings
         ss.pop("seq_chain", None)
-    with st.container(horizontal=True, vertical_alignment="bottom", key="seq_options"):
+    with st.container(horizontal=True, vertical_alignment="top", key="seq_options"):
         st.slider("Columns per row", 20, 150, 60, step=5, key="seq_columns", width=300, persist_state="session")
         st.segmented_control(
             "Element colours",
@@ -510,6 +513,7 @@ def sequence_view(ws: Workspace) -> None:
     except Exception as err:
         st.error(problem(ws, err))
         return
+    ss["seq_drawn"] = (ws.blob, view_json)  # what the Download popover offers
     with st.container(key="canvas"):
         background = json.loads(ws.blob).get("background", "#ffffff")
         st.markdown(
@@ -529,6 +533,7 @@ def explorer_view(ws: Workspace) -> None:
     except Exception as err:
         st.error(problem(ws, err))
         return
+    ss["page_drawn"] = ws.blob  # what the Download popover offers (from the same cache)
     size = len(page.encode("utf-8"))
     with st.container(key="explorer"):
         if size > app_jobs.PAGE_EMBED_MAX:
@@ -611,30 +616,39 @@ def sequence_downloads(path: str, blob: str, view_json: str, stem: str, lim: app
     ]
 
 
-def page_downloads(path: str, blob: str, stem: str, lim: app_jobs.Limits) -> list[Download]:
-    """The interactive page."""
-    page = partial(app_jobs.page_file, path, blob, lim)
-    return [Download("dl_html", "Interactive page", page, f"{stem}-explorer.html", "text/html")]
+def page_bytes(page: Callable[[str, str], str], path: str, blob: str) -> bytes:
+    """The interactive page as a file, from `page` (the app's cache, which holds the one the 3D view showed)."""
+    return page(path, blob).encode("utf-8")
 
 
-def figure_offered(ss: MutableMapping, path: str, blob: str) -> tuple[str, tuple | None, bool] | None:
-    """The figure the Download popover offers, as (settings JSON, eager files, whether it is the previous figure):
-    the one on screen (or, in another view, the one these settings draw); when these settings failed to draw, the
-    last good figure of this structure, else None."""
-    target = blob if ss.get("auto_redraw", True) else ss.get("drawn_blob", blob)
+def page_downloads(path: str, blob: str, stem: str, page: Callable[[str, str], str]) -> list[Download]:
+    """The interactive page the 3D view built (page: the app's page cache)."""
+    data = partial(page_bytes, page, path, blob)
+    return [Download("dl_html", "Interactive page", data, f"{stem}-explorer.html", "text/html")]
+
+
+PREVIOUS_NOTE = "These are the previous figure's files: the current settings do not draw."
+LAST_DRAWN_NOTE = "These are the files of the figure as last drawn; open the Figure view to draw your changes."
+
+
+def figure_offered(ss: MutableMapping, path: str, blob: str) -> tuple[str, tuple | None, str] | None:
+    """The figure the Download popover offers: always the last one drawn of this structure (last_good), as
+    (settings JSON, eager files, a note when it is not the figure of the current settings), else None."""
     good = ss.get("last_good") or {}
     if good.get("path") != path:
-        good = {}
+        return None
+    target = blob if ss.get("auto_redraw", True) else ss.get("drawn_blob", blob)
     if ss.get("figure_failed") == target:
-        return (good["blob"], good.get("files"), True) if good else None
-    return target, good.get("files") if good.get("blob") == target else None, False
+        note = PREVIOUS_NOTE
+    else:
+        note = LAST_DRAWN_NOTE if good["blob"] != target else ""
+    return good["blob"], good.get("files"), note
 
 
 def download_menu(ws: Workspace) -> None:
-    """The Download popover's body: the figure, sequence and 3D files (each built when clicked), what the formats
-    are for, and the share link."""
+    """The Download popover's body: the files of what each view drew (each made when clicked; a view not opened yet
+    offers none), what the formats are for, and the share link."""
     st, ss = ws.st, ws.ss
-    settings = json.loads(ws.blob)
 
     def buttons(files: list[Download]) -> None:
         with st.container(horizontal=True):
@@ -646,21 +660,21 @@ def download_menu(ws: Workspace) -> None:
     if offered is None:
         st.caption("Nothing to download until the figure draws.")
     else:
-        blob, eager, previous = offered
-        if previous:
-            st.caption("These are the previous figure's files: the current settings do not draw.")
+        blob, eager, note = offered
+        if note:
+            st.caption(note)
         buttons(figure_downloads(ws.path, blob, ws.name, ws.lim, eager))
-    view_json = sequence_json(ss)
-    for title, job, files in (
-        ("Sequence", "sequence", lambda: sequence_downloads(ws.path, ws.blob, view_json, ws.name, ws.lim)),
-        ("3D", "page", lambda: page_downloads(ws.path, ws.blob, ws.name, ws.lim)),
-    ):
-        st.markdown(f"**{title}**")
-        failed = app_jobs.known_failure(ws.path, settings, job, view_json if job == "sequence" else "")
-        if failed is not None:  # over a limit before: say so rather than try again on a click
-            st.caption(f"{title}: {problem(ws, failed)}")
-        else:
-            buttons(files())
+    st.markdown("**Sequence**")
+    if ss.get("seq_drawn"):
+        blob, view_json = ss["seq_drawn"]
+        buttons(sequence_downloads(ws.path, blob, view_json, ws.name, ws.lim))
+    else:
+        st.caption("Open the Sequence view to make this file.")
+    st.markdown("**3D**")
+    if ss.get("page_drawn"):
+        buttons(page_downloads(ws.path, ss["page_drawn"], ws.name, ws.page))
+    else:
+        st.caption("Open the 3D view to make this file.")
     st.caption(FORMATS_NOTE)
     if ss.get("share_id"):
         st.caption("Link to this figure")
@@ -923,9 +937,10 @@ def main() -> None:
                     label_visibility="collapsed",
                     persist_state="session",
                 )
-                with st.popover("Download", key="downloads"):
-                    download_menu(ws)
-                st.button("New structure", key="new_structure", type="tertiary", on_click=new_structure)
+                with st.container(horizontal=True, width="content"):  # wraps as one: never a lone button
+                    with st.popover("Download", key="downloads"):
+                        download_menu(ws)
+                    st.button("New structure", key="new_structure", type="tertiary", on_click=new_structure)
             if not ss["auto_redraw"]:
                 st.caption(
                     f"Auto-redraw is off for this structure: drawing took {ss.get('slow_seconds', 0.0):.1f} s. "

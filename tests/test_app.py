@@ -453,10 +453,13 @@ def test_the_look_carries_to_the_next_structure_and_its_parts_do_not():
     at.selectbox(key="theme").select("trace").run()
     at.slider(key="font_scale").set_value(1.4)
     at.text_input(key="mark").set_value("res:A:1-10=red").run()
-    at.text_input(key="swap").input("α1").run()  # a failing setting: the popover offers the last good figure
-    assert at.session_state["figure_failed"]
     at.segmented_control(key="pane").set_value("Sequence").run()
     at.selectbox(key="seq_chain").select("D").run()  # Sequence-view and names widgets of this structure
+    at.segmented_control(key="pane").set_value("3D").run()
+    assert at.session_state["seq_drawn"] and at.session_state["page_drawn"]  # what the views drew
+    at.segmented_control(key="pane").set_value("Figure").run()
+    at.text_input(key="swap").input("α1").run()  # a failing setting: the popover offers the last good figure
+    assert at.session_state["figure_failed"]
     at.session_state["names__kw"] = ["beta"]  # (Task 10)
     at.button(key="new_structure").click().run()
     assert at.session_state["stage"] == "load" and "id" not in at.query_params
@@ -466,7 +469,7 @@ def test_the_look_carries_to_the_next_structure_and_its_parts_do_not():
     assert not at.exception and ss["stage"] == "edit" and ss["name"] == "1UBQ"
     assert ss["theme"] == "trace" and ss["font_scale"] == 1.4 and ss["mark"] == ""
     assert "seq_chain" not in ss and "names__kw" not in ss and ss["auto_redraw"] is True
-    assert "figure_failed" not in ss and ss["pane"] == "Figure"
+    assert "figure_failed" not in ss and "seq_drawn" not in ss and "page_drawn" not in ss and ss["pane"] == "Figure"
     at.segmented_control(key="pane").set_value("Sequence").run()
     assert not at.exception and "seq_chain" not in [s.key for s in at.selectbox]
 
@@ -861,12 +864,14 @@ def test_sequence_and_3d_limits_are_remembered_apart_from_the_figure(monkeypatch
     at.segmented_control(key="pane").set_value("3D").run()
     assert not at.exception and _visible(at.error[0].value).startswith("1UBQ took longer than")
     assert sorted(k[1] for k in app_jobs.FAILED) == ["page", "sequence"]
-    assert any(_visible(c.value).startswith("Sequence: 1UBQ took longer than") for c in at.caption)  # popover
+    assert "dl_seq_svg" not in [b.key for b in at.download_button]  # nothing drawn: nothing to download
+    assert any(c.value == "Open the Sequence view to make this file." for c in at.caption)
     at.segmented_control(key="pane").set_value("Figure").run()
     assert not at.exception and not at.error and "<svg" in svg_of(at)
 
 
 def test_downloads_are_built_only_when_asked(monkeypatch):
+    """Each group offers what its view drew (nothing before the view was opened), as files made on a click only."""
     from app_helpers import count_calls, fresh_caches
     from foldmap import app_jobs
 
@@ -875,12 +880,41 @@ def test_downloads_are_built_only_when_asked(monkeypatch):
     seq = count_calls(monkeypatch, app_jobs, "sequence_job")
     page = count_calls(monkeypatch, app_jobs, "page_job")
     at = opened(DATA / "1UBQ.cif")
-    keys = {b.key for b in at.download_button}
-    assert keys == {"dl_svg", "dl_png", "dl_pdf", "dl_layout", "dl_seq_svg", "dl_seq_png", "dl_seq_pdf", "dl_html"}
+    figure = {"dl_svg", "dl_png", "dl_pdf", "dl_layout"}
+    assert {b.key for b in at.download_button} == figure
+    assert any(c.value == "Open the Sequence view to make this file." for c in at.caption)
+    assert any(c.value == "Open the 3D view to make this file." for c in at.caption)
     assert calls == [] and seq == [] and page == []
     at.segmented_control(key="pane").set_value("Sequence").run()
-    assert {b.key for b in at.download_button} == keys and calls == [] and page == []
+    assert len(seq) == 1  # the view's own figure (svg)
+    assert {b.key for b in at.download_button} == figure | {"dl_seq_svg", "dl_seq_png", "dl_seq_pdf"}
+    at.segmented_control(key="pane").set_value("3D").run()
+    assert len(page) == 1 and {b.key for b in at.download_button} == figure | {
+        "dl_seq_svg",
+        "dl_seq_png",
+        "dl_seq_pdf",
+        "dl_html",
+    }
+    at.segmented_control(key="pane").set_value("Figure").run()
+    assert calls == [] and len(seq) == 1 and len(page) == 1
     assert any(c.value.startswith("SVG: edit in Illustrator or Inkscape · PNG: slides and web") for c in at.caption)
+
+
+def test_downloads_offer_what_was_drawn():
+    """A figure setting changed in another view: the Figure files stay those of the figure drawn, and say so; the
+    sequence files are those of the sequence drawn, with its options."""
+    at = opened(DATA / "1UBQ.cif")
+    drawn = at.session_state["last_good"]["blob"]
+    at.segmented_control(key="pane").set_value("Sequence").run()
+    at.slider(key="seq_columns").set_value(80).run()
+    blob, view_json = at.session_state["seq_drawn"]
+    assert '"columns": 80' in view_json and blob == drawn
+    at.selectbox(key="palette").select("tol-muted").run()
+    ss = at.session_state
+    assert ss["last_good"]["blob"] == drawn and "tol-muted" in ss["seq_drawn"][0]
+    assert any(c.value.startswith("These are the files of the figure as last drawn") for c in at.caption)
+    at.segmented_control(key="pane").set_value("Figure").run()
+    assert not any(c.value.startswith("These are the files of the figure as last") for c in at.caption)
 
 
 def test_every_download_makes_its_whole_file():
@@ -891,11 +925,17 @@ def test_every_download_makes_its_whole_file():
     from foldmap.app import figure_downloads, page_downloads, sequence_downloads
 
     path, blob, lim = str(DATA / "1UBQ.cif"), json.dumps({"theme": "publication"}), app_jobs.Limits()
+    built = []  # the 3D page: the one the view built (its cache), not built again
+
+    def page(p, b):
+        built.append((p, b))
+        return app_jobs.page_job(p, b)
+
     view = json.dumps({"chain": "A", "columns": 30, "full_sequence": False, "ss_colour": "black"}, sort_keys=True)
     files = [
         *figure_downloads(path, blob, "1UBQ", lim),
         *sequence_downloads(path, blob, view, "1UBQ", lim),
-        *page_downloads(path, blob, "1UBQ", lim),
+        *page_downloads(path, blob, "1UBQ", page),
     ]
     names = {d.key: d.file_name for d in files}
     assert names == {
@@ -912,6 +952,7 @@ def test_every_download_makes_its_whole_file():
     for d in files:
         data = d.data()
         assert data.startswith(start[d.file_name.rsplit(".", 1)[1]]), d.key
+    assert built == [(path, blob)]
     assert b"columns: 30" not in files[4].data()  # the sequence file is the sequence figure, not the layout
     eager = (("pdf", b"%PDF eager"), ("png", b"\x89PNG eager"))
     kept = {d.key: d.data() for d in figure_downloads(path, blob, "x", lim, eager)}
@@ -951,8 +992,8 @@ def test_a_failing_setting_offers_the_last_good_figure():
     assert {"dl_svg", "dl_png", "dl_pdf", "dl_layout"} <= {b.key for b in at.download_button}
     assert any(c.value.startswith("These are the previous figure's files") for c in at.caption)
     ss = at.session_state
-    blob, eager, previous = figure_offered(ss, ss["path"], ss["figure_failed"])
-    assert blob == good and previous and eager is None
+    blob, eager, note = figure_offered(ss, ss["path"], ss["figure_failed"])
+    assert blob == good and note.startswith("These are the previous figure's files") and eager is None
     at.text_input(key="swap").input("").run()
     assert not at.error and not any(c.value.startswith("These are the previous") for c in at.caption)
 
@@ -962,11 +1003,13 @@ def test_figure_offered_is_the_figure_on_screen():
 
     files = (("pdf", b"%PDF"), ("png", b"\x89PNG"))
     ss = {"auto_redraw": True, "last_good": {"path": "p", "blob": "B1", "svg": "<svg/>", "files": files}}
-    assert figure_offered(ss, "p", "B1") == ("B1", files, False)  # drawn: its eager files come along
-    assert figure_offered(ss, "p", "B2") == ("B2", None, False)  # not drawn yet (another view): drawn on click
-    assert figure_offered({**ss, "figure_failed": "B2"}, "p", "B2") == ("B1", files, True)
+    assert figure_offered(ss, "p", "B1") == ("B1", files, "")  # drawn: its eager files come along
+    blob, eager, note = figure_offered(ss, "p", "B2")  # changed in another view, not drawn yet: the drawn one
+    assert (blob, eager) == ("B1", files) and note.startswith("These are the files of the figure as last drawn")
+    blob, eager, note = figure_offered({**ss, "figure_failed": "B2"}, "p", "B2")
+    assert (blob, eager) == ("B1", files) and note.startswith("These are the previous figure's files")
     assert figure_offered({**ss, "figure_failed": "B2"}, "q", "B2") is None  # nothing good of this structure
-    assert figure_offered({**ss, "auto_redraw": False, "drawn_blob": "B1"}, "p", "B2") == ("B1", files, False)
+    assert figure_offered({**ss, "auto_redraw": False, "drawn_blob": "B1"}, "p", "B2") == ("B1", files, "")
 
 
 def test_share_url_carries_id_and_theme_only():
