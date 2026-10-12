@@ -342,6 +342,8 @@ def _sheet_item(sheet: Sheet, frame: Frame, pitch: float = PITCH) -> _Item:
 
 
 _BA_GAP = 0.3  # page units between the footprints of neighbours in a βα template row
+_BA_MAX = 10  # strands: a longer parallel sheet (2BNH's 17-strand leucine-rich repeat) is no α/β barrel or Rossmann
+# sheet, and as one row it would run across the page
 _BA_SHARE = (3, 5)  # the template applies when at least this share of a sheet's βα units are in its row
 
 
@@ -397,12 +399,12 @@ def _open_at_ends(sheet: Sheet) -> Sheet:
 
 
 def _row_shape(sheet: Sheet) -> bool:
-    """Can the sheet be a βα row at all: all parallel, at least four strands, its order not a guess?"""
-    return len(sheet.strands) >= 4 and not sheet.ambiguous and all(k == "P" for k in sheet.pair_kinds)
+    """Can the sheet be a βα row at all: all parallel, four to _BA_MAX strands, its order not a guess?"""
+    return 4 <= len(sheet.strands) <= _BA_MAX and not sheet.ambiguous and all(k == "P" for k in sheet.pair_kinds)
 
 
 def template_applies(sheet: Sheet, sses: list[SSE]) -> bool:
-    """Is the sheet, on its own, drawn as a βα row (_ba_template)? An all-parallel sheet of at least four strands, its
+    """Is the sheet, on its own, drawn as a βα row (_ba_template)? An all-parallel sheet of 4 to _BA_MAX strands, its
     order not a guess, with at least 3/5 of its βα units in the row (1TIM: 7 of 7, 1LDM: 4 of 5). Mixed and
     antiparallel sheets never are. Pure: it changes nothing. Copies of a protein share the decision: see
     template_choices."""

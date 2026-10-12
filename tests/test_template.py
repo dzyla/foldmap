@@ -246,3 +246,18 @@ def test_open_at_ends_leaves_a_barrel_of_two_chains_as_it_is():
     one = Sheet([fake_sse("E", s, s + 4) for s in (30, 20, 10, 0, 50, 40)], [1] * 6, ["P"] * 5, closed=True)
     opened = _open_at_ends(one)  # first (0) and last (50) in sequence are neighbours in the ring: opened there
     assert [s.start for s in opened.strands] == [50, 40, 30, 20, 10, 0] and opened.closed
+
+
+@pytest.mark.parametrize("n, applies", [(10, True), (11, False)])
+def test_a_row_holds_at_most_ten_strands(n, applies):
+    """A parallel sheet of more than ten strands (2BNH, a 17-strand leucine-rich repeat solenoid) is no TIM or
+    Rossmann fold: as one row it ran across the whole page. It is drawn as projected."""
+    from foldmap.layout import _BA_MAX, template_applies
+    from foldmap.model import Sheet
+    from helpers import fake_sse
+
+    assert _BA_MAX == 10
+    strands = [fake_sse("E", 20 * k, 20 * k + 4) for k in range(n)]
+    helices = [fake_sse("H", 20 * k + 7, 20 * k + 16) for k in range(n - 1)]
+    sheet = Sheet(strands, [1] * n, ["P"] * (n - 1))
+    assert template_applies(sheet, sorted(strands + helices, key=lambda s: s.start)) is applies
