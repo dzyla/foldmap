@@ -495,3 +495,33 @@ def test_tie_letters_and_a_domain_bar_share_the_page():
     for a in ties:
         for b in bar:
             assert not boxes[id(a)].overlaps(boxes[id(b)]), (a.get_gid(), b.get_gid())
+
+
+def _name_overlaps(fig, name):
+    """What the drawn name of a domain lies on: elements, sheet plates and other domains' panels (gids)."""
+    from matplotlib.backends.backend_agg import FigureCanvasAgg
+
+    renderer = FigureCanvasAgg(fig).get_renderer()
+    ax = fig.axes[0]
+    (text,) = [t for t in ax.texts if t.get_gid() == f"domain-label:{name}"]
+    box = text.get_window_extent(renderer)
+    hits = []
+    for a in ax.patches:
+        gid = a.get_gid() or ""
+        if gid.startswith(("strand:", "helix:", "sheet-panel:", "eta:")) or (
+            gid.startswith("domain:") and gid != f"domain:{name}"
+        ):
+            if a.get_window_extent(renderer).overlaps(box):
+                hits.append(gid)
+    return hits
+
+
+def test_a_domain_name_takes_the_top_corner_clear_of_elements_and_other_panels():
+    """8UTF, one subunit with the docs domains: the DII panel's top left lies under a neighbour's grey strand (A′)
+    and its plate, so DII's name goes to the panel's top right, which is clear. A name whose top left is clear stays
+    there (ZPN, ZPC on 6ZS5)."""
+    kw = {"focus": "protomer", "domains": _flag_file(CAS9_FILE.parent / "8UTF-measles-F.txt")}
+    fig = make_figure(DATA / "8UTF.cif", **kw)
+    assert _name_overlaps(fig, "DII") == []
+    lay, _, _ = make_layout(UMOD, domains=DOMAINS)
+    assert lay.domain_name_right == set()

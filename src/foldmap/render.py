@@ -2257,7 +2257,7 @@ def _draw_membrane(c: _Canvas, layout: Layout) -> None:
 
 def _draw_domains(c: _Canvas, layout: Layout) -> None:
     """Named domains: a soft tinted panel each."""
-    for k, (name, ids) in enumerate(layout.domains):  # named domains: a soft tinted panel, name at top left
+    for k, (name, ids) in enumerate(layout.domains):  # named domains: a soft tinted panel, name at a top corner
         if not ids:
             continue
         x0, y0, x1, y1 = domain_panel(layout, name)
@@ -2275,11 +2275,12 @@ def _draw_domains(c: _Canvas, layout: Layout) -> None:
         )
         panel.set_gid(f"domain:{name}")
         c.ax.add_patch(panel)
+        right = name in layout.domain_name_right  # its top left is taken (layout._choose_domain_name_corners)
         t = c.ax.text(
-            x0 + 0.35,
+            x1 - 0.35 if right else x0 + 0.35,
             y1 - 0.3,
             name,
-            ha="left",
+            ha="right" if right else "left",
             va="top",
             fontsize=c.font * 1.05,
             fontweight="bold",

@@ -192,6 +192,7 @@ class Layout:
     nucleic: Nucleic | None = None
     sheets: list[list[str]] = field(default_factory=list)  # strand ids of each sheet block, in layout order
     domains: list[tuple[str, list[str]]] = field(default_factory=list)  # named domains and their element ids
+    domain_name_right: set[str] = field(default_factory=set)  # domains named at their panel's top right, not left
     na_paths: list = field(default_factory=list)  # route.NAPath: single strands as drawn (filled by route_loops)
     na_traces: dict = field(default_factory=dict)  # strand -> projected backbone (page units), for unpaired strands
     na_ends: list = field(default_factory=list)  # (strand, "5′" or "3′", label position), filled by route_loops
@@ -2277,6 +2278,7 @@ def build_layout(
     rects = np.vstack([rects, *[[domain_panel(lay, name)] for name, _ in lay.domains]]) if lay.domains else rects
     lay.na_cropped = na_cropped
     _choose_label_sides(lay, sses, style, mirrored)  # after naming: a name's length sets its box
+    _choose_domain_name_corners(lay, sses)  # after the element and stem names it keeps clear of
     rects = np.vstack([rects, [b for _, b in label_boxes(lay, sses)] or np.empty((0, 4))])
     lay.bounds = (
         float(rects[:, 0].min()),
@@ -2378,6 +2380,47 @@ def domain_panel(layout: Layout, name: str) -> tuple[float, float, float, float]
     r = np.array([layout.placed[k].rect for k in ids] + [g.rect for g in layout.ghosts if g.sse.id in ids])
     x0, y0, x1, y1 = r[:, 0].min(), r[:, 1].min(), r[:, 2].max(), r[:, 3].max()
     return (float(x0 - DOMAIN_PAD), float(y0 - DOMAIN_PAD), float(x1 + DOMAIN_PAD), float(y1 + DOMAIN_PAD + 0.6))
+
+
+def domain_name_box(layout: Layout, name: str) -> tuple[float, float, float, float]:
+    """The box a domain's name takes inside the top of its panel: at the left, or the right (domain_name_right)."""
+    x0, _, x1, y1 = domain_panel(layout, name)
+    width = 0.2 + _GLYPH_W * 1.1 * len(name)
+    lo, hi = y1 - 0.35 - _GLYPH_H * 1.1, y1 - 0.2
+    if name in layout.domain_name_right:
+        return (x1 - 0.25 - width, lo, x1 - 0.25, hi)
+    return (x0 + 0.25, lo, x0 + 0.25 + width, hi)
+
+
+_PLATE_PAD = 0.3  # a sheet's plate reaches this far beyond its strands (render._draw_sheet_panels)
+
+
+def _choose_domain_name_corners(layout: Layout, sses: list[SSE]) -> None:
+    """Each domain's name at the top left of its panel, unless the box there meets more of the figure than at the
+    top right: elements, ghosts, sheet plates, stems, unpaired strands, element and stem names, the other domains'
+    panels and the names placed before it. Ties keep the left."""
+    ghosts = {g.sse.id: g for g in layout.ghosts}
+    rects = [p.rect for p in [*layout.placed.values(), *layout.ghosts, *layout.stems]]
+    for ids in layout.sheets:
+        if len(ids) > 1:
+            r = np.array([layout.placed[i].rect for i in ids] + [ghosts[i].rect for i in ids if i in ghosts])
+            rects.append((*(r[:, :2].min(axis=0) - _PLATE_PAD), *(r[:, 2:].max(axis=0) + _PLATE_PAD)))
+    rects += [b for n, b in label_boxes(layout, sses) if n.startswith(("label:", "stem-label:"))]
+    traces = [np.asarray(pts, float).reshape(-1, 2) for _, pts in sorted(layout.na_traces.items())]
+    panels = {name: domain_panel(layout, name) for name, ids in layout.domains if ids}
+    named: list[tuple[float, float, float, float]] = []
+    for name in panels:
+        taken = [*rects, *(b for k, b in panels.items() if k != name), *named]
+        left = _box_hits(domain_name_box(layout, name), taken, traces)
+        layout.domain_name_right.add(name)
+        if _box_hits(domain_name_box(layout, name), taken, traces) >= left:
+            layout.domain_name_right.discard(name)
+        named.append(domain_name_box(layout, name))
+
+
+def _box_hits(box, rects, traces: list[np.ndarray]) -> int:
+    """How many of the rects the box overlaps, plus what it sits on of the unpaired strands (_trace_hits)."""
+    return sum(overlaps_any(box, [r]) for r in rects) + _trace_hits(box, traces)
 
 
 def provisional(sses: list[SSE]) -> Layout:
@@ -2706,15 +2749,9 @@ def label_boxes(layout: Layout, sses: list[SSE]) -> list[tuple[str, tuple[float,
     for n, tie in enumerate(layout.na_ties):  # a long tie's labels at its two marks
         for end, (_, _, (x, y)) in enumerate(tie.marks):
             out.append((f"tie-label:{n}:{end}", centred_box(x, y, _GLYPH_W / 2 + 0.05, _GLYPH_H / 2)))
-    for name, ids in layout.domains:  # a domain's name, top left inside its panel
+    for name, ids in layout.domains:  # a domain's name, top left (or right) inside its panel
         if ids:
-            x0, _, _, y1 = domain_panel(layout, name)
-            out.append(
-                (
-                    f"domain-label:{name}",
-                    (x0 + 0.25, y1 - 0.35 - _GLYPH_H * 1.1, x0 + 0.45 + _GLYPH_W * 1.1 * len(name), y1 - 0.2),
-                )
-            )
+            out.append((f"domain-label:{name}", domain_name_box(layout, name)))
     return out
 
 
