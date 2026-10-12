@@ -1732,15 +1732,15 @@ def _mirrored(angle: float) -> float:
     return float(-((angle - 2 * np.pi) % (2 * np.pi) - np.pi)) + 0.0  # + 0.0: never -0.0
 
 
-def _symmetry_ties(items: list[_Item], frame) -> dict[int, tuple[int, int]]:
+def _symmetry_ties(items: list[_Item], frame, mirror: bool = True) -> dict[int, tuple[int, int]]:
     """Copy item -> (its protomer-0 mate, protomer index k): matched by chain class and shared residue numbers.
     The copy also takes the mate's shape and orientation, so every protomer is drawn the same; in a frame with a
     mirror line (`mirror_x`, a dyad in the page) it takes them mirrored, protomer 1 drawn as protomer 0's mirror
-    image."""
+    image; `mirror` False takes them unmirrored all the same (build_layout drops a mirror line a βα row crosses)."""
     sector, classes = getattr(frame, "sector", None), getattr(frame, "classes", None)
     if not sector or not classes:
         return {}
-    mirror = getattr(frame, "mirror_x", None) is not None
+    mirror = mirror and getattr(frame, "mirror_x", None) is not None
 
     def residues(it):  # chains outside every protomer (bound peptides, unpaired chains) take no part
         return {
@@ -1771,14 +1771,28 @@ def _symmetry_ties(items: list[_Item], frame) -> dict[int, tuple[int, int]]:
                 return set()
             return {(classes[m.sse.chain], r) for r in range(m.sse.first.seq, m.sse.last.seq + 1)}
 
+        ghosts = [q for q, x in enumerate(mate.members) if x.ghost]
         pairs = [
-            max(
+            ghosts[0]  # a barrel's ghost takes the place of the mate's, whichever strand each repeats
+            if m.ghost and len(ghosts) == 1
+            else max(
                 range(len(mate.members)),
                 key=lambda q: (len(span(m) & span(mate.members[q])), mate.members[q].ghost == m.ghost),
             )
             for m in it.members
         ]
         if len(mate.members) == len(it.members) and sorted(pairs) == list(range(len(pairs))):
+            for m, q in zip(it.members, pairs):
+                if m.ghost:  # it repeats the strand that pairs with the one the mate's ghost repeats (a barrel seen
+                    # from its other face opened its row at the other end)
+                    m.sse = next(
+                        (
+                            x.sse
+                            for x, r in zip(it.members, pairs)
+                            if not x.ghost and mate.members[r].sse is mate.members[q].sse
+                        ),
+                        m.sse,
+                    )
             for m, q in zip(it.members, pairs):  # one-to-one: take the mate's shape member by member
                 a = mate.members[q].angle
                 m.angle, m.length = (_mirrored(a) if mirror else a), mate.members[q].length
@@ -1954,9 +1968,13 @@ def build_layout(
     ba_rows = [
         [m.sse.id for m in it.members if not m.ghost] for it in items if any(m.sse.kind == "H" for m in it.members)
     ]
+    mirror = getattr(frame, "mirror_x", None)  # a dyad in the page: protomer 1 drawn as protomer 0's mirror image
+    rows_x = [(it.cx + it.box[0], it.cx + it.box[2]) for it in items if any(m.sse.kind == "H" for m in it.members)]
+    if mirror is not None and any(x0 < mirror < x1 for x0, x1 in rows_x):
+        mirror = None  # a βα row across the mirror line would meet its own image: the copies go side by side instead
     by_id = {s.id: s for s in sses}
     bundles = helix_bundles([s for s in sses if s.id not in in_rows])  # bundles are coiled coils, never a row's
-    if getattr(frame, "mirror_x", None) is not None and getattr(frame, "sector", None):
+    if mirror is not None and getattr(frame, "sector", None):
         bundles = _within_protomers(bundles, by_id, frame.sector)
     bundled = {k for g in bundles for k in g}
     items += [_bundle_item([by_id[k] for k in g], frame, angle_mode, HELIX_W * style.helix_scale) for g in bundles]
@@ -1998,9 +2016,8 @@ def build_layout(
         rows = _stack(items, keep_depth)
         _centre_dna_over_binders(items, contacts)
     else:
-        ties = _symmetry_ties(items, frame)
+        ties = _symmetry_ties(items, frame, mirror is not None)
         spread, lift = 0.0, 0.0
-        mirror = getattr(frame, "mirror_x", None)
         if ties and mirror is not None:  # a dyad in the page: each copy starts at its mate's mirror image
             mirrored = [
                 (a, b) for i, (j, _) in sorted(ties.items()) for a, b in zip(items[i].members, items[j].members)
@@ -2014,7 +2031,7 @@ def build_layout(
             x1 = max(items[j].cx + items[j].box[2] for j in mates)
             # protomer k sits k spreads along: rightwards when the copies turn anticlockwise seen from the top
             # of the axis, leftwards for a left-handed filament (or an assembly turned over), as projected
-            period = getattr(frame, "period", 0.0)  # a CylinderFrame's; a Frame with ties always has a mirror line
+            period = getattr(frame, "period", 0.0)  # a CylinderFrame's; a Frame's (its mirror dropped) is 0
             spread = float(np.sign(period) or 1.0) * max(abs(period) * SCALE, x1 - x0 + 2 * MARGIN)
             lift = getattr(frame, "rise", 0.0) * SCALE
             for i, (j, k) in ties.items():

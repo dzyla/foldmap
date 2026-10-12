@@ -109,8 +109,8 @@ def test_separation_keeps_every_copy_where_its_mate_is(name, monkeypatch):
     seen = {}
     real = layout._symmetry_ties
 
-    def spy(items, frame):
-        seen["items"], seen["ties"] = items, real(items, frame)
+    def spy(items, frame, *rest):
+        seen["items"], seen["ties"] = items, real(items, frame, *rest)
         return seen["ties"]
 
     monkeypatch.setattr(layout, "_symmetry_ties", spy)

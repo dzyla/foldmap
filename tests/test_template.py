@@ -155,3 +155,46 @@ def test_template_barrel_opens_between_its_last_and_first_strand(path, kw):
             if lp.a_id in row or lp.b_id in row:
                 xs = [x for x, _ in lp.points]
                 assert max(xs) - min(xs) < 0.5 * (x1 - x0), (lp.a_id, lp.b_id)  # no loop over the whole row
+
+
+def test_a_template_row_across_the_mirror_line_takes_side_by_side_copies():
+    """1TIM seen with its dyad in the page (--up 0.927,0.051,-0.371): each protomer's row is wider than its half of
+    the page and straddles the mirror line, so mirroring lifted B's row 9.4 units over A's while B's free helices
+    stayed mirrored (Task 12 review). Such a figure drops the mirror: the protomers sit side by side, drawn alike."""
+    from foldmap.route import clip_len
+
+    lay, sses, bb = make_layout(DATA / "1TIM.cif", up=np.array([0.927, 0.051, -0.371]))
+    assert lay.frame.mirror_x is not None and len(lay.ba_rows) == 2
+    placed = list(lay.placed.values()) + lay.ghosts
+    assert not [
+        (a.sse.id, b.sse.id)
+        for i, a in enumerate(placed)
+        for b in placed[i + 1 :]
+        if min(a.rect[2], b.rect[2]) - max(a.rect[0], b.rect[0]) > 1e-6
+        and min(a.rect[3], b.rect[3]) - max(a.rect[1], b.rect[1]) > 1e-6
+    ]
+    loops = route_loops(lay, sses, bb)
+    for row in lay.ba_rows:
+        r = np.array([lay.placed[k].rect for k in row])
+        box = (r[:, 0].min(), r[:, 1].min(), r[:, 2].max(), r[:, 3].max())
+        chain = row[0].split(":")[0]
+        crossing = [
+            (lp.a_id, lp.b_id)
+            for lp in loops
+            if not lp.a_id.startswith(chain + ":")
+            and any(clip_len(p, q, box) > 1e-9 for p, q in zip(lp.points, lp.points[1:]))
+        ]
+        assert not crossing, (chain, crossing)
+    a, b = ([lay.placed[k] for k in row if lay.placed[k].sse.kind == "E"] for row in lay.ba_rows)
+    assert {round(p.cy, 6) for p in a} == {round(p.cy, 6) for p in b}  # side by side, at one height
+
+    # drawn alike: the same strands in the same order, and each ghost repeats the same strand (the rows were built
+    # from opposite faces, so they opened at opposite ends)
+    def ranks(row):
+        return [sorted(row, key=lambda p: p.sse.start).index(p) for p in sorted(row, key=lambda p: p.cx)]
+
+    assert ranks(a) == ranks(b)
+    ga, gb = sorted(lay.ghosts, key=lambda g: g.sse.chain)
+    assert sorted(a, key=lambda p: p.sse.start).index(lay.placed[ga.sse.id]) == sorted(
+        b, key=lambda p: p.sse.start
+    ).index(lay.placed[gb.sse.id])
