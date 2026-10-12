@@ -297,7 +297,7 @@ def make_layout(
     rows = (  # βα rows are rigid units: automatic domains never split one
         template_rows(sheets, sses, copies) if mode == "projected" and (look or Style()).fold_template == "auto" else []
     )
-    named = _domains(domains, sses, contacts, rows)
+    named = _domains(domains, sses, contacts, rows, copies, partial)
     for _, ids in named:  # a domain holds together: its elements pull on each other
         for a in range(len(ids)):
             for b in range(a + 1, len(ids)):
@@ -575,16 +575,17 @@ def _uniprot_domains(ann, sses) -> list[tuple[str, list[str]]]:
     return [(name, ids) for name, ids in out]
 
 
-def _domains(spec, sses, contacts, rows=()) -> list[tuple[str, list[str]]]:
-    """[(name, element ids)] from 'auto' (never splitting a βα row of `rows`) or [(name, [refs])]; every element in
-    at most one domain."""
+def _domains(spec, sses, contacts, rows=(), copies=None, lent=frozenset()) -> list[tuple[str, list[str]]]:
+    """[(name, element ids)] from 'auto' (chain by chain, copies of a protein (`copies`) alike, chains that only
+    lend elements (`lent`) in their mates' domains, never splitting a βα row of `rows`) or [(name, [refs])]; every
+    element in at most one domain."""
     from .features import auto_domains
     from .layout import provisional
 
     if not spec:
         return []
     if spec == "auto":
-        return auto_domains(sses, contacts, rows)
+        return auto_domains(sses, contacts, rows, copies, lent)
     if spec and all(
         isinstance(ids, list) and all(":" in i and "-" in i and not i.startswith("res:") for i in ids)
         for _, ids in spec

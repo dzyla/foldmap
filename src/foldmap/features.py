@@ -9,7 +9,7 @@ from collections import Counter
 import numpy as np
 from scipy.spatial import cKDTree
 
-from .model import SSE, Backbone, Sheet
+from .model import SSE, Backbone, Sheet, copy_classes, group_by_chain
 
 CONTACT_CUTOFF = 8.0  # Å between CA atoms
 MIN_CONTACT_PAIRS = 3  # CA pairs needed to call two elements neighbours
@@ -164,13 +164,55 @@ DOMAIN_MIN_SSE_RESIDUES = 30  # residues in helices/strands an automatic domain 
 
 
 def auto_domains(
-    sses: list[SSE], contacts: dict[frozenset[str], int], together: list[list[str]] = ()
+    sses: list[SSE],
+    contacts: dict[frozenset[str], int],
+    together: list[list[str]] = (),
+    copies: dict[str, tuple[str, int]] | None = None,
+    lent: set[str] = frozenset(),
 ) -> list[tuple[str, list[str]]]:
-    """Domains found as communities of the element contact graph (plus chain connectivity), named D1, D2...
-    in sequence order; [] when the protein reads as a single domain. A βα row of `together` (layout.template_rows,
-    drawn as one rigid unit) is never split: the communities holding its strands merge and its helices follow its
-    strands, so the row lies in one domain's panel (1LDM's Rossmann sheet: the contacts alone cut it in two and put
-    its α2 in the catalytic domain)."""
+    """Domains, chain by chain: each chain's split (_chain_domains), named D1, D2... in sequence order (with
+    " · chain" when several chains are split). Copies of one protein (`copies`, model.homolog_chains) share their
+    reference copy's split (model.copy_classes): each element joins the domain of its mate there, an element the
+    reference lacks the domain of the element before it (else after it) in its chain. Chains lending a few
+    elements to the drawn subunit (`lent`, focus mode) add them to their mates' domains instead of having their own.
+    [] when no chain reads as more than one domain."""
+    classes = copy_classes(sses, copies or {})
+    mine = group_by_chain(sses)
+    root = {c: (copies or {}).get(c, (c, 0))[0] for c in mine}
+    owner: dict[str, tuple[str, int]] = {}  # element -> (chain, its domain's number there)
+    for chain, els in mine.items():
+        if classes.reference.get(root[chain], chain) == chain:
+            for d, ids in enumerate(_chain_domains(els, contacts, together)):
+                owner.update({k: (chain, d) for k in ids})
+    for chain, els in mine.items():
+        if classes.reference.get(root[chain], chain) == chain:
+            continue
+        got = [owner.get(classes.mate[s.id]) for s in els]
+        if not any(got):
+            continue
+        for k, s in enumerate(els):
+            near = got[k] or next((g for g in reversed(got[:k]) if g), None) or next(g for g in got[k:] if g)
+            owner[s.id] = near if chain in lent else (chain, near[1])
+    groups: dict[tuple[str, int], list[str]] = {}
+    for s in sses:
+        if s.id in owner:
+            groups.setdefault(owner[s.id], []).append(s.id)
+    split = list(dict.fromkeys(chain for chain, _ in groups))
+    out = []
+    for chain in split:
+        for d in sorted(d for c, d in groups if c == chain):  # a copy's domains are numbered as its reference's
+            out.append((f"D{d + 1}" if len(split) == 1 else f"D{d + 1} · {chain}", groups[(chain, d)]))
+    return out
+
+
+def _chain_domains(sses: list[SSE], contacts: dict[frozenset[str], int], together=()) -> list[list[str]]:
+    """One chain's domains, in sequence order: communities of its element contact graph (plus chain connectivity),
+    each with at least DOMAIN_MIN_SSE_RESIDUES residues of elements (smaller ones fold into their best-connected
+    neighbour), when they split the chain clearly (modularity at least 0.3). A βα row of `together`
+    (layout.template_rows, drawn as one rigid unit) is never split: the communities holding its strands merge and
+    its helices follow its strands, so the row lies in one domain's panel (1LDM's Rossmann sheet: the contacts alone
+    cut it in two and put its α2 in the catalytic domain); what that leaves too small folds again (1TIM: a
+    10-residue domain of two helices). [] when the chain reads as a single domain."""
     import networkx as nx
 
     graph = nx.Graph()
@@ -180,33 +222,36 @@ def auto_domains(
         if a in graph and b in graph:
             graph.add_edge(a, b, weight=float(n))
     for a, b in zip(sses, sses[1:]):
-        if a.chain == b.chain:
-            w = graph.get_edge_data(a.id, b.id, {}).get("weight", 0.0)
-            graph.add_edge(a.id, b.id, weight=w + 1.0)
+        w = graph.get_edge_data(a.id, b.id, {}).get("weight", 0.0)
+        graph.add_edge(a.id, b.id, weight=w + 1.0)
     if graph.number_of_edges() == 0:
         return []
-    groups = [set(g) for g in nx.community.greedy_modularity_communities(graph, weight="weight")]
     size = {s.id: len(s) for s in sses}
-    while len(groups) > 1:  # a domain needs enough structure: fold the smallest into its best-connected neighbour
-        small = min(groups, key=lambda g: sum(size[k] for k in g))
-        if sum(size[k] for k in small) >= DOMAIN_MIN_SSE_RESIDUES:
-            break
-        groups.remove(small)
-        link = [sum(graph.get_edge_data(a, b, {}).get("weight", 0.0) for a in small for b in g) for g in groups]
-        groups[int(np.argmax(link))] |= small
-    groups = [sorted(g) for g in groups]
-    if len(groups) < 2:
-        return []
-    if nx.community.modularity(graph, groups, weight="weight") < 0.3:
+
+    def fold(groups: list[set[str]]) -> list[set[str]]:  # a domain needs enough structure: the smallest folds
+        groups = list(groups)  # into its best-connected neighbour
+        while len(groups) > 1:
+            small = min(groups, key=lambda g: sum(size[k] for k in g))
+            if sum(size[k] for k in small) >= DOMAIN_MIN_SSE_RESIDUES:
+                break
+            groups.remove(small)
+            link = [sum(graph.get_edge_data(a, b, {}).get("weight", 0.0) for a in small for b in g) for g in groups]
+            groups[int(np.argmax(link))] |= small
+        return groups
+
+    groups = fold(set(g) for g in nx.community.greedy_modularity_communities(graph, weight="weight"))
+    if len(groups) < 2 or nx.community.modularity(graph, [sorted(g) for g in groups], weight="weight") < 0.3:
         return []
     kind = {s.id: s.kind for s in sses}
     for keep in together:  # a βα row stays whole: its strands' communities merge, its helices follow its strands
         strands = {k for k in keep if kind.get(k) == "E"}
-        mine = [set(g) for g in groups if set(g) & strands]
-        rest = [set(g) - set(keep) for g in groups if not set(g) & strands]
-        groups = [sorted(g) for g in [*rest, set().union(*mine, keep)] if g]
+        if not strands:
+            continue
+        mine = [g for g in groups if g & strands]
+        rest = [g - set(keep) for g in groups if not g & strands]
+        groups = [g for g in [*rest, set().union(*mine, set(keep) & set(kind))] if g]
+    groups = fold(groups)
     if len(groups) < 2:
         return []
-    start = {s.id: (s.chain, s.start) for s in sses}
-    groups.sort(key=lambda g: min(start[k] for k in g))
-    return [(f"D{k}", g) for k, g in enumerate(groups, 1)]
+    start = {s.id: s.start for s in sses}
+    return sorted((sorted(g) for g in groups), key=lambda g: min(start[k] for k in g))

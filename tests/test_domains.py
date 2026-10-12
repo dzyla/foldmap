@@ -6,6 +6,7 @@ import numpy as np
 import pytest
 
 from foldmap.cli import main, make_figure, make_layout
+from helpers import FID
 
 DATA = Path(__file__).parent / "data"
 UMOD = DATA / "6ZS5.cif"
@@ -525,3 +526,46 @@ def test_a_domain_name_takes_the_top_corner_clear_of_elements_and_other_panels()
     assert _name_overlaps(fig, "DII") == []
     lay, _, _ = make_layout(UMOD, domains=DOMAINS)
     assert lay.domain_name_right == set()
+
+
+# ---------------------------------------------------------------------------------------------- auto, chain by chain
+
+
+def _auto_domains_alike(path, **kw):
+    """lay.domains of `path` with --domains auto, after checking that each domain lies in one chain, holds at
+    least DOMAIN_MIN_SSE_RESIDUES residues of elements, and that every copy of the protein (model.copy_classes)
+    has as many domains as its reference and each element in the domain its mate is in."""
+    from foldmap.features import DOMAIN_MIN_SSE_RESIDUES
+    from foldmap.io import load_backbone
+    from foldmap.model import copy_classes, homolog_chains
+
+    lay, sses, bb = make_layout(path, domains="auto", **kw)
+    by_id = {s.id: s for s in sses}
+    owner = {}
+    for name, ids in lay.domains:
+        assert len({by_id[k].chain for k in ids}) == 1, name
+        assert sum(len(by_id[k]) for k in ids) >= DOMAIN_MIN_SSE_RESIDUES, name
+        owner.update({k: name.split(" · ")[0] for k in ids})
+    classes = copy_classes(sses, homolog_chains(load_backbone(path, "auto")))
+    count = {c: len({owner[s.id] for s in sses if s.chain == c and s.id in owner}) for c in {s.chain for s in sses}}
+    for members in classes.groups.values():
+        assert len({count[c] for c in members}) == 1, count
+        for s in (s for s in sses if s.chain in members):
+            assert owner.get(s.id) == owner.get(classes.mate[s.id]) or classes.mate[s.id] == s.id, s.id
+    return lay
+
+
+def test_auto_domains_of_a_tetramer_lie_each_in_one_chain_and_copies_split_alike():
+    """1LDM: the domains were communities of the whole tetramer, three or four chains each. Now each chain is split
+    on its own (its reference copy's split shared by the others): every copy has the NAD-binding Rossmann domain and
+    the catalytic domain, named alike."""
+    lay = _auto_domains_alike(FID / "1LDM.cif.gz")
+    names = [name for name, _ in lay.domains]
+    assert len(names) == 8 and {n.split(" · ")[1] for n in names} == {"A1", "A2", "A3", "A4"}
+
+
+def test_auto_domains_fold_the_small_ones_after_the_ba_row_is_kept_whole():
+    """1TIM: merging the barrel's βα row left chain A a 10-residue D2 (two short helices) and chain B none. The
+    smallest domains are folded after the merge now, so neither chain is split: a TIM barrel is one domain."""
+    lay = _auto_domains_alike(DATA / "1TIM.cif")
+    assert lay.domains == []
