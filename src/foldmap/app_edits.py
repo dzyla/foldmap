@@ -156,6 +156,7 @@ EDITORS = {
     "mark": ("element", "colour"),
     "domains": ("name", "ranges"),
 }
+NEEDED = {"swap": ("a", "b")}  # a table row is written once these cells are filled (else its first column)
 _RANGE_IN_CHAIN = re.compile(r"[A-Za-z0-9]+:-?\d+[A-Z]?(--?\d+[A-Z]?)?")
 _RANGE = re.compile(r"-?\d+[A-Z]?(--?\d+[A-Z]?)?")
 
@@ -244,22 +245,33 @@ def text_of(kind: str, rows: list[dict]) -> str:
     return {"mark": ", ", "domains": "\n"}.get(kind, "; ").join(items)
 
 
+def table_rows(ss: MutableMapping, kind: str) -> list[dict]:
+    """The rows an editor's table shows: its text's rows, then the rows not filled in yet (NEEDED cells empty: a
+    row just added, a swap with one element picked), which are not written to the text: they wait in
+    `<kind>__blank`."""
+    return rows_of(kind, ss.get(kind, "")) + [dict(row) for row in ss.get(f"{kind}__blank") or []]
+
+
 def apply_table(ss: MutableMapping, kind: str) -> None:
     """Apply a data editor's edits (`{"edited_rows", "added_rows", "deleted_rows"}`, indices into the rows it was
-    given) to the editor's text. The version moves on, so the next run builds a new editor key and the same delta
-    is never applied twice."""
+    given: table_rows) to the editor's text; rows not filled in yet stay in `<kind>__blank` (the add-row button
+    sends an empty row at once, and a half-made swap would be an error). The version moves on, so the next run
+    builds a new editor key and the same delta is never applied twice."""
     ver = ss.get(f"{kind}__ver", 0)
     delta = ss.get(f"{kind}__table_{ver}")
     if delta is None:
         return
-    rows = rows_of(kind, ss.get(kind, ""))
+    rows = table_rows(ss, kind)
     for i, change in (delta.get("edited_rows") or {}).items():
         if 0 <= int(i) < len(rows):
             rows[int(i)].update(change)
     gone = {int(i) for i in delta.get("deleted_rows") or []}
     rows = [r for i, r in enumerate(rows) if i not in gone]
     rows += [{c: added.get(c, "") for c in EDITORS[kind]} for added in delta.get("added_rows") or []]
-    ss[kind] = text_of(kind, rows)
+    needed = NEEDED.get(kind, EDITORS[kind][:1])
+    filled = [all(_cell(row.get(c)) for c in needed) for row in rows]
+    ss[f"{kind}__blank"] = [row for row, done in zip(rows, filled) if not done]
+    ss[kind] = text_of(kind, [row for row, done in zip(rows, filled) if done])
     ss[f"{kind}__ver"] = ver + 1
     ss["last_changed"] = kind
 

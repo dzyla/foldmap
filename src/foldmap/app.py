@@ -17,7 +17,15 @@ from dataclasses import fields, replace
 from pathlib import Path
 
 from foldmap import CREDIT, app_jobs
-from foldmap.app_controls import chains_section, prepare, setting, show_section, style_section, touched
+from foldmap.app_controls import (
+    chains_section,
+    layout_section,
+    prepare,
+    setting,
+    show_section,
+    style_section,
+    touched,
+)
 from foldmap.app_edits import chain_choices, shown
 from foldmap.app_views import Workspace, download_menu, explorer_view, figure_view, said, sequence_view
 from foldmap.cli import _adjustments, _domain_spec
@@ -399,6 +407,7 @@ def reset_structure(ss: MutableMapping) -> None:
 
     for kind in EDITORS:  # a new table key: no edit of the last structure's table is applied to this one
         ss[f"{kind}__ver"] = ss.get(f"{kind}__ver", 0) + 1
+        ss.pop(f"{kind}__blank", None)  # nor its rows added but not filled in
     for key in (
         *STRUCTURE_WIDGETS,
         "drawn_blob",
@@ -692,29 +701,14 @@ def main() -> None:
     {"Figure": figure_view, "Sequence": sequence_view, "3D": explorer_view}[ss["pane"]](ws)  # only this view
     top_bar()
 
-    # ---- sidebar: the essentials, then six sections (Tasks 8-11 replace the interim expanders)
+    # ---- sidebar: the essentials, then six sections (Tasks 10-11 finish the interim ones)
     with st.sidebar:
         essentials(st, ss)
         with st.container(gap="xxsmall", key="sections"):
             style_section(st, ss)
             show_section(st, ss)
             chains_section(st, ss)
-            with st.expander("Sizes and layout"):  # interim: Task 9's Edit layout
-                st.selectbox("Mode", ["projected", "stack"], **tracked("mode"))
-                st.slider("Helix size", 0.5, 2.0, step=0.05, **tracked("helix_scale"))
-                st.slider("Strand size", 0.5, 2.0, step=0.05, **tracked("strand_scale"))
-                st.slider("DNA size", 0.5, 2.0, step=0.05, **tracked("dna_scale"))
-                st.slider("Rotate (°)", -180.0, 180.0, step=0.5, **tracked("rotate"))
-                st.text_input("Swap", help="two elements, e.g. α1,α3 (several: separate with ;)", **tracked("swap"))
-                st.text_input("Move", help="e.g. α2=1,-2 (page units)", **tracked("move"))
-                st.text_input("Rename", help="e.g. res:167-182=Gd", **tracked("rename"))
-                st.text_input("Mark elements", help="e.g. G, A:G=#2ca02c, #3, res:150-159=red", **tracked("mark"))
-                st.text_area(
-                    "Domains",
-                    height=80,
-                    help="one per line, NAME=REF[,REF...], e.g. ZPN=res:A:331-440; or just 'auto'",
-                    **tracked("domains"),
-                )
+            layout_section(st, ss)
             with st.expander("Conservation & UniProt"):  # interim: Task 11 finishes this section
                 st.file_uploader(
                     "Multiple sequence alignment or ConSurf grades table",

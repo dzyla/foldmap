@@ -1,17 +1,12 @@
 """The Streamlit app, driven headlessly: Start, load (drawn at once), share links, edit, download."""
 
-import re
 from pathlib import Path
 
 import pytest
 
 pytest.importorskip("streamlit")
-from app_helpers import DATA, app_test, load, opened, seed_cache, svg_of  # noqa: E402
-
-
-def _visible(text):
-    """What a reader sees of the app's Markdown-escaped text: escapes resolved, zero-width spaces gone."""
-    return re.sub(r"\\(.)", r"\1", text).replace("\u200b", "")
+from app_helpers import DATA, app_test, as_text, load, opened, seed_cache, svg_of  # noqa: E402
+from app_helpers import visible as _visible  # noqa: E402
 
 
 def test_first_screen_asks_for_a_structure():
@@ -36,14 +31,6 @@ def test_picking_a_theme_redraws_with_it():
     assert not at.exception and at.session_state["loop_arrows"] is True and "<svg" in svg_of(at)
 
 
-def test_mode_control_redraws():
-    """The mode half of test_controls_change_the_figure (its residue-numbers half is in test_app_controls.py);
-    Task 9 restates it as test_layout_mode_and_sizes."""
-    at = opened(DATA / "1UBQ.cif")
-    at.selectbox(key="mode").select("stack").run()
-    assert not at.exception and "<svg" in svg_of(at)
-
-
 def test_nucleic_acid_style_control_redraws_the_stems():
     """Was a selectbox; now the segmented "Stems" in Show."""
     from foldmap.style import CHOICES
@@ -63,9 +50,8 @@ def test_bad_input_is_reported_not_raised():
 
 
 def test_layout_errors_are_shown_in_the_editor():
-    at = load(app_test(), DATA / "2LZM.cif")
-    at.text_input(key="swap").input("α1")  # one element: not a swap
-    at.run()
+    at = opened(DATA / "2LZM.cif")
+    as_text(at, "swap", "α1")  # one element: not a swap
     assert not at.exception and any("swap" in e.value for e in at.error)
 
 
@@ -251,9 +237,10 @@ def test_app_layout_file_options_without_a_control_do_not_carry_to_the_next_stru
 
 def test_app_edits_of_one_structure_do_not_carry_to_the_next():
     at = load(app_test(), DATA / "2HHB.cif")
-    at.text_input(key="rename").set_value("res:B:1-10=Zz")
+    as_text(at, "rename", "res:B:1-10=Zz")
     at.multiselect(key="chains__pick").set_value(["B", "D"]).run()
-    assert not at.exception and not at.error
+    ss = at.session_state
+    assert not at.exception and not at.error and ss["rename"] == "res:B:1-10=Zz" and ss["rename__as_text"] is True
     at.button(key="new_structure").click().run()
     at.text_input(key="source").input(str(DATA / "1UBQ.cif"))
     at.button(key="load").click().run()
@@ -301,7 +288,7 @@ def test_app_pruned_upload_is_a_message_not_a_traceback():
     kept = Path(at.session_state["path"])
     assert kept.is_file()
     kept.unlink()  # a long hosted session: the upload was pruned
-    at.selectbox(key="mode").select("stack").run()
+    at.segmented_control(key="mode").set_value("stack").run()
     assert not at.exception
     assert any("load it again" in e.value and str(kept.parent) not in e.value for e in at.error)
 
@@ -451,13 +438,13 @@ def test_the_look_carries_to_the_next_structure_and_its_parts_do_not():
     at = opened(DATA / "2HHB.cif")
     at.selectbox(key="theme").select("trace").run()
     at.slider(key="font_scale").set_value(1.4)
-    at.text_input(key="mark").set_value("res:A:1-10=red").run()
+    as_text(at, "mark", "res:A:1-10=red")
     at.segmented_control(key="pane").set_value("Sequence").run()
     at.selectbox(key="seq_chain").select("D").run()  # Sequence-view and names widgets of this structure
     at.segmented_control(key="pane").set_value("3D").run()
     assert at.session_state["seq_drawn"] and at.session_state["page_drawn"]  # what the views drew
     at.segmented_control(key="pane").set_value("Figure").run()
-    at.text_input(key="swap").input("α1").run()  # a failing setting: the popover offers the last good figure
+    as_text(at, "swap", "α1")  # a failing setting: the popover offers the last good figure
     assert at.session_state["figure_failed"]
     at.session_state["names__kw"] = ["beta"]  # (Task 10)
     at.button(key="new_structure").click().run()
@@ -653,7 +640,7 @@ def test_a_figure_setting_changed_in_another_view_draws_no_figure(monkeypatch):
 def test_a_failing_setting_keeps_the_last_figure_and_names_the_control():
     at = opened(DATA / "2LZM.cif")
     before = svg_of(at)
-    at.text_input(key="swap").input("α1").run()  # one element: not a swap (Task 9: as_text)
+    as_text(at, "swap", "α1")  # one element: not a swap
     assert not at.exception
     assert any("swap" in e.value and "Check Swap (Edit layout)." in e.value for e in at.error)
     assert any(_visible(e.value).endswith("got 'α1'. Check Swap (Edit layout).") for e in at.error)  # two sentences
@@ -782,7 +769,7 @@ def test_figure_card_is_accessible_and_scrolls_only_when_very_wide():
 
 def test_a_layout_file_forgets_the_control_changed_last():
     at = opened(DATA / "1UBQ.cif")
-    at.text_input(key="swap").input("α1").run()
+    as_text(at, "swap", "α1")
     assert at.session_state["last_changed"] == "swap"
     up = ("layout.yaml", b"foldmap: 1\nlayout: {rotate: 30}\n", "application/x-yaml")
     at.file_uploader(key="layout_upload").set_value(up).run()
@@ -986,7 +973,7 @@ def test_a_failing_setting_offers_the_last_good_figure():
 
     at = opened(DATA / "2LZM.cif")
     good = at.session_state["last_good"]["blob"]
-    at.text_input(key="swap").input("α1").run()  # one element: not a swap
+    as_text(at, "swap", "α1")  # one element: not a swap
     assert not at.exception and at.error
     assert {"dl_svg", "dl_png", "dl_pdf", "dl_layout"} <= {b.key for b in at.download_button}
     assert any(c.value.startswith("These are the previous figure's files") for c in at.caption)

@@ -4,7 +4,7 @@ import pytest
 
 pytest.importorskip("streamlit")
 
-from app_helpers import DATA, count_calls, fresh_caches, opened, svg_of, widget_keys  # noqa: E402
+from app_helpers import DATA, as_text, count_calls, fresh_caches, opened, svg_of, visible, widget_keys  # noqa: E402
 
 
 def test_first_view_shows_at_most_twelve_controls():
@@ -71,8 +71,10 @@ def test_reset_keeps_what_names_this_structure():
         "highlight": "A",
         "backbone_colors": "A=#1f77b4",
     }
-    for key in ("rename", "domains", "mark", "backbone_colors"):
-        (at.text_area(key=key) if key == "domains" else at.text_input(key=key)).set_value(kept[key])
+    for key in ("rename", "mark"):
+        as_text(at, key, kept[key])
+    at.text_area(key="domains").set_value(kept["domains"])
+    at.text_input(key="backbone_colors").set_value(kept["backbone_colors"])
     at.multiselect(key="chains__pick").set_value(["A", "B"])
     at.selectbox(key="assembly").select("asu")
     at.segmented_control(key="highlight__mode").set_value("chains").run()
@@ -283,3 +285,50 @@ def test_protein_dna_hbonds_offered_only_with_nucleic_acid():
     shown = opened(DATA / "2HHB.cif").segmented_control(key="hbonds__mode").options  # the labels
     assert list(shown) == [HBONDS[k] for k in ("off", "interchain", "chains")]
     assert list(opened(DATA / "1LMB.cif").segmented_control(key="hbonds__mode").options) == list(HBONDS.values())
+
+
+# ---------------------------------------------------------------------------------------------- Edit layout
+def test_layout_mode_and_sizes():
+    at = opened(DATA / "1UBQ.cif")
+    at.segmented_control(key="mode").set_value("stack").run()
+    assert not at.exception and "<svg" in svg_of(at)
+    # AppTest lists formatted labels; values stay the Style values
+    assert list(at.segmented_control(key="fold_template").options) == ["βα row", "as projected"]
+    assert list(at.segmented_control(key="helix_on_sheet").options) == ["beside the sheet", "over the sheet"]
+    assert at.segmented_control(key="fold_template").value == "auto"
+    at.segmented_control(key="helix_on_sheet").set_value("auto").run()
+    assert at.session_state["helix_on_sheet"] == "auto" and not at.exception
+
+
+def test_layout_section_holds_the_editors_and_dna_size_only_with_nucleic_acid():
+    keys = widget_keys(opened(DATA / "1UBQ.cif").sidebar, skip=())
+    assert {"mode", "rotate", "helix_scale", "strand_scale", "fold_template", "helix_on_sheet"} <= set(keys)
+    assert {f"{kind}__as_text" for kind in ("swap", "move", "rename", "mark")} <= set(keys)
+    assert "dna_scale" not in keys and "dna_scale" in widget_keys(opened(DATA / "1LMB.cif").sidebar, skip=())
+
+
+def test_editor_text_and_tables_write_the_same_string():
+    at = opened(DATA / "2LZM.cif")
+    as_text(at, "swap", "res:A:3-11,res:A:60-79")
+    assert at.session_state["swap"] == "res:A:3-11,res:A:60-79"
+    assert any(visible(c.value) == "Writes: res:A:3-11,res:A:60-79" for c in at.caption)  # shown(): escaped
+    at.toggle(key="swap__as_text").set_value(False).run()  # back to the table: same value
+    assert at.session_state["swap"] == "res:A:3-11,res:A:60-79" and not at.exception
+
+
+def test_element_pickers_list_the_drawn_elements():
+    at = opened(DATA / "2LZM.cif")
+    els = at.session_state["elements"]
+    assert els[0]["ref"] == "res:A:3-11" and els[0]["label"] == "α1"
+
+
+def test_editor_tables_show_the_rows_of_the_text():
+    from foldmap.app_controls import editor_frame, element_options
+
+    frame = editor_frame("move", [{"element": "α2", "dx": 1.0, "dy": ""}, {"element": "", "dx": None, "dy": None}])
+    assert list(frame.columns) == ["element", "dx", "dy"] and frame["dx"].dtype == float
+    assert frame["dx"].tolist()[0] == 1.0 and frame["dy"].isna().all()  # a cell that is not a number: empty
+    assert list(editor_frame("swap", []).columns) == ["a", "b"]
+    choices = [("res:A:3-11", "α1 · A 3–11"), ("res:A:60-79", "α3 · A 60–79")]
+    rows = [{"a": "α1", "b": "res:A:60-79"}]
+    assert element_options("swap", rows, choices) == ["res:A:3-11", "res:A:60-79", "α1"]  # typed labels kept

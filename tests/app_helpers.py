@@ -75,6 +75,14 @@ def count_calls(monkeypatch, module, name) -> list:
     return calls
 
 
+def visible(text) -> str:
+    """What a reader sees of the app's Markdown-escaped text (app_edits.shown): escapes resolved, zero-width spaces
+    gone."""
+    import re
+
+    return re.sub(r"\\(.)", r"\1", text).replace("\u200b", "")
+
+
 def rendered_text(at) -> str:
     """Every text the app put on the page (markdown, captions, callouts, headings, code), one per line."""
     kinds = ("markdown", "caption", "error", "warning", "info", "success", "text", "title", "header", "subheader")

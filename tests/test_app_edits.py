@@ -1,6 +1,7 @@
 """The app's structured controls write exactly the text the command line takes, and read it back."""
 
 import re
+from pathlib import Path
 
 import pytest
 
@@ -19,6 +20,8 @@ from foldmap.app_edits import (
     sync_composites,
     text_of,
 )
+
+DATA = Path(__file__).parent / "data"
 
 ROUND_TRIP = {
     "chains": ["", "A", "A,B"],
@@ -114,6 +117,47 @@ def test_table_delta_is_applied_once():
     ss["swap__table_1"] = {"edited_rows": {}, "added_rows": [], "deleted_rows": [0]}
     apply_table(ss, "swap")
     assert ss["swap"] == "res:A:3-11,res:A:60-79" and ss["swap__ver"] == 2
+
+
+def test_a_row_added_empty_stays_until_it_is_filled_in():
+    """The table's add-row button sends an empty row at once; the text cannot hold it, so it waits in
+    `<kind>__blank` (shown after the text's rows) until its elements are picked."""
+    from foldmap.app_edits import table_rows
+
+    ss = {"swap": "α1,α3", "swap__ver": 0, "swap__table_0": {"edited_rows": {}, "added_rows": [{}], "deleted_rows": []}}
+    apply_table(ss, "swap")
+    assert ss["swap"] == "α1,α3" and table_rows(ss, "swap") == [{"a": "α1", "b": "α3"}, {"a": "", "b": ""}]
+    ss["swap__table_1"] = {"edited_rows": {1: {"a": "res:A:39-50"}}, "added_rows": [], "deleted_rows": []}
+    apply_table(ss, "swap")  # one element of two: not written yet (it would be an error)
+    assert ss["swap"] == "α1,α3" and ss["swap__blank"] == [{"a": "res:A:39-50", "b": ""}]
+    ss["swap__table_2"] = {"edited_rows": {1: {"b": "res:A:60-79"}}, "added_rows": [{"b": "α2"}], "deleted_rows": []}
+    apply_table(ss, "swap")
+    assert ss["swap"] == "α1,α3; res:A:39-50,res:A:60-79" and ss["swap__blank"] == [{"a": "", "b": "α2"}]
+    ss["swap__table_3"] = {"edited_rows": {}, "added_rows": [], "deleted_rows": [2]}
+    apply_table(ss, "swap")
+    assert table_rows(ss, "swap") == rows_of("swap", "α1,α3; res:A:39-50,res:A:60-79")
+
+
+@pytest.mark.parametrize(
+    "kind, typed, rows",
+    [
+        ("swap", "α1,α3", [{"a": "res:A:3-11", "b": "res:A:60-79"}]),
+        ("rename", "α1=Gd", [{"element": "res:A:3-11", "name": "Gd"}]),
+        ("move", "α2=1,-2", [{"element": "res:A:39-50", "dx": 1.0, "dy": -2.0}]),
+        ("mark", "α3=#2ca02c", [{"element": "res:A:60-79", "colour": "#2ca02c"}]),
+    ],
+)
+def test_rows_from_pickers_draw_the_same_figure_as_typed_labels(kind, typed, rows):
+    """Spec: table -> string -> layout_options -> the same figure as the text people typed (2LZM: α1 A:3-11,
+    α2 A:39-50, α3 A:60-79)."""
+    import json
+
+    from foldmap import app_jobs
+
+    def svg(text):
+        return app_jobs.draw_job(DATA / "2LZM.cif", json.dumps({"theme": "publication", kind: text}))["svg"]
+
+    assert svg(text_of(kind, rows)) == svg(typed)
 
 
 def test_element_choices_name_the_drawn_element():

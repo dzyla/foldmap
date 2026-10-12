@@ -1,15 +1,27 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 # Copyright (C) 2026 Dawid Zyla. Additional terms (AGPL-3.0 section 7(b)): see NOTICE.
 """The app's sidebar sections: how each settings widget is made (its key, kept while hidden, the setting it names
-when the figure fails) and the sections Style, Show and Chains & assembly.
+when the figure fails) and the sections Style, Show, Chains & assembly and Edit layout.
 
-Streamlit comes in as an argument (app.main imports it); no pandas."""
+Streamlit comes in as an argument (app.main imports it); pandas only inside editor_frame (Streamlit's own
+dependency, for the editors' tables)."""
 
 from __future__ import annotations
 
 from collections.abc import MutableMapping
 
-from foldmap.app_edits import SYMMETRIES, compose_into, hex_colour, sync_composites
+from foldmap.app_edits import (
+    EDITORS,
+    SYMMETRIES,
+    apply_table,
+    compose_into,
+    display,
+    element_choices,
+    hex_colour,
+    shown,
+    sync_composites,
+    table_rows,
+)
 from foldmap.style import CHOICES, THEMES
 
 
@@ -267,6 +279,124 @@ def highlight_block(st, ss: MutableMapping) -> None:
                 **part(ss, "highlight__chains", "highlight"),
             )
     st.toggle("Highlight as text", key="highlight__as_text", persist_state="session")
+
+
+FOLD_TEMPLATE = {"auto": "βα row", "off": "as projected"}
+HELIX_ON_SHEET = {"off": "beside the sheet", "auto": "over the sheet"}
+EXAMPLE = {"swap": "α1,α3", "move": "α2=1,-2", "rename": "α1=Gd", "mark": "α3=#2ca02c, β1"}  # the syntax, as text
+EDITOR_HELP = {
+    "swap": "two elements trade places · as text: α1,α3 (several: separate with ;)",
+    "move": "shift an element by dx, dy in page units · as text: α2=1,-2",
+    "rename": "a new name for an element · as text: α1=Gd or res:A:167-182=Gd",
+    "mark": "elements drawn in a colour, or the theme's mark colour when none is given · as text: "
+    "G, A:G=#2ca02c, #3, res:150-159=red",
+}
+
+
+def layout_section(st, ss: MutableMapping) -> None:
+    """Edit layout: the arrangement, rotation and element sizes, the two fold options, then the editors (swap,
+    move, rename, mark), each a table of drawn elements or, "as text", the command line's syntax."""
+    with st.expander("Edit layout", key="sec_layout"):
+        segmented(
+            st,
+            "Arrangement",
+            ("projected", "stack"),
+            setting(ss, "mode"),
+            help="projected: as in 3D, flattened · stack: elements in sequence order",
+        )
+        st.slider("Rotate (°)", -180.0, 180.0, step=0.5, **setting(ss, "rotate"))
+        st.slider("Helix size", 0.5, 2.0, step=0.05, **setting(ss, "helix_scale"))
+        st.slider("Strand size", 0.5, 2.0, step=0.05, **setting(ss, "strand_scale"))
+        if ss.get("na_chains"):
+            st.slider("DNA size", 0.5, 2.0, step=0.05, **setting(ss, "dna_scale"))
+        segmented(
+            st,
+            "Parallel α/β sheets",
+            CHOICES["fold_template"],
+            setting(ss, "fold_template"),
+            format_func=FOLD_TEMPLATE.get,
+            help="an all-parallel α/β sheet (TIM barrel, Rossmann fold) drawn as one row of strands, its helices "
+            "above and below · or as projected",
+        )
+        segmented(
+            st,
+            "Helices packed on a sheet",
+            CHOICES["helix_on_sheet"],
+            setting(ss, "helix_on_sheet"),
+            format_func=HELIX_ON_SHEET.get,
+            help="a helix packed on a sheet's face stays beside the sheet, or is drawn over it",
+        )
+        editor(st, ss, "swap", "Swap", {"a": "Element", "b": "with"})
+        number, text = st.column_config.NumberColumn, st.column_config.TextColumn
+        offsets = {"dx": number("dx", step=0.5, width=NARROW), "dy": number("dy", step=0.5, width=NARROW)}
+        editor(st, ss, "move", "Move", {"element": "Element", **offsets}, element_width=CELL - 10)
+        editor(st, ss, "rename", "Rename", {"element": "Element", "name": text("Name", width=CELL)})
+        colour_column = text("Colour", validate=r"^(#[0-9a-fA-F]{6}|[a-z]+)?$", width=CELL)
+        editor(st, ss, "mark", "Mark", {"element": "Element", "colour": colour_column})
+        st.text_area(  # interim: Task 10's domains block
+            "Domains",
+            height=80,
+            help="one per line, NAME=REF[,REF...], e.g. ZPN=res:A:331-440; or just 'auto'",
+            **setting(ss, "domains"),
+        )
+
+
+CELL, NARROW = 80, 50  # column widths (px): two cells, or a narrower element and two numbers, fit the sidebar
+ELEMENT_COLUMNS = {"swap": ("a", "b"), "move": ("element",), "rename": ("element",), "mark": ("element",)}
+
+
+def element_options(kind: str, rows: list[dict], choices: list[tuple[str, str]]) -> list[str]:
+    """What an element column offers: the drawn elements' references, then any other the rows already hold (a
+    label typed as text, a residue range), so a cell never holds a value it does not offer."""
+    refs = [ref for ref, _ in choices]
+    held = (row.get(c) for row in rows for c in ELEMENT_COLUMNS[kind])
+    return refs + [h for h in dict.fromkeys(held) if isinstance(h, str) and h and h not in refs]
+
+
+def editor_frame(kind: str, rows: list[dict]):
+    """An editor's rows as the table the data editor shows: its columns in order, move's offsets as numbers (a
+    cell that is not one is empty)."""
+    import pandas as pd
+
+    frame = pd.DataFrame(rows, columns=list(EDITORS[kind]))
+    for column in ("dx", "dy") if kind == "move" else ():
+        frame[column] = pd.to_numeric(frame[column], errors="coerce").astype(float)
+    return frame
+
+
+def editor(st, ss: MutableMapping, kind: str, label: str, columns: dict, element_width: int = CELL) -> None:
+    """One editor: its label and "as text" switch, then a table (rows of the text, element cells picked from the
+    drawn elements) or the text itself, and under it the exact text it writes. `columns`: each column's config; a
+    str is an element column of that label. A table edit is applied by app_edits.apply_table."""
+    with st.container(horizontal=True, vertical_alignment="center", key=f"{kind}_head"):
+        st.markdown(f"**{label}**", help=EDITOR_HELP[kind], width="stretch")
+        st.toggle("as text", key=f"{kind}__as_text", persist_state="session")
+    if ss.get(f"{kind}__as_text"):
+        st.text_input(label, placeholder=EXAMPLE[kind], label_visibility="collapsed", **setting(ss, kind))
+    else:
+        rows = table_rows(ss, kind)
+        choices = element_choices(ss.get("elements") or [])
+        options = element_options(kind, rows, choices)
+        config = {
+            column: st.column_config.SelectboxColumn(
+                spec, options=options, format_func=lambda ref: display(ref, choices), width=element_width
+            )
+            if isinstance(spec, str)
+            else spec
+            for column, spec in columns.items()
+        }
+        st.data_editor(
+            editor_frame(kind, rows),
+            key=f"{kind}__table_{ss.get(f'{kind}__ver', 0)}",
+            num_rows="dynamic",
+            hide_index=True,
+            column_config=config,
+            placeholder="default" if kind == "mark" else "",
+            on_change=apply_table,
+            args=(ss, kind),
+        )
+    if ss.get(kind):
+        st.caption(f"Writes: {shown(ss[kind])}")
 
 
 def contact_lines(report: dict | None, most: int = 10) -> list[str]:
