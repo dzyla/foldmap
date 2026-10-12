@@ -196,3 +196,31 @@ def test_layout_text_measures_every_prime_a_name_may_hold():
     from foldmap import text_metrics
 
     assert all(c in text_metrics.ADVANCE for c in "αβη′″‴")
+
+
+@pytest.mark.parametrize(
+    "text, refs",
+    [
+        ("elements:\n  res:A:2-7: X\n  res:A:12-16: X\n", ["res:A:2-7", "res:A:12-16"]),
+        ("elements:\n  res:A:1-20: X\n", ["res:A:1-20"]),  # one ref over two strands
+    ],
+)
+def test_two_elements_of_one_chain_may_not_share_a_name(tmp_path, text, refs):
+    bad = tmp_path / "dup.yaml"
+    bad.write_text(text, encoding="utf-8")
+    with pytest.raises(ValueError, match="dup.yaml: " + ".*".join(map(repr, refs)) + ".*chain A 'X'"):
+        make_layout(DATA / "1UBQ.cif", names=[str(bad)])
+
+
+def test_one_name_in_two_chains_is_fine(tmp_path):
+    ok = tmp_path / "ok.yaml"
+    ok.write_text("elements:\n  res:A:4-17: X\n  res:B:5-15: X\n", encoding="utf-8")
+    lay, _, _ = make_layout(DATA / "2HHB.cif", names=[str(ok)])
+    assert lay.placed["A:4-17"].label == lay.placed["B:5-15"].label == "X"
+
+
+def test_two_stems_of_one_chain_may_not_share_a_name(tmp_path):
+    bad = tmp_path / "dup.yaml"
+    bad.write_text("stems:\n  A:1: arm\n  A:72: arm\n  A:10: arm\n", encoding="utf-8")  # 1 and 72: one stem
+    with pytest.raises(ValueError, match="dup.yaml: 'A:1' and 'A:10' both name stems of chain A 'arm'"):
+        make_layout(DATA / "na" / "1EHZ.cif.gz", names=[str(bad)])

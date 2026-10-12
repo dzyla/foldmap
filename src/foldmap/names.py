@@ -209,19 +209,44 @@ def _file_names(path: Path, layout: Layout, sses, nucleic, whole, chains) -> tup
     for key in doc:
         if key not in ("elements", "stems"):
             raise ValueError(f"{path}: unknown key {key!r}; a names file has elements and stems")
+    chain_of = {s.id: s.chain for s in sses}
     elements: dict[str, str] = {}
+    given: dict[tuple[str, str], tuple[str, str]] = {}  # (chain, name) -> (ref, element) that took it
     for ref, name in (doc.get("elements") or {}).items():
-        ref = str(ref)
-        if _resolves(layout, sses, ref):
-            elements[ref] = str(name)
-        elif not _left_out(ref, sses, whole, chains):
+        ref, name = str(ref), str(name)
+        ids = _resolves(layout, sses, ref)
+        if not ids and not _left_out(ref, sses, whole, chains):
             raise ValueError(
                 f"{path}: no element {ref!r} in the figure; use a label such as A or α1, chain:label, #k or res:a-b"
             )
+        for sid in ids:
+            _one_each(path, given, (chain_of[sid], name), (ref, sid), "element")
+        if ids:
+            elements[ref] = name
     stems: dict[int, str] = {}
+    taken: dict[tuple[str, str], tuple[str, str]] = {}
     for key, name in (doc.get("stems") or {}).items():
-        stems.update(_stem_names(path, str(key), str(name), layout, nucleic))
+        key, name = str(key), str(name)
+        named = _stem_names(path, key, name, layout, nucleic)
+        for k in named:
+            d = layout.stems[k]
+            for chain in sorted({nucleic.strands[s].chain for s in d.strands}):
+                _one_each(path, taken, (chain, name), (key, d.parent or d.id), "stem")
+        stems.update(named)
     return elements, stems
+
+
+def _one_each(path: Path, given: dict, at: tuple[str, str], by: tuple[str, str], what: str) -> None:
+    """One name, one element (or stem) per chain: `at` (chain, name) is taken by `by` (ref, which element), unless
+    another one already took it. The same name in two chains is fine (H3 α1 and H4 α1)."""
+    ref, thing = by
+    first = given.setdefault(at, by)
+    if first[1] != thing:
+        chain, name = at
+        also = f"{first[0]!r} and {ref!r} both name" if first[0] != ref else f"{ref!r} names two"
+        raise ValueError(
+            f"{path}: {also} {what}s of chain {chain} {name!r} ({first[1]}, {thing}); one name, one {what}"
+        )
 
 
 def _resolves(layout: Layout, sses: list[SSE], ref: str) -> list[str]:
