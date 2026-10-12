@@ -490,6 +490,9 @@ SIDE, PAIR = '[data-testid="stSidebarUserContent"]', '[data-testid="stElementCon
 THEME_KEYS = ("textColor", "borderColor", "backgroundColor")  # the theme colours the stylesheet also sets
 APP, SWITCH = '[data-testid="stApp"]', '[data-testid="stCheckbox"] label:has(input[role="switch"]'
 TEXT, EDGE, BACK = ({m: APP_THEME[f"theme.{m}"][k] for m in ("light", "dark")} for k in THEME_KEYS)
+TINT, PRIMARY = (
+    {m: APP_THEME[f"theme.{m}"][k] for m in ("light", "dark")} for k in ("secondaryBackgroundColor", "primaryColor")
+)  # the scope bar: the text colour on the tint, a primary edge (decorative)
 # Colours (each a light-dark pair, so a live theme switch needs no rerun): muted text (captions, upload limits, input
 # hints, placeholders: Streamlit fades them below 4.5:1; outside the app, in a dialog or popover where no
 # color-scheme reaches, a caption is only made opaque), the chosen segment's label in the text colour (the primary
@@ -501,7 +504,10 @@ STYLESHEET = f"""
 .st-key-topbar {{row-gap:0.25rem}}
 .st-key-canvas .fm-card {{border-radius:8px;padding:12px;overflow-x:auto;border:1px solid {_both(CARD_BORDER)}}}
 .st-key-canvas svg {{display:block;width:100%;height:auto;max-height:80vh}}
-[data-testid="stMainBlockContainer"]:has([data-testid="stAlert"]) .st-key-canvas svg {{max-height:calc(80vh - 5rem)}}
+[data-testid="stMainBlockContainer"]:has([data-testid="stAlert"]) .st-key-canvas svg,
+[data-testid="stMainBlockContainer"]:has(.st-key-scope_bar) .st-key-canvas svg {{max-height:calc(80vh - 5rem)}}
+.st-key-scope_bar {{background:{_both(TINT)};border:1px solid {_both(CARD_BORDER)};border-left:4px solid
+  {_both(PRIMARY)};border-radius:8px;padding:0.375rem 0.75rem;flex-wrap:wrap;row-gap:0.25rem}}
 .st-key-seq_options .st-key-seq_full {{padding-top:2.25rem}}
 .st-key-explorer iframe {{height:min(1100px,85vh)!important}}
 {SIDE} {{padding-bottom:0.5rem}}
@@ -691,6 +697,7 @@ def reset_structure(ss: MutableMapping) -> None:
         "seq_drawn",
         "page_drawn",
         "msa_uploaded",
+        "scope_kept",
     ):
         ss.pop(key, None)
     ss["auto_redraw"] = True

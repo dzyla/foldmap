@@ -131,6 +131,7 @@ def figure_view(ws: Workspace) -> None:
                 "blob": target,
                 "svg": result["svg"],
                 "files": tuple(sorted(result["files"].items())) or None,
+                "scope": result.get("scope"),
             },
             elements=result["elements"],
             protein_chains=result["chains"],
@@ -143,6 +144,7 @@ def figure_view(ws: Workspace) -> None:
     good = ss.get("last_good") or {}
     if good.get("path") != ws.path:
         return
+    scope_bar(ws, good.get("scope"), good["blob"])
     with st.container(key="canvas"):
         background = json.loads(good["blob"]).get("background", "#ffffff")
         st.markdown(figure_card(good["svg"], background, ws.name), unsafe_allow_html=True)
@@ -170,12 +172,73 @@ def missing_files(ws: Workspace) -> None:
         ws.st.warning(f"The layout file's names file {name} is not on this machine; upload it under Edit layout.")
 
 
+# ---------------------------------------------------------------------------------------------- scope bar
+def scope_text(scope: dict) -> str:
+    """The bar's line: what an automatic choice drew, and how many of the chains."""
+    return f"Drawn: {scope['reason']} — {scope['drawn_chains']} of {scope['file_chains']} chains."
+
+
+def scope_flags(scope: dict) -> str:
+    """The command-line flags that draw every chain."""
+    return " ".join(f"--{k} {v}" for k, v in scope["all_options"].items())
+
+
+def too_large_text(scope: dict, name: str) -> str:
+    return (
+        f"All {scope['file_chains']} chains: too large for this app — draw with foldmap plot {name} "
+        f"{scope_flags(scope)}"
+    )
+
+
+def too_large(ws: Workspace, scope: dict, blob: str) -> bool:
+    """Would drawing every chain go over this app's residue cap, or did it go over a limit before?"""
+    if ws.lim.max_residues and scope.get("residues", 0) > ws.lim.max_residues:
+        return True
+    every = {**json.loads(blob), **scope["all_options"]}
+    return app_jobs.known_failure(ws.path, every) is not None
+
+
+def show_all_chains(ss: MutableMapping, options: dict) -> None:
+    """The bar's "Show all chains": the settings that draw every chain, drawn at once (auto-redraw off too)."""
+    from foldmap.app import current_blob
+
+    for key, value in options.items():
+        ss[key] = value
+        ss["last_changed"] = key  # a failure names the control that changed
+    if not ss.get("auto_redraw", True):
+        ss["drawn_blob"] = current_blob(ss)
+
+
+def keep_scope(ss: MutableMapping) -> None:
+    """The bar's "Keep this": no bar for this structure again (app.reset_structure forgets it)."""
+    ss["scope_kept"] = True
+
+
+def scope_bar(ws: Workspace, scope: dict | None, blob: str) -> None:
+    """Above the figure, when an automatic choice drew part of the file (scope.drawn_scope): what was drawn, a
+    button that draws every chain (or why this app cannot) and one that keeps the figure as it is."""
+    st, ss = ws.st, ws.ss
+    if not scope or not scope.get("reason") or ss.get("scope_kept"):
+        return
+    with st.container(key="scope_bar", horizontal=True, vertical_alignment="center", gap="small"):
+        st.markdown(shown(scope_text(scope)), width="stretch")
+        if too_large(ws, scope, blob):
+            st.caption(shown(too_large_text(scope, ws.name)), width="stretch")
+        else:
+            st.button("Show all chains", key="scope_all", on_click=show_all_chains, args=(ss, scope["all_options"]))
+        st.button("Keep this", key="scope_keep", type="tertiary", on_click=keep_scope, args=(ss,))
+
+
 def drawn_summary(ss: MutableMapping, settings: dict, result: dict) -> str:
     """The top bar's line for the figure drawn. A figure of every chain counts the protein chains of its assembly
-    (`protein_chains_total`); one of some chains says "2 of 6 chains" when that count is of the same assembly."""
+    (`protein_chains_total`); one of some chains says "2 of 6 chains" when that count is of the same assembly; one
+    that an automatic choice drew part of (scope.drawn_scope) says how many chains of the file it drew."""
     assembly = settings.get("assembly") or "auto"
     if not settings.get("chains"):
         ss["protein_chains_total"] = {"assembly": assembly, "count": len(result["chains"])}
+        scope = result.get("scope") or {}
+        if scope.get("reason"):
+            return app_jobs.scoped_summary(result["summary"], scope["drawn_chains"], scope["file_chains"])
         return result["summary"]
     total = ss.get("protein_chains_total") or {}
     if total.get("assembly") != assembly:  # not counted in this assembly yet

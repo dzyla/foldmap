@@ -320,6 +320,7 @@ def draw_job(path, settings_json: str, eager_after: float | None = None) -> dict
     from . import app, render
     from . import spec as spec_mod
     from .cli import stale_domains_note
+    from .scope import drawn_scope
 
     t0 = time.perf_counter()
     spec = app.spec_of(path, json.loads(settings_json))
@@ -341,6 +342,7 @@ def draw_job(path, settings_json: str, eager_after: float | None = None) -> dict
         "na_chains": na_chains,
         "summary": summary_of(drawn),
         "domains_note": stale_domains_note(spec.domains, drawn.sses),  # a layout file's stale ids, dropped
+        "scope": drawn_scope(drawn.model, drawn.layout, spec.assembly, spec.focus),  # what auto choices left out
         "seconds": seconds,
         "files": files,
     }
@@ -504,6 +506,16 @@ def restricted_summary(summary: str, total: int) -> str:
     if not m or int(m.group(1).replace(",", "")) >= total:
         return summary
     return f"{m.group(1)} of {total:,} chains{summary[m.end() :]}"
+
+
+def scoped_summary(summary: str, drawn: int, total: int) -> str:
+    """The summary of a figure an automatic choice drew part of (scope.drawn_scope): its chain count, protein and
+    nucleic acid, as 'drawn of total chains'."""
+    head = f"{drawn:,} of {total:,} chains"
+    m = re.match(r"([\d,]+) chains?\b", summary)
+    if m:
+        return head + summary[m.end() :]
+    return f"{head} · {summary}" if summary else head
 
 
 # ---------------------------------------------------------------------------------------------- downloads
