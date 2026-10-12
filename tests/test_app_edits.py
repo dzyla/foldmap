@@ -1,0 +1,172 @@
+"""The app's structured controls write exactly the text the command line takes, and read it back."""
+
+import pytest
+
+from foldmap.app_edits import (
+    COMPOSITES,
+    EDITORS,
+    apply_table,
+    compose_into,
+    control_for,
+    element_choices,
+    notes_text,
+    palette_used,
+    row_source,
+    rows_of,
+    sync_composites,
+    text_of,
+)
+
+ROUND_TRIP = {
+    "chains": ["", "A", "A,B"],
+    "highlight": ["none", "asu", "protomer", "A,B"],
+    "focus": ["auto", "none", "B", "B,C"],
+    "ligands": ["auto", "all", "none", "HEM,ZN"],
+    "na_backbone": ["modality", "chain", "ink", "#123456"],
+    "hbonds": ["off", "na", "interchain", "chains:A+B,C+D"],
+    "uniprot": ["off", "auto", "P0CG48"],
+    "uniprot_sites": ["auto", "all", "none", "active,binding"],
+}
+
+
+@pytest.mark.parametrize("key", sorted(ROUND_TRIP))
+def test_composites_round_trip_every_form(key):
+    _, parts, text = COMPOSITES[key]
+    for value in ROUND_TRIP[key]:
+        assert text(*parts(value)) == value, (key, value)
+
+
+def test_composites_normalise_what_people_type():
+    assert COMPOSITES["ligands"][2]("codes", "hem  zn,") == "HEM,ZN"
+    assert COMPOSITES["hbonds"][2]("chains", "A + B, C+D") == "chains:A+B,C+D"
+    assert COMPOSITES["highlight"][2]("chains", []) == "none"
+    assert COMPOSITES["uniprot"][2]("accession", "p0cg48") == "P0CG48"
+
+
+def test_sync_keeps_a_half_made_choice():
+    ss = {"ligands": "auto"}
+    sync_composites(ss)
+    assert ss["ligands__mode"] == "auto" and ss["ligands__codes"] == ""
+    ss["ligands__mode"] = "codes"  # chosen, nothing typed yet
+    compose_into(ss, "ligands")
+    assert ss["ligands"] == "auto" and ss["last_changed"] == "ligands"
+    sync_composites(ss)
+    assert ss["ligands__mode"] == "codes"  # not snapped back
+    ss["ligands__codes"] = "hem, zn"
+    compose_into(ss, "ligands")
+    assert ss["ligands"] == "HEM,ZN"
+    ss["ligands"] = "all"  # a layout file or a theme reset
+    sync_composites(ss)
+    assert ss["ligands__mode"] == "all"
+
+
+EDITOR_TEXT = {
+    "swap": ["α1,α3", "α1,α3; res:A:60-79,β2"],
+    "move": ["α2=1,-2", "α2=1,-2; res:A:3-11=0.5,0"],
+    "rename": ["res:167-182=Gd", "α1=A; res:A:60-79=C"],
+    "mark": ["G", "G, A:G=#2ca02c, #3, res:150-159=red"],
+    "domains": ["ZPN=res:A:331-440", "N=res:A:1-30\nC=res:A:31-76,α1"],
+}
+
+
+@pytest.mark.parametrize("kind", sorted(EDITOR_TEXT))
+def test_editor_rows_round_trip_today_s_syntax(kind):
+    for text in EDITOR_TEXT[kind]:
+        rows = rows_of(kind, text)
+        assert all(set(r) == set(EDITORS[kind]) for r in rows)
+        assert text_of(kind, rows) == text, (kind, text)
+
+
+def test_editor_text_takes_newlines_and_drops_empty_rows():
+    assert rows_of("swap", "α1,α3\nα2,α4") == [{"a": "α1", "b": "α3"}, {"a": "α2", "b": "α4"}]
+    assert text_of("rename", [{"element": "", "name": "x"}, {"element": "α1", "name": "Z"}]) == "α1=Z"
+    assert text_of("move", [{"element": "α2", "dx": 1.0, "dy": -2.5}]) == "α2=1,-2.5"
+
+
+def test_domain_ranges_become_residue_references():
+    rows = [{"name": "N", "ranges": "A:1-80, 200-240, α3"}]
+    assert text_of("domains", rows) == "N=res:A:1-80,res:200-240,α3"
+
+
+def test_table_delta_is_applied_once():
+    ss = {"swap": "α1,α3", "swap__ver": 0}
+    ss["swap__table_0"] = {
+        "edited_rows": {0: {"b": "α4"}},
+        "added_rows": [{"a": "res:A:3-11", "b": "res:A:60-79"}],
+        "deleted_rows": [],
+    }
+    apply_table(ss, "swap")
+    assert ss["swap"] == "α1,α4; res:A:3-11,res:A:60-79" and ss["swap__ver"] == 1
+    assert ss["last_changed"] == "swap"
+    ss["swap__table_1"] = {"edited_rows": {}, "added_rows": [], "deleted_rows": [0]}
+    apply_table(ss, "swap")
+    assert ss["swap"] == "res:A:3-11,res:A:60-79" and ss["swap__ver"] == 2
+
+
+def test_element_choices_name_the_drawn_element():
+    elements = [
+        {"ref": "res:A:23-34", "label": "α1", "chain": "A", "kind": "H", "first": "23", "last": "34"},
+        {"ref": "res:B:23-34", "label": "α1", "chain": "B", "kind": "H", "first": "23", "last": "34"},
+    ]
+    assert element_choices(elements) == [("res:A:23-34", "α1 · A 23–34"), ("res:B:23-34", "α1 · B 23–34")]
+
+
+def test_palette_is_hidden_only_where_it_colours_nothing():
+    assert palette_used("chain", "black") and palette_used("shade", "black") and palette_used("domain", "black")
+    assert not palette_used("plddt", "black") and not palette_used("sequence", "residue")
+    assert palette_used("bfactor", "chain")
+
+
+def test_the_failing_control_is_named():
+    assert control_for("--swap needs two elements separated by a comma, got 'α1'", None) == "Swap (Edit layout)"
+    assert control_for("no chain Z; the structure has protein chains A", None) == "Chains (Chains & assembly)"
+    assert control_for("no element 'α9': ...", "rename") == "Rename (Edit layout)"
+    assert control_for("something else", None) is None
+
+
+def test_route_notes_read_as_one_line():
+    assert notes_text([], []) == ""
+    assert notes_text(["a>b"], ["c>d"]) == (
+        "No clear route for a>b (drawn as plain curves). Drawn over a label or chain end, the only route found: c>d."
+    )
+
+
+def test_a_table_row_picks_its_structure():
+    choices = [("AF-P07911-F1", "AlphaFold model"), ("4WRN", "X-ray")]
+    assert row_source([1], choices) == "4WRN" and row_source([], choices) is None and row_source([5], choices) is None
+
+
+# ------------------------------------------------------------- beyond the plan's list: display, symmetry, controls
+def test_a_ref_not_drawn_is_shown_as_itself():
+    from foldmap.app_edits import display
+
+    choices = [("res:A:23-34", "α1 · A 23–34")]
+    assert display("res:A:23-34", choices) == "α1 · A 23–34" and display("res:Q:1-9", choices) == "res:Q:1-9"
+
+
+def test_symmetry_choices_are_the_ones_the_command_line_takes():
+    from foldmap.app_edits import SYMMETRIES
+
+    assert SYMMETRIES[:3] == ("auto", "off", "helical")
+    assert SYMMETRIES[3:] == (*(f"C{n}" for n in range(2, 13)), *(f"D{n}" for n in range(2, 9)))
+
+
+def test_every_setting_has_a_control_entry():
+    from foldmap.app import HIDDEN_LAYOUT, LAYOUT_DEFAULTS, STYLE_FIELDS
+    from foldmap.app_edits import CONTROLS
+
+    assert set(CONTROLS) == {*STYLE_FIELDS, *LAYOUT_DEFAULTS, "theme", "names"}
+    for key, (label, section, widgets) in CONTROLS.items():
+        assert (label == "" and section == "" and widgets == ()) == (key in HIDDEN_LAYOUT), key
+    for key, (derived, _, _) in COMPOSITES.items():
+        assert set(derived) <= set(CONTROLS[key][2]), key
+    assert CONTROLS["swap"] == ("Swap", "Edit layout", ("swap__as_text", "swap"))
+    assert CONTROLS["msa_path"] == ("Alignment", "Conservation & UniProt", ("msa_upload",))
+    assert CONTROLS["names"] == ("Element names", "Edit layout", ("names__kw", "names_upload"))
+
+
+def test_a_failing_layout_option_names_its_control():
+    assert control_for("--move needs ref=dx,dy, got 'α2'", None) == "Move (Edit layout)"
+    assert control_for("domain 'N': 'A:1-60' is no element; ...", None) == "Domains (Edit layout)"
+    assert control_for("something else", "ligands") == "Ligands and ions (Show)"
+    assert control_for("something else", "not_a_setting") is None
