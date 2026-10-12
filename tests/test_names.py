@@ -224,3 +224,20 @@ def test_two_stems_of_one_chain_may_not_share_a_name(tmp_path):
     bad.write_text("stems:\n  A:1: arm\n  A:72: arm\n  A:10: arm\n", encoding="utf-8")  # 1 and 72: one stem
     with pytest.raises(ValueError, match="dup.yaml: 'A:1' and 'A:10' both name stems of chain A 'arm'"):
         make_layout(DATA / "na" / "1EHZ.cif.gz", names=[str(bad)])
+
+
+@pytest.mark.parametrize("text", ["α2‴", "C‴", "αN", "β10″", "anticodon", "ψ1", "Ω′"])
+def test_a_name_is_measured_as_render_draws_it(text):
+    """The layout's built-in metrics (Liberation Sans Bold) give a name the width render's TextPath gives it, within
+    2 %: ‴ has its own glyph there, whose advance happens to equal ″'s (its ink overhangs both sides)."""
+    from matplotlib.font_manager import FontProperties, findfont
+    from matplotlib.textpath import text_to_path
+
+    from foldmap.layout import _text_width
+    from foldmap.render import _FONTS
+
+    prop = FontProperties(family=_FONTS, weight="bold", size=100)
+    if "LiberationSans-Bold" not in findfont(prop):
+        pytest.skip("needs Liberation Sans Bold (fonts-liberation), the font render draws names in here")
+    drawn = text_to_path.get_text_width_height_descent(text, prop, ismath=False)[0] / 100
+    assert abs(_text_width(text) / drawn - 1) < 0.02

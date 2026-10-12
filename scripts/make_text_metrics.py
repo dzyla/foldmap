@@ -20,7 +20,8 @@ HEADER = (
     "# SPDX-License-Identifier: AGPL-3.0-or-later\n"
     "# Copyright (C) 2026 Dawid Zyla. Additional terms (AGPL-3.0 section 7(b)): see NOTICE.\n"
 )
-CHARS = "".join(chr(c) for c in range(0x20, 0x7F)) + "′″‴·–—αβγδεηθλπστω"  # what names are written with
+GREEK = "".join(chr(c) for c in range(0x3B1, 0x3CA)) + "".join(chr(c) for c in range(0x391, 0x3AA) if c != 0x3A2)
+CHARS = "".join(chr(c) for c in range(0x20, 0x7F)) + "′″‴·–—‘’“”×±°" + GREEK  # what names are written with
 
 
 def _quote(s: str) -> str:
@@ -34,7 +35,10 @@ def main(path: Path) -> None:
     font = TTFont(path)
     cmap, hmtx = font.getBestCmap(), font["hmtx"]
     units = font["head"].unitsPerEm
-    glyph = {c: cmap[ord(c)] for c in CHARS if ord(c) in cmap}
+    missing = [c for c in CHARS if ord(c) not in cmap]
+    if missing:  # never silently: the layout would measure them at the fallback width while render draws another font
+        raise SystemExit(f"{path.name} has no glyph for {' '.join(missing)}")
+    glyph = {c: cmap[ord(c)] for c in CHARS}
     rows = {c: hmtx[g][0] for c, g in glyph.items()}
     pairs = {}
     for table in font["kern"].kernTables if "kern" in font else []:
