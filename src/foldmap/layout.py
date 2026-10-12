@@ -1794,6 +1794,7 @@ def build_layout(
     joints = _joints(items, nucleic) if pieces else set()
     walls = _trace_walls(items, traces, nucleic) if traces else None  # traces stay: items keep off them
     rows: list[list[_Item]] = []
+    mirrored: list[tuple] = []  # (copy, mate) members of protomers drawn as mirror images
     if mode == "stack":
         rows = _stack(items, keep_depth)
         _centre_dna_over_binders(items, contacts)
@@ -1802,6 +1803,9 @@ def build_layout(
         spread, lift = 0.0, 0.0
         mirror = getattr(frame, "mirror_x", None)
         if ties and mirror is not None:  # a dyad in the page: each copy starts at its mate's mirror image
+            mirrored = [
+                (a, b) for i, (j, _) in sorted(ties.items()) for a, b in zip(items[i].members, items[j].members)
+            ]
             for i, (j, _) in ties.items():
                 items[i].cx, items[i].cy = 2 * mirror - items[j].cx, items[j].cy
                 items[i].home = (2 * mirror - items[j].home[0], items[j].home[1])
@@ -1872,7 +1876,7 @@ def build_layout(
     lay.partial = set(partial or ())
     lay.domains = [(name, [k for k in ids if k in real]) for name, ids in domains or []]
     rects = np.vstack([rects, *[[domain_panel(lay, name)] for name, _ in lay.domains]]) if lay.domains else rects
-    _choose_label_sides(lay, sses, style.font_scale)  # after naming: a name's length sets its box
+    _choose_label_sides(lay, sses, style.font_scale, mirrored)  # after naming: a name's length sets its box
     rects = np.vstack([rects, [b for _, b in label_boxes(lay, sses)] or np.empty((0, 4))])
     lay.bounds = (
         float(rects[:, 0].min()),
@@ -2111,14 +2115,34 @@ def _element_label_sides(layout: Layout, sses: list[SSE]) -> None:
             p.label_side = 1
 
 
-def _choose_label_sides(layout: Layout, sses: list[SSE], font_scale: float = 1.0) -> None:
+def _mirror_sides(mirrored: list[tuple]) -> None:
+    """Each mirror copy's name on the mirror image of its mate's side: its offset from its body points the way the
+    mate's does, reflected in the page's (vertical) dyad line."""
+    for copy, mate in mirrored:
+        if type(copy) is not type(mate) or isinstance(copy, Placed) and copy.sse.kind != mate.sse.kind:
+            continue
+        if isinstance(copy, Placed) and copy.sse.kind not in ("H", "G"):
+            continue
+        where = stem_label_pos if isinstance(copy, PlacedStem) else helix_label_pos
+        mx, my = np.subtract(where(mate), (mate.cx, mate.cy))
+        copy.label_side = 1
+        if isinstance(copy, PlacedStem):
+            copy.label_out = mate.label_out
+        if float(np.dot(np.subtract(where(copy), (copy.cx, copy.cy)), (-mx, my))) < 0:
+            copy.label_side = -1
+
+
+def _choose_label_sides(layout: Layout, sses: list[SSE], font_scale: float = 1.0, mirrored: list[tuple] = ()) -> None:
     """Element names first (_element_label_sides). Then each stem's name beside its first rail (label_side 1) unless
     its box meets another stem's name decided before it, another stem's body, an element or an element's name, or
     sits nearer another stem than its own, or its drawn text meets a base letter of any stem; then beside the second
     rail if that is clear; then further out (_SLOTS), either side (the upright box of a name turned 30-60 degrees can
-    reach its own stem's letters on both sides alike); else on the first side after all. Runs once the names (and so
-    the boxes' widths) are final."""
+    reach its own stem's letters on both sides alike); else on the first side after all. A mirror copy's name (the
+    (copy, mate) members in `mirrored`, of protomers drawn as mirror images) then takes the mirror of its mate's
+    side (_mirror_sides). Runs once the names (and so the boxes' widths) are final."""
     _element_label_sides(layout, sses)
+    if mirrored:
+        _mirror_sides([(a, b) for a, b in mirrored if isinstance(a, Placed)])
     em = _ink_em(layout, font_scale)
     g = 0.75 * em * _INK_GLYPH  # a base letter: render draws it at 0.75 em
     rects = [p.rect for p in [*layout.placed.values(), *layout.ghosts]]
@@ -2132,6 +2156,8 @@ def _choose_label_sides(layout: Layout, sses: list[SSE], font_scale: float = 1.0
             (s for s in slots if _name_clear(d, s, others, named, rects, letters, em)), (1, 0.0)
         )
         named.append(_stem_label_box(d))
+    if mirrored:
+        _mirror_sides([(a, b) for a, b in mirrored if isinstance(a, PlacedStem)])
 
 
 def _name_clear(d: PlacedStem, slot, others, named, rects, letters, em: float) -> bool:

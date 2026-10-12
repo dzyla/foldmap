@@ -415,6 +415,31 @@ def test_dimer_on_dna_is_an_exact_mirror_image():
         assert np.cos(q.angle - (np.pi - p.angle)) > 1 - 1e-9, k
 
 
+def test_a_mirror_copys_labels_are_its_mates_mirrored():
+    """1LMB: both α3 names sat on the right of their helices; a mirror copy's name takes the mirror of its mate's
+    side, so every name pair is symmetric about the dyad (and routes follow the boxes)."""
+    from matplotlib.backends.backend_agg import FigureCanvasAgg
+
+    from foldmap.cli import make_figure, make_layout
+
+    lay, _, _ = make_layout(DATA / "1LMB.cif")
+    mx = lay.frame.mirror_x
+    fig = make_figure(DATA / "1LMB.cif")
+    FigureCanvasAgg(fig).draw()
+    ax, r = fig.axes[0], fig.canvas.get_renderer()
+    box = {
+        t.get_gid(): t.get_window_extent(r).transformed(ax.transData.inverted())
+        for t in ax.texts
+        if (t.get_gid() or "").startswith("label:")
+    }
+    pairs = [(g, "label:4:" + g[len("label:3:") :]) for g in box if g.startswith("label:3:")]
+    assert len(pairs) == 6 and all(b in box for _, b in pairs)
+    for a, b in pairs:
+        p, q = box[a], box[b]
+        assert abs(q.x0 - (2 * mx - p.x1)) < 0.05 and abs(q.x1 - (2 * mx - p.x0)) < 0.05, (a, b)
+        assert abs(q.y0 - p.y0) < 0.05 and abs(q.y1 - p.y1) < 0.05, (a, b)
+
+
 def test_mirror_energy_gradient_is_exact(monkeypatch):
     from foldmap import layout
 
