@@ -2164,3 +2164,14 @@ def test_stem_name_slots_do_not_depend_on_the_installed_fonts(monkeypatch):
     lay, _, _ = make_layout(_path("1KX5"))
     assert ([(d.label_side, d.label_out) for d in lay.stems], lay.bounds) == want
 
+
+@pytest.mark.parametrize("path", [NA / "30QM.cif.gz", Path(__file__).parent / "data" / "1UBQ.cif"])
+def test_no_tie_legend_without_lettered_ties(path):
+    """The legend explains tie letters only when a tie is drawn as two lettered marks: 30QM has none, 1UBQ no
+    nucleic acid at all."""
+    from foldmap.cli import make_figure
+
+    ax = make_figure(path).axes[0]
+    assert not [t for t in ax.texts if (t.get_gid() or "").startswith("na:tie:") and t.get_gid().endswith(":label")]
+    assert not [t for t in ax.texts if "tertiary base pair" in t.get_text()]
+    assert not [a for a in [*ax.lines, *ax.texts] if (a.get_gid() or "").startswith("legend-tie")]

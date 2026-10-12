@@ -2157,11 +2157,10 @@ def _choose_label_sides(layout: Layout, sses: list[SSE], style: Style, mirrored:
     """Element names first (_element_label_sides). Then each stem's name beside its first rail (label_side 1) unless
     its box meets another stem's name decided before it, another stem's body, an element or an element's name, or
     sits nearer another stem than its own, or its drawn text meets a base letter of any stem (where the style draws
-    them); then beside the second
-    rail if that is clear; then further out (_SLOTS), either side (the upright box of a name turned 30-60 degrees can
-    reach its own stem's letters on both sides alike); else on the first side after all. A mirror copy's name (the
-    (copy, mate) members in `mirrored`, of protomers drawn as mirror images) then takes the mirror of its mate's
-    side (_mirror_sides). Runs once the names (and so the boxes' widths) are final."""
+    them); then beside the second rail if that is clear; then further out (_SLOTS), either side (the upright box of
+    a name turned 30-60 degrees can reach its own stem's letters on both sides alike); else on the first side after
+    all. A mirror copy's name (the (copy, mate) members in `mirrored`, of protomers drawn as mirror images) then
+    takes the mirror of its mate's side (_mirror_sides). Runs once the names (and so the boxes' widths) are final."""
     _element_label_sides(layout, sses)
     if mirrored:
         _mirror_sides([(a, b) for a, b in mirrored if isinstance(a, Placed)])
