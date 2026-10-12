@@ -95,7 +95,7 @@ def style_section(st, ss: MutableMapping) -> None:
             st.slider("Loop weight", 0.4, 3.0, step=0.1, **setting(ss, "loop_width"))
 
 
-HBONDS = {"off": "off", "na": "protein–DNA/RNA", "interchain": "interchain", "chains": "pairs"}
+HBONDS = {"off": "off", "na": "protein–DNA/RNA", "interchain": "interchain", "chains": "chain pairs"}
 
 
 def show_section(st, ss: MutableMapping) -> None:
@@ -525,12 +525,11 @@ def editor_frame(kind: str, rows: list[dict]):
 
 
 def editor(st, ss: MutableMapping, kind: str, label: str, columns: dict) -> None:
-    """One editor: its label and "as text" switch, then a table (rows of the text, element cells picked from the
-    drawn elements) or the text itself, and under it the exact text it writes. `columns`: each column's config; a
-    str is an element column of that label. A table edit is applied by app_edits.apply_table."""
-    with st.container(horizontal=True, vertical_alignment="center", key=f"{kind}_head"):
-        st.markdown(f"**{label}**", help=EDITOR_HELP[kind], width="stretch")
-        st.toggle("as text", key=f"{kind}__as_text", persist_state="session")
+    """One editor (in its tab, which names it): its "as text" switch with the editor's help, then a table (rows of
+    the text, element cells picked from the drawn elements) or the text itself (labelled `label` for screen
+    readers), and under it the exact text it writes. `columns`: each column's config; a str is an element column of
+    that label. A table edit is applied by app_edits.apply_table."""
+    st.toggle("as text", key=f"{kind}__as_text", help=EDITOR_HELP[kind], persist_state="session")
     if ss.get(f"{kind}__as_text"):
         field = st.text_area if kind == "domains" else st.text_input  # domains: one per line
         field(label, placeholder=EXAMPLE[kind], label_visibility="collapsed", **setting(ss, kind))
@@ -562,10 +561,12 @@ def editor(st, ss: MutableMapping, kind: str, label: str, columns: dict) -> None
 
 UNIPROT = ("off", "auto", "accession")
 SITES = ("auto", "all", "none", "types")
-CONSERVATION_NOTE = "Then colour by 'conservation' (ConSurf: its own grades)."
+CONSERVATION_NOTE = "Then colour by 'conservation'; a ConSurf grades file colours by its own grades."
+ALIGNMENT_TYPES = ("fasta", "fa", "aln", "sto", "txt")  # the uploader's accepted files (its help lists them in full)
 ALIGNMENT_HELP = (
     "an alignment with the structure's sequence among its rows: colour by 'conservation', and the Sequence view "
-    "shows the alignment · a ConSurf grades table (consurf_grades.txt) colours by ConSurf's own grades"
+    "shows the alignment · a ConSurf grades table (consurf_grades.txt) colours by ConSurf's own grades · files: "
+    + ", ".join(f".{t}" for t in ALIGNMENT_TYPES)
 )
 
 
@@ -576,7 +577,7 @@ def conservation_section(st, ss: MutableMapping) -> None:
     with st.expander("Conservation & UniProt", key="sec_conservation"):
         st.file_uploader(
             "Multiple sequence alignment or ConSurf grades table",
-            type=["fasta", "fa", "aln", "sto", "txt"],
+            type=list(ALIGNMENT_TYPES),
             key="msa_upload",
             on_change=store_alignment,
             args=(ss,),

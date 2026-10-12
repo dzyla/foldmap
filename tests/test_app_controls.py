@@ -558,6 +558,24 @@ def test_the_editors_are_tabs_in_edit_layout():
     assert all(at.toggle(key=f"{kind}__as_text") for kind in ("swap", "move", "rename", "mark", "domains"))
 
 
+def test_an_editor_tab_shows_no_second_heading_but_keeps_its_help_and_switch():
+    from foldmap.app_controls import EDITOR_HELP, EDITOR_TABS
+
+    at = opened(DATA / "2LZM.cif")
+    assert not [m.value for m in at.sidebar.markdown if m.value in {f"**{label}**" for label in EDITOR_TABS}]
+    for kind in ("swap", "move", "rename", "mark", "domains"):
+        assert at.toggle(key=f"{kind}__as_text").proto.help == EDITOR_HELP[kind]
+
+
+def test_option_labels_and_help_say_everything_in_full():
+    from foldmap.app_controls import ALIGNMENT_TYPES, CONSERVATION_NOTE, HBONDS
+
+    at = opened(DATA / "1UBQ.cif")
+    assert HBONDS["chains"] == "chain pairs" and "ConSurf grades file" in CONSERVATION_NOTE
+    assert all(f".{t}" in at.file_uploader(key="msa_upload").proto.help for t in ALIGNMENT_TYPES)
+    assert list(at.file_uploader(key="msa_upload").proto.type) == [f".{t}" for t in ALIGNMENT_TYPES]
+
+
 def test_credit_stays_visible_in_the_workspace():
     from foldmap import CREDIT
 
