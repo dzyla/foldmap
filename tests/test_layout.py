@@ -6,7 +6,7 @@ import pytest
 from foldmap.frame import Frame, view_frame
 from foldmap.layout import HELIX_RISE, HELIX_W, PITCH, SCALE, STRAND_RISE, build_layout
 from foldmap.style import Style
-from helpers import FID, fake_sse, loop_crossings, pipeline
+from helpers import FID, fake_sse, honest_crossings, pipeline
 
 DATA = Path(__file__).parent / "data"
 ON_SHEET = Style(helix_on_sheet="auto")  # helices packed on a sheet drawn over it (opt-in, Task 14)
@@ -475,13 +475,33 @@ def test_helix_packing_on_a_sheet_is_drawn_over_it(path, helices):
 
 
 def test_ferredoxin_helices_over_the_sheet_keep_crossings_low():
-    """2ACY with both helices over its sheet: at most the 2 loop crossings it had with them at its flanks (plan 11
-    Task 14 target, measured at b43695e)."""
+    """2ACY with both helices over its sheet: at most the 2 crossings it had with them at its flanks (plan 11 Task 14
+    target, measured at b43695e), counted honestly (loops under a helix not their own, stubs across a strand not
+    under their port), in under 0.8 of the area."""
     from foldmap.cli import make_layout
     from foldmap.route import route_loops
 
     lay, sses, bb = make_layout(FID / "2ACY.cif.gz", look=ON_SHEET)
-    assert loop_crossings(route_loops(lay, sses, bb)) <= 2
+    off = make_layout(FID / "2ACY.cif.gz")[0]
+    assert honest_crossings(lay, route_loops(lay, sses, bb)) <= 2
+    assert lay.width * lay.height < 0.8 * off.width * off.height
+
+
+def test_honest_crossings_count_loops_under_a_helix_and_stubs_off_their_port():
+    from foldmap.layout import Layout, Placed
+    from foldmap.route import Loop
+
+    strand = Placed(fake_sse("E", 1, 6), 0.0, 0.0, 4.0, np.pi / 2, 1.1)
+    other = Placed(fake_sse("E", 20, 25), 1.1, 0.0, 4.0, -np.pi / 2, 1.1)
+    helix = Placed(fake_sse("H", 8, 18), -0.5, 0.5, 2.0, 0.0, 1.0, over=True)  # its C port on `strand`
+    far = Placed(fake_sse("H", 30, 40), 5.0, 0.0, 2.0, np.pi / 2, 1.0)
+    lay = Layout({p.sse.id: p for p in (strand, other, helix, far)}, (-3, -3, 7, 3))
+    lay.on_sheet = {helix.sse.id: [strand.sse.id, other.sse.id]}
+    stub = Loop(helix.sse.id, far.sse.id, [helix.c_port, (1.6, 0.5), (1.6, 2.5), (5.0, 2.5), far.n_port], False, False)
+    assert honest_crossings(lay, [stub]) == 1  # its stub crosses `other`, which its port does not lie on
+    under = Loop(strand.sse.id, far.sse.id, [strand.c_port, (0.0, 3.0), (5.0, 3.0), far.n_port], False, False)
+    beneath = Loop(far.sse.id, other.sse.id, [(-1.0, 0.5), (0.5, 0.5)], False, False)
+    assert honest_crossings(lay, [under]) == 0 and honest_crossings(lay, [beneath]) == 2  # under the helix, `strand`
 
 
 def test_symmetric_and_template_sheets_have_no_helix_over_them():
