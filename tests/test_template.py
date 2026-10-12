@@ -20,10 +20,11 @@ def _row(lay, sses, chain):
 
 
 def test_tim_barrel_is_one_row_with_each_helix_between_its_strands():
-    """The (βα)8 row of the textbook TIM figures: 3 loop crossings, against 30 for the projected figure (b43695e). The
+    """The (βα)8 row of the textbook TIM figures: 2 loop crossings, against 30 for the projected figure (b43695e). The
     row is wider than the projected figure (27.2 x 13.0 = 353 units², against 20.3 x 14.2 = 288): eight strands, the
     ghost and seven helices, each helix with its name beside it, side by side. The crossings, not the area, decide
-    whether the figure reads (Task 12 ruling: the area limit was a target)."""
+    whether the figure reads (Task 12 ruling: the area limit was a target). Opening the barrel between β8 and β1
+    (the textbook cut) moved the free elements: 353.10 measured, hence 354."""
     lay, sses, bb = make_layout(DATA / "1TIM.cif", chains=["A"])
     strands, by_x = _row(lay, sses, "A")
     ys = {round(p.cy, 6) for p in strands}
@@ -39,21 +40,16 @@ def test_tim_barrel_is_one_row_with_each_helix_between_its_strands():
             assert any(lo < h.cx < hi and abs(h.cy - a.cy) < 1e-6 for h in between)  # in the gap, in the row
             assert any(np.cos(h.angle - a.angle) < -0.99 for h in between)  # antiparallel to the strands
             inrow += 1
-    # six units join strands side by side; the seventh closes the barrel (β7 -> β8: first and last slot), its helix
-    # in the row between the last strand and the ghost of the first
-    assert inrow == 6
+    assert inrow == 7  # the barrel opens between β8 and β1, which no unit joins: every unit joins neighbours
     (ghost,) = [g for g in lay.ghosts if g.sse.chain == "A"]
-    last = by_x[-1]
-    a, b = sorted((ghost.sse, last.sse), key=lambda s: s.start)
-    closure = [p for p in lay.placed.values() if p.sse.kind == "H" and a.end < p.sse.start < b.start]
-    assert any(
-        last.cx < h.cx < ghost.cx and abs(h.cy - last.cy) < 1e-6 and np.cos(h.angle - last.angle) < -0.99
-        for h in closure
-    )
+    assert ghost.sse in (by_x[0].sse, by_x[-1].sse) and {by_x[0].sse.start, by_x[-1].sse.start} == {
+        min(p.sse.start for p in strands),
+        max(p.sse.start for p in strands),
+    }
     assert [k for row in lay.ba_rows for k in row if lay.placed[k].sse.kind == "H"]  # Task 13 numbers these
     loops = route_loops(lay, sses, bb)
     assert loop_crossings(loops) <= 4  # 30 at b43695e
-    assert lay.width * lay.height <= 353.0  # measured (x1.22 the projected figure's 288 units²)
+    assert lay.width * lay.height <= 354.0  # measured 353.10 with the β8|β1 cut (x1.22 the projected 288 units²)
 
 
 def test_7tim_barrel_row_keeps_a_unit_without_helix():
@@ -136,3 +132,26 @@ def test_build_layout_takes_the_template_choice_from_the_style_by_default():
     assert rows(style=Style(fold_template="off")) == [] == rows(template="off")
     with pytest.raises(ValueError, match="fold_template"):
         rows(template="on")
+
+
+@pytest.mark.parametrize(
+    "path, kw",
+    [(DATA / "1TIM.cif", {"chains": ["A"]}), (DATA / "1TIM.cif", {}), (FID / "7TIM.cif.gz", {"chains": ["A"]})],
+)
+def test_template_barrel_opens_between_its_last_and_first_strand(path, kw):
+    """The textbook cut (the Commons TIM schematic): the barrel opens between β8 and β1, so the row reads β1 α1 β2 ...
+    β8 (or back) and the ghost repeats an end strand. build_sheets cut 1TIM between β7 and β8: the β7 -> β8 loop then
+    ran over the whole row from the real β7 to the closing helix beside the ghost."""
+    lay, sses, bb = make_layout(path, **kw)
+    loops = route_loops(lay, sses, bb)
+    for row in lay.ba_rows:
+        strands = sorted((lay.placed[k] for k in row if lay.placed[k].sse.kind == "E"), key=lambda p: p.cx)
+        rank = [sorted(strands, key=lambda p: p.sse.start).index(p) + 1 for p in strands]
+        assert rank in (list(range(1, 9)), list(range(8, 0, -1))), rank
+        (ghost,) = [g for g in lay.ghosts if g.sse.chain == strands[0].sse.chain]
+        assert ghost.sse in (strands[0].sse, strands[-1].sse)
+        x0, x1 = strands[0].cx, max(strands[-1].cx, ghost.cx)
+        for lp in loops:
+            if lp.a_id in row or lp.b_id in row:
+                xs = [x for x, _ in lp.points]
+                assert max(xs) - min(xs) < 0.5 * (x1 - x0), (lp.a_id, lp.b_id)  # no loop over the whole row

@@ -373,6 +373,29 @@ def _ba_units(sheet: Sheet, sses: list[SSE]) -> list[BAUnit]:
     return out
 
 
+def _open_at_ends(sheet: Sheet) -> Sheet:
+    """A barrel of one chain opened between its last and first strand in sequence (β8|β1 of a TIM barrel, the cut of
+    the textbook figures), when those two pair: the same ring of strands, turned so the row (_ba_template) reads in
+    sequence and no βα unit closes the barrel round the row. Anything else is returned as it is."""
+    n = len(sheet.strands)
+    if not sheet.closed or n < 3 or len({s.chain for s in sheet.strands}) != 1:
+        return sheet
+    by_seq = sorted(range(n), key=lambda k: sheet.strands[k].start)
+    lo, hi = sorted((by_seq[0], by_seq[-1]))
+    if hi - lo != 1:  # already the ends (0, n - 1), or not neighbours in the ring
+        return sheet
+    order = list(range(hi, n)) + list(range(hi))
+    kinds = {frozenset((k, k + 1)): kind for k, kind in enumerate(sheet.pair_kinds)}
+    d = sheet.directions
+    return Sheet(
+        [sheet.strands[k] for k in order],
+        [d[k] * d[order[0]] for k in order],
+        [kinds.get(frozenset((a, b)), "P" if d[a] == d[b] else "A") for a, b in zip(order, order[1:])],
+        True,
+        sheet.ambiguous,
+    )
+
+
 def template_applies(sheet: Sheet, sses: list[SSE]) -> bool:
     """Is the sheet drawn as a βα row (_ba_template)? An all-parallel sheet of at least four strands, its order not
     a guess, with at least 3/5 of its βα units in the row (1TIM: 7 of 7, 1LDM: 4 of 5). Mixed and antiparallel
@@ -1908,7 +1931,13 @@ def build_layout(
         raise ValueError(f"fold_template must be one of {', '.join(CHOICES['fold_template'])}; got {template!r}")
     as_rows = mode == "projected" and template == "auto"  # a stack row draws elements in sequence instead
     items = [
-        _ba_template(sh, _ba_units(sh, sses), frame, PITCH * style.strand_scale, HELIX_W * style.helix_scale)
+        _ba_template(
+            ring := _open_at_ends(sh),
+            _ba_units(ring, sses),
+            frame,
+            PITCH * style.strand_scale,
+            HELIX_W * style.helix_scale,
+        )
         if as_rows and template_applies(sh, sses)
         else _sheet_item(sh, frame, PITCH * style.strand_scale)
         for sh in sheets
