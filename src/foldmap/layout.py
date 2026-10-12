@@ -524,6 +524,18 @@ def template_choices(sheets: list[Sheet], sses: list[SSE], copies: dict[str, tup
     return out
 
 
+def template_rows(sheets: list[Sheet], sses: list[SSE], copies: dict[str, tuple[str, int]]) -> list[list[str]]:
+    """The elements of each sheet drawn as a βα row (template_choices), in projected mode with fold_template auto:
+    its strands and every helix of its in-row βα units (the one in the row and any drawn free beside it). Pure."""
+    rows = []
+    for sh, row in zip(sheets, template_choices(sheets, sses, copies)):
+        if row:
+            units = _ba_units(_open_at_ends(sh), sses)
+            helices = sorted({h.id for u in units if u.inrow for h in u.helices})
+            rows.append([s.id for s in sh.strands] + helices)
+    return rows
+
+
 def _ba_template(
     sheet: Sheet, units: list[BAUnit], frame: Frame, pitch: float = PITCH, helix_w: float = HELIX_W
 ) -> _Item:

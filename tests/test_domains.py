@@ -136,3 +136,30 @@ def test_loops_keep_off_domain_names():
         for x0, y0, x1, y1 in names:
             inside = (dense[:, 0] > x0) & (dense[:, 0] < x1) & (dense[:, 1] > y0) & (dense[:, 1] < y1)
             assert not inside.any()
+
+
+def _meet(a, b) -> bool:
+    """Do two (x0, y0, x1, y1) boxes overlap with some area?"""
+    return min(a[2], b[2]) > max(a[0], b[0]) and min(a[3], b[3]) > max(a[1], b[1])
+
+
+def test_a_ba_row_lies_in_one_domain_panel():
+    """1LDM's Rossmann sheet is drawn as one βα row (one rigid unit). Auto domains split it (D1 the first βαβαβ, D3
+    the second, α2 in D2), so three panels overlapped the row and each other; a row is never split now."""
+    from foldmap.layout import domain_panel
+    from helpers import FID
+
+    lay, _, _ = make_layout(FID / "1LDM.cif.gz", focus="protomer", domains="auto")
+    panels = {name: domain_panel(lay, name) for name, ids in lay.domains if ids}
+    assert len(panels) >= 2 and lay.ba_rows
+    names = sorted(panels)
+    for i, a in enumerate(names):
+        for b in names[i + 1 :]:
+            assert not _meet(panels[a], panels[b]), (a, b)
+    owner = {k: name for name, ids in lay.domains for k in ids}
+    for row in lay.ba_rows:
+        assert len({owner.get(k) for k in row}) == 1, row
+        for k in row:
+            for name, box in panels.items():
+                if name != owner.get(k):
+                    assert not _meet(lay.placed[k].rect, box), (k, name)

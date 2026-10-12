@@ -19,7 +19,7 @@ from .dssp import assign_dssp
 from .features import helices_on_sheets, sse_contacts
 from .frame import Frame, RadialFrame, dna_radial_frame, dna_view_frame, protomer_maps, symmetric_frame, view_frame
 from .io import load_backbone, load_links, load_nucleic, read_model
-from .layout import SCALE, _snap, build_layout, na_torn_by_unrolling, resolve
+from .layout import SCALE, _snap, build_layout, na_torn_by_unrolling, resolve, template_rows
 from .model import AUTO_NT, crop_nucleic, homolog_chains, nucleic_of_chains, nucleic_touching, res_ref
 from .names import apply_names, check_spec
 from .nucleic import StemView, stem_views, straight_duplex
@@ -294,7 +294,10 @@ def make_layout(
         if ann is None:
             raise ValueError("--domains uniprot needs UniProt annotation: add --uniprot auto (or an accession)")
         domains = _uniprot_domains(ann, sses)
-    named = _domains(domains, sses, contacts)
+    rows = (  # βα rows are rigid units: automatic domains never split one
+        template_rows(sheets, sses, copies) if mode == "projected" and (look or Style()).fold_template == "auto" else []
+    )
+    named = _domains(domains, sses, contacts, rows)
     for _, ids in named:  # a domain holds together: its elements pull on each other
         for a in range(len(ids)):
             for b in range(a + 1, len(ids)):
@@ -593,15 +596,16 @@ def _uniprot_domains(ann, sses) -> list[tuple[str, list[str]]]:
     return [(name, ids) for name, ids in out]
 
 
-def _domains(spec, sses, contacts) -> list[tuple[str, list[str]]]:
-    """[(name, element ids)] from 'auto' or [(name, [refs])]; every element in at most one domain."""
+def _domains(spec, sses, contacts, rows=()) -> list[tuple[str, list[str]]]:
+    """[(name, element ids)] from 'auto' (never splitting a βα row of `rows`) or [(name, [refs])]; every element in
+    at most one domain."""
     from .features import auto_domains
     from .layout import provisional
 
     if not spec:
         return []
     if spec == "auto":
-        return auto_domains(sses, contacts)
+        return auto_domains(sses, contacts, rows)
     if spec and all(
         isinstance(ids, list) and all(":" in i and "-" in i and not i.startswith("res:") for i in ids)
         for _, ids in spec

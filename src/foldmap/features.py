@@ -163,9 +163,14 @@ def helices_on_sheets(bb: Backbone, sses: list[SSE], sheets: list[Sheet]) -> dic
 DOMAIN_MIN_SSE_RESIDUES = 30  # residues in helices/strands an automatic domain needs
 
 
-def auto_domains(sses: list[SSE], contacts: dict[frozenset[str], int]) -> list[tuple[str, list[str]]]:
+def auto_domains(
+    sses: list[SSE], contacts: dict[frozenset[str], int], together: list[list[str]] = ()
+) -> list[tuple[str, list[str]]]:
     """Domains found as communities of the element contact graph (plus chain connectivity), named D1, D2...
-    in sequence order; [] when the protein reads as a single domain."""
+    in sequence order; [] when the protein reads as a single domain. A βα row of `together` (layout.template_rows,
+    drawn as one rigid unit) is never split: the communities holding its strands merge and its helices follow its
+    strands, so the row lies in one domain's panel (1LDM's Rossmann sheet: the contacts alone cut it in two and put
+    its α2 in the catalytic domain)."""
     import networkx as nx
 
     graph = nx.Graph()
@@ -193,6 +198,14 @@ def auto_domains(sses: list[SSE], contacts: dict[frozenset[str], int]) -> list[t
     if len(groups) < 2:
         return []
     if nx.community.modularity(graph, groups, weight="weight") < 0.3:
+        return []
+    kind = {s.id: s.kind for s in sses}
+    for keep in together:  # a βα row stays whole: its strands' communities merge, its helices follow its strands
+        strands = {k for k in keep if kind.get(k) == "E"}
+        mine = [set(g) for g in groups if set(g) & strands]
+        rest = [set(g) - set(keep) for g in groups if not set(g) & strands]
+        groups = [sorted(g) for g in [*rest, set().union(*mine, keep)] if g]
+    if len(groups) < 2:
         return []
     start = {s.id: (s.chain, s.start) for s in sses}
     groups.sort(key=lambda g: min(start[k] for k in g))
