@@ -2148,3 +2148,19 @@ def test_element_labels_keep_off_nucleic_acid_traces():
         assert not [q for q in beads if x0 - r < q[0] < x1 + r and y0 - r < q[1] < y1 + r], n
         assert not [s for s in segs if clip_len(*s, box) > 1e-9], n
         assert not [q for q in lay.na_letters.values() if x0 - gw < q[0] < x1 + gw and y0 - gh < q[1] < y1 + gh], n
+
+
+def test_stem_name_slots_do_not_depend_on_the_installed_fonts(monkeypatch):
+    """Names are measured from built-in Liberation Sans Bold metrics: on a DejaVu-only machine (a bare container)
+    7 of 1KX5's 22 slots and its bounds changed while the layout measured with the fonts it found."""
+    from matplotlib import font_manager
+
+    lay, _, _ = make_layout(_path("1KX5"))
+    want = ([(d.label_side, d.label_out) for d in lay.stems], lay.bounds)
+    dejavu = font_manager.findfont(font_manager.FontProperties(family="DejaVu Sans", weight="bold"))
+    monkeypatch.setattr(font_manager, "findfont", lambda *a, **k: dejavu)
+    monkeypatch.setattr(font_manager.fontManager, "findfont", lambda *a, **k: dejavu)
+    monkeypatch.setattr(font_manager.fontManager, "_find_fonts_by_props", lambda *a, **k: [dejavu])
+    lay, _, _ = make_layout(_path("1KX5"))
+    assert ([(d.label_side, d.label_out) for d in lay.stems], lay.bounds) == want
+

@@ -40,7 +40,6 @@ from .layout import (
     NT_ROW,
     PITCH,
     SHAFT,
-    TEXT_FONTS,
     Layout,
     Placed,
     PlacedStem,
@@ -68,7 +67,7 @@ _HEAD_HALF = HEAD / 2
 _HEAD_LEN = 0.7
 _CORNER = 0.3
 _EXT = {".svg": "svg", ".pdf": "pdf", ".png": "png"}
-_FONTS = TEXT_FONTS  # journal sans first
+_FONTS = ["Arial", "Helvetica", "Liberation Sans", "Nimbus Sans", "DejaVu Sans"]  # journal sans first
 _MEASURE = FontProperties(family=_FONTS, size=10)  # text widths are measured at this size and scaled
 _RC = {"font.family": "sans-serif", "font.sans-serif": _FONTS}
 

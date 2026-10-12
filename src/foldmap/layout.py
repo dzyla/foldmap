@@ -12,6 +12,7 @@ from typing import NamedTuple
 
 import numpy as np
 
+from . import text_metrics
 from .features import helix_bundles
 from .frame import Frame, symmetric_frame, view_frame
 from .model import SSE, Nucleic, Sheet, group_by_chain
@@ -2030,20 +2031,24 @@ def _body_distance(q, d) -> float:
 
 
 _SLOTS = (0.25, 0.5, 0.75)  # page units a stem's name may move further out, when neither side is clear beside it
-TEXT_FONTS = ["Arial", "Helvetica", "Liberation Sans", "Nimbus Sans", "DejaVu Sans"]  # render's, journal sans first
-_INK_FIT = 0.93  # turned names are drawn 0.88-1.03 the size of their TextPath box (NA fixtures; hinting narrows small
+_INK_FIT = (
+    0.93  # turned names are drawn 0.88-1.03 the size of their advance-width box (NA fixtures; hinting narrows small
+)
 # text the most): the middle, so a name steps out only where its drawn text meets a letter
 _INK_GLYPH = 0.6  # half a base letter's drawn box, in ems of its own size (rendered: 0.59-0.62 on the NA fixtures)
 
 
-def _text_width(text: str, bold: bool) -> float:
-    """A text's advance width in ems of its own size, measured as render measures its legend (TextPath, unhinted;
-    within 5% of the drawn extent)."""
-    from matplotlib.font_manager import FontProperties
-    from matplotlib.textpath import text_to_path
+_FALLBACK_WIDTH = 0.6  # ems: a character the metric table lacks (about a bold lower-case letter)
 
-    font = FontProperties(family=TEXT_FONTS, size=10, weight="bold" if bold else "normal")
-    return text_to_path.get_text_width_height_descent(text, font, ismath=False)[0] / 10
+
+def _text_width(text: str) -> float:
+    """A bold name's width in ems of its own size, from the built-in metrics of Liberation Sans Bold (Arial Bold's
+    metrics; text_metrics.py), never from the fonts this machine happens to have, so the layout is the same
+    everywhere: its advances plus pair kerning, as render's TextPath measure adds them up; snapped."""
+    advance, kern = text_metrics.ADVANCE, text_metrics.KERN
+    fallback = _FALLBACK_WIDTH * text_metrics.UNITS
+    pen = sum(advance.get(c, fallback) for c in text) + sum(kern.get(a + b, 0) for a, b in zip(text, text[1:]))
+    return float(_snap(pen / text_metrics.UNITS))
 
 
 def _ink_em(layout: Layout, font_scale: float) -> float:
@@ -2061,7 +2066,7 @@ def _stem_name_ink(d: PlacedStem, em: float) -> tuple[float, float, float, float
     """The upright box a stem's name is drawn in (render: 0.8 em, bold, turned along the stem, one line high), one em
     being `em`, fitted to the drawn extents (_INK_FIT)."""
     size = 0.8 * em * _INK_FIT
-    along, across = size * _text_width(d.name, True) / 2, size / 2
+    along, across = size * _text_width(d.name) / 2, size / 2
     c, s = abs(np.cos(d.angle)), abs(np.sin(d.angle))
     return centred_box(*stem_label_pos(d), c * along + s * across, s * along + c * across)
 
