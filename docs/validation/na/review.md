@@ -202,3 +202,15 @@ Failure lists that changed with no change in value:
 - This rerun is the first report.md/report.json written under those limits, so the Thresholds line changes with it.
 
 Seconds differ by up to 2.1 s on single entries (3KTQ 2.6 -> 0.5). This is machine load only.
+
+## Plan 11b rerun (2026-10-12, HEAD 7fc8801 after plan-11 Tasks 12-15 and the Task 16 domain-name fix; report.md, report.json): **33/39 pass**
+
+The same six entries fail as in the 11a rerun: 30QM, 4PJO, 3KTQ, 4YBB, 1YTB and 3CRX. No entry that passed now fails.
+
+**No metric changed.** report.json was compared field by field with the 11a rerun (2d08b75). Every field of all 39 entries is identical apart from `seconds`, so no commit needs attributing. This is what the 11b design predicts for these entries:
+- the βα template (1a9918c, a8acd06) applies only to all-parallel sheets of 4 to 10 strands, and no campaign entry has one;
+- names (4cf9802) and helix-over-sheet (85ed1e6, opt-in since 5bcd2ba, and off whenever nucleic acid is drawn) are off by default;
+- domain colours, the domain bar (bee6cf8) and the name corner (7fc8801) apply only when domains are given, and the campaign gives none;
+- 46b2e90 (kinked helix pieces held end to end) moves only pieces split at a kink, and no campaign protein has a kink split.
+
+Seconds differ by up to 2.3 s on single entries (4YBB 12.4 -> 10.1; every other entry by at most 0.7 s). This is machine load only: the campaign ran beside two test-suite runs.
