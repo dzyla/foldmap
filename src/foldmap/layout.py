@@ -71,6 +71,7 @@ class Placed:
     label: str = ""
     ghost: bool = False  # repeat of a barrel's first strand, drawn to show the sheet closes
     ends: str = ""  # "N", "C" or "NC" when the chain starts/ends here (its stub and letter need room)
+    label_side: int = 1  # a helix's label: 1 on its upper side, -1 on the other (_choose_label_sides)
 
     @property
     def direction(self) -> np.ndarray:
@@ -136,6 +137,8 @@ class PlacedStem:
     margin: float = 0.0  # Å the first arm is seen beside the second (_side_signal): how clearly the side is seen
     hairpin: int = -1  # nucleotides of the hairpin loop over the stem's inner tip (-1: no hairpin loop there)
     ghost: bool = False
+    label_side: int = 1  # its name beside the first rail (1) or the second (-1): _choose_label_sides
+    label_out: float = 0.0  # and this much further out than the first slot (_choose_label_sides)
 
     @property
     def direction(self) -> np.ndarray:
@@ -1861,6 +1864,7 @@ def build_layout(
     )
     lay.na_traces = traces
     lay.frame = frame
+    _choose_label_sides(lay, style.font_scale)  # after naming: a name's length sets its box
     if keep_depth and len(rows) > 1:  # wrapped into rows of whole chains: each row gets its own band
         lay.stack_rows = [[m.sse.id for it in row for m in it.members if isinstance(m, Placed)] for row in rows]
     if traces:
@@ -1943,9 +1947,9 @@ def provisional(sses: list[SSE]) -> Layout:
 
 
 def helix_label_pos(p: Placed) -> tuple[float, float]:
-    """Beside the bar, on its upper side, clear of the body."""
+    """Beside the bar, on its upper side (the other with label_side -1), clear of the body."""
     nx, ny = -np.sin(p.angle), np.cos(p.angle)
-    side = (p.width / 2 + LABEL_GAP) * (1 if ny >= 0 else -1)
+    side = (p.width / 2 + LABEL_GAP) * (1 if ny >= 0 else -1) * p.label_side
     return float(p.cx + nx * side), float(p.cy + ny * side)
 
 
@@ -1985,8 +1989,9 @@ NT_ROW = 0.55  # a base letter sits this far out from its nucleotide
 
 
 def stem_label_pos(d: PlacedStem) -> tuple[float, float]:
-    """Where a stem's name goes: beside it on its first rail's side, a glyph beyond its base letters."""
-    p = np.array([d.cx, d.cy]) + d.normal * (d.width / 2 + NT_ROW + _GLYPH_H)
+    """Where a stem's name goes: beside it on its first rail's side (the second's with label_side -1), a glyph
+    beyond its base letters."""
+    p = np.array([d.cx, d.cy]) + d.normal * d.label_side * (d.width / 2 + NT_ROW + _GLYPH_H + d.label_out)
     return float(p[0]), float(p[1])
 
 
@@ -1995,6 +2000,84 @@ def _stem_label_box(d: PlacedStem) -> tuple[float, float, float, float]:
     along, across = _GLYPH_W * len(d.name) / 2 + 0.05, _GLYPH_H / 2
     c, s = abs(np.cos(d.angle)), abs(np.sin(d.angle))
     return centred_box(*stem_label_pos(d), c * along + s * across, s * along + c * across)
+
+
+def _box_meets_body(box, d) -> bool:
+    """Does the box (x0, y0, x1, y1) overlap the body (length x width, turned by its angle) of the stem or
+    element d? Separating axes: the page's two and the body's two."""
+    x0, y0, x1, y1 = box
+    c = np.array([(x0 + x1) / 2 - d.cx, (y0 + y1) / 2 - d.cy])
+    hx, hy = (x1 - x0) / 2, (y1 - y0) / 2
+    for u in (np.array([1.0, 0.0]), np.array([0.0, 1.0]), d.direction, d.normal):
+        reach = abs(u[0]) * hx + abs(u[1]) * hy + abs(u @ d.direction) * d.length / 2 + abs(u @ d.normal) * d.width / 2
+        if abs(u @ c) >= reach:
+            return False
+    return True
+
+
+def _body_distance(q, d) -> float:
+    """How far the point q is from the body (length x width, turned) of the stem d; 0 inside it."""
+    v = np.subtract(q, (d.cx, d.cy))
+    a, b = abs(v @ d.direction) - d.length / 2, abs(v @ d.normal) - d.width / 2
+    return float(np.hypot(max(a, 0.0), max(b, 0.0)))
+
+
+_SLOTS = (0.25, 0.5, 0.75)  # page units a stem's name may move further out, when neither side is clear beside it
+_INK_CHAR, _INK_LINE = 0.55, 1.0  # a bold label's mean character width and its line's height, in ems of its own size
+_INK_GLYPH = 0.6  # half a base letter's drawn box, in ems of its own size (measured on 1KX5: 0.49 x 0.46 at 0.42)
+_INK_ROOM = 1.15  # room for the page to grow after routing (its text then grows with it), as na_labels._GAP_ROOM
+
+
+def _ink_em(layout: Layout, font_scale: float) -> float:
+    """Page units of one em of the drawn text, from the page the placed elements, stems and traces span so far
+    (it only grows after routing: _INK_ROOM covers that)."""
+    rects = [p.rect for p in [*layout.placed.values(), *layout.ghosts, *layout.stems]]
+    rects += [(*pts.min(axis=0), *pts.max(axis=0)) for pts in map(np.asarray, layout.na_traces.values())]
+    if not rects:
+        return 0.0
+    r = np.asarray(rects, float)
+    return text_em(float(r[:, 2].max() - r[:, 0].min()) + 2.0) * font_scale * _INK_ROOM
+
+
+def _stem_name_ink(d: PlacedStem, em: float) -> tuple[float, float, float, float]:
+    """The box a stem's name is drawn in (render: 0.8 em, bold, turned along the stem), one em being `em`."""
+    along, across = 0.8 * em * _INK_CHAR * len(d.name) / 2, 0.8 * em * _INK_LINE / 2
+    c, s = abs(np.cos(d.angle)), abs(np.sin(d.angle))
+    return centred_box(*stem_label_pos(d), c * along + s * across, s * along + c * across)
+
+
+def _choose_label_sides(layout: Layout, font_scale: float = 1.0) -> None:
+    """Each stem's name beside its first rail (label_side 1) unless its box meets another stem's name decided before
+    it, another stem's body, an element or an element's name, or sits nearer another stem than its own, or its
+    drawn text meets a base letter of any stem; then beside the second rail if that is clear; then further out
+    (_SLOTS), either side (the upright box of a name turned 30-60 degrees can reach its own stem's letters on both
+    sides alike); else on the first side after all. Runs once the names (and so the boxes' widths) are final."""
+    em = _ink_em(layout, font_scale)
+    g = 0.75 * em * _INK_GLYPH  # a base letter: render draws it at 0.75 em
+    rects = [p.rect for p in [*layout.placed.values(), *layout.ghosts]]
+    rects += [b for name, b in label_boxes(Layout(layout.placed, layout.bounds), []) if name.startswith("label:")]
+    letters = [(x - g, y - g, x + g, y + g) for d in layout.stems for x, y in (d.point(k, NT_ROW) for k in d.axial)]
+    named: list[tuple[float, float, float, float]] = []
+    for d in layout.stems:
+        others = [e for e in layout.stems if e is not d]
+        slots = [(side, out) for out in (0.0, *_SLOTS) for side in (1, -1)]
+        d.label_side, d.label_out = next(
+            (s for s in slots if _name_clear(d, s, others, named, rects, letters, em)), (1, 0.0)
+        )
+        named.append(_stem_label_box(d))
+
+
+def _name_clear(d: PlacedStem, slot, others, named, rects, letters, em: float) -> bool:
+    """Is the stem's name clear in this slot (label_side, label_out)? See _choose_label_sides. Leaves d there."""
+    d.label_side, d.label_out = slot
+    box, at = _stem_label_box(d), stem_label_pos(d)
+    own = _body_distance(at, d)
+    return not (
+        overlaps_any(box, named)
+        or overlaps_any(box, rects)
+        or any(_box_meets_body(box, e) or _body_distance(at, e) <= own for e in others)
+        or overlaps_any(_stem_name_ink(d, em), letters)
+    )
 
 
 def label_boxes(layout: Layout, sses: list[SSE]) -> list[tuple[str, tuple[float, float, float, float]]]:

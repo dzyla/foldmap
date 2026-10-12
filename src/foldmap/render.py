@@ -472,7 +472,8 @@ def _draw_strands(ink: _NAInk, layout: Layout, style: str, where: dict, letters:
             letters[key] = (np.asarray(xy if style == "letters" else layout.na_letters[key]), 0.0)
 
 
-_TIE_LABEL = 0.75 * 0.75  # a tie label's size: three quarters of a base letter's (0.75 of the text size)
+_TIE_LABEL = 0.75  # a tie label's size: a base letter's (0.75 of the text size)
+TIE_LEGEND = "a…a: tertiary base pair"  # the legend's words for a tie drawn as two labelled marks
 
 
 @dataclass
@@ -512,8 +513,9 @@ def _draw_na_marks(ink: _NAInk, layout: Layout, style: str, residue_colour, pt_p
                 tie.label,
                 ha="center",
                 va="center",
-                fontsize=ink.font * _TIE_LABEL,  # smaller than the base letters, upright and grey: not a base
-                color=_legible(ink.rung),
+                fontsize=ink.font * _TIE_LABEL,  # a base letter's size, upright, bold, in the mark's colour
+                fontweight="bold",
+                color=_legible(ink.colour(tie.a[0])),
                 zorder=4,
             )
             t.set_gid(f"{gid}:label")
@@ -1897,6 +1899,10 @@ def _legend_entries(
             rna = [any(s.rna for s in strands if s.chain == c) for c in mine]
             kind = "RNA" if all(rna) else "DNA" if not any(rna) else "DNA/RNA"
             entries.append((colour, f"{kind} ({', '.join(mine)})"))
+    if layout.nucleic is not None and look.legend:  # ties drawn as two labelled marks: what the letters mean
+        tie = next((t for t in layout.na_ties if t.label), None)
+        if tie is not None:
+            entries.append((na_colours[layout.nucleic.strands[tie.a[0]].chain], TIE_LEGEND))
     if hb is not None and hb.lines and look.legend:
         entries.append((look.hbond_color, hb.legend()))
     if linked and look.legend:
@@ -2400,6 +2406,27 @@ def _draw_legend(c: _Canvas, layout: Layout, legend: _Legend) -> None:
         elif _NA_ENTRY.match(text):  # a nucleic-acid backbone: a short thick stroke, not a chain's square
             (rail,) = c.ax.plot([x, x + 0.6], [y, y], color=colour, lw=c.lw * 2.4, solid_capstyle="butt")
             rail.set_gid("legend-na")
+        elif text == TIE_LEGEND:  # two short ticks, each with its letter, as a tie is drawn
+            (ticks,) = c.ax.plot(
+                [x + 0.1, x + 0.1, np.nan, x + 0.5, x + 0.5],
+                [y - 0.3, y, np.nan, y - 0.3, y],
+                color=colour,
+                lw=c.lw * 1.2,
+                solid_capstyle="round",
+            )
+            ticks.set_gid("legend-tie")
+            for n, tx in enumerate((x + 0.1, x + 0.5)):
+                a = c.ax.text(
+                    tx,
+                    y + 0.22,
+                    "a",
+                    ha="center",
+                    va="center",
+                    fontsize=c.font * _TIE_LABEL,
+                    fontweight="bold",
+                    color=_legible(colour),
+                )
+                a.set_gid(f"legend-tie-label:{n}")
         elif text.startswith("chromophore"):  # the mark itself: a star
             star = Polygon(_star(x + 0.3, y, 0.42), closed=True, fc=colour, ec=LIGAND_EDGE, lw=c.lw * 0.7)
             star.set_gid("legend-linked")

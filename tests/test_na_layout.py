@@ -514,11 +514,11 @@ def test_a_long_tie_is_two_labelled_marks():
     fig, _ = make_figure_and_loops(_path("1EHZ"))
     marks, labels = _gid(fig, "na:tie:19-56:mark"), _gid(fig, "na:tie:19-56:label")
     assert len(marks) == 2 and [t.get_text() for t in labels] == ["a", "a"]
-    for t in labels:  # not a base: smaller than the letters, upright, in the rung grey
+    for t in labels:  # a base letter's size, upright, bold in the tick's colour; the legend says what it means
         base = _gid(fig, "na:nt:")[0]
-        assert t.get_fontsize() == pytest.approx(0.75 * base.get_fontsize())
-        assert t.get_fontstyle() == "normal" and base.get_fontstyle() == "normal"
-        assert to_hex(t.get_color()) != to_hex(base.get_color())
+        assert t.get_fontsize() == pytest.approx(base.get_fontsize())
+        assert t.get_rotation() == 0 and t.get_fontweight() == "bold" and base.get_fontweight() == "normal"
+        assert to_hex(t.get_color()) == to_hex(marks[0].get_color()) != to_hex(base.get_color())
     assert not [a for a in _gid(fig, "na:tie:") if not a.get_gid().endswith((":mark", ":label"))]
 
 
@@ -2089,3 +2089,42 @@ def test_a_gap_is_named_as_a_gap_in_warnings():
     na = SimpleNamespace(strands=[SimpleNamespace(labels=labels)])
     assert path_name(NAPath("gap", 0, [], [], []), na) == "gap after I:10"
     assert path_name(NAPath("tail", 0, [8, 9], [], []), na) == "strand I:9-10"
+
+
+@pytest.mark.parametrize("pdb", ["2GIS", "30QM", "1EHZ", "4OO8", "1KX5", "3CRX"])
+def test_stem_labels_sit_by_their_own_stem_clear_of_other_text(pdb):
+    from matplotlib.backends.backend_agg import FigureCanvasAgg
+
+    from foldmap.cli import make_figure
+    from foldmap.layout import stem_label_pos
+
+    lay, sses, bb = make_layout(NA / f"{pdb}.cif.gz")
+    route_loops(lay, sses, bb)
+
+    def body(p, d):
+        v = np.subtract(p, (d.cx, d.cy))
+        a, b = abs(v @ d.direction) - d.length / 2, abs(v @ d.normal) - d.width / 2
+        return float(np.hypot(max(a, 0), max(b, 0)))
+
+    for k, d in enumerate(lay.stems):
+        p = stem_label_pos(d)
+        dist = [body(p, e) for e in lay.stems]
+        assert dist[k] == min(dist) and dist[k] <= d.width, (pdb, d.name)
+    fig = make_figure(NA / f"{pdb}.cif.gz")
+    FigureCanvasAgg(fig).draw()
+    r = fig.canvas.get_renderer()
+    texts = [(t.get_gid() or "", t.get_window_extent(r)) for t in fig.axes[0].texts]
+    for g, box in texts:
+        if g.startswith("na:label:"):
+            assert not [h for h, b in texts if h != g and box.overlaps(b)], (pdb, g)  # 1KX5 labels 6, 9, 12, 15 did
+
+
+def test_tie_letters_are_base_letter_size_and_explained():
+    from foldmap.cli import make_figure
+
+    ax = make_figure(NA / "1EHZ.cif.gz").axes[0]
+    ties = [t for t in ax.texts if (t.get_gid() or "").endswith(":label") and (t.get_gid() or "").startswith("na:tie:")]
+    letters = [t for t in ax.texts if (t.get_gid() or "").startswith("na:nt:")]
+    assert ties and {t.get_fontsize() for t in ties} == {letters[0].get_fontsize()}
+    assert any("tertiary base pair" in t.get_text() for t in ax.texts)
+    assert [ln for ln in ax.lines if ln.get_gid() == "legend-tie"]  # drawn as the two ticks
