@@ -18,7 +18,7 @@ from pathlib import Path
 
 from foldmap import CREDIT, app_jobs
 from foldmap.app_controls import chains_section, prepare, setting, show_section, style_section, touched
-from foldmap.app_edits import shown
+from foldmap.app_edits import chain_choices, shown
 from foldmap.app_views import Workspace, download_menu, explorer_view, figure_view, said, sequence_view
 from foldmap.cli import _adjustments, _domain_spec
 from foldmap.fetch import ALIGNMENT_SUFFIXES, fetch, keep_upload, source_id
@@ -228,6 +228,7 @@ def settings_from_document(doc: dict) -> dict:
     for key in ("symmetry", "membrane"):  # unquoted `off` in YAML is False
         if out[key] is False:
             out[key] = "off"
+    out["assembly"] = out["assembly"] or "auto"  # `assembly: ""` draws as auto: the picker shows it so
     out["up"], out["view"] = parse_vector(out["up"], "up"), parse_vector(out["view"], "view")
     if isinstance(out["protomers"], str):
         out["protomers"] = parse_protomers(out["protomers"])
@@ -538,7 +539,8 @@ def main() -> None:
             elements=result["elements"],
             protein_chains=result["chains"],
             na_chains=result["na_chains"],
-            all_chains=list(dict.fromkeys([*result["chains"], *result["na_chains"]])),
+            all_chains=chain_choices(size["chain_ids"], [*result["chains"], *result["na_chains"]]),
+            chains_total=len(result["chains"]),  # protein chains, as the summary counts them
             assemblies=size["assemblies"],
             share_id="" if file or local_path else source_id(text) or "",
             stage="edit",

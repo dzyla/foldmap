@@ -342,6 +342,7 @@ def test_app_reads_hand_written_layout_values_like_the_command_line():
         got["up"] == [0.0, 0.0, 1.0] and got["view"] == [1.0, 0.0, 0.0] and got["protomers"] == [["A", "B"], ["C", "D"]]
     )
     assert settings_from_document({"layout": {"flip_v": "no", "dna": "no"}})["flip_v"] is False
+    assert settings_from_document({"layout": {"assembly": ""}})["assembly"] == "auto"  # the picker's own value
     with pytest.raises(ValueError, match="needs three numbers"):
         settings_from_document({"layout": {"up": "1,2"}})
 

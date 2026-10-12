@@ -188,6 +188,36 @@ def test_chain_picker_keeps_every_chain_while_some_are_drawn():
     assert at.session_state["protein_chains"] == ["B", "D"]  # what the highlight and Sequence pickers offer
 
 
+def test_chain_picker_offers_the_structure_s_chains():
+    """From the file (the size check), not from a figure: nucleic-acid strands too, in the file's order."""
+    at = opened(DATA / "1LMB.cif")
+    assert at.multiselect(key="chains__pick").options == ["1", "2", "3", "4"]
+    at.selectbox(key="assembly").select("asu").run()
+    assert at.multiselect(key="chains__pick").options == ["1", "2", "3", "4"]
+
+
+def test_top_bar_says_how_many_chains_are_drawn():
+    at = opened(DATA / "2HHB.cif")
+    summary = lambda: at.session_state["info"]  # noqa: E731
+    assert summary().startswith("4 chains · ")
+    at.multiselect(key="chains__pick").set_value(["B", "D"]).run()
+    assert not at.exception and summary().startswith("2 of 4 chains · ")
+    assert any(c.value.startswith("2 of 4 chains · ") for c in at.caption)
+    at.multiselect(key="chains__pick").set_value([]).run()
+    assert summary().startswith("4 chains · ")
+
+
+def test_long_chain_and_assembly_ids_are_cut_in_the_pickers():
+    from foldmap.app_controls import capped
+
+    assert capped("A") == "A" and capped("x" * 24) == "x" * 24 and capped("x" * 40) == "x" * 23 + "…"
+    at = opened(DATA / "2HHB.cif")
+    up = ("layout.yaml", f"foldmap: 1\nlayout: {{assembly: {'x' * 40}}}\n".encode(), "application/x-yaml")
+    at.file_uploader(key="layout_upload").set_value(up).run()
+    assert not at.exception and at.session_state["assembly"] == "x" * 40
+    assert at.selectbox(key="assembly").options[-1] == "x" * 23 + "…"
+
+
 def test_highlight_symmetry_assembly_and_focus():
     from foldmap.app_edits import SYMMETRIES
 

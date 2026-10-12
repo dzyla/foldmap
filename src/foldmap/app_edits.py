@@ -275,6 +275,13 @@ def display(ref: str, choices: list[tuple[str, str]]) -> str:
 
 
 # ------------------------------------------------------------------------------------------- choices
+def chain_choices(deposited: list[str], drawn: list[str]) -> list[str]:
+    """The chains the Chains picker offers: the file's own, in its order (a chain the first figure left out can
+    still be asked for), unless that figure drew an assembly's copies, whose names the file does not hold (A1, A2):
+    then the chains drawn."""
+    return list(deposited) if set(drawn) <= set(deposited) else list(dict.fromkeys(drawn))
+
+
 _UNPALETTED = ("plddt", "bfactor", "hydropathy", "conservation", "sequence")  # colourings with their own scale
 
 

@@ -17,6 +17,7 @@ from functools import partial
 from typing import Any, NamedTuple
 
 from foldmap import app_edits, app_jobs
+from foldmap.app_controls import capped
 from foldmap.app_edits import shown
 
 _LOG = logging.getLogger("foldmap.app")  # the app's logger: one name for every app message on the server
@@ -132,8 +133,10 @@ def figure_view(ws: Workspace) -> None:
             protein_chains=result["chains"],
             na_chains=result["na_chains"],
         )
-        if not json.loads(target).get("chains"):  # the chain picker offers every chain, also while some are drawn
-            ss["all_chains"] = list(dict.fromkeys([*result["chains"], *result["na_chains"]]))
+        summary = result["summary"]  # the top bar describes the figure drawn
+        if json.loads(target).get("chains"):
+            summary = app_jobs.restricted_summary(summary, ss.get("chains_total", 0))
+        ss["info"] = summary
         slow = result["seconds"]  # the drawing itself, as at load (not the job's start-up or a cache hit)
         if slow > ws.lim.slow and ss.get("slow_noted") != ws.path:  # the toggle is created later in this run
             ss.update(auto_redraw=False, slow_noted=ws.path, slow_seconds=slow)
@@ -207,7 +210,7 @@ def sequence_view(ws: Workspace) -> None:
         )
         st.toggle("Unmodelled ends", key="seq_full", persist_state="session")
         if len(chains) > 1:
-            st.selectbox("Chain", chains, key="seq_chain", width=160, persist_state="session")
+            st.selectbox("Chain", chains, key="seq_chain", format_func=capped, width=160, persist_state="session")
     view_json = sequence_json(ss)
     try:
         with ws.status, st.spinner("Drawing…"):

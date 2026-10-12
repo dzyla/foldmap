@@ -124,6 +124,14 @@ def test_element_choices_name_the_drawn_element():
     assert element_choices(elements) == [("res:A:23-34", "α1 · A 23–34"), ("res:B:23-34", "α1 · B 23–34")]
 
 
+def test_chain_choices_are_the_file_s_chains_unless_an_assembly_adds_copies():
+    from foldmap.app_edits import chain_choices
+
+    assert chain_choices(["1", "2", "3", "4"], ["3", "4", "1", "2"]) == ["1", "2", "3", "4"]  # file order
+    assert chain_choices(["A", "B", "C", "D"], ["B", "D"]) == ["A", "B", "C", "D"]  # the rest can be asked for
+    assert chain_choices(["A"], ["A1", "A2", "A3"]) == ["A1", "A2", "A3"]  # copies: named as drawn
+
+
 def test_palette_is_hidden_only_where_it_colours_nothing():
     assert palette_used("chain", "black") and palette_used("shade", "black") and palette_used("domain", "black")
     assert not palette_used("plddt", "black") and not palette_used("sequence", "residue")

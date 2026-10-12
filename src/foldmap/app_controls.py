@@ -174,6 +174,12 @@ def nucleic_block(st, ss: MutableMapping) -> None:
     st.toggle("Check contacts against the coordinates", **setting(ss, "check_contacts"))
 
 
+def capped(option, most: int = 24) -> str:
+    """A picker's label for a chain or assembly id, which a file may make any length: at most `most` characters."""
+    text = str(option)
+    return text if len(text) <= most else text[: most - 1] + "…"
+
+
 def listed(options, current) -> list:
     """A picker's options, then what the setting holds that they lack (a layout file may name anything): a widget
     never holds a value it does not offer."""
@@ -197,6 +203,7 @@ def chains_section(st, ss: MutableMapping) -> None:
                 "Chains",
                 listed(ss.get("all_chains") or [], ss.get("chains__pick")),
                 placeholder="All chains",
+                format_func=capped,
                 help="draw only these chains (protein and nucleic acid each restricted only if some are named)",
                 **part(ss, "chains__pick", "chains"),
             )
@@ -205,6 +212,7 @@ def chains_section(st, ss: MutableMapping) -> None:
         st.selectbox(
             "Assembly",
             listed(["auto", "asu", *(ss.get("assemblies") or [])], ss.get("assembly")),
+            format_func=capped,
             help="auto: the file's first biological assembly when it adds copies · asu: as deposited · or an "
             "assembly of the file",
             **setting(ss, "assembly"),
@@ -229,6 +237,7 @@ def chains_section(st, ss: MutableMapping) -> None:
                 "Chains in full",
                 listed(ss.get("protein_chains") or [], ss.get("focus__chains")),
                 placeholder="Pick chains",
+                format_func=capped,
                 label_visibility="collapsed",
                 **part(ss, "focus__chains", "focus"),
             )
@@ -253,6 +262,7 @@ def highlight_block(st, ss: MutableMapping) -> None:
                 "Highlighted chains",
                 listed(ss.get("protein_chains") or [], ss.get("highlight__chains")),
                 placeholder="Pick chains",
+                format_func=capped,
                 label_visibility="collapsed",
                 **part(ss, "highlight__chains", "highlight"),
             )

@@ -142,6 +142,17 @@ def test_contacts_are_checked_on_request():
 def test_size_job_counts_before_drawing():
     size = app_jobs.size_job(DATA / "1UBQ.cif")
     assert size["residues"] == 76 and size["chains"] == 1 and isinstance(size["assemblies"], list)
+    assert size["chain_ids"] == ["A"]
+    assert app_jobs.size_job(DATA / "1LMB.cif")["chain_ids"] == ["1", "2", "3", "4"]  # nucleic acid too
+
+
+def test_a_restricted_figure_says_how_many_chains_it_shows():
+    from foldmap.app_jobs import restricted_summary
+
+    assert restricted_summary("2 chains · 574 residues", 6) == "2 of 6 chains · 574 residues"
+    assert restricted_summary("1 chain · 76 residues", 4) == "1 of 4 chains · 76 residues"
+    assert restricted_summary("6 chains · 1,248 residues", 6) == "6 chains · 1,248 residues"  # all of them
+    assert restricted_summary("40 nucleotides", 2) == "40 nucleotides"  # no protein chain drawn
 
 
 def test_limits_come_from_the_environment(monkeypatch):
@@ -428,3 +439,4 @@ def test_contacts_key_names_only_what_changes_the_contacts():
     assert contacts_key(base) == contacts_key({**base, **look})
     assert contacts_key(base) != contacts_key({**base, "chains": "A"})
     assert contacts_key(base) != contacts_key({**base, "na_extent": "all"})
+    assert contacts_key(base) != contacts_key({**base, "mode": "stack"})

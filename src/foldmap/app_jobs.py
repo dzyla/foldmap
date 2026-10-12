@@ -21,6 +21,7 @@ import json
 import logging
 import multiprocessing
 import os
+import re
 import signal
 import sys
 import tempfile
@@ -389,9 +390,13 @@ def contacts_job(path, settings_json: str) -> dict | None:
 # The settings that decide the contacts check's answer: what is drawn (chains, assembly, symmetry and the subunit
 # shown, which nucleic acid, the elements), whether the beads are drawn (letters or beads) and which residues have a
 # colour (the colouring and the data behind it). The bead colours themselves are checked against the figure's own
-# colouring, so a palette, a theme's colours or a position change gives the same answer.
+# colouring, so a palette, a theme's colours or a position change gives the same answer. The app's cache of the check
+# is keyed on these settings only and does not hash the settings JSON it passes to contacts_job (`_blob`): that is
+# safe only while this list is complete, so a setting that may change which beads are drawn belongs here (a superset
+# costs a check more, never a wrong answer).
 CONTACT_KEYS = (
     "chains",
+    "mode",
     "assembly",
     "symmetry",
     "symmetry_tol",
@@ -419,14 +424,19 @@ def contacts_key(settings: dict) -> str:
 
 def size_job(path) -> dict:
     """What the file holds, read before any drawing: polymer residues and chains of its first model (as
-    deposited), and its assemblies."""
+    deposited; `chain_ids` in the file's order, nucleic acid too), and its assemblies."""
     import gemmi
 
     st = gemmi.read_structure(str(path))
     st.setup_entities()
-    polymers = [len(chain.get_polymer()) for chain in st[0]] if len(st) else []
-    polymers = [n for n in polymers if n]
-    return {"residues": sum(polymers), "chains": len(polymers), "assemblies": [a.name for a in st.assemblies]}
+    polymers = [(chain.name, len(chain.get_polymer())) for chain in st[0]] if len(st) else []
+    polymers = [(name, n) for name, n in polymers if n]
+    return {
+        "residues": sum(n for _, n in polymers),
+        "chains": len(polymers),
+        "chain_ids": list(dict.fromkeys(name for name, _ in polymers)),
+        "assemblies": [a.name for a in st.assemblies],
+    }
 
 
 def elements_of(drawn) -> list[dict]:
@@ -474,6 +484,15 @@ def summary_of(drawn) -> str:
     if sym is not None:
         parts.append(f"symmetry {sym.label}")
     return " · ".join(parts)
+
+
+def restricted_summary(summary: str, total: int) -> str:
+    """The summary of a figure drawn with only some of the structure's `total` protein chains: '2 of 6 chains · …'
+    (unchanged when it names no chain count, or all of them)."""
+    m = re.match(r"([\d,]+) chains?\b", summary)
+    if not m or int(m.group(1).replace(",", "")) >= total:
+        return summary
+    return f"{m.group(1)} of {total:,} chains{summary[m.end() :]}"
 
 
 # ---------------------------------------------------------------------------------------------- downloads
