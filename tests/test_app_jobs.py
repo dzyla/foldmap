@@ -335,20 +335,19 @@ def test_download_callables_draw_on_demand():
     view = json.dumps({"columns": 30, "ss_colour": "figure"}, sort_keys=True)
     assert app_jobs.sequence_file(path, _blob(), view, "svg", lim).startswith(b"<svg")
     assert app_jobs.sequence_file(path, _blob(), view, "png", lim)[:4] == b"\x89PNG"
-    page = app_jobs.page_file(path, _blob(), lim)
-    assert isinstance(page, bytes) and b"<html" in page[:200].lower()
     assert app_jobs.figure_file.cache_info().currsize == 2
     app_jobs.clear()
     assert app_jobs.figure_file.cache_info().currsize == 0 and not app_jobs._DRAWN
 
 
 def test_sequence_job_is_the_sequence_download():
-    from foldmap.app import sequence_files
+    from foldmap.app import sequence_figure
+    from foldmap.render import save_svg
 
     view = {"columns": 30, "ss_colour": "figure"}
-    old = sequence_files(DATA / "1UBQ.cif", {"theme": "publication"}, view)
+    old = save_svg(sequence_figure(DATA / "1UBQ.cif", {"theme": "publication"}, view)).encode()
     got = app_jobs.sequence_job(DATA / "1UBQ.cif", _blob(), json.dumps(view), "svg")
-    assert got == old["svg"]
+    assert got == old
 
 
 def test_contact_problems_read_as_the_command_line_prints_them():

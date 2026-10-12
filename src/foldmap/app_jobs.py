@@ -523,12 +523,6 @@ def sequence_file(path: str, blob: str, view_json: str, ext: str, limits: Limits
     return run_job(sequence_job, path, blob, view_json, ext, limits=limits)
 
 
-@functools.lru_cache(maxsize=16)
-def page_file(path: str, blob: str, limits: Limits) -> bytes:
-    """The interactive page download (UTF-8 HTML)."""
-    return run_job(page_job, path, blob, limits=limits).encode("utf-8")
-
-
 # ---------------------------------------------------------------------------------------------- failures
 FAILED: OrderedDict = OrderedDict()  # (path, job, layout_key, view_json) -> JobLimit, process-wide, the latest 256
 _FAILED_MAX = 256
@@ -618,7 +612,7 @@ def explain(err: Exception, name: str, limits: Limits, last_changed: str | None 
 
 def clear() -> None:
     """Forget every kept figure, download and failure (tests)."""
-    for cached in (figure_file, sequence_file, page_file):
+    for cached in (figure_file, sequence_file):
         cached.cache_clear()
     with _LOCK:
         _DRAWN.clear()

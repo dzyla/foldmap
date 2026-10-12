@@ -68,14 +68,19 @@ def test_app_passes_membrane_and_alignment_to_the_layout():
 
 
 def test_app_sequence_files():
-    from foldmap.app import sequence_files
+    """The sequence downloads (app_jobs.sequence_file, as the Download popover makes them)."""
+    import json
 
-    out = sequence_files(DATA / "1UBQ.cif", {"theme": "publication"}, {"columns": 30, "ss_colour": "figure"})
+    from foldmap import app_jobs
+
+    path, lim, view = str(DATA / "1UBQ.cif"), app_jobs.Limits(), json.dumps({"columns": 30, "ss_colour": "figure"})
+    out = {ext: app_jobs.sequence_file(path, json.dumps({"theme": "publication"}), view, ext, lim) for ext in EXTS}
     assert out["svg"].startswith(b"<svg") and out["png"][:4] == b"\x89PNG" and out["pdf"][:4] == b"%PDF"
-    msa = sequence_files(
-        DATA / "1UBQ.cif", {"theme": "publication", "msa_path": str(DATA / "ubq_family.fasta")}, {"columns": 40}
-    )
-    assert b"strict:" in msa["svg"]
+    blob = json.dumps({"theme": "publication", "msa_path": str(DATA / "ubq_family.fasta")})
+    assert b"strict:" in app_jobs.sequence_file(path, blob, json.dumps({"columns": 40}), "svg", lim)
+
+
+EXTS = ("svg", "png", "pdf")
 
 
 def test_app_shows_the_sequence_view():
@@ -164,7 +169,9 @@ def test_app_offers_flip_for_the_membrane():
 
 def test_app_accepts_a_consurf_table():
     """A ConSurf grades table colours by conservation; the Sequence tab draws the plain sequence beside it."""
-    from foldmap.app import sequence_files
+    import json
+
+    from foldmap import app_jobs
 
     table = DATA / "consurf" / "1TIM_A_grades.txt"
     at = load(app_test(), DATA / "1TIM.cif")
@@ -172,8 +179,10 @@ def test_app_accepts_a_consurf_table():
     assert not at.exception and not at.error
     assert at.session_state["msa_error"] == "" and at.session_state["msa_path"].endswith(".txt")
     assert any("ConSurf" in c.value for c in at.caption)
-    out = sequence_files(DATA / "1TIM.cif", {"theme": "publication", "msa_path": str(table)}, {"columns": 40})
-    assert out["svg"].startswith(b"<svg") and b"strict:" not in out["svg"]
+    svg = app_jobs.sequence_job(
+        DATA / "1TIM.cif", json.dumps({"theme": "publication", "msa_path": str(table)}), '{"columns": 40}', "svg"
+    )
+    assert svg.startswith(b"<svg") and b"strict:" not in svg
 
 
 def test_app_layout_file_keeps_every_layout_option():
@@ -1075,10 +1084,12 @@ def test_every_download_makes_its_whole_file():
 
 
 def test_download_buttons_are_offered():
-    from foldmap.app import figure_files
+    import json
 
-    files = figure_files(DATA / "1UBQ.cif", {"theme": "publication"})
-    assert set(files) == {"svg", "png", "pdf"}
+    from foldmap import app_jobs
+
+    blob, lim = json.dumps({"theme": "publication"}), app_jobs.Limits()
+    files = {ext: app_jobs.figure_file(str(DATA / "1UBQ.cif"), blob, ext, lim) for ext in EXTS}
     assert files["png"][:4] == b"\x89PNG" and files["pdf"][:4] == b"%PDF" and b"<svg" in files["svg"]
 
 
@@ -1086,14 +1097,14 @@ def test_download_files_are_whole():
     import json
 
     from foldmap import app_jobs
-    from foldmap.app_views import layout_yaml
+    from foldmap.app_views import layout_yaml, page_downloads
 
     blob = json.dumps({"theme": "publication"})
     png = app_jobs.figure_file(str(DATA / "1UBQ.cif"), blob, "png", app_jobs.Limits())
     assert png[:4] == b"\x89PNG"
     assert layout_yaml(str(DATA / "1UBQ.cif"), blob).startswith(b"foldmap: 1\n")
-    html = app_jobs.page_file(str(DATA / "1UBQ.cif"), blob, app_jobs.Limits())
-    assert html.startswith(b"<!doctype html>")
+    html = page_downloads(str(DATA / "1UBQ.cif"), blob, "1UBQ", lambda path, blob: app_jobs.page_job(path, blob))
+    assert html[0].data().startswith(b"<!doctype html>")
 
 
 def test_a_failing_setting_offers_the_last_good_figure():

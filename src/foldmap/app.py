@@ -37,8 +37,7 @@ from foldmap.app_views import Workspace, download_menu, explorer_view, figure_vi
 from foldmap.cli import _adjustments, _domain_spec
 from foldmap.fetch import fetch, source_id
 from foldmap.names import KEYWORDS as NAME_KEYWORDS
-from foldmap.render import save, save_svg
-from foldmap.spec import MEMBRANES, MODES, FigureSpec, SavedDomains, draw_spec, parse_flag, parse_protomers
+from foldmap.spec import MEMBRANES, MODES, FigureSpec, SavedDomains, parse_flag, parse_protomers
 from foldmap.spec import layout_document as spec_document
 from foldmap.style import _KEY_ALIASES, CHOICES, THEMES, Style
 from foldmap.symmetry import TOLERANCE
@@ -223,30 +222,6 @@ def sequence_figure(path, settings: dict, view: dict):
         title=settings.get("title") or None,
         msa=msa or None,
     )
-
-
-def sequence_files(path, settings: dict, view: dict) -> dict[str, bytes]:
-    """The sequence figure (sequence_figure) as SVG, PNG and PDF."""
-    fig = sequence_figure(path, settings, view)
-    out = {"svg": save_svg(fig).encode()}
-    with tempfile.TemporaryDirectory() as tmp:
-        for ext in ("png", "pdf"):
-            out[ext] = save(fig, Path(tmp) / f"sequence.{ext}").read_bytes()
-    return out
-
-
-def figure(path, settings: dict):
-    drawn = draw_spec(spec_of(path, settings))
-    return drawn.figure, drawn.loops
-
-
-def figure_files(path, settings: dict) -> dict[str, bytes]:
-    fig, _ = figure(path, settings)
-    out = {"svg": save_svg(fig).encode()}
-    with tempfile.TemporaryDirectory() as tmp:
-        for ext in ("png", "pdf"):
-            out[ext] = save(fig, Path(tmp) / f"figure.{ext}").read_bytes()
-    return out
 
 
 def layout_document(path, settings: dict, uploads: dict[str, str] | None = None) -> dict:
