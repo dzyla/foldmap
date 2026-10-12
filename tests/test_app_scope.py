@@ -47,8 +47,9 @@ def test_keep_this_hides_the_bar_until_the_next_structure():
     assert not at.exception and bar(at) == ["scope_all", "scope_keep"]
 
 
-def test_nothing_left_out_shows_no_bar():
-    at = opened(DATA / "na" / "1KX5.cif.gz")
+@pytest.mark.parametrize("name", ["na/1KX5.cif.gz", "assemblies/3UTB.cif.gz"])
+def test_nothing_left_out_shows_no_bar(name):
+    at = opened(DATA / name)
     assert bar(at) == [] and "Drawn:" not in rendered_text(at)
 
 

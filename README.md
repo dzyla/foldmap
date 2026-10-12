@@ -105,7 +105,9 @@ its fold: strands paired with its own by backbone hydrogen bonds (donor strands,
 cross-β stacking) and helices bundled with its own. Neighbours' elements are grey and primed (A′, A″), carry no
 termini or loops of their own, and a line under the legend says what is shown, e.g. *1 of 6 subunits shown ·
 helical, 115.0° twist, 7.9 Å rise per subunit*. A left-handed filament has a negative twist and says so:
-*−115.0° twist (left-handed)*. `--focus none` draws everything; `--focus B` picks the subunit.
+*−115.0° twist (left-handed)*. `--focus none` draws everything; `--focus B` picks the subunit. A two-subunit
+assembly (a C2 histone octamer) is never cut in half, nor a ring whose subunits share one DNA or RNA (nucleosome DNA):
+those are drawn whole.
 
 ### Sequence and alignment
 
@@ -474,10 +476,9 @@ title. The rest is in sections:
 - **Layout file**: load one saved from Download (or by `foldmap plot --save-layout`) to restore every setting.
 
 **Part of the file.** When foldmap draws part of the file on its own (assembly 1 when the file holds several
-copies of a complex, or one subunit of a cage, a filament or a large symmetric assembly such as a nucleosome's
-histone octamer), a bar above the figure says what was drawn and how many of the file's chains, as in "Drawn: one of
-2 subunits (C2 symmetry) — 6 of 10 chains." **Show all chains** draws every chain; **Keep this** hides the bar for
-that structure. When every chain is too large for the online app, the bar gives the command that draws it instead.
+copies of a complex, or one subunit of a cage, a filament or a large ring), a bar above the figure says what was
+drawn and how many of the file's chains, as in "Drawn: one of 24 subunits of an O cage — 1 of 24 chains."
+**Show all chains** draws every chain; **Keep this** hides the bar for that structure. When every chain is too large for the online app, the bar gives the command that draws it instead.
 
 **Share links.** A structure loaded by PDB ID or accession puts its id and theme in the address, as in
 `https://foldmap.streamlit.app/?id=1LMB&theme=journal`, so the link opens the same structure in the same theme.

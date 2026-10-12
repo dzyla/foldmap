@@ -43,16 +43,17 @@ def test_pilus_rod_is_one_subunit_of_its_filament():
     assert s["all_options"] == {"focus": "none"}
 
 
-def test_nucleosome_is_drawn_as_one_half_and_says_so():
-    """The author's report: a nucleosome (3UTB) drawn as one copy of each histone. focus auto finds the C2 axis, and
-    eight protein chains are more than FOCUS_CHAINS (6): one protomer (H3, H4, H2A, H2B) in full, the other four
-    as grey neighbours, both DNA strands. 6 of the 10 chains are drawn."""
-    s = scope_of(NUCLEOSOME)
-    assert (s["drawn_chains"], s["file_chains"]) == (6, 10)
-    assert s["reason"] == "one of 2 subunits (C2 symmetry)"
-    assert s["all_options"] == {"focus": "none"}
-    whole = scope_of(NUCLEOSOME, focus="none")
-    assert (whole["drawn_chains"], whole["file_chains"], whole["reason"], whole["all_options"]) == (10, 10, "", {})
+def test_nucleosome_is_drawn_whole_with_nothing_to_report():
+    """The author's report: a nucleosome (3UTB) was drawn as one copy of each histone (focus auto took one half of
+    the C2 octamer, as 8 protein chains are more than FOCUS_CHAINS). focus auto never reduces a two-subunit
+    assembly, nor splits one whose DNA both halves hold: all 8 histones and both DNA strands, nothing reported."""
+    read = read_model(NUCLEOSOME)
+    lay, sses, bb = make_layout(NUCLEOSOME, model=read)
+    assert lay.focus_chains is None and not lay.partial
+    assert {s.chain for s in sses} == set("ABCDEFGH") and {s.chain for s in lay.nucleic.strands} == {"I", "J"}
+    assert not any(p.ghost for p in lay.placed.values())
+    s = drawn_scope(read, lay)
+    assert (s["drawn_chains"], s["file_chains"], s["reason"], s["all_options"]) == (10, 10, "", {})
 
 
 @pytest.mark.parametrize("path", [DATA / "na" / "4OO8.cif.gz", DATA / "na" / "1KX5.cif.gz", DATA / "1UBQ.cif"])
@@ -78,7 +79,5 @@ def test_scope_notes_name_the_settings_that_draw_everything():
     assert scope_note(kelch, how="mcp") == (
         'drew assembly 1, one of 2 copies in the file: 2 of 4 chains; assembly="asu", focus="none" draws all of them'
     )
-    nucleosome = scope_of(NUCLEOSOME)
-    assert (
-        scope_note(nucleosome) == "drew one of 2 subunits (C2 symmetry): 6 of 10 chains; --focus none draws all of them"
-    )
+    apo = scope_of(DATA / "assemblies" / "7A4M.cif")
+    assert scope_note(apo) == "drew one of 24 subunits of an O cage: 1 of 24 chains; --focus none draws all of them"

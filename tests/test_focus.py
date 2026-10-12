@@ -143,3 +143,33 @@ def test_no_neighbour_legend_when_no_neighbour_is_drawn():
         fig = make_figure(CAPSID, focus="A")
         texts = " ".join(t.get_text() for t in fig.axes[0].texts)
         assert "neighbour" not in texts and "1 of" in texts
+
+
+NUCLEOSOME = DATA / "assemblies" / "3UTB.cif.gz"  # C2 histone octamer wrapped by one DNA duplex
+
+
+def test_focus_auto_never_reduces_a_two_subunit_assembly():
+    """The histone octamer without its DNA: C2, 8 protein chains (more than FOCUS_CHAINS), two subunits. focus
+    auto draws both halves; asked for, the protomer is still one half."""
+    lay, sses, _ = make_layout(NUCLEOSOME, dna=False)
+    assert lay.focus_chains is None and _chains(sses) == set("ABCDEFGH")
+    lay, _, _ = make_layout(NUCLEOSOME, dna=False, focus="protomer")
+    assert lay.focus_chains is not None and len(lay.focus_chains) == 4
+
+
+def test_focus_auto_does_not_split_a_nucleic_acid_its_protomers_share():
+    """A strand held by two or more protomers (NA_HOLD_MIN residues each) of a point-group assembly ties them into
+    one complex; one with a strand per protomer, or none, does not. Filaments and cages keep focus."""
+    from types import SimpleNamespace
+
+    from foldmap.cli import _na_shared
+    from foldmap.model import ResLabel
+
+    bb = SimpleNamespace(labels=[ResLabel(c, k, "", "ALA") for k, c in enumerate("AAABBBCCC")])
+    sym = SimpleNamespace(protomers=[["A"], ["B"], ["C"]])
+    shared = SimpleNamespace(contacts={r: {(0, r)} for r in range(6)})
+    each = SimpleNamespace(contacts={r: {(r // 3, r)} for r in range(9)})
+    glancing = SimpleNamespace(contacts={0: {(0, 1)}, 1: {(0, 2)}, 2: {(0, 3)}, 3: {(0, 9)}})
+    assert _na_shared(shared, sym, bb)  # no stems needed: a single strand two protomers hold is shared too
+    assert not _na_shared(each, sym, bb) and not _na_shared(glancing, sym, bb)
+    assert not _na_shared(None, sym, bb) and not _na_shared(shared, None, bb)

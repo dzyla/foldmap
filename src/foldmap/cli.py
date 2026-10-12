@@ -122,10 +122,18 @@ NA_HOLD_MIN = 3  # residues of one protomer touching a strand for that protomer 
 
 
 def _na_across_protomers(nucleic, sym, bb) -> bool:
-    """Whether a nucleic acid with stems has a strand held by two or more protomers of `sym`, each touching it
-    with at least NA_HOLD_MIN residues: the precondition for drawing it in a projected frame (unrolling the assembly
-    one protomer beside the next may tear that strand apart; layout.na_torn_by_unrolling decides)."""
-    if nucleic is None or sym is None or not nucleic.structure.stems:
+    """Whether a nucleic acid with stems has a strand held by two or more protomers of `sym` (_na_shared): the
+    precondition for drawing it in a projected frame (unrolling the assembly one protomer beside the next may tear
+    that strand apart; layout.na_torn_by_unrolling decides)."""
+    if nucleic is None or not nucleic.structure.stems:
+        return False
+    return _na_shared(nucleic, sym, bb)
+
+
+def _na_shared(nucleic, sym, bb) -> bool:
+    """Whether a strand of the nucleic acid is held by two or more protomers of `sym`, each touching it with at
+    least NA_HOLD_MIN residues (nucleosome DNA, a duplex bound by both halves of a dimer)."""
+    if nucleic is None or sym is None:
         return False
     sector = {c: k for k, chains in enumerate(sym.protomers) for c in chains}
     holders: dict[int, dict[int, set[int]]] = {}  # strand -> protomer -> residues touching it
@@ -224,7 +232,7 @@ def make_layout(
     copies = homolog_chains(bb)
     if focus == "auto" and (look or Style()).highlight != "none":
         focus = "none"  # highlighting the asymmetric unit or a protomer asks for the whole assembly
-    focus_chains = _focus_chains(focus, sym, bb, sses)
+    focus_chains = _focus_chains(focus, sym, bb, sses, nucleic)
     strands = nucleic.strands if nucleic is not None else []
     read = list(dict.fromkeys([l.chain for l in bb.labels] + [s.chain for s in strands]))
     subunits = None
@@ -477,10 +485,12 @@ def _face_medians(lay, sses, bb, mem) -> tuple[float, float] | None:
 FOCUS_CHAINS, FOCUS_ELEMENTS = 6, 160  # symmetric assemblies larger than this are drawn one subunit at a time
 
 
-def _focus_chains(focus: str, sym, bb, sses) -> set | None:
+def _focus_chains(focus: str, sym, bb, sses, nucleic=None) -> set | None:
     """The chains drawn in full: none ('none', or a modest assembly under 'auto'), one protomer (helical
     filaments, cubic cages, or assemblies over FOCUS_CHAINS chains / FOCUS_ELEMENTS elements), or the chains
-    named. Helical filaments use their middle subunit, so it has neighbours on both sides."""
+    named. Helical filaments use their middle subunit, so it has neighbours on both sides. 'auto' never takes one
+    subunit of two (a C2 histone octamer is drawn whole), nor one of a ring or other point-group assembly whose
+    protomers share a nucleic acid (_na_shared: nucleosome DNA); filaments and cages keep it."""
     present = list(dict.fromkeys(l.chain for l in bb.labels))
     if focus in (None, "none"):
         return None
@@ -498,7 +508,12 @@ def _focus_chains(focus: str, sym, bb, sses) -> set | None:
     if focus == "auto" and not big:
         return None
     k = len(sym.protomers) // 2 if sym.kind == "H" else 0
-    return _one_of_each(sym.protomers[k], bb)
+    one = _one_of_each(sym.protomers[k], bb)
+    if focus == "auto" and (
+        _subunits(sym, one) <= 2 or (sym.kind in ("C", "D") and _na_shared(nucleic, sym, bb))
+    ):  # one complex: drawn whole
+        return None
+    return one
 
 
 def _one_of_each(chains: list[str], bb) -> set:
@@ -1035,7 +1050,8 @@ def build_parser() -> argparse.ArgumentParser:
             "--focus",
             metavar="auto|none|protomer|A,B",
             help="large assemblies: draw one subunit in full plus what its neighbours add to its fold "
-            "(auto: helical filaments, cages and assemblies over 6 chains / 160 elements)",
+            "(auto: helical filaments, cages and assemblies over 6 chains / 160 elements, never one of two "
+            "subunits nor a ring whose subunits share a nucleic acid)",
         )
         q.add_argument(
             "--chains",
