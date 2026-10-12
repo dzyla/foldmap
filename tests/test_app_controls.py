@@ -427,7 +427,8 @@ def test_a_names_file_keeps_the_keyword_shows_its_name_and_can_be_removed():
         (b"elements: " + b"[" * 2000 + b"]" * 2000 + b"\n", "nested too deeply"),  # 4 kB, no RecursionError
         (b"elements:\n  res:A:3-18: 2001-01-01\n", "reads as a date; give a name as text"),
     ],
-)
+    ids=["list", "bad-yaml", "unknown-key", "not-a-name", "aliases", "too-large", "not-utf8", "deep", "date"],
+)  # short ids: a 200 kB id is longer than an environment variable may be on Windows (PYTEST_CURRENT_TEST)
 def test_an_upload_that_is_not_a_names_file_is_an_error_and_changes_nothing(data, said):
     at = opened(DATA / "2HHB.cif")
     at.segmented_control(key="names__kw").set_value("deposited").run()

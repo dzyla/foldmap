@@ -110,6 +110,7 @@ def test_edits_from_file_and_command_line_add_up(tmp_path):
         ("- a\n- b\n", "mapping"),
         ("names: " + "[" * 3000 + "]" * 3000 + "\n", "nested too deeply"),  # not a RecursionError traceback
     ],
+    ids=["unknown-key", "version", "list", "deep"],  # short ids (PYTEST_CURRENT_TEST has a size limit on Windows)
 )
 def test_bad_layout_files_are_explained(tmp_path, text, msg, capsys):
     lf = tmp_path / "bad.yaml"

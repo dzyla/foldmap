@@ -1328,7 +1328,7 @@ def test_an_oversized_alignment_is_refused_unstored_and_unread(monkeypatch):
     assert any(_visible(e.value) == "big.fasta: an alignment is at most 10 MB" for e in at.error)
 
 
-@pytest.mark.parametrize("data", [bytes(range(256)) * 20, b"\xff\xfe>a\nAC\n"])
+@pytest.mark.parametrize("data", [bytes(range(256)) * 20, b"\xff\xfe>a\nAC\n"], ids=["binary", "not-utf8"])
 def test_an_alignment_that_is_not_text_says_so_plainly(monkeypatch, tmp_path, data):
     monkeypatch.setenv("FOLDMAP_APP_LOCAL_FILES", "0")
     seed_cache(monkeypatch, tmp_path, "1UBQ")
