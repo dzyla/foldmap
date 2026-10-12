@@ -78,6 +78,17 @@ def test_unknown_domain_reference_is_an_error():
         make_layout(UMOD, domains=[("X", ["Q"])])
 
 
+def test_a_residue_range_without_res_is_an_error_naming_the_domain():
+    """A:1-60 looks like an element id but is no element: a message, not an IndexError (Q-A19)."""
+    with pytest.raises(ValueError, match=r"domain 'N'.*'A:1-60'.*res:A:1-60"):
+        make_layout(DATA / "2LZM.cif", domains=[("N", ["A:1-60"])])
+
+
+def test_a_domain_left_without_elements_is_an_error_naming_it():
+    with pytest.raises(ValueError, match=r"domain 'C'.*no elements"):
+        make_layout(DATA / "2LZM.cif", domains=[("N", ["α1"]), ("C", ["α1"])])
+
+
 def test_cli_domains_and_layout_file(tmp_path):
     import yaml
 

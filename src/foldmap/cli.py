@@ -594,12 +594,25 @@ def _domains(spec, sses, contacts, rows=(), copies=None, lent=frozenset()) -> li
         isinstance(ids, list) and all(":" in i and "-" in i and not i.startswith("res:") for i in ids)
         for _, ids in spec
     ):
+        known = {s.id for s in sses}
+        for name, ids in spec:
+            for i in ids:
+                if i not in known:
+                    raise ValueError(
+                        f"domain {name!r}: {i!r} is no element; write a residue range as res:{i}, "
+                        "or name elements by label (α1, A:G)"
+                    )
         return [(name, list(ids)) for name, ids in spec]  # already element ids (UniProt domains)
     lay, out, seen = provisional(sses), [], set()
     for name, refs in spec:
         ids = []
         for ref in refs:
             ids += [k for k in resolve(lay, sses, ref) if k not in seen and k not in ids]
+        if not ids:
+            raise ValueError(
+                f"domain {name!r} has no elements: {', '.join(refs)} already belong to an earlier domain; "
+                "give each domain elements of its own"
+            )
         seen |= set(ids)
         out.append((name, ids))
     return out
