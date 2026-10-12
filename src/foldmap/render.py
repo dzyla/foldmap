@@ -88,7 +88,17 @@ _LIPID, _HEADS, _HEAD_EDGE = "#f7f0de", "#e6d3a3", "#c2a765"  # membrane band, l
 _RUN_EDGE, _RUN_EDGE_W = "#3a3a3a", 1.8  # dark edge under residue-coloured loops (pale colours stay legible)
 _SHORT_HELIX = 1.6  # helices/3-10 boxes shorter than this hold their residue numbers past the ends
 LONG_LOOP, LONG_TAIL = 25, 10  # loops / chain ends at least this many residues get a residue-count label
-_DOMAIN_TONES = ("#4c78a8", "#e45756", "#54a24b", "#b279a2", "#f58518", "#72b7b2")  # one hue per domain
+_DOMAIN_TONES = (  # one hue per domain: Paul Tol's muted set less its indigo (too near the RNA purple), ordered so
+    # that neighbours in sequence differ most; colour-blind safe (tests/test_domains.py checks it)
+    "#44aa99",  # teal
+    "#cc6677",  # rose
+    "#ddcc77",  # sand
+    "#117733",  # green
+    "#88ccee",  # cyan
+    "#882255",  # wine
+    "#999933",  # olive
+    "#aa4499",  # purple
+)
 _DOMAIN_BAR_H = 1.1  # page units each chain's domain bar takes below the figure (at least; more for larger text)
 _BAR_TICK = 0.3  # page units from a narrow segment to its name below it
 MARK_DEFAULT = "#d1495b"  # a marked element without its own colour
@@ -1661,7 +1671,7 @@ def _colouring(sses: list[SSE], chains: list[str], colors: dict[str, str], look:
 
 def domain_tone(k: int) -> str:
     """The colour of the k-th named domain (Layout.domains order): its panel's tint, its bar segment and, coloured by
-    domain, its elements. Six tones, used again from the seventh domain on (Cas9 has eight)."""
+    domain, its elements. Eight tones (Cas9 has eight domains), used again from the ninth domain on."""
     return _DOMAIN_TONES[k % len(_DOMAIN_TONES)]
 
 

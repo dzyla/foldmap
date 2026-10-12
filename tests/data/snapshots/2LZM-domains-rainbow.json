@@ -60,8 +60,8 @@
     514.1
    ],
    "colours": [
-    "fill:#4c78a8",
-    "stroke:#2e4865"
+    "fill:#44aa99",
+    "stroke:#29665c"
    ],
    "text": []
   },
@@ -73,8 +73,8 @@
     514.1
    ],
    "colours": [
-    "fill:#e45756",
-    "stroke:#893434"
+    "fill:#cc6677",
+    "stroke:#7a3d47"
    ],
    "text": []
   },
@@ -86,7 +86,7 @@
     225.9
    ],
    "colours": [
-    "fill:#395a7e"
+    "fill:#338073"
    ],
    "text": [
     "D1"
@@ -100,7 +100,7 @@
     33.7
    ],
    "colours": [
-    "fill:#ab4140"
+    "fill:#994d59"
    ],
    "text": [
     "D2"
@@ -114,8 +114,8 @@
     466.0
    ],
    "colours": [
-    "fill:#e6ecf3",
-    "stroke:#aec2d8"
+    "fill:#e5f3f1",
+    "stroke:#abd9d1"
    ],
    "text": []
   },
@@ -127,8 +127,8 @@
     213.7
    ],
    "colours": [
-    "fill:#fbe7e7",
-    "stroke:#f3b3b3"
+    "fill:#f8eaec",
+    "stroke:#e8bac2"
    ],
    "text": []
   },

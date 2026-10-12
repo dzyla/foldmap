@@ -318,3 +318,48 @@ def test_domain_bars_share_one_residue_scale():
     assert bars["A"][0] == pytest.approx(bars["a"][0])
     width = {c: x1 - x0 for c, (x0, x1) in bars.items()}
     assert width["A"] / width["a"] == pytest.approx(spans["A"] / spans["a"], rel=1e-6)
+
+
+_CVD = {  # Machado, Oliveira and Fernandes 2009, severity 1, on linear RGB
+    "deuteranopia": [[0.367322, 0.860646, -0.227968], [0.280085, 0.672501, 0.047413], [-0.011820, 0.042940, 0.968881]],
+    "protanopia": [[0.152286, 1.052583, -0.204868], [0.114503, 0.786281, 0.099216], [-0.003882, -0.048116, 1.051998]],
+    "tritanopia": [[1.255528, -0.076749, -0.178779], [-0.078411, 0.930809, 0.147602], [0.004733, 0.691367, 0.303900]],
+}
+
+
+def _seen(colour: str, matrix) -> str:
+    """The colour as a viewer with that colour-vision deficiency sees it."""
+    rgb = np.array([int(colour[i : i + 2], 16) / 255 for i in (1, 3, 5)])
+    lin = np.where(rgb <= 0.04045, rgb / 12.92, ((rgb + 0.055) / 1.055) ** 2.4)
+    out = np.clip(np.array(matrix) @ lin, 0, 1)
+    srgb = np.where(out <= 0.0031308, 12.92 * out, 1.055 * out ** (1 / 2.4) - 0.055)
+    return "#" + "".join(f"{round(v * 255):02x}" for v in srgb)
+
+
+def test_cas9_domains_get_eight_different_tones():
+    """Eight tones, so Cas9's eight domains (Nishimasu 2014) all differ; the ninth domain takes the first again."""
+    from foldmap.render import _DOMAIN_TONES, domain_tone
+
+    domains = _flag_file(CAS9_FILE)
+    lay, _, _ = make_layout(DATA / "na" / "4OO8.cif.gz", chains=["A"], domains=domains)
+    tones = [domain_tone(k) for k, (_, ids) in enumerate(lay.domains) if ids]
+    assert len(tones) == 8 and len(set(tones)) == 8
+    assert len(_DOMAIN_TONES) == 8 and domain_tone(8) == domain_tone(0)
+
+
+def test_domain_tones_stay_apart_for_colour_blind_readers_and_from_nucleic_acid():
+    """Every two tones differ by CIEDE2000 >= 10 as seen with normal vision and with each dichromacy (Machado 2009),
+    and every tone differs as much from the nucleic-acid backbones (Style dna_color, rna_color and the journal
+    theme's RNA), the H-bond lines and the grey of other chains."""
+    import itertools
+
+    from foldmap.palette import delta_e
+    from foldmap.render import _DOMAIN_TONES, MATE_GREY
+    from foldmap.style import THEMES, Style
+
+    for name, matrix in [("normal", None), *_CVD.items()]:
+        seen = [c if matrix is None else _seen(c, matrix) for c in _DOMAIN_TONES]
+        worst = min(delta_e(a, b) for a, b in itertools.combinations(seen, 2))
+        assert worst >= 10, (name, worst)
+    others = {Style().dna_color, Style().rna_color, THEMES["journal"].rna_color, Style().hbond_color, MATE_GREY}
+    assert min(delta_e(a, b) for a in _DOMAIN_TONES for b in others) >= 10
