@@ -909,7 +909,9 @@ LIMITS = {
     "dssp_agree": 0.99,  # A10: fraction of residues whose SS agrees with mkdssp 3.1.2
     "copies_alike": 0.5,  # A15: page units (Q-R12)
     "domain_overlap": 0.02,  # A16: fraction of the smaller panel
-    "stem_name_gap": 0.25,  # A17: page units from a stem name to its own letters
+    # A17: page units from a stem name to its own letters, at most layout._INK_MARGIN em in the drawn figure's page
+    # units plus 1e-3 (figcheck.stem_gap_tolerance; plan 10 Task 4 fix round 2 ruling), measured per figure
+    "stem_name_gap": "figcheck.stem_gap_tolerance(layout._INK_MARGIN em)",
     "tm_overlap": 0.75,  # A18: a TM helix overlaps the band by this fraction of the band's height
     "slab_margin": 0.3,  # A18: a loop's sideways run inside the band, this far from its faces, is in the slab
     "tether_length": 6.5,  # A20: page units, a ligand tether from its mark to the element it touches most
@@ -1238,6 +1240,24 @@ def na_metrics(drawn, path) -> dict:
     return m
 
 
+def stem_gap_limit(fig) -> float | None:
+    """A17's limit for this figure: the stem-name margin (layout._INK_MARGIN em) in its page units, plus 1e-3
+    (figcheck.stem_gap_tolerance). The em is read from a drawn stem name (render: 0.8 em) as points -> pixels ->
+    page units, as tests/test_na_layout.py reads it from a base letter; None when no stem name is drawn."""
+    from foldmap import figcheck
+    from foldmap.layout import _INK_MARGIN, _NAME_EM
+
+    if not fig.axes:
+        return None
+    ax = fig.axes[0]
+    name = next((t for t in ax.texts if (t.get_gid() or "").startswith("na:label:")), None)
+    if name is None:
+        return None
+    px_per_unit = ax.transData.transform((1, 0))[0] - ax.transData.transform((0, 0))[0]
+    em = name.get_fontsize() / _NAME_EM * fig.dpi / 72 / px_per_unit
+    return figcheck.stem_gap_tolerance(_INK_MARGIN * em)
+
+
 def measure_view(view: str, drawn, spec, path: Path, name: str, work: Path) -> dict:
     """Everything one drawn figure view is judged on."""
     from foldmap import figcheck
@@ -1276,6 +1296,7 @@ def measure_view(view: str, drawn, spec, path: Path, name: str, work: Path) -> d
         "context": lay.context,
         "copy_ties": len(lay.copy_ties),
         "tethers": tether_lengths(drawn.figure),
+        "stem_gap_limit": stem_gap_limit(drawn.figure),
     }
     if view == "membrane":
         out["membrane"] = membrane_checks(drawn, path)
@@ -1648,11 +1669,12 @@ def criteria(e: dict) -> dict:
     if "na" in d:
         bad = list(d["na"].get("failed", []))
         gaps = ((d.get("checks") or {}).get("details") or {}).get("stem_name_gaps")
-        if gaps is None:
+        limit = d.get("stem_gap_limit")
+        if gaps is None or (gaps and limit is None):
             bad.append("stem-name gaps not measured")
         else:
             for k, (own, other) in sorted(gaps.items()):
-                if own > LIMITS["stem_name_gap"] or own >= other:
+                if own > limit or own >= other:
                     bad.append(f"stem name {k} {own:.3f} from its letters, {other:.3f} from another stem")
         out["A17"] = _ok(not bad, "; ".join(bad))
     mem = _views(e, ["membrane"]).get("membrane")
@@ -1673,9 +1695,13 @@ def criteria(e: dict) -> dict:
 
 
 def pair_check(a: dict, b: dict) -> dict:
-    """A19: the beta views of the two entries of a pair, the first protein chain of each: every element matched to
-    one of the same kind in the other by author residue range (overlap >= half the shorter), the same names, in the
-    same order."""
+    """A19: the beta views of the two entries of a pair, the first protein chain of each. Elements pair one-to-one
+    by author residue range as copies of one protein do (model.pair_places: the same kind, sharing at least half of
+    the shorter, the largest overlaps first). The pairs must keep one order, and pair at least half of the larger
+    chain's elements (and 3, when both have that many). One entry may hold an element the other lacks (listed, not
+    failed); the generic names after it then differ, so names are compared only up to the first unpaired element."""
+    from foldmap.model import pair_places
+
     ra = (a["views"].get("beta", {}).get("result") or {}).get("elements")
     rb = (b["views"].get("beta", {}).get("result") or {}).get("elements")
     if not ra or not rb:
@@ -1686,27 +1712,22 @@ def pair_check(a: dict, b: dict) -> dict:
         return sorted((x for x in els if x["chain"] == chain), key=lambda x: (x["first"], x["last"]))
 
     ea, eb = first_chain(ra), first_chain(rb)
-    pairs, used = [], set()
-    for x in ea:
-        best, score = None, 0.0
-        for k, y in enumerate(eb):
-            if k in used or y["kind"] != x["kind"]:
-                continue
-            common = min(x["last"], y["last"]) - max(x["first"], y["first"]) + 1
-            shorter = min(x["last"] - x["first"], y["last"] - y["first"]) + 1
-            if common >= 0.5 * shorter and common > score:
-                best, score = k, common
-        if best is not None:
-            used.add(best)
-            pairs.append((x, best))
-    bad = [f"{x['id']} unmatched" for x in ea if all(x is not p for p, _ in pairs)]
-    bad += [f"{y['id']} unmatched" for k, y in enumerate(eb) if k not in used]
-    bad += [
-        f"{x['label']}~{eb[k]['label']} ({x['id']}~{eb[k]['id']})" for x, k in pairs if x["label"] != eb[k]["label"]
-    ]
+    found = pair_places(*([(x["kind"], x["first"], x["last"]) for x in els] for els in (ea, eb)))
+    pairs = sorted(found.items())
+    bad, notes = [], [f"{x['id']} unpaired" for i, x in enumerate(ea) if i not in found]
+    notes += [f"{y['id']} unpaired" for k, y in enumerate(eb) if k not in found.values()]
     if [k for _, k in pairs] != sorted(k for _, k in pairs):
         bad.append("elements in another order")
-    return _ok(not bad, "; ".join(bad[:8]) + (f" (+{len(bad) - 8} more)" if len(bad) > 8 else ""))
+    if len(pairs) < max(min(3, len(ea), len(eb)), max(len(ea), len(eb)) / 2):
+        bad.append(f"only {len(pairs)} of {len(ea)} and {len(eb)} elements paired")
+    for i, k in pairs:  # names, while every element before is paired (generic numbering shifts after an extra one)
+        if any(j not in found for j in range(i)) or any(j not in found.values() for j in range(k)):
+            break
+        if ea[i]["label"] != eb[k]["label"]:
+            bad.append(f"{ea[i]['label']}~{eb[k]['label']} ({ea[i]['id']}~{eb[k]['id']})")
+    shown = bad + notes
+    detail = "; ".join(shown[:8]) + (f" (+{len(shown) - 8} more)" if len(shown) > 8 else "")
+    return _ok(not bad, detail)
 
 
 # ------------------------------------------------------------------------------------------- contact sheet

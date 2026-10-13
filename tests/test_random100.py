@@ -265,6 +265,38 @@ def test_criteria_fail_closed_on_unmeasured_checks(r100):
     assert r100.criteria(warned)["A1"]["pass"] is False
 
 
+def test_a17_gates_stem_names_at_the_margin_tolerance(r100):
+    """A17 (ruling): a stem name may sit at most figcheck.stem_gap_tolerance(margin) from its own letters, the margin
+    being layout._INK_MARGIN em in the figure's page units (measured per figure: stem_gap_limit), and nearer its
+    own stem than any other."""
+    view = {"exit": 0, "timed_out": False, "traceback": False, "python_warnings": [], "written": {}, "seconds": 1.0}
+
+    def a17(gaps, limit=0.4):
+        checks = {"details": {"stem_name_gaps": gaps}}
+        result = {"checks": checks, "na": {"failed": []}, "stem_gap_limit": limit}
+        return r100.criteria({"views": {"default": {**view, "result": result}}})["A17"]
+
+    assert a17({"P1": [0.39, 3.0]})["pass"] is True  # 1.0 em out: beyond the old fixed 0.25, within the margin
+    assert a17({"P1": [0.41, 3.0]})["pass"] is False
+    assert a17({"P1": [0.3, 0.2]})["pass"] is False  # nearer another stem
+    assert a17({"P1": [0.3, 3.0]}, limit=None)["pass"] is False  # names drawn but no limit measured: fail closed
+
+
+def test_stem_gap_limit_is_the_margin_in_page_units(r100):
+    """The limit read from a drawn stem name equals the one the layout tests read from a base letter."""
+    from foldmap import figcheck
+    from foldmap.layout import _INK_MARGIN
+    from foldmap.spec import draw_spec, figure_spec
+
+    d = draw_spec(figure_spec(DATA / "na" / "1EHZ.cif.gz"))
+    ax = d.figure.axes[0]
+    letter = next(t for t in ax.texts if (t.get_gid() or "").startswith("na:nt:"))
+    px_per_unit = ax.transData.transform((1, 0))[0] - ax.transData.transform((0, 0))[0]
+    em = letter.get_fontsize() / 0.75 * d.figure.dpi / 72 / px_per_unit
+    assert r100.stem_gap_limit(d.figure) == pytest.approx(figcheck.stem_gap_tolerance(_INK_MARGIN * em))
+    assert 0.3 < r100.stem_gap_limit(d.figure) < 1.0
+
+
 def test_a_ca_only_entry_must_be_refused_in_one_line(r100):
     view = {"timed_out": False, "python_warnings": [], "written": {}, "seconds": 1.0, "result": None}
     refused = {"exit": 1, "traceback": False, "foldmap_said": ["foldmap: x.cif: only CA atoms"]}
@@ -343,8 +375,41 @@ def test_pair_check_matches_elements_by_residue_range(r100):
     assert r100.pair_check(entry(a), entry(b))["pass"] is True
     renamed = [dict(b[0]), dict(b[1], label="α2")]
     got = r100.pair_check(entry(a), entry(renamed))
-    assert got["pass"] is False and "α1~α2" in got["detail"]
-    assert r100.pair_check(entry(a), entry(b[:1]))["pass"] is False  # α1 has no partner
+    assert got["pass"] is False and "α1~α2" in got["detail"]  # nothing unpaired before it explains the name
+
+
+def test_pair_check_allows_an_extra_element_and_its_numbering(r100):
+    """A19 (ruling): one entry may hold an element the other lacks (8P3N's short helix B:121-125), and the generic
+    names after it differ; enough elements must pair (the pairs' order is checked too; with each chain's elements
+    apart in sequence, residue-range pairs cannot cross)."""
+
+    def entry(elements):
+        return {"views": {"beta": {"result": {"elements": elements}}}}
+
+    def el(chain, kind, first, last, label):
+        return {
+            "id": f"{chain}:{first}-{last}",
+            "chain": chain,
+            "kind": kind,
+            "first": first,
+            "last": last,
+            "label": label,
+        }
+
+    a = [el("A", "E", 1, 8, "β1"), el("A", "H", 12, 30, "α1"), el("A", "E", 34, 40, "β2"), el("A", "H", 44, 60, "α2")]
+    b = [el("B", "E", 2, 9, "β1"), el("B", "H", 13, 30, "α1"), el("B", "E", 34, 41, "β2"), el("B", "H", 44, 50, "α2")]
+    b += [el("B", "H", 52, 60, "α3")]  # the last helix split in two: one extra, numbering unchanged before it
+    got = r100.pair_check(entry(a), entry(b))
+    assert got["pass"] is True and "B:44-50 unpaired" in got["detail"]  # A:44-60 pairs the larger part
+    extra = [el("B", "E", 2, 9, "β1"), el("B", "H", 10, 11, "α1")]  # an extra short helix: every later α shifts
+    extra += [el("B", "H", 13, 30, "α2"), el("B", "E", 34, 41, "β2"), el("B", "H", 44, 60, "α3")]
+    got = r100.pair_check(entry(a), entry(extra))
+    assert got["pass"] is True and "B:10-11 unpaired" in got["detail"]
+    assert r100.pair_check(entry(a), entry(b[:1]))["pass"] is False  # one of four paired: too few
+    renamed = [dict(x) for x in extra]
+    renamed[3]["label"] = "β3"  # a strand renamed with no extra strand before it: a real naming difference
+    got = r100.pair_check(entry(a), entry(renamed))
+    assert got["pass"] is True  # after the extra helix B:10-11 names are not compared
 
 
 def test_report_md_lists_every_entry_and_the_limits(r100, tmp_path):
