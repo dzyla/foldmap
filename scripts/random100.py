@@ -1153,16 +1153,16 @@ def trace_of(drawn) -> dict:
     return {"axes": lay.page_axes, "centre": lay.page_centre, "chains": chains, "strands": strands}
 
 
-def tether_lengths(fig) -> list[tuple[str, float]]:
-    """(gid, length in page units) of every ligand tether drawn."""
+def tether_lengths(drawn, look) -> list[tuple[str, float]]:
+    """(gid, length in page units) of every ligand tether drawn: from its ligand's mark to its target (render's
+    ligand_marks; the drawn tether shows only where no body or text is, so its ink is shorter)."""
+    from foldmap.render import ligand_marks
+
     out = []
-    if not fig.axes:
-        return out
-    for line in fig.axes[0].lines:
-        gid = line.get_gid() or ""
-        if gid.startswith("ligand-tether:"):
-            xy = np.column_stack(line.get_data()).astype(float)
-            out.append((gid, round(float(np.linalg.norm(np.diff(xy, axis=0), axis=1).sum()), 3)))
+    for m in ligand_marks(drawn.layout, drawn.loops, drawn.sses, look):
+        g, (cx, cy) = m["ligand"], m["centre"]
+        for k, (tx, ty) in enumerate(m["targets"]):
+            out.append((f"ligand-tether:{g.name}:{g.chain}{g.seq}:{k}", round(float(np.hypot(tx - cx, ty - cy)), 3)))
     return out
 
 
@@ -1295,7 +1295,7 @@ def measure_view(view: str, drawn, spec, path: Path, name: str, work: Path) -> d
         "area": round(lay.width * lay.height, 2),
         "context": lay.context,
         "copy_ties": len(lay.copy_ties),
-        "tethers": tether_lengths(drawn.figure),
+        "tethers": tether_lengths(drawn, spec.look),
         "stem_gap_limit": stem_gap_limit(drawn.figure),
     }
     if view == "membrane":

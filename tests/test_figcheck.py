@@ -61,12 +61,6 @@ def test_best_fit_deviation_turns_and_mirrors_only_when_asked():
     assert figcheck.fit_deviation(a, mirror, mirrored=False) > 0.5
 
 
-def test_disulfide_bar_over_a_label_is_a_text_collision():
-    d = drawn(DATA / "r100" / "7FAB-HL.cif.gz")  # Fab, chains H and L (Task 1 fixture)
-    hits = [h for h in figcheck.text_collisions(d) if "disulfide:" in h]
-    assert hits  # Task 6 turns this into == []
-
-
 def _page(*artists_and_texts):
     """A 10 x 10 unit page at 100 dpi (one unit = 50 px), its artists added, as a Drawn-like object."""
     fig = Figure(figsize=(5, 5), dpi=100)

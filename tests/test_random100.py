@@ -297,6 +297,18 @@ def test_stem_gap_limit_is_the_margin_in_page_units(r100):
     assert 0.3 < r100.stem_gap_limit(d.figure) < 1.0
 
 
+def test_tether_lengths_are_measured_from_mark_to_target(r100):
+    """A20 reads every ligand tether (they are patches, drawn in pieces where no body or text is; reading lines
+    found none): myoglobin's heme and hydroxide, six tethers, the longest 6.06 page units."""
+    from foldmap.spec import draw_spec, figure_spec
+    from foldmap.style import Style
+
+    d = draw_spec(figure_spec(DATA / "fidelity" / "1MBN.cif.gz"))
+    got = r100.tether_lengths(d, Style())
+    assert len(got) == 6 and all(g.startswith("ligand-tether:") for g, _ in got)
+    assert max(n for _, n in got) == pytest.approx(6.06, abs=0.01)
+
+
 def test_a_ca_only_entry_must_be_refused_in_one_line(r100):
     view = {"timed_out": False, "python_warnings": [], "written": {}, "seconds": 1.0, "result": None}
     refused = {"exit": 1, "traceback": False, "foldmap_said": ["foldmap: x.cif: only CA atoms"]}

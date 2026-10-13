@@ -181,8 +181,8 @@ _APP = r"""
     const key = 'loop ' + a + '>' + b;
     (parts[key] = parts[key] || []).push(node);
   });
-  svg.querySelectorAll('[id^="disulfide:"], [id^="ss-dot:"], [id^="glycan:"], [id^="ligand"], [id^="feature"], [id^="na:"]').forEach(node => {
-    let m = node.id.match(/^(disulfide|ss-dot):(.+)$/), key = null;
+  svg.querySelectorAll('[id^="disulfide:"], [id^="ss-dot:"], [id^="disulfide-end:"], [id^="glycan:"], [id^="ligand"], [id^="feature"], [id^="na:"]').forEach(node => {
+    let m = node.id.match(/^(disulfide|ss-dot|disulfide-end):(.+)$/), key = null;
     const na = lib.nucleicKey(node.id);
     if (na) key = 'nucleic ' + na;
     if (m) key = 'disulfide ' + m[2];
@@ -475,7 +475,7 @@ _APP = r"""
       if (t && data.beads.marks[t[1]]) return { type: 'bead', mark: t[1] };  // the bold letter of a touched nucleotide
       const c = n.id.match(/^(legend-chain|legend-chain-label|terminus:[NC]|stub:[NC]):(.+)$/);
       if (c) return { type: 'chain', chain: c[2] };
-      let l = n.id.match(/^(?:disulfide|ss-dot):(.+)$/);
+      let l = n.id.match(/^(?:disulfide|ss-dot|disulfide-end):(.+)$/);
       if (l) return { type: 'disulfide', key: l[1] };
       if ((l = n.id.match(/^glycan:(\d+):/))) return { type: 'glycan', key: l[1] };
       if ((l = n.id.match(/^hbond:(.+)$/)) && data.hbonds.some(h => h.key === l[1])) return { type: 'hbond', key: l[1] };
@@ -547,10 +547,11 @@ main { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1
 #stage svg.focus [id^="loop:"]:not(.on), #stage svg.focus [id^="loop-arrow:"]:not(.on),
 #stage svg.focus [id^="ghost:"]:not(.on),
 #stage svg.focus [id^="disulfide:"]:not(.on), #stage svg.focus [id^="ss-dot:"]:not(.on),
+#stage svg.focus [id^="disulfide-end:"]:not(.on),
 #stage svg.focus [id^="glycan:"]:not(.on), #stage svg.focus [id^="ligand"]:not(.on),
 #stage svg.focus [id^="feature"]:not(.on), #stage svg.focus [id^="na:stem:"]:not(.on),
 #stage svg.focus [id^="na:label:"]:not(.on), #stage svg.focus [id^="na:run:"]:not(.on) { opacity: .2; transition: opacity .12s }
-#stage svg [id^="disulfide:"], #stage svg [id^="ss-dot:"], #stage svg [id^="glycan:"], #stage svg [id^="ligand"],
+#stage svg [id^="disulfide:"], #stage svg [id^="ss-dot:"], #stage svg [id^="disulfide-end:"], #stage svg [id^="glycan:"], #stage svg [id^="ligand"],
 #stage svg [id^="na:stem:"], #stage svg [id^="na:label:"], #stage svg [id^="na:run:"] { cursor: pointer }
 #molpanel { flex: 1.15 }
 #mol { flex: 1; min-height: 200px; position: relative; border-radius: 6px; overflow: hidden; background: #fff }

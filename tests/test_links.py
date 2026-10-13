@@ -37,9 +37,23 @@ def _gids(fig, prefix):
     ]
 
 
+def _on_outline(q, path, tol=0.03) -> bool:
+    """Is point q within tol page units of the closed outline `path`?"""
+    v = path.vertices
+    best = np.inf
+    for a, b in zip(v, v[1:]):
+        ab = b - a
+        t = float(np.clip(np.dot(q - a, ab) / max(np.dot(ab, ab), 1e-12), 0.0, 1.0))
+        best = min(best, float(np.hypot(*(q - a - t * ab))))
+    return best <= tol
+
+
 @pytest.mark.parametrize("name", ["5NKT", "6ZS5"])
 def test_disulfides_are_drawn_between_their_residues(name):
-    from foldmap.render import disulfide_points
+    """Each bar joins its two cysteines: one in the open (a loop) keeps its sulfur dot on its own loop; one in an
+    element, whose body hides the bar's end, gets its end mark where the bar comes out from under that body, on its
+    outline (plan 10 Task 6)."""
+    from foldmap.render import link_bodies, loop_of, residue_point
     from foldmap.route import route_loops
 
     path = DATA / f"{name}.cif"
@@ -49,11 +63,37 @@ def test_disulfides_are_drawn_between_their_residues(name):
     bars = _gids(fig, "disulfide:")
     assert len(bars) == len(links.disulfides) > 0
     loops = route_loops(lay, sses, bb)
+    dots = {d.get_gid(): d.get_offsets() for d in _gids(fig, "ss-dot:")}
+    ends = {d.get_gid(): d.get_offsets() for d in _gids(fig, "disulfide-end:")}
+    outline = dict(zip([*lay.placed, *(f"ghost:{g.sse.id}" for g in lay.ghosts)], link_bodies(lay)))
     for bar in bars:
         i, j = (int(x) for x in bar.get_gid().split(":")[1].split("-"))
-        ends = bar.get_path().vertices[[0, -1]]
-        want = np.array(disulfide_points(lay, loops, sses, lay.res_chain, i, j))
-        assert np.allclose(sorted(map(tuple, ends)), sorted(map(tuple, want)), atol=1e-6)
+        drawn = bar.get_path().vertices
+        marks = [*dots.get(f"ss-dot:{i}-{j}", []), *ends.get(f"disulfide-end:{i}-{j}", [])]
+        assert len(marks) == 2
+        for r in (i, j):
+            loop = loop_of(lay, loops, sses, lay.res_chain, r)
+            home = next((s.id for s in sses if s.start <= r <= s.end and s.id in lay.placed), None)
+            if loop is not None or home is None:  # in a loop or past a chain end: a dot on its loop or at its place
+                at = residue_point(lay, loops, sses, lay.res_chain, r)
+                on = [m for m in dots[f"ss-dot:{i}-{j}"] if loop is None and np.allclose(m, at)]
+                on += [m for m in dots[f"ss-dot:{i}-{j}"] if loop is not None and _on_outline(m, _Poly(loop), 1e-6)]
+                assert on, (r, name)
+            else:  # in an element whose body hides it: an end mark where the bar comes out (at the body's
+                # edge, or just past it where text keeps the bar off), a stretch of the bar starting there; at a
+                # tip the body does not cover, its dot
+                at = residue_point(lay, loops, sses, lay.res_chain, r)
+                dot = [m for m in dots.get(f"ss-dot:{i}-{j}", []) if np.allclose(m, at)]
+                if not dot:
+                    assert outline[home].contains_point(at), (r, name)
+                    mark = [m for m in ends[f"disulfide-end:{i}-{j}"] if np.hypot(*(m - at)) < 1.0]
+                    assert mark and any(np.allclose(mark[0], v) for v in drawn), (r, name)
+                    assert not outline[home].contains_point(mark[0]) or _on_outline(mark[0], outline[home])
+
+
+class _Poly:
+    def __init__(self, pts):
+        self.vertices = np.asarray(pts, float)
 
 
 def test_glycans_are_drawn_with_snfg_symbols():
@@ -154,15 +194,14 @@ def test_glycans_stay_off_elements(name):
 
 
 def _bars(name):
-    from foldmap.cli import make_figure
+    """Each disulfide's length on the page, cysteine to cysteine (its route's ends: the drawn bar shows only where
+    no body or text covers it)."""
+    from foldmap.render import disulfide_bars
+    from foldmap.route import route_loops
 
-    fig = make_figure(Path(__file__).parent / "data" / f"{name}.cif")
-    out = []
-    for a in fig.axes[0].patches:
-        if (a.get_gid() or "").startswith("disulfide:"):
-            v = a.get_path().vertices
-            out.append(float(np.hypot(*(v[-1] - v[0]))))
-    return out
+    lay, sses, bb = make_layout(Path(__file__).parent / "data" / f"{name}.cif")
+    loops = route_loops(lay, sses, bb)
+    return [float(np.hypot(*np.subtract(b, a))) for _, _, a, b, _ in disulfide_bars(lay, loops, sses, Style(), 1, 1)]
 
 
 @pytest.mark.parametrize("name", ["8UUP", "6Y7S", "6ZS5"])
@@ -276,7 +315,9 @@ def test_overlapping_bars_are_drawn_as_brackets_that_keep_their_cysteines(monkey
     for k, pair in enumerate(pairs):  # the first two lie on top of each other, the others far apart
         y = 0.0 if k < 2 else 50.0 * k
         spots[pair] = (np.array([1.0, y]), np.array([4.0 + k, y]))
-    monkeypatch.setattr(render, "disulfide_points", lambda lay, loops, sses, chains, i, j: spots[(i, j)])
+    monkeypatch.setattr(render, "disulfide_points", lambda lay, loops, sses, chains, i, j, avoid=(): spots[(i, j)])
+    # the lanes only: nothing hides these planted bars (what bodies and text hide is tested on real figures)
+    monkeypatch.setattr(render, "visible_pieces", lambda points, bodies, halos=(): [np.asarray(points, float)])
     fig = make_figure(path)
     bars = {b.get_gid(): b.get_path().vertices for b in _gids(fig, "disulfide:")}
     first, second = (bars[f"disulfide:{i}-{j}"] for i, j in pairs[:2])
@@ -285,9 +326,10 @@ def test_overlapping_bars_are_drawn_as_brackets_that_keep_their_cysteines(monkey
     assert np.allclose(second[0], a) and np.allclose(second[-1], b)  # still ends on its cysteines
     assert abs(second[1][1] - a[1]) >= 0.1 and np.isclose(second[1][1], second[2][1])  # a lane clear of the first bar
     assert all(len(v) == 2 for g, v in bars.items() if g not in {f"disulfide:{i}-{j}" for i, j in pairs[:2]})
-    dots = {d.get_gid(): d.get_offsets() for d in _gids(fig, "ss-dot:")}
     i, j = pairs[1]
-    assert np.allclose(dots[f"ss-dot:{i}-{j}"], [a, b])
+    marks = [d for d in _gids(fig, "ss-dot:") + _gids(fig, "disulfide-end:") if d.get_gid().endswith(f":{i}-{j}")]
+    marks = sorted(map(tuple, np.vstack([d.get_offsets() for d in marks])))  # a dot, or an end mark under a body
+    assert np.allclose(marks, sorted([tuple(a), tuple(b)]))
 
 
 def test_4ch9_bond_lying_on_another_detours_in_a_bracket():
@@ -318,3 +360,40 @@ def test_the_lane_step_clears_a_sulfur_dot(inches_per_unit):
     step = disulfide_step(lw, ppu)
     assert step > 5.5 * lw / ppu  # more than a dot's diameter
     assert step >= 3 * 2.4 * lw / ppu  # and three bar widths
+
+
+def _drawn_points(fig, prefix):
+    """Points along every drawn stretch of the lines whose gid starts with prefix, every 0.02 page units."""
+    from foldmap.render import _dense
+
+    out = []
+    for a in fig.axes[0].patches:
+        if (a.get_gid() or "").startswith(prefix):
+            for poly in a.get_path().to_polygons(closed_only=False):
+                out.append(_dense(poly)[0][1:-1])  # its ends meet the body edge they come out at
+    return np.vstack(out) if out else np.empty((0, 2))
+
+
+@pytest.mark.parametrize(
+    "path",
+    [DATA / "r100" / "7FAB-HL.cif.gz", DATA / "r100" / "1IGT-AB.cif.gz", DATA / "6ZS5.cif"],
+    ids=["7FAB-HL", "1IGT-AB", "6ZS5"],
+)
+def test_disulfide_bars_cross_no_label(path):
+    """A disulfide bar passes under the element bodies and the text (Q-R10): it is drawn only where no body or
+    letter is, so no bar runs over a strand's letter (7FAB's C-I bar over F, E and D; 1IGT's bars over its strands'
+    letters; 6ZS5's C-terminal bar through its "C" and "12 aa"). Judged by figcheck's ink at its line clearance,
+    LINE_TEXT_CLEARANCE_PX (the Task 1 ruling for Task 6), and every bond still drawn."""
+    from foldmap import figcheck
+    from foldmap.render import link_bodies
+    from foldmap.spec import draw_spec, figure_spec
+
+    d = draw_spec(figure_spec(path))
+    if reason := figcheck.ink_font_reason(d.figure):
+        pytest.skip(reason)
+    hits = figcheck.text_collisions(d, clearance_px=figcheck.LINE_TEXT_CLEARANCE_PX)
+    assert [h for h in hits if "disulfide" in h] == []
+    bars = {a.get_gid() for a in d.figure.axes[0].patches if (a.get_gid() or "").startswith("disulfide:")}
+    assert bars and len(bars) == len(d.layout.links.disulfides)
+    pts = _drawn_points(d.figure, "disulfide:")
+    assert not any(body.contains_points(pts).any() for body in link_bodies(d.layout))  # never over a body

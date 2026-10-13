@@ -193,3 +193,32 @@ def test_haem_tethers_keep_to_the_pocket():
     lay, sses, bb = make_layout(DATA / "2HHB.cif")
     marks = ligand_marks(lay, route_loops(lay, sses, bb), sses, Style())
     assert [(m["ligand"].chain, len(m["targets"])) for m in marks] == [("A", 4), ("B", 4), ("C", 4), ("D", 4)]
+
+
+@pytest.mark.parametrize(
+    "path, kw",
+    [
+        (DATA / "fidelity" / "1MBN.cif.gz", {}),
+        (DATA / "r100" / "1GOX-A.cif.gz", {}),
+        (DATA / "fidelity" / "1LDM.cif.gz", {"focus": "A1"}),
+    ],
+    ids=["1MBN", "1GOX", "1LDM-focus-A1"],
+)
+def test_tethers_cross_no_label(path, kw):
+    """A ligand's tethers pass under the element bodies and the text (Q-R10): drawn only where no body or letter
+    is, and the ligand's mark takes the nearest clear spot (within 3 units) whose tethers cross no label, lengthening
+    none past the plan-11 reach: 1MBN's heme tether over α7 (the "C" of the carried item is stale), 1GOX's FMN
+    tethers on the βα barrel over a helix label (K8), 1LDM --focus A1's oxamate tethers over three labels. Judged
+    by figcheck's ink at LINE_TEXT_CLEARANCE_PX."""
+    from foldmap import figcheck
+    from foldmap.render import link_bodies
+    from foldmap.spec import draw_spec, figure_spec
+    from test_links import _drawn_points
+
+    d = draw_spec(figure_spec(path, **kw))
+    if reason := figcheck.ink_font_reason(d.figure):
+        pytest.skip(reason)
+    hits = figcheck.text_collisions(d, clearance_px=figcheck.LINE_TEXT_CLEARANCE_PX)
+    assert [h for h in hits if "ligand-tether" in h] == []
+    pts = _drawn_points(d.figure, "ligand-tether:")
+    assert len(pts) and not any(body.contains_points(pts).any() for body in link_bodies(d.layout))

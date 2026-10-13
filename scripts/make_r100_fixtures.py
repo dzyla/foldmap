@@ -9,7 +9,8 @@
 Waters and hydrogens are dropped, and the water subchains leave the assembly generators (gemmi cannot build from a
 subchain the file lacks). An entry in WINDOWS keeps only the chains it names, each whole or cut to residue windows;
 the helix records keep their deposited ids. TRIMS shrinks an entry further: `assembly` keeps only the subchains of
-that biological assembly, `backbone` keeps only a protein's N, CA, C, O and CB atoms, `no_protein_sequence` drops
+that biological assembly, `backbone` keeps only a protein's N, CA, C, O and CB atoms (`atoms`: these names
+instead, e.g. with the cysteines' SG for disulfides), `no_protein_sequence` drops
 the protein entities' full sequences (a big complex's are most of a small window's file). Each fixture stays under
 100 KB and all of them under 600 KB (tests/test_r100_fixtures.py). Files are written gzipped, outside
 tests/data/*.cif, so scripts/bench.py never reads them.
@@ -34,10 +35,13 @@ ENTRIES = {  # fixture name -> (PDB id, what it is for)
         "its 3' end V:85-92 ran back over its own stem and buried the gap after V:92 (Task 5, K5)",
     ),
     "4V4F-ring": ("4V4F", "TRAP-RNA: assembly 1, the 11-subunit ring and its RNA, backbone only (Task 5, K24)"),
+    "1IGT-AB": ("1IGT", "IgG: a light and a heavy chain, backbone and SG: disulfide bars over labels (Task 6, K11)"),
+    "1GOX-A": ("1GOX", "glycolate oxidase, one subunit and its FMN: tethers on a template barrel (Task 6, K8)"),
 }
 Span = tuple[int, int]
 WINDOWS: dict[str, dict[str, Span | list[Span] | None]] = {  # fixture -> {chain: windows (first, last), None: whole}
     "7FAB-HL": {"H": None, "L": None},
+    "1IGT-AB": {"A": None, "B": None},
     "5LJ3-V": {  # found by a seeded search over the page neighbours of the gap (plan 10 Task 5 report)
         "V": None,
         "Z": (1, 16),
@@ -51,6 +55,7 @@ WINDOWS: dict[str, dict[str, Span | list[Span] | None]] = {  # fixture -> {chain
 TRIMS: dict[str, dict] = {
     "5LJ3-V": {"no_protein_sequence": True},
     "4V4F-ring": {"assembly": "1", "backbone": True},
+    "1IGT-AB": {"atoms": ("N", "CA", "C", "O", "CB", "SG")},
 }
 _BACKBONE = {"N", "CA", "C", "O", "CB"}
 
@@ -85,11 +90,12 @@ def build(text: str, window: dict[str, Span | list[Span] | None] | None = None, 
                 for i in reversed(range(len(c))):
                     if c[i].subchain not in sub:
                         del c[i]
-    if trim.get("backbone"):
+    keep = set(trim["atoms"]) if "atoms" in trim else _BACKBONE if trim.get("backbone") else None
+    if keep is not None:
         for model in st:
             for r in (r for c in model for r in c if _protein(r)):
                 for i in reversed(range(len(r))):
-                    if r[i].name not in _BACKBONE:
+                    if r[i].name not in keep:
                         del r[i]
     st.remove_empty_chains()
     if trim.get("no_protein_sequence"):
