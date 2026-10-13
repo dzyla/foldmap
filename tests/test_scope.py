@@ -182,3 +182,39 @@ def test_half_a_subunit_rounds_up():
     assert _subunits(sym, {"A", "B"}) == 5
     assert _subunits(SimpleNamespace(protomers=[["A", "B", "C"]] * 5), {"A", "B"}) == 8  # 7.5
     assert _subunits(SimpleNamespace(protomers=[["A"]] * 24), {"A"}) == 24
+
+
+def test_a_chain_with_no_helix_or_strand_is_said_not_drawn():
+    """C15 (random-100): a protein chain with no helix or strand has no element, so it was drawn as nothing and
+    said by nothing (6B5W, a 19-residue lasso peptide: an empty page; 7PIU chain P, 7MW8 chain K). The scope says
+    it is not drawn and why, the note prints it, and figcheck.scope_honest counts it as said."""
+    from foldmap import figcheck
+    from foldmap.spec import draw_spec, figure_spec
+
+    path = DATA / "r100" / "6B5W.cif.gz"
+    s = scope_of(path)
+    assert s["undrawn_chains"] == ["A"] and s["not_drawn"] == "chain A (19 residues, no helix or strand)"
+    assert s["reason"] == "not drawn: chain A (19 residues, no helix or strand)"
+    assert (s["drawn_chains"], s["file_chains"]) == (0, 1) and s["all_options"] == {}
+    assert scope_note(s) == "not drawn: chain A (19 residues, no helix or strand)"
+    assert figcheck.scope_honest(draw_spec(figure_spec(path)), path) == []
+    assert scope_of(DATA / "1UBQ.cif")["not_drawn"] == ""
+
+
+def test_a_nucleic_acid_chain_too_short_to_draw_is_said(tmp_path):
+    """C15 (random-100): 7MW8's chain K is one nucleotide, read but drawn by no strand; it is said too."""
+    import gemmi
+
+    st = gemmi.read_structure(str(DATA / "na" / "1URN.cif.gz"))
+    rna = st[0]["R"].clone()
+    for i in reversed(range(1, len(rna))):
+        del rna[i]
+    rna.name = "K"
+    ubq = gemmi.read_structure(str(DATA / "1UBQ.cif"))
+    ubq.remove_ligands_and_waters()
+    ubq[0].add_chain(rna)
+    ubq.setup_entities()
+    path = tmp_path / "1UBQ-K.cif"
+    ubq.make_mmcif_document().write_file(str(path))
+    s = scope_of(path)
+    assert s["undrawn_chains"] == ["K"] and s["not_drawn"] == "chain K (1 nucleotide, too short to draw)"

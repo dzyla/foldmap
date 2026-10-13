@@ -63,6 +63,11 @@ ENTRIES = {  # fixture name -> (PDB id, what it is for)
         "eight pentamers in the asymmetric unit, cut to two (assembly 1's P-T and K-O), residues 30-40, backbone "
         "only: assembly 1 holds two single-copy entities of the same protein (random-100 C30)",
     ),
+    "6B5W": (
+        "6B5W",
+        "a 19-residue lasso peptide (NMR model 1, backbone only) with no helix or strand: nothing drawn, which the "
+        "note must say (random-100 C15)",
+    ),
     "7IMM-A": (
         "7IMM",
         "a dimer (assembly 1: chain A twice) whose two copies make one continuous A B B A sheet, backbone only: the "
@@ -99,6 +104,7 @@ TRIMS: dict[str, dict] = {
         "backbone": True,
         "drop": ("_atom_site_anisotrop.", "_pdbx_refine_tls.", "_pdbx_refine_tls_group.", "_struct_sheet_order."),
     },
+    "6B5W": {"first_model": True, "backbone": True},
     "1BXI": {
         "atoms": ("N", "CA", "C", "O", "CB", "ND1", "NE2", "SG", "OD1", "OD2", "OE1", "OE2", "NZ", "OG", "OG1", "SD")
     },

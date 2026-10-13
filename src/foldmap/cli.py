@@ -10,6 +10,7 @@ import functools
 import math
 import re
 import sys
+from collections import Counter
 from collections.abc import Callable
 from pathlib import Path
 
@@ -376,6 +377,8 @@ def make_layout(
     lay.res_labels = list(bb.labels)
     lay.res_linked = sorted(bb.linked)
     lay.res_b = [float(x) for x in bb.b] if bb.b is not None else []
+    with_elements = {s.chain for s in sses}
+    lay.coil_chains = [(c, n) for c, n in Counter(lay.res_chain).items() if c not in with_elements]
     lay.uniprot = ann
     first = [s.centroid for s in sses if s.chain == sses[0].chain] if sses else [_any_centre(bb, nucleic)]
     centre = np.mean(first, axis=0)

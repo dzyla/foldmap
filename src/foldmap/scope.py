@@ -27,6 +27,26 @@ def _na_kind(layout) -> str:
     return "RNA" if kinds == {True} else "DNA" if kinds == {False} else "nucleic acid"
 
 
+def _undrawn_chains(model, layout) -> list[tuple[str, str]]:
+    """(chain, why) for each polymer chain read for the figure (and asked for, and in the focus) that it has nothing
+    of: a protein chain with no helix or strand (Layout.coil_chains: a bound peptide, a lasso peptide), or a
+    nucleic-acid chain no strand of the figure holds (7MW8 chain K: a single nucleotide)."""
+    focus, asked = layout.focus_chains, set(getattr(layout, "chains_asked", None) or [])
+    coil = dict(getattr(layout, "coil_chains", None) or [])
+    protein = set(getattr(layout, "res_chain", None) or [])
+    strands = {s.chain for s in layout.nucleic.strands} if layout.nucleic is not None else set()
+    out = []
+    for c in getattr(layout, "chains_read", None) or []:
+        if c in layout.partial or (focus and c not in focus) or (asked and c not in asked):
+            continue
+        if c in coil:
+            out.append((c, f"{coil[c]} residues, no helix or strand"))
+        elif c not in protein and c not in strands and not getattr(layout, "na_cropped", False):
+            n = next((len(ch.get_polymer()) for ch in model[0] if ch.name == c), 0)
+            out.append((c, f"{n} nucleotide{'' if n == 1 else 's'}, too short to draw"))
+    return out
+
+
 def drawn_scope(model, layout, assembly: str = "auto", focus: str = "auto") -> dict:
     """What the figure drew of the structure, given the io.read_model result it was built from (`model`), its
     layout and the assembly and focus settings it was drawn with. Only automatic choices count (an assembly or a
@@ -38,7 +58,8 @@ def drawn_scope(model, layout, assembly: str = "auto", focus: str = "auto") -> d
         chains_reason (what was drawn of the chains) and crop (what of the nucleic acid, '' when none was
         cropped); all_options: the settings that draw everything ({} when nothing was left out: `set` is a style
         key=value, as --set takes it); residues: polymer residues those settings would draw (of the chains asked
-        for, when some were)."""
+        for, when some were); undrawn_chains: chains the figure has nothing of (_undrawn_chains), and not_drawn:
+        them and why ('' when none), part of the reason (random-100 C15)."""
     several = getattr(model, "several", None) if assembly == "auto" else None
     read = list(getattr(layout, "chains_read", None) or [])
     asked = list(getattr(layout, "chains_asked", None) or [])
@@ -69,7 +90,11 @@ def drawn_scope(model, layout, assembly: str = "auto", focus: str = "auto") -> d
         options["set"] = "na_extent=all"
     if asked:
         reasons.insert(0, f"chains {', '.join(asked)} (asked for)")
-    if not reasons and not crop:
+    undrawn = _undrawn_chains(model, layout)
+    not_drawn = "; ".join(f"chain {c} ({why})" for c, why in undrawn)
+    drawn -= len(undrawn)
+    unsaid = {"undrawn_chains": [c for c, _ in undrawn], "not_drawn": not_drawn}
+    if not reasons and not crop and not not_drawn:
         return {
             "file_chains": total,
             "drawn_chains": drawn,
@@ -78,17 +103,19 @@ def drawn_scope(model, layout, assembly: str = "auto", focus: str = "auto") -> d
             "crop": "",
             "all_options": {},
             "residues": 0,
+            **unsaid,
         }
     if residues is None and options:
         residues = sum(len(c.get_polymer()) for c in model[0] if c.name in read) if asked else _polymers(model[0])[1]
     return {
         "file_chains": total,
         "drawn_chains": drawn,
-        "reason": "; ".join([*reasons, *([crop] if crop else [])]),
+        "reason": "; ".join([*reasons, *([crop] if crop else []), *([f"not drawn: {not_drawn}"] if not_drawn else [])]),
         "chains_reason": "; ".join(reasons),
         "crop": crop,
         "all_options": options,
         "residues": residues or 0,
+        **unsaid,
     }
 
 
@@ -106,7 +133,11 @@ def scope_note(scope: dict, how: str = "cli") -> str:
         )
     else:
         draw = " ".join(f"--{k} {v}" for k, v in options.items())
-    return f"drew {scope_what(scope)}" + (f"; {draw} draws all of them" if options else "")
+    what = scope_what(scope)
+    parts = [f"drew {what}" + (f"; {draw} draws all of them" if options else "")] if what else []
+    if scope.get("not_drawn"):
+        parts.append(f"not drawn: {scope['not_drawn']}")
+    return "; ".join(parts)
 
 
 def scope_what(scope: dict, count: str = ": {drawn} of {total} chains") -> str:

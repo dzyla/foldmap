@@ -892,7 +892,8 @@ def scope_honest(drawn, path, assembly: str = "auto", focus: str = "auto", *, ch
     among `chains` (--chains), and the chains an explicit --focus leaves undrawn (the chains it draws are still
     checked nucleotide by nucleotide), and what na_extent auto crops from a large nucleic acid once the drawn_scope
     reason says so (plan 10 Task 8): its ends and the gaps between the pieces it kept (_cropped_away); a run missing
-    inside a kept piece is still counted."""
+    inside a kept piece is still counted. A protein chain with no helix or strand is counted as said when the
+    reason says it is not drawn (random-100 C15)."""
     import gemmi
 
     from .scope import drawn_scope
@@ -918,7 +919,7 @@ def scope_honest(drawn, path, assembly: str = "auto", focus: str = "auto", *, ch
         show(s, range(len(strands[s])))
     drawn_chains = {p.sse.chain for p in lay.placed.values()} | {g.sse.chain for g in lay.ghosts} | set(shown)
     scope = drawn_scope(model, lay, assembly, focus)
-    covered: set[str] = set()
+    covered: set[str] = set(scope.get("undrawn_chains", []))  # said not drawn: no helix or strand (C15)
     if scope["reason"]:
         if several:
             covered |= set(expected) - {c.name for c in model[0]}
