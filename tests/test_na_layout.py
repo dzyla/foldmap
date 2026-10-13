@@ -2201,12 +2201,15 @@ _TRNA_NAMES = Path(__file__).parents[1] / "docs" / "names" / "1EHZ-trna.yaml"
     ids=["1EHZ", "1EHZ-trna-names", "2GIS", "30QM", "1KX5"],
 )
 def test_stem_name_sits_by_its_own_letters(pdb, names):
-    """Each stem's name sits 0.5 em (layout._INK_MARGIN) beyond its own letter row, across the stem, centred along
+    """Each stem's name sits 1.0 em (layout._INK_MARGIN) beyond its own letter row, across the stem, centred along
     it: 1EHZ's D name sat six glyph heights above its row, T between the T arm and the D-loop run; at 0.25 em (plan
-    10 Task 4) D and T read as letters of their rows. Measured by figcheck.stem_name_gaps in the stem's frame under
-    its fixed hinting (Liberation Sans only); the limit is that margin in page units plus 1e-3
-    (figcheck.stem_gap_tolerance, R7). The name is also nearer its own letters than half the way to any other stem,
-    never on its letters, and the letters stay apart (nacheck letter_overlaps)."""
+    10 Task 4) D and T read as letters of their rows, at 0.5 em T still stacked on a G of the T arm (fix round 1).
+    Measured by figcheck.stem_name_gaps in the stem's frame under its fixed hinting (Liberation Sans only); the limit
+    is that margin in page units plus 1e-3 (figcheck.stem_gap_tolerance, R7), and at least 0.9 of 1.0 em of the
+    drawn text (the layout's em, from the page before routing and names widen it, is up to 6 % smaller than the
+    drawn page's: 30QM and 1KX5 measure 0.95 em). The name is also nearer its own letters than any other stem (fix
+    round 2 ruling: at 1.0 em 1KX5's DNA 1h is 0.53 from its letters and 1.05 from the next piece, past the T4
+    brief's half), never on its letters, and the letters stay apart (nacheck letter_overlaps)."""
     from foldmap import figcheck
     from foldmap.layout import _INK_MARGIN
     from foldmap.nacheck import render_checks
@@ -2220,12 +2223,65 @@ def test_stem_name_sits_by_its_own_letters(pdb, names):
     assert gaps and len(gaps) == len([s for s in d.layout.stems if not s.ghost])
     far = {k: (round(own, 3), round(other, 3)) for k, (own, other) in gaps.items() if not 0 < own <= limit}
     assert not far, (pdb, round(limit, 3), far)
-    near_other = {k: (own, other) for k, (own, other) in gaps.items() if not own < 0.5 * other}
+    em = _page_em(d)
+    tight = {k: round(own / em, 3) for k, (own, _) in gaps.items() if own < 0.9 * 1.0 * em}  # in ems
+    assert not tight, (pdb, tight)
+    near_other = {k: (own, other) for k, (own, other) in gaps.items() if not own < other}
     assert not near_other, (pdb, near_other)
     assert render_checks(d.layout, d.loops, d.figure, d.sses)["letter_overlaps"] == 0
     for s in d.layout.stems:  # centred along its row: midway between the row's first and last letters
         row = [s.axial[key] for key in s.axial if s.side[key] == s.label_side]
         assert s.label_along == pytest.approx((min(row) + max(row)) / 2, abs=1e-4), (pdb, s.name)
+
+
+@pytest.mark.parametrize(
+    "pdb, names",
+    [("1EHZ", None), ("1EHZ", _TRNA_NAMES), ("2GIS", None), ("30QM", None), ("1KX5", None), ("4OO8", None)],
+    ids=["1EHZ", "1EHZ-trna-names", "2GIS", "30QM", "1KX5", "4OO8"],
+)
+def test_routes_keep_the_margin_from_stem_names(pdb, names):
+    """No drawn line (run, joint, tail, gap, hairpin loop, protein loop, tie) passes within layout._INK_MARGIN em of
+    a stem's name: routes keep out of its ink box grown by the margin (layout.stem_keep_box). 30QM's P4 had a run
+    0.32 em from its ink (plan 10 Task 4 fix round 1). Measured from the name's ink box to each line's stroke,
+    segment by segment (figcheck.stem_name_line_gaps), in ems of the drawn text."""
+    from foldmap import figcheck
+    from foldmap.layout import _INK_MARGIN
+    from foldmap.spec import draw_spec, figure_spec
+
+    d = draw_spec(figure_spec(_path(pdb), names=[str(names)] if names else None))
+    if reason := figcheck.ink_font_reason(d.figure):
+        pytest.skip(reason)
+    em = _page_em(d)
+    gaps = figcheck.stem_name_line_gaps(d)
+    assert gaps
+    near = {k: (round(gap / em, 3), line) for k, (gap, line) in gaps.items() if gap < _INK_MARGIN * em}
+    assert not near, (pdb, near)
+
+
+def test_block_slots_hold_no_name_so_routes_keep_no_margin_from_them():
+    """In block style (4YBB, cropped) a stem's name is drawn on its block and its side slot holds the first pair's
+    numbers: routes keep out of that text's box only, not a name's margin (layout.stem_keep_box), which raised the
+    NA campaign's 4YBB crossings from 110 to 142 (plan 10 Task 4 fix round 2)."""
+    from foldmap.layout import _stem_label_box, stem_keep_box
+
+    lay, sses, bb = make_layout(NA / "4YBB.cif.gz")
+    assert lay.na_cropped and lay.stems
+    assert all(stem_keep_box(d) == _stem_label_box(d) for d in lay.stems)
+    lay, sses, bb = make_layout(NA / "1EHZ.cif.gz")  # letters drawn: the name's ink and its margin
+    assert all(d.label_keep is not None and stem_keep_box(d) != _stem_label_box(d) for d in lay.stems)
+
+
+def test_a_stem_name_stays_nearer_its_own_stem_unless_no_slot_allows_it():
+    """_pick_slot takes the first slot that is clear, nearer the name's own stem than any other and has the margin
+    of room; else (a fallback) the most room among the clear slots nearer its own stem, and only when no clear slot
+    is nearer its own stem the most room among the clear ones (plan 10 Task 4 fix round 2 ruling)."""
+    from foldmap.layout import _pick_slot
+
+    assert _pick_slot([(True, True, 0.2), (True, True, 1.5), (True, True, 9.0)], 1.0) == (1, False)
+    assert _pick_slot([(True, False, 9.0), (True, True, 0.3), (True, True, 0.6)], 1.0) == (2, True)
+    assert _pick_slot([(True, False, 0.3), (True, False, 0.9), (False, True, 9.0)], 1.0) == (1, True)
+    assert _pick_slot([(False, True, 2.0), (True, False, 0.1)], 1.0) == (1, True)
+    assert _pick_slot([(True, True, 0.5), (True, True, 0.5)], 1.0) == (0, True)  # the first of equals
 
 
 @pytest.mark.parametrize("pdb", ["1EHZ", "1KX5"])

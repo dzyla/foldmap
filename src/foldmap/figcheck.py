@@ -711,6 +711,50 @@ def stem_name_gaps(drawn, *, page: Page | None = None) -> dict[str, tuple[float,
     return out
 
 
+def _segment_box_gap(p, q, box) -> float:
+    """Distance between the segment p-q and the box (x0, y0, x1, y1); 0 when they meet."""
+    p, q = np.asarray(p, float), np.asarray(q, float)
+    if _clip(p, q, Bbox.from_extents(*box)) is not None:
+        return 0.0
+    x0, y0, x1, y1 = box
+    ends = min(_box_gap(box, (*v, *v)) for v in (p, q))  # an end nearest the box
+    d = q - p
+    n = float(d @ d)
+    if n < 1e-24:
+        return ends
+    corners = np.array([(x0, y0), (x1, y0), (x1, y1), (x0, y1)])
+    t = np.clip((corners - p) @ d / n, 0.0, 1.0)  # or a corner nearest the segment
+    return float(min(ends, np.hypot(*(p + t[:, None] * d - corners).T).min()))
+
+
+def stem_name_line_gaps(drawn, *, page: Page | None = None) -> dict[str, tuple[float, str]]:
+    """na:label:<k> -> (gap from the name's ink box to the nearest drawn line's stroke, page units; that line's gid):
+    every line figcheck draws a text against (loops, nucleic-acid runs, ties, tethers, bonds), segment by segment.
+    Routes keep a stem's name layout._INK_MARGIN em clear (layout.stem_keep_box)."""
+    lay, fig = drawn.layout, drawn.figure
+    if not lay.stems or not fig.axes:
+        return {}
+    page = page or measure(drawn)
+    to_page = fig.axes[0].transData.inverted()
+    per_px = float(to_page.transform((1, 0))[0] - to_page.transform((0, 0))[0])  # page units per pixel
+    ink = {name: tuple(to_page.transform_bbox(box).extents) for _, name, box in page.texts}
+    lines = [(gid, to_page.transform(poly), pad * per_px) for gid, polys, _, pad in page.lines for poly in polys]
+    out = {}
+    for k in range(len(lay.stems)):
+        box = ink.get(f"na:label:{k}")
+        if box is None:
+            continue
+        best = (math.inf, "")
+        for gid, poly, pad in lines:
+            lo, hi = poly.min(axis=0), poly.max(axis=0)
+            if _box_gap(box, (*lo, *hi)) - pad >= best[0]:
+                continue
+            gap = min(_segment_box_gap(p, q, box) for p, q in zip(poly, poly[1:]))
+            best = min(best, (max(gap - pad, 0.0), gid))
+        out[f"na:label:{k}"] = best
+    return out
+
+
 def _paths_on_page(page: Page, text, to_page) -> list[MPath]:
     """A text's glyph outlines in page units."""
     return [p.transformed(to_page) for p in page.outlines[id(text)]]

@@ -125,7 +125,7 @@ def test_label_keep_out_never_forces_a_fallback(case, monkeypatch):
     import foldmap.route as route
 
     name, mode, lay, sses, loops = case
-    monkeypatch.setattr(route, "label_boxes", lambda *a: [])
+    monkeypatch.setattr(route, "label_boxes", lambda *a, **k: [])  # routes ask with route=True
     bb = _layout(name, mode)[2]
     without = {(l.a_id, l.b_id) for l in route.route_loops(lay, sses, bb) if l.fallback}
     assert {(l.a_id, l.b_id) for l in loops if l.fallback} <= without

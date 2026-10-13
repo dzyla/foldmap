@@ -151,6 +151,8 @@ class PlacedStem:
     label_out: float = 0.0  # and this much further out than the first slot (_choose_label_sides)
     label_at: float | None = None  # its name's centre this far from the axis, beside its letters (_choose_label_sides)
     label_along: float = 0.0  # and this far along it from its centre, midway along its row (_choose_label_sides)
+    label_keep: tuple[float, float, float, float] | None = None  # its name's ink box grown by _INK_MARGIN em, around
+    # the name's centre: what routes keep out of (stem_keep_box); None until _choose_label_sides
 
     @property
     def direction(self) -> np.ndarray:
@@ -2917,6 +2919,16 @@ def _middle_pair(d: PlacedStem, side: int, letters: bool) -> float:
     return float(_snap((at[(len(at) - 1) // 2] + at[len(at) // 2]) / 2))
 
 
+def stem_keep_box(d: PlacedStem) -> tuple[float, float, float, float]:
+    """The box routes keep out of round a stem's name: its ink grown by _INK_MARGIN em (label_keep) where its place
+    is chosen, else its text box (_stem_label_box)."""
+    if d.label_keep is None:
+        return _stem_label_box(d)
+    x, y = stem_label_pos(d)
+    x0, y0, x1, y1 = d.label_keep
+    return x + x0, y + y0, x + x1, y + y1
+
+
 def _stem_label_box(d: PlacedStem) -> tuple[float, float, float, float]:
     """The box around a stem's name, written along the stem."""
     along, across = _GLYPH_W * len(d.name) / 2 + 0.05, _GLYPH_H / 2
@@ -2946,8 +2958,9 @@ def _body_distance(q, d) -> float:
 
 _SLOTS = (0.25, 0.5, 0.75)  # page units a stem's name may move further out than beside its letters, when neither
 # side is clear there
-_INK_MARGIN = 0.5  # ems kept clear between a stem's name and every base letter (its own letter row, or its rail
-# when no letters are drawn): at 0.25 em 1EHZ's D and T read as letters of their rows (plan 10 Task 4 review)
+_INK_MARGIN = 1.0  # ems kept clear between a stem's name and every base letter (its own letter row, or its rail
+# when no letters are drawn), and by every route: at 0.25 em 1EHZ's D and T read as letters of their rows, at 0.5 em
+# T still stacked on a G of the T arm (plan 10 Task 4 review, fix round 1)
 _NAME_EM, _LETTER_EM = 0.8, 0.75  # ems: render draws a stem's name, and a base letter, at these sizes
 DNA_TUBE = 0.42  # a drawn double helix's backbone tube width, page units (render's ribbon)
 _ink_lines: dict[tuple[str, bool], tuple[np.ndarray, np.ndarray]] = {}
@@ -3187,9 +3200,11 @@ def _choose_label_sides(layout: Layout, sses: list[SSE], style: Style, mirrored:
     rail (label_side 1) unless its box meets another stem's name decided before it, another stem's body, an element
     or an element's name, or sits nearer another stem than its own, or its ink comes within _INK_MARGIN em of a base
     letter of another stem (where the style draws them); then beside the second rail if that is clear; then further
-    out (_SLOTS), either side; else (logged) in the slot with the most room. A mirror copy's name (the (copy, mate)
-    members in `mirrored`, of protomers drawn as mirror images) then takes the mirror of its mate's side
-    (_mirror_sides). Runs once the names (and so the boxes' widths) are final."""
+    out (_SLOTS), either side; else (logged) the slot with the most room, nearer its own stem where any slot is
+    (_pick_slot). A mirror copy's name (the (copy, mate) members in `mirrored`, of protomers drawn as mirror images)
+    then takes the mirror of its mate's side (_mirror_sides). Each name's ink box grown by _INK_MARGIN em is what
+    routes keep out of (label_keep; not in block style, which draws the name on the block). Runs once the names (and
+    so the boxes' widths) are final."""
     _element_label_sides(layout, sses)
     _over_label_sides(layout)
     if mirrored:
@@ -3232,24 +3247,51 @@ def _choose_label_sides(layout: Layout, sses: list[SSE], style: Style, mirrored:
         for d in layout.stems
     }
     named: list[tuple[float, float, float, float]] = []
+    slots = [(side, out) for out in (0.0, *_SLOTS) for side in (1, -1)]
     for d in layout.stems:
         others = [e for e in layout.stems if e is not d]
         reach = _reach(ink[id(d)])
-        slots = [(side, out) for out in (0.0, *_SLOTS) for side in (1, -1)]
-        room = []
+        rooms = []
         for s in slots:
-            room.append(_name_room(d, s, beside, others, named, rects, reach, others_letters[id(d)]))
-            if room[-1] >= _INK_MARGIN * em:
+            rooms.append(_name_room(d, s, beside, others, named, rects, reach, others_letters[id(d)]))
+            if _pick_slot(rooms[-1:], _INK_MARGIN * em) == (0, False):
                 break
-        else:  # no slot has the margin: the one with the most room (the first of equals)
-            log.info("stem %s: no slot keeps %.2f em from every letter; best %.3f", d.name, _INK_MARGIN, max(room))
-        d.label_side, d.label_out = slots[int(np.argmax(room))]  # the clear one has the most room
+        k, fallback = _pick_slot(rooms, _INK_MARGIN * em)
+        if fallback:
+            clear, nearer, room = rooms[k]
+            log.info(
+                "stem %s: no slot is clear, nearer its own stem and %.2f em from every other letter; took side %d "
+                "out %.2f (clear %s, nearer %s, room %.3f)",
+                d.name,
+                _INK_MARGIN,
+                *slots[k],
+                clear,
+                nearer,
+                room,
+            )
+        d.label_side, d.label_out = slots[k]
         d.label_at, d.label_along = beside[id(d), d.label_side][0] + d.label_out, beside[id(d), d.label_side][1]
         named.append(_stem_label_box(d))
     if mirrored:
         _mirror_sides([(a, b) for a, b in mirrored if isinstance(a, PlacedStem)])
         for d in layout.stems:  # a copy's name beside its own letters on the side it took
             d.label_at, d.label_along = beside[id(d), d.label_side][0] + d.label_out, beside[id(d), d.label_side][1]
+    for d in layout.stems:  # what routes keep out of: the name's ink and the margin round it; a block's name is
+        # drawn on its body, its slot holds only the first pair's numbers (4YBB's 23 % more crossings with a margin)
+        d.label_keep = None if block else _grown(tuple(float(v) for v in _reach(ink[id(d)])), _INK_MARGIN * em)
+
+
+def _pick_slot(rooms: list[tuple[bool, bool, float]], margin: float) -> tuple[int, bool]:
+    """Which slot a stem's name takes, from each slot's (clear: its box meets no name placed before it, element,
+    element's name or other stem's body; nearer: it is nearer its own stem than any other; room: the gap from its
+    ink to the nearest letter of another stem), in the order tried: the first clear and nearer one with `margin` of
+    room; else (a fallback, logged) the one with the most room among the clear and nearer ones, else among the clear
+    ones (a name must stay nearer its own stem than any other unless no slot allows it), else the first; the first of
+    equals. -> (its index, whether it fell back)"""
+    for k, (clear, nearer, room) in enumerate(rooms):
+        if clear and nearer and room >= margin:
+            return k, False
+    return max(range(len(rooms)), key=lambda k: (rooms[k][0], rooms[k][1], rooms[k][2], -k)), True
 
 
 def _name_at(
@@ -3271,22 +3313,19 @@ def _name_at(
     return math.ceil((out + margin + inner) * _GRID) / _GRID, along
 
 
-def _name_room(d: PlacedStem, slot, beside, others, named, rects, ink, letters) -> float:
-    """How much room the stem's name has in this slot (label_side, label_out): -inf when its box meets another
-    stem's name decided before it, an element, an element's name or another stem's body, or it sits nearer another
-    stem than its own; else the gap from its ink box to the nearest letter of another stem (inf for none). See
-    _choose_label_sides. Leaves d there."""
+def _name_room(d: PlacedStem, slot, beside, others, named, rects, ink, letters) -> tuple[bool, bool, float]:
+    """The stem's name in this slot (label_side, label_out), as _pick_slot weighs it: (clear: its box meets no
+    other stem's name decided before it, element, element's name or other stem's body; nearer: it sits nearer its
+    own stem than any other; room: the gap from its ink box to the nearest letter of another stem, inf for none).
+    See _choose_label_sides. Leaves d there."""
     d.label_side, d.label_out = slot
     d.label_at, d.label_along = beside[id(d), d.label_side][0] + d.label_out, beside[id(d), d.label_side][1]
     box, at = _stem_label_box(d), stem_label_pos(d)
     own = _body_distance(at, d)
-    if (
-        overlaps_any(box, named)
-        or overlaps_any(box, rects)
-        or any(_box_meets_body(box, e) or _body_distance(at, e) <= own for e in others)
-    ):
-        return -math.inf
-    return float(_box_gaps(ink + np.tile(at, 2), letters).min()) if len(letters) else math.inf
+    clear = not (overlaps_any(box, named) or overlaps_any(box, rects) or any(_box_meets_body(box, e) for e in others))
+    nearer = all(_body_distance(at, e) > own for e in others)
+    room = float(_box_gaps(ink + np.tile(at, 2), letters).min()) if len(letters) else math.inf
+    return clear, nearer, room
 
 
 def _grown(box, pad: float) -> tuple[float, float, float, float]:
@@ -3298,8 +3337,11 @@ def _element_label_box(p: Placed) -> tuple[float, float, float, float]:
     return centred_box(*helix_label_pos(p), _GLYPH_W * len(p.label) / 2 + 0.05, _GLYPH_H / 2)
 
 
-def label_boxes(layout: Layout, sses: list[SSE]) -> list[tuple[str, tuple[float, float, float, float]]]:
-    """Keep-out boxes for text and chain-end stubs: loops route around them, the page bounds include them."""
+def label_boxes(
+    layout: Layout, sses: list[SSE], route: bool = False
+) -> list[tuple[str, tuple[float, float, float, float]]]:
+    """Keep-out boxes for text and chain-end stubs: loops route around them, the page bounds include them. With
+    `route`, a stem's name is what routes keep out of: its ink grown by _INK_MARGIN em (stem_keep_box)."""
     out = []
     for p in layout.placed.values():
         if p.sse.kind in ("H", "G"):
@@ -3315,7 +3357,7 @@ def label_boxes(layout: Layout, sses: list[SSE]) -> list[tuple[str, tuple[float,
         t = np.add(port, ex * END_LABEL)
         out.append((f"{end}:{chain}", centred_box(float(t[0]), float(t[1]), _GLYPH_W / 2 + 0.05, _GLYPH_H / 2)))
     for k, d in enumerate(layout.stems):
-        out.append((f"stem-label:{k}", _stem_label_box(d)))
+        out.append((f"stem-label:{k}", stem_keep_box(d) if route else _stem_label_box(d)))
     for n, tie in enumerate(layout.na_ties):  # a long tie's labels at its two marks
         for end, (_, _, (x, y)) in enumerate(tie.marks):
             out.append((f"tie-label:{n}:{end}", centred_box(x, y, _GLYPH_W / 2 + 0.05, _GLYPH_H / 2)))

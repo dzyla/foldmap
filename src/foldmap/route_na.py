@@ -10,7 +10,7 @@ import logging
 
 import numpy as np
 
-from .layout import _GLYPH_H, _GLYPH_W, NT_ROW, NT_STEP, Layout, _stem_label_box, label_boxes
+from .layout import _GLYPH_H, _GLYPH_W, NT_ROW, NT_STEP, Layout, label_boxes, stem_keep_box
 from .na_ends import SHORT_GAP, _face_label, _gap, _tail, _trace_clear
 from .na_labels import _label_gaps, _place_letters, _ties, _unbunch, _widen
 from .na_paths import (
@@ -70,7 +70,7 @@ def route_nucleic(layout: Layout, router: _Router | None = None, loops=()) -> li
     single-stranded nucleotide's letter goes), and widens layout.bounds to hold it all."""
     na = layout.nucleic
     if router is None:
-        keep_out = [b for _, b in label_boxes(layout, [])]
+        keep_out = [b for _, b in label_boxes(layout, [], route=True)]
         router = _Router(_Grid(layout, keep_out), _element_obstacles(layout), keep_out)
     at = {key: d for d in layout.stems for key in d.axial}
     kind_of = {(r.strand, r.lo): r.kind for r in na.structure.runs}
@@ -163,7 +163,7 @@ def route_nucleic(layout: Layout, router: _Router | None = None, loops=()) -> li
             _use(router.grid, p.points, beside)
     for pts in loops:
         _use(router.grid, pts, beside_loops)
-    names = [_stem_label_box(d) for d in layout.stems]
+    names = [stem_keep_box(d) for d in layout.stems]  # each name with the margin routes keep from it
     routed = {}
     for s, i, j, da, db, kind in between:
         # a run with nucleotides may pay for the cells beside strands and protein loops too, one without

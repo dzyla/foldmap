@@ -356,6 +356,16 @@ def test_a_stem_name_is_measured_across_its_row():
     assert min(figcheck._box_gap(ink[f"na:label:{k}"], ink[t]) for t in tags) > own + 0.05  # its nearest letter
 
 
+def test_a_line_is_measured_to_a_text_box_along_its_segments():
+    """figcheck.stem_name_line_gaps measures a line segment by segment, not at its vertices: a long straight run
+    passing a name has no vertex near it (plan 10 Task 4 fix round 2)."""
+    box = (0.0, 0.0, 1.0, 1.0)
+    assert figcheck._segment_box_gap((-5, 1.5), (5, 1.5), box) == pytest.approx(0.5)  # passes over it, ends far
+    assert figcheck._segment_box_gap((-5, 0.5), (5, 0.5), box) == 0.0  # through it
+    assert figcheck._segment_box_gap((2, 3), (3, 2), box) == pytest.approx(3 / math.sqrt(2))  # a corner to its middle
+    assert figcheck._segment_box_gap((3, 0.5), (3, 0.5), box) == pytest.approx(2.0)  # a point
+
+
 def test_stem_names_are_measured_to_letters_not_to_the_stem_box():
     """1EHZ named: the D arm's name sits inside its turned stem's box (page-upright) but clear of its letters (plan 10
     Task 4 put it 0.5 em beyond them; before, it sat near the box and far from the letters)."""

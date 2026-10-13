@@ -467,7 +467,7 @@ def route_loops(layout: Layout, sses: list[SSE], bb) -> list[Loop]:
     ]
     if not pairs and layout.nucleic is None:
         return []
-    keep_out = label_boxes(layout, sses)
+    keep_out = label_boxes(layout, sses, route=True)
     grid = _Grid(layout, [b for _, b in keep_out])
     # the elements every drawn loop must not cross, then the text and stubs a kink link also keeps clear of
     elements = _element_obstacles(layout)
