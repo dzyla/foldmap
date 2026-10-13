@@ -215,19 +215,25 @@ The same six entries fail as in the 11a rerun: 30QM, 4PJO, 3KTQ, 4YBB, 1YTB and 
 
 Seconds differ by up to 2.3 s on single entries (4YBB 12.4 -> 10.1; every other entry by at most 0.7 s). This is machine load only: the campaign ran beside two test-suite runs.
 
-## Plan 10 T4 (2026-10-13, base 7ec7e32 plus plan 10 Task 4 and its fix round 1, stem names 0.5 em beyond their own letter row, centred along the stem; report.md, report.json, run.log): **33/39 pass**
+## Plan 10 T4 (2026-10-13, base 7ec7e32 plus plan 10 Task 4 and its fix rounds 1 and 2, stem names 1.0 em beyond their own letter row, centred along the stem, and every route kept 1.0 em clear of them; report.md, report.json, run.log): **33/39 pass**
 
 The same six entries fail as in the plan 11b rerun: 30QM, 4PJO, 3KTQ, 4YBB, 1YTB and 3CRX. No entry that passed now fails, and no judged metric changed.
 
-Task 4 moved every stem name in from one glyph beyond its letter row to 0.25 em beyond the row's ink (and a block style's first-pair numbers to 0.25 em beyond the rail). At 0.25 em 1EHZ's D and T read as letters of their rows, so the fix round sets the margin to 0.5 em, measured across the stem in its own frame, and centres each name along its row (block and ribbon styles: 0.5 em beyond the rail or tube, midway along the middle pair). The names' keep-out boxes move with them, so some nucleic-acid runs route differently. report.json was compared field by field with the Task 4 run (d644c3b). Only reported-not-judged counts changed:
+Task 4 moved every stem name in from one glyph beyond its letter row to 0.25 em beyond the row's ink (and a block style's first-pair numbers to 0.25 em beyond the rail). At 0.25 em 1EHZ's D and T read as letters of their rows. Fix round 1 set the margin to 0.5 em, measured across the stem in its own frame, and centred each name along its row (block and ribbon styles: beyond the rail or tube, midway along the middle pair). At 0.5 em 1EHZ's T still stacked on a G of the T arm, and a 30QM run passed 0.32 em from P4.
 
-| Entry | Task 4 (0.25 em) | Fix round 1 (0.5 em, centred) | Cause |
-|---|---|---|---|
-| 3D0U | na_run_crossings 6 | 8 | Runs route round the names' boxes, now 0.25 em further out and centred |
-| 1Y26 | na_run_crossings 5 | 3 | Same |
-| 5F9R | na_run_crossings 3, na_protein_crossings 8 | 4, 7 | Same |
-| 1KX5 | na_run_crossings 4 | 6 | Same |
+Fix round 2 sets the margin to 1.0 em. Every route (nucleic-acid runs, joints, tails, gaps and protein loops) now keeps out of each name's ink box grown by 1.0 em. A block style is the exception: it draws the name on the block, and its side slot holds only the first pair's numbers, so routes keep out of that text's box alone. With the margin there too, 4YBB's crossings rose from 110 to 142 (runs) and from 44 to 63 (protein); that attempt was not kept. Most nucleic-acid figures reroute. Loop fallbacks are unchanged (2, both 4YBB, as before).
 
-Against the plan 11b rerun (eb0bb52), Task 4 had changed 2GIS 4 -> 6, 3IGI 18 -> 17, 4YBB 113 -> 110 and 1KX5 6 -> 4 (na_run_crossings) and 4OO8 13 -> 11 (na_protein_crossings); those values stand, apart from 1KX5, now 6 again.
+report.json was compared field by field with the fix round 1 run (4ff6c88). Only reported-not-judged counts changed:
 
-Seconds differ by at most 0.1 s on any entry.
+| Entry | Fix round 1 (0.5 em) | Fix round 2 (1.0 em, routes keep the margin) |
+|---|---|---|
+| 2GIS | na_run_crossings 6 | 4 |
+| 3D0U | na_run_crossings 8 | 6 |
+| 1Y26 | na_run_crossings 3 | 5 |
+| 3IGI | na_run_crossings 17 | 18 |
+| 5F9R | na_run_crossings 4, na_protein_crossings 7 | 3, 8 |
+| 4YBB | na_protein_crossings 44 | 45 |
+
+Summed over the campaign, na_run_crossings went from 205 to 203 (-1.0 %) and na_protein_crossings from 102 to 104 (+2.0 %).
+
+Seconds differ by at most 1.1 s on any entry (5B43; the machine was shared).
