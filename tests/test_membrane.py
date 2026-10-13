@@ -248,3 +248,126 @@ def test_opm_dummy_atoms_are_never_drawn_as_ligands(kw):
     assert "DUM" not in texts and "K" in texts
     if kw:
         assert lay.membrane["source"] == "opm" and lay.membrane["sides"]
+
+
+# ------------------------------------------------------------------ outer-membrane beta-barrels (C-MEM-BARREL)
+
+R100 = DATA / "r100"
+OMP_NORMALS = {  # the membrane normal OPM gives, in each fixture's frame (OPM tilts these barrels 5 degrees)
+    "9FWZ-DC": (-0.0193, -0.2999, 0.9538),  # OPM's 3RFZ FimD superposed on 9FWZ chain D (CA rmsd 1.7 A, 678 residues)
+    "1BXW-A": (-0.9302, 0.3594, -0.0749),  # OPM's 1bxw (OmpA)
+}
+
+
+def _closed_barrel_strands(bb):
+    """The strands (>= 7 residues) of the fixture's closed beta-barrel, as foldmap's own sheets find it."""
+    from foldmap.dssp import assign_dssp
+    from foldmap.sheets import build_sheets
+    from foldmap.ss import build_sses
+
+    dssp = assign_dssp(bb)
+    sheets = build_sheets(build_sses(bb, dssp.ss, bridges=dssp.bridges), dssp.bridges)
+    (barrel,) = [sh for sh in sheets if sh.closed and len(sh.strands) >= 8]
+    return [s for s in barrel.strands if len(s) >= 7]
+
+
+@pytest.mark.parametrize("name", OMP_NORMALS)
+def test_outer_membrane_barrels_are_recognised(name):
+    """9FWZ (the FimD usher, author: "9FWZ does not draw membrane") and OmpA: the barrel's axis is the normal, the
+    band is 24 A thick (an outer membrane), and every barrel strand runs through it."""
+    path = R100 / f"{name}.cif.gz"
+    bb = load_backbone(path, "asu")
+    m = find_membrane(path, bb)
+    assert m is not None and m.source == "estimate" and m.half == 12.0
+    assert np.linalg.norm(m.normal) == pytest.approx(1.0, abs=1e-3)
+    opm = np.array(OMP_NORMALS[name]) / np.linalg.norm(OMP_NORMALS[name])
+    assert np.degrees(np.arccos(abs(m.normal @ opm) / np.linalg.norm(m.normal))) < 10.0
+    strands = _closed_barrel_strands(bb)
+    assert len(strands) >= 8
+    for s in strands:
+        d = m.depth(bb.ca[s.start : s.end + 1])
+        through = min(d.max(), m.half) - max(d.min(), -m.half)
+        assert through >= m.half, s.id  # at least half the slab's thickness inside it
+
+
+def test_outer_membrane_barrel_normal_and_centre_are_on_the_grid():
+    """Snapped like every other layout input, so the page frame built from it never carries BLAS noise."""
+    path = R100 / "1BXW-A.cif.gz"
+    m = find_membrane(path, load_backbone(path, "asu"))
+    assert np.array_equal(m.normal, np.round(m.normal * 1e4) / 1e4)
+    assert m.centre == np.round(m.centre * 1e4) / 1e4
+
+
+@pytest.mark.parametrize("path", [DATA / "1EMA.cif", DATA / "1TIM.cif", DATA / "fidelity" / "1LDM.cif.gz"])
+def test_soluble_barrels_are_not_membranes(path):
+    """GFP is a closed 11-strand barrel of long strands, but its outside is polar: no membrane."""
+    assert find_membrane(path, load_backbone(path, "asu")) is None
+
+
+def test_gfp_barrel_is_rejected_by_its_outward_residues():
+    from foldmap.membrane import _MIN_OUTWARD_HYDROPHOBIC, _barrel_slab
+
+    bb = load_backbone(DATA / "1EMA.cif", "asu")
+    _, _, hydrophobic, charged = _barrel_slab(bb, _closed_barrel_strands(bb))
+    assert hydrophobic < _MIN_OUTWARD_HYDROPHOBIC  # measured 0.35 (outer-membrane barrels 0.76-1.00)
+
+
+HELICAL = {  # find_membrane before the beta-barrel estimate: (normal, centre, half, source, sided), or None
+    DATA / "1C3W.cif": (
+        [0.015091081379981436, 0.11620109627440002, -0.9931110534514308],
+        -1.5448989290611692,
+        15.0,
+        "estimate",
+        True,
+    ),
+    DATA / "1BL8.cif": (
+        [0.36292304637025796, -0.0033065376136334106, 0.9318132480397247],
+        47.81279573824658,
+        15.0,
+        "estimate",
+        False,
+    ),
+    OPM: ([0.0, 0.0, 1.0], 0.0, 16.200000000000003, "opm", True),
+    DATA / "fidelity" / "1PV7.cif.gz": None,  # a 46-residue window of LacY: too little to call
+}
+
+
+@pytest.mark.parametrize("path", HELICAL, ids=lambda p: p.name)
+def test_helical_membranes_are_unchanged_by_the_barrel_estimate(path):
+    m = find_membrane(path, load_backbone(path, "asu"))
+    if HELICAL[path] is None:
+        assert m is None
+        return
+    normal, centre, half, source, sided = HELICAL[path]
+    assert m.normal.tolist() == pytest.approx(normal, rel=1e-12, abs=1e-12)
+    assert m.centre == pytest.approx(centre, rel=1e-12, abs=1e-12)
+    assert (m.half, m.source, m.sided) == (half, source, sided)
+
+
+@pytest.mark.parametrize("mode", ["projected", "stack"])
+def test_outer_membrane_barrel_strands_cross_the_drawn_band(mode):
+    """9FWZ --membrane auto: the band is drawn, and every drawn strand of the FimD barrel crosses it."""
+    path = R100 / "9FWZ-DC.cif.gz"
+    lay, sses, bb = make_layout(path, mode=mode, membrane="auto")
+    assert lay.membrane is not None
+    strands = {s.id for s in _closed_barrel_strands(bb)}
+    drawn = [p for p in lay.placed.values() if p.sse.id in strands]
+    assert len(drawn) >= 8
+    for p in drawn:
+        y0, y1 = _row_band(lay, p)
+        lo, hi = sorted((p.n_port[1], p.c_port[1]))
+        assert min(hi, y1) - max(lo, y0) >= 0.5 * (y1 - y0), p.sse.id
+    fig = make_figure(path, mode=mode, membrane="auto")
+    assert [a for a in fig.axes[0].patches if (a.get_gid() or "").split(":")[0].startswith("membrane")]
+
+
+@pytest.mark.parametrize("name, sided", [("1BXW-A", True), ("9FWZ-DC", False)])
+def test_outer_membrane_barrel_sides_come_from_its_loops(name, sided):
+    """The positive-inside rule called OmpA's sides backwards (measured on 19 outer-membrane barrels against OPM: wrong
+    on 16, 10 of them called clear). An outer-membrane barrel's extracellular loops are long and its periplasmic
+    turns short: OmpA's loops (51 residues against 10) put the outside where OPM has it; FimD's (75 against 71, its
+    plug capped) are too close to call, so no in/out labels, though the long-loop face still goes on top."""
+    path = R100 / f"{name}.cif.gz"
+    m = find_membrane(path, load_backbone(path, "asu"))
+    assert m.sided == sided
+    assert m.normal @ np.array(OMP_NORMALS[name]) > 0  # the outside where OPM has it
