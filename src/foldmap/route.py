@@ -477,15 +477,13 @@ def route_loops(layout: Layout, sses: list[SSE], bb) -> list[Loop]:
 
     dist = lambda ab: math.dist(layout.placed[ab[0].id].c_port, layout.placed[ab[1].id].n_port)  # noqa: E731
     routed: dict[tuple[str, str], tuple[list, bool, bool]] = {}  # points, fallback curve, over labels
+    kinks_rejected = 0  # debug count: kink links not drawn straight for something (a third element, text) in the way
     for a, b in sorted(pairs, key=dist):
         pa, pb = layout.placed[a.id], layout.placed[b.id]
         gap = np.subtract(pb.n_port, pa.c_port)
         # a kink is drawn straight with no grid clearance, so it clears by the full _INFLATE (drawn routes use _TOUCH)
-        if (
-            b.start - a.end - 1 <= KINK_GAP
-            and np.hypot(*gap) < 1.5
-            and gap @ pa.exit_c > 0
-            and _clear(  # and labels
+        if b.start - a.end - 1 <= KINK_GAP and np.hypot(*gap) < 1.5 and gap @ pa.exit_c > 0:
+            if _clear(  # and labels
                 [pa.c_port, pb.n_port],
                 (pa, pb),
                 rects,
@@ -493,12 +491,12 @@ def route_loops(layout: Layout, sses: list[SSE], bb) -> list[Loop]:
                 grow=_INFLATE,
                 kink=True,
                 exempt=_over_exempt(layout, a.id, b.id),
-            )
-        ):
-            for c in grid.cells_along(pa.c_port, pb.n_port):
-                grid.used[c] += 1
-            routed[(a.id, b.id)] = ([pa.c_port, pb.n_port], False, False)  # a kink: the helix just carries on
-            continue
+            ):
+                for c in grid.cells_along(pa.c_port, pb.n_port):
+                    grid.used[c] += 1
+                routed[(a.id, b.id)] = ([pa.c_port, pb.n_port], False, False)  # a kink: the helix just carries on
+                continue
+            kinks_rejected += 1
         # a helix over a sheet: its loops leave it straight across the strand its port lies on, and reach the other
         # end under it
         under = (
@@ -521,14 +519,22 @@ def route_loops(layout: Layout, sses: list[SSE], bb) -> list[Loop]:
             routed[(a.id, b.id)] = (_curve(pa.c_port, pa.exit_c, pb.n_port, pb.exit_n), True, False)
         else:
             routed[(a.id, b.id)] = (pts, False, over)
-    log.debug(
-        "%d loops: %d fallback curves, %d drawn nearer than %.2f to an element, %d drawings rejected as crossing",
-        len(pairs),
-        sum(fb for _, fb, _ in routed.values()),
-        router.tight,
-        _INFLATE,
-        router.rejected,
-    )
+    if log.isEnabledFor(logging.DEBUG):
+        crossing = sum(  # fallback curves through an element (other than their own two)
+            fb and not _clear(pts, (layout.placed[a], layout.placed[b]), *elements)
+            for (a, b), (pts, fb, _) in sorted(routed.items())
+        )
+        log.debug(
+            "%d loops: %d fallback curves, %d of them crossing an element, %d kink links rejected, "
+            "%d drawn nearer than %.2f to an element, %d drawings rejected as crossing",
+            len(pairs),
+            sum(fb for _, fb, _ in routed.values()),
+            crossing,
+            kinks_rejected,
+            router.tight,
+            _INFLATE,
+            router.rejected,
+        )
     out = []
     for a, b in pairs:
         pts, fb, over = routed[(a.id, b.id)]

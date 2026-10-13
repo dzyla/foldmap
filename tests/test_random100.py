@@ -298,15 +298,34 @@ def test_route_summary_record_is_read(r100):
         logging.DEBUG,
         "f",
         1,
-        "%d loops: %d fallback curves, %d drawn nearer than %.2f to an element, %d drawings rejected as crossing",
-        (9, 1, 2, 0.6, 3),
+        "%d loops: %d fallback curves, %d of them crossing an element, %d kink links rejected, "
+        "%d drawn nearer than %.2f to an element, %d drawings rejected as crossing",
+        (9, 1, 1, 5, 2, 0.15, 3),
         None,
     )
     handler.emit(record)
     handler.emit(record)
     s = handler.summary()
     assert s["loops"] == 18 and s["fallback_curves"] == 2 and s["tighter_than_inflate"] == 4
-    assert s["rejected_as_crossing"] == 6 and s["records"] == 2
+    assert s["fallback_curves_crossing_an_element"] == 2 and s["kink_links_rejected"] == 10
+    assert s["rejected_as_crossing"] == 6 and s["records"] == 2 and "inflate" not in s
+
+
+def test_route_summary_record_is_the_one_route_logs(r100, caplog):
+    """The runner reads the record route.route_loops writes (its format and argument count)."""
+    import logging
+
+    from foldmap.cli import make_layout
+    from foldmap.route import route_loops
+
+    caplog.set_level(logging.DEBUG, logger="foldmap.route")
+    layout, sses, bb = make_layout(DATA / "1UBQ.cif")
+    route_loops(layout, sses, bb)
+    handler = r100._RouteLog()
+    for record in caplog.records:
+        handler.emit(record)
+    s = handler.summary()
+    assert s["records"] == 1 and s["loops"] > 0 and s["kink_links_rejected"] >= 0
 
 
 def test_pair_check_matches_elements_by_residue_range(r100):

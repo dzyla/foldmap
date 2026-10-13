@@ -1047,27 +1047,31 @@ def view_command(view: str, path: Path, name: str, work: Path, focus: str | None
 class _RouteLog(logging.Handler):
     """The summary records route.route_loops logs at DEBUG, summed over every routing of the figure."""
 
+    KEYS = (  # the record's arguments in order; "inflate" is the clearance it names, not a count
+        "loops",
+        "fallback_curves",
+        "fallback_curves_crossing_an_element",
+        "kink_links_rejected",
+        "tighter_than_inflate",
+        "inflate",
+        "rejected_as_crossing",
+    )
+
     def __init__(self):
         super().__init__(logging.DEBUG)
-        self.sums = {"loops": 0, "fallback_curves": 0, "tighter_than_inflate": 0, "rejected_as_crossing": 0}
+        self.sums = {k: 0 for k in self.KEYS if k != "inflate"}
         self.records = 0
 
     def emit(self, record):
-        if not str(record.msg).startswith("%d loops:") or len(record.args) != 5:
+        if not str(record.msg).startswith("%d loops:") or len(record.args) != len(self.KEYS):
             return
-        n, fallback, tight, _inflate, rejected = record.args
         self.records += 1
-        for k, v in zip(self.sums, (n, fallback, tight, rejected)):
-            self.sums[k] += int(v)
+        for k, v in zip(self.KEYS, record.args):
+            if k in self.sums:
+                self.sums[k] += int(v)
 
     def summary(self) -> dict:
-        return {
-            **self.sums,
-            "records": self.records,
-            # not in route.route_loops' summary record (adding them is a src change, reported for Task 11)
-            "fallback_curves_crossing_an_element": None,
-            "kink_links_rejected": None,
-        }
+        return {**self.sums, "records": self.records}
 
 
 def _colour(c) -> str:
@@ -2002,6 +2006,8 @@ REPORTED = (
     "loop_crossings",
     "na_run_crossings",
     "fallback_curves",
+    "fallback_curves_crossing_an_element",
+    "kink_links_rejected",
     "tighter_than_inflate",
     "rejected_as_crossing",
     "area",
@@ -2018,6 +2024,8 @@ def reported(e: dict) -> dict:
         "loop_crossings": ch.get("loop_crossings"),
         "na_run_crossings": (d.get("na") or {}).get("na_run_crossings"),
         "fallback_curves": route.get("fallback_curves"),
+        "fallback_curves_crossing_an_element": route.get("fallback_curves_crossing_an_element"),
+        "kink_links_rejected": route.get("kink_links_rejected"),
         "tighter_than_inflate": route.get("tighter_than_inflate"),
         "rejected_as_crossing": route.get("rejected_as_crossing"),
         "area": d.get("area"),

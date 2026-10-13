@@ -405,6 +405,28 @@ def test_kink_blocked_by_a_small_element_is_routed_around_it():
     assert all(segment_clear(p, q, [third.rect]) for p, q in zip(loop.points, loop.points[1:]))
 
 
+def test_debug_summary_counts_kinks(monkeypatch, caplog):
+    """The routing debug line (read by the random-100 campaign, plan 08b K1) counts the kink links rejected for a
+    third element in the way and the fallback curves that cross an element, beside the fallback curves."""
+    third = Placed(fake_sse("E", 0, 6, chain="B"), 0.5, 0.5, 0.3, np.pi / 4, 0.3, "A")  # on the kink's diagonal
+    caplog.set_level(logging.DEBUG, logger="foldmap.route")
+    kink_with(third)
+    assert logged(caplog, "kink links rejected") == 1
+    assert logged(caplog, "fallback curves") == 0 and logged(caplog, "of them crossing an element") == 0
+    caplog.clear()
+    monkeypatch.setattr(route, "_astar", lambda *args: None)  # no grid route: the loop is the fallback curve
+    _, _, _, loop = kink_with(third)
+    assert loop.fallback and all(segment_clear(p, q, [third.rect]) for p, q in zip(loop.points, loop.points[1:]))
+    assert logged(caplog, "fallback curves") == 1 and logged(caplog, "of them crossing an element") == 0
+    caplog.clear()
+    a, b = bar(0, -2.0, 0.0, 4.0, 0.0), bar(11, 1.0, 3.0, 4.0, np.pi / 2)  # as kink_with draws them
+    mid = loop.points[len(loop.points) // 2]  # and a fourth element where that curve passes
+    fourth = Placed(fake_sse("E", 20, 26, chain="B"), *mid, 0.3, 0.0, 0.3, "A")
+    (loop,) = route_loops(layout_of(a, b, third, fourth), [a.sse, b.sse], stub_bb())
+    assert loop.fallback and not all(segment_clear(p, q, [fourth.rect]) for p, q in zip(loop.points, loop.points[1:]))
+    assert logged(caplog, "fallback curves") == 1 and logged(caplog, "of them crossing an element") == 1
+
+
 def test_kink_blocked_only_by_another_elements_label_is_routed_around_it():
     third = Placed(fake_sse("H", 0, 9, chain="B"), 0.15, 0.7, 0.4, -np.pi / 2, 0.1, "α")  # label to its right
     a, b, lay, loop = kink_with(third)
