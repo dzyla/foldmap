@@ -192,13 +192,45 @@ def _operator_tags(assembly, model, built) -> list[int] | None:
 
 
 def _polymer_entities(st, chains) -> list[str]:
-    """The polymer entity of each chain's polymer, in order ('' where the file names none)."""
+    """The polymer entity of each chain's polymer, in order ('' where the file names none), entities of one
+    protein (_same_proteins) under the first one's name."""
+    one = _same_proteins(st)
     out = []
     for c in chains:
         polymer = c.get_polymer()
         if len(polymer):
             entity = st.get_entity_of(polymer)
-            out.append(entity.name if entity is not None else "")
+            out.append(one.get(entity.name, entity.name) if entity is not None else "")
+    return out
+
+
+SAME_PROTEIN = (
+    0.9  # two polymer entities are one protein when their full sequences align this identical (of the shorter)
+)
+
+
+def _same_proteins(st) -> dict[str, str]:
+    """Polymer entity -> the first entity (file order) of its kind whose full sequence aligns with it at least
+    SAME_PROTEIN identical over the shorter one (4UM3: a deletion and a point mutant of the protein deposited 38
+    times are entities of their own). Entities without a full sequence stand alone."""
+    seqs = [
+        (e.name, e.polymer_type, [gemmi.Entity.first_mon(m) for m in e.full_sequence])
+        for e in st.entities
+        if e.entity_type == gemmi.EntityType.Polymer
+    ]
+    out: dict[str, str] = {}
+    firsts: list[tuple[str, object, list[str]]] = []
+    for name, kind, seq in seqs:
+        out[name] = name
+        for first, k, ref in firsts:
+            if k != kind or not seq or not ref or min(len(seq), len(ref)) < 20:
+                continue
+            same = gemmi.align_string_sequences(ref, seq, [], gemmi.AlignmentScoring()).match_count
+            if same >= SAME_PROTEIN * min(len(seq), len(ref)):
+                out[name] = first
+                break
+        else:
+            firsts.append((name, kind, seq))
     return out
 
 
@@ -228,8 +260,9 @@ def _polymer_kinds(chains) -> set[str]:
 def _one_complex_of_several(st, assembly, model) -> bool:
     """`assembly` is one of several copies of a complex deposited in the asymmetric unit (4OO8: two Cas9
     complexes, assembly 1 = A, B, C; 1URN: three U1A–RNA complexes; 4CH9: two Kelch domains with their WNK4
-    peptides, assembly 1 = B, D): every operator the identity, a strict subset of the deposited chains, each of its
-    polymer entities deposited at least twice as often as it holds it, and every kind of polymer the asymmetric
+    peptides, assembly 1 = B, D; 4UM3: eight pentamers): every operator the identity, a strict subset of the
+    deposited chains, each of its polymer entities (entities of one protein counted as one: _same_proteins)
+    deposited at least twice as often as it holds it, and every kind of polymer the asymmetric
     unit holds (protein, DNA, RNA) among its own chains: a protein–DNA entry whose assembly 1 leaves the DNA out
     keeps the asymmetric unit, never silently losing the DNA. The other copies lie next to it by crystal packing,
     not by biology."""

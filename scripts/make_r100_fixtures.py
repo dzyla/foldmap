@@ -10,10 +10,10 @@ Waters and hydrogens are dropped, and the water subchains leave the assembly gen
 subchain the file lacks). An entry in WINDOWS keeps only the chains it names, each whole or cut to residue windows; the
 helix records keep their deposited ids. TRIMS shrinks an entry further: `assembly` keeps only the subchains of that
 biological assembly, `backbone` keeps only a protein's N, CA, C, O and CB atoms (`atoms`: these names instead, e.g. with
-the cysteines' SG for disulfides), `first_model` keeps an NMR ensemble's model 1, `no_protein_sequence` drops the
-protein entities' full sequences (a big complex's are most of a small window's file). Each fixture stays under 100 KB
-and all of them under 600 KB (tests/test_r100_fixtures.py). Files are written gzipped, outside tests/data/*.cif, so
-scripts/bench.py never reads them.
+the cysteines' SG for disulfides), `first_model` keeps an NMR ensemble's model 1, `drop` erases the mmCIF categories
+named, `no_protein_sequence` drops the protein entities' full sequences (a big complex's are most of a small window's
+file). Each fixture stays under 100 KB and all of them under 600 KB (tests/test_r100_fixtures.py). Files are written
+gzipped, outside tests/data/*.cif, so scripts/bench.py never reads them.
 """
 
 from __future__ import annotations
@@ -58,6 +58,11 @@ ENTRIES = {  # fixture name -> (PDB id, what it is for)
         "colicin E9 DNase and Im9, backbone, CB and the side-chain atoms that hold a metal: the Ni mark was put on the "
         "loop B:22-25>B:32-33 (random-100 C5)",
     ),
+    "4UM3-two": (
+        "4UM3",
+        "eight pentamers in the asymmetric unit, cut to two (assembly 1's P-T and K-O), residues 30-40, backbone "
+        "only: assembly 1 holds two single-copy entities of the same protein (random-100 C30)",
+    ),
     "7IMM-A": (
         "7IMM",
         "a dimer (assembly 1: chain A twice) whose two copies make one continuous A B B A sheet, backbone only: the "
@@ -69,7 +74,8 @@ WINDOWS: dict[str, dict[str, Span | list[Span] | None]] = {  # fixture -> {chain
     "7FAB-HL": {"H": None, "L": None},
     "1IGT-AB": {"A": None, "B": None},
     "9FWZ-DB": {"D": (116, 700), "B": None},
-    "9ON5-A": {"A": (100, 200)},  # the barrel (139-659), its plug, the start of CTD1; FimA
+    "9ON5-A": {"A": (100, 200)},
+    "4UM3-two": {c: (30, 40) for c in "KLMNOPQRST"},  # the barrel (139-659), its plug, the start of CTD1; FimA
     "5LJ3-V": {  # found by a seeded search over the page neighbours of the gap (plan 10 Task 5 report)
         "V": None,
         "Z": (1, 16),
@@ -89,6 +95,10 @@ TRIMS: dict[str, dict] = {
     "7IMM-A": {"backbone": True},
     "2DGS-A": {"first_model": True, "backbone": True},
     "9ON5-A": {"backbone": True},
+    "4UM3-two": {
+        "backbone": True,
+        "drop": ("_atom_site_anisotrop.", "_pdbx_refine_tls.", "_pdbx_refine_tls_group.", "_struct_sheet_order."),
+    },
     "1BXI": {
         "atoms": ("N", "CA", "C", "O", "CB", "ND1", "NE2", "SG", "OD1", "OD2", "OE1", "OE2", "NZ", "OG", "OG1", "SD")
     },
@@ -146,6 +156,8 @@ def build(text: str, window: dict[str, Span | list[Span] | None] | None = None, 
         for g in assembly.generators:
             g.subchains = [s for s in g.subchains if s in kept]
     doc = st.make_mmcif_document()
+    for name in trim.get("drop", ()):  # categories a fixture does not need (anisotropic B, TLS groups)
+        doc.sole_block().find_mmcif_category(name).erase()
     _keep_helix_ids(gemmi.cif.read_string(text).sole_block(), doc.sole_block(), {c.name for c in st[0]})
     return gzip.compress(doc.as_string().encode("utf-8"), 9, mtime=0)
 

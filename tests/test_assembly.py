@@ -354,6 +354,20 @@ def test_one_protein_complex_of_several_draws_assembly_one(tmp_path):
     assert sorted(c.name for c in model) == ["C", "D"]
 
 
+def test_one_complex_of_several_counts_copies_of_a_protein_by_sequence():
+    """C30 (random-100): 4UM3 deposits eight pentamers (40 chains); assembly 1 is one of them, P-T. Its chains P and
+    S are entities of their own (a deletion and a point mutant of the same 229-residue protein), each deposited
+    once, so counting by entity kept the 40-chain asymmetric unit (301 s, past the app's limit). Entities whose
+    sequences align at least 90 % identical count as one protein: auto draws the pentamer and says so."""
+    from foldmap.io import read_model
+
+    path = DATA / "r100" / "4UM3-two.cif.gz"
+    model = read_model(path)
+    assert sorted(c.name for c in model[0]) == list("PQRST")
+    assert model.several == {"assembly": "1", "copies": 2, "chains": 10, "residues": model.several["residues"]}
+    assert sorted(c.name for c in read_model(path, "asu")[0]) == list("KLMNOPQRST")
+
+
 def test_kelch_dimer_asu_draws_its_biological_assembly():
     from foldmap.cli import make_layout
     from foldmap.io import read_model
