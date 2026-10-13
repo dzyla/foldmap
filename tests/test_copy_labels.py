@@ -1,24 +1,15 @@
 """Copies of one protein share element labels (model.copy_classes): one element, one label, in every chain."""
 
-from collections import Counter
 from pathlib import Path
 
 import pytest
 
 from foldmap.cli import make_layout
+from foldmap.figcheck import label_repeats as _repeats
 from helpers import FID
 
 DATA = Path(__file__).parent / "data"
 FIXTURES = sorted([*DATA.glob("*.cif"), *FID.glob("*.cif.gz"), *(DATA / "na").glob("*.cif*")])
-
-
-def _repeats(lay) -> dict[str, list[str]]:
-    """chain -> the labels two or more of its drawn elements carry."""
-    count: dict[str, Counter] = {}
-    for p in lay.placed.values():
-        count.setdefault(p.sse.chain, Counter())[p.label] += 1
-    repeated = {c: sorted(k for k, n in got.items() if n > 1) for c, got in count.items()}
-    return {c: ks for c, ks in repeated.items() if ks}
 
 
 @pytest.mark.parametrize("focus", ["auto", "none", "first"])

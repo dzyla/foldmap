@@ -21,7 +21,7 @@ from scipy.stats import spearmanr
 
 from .frame import Frame
 from .io import CONTACT
-from .layout import SCALE, joined_pieces, lying_over, stem_pieces
+from .layout import SCALE, stem_pieces
 from .na_paths import _BEAD, among, crosses_body, graze, in_body
 from .nucleic import stem_axis
 from .route import clip_len
@@ -652,16 +652,9 @@ def render_checks(lay, loops, fig, sses, *, model=None, bb=None) -> dict:
     from; without them they are None (not measured)."""
     from matplotlib.backends.backend_agg import FigureCanvasAgg
 
-    joined = joined_pieces(lay.stems, lay.nucleic) if lay.nucleic is not None else set()
-    joined |= lying_over(lay)  # a helix drawn over a sheet lies on its strands
-    boxes = [(p.sse.id, p.rect) for p in lay.placed.values()] + [(d.id, d.rect) for d in lay.stems]
-    overlaps = sum(
-        1
-        for (i, a), (j, b) in combinations(boxes, 2)
-        if min(a[2], b[2]) - max(a[0], b[0]) > 1e-6
-        and min(a[3], b[3]) - max(a[1], b[1]) > 1e-6
-        and frozenset((i, j)) not in joined
-    )
+    from .figcheck import element_overlaps
+
+    overlaps = len(element_overlaps(lay))
     canvas = FigureCanvasAgg(fig)
     canvas.draw()
     renderer = canvas.get_renderer()

@@ -228,6 +228,8 @@ class Layout:
     res_cons: list[float] = field(default_factory=list)  # alignment conservation of each residue (nan: none)
     res_grade: list[int] = field(default_factory=list)  # conservation grade 1..9 of each residue (0: none)
     cons_label: str = ""  # legend text saying where the grades come from
+    copy_ties: dict[str, tuple[str, bool]] = field(default_factory=dict)  # copy chain -> (its protomer-0 mate chain,
+    # drawn as its mirror image): the symmetry ties asked for (_symmetry_ties), kept when _separate moves one by one
 
     @property
     def dna(self) -> list[PlacedStem]:  # earlier name
@@ -1949,6 +1951,22 @@ def _symmetry_ties(items: list[_Item], frame, mirror: bool = True) -> dict[int, 
     return ties
 
 
+def _copy_ties(
+    items: list[_Item], ties: dict[int, tuple[int, int]], frame, mirrored: bool
+) -> dict[str, tuple[str, bool]]:
+    """Chain -> (the protomer-0 chain of its class, mirrored) for each chain holding a copy item of `ties`
+    (_symmetry_ties): the copies the symmetry asked to draw alike, whether or not _separate keeps them tied."""
+    sector, classes = getattr(frame, "sector", None) or {}, getattr(frame, "classes", None) or {}
+    first = {classes[c]: c for c in sorted(classes) if sector.get(c) == 0}
+    out = {}
+    for i in sorted(ties):
+        for m in items[i].members:
+            c = m.sse.chain if isinstance(m, Placed) and not m.ghost else None
+            if c in classes and classes[c] in first:
+                out[c] = (first[classes[c]], mirrored)
+    return dict(sorted(out.items()))
+
+
 _RES_RANGE = re.compile(r"(-?\d+)([A-Za-z]?)(?:-(-?\d+)([A-Za-z]?))?")  # 150, 150-159, -7-4, 100A-100K
 
 
@@ -2177,11 +2195,13 @@ def build_layout(
     walls = _trace_walls(items, traces, nucleic) if traces else None  # traces stay: items keep off them
     rows: list[list[_Item]] = []
     mirrored: list[tuple] = []  # (copy, mate) members of protomers drawn as mirror images
+    copy_ties: dict[str, tuple[str, bool]] = {}
     if mode == "stack":
         rows = _stack(items, keep_depth)
         _centre_dna_over_binders(items, contacts)
     else:
         ties = _symmetry_ties(items, frame, mirror is not None)
+        copy_ties = _copy_ties(items, ties, frame, mirror is not None)
         spread, lift = 0.0, 0.0
         if ties and mirror is not None:  # a dyad in the page: each copy starts at its mate's mirror image
             mirrored = [
@@ -2254,6 +2274,7 @@ def build_layout(
     )
     lay.na_traces = traces
     lay.frame = frame
+    lay.copy_ties = copy_ties
     lay.ba_rows = _ba_rows(items)  # after the user's swaps
     lay.on_sheet = {
         m.sse.id: [x.sse.id for x in it.members if x.sse.kind == "E" and not x.ghost]
