@@ -18,18 +18,18 @@ file byte for byte. --check re-queries the ids and lists those now obsolete, wit
     python scripts/random100.py run [--ids A,B | --failed-from report.json] [--views all|quick|v1,v2]
                                     [--out docs/validation/random100] [--jobs 1]
 
-run draws every entry (plus each CA-only / P-only id met while sampling, which must be refused: A1c) with
-`entry <id> --out DIR`, a child process (python -I, OPENBLAS_NUM_THREADS=1, PYTHONHASHSEED=0). The entry draws each
-view (VIEWS) in a grandchild of its own (`view`, run with -W default), killed after LIMITS["view_timeout_s"], so a
-crash or a hang in one view does not hide the others; wall time and max RSS come from os.wait4. Each view writes
-what it measured (figcheck.figure_checks, route statistics from foldmap.route's DEBUG summary record, layout
+run draws every entry (plus each CA-only / P-only id met while sampling, which must be refused: A1c) with `entry <id>
+--out DIR`, a child process (python -I, OPENBLAS_NUM_THREADS=1, PYTHONHASHSEED=0). The entry draws each view (VIEWS) in
+a grandchild of its own (`view`, run with -W default), killed after LIMITS["view_timeout_s"], so a crash or a hang in
+one view does not hide the others; wall time and max RSS come from os.wait4 (where there is one: run_child). Each view
+writes what it measured (figcheck.figure_checks, route statistics from foldmap.route's DEBUG summary record, layout
 signature and SVG hashes, na_validate's nucleic-acid measures, membrane and tether checks); the entry adds mkdssp
-agreement and judges A1-A20 (criteria, LIMITS) into <out>/<id>.json. Then the pairs are compared (A19), a contact
-sheet <out>/<id>.png is drawn per entry (the figure, the 3D CA/P traces seen through the figure's page axes in its
-element colours, the same turned 90° about page-up, the partner's figure for a pair, facts and criteria), and
-report.json, report.md and index.html are written. Exit 0 only if every entry passes. Each view's files are kept in
-<out>/work/<id>/. Pairing against RNApolis needs NA_RNAPOLIS_PYTHON (the Python of a venv that has it); mkdssp 3.1.2
-is found on PATH or as MKDSSP.
+agreement and judges A1-A20 (criteria, LIMITS) into <out>/<id>.json. Then the pairs are compared (A19), a contact sheet
+<out>/<id>.png is drawn per entry (the figure, the 3D CA/P traces seen through the figure's page axes in its element
+colours, the same turned 90° about page-up, the partner's figure for a pair, facts and criteria), and report.json,
+report.md and index.html are written. Exit 0 only if every entry passes. Each view's files are kept in <out>/work/<id>/.
+Pairing against RNApolis needs NA_RNAPOLIS_PYTHON (the Python of a venv that has it); mkdssp 3.1.2 is found on PATH or
+as MKDSSP.
 """
 
 from __future__ import annotations
@@ -991,10 +991,18 @@ def _script_module(name: str):
     return mod
 
 
+def _rss_mb(ru_maxrss: float) -> float:
+    """Max RSS in MB from getrusage's ru_maxrss (kilobytes on Linux, bytes on macOS)."""
+    return round(ru_maxrss / (1024 * 1024 if sys.platform == "darwin" else 1024), 1)
+
+
 def run_child(cmd: list[str], *, env: dict | None = None, timeout: float, out: Path, err: Path) -> dict:
     """Run cmd in its own session, stdout and stderr to files; killed (with everything it started) after timeout
     seconds. Exit code, wall seconds and the child's own max RSS (os.wait4: its rusage, the waited-for children it
-    reaped included)."""
+    reaped included). Without os.wait4 (Windows) the child is waited for by subprocess and its max RSS is the
+    largest of this process's reaped children (resource.RUSAGE_CHILDREN), or None where there is no resource."""
+    if not hasattr(os, "wait4"):
+        return _run_child_portable(cmd, env=env, timeout=timeout, out=out, err=err)
     t0 = time.perf_counter()
     with open(out, "wb") as fo, open(err, "wb") as fe:
         proc = subprocess.Popen(cmd, stdout=fo, stderr=fe, env=env, start_new_session=True)
@@ -1013,7 +1021,35 @@ def run_child(cmd: list[str], *, env: dict | None = None, timeout: float, out: P
     return {
         "exit": proc.returncode,
         "seconds": round(time.perf_counter() - t0, 2),
-        "max_rss_mb": round(usage.ru_maxrss / 1024, 1),
+        "max_rss_mb": _rss_mb(usage.ru_maxrss),
+        "timed_out": timed_out,
+    }
+
+
+def _run_child_portable(cmd: list[str], *, env: dict | None, timeout: float, out: Path, err: Path) -> dict:
+    """run_child where os.wait4 is missing."""
+    try:
+        import resource
+    except ImportError:
+        resource = None
+    t0 = time.perf_counter()
+    with open(out, "wb") as fo, open(err, "wb") as fe:
+        proc = subprocess.Popen(cmd, stdout=fo, stderr=fe, env=env, start_new_session=os.name == "posix")
+        timed_out = False
+        try:
+            proc.wait(timeout=timeout)
+        except subprocess.TimeoutExpired:
+            timed_out = True
+            if hasattr(os, "killpg"):
+                os.killpg(proc.pid, signal.SIGKILL)
+            else:
+                proc.kill()
+            proc.wait()
+    rss = _rss_mb(resource.getrusage(resource.RUSAGE_CHILDREN).ru_maxrss) if resource is not None else None
+    return {
+        "exit": proc.returncode,
+        "seconds": round(time.perf_counter() - t0, 2),
+        "max_rss_mb": rss,
         "timed_out": timed_out,
     }
 
@@ -1840,7 +1876,8 @@ def _facts(e: dict) -> list[str]:
 def _metric_items(e: dict) -> list[str]:
     items = []
     for v, r in e.get("views", {}).items():
-        items.append(f"{v}={r['seconds']}s/{r['max_rss_mb']:.0f}MB")
+        rss = "?" if r.get("max_rss_mb") is None else f"{r['max_rss_mb']:.0f}"
+        items.append(f"{v}={r['seconds']}s/{rss}MB")
     d = e.get("views", {}).get("default", {}).get("result") or {}
     ch = d.get("checks") or {}
     for k in ("honest_crossings", "loop_crossings", "copies_alike", "stem_name_gap"):
@@ -2092,7 +2129,9 @@ def reported(e: dict) -> dict:
         "tighter_than_inflate": route.get("tighter_than_inflate"),
         "rejected_as_crossing": route.get("rejected_as_crossing"),
         "area": d.get("area"),
-        "max_rss_mb": max((r["max_rss_mb"] for r in e.get("views", {}).values()), default=None),
+        "max_rss_mb": max(
+            (r["max_rss_mb"] for r in e.get("views", {}).values() if r.get("max_rss_mb") is not None), default=None
+        ),
     }
 
 

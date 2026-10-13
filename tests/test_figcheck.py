@@ -27,11 +27,23 @@ def test_crossing_counters_moved_but_unchanged():
     assert loop_crossings is figcheck.loop_crossings and honest_crossings is figcheck.honest_crossings
 
 
-def test_ubiquitin_is_clean():
+@pytest.mark.parametrize("font", ["this machine's", "another"])
+def test_ubiquitin_is_clean(font, monkeypatch):
+    """Clean on every check. Where text is not drawn in figcheck.INK_FONT (macOS, Windows: Arial or DejaVu; forced
+    here by asking for another font), the ink checks are not run: None, with the reason under "skipped"."""
+    if font == "another":
+        monkeypatch.setattr(figcheck, "INK_FONT", "No Such Sans")
     d = drawn(DATA / "1UBQ.cif")
     got = figcheck.figure_checks(d, DATA / "1UBQ.cif", assembly="auto", focus="auto")
-    assert got["element_overlaps"] == got["text_collisions"] == got["off_page"] == 0, got
-    assert got["label_repeats"] == 0 and got["order"] == 0 and got["scope_silent"] == 0
+    reason = figcheck.ink_font_reason(d.figure)
+    assert got["element_overlaps"] == 0 and got["label_repeats"] == 0 and got["order"] == 0, got
+    assert got["scope_silent"] == 0
+    if reason:
+        assert got["skipped"] == dict.fromkeys(figcheck.INK_CHECKS, reason)
+        assert got["text_collisions"] is None and got["off_page"] is None
+    else:
+        assert got["skipped"] == {} and got["text_collisions"] == got["off_page"] == 0, got
+    assert bool(reason) == (font == "another" or figcheck.ink_font_reason(d.figure) != "")
 
 
 def test_tim_copies_are_alike_and_mirror_ties_count_as_alike():
@@ -234,11 +246,24 @@ def test_ink_is_measured_under_a_fixed_hinting_and_the_font_is_recorded():
     assert got["skipped"] == {} or set(got["skipped"]) == set(figcheck.INK_CHECKS)
 
 
+def _names_its_fonts(reason: str, fig) -> bool:
+    """The reason says which font the ink checks need and names every other font file the texts resolve to."""
+    from matplotlib.ft2font import FT2Font
+
+    other = [f for f in figcheck.text_fonts(fig) if FT2Font(f).family_name != figcheck.INK_FONT]
+    return reason.startswith(f"ink checks are calibrated on {figcheck.INK_FONT}") and all(f in reason for f in other)
+
+
 def test_ink_checks_name_the_font_they_need():
+    """A text in DejaVu Sans (matplotlib's own font, on every machine) is not the calibrated font; the figure's own
+    texts resolve to Liberation Sans on Linux CI, and to whatever this machine has elsewhere (Arial, DejaVu)."""
     d = _page(_text("label:A:1-5"))
     d.figure.axes[0].texts[0].set_fontfamily(["DejaVu Sans"])
-    assert "Liberation Sans" in figcheck.ink_font_reason(d.figure)
-    assert figcheck.ink_font_reason(drawn(DATA / "1UBQ.cif").figure) in ("", figcheck.ink_font_reason(d.figure))
+    reason = figcheck.ink_font_reason(d.figure)
+    assert _names_its_fonts(reason, d.figure) and "DejaVuSans" in reason
+    ubq = drawn(DATA / "1UBQ.cif").figure
+    reason = figcheck.ink_font_reason(ubq)
+    assert reason == "" or _names_its_fonts(reason, ubq)
 
 
 def test_gate_tolerances_for_later_tasks():

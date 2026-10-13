@@ -221,11 +221,24 @@ def test_pairs_try_at_most_eight_partners(r100):
 # ------------------------------------------------------------------------------------------------ runner
 
 
+def _font_reason() -> str:
+    """Why the ink checks are not run on this machine ('' on Linux CI, where text is drawn in Liberation Sans)."""
+    from foldmap import figcheck
+    from foldmap.spec import draw_spec, figure_spec
+
+    return figcheck.ink_font_reason(draw_spec(figure_spec(DATA / "1UBQ.cif")).figure)
+
+
 def test_entry_measures_a_fixture(r100, tmp_path):
+    """Where text is not drawn in Liberation Sans (macOS, Windows) the ink checks fail closed as not measured, and
+    they are the only failures."""
     code = r100.main(["entry", str(DATA / "1UBQ.cif"), "--out", str(tmp_path), "--views", "quick"])
     saved = json.loads((tmp_path / "1UBQ.json").read_text(encoding="utf-8"))
-    assert code == 0
     assert set(saved["criteria"]) == set(r100.CRITERIA) and {f"A{k}" for k in range(1, 21)} <= set(saved["criteria"])
+    if _font_reason():
+        assert code == 1 and saved["failed"] and all("not measured (ink checks" in f for f in saved["failed"])
+        return
+    assert code == 0
     assert saved["pass"] is True, saved["failed"]
     assert set(saved["views"]) == set(r100.QUICK)
     c = saved["criteria"]
@@ -235,6 +248,29 @@ def test_entry_measures_a_fixture(r100, tmp_path):
     assert d["checks"]["element_overlaps"] == 0 and d["signature_sha256"] and d["svg_sha256"]
     assert d["route"]["records"] >= 1 and d["route"]["loops"] > 0  # route's summary record was read
     assert (tmp_path / "work" / "1UBQ" / "1UBQ-trace.json").is_file()
+
+
+@pytest.mark.parametrize("platform", ["posix", "no wait4", "no wait4, no resource"])
+def test_run_child_without_wait4(r100, tmp_path, monkeypatch, platform):
+    """Windows has no os.wait4 (nor os.killpg, nor resource): the child is waited for with subprocess, its max RSS
+    read from the children's rusage where there is one, else None; a hung child is still killed at the timeout."""
+    if platform != "posix":
+        monkeypatch.delattr(r100.os, "wait4", raising=False)
+        monkeypatch.delattr(r100.os, "killpg", raising=False)
+    if platform == "no wait4, no resource":
+        monkeypatch.setitem(sys.modules, "resource", None)
+    run = [sys.executable, "-I", "-c", "import sys; b = bytearray(64 << 20); sys.exit(3)"]
+    got = r100.run_child(run, timeout=60, out=tmp_path / "o", err=tmp_path / "e")
+    assert got["exit"] == 3 and not got["timed_out"] and got["seconds"] > 0
+    if platform == "no wait4, no resource":
+        assert got["max_rss_mb"] is None
+    else:
+        assert 60 < got["max_rss_mb"] < 4096
+    hang = [sys.executable, "-I", "-c", "import time; time.sleep(60)"]
+    got = r100.run_child(hang, timeout=0.5, out=tmp_path / "o", err=tmp_path / "e")
+    assert got["timed_out"] and got["exit"] != 0 and got["seconds"] < 30
+    e = {"views": {"default": {**got, "result": None}}}
+    assert "default=" in " ".join(r100._metric_items(e)) and "max_rss_mb" in r100.reported(e)
 
 
 def test_entry_reports_a_crash_without_dying(r100, tmp_path, monkeypatch):
