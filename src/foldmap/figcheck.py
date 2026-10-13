@@ -151,9 +151,15 @@ def _names(texts) -> list[str]:
 
 
 def _ink_boxes(fig, renderer=None) -> list[tuple[object, Bbox]]:
-    """(text, ink box in pixels) for every drawn text: the extents of its glyph outlines (matplotlib's TextToPath,
-    placed and turned as the text is drawn, under MEASURE_RC), tighter than the layout box get_window_extent gives
-    (line height, descent). A text that never reaches the glyph recorder is an error, not a text left out."""
+    """(text, ink box in pixels) for every drawn text: the extents of its glyph outlines (_ink_outlines), tighter
+    than the layout box get_window_extent gives (line height, descent)."""
+    return [(t, Bbox.union([p.get_extents() for p in paths])) for t, paths in _ink_outlines(fig, renderer)]
+
+
+def _ink_outlines(fig, renderer=None) -> list[tuple[object, list[MPath]]]:
+    """(text, its glyph outlines in pixels) for every drawn text: matplotlib's TextToPath, placed and turned as the
+    text is drawn, under MEASURE_RC. A text that never reaches the glyph recorder is an error, not a text left
+    out."""
     from matplotlib import rc_context
     from matplotlib.textpath import TextToPath
 
@@ -172,7 +178,7 @@ def _ink_boxes(fig, renderer=None) -> list[tuple[object, Bbox]]:
             if renderer.flipy():  # as RendererBase._draw_text_as_path places them: y counted from the top
                 y = renderer.get_canvas_width_height()[1] - y
             place = Affine2D().scale(scale).rotate_deg(angle).translate(x, y)
-            got.append(MPath(verts, codes).transformed(place).get_extents())
+            got.append(MPath(verts, codes).transformed(place))
 
     renderer.draw_text = record  # this instance only: the glyph outlines are measured, nothing is drawn
     out = []
@@ -186,7 +192,7 @@ def _ink_boxes(fig, renderer=None) -> list[tuple[object, Bbox]]:
                 if not calls[0]:
                     raise RuntimeError(f"figcheck: text {name} drew nothing to measure")
                 if got:
-                    out.append((t, Bbox.union(got)))
+                    out.append((t, list(got)))
     finally:
         del renderer.draw_text
     return out
@@ -237,7 +243,9 @@ class Page:
         fig = drawn.figure
         self.fig = fig
         renderer = _renderer(fig)
-        boxes = dict((id(t), box) for t, box in _ink_boxes(fig, renderer))
+        self.outlines = dict((id(t), paths) for t, paths in _ink_outlines(fig, renderer))  # text -> pixels
+        self._turned_boxes: dict[tuple[int, float], Bbox] = {}
+        boxes = {k: Bbox.union([p.get_extents() for p in paths]) for k, paths in self.outlines.items()}
         texts = _texts(fig)
         self.texts = [(t, n, boxes[id(t)]) for t, n in zip(texts, _names(texts)) if id(t) in boxes]
         self.fonts = text_fonts(fig)
@@ -258,6 +266,22 @@ class Page:
             if gid.startswith("legend"):
                 self.legend.append((gid, a.get_window_extent(renderer)))
         self.stems = self._stem_bodies()
+
+    def pair_boxes(self, ta, a: Bbox, tb, b: Bbox) -> tuple[Bbox, Bbox]:
+        """Two texts' ink boxes to compare: for two texts turned alike (a stem's name and its letters), the boxes
+        of their outlines in that turned frame, which hold their inks tightly; else their page boxes (a and b),
+        which hold a turned text's ink loosely (its corners)."""
+        turn = ta.get_rotation()
+        if abs(turn - tb.get_rotation()) > 1e-6 or turn % 90 == 0:
+            return a, b
+        return self._turned(ta, turn), self._turned(tb, turn)
+
+    def _turned(self, t, turn: float) -> Bbox:
+        key = (id(t), turn)
+        if key not in self._turned_boxes:
+            back = Affine2D().rotate_deg(-turn)
+            self._turned_boxes[key] = Bbox.union([p.transformed(back).get_extents() for p in self.outlines[id(t)]])
+        return self._turned_boxes[key]
 
     def _stem_bodies(self) -> list[tuple[str, MPath, set[str]]]:
         """Each stem's body (its length x width box, turned) in pixels, with the texts that are its own: its name,
@@ -414,7 +438,8 @@ def text_collisions(drawn, *, clearance_px: float = 0.0, page: Page | None = Non
     """Every "<text> × <thing gid>" a reader sees on the page (a text is named by its gid, one drawn without a gid
     by its place and words: _names):
     - text over text, their ink boxes overlapping by more than TEXT_OVERLAP_PX2 and deeper than TEXT_DEPTH_PX both
-      ways (a text's own parts, one gid, never);
+      ways (a text's own parts, one gid, never); two texts turned alike are compared in their turned frame
+      (Page.pair_boxes: a stem's name beside its letter row);
     - text over a body (an element, a stem, a ligand or linked mark, a domain name plate) it does not belong to (its
       label, its residue numbers, its letters, its name), by more than TEXT_OVERLAP_PX2 of its ink deeper than
       TEXT_DEPTH_PX inside it, once per element (a helix
@@ -436,8 +461,8 @@ def text_collisions(drawn, *, clearance_px: float = 0.0, page: Page | None = Non
         if polys
         for covers in [[p for _, p, bz, opaque in page.bodies if opaque and bz > z]]
     ]
-    for (_, ga, a), (_, gb, b) in combinations(page.texts, 2):
-        if ga != gb and _texts_meet(a, b):
+    for (ta, ga, a), (tb, gb, b) in combinations(page.texts, 2):
+        if ga != gb and _texts_meet(a, b) and _texts_meet(*page.pair_boxes(ta, a, tb, b)):
             hits.append(f"{ga} × {gb}")
     for t, name, box in page.texts:
         gid = t.get_gid() or ""
@@ -643,13 +668,18 @@ def _box_gap(a, b) -> float:
 
 
 def stem_name_gaps(drawn, *, page: Page | None = None) -> dict[str, tuple[float, float]]:
-    """na:label:<k> -> (gap from the name's ink box to the ink of stem k's own letters (na:nt: of its nucleotides),
-    or to the stem's rect when its letters are not drawn; gap to the nearest other stem's rect), page units."""
+    """na:label:<k> -> (gap from the name's ink to stem k's own letters (na:nt: of its nucleotides), or to the stem's
+    rect when its letters are not drawn; gap from the name's ink box to the nearest other stem's rect), page units.
+    The gap to the letters is measured in the stem's own frame (along it and across it, as names and letters are
+    written along it): across the stem from its letter row on the name's side to the name, where the name lies
+    beside that row (a name centred between two letters sits that far from the row, not from either letter); else
+    the gap from the name to the nearest letter."""
     lay, fig = drawn.layout, drawn.figure
     if not lay.stems or not fig.axes:
         return {}
     page = page or measure(drawn)
     to_page = fig.axes[0].transData.inverted()
+    texts = {name: t for t, name, _ in page.texts}
     ink = {name: tuple(to_page.transform_bbox(box).extents) for _, name, box in page.texts}
     na = lay.nucleic
     out = {}
@@ -657,12 +687,33 @@ def stem_name_gaps(drawn, *, page: Page | None = None) -> dict[str, tuple[float,
         name = ink.get(f"na:label:{k}")
         if name is None:
             continue
-        letters = [ink.get(f"na:nt:{na.strands[s].labels[i].chain}:{na.strands[s].labels[i].tag}") for s, i in d.axial]
-        letters = [b for b in letters if b is not None]
-        own = min(_box_gap(name, b) for b in letters) if letters else _box_gap(name, d.rect)
+        tags = [f"na:nt:{na.strands[s].labels[i].chain}:{na.strands[s].labels[i].tag}" for s, i in d.axial]
+        frame = Affine2D().translate(-d.cx, -d.cy).rotate(-d.angle)  # page -> (along, across) the stem
+        local = {
+            g: Bbox.union([p.transformed(frame).get_extents() for p in _paths_on_page(page, texts[g], to_page)])
+            for g in [f"na:label:{k}", *tags]
+            if g in texts
+        }
+        letters = [local[g] for g in tags if g in local]
+        if not letters:
+            own = _box_gap(name, d.rect)
+        else:
+            box = local[f"na:label:{k}"]
+            side = 1.0 if box.y0 + box.y1 > 0 else -1.0
+            row = [b for b in letters if (b.y0 + b.y1) * side > 0]
+            across = (
+                (box.y0 - max(b.y1 for b in row) if side > 0 else min(b.y0 for b in row) - box.y1) if row else -math.inf
+            )
+            beside = row and box.x1 > min(b.x0 for b in row) and box.x0 < max(b.x1 for b in row)
+            own = across if beside and across > 0 else min(_box_gap(box.extents, b.extents) for b in letters)
         others = [_box_gap(name, e.rect) for j, e in enumerate(lay.stems) if j != k]
-        out[f"na:label:{k}"] = (own, min(others) if others else math.inf)
+        out[f"na:label:{k}"] = (float(own), min(others) if others else math.inf)
     return out
+
+
+def _paths_on_page(page: Page, text, to_page) -> list[MPath]:
+    """A text's glyph outlines in page units."""
+    return [p.transformed(to_page) for p in page.outlines[id(text)]]
 
 
 # ------------------------------------------------------------------------------------------- scope

@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import itertools
+import logging
 import math
 import re
 from collections import Counter
@@ -21,6 +22,8 @@ from .frame import Frame, symmetric_frame, view_frame
 from .model import SSE, Nucleic, Sheet, generic_label, group_by_chain, pair_places, same_place
 from .nucleic import Stem, StemView, segment_stem, stem_axis, stem_views
 from .style import CHOICES, Style
+
+log = logging.getLogger(__name__)
 
 PITCH = 1.1  # distance between neighbouring strand centres
 SHAFT = 0.62  # arrow shaft width
@@ -147,7 +150,7 @@ class PlacedStem:
     label_side: int = 1  # its name beside the first rail (1) or the second (-1): _choose_label_sides
     label_out: float = 0.0  # and this much further out than the first slot (_choose_label_sides)
     label_at: float | None = None  # its name's centre this far from the axis, beside its letters (_choose_label_sides)
-    label_along: float = 0.0  # and this far along it from its centre, level with its middle pair (_choose_label_sides)
+    label_along: float = 0.0  # and this far along it from its centre, midway along its row (_choose_label_sides)
 
     @property
     def direction(self) -> np.ndarray:
@@ -2891,9 +2894,9 @@ NT_ROW = 0.55  # a base letter sits this far out from its nucleotide
 
 def stem_label_pos(d: PlacedStem) -> tuple[float, float]:
     """Where a stem's name goes: beside it on its first rail's side (the second's with label_side -1). Once placed
-    (label_at, _choose_label_sides), level with its middle pair's letter on that side and label_at from its axis,
-    0.25 em beyond its letters; before that (the room placement keeps for it) a glyph beyond them, level with its
-    centre."""
+    (label_at, _choose_label_sides), midway along its letter row on that side and label_at from its axis,
+    _INK_MARGIN em beyond its letters; before that (the room placement keeps for it) a glyph beyond them, level with
+    its centre."""
     if d.label_at is None:
         p = np.array([d.cx, d.cy]) + d.normal * d.label_side * (d.width / 2 + NT_ROW + _GLYPH_H + d.label_out)
     else:
@@ -2902,14 +2905,14 @@ def stem_label_pos(d: PlacedStem) -> tuple[float, float]:
 
 
 def _middle_pair(d: PlacedStem, side: int, letters: bool) -> float:
-    """Where along the stem a name level with its middle base pair sits, from its centre: beside the letter of that
-    pair's nucleotide on `side` (of an even count of pairs, the first of the middle two, so the name sits beside a
-    letter, not between two), or, with no letters drawn, midway along its middle pair (pairs)."""
+    """Where along the stem, from its centre, a name centred on it sits: midway along its letter row on `side` (the
+    first and last letters of that side's nucleotides), or, with no letters drawn, midway along its middle pair
+    (pairs)."""
     if not d.pairs:
         return 0.0
     if letters:
-        at = sorted(d.axial[min(((a, i), (b, j)), key=lambda key: d.side[key] != side)] for a, i, b, j in d.pairs)
-        return float(at[(len(at) - 1) // 2])
+        at = [d.axial[key] for key in d.axial if d.side[key] == side]
+        return float(_snap((min(at) + max(at)) / 2)) if at else 0.0
     at = sorted((d.axial[(a, i)] + d.axial[(b, j)]) / 2 for a, i, b, j in d.pairs)
     return float(_snap((at[(len(at) - 1) // 2] + at[len(at) // 2]) / 2))
 
@@ -2943,9 +2946,8 @@ def _body_distance(q, d) -> float:
 
 _SLOTS = (0.25, 0.5, 0.75)  # page units a stem's name may move further out than beside its letters, when neither
 # side is clear there
-_INK_MARGIN = 0.25  # ems kept clear between a stem's name and every base letter (its own letter row, or its rail
-# when no letters are drawn): rendered extents differ by font engine (matplotlib 3.10 drew 1KX5's name 0.9 px nearer
-# a letter than 3.11 does, touching it)
+_INK_MARGIN = 0.5  # ems kept clear between a stem's name and every base letter (its own letter row, or its rail
+# when no letters are drawn): at 0.25 em 1EHZ's D and T read as letters of their rows (plan 10 Task 4 review)
 _NAME_EM, _LETTER_EM = 0.8, 0.75  # ems: render draws a stem's name, and a base letter, at these sizes
 DNA_TUBE = 0.42  # a drawn double helix's backbone tube width, page units (render's ribbon)
 _ink_lines: dict[tuple[str, bool], tuple[np.ndarray, np.ndarray]] = {}
@@ -3181,13 +3183,13 @@ def _mirror_sides(mirrored: list[tuple]) -> None:
 
 def _choose_label_sides(layout: Layout, sses: list[SSE], style: Style, mirrored: list[tuple] = ()) -> None:
     """Element names first (_element_label_sides). Then each stem's name beside its own letter row (_name_at): its
-    ink _INK_MARGIN em beyond the row's nearest letter's ink, level with the stem's middle pair; beside its first
+    ink _INK_MARGIN em beyond the row's ink across the stem, centred along the row; beside its first
     rail (label_side 1) unless its box meets another stem's name decided before it, another stem's body, an element
     or an element's name, or sits nearer another stem than its own, or its ink comes within _INK_MARGIN em of a base
     letter of another stem (where the style draws them); then beside the second rail if that is clear; then further
-    out (_SLOTS), either side; else beside the first rail after all. A mirror copy's name (the (copy, mate) members
-    in `mirrored`, of protomers drawn as mirror images) then takes the mirror of its mate's side (_mirror_sides).
-    Runs once the names (and so the boxes' widths) are final."""
+    out (_SLOTS), either side; else (logged) in the slot with the most room. A mirror copy's name (the (copy, mate)
+    members in `mirrored`, of protomers drawn as mirror images) then takes the mirror of its mate's side
+    (_mirror_sides). Runs once the names (and so the boxes' widths) are final."""
     _element_label_sides(layout, sses)
     _over_label_sides(layout)
     if mirrored:
@@ -3234,14 +3236,14 @@ def _choose_label_sides(layout: Layout, sses: list[SSE], style: Style, mirrored:
         others = [e for e in layout.stems if e is not d]
         reach = _reach(ink[id(d)])
         slots = [(side, out) for out in (0.0, *_SLOTS) for side in (1, -1)]
-        d.label_side, d.label_out = next(
-            (
-                s
-                for s in slots
-                if _name_clear(d, s, beside, others, named, rects, reach, others_letters[id(d)], _INK_MARGIN * em)
-            ),
-            (1, 0.0),
-        )
+        room = []
+        for s in slots:
+            room.append(_name_room(d, s, beside, others, named, rects, reach, others_letters[id(d)]))
+            if room[-1] >= _INK_MARGIN * em:
+                break
+        else:  # no slot has the margin: the one with the most room (the first of equals)
+            log.info("stem %s: no slot keeps %.2f em from every letter; best %.3f", d.name, _INK_MARGIN, max(room))
+        d.label_side, d.label_out = slots[int(np.argmax(room))]  # the clear one has the most room
         d.label_at, d.label_along = beside[id(d), d.label_side][0] + d.label_out, beside[id(d), d.label_side][1]
         named.append(_stem_label_box(d))
     if mirrored:
@@ -3250,18 +3252,14 @@ def _choose_label_sides(layout: Layout, sses: list[SSE], style: Style, mirrored:
             d.label_at, d.label_along = beside[id(d), d.label_side][0] + d.label_out, beside[id(d), d.label_side][1]
 
 
-_NAME_STEP_OUT = 0.05  # page units a stem's name is stepped out by while its ink box is too near a letter's
-
-
 def _name_at(
     d: PlacedStem, side: int, ink: np.ndarray, letters: list, edge: float, margin: float
 ) -> tuple[float, float]:
     """How far from the stem's axis, and along it from its centre (_middle_pair), its name (ink: its points around
-    its centre, as drawn) is centred beside `side`: `margin` beyond its letter row's ink along the stem's normal
-    (letters: (nucleotide, its letter's ink on the page) of the stem), and further out where its ink box is nearer
-    than `margin` to a letter's ink box (the distance figcheck measures, box to box: on a tilted row the letter
-    nearest the name decides); with no letters drawn, `margin` beyond the stem's drawn edge (`edge` from the axis).
-    On the 1e-4 grid, outward."""
+    its centre, as drawn) is centred beside `side`: `margin` beyond its letter row's ink across the stem (letters:
+    (nucleotide, its letter's ink on the page) of the stem; the row is that side's letters, measured in the stem's
+    own frame, as figcheck.stem_name_gaps measures it), centred along the row; with no letters drawn, `margin`
+    beyond the stem's drawn edge (`edge` from the axis). On the 1e-4 grid, outward."""
     normal = d.normal * side
     inner = float(np.max(ink @ -normal, initial=0.0))  # how far the name's ink reaches back toward the stem
     centre = np.array([d.cx, d.cy])
@@ -3269,36 +3267,26 @@ def _name_at(
     along = _middle_pair(d, side, bool(row))
     if not row:
         return math.ceil((edge + margin + inner) * _GRID) / _GRID, along
-    reach, boxes = _reach(ink), np.array([_reach(p) for _, p in letters])
-    mid = centre + d.direction * along
-
-    def gap(t: float) -> float:
-        return float(_box_gaps(reach + np.tile(mid + normal * t, 2), boxes).min())
-
-    lo = max(float(np.max((p - centre) @ normal)) for p in row) + margin + inner  # beyond the row along the normal
-    if gap(lo) < margin:
-        hi = lo + _NAME_STEP_OUT
-        while gap(hi) < margin:
-            lo, hi = hi, hi + _NAME_STEP_OUT
-        for _ in range(40):  # the first place `margin` clear, to well under the grid
-            m = (lo + hi) / 2
-            lo, hi = (lo, m) if gap(m) >= margin else (m, hi)
-        lo = hi
-    return math.ceil(lo * _GRID) / _GRID, along
+    out = max(float(np.max((p - centre) @ normal)) for p in row)  # the row's ink reaches this far out
+    return math.ceil((out + margin + inner) * _GRID) / _GRID, along
 
 
-def _name_clear(d: PlacedStem, slot, beside, others, named, rects, ink, letters, margin: float) -> bool:
-    """Is the stem's name clear in this slot (label_side, label_out)? See _choose_label_sides. Leaves d there."""
+def _name_room(d: PlacedStem, slot, beside, others, named, rects, ink, letters) -> float:
+    """How much room the stem's name has in this slot (label_side, label_out): -inf when its box meets another
+    stem's name decided before it, an element, an element's name or another stem's body, or it sits nearer another
+    stem than its own; else the gap from its ink box to the nearest letter of another stem (inf for none). See
+    _choose_label_sides. Leaves d there."""
     d.label_side, d.label_out = slot
     d.label_at, d.label_along = beside[id(d), d.label_side][0] + d.label_out, beside[id(d), d.label_side][1]
     box, at = _stem_label_box(d), stem_label_pos(d)
     own = _body_distance(at, d)
-    return not (
+    if (
         overlaps_any(box, named)
         or overlaps_any(box, rects)
         or any(_box_meets_body(box, e) or _body_distance(at, e) <= own for e in others)
-        or (len(letters) and float(_box_gaps(ink + np.tile(at, 2), letters).min()) < margin)
-    )
+    ):
+        return -math.inf
+    return float(_box_gaps(ink + np.tile(at, 2), letters).min()) if len(letters) else math.inf
 
 
 def _grown(box, pad: float) -> tuple[float, float, float, float]:

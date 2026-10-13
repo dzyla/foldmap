@@ -11,6 +11,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 from matplotlib.colors import to_hex
+from matplotlib.transforms import Bbox
 
 from foldmap.cli import make_figure_and_loops, make_layout
 from foldmap.layout import PlacedStem, label_boxes
@@ -571,8 +572,10 @@ def _page_em(d) -> float:
 @pytest.mark.parametrize("pdb", ["1KX5", "30QM", "3CRX"])
 def test_stem_names_keep_clear_of_base_letters(pdb):
     """No stem name sits on a base letter: its ink (figcheck, fixed hinting, Liberation Sans) keeps at least half the
-    0.25 em margin from every letter's ink, its own row's (where it sits at the margin: plan 10 Task 4, which
-    replaced the "a letter and a half" clearance of the one-glyph-out place) and every other stem's."""
+    0.5 em margin from every letter's ink, its own row's (where it sits at the margin: plan 10 Task 4, which
+    replaced the "a letter and a half" clearance of the one-glyph-out place) and every other stem's. A name and the
+    letters turned alike with it (its own row) are compared in that turned frame (figcheck Page.pair_boxes): the
+    page boxes of a long name turned 30 degrees reach a whole em past its ink."""
     from foldmap import figcheck
     from foldmap.layout import _INK_MARGIN
     from foldmap.spec import draw_spec, figure_spec
@@ -580,13 +583,17 @@ def test_stem_names_keep_clear_of_base_letters(pdb):
     d = draw_spec(figure_spec(_path(pdb)))
     if reason := figcheck.ink_font_reason(d.figure):
         pytest.skip(reason)
-    em, ax = _page_em(d), d.figure.axes[0]
-    to_page = ax.transData.inverted()
-    ink = [(name, to_page.transform_bbox(box).extents) for _, name, box in figcheck.measure(d).texts]
-    names = [(n, b) for n, b in ink if n.startswith("na:label:")]
-    letters = [(n, b) for n, b in ink if n.startswith("na:nt:")]
+    em, page = _page_em(d), figcheck.measure(d)
+    px = d.figure.axes[0].transData.transform((1, 0))[0] - d.figure.axes[0].transData.transform((0, 0))[0]
+    names = [(t, n, b) for t, n, b in page.texts if n.startswith("na:label:")]
+    letters = [(t, n, b) for t, n, b in page.texts if n.startswith("na:nt:")]
     assert names and letters
-    near = [(n, m) for n, a in names for m, b in letters if figcheck._box_gap(a, b) < 0.5 * _INK_MARGIN * em]
+    near = [
+        (n, m)
+        for tn, n, a in names
+        for tm, m, b in letters
+        if figcheck._box_gap(*(box.extents for box in page.pair_boxes(tn, a, tm, b))) < 0.5 * _INK_MARGIN * em * px
+    ]
     assert not near, (pdb, near)
 
 
@@ -2117,11 +2124,13 @@ def test_stem_labels_sit_by_their_own_stem_clear_of_other_text(pdb):
     d = draw_spec(figure_spec(NA / f"{pdb}.cif.gz"))
     if reason := figcheck.ink_font_reason(d.figure):
         pytest.skip(reason)
-    texts = [(name, box) for _, name, box in figcheck.measure(d).texts]  # ink boxes (fixed hinting), pixels
-    for g, box in texts:
-        if g.startswith("na:label:"):  # 1KX5 labels 6, 9, 12, 15 did; a name 0.25 em from its letters (plan 10
-            # Task 4) meets their line boxes (get_window_extent: line height and descent) but not their ink
-            assert not [h for h, b in texts if h != g and box.overlaps(b)], (pdb, g)
+    page = figcheck.measure(d)  # ink boxes (fixed hinting), pixels
+    for t, g, box in page.texts:
+        if g.startswith("na:label:"):  # 1KX5 labels 6, 9, 12, 15 did; a name 0.5 em from its letters (plan 10
+            # Task 4) meets their line boxes (get_window_extent: line height and descent) but not their ink, nor
+            # their page boxes in the frame they are turned in alike (Page.pair_boxes)
+            hits = [h for u, h, b in page.texts if h != g and Bbox.overlaps(*page.pair_boxes(t, box, u, b))]
+            assert not hits, (pdb, g, hits)
 
 
 @pytest.mark.parametrize("pdb", ["1EHZ", "2GIS"])
@@ -2192,11 +2201,12 @@ _TRNA_NAMES = Path(__file__).parents[1] / "docs" / "names" / "1EHZ-trna.yaml"
     ids=["1EHZ", "1EHZ-trna-names", "2GIS", "30QM", "1KX5"],
 )
 def test_stem_name_sits_by_its_own_letters(pdb, names):
-    """Each stem's name sits 0.25 em (layout._INK_MARGIN, the margin of e9a3b53) beyond its own letter row, by the
-    ink: 1EHZ's D name sat six glyph heights above its row, T between the T arm and the D-loop run. Measured by
-    figcheck.stem_name_gaps under its fixed hinting (Liberation Sans only); the limit is that margin in page units
-    plus 1e-3 (figcheck.stem_gap_tolerance, R7). The name is also nearer its own letters than half the way to any
-    other stem, never on its letters, and the letters stay apart (nacheck letter_overlaps)."""
+    """Each stem's name sits 0.5 em (layout._INK_MARGIN) beyond its own letter row, across the stem, centred along
+    it: 1EHZ's D name sat six glyph heights above its row, T between the T arm and the D-loop run; at 0.25 em (plan
+    10 Task 4) D and T read as letters of their rows. Measured by figcheck.stem_name_gaps in the stem's frame under
+    its fixed hinting (Liberation Sans only); the limit is that margin in page units plus 1e-3
+    (figcheck.stem_gap_tolerance, R7). The name is also nearer its own letters than half the way to any other stem,
+    never on its letters, and the letters stay apart (nacheck letter_overlaps)."""
     from foldmap import figcheck
     from foldmap.layout import _INK_MARGIN
     from foldmap.nacheck import render_checks
@@ -2213,6 +2223,9 @@ def test_stem_name_sits_by_its_own_letters(pdb, names):
     near_other = {k: (own, other) for k, (own, other) in gaps.items() if not own < 0.5 * other}
     assert not near_other, (pdb, near_other)
     assert render_checks(d.layout, d.loops, d.figure, d.sses)["letter_overlaps"] == 0
+    for s in d.layout.stems:  # centred along its row: midway between the row's first and last letters
+        row = [s.axial[key] for key in s.axial if s.side[key] == s.label_side]
+        assert s.label_along == pytest.approx((min(row) + max(row)) / 2, abs=1e-4), (pdb, s.name)
 
 
 @pytest.mark.parametrize("pdb", ["1EHZ", "1KX5"])

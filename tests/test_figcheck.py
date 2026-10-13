@@ -8,6 +8,7 @@ import pytest
 from matplotlib.figure import Figure
 from matplotlib.patches import PathPatch, Rectangle
 from matplotlib.path import Path as MPath
+from matplotlib.transforms import Bbox
 
 from foldmap import figcheck
 from foldmap.spec import draw_spec, figure_spec
@@ -315,9 +316,49 @@ def test_a_loop_length_is_not_crossed_by_its_own_loop():
     assert figcheck.text_collisions(other) == ["loop-length:A:1-5>A:9-12 × loop:B:1-5>B:9-12"]
 
 
+def test_texts_turned_alike_are_compared_in_their_turned_frame():
+    """Two texts turned 30 degrees alike, one beside the other across their baseline: their page boxes overlap (a
+    turned text's corners), their ink in the turned frame does not, so they are no collision (Page.pair_boxes)."""
+
+    def turned(gid, xy):
+        def make(ax):
+            ax.text(*xy, "WWWWWW", ha="center", va="center", fontsize=20, rotation=30).set_gid(gid)
+
+        return make
+
+    across = np.array([-np.sin(np.radians(30)), np.cos(np.radians(30))]) * 0.75  # 37 px: a line and a bit
+    d = _page(turned("a", (5, 5)), turned("b", tuple(np.add((5, 5), across))))
+    page = figcheck.measure(d)
+    (ta, _, a), (tb, _, b) = page.texts
+    assert a.overlaps(b) and figcheck._texts_meet(a, b)  # by the page boxes, a collision
+    assert not Bbox.overlaps(*page.pair_boxes(ta, a, tb, b))
+    assert figcheck.text_collisions(d) == []
+
+
+def test_a_stem_name_is_measured_across_its_row():
+    """1EHZ named: the D arm has four pairs, so its name centred along the arm sits between two letters of its row;
+    its gap is measured across the stem from the row (the margin), not to the nearer letter's corner (plan 10 Task 4
+    fix round 1)."""
+    from foldmap.layout import _INK_MARGIN
+
+    d = drawn(DATA / "na" / "1EHZ.cif.gz", names=[str(Path(__file__).parents[1] / "docs" / "names" / "1EHZ-trna.yaml")])
+    _liberation(d)
+    k = next(k for k, s in enumerate(d.layout.stems) if s.name == "D")
+    ax = d.figure.axes[0]
+    em = next(t for t in ax.texts if t.get_gid().startswith("na:nt:")).get_fontsize() / 0.75 * d.figure.dpi / 72
+    em /= ax.transData.transform((1, 0))[0] - ax.transData.transform((0, 0))[0]
+    own, _ = figcheck.stem_name_gaps(d)[f"na:label:{k}"]
+    assert own == pytest.approx(_INK_MARGIN * em, abs=2e-3)
+    to_page = ax.transData.inverted()
+    ink = {n: to_page.transform_bbox(b).extents for _, n, b in figcheck.measure(d).texts}
+    na, s = d.layout.nucleic, d.layout.stems[k]
+    tags = [f"na:nt:{na.strands[a].labels[i].chain}:{na.strands[a].labels[i].tag}" for a, i in s.axial]
+    assert min(figcheck._box_gap(ink[f"na:label:{k}"], ink[t]) for t in tags) > own + 0.05  # its nearest letter
+
+
 def test_stem_names_are_measured_to_letters_not_to_the_stem_box():
     """1EHZ named: the D arm's name sits inside its turned stem's box (page-upright) but clear of its letters (plan 10
-    Task 4 put it 0.25 em beyond them; before, it sat near the box and far from the letters)."""
+    Task 4 put it 0.5 em beyond them; before, it sat near the box and far from the letters)."""
     d = drawn(DATA / "na" / "1EHZ.cif.gz", names=[str(Path(__file__).parents[1] / "docs" / "names" / "1EHZ-trna.yaml")])
     _liberation(d)
     got = figcheck.stem_name_gaps(d)
