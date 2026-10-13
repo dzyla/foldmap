@@ -45,6 +45,7 @@ from .layout import (
     Placed,
     PlacedStem,
     _text_width,
+    block_ghosts,
     centred_box,
     dna_to_page,
     dna_y,
@@ -2441,11 +2442,10 @@ def _draw_domain_bar(c: _Canvas, layout: Layout) -> None:
 def _draw_sheet_panels(c: _Canvas, layout: Layout) -> None:
     """A pale panel behind each sheet."""
     if c.look.sheet_panels:
-        ghosts = {g.sse.id: g for g in layout.ghosts}
         for k, ids in enumerate(layout.sheets):
             if len(ids) < 2:
                 continue
-            rects = np.array([layout.placed[i].rect for i in ids] + [ghosts[i].rect for i in ids if i in ghosts])
+            rects = np.array([layout.placed[i].rect for i in ids] + [g.rect for g in block_ghosts(layout, k)])
             x0, y0 = rects[:, 0].min() - 0.3, rects[:, 1].min() - 0.3
             x1, y1 = rects[:, 2].max() + 0.3, rects[:, 3].max() + 0.3
             panel = FancyBboxPatch(

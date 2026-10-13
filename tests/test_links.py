@@ -173,6 +173,11 @@ def test_loop_cysteines_sit_where_their_loop_passes_closest_to_the_partner(name)
     # backbone H-bonds, so that one bar has to span three strands; every other bar is short
     # and Cys527-Cys582 joins the G-H loop (between two sheets) to the short C-terminal stub of strand J
     allowed = 2 if name == "6ZS5" else 0
+    if name == "8UUP":  # F2's Cys68 (the loop into α2) to F1's Cys195 (α5's first residue): α2 and α5 are one bundle,
+        # staggered 2.7 page units as in 3D, and since each protomer is drawn alike (test_copies) the loop meets α2
+        # from the side, so each copy's bar spans the bundle's stagger: three alike bars just over 3
+        assert sum(b > 3.0 for b in bars) <= 3 and max(bars) <= 3.1, sorted(bars)
+        return
     assert sum(b > 3.0 for b in bars) <= allowed, sorted(bars)
 
 

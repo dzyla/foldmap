@@ -14,7 +14,7 @@ from typing import NamedTuple
 import numpy as np
 
 from . import text_metrics
-from .features import helix_bundles
+from .features import KINK_GAP, helix_bundles
 from .frame import Frame, symmetric_frame, view_frame
 from .model import SSE, Nucleic, Sheet, generic_label, group_by_chain, pair_places, same_place
 from .nucleic import Stem, StemView, segment_stem, stem_axis, stem_views
@@ -191,6 +191,8 @@ class Layout:
     stems: list[PlacedStem] = field(default_factory=list)
     nucleic: Nucleic | None = None
     sheets: list[list[str]] = field(default_factory=list)  # strand ids of each sheet block, in layout order
+    sheet_ghosts: list[list[str]] = field(default_factory=list)  # ghost strand ids drawn in each block of `sheets` (a
+    # barrel's repeated strand, a strand lent across the cut of an unrolled ring: _unwrap); [] when not recorded
     domains: list[tuple[str, list[str]]] = field(default_factory=list)  # named domains and their element ids
     domain_name_right: set[str] = field(default_factory=set)  # domains named at their panel's top right, not left
     domain_tones: list[int] = field(default_factory=list)  # tone of each domain (features.domain_tones; [] by order)
@@ -1850,9 +1852,11 @@ def _short_loops(na: Nucleic) -> set[frozenset[str]]:
 
 def _within_protomers(bundles: list[list[str]], by_id: dict[str, SSE], sector: dict) -> list[list[str]]:
     """Helix bundles (features.helix_bundles) cut where they cross between two protomers: the part of such a
-    bundle in one protomer stays a bundle if it still spans two chains, else its helices are drawn alone. A
+    bundle in one protomer stays a bundle if it still spans two chains; else the pieces of one kinked helix in it
+    (consecutive, at most features.KINK_GAP residues apart) stay together, and its other helices are drawn alone. A
     bundle of a dimer's two copies of one helix (1LMB α5) would hold them in one item, side by side across their
     axis, where no mirror line can pass between them; apart, each copy can sit at its mate's mirror image. A
+    bundle of a ring's copies (the measles F stalk, 8UUP) keeps each copy's part with its protomer, drawn alike. A
     bundle within one protomer, or of one protomer and chains outside every protomer (sector -1: a bound
     peptide), is kept whole."""
     out = []
@@ -1863,7 +1867,17 @@ def _within_protomers(bundles: list[list[str]], by_id: dict[str, SSE], sector: d
         if len(parts.keys() - {-1}) < 2:
             out.append(g)
             continue
-        out += [parts[p] for p in sorted(parts) if len({by_id[k].chain for k in parts[p]}) > 1]
+        for p in sorted(parts):
+            if len({by_id[k].chain for k in parts[p]}) > 1:
+                out.append(parts[p])
+                continue
+            runs: list[list[str]] = []
+            for k in sorted(parts[p], key=lambda k: by_id[k].start):
+                if runs and by_id[k].start - by_id[runs[-1][-1]].end - 1 <= KINK_GAP:
+                    runs[-1].append(k)
+                else:
+                    runs.append([k])
+            out += [r for r in runs if len(r) > 1]
     return out
 
 
@@ -1872,52 +1886,95 @@ def _mirrored(angle: float) -> float:
     return float(-((angle - 2 * np.pi) % (2 * np.pi) - np.pi)) + 0.0  # + 0.0: never -0.0
 
 
+def _ring(frame) -> int | None:
+    """The number of protomers round a closed ring (a cyclic assembly, or a dimer drawn side by side), counted from
+    the frame's sectors; None along a helical filament (its protomers rise and never come round)."""
+    sector = getattr(frame, "sector", None) or {}
+    if getattr(frame, "rise", 0.0):
+        return None
+    return len(set(sector.values())) or None
+
+
+def _host(members: list[Placed], sector: dict, classes: dict) -> int | None:
+    """The protomer an item holding elements of two or more protomers belongs to: that of its first element by
+    chain class, then residue number (a copy's own strands with a strand lent by its neighbour, as in a measles F
+    sheet; each copy's such sheet is then its mates' image). None when two protomers' copies of one element come
+    first (an item symmetric in itself)."""
+    real = sorted(
+        (classes[m.sse.chain], m.sse.first.seq, m.sse.last.seq, sector[m.sse.chain]) for m in members if not m.ghost
+    )
+    if not real:
+        return None
+    c, a, b, k = real[0]
+    if any(x == c and y <= b and a <= z and s != k for x, y, z, s in real[1:]):
+        return None
+    return k
+
+
+def _protomers(items: list[_Item], frame, mirror: bool) -> list[int | None]:
+    """The protomer of each item (frame.sector): that of all its elements, or of an item holding several protomers'
+    elements its _host (not with a mirror line); None for an item with chains outside every protomer."""
+    sector, classes = getattr(frame, "sector", None) or {}, getattr(frame, "classes", None) or {}
+    out = []
+    for it in items:
+        members = [m for m in it.members if isinstance(m, Placed)]
+        ks = {sector.get(m.sse.chain) for m in members}
+        if len(ks) == 1:
+            out.append(ks.pop())
+        else:
+            out.append(None if mirror or None in ks or not members else _host(members, sector, classes))
+    return out
+
+
 def _symmetry_ties(items: list[_Item], frame, mirror: bool = True) -> dict[int, tuple[int, int]]:
     """Copy item -> (its protomer-0 mate, protomer index k): matched by chain class and shared residue numbers.
     The copy also takes the mate's shape and orientation, so every protomer is drawn the same; in a frame with a
     mirror line (`mirror_x`, a dyad in the page) it takes them mirrored, protomer 1 drawn as protomer 0's mirror
-    image; `mirror` False takes them unmirrored all the same (build_layout drops a mirror line a βα row crosses)."""
+    image; `mirror` False takes them unmirrored all the same (build_layout drops a mirror line a βα row crosses).
+    An item holding elements of several protomers (_protomers: a sheet with a neighbour's strand) is matched with
+    each element's protomer counted from the item's own, round the ring (_ring). A copy whose elements each match
+    one of its mate's, but not all of them (DSSP missed a strand in one copy), is tied too when they share at least
+    half the smaller one's residues; and when no element of a copy matches two of its mate's, those it shares take
+    the mate's shape and place, the rest keep theirs beside them."""
     sector, classes = getattr(frame, "sector", None), getattr(frame, "classes", None)
     if not sector or not classes:
         return {}
     mirror = mirror and getattr(frame, "mirror_x", None) is not None
+    ring = _ring(frame)
+    homes = _protomers(items, frame, mirror)
 
-    def residues(it):  # chains outside every protomer (bound peptides, unpaired chains) take no part
-        return {
-            (classes[m.sse.chain], r)
-            for m in it.members
-            if isinstance(m, Placed) and not m.ghost and m.sse.chain in classes
-            for r in range(m.sse.first.seq, m.sse.last.seq + 1)
-        }
+    def span(m, k):  # its residues by chain class and protomer counted from the item's own, k
+        if not isinstance(m, Placed) or m.sse.chain not in classes:
+            return set()
+        d = sector[m.sse.chain] - k
+        place = (classes[m.sse.chain], d % ring if ring else d)
+        return {(place, r) for r in range(m.sse.first.seq, m.sse.last.seq + 1)}
 
-    def protomer(it):
-        ks = {sector.get(m.sse.chain) for m in it.members if isinstance(m, Placed)}
-        return ks.pop() if len(ks) == 1 else None
+    def residues(i):  # chains outside every protomer (bound peptides, unpaired chains) take no part
+        return set().union(*(span(m, homes[i]) for m in items[i].members if isinstance(m, Placed) and not m.ghost))
 
-    sets = [residues(it) for it in items]
-    zero = [i for i, it in enumerate(items) if protomer(it) == 0 and sets[i]]
+    sets = [residues(i) if homes[i] is not None else set() for i in range(len(items))]
+    zero = [i for i in range(len(items)) if homes[i] == 0 and sets[i]]
     ties = {}
     for i, it in enumerate(items):
-        k = protomer(it)
+        k = homes[i]
         if not k or not sets[i]:
             continue
         best = max(zero, key=lambda j: len(sets[i] & sets[j]) / len(sets[i] | sets[j]), default=None)
-        if best is None or len(sets[i] & sets[best]) < 0.5 * len(sets[i] | sets[best]):
+        if best is None:
             continue
+        if len(sets[i] & sets[best]) < 0.5 * len(sets[i] | sets[best]):
+            best = _part_mate(it, k, zero, items, sets[i], sets, span)
+            if best is None:
+                continue
         mate = items[best]
-
-        def span(m):
-            if m.sse.chain not in classes:
-                return set()
-            return {(classes[m.sse.chain], r) for r in range(m.sse.first.seq, m.sse.last.seq + 1)}
-
         ghosts = [q for q, x in enumerate(mate.members) if x.ghost]
         pairs = [
             ghosts[0]  # a barrel's ghost takes the place of the mate's, whichever strand each repeats
             if m.ghost and len(ghosts) == 1
             else max(
                 range(len(mate.members)),
-                key=lambda q: (len(span(m) & span(mate.members[q])), mate.members[q].ghost == m.ghost),
+                key=lambda q: (len(span(m, k) & span(mate.members[q], 0)), mate.members[q].ghost == m.ghost),
             )
             for m in it.members
         ]
@@ -1937,32 +1994,110 @@ def _symmetry_ties(items: list[_Item], frame, mirror: bool = True) -> dict[int, 
                 a = mate.members[q].angle
                 m.angle, m.length = (_mirrored(a) if mirror else a), mate.members[q].length
             it.offsets = [(-mate.offsets[q][0], mate.offsets[q][1]) if mirror else mate.offsets[q] for q in pairs]
-        else:  # DSSP split or merged an element in one copy: keep the shape, match the orientation
+        else:  # DSSP split, merged or missed an element in one copy: match the orientation
+            shared = [(p, q) for p, q in enumerate(pairs) if span(it.members[p], k) & span(mate.members[q], 0)]
             votes = [
-                np.cos(m.angle - (np.pi - mate.members[q].angle if mirror else mate.members[q].angle))
-                for m, q in zip(it.members, pairs)
-                if span(m) & span(mate.members[q])
+                np.cos(it.members[p].angle - (np.pi - mate.members[q].angle if mirror else mate.members[q].angle))
+                for p, q in shared
             ]
             if votes and np.mean(votes) < 0:  # drawn upside down: turn the block 180 degrees in the page
                 for m in it.members:
                     m.angle += np.pi
                 it.offsets = [(-ox, -oy) for ox, oy in it.offsets]
+            if not mirror and shared and len({q for _, q in shared}) == len(shared):
+                _take_shared(it, mate, shared)
         ties[i] = (best, k)
     return ties
+
+
+def _part_mate(it: _Item, k: int, zero: list[int], items: list[_Item], mine: set, sets: list[set], span) -> int | None:
+    """The protomer-0 item whose elements hold each of this copy's elements, one each, or the other way round (DSSP
+    missed a strand in one copy), sharing at least half the smaller one's residues; the most shared first."""
+
+    def into(a: list, ka: int, b: list, kb: int) -> bool:  # every element of a overlaps its own element of b
+        hit = [next((q for q, y in enumerate(b) if span(x, ka) & span(y, kb)), None) for x in a if span(x, ka)]
+        return None not in hit and len(set(hit)) == len(hit)
+
+    mine_m = [m for m in it.members if isinstance(m, Placed) and not m.ghost]
+    found = []
+    for j in zero:
+        both = len(mine & sets[j])
+        if not both or both < 0.5 * min(len(mine), len(sets[j])):
+            continue
+        theirs = [m for m in items[j].members if isinstance(m, Placed) and not m.ghost]
+        if into(mine_m, k, theirs, 0) or into(theirs, 0, mine_m, k):
+            found.append((-both, j))
+    return min(found)[1] if found else None
+
+
+def _take_shared(it: _Item, mate: _Item, shared: list[tuple[int, int]]) -> None:
+    """A copy's elements `shared` (member, its mate's member) take the mate's shape and place; the copy's other
+    elements move with them, by their mean step, so each keeps its place beside the elements it is drawn with."""
+    step = np.mean([np.subtract(mate.offsets[q], it.offsets[p]) for p, q in shared], axis=0)
+    offsets = [tuple(float(v) for v in _snap(np.add(o, step))) for o in it.offsets]
+    for p, q in shared:
+        it.members[p].angle, it.members[p].length = mate.members[q].angle, mate.members[q].length
+        offsets[p] = mate.offsets[q]
+    it.offsets = offsets
+
+
+def _unwrap(items: list[_Item], ties: dict[int, tuple[int, int]], frame) -> dict[int, int]:
+    """Elements lent across the cut of a ring unrolled into a row. A copy's element drawn in its neighbour's item
+    (a strand that pairs in the next protomer's sheet) sits on the same side of its own protomer in every copy but
+    one: the copy whose neighbour lies across the cut, at the row's other end. There the element leaves the item
+    for an item of its own, tied to the protomer-0 mate's place the same number of protomers along as in the other
+    copies (one past the row's end), so every copy is drawn alike; a strand leaves a ghost (dashed, as a barrel's)
+    where it pairs. New items are appended to `items` and their ties to `ties`. Returns each new item's index ->
+    the index of the item it left."""
+    ring = _ring(frame)
+    sector = getattr(frame, "sector", None) or {}
+    if not ring or not ties:
+        return {}
+    homes = _protomers(items, frame, False)
+    roots = {j for j, _ in ties.values()}
+    orbit = sorted([(j, j, 0) for j in roots] + [(i, j, k) for i, (j, k) in ties.items() if homes[i] == k])
+    out = {}
+    for x, root, h in orbit:
+        it = items[x]
+        away: dict[int, list[int]] = {}
+        for p, m in enumerate(it.members):
+            if not isinstance(m, Placed) or m.ghost or m.sse.chain not in sector or sector[m.sse.chain] == h:
+                continue
+            g = sector[m.sse.chain]
+            r = (g - h) % ring
+            usual = -r if 2 * r < ring else ring - r  # protomers from the element's own to the item holding it
+            if h - g != usual:
+                away.setdefault(g + usual, []).append(p)
+        for k, ps in sorted(away.items()):
+            moved = [it.members[p] for p in ps]
+            items.append(
+                _Item(moved, [it.offsets[p] for p in ps], it.cx, it.cy, it.home, *_anchor([m.sse for m in moved]))
+            )
+            ties[len(items) - 1] = (root, k)
+            out[len(items) - 1] = x
+            for p in ps:  # a strand leaves its ghost; a helix just leaves (and lies over no sheet now)
+                m = it.members[p]
+                m.over = False
+                ghost = Placed(m.sse, 0, 0, m.length, m.angle, m.width, ghost=True)
+                it.members[p] = ghost if m.sse.kind == "E" else None
+            keep = [p for p, m in enumerate(it.members) if m is not None]
+            it.members, it.offsets = [it.members[p] for p in keep], [it.offsets[p] for p in keep]
+    return out
 
 
 def _copy_ties(
     items: list[_Item], ties: dict[int, tuple[int, int]], frame, mirrored: bool
 ) -> dict[str, tuple[str, bool]]:
-    """Chain -> (the protomer-0 chain of its class, mirrored) for each chain holding a copy item of `ties`
-    (_symmetry_ties): the copies the symmetry asked to draw alike, whether or not _separate keeps them tied."""
+    """Chain -> (the protomer-0 chain of its class, mirrored) for each chain of protomer k holding an element of a
+    copy item of `ties` (_symmetry_ties) tied as protomer k: the copies the symmetry asked to draw alike, whether or
+    not _separate keeps them tied (an element lent by a neighbouring protomer is that protomer's)."""
     sector, classes = getattr(frame, "sector", None) or {}, getattr(frame, "classes", None) or {}
     first = {classes[c]: c for c in sorted(classes) if sector.get(c) == 0}
     out = {}
     for i in sorted(ties):
         for m in items[i].members:
             c = m.sse.chain if isinstance(m, Placed) and not m.ghost else None
-            if c in classes and classes[c] in first:
+            if c in classes and classes[c] in first and sector.get(c) == ties[i][1]:
                 out[c] = (first[classes[c]], mirrored)
     return dict(sorted(out.items()))
 
@@ -2139,7 +2274,7 @@ def build_layout(
         mirror = None  # a βα row across the mirror line would meet its own image: the copies go side by side instead
     by_id = {s.id: s for s in sses}
     bundles = helix_bundles([s for s in sses if s.id not in in_rows])  # bundles are coiled coils, never a row's
-    if mirror is not None and getattr(frame, "sector", None):
+    if getattr(frame, "sector", None):  # each protomer's part of a bundle drawn with its own copy
         bundles = _within_protomers(bundles, by_id, frame.sector)
     bundled = {k for g in bundles for k in g}
     kinked = (
@@ -2201,6 +2336,9 @@ def build_layout(
         _centre_dna_over_binders(items, contacts)
     else:
         ties = _symmetry_ties(items, frame, mirror is not None)
+        left = _unwrap(items, ties, frame) if mirror is None else {}
+        if left and walls is not None:  # an element that left its item keeps off the traces it kept off
+            walls = Walls(walls.boxes, np.vstack([walls.hard, walls.hard[list(left.values())]]))
         copy_ties = _copy_ties(items, ties, frame, mirror is not None)
         spread, lift = 0.0, 0.0
         if ties and mirror is not None:  # a dyad in the page: each copy starts at its mate's mirror image
@@ -2259,8 +2397,8 @@ def build_layout(
     for g in ghosts:
         g.label = real[g.sse.id].label
     rects = np.array([p.rect for p in placed + ghosts + dna]).reshape(-1, 4)
-    sheet_blocks = [  # the strands of each item holding any: a βα row's helices lie between them, on its panel
-        ids
+    blocks = [  # the strands of each item holding any: a βα row's helices lie between them, on its panel
+        (ids, [m.sse.id for m in it.members if isinstance(m, Placed) and m.ghost])
         for it in items
         if (ids := [m.sse.id for m in it.members if isinstance(m, Placed) and m.sse.kind == "E" and not m.ghost])
     ]
@@ -2270,7 +2408,8 @@ def build_layout(
         ghosts=ghosts,
         stems=dna,
         nucleic=nucleic if dna or traces else None,
-        sheets=sheet_blocks,
+        sheets=[ids for ids, _ in blocks],
+        sheet_ghosts=[ghost_ids for _, ghost_ids in blocks],
     )
     lay.na_traces = traces
     lay.frame = frame
@@ -2389,6 +2528,14 @@ def _part_domains(items: list[_Item], domains: list[tuple[str, list[str]]], swee
     return moved
 
 
+def block_ghosts(layout: Layout, k: int) -> list[Placed]:
+    """The ghosts drawn in sheet block k (Layout.sheets): Layout.sheet_ghosts when recorded, else those repeating
+    one of its strands (a barrel's)."""
+    ghosts = {g.sse.id: g for g in layout.ghosts}
+    mine = layout.sheet_ghosts[k] if layout.sheet_ghosts else layout.sheets[k]
+    return [ghosts[i] for i in mine if i in ghosts]
+
+
 def domain_panel(layout: Layout, name: str) -> tuple[float, float, float, float]:
     """A domain's panel (its elements plus margin) with room above for its name."""
     ids = dict(layout.domains)[name]
@@ -2414,11 +2561,10 @@ def _choose_domain_name_corners(layout: Layout, sses: list[SSE]) -> None:
     """Each domain's name at the top left of its panel, unless the box there meets more of the figure than at the
     top right: elements, ghosts, sheet plates, stems, unpaired strands, element and stem names, the other domains'
     panels and the names placed before it. Ties keep the left."""
-    ghosts = {g.sse.id: g for g in layout.ghosts}
     rects = [p.rect for p in [*layout.placed.values(), *layout.ghosts, *layout.stems]]
-    for ids in layout.sheets:
+    for k, ids in enumerate(layout.sheets):
         if len(ids) > 1:
-            r = np.array([layout.placed[i].rect for i in ids] + [ghosts[i].rect for i in ids if i in ghosts])
+            r = np.array([layout.placed[i].rect for i in ids] + [g.rect for g in block_ghosts(layout, k)])
             rects.append((*(r[:, :2].min(axis=0) - _PLATE_PAD), *(r[:, 2:].max(axis=0) + _PLATE_PAD)))
     rects += [b for n, b in label_boxes(layout, sses) if n.startswith(("label:", "stem-label:"))]
     traces = [np.asarray(pts, float).reshape(-1, 2) for _, pts in sorted(layout.na_traces.items())]

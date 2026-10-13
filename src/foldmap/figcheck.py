@@ -20,7 +20,7 @@ import numpy as np
 from matplotlib.path import Path as MPath
 from matplotlib.transforms import Affine2D, Bbox
 
-from .layout import joined_pieces, lying_over
+from .layout import block_ghosts, joined_pieces, lying_over
 
 # Lines a text can be crossed by (render's gids, matched by prefix). A loop's casing (loopcase:) is drawn in the
 # page colour and a chain-end stub belongs to its terminus letter: neither is read.
@@ -762,26 +762,32 @@ def order_checks(drawn) -> list[str]:
         return out
     bridges = assign_dssp(drawn.bb).bridges
     sheets = {frozenset(s.id for s in sh.strands): sh for sh in build_sheets(sses, bridges)}
+    lent = {k: [g for g in block_ghosts(lay, k) if g.sse.id not in ids] for k, ids in enumerate(lay.sheets)}
+    away = {g.sse.id for gs in lent.values() for g in gs}  # strands lent across an unrolled ring's cut (layout._unwrap)
     for k, ids in enumerate(lay.sheets):
-        sheet = sheets.get(frozenset(ids))
+        if set(ids) <= away:  # checked in the sheet where their ghosts stand
+            continue
+        at = {**{i: lay.placed[i] for i in ids}, **{g.sse.id: g for g in lent[k]}}
+        sheet = sheets.get(frozenset(at))
         if sheet is None:
-            out.append(f"sheet {k}: {', '.join(ids)} is no sheet of the bridges")
+            out.append(f"sheet {k}: {', '.join(at)} is no sheet of the bridges")
             continue
         want = [s.id for s in sheet.strands]
-        got = _drawn_order(lay, ids)
+        got = _drawn_order(at)
         if not _same_order(got, want, sheet.closed):
             out.append(f"sheet {k}: drawn {', '.join(got)}, paired {', '.join(want)}")
         for (a, da), (b, db) in zip(zip(want, sheet.directions), zip(want[1:], sheet.directions[1:])):
-            pa, pb = lay.placed[a], lay.placed[b]
+            pa, pb = at[a], at[b]
             same = float(pa.direction @ pb.direction) > 0
             if same != (da == db):
                 out.append(f"sheet {k}: {a} and {b} drawn {'parallel' if same else 'antiparallel'}")
     return out
 
 
-def _drawn_order(lay, ids: list[str]) -> list[str]:
-    """Strand ids in the order they stand side by side on the page: across their mean direction."""
-    ps = [lay.placed[k] for k in ids]
+def _drawn_order(at: dict) -> list[str]:
+    """Strand ids (id -> its drawn strand, or the ghost standing for it) in the order they stand side by side on
+    the page: across their mean direction."""
+    ids, ps = list(at), list(at.values())
     ref = ps[0].direction
     mean = sum(p.direction * (1.0 if p.direction @ ref >= 0 else -1.0) for p in ps)
     across = np.array([mean[1], -mean[0]])

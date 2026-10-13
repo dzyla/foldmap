@@ -43,16 +43,6 @@ def test_tim_copies_are_alike_and_mirror_ties_count_as_alike():
     assert max(figcheck.copies_alike(lmb).values()) <= 1e-6
 
 
-def test_measles_f_copies_measured_unalike_today():
-    """Measured at bcdec7a: a~c 33.0 page units. Task 2 turns this into the gate (<= 0.5). The ties are the ones
-    asked for, kept although _separate dropped them, and chain b is matched through its copy classes."""
-    d = drawn(DATA / "8UTF.cif")
-    assert {c: ref for c, (ref, _) in d.layout.copy_ties.items()} == {"B": "A", "C": "A", "b": "a", "c": "a"}
-    got = figcheck.copies_alike(d)
-    assert set(got) == {("B", "A"), ("C", "A"), ("b", "a"), ("c", "a")} and all(math.isfinite(v) for v in got.values())
-    assert max(got.values()) > 0.5
-
-
 def test_a_tied_copy_with_nothing_matched_is_a_violation():
     d = drawn(DATA / "1TIM.cif")
     copy, (ref, _) = sorted(d.layout.copy_ties.items())[0]

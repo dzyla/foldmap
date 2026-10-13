@@ -188,11 +188,12 @@ foldmap styles                                    # every theme and style key
   [Conventions of the published figures](#conventions-of-the-published-figures).
 - **Assemblies and symmetry**: `--assembly auto` builds the file's first biological assembly when it adds copies
   (up to 24 chains) or when the file holds several copies of one complex, and never one that leaves out the DNA or
-  RNA; cyclic, dihedral, cubic and helical symmetry is detected and the protomers are placed alike (two copies across a
-  dyad in the page as mirror images; large, interleaved protomers such as the measles F trimer can still differ); highlight one protomer or the asymmetric unit; filaments, cages and large
-  assemblies drawn as one subunit with the neighbouring parts that complete its fold. When either automatic choice
-  draws part of the file, foldmap says so (a note on stderr, a bar in the app, a line in the MCP result) and names
-  the setting that draws everything (`--assembly asu`, `--focus none`).
+  RNA; cyclic, dihedral, cubic and helical symmetry is detected and the protomers are drawn alike (two copies across a
+  dyad in the page as mirror images; interleaved protomers such as the measles F trimer's too, a strand lent across
+  the cut of the unrolled ring drawn past its end, with a dashed ghost where it pairs); highlight one protomer or the
+  asymmetric unit; filaments, cages and large assemblies drawn as one subunit with the neighbouring parts that
+  complete its fold. When either automatic choice draws part of the file, foldmap says so (a note on stderr, a bar
+  in the app, a line in the MCP result) and names the setting that draws everything (`--assembly asu`, `--focus none`).
 - **DNA and RNA as their fold**: base pairs from the coordinates, stems, hairpins, pseudoknots, junctions and single
   strands placed beside the protein that holds them; bent duplexes as chains of straight pieces; protein–DNA/RNA
   hydrogen bonds on request; see [RNA and DNA](#rna-and-dna).
