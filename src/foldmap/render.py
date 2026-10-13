@@ -960,8 +960,8 @@ def loop_of(layout: Layout, loops: list[Loop], sses: list[SSE], chains, r: int) 
 
 
 def _nearest_on(pts: np.ndarray, q, avoid=()) -> tuple[float, float]:
-    """The point of polyline pts closest to q, kept clear of the loop's two end stubs, and outside every box in
-    `avoid` where any of the polyline is (sampled every _HIDE_STEP there)."""
+    """The point of polyline pts closest to q, kept clear of the loop's two end stubs, and outside everything in
+    `avoid` (boxes and outlines: _covered) where any of the polyline is (sampled every _HIDE_STEP there)."""
     q = np.asarray(q, float)
     best, d_best = None, np.inf
     for a, b in zip(pts, pts[1:]):
@@ -971,20 +971,29 @@ def _nearest_on(pts: np.ndarray, q, avoid=()) -> tuple[float, float]:
         d = float(np.hypot(*(c - q)))
         if d < d_best:
             best, d_best = c, d
-    if avoid and _in_boxes(best[None, :], avoid)[0]:
+    if avoid and _covered(best[None, :], avoid)[0]:
         dense = _dense(pts)[0]
-        free = ~_in_boxes(dense, avoid)
+        free = ~_covered(dense, avoid)
         if free.any():
             d = np.hypot(*(dense - q).T)
             best = dense[int(np.argmin(np.where(free, d, np.inf)))]
     return float(best[0]), float(best[1])
 
 
+def _covered(pts: np.ndarray, avoid) -> np.ndarray:
+    """Which of the points lie inside any of `avoid`: boxes (x0, y0, x1, y1) and outlines (Path)."""
+    shapes = [a for a in avoid if isinstance(a, Path)]
+    out = _in_boxes(pts, [a for a in avoid if not isinstance(a, Path)])
+    for shape in shapes:
+        out |= shape.contains_points(pts)
+    return out
+
+
 def disulfide_points(layout, loops, sses, chains, i: int, j: int, avoid=()):
     """Where to draw a disulfide's two cysteines. A cysteine in a loop is placed where its loop passes closest
-    to its partner, outside the boxes in `avoid` (text) where its loop leaves room: loop routes are schematic, so any
-    point on its own loop is faithful, and the nearest one keeps the bond short. Cysteines in elements stay at their
-    place along the element."""
+    to its partner, outside `avoid` (text boxes, body outlines) where its loop leaves room: loop routes are
+    schematic, so any point on its own loop is faithful, and the nearest one keeps the bond short. Cysteines in
+    elements stay at their place along the element."""
     a, b = residue_point(layout, loops, sses, chains, i), residue_point(layout, loops, sses, chains, j)
     if a is None or b is None:
         return None, None
@@ -1221,11 +1230,11 @@ def ligand_marks(layout: Layout, loops: list[Loop], sses: list[SSE], look: Style
     if layout.focus_chains:  # one subunit of an assembly: only what binds it
         chosen = [g for g in chosen if any(layout.res_chain[r] in layout.focus_chains for r in g.contacts)]
     taken = [p.rect for p in layout.placed.values()] + [g.rect for g in layout.ghosts]
-    texts = [box for _, box in label_boxes(layout, sses)]
-    texts += [
+    labels = [box for _, box in label_boxes(layout, sses)]
+    taken += labels
+    texts = labels + [  # and the strand letters at their centres (they slide off a disulfide bar only later)
         centred_box(p.cx, p.cy, 0.12 * len(p.label) + 0.1, 0.25) for p in layout.placed.values() if p.sse.kind == "E"
     ]
-    taken += texts[: len(label_boxes(layout, sses))]
     out = []
     for g in sorted(chosen, key=lambda g: g.contacts[0]):
         targets, weights, tethered = _local_targets(layout, loops, sses, g, g.metal)
@@ -1269,7 +1278,7 @@ def ligand_marks(layout: Layout, loops: list[Loop], sses: list[SSE], look: Style
 def _draw_ligands(ax, marks: list[dict], lw: float, font: float, layout: Layout, pt_per_unit: float) -> None:
     """Each ligand's mark and name, and its tethers: drawn under the bodies and the text (only what shows of each,
     visible_pieces), so none runs over a letter."""
-    bodies = link_bodies(layout)
+    bodies = link_bodies(layout, ax)
     halos = text_halos(ax, pt_per_unit, link_keep(lw * 0.7, pt_per_unit, ax.figure.dpi))
     for m in marks:
         g, (cx, cy), (hw, hh) = m["ligand"], m["centre"], m["half"]
@@ -1477,6 +1486,11 @@ def _draw_uniprot(ax, marks: list[dict], layout, lw: float, font: float) -> None
 
 
 _HIDE_STEP = 0.02  # page units: a bar or a tether is sampled this finely where a body or a text hides it
+_SS_PIECE_MIN = 0.15  # page units: a stretch of a disulfide bar shorter than this between bodies or text is not drawn
+
+
+def _length_of(pts) -> float:
+    return float(np.hypot(*np.diff(np.asarray(pts, float), axis=0).T).sum())
 
 
 def _dense(points) -> tuple[np.ndarray, np.ndarray]:
@@ -1500,19 +1514,31 @@ def _in_boxes(pts: np.ndarray, boxes) -> np.ndarray:
     return ((x > b[:, 0]) & (x < b[:, 2]) & (y > b[:, 1]) & (y < b[:, 3])).any(axis=1)
 
 
-def link_bodies(layout: Layout) -> list[Path]:
+def link_bodies(layout: Layout, ax=None) -> list[Path]:
     """The outlines (page units) of the bodies a disulfide bar or a ligand tether passes under: each strand's and
-    ghost's arrow, each helix's and 3-10 helix's box."""
+    ghost's arrow, each helix's and 3-10 helix's box (in that order: placed elements, then ghosts), and with `ax`
+    the helices' and 3-10 helices' drawn patches after them too (a ribbon's end caps reach past its box)."""
     out = []
     for p in layout.placed.values():
         if p.sse.kind == "E":
-            out.append(Path(_arrow(p), closed=True))
+            out.append(_ring(_arrow(p)))
             continue
         u = np.array([np.cos(p.angle), np.sin(p.angle)]) * p.length / 2
         v = np.array([-np.sin(p.angle), np.cos(p.angle)]) * p.width / 2
         c = np.array([p.cx, p.cy])
-        out.append(Path(np.array([c - u - v, c + u - v, c + u + v, c - u + v, c - u - v]), closed=True))
-    return out + [Path(_arrow(g), closed=True) for g in layout.ghosts]
+        out.append(_ring([c - u - v, c + u - v, c + u + v, c - u + v]))
+    out += [_ring(_arrow(g)) for g in layout.ghosts]
+    for a in ax.patches if ax is not None else ():
+        if (a.get_gid() or "").startswith(("helix:", "helix-back:", "eta:")):
+            out.append(a.get_path().transformed(a.get_transform() - ax.transData))
+    return out
+
+
+def _ring(corners) -> Path:
+    """A closed outline through every one of `corners`: the first repeated at the end, as Path's closed=True
+    takes the last vertex for its CLOSEPOLY code and ignores where it lies."""
+    v = np.asarray(corners, float)
+    return Path(np.vstack([v, v[:1]]), closed=True)
 
 
 def text_halos(ax, pt_per_unit: float, keep: float, skip=()) -> list[tuple[float, float, float, float]]:
@@ -1626,8 +1652,10 @@ def strand_label_spot(p: Placed, label: str, lines, em: float, keep: float) -> t
 
 
 def _draw_links(
-    ax, layout: Layout, loops: list[Loop], sses: list[SSE], look: Style, lw: float, pt_per_unit: float
+    ax, layout: Layout, loops: list[Loop], sses: list[SSE], look: Style, lw: float, pt_per_unit: float, bars=None
 ) -> None:
+    """Disulfide bars (`bars`: disulfide_bars' routes, the ones the strand letters slid off; computed here when
+    None) and glycans."""
     links = layout.links
     if links is None:
         return
@@ -1636,14 +1664,17 @@ def _draw_links(
     if look.disulfides:
         keep = link_keep(lw * 2.4, pt_per_unit, ax.figure.dpi)
         halos = text_halos(ax, pt_per_unit, keep)
-        bodies = link_bodies(layout)
-        for i, j, a, b, route in disulfide_bars(layout, loops, sses, look, lw, pt_per_unit, halos):
+        bodies = link_bodies(layout, ax)
+        if bars is None:
+            bars = disulfide_bars(layout, loops, sses, look, lw, pt_per_unit, halos)
+        for i, j, a, b, route in bars:
             # drawn under the bodies and the text (only what shows of it); a cysteine in the open keeps its sulfur
             # dot, one under a body gets its end mark on the body's edge, where the bar comes out from under it
             pieces = visible_pieces(route, bodies, halos)
+            kept = [q for q in pieces if _length_of(q) >= _SS_PIECE_MIN] or pieces[:1]  # no slivers
             if pieces:
                 bar = PathPatch(
-                    _pieces_path(pieces),
+                    _pieces_path(kept),
                     fc="none",
                     ec=_SULFUR,
                     lw=lw * 2.4,
@@ -3122,13 +3153,17 @@ def _draw(
         _draw_nucleic(
             c.ax, layout, sses, c.residue_colour, c.look.fill, c.lw, c.font, c.pt_per_unit, c.look, c.backbone[0]
         )
-    bars = [route for *_, route in disulfide_bars(layout, loops, sses, look, c.lw, c.pt_per_unit)]
-    _draw_elements(c, layout, bars)
     _draw_residue_numbers(c, layout)
-    _draw_ghosts(c, layout)
     _draw_termini(c, layout, sses)
+    # the bars once: a loop's cysteine off the text drawn so far (loop lengths, chain ends, residue numbers); a
+    # strand's letter then slides off the bars that pass under it (not when residue numbers share its shaft)
+    keep = link_keep(c.lw * 2.4, c.pt_per_unit, c.fig.dpi)
+    avoid = [*text_halos(c.ax, c.pt_per_unit, keep), *link_bodies(layout)]  # a loop's cysteine shows: not under
+    bars = disulfide_bars(layout, loops, sses, look, c.lw, c.pt_per_unit, avoid)  # a letter, nor under a body
+    _draw_elements(c, layout, [] if look.residue_numbers else [route for *_, route in bars])
+    _draw_ghosts(c, layout)
     # after every text but the marks' own: bars and tethers keep off the letters (text_halos)
-    _draw_links(c.ax, layout, loops, sses, look, c.lw, c.pt_per_unit)
+    _draw_links(c.ax, layout, loops, sses, look, c.lw, c.pt_per_unit, bars=bars)
     _draw_ligands(c.ax, marks, c.lw, c.font, layout, c.pt_per_unit)
     _draw_linked(c.ax, linked, c.lw, c.font)
     _draw_uniprot(c.ax, umarks, layout, c.lw, c.font)

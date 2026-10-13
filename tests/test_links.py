@@ -194,14 +194,25 @@ def test_glycans_stay_off_elements(name):
 
 
 def _bars(name):
-    """Each disulfide's length on the page, cysteine to cysteine (its route's ends: the drawn bar shows only where
-    no body or text covers it)."""
-    from foldmap.render import disulfide_bars
-    from foldmap.route import route_loops
+    """Each disulfide's length on the page, cysteine to cysteine, as the figure drew it (its route's ends from
+    render.disulfide_bars, called with the text and bodies its loop cysteines keep off): the drawn bar shows only
+    where no body or text covers it."""
+    import foldmap.render as render
+    from foldmap.cli import make_figure
 
-    lay, sses, bb = make_layout(Path(__file__).parent / "data" / f"{name}.cif")
-    loops = route_loops(lay, sses, bb)
-    return [float(np.hypot(*np.subtract(b, a))) for _, _, a, b, _ in disulfide_bars(lay, loops, sses, Style(), 1, 1)]
+    seen, real = [], render.disulfide_bars
+
+    def spy(*args, **kw):
+        seen.append(real(*args, **kw))
+        return seen[-1]
+
+    render.disulfide_bars = spy
+    try:
+        make_figure(Path(__file__).parent / "data" / f"{name}.cif")
+    finally:
+        render.disulfide_bars = real
+    (bars,) = seen
+    return [float(np.hypot(*np.subtract(b, a))) for _, _, a, b, _ in bars]
 
 
 @pytest.mark.parametrize("name", ["8UUP", "6Y7S", "6ZS5"])
@@ -374,6 +385,25 @@ def _drawn_points(fig, prefix):
     return np.vstack(out) if out else np.empty((0, 2))
 
 
+def _drawn_bodies(fig) -> dict[str, object]:
+    """gid -> outline in page units of every element body as drawn (strand:, helix:, helix-back:, eta:, ghost:
+    patches), read from the figure itself, not from the renderer's own masks."""
+    ax = fig.axes[0]
+    out = {}
+    for a in ax.patches:
+        gid = a.get_gid() or ""
+        if gid.startswith(("strand:", "helix:", "helix-back:", "eta:", "ghost:")):
+            out[gid] = a.get_path().transformed(a.get_transform() - ax.transData)
+    return out
+
+
+def bodies_under(fig, prefix) -> dict[str, float]:
+    """For the lines whose gid starts with prefix: drawn length (page units) over each body it lies on."""
+    pts = _drawn_points(fig, prefix)
+    got = {g: round(int(b.contains_points(pts).sum()) * 0.02, 2) for g, b in _drawn_bodies(fig).items()}
+    return {g: v for g, v in got.items() if v}
+
+
 @pytest.mark.parametrize(
     "path",
     [DATA / "r100" / "7FAB-HL.cif.gz", DATA / "r100" / "1IGT-AB.cif.gz", DATA / "6ZS5.cif"],
@@ -385,7 +415,6 @@ def test_disulfide_bars_cross_no_label(path):
     letters; 6ZS5's C-terminal bar through its "C" and "12 aa"). Judged by figcheck's ink at its line clearance,
     LINE_TEXT_CLEARANCE_PX (the Task 1 ruling for Task 6), and every bond still drawn."""
     from foldmap import figcheck
-    from foldmap.render import link_bodies
     from foldmap.spec import draw_spec, figure_spec
 
     d = draw_spec(figure_spec(path))
@@ -395,5 +424,34 @@ def test_disulfide_bars_cross_no_label(path):
     assert [h for h in hits if "disulfide" in h] == []
     bars = {a.get_gid() for a in d.figure.axes[0].patches if (a.get_gid() or "").startswith("disulfide:")}
     assert bars and len(bars) == len(d.layout.links.disulfides)
-    pts = _drawn_points(d.figure, "disulfide:")
-    assert not any(body.contains_points(pts).any() for body in link_bodies(d.layout))  # never over a body
+    assert bodies_under(d.figure, "disulfide:") == {}  # never over a body, as the bodies are drawn
+    for a in d.figure.axes[0].patches:  # and no sliver between two bodies or a body and a letter
+        if (a.get_gid() or "").startswith("disulfide:"):
+            polys = a.get_path().to_polygons(closed_only=False)
+            lengths = [float(np.hypot(*np.diff(q, axis=0).T).sum()) for q in polys]
+            assert len(polys) == 1 or min(lengths) >= 0.15, (a.get_gid(), [round(x, 2) for x in lengths])
+
+
+def test_letters_slide_off_the_bars_drawn(monkeypatch):
+    """The bar routes are computed once per figure (render.disulfide_bars), with the loop cysteines kept off text
+    and bodies, and the same routes both slide the strand letters and are drawn: every drawn stretch of a bar lies
+    on its route (fix round 1: the letters slid off routes computed without `avoid`, drawn elsewhere)."""
+    import foldmap.render as render
+    from foldmap.render import _dense
+
+    seen = []
+    real = render.disulfide_bars
+
+    def spy(*args, **kw):
+        seen.append(real(*args, **kw))
+        return seen[-1]
+
+    monkeypatch.setattr(render, "disulfide_bars", spy)
+    fig = make_figure(DATA / "6ZS5.cif")
+    assert len(seen) == 1
+    routes = {f"disulfide:{i}-{j}": np.asarray(route, float) for i, j, _, _, route in seen[0]}
+    for a in _gids(fig, "disulfide:"):
+        route = _dense(routes[a.get_gid()])[0]
+        for poly in a.get_path().to_polygons(closed_only=False):
+            gap = [float(np.hypot(*(route - q).T).min()) for q in poly]
+            assert max(gap) < 0.02, a.get_gid()

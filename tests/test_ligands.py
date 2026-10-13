@@ -211,9 +211,8 @@ def test_tethers_cross_no_label(path, kw):
     tethers on the βα barrel over a helix label (K8), 1LDM --focus A1's oxamate tethers over three labels. Judged
     by figcheck's ink at LINE_TEXT_CLEARANCE_PX."""
     from foldmap import figcheck
-    from foldmap.render import link_bodies
     from foldmap.spec import draw_spec, figure_spec
-    from test_links import _drawn_points
+    from test_links import _drawn_points, bodies_under
 
     d = draw_spec(figure_spec(path, **kw))
     if reason := figcheck.ink_font_reason(d.figure):
@@ -221,4 +220,4 @@ def test_tethers_cross_no_label(path, kw):
     hits = figcheck.text_collisions(d, clearance_px=figcheck.LINE_TEXT_CLEARANCE_PX)
     assert [h for h in hits if "ligand-tether" in h] == []
     pts = _drawn_points(d.figure, "ligand-tether:")
-    assert len(pts) and not any(body.contains_points(pts).any() for body in link_bodies(d.layout))
+    assert len(pts) and bodies_under(d.figure, "ligand-tether:") == {}  # never over a body, as drawn
