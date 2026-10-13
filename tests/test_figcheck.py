@@ -93,7 +93,9 @@ def _page(*artists_and_texts):
 
 def _text(gid, xy=(5, 5), z=4):
     def make(ax):
-        ax.text(*xy, "WWW", ha="center", va="center", fontsize=20, zorder=z).set_gid(gid)
+        t = ax.text(*xy, "WWW", ha="center", va="center", fontsize=20, zorder=z)
+        if gid:
+            t.set_gid(gid)
 
     return make
 
@@ -200,3 +202,196 @@ def test_order_checks_catch_a_swapped_or_skipped_element(bad):
         del d.loops[k + 1]
     got = figcheck.order_checks(d)
     assert len(got) == 1, got
+
+
+# ------------------------------------------------------------------------------------- fix round 1 (review)
+
+
+def _liberation(d):
+    """Ink measures are calibrated on Liberation Sans (the font CI installs): elsewhere a gated check is skipped."""
+    reason = figcheck.ink_font_reason(d.figure)
+    if reason:
+        pytest.skip(reason)
+
+
+def test_ink_is_measured_under_a_fixed_hinting_and_the_font_is_recorded():
+    """The ink boxes do not follow the caller's hinting settings (matplotlib 3.10 and 3.11 default differently)."""
+    from matplotlib import rc_context
+
+    d = drawn(DATA / "na" / "1EHZ.cif.gz")
+    plain = figcheck.stem_name_gaps(d)
+    with rc_context({"text.hinting": "force_autohint"}):
+        assert figcheck.stem_name_gaps(d) == plain
+    got = figcheck.figure_checks(d, DATA / "na" / "1EHZ.cif.gz")
+    assert got["font"] and all(Path(f).suffix.lower() in (".ttf", ".otf") for f in got["font"])
+    assert got["skipped"] == {} or set(got["skipped"]) == set(figcheck.INK_CHECKS)
+
+
+def test_ink_checks_name_the_font_they_need():
+    d = _page(_text("label:A:1-5"))
+    d.figure.axes[0].texts[0].set_fontfamily(["DejaVu Sans"])
+    assert "Liberation Sans" in figcheck.ink_font_reason(d.figure)
+    assert figcheck.ink_font_reason(drawn(DATA / "1UBQ.cif").figure) in ("", figcheck.ink_font_reason(d.figure))
+
+
+def test_gate_tolerances_for_later_tasks():
+    assert figcheck.stem_gap_tolerance(0.02) == figcheck.STEM_GAP_FLOOR == 0.08
+    assert figcheck.stem_gap_tolerance(0.2) == pytest.approx(0.201)
+    assert figcheck.LINE_TEXT_CLEARANCE_PX >= 2.0
+    near = _page(_text("label:A:1-5"), _line("disulfide:1-9", (0, 4.80), (10, 4.80), 3.7))  # 2.8 px under the ink
+    assert figcheck.text_collisions(near) == []
+    assert figcheck.text_collisions(near, clearance_px=figcheck.LINE_TEXT_CLEARANCE_PX) == [
+        "label:A:1-5 × disulfide:1-9"
+    ]
+
+
+def test_every_text_must_reach_the_glyph_recorder():
+    d = _page(_text("label:A:1-5"))
+    d.figure.axes[0].texts[0].draw = lambda renderer: None  # a text drawing nothing would vanish from every check
+    with pytest.raises(RuntimeError, match="label:A:1-5"):
+        figcheck.text_collisions(d)
+
+
+def test_a_legend_mark_off_the_page_is_found():
+    def legend(ax):
+        ax.add_patch(Rectangle((9.8, 1), 0.6, 0.6, fc="r")).set_gid("legend-chain:A")
+
+    assert figcheck.off_page(_page(legend)) == ["legend-chain:A"]
+
+
+def test_element_overlaps_on_synthetic_boxes():
+    from types import SimpleNamespace as NS
+
+    el = lambda k, rect: NS(sse=NS(id=k), rect=rect)  # noqa: E731
+    lay = NS(
+        placed={"a": el("a", (0, 0, 2, 2)), "b": el("b", (1, 1, 3, 3)), "c": el("c", (2.5, 0, 4, 0.5))},
+        stems=[],
+        nucleic=None,
+        on_sheet={},
+    )
+    assert figcheck.element_overlaps(lay) == [("a", "b")]
+    lay.on_sheet = {"a": ["b"]}  # a helix drawn over its sheet's strand: by design
+    assert figcheck.element_overlaps(lay) == []
+
+
+def _stem_page(*more):
+    """A page holding one stem (P1, 4 x 2 units at the centre) and the given artists."""
+    from foldmap.layout import PlacedStem
+
+    stem = PlacedStem("s1", "P1", [0, 0], [], 5.0, 5.0, 4.0, 0.0, 2.0, {}, {})
+    d = _page(*more)
+    d.layout = type("L", (), {"stems": [stem], "nucleic": None, "on_sheet": {}, "na_paths": []})()
+    return d
+
+
+def test_text_on_a_stem_body_is_a_collision_unless_it_is_the_stems_own():
+    assert figcheck.text_collisions(_stem_page(_text("label:A:1-5"))) == ["label:A:1-5 × na:stem:0"]
+    assert figcheck.text_collisions(_stem_page(_text("na:label:0"))) == []
+
+
+def test_a_helix_body_counts_once_and_texts_without_gid_are_told_apart():
+    d = _page(_text("label:A:1-5"), _body("helix-back:B:1-9", 2, 4, 8, 6, 2.9), _body("helix:B:1-9", 2, 4, 8, 6))
+    assert figcheck.text_collisions(d) == ["label:A:1-5 × helix:B:1-9"]
+    d = _page(_text(None), _text(None, (5.3, 5.1)))
+    assert len(figcheck.text_collisions(d)) == 1  # the same words, two texts
+
+
+def test_a_loop_length_is_not_crossed_by_its_own_loop():
+    own = _page(_text("loop-length:A:1-5>A:9-12"), _line("loop:A:1-5>A:9-12", (0, 5), (10, 5)))
+    assert figcheck.text_collisions(own) == []
+    seg = _page(_text("loop-length:A:1-5>A:9-12"), _line("loop-seg:A:1-5>A:9-12:0", (0, 5), (10, 5)))
+    assert figcheck.text_collisions(seg) == []
+    other = _page(_text("loop-length:A:1-5>A:9-12"), _line("loop:B:1-5>B:9-12", (0, 5), (10, 5)))
+    assert figcheck.text_collisions(other) == ["loop-length:A:1-5>A:9-12 × loop:B:1-5>B:9-12"]
+
+
+def test_stem_names_are_measured_to_letters_not_to_the_stem_box():
+    """1EHZ named: the D arm's name sits near its stem's box but far from its letters (plan 10, measured)."""
+    d = drawn(DATA / "na" / "1EHZ.cif.gz", names=[str(Path(__file__).parents[1] / "docs" / "names" / "1EHZ-trna.yaml")])
+    _liberation(d)
+    got = figcheck.stem_name_gaps(d)
+    k = next(k for k, s in enumerate(d.layout.stems) if s.name == "D")
+    to_page = d.figure.axes[0].transData.inverted()
+    name = next(t for t in d.figure.axes[0].texts if t.get_gid() == f"na:label:{k}")
+    box = to_page.transform_bbox(name.get_window_extent(figcheck._renderer(d.figure))).extents
+    rect_gap = figcheck._box_gap(box, d.layout.stems[k].rect)
+    assert got[f"na:label:{k}"][0] > rect_gap + 0.2
+
+
+def test_a_strand_drawn_the_wrong_way_is_an_order_violation():
+    d = drawn(DATA / "1UBQ.cif")
+    ids = next(ids for ids in d.layout.sheets if len(ids) >= 3)
+    d.layout.placed[ids[0]].angle += math.pi  # the sheet's edge strand turned round
+    got = figcheck.order_checks(d)
+    assert len(got) == 1 and ids[0] in got[0] and "drawn" in got[0], got
+
+
+def test_a_domain_across_two_chains_is_found():
+    d = drawn(DATA / "1TIM.cif", domains=[("both", ["res:A:1-60", "res:B:1-60"]), ("rest", ["res:A:61-250"])])
+    assert figcheck.domain_checks(d)["cross_chain"] == ["both"]
+
+
+def test_copies_split_differently_are_found():
+    alike = [("N", ["res:A:1-100", "res:B:1-100"]), ("C", ["res:A:101-250", "res:B:101-250"])]
+    unalike = [("N", ["res:A:1-100", "res:B:1-50"]), ("C", ["res:A:101-250", "res:B:51-250"])]
+    assert figcheck.domain_checks(drawn(DATA / "1TIM.cif", domains=alike))["unalike"] == []
+    assert figcheck.domain_checks(drawn(DATA / "1TIM.cif", domains=unalike))["unalike"]
+
+
+def test_measles_f_automatic_domains_include_a_small_one_today():
+    """Measured at bcdec7a: 8UUP --domains auto gives chain F a D5 under DOMAIN_MIN_SSE_RESIDUES. Task 3 gates
+    small == [] (test_domains_auto_rules_on_oligomers)."""
+    assert figcheck.domain_checks(drawn(DATA / "8UUP.cif", domains="auto"))["small"] == ["D5 · F"]
+
+
+def test_cas9_domain_names_collide_today():
+    """Measured at bcdec7a (fixed hinting): 4 name collisions, BH, REC2 and RuvC-I under loops, RuvC-III on a helix
+    (counted once: the review's 5 counted its helix: and helix-back: patches apart).
+    Task 3 gates name_collisions == []."""
+    import sys
+
+    sys.path.insert(0, str(Path(__file__).parent))
+    from test_domains import CAS9_FILE, _flag_file
+
+    d = drawn(DATA / "na" / "4OO8.cif.gz", chains=["A"], domains=_flag_file(CAS9_FILE))
+    _liberation(d)
+    got = figcheck.domain_checks(d)["name_collisions"]
+    assert len(got) == 4 and {h.split(" × ")[0] for h in got} == {
+        f"domain-label:{n}" for n in ("BH", "REC2", "RuvC-I", "RuvC-III")
+    }, got
+
+
+def test_copies_need_three_matches_and_half_the_smaller_copy():
+    d = drawn(DATA / "1TIM.cif")
+    keep = [k for k, p in d.layout.placed.items() if p.sse.chain == "B"]
+    for k in keep[4:]:  # B keeps its elements, but only 4 of them still match A's
+        d.layout.placed[k + "~"] = d.layout.placed.pop(k)
+    assert figcheck.copy_matches(d)[("B", "A")] == (4, 20)
+    assert figcheck.copies_alike(d)[("B", "A")] == math.inf  # 4 < 10, half of the smaller copy
+    d = drawn(DATA / "1TIM.cif")
+    for k in [k for k, p in d.layout.placed.items() if p.sse.chain == "B"][2:]:
+        del d.layout.placed[k]
+    assert figcheck.copy_matches(d)[("B", "A")] == (2, 2)
+    assert figcheck.copies_alike(d)[("B", "A")] == math.inf  # two points always fit
+
+
+def test_an_explicit_focus_still_checks_the_nucleotides_of_chains_it_draws():
+    d = drawn(DATA / "1LMB.cif", assembly="asu", focus="3")
+    assert figcheck.scope_honest(d, DATA / "1LMB.cif", "asu", "3") == []
+    d.layout.stems.clear()  # the duplex gone, its chains' 5' tails still drawn
+    got = figcheck.scope_honest(d, DATA / "1LMB.cif", "asu", "3")
+    assert [s.split(":")[0] for s in got] == ["nt 1", "nt 2"], got
+
+
+def test_na_crop_is_not_yet_counted_as_silent():
+    """Pins a known gap: 4YBB's automatic na_extent crop leaves nucleotides out and no note says so yet, and
+    scope_honest does not count it. Task 8 announces the crop (scope.drawn_scope) and turns this test into
+    test_scope.py::test_na_crop_is_announced."""
+
+    path = DATA / "na" / "4YBB.cif.gz"
+    d = drawn(path)
+    assert d.layout.na_cropped
+    shown = sum(len(s.axial) for s in d.layout.stems) + sum(len(p.nts) for p in d.layout.na_paths)
+    held = sum(len(c.get_polymer()) for c in d.model[0] if c.get_polymer().check_polymer_type().name in ("Rna", "Dna"))
+    assert held - shown > 100  # the crop leaves out hundreds of nucleotides ...
+    assert not [s for s in figcheck.scope_honest(d, path) if s.startswith("nt ")]  # ... and nothing says so

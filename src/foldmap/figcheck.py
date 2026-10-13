@@ -15,6 +15,7 @@ import re
 from collections import Counter
 from itertools import combinations
 
+import matplotlib
 import numpy as np
 from matplotlib.path import Path as MPath
 from matplotlib.transforms import Affine2D, Bbox
@@ -33,6 +34,7 @@ TEXT_OVERLAP_PX2 = 1.0  # text over text or a body: overlaps up to this many squ
 OFF_PAGE_PX = 1.0  # text may reach this far past the page edge
 PANEL_GRID = 0.05  # page units: the raster domain panel outlines are measured on
 _STEP_PX = 0.5  # sampling step (pixels) along a line inside a text box, and across a text box over a body
+_MPL = tuple(int(x) for x in re.findall(r"\d+", matplotlib.__version__)[:2])
 _AUTO_DOMAIN = re.compile(r"D\d+( · .+)?")  # features.auto_domains names: D1, D2 ... with " · chain" when split
 
 
@@ -100,12 +102,37 @@ def element_overlaps(lay) -> list[tuple[str, str]]:
 
 # ------------------------------------------------------------------------------------------- text on the page
 
+# Ink is measured under one hinting setting, whatever the caller's rcParams: matplotlib 3.10 and 3.11 hint by
+# default differently, and the hinted layout moved text collisions (5 of 9 fixtures) and stem-name gaps (up to
+# 0.061 page units) between them (plan 10 Task 1 review).
+MEASURE_RC = {"text.hinting": "no_hinting"}
+if _MPL < (3, 11):  # 3.11 deprecates the factor and hints at 1 always
+    MEASURE_RC["text.hinting_factor"] = 1
+INK_FONT = "Liberation Sans"  # the font the ink gates are calibrated on (CI installs fonts-liberation)
+INK_CHECKS = ("text_collisions", "off_page", "stem_name_gaps", "domain_name_collisions")  # gated on INK_FONT
+# Tolerances later tasks gate with (R7 revised, Task 1 fix round 1). Under MEASURE_RC, with Liberation Sans, the
+# same figures measured with matplotlib 3.10.9 (the minimum-deps pins) and 3.11.2 agree exactly on protein figures;
+# on nucleic-acid figures (text at other sizes) ink boxes still move by up to 0.15 px, stem-name gaps by up to 0.047
+# page units (1KX5; 0.015 elsewhere) and 3 of 14 figures gain or lose one near-touch text collision. So a stem name's
+# gap to its letters is gated at stem_gap_tolerance(margin), and a line is counted against a text within
+# LINE_TEXT_CLEARANCE_PX of its ink (T6), wider than that spread.
+STEM_GAP_FLOOR = 0.08  # page units
+LINE_TEXT_CLEARANCE_PX = 2.0
+
+
+def stem_gap_tolerance(margin: float) -> float:
+    """The largest gap (page units) a stem name may keep from its own letters when it should sit `margin` from
+    them: the margin plus 1e-3, never under STEM_GAP_FLOOR (what matplotlib versions disagree by)."""
+    return max(margin + 1e-3, STEM_GAP_FLOOR)
+
 
 def _renderer(fig):
+    from matplotlib import rc_context
     from matplotlib.backends.backend_agg import FigureCanvasAgg
 
     canvas = FigureCanvasAgg(fig)
-    canvas.draw()
+    with rc_context(MEASURE_RC):
+        canvas.draw()
     return canvas.get_renderer()
 
 
@@ -115,22 +142,26 @@ def _texts(fig) -> list:
     ]
 
 
-def _name(t) -> str:
-    """A text's gid, or its words for a text drawn without one (the title, legend entries)."""
-    return t.get_gid() or f"text:{t.get_text()!r}"
+def _names(texts) -> list[str]:
+    """Each text's gid; a text drawn without one (the title, legend entries) by its place among the texts and its
+    words, so two such texts are never taken for one."""
+    return [t.get_gid() or f"text#{k}:{t.get_text()!r}" for k, t in enumerate(texts)]
 
 
 def _ink_boxes(fig, renderer=None) -> list[tuple[object, Bbox]]:
     """(text, ink box in pixels) for every drawn text: the extents of its glyph outlines (matplotlib's TextToPath,
-    placed and turned as the text is drawn), tighter than the layout box get_window_extent gives (line height,
-    descent)."""
+    placed and turned as the text is drawn, under MEASURE_RC), tighter than the layout box get_window_extent gives
+    (line height, descent). A text that never reaches the glyph recorder is an error, not a text left out."""
+    from matplotlib import rc_context
     from matplotlib.textpath import TextToPath
 
     renderer = renderer or _renderer(fig)
     to_path = TextToPath()
     got: list[Bbox] = []
+    calls = [0]
 
     def record(gc, x, y, s, prop, angle, ismath=False, mtext=None):
+        calls[0] += 1
         if not s.strip():
             return
         verts, codes = to_path.get_text_path(prop, s, ismath=ismath)
@@ -143,15 +174,37 @@ def _ink_boxes(fig, renderer=None) -> list[tuple[object, Bbox]]:
 
     renderer.draw_text = record  # this instance only: the glyph outlines are measured, nothing is drawn
     out = []
+    texts = _texts(fig)
     try:
-        for t in _texts(fig):
-            got.clear()
-            t.draw(renderer)
-            if got:
-                out.append((t, Bbox.union(got)))
+        with rc_context(MEASURE_RC):
+            for t, name in zip(texts, _names(texts)):
+                got.clear()
+                calls[0] = 0
+                t.draw(renderer)
+                if not calls[0]:
+                    raise RuntimeError(f"figcheck: text {name} drew nothing to measure")
+                if got:
+                    out.append((t, Bbox.union(got)))
     finally:
         del renderer.draw_text
     return out
+
+
+def text_fonts(fig) -> list[str]:
+    """The font files the figure's texts resolve to on this machine, sorted."""
+    from matplotlib.font_manager import findfont
+
+    return sorted({findfont(t.get_fontproperties()) for t in _texts(fig)})
+
+
+def ink_font_reason(fig) -> str:
+    """'' when every text resolves to INK_FONT, else why the ink-gated checks are skipped."""
+    from matplotlib.ft2font import FT2Font
+
+    other = [f for f in text_fonts(fig) if FT2Font(f).family_name != INK_FONT]
+    if not other:
+        return ""
+    return f"ink checks are calibrated on {INK_FONT}; this machine draws text in {', '.join(other)}"
 
 
 def _overlap(a: Bbox, b: Bbox) -> float:
@@ -174,18 +227,25 @@ def _owner(gid: str) -> str | None:
     return None
 
 
-class _Page:
-    """The figure as drawn, for the text checks: texts with their ink boxes, bodies and lines in pixels."""
+class Page:
+    """A figure measured once (measure()): its texts with their names and ink boxes, its bodies and lines, all in
+    pixels, its legend marks' extents, and the fonts its text resolves to."""
 
     def __init__(self, drawn):
         fig = drawn.figure
         self.fig = fig
-        self.texts = _ink_boxes(fig)
+        renderer = _renderer(fig)
+        boxes = dict((id(t), box) for t, box in _ink_boxes(fig, renderer))
+        texts = _texts(fig)
+        self.texts = [(t, n, boxes[id(t)]) for t, n in zip(texts, _names(texts)) if id(t) in boxes]
+        self.fonts = text_fonts(fig)
+        self.font_reason = ink_font_reason(fig)
         self.ax = fig.axes[0] if fig.axes else None
         self.layout = getattr(drawn, "layout", None)
         artists = [a for ax in fig.axes for a in (*ax.patches, *ax.lines)]
         self.bodies = []  # (gid, path in pixels, zorder, opaque)
         self.lines = []  # (gid, [polyline (n, 2) in pixels], zorder, half its stroke width in pixels)
+        self.legend = []  # (gid, extent in pixels) of the legend's marks
         for a in artists:
             gid = a.get_gid() or ""
             if gid.startswith(LINE_GIDS) or GLYCAN_STEM.match(gid):
@@ -193,6 +253,8 @@ class _Page:
             elif gid.startswith(ELEMENT_BODIES) or gid.startswith(tuple(OWN_BODIES)) or gid.startswith("na:stem:"):
                 path = a.get_path().transformed(a.get_transform())
                 self.bodies.append((gid, path, a.get_zorder(), _opaque(a)))
+            if gid.startswith("legend"):
+                self.legend.append((gid, a.get_window_extent(renderer)))
         self.stems = self._stem_bodies()
 
     def _stem_bodies(self) -> list[tuple[str, MPath, set[str]]]:
@@ -239,6 +301,11 @@ class _Page:
             for t in mine:
                 out.setdefault(t, set()).add(f"na:run:{n}")
         return out
+
+
+def measure(drawn) -> Page:
+    """The figure drawn and measured once, for any number of the page checks (their `page` argument)."""
+    return Page(drawn)
 
 
 def _opaque(a) -> bool:
@@ -309,68 +376,69 @@ def _area_on(box: Bbox, path: MPath) -> float:
     return float(path.contains_points(np.c_[gx.ravel(), gy.ravel()]).sum()) * _STEP_PX**2
 
 
-def text_collisions(drawn) -> list[str]:
-    """Every "<text gid> × <thing gid>" a reader sees on the page (a text drawn without a gid is named by its words):
+def _on(box: Bbox, path: MPath) -> bool:
+    return _overlap(box, path.get_extents()) > TEXT_OVERLAP_PX2 and _area_on(box, path) > TEXT_OVERLAP_PX2
+
+
+def text_collisions(drawn, *, clearance_px: float = 0.0, page: Page | None = None) -> list[str]:
+    """Every "<text> × <thing gid>" a reader sees on the page (a text is named by its gid, one drawn without a gid
+    by its place and words: _names):
     - text over text, their ink boxes overlapping by more than TEXT_OVERLAP_PX2 (a text's own parts, one gid, never);
     - text over a body (an element, a stem, a ligand or linked mark, a domain name plate) it does not belong to (its
-      label, its residue numbers, its letters, its name), by more than TEXT_OVERLAP_PX2; a helix drawn over a sheet
-      and that sheet's strands are each other's (layout.lying_over);
+      label, its residue numbers, its letters, its name), by more than TEXT_OVERLAP_PX2, once per element (a helix
+      is drawn as helix: and helix-back:); a helix drawn over a sheet and that sheet's strands are each other's
+      (layout.lying_over);
     - text crossed by a line (LINE_GIDS: loops, nucleic-acid runs and ties, tethers, disulfide bars, glycan stems,
-      H-bonds) whose stroke meets its ink box where no opaque body drawn above the line hides it there: a line
-      under the text still runs through its letters, a loop under the strand its letter sits on does not show. A
-      text's own line (a loop's length, a gap's label, a tie's letter, a ligand's tethers, a strand's letters and
-      ends) is not counted."""
-    page = _Page(drawn)
+      H-bonds) whose stroke comes within `clearance_px` of its ink box where no opaque body drawn above the line
+      hides it there: a line under the text still runs through its letters, a loop under the strand its letter sits
+      on does not show. A text's own line (a loop's length, a gap's label, a tie's letter, a ligand's tethers, a
+      strand's letters and ends) is not counted."""
+    page = page or measure(drawn)
     lay = page.layout
     over = {frozenset(f"el:{k}" for k in pair) for pair in lying_over(lay)} if lay is not None else set()
     own_lines = page.own_lines()
     hits: list[str] = []
-    named = [(t, _name(t), box) for t, box in page.texts]
-    lines = [  # each line, the extent of its drawing, half its stroke and the opaque bodies drawn above it
+    lines = [  # each line, the extent of its drawing, its reach and the opaque bodies drawn above it
         (gid, polys, Bbox.union([Bbox.from_extents(*p.min(axis=0), *p.max(axis=0)) for p in polys]), pad, covers)
         for gid, polys, z, pad in page.lines
         if polys
         for covers in [[p for _, p, bz, opaque in page.bodies if opaque and bz > z]]
     ]
-    for (_, ga, a), (_, gb, b) in combinations(named, 2):
+    for (_, ga, a), (_, gb, b) in combinations(page.texts, 2):
         if ga != gb and _overlap(a, b) > TEXT_OVERLAP_PX2:
             hits.append(f"{ga} × {gb}")
-    for _, gid, box in named:
+    for t, name, box in page.texts:
+        gid = t.get_gid() or ""
         mine = _owner(gid)
+        met: set[str] = set()
         for body, path, _, _ in page.bodies:
             if body.startswith("na:stem:"):
                 continue  # stems: their whole body below
-            theirs = _owner(body)
-            if theirs is not None and (theirs == mine or frozenset((theirs, mine)) in over):
+            theirs = _owner(body) or body
+            if theirs == mine or theirs in met or frozenset((theirs, mine)) in over:
                 continue
-            if _overlap(box, path.get_extents()) > TEXT_OVERLAP_PX2 and _area_on(box, path) > TEXT_OVERLAP_PX2:
-                hits.append(f"{gid} × {body}")
+            if _on(box, path):
+                met.add(theirs)
+                hits.append(f"{name} × {body.replace('helix-back:', 'helix:', 1)}")
         for body, path, own in page.stems:
-            if gid in own:
-                continue
-            if _overlap(box, path.get_extents()) > TEXT_OVERLAP_PX2 and _area_on(box, path) > TEXT_OVERLAP_PX2:
-                hits.append(f"{gid} × {body}")
+            if gid not in own and _on(box, path):
+                hits.append(f"{name} × {body}")
         for line, polys, extent, pad, covers in lines:
-            reach = Bbox.from_extents(box.x0 - pad, box.y0 - pad, box.x1 + pad, box.y1 + pad)  # its stroke meets ink
+            r = pad + clearance_px  # its stroke meets the ink, or comes within the clearance
+            reach = Bbox.from_extents(box.x0 - r, box.y0 - r, box.x1 + r, box.y1 + r)
             if line in own_lines.get(gid, ()) or not extent.overlaps(reach):
                 continue
             if _crosses(polys, reach, covers):
-                hits.append(f"{gid} × {line}")
+                hits.append(f"{name} × {line}")
     return hits
 
 
-def off_page(drawn) -> list[str]:
+def off_page(drawn, *, page: Page | None = None) -> list[str]:
     """Texts (their ink) and legend marks reaching more than OFF_PAGE_PX past the page edge."""
-    fig = drawn.figure
-    page = fig.bbox
-    renderer = _renderer(fig)
-    out = [_name(t) for t, box in _ink_boxes(fig, renderer) if _beyond(box, page)]
-    for ax in fig.axes:
-        for a in (*ax.patches, *ax.lines):
-            gid = a.get_gid() or ""
-            if gid.startswith("legend") and _beyond(a.get_window_extent(renderer), page):
-                out.append(gid)
-    return out
+    page = page or measure(drawn)
+    edge = page.fig.bbox
+    out = [name for _, name, box in page.texts if _beyond(box, edge)]
+    return out + [gid for gid, box in page.legend if _beyond(box, edge)]
 
 
 def _beyond(box: Bbox, page: Bbox) -> bool:
@@ -413,11 +481,14 @@ def fit_deviation(a, b, mirrored: bool = False) -> float:
     return float(np.hypot(*(fitted - a).T).max())
 
 
-def copies_alike(drawn) -> dict[tuple[str, str], float]:
-    """(copy chain, reference chain) -> the largest element-centre deviation (page units) between the two after the
-    best rigid 2D motion (fit_deviation; a reflection only for a mirror tie), for every tie the symmetry asked for
-    (Layout.copy_ties). Elements are matched as one element through the copy classes (model.copy_classes over
-    model.homolog_chains): elements one copy lacks are left out. A tied copy with no element matched is inf."""
+COPY_MIN_MATCHED = 3  # a tied copy is compared on at least this many elements, and on half the smaller copy's
+
+
+def _copy_pairs(drawn) -> dict[tuple[str, str], tuple[float, int, int]]:
+    """(copy, reference) -> (deviation, elements matched, elements of the smaller of the two) for each tie of
+    Layout.copy_ties: the copies' elements matched as one element through the copy classes (model.copy_classes over
+    model.homolog_chains), the deviation that of fit_deviation (a reflection only for a mirror tie), inf when fewer
+    than COPY_MIN_MATCHED or than half the smaller copy's elements match (two points always fit)."""
     from .model import copy_classes, homolog_chains
 
     lay = drawn.layout
@@ -429,8 +500,23 @@ def copies_alike(drawn) -> dict[tuple[str, str], float]:
     for copy, (ref, mirrored) in sorted(lay.copy_ties.items()):
         a, b = by_chain.get(ref, {}), by_chain.get(copy, {})
         keys = sorted(a.keys() & b.keys())
-        out[(copy, ref)] = fit_deviation([a[k] for k in keys], [b[k] for k in keys], mirrored) if keys else math.inf
+        smaller = min(len(a), len(b))
+        enough = len(keys) >= COPY_MIN_MATCHED and 2 * len(keys) >= smaller
+        dev = fit_deviation([a[k] for k in keys], [b[k] for k in keys], mirrored) if enough else math.inf
+        out[(copy, ref)] = (dev, len(keys), smaller)
     return out
+
+
+def copies_alike(drawn) -> dict[tuple[str, str], float]:
+    """(copy chain, reference chain) -> the largest element-centre deviation (page units) between the two after the
+    best rigid 2D motion, for every tie the symmetry asked for (Layout.copy_ties); inf when too few elements match
+    to say (_copy_pairs). Elements one copy lacks are left out."""
+    return {pair: dev for pair, (dev, _, _) in _copy_pairs(drawn).items()}
+
+
+def copy_matches(drawn) -> dict[tuple[str, str], tuple[int, int]]:
+    """(copy chain, reference chain) -> (elements matched, elements of the smaller copy) for every tie."""
+    return {pair: (n, smaller) for pair, (_, n, smaller) in _copy_pairs(drawn).items()}
 
 
 # ------------------------------------------------------------------------------------------- domains
@@ -524,14 +610,15 @@ def _box_gap(a, b) -> float:
     return float(np.hypot(dx, dy))
 
 
-def stem_name_gaps(drawn) -> dict[str, tuple[float, float]]:
+def stem_name_gaps(drawn, *, page: Page | None = None) -> dict[str, tuple[float, float]]:
     """na:label:<k> -> (gap from the name's ink box to the ink of stem k's own letters (na:nt: of its nucleotides),
     or to the stem's rect when its letters are not drawn; gap to the nearest other stem's rect), page units."""
     lay, fig = drawn.layout, drawn.figure
     if not lay.stems or not fig.axes:
         return {}
+    page = page or measure(drawn)
     to_page = fig.axes[0].transData.inverted()
-    ink = {_name(t): tuple(to_page.transform_bbox(box).extents) for t, box in _ink_boxes(fig)}
+    ink = {name: tuple(to_page.transform_bbox(box).extents) for _, name, box in page.texts}
     na = lay.nucleic
     out = {}
     for k, d in enumerate(lay.stems):
@@ -574,8 +661,9 @@ def scope_honest(drawn, path, assembly: str = "auto", focus: str = "auto", *, ch
     The chains are counted with gemmi from the model read_model read (the asymmetric unit when `assembly` auto drew
     one copy of several), not from foldmap's loaders. Left out on purpose, and so not counted: what the drawn_scope
     reason (the note printed with the figure) covers (assembly copies, the subunits a focus leaves out), chains not
-    among `chains` (--chains), and anything left out by an explicit --focus. A nucleic acid cropped by na_extent auto
-    is not counted until that crop is announced (plan 10 Task 8)."""
+    among `chains` (--chains), and the chains an explicit --focus leaves undrawn (the chains it draws are still
+    checked nucleotide by nucleotide). A nucleic acid cropped by na_extent auto is not counted until that crop is
+    announced (plan 10 Task 8)."""
     import gemmi
 
     from .scope import drawn_scope
@@ -615,7 +703,7 @@ def scope_honest(drawn, path, assembly: str = "auto", focus: str = "auto", *, ch
         if lay.na_cropped and chain in _nucleic_chains(read):
             continue
         out.append(f"chain {chain}")
-    if chosen or lay.na_cropped:
+    if lay.na_cropped:  # not counted until Task 8 announces the crop (test_na_crop_is_not_yet_counted_as_silent)
         return out
     for chain in sorted(shown):
         drawn_nts = shown[chain]
@@ -712,34 +800,41 @@ def _same_order(got: list[str], want: list[str], closed: bool) -> bool:
 
 
 def figure_checks(drawn, path, *, assembly: str = "auto", focus: str = "auto", chains=None) -> dict:
-    """Every check on one drawn figure: a count (or the largest value) under each name, the findings under
-    "details"."""
-    collisions = text_collisions(drawn)
+    """Every check on one drawn figure, measured once: a count (or the largest value) under each name, the findings
+    under "details", the font files the text resolved to under "font". When that font is not INK_FONT the ink
+    checks (INK_CHECKS) are not run: their counts are None and "skipped" says why."""
+    page = measure(drawn)
+    skip = page.font_reason
+    collisions = None if skip else text_collisions(drawn, page=page)
+    pairs = _copy_pairs(drawn)
     details = {
         "element_overlaps": element_overlaps(drawn.layout),
         "text_collisions": collisions,
-        "off_page": off_page(drawn),
+        "off_page": None if skip else off_page(drawn, page=page),
         "label_repeats": label_repeats(drawn.layout),
-        "copies_alike": copies_alike(drawn),
-        "domains": domain_checks(drawn, collisions) if drawn.layout.domains else {},
-        "stem_name_gaps": stem_name_gaps(drawn),
+        "copies_alike": {pair: {"deviation": dev, "matched": n, "of": m} for pair, (dev, n, m) in pairs.items()},
+        "domains": domain_checks(drawn, collisions or []) if drawn.layout.domains else {},
+        "stem_name_gaps": None if skip else stem_name_gaps(drawn, page=page),
         "scope_silent": scope_honest(drawn, path, assembly, focus, chains=chains),
         "order": order_checks(drawn),
     }
     domains = details["domains"]
+    gaps = details["stem_name_gaps"]
     return {
         "element_overlaps": len(details["element_overlaps"]),
-        "text_collisions": len(details["text_collisions"]),
-        "off_page": len(details["off_page"]),
+        "text_collisions": None if skip else len(collisions),
+        "off_page": None if skip else len(details["off_page"]),
         "label_repeats": sum(len(v) for v in details["label_repeats"].values()),
-        "copies_alike": max(details["copies_alike"].values(), default=0.0),
+        "copies_alike": max((dev for dev, _, _ in pairs.values()), default=0.0),
         "domain_rules": sum(len(domains.get(k, [])) for k in ("cross_chain", "unalike", "small")),
         "domain_overlap": max((f for *_, f in domains.get("panel_overlaps", [])), default=0.0),
-        "domain_name_collisions": len(domains.get("name_collisions", [])),
-        "stem_name_gap": max((own for own, _ in details["stem_name_gaps"].values()), default=0.0),
+        "domain_name_collisions": None if skip else len(domains.get("name_collisions", [])),
+        "stem_name_gap": None if skip else max((own for own, _ in gaps.values()), default=0.0),
         "scope_silent": len(details["scope_silent"]),
         "order": len(details["order"]),
         "loop_crossings": loop_crossings(drawn.loops),
         "honest_crossings": honest_crossings(drawn.layout, drawn.loops),
+        "font": page.fonts,
+        "skipped": dict.fromkeys(INK_CHECKS, skip) if skip else {},
         "details": details,
     }
