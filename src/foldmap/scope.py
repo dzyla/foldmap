@@ -34,9 +34,11 @@ def drawn_scope(model, layout, assembly: str = "auto", focus: str = "auto") -> d
 
     file_chains: chains (protein and nucleic acid) of the structure as automatic choices did not cut it (the
         asymmetric unit when assembly 1 is one of its copies; else the assembly read); drawn_chains: those drawn
-        in full; reason: what was drawn, '' when nothing was left out and no chain was asked for; all_options: the
-        settings that draw everything ({} when nothing was left out: `set` is a style key=value, as --set takes
-        it); residues: polymer residues those settings would draw."""
+        in full; reason: what was drawn, '' when nothing was left out and no chain was asked for, made of
+        chains_reason (what was drawn of the chains) and crop (what of the nucleic acid, '' when none was
+        cropped); all_options: the settings that draw everything ({} when nothing was left out: `set` is a style
+        key=value, as --set takes it); residues: polymer residues those settings would draw (of the chains asked
+        for, when some were)."""
     several = getattr(model, "several", None) if assembly == "auto" else None
     read = list(getattr(layout, "chains_read", None) or [])
     asked = list(getattr(layout, "chains_asked", None) or [])
@@ -58,24 +60,35 @@ def drawn_scope(model, layout, assembly: str = "auto", focus: str = "auto") -> d
         options["focus"] = "none"
     if reasons and drawn >= total:  # every chain drawn after all
         reasons, options = [], {}
+    crop = ""
     if getattr(layout, "na_cropped", False) and layout.nucleic is not None:
-        reasons.append(
-            f"the {_na_kind(layout)} cropped to the {layout.nucleic.size:,} of {layout.na_read:,} nucleotides the "
-            "protein touches"
+        crop = (
+            f"the {_na_kind(layout)} cropped to the stems the protein touches ({layout.nucleic.size:,} of "
+            f"{layout.na_read:,} nucleotides)"
         )
         options["set"] = "na_extent=all"
     if asked:
         reasons.insert(0, f"chains {', '.join(asked)} (asked for)")
-    if not reasons:
-        return {"file_chains": total, "drawn_chains": drawn, "reason": "", "all_options": {}, "residues": 0}
-    if residues is None:
-        residues = _polymers(model[0])[1] if options else 0
+    if not reasons and not crop:
+        return {
+            "file_chains": total,
+            "drawn_chains": drawn,
+            "reason": "",
+            "chains_reason": "",
+            "crop": "",
+            "all_options": {},
+            "residues": 0,
+        }
+    if residues is None and options:
+        residues = sum(len(c.get_polymer()) for c in model[0] if c.name in read) if asked else _polymers(model[0])[1]
     return {
         "file_chains": total,
         "drawn_chains": drawn,
-        "reason": "; ".join(reasons),
+        "reason": "; ".join([*reasons, *([crop] if crop else [])]),
+        "chains_reason": "; ".join(reasons),
+        "crop": crop,
         "all_options": options,
-        "residues": residues,
+        "residues": residues or 0,
     }
 
 
@@ -93,9 +106,13 @@ def scope_note(scope: dict, how: str = "cli") -> str:
         )
     else:
         draw = " ".join(f"--{k} {v}" for k, v in options.items())
-    count = (
-        f": {scope['drawn_chains']} of {scope['file_chains']} chains"
-        if scope["drawn_chains"] < scope["file_chains"]
-        else ""
-    )
-    return f"drew {scope['reason']}{count}" + (f"; {draw} draws all of them" if options else "")
+    return f"drew {scope_what(scope)}" + (f"; {draw} draws all of them" if options else "")
+
+
+def scope_what(scope: dict, count: str = ": {drawn} of {total} chains") -> str:
+    """What was drawn, its clauses apart: what of the chains with their count (`count`, when chains were left out),
+    then what of the nucleic acid, so the chain count never reads as part of the crop."""
+    head = scope.get("chains_reason", scope["reason"])
+    if head and scope["drawn_chains"] < scope["file_chains"]:
+        head += count.format(drawn=scope["drawn_chains"], total=scope["file_chains"])
+    return "; ".join(part for part in (head, scope.get("crop", "")) if part)

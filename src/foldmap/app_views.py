@@ -174,10 +174,11 @@ def missing_files(ws: Workspace) -> None:
 
 # ---------------------------------------------------------------------------------------------- scope bar
 def scope_text(scope: dict) -> str:
-    """The bar's line: what an automatic choice drew, and how many of the chains (when not all of them)."""
-    if scope["drawn_chains"] >= scope["file_chains"]:
-        return f"Drawn: {scope['reason']}."
-    return f"Drawn: {scope['reason']} — {scope['drawn_chains']} of {scope['file_chains']} chains."
+    """The bar's line: what an automatic choice drew, how many of the chains (when not all of them), then what of
+    the nucleic acid (scope.scope_what)."""
+    from foldmap.scope import scope_what
+
+    return f"Drawn: {scope_what(scope, ' — {drawn} of {total} chains')}."
 
 
 def scope_flags(scope: dict) -> str:

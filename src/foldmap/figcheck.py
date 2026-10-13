@@ -790,7 +790,8 @@ def scope_honest(drawn, path, assembly: str = "auto", focus: str = "auto", *, ch
     reason (the note printed with the figure) covers (assembly copies, the subunits a focus leaves out), chains not
     among `chains` (--chains), and the chains an explicit --focus leaves undrawn (the chains it draws are still
     checked nucleotide by nucleotide), and what na_extent auto crops from a large nucleic acid once the drawn_scope
-    reason says so (plan 10 Task 8)."""
+    reason says so (plan 10 Task 8): its ends and the gaps between the pieces it kept (_cropped_away); a run missing
+    inside a kept piece is still counted."""
     import gemmi
 
     from .scope import drawn_scope
@@ -823,7 +824,7 @@ def scope_honest(drawn, path, assembly: str = "auto", focus: str = "auto", *, ch
         if focus == "auto" and lay.focus_chains and lay.subunits:
             covered |= set(expected) - set(lay.focus_chains)
     chosen = focus not in ("auto", "none")
-    cropped = lay.na_cropped and "cropped to the" in scope["reason"]
+    cropped = bool(lay.na_cropped and scope.get("crop"))
     out = []
     for chain in sorted(expected):
         if chain in drawn_chains or chain in covered or chosen or (chains and chain not in chains):
@@ -831,10 +832,9 @@ def scope_honest(drawn, path, assembly: str = "auto", focus: str = "auto", *, ch
         if cropped and chain in _nucleic_chains(read):
             continue
         out.append(f"chain {chain}")
-    if cropped:  # the note says the nucleic acid was cropped, and how to draw it all
-        return out
+    said = _cropped_away(na, expected) if cropped else {}  # the note says these were cropped, and how to draw them
     for chain in sorted(shown):
-        drawn_nts = shown[chain]
+        drawn_nts = shown[chain] | said.get(chain, set())
         run: list[tuple[int, str]] = []
         for r in [*expected.get(chain, []), None]:
             if r is not None and r not in drawn_nts:
@@ -843,6 +843,32 @@ def scope_honest(drawn, path, assembly: str = "auto", focus: str = "auto", *, ch
             if len(run) >= 4:
                 out.append(f"nt {chain}:{run[0][0]}{run[0][1]}-{run[-1][0]}{run[-1][1]}")
             run = []
+    return out
+
+
+def _cropped_away(na, expected: dict) -> dict[str, set[tuple[int, str]]]:
+    """Chain -> the nucleotides na_extent auto's crop took away, as its note says: those before the first piece and
+    after the last piece the crop kept of the chain, and those of each gap between two of its pieces (NAGap); a
+    nucleotide missing inside a kept piece is not among them."""
+    out: dict[str, set[tuple[int, str]]] = {}
+    pieces: dict[str, list[tuple[int, int]]] = {}  # chain -> (first, last) index into expected, per piece
+    for st in na.strands:
+        order = {r: k for k, r in enumerate(expected.get(st.chain, []))}
+        at = [order[(lab.seq, lab.icode.strip())] for lab in st.labels if (lab.seq, lab.icode.strip()) in order]
+        if at:
+            pieces.setdefault(st.chain, []).append((min(at), max(at)))
+    for g in na.gaps:
+        a, b = na.strands[g.before], na.strands[g.after]
+        if a.chain == b.chain and a.chain in pieces:
+            order = {r: k for k, r in enumerate(expected[a.chain])}
+            lo = order.get((a.labels[-1].seq, a.labels[-1].icode.strip()))
+            hi = order.get((b.labels[0].seq, b.labels[0].icode.strip()))
+            if lo is not None and hi is not None:
+                out.setdefault(a.chain, set()).update(expected[a.chain][lo + 1 : hi])
+    for chain, spans in pieces.items():
+        rows = expected[chain]
+        first, last = min(lo for lo, _ in spans), max(hi for _, hi in spans)
+        out.setdefault(chain, set()).update(rows[:first] + rows[last + 1 :])
     return out
 
 

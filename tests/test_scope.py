@@ -95,13 +95,59 @@ def test_na_crop_is_announced(capsys, tmp_path):
     d = draw_spec(figure_spec(path))
     assert d.layout.na_cropped and d.layout.na_read > d.layout.nucleic.size
     s = drawn_scope(d.model, d.layout)
-    want = f"the RNA cropped to the {d.layout.nucleic.size:,} of {d.layout.na_read:,} nucleotides the protein touches"
+    size, read = d.layout.nucleic.size, d.layout.na_read
+    want = f"the RNA cropped to the stems the protein touches ({size:,} of {read:,} nucleotides)"
     assert s["reason"] == want and s["all_options"] == {"set": "na_extent=all"}
     assert scope_note(s) == f"drew {want}; --set na_extent=all draws all of them"
     assert scope_note(s, how="mcp").endswith('; style={"na_extent": "all"} draws all of them')
     assert figcheck.scope_honest(d, path) == []
     assert main(["plot", str(path), "-o", str(tmp_path / "4YBB.svg")]) == 0
     assert f"foldmap: drew {want}; --set na_extent=all draws all of them" in capsys.readouterr().err
+    # the crop covers its ends and the gaps between the pieces it kept, not a run missing inside a kept piece
+    stem = max(d.layout.stems, key=lambda st: len(st.axial))
+    keys = sorted(stem.axial)
+    for key in keys[:4]:
+        del stem.axial[key]
+    got = figcheck.scope_honest(d, path)
+    assert len(got) == 1 and got[0].startswith("nt "), got
+
+
+def test_a_crop_and_a_left_out_chain_are_said_apart():
+    """When a chain count and a crop are both said, the count goes with what was drawn of the chains, never after
+    the crop's clause (fix round 1)."""
+    head, crop = (
+        "one of 6 subunits of a helical filament",
+        "the RNA cropped to the stems the protein touches (8 of 90 nucleotides)",
+    )
+    s = {
+        "file_chains": 6,
+        "drawn_chains": 2,
+        "reason": f"{head}; {crop}",
+        "chains_reason": head,
+        "crop": crop,
+        "all_options": {"focus": "none", "set": "na_extent=all"},
+        "residues": 900,
+    }
+    assert scope_note(s) == (
+        "drew one of 6 subunits of a helical filament: 2 of 6 chains; the RNA cropped to the stems the protein "
+        "touches (8 of 90 nucleotides); --focus none --set na_extent=all draws all of them"
+    )
+
+
+def test_chains_asked_with_a_crop_count_the_residues_of_those_chains():
+    """--chains with na_extent auto's crop: "draw all" draws the asked-for chains whole, so the residues counted are
+    theirs, not the file's (fix round 1)."""
+    from foldmap.spec import draw_spec, figure_spec
+
+    path = DATA / "na" / "4YBB.cif.gz"
+    d = draw_spec(figure_spec(path))
+    protein = sorted({p.sse.chain for p in d.layout.placed.values()})[:1]
+    rna = sorted({st.chain for st in d.layout.nucleic.strands})
+    d = draw_spec(figure_spec(path, chains=protein + rna))
+    s = drawn_scope(d.model, d.layout)
+    assert s["crop"] and s["chains_reason"].startswith("chains ")
+    want = sum(len(c.get_polymer()) for c in d.model[0] if c.name in d.layout.chains_read)
+    assert s["residues"] == want < sum(len(c.get_polymer()) for c in d.model[0])
 
 
 def test_explicit_chains_note_says_what_was_asked():

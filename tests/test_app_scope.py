@@ -127,7 +127,7 @@ def test_the_bar_says_the_nucleic_acid_was_cropped_and_shows_all_of_it():
     out, so no chain count), and "Show all chains" sets na_extent to all."""
     at = opened(DATA / "na" / "4YBB.cif.gz")
     text = visible(rendered_text(at))
-    assert "Drawn: the RNA cropped to the " in text and "nucleotides the protein touches." in text
+    assert "Drawn: the RNA cropped to the stems the protein touches (" in text and " nucleotides)." in text
     assert bar(at) == ["scope_all", "scope_keep"]
     at.button(key="scope_all").click().run()
     assert not at.exception and at.session_state["na_extent"] == "all"
