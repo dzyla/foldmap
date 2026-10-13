@@ -39,3 +39,4 @@ docs/validation/random100/work/
 docs/validation/random100/*.json
 !docs/validation/random100/sample.json
 !docs/validation/random100/report.json
+docs/validation/random100/*/report.json
