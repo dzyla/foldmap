@@ -27,3 +27,15 @@ docs/validation/na/*.png
 docs/validation/na/*.svg
 docs/validation/na/report-step*
 docs/validation/na/run-step*
+
+# random-100 campaign: contact sheets, figures, page and step reports stay local (regenerate with scripts/random100.py)
+docs/validation/random100/*.png
+docs/validation/random100/*.svg
+docs/validation/random100/*.html
+docs/validation/random100/report-step*
+docs/validation/random100/run-step*
+# ... and each view's files and each entry's measures (report.json holds them all)
+docs/validation/random100/work/
+docs/validation/random100/*.json
+!docs/validation/random100/sample.json
+!docs/validation/random100/report.json
