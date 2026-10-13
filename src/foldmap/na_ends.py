@@ -122,8 +122,9 @@ def _tail(
             found = _routed_end(
                 router, layout, d, key, len(nts), five, room, strands, door if keep_door else None, strict
             )
-            if found is not None and _enters([*found[0], found[2]], circles, d):
+            if found is not None and _enters(found[3], circles, d):  # along its line out to its label
                 found = None
+            found = found[:3] if found is not None else None
         if found:
             break
     pts, xy, tip = found or _free_end(d, key, len(nts), five)
@@ -234,8 +235,9 @@ def _routed_end(
 ):
     """A long free end routed from its stem's end face out to free space along the grid (around the elements, off
     the cells of the strands drawn so far, `strands`), its m nucleotides spaced NT_STEP apart along it as on a
-    straight end, checked like one: (points, nucleotide positions, end label position) as _free_end gives them, or
-    None when no such drawing is clear (or, with `labels`, leaves its end label no room, or crosses `door`).
+    straight end, checked like one: (points, nucleotide positions, end label position) as _free_end gives them, and
+    the line from the stem out to the label (what it is judged along), or None when no such drawing is clear (or,
+    with `labels`, leaves its end label no room, or crosses `door`).
     `strict`: the cells any loop or strand drawn so far uses are blocked, not only paid for."""
     grid = router.grid
     rail = d.point(key)
@@ -285,7 +287,7 @@ def _routed_end(
         grid.used[c] += 1
     if five:
         pts, xy = pts[::-1], xy[::-1]
-    return pts, xy, tip
+    return pts, xy, tip, out_to_label
 
 
 _END_SPOTS = ((1.0, 0.0), (1.0, 0.6), (2.0, 0.0), (2.0, 0.6), (1.0, -0.6), (3.0, 0.0), (0.0, 2.4), (3.0, 1.2))

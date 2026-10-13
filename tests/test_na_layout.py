@@ -1063,6 +1063,37 @@ def test_a_routed_free_end_is_judged_along_its_line_to_its_label(monkeypatch):
     assert not path.fallback and np.allclose(path.points, first.points) and np.allclose(again, tip)
 
 
+def test_a_routed_five_prime_end_is_judged_along_its_line_too(monkeypatch):
+    """A routed 5' end is kept out of other hairpin loops along its line from its stem out to its label, as a 3' end
+    is; it was judged by [5'->3' points, label], whose last segment is a chord from the stem back to the label
+    across the whole end (fix round 1). 4YBB's 7-nt 5' end, routed (no straight drawing offered)."""
+    import foldmap.na_ends as na_ends
+    from foldmap.route import _element_obstacles, _Grid, _Router
+
+    lay, _, _, _ = _routed("4YBB")
+    at = {key: d for d in lay.stems for key in d.axial}
+    tail = next(p for p in lay.na_paths if p.kind == "tail" and len(p.nts) == 7)
+    (key,) = tail.between
+    d, five = at[key], tail.nts[-1] < key[1]
+    assert five
+    seen = []
+    real = na_ends._enters
+    monkeypatch.setattr(
+        na_ends, "_enters", lambda pts, circles, own: seen.append(np.asarray(pts)) or real(pts, circles, own)
+    )
+    monkeypatch.setattr(na_ends, "_TURNS", ())  # no straight drawing: the end is routed
+    path, tip, _ = na_ends._tail(
+        _Router(_Grid(lay), _element_obstacles(lay)), lay, d, key[0], key, tail.nts, five, None
+    )
+    assert not path.fallback and seen
+    line = seen[-1]
+    assert np.allclose(line[0], d.point(key)) and np.allclose(line[-1], tip)  # stem first, label last
+    for q in path.nt_xy:  # through every nucleotide, in order from the stem
+        a, b = line[:-1], line[1:]
+        t = np.clip(((q - a) * (b - a)).sum(1) / np.maximum(((b - a) ** 2).sum(1), 1e-12), 0, 1)
+        assert np.hypot(*(a + (b - a) * t[:, None] - q).T).min() < 1e-6
+
+
 def test_a_free_end_keeps_out_of_its_partners_doorway(monkeypatch):
     """A free end is not turned across the way its partner nucleotide's strand leaves the same end of the stem, when
     another drawing is clear (5F9R: the non-target strand's free end D:12-20, turned across the face of DNA 1, closed
