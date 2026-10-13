@@ -796,7 +796,8 @@ def test_domain_names_sit_on_plates_in_the_drawing_order():
 
     from foldmap.render import Z
 
-    assert Z["domain-panel"] < Z["domain-name-plate"] < Z["domain-name"] < Z["loop"] < Z["body"] < Z["label"]
+    assert Z["domain-panel"] < Z["domain-name-plate"] < Z["domain-name"] < Z["loop"] < Z["body"]
+    assert Z["body"] < Z["tether"] < Z["label"] and Z["body"] < Z["bar"] < Z["label"]  # bars and tethers: R8
     fig = _domains_drawn("2LZM").figure
     renderer = FigureCanvasAgg(fig).get_renderer()
     ax = fig.axes[0]
@@ -811,11 +812,48 @@ def test_domain_names_sit_on_plates_in_the_drawing_order():
         assert plate.get_window_extent(renderer).contains(*t.get_window_extent(renderer).p0)
         assert plate.get_window_extent(renderer).contains(*t.get_window_extent(renderer).p1)
         assert (plate.get_zorder(), t.get_zorder()) == (Z["domain-name-plate"], Z["domain-name"])
-    by_prefix = {"domain:": Z["domain-panel"], "strand:": Z["body"], "label:": Z["label"]}
-    for a in [*ax.patches, *ax.texts]:
-        for prefix, z in by_prefix.items():
-            if (a.get_gid() or "").startswith(prefix):
-                assert a.get_zorder() == z, a.get_gid()
-    assert all(
-        Z["loop"] <= a.get_zorder() < Z["loop"] + 1 for a in ax.patches if (a.get_gid() or "").startswith("loop:")
-    )
+    loops = [a.get_zorder() for a in ax.patches if (a.get_gid() or "").startswith("loop:")]
+    assert loops and all(Z["loop"] <= z < Z["loop"] + 1 for z in loops)
+
+
+# every drawn artist with one of these gid prefixes takes its zorder from render.Z (plan 10 R8)
+_Z_OF = {
+    "domain:": "domain-panel",
+    "strand:": "body",
+    "eta:": "body",
+    "ghost:": "body",
+    "label:": "label",
+    "ghostlabel:": "label",
+    "terminus:": "label",
+    "stub:": "stub",
+    "disulfide:": "bar",
+    "ligand-tether:": "tether",
+    "ligand:": "mark",
+    "ligand-label:": "mark-label",
+    "sheet-panel:": "sheet-panel",
+}
+
+
+@pytest.mark.parametrize(
+    "path, kw",
+    [(DATA / "6ZS5.cif", {"domains": DOMAINS}), (DATA / "1C3W.cif", {}), (DATA / "8UTF.cif", {})],
+    ids=["6ZS5", "1C3W", "8UTF"],
+)
+def test_every_layer_takes_its_place_from_the_one_table(path, kw):
+    """Bodies (strands, 3-10 boxes, ghosts), labels, chain ends, disulfide bars, ligand tethers and marks are drawn
+    at their render.Z entries (lifted with a helix drawn over a sheet): 6ZS5 has disulfides, 1C3W a retinal with
+    tethers, the 8UTF trimer dashed ghosts of strands lent across its cut."""
+    from foldmap.render import Z
+
+    ax = make_figure(path, **kw).axes[0]
+    seen = set()
+    for a in [*ax.patches, *ax.texts, *ax.lines]:
+        gid = a.get_gid() or ""
+        prefix = next((q for q in _Z_OF if gid.startswith(q)), None)
+        if prefix is None:
+            continue
+        seen.add(prefix)
+        z = Z[_Z_OF[prefix]]
+        assert a.get_zorder() in (z, z + Z["over"] - Z["body"]), (gid, a.get_zorder())  # or lifted over a sheet
+    assert {"strand:", "label:", "terminus:"} <= seen
+    assert {"6ZS5": {"disulfide:"}, "1C3W": {"ligand-tether:", "ligand:"}, "8UTF": {"ghost:"}}[path.stem] <= seen

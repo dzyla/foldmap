@@ -103,17 +103,44 @@ _DOMAIN_TONES = (  # one hue per domain: Paul Tol's muted set less its indigo (t
 )
 _DOMAIN_BAR_H = 1.1  # page units each chain's domain bar takes below the figure (at least; more for larger text)
 
-Z = {  # the drawing order, back to front (plan 10 R8): one table for the layers named here
-    "membrane": 0.1,
+Z = {  # the drawing order, back to front (plan 10 R8: panel < plate < loops < bodies < bars/tethers < labels).
+    # Every zorder render sets is taken from here; a loop adds i * 1e-3 (its rank), its casing, arrows and runs a
+    # few 1e-4 more, and a helix over a sheet lifts its parts by Z["over"] - Z["body"].
+    "membrane": 0.1,  # the lipid band ...
+    "membrane-heads": 0.15,  # ... and its head groups
     "domain-panel": 0.2,  # a domain's tinted panel
     "sheet-panel": 0.3,  # a sheet's plate
+    "sheet-domain-edge": 0.31,  # a domain's edge over a sheet several domains share
     "domain-name-plate": 0.32,  # a domain's name: its plate over the panel's edge ...
     "domain-leader": 0.33,  # ... its leader, when it stands outside
     "domain-name": 0.35,  # ... the name
-    "loop": 1.0,  # loops (each one 1e-3 above the one before; those of a helix over a sheet at _OVER_LOOP_Z)
-    "body": 3.0,  # strands and helices (a helix over a sheet at _OVER_Z); disulfide bars, tethers and ligand marks
-    # are drawn at 3.6-3.9, above the bodies (plan 10 Task 6 moves bars and tethers under them)
-    "label": 4.0,  # element labels and chain ends
+    "loop": 1.0,  # loops
+    "na-tie": 1.8,  # an isolated pair drawn as a short tie
+    "na-run": 1.9,  # a single nucleic-acid strand
+    "stub-edge": 1.99,  # a chain end's stub: its edge ...
+    "stub": 2.0,  # ... and line
+    "na-back": 2.0,  # a stem: its back rail ...
+    "na-rung": 2.1,  # ... its rungs ...
+    "na-front": 2.2,  # ... its front rail or block
+    "hbond": 2.15,  # H-bond overlay lines
+    "na-contact": 2.3,  # contact beads on a nucleic acid
+    "na-tie-mark": 2.4,  # a long tie's marks
+    "domain-bar": 2.0,  # the domain bar under the figure ...
+    "domain-bar-label": 2.1,  # ... and the names in it
+    "body-back": 2.9,  # a helix's back face (Z["body"] - 0.1)
+    "body": 3.0,  # strands, helices, 3-10 boxes, ghosts
+    "gloss": 3.05,  # a helix's shine (Z["body"] + 0.05)
+    "over-loop": 3.2,  # the loops of a helix over a sheet: above the strands, below the helix
+    "over": 3.5,  # a helix over a sheet (Placed.over): above the strands, below their letters
+    "tether": 3.6,  # ligand tethers
+    "bar": 3.7,  # disulfide bars
+    "bar-end": 3.75,  # a disulfide's end dots, glycan stems
+    "mark": 3.8,  # ligand, linked and glycan marks
+    "feature-ring": 3.84,  # a UniProt feature: its ring ...
+    "feature": 3.85,  # ... and dot
+    "mark-label": 3.9,  # ligand and linked names
+    "label": 4.0,  # element labels, stem names, letters, chain ends, loop lengths
+    "resnum": 4.5,  # residue numbers at element ends (and a helix-over-sheet's name)
 }
 
 _BAR_TICK = 0.3  # page units from a narrow segment to its name below it
@@ -315,7 +342,7 @@ def _rung_lines(ink: _NAInk, k: int, d: PlacedStem, inset: float = 0.0) -> None:
             lw=ink.lw * 1.4,
             ls=(0, (1, 1.5)) if pair in ink.gu else "-",
             solid_capstyle="round",
-            zorder=2.1,
+            zorder=Z["na-rung"],
         )
         line.set_gid(f"na:stem:{k}:rung")
 
@@ -338,7 +365,7 @@ def _ladder(ink: _NAInk, k: int, d: PlacedStem, where: dict, letters: dict) -> N
             lw=ink.lw * 2.2,
             capstyle="round",
             joinstyle="round",
-            zorder=2.2,
+            zorder=Z["na-front"],
         )
         rail.set_gid(f"na:stem:{k}:rails" if n == 0 else f"na:stem:{k}:rails:{n + 1}")
         ink.ax.add_patch(rail)
@@ -357,7 +384,7 @@ def _draw_stem_label(ink: _NAInk, k: int, d: PlacedStem) -> None:
         fontsize=ink.font * 0.8,
         fontweight="bold",
         color=ink.front,
-        zorder=4,
+        zorder=Z["label"],
     )
     t.set_gid(f"na:label:{k}")
 
@@ -394,7 +421,7 @@ def _ribbon(ink: _NAInk, k: int, d: PlacedStem, where: dict, letters: dict) -> N
             fronts += f
             backs += b
         suffix = "" if n == 0 else f":{n + 1}"
-        back = PathPatch(_compound([page(q) for q in backs]), fc=tint(c, 0.5), ec="none", zorder=2.0)
+        back = PathPatch(_compound([page(q) for q in backs]), fc=tint(c, 0.5), ec="none", zorder=Z["na-back"])
         back.set_gid(f"na:stem:{k}:back{suffix}")
         ink.ax.add_patch(back)
         front = PathPatch(
@@ -402,7 +429,7 @@ def _ribbon(ink: _NAInk, k: int, d: PlacedStem, where: dict, letters: dict) -> N
             fc="white" if outline else c,
             ec=c if outline else "none",
             lw=ink.lw * 0.8,
-            zorder=2.2,
+            zorder=Z["na-front"],
         )
         front.set_gid(f"na:stem:{k}:front{suffix}")
         ink.ax.add_patch(front)
@@ -411,7 +438,7 @@ def _ribbon(ink: _NAInk, k: int, d: PlacedStem, where: dict, letters: dict) -> N
         for x in (d.axial[(a, i)] for a, i, _, _ in d.pairs)
     ]
     rung = PathPatch(
-        _compound(rungs, closed=False), fc="none", ec=ink.rung, lw=ink.lw * 2.2, capstyle="round", zorder=2.1
+        _compound(rungs, closed=False), fc="none", ec=ink.rung, lw=ink.lw * 2.2, capstyle="round", zorder=Z["na-rung"]
     )
     rung.set_gid(f"na:stem:{k}:rungs")
     ink.ax.add_patch(rung)
@@ -433,7 +460,12 @@ def _block(ink: _NAInk, k: int, d: PlacedStem, where: dict, letters: dict) -> No
             for x, y in ((-d.length / 2, lo), (d.length / 2, lo), (d.length / 2, hi), (-d.length / 2, hi))
         ]
         body = Polygon(
-            corners, closed=True, fc="white" if ink.fill == "outline" else c, ec=c, lw=ink.lw * 1.2, zorder=2.2
+            corners,
+            closed=True,
+            fc="white" if ink.fill == "outline" else c,
+            ec=c,
+            lw=ink.lw * 1.2,
+            zorder=Z["na-front"],
         )
         body.set_gid(f"na:stem:{k}:block" if n == 0 else f"na:stem:{k}:block:{n + 1}")
         ink.ax.add_patch(body)
@@ -448,7 +480,7 @@ def _block(ink: _NAInk, k: int, d: PlacedStem, where: dict, letters: dict) -> No
         fontsize=ink.font * 0.9,
         fontweight="bold",
         color=_legible(mixed) if ink.fill == "outline" else text_color_on(mixed),
-        zorder=4,
+        zorder=Z["label"],
     )
     t.set_gid(f"na:label:{k}")
     a, i, b, j = d.pairs[0]  # the first pair (outermost): its two residue numbers, in the slot beside the stem
@@ -461,7 +493,7 @@ def _block(ink: _NAInk, k: int, d: PlacedStem, where: dict, letters: dict) -> No
         rotation=_upright(d.angle),
         fontsize=ink.font * 0.75,  # a base letter's size: the stem's name slot, empty in this style
         color=ink.front,
-        zorder=4,
+        zorder=Z["label"],
     )
     t.set_gid(f"na:stem:{k}:first")
 
@@ -490,7 +522,7 @@ def _draw_strands(ink: _NAInk, layout: Layout, style: str, where: dict, letters:
             ls=((0, (2, 2)) if path.label else (0, (1, 1.5))) if gap else "-",
             solid_capstyle="round",
             solid_joinstyle="round",
-            zorder=1.9,
+            zorder=Z["na-run"],
         )
         line.set_gid(f"na:run:{n}")
         if path.label:  # where routing put it (_label_gaps), else standing on the gap's midpoint
@@ -529,13 +561,17 @@ def _draw_na_marks(ink: _NAInk, layout: Layout, style: str, residue_colour, pt_p
                 color=ink.rung,
                 lw=ink.lw,
                 ls=(0, (1, 1.5)) if wobble else "-",
-                zorder=1.8,
+                zorder=Z["na-tie"],
             )
             line.set_gid(gid)
             continue
         for a, b, at in tie.marks:
             (tick,) = ink.ax.plot(
-                *np.c_[a, b], color=ink.colour(tie.a[0]), lw=ink.lw * 1.2, solid_capstyle="round", zorder=2.4
+                *np.c_[a, b],
+                color=ink.colour(tie.a[0]),
+                lw=ink.lw * 1.2,
+                solid_capstyle="round",
+                zorder=Z["na-tie-mark"],
             )
             tick.set_gid(f"{gid}:mark")
             t = ink.ax.text(
@@ -546,7 +582,7 @@ def _draw_na_marks(ink: _NAInk, layout: Layout, style: str, residue_colour, pt_p
                 fontsize=ink.font * _TIE_LABEL,  # a base letter's size, upright, bold, in the mark's colour
                 fontweight="bold",
                 color=_legible(ink.colour(tie.a[0])),
-                zorder=4,
+                zorder=Z["label"],
             )
             t.set_gid(f"{gid}:label")
     touched: dict[tuple[int, int], tuple[str, str]] = {}  # nucleotide -> (chain, colour) of its first toucher
@@ -574,7 +610,7 @@ def _draw_na_marks(ink: _NAInk, layout: Layout, style: str, residue_colour, pt_p
                 fontsize=ink.font * 0.75,
                 fontweight="bold" if hit else "normal",
                 color=hit[1] if hit else ink.colour(key[0]) if style == "letters" else ink.front,
-                zorder=4,
+                zorder=Z["label"],
             )
             t.set_gid(f"na:nt:{lab.chain}:{lab.tag}")
     if style != "letters":
@@ -591,7 +627,7 @@ def _draw_na_marks(ink: _NAInk, layout: Layout, style: str, residue_colour, pt_p
                     c=[touched[key][1] for key in keys],
                     edgecolors="white",
                     linewidths=ink.lw * 0.6,
-                    zorder=2.3,
+                    zorder=Z["na-contact"],
                 )
                 sc.set_gid(f"na:contact:{chain}")
     for s, end, (x, y) in layout.na_ends:
@@ -1062,7 +1098,7 @@ def _symbol(ax, shape: str, colour: str, xy, size: float, lw: float, gid: str) -
         n, r0 = {"triangle": (3, 1.15), "diamond": (4, 1.2), "star": (5, 1.15)}[shape]
         ang = np.pi / 2 + np.arange(n) * 2 * np.pi / n
         patch = Polygon(np.column_stack([x + r0 * h * np.cos(ang), y + r0 * h * np.sin(ang)]), closed=True)
-    patch.set(facecolor=colour, edgecolor=_legible("#2b2b2b"), linewidth=lw * 0.6, zorder=3.8)
+    patch.set(facecolor=colour, edgecolor=_legible("#2b2b2b"), linewidth=lw * 0.6, zorder=Z["mark"])
     patch.set_gid(gid)
     ax.add_patch(patch)
 
@@ -1212,13 +1248,13 @@ def _draw_ligands(ax, marks: list[dict], lw: float, font: float) -> None:
                 lw=lw * 0.7,
                 ls=(0, (1.2, 1.4)),
                 capstyle="round",
-                zorder=3.6,
+                zorder=Z["tether"],
             )
             tether.set_gid(f"ligand-tether:{key}:{k}")
             ax.add_patch(tether)
         if g.metal:
             fill = METAL_COLOURS.get(g.symbol, "#7f7f7f")
-            marker = Circle((cx, cy), hw, fc=fill, ec=darken(fill, 0.7), lw=lw * 0.7, zorder=3.8)
+            marker = Circle((cx, cy), hw, fc=fill, ec=darken(fill, 0.7), lw=lw * 0.7, zorder=Z["mark"])
             ink = text_color_on(fill)
         else:
             marker = FancyBboxPatch(
@@ -1229,7 +1265,7 @@ def _draw_ligands(ax, marks: list[dict], lw: float, font: float) -> None:
                 fc=LIGAND_FILL,
                 ec=LIGAND_EDGE,
                 lw=lw * 0.7,
-                zorder=3.8,
+                zorder=Z["mark"],
             )
             ink = "#5c4300"
         marker.set_gid(f"ligand:{key}")
@@ -1243,7 +1279,7 @@ def _draw_ligands(ax, marks: list[dict], lw: float, font: float) -> None:
             fontsize=font * (0.62 if g.metal else 0.6),
             fontweight="bold",
             color=ink,
-            zorder=3.9,
+            zorder=Z["mark-label"],
         )
         t.set_gid(f"ligand-label:{key}")
 
@@ -1327,7 +1363,7 @@ def _draw_linked(ax, linked: list[dict], lw: float, font: float) -> None:
             ec=LIGAND_EDGE,
             lw=lw * 0.7,
             joinstyle="round",
-            zorder=3.8,
+            zorder=Z["mark"],
         )
         star.set_gid(f"linked:{key}")
         ax.add_patch(star)
@@ -1339,7 +1375,7 @@ def _draw_linked(ax, linked: list[dict], lw: float, font: float) -> None:
                 va="center",
                 fontsize=max(_LINKED_LABEL_MIN, font * _LINKED_LABEL),
                 color="#5c4300",
-                zorder=3.9,
+                zorder=Z["mark-label"],
             )
             t.set_gid(f"linked-label:{key}")
 
@@ -1395,10 +1431,10 @@ def _draw_uniprot(ax, marks: list[dict], layout, lw: float, font: float) -> None
     for n, m in enumerate(marks):
         f, (x, y) = m["feature"], m["at"]
         colour = SITE_COLOURS.get(f.type, "#555555")
-        halo = Circle((x, y), 0.27, fc=_BACKGROUND.get(), ec=_legible("#1d1d1f"), lw=lw * 0.9, zorder=3.84)
+        halo = Circle((x, y), 0.27, fc=_BACKGROUND.get(), ec=_legible("#1d1d1f"), lw=lw * 0.9, zorder=Z["feature-ring"])
         halo.set_gid(f"feature-ring:{n}")
         ax.add_patch(halo)
-        dot = Circle((x, y), 0.17, fc=colour, ec="none", zorder=3.85)
+        dot = Circle((x, y), 0.17, fc=colour, ec="none", zorder=Z["feature"])
         dot.set_gid(f"feature:{n}")
         ax.add_patch(dot)
 
@@ -1434,7 +1470,7 @@ def _draw_links(
                 lw=lw * 2.4,
                 capstyle="round",
                 joinstyle="round",
-                zorder=3.7,
+                zorder=Z["bar"],
             )
             bar.set_gid(f"disulfide:{i}-{j}")
             ax.add_patch(bar)
@@ -1445,7 +1481,7 @@ def _draw_links(
                 c=_SULFUR,
                 edgecolors="#8a6d00",
                 linewidths=lw * 0.5,
-                zorder=3.75,
+                zorder=Z["bar-end"],
             )
             dots.set_gid(f"ss-dot:{i}-{j}")
     if look.glycans:
@@ -1497,7 +1533,7 @@ def _draw_links(
                 fc="none",
                 ec=_legible("#2b2b2b"),
                 lw=lw * 0.8,
-                zorder=3.75,
+                zorder=Z["bar-end"],
             )
             stem.set_gid(f"glycan:{r}:stem")
             ax.add_patch(stem)
@@ -1939,7 +1975,7 @@ def _draw_hbonds(c: _Canvas, overlay: HBondOverlay) -> None:
             ls=(0, (3, 2)),
             alpha=hbond_alpha(line.length, diag),
             solid_capstyle="butt",
-            zorder=2.15,
+            zorder=Z["hbond"],
         )
         artist.set_gid(line.gid)
 
@@ -2142,11 +2178,11 @@ def _canvas(
     return canvas, _Legend(entries, entry, per_row, legend_h)
 
 
-_OVER_Z = 3.5  # a helix over a sheet (Placed.over): above the strands (3), below their letters (4); its name at 4.5
+_OVER_Z = Z["over"]  # a helix over a sheet (Placed.over): above the strands, below their letters; its name at 4.5
 _OVER_ALPHA = 0.6  # its fill and edge: the strands beneath show through
 _OVER_TONE = 0.7  # coloured as its strands: darkened this much, to stand apart from them ...
 _OVER_SAME_ALPHA = 0.8  # ... its fill at this alpha, its edge (darker still) opaque
-_OVER_LOOP_Z = 3.2  # the loops of a helix over a sheet: above the strands, below the helix
+_OVER_LOOP_Z = Z["over-loop"]  # the loops of a helix over a sheet: above the strands, below the helix
 
 
 def _draw_loops(c: _Canvas, layout: Layout, loops: list[Loop], sses: list[SSE]) -> None:
@@ -2229,7 +2265,7 @@ def _draw_loops(c: _Canvas, layout: Layout, loops: list[Loop], sses: list[SSE]) 
                 va="center" if vertical else "bottom",
                 fontsize=c.font * 0.72,
                 color=_legible("#5d6877"),
-                zorder=4,
+                zorder=Z["label"],
                 rotation=0,
             )
             t.set_gid(f"loop-length:{name}")
@@ -2277,7 +2313,7 @@ def _draw_membrane(c: _Canvas, layout: Layout) -> None:
                 c=_HEADS,
                 edgecolors=_HEAD_EDGE,
                 linewidths=c.lw * 0.4,
-                zorder=0.15,
+                zorder=Z["membrane-heads"],
             )
             heads.set_gid(f"membrane-heads:{face}{row}")
         below = layout.membrane["inside"] == "below"
@@ -2447,7 +2483,14 @@ def _draw_domain_bar(c: _Canvas, layout: Layout) -> None:
         for seg in segments:
             xa, xb = x0 + (seg.lo - first) * unit, x0 + (seg.hi - first) * unit
             rect = Rectangle(
-                (xa, y), xb - xa, em, fc=seg.tone, ec=darken(seg.tone), lw=c.lw * 0.6, hatch=seg.hatch or None, zorder=2
+                (xa, y),
+                xb - xa,
+                em,
+                fc=seg.tone,
+                ec=darken(seg.tone),
+                lw=c.lw * 0.6,
+                hatch=seg.hatch or None,
+                zorder=Z["domain-bar"],
             )
             if seg.hatch and hasattr(rect, "set_hatchcolor"):  # matplotlib >= 3.11; earlier: the rc hatch colour
                 rect.set_hatchcolor(darken(seg.tone, 0.8))
@@ -2463,7 +2506,7 @@ def _draw_domain_bar(c: _Canvas, layout: Layout) -> None:
                     va="center",
                     fontsize=c.font * 0.7,
                     color=ink_on(seg.tone),
-                    zorder=2.1,
+                    zorder=Z["domain-bar-label"],
                     bbox={"boxstyle": "square,pad=0.15", "fc": seg.tone, "ec": "none"} if seg.hatch else None,
                 )
                 t.set_gid(seg.gid.replace("domain-bar:", "domain-bar-label:", 1))
@@ -2545,7 +2588,7 @@ def _draw_elements(c: _Canvas, layout: Layout) -> None:
                 fc=fill,
                 ec=edge,
                 lw=edge_w,
-                zorder=3,
+                zorder=Z["body"],
             )
             box.set_transform(Affine2D().rotate(p.angle).translate(p.cx, p.cy) + c.ax.transData)
             box.set_gid(f"eta:{p.sse.id}")
@@ -2558,7 +2601,7 @@ def _draw_elements(c: _Canvas, layout: Layout) -> None:
                     va="center",
                     fontsize=c.font * 0.9,
                     color=_label_ink(color),
-                    zorder=4,
+                    zorder=Z["label"],
                 )
                 t.set_gid(f"label:{p.sse.id}")
         else:
@@ -2570,7 +2613,9 @@ def _draw_elements(c: _Canvas, layout: Layout) -> None:
             if c.look.helix_shading == "none":
                 shade = fill
             front, back, shine = _coil(p, len(p.sse))
-            lift, alpha = (_OVER_Z - 3, _OVER_ALPHA) if p.over else (0.0, None)  # over a sheet: on top, see-through
+            lift, alpha = (
+                (_OVER_Z - Z["body"], _OVER_ALPHA) if p.over else (0.0, None)
+            )  # over a sheet: on top, see-through
             fc_fill, fc_shade = fill, shade
             if p.over and all(c.element_colour.get(k) == color for k in layout.on_sheet.get(p.sse.id, ())):
                 # the strands' own colour: a darker tone, fill partly see-through, edge opaque and darker still
@@ -2578,7 +2623,13 @@ def _draw_elements(c: _Canvas, layout: Layout) -> None:
                 fc_fill, fc_shade = to_rgba(fill, _OVER_SAME_ALPHA), to_rgba(shade, _OVER_SAME_ALPHA)
                 edge = to_rgba(darken(color, 0.45), 1.0)
             behind = PathPatch(
-                back, fc=fc_shade, ec=edge, lw=edge_w * 0.8, joinstyle="round", zorder=2.9 + lift, alpha=alpha
+                back,
+                fc=fc_shade,
+                ec=edge,
+                lw=edge_w * 0.8,
+                joinstyle="round",
+                zorder=Z["body-back"] + lift,
+                alpha=alpha,
             )
             behind.set_gid(f"helix-back:{p.sse.id}")
             c.ax.add_patch(behind)
@@ -2588,7 +2639,9 @@ def _draw_elements(c: _Canvas, layout: Layout) -> None:
             bar.set_gid(f"helix:{p.sse.id}")
             c.ax.add_patch(bar)
             if shine is not None and c.look.helix_shading == "gloss" and c.look.fill != "outline":
-                gloss = PathPatch(shine, fc=tint(fill, 0.4), ec="none", alpha=0.85 * (alpha or 1.0), zorder=3.05 + lift)
+                gloss = PathPatch(
+                    shine, fc=tint(fill, 0.4), ec="none", alpha=0.85 * (alpha or 1.0), zorder=Z["gloss"] + lift
+                )
                 gloss.set_gid(f"helix-shine:{p.sse.id}")
                 c.ax.add_patch(gloss)
             if c.look.labels:
@@ -2626,7 +2679,9 @@ def _draw_residue_numbers(c: _Canvas, layout: Layout) -> None:
                     )
                 else:  # too short to hold numbers: just past the end, beside the loop stub
                     xy, ink = np.asarray(port) - inward * 0.45 + nrm * 0.42, _legible("#4a4a4a")
-                t = c.ax.text(*xy, str(num), ha="center", va="center", fontsize=c.font * 0.62, color=ink, zorder=4.5)
+                t = c.ax.text(
+                    *xy, str(num), ha="center", va="center", fontsize=c.font * 0.62, color=ink, zorder=Z["resnum"]
+                )
                 t.set_gid(f"resnum:{p.sse.id}:{end}")
 
 
@@ -2642,7 +2697,7 @@ def _draw_ghosts(c: _Canvas, layout: Layout) -> None:
             lw=c.lw * 0.8,
             ls=(0, (2, 1.5)),
             joinstyle="round",
-            zorder=3,
+            zorder=Z["body"],
         )
         patch.set_gid(f"ghost:{g.sse.id}")
         c.ax.add_patch(patch)
@@ -2656,7 +2711,7 @@ def _draw_ghosts(c: _Canvas, layout: Layout) -> None:
                 fontsize=c.font,
                 fontweight="bold",
                 color=darken(color),
-                zorder=4,
+                zorder=Z["label"],
             )
             t.set_gid(f"ghostlabel:{g.sse.id}")
 
@@ -2677,10 +2732,14 @@ def _draw_termini(c: _Canvas, layout: Layout, sses: list[SSE]) -> None:
                 tail = range(ours[0], mine[0].start) if end == "N" else range(mine[-1].end + 1, ours[-1] + 1)
                 ink = _typical([c.residue_colour(r, chain) for r in tail]) or c.look.ink
         if ink != c.look.ink and chain not in over:
-            edge = PathPatch(Path([port, tip]), fc="none", ec=_RUN_EDGE, lw=c.loop_lw * _RUN_EDGE_W, zorder=1.99)
+            edge = PathPatch(
+                Path([port, tip]), fc="none", ec=_RUN_EDGE, lw=c.loop_lw * _RUN_EDGE_W, zorder=Z["stub-edge"]
+            )
             edge.set_gid(f"stub-edge:{end}:{chain}")
             c.ax.add_patch(edge)
-        stub = PathPatch(Path([port, tip], [Path.MOVETO, Path.LINETO]), fc="none", ec=ink, lw=c.loop_lw, zorder=2)
+        stub = PathPatch(
+            Path([port, tip], [Path.MOVETO, Path.LINETO]), fc="none", ec=ink, lw=c.loop_lw, zorder=Z["stub"]
+        )
         stub.set_gid(f"stub:{end}:{chain}")
         c.ax.add_patch(stub)
         t = c.ax.text(
@@ -2691,7 +2750,7 @@ def _draw_termini(c: _Canvas, layout: Layout, sses: list[SSE]) -> None:
             va="center",
             fontsize=c.font,
             fontweight="bold",
-            zorder=4,
+            zorder=Z["label"],
         )
         t.set_gid(f"terminus:{end}:{chain}")
         mine = groups.get(chain, [])
@@ -2707,7 +2766,7 @@ def _draw_termini(c: _Canvas, layout: Layout, sses: list[SSE]) -> None:
                     va="center",
                     fontsize=c.font * 0.72,
                     color=_legible("#5d6877"),
-                    zorder=4,
+                    zorder=Z["label"],
                 )
                 t.set_gid(f"tail-length:{end}:{chain}")
 
