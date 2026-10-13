@@ -70,3 +70,20 @@ def test_a_short_piece_does_not_join_antiparallel_helices():
     a3 = fake_sse("H", 32, 47, centroid=(10, 0, 0), axis=(0, 0, -1), chain="A")
     b = fake_sse("H", 10, 25, centroid=(20, 0, 0), axis=(0, 0, 1), chain="B")
     assert helix_bundles([a1, a2, a3, b]) == [["A:32-47", "B:10-25"]]
+
+
+def test_a_small_domain_folds_though_another_protein_has_one_domain_left():
+    """features._fold_small_copies: a protein whose only domain is small cannot fold it, and that no longer stops
+    the small domains of the other proteins from folding (it broke out of the loop)."""
+    from foldmap.features import _fold_small_copies
+
+    sses = [
+        fake_sse("H", 1, 10, chain="A"),  # protein A: one small domain
+        fake_sse("H", 1, 10, chain="B"),  # protein B: a small domain ...
+        fake_sse("H", 20, 60, chain="B"),  # ... and a large one
+        fake_sse("H", 70, 110, chain="B"),  # ... and another
+    ]
+    owner = {sses[0].id: ("A", 0), sses[1].id: ("B", 0), sses[2].id: ("B", 1), sses[3].id: ("B", 2)}
+    _fold_small_copies(owner, {"A": "A", "B": "B"}, sses, {})
+    assert sses[0].id not in owner  # A is not split
+    assert owner[sses[1].id] == owner[sses[2].id] == ("B", 0) and owner[sses[3].id] == ("B", 1)

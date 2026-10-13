@@ -888,3 +888,14 @@ def test_domain_names_keep_clear_of_the_nucleic_acid():
         dx = np.maximum(np.maximum(x0 - pts[:, 0], pts[:, 0] - x1), 0)
         dy = np.maximum(np.maximum(y0 - pts[:, 1], pts[:, 1] - y1), 0)
         assert np.hypot(dx, dy).min() >= 2 * _NAME_ROUTE, name
+
+
+def test_a_domain_moves_as_the_protomer_holding_most_of_its_items():
+    """_part_domains reads a domain's protomer (its items' copy level) by majority, ties to the lower: a domain whose
+    first item is a lent element of protomer 0 but whose other items are protomer 1's moves as protomer 1."""
+    from foldmap.layout import _domain_level
+
+    k = np.array([0.0, 1.0, 1.0, 2.0])
+    assert _domain_level([0, 1, 2], k) == 1.0
+    assert _domain_level([0, 3], k) == 0.0
+    assert _domain_level([3], k) == 2.0

@@ -369,6 +369,11 @@ def test_a_domain_name_on_a_body_or_under_a_line_is_found():
     name.set_position((helix.cx, helix.cy))
     got = figcheck.domain_checks(d)["name_collisions"]
     assert f"domain-label:N × helix:{helix.sse.id}" in got, got
+    loop = max(d.loops, key=lambda lp: len(lp.points))  # on the middle of a loop's longest run, off any body
+    a, b = max(zip(loop.points, loop.points[1:]), key=lambda ab: math.dist(*ab))
+    name.set_position(((a[0] + b[0]) / 2, (a[1] + b[1]) / 2))
+    got = figcheck.domain_checks(d)["name_collisions"]
+    assert f"domain-label:N × loop:{loop.a_id}>{loop.b_id}" in got, got
 
 
 def test_copies_need_three_matches_and_half_the_smaller_copy():

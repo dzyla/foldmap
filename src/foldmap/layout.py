@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import itertools
 import re
+from collections import Counter
 from collections.abc import Callable
 from dataclasses import KW_ONLY, dataclass, field
 from types import SimpleNamespace
@@ -2578,8 +2579,8 @@ def _part_domains(
                 oy = min(A[3], B[3]) - max(A[1], B[1]) + _DOMAIN_GAP
                 if ox <= 0 or oy <= 0:
                     continue
-                sa, sb = sx[groups[a][0]], sx[groups[b][0]]
-                ka, kb = copy_k[groups[a][0]], copy_k[groups[b][0]]
+                ka, kb = _domain_level(groups[a], copy_k), _domain_level(groups[b], copy_k)
+                sa, sb = (-1.0 if k > 0 and mirror is not None else 1.0 for k in (ka, kb))
                 s = 1.0 if (B[0] + B[2]) >= (A[0] + A[2]) else -1.0  # b lies this way of a, in x
                 if unit[a] != unit[b]:
                     if ox <= oy:  # the cheaper direction, each side going half way (as the domain's copy moves)
@@ -2602,6 +2603,12 @@ def _part_domains(
         if not clash:
             break
     return moved
+
+
+def _domain_level(ns: list[int], copy_k: np.ndarray) -> float:
+    """The protomer a domain's items (`ns`) belong to: the copy level most of them have, the lower on a tie."""
+    levels = Counter(copy_k[n] for n in ns)
+    return float(max(sorted(levels), key=lambda k: levels[k]))
 
 
 def _domain_units(

@@ -220,11 +220,12 @@ def _fold_small_copies(
     def root_of(key: tuple[str, int]) -> tuple[str, int]:  # a domain's place in its reference
         return ref.get(key[0], key[0]), key[1]
 
+    alone: set[tuple[str, int]] = set()  # small domains with nothing to fold into: their protein is not split
     while True:
         total: Counter = Counter()
         for k, key in owner.items():
             total[key] += size[k]
-        small = sorted({root_of(key) for key, n in total.items() if n < DOMAIN_MIN_SSE_RESIDUES})
+        small = sorted({root_of(key) for key, n in total.items() if n < DOMAIN_MIN_SSE_RESIDUES} - alone)
         if not small:
             break
         r, d = small[0]
@@ -239,7 +240,8 @@ def _fold_small_copies(
                     link[owner[y][1]] += 1
         others = sorted({key[1] for key in owner.values() if key[0] == r and key[1] != d})
         if not others:
-            break
+            alone.add((r, d))
+            continue
         into = max(others, key=lambda e: (link[e], -e))
         for k, key in list(owner.items()):
             if root_of(key) == (r, d):
