@@ -48,6 +48,11 @@ ENTRIES = {  # fixture name -> (PDB id, what it is for)
         "an NMR domain (model 1, backbone only) with a 14-residue N tail whose count text a loop ran through "
         "(random-100 C1)",
     ),
+    "9ON5-A": (
+        "9ON5",
+        "P2X receptor chain A, residues 100-200, backbone only: a long loop's residue count written on a strand "
+        "(random-100 C3)",
+    ),
     "7IMM-A": (
         "7IMM",
         "a dimer (assembly 1: chain A twice) whose two copies make one continuous A B B A sheet, backbone only: the "
@@ -58,7 +63,8 @@ Span = tuple[int, int]
 WINDOWS: dict[str, dict[str, Span | list[Span] | None]] = {  # fixture -> {chain: windows (first, last), None: whole}
     "7FAB-HL": {"H": None, "L": None},
     "1IGT-AB": {"A": None, "B": None},
-    "9FWZ-DB": {"D": (116, 700), "B": None},  # the barrel (139-659), its plug, the start of CTD1; FimA
+    "9FWZ-DB": {"D": (116, 700), "B": None},
+    "9ON5-A": {"A": (100, 200)},  # the barrel (139-659), its plug, the start of CTD1; FimA
     "5LJ3-V": {  # found by a seeded search over the page neighbours of the gap (plan 10 Task 5 report)
         "V": None,
         "Z": (1, 16),
@@ -77,6 +83,7 @@ TRIMS: dict[str, dict] = {
     "1BXW-A": {"backbone": True},
     "7IMM-A": {"backbone": True},
     "2DGS-A": {"first_model": True, "backbone": True},
+    "9ON5-A": {"backbone": True},
 }
 _BACKBONE = {"N", "CA", "C", "O", "CB"}
 

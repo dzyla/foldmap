@@ -48,6 +48,7 @@ from .layout import (
     Layout,
     Placed,
     PlacedStem,
+    _ink_em,
     _ink_line,
     _reach,
     _text_width,
@@ -66,6 +67,7 @@ from .layout import (
     tail_counts,
     termini,
     text_anchor,
+    text_em,
     upright_deg,
 )
 from .model import SSE, group_by_chain
@@ -2410,12 +2412,72 @@ _OVER_SAME_ALPHA = 0.8  # ... its fill at this alpha, its edge (darker still) op
 _OVER_LOOP_Z = Z["over-loop"]  # the loops of a helix over a sheet: above the strands, below the helix
 
 
+_COUNT_GAP = 0.15  # page units from a loop's line to its residue count's ink
+_COUNT_RUNS = 4  # the loop's longest straight runs tried for its count
+
+
+def _thin_boxes(points, pad: float = 0.06) -> list[tuple[float, float, float, float]]:
+    """A line as thin boxes along its segments (for box overlap tests)."""
+    pts = np.asarray(points, float).reshape(-1, 2)
+    return [(*(np.minimum(a, b) - pad), *(np.maximum(a, b) + pad)) for a, b in zip(pts, pts[1:])]
+
+
+def loop_counts(layout: Layout, loops: list[Loop], sses: list[SSE]) -> list[dict]:
+    """The residue count ("NN aa") of each loop of at least LONG_LOOP residues: name (a>b), text, centre and ink box
+    (page units, sized from the drawn text as tail counts are). Its place is the first of a few spots, the loop's
+    longest straight runs (at most _COUNT_RUNS), each at its middle, a third and two thirds, on either side, that is
+    clear of elements, text (label_boxes, tail counts), every loop's line but the run itself and the counts placed
+    before; else the first spot (beside the longest run, at its middle). Placed after routing: no keep-out."""
+    em = _ink_em(layout, layout.font_scale) or text_em(layout.width or 1.0) * layout.font_scale
+    by_id = {s.id: s for s in sses}
+    taken = [p.rect for p in [*layout.placed.values(), *layout.ghosts, *layout.stems]]
+    taken += [b for _, b in label_boxes(layout, sses)] + [t["box"] for t in tail_counts(layout, sses, loops)]
+    lines = [_thin_boxes(lp.points) for lp in loops]
+    out = []
+    for i, loop in enumerate(loops):
+        a, b = by_id.get(loop.a_id), by_id.get(loop.b_id)
+        if a is None or b is None or b.start - a.end - 1 < LONG_LOOP:
+            continue
+        text = f"{b.start - a.end - 1} aa"
+        size = TAIL_COUNT_SIZE * em
+        half = (size * _text_width(text, bold=False) / 2 + 0.04, size * 0.4 + 0.04)
+        pts = np.asarray(loop.points, float)
+        runs = sorted(range(len(pts) - 1), key=lambda j: (-np.hypot(*(pts[j + 1] - pts[j])), j))[:_COUNT_RUNS]
+        others = [box for k, boxes in enumerate(lines) if k != i for box in boxes]
+        spots = []
+        for j in runs:
+            p, q = pts[j], pts[j + 1]
+            d = q - p
+            vertical = abs(d[1]) > abs(d[0])
+            sides = (
+                (np.array([1.0, 0.0]), np.array([-1.0, 0.0]))
+                if vertical
+                else (np.array([0.0, 1.0]), np.array([0.0, -1.0]))
+            )
+            for t in (0.5, 1 / 3, 2 / 3):
+                for n in sides:
+                    reach = _COUNT_GAP + abs(n[0]) * half[0] + abs(n[1]) * half[1]
+                    c = p + d * t + n * reach
+                    own = [box for k, box in enumerate(lines[i]) if k != j]
+                    spots.append((centred_box(float(c[0]), float(c[1]), *half), own))
+        box = next(
+            (bx for bx, own in spots if not overlaps_any(bx, taken + others + own)), spots[0][0] if spots else None
+        )
+        if box is None:
+            continue
+        taken.append(box)
+        name = f"{loop.a_id}>{loop.b_id}"
+        out.append({"name": name, "text": text, "centre": ((box[0] + box[2]) / 2, (box[1] + box[3]) / 2), "box": box})
+    return out
+
+
 def _draw_loops(c: _Canvas, layout: Layout, loops: list[Loop], sses: list[SSE]) -> None:
     """Each loop: a casing in the background colour, its coloured line, arrows, residue runs and length labels."""
     boxes = np.array([p.rect for p in [*layout.placed.values(), *layout.ghosts]]).reshape(-1, 4)  # none: DNA only
     boxes = boxes + [1e-6, 1e-6, -1e-6, -1e-6]
     sse_by_id = {s.id: s for s in sses}
     over = c.backbone[1]
+    counts = {count["name"]: count for count in loop_counts(layout, loops, sses)}
     lifted = {k for k, p in layout.placed.items() if p.over}  # helices over a sheet: their loops lie on it too
     for i, loop in enumerate(loops):
         z = (_OVER_LOOP_Z if lifted & {loop.a_id, loop.b_id} else Z["loop"]) + i * 1e-3
@@ -2476,19 +2538,14 @@ def _draw_loops(c: _Canvas, layout: Layout, loops: list[Loop], sses: list[SSE]) 
         )
         line.set_gid(f"loop:{name}")
         c.ax.add_patch(line)
-        b_sse = sse_by_id.get(loop.b_id)
-        if a_sse is not None and b_sse is not None and b_sse.start - a_sse.end - 1 >= LONG_LOOP:
-            pts = np.asarray(loop.points, float)  # the residue count, beside the loop's longest straight run
-            k = max(range(len(pts) - 1), key=lambda j: np.hypot(*(pts[j + 1] - pts[j])))
-            mid, d = (pts[k] + pts[k + 1]) / 2, pts[k + 1] - pts[k]
-            vertical = abs(d[1]) > abs(d[0])
+        count = counts.get(name)
+        if count is not None:  # the residue count, beside one of the loop's long straight runs
             t = c.ax.text(
-                mid[0] + (0.15 if vertical else 0.0),
-                mid[1] + (0.0 if vertical else 0.22),
-                f"{b_sse.start - a_sse.end - 1} aa",
-                ha="left" if vertical else "center",
-                va="center" if vertical else "bottom",
-                fontsize=c.font * 0.72,
+                *count["centre"],
+                count["text"],
+                ha="center",
+                va="center",
+                fontsize=c.font * TAIL_COUNT_SIZE,
                 color=_legible("#5d6877"),
                 zorder=Z["label"],
                 rotation=0,
@@ -3144,7 +3201,7 @@ def _draw(
     linked = linked_marks(layout, loops, sses, marks)
     umarks = uniprot_marks(layout, loops, sses, look)
     hb = hbond_overlay(layout, loops, sses, look, model)
-    counts = [t["box"] for t in tail_counts(layout, sses, loops)]
+    counts = [t["box"] for t in [*tail_counts(layout, sses, loops), *loop_counts(layout, loops, sses)]]
     c, legend = _canvas(
         layout, look, title, chains, colors, element_colour, residue_colour, marks, umarks, hb, linked, loops, counts
     )

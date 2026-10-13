@@ -8,6 +8,7 @@ import pytest
 
 from foldmap import figcheck
 from foldmap.layout import label_boxes, overlaps_any, tail_counts
+from foldmap.render import loop_counts
 from foldmap.spec import draw_spec, figure_spec
 
 R100 = Path(__file__).parent / "data" / "r100"
@@ -43,3 +44,21 @@ def test_tail_count_sits_clear_beyond_its_letter(scale):
     xmin, xmax = d.figure.axes[0].get_xlim()
     ymin, ymax = d.figure.axes[0].get_ylim()
     assert all(xmin < t["box"][0] and t["box"][2] < xmax and ymin < t["box"][1] and t["box"][3] < ymax for t in counts)
+
+
+def test_loop_count_sits_clear_of_elements_lines_and_text():
+    """C3 (random-100): a long loop's "NN aa" was written beside its longest straight run with no test, so it sat on
+    strands (9ON5: the count of A:121-126>A:154-161 on strand 154-161), other loops and labels, and lay outside the
+    page (7BRG focus). It now takes the first of a few spots (the longest runs, either side, near the middle) clear
+    of elements, loops, text and earlier counts, and the page holds it."""
+    d = drawn(R100 / "9ON5-A.cif.gz")
+    counts = loop_counts(d.layout, d.loops, d.sses)
+    assert [c["name"] for c in counts] == ["A:121-126>A:154-161"]
+    assert hits(d, "loop-length") == []
+    ax = d.figure.axes[0]
+    texts = {t.get_gid(): t for t in ax.texts}
+    for c in counts:
+        assert texts[f"loop-length:{c['name']}"].get_position() == pytest.approx(c["centre"])
+        x0, y0, x1, y1 = c["box"]
+        assert ax.get_xlim()[0] < x0 < x1 < ax.get_xlim()[1] and ax.get_ylim()[0] < y0 < y1 < ax.get_ylim()[1]
+    assert figcheck.off_page(d) == []
