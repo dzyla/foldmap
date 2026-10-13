@@ -2339,19 +2339,37 @@ def domain_outline(fields, name: str) -> Path | None:
     return Path(np.vstack(points), np.concatenate(codes))
 
 
-def _draw_domains(c: _Canvas, layout: Layout) -> None:
+_COPY_DASHES = ("-", (0, (5, 2)), (0, (1.5, 1.5)), (0, (5, 2, 1.5, 2)))  # copies of one domain: one edge each
+
+
+def _draw_domains(c: _Canvas, layout: Layout) -> dict[str, Path]:
     """Named domains: a soft tinted panel each, following its elements (layout.domain_fields), its name on a plate
-    over the panel's top edge (or above it, with a leader)."""
+    over the panel's top edge (or above it, with a leader). Copies of one domain share its tone (tone_of) but each
+    has an edge of its own, deeper and dashed differently (_COPY_DASHES), so interlocked copies read apart. The
+    outlines drawn, by domain."""
     fields = domain_fields(layout)
+    tones = [tone_of(layout, k) for k in range(len(layout.domains))]
+    shared = Counter(t for t, (_, ids) in zip(tones, layout.domains) if ids)
+    seen: Counter = Counter()
+    outlines: dict[str, Path] = {}
     for k, (name, ids) in enumerate(layout.domains):
         if not ids or name not in fields.values:
             continue
         outline = domain_outline(fields, name)
-        tone = domain_paint(tone_of(layout, k), c.look)[0]
+        tone = domain_paint(tones[k], c.look)[0]
         fill = _mix(tone, c.look.background, 0.86)
+        copy = seen[tones[k]]
+        seen[tones[k]] += 1
         if outline is not None:
+            outlines[name] = outline
+            many = shared[tones[k]] > 1
             panel = PathPatch(
-                outline, fc=fill, ec=_mix(tone, c.look.background, 0.55), lw=c.lw * 0.6, zorder=Z["domain-panel"]
+                outline,
+                fc=fill,
+                ec=_mix(tone, c.look.background, (0.15 + 0.15 * (copy % 3)) if many else 0.55),
+                lw=c.lw * (0.8 if many else 0.6),
+                ls=_COPY_DASHES[copy % len(_COPY_DASHES)] if many else "-",
+                zorder=Z["domain-panel"],
             )
             panel.set_gid(f"domain:{name}")
             c.ax.add_patch(panel)
@@ -2387,6 +2405,7 @@ def _draw_domains(c: _Canvas, layout: Layout) -> None:
             zorder=Z["domain-name"],
         )
         t.set_gid(f"domain-label:{name}")
+    return outlines
 
 
 class BarSegment(NamedTuple):
@@ -2528,26 +2547,48 @@ def _draw_domain_bar(c: _Canvas, layout: Layout) -> None:
             t.set_gid(seg.gid.replace("domain-bar:", "domain-bar-label:", 1))
 
 
-def _draw_sheet_panels(c: _Canvas, layout: Layout) -> None:
-    """A pale panel behind each sheet."""
-    if c.look.sheet_panels:
-        for k, ids in enumerate(layout.sheets):
-            if len(ids) < 2:
-                continue
-            rects = np.array([layout.placed[i].rect for i in ids] + [g.rect for g in block_ghosts(layout, k)])
-            x0, y0 = rects[:, 0].min() - 0.3, rects[:, 1].min() - 0.3
-            x1, y1 = rects[:, 2].max() + 0.3, rects[:, 3].max() + 0.3
-            panel = FancyBboxPatch(
-                (x0, y0),
-                x1 - x0,
-                y1 - y0,
-                boxstyle="round,pad=0,rounding_size=0.35",
-                fc=_mix(c.look.background, c.look.ink, 0.07) if c.look.background != "#ffffff" else _PANEL,
-                ec="none",
-                zorder=Z["sheet-panel"],
-            )
-            panel.set_gid(f"sheet-panel:{k}")
-            c.ax.add_patch(panel)
+def _draw_sheet_panels(c: _Canvas, layout: Layout, outlines: dict[str, Path] | None = None) -> None:
+    """A pale panel behind each sheet. With named domains (`outlines`, _draw_domains), a sheet whose strands are all
+    one domain's takes that domain's tint, a little deeper than its panel; a sheet several domains share stays pale,
+    with each of those domains' edges drawn over it, clipped to it, so the domains stay visible inside sheets."""
+    if not c.look.sheet_panels:
+        return
+    owner = {i: d for d, (_, ids) in enumerate(layout.domains) for i in ids}
+    for k, ids in enumerate(layout.sheets):
+        if len(ids) < 2:
+            continue
+        rects = np.array([layout.placed[i].rect for i in ids] + [g.rect for g in block_ghosts(layout, k)])
+        x0, y0 = rects[:, 0].min() - 0.3, rects[:, 1].min() - 0.3
+        x1, y1 = rects[:, 2].max() + 0.3, rects[:, 3].max() + 0.3
+        fill = _mix(c.look.background, c.look.ink, 0.07) if c.look.background != "#ffffff" else _PANEL
+        mine = sorted({owner[i] for i in ids if i in owner})
+        names = [layout.domains[d][0] for d in mine if outlines and layout.domains[d][0] in outlines]
+        if len(mine) == 1 and len(names) == 1 and all(i in owner for i in ids):
+            fill = _mix(domain_paint(tone_of(layout, mine[0]), c.look)[0], c.look.background, 0.78)
+        panel = FancyBboxPatch(
+            (x0, y0),
+            x1 - x0,
+            y1 - y0,
+            boxstyle="round,pad=0,rounding_size=0.35",
+            fc=fill,
+            ec="none",
+            zorder=Z["sheet-panel"],
+        )
+        panel.set_gid(f"sheet-panel:{k}")
+        c.ax.add_patch(panel)
+        if len(names) > 1:
+            for d, name in zip(mine, names):
+                tone = domain_paint(tone_of(layout, d), c.look)[0]
+                edge = PathPatch(
+                    outlines[name],
+                    fc="none",
+                    ec=_mix(tone, c.look.background, 0.3),
+                    lw=c.lw * 0.8,
+                    zorder=Z["sheet-domain-edge"],
+                )
+                edge.set_clip_path(panel)
+                edge.set_gid(f"sheet-domain-edge:{k}:{name}")
+                c.ax.add_patch(edge)
 
 
 def _draw_elements(c: _Canvas, layout: Layout) -> None:
@@ -2885,8 +2926,8 @@ def _draw(
     )
     _draw_loops(c, layout, loops, sses)
     _draw_membrane(c, layout)
-    _draw_domains(c, layout)
-    _draw_sheet_panels(c, layout)
+    outlines = _draw_domains(c, layout)
+    _draw_sheet_panels(c, layout, outlines)
     _draw_hbonds(c, hb)
     c.fig.foldmap_hbonds = hb  # for the interactive page's hover notes
     if layout.stems or layout.na_paths:

@@ -2715,10 +2715,12 @@ def _domain_boxes(layout: Layout) -> tuple[dict[str, list[tuple]], list[tuple]]:
 
 def domain_fields(layout: Layout, names: bool = True) -> panels.Fields:
     """The panels of the drawn domains as fields (panels.panel_fields): each follows its own elements, padded by
-    DOMAIN_PAD, and wraps its name's box (unless names=False)."""
+    DOMAIN_PAD, and wraps its name's box when the name sits on its edge (names=True; a name with a leader stands
+    outside, on its own plate)."""
     owned, free = _domain_boxes(layout)
     stems = [(d.cx, d.cy, d.length / 2, d.width / 2, d.angle) for d in layout.stems]
-    return panels.panel_fields(owned, free, DOMAIN_PAD, layout.domain_names if names else None, stems)
+    on_edge = {n: b for n, b in layout.domain_names.items() if n not in layout.domain_leaders} if names else None
+    return panels.panel_fields(owned, free, DOMAIN_PAD, on_edge, stems)
 
 
 def _name_obstacles(layout: Layout, sses: list[SSE]) -> tuple[list[tuple], list[tuple]]:

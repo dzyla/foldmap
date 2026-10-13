@@ -644,8 +644,8 @@ def test_auto_domains_fold_the_small_ones_after_the_ba_row_is_kept_whole():
 
 def test_copies_of_a_domain_share_one_tone():
     """1LDM --domains auto: four copies of the chain, each split into D1 (the NAD-binding domain) and D2 (the
-    catalytic one). Every copy of D1 is drawn in one tone and every copy of D2 in another: panels, bar segments,
-    elements and one legend entry each."""
+    catalytic one). Every copy of D1 is drawn in one tone and every copy of D2 in another: panel tints (each copy
+    keeps an edge of its own), bar segments, elements and one legend entry each."""
     from matplotlib.colors import to_hex
 
     from foldmap.render import _DOMAIN_TONES, _legend_entries, domain_bars, element_colours
@@ -658,7 +658,7 @@ def test_copies_of_a_domain_share_one_tone():
     colours, _ = element_colours(lay, sses, Style())
     element = {name: {colours[k] for k in ids} for name, ids in lay.domains}
     fig = make_figure(FID / "1LDM.cif.gz", domains="auto")
-    panel = {a.get_gid()[len("domain:") :]: to_hex(a.get_edgecolor()) for a in _gids(fig, "domain:")}
+    panel = {a.get_gid()[len("domain:") :]: to_hex(a.get_facecolor()) for a in _gids(fig, "domain:")}
     for tones in (bar, {name: next(iter(c)) for name, c in element.items()}, panel):
         by_stem = {s: {tones[n] for n in stem if stem[n] == s} for s in ("D1", "D2")}
         assert all(len(t) == 1 for t in by_stem.values()) and by_stem["D1"] != by_stem["D2"], by_stem
@@ -899,3 +899,54 @@ def test_a_domain_moves_as_the_protomer_holding_most_of_its_items():
     assert _domain_level([0, 1, 2], k) == 1.0
     assert _domain_level([0, 3], k) == 0.0
     assert _domain_level([3], k) == 2.0
+
+
+def test_a_name_with_a_leader_stands_on_its_plate_outside_the_panel():
+    """A name moved outside its panel (with a leader) stands on its own plate in the page, not in a tinted island
+    of the panel; a name on the panel's edge is wrapped by it."""
+    d = _domains_drawn("2LZM")
+    assert d.layout.domain_leaders, "2LZM's N-lobe name stands above its panel"
+    ax = d.figure.axes[0]
+    to_page = ax.transData.inverted()
+    outline = {
+        p.get_gid()[len("domain:") :]: p.get_path().transformed(p.get_transform() + to_page)
+        for p in ax.patches
+        if (p.get_gid() or "").startswith("domain:")
+    }
+    for name, (x0, y0, x1, y1) in d.layout.domain_names.items():
+        inside = outline[name].contains_point(((x0 + x1) / 2, (y0 + y1) / 2))
+        assert inside is (name not in d.layout.domain_leaders), name
+
+
+def test_domains_show_inside_sheets():
+    """A sheet whose strands are all one domain's takes that domain's tint; a sheet several domains share stays
+    grey with each domain's edge drawn over it, clipped to the plate (Cas9's central sheet: RuvC-I, II and III)."""
+    from matplotlib.colors import to_hex
+
+    from foldmap.render import _PANEL, Z
+
+    ax = _domains_drawn("4OO8-A").figure.axes[0]
+    plates = {p.get_gid(): p for p in ax.patches if (p.get_gid() or "").startswith("sheet-panel:")}
+    edges = [p for p in ax.patches if (p.get_gid() or "").startswith("sheet-domain-edge:")]
+    shared = {p.get_gid().split(":")[1] for p in edges}
+    names = {p.get_gid().split(":", 2)[2] for p in edges}
+    assert {"RuvC-I", "RuvC-II", "RuvC-III"} <= names
+    for p in edges:
+        assert p.get_clip_path() is not None and p.get_zorder() == Z["sheet-domain-edge"], p.get_gid()
+    tinted = [g for g, p in plates.items() if g.split(":")[1] not in shared]
+    assert tinted and all(to_hex(plates[g].get_facecolor()) != _PANEL for g in tinted)
+    assert all(to_hex(plates[f"sheet-panel:{k}"].get_facecolor()) == _PANEL for k in shared)
+
+
+def test_copies_of_one_domain_share_a_tone_but_not_an_edge():
+    """1LDM --domains auto: D1 · A1 and D1 · A4 interlock; both D1, so one tint, but each copy's panel has its own
+    edge (colour and dash), so the two read as two panels."""
+    from matplotlib.colors import to_hex
+
+    ax = _domains_drawn("1LDM-auto").figure.axes[0]
+    panel = {p.get_gid()[len("domain:") :]: p for p in ax.patches if (p.get_gid() or "").startswith("domain:")}
+    a, b = panel["D1 · A1"], panel["D1 · A4"]
+    assert to_hex(a.get_facecolor()) == to_hex(b.get_facecolor())
+    assert (to_hex(a.get_edgecolor()), a.get_linestyle()) != (to_hex(b.get_edgecolor()), b.get_linestyle())
+    d1 = [p for n, p in panel.items() if n.startswith("D1")]
+    assert len({(to_hex(p.get_edgecolor()), str(p.get_linestyle())) for p in d1}) == len(d1) == 4
