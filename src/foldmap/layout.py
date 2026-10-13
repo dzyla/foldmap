@@ -2673,6 +2673,10 @@ _NAME_INSET = 0.35  # page units a name keeps from its panel's side
 _NAME_SINK = 0.1  # page units a name's middle sits inside its panel's top edge: it lies on the edge, on its plate
 _NAME_STEP = 0.25  # page units between the places tried along the top edge
 _NAME_CLEAR = 0.08  # page units a name keeps from anything else
+_NAME_KEEP = 0.3  # page units loops and nucleic-acid strands keep from a name: room kept round it where there is
+# any, and its routing keep-out (label_boxes) grown by _NAME_ROUTE
+_NAME_ROUTE = 0.15  # (a wider keep-out forces loops over it where room is short)
+_NAME_NEAR_NT = 0.3  # page units a name keeps from a nucleotide of an unpaired strand, beyond its letter
 _NAME_STUB = 0.8  # page units: the straight run of a loop out of an element's end, kept clear of a name
 _SHORT_LOOP = 6.0  # page units: a loop whose ends are this near takes the short way between them, kept clear too
 _LEADER = 0.8  # page units a name moved outside its panel stands above it, joined to it by a short leader
@@ -2757,8 +2761,8 @@ def _place_domain_names(layout: Layout, sses: list[SSE], font_scale: float = 1.0
 
     letters = (0.0 if layout.na_cropped else NT_ROW + _GLYPH_H) + _NAME_CLEAR
 
-    def clear(box, foot) -> bool:
-        if overlaps_any(box, solid + ways) or _trace_hits(box, traces):
+    def clear(box, foot, margin) -> bool:
+        if overlaps_any(_grown(box, margin), solid + ways) or _trace_hits(_grown(box, _NAME_NEAR_NT), traces):
             return False
         if any(_box_meets_body(_grown(box, letters), d) for d in layout.stems):  # a stem, with its letters
             return False
@@ -2772,7 +2776,9 @@ def _place_domain_names(layout: Layout, sses: list[SSE], font_scale: float = 1.0
         spots = list(_name_spots(value > 0, fields.xs, fields.ys, size * _text_width(name) + 0.1, size * _NAME_HEIGHT))
         if not spots:
             continue
-        box, foot = next((spot for spot in spots if clear(*spot)), spots[0])
+        box, foot = next(  # a place with room for the margin loops keep (_NAME_KEEP), else one without
+            (spot for margin in (_NAME_KEEP, 0.0) for spot in spots if clear(*spot, margin)), spots[0]
+        )
         layout.domain_names[name] = box
         if foot is not None:
             layout.domain_leaders[name] = foot
@@ -3153,8 +3159,8 @@ def label_boxes(layout: Layout, sses: list[SSE]) -> list[tuple[str, tuple[float,
     for n, tie in enumerate(layout.na_ties):  # a long tie's labels at its two marks
         for end, (_, _, (x, y)) in enumerate(tie.marks):
             out.append((f"tie-label:{n}:{end}", centred_box(x, y, _GLYPH_W / 2 + 0.05, _GLYPH_H / 2)))
-    for name, box in layout.domain_names.items():  # a domain's name, on its panel's edge (_place_domain_names)
-        out.append((f"domain-label:{name}", box))
+    for name, box in layout.domain_names.items():  # a domain's name, on its panel's edge (_place_domain_names), with
+        out.append((f"domain-label:{name}", _grown(box, _NAME_ROUTE)))  # room so no line or nucleotide runs by it
     for name, ((x, y0), (_, y1)) in layout.domain_leaders.items():
         out.append((f"domain-leader:{name}", (x - 0.1, min(y0, y1), x + 0.1, max(y0, y1))))
     return out

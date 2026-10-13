@@ -857,3 +857,34 @@ def test_every_layer_takes_its_place_from_the_one_table(path, kw):
         assert a.get_zorder() in (z, z + Z["over"] - Z["body"]), (gid, a.get_zorder())  # or lifted over a sheet
     assert {"strand:", "label:", "terminus:"} <= seen
     assert {"6ZS5": {"disulfide:"}, "1C3W": {"ligand-tether:", "ligand:"}, "8UTF": {"ghost:"}}[path.stem] <= seen
+
+
+def _nucleic_points(fig) -> np.ndarray:
+    """Page points along the drawn single nucleic-acid strands (na:run:) and the contact beads on them (na:...)."""
+    ax = fig.axes[0]
+    to_page = ax.transData.inverted()
+    pts = []
+    for a in ax.patches:
+        if (a.get_gid() or "").startswith("na:run:"):
+            for poly in a.get_path().transformed(a.get_transform()).to_polygons(closed_only=False):
+                poly = to_page.transform(poly)
+                pts += [p + t * (q - p) for p, q in zip(poly, poly[1:]) for t in np.linspace(0, 1, 30)]
+    for c in ax.collections:
+        if (c.get_gid() or "").startswith("na:"):
+            pts += list(c.get_offsets())
+    return np.array(pts)
+
+
+def test_domain_names_keep_clear_of_the_nucleic_acid():
+    """Cas9 drawn whole: no name is boxed in by the guide RNA or touches a nucleotide's bead, so none reads as a
+    nucleotide's label. Strands are routed _NAME_ROUTE clear of a name, and a name takes a place with room round
+    it where there is any. At 396e4a1 + Task 3: RuvC-II's plate 0.09 from bead A."""
+    from foldmap.layout import _NAME_ROUTE
+
+    d = _domains_drawn("4OO8")
+    pts = _nucleic_points(d.figure)
+    assert len(pts)
+    for name, (x0, y0, x1, y1) in d.layout.domain_names.items():
+        dx = np.maximum(np.maximum(x0 - pts[:, 0], pts[:, 0] - x1), 0)
+        dy = np.maximum(np.maximum(y0 - pts[:, 1], pts[:, 1] - y1), 0)
+        assert np.hypot(dx, dy).min() >= 2 * _NAME_ROUTE, name
