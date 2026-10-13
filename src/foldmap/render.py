@@ -44,6 +44,7 @@ from .layout import (
     NT_ROW,
     PITCH,
     SHAFT,
+    TAIL_COUNT_SIZE,
     Layout,
     Placed,
     PlacedStem,
@@ -62,6 +63,7 @@ from .layout import (
     overlaps_any,
     resolve,
     stem_label_pos,
+    tail_counts,
     termini,
     text_anchor,
     upright_deg,
@@ -97,7 +99,7 @@ _LIPID, _HEADS, _HEAD_EDGE = "#f7f0de", "#e6d3a3", "#c2a765"  # membrane band, l
 _LIPID_ALPHA = 0.8  # the band over a sheet's plate lets the plate show through
 _RUN_EDGE, _RUN_EDGE_W = "#3a3a3a", 1.8  # dark edge under residue-coloured loops (pale colours stay legible)
 _SHORT_HELIX = 1.6  # helices/3-10 boxes shorter than this hold their residue numbers past the ends
-LONG_LOOP, LONG_TAIL = 25, 10  # loops / chain ends at least this many residues get a residue-count label
+LONG_LOOP = 25  # loops at least this many residues get a residue-count label (chain ends: layout.LONG_TAIL)
 _DOMAIN_TONES = (  # one hue per domain: Paul Tol's muted set less its indigo (too near the RNA purple), ordered so
     # that neighbours in sequence differ most; colour-blind safe (tests/test_domains.py checks it)
     "#44aa99",  # teal
@@ -2324,9 +2326,12 @@ def _canvas(
     hb,
     linked=(),
     loops: list[Loop] = (),
+    texts=(),
 ) -> tuple[_Canvas, _Legend]:
     """The figure, its axes and every size the steps share; also lays the legend out, as it sets the page width."""
     x0, y0, x1, y1 = layout.bounds
+    for bx0, by0, bx1, by1 in texts:  # texts placed outside the elements' bounds (tail counts)
+        x0, y0, x1, y1 = min(x0, bx0), min(y0, by0), max(x1, bx1), max(y1, by1)
     for m in [*marks, *({"centre": m["text_at"], "half": m["half"]} for m in linked if m["text_at"])]:
         (cx, cy), (hw, hh) = m["centre"], m["half"]  # markers may sit just outside the elements' bounds
         x0, y0, x1, y1 = min(x0, cx - hw), min(y0, cy - hh), max(x1, cx + hw), max(y1, cy + hh)
@@ -2980,7 +2985,7 @@ def _draw_ghosts(c: _Canvas, layout: Layout) -> None:
             t.set_gid(f"ghostlabel:{g.sse.id}")
 
 
-def _draw_termini(c: _Canvas, layout: Layout, sses: list[SSE]) -> None:
+def _draw_termini(c: _Canvas, layout: Layout, sses: list[SSE], loops: list[Loop]) -> None:
     """The N and C terminal stubs, their letters and long-tail lengths."""
     groups = group_by_chain(sses)
     over = c.backbone[1]
@@ -3017,22 +3022,17 @@ def _draw_termini(c: _Canvas, layout: Layout, sses: list[SSE]) -> None:
             zorder=Z["label"],
         )
         t.set_gid(f"terminus:{end}:{chain}")
-        mine = groups.get(chain, [])
-        ours = [r for r, ch in enumerate(layout.res_chain) if ch == chain] if layout.res_chain else []
-        if mine and ours:  # a long unstructured end: say how long, so it is not mistaken for a short stub
-            n_tail = (mine[0].start - ours[0]) if end == "N" else (ours[-1] - mine[-1].end)
-            if n_tail >= LONG_TAIL:
-                at = np.add(port, np.asarray(ex) * (END_LABEL + 0.62))
-                t = c.ax.text(
-                    *at,
-                    f"{n_tail} aa",
-                    ha="center",
-                    va="center",
-                    fontsize=c.font * 0.72,
-                    color=_legible("#5d6877"),
-                    zorder=Z["label"],
-                )
-                t.set_gid(f"tail-length:{end}:{chain}")
+    for count in tail_counts(layout, sses, loops):  # a long unstructured end: how long, not taken for a short stub
+        t = c.ax.text(
+            *count["centre"],
+            count["text"],
+            ha="center",
+            va="center",
+            fontsize=c.font * TAIL_COUNT_SIZE,
+            color=_legible("#5d6877"),
+            zorder=Z["label"],
+        )
+        t.set_gid(f"tail-length:{count['end']}:{count['chain']}")
 
 
 _NA_ENTRY = re.compile(r"(DNA|RNA|DNA/RNA) \(")  # the legend text of a nucleic-acid backbone
@@ -3144,8 +3144,9 @@ def _draw(
     linked = linked_marks(layout, loops, sses, marks)
     umarks = uniprot_marks(layout, loops, sses, look)
     hb = hbond_overlay(layout, loops, sses, look, model)
+    counts = [t["box"] for t in tail_counts(layout, sses, loops)]
     c, legend = _canvas(
-        layout, look, title, chains, colors, element_colour, residue_colour, marks, umarks, hb, linked, loops
+        layout, look, title, chains, colors, element_colour, residue_colour, marks, umarks, hb, linked, loops, counts
     )
     _draw_loops(c, layout, loops, sses)
     _draw_membrane(c, layout)
@@ -3158,7 +3159,7 @@ def _draw(
             c.ax, layout, sses, c.residue_colour, c.look.fill, c.lw, c.font, c.pt_per_unit, c.look, c.backbone[0]
         )
     _draw_residue_numbers(c, layout)
-    _draw_termini(c, layout, sses)
+    _draw_termini(c, layout, sses, loops)
     # the bars once: a loop's cysteine off the text drawn so far (loop lengths, chain ends, residue numbers); a
     # strand's letter then slides off the bars that pass under it (not when residue numbers share its shaft)
     keep = link_keep(c.lw * 2.4, c.pt_per_unit, c.fig.dpi)

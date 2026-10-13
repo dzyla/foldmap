@@ -7,13 +7,13 @@
     python scripts/make_r100_fixtures.py 7FAB-HL       # only these fixtures
 
 Waters and hydrogens are dropped, and the water subchains leave the assembly generators (gemmi cannot build from a
-subchain the file lacks). An entry in WINDOWS keeps only the chains it names, each whole or cut to residue windows;
-the helix records keep their deposited ids. TRIMS shrinks an entry further: `assembly` keeps only the subchains of
-that biological assembly, `backbone` keeps only a protein's N, CA, C, O and CB atoms (`atoms`: these names
-instead, e.g. with the cysteines' SG for disulfides), `no_protein_sequence` drops
-the protein entities' full sequences (a big complex's are most of a small window's file). Each fixture stays under
-100 KB and all of them under 600 KB (tests/test_r100_fixtures.py). Files are written gzipped, outside
-tests/data/*.cif, so scripts/bench.py never reads them.
+subchain the file lacks). An entry in WINDOWS keeps only the chains it names, each whole or cut to residue windows; the
+helix records keep their deposited ids. TRIMS shrinks an entry further: `assembly` keeps only the subchains of that
+biological assembly, `backbone` keeps only a protein's N, CA, C, O and CB atoms (`atoms`: these names instead, e.g. with
+the cysteines' SG for disulfides), `first_model` keeps an NMR ensemble's model 1, `no_protein_sequence` drops the
+protein entities' full sequences (a big complex's are most of a small window's file). Each fixture stays under 100 KB
+and all of them under 600 KB (tests/test_r100_fixtures.py). Files are written gzipped, outside tests/data/*.cif, so
+scripts/bench.py never reads them.
 """
 
 from __future__ import annotations
@@ -43,6 +43,11 @@ ENTRIES = {  # fixture name -> (PDB id, what it is for)
         "backbone only: the beta-barrel membrane estimate; B spans the slab without defining it (C-MEM-BARREL)",
     ),
     "1BXW-A": ("1BXW", "OmpA, an 8-strand outer-membrane beta-barrel, backbone only: the control (C-MEM-BARREL)"),
+    "2DGS-A": (
+        "2DGS",
+        "an NMR domain (model 1, backbone only) with a 14-residue N tail whose count text a loop ran through "
+        "(random-100 C1)",
+    ),
     "7IMM-A": (
         "7IMM",
         "a dimer (assembly 1: chain A twice) whose two copies make one continuous A B B A sheet, backbone only: the "
@@ -71,6 +76,7 @@ TRIMS: dict[str, dict] = {
     "9FWZ-DB": {"backbone": True, "no_protein_sequence": True},
     "1BXW-A": {"backbone": True},
     "7IMM-A": {"backbone": True},
+    "2DGS-A": {"first_model": True, "backbone": True},
 }
 _BACKBONE = {"N", "CA", "C", "O", "CB"}
 
@@ -83,6 +89,9 @@ def _protein(r: gemmi.Residue) -> bool:
 def build(text: str, window: dict[str, Span | list[Span] | None] | None = None, trim: dict | None = None) -> bytes:
     trim = trim or {}
     st = gemmi.read_structure_string(text)
+    if trim.get("first_model"):  # an NMR ensemble: model 1 only
+        while len(st) > 1:
+            del st[len(st) - 1]
     st.remove_waters()
     st.remove_hydrogens()
     if window:

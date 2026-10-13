@@ -41,6 +41,9 @@ _ROW_SPACING = 3.2  # between stack rows: room for a chain-end label below one r
 LABEL_GAP = 0.3  # a helix label's centre sits this far beyond the side of the element box
 END_STUB = 0.7  # chain-end stub length
 END_LABEL = 1.15  # distance from a chain-end port to its N/C letter
+LONG_TAIL = 10  # a chain end with this many residues or more past its last element gets a count ("14 aa")
+TAIL_COUNT_SIZE = 0.72  # that count's text size, as a fraction of the figure's
+_TAIL_COUNT_GAP = 0.08  # page units between the N/C letter's ink and the count's
 _GLYPH_W, _GLYPH_H = 0.32, 0.42  # rough label glyph size in page units, for keep-out boxes
 IN_PER_UNIT = 0.30  # render: inches per page unit, at most
 MAX_WIDTH_IN = 7.2  # render: the widest figure (double-column width), inches
@@ -245,6 +248,7 @@ class Layout:
     cons_label: str = ""  # legend text saying where the grades come from
     copy_ties: dict[str, tuple[str, bool]] = field(default_factory=dict)  # copy chain -> (its protomer-0 mate chain,
     # drawn as its mirror image): the symmetry ties asked for (_symmetry_ties), kept when _separate moves one by one
+    font_scale: float = 1.0  # Style.font_scale the figure is drawn with (texts placed in the layout are sized by it)
 
     @property
     def dna(self) -> list[PlacedStem]:  # earlier name
@@ -2462,6 +2466,7 @@ def build_layout(
     lay.na_traces = traces
     lay.frame = frame
     lay.copy_ties = copy_ties
+    lay.font_scale = style.font_scale
     lay.ba_rows = _ba_rows(items)  # after the user's swaps
     lay.on_sheet = {
         m.sse.id: [x.sse.id for x in it.members if x.sse.kind == "E" and not x.ghost]
@@ -3053,11 +3058,14 @@ def first_pair_text(d: PlacedStem, chains: list, seqs: list) -> str:
 _FALLBACK_WIDTH = 0.6  # ems: a character the metric table lacks (about a bold lower-case letter)
 
 
-def _text_width(text: str) -> float:
+def _text_width(text: str, bold: bool = True) -> float:
     """A bold name's width in ems of its own size, from the built-in metrics of Liberation Sans Bold (Arial Bold's
-    metrics; text_metrics.py), never from the fonts this machine happens to have, so the layout is the same
-    everywhere: its advances plus pair kerning, as render's TextPath measure adds them up; snapped."""
+    metrics; text_metrics.py; Regular when not `bold`), never from the fonts this machine happens to have, so the
+    layout is the same everywhere: its advances plus pair kerning, as render's TextPath measure adds them up;
+    snapped."""
     advance, kern = text_metrics.ADVANCE, text_metrics.KERN
+    if not bold:
+        advance, kern = text_metrics.ADVANCE_NORMAL, text_metrics.KERN_NORMAL
     fallback = _FALLBACK_WIDTH * text_metrics.UNITS
     pen = sum(advance.get(c, fallback) for c in text) + sum(kern.get(a + b, 0) for a, b in zip(text, text[1:]))
     return float(_snap(pen / text_metrics.UNITS))
@@ -3340,6 +3348,58 @@ def _grown(box, pad: float) -> tuple[float, float, float, float]:
 def _element_label_box(p: Placed) -> tuple[float, float, float, float]:
     """The box around a helix's name."""
     return centred_box(*helix_label_pos(p), _GLYPH_W * len(p.label) / 2 + 0.05, _GLYPH_H / 2)
+
+
+def tail_counts(layout: Layout, sses: list[SSE], loops=()) -> list[dict]:
+    """The residue count written beyond each long chain end (at least LONG_TAIL residues past its last element):
+    end, chain, text ("14 aa"), centre and ink box (page units). Placed after routing, so not a route keep-out: the
+    box is sized from the figure's text (TAIL_COUNT_SIZE em of _ink_em) and set from the N/C letter's far edge,
+    along the stub, beside the letter on either side, then further along, the first clear of elements, text
+    (label_boxes), the loops' lines (`loops`, route.Loop) and the counts placed before; else along the stub."""
+    if not layout.res_chain:
+        return []
+    em = _ink_em(layout, layout.font_scale) or text_em(layout.width or 1.0) * layout.font_scale
+    groups = group_by_chain(sses)
+    rows: dict[str, list[int]] = {}
+    for r, ch in enumerate(layout.res_chain):
+        rows.setdefault(ch, []).append(r)
+    taken = [p.rect for p in [*layout.placed.values(), *layout.ghosts, *layout.stems]]
+    taken += [b for _, b in label_boxes(layout, sses)]
+    for loop in loops:  # loop lines as thin boxes along each segment
+        pts = np.asarray(loop.points, float).reshape(-1, 2)
+        taken += [(*np.minimum(a, b) - 0.06, *np.maximum(a, b) + 0.06) for a, b in zip(pts, pts[1:])]
+    out = []
+    for end, chain, port, ex in termini(layout, sses):
+        mine, ours = groups.get(chain, []), rows.get(chain, [])
+        if not mine or not ours:
+            continue
+        n = (mine[0].start - ours[0]) if end == "N" else (ours[-1] - mine[-1].end)
+        if n < LONG_TAIL:
+            continue
+        text = f"{n} aa"
+        size = TAIL_COUNT_SIZE * em
+        half = (size * _text_width(text, bold=False) / 2 + 0.04, size * 0.4 + 0.04)
+        ex = np.asarray(ex, float)
+        letter = np.add(port, ex * END_LABEL)
+        own = (max(_GLYPH_W / 2 + 0.05, em * _text_width(end) / 2), max(_GLYPH_H / 2, em * 0.4))
+        spots = []
+        for u in (ex, np.array([-ex[1], ex[0]]), np.array([ex[1], -ex[0]])):
+            reach = abs(u[0]) * (own[0] + half[0]) + abs(u[1]) * (own[1] + half[1]) + _TAIL_COUNT_GAP
+            spots.append(_snap(letter + u * reach))
+        spots += [_snap(spots[0] + ex * k) for k in (0.3, 0.6)]
+        boxes = [centred_box(float(c[0]), float(c[1]), *half) for c in spots]
+        box = next((b for b in boxes if not overlaps_any(b, taken)), boxes[0])
+        taken.append(box)
+        out.append(
+            {
+                "end": end,
+                "chain": chain,
+                "text": text,
+                "centre": ((box[0] + box[2]) / 2, (box[1] + box[3]) / 2),
+                "box": box,
+            }
+        )
+    return out
 
 
 def label_boxes(
