@@ -22,6 +22,22 @@ def pipeline(path, assembly="asu"):
     return bb, sses, build_sheets(sses, d.bridges)
 
 
+def text_centre(t) -> np.ndarray:
+    """The page point a stem name or base letter is centred on: render starts it at layout.text_anchor (ha "left",
+    va "baseline", rotation_mode "anchor", plan 10 Task 4), so its position is where its pen starts; other text is
+    drawn centred on its position."""
+    from foldmap.layout import text_anchor
+
+    xy = np.asarray(t.get_position(), float)
+    if t.get_horizontalalignment() != "left" or t.get_rotation_mode() != "anchor":
+        return xy
+    ax = t.axes
+    px_per_unit = ax.transData.transform((1, 0))[0] - ax.transData.transform((0, 0))[0]
+    size = t.get_fontsize() * ax.figure.dpi / 72 / px_per_unit  # page units to the em
+    bold = t.get_fontweight() in ("bold", 700)
+    return xy - np.asarray(text_anchor(t.get_text(), bold, (0.0, 0.0), size, t.get_rotation()))
+
+
 def fake_sse(kind, start, end, centroid=(0, 0, 0), axis=(1, 0, 0), chain="A"):
     lab = ResLabel(chain, start, "", "ALA")
     last = ResLabel(chain, end, "", "ALA")

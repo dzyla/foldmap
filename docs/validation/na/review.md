@@ -214,3 +214,19 @@ The same six entries fail as in the 11a rerun: 30QM, 4PJO, 3KTQ, 4YBB, 1YTB and 
 - 46b2e90 (kinked helix pieces held end to end) moves only pieces split at a kink, and no campaign protein has a kink split.
 
 Seconds differ by up to 2.3 s on single entries (4YBB 12.4 -> 10.1; every other entry by at most 0.7 s). This is machine load only: the campaign ran beside two test-suite runs.
+
+## Plan 10 T4 (2026-10-13, base 7ec7e32 plus plan 10 Task 4, stem names 0.25 em beyond their own letters; report.md, report.json, run.log): **33/39 pass**
+
+The same six entries fail as in the plan 11b rerun: 30QM, 4PJO, 3KTQ, 4YBB, 1YTB and 3CRX. No entry that passed now fails, and no judged metric changed.
+
+Task 4 moves every stem name in from one glyph beyond its letter row to 0.25 em beyond the row's ink (and a block style's first-pair numbers to 0.25 em beyond the rail). The names' keep-out boxes move with them, so some nucleic-acid runs route differently. report.json was compared field by field with the plan 11b rerun (eb0bb52) and with plan 10 Task 3's comparison run. Both comparisons give the same result: only two reported-not-judged counts changed.
+
+| Entry | Change | Cause |
+|---|---|---|
+| 2GIS | na_run_crossings 4 -> 6 | Runs route round the names' new boxes beside the letter rows |
+| 3IGI | na_run_crossings 18 -> 17 | Same |
+| 4YBB | na_run_crossings 113 -> 110 | Same (block style: the first-pair numbers sit beside the rail, level with the middle of the stem) |
+| 1KX5 | na_run_crossings 6 -> 4 | Same |
+| 4OO8 | na_protein_crossings 13 -> 11 | Same |
+
+Seconds differ by at most 0.7 s on any entry. This is machine load only.

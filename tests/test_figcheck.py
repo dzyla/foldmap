@@ -316,7 +316,8 @@ def test_a_loop_length_is_not_crossed_by_its_own_loop():
 
 
 def test_stem_names_are_measured_to_letters_not_to_the_stem_box():
-    """1EHZ named: the D arm's name sits near its stem's box but far from its letters (plan 10, measured)."""
+    """1EHZ named: the D arm's name sits inside its turned stem's box (page-upright) but clear of its letters (plan 10
+    Task 4 put it 0.25 em beyond them; before, it sat near the box and far from the letters)."""
     d = drawn(DATA / "na" / "1EHZ.cif.gz", names=[str(Path(__file__).parents[1] / "docs" / "names" / "1EHZ-trna.yaml")])
     _liberation(d)
     got = figcheck.stem_name_gaps(d)
@@ -325,7 +326,7 @@ def test_stem_names_are_measured_to_letters_not_to_the_stem_box():
     name = next(t for t in d.figure.axes[0].texts if t.get_gid() == f"na:label:{k}")
     box = to_page.transform_bbox(name.get_window_extent(figcheck._renderer(d.figure))).extents
     rect_gap = figcheck._box_gap(box, d.layout.stems[k].rect)
-    assert got[f"na:label:{k}"][0] > rect_gap + 0.2
+    assert rect_gap == 0 and got[f"na:label:{k}"][0] > 0.05  # measured to the box, the gap would be 0
 
 
 def test_a_strand_drawn_the_wrong_way_is_an_order_violation():

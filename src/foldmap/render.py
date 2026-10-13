@@ -31,6 +31,7 @@ from .hbonds import find_hbonds, parse_selection
 from .layout import (
     DNA_MINOR,
     DNA_PITCH,
+    DNA_TUBE,
     DNA_W,
     DOMAIN_NAME_SIZE,
     END_LABEL,
@@ -51,6 +52,7 @@ from .layout import (
     dna_to_page,
     dna_y,
     domain_fields,
+    first_pair_text,
     font_pt,
     helix_label_pos,
     label_boxes,
@@ -58,6 +60,8 @@ from .layout import (
     resolve,
     stem_label_pos,
     termini,
+    text_anchor,
+    upright_deg,
 )
 from .model import SSE, group_by_chain
 from .na_paths import midway
@@ -262,7 +266,7 @@ def backbone_colours(
     return na, loops
 
 
-_DNA_TUBE = 0.42  # backbone tube width, page units
+_DNA_TUBE = DNA_TUBE  # backbone tube width, page units
 _DNA_SEG = 16  # points along each half-turn
 
 
@@ -320,15 +324,14 @@ class _NAInk(NamedTuple):
     chains: list  # chain of each strand
     backbone: dict  # chain -> backbone colour (the shared nucleic-acid backbone helper's answer)
     seqs: list  # per strand, the residue number of each nucleotide as the structure file writes it
+    em: float  # page units of one em of the text (font / points per page unit)
 
     def colour(self, strand: int) -> str:
         """The backbone colour of a strand: stem rails, ribbons, blocks, paths, hairpins, ties."""
         return self.backbone[self.chains[strand]]
 
 
-def _upright(angle: float) -> float:
-    rot = float(np.degrees(angle))
-    return rot - 180 if rot > 90 else rot + 180 if rot < -90 else rot
+_upright = upright_deg
 
 
 def _rung_lines(ink: _NAInk, k: int, d: PlacedStem, inset: float = 0.0) -> None:
@@ -376,11 +379,12 @@ def _ladder(ink: _NAInk, k: int, d: PlacedStem, where: dict, letters: dict) -> N
 
 def _draw_stem_label(ink: _NAInk, k: int, d: PlacedStem) -> None:
     t = ink.ax.text(
-        *stem_label_pos(d),
+        *text_anchor(d.name, True, stem_label_pos(d), ink.em * 0.8, _upright(d.angle)),
         d.name,
-        ha="center",
-        va="center",
+        ha="left",
+        va="baseline",
         rotation=_upright(d.angle),
+        rotation_mode="anchor",  # started where the layout centres it (text_anchor), as any matplotlib draws it
         fontsize=ink.font * 0.8,
         fontweight="bold",
         color=ink.front,
@@ -483,14 +487,14 @@ def _block(ink: _NAInk, k: int, d: PlacedStem, where: dict, letters: dict) -> No
         zorder=Z["label"],
     )
     t.set_gid(f"na:label:{k}")
-    a, i, b, j = d.pairs[0]  # the first pair (outermost): its two residue numbers, in the slot beside the stem
-    partner = f"{ink.chains[b]}:" if ink.chains[b] != ink.chains[a] else ""  # across chains, the partner's chain too
+    first = first_pair_text(d, ink.chains, ink.seqs)  # the outermost pair's residue numbers, in the name's slot
     t = ink.ax.text(
-        *stem_label_pos(d),
-        f"{ink.seqs[a][i]}\u00b7{partner}{ink.seqs[b][j]}",
-        ha="center",
-        va="center",
+        *text_anchor(first, False, stem_label_pos(d), ink.em * 0.75, _upright(d.angle)),
+        first,
+        ha="left",
+        va="baseline",
         rotation=_upright(d.angle),
+        rotation_mode="anchor",
         fontsize=ink.font * 0.75,  # a base letter's size: the stem's name slot, empty in this style
         color=ink.front,
         zorder=Z["label"],
@@ -601,12 +605,14 @@ def _draw_na_marks(ink: _NAInk, layout: Layout, style: str, residue_colour, pt_p
             lab = na.strands[key[0]].labels[key[1]]
             if hit and style == "letters":  # the bold coloured letter is the mark
                 marks.setdefault(hit[0], []).append((key, toucher[key], hit[1]))
+            base = na.strands[key[0]].bases[key[1]]
             t = ink.ax.text(
-                *xy,
-                na.strands[key[0]].bases[key[1]],
-                ha="center",
-                va="center",
+                *text_anchor(base, bool(hit), xy, ink.em * 0.75, rot),  # centred on xy, as the layout measures it
+                base,
+                ha="left",
+                va="baseline",
                 rotation=rot,
+                rotation_mode="anchor",
                 fontsize=ink.font * 0.75,
                 fontweight="bold" if hit else "normal",
                 color=hit[1] if hit else ink.colour(key[0]) if style == "letters" else ink.front,
@@ -666,6 +672,7 @@ def _draw_nucleic(
         [s.chain for s in na.strands],
         backbone,
         [[lab.seq for lab in s.labels] for s in na.strands],
+        font / pt_per_unit,
     )
     style = _na_style(layout, look)
     where = nucleotide_points(layout, style)  # nucleotide -> where it is drawn (bead and hydrogen bonds go there)

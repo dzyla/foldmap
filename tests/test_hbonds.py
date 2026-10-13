@@ -16,6 +16,7 @@ import pytest
 from foldmap import hbonds
 from foldmap.hbonds import HBond, Selection, find_hbonds, parse_selection
 from foldmap.io import read_model
+from helpers import text_centre
 
 DATA = Path(__file__).parent / "data"
 
@@ -567,7 +568,7 @@ def test_the_nucleotide_end_of_every_line_is_a_drawn_bead_or_letter_in_every_sty
     fig = _drawn(pdb, "hbonds=na", "hbond_max=1000", f"na_style={style}")[0]
     ax = fig.axes[0]
     marks = [xy for c in ax.collections if (c.get_gid() or "").startswith("na:contact:") for xy in c.get_offsets()]
-    marks += [t.get_position() for t in ax.texts if (t.get_gid() or "").startswith("na:nt:")]
+    marks += [text_centre(t) for t in ax.texts if (t.get_gid() or "").startswith("na:nt:")]
     marks = np.array(marks, float)
     lines = _lines(fig)
     assert lines and len(marks)

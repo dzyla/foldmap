@@ -14,7 +14,7 @@
 5B43: PASS
 5W1H: PASS
 5F9R: PASS
-30QM: FAIL spearman 0.521 (limit 0.6); angle_median 35.7 (limit 5.0); angle_max 109.6 (limit 5.0); stems_nearer_frac 0.833 (limit 1.0)
+30QM: FAIL spearman 0.521 (limit 0.6); procrustes 0.776 (limit 0.5); angle_median 35.7 (limit 0.05); angle_max 109.6 (limit 0.05); stems_nearer_frac 0.833 (limit 1.0)
 1URN: PASS
 4PJO: FAIL stems_nearer_frac 0.5 (limit 1.0)
 1HQ1: PASS
@@ -30,7 +30,7 @@
 1LMB: PASS
 1ZAA: PASS
 1RVA: PASS
-3CRX: FAIL procrustes 0.817 (limit 0.8)
+3CRX: FAIL procrustes 0.817 (limit 0.5)
 4LD0: PASS
 1ZBI: PASS
 1KF1: PASS

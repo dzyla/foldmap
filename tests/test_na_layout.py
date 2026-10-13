@@ -15,6 +15,7 @@ from matplotlib.colors import to_hex
 from foldmap.cli import make_figure_and_loops, make_layout
 from foldmap.layout import PlacedStem, label_boxes
 from foldmap.route import route_loops
+from helpers import text_centre
 
 NA = Path(__file__).parent / "data" / "na"
 FIXTURES = ["30QM", "1EHZ", "4OO8", "1KX5", "1IHF", "3CRX", "4YBB"]
@@ -558,32 +559,35 @@ def test_bulged_nucleotides_get_room_on_their_rail(pdb):
             assert np.all(np.diff(along) >= 0.9 * _MIN_RISE * SCALE), (d.name, np.round(np.diff(along), 3))
 
 
-def _upright_size(t, renderer):
-    """Width and height (display units) of a text as if written level."""
-    rot = t.get_rotation()
-    t.set_rotation(0)
-    box = t.get_window_extent(renderer)
-    t.set_rotation(rot)
-    return box.width, box.height
+def _page_em(d) -> float:
+    """One em of a drawn figure's text in page units: a base letter is drawn at 0.75 em (render._draw_na_marks);
+    points -> pixels (dpi / 72) -> page units (the axes' pixels per unit)."""
+    ax = d.figure.axes[0]
+    letter = next(t for t in ax.texts if (t.get_gid() or "").startswith("na:nt:"))
+    px_per_unit = ax.transData.transform((1, 0))[0] - ax.transData.transform((0, 0))[0]
+    return letter.get_fontsize() / 0.75 * d.figure.dpi / 72 / px_per_unit
 
 
 @pytest.mark.parametrize("pdb", ["1KX5", "30QM", "3CRX"])
 def test_stem_names_keep_clear_of_base_letters(pdb):
-    from matplotlib.backends.backend_agg import FigureCanvasAgg
+    """No stem name sits on a base letter: its ink (figcheck, fixed hinting, Liberation Sans) keeps at least half the
+    0.25 em margin from every letter's ink, its own row's (where it sits at the margin: plan 10 Task 4, which
+    replaced the "a letter and a half" clearance of the one-glyph-out place) and every other stem's."""
+    from foldmap import figcheck
+    from foldmap.layout import _INK_MARGIN
+    from foldmap.spec import draw_spec, figure_spec
 
-    fig, _ = make_figure_and_loops(_path(pdb))
-    renderer = FigureCanvasAgg(fig).get_renderer()
-    to_px = fig.axes[0].transData.transform
-    names, letters = _gid(fig, "na:label:"), _gid(fig, "na:nt:")
+    d = draw_spec(figure_spec(_path(pdb)))
+    if reason := figcheck.ink_font_reason(d.figure):
+        pytest.skip(reason)
+    em, ax = _page_em(d), d.figure.axes[0]
+    to_page = ax.transData.inverted()
+    ink = [(name, to_page.transform_bbox(box).extents) for _, name, box in figcheck.measure(d).texts]
+    names = [(n, b) for n, b in ink if n.startswith("na:label:")]
+    letters = [(n, b) for n, b in ink if n.startswith("na:nt:")]
     assert names and letters
-    for n in names:  # each letter (as a disc) against the name's own box, written along its stem
-        w, h = _upright_size(n, renderer)
-        c, rot = to_px(n.get_position()), np.radians(n.get_rotation())
-        along, across = np.array([np.cos(rot), np.sin(rot)]), np.array([-np.sin(rot), np.cos(rot)])
-        for t in letters:
-            r = max(_upright_size(t, renderer)) * 1.5  # a letter and a half from its centre: read apart at a glance
-            q = to_px(t.get_position()) - c
-            assert abs(q @ along) >= w / 2 + r or abs(q @ across) >= h / 2 + r, (n.get_text(), t.get_gid())
+    near = [(n, m) for n, a in names for m, b in letters if figcheck._box_gap(a, b) < 0.5 * _INK_MARGIN * em]
+    assert not near, (pdb, near)
 
 
 def test_layout_is_the_same_whatever_the_hash_seed():
@@ -1406,7 +1410,7 @@ def test_every_block_bar_numbers_its_first_pair_beside_it():
         assert text.get_text() == f"{lay.nucleic.strands[a].labels[i].seq}\u00b7{lay.nucleic.strands[b].labels[j].seq}"
         assert text.get_fontsize() == pytest.approx(letter)
         x0, y0, x1, y1 = boxes[f"stem-label:{k}"]  # the slot the layout reserves beside the stem
-        x, y = text.get_position()
+        x, y = text_centre(text)
         assert x0 <= x <= x1 and y0 <= y <= y1
         assert text.get_rotation() % 360 < 90 or text.get_rotation() % 360 > 270  # reads left to right
 
@@ -2094,10 +2098,9 @@ def test_a_gap_is_named_as_a_gap_in_warnings():
 
 @pytest.mark.parametrize("pdb", ["2GIS", "30QM", "1EHZ", "4OO8", "1KX5", "3CRX"])
 def test_stem_labels_sit_by_their_own_stem_clear_of_other_text(pdb):
-    from matplotlib.backends.backend_agg import FigureCanvasAgg
-
-    from foldmap.cli import make_figure
+    from foldmap import figcheck
     from foldmap.layout import stem_label_pos
+    from foldmap.spec import draw_spec, figure_spec
 
     lay, sses, bb = make_layout(NA / f"{pdb}.cif.gz")
     route_loops(lay, sses, bb)
@@ -2111,13 +2114,14 @@ def test_stem_labels_sit_by_their_own_stem_clear_of_other_text(pdb):
         p = stem_label_pos(d)
         dist = [body(p, e) for e in lay.stems]
         assert dist[k] == min(dist) and dist[k] <= d.width, (pdb, d.name)
-    fig = make_figure(NA / f"{pdb}.cif.gz")
-    FigureCanvasAgg(fig).draw()
-    r = fig.canvas.get_renderer()
-    texts = [(t.get_gid() or "", t.get_window_extent(r)) for t in fig.axes[0].texts]
+    d = draw_spec(figure_spec(NA / f"{pdb}.cif.gz"))
+    if reason := figcheck.ink_font_reason(d.figure):
+        pytest.skip(reason)
+    texts = [(name, box) for _, name, box in figcheck.measure(d).texts]  # ink boxes (fixed hinting), pixels
     for g, box in texts:
-        if g.startswith("na:label:"):
-            assert not [h for h, b in texts if h != g and box.overlaps(b)], (pdb, g)  # 1KX5 labels 6, 9, 12, 15 did
+        if g.startswith("na:label:"):  # 1KX5 labels 6, 9, 12, 15 did; a name 0.25 em from its letters (plan 10
+            # Task 4) meets their line boxes (get_window_extent: line height and descent) but not their ink
+            assert not [h for h, b in texts if h != g and box.overlaps(b)], (pdb, g)
 
 
 @pytest.mark.parametrize("pdb", ["1EHZ", "2GIS"])
@@ -2177,3 +2181,67 @@ def test_no_tie_legend_without_lettered_ties(path):
     assert not [t for t in ax.texts if (t.get_gid() or "").startswith("na:tie:") and t.get_gid().endswith(":label")]
     assert not [t for t in ax.texts if "tertiary base pair" in t.get_text()]
     assert not [a for a in [*ax.lines, *ax.texts] if (a.get_gid() or "").startswith("legend-tie")]
+
+
+_TRNA_NAMES = Path(__file__).parents[1] / "docs" / "names" / "1EHZ-trna.yaml"
+
+
+@pytest.mark.parametrize(
+    "pdb, names",
+    [("1EHZ", None), ("1EHZ", _TRNA_NAMES), ("2GIS", None), ("30QM", None), ("1KX5", None)],
+    ids=["1EHZ", "1EHZ-trna-names", "2GIS", "30QM", "1KX5"],
+)
+def test_stem_name_sits_by_its_own_letters(pdb, names):
+    """Each stem's name sits 0.25 em (layout._INK_MARGIN, the margin of e9a3b53) beyond its own letter row, by the
+    ink: 1EHZ's D name sat six glyph heights above its row, T between the T arm and the D-loop run. Measured by
+    figcheck.stem_name_gaps under its fixed hinting (Liberation Sans only); the limit is that margin in page units
+    plus 1e-3 (figcheck.stem_gap_tolerance, R7). The name is also nearer its own letters than half the way to any
+    other stem, never on its letters, and the letters stay apart (nacheck letter_overlaps)."""
+    from foldmap import figcheck
+    from foldmap.layout import _INK_MARGIN
+    from foldmap.nacheck import render_checks
+    from foldmap.spec import draw_spec, figure_spec
+
+    d = draw_spec(figure_spec(_path(pdb), names=[str(names)] if names else None))
+    if reason := figcheck.ink_font_reason(d.figure):
+        pytest.skip(reason)
+    limit = figcheck.stem_gap_tolerance(_INK_MARGIN * _page_em(d))  # the margin in page units, plus 1e-3
+    gaps = figcheck.stem_name_gaps(d)
+    assert gaps and len(gaps) == len([s for s in d.layout.stems if not s.ghost])
+    far = {k: (round(own, 3), round(other, 3)) for k, (own, other) in gaps.items() if not 0 < own <= limit}
+    assert not far, (pdb, round(limit, 3), far)
+    near_other = {k: (own, other) for k, (own, other) in gaps.items() if not own < 0.5 * other}
+    assert not near_other, (pdb, near_other)
+    assert render_checks(d.layout, d.loops, d.figure, d.sses)["letter_overlaps"] == 0
+
+
+@pytest.mark.parametrize("pdb", ["1EHZ", "1KX5"])
+def test_stem_names_and_letters_are_drawn_where_the_layout_measures_them(pdb):
+    """The layout places a name by its ink (layout._ink_line: built-in Liberation Sans hulls and advances) and render
+    starts the text where that ink lands (layout.text_anchor), so the drawn ink box (figcheck, fixed hinting) is the
+    predicted one, within 5e-3 page units, and the hulls lie inside the ink (to 2e-3: matplotlib rounds kerning to
+    whole pixels at its outline size, which moves the end of a kerned name such as "DNA 1a" 1.2e-3 units on 3.10).
+    1KX5's names hold a space and a kerned pair ("DNA 1a"), where matplotlib 3.10's centring drifted 0.05 units."""
+    from foldmap import figcheck
+    from foldmap.layout import _ink_line, _ink_points, _reach, _turn
+    from foldmap.spec import draw_spec, figure_spec
+
+    d = draw_spec(figure_spec(_path(pdb)))
+    if reason := figcheck.ink_font_reason(d.figure):
+        pytest.skip(reason)
+    ax, em = d.figure.axes[0], _page_em(d)
+    to_page = ax.transData.inverted()
+    drawn = {name: (t, to_page.transform_bbox(box).extents) for t, name, box in figcheck.measure(d).texts}
+    for k, s in enumerate(d.layout.stems):
+        t, got = drawn[f"na:label:{k}"]
+        want = _reach(_ink_points(s.name, True, 0.8 * em, s.angle)) + np.tile(text_centre(t), 2)
+        assert np.all((got - want) * [-1, -1, 1, 1] > -2e-3) and np.abs(got - want).max() < 5e-3, (s.name, got - want)
+    letters = [(t, box) for name, (t, box) in drawn.items() if name.startswith("na:nt:")]
+    assert letters
+    for t, got in letters:
+        ink = _turn(_ink_line(t.get_text(), t.get_fontweight() == "bold")[0] * 0.75 * em, t.get_rotation())
+        want = _reach(ink) + np.tile(text_centre(t), 2)
+        assert np.all((got - want) * [-1, -1, 1, 1] > -2e-3) and np.abs(got - want).max() < 5e-3, (
+            t.get_gid(),
+            got - want,
+        )
