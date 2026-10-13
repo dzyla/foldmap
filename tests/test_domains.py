@@ -7,6 +7,7 @@ import numpy as np
 import pytest
 
 from foldmap.cli import main, make_figure, make_layout
+from foldmap.panels import GRID
 from helpers import FID
 
 DATA = Path(__file__).parent / "data"
@@ -33,11 +34,12 @@ def test_each_domain_gets_a_named_panel_around_all_its_elements():
     names = {t.get_text() for t in _gids(fig, "domain-label:")}
     assert set(panels) == {"ZPN", "ZPC"} and names == {"ZPN", "ZPC"}
     inv = fig.axes[0].transData.inverted()
+    near = GRID / 2  # the panel is a contour on a raster of GRID: it may cut an element's corner by up to this
     for name, ids in lay.domains:
         box = panels[name].get_window_extent().transformed(inv)
         for k in ids:
             x0, y0, x1, y1 = lay.placed[k].rect
-            assert box.x0 <= x0 + 1e-6 and x1 <= box.x1 + 1e-6 and box.y0 <= y0 + 1e-6 and y1 <= box.y1 + 1e-6
+            assert box.x0 <= x0 + near and x1 <= box.x1 + near and box.y0 <= y0 + near and y1 <= box.y1 + near
 
 
 T4L = DATA / "2LZM.cif"
@@ -549,15 +551,52 @@ def _name_overlaps(fig, name):
     return hits
 
 
-def test_a_domain_name_takes_the_top_corner_clear_of_elements_and_other_panels():
+def test_a_domain_name_takes_the_first_clear_place_on_its_panel_edge():
     """8UTF, one subunit with the docs domains: the DII panel's top left lies under a neighbour's grey strand (A′)
-    and its plate, so DII's name goes to the panel's top right, which is clear. A name whose top left is clear stays
-    there (ZPN, ZPC on 6ZS5)."""
-    kw = {"focus": "protomer", "domains": _flag_file(CAS9_FILE.parent / "8UTF-measles-F.txt")}
-    fig = make_figure(DATA / "8UTF.cif", **kw)
-    assert _name_overlaps(fig, "DII") == []
-    lay, _, _ = make_layout(UMOD, domains=DOMAINS)
-    assert lay.domain_name_right == set()
+    and its plate, so DII's name goes further along the edge, clear of elements, sheet plates and other panels."""
+    fig = make_figure(DATA / "8UTF.cif", focus="protomer", domains=_flag_file(CAS9_FILE.parent / "8UTF-measles-F.txt"))
+    ax = fig.axes[0]
+    assert [g for g in _name_overlaps(fig, "DII") if not g.startswith("domain:")] == []
+    (name,) = [t for t in ax.texts if t.get_gid() == "domain-label:DII"]
+    to_page = ax.transData.inverted()
+    for p in _gids(fig, "domain:"):
+        if p.get_gid() != "domain:DII":
+            assert not p.get_path().transformed(p.get_transform() + to_page).contains_point(name.get_position())
+
+
+def test_a_domain_name_is_tried_at_the_top_corners_then_along_the_edge_then_outside():
+    """The places a name may take on a panel (layout._name_spots), on a 6 x 3 panel: the top left and the top right
+    on its top edge, then along that edge, then above it with a leader down to the edge, then the bottom edge."""
+    from foldmap.layout import _LEADER, _NAME_INSET, _NAME_SINK, _name_spots
+
+    xs = (np.arange(0, 80) + 0.5) * GRID
+    ys = (np.arange(0, 60) + 0.5) * GRID
+    inside = (xs[None, :] > 1.0) & (xs[None, :] < 7.0) & (ys[:, None] > 2.0) & (ys[:, None] < 5.0)
+    spots = list(_name_spots(inside, xs, ys, 1.0, 0.4))
+    (b0, f0), (b1, f1) = spots[:2]
+    assert b0 == pytest.approx((1.0 + _NAME_INSET, 5.0 - _NAME_SINK - 0.2, 2.0 + _NAME_INSET, 5.0 - _NAME_SINK + 0.2))
+    assert b1[2] == pytest.approx(7.0 - _NAME_INSET) and b1[1] == pytest.approx(b0[1]) and f0 is f1 is None
+    lifted = [(b, f) for b, f in spots if f is not None]
+    assert spots.index(lifted[0]) > max(i for i, (b, f) in enumerate(spots) if f is None and b[1] > 4)
+    b, ((x, ya), (_, yb)) = lifted[0]
+    assert b[1] == pytest.approx(5.0 + _LEADER) and (ya, yb) == pytest.approx((b[1], 5.0))
+    assert spots[-1][0][3] < 2.0  # the bottom edge last
+
+
+def test_each_domain_name_keeps_clear_of_the_figure():
+    """No name's box meets an element, a sheet plate, a stem (with its letters), a label, a chain end or another
+    name, nor the straight way of a loop out of an element's end (layout._name_obstacles), on Cas9 and 6ZS5."""
+    from foldmap.layout import _name_obstacles, overlaps_any
+
+    for path, kw in [(UMOD, {"domains": DOMAINS}), (DATA / "na" / "4OO8.cif.gz", {"domains": _flag_file(CAS9_FILE)})]:
+        lay, sses, _ = make_layout(path, **kw)
+        names = dict(lay.domain_names)
+        assert set(names) == {n for n, ids in lay.domains if ids}
+        lay.domain_names, lay.domain_leaders = {}, {}
+        solid, ways = _name_obstacles(lay, sses)
+        others = list(names.values())
+        for name, box in names.items():
+            assert not overlaps_any(box, solid + ways + [b for b in others if b != box]), (path.name, name)
 
 
 # ---------------------------------------------------------------------------------------------- auto, chain by chain
@@ -653,3 +692,130 @@ def test_app_reads_a_layout_file_with_auto_or_uniprot_domains():
     assert back["domains"] == "" and back["uniprot_domains"] is True
     pairs = settings_from_document({"domains": [["N", ["res:A:13-59"]], ["C", ["res:A:1-12", "res:A:60-164"]]]})
     assert pairs["domains"] == "N=res:A:13-59\nC=res:A:1-12,res:A:60-164"
+
+
+# ------------------------------------------------------------------------------------------ panels apart, names clear
+
+MEASLES_FILE = CAS9_FILE.parent / "8UTF-measles-F.txt"
+T4L_GALLERY = [("N-lobe", ["res:A:13-59"]), ("C-lobe", ["res:A:1-12", "res:A:60-164"])]  # scripts/gallery.py
+PANEL_LIMIT = 0.02  # A16: two domains' panels share at most this fraction of the smaller panel's area
+PANEL_CASES = {  # name: (structure, options; "cas9"/"measles" stand for the docs/domains files)
+    "4OO8-A": (DATA / "na" / "4OO8.cif.gz", {"chains": ["A"], "domains": "cas9"}),
+    "4OO8": (DATA / "na" / "4OO8.cif.gz", {"domains": "cas9"}),  # protein and nucleic acid, as published
+    "8UTF-protomer": (DATA / "8UTF.cif", {"focus": "protomer", "domains": "measles"}),
+    "1LDM-auto": (FID / "1LDM.cif.gz", {"domains": "auto"}),
+    "2LZM": (T4L, {"assembly": "asu", "domains": T4L_GALLERY}),
+}
+_OVER_LABELS_GATED = ("4OO8-A", "4OO8", "8UTF-protomer")  # 4 and 3 loops over a label at 396e4a1
+
+
+def _domains_drawn(case):
+    from foldmap.spec import draw_spec, figure_spec
+
+    path, kw = PANEL_CASES[case]
+    files = {"cas9": CAS9_FILE, "measles": MEASLES_FILE}
+    given = kw["domains"]
+    kw = {**kw, "domains": _flag_file(files[given]) if isinstance(given, str) and given in files else given}
+    return draw_spec(figure_spec(path, **kw))
+
+
+@pytest.mark.parametrize("case", sorted(PANEL_CASES))
+def test_domain_panels_do_not_overlap(case):
+    """Each panel follows its own elements, so panels of different domains share at most PANEL_LIMIT of the smaller
+    one, even where their elements interleave in one sheet (Cas9's RuvC-I/II/III) or across chains (1LDM's D1);
+    every name sits on a clear plate (no text, body or line on it, figcheck); no loop is routed over a label.
+    At 396e4a1: Cas9 RuvC-II/RuvC-III 0.375 with 4 names under loops or a helix and 4 loops over labels; 8UTF F2/DIII
+    0.625 and 3 loops over labels; 1LDM D1 · A1/D1 · A4 0.566."""
+    from foldmap import figcheck
+
+    d = _domains_drawn(case)
+    got = figcheck.domain_checks(d)
+    assert len({n for n, ids in d.layout.domains if ids}) >= 2
+    assert all(f <= PANEL_LIMIT for *_, f in got["panel_overlaps"]), got["panel_overlaps"]
+    if case in _OVER_LABELS_GATED:
+        assert d.over_labels == []
+    reason = figcheck.ink_font_reason(d.figure)
+    if reason:
+        pytest.skip(reason)
+    assert got["name_collisions"] == []
+
+
+@pytest.mark.parametrize("path", [FID / "1LDM.cif.gz", DATA / "1TIM.cif", DATA / "8UUP.cif"], ids=lambda p: p.name)
+def test_domains_auto_rules_on_oligomers(path):
+    """--domains auto on oligomers: each domain in one chain, copies split alike, none under DOMAIN_MIN_SSE_RESIDUES
+    (8UUP at 396e4a1: chain F's D5, its copy lacking elements B's and D's have)."""
+    from foldmap import figcheck
+    from foldmap.spec import draw_spec, figure_spec
+
+    got = figcheck.domain_checks(draw_spec(figure_spec(path, domains="auto")))
+    assert got["cross_chain"] == got["unalike"] == got["small"] == [], got
+
+
+@pytest.mark.parametrize(
+    "path, domains",
+    [
+        (FID / "1LDM.cif.gz", "auto"),
+        (DATA / "8UUP.cif", "auto"),
+        (DATA / "8UTF.cif", [("DII · a", ["res:a:374-456"]), ("DII · c", ["res:c:374-456"])]),
+    ],
+    ids=["1LDM-auto", "8UUP-auto", "8UTF-DII"],
+)
+def test_domain_views_keep_copies_alike(path, domains):
+    """A15 in the domains view: domains are moved apart with their copies (each copy's domain by its tie), so tied
+    copies stay alike. At 396e4a1 each copy's domain moved on its own: 1LDM 8.8, 8UUP 9.8, 8UTF 43.6."""
+    from foldmap import figcheck
+    from foldmap.spec import draw_spec, figure_spec
+
+    got = figcheck.copies_alike(draw_spec(figure_spec(path, domains=domains)))
+    assert got and max(got.values()) <= 0.5, {f"{a}~{b}": round(v, 3) for (a, b), v in got.items()}
+
+
+def test_a_panel_follows_its_own_elements():
+    """Cas9's RuvC-II holds one strand of the central sheet (between RuvC-III's and RuvC-I's) and two helices: its
+    panel holds those three elements and none of the other domains' elements (a box around them held RuvC-I's)."""
+    d = _domains_drawn("4OO8-A")
+    ax = d.figure.axes[0]
+    to_page = ax.transData.inverted()
+    outlines = {
+        p.get_gid()[len("domain:") :]: p.get_path().transformed(p.get_transform() + to_page)
+        for p in ax.patches
+        if (p.get_gid() or "").startswith("domain:")
+    }
+    owner = {k: name for name, ids in d.layout.domains for k in ids}
+    for k, p in d.layout.placed.items():
+        x0, y0, x1, y1 = p.rect
+        inside = {n for n, o in outlines.items() if o.contains_point(((x0 + x1) / 2, (y0 + y1) / 2))}
+        assert inside == ({owner[k]} if k in owner else set()), (k, owner.get(k), inside)
+
+
+def test_domain_names_sit_on_plates_in_the_drawing_order():
+    """Every domain name has its plate (domain-name-plate:<name>): a rounded box in the page colour at 85 % alpha
+    under the whole name. One table (render.Z) orders the drawing: panels, plates, names, loops, bodies, labels."""
+    from matplotlib.backends.backend_agg import FigureCanvasAgg
+    from matplotlib.colors import to_rgba
+
+    from foldmap.render import Z
+
+    assert Z["domain-panel"] < Z["domain-name-plate"] < Z["domain-name"] < Z["loop"] < Z["body"] < Z["label"]
+    fig = _domains_drawn("2LZM").figure
+    renderer = FigureCanvasAgg(fig).get_renderer()
+    ax = fig.axes[0]
+    plates = {
+        p.get_gid().split(":", 1)[1]: p for p in ax.patches if (p.get_gid() or "").startswith("domain-name-plate:")
+    }
+    names = {t.get_gid().split(":", 1)[1]: t for t in ax.texts if (t.get_gid() or "").startswith("domain-label:")}
+    assert set(plates) == set(names) == {"N-lobe", "C-lobe"}
+    for name, t in names.items():
+        plate = plates[name]
+        assert to_rgba(plate.get_facecolor()) == pytest.approx(to_rgba("#ffffff", 0.85))
+        assert plate.get_window_extent(renderer).contains(*t.get_window_extent(renderer).p0)
+        assert plate.get_window_extent(renderer).contains(*t.get_window_extent(renderer).p1)
+        assert (plate.get_zorder(), t.get_zorder()) == (Z["domain-name-plate"], Z["domain-name"])
+    by_prefix = {"domain:": Z["domain-panel"], "strand:": Z["body"], "label:": Z["label"]}
+    for a in [*ax.patches, *ax.texts]:
+        for prefix, z in by_prefix.items():
+            if (a.get_gid() or "").startswith(prefix):
+                assert a.get_zorder() == z, a.get_gid()
+    assert all(
+        Z["loop"] <= a.get_zorder() < Z["loop"] + 1 for a in ax.patches if (a.get_gid() or "").startswith("loop:")
+    )

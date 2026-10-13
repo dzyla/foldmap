@@ -118,6 +118,19 @@ def test_text_collisions_on_a_synthetic_page():
     assert figcheck.off_page(_page(_text("label:A:1-5", (9.9, 5)))) == ["label:A:1-5"]
 
 
+def test_a_near_touch_is_no_text_collision():
+    """R13: a text or a body counts against a text only reaching more than TEXT_DEPTH_PX into its ink (1 px of
+    anti-aliasing or of matplotlib versions never flips a gate); deeper, it does."""
+    ink = dict((t.get_gid(), b) for t, b in figcheck._ink_boxes(_page(_text("label:A:1-5")).figure))["label:A:1-5"]
+    px = 10 / 500  # page units per pixel on _page
+    top = ink.y1 * px
+    for depth, hit in ((1.5, False), (3.0, True)):
+        d = _page(_text("label:A:1-5"), _body("strand:B:1-5", 2, top - depth * px, 8, 9))
+        assert bool(figcheck.text_collisions(d)) is hit, depth
+        d = _page(_text("label:A:1-5"), _text("label:B:1-5", (5, 5 + (ink.height - depth) * px)))
+        assert bool(figcheck.text_collisions(d)) is hit, depth
+
+
 def test_overlap_of_two_outlines_is_measured_on_their_area():
     square = MPath([(0, 0), (2, 0), (2, 2), (0, 2), (0, 0)], closed=True)
     corner = MPath([(1, 1), (5, 1), (5, 5), (1, 5), (1, 1)], closed=True)
@@ -127,10 +140,17 @@ def test_overlap_of_two_outlines_is_measured_on_their_area():
     assert figcheck.outline_overlap(l_shape, inside) == 0.0
 
 
-def test_domain_panel_overlap_is_measured_on_1ldm():
-    got = figcheck.domain_checks(drawn(FID / "1LDM.cif.gz", domains="auto"))
-    assert max(f for *_, f in got["panel_overlaps"]) > 0.5  # D1·A1 / D1·A4, outline areas at bcdec7a; Task 3 gates it
-    assert got["cross_chain"] == got["small"] == []
+def test_domain_panels_drawn_on_one_another_are_found():
+    """domain_checks reads the drawn panels (domain:<name>): a copy of a panel drawn as another domain's overlaps it
+    whole. test_domains.py::test_domain_panels_do_not_overlap gates real figures."""
+    d = drawn(
+        DATA / "2LZM.cif", assembly="asu", domains=[("N", ["res:A:13-59"]), ("C", ["res:A:1-12", "res:A:60-164"])]
+    )
+    assert figcheck.domain_checks(d)["panel_overlaps"] == []
+    ax = d.figure.axes[0]
+    (panel,) = [p for p in ax.patches if p.get_gid() == "domain:N"]
+    ax.add_patch(PathPatch(panel.get_path(), transform=panel.get_transform())).set_gid("domain:copy")
+    assert figcheck.domain_checks(d)["panel_overlaps"] == [("N", "copy", 1.0)]
 
 
 def test_stem_names_are_measured_to_their_own_letters():
@@ -328,27 +348,27 @@ def test_copies_split_differently_are_found():
     assert figcheck.domain_checks(drawn(DATA / "1TIM.cif", domains=unalike))["unalike"]
 
 
-def test_measles_f_automatic_domains_include_a_small_one_today():
-    """Measured at bcdec7a: 8UUP --domains auto gives chain F a D5 under DOMAIN_MIN_SSE_RESIDUES. Task 3 gates
-    small == [] (test_domains_auto_rules_on_oligomers)."""
-    assert figcheck.domain_checks(drawn(DATA / "8UUP.cif", domains="auto"))["small"] == ["D5 · F"]
+def test_a_small_automatic_domain_is_found():
+    """A domain named as automatic ones are (D1, D2 ...) holding fewer than DOMAIN_MIN_SSE_RESIDUES residues of
+    elements. test_domains.py::test_domains_auto_rules_on_oligomers gates --domains auto (8UUP's D5 · F at 396e4a1)."""
+    d = drawn(DATA / "1TIM.cif", domains=[("D1", ["res:A:1-20"]), ("D2", ["res:A:21-250"])])
+    assert figcheck.domain_checks(d)["small"] == ["D1"]
 
 
-def test_cas9_domain_names_collide_today():
-    """Measured at bcdec7a (fixed hinting): 4 name collisions, BH, REC2 and RuvC-I under loops, RuvC-III on a helix
-    (counted once: the review's 5 counted its helix: and helix-back: patches apart).
-    Task 3 gates name_collisions == []."""
-    import sys
-
-    sys.path.insert(0, str(Path(__file__).parent))
-    from test_domains import CAS9_FILE, _flag_file
-
-    d = drawn(DATA / "na" / "4OO8.cif.gz", chains=["A"], domains=_flag_file(CAS9_FILE))
+def test_a_domain_name_on_a_body_or_under_a_line_is_found():
+    """name_collisions: a domain name moved onto a helix, or crossed by a loop, is a collision; on its own plate it
+    is not. test_domains.py::test_domain_panels_do_not_overlap gates real figures (Cas9 had 4 at 396e4a1)."""
+    d = drawn(
+        DATA / "2LZM.cif", assembly="asu", domains=[("N", ["res:A:13-59"]), ("C", ["res:A:1-12", "res:A:60-164"])]
+    )
     _liberation(d)
+    assert figcheck.domain_checks(d)["name_collisions"] == []
+    ax = d.figure.axes[0]
+    (name,) = [t for t in ax.texts if t.get_gid() == "domain-label:N"]
+    helix = next(p for p in d.layout.placed.values() if p.sse.kind == "H")
+    name.set_position((helix.cx, helix.cy))
     got = figcheck.domain_checks(d)["name_collisions"]
-    assert len(got) == 4 and {h.split(" × ")[0] for h in got} == {
-        f"domain-label:{n}" for n in ("BH", "REC2", "RuvC-I", "RuvC-III")
-    }, got
+    assert f"domain-label:N × helix:{helix.sse.id}" in got, got
 
 
 def test_copies_need_three_matches_and_half_the_smaller_copy():

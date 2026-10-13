@@ -32,6 +32,7 @@ from .layout import (
     DNA_MINOR,
     DNA_PITCH,
     DNA_W,
+    DOMAIN_NAME_SIZE,
     END_LABEL,
     END_STUB,
     HEAD,
@@ -49,7 +50,7 @@ from .layout import (
     centred_box,
     dna_to_page,
     dna_y,
-    domain_panel,
+    domain_fields,
     font_pt,
     helix_label_pos,
     label_boxes,
@@ -101,6 +102,20 @@ _DOMAIN_TONES = (  # one hue per domain: Paul Tol's muted set less its indigo (t
     "#aa4499",  # purple
 )
 _DOMAIN_BAR_H = 1.1  # page units each chain's domain bar takes below the figure (at least; more for larger text)
+
+Z = {  # the drawing order, back to front (plan 10 R8): one table for the layers named here
+    "membrane": 0.1,
+    "domain-panel": 0.2,  # a domain's tinted panel
+    "sheet-panel": 0.3,  # a sheet's plate
+    "domain-name-plate": 0.32,  # a domain's name: its plate over the panel's edge ...
+    "domain-leader": 0.33,  # ... its leader, when it stands outside
+    "domain-name": 0.35,  # ... the name
+    "loop": 1.0,  # loops (each one 1e-3 above the one before; those of a helix over a sheet at _OVER_LOOP_Z)
+    "body": 3.0,  # strands and helices (a helix over a sheet at _OVER_Z); disulfide bars, tethers and ligand marks
+    # are drawn at 3.6-3.9, above the bodies (plan 10 Task 6 moves bars and tethers under them)
+    "label": 4.0,  # element labels and chain ends
+}
+
 _BAR_TICK = 0.3  # page units from a narrow segment to its name below it
 MARK_DEFAULT = "#d1495b"  # a marked element without its own colour
 MATE_GREY = "#c4c9cf"  # symmetry mates (or other chains) when one part is highlighted
@@ -2142,7 +2157,7 @@ def _draw_loops(c: _Canvas, layout: Layout, loops: list[Loop], sses: list[SSE]) 
     over = c.backbone[1]
     lifted = {k for k, p in layout.placed.items() if p.over}  # helices over a sheet: their loops lie on it too
     for i, loop in enumerate(loops):
-        z = (_OVER_LOOP_Z if lifted & {loop.a_id, loop.b_id} else 1) + i * 1e-3
+        z = (_OVER_LOOP_Z if lifted & {loop.a_id, loop.b_id} else Z["loop"]) + i * 1e-3
         if loop.fallback:  # already a smooth curve
             path = _polyline(loop.points)
         elif c.look.loops == "curved":
@@ -2250,7 +2265,7 @@ def _draw_membrane(c: _Canvas, layout: Layout) -> None:
     for k, (b0, b1) in enumerate(layout.membrane.get("bands", [layout.membrane["y"]])):
         row = f":{k}" if k else ""
         left, right = x0 - c.pad * 0.7, x1 + c.pad * 0.7
-        band = Rectangle((left, b0), right - left, b1 - b0, fc=_LIPID, ec="none", zorder=0.1)
+        band = Rectangle((left, b0), right - left, b1 - b0, fc=_LIPID, ec="none", zorder=Z["membrane"])
         band.set_gid(f"membrane{row}")
         c.ax.add_patch(band)
         xs = np.arange(left + 0.2, right, 0.42)
@@ -2272,37 +2287,68 @@ def _draw_membrane(c: _Canvas, layout: Layout) -> None:
             t.set_gid(f"membrane-side:{text}{row}")
 
 
+_NAME_PLATE_ALPHA = 0.85  # a domain name's plate: the page colour at this alpha over the panel's edge
+_NAME_PLATE_PAD = 0.06  # page units the plate reaches beyond the name's box
+
+
+def domain_outline(fields, name: str) -> Path | None:
+    """A domain's panel outline (layout.domain_fields): the zero contour of its field, as one compound path
+    (pieces and holes), None when the panel is empty."""
+    from contourpy import FillType, contour_generator
+
+    gen = contour_generator(fields.xs, fields.ys, fields.values[name], fill_type=FillType.OuterCode)
+    points, codes = gen.filled(0.0, 2.0)
+    if not points:
+        return None
+    return Path(np.vstack(points), np.concatenate(codes))
+
+
 def _draw_domains(c: _Canvas, layout: Layout) -> None:
-    """Named domains: a soft tinted panel each."""
-    for k, (name, ids) in enumerate(layout.domains):  # named domains: a soft tinted panel, name at a top corner
-        if not ids:
+    """Named domains: a soft tinted panel each, following its elements (layout.domain_fields), its name on a plate
+    over the panel's top edge (or above it, with a leader)."""
+    fields = domain_fields(layout)
+    for k, (name, ids) in enumerate(layout.domains):
+        if not ids or name not in fields.values:
             continue
-        x0, y0, x1, y1 = domain_panel(layout, name)
+        outline = domain_outline(fields, name)
         tone = domain_paint(tone_of(layout, k), c.look)[0]
         fill = _mix(tone, c.look.background, 0.86)
-        panel = FancyBboxPatch(
+        if outline is not None:
+            panel = PathPatch(
+                outline, fc=fill, ec=_mix(tone, c.look.background, 0.55), lw=c.lw * 0.6, zorder=Z["domain-panel"]
+            )
+            panel.set_gid(f"domain:{name}")
+            c.ax.add_patch(panel)
+        if name not in layout.domain_names:
+            continue
+        x0, y0, x1, y1 = layout.domain_names[name]
+        plate = FancyBboxPatch(
             (x0, y0),
             x1 - x0,
             y1 - y0,
-            boxstyle="round,pad=0,rounding_size=0.6",
-            fc=fill,
-            ec=_mix(tone, c.look.background, 0.55),
-            lw=c.lw * 0.6,
-            zorder=0.2,
+            boxstyle=f"round,pad={_NAME_PLATE_PAD},rounding_size={(y1 - y0) / 2 + _NAME_PLATE_PAD}",
+            fc=to_rgba(c.look.background, _NAME_PLATE_ALPHA),
+            ec="none",
+            zorder=Z["domain-name-plate"],
         )
-        panel.set_gid(f"domain:{name}")
-        c.ax.add_patch(panel)
-        right = name in layout.domain_name_right  # its top left is taken (layout._choose_domain_name_corners)
+        plate.set_gid(f"domain-name-plate:{name}")
+        c.ax.add_patch(plate)
+        if name in layout.domain_leaders:
+            (lx, ly0), (_, ly1) = layout.domain_leaders[name]
+            (leader,) = c.ax.plot(
+                [lx, lx], [ly0, ly1], color=_mix(tone, c.look.background, 0.3), lw=c.lw * 0.8, zorder=Z["domain-leader"]
+            )
+            leader.set_gid(f"domain-leader:{name}")
         t = c.ax.text(
-            x1 - 0.35 if right else x0 + 0.35,
-            y1 - 0.3,
+            (x0 + x1) / 2,
+            (y0 + y1) / 2,
             name,
-            ha="right" if right else "left",
-            va="top",
-            fontsize=c.font * 1.05,
+            ha="center",
+            va="center",
+            fontsize=c.font * DOMAIN_NAME_SIZE,
             fontweight="bold",
             color=domain_name_colour(tone, fill),
-            zorder=0.25,
+            zorder=Z["domain-name"],
         )
         t.set_gid(f"domain-label:{name}")
 
@@ -2455,7 +2501,7 @@ def _draw_sheet_panels(c: _Canvas, layout: Layout) -> None:
                 boxstyle="round,pad=0,rounding_size=0.35",
                 fc=_mix(c.look.background, c.look.ink, 0.07) if c.look.background != "#ffffff" else _PANEL,
                 ec="none",
-                zorder=0.3,
+                zorder=Z["sheet-panel"],
             )
             panel.set_gid(f"sheet-panel:{k}")
             c.ax.add_patch(panel)
@@ -2471,7 +2517,9 @@ def _draw_elements(c: _Canvas, layout: Layout) -> None:
             strand_fill = c.look.background if outline else tint(color, 0.45) if c.look.fill == "pale" else color
             if c.look.fill == "pale":
                 edge = darken(color, 0.5)  # pastel body, firm outline (illustration style)
-            patch = Polygon(_arrow(p), closed=True, fc=strand_fill, ec=edge, lw=edge_w, joinstyle="round", zorder=3)
+            patch = Polygon(
+                _arrow(p), closed=True, fc=strand_fill, ec=edge, lw=edge_w, joinstyle="round", zorder=Z["body"]
+            )
             patch.set_gid(f"strand:{p.sse.id}")
             c.ax.add_patch(patch)
             if c.look.labels:
@@ -2484,7 +2532,7 @@ def _draw_elements(c: _Canvas, layout: Layout) -> None:
                     fontsize=c.font,
                     fontweight="bold",
                     color=_label_ink(color) if outline else text_color_on(strand_fill),
-                    zorder=4,
+                    zorder=Z["label"],
                 )
                 t.set_gid(f"label:{p.sse.id}")
         elif p.sse.kind == "G":  # a short 3-10 helix: a small rounded box
@@ -2534,7 +2582,9 @@ def _draw_elements(c: _Canvas, layout: Layout) -> None:
             )
             behind.set_gid(f"helix-back:{p.sse.id}")
             c.ax.add_patch(behind)
-            bar = PathPatch(front, fc=fc_fill, ec=edge, lw=edge_w, joinstyle="round", zorder=3 + lift, alpha=alpha)
+            bar = PathPatch(
+                front, fc=fc_fill, ec=edge, lw=edge_w, joinstyle="round", zorder=Z["body"] + lift, alpha=alpha
+            )
             bar.set_gid(f"helix:{p.sse.id}")
             c.ax.add_patch(bar)
             if shine is not None and c.look.helix_shading == "gloss" and c.look.fill != "outline":
@@ -2549,7 +2599,7 @@ def _draw_elements(c: _Canvas, layout: Layout) -> None:
                     va="center",
                     fontsize=c.font,
                     color=_label_ink(color),
-                    zorder=4 + lift,
+                    zorder=Z["label"] + lift,
                 )
                 if p.over:  # on the strands: a plate of the page colour keeps the name readable
                     t.set_bbox({"boxstyle": "round,pad=0.12", "fc": c.look.background, "ec": "none", "alpha": 0.85})

@@ -193,6 +193,8 @@ def auto_domains(
         for k, s in enumerate(els):
             near = got[k] or next((g for g in reversed(got[:k]) if g), None) or next(g for g in got[k:] if g)
             owner[s.id] = near if chain in lent else (chain, near[1])
+    ref = {c: classes.reference.get(root[c], c) for c in mine}
+    _fold_small_copies(owner, ref, sses, contacts)
     groups: dict[tuple[str, int], list[str]] = {}
     for s in sses:
         if s.id in owner:
@@ -203,6 +205,53 @@ def auto_domains(
         for d in sorted(d for c, d in groups if c == chain):  # a copy's domains are numbered as its reference's
             out.append((f"D{d + 1}" if len(split) == 1 else f"D{d + 1} · {chain}", groups[(chain, d)]))
     return out
+
+
+def _fold_small_copies(
+    owner: dict[str, tuple[str, int]], ref: dict[str, str], sses: list[SSE], contacts: dict[frozenset[str], int]
+) -> None:
+    """In place: a domain that some copy of the protein holds with fewer than DOMAIN_MIN_SSE_RESIDUES residues of
+    elements (a copy missing elements its reference has: 8UUP chain F's D5) folds, in every copy alike, into the
+    domain of the reference it is best connected to (contacts, plus one per neighbour in sequence); the domains are
+    then numbered again from 0 in each reference, and a protein left with one domain is not split."""
+    size = {s.id: len(s) for s in sses}
+    order = [s.id for s in sses]
+
+    def root_of(key: tuple[str, int]) -> tuple[str, int]:  # a domain's place in its reference
+        return ref.get(key[0], key[0]), key[1]
+
+    while True:
+        total: Counter = Counter()
+        for k, key in owner.items():
+            total[key] += size[k]
+        small = sorted({root_of(key) for key, n in total.items() if n < DOMAIN_MIN_SSE_RESIDUES})
+        if not small:
+            break
+        r, d = small[0]
+        mine = {k for k, key in owner.items() if key == (r, d)}
+        link: Counter = Counter()
+        for k, key in owner.items():
+            if key[0] == r and key[1] != d:
+                link[key[1]] += sum(contacts.get(frozenset((k, m)), 0) for m in sorted(mine))
+        for a, b in zip(order, order[1:]):
+            for x, y in ((a, b), (b, a)):
+                if x in mine and owner.get(y, (None,))[0] == r and owner[y][1] != d:
+                    link[owner[y][1]] += 1
+        others = sorted({key[1] for key in owner.values() if key[0] == r and key[1] != d})
+        if not others:
+            break
+        into = max(others, key=lambda e: (link[e], -e))
+        for k, key in list(owner.items()):
+            if root_of(key) == (r, d):
+                owner[k] = (key[0], into)
+    for r in sorted(set(ref.values())):
+        numbers = sorted({key[1] for key in owner.values() if root_of(key)[0] == r})
+        for k, key in list(owner.items()):
+            if root_of(key)[0] == r:
+                if len(numbers) < 2:
+                    del owner[k]
+                else:
+                    owner[k] = (key[0], numbers.index(key[1]))
 
 
 def domain_tones(

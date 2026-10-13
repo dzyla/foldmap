@@ -13,7 +13,7 @@ from typing import NamedTuple
 
 import numpy as np
 
-from . import text_metrics
+from . import panels, text_metrics
 from .features import KINK_GAP, helix_bundles
 from .frame import Frame, symmetric_frame, view_frame
 from .model import SSE, Nucleic, Sheet, generic_label, group_by_chain, pair_places, same_place
@@ -194,7 +194,9 @@ class Layout:
     sheet_ghosts: list[list[str]] = field(default_factory=list)  # ghost strand ids drawn in each block of `sheets` (a
     # barrel's repeated strand, a strand lent across the cut of an unrolled ring: _unwrap); [] when not recorded
     domains: list[tuple[str, list[str]]] = field(default_factory=list)  # named domains and their element ids
-    domain_name_right: set[str] = field(default_factory=set)  # domains named at their panel's top right, not left
+    domain_names: dict[str, tuple[float, float, float, float]] = field(default_factory=dict)  # each drawn domain's
+    # name box (_place_domain_names), on the top edge of its panel or, with a leader, above it
+    domain_leaders: dict[str, tuple] = field(default_factory=dict)  # domain -> leader (from the name, to its panel)
     domain_tones: list[int] = field(default_factory=list)  # tone of each domain (features.domain_tones; [] by order)
     na_paths: list = field(default_factory=list)  # route.NAPath: single strands as drawn (filled by route_loops)
     na_traces: dict = field(default_factory=dict)  # strand -> projected backbone (page units), for unpaired strands
@@ -743,10 +745,11 @@ def _separate(
     joints: set[tuple[int, int]] = frozenset(),
     fixed: Walls | None = None,
     mirror: float | None = None,
+    room: float = _SEP_SYM_ROOM,
 ) -> None:
     """Push overlapping items apart, then slide any left over clear. With `ties` (_symmetry_ties) the pushes
     keep every protomer drawn alike (_push_apart), and that result is kept if it clears every overlap within
-    _SEP_ORBIT_SWEEPS sweeps and its box takes at most _SEP_SYM_ROOM times the area of moving the items one by
+    _SEP_ORBIT_SWEEPS sweeps and its box takes at most `room` times the area of moving the items one by
     one from the same start (widening the spread can otherwise cost far more room); else the one-by-one
     result is used. Consecutive pieces of one bent duplex (`joints`, _joints) in a short chain (_rigid_joints)
     are moved together and never pushed apart. Items are pushed off the `fixed` boxes they must keep off (Walls),
@@ -761,7 +764,7 @@ def _separate(
     alone = start.copy()
     _push_apart(alone, halves, mids, home, {}, _SEP_SWEEPS, apart, fixed)
     together = ties and _push_apart(xy, halves, mids, home, ties, _SEP_ORBIT_SWEEPS, apart, fixed, mirror)
-    if not together or _box_area(xy, halves, mids) > _SEP_SYM_ROOM * _box_area(alone, halves, mids):
+    if not together or _box_area(xy, halves, mids) > room * _box_area(alone, halves, mids):
         xy = alone
     for it, (x, y) in zip(items, xy.tolist()):
         it.cx, it.cy = x, y
@@ -2407,8 +2410,9 @@ def build_layout(
                 mirror=mirror if ties else None,
             )
         _separate(items, ties, joints, walls, mirror=mirror if ties else None)
-        if domains and _part_domains(items, domains):
-            _separate(items, ties, joints, walls, mirror=mirror if ties else None)
+        if domains and _part_domains(items, domains, ties, mirror if ties else None):
+            # the domains, parted with their copies, keep them alike whatever room that takes
+            _separate(items, ties, joints, walls, mirror=mirror if ties else None, room=np.inf)
     for it in items:
         it.apply()
     dna = [m for it in items for m in it.members if isinstance(m, PlacedStem)]
@@ -2461,7 +2465,7 @@ def build_layout(
     rects = np.vstack([rects, *[[domain_panel(lay, name)] for name, _ in lay.domains]]) if lay.domains else rects
     lay.na_cropped = na_cropped
     _choose_label_sides(lay, sses, style, mirrored)  # after naming: a name's length sets its box
-    _choose_domain_name_corners(lay, sses)  # after the element and stem names it keeps clear of
+    _place_domain_names(lay, sses, style.font_scale)  # after the element and stem names it keeps clear of
     rects = np.vstack([rects, [b for _, b in label_boxes(lay, sses)] or np.empty((0, 4))])
     lay.bounds = (
         float(rects[:, 0].min()),
@@ -2514,22 +2518,55 @@ DOMAIN_PAD = 0.7  # panel margin around a domain's elements
 _DOMAIN_GAP = 2 * DOMAIN_PAD + 0.6  # clear space between two domains' elements: both panels plus a gutter
 
 
-def _part_domains(items: list[_Item], domains: list[tuple[str, list[str]]], sweeps: int = 60) -> bool:
-    """Move whole domains apart (each as a rigid group) until their panels no longer overlap. Each item goes
-    with the domain most of its elements belong to. True if anything moved."""
+def _part_domains(
+    items: list[_Item],
+    domains: list[tuple[str, list[str]]],
+    ties: dict[int, tuple[int, int]] | None = None,
+    mirror: float | None = None,
+    sweeps: int = 60,
+) -> bool:
+    """Move whole domains apart (each as a rigid group) until their boxes no longer overlap. Each item goes with
+    the domain most of its elements belong to. With `ties` (_symmetry_ties) copies stay alike: a domain moves with
+    its copies' domains and every item of their orbits (a unit, _domain_units), each copy by its tie (a mirrored
+    copy, `mirror`, the other way across); two domains of one unit, copies of each other, part by widening the
+    spread between protomers (protomer k moves k times the step), or for a mirror image sideways symmetrically.
+    True if anything moved."""
+    ties = ties or {}
     owner = {k: d for d, (_, ids) in enumerate(domains) for k in ids}
-    groups: dict[int, list[_Item]] = {}
-    for it in items:
+    groups: dict[int, list[int]] = {}
+    for n, it in enumerate(items):
         votes = [owner[m.sse.id] for m in it.members if isinstance(m, Placed) and m.sse.id in owner]
         if votes:
-            groups.setdefault(max(set(votes), key=votes.count), []).append(it)
+            groups.setdefault(max(set(votes), key=votes.count), []).append(n)
     keys = sorted(groups)
     if len(keys) < 2:
         return False
+    unit, members = _domain_units(len(items), groups, ties)
+    copy_k = np.zeros(len(items))
+    for i, (_, k) in ties.items():
+        copy_k[i] = k
+    sx = np.where((copy_k > 0) & (mirror is not None), -1.0, 1.0)  # a mirrored copy moves against its mate in x
 
     def box(d):
-        b = np.array([(it.cx + it.box[0], it.cy + it.box[1], it.cx + it.box[2], it.cy + it.box[3]) for it in groups[d]])
+        b = np.array(
+            [
+                (
+                    items[n].cx + items[n].box[0],
+                    items[n].cy + items[n].box[1],
+                    items[n].cx + items[n].box[2],
+                    items[n].cy + items[n].box[3],
+                )
+                for n in groups[d]
+            ]
+        )
         return b[:, 0].min(), b[:, 1].min(), b[:, 2].max(), b[:, 3].max()
+
+    def shift(ns, dx, dy) -> None:
+        for n in ns:
+            it = items[n]
+            step = _snap(np.array([sx[n] * dx, dy]))
+            it.cx, it.cy = it.cx + float(step[0]), it.cy + float(step[1])
+            it.home = (it.home[0] + float(step[0]), it.home[1] + float(step[1]))  # rest here from now on
 
     moved = False
     for _ in range(sweeps):
@@ -2541,21 +2578,63 @@ def _part_domains(items: list[_Item], domains: list[tuple[str, list[str]]], swee
                 oy = min(A[3], B[3]) - max(A[1], B[1]) + _DOMAIN_GAP
                 if ox <= 0 or oy <= 0:
                     continue
-                clash = moved = True
-                ca, cb = (
-                    np.array([(A[0] + A[2]) / 2, (A[1] + A[3]) / 2]),
-                    np.array([(B[0] + B[2]) / 2, (B[1] + B[3]) / 2]),
-                )
-                if ox <= oy:  # the cheaper direction, each side going half way
-                    step = np.array([ox / 2 if cb[0] >= ca[0] else -ox / 2, 0.0])
+                sa, sb = sx[groups[a][0]], sx[groups[b][0]]
+                ka, kb = copy_k[groups[a][0]], copy_k[groups[b][0]]
+                s = 1.0 if (B[0] + B[2]) >= (A[0] + A[2]) else -1.0  # b lies this way of a, in x
+                if unit[a] != unit[b]:
+                    if ox <= oy:  # the cheaper direction, each side going half way (as the domain's copy moves)
+                        shift(members[unit[a]], -s * ox / 2 * sa, 0.0)
+                        shift(members[unit[b]], s * ox / 2 * sb, 0.0)
+                    else:
+                        t = 1.0 if (B[1] + B[3]) >= (A[1] + A[3]) else -1.0
+                        shift(members[unit[a]], 0.0, -t * oy / 2)
+                        shift(members[unit[b]], 0.0, t * oy / 2)
+                elif sa != sb:  # a domain and its mirror image: apart sideways, symmetrically
+                    shift(members[unit[a]], s * ox / (sb - sa), 0.0)
+                elif kb != ka and mirror is None:  # copies of one domain: the spread widens
+                    wider = s * ox / (kb - ka)
+                    for n, k in enumerate(copy_k.tolist()):
+                        if k:
+                            shift([n], k * wider, 0.0)
                 else:
-                    step = np.array([0.0, oy / 2 if cb[1] >= ca[1] else -oy / 2])
-                for it, sign in [(it, -1) for it in groups[a]] + [(it, 1) for it in groups[b]]:
-                    it.cx, it.cy = it.cx + sign * step[0], it.cy + sign * step[1]
-                    it.home = (it.home[0] + sign * step[0], it.home[1] + sign * step[1])  # rest here from now on
+                    continue  # no move keeps them alike: left to _separate
+                clash = moved = True
         if not clash:
             break
     return moved
+
+
+def _domain_units(
+    n: int, groups: dict[int, list[int]], ties: dict[int, tuple[int, int]]
+) -> tuple[dict[int, int], dict[int, list[int]]]:
+    """Domains that must move together to keep copies alike, and the items each such unit moves: the domain groups
+    (domain -> its items) joined through the symmetry orbits of their items (ties: copy -> its protomer-0 mate),
+    with every item of those orbits. (domain -> unit, unit -> items, in order.)"""
+    parent = list(range(n))
+
+    def find(x: int) -> int:
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]
+            x = parent[x]
+        return x
+
+    def join(a: int, b: int) -> None:
+        a, b = find(a), find(b)
+        if a != b:
+            parent[max(a, b)] = min(a, b)
+
+    for i, (j, _) in sorted(ties.items()):
+        join(i, j)
+    for d in sorted(groups):
+        for m in groups[d][1:]:
+            join(groups[d][0], m)
+    unit = {d: find(groups[d][0]) for d in sorted(groups)}
+    used = set(unit.values())
+    members: dict[int, list[int]] = {}
+    for m in range(n):
+        if find(m) in used:
+            members.setdefault(find(m), []).append(m)
+    return unit, members
 
 
 def block_ghosts(layout: Layout, k: int) -> list[Placed]:
@@ -2583,43 +2662,163 @@ def domain_panel(layout: Layout, name: str) -> tuple[float, float, float, float]
 
 
 def domain_name_box(layout: Layout, name: str) -> tuple[float, float, float, float]:
-    """The box a domain's name takes inside the top of its panel: at the left, or the right (domain_name_right)."""
-    x0, _, x1, y1 = domain_panel(layout, name)
-    width = 0.2 + _GLYPH_W * 1.1 * len(name)
-    lo, hi = y1 - 0.35 - _GLYPH_H * 1.1, y1 - 0.2
-    if name in layout.domain_name_right:
-        return (x1 - 0.25 - width, lo, x1 - 0.25, hi)
-    return (x0 + 0.25, lo, x0 + 0.25 + width, hi)
+    """The box a domain's name is drawn in (_place_domain_names), on its plate."""
+    return layout.domain_names[name]
 
 
 _PLATE_PAD = 0.3  # a sheet's plate reaches this far beyond its strands (render._draw_sheet_panels)
+DOMAIN_NAME_SIZE = 1.05  # a domain's name, in ems of the figure's text (render draws it bold at this size)
+_NAME_HEIGHT = 1.0  # ems of its own size a name's box takes up and down (capitals, a descender, the plate's room)
+_NAME_INSET = 0.35  # page units a name keeps from its panel's side
+_NAME_SINK = 0.1  # page units a name's middle sits inside its panel's top edge: it lies on the edge, on its plate
+_NAME_STEP = 0.25  # page units between the places tried along the top edge
+_NAME_CLEAR = 0.08  # page units a name keeps from anything else
+_NAME_STUB = 0.8  # page units: the straight run of a loop out of an element's end, kept clear of a name
+_SHORT_LOOP = 6.0  # page units: a loop whose ends are this near takes the short way between them, kept clear too
+_LEADER = 0.8  # page units a name moved outside its panel stands above it, joined to it by a short leader
 
 
-def _choose_domain_name_corners(layout: Layout, sses: list[SSE]) -> None:
-    """Each domain's name at the top left of its panel, unless the box there meets more of the figure than at the
-    top right: elements, ghosts, sheet plates, stems, unpaired strands, element and stem names, the other domains'
-    panels and the names placed before it. Ties keep the left."""
-    rects = [p.rect for p in [*layout.placed.values(), *layout.ghosts, *layout.stems]]
+def _domain_boxes(layout: Layout) -> tuple[dict[str, list[tuple]], list[tuple]]:
+    """Each drawn domain's element boxes (its elements, and the ghosts repeating a strand of their own block: a
+    barrel's, as domain_panel counts them), and the boxes of what is in no domain (elements, ghosts, stems)."""
+    owned: dict[str, list[tuple]] = {}
+    used: set[str] = set()
+    repeats: set[int] = set()
+    for name, ids in layout.domains:
+        if not ids:
+            continue
+        mine = set(ids)
+        own = [
+            g
+            for k, block in enumerate(layout.sheets)
+            for g in block_ghosts(layout, k)
+            if g.sse.id in block and g.sse.id in mine
+        ]
+        owned[name] = [layout.placed[k].rect for k in ids] + [g.rect for g in own]
+        used |= mine
+        repeats |= {id(g) for g in own}
+    free = [p.rect for k, p in layout.placed.items() if k not in used]
+    free += [g.rect for g in layout.ghosts if id(g) not in repeats]
+    return owned, free
+
+
+def domain_fields(layout: Layout, names: bool = True) -> panels.Fields:
+    """The panels of the drawn domains as fields (panels.panel_fields): each follows its own elements, padded by
+    DOMAIN_PAD, and wraps its name's box (unless names=False)."""
+    owned, free = _domain_boxes(layout)
+    stems = [(d.cx, d.cy, d.length / 2, d.width / 2, d.angle) for d in layout.stems]
+    return panels.panel_fields(owned, free, DOMAIN_PAD, layout.domain_names if names else None, stems)
+
+
+def _name_obstacles(layout: Layout, sses: list[SSE]) -> tuple[list[tuple], list[tuple]]:
+    """What a domain's name must keep clear of: (solid) elements and ghosts, stems with their letters, sheet plates
+    and the other names (labels, chain ends and their stubs, stem names, tie letters, domain names placed before),
+    and (ways) the straight run of a loop out of each element's end and a short loop's way between its two ends. A
+    name's leader keeps off the solid ones only: it may cross a loop."""
+    solid = [_grown(p.rect, _NAME_CLEAR) for p in [*layout.placed.values(), *layout.ghosts]]
     for k, ids in enumerate(layout.sheets):
         if len(ids) > 1:
             r = np.array([layout.placed[i].rect for i in ids] + [g.rect for g in block_ghosts(layout, k)])
-            rects.append((*(r[:, :2].min(axis=0) - _PLATE_PAD), *(r[:, 2:].max(axis=0) + _PLATE_PAD)))
-    rects += [b for n, b in label_boxes(layout, sses) if n.startswith(("label:", "stem-label:"))]
+            solid.append((*(r[:, :2].min(axis=0) - _PLATE_PAD), *(r[:, 2:].max(axis=0) + _PLATE_PAD)))
+    solid += [_grown(b, _NAME_CLEAR) for _, b in label_boxes(layout, sses)]
+    ways = []
+    for q in [*layout.placed.values(), *layout.ghosts]:
+        for port, out in ((q.n_port, q.exit_n), (q.c_port, q.exit_c)):
+            (ax, ay), (bx, by) = port, np.add(port, out * _NAME_STUB)
+            ways.append((min(ax, bx) - 0.2, min(ay, by) - 0.2, max(ax, bx) + 0.2, max(ay, by) + 0.2))
+    for mine in group_by_chain(sses, keep=layout.placed).values():
+        for a, b in zip(mine, mine[1:]):
+            p, q = layout.placed[a.id], layout.placed[b.id]
+            if np.hypot(*np.subtract(p.c_port, q.n_port)) <= _SHORT_LOOP:
+                ends = np.array(
+                    [
+                        p.c_port,
+                        np.add(p.c_port, p.exit_c * _NAME_STUB),
+                        q.n_port,
+                        np.add(q.n_port, q.exit_n * _NAME_STUB),
+                    ]
+                )
+                ways.append((*(ends.min(axis=0) - 0.2), *(ends.max(axis=0) + 0.2)))
+    return solid, ways
+
+
+def _place_domain_names(layout: Layout, sses: list[SSE], font_scale: float = 1.0) -> None:
+    """Each drawn domain's name (Layout.domain_names), in domain order, at the first clear place (_name_obstacles,
+    and the unpaired strands' traces) of _name_spots: its panel's top left and top right on the top edge, then
+    along that edge, then outside with a short leader (Layout.domain_leaders). When nothing is clear, the top
+    left."""
+    layout.domain_names, layout.domain_leaders = {}, {}
+    fields = domain_fields(layout, names=False)
+    if not fields.values:
+        return
+    em = _ink_em(layout, font_scale) or text_em(layout.width or 1.0) * font_scale
     traces = [np.asarray(pts, float).reshape(-1, 2) for _, pts in sorted(layout.na_traces.items())]
-    panels = {name: domain_panel(layout, name) for name, ids in layout.domains if ids}
-    named: list[tuple[float, float, float, float]] = []
-    for name in panels:
-        taken = [*rects, *(b for k, b in panels.items() if k != name), *named]
-        left = _box_hits(domain_name_box(layout, name), taken, traces)
-        layout.domain_name_right.add(name)
-        if _box_hits(domain_name_box(layout, name), taken, traces) >= left:
-            layout.domain_name_right.discard(name)
-        named.append(domain_name_box(layout, name))
+    solid, ways = _name_obstacles(layout, sses)
+
+    letters = (0.0 if layout.na_cropped else NT_ROW + _GLYPH_H) + _NAME_CLEAR
+
+    def clear(box, foot) -> bool:
+        if overlaps_any(box, solid + ways) or _trace_hits(box, traces):
+            return False
+        if any(_box_meets_body(_grown(box, letters), d) for d in layout.stems):  # a stem, with its letters
+            return False
+        if foot is None:
+            return True
+        (x, ya), (_, yb) = foot
+        return not overlaps_any((x - 0.05, min(ya, yb), x + 0.05, max(ya, yb)), solid)
+
+    for name, value in fields.values.items():
+        size = DOMAIN_NAME_SIZE * em
+        spots = list(_name_spots(value > 0, fields.xs, fields.ys, size * _text_width(name) + 0.1, size * _NAME_HEIGHT))
+        if not spots:
+            continue
+        box, foot = next((spot for spot in spots if clear(*spot)), spots[0])
+        layout.domain_names[name] = box
+        if foot is not None:
+            layout.domain_leaders[name] = foot
+        solid.append(_grown(box, _NAME_CLEAR))
 
 
-def _box_hits(box, rects, traces: list[np.ndarray]) -> int:
-    """How many of the rects the box overlaps, plus what it sits on of the unpaired strands (_trace_hits)."""
-    return sum(overlaps_any(box, [r]) for r in rects) + _trace_hits(box, traces)
+def _name_spots(inside: np.ndarray, xs: np.ndarray, ys: np.ndarray, w: float, h: float):
+    """The places a name of w x h may take on a panel (its cells `inside`, rows along ys), in order, as (box,
+    leader or None): on the top edge (the name's middle _NAME_SINK inside it, its plate over the edge) at the top
+    left, the top right, then along the edge left to right, _NAME_INSET from the panel's sides; then outside, _LEADER
+    and twice that above the edge, with a leader down to it; then the same on the bottom edge. The largest piece of
+    a panel in pieces first, at each of these steps; on a piece narrower than the name, the name centred over it."""
+    from scipy.ndimage import label as pieces
+
+    marks, n = pieces(inside)
+    order = sorted(range(1, n + 1), key=lambda m: (-int((marks == m).sum()), m))
+    rows = np.arange(len(ys))[:, None]
+    half = panels.GRID / 2
+    for up in (1, -1):
+        for lift in (0.0, _LEADER, 2 * _LEADER):
+            for m in order:
+                mine = marks == m
+                cols = np.flatnonzero(mine.any(axis=0))
+                edge = np.full(len(xs), np.nan)
+                if up > 0:
+                    edge[cols] = ys[np.where(mine, rows, -1).max(axis=0)[cols]] + half
+                else:
+                    edge[cols] = ys[np.where(mine, rows, len(ys)).min(axis=0)[cols]] - half
+                x0, x1 = xs[cols[0]] - half + _NAME_INSET, xs[cols[-1]] + half - _NAME_INSET
+                if x1 - x0 < w:  # a narrow piece (a helix on end): the name centred over it, its plate overhanging
+                    starts = [(x0 + x1 - w) / 2]
+                else:
+                    starts = [*np.arange(x0, x1 - w, _NAME_STEP), x1 - w]
+                for bx in dict.fromkeys([starts[0], starts[-1], *starts[1:-1]]):
+                    span = (xs >= bx) & (xs <= bx + w) & ~np.isnan(edge)
+                    if not span.any():
+                        continue
+                    at = float(edge[span].max() if up > 0 else edge[span].min())
+                    mid = at + up * (lift + h / 2 if lift else -_NAME_SINK)
+                    box = tuple(float(v) for v in _snap([bx, mid - h / 2, bx + w, mid + h / 2]))
+                    foot = None
+                    if lift:
+                        x = float(_snap(bx + w / 2))
+                        below = float(_snap(edge[span][np.argmin(np.abs(xs[span] - x))]))
+                        foot = ((x, box[1] if up > 0 else box[3]), (x, below))
+                    yield box, foot
 
 
 def provisional(sses: list[SSE]) -> Layout:
@@ -2954,9 +3153,10 @@ def label_boxes(layout: Layout, sses: list[SSE]) -> list[tuple[str, tuple[float,
     for n, tie in enumerate(layout.na_ties):  # a long tie's labels at its two marks
         for end, (_, _, (x, y)) in enumerate(tie.marks):
             out.append((f"tie-label:{n}:{end}", centred_box(x, y, _GLYPH_W / 2 + 0.05, _GLYPH_H / 2)))
-    for name, ids in layout.domains:  # a domain's name, top left (or right) inside its panel
-        if ids:
-            out.append((f"domain-label:{name}", domain_name_box(layout, name)))
+    for name, box in layout.domain_names.items():  # a domain's name, on its panel's edge (_place_domain_names)
+        out.append((f"domain-label:{name}", box))
+    for name, ((x, y0), (_, y1)) in layout.domain_leaders.items():
+        out.append((f"domain-leader:{name}", (x - 0.1, min(y0, y1), x + 0.1, max(y0, y1))))
     return out
 
 

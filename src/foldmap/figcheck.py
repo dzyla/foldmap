@@ -31,6 +31,8 @@ GLYCAN_STEM = re.compile(r"glycan:[^:]+:stem$")
 ELEMENT_BODIES = ("strand:", "helix:", "helix-back:", "eta:", "ghost:")
 OWN_BODIES = {"ligand:": "ligand-label:", "linked:": "linked-label:", "domain-name-plate:": "domain-label:"}
 TEXT_OVERLAP_PX2 = 1.0  # text over text or a body: overlaps up to this many square pixels are anti-aliasing
+TEXT_DEPTH_PX = 2.0  # ... and a text or body reaching no deeper than this into a text's ink is a near-touch (R13):
+# the same scale as LINE_TEXT_CLEARANCE_PX, wider than what matplotlib versions disagree by
 OFF_PAGE_PX = 1.0  # text may reach this far past the page edge
 PANEL_GRID = 0.05  # page units: the raster domain panel outlines are measured on
 _STEP_PX = 0.5  # sampling step (pixels) along a line inside a text box, and across a text box over a body
@@ -377,15 +379,45 @@ def _area_on(box: Bbox, path: MPath) -> float:
 
 
 def _on(box: Bbox, path: MPath) -> bool:
-    return _overlap(box, path.get_extents()) > TEXT_OVERLAP_PX2 and _area_on(box, path) > TEXT_OVERLAP_PX2
+    """Does the body cover more than TEXT_OVERLAP_PX2 of the text's ink lying deeper than TEXT_DEPTH_PX inside it?"""
+    core = _core(box)
+    return (
+        core is not None
+        and _overlap(core, path.get_extents()) > TEXT_OVERLAP_PX2
+        and _area_on(core, path) > TEXT_OVERLAP_PX2
+    )
+
+
+def _depth(*boxes: Bbox) -> float:
+    """How deep an overlap must reach into the texts' inks to count: TEXT_DEPTH_PX, or a third of the smallest ink
+    side for text smaller than that (its whole ink covered still counts)."""
+    return min(TEXT_DEPTH_PX, *(min(b.width, b.height) / 3 for b in boxes))
+
+
+def _core(box: Bbox) -> Bbox | None:
+    """A text's ink box less _depth all round (None when nothing is left)."""
+    d = _depth(box)
+    if box.width <= 2 * d or box.height <= 2 * d:
+        return None
+    return Bbox.from_extents(box.x0 + d, box.y0 + d, box.x1 - d, box.y1 - d)
+
+
+def _texts_meet(a: Bbox, b: Bbox) -> bool:
+    """Two texts' inks overlap by more than TEXT_OVERLAP_PX2, deeper than _depth both ways."""
+    w = min(a.x1, b.x1) - max(a.x0, b.x0)
+    h = min(a.y1, b.y1) - max(a.y0, b.y0)
+    d = _depth(a, b)
+    return w > d and h > d and w * h > TEXT_OVERLAP_PX2
 
 
 def text_collisions(drawn, *, clearance_px: float = 0.0, page: Page | None = None) -> list[str]:
     """Every "<text> × <thing gid>" a reader sees on the page (a text is named by its gid, one drawn without a gid
     by its place and words: _names):
-    - text over text, their ink boxes overlapping by more than TEXT_OVERLAP_PX2 (a text's own parts, one gid, never);
+    - text over text, their ink boxes overlapping by more than TEXT_OVERLAP_PX2 and deeper than TEXT_DEPTH_PX both
+      ways (a text's own parts, one gid, never);
     - text over a body (an element, a stem, a ligand or linked mark, a domain name plate) it does not belong to (its
-      label, its residue numbers, its letters, its name), by more than TEXT_OVERLAP_PX2, once per element (a helix
+      label, its residue numbers, its letters, its name), by more than TEXT_OVERLAP_PX2 of its ink deeper than
+      TEXT_DEPTH_PX inside it, once per element (a helix
       is drawn as helix: and helix-back:); a helix drawn over a sheet and that sheet's strands are each other's
       (layout.lying_over);
     - text crossed by a line (LINE_GIDS: loops, nucleic-acid runs and ties, tethers, disulfide bars, glycan stems,
@@ -405,7 +437,7 @@ def text_collisions(drawn, *, clearance_px: float = 0.0, page: Page | None = Non
         for covers in [[p for _, p, bz, opaque in page.bodies if opaque and bz > z]]
     ]
     for (_, ga, a), (_, gb, b) in combinations(page.texts, 2):
-        if ga != gb and _overlap(a, b) > TEXT_OVERLAP_PX2:
+        if ga != gb and _texts_meet(a, b):
             hits.append(f"{ga} × {gb}")
     for t, name, box in page.texts:
         gid = t.get_gid() or ""
@@ -524,28 +556,27 @@ def copy_matches(drawn) -> dict[tuple[str, str], tuple[int, int]]:
 
 def outline_overlap(a: MPath, b: MPath, grid: float = PANEL_GRID) -> float:
     """The area two closed outlines (page units) share, over the smaller one's area, both rasterised at `grid`."""
-    area_a, area_b = _raster_area(a, a.get_extents(), grid), _raster_area(b, b.get_extents(), grid)
-    if not area_a or not area_b:
+    return _cells_overlap(_cells(a, grid), _cells(b, grid))
+
+
+def _cells(path: MPath, grid: float = PANEL_GRID) -> np.ndarray:
+    """The cells of the shared raster (`grid`, anchored at the origin) whose centres lie inside the closed path, each
+    as one sorted integer key."""
+    box = path.get_extents()
+    i0, j0 = math.floor(box.x0 / grid), math.floor(box.y0 / grid)
+    i1, j1 = math.ceil(box.x1 / grid), math.ceil(box.y1 / grid)
+    if i1 <= i0 or j1 <= j0:
+        return np.empty(0, np.int64)
+    gi, gj = np.meshgrid(np.arange(i0, i1), np.arange(j0, j1))
+    gi, gj = gi.ravel(), gj.ravel()
+    hit = path.contains_points(np.c_[(gi + 0.5) * grid, (gj + 0.5) * grid])
+    return np.sort((gi[hit].astype(np.int64) << 32) + (gj[hit].astype(np.int64) + (1 << 31)))
+
+
+def _cells_overlap(a: np.ndarray, b: np.ndarray) -> float:
+    if not len(a) or not len(b):
         return 0.0
-    ea, eb = a.get_extents(), b.get_extents()
-    both = Bbox.from_extents(max(ea.x0, eb.x0), max(ea.y0, eb.y0), min(ea.x1, eb.x1), min(ea.y1, eb.y1))
-    if both.x1 <= both.x0 or both.y1 <= both.y0:
-        return 0.0
-    pts = _grid(both, grid)
-    shared = float((a.contains_points(pts) & b.contains_points(pts)).sum()) * grid * grid
-    return shared / min(area_a, area_b)
-
-
-def _grid(box: Bbox, step: float) -> np.ndarray:
-    """Cell centres of a grid of `step`, anchored at the origin so every box shares one raster."""
-    xs = (np.arange(math.floor(box.x0 / step), math.ceil(box.x1 / step)) + 0.5) * step
-    ys = (np.arange(math.floor(box.y0 / step), math.ceil(box.y1 / step)) + 0.5) * step
-    gx, gy = np.meshgrid(xs, ys)
-    return np.c_[gx.ravel(), gy.ravel()]
-
-
-def _raster_area(path: MPath, box: Bbox, grid: float) -> float:
-    return float(path.contains_points(_grid(box, grid)).sum()) * grid * grid
+    return len(np.intersect1d(a, b, assume_unique=True)) / min(len(a), len(b))
 
 
 def domain_checks(drawn, collisions: list[str] | None = None) -> dict:
@@ -586,8 +617,9 @@ def domain_checks(drawn, collisions: list[str] | None = None) -> dict:
             if gid.startswith("domain:"):
                 outlines[gid[len("domain:") :]] = a.get_path().transformed(a.get_transform() + to_page)
     overlaps = []
-    for (na, pa), (nb, pb) in combinations(outlines.items(), 2):
-        f = outline_overlap(pa, pb)
+    cells = {name: _cells(path) for name, path in outlines.items()}
+    for (na, ca), (nb, cb) in combinations(cells.items(), 2):
+        f = _cells_overlap(ca, cb)
         if f > 0:
             overlaps.append((na, nb, round(f, 4)))
     names = [h for h in (text_collisions(drawn) if collisions is None else collisions) if "domain-label:" in h]
