@@ -8,11 +8,12 @@ import pytest
 
 from foldmap import figcheck
 from foldmap.layout import label_boxes, overlaps_any, tail_counts
-from foldmap.render import ligand_marks, loop_counts
+from foldmap.render import ligand_marks, linked_marks, loop_counts
 from foldmap.route import clip_len
 from foldmap.spec import draw_spec, figure_spec
 
-R100 = Path(__file__).parent / "data" / "r100"
+DATA = Path(__file__).parent / "data"
+R100 = DATA / "r100"
 FID = Path(__file__).parent / "data" / "fidelity"
 
 
@@ -88,3 +89,45 @@ def test_ligand_marks_sit_off_loops_and_earlier_tethers(path, kw):
             assert not any(clip_len(e["centre"], t, box) > 1e-9 for t in e["targets"])
             assert not any(clip_len(m["centre"], t, _mark_box(e)) > 1e-9 for t in m["targets"])
     assert hits(d, "ligand") == []
+
+
+@pytest.mark.parametrize("scale", [1.0, 0.5])
+def test_linked_label_place_is_sized_from_its_ink(scale):
+    """C28 (random-100): a linked residue's label (GFP's CRO66) is drawn at no less than 7 pt, but its place was
+    tested with a fixed box narrower than its ink (8K8E: "JUU15" at 7 pt on a 3.6 pt page, 2.3 page units wide
+    against a 0.9 box, ran over the η1 label). The box is now its ink's, so the spot it takes is clear."""
+    d = drawn(DATA / "1EMA.cif", style=[f"font_scale={scale}"])
+    marks = [m for m in linked_marks(d.layout, d.loops, d.sses, []) if m["text_at"]]
+    assert marks
+    to_page = d.figure.axes[0].transData.inverted()
+    ink = {t.get_gid(): to_page.transform([[b.x0, b.y0], [b.x1, b.y1]]) for t, b in figcheck._ink_boxes(d.figure)}
+    for m in marks:
+        (x0, y0), (x1, y1) = ink[f"linked-label:{m['label'].chain}:{m['label'].tag}"]
+        (cx, cy), (hw, hh) = m["text_at"], m["half"]
+        assert cx - hw <= x0 and x1 <= cx + hw and cy - hh <= y0 and y1 <= cy + hh, (m["text"], x0, x1, cx, hw)
+    assert hits(d, "linked") == []
+
+
+def _stem_and_first_sugar(fig, r):
+    patches = {p.get_gid(): p for p in fig.axes[0].patches}
+    at, _ = patches[f"glycan:{r}:stem"].get_path().vertices
+    sugar = patches[f"glycan:{r}:0"].get_window_extent()
+    centre = fig.axes[0].transData.inverted().transform([(sugar.x0 + sugar.x1) / 2, (sugar.y0 + sugar.y1) / 2])
+    return at, centre
+
+
+def test_glycan_stem_crosses_no_name(monkeypatch):
+    """C28 (random-100): a glycan's sugars were kept off names, but not its stem (1WWL domains: the stem of the
+    glycan at 254 ran across strand K's letter). A name put on a 6ZS5 stem, between the chain and the first sugar,
+    now turns the stem another way."""
+    import foldmap.render as render
+
+    d = drawn(DATA / "6ZS5.cif")
+    r = sorted(g.split(":")[1] for g in (p.get_gid() or "" for p in d.figure.axes[0].patches) if g.endswith(":stem"))[0]
+    at, sugar = _stem_and_first_sugar(d.figure, r)
+    mid = (at + sugar) / 2
+    name = (mid[0] - 0.05, mid[1] - 0.05, mid[0] + 0.05, mid[1] + 0.05)
+    real = render.label_boxes
+    monkeypatch.setattr(render, "label_boxes", lambda *a, **k: [*real(*a, **k), ("label:test", name)])
+    at, sugar = _stem_and_first_sugar(drawn(DATA / "6ZS5.cif").figure, r)
+    assert clip_len(at, sugar, name) == 0

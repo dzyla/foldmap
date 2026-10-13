@@ -3071,6 +3071,16 @@ def _text_width(text: str, bold: bool = True) -> float:
     return float(_snap(pen / text_metrics.UNITS))
 
 
+def page_text(layout: Layout) -> tuple[float, float]:
+    """The figure's text size in points (Layout.font_scale applied) and page units per point, on the page the
+    placed elements, stems and traces span so far (as _ink_em; a layout with nothing placed: its bounds)."""
+    rects = [p.rect for p in [*layout.placed.values(), *layout.ghosts, *layout.stems]]
+    rects += [(*pts.min(axis=0), *pts.max(axis=0)) for pts in map(np.asarray, layout.na_traces.values())]
+    width = (max(r[2] for r in rects) - min(r[0] for r in rects) + 2.0) if rects else (layout.width or 1.0)
+    scale = min(IN_PER_UNIT, MAX_WIDTH_IN / width)
+    return font_pt(scale) * layout.font_scale, 1.0 / (scale * 72)
+
+
 def _ink_em(layout: Layout, font_scale: float) -> float:
     """Page units of one em of the drawn text, from the page the placed elements, stems and traces span so far
     (the drawn page is at most 4% wider on the NA fixtures drawn with letters, whose text then grows with it)."""

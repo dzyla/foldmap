@@ -62,6 +62,7 @@ from .layout import (
     helix_label_pos,
     label_boxes,
     overlaps_any,
+    page_text,
     resolve,
     stem_label_pos,
     tail_counts,
@@ -1392,7 +1393,9 @@ def linked_marks(layout: Layout, loops: list[Loop], sses: list[SSE], marks: list
             continue
         label = layout.res_labels[k]
         text = f"{label.name}{label.tag}"
-        half = (0.07 * len(text) + 0.1, 0.17)
+        pt, unit = page_text(layout)  # its ink as drawn (_draw_linked), at least _LINKED_LABEL_MIN pt (C28)
+        size = max(_LINKED_LABEL_MIN, pt * _LINKED_LABEL) * unit
+        half = (size * _text_width(text, bold=False) / 2 + 0.04, size * 0.4 + 0.04)
         taken.append((at[0] - _LINKED_STAR, at[1] - _LINKED_STAR, at[0] + _LINKED_STAR, at[1] + _LINKED_STAR))
         spot = None
         for ring in np.arange(_LINKED_STAR + 0.1, 12.0, 0.35):
@@ -1743,6 +1746,12 @@ def _draw_links(
                     (min(a[0], b[0]) - 0.06, min(a[1], b[1]) - 0.06, max(a[0], b[0]) + 0.06, max(a[1], b[1]) + 0.06)
                 )
         size, step = 0.34, 0.42
+        texts = [box for _, box in label_boxes(layout, sses)] + [  # what a stem must not cross (C28)
+            centred_box(p.cx, p.cy, 0.12 * len(p.label) + 0.1, 0.25)
+            for p in layout.placed.values()
+            if p.sse.kind == "E"
+        ]
+        texts += [t["box"] for t in [*tail_counts(layout, sses, loops), *loop_counts(layout, loops, sses)]]
         for r, sugars in links.glycans:
             if not shown(r):
                 continue
@@ -1753,17 +1762,23 @@ def _draw_links(
             count = min(len(sugars), 5)
             away = at - centre
             best = None
-            for out in (np.array([1.0, 0.0]), np.array([-1.0, 0.0]), np.array([0.0, 1.0]), np.array([0.0, -1.0])):
-                for lead in np.arange(0.35, 6.0, 0.1):  # the shortest stem that clears everything
-                    boxes = [
-                        centred_box(*(at + out * (lead + step * k)), size / 2 + 0.03, size / 2 + 0.03)
-                        for k in range(count)
-                    ]
-                    if not any(overlaps_any(b, taken) for b in boxes):
-                        cost = lead - 0.15 * float(np.dot(out, away) > 0)  # ties: point outward
-                        if best is None or cost < best[0]:
-                            best = (cost, out, lead, boxes)
-                        break
+            for clear_stem in (True, False):  # a stem across no text where there is one, else as before
+                for out in (np.array([1.0, 0.0]), np.array([-1.0, 0.0]), np.array([0.0, 1.0]), np.array([0.0, -1.0])):
+                    for lead in np.arange(0.35, 6.0, 0.1):  # the shortest stem that clears everything
+                        boxes = [
+                            centred_box(*(at + out * (lead + step * k)), size / 2 + 0.03, size / 2 + 0.03)
+                            for k in range(count)
+                        ]
+                        if not any(overlaps_any(b, taken) for b in boxes):
+                            stem_at = at + out * (lead - size / 2)
+                            if clear_stem and any(clip_len(at, stem_at, b) > 1e-9 for b in texts):
+                                break  # this way the stem crosses a name: the next way
+                            cost = lead - 0.15 * float(np.dot(out, away) > 0)  # ties: point outward
+                            if best is None or cost < best[0]:
+                                best = (cost, out, lead, boxes)
+                            break
+                if best is not None:
+                    break
             if best is None:  # nowhere clear: the direction and stem crossing the fewest things
                 tries = []
                 for out in (np.array([1.0, 0.0]), np.array([-1.0, 0.0]), np.array([0.0, 1.0]), np.array([0.0, -1.0])):
