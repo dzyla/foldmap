@@ -553,37 +553,109 @@ def shared_sheet_elements(lay, copy: str, ref: str) -> set[str]:
     return out
 
 
+COPY_IDENTITY = 0.9  # two chains are copies of one protein when this fraction of their aligned residues match ...
+COPY_ALIGNED = 20  # ... and at least this many do (as model.homolog_chains asks of residues at the same numbers)
+
+
+def aligned_positions(xs, ys) -> list[tuple[int, int]]:
+    """(i, j) for every residue xs[i] the global alignment of two residue-name sequences puts against ys[j]
+    (gemmi.align_string_sequences; equal sequences align one to one)."""
+    xs, ys = list(xs), list(ys)
+    if xs == ys:
+        return [(i, i) for i in range(len(xs))]
+    import gemmi
+
+    cigar = gemmi.align_string_sequences(xs, ys, [], gemmi.AlignmentScoring()).cigar_str()
+    out, i, j = [], 0, 0
+    for n, op in re.findall(r"(\d+)([MID])", cigar):
+        n = int(n)
+        if op == "M":
+            out += [(i + k, j + k) for k in range(n)]
+        i += n if op in "MI" else 0
+        j += n if op in "MD" else 0
+    return out
+
+
+def same_protein(xs, ys, pairs: list[tuple[int, int]]) -> bool:
+    """Are two chains (residue names; pairs from aligned_positions) copies of one protein?"""
+    same = sum(xs[i] == ys[j] for i, j in pairs)
+    return same >= COPY_ALIGNED and same >= COPY_IDENTITY * len(pairs)
+
+
+def _untied_copies(lay, residues: dict[str, list[str]], chains: list[str]) -> list[tuple[str, str]]:
+    """(copy, reference) for each drawn chain no tie holds that is a copy of one protein (by sequence) with a tied
+    reference or an earlier untied chain, when the figure ties any copies (a symmetric assembly): such a copy
+    must be drawn alike too (C18 ruling)."""
+    if not lay.copy_ties:
+        return []
+    tied = set(lay.copy_ties) | {ref for ref, _ in lay.copy_ties.values()}
+    roots = sorted({ref for ref, _ in lay.copy_ties.values()}, key=chains.index)
+    out = []
+    for c in (c for c in chains if c not in tied):
+        root = next((r for r in roots if same_protein(residues[r], residues[c], _aligned(residues, r, c))), None)
+        if root is None:
+            roots.append(c)
+        else:
+            out.append((c, root))
+    return out
+
+
+def _aligned(residues: dict[str, list[str]], a: str, b: str) -> list[tuple[int, int]]:
+    return aligned_positions(residues[a], residues[b])
+
+
 def _copy_pairs(drawn) -> dict[tuple[str, str], tuple[float | None, int, int, str]]:
     """(copy, reference) -> (deviation, elements matched, elements of the smaller of the two, why not judged) for each
-    tie of Layout.copy_ties: the copies' elements matched as one element through the copy classes
-    (model.copy_classes over model.homolog_chains), strands of a sheet shared between copies left out
-    (shared_sheet_elements), the deviation that of fit_deviation (a reflection only for a mirror tie). When fewer
+    tie of Layout.copy_ties, and for each copy no tie holds (_untied_copies). The copies' elements pair one-to-one
+    by sequence (C18 ruling): the copy's residues aligned to the reference's (aligned_positions), its element ranges
+    taken to the reference's residues, then model.pair_places (the same kind, sharing at least half of the shorter).
+    Strands of a sheet shared between the two copies are left out (shared_sheet_elements). The deviation is that of
+    fit_deviation (a reflection for a mirror tie; for an untied copy only when the figure mirrors a tie). When fewer
     than COPY_MIN_MATCHED or than half the smaller copy's elements match (two points always fit), the tie is not
     judged (deviation None) if the smaller copy has fewer than COPY_MIN_MATCHED elements to match ("n/a: k
     elements") or a shared sheet took the rest ("n/a: shared sheet"), C22 and C10 rulings; else it is inf."""
-    from .model import copy_classes, homolog_chains
+    from .model import pair_places
 
     lay = drawn.layout
-    mate = copy_classes(drawn.sses, homolog_chains(drawn.bb)).mate
-    by_chain: dict[str, dict[str, tuple[float, float]]] = {}
+    residues: dict[str, list[str]] = {}
+    first: dict[str, int] = {}
+    for k, label in enumerate(drawn.bb.labels):
+        residues.setdefault(label.chain, []).append(label.name)
+        first.setdefault(label.chain, k)
+    mine: dict[str, list[tuple[str, object]]] = {}
     for k, p in lay.placed.items():
-        by_chain.setdefault(p.sse.chain, {})[k] = (p.cx, p.cy)
+        if not p.ghost and p.sse.chain in residues:
+            mine.setdefault(p.sse.chain, []).append((k, p))
+    chains = sorted(mine, key=first.__getitem__)
+    ties = [(copy, ref, (mirrored,)) for copy, (ref, mirrored) in sorted(lay.copy_ties.items())]
+    hands = (False, True) if any(m for _, m in lay.copy_ties.values()) else (False,)
+    ties += [(copy, ref, hands) for copy, ref in _untied_copies(lay, residues, chains)]
     out = {}
-    for copy, (ref, mirrored) in sorted(lay.copy_ties.items()):
+    for copy, ref, mirrors in ties:
         shared = shared_sheet_elements(lay, copy, ref)
-        a, b = ({mate.get(k, k): at for k, at in by_chain.get(c, {}).items() if k not in shared} for c in (ref, copy))
-        keys = sorted(a.keys() & b.keys())
+        a = [p for k, p in mine.get(ref, []) if k not in shared]
+        b = [p for k, p in mine.get(copy, []) if k not in shared]
+        to_ref = {j: i for i, j in _aligned(residues, ref, copy)} if ref in residues and copy in residues else {}
+
+        def place(p, chain, mapping=None):
+            local = range(p.sse.start - first[chain], p.sse.end - first[chain] + 1)
+            got = [mapping[j] for j in local if j in mapping] if mapping is not None else list(local)
+            return (p.sse.kind, min(got), max(got)) if got else (p.sse.kind, -2, -3)
+
+        found = sorted(pair_places([place(p, ref) for p in a], [place(p, copy, to_ref) for p in b]).items())
         smaller = min(len(a), len(b))
         why = ""
-        if len(keys) >= COPY_MIN_MATCHED and 2 * len(keys) >= smaller:
-            dev: float | None = fit_deviation([a[k] for k in keys], [b[k] for k in keys], mirrored)
+        if len(found) >= COPY_MIN_MATCHED and 2 * len(found) >= smaller:
+            pa = [(a[i].cx, a[i].cy) for i, _ in found]
+            pb = [(b[j].cx, b[j].cy) for _, j in found]
+            dev: float | None = min(fit_deviation(pa, pb, m) for m in mirrors)
         elif 0 < smaller < COPY_MIN_MATCHED:
             dev, why = None, f"n/a: {smaller} element{'s' if smaller > 1 else ''}"
-        elif shared and len(keys) < COPY_MIN_MATCHED:
+        elif shared and len(found) < COPY_MIN_MATCHED:
             dev, why = None, "n/a: shared sheet"
         else:
             dev = math.inf
-        out[(copy, ref)] = (dev, len(keys), smaller, why)
+        out[(copy, ref)] = (dev, len(found), smaller, why)
     return out
 
 

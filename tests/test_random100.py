@@ -446,6 +446,45 @@ def test_pair_check_allows_an_extra_element_and_its_numbering(r100):
     assert got["pass"] is True  # after the extra helix B:10-11 names are not compared
 
 
+def test_pair_check_pairs_elements_by_sequence_not_numbers(r100):
+    """C18 (random-100): 2HKI numbers GAPDH ahead of 1RM5 (by 1 to 3 residues), so pairing by author numbers paired
+    14 of 28-30 elements. The beta view records the first chain's residues, and A19 aligns the two sequences and
+    takes the second entry's element ranges to the first's numbering before pairing (ruling)."""
+    import random as rnd
+
+    names = rnd.Random("C18").choices(["ALA", "GLY", "SER", "LEU", "LYS", "GLU", "ASP", "PHE", "TRP", "VAL"], k=70)
+    nums_a = list(range(1, 71))
+    nums_b = list(range(1, 21)) + list(range(27, 77))  # b numbers six ahead after residue 20
+
+    def el(chain, kind, first, last, label):
+        return {"id": f"{chain}:{first}-{last}", "chain": chain, "kind": kind, "first": first, "last": last}, label
+
+    def entry(chain, nums, elements):
+        els = [dict(e, label=label) for e, label in elements]
+        res = {"chain": chain, "residues": [[n, x] for n, x in zip(nums, names)]}
+        return {"views": {"beta": {"result": {"elements": els, "chain_residues": res}}}}
+
+    a = entry("A", nums_a, [el("A", "E", 5, 10, "A"), el("A", "H", 25, 35, "α1"), el("A", "E", 40, 44, "B")])
+    a["views"]["beta"]["result"]["elements"].append(el("A", "H", 50, 58, "α2")[0] | {"label": "α2"})
+    b = entry("B", nums_b, [el("B", "E", 5, 10, "A"), el("B", "H", 31, 41, "α1"), el("B", "E", 46, 50, "B")])
+    b["views"]["beta"]["result"]["elements"].append(el("B", "H", 56, 64, "α2")[0] | {"label": "α2"})
+    got = r100.pair_check(a, b)
+    assert got["pass"] is True and "unpaired" not in got["detail"], got
+    for e in (a, b):  # without the residues (an older report) the numbers are read as before
+        del e["views"]["beta"]["result"]["chain_residues"]
+    assert r100.pair_check(a, b)["pass"] is False
+
+
+def test_beta_view_records_the_first_chain_residues(r100, tmp_path):
+    """C18: the beta view's measure carries the residues of its first element's chain (number, name) for A19."""
+    from foldmap.spec import draw_spec, figure_spec
+
+    spec = figure_spec(DATA / "1UBQ.cif", names=["beta"])
+    got = r100.measure_view("beta", draw_spec(spec), spec, DATA / "1UBQ.cif", "1UBQ", tmp_path)
+    res = got["chain_residues"]
+    assert res["chain"] == "A" and res["residues"][:2] == [[1, "MET"], [2, "GLN"]] and len(res["residues"]) == 76
+
+
 def test_report_md_lists_every_entry_and_the_limits(r100, tmp_path):
     def entry(i, ok):
         crit = {

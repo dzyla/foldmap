@@ -1306,6 +1306,12 @@ def measure_view(view: str, drawn, spec, path: Path, name: str, work: Path) -> d
         "tethers": tether_lengths(drawn, spec.look),
         "stem_gap_limit": stem_gap_limit(drawn.figure),
     }
+    if view == "beta" and lay.placed:  # A19 pairs this chain's elements with its partner's by sequence
+        chain = next(iter(lay.placed.values())).sse.chain
+        out["chain_residues"] = {
+            "chain": chain,
+            "residues": [[x.seq, x.name] for x in drawn.bb.labels if x.chain == chain],
+        }
     if view == "membrane":
         out["membrane"] = membrane_checks(drawn, path)
     if view == "default":
@@ -1706,10 +1712,30 @@ def criteria(e: dict) -> dict:
     return out
 
 
+def _to_first_numbering(a: dict, b: dict) -> Callable[[int, int], tuple[int, int] | None] | None:
+    """Takes a residue range of b's first chain to a's numbering by their sequences (figcheck.aligned_positions):
+    the first and last of a's residues aligned to b's in the range. None when either view lacks its residues (a
+    report from before C18), and the author numbers are read as they are."""
+    from foldmap.figcheck import aligned_positions
+
+    ra, rb = ((x["views"].get("beta", {}).get("result") or {}).get("chain_residues") for x in (a, b))
+    if not ra or not rb:
+        return None
+    na, nb = ([n for n, _ in r["residues"]] for r in (ra, rb))
+    pairs = aligned_positions([x for _, x in ra["residues"]], [x for _, x in rb["residues"]])
+
+    def taken(first: int, last: int) -> tuple[int, int] | None:
+        got = [na[i] for i, j in pairs if first <= nb[j] <= last]
+        return (min(got), max(got)) if got else None
+
+    return taken
+
+
 def pair_check(a: dict, b: dict) -> dict:
     """A19: the beta views of the two entries of a pair, the first protein chain of each. Elements pair one-to-one
-    by author residue range as copies of one protein do (model.pair_places: the same kind, sharing at least half of
-    the shorter, the largest overlaps first). The pairs must keep one order, and pair at least half of the larger
+    by residue range as copies of one protein do (model.pair_places: the same kind, sharing at least half of the
+    shorter, the largest overlaps first), b's ranges taken to a's numbering by sequence alignment (C18 ruling:
+    2HKI numbers GAPDH ahead of 1RM5). The pairs must keep one order, and pair at least half of the larger
     chain's elements (and 3, when both have that many). One entry may hold an element the other lacks (listed, not
     failed); the generic names after it then differ, so names are compared only up to the first unpaired element."""
     from foldmap.model import pair_places
@@ -1724,7 +1750,9 @@ def pair_check(a: dict, b: dict) -> dict:
         return sorted((x for x in els if x["chain"] == chain), key=lambda x: (x["first"], x["last"]))
 
     ea, eb = first_chain(ra), first_chain(rb)
-    found = pair_places(*([(x["kind"], x["first"], x["last"]) for x in els] for els in (ea, eb)))
+    taken = _to_first_numbering(a, b) or (lambda first, last: (first, last))
+    places_b = [(x["kind"], *(taken(x["first"], x["last"]) or (-2, -3))) for x in eb]
+    found = pair_places([(x["kind"], x["first"], x["last"]) for x in ea], places_b)
     pairs = sorted(found.items())
     bad, notes = [], [f"{x['id']} unpaired" for i, x in enumerate(ea) if i not in found]
     notes += [f"{y['id']} unpaired" for k, y in enumerate(eb) if k not in found.values()]

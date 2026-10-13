@@ -1,5 +1,6 @@
 """figcheck: page checks for any figure (plan 10)."""
 
+import dataclasses
 import math
 from pathlib import Path
 
@@ -423,11 +424,16 @@ def test_a_domain_name_on_a_body_or_under_a_line_is_found():
     assert f"domain-label:N × loop:{loop.a_id}>{loop.b_id}" in got, got
 
 
+def _unmatched(p) -> None:
+    """Make a placed element match no copy's: the other kind at the same residues."""
+    p.sse = dataclasses.replace(p.sse, kind="E" if p.sse.kind == "H" else "H")
+
+
 def test_copies_need_three_matches_and_half_the_smaller_copy():
     d = drawn(DATA / "1TIM.cif")
     keep = [k for k, p in d.layout.placed.items() if p.sse.chain == "B"]
     for k in keep[4:]:  # B keeps its elements, but only 4 of them still match A's
-        d.layout.placed[k + "~"] = d.layout.placed.pop(k)
+        _unmatched(d.layout.placed[k])
     assert figcheck.copy_matches(d)[("B", "A")] == (4, 20)
     assert figcheck.copies_alike(d)[("B", "A")] == math.inf  # 4 < 10, half of the smaller copy
     d = drawn(DATA / "1TIM.cif")
@@ -452,7 +458,7 @@ def test_copies_of_fewer_than_three_elements_are_reported_not_judged():
     other = [k for k, p in d.layout.placed.items() if p.sse.chain == "A2" and p.sse.kind != "E"]
     for k in other[3:]:
         del d.layout.placed[k]  # A2 keeps its shared strands and three other elements, two of them matching A1's
-    d.layout.placed[other[2] + "~"] = d.layout.placed.pop(other[2])
+    _unmatched(d.layout.placed[other[2]])
     assert figcheck.copies_not_judged(d) == {("A2", "A1"): "n/a: shared sheet"}
 
 
@@ -475,6 +481,43 @@ def test_strands_of_a_sheet_shared_between_copies_are_left_out():
     assert figcheck.copies_alike(d)[("A2", "A1")] > 1.0
     utf = drawn(DATA / "8UTF.cif")
     assert figcheck.shared_sheet_elements(utf.layout, "C", "A") == set()
+
+
+def test_copies_are_matched_by_sequence_not_numbers(tmp_path):
+    """C18 (random-100): copies pair their elements by sequence, not by author numbers (ruling). 1TIM with chain B
+    renumbered from residue 101 on (+1000): by numbers only 8 of its 20 elements paired A's and the tie read inf;
+    aligned, all 20 pair and the drawing is judged."""
+    import gemmi
+
+    st = gemmi.read_structure(str(DATA / "1TIM.cif"))
+    st.setup_entities()
+    for r in st[0]["B"]:
+        if r.seqid.num > 100:
+            r.seqid.num += 1000
+    path = tmp_path / "1TIM-renumbered.cif"
+    st.make_mmcif_document().write_file(str(path))
+    d = drawn(path)
+    assert d.layout.copy_ties == {"B": ("A", False)}
+    assert figcheck.copy_matches(d) == {("B", "A"): (20, 20)}
+    assert math.isfinite(figcheck.copies_alike(d)[("B", "A")])
+
+
+def test_untied_copies_of_a_symmetric_assembly_are_checked_too():
+    """C18 (random-100): 2MJW ties A~C but not B~D (DSSP split D's elements), so B and D were drawn unlike with no
+    check. A chain no tie holds, in a figure that ties copies, is checked against its copy found by sequence
+    (25IN with D's tie dropped: D is matched to C by sequence and judged)."""
+    d = drawn(DATA / "25IN.cif")
+    del d.layout.copy_ties["D"]
+    assert set(figcheck.copies_alike(d)) == {("B", "A"), ("D", "C")}
+    assert figcheck.copies_alike(d)[("D", "C")] <= 1e-6
+    moved = next(p for p in d.layout.placed.values() if p.sse.chain == "D")
+    moved.cx += 3.0
+    assert figcheck.copies_alike(d)[("D", "C")] > 0.5
+    assert figcheck.aligned_positions(["ALA", "GLY", "SER", "TRP", "LYS"], ["GLY", "SER", "LYS"]) == [
+        (1, 0),
+        (2, 1),
+        (4, 2),
+    ]
 
 
 def test_an_explicit_focus_still_checks_the_nucleotides_of_chains_it_draws():
