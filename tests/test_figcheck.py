@@ -15,6 +15,7 @@ from foldmap.spec import draw_spec, figure_spec
 from helpers import FID, honest_crossings, loop_crossings
 
 DATA = Path(__file__).parent / "data"
+R100 = DATA / "r100"
 
 
 def drawn(path, **kw):
@@ -434,6 +435,27 @@ def test_copies_need_three_matches_and_half_the_smaller_copy():
         del d.layout.placed[k]
     assert figcheck.copy_matches(d)[("B", "A")] == (2, 2)
     assert figcheck.copies_alike(d)[("B", "A")] == math.inf  # two points always fit
+
+
+def test_strands_of_a_sheet_shared_between_copies_are_left_out():
+    """C10 (random-100): 7IMM's two copies make one continuous A B B A sheet: one item holding both, placed by the
+    sheet, so its strands cannot sit at their copy's tied place (5.63 page units from it); A15 leaves them out
+    (ruling) and judges the rest. A sheet with a third copy's strand, tied round the ring, stays in (8UTF)."""
+    d = drawn(R100 / "7IMM-A.cif.gz")
+    assert d.layout.copy_ties == {"A2": ("A1", False)}
+    assert figcheck.shared_sheet_elements(d.layout, "A2", "A1") == {
+        "A1:319-325",
+        "A1:328-338",
+        "A2:328-338",
+        "A2:319-325",
+    }
+    assert figcheck.copy_matches(d)[("A2", "A1")] == (8, 8)
+    assert figcheck.copies_alike(d)[("A2", "A1")] <= 0.5
+    moved = next(k for k, p in d.layout.placed.items() if p.sse.chain == "A2" and k not in {"A2:328-338", "A2:319-325"})
+    d.layout.placed[moved].cx += 5.0  # any element outside the shared sheet still counts
+    assert figcheck.copies_alike(d)[("A2", "A1")] > 1.0
+    utf = drawn(DATA / "8UTF.cif")
+    assert figcheck.shared_sheet_elements(utf.layout, "C", "A") == set()
 
 
 def test_an_explicit_focus_still_checks_the_nucleotides_of_chains_it_draws():

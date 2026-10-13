@@ -43,6 +43,11 @@ ENTRIES = {  # fixture name -> (PDB id, what it is for)
         "backbone only: the beta-barrel membrane estimate; B spans the slab without defining it (C-MEM-BARREL)",
     ),
     "1BXW-A": ("1BXW", "OmpA, an 8-strand outer-membrane beta-barrel, backbone only: the control (C-MEM-BARREL)"),
+    "7IMM-A": (
+        "7IMM",
+        "a dimer (assembly 1: chain A twice) whose two copies make one continuous A B B A sheet, backbone only: the "
+        "shared sheet A15 leaves out (random-100 C10)",
+    ),
 }
 Span = tuple[int, int]
 WINDOWS: dict[str, dict[str, Span | list[Span] | None]] = {  # fixture -> {chain: windows (first, last), None: whole}
@@ -65,6 +70,7 @@ TRIMS: dict[str, dict] = {
     "1IGT-AB": {"atoms": ("N", "CA", "C", "O", "CB", "SG")},
     "9FWZ-DB": {"backbone": True, "no_protein_sequence": True},
     "1BXW-A": {"backbone": True},
+    "7IMM-A": {"backbone": True},
 }
 _BACKBONE = {"N", "CA", "C", "O", "CB"}
 

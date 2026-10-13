@@ -541,21 +541,35 @@ def fit_deviation(a, b, mirrored: bool = False) -> float:
 COPY_MIN_MATCHED = 3  # a tied copy is compared on at least this many elements, and on half the smaller copy's
 
 
+def shared_sheet_elements(lay, copy: str, ref: str) -> set[str]:
+    """The strands of every sheet block (Layout.sheets) holding strands of both a copy and its reference (a dimer's
+    continuous sheet, a swapped strand). Such a sheet is one item holding both copies, placed by the sheet and tied
+    to no other, so its strands cannot sit at their copy's tied place: copies_alike leaves them out (C10 ruling). A
+    sheet with a strand lent by a third copy is tied round the ring (layout._symmetry_ties) and stays in."""
+    out: set[str] = set()
+    for block in lay.sheets:
+        if {copy, ref} <= {lay.placed[k].sse.chain for k in block if k in lay.placed}:
+            out |= set(block)
+    return out
+
+
 def _copy_pairs(drawn) -> dict[tuple[str, str], tuple[float, int, int]]:
     """(copy, reference) -> (deviation, elements matched, elements of the smaller of the two) for each tie of
     Layout.copy_ties: the copies' elements matched as one element through the copy classes (model.copy_classes over
-    model.homolog_chains), the deviation that of fit_deviation (a reflection only for a mirror tie), inf when fewer
-    than COPY_MIN_MATCHED or than half the smaller copy's elements match (two points always fit)."""
+    model.homolog_chains), strands of a sheet shared between copies left out (shared_sheet_elements), the deviation
+    that of fit_deviation (a reflection only for a mirror tie), inf when fewer than COPY_MIN_MATCHED or than half
+    the smaller copy's elements match (two points always fit)."""
     from .model import copy_classes, homolog_chains
 
     lay = drawn.layout
     mate = copy_classes(drawn.sses, homolog_chains(drawn.bb)).mate
     by_chain: dict[str, dict[str, tuple[float, float]]] = {}
     for k, p in lay.placed.items():
-        by_chain.setdefault(p.sse.chain, {})[mate.get(k, k)] = (p.cx, p.cy)
+        by_chain.setdefault(p.sse.chain, {})[k] = (p.cx, p.cy)
     out = {}
     for copy, (ref, mirrored) in sorted(lay.copy_ties.items()):
-        a, b = by_chain.get(ref, {}), by_chain.get(copy, {})
+        shared = shared_sheet_elements(lay, copy, ref)
+        a, b = ({mate.get(k, k): at for k, at in by_chain.get(c, {}).items() if k not in shared} for c in (ref, copy))
         keys = sorted(a.keys() & b.keys())
         smaller = min(len(a), len(b))
         enough = len(keys) >= COPY_MIN_MATCHED and 2 * len(keys) >= smaller
