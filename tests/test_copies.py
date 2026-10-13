@@ -38,7 +38,7 @@ def test_measles_f_trimer_copies_drawn_alike(name, ties):
 
 
 @pytest.mark.parametrize("path", [DATA / "1TIM.cif", DATA / "6ZYA.cif", FID / "1LDM.cif.gz"], ids=lambda p: p.name)
-def test_symmetric_controls_unchanged(path):
+def test_symmetric_controls_drawn_alike(path):
     got = figcheck.copies_alike(drawn(path))
     assert all(math.isfinite(v) and v <= 1e-6 for v in got.values()), got
 
@@ -51,8 +51,9 @@ def test_a_strand_lent_across_the_cut_leaves_a_ghost_where_it_pairs():
 
     d = drawn(DATA / "8UTF.cif")
     lay = d.layout
-    assert sorted(g.sse.id for g in lay.ghosts) == ["c:440-442", "c:445-446"]
     hosts = {g.sse.id: lay.sheets[k] for k in range(len(lay.sheets)) for g in block_ghosts(lay, k)}
+    hosts = {i: block for i, block in hosts.items() if i.startswith("c:")}  # their partners' ghosts aside
+    assert sorted(hosts) == ["c:440-442", "c:445-446"]
     assert "a:325-329" in hosts["c:440-442"] and hosts["c:445-446"] == ["A:61-62"]
     right = max(p.rect[2] for k, p in lay.placed.items() if p.sse.chain in "Cc" and k not in hosts)
     assert all(lay.placed[k].cx > right for k in hosts)  # past the rest of copy c
@@ -60,17 +61,18 @@ def test_a_strand_lent_across_the_cut_leaves_a_ghost_where_it_pairs():
 
 
 def test_a_sheet_panel_covers_its_own_ghosts_only():
-    """8UUP: chain F's three strands lent across the cut stand past the row's end as a block of their own; its panel
-    covers them, not their ghosts in chain B's sheet at the other end of the page."""
+    """8UUP: A's and B's strands lent to F's sheet (protomer 2 holds most of it) across the cut stand before the
+    row's start as a block of their own; its panel covers them and their partners' ghosts, not their own ghosts in
+    F's sheet at the other end of the page."""
     from foldmap.layout import block_ghosts
 
     d = drawn(DATA / "8UUP.cif")
     lay = d.layout
     ghosted = {g.sse.id for g in lay.ghosts}
-    lent = [k for k, ids in enumerate(lay.sheets) if set(ids) <= ghosted]
-    host = [k for k in range(len(lay.sheets)) if block_ghosts(lay, k)]
-    assert len(lent) == 1 and len(host) == 1 and not block_ghosts(lay, lent[0])
-    assert sorted(lay.sheets[lent[0]]) == ["F:396-397", "F:422-424", "F:429-431"]
+    lent = [k for k, ids in enumerate(lay.sheets) if set(ids) <= ghosted and len(ids) > 1]
+    host = [k for k in range(len(lay.sheets)) if set(lay.sheets[lent[0]]) & {g.sse.id for g in block_ghosts(lay, k)}]
+    assert len(lent) == 1 and len(host) == 1
+    assert sorted(lay.sheets[lent[0]]) == ["A:98-100", "B:116-119"]
     panels = {a.get_gid(): a for a in d.figure.axes[0].patches if (a.get_gid() or "").startswith("sheet-panel:")}
     for k in lent + host:
         rects = np.array([lay.placed[i].rect for i in lay.sheets[k]] + [g.rect for g in block_ghosts(lay, k)])
@@ -96,3 +98,68 @@ def test_a_ring_stalk_is_drawn_with_each_copy():
         for a, b in zip(pieces, pieces[1:]):
             lp = loops[(a.sse.id, b.sse.id)]
             assert not lp.fallback and len(lp.points) == 2
+
+
+def test_a_cage_drawn_whole_has_its_copies_alike():
+    """7A4M (an O cage of 24 chains) drawn whole: every tied copy alike (before the ring's bundles and lent elements
+    were tied: 4.1 to 19.6 page units)."""
+    got = figcheck.copies_alike(drawn(DATA / "assemblies" / "7A4M.cif", focus="none"))
+    assert got and max(got.values()) <= ALIKE, {f"{a}~{b}": round(v, 3) for (a, b), v in got.items()}
+
+
+def test_copies_of_one_domain_get_alike_panels():
+    """A domain's panel counts a ghost only where it repeats a strand of its own block (a barrel's); a strand lent
+    across the cut leaves its ghost in another copy's sheet, which is no part of this copy's domain. Taken on the
+    default figure: with --domain, _part_domains still moves copies' domains apart one by one (Task 3)."""
+    from foldmap.layout import domain_panel
+
+    lay = drawn(DATA / "8UTF.cif").layout
+    span = {"a": [], "c": []}
+    for k, p in lay.placed.items():
+        if p.sse.chain in span and 374 <= p.sse.first.seq and p.sse.last.seq <= 456:
+            span[p.sse.chain].append(k)
+    lay.domains = [("DIIa", span["a"]), ("DIIc", span["c"])]
+    widths = {n: domain_panel(lay, n)[2] - domain_panel(lay, n)[0] for n in ("DIIa", "DIIc")}
+    assert abs(widths["DIIa"] - widths["DIIc"]) < 1e-6, widths
+
+
+@pytest.mark.parametrize("name", ["8UTF", "8UUP"])
+def test_a_lent_strand_past_the_row_end_shows_the_strands_it_pairs_with(name):
+    """A strand drawn past the row's end (it pairs in protomer 0's sheet, across the cut) stands beside dashed ghosts
+    of its partners, one strand pitch away, as it stands beside the real ones in every other copy."""
+    from foldmap.layout import PITCH, block_ghosts
+
+    d = drawn(DATA / f"{name}.cif")
+    lay = d.layout
+    ghosted = {g.sse.id for g in lay.ghosts}
+    lent = [k for k, ids in enumerate(lay.sheets) if set(ids) <= ghosted]
+    assert lent
+    for k in lent:
+        partners = [g for g in block_ghosts(lay, k) if g.sse.id not in lay.sheets[k]]
+        assert partners, lay.sheets[k]
+        for i in lay.sheets[k]:
+            p = lay.placed[i]
+            near = min(
+                np.hypot(g.cx - p.cx, g.cy - p.cy)
+                for g in [*partners, *(lay.placed[j] for j in lay.sheets[k] if j != i)]
+            )
+            assert near <= PITCH + 1e-6, (i, near)
+    assert figcheck.order_checks(d) == []
+
+
+def test_an_item_of_two_protomers_belongs_to_the_one_holding_most_of_it():
+    from foldmap.layout import Placed, _host
+    from helpers import fake_sse
+
+    def m(chain, a, b):
+        return Placed(fake_sse("E", a, b, chain=chain), 0, 0, 1.0, 0.0, 1.0)
+
+    sector, classes = {"A": 0, "B": 0, "E": 2, "F": 2}, {"A": 0, "B": 1, "E": 0, "F": 1}
+    # 8UUP: A's and B's strands (7 residues) with F's three (8 residues) lent by protomer 2
+    held = [m("A", 98, 100), m("B", 116, 119), m("F", 429, 431), m("F", 422, 424), m("F", 396, 397)]
+    assert _host(held, sector, classes) == 2
+    # a tie on residues: the first element by chain class, then residue number
+    assert _host([m("B", 61, 62), m("E", 445, 446)], sector, classes) == 2
+    assert _host([m("A", 61, 62), m("F", 445, 446)], sector, classes) == 0
+    # two protomers' copies of one element first: symmetric in itself
+    assert _host([m("A", 10, 20), m("E", 10, 20)], sector, classes) is None

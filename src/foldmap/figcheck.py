@@ -762,22 +762,24 @@ def order_checks(drawn) -> list[str]:
         return out
     bridges = assign_dssp(drawn.bb).bridges
     sheets = {frozenset(s.id for s in sh.strands): sh for sh in build_sheets(sses, bridges)}
-    lent = {k: [g for g in block_ghosts(lay, k) if g.sse.id not in ids] for k, ids in enumerate(lay.sheets)}
-    away = {g.sse.id for gs in lent.values() for g in gs}  # strands lent across an unrolled ring's cut (layout._unwrap)
+    at = {  # each block's strands as drawn: its own, and the ghosts standing in it for strands drawn elsewhere
+        k: {**{i: lay.placed[i] for i in ids}, **{g.sse.id: g for g in block_ghosts(lay, k) if g.sse.id not in ids}}
+        for k, ids in enumerate(lay.sheets)
+    }
+    whole = [k for k in at if frozenset(at[k]) in sheets]
     for k, ids in enumerate(lay.sheets):
-        if set(ids) <= away:  # checked in the sheet where their ghosts stand
-            continue
-        at = {**{i: lay.placed[i] for i in ids}, **{g.sse.id: g for g in lent[k]}}
-        sheet = sheets.get(frozenset(at))
+        sheet = sheets.get(frozenset(at[k]))
+        if sheet is None and any(set(ids) <= set(at[j]) for j in whole if j != k):
+            continue  # strands lent across an unrolled ring's cut (layout._unwrap): checked where their ghosts stand
         if sheet is None:
-            out.append(f"sheet {k}: {', '.join(at)} is no sheet of the bridges")
+            out.append(f"sheet {k}: {', '.join(at[k])} is no sheet of the bridges")
             continue
         want = [s.id for s in sheet.strands]
-        got = _drawn_order(at)
+        got = _drawn_order(at[k])
         if not _same_order(got, want, sheet.closed):
             out.append(f"sheet {k}: drawn {', '.join(got)}, paired {', '.join(want)}")
         for (a, da), (b, db) in zip(zip(want, sheet.directions), zip(want[1:], sheet.directions[1:])):
-            pa, pb = at[a], at[b]
+            pa, pb = at[k][a], at[k][b]
             same = float(pa.direction @ pb.direction) > 0
             if same != (da == db):
                 out.append(f"sheet {k}: {a} and {b} drawn {'parallel' if same else 'antiparallel'}")

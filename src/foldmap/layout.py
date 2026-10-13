@@ -1896,13 +1896,17 @@ def _ring(frame) -> int | None:
 
 
 def _host(members: list[Placed], sector: dict, classes: dict) -> int | None:
-    """The protomer an item holding elements of two or more protomers belongs to: that of its first element by
-    chain class, then residue number (a copy's own strands with a strand lent by its neighbour, as in a measles F
-    sheet; each copy's such sheet is then its mates' image). None when two protomers' copies of one element come
-    first (an item symmetric in itself)."""
+    """The protomer an item holding elements of two or more protomers belongs to: the one holding most of its
+    residues (a copy's own strands with strands lent by its neighbour, as in a measles F sheet; each copy's such sheet
+    is then its mates' image); on a tie, that of its first element by chain class, then residue number. None when
+    two protomers' copies of one element come first (an item symmetric in itself)."""
     real = sorted(
         (classes[m.sse.chain], m.sse.first.seq, m.sse.last.seq, sector[m.sse.chain]) for m in members if not m.ghost
     )
+    held: dict[int, int] = {}
+    for _, a, b, k in real:
+        held[k] = held.get(k, 0) + b - a + 1
+    real = [r for r in real if held[r[3]] == max(held.values(), default=0)]
     if not real:
         return None
     c, a, b, k = real[0]
@@ -1913,8 +1917,10 @@ def _host(members: list[Placed], sector: dict, classes: dict) -> int | None:
 
 def _protomers(items: list[_Item], frame, mirror: bool) -> list[int | None]:
     """The protomer of each item (frame.sector): that of all its elements, or of an item holding several protomers'
-    elements its _host (not with a mirror line); None for an item with chains outside every protomer."""
+    elements its _host round a closed ring (_ring; not with a mirror line, nor along a filament, where such items
+    stay as they were: untied); None for an item with chains outside every protomer."""
     sector, classes = getattr(frame, "sector", None) or {}, getattr(frame, "classes", None) or {}
+    ring = _ring(frame)
     out = []
     for it in items:
         members = [m for m in it.members if isinstance(m, Placed)]
@@ -1922,7 +1928,7 @@ def _protomers(items: list[_Item], frame, mirror: bool) -> list[int | None]:
         if len(ks) == 1:
             out.append(ks.pop())
         else:
-            out.append(None if mirror or None in ks or not members else _host(members, sector, classes))
+            out.append(None if mirror or not ring or None in ks or not members else _host(members, sector, classes))
     return out
 
 
@@ -2047,8 +2053,8 @@ def _unwrap(items: list[_Item], ties: dict[int, tuple[int, int]], frame) -> dict
     one: the copy whose neighbour lies across the cut, at the row's other end. There the element leaves the item
     for an item of its own, tied to the protomer-0 mate's place the same number of protomers along as in the other
     copies (one past the row's end), so every copy is drawn alike; a strand leaves a ghost (dashed, as a barrel's)
-    where it pairs. New items are appended to `items` and their ties to `ties`. Returns each new item's index ->
-    the index of the item it left."""
+    where it pairs, and takes ghosts of the strands it pairs with (_partners) to stand beside. New items are
+    appended to `items` and their ties to `ties`. Returns each new item's index -> the index of the item it left."""
     ring = _ring(frame)
     sector = getattr(frame, "sector", None) or {}
     if not ring or not ties:
@@ -2070,8 +2076,16 @@ def _unwrap(items: list[_Item], ties: dict[int, tuple[int, int]], frame) -> dict
                 away.setdefault(g + usual, []).append(p)
         for k, ps in sorted(away.items()):
             moved = [it.members[p] for p in ps]
+            partners = _partners(it, ps)
             items.append(
-                _Item(moved, [it.offsets[p] for p in ps], it.cx, it.cy, it.home, *_anchor([m.sse for m in moved]))
+                _Item(
+                    moved + [Placed(m.sse, 0, 0, m.length, m.angle, m.width, ghost=True) for m in partners],
+                    [it.offsets[p] for p in ps] + [it.offsets[it.members.index(m)] for m in partners],
+                    it.cx,
+                    it.cy,
+                    it.home,
+                    *_anchor([m.sse for m in moved]),
+                )
             )
             ties[len(items) - 1] = (root, k)
             out[len(items) - 1] = x
@@ -2082,6 +2096,22 @@ def _unwrap(items: list[_Item], ties: dict[int, tuple[int, int]], frame) -> dict
                 it.members[p] = ghost if m.sse.kind == "E" else None
             keep = [p for p, m in enumerate(it.members) if m is not None]
             it.members, it.offsets = [it.members[p] for p in keep], [it.offsets[p] for p in keep]
+    return out
+
+
+def _partners(it: _Item, ps: list[int]) -> list[Placed]:
+    """The strands of item `it` beside its strands `ps` in the sheet (one strand pitch from one of them, centre to
+    centre), not among them: those they pair with, whose ghosts stand beside them where they leave (_unwrap)."""
+    out = []
+    for q, m in enumerate(it.members):
+        if q in ps or not isinstance(m, Placed) or m.ghost or m.sse.kind != "E":
+            continue
+        if any(
+            it.members[p].sse.kind == "E"
+            and np.hypot(*np.subtract(it.offsets[q], it.offsets[p])) <= max(m.width, it.members[p].width) + 1e-6
+            for p in ps
+        ):
+            out.append(m)
     return out
 
 
@@ -2537,9 +2567,17 @@ def block_ghosts(layout: Layout, k: int) -> list[Placed]:
 
 
 def domain_panel(layout: Layout, name: str) -> tuple[float, float, float, float]:
-    """A domain's panel (its elements plus margin) with room above for its name."""
+    """A domain's panel (its elements plus margin) with room above for its name. A ghost counts where it repeats a
+    strand of its own block (a barrel's): one lent across an unrolled ring's cut stands in another copy's sheet."""
     ids = dict(layout.domains)[name]
-    r = np.array([layout.placed[k].rect for k in ids] + [g.rect for g in layout.ghosts if g.sse.id in ids])
+    mine = set(ids)
+    repeats = [
+        g.rect
+        for k, block in enumerate(layout.sheets)
+        for g in block_ghosts(layout, k)
+        if g.sse.id in block and g.sse.id in mine
+    ]
+    r = np.array([layout.placed[k].rect for k in ids] + repeats)
     x0, y0, x1, y1 = r[:, 0].min(), r[:, 1].min(), r[:, 2].max(), r[:, 3].max()
     return (float(x0 - DOMAIN_PAD), float(y0 - DOMAIN_PAD), float(x1 + DOMAIN_PAD), float(y1 + DOMAIN_PAD + 0.6))
 
