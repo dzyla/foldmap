@@ -107,6 +107,17 @@ def test_a_cage_drawn_whole_has_its_copies_alike():
     assert got and max(got.values()) <= ALIKE, {f"{a}~{b}": round(v, 3) for (a, b), v in got.items()}
 
 
+def test_a_filament_drawn_whole_has_its_copies_alike():
+    """6Y7S (FimA rod, six subunits) drawn whole: each subunit's sheet holds the next subunit's donor strand, and an
+    item holding two subunits' elements belongs to the one holding most of it along a filament too, as round a ring
+    (plan 10 Task 2 follow-up): every tied copy alike (5.2 to 6.7 page units before), the end subunit, which no
+    neighbour lends a strand, within 1.2."""
+    got = figcheck.copies_alike(drawn(DATA / "6Y7S.cif", focus="none"))
+    shown = {f"{a}~{b}": round(v, 3) for (a, b), v in got.items()}
+    assert len(got) == 5 and max(got.values()) <= 1.2, shown
+    assert sorted(got.values())[-2] <= ALIKE, shown
+
+
 def test_copies_of_one_domain_get_alike_panels():
     """A domain's panel counts a ghost only where it repeats a strand of its own block (a barrel's); a strand lent
     across the cut leaves its ghost in another copy's sheet, which is no part of this copy's domain. Taken on the

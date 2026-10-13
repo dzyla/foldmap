@@ -1932,10 +1932,10 @@ def _host(members: list[Placed], sector: dict, classes: dict) -> int | None:
 
 def _protomers(items: list[_Item], frame, mirror: bool) -> list[int | None]:
     """The protomer of each item (frame.sector): that of all its elements, or of an item holding several protomers'
-    elements its _host round a closed ring (_ring; not with a mirror line, nor along a filament, where such items
-    stay as they were: untied); None for an item with chains outside every protomer."""
+    elements its _host, round a closed ring (_ring) or along a filament (a FimA subunit's sheet with the next
+    one's donor strand; not with a mirror line, where such items stay as they were: untied); None for an item with
+    chains outside every protomer."""
     sector, classes = getattr(frame, "sector", None) or {}, getattr(frame, "classes", None) or {}
-    ring = _ring(frame)
     out = []
     for it in items:
         members = [m for m in it.members if isinstance(m, Placed)]
@@ -1943,7 +1943,7 @@ def _protomers(items: list[_Item], frame, mirror: bool) -> list[int | None]:
         if len(ks) == 1:
             out.append(ks.pop())
         else:
-            out.append(None if mirror or not ring or None in ks or not members else _host(members, sector, classes))
+            out.append(None if mirror or None in ks or not members else _host(members, sector, classes))
     return out
 
 
