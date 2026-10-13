@@ -1240,6 +1240,9 @@ def na_metrics(drawn, path) -> dict:
     return m
 
 
+_BLOCK_NAME_EM = 0.9  # render._draw_block draws a stem's name on its block at this many ems of the figure's text
+
+
 def stem_gap_limit(fig) -> float | None:
     """A17's limit for this figure: the stem-name margin (layout._INK_MARGIN em) in its page units, plus 1e-3
     (figcheck.stem_gap_tolerance). The em is read from a drawn stem name (render: 0.8 em) as points -> pixels ->
@@ -1253,8 +1256,10 @@ def stem_gap_limit(fig) -> float | None:
     name = next((t for t in ax.texts if (t.get_gid() or "").startswith("na:label:")), None)
     if name is None:
         return None
+    block = any(re.fullmatch(r"na:stem:\d+:block(:\d+)?", a.get_gid() or "") for a in ax.patches)
     px_per_unit = ax.transData.transform((1, 0))[0] - ax.transData.transform((0, 0))[0]
-    em = name.get_fontsize() / _NAME_EM * fig.dpi / 72 / px_per_unit
+    size = _BLOCK_NAME_EM if block else _NAME_EM  # render draws a block's name at 0.9 em, a ladder's at 0.8
+    em = name.get_fontsize() / size * fig.dpi / 72 / px_per_unit
     return figcheck.stem_gap_tolerance(_INK_MARGIN * em)
 
 
@@ -1716,6 +1721,8 @@ def pair_check(a: dict, b: dict) -> dict:
     pairs = sorted(found.items())
     bad, notes = [], [f"{x['id']} unpaired" for i, x in enumerate(ea) if i not in found]
     notes += [f"{y['id']} unpaired" for k, y in enumerate(eb) if k not in found.values()]
+    # pairs sorted by the first entry's elements must take the second's in their order too: two chains' elements do
+    # not overlap and both are in residue order, so this holds for residue-range pairs unless a pairing is wrong
     if [k for _, k in pairs] != sorted(k for _, k in pairs):
         bad.append("elements in another order")
     if len(pairs) < max(min(3, len(ea), len(eb)), max(len(ea), len(eb)) / 2):

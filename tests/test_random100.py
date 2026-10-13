@@ -472,3 +472,19 @@ def test_gitignore_keeps_images_local():
     for name in ("sample.json", "report.json", "report.md", "run.log", "review.md"):
         done = subprocess.run(["git", "check-ignore", f"docs/validation/random100/{name}"], cwd=ROOT)
         assert done.returncode == 1, name
+
+
+def test_stem_gap_limit_reads_a_block_name_at_its_own_size(r100):
+    """A block-style stem's name is drawn at 0.9 em, a ladder's at 0.8 (render): A17's em comes out the figure's em
+    either way, the size an element's label is drawn at (4YBB's crop draws blocks)."""
+    from foldmap import figcheck
+    from foldmap.layout import _INK_MARGIN
+    from foldmap.spec import draw_spec, figure_spec
+
+    d = draw_spec(figure_spec(DATA / "na" / "4YBB.cif.gz"))
+    ax = d.figure.axes[0]
+    assert any((a.get_gid() or "").endswith(":block") for a in ax.patches)
+    label = next(t for t in ax.texts if (t.get_gid() or "").startswith("label:"))  # drawn at one em
+    px = ax.transData.transform((1, 0))[0] - ax.transData.transform((0, 0))[0]
+    em = label.get_fontsize() * d.figure.dpi / 72 / px
+    assert r100.stem_gap_limit(d.figure) == pytest.approx(figcheck.stem_gap_tolerance(_INK_MARGIN * em))
