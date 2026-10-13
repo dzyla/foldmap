@@ -47,6 +47,22 @@ def _undrawn_chains(model, layout) -> list[tuple[str, str]]:
     return out
 
 
+def _hidden_additives(layout) -> list[str]:
+    """The additives (io.ADDITIVES: crystallisation and purification leftovers) touching the drawn chains that the
+    figure hides (Style.ligands auto), by code: the note names them (random-100 C20 ruling)."""
+    links = getattr(layout, "links", None)
+    if getattr(layout, "ligands", "auto") != "auto" or links is None:
+        return []
+    focus = layout.focus_chains
+    return sorted(
+        {
+            g.name
+            for g in getattr(links, "ligands", None) or []
+            if g.additive and (not focus or any(layout.res_chain[r] in focus for r in g.contacts))
+        }
+    )
+
+
 def drawn_scope(model, layout, assembly: str = "auto", focus: str = "auto") -> dict:
     """What the figure drew of the structure, given the io.read_model result it was built from (`model`), its
     layout and the assembly and focus settings it was drawn with. Only automatic choices count (an assembly or a
@@ -58,8 +74,9 @@ def drawn_scope(model, layout, assembly: str = "auto", focus: str = "auto") -> d
         chains_reason (what was drawn of the chains) and crop (what of the nucleic acid, '' when none was
         cropped); all_options: the settings that draw everything ({} when nothing was left out: `set` is a style
         key=value, as --set takes it); residues: polymer residues those settings would draw (of the chains asked
-        for, when some were); undrawn_chains: chains the figure has nothing of (_undrawn_chains), and not_drawn:
-        them and why ('' when none), part of the reason (random-100 C15)."""
+        for, when some were); undrawn_chains: chains the figure has nothing of (_undrawn_chains), not_drawn: them
+        with why ('' when none), part of the reason (random-100 C15); additives: the additives it hides on purpose
+        (_hidden_additives), named by scope_note but not part of the reason (C20 ruling)."""
     several = getattr(model, "several", None) if assembly == "auto" else None
     read = list(getattr(layout, "chains_read", None) or [])
     asked = list(getattr(layout, "chains_asked", None) or [])
@@ -91,9 +108,10 @@ def drawn_scope(model, layout, assembly: str = "auto", focus: str = "auto") -> d
     if asked:
         reasons.insert(0, f"chains {', '.join(asked)} (asked for)")
     undrawn = _undrawn_chains(model, layout)
+    additives = _hidden_additives(layout)
     not_drawn = "; ".join(f"chain {c} ({why})" for c, why in undrawn)
     drawn -= len(undrawn)
-    unsaid = {"undrawn_chains": [c for c, _ in undrawn], "not_drawn": not_drawn}
+    unsaid = {"undrawn_chains": [c for c, _ in undrawn], "additives": additives, "not_drawn": not_drawn}
     if not reasons and not crop and not not_drawn:
         return {
             "file_chains": total,
@@ -121,9 +139,9 @@ def drawn_scope(model, layout, assembly: str = "auto", focus: str = "auto") -> d
 
 def scope_note(scope: dict, how: str = "cli") -> str:
     """One line saying what was drawn of the structure and how to draw everything ('' when nothing was left out
-    and no chain asked for): with command-line flags (how='cli') or MCP tool arguments (how='mcp'); the chain count
-    when chains were left out."""
-    if not scope.get("reason"):
+    and no chain asked for), then what it has not drawn (chains with nothing to draw, additives hidden): with
+    command-line flags (how='cli') or MCP tool arguments (how='mcp'); the chain count when chains were left out."""
+    if not scope.get("reason") and not scope.get("additives"):
         return ""
     options = scope["all_options"]
     if how == "mcp":
@@ -135,8 +153,12 @@ def scope_note(scope: dict, how: str = "cli") -> str:
         draw = " ".join(f"--{k} {v}" for k, v in options.items())
     what = scope_what(scope)
     parts = [f"drew {what}" + (f"; {draw} draws all of them" if options else "")] if what else []
-    if scope.get("not_drawn"):
-        parts.append(f"not drawn: {scope['not_drawn']}")
+    unsaid = [scope["not_drawn"]] if scope.get("not_drawn") else []
+    if scope.get("additives"):  # hidden on purpose, but named (C20 ruling)
+        shows = 'style={"ligands": "all"}' if how == "mcp" else "--set ligands=all"
+        unsaid.append(f"additives {', '.join(scope['additives'])} ({shows} draws them)")
+    if unsaid:
+        parts.append(f"not drawn: {'; '.join(unsaid)}")
     return "; ".join(parts)
 
 

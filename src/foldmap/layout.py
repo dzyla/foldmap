@@ -249,6 +249,7 @@ class Layout:
     copy_ties: dict[str, tuple[str, bool]] = field(default_factory=dict)  # copy chain -> (its protomer-0 mate chain,
     # drawn as its mirror image): the symmetry ties asked for (_symmetry_ties), kept when _separate moves one by one
     font_scale: float = 1.0  # Style.font_scale the figure is drawn with (texts placed in the layout are sized by it)
+    ligands: str = "auto"  # Style.ligands the figure is drawn with (auto hides additives: scope.drawn_scope names them)
     coil_chains: list[tuple[str, int]] = field(default_factory=list)  # (chain, residues) of each protein chain read
     # with no helix or strand: nothing of it can be drawn (scope.drawn_scope says so)
 
@@ -2469,6 +2470,7 @@ def build_layout(
     lay.frame = frame
     lay.copy_ties = copy_ties
     lay.font_scale = style.font_scale
+    lay.ligands = style.ligands
     lay.ba_rows = _ba_rows(items)  # after the user's swaps
     lay.on_sheet = {
         m.sse.id: [x.sse.id for x in it.members if x.sse.kind == "E" and not x.ghost]

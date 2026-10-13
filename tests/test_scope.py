@@ -58,9 +58,12 @@ def test_nucleosome_is_drawn_whole_with_nothing_to_report():
 
 @pytest.mark.parametrize("path", [DATA / "na" / "4OO8.cif.gz", DATA / "na" / "1KX5.cif.gz", DATA / "1UBQ.cif"])
 def test_nothing_left_out_reports_nothing(path):
+    """Nothing left out: no reason, no settings; the note names only the additives hidden on purpose (C20: 1KX5's
+    CL), when there are any."""
     s = scope_of(path)
     assert s["drawn_chains"] == s["file_chains"] and s["reason"] == "" and s["all_options"] == {}
-    assert scope_note(s) == ""
+    hidden = f"not drawn: additives {', '.join(s['additives'])} (--set ligands=all draws them)"
+    assert scope_note(s) == (hidden if s["additives"] else "")
 
 
 def test_choices_the_user_made_are_not_reported():
@@ -74,10 +77,12 @@ def test_choices_the_user_made_are_not_reported():
 def test_scope_notes_name_the_settings_that_draw_everything():
     kelch = scope_of(DATA / "4CH9.cif")
     assert scope_note(kelch) == (
-        "drew assembly 1, one of 2 copies in the file: 2 of 4 chains; --assembly asu --focus none draws all of them"
+        "drew assembly 1, one of 2 copies in the file: 2 of 4 chains; --assembly asu --focus none draws all of them; "
+        "not drawn: additives CL, EDO, SO4 (--set ligands=all draws them)"  # C20: hidden, but named
     )
     assert scope_note(kelch, how="mcp") == (
-        'drew assembly 1, one of 2 copies in the file: 2 of 4 chains; assembly="asu", focus="none" draws all of them'
+        'drew assembly 1, one of 2 copies in the file: 2 of 4 chains; assembly="asu", focus="none" draws all of them; '
+        'not drawn: additives CL, EDO, SO4 (style={"ligands": "all"} draws them)'
     )
     apo = scope_of(DATA / "assemblies" / "7A4M.cif")
     assert scope_note(apo) == "drew one of 24 subunits of an O cage: 1 of 24 chains; --focus none draws all of them"
@@ -158,7 +163,9 @@ def test_explicit_chains_note_says_what_was_asked():
 
     s = scope_of(DATA / "4CH9.cif", chains=["B"])
     assert s["reason"] == "chains B (asked for)" and s["all_options"] == {}
-    assert scope_note(s) == "drew chains B (asked for)"  # no "one of 2 copies", nothing "left out"
+    assert scope_note(s) == (  # no "one of 2 copies", nothing "left out"; the additives hidden named (C20)
+        "drew chains B (asked for); not drawn: additives CL, EDO, SO4 (--set ligands=all draws them)"
+    )
     d = draw_spec(figure_spec(DATA / "2HHB.cif", chains=["A", "C"]))
     s = drawn_scope(d.model, d.layout)
     assert s["reason"] == "chains A, C (asked for)" and "draws all" not in scope_note(s)
@@ -218,3 +225,20 @@ def test_a_nucleic_acid_chain_too_short_to_draw_is_said(tmp_path):
     ubq.make_mmcif_document().write_file(str(path))
     s = scope_of(path)
     assert s["undrawn_chains"] == ["K"] and s["not_drawn"] == "chain K (1 nucleotide, too short to draw)"
+
+
+def test_hidden_additives_are_named():
+    """C20 (random-100, ruling): crystallisation additives stay hidden (io.ADDITIVES) but the note names them, as the
+    reviewers failed V1/V7 on 9B7C's GOL, 5Q42's MLI and 7LX9's TRS listed in the facts and drawn nowhere. 2HHB's
+    PO4 and 4CH9's SO4, EDO and CL; the MCP note in its own terms; ligands=all draws them and says nothing."""
+    s = scope_of(DATA / "2HHB.cif")
+    assert s["additives"] == ["PO4"] and s["reason"] == "" and s["not_drawn"] == ""  # named, not left out
+    assert scope_note(s) == "not drawn: additives PO4 (--set ligands=all draws them)"
+    assert scope_note(s, how="mcp") == 'not drawn: additives PO4 (style={"ligands": "all"} draws them)'
+    kelch = scope_of(DATA / "4CH9.cif")
+    assert kelch["additives"] == ["CL", "EDO", "SO4"]
+    assert scope_note(kelch).endswith("; not drawn: additives CL, EDO, SO4 (--set ligands=all draws them)")
+    from foldmap.style import resolve_style
+
+    shown = scope_of(DATA / "2HHB.cif", look=resolve_style("publication", None, ["ligands=all"]))
+    assert shown["additives"] == [] and scope_note(shown) == ""
