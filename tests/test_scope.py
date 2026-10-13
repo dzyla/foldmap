@@ -81,3 +81,58 @@ def test_scope_notes_name_the_settings_that_draw_everything():
     )
     apo = scope_of(DATA / "assemblies" / "7A4M.cif")
     assert scope_note(apo) == "drew one of 24 subunits of an O cage: 1 of 24 chains; --focus none draws all of them"
+
+
+def test_na_crop_is_announced(capsys, tmp_path):
+    """na_extent auto crops a large nucleic acid to the stems the protein touches (4YBB: hundreds of nucleotides
+    left out). That is an automatic choice like any other: drawn_scope says it, with the setting that draws all of
+    it, the command line prints it, and figcheck.scope_honest finds nothing left out silently (plan 10 Task 8)."""
+    from foldmap import figcheck
+    from foldmap.cli import main
+    from foldmap.spec import draw_spec, figure_spec
+
+    path = DATA / "na" / "4YBB.cif.gz"
+    d = draw_spec(figure_spec(path))
+    assert d.layout.na_cropped and d.layout.na_read > d.layout.nucleic.size
+    s = drawn_scope(d.model, d.layout)
+    want = f"the RNA cropped to the {d.layout.nucleic.size:,} of {d.layout.na_read:,} nucleotides the protein touches"
+    assert s["reason"] == want and s["all_options"] == {"set": "na_extent=all"}
+    assert scope_note(s) == f"drew {want}; --set na_extent=all draws all of them"
+    assert scope_note(s, how="mcp").endswith('; style={"na_extent": "all"} draws all of them')
+    assert figcheck.scope_honest(d, path) == []
+    assert main(["plot", str(path), "-o", str(tmp_path / "4YBB.svg")]) == 0
+    assert f"foldmap: drew {want}; --set na_extent=all draws all of them" in capsys.readouterr().err
+
+
+def test_explicit_chains_note_says_what_was_asked():
+    """--chains A draws what was asked: no "left out" note, the note says "chains A (asked for)" (F1 review nit);
+    4CH9 --chains B is not "one of 2 copies" any more."""
+    from foldmap import figcheck
+    from foldmap.spec import draw_spec, figure_spec
+
+    s = scope_of(DATA / "4CH9.cif", chains=["B"])
+    assert s["reason"] == "chains B (asked for)" and s["all_options"] == {}
+    assert scope_note(s) == "drew chains B (asked for)"  # no "one of 2 copies", nothing "left out"
+    d = draw_spec(figure_spec(DATA / "2HHB.cif", chains=["A", "C"]))
+    s = drawn_scope(d.model, d.layout)
+    assert s["reason"] == "chains A, C (asked for)" and "draws all" not in scope_note(s)
+    assert figcheck.scope_honest(d, DATA / "2HHB.cif", chains=["A", "C"]) == []
+
+
+@pytest.mark.parametrize("path, n", [(DATA / "assemblies" / "7A4M.cif", 24), (DATA / "6Y7S.cif", 6)])
+def test_subunits_are_counted_as_drawn(path, n):
+    """The number of subunits a focus says ("one of N"): 7A4M's cage 24, 6Y7S's rod 6."""
+    lay, _, _ = make_layout(path)
+    assert lay.subunits[0] == n
+
+
+def test_half_a_subunit_rounds_up():
+    """Nine chains in focus units of two: four and a half units, said as five (round() took it to four)."""
+    from types import SimpleNamespace
+
+    from foldmap.cli import _subunits
+
+    sym = SimpleNamespace(protomers=[["A", "B", "C"], ["D", "E", "F"], ["G", "H", "I"]])
+    assert _subunits(sym, {"A", "B"}) == 5
+    assert _subunits(SimpleNamespace(protomers=[["A", "B", "C"]] * 5), {"A", "B"}) == 8  # 7.5
+    assert _subunits(SimpleNamespace(protomers=[["A"]] * 24), {"A"}) == 24

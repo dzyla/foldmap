@@ -193,3 +193,25 @@ def test_4v4f_shared_rna_ring_draws_clear(monkeypatch):
     monkeypatch.setattr(cli, "_na_shared", lambda *args: False)
     lay, sses, _ = make_layout(ring)
     assert lay.focus_chains is not None and len(lay.focus_chains) == 1
+
+
+def test_shared_na_cage_stays_focused():
+    """A cage keeps focus auto on one subunit even when a nucleic acid touches two or more of its protomers (F1
+    review): only a ring or other point group (C, D) whose protomers share a nucleic acid is drawn whole (the 4V4F
+    ring test). 7A4M's O cage with a strand held by four of its subunits."""
+    from types import SimpleNamespace
+
+    from foldmap.cli import _focus_chains, _na_shared
+    from foldmap.io import load_backbone
+    from foldmap.symmetry import detect_symmetry
+
+    cage = DATA / "assemblies" / "7A4M.cif"
+    _, sses, _ = make_layout(cage, focus="none")
+    bb = load_backbone(cage)
+    sym = detect_symmetry(bb, sses)
+    assert sym.kind == "O"
+    held = [k for c in sorted({l.chain for l in bb.labels})[:4] for k in range(len(bb)) if bb.labels[k].chain == c]
+    shared = SimpleNamespace(contacts={r: {(0, 1)} for r in held}, strands=[SimpleNamespace(chain="X")])
+    assert _na_shared(shared, sym, bb)  # the strand is held by four subunits
+    focus = _focus_chains("auto", sym, bb, sses, shared)
+    assert focus is not None and len(focus) == 1

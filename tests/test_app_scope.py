@@ -108,3 +108,26 @@ def test_the_summary_counts_the_chains_the_bar_counts():
     at = opened(APO)
     assert at.session_state["info"].startswith("1 of 24 chains · ")
     assert "— 1 of 24 chains." in visible(rendered_text(at))
+
+
+def test_the_top_bar_counts_the_residues_the_scope_counts():
+    """7A4M: the top bar's residue count is drawn_scope's (every subunit's, what "Show all chains" draws)."""
+    from foldmap.io import read_model
+    from foldmap.scope import drawn_scope
+    from foldmap.spec import draw_spec, figure_spec
+
+    at = opened(APO)
+    d = draw_spec(figure_spec(APO))
+    residues = drawn_scope(read_model(APO), d.layout)["residues"]
+    assert f" · {residues:,} residues · " in at.session_state["info"]
+
+
+def test_the_bar_says_the_nucleic_acid_was_cropped_and_shows_all_of_it():
+    """na_extent auto cropped 4YBB's RNA to the stems the protein touches: the bar says so (no chain was left
+    out, so no chain count), and "Show all chains" sets na_extent to all."""
+    at = opened(DATA / "na" / "4YBB.cif.gz")
+    text = visible(rendered_text(at))
+    assert "Drawn: the RNA cropped to the " in text and "nucleotides the protein touches." in text
+    assert bar(at) == ["scope_all", "scope_keep"]
+    at.button(key="scope_all").click().run()
+    assert not at.exception and at.session_state["na_extent"] == "all"

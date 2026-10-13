@@ -7,6 +7,7 @@ from __future__ import annotations
 import argparse
 import dataclasses
 import functools
+import math
 import re
 import sys
 from collections.abc import Callable
@@ -240,7 +241,7 @@ def make_layout(
         subunits = (_subunits(sym, focus_chains), "helical" if sym.kind == "H" else sym.label)
     if focus_chains and nucleic is not None and nucleic.strands:  # one subunit: the nucleic acid it holds
         nucleic = nucleic_touching(nucleic, focus_chains)
-    na_cropped = False
+    na_cropped, na_read = False, nucleic.size if nucleic is not None else 0
     if nucleic is not None and nucleic.strands:  # after focus: auto crops to the stems the subunit touches
         nucleic, na_cropped = _na_extent(nucleic, (look or Style()).na_extent)
     partial, context, unjoined = set(), None, set()
@@ -367,6 +368,8 @@ def make_layout(
         lay.focus, lay.focus_chains, lay.context = set(focus_chains), set(focus_chains), context
         lay.unjoined, lay.subunits = unjoined, subunits
     lay.chains_read = read
+    lay.chains_asked = [c for c in chains or [] if c in present]
+    lay.na_read = na_read if na_cropped else 0
     lay.links = links
     lay.res_chain = [l.chain for l in bb.labels]
     lay.res_name = [l.name for l in bb.labels]
@@ -569,9 +572,10 @@ def _homolog_labels(bb, sses) -> dict[str, str]:
 
 
 def _subunits(sym, focus: set) -> int:
-    """How many subunits like the `focus` chains the assembly holds."""
-    copies = sum(len(p) for p in sym.protomers) / max(len(sym.protomers), 1) / max(len(focus), 1)
-    return int(round(len(sym.protomers) * copies))
+    """How many subunits like the `focus` chains the assembly holds: its chains over the focus's, a half rounded
+    up (Python's round takes 4.5 to 4: nine chains in units of two are said as five subunits, not four)."""
+    chains = sum(len(p) for p in sym.protomers)
+    return int(math.floor(chains / max(len(focus), 1) + 0.5))
 
 
 def _context(sym, focus: set, bb, neighbours: bool = True) -> str:

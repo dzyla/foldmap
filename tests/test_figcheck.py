@@ -442,17 +442,3 @@ def test_an_explicit_focus_still_checks_the_nucleotides_of_chains_it_draws():
     d.layout.stems.clear()  # the duplex gone, its chains' 5' tails still drawn
     got = figcheck.scope_honest(d, DATA / "1LMB.cif", "asu", "3")
     assert [s.split(":")[0] for s in got] == ["nt 1", "nt 2"], got
-
-
-def test_na_crop_is_not_yet_counted_as_silent():
-    """Pins a known gap: 4YBB's automatic na_extent crop leaves nucleotides out and no note says so yet, and
-    scope_honest does not count it. Task 8 announces the crop (scope.drawn_scope) and turns this test into
-    test_scope.py::test_na_crop_is_announced."""
-
-    path = DATA / "na" / "4YBB.cif.gz"
-    d = drawn(path)
-    assert d.layout.na_cropped
-    shown = sum(len(s.axial) for s in d.layout.stems) + sum(len(p.nts) for p in d.layout.na_paths)
-    held = sum(len(c.get_polymer()) for c in d.model[0] if c.get_polymer().check_polymer_type().name in ("Rna", "Dna"))
-    assert held - shown > 100  # the crop leaves out hundreds of nucleotides ...
-    assert not [s for s in figcheck.scope_honest(d, path) if s.startswith("nt ")]  # ... and nothing says so

@@ -213,6 +213,7 @@ class Layout:
     na_letters: dict = field(default_factory=dict)  # single-stranded (strand, nt) -> its letter's place (route_loops)
     na_ties: list = field(default_factory=list)  # na_paths.NATie: isolated pairs as drawn (route_loops)
     na_cropped: bool = False  # na_extent auto cropped a large nucleic acid to the stems the protein touches
+    na_read: int = 0  # nucleotides read before that crop (scope.drawn_scope says how many of them were drawn)
     frame: object = None  # the frame.Frame (or RadialFrame, CylinderFrame) that took 3D to the page
     focus: set[str] | None = None  # chains drawn in colour when highlighting; the rest in grey
     links: object = None  # model.Links: disulfides and glycans, residue indices in Backbone order
@@ -229,6 +230,7 @@ class Layout:
     # or "helical")
     chains_read: list[str] = field(default_factory=list)  # every chain read and asked for (protein, then nucleic
     # acid), before focus kept one subunit
+    chains_asked: list[str] = field(default_factory=list)  # --chains: the protein chains asked for (scope says so)
     page_axes: list | None = None  # 3x3 rows: page-right, page-up, toward-viewer (for the first protomer)
     page_centre: list | None = None  # the 3D point those axes are taken around
     uniprot: object = None  # uniprot.Annotation when UniProt features were requested

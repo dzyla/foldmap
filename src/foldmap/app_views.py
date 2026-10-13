@@ -174,7 +174,9 @@ def missing_files(ws: Workspace) -> None:
 
 # ---------------------------------------------------------------------------------------------- scope bar
 def scope_text(scope: dict) -> str:
-    """The bar's line: what an automatic choice drew, and how many of the chains."""
+    """The bar's line: what an automatic choice drew, and how many of the chains (when not all of them)."""
+    if scope["drawn_chains"] >= scope["file_chains"]:
+        return f"Drawn: {scope['reason']}."
     return f"Drawn: {scope['reason']} — {scope['drawn_chains']} of {scope['file_chains']} chains."
 
 
@@ -203,6 +205,8 @@ def show_all_chains(ss: MutableMapping, options: dict) -> None:
     from foldmap.app import current_blob
 
     for key, value in options.items():
+        if key == "set":  # a style key, as --set takes it: key=value
+            key, value = value.split("=", 1)
         ss[key] = value
         ss["last_changed"] = key  # a failure names the control that changed
     if not ss.get("auto_redraw", True):
@@ -218,7 +222,7 @@ def scope_bar(ws: Workspace, scope: dict | None, blob: str) -> None:
     """Above the figure, when an automatic choice drew part of the file (scope.drawn_scope): what was drawn, a
     button that draws every chain (or why this app cannot) and one that keeps the figure as it is."""
     st, ss = ws.st, ws.ss
-    if not scope or not scope.get("reason") or ss.get("scope_kept"):
+    if not scope or not scope.get("all_options") or ss.get("scope_kept"):  # chains asked for: nothing to offer
         return
     with st.container(key="scope_bar", horizontal=True, vertical_alignment="center", gap="small"):
         st.markdown(shown(scope_text(scope)), width="stretch")
@@ -238,7 +242,7 @@ def drawn_summary(ss: MutableMapping, settings: dict, result: dict) -> str:
     if not settings.get("chains"):
         ss["chains_total"] = {"assembly": assembly, "count": result["chain_count"]}
         scope = result.get("scope") or {}
-        if scope.get("reason"):
+        if scope.get("reason") and scope["drawn_chains"] < scope["file_chains"]:
             return app_jobs.scoped_summary(result["summary"], scope["drawn_chains"], scope["file_chains"])
         return result["summary"]
     total = ss.get("chains_total") or {}

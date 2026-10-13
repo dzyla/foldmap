@@ -789,8 +789,8 @@ def scope_honest(drawn, path, assembly: str = "auto", focus: str = "auto", *, ch
     one copy of several), not from foldmap's loaders. Left out on purpose, and so not counted: what the drawn_scope
     reason (the note printed with the figure) covers (assembly copies, the subunits a focus leaves out), chains not
     among `chains` (--chains), and the chains an explicit --focus leaves undrawn (the chains it draws are still
-    checked nucleotide by nucleotide). A nucleic acid cropped by na_extent auto is not counted until that crop is
-    announced (plan 10 Task 8)."""
+    checked nucleotide by nucleotide), and what na_extent auto crops from a large nucleic acid once the drawn_scope
+    reason says so (plan 10 Task 8)."""
     import gemmi
 
     from .scope import drawn_scope
@@ -823,14 +823,15 @@ def scope_honest(drawn, path, assembly: str = "auto", focus: str = "auto", *, ch
         if focus == "auto" and lay.focus_chains and lay.subunits:
             covered |= set(expected) - set(lay.focus_chains)
     chosen = focus not in ("auto", "none")
+    cropped = lay.na_cropped and "cropped to the" in scope["reason"]
     out = []
     for chain in sorted(expected):
         if chain in drawn_chains or chain in covered or chosen or (chains and chain not in chains):
             continue
-        if lay.na_cropped and chain in _nucleic_chains(read):
+        if cropped and chain in _nucleic_chains(read):
             continue
         out.append(f"chain {chain}")
-    if lay.na_cropped:  # not counted until Task 8 announces the crop (test_na_crop_is_not_yet_counted_as_silent)
+    if cropped:  # the note says the nucleic acid was cropped, and how to draw it all
         return out
     for chain in sorted(shown):
         drawn_nts = shown[chain]

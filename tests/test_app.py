@@ -282,6 +282,24 @@ def test_a_layout_file_names_file_missing_here_is_a_warning_under_the_figure():
     assert not at.exception and not at.warning and len(at.session_state["names"]) == 2
 
 
+@pytest.mark.parametrize(
+    "body, said",
+    [
+        (b"elements: [unclosed", "x.yaml: not valid YAML"),
+        (b"elements:\n  res:Z:900-950: Q\n", "x.yaml: no element 'res:Z:900-950' in the figure"),
+    ],
+    ids=["parse", "apply"],
+)
+def test_a_names_file_error_names_the_file_as_uploaded(body, said):
+    """An invalid names file uploaded as x.yaml: its error names x.yaml, never the copy kept on the server (F1
+    review nit), whether it fails to parse or names an element the figure lacks."""
+    at = load(app_test(), DATA / "2HHB.cif")
+    at.file_uploader(key="names_upload").set_value(("x.yaml", body, "text/yaml")).run()
+    errors = [_visible(e.value) for e in at.error]
+    assert not at.exception and any(e.startswith(said) for e in errors), errors
+    assert not any("/tmp" in e or "upload" in e.split(":")[0] for e in errors)
+
+
 def test_layout_file_domains_naming_elements_the_structure_lacks_are_a_warning(capsys):
     """A layout file outlives its structure: element ids it names that this one lacks are dropped with a warning
     (as on the command line); typed in the app, the same ids are an error."""
