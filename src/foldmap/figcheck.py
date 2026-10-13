@@ -553,12 +553,14 @@ def shared_sheet_elements(lay, copy: str, ref: str) -> set[str]:
     return out
 
 
-def _copy_pairs(drawn) -> dict[tuple[str, str], tuple[float, int, int]]:
-    """(copy, reference) -> (deviation, elements matched, elements of the smaller of the two) for each tie of
-    Layout.copy_ties: the copies' elements matched as one element through the copy classes (model.copy_classes over
-    model.homolog_chains), strands of a sheet shared between copies left out (shared_sheet_elements), the deviation
-    that of fit_deviation (a reflection only for a mirror tie), inf when fewer than COPY_MIN_MATCHED or than half
-    the smaller copy's elements match (two points always fit)."""
+def _copy_pairs(drawn) -> dict[tuple[str, str], tuple[float | None, int, int, str]]:
+    """(copy, reference) -> (deviation, elements matched, elements of the smaller of the two, why not judged) for each
+    tie of Layout.copy_ties: the copies' elements matched as one element through the copy classes
+    (model.copy_classes over model.homolog_chains), strands of a sheet shared between copies left out
+    (shared_sheet_elements), the deviation that of fit_deviation (a reflection only for a mirror tie). When fewer
+    than COPY_MIN_MATCHED or than half the smaller copy's elements match (two points always fit), the tie is not
+    judged (deviation None) if the smaller copy has fewer than COPY_MIN_MATCHED elements to match ("n/a: k
+    elements") or a shared sheet took the rest ("n/a: shared sheet"), C22 and C10 rulings; else it is inf."""
     from .model import copy_classes, homolog_chains
 
     lay = drawn.layout
@@ -572,22 +574,35 @@ def _copy_pairs(drawn) -> dict[tuple[str, str], tuple[float, int, int]]:
         a, b = ({mate.get(k, k): at for k, at in by_chain.get(c, {}).items() if k not in shared} for c in (ref, copy))
         keys = sorted(a.keys() & b.keys())
         smaller = min(len(a), len(b))
-        enough = len(keys) >= COPY_MIN_MATCHED and 2 * len(keys) >= smaller
-        dev = fit_deviation([a[k] for k in keys], [b[k] for k in keys], mirrored) if enough else math.inf
-        out[(copy, ref)] = (dev, len(keys), smaller)
+        why = ""
+        if len(keys) >= COPY_MIN_MATCHED and 2 * len(keys) >= smaller:
+            dev: float | None = fit_deviation([a[k] for k in keys], [b[k] for k in keys], mirrored)
+        elif 0 < smaller < COPY_MIN_MATCHED:
+            dev, why = None, f"n/a: {smaller} element{'s' if smaller > 1 else ''}"
+        elif shared and len(keys) < COPY_MIN_MATCHED:
+            dev, why = None, "n/a: shared sheet"
+        else:
+            dev = math.inf
+        out[(copy, ref)] = (dev, len(keys), smaller, why)
     return out
 
 
 def copies_alike(drawn) -> dict[tuple[str, str], float]:
     """(copy chain, reference chain) -> the largest element-centre deviation (page units) between the two after the
-    best rigid 2D motion, for every tie the symmetry asked for (Layout.copy_ties); inf when too few elements match
-    to say (_copy_pairs). Elements one copy lacks are left out."""
-    return {pair: dev for pair, (dev, _, _) in _copy_pairs(drawn).items()}
+    best rigid 2D motion, for every tie the symmetry asked for (Layout.copy_ties) and judged; inf when too few
+    elements match to say (_copy_pairs). Elements one copy lacks are left out; ties not judged are in
+    copies_not_judged."""
+    return {pair: dev for pair, (dev, *_) in _copy_pairs(drawn).items() if dev is not None}
+
+
+def copies_not_judged(drawn) -> dict[tuple[str, str], str]:
+    """(copy chain, reference chain) -> why, for every tie too small to judge (reported, not failed: _copy_pairs)."""
+    return {pair: why for pair, (dev, _, _, why) in _copy_pairs(drawn).items() if dev is None}
 
 
 def copy_matches(drawn) -> dict[tuple[str, str], tuple[int, int]]:
     """(copy chain, reference chain) -> (elements matched, elements of the smaller copy) for every tie."""
-    return {pair: (n, smaller) for pair, (_, n, smaller) in _copy_pairs(drawn).items()}
+    return {pair: (n, smaller) for pair, (_, n, smaller, _) in _copy_pairs(drawn).items()}
 
 
 # ------------------------------------------------------------------------------------------- domains
@@ -988,7 +1003,10 @@ def figure_checks(drawn, path, *, assembly: str = "auto", focus: str = "auto", c
         "text_collisions": collisions,
         "off_page": None if skip else off_page(drawn, page=page),
         "label_repeats": label_repeats(drawn.layout),
-        "copies_alike": {pair: {"deviation": dev, "matched": n, "of": m} for pair, (dev, n, m) in pairs.items()},
+        "copies_alike": {
+            pair: {"deviation": dev, "matched": n, "of": m, "judged": why or "yes"}
+            for pair, (dev, n, m, why) in pairs.items()
+        },
         "domains": domain_checks(drawn, collisions or []) if drawn.layout.domains else {},
         "stem_name_gaps": None if skip else stem_name_gaps(drawn, page=page),
         "scope_silent": scope_honest(drawn, path, assembly, focus, chains=chains),
@@ -1001,7 +1019,7 @@ def figure_checks(drawn, path, *, assembly: str = "auto", focus: str = "auto", c
         "text_collisions": None if skip else len(collisions),
         "off_page": None if skip else len(details["off_page"]),
         "label_repeats": sum(len(v) for v in details["label_repeats"].values()),
-        "copies_alike": max((dev for dev, _, _ in pairs.values()), default=0.0),
+        "copies_alike": max((dev for dev, *_ in pairs.values() if dev is not None), default=0.0),
         "domain_rules": sum(len(domains.get(k, [])) for k in ("cross_chain", "unalike", "small")),
         "domain_overlap": max((f for *_, f in domains.get("panel_overlaps", [])), default=0.0),
         "domain_name_collisions": None if skip else len(domains.get("name_collisions", [])),

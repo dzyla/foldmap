@@ -434,7 +434,26 @@ def test_copies_need_three_matches_and_half_the_smaller_copy():
     for k in [k for k, p in d.layout.placed.items() if p.sse.chain == "B"][2:]:
         del d.layout.placed[k]
     assert figcheck.copy_matches(d)[("B", "A")] == (2, 2)
-    assert figcheck.copies_alike(d)[("B", "A")] == math.inf  # two points always fit
+    assert ("B", "A") not in figcheck.copies_alike(d)  # a copy of two elements is reported, not judged (C22)
+
+
+def test_copies_of_fewer_than_three_elements_are_reported_not_judged():
+    """C22 (random-100): a copy with fewer than COPY_MIN_MATCHED elements (7AOD's two-helix chain D~P, 6JLN's
+    single-TM subunits) can never match three; it is reported as not judged (ruling), not failed as inf. So is a
+    tie left with fewer than three after its shared sheet is left out (C10; 6YQD). A copy that draws nothing at all
+    stays a violation."""
+    d = drawn(DATA / "1TIM.cif")
+    for chain in "AB":
+        for k in [k for k, p in d.layout.placed.items() if p.sse.chain == chain][2:]:
+            del d.layout.placed[k]
+    assert figcheck.copies_alike(d) == {} and figcheck.copy_matches(d) == {("B", "A"): (2, 2)}
+    assert figcheck.copies_not_judged(d) == {("B", "A"): "n/a: 2 elements"}
+    d = drawn(R100 / "7IMM-A.cif.gz")
+    other = [k for k, p in d.layout.placed.items() if p.sse.chain == "A2" and p.sse.kind != "E"]
+    for k in other[3:]:
+        del d.layout.placed[k]  # A2 keeps its shared strands and three other elements, two of them matching A1's
+    d.layout.placed[other[2] + "~"] = d.layout.placed.pop(other[2])
+    assert figcheck.copies_not_judged(d) == {("A2", "A1"): "n/a: shared sheet"}
 
 
 def test_strands_of_a_sheet_shared_between_copies_are_left_out():
