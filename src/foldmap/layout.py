@@ -562,6 +562,9 @@ def _ba_template(
     Other helices are placed as free helices. Home: the strands' projected mean, as _sheet_item."""
     strands = sheet.strands
     order, s, cents = _sheet_order(sheet, frame)
+    if strands[order[0]].start > strands[order[-1]].start:  # the row reads left to right in sequence: turned
+        order, s = order[::-1], -s  # half round in the page (never mirrored), its strands then point down (K9: under
+        # --up 1TIM read β8 ... β1; 1GOX's barrels and two of 1LDM's Rossmann rows did by default)
     n = len(order)
     drawn = {k: d for d, k in enumerate(order)}
     after: dict[int, SSE] = {}  # drawn slot -> the helix drawn right of it

@@ -24,7 +24,9 @@ def test_tim_barrel_is_one_row_with_each_helix_between_its_strands():
     row is wider than the projected figure (27.2 x 13.0 = 353 units², against 20.3 x 14.2 = 288): eight strands, the
     ghost and seven helices, each helix with its name beside it, side by side. The crossings, not the area, decide
     whether the figure reads (Task 12 ruling: the area limit was a target). Opening the barrel between β8 and β1
-    (the textbook cut) moved the free elements: 353.10 measured, hence 354."""
+    (the textbook cut) moved the free elements: 353.10 measured, hence 354. Reading β1 to β8 left to right (K9, plan
+    10 Task 7: chain A alone read β8 ... β1), the row turned half round as the dimer's figure draws it: 364.9 measured,
+    hence 365."""
     lay, sses, bb = make_layout(DATA / "1TIM.cif", chains=["A"])
     strands, by_x = _row(lay, sses, "A")
     ys = {round(p.cy, 6) for p in strands}
@@ -49,7 +51,8 @@ def test_tim_barrel_is_one_row_with_each_helix_between_its_strands():
     assert [k for row in lay.ba_rows for k in row if lay.placed[k].sse.kind == "H"]  # Task 13 numbers these
     loops = route_loops(lay, sses, bb)
     assert loop_crossings(loops) <= 4  # 30 at b43695e
-    assert lay.width * lay.height <= 354.0  # measured 353.10 with the β8|β1 cut (x1.22 the projected 288 units²)
+    assert lay.width * lay.height <= 365.0  # measured 364.9 reading β1..β8 (x1.27 the projected 288 units²)
+    assert [p.sse.start for p in by_x] == sorted(p.sse.start for p in by_x)  # β1 ... β8, left to right
 
 
 def test_7tim_barrel_row_keeps_a_unit_without_helix():
@@ -279,3 +282,16 @@ def test_template_choices_do_not_depend_on_the_order_of_the_sheets(monkeypatch):
     forward = layout.template_choices([a, b], [], copies)
     backward = layout.template_choices([b, a], [], copies)
     assert forward == backward[::-1] == [True, False]
+
+
+@pytest.mark.parametrize("axis", [0, 1, 2], ids=["page-right", "page-up", "toward-viewer"])
+def test_ba_row_reads_left_to_right_under_up(axis):
+    """A βα row reads left to right in sequence whatever page-up is asked for (K9): 1TIM chain A, --up along each of
+    the three page axes of its default figure (right, up, toward the viewer)."""
+    default, _, _ = make_layout(DATA / "1TIM.cif", chains=["A"])
+    up = list(default.page_axes[axis])
+    lay, sses, _ = make_layout(DATA / "1TIM.cif", chains=["A"], up=up)
+    assert lay.ba_rows
+    strands, _ = _row(lay, sses, "A")
+    xs = [p.cx for p in sorted(strands, key=lambda p: p.sse.start)]
+    assert xs == sorted(xs), xs
