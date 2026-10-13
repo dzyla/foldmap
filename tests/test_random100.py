@@ -305,8 +305,30 @@ def test_tether_lengths_are_measured_from_mark_to_target(r100):
 
     d = draw_spec(figure_spec(DATA / "fidelity" / "1MBN.cif.gz"))
     got = r100.tether_lengths(d, Style())
-    assert len(got) == 6 and all(g.startswith("ligand-tether:") for g, _ in got)
-    assert max(n for _, n in got) == pytest.approx(6.06, abs=0.01)
+    assert len(got) == 6 and all(g.startswith("ligand-tether:") for g, *_ in got)
+    assert max(n for _, n, _, _ in got) == pytest.approx(6.06, abs=0.01)
+
+
+def test_a20_gates_only_tethers_to_other_chains(r100):
+    """C2 (random-100): A20 bounds only a tether to another chain than the ligand's home (ruling); a long tether
+    to the home chain is reported, not failed. Each tether records its home and target chains (myoglobin: one
+    chain, so every tether is a home one)."""
+    from foldmap.spec import draw_spec, figure_spec
+    from foldmap.style import Style
+
+    d = draw_spec(figure_spec(DATA / "fidelity" / "1MBN.cif.gz"))
+    got = r100.tether_lengths(d, Style())
+    assert got and all(home == target == "A" for _, _, home, target in got)
+    view = {"exit": 0, "timed_out": False, "traceback": False, "python_warnings": [], "written": {}, "seconds": 1.0}
+
+    def a20(tethers):
+        return r100.criteria({"views": {"default": {**view, "result": {"tethers": tethers}}}})["A20"]
+
+    home = a20([["ligand-tether:URC:A300:0", 9.01, "A", "A"], ["ligand-tether:URC:A300:1", 2.0, "A", "A"]])
+    assert home["pass"] is True and "reported: ligand-tether:URC:A300:0 9.01 (home A)" in home["detail"]
+    other = a20([["ligand-tether:CLA:B609:2", 7.08, "B", "H"], ["ligand-tether:CLA:B609:0", 3.0, "B", "B"]])
+    assert other["pass"] is False and other["detail"].startswith("ligand-tether:CLA:B609:2 7.08 (B to H)")
+    assert a20([["ligand-tether:CLA:B609:2", 6.4, "B", "H"]])["pass"] is True
 
 
 def test_a_ca_only_entry_must_be_refused_in_one_line(r100):

@@ -914,7 +914,7 @@ LIMITS = {
     "stem_name_gap": "figcheck.stem_gap_tolerance(layout._INK_MARGIN em)",
     "tm_overlap": 0.75,  # A18: a TM helix overlaps the band by this fraction of the band's height
     "slab_margin": 0.3,  # A18: a loop's sideways run inside the band, this far from its faces, is in the slab
-    "tether_length": 6.5,  # A20: page units, a ligand tether from its mark to the element it touches most
+    "tether_length": 6.5,  # A20: page units, a ligand tether from its mark to another chain than its home
 }
 DOCUMENTED_WARNINGS: tuple[str, ...] = ()  # Python warnings a view may print (regexes); none at the start
 VIEWS = (
@@ -1153,16 +1153,19 @@ def trace_of(drawn) -> dict:
     return {"axes": lay.page_axes, "centre": lay.page_centre, "chains": chains, "strands": strands}
 
 
-def tether_lengths(drawn, look) -> list[tuple[str, float]]:
-    """(gid, length in page units) of every ligand tether drawn: from its ligand's mark to its target (render's
-    ligand_marks; the drawn tether shows only where no body or text is, so its ink is shorter)."""
+def tether_lengths(drawn, look) -> list[tuple[str, float, str, str]]:
+    """(gid, length in page units, home chain, target chain) of every ligand tether drawn: from its ligand's mark
+    to its target (render's ligand_marks; the drawn tether shows only where no body or text is, so its ink is
+    shorter). The home chain is the one the ligand is drawn with: render._local_targets lists its targets first."""
     from foldmap.render import ligand_marks
 
-    out = []
-    for m in ligand_marks(drawn.layout, drawn.loops, drawn.sses, look):
+    lay, out = drawn.layout, []
+    for m in ligand_marks(lay, drawn.loops, drawn.sses, look):
         g, (cx, cy) = m["ligand"], m["centre"]
-        for k, (tx, ty) in enumerate(m["targets"]):
-            out.append((f"ligand-tether:{g.name}:{g.chain}{g.seq}:{k}", round(float(np.hypot(tx - cx, ty - cy)), 3)))
+        home = lay.res_chain[m["residues"][0]]
+        for k, ((tx, ty), r) in enumerate(zip(m["targets"], m["residues"])):
+            gid, length = f"ligand-tether:{g.name}:{g.chain}{g.seq}:{k}", round(float(np.hypot(tx - cx, ty - cy)), 3)
+            out.append((gid, length, home, lay.res_chain[r]))
     return out
 
 
@@ -1694,8 +1697,12 @@ def criteria(e: dict) -> dict:
     if e.get("pair_check") is not None:
         out["A19"] = e["pair_check"]
     if "default" in views and d:
-        long = [f"{g} {n}" for g, n in d.get("tethers", []) if n > LIMITS["tether_length"]]
-        out["A20"] = _ok(not long, "; ".join(long[:4]))
+        # only a tether to another chain is bounded (ruling); a long one to the home chain is reported
+        long = [(g, n, h, t) for g, n, h, t in d.get("tethers", []) if n > LIMITS["tether_length"]]
+        other = [f"{g} {n} ({h} to {t})" for g, n, h, t in long if t != h]
+        same = [f"{g} {n} (home {h})" for g, n, h, t in long if t == h]
+        shown = other[:4] + ([f"reported: {'; '.join(same[:4])}"] if same else [])
+        out["A20"] = _ok(not other, "; ".join(shown))
     return out
 
 
