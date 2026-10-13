@@ -4,6 +4,8 @@
 
 Run with `foldmap app` (or `streamlit run src/foldmap/app.py`)."""
 
+# ruff: noqa: E402  (the foldmap imports follow _drop_changed_foldmap, which must run before them)
+
 from __future__ import annotations
 
 import base64
@@ -13,10 +15,38 @@ import logging
 import math
 import os
 import re
+import sys
 import tempfile
 from collections.abc import MutableMapping
 from dataclasses import fields, replace
 from pathlib import Path
+
+
+def _drop_changed_foldmap(here: str = __name__) -> list[str]:
+    """Streamlit Cloud updates the code in place and reruns this script, but the foldmap modules it already imported
+    keep their old code in memory, so a new app.py can ask an old module for a name it does not have yet (an
+    ImportError until the app is rebooted). When any foldmap file changed on disk since it was loaded, forget every
+    foldmap module (not this one) so all of them load fresh and agree. Returns the names forgotten."""
+    seen = sys.__dict__.setdefault("_foldmap_file_stamps", {})
+    mods = {n: m for n, m in sys.modules.items() if (n == "foldmap" or n.startswith("foldmap.")) and n != here}
+
+    def stamp(m):
+        try:
+            return os.stat(m.__file__).st_mtime_ns
+        except (AttributeError, TypeError, OSError):
+            return None
+
+    now = {n: stamp(m) for n, m in mods.items()}
+    if any(n in seen and now[n] != seen[n] for n in now):
+        for n in mods:
+            del sys.modules[n]
+        seen.clear()
+        return sorted(mods)
+    seen.update(now)
+    return []
+
+
+_drop_changed_foldmap()
 
 from foldmap import CREDIT, app_jobs, layoutfile
 from foldmap.app_controls import (

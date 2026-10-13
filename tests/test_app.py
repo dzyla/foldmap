@@ -1451,3 +1451,26 @@ def test_hosted_missing_files_of_a_layout_file_are_named_without_their_path(monk
     at.file_uploader(key="layout_upload").set_value(("l.yaml", yaml.safe_dump(doc).encode(), "x")).run()
     text = " ".join(_visible(w.value) for w in at.warning)
     assert not at.exception and "names file n.yaml" in text and "alignment x.fasta" in text and "/srv" not in text
+
+
+def test_a_foldmap_module_changed_on_disk_is_loaded_fresh(tmp_path, monkeypatch):
+    """Streamlit Cloud updates the code in place and reruns app.py while the foldmap modules it imported keep their
+    old code; when a foldmap file changes on disk, every foldmap module is forgotten so the next import is fresh."""
+    import sys
+
+    from foldmap import app
+
+    seen = sys.__dict__.setdefault("_foldmap_file_stamps", {})
+    seen.clear()
+    assert app._drop_changed_foldmap() == []  # first look records the stamps
+    assert app._drop_changed_foldmap() == []  # nothing changed
+    name = next(n for n in seen if n.startswith("foldmap.") and n != "foldmap.app")
+    monkeypatch.setitem(seen, name, -1)  # as if that file changed since it was loaded
+    kept = dict(sys.modules)
+    try:
+        dropped = app._drop_changed_foldmap()
+        assert name in dropped and "foldmap.app" not in dropped
+        assert not any(n in sys.modules for n in dropped)
+    finally:
+        sys.modules.update(kept)
+        seen.clear()
