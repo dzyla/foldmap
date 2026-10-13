@@ -53,6 +53,11 @@ ENTRIES = {  # fixture name -> (PDB id, what it is for)
         "P2X receptor chain A, residues 100-200, backbone only: a long loop's residue count written on a strand "
         "(random-100 C3)",
     ),
+    "1BXI": (
+        "1BXI",
+        "colicin E9 DNase and Im9, backbone, CB and the side-chain atoms that hold a metal: the Ni mark was put on the "
+        "loop B:22-25>B:32-33 (random-100 C5)",
+    ),
     "7IMM-A": (
         "7IMM",
         "a dimer (assembly 1: chain A twice) whose two copies make one continuous A B B A sheet, backbone only: the "
@@ -84,6 +89,9 @@ TRIMS: dict[str, dict] = {
     "7IMM-A": {"backbone": True},
     "2DGS-A": {"first_model": True, "backbone": True},
     "9ON5-A": {"backbone": True},
+    "1BXI": {
+        "atoms": ("N", "CA", "C", "O", "CB", "ND1", "NE2", "SG", "OD1", "OD2", "OE1", "OE2", "NZ", "OG", "OG1", "SD")
+    },
 }
 _BACKBONE = {"N", "CA", "C", "O", "CB"}
 

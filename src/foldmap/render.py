@@ -1220,6 +1220,30 @@ def _local_targets(layout: Layout, loops: list[Loop], sses: list[SSE], g, metal:
     return targets, weights, residues
 
 
+def _mark_spot(anchor, half, targets, taken, texts, tethers):
+    """The first spot on rings round the anchor whose mark (grown by 0.08) is clear of `taken` and of the tethers
+    drawn before, and whose own tethers cross no text, lengthening none past the first clear spot's (the plan-11
+    spot); else that first clear spot; None when there is none within _SPOT_RADIUS."""
+    spot = free = None
+    for ring in np.arange(0.0, _SPOT_RADIUS, 0.35):
+        for angle in np.linspace(0, 2 * np.pi, max(1, int(ring * 10)), endpoint=False):
+            c = anchor + ring * np.array([np.cos(angle), np.sin(angle)])
+            box = (c[0] - half[0] - 0.08, c[1] - half[1] - 0.08, c[0] + half[0] + 0.08, c[1] + half[1] + 0.08)
+            if overlaps_any(box, taken) or any(clip_len(a, b, box) > 1e-9 for a, b in tethers):
+                continue
+            if free is None:
+                free = c
+                reach = max(_TETHER_REACH, *(np.hypot(*(np.subtract(t, c))) for t in targets))
+            if all(np.hypot(*(np.subtract(t, c))) <= reach for t in targets) and not any(
+                clip_len(c, t, b) > 1e-9 for t in targets for b in texts
+            ):
+                spot = c
+                break
+        if spot is not None:
+            break
+    return spot if spot is not None else free
+
+
 def ligand_marks(layout: Layout, loops: list[Loop], sses: list[SSE], look: Style) -> list[dict]:
     """Where each shown ligand/ion goes: as close as possible to the residues holding it, clear of elements,
     labels and other markers. Each mark: ligand, centre, half size, tether targets, tethered residues."""
@@ -1237,10 +1261,19 @@ def ligand_marks(layout: Layout, loops: list[Loop], sses: list[SSE], look: Style
         chosen = [g for g in chosen if any(layout.res_chain[r] in layout.focus_chains for r in g.contacts)]
     taken = [p.rect for p in layout.placed.values()] + [g.rect for g in layout.ghosts]
     labels = [box for _, box in label_boxes(layout, sses)]
-    taken += labels
-    texts = labels + [  # and the strand letters at their centres (they slide off a disulfide bar only later)
-        centred_box(p.cx, p.cy, 0.12 * len(p.label) + 0.1, 0.25) for p in layout.placed.values() if p.sse.kind == "E"
-    ]
+    counts = [t["box"] for t in [*tail_counts(layout, sses, loops), *loop_counts(layout, loops, sses)]]
+    taken += labels + counts
+    texts = (
+        labels
+        + counts
+        + [  # and the strand letters at their centres (they slide off a disulfide bar only later)
+            centred_box(p.cx, p.cy, 0.12 * len(p.label) + 0.1, 0.25)
+            for p in layout.placed.values()
+            if p.sse.kind == "E"
+        ]
+    )
+    lines = [box for lp in loops for box in _thin_boxes(lp.points)]  # a mark is kept off the loops' lines (C5) ...
+    tethers: list[tuple] = []  # ... and the tethers drawn before: (from, to)
     out = []
     for g in sorted(chosen, key=lambda g: g.contacts[0]):
         targets, weights, tethered = _local_targets(layout, loops, sses, g, g.metal)
@@ -1248,27 +1281,17 @@ def ligand_marks(layout: Layout, loops: list[Loop], sses: list[SSE], look: Style
             continue
         anchor = np.average(np.asarray(targets), axis=0, weights=weights)
         half = (0.3, 0.3) if g.metal else (0.12 * len(g.name) + 0.2, 0.27)
-        spot = free = None  # the first spot whose tethers cross no text, else the first clear spot
-        for ring in np.arange(0.0, _SPOT_RADIUS, 0.35):
-            for angle in np.linspace(0, 2 * np.pi, max(1, int(ring * 10)), endpoint=False):
-                c = anchor + ring * np.array([np.cos(angle), np.sin(angle)])
-                box = (c[0] - half[0] - 0.08, c[1] - half[1] - 0.08, c[0] + half[0] + 0.08, c[1] + half[1] + 0.08)
-                if any(box[0] < t[2] and t[0] < box[2] and box[1] < t[3] and t[1] < box[3] for t in taken):
-                    continue
-                if free is None:
-                    free = c  # the plan-11 spot; one that crosses no text may lengthen no tether past this
-                    reach = max(_TETHER_REACH, *(np.hypot(*(np.subtract(t, c))) for t in targets))
-                if all(np.hypot(*(np.subtract(t, c))) <= reach for t in targets) and not any(
-                    clip_len(c, t, b) > 1e-9 for t in targets for b in texts
-                ):
-                    spot = c
-                    break
+        spot = None
+        for blocked in (taken + lines, taken):  # off the lines where there is room, else as before
+            spot = _mark_spot(anchor, half, targets, blocked, texts, tethers)
             if spot is not None:
                 break
-        spot = spot if spot is not None else free
         if spot is None:
             continue
-        taken.append((spot[0] - half[0], spot[1] - half[1], spot[0] + half[0], spot[1] + half[1]))
+        mark = (spot[0] - half[0], spot[1] - half[1], spot[0] + half[0], spot[1] + half[1])
+        taken.append(mark)
+        texts.append(mark)  # a later ligand's tether keeps off this one's name
+        tethers += [(tuple(spot), tuple(t)) for t in targets]
         out.append(
             {
                 "ligand": g,

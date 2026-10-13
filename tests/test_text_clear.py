@@ -8,10 +8,12 @@ import pytest
 
 from foldmap import figcheck
 from foldmap.layout import label_boxes, overlaps_any, tail_counts
-from foldmap.render import loop_counts
+from foldmap.render import ligand_marks, loop_counts
+from foldmap.route import clip_len
 from foldmap.spec import draw_spec, figure_spec
 
 R100 = Path(__file__).parent / "data" / "r100"
+FID = Path(__file__).parent / "data" / "fidelity"
 
 
 def drawn(path, **kw):
@@ -62,3 +64,27 @@ def test_loop_count_sits_clear_of_elements_lines_and_text():
         x0, y0, x1, y1 = c["box"]
         assert ax.get_xlim()[0] < x0 < x1 < ax.get_xlim()[1] and ax.get_ylim()[0] < y0 < y1 < ax.get_ylim()[1]
     assert figcheck.off_page(d) == []
+
+
+def _mark_box(m) -> tuple[float, float, float, float]:
+    (cx, cy), (hw, hh) = m["centre"], m["half"]
+    return cx - hw, cy - hh, cx + hw, cy + hh
+
+
+@pytest.mark.parametrize("path, kw", [(R100 / "1BXI.cif.gz", {}), (FID / "1MBN.cif.gz", {})], ids=["1BXI", "1MBN"])
+def test_ligand_marks_sit_off_loops_and_earlier_tethers(path, kw):
+    """C5 (random-100): a ligand's mark was kept clear of elements, labels and other marks but not of the loops'
+    lines, so 1BXI's Ni sat on the loop B:22-25>B:32-33 (and 1A0Z's hems, 3MHT's SAH, 5SB5's Ca); nor were earlier
+    marks' tethers and names obstacles to later ones (6JO6: chlorophyll names crossed by other chlorophylls'
+    tethers). Marks now keep off loop lines, counts, earlier tethers and names wherever a spot is free."""
+    spec = figure_spec(path, **kw)
+    d = draw_spec(spec)
+    marks = ligand_marks(d.layout, d.loops, d.sses, spec.look)
+    assert marks
+    for i, m in enumerate(marks):
+        box = _mark_box(m)
+        assert not any(clip_len(p, q, box) > 1e-9 for lp in d.loops for p, q in zip(lp.points, lp.points[1:])), m
+        for e in marks[:i]:  # no earlier tether runs through it, and its tethers through no earlier mark
+            assert not any(clip_len(e["centre"], t, box) > 1e-9 for t in e["targets"])
+            assert not any(clip_len(m["centre"], t, _mark_box(e)) > 1e-9 for t in m["targets"])
+    assert hits(d, "ligand") == []
