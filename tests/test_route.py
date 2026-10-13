@@ -322,6 +322,26 @@ def test_random_layouts_never_route_through_an_element(page):
     assert fallbacks <= {"normal": 8, "big": 45}[page], fallbacks
 
 
+def test_5lj3_window_routes_without_fallback():
+    """A long gap or free end inside a large RNP routes clear (K5). 5LJ3's RNA V with Z's stem and the protein
+    elements beside them on the full figure's page (tests/data/r100/5LJ3-V): the 3' end V:85-92 was drawn back over
+    its own stem, as a free end's clearance check trimmed its far end too when that lay inside the stem, and the gap
+    after V:92 then had no way out of the stem ("gap after V:92", as on the full figure). Every free end now keeps
+    out of its own stem past where it leaves it, and every path is drawn clear."""
+    from foldmap.na_paths import in_body
+    from foldmap.spec import draw_spec, figure_spec
+
+    d = draw_spec(figure_spec(DATA / "r100" / "5LJ3-V.cif.gz"))
+    lay = d.layout
+    at = {key: s for s in lay.stems for key in s.axial}
+    for p in lay.na_paths:
+        if p.kind == "tail":
+            (key,) = p.between
+            assert not any(in_body(q, at[key]) for q in p.nt_xy), p.nts
+    assert any(p.kind == "gap" for p in lay.na_paths)
+    assert d.stuck == []
+
+
 def logged(caplog, what):
     """The count route_loops logged for `what` in its debug line."""
     (n,) = re.findall(rf"\b(\d+) {what}", caplog.text)

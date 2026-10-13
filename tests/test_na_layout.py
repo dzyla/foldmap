@@ -1022,6 +1022,47 @@ def test_a_long_free_end_is_routed_round_what_blocks_it(monkeypatch):
     assert np.all(steps <= NT_STEP + 1e-6) and np.all(steps > 0.5 * NT_STEP)
 
 
+def test_a_routed_free_end_is_judged_along_its_line_to_its_label(monkeypatch):
+    """A free end routed out to free space is checked along the line it is drawn on, out to where its end label
+    goes, not along the straight chord from its last nucleotide to the label: past a corner the chord cut an element
+    the line keeps clear of (5LJ3's 12-nt end E:-16--5 was drawn as a fallback). 4YBB's 10-nt end, routed (no
+    straight drawing offered) along a path fixed to turn between its last nucleotide and its label, with a small
+    element planted on that chord."""
+    import foldmap.na_ends as na_ends
+    from foldmap.na_paths import _face, _seg_dist
+    from foldmap.route import _DIRS, _element_obstacles, _Grid, _Router
+
+    lay, _, _, _ = _routed("4YBB")
+    at = {key: d for d in lay.stems for key in d.axial}
+    tail = next(p for p in lay.na_paths if p.kind == "tail" and len(p.nts) == 10)
+    (key,) = tail.between
+    d, five = at[key], tail.nts[-1] < key[1]
+    face, way = _face(d, key, not five)
+    grid = _Grid(lay)
+    start = grid.free_cell_along(face, way, d)
+    heading = min(range(4), key=lambda k: -(_DIRS[k][0] * way[0] + _DIRS[k][1] * way[1]))
+
+    def run(more=()):  # the end drawn along 19 cells straight out, then 13 to the side that is free
+        for side in ((heading + 1) % 4, (heading + 3) % 4):
+            cells = [(start[0] + _DIRS[heading][0] * k, start[1] + _DIRS[heading][1] * k) for k in range(20)]
+            cells += [(cells[-1][0] + _DIRS[side][0] * k, cells[-1][1] + _DIRS[side][1] * k) for k in range(1, 14)]
+            if all(grid.free(c) for c in cells):
+                break
+        rects, owners = _element_obstacles(lay)
+        elements = (np.hstack([rects, np.array(more, float).reshape(-1, 4).T]), [*owners, *["small"] * len(more)])
+        monkeypatch.setattr(na_ends, "_reach_out", lambda *args, **kw: list(cells))
+        return na_ends._tail(_Router(_Grid(lay), elements), lay, d, key[0], key, tail.nts, five, None)
+
+    monkeypatch.setattr(na_ends, "_TURNS", ())  # no straight drawing: the end is routed
+    first, tip, _ = run()
+    last = first.nt_xy[0 if five else -1]
+    mid = np.add(last, tip) / 2  # the chord's middle, off the line by its corner ...
+    assert not first.fallback and min(_seg_dist(mid, a, b) for a, b in zip(first.points, first.points[1:])) > 0.2
+    small = (mid[0] - 0.05, mid[1] - 0.05, mid[0] + 0.05, mid[1] + 0.05)  # ... and an element there
+    path, again, _ = run([small])
+    assert not path.fallback and np.allclose(path.points, first.points) and np.allclose(again, tip)
+
+
 def test_a_free_end_keeps_out_of_its_partners_doorway(monkeypatch):
     """A free end is not turned across the way its partner nucleotide's strand leaves the same end of the stem, when
     another drawing is clear (5F9R: the non-target strand's free end D:12-20, turned across the face of DNA 1, closed

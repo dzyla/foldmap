@@ -105,7 +105,7 @@ def _tail(
                 pts, xy, tip = _free_end(d, key, len(nts), five, turn)
                 drawn = [*(pts[::-1] if five else pts), tip]
                 if (
-                    _na_clear(drawn, (d,), router.elements)
+                    _na_clear(drawn, (d,), router.elements, both=False)  # its tip never back in its stem
                     and not _enters(drawn, circles, d)
                     and not (keep_door and door is not None and _crosses_segment(drawn[:-1], *door))
                     and (not need_label or _label_room(router, layout, tip, labels))
@@ -267,12 +267,15 @@ def _routed_end(
     strung = _strung(line, gaps)
     if strung is None:
         return None
-    marks, last = strung
+    marks, last, end = strung
     if min(math.dist(p, q) for k, p in enumerate(marks) for q in marks[k + 1 :]) < 0.9 * NT_STEP:
         return None  # it turns back on itself: its nucleotides would bunch up
     xy, tip = marks[:-1], marks[-1]
     pts = _upto(line, last)
-    if not _na_clear([*pts, tip], (d,), router.elements) or (strands is not None and strands.crosses(pts)):
+    # judged along its line out to its label, as a straight end is: a chord from its last nucleotide to the label
+    # cut the corner of an element the line keeps clear of (5LJ3's E:-16--5)
+    out_to_label = _upto(line, end)
+    if not _na_clear(out_to_label, (d,), router.elements, both=False) or (strands is not None and strands.crosses(pts)):
         return None
     if door is not None and _crosses_segment(pts, *door):
         return None

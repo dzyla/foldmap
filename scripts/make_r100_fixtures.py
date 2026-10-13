@@ -7,10 +7,12 @@
     python scripts/make_r100_fixtures.py 7FAB-HL       # only these fixtures
 
 Waters and hydrogens are dropped, and the water subchains leave the assembly generators (gemmi cannot build from a
-subchain the file lacks). An entry in WINDOWS keeps only the chains it names, each whole or cut to a residue window;
-the helix records keep their deposited ids. Each fixture stays under 100 KB and all of them under 600 KB
-(tests/test_r100_fixtures.py). Files are written gzipped, outside tests/data/*.cif, so scripts/bench.py never reads
-them.
+subchain the file lacks). An entry in WINDOWS keeps only the chains it names, each whole or cut to residue windows;
+the helix records keep their deposited ids. TRIMS shrinks an entry further: `assembly` keeps only the subchains of
+that biological assembly, `backbone` keeps only a protein's N, CA, C, O and CB atoms, `no_protein_sequence` drops
+the protein entities' full sequences (a big complex's are most of a small window's file). Each fixture stays under
+100 KB and all of them under 600 KB (tests/test_r100_fixtures.py). Files are written gzipped, outside
+tests/data/*.cif, so scripts/bench.py never reads them.
 """
 
 from __future__ import annotations
@@ -26,13 +28,40 @@ from make_fidelity_fixtures import _fetch, _keep_helix_ids
 OUT = Path(__file__).resolve().parent.parent / "tests" / "data" / "r100"
 ENTRIES = {  # fixture name -> (PDB id, what it is for)
     "7FAB-HL": ("7FAB", "Fab New, chains H and L whole: disulfide bars over strand labels (Task 6, K11)"),
+    "5LJ3-V": (
+        "5LJ3",
+        "spliceosome: RNA V whole, Z's stem with it and the protein elements beside them on the full figure's page; "
+        "its 3' end V:85-92 ran back over its own stem and buried the gap after V:92 (Task 5, K5)",
+    ),
+    "4V4F-ring": ("4V4F", "TRAP-RNA: assembly 1, the 11-subunit ring and its RNA, backbone only (Task 5, K24)"),
 }
-WINDOWS: dict[str, dict[str, tuple[int, int] | None]] = {  # fixture -> {chain: (first, last residue) or None: whole}
+Span = tuple[int, int]
+WINDOWS: dict[str, dict[str, Span | list[Span] | None]] = {  # fixture -> {chain: windows (first, last), None: whole}
     "7FAB-HL": {"H": None, "L": None},
+    "5LJ3-V": {  # found by a seeded search over the page neighbours of the gap (plan 10 Task 5 report)
+        "V": None,
+        "Z": (1, 16),
+        "A": [(208, 232), (514, 536), (1284, 1290), (1019, 1036), (906, 925), (840, 871)],
+        "O": [(164, 192), (82, 93)],
+        "H": (146, 159),
+        "N": (121, 129),
+        "T": [(434, 441), (482, 498), (406, 420)],
+    },
 }
+TRIMS: dict[str, dict] = {
+    "5LJ3-V": {"no_protein_sequence": True},
+    "4V4F-ring": {"assembly": "1", "backbone": True},
+}
+_BACKBONE = {"N", "CA", "C", "O", "CB"}
 
 
-def build(text: str, window: dict[str, tuple[int, int] | None] | None = None) -> bytes:
+def _protein(r: gemmi.Residue) -> bool:
+    info = gemmi.find_tabulated_residue(r.name)
+    return info is not None and info.is_amino_acid()
+
+
+def build(text: str, window: dict[str, Span | list[Span] | None] | None = None, trim: dict | None = None) -> bytes:
+    trim = trim or {}
     st = gemmi.read_structure_string(text)
     st.remove_waters()
     st.remove_hydrogens()
@@ -44,9 +73,29 @@ def build(text: str, window: dict[str, tuple[int, int] | None] | None = None) ->
                 span = window[c.name]
                 if span is None:
                     continue
+                spans = span if isinstance(span, list) else [span]
                 for i in reversed(range(len(c))):
-                    if not span[0] <= c[i].seqid.num <= span[1]:
+                    if not any(lo <= c[i].seqid.num <= hi for lo, hi in spans):
                         del c[i]
+    if "assembly" in trim:
+        (assembly,) = [a for a in st.assemblies if a.name == trim["assembly"]]
+        sub = {s for g in assembly.generators for s in g.subchains}
+        for model in st:
+            for c in model:
+                for i in reversed(range(len(c))):
+                    if c[i].subchain not in sub:
+                        del c[i]
+    if trim.get("backbone"):
+        for model in st:
+            for r in (r for c in model for r in c if _protein(r)):
+                for i in reversed(range(len(r))):
+                    if r[i].name not in _BACKBONE:
+                        del r[i]
+    st.remove_empty_chains()
+    if trim.get("no_protein_sequence"):
+        for ent in st.entities:
+            if ent.polymer_type == gemmi.PolymerType.PeptideL:
+                ent.full_sequence = []
     kept = {r.subchain for c in st[0] for r in c}
     for assembly in st.assemblies:  # gemmi refuses to build from a subchain the file no longer has (the waters)
         for g in assembly.generators:
@@ -68,7 +117,7 @@ def main(argv=None) -> int:
     total = 0
     for name in args.names or ENTRIES:
         pdb, _ = ENTRIES[name]
-        data = build(_fetch(pdb, args.src), WINDOWS.get(name))
+        data = build(_fetch(pdb, args.src), WINDOWS.get(name), TRIMS.get(name))
         (OUT / f"{name}.cif.gz").write_bytes(data)
         total += len(data)
         print(f"{name}.cif.gz: {len(data) / 1024:.0f} KB")

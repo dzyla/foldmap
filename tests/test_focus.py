@@ -173,3 +173,23 @@ def test_focus_auto_does_not_split_a_nucleic_acid_its_protomers_share():
     assert _na_shared(shared, sym, bb)  # no stems needed: a single strand two protomers hold is shared too
     assert not _na_shared(each, sym, bb) and not _na_shared(glancing, sym, bb)
     assert not _na_shared(None, sym, bb) and not _na_shared(shared, None, bb)
+
+
+def test_4v4f_shared_rna_ring_draws_clear(monkeypatch):
+    """F1's shared-nucleic-acid ring rule, end to end (K24): TRAP's 11-subunit ring (4V4F assembly 1, backbone only)
+    with the RNA wound round it is one complex. focus auto draws the whole ring and every RNA piece, says nothing was
+    left out, and routes every loop and strand clear (the full entry's two fallbacks, A2:102-103 and AZ:102-103, went
+    with plan 10 Task 2's ring layout). Without the rule the same figure would be one subunit."""
+    from foldmap import cli
+    from foldmap.scope import drawn_scope
+    from foldmap.spec import draw_spec, figure_spec
+
+    ring = DATA / "r100" / "4V4F-ring.cif.gz"
+    d = draw_spec(figure_spec(ring))
+    assert d.layout.focus_chains is None and len(_chains(d.sses)) == 11
+    assert len(d.layout.nucleic.strands) == 11 and len(d.layout.na_paths) == 11
+    assert drawn_scope(d.model, d.layout, "auto", "auto")["reason"] == ""
+    assert d.stuck == []
+    monkeypatch.setattr(cli, "_na_shared", lambda *args: False)
+    lay, sses, _ = make_layout(ring)
+    assert lay.focus_chains is not None and len(lay.focus_chains) == 1

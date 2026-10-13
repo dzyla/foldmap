@@ -160,8 +160,8 @@ def _upto(pts, at: float) -> list[tuple[float, float]]:
 
 def _strung(line, gaps):
     """Marks strung along the polyline from its start, each the first point at exactly gaps[k] (measured straight)
-    from the one before: (the marks, how far along the polyline the last but one lies), or None if it is too
-    short."""
+    from the one before: (the marks, how far along the polyline the last but one and the last lie), or None if it
+    is too short."""
     p = np.asarray(line, float)
     marks: list[tuple[float, float]] = []
     prev, done, along, at = p[0], 0, 0.0, None
@@ -183,7 +183,7 @@ def _strung(line, gaps):
             if done == len(gaps) - 1:
                 at = along + math.sqrt(vv) * t
             if done == len(gaps):
-                return marks, at
+                return marks, at, along + math.sqrt(vv) * t
         along += math.sqrt(vv)
     return None
 
@@ -226,9 +226,10 @@ def _leaves_at(p, q, d) -> float:
     return max(0.0, t)
 
 
-def outside_own(pts, own) -> list[tuple[float, float]]:
+def outside_own(pts, own, both: bool = True) -> list[tuple[float, float]]:
     """The polyline without its first and last stretches inside its own stems' bodies (a strand runs along its
-    rail to the stem's end face before it is drawn among the other elements)."""
+    rail to the stem's end face before it is drawn among the other elements); without `both`, only its first (a free
+    end, drawn from its stem out to its tip: a tip back inside the stem is no part of the stem's rail)."""
 
     def trim(p):
         for i in range(len(p) - 1):
@@ -242,13 +243,15 @@ def outside_own(pts, own) -> list[tuple[float, float]]:
             return [(float(q[0]), float(q[1]))] + list(p[i + 1 :])
         return [p[-1], p[-1]]
 
-    out = trim(trim(list(pts))[::-1])[::-1]
+    out = trim(list(pts))
+    out = trim(out[::-1])[::-1] if both else out
     return out if len(out) > 1 else [out[0], out[0]]
 
 
-def _na_clear(pts, own, elements) -> bool:
-    """A strand drawn clear of every element and stem (by _clear), from where it leaves its own stems."""
-    return _clear(outside_own(pts, own), own, *elements, own_body=True)
+def _na_clear(pts, own, elements, both: bool = True) -> bool:
+    """A strand drawn clear of every element and stem (by _clear), from where it leaves its own stems (`both`:
+    see outside_own)."""
+    return _clear(outside_own(pts, own, both), own, *elements, own_body=True)
 
 
 class _Strands:
