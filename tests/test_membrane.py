@@ -254,7 +254,7 @@ def test_opm_dummy_atoms_are_never_drawn_as_ligands(kw):
 
 R100 = DATA / "r100"
 OMP_NORMALS = {  # the membrane normal OPM gives, in each fixture's frame (OPM tilts these barrels 5 degrees)
-    "9FWZ-DC": (-0.0193, -0.2999, 0.9538),  # OPM's 3RFZ FimD superposed on 9FWZ chain D (CA rmsd 1.7 A, 678 residues)
+    "9FWZ-DB": (-0.0193, -0.2999, 0.9538),  # OPM's 3RFZ FimD superposed on 9FWZ chain D (CA rmsd 1.7 A, 678 residues)
     "1BXW-A": (-0.9302, 0.3594, -0.0749),  # OPM's 1bxw (OmpA)
 }
 
@@ -347,7 +347,7 @@ def test_helical_membranes_are_unchanged_by_the_barrel_estimate(path):
 @pytest.mark.parametrize("mode", ["projected", "stack"])
 def test_outer_membrane_barrel_strands_cross_the_drawn_band(mode):
     """9FWZ --membrane auto: the band is drawn, and every drawn strand of the FimD barrel crosses it."""
-    path = R100 / "9FWZ-DC.cif.gz"
+    path = R100 / "9FWZ-DB.cif.gz"
     lay, sses, bb = make_layout(path, mode=mode, membrane="auto")
     assert lay.membrane is not None
     strands = {s.id for s in _closed_barrel_strands(bb)}
@@ -361,7 +361,7 @@ def test_outer_membrane_barrel_strands_cross_the_drawn_band(mode):
     assert [a for a in fig.axes[0].patches if (a.get_gid() or "").split(":")[0].startswith("membrane")]
 
 
-@pytest.mark.parametrize("name, sided", [("1BXW-A", True), ("9FWZ-DC", False)])
+@pytest.mark.parametrize("name, sided", [("1BXW-A", True), ("9FWZ-DB", False)])
 def test_outer_membrane_barrel_sides_come_from_its_loops(name, sided):
     """The positive-inside rule called OmpA's sides backwards (measured on 19 outer-membrane barrels against OPM: wrong
     on 16, 10 of them called clear). An outer-membrane barrel's extracellular loops are long and its periplasmic
@@ -371,3 +371,40 @@ def test_outer_membrane_barrel_sides_come_from_its_loops(name, sided):
     m = find_membrane(path, load_backbone(path, "asu"))
     assert m.sided == sided
     assert m.normal @ np.array(OMP_NORMALS[name]) > 0  # the outside where OPM has it
+
+
+def test_band_lies_over_the_sheet_plates_and_under_the_loops():
+    """9FWZ: the band hid under the barrel's sheet plate, showing only beyond its edges. It now lies over every plate
+    (translucent, so the plate still shows through) and under the loops and bodies."""
+    from matplotlib.colors import to_hex
+
+    from foldmap.render import Z
+
+    assert Z["sheet-panel"] < Z["membrane"] < Z["membrane-heads"] < Z["loop"] < Z["body"]
+    ax = make_figure(R100 / "9FWZ-DB.cif.gz", membrane="auto").axes[0]
+    (band,) = _band(ax.figure)
+    assert band.get_zorder() == Z["membrane"] and 0 < band.get_alpha() < 1
+    assert to_hex(band.get_facecolor()) == "#f7f0de"
+    bx0, by0, bx1, by1 = band.get_bbox().extents
+    plates = [p for p in ax.patches if (p.get_gid() or "").startswith("sheet-panel:")]
+    crossed = [p for p in plates if p.get_extents().overlaps(band.get_extents())]
+    assert crossed  # the unrolled barrel's plate
+    for p in crossed:
+        px0, _, px1, _ = p.get_bbox().extents
+        assert band.get_zorder() > p.get_zorder() and bx0 <= px0 and px1 <= bx1  # over the plate, all across it
+    heads = [c for c in ax.collections if (c.get_gid() or "").startswith("membrane-heads:")]
+    assert len(heads) == 2 and all(c.get_zorder() == Z["membrane-heads"] for c in heads)
+
+
+def test_stack_rows_get_a_band_only_from_the_elements_that_define_the_membrane():
+    """9FWZ --mode stack drew two bands: one on FimD's row and one on the row of the FimA subunit whose strands lie in
+    the usher's lumen and so span the slab's depth. Only the barrel's own strands give a row its band."""
+    lay, sses, bb = make_layout(R100 / "9FWZ-DB.cif.gz", mode="stack", membrane="auto")
+    rows = [{lay.placed[k].sse.chain for k in ids if k in lay.placed} for ids in lay.stack_rows]
+    assert rows == [{"B"}, {"D"}]  # FimA and FimD each in a row of their own
+    assert len(lay.membrane["bands"]) == 1 and lay.membrane["y"] == lay.membrane["bands"][0]
+    y0, y1 = lay.membrane["y"]
+    usher = [lay.placed[k] for k in lay.stack_rows[1] if k in lay.placed]
+    assert min(p.rect[1] for p in usher) < y0 < y1 < max(p.rect[3] for p in usher)  # the band is on FimD's row
+    fig = make_figure(R100 / "9FWZ-DB.cif.gz", mode="stack", membrane="auto")
+    assert len([a for a in fig.axes[0].patches if (a.get_gid() or "").split(":")[0] == "membrane"]) == 1

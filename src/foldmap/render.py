@@ -94,6 +94,7 @@ class _QuietMissingFonts(logging.Filter):
 logging.getLogger("matplotlib.font_manager").addFilter(_QuietMissingFonts())
 _PANEL = "#eef1f4"
 _LIPID, _HEADS, _HEAD_EDGE = "#f7f0de", "#e6d3a3", "#c2a765"  # membrane band, lipid head groups
+_LIPID_ALPHA = 0.8  # the band over a sheet's plate lets the plate show through
 _RUN_EDGE, _RUN_EDGE_W = "#3a3a3a", 1.8  # dark edge under residue-coloured loops (pale colours stay legible)
 _SHORT_HELIX = 1.6  # helices/3-10 boxes shorter than this hold their residue numbers past the ends
 LONG_LOOP, LONG_TAIL = 25, 10  # loops / chain ends at least this many residues get a residue-count label
@@ -110,14 +111,15 @@ _DOMAIN_TONES = (  # one hue per domain: Paul Tol's muted set less its indigo (t
 )
 _DOMAIN_BAR_H = 1.1  # page units each chain's domain bar takes below the figure (at least; more for larger text)
 
-Z = {  # the drawing order, back to front (plan 10 R8: panel < plate < loops < bodies < bars/tethers < labels).
+Z = {  # the drawing order, back to front (plan 10 R8: panel < plate < membrane band < loops < bodies < bars/tethers
+    # < labels).
     # Every zorder render sets is taken from here; a loop adds i * 1e-3 (its rank), its casing, arrows and runs a
     # few 1e-4 more, and a helix over a sheet lifts its parts by Z["over"] - Z["body"].
-    "membrane": 0.1,  # the lipid band ...
-    "membrane-heads": 0.15,  # ... and its head groups
     "domain-panel": 0.2,  # a domain's tinted panel
     "sheet-panel": 0.3,  # a sheet's plate
     "sheet-domain-edge": 0.31,  # a domain's edge over a sheet several domains share
+    "membrane": 0.312,  # the lipid band, translucent over the plates (an unrolled beta-barrel's runs across it) ...
+    "membrane-heads": 0.315,  # ... and its head groups
     "domain-name-plate": 0.32,  # a domain's name: its plate over the panel's edge ...
     "domain-leader": 0.33,  # ... its leader, when it stands outside
     "domain-name": 0.35,  # ... the name
@@ -2511,15 +2513,17 @@ def _draw_loops(c: _Canvas, layout: Layout, loops: list[Loop], sses: list[SSE]) 
 
 
 def _draw_membrane(c: _Canvas, layout: Layout) -> None:
-    """The lipid bilayer behind everything."""
+    """The lipid bilayer: over the panels and plates, behind the loops and elements."""
     x0, y0, x1, y1 = c.content
     if layout.membrane is None:
         return
-    # the lipid bilayer behind everything: a band with head groups on both faces; one per row of a wrapped stack
+    # a translucent band with head groups on both faces; one per row of a wrapped stack
     for k, (b0, b1) in enumerate(layout.membrane.get("bands", [layout.membrane["y"]])):
         row = f":{k}" if k else ""
         left, right = x0 - c.pad * 0.7, x1 + c.pad * 0.7
-        band = Rectangle((left, b0), right - left, b1 - b0, fc=_LIPID, ec="none", zorder=Z["membrane"])
+        band = Rectangle(
+            (left, b0), right - left, b1 - b0, fc=_LIPID, ec="none", alpha=_LIPID_ALPHA, zorder=Z["membrane"]
+        )
         band.set_gid(f"membrane{row}")
         c.ax.add_patch(band)
         xs = np.arange(left + 0.2, right, 0.42)

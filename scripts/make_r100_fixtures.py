@@ -37,10 +37,10 @@ ENTRIES = {  # fixture name -> (PDB id, what it is for)
     "4V4F-ring": ("4V4F", "TRAP-RNA: assembly 1, the 11-subunit ring and its RNA, backbone only (Task 5, K24)"),
     "1IGT-AB": ("1IGT", "IgG: a light and a heavy chain, backbone and SG: disulfide bars over labels (Task 6, K11)"),
     "1GOX-A": ("1GOX", "glycolate oxidase, one subunit and its FMN: tethers on a template barrel (Task 6, K8)"),
-    "9FWZ-DC": (
+    "9FWZ-DB": (
         "9FWZ",
-        "type 1 pilus usher FimD (D, a 24-strand outer-membrane beta-barrel) and its chaperone FimC (C), backbone "
-        "only: the beta-barrel membrane estimate (C-MEM-BARREL)",
+        "type 1 pilus usher FimD (D, a 24-strand outer-membrane beta-barrel) and the FimA subunit in its lumen (B), "
+        "backbone only: the beta-barrel membrane estimate; B spans the slab without defining it (C-MEM-BARREL)",
     ),
     "1BXW-A": ("1BXW", "OmpA, an 8-strand outer-membrane beta-barrel, backbone only: the control (C-MEM-BARREL)"),
 }
@@ -48,7 +48,7 @@ Span = tuple[int, int]
 WINDOWS: dict[str, dict[str, Span | list[Span] | None]] = {  # fixture -> {chain: windows (first, last), None: whole}
     "7FAB-HL": {"H": None, "L": None},
     "1IGT-AB": {"A": None, "B": None},
-    "9FWZ-DC": {"D": (116, 700), "C": None},  # the barrel (139-659), its plug and the start of CTD1
+    "9FWZ-DB": {"D": (116, 700), "B": None},  # the barrel (139-659), its plug, the start of CTD1; FimA
     "5LJ3-V": {  # found by a seeded search over the page neighbours of the gap (plan 10 Task 5 report)
         "V": None,
         "Z": (1, 16),
@@ -63,7 +63,7 @@ TRIMS: dict[str, dict] = {
     "5LJ3-V": {"no_protein_sequence": True},
     "4V4F-ring": {"assembly": "1", "backbone": True},
     "1IGT-AB": {"atoms": ("N", "CA", "C", "O", "CB", "SG")},
-    "9FWZ-DC": {"backbone": True, "no_protein_sequence": True},
+    "9FWZ-DB": {"backbone": True, "no_protein_sequence": True},
     "1BXW-A": {"backbone": True},
 }
 _BACKBONE = {"N", "CA", "C", "O", "CB"}

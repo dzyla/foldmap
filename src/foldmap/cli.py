@@ -459,13 +459,16 @@ def _membrane_band(lay, sses, bb, mem) -> dict | None:
 
 
 def _face_medians(lay, sses, bb, mem) -> tuple[float, float] | None:
-    """Where these elements pass the outer and the inner membrane face on the page (medians), if any is TM."""
+    """Where these elements pass the outer and the inner membrane face on the page (medians), if any is TM and
+    defines the membrane (Membrane.defining: a beta-barrel's strands, not a subunit lying in its lumen)."""
     depth = mem.depth(bb.ca)
     outs, ins = [], []
     for s in sses:
         p = lay.placed.get(s.id)
         seg = depth[s.start : s.end + 1]
         if p is None or len(seg) < 2 or seg.min() > -mem.half + 2 or seg.max() < mem.half - 2:
+            continue
+        if mem.defining is not None and mem.defining.isdisjoint(range(s.start, s.end + 1)):
             continue
 
         def page_y(face: float, seg=seg, p=p) -> float | None:

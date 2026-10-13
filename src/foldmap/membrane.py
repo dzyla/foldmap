@@ -9,6 +9,7 @@ cytoplasmic side comes from the positive-inside rule (more Lys/Arg)."""
 
 from __future__ import annotations
 
+import dataclasses
 from dataclasses import dataclass
 
 import gemmi
@@ -53,6 +54,9 @@ class Membrane:
     half: float  # half thickness (Å)
     source: str  # 'opm' (dummy atoms in the file) or 'estimate'
     sided: bool = False  # True when the positive-inside rule clearly says which side is the cytoplasm
+    # residues (indices) of the elements that define it, a beta-barrel's strands: only those give a page row its band
+    # (a subunit in the barrel's lumen spans the slab without being in the membrane); None: any element crossing it
+    defining: frozenset[int] | None = None
 
     def depth(self, xyz: np.ndarray) -> np.ndarray:
         """Signed distance from the mid-plane, positive outside."""
@@ -179,7 +183,8 @@ def _barrel_estimate(bb: Backbone, sses: list[SSE], bridges: list[Bridge]) -> Me
             and (bb.ca[s.start : s.end + 1] @ normal).max() > centre + _MIN_CROSSING
         ]
         if oily >= _MIN_OUTWARD_HYDROPHOBIC and charged <= _MAX_OUTWARD_CHARGED and crossing:
-            return _barrel_sides(Membrane(normal, centre, BARREL_HALF, "estimate"), bb, strands)
+            barrel = frozenset(k for s in strands for k in range(s.start, s.end + 1))
+            return _barrel_sides(Membrane(normal, centre, BARREL_HALF, "estimate", defining=barrel), bb, strands)
     return None
 
 
@@ -197,8 +202,8 @@ def _barrel_sides(m: Membrane, bb: Backbone, strands: list[SSE]) -> Membrane:
     one_chain = len({s.chain for s in strands}) == 1
     sided = one_chain and max(up, down) >= _SIDED_RATIO * min(up, down) and abs(up - down) >= _SIDED_LOOPS
     if down > up:
-        return Membrane(-m.normal, -m.centre, m.half, m.source, sided)
-    return Membrane(m.normal, m.centre, m.half, m.source, sided)
+        return dataclasses.replace(m, normal=-m.normal, centre=-m.centre, sided=sided)
+    return dataclasses.replace(m, sided=sided)
 
 
 def _estimate(bb: Backbone, sses: list[SSE]) -> Membrane | None:

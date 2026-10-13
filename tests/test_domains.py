@@ -831,32 +831,39 @@ _Z_OF = {
     "ligand:": "mark",
     "ligand-label:": "mark-label",
     "sheet-panel:": "sheet-panel",
+    "membrane-side:": None,  # the in/out words: plain text beside the band
+    "membrane-heads:": "membrane-heads",
+    "membrane": "membrane",  # the band ("membrane", or "membrane:<row>" in a wrapped stack)
 }
 
 
 @pytest.mark.parametrize(
     "path, kw",
-    [(DATA / "6ZS5.cif", {"domains": DOMAINS}), (DATA / "1C3W.cif", {}), (DATA / "8UTF.cif", {})],
+    [(DATA / "6ZS5.cif", {"domains": DOMAINS}), (DATA / "1C3W.cif", {"membrane": "auto"}), (DATA / "8UTF.cif", {})],
     ids=["6ZS5", "1C3W", "8UTF"],
 )
 def test_every_layer_takes_its_place_from_the_one_table(path, kw):
     """Bodies (strands, 3-10 boxes, ghosts), labels, chain ends, disulfide bars, ligand tethers and marks are drawn
     at their render.Z entries (lifted with a helix drawn over a sheet): 6ZS5 has disulfides, 1C3W a retinal with
-    tethers, the 8UTF trimer dashed ghosts of strands lent across its cut."""
+    tethers and a membrane band over its sheet's plate, the 8UTF trimer dashed ghosts of strands lent across its cut."""
     from foldmap.render import Z
 
     ax = make_figure(path, **kw).axes[0]
     seen = set()
-    for a in [*ax.patches, *ax.texts, *ax.lines]:
+    for a in [*ax.patches, *ax.texts, *ax.lines, *ax.collections]:
         gid = a.get_gid() or ""
         prefix = next((q for q in _Z_OF if gid.startswith(q)), None)
-        if prefix is None:
+        if prefix is None or _Z_OF[prefix] is None:
             continue
         seen.add(prefix)
         z = Z[_Z_OF[prefix]]
         assert a.get_zorder() in (z, z + Z["over"] - Z["body"]), (gid, a.get_zorder())  # or lifted over a sheet
     assert {"strand:", "label:", "terminus:"} <= seen
-    assert {"6ZS5": {"disulfide:"}, "1C3W": {"ligand-tether:", "ligand:"}, "8UTF": {"ghost:"}}[path.stem] <= seen
+    assert {
+        "6ZS5": {"disulfide:"},
+        "1C3W": {"ligand-tether:", "ligand:", "membrane", "membrane-heads:"},
+        "8UTF": {"ghost:"},
+    }[path.stem] <= seen
 
 
 def _nucleic_points(fig) -> np.ndarray:
