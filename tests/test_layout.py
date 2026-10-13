@@ -625,3 +625,38 @@ def test_layout_fields_after_bounds_are_keywords():
     bb, sses, sheets = pipeline(DATA / "2LZM.cif")
     lay = build_layout(sses, sheets, view_frame(sses))
     assert lay.domains == [] and lay.sheets and lay.nucleic is None
+
+
+def test_helix_on_sheet_offsets_snapped():
+    """K16: a helix drawn over a sheet sits at an offset from its sheet's strands on the layout grid (1e-4), as
+    every optimiser input is snapped (layout._snap): 2ACY with helix_on_sheet=auto."""
+    from foldmap.cli import make_layout
+
+    lay, _, _ = make_layout(FID / "2ACY.cif.gz", look=ON_SHEET)
+    over = {k: p for k, p in lay.placed.items() if p.over}
+    assert over
+    for h, ids in lay.on_sheet.items():
+        if h not in over:
+            continue
+        for k in ids:
+            for d in (over[h].cx - lay.placed[k].cx, over[h].cy - lay.placed[k].cy):
+                assert abs(d * 1e4 - round(d * 1e4)) < 1e-6, (h, k, d)
+
+
+@pytest.mark.parametrize("path", [DATA / "1ZAA.cif", DATA / "1LMB.cif", DATA / "na" / "4OO8.cif.gz"])
+def test_helix_on_sheet_skips_nucleic_acid(path):
+    """K18 (T14's guard, cli.make_layout): with helix_on_sheet=auto no stem and no nucleic-acid path lies under a
+    helix drawn over a sheet."""
+    from foldmap.cli import make_layout
+    from foldmap.route import route_loops
+
+    lay, sses, bb = make_layout(path, look=ON_SHEET)
+    route_loops(lay, sses, bb)
+    assert lay.nucleic is not None
+    for p in (p for p in lay.placed.values() if p.over):
+        x0, y0, x1, y1 = p.rect
+        assert not any(
+            min(x1, s.rect[2]) > max(x0, s.rect[0]) and min(y1, s.rect[3]) > max(y0, s.rect[1]) for s in lay.stems
+        )
+        pts = np.array([q for path_ in lay.na_paths for q in path_.points]).reshape(-1, 2)
+        assert not ((pts[:, 0] > x0) & (pts[:, 0] < x1) & (pts[:, 1] > y0) & (pts[:, 1] < y1)).any()

@@ -12,15 +12,23 @@ DATA = Path(__file__).parent / "data"
 FIXTURES = sorted([*DATA.glob("*.cif"), *FID.glob("*.cif.gz"), *(DATA / "na").glob("*.cif*")])
 
 
-@pytest.mark.parametrize("focus", ["auto", "none", "first"])
+VIEWS = [  # (focus, names, domains): every focus with every naming, and the automatic domains (K6, K19)
+    *((focus, names, None) for focus in ("auto", "none", "first") for names in ("none", "deposited", "beta")),
+    ("auto", "none", "auto"),
+]
+
+
+@pytest.mark.parametrize("focus, names, domains", VIEWS, ids=lambda v: str(v))
 @pytest.mark.parametrize("path", FIXTURES, ids=lambda p: p.name.split(".")[0])
-def test_no_chain_draws_one_label_twice(path, focus):
+def test_no_chain_draws_one_label_twice(path, focus, names, domains):
     """Every fixture in its default view, whole, and focused on its first protein chain (a structure without
-    protein: whole)."""
+    protein: whole), with its generic, deposited and beta names, and with automatic domains: no chain carries one
+    label on two elements, and no two stems one name (figcheck.label_repeats, the campaign's A8)."""
     if focus == "first":
         _, sses, _ = make_layout(path, focus="none")
         focus = sses[0].chain if sses else "none"
-    lay, _, _ = make_layout(path, focus=focus)
+    named = None if names == "none" else [names]
+    lay, _, _ = make_layout(path, focus=focus, names=named, domains=domains)
     assert _repeats(lay) == {}
 
 
