@@ -55,14 +55,17 @@ NEARER: dict[str, float] = {"30QM": 0.833}
 # joints). 1RVA's contact_auc hold (0.58) went with C3: its two pieces meet across the kink (0.609).
 # 30QM, unrolled side by side (see NEARER): its stems are measured against the plain projection of the same
 # orientation (nacheck.measuring_frame), so the angles and the distance ranks measure the unrolling itself, which
-# turns each protomer's half to face the viewer (angle_median 35.7, angle_max 109.6, spearman 0.521, procrustes
-# 0.776: the limit set from the final campaign, 0.50, excludes the unrolled figure).
+# turns each protomer's half to face the viewer (angle_median 35.7, angle_max 109.6, procrustes 0.776: the limit set
+# from the final campaign, 0.50, excludes the unrolled figure). Plan 12 Task 2 (rulings): A:263-266 and B:263-266,
+# which pair with 130-137 only, are no longer wedged between 130-137 and 251-252 but stand end to end with 130-137 in
+# its column (fix round 1 ruling); the layout resettles: spearman 0.521 -> 0.421 (re-held, as ruled for 0.493 when
+# they stood in the next strand's column), procrustes 0.776 -> 0.726.
 HELD = {
     ("3CRX", "procrustes"): 0.817,
     ("30QM", "procrustes"): 0.776,
     ("30QM", "angle_median"): 35.7,
     ("30QM", "angle_max"): 109.6,
-    ("30QM", "spearman"): 0.521,
+    ("30QM", "spearman"): 0.421,
 }
 # what each fixture cannot measure (None): Spearman under 5 stems, contacts without protein, bends without a
 # split duplex; every other metric must be there, so a check that stops measuring fails
