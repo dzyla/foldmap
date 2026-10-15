@@ -369,3 +369,30 @@ def test_beta_names_letter_the_helices_after_a_strand_past_three_primes():
     assert got[row.id] == "α1"
     assert [got[h.id] for h in many] == ["α1a", "α1b", "α1c", "α1d", "α1e", "α1f"]
     assert [got[h.id] for h in few] == ["α2", "α2′"]
+
+
+def test_beta_names_past_the_alphabet_fall_back_to_primes():
+    """Batch C2a review Q10: lettered helices past z raised IndexError; αnz is primed on: αnz′, αnz″ …"""
+    import numpy as np
+
+    from foldmap.model import SSE, ResLabel
+    from foldmap.names import _row_helices
+
+    def sse(kind, start, end):
+        return SSE(
+            kind,
+            "A",
+            start,
+            end,
+            ResLabel("A", start, "", "ALA"),
+            ResLabel("A", end, "", "ALA"),
+            np.zeros(3),
+            np.array([0.0, 0.0, 1.0]),
+        )
+
+    b1 = sse("E", 0, 4)
+    many = [sse("H", 10 + 6 * k, 13 + 6 * k) for k in range(28)]
+    got = _row_helices(sorted([b1, *many], key=lambda s: s.start), [b1], {b1.id: 1}, {b1.id})
+    names = [got[h.id] for h in many]
+    assert names[:2] == ["α1a", "α1b"] and names[25] == "α1z" and names[26:] == ["α1z′", "α1z″"]
+    assert len(set(names)) == 28

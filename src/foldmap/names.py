@@ -196,15 +196,20 @@ def _row_helices(mine: list[SSE], strands: list[SSE], number: dict[str, int], ro
     for h in rest:
         n, k = after(h, strands), 0
         if many[n] + (name(n) in taken) > len(_PRIMES):  # more than αn‴ can mark: lettered αna, αnb …
-            while f"{name(n)}{_LETTERS[k]}" in taken:
+            while _lettered(name(n), k) in taken:
                 k += 1
-            out[h.id] = f"{name(n)}{_LETTERS[k]}"
+            out[h.id] = _lettered(name(n), k)
         else:
             while _primed(name(n), k) in taken:
                 k += 1
             out[h.id] = _primed(name(n), k)
         taken.add(out[h.id])
     return out
+
+
+def _lettered(name: str, k: int) -> str:
+    """αna, αnb … αnz, then αnz′, αnz″ … past the alphabet (never seen: 26 helices after one strand)."""
+    return name + _LETTERS[k] if k < len(_LETTERS) else _primed(name + _LETTERS[-1], k - len(_LETTERS) + 1)
 
 
 def _primed(name: str, k: int) -> str:

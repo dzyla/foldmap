@@ -98,7 +98,9 @@ def _tail(
     the end from there would cross the loop (4YBB). A free end the protein touches tries its turns nearest its
     touching elements first (_toward), so it lies along what holds it (1URN's loop on U1A's RRM). Every drawing
     whose nucleotides keep a bead's width (_BEAD) off the strands drawn so far comes before any that does not (9CJI's
-    3' end was turned onto its 5' end's line, nucleotides on top of each other). `target`: where the molecule goes on
+    3' end was turned onto its 5' end's line, nucleotides on top of each other): first the straight or turned ones
+    off the strands, then the routed ones kept off their cells (strict); only then the old order, a routed end
+    crossing strands as a cost last. `target`: where the molecule goes on
     past a gap at this 3' end (_toward)."""
     found = None
     tries = (True, False) if labels is not None else (False,)
@@ -122,8 +124,10 @@ def _tail(
                 if found:
                     break
             # routed: first off every cell a loop or strand uses; crossing them only as a cost when the doorway is
-            # given up
-            for strict, need_label in [(True, n) for n in tries] + ([] if keep_door else [(False, n) for n in tries]):
+            # given up, and only after every drawing off the strands failed (a crossing is no better than running
+            # by a strand: batch C2a review Q10)
+            crossing = [] if keep_door or apart else [(False, n) for n in tries]
+            for strict, need_label in [(True, n) for n in tries] + crossing:
                 if found is not None or len(nts) <= _TAIL_ROUTED:
                     break
                 room = labels if need_label else None

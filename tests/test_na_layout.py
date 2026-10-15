@@ -2512,3 +2512,26 @@ def test_a_hairpin_letter_struck_by_the_clearance_keeps_an_inside_spot_clear_of_
     box = _reach(_ink_points(base, False, _LETTER_EM * na_labels._em(lay), 0.0)) + np.array([lx, ly, lx, ly])
     segs = [(*a, *b) for p in [*lay.na_paths, bar] for a, b in zip(p.points, p.points[1:])]
     assert not (clip_lengths(segs, [box]) > 0).any()
+
+
+def test_a_free_end_tries_every_drawing_off_the_strands_before_one_crossing_them(monkeypatch):
+    """Batch C2a review Q10: _tail's first pass keeps off the strands drawn so far (9CJI); in it a routed end is tried
+    only strictly (kept off their cells); one crossing strands as a cost comes only in the old order after, never
+    before a straight drawing that merely runs near a strand. With every straight drawing near a strand and no route
+    found, the first pass asks for strict routes only (before the fix it also asked for crossing ones)."""
+    from foldmap import na_ends
+    from foldmap.na_paths import _Strands
+
+    calls = []
+
+    def routed(*args):
+        calls.append(args[-1])  # strict
+        return None
+
+    monkeypatch.setattr(na_ends, "_routed_end", routed)
+    monkeypatch.setattr(_Strands, "near", lambda self, points, r: True)
+    lay, sses, bb = make_layout(NA.parent / "r100" / "9CJI-AB.cif.gz")
+    route_loops(lay, sses, bb)
+    # the 7-nt 3' end: strict routes with and without its partner's doorway (label room or not), then the old order
+    # finds a straight drawing (near no longer asked): no crossing route tried
+    assert calls == [True] * 4
