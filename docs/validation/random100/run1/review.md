@@ -710,6 +710,27 @@ change to the shared placement (`_attract`/`_separate`) that all 39 NA entries g
 
 **Effort:** L. **Bench:** 1C3W, 1BL8, 1PV7 membrane fixtures must stay as they are.
 
+**Batch C2a result (C17, projected membrane view):** after the layout `cli._off_band` checks the transmembrane
+elements against the band they make, as A18 judges them; when one is off it (entering through no face, or not
+reaching past the middle), the view is laid out again (`build_layout(level=, band=)`): the items holding
+transmembrane elements keep their projected height (pushed and slid sideways only, `_push_apart`/`_slide_clear`
+`level`), each moved the least way to meet a face when drawn wholly inside the slab (`_to_face`), and the band is
+drawn at the membrane's faces as projected (`_faces_on_page`). Views whose elements already cross the band are not
+touched (1C3W, 6PS3, 7PIU, 5JDN and the 1C3W-membrane snapshot unchanged). 6JLN: TM helices off the band 20 -> 0
+(3 slab loops instead of 1, 6 fallbacks instead of 4: its other causes are C8/C12); 5LDW 6 -> 0 (one slab loop,
+L:448-454>L:457-462); 1BL8 (fixture) 4 -> 0. Bench identical. 6JO6 still draws no band: its slab is 0.174 polar
+(limit 0.15, `membrane._MAX_POLAR`), with 46 long elements crossing it; the soluble entries of the sample with 10 or
+more crossing elements are at most 0.39 hydrophobic (limit 0.55) -- a rule "polar up to 0.20 when 10 or more long
+elements cross" would find it, and needs a ruling (a test needs a 70 KB cut).
+
+**Batch C2a, loops in the slab (for a ruling):** the three left are jogs beside an element end, not runs along the
+slab: 7SMR B:171-173>B:190-201 (1.75 sideways 0.38 inside the face, over an element end at the face), 8W9Y
+C/F:225-249>271-280 (k = 2 after a 0.31 port stub: 1.25 sideways round α8's end, from an interfacial helix's port
+inside the slab), 6JO6 (with a band) 5:167-169>5:179-207 (0.72 sideways 0.42 inside, from a port 0.03 outside the
+face). A18 excuses a sideways run only as one of a loop's first two segments from a port inside the band: a ruling
+could excuse the first sideways run of more than 0.5 (a stub under 0.5 not counted) before the loop first leaves
+the band.
+
 ### C18 (b + a): pairs and copies matched by author residue numbers; untied copies go unchecked (2 + visual 2)
 
 **Entries:** 1RM5 and 2HKI (A19, one pair, both fail). Visual: 2MJW (S100P B and D not tied), 8QEM (one copy

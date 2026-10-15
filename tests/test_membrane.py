@@ -408,3 +408,26 @@ def test_stack_rows_get_a_band_only_from_the_elements_that_define_the_membrane()
     assert min(p.rect[1] for p in usher) < y0 < y1 < max(p.rect[3] for p in usher)  # the band is on FimD's row
     fig = make_figure(R100 / "9FWZ-DB.cif.gz", mode="stack", membrane="auto")
     assert len([a for a in fig.axes[0].patches if (a.get_gid() or "").split(":")[0] == "membrane"]) == 1
+
+
+def test_every_transmembrane_helix_crosses_the_band_in_the_membrane_view():
+    """1BL8 (random-100 C17, A18 on 6JLN and 5LDW): the projected membrane view placed KcsA's inner helices (86-112)
+    by their loops and contacts, with half of each above the band it drew (0.49 of the band covered, no face
+    crossed past the middle). When a transmembrane element comes out off the band, the view is laid out again with
+    every transmembrane element at its projected height (moved to meet a face when drawn wholly inside the slab),
+    and the band is the membrane's faces as projected: each enters through a face and reaches past the middle."""
+    path = DATA / "1BL8.cif"
+    lay, sses, bb = make_layout(path, membrane="auto")
+    mem = find_membrane(path, bb)
+    depth = mem.depth(bb.ca)
+    lo, hi = lay.membrane["y"]
+    tm = [
+        s
+        for s in sses
+        if depth[s.start : s.end + 1].min() <= -mem.half + 2 and depth[s.start : s.end + 1].max() >= mem.half - 2
+    ]
+    assert len(tm) == 8
+    for s in tm:
+        p = lay.placed[s.id]
+        y0, y1 = sorted((p.n_port[1], p.c_port[1]))
+        assert y0 < (lo + hi) / 2 < y1 and (y0 <= lo or y1 >= hi), s.id

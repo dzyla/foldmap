@@ -815,6 +815,7 @@ def _separate(
     fixed: Walls | None = None,
     mirror: float | None = None,
     room: float = _SEP_SYM_ROOM,
+    level: np.ndarray | None = None,
 ) -> None:
     """Push overlapping items apart, then slide any left over clear. With `ties` (_symmetry_ties) the pushes
     keep every protomer drawn alike (_push_apart), and that result is kept if it clears every overlap within
@@ -823,7 +824,9 @@ def _separate(
     result is used. Consecutive pieces of one bent duplex (`joints`, _joints) in a short chain (_rigid_joints)
     are moved together and never pushed apart. Items are pushed off the `fixed` boxes they must keep off (Walls),
     which stay where they are. `mirror`: the copies are their mates' mirror images about that page x (_push_apart);
-    then the tied pushes run as many passes as the one-by-one ones and may take up to _SEP_MIRROR_ROOM."""
+    then the tied pushes run as many passes as the one-by-one ones and may take up to _SEP_MIRROR_ROOM. `level`
+    (bool per item): items that keep their height (the transmembrane elements of a membrane view), only ever pushed
+    and slid sideways (_push_apart, _slide_clear)."""
     halves = np.array([it.half for it in items], float).reshape(-1, 2)
     mids = np.array([it.mid for it in items], float).reshape(-1, 2)
     start = np.array([(it.cx, it.cy) for it in items], float).reshape(-1, 2)
@@ -832,17 +835,17 @@ def _separate(
     apart = _joint_matrix(len(items), joints)
     xy = start.copy()
     alone = start.copy()
-    _push_apart(alone, halves, mids, home, {}, _SEP_SWEEPS, apart, fixed)
+    _push_apart(alone, halves, mids, home, {}, _SEP_SWEEPS, apart, fixed, level=level)
     if mirror is not None:  # mirror images about a dyad in the page: drawn so whenever room allows (9GEP)
         sweeps, room = _SEP_SWEEPS, max(room, _SEP_MIRROR_ROOM)
     else:
         sweeps = _SEP_ORBIT_SWEEPS
-    together = ties and _push_apart(xy, halves, mids, home, ties, sweeps, apart, fixed, mirror)
+    together = ties and _push_apart(xy, halves, mids, home, ties, sweeps, apart, fixed, mirror, level)
     if not together or _box_area(xy, halves, mids) > room * _box_area(alone, halves, mids):
         xy = alone
     for it, (x, y) in zip(items, xy.tolist()):
         it.cx, it.cy = x, y
-    _slide_clear(items, joints, fixed)
+    _slide_clear(items, joints, fixed, level)
 
 
 def _components(n: int, links) -> np.ndarray:
@@ -920,6 +923,7 @@ def _push_apart(
     apart: np.ndarray | None = None,
     fixed: Walls | None = None,
     mirror: float | None = None,
+    level: np.ndarray | None = None,
 ) -> bool:
     """Push overlapping footprints apart in place (axis of least penetration); spring back to home early on.
     Each sweep finds the overlapping pairs at once and resolves them in order. With `ties` a push moves an
@@ -931,7 +935,9 @@ def _push_apart(
     An item overlapping a `fixed` box it must keep off (Walls) is pushed (with its group) the whole way off it.
     With `mirror` (page x of a dyad in the page) each copy is its mate's mirror image: a sideways push moves the
     copies of a group the other way, an item and its own copy are pushed apart sideways only, symmetrically about
-    the mirror line, and the spread is never widened. True if no overlap is left."""
+    the mirror line, and the spread is never widened. `level` (bool per item): an item (with its group) that keeps
+    its height; a push up or down moves only the other one of a pair, and two such items are pushed sideways. True
+    if no overlap is left."""
     n = len(xy)
     root = list(range(n))  # the protomer-0 item of each item's orbit
     copy_k = np.zeros(n)  # protomer of each copy (0 for everything else)
@@ -948,6 +954,7 @@ def _push_apart(
     widen = np.sign(sum((xy[i, 0] - xy[j, 0]) / k for i, (j, k) in ties.items())) or 1.0  # protomer k lies this way
     sx = np.where((copy_k > 0) & (mirror is not None), -1.0, 1.0)  # a mirrored copy moves against its mate in x
     walls = fixed
+    held = None if level is None else np.array([bool(level[g].any()) for g in group])  # its group keeps its height
     for sweep in range(sweeps):
         pairs = _overlapping(xy, halves, mids, apart)
         if not len(pairs) and not _off_walls(xy, halves, mids, walls, group, move=False) and sweep >= 100:
@@ -962,6 +969,8 @@ def _push_apart(
             gi, gj = (group[i], group[j]) if cid[i] != cid[j] else (i, j)
             if mirror is not None and cid[i] == cid[j] and root[i] == root[j]:  # an item and its own mirror copy
                 py = np.inf
+            if held is not None and held[i] and held[j]:  # both keep their height: sideways
+                py = np.inf
             if px < py:
                 s = (1 if dx > 0 else -1) if dx != 0 else 1
                 if mirror is None and None not in (protomer[i], protomer[j]) and protomer[i] != protomer[j]:
@@ -971,6 +980,12 @@ def _push_apart(
                         continue
                 xy[gi, 0] -= sx[gi] * sx[i] * s * (px / 2 + _SEP_PUSH)
                 xy[gj, 0] += sx[gj] * sx[j] * s * (px / 2 + _SEP_PUSH)
+            elif held is not None and (held[i] or held[j]):  # the other one moves the whole way
+                s = (1 if dy > 0 else -1) if dy != 0 else 1
+                if held[i]:
+                    xy[gj, 1] += s * (py + _SEP_PUSH)
+                else:
+                    xy[gi, 1] -= s * (py + _SEP_PUSH)
             else:
                 s = (1 if dy > 0 else -1) if dy != 0 else 1
                 xy[gi, 1] -= s * (py / 2 + _SEP_PUSH)
@@ -1009,10 +1024,15 @@ def _off_walls(xy, halves, mids, walls: Walls | None, group, move: bool = True, 
     return True
 
 
-def _slide_clear(items: list[_Item], joints: set[tuple[int, int]] = frozenset(), fixed: Walls | None = None) -> None:
+def _slide_clear(
+    items: list[_Item],
+    joints: set[tuple[int, int]] = frozenset(),
+    fixed: Walls | None = None,
+    level: np.ndarray | None = None,
+) -> None:
     """Guarantee: each item in turn, if it still overlaps one already settled (other than a piece it is joined
     to, `joints`) or a `fixed` box it must keep off, takes the nearest clear spot straight right, left, up or down
-    (in that order on a tie), in _SLIDE_STEP steps."""
+    (in that order on a tie), in _SLIDE_STEP steps; one that keeps its height (`level`) right or left only."""
     halves = [it.half for it in items]
     mids = [it.mid for it in items]
     boxes = [] if fixed is None else np.asarray(fixed.boxes, float).tolist()
@@ -1025,9 +1045,10 @@ def _slide_clear(items: list[_Item], joints: set[tuple[int, int]] = frozenset(),
         mine = [w for k, w in enumerate(walls) if fixed.hard[i, k]] if walls else []
         settled = mine + [(items[j], halves[j], mids[j]) for j in range(i) if (j, i) not in joints]
         k = 0
+        ways = ((1, 0), (-1, 0)) if level is not None and level[i] else ((1, 0), (-1, 0), (0, 1), (0, -1))
         while any(_collide(it, halves[i], mids[i], *other) for other in settled):
             k += 1
-            for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+            for dx, dy in ways:
                 it.cx, it.cy = x0 + k * dx * _SLIDE_STEP, y0 + k * dy * _SLIDE_STEP
                 if not any(_collide(it, halves[i], mids[i], *other) for other in settled):
                     break
@@ -2320,6 +2341,28 @@ def _adjust(
             it.apply()
 
 
+def _tm_ends(it: _Item, level: set[str], y: float) -> list[tuple[float, float]]:
+    """Page y of the two ends (ports) of each transmembrane element (`level`) of an item centred at height y."""
+    out = []
+    for m, (_, oy) in zip(it.members, it.offsets):
+        if getattr(m, "sse", None) is not None and m.sse.id in level and not m.ghost:
+            reach = abs(float(np.sin(m.angle))) * m.length / 2
+            out.append((y + oy - reach, y + oy + reach))
+    return out
+
+
+def _to_face(it: _Item, level: set[str], band: tuple[float, float], y: float) -> float:
+    """The least move up or down that brings each transmembrane element of the item at height y drawn wholly
+    between the faces (a tilted helix, drawn upright at its length, is shorter than the slab it crosses) to a face;
+    0 when none is."""
+    inside = [(y0, y1) for y0, y1 in _tm_ends(it, level, y) if band[0] < y0 and y1 < band[1]]
+    if not inside:
+        return 0.0
+    up = max(band[1] - y1 for _, y1 in inside)
+    down = min(band[0] - y0 for y0, _ in inside)
+    return up if up < -down else down
+
+
 def _text_scaled(build):
     """build_layout with _GLYPH_K set, while it runs, to the glyph_scale of the text its style draws (Style.font_scale):
     the glyph room of footprints and stem names follows the text size, as layout.glyph does where a layout is held."""
@@ -2361,6 +2404,8 @@ def build_layout(
     relabel: dict[str, str] | None = None,
     names: Callable[[Layout, list[SSE]], None] | None = None,
     over: dict[str, int] | None = None,
+    level: set[str] | None = None,
+    band: tuple[float, float] | None = None,
 ) -> Layout:
     """Labels: the generic ones (_assign_labels), then `relabel` (ref -> label: copies' shared labels, primes of
     elements lent by neighbours), then `names` (names.apply_names: --names, given the placed layout with its stems
@@ -2376,7 +2421,11 @@ def build_layout(
     the nucleic acid): drawn as blocks, without base letters. `attract` (projected mode) pulls loop-joined and
     touching elements together before overlaps are removed; `contacts` comes from features.sse_contacts. `nucleic`
     adds its stems (straight pieces of base-paired DNA/RNA), placed like any element and pulling the elements that
-    touch them; strands with no pair at all are kept as projected traces."""
+    touch them; strands with no pair at all are kept as projected traces. `level` (projected mode; the
+    transmembrane elements of a membrane view, cli): the items holding them keep their projected height, so they
+    cross the band where the membrane is; the rest moves round them (_separate). `band` (page y of the membrane's
+    two faces as projected): a lone transmembrane helix drawn wholly between them (a tilted helix drawn upright at
+    its length is shorter than the slab it crosses) is moved, the least way, until one end meets a face."""
     if mode not in ("projected", "stack"):
         raise ValueError(f"unknown layout mode {mode!r}")
     style = style or Style()
@@ -2492,6 +2541,14 @@ def build_layout(
             for i, (j, k) in ties.items():
                 items[i].cx, items[i].cy = items[j].cx + k * spread, items[j].cy + k * lift
                 items[i].home = (items[j].home[0] + k * spread, items[j].home[1] + k * lift)
+        kept = (
+            np.array(
+                [any(getattr(m, "sse", None) is not None and m.sse.id in level for m in it.members) for it in items]
+            )
+            if level
+            else None
+        )
+        heights = [it.home[1] for it in items]
         if attract and len(items) > 1:
             extra = _stem_springs(items, nucleic) if pieces else []
             rise = getattr(frame, "rise", 0.0) * SCALE
@@ -2508,10 +2565,16 @@ def build_layout(
                 fixed=walls,
                 mirror=mirror if ties else None,
             )
-        _separate(items, ties, joints, walls, mirror=mirror if ties else None)
+        if kept is not None and kept.any():  # transmembrane elements at their projected height, reaching a face
+            for k in np.flatnonzero(kept).tolist():
+                shift = _to_face(items[k], level, band, heights[k]) if band is not None else 0.0
+                y = float(_snap(heights[k] + shift))
+                items[k].cy = y
+                items[k].home = (items[k].home[0], y)
+        _separate(items, ties, joints, walls, mirror=mirror if ties else None, level=kept)
         if domains and _part_domains(items, domains, ties, mirror if ties else None):
             # the domains, parted with their copies, keep them alike whatever room that takes
-            _separate(items, ties, joints, walls, mirror=mirror if ties else None, room=np.inf)
+            _separate(items, ties, joints, walls, mirror=mirror if ties else None, room=np.inf, level=kept)
     for it in items:
         it.apply()
     dna = [m for it in items for m in it.members if isinstance(m, PlacedStem)]

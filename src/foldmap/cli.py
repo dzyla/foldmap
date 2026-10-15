@@ -335,7 +335,8 @@ def make_layout(
         if (look or Style()).helix_on_sheet == "auto" and sym is None and (nucleic is None or not nucleic.strands)
         else {}
     )
-    lay = build_layout(
+    lay_out = functools.partial(
+        build_layout,
         sses,
         sheets,
         frame,
@@ -361,6 +362,13 @@ def make_layout(
         else None,
         over=over,
     )
+    lay = lay_out()
+    faces = None
+    if mem is not None and mode == "projected" and _off_band(lay, sses, bb, mem):
+        # a transmembrane element drawn off the band: laid out again with every one at its projected height (C17)
+        level = _transmembrane(sses, bb, mem)
+        faces = _faces_on_page(frame, sses, bb, mem, level)
+        lay = lay_out(level=level, band=tuple(sorted(faces)))
     lay.helix_matched = {"cut": matched.get("cut", 0), "joined": matched.get("joined", 0)}
     if lay.domains:  # copies of one domain share a tone
         from .features import domain_tones
@@ -387,7 +395,7 @@ def make_layout(
     lay.page_axes = [list(map(float, a)) for a in frame.basis(centre)]
     lay.page_centre = list(map(float, bb.ca.mean(axis=0) if len(bb) else centre))
     if mem is not None:
-        lay.membrane = _membrane_band(lay, sses, bb, mem)
+        lay.membrane = _membrane_band(lay, sses, bb, mem, faces)
     if msa:
         from .sequence import grades, is_consurf, read_alignment, read_consurf, residue_conservation
 
@@ -444,12 +452,16 @@ def make_layout(
     return lay, sses, bb
 
 
-def _membrane_band(lay, sses, bb, mem) -> dict | None:
+def _membrane_band(lay, sses, bb, mem, faces=None) -> dict | None:
     """The band on the page: where the transmembrane elements pass the two membrane faces (medians). A
     depth-keeping stack wrapped into rows has one band per row ("bands"), each from its own row's elements; a
-    row with no transmembrane element (a soluble partner chain) has none."""
+    row with no transmembrane element (a soluble partner chain) has none. `faces` (a projected view whose
+    transmembrane elements kept their height, _faces_on_page): the faces themselves, as projected (C17)."""
     rows = [set(ids) for ids in lay.stack_rows] or [set(lay.placed)]
-    bands = [_face_medians(lay, [s for s in sses if s.id in ids], bb, mem) for ids in rows]
+    if faces is not None:
+        bands = [faces]
+    else:
+        bands = [_face_medians(lay, [s for s in sses if s.id in ids], bb, mem) for ids in rows]
     bands = [b for b in bands if b is not None]
     if not bands:
         return None
@@ -461,6 +473,51 @@ def _membrane_band(lay, sses, bb, mem) -> dict | None:
         "source": mem.source,
         "sides": mem.sided,
     }
+
+
+def _off_band(lay, sses, bb, mem) -> bool:
+    """Is a transmembrane element (_transmembrane) drawn off the band it makes (_membrane_band): not entering it
+    through a face and reaching past its middle, as the membrane view is judged (random-100 A18, C27 ruling)?"""
+    band = _membrane_band(lay, sses, bb, mem)
+    if band is None:
+        return False
+    for k in sorted(_transmembrane(sses, bb, mem)):
+        p = lay.placed.get(k)
+        if p is None:
+            continue
+        lo, hi = sorted((p.n_port[1], p.c_port[1]))
+        y0, y1 = min(band["bands"], key=lambda b: abs((b[0] + b[1]) / 2 - (lo + hi) / 2))
+        if not (lo < (y0 + y1) / 2 < hi and (lo <= y0 or hi >= y1)):
+            return True
+    return False
+
+
+def _transmembrane(sses, bb, mem) -> set[str]:
+    """The elements that cross the membrane (their CA run reaching both faces, as _face_medians counts them) and
+    define it (Membrane.defining): in a projected membrane view they keep their projected height (build_layout
+    `level`), so each crosses the band where the membrane is (random-100 C17)."""
+    depth = mem.depth(bb.ca)
+    out = set()
+    for s in sses:
+        seg = depth[s.start : s.end + 1]
+        if len(seg) < 2 or seg.min() > -mem.half + 2 or seg.max() < mem.half - 2:
+            continue
+        if mem.defining is not None and mem.defining.isdisjoint(range(s.start, s.end + 1)):
+            continue
+        out.add(s.id)
+    return out
+
+
+def _faces_on_page(frame, sses, bb, mem, tm: set[str]) -> tuple[float, float]:
+    """Page y (layout units, snapped) of the membrane's outer and inner face, projected through the frame at the
+    transmembrane elements' centre (build_layout `band`, _membrane_band `faces`)."""
+    first = next(s for s in sses if s.id in tm)
+    at = np.mean([bb.ca[s.start : s.end + 1].mean(axis=0) for s in sses if s.id in tm], axis=0)
+    mid = at - mem.normal * float(np.ravel(mem.depth(at))[0])
+    y_out, y_in = (
+        float(frame.project(mid + mem.normal * h, [first.chain])[0, 1]) * SCALE for h in (mem.half, -mem.half)
+    )
+    return float(_snap(y_out)), float(_snap(y_in))
 
 
 def _face_medians(lay, sses, bb, mem) -> tuple[float, float] | None:
