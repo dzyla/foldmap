@@ -510,12 +510,15 @@ def _name_ink(layout: Layout, p: Placed, em: float) -> tuple[float, float, float
 
 def _clear_helix_names(layout: Layout, sses: list[SSE], loops: list[Loop]) -> None:
     """A helix name that a line runs through or nearer than figcheck.LINE_TEXT_CLEARANCE_PX of its ink (a loop's,
-    a nucleic-acid strand's, a nucleotide trace's; a loop out of the helix's own end included: the route keeps out of
-    the name's rough box only, and a crowded page leaves no way round it) moves to the spot that lines run nearest
-    least: the other side of the helix, or along it (_NAME_ALONG), the earlier spot (the current side first) on a
-    tie. A spot must be on the page and meet no element, other name, stub or letter. A name no spot improves stays.
-    A mirror copy's name (Layout.mirror_pairs) follows its mate's, as _mirror_sides sets it, and both must be clear.
-    Run after the strands are routed (route_nucleic): their paths and traces count. Routes are unchanged."""
+    a nucleic-acid strand's, a nucleotide trace's; a loop out of the helix's own end included) moves to the spot that
+    lines run nearest least. Routed loops keep clear of the names already (random-100 C6: their keep-outs are sized
+    from the drawn text, label_boxes and layout.glyph, at the 6 pt floor); this is the fallback for lines no route
+    holds: a fallback curve where no route exists, a nucleic-acid path or trace. It moves a name to the spot lines
+    run nearest least: the other side of the helix, or along it (_NAME_ALONG), the earlier spot (the current side
+    first) on a tie. A spot must be on the page and meet no element, other name, stub or letter. A name no spot
+    improves stays. A mirror copy's name (Layout.mirror_pairs) follows its mate's, as _mirror_sides sets it, and both
+    must be clear. Run after the strands are routed (route_nucleic): their paths and traces count. Routes are
+    unchanged."""
     from .layout import _mirror_sides, line_clearance
 
     names = sorted((p for p in layout.placed.values() if p.sse.kind in ("H", "G") and p.label), key=lambda p: p.sse.id)
@@ -552,6 +555,7 @@ def _clear_helix_names(layout: Layout, sses: list[SSE], loops: list[Loop]) -> No
             total += struck(ink)
         return total
 
+    moved = 0  # names (with a mirror copy's) moved
     for p in names:
         if p.sse.id in mate_of:  # a mirror copy goes with its mate
             continue
@@ -568,9 +572,11 @@ def _clear_helix_names(layout: Layout, sses: list[SSE], loops: list[Loop]) -> No
                 got = place(group, side, along, taken)
                 if got is not None and got < best[0]:
                     best = (got, [(q.label_side, q.label_along) for q in group])
+        moved += best[1] != start
         for q, (side, along) in zip(group, best[1]):
             q.label_side, q.label_along = side, along
             texts[f"label:{q.sse.id}"] = _element_label_box(q)
+    log.debug("%d helix names moved off lines", moved)  # random-100 C6: what the campaign reports of the mover
 
 
 def route_loops(layout: Layout, sses: list[SSE], bb) -> list[Loop]:

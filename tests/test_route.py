@@ -667,28 +667,30 @@ def test_a_loop_out_of_a_helix_over_a_sheet_keeps_off_text_unless_flagged():
 
 
 def _name_in_the_way(bounds=(-8.0, -6.0, 8.0, 6.0)):
-    """A horizontal helix whose name sits above it, and a loop line that runs just above the name's ink: outside the
-    name's keep-out box (so the router would not mind it), inside the room figcheck keeps between a line and text."""
+    """A horizontal helix whose name sits above it, and a line that runs just above the name's ink, inside the room
+    figcheck keeps between a line and text: a fallback curve (no route holds it: random-100 C6, routed loops keep
+    clear of names sized from the drawn text, test_routed_loops_keep_off_every_helix_name_as_drawn)."""
     from foldmap.figcheck import LINE_TEXT_CLEARANCE_PX
     from foldmap.layout import page_text
 
     h = bar(10, 0.0, 0.0, 3.0, 0.0)
     h.label = "α10"
     lay = Layout({h.sse.id: h}, bounds)
-    lay.font_scale = 1.8  # text larger than its keep-out box, as on a wide page (4 pt floor)
+    lay.font_scale = 1.8  # larger text: a larger name (and keep-out box)
     em = route._ink_em(lay, lay.font_scale)
     room = (LINE_TEXT_CLEARANCE_PX + 0.5) * 0.72 * page_text(lay)[1]
     top = route._name_ink(lay, h, em)[3]
     y = top + room / 2
-    loop = route.Loop("x", "y", [(-2.0, y), (2.0, y)], False, False)
+    loop = route.Loop("x", "y", [(-2.0, y), (2.0, y)], False, True)
     return lay, h, loop, y, room
 
 
 def test_a_helix_name_a_loop_runs_too_near_moves_to_the_clear_side():
-    """random-100 C6: the route keeps out of a name's rough box (smaller than its text on a wide page) and its own
-    helix's loops may leave through it, so the name is set clear of every loop's line after routing."""
+    """random-100 C6: a line no route holds (a fallback curve) that runs through a name or within figcheck's room of
+    its ink moves the name clear of it, after routing (the mover is the fallback of the router's keep-outs)."""
     lay, h, loop, y, room = _name_in_the_way()
-    assert h.label_side == 1 and label_boxes(lay, [h.sse])[0][1][3] < y  # outside the keep-out box
+    ink = route._name_ink(lay, h, route._ink_em(lay, lay.font_scale))
+    assert h.label_side == 1 and ink[3] < y < ink[3] + room  # within the room a line keeps from text
     route._clear_helix_names(lay, [h.sse], [loop])
     ink = route._name_ink(lay, h, route._ink_em(lay, lay.font_scale))
     assert h.label_side == -1 and ink[3] < y - room  # below the helix, with the room a line keeps from text
@@ -803,3 +805,60 @@ def test_a_reroute_may_turn_more_to_free_text_it_ran_through():
     wiggle += [(8.0, 3.0), (8.0, 1.0), (10.0, 1.0), (10.0, 0.0)]  # 8 corners more, clear of both
     assert route._better(wiggle, through, pad, [], None, ink)
     assert not route._better(wiggle, grazing, pad, [], None, ink)
+
+
+def _names_struck_by_routes(path, scale: str) -> list[tuple[str, str]]:
+    """(helix, loop) for every helix name whose drawn ink (route._name_ink) a routed loop (not a fallback curve) comes
+    within figcheck's line clearance of, as the loops stand when the post-route mover (_clear_helix_names) starts."""
+    from foldmap.layout import _ink_em, line_clearance
+    from foldmap.spec import draw_spec, figure_spec
+
+    got = []
+    mover = route._clear_helix_names
+
+    def look(layout, sses, loops):
+        em, grow = _ink_em(layout, layout.font_scale), line_clearance(layout)
+        for p in layout.placed.values():
+            if p.sse.kind not in ("H", "G") or not p.label:
+                continue
+            x0, y0, x1, y1 = route._name_ink(layout, p, em)
+            room = (x0 - grow, y0 - grow, x1 + grow, y1 + grow)
+            for lp in loops:
+                if not lp.fallback and any(route.clip_len(a, b, room) > 1e-9 for a, b in zip(lp.points, lp.points[1:])):
+                    got.append((p.sse.id, f"{lp.a_id}>{lp.b_id}"))
+        mover(layout, sses, loops)
+
+    route._clear_helix_names = look
+    try:
+        draw_spec(figure_spec(path, style=[f"font_scale={scale}"]))
+    finally:
+        route._clear_helix_names = mover
+    return got
+
+
+@pytest.mark.parametrize(("name", "scale"), [("8UUP", "1"), ("8UUP", "2"), ("8UTF", "2"), ("25IN", "2")])
+def test_routed_loops_keep_off_every_helix_name_as_drawn(name, scale):
+    """random-100 C6, router side: the boxes loops route round are sized from the text as drawn (C4: text held at
+    6 pt, its em the same page units on any page; layout.glyph grows the boxes with larger text), so no routed loop
+    comes within figcheck's line clearance of a helix name's ink, its own loops' ends included, and the post-route
+    mover has nothing to move: it is left for lines no route holds (fallback curves, nucleic-acid paths). At f57887a
+    (4 pt text on 8UUP's 84-unit page; boxes of a fixed size under larger text): 8UUP 2 names struck (one by its own
+    loop), 45 at text size 2; 8UTF 10 and 25IN 2 at text size 2."""
+    assert _names_struck_by_routes(DATA / f"{name}.cif", scale) == []
+
+
+def test_keep_out_boxes_grow_with_larger_text():
+    """random-100 C6: a name's and a chain end's keep-out box is sized from the text drawn (layout.glyph): three
+    times the text, three times the glyph (the 0.05 pad aside); never smaller than at the usual size."""
+    from foldmap.cli import make_layout
+
+    lay, sses, _ = make_layout(DATA / "2HHB.cif")
+    small = dict(label_boxes(lay, sses))
+    lay.font_scale = 3.0
+    big = dict(label_boxes(lay, sses))
+    lay.font_scale = 0.6
+    less = dict(label_boxes(lay, sses))
+    for key in ("N:A", next(k for k in small if k.startswith("label:"))):
+        (a0, b0, a1, b1), (c0, d0, c1, d1) = small[key], big[key]
+        assert d1 - d0 == pytest.approx(3 * (b1 - b0)) and c1 - c0 == pytest.approx(3 * (a1 - a0 - 0.1) + 0.1)
+        assert less[key] == small[key]

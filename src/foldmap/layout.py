@@ -3468,9 +3468,9 @@ def _grown(box, pad: float) -> tuple[float, float, float, float]:
     return box[0] - pad, box[1] - pad, box[2] + pad, box[3] + pad
 
 
-def _element_label_box(p: Placed) -> tuple[float, float, float, float]:
-    """The box around a helix's name."""
-    return centred_box(*helix_label_pos(p), _GLYPH_W * len(p.label) / 2 + 0.05, _GLYPH_H / 2)
+def _element_label_box(p: Placed, k: float = 1.0) -> tuple[float, float, float, float]:
+    """The box around a helix's name: `k` (glyph_scale of the text drawn) glyphs of _GLYPH_W x _GLYPH_H a letter."""
+    return centred_box(*helix_label_pos(p), _GLYPH_W * k * len(p.label) / 2 + 0.05, _GLYPH_H * k / 2)
 
 
 def na_text_boxes(layout: Layout) -> list[tuple[float, float, float, float]]:
@@ -3520,6 +3520,7 @@ def tail_counts(layout: Layout, sses: list[SSE], loops=()) -> list[dict]:
     if not layout.res_chain:
         return []
     em = _ink_em(layout, layout.font_scale) or text_em(layout.width or 1.0) * layout.font_scale
+    gw, gh = glyph(layout)
     groups = group_by_chain(sses)
     rows: dict[str, list[int]] = {}
     for r, ch in enumerate(layout.res_chain):
@@ -3541,7 +3542,7 @@ def tail_counts(layout: Layout, sses: list[SSE], loops=()) -> list[dict]:
         half = count_half(text, size)
         ex = np.asarray(ex, float)
         letter = np.add(port, ex * END_LABEL)
-        own = (max(_GLYPH_W / 2 + 0.05, em * _text_width(end) / 2), max(_GLYPH_H / 2, em * 0.4))
+        own = (max(gw / 2 + 0.05, em * _text_width(end) / 2), max(gh / 2, em * 0.4))  # its keep-out (label_boxes)
         spots = []
         for u in (ex, np.array([-ex[1], ex[0]]), np.array([ex[1], -ex[0]])):
             reach = abs(u[0]) * (own[0] + half[0]) + abs(u[1]) * (own[1] + half[1]) + _TAIL_COUNT_GAP
@@ -3566,11 +3567,14 @@ def label_boxes(
     layout: Layout, sses: list[SSE], route: bool = False
 ) -> list[tuple[str, tuple[float, float, float, float]]]:
     """Keep-out boxes for text and chain-end stubs: loops route around them, the page bounds include them. With
-    `route`, a stem's name is what routes keep out of: its ink grown by _INK_MARGIN em (stem_keep_box)."""
+    `route`, a stem's name is what routes keep out of: its ink grown by _INK_MARGIN em (stem_keep_box). Names and
+    letters are sized from the text drawn (glyph)."""
     out = []
+    gw, gh = glyph(layout)
+    k = gw / _GLYPH_W
     for p in layout.placed.values():
         if p.sse.kind in ("H", "G"):
-            out.append((f"label:{p.sse.id}", _element_label_box(p)))
+            out.append((f"label:{p.sse.id}", _element_label_box(p, k)))
     for end, chain, port, ex in termini(layout, sses):
         a, b = np.add(port, ex * 0.15), np.add(port, ex * END_STUB)
         out.append(
@@ -3580,12 +3584,12 @@ def label_boxes(
             )
         )
         t = np.add(port, ex * END_LABEL)
-        out.append((f"{end}:{chain}", centred_box(float(t[0]), float(t[1]), _GLYPH_W / 2 + 0.05, _GLYPH_H / 2)))
+        out.append((f"{end}:{chain}", centred_box(float(t[0]), float(t[1]), gw / 2 + 0.05, gh / 2)))
     for k, d in enumerate(layout.stems):
         out.append((f"stem-label:{k}", stem_keep_box(d) if route else _stem_label_box(d)))
     for n, tie in enumerate(layout.na_ties):  # a long tie's labels at its two marks
         for end, (_, _, (x, y)) in enumerate(tie.marks):
-            out.append((f"tie-label:{n}:{end}", centred_box(x, y, _GLYPH_W / 2 + 0.05, _GLYPH_H / 2)))
+            out.append((f"tie-label:{n}:{end}", centred_box(x, y, gw / 2 + 0.05, gh / 2)))
     for name, box in layout.domain_names.items():  # a domain's name, on its panel's edge (_place_domain_names), with
         out.append((f"domain-label:{name}", _grown(box, _NAME_ROUTE)))  # room so no line or nucleotide runs by it
     for name, ((x, y0), (_, y1)) in layout.domain_leaders.items():
@@ -3627,6 +3631,13 @@ def glyph_scale(em: float) -> float:
     proportion past _EM_TUNED, the em they were sized at, never below it (random-100 C4 ruling: every route
     keep-out and legend row is sized from the drawn text); snapped. The one helper they all go through."""
     return max(1.0, float(_snap(em / _EM_TUNED)))
+
+
+def glyph(layout: Layout) -> tuple[float, float]:
+    """A glyph's keep-out width and height (page units) for the text this layout is drawn with (glyph_scale of
+    its em: text_em with Layout.font_scale)."""
+    k = glyph_scale(text_em(layout.width or 1.0, layout.height or 0.0) * layout.font_scale)
+    return _GLYPH_W * k, _GLYPH_H * k
 
 
 def page_fit(width_in: float, height_in: float, font: float) -> str:

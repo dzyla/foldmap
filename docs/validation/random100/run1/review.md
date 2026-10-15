@@ -339,6 +339,18 @@ drawn text moves to batch C with C4. No fixture under 150 KB reproduces the defe
 wide enough that 2 px is a large part of a loop spacing (6MHS windows, 8UUP and 1GOX cuts all draw clean), so the tests
 are synthetic.
 
+**Batch C1 result (C6, router side):** every keep-out a loop routes round is sized from the text as drawn:
+`layout.glyph` (the `_GLYPH_W` x `_GLYPH_H` glyph grown by `glyph_scale` of the drawn em) sizes the helix-name,
+chain-end and tie-label boxes in `label_boxes`, the strands' 5′/3′ keep-outs (`route_na`, `na_ends`) and the tail
+count's letter room; with C4's 6 pt floor the em is the same page units on every page. Routed loops that come within
+figcheck's line clearance of a helix name's ink, before the mover runs: 8UUP 2 (one its own loop) and 45 at text
+size 2, 8UTF 10 and 25IN 2 at text size 2 at `f57887a`; none now. The post-route mover (`route._clear_helix_names`)
+stays as the fallback for lines no route holds; it now logs how many names it moved (the campaign reports
+`names_moved`). Across 97 sample entries (default view; 7JU4, 7Y7C, 8VWQ left out for time) it moved 177 names at
+`f57887a` (7AOD 39, 8RRX 27, 6DPV 25, 5JB1 19, 9GEP 16, 6MHS 15, ...) and 1 now: 6JLN's η4 of chain B, struck by
+the fallback curve `E:17-39>E:42-47` (no route exists there, C8). The figure is unchanged at text size 1 (bench and
+snapshots identical).
+
 ### C7 (a, visual): parallel loops 10–20 px apart cannot be told apart (15 entries)
 
 **Entries:** 5Q42, 5HI7, 1F09, 9C0M, 7FDN (chain B), 1BXI, 2I5Y, 3L9G, 7JU4, 7ARD, 8OH7, 3MHT, 10UJ, AF_AFO42816F1,

@@ -10,7 +10,7 @@ import math
 
 import numpy as np
 
-from .layout import _GLYPH_H, _GLYPH_W, NT_ROW, NT_STEP, Layout, PlacedStem
+from .layout import NT_ROW, NT_STEP, Layout, PlacedStem, glyph
 from .na_paths import (
     NAPath,
     _bow,
@@ -298,7 +298,7 @@ def _face_label(router: _Router, layout: Layout, d: PlacedStem, key, leaving: bo
     the side or further on, the first spot clear of loops, elements, stems and other text."""
     port, along = d.port(key, leaving)
     side = d.normal * d.side[key]  # away from the stem's axis
-    spots = [port + along * NT_ROW * a + side * _GLYPH_H * b for a, b in _END_SPOTS]
+    spots = [port + along * NT_ROW * a + side * glyph(layout)[1] * b for a, b in _END_SPOTS]
     clear = (q for q in spots if labels is not None and _label_room(router, layout, q, labels))
     spot = next(clear, spots[0])
     return float(spot[0]), float(spot[1])
@@ -307,7 +307,8 @@ def _face_label(router: _Router, layout: Layout, d: PlacedStem, key, leaving: bo
 def _label_room(router: _Router, layout: Layout, xy, labels: list) -> bool:
     """An end label at xy keeps clear of the loops routed so far (their grid cells), every element's and stem's
     body, the text and stub boxes, and the end labels already placed."""
-    hw, hh = _GLYPH_W / 2 + 0.05, _GLYPH_H / 2
+    gw, gh = glyph(layout)  # sized from the text drawn (C4)
+    hw, hh = gw / 2 + 0.05, gh / 2
     x0, y0, x1, y1 = xy[0] - hw, xy[1] - hh, xy[0] + hw, xy[1] + hh
     grid = router.grid
     (i0, j0), (i1, j1) = grid.cell((x0, y0)), grid.cell((x1, y1))

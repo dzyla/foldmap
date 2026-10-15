@@ -10,7 +10,7 @@ import logging
 
 import numpy as np
 
-from .layout import _GLYPH_H, _GLYPH_W, NT_ROW, NT_STEP, Layout, label_boxes, stem_keep_box
+from .layout import _GLYPH_W, NT_ROW, NT_STEP, Layout, glyph, label_boxes, stem_keep_box
 from .na_ends import SHORT_GAP, _face_label, _gap, _tail, _trace_clear
 from .na_labels import _label_gaps, _place_letters, _ties, _unbunch, _widen
 from .na_paths import (
@@ -153,7 +153,7 @@ def route_nucleic(layout: Layout, router: _Router | None = None, loops=()) -> li
             exits[(s, n - 1)] = (*_face(dn, (s, last), True), dn)
         end(s, "3′", tip)
     # routes keep off the strands' end labels (as a protein loop keeps off its chain's N and C)
-    g = _GLYPH_H / 2 + 0.05
+    g = glyph(layout)[1] / 2 + 0.05  # sized from the text drawn (C4)
     router.grid.keep_off([(x - g, y - g, x + g, y + g) for s, e, (x, y) in ends if (s, e) not in gapped])
     # and pay to cross a hairpin loop or a free end, as a loop pays to share an earlier loop's cells, or to run
     # beside one; beside a protein loop costs the same, so crossing one costs as much as crossing a strand

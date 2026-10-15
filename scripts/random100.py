@@ -1098,9 +1098,13 @@ class _RouteLog(logging.Handler):
     def __init__(self):
         super().__init__(logging.DEBUG)
         self.sums = {k: 0 for k in self.KEYS if k != "inflate"}
+        self.sums["names_moved"] = 0  # helix names route._clear_helix_names moved off lines (random-100 C6)
         self.records = 0
 
     def emit(self, record):
+        if str(record.msg).startswith("%d helix names moved"):
+            self.sums["names_moved"] += int(record.args[0])
+            return
         if not str(record.msg).startswith("%d loops:") or len(record.args) != len(self.KEYS):
             return
         self.records += 1
@@ -2128,6 +2132,7 @@ REPORTED = (
     "kink_links_rejected",
     "tighter_than_inflate",
     "rejected_as_crossing",
+    "names_moved",
     "area",
     "max_rss_mb",
 )
@@ -2146,6 +2151,7 @@ def reported(e: dict) -> dict:
         "kink_links_rejected": route.get("kink_links_rejected"),
         "tighter_than_inflate": route.get("tighter_than_inflate"),
         "rejected_as_crossing": route.get("rejected_as_crossing"),
+        "names_moved": route.get("names_moved"),  # by the post-route mover (C6): lines no route holds
         "area": d.get("area"),
         "max_rss_mb": max(
             (r["max_rss_mb"] for r in e.get("views", {}).values() if r.get("max_rss_mb") is not None), default=None
