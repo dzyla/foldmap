@@ -121,6 +121,11 @@ ENTRIES = {  # fixture name -> (PDB id, what it is for)
         "THF-II riboswitch (one RNA chain) with SPM and THG, which touch only the RNA, and Mg ions: neither ligand "
         "was drawn and nothing said so (random-100 C33)",
     ),
+    "5KQJ": (
+        "5KQJ",
+        "an NMR protein (model 1, N, CA, C and O only) whose strand F pairs with E end to end with B on E's same side "
+        "(a bulged continuation): it was drawn as a column of its own between E and B (random-100 C34)",
+    ),
 }
 Span = tuple[int, int]
 WINDOWS: dict[str, dict[str, Span | list[Span] | None]] = {  # fixture -> {chain: windows (first, last), None: whole}
@@ -163,6 +168,7 @@ TRIMS: dict[str, dict] = {
     "2MJW-BD": {"first_model": True, "backbone": True},
     "6SO9": {"first_model": True, "backbone": True},
     "3L9G-A": {"atoms": ("N", "CA", "C", "O"), "no_protein_sequence": True, "drop": ("_atom_site_anisotrop.",)},
+    "5KQJ": {"first_model": True, "atoms": ("N", "CA", "C", "O"), "no_protein_sequence": True},
     "8XZE": {"drop": ("_atom_site_anisotrop.", "_pdbx_refine_tls.", "_pdbx_refine_tls_group.")},
     "3OWW-P5": {"drop": ("_atom_site_anisotrop.", "_pdbx_refine_tls.", "_pdbx_refine_tls_group.")},
     "9CJI-AB": {"backbone": True, "no_protein_sequence": True, "drop": ("_atom_site_anisotrop.",)},

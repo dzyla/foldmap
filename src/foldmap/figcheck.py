@@ -1047,7 +1047,8 @@ def order_checks(drawn) -> list[str]:
       elements with no loop and no such loop over them ("no loop <a>><b>"); chains only lent to the figure
       (Layout.partial) and pairs shown side by side but not adjacent (Layout.unjoined) have no loops;
     - each sheet block (Layout.sheets) holds the strands of one sheet of sheets.build_sheets on the backbone's
-      bridges, side by side in that sheet's order (either way round; a closed barrel from any strand), each two
+      bridges, side by side in that sheet's order (either way round; a closed barrel from any strand; strands
+      sharing a column, Sheet.columns, as one), each two
       neighbours pointing the same way when they pair in parallel and opposite ways when antiparallel."""
     from .dssp import assign_dssp
     from .sheets import build_sheets
@@ -1091,7 +1092,11 @@ def order_checks(drawn) -> list[str]:
             continue
         want = [s.id for s in sheet.strands]
         got = _drawn_order(at[k])
-        if not _same_order(got, want, sheet.closed):
+        seen, wanted = got, want
+        if sheet.columns:  # strands sharing a column (sheets._columns) stand one above the other: read by column
+            column = {s.id: c for s, c in zip(sheet.strands, sheet.columns)}
+            seen, wanted = _by_column(got, column), _by_column(want, column)
+        if not _same_order(seen, wanted, sheet.closed):
             out.append(f"sheet {k}: drawn {', '.join(got)}, paired {', '.join(want)}")
         for (a, da), (b, db) in zip(zip(want, sheet.directions), zip(want[1:], sheet.directions[1:])):
             pa, pb = at[k][a], at[k][b]
@@ -1109,6 +1114,18 @@ def _drawn_order(at: dict) -> list[str]:
     mean = sum(p.direction * (1.0 if p.direction @ ref >= 0 else -1.0) for p in ps)
     across = np.array([mean[1], -mean[0]])
     return [k for _, k in sorted(((float(np.array([p.cx, p.cy]) @ across), k) for k, p in zip(ids, ps)))]
+
+
+def _by_column(ids: list[str], column: dict[str, int]) -> list[str]:
+    """Strand ids in order, the strands of one column (side by side in that order) as one entry, their ids
+    joined in sorted order: the order of the columns, whichever way the strands sharing one stand."""
+    out: list[str] = []
+    for k in ids:
+        if out and column[k] == column[out[-1].split("|")[0]]:
+            out[-1] = "|".join(sorted([*out[-1].split("|"), k]))
+        else:
+            out.append(k)
+    return out
 
 
 def _same_order(got: list[str], want: list[str], closed: bool) -> bool:

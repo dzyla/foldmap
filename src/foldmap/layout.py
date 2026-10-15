@@ -383,6 +383,32 @@ def _sheet_order(sheet: Sheet, frame: Frame) -> tuple[list[int], int, np.ndarray
     return order, s, cents
 
 
+_STACK_PAD = 1.0  # page units between two strands drawn one above the other in one column: room for the loops
+# leaving their facing ends (0.2 left 5KQJ's B and F loops no route)
+
+
+def _column_heights(sheet: Sheet, order: list[int], s: int) -> dict[int, float]:
+    """The heights (page units) of the strands that share a column (Sheet.columns), each as its centroid lies along
+    the sheet's drawn up (its strands' mean direction, by their senses, times the flip s) from the column's middle,
+    moved apart evenly from that middle until they keep _STACK_PAD between them; snapped."""
+    up3 = _unit(s * sum(d * x.axis for d, x in zip(sheet.directions, sheet.strands)))
+    out: dict[int, float] = {}
+    for c in sorted(set(sheet.columns)):
+        ks = [k for k in order if sheet.columns[k] == c]
+        if len(ks) < 2:
+            continue
+        cents = [_snap(sheet.strands[k].centroid) for k in ks]
+        mid = _snap(np.mean(cents, axis=0))
+        ys = sorted(((float(_snap((x - mid) @ up3 * SCALE)), k) for x, k in zip(cents, ks)))
+        placed = [ys[0][0]]
+        for (_, a), (y, b) in zip(ys, ys[1:]):  # each above the one below it, at least its reach apart
+            need = (_strand_length(sheet.strands[a]) + _strand_length(sheet.strands[b])) / 2 + _STACK_PAD
+            placed.append(max(y, placed[-1] + need))
+        shift = (ys[0][0] + ys[-1][0]) / 2 - (placed[0] + placed[-1]) / 2  # the column's middle kept where it was
+        out.update({k: float(_snap(y + shift)) for y, (_, k) in zip(placed, ys)})
+    return out
+
+
 def _sheet_item(
     sheet: Sheet, frame: Frame, pitch: float = PITCH, over: list[SSE] = (), helix_w: float = HELIX_W
 ) -> _Item:
@@ -392,12 +418,15 @@ def _sheet_item(
     strands = sheet.strands
     order, s, cents = _sheet_order(sheet, frame)
     members, offsets = [], []
-    slots = len(order) + (1 if sheet.closed else 0)
-    for slot, k in enumerate(order):
+    column = sheet.columns or list(range(len(strands)))  # strands sharing a column (sheets._columns) stand in it
+    slot_of = {c: n for n, c in enumerate(dict.fromkeys(column[k] for k in order))}
+    slots = len(slot_of) + (1 if sheet.closed else 0)
+    heights = _column_heights(sheet, order, s) if sheet.columns else {}
+    for k in order:
         up = sheet.directions[k] * s > 0
         sse = strands[k]
         members.append(Placed(sse, 0, 0, _strand_length(sse), np.pi / 2 if up else -np.pi / 2, pitch))
-        offsets.append(((slot - (slots - 1) / 2) * pitch, 0.0))
+        offsets.append(((slot_of[column[k]] - (slots - 1) / 2) * pitch, heights.get(k, 0.0)))
     if sheet.closed:  # the barrel wraps: its first strand pairs again with the last
         f = members[0]
         members.append(Placed(f.sse, 0, 0, f.length, f.angle, f.width, ghost=True))

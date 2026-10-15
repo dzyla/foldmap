@@ -142,3 +142,24 @@ def test_bulged_strands_take_their_true_place_in_the_sheet():
     sh = next(s for s in sheets if any(x.id == "A:68-74" for x in s.strands))
     known = ["A:29-35", "A:8-14", "A:149-158", "A:68-74", "A:114-123"]  # B'/B'' one strand, beside 68-74
     assert [s.id for s in sh.strands] in (known, known[::-1]) and not sh.ambiguous
+
+
+def test_a_strand_continuing_another_along_their_partner_shares_its_column():
+    """5KQJ (random-100 C34): F pairs with E end to end with B, on E's same side (F at 3D y +11.8, B at -1.1, 0.8 Å
+    apart along E): a bulged continuation. The sheet's one path of strands drew it as a column of its own, wedged
+    between E and B (C D E F B A). Such a pair now shares a column (Sheet.columns), one above the other as along E,
+    and the order check reads the block by its columns."""
+    from foldmap import figcheck
+    from foldmap.cli import make_layout
+    from foldmap.spec import draw_spec, figure_spec
+
+    path = Path(__file__).parent / "data" / "r100" / "5KQJ.cif.gz"
+    lay, sses, _ = make_layout(path)
+    b, e, f = lay.placed["A:44-50"], lay.placed["A:83-93"], lay.placed["A:96-99"]
+    assert abs(b.cx - f.cx) < 1e-9 and abs(e.cx - b.cx) > 0.5
+    (by0, by1), (fy0, fy1) = sorted((b.n_port[1], b.c_port[1])), sorted((f.n_port[1], f.c_port[1]))
+    assert by1 <= fy0 or fy1 <= by0  # one above the other
+    block = next(ids for ids in lay.sheets if "A:96-99" in ids)
+    assert len({round(lay.placed[k].cx, 6) for k in block}) == len(block) - 1
+    d = draw_spec(figure_spec(path))
+    assert not [v for v in figcheck.order_checks(d) if v.startswith("sheet")]

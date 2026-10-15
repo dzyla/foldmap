@@ -8,6 +8,7 @@ from collections import Counter, defaultdict
 from itertools import combinations
 
 import networkx as nx
+import numpy as np
 
 from .model import SSE, Bridge, Sheet
 
@@ -67,6 +68,51 @@ def _order_tree(tree: nx.Graph, first: int) -> tuple[list[int], bool]:
     return order, True
 
 
+_STRAND_RISE = 3.3  # Å per residue along a strand
+_STACK_GAP = 5.0  # Å: two strands on one side of a partner whose spans along it are at most this far apart, and
+_STACK_OVERLAP = 1.0  # ... overlap by no more than this, continue one another along it (a beta bulge, end to end)
+
+
+def _span(s: SSE, at: np.ndarray, axis: np.ndarray) -> tuple[float, float]:
+    """Where strand s lies along a partner's axis (Å from the partner's centroid `at`)."""
+    c = float((s.centroid - at) @ axis)
+    half = (len(s) - 1) * _STRAND_RISE / 2 * abs(float(s.axis @ axis))
+    return c - half, c + half
+
+
+def _columns(tree: nx.Graph, order: list[int], strands: list[SSE]) -> list[int]:
+    """Column of each strand of `order`: a branch strand b set beside its partner p (_order_tree) that lies on the
+    same side of p as the strand q next to it in the order, which also pairs with p, end to end with q along p (a
+    bulged continuation: 5KQJ's F after B along E), shares q's column; empty when none does. Directions in 3D from
+    the strands' centroids and axes, snapped."""
+    from .layout import _snap, _unit
+
+    share: dict[int, int] = {}
+    for i, b in enumerate(order):
+        for j in (i - 1, i + 1):
+            if not 0 <= j < len(order) or b in share or order[j] in share:
+                continue
+            q = order[j]
+            for p in sorted(set(tree.neighbors(b)) & set(tree.neighbors(q))):
+                at, axis = _snap(strands[p].centroid), _snap(_unit(strands[p].axis))
+                sb, sq = _snap(strands[b].centroid) - at, _snap(strands[q].centroid) - at
+                if float((sb - (sb @ axis) * axis) @ (sq - (sq @ axis) * axis)) <= 0:
+                    continue  # on opposite sides of p
+                (b0, b1), (q0, q1) = _span(strands[b], at, axis), _span(strands[q], at, axis)
+                overlap = min(b1, q1) - max(b0, q0)
+                if -_STACK_GAP <= overlap <= _STACK_OVERLAP:
+                    share[b] = q
+                    break
+    if not share:
+        return []
+    cols, k = [], -1
+    for i, x in enumerate(order):
+        if not (x in share and i > 0 and share[x] == order[i - 1]) and not (i > 0 and share.get(order[i - 1]) == x):
+            k += 1
+        cols.append(k)
+    return cols
+
+
 def build_sheets(sses: list[SSE], bridges: list[Bridge]) -> list[Sheet]:
     strands = [s for s in sses if s.kind == "E"]
     table = _edge_table(strands, bridges)
@@ -91,5 +137,8 @@ def build_sheets(sses: list[SSE], bridges: list[Bridge]) -> list[Sheet]:
         ends = (min(order[0], order[-1]), max(order[0], order[-1]))
         if not closed and not ambiguous and len(order) >= _BARREL_MIN and ends in weak:
             closed = True  # a barrel whose last pairing is a lone bridge (DSSP counts it as a ladder too)
-        sheets.append(Sheet([strands[k] for k in order], [direction[k] for k in order], kinds, closed, ambiguous))
+        columns = _columns(tree, order, strands) if ambiguous and not closed else []
+        sheets.append(
+            Sheet([strands[k] for k in order], [direction[k] for k in order], kinds, closed, ambiguous, columns)
+        )
     return sheets
