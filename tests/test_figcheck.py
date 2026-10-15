@@ -484,7 +484,11 @@ def test_copies_of_fewer_than_three_elements_are_reported_not_judged():
     for k in other[3:]:
         del d.layout.placed[k]  # A2 keeps its shared strands and three other elements, two of them matching A1's
     _unmatched(d.layout.placed[other[2]])
-    assert figcheck.copies_not_judged(d) == {}  # three elements left and not paired: a real inf, not "not judged"
+    assert figcheck.copy_matches(d)[("A2", "A1")] == (2, 3)
+    assert figcheck.copies_not_judged(d) == {("A2", "A1"): "n/a: 2 matched"}  # two fit nothing (6YQD, round 2)
+    assert ("A2", "A1") not in figcheck.copies_alike(d)
+    _unmatched(d.layout.placed[other[1]])  # one matched or none: a real inf, not "not judged"
+    assert figcheck.copies_not_judged(d) == {}
     assert figcheck.copies_alike(d)[("A2", "A1")] == math.inf
     shared = figcheck.shared_sheet_elements(d.layout, "A2", "A1")
     for k in [k for k, p in d.layout.placed.items() if p.sse.chain in ("A1", "A2") and k not in shared]:

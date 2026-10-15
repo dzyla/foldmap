@@ -656,6 +656,8 @@ def _copy_pairs(drawn) -> dict[tuple[str, str], tuple[float | None, int, int, st
             dev, why = None, f"n/a: {smaller} element{'s' if smaller > 1 else ''}"
         elif shared and smaller == 0:
             dev, why = None, "n/a: shared sheet"
+        elif shared and len(found) == COPY_MIN_MATCHED - 1 and 2 * len(found) >= smaller:
+            dev, why = None, f"n/a: {len(found)} matched"  # a shared sheet left two to match, too few to fit (6YQD)
         else:
             dev = math.inf
         out[(copy, ref)] = (dev, len(found), smaller, why)
