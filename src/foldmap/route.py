@@ -683,7 +683,8 @@ def _text_hits(points, boxes) -> int:
     return int((clip_lengths(np.hstack([pts[:-1], pts[1:]]), boxes) > 0).any(axis=0).sum())
 
 
-_REROUTE_TURNS = 4  # corners a route off NA text may add to the one it replaces (no weaving round each letter)
+_REROUTE_TURNS = 4  # corners a route off NA text may add to the one it replaces when it only grazed the clearance
+_REROUTE_TURNS_INK = 12  # ... and when it ran through the text's ink (7XSP's B:355-374 loop: 6 more to free 2 letters)
 
 
 def _strand_crossings(points, strands) -> int:
@@ -691,12 +692,14 @@ def _strand_crossings(points, strands) -> int:
     return strands.crossings(points) if strands is not None else 0
 
 
-def _better(new, old, boxes, text, strands=None) -> bool:
+def _better(new, old, boxes, text, strands=None, ink=()) -> bool:
     """Does route `new` cross less nucleic-acid text (`boxes`) than `old`, and no more text in all (`text`: the
-    names and stubs routes keep out of), with at most _REROUTE_TURNS more corners, crossing the strands (`strands`:
+    names and stubs routes keep out of), with at most _REROUTE_TURNS more corners (_REROUTE_TURNS_INK when `old` runs
+    through the text's ink itself, `ink`, not only its clearance), crossing the strands (`strands`:
     routed round the old route) no more often than it crosses less text (fix round 1: one crossing more per letter or
     label freed at most)?"""
-    if len(new) > len(old) + _REROUTE_TURNS:
+    turns = _REROUTE_TURNS_INK if _text_hits(old, ink) else _REROUTE_TURNS
+    if len(new) > len(old) + turns:
         return False
     freed = _text_hits(old, boxes) - _text_hits(new, boxes)
     if _strand_crossings(new, strands) - _strand_crossings(old, strands) > freed:
@@ -713,7 +716,8 @@ def _off_na_text(layout: Layout, router: _Router, loops: list[Loop]) -> None:
     from .layout import line_clearance, na_text_boxes
 
     g = line_clearance(layout)  # a protein loop keeps this far from the nucleic acid's text, beyond its ink
-    boxes = [(x0 - g, y0 - g, x1 + g, y1 + g) for x0, y0, x1, y1 in na_text_boxes(layout)]
+    ink = na_text_boxes(layout)
+    boxes = [(x0 - g, y0 - g, x1 + g, y1 + g) for x0, y0, x1, y1 in ink]
     hit = [k for k, lp in enumerate(loops) if not lp.fallback and len(lp.points) > 2 and _text_hits(lp.points, boxes)]
     if not hit:
         return
@@ -748,7 +752,7 @@ def _off_na_text(layout: Layout, router: _Router, loops: list[Loop]) -> None:
         for h in exempt:
             grid.blocked |= grid.over[h]
         over = over and _text_hits(best, router.keep_out) > 0  # routed with the keep-outs open: does it cross one?
-        better = best is not None and _better(best, lp.points, boxes, router.keep_out, strands)
+        better = best is not None and _better(best, lp.points, boxes, router.keep_out, strands, ink)
         if better and over <= lp.crosses_labels:
             loops[k] = Loop(lp.a_id, lp.b_id, [(float(x), float(y)) for x, y in best], lp.dashed, False, over)
             continue

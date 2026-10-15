@@ -89,10 +89,11 @@ def _place_letters(layout: Layout, paths: list[NAPath]) -> dict[tuple[int, int],
     line_clear = line_clearance(layout)  # figcheck.LINE_TEXT_CLEARANCE_PX at the page's text size
     ink = {b: _reach(_ink_points(b, False, _LETTER_EM * em, 0.0)) for b in "ACGUTIN"}
 
-    def struck(q, key) -> bool:  # a strand drawn through the letter's ink, or within the line clearance of it
+    def struck(q, key, clear: float | None = None) -> bool:  # a strand through the letter's ink, or near it
         base = layout.nucleic.strands[key[0]].bases[key[1]]
         x0, y0, x1, y1 = ink.get(base, ink["N"]) + np.array([q[0], q[1], q[0], q[1]])
-        box = (x0 - line_clear, y0 - line_clear, x1 + line_clear, y1 + line_clear)
+        c = line_clear if clear is None else clear
+        box = (x0 - c, y0 - c, x1 + c, y1 + c)
         near = (seg_lo[:, 0] < box[2]) & (seg_hi[:, 0] > box[0]) & (seg_lo[:, 1] < box[3]) & (seg_hi[:, 1] > box[1])
         return bool(near.any()) and bool((clip_lengths(strand_segs[near], [box]) > 0).any())
 
@@ -139,7 +140,8 @@ def _place_letters(layout: Layout, paths: list[NAPath]) -> dict[tuple[int, int],
                 options += more
                 spaces += [room(q, index[key]) for q in more]
                 free += [r >= _LETTER_GAP and not struck(q, key) for q, r in zip(more, spaces[-len(more) :])]
-            if p.kind == "hairpin":  # a hairpin loop's letters stay in its stem's footprint (layout keeps that clear)
+            if p.kind == "hairpin":  # a hairpin loop's letters stay in its stem's footprint (layout keeps it clear):
+                # a spot inside clear with the line clearance, else one no strand runs through; else outside (8SA2)
                 d = at[p.between[0]]
                 fx0, fy0, fx1, fy1 = _footprint(d)
                 g = _GLYPH_H / 2
@@ -150,8 +152,12 @@ def _place_letters(layout: Layout, paths: list[NAPath]) -> dict[tuple[int, int],
                     and q[1] - d.cy + g <= fy1
                     for q in options
                 ]
-                if any(held):
+                inked = [h and r >= _LETTER_GAP and not struck(q, key, 0.0) for q, r, h in zip(options, spaces, held)]
+                if any(ok and h for ok, h in zip(free, held)):  # a clear spot inside: only those
                     free = [ok and h for ok, h in zip(free, held)]
+                elif any(inked):  # inside, no strand through its ink (within the clearance only)
+                    free = inked
+                elif not any(free) and any(held):  # none clear anywhere: the roomiest inside
                     spaces = [r if h else -1.0 for r, h in zip(spaces, held)]
             clear = [q for q, ok in zip(options, free) if ok]  # clear of letters and of every strand drawn
             spot = clear[0] if clear else options[int(np.argmax(spaces))]  # else the furthest from other letters

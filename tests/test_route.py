@@ -789,3 +789,17 @@ def test_clip_lengths_is_clip_len_for_every_pair():
     assert route.boxes_meeting(boxes, (0.0, 0.0, 1.0, 1.0)).tolist() == [
         b[0] < 1 and b[2] > 0 and b[1] < 1 and b[3] > 0 for b in boxes
     ]
+
+
+def test_a_reroute_may_turn_more_to_free_text_it_ran_through():
+    """Fix round 1 campaign: with the clearance in pixels, a reroute of a loop that only grazes a letter's clearance
+    may add at most _REROUTE_TURNS corners (1KX5's loop wove round letters it did not touch), but one that runs
+    through the letters' ink may add up to _REROUTE_TURNS_INK (7XSP's B:355-374 loop: 6 more to free two letters)."""
+    ink = [(4.0, 1.8, 5.0, 2.2)]
+    pad = [(3.8, 1.6, 5.2, 2.4)]
+    through = [(0.0, 0.0), (0.0, 2.0), (10.0, 2.0), (10.0, 0.0)]  # through the ink
+    grazing = [(0.0, 0.0), (0.0, 2.3), (10.0, 2.3), (10.0, 0.0)]  # inside the clearance pad only
+    wiggle = [(0.0, 0.0), (0.0, 1.0), (1.0, 1.0), (1.0, 3.0), (3.0, 3.0), (3.0, 4.0), (6.0, 4.0), (6.0, 3.0)]
+    wiggle += [(8.0, 3.0), (8.0, 1.0), (10.0, 1.0), (10.0, 0.0)]  # 8 corners more, clear of both
+    assert route._better(wiggle, through, pad, [], None, ink)
+    assert not route._better(wiggle, grazing, pad, [], None, ink)
