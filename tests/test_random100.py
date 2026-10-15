@@ -627,8 +627,8 @@ def test_the_focus_view_draws_the_chain_with_most_elements(r100):
 
 
 def test_a18_tm_helix_passes_when_it_reaches_both_leaflets(r100):
-    """C27 (random-100, ruling): a TM helix passes A18 when it spans the band, entering it on both sides of the
-    bilayer's middle (both leaflets), not by covering 75 % of the band's height: a tilted or offset helix that
+    """C27 (random-100, ruling): a TM helix passes A18 when it enters the band through a face and reaches past its
+    middle, not by covering 75 % of the band's height: a tilted or offset helix that
     crosses one face and reaches past the middle (6PS3 A:267-298 covers 0.73, 7PIU R:48-70 0.70) passes; one
     that stays in one leaflet fails. Bacteriorhodopsin's five helices whose CA runs reach both faces pass as drawn."""
     from dataclasses import replace
@@ -651,6 +651,9 @@ def test_a18_tm_helix_passes_when_it_reaches_both_leaflets(r100):
     lay.placed[hid] = replace(p, cy=mid - 0.05 - half)  # crosses the lower face, ends short of the middle
     assert [x.split()[0] for x in r100.membrane_checks(d, path)["tm_short"]] == [hid]
     lay.placed[hid] = replace(p, cy=mid + 0.05 + half)  # the upper leaflet only
+    assert [x.split()[0] for x in r100.membrane_checks(d, path)["tm_short"]] == [hid]
+    short = (y1 - y0) / 3  # a short helix centred in the band, entering it through neither face (fix round 1)
+    lay.placed[hid] = replace(p, cy=mid, length=short * abs(p.length) / max(2 * half, 1e-9))
     assert [x.split()[0] for x in r100.membrane_checks(d, path)["tm_short"]] == [hid]
 
 

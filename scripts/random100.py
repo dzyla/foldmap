@@ -1207,9 +1207,10 @@ def tether_lengths(drawn, look) -> list[tuple[str, float, str, str]]:
 
 def membrane_checks(drawn, path) -> dict:
     """A18 on a --membrane auto figure: each TM helix (its CA run reaches both membrane faces, as cli._face_medians
-    counts it) spans its band, entering it on both sides of its middle (both leaflets; C27 ruling: not by a share
-    of the band's height, so a tilted or offset helix with one end a little short passes); loops run sideways
-    inside a band (slab_margin from its faces) only next to one of their own ports inside it."""
+    counts it) enters its band through a face and reaches past its middle (C27 ruling: not by a share of the band's
+    height, so a tilted or offset helix with one end a little short passes; one in the middle reaching no face
+    fails); loops run sideways inside a band (slab_margin from its faces) only next to one of their own ports inside
+    it."""
     from foldmap.membrane import find_membrane
 
     lay, bb = drawn.layout, drawn.bb
@@ -1230,7 +1231,7 @@ def membrane_checks(drawn, path) -> dict:
         lo, hi = sorted((p.n_port[1], p.c_port[1]))
         y0, y1 = min(bands, key=lambda b: abs((b[0] + b[1]) / 2 - (lo + hi) / 2))
         frac = (min(hi, y1) - max(lo, y0)) / max(y1 - y0, 1e-9)
-        if not lo < (y0 + y1) / 2 < hi:  # in one leaflet only, or off the band
+        if not (lo < (y0 + y1) / 2 < hi and (lo <= y0 or hi >= y1)):  # through a face and past the middle
             short.append(f"{s.id} {frac:.2f}")
     margin = LIMITS["slab_margin"]
 

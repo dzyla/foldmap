@@ -12,7 +12,7 @@ helix records keep their deposited ids. TRIMS shrinks an entry further: `assembl
 biological assembly, `backbone` keeps only a protein's N, CA, C, O and CB atoms (`atoms`: these names instead, e.g. with
 the cysteines' SG for disulfides), `first_model` keeps an NMR ensemble's model 1, `drop` erases the mmCIF categories
 named, `no_protein_sequence` drops the protein entities' full sequences (a big complex's are most of a small window's
-file). Each fixture stays under 100 KB and all of them under 600 KB (tests/test_r100_fixtures.py). Files are written
+file). Each fixture stays under 100 KB and all of them under 800 KB (tests/test_r100_fixtures.py). Files are written
 gzipped, outside tests/data/*.cif, so scripts/bench.py never reads them.
 """
 
