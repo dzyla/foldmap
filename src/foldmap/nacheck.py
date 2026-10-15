@@ -667,11 +667,16 @@ def render_checks(lay, loops, fig, sses, *, model=None, bb=None) -> dict:
     )
     letters = [e for t, e in zip(texts, extents) if (t.get_gid() or "").startswith("na:nt:")]  # pixels
     bad = 0
-    for a, b in combinations(letters, 2):
-        w = min(a.x1, b.x1) - max(a.x0, b.x0)
-        h = min(a.y1, b.y1) - max(a.y0, b.y0)
-        if w > 0 and h > 0 and w * h > min(a.width * a.height, b.width * b.height) / 3:
-            bad += 1
+    ink = np.array([e.extents for e in letters], float).reshape(-1, 4)
+    for i, a in enumerate(letters):  # only later letters whose boxes share area with this one's can count
+        rest = ink[i + 1 :]
+        near = (rest[:, 0] < a.x1) & (a.x0 < rest[:, 2]) & (rest[:, 1] < a.y1) & (a.y0 < rest[:, 3])
+        for j in np.flatnonzero(near).tolist():
+            b = letters[i + 1 + j]
+            w = min(a.x1, b.x1) - max(a.x0, b.x0)
+            h = min(a.y1, b.y1) - max(a.y0, b.y0)
+            if w > 0 and h > 0 and w * h > min(a.width * a.height, b.width * b.height) / 3:
+                bad += 1
     # contact beads: centres and radii on the page, in pixels
     centres, radii = [], []
     for c in ax.collections:
@@ -679,11 +684,11 @@ def render_checks(lay, loops, fig, sses, *, model=None, bb=None) -> dict:
             xy = ax.transData.transform(c.get_offsets())
             centres += list(xy)
             radii += [float(np.sqrt(c.get_sizes()[0])) / 2 * fig.dpi / 72] * len(xy)
-    bead_overlaps = sum(
-        1
-        for i, j in combinations(range(len(centres)), 2)
-        if np.hypot(*(centres[i] - centres[j])) < radii[i] + radii[j] - 1e-6
-    )
+    bead_overlaps = 0
+    at, size = np.asarray(centres, float).reshape(-1, 2), np.asarray(radii, float)
+    for i in range(len(at) - 1):  # each pair once, as combinations gives them, by the same arithmetic
+        d = at[i] - at[i + 1 :]
+        bead_overlaps += int(np.count_nonzero(np.hypot(d[:, 0], d[:, 1]) < size[i] + size[i + 1 :] - 1e-6))
     # gap labels: (path index, box in page units, box in pixels)
     to_page = ax.transData.inverted()
     gaps = [

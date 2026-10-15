@@ -1204,7 +1204,8 @@ def _cmd_figure(args: argparse.Namespace) -> int:
             file=sys.stderr,
         )
     if args.save_layout:
-        print(f"wrote {layoutfile.save(args.save_layout, layout_document(spec))}")
+        laid = drawn if args.command != "interactive" else None  # the figure's own layout, when it has no edits
+        print(f"wrote {layoutfile.save(args.save_layout, layout_document(spec, drawn=laid))}")
     return 0
 
 

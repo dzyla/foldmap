@@ -53,13 +53,22 @@ def loop_crossings(loops) -> int:
         return side(r, s, p) * side(r, s, q) < 0 and side(p, q, r) * side(p, q, s) < 0
 
     segs = [list(zip(lp.points, lp.points[1:])) for lp in loops]
-    return sum(
-        cross(p, q, r, s)
-        for i in range(len(segs))
-        for j in range(i + 1, len(segs))
-        for p, q in segs[i]
-        for r, s in segs[j]
-    )
+    flat = [(i, p, q) for i, ss in enumerate(segs) for p, q in ss]
+    if not flat:
+        return 0
+    own = np.array([i for i, _, _ in flat])
+    box = np.array([(min(p[0], q[0]), min(p[1], q[1]), max(p[0], q[0]), max(p[1], q[1])) for _, p, q in flat], float)
+    n = 0
+    for k, (i, p, q) in enumerate(flat):  # only segments of later loops whose boxes meet this one's can cross it
+        later = np.flatnonzero(own > i)
+        near = later[
+            (box[later, 0] <= box[k, 2])
+            & (box[k, 0] <= box[later, 2])
+            & (box[later, 1] <= box[k, 3])
+            & (box[k, 1] <= box[later, 3])
+        ]
+        n += sum(cross(p, q, flat[m][1], flat[m][2]) for m in near.tolist())
+    return n
 
 
 def honest_crossings(lay, loops) -> int:
@@ -69,11 +78,18 @@ def honest_crossings(lay, loops) -> int:
     from .route import _crosses_body
 
     n = loop_crossings(loops)
+    placed = list(lay.placed.items())
+    rects = np.array([e.rect for _, e in placed], float).reshape(-1, 4)
     for lp in loops:
         segs = list(zip(lp.points, lp.points[1:]))
         a, b = lay.placed.get(lp.a_id), lay.placed.get(lp.b_id)
         ports = [p for q, p in ((a, lp.points[0]), (b, lp.points[-1])) if q is not None and q.over]
-        for k, e in lay.placed.items():
+        pts = np.asarray(lp.points, float).reshape(-1, 2)
+        x0, y0 = pts.min(axis=0) - 1e-6
+        x1, y1 = pts.max(axis=0) + 1e-6
+        near = (rects[:, 0] <= x1) & (x0 <= rects[:, 2]) & (rects[:, 1] <= y1) & (y0 <= rects[:, 3])
+        for m in np.flatnonzero(near).tolist():  # an element whose box the loop's extent misses is not crossed
+            k, e = placed[m]
             if k in (lp.a_id, lp.b_id) or not any(_crosses_body(p, q, e) for p, q in segs):
                 continue
             x0, y0, x1, y1 = e.rect
@@ -402,14 +418,34 @@ def _area_on(box: Bbox, path: MPath) -> float:
     return float(path.contains_points(np.c_[gx.ravel(), gy.ravel()]).sum()) * _STEP_PX**2
 
 
-def _on(box: Bbox, path: MPath) -> bool:
-    """Does the body cover more than TEXT_OVERLAP_PX2 of the text's ink lying deeper than TEXT_DEPTH_PX inside it?"""
+def _on(box: Bbox, path: MPath, extent: Bbox | None = None) -> bool:
+    """Does the body cover more than TEXT_OVERLAP_PX2 of the text's ink lying deeper than TEXT_DEPTH_PX inside it?
+    `extent`: the path's extents, when known (text_collisions measures each body's once)."""
     core = _core(box)
     return (
         core is not None
-        and _overlap(core, path.get_extents()) > TEXT_OVERLAP_PX2
+        and _overlap(core, path.get_extents() if extent is None else extent) > TEXT_OVERLAP_PX2
         and _area_on(core, path) > TEXT_OVERLAP_PX2
     )
+
+
+def _extents(boxes) -> np.ndarray:
+    """(n, 4) x0, y0, x1, y1 rows of Bboxes (each normalised as Bbox.overlaps reads it)."""
+    e = np.array([b.extents for b in boxes], float).reshape(-1, 4)
+    return np.hstack([np.minimum(e[:, :2], e[:, 2:]), np.maximum(e[:, :2], e[:, 2:])])
+
+
+def _meeting(box, rows: np.ndarray, open_: bool) -> np.ndarray:
+    """Indices of the rows (_extents) that `box` (x0, y0, x1, y1) meets: sharing area (open_, as _overlap > 0
+    needs) or touching (as Bbox.overlaps counts it). A prefilter only: what it leaves out could not pass the test
+    it stands before, so the checks give what they gave one pair at a time (random-100 C33: 7JU4's text checks
+    took 90 s)."""
+    x0, y0, x1, y1 = box
+    if open_:
+        m = (rows[:, 0] < x1) & (x0 < rows[:, 2]) & (rows[:, 1] < y1) & (y0 < rows[:, 3])
+    else:
+        m = (rows[:, 0] <= x1) & (x0 <= rows[:, 2]) & (rows[:, 1] <= y1) & (y0 <= rows[:, 3])
+    return np.flatnonzero(m)
 
 
 def _depth(*boxes: Bbox) -> float:
@@ -461,27 +497,40 @@ def text_collisions(drawn, *, clearance_px: float = 0.0, page: Page | None = Non
         if polys
         for covers in [[p for _, p, bz, opaque in page.bodies if opaque and bz > z]]
     ]
-    for (ta, ga, a), (tb, gb, b) in combinations(page.texts, 2):
-        if ga != gb and _texts_meet(a, b) and _texts_meet(*page.pair_boxes(ta, a, tb, b)):
-            hits.append(f"{ga} × {gb}")
+    inks = _extents([box for *_, box in page.texts])
+    for i, (ta, ga, a) in enumerate(page.texts):  # pairs in combinations' order; those whose inks share no area skipped
+        for j in _meeting(inks[i], inks[i + 1 :], True).tolist():
+            tb, gb, b = page.texts[i + 1 + j]
+            if ga != gb and _texts_meet(a, b) and _texts_meet(*page.pair_boxes(ta, a, tb, b)):
+                hits.append(f"{ga} × {gb}")
+    bodies = [(body, path, _owner(body) or body) for body, path, _, _ in page.bodies if not body.startswith("na:stem:")]
+    body_rows = _extents([path.get_extents() for _, path, _ in bodies])  # each body measured once
+    stem_rows = _extents([path.get_extents() for _, path, _ in page.stems])
+    line_rows = _extents([extent for _, _, extent, _, _ in lines])
+    pads = np.array([pad for _, _, _, pad, _ in lines], float)
     for t, name, box in page.texts:
         gid = t.get_gid() or ""
         mine = _owner(gid)
         met: set[str] = set()
-        for body, path, _, _ in page.bodies:
-            if body.startswith("na:stem:"):
-                continue  # stems: their whole body below
-            theirs = _owner(body) or body
-            if theirs == mine or theirs in met or frozenset((theirs, mine)) in over:
-                continue
-            if _on(box, path):
-                met.add(theirs)
-                hits.append(f"{name} × {body.replace('helix-back:', 'helix:', 1)}")
-        for body, path, own in page.stems:
-            if gid not in own and _on(box, path):
-                hits.append(f"{name} × {body}")
-        for line, polys, extent, pad, covers in lines:
-            r = pad + clearance_px  # its stroke meets the ink, or comes within the clearance
+        core = _core(box)
+        if core is not None:  # stems: their whole body below
+            for k in _meeting(core.extents, body_rows, True).tolist():
+                body, path, theirs = bodies[k]
+                if theirs == mine or theirs in met or frozenset((theirs, mine)) in over:
+                    continue
+                if _on(box, path, Bbox(body_rows[k].reshape(2, 2))):
+                    met.add(theirs)
+                    hits.append(f"{name} × {body.replace('helix-back:', 'helix:', 1)}")
+            for k in _meeting(core.extents, stem_rows, True).tolist():
+                body, path, own = page.stems[k]
+                if gid not in own and _on(box, path, Bbox(stem_rows[k].reshape(2, 2))):
+                    hits.append(f"{name} × {body}")
+        r = pads + clearance_px  # each line's stroke meets the ink, or comes within the clearance
+        near = (line_rows[:, 0] <= box.x1 + r) & (box.x0 - r <= line_rows[:, 2])
+        near &= (line_rows[:, 1] <= box.y1 + r) & (box.y0 - r <= line_rows[:, 3])
+        for k in np.flatnonzero(near).tolist():
+            line, polys, extent, pad, covers = lines[k]
+            r = pad + clearance_px
             reach = Bbox.from_extents(box.x0 - r, box.y0 - r, box.x1 + r, box.y1 + r)
             if line in own_lines.get(gid, ()) or not extent.overlaps(reach):
                 continue

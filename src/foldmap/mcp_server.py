@@ -234,7 +234,7 @@ def draw_topology(
         save(drawn.figure, out)
         note = f"wrote {out}"
         if keep is not None:
-            note += f" and layout file {layoutfile.save(keep, layout_document(spec))}"
+            note += f" and layout file {layoutfile.save(keep, layout_document(spec, drawn=drawn))}"
         if drawn.stuck:
             note += f"; no clear route for {', '.join(drawn.stuck)} (drawn as plain curves)"
         if drawn.over_labels:

@@ -94,23 +94,56 @@ def panel_fields(
     r = np.asarray(every, float)
     xs = _axis(r[:, 0].min() - reach, r[:, 2].max() + reach)
     ys = _axis(r[:, 1].min() - reach, r[:, 3].max() + reach)
-    elements = {d: _distance(bs, xs, ys, reach) for d, bs in owned.items()}
-    none = np.full((len(ys), len(xs)), np.inf)
-    named = {d: _distance([names[d]], xs, ys, reach) if d in names else none for d in owned}
-    own = {d: np.minimum(elements[d], named[d]) for d in owned}
+    shape_all = (len(ys), len(xs))
+
+    def window(d: str) -> tuple[slice, slice]:
+        """The raster rows and columns within `reach` of the domain's elements and name (where _distance measures
+        them); outside it the domain's field is -1 (no element, no name near: below the clipped floor)."""
+        b = np.asarray(list(owned[d]) + ([names[d]] if d in names else []), float).reshape(-1, 4)
+        if not len(b):
+            return slice(0, 0), slice(0, 0)
+        i0, i1 = np.searchsorted(xs, b[:, 0].min() - reach), np.searchsorted(xs, b[:, 2].max() + reach, side="right")
+        j0, j1 = np.searchsorted(ys, b[:, 1].min() - reach), np.searchsorted(ys, b[:, 3].max() + reach, side="right")
+        return slice(int(j0), int(j1)), slice(int(i0), int(i1))
+
+    def own_of(d: str, w) -> tuple[np.ndarray, np.ndarray, np.ndarray]:  # its elements', name's, own distance in w
+        gx, gy = xs[w[1]], ys[w[0]]
+        elements = _distance(owned[d], gx, gy, reach)
+        named = _distance([names[d]], gx, gy, reach) if d in names else np.full(elements.shape, np.inf)
+        return elements, named, np.minimum(elements, named)
+
+    # each cell's nearest domain (`which`, by its order), that distance and the nearest of every other domain's, so
+    # a domain's rivals (every other domain) are one look-up, not a pass over all the others; and each domain worked
+    # on its own window of the raster (random-100 C33: 7JU4's domains view held every domain's whole raster at once,
+    # 20 GB, and took them pairwise). Distances and min are exact and the closing's distance transform sees the
+    # same background within the window (a ring of cells past pad + CLOSE surrounds the domain), so the same fields
+    first, second = np.full(shape_all, np.inf), np.full(shape_all, np.inf)
+    which = np.full(shape_all, -1)
+    windows = {d: window(d) for d in owned}
+    for k, d in enumerate(owned):
+        w = windows[d]
+        o = own_of(d, w)[2]
+        f = first[w]
+        lower = o < f
+        second[w] = np.where(lower, f, np.minimum(second[w], o))
+        which[w] = np.where(lower, k, which[w])
+        first[w] = np.where(lower, o, f)
     loose = np.minimum(_distance(list(free), xs, ys, reach), _turned_distance(list(turned), xs, ys, reach))
     values = {}
-    for d in owned:
-        rival = loose.copy()
-        for e in owned:
-            if e != d:
-                np.minimum(rival, own[e], out=rival)
-        base = np.maximum(pad - elements[d], NAME_PAD - named[d])
-        dilated = elements[d] <= pad + CLOSE
+    for k, d in enumerate(owned):
+        w = windows[d]
+        out = np.full(shape_all, -1.0)
+        values[d] = out
+        if out[w].size == 0:
+            continue
+        elements, named, own = own_of(d, w)
+        rival = np.minimum(loose[w], np.where(which[w] == k, second[w], first[w]))
+        base = np.maximum(pad - elements, NAME_PAD - named)
+        dilated = elements <= pad + CLOSE
         closed = distance_transform_edt(dilated) * GRID - CLOSE  # >= 0: inside the dilation eroded back
         shape = np.maximum(base, closed)
         with np.errstate(invalid="ignore"):  # inf - inf far from everything: outside
-            split = np.maximum((rival - own[d] - GUTTER) / 2, np.minimum(EDGE - own[d], (rival - own[d]) / 2))
+            split = np.maximum((rival - own - GUTTER) / 2, np.minimum(EDGE - own, (rival - own) / 2))
         split = np.where(np.isinf(rival), np.inf, split)
-        values[d] = np.clip(np.nan_to_num(np.minimum(shape, split), nan=-1.0), -1.0, 1.0)
+        out[w] = np.clip(np.nan_to_num(np.minimum(shape, split), nan=-1.0), -1.0, 1.0)
     return Fields(xs, ys, values)

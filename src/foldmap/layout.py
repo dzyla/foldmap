@@ -745,15 +745,39 @@ def _bundle_item(group: list[SSE], frame: Frame, angle_mode: str, width: float) 
     )
 
 
+_DENSE_PAIRS = 256  # _overlapping tests every pair of up to this many footprints at once; more, only near ones
+
+
 def _overlapping(xy: np.ndarray, halves: np.ndarray, mids: np.ndarray, apart: np.ndarray | None = None) -> np.ndarray:
     """(i, j) with i < j, in row order, for every pair of footprints (plus MARGIN) that overlap; pairs marked in
-    the boolean matrix `apart` (_joint_matrix) are never counted."""
+    the boolean matrix `apart` (_joint_matrix) are never counted. Past _DENSE_PAIRS footprints only the pairs whose
+    centres lie near enough across the page to overlap are measured (random-100 C33: every sweep measured all
+    pairs, 20 s of 7JU4's layout), by the same arithmetic, so the pairs are the same."""
     q = xy + mids
-    depth = halves[:, None, :] + halves[None, :, :] + MARGIN - np.abs(q[None, :, :] - q[:, None, :])
-    hit = (depth[..., 0] > 1e-9) & (depth[..., 1] > 1e-9)
+    n = len(q)
+    if n <= _DENSE_PAIRS:
+        depth = halves[:, None, :] + halves[None, :, :] + MARGIN - np.abs(q[None, :, :] - q[:, None, :])
+        hit = (depth[..., 0] > 1e-9) & (depth[..., 1] > 1e-9)
+        if apart is not None:
+            hit &= ~apart
+        return np.argwhere(np.triu(hit, 1))
+    order = np.argsort(q[:, 0], kind="stable")
+    sx = q[order, 0]
+    reach = (halves[order, 0] + halves[:, 0].max() + MARGIN) * (1 + 1e-9) + 1e-6  # past any pair that can overlap
+    stop = np.searchsorted(sx, sx + reach, side="right")
+    start = np.arange(n) + 1
+    count = np.maximum(stop - start, 0)
+    first = np.repeat(order, count)
+    other = order[np.repeat(start - np.cumsum(count) + count, count) + np.arange(count.sum())]
+    a, b = np.minimum(first, other), np.maximum(first, other)
+    dx = halves[a, 0] + halves[b, 0] + MARGIN - np.abs(q[b, 0] - q[a, 0])  # as the dense matrix's [a, b]
+    dy = halves[a, 1] + halves[b, 1] + MARGIN - np.abs(q[b, 1] - q[a, 1])
+    hit = (dx > 1e-9) & (dy > 1e-9)
     if apart is not None:
-        hit &= ~apart
-    return np.argwhere(np.triu(hit, 1))
+        hit &= ~apart[a, b]
+    a, b = a[hit], b[hit]
+    rows = np.lexsort((b, a))
+    return np.stack([a[rows], b[rows]], axis=1).reshape(-1, 2)
 
 
 def _joint_matrix(n: int, joints) -> np.ndarray:
@@ -2613,14 +2637,17 @@ def _part_domains(
         copy_k[i] = k
     sx = np.where((copy_k > 0) & (mirror is not None), -1.0, 1.0)  # a mirrored copy moves against its mate in x
 
+    rel = [it.box for it in items]  # each item's footprint about its centre: only centres move here (C33: the
+    # property, measured afresh four times an item for every pair of domains, was 165 s of 7JU4's domains view)
+
     def box(d):
         b = np.array(
             [
                 (
-                    items[n].cx + items[n].box[0],
-                    items[n].cy + items[n].box[1],
-                    items[n].cx + items[n].box[2],
-                    items[n].cy + items[n].box[3],
+                    items[n].cx + rel[n][0],
+                    items[n].cy + rel[n][1],
+                    items[n].cx + rel[n][2],
+                    items[n].cy + rel[n][3],
                 )
                 for n in groups[d]
             ]
@@ -2648,7 +2675,7 @@ def _part_domains(
     start = [(it.cx, it.cy, it.home) for it in items]
 
     def extent() -> float:  # the items' width and height, summed
-        b = np.array([(it.cx + it.box[0], it.cy + it.box[1], it.cx + it.box[2], it.cy + it.box[3]) for it in items])
+        b = np.array([(it.cx + r[0], it.cy + r[1], it.cx + r[2], it.cy + r[3]) for it, r in zip(items, rel)])
         return float(b[:, 2].max() - b[:, 0].min() + b[:, 3].max() - b[:, 1].min())
 
     before = extent()

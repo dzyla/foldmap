@@ -944,6 +944,27 @@ default's size, no fallback, the legend on the page.
 dominates. **Ruling or fix:** a profile first. 7JU4's figure is unusable anyway (C4/C8/C7), so a focus default
 above about 40 chains of no symmetry would fix both. **Effort:** M.
 
+**Batch C1 result (C32; the time cause the Task 12 rulings call C33):** profiled, the slow views spent their time in
+work done twice or pair by pair, not in drawing. Removed, with the output the same (SVG, layout file, figcheck
+findings and NA metrics byte-identical on 13 views: 29RY, 6JO6, 6DPV, 3OWW, 8BW5, 1KX5 and the domains views of 2C4M,
+3L9G-A, 5X4Z, 9GEP, 6JLN, 8RVL, 2ILU; both bench baselines identical):
+- `plot --save-layout` laid the figure out a second time for the layout file (27 of 7JU4's 183 s); with no edits it
+  is written from the figure's own layout (`spec.layout_document(..., drawn=)`).
+- `figcheck.text_collisions` measured every text against every body and line (`path.get_extents` 2 M times):
+  each body is measured once, and only pairs whose boxes meet are tested (90 s -> 0.5 s on 7JU4).
+  `loop_crossings`, `honest_crossings` and `nacheck.render_checks`' letter and bead overlaps likewise.
+- `layout._overlapping` measured all n x n footprint pairs each sweep; past 256 footprints only pairs near enough
+  across the page (same arithmetic, same pairs and order).
+- `layout._part_domains` measured every item's footprint four times for every pair of domains in every sweep
+  (90,032 footprints on 3L9G-A for 34 items): once now.
+- `panels.panel_fields` held every domain's whole raster and took each domain's rivals one by one: the nearest and
+  second-nearest domain per cell are kept once, and each domain is worked on its own raster window.
+
+Times of the campaign's view process (`random100.py view`, eight run side by side, same load before and after):
+7JU4 default 202 -> 52 s, 7Y7C default 193 -> 82 s, 8VWQ default 194 -> 76 s, 7JU4 domains 632 -> 225 s (its
+figure alone: 20.3 GB -> 6.2 GB). What is left is foldmap's own routing (A* on 7JU4's 61-chain domains page: 106 s
+profiled) and NA letter placement (7Y7C).
+
 ### C33 (a, visual): ligands that touch only nucleic acid are never drawn, silently (1 entry)
 
 **Entry:** 8XZE (THF-II riboswitch: the facts list SPM and THG; neither is drawn, and nothing is said).

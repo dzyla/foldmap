@@ -309,14 +309,19 @@ def draw_spec(spec: FigureSpec) -> Drawn:
     return Drawn(draw(layout, loops, sses, spec.title, model=model, look=spec.look), loops, layout, sses, bb, model)
 
 
-def layout_document(spec: FigureSpec, structure_name: str | None = None) -> dict:
+def layout_document(spec: FigureSpec, structure_name: str | None = None, drawn: Drawn | None = None) -> dict:
     """The layout file document for the figure. Element references in the edits are resolved against the
-    layout without the edits (the labels they were written for) and saved as residue ranges."""
+    layout without the edits (the labels they were written for) and saved as residue ranges. With no edits that is
+    the layout `drawn` (the figure of this spec, draw_spec) when given, which is not laid out again (random-100
+    C33: 7JU4's figure was laid out twice, 27 of its 183 s)."""
     from .cli import make_layout
 
-    layout, sses, _ = make_layout(
-        spec.structure, spec.mode, spec.rotate, spec.flip_v, **spec.layout_kwargs(edits=False)
-    )
+    if drawn is not None and not any(spec.edits().values()):
+        layout, sses = drawn.layout, drawn.sses
+    else:
+        layout, sses, _ = make_layout(
+            spec.structure, spec.mode, spec.rotate, spec.flip_v, **spec.layout_kwargs(edits=False)
+        )
     return layoutfile.document(
         structure_name or str(spec.structure),
         spec.theme,
