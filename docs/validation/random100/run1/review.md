@@ -433,6 +433,13 @@ its tethers over element bodies (`render._over_bodies`; the body a target lies o
 past the first spot's reach. Tether over bodies: 7LX9 1.15 -> 0, 3MHT 0.56 -> 0, 9YLM 3.15 -> 2.5, 1GOX-A 12.0 ->
 11.3; 5Q42, 5HI7 and 8P3N unchanged (no spot in reach does better). Running along loops is not scored yet.
 
+**Batch C2a result (C9, running along loops):** a spot's score adds the length its tethers run along a loop's line
+(`render._along_loops`: beside a segment within 20 degrees of its direction, both its ends within 0.15 of the tether's
+line) to the length over bodies. Along loops, as drawn: 5HI7 1.5 -> 0, 8P3N 0 -> 0 (its ADZ tether over loops is a
+crossing, scored as bodies are not), 5Q42 0.72 -> 0.72 (its Ni reaches a residue on the horizontal α1 -> C loop
+from the only clear spot level with it; no spot within the 4 rings past it does better). Snapshot re-recorded:
+1KX5-nucleosome (the MN:E3132 tether ran 0.54 along a loop; its mark moved 0.8 units). Bench identical.
+
 ### C10 (b, ruling): copies alike counts strands of intermolecular sheets (11 entries, 4 last)
 
 **Entries:** 7IMM, 9PXS, 6YPX, 6YQD (last), 1SLV, 1WWL, 2ILU, 3L9G, 5DWZ, 8QEM (focus, part), 9P1X (focus, part).

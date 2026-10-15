@@ -1242,12 +1242,47 @@ def _over_bodies(c, targets, bodies) -> float:
     return float(np.where(own, 0.0, lengths).sum())
 
 
-def _mark_spot(anchor, half, targets, taken, texts, tethers, bodies=(), radius=_SPOT_RADIUS):
+_ALONG_NEAR, _ALONG_TURN = (
+    0.15,
+    np.radians(20),
+)  # a tether this near a loop line and this near its direction runs along it
+
+
+def _along_loops(c, targets, runs) -> float:
+    """How much of the tethers from spot c runs along a loop's line (`runs`, segments x0 y0 x1 y1): the length of
+    each tether beside a segment within _ALONG_TURN of its direction whose two ends lie within _ALONG_NEAR of the
+    tether's line (random-100 C9: 5HI7's Zn tether drawn on the loop it reaches)."""
+    segs = np.asarray(runs, float).reshape(-1, 4)
+    if not len(segs):
+        return 0.0
+    c = np.asarray(c, float)
+    a, b = segs[:, :2], segs[:, 2:]
+    e = b - a
+    el = np.hypot(e[:, 0], e[:, 1])
+    total = 0.0
+    for t in np.asarray(targets, float).reshape(-1, 2):
+        d = t - c
+        length = float(np.hypot(d[0], d[1]))
+        if length < 1e-9:
+            continue
+        u = d / length
+        sin = np.abs(u[0] * e[:, 1] - u[1] * e[:, 0]) / np.maximum(el, 1e-12)
+        ra, rb = a - c, b - c
+        off_a = np.abs(ra[:, 0] * u[1] - ra[:, 1] * u[0])
+        off_b = np.abs(rb[:, 0] * u[1] - rb[:, 1] * u[0])
+        pa, pb = ra @ u, rb @ u
+        lo, hi = np.clip(np.minimum(pa, pb), 0.0, length), np.clip(np.maximum(pa, pb), 0.0, length)
+        beside = (el > 1e-9) & (sin < np.sin(_ALONG_TURN)) & (off_a <= _ALONG_NEAR) & (off_b <= _ALONG_NEAR)
+        total += float(np.where(beside, hi - lo, 0.0).sum())
+    return total
+
+
+def _mark_spot(anchor, half, targets, taken, texts, tethers, bodies=(), radius=_SPOT_RADIUS, runs=()):
     """The first spot on rings round the anchor whose mark (grown by 0.08) is clear of `taken` and of the tethers
     drawn before, and whose own tethers cross no text, lengthening none past the first clear spot's (the plan-11
     spot); where its tethers run over element bodies (`bodies`), the spot within _SPOT_MORE_RINGS rings further whose
-    tethers run over the least of them (C9: straight tethers cross strands and helices); else that first clear spot;
-    None when there is none within _SPOT_RADIUS."""
+    tethers run over the least of them (C9: straight tethers cross strands and helices), and along the least of the
+    loops' lines (`runs`, _along_loops); else that first clear spot; None when there is none within _SPOT_RADIUS."""
     spot = free = None
     best, last_ring = None, None
     for n, ring in enumerate(np.arange(0.0, radius, 0.35)):
@@ -1264,7 +1299,7 @@ def _mark_spot(anchor, half, targets, taken, texts, tethers, bodies=(), radius=_
             if all(np.hypot(*(np.subtract(t, c))) <= reach for t in targets) and not any(
                 clip_len(c, t, b) > 1e-9 for t in targets for b in texts
             ):
-                over = _over_bodies(c, targets, bodies)
+                over = _over_bodies(c, targets, bodies) + _along_loops(c, targets, runs)
                 if best is None or over < best[0] - 1e-9:
                     best = (over, c)
                 if over <= 1e-9:
@@ -1277,17 +1312,17 @@ def _mark_spot(anchor, half, targets, taken, texts, tethers, bodies=(), radius=_
     return spot if spot is not None else free
 
 
-def _place_mark(anchor, half, targets, taken, lines, texts, tethers, bodies=()):
+def _place_mark(anchor, half, targets, taken, lines, texts, tethers, bodies=(), runs=()):
     """A ligand's spot: clear of the loops' lines and the tethers drawn before where there is room, else of the
     elements and text only (the tethers' crossings given up), else of the elements and text with every tether given
     up; else further out, else on its anchor: a chosen ligand is never left without a mark (C5 fix round 1: 6JO6 lost
     24 on a crowded page; batch B: 7QUP lost one with nothing clear within _SPOT_RADIUS)."""
     for blocked, drawn in ((taken + lines, tethers), (taken, tethers), (taken, ())):
-        spot = _mark_spot(anchor, half, targets, blocked, texts, drawn, bodies)
+        spot = _mark_spot(anchor, half, targets, blocked, texts, drawn, bodies, runs=runs)
         if spot is not None:
             return spot
     # nothing clear within _SPOT_RADIUS (7QUP's crowded page dropped GTP:9E500): further out, else the least bad
-    spot = _mark_spot(anchor, half, targets, taken, texts, (), bodies, radius=_SPOT_FAR * _SPOT_RADIUS)
+    spot = _mark_spot(anchor, half, targets, taken, texts, (), bodies, radius=_SPOT_FAR * _SPOT_RADIUS, runs=runs)
     return spot if spot is not None else _least_bad_spot(anchor, half, taken, bodies)
 
 
@@ -1357,6 +1392,7 @@ def ligand_marks(layout: Layout, loops: list[Loop], sses: list[SSE], look: Style
         ]
     )
     lines = [box for lp in loops for box in thin_boxes(lp.points)] + _disulfide_lines(layout, loops, sses, look)
+    runs = [(*p, *q) for lp in loops for p, q in zip(lp.points, lp.points[1:])]  # a tether keeps off along them (C9)
     # a mark is kept off the loops' lines (C5) ...
     tethers: list[tuple] = []  # ... and the tethers drawn before: (from, to)
     out = []
@@ -1366,7 +1402,7 @@ def ligand_marks(layout: Layout, loops: list[Loop], sses: list[SSE], look: Style
             continue
         anchor = np.average(np.asarray(targets), axis=0, weights=weights)
         half = (0.3, 0.3) if g.metal else (0.12 * len(g.name) + 0.2, 0.27)
-        spot = _place_mark(anchor, half, targets, taken, lines, texts, tethers, bodies)
+        spot = _place_mark(anchor, half, targets, taken, lines, texts, tethers, bodies, runs)
         crowded = overlaps_any((spot[0] - half[0], spot[1] - half[1], spot[0] + half[0], spot[1] + half[1]), taken)
         mark = (spot[0] - half[0], spot[1] - half[1], spot[0] + half[0], spot[1] + half[1])
         taken.append(mark)

@@ -171,6 +171,34 @@ def test_a_glycan_stem_that_must_cross_a_letter_is_drawn_off_it(monkeypatch):
     assert not any(halo[0] < x < halo[2] and halo[1] < y < halo[3] for x, y in path.vertices)
 
 
+def test_no_tether_runs_along_a_loop():
+    """C9 (random-100, batch C2a: 5HI7's Zn tether drawn 1.5 units on the loop it reaches, 1KX5's Mn 0.54): a mark's
+    spot was chosen by the length of its tethers over element bodies only. Spots whose tethers run along a loop's
+    line (beside it, near its direction) now count that length too. Measured here by sampling each tether every 0.02
+    for points within 0.1 of a loop segment running within 15 degrees of it."""
+    spec = figure_spec(DATA / "na" / "1KX5.cif.gz")
+    d = draw_spec(spec)
+    segs = [(np.asarray(p, float), np.asarray(q, float)) for lp in d.loops for p, q in zip(lp.points, lp.points[1:])]
+    marks = ligand_marks(d.layout, d.loops, d.sses, spec.look)
+    assert marks
+    for m in marks:
+        c = np.asarray(m["centre"], float)
+        for t in np.asarray(m["targets"], float):
+            u = (t - c) / np.hypot(*(t - c))
+            run = 0.0
+            for x in np.arange(0.0, np.hypot(*(t - c)), 0.02):
+                pt = c + u * x
+                for a, b in segs:
+                    e = b - a
+                    if np.hypot(*e) < 1e-9 or abs(u[0] * e[1] - u[1] * e[0]) / np.hypot(*e) > np.sin(np.radians(15)):
+                        continue
+                    k = np.clip(np.dot(pt - a, e) / np.dot(e, e), 0.0, 1.0)
+                    if np.hypot(*(pt - a - k * e)) < 0.1:
+                        run += 0.02
+                        break
+            assert run < 0.1, (m["ligand"].name, run)
+
+
 def test_a_ligand_is_never_left_without_a_mark():
     """C5 fix round 1: with every ring spot crossed by earlier tethers or loop lines, a chosen ligand still gets a
     mark where the old code put it (6JO6 lost 24 ligands on a crowded page when the tether test had no fallback)."""
