@@ -25,6 +25,27 @@ def test_palette_is_stable_and_distinct():
     assert chain_colors(["A", "B"]) == {k: colors[k] for k in "AB"}  # same chain, same colour
 
 
+def test_chains_past_the_palette_keep_distinct_colours():
+    """random-100 C35: chains A and I drew one #0072B2 (5X4Z, 6JO6, 7Y7C): past the palette's first pass each chain
+    takes a lightness step of the colour it repeats that stands CIEDE2000 >= 10 from every colour assigned, the
+    white page and the helix back faces of its family; the first eight are the palette's, so figures of up to
+    eight chains are unchanged."""
+    from itertools import combinations
+
+    from foldmap.palette import BACK_SHADE, CHAIN_DE, PALETTES, darken, delta_e
+
+    chains = [f"c{k}" for k in range(24)]
+    colours = list(chain_colors(chains).values())
+    assert colours[:8] == PALETTES["okabe-ito"]
+    assert min(delta_e(a, b) for a, b in combinations(colours, 2)) >= CHAIN_DE
+    for k in range(8, 24):  # nor like a helix back face of its family, nor near the white page
+        family = colours[k % 8 : k : 8]
+        assert min(delta_e(colours[k], darken(c, BACK_SHADE)) for c in family) >= CHAIN_DE
+        assert delta_e(colours[k], "#ffffff") >= CHAIN_DE
+    assert chain_colors(chains) == dict(zip(chains, colours))  # deterministic
+    assert len(set(chain_colors([f"c{k}" for k in range(61)]).values())) == 61  # 7JU4: every chain its own colour
+
+
 @pytest.mark.parametrize("mode", ["projected", "stack"])
 def test_svg_has_one_named_element_per_strand_helix_and_loop(zs5, tmp_path, mode):
     _, sses, _ = pipeline(zs5)

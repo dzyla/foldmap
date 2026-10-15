@@ -209,7 +209,10 @@ foldmap styles                                    # every theme and style key
   and other residues fused into the chain (starred), membrane bands, named domain panels with a domain bar, residue
   numbers, marked elements.
 - **Colouring**: by chain, N→C, per-element shade, secondary-structure type, domain, B-factor, hydropathy,
-  AlphaFold pLDDT or conservation from an alignment.
+  AlphaFold pLDDT or conservation from an alignment. Chains take the palette's colours in order; past its first
+  pass (the ninth chain on the default palette) each chain takes a lighter or darker step of the colour it repeats,
+  chosen to stand clear (CIEDE2000 ≥ 10, as far as the palette's hues allow: 24 chains on the default palette) of
+  every colour already used, the white page and the helices' back faces, so chains do not share a colour.
 
 ## Themes
 

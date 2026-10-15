@@ -78,7 +78,7 @@ from .layout import (
 )
 from .model import SSE, group_by_chain
 from .na_paths import midway
-from .palette import PALETTES, chain_colors, darken, delta_e, text_color_on, tint
+from .palette import BACK_SHADE, PALETTES, chain_colors, darken, delta_e, text_color_on, tint
 from .route import Loop, boxes_meeting, clip_len, clip_lengths
 from .style import _ALIASES, CHOICES, MODALITIES, Style, backbone_overrides
 
@@ -3058,7 +3058,7 @@ def _draw_elements(c: _Canvas, layout: Layout, bars=()) -> None:
                 t.set_gid(f"label:{p.sse.id}")
         else:
             fill, shade = {
-                "bold": (color, darken(color, 0.72)),
+                "bold": (color, darken(color, BACK_SHADE)),
                 "pale": (tint(color, 0.15), tint(color, 0.55)),
                 "outline": (c.look.background, _mix(color, c.look.background, 0.7)),
             }[c.look.fill]

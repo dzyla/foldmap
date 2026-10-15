@@ -1005,6 +1005,19 @@ order check and the sheet plates to follow. Larger than an M change; left for a 
   (`ss._copy_breaks`; a tie cuts): the whole copies are cut there, or the broken ones joined. 7TIM's B:178-203 is now
   broken like A's (both draw α8 and α9); 5JB1, 7JU4, 8QEM and 9P1X join a few broken pieces (fewer elements).
 
+### C35 (a, batch C1 review): chain colours repeat past the palette (3 entries seen)
+
+**Entries:** 5X4Z (A = I = `#0072b2`, B = J, C = K, D = L), 6JO6 (three passes), 7Y7C. **Checks:** none (visual).
+
+**Mechanism:** `palette.chain_colors` cycled `cols[i % len(cols)]`.
+
+**Batch C1 fix round 1 result:** from the second pass each chain takes a lightness step of the colour it repeats
+(tint 0.45, darken 0.75, tint 0.7, ... as the pass's own step first), the first that stands CIEDE2000 >= 10 from every
+colour already assigned, the white page and its family's helix back faces (`palette.BACK_SHADE`); else the step of
+its L* that stands furthest. 24 chains on okabe-ito: pairwise >= 10.2; 61 chains: all distinct (min 4.1, the
+palette's eight hues allow no more). The first eight are the palette's: figures of up to eight chains are unchanged
+(no snapshot has more; none re-recorded; bench identical).
+
 ## Visual review
 
 **Who reviewed:**

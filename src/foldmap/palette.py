@@ -13,12 +13,46 @@ PALETTES = {
 }
 
 
+BACK_SHADE = 0.72  # a helix's back face is its colour darkened this much (render)
+CHAIN_DE = 10.0  # CIEDE2000: a chain's colour past the palette's first pass stands this far from every other
+_PASS_STEPS = (("tint", 0.45), ("darken", 0.75), ("tint", 0.7), ("darken", 0.55), ("tint", 0.25), ("darken", 0.85))
+_LAB_STEPS = tuple(range(-60, 61, 3))  # L* steps tried when none of _PASS_STEPS stands CHAIN_DE apart
+
+
 def chain_colors(chains: list[str], palette: str = "okabe-ito") -> dict[str, str]:
-    """One colour per chain, assigned in the order given (cycles when the palette runs out)."""
+    """One colour per chain, assigned in the order given: the palette's colours, then (random-100 C35: chains A and I
+    drew one #0072B2) each further pass through it a lightness step of the colour it repeats: the pass's own step of
+    _PASS_STEPS first (tint 0.45, then darken 0.75, ...), the first in that order that stands CHAIN_DE (CIEDE2000)
+    from every colour already assigned, from the white page and from the helix back faces (BACK_SHADE) of the colours
+    it repeats; else the step of its L* (_LAB_STEPS) that stands furthest from them. A palette with few hues (greys)
+    cannot keep CHAIN_DE past its first passes; its colours still differ. Deterministic: the order given, ties by
+    the colour's hex."""
     if palette not in PALETTES:
         raise ValueError(f"unknown palette {palette!r}; choose from {', '.join(PALETTES)}")
     cols = PALETTES[palette]
-    return {c: cols[i % len(cols)] for i, c in enumerate(chains)}
+    n = len(cols)
+    out: list[str] = []
+    for i in range(len(chains)):
+        base = cols[i % n]
+        if i < n:
+            out.append(base)
+            continue
+        family = out[i % n :: n]  # the colours of the earlier passes over this palette colour
+        refs = [*out, "#ffffff", *(darken(c, BACK_SHADE) for c in family)]
+
+        def apart(colour: str, refs=refs) -> float:
+            return min(delta_e(colour, r) for r in refs)
+
+        k = (i // n - 1) % len(_PASS_STEPS)
+        steps = _PASS_STEPS[k:] + _PASS_STEPS[:k]
+        made = [tint(base, a) if how == "tint" else darken(base, a) for how, a in steps]
+        pick = next((c for c in made if apart(c) >= CHAIN_DE), None)
+        if pick is None:
+            lab = _lab(base)
+            ladder = [_from_lab(lab[0] + d, lab[1], lab[2]) for d in _LAB_STEPS if 8 <= lab[0] + d <= 92]
+            pick = max(ladder, key=lambda c: (apart(c), c))
+        out.append(pick)
+    return dict(zip(chains, out))
 
 
 def _rgb(hex_color: str) -> tuple[float, float, float]:
@@ -53,6 +87,28 @@ def _lab(colour: str) -> tuple[float, float, float]:
 
     fx, fy, fz = f(x), f(y), f(z)
     return 116 * fy - 16, 500 * (fx - fy), 200 * (fy - fz)
+
+
+def _from_lab(L: float, a: float, b: float) -> str:  # noqa: N803 (CIE's own letter)
+    """The sRGB hex of a CIE L*a*b* (D65) colour, clipped into the gamut (the inverse of _lab)."""
+    fy = (L + 16) / 116
+    fx, fz = fy + a / 500, fy - b / 200
+
+    def finv(t: float) -> float:
+        return t**3 if t**3 > 216 / 24389 else (116 * t - 16) / (24389 / 27)
+
+    x, y, z = finv(fx) * 0.95047, finv(fy), finv(fz) * 1.08883
+    rgb = (
+        3.2404542 * x - 1.5371385 * y - 0.4985314 * z,
+        -0.9692660 * x + 1.8760108 * y + 0.0415560 * z,
+        0.0556434 * x - 0.2040259 * y + 1.0572252 * z,
+    )
+
+    def gamma(c: float) -> float:
+        c = min(max(c, 0.0), 1.0)
+        return 12.92 * c if c <= 0.0031308 else 1.055 * c ** (1 / 2.4) - 0.055
+
+    return "#" + "".join(f"{round(gamma(c) * 255):02x}" for c in rgb)
 
 
 def delta_e(a: str, b: str) -> float:
