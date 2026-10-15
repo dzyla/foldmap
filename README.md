@@ -445,7 +445,10 @@ Every figure (command line, app, MCP or Python) goes through the same steps:
    base pairs grouped into stems; long bent duplexes cut where the axis turns by 25°.
 5. **Projection.** A frame turns 3D into page coordinates: the dominant element direction points up and the
    widest spread runs left–right (single chains); a symmetric assembly is unrolled around its axis, protein–DNA
-   complexes around the DNA axis, membrane proteins with the bilayer horizontal. Never mirrored.
+   complexes around the DNA axis, membrane proteins with the bilayer horizontal. Never mirrored. An assembly whose
+   nucleic acid unrolling would tear apart stays in the plain projected view: a duplex kinked across protomers,
+   linked stems that would turn against one another, or most stems each held by two protomers (the PFV intasome
+   3L2V, whose viral DNA ends are gripped by both inner integrase chains).
 6. **Layout.** Sheets (as rigid blocks), helices and DNA are placed by minimising one energy: springs to their
    projected positions, short loops between sequence neighbours, attraction between elements in contact, a pull
    between disulfide-bonded cysteines, and an overlap penalty; then any remaining overlaps are cleared.

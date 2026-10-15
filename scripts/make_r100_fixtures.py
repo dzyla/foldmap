@@ -99,11 +99,18 @@ ENTRIES = {  # fixture name -> (PDB id, what it is for)
         "S100P dimer (chains B and D, NMR model 1, backbone only): D is numbered 95-188 where B is 1-94, so the copies "
         "shared no residue number and were never tied (random-100 C18/A15: B~D 3.34)",
     ),
+    "3L2V-A": (
+        "3L2V",
+        "PFV intasome: the inner integrase chain A cut to three windows that touch the DNA, N, CA, C and O only, and "
+        "the viral DNA C and D whole (assembly 1 doubles them): each DNA end is held by both inner chains, so "
+        "unrolling the C2 tetramer drew each one turned 18-58 degrees from its 3D axis (random-100 C16)",
+    ),
 }
 Span = tuple[int, int]
 WINDOWS: dict[str, dict[str, Span | list[Span] | None]] = {  # fixture -> {chain: windows (first, last), None: whole}
     "3OWW-AB": {c: [(5, 12), (38, 45), (60, 70), (80, 88)] for c in "AB"},
     "3L9G-A": {"A": None},
+    "3L2V-A": {"A": [(60, 75), (100, 118), (205, 230)], "C": None, "D": None},
     "2MJW-BD": {"B": None, "D": None},  # where the two RNAs pair
     "7FAB-HL": {"H": None, "L": None},
     "1IGT-AB": {"A": None, "B": None},
@@ -138,6 +145,7 @@ TRIMS: dict[str, dict] = {
     "2MJW-BD": {"first_model": True, "backbone": True},
     "6SO9": {"first_model": True, "backbone": True},
     "3L9G-A": {"atoms": ("N", "CA", "C", "O"), "no_protein_sequence": True, "drop": ("_atom_site_anisotrop.",)},
+    "3L2V-A": {"atoms": ("N", "CA", "C", "O"), "no_protein_sequence": True, "drop": ("_atom_site_anisotrop.",)},
     "1BXI": {
         "atoms": ("N", "CA", "C", "O", "CB", "ND1", "NE2", "SG", "OD1", "OD2", "OE1", "OE2", "NZ", "OG", "OG1", "SD")
     },

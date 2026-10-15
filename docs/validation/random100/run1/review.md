@@ -636,6 +636,14 @@ An empty figure for 6B5W should at least say why.
 - **3OWW (a, real):** the domain-swapped dimer (both chains, 3OWW ruling) has its stems in an order that follows 3D
   poorly (spearman 0.484) and two run-run crossings (na_crossings 2, not letters: C14 cleared its letter hit). Not done.
 
+**Batch C2a result (3L2V):** `layout.na_torn_by_unrolling` gains rule (c): when most stem pieces (more than half)
+are each held by two protomers (≥ 3 residues each, `_held_by_two`), unrolling would set each piece beside one protomer
+with the other's contacts a protomer's width away, so the plain frame is used. 3L2V is drawn in the plain frame, which
+sees its dyad in the page: the two halves are mirror images and the two viral DNA ends make a V above the inner
+chains (angle_median 40.6 -> 0, angle_max 58.3 -> 0, contact_auc 0.481 -> 0.833, stems_nearer 0.5 -> 1.0; entry
+passes in every view). 30QM (one of six stems shared) stays unrolled, as the NA campaign's C4 ruling keeps it; over
+the 39 NA entries and the 18 random-100 NA entries only 3L2V changes frame. Fixture 3L2V-A (24 KB). Bench identical.
+
 ### C17 (a): large membrane complexes, with TM helices off the band or no band (3 entries, + visual 1)
 
 **Entries:**

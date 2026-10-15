@@ -3714,6 +3714,28 @@ def page_fit(width_in: float, height_in: float, font: float) -> str:
 NA_TORN_TURN = 90.0  # degrees: linked stems turned against one another by more than this when unrolled are torn
 
 
+NA_HELD = 3  # residues of one protomer touching a stem piece for that protomer to hold it (as cli.NA_HOLD_MIN)
+
+
+def _held_by_two(nucleic, sym, at: dict, n: int) -> bool:
+    """Are most of the n stem pieces (more than half) each held by two protomers of `sym`, each touching it with at
+    least NA_HELD residues? Unrolled, a piece is drawn beside one protomer only, so the other's contacts land a
+    protomer's width away: when that is most of the nucleic acid, the unrolling tears it from the protein that holds
+    it (3L2V: each viral DNA end of the PFV intasome is gripped by both inner integrase chains). One shared stem
+    among several stays unrolled (30QM's P3, by the NA campaign's C4 ruling). `at`: nucleotide -> piece."""
+    sector = {c: k for k, chains in enumerate(sym.protomers) for c in chains}
+    holders: dict[int, dict[int, set[int]]] = {}  # piece -> protomer -> residues touching it
+    for r, touched in sorted(nucleic.contacts.items()):
+        k = sector.get(nucleic.contact_chain.get(r))
+        if k is None:
+            continue
+        for key in sorted(touched):
+            if key in at:
+                holders.setdefault(at[key], {}).setdefault(k, set()).add(r)
+    shared = sum(sum(len(rs) >= NA_HELD for rs in by.values()) >= 2 for by in holders.values())
+    return 2 * shared > n
+
+
 def na_torn_by_unrolling(nucleic, sses, sym) -> bool:
     """Would unrolling the assembly (symmetric_frame) tear the nucleic acid apart, against the plain projected frame
     (view_frame) the figure would otherwise use? Each stem is drawn whole where its centre is seen, so a single stem
@@ -3721,7 +3743,8 @@ def na_torn_by_unrolling(nucleic, sses, sym) -> bool:
     protomers (they land on either side of a seam: 1RVA's kinked site, drawn as a 180° hairpin), or (b) a group of
     stems linked through at most _SHORT_RUN nucleotides (a junction, a bent duplex, coaxial stacks) whose axes, after
     the best common turn, are turned against one another by more than NA_TORN_TURN between the two frames (4LD0's
-    junction arms: 139°; 30QM's linked stems at most 57°)."""
+    junction arms: 139°; 30QM's linked stems at most 57°), or (c) most stem pieces each held by two protomers
+    (_held_by_two: 3L2V's two viral DNA ends, each gripped by both inner integrase chains)."""
     import math
 
     cyl = symmetric_frame(sses, sym)
@@ -3742,6 +3765,8 @@ def na_torn_by_unrolling(nucleic, sses, sym) -> bool:
         if a.parent and a.parent == b.parent and facing(axes[k][0]) != facing(axes[k + 1][0]):
             return True
     at = {key: k for k, p in enumerate(pieces) for key in p.nucleotides()}
+    if _held_by_two(nucleic, sym, at, len(pieces)):
+        return True
     links = []  # pieces a strand steps between through at most _SHORT_RUN nucleotides
     for s, strand in enumerate(nucleic.strands):
         held = [i for i in range(len(strand)) if (s, i) in at]

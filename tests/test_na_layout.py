@@ -434,6 +434,30 @@ def test_a_kinked_duplex_across_a_dimer_is_no_longer_a_hairpin():
     assert abs(m["bend_drawn"]) < 150 and m["joint_error_max"] <= 5.0
 
 
+def test_dna_held_by_both_protomers_is_not_unrolled():
+    """3L2V (random-100 C16): each viral DNA end of the PFV intasome is gripped by both inner integrase chains.
+    Unrolled side by side, each DNA sat beside one protomer, turned 18-28° (58° on the whole entry) from its 3D axis
+    with the other protomer's contacts a protomer's width away. When most stem pieces are held by two protomers the
+    plain frame is used (on the whole entry its dyad lies in the page: the two halves drawn as mirror images), and
+    every stem is drawn along its seen axis."""
+    from foldmap.frame import Frame
+    from foldmap.nacheck import shape
+
+    lay, _, _ = make_layout(NA.parent / "r100" / "3L2V-A.cif.gz")
+    assert type(lay.frame) is Frame
+    m = shape(lay)
+    assert m["stems_drawn"] == 2 and m["angle_max"] == 0.0
+
+
+def test_one_shared_stem_among_several_stays_unrolled():
+    """30QM: one of six stems (P3) is held by both RT protomers; the NA campaign's C4 ruling keeps it unrolled (the
+    linked stems turn at most 57°): rule (c) of na_torn_by_unrolling needs most pieces shared."""
+    from foldmap.frame import CylinderFrame
+
+    lay, _, _ = make_layout(_path("30QM"))
+    assert type(lay.frame) is CylinderFrame
+
+
 def test_unrolled_frame_kept_when_each_strand_is_held_by_one_protomer():
     """The plain frame only for a nucleic acid with stems that some strand ties to two protomers, each touching
     it with at least NA_HOLD_MIN (3) residues: a glancing contact from the other protomer does not count."""
