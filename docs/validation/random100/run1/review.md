@@ -550,7 +550,8 @@ clear. No snapshot changed.
 rerun.
 
 **Batch B result:** `na_labels._place_letters` counts a spot a drawn strand (run, end, gap) passes through, within
-the line clearance of the letter's ink, as having no room, so the letter takes its next spot (8SA2 14 hits -> 0;
+the line clearance of the letter's ink, as not clear, so the letter takes its next clear spot (with none clear, the
+roomiest, as before: making a struck spot roomless crowded 1HQ1's B:148 onto another letter) (8SA2 14 hits -> 0;
 3OWW-AB fixture A:87 -> 0; 30QM 1:59/1:60). Snapshots re-recorded: 1EHZ-trna (A:48's letter moves off the corner
 of the strand to the P4 loop) and 30QM-ncrna (1:59 and 1:60 off run 2).
 
@@ -869,6 +870,10 @@ done.
 
 **Effort:** S. **Bench:** none (no bench entry has this shape). Expected to turn A2/A2b/A16 and most of 4UM3's
 A6 hits.
+
+**Batch B (NA campaign):** batch A's fix round 2 (`io.PAIRED_MIN` 2, base pairs only) was not followed by an NA
+run; 4PLX's three copies touch in the crystal by one swapped pair of bases (2 residue pairs), were made one object and
+failed (na_crossings 1). PAIRED_MIN is 3 (3OWW pairs in 4).
 
 ### C31 (a): the domains view explodes the page when domains interlock across copies (1 entry)
 
