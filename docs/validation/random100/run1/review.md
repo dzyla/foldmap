@@ -897,8 +897,9 @@ the page.
 **Fixture:** 3L9G cut to 2 chains. **Effort:** M. **Bench:** domain snapshots unchanged (no interlocked copies
 there), to be measured.
 
-**Batch B result:** domains with elements in one item (a sheet shared by copies) are never parted, and
-`_part_domains` stops when its sweeps no longer shrink the overlap. 3L9G's domains view: 2160 x 292 px -> about the
+**Batch B result:** when `_part_domains`' sweeps leave the domains unparted and the items over twice as wide and high,
+it starts over with domains that share an item (a sheet shared by copies) never parted, stopping when a sweep no
+longer shrinks the overlap (joining them always changed 1WWL, 2ILU, 7SMR, 6JLN and 5LDW, which parted fine). 3L9G's domains view: 2160 x 292 px -> about the
 default's size, no fallback, the legend on the page.
 
 ### C32 (c/a): a 61-chain default view over 180 s (1 entry)
@@ -945,8 +946,9 @@ order check and the sheet plates to follow. Larger than an M change; left for a 
   B is 1-94, so they shared none and were never tied. Numbers are taken to the first copy's by homolog_chains'
   offset.
 - **7OKA 1.12 -> 0:** DSSP broke helix 225-238 at 232 in B and C, not in A; each piece was tied to A's whole helix and
-  took its length. A helix broken by one or two residues in one copy is broken there in every copy
-  (`ss._copy_breaks`), as a kink split already is. 7TIM's B:178-203 is now broken like A's (both draw α8 and α9).
+  took its length. Where DSSP breaks a helix by one or two residues in some copies, the majority decides
+  (`ss._copy_breaks`; a tie cuts): the whole copies are cut there, or the broken ones joined. 7TIM's B:178-203 is now
+  broken like A's (both draw α8 and α9); 5JB1, 7JU4, 8QEM and 9P1X join a few broken pieces (fewer elements).
 
 ## Visual review
 
