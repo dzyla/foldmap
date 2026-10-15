@@ -23,7 +23,6 @@ from .layout import (
     helix_label_pos,
     label_boxes,
     overlaps_any,
-    page_text,
 )
 from .model import SSE
 
@@ -488,14 +487,13 @@ def _clear_helix_names(layout: Layout, sses: list[SSE], loops: list[Loop]) -> No
     tie. A spot must be on the page and meet no element, other name, stub or letter. A name no spot improves stays.
     A mirror copy's name (Layout.mirror_pairs) follows its mate's, as _mirror_sides sets it, and both must be clear.
     Run after the strands are routed (route_nucleic): their paths and traces count. Routes are unchanged."""
-    from .figcheck import LINE_TEXT_CLEARANCE_PX
-    from .layout import _mirror_sides
+    from .layout import _mirror_sides, line_clearance
 
     names = sorted((p for p in layout.placed.values() if p.sse.kind in ("H", "G") and p.label), key=lambda p: p.sse.id)
     if not names:
         return
     em = _ink_em(layout, layout.font_scale)
-    grow = (LINE_TEXT_CLEARANCE_PX + 0.5) * 0.72 * page_text(layout)[1]  # clearance and a line's half width
+    grow = line_clearance(layout)  # clearance and a line's half width
     runs = [lp.points for lp in loops] + [path.points for path in layout.na_paths]
     segs = [(a, b) for pts in runs for a, b in zip(pts, pts[1:])]
     traces = [np.asarray(pts, float).reshape(-1, 2) for _, pts in sorted(layout.na_traces.items())]
@@ -645,7 +643,6 @@ def route_loops(layout: Layout, sses: list[SSE], bb) -> list[Loop]:
     return out
 
 
-_NA_TEXT_PAD = 0.1  # ems a protein loop keeps from the nucleic acid's text (letters, 5'/3'), beyond its ink
 _NA_TEXT_TOLL = 25.0  # the extra cost of a cell of that text, while such a loop is routed again
 
 
@@ -653,9 +650,14 @@ def _text_hits(points, boxes) -> int:
     return sum(any(clip_len(p, q, b) > 0 for p, q in zip(points, points[1:])) for b in boxes)
 
 
+_REROUTE_TURNS = 4  # corners a route off NA text may add to the one it replaces (no weaving round each letter)
+
+
 def _better(new, old, boxes, text) -> bool:
     """Does route `new` cross less nucleic-acid text (`boxes`) than `old`, and no more text in all (`text`: the
-    names and stubs routes keep out of)?"""
+    names and stubs routes keep out of), with at most _REROUTE_TURNS more corners?"""
+    if len(new) > len(old) + _REROUTE_TURNS:
+        return False
     fewer = _text_hits(new, boxes) < _text_hits(old, boxes)
     return fewer and _text_hits(new, [*boxes, *text]) < _text_hits(old, [*boxes, *text])
 
@@ -665,9 +667,9 @@ def _off_na_text(layout: Layout, router: _Router, loops: list[Loop]) -> None:
     loops were routed: layout.na_text_boxes) is routed again with that text as a keep-out, and takes the new route
     when it crosses less of it (random-100 C11: 6SO9's RRM loops ran over the bound RNA's letters). Fallback
     curves and kinks stay as they are; a loop with no better route keeps its own."""
-    from .layout import _ink_em, na_text_boxes
+    from .layout import line_clearance, na_text_boxes
 
-    g = _NA_TEXT_PAD * _ink_em(layout, layout.font_scale)
+    g = line_clearance(layout)  # a protein loop keeps this far from the nucleic acid's text, beyond its ink
     boxes = [(x0 - g, y0 - g, x1 + g, y1 + g) for x0, y0, x1, y1 in na_text_boxes(layout)]
     hit = [k for k, lp in enumerate(loops) if not lp.fallback and len(lp.points) > 2 and _text_hits(lp.points, boxes)]
     if not hit:

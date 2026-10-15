@@ -16,10 +16,12 @@ from .layout import (
     _LETTER_EM,
     NT_ROW,
     Layout,
+    _footprint,
     _ink_points,
     _reach,
     _stem_label_box,
     label_boxes,
+    line_clearance,
     text_em,
 )
 from .na_paths import _BEAD, NAPath, NATie, _dot, _near, _seg_dist, _spaced, crosses_body, in_body, midway
@@ -70,8 +72,6 @@ def _unbunch(layout: Layout, paths: list[NAPath]) -> None:
 
 
 _LETTER_GAP = 0.38  # page units: closest two base letters (or a letter and a nucleotide) may sit
-_LETTER_CLEAR = 0.07  # ems of the figure's text: a line keeps this far from a base letter's ink (2 px at 7 pt,
-# figcheck.LINE_TEXT_CLEARANCE_PX)
 
 
 def _place_letters(layout: Layout, paths: list[NAPath]) -> dict[tuple[int, int], tuple[float, float]]:
@@ -86,7 +86,7 @@ def _place_letters(layout: Layout, paths: list[NAPath]) -> dict[tuple[int, int],
     seg_lo = np.minimum(strand_segs[:, :2], strand_segs[:, 2:])
     seg_hi = np.maximum(strand_segs[:, :2], strand_segs[:, 2:])
     em = _em(layout)
-    line_clear = _LETTER_CLEAR * em  # figcheck.LINE_TEXT_CLEARANCE_PX (2 px) at the figure's text size
+    line_clear = line_clearance(layout)  # figcheck.LINE_TEXT_CLEARANCE_PX at the page's text size
     ink = {b: _reach(_ink_points(b, False, _LETTER_EM * em, 0.0)) for b in "ACGUTIN"}
 
     def struck(q, key) -> bool:  # a strand drawn through the letter's ink, or within the line clearance of it
@@ -139,6 +139,20 @@ def _place_letters(layout: Layout, paths: list[NAPath]) -> dict[tuple[int, int],
                 options += more
                 spaces += [room(q, index[key]) for q in more]
                 free += [r >= _LETTER_GAP and not struck(q, key) for q, r in zip(more, spaces[-len(more) :])]
+            if p.kind == "hairpin":  # a hairpin loop's letters stay in its stem's footprint (layout keeps that clear)
+                d = at[p.between[0]]
+                fx0, fy0, fx1, fy1 = _footprint(d)
+                g = _GLYPH_H / 2
+                held = [
+                    fx0 <= q[0] - d.cx - g
+                    and q[0] - d.cx + g <= fx1
+                    and fy0 <= q[1] - d.cy - g
+                    and q[1] - d.cy + g <= fy1
+                    for q in options
+                ]
+                if any(held):
+                    free = [ok and h for ok, h in zip(free, held)]
+                    spaces = [r if h else -1.0 for r, h in zip(spaces, held)]
             clear = [q for q, ok in zip(options, free) if ok]  # clear of letters and of every strand drawn
             spot = clear[0] if clear else options[int(np.argmax(spaces))]  # else the furthest from other letters
             out[(p.strand, i)] = (float(spot[0]), float(spot[1]))

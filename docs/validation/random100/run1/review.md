@@ -553,7 +553,10 @@ rerun.
 the line clearance of the letter's ink, as not clear, so the letter takes its next clear spot (with none clear, the
 roomiest, as before: making a struck spot roomless crowded 1HQ1's B:148 onto another letter) (8SA2 14 hits -> 0;
 3OWW-AB fixture A:87 -> 0; 30QM 1:59/1:60). Snapshots re-recorded: 1EHZ-trna (A:48's letter moves off the corner
-of the strand to the P4 loop) and 30QM-ncrna (1:59 and 1:60 off run 2).
+of the strand to the P4 loop) and 30QM-ncrna (1:59 and 1:60 off run 2). Fix round 1: the letter and reroute clearances are figcheck's 2 px
+(and half a line) at the page's text size (`layout.line_clearance`), not ems; hairpin-loop letters stay in their
+stem's footprint. Snapshots re-recorded again: 1EHZ-trna (A:14, A:26) and 30QM-ncrna (1:41, 1:61, 1:104, 1:111), letters
+a few pixels further from strands.
 
 ### C15 (a): a protein chain with no helix or strand draws nothing, silently (4 entries, 2 last)
 

@@ -172,3 +172,19 @@ def test_every_chosen_ligand_of_a_crowded_page_has_a_mark():
     full = ligand_marks(d.layout, d.loops, d.sses, spec.look)
     jammed = ligand_marks(d.layout, [*d.loops, *crowd], d.sses, spec.look)
     assert full and {m["ligand"].name for m in jammed} == {m["ligand"].name for m in full}
+
+
+def test_line_clearance_is_figchecks_pixels_at_the_drawn_text_size():
+    """Fix round 1 (minor): C14's letter spots and C11's reroutes kept 0.07 and 0.1 em from NA text, which is at
+    least figcheck.LINE_TEXT_CLEARANCE_PX only near 7 pt text; on a wide page (4 pt text) it fell short. They now keep
+    layout.line_clearance: that many pixels (and half a line) in page units at the page's text scale, as the helix-name
+    mover does."""
+    from foldmap.figcheck import LINE_TEXT_CLEARANCE_PX
+    from foldmap.layout import Layout, Placed, line_clearance, page_text
+    from helpers import fake_sse
+
+    for width in (10.0, 160.0):
+        lay = Layout({"A:1-10": Placed(fake_sse("H", 0, 9), 0.0, 0.0, 1.0, 0.0, 0.5)}, (0.0, 0.0, width, 10.0))
+        lay.placed["B:1-10"] = Placed(fake_sse("H", 20, 29, chain="B"), width - 2.0, 0.0, 1.0, 0.0, 0.5)
+        per_pt = page_text(lay)[1]
+        assert line_clearance(lay) == pytest.approx((LINE_TEXT_CLEARANCE_PX + 0.5) * 0.72 * per_pt)

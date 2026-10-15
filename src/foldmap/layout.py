@@ -3170,11 +3170,20 @@ def _text_width(text: str, bold: bool = True) -> float:
 def page_text(layout: Layout) -> tuple[float, float]:
     """The figure's text size in points (Layout.font_scale applied) and page units per point, on the page the
     placed elements, stems and traces span so far (as _ink_em; a layout with nothing placed: its bounds)."""
-    rects = [p.rect for p in [*layout.placed.values(), *layout.ghosts, *layout.stems]]
+    rects = [p.rect for p in [*layout.placed.values(), *layout.ghosts, *layout.stems] if hasattr(p, "rect")]
     rects += [(*pts.min(axis=0), *pts.max(axis=0)) for pts in map(np.asarray, layout.na_traces.values())]
     width = (max(r[2] for r in rects) - min(r[0] for r in rects) + 2.0) if rects else (layout.width or 1.0)
     scale = min(IN_PER_UNIT, MAX_WIDTH_IN / width)
     return font_pt(scale) * layout.font_scale, 1.0 / (scale * 72)
+
+
+def line_clearance(layout: Layout) -> float:
+    """Page units a line keeps from text: figcheck.LINE_TEXT_CLEARANCE_PX and half a pixel of line width, at the
+    page's text scale (page_text; 100 dpi, as figcheck measures), so as many pixels on a wide page of small text as
+    on a small one (fix round 1: C14 and C11 kept a share of an em, short of it below 7 pt)."""
+    from .figcheck import LINE_TEXT_CLEARANCE_PX
+
+    return (LINE_TEXT_CLEARANCE_PX + 0.5) * 0.72 * page_text(layout)[1]
 
 
 def _ink_em(layout: Layout, font_scale: float) -> float:
