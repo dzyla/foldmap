@@ -148,7 +148,11 @@ def figure_view(ws: Workspace) -> None:
     with st.container(key="canvas"):
         background = json.loads(good["blob"]).get("background", "#ffffff")
         st.markdown(figure_card(good["svg"], background, ws.name), unsafe_allow_html=True)
-        notes = app_edits.notes_text(result["fallback"], result["over_labels"]) if result else ""
+        notes = (
+            app_edits.notes_text(result["fallback"], result["over_labels"], result.get("crowded_marks", []))
+            if result
+            else ""
+        )
         if notes:
             st.caption(shown(notes))
         if result and result.get("domains_note"):  # as the command line warns

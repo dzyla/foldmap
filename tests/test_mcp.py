@@ -356,3 +356,18 @@ def test_draw_topology_says_when_it_drew_part_of_the_file(tmp_path):
     assert '; drew one of 6 subunits of a helical filament: 1 of 6 chains; focus="none" draws all of them' in text
     r = call("draw_topology", {"source": UBQ, "output_path": str(tmp_path / "u.svg")})
     assert "drew " not in r.content[0].text.replace("wrote", "")
+
+
+def test_a_crowded_ligand_mark_is_noted(tmp_path, monkeypatch):
+    """Batch B fix round 2: the MCP note says when a ligand mark had no clear spot (as it says stuck and over-label
+    loops). 1MBN's marks forced onto their first target (an element)."""
+    import numpy as np
+
+    from foldmap import render
+
+    mbn = str(Path(__file__).parent / "data" / "fidelity" / "1MBN.cif.gz")
+    r = call("draw_topology", {"source": mbn, "output_path": str(tmp_path / "m.svg")})
+    assert "no clear spot" not in r.content[0].text
+    monkeypatch.setattr(render, "_place_mark", lambda anchor, half, targets, *a, **k: np.asarray(targets[0], float))
+    r = call("draw_topology", {"source": mbn, "output_path": str(tmp_path / "n.svg")})
+    assert "ligand mark(s) with no clear spot" in r.content[0].text

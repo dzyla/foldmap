@@ -337,6 +337,7 @@ def draw_job(path, settings_json: str, eager_after: float | None = None) -> dict
         "svg": svg,
         "fallback": drawn.stuck,
         "over_labels": drawn.over_labels,
+        "crowded_marks": drawn.crowded_marks,  # ligand marks with no clear spot, drawn over other ink
         "elements": elements_of(drawn),
         "chains": chains,
         "na_chains": na_chains,

@@ -469,13 +469,16 @@ def control_for(message: str, last_changed: str | None) -> str | None:
     return f"{label} ({section})" if label else None
 
 
-def notes_text(fallback: list[str], over_labels: list[str]) -> str:
-    """The loop-routing notes under a figure, as one line ('' when there are none)."""
+def notes_text(fallback: list[str], over_labels: list[str], crowded: list[str] = ()) -> str:
+    """The routing and placement notes under a figure, as one line ('' when there are none): loops with no clear
+    route, loops over a label, ligand marks with no clear spot (Drawn.crowded_marks)."""
     notes = []
     if fallback:
         notes.append(f"No clear route for {', '.join(fallback)} (drawn as plain curves).")
     if over_labels:
         notes.append(f"Drawn over a label or chain end, the only route found: {', '.join(over_labels)}.")
+    if crowded:
+        notes.append(f"{len(crowded)} ligand mark(s) with no clear spot, drawn over other ink: {', '.join(crowded)}.")
     return " ".join(notes)
 
 

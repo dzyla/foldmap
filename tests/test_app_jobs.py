@@ -455,3 +455,17 @@ def test_the_app_process_caches_hold_about_300_mb_at_most():
     source = Path(app.__file__).read_text(encoding="utf-8")
     for name in app.CACHES:
         assert f'max_entries=CACHES["{name}"][0]' in source, name
+
+
+def test_a_crowded_ligand_mark_is_in_the_draw_result(monkeypatch):
+    """Batch B fix round 2: a ligand mark with no clear spot (Drawn.crowded_marks) reaches the app, beside the
+    fallback and over_labels routes. 1MBN's marks forced onto their first target (an element)."""
+    import numpy as np
+
+    from foldmap import render
+
+    out = app_jobs.draw_job(DATA / "fidelity" / "1MBN.cif.gz", _blob())
+    assert out["crowded_marks"] == []
+    monkeypatch.setattr(render, "_place_mark", lambda anchor, half, targets, *a, **k: np.asarray(targets[0], float))
+    out = app_jobs.draw_job(DATA / "fidelity" / "1MBN.cif.gz", _blob())
+    assert out["crowded_marks"] and all(m.startswith(("HEM:", "OH:")) for m in out["crowded_marks"])

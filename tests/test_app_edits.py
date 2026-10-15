@@ -217,6 +217,9 @@ def test_route_notes_read_as_one_line():
     assert notes_text(["a>b"], ["c>d"]) == (
         "No clear route for a>b (drawn as plain curves). Drawn over a label or chain end, the only route found: c>d."
     )
+    assert notes_text([], [], ["HEM:A154"]) == (  # batch B fix round 2: crowded ligand marks are told in the app too
+        "1 ligand mark(s) with no clear spot, drawn over other ink: HEM:A154."
+    )
 
 
 def test_a_table_row_picks_its_structure():

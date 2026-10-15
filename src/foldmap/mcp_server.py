@@ -239,6 +239,9 @@ def draw_topology(
             note += f"; no clear route for {', '.join(drawn.stuck)} (drawn as plain curves)"
         if drawn.over_labels:
             note += f"; drawn over a label or chain end: {', '.join(drawn.over_labels)}"
+        if drawn.crowded_marks:
+            n = len(drawn.crowded_marks)
+            note += f"; {n} ligand mark(s) with no clear spot: {', '.join(drawn.crowded_marks)}"
         scope = scope_note(drawn_scope(drawn.model, drawn.layout, spec.assembly, spec.focus), how="mcp")
         if scope:  # an automatic choice drew part of the file
             note += f"; {scope}"
