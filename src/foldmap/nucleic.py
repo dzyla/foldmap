@@ -173,6 +173,42 @@ def pair_nucleotides(runs: list[list]) -> list[BasePair]:
     return sorted(out)
 
 
+TETRAD_HBOND = 3.5  # Å, N1···O6 and N2···N7 of a Hoogsteen G·G pair in a G-tetrad (2.8-3.1 in solved quadruplexes)
+
+
+def g_tetrads(runs: list[list]) -> list[tuple[tuple[int, int], ...]]:
+    """G-tetrads among the gemmi residues of each strand (runs[strand][nucleotide]): four guanines in a ring, each
+    bonding the next by Hoogsteen pairing (its N1 to the next one's O6, its N2 to the next one's N7, both within
+    TETRAD_HBOND). foldmap draws no tetrad (C29 ruling: the note says so); each is (strand, nucleotide) x 4,
+    sorted, the list sorted."""
+    gs = [(s, i, r) for s, run in enumerate(runs) for i, r in enumerate(run) if parent_base(r) == "G"]
+    atoms = {name: [] for name in ("N1", "N2", "O6", "N7")}
+    for k, (_, _, r) in enumerate(gs):
+        for name, found in atoms.items():
+            a = r.find_atom(name, "*")
+            if a is not None:
+                found.append((k, a.pos.tolist()))
+    if not all(atoms.values()):
+        return []
+
+    def near(donor: str, acceptor: str) -> set[tuple[int, int]]:
+        d, a = atoms[donor], atoms[acceptor]
+        hits = cKDTree([p for _, p in d]).query_ball_tree(cKDTree([p for _, p in a]), TETRAD_HBOND)
+        return {(d[x][0], a[y][0]) for x, ys in enumerate(hits) for y in ys if d[x][0] != a[y][0]}
+
+    nxt: dict[int, set[int]] = {}
+    for g, h in sorted(near("N1", "O6") & near("N2", "N7")):
+        nxt.setdefault(g, set()).add(h)
+    rings = set()
+    for a in sorted(nxt):
+        for b in sorted(nxt[a]):
+            for c in sorted(nxt.get(b, ())):
+                for d in sorted(nxt.get(c, ())):
+                    if a in nxt.get(d, ()) and len({a, b, c, d}) == 4:
+                        rings.add(tuple(sorted((gs[k][0], gs[k][1]) for k in (a, b, c, d))))
+    return sorted(rings)
+
+
 def _mutual_best(candidates: list[tuple]) -> set[BasePair]:
     """The pairs of (key, other key, score, kind) candidates (both orders listed) that are each nucleotide's best
     (highest score; the first listed on a tie) for both of its nucleotides."""

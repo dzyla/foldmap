@@ -63,6 +63,11 @@ def _hidden_additives(layout) -> list[str]:
     )
 
 
+def _tetrads(layout) -> int:
+    """G-tetrads of the drawn nucleic acid: foldmap draws none, their guanines unpaired (C29 ruling: said)."""
+    return len(layout.nucleic.tetrads) if layout.nucleic is not None else 0
+
+
 def drawn_scope(model, layout, assembly: str = "auto", focus: str = "auto") -> dict:
     """What the figure drew of the structure, given the io.read_model result it was built from (`model`), its
     layout and the assembly and focus settings it was drawn with. Only automatic choices count (an assembly or a
@@ -76,7 +81,8 @@ def drawn_scope(model, layout, assembly: str = "auto", focus: str = "auto") -> d
         key=value, as --set takes it); residues: polymer residues those settings would draw (of the chains asked
         for, when some were); undrawn_chains: chains the figure has nothing of (_undrawn_chains), not_drawn: them
         with why ('' when none), part of the reason (random-100 C15); additives: the additives it hides on purpose
-        (_hidden_additives), named by scope_note but not part of the reason (C20 ruling)."""
+        (_hidden_additives), named by scope_note but not part of the reason (C20 ruling); tetrads: the G-tetrads of
+        the drawn nucleic acid, drawn unpaired, named by scope_note but not part of the reason (C29 ruling)."""
     several = getattr(model, "several", None) if assembly == "auto" else None
     read = list(getattr(layout, "chains_read", None) or [])
     asked = list(getattr(layout, "chains_asked", None) or [])
@@ -111,7 +117,12 @@ def drawn_scope(model, layout, assembly: str = "auto", focus: str = "auto") -> d
     additives = _hidden_additives(layout)
     not_drawn = "; ".join(f"chain {c} ({why})" for c, why in undrawn)
     drawn -= len(undrawn)
-    unsaid = {"undrawn_chains": [c for c, _ in undrawn], "additives": additives, "not_drawn": not_drawn}
+    unsaid = {
+        "undrawn_chains": [c for c, _ in undrawn],
+        "additives": additives,
+        "not_drawn": not_drawn,
+        "tetrads": _tetrads(layout),
+    }
     if not reasons and not crop and not not_drawn:
         return {
             "file_chains": total,
@@ -140,8 +151,9 @@ def drawn_scope(model, layout, assembly: str = "auto", focus: str = "auto") -> d
 def scope_note(scope: dict, how: str = "cli") -> str:
     """One line saying what was drawn of the structure and how to draw everything ('' when nothing was left out
     and no chain asked for), then what it has not drawn (chains with nothing to draw, additives hidden): with
-    command-line flags (how='cli') or MCP tool arguments (how='mcp'); the chain count when chains were left out."""
-    if not scope.get("reason") and not scope.get("additives"):
+    command-line flags (how='cli') or MCP tool arguments (how='mcp'); the chain count when chains were left out;
+    G-tetrads, which no setting draws."""
+    if not scope.get("reason") and not scope.get("additives") and not scope.get("tetrads"):
         return ""
     options = scope["all_options"]
     if how == "mcp":
@@ -157,6 +169,9 @@ def scope_note(scope: dict, how: str = "cli") -> str:
     if scope.get("additives"):  # hidden on purpose, but named (C20 ruling)
         shows = 'style={"ligands": "all"}' if how == "mcp" else "--set ligands=all"
         unsaid.append(f"additives {', '.join(scope['additives'])} ({shows} draws them)")
+    if scope.get("tetrads"):  # read, never drawn (C29 ruling)
+        n = scope["tetrads"]
+        unsaid.append(f"{n} G-tetrad{'' if n == 1 else 's'} of a G-quadruplex (their Gs drawn unpaired)")
     if unsaid:
         parts.append(f"not drawn: {'; '.join(unsaid)}")
     return "; ".join(parts)

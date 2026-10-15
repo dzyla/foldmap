@@ -79,6 +79,11 @@ ENTRIES = {  # fixture name -> (PDB id, what it is for)
         "a dimer (assembly 1: chain A twice) whose two copies make one continuous A B B A sheet, backbone only: the "
         "shared sheet A15 leaves out (random-100 C10)",
     ),
+    "8Q4O": (
+        "8Q4O",
+        "an RNA G-quadruplex (NMR model 1): three stacked G-tetrads, no Watson-Crick pair, so no stem: drawn as a "
+        "trace, which the note must say (random-100 C29 ruling)",
+    ),
 }
 Span = tuple[int, int]
 WINDOWS: dict[str, dict[str, Span | list[Span] | None]] = {  # fixture -> {chain: windows (first, last), None: whole}
@@ -112,6 +117,7 @@ TRIMS: dict[str, dict] = {
         "drop": ("_atom_site_anisotrop.", "_pdbx_refine_tls.", "_pdbx_refine_tls_group.", "_struct_sheet_order."),
     },
     "6B5W": {"first_model": True, "backbone": True},
+    "8Q4O": {"first_model": True},
     "1BXI": {
         "atoms": ("N", "CA", "C", "O", "CB", "ND1", "NE2", "SG", "OD1", "OD2", "OE1", "OE2", "NZ", "OG", "OG1", "SD")
     },

@@ -242,3 +242,23 @@ def test_hidden_additives_are_named():
 
     shown = scope_of(DATA / "2HHB.cif", look=resolve_style("publication", None, ["ligands=all"]))
     assert shown["additives"] == [] and scope_note(shown) == ""
+
+
+def test_a_g_quadruplex_is_said_drawn_unpaired():
+    """C29 (random-100, ruling): G-tetrads (Hoogsteen G·G pairs closed in a ring of four) are not drawn: an RNA
+    G-quadruplex with no Watson-Crick pair has no stem and is drawn as a trace. The figure passes when the note says
+    so (8Q4O: three stacked tetrads). A tRNA has none and says nothing."""
+    from foldmap.io import load_backbone, load_nucleic
+
+    path = DATA / "r100" / "8Q4O.cif.gz"
+    na = load_nucleic(path, load_backbone(path))
+    assert [sorted(na.strands[s].labels[i].seq for s, i in t) for t in na.tetrads] == [
+        [2, 8, 14, 20],
+        [3, 9, 15, 21],
+        [6, 10, 16, 22],
+    ]
+    s = scope_of(path)
+    assert s["tetrads"] == 3 and s["reason"] == "" and s["not_drawn"] == ""
+    assert scope_note(s) == "not drawn: 3 G-tetrads of a G-quadruplex (their Gs drawn unpaired)"
+    trna = scope_of(DATA / "na" / "1EHZ.cif.gz")
+    assert trna["tetrads"] == 0 and "tetrad" not in scope_note(trna)

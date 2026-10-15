@@ -289,7 +289,8 @@ class Nucleic:
     """Nucleic acid of model 1. pairs: (strand a, nucleotide i, strand b, nucleotide j) with a <= b.
     contacts: protein residue index (Backbone order) -> {(strand, nucleotide)} within contact distance.
     base_pairs: the same pairs with their kind; structure: stems, runs and ties built from them; gaps: where
-    cropping left nucleotides out between two pieces of one strand."""
+    cropping left nucleotides out between two pieces of one strand; tetrads: G-tetrads of a G-quadruplex, (strand,
+    nucleotide) x 4 (read, not drawn: the scope note says so)."""
 
     strands: list[NAStrand] = field(default_factory=list)
     pairs: list[tuple[int, int, int, int]] = field(default_factory=list)
@@ -298,13 +299,14 @@ class Nucleic:
     base_pairs: list[BasePair] = field(default_factory=list)
     structure: NAStructure = field(default_factory=NAStructure)
     gaps: list[NAGap] = field(default_factory=list)
+    tetrads: list[tuple[tuple[int, int], ...]] = field(default_factory=list)  # G-tetrads (nucleic.g_tetrads), not drawn
 
     @property
     def size(self) -> int:
         return sum(len(s) for s in self.strands)
 
 
-def nucleic_from_pairs(strands, base_pairs, contacts, contact_chain, gaps=()) -> Nucleic:
+def nucleic_from_pairs(strands, base_pairs, contacts, contact_chain, gaps=(), tetrads=()) -> Nucleic:
     """A Nucleic with its derived fields (pairs, structure) filled in."""
     base_pairs = sorted(base_pairs)
     return Nucleic(
@@ -315,6 +317,7 @@ def nucleic_from_pairs(strands, base_pairs, contacts, contact_chain, gaps=()) ->
         base_pairs,
         secondary_structure(strands, base_pairs),
         list(gaps),
+        sorted(tetrads),
     )
 
 
@@ -461,7 +464,8 @@ def _cut(na: Nucleic, windows: dict[int, list[tuple[int, int]]]) -> Nucleic:
     contacts = {r: {where[x] for x in v if x in where} for r, v in na.contacts.items()}
     contacts = {r: v for r, v in contacts.items() if v}
     chains = {r: c for r, c in na.contact_chain.items() if r in contacts}
-    return nucleic_from_pairs(strands, pairs, contacts, chains, gaps)
+    tetrads = [tuple(sorted(where[x] for x in t)) for t in na.tetrads if all(x in where for x in t)]
+    return nucleic_from_pairs(strands, pairs, contacts, chains, gaps, tetrads)
 
 
 @dataclass

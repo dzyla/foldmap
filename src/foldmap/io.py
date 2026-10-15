@@ -11,7 +11,7 @@ import numpy as np
 from scipy.spatial import cKDTree
 
 from .model import Backbone, Ligand, Links, NAStrand, Nucleic, ResLabel, nucleic_from_pairs
-from .nucleic import NAGap, pair_nucleotides, parent_base
+from .nucleic import NAGap, g_tetrads, pair_nucleotides, parent_base
 
 _BB_ATOMS = ("N", "CA", "C", "O")
 _PEPTIDE_BOND_MAX = 2.5  # Å, C(i-1)-N(i), as in DSSP
@@ -540,8 +540,9 @@ def load_nucleic(
                     if k is not None:
                         contacts.setdefault(k, set()).add((s, i))
     strands = [s for s, _ in found]
-    pairs = pair_nucleotides([run for _, run in found])
-    return nucleic_from_pairs(strands, pairs, contacts, {k: bb.labels[k].chain for k in contacts}, _breaks(found))
+    runs = [run for _, run in found]
+    chains = {k: bb.labels[k].chain for k in contacts}
+    return nucleic_from_pairs(strands, pair_nucleotides(runs), contacts, chains, _breaks(found), g_tetrads(runs))
 
 
 def _breaks(found) -> list[NAGap]:
