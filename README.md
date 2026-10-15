@@ -278,7 +278,9 @@ Rossmann schematics, Burroughs 2007, Nishimasu 2014). Each is a layout or style 
 
 **Conventional names** (`--names`, opt-in). `--names deposited` takes the helix ids the file itself gives, so a
 globin's helices read A–H (an element the file gives no id keeps its generic label). `--names beta` numbers the
-strands β1…βn in sequence and names each helix of a βα row after the strand before it (β1 α1 β2 α2 …).
+strands β1…βn in sequence and names each helix of a βα row after the strand before it (β1 α1 β2 α2 …); the
+chain's other helices take the name of the strand before them primed (α4′, α4″, α4‴), or lettered (α10a, α10b …)
+when a strand is followed by more helices than three primes can tell apart.
 `--names FILE.yaml` names elements by residue range and, under `stems:`, nucleic-acid stems by one nucleotide they
 pair. The option repeats, and a later spec wins. `docs/names/` ships four files: globin helices (2HHB), FN3
 strands (1TEN), histone-fold helices (1KX5) and tRNA arms (1EHZ). Each file says where its ranges come from.

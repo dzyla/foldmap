@@ -1048,6 +1048,17 @@ its L* that stands furthest. 24 chains on okabe-ito: pairwise >= 10.2; 61 chains
 palette's eight hues allow no more). The first eight are the palette's: figures of up to eight chains are unchanged
 (no snapshot has more; none re-recorded; bench identical).
 
+### C36 (a, batch C2a): `--names beta` writes a run of primes past ‴ (1 entry)
+
+**Entry:** 9YKJ (A4 in the beta view: A:194-198>A:204-210 and A:664-674>A:683-696 drawn over labels). Chain A has
+nine helices after β10 (and chain B nine after β8). `names._primed` gives αn, αn′, αn″, αn‴ and then "′" × k, so the
+beta view wrote α10′′′′′′′′′ (nine primes): names up to three times as wide as α10, whose label boxes left the loops
+no route.
+
+**Batch C2a result:** when a strand is followed by more helices than αn … αn‴ can name, `names._row_helices` letters
+them in sequence instead, αna, αnb … (the row helix keeps αn); four or fewer keep their primes, so 1TIM's α4′ and
+α5′ stay. 9YKJ passes in every view. README: `--names beta` paragraph. Bench identical (names are opt-in).
+
 ## Visual review
 
 **Who reviewed:**

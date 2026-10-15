@@ -15,6 +15,7 @@ from __future__ import annotations
 import datetime
 import gzip
 import re
+from collections import Counter
 from pathlib import Path
 
 from .layout import Layout, provisional, resolve
@@ -24,6 +25,7 @@ from .yamlfile import read_yaml
 KEYWORDS = ("deposited", "beta")
 _GENERIC = re.compile(r"(HELX_P)?\d+|H\d+")  # numbered helices name nothing
 _PRIMES = ("", "′", "″", "‴")
+_LETTERS = "abcdefghijklmnopqrstuvwxyz"  # beta names of the helices after a strand past what _PRIMES can mark
 _LETTER = re.compile(r"[A-Za-z]")  # a deposited name starting with a letter, as strand labels do
 
 
@@ -174,7 +176,9 @@ def beta_names(layout: Layout, sses: list[SSE], whole: list[SSE] | None = None) 
 
 def _row_helices(mine: list[SSE], strands: list[SSE], number: dict[str, int], rows: set[str]) -> dict[str, str]:
     """The helices of a chain with a βα row: each row helix after βn is αn; the others, in sequence, αn, αn′ …
-    after the last strand before them, the first name not taken."""
+    after the last strand before them, the first name not taken. When a strand is followed by more of them than
+    αn, αn′, αn″, αn‴ can name, they are lettered αna, αnb … instead (9YKJ: nine helices after β10 were α10′ to
+    α10′′′′′′′′′, names whose width the loops could not route around)."""
 
     def after(h: SSE, pool: list[SSE]) -> int:  # the number of the pool's last strand before the helix (0: none)
         return max((number[s.id] for s in pool if s.start < h.start), default=0)
@@ -187,11 +191,18 @@ def _row_helices(mine: list[SSE], strands: list[SSE], number: dict[str, int], ro
 
     out = {h.id: name(after(h, in_row)) for h in helices if h.id in rows}
     taken = set(out.values())
-    for h in (h for h in helices if h.id not in rows):
+    rest = [h for h in helices if h.id not in rows]
+    many = Counter(after(h, strands) for h in rest)
+    for h in rest:
         n, k = after(h, strands), 0
-        while _primed(name(n), k) in taken:
-            k += 1
-        out[h.id] = _primed(name(n), k)
+        if many[n] + (name(n) in taken) > len(_PRIMES):  # more than αn‴ can mark: lettered αna, αnb …
+            while f"{name(n)}{_LETTERS[k]}" in taken:
+                k += 1
+            out[h.id] = f"{name(n)}{_LETTERS[k]}"
+        else:
+            while _primed(name(n), k) in taken:
+                k += 1
+            out[h.id] = _primed(name(n), k)
         taken.add(out[h.id])
     return out
 

@@ -337,3 +337,35 @@ def test_a_names_file_nested_too_deeply_is_a_command_line_error(tmp_path, capsys
     assert main(["plot", str(DATA / "2HHB.cif"), "-o", str(tmp_path / "x.svg"), "--names", str(deep)]) == 1
     err = capsys.readouterr().err
     assert "nested too deeply" in err and "Traceback" not in err
+
+
+def test_beta_names_letter_the_helices_after_a_strand_past_three_primes():
+    """9YKJ (random-100 A4, beta view): nine helices after β10 were named α10′ to α10′′′′′′′′′, names whose width the
+    loops could not route around (two loops drawn over labels). Past what αn, αn′, αn″ and αn‴ can name, a
+    strand's helices are lettered in sequence: αna, αnb …; up to four keep their primes (1TIM: α4′, α5′)."""
+    import numpy as np
+
+    from foldmap.model import SSE, ResLabel
+    from foldmap.names import _row_helices
+
+    def sse(kind, start, end):
+        return SSE(
+            kind,
+            "A",
+            start,
+            end,
+            ResLabel("A", start, "", "ALA"),
+            ResLabel("A", end, "", "ALA"),
+            np.zeros(3),
+            np.array([0.0, 0.0, 1.0]),
+        )
+
+    b1, b2 = sse("E", 0, 4), sse("E", 100, 104)
+    row = sse("H", 10, 20)
+    many = [sse("H", 30 + 6 * k, 33 + 6 * k) for k in range(6)]
+    few = [sse("H", 110, 115), sse("H", 120, 125)]
+    mine = sorted([b1, b2, row, *many, *few], key=lambda s: s.start)
+    got = _row_helices(mine, [b1, b2], {b1.id: 1, b2.id: 2}, {b1.id, row.id})
+    assert got[row.id] == "α1"
+    assert [got[h.id] for h in many] == ["α1a", "α1b", "α1c", "α1d", "α1e", "α1f"]
+    assert [got[h.id] for h in few] == ["α2", "α2′"]
