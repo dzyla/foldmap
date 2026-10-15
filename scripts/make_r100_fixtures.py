@@ -124,7 +124,8 @@ ENTRIES = {  # fixture name -> (PDB id, what it is for)
     "5KQJ": (
         "5KQJ",
         "an NMR protein (model 1, N, CA, C and O only) whose strand F pairs with E end to end with B on E's same side "
-        "(a bulged continuation): it was drawn as a column of its own between E and B (random-100 C34)",
+        "(two strands end to end along one edge of a partner): it was drawn as a column of its own between E and B "
+        "(random-100 C34)",
     ),
     "6JO6-AB": (
         "6JO6",

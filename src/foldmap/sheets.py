@@ -70,7 +70,7 @@ def _order_tree(tree: nx.Graph, first: int) -> tuple[list[int], bool]:
 
 _STRAND_RISE = 3.3  # Å per residue along a strand
 _STACK_GAP = 5.0  # Å: two strands on one side of a partner whose spans along it are at most this far apart, and
-_STACK_OVERLAP = 1.0  # ... overlap by no more than this, continue one another along it (a beta bulge, end to end)
+_STACK_OVERLAP = 1.0  # ... overlap by no more than this, lie end to end along one edge of it
 
 
 def _span(s: SSE, at: np.ndarray, axis: np.ndarray) -> tuple[float, float]:
@@ -81,10 +81,14 @@ def _span(s: SSE, at: np.ndarray, axis: np.ndarray) -> tuple[float, float]:
 
 
 def _columns(tree: nx.Graph, order: list[int], strands: list[SSE]) -> list[int]:
-    """Column of each strand of `order`: a branch strand b set beside its partner p (_order_tree) that lies on the
-    same side of p as the strand q next to it in the order, which also pairs with p, end to end with q along p (a
-    bulged continuation: 5KQJ's F after B along E), shares q's column; empty when none does. Directions in 3D from
-    the strands' centroids and axes, snapped."""
+    """Sheet.columns for the strands of `order` (a branched, open sheet's path order, _order_tree): column index per
+    position, side by side left to right in that order, or [] when every strand has its own. Two strands end to end
+    along one edge of a partner share a column: a strand b next to q in the order where both pair with one partner p
+    (tree neighbours of both), lie on the same side of p, and their spans along p's axis are at most _STACK_GAP Å apart
+    and overlap by at most _STACK_OVERLAP Å (5KQJ: F and B along E's one edge; two different strands, not a bulge of
+    one). No sequence test: any two strands sharing p's edge end to end qualify. Directions in 3D from the strands'
+    centroids and axes, snapped. layout._sheet_item stacks a column's strands (_column_heights); figcheck's order
+    check reads a block by its columns. Plan 12's branched-sheet drawing builds on this."""
     from .layout import _snap, _unit
 
     share: dict[int, int] = {}

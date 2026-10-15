@@ -1114,8 +1114,8 @@ order check and the sheet plates to follow. Larger than an M change; left for a 
   (`ss._copy_breaks`; a tie cuts): the whole copies are cut there, or the broken ones joined. 7TIM's B:178-203 is now
   broken like A's (both draw α8 and α9); 5JB1, 7JU4, 8QEM and 9P1X join a few broken pieces (fewer elements).
 
-**Batch C2a result (C34):** `sheets._columns` (a branched, open sheet only): a branch strand b set beside its
-partner p that lies on the same side of p as the strand q next to it in the order, both pairing with p, their
+**Batch C2a result (C34):** `sheets._columns` (a branched, open sheet only; two strands end to end along one edge
+of a partner, not necessarily one strand: 5KQJ's B and F are two): a branch strand b set beside its partner p that lies on the same side of p as the strand q next to it in the order, both pairing with p, their
 spans along p at most 5 Å apart and overlapping by at most 1 Å, shares q's column (`Sheet.columns`).
 `layout._sheet_item` draws a column's strands one above the other as their centroids lie along the sheet's up
 (`_column_heights`), at least `_STACK_PAD` (1.2) apart, room for the loops leaving their facing ends (at 0.2,

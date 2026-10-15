@@ -257,8 +257,8 @@ class Sheet:
     pair_kinds: list[str]
     closed: bool = False  # barrel: a cycle was cut at its weakest pairing
     ambiguous: bool = False  # branched: ordering is a heuristic
-    # column of each strand side by side (sheets._columns): two strands pairing end to end with one partner on the
-    # same side of it (a bulged continuation) share one; empty: each strand its own
+    # column of each strand side by side (sheets._columns): two strands end to end along one edge of a partner (both
+    # pairing with it, on its same side; not necessarily one strand) share one; empty: each strand its own
     columns: list[int] = field(default_factory=list)
 
 

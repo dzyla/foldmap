@@ -443,9 +443,9 @@ Every figure (command line, app, MCP or Python) goes through the same steps:
 2. **Secondary structure.** A DSSP implementation assigns hydrogen bonds from the backbone and calls α-, 3₁₀- and
    π-helices, β-strands (with bulges) and turns, exactly as mkdssp 3.1.2 does on every test structure.
 3. **Sheets and bundles.** Strands joined by backbone H-bond ladders form sheets; their order and directions come
-   from the ladder network, and a sheet whose ends pair is a closed barrel. Two strands that pair end to end with
-   one partner, on the same side of it (a bulged continuation), share a column, one above the other as along the
-   partner. Helices packed along their length across chains form bundles.
+   from the ladder network, and a sheet whose ends pair is a closed barrel. Two strands end to end along one edge of a
+   partner (both pairing with it, on its same side) share a column, one above the other as along the partner.
+   Helices packed along their length across chains form bundles.
 4. **Context.** Symmetry (cyclic, dihedral, cubic, helical) is found by superposing chains of the same sequence;
    disulfides, glycans and ligands are read from the atoms; a membrane is estimated on request. Nucleic acids:
    base pairs grouped into stems; long bent duplexes cut where the axis turns by 25°.

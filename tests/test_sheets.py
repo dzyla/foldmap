@@ -146,7 +146,8 @@ def test_bulged_strands_take_their_true_place_in_the_sheet():
 
 def test_a_strand_continuing_another_along_their_partner_shares_its_column():
     """5KQJ (random-100 C34): F pairs with E end to end with B, on E's same side (F at 3D y +11.8, B at -1.1, 0.8 Å
-    apart along E): a bulged continuation. The sheet's one path of strands drew it as a column of its own, wedged
+    apart along E): two strands end to end along one edge of a partner. The sheet's one path of strands drew F as a
+    column of its own, wedged
     between E and B (C D E F B A). Such a pair now shares a column (Sheet.columns), one above the other as along E,
     and the order check reads the block by its columns."""
     from foldmap import figcheck
@@ -192,3 +193,23 @@ def test_the_loops_out_of_a_shared_column_never_meet_in_its_gap():
         a, b = inside
         d = a[:, None, :] - b[None, :, :]
         assert np.hypot(d[..., 0], d[..., 1]).min() >= 0.05
+
+
+def test_partners_far_apart_along_a_long_strand_stay_side_by_side():
+    """C34's controls (batch C2a review Q3): 8UTF's a:266-273 and a:318-322 both pair with a:278-301 on one side, 27.6
+    Å apart along it: not end to end, so each keeps its own column; and a sheet with no branch (1TIM's barrel, 8UTF's
+    other sheets) has Sheet.columns == []."""
+    from foldmap.cli import make_layout
+
+    data = Path(__file__).parent / "data"
+    bb = load_backbone(data / "8UTF.cif", "auto")
+    dssp = assign_dssp(bb)
+    sheets = build_sheets(build_sses(bb, dssp.ss, bridges=dssp.bridges), dssp.bridges)
+    (sh,) = [sh for sh in sheets if {"a:266-273", "a:318-322", "a:278-301"} <= {s.id for s in sh.strands}]
+    assert sh.ambiguous and sh.columns == []
+    assert all(sh.columns == [] for sh in sheets)
+    lay, _, _ = make_layout(data / "1TIM.cif")
+    assert lay.stack_gaps == []
+    bb = load_backbone(data / "1TIM.cif", "auto")
+    dssp = assign_dssp(bb)
+    assert all(sh.columns == [] for sh in build_sheets(build_sses(bb, dssp.ss, bridges=dssp.bridges), dssp.bridges))
