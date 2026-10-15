@@ -163,3 +163,32 @@ def test_a_strand_continuing_another_along_their_partner_shares_its_column():
     assert len({round(lay.placed[k].cx, 6) for k in block}) == len(block) - 1
     d = draw_spec(figure_spec(path))
     assert not [v for v in figcheck.order_checks(d) if v.startswith("sheet")]
+
+
+def test_the_loops_out_of_a_shared_column_never_meet_in_its_gap():
+    """5KQJ (batch C2a review Q1): B's loop left its top upward and F's its bottom downward on the same line in the
+    1.2 gap between them, meeting at one junction, so the column read as F running into B. The two loops leaving the
+    facing ends of a stack gap (Layout.stack_gaps) start nearer those ends and turn out of the gap, the lower as low
+    as it can and the upper as high, so no point of one comes within 0.05 of the other there."""
+    from foldmap.cli import make_layout
+    from foldmap.route import route_loops
+
+    def in_box(points, box):  # the polyline sampled every 0.02, the samples inside the box
+        out = []
+        for p, q in zip(points, points[1:]):
+            for t in np.linspace(0.0, 1.0, max(2, int(np.hypot(q[0] - p[0], q[1] - p[1]) / 0.02) + 1)):
+                x, y = p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t
+                if box[0] - 1e-9 <= x <= box[2] + 1e-9 and box[1] - 1e-9 <= y <= box[3] + 1e-9:
+                    out.append((x, y))
+        return np.array(out).reshape(-1, 2)
+
+    lay, sses, bb = make_layout(Path(__file__).parent / "data" / "r100" / "5KQJ.cif.gz")
+    loops = route_loops(lay, sses, bb)
+    assert lay.stack_gaps and not any(lp.fallback for lp in loops)
+    for box in lay.stack_gaps:
+        inside = [in_box(lp.points, box) for lp in loops]
+        inside = [pts for pts in inside if len(pts)]
+        assert len(inside) == 2
+        a, b = inside
+        d = a[:, None, :] - b[None, :, :]
+        assert np.hypot(d[..., 0], d[..., 1]).min() >= 0.05

@@ -256,6 +256,9 @@ class Layout:
     ba_rows: list[list[str]] = field(default_factory=list)  # each βα template row's elements (no ghost), as drawn
     # left to right: the strands and the helices between them (_ba_template)
     on_sheet: dict[str, list[str]] = field(default_factory=dict)  # a helix drawn over a sheet -> the sheet's strands
+    # the gaps between two strands sharing a column (Sheet.columns), as boxes (_stack_gaps): the loops leaving
+    # their facing ends are kept apart there (route._apart_in_stack_gaps)
+    stack_gaps: list[tuple] = field(default_factory=list)
     res_cons: list[float] = field(default_factory=list)  # alignment conservation of each residue (nan: none)
     res_grade: list[int] = field(default_factory=list)  # conservation grade 1..9 of each residue (0: none)
     cons_label: str = ""  # legend text saying where the grades come from
@@ -385,6 +388,22 @@ def _sheet_order(sheet: Sheet, frame: Frame) -> tuple[list[int], int, np.ndarray
 
 _STACK_PAD = 1.2  # page units between two strands drawn one above the other in one column: room for the loops
 # leaving their facing ends (0.2 left 5KQJ's B and F loops no route, 1.0 5JB1's; set on the 5 sample entries)
+
+
+def _stack_gaps(lay: Layout) -> list[tuple[float, float, float, float]]:
+    """The gaps between two strands drawn one above the other in a column (Layout.stack_gaps): the box between their
+    facing ends, the column's width wide. route._apart_in_stack_gaps keeps the two loops leaving those ends apart
+    there, so the column never reads as one strand (5KQJ's B and F)."""
+    out = []
+    for ids in lay.sheets:
+        strands = [lay.placed[k] for k in ids]
+        for p in strands:
+            above = [q for q in strands if q is not p and abs(q.cx - p.cx) < 1e-6 and q.cy > p.cy]
+            if above:
+                q = min(above, key=lambda x: x.cy)
+                top, bottom = max(p.n_port[1], p.c_port[1]), min(q.n_port[1], q.c_port[1])
+                out.append((p.cx - p.width / 2, top, p.cx + p.width / 2, bottom))
+    return out
 
 
 def _column_heights(sheet: Sheet, order: list[int], s: int) -> dict[int, float]:
@@ -2650,6 +2669,7 @@ def build_layout(
     lay.font_scale = style.font_scale
     lay.ligands = style.ligands
     lay.ba_rows = _ba_rows(items)  # after the user's swaps
+    lay.stack_gaps = _stack_gaps(lay)
     lay.on_sheet = {
         m.sse.id: [x.sse.id for x in it.members if x.sse.kind == "E" and not x.ghost]
         for it in items

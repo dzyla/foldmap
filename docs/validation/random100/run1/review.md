@@ -1125,6 +1125,14 @@ C D E [F above B] A, as 3D (passes in every view). In the sample only 5JB1, 5X4Z
 passing) gain a shared column; 8UTF's two partners of a:278-301 are 27.6 Å apart and stay side by side. Bench
 identical; no snapshot changed. Fixture 5KQJ (14 KB).
 
+**Batch C2a fix round 1 (C34, Q1):** in 5KQJ, B's loop left its top upward and F's its bottom downward on the same
+line in the gap, meeting at one junction (the column read as F running into B). The layout records each stack gap
+(`Layout.stack_gaps`); after routing, two loops that meet in one (`route._apart_in_stack_gaps`) are routed again
+from nearer their facing ends (`_PUSH_NEAR`), the lower turning out of the gap as low as it can and the upper as high
+(a toll on the gap's cells rising with height, or depth), taken only when both are found and no longer meet. 5KQJ:
+apart. Both leave by the right: E spans the gap's height on its left. 5JB1's B:125-128/B:248-263 loops still meet
+(the strand they reach, B:145-149, ends beside the gap); its checks pass.
+
 ### C35 (a, batch C1 review): chain colours repeat past the palette (3 entries seen)
 
 **Entries:** 5X4Z (A = I = `#0072b2`, B = J, C = K, D = L), 6JO6 (three passes), 7Y7C. **Checks:** none (visual).

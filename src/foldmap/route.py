@@ -44,6 +44,7 @@ _MAX_NODES = 200_000
 _MAX_CELLS = 1_500_000
 _DIRS = [(1, 0), (0, 1), (-1, 0), (0, -1)]
 _PUSH = [0.4 + 0.25 * k for k in range(12)]  # how far out along the exit the path may start
+_PUSH_NEAR = [0.15 + 0.25 * k for k in range(13)]  # ... out of a port facing a stack gap (Grid.near_ports): nearer
 _PUSH_OVER = [0.4 + 0.25 * k for k in range(60)]  # from a helix drawn over a sheet: out past the sheet's edge
 
 log = logging.getLogger(__name__)
@@ -102,6 +103,7 @@ class _Grid:
             self.soft |= cells
         self.blocked |= self.soft
         self.toll: np.ndarray | None = None  # extra cost of entering a cell (text placed after routing), when set
+        self.near_ports: set[tuple[float, float]] = set()  # ports a route may start nearer (_PUSH_NEAR), when set
         self.slab = np.zeros((self.nx, self.ny), bool)  # cells strictly inside the membrane band (one per row)
         if layout.membrane:
             for lo, hi in layout.membrane.get("bands", [layout.membrane["y"]]):
@@ -158,7 +160,8 @@ class _Grid:
         g = _INFLATE + self.reach
         rx0, ry0, rx1, ry1 = own.rect
         over = loose and getattr(own, "over", False)
-        for t in _PUSH_OVER if over else _PUSH:
+        near = (round(float(port[0]), 6), round(float(port[1]), 6)) in self.near_ports
+        for t in _PUSH_OVER if over else _PUSH_NEAR if near else _PUSH:
             pt = (port[0] + exit_vec[0] * t, port[1] + exit_vec[1] * t)
             c = self.cell(pt)
             if self.free(c):
@@ -672,6 +675,8 @@ def route_loops(layout: Layout, sses: list[SSE], bb) -> list[Loop]:
         pts, fb, over = routed[(a.id, b.id)]
         dashed = any(not bb.prev[k] for k in range(a.end + 1, b.start + 1))
         out.append(Loop(a.id, b.id, [(float(x), float(y)) for x, y in pts], dashed, fb, over))
+    if layout.stack_gaps:
+        _apart_in_stack_gaps(layout, router, out)
     if layout.nucleic is not None:  # after the loops, so strands see the cells they use
         from .route_na import route_nucleic
 
@@ -682,6 +687,112 @@ def route_loops(layout: Layout, sses: list[SSE], bb) -> list[Loop]:
 
 
 _NA_TEXT_TOLL = 25.0  # the extra cost of a cell of that text, while such a loop is routed again
+_GAP_TOLL = 50.0  # the extra cost of a cell a loop must not take in a stack gap (_apart_in_stack_gaps)
+
+
+def _cells(grid: _Grid, points) -> list:
+    return sorted({c for p, q in zip(points, points[1:]) for c in grid.cells_along(p, q)})
+
+
+def _route_again(layout: Layout, router: _Router, lp: Loop):
+    """Loop `lp` routed again on the router's grid as it stands (its toll set by the caller), its own cells freed
+    while it looks; (points, over a keep-out) or None, its cells given back either way (the caller marks the route
+    it takes)."""
+    grid = router.grid
+    pa, pb = layout.placed[lp.a_id], layout.placed[lp.b_id]
+    cells = _cells(grid, lp.points)
+    for c in cells:
+        grid.used[c] = max(grid.used[c] - 1, 0)
+    under = (
+        _strands_under(layout, lp.a_id, pa.c_port) | ({lp.b_id} if pb.over else set()),
+        _strands_under(layout, lp.b_id, pb.n_port) | ({lp.a_id} if pa.over else set()),
+    )
+    exempt = _over_exempt(layout, lp.a_id, lp.b_id)
+    for h in exempt:
+        grid.blocked &= ~grid.over[h]
+    best, over = None, False
+    for ea, eb in _over_exits(pa, pb):
+        best, over = router.route(
+            pa.c_port, ea, pa, pb.n_port, eb, pb, loose=(pa.over, pb.over), under=under, exempt=exempt
+        )
+        if best is not None:
+            break
+    for h in exempt:
+        grid.blocked |= grid.over[h]
+    if best is not None:  # router.route marked its cells: give them back
+        for c in _cells(grid, best):
+            grid.used[c] = max(grid.used[c] - 1, 0)
+    for c in cells:
+        grid.used[c] += 1
+    return None if best is None else (best, over and _text_hits(best, router.keep_out) > 0)
+
+
+def _in_box(points, box) -> list[tuple[float, float]]:
+    """The points of a polyline, sampled every 0.05 along it, that lie inside box (x0, y0, x1, y1), rounded."""
+    out = []
+    for p, q in zip(points, points[1:]):
+        n = max(1, int(math.dist(p, q) / 0.05))
+        for t in np.linspace(0.0, 1.0, n + 1):
+            x, y = p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t
+            if box[0] - 1e-9 <= x <= box[2] + 1e-9 and box[1] - 1e-9 <= y <= box[3] + 1e-9:
+                out.append((round(float(x), 3), round(float(y), 3)))
+    return out
+
+
+def _meet_in(a, b, box) -> bool:
+    """Do two polylines come within 0.05 of each other inside the box?"""
+    pa, pb = np.array(_in_box(a, box)).reshape(-1, 2), np.array(_in_box(b, box)).reshape(-1, 2)
+    if not len(pa) or not len(pb):
+        return False
+    d = pa[:, None, :] - pb[None, :, :]
+    return bool((np.hypot(d[..., 0], d[..., 1]) < 0.05).any())
+
+
+def _apart_in_stack_gaps(layout: Layout, router: _Router, loops: list[Loop]) -> None:
+    """In place: the two loops leaving the facing ends of strands drawn one above the other in a column
+    (Layout.stack_gaps) are kept apart in the gap between them, each in its own half (5KQJ: B's loop up and F's loop
+    down met on one line, so the column read as one strand). When they meet there, the lower strand's loop is routed
+    again to turn out of the gap as low as it can (a toll on the gap's cells, and those beside it, rising with the
+    height), then the upper's as high as it can and off the lower loop; the new routes are taken only when both are
+    found and no longer meet in the gap (fix round 1). Each leaves the gap on the side its route takes: where a
+    neighbouring strand spans the gap's height on one side (5KQJ's E, left of B and F), both leave by the other."""
+    grid = router.grid
+    for x0, y0, x1, y1 in layout.stack_gaps:
+        cx = (x0 + x1) / 2
+        ends = {}
+        for k, lp in enumerate(loops):
+            for p in (lp.points[0], lp.points[-1]):
+                if abs(p[0] - cx) < 1e-6 and (abs(p[1] - y0) < 1e-6 or abs(p[1] - y1) < 1e-6):
+                    ends["lower" if abs(p[1] - y0) < 1e-6 else "upper"] = k
+        if len(ends) < 2 or loops[ends["lower"]].fallback or loops[ends["upper"]].fallback:
+            continue
+        lo, up = loops[ends["lower"]], loops[ends["upper"]]
+        if not _meet_in(lo.points, up.points, (x0, y0, x1, y1)):
+            continue
+        # the lower loop turns out of the gap as low as it can, the upper as high: a toll on the gap's cells (and
+        # beside it, where the loops turn out) rising with the height, or with the depth
+        # their routes may start nearer the facing ends, so a tight gap holds both turns
+        grid.near_ports = {(round(cx, 6), round(y0, 6)), (round(cx, 6), round(y1, 6))}
+        near = grid._mask([(x0 - (x1 - x0), y0, x1 + (x1 - x0), y1)])
+        rows = np.broadcast_to(grid.ys[None, :], near.shape)
+        grid.toll = np.where(near, _GAP_TOLL * (rows - y0) / max(y1 - y0, 1e-9), 0.0)
+        new_lo = _route_again(layout, router, lo)
+        if new_lo is None:
+            grid.toll, grid.near_ports = None, set()
+            continue
+        grid.toll = np.where(near, _GAP_TOLL * (y1 - rows) / max(y1 - y0, 1e-9), 0.0)
+        for c in _cells(grid, new_lo[0]):
+            grid.toll[c] += _GAP_TOLL
+        new_up = _route_again(layout, router, up)
+        grid.toll, grid.near_ports = None, set()
+        if new_up is None or _meet_in(new_lo[0], new_up[0], (x0, y0, x1, y1)):
+            continue
+        for old, (pts, over), k in ((lo, new_lo, ends["lower"]), (up, new_up, ends["upper"])):
+            for c in _cells(grid, old.points):
+                grid.used[c] = max(grid.used[c] - 1, 0)
+            for c in _cells(grid, pts):
+                grid.used[c] += 1
+            loops[k] = Loop(old.a_id, old.b_id, [(float(x), float(y)) for x, y in pts], old.dashed, False, over)
 
 
 def _text_hits(points, boxes) -> int:
