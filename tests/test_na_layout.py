@@ -2425,3 +2425,35 @@ def test_single_stranded_letters_keep_off_the_strands():
     assert d.layout.na_letters
     hits = [h for h in figcheck.text_collisions(d) if h.startswith("na:nt:") and "× na:run:" in h]
     assert hits == [], hits
+
+
+def test_a_hairpin_letter_struck_by_the_clearance_keeps_an_inside_spot_clear_of_ink(monkeypatch):
+    """Batch B fix rounds 1-2 (8SA2 A:35, A:36): a hairpin loop's letter whose spots inside its stem's footprint are
+    all within the line clearance of a strand takes an inside spot no strand runs through (clear of the ink), before
+    the roomiest inside spot or any spot outside the footprint. 1EHZ with the clearance made huge (every spot "near"
+    a strand) and a short strand laid through where one hairpin letter would go: it moves to another inside spot
+    clear of the ink."""
+    from foldmap import na_labels
+    from foldmap.layout import _GLYPH_H, _LETTER_EM, _footprint, _ink_points, _reach
+    from foldmap.na_paths import NAPath
+    from foldmap.route import clip_lengths
+
+    lay, _, _, _ = _routed("1EHZ")
+    monkeypatch.setattr(na_labels, "line_clearance", lambda layout: 5.0)
+    first = na_labels._place_letters(lay, lay.na_paths)
+    at = {key: d for d in lay.stems for key in d.axial}
+    arc = next(p for p in lay.na_paths if p.kind == "hairpin")
+    key = (arc.strand, arc.nts[len(arc.nts) // 2])
+    x, y = first[key]
+    bar = NAPath("run", arc.strand, [], [(x - 0.3, y), (x + 0.3, y)], [])  # a strand through that letter
+    letters = na_labels._place_letters(lay, [*lay.na_paths, bar])
+    d = at[arc.between[0]]
+    x0, y0, x1, y1 = _footprint(d)
+    g = _GLYPH_H / 2
+    lx, ly = letters[key]
+    assert (lx, ly) != (x, y)
+    assert x0 <= lx - d.cx - g and lx - d.cx + g <= x1 and y0 <= ly - d.cy - g and ly - d.cy + g <= y1
+    base = lay.nucleic.strands[key[0]].bases[key[1]]
+    box = _reach(_ink_points(base, False, _LETTER_EM * na_labels._em(lay), 0.0)) + np.array([lx, ly, lx, ly])
+    segs = [(*a, *b) for p in [*lay.na_paths, bar] for a, b in zip(p.points, p.points[1:])]
+    assert not (clip_lengths(segs, [box]) > 0).any()
