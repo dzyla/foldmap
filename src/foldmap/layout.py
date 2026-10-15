@@ -2564,7 +2564,7 @@ DOMAIN_PAD = 0.7  # panel margin around a domain's elements
 _DOMAIN_GAP = 2 * DOMAIN_PAD + 0.6  # clear space between two domains' elements: both panels plus a gutter
 
 
-_PART_BLOWUP = 2.0  # parting domains that left them unparted and the items this many times as wide and high: undone
+_PART_BLOWUP = 2.0  # parting that left domains unparted and the items' width + height this many times: undone
 
 
 def _part_domains(
@@ -2579,7 +2579,7 @@ def _part_domains(
     its copies' domains and every item of their orbits (a unit, _domain_units), each copy by its tie (a mirrored
     copy, `mirror`, the other way across); two domains of one unit, copies of each other, part by widening the
     spread between protomers (protomer k moves k times the step), or for a mirror image sideways symmetrically.
-    When the sweeps do not part them and leave the items over _PART_BLOWUP times as wide and high (3L9G: a sheet
+    When the sweeps do not part them and leave the items' width plus height over _PART_BLOWUP times (3L9G: a sheet
     shared by four copies holds ten domains, so every sweep widened the spread again: random-100 C31), they start
     over with domains that share an item never parted (nor any domain joined to them so), stopping when a sweep no
     longer shrinks the overlap. True if anything moved."""
@@ -2668,7 +2668,7 @@ def _part_domains(
 def _part_sweeps(keys, groups, unit, members, copy_k, mirror, box, shift, overlap, root, sweeps: int, guard: bool):
     """_part_domains' sweeps: (anything moved, parted: a sweep found no clash); with `guard`, they also stop when a
     sweep no longer shrinks the overlap."""
-    moved, last = False, overlap()
+    moved, last = False, (overlap() if guard else 0.0)  # summed only when it may stop the sweeps (its boxes cost)
     for _ in range(sweeps):
         clash = False
         for i, a in enumerate(keys):
@@ -2703,10 +2703,11 @@ def _part_sweeps(keys, groups, unit, members, copy_k, mirror, box, shift, overla
                 clash = moved = True
         if not clash:
             return moved, True
-        now = overlap()
-        if guard and now >= last - 1e-6:  # the moves no longer help
-            break
-        last = now
+        if guard:
+            now = overlap()
+            if now >= last - 1e-6:  # the moves no longer help
+                break
+            last = now
     return moved, False
 
 
