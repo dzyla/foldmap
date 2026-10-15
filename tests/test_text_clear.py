@@ -152,6 +152,25 @@ def test_glycan_stem_crosses_no_name(monkeypatch):
     assert clip_len(at, sugar, name) == 0
 
 
+def test_a_glycan_stem_that_must_cross_a_letter_is_drawn_off_it(monkeypatch):
+    """7SMR (random-100 A6 label x glycan stem, batch C2a): the glycan on strand G had no way out of its sheet but
+    down the strand, over the letter G. A stem is drawn, as a ligand's tether is, only where it shows: off the halo of
+    every text. Here a text's halo is put across a 6ZS5 stem: the stem is drawn in two pieces, none of it inside."""
+    import foldmap.render as render
+
+    d = drawn(DATA / "6ZS5.cif")
+    r = sorted(g.split(":")[1] for g in (p.get_gid() or "" for p in d.figure.axes[0].patches) if g.endswith(":stem"))[0]
+    at, sugar = _stem_and_first_sugar(d.figure, r)
+    mid = (at + sugar) / 2
+    halo = (mid[0] - 0.06, mid[1] - 0.06, mid[0] + 0.06, mid[1] + 0.06)
+    real = render.text_halos
+    monkeypatch.setattr(render, "text_halos", lambda *a, **k: [*real(*a, **k), halo])
+    patches = {p.get_gid(): p for p in drawn(DATA / "6ZS5.cif").figure.axes[0].patches}
+    path = patches[f"glycan:{r}:stem"].get_path()
+    assert list(path.codes).count(1) == 2  # two pieces (MOVETO each)
+    assert not any(halo[0] < x < halo[2] and halo[1] < y < halo[3] for x, y in path.vertices)
+
+
 def test_a_ligand_is_never_left_without_a_mark():
     """C5 fix round 1: with every ring spot crossed by earlier tethers or loop lines, a chosen ligand still gets a
     mark where the old code put it (6JO6 lost 24 ligands on a crowded page when the tether test had no fallback)."""

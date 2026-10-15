@@ -1830,6 +1830,7 @@ def _draw_links(
         for loop in loops:  # loop lines too, as thin boxes along each segment
             taken += thin_boxes(loop.points)
         size, step = 0.34, 0.42
+        stem_halos = text_halos(ax, pt_per_unit, link_keep(lw * 0.8, pt_per_unit, ax.figure.dpi))
         texts = [box for _, box in label_boxes(layout, sses)] + [  # what a stem must not cross (C28)
             centred_box(p.cx, p.cy, 0.12 * len(p.label) + 0.1, 0.25)
             for p in layout.placed.values()
@@ -1878,8 +1879,11 @@ def _draw_links(
             _, out, lead, boxes = best
             taken += boxes
             tip = at + out * (lead + step * (count - 0.5))
+            # drawn off the letters it would cross (as a ligand's tether): 7SMR's only way out of its sheet ran down
+            # strand G over the letter G
+            pieces = visible_pieces([tuple(at), tuple(tip)], [], stem_halos)
             stem = PathPatch(
-                Path([tuple(at), tuple(tip)], [Path.MOVETO, Path.LINETO]),
+                _pieces_path(pieces) if pieces else Path(np.empty((0, 2))),
                 fc="none",
                 ec=_legible("#2b2b2b"),
                 lw=lw * 0.8,

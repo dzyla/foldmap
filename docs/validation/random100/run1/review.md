@@ -903,6 +903,11 @@ Glycan hits on pages over 44 units (7SMR, 8OZJ, 4UM3, 7BBH) are counted under C4
 
 **Effort:** S. **Bench:** glycan snapshots (6ZS5).
 
+**Batch C2a result (7SMR, label x glycan stem):** the glycan at D:1358 hangs on strand G mid-sheet; left and right
+are strands, up are loops, so its stem ran down the strand over the letter G (the "fewest crossings" fallback finds
+no way without one). A glycan stem is now drawn as a ligand's tether is, only where it shows: off the halo of every
+text (`render.visible_pieces` with `text_halos`). 7SMR's A6 hit -> 0. Bench identical; no snapshot changed.
+
 ### C29 (a/c, visual): G-quadruplex tetrads not drawn; NA letters detached from the trace (2 entries)
 
 - **8Q4O (RNA G-quadruplex, NMR):** no canonical pairs, so no stems. The figure is a bare projected P trace that
