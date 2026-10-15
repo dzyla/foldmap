@@ -449,3 +449,39 @@ def test_a_ligand_outside_assembly_one_is_not_a_polymer_kind(tmp_path):
     assert "L" in [c.name for c in model] and _polymer_kinds(model) == {"protein"}
     model, deposited = read_model(out)
     assert [c.name for c in model] == ["C"] and deposited == {"C"}
+
+
+def test_a_peptide_is_not_a_copy_of_its_receptor():
+    """C30 fix round 1: a global alignment scatters a short sequence over a long one, so a 30-residue peptide
+    counted as the same protein as a 300-residue receptor (and the bound peptide of an asymmetric unit was merged
+    with it): the shorter must also be at least 0.8 as long as the longer. A mutant 90 % as long still merges."""
+    import gemmi
+
+    from foldmap.io import _same_proteins
+
+    seq = [
+        ("ALA", "GLY", "LEU", "SER", "VAL", "LYS", "GLU", "ASP", "THR", "PRO")[(7 * i + i // 3) % 10]
+        for i in range(300)
+    ]
+
+    def entity(name, residues):
+        e = gemmi.Entity(name)
+        e.entity_type = gemmi.EntityType.Polymer
+        e.polymer_type = gemmi.PolymerType.PeptideL
+        e.full_sequence = list(residues)
+        return e
+
+    st = gemmi.Structure()
+    for e in (entity("1", seq), entity("2", seq[100:130]), entity("3", seq[:270])):
+        st.entities.append(e)
+    assert _same_proteins(st) == {"1": "1", "2": "2", "3": "1"}
+
+
+def test_chains_that_pair_are_one_object_and_auto_keeps_both(tmp_path):
+    """3OWW ruling: the two RNAs of a glycine riboswitch dimer are identical entities deposited once each, and
+    assembly 1 is chain A alone (assembly 3 the dimer); counting copies by sequence drew A alone. Chains held together
+    by base pairs or β-strands between them are one object, so auto keeps A and B."""
+    from foldmap.io import read_model
+
+    model = read_model(DATA / "r100" / "3OWW-AB.cif.gz")
+    assert sorted(c.name for c in model[0]) == ["A", "B"] and model.several is None

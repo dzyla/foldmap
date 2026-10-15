@@ -204,15 +204,16 @@ def _polymer_entities(st, chains) -> list[str]:
     return out
 
 
-SAME_PROTEIN = (
-    0.9  # two polymer entities are one protein when their full sequences align this identical (of the shorter)
-)
+SAME_PROTEIN = 0.9  # two polymer entities are one protein when their full sequences align this identical (of the
+# shorter) and the shorter is at least SAME_LENGTH of the longer (a bound peptide is not its receptor)
+SAME_LENGTH = 0.8
 
 
 def _same_proteins(st) -> dict[str, str]:
     """Polymer entity -> the first entity (file order) of its kind whose full sequence aligns with it at least
-    SAME_PROTEIN identical over the shorter one (4UM3: a deletion and a point mutant of the protein deposited 38
-    times are entities of their own). Entities without a full sequence stand alone."""
+    SAME_PROTEIN identical over the shorter one, which is at least SAME_LENGTH as long as the longer (4UM3: a
+    deletion and a point mutant of the protein deposited 38 times are entities of their own; a peptide bound to its
+    receptor is not one with it). Entities without a full sequence stand alone."""
     seqs = [
         (e.name, e.polymer_type, [gemmi.Entity.first_mon(m) for m in e.full_sequence])
         for e in st.entities
@@ -223,7 +224,12 @@ def _same_proteins(st) -> dict[str, str]:
     for name, kind, seq in seqs:
         out[name] = name
         for first, k, ref in firsts:
-            if k != kind or not seq or not ref or min(len(seq), len(ref)) < 20:
+            if (
+                k != kind
+                or not seq
+                or not ref
+                or min(len(seq), len(ref)) < max(20, SAME_LENGTH * max(len(seq), len(ref)))
+            ):
                 continue
             same = gemmi.align_string_sequences(ref, seq, [], gemmi.AlignmentScoring()).match_count
             if same >= SAME_PROTEIN * min(len(seq), len(ref)):
@@ -257,6 +263,41 @@ def _polymer_kinds(chains) -> set[str]:
     return out
 
 
+PAIRED_MIN = 4  # residue pairs of two chains with polar base or backbone atoms this near: held together (_paired)
+_PAIR_DIST = 3.4  # angstrom
+_BASE_POLAR = frozenset({"N1", "N3", "N2", "N4", "N6", "N7", "O2", "O4", "O6"})
+
+
+def _pair_atoms(chain) -> list[tuple[tuple[float, float, float], int]]:
+    """(position, residue index) of a chain's polar atoms that hold a pair: a nucleotide's base N and O, a protein
+    residue's backbone N and O (the donors and acceptors of a base pair and of strands side by side)."""
+    out = []
+    for k, r in enumerate(chain):
+        info = gemmi.find_tabulated_residue(r.name)
+        names = {"N", "O"} if info is not None and info.is_amino_acid() else _BASE_POLAR
+        out += [(a.pos.tolist(), k) for a in r if a.name in names]
+    return out
+
+
+def _paired(members, others) -> bool:
+    """Are chains of `members` held to chains of `others` by base pairs or β-strands between them (at least
+    PAIRED_MIN residue pairs with polar base or backbone atoms within _PAIR_DIST)? Such chains are one object (3OWW:
+    the two chains of a glycine riboswitch dimer pair their RNAs), however alike their sequences."""
+    from scipy.spatial import cKDTree
+
+    for a in members:
+        pa = _pair_atoms(a)
+        for b in others:
+            pb = _pair_atoms(b)
+            if not pa or not pb:
+                continue
+            tree = cKDTree([x for x, _ in pb])
+            found = {(k, pb[j][1]) for x, k in pa for j in tree.query_ball_point(x, _PAIR_DIST)}
+            if len(found) >= PAIRED_MIN:
+                return True
+    return False
+
+
 def _one_complex_of_several(st, assembly, model) -> bool:
     """`assembly` is one of several copies of a complex deposited in the asymmetric unit (4OO8: two Cas9
     complexes, assembly 1 = A, B, C; 1URN: three U1A–RNA complexes; 4CH9: two Kelch domains with their WNK4
@@ -278,7 +319,9 @@ def _one_complex_of_several(st, assembly, model) -> bool:
         return False
     if _polymer_kinds(members) != _polymer_kinds(model):
         return False
-    return all(deposited.count(e) >= 2 * held.count(e) for e in set(held))
+    if not all(deposited.count(e) >= 2 * held.count(e) for e in set(held)):
+        return False
+    return not _paired(members, [c for c in model if c not in members])  # copies paired to it are one object
 
 
 class ModelRead(tuple):

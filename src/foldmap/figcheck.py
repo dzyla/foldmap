@@ -555,6 +555,7 @@ def shared_sheet_elements(lay, copy: str, ref: str) -> set[str]:
 
 
 COPY_IDENTITY = 0.9  # two chains are copies of one protein when this fraction of their aligned residues match ...
+COPY_LENGTH = 0.8  # ... and the shorter is at least this fraction of the longer
 COPY_ALIGNED = 20  # ... and at least this many do (as model.homolog_chains asks of residues at the same numbers)
 
 
@@ -580,7 +581,8 @@ def aligned_positions(xs, ys) -> list[tuple[int, int]]:
 def same_protein(xs, ys, pairs: list[tuple[int, int]]) -> bool:
     """Are two chains (residue names; pairs from aligned_positions) copies of one protein?"""
     same = sum(xs[i] == ys[j] for i, j in pairs)
-    return same >= COPY_ALIGNED and same >= COPY_IDENTITY * len(pairs)
+    longer = max(len(xs), len(ys))  # a short chain scattered over a long one is no copy of it
+    return same >= COPY_ALIGNED and same >= COPY_IDENTITY * len(pairs) and min(len(xs), len(ys)) >= COPY_LENGTH * longer
 
 
 def _untied_copies(lay, residues: dict[str, list[str]], chains: list[str]) -> list[tuple[str, str]]:

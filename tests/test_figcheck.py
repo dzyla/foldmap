@@ -567,3 +567,11 @@ def test_an_explicit_focus_still_checks_the_nucleotides_of_chains_it_draws():
     d.layout.stems.clear()  # the duplex gone, its chains' 5' tails still drawn
     got = figcheck.scope_honest(d, DATA / "1LMB.cif", "asu", "3")
     assert [s.split(":")[0] for s in got] == ["nt 1", "nt 2"], got
+
+
+def test_same_protein_needs_a_length_ratio():
+    """A 30-residue chain aligned inside a 300-residue one is no copy of it (C30 fix round 1)."""
+    long = ["ALA", "GLY", "LEU", "SER", "VAL", "LYS", "GLU", "ASP", "THR", "PRO"] * 30
+    short = long[100:130]
+    assert not figcheck.same_protein(long, short, figcheck.aligned_positions(long, short))
+    assert figcheck.same_protein(long, long[:260], figcheck.aligned_positions(long, long[:260]))

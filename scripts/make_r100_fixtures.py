@@ -28,6 +28,12 @@ from make_fidelity_fixtures import _fetch, _keep_helix_ids
 
 OUT = Path(__file__).resolve().parent.parent / "tests" / "data" / "r100"
 ENTRIES = {  # fixture name -> (PDB id, what it is for)
+    "3OWW-AB": (
+        "3OWW",
+        "glycine riboswitch, chains A and B around the residues where they pair: two identical RNA entities, "
+        "deposited once each, so --assembly auto counted two copies and "
+        "drew assembly 1's chain A alone (random-100 C30, 3OWW ruling)",
+    ),
     "7FAB-HL": ("7FAB", "Fab New, chains H and L whole: disulfide bars over strand labels (Task 6, K11)"),
     "5LJ3-V": (
         "5LJ3",
@@ -76,6 +82,7 @@ ENTRIES = {  # fixture name -> (PDB id, what it is for)
 }
 Span = tuple[int, int]
 WINDOWS: dict[str, dict[str, Span | list[Span] | None]] = {  # fixture -> {chain: windows (first, last), None: whole}
+    "3OWW-AB": {c: [(5, 12), (38, 45), (60, 70), (80, 88)] for c in "AB"},  # where the two RNAs pair
     "7FAB-HL": {"H": None, "L": None},
     "1IGT-AB": {"A": None, "B": None},
     "9FWZ-DB": {"D": (116, 700), "B": None},
