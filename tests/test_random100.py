@@ -681,7 +681,7 @@ def test_science_checks_are_reported_apart_from_the_criteria(r100, tmp_path):
 
     spec = figure_spec(DATA / "1UBQ.cif")
     got = r100.measure_view("default", draw_spec(spec), spec, DATA / "1UBQ.cif", "1UBQ", tmp_path)
-    assert got["science"] == {"S1": [], "S2": [], "S3": [], "S4": None, "S5": None}
+    assert got["science"] == {"S1": [], "S2": [], "S3": [], "S4": None, "S5": None, "S6": []}
     crit = {k: {"pass": True, "detail": ""} for k in r100.CRITERIA}
     found = {"S1": ["sheet 0: a | b drawn side by side with no bridge"], "S2": [], "S3": [], "S4": None, "S5": None}
     e = {"id": "1ABC", "name": "1ABC", "views": {"default": {"result": {"science": found}}}, "criteria": crit}
@@ -690,5 +690,5 @@ def test_science_checks_are_reported_apart_from_the_criteria(r100, tmp_path):
     assert r100.science(e)["S4"]["pass"] is None
     r100.report([e], tmp_path, None, total=1)
     md = (tmp_path / "report.md").read_text(encoding="utf-8")
-    assert "1 of 1 pass." in md and "## Science checks (S1-S5), apart from A1-A20" in md
+    assert "1 of 1 pass." in md and "## Science checks (S1-S6), apart from A1-A20" in md
     assert "| S1 sheet neighbours pair | 0 | 1 | 0 |" in md and "S1: sheet 0: a / b drawn side by side" in md

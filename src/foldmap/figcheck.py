@@ -1048,7 +1048,7 @@ def order_checks(drawn) -> list[str]:
       (Layout.partial) and pairs shown side by side but not adjacent (Layout.unjoined) have no loops;
     - each sheet block (Layout.sheets) holds the strands of one sheet of sheets.build_sheets on the backbone's
       bridges, its track side by side in that sheet's order (either way round; a closed barrel from any strand) and
-      each accessory strand (Sheet.accessory) in a column next to its parent's, each two
+      each accessory strand (Sheet.accessory) in its parent's column or the next (science S6 judges which), each two
       neighbours pointing the same way when they pair in parallel and opposite ways when antiparallel."""
     from .dssp import assign_dssp
     from .sheets import build_sheets
@@ -1102,8 +1102,8 @@ def order_checks(drawn) -> list[str]:
             seen = [i for i in got if i in want]
             for a in sheet.accessory:
                 i, p = a.strand.id, a.parent.id
-                if i in drawn and p in drawn and abs(place[drawn[i]] - place[drawn[p]]) != 1:
-                    out.append(f"sheet {k}: {i} not drawn beside {p}, the strand it pairs with")
+                if i in drawn and p in drawn and abs(place[drawn[i]] - place[drawn[p]]) > 1:
+                    out.append(f"sheet {k}: {i} not drawn at {p}, the strand it pairs with")
         if not _same_order(seen, wanted, sheet.closed):
             out.append(f"sheet {k}: drawn {', '.join(got)}, paired {', '.join(want)}")
         for (a, da), (b, db) in zip(zip(want, sheet.directions), zip(want[1:], sheet.directions[1:])):
@@ -1153,19 +1153,28 @@ def drawn_columns(layout, k: int) -> list[list[tuple[str, bool]]]:
     return [sorted(cols[x]) for x in sorted(cols)]
 
 
+def _span(p) -> tuple[float, float]:
+    """A drawn strand's extent along the page's up: (bottom, top) of its two ports."""
+    return tuple(sorted((float(p.n_port[1]), float(p.c_port[1]))))
+
+
 def science_checks(drawn) -> dict[str, list[str] | None]:
     """The science checks (science.SCIENCE) of a drawn figure, apart from the page checks: findings per check, None
     for those not yet measured (S4, S5). Sheet block k is named "sheet <k>" (Layout.sheets, from 0)."""
     from .dssp import assign_dssp
-    from .science import NOT_YET, adjacent_pairs, bridge_counts, count_finding, neighbour_findings
+    from .science import NOT_YET, adjacent_pairs, bridge_counts, count_finding, neighbour_findings, partner_findings
 
     lay = drawn.layout
-    out: dict[str, list[str] | None] = {"S1": [], "S2": [], "S3": [], **dict.fromkeys(NOT_YET)}
+    out: dict[str, list[str] | None] = {"S1": [], "S2": [], "S3": [], **dict.fromkeys(NOT_YET), "S6": []}
     if not lay.sheets:
         return out
     count = bridge_counts(drawn.sses, assign_dssp(drawn.bb).bridges)
     for k, ids in enumerate(lay.sheets):
         columns = drawn_columns(lay, k)
+        where = {(i, g): c for c, col in enumerate(columns) for i, g in col}
+        ghosts = {g.sse.id: g for g in block_ghosts(lay, k)}
+        spots = [(i, c, _span(ghosts[i] if g else lay.placed[i]), g) for (i, g), c in where.items()]
+        out["S6"] += [f"sheet {k}: {t}" for t in partner_findings(spots, lay.accessory)]
         s1, s2 = neighbour_findings(columns, count)
         out["S1"] += [f"sheet {k}: {t}" for t in s1]
         out["S2"] += [f"sheet {k}: {t}" for t in s2]

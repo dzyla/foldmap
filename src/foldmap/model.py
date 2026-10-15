@@ -248,11 +248,10 @@ def shared_labels(sses: list[SSE], copies: dict[str, tuple[str, int]], labels: d
 
 
 class Accessory(NamedTuple):
-    """A strand of a sheet off its track (sheets._order_tree: off the longest path of the pairing tree), drawn beside
-    `parent`, the strand it pairs with on the way to the track, never between two strands that pair. `column`: the
-    track position whose column it shares (0 .. len(strands) - 1), stacked end to end with what stands there, or past
-    either end (-1, -2 ...; len(strands) ...: a closed sheet's ghost stands at len(strands)). `direction` as
-    Sheet.directions."""
+    """A strand of a sheet off its track (sheets._order_tree: off the longest path of the pairing tree), drawn at
+    `parent`, the strand it pairs with on the way to the track, never between two strands that pair nor in another
+    strand's column. `column`: the track position whose column it stands in, its parent's (end to end with it; a
+    branch of several strands up its root's partner's column). `direction` as Sheet.directions."""
 
     strand: SSE
     parent: SSE

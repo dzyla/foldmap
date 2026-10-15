@@ -427,19 +427,19 @@ _END_ROOM = END_LABEL + 1.2  # more room in a stack gap a chain end faces: its s
 def _column_heights(
     sheet: Sheet, column: dict[int, int], s: int, ends: dict[str, str] | None = None
 ) -> dict[int, float]:
-    """The heights (page units) of the strands that share a drawn column (`column`: index into _drawn_strands, the
-    ghost as -1, -> drawn column): branch strands stacked beside their parent (Sheet.accessory), as C2a stacked two
-    strands end to end along one edge of a partner (5KQJ's F above B). A track strand (or the ghost) keeps its row
-    (height 0), so the sheet's run of paired strands stays in line; the others stand as their centroids lie along
-    the sheet's drawn up (its strands' mean direction, by their senses, times the flip s) from it, moved out until
-    each keeps _STACK_PAD from the one nearer the row. A column past the track's end, of accessory strands alone,
-    stands as they lie from the parent of its first, at that parent's height (a branch of several strands a sub-row
-    beside its parent: 1EYG's B barrel beside A's), its middle kept there. A gap a chain end faces (`ends`: element
-    id -> "N", "C" or both, the chain ends drawn) is _END_ROOM wider, room for its stub and letter (9FWZ's C end,
-    D:662-666, above D:634-641). Snapped."""
+    """The heights (page units) of the strands in a column with accessory strands (`column`: index into _drawn_strands,
+    the ghost as -1, -> drawn column). Each accessory strand stands in its partner's column (Accessory.column), end to
+    end with its partner (fix round 1 ruling: never in another strand's column): next to it, above when its centroid
+    lies above the partner's along the sheet's drawn up (its strands' mean direction, by their senses, times the flip
+    s), else below; on the other side when that one is taken; a branch of several strands so up the column, each next to
+    its own partner. The track strand keeps its row (height 0), so the run of paired strands stays in line (a barrel
+    across a membrane band, 9FWZ; an open sheet's loops route round it: keeping a column's middle instead, as C2a did,
+    left 2B9V, 4XG1, 5JB1 and 8RVL loops with no route). End to end, _STACK_PAD apart, _END_ROOM more where a chain end
+    faces the gap (`ends`: element id -> "N", "C" or both, the chain ends drawn; 9FWZ's C end, D:662-666). Snapped."""
     every, senses = _drawn_strands(sheet)
     ends = ends or {}
     sense = dict(zip(range(len(senses)), senses)) | {-1: senses[0]}
+    strand = lambda k: every[k] if k >= 0 else sheet.strands[0]  # noqa: E731
 
     def room(lo: int, hi: int) -> float:  # lo stands below hi: lo's top end and hi's bottom end face the gap
         up_lo, up_hi = sense[lo] * s > 0, sense[hi] * s > 0
@@ -447,41 +447,32 @@ def _column_heights(
         facing |= ("N" if up_hi else "C") in ends.get(strand(hi).id, "") if hi >= 0 else False
         return _STACK_PAD + (_END_ROOM if facing else 0.0)
 
-    n = len(sheet.strands)
-    up3 = _unit(s * sum(d * x.axis for d, x in zip(senses, every)))
-    strand = lambda k: every[k] if k >= 0 else sheet.strands[0]  # noqa: E731
-    index = {id(x): k for k, x in enumerate(every)}
-    parent = {n + i: index[id(a.parent)] for i, a in enumerate(sheet.accessory)}
-    height = lambda k, ref: float(_snap((_snap(strand(k).centroid) - _snap(strand(ref).centroid)) @ up3 * SCALE))  # noqa: E731
-
-    def need(a: int, b: int) -> float:  # a below b, at least their reach apart
+    def need(a: int, b: int) -> float:  # a below b, end to end
         return (_strand_length(strand(a)) + _strand_length(strand(b))) / 2 + room(a, b)
 
+    n = len(sheet.strands)
+    up3 = _unit(s * sum(d * x.axis for d, x in zip(senses, every)))
+    index = {id(x): k for k, x in enumerate(every)}
+    stacks: dict[int, list[int]] = {column[k]: [k] for k in range(n)}  # each column bottom to top
+    for i, a in enumerate(sheet.accessory):
+        k, p = n + i, index[id(a.parent)]
+        stack = stacks.setdefault(column[k], [p])
+        j = stack.index(p)
+        rise = float(_snap((_snap(a.strand.centroid) - _snap(a.parent.centroid)) @ up3))
+        top, bottom = j == len(stack) - 1, j == 0
+        up = (rise >= 0 and top) or (not bottom and top) or (rise >= 0 and not bottom)
+        stack.insert(j + 1 if up else j, k)
     out: dict[int, float] = {}
-    cols: dict[int, list[int]] = {}
-    for k in sorted(column, key=lambda k: (k >= n, k)):
-        cols.setdefault(column[k], []).append(k)
-    track = [c for c, ks in cols.items() if ks[0] < n]
-    rest = sorted((c for c in cols if c not in track), key=lambda c: min(cols[c]))
-    for c in [*track, *rest]:  # a track strand's column first; then a branch's, from its parent's height
-        ks = cols[c]
-        if ks[0] < n:  # the track strand (or the ghost) keeps its row; the others go out from it
-            ys = sorted((height(k, ks[0]), k) for k in ks)
-            at = next(i for i, (_, k) in enumerate(ys) if k == ks[0])
-            placed = {at: 0.0}
-            for i in range(at + 1, len(ys)):
-                placed[i] = max(ys[i][0], placed[i - 1] + need(ys[i - 1][1], ys[i][1]))
-            for i in range(at - 1, -1, -1):
-                placed[i] = min(ys[i][0], placed[i + 1] - need(ys[i][1], ys[i + 1][1]))
-            out.update({k: float(_snap(placed[i])) for i, (_, k) in enumerate(ys) if i != at})
+    for stack in stacks.values():
+        if len(stack) < 2:
             continue
-        ref = parent[ks[0]]  # past the track's end: as they lie from the parent of the first, at its height
-        ys = sorted((out.get(ref, 0.0) + height(k, ref), k) for k in ks)
-        placed_ = [ys[0][0]]
-        for (_, a), (y, b) in zip(ys, ys[1:]):
-            placed_.append(max(y, placed_[-1] + need(a, b)))
-        shift = (ys[0][0] + ys[-1][0]) / 2 - (placed_[0] + placed_[-1]) / 2  # the column's middle kept where it was
-        out.update({k: float(_snap(y + shift)) for y, (_, k) in zip(placed_, ys)})
+        at = next(j for j, k in enumerate(stack) if k < n)
+        placed = {at: 0.0}
+        for j in range(at + 1, len(stack)):
+            placed[j] = placed[j - 1] + need(stack[j - 1], stack[j])
+        for j in range(at - 1, -1, -1):
+            placed[j] = placed[j + 1] - need(stack[j], stack[j + 1])
+        out.update({k: float(_snap(placed[j])) for j, k in enumerate(stack) if j != at})
     return out
 
 
@@ -2328,20 +2319,34 @@ def _unwrap(items: list[_Item], ties: dict[int, tuple[int, int]], frame) -> dict
 
 
 def _partners(it: _Item, ps: list[int]) -> list[Placed]:
-    """The strands of item `it` beside its strands `ps` in the sheet (at most one strand pitch across from one of
-    them, their spans meeting along it), not among them: those they pair with, whose ghosts stand beside them where
-    they leave (_unwrap)."""
+    """The strands of item `it` beside its strands `ps` in the sheet, not among them: those they pair with, whose
+    ghosts stand beside them where they leave (_unwrap). A strand standing in another's column (an accessory strand,
+    end to end with its partner: Sheet.accessory) has that partner, the strand next to it in its column; any other has
+    the strands at most one pitch across whose spans meet its own."""
+
+    def strand(q):
+        m = it.members[q]
+        return isinstance(m, Placed) and not m.ghost and m.sse.kind == "E"
+
     out = []
-    for q, m in enumerate(it.members):
-        if q in ps or not isinstance(m, Placed) or m.ghost or m.sse.kind != "E":
+    for p in ps:
+        if not strand(p):
             continue
-        if any(
-            it.members[p].sse.kind == "E"
-            and abs(it.offsets[q][0] - it.offsets[p][0]) <= max(m.width, it.members[p].width) + 1e-6
-            and abs(it.offsets[q][1] - it.offsets[p][1]) < (m.length + it.members[p].length) / 2  # side by side: a
-            for p in ps  # strand stacked in the next column (Sheet.accessory) is beside it where their spans meet
-        ):
-            out.append(m)
+        mp, (x, y) = it.members[p], it.offsets[p]
+        column = [q for q in range(len(it.members)) if q != p and strand(q) and abs(it.offsets[q][0] - x) < 1e-6]
+        if column:  # stacked: the nearest above or below, end to end
+            near = min(column, key=lambda q: (abs(it.offsets[q][1] - y), q))
+            found = [near]
+        else:
+            found = [
+                q
+                for q in range(len(it.members))
+                if q != p
+                and strand(q)
+                and abs(it.offsets[q][0] - x) <= max(mp.width, it.members[q].width) + 1e-6
+                and abs(it.offsets[q][1] - y) < (mp.length + it.members[q].length) / 2
+            ]
+        out += [it.members[q] for q in found if q not in ps and it.members[q] not in out]
     return out
 
 

@@ -45,7 +45,7 @@ def test_a_branch_strand_is_kept_off_the_track_beside_its_parent():
     (sh,) = build_sheets([c, a, b, d], br)
     assert sh.ambiguous and [s.start for s in sh.strands] == [20, 0, 40]  # a c b: each pairs with the next
     ((acc, parent, column, direction),) = sh.accessory
-    assert acc is d and parent is c and abs(column - 1) == 1 and direction == 1  # a c d: + - +
+    assert acc is d and parent is c and column == 1 and direction == 1  # a c d: + - +; in c's own column
     assert sorted(s.start for s in [*sh.strands, acc]) == [0, 20, 40, 60]
 
 
@@ -71,7 +71,7 @@ def test_a_barrel_keeps_its_ring_and_draws_a_pendant_strand_off_it():
     assert sh.closed and not sh.unclosed and len(sh.strands) == 6 and set(sh.strands) == set(ring)
     assert {sh.strands[0].start, sh.strands[-1].start} in ({0, 100}, {100, 0})  # cut at the weakest pairing
     ((acc, parent, column, _),) = sh.accessory
-    assert acc is x and parent is ring[2] and abs(column - sh.strands.index(ring[2])) == 1
+    assert acc is x and parent is ring[2] and column == sh.strands.index(ring[2])  # end to end with its partner
 
 
 def test_a_cycle_whose_ends_do_not_pair_is_drawn_open():
@@ -189,10 +189,9 @@ def test_bulged_strands_take_their_true_place_in_the_sheet():
 
 def test_a_strand_continuing_another_along_their_partner_shares_its_column():
     """5KQJ (random-100 C34): F pairs with E end to end with B, on E's same side (F at 3D y +11.8, B at -1.1, 0.8 Å
-    apart along E): two strands end to end along one edge of a partner. The sheet's one path of strands drew F as a
-    column of its own, wedged
-    between E and B (C D E F B A). Such a pair now shares a column (F, off the track, an accessory strand beside E,
-    plan 12), one above the other as along E, and the order check reads the block by its columns."""
+    apart along E). The sheet's one path of strands drew F as a column of its own, wedged between E and B (C D E F B
+    A); C34 stacked it in B's column. Plan 12 fix round 1 ruling: an accessory strand stands in its own partner's
+    column, end to end with it, never in another strand's (B's column read as F pairing with B): F above or below E."""
     from foldmap import figcheck
     from foldmap.cli import make_layout
     from foldmap.spec import draw_spec, figure_spec
@@ -200,9 +199,9 @@ def test_a_strand_continuing_another_along_their_partner_shares_its_column():
     path = Path(__file__).parent / "data" / "r100" / "5KQJ.cif.gz"
     lay, sses, _ = make_layout(path)
     b, e, f = lay.placed["A:44-50"], lay.placed["A:83-93"], lay.placed["A:96-99"]
-    assert abs(b.cx - f.cx) < 1e-9 and abs(e.cx - b.cx) > 0.5
-    (by0, by1), (fy0, fy1) = sorted((b.n_port[1], b.c_port[1])), sorted((f.n_port[1], f.c_port[1]))
-    assert by1 <= fy0 or fy1 <= by0  # one above the other
+    assert abs(e.cx - f.cx) < 1e-9 and abs(e.cx - b.cx) > 0.5
+    (ey0, ey1), (fy0, fy1) = sorted((e.n_port[1], e.c_port[1])), sorted((f.n_port[1], f.c_port[1]))
+    assert ey1 <= fy0 or fy1 <= ey0  # one above the other
     block = next(ids for ids in lay.sheets if "A:96-99" in ids)
     assert len({round(lay.placed[k].cx, 6) for k in block}) == len(block) - 1
     d = draw_spec(figure_spec(path))
@@ -229,20 +228,29 @@ def test_the_loops_out_of_a_shared_column_never_meet_in_its_gap():
     lay, sses, bb = make_layout(Path(__file__).parent / "data" / "r100" / "5KQJ.cif.gz")
     loops = route_loops(lay, sses, bb)
     assert lay.stack_gaps and not any(lp.fallback for lp in loops)
-    for box in lay.stack_gaps:
-        inside = [in_box(lp.points, box) for lp in loops]
-        inside = [pts for pts in inside if len(pts)]
-        assert len(inside) == 2
-        a, b = inside
-        d = a[:, None, :] - b[None, :, :]
-        assert np.hypot(d[..., 0], d[..., 1]).min() >= 0.05
+    for box in lay.stack_gaps:  # the loops leaving the gap's two facing ends (fix round 1: F above E, its partner;
+        cx = (box[0] + box[2]) / 2  # other loops may cross the gap)
+        facing = [
+            lp
+            for lp in loops
+            if any(
+                abs(p[0] - cx) < 1e-6 and min(abs(p[1] - box[1]), abs(p[1] - box[3])) < 1e-6
+                for p in (lp.points[0], lp.points[-1])
+            )
+        ]
+        assert len(facing) == 2
+        a, b = (in_box(lp.points, box) for lp in facing)
+        if len(a) and len(b):
+            d = a[:, None, :] - b[None, :, :]
+            assert np.hypot(d[..., 0], d[..., 1]).min() >= 0.05
 
 
 def test_partners_far_apart_along_a_long_strand_share_its_edge_in_one_column():
     """C34's controls (batch C2a review Q3), revised by plan 12: 8UTF's a:266-273 and a:318-322 both pair with
     a:278-301 on one side, 27.6 Å apart along it. C2a kept each in a column of its own, so one stood between
-    a:278-301 and the other, which do not pair (an S1 failure); the one off the track now shares the other's column,
-    one above the other as along a:278-301. A sheet with no branch (1TIM's barrel) has no accessory strand and no
+    a:278-301 and the other, which do not pair (an S1 failure); the one off the track now stands in a:278-301's own
+    column, end to end with it (fix round 1 ruling). A sheet with no branch (1TIM's barrel) has no accessory strand
+    and no
     stack gap."""
     from foldmap.cli import make_layout
 
@@ -253,7 +261,7 @@ def test_partners_far_apart_along_a_long_strand_share_its_edge_in_one_column():
     pair = {"a:266-273", "a:318-322"}
     (sh,) = [sh for sh in sheets if any(a.strand.id in pair for a in sh.accessory)]
     (acc,) = [a for a in sh.accessory if a.strand.id in pair]
-    assert acc.parent.id == "a:278-301" and sh.strands[acc.column].id in pair
+    assert acc.parent.id == "a:278-301" and sh.strands[acc.column].id == "a:278-301"  # its partner's own column
     lay, _, _ = make_layout(data / "1TIM.cif")
     assert lay.stack_gaps == [] and lay.accessory == {}
     bb = load_backbone(data / "1TIM.cif", "auto")
@@ -275,7 +283,7 @@ def test_fimd_barrel_has_24_strands_and_its_pendant_strand_beside_its_partner():
     ids = [s.id for s in barrel.strands]
     assert len(ids) == 24 and abs(ids.index("D:645-659") - ids.index("D:139-153")) == 1
     assert [(a.strand.id, a.parent.id) for a in barrel.accessory] == [("D:662-666", "D:645-659")]
-    assert sheet_checks(sheets, sses, d.bridges) | {"S4": None, "S5": None} == dict.fromkeys(("S1", "S2", "S3"), []) | {
+    assert sheet_checks(sheets, sses, d.bridges) == dict.fromkeys(("S1", "S2", "S3", "S6"), []) | {
         "S4": None,
         "S5": None,
     }

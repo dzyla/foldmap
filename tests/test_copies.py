@@ -138,8 +138,8 @@ def test_copies_of_one_domain_get_alike_panels():
 def test_a_lent_strand_past_the_row_end_shows_the_strands_it_pairs_with(name):
     """A strand drawn past the row's end (it pairs in protomer 0's sheet, across the cut) stands beside dashed ghosts
     of its partners, one strand pitch across, their spans meeting, as it stands beside the real ones in every other
-    copy (plan 12 Task 2: 8UTF's 440-442, off its sheet's track, stands in the next column, above the partner's
-    centre)."""
+    copy (plan 12 Task 2 fix round 1: 8UTF's 440-442, off its sheet's track, stands end to end with its partner in
+    the partner's column)."""
     from foldmap.layout import PITCH, block_ghosts
 
     d = drawn(DATA / f"{name}.cif")
@@ -152,8 +152,8 @@ def test_a_lent_strand_past_the_row_end_shows_the_strands_it_pairs_with(name):
         assert partners, lay.sheets[k]
         for i in lay.sheets[k]:
             p = lay.placed[i]
-            near = min(
-                abs(g.cx - p.cx) if abs(g.cy - p.cy) < (g.length + p.length) / 2 else np.inf
+            near = min(  # across, spans meeting; or in its column, end to end (an accessory strand, fix round 1)
+                abs(g.cx - p.cx) if abs(g.cy - p.cy) < (g.length + p.length) / 2 or abs(g.cx - p.cx) < 1e-6 else np.inf
                 for g in [*partners, *(lay.placed[j] for j in lay.sheets[k] if j != i)]
             )
             assert near <= PITCH + 1e-6, (i, near)

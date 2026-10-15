@@ -396,10 +396,12 @@ On large complexes the lines can pile up into a hairball (30QM with `hbonds=na` 
 **Checking the science.** A figure can look clean and still say something false about the structure, so foldmap
 checks what it draws against the coordinates, apart from how the page looks. `foldmap check 9FWZ` draws the figure
 `plot` would (same options, `-o` to save it) and prints one line per check and one per problem, exiting 1 on any:
-S1, two strands drawn side by side in a sheet are joined by at least one backbone bridge (a branch strand stacked in
-a shared column must sit beside one of its partners); S2, a closed barrel's closure (the ghost beside the last
-strand) is; S3, a barrel's strand count is the cycle its pairing makes. S4 (ligand and modified-residue marks at
-their residue) and S5 (automatic domains against a reference) are not yet measured. `foldmap summary` prints the
+S1, two strands drawn side by side in a sheet are joined by at least one backbone bridge (a strand stacked in a
+shared column must pair with a strand of its column or the next); S2, a closed barrel's closure (the ghost beside the
+last strand) is; S3, a barrel's strand count is the cycle its pairing makes; S6, a strand off a sheet's run of
+paired strands stands at its partner: end to end with it in its column, or alone in the column beside it, never in
+another strand's column. S4 (ligand and modified-residue marks at their residue) and S5 (automatic domains against a
+reference) are not yet measured. `foldmap summary` prints the
 same checks of the sheets as built.
 
 **Checking the contact beads.** `foldmap contacts 1LMB.cif` draws the figure `plot` would (it takes the same options),
@@ -456,14 +458,14 @@ Every figure (command line, app, MCP or Python) goes through the same steps:
    from the ladder network, and a sheet whose ends pair is a closed barrel. Each strand drawn side by side with
    another pairs with it: a branched sheet's run of paired strands is its ladder network's longest path (a closed
    barrel's: its longest pairing cycle, so FimD 9FWZ has 24 barrel strands and OmpF 16), and a strand off that run
-   (a short strand pairing with one barrel strand, or a branch of several) is drawn beside its partner, stacked in
-   the column next to it, one above the other as along the partner; never between two strands that pair.
-   `foldmap summary` lists these strands ("beside … (off the run)") and the figure's note names them. Barrels that
+   (a short strand pairing with one barrel strand, or a branch of several) is drawn at its partner, end to end with
+   it in the partner's own column, above or below as it lies along it; never between two strands that pair, nor in
+   another strand's column. `foldmap summary` lists these strands ("beside … (off the run)") and the figure's note
+   names each with its partner ("D:662-666 drawn beside its partner D:645-659"). Barrels that
    pair with one another (the four OB folds of the SSB tetramer 1EYG) are each drawn closed, as a sheet of its own;
    the note and the summary name the pairings joining them. A barrel whose ends do not pair is drawn open, with the
-   note "barrel closure not supported by pairing: drawn open". Two strands
-   end to end along one edge of a partner share a column the same way. Helices packed along their length across
-   chains form bundles.
+   note "barrel closure not supported by pairing: drawn open". Helices packed along their length across chains
+   form bundles.
 4. **Context.** Symmetry (cyclic, dihedral, cubic, helical) is found by superposing chains of the same sequence;
    disulfides, glycans and ligands are read from the atoms; a membrane is estimated on request. Nucleic acids:
    base pairs grouped into stems; long bent duplexes cut where the axis turns by 25°.

@@ -90,24 +90,14 @@ def _ring(tree: nx.Graph, graph: nx.Graph) -> list[int] | None:
     return best if len(best) >= _BARREL_MIN else None
 
 
-def _branch_columns(track: list[int], off: list[tuple[int, int]], strands: list[SSE]) -> dict[int, int]:
-    """The column each off-track strand is drawn in (Accessory.column): beside the strand it hangs from, on the side
-    it lies on in 3D, sharing the column of the track strand there (stacked end to end with it, layout._column_heights;
-    as C2a stacked two strands along one edge of a partner) or past the track's end. The side: the
-    strand's offset from its parent against the track's local across direction (from the track strand before the
-    parent's column to the one after it), both seen across the parent's axis; snapped."""
-    from .layout import _snap, _unit
-
-    n = len(track)
+def _branch_columns(track: list[int], off: list[tuple[int, int]]) -> dict[int, int]:
+    """The column each off-track strand is drawn in (Accessory.column): its partner's own (the strand it hangs from),
+    end to end with it (layout._column_heights stacks them), a branch of several strands so up its root's partner's
+    column. Fix round 1 ruling: never another strand's column, which reads as pairing with that strand (9FWZ's
+    D:662-666 stood in D:634-641's column, beside its partner D:645-659)."""
     column = {node: k for k, node in enumerate(track)}
     for node, parent in off:
-        c = column[parent]
-        at = min(max(c, 0), n - 1)
-        across = _snap(strands[track[min(at + 1, n - 1)]].centroid) - _snap(strands[track[max(at - 1, 0)]].centroid)
-        axis = _unit(strands[parent].axis)
-        v = _snap(strands[node].centroid) - _snap(strands[parent].centroid)
-        side = float((v - (v @ axis) * axis) @ (across - (across @ axis) * axis))
-        column[node] = c + (1 if side >= 0 else -1)
+        column[node] = column[parent]
     return {node: column[node] for node, _ in off}
 
 
@@ -129,10 +119,10 @@ def build_sheets(sses: list[SSE], bridges: list[Bridge]) -> list[Sheet]:
     """The sheets of these strands: strands joined by at least _MIN_PAIRS bridges, per connected component its
     maximum spanning tree. The track (Sheet.strands): the tree's longest path; a closed sheet's (its pairing has a
     cycle): a branched tree's longest cycle (_ring), a path tree's path. A part off that ring closing a barrel of its
-    own is a sheet of its own (_other_rings). Every other strand is an accessory strand (Sheet.accessory), drawn
-    beside the strand it hangs from (_branch_columns), never between two strands that pair. A sheet whose pairing
-    has a cycle but whose track's ends do not pair (or whose longest cycle is under _BARREL_MIN strands) is drawn
-    open, flagged `unclosed`."""
+    own is a sheet of its own (_other_rings). Every other strand is an accessory strand (Sheet.accessory), drawn in
+    the column of the strand it hangs from (_branch_columns), never between two strands that pair. A sheet whose
+    pairing has a cycle but whose track's ends do not pair (or whose longest cycle is under _BARREL_MIN strands) is
+    drawn open, flagged `unclosed`."""
     strands = [s for s in sses if s.kind == "E"]
     table = _edge_table(strands, bridges)
     weak = _edge_table(strands, bridges, minimum=1)  # single bridges, used only to close barrels
@@ -168,7 +158,7 @@ def build_sheets(sses: list[SSE], bridges: list[Bridge]) -> list[Sheet]:
         kinds = [tree.edges[a, b]["kind"] for a, b in zip(order, order[1:])]
         if not cyclic and not ambiguous and len(order) >= _BARREL_MIN and ends in weak:
             closed = True  # a barrel whose last pairing is a lone bridge (DSSP counts it as a ladder too)
-        columns = _branch_columns(order, off, strands)
+        columns = _branch_columns(order, off)
         accessory = [Accessory(strands[k], strands[p], columns[k], direction[k]) for k, p in off]
         mine = {*order, *(k for k, _ in off)}
         apart = set(comp_of[comp[0]]) - mine  # strands of its component drawn in another sheet

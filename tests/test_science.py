@@ -38,11 +38,9 @@ def test_a_strand_stacked_beside_its_parent_passes_and_one_beside_none_fails():
     s1, _ = neighbour_findings(cols, counts({("a", "b"): 4, ("b", "c"): 5, ("a", "x"): 3}))  # x pairs with a only
     assert s1 == ["x drawn in a shared column beside none of its partners"]
     s1, _ = neighbour_findings([col("a"), col("b", "x")], counts({("b", "x"): 3}))  # no bridge across at all
-    assert s1 == [
-        "columns a | b/x share no bridge",
-        "b drawn in a shared column beside none of its partners",
-        "x drawn in a shared column beside none of its partners",
-    ]
+    assert s1 == ["columns a | b/x share no bridge"]  # x end to end with its partner b (fix round 1): both pair
+    s1, _ = neighbour_findings([col("a"), col("b", "x")], counts({("a", "b"): 3}))  # x pairs with nothing here
+    assert s1 == ["x drawn in a shared column beside none of its partners"]
 
 
 def test_an_unpaired_closure_fails_s2():
@@ -112,7 +110,7 @@ def test_a_control_barrel_figure_passes_and_a_moved_strand_fails(path):
     from foldmap.figcheck import drawn_columns, science_checks
 
     d = _drawn(path)
-    assert science_checks(d) | {"S4": None, "S5": None} == {"S1": [], "S2": [], "S3": [], "S4": None, "S5": None}
+    assert science_checks(d) == {"S1": [], "S2": [], "S3": [], "S4": None, "S5": None, "S6": []}
     k = next(k for k, ids in enumerate(d.layout.sheets) if len(ids) >= 8)
     cols = drawn_columns(d.layout, k)
     a, b = d.layout.placed[cols[1][0][0]], d.layout.placed[cols[4][0][0]]
@@ -131,11 +129,12 @@ def test_science_lines_say_pass_count_or_not_yet_measured():
         "S2 barrel closure pairs: 1 problem(s)",
         "  sheet 1: c | a (ghost) drawn side by side with no bridge",
     ]
-    assert lines[-2:] == [
+    assert lines[-3:] == [
         "S4 residue marks at their residue: not yet measured",
         "S5 automatic domains agree with a reference: not yet measured",
+        "S6 accessory drawn at its partner: not yet measured",
     ]
-    assert list(SCIENCE) == ["S1", "S2", "S3", "S4", "S5"]
+    assert list(SCIENCE) == ["S1", "S2", "S3", "S4", "S5", "S6"]
 
 
 def test_summary_prints_the_science_checks():
@@ -161,6 +160,7 @@ def test_check_command_prints_the_figures_science_and_exits_1_on_a_problem(capsy
             "S3": [],
             "S4": None,
             "S5": None,
+            "S6": [],
         },
     )
     assert main(["check", str(DATA / "1UBQ.cif")]) == 1
@@ -185,13 +185,13 @@ def test_branched_sheets_draw_every_strand_beside_a_partner(path):
 
     d = _drawn(path)
     found = science_checks(d)
-    assert found["S1"] == found["S2"] == found["S3"] == [], found
+    assert found["S1"] == found["S2"] == found["S3"] == found["S6"] == [], found
     assert d.layout.accessory
-    for k in range(len(d.layout.sheets)):
+    for k in range(len(d.layout.sheets)):  # fix round 1 ruling: in the partner's own column, or beside it alone
         where = {i: c for c, col in enumerate(drawn_columns(d.layout, k)) for i, g in col if not g}
         for strand, parent in d.layout.accessory.items():
             if strand in where and parent in where:
-                assert abs(where[strand] - where[parent]) == 1, (strand, parent)
+                assert abs(where[strand] - where[parent]) <= 1, (strand, parent)
 
 
 def test_fimd_figure_has_its_24_strand_barrel_and_says_where_its_pendant_strand_is(capsys, tmp_path):
@@ -236,3 +236,32 @@ def test_ssb_draws_each_subunit_its_own_ob_fold_barrel():
     found = science_checks(d)
     assert found["S1"] == found["S2"] == found["S3"] == []
     assert "barrels drawn apart, each closed, that also pair: A:1005-1021 with B:2005-2021, " in d.layout.sheet_notes[0]
+
+
+def spot(i, c, lo=None, hi=None, ghost=False):
+    return (i, c, None if lo is None else (lo, hi), ghost)
+
+
+def test_s6_an_accessory_stands_at_its_own_partner():
+    """Fix round 1 ruling: an accessory strand stands in its partner's own column, next to it (end to end), or in a
+    column beside the partner's that it has alone, their spans overlapping; never in another strand's column."""
+    from foldmap.science import partner_findings
+
+    track = [spot("p", 1, -5, 5), spot("q", 2, -5, 5)]
+    assert partner_findings([*track, spot("x", 1, 6, 8)], {"x": "p"}) == []  # end to end with p
+    assert partner_findings([*track, spot("x", 2, 6, 8)], {"x": "p"}) == ["x drawn in q's column, not at its partner p"]
+    assert partner_findings([*track, spot("x", 0, -2, 2)], {"x": "p"}) == []  # beside p, alone, overlapping
+    assert partner_findings([*track, spot("x", 0, 6, 8)], {"x": "p"}) == ["x drawn away from it, not at its partner p"]
+    found = partner_findings([*track, spot("y", 1, 6, 8), spot("x", 1, 9, 11)], {"x": "p", "y": "p"})
+    assert found == ["x drawn in its partner p's column but not next to it (y between)"]
+    assert partner_findings([*track, spot("x", 2)], {"x": "p"}) == ["x drawn in q's column, not at its partner p"]
+
+
+def test_fimd_pendant_strand_stands_at_its_partner():
+    """Fix round 1 (controller VIEW of 9FWZ): S31, D:662-666, stood in S29's (D:634-641) column, beside its partner
+    S30 (D:645-659): it read as pairing with S29. S6 holds for the sheets as built and for the figure."""
+    from foldmap.figcheck import science_checks
+
+    sses, sheets, bridges = _built(R100 / "9FWZ-DB.cif.gz")
+    assert sheet_checks(sheets, sses, bridges)["S6"] == []
+    assert science_checks(_drawn(R100 / "9FWZ-DB.cif.gz"))["S6"] == []

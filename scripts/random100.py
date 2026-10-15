@@ -2118,7 +2118,7 @@ def science_section(entries: list[dict]) -> list[str]:
     from foldmap.science import SCIENCE
 
     rows = [(e, science(e)) for e in entries]
-    lines = ["", "## Science checks (S1-S5), apart from A1-A20", "", "| check | pass | fail | not measured |"]
+    lines = ["", "## Science checks (S1-S6), apart from A1-A20", "", "| check | pass | fail | not measured |"]
     lines.append("|---|---|---|---|")
     for key, what in SCIENCE.items():
         got = [s[key]["pass"] for _, s in rows]
