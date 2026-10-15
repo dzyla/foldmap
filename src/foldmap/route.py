@@ -653,10 +653,20 @@ def _text_hits(points, boxes) -> int:
 _REROUTE_TURNS = 4  # corners a route off NA text may add to the one it replaces (no weaving round each letter)
 
 
-def _better(new, old, boxes, text) -> bool:
+def _strand_crossings(points, strands) -> int:
+    """How many times a polyline properly crosses the nucleic-acid strands (`strands`, an na_paths._Strands)."""
+    return strands.crossings(points) if strands is not None else 0
+
+
+def _better(new, old, boxes, text, strands=None) -> bool:
     """Does route `new` cross less nucleic-acid text (`boxes`) than `old`, and no more text in all (`text`: the
-    names and stubs routes keep out of), with at most _REROUTE_TURNS more corners?"""
+    names and stubs routes keep out of), with at most _REROUTE_TURNS more corners, crossing the strands (`strands`:
+    routed round the old route) no more often than it crosses less text (fix round 1: one crossing more per letter or
+    label freed at most)?"""
     if len(new) > len(old) + _REROUTE_TURNS:
+        return False
+    freed = _text_hits(old, boxes) - _text_hits(new, boxes)
+    if _strand_crossings(new, strands) - _strand_crossings(old, strands) > freed:
         return False
     fewer = _text_hits(new, boxes) < _text_hits(old, boxes)
     return fewer and _text_hits(new, [*boxes, *text]) < _text_hits(old, [*boxes, *text])
@@ -674,22 +684,39 @@ def _off_na_text(layout: Layout, router: _Router, loops: list[Loop]) -> None:
     hit = [k for k, lp in enumerate(loops) if not lp.fallback and len(lp.points) > 2 and _text_hits(lp.points, boxes)]
     if not hit:
         return
+    from .na_paths import _Strands
+
     grid = router.grid
     text = grid._mask(boxes)
     grid.toll = np.where(text, _NA_TEXT_TOLL, 0.0)
+    strands = _Strands(None)  # the nucleic acid's strands as drawn: a reroute crosses no more of them
+    for path in layout.na_paths:
+        strands.add(path.points)
     for k in hit:
         lp = loops[k]
         pa, pb = layout.placed[lp.a_id], layout.placed[lp.b_id]
         cells = sorted({c for p, q in zip(lp.points, lp.points[1:]) for c in grid.cells_along(p, q)})
         for c in cells:  # its own cells free while it looks again
             grid.used[c] = max(grid.used[c] - 1, 0)
+        under = (  # as route_loops routed it: a helix over a sheet leaves it across its strands
+            _strands_under(layout, lp.a_id, pa.c_port) | ({lp.b_id} if pb.over else set()),
+            _strands_under(layout, lp.b_id, pb.n_port) | ({lp.a_id} if pa.over else set()),
+        )
+        exempt = _over_exempt(layout, lp.a_id, lp.b_id)
+        for h in exempt:
+            grid.blocked &= ~grid.over[h]
         best, over = None, False
         for ea, eb in _over_exits(pa, pb):
-            best, over = router.route(pa.c_port, ea, pa, pb.n_port, eb, pb, loose=(pa.over, pb.over))
+            best, over = router.route(
+                pa.c_port, ea, pa, pb.n_port, eb, pb, loose=(pa.over, pb.over), under=under, exempt=exempt
+            )
             if best is not None:
                 break
+        for h in exempt:
+            grid.blocked |= grid.over[h]
         over = over and _text_hits(best, router.keep_out) > 0  # routed with the keep-outs open: does it cross one?
-        if best is not None and _better(best, lp.points, boxes, router.keep_out) and over <= lp.crosses_labels:
+        better = best is not None and _better(best, lp.points, boxes, router.keep_out, strands)
+        if better and over <= lp.crosses_labels:
             loops[k] = Loop(lp.a_id, lp.b_id, [(float(x), float(y)) for x, y in best], lp.dashed, False, over)
             continue
         if best is not None:  # not taken: give back the cells drawn() marked

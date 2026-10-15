@@ -754,3 +754,20 @@ def test_protein_loops_keep_off_the_nucleotide_letters():
     assert d.over_labels == []  # and no route over a name instead (the campaign's A4: a reroute flagged over)
     hits = [h for h in figcheck.text_collisions(d) if h.startswith("na:")]
     assert hits == [], hits
+
+
+def test_a_reroute_off_na_text_crosses_no_more_strands():
+    """Fix round 1 (minor): C11's reroute took a route that crossed less NA text and no more text in all, whatever it
+    crossed of the nucleic acid's strands, routed round the old path. A reroute may cross the strands at most once
+    more for each piece of text it frees (6SO9's loop: 3 letters freed, 3 more crossings of the bound RNA's trace);
+    here one letter freed for two more crossings: not taken."""
+    from foldmap.na_paths import _Strands
+
+    letter = [(4.0, 1.5, 5.0, 2.5)]
+    strands = _Strands(None)
+    strands.add([(6.0, -5.0), (6.0, 5.0)])  # a strand across x = 6
+    old = [(0.0, 0.0), (0.0, 2.0), (10.0, 2.0), (10.0, 0.0)]  # through the letter, across the strand once
+    around = [(0.0, 0.0), (0.0, 3.0), (10.0, 3.0), (10.0, 0.0)]  # over the letter, across the strand once
+    weave = [(0.0, 0.0), (0.0, 3.0), (7.0, 3.0), (7.0, -1.0), (5.5, -1.0), (5.5, -2.0), (10.0, -2.0), (10.0, 0.0)]
+    assert route._better(around, old, letter, [], strands)
+    assert route._strand_crossings(weave, strands) == 3 and not route._better(weave, old, letter, [], strands)
