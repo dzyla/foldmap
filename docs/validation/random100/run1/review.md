@@ -738,6 +738,12 @@ face). A18 excuses a sideways run only as one of a loop's first two segments fro
 could excuse the first sideways run of more than 0.5 (a stub under 0.5 not counted) before the loop first leaves
 the band.
 
+**Batch C2a fix round 1 (6JO6 ruling):** `membrane._estimate` allows a slab up to 0.20 polar
+(`_MAX_POLAR_CROSSED`) when `_MANY_CROSSING` (10) or more long elements cross it, the hydrophobic minimum (0.55)
+still holding. 6JO6 (0.174 polar, 46 crossing) gets its band: all 30 TM helices cross it; one loop stays in the slab
+(5:167-169>5:179-207 leaves a port 0.03 outside the face). Controls 1UBQ, 2LZM, 2HHB, 8UUP, 8UTF, 6ZS5, 1TIM,
+AF-P04637, 1EMA (GFP) and 1LDM find no membrane. Fixture 6JO6-AB (59 KB; budget 900 KB).
+
 ### C18 (b + a): pairs and copies matched by author residue numbers; untied copies go unchecked (2 + visual 2)
 
 **Entries:** 1RM5 and 2HKI (A19, one pair, both fail). Visual: 2MJW (S100P B and D not tied), 8QEM (one copy

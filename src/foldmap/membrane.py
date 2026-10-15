@@ -25,6 +25,9 @@ HALF = 15.0  # Å, half the hydrophobic thickness of a typical bilayer
 _HYDROPHOBIC = {"ALA", "ILE", "LEU", "MET", "PHE", "VAL", "TRP", "CYS"}
 _POLAR = {"LYS", "ARG", "ASP", "GLU", "ASN", "GLN", "HIS"}
 _MIN_HYDROPHOBIC, _MAX_POLAR = 0.55, 0.15  # a slab this oily and this uncharged is membrane
+# ... or this polar when this many long elements cross it (6JO6, photosystem I: 0.174 polar, 46 crossing; cofactor
+# pockets in the slab; the sample's soluble entries with 10 or more crossing are at most 0.39 hydrophobic)
+_MAX_POLAR_CROSSED, _MANY_CROSSING = 0.20, 10
 _SIDED_RATIO, _SIDED_DIFF = 2.0, 3  # Lys/Arg counts must differ this clearly to call the sides
 _MIN_CROSSING = 10.0  # Å an element must reach beyond the centre on both sides to cross the membrane
 
@@ -231,7 +234,8 @@ def _estimate(bb: Backbone, sses: list[SSE]) -> Membrane | None:
         if z[s.start : s.end + 1].min() < centre - _MIN_CROSSING
         and z[s.start : s.end + 1].max() > centre + _MIN_CROSSING
     ]
-    if hyd[inside].mean() < _MIN_HYDROPHOBIC or pol[inside].mean() > _MAX_POLAR or not crossing:
+    polar = _MAX_POLAR_CROSSED if len(crossing) >= _MANY_CROSSING else _MAX_POLAR
+    if hyd[inside].mean() < _MIN_HYDROPHOBIC or pol[inside].mean() > polar or not crossing:
         return None
     return Membrane(normal, float(centre), HALF, "estimate")
 

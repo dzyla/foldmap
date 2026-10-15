@@ -19,9 +19,29 @@ def test_membrane_proteins_are_recognised(name):
     assert np.isclose(np.linalg.norm(m.normal), 1.0)
 
 
-@pytest.mark.parametrize("name", ["1UBQ", "2LZM", "2HHB", "8UUP", "8UTF", "6ZS5", "1TIM", "AF-P04637"])
+@pytest.mark.parametrize("name", ["1UBQ", "2LZM", "2HHB", "8UUP", "8UTF", "6ZS5", "1TIM", "AF-P04637", "1EMA"])
 def test_soluble_proteins_are_not(name):
     assert find_membrane(DATA / f"{name}.cif", load_backbone(DATA / f"{name}.cif", "asu")) is None
+
+
+def test_a_soluble_tetramer_is_not_a_membrane():
+    """1LDM (lactate dehydrogenase tetramer, the fidelity fixture): its long helices cross no slab oily enough."""
+    path = DATA / "fidelity" / "1LDM.cif.gz"
+    assert find_membrane(path, load_backbone(path, "auto")) is None
+
+
+def test_a_slab_crossed_by_many_long_elements_may_be_more_polar():
+    """6JO6 (photosystem I; random-100 C17, 6JO6 ruling): its slab is 0.174 polar (chlorophyll pockets, His ligands),
+    over the 0.15 limit, so no membrane was found and the membrane view drew no band. A slab that 10 or more long
+    elements cross may be up to 0.20 polar, the hydrophobic minimum (0.55) still holding. The cut keeps chains A and B
+    within 18 Å of the mid-plane: 0.162 polar, 0.567 hydrophobic, 21 long elements crossing."""
+    from foldmap import membrane
+
+    path = DATA / "r100" / "6JO6-AB.cif.gz"
+    bb = load_backbone(path, "auto")
+    found = find_membrane(path, bb)
+    assert found is not None and found.source == "estimate" and found.half == membrane.HALF
+    assert membrane._MAX_POLAR < 0.174 <= membrane._MAX_POLAR_CROSSED and membrane._MANY_CROSSING == 10
 
 
 def test_opm_dummy_atoms_give_the_exact_membrane(tmp_path):

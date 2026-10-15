@@ -12,7 +12,7 @@ helix records keep their deposited ids. TRIMS shrinks an entry further: `assembl
 biological assembly, `backbone` keeps only a protein's N, CA, C, O and CB atoms (`atoms`: these names instead, e.g. with
 the cysteines' SG for disulfides), `first_model` keeps an NMR ensemble's model 1, `drop` erases the mmCIF categories
 named, `no_protein_sequence` drops the protein entities' full sequences (a big complex's are most of a small window's
-file). Each fixture stays under 100 KB and all of them under 800 KB (tests/test_r100_fixtures.py). Files are written
+file). Each fixture stays under 100 KB and all of them under 900 KB (tests/test_r100_fixtures.py). Files are written
 gzipped, outside tests/data/*.cif, so scripts/bench.py never reads them.
 """
 
@@ -126,12 +126,60 @@ ENTRIES = {  # fixture name -> (PDB id, what it is for)
         "an NMR protein (model 1, N, CA, C and O only) whose strand F pairs with E end to end with B on E's same side "
         "(a bulged continuation): it was drawn as a column of its own between E and B (random-100 C34)",
     ),
+    "6JO6-AB": (
+        "6JO6",
+        "photosystem I, chains A and B cut to the residues within 18 Å of the estimated mid-plane, N/CA/C/O: a slab "
+        "0.174 polar (cofactor pockets) with many long elements crossing it, which found no membrane at the 0.15 "
+        "limit (random-100 C17, 6JO6 ruling)",
+    ),
 }
 Span = tuple[int, int]
 WINDOWS: dict[str, dict[str, Span | list[Span] | None]] = {  # fixture -> {chain: windows (first, last), None: whole}
     "3OWW-AB": {c: [(5, 12), (38, 45), (60, 70), (80, 88)] for c in "AB"},
     "3L9G-A": {"A": None},
     "3OWW-P5": {"B": (12, 28)},
+    "6JO6-AB": {  # residues within 18 Å of the mid-plane _estimate finds on the whole entry
+        "A": [
+            (74, 99),
+            (114, 127),
+            (138, 179),
+            (194, 221),
+            (240, 245),
+            (260, 278),
+            (291, 313),
+            (318, 320),
+            (352, 377),
+            (385, 409),
+            (437, 465),
+            (470, 499),
+            (506, 507),
+            (528, 553),
+            (590, 614),
+            (639, 658),
+            (665, 688),
+            (722, 746),
+        ],
+        "B": [
+            (49, 73),
+            (88, 97),
+            (114, 155),
+            (175, 200),
+            (208, 235),
+            (255, 261),
+            (268, 291),
+            (335, 362),
+            (367, 389),
+            (419, 447),
+            (452, 470),
+            (475, 498),
+            (508, 536),
+            (576, 599),
+            (613, 633),
+            (644, 672),
+            (688, 689),
+            (705, 730),
+        ],
+    },
     "9CJI-AB": {"B": None, "A": [(10, 22), (740, 765), (784, 812), (850, 875)]},
     "3L2V-A": {"A": [(60, 75), (100, 118), (205, 230)], "C": None, "D": None},
     "2MJW-BD": {"B": None, "D": None},  # where the two RNAs pair
@@ -168,6 +216,7 @@ TRIMS: dict[str, dict] = {
     "2MJW-BD": {"first_model": True, "backbone": True},
     "6SO9": {"first_model": True, "backbone": True},
     "3L9G-A": {"atoms": ("N", "CA", "C", "O"), "no_protein_sequence": True, "drop": ("_atom_site_anisotrop.",)},
+    "6JO6-AB": {"atoms": ("N", "CA", "C", "O"), "no_protein_sequence": True, "drop": ("_atom_site_anisotrop.",)},
     "5KQJ": {"first_model": True, "atoms": ("N", "CA", "C", "O"), "no_protein_sequence": True},
     "8XZE": {"drop": ("_atom_site_anisotrop.", "_pdbx_refine_tls.", "_pdbx_refine_tls_group.")},
     "3OWW-P5": {"drop": ("_atom_site_anisotrop.", "_pdbx_refine_tls.", "_pdbx_refine_tls_group.")},
