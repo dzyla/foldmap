@@ -248,7 +248,7 @@ def test_ligands_held_by_the_nucleic_acid_alone_are_marked_and_its_ions_said(tmp
     protein residue holds them) and nothing said so. A small molecule held by nucleotides alone is now a ligand with
     those nucleotides (Ligand.nucleotides), marked and tethered to the stems and strands holding it, off the RNA's
     stems, paths and text; metal ions held by nucleotides alone are counted (Links.na_ions) and the note names them
-    (a ribosome holds hundreds: 7Y7C's 283 Mg)."""
+    (a ribosome holds hundreds: 7Y7C's note names 204 of its 283 Mg, the ones nucleotides alone hold)."""
     from foldmap.cli import main
     from foldmap.render import ligand_marks
     from foldmap.spec import draw_spec, figure_spec

@@ -1083,7 +1083,7 @@ profiled) and NA letter placement (7Y7C).
 **Batch C2a result (C33):** `io._ligands` keeps a small molecule touching nucleotides but no protein residue, with
 those nucleotides (`Ligand.nucleotides`); it is marked (`render._na_targets`: one tether per stem or strand it sits
 on, up to four) and kept off the nucleic acid's stems, paths, letters and names (`_na_spots`). Metal ions held by
-nucleotides alone are counted (`Links.na_ions`), not marked (7Y7C holds 283 Mg, 8VWQ 586), and the CLI, MCP and app
+nucleotides alone are counted (`Links.na_ions`), not marked (7Y7C: 204 of its 283 Mg; 8VWQ: 220 of 586), and the CLI, MCP and app
 notes name them ("not drawn: metal ions held by the nucleic acid alone (MG)"). Drawn tethers now keep off stem names'
 margin and the nucleic acid's letters, which are drawn after them (2GIS's SAM tether by P1, 8XZE's THG by A21).
 Iridium and cobalt hexammine (IRI, NCO: RNA crystallisation and phasing agents) are additives. 8XZE passes in every
