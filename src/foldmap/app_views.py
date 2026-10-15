@@ -132,6 +132,7 @@ def figure_view(ws: Workspace) -> None:
                 "svg": result["svg"],
                 "files": tuple(sorted(result["files"].items())) or None,
                 "scope": result.get("scope"),
+                "png_dpi": result.get("png_dpi"),  # the download button's label
             },
             elements=result["elements"],
             protein_chains=result["chains"],
@@ -379,6 +380,13 @@ FORMATS = (
     ("png", "PNG · 300 dpi", "image/png"),
     ("pdf", "PDF", "application/pdf"),
 )
+
+
+def png_label(dpi: int | None) -> str:
+    """The PNG button's label: the dpi the figure's PNG is written at (300 when not known)."""
+    return f"PNG · {dpi or 300} dpi"
+
+
 FORMATS_NOTE = (
     "SVG: edit in Illustrator or Inkscape · PNG: slides and web · PDF: print · Layout file: re-render this figure "
     "later with `foldmap plot --layout-file`"
@@ -425,11 +433,19 @@ def figure_downloads(
     lim: app_jobs.Limits,
     eager: tuple | None = None,
     uploads: dict[str, str] | None = None,
+    png_dpi: int | None = None,
 ) -> list[Download]:
     """The figure's files (eager: the render's files as sorted (ext, bytes) items) and its layout file (uploads:
-    uploads_of the session)."""
+    uploads_of the session). png_dpi: what the figure's PNG is written at (render.png_dpi: 300, less on a page past
+    50 megapixels), which its button says."""
     out = [
-        Download(f"dl_{ext}", label, partial(app_jobs.figure_file, path, blob, ext, lim, eager), f"{stem}.{ext}", mime)
+        Download(
+            f"dl_{ext}",
+            png_label(png_dpi) if ext == "png" else label,
+            partial(app_jobs.figure_file, path, blob, ext, lim, eager),
+            f"{stem}.{ext}",
+            mime,
+        )
         for ext, label, mime in FORMATS
     ]
     out.append(
@@ -505,7 +521,8 @@ def download_menu(ws: Workspace) -> None:
         blob, eager, note = offered
         if note:
             st.caption(note)
-        buttons(figure_downloads(ws.path, blob, ws.name, ws.lim, eager, uploads_of(ss)))
+        dpi = (ss.get("last_good") or {}).get("png_dpi")
+        buttons(figure_downloads(ws.path, blob, ws.name, ws.lim, eager, uploads_of(ss), png_dpi=dpi))
     st.markdown("**Sequence**")
     if ss.get("seq_drawn"):
         blob, view_json = ss["seq_drawn"]

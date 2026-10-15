@@ -481,3 +481,25 @@ def test_a_page_held_at_its_largest_is_in_the_draw_result(monkeypatch):
     past_the_largest_page(monkeypatch)
     notes = app_jobs.draw_job(DATA / "1UBQ.cif", _blob())["page_notes"]
     assert len(notes) == 2 and notes_text([], [], [], notes).startswith("The page (3 x 2 in) is held at 3 in")
+
+
+def test_the_png_button_says_the_dpi_its_png_is_written_at(monkeypatch):
+    """Batch C1 review (finding 1): a page past 50 megapixels at 300 dpi has its PNG written at less (render.png_dpi);
+    the app's download button says the dpi the file has, not a fixed 300."""
+    from foldmap import render
+    from foldmap.app_views import figure_downloads
+
+    lim = app_jobs.Limits()
+    out = app_jobs.draw_job(DATA / "1UBQ.cif", _blob())
+    assert out["png_dpi"] == 300
+    monkeypatch.setattr(render, "MAX_PNG_PIXELS", 200_000)
+    out = app_jobs.draw_job(DATA / "1UBQ.cif", _blob())
+    dpi = out["png_dpi"]
+    assert dpi < 300
+    (png,) = [d for d in figure_downloads(str(DATA / "1UBQ.cif"), _blob(), "u", lim, png_dpi=dpi) if d.key == "dl_png"]
+    assert png.label == f"PNG · {dpi} dpi"
+    import re
+
+    width_pt = float(re.search(r'width="([\d.]+)pt"', out["svg"]).group(1))
+    width_px = int.from_bytes(png.data()[16:20], "big")
+    assert abs(width_px - width_pt / 72 * dpi) <= 1  # the file is what the label says

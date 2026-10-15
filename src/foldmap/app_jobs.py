@@ -305,7 +305,8 @@ def _drawn(path, settings_json: str):
 
 
 def figure_bytes(fig, ext: str) -> bytes:
-    """A figure as SVG (inline, as the app shows it), PNG (300 dpi) or PDF: the files the app offers."""
+    """A figure as SVG (inline, as the app shows it), PNG (300 dpi, less past 50 megapixels: render.png_dpi) or PDF:
+    the files the app offers."""
     from . import render
 
     if ext == "svg":
@@ -339,6 +340,7 @@ def draw_job(path, settings_json: str, eager_after: float | None = None) -> dict
         "over_labels": drawn.over_labels,
         "crowded_marks": drawn.crowded_marks,  # ligand marks with no clear spot, drawn over other ink
         "page_notes": drawn.page_notes,  # a page held at its largest (text under 6 pt); a PNG under 300 dpi
+        "png_dpi": render.png_dpi(drawn.figure),  # what its PNG is written at (the download button says it)
         "elements": elements_of(drawn),
         "chains": chains,
         "na_chains": na_chains,

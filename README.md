@@ -162,7 +162,7 @@ Downloads are cached in `~/.cache/foldmap`.
 
 ```bash
 foldmap summary 1UBQ                              # elements, sheets, symmetry, ligands
-foldmap plot 1UBQ -o ubiquitin.svg                # .svg (editable text), .png (300 dpi) or .pdf; -o repeats
+foldmap plot 1UBQ -o ubiquitin.svg                # .svg (editable text), .png (300 dpi, less past 50 MP) or .pdf
 foldmap plot 1UBQ -o fig.png --theme richardson --set residue_numbers=true
 foldmap plot P04637 -o p53.svg --theme alphafold  # AlphaFold model, pLDDT colours
 foldmap sequence 1UBQ -o seq.svg --columns 50     # sequence with secondary structure
@@ -468,8 +468,8 @@ draw it. The examples are one click, and a `.cif` or `.pdb` file can be dropped 
 **Workspace.** The figure is drawn at once in the current theme. The top bar names the structure, summarises it,
 and switches between three views: Figure, Sequence (the sequence, or an uploaded alignment, with the secondary
 structure on top) and 3D (the interactive page). Only the chosen view is drawn. Download makes each file when you
-click it, from what was drawn: SVG, PNG (300 dpi), PDF and the layout file for the figure, the sequence figure,
-and the 3D page as HTML. A setting that fails keeps the last good figure on screen and names the control to check.
+click it, from what was drawn: SVG, PNG (300 dpi, less past 50 megapixels; the button says which), PDF and the
+layout file for the figure, the sequence figure, and the 3D page as HTML. A setting that fails keeps the last good figure on screen and names the control to check.
 
 The sidebar starts with the theme (Browse themes shows them all), the colouring, labels, legend, text size and
 title. The rest is in sections:
