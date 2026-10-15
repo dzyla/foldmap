@@ -1485,7 +1485,9 @@ def _draw_ligands(ax, marks: list[dict], lw: float, font: float, layout: Layout,
     bodies = link_bodies(layout, ax)
     keep = link_keep(lw * 0.7, pt_per_unit, ax.figure.dpi)
     halos = text_halos(ax, pt_per_unit, keep)
-    halos += [stem_keep_box(d, glyph(layout)[0] / _GLYPH_W) for d in layout.stems]  # names' margin, as routes keep
+    for d in layout.stems:  # names' margin, as routes keep it, the tether's own half width beyond
+        x0, y0, x1, y1 = stem_keep_box(d, glyph(layout)[0] / _GLYPH_W)
+        halos.append((x0 - keep, y0 - keep, x1 + keep, y1 + keep))
     # and the nucleic acid's letters and ends, drawn after the tethers (as the layout measures their ink)
     halos += [(x0 - keep, y0 - keep, x1 + keep, y1 + keep) for x0, y0, x1, y1 in na_text_boxes(layout)]
     for m in marks:
