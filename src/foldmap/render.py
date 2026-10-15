@@ -64,6 +64,7 @@ from .layout import (
     label_boxes,
     overlaps_any,
     page_text,
+    panel_members,
     resolve,
     stem_label_pos,
     tail_counts,
@@ -2907,7 +2908,7 @@ def _draw_sheet_panels(c: _Canvas, layout: Layout, outlines: dict[str, Path] | N
     with each of those domains' edges drawn over it, clipped to it, so the domains stay visible inside sheets."""
     if not c.look.sheet_panels:
         return
-    owner = {i: d for d, (_, ids) in enumerate(layout.domains) for i in ids}
+    owner = {i: d for d, (name, _) in enumerate(layout.domains) for i in panel_members(layout, name)}
     for k, ids in enumerate(layout.sheets):
         if len(ids) < 2:
             continue

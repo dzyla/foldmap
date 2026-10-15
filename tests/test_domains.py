@@ -326,13 +326,28 @@ def test_domain_bar_keeps_every_text_on_the_page():
 
 
 def test_neighbours_lending_elements_get_no_bar():
-    """1LDM, one subunit with its neighbours' lent elements (A4's in D1): one bar, the subunit's own chain."""
+    """1LDM, one subunit with its neighbours' lent elements: one bar, the subunit's own chain."""
     from foldmap.render import domain_bars
     from helpers import FID
 
     lay, _, _ = make_layout(FID / "1LDM.cif.gz", focus="protomer", domains="auto")
-    assert any(k.startswith("A4:") for _, ids in lay.domains for k in ids) and lay.partial
-    assert [chain for chain, *_ in domain_bars(lay)] == ["A1"]
+    assert lay.partial and [chain for chain, *_ in domain_bars(lay)] == ["A1"]
+
+
+def test_lent_elements_are_in_no_domain():
+    """C23 (random-100): an automatic domain lies in one chain. Elements a neighbouring subunit lends to the drawn
+    one (focus mode, drawn grey and primed) joined their mates' domains, so D1 of 1LDM's protomer held A4's strands
+    (8RRX D19, 7BBH D4/D6, 8QEM D1/D3/D4 · N: A16 cross_chain). They are the neighbour's: in no domain."""
+    from foldmap import figcheck
+    from foldmap.spec import draw_spec, figure_spec
+    from helpers import FID
+
+    d = draw_spec(figure_spec(FID / "1LDM.cif.gz", focus="protomer", domains="auto"))
+    lay = d.layout
+    assert lay.partial and [name for name, _ in lay.domains] == ["D1", "D2"]
+    assert not any(k.split(":")[0] in lay.partial for _, ids in lay.domains for k in ids)
+    got = figcheck.domain_checks(d)
+    assert got["cross_chain"] == got["unalike"] == got["small"] == [] and got["panel_overlaps"] == [], got
 
 
 def test_domain_bars_share_one_residue_scale():

@@ -26,7 +26,7 @@ from pathlib import Path
 
 import yaml
 
-from .layout import Layout, resolve
+from .layout import Layout, panel_members, resolve
 from .model import SSE, res_ref
 from .style import _KEY_ALIASES, THEMES, Style
 from .yamlfile import read_yaml
@@ -88,7 +88,9 @@ def document(
     }
     if layout.domains:  # saved as resolved element ranges, so 'auto' domains are frozen as found
         by_id = {s.id: s for s in sses}
-        doc["domains"] = {name: [_range(by_id[k]) for k in ids] for name, ids in layout.domains}
+        doc["domains"] = {  # with the elements neighbours lend (panel_members): read back, they are lent again
+            name: [_range(by_id[k]) for k in panel_members(layout, name)] for name, _ in layout.domains
+        }
     if names:
         doc["names"] = [str(n) for n in names]
     doc["edits"] = {"rename": rename, "swap": swap, "move": move}

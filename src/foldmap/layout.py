@@ -206,6 +206,8 @@ class Layout:
     sheet_ghosts: list[list[str]] = field(default_factory=list)  # ghost strand ids drawn in each block of `sheets` (a
     # barrel's repeated strand, a strand lent across the cut of an unrolled ring: _unwrap); [] when not recorded
     domains: list[tuple[str, list[str]]] = field(default_factory=list)  # named domains and their element ids
+    domain_lent: dict[str, list[str]] = field(default_factory=dict)  # domain -> elements a neighbour lends to it
+    # (focus mode, chains in `partial`, drawn grey): inside its panel (panel_members), not its members (random-100 C23)
     domain_names: dict[str, tuple[float, float, float, float]] = field(default_factory=dict)  # each drawn domain's
     # name box (_place_domain_names), on the top edge of its panel or, with a leader, above it
     domain_leaders: dict[str, tuple] = field(default_factory=dict)  # domain -> leader (from the name, to its panel)
@@ -2493,7 +2495,12 @@ def build_layout(
         pts = np.vstack(list(traces.values()))
         rects = np.vstack([rects, [[pts[:, 0].min(), pts[:, 1].min(), pts[:, 0].max(), pts[:, 1].max()]]])
     lay.partial = set(partial or ())
-    lay.domains = [(name, [k for k in ids if k in real]) for name, ids in domains or []]
+    chain_of = {k: p.sse.chain for k, p in lay.placed.items()}
+    lay.domains = [
+        (name, [k for k in ids if k in real and chain_of[k] not in lay.partial]) for name, ids in domains or []
+    ]
+    lent = {name: [k for k in ids if k in real and chain_of[k] in lay.partial] for name, ids in domains or []}
+    lay.domain_lent = {name: ids for name, ids in lent.items() if ids}
     rects = np.vstack([rects, *[[domain_panel(lay, name)] for name, _ in lay.domains]]) if lay.domains else rects
     lay.na_cropped = na_cropped
     _choose_label_sides(lay, sses, style, mirrored)  # after naming: a name's length sets its box
@@ -2683,10 +2690,16 @@ def block_ghosts(layout: Layout, k: int) -> list[Placed]:
     return [ghosts[i] for i in mine if i in ghosts]
 
 
+def panel_members(layout: Layout, name: str) -> list[str]:
+    """The elements a domain's panel is drawn round: its own, then those its neighbours lend to it (focus mode:
+    drawn grey and primed, a neighbour's strand completing its sheet; Layout.domain_lent), which are no member."""
+    return [*dict(layout.domains)[name], *layout.domain_lent.get(name, [])]
+
+
 def domain_panel(layout: Layout, name: str) -> tuple[float, float, float, float]:
     """A domain's panel (its elements plus margin) with room above for its name. A ghost counts where it repeats a
     strand of its own block (a barrel's): one lent across an unrolled ring's cut stands in another copy's sheet."""
-    ids = dict(layout.domains)[name]
+    ids = panel_members(layout, name)
     mine = set(ids)
     repeats = [
         g.rect
@@ -2729,6 +2742,7 @@ def _domain_boxes(layout: Layout) -> tuple[dict[str, list[tuple]], list[tuple]]:
     for name, ids in layout.domains:
         if not ids:
             continue
+        ids = panel_members(layout, name)
         mine = set(ids)
         own = [
             g
