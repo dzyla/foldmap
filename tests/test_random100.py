@@ -262,7 +262,13 @@ def test_run_child_without_wait4(r100, tmp_path, monkeypatch, platform):
     run = [sys.executable, "-I", "-c", "import sys; b = bytearray(64 << 20); sys.exit(3)"]
     got = r100.run_child(run, timeout=60, out=tmp_path / "o", err=tmp_path / "e")
     assert got["exit"] == 3 and not got["timed_out"] and got["seconds"] > 0
-    if platform == "no wait4, no resource":
+    try:
+        import resource  # noqa: F401  (absent on Windows: no rusage, whatever the platform case)
+    except ImportError:
+        has_resource = False
+    else:
+        has_resource = True
+    if platform == "no wait4, no resource" or not has_resource:
         assert got["max_rss_mb"] is None
     else:
         assert 60 < got["max_rss_mb"] < 4096
