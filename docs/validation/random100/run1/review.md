@@ -690,6 +690,12 @@ rungs at the schematic step), so `_separate` pushes them apart by whichever way 
 B:82-88) lands 11 units below its projected place under P5. Holding the projected order through the expansion is a
 change to the shared placement (`_attract`/`_separate`) that all 39 NA entries go through; not done here.
 
+**Batch C2a fix round 1 (9CJI end labels, Q6):** a free end's 5'/3' label that lies nearer another drawn
+nucleotide than its own end moves round its end, at the same distance, to the first turn where its own end is the
+nearest and it has room (`route_na._own_ends`), once the free ends are drawn and again once the runs are. 9CJI's "5′"
+no longer sits by the 3' end's first nucleotide; 30QM's "3′" (0.61 from a run's nucleotide) moves too. Snapshot
+re-recorded: 30QM-ncrna (its 3' label and the letter of nucleotide 106 beside it). Bench identical.
+
 ### C17 (a): large membrane complexes, with TM helices off the band or no band (3 entries, + visual 1)
 
 **Entries:**

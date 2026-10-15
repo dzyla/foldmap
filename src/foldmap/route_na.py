@@ -7,11 +7,12 @@ geometry they share are in na_paths; the names other modules use are re-exported
 from __future__ import annotations
 
 import logging
+import math
 
 import numpy as np
 
 from .layout import _GLYPH_W, NT_ROW, NT_STEP, Layout, glyph, label_boxes, stem_keep_box
-from .na_ends import SHORT_GAP, _face_label, _gap, _tail, _trace_clear
+from .na_ends import SHORT_GAP, _face_label, _gap, _label_room, _tail, _trace_clear
 from .na_labels import _label_gaps, _place_letters, _ties, _unbunch, _widen
 from .na_paths import (
     NAPath,
@@ -59,6 +60,50 @@ def _use(grid: _Grid, pts, beside: np.ndarray | None = None) -> None:
         for c in sorted(near):
             if 0 <= c[0] < grid.nx and 0 <= c[1] < grid.ny:
                 beside[c] += 1
+
+
+_END_TURNS = (0.0, np.pi / 4, -np.pi / 4, np.pi / 2, -np.pi / 2, 3 * np.pi / 4, -3 * np.pi / 4, np.pi)
+
+
+def _own_ends(router, layout: Layout, fixed: dict, at: dict, ends: list, gapped: set) -> list:
+    """The strands' end labels once every free end is drawn (fix round 1, review Q6: 9CJI's 3' end, drawn after the
+    5' label was placed, started beside that label, so "5′" read as naming it): a label of a free end that lies
+    nearer another drawn nucleotide (a free end's, a hairpin loop's, a stem's rail) than its own end nucleotide moves
+    round that nucleotide, at the same distance, to the first turn (_END_TURNS) where its own end is the nearest and it
+    has room (_label_room); else it stays. Run once the free ends and hairpin loops are drawn (`fixed`), and again
+    with the runs (30QM's 3' label lay 0.61 from a run's nucleotide, 1.1 from its own end)."""
+    pts = [
+        (key, np.asarray(xy, float)) for p in fixed.values() for key, xy in zip(((p.strand, k) for k in p.nts), p.nt_xy)
+    ]
+    pts += [((key[0], key[1]), np.asarray(d.point(key), float)) for key, d in sorted(at.items())]
+    tails = {(p.strand, "5′" if p.nts[0] == 0 else "3′"): p for p in fixed.values() if p.kind == "tail"}
+
+    def nearest(xy):
+        return min(pts, key=lambda kp: (float(np.hypot(*(kp[1] - xy))), kp[0]))[0] if pts else None
+
+    out = []
+    for s, e, xy in ends:
+        path = tails.get((s, e))
+        if path is None or (s, e) in gapped or not path.nt_xy:
+            out.append((s, e, xy))
+            continue
+        own = (s, path.nts[0] if e == "5′" else path.nts[-1])
+        end_xy = np.asarray(path.nt_xy[0] if e == "5′" else path.nt_xy[-1], float)
+        if nearest(np.asarray(xy, float)) == own:
+            out.append((s, e, xy))
+            continue
+        v = np.subtract(xy, end_xy)
+        r = float(np.hypot(*v))
+        others = [q for t, f, q in ends if (t, f) != (s, e) and (t, f) not in gapped]
+        moved = xy
+        for turn in _END_TURNS:
+            c, n = math.cos(turn), math.sin(turn)
+            spot = end_xy + np.array([v[0] * c - v[1] * n, v[0] * n + v[1] * c])
+            if r > 0 and nearest(spot) == own and _label_room(router, layout, spot, others):
+                moved = (float(spot[0]), float(spot[1]))
+                break
+        out.append((s, e, moved))
+    return out
 
 
 def route_nucleic(layout: Layout, router: _Router | None = None, loops=()) -> list[NAPath]:
@@ -167,6 +212,8 @@ def route_nucleic(layout: Layout, router: _Router | None = None, loops=()) -> li
             tip = _face_label(router, layout, dn, (s, last), True, room(s, "3′"))
             exits[(s, n - 1)] = (*_face(dn, (s, last), True), dn)
         end(s, "3′", tip)
+    ends = _own_ends(router, layout, fixed, at, ends, gapped)
+    labels[:] = [xy for s, e, xy in ends if (s, e) not in gapped]
     # routes keep off the strands' end labels (as a protein loop keeps off its chain's N and C)
     g = glyph(layout)[1] / 2 + 0.05  # sized from the text drawn (C4)
     router.grid.keep_off([(x - g, y - g, x + g, y + g) for s, e, (x, y) in ends if (s, e) not in gapped])
@@ -188,6 +235,7 @@ def route_nucleic(layout: Layout, router: _Router | None = None, loops=()) -> li
         strands.add(among(p, at), frozenset((da.id, db.id)) if p.kind == "joint" else None)
         _use(router.grid, among(p, at), beside)
     out = [p for _, p in sorted({**fixed, **routed}.items())]
+    ends = _own_ends(router, layout, {**fixed, **routed}, at, ends, gapped)  # again, the runs drawn too
     for g in na.gaps:  # cropped away: the 3' end of one piece to the 5' end of the next, dashed
         a, b = exits.get((g.before, len(na.strands[g.before]) - 1)), exits.get((g.after, 0))
         if a is not None and b is not None:

@@ -2535,3 +2535,26 @@ def test_a_free_end_tries_every_drawing_off_the_strands_before_one_crossing_them
     # the 7-nt 3' end: strict routes with and without its partner's doorway (label room or not), then the old order
     # finds a straight drawing (near no longer asked): no crossing route tried
     assert calls == [True] * 4
+
+
+@pytest.mark.parametrize("path", [NA / "30QM.cif.gz", NA.parent / "r100" / "9CJI-AB.cif.gz"], ids=["30QM", "9CJI"])
+def test_each_end_label_names_its_own_end(path):
+    """9CJI (batch C2a review Q6): the crRNA's 3' end, drawn after the 5' label was placed, started 0.6 from that label
+    and 1.1 from the label's own end, so "5′" read as naming it; 30QM's 3' label lay 0.61 from a run's nucleotide.
+    Once the free ends are drawn, and again once the runs are, a free end's label that lies nearer another drawn
+    nucleotide than its own end moves round its end to a spot where its own is nearest (route_na._own_ends)."""
+    lay, sses, bb = make_layout(path)
+    route_loops(lay, sses, bb)
+    drawn = {(p.strand, k): np.asarray(xy, float) for p in lay.na_paths for k, xy in zip(p.nts, p.nt_xy)}
+    drawn.update({key: np.asarray(d.point(key), float) for d in lay.stems for key in d.axial})
+    tails = {(p.strand, "5′" if p.nts[0] == 0 else "3′"): p for p in lay.na_paths if p.kind == "tail"}
+    checked = 0
+    for s, e, xy in lay.na_ends:
+        if (s, e) not in tails:
+            continue
+        p = tails[(s, e)]
+        own = (s, p.nts[0] if e == "5′" else p.nts[-1])
+        nearest = min(drawn, key=lambda k: (float(np.hypot(*(drawn[k] - np.asarray(xy)))), k))
+        assert nearest == own, (s, e)
+        checked += 1
+    assert checked >= 1
