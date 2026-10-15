@@ -2564,6 +2564,9 @@ DOMAIN_PAD = 0.7  # panel margin around a domain's elements
 _DOMAIN_GAP = 2 * DOMAIN_PAD + 0.6  # clear space between two domains' elements: both panels plus a gutter
 
 
+_PART_BLOWUP = 2.0  # parting domains that left them unparted and the items this many times as wide and high: undone
+
+
 def _part_domains(
     items: list[_Item],
     domains: list[tuple[str, list[str]]],
@@ -2576,13 +2579,15 @@ def _part_domains(
     its copies' domains and every item of their orbits (a unit, _domain_units), each copy by its tie (a mirrored
     copy, `mirror`, the other way across); two domains of one unit, copies of each other, part by widening the
     spread between protomers (protomer k moves k times the step), or for a mirror image sideways symmetrically.
-    Domains with elements in one item (a sheet shared by copies: 3L9G's barrel) are never parted, nor any domain
-    joined to them so; the sweeps stop when they no longer shrink the overlap (random-100 C31). True if anything
-    moved."""
+    When the sweeps do not part them and leave the items over _PART_BLOWUP times as wide and high (3L9G: a sheet
+    shared by four copies holds ten domains, so every sweep widened the spread again: random-100 C31), they start
+    over with domains that share an item never parted (nor any domain joined to them so), stopping when a sweep no
+    longer shrinks the overlap. True if anything moved."""
     ties = ties or {}
     owner = {k: d for d, (_, ids) in enumerate(domains) for k in ids}
     groups: dict[int, list[int]] = {}
-    bound = list(range(len(domains)))  # domains sharing an item, joined
+    bound = list(range(len(domains)))  # domains joined (sharing an item), on the second try only
+    shared: list[list[int]] = []  # the domains of each item holding several
 
     def root(d: int) -> int:
         while bound[d] != d:
@@ -2593,9 +2598,8 @@ def _part_domains(
         votes = [owner[m.sse.id] for m in it.members if isinstance(m, Placed) and m.sse.id in owner]
         if votes:
             groups.setdefault(max(set(votes), key=votes.count), []).append(n)
-            for d in sorted(set(votes)):
-                a, b = root(votes[0]), root(d)
-                bound[max(a, b)] = min(a, b)
+            if len(set(votes)) > 1:
+                shared.append(sorted(set(votes)))
     keys = sorted(groups)
     if len(keys) < 2:
         return False
@@ -2637,6 +2641,33 @@ def _part_domains(
                     total += min(ox, oy) if ox > 0 and oy > 0 else 0.0
         return total
 
+    start = [(it.cx, it.cy, it.home) for it in items]
+
+    def extent() -> float:  # the items' width and height, summed
+        b = np.array([(it.cx + it.box[0], it.cy + it.box[1], it.cx + it.box[2], it.cy + it.box[3]) for it in items])
+        return float(b[:, 2].max() - b[:, 0].min() + b[:, 3].max() - b[:, 1].min())
+
+    before = extent()
+    moved = parted = False
+    for second in (False, True):
+        if second:  # the sweeps never parted them and blew the page up: again, domains sharing an item joined
+            if parted or not shared or extent() <= _PART_BLOWUP * before:
+                break
+            for it, (cx, cy, home) in zip(items, start):
+                it.cx, it.cy, it.home = cx, cy, home
+            for ds in shared:
+                for d in ds:
+                    a, b = root(ds[0]), root(d)
+                    bound[max(a, b)] = min(a, b)
+        moved, parted = _part_sweeps(
+            keys, groups, unit, members, copy_k, mirror, box, shift, overlap, root, sweeps, second
+        )
+    return moved
+
+
+def _part_sweeps(keys, groups, unit, members, copy_k, mirror, box, shift, overlap, root, sweeps: int, guard: bool):
+    """_part_domains' sweeps: (anything moved, parted: a sweep found no clash); with `guard`, they also stop when a
+    sweep no longer shrinks the overlap."""
     moved, last = False, overlap()
     for _ in range(sweeps):
         clash = False
@@ -2670,11 +2701,13 @@ def _part_domains(
                 else:
                     continue  # no move keeps them alike: left to _separate
                 clash = moved = True
+        if not clash:
+            return moved, True
         now = overlap()
-        if not clash or now >= last - 1e-6:  # parted, or the moves no longer help
+        if guard and now >= last - 1e-6:  # the moves no longer help
             break
         last = now
-    return moved
+    return moved, False
 
 
 def _domain_level(ns: list[int], copy_k: np.ndarray) -> float:
