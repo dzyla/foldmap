@@ -3364,6 +3364,17 @@ def _element_label_box(p: Placed) -> tuple[float, float, float, float]:
     return centred_box(*helix_label_pos(p), _GLYPH_W * len(p.label) / 2 + 0.05, _GLYPH_H / 2)
 
 
+def thin_boxes(points, pad: float = 0.06) -> list[tuple[float, float, float, float]]:
+    """A line as thin boxes along its segments (for box overlap tests)."""
+    pts = np.asarray(points, float).reshape(-1, 2)
+    return [(*(np.minimum(a, b) - pad), *(np.maximum(a, b) + pad)) for a, b in zip(pts, pts[1:])]
+
+
+def count_half(text: str, size: float) -> tuple[float, float]:
+    """Half the width and height of a count's or note's ink box: `text` at `size` page units per em."""
+    return size * _text_width(text, bold=False) / 2 + 0.04, size * 0.4 + 0.04
+
+
 def tail_counts(layout: Layout, sses: list[SSE], loops=()) -> list[dict]:
     """The residue count written beyond each long chain end (at least LONG_TAIL residues past its last element):
     end, chain, text ("14 aa"), centre and ink box (page units). Placed after routing, so not a route keep-out: the
@@ -3380,8 +3391,7 @@ def tail_counts(layout: Layout, sses: list[SSE], loops=()) -> list[dict]:
     taken = [p.rect for p in [*layout.placed.values(), *layout.ghosts, *layout.stems]]
     taken += [b for _, b in label_boxes(layout, sses)]
     for loop in loops:  # loop lines as thin boxes along each segment
-        pts = np.asarray(loop.points, float).reshape(-1, 2)
-        taken += [(*np.minimum(a, b) - 0.06, *np.maximum(a, b) + 0.06) for a, b in zip(pts, pts[1:])]
+        taken += thin_boxes(loop.points)
     out = []
     for end, chain, port, ex in termini(layout, sses):
         mine, ours = groups.get(chain, []), rows.get(chain, [])
@@ -3392,7 +3402,7 @@ def tail_counts(layout: Layout, sses: list[SSE], loops=()) -> list[dict]:
             continue
         text = f"{n} aa"
         size = TAIL_COUNT_SIZE * em
-        half = (size * _text_width(text, bold=False) / 2 + 0.04, size * 0.4 + 0.04)
+        half = count_half(text, size)
         ex = np.asarray(ex, float)
         letter = np.add(port, ex * END_LABEL)
         own = (max(_GLYPH_W / 2 + 0.05, em * _text_width(end) / 2), max(_GLYPH_H / 2, em * 0.4))

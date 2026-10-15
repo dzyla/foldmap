@@ -4,6 +4,7 @@ fixtures cut from campaign entries (tests/data/r100); figcheck measures them as 
 
 from pathlib import Path
 
+import numpy as np
 import pytest
 
 from foldmap import figcheck
@@ -131,3 +132,28 @@ def test_glycan_stem_crosses_no_name(monkeypatch):
     monkeypatch.setattr(render, "label_boxes", lambda *a, **k: [*real(*a, **k), ("label:test", name)])
     at, sugar = _stem_and_first_sugar(drawn(DATA / "6ZS5.cif").figure, r)
     assert clip_len(at, sugar, name) == 0
+
+
+def test_a_ligand_is_never_left_without_a_mark():
+    """C5 fix round 1: with every ring spot crossed by earlier tethers or loop lines, a chosen ligand still gets a
+    mark where the old code put it (6JO6 lost 24 ligands on a crowded page when the tether test had no fallback)."""
+    from foldmap.render import _place_mark
+
+    anchor = np.array([0.0, 0.0])
+    half = (0.3, 0.3)
+    wall = [(-9.0, y, 9.0, y + 0.1) for y in np.arange(-4.0, 4.0, 0.2)]  # loop lines over every ring spot
+    cross = [((-9.0, y), (9.0, y)) for y in np.arange(-4.0, 4.0, 0.2)]  # and tethers of earlier marks
+    spot = _place_mark(anchor, half, [(1.0, 0.0)], [], wall, [], cross)
+    assert spot is not None
+
+
+def test_every_chosen_ligand_of_a_crowded_page_has_a_mark():
+    """Same, end to end: 1GOX's FMN and 1BXI's metal, with a loop line laid over every spot near each."""
+    spec = figure_spec(R100 / "1BXI.cif.gz")
+    d = draw_spec(spec)
+    from foldmap.route import Loop
+
+    crowd = [Loop("x", "y", [(x, y), (x + 40.0, y)], False, False) for x in (-20.0,) for y in np.arange(-20, 20, 0.2)]
+    full = ligand_marks(d.layout, d.loops, d.sses, spec.look)
+    jammed = ligand_marks(d.layout, [*d.loops, *crowd], d.sses, spec.look)
+    assert full and {m["ligand"].name for m in jammed} == {m["ligand"].name for m in full}

@@ -54,6 +54,7 @@ from .layout import (
     _text_width,
     block_ghosts,
     centred_box,
+    count_half,
     dna_to_page,
     dna_y,
     domain_fields,
@@ -69,6 +70,7 @@ from .layout import (
     termini,
     text_anchor,
     text_em,
+    thin_boxes,
     upright_deg,
 )
 from .model import SSE, group_by_chain
@@ -1245,7 +1247,35 @@ def _mark_spot(anchor, half, targets, taken, texts, tethers):
     return spot if spot is not None else free
 
 
-def ligand_marks(layout: Layout, loops: list[Loop], sses: list[SSE], look: Style) -> list[dict]:
+def _place_mark(anchor, half, targets, taken, lines, texts, tethers):
+    """A ligand's spot: clear of the loops' lines and the tethers drawn before where there is room, else of the
+    elements and text only (the tethers' crossings given up), else of the elements and text with every tether given
+    up: a chosen ligand is never left without a mark (C5 fix round 1: 6JO6 lost 24 on a crowded page)."""
+    for blocked, drawn in ((taken + lines, tethers), (taken, tethers), (taken, ())):
+        spot = _mark_spot(anchor, half, targets, blocked, texts, drawn)
+        if spot is not None:
+            return spot
+    return None
+
+
+def _disulfide_lines(layout: Layout, loops: list[Loop], sses: list[SSE], look: Style) -> list[tuple]:
+    """Thin boxes along each disulfide bar's straight run between its two cysteines (its routed lane lies near it):
+    ligand marks keep off them (C5)."""
+    links = layout.links
+    if links is None or not look.disulfides:
+        return []
+    chains = layout.res_chain
+    out = []
+    for i, j in links.disulfides:
+        if layout.partial and (chains[i] in layout.partial or chains[j] in layout.partial):
+            continue
+        a, b = disulfide_points(layout, loops, sses, chains, i, j)
+        if a is not None and b is not None:
+            out += thin_boxes([a, b])
+    return out
+
+
+def ligand_marks(layout: Layout, loops: list[Loop], sses: list[SSE], look: Style, counts=None) -> list[dict]:
     """Where each shown ligand/ion goes: as close as possible to the residues holding it, clear of elements,
     labels and other markers. Each mark: ligand, centre, half size, tether targets, tethered residues."""
     links = layout.links
@@ -1262,7 +1292,8 @@ def ligand_marks(layout: Layout, loops: list[Loop], sses: list[SSE], look: Style
         chosen = [g for g in chosen if any(layout.res_chain[r] in layout.focus_chains for r in g.contacts)]
     taken = [p.rect for p in layout.placed.values()] + [g.rect for g in layout.ghosts]
     labels = [box for _, box in label_boxes(layout, sses)]
-    counts = [t["box"] for t in [*tail_counts(layout, sses, loops), *loop_counts(layout, loops, sses)]]
+    if counts is None:
+        counts = [t["box"] for t in [*tail_counts(layout, sses, loops), *loop_counts(layout, loops, sses)]]
     taken += labels + counts
     texts = (
         labels
@@ -1273,7 +1304,8 @@ def ligand_marks(layout: Layout, loops: list[Loop], sses: list[SSE], look: Style
             if p.sse.kind == "E"
         ]
     )
-    lines = [box for lp in loops for box in _thin_boxes(lp.points)]  # a mark is kept off the loops' lines (C5) ...
+    lines = [box for lp in loops for box in thin_boxes(lp.points)] + _disulfide_lines(layout, loops, sses, look)
+    # a mark is kept off the loops' lines (C5) ...
     tethers: list[tuple] = []  # ... and the tethers drawn before: (from, to)
     out = []
     for g in sorted(chosen, key=lambda g: g.contacts[0]):
@@ -1282,11 +1314,7 @@ def ligand_marks(layout: Layout, loops: list[Loop], sses: list[SSE], look: Style
             continue
         anchor = np.average(np.asarray(targets), axis=0, weights=weights)
         half = (0.3, 0.3) if g.metal else (0.12 * len(g.name) + 0.2, 0.27)
-        spot = None
-        for blocked in (taken + lines, taken):  # off the lines where there is room, else as before
-            spot = _mark_spot(anchor, half, targets, blocked, texts, tethers)
-            if spot is not None:
-                break
+        spot = _place_mark(anchor, half, targets, taken, lines, texts, tethers)
         if spot is None:
             continue
         mark = (spot[0] - half[0], spot[1] - half[1], spot[0] + half[0], spot[1] + half[1])
@@ -1395,7 +1423,7 @@ def linked_marks(layout: Layout, loops: list[Loop], sses: list[SSE], marks: list
         text = f"{label.name}{label.tag}"
         pt, unit = page_text(layout)  # its ink as drawn (_draw_linked), at least _LINKED_LABEL_MIN pt (C28)
         size = max(_LINKED_LABEL_MIN, pt * _LINKED_LABEL) * unit
-        half = (size * _text_width(text, bold=False) / 2 + 0.04, size * 0.4 + 0.04)
+        half = count_half(text, size)
         taken.append((at[0] - _LINKED_STAR, at[1] - _LINKED_STAR, at[0] + _LINKED_STAR, at[1] + _LINKED_STAR))
         spot = None
         for ring in np.arange(_LINKED_STAR + 0.1, 12.0, 0.35):
@@ -1684,7 +1712,15 @@ def strand_label_spot(p: Placed, label: str, lines, em: float, keep: float) -> t
 
 
 def _draw_links(
-    ax, layout: Layout, loops: list[Loop], sses: list[SSE], look: Style, lw: float, pt_per_unit: float, bars=None
+    ax,
+    layout: Layout,
+    loops: list[Loop],
+    sses: list[SSE],
+    look: Style,
+    lw: float,
+    pt_per_unit: float,
+    bars=None,
+    counts=None,
 ) -> None:
     """Disulfide bars (`bars`: disulfide_bars' routes, the ones the strand letters slid off; computed here when
     None) and glycans."""
@@ -1740,18 +1776,18 @@ def _draw_links(
         taken = [p.rect for p in layout.placed.values()] + [g.rect for g in layout.ghosts]
         taken += [box for _, box in label_boxes(layout, sses)]
         for loop in loops:  # loop lines too, as thin boxes along each segment
-            pts = np.asarray(loop.points, float)
-            for a, b in zip(pts, pts[1:]):
-                taken.append(
-                    (min(a[0], b[0]) - 0.06, min(a[1], b[1]) - 0.06, max(a[0], b[0]) + 0.06, max(a[1], b[1]) + 0.06)
-                )
+            taken += thin_boxes(loop.points)
         size, step = 0.34, 0.42
         texts = [box for _, box in label_boxes(layout, sses)] + [  # what a stem must not cross (C28)
             centred_box(p.cx, p.cy, 0.12 * len(p.label) + 0.1, 0.25)
             for p in layout.placed.values()
             if p.sse.kind == "E"
         ]
-        texts += [t["box"] for t in [*tail_counts(layout, sses, loops), *loop_counts(layout, loops, sses)]]
+        texts += (
+            counts
+            if counts is not None
+            else [t["box"] for t in [*tail_counts(layout, sses, loops), *loop_counts(layout, loops, sses)]]
+        )
         for r, sugars in links.glycans:
             if not shown(r):
                 continue
@@ -2454,13 +2490,7 @@ _COUNT_GAP = 0.15  # page units from a loop's line to its residue count's ink
 _COUNT_RUNS = 4  # the loop's longest straight runs tried for its count
 
 
-def _thin_boxes(points, pad: float = 0.06) -> list[tuple[float, float, float, float]]:
-    """A line as thin boxes along its segments (for box overlap tests)."""
-    pts = np.asarray(points, float).reshape(-1, 2)
-    return [(*(np.minimum(a, b) - pad), *(np.maximum(a, b) + pad)) for a, b in zip(pts, pts[1:])]
-
-
-def loop_counts(layout: Layout, loops: list[Loop], sses: list[SSE]) -> list[dict]:
+def loop_counts(layout: Layout, loops: list[Loop], sses: list[SSE], tails=None) -> list[dict]:
     """The residue count ("NN aa") of each loop of at least LONG_LOOP residues: name (a>b), text, centre and ink box
     (page units, sized from the drawn text as tail counts are). Its place is the first of a few spots, the loop's
     longest straight runs (at most _COUNT_RUNS), each at its middle, a third and two thirds, on either side, that is
@@ -2469,8 +2499,10 @@ def loop_counts(layout: Layout, loops: list[Loop], sses: list[SSE]) -> list[dict
     em = _ink_em(layout, layout.font_scale) or text_em(layout.width or 1.0) * layout.font_scale
     by_id = {s.id: s for s in sses}
     taken = [p.rect for p in [*layout.placed.values(), *layout.ghosts, *layout.stems]]
-    taken += [b for _, b in label_boxes(layout, sses)] + [t["box"] for t in tail_counts(layout, sses, loops)]
-    lines = [_thin_boxes(lp.points) for lp in loops]
+    taken += [b for _, b in label_boxes(layout, sses)] + [
+        t["box"] for t in (tails if tails is not None else tail_counts(layout, sses, loops))
+    ]
+    lines = [thin_boxes(lp.points) for lp in loops]
     out = []
     for i, loop in enumerate(loops):
         a, b = by_id.get(loop.a_id), by_id.get(loop.b_id)
@@ -2478,7 +2510,7 @@ def loop_counts(layout: Layout, loops: list[Loop], sses: list[SSE]) -> list[dict
             continue
         text = f"{b.start - a.end - 1} aa"
         size = TAIL_COUNT_SIZE * em
-        half = (size * _text_width(text, bold=False) / 2 + 0.04, size * 0.4 + 0.04)
+        half = count_half(text, size)
         pts = np.asarray(loop.points, float)
         runs = sorted(range(len(pts) - 1), key=lambda j: (-np.hypot(*(pts[j + 1] - pts[j])), j))[:_COUNT_RUNS]
         others = [box for k, boxes in enumerate(lines) if k != i for box in boxes]
@@ -2509,13 +2541,13 @@ def loop_counts(layout: Layout, loops: list[Loop], sses: list[SSE]) -> list[dict
     return out
 
 
-def _draw_loops(c: _Canvas, layout: Layout, loops: list[Loop], sses: list[SSE]) -> None:
+def _draw_loops(c: _Canvas, layout: Layout, loops: list[Loop], sses: list[SSE], lcounts=None) -> None:
     """Each loop: a casing in the background colour, its coloured line, arrows, residue runs and length labels."""
     boxes = np.array([p.rect for p in [*layout.placed.values(), *layout.ghosts]]).reshape(-1, 4)  # none: DNA only
     boxes = boxes + [1e-6, 1e-6, -1e-6, -1e-6]
     sse_by_id = {s.id: s for s in sses}
     over = c.backbone[1]
-    counts = {count["name"]: count for count in loop_counts(layout, loops, sses)}
+    counts = {count["name"]: count for count in (lcounts if lcounts is not None else loop_counts(layout, loops, sses))}
     lifted = {k for k, p in layout.placed.items() if p.over}  # helices over a sheet: their loops lie on it too
     for i, loop in enumerate(loops):
         z = (_OVER_LOOP_Z if lifted & {loop.a_id, loop.b_id} else Z["loop"]) + i * 1e-3
@@ -3080,7 +3112,7 @@ def _draw_ghosts(c: _Canvas, layout: Layout) -> None:
             t.set_gid(f"ghostlabel:{g.sse.id}")
 
 
-def _draw_termini(c: _Canvas, layout: Layout, sses: list[SSE], loops: list[Loop]) -> None:
+def _draw_termini(c: _Canvas, layout: Layout, sses: list[SSE], loops: list[Loop], tails=None) -> None:
     """The N and C terminal stubs, their letters and long-tail lengths."""
     groups = group_by_chain(sses)
     over = c.backbone[1]
@@ -3117,7 +3149,9 @@ def _draw_termini(c: _Canvas, layout: Layout, sses: list[SSE], loops: list[Loop]
             zorder=Z["label"],
         )
         t.set_gid(f"terminus:{end}:{chain}")
-    for count in tail_counts(layout, sses, loops):  # a long unstructured end: how long, not taken for a short stub
+    for count in (
+        tails if tails is not None else tail_counts(layout, sses, loops)
+    ):  # a long unstructured end: how long, not taken for a short stub
         t = c.ax.text(
             *count["centre"],
             count["text"],
@@ -3235,15 +3269,17 @@ def _draw(
     element_colour, residue_colour = element_colours(layout, sses, look)
     if not layout.placed and not layout.stems and not layout.na_paths:
         return _empty_figure()
-    marks = ligand_marks(layout, loops, sses, look)
+    tails = tail_counts(layout, sses, loops)  # placed once: every text that keeps off them gets these boxes
+    lcounts = loop_counts(layout, loops, sses, tails)
+    counts = [t["box"] for t in [*tails, *lcounts]]
+    marks = ligand_marks(layout, loops, sses, look, counts)
     linked = linked_marks(layout, loops, sses, marks)
     umarks = uniprot_marks(layout, loops, sses, look)
     hb = hbond_overlay(layout, loops, sses, look, model)
-    counts = [t["box"] for t in [*tail_counts(layout, sses, loops), *loop_counts(layout, loops, sses)]]
     c, legend = _canvas(
         layout, look, title, chains, colors, element_colour, residue_colour, marks, umarks, hb, linked, loops, counts
     )
-    _draw_loops(c, layout, loops, sses)
+    _draw_loops(c, layout, loops, sses, lcounts)
     _draw_membrane(c, layout)
     outlines = _draw_domains(c, layout)
     _draw_sheet_panels(c, layout, outlines)
@@ -3254,7 +3290,7 @@ def _draw(
             c.ax, layout, sses, c.residue_colour, c.look.fill, c.lw, c.font, c.pt_per_unit, c.look, c.backbone[0]
         )
     _draw_residue_numbers(c, layout)
-    _draw_termini(c, layout, sses, loops)
+    _draw_termini(c, layout, sses, loops, tails)
     # the bars once: a loop's cysteine off the text drawn so far (loop lengths, chain ends, residue numbers); a
     # strand's letter then slides off the bars that pass under it (not when residue numbers share its shaft)
     keep = link_keep(c.lw * 2.4, c.pt_per_unit, c.fig.dpi)
@@ -3263,7 +3299,7 @@ def _draw(
     _draw_elements(c, layout, [] if look.residue_numbers else [route for *_, route in bars])
     _draw_ghosts(c, layout)
     # after every text but the marks' own: bars and tethers keep off the letters (text_halos)
-    _draw_links(c.ax, layout, loops, sses, look, c.lw, c.pt_per_unit, bars=bars)
+    _draw_links(c.ax, layout, loops, sses, look, c.lw, c.pt_per_unit, bars=bars, counts=counts)
     _draw_ligands(c.ax, marks, c.lw, c.font, layout, c.pt_per_unit)
     _draw_linked(c.ax, linked, c.lw, c.font)
     _draw_uniprot(c.ax, umarks, layout, c.lw, c.font)
