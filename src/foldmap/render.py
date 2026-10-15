@@ -1444,7 +1444,8 @@ def ligand_marks(layout: Layout, loops: list[Loop], sses: list[SSE], look: Style
     tethers: list[tuple] = []  # ... and the tethers drawn before: (from, to)
     out = []
     na_spots = None  # where nucleotides are drawn, and the nucleic acid's own boxes: for ligands held by it alone
-    for g in sorted(chosen, key=lambda g: (not g.contacts, g.contacts[0] if g.contacts else 0, g.chain, g.seq)):
+    # by first holding residue, in the file's order on a tie (as before C33), those held by nucleotides alone last
+    for g in sorted(chosen, key=lambda g: (not g.contacts, g.contacts[0] if g.contacts else 0)):
         if g.contacts:
             targets, weights, tethered = _local_targets(layout, loops, sses, g, g.metal)
             keep_off, words = taken, texts
