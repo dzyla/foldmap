@@ -291,8 +291,13 @@ def _ties(layout: Layout, paths: list[NAPath]) -> list[NATie]:
         box = (x - hw, y - hh, x + hw, y + hh)
         if any(_near(at, e, 0.0) or crosses_body(a, b, e) for e in bodies):
             return False
-        near = [t for t in taken if math.dist(t, own) > 1e-9]
-        if any(math.dist(at, t) < _LETTER_GAP + hh for t in near) or any(_seg_dist(t, a, b) < 0.2 for t in near):
+        pts = np.asarray(taken, float).reshape(-1, 2)  # vectorised (batch B: 37 s of 7Y7C's 140 s was here)
+        near = pts[np.hypot(*(pts - np.asarray(own, float)).T) > 1e-9]
+        if (np.hypot(*(near - np.asarray(at, float)).T) < _LETTER_GAP + hh).any():
+            return False
+        ab = np.asarray(b, float) - np.asarray(a, float)
+        t = np.clip((near - a) @ ab / max(float(ab @ ab), 1e-300), 0.0, 1.0) if ab.any() else np.zeros(len(near))
+        if (np.hypot(*(near - a - t[:, None] * ab).T) < 0.2).any():
             return False
         if any(min(box[2], o[2]) > max(box[0], o[0]) and min(box[3], o[3]) > max(box[1], o[1]) for o in boxes):
             return False
