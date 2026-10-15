@@ -244,6 +244,31 @@ def test_symmetric_separation_never_costs_much_more_room_than_moving_items_alone
     assert _area(items) <= 1.05 * _area(alone)
 
 
+def test_mirror_images_are_kept_when_they_cost_a_little_more_room():
+    """9GEP (random-100 A15 E~A 1.17, F~B 0.81, batch C2a): a dimer drawn as mirror images about a dyad in the page,
+    crowded by untied chains, cleared its overlaps symmetrically only after about 3,000 passes and in 1.07 times the
+    one-by-one area; both over the limits, so its copies were moved one by one and drawn unalike. Mirror images
+    (the figure says so) get as many passes as moving one by one and up to _SEP_MIRROR_ROOM. Three elements and
+    their mirror images (a random case found to need 1.058 times the room) stay exact mirror images."""
+    from foldmap import layout
+
+    base = [(-1.46, 0.78, 2.5, 1), (-0.34, -0.17, 1.1, 1), (-0.7, -0.41, 3.8, 0)]
+
+    def build():
+        items = [_box(x, y, 10 * a + 1, "A", t, np.pi / 2 * u) for a, (x, y, t, u) in enumerate(base)]
+        items += [_box(-x, y, 10 * a + 1, "B", t, np.pi / 2 * u) for a, (x, y, t, u) in enumerate(base)]
+        return items, {3 + a: (a, 1) for a in range(3)}
+
+    items, ties = build()
+    alone, _ = build()
+    layout._separate(items, ties, mirror=0.0)
+    layout._separate(alone)
+    assert _overlaps(items) == 0
+    for a in range(3):
+        assert (items[3 + a].cx, items[3 + a].cy) == pytest.approx((-items[a].cx, items[a].cy), abs=1e-12)
+    assert 1.05 * _area(alone) < _area(items) <= layout._SEP_MIRROR_ROOM * _area(alone)
+
+
 def test_symmetry_can_be_switched_off(tmp_path):
     from foldmap.cli import main
 

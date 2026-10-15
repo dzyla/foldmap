@@ -72,6 +72,9 @@ _SWEEPS = 400
 _SEP_SWEEPS = 5000  # push-apart passes before the guaranteed slide
 _SEP_ORBIT_SWEEPS = 1000  # push-apart passes that keep symmetry copies alike, before they may move alone
 _SEP_SYM_ROOM = 1.05  # copies drawn alike may take at most this much more area than items moved one by one
+# ... and copies drawn as mirror images about a dyad in the page, pushed for as many passes as items moved one by
+# one: the figure says they are mirror images (9GEP's nucleosome needed 1.07 and about 3,000 passes)
+_SEP_MIRROR_ROOM = 1.10
 _SEP_PUSH = 0.005  # each push clears an overlap by this much more, so touching boxes cannot trade it back and forth
 _SLIDE_STEP = 0.5  # the guaranteed slide moves an item by this much at a time
 _LAMBDAS = (0.3, 3.0, 30.0, 300.0)  # overlap penalty, stage by stage
@@ -819,7 +822,8 @@ def _separate(
     one from the same start (widening the spread can otherwise cost far more room); else the one-by-one
     result is used. Consecutive pieces of one bent duplex (`joints`, _joints) in a short chain (_rigid_joints)
     are moved together and never pushed apart. Items are pushed off the `fixed` boxes they must keep off (Walls),
-    which stay where they are. `mirror`: the copies are their mates' mirror images about that page x (_push_apart)."""
+    which stay where they are. `mirror`: the copies are their mates' mirror images about that page x (_push_apart);
+    then the tied pushes run as many passes as the one-by-one ones and may take up to _SEP_MIRROR_ROOM."""
     halves = np.array([it.half for it in items], float).reshape(-1, 2)
     mids = np.array([it.mid for it in items], float).reshape(-1, 2)
     start = np.array([(it.cx, it.cy) for it in items], float).reshape(-1, 2)
@@ -829,7 +833,11 @@ def _separate(
     xy = start.copy()
     alone = start.copy()
     _push_apart(alone, halves, mids, home, {}, _SEP_SWEEPS, apart, fixed)
-    together = ties and _push_apart(xy, halves, mids, home, ties, _SEP_ORBIT_SWEEPS, apart, fixed, mirror)
+    if mirror is not None:  # mirror images about a dyad in the page: drawn so whenever room allows (9GEP)
+        sweeps, room = _SEP_SWEEPS, max(room, _SEP_MIRROR_ROOM)
+    else:
+        sweeps = _SEP_ORBIT_SWEEPS
+    together = ties and _push_apart(xy, halves, mids, home, ties, sweeps, apart, fixed, mirror)
     if not together or _box_area(xy, halves, mids) > room * _box_area(alone, halves, mids):
         xy = alone
     for it, (x, y) in zip(items, xy.tolist()):

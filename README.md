@@ -326,7 +326,8 @@ backbone atom names (GFP's CRO66) keeps the chain whole: no dashed "missing" loo
 element. It is marked with a star on the chain and the legend entry "chromophore / linked residue".
 
 **Mirrored dimers.** Two copies related by a two-fold axis lying in the page (λ repressor on its operator, 1LMB) are
-drawn as exact mirror images about that axis, names included. Other symmetric copies, and the unrolled cylinders of
+drawn as exact mirror images about that axis, names included, even where that takes up to a tenth more room than
+placing the copies one by one (other copies: a twentieth). Other symmetric copies, and the unrolled cylinders of
 filaments, are drawn alike.
 
 **Layout files.** `--save-layout fig.yaml` records everything that defines a figure: theme, style changes,

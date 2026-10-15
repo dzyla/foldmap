@@ -539,6 +539,16 @@ clear. No snapshot changed.
 
 **Effort:** L. **Bench:** 6Y7S, 8UTF, 8UUP, 25IN (ties) re-recorded.
 
+**Batch C2a result (9GEP):** not a push on one element: the nucleosome and its bound N/M chains are drawn as mirror
+images about a dyad in the page, and `_separate`'s symmetric pushes cleared the overlaps only after about 3,000
+passes (the limit is `_SEP_ORBIT_SWEEPS`, 1,000) and in 1.07 times the one-by-one area (limit `_SEP_SYM_ROOM`, 1.05),
+so the copies were moved one by one and drawn unalike. With a mirror (the figure says the copies are mirror images)
+the symmetric pushes now run as many passes as the one-by-one ones (`_SEP_SWEEPS`) and may take up to
+`_SEP_MIRROR_ROOM` (1.10); other ties keep both limits. 9GEP copies 1.17/0.81 -> 0 (every tie below 1e-12), entry
+passes. Bench identical (1LMB, the bench's mirror, unchanged); NA campaign identical; no snapshot changed. The test
+is synthetic (tests/test_symmetry.py, like the other separation tests): a real cut reproducing it needs the
+nucleosome, its DNA and the 469-residue chain N (over 180 KB).
+
 ### C13 (a, visual): arrangement off the 3D contacts or the familiar published form (7 entries)
 
 - **1F09 (GFP):** the central helix (57–64) and its chromophore sit above the sheet, and the 64–69 loop detours
