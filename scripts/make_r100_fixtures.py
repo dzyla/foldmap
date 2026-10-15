@@ -84,10 +84,16 @@ ENTRIES = {  # fixture name -> (PDB id, what it is for)
         "an RNA G-quadruplex (NMR model 1): three stacked G-tetrads, no Watson-Crick pair, so no stem: drawn as a "
         "trace, which the note must say (random-100 C29 ruling)",
     ),
+    "3L9G-A": (
+        "3L9G",
+        "urate oxidase, chain A (assembly 1: four copies by symmetry), backbone only: its copies share sheets, so "
+        "the domains view parted their domains for ever and exploded the page (random-100 C31)",
+    ),
 }
 Span = tuple[int, int]
 WINDOWS: dict[str, dict[str, Span | list[Span] | None]] = {  # fixture -> {chain: windows (first, last), None: whole}
-    "3OWW-AB": {c: [(5, 12), (38, 45), (60, 70), (80, 88)] for c in "AB"},  # where the two RNAs pair
+    "3OWW-AB": {c: [(5, 12), (38, 45), (60, 70), (80, 88)] for c in "AB"},
+    "3L9G-A": {"A": None},  # where the two RNAs pair
     "7FAB-HL": {"H": None, "L": None},
     "1IGT-AB": {"A": None, "B": None},
     "9FWZ-DB": {"D": (116, 700), "B": None},
@@ -118,6 +124,7 @@ TRIMS: dict[str, dict] = {
     },
     "6B5W": {"first_model": True, "backbone": True},
     "8Q4O": {"first_model": True},
+    "3L9G-A": {"atoms": ("N", "CA", "C", "O"), "no_protein_sequence": True, "drop": ("_atom_site_anisotrop.",)},
     "1BXI": {
         "atoms": ("N", "CA", "C", "O", "CB", "ND1", "NE2", "SG", "OD1", "OD2", "OE1", "OE2", "NZ", "OG", "OG1", "SD")
     },

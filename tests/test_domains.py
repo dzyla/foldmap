@@ -972,3 +972,21 @@ def test_copies_of_one_domain_share_a_tone_but_not_an_edge():
     assert (to_hex(a.get_edgecolor()), a.get_linestyle()) != (to_hex(b.get_edgecolor()), b.get_linestyle())
     d1 = [p for n, p in panel.items() if n.startswith("D1")]
     assert len({(to_hex(p.get_edgecolor()), str(p.get_linestyle())) for p in d1}) == len(d1) == 4
+
+
+def test_domains_sharing_a_sheet_of_copies_are_not_parted():
+    """C31 (random-100): urate oxidase's four copies share their sheets (one item holds strands of every copy's
+    domains), so _part_domains could never part those domains and widened the spread on every sweep: the domains
+    view of 3L9G was 2160 x 292 px (area 109 times the default's), its legend off the page. Domains sharing an item
+    stay together, and the sweeps stop when they no longer shrink the overlap."""
+    from foldmap import figcheck
+    from foldmap.spec import draw_spec, figure_spec
+
+    path = DATA / "r100" / "3L9G-A.cif.gz"
+    plain = draw_spec(figure_spec(path)).layout
+    d = draw_spec(figure_spec(path, domains="auto"))
+    lay = d.layout
+    assert len(lay.domains) == 12 and d.stuck == []
+    assert lay.width * lay.height < 1.5 * plain.width * plain.height
+    assert lay.width < 1.5 * plain.width
+    assert figcheck.off_page(d) == []

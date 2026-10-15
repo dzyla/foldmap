@@ -2569,14 +2569,26 @@ def _part_domains(
     its copies' domains and every item of their orbits (a unit, _domain_units), each copy by its tie (a mirrored
     copy, `mirror`, the other way across); two domains of one unit, copies of each other, part by widening the
     spread between protomers (protomer k moves k times the step), or for a mirror image sideways symmetrically.
-    True if anything moved."""
+    Domains with elements in one item (a sheet shared by copies: 3L9G's barrel) are never parted, nor any domain
+    joined to them so; the sweeps stop when they no longer shrink the overlap (random-100 C31). True if anything
+    moved."""
     ties = ties or {}
     owner = {k: d for d, (_, ids) in enumerate(domains) for k in ids}
     groups: dict[int, list[int]] = {}
+    bound = list(range(len(domains)))  # domains sharing an item, joined
+
+    def root(d: int) -> int:
+        while bound[d] != d:
+            d = bound[d]
+        return d
+
     for n, it in enumerate(items):
         votes = [owner[m.sse.id] for m in it.members if isinstance(m, Placed) and m.sse.id in owner]
         if votes:
             groups.setdefault(max(set(votes), key=votes.count), []).append(n)
+            for d in sorted(set(votes)):
+                a, b = root(votes[0]), root(d)
+                bound[max(a, b)] = min(a, b)
     keys = sorted(groups)
     if len(keys) < 2:
         return False
@@ -2607,11 +2619,24 @@ def _part_domains(
             it.cx, it.cy = it.cx + float(step[0]), it.cy + float(step[1])
             it.home = (it.home[0] + float(step[0]), it.home[1] + float(step[1]))  # rest here from now on
 
-    moved = False
+    def overlap() -> float:  # summed over the pairs that may part
+        total = 0.0
+        for i, a in enumerate(keys):
+            for b in keys[i + 1 :]:
+                if root(a) != root(b):
+                    A, B = box(a), box(b)
+                    ox = min(A[2], B[2]) - max(A[0], B[0]) + _DOMAIN_GAP
+                    oy = min(A[3], B[3]) - max(A[1], B[1]) + _DOMAIN_GAP
+                    total += min(ox, oy) if ox > 0 and oy > 0 else 0.0
+        return total
+
+    moved, last = False, overlap()
     for _ in range(sweeps):
         clash = False
         for i, a in enumerate(keys):
             for b in keys[i + 1 :]:
+                if root(a) == root(b):
+                    continue
                 A, B = box(a), box(b)
                 ox = min(A[2], B[2]) - max(A[0], B[0]) + _DOMAIN_GAP
                 oy = min(A[3], B[3]) - max(A[1], B[1]) + _DOMAIN_GAP
@@ -2638,8 +2663,10 @@ def _part_domains(
                 else:
                     continue  # no move keeps them alike: left to _separate
                 clash = moved = True
-        if not clash:
+        now = overlap()
+        if not clash or now >= last - 1e-6:  # parted, or the moves no longer help
             break
+        last = now
     return moved
 
 
