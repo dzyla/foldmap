@@ -469,3 +469,15 @@ def test_a_crowded_ligand_mark_is_in_the_draw_result(monkeypatch):
     monkeypatch.setattr(render, "_place_mark", lambda anchor, half, targets, *a, **k: np.asarray(targets[0], float))
     out = app_jobs.draw_job(DATA / "fidelity" / "1MBN.cif.gz", _blob())
     assert out["crowded_marks"] and all(m.startswith(("HEM:", "OH:")) for m in out["crowded_marks"])
+
+
+def test_a_page_held_at_its_largest_is_in_the_draw_result(monkeypatch):
+    """random-100 C4: what is said of the page (Drawn.page_notes: held at layout.MAX_PAGE_IN with its text under
+    6 pt; a PNG under 300 dpi) reaches the app's notes under the figure."""
+    from foldmap.app_edits import notes_text
+    from test_page_text import past_the_largest_page
+
+    assert app_jobs.draw_job(DATA / "1UBQ.cif", _blob())["page_notes"] == []
+    past_the_largest_page(monkeypatch)
+    notes = app_jobs.draw_job(DATA / "1UBQ.cif", _blob())["page_notes"]
+    assert len(notes) == 2 and notes_text([], [], [], notes).startswith("The page (3 x 2 in) is held at 3 in")

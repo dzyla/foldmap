@@ -353,7 +353,8 @@ def test_long_loops_and_tails_say_how_long_they_are():
 
 @pytest.mark.parametrize("name", ["6Y7S", "8UTF"])
 def test_legend_text_ends_before_the_next_swatch_on_a_wide_figure(name):
-    """A wide figure draws legend text at the 4 pt floor; the legend is spaced for that size, not a smaller one."""
+    """A wide figure draws legend text at its size (random-100 C4: 6 pt at least, the page growing past 7.2 in for
+    it); the legend is spaced for that size, not a smaller one."""
     from pathlib import Path
 
     from matplotlib.backends.backend_agg import FigureCanvasAgg
@@ -362,7 +363,8 @@ def test_legend_text_ends_before_the_next_swatch_on_a_wide_figure(name):
     r = FigureCanvasAgg(fig).get_renderer()
     swatches = [p.get_window_extent(r) for p in _gids(fig, "legend-chain:")]
     texts = [t.get_window_extent(r) for t in _gids(fig, "legend-chain-label:")]
-    assert len(texts) > 4 and fig.get_size_inches()[0] == pytest.approx(7.2)
+    assert len(texts) > 4 and fig.get_size_inches()[0] > 7.2
+    assert min(t.get_fontsize() for t in _gids(fig, "legend-chain-label:")) >= 6.0 - 1e-9
     for t in texts:
         row = [s for s in swatches if abs((s.y0 + s.y1) / 2 - (t.y0 + t.y1) / 2) < 2 and s.x0 > t.x0]
         if row:

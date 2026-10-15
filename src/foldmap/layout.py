@@ -44,9 +44,12 @@ END_LABEL = 1.15  # distance from a chain-end port to its N/C letter
 LONG_TAIL = 10  # a chain end with this many residues or more past its last element gets a count ("14 aa")
 TAIL_COUNT_SIZE = 0.72  # that count's text size, as a fraction of the figure's
 _TAIL_COUNT_GAP = 0.08  # page units between the N/C letter's ink and the count's
-_GLYPH_W, _GLYPH_H = 0.32, 0.42  # rough label glyph size in page units, for keep-out boxes
+_GLYPH_W, _GLYPH_H = 0.32, 0.42  # rough label glyph size in page units, for keep-out boxes (at _EM_TUNED: glyph_scale)
 IN_PER_UNIT = 0.30  # render: inches per page unit, at most
-MAX_WIDTH_IN = 7.2  # render: the widest figure (double-column width), inches
+MAX_WIDTH_IN = 7.2  # render: a figure is drawn at most this wide (double column), inches, while its text stays ...
+MIN_TEXT_PT = 6.0  # ... this size or larger: a wider page grows past MAX_WIDTH_IN instead (random-100 C4 ruling)
+MAX_PAGE_IN = 48.0  # render: the longest side a page grows to (A0's, about); past it the whole figure, its text
+# with it, is scaled to fit: text under MIN_TEXT_PT, said by the figure's notes (page_fit)
 _MAX_ROW = 30.0
 _MIN_STRAND = 1.0  # shortest drawn strand (room for the arrow head)
 # items: at or below it the dense energy keeps recorded layouts bit-identical (the pair-list summation order
@@ -3172,8 +3175,12 @@ def page_text(layout: Layout) -> tuple[float, float]:
     placed elements, stems and traces span so far (as _ink_em; a layout with nothing placed: its bounds)."""
     rects = [p.rect for p in [*layout.placed.values(), *layout.ghosts, *layout.stems] if hasattr(p, "rect")]
     rects += [(*pts.min(axis=0), *pts.max(axis=0)) for pts in map(np.asarray, layout.na_traces.values())]
-    width = (max(r[2] for r in rects) - min(r[0] for r in rects) + 2.0) if rects else (layout.width or 1.0)
-    scale = min(IN_PER_UNIT, MAX_WIDTH_IN / width)
+    if rects:
+        r = np.asarray(rects, float)
+        width, height = float(r[:, 2].max() - r[:, 0].min()) + 2.0, float(r[:, 3].max() - r[:, 1].min()) + 2.0
+    else:
+        width, height = layout.width or 1.0, layout.height or 0.0
+    scale = page_scale(width, height)
     return font_pt(scale) * layout.font_scale, 1.0 / (scale * 72)
 
 
@@ -3586,17 +3593,52 @@ def label_boxes(
     return out
 
 
+_EM_TUNED = 0.55 * SHAFT  # page units per em of the figure's text (before Style.font_scale), on every page
+_MIN_SCALE = MIN_TEXT_PT / (_EM_TUNED * 72)  # inches per page unit at which the text is MIN_TEXT_PT
+
+
+def page_scale(width: float, height: float = 0.0) -> float:
+    """Inches per page unit of a page `width` x `height` page units, as render draws it: IN_PER_UNIT, less on a
+    page wider than MAX_WIDTH_IN, but never so little that the text falls under MIN_TEXT_PT (the page grows past
+    MAX_WIDTH_IN instead; random-100 C4: on wide pages text held at 4 pt outgrew every keep-out sized in page
+    units), nor so much that a side passes MAX_PAGE_IN (past it the whole figure is scaled to fit, its text with
+    it: the text keeps its page units, so nothing it keeps clear of changes; only its print size falls)."""
+    scale = max(min(IN_PER_UNIT, MAX_WIDTH_IN / width), _MIN_SCALE)
+    return min(scale, MAX_PAGE_IN / max(width, height))
+
+
 def font_pt(scale: float) -> float:
-    """The figure's text size in points (before Style.font_scale) at `scale` inches per page unit."""
-    return float(np.clip(0.55 * SHAFT * scale * 72, 4.0, 9.0))
+    """The figure's text size in points (before Style.font_scale) at `scale` inches per page unit (page_scale):
+    _EM_TUNED page units per em, at most 9 pt."""
+    return float(min(_EM_TUNED * scale * 72, 9.0))
 
 
-def text_em(width: float) -> float:
-    """How many page units one em of the figure's text takes on a page `width` units wide, as render sizes it
-    (before Style.font_scale): a wide page is scaled down to MAX_WIDTH_IN and its text, held at 4 pt or more,
-    takes more page units."""
-    scale = min(IN_PER_UNIT, MAX_WIDTH_IN / width)
+def text_em(width: float, height: float = 0.0) -> float:
+    """How many page units one em of the figure's text takes on a page `width` x `height` units, as render sizes it
+    (before Style.font_scale): _EM_TUNED on every page (page_scale grows a wide page rather than shrink its text
+    under MIN_TEXT_PT, and scales a page past MAX_PAGE_IN as a whole)."""
+    scale = page_scale(width, height)
     return font_pt(scale) / (scale * 72)
+
+
+def glyph_scale(em: float) -> float:
+    """How much the keep-outs sized for text in page units (the _GLYPH_W x _GLYPH_H glyph box of names, chain-end
+    letters and nucleotide letters; render's legend row) grow for text drawn `em` page units per em: in
+    proportion past _EM_TUNED, the em they were sized at, never below it (random-100 C4 ruling: every route
+    keep-out and legend row is sized from the drawn text); snapped. The one helper they all go through."""
+    return max(1.0, float(_snap(em / _EM_TUNED)))
+
+
+def page_fit(width_in: float, height_in: float, font: float) -> str:
+    """What the figure's notes say of its page (random-100 C4): '' while its text is MIN_TEXT_PT or larger (before
+    Style.font_scale: `font`, the text size drawn, is compared at font_scale 1); past MAX_PAGE_IN, that the
+    whole figure was scaled to fit and its text is smaller."""
+    if font >= MIN_TEXT_PT - 1e-6:
+        return ""
+    return (
+        f"the page ({width_in:.0f} x {height_in:.0f} in) is held at {MAX_PAGE_IN:.0f} in on its longer side, so its "
+        f"text is {font:.1f} pt, under {MIN_TEXT_PT:.0f} pt; draw fewer chains (--chains, --focus) for larger text"
+    )
 
 
 NA_TORN_TURN = 90.0  # degrees: linked stems turned against one another by more than this when unrolled are torn

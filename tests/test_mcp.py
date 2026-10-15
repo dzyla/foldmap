@@ -371,3 +371,14 @@ def test_a_crowded_ligand_mark_is_noted(tmp_path, monkeypatch):
     monkeypatch.setattr(render, "_place_mark", lambda anchor, half, targets, *a, **k: np.asarray(targets[0], float))
     r = call("draw_topology", {"source": mbn, "output_path": str(tmp_path / "n.svg")})
     assert "ligand mark(s) with no clear spot" in r.content[0].text
+
+
+def test_a_page_held_at_its_largest_is_noted(tmp_path, monkeypatch):
+    """random-100 C4: the MCP note says when the page was held at layout.MAX_PAGE_IN (text under 6 pt)."""
+    from test_page_text import past_the_largest_page
+
+    r = call("draw_topology", {"source": UBQ, "output_path": str(tmp_path / "u.svg")})
+    assert "held at" not in r.content[0].text
+    past_the_largest_page(monkeypatch)
+    r = call("draw_topology", {"source": UBQ, "output_path": str(tmp_path / "v.svg")})
+    assert "; the page (3 x 2 in) is held at 3 in on its longer side" in r.content[0].text

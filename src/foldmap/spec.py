@@ -283,6 +283,14 @@ class Drawn:
         return list(getattr(self.figure, "foldmap_crowded_marks", []))
 
     @property
+    def page_notes(self) -> list[str]:
+        """What is said of the figure's page (render.page_notes): held at layout.MAX_PAGE_IN with its text under
+        6 pt; its PNG at less than 300 dpi."""
+        from .render import page_notes
+
+        return page_notes(self.figure)
+
+    @property
     def over_labels(self) -> list[str]:
         """Loops routed over a label or a chain-end stub, the only route found (route.Loop.crosses_labels)."""
         return [f"{l.a_id}>{l.b_id}" for l in self.loops if l.crosses_labels and not l.fallback]

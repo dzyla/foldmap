@@ -149,7 +149,12 @@ def figure_view(ws: Workspace) -> None:
         background = json.loads(good["blob"]).get("background", "#ffffff")
         st.markdown(figure_card(good["svg"], background, ws.name), unsafe_allow_html=True)
         notes = (
-            app_edits.notes_text(result["fallback"], result["over_labels"], result.get("crowded_marks", []))
+            app_edits.notes_text(
+                result["fallback"],
+                result["over_labels"],
+                result.get("crowded_marks", []),
+                result.get("page_notes", []),
+            )
             if result
             else ""
         )

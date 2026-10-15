@@ -469,10 +469,11 @@ def control_for(message: str, last_changed: str | None) -> str | None:
     return f"{label} ({section})" if label else None
 
 
-def notes_text(fallback: list[str], over_labels: list[str], crowded: list[str] = ()) -> str:
+def notes_text(fallback: list[str], over_labels: list[str], crowded: list[str] = (), page: list[str] = ()) -> str:
     """The routing and placement notes under a figure, as one line ('' when there are none): loops with no clear
-    route, loops over a label, ligand marks with no clear spot (Drawn.crowded_marks)."""
-    notes = []
+    route, loops over a label, ligand marks with no clear spot (Drawn.crowded_marks), and what is said of its page
+    (Drawn.page_notes: held at its largest with text under 6 pt; a PNG under 300 dpi)."""
+    notes = [f"{note[0].upper()}{note[1:]}." for note in page]
     if fallback:
         notes.append(f"No clear route for {', '.join(fallback)} (drawn as plain curves).")
     if over_labels:

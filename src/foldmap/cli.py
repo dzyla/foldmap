@@ -1192,6 +1192,8 @@ def _cmd_figure(args: argparse.Namespace) -> int:
                 f"ink: {', '.join(drawn.crowded_marks)}",
                 file=sys.stderr,
             )
+        for note in drawn.page_notes:  # a page past layout.MAX_PAGE_IN; a PNG under 300 dpi (random-100 C4)
+            print(f"foldmap: {note}", file=sys.stderr)
         for out in args.output:
             print(f"wrote {save(drawn.figure, out)}")
     method = experimental_method(spec.structure) if spec.look.color_by == "plddt" else None

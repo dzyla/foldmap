@@ -40,7 +40,6 @@ from .layout import (
     HEAD,
     HEAD_LEN,
     IN_PER_UNIT,
-    MAX_WIDTH_IN,
     NT_ROW,
     PITCH,
     SHAFT,
@@ -60,9 +59,12 @@ from .layout import (
     domain_fields,
     first_pair_text,
     font_pt,
+    glyph_scale,
     helix_label_pos,
     label_boxes,
     overlaps_any,
+    page_fit,
+    page_scale,
     page_text,
     panel_members,
     resolve,
@@ -81,7 +83,6 @@ from .route import Loop, boxes_meeting, clip_len, clip_lengths
 from .style import _ALIASES, CHOICES, MODALITIES, Style, backbone_overrides
 
 _IN_PER_UNIT = IN_PER_UNIT
-_MAX_WIDTH_IN = MAX_WIDTH_IN  # double-column width
 _HEAD_HALF = HEAD / 2
 _HEAD_LEN = HEAD_LEN
 _CORNER = 0.3
@@ -2355,6 +2356,7 @@ class _Legend(NamedTuple):
     entry: float  # width of one legend entry (page units)
     per_row: int
     height: float
+    row: float = _LEGEND_ROW  # the step between rows (page units): _LEGEND_ROW, grown with the text (C4)
 
 
 def _resolve_look(look, palette, style, loop_style) -> Style:
@@ -2475,7 +2477,7 @@ def _canvas(
     entries = _legend_entries(layout, look, chains, colors, umarks, backbone[0], hb, linked)
 
     def legend_entry(x1: float) -> float:  # one legend entry's width in page units: swatch, text, gap
-        scale = min(_IN_PER_UNIT, _MAX_WIDTH_IN / (x1 - x0 + 2 * pad))  # as the figure below
+        scale = page_scale(x1 - x0 + 2 * pad)  # as the figure below (the text's page units do not depend on it)
         font_u = _font_pt(scale) * look.font_scale / (scale * 72)  # text drawn at that size, in page units
         # the unhinted advance width, which is what is drawn (ink extents differ between matplotlib versions);
         # measured at a size matplotlib does not clamp (it floors font sizes at 1 pt) and scaled to font_u
@@ -2492,16 +2494,19 @@ def _canvas(
     per_row = max(1, int((x1 - x0 + 0.9) // entry))
     if not look.legend:
         entries = []
-    legend_h = 0.8 + _LEGEND_ROW * -(-len(entries) // per_row) if entries else 0.3
+    scale = page_scale(x1 - x0 + 2 * pad)  # as the figure below (the text's page units do not depend on it)
+    em = _font_pt(scale) * look.font_scale / (scale * 72)  # the text drawn, in page units
+    row = _LEGEND_ROW * glyph_scale(em)  # a legend row, sized from the text drawn in it (C4)
+    legend_h = 0.8 + row * -(-len(entries) // per_row) if entries else 0.3
     if layout.context and look.legend:
         legend_h += 1.3
     bars = domain_bars(layout) if domain_bar_shown(look, layout) else []
-    scale = min(_IN_PER_UNIT, _MAX_WIDTH_IN / (x1 - x0 + 2 * pad))  # as the figure below
-    bar_h = max(_DOMAIN_BAR_H, 2.4 * _font_pt(scale) * look.font_scale / (scale * 72) + _BAR_TICK) if bars else 0.0
+    bar_h = max(_DOMAIN_BAR_H, 2.4 * em + _BAR_TICK) if bars else 0.0
     xmin, xmax, ymin, ymax = x0 - pad, x1 + pad, y0 - pad - len(bars) * bar_h - legend_h, y1 + pad + top
     w_u, h_u = xmax - xmin, ymax - ymin
-    scale = min(_IN_PER_UNIT, _MAX_WIDTH_IN / w_u)
+    scale = page_scale(w_u, h_u)  # text at MIN_TEXT_PT or larger: past MAX_WIDTH_IN the page grows (C4)
     fig = Figure(figsize=(w_u * scale, h_u * scale), facecolor=look.background)
+    fig.foldmap_page_fit = page_fit(w_u * scale, h_u * scale, _font_pt(scale))  # the notes' page line, if any
     ax = fig.add_axes([0, 0, 1, 1])
     ax.set_xlim(xmin, xmax)
     ax.set_ylim(ymin, ymax)
@@ -2527,7 +2532,7 @@ def _canvas(
         backbone,
         bar_h,
     )
-    return canvas, _Legend(entries, entry, per_row, legend_h)
+    return canvas, _Legend(entries, entry, per_row, legend_h, row)
 
 
 _OVER_Z = Z["over"]  # a helix over a sheet (Placed.over): above the strands, below their letters; its name at 4.5
@@ -3223,7 +3228,7 @@ def _draw_legend(c: _Canvas, layout: Layout, legend: _Legend) -> None:
     xmin, xmax, ymin, ymax = c.page
     for k, (colour, text) in enumerate(legend.entries):
         row, col = divmod(k, legend.per_row)
-        x, y = xmin + c.pad + col * legend.entry, ymin + legend.height - 1.1 - row * _LEGEND_ROW
+        x, y = xmin + c.pad + col * legend.entry, ymin + legend.height - 1.1 - row * legend.row
         if isinstance(colour, tuple) and colour[0] == "grades":  # the nine grades in ConSurf's colours
             for q, shade in enumerate(CONSURF):
                 c.ax.add_patch(Rectangle((x + q * 0.6 / 9, y - 0.3), 0.6 / 9, 0.6, fc=shade, ec="none"))
@@ -3376,13 +3381,37 @@ def save_svg(fig: Figure) -> str:
     return text[text.index("<svg") :]
 
 
-def save(fig: Figure, path: str | FsPath, dpi: int = 300) -> FsPath:
+PNG_DPI = 300  # a PNG's resolution ...
+MAX_PNG_PIXELS = 50_000_000  # ... up to this many pixels (200 MB to draw): a larger page's PNG takes a lower dpi
+
+
+def png_dpi(fig: Figure, dpi: int = PNG_DPI) -> int:
+    """The dpi save() writes the figure's PNG at: `dpi`, or less on a page so large (random-100 C4: past
+    MAX_WIDTH_IN the page grows to keep its text at 6 pt) that it would take more than MAX_PNG_PIXELS."""
+    w, h = fig.get_size_inches()
+    return int(min(dpi, (MAX_PNG_PIXELS / (w * h)) ** 0.5))
+
+
+def page_notes(fig: Figure) -> list[str]:
+    """What the notes (CLI, app, MCP) say of the figure's page: a page held at layout.MAX_PAGE_IN with its text under
+    6 pt (layout.page_fit), and a PNG written at less than PNG_DPI (png_dpi)."""
+    out = [fit] if (fit := getattr(fig, "foldmap_page_fit", "")) else []
+    if (dpi := png_dpi(fig)) < PNG_DPI:
+        w, h = fig.get_size_inches()
+        out.append(f"its PNG is {dpi} dpi, not {PNG_DPI}: the page is {w:.0f} x {h:.0f} in (SVG and PDF keep it whole)")
+    return out
+
+
+def save(fig: Figure, path: str | FsPath, dpi: int = PNG_DPI) -> FsPath:
+    """The figure as .svg, .pdf or .png (at `dpi`, at most png_dpi's)."""
     path = FsPath(path)
     fmt = _EXT.get(path.suffix.lower())
     if fmt is None:
         raise ValueError(f"unsupported extension {path.suffix!r}; use .svg, .pdf or .png")
     path.parent.mkdir(parents=True, exist_ok=True)
     meta = {"svg": {"Date": None}, "pdf": {"CreationDate": None}, "png": {"Software": None}}[fmt]
+    if fmt == "png":
+        dpi = min(dpi, png_dpi(fig))
     with rc_context({"svg.fonttype": "none", "pdf.fonttype": 42, "svg.hashsalt": "foldmap", **_RC}):
         fig.savefig(path, format=fmt, dpi=dpi, metadata=meta, facecolor=fig.get_facecolor())
     return path

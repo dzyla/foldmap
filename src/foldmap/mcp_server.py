@@ -242,6 +242,8 @@ def draw_topology(
         if drawn.crowded_marks:
             n = len(drawn.crowded_marks)
             note += f"; {n} ligand mark(s) with no clear spot: {', '.join(drawn.crowded_marks)}"
+        for page in drawn.page_notes:  # a page past layout.MAX_PAGE_IN; a PNG under 300 dpi
+            note += f"; {page}"
         scope = scope_note(drawn_scope(drawn.model, drawn.layout, spec.assembly, spec.focus), how="mcp")
         if scope:  # an automatic choice drew part of the file
             note += f"; {scope}"

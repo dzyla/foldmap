@@ -184,7 +184,11 @@ foldmap styles                                    # every theme and style key
   copies have it (a tie breaks it); the figure's scope facts count these cuts and joins.
 - **Layout** from the 3D structure: elements projected onto the page, then arranged so sheets stay in order,
   contacting elements and disulfide partners stay close, and nothing overlaps; loops routed orthogonally around
-  elements and labels. The layout is deterministic: the same figure on every machine.
+  elements and labels. The layout is deterministic: the same figure on every machine. A figure is at most 7.2 in
+  wide (double column) while its text stays at 6 pt or larger; a larger figure's page grows instead (up to 48 in on
+  its longer side, past which the whole figure is scaled to fit and the notes say its text is under 6 pt), and
+  every keep-out round text and every legend row is sized from the text as drawn. Its PNG is 300 dpi up to 50
+  megapixels and takes a lower dpi past that (said in the notes); SVG and PDF keep the page whole.
 - **Fold conventions** of the published figures: all-parallel α/β sheets (TIM barrels, Rossmann folds) as one βα
   row, conventional names (`--names`), helices drawn over the sheet they pack on (opt-in); see
   [Conventions of the published figures](#conventions-of-the-published-figures).

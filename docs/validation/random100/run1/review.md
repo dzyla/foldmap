@@ -258,6 +258,25 @@ any page width.
 **Effort:** L (part 1 alone is M). **Bench:** every bench entry wider than 44 units moves (6Y7S, 8UTF, 8UUP,
 25IN, 6ZYA among them). They need re-recording with this reason.
 
+**Batch C1 result (C4):** ruled (progress.md): text has a floor of 6 pt and the page grows instead.
+- `layout.page_scale` sets a page's inches per page unit: `IN_PER_UNIT`, less on a page wider than `MAX_WIDTH_IN`
+  (7.2 in), never so little that the text falls under `MIN_TEXT_PT` (6 pt), and never so much that a side passes
+  `MAX_PAGE_IN` (48 in, about A0's long side). The text's em is then 0.341 page units on every page (it was up to
+  1.24 on 6JO6), so the keep-outs sized in page units hold it again. Past 48 in the whole figure, text with it, is
+  scaled to fit (no keep-out changes; only its print size falls under 6 pt), and the CLI, app and MCP notes say so.
+- A PNG is 300 dpi up to 50 megapixels, and takes a lower dpi past that (said in the notes); SVG and PDF keep the
+  page whole.
+- The legend's row step is sized from its text (`layout.glyph_scale`, the one helper the keep-outs go through).
+- "6 pt" is the figure's text size (helix names, terminus letters, legend); texts drawn at a set fraction of it
+  (strand letters 0.9, counts 0.72) keep their fractions, as on a small page.
+- Bench: both baselines `identical` (a protein layout does not depend on the em; the NA entries are under 29.5 page
+  units, where nothing changes). Pages under about 29.5 units are drawn exactly as before.
+- Snapshots re-recorded, each because its page grew (C4): `2HHB-journal`, `2HHB-shaded`, `2HHB-trace`,
+  `2HHB-highlight` (40 units: 7.2 -> 10.2 in, nothing else moves once scaled back), `1TIM-symmetry`, `1TIM-shaded`
+  (7.2 -> 14.2 in; text 4 -> 6 pt, so the legend entries are narrower), `1C3W-membrane` (7.2 -> 13.8 in; legend
+  and the RET marks, placed from the text's size), `1KX5-nucleosome` and `30QM-ncrna` (7.2 -> 17.7 and 17.4 in;
+  base letters, stem names and the strands routed round them are sized from the text, smaller in page units now).
+
 ### C5 (a): ligand marks ignore loops, later tethers, other ligand labels and bars (19 entries + visual 6)
 
 **Entries:**
