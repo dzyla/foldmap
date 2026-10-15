@@ -390,6 +390,11 @@ loop), 8P3N (an ADZ tether about 300 px). Examples:
 
 **Effort:** M. **Bench:** none (marks are not in the signature); ligand snapshots.
 
+**Batch B result:** the spot of a mark is chosen among the clear spots up to 4 rings past the first by the length of
+its tethers over element bodies (`render._over_bodies`; the body a target lies on not counted), no tether lengthened
+past the first spot's reach. Tether over bodies: 7LX9 1.15 -> 0, 3MHT 0.56 -> 0, 9YLM 3.15 -> 2.5, 1GOX-A 12.0 ->
+11.3; 5Q42, 5HI7 and 8P3N unchanged (no spot in reach does better). Running along loops is not scored yet.
+
 ### C10 (b, ruling): copies alike counts strands of intermolecular sheets (11 entries, 4 last)
 
 **Entries:** 7IMM, 9PXS, 6YPX, 6YQD (last), 1SLV, 1WWL, 2ILU, 3L9G, 5DWZ, 8QEM (focus, part), 9P1X (focus, part).
@@ -458,6 +463,11 @@ A17 `bead_overlaps` in 9CJI.
 
 **Fixture:** 6SO9 (RRM + 6-nt RNA, 2 chains, small). **Effort:** M. **Bench:** 1LMB, 1ZAA, 4OO8 snapshots; NA
 campaign rerun (constraint).
+
+**Batch B result:** after `route_nucleic` places the NA text, a protein loop crossing it (letters, stem letters on
+their row, 5'/3' labels: `layout.na_text_boxes`) is routed again with that text tolled on the grid, and takes the new
+route only when it crosses less NA text and no more text in all. 6SO9 4 hits -> 0; 9CJI and 7XSP default views
+clear. No snapshot changed.
 
 ### C12 (a): tied copies drift apart in large assemblies and filaments (6 entries + visual 7FDN)
 
@@ -577,6 +587,20 @@ An empty figure for 6B5W should at least say why.
 
 **Effort:** M overall. The NA campaign rerun applies.
 
+**Batch B classification (per entry, probed at HEAD):**
+- **8BW5 (c, inherent):** RNApolis' two extra canonical pairs, F5·F37 and F10·F33, are isolated A·T pairs with a
+  stretched bond (3.44/4.33 Å and 3.87/3.33 Å, C1'-C1' 10.5 and 12.1 Å) beside the quadruplex. foldmap takes a
+  stretched pair only stacked in register on a strict one (`nucleic.pair_nucleotides`, tuned on the 39 NA entries),
+  so it draws 4 of 6 pairs (pair_f1 0.8, stem_recall 0.5). The G-tetrads are not the cause (RNApolis' reference counts
+  canonical pairs only); C29's note now names them. Needs a ruling: accept, or count isolated stretched pairs.
+- **9YLM (a, real):** the three zinc fingers' recognition helices touch the duplex, but the layout puts their small
+  β-hairpins between them and the DNA (stems_nearer_frac 0). Needs contact-driven placement along the duplex; not
+  done in batch B.
+- **3L2V (a, real):** the C2 intasome is unrolled protomer by protomer, which turns each viral DNA 40-58° from its 3D
+  axis (angle metrics measure the unrolling; contact_auc 0.48, stems_nearer 0.5). Not done in batch B.
+- **3OWW (a, real):** the domain-swapped dimer (both chains, 3OWW ruling) has its stems in an order that follows 3D
+  poorly (spearman 0.484) and two run-run crossings (na_crossings 2, not letters: C14 cleared its letter hit). Not done.
+
 ### C17 (a): large membrane complexes, with TM helices off the band or no band (3 entries, + visual 1)
 
 **Entries:**
@@ -672,6 +696,12 @@ interleave.
 **Fix:** after outlining, shrink a panel locally where two overlap (clip by the bisector between the two
 domains' nearest elements). **Effort:** M. **Bench:** domain views (1LDM, 8UTF, 4OO8 snapshots).
 
+**Batch B result:** check defect. A panel with another domain's element interleaved in it has a hole (an inner ring
+turning the other way); Agg fills by the nonzero rule, so the hole is empty on the page, but `figcheck._cells` used
+`Path.contains_points`, which tests each ring alone and counted the hole as inside. Cells are now counted by nonzero
+winding (the panel fields already share no cell, asserted on 3L9G). 5X4Z, 7JU4 and 3L9G overlaps -> none; 2ILU's went
+with C31.
+
 ### C22 (b): copies with fewer than 3 elements judged inf (3 entries)
 
 **Entries:** 7AOD (its only A15 failure: `D~P` inf, 2 of 2 matched, a two-helix chain), 6JLN (`f~F`, `i~I`,
@@ -706,6 +736,11 @@ elements)".
 **Fix:** `_fold_small_copies` and the lent branch keep the chain: a lent element starts or joins a domain of its
 own chain. **Effort:** S–M. **Bench:** none (domains are a view).
 
+**Batch B result:** lent elements (focus mode, drawn grey and primed) are no longer members of a domain
+(`Layout.domains`); `Layout.domain_lent` keeps them per domain so the panel, its name field and the sheet tint are
+drawn round them as before (`layout.panel_members`; 1LDM protomer figure identical). 8RRX, 7BBH and 8QEM cross_chain
+-> none. Making them a domain of their own chain was tried: one-strand domains, panels torn round the grey strands.
+
 ### C24 (a): NA route fallbacks (3 entries)
 
 **Entries:** 9C75 (`strand R:28-29`), 7Y7C (`gap after a:1439`, Z:27/37/61), 8VWQ (strand 1:662-663, 934-935,
@@ -716,6 +751,11 @@ own chain. **Effort:** S–M. **Bench:** none (domains are a view).
 **Mechanism:** `route_na.route_nucleic` gives up on a 2-nt run between stems placed tight together (9C75), and
 on gaps across the 4,000-nt crops. **Effort:** L for the large ones, M for 9C75. **Bench:** NA entries; NA
 campaign rerun.
+
+**Batch B result:** a joint between two pieces of a bent duplex that no route reaches is drawn straight up to
+`na_runs._JOINT_REACH` (2.5) under the same tests (forward, clear by _INFLATE, crossing no strand but its partner):
+9C75 P2b -> P2a (1.83 apart) no longer falls back. 7Y7C and 8VWQ (gaps across 4,000-nt crops) are not this case and
+stay with C4/C8 (batch C).
 
 ### C25 (a, visual): neighbour ghosts not deduplicated; focus picks an uninformative chain (3 entries)
 
@@ -731,6 +771,11 @@ campaign rerun.
 **Fix:** merge ghosts of one element class lent by several mates into one "×11" ghost. Focus picks the largest or
 most-contacted chain. **Effort:** M.
 
+**Batch B result:** a focused subunit borrows the helices packed directly along its own
+(`features.helix_partners`), not every helix of the bundle: 8QEM's ring of twelve C-terminal helices lends two, not
+eleven (15 lent elements -> 6). The campaign's focus view takes the protein chain with the most elements drawn in
+the default view (`random100.focus_target`), not the first (7JU4's chain "0", a two-helix coiled coil).
+
 ### C26 (a/c): loops run inside the membrane slab (2 entries)
 
 **Entries:** 7SMR (B:117-129>B:141-150, B:171-173>B:190-201, E:156-160>E:162-163, E:166-167>E:184-195), 8W9Y
@@ -745,13 +790,15 @@ than the slab one.
 **Ruling or fix:** decide whether a loop joining two in-slab ports counts (it is in the slab in 3D too), or
 route such loops out to the nearer face. **Effort:** M.
 
-**Batch B result:** a step along the slab costs `route._SLAB_RUN` (24) where a step across it costs `_SLAB_COST`
+**Batch B result:** a step along the slab costs `route._SLAB_RUN` (12) where a step across it costs `_SLAB_COST`
 (3), so a loop leaves the slab at a face instead of running along it over an element that reaches into the band
-(7SMR B:117-129, B:171-173). A18's port rule measures the port against the band itself, not its 0.3 margin (7SMR
-E:162-163 and E:166-167 end 0.29 inside the face). 7SMR: 4 loops in the slab -> 0. 8W9Y keeps C/F:225-249>271-280:
-the loop leaves an interfacial helix's end inside the slab with α8 right above it; the way out through the near
-face (tried at cost 30) is a long detour that strikes the α7 and α10 names. Snapshot re-recorded: 1C3W-membrane
-(one A1 loop above the band takes the other side of a strand end; crossings 6 -> 3).
+(7SMR B:117-129). A18's port rule measures the port against the band itself, not its 0.3 margin (7SMR E:162-163 and
+E:166-167 end 0.29 inside the face). 7SMR: 4 loops in the slab -> 1 (B:171-173>B:190-201 still dips 0.4 into the
+band over an element end at the face). At 24 that loop went out too, but another of chain B's loops then crossed the
+whole slab twice to run along the far face: worse, so 12 was kept. 8W9Y keeps C/F:225-249>271-280: the loop leaves an
+interfacial helix's end inside the slab with α8 right above it; the way out through the near face (tried at cost 30)
+is a long detour that strikes the α7 and α10 names. Snapshot re-recorded: 1C3W-membrane (one A1 loop above the band
+takes the other side of a strand end; crossings 6 -> 3).
 
 ### C27 (b/c, ruling): A18 requires 75 % band cover from TM helices that are tilted or offset (2 entries, 1 last)
 
@@ -765,6 +812,12 @@ face (tried at cost 30) is a long detour that strikes the α7 and α10 names. Sn
 
 **Ruling:** 0.70, or "reaches within 0.5 units of both faces". The alternative fix is to snap TM-helix ends to
 the faces in the membrane view. **Effort:** S.
+
+**Batch B result (ruling C27):** A18 passes a TM helix that spans the band through both leaflets: its drawn extent
+reaches past the band's middle from a face (6PS3 A:267-298, 0.73; 7PIU R:48-70, 0.70). A helix in one leaflet or off
+the band still fails. Read of "spans the band (enters both faces)": the strict reading, both face lines reached,
+fails nearly every TM helix of the passing membrane entries (5JDN, 7SMR, 8W9Y: 0.3-1.6 units short), so it was not
+taken; the controller should confirm.
 
 ### C28 (a): glycan stems and linked-residue labels over labels (2 entries)
 
@@ -791,6 +844,11 @@ with no backbone obstacle test. Hoogsteen tetrads are not read as pairs (as C16'
 
 **Ruling or fix:** a tetrad glyph (M–L), or a note "G-quadruplex: tetrads not drawn". Letter placement on the
 trace with a backbone keep-out (M).
+
+**Batch B result (ruling C29):** `nucleic.g_tetrads` reads G-tetrads (four guanines, each Hoogsteen-bonded to the
+next: N1-O6 and N2-N7 within 3.5 Å); `scope_note` says "not drawn: 3 G-tetrads of a G-quadruplex (their Gs drawn
+unpaired)" (8Q4O: 3; 8BW5: 2). 8XZE's junction letters detached from the trace (the second half of C29) are not
+done.
 
 ### C30 (a): `--assembly auto` keeps a 40-chain ASU (1 entry)
 
@@ -834,6 +892,10 @@ the page.
 **Fixture:** 3L9G cut to 2 chains. **Effort:** M. **Bench:** domain snapshots unchanged (no interlocked copies
 there), to be measured.
 
+**Batch B result:** domains with elements in one item (a sheet shared by copies) are never parted, and
+`_part_domains` stops when its sweeps no longer shrink the overlap. 3L9G's domains view: 2160 x 292 px -> about the
+default's size, no fallback, the legend on the page.
+
 ### C32 (c/a): a 61-chain default view over 180 s (1 entry)
 
 **Entry:** 7JU4 (192.7 s, limit 180 s for > 20 chains). **Check:** A2.
@@ -868,6 +930,18 @@ both pair with the same side of a third (a β-bulge or end-to-end stack, COMPARE
 
 **Fix:** detect two strands on one side of a strand with no residue overlap along it, and stack them in one
 column. **Effort:** M. **Bench:** sheet entries where it occurs (to be measured).
+
+**Batch B result (C34):** not done. A sheet block is one row of columns (`layout._sheet_item`, offsets per slot,
+all centred vertically); putting two end-to-end strands in one column needs per-strand vertical offsets, A11's
+order check and the sheet plates to follow. Larger than an M change; left for a later batch.
+
+**Batch B copy defects:**
+- **2MJW B~D 3.34 -> 0:** `_symmetry_ties` matched copies by shared residue numbers; chain D is numbered 95-188 where
+  B is 1-94, so they shared none and were never tied. Numbers are taken to the first copy's by homolog_chains'
+  offset.
+- **7OKA 1.12 -> 0:** DSSP broke helix 225-238 at 232 in B and C, not in A; each piece was tied to A's whole helix and
+  took its length. A helix broken by one or two residues in one copy is broken there in every copy
+  (`ss._copy_breaks`), as a kink split already is. 7TIM's B:178-203 is now broken like A's (both draw α8 and α9).
 
 ## Visual review
 
