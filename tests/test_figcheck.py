@@ -167,10 +167,23 @@ def test_a_panel_in_another_panels_hole_does_not_overlap_it():
 
 def test_interleaved_copies_panels_are_measured_with_their_holes():
     """C21: 3L9G's domains view (four copies, shared sheets): the panel fields share no cell, and neither do the
-    drawn outlines (D1 · A3 has a hole where D3 · A4's strand sits; measured 0.18 overlap before)."""
+    drawn outlines (D1 · A3 has a hole where D3 · A4's strand sits; measured 0.18 overlap before). Fix round 1: the
+    test first asserts the case it measures (the copies interleaved on one page, panels with holes), so it cannot
+    pass on an exploded page as it did on be5c237."""
     from foldmap.layout import domain_fields
 
     d = drawn(DATA / "r100" / "3L9G-A.cif.gz", domains="auto")
+    plain = drawn(DATA / "r100" / "3L9G-A.cif.gz").layout
+    assert d.layout.width < 1.5 * plain.width  # the copies interleaved, not parted apart (C31): else nothing to test
+    to_page = d.figure.axes[0].transData.inverted()
+    rings = [
+        ring
+        for a in d.figure.axes[0].patches
+        if (a.get_gid() or "").startswith("domain:")
+        for ring in a.get_path().transformed(a.get_transform() + to_page).to_polygons(closed_only=True)
+    ]
+    turns = [np.sum(r[:-1, 0] * r[1:, 1] - r[1:, 0] * r[:-1, 1]) for r in rings]
+    assert any(t < 0 for t in turns)  # some panel has a hole (an interleaved domain's element): the case measured
     fields = domain_fields(d.layout)
     inside = {name: v > 0 for name, v in fields.values.items()}
     assert not any((inside[a] & inside[b]).any() for a, b in combinations(sorted(inside), 2))

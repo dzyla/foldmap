@@ -1320,6 +1320,7 @@ def measure_view(view: str, drawn, spec, path: Path, name: str, work: Path) -> d
         "checks": _jsonable(checks),
         "stuck": drawn.stuck,
         "over_labels": drawn.over_labels,
+        "crowded_marks": drawn.crowded_marks,  # reported: ligand marks with no clear spot (render._least_bad_spot)
         "signature_sha256": _sha256(sig.encode()),
         "loops_sha256": _sha256(loops.encode()),
         "svg_sha256": _sha256(svg.read_bytes()) if svg.is_file() else None,
