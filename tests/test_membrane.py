@@ -491,3 +491,14 @@ def test_the_second_membrane_layout_is_kept_only_when_it_does_better(monkeypatch
     first, _, _ = make_layout(path, membrane="auto")
     assert kept.membrane["y"] != first.membrane["y"]  # the faces as projected, against the medians of the first
     assert next(scores, None) is None
+
+
+def test_a_users_move_never_pushes_a_transmembrane_helix_off_its_height():
+    """C17 fix round 1 (Q8): the transmembrane elements of a membrane view laid out at their projected height keep it
+    through the user's own moves (_adjust's _separate) and the pushes off unpaired strands (_off_walls). In 1BL8, the
+    pore helix moved onto the top of an inner helix pushed that helix 1.24 down."""
+    path = DATA / "1BL8.cif"
+    plain, _, _ = make_layout(path, membrane="auto")
+    moved, _, _ = make_layout(path, membrane="auto", move=[("res:A:62-74", (2.64, 10.6))])
+    assert moved.placed["A:86-112"].cy == plain.placed["A:86-112"].cy
+    assert moved.placed["A:62-74"].cy > plain.placed["A:62-74"].cy + 10

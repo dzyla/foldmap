@@ -1019,17 +1019,20 @@ def _push_apart(
                 s = (1 if dy > 0 else -1) if dy != 0 else 1
                 xy[gi, 1] -= s * (py / 2 + _SEP_PUSH)
                 xy[gj, 1] += s * (py / 2 + _SEP_PUSH)
-        _off_walls(xy, halves, mids, walls, group, sx=sx)
+        _off_walls(xy, halves, mids, walls, group, sx=sx, held=held)
         if sweep < 100:
             xy += 0.03 * (home - xy)
     return not len(_overlapping(xy, halves, mids, apart)) and not _off_walls(xy, halves, mids, walls, group, move=False)
 
 
-def _off_walls(xy, halves, mids, walls: Walls | None, group, move: bool = True, sx: np.ndarray | None = None) -> bool:
+def _off_walls(
+    xy, halves, mids, walls: Walls | None, group, move: bool = True, sx: np.ndarray | None = None, held=None
+) -> bool:
     """Push each footprint overlapping a fixed box it must keep off (Walls), MARGIN kept, the whole way off it
     along the axis of least overlap, moving its group (`group[i]`, the items moved with item i) in place; `sx`
-    (-1 for a mirrored copy, _push_apart) turns a sideways move of a group's copies the other way. True if any
-    overlapped (with move=False, only that is reported)."""
+    (-1 for a mirrored copy, _push_apart) turns a sideways move of a group's copies the other way; `held` (bool per
+    item, _push_apart's): a group keeping its height is moved sideways only. True if any overlapped (with
+    move=False, only that is reported)."""
     if walls is None or not len(walls.boxes):
         return False
     boxes = np.asarray(walls.boxes, float)
@@ -1045,7 +1048,7 @@ def _off_walls(xy, halves, mids, walls: Walls | None, group, move: bool = True, 
         py = halves[i, 1] + half[w, 1] + MARGIN - abs(dy)
         if px <= 1e-9 or py <= 1e-9:
             continue
-        if px < py:
+        if px < py or (held is not None and held[i]):
             turn = 1.0 if sx is None else sx[group[i]] * sx[i]
             xy[group[i], 0] -= turn * ((1 if dx > 0 else -1) if dx != 0 else 1) * (px + _SEP_PUSH)
         else:
@@ -2334,9 +2337,11 @@ def _adjust(
     move: list[tuple[str, tuple[float, float]]],
     joints: set[tuple[int, int]] = frozenset(),
     fixed: Walls | None = None,
+    level: np.ndarray | None = None,
 ) -> None:
     """The user's own hand on the layout: new labels, exchanged places, nudges; then overlaps are cleared
-    (consecutive pieces of a bent duplex, `joints`, may still meet; items keep off the `fixed` boxes)."""
+    (consecutive pieces of a bent duplex, `joints`, may still meet; items keep off the `fixed` boxes; the items of
+    `level`, a membrane view's transmembrane elements, keep their height: _separate)."""
     where = {
         m.sse.id: (it, k) for it in items for k, m in enumerate(it.members) if isinstance(m, Placed) and not m.ghost
     }
@@ -2365,7 +2370,7 @@ def _adjust(
     if moved:
         for it in items:
             it.home = (it.cx, it.cy)
-        _separate(items, None, joints, fixed)
+        _separate(items, None, joints, fixed, level=level)
         for it in items:
             it.apply()
 
@@ -2537,6 +2542,7 @@ def build_layout(
     joints = _joints(items, nucleic) if pieces else set()
     walls = _trace_walls(items, traces, nucleic) if traces else None  # traces stay: items keep off them
     rows: list[list[_Item]] = []
+    kept = None  # items keeping their height (projected mode, `level`)
     mirrored: list[tuple] = []  # (copy, mate) members of protomers drawn as mirror images
     copy_ties: dict[str, tuple[str, bool]] = {}
     tied_ids: set[str] = set()
@@ -2618,7 +2624,7 @@ def build_layout(
     if names is not None:  # conventional names (names.apply_names): before the user's own
         names(named, sses)
     if rename or swap or move:
-        _adjust(items, named, sses, rename or {}, swap or [], move or [], joints, walls)
+        _adjust(items, named, sses, rename or {}, swap or [], move or [], joints, walls, kept)
     for g in ghosts:
         g.label = real[g.sse.id].label
     rects = np.array([p.rect for p in placed + ghosts + dna]).reshape(-1, 4)
@@ -2736,7 +2742,9 @@ def _part_domains(
     When the sweeps do not part them and leave the items' width plus height over _PART_BLOWUP times (3L9G: a sheet
     shared by four copies holds ten domains, so every sweep widened the spread again: random-100 C31), they start
     over with domains that share an item never parted (nor any domain joined to them so), stopping when a sweep no
-    longer shrinks the overlap. True if anything moved."""
+    longer shrinks the overlap. True if anything moved. A domain moves as a whole, up or down too, its transmembrane
+    elements in a membrane view with it (build_layout `level` is not held here: a domain keeps its own shape, and
+    holding some of its items' heights would tear it; the _separate after parting holds them again)."""
     ties = ties or {}
     owner = {k: d for d, (_, ids) in enumerate(domains) for k in ids}
     groups: dict[int, list[int]] = {}
