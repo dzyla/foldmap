@@ -50,6 +50,7 @@ import sys
 import tempfile
 import time
 import urllib.request
+from collections import Counter
 from collections.abc import Callable, Mapping
 from pathlib import Path
 
@@ -1535,11 +1536,17 @@ def run_view(view: str, path: Path, name: str, work: Path, focus: str | None = N
 
 def focus_target(d: dict) -> str:
     """The focus view's --focus: 'none' (the whole file) when the default view drew part of it (a scope the chains
-    or the nucleic-acid crop left out), else the first protein chain alone. A chain "not drawn" because it has
-    nothing to draw (C15) is no scope: 7ARD and 7PIU keep their single-chain focus view."""
+    or the nucleic-acid crop left out), else the protein chain with the most elements drawn alone (the first of
+    them in drawing order; C25: chain "0" of 7JU4, a two-helix coiled coil, was taken by sort order), or the first
+    protein chain when no element is recorded. A chain "not drawn" because it has nothing to draw (C15) is no
+    scope: 7ARD and 7PIU keep their single-chain focus view."""
     scope = d.get("scope") or {}
     scoped = scope.get("chains_reason") or scope.get("crop")
-    return "none" if scoped or not d.get("first_protein_chain") else d["first_protein_chain"]
+    if scoped or not d.get("first_protein_chain"):
+        return "none"
+    count = Counter(e["chain"] for e in d.get("elements") or [])
+    order = list(dict.fromkeys(e["chain"] for e in d.get("elements") or []))
+    return max(order, key=lambda c: (count[c], -order.index(c))) if order else d["first_protein_chain"]
 
 
 def run_entry(source: str, out: Path, views=VIEWS, info: dict | None = None) -> dict:

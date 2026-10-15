@@ -616,6 +616,16 @@ def test_a_chain_with_nothing_to_draw_does_not_widen_the_focus_view(r100):
     assert r({"scope": {}, "first_protein_chain": ""}) == "none"
 
 
+def test_the_focus_view_draws_the_chain_with_most_elements(r100):
+    """C25 (random-100): with nothing left out, the focus view drew the first protein chain, whatever it was: 7JU4's
+    chain "0" is a two-helix coiled coil. It draws the protein chain with the most elements in the default view
+    (the first of them on a tie), else the first protein chain."""
+    els = [{"chain": "0"}, {"chain": "0"}, {"chain": "A"}, {"chain": "A"}, {"chain": "A"}, {"chain": "B"}]
+    assert r100.focus_target({"scope": {}, "first_protein_chain": "0", "elements": els}) == "A"
+    assert r100.focus_target({"scope": {}, "first_protein_chain": "0", "elements": els[:4]}) == "0"
+    assert r100.focus_target({"scope": {}, "first_protein_chain": "0"}) == "0"
+
+
 def test_a18_tm_helix_passes_when_it_reaches_both_leaflets(r100):
     """C27 (random-100, ruling): a TM helix passes A18 when it spans the band, entering it on both sides of the
     bilayer's middle (both leaflets), not by covering 75 % of the band's height: a tilted or offset helix that

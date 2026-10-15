@@ -546,8 +546,10 @@ def _one_of_each(chains: list[str], bb) -> set:
 
 def _focus_subset(sses, focus: set, bridges) -> tuple[list, set]:
     """The focus chains' elements plus other chains' elements that complete them: strands paired with theirs by
-    backbone H-bond bridges (donor strands, domain swaps, beta-augmentation) and helices bundled with theirs."""
-    from .features import helix_bundles
+    backbone H-bond bridges (donor strands, domain swaps, beta-augmentation) and helices packed along theirs
+    (features.helix_partners: its neighbours in a bundle; a ring of helices lends two, not all eleven, random-100
+    C25)."""
+    from .features import helix_partners
 
     owner = {r: s for s in sses for r in range(s.start, s.end + 1)}
     own = {s.id for s in sses if s.chain in focus}
@@ -560,9 +562,9 @@ def _focus_subset(sses, focus: set, bridges) -> tuple[list, set]:
             guests.add(b.id)
         if b.id in own and a.chain not in focus:
             guests.add(a.id)
-    for group in helix_bundles(sses):
-        if own & set(group):
-            guests |= {k for k in group if k not in own}
+    for k, partners in sorted(helix_partners(sses).items()):
+        if k in own:
+            guests |= {m for m in partners if m not in own}
     keep = [s for s in sses if s.id in own or s.id in guests]
     return keep, {s.chain for s in keep if s.chain not in focus}
 

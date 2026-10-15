@@ -58,6 +58,18 @@ def _shape(pieces: list[SSE]) -> tuple[np.ndarray, int, np.ndarray]:
 def helix_bundles(sses: list[SSE]) -> list[list[str]]:
     """Helices of different chains packed along their length (coiled-coil stalks, zippers, interface pairs):
     groups of element ids, each spanning at least two chains, sorted. Kinked pieces of one helix stay together."""
+    return _helix_packing(sses)[0]
+
+
+def helix_partners(sses: list[SSE]) -> dict[str, set[str]]:
+    """Each helix (element id) -> the helices of other chains packed along it directly (every piece of a kinked
+    one): its neighbours in a bundle, not the whole bundle (a ring of twelve helices lends a subunit two, random-100
+    C25)."""
+    return _helix_packing(sses)[1]
+
+
+def _helix_packing(sses: list[SSE]) -> tuple[list[list[str]], dict[str, set[str]]]:
+    """helix_bundles' groups and helix_partners' direct packing, from one pass."""
     helices = [s for s in sses if s.kind == "H"]
     group = {s.id: s.id for s in helices}
 
@@ -89,6 +101,7 @@ def helix_bundles(sses: list[SSE]) -> list[list[str]]:
     shapes = [[s] for s in helices] + [p for p in kinked.values() if len(p) > 1]  # pieces, and whole kinked helices
     long_ = [(p, *_shape(p)) for p in shapes if sum(len(s) for s in p) >= BUNDLE_MIN]
     linked = set()
+    partners: dict[str, set[str]] = {}
     for i, (a, pa, la, xa) in enumerate(long_):
         for b, pb, lb, xb in long_[i + 1 :]:
             if a[0].chain == b[0].chain or abs(float(xa @ xb)) < BUNDLE_COS:
@@ -98,11 +111,15 @@ def helix_bundles(sses: list[SSE]) -> list[list[str]]:
             if (near < BUNDLE_DIST).mean() >= BUNDLE_COVER:
                 join(a[0].id, b[0].id)
                 linked |= {a[0].id, b[0].id}
+                for x, y in ((a, b), (b, a)):
+                    for piece in x:
+                        partners.setdefault(piece.id, set()).update(q.id for q in y)
     out: dict[str, list[str]] = {}
     for s in helices:
         out.setdefault(root(s.id), []).append(s.id)
     chain = {s.id: s.chain for s in helices}
-    return sorted(sorted(g) for g in out.values() if len({chain[k] for k in g}) > 1 and linked & set(g))
+    groups = sorted(sorted(g) for g in out.values() if len({chain[k] for k in g}) > 1 and linked & set(g))
+    return groups, partners
 
 
 ON_SHEET_MIN = 10  # residues: a shorter helix is a turn at the sheet's edge, not one packed on its face

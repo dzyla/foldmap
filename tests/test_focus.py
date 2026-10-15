@@ -215,3 +215,27 @@ def test_shared_na_cage_stays_focused():
     assert _na_shared(shared, sym, bb)  # the strand is held by four subunits
     focus = _focus_chains("auto", sym, bb, sses, shared)
     assert focus is not None and len(focus) == 1
+
+
+def test_a_ring_of_helices_lends_a_subunit_its_two_neighbours():
+    """C25 (random-100): a subunit drawn in focus borrowed every helix of a bundle one of its helices is in, so
+    8QEM's ring of twelve C-terminal helices put eleven neighbours' copies on the page as primed ghosts in a row
+    (15 lent elements; 6 now). It borrows the helices packed along its own (features.helix_partners): in a ring,
+    the two beside it; in a three-helix stalk, both others."""
+    import numpy as np
+
+    from foldmap.cli import _focus_subset
+    from helpers import fake_sse
+
+    radius = 10.0 / (2 * np.sin(np.pi / 12))  # neighbours 10 Å apart round the ring
+    ring = [
+        fake_sse("H", 438, 451, (radius * np.cos(t), radius * np.sin(t), 0.0), (0, 0, 1), chain=c)
+        for c, t in zip("ABCDEFGHIJKL", np.linspace(0, 2 * np.pi, 12, endpoint=False))
+    ]
+    kept, partial = _focus_subset(ring, {"A"}, [])
+    assert sorted(s.chain for s in kept) == ["A", "B", "L"] and partial == {"B", "L"}
+    stalk = [
+        fake_sse("H", 438, 451, (6 * np.cos(t), 6 * np.sin(t), 0.0), (0, 0, 1), chain=c)
+        for c, t in zip("ABC", (0, 2.1, 4.2))
+    ]
+    assert _focus_subset(stalk, {"A"}, [])[1] == {"B", "C"}
