@@ -50,6 +50,24 @@ def test_tail_count_sits_clear_beyond_its_letter(scale):
     assert all(xmin < t["box"][0] and t["box"][2] < xmax and ymin < t["box"][1] and t["box"][3] < ymax for t in counts)
 
 
+def test_tail_count_looks_further_when_its_near_spots_are_crossed():
+    """7BBH, 6JO6, 5LDW (random-100 A6 tail-length x loop, batch C2a): on a crowded page every one of the five spots
+    beside the N/C letter was crossed by a loop, and the count went on the first of them, over the loop. Here a loop
+    is laid through each spot the count takes, one after another; past the five near spots it looks further out
+    beside the letter and along its stub, and takes a spot no loop crosses."""
+    from foldmap.route import Loop
+
+    d = drawn(R100 / "2DGS-A.cif.gz")
+    lay, loops = d.layout, list(d.loops)
+    for _ in range(5):
+        (x0, y0, x1, y1) = next(t["box"] for t in tail_counts(lay, d.sses, loops) if t["end"] == "N")
+        cy = (y0 + y1) / 2
+        loops.append(Loop("x", "y", [(x0 - 0.3, cy), (x1 + 0.3, cy)], False, False))
+    box = next(t["box"] for t in tail_counts(lay, d.sses, loops) if t["end"] == "N")
+    lines = [(p, q) for lp in loops[len(d.loops) :] for p, q in zip(lp.points, lp.points[1:])]
+    assert not any(clip_len(p, q, box) > 1e-9 for p, q in lines)
+
+
 def test_loop_count_sits_clear_of_elements_lines_and_text():
     """C3 (random-100): a long loop's "NN aa" was written beside its longest straight run with no test, so it sat on
     strands (9ON5: the count of A:121-126>A:154-161 on strand 154-161), other loops and labels, and lay outside the

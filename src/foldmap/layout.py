@@ -45,6 +45,7 @@ END_LABEL = 1.15  # distance from a chain-end port to its N/C letter
 LONG_TAIL = 10  # a chain end with this many residues or more past its last element gets a count ("14 aa")
 TAIL_COUNT_SIZE = 0.72  # that count's text size, as a fraction of the figure's
 _TAIL_COUNT_GAP = 0.08  # page units between the N/C letter's ink and the count's
+_TAIL_COUNT_FAR = (0.3, 0.6, 0.9, 1.2)  # page units further out a count looks when its near spots are all taken
 _GLYPH_W, _GLYPH_H = 0.32, 0.42  # rough label glyph size in page units, for keep-out boxes (at _EM_TUNED: glyph_scale)
 _GLYPH_K: ContextVar[float] = ContextVar("foldmap_glyph_scale", default=1.0)  # glyph_scale of the text the layout
 # being built is drawn with (build_layout sets it from Style.font_scale): for the glyph room of things that hold no
@@ -3573,8 +3574,9 @@ def tail_counts(layout: Layout, sses: list[SSE], loops=()) -> list[dict]:
     """The residue count written beyond each long chain end (at least LONG_TAIL residues past its last element):
     end, chain, text ("14 aa"), centre and ink box (page units). Placed after routing, so not a route keep-out: the
     box is sized from the figure's text (TAIL_COUNT_SIZE em of _ink_em) and set from the N/C letter's far edge,
-    along the stub, beside the letter on either side, then further along, the first clear of elements, text
-    (label_boxes), the loops' lines (`loops`, route.Loop) and the counts placed before; else along the stub."""
+    along the stub, beside the letter on either side, then further along, then further out beside the letter and along
+    the stub (_TAIL_COUNT_FAR), the first clear of elements, text (label_boxes), the loops' lines (`loops`,
+    route.Loop) and the counts placed before; else the one of them meeting the fewest of those."""
     if not layout.res_chain:
         return []
     em = _ink_em(layout, layout.font_scale) or text_em(layout.width or 1.0) * layout.font_scale
@@ -3606,8 +3608,14 @@ def tail_counts(layout: Layout, sses: list[SSE], loops=()) -> list[dict]:
             reach = abs(u[0]) * (own[0] + half[0]) + abs(u[1]) * (own[1] + half[1]) + _TAIL_COUNT_GAP
             spots.append(_snap(letter + u * reach))
         spots += [_snap(spots[0] + ex * k) for k in (0.3, 0.6)]
+        # crowded (batch C2a: 7BBH, 6JO6, 5LDW): further out beside the letter, then further along its stub
+        side = (np.array([-ex[1], ex[0]]), np.array([ex[1], -ex[0]]))
+        spots += [_snap(spots[1 + j] + side[j] * k) for k in _TAIL_COUNT_FAR for j in (0, 1)]
+        spots += [_snap(spots[0] + ex * k) for k in _TAIL_COUNT_FAR[2:]]
         boxes = [centred_box(float(c[0]), float(c[1]), *half) for c in spots]
-        box = next((b for b in boxes if not overlaps_any(b, taken)), boxes[0])
+        box = next((b for b in boxes if not overlaps_any(b, taken)), None)
+        if box is None:  # nowhere clear: the spot meeting the fewest things, the first of them
+            box = min(boxes, key=lambda b: sum(overlaps_any(b, (t,)) for t in taken))
         taken.append(box)
         out.append(
             {

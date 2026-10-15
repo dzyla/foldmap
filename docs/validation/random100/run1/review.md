@@ -156,6 +156,13 @@ spot.
 **Effort:** S. **Bench:** a keep-out moves routes where a loop crossed a long tail's count. AF-P04637 (p53, long
 tails) and 2JTY are the likely members; the others have no tail ≥ 10.
 
+**Batch C2a result (6JO6, 7BBH, 5LDW: tail-length × loop left after C1):** when all five near spots meet something
+(crowded pages), the count now looks further out beside its letter and along the stub (`layout._TAIL_COUNT_FAR`,
+up to 1.2 units), and when nothing is clear takes the spot meeting the fewest things instead of the first. 6JO6: 2
+hits -> 0 in every view. 7BBH (focus none) and 5LDW keep one hit each per chain: the N letter is boxed in by a glycan,
+a disulfide, strands and loops; the nearest clear spot is 2.7 units away (8 em), too far to read as the letter's
+count, so it is not taken (page crowding, C4/C8). Bench identical; no snapshot changed.
+
 ### C2 (b): A20 gates same-chain tethers, against the ruling (30 entries, 6 last)
 
 **Entries (all 30 A20 failures):** 13MV, 2YBE, 6IDJ, 6KTL, 7GLY, 5JDN (last cause), 2C4M, 2ILU, 3L9G, 4UM3,
