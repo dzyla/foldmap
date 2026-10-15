@@ -77,23 +77,25 @@ def test_helicase_neighbours_keep_their_primes():
 
 
 def test_a_name_given_to_one_copy_reaches_one_element_of_each_other():
-    """7TIM: B:178-203 is one helix, A holds it as 178-196 + 198-203. Named in B only, the name reaches A's
-    178-196 (the larger overlap) and not 198-203 too."""
+    """7TIM: A holds helix 178-203 as 178-196 + 198-203 (DSSP breaks it at 197) where B's run is whole; B is broken
+    there too (ss._copy_breaks, random-100 7OKA), so each copy has both pieces. Named in B only, the name reaches A's
+    178-196 and not 198-203 too."""
     import tempfile
 
     with tempfile.TemporaryDirectory() as tmp:
         names = Path(tmp) / "b.yaml"
-        names.write_text("elements:\n  res:B:178-203: H8\n", encoding="utf-8")
+        names.write_text("elements:\n  res:B:178-196: H8\n", encoding="utf-8")
         lay, _, _ = make_layout(FID / "7TIM.cif.gz", names=[str(names)])
-    assert lay.placed["B:178-203"].label == lay.placed["A:178-196"].label == "H8"
-    assert lay.placed["A:198-203"].label != "H8"
+    assert lay.placed["B:178-196"].label == lay.placed["A:178-196"].label == "H8"
+    assert lay.placed["A:198-203"].label != "H8" and lay.placed["B:198-203"].label != "H8"
     assert _repeats(lay) == {}
 
 
 def test_tim_copies_name_each_helix_once():
-    """7TIM: B's 178-203 is A's 178-196 (α8); A's 198-203, which B does not have, keeps its α9: no chain has a
-    second α8."""
+    """7TIM: DSSP breaks A's helix 178-203 at 197 and not B's; B is broken there too (ss._copy_breaks), so both copies
+    draw α8 (178-196) and α9 (198-203), each once."""
     lay, sses, _ = make_layout(FID / "7TIM.cif.gz")
     labels = {c: [lay.placed[s.id].label for s in sses if s.chain == c] for c in "AB"}
     assert labels["A"].count("α8") == labels["B"].count("α8") == 1
-    assert lay.placed["A:198-203"].label == "α9" and lay.placed["B:178-203"].label == "α8"
+    assert lay.placed["A:198-203"].label == lay.placed["B:198-203"].label == "α9"
+    assert lay.placed["A:178-196"].label == lay.placed["B:178-196"].label == "α8"

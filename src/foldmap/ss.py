@@ -172,6 +172,47 @@ def _split_kinks(a: int, b: int, cuts) -> tuple[list[tuple[int, int]], list[int]
     return pieces, corners
 
 
+_BREAK_MAX = 2  # residues: a helix broken by this few in one copy of a protein is broken there in every copy
+
+
+def _copy_breaks(helices: list[tuple[int, int]], bb: Backbone, copies) -> list[tuple[int, int]]:
+    """Helix runs broken alike in every copy of a protein: where DSSP breaks a helix by up to _BREAK_MAX residues in
+    one copy (two runs, chain-contiguous) and a copy's run covers that place whole, the whole run is cut there, at
+    the same residue numbers (copies() as in model.homolog_chains), the residues between in no piece; each piece
+    still a helix's length (_MIN_HELIX_ANY). 7OKA: 225-231 + 233-238 in B and C, 225-238 in A."""
+    breaks = [
+        (x, y)
+        for x, y in zip(helices, helices[1:])
+        if bb.labels[x[0]].chain == bb.labels[y[0]].chain
+        and 1 <= y[0] - x[1] - 1 <= _BREAK_MAX
+        and bool(bb.prev[x[1] + 1 : y[0] + 1].all())
+    ]
+    if not breaks:
+        return helices
+    at = {(l.chain, l.seq): k for k, l in enumerate(bb.labels)}
+    gaps = {}  # (root, last number before the break, first after) -> True
+    for x, y in breaks:
+        root, _, xb, ya, _ = _span(bb, copies(), x, y)
+        gaps[(root, xb, ya)] = True
+    out = []
+    for a, b in helices:
+        chain = bb.labels[a].chain
+        root, shift = copies()[chain]
+        lo, hi = bb.labels[a].seq - shift, bb.labels[b].seq - shift
+        cuts = sorted((xb, ya) for r, xb, ya in gaps if r == root and lo <= xb and ya <= hi and xb < ya)
+        pieces, start = [], a
+        for xb, ya in cuts:
+            end, nxt = at.get((chain, xb + shift)), at.get((chain, ya + shift))
+            if end is None or nxt is None or end < start or nxt > b:
+                continue
+            if end - start + 1 >= _MIN_HELIX_ANY and b - nxt + 1 >= _MIN_HELIX_ANY:
+                pieces.append((start, end))
+                start = nxt
+        pieces.append((start, b))
+        out += pieces
+    return out
+
+
 def build_sses(bb: Backbone, ss: str, short_helices: bool = False, bridges: list[Bridge] | None = None) -> list[SSE]:
     """Strands (E) and helices (H); with short_helices, isolated 3-10 runs too short to count as helices
     become their own kind G (drawn as small boxes, labelled η). Pass the DSSP bridges so that strand pieces
@@ -186,6 +227,7 @@ def build_sses(bb: Backbone, ss: str, short_helices: bool = False, bridges: list
         for a, b in _runs(ss, "HGI", bb.prev)
         if ss[a : b + 1].count("H") >= _MIN_HELIX_H or b - a + 1 >= _MIN_HELIX_ANY
     ]
+    helices = _copy_breaks(helices, bb, copies)
     kinks = {h: _kinks(*h, ss, bb) for h in helices}
     sharp = [_span(bb, copies(), x, y) for h in helices for x, y, angle in kinks[h] if angle > KINK_SPLIT]
     corners: list[int] = []  # residues of a kink between two helix pieces: no element of their own

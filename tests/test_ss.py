@@ -255,3 +255,20 @@ def test_a_kink_split_in_one_copy_is_split_in_every_copy(monkeypatch):
     monkeypatch.setattr(foldmap.ss, "KINK_SPLIT", 106.0)  # neither copy is split
     _, sses, _ = pipeline(Path(__file__).parent / "data" / "2HHB.cif")
     assert {"A:4-35", "C:4-35"} <= {s.id for s in sses}
+
+
+def test_a_helix_broken_in_one_copy_is_broken_in_every_copy():
+    """7OKA (random-100 A15 1.12): DSSP broke helix 225-238 at residue 232 in chains B and C but not in A, so B's
+    and C's two pieces were each tied to A's whole helix, took its length and stood one above the other. A break of
+    one or two residues in one copy of a protein is made in its other copies too, at the same residue numbers, as a
+    kink split is (2HHB: chain C's helix 20-35 broken at 28 by hand; chain A follows; the beta chains do not)."""
+    bb = load_backbone(Path(__file__).parent / "data" / "2HHB.cif", "asu")
+    ss = list(assign_dssp(bb).ss)
+    at = {(l.chain, l.seq): k for k, l in enumerate(bb.labels)}
+    whole = {(s.chain, s.first.seq, s.last.seq) for s in build_sses(bb, "".join(ss))}
+    helix = next(h for h in sorted(whole) if h[0] == "C" and h[1] <= 28 <= h[2])
+    ss[at[("C", 28)]] = "T"
+    got = {(s.chain, s.first.seq, s.last.seq) for s in build_sses(bb, "".join(ss))}
+    for c in "AC":
+        assert (c, helix[1], 27) in got and (c, 29, helix[2]) in got, sorted(h for h in got if h[0] == c)[:6]
+    assert {h for h in got if h[0] in "BD"} == {h for h in whole if h[0] in "BD"}
