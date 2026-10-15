@@ -382,3 +382,22 @@ def test_a_page_held_at_its_largest_is_noted(tmp_path, monkeypatch):
     past_the_largest_page(monkeypatch)
     r = call("draw_topology", {"source": UBQ, "output_path": str(tmp_path / "v.svg")})
     assert "; the page (3 x 2 in) is held at 3 in on its longer side" in r.content[0].text
+
+
+def test_the_preview_of_a_large_page_is_capped(tmp_path, monkeypatch):
+    """Batch C1 review (finding 3): a page grown for 6 pt text (up to 48 in) made a 4320 px preview at 90 dpi; the
+    preview's longer side is capped at PREVIEW_PX, and a small page keeps 90 dpi."""
+    import base64
+
+    from foldmap import mcp_server
+
+    def width(r):
+        image = next(c for c in r.content if getattr(c, "type", "") == "image")
+        data = base64.b64decode(image.data)
+        return int.from_bytes(data[16:20], "big"), int.from_bytes(data[20:24], "big")
+
+    r = call("draw_topology", {"source": UBQ, "output_path": str(tmp_path / "u.svg")})
+    small = width(r)
+    monkeypatch.setattr(mcp_server, "PREVIEW_PX", 200)  # 1UBQ's 4.2 in page at 90 dpi is 375 px wide
+    r = call("draw_topology", {"source": UBQ, "output_path": str(tmp_path / "v.svg")})
+    assert small[0] > 300 and max(width(r)) <= 200

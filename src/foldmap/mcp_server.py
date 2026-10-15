@@ -96,11 +96,16 @@ def _theme(name: str):
     return THEMES[name]
 
 
+PREVIEW_DPI = 90  # the preview image's resolution ...
+PREVIEW_PX = 1600  # ... with its longer side at most this many pixels (a page grown for 6 pt text: 48 in)
+
+
 def _preview(fig) -> Image:
     from .render import save
 
+    dpi = min(PREVIEW_DPI, PREVIEW_PX / max(fig.get_size_inches()))
     with tempfile.TemporaryDirectory() as tmp:
-        data = save(fig, Path(tmp) / "preview.png", dpi=90).read_bytes()
+        data = save(fig, Path(tmp) / "preview.png", dpi=dpi).read_bytes()
     return Image(data=data, format="png")
 
 
