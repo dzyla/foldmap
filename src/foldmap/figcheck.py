@@ -543,12 +543,13 @@ COPY_MIN_MATCHED = 3  # a tied copy is compared on at least this many elements, 
 
 def shared_sheet_elements(lay, copy: str, ref: str) -> set[str]:
     """The strands of every sheet block (Layout.sheets) holding strands of both a copy and its reference (a dimer's
-    continuous sheet, a swapped strand). Such a sheet is one item holding both copies, placed by the sheet and tied
-    to no other, so its strands cannot sit at their copy's tied place: copies_alike leaves them out (C10 ruling). A
-    sheet with a strand lent by a third copy is tied round the ring (layout._symmetry_ties) and stays in."""
+    continuous sheet, a swapped strand) that the layout left untied: one item holding both copies, placed by the
+    sheet, so its strands cannot sit at their copy's tied place: copies_alike leaves them out (C10 ruling). A sheet a
+    symmetry tie holds (Layout.tied_ids: a ring's sheets, with a strand lent by a third copy or not) stays in, and so
+    is measured (8UTF b~a, 8UUP D~B: fix round 1)."""
     out: set[str] = set()
     for block in lay.sheets:
-        if {copy, ref} <= {lay.placed[k].sse.chain for k in block if k in lay.placed}:
+        if {copy, ref} <= {lay.placed[k].sse.chain for k in block if k in lay.placed} and not set(block) & lay.tied_ids:
             out |= set(block)
     return out
 
@@ -651,7 +652,7 @@ def _copy_pairs(drawn) -> dict[tuple[str, str], tuple[float | None, int, int, st
             dev: float | None = min(fit_deviation(pa, pb, m) for m in mirrors)
         elif 0 < smaller < COPY_MIN_MATCHED:
             dev, why = None, f"n/a: {smaller} element{'s' if smaller > 1 else ''}"
-        elif shared and len(found) < COPY_MIN_MATCHED:
+        elif shared and smaller == 0:
             dev, why = None, "n/a: shared sheet"
         else:
             dev = math.inf

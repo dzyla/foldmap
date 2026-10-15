@@ -484,6 +484,11 @@ def test_copies_of_fewer_than_three_elements_are_reported_not_judged():
     for k in other[3:]:
         del d.layout.placed[k]  # A2 keeps its shared strands and three other elements, two of them matching A1's
     _unmatched(d.layout.placed[other[2]])
+    assert figcheck.copies_not_judged(d) == {}  # three elements left and not paired: a real inf, not "not judged"
+    assert figcheck.copies_alike(d)[("A2", "A1")] == math.inf
+    shared = figcheck.shared_sheet_elements(d.layout, "A2", "A1")
+    for k in [k for k, p in d.layout.placed.items() if p.sse.chain in ("A1", "A2") and k not in shared]:
+        del d.layout.placed[k]  # the shared sheet took every element: nothing left to judge
     assert figcheck.copies_not_judged(d) == {("A2", "A1"): "n/a: shared sheet"}
 
 
@@ -504,8 +509,19 @@ def test_strands_of_a_sheet_shared_between_copies_are_left_out():
     moved = next(k for k, p in d.layout.placed.items() if p.sse.chain == "A2" and k not in {"A2:328-338", "A2:319-325"})
     d.layout.placed[moved].cx += 5.0  # any element outside the shared sheet still counts
     assert figcheck.copies_alike(d)[("A2", "A1")] > 1.0
-    utf = drawn(DATA / "8UTF.cif")
-    assert figcheck.shared_sheet_elements(utf.layout, "C", "A") == set()
+    utf = drawn(DATA / "8UTF.cif")  # tied ring sheets stay measured (fix round 1): nothing left out, all matched
+    assert figcheck.shared_sheet_elements(utf.layout, "b", "a") == set()
+    assert figcheck.copy_matches(utf)[("b", "a")] == (25, 25) and figcheck.copies_alike(utf)[("b", "a")] < 1e-6
+    uup = drawn(DATA / "8UUP.cif")
+    assert figcheck.shared_sheet_elements(uup.layout, "D", "B") == set()
+    assert figcheck.copy_matches(uup)[("D", "B")] == (33, 33)
+    utf.layout.placed[
+        "b:"
+        + next(k for k in utf.layout.placed if k.startswith("b:") and utf.layout.placed[k].sse.kind == "E").split(
+            ":", 1
+        )[1]
+    ].cx += 3.0
+    assert figcheck.copies_alike(utf)[("b", "a")] > 1.0  # drift in a tied ring sheet is seen
 
 
 def test_copies_are_matched_by_sequence_not_numbers(tmp_path):

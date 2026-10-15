@@ -248,6 +248,8 @@ class Layout:
     cons_label: str = ""  # legend text saying where the grades come from
     copy_ties: dict[str, tuple[str, bool]] = field(default_factory=dict)  # copy chain -> (its protomer-0 mate chain,
     # drawn as its mirror image): the symmetry ties asked for (_symmetry_ties), kept when _separate moves one by one
+    tied_ids: set[str] = field(default_factory=set)  # ids of the elements of every item a symmetry tie holds, copy
+    # and mate alike (a sheet block among them is drawn as its mate is: figcheck.shared_sheet_elements)
     font_scale: float = 1.0  # Style.font_scale the figure is drawn with (texts placed in the layout are sized by it)
     ligands: str = "auto"  # Style.ligands the figure is drawn with (auto hides additives: scope.drawn_scope names them)
     coil_chains: list[tuple[str, int]] = field(default_factory=list)  # (chain, residues) of each protein chain read
@@ -2385,6 +2387,7 @@ def build_layout(
     rows: list[list[_Item]] = []
     mirrored: list[tuple] = []  # (copy, mate) members of protomers drawn as mirror images
     copy_ties: dict[str, tuple[str, bool]] = {}
+    tied_ids: set[str] = set()
     if mode == "stack":
         rows = _stack(items, keep_depth)
         _centre_dna_over_binders(items, contacts)
@@ -2394,6 +2397,7 @@ def build_layout(
         if left and walls is not None:  # an element that left its item keeps off the traces it kept off
             walls = Walls(walls.boxes, np.vstack([walls.hard, walls.hard[list(left.values())]]))
         copy_ties = _copy_ties(items, ties, frame, mirror is not None)
+        tied_ids = {m.sse.id for i, (j, _) in ties.items() for k in (i, j) for m in items[k].members}
         spread, lift = 0.0, 0.0
         if ties and mirror is not None:  # a dyad in the page: each copy starts at its mate's mirror image
             mirrored = [
@@ -2469,6 +2473,7 @@ def build_layout(
     lay.na_traces = traces
     lay.frame = frame
     lay.copy_ties = copy_ties
+    lay.tied_ids = tied_ids
     lay.font_scale = style.font_scale
     lay.ligands = style.ligands
     lay.ba_rows = _ba_rows(items)  # after the user's swaps
