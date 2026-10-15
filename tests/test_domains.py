@@ -990,3 +990,34 @@ def test_domains_sharing_a_sheet_of_copies_are_not_parted():
     assert lay.width * lay.height < 1.5 * plain.width * plain.height
     assert lay.width < 1.5 * plain.width
     assert figcheck.off_page(d) == []
+
+
+def test_parting_domains_sums_no_overlap_unless_it_may_stop(monkeypatch):
+    """Batch B fix round 2 (gate for the C31 speed fix): _part_domains' overlap sum, which re-evaluates every domain's
+    box, runs only when it may stop the sweeps (the second try, guard armed). 1LDM's domains part on the first try:
+    no overlap sum at all (1fb574a summed it before and after every sweep, doubling 6DPV's parting time); 3L9G's blow
+    up and take the second try, which sums it."""
+    from foldmap import layout as L
+    from helpers import FID
+
+    calls = {"overlap": 0, "box": 0, "tries": []}
+    real = L._part_sweeps
+
+    def counted(keys, groups, unit, members, copy_k, mirror, box, shift, overlap, root, sweeps, guard):
+        def box_c(d):
+            calls["box"] += 1
+            return box(d)
+
+        def overlap_c():
+            calls["overlap"] += 1
+            return overlap()
+
+        calls["tries"].append(guard)
+        return real(keys, groups, unit, members, copy_k, mirror, box_c, shift, overlap_c, root, sweeps, guard)
+
+    monkeypatch.setattr(L, "_part_sweeps", counted)
+    make_layout(FID / "1LDM.cif.gz", domains="auto")
+    assert calls["tries"] and not any(calls["tries"]) and calls["overlap"] == 0 and calls["box"] > 0
+    calls.update(overlap=0, tries=[])
+    make_layout(DATA / "r100" / "3L9G-A.cif.gz", domains="auto")
+    assert calls["tries"] == [False, True] and calls["overlap"] > 0
