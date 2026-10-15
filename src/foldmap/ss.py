@@ -225,10 +225,10 @@ def _copy_breaks(helices: list[tuple[int, int]], bb: Backbone, copies) -> tuple[
         if a in skip:
             continue
         if a in following:  # joined with the next run, and that with its next (x|y|z), as the other copies have it
-            at = a
-            while at in following:
-                at, b = following[at]
-                skip.add(at)
+            run = a
+            while run in following:
+                run, b = following[run]
+                skip.add(run)
                 n_joined += 1
             out.append((a, b))
             continue

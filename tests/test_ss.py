@@ -324,3 +324,26 @@ def test_a_helix_broken_twice_in_one_copy_of_three_is_joined_whole():
     for seq in (a + 7, a + 14):
         ss[next(i for i, l in enumerate(bb.labels) if l.chain == c and l.seq == seq)] = "T"
     assert {(s.chain, s.first.seq, s.last.seq) for s in build_sses(bb, "".join(ss))} == plain
+
+
+def test_a_join_and_a_cut_in_one_structure():
+    """Fix round 1 campaign (7JU4, 7QUP crashed: the join's loop variable shadowed the residue index): in 1C3W's
+    trimer, one copy's helix broken by hand is joined again, and a later helix broken in two copies of three is cut
+    in the third at the same residue."""
+    bb = load_backbone(Path(__file__).parent / "data" / "1C3W.cif", "auto")
+    ss = list(assign_dssp(bb).ss)
+    plain = {(s.chain, s.first.seq, s.last.seq) for s in build_sses(bb, "".join(ss))}
+    chains = sorted({c for c, _, _ in plain})
+    first, second = [h for h in sorted(plain, key=lambda h: h[1]) if h[0] == chains[0] and h[2] - h[1] >= 20][:2]
+
+    def broken(chain, seq):
+        ss[next(i for i, l in enumerate(bb.labels) if l.chain == chain and l.seq == seq)] = "T"
+
+    broken(chains[0], (first[1] + first[2]) // 2)  # one copy of three: joined
+    cut = (second[1] + second[2]) // 2
+    for c in chains[1:]:  # two copies of three: cut in the third too
+        broken(c, cut)
+    got = {(s.chain, s.first.seq, s.last.seq) for s in build_sses(bb, "".join(ss))}
+    assert first in got
+    for c in chains:
+        assert (c, second[1], cut - 1) in got and (c, cut + 1, second[2]) in got, c
