@@ -266,3 +266,31 @@ def test_ligands_held_by_the_nucleic_acid_alone_are_marked_and_its_ions_said(tmp
     assert d.layout.links.na_ions == {"MG": 1}
     assert main(["plot", str(path), "-o", str(tmp_path / "f.svg")]) == 0
     assert "not drawn: metal ions held by the nucleic acid alone (MG)" in capsys.readouterr().err
+
+
+def test_a_ligand_held_by_a_stem_is_tethered_to_the_rail_facing_it():
+    """8XZE (batch C2a review Q5): THG's tether to P1c ran from the stem's far rail along a G-C rung, reading as an
+    extra rung. A tether to a stem ends on the touched nucleotide drawn nearest the mark, on the rail facing it."""
+    import numpy as np
+
+    from foldmap.render import _na_style, ligand_marks, nucleotide_points
+    from foldmap.spec import draw_spec, figure_spec
+
+    spec = figure_spec(DATA / "r100" / "8XZE.cif.gz")
+    d = draw_spec(spec)
+    lay = d.layout
+    where = nucleotide_points(lay, _na_style(lay, spec.look))
+    key = {
+        (lab.chain, lab.seq, lab.icode): (s, i)
+        for s, st in enumerate(lay.nucleic.strands)
+        for i, lab in enumerate(st.labels)
+    }
+    stem = {k: st.id for st in lay.stems for k in st.axial}
+    for m in ligand_marks(lay, d.loops, d.sses, spec.look):
+        held = [key[n] for n in m["ligand"].nucleotides if n in key and key[n] in where]
+        c = np.asarray(m["centre"], float)
+        for t in m["targets"]:
+            k = min(held, key=lambda h: np.hypot(*(np.asarray(where[h], float) - t)))  # the nucleotide it ends on
+            same = [h for h in held if stem.get(h, h[0]) == stem.get(k, k[0])]
+            gaps = [np.hypot(*(np.asarray(where[h], float) - c)) for h in same]
+            assert np.hypot(*(np.asarray(t) - c)) <= min(gaps) + 1e-9

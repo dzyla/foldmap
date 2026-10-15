@@ -1378,10 +1378,11 @@ def _na_spots(layout: Layout, look: Style) -> tuple[dict, list]:
     )
 
 
-def _na_targets(layout: Layout, g, where: dict):
+def _na_targets(layout: Layout, g, where: dict, near=None):
     """The tether targets of a ligand held by nucleotides alone (Ligand.nucleotides): one per stem (or strand) it
-    sits on, at its middle nucleotide there, the _LIGAND_TETHERS it touches most; weights: nucleotides held there;
-    no protein residues."""
+    sits on, the _LIGAND_TETHERS it touches most, at its middle nucleotide there, or with `near` (the mark's spot)
+    the one drawn nearest it, so a tether to a stem ends on the rail facing the mark and never runs along a rung
+    (8XZE's THG, batch C2a review Q5); weights: nucleotides held there; no protein residues."""
     na = layout.nucleic
     if na is None or not g.nucleotides:
         return [], [], []
@@ -1396,7 +1397,11 @@ def _na_targets(layout: Layout, g, where: dict):
             groups.setdefault(stem.get(k, f"strand {k[0]}"), []).append(k)
     targets, weights = [], []
     for ks in sorted(groups.values(), key=len, reverse=True)[:_LIGAND_TETHERS]:
-        x, y = (float(v) for v in where[sorted(ks)[len(ks) // 2]])
+        if near is None:
+            k = sorted(ks)[len(ks) // 2]
+        else:  # the nearest, the first in order on a tie
+            k = min(sorted(ks), key=lambda key: float(np.hypot(*(np.asarray(where[key], float) - near))))
+        x, y = (float(v) for v in where[k])
         if all(np.hypot(x - t[0], y - t[1]) > 0.3 for t in targets):
             targets.append((x, y))
             weights.append(len(ks))
@@ -1453,6 +1458,8 @@ def ligand_marks(layout: Layout, loops: list[Loop], sses: list[SSE], look: Style
         anchor = np.average(np.asarray(targets), axis=0, weights=weights)
         half = (0.3, 0.3) if g.metal else (0.12 * len(g.name) + 0.2, 0.27)
         spot = _place_mark(anchor, half, targets, keep_off, lines, words, tethers, bodies, runs)
+        if not g.contacts:  # held by nucleotides alone: each tether to the touched nucleotide nearest the mark
+            targets = _na_targets(layout, g, na_spots[0], np.asarray(spot, float))[0]
         crowded = overlaps_any((spot[0] - half[0], spot[1] - half[1], spot[0] + half[0], spot[1] + half[1]), keep_off)
         mark = (spot[0] - half[0], spot[1] - half[1], spot[0] + half[0], spot[1] + half[1])
         taken.append(mark)
