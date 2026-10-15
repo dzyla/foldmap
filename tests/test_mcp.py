@@ -389,12 +389,11 @@ def test_strands_drawn_beside_their_partner_are_noted(tmp_path):
     strands (9FWZ's D:662-666), as the command line and the app say it."""
     fimd = str(Path(__file__).parent / "data" / "r100" / "9FWZ-DB.cif.gz")
     r = call("draw_topology", {"source": fimd, "output_path": str(tmp_path / "f.svg")})
-    assert (
-        "; 1 strand(s) drawn beside their partner, off the sheet's run of paired strands: D:662-666 beside D:645-659"
-        in (r.content[0].text)
+    assert "; 1 strand(s) off a sheet's run of paired strands: D:662-666 drawn beside its partner D:645-659" in (
+        r.content[0].text
     )
     r = call("draw_topology", {"source": UBQ, "output_path": str(tmp_path / "u.svg")})
-    assert "beside their partner" not in r.content[0].text
+    assert "beside its partner" not in r.content[0].text
 
 
 def test_the_preview_of_a_large_page_is_capped(tmp_path, monkeypatch):

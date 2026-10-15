@@ -3021,25 +3021,20 @@ def _domain_units(
 
 
 UNCLOSED = "barrel closure not supported by pairing: drawn open"
-_NOTE_MAX = 6  # accessory strands a note names; summary lists every one
 
 
 def sheet_notes(sheets: list[Sheet]) -> list[str]:
     """What the figure says of its sheets: each sheet whose pairing closes a cycle but whose ends do not pair
     (Sheet.unclosed), drawn open (UNCLOSED, then its end strands); the pairings joining barrels drawn apart
-    (Sheet.joined); then the strands drawn beside their parent off a
-    sheet's track (Sheet.accessory), the first _NOTE_MAX of them named."""
+    (Sheet.joined); then every strand drawn off a sheet's run of paired strands (Sheet.accessory), each named with
+    its partner: "D:662-666 drawn beside its partner D:645-659" (fix round 1)."""
     out = [f"{UNCLOSED} ({sh.strands[0].id} … {sh.strands[-1].id})" for sh in sheets if sh.unclosed]
     joins = sorted({" with ".join(sorted((a.id, b.id))) for sh in sheets for a, b in sh.joined})
     if joins:  # two barrels of one pairing network (sheets._other_rings), drawn each as its own
         out.append(f"barrels drawn apart, each closed, that also pair: {', '.join(joins)}")
-    acc = [f"{a.strand.id} beside {a.parent.id}" for sh in sheets for a in sh.accessory]
+    acc = [f"{a.strand.id} drawn beside its partner {a.parent.id}" for sh in sheets for a in sh.accessory]
     if acc:
-        more = f" and {len(acc) - _NOTE_MAX} more (foldmap summary lists them)" if len(acc) > _NOTE_MAX else ""
-        out.append(
-            f"{len(acc)} strand(s) drawn beside their partner, off the sheet's run of paired strands: "
-            f"{', '.join(acc[:_NOTE_MAX])}{more}"
-        )
+        out.append(f"{len(acc)} strand(s) off a sheet's run of paired strands: {'; '.join(acc)}")
     return out
 
 

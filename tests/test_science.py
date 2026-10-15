@@ -198,12 +198,20 @@ def test_fimd_figure_has_its_24_strand_barrel_and_says_where_its_pendant_strand_
     from foldmap.cli import main
 
     assert main(["plot", str(R100 / "9FWZ-DB.cif.gz"), "-o", str(tmp_path / "f.svg")]) == 0
-    assert "D:662-666 beside D:645-659" in capsys.readouterr().err
+    assert "D:662-666 drawn beside its partner D:645-659" in capsys.readouterr().err
     d = _drawn(R100 / "9FWZ-DB.cif.gz")
     (k,) = [k for k, ids in enumerate(d.layout.sheets) if len(ids) > 20]
     ring = [i for i in d.layout.sheets[k] if i not in d.layout.accessory]
     assert len(ring) == 24 and d.layout.accessory == {"D:662-666": "D:645-659"}
-    assert any("D:662-666 beside D:645-659" in n for n in d.layout.sheet_notes)
+    assert any("D:662-666 drawn beside its partner D:645-659" in n for n in d.layout.sheet_notes)
+
+
+def test_every_accessory_is_named_with_its_partner_in_the_notes():
+    """Fix round 1: the note names each accessory strand with its partner, all of them (3L9G-A has 16)."""
+    d = _drawn(R100 / "3L9G-A.cif.gz")
+    (note,) = [n for n in d.layout.sheet_notes if "off a sheet's run" in n]
+    assert note.startswith("16 strand(s) off a sheet's run of paired strands: ")
+    assert all(f"{a} drawn beside its partner {p}" in note for a, p in d.layout.accessory.items())
 
 
 def test_summary_names_the_accessory_strands():
