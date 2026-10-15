@@ -78,8 +78,8 @@ def _place_letters(layout: Layout, paths: list[NAPath]) -> dict[tuple[int, int],
     """A letter for each single-stranded nucleotide beside its strand: on the side away from the stems it leaves
     and enters (outside a hairpin loop, in the row of the stem's letters along a free end), else the other, else
     further out on either side, or a little along the strand, whichever first keeps clear of other letters,
-    nucleotides, end labels, elements, stem names and the strands drawn (runs, ends, gaps: a letter a line passes
-    through has no room, random-100 C14); when none is clear, the one furthest from the others."""
+    nucleotides, end labels, elements, stem names and the strands drawn (runs, ends, gaps: a spot a line passes
+    through is not clear, random-100 C14); when none is clear, the one furthest from the other letters."""
     where = {key: d.point(key) for d in layout.stems for key in d.axial}
     lines = [np.asarray(p.points, float).reshape(-1, 2) for p in paths if len(p.points) > 1]
     strand_segs = np.vstack([np.hstack([q[:-1], q[1:]]) for q in lines]) if lines else np.empty((0, 4))
@@ -109,10 +109,8 @@ def _place_letters(layout: Layout, paths: list[NAPath]) -> dict[tuple[int, int],
     boxes = [np.add(_stem_label_box(d), (-g, -g, g, g)) for d in layout.stems]
     out: dict[tuple[int, int], tuple[float, float]] = {}
 
-    def room(q, own: int, key=None) -> float:
+    def room(q, own: int) -> float:
         if any(x0 < q[0] < x1 and y0 < q[1] < y1 for x0, y0, x1, y1 in boxes) or any(_near(q, e) for e in bodies):
-            return 0.0
-        if key is not None and struck(q, key):
             return 0.0
         return taken.nearest(q, own)
 
@@ -132,14 +130,17 @@ def _place_letters(layout: Layout, paths: list[NAPath]) -> dict[tuple[int, int],
                 side = -side
             options = [xy + side * NT_ROW * f for f in (1.0, -1.0, 1.7, -1.7, 2.4, -2.4)]
             options += [xy + side * NT_ROW * f + ahead * t for f in (1.0, -1.0) for t in (0.4, -0.4)]
-            spaces = [room(q, index[(p.strand, i)], (p.strand, i)) for q in options]
-            if max(spaces) < _LETTER_GAP:  # crowded: further out, and further along the strand
+            key = (p.strand, i)
+            spaces = [room(q, index[key]) for q in options]
+            free = [r >= _LETTER_GAP and not struck(q, key) for q, r in zip(options, spaces)]
+            if not any(free):  # crowded: further out, and further along the strand
                 more = [xy + side * NT_ROW * f for f in (3.1, -3.1)]
                 more += [xy + side * NT_ROW * f + ahead * t for f in (1.0, -1.0, 1.7, -1.7) for t in (0.8, -0.8)]
                 options += more
-                spaces += [room(q, index[(p.strand, i)], (p.strand, i)) for q in more]
-            clear = [q for q, r in zip(options, spaces) if r >= _LETTER_GAP]
-            spot = clear[0] if clear else options[int(np.argmax(spaces))]
+                spaces += [room(q, index[key]) for q in more]
+                free += [r >= _LETTER_GAP and not struck(q, key) for q, r in zip(more, spaces[-len(more) :])]
+            clear = [q for q, ok in zip(options, free) if ok]  # clear of letters and of every strand drawn
+            spot = clear[0] if clear else options[int(np.argmax(spaces))]  # else the furthest from other letters
             out[(p.strand, i)] = (float(spot[0]), float(spot[1]))
             taken.add(spot)
     return out
