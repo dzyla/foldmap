@@ -913,7 +913,6 @@ LIMITS = {
     # A17: page units from a stem name to its own letters, at most layout._INK_MARGIN em in the drawn figure's page
     # units plus 1e-3 (figcheck.stem_gap_tolerance; plan 10 Task 4 fix round 2 ruling), measured per figure
     "stem_name_gap": "figcheck.stem_gap_tolerance(layout._INK_MARGIN em)",
-    "slab_margin": 0.3,  # A18: a loop's sideways run inside the band, this far from its faces, is in the slab
     "tether_length": 6.5,  # A20: page units, a ligand tether from its mark to another chain than its home
 }
 DOCUMENTED_WARNINGS: tuple[str, ...] = ()  # Python warnings a view may print (regexes); none at the start
@@ -1214,48 +1213,18 @@ def tether_lengths(drawn, look) -> list[tuple[str, float, str, str]]:
 
 
 def membrane_checks(drawn, path) -> dict:
-    """A18 on a --membrane auto figure: each TM helix (its CA run reaches both membrane faces, as cli._face_medians
-    counts it) enters its band through a face and reaches past its middle (C27 ruling: not by a share of the band's
-    height, so a tilted or offset helix with one end a little short passes; one in the middle reaching no face
-    fails); loops run sideways inside a band (slab_margin from its faces) only next to one of their own ports inside
-    it."""
+    """A18 on a --membrane auto figure (figcheck.membrane_view, the same test the membrane view lays itself out by):
+    each TM helix (its CA run reaches both membrane faces) enters its band through a face and reaches past its middle
+    (C27 ruling); loops run sideways inside a band (figcheck.SLAB_MARGIN from its faces) only on the first segment
+    out of their own port inside it, up to clearing its element (membrane slab ruling)."""
+    from foldmap import figcheck
     from foldmap.membrane import find_membrane
 
     lay, bb = drawn.layout, drawn.bb
-    if lay.membrane is None:
-        return {"band": False, "tm_helices": 0, "tm_short": [], "loops_in_slab": []}
     mem = find_membrane(path, bb)
-    bands = lay.membrane.get("bands") or [lay.membrane["y"]]
-    depth = mem.depth(bb.ca) if mem is not None else None
-    short, tm = [], 0
-    for s in drawn.sses:
-        p = lay.placed.get(s.id)
-        if p is None or s.kind != "H" or depth is None:
-            continue
-        seg = depth[s.start : s.end + 1]
-        if len(seg) < 2 or seg.min() > -mem.half + 2 or seg.max() < mem.half - 2:
-            continue
-        tm += 1
-        lo, hi = sorted((p.n_port[1], p.c_port[1]))
-        y0, y1 = min(bands, key=lambda b: abs((b[0] + b[1]) / 2 - (lo + hi) / 2))
-        frac = (min(hi, y1) - max(lo, y0)) / max(y1 - y0, 1e-9)
-        if not (lo < (y0 + y1) / 2 < hi and (lo <= y0 or hi >= y1)):  # through a face and past the middle
-            short.append(f"{s.id} {frac:.2f}")
-    margin = LIMITS["slab_margin"]
-
-    def inside(y, margin=margin):
-        return any(lo + margin < y < hi - margin for lo, hi in bands)
-
-    in_slab = []
-    for lp in drawn.loops:
-        pts, n = lp.points, len(lp.points)
-        for k, ((xa, ya), (xb, yb)) in enumerate(zip(pts, pts[1:])):
-            if abs(ya - yb) < 1e-9 and abs(xa - xb) > 0.5 and inside(ya):
-                # a port in the band (at any depth: a helix end just inside a face) is entered or left inside it
-                if not ((k <= 1 and inside(pts[0][1], 0.0)) or (k >= n - 3 and inside(pts[-1][1], 0.0))):
-                    in_slab.append(f"{lp.a_id}>{lp.b_id}")
-                    break
-    return {"band": True, "tm_helices": tm, "tm_short": short, "loops_in_slab": in_slab}
+    if lay.membrane is None or mem is None:
+        return {"band": lay.membrane is not None, "tm_helices": 0, "tm_short": [], "loops_in_slab": []}
+    return {"band": True, **figcheck.membrane_view(lay, drawn.sses, bb, mem, drawn.loops)}
 
 
 def na_metrics(drawn, path) -> dict:

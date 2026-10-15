@@ -451,3 +451,43 @@ def test_every_transmembrane_helix_crosses_the_band_in_the_membrane_view():
         p = lay.placed[s.id]
         y0, y1 = sorted((p.n_port[1], p.c_port[1]))
         assert y0 < (lo + hi) / 2 < y1 and (y0 <= lo or y1 >= hi), s.id
+
+
+def test_a_loop_runs_in_the_slab_only_beside_its_own_port():
+    """A18's loops in the slab (figcheck.slab_runs; C26 port rule, membrane slab ruling): with a band from 0 to 10, a
+    loop leaving a port inside it may run sideways on its first two segments (the stub out of the port and the turn
+    after it), and on its first run as far as that stays over its own element's body (8W9Y: back above the
+    interfacial helix it leaves, round α8's end). A run past the element, or any later run, is in the slab."""
+    from types import SimpleNamespace
+
+    from foldmap.figcheck import slab_runs
+    from foldmap.route import Loop
+
+    helix = SimpleNamespace(rect=(-6.0, 3.5, 0.0, 4.5))  # lying in the slab, its C end (the port) at x = 0
+    placed = {"h": helix, "o": SimpleNamespace(rect=(9.0, -5.0, 10.0, 5.0))}
+    band = [(0.0, 10.0)]
+
+    def loop(*pts):
+        return Loop("h", "o", list(pts), False, False)
+
+    turn = loop((0, 4), (0, 6), (3, 6), (3, 12), (9.5, 12), (9.5, 5))  # up, then sideways on its 2nd segment
+    back = loop((0, 4), (0.3, 4), (0.3, 6), (-2, 6), (-2, 12), (9.5, 12), (9.5, 5))  # 3rd segment, over the helix
+    past = loop((0, 4), (0.3, 4), (0.3, 6), (-7, 6), (-7, 12), (9.5, 12), (9.5, 5))  # 3rd segment, past the helix
+    later = loop((0, 4), (0, 6), (2, 6), (2, 7), (5, 7), (5, 12), (9.5, 12), (9.5, 5))  # a 2nd run in the slab
+    assert slab_runs([turn, back], band, placed) == []
+    assert slab_runs([past], band, placed) == ["h>o"] and slab_runs([later], band, placed) == ["h>o"]
+
+
+def test_the_second_membrane_layout_is_kept_only_when_it_does_better(monkeypatch):
+    """C17 fix round 1: 6JLN's second layout put every TM helix on the band but added slab loops (1 -> 3); it is now
+    kept only when it has fewer helices off the band and no more slab loops or route fallbacks (cli._membrane_score,
+    on a routed copy). 1BL8's does better (4 -> 0, nothing added) and is kept; scored worse, the first is kept."""
+    import foldmap.cli as cli
+
+    path = DATA / "1BL8.cif"
+    kept, _, _ = make_layout(path, membrane="auto")
+    scores = iter([(4, 0, 0), (0, 1, 0)])
+    monkeypatch.setattr(cli, "_membrane_score", lambda *a: next(scores))
+    first, _, _ = make_layout(path, membrane="auto")
+    assert kept.membrane["y"] != first.membrane["y"]  # the faces as projected, against the medians of the first
+    assert next(scores, None) is None

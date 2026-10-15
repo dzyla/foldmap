@@ -744,6 +744,19 @@ still holding. 6JO6 (0.174 polar, 46 crossing) gets its band: all 30 TM helices 
 (5:167-169>5:179-207 leaves a port 0.03 outside the face). Controls 1UBQ, 2LZM, 2HHB, 8UUP, 8UTF, 6ZS5, 1TIM,
 AF-P04637, 1EMA (GFP) and 1LDM find no membrane. Fixture 6JO6-AB (59 KB; budget 900 KB).
 
+**Batch C2a fix round 1 (membrane slab ruling, C17 relayout):** A18 is one helper shared by the membrane view and
+the campaign (`figcheck.membrane_view`, `crosses_band`, `slab_runs`). A loop leaving (or entering) a port inside the
+band may run sideways on its first two segments (C26's port rule) and on its first run as far as that stays over its
+own element's body (its box grown by the router's clearance); every other sideways run more than 0.3 inside a face
+is in the slab. Read of the ruling: "the first segment out of a port" taken as the loop's first sideways run, since
+the literal first segment is the vertical stub out of a TM helix's end and the strict reading put 17 loops of 8W9Y,
+23 of 6JLN, 12 of 5LDW and 2 of 7PIU (passing) in the slab. 8W9Y's C/F:225-249>271-280 (back above the interfacial
+helix they leave, round α8's end) pass; 7SMR's B:171-173>B:190-201 (its port below the band) and 6JO6's
+5:167-169>5:179-207 (its port 0.03 outside the face) stay. The second membrane layout is kept only when, routed, it
+has fewer TM helices off the band and no more slab loops or route fallbacks (`cli._membrane_score`): 1BL8 (4, 0, 0)
+-> (0, 0, 0) kept; 5LDW (6, 0, 0) -> (0, 1, 0) and 6JLN (20, 0, 6) -> (0, 3, 6) are not, so they keep their first
+layout (TM helices off the band, as in run t12c1).
+
 ### C18 (b + a): pairs and copies matched by author residue numbers; untied copies go unchecked (2 + visual 2)
 
 **Entries:** 1RM5 and 2HKI (A19, one pair, both fail). Visual: 2MJW (S100P B and D not tied), 8QEM (one copy

@@ -362,40 +362,50 @@ def make_layout(
         else None,
         over=over,
     )
-    lay = lay_out()
-    faces = None
-    if mem is not None and mode == "projected" and _off_band(lay, sses, bb, mem):
-        # a transmembrane element drawn off the band: laid out again with every one at its projected height (C17)
-        level = _transmembrane(sses, bb, mem)
-        faces = _faces_on_page(frame, sses, bb, mem, level)
-        lay = lay_out(level=level, band=tuple(sorted(faces)))
-    lay.helix_matched = {"cut": matched.get("cut", 0), "joined": matched.get("joined", 0)}
-    if lay.domains:  # copies of one domain share a tone
-        from .features import domain_tones
 
-        lay.domain_tones = domain_tones(lay.domains, sses, copies)
-    lay.focus = _focus((look or Style()).highlight, bb, sym)
-    if focus_chains:
-        lay.focus, lay.focus_chains, lay.context = set(focus_chains), set(focus_chains), context
-        lay.unjoined, lay.subunits = unjoined, subunits
-    lay.chains_read = read
-    lay.chains_asked = [c for c in chains or [] if c in present]
-    lay.na_read = na_read if na_cropped else 0
-    lay.links = links
-    lay.res_chain = [l.chain for l in bb.labels]
-    lay.res_name = [l.name for l in bb.labels]
-    lay.res_labels = list(bb.labels)
-    lay.res_linked = sorted(bb.linked)
-    lay.res_b = [float(x) for x in bb.b] if bb.b is not None else []
-    with_elements = {s.chain for s in sses}
-    lay.coil_chains = [(c, n) for c, n in Counter(lay.res_chain).items() if c not in with_elements]
-    lay.uniprot = ann
-    first = [s.centroid for s in sses if s.chain == sses[0].chain] if sses else [_any_centre(bb, nucleic)]
-    centre = np.mean(first, axis=0)
-    lay.page_axes = [list(map(float, a)) for a in frame.basis(centre)]
-    lay.page_centre = list(map(float, bb.ca.mean(axis=0) if len(bb) else centre))
-    if mem is not None:
-        lay.membrane = _membrane_band(lay, sses, bb, mem, faces)
+    def finish(lay, faces=None):  # what make_layout sets on a layout after build_layout
+        lay.helix_matched = {"cut": matched.get("cut", 0), "joined": matched.get("joined", 0)}
+        if lay.domains:  # copies of one domain share a tone
+            from .features import domain_tones
+
+            lay.domain_tones = domain_tones(lay.domains, sses, copies)
+        lay.focus = _focus((look or Style()).highlight, bb, sym)
+        if focus_chains:
+            lay.focus, lay.focus_chains, lay.context = set(focus_chains), set(focus_chains), context
+            lay.unjoined, lay.subunits = unjoined, subunits
+        lay.chains_read = read
+        lay.chains_asked = [c for c in chains or [] if c in present]
+        lay.na_read = na_read if na_cropped else 0
+        lay.links = links
+        lay.res_chain = [l.chain for l in bb.labels]
+        lay.res_name = [l.name for l in bb.labels]
+        lay.res_labels = list(bb.labels)
+        lay.res_linked = sorted(bb.linked)
+        lay.res_b = [float(x) for x in bb.b] if bb.b is not None else []
+        with_elements = {s.chain for s in sses}
+        lay.coil_chains = [(c, n) for c, n in Counter(lay.res_chain).items() if c not in with_elements]
+        lay.uniprot = ann
+        first = [s.centroid for s in sses if s.chain == sses[0].chain] if sses else [_any_centre(bb, nucleic)]
+        centre = np.mean(first, axis=0)
+        lay.page_axes = [list(map(float, a)) for a in frame.basis(centre)]
+        lay.page_centre = list(map(float, bb.ca.mean(axis=0) if len(bb) else centre))
+        if mem is not None:
+            lay.membrane = _membrane_band(lay, sses, bb, mem, faces)
+        return lay
+
+    lay = finish(lay_out())
+    if mem is not None and mode == "projected" and lay.membrane is not None:
+        from .figcheck import membrane_view
+
+        if membrane_view(lay, sses, bb, mem)["tm_short"]:  # a transmembrane helix drawn off its band: laid out
+            before = _membrane_score(lay, sses, bb, mem)  # again with every one at its projected height (C17)
+            level = _transmembrane(sses, bb, mem)
+            faces = _faces_on_page(frame, sses, bb, mem, level)
+            again = finish(lay_out(level=level, band=tuple(sorted(faces))), faces)
+            after = _membrane_score(again, sses, bb, mem)
+            # kept only when it helps: fewer helices off the band, no more loops in the slab, no more fallbacks
+            if after[0] < before[0] and after[1] <= before[1] and after[2] <= before[2]:
+                lay = again
     if msa:
         from .sequence import grades, is_consurf, read_alignment, read_consurf, residue_conservation
 
@@ -475,21 +485,18 @@ def _membrane_band(lay, sses, bb, mem, faces=None) -> dict | None:
     }
 
 
-def _off_band(lay, sses, bb, mem) -> bool:
-    """Is a transmembrane element (_transmembrane) drawn off the band it makes (_membrane_band): not entering it
-    through a face and reaching past its middle, as the membrane view is judged (random-100 A18, C27 ruling)?"""
-    band = _membrane_band(lay, sses, bb, mem)
-    if band is None:
-        return False
-    for k in sorted(_transmembrane(sses, bb, mem)):
-        p = lay.placed.get(k)
-        if p is None:
-            continue
-        lo, hi = sorted((p.n_port[1], p.c_port[1]))
-        y0, y1 = min(band["bands"], key=lambda b: abs((b[0] + b[1]) / 2 - (lo + hi) / 2))
-        if not (lo < (y0 + y1) / 2 < hi and (lo <= y0 or hi >= y1)):
-            return True
-    return False
+def _membrane_score(lay, sses, bb, mem) -> tuple[int, int, int]:
+    """A membrane view judged as A18 judges it (figcheck.membrane_view, on a routed copy of the layout): transmembrane
+    helices off their band, loops running in the slab, and route fallbacks; make_layout keeps a second layout only
+    when it does better (C17, fix round 1)."""
+    import copy
+
+    from .figcheck import membrane_view
+
+    trial = copy.deepcopy(lay)
+    loops = route_loops(trial, sses, bb)
+    view = membrane_view(trial, sses, bb, mem, loops)
+    return len(view["tm_short"]), len(view["loops_in_slab"]), sum(lp.fallback for lp in loops)
 
 
 def _transmembrane(sses, bb, mem) -> set[str]:

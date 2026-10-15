@@ -1136,6 +1136,82 @@ def _same_order(got: list[str], want: list[str], closed: bool) -> bool:
     return got in (want, want[::-1])
 
 
+# ------------------------------------------------------------------------------------------- membrane (A18)
+SLAB_MARGIN = 0.3  # page units: a loop's sideways run this far inside a band's faces is in the slab
+_RUN_MIN = 0.5  # page units: a shorter sideways step is no run along the slab
+
+
+def crosses_band(ends: tuple[float, float], band: tuple[float, float]) -> bool:
+    """Does a transmembrane element drawn from page y ends[0] to ends[1] cross the band (bottom, top) as A18 judges
+    it: entering it through a face and reaching past its middle (C27 ruling)? Shared by the membrane view's own test
+    (cli._off_band) and the campaign's (random100.membrane_checks)."""
+    lo, hi = sorted(ends)
+    y0, y1 = band
+    return lo < (y0 + y1) / 2 < hi and (lo <= y0 or hi >= y1)
+
+
+def membrane_view(layout, sses, bb, mem, loops=None) -> dict:
+    """A18 on a membrane view (layout.membrane, the membrane `mem` it was drawn for): tm_helices, the helices whose
+    CA run reaches both faces (within 2 Å); tm_short, those that do not cross their band (crosses_band), with the
+    share of the band they cover; loops_in_slab, slab_runs of `loops` (None: not measured)."""
+    bands = layout.membrane.get("bands") or [layout.membrane["y"]]
+    depth = mem.depth(bb.ca)
+    short, tm = [], 0
+    for s in sses:
+        p = layout.placed.get(s.id)
+        if p is None or s.kind != "H":
+            continue
+        seg = depth[s.start : s.end + 1]
+        if len(seg) < 2 or seg.min() > -mem.half + 2 or seg.max() < mem.half - 2:
+            continue
+        tm += 1
+        lo, hi = sorted((p.n_port[1], p.c_port[1]))
+        y0, y1 = min(bands, key=lambda b: abs((b[0] + b[1]) / 2 - (lo + hi) / 2))
+        if not crosses_band((lo, hi), (y0, y1)):
+            short.append(f"{s.id} {(min(hi, y1) - max(lo, y0)) / max(y1 - y0, 1e-9):.2f}")
+    slab = None if loops is None else slab_runs(loops, bands, layout.placed)
+    return {"tm_helices": tm, "tm_short": short, "loops_in_slab": slab}
+
+
+def slab_runs(loops, bands, placed, margin: float = SLAB_MARGIN) -> list[str]:
+    """The loops (a>b) that run sideways (more than _RUN_MIN) inside a band, more than `margin` from its faces (A18).
+    Excused, at either end of a loop whose port lies inside the band: its first two segments (the C26 port rule: the
+    stub out of the port and the turn after it), and its first run out of that port up to the length that clears
+    the port's own element (its box grown by the router's clearance: 8W9Y's loop leaving an interfacial helix's end
+    runs back above that helix to pass α8's end; membrane slab ruling); every other run in the slab counts."""
+    from .route import _INFLATE
+
+    def inside(y, m):
+        return any(lo + m < y < hi - m for lo, hi in bands)
+
+    def within(port, step, element) -> bool:  # does a run of `step` from the port stay over its element's body?
+        if element is None:
+            return False
+        x0, _, x1, _ = element.rect
+        reach = (x1 + _INFLATE - port[0]) if step > 0 else (port[0] - (x0 - _INFLATE))
+        return abs(step) <= max(reach, 0.0) + 1e-9
+
+    out = []
+    for lp in loops:
+        pts, n = lp.points, len(lp.points)
+        segs = list(zip(pts, pts[1:]))
+        runs = [k for k, ((xa, ya), (xb, yb)) in enumerate(segs) if abs(ya - yb) < 1e-9 and abs(xa - xb) > _RUN_MIN]
+        start_in, end_in = inside(pts[0][1], 0.0), inside(pts[-1][1], 0.0)
+        for k in runs:
+            (xa, ya), (xb, _) = segs[k]
+            if not inside(ya, margin):
+                continue
+            if (start_in and k <= 1) or (end_in and k >= n - 3):  # beside its own port (C26)
+                continue
+            if start_in and k == runs[0] and within(pts[0], xb - xa, placed.get(lp.a_id)):
+                continue
+            if end_in and k == runs[-1] and within(pts[-1], xa - xb, placed.get(lp.b_id)):
+                continue
+            out.append(f"{lp.a_id}>{lp.b_id}")
+            break
+    return out
+
+
 # ------------------------------------------------------------------------------------------- all of them
 
 
