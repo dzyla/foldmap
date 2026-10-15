@@ -89,6 +89,8 @@ def test_past_the_largest_page_the_whole_figure_is_scaled_and_said(monkeypatch):
     fig = make_figure(DATA / "1UBQ.cif")
     assert max(fig.get_size_inches()) == pytest.approx(3.0)
     assert "held at 3 in" in fig.foldmap_page_fit and "under 6 pt" in fig.foldmap_page_fit
+    assert "its text is 5.9 pt, under 6 pt" in layout.page_fit(48.0, 44.0, 5.97)  # not "6.0 pt, under 6" (7Y7C)
+    assert layout.page_fit(48.0, 44.0, 6.0) == ""
 
 
 def past_the_largest_page(monkeypatch):

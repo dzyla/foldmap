@@ -3670,12 +3670,13 @@ def glyph(layout: Layout) -> tuple[float, float]:
 def page_fit(width_in: float, height_in: float, font: float) -> str:
     """What the figure's notes say of its page (random-100 C4): '' while its text is MIN_TEXT_PT or larger (before
     Style.font_scale: `font`, the text size drawn, is compared at font_scale 1); past MAX_PAGE_IN, that the
-    whole figure was scaled to fit and its text is smaller."""
+    whole figure was scaled to fit and its text is smaller (rounded down: 5.97 pt is "5.9 pt", under 6)."""
     if font >= MIN_TEXT_PT - 1e-6:
         return ""
     return (
         f"the page ({width_in:.0f} x {height_in:.0f} in) is held at {MAX_PAGE_IN:.0f} in on its longer side, so its "
-        f"text is {font:.1f} pt, under {MIN_TEXT_PT:.0f} pt; draw fewer chains (--chains, --focus) for larger text"
+        f"text is {math.floor(font * 10) / 10:.1f} pt, under {MIN_TEXT_PT:.0f} pt; draw fewer chains (--chains, "
+        "--focus) for larger text"
     )
 
 
