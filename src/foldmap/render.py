@@ -77,7 +77,7 @@ from .layout import (
 from .model import SSE, group_by_chain
 from .na_paths import midway
 from .palette import PALETTES, chain_colors, darken, delta_e, text_color_on, tint
-from .route import Loop, clip_len
+from .route import Loop, boxes_meeting, clip_len, clip_lengths
 from .style import _ALIASES, CHOICES, MODALITIES, Style, backbone_overrides
 
 _IN_PER_UNIT = IN_PER_UNIT
@@ -1231,15 +1231,14 @@ _SPOT_MORE_RINGS = 4  # rings past the first clear spot's where a spot whose tet
 def _over_bodies(c, targets, bodies) -> float:
     """How much of the tethers from spot c runs over element bodies (`bodies`, their boxes): each tether counted
     over every body but the one its target lies on (random-100 C9)."""
-    total = 0.0
     boxes = np.asarray(bodies, float).reshape(-1, 4)
-    for t in targets:
-        lo, hi = np.minimum(c, t), np.maximum(c, t)
-        near = (boxes[:, 0] < hi[0]) & (boxes[:, 2] > lo[0]) & (boxes[:, 1] < hi[1]) & (boxes[:, 3] > lo[1])
-        for b in boxes[near]:
-            if not (b[0] <= t[0] <= b[2] and b[1] <= t[1] <= b[3]):
-                total += clip_len(c, t, b)
-    return total
+    if not len(boxes) or not len(targets):
+        return 0.0
+    t = np.asarray(targets, float).reshape(-1, 2)
+    lengths = clip_lengths(np.hstack([np.broadcast_to(np.asarray(c, float), t.shape), t]), boxes)
+    own = (boxes[None, :, 0] <= t[:, 0:1]) & (t[:, 0:1] <= boxes[None, :, 2])  # the body a target lies on
+    own &= (boxes[None, :, 1] <= t[:, 1:2]) & (t[:, 1:2] <= boxes[None, :, 3])
+    return float(np.where(own, 0.0, lengths).sum())
 
 
 def _mark_spot(anchor, half, targets, taken, texts, tethers, bodies=(), radius=_SPOT_RADIUS):
@@ -1286,9 +1285,27 @@ def _place_mark(anchor, half, targets, taken, lines, texts, tethers, bodies=()):
         spot = _mark_spot(anchor, half, targets, blocked, texts, drawn, bodies)
         if spot is not None:
             return spot
-    # nothing clear within _SPOT_RADIUS (7QUP's crowded page dropped GTP:9E500): further out, else on the anchor
+    # nothing clear within _SPOT_RADIUS (7QUP's crowded page dropped GTP:9E500): further out, else the least bad
     spot = _mark_spot(anchor, half, targets, taken, texts, (), bodies, radius=_SPOT_FAR * _SPOT_RADIUS)
-    return spot if spot is not None else np.asarray(anchor, float)
+    return spot if spot is not None else _least_bad_spot(anchor, half, taken, bodies)
+
+
+def _least_bad_spot(anchor, half, taken, bodies) -> np.ndarray:
+    """A mark with no clear spot at all (ligand_marks records it as crowded): the ring spot within _SPOT_FAR times
+    _SPOT_RADIUS overlapping the fewest element bodies, then the fewest other boxes, the nearest on a tie (fix round
+    1: it went on its anchor, over whatever was there)."""
+    body = np.asarray(bodies, float).reshape(-1, 4)
+    other = np.asarray(taken, float).reshape(-1, 4)
+    best, score = np.asarray(anchor, float), None
+    for ring in np.arange(0.0, _SPOT_FAR * _SPOT_RADIUS, 0.35):
+        for angle in np.linspace(0, 2 * np.pi, max(1, int(ring * 10)), endpoint=False):
+            c = np.asarray(anchor, float) + ring * np.array([np.cos(angle), np.sin(angle)])
+            box = np.array([c[0] - half[0], c[1] - half[1], c[0] + half[0], c[1] + half[1]])
+
+            s = (int(boxes_meeting(body, box).sum()), int(boxes_meeting(other, box).sum()))
+            if score is None or s < score:
+                best, score = c, s
+    return best
 
 
 def _disulfide_lines(layout: Layout, loops: list[Loop], sses: list[SSE], look: Style) -> list[tuple]:
@@ -1349,8 +1366,7 @@ def ligand_marks(layout: Layout, loops: list[Loop], sses: list[SSE], look: Style
         anchor = np.average(np.asarray(targets), axis=0, weights=weights)
         half = (0.3, 0.3) if g.metal else (0.12 * len(g.name) + 0.2, 0.27)
         spot = _place_mark(anchor, half, targets, taken, lines, texts, tethers, bodies)
-        if spot is None:
-            continue
+        crowded = overlaps_any((spot[0] - half[0], spot[1] - half[1], spot[0] + half[0], spot[1] + half[1]), taken)
         mark = (spot[0] - half[0], spot[1] - half[1], spot[0] + half[0], spot[1] + half[1])
         taken.append(mark)
         texts.append(mark)  # a later ligand's tether keeps off this one's name
@@ -1362,6 +1378,7 @@ def ligand_marks(layout: Layout, loops: list[Loop], sses: list[SSE], look: Style
                 "half": half,
                 "targets": targets,
                 "residues": tethered,
+                "crowded": bool(crowded),  # no clear spot: drawn over an element or text (Drawn.crowded_marks)
             }
         )
     return out
@@ -3319,6 +3336,9 @@ def _draw(
     _draw_sheet_panels(c, layout, outlines)
     _draw_hbonds(c, hb)
     c.fig.foldmap_hbonds = hb  # for the interactive page's hover notes
+    c.fig.foldmap_crowded_marks = [  # ligand marks with no clear spot, drawn over other ink (Drawn.crowded_marks)
+        f"{m['ligand'].name}:{m['ligand'].chain}{m['ligand'].seq}" for m in marks if m.get("crowded")
+    ]
     if layout.stems or layout.na_paths:
         _draw_nucleic(
             c.ax, layout, sses, c.residue_colour, c.look.fill, c.lw, c.font, c.pt_per_unit, c.look, c.backbone[0]

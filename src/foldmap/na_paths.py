@@ -341,6 +341,15 @@ def among(path: NAPath, at: dict) -> list[tuple[float, float]]:
     return outside_own(path.points, tuple(at[k] for k in path.between if k in at))
 
 
+def _seg_dists(points, a, b) -> np.ndarray:
+    """Distances from each point (n, 2) to segment a-b, as _seg_dist (fix round 1: one test for _ties' spots)."""
+    q = np.asarray(points, float).reshape(-1, 2)
+    a, b = np.asarray(a, float), np.asarray(b, float)
+    ab = b - a
+    t = np.clip((q - a) @ ab / float(ab @ ab), 0.0, 1.0) if ab.any() else np.zeros(len(q))
+    return np.hypot(*(q - a - t[:, None] * ab).T)
+
+
 def _seg_dist(q, a, b) -> float:
     """Distance from point q to segment a-b."""
     q, a, b = (np.asarray(x, float) for x in (q, a, b))

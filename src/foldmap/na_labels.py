@@ -24,8 +24,8 @@ from .layout import (
     line_clearance,
     text_em,
 )
-from .na_paths import _BEAD, NAPath, NATie, _dot, _near, _seg_dist, _spaced, crosses_body, in_body, midway
-from .route import clip_len
+from .na_paths import _BEAD, NAPath, NATie, _dot, _near, _seg_dist, _seg_dists, _spaced, crosses_body, in_body, midway
+from .route import clip_len, clip_lengths
 
 _TIE_SHORT = 3.0  # stem widths: a longer tie is drawn as two labelled marks, not a line
 _TICK_GAP, _TICK = 0.15, 0.35  # a tie mark: a tick this far out from its nucleotide, this long
@@ -94,7 +94,7 @@ def _place_letters(layout: Layout, paths: list[NAPath]) -> dict[tuple[int, int],
         x0, y0, x1, y1 = ink.get(base, ink["N"]) + np.array([q[0], q[1], q[0], q[1]])
         box = (x0 - line_clear, y0 - line_clear, x1 + line_clear, y1 + line_clear)
         near = (seg_lo[:, 0] < box[2]) & (seg_hi[:, 0] > box[0]) & (seg_lo[:, 1] < box[3]) & (seg_hi[:, 1] > box[1])
-        return any(clip_len(g[:2], g[2:], box) > 0 for g in strand_segs[near])
+        return bool(near.any()) and bool((clip_lengths(strand_segs[near], [box]) > 0).any())
 
     where.update({(p.strand, i): np.asarray(xy) for p in paths for i, xy in zip(p.nts, p.nt_xy)})
     taken = _Points(1.0)  # every letter, nucleotide and end label so far: nearer than 1 is measured exactly
@@ -309,9 +309,7 @@ def _ties(layout: Layout, paths: list[NAPath]) -> list[NATie]:
         near = pts[np.hypot(*(pts - np.asarray(own, float)).T) > 1e-9]
         if (np.hypot(*(near - np.asarray(at, float)).T) < _LETTER_GAP + hh).any():
             return False
-        ab = np.asarray(b, float) - np.asarray(a, float)
-        t = np.clip((near - a) @ ab / max(float(ab @ ab), 1e-300), 0.0, 1.0) if ab.any() else np.zeros(len(near))
-        if (np.hypot(*(near - a - t[:, None] * ab).T) < 0.2).any():
+        if (_seg_dists(near, a, b) < 0.2).any():
             return False
         if any(min(box[2], o[2]) > max(box[0], o[0]) and min(box[3], o[3]) > max(box[1], o[1]) for o in boxes):
             return False

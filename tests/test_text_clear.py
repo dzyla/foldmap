@@ -162,6 +162,22 @@ def test_a_ligand_boxed_in_by_elements_and_text_still_gets_a_mark():
     assert _place_mark(anchor, half, [(1.0, 0.0)], everywhere, [], [], []) is not None
 
 
+def test_a_mark_with_nowhere_clear_takes_the_least_bad_spot_and_says_so():
+    """Fix round 1 (minor): with nothing clear even far out, the mark went on its anchor, over whatever was there,
+    silently. It takes the spot overlapping the fewest element bodies, then the fewest other boxes (here: off the
+    element, on a label box), and the figure records it (Drawn.crowded_marks; the CLI warns)."""
+    from foldmap.render import _SPOT_FAR, _SPOT_RADIUS, _place_mark
+
+    anchor, half = np.array([0.0, 0.0]), (0.3, 0.3)
+    far = _SPOT_FAR * _SPOT_RADIUS + 1.0
+    body = (-far, -far, 0.5, far)  # an element over the left and the middle
+    label = (0.5, -far, far, far)  # a label over the right
+    spot = _place_mark(anchor, half, [(1.0, 0.0)], [body, label], [], [], [], [body])
+    assert spot is not None and spot[0] - half[0] > 0.5  # on the label, not the element
+    d = draw_spec(figure_spec(R100 / "1BXI.cif.gz"))
+    assert d.crowded_marks == []
+
+
 def test_every_chosen_ligand_of_a_crowded_page_has_a_mark():
     """Same, end to end: 1GOX's FMN and 1BXI's metal, with a loop line laid over every spot near each."""
     spec = figure_spec(R100 / "1BXI.cif.gz")

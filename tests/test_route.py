@@ -771,3 +771,21 @@ def test_a_reroute_off_na_text_crosses_no_more_strands():
     weave = [(0.0, 0.0), (0.0, 3.0), (7.0, 3.0), (7.0, -1.0), (5.5, -1.0), (5.5, -2.0), (10.0, -2.0), (10.0, 0.0)]
     assert route._better(around, old, letter, [], strands)
     assert route._strand_crossings(weave, strands) == 3 and not route._better(weave, old, letter, [], strands)
+
+
+def test_clip_lengths_is_clip_len_for_every_pair():
+    """Fix round 1 (minor): the four segment-against-box loops (text hits, letter spots, tethers over bodies, tie
+    spots) share route.clip_lengths, which gives clip_len for every (segment, box) pair; boxes_meeting is the open
+    box overlap."""
+    rng = np.random.default_rng(7)
+    segs = rng.uniform(-3, 3, (40, 4))
+    segs[:5, 2] = segs[:5, 0]  # vertical
+    segs[5:10, 3] = segs[5:10, 1]  # horizontal
+    lo = rng.uniform(-3, 2, (30, 2))
+    boxes = np.hstack([lo, lo + rng.uniform(0.1, 2.0, (30, 2))])
+    got = route.clip_lengths(segs, boxes)
+    want = np.array([[route.clip_len(s[:2], s[2:], b) for b in boxes] for s in segs])
+    assert np.allclose(got, want) and ((got > 0) == (want > 0)).all()
+    assert route.boxes_meeting(boxes, (0.0, 0.0, 1.0, 1.0)).tolist() == [
+        b[0] < 1 and b[2] > 0 and b[1] < 1 and b[3] > 0 for b in boxes
+    ]

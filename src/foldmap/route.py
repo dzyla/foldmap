@@ -189,6 +189,35 @@ def clip_len(p, q, rect) -> float:
     return (t1 - t0) * math.hypot(dx, dy)
 
 
+def clip_lengths(segments, boxes) -> np.ndarray:
+    """clip_len for every (segment, box) pair at once: segments (x0, y0, x1, y1) by boxes (x0, y0, x1, y1), the length
+    of each segment strictly inside each box (Liang-Barsky, as clip_len). The one segment-against-box test of the
+    text and tether checks (route._text_hits, na_labels letter spots, render._over_bodies; fix round 1)."""
+    seg = np.asarray(segments, float).reshape(-1, 4)
+    box = np.asarray(boxes, float).reshape(-1, 4)
+    px, py = seg[:, 0:1], seg[:, 1:2]
+    dx, dy = seg[:, 2:3] - px, seg[:, 3:4] - py
+    t0 = np.zeros((len(seg), len(box)))
+    t1 = np.ones((len(seg), len(box)))
+    empty = np.zeros((len(seg), len(box)), bool)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        for pk, qk in ((-dx, px - box[:, 0]), (dx, box[:, 2] - px), (-dy, py - box[:, 1]), (dy, box[:, 3] - py)):
+            pk = np.broadcast_to(pk, qk.shape)
+            flat = pk == 0
+            empty |= flat & (qk <= 0)
+            r = qk / pk
+            t0 = np.where(~flat & (pk < 0), np.maximum(t0, r), t0)
+            t1 = np.where(~flat & (pk > 0), np.minimum(t1, r), t1)
+    inside = ~empty & (t0 < t1)
+    return np.where(inside, (t1 - t0) * np.hypot(dx, dy), 0.0)
+
+
+def boxes_meeting(boxes, box) -> np.ndarray:
+    """Which of `boxes` share area with `box` (open overlap), as a bool array."""
+    b = np.asarray(boxes, float).reshape(-1, 4)
+    return (b[:, 0] < box[2]) & (b[:, 2] > box[0]) & (b[:, 1] < box[3]) & (b[:, 3] > box[1])
+
+
 def _crosses_body(p, q, e: Placed) -> bool:
     """True when segment p-q runs through the element's own (possibly tilted) body, not just its end."""
     c, s = math.cos(e.angle), math.sin(e.angle)
@@ -647,7 +676,11 @@ _NA_TEXT_TOLL = 25.0  # the extra cost of a cell of that text, while such a loop
 
 
 def _text_hits(points, boxes) -> int:
-    return sum(any(clip_len(p, q, b) > 0 for p, q in zip(points, points[1:])) for b in boxes)
+    """How many of `boxes` the polyline runs through."""
+    pts = np.asarray(points, float).reshape(-1, 2)
+    if len(pts) < 2 or not len(boxes):
+        return 0
+    return int((clip_lengths(np.hstack([pts[:-1], pts[1:]]), boxes) > 0).any(axis=0).sum())
 
 
 _REROUTE_TURNS = 4  # corners a route off NA text may add to the one it replaces (no weaving round each letter)

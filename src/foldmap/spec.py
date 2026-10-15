@@ -277,6 +277,12 @@ class Drawn:
         return out + [path_name(p, na) for p in getattr(self.layout, "na_paths", []) if p.fallback]
 
     @property
+    def crowded_marks(self) -> list[str]:
+        """Ligand marks (name:chain+number) with no clear spot anywhere near, drawn over an element or text at the
+        least bad spot (render._least_bad_spot)."""
+        return list(getattr(self.figure, "foldmap_crowded_marks", []))
+
+    @property
     def over_labels(self) -> list[str]:
         """Loops routed over a label or a chain-end stub, the only route found (route.Loop.crosses_labels)."""
         return [f"{l.a_id}>{l.b_id}" for l in self.loops if l.crosses_labels and not l.fallback]
