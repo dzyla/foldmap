@@ -87,7 +87,8 @@ def test_fimd_drawn_with_its_accessory_strand_in_the_ring_fails_s1_and_s3():
     sses, sheets, bridges = _built(R100 / "9FWZ-DB.cif.gz")
     (barrel,) = [sh for sh in sheets if sh.closed]
     found = sheet_checks([wedged(barrel)], sses, bridges)
-    assert found["S1"] == ["sheet 1: D:662-666 | D:139-153 drawn side by side with no bridge"]
+    ((s1,),) = [found["S1"]]  # wedged after D:645-659, beside a strand it does not pair with (D:139-153 as drawn)
+    assert s1.startswith("sheet 1: D:662-666 | D:") and s1.endswith(" drawn side by side with no bridge")
     assert found["S2"] == []  # its closure, D:197-209 | D:214-223, pairs
     assert found["S3"] == ["sheet 1: 25 barrel strands drawn, the pairing cycle has 24"]
     assert found["S4"] is None and found["S5"] is None  # hooks, not yet measured
@@ -164,3 +165,66 @@ def test_check_command_prints_the_figures_science_and_exits_1_on_a_problem(capsy
     )
     assert main(["check", str(DATA / "1UBQ.cif")]) == 1
     assert "S1 sheet neighbours pair: 1 problem(s)" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        R100 / "9FWZ-DB.cif.gz",
+        R100 / "2OMF-A.cif.gz",
+        R100 / "3L9G-A.cif.gz",
+        R100 / "5KQJ.cif.gz",
+        DATA / "8UTF.cif",
+    ],
+)
+def test_branched_sheets_draw_every_strand_beside_a_partner(path):
+    """Plan 12 Task 2: S1-S3 hold in the drawn figure of entries with branched sheets (9FWZ's and OmpF's barrels with
+    a pendant strand, 3L9G's barrels with branches of several strands, 5KQJ's stacked pair, 8UTF's partners along one
+    long strand), and every accessory strand stands in a column next to its parent's."""
+    from foldmap.figcheck import drawn_columns, science_checks
+
+    d = _drawn(path)
+    found = science_checks(d)
+    assert found["S1"] == found["S2"] == found["S3"] == [], found
+    assert d.layout.accessory
+    for k in range(len(d.layout.sheets)):
+        where = {i: c for c, col in enumerate(drawn_columns(d.layout, k)) for i, g in col if not g}
+        for strand, parent in d.layout.accessory.items():
+            if strand in where and parent in where:
+                assert abs(where[strand] - where[parent]) == 1, (strand, parent)
+
+
+def test_fimd_figure_has_its_24_strand_barrel_and_says_where_its_pendant_strand_is(capsys, tmp_path):
+    from foldmap.cli import main
+
+    assert main(["plot", str(R100 / "9FWZ-DB.cif.gz"), "-o", str(tmp_path / "f.svg")]) == 0
+    assert "D:662-666 beside D:645-659" in capsys.readouterr().err
+    d = _drawn(R100 / "9FWZ-DB.cif.gz")
+    (k,) = [k for k, ids in enumerate(d.layout.sheets) if len(ids) > 20]
+    ring = [i for i in d.layout.sheets[k] if i not in d.layout.accessory]
+    assert len(ring) == 24 and d.layout.accessory == {"D:662-666": "D:645-659"}
+    assert any("D:662-666 beside D:645-659" in n for n in d.layout.sheet_notes)
+
+
+def test_summary_names_the_accessory_strands():
+    from foldmap.cli import summarize
+
+    text = summarize(str(R100 / "9FWZ-DB.cif.gz"))
+    assert "sheet 1: 24 strand(s) closed ambiguous" in text
+    assert "  beside D:645-659 (off the run): D:662-666" in text
+
+
+def test_ssb_draws_each_subunit_its_own_ob_fold_barrel():
+    """1EYG (SSB tetramer): the four OB-fold barrels pair across subunits (A:1005-1021 with B:2005-2021). They were
+    drawn as two 10-strand "barrels", each with two neighbours that do not pair; a part of a component closing a ring
+    of its own is a sheet of its own: four closed 5-strand barrels, S1-S3 clean."""
+    from foldmap.figcheck import science_checks
+
+    sses, sheets, bridges = _built(DATA / "na" / "1EYG.cif.gz")
+    barrels = [sh for sh in sheets if sh.closed]
+    assert [len(sh.strands) for sh in barrels] == [5, 5, 5, 5]
+    assert [sorted({s.chain for s in sh.strands}) for sh in barrels] == [["A"], ["B"], ["C"], ["D"]]
+    d = _drawn(DATA / "na" / "1EYG.cif.gz")
+    found = science_checks(d)
+    assert found["S1"] == found["S2"] == found["S3"] == []
+    assert "barrels drawn apart, each closed, that also pair: A:1005-1021 with B:2005-2021, " in d.layout.sheet_notes[0]

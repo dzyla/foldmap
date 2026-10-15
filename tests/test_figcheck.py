@@ -183,7 +183,9 @@ def test_interleaved_copies_panels_are_measured_with_their_holes():
         for ring in a.get_path().transformed(a.get_transform() + to_page).to_polygons(closed_only=True)
     ]
     turns = [np.sum(r[:-1, 0] * r[1:, 1] - r[1:, 0] * r[:-1, 1]) for r in rings]
-    assert any(t < 0 for t in turns)  # some panel has a hole (an interleaved domain's element): the case measured
+    # the case measured: some panel has a hole (an interleaved domain's element), or (plan 12 Task 2: 3L9G's barrels
+    # are 16-strand rings, their branch strands stacked beside them) some domain's panel is cut round another's
+    assert any(t < 0 for t in turns) or len(rings) > len(d.layout.domains)
     fields = domain_fields(d.layout)
     inside = {name: v > 0 for name, v in fields.values.items()}
     assert not any((inside[a] & inside[b]).any() for a, b in combinations(sorted(inside), 2))

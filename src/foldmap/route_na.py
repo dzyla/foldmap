@@ -63,14 +63,20 @@ def _use(grid: _Grid, pts, beside: np.ndarray | None = None) -> None:
 
 
 _END_TURNS = (0.0, np.pi / 4, -np.pi / 4, np.pi / 2, -np.pi / 2, 3 * np.pi / 4, -3 * np.pi / 4, np.pi)
+_END_FINE = tuple(  # every 5° between those, the least turn first, when none of them fits
+    x for k in range(1, 36) if k % 9 for x in (k * np.pi / 36, -k * np.pi / 36)
+)
+_END_REACH = (1.0, 1.4, 1.8)  # times the label's distance from its end: the same first, then further out
 
 
 def _own_ends(router, layout: Layout, fixed: dict, at: dict, ends: list, gapped: set) -> list:
     """The strands' end labels once every free end is drawn (fix round 1, review Q6: 9CJI's 3' end, drawn after the
     5' label was placed, started beside that label, so "5′" read as naming it): a label of a free end that lies
     nearer another drawn nucleotide (a free end's, a hairpin loop's, a stem's rail) than its own end nucleotide moves
-    round that nucleotide, at the same distance, to the first turn (_END_TURNS) where its own end is the nearest and it
-    has room (_label_room); else it stays. Run once the free ends and hairpin loops are drawn (`fixed`), and again
+    round that nucleotide, at the same distance, to the first turn (_END_TURNS, then the turns between them, _END_FINE)
+    where its own end is the nearest and it has room (_label_room), else at the next distance out (_END_REACH; plan 12:
+    30QM's 3' end, laid out anew once its sheets' branch strands moved, between nucleotides 103, 104 and 119, has room
+    only about 100° round); else it stays. Run once the free ends and hairpin loops are drawn (`fixed`), and again
     with the runs (30QM's 3' label lay 0.61 from a run's nucleotide, 1.1 from its own end)."""
     pts = [
         (key, np.asarray(xy, float)) for p in fixed.values() for key, xy in zip(((p.strand, k) for k in p.nts), p.nt_xy)
@@ -96,9 +102,9 @@ def _own_ends(router, layout: Layout, fixed: dict, at: dict, ends: list, gapped:
         r = float(np.hypot(*v))
         others = [q for t, f, q in ends if (t, f) != (s, e) and (t, f) not in gapped]
         moved = xy
-        for turn in _END_TURNS:
+        for reach, turn in ((k, t) for k in _END_REACH for t in (*_END_TURNS, *_END_FINE)):
             c, n = math.cos(turn), math.sin(turn)
-            spot = end_xy + np.array([v[0] * c - v[1] * n, v[0] * n + v[1] * c])
+            spot = end_xy + reach * np.array([v[0] * c - v[1] * n, v[0] * n + v[1] * c])
             if r > 0 and nearest(spot) == own and _label_room(router, layout, spot, others):
                 moved = (float(spot[0]), float(spot[1]))
                 break

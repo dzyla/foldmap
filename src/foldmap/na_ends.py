@@ -354,9 +354,15 @@ def _trace_clear(layout: Layout, s: int, pts) -> bool:
         got = {x[1] for r in range(p.sse.start, p.sse.end + 1) for x in na.contacts.get(r, ()) if x[0] == s}
         if got:
             holds[p.sse.id] = got
-    for block in layout.sheets:  # a sheet is placed whole: all its strands lie where its touching ones do
+    blocks = [set(b) for b in layout.sheets]  # barrels of one pairing network count as one (Layout.sheet_joins: 1EYG's
+    for a, b in getattr(layout, "sheet_joins", []):  # OB folds, one sheet until plan 12 drew each barrel apart)
+        ka, kb = (next((k for k, x in enumerate(blocks) if e in x), None) for e in (a, b))
+        if ka is not None and kb is not None and ka != kb:
+            blocks[ka] |= blocks[kb]
+            blocks[kb] = set()
+    for block in blocks:  # a sheet is placed whole: all its strands lie where its touching ones do
         got = set().union(*(holds.get(e, set()) for e in block))
-        for e in block if got else ():
+        for e in sorted(block) if got else ():
             holds[e] = got
     rects, owners = _element_obstacles(layout, ghost_owner=True)  # the router's obstacles; a ghost is its strand's
     xy = _xy(pts)

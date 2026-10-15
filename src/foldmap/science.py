@@ -124,9 +124,9 @@ def sheet_columns(sheet: Sheet) -> Columns:
     n = len(sheet.strands)
     cols: dict[int, list[tuple[str, bool]]] = {}
     for k, s in enumerate(sheet.strands):
-        cols.setdefault(sheet.columns[k] if sheet.columns else k, []).append((s.id, False))
+        cols.setdefault(k, []).append((s.id, False))
     if sheet.closed:
-        cols.setdefault(n, []).append((sheet.strands[0].id, True))  # (a closed sheet has no shared columns)
+        cols.setdefault(n, []).append((sheet.strands[0].id, True))
     for acc in sheet.accessory:
         cols.setdefault(acc.column, []).append((acc.strand.id, False))
     return [cols[k] for k in sorted(cols)]

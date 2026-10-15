@@ -8,9 +8,8 @@ from collections import Counter, defaultdict
 from itertools import combinations
 
 import networkx as nx
-import numpy as np
 
-from .model import SSE, Bridge, Sheet
+from .model import SSE, Accessory, Bridge, Sheet
 
 _SPLIT_GAP = 4  # strands of one chain this close end to end are pieces of one long strand
 _BARREL_MIN = 5  # strands a sheet needs before a lone end-to-end bridge may close it into a barrel
@@ -45,79 +44,95 @@ def _flank_one_partner(tree: nx.Graph, strands: list[SSE]) -> bool:
     return False
 
 
-def _order_tree(tree: nx.Graph, first: int) -> tuple[list[int], bool]:
-    """Order tree nodes along its longest path; branches are inserted beside their parent."""
+def _hanging(tree: nx.Graph, track: list[int]) -> list[tuple[int, int]]:
+    """Every tree node off the track, with the neighbour it hangs from (the one nearer the track), parents before
+    children: what pruning the tree's off-track leaves to a fixed point removes, a branch of several strands whole."""
+    seen, out, frontier = set(track), [], list(track)
+    while frontier:
+        nxt = []
+        for p in frontier:
+            for q in sorted(tree.neighbors(p)):
+                if q not in seen:
+                    seen.add(q)
+                    out.append((q, p))
+                    nxt.append(q)
+        frontier = nxt
+    return out
+
+
+def _order_tree(tree: nx.Graph, first: int) -> tuple[list[int], list[tuple[int, int]]]:
+    """The tree's longest path, in order (the sheet's track), and every node off it with the node it hangs from
+    (_hanging). Plan 12 (the review's R1): an off-path strand was inserted right after its parent, between the parent
+    and the parent's real neighbour (9FWZ's D:662-666 between D:645-659 and D:139-153, which pair); it is now kept
+    off the track and drawn beside its parent (Sheet.accessory)."""
     degrees = dict(tree.degree)
     if tree.number_of_nodes() == 1:
-        return [first], False
+        return [first], []
     if max(degrees.values()) <= 2:
         end = min((n for n, d in degrees.items() if d == 1))
-        return list(nx.dfs_preorder_nodes(tree, end)), False
+        return list(nx.dfs_preorder_nodes(tree, end)), []
     far = lambda src: max(nx.single_source_shortest_path_length(tree, src).items(), key=lambda kv: (kv[1], -kv[0]))[0]  # noqa: E731
     a = far(min(tree.nodes))
-    b = far(a)
-    path = nx.shortest_path(tree, a, b)
-    order = list(path)
-    placed = set(order)
-    for node in nx.bfs_tree(tree, a):
-        if node in placed:
-            continue
-        parent = next(p for p in tree.neighbors(node) if p in placed)
-        order.insert(order.index(parent) + 1, node)
-        placed.add(node)
-    return order, True
+    path = nx.shortest_path(tree, a, far(a))
+    return path, _hanging(tree, path)
 
 
-_STRAND_RISE = 3.3  # Å per residue along a strand
-_STACK_GAP = 5.0  # Å: two strands on one side of a partner whose spans along it are at most this far apart, and
-_STACK_OVERLAP = 1.0  # ... overlap by no more than this, lie end to end along one edge of it
+def _ring(tree: nx.Graph, graph: nx.Graph) -> list[int] | None:
+    """A branched closed sheet's barrel: the longest cycle its pairing closes over the tree (for each pairing left
+    out of the maximum spanning tree, the tree path between its two strands; the first of the longest, by strand
+    index), as that path: its ends pair (the closure). None when that cycle has fewer than _BARREL_MIN strands (a
+    bifurcation, not a barrel)."""
+    best: list[int] = []
+    for u, v in sorted(tuple(sorted(e)) for e in graph.edges if not tree.has_edge(*e)):
+        path = nx.shortest_path(tree, u, v)
+        if len(path) > len(best):
+            best = path
+    return best if len(best) >= _BARREL_MIN else None
 
 
-def _span(s: SSE, at: np.ndarray, axis: np.ndarray) -> tuple[float, float]:
-    """Where strand s lies along a partner's axis (Å from the partner's centroid `at`)."""
-    c = float((s.centroid - at) @ axis)
-    half = (len(s) - 1) * _STRAND_RISE / 2 * abs(float(s.axis @ axis))
-    return c - half, c + half
-
-
-def _columns(tree: nx.Graph, order: list[int], strands: list[SSE]) -> list[int]:
-    """Sheet.columns for the strands of `order` (a branched, open sheet's path order, _order_tree): column index per
-    position, side by side left to right in that order, or [] when every strand has its own. Two strands end to end
-    along one edge of a partner share a column: a strand b next to q in the order where both pair with one partner p
-    (tree neighbours of both), lie on the same side of p, and their spans along p's axis are at most _STACK_GAP Å apart
-    and overlap by at most _STACK_OVERLAP Å (5KQJ: F and B along E's one edge; two different strands, not a bulge of
-    one). No sequence test: any two strands sharing p's edge end to end qualify. Directions in 3D from the strands'
-    centroids and axes, snapped. layout._sheet_item stacks a column's strands (_column_heights); figcheck's order
-    check reads a block by its columns. Plan 12's branched-sheet drawing builds on this."""
+def _branch_columns(track: list[int], off: list[tuple[int, int]], strands: list[SSE]) -> dict[int, int]:
+    """The column each off-track strand is drawn in (Accessory.column): beside the strand it hangs from, on the side
+    it lies on in 3D, sharing the column of the track strand there (stacked end to end with it, layout._column_heights;
+    as C2a stacked two strands along one edge of a partner) or past the track's end. The side: the
+    strand's offset from its parent against the track's local across direction (from the track strand before the
+    parent's column to the one after it), both seen across the parent's axis; snapped."""
     from .layout import _snap, _unit
 
-    share: dict[int, int] = {}
-    for i, b in enumerate(order):
-        for j in (i - 1, i + 1):
-            if not 0 <= j < len(order) or b in share or order[j] in share:
-                continue
-            q = order[j]
-            for p in sorted(set(tree.neighbors(b)) & set(tree.neighbors(q))):
-                at, axis = _snap(strands[p].centroid), _snap(_unit(strands[p].axis))
-                sb, sq = _snap(strands[b].centroid) - at, _snap(strands[q].centroid) - at
-                if float((sb - (sb @ axis) * axis) @ (sq - (sq @ axis) * axis)) <= 0:
-                    continue  # on opposite sides of p
-                (b0, b1), (q0, q1) = _span(strands[b], at, axis), _span(strands[q], at, axis)
-                overlap = min(b1, q1) - max(b0, q0)
-                if -_STACK_GAP <= overlap <= _STACK_OVERLAP:
-                    share[b] = q
-                    break
-    if not share:
-        return []
-    cols, k = [], -1
-    for i, x in enumerate(order):
-        if not (x in share and i > 0 and share[x] == order[i - 1]) and not (i > 0 and share.get(order[i - 1]) == x):
-            k += 1
-        cols.append(k)
-    return cols
+    n = len(track)
+    column = {node: k for k, node in enumerate(track)}
+    for node, parent in off:
+        c = column[parent]
+        at = min(max(c, 0), n - 1)
+        across = _snap(strands[track[min(at + 1, n - 1)]].centroid) - _snap(strands[track[max(at - 1, 0)]].centroid)
+        axis = _unit(strands[parent].axis)
+        v = _snap(strands[node].centroid) - _snap(strands[parent].centroid)
+        side = float((v - (v @ axis) * axis) @ (across - (across @ axis) * axis))
+        column[node] = c + (1 if side >= 0 else -1)
+    return {node: column[node] for node, _ in off}
+
+
+def _other_rings(graph: nx.Graph, nodes: set[int], ring: list[int]) -> list[list[int]]:
+    """The parts of a component, its ring taken out, that close a barrel of their own (a cycle of at least
+    _BARREL_MIN strands, _ring): each a sheet of its own (1EYG: subunit B's OB-fold barrel, joined to A's by one
+    pairing, A:1005-1021 with B:2005-2021). The rest stays with the ring, its strands accessory."""
+    rest = graph.subgraph(nodes - set(ring))
+    out = []
+    for part in sorted(nx.connected_components(rest), key=min):
+        sub = rest.subgraph(part)
+        tree = nx.maximum_spanning_tree(sub, weight="weight")
+        if tree.number_of_edges() < sub.number_of_edges() and _ring(tree, sub) is not None:
+            out.append(sorted(part))
+    return out
 
 
 def build_sheets(sses: list[SSE], bridges: list[Bridge]) -> list[Sheet]:
+    """The sheets of these strands: strands joined by at least _MIN_PAIRS bridges, per connected component its
+    maximum spanning tree. The track (Sheet.strands): the tree's longest path; a closed sheet's (its pairing has a
+    cycle): a branched tree's longest cycle (_ring), a path tree's path. A part off that ring closing a barrel of its
+    own is a sheet of its own (_other_rings). Every other strand is an accessory strand (Sheet.accessory), drawn
+    beside the strand it hangs from (_branch_columns), never between two strands that pair. A sheet whose pairing
+    has a cycle but whose track's ends do not pair (or whose longest cycle is under _BARREL_MIN strands) is drawn
+    open, flagged `unclosed`."""
     strands = [s for s in sses if s.kind == "E"]
     table = _edge_table(strands, bridges)
     weak = _edge_table(strands, bridges, minimum=1)  # single bridges, used only to close barrels
@@ -127,22 +142,47 @@ def build_sheets(sses: list[SSE], bridges: list[Bridge]) -> list[Sheet]:
         graph.add_edge(a, b, weight=sum(c.values()), kind=_majority(c))
 
     sheets: list[Sheet] = []
-    for comp in sorted(nx.connected_components(graph), key=min):
+    pending = [sorted(comp) for comp in sorted(nx.connected_components(graph), key=min)]
+    comp_of = {k: comp for comp in pending for k in comp}
+    while pending:
+        comp = pending.pop(0)
         sub = graph.subgraph(comp)
         tree = nx.maximum_spanning_tree(sub, weight="weight")
-        closed = tree.number_of_edges() < sub.number_of_edges()
-        order, ambiguous = _order_tree(tree, min(comp))
-        ambiguous = ambiguous or _flank_one_partner(tree, strands)
+        cyclic = tree.number_of_edges() < sub.number_of_edges()  # a cycle was cut at its weakest pairing
+        order, off = _order_tree(tree, min(comp))
+        ring = _ring(tree, sub) if cyclic and off else None  # a branched barrel: its ring, every other strand off it
+        if ring is not None:
+            order, off = ring, _hanging(tree, ring)
+            split = _other_rings(graph, set(comp), ring)
+            gone = {k for part in split for k in part}
+            off = [(k, p) for k, p in off if k not in gone]
+            pending[:0] = split  # next, in order
+        ends = (min(order[0], order[-1]), max(order[0], order[-1]))
+        closed = cyclic and (ring is not None or not off) and ends in weak
+        unclosed = cyclic and not closed  # drawn open: its closure is not supported by pairing
+        ambiguous = bool(off) or _flank_one_partner(tree, strands)
         direction = {order[0]: 1}
         for parent, child in nx.bfs_edges(tree, order[0]):
             flip = -1 if tree.edges[parent, child]["kind"] == "A" else 1
             direction[child] = direction[parent] * flip
-        kinds = [tree.edges[a, b]["kind"] if tree.has_edge(a, b) else "?" for a, b in zip(order, order[1:])]
-        ends = (min(order[0], order[-1]), max(order[0], order[-1]))
-        if not closed and not ambiguous and len(order) >= _BARREL_MIN and ends in weak:
+        kinds = [tree.edges[a, b]["kind"] for a, b in zip(order, order[1:])]
+        if not cyclic and not ambiguous and len(order) >= _BARREL_MIN and ends in weak:
             closed = True  # a barrel whose last pairing is a lone bridge (DSSP counts it as a ladder too)
-        columns = _columns(tree, order, strands) if ambiguous and not closed else []
+        columns = _branch_columns(order, off, strands)
+        accessory = [Accessory(strands[k], strands[p], columns[k], direction[k]) for k, p in off]
+        mine = {*order, *(k for k, _ in off)}
+        apart = set(comp_of[comp[0]]) - mine  # strands of its component drawn in another sheet
+        joined = [(strands[a], strands[b]) for a in sorted(mine) for b in sorted(graph.neighbors(a)) if b in apart]
         sheets.append(
-            Sheet([strands[k] for k in order], [direction[k] for k in order], kinds, closed, ambiguous, columns)
+            Sheet(
+                [strands[k] for k in order],
+                [direction[k] for k in order],
+                kinds,
+                closed,
+                ambiguous,
+                accessory=accessory,
+                unclosed=unclosed,
+                joined=joined,
+            )
         )
     return sheets

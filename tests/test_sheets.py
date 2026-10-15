@@ -37,12 +37,55 @@ def test_cycle_is_closed_and_cut():
     assert [x.start for x in sh.strands] in ([0, 20, 40], [40, 20, 0])  # weakest edge (0-2) cut
 
 
-def test_branch_is_ambiguous():
+def test_a_branch_strand_is_kept_off_the_track_beside_its_parent():
+    """Plan 12 (the review's R1): a strand off the pairing tree's longest path was inserted right after its parent,
+    between the parent and a strand the parent pairs with. It is now an accessory strand, drawn beside its parent."""
     c, a, b, d = fake(0, 9), fake(20, 29), fake(40, 49), fake(60, 69)
     br = ladder(c, a, "A") + ladder(c, b, "A") + ladder(c, d, "A")
     (sh,) = build_sheets([c, a, b, d], br)
-    assert sh.ambiguous and len(sh.strands) == 4
-    assert sorted(s.start for s in sh.strands) == [0, 20, 40, 60]
+    assert sh.ambiguous and [s.start for s in sh.strands] == [20, 0, 40]  # a c b: each pairs with the next
+    ((acc, parent, column, direction),) = sh.accessory
+    assert acc is d and parent is c and abs(column - 1) == 1 and direction == 1  # a c d: + - +
+    assert sorted(s.start for s in [*sh.strands, acc]) == [0, 20, 40, 60]
+
+
+def _ring_sheet(n, extra=()):
+    """n strands paired round a ring (6 bridges each, the last pair 3), plus (strand, partner index) pendants."""
+    ring = [fake(20 * k, 20 * k + 9) for k in range(n)]
+    for k, s in enumerate(ring):
+        s.centroid = np.array([np.cos(2 * np.pi * k / n), np.sin(2 * np.pi * k / n), 0.0]) * 10
+        s.axis = np.array([0.0, 0.0, 1.0])
+    br = [b for k in range(n - 1) for b in ladder(ring[k], ring[k + 1], "A", 6)] + ladder(ring[-1], ring[0], "A", 3)
+    pend = []
+    for x, at in extra:
+        x.centroid, x.axis = ring[at].centroid * 1.0 + np.array([0.0, 0.0, 12.0]), np.array([0.0, 0.0, 1.0])
+        br += ladder(x, ring[at], "A", 4)
+        pend.append(x)
+    return ring, pend, build_sheets(ring + pend, br)
+
+
+def test_a_barrel_keeps_its_ring_and_draws_a_pendant_strand_off_it():
+    """9FWZ's case in small: a 6-strand ring and a short strand pairing with one ring strand only. The barrel is the
+    6 ring strands (closed, its ends pair); the pendant is an accessory strand beside its partner."""
+    ring, (x,), (sh,) = _ring_sheet(6, [(fake(500, 504), 2)])
+    assert sh.closed and not sh.unclosed and len(sh.strands) == 6 and set(sh.strands) == set(ring)
+    assert {sh.strands[0].start, sh.strands[-1].start} in ({0, 100}, {100, 0})  # cut at the weakest pairing
+    ((acc, parent, column, _),) = sh.accessory
+    assert acc is x and parent is ring[2] and abs(column - sh.strands.index(ring[2])) == 1
+
+
+def test_a_cycle_whose_ends_do_not_pair_is_drawn_open():
+    """Three strands pairing in a triangle, then a run of three more off one of them: the pairing has a cycle, but
+    the track's ends (the run's) do not pair. It was drawn closed, its ghost beside a strand it does not pair with;
+    it is drawn open, flagged unclosed (layout.sheet_notes says so)."""
+    from foldmap.layout import UNCLOSED, sheet_notes
+
+    t = [fake(20 * k, 20 * k + 9) for k in range(6)]
+    br = ladder(t[0], t[1], "A", 5) + ladder(t[1], t[2], "A", 5) + ladder(t[0], t[2], "A", 3)
+    br += ladder(t[2], t[3], "A", 5) + ladder(t[3], t[4], "A", 5) + ladder(t[4], t[5], "A", 5)
+    (sh,) = build_sheets(t, br)
+    assert sh.unclosed and not sh.closed and len(sh.strands) == 6
+    assert sheet_notes([sh]) == [f"{UNCLOSED} ({sh.strands[0].id} … {sh.strands[-1].id})"]
 
 
 def test_weak_pairing_and_isolated_strand_make_separate_sheets():
@@ -77,8 +120,8 @@ def test_ubiquitin_mixed_sheet(ubq):
 def test_uromodulin_sheets(zs5):
     bb, sses, sheets = _pipeline(zs5)
     strands = [s for s in sses if s.kind == "E"]
-    assert sum(len(sh.strands) for sh in sheets) == len(strands)  # every strand in exactly one sheet
-    assert len({s.id for sh in sheets for s in sh.strands}) == len(strands)
+    drawn = [s.id for sh in sheets for s in [*sh.strands, *(a.strand for a in sh.accessory)]]
+    assert len(drawn) == len(set(drawn)) == len(strands)  # every strand in exactly one sheet (track or accessory)
     assert any({s.chain for s in sh.strands} == {"A", "D"} for sh in sheets)  # complementation
     first = [s.id for s in sheets[0].strands]  # matches deposited sheet AA1 in the mmCIF
     assert first == ["A:331-333", "A:339-345", "A:377-383", "A:369-371"]
@@ -148,8 +191,8 @@ def test_a_strand_continuing_another_along_their_partner_shares_its_column():
     """5KQJ (random-100 C34): F pairs with E end to end with B, on E's same side (F at 3D y +11.8, B at -1.1, 0.8 Å
     apart along E): two strands end to end along one edge of a partner. The sheet's one path of strands drew F as a
     column of its own, wedged
-    between E and B (C D E F B A). Such a pair now shares a column (Sheet.columns), one above the other as along E,
-    and the order check reads the block by its columns."""
+    between E and B (C D E F B A). Such a pair now shares a column (F, off the track, an accessory strand beside E,
+    plan 12), one above the other as along E, and the order check reads the block by its columns."""
     from foldmap import figcheck
     from foldmap.cli import make_layout
     from foldmap.spec import draw_spec, figure_spec
@@ -195,21 +238,56 @@ def test_the_loops_out_of_a_shared_column_never_meet_in_its_gap():
         assert np.hypot(d[..., 0], d[..., 1]).min() >= 0.05
 
 
-def test_partners_far_apart_along_a_long_strand_stay_side_by_side():
-    """C34's controls (batch C2a review Q3): 8UTF's a:266-273 and a:318-322 both pair with a:278-301 on one side, 27.6
-    Å apart along it: not end to end, so each keeps its own column; and a sheet with no branch (1TIM's barrel, 8UTF's
-    other sheets) has Sheet.columns == []."""
+def test_partners_far_apart_along_a_long_strand_share_its_edge_in_one_column():
+    """C34's controls (batch C2a review Q3), revised by plan 12: 8UTF's a:266-273 and a:318-322 both pair with
+    a:278-301 on one side, 27.6 Å apart along it. C2a kept each in a column of its own, so one stood between
+    a:278-301 and the other, which do not pair (an S1 failure); the one off the track now shares the other's column,
+    one above the other as along a:278-301. A sheet with no branch (1TIM's barrel) has no accessory strand and no
+    stack gap."""
     from foldmap.cli import make_layout
 
     data = Path(__file__).parent / "data"
     bb = load_backbone(data / "8UTF.cif", "auto")
     dssp = assign_dssp(bb)
     sheets = build_sheets(build_sses(bb, dssp.ss, bridges=dssp.bridges), dssp.bridges)
-    (sh,) = [sh for sh in sheets if {"a:266-273", "a:318-322", "a:278-301"} <= {s.id for s in sh.strands}]
-    assert sh.ambiguous and sh.columns == []
-    assert all(sh.columns == [] for sh in sheets)
+    pair = {"a:266-273", "a:318-322"}
+    (sh,) = [sh for sh in sheets if any(a.strand.id in pair for a in sh.accessory)]
+    (acc,) = [a for a in sh.accessory if a.strand.id in pair]
+    assert acc.parent.id == "a:278-301" and sh.strands[acc.column].id in pair
     lay, _, _ = make_layout(data / "1TIM.cif")
-    assert lay.stack_gaps == []
+    assert lay.stack_gaps == [] and lay.accessory == {}
     bb = load_backbone(data / "1TIM.cif", "auto")
     dssp = assign_dssp(bb)
-    assert all(sh.columns == [] for sh in build_sheets(build_sses(bb, dssp.ss, bridges=dssp.bridges), dssp.bridges))
+    assert all(sh.accessory == [] for sh in build_sheets(build_sses(bb, dssp.ss, bridges=dssp.bridges), dssp.bridges))
+
+
+def test_fimd_barrel_has_24_strands_and_its_pendant_strand_beside_its_partner():
+    """9FWZ FimD (the review's R1): the barrel is 24 strands, D:645-659 next to D:139-153 (12 bridges); D:662-666,
+    which pairs with D:645-659 only, is an accessory strand beside it."""
+    from foldmap.science import sheet_checks
+
+    path = Path(__file__).parent / "data" / "r100" / "9FWZ-DB.cif.gz"
+    bb = load_backbone(path, "asu")
+    d = assign_dssp(bb)
+    sses = build_sses(bb, d.ss, short_helices=True, bridges=d.bridges)
+    sheets = build_sheets(sses, d.bridges)
+    (barrel,) = [sh for sh in sheets if sh.closed]
+    ids = [s.id for s in barrel.strands]
+    assert len(ids) == 24 and abs(ids.index("D:645-659") - ids.index("D:139-153")) == 1
+    assert [(a.strand.id, a.parent.id) for a in barrel.accessory] == [("D:662-666", "D:645-659")]
+    assert sheet_checks(sheets, sses, d.bridges) | {"S4": None, "S5": None} == dict.fromkeys(("S1", "S2", "S3"), []) | {
+        "S4": None,
+        "S5": None,
+    }
+
+
+def test_ompf_barrel_has_16_strands_its_n_terminal_strand_beside_a9_23():
+    """OmpF 2OMF (plan 12 pre-scan): A:2-6 pairs with A:9-23 only and was drawn between A:9-23 and A:36-50, a
+    17-strand barrel; the porin's barrel has 16 strands."""
+    path = Path(__file__).parent / "data" / "r100" / "2OMF-A.cif.gz"
+    bb = load_backbone(path, "asu")
+    d = assign_dssp(bb)
+    (barrel,) = [sh for sh in build_sheets(build_sses(bb, d.ss, bridges=d.bridges), d.bridges) if sh.closed]
+    ids = [s.id for s in barrel.strands]
+    assert len(ids) == 16 and abs(ids.index("A:9-23") - ids.index("A:36-50")) == 1
+    assert [(a.strand.id, a.parent.id) for a in barrel.accessory] == [("A:2-6", "A:9-23")]

@@ -291,6 +291,12 @@ class Drawn:
         return page_notes(self.figure)
 
     @property
+    def sheet_notes(self) -> list[str]:
+        """What is said of the sheets as drawn (layout.sheet_notes): a barrel whose closure its pairing does not
+        support, drawn open; the strands drawn beside their partner, off a sheet's run of paired strands."""
+        return list(getattr(self.layout, "sheet_notes", []))
+
+    @property
     def over_labels(self) -> list[str]:
         """Loops routed over a label or a chain-end stub, the only route found (route.Loop.crosses_labels)."""
         return [f"{l.a_id}>{l.b_id}" for l in self.loops if l.crosses_labels and not l.fallback]

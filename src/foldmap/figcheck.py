@@ -1047,8 +1047,8 @@ def order_checks(drawn) -> list[str]:
       elements with no loop and no such loop over them ("no loop <a>><b>"); chains only lent to the figure
       (Layout.partial) and pairs shown side by side but not adjacent (Layout.unjoined) have no loops;
     - each sheet block (Layout.sheets) holds the strands of one sheet of sheets.build_sheets on the backbone's
-      bridges, side by side in that sheet's order (either way round; a closed barrel from any strand; strands
-      sharing a column, Sheet.columns, as one), each two
+      bridges, its track side by side in that sheet's order (either way round; a closed barrel from any strand) and
+      each accessory strand (Sheet.accessory) in a column next to its parent's, each two
       neighbours pointing the same way when they pair in parallel and opposite ways when antiparallel."""
     from .dssp import assign_dssp
     from .sheets import build_sheets
@@ -1077,7 +1077,10 @@ def order_checks(drawn) -> list[str]:
     if not lay.sheets:
         return out
     bridges = assign_dssp(drawn.bb).bridges
-    sheets = {frozenset(s.id for s in sh.strands): sh for sh in build_sheets(sses, bridges)}
+    sheets = {
+        frozenset([*(s.id for s in sh.strands), *(a.strand.id for a in sh.accessory)]): sh
+        for sh in build_sheets(sses, bridges)
+    }
     at = {  # each block's strands as drawn: its own, and the ghosts standing in it for strands drawn elsewhere
         k: {**{i: lay.placed[i] for i in ids}, **{g.sse.id: g for g in block_ghosts(lay, k) if g.sse.id not in ids}}
         for k, ids in enumerate(lay.sheets)
@@ -1093,9 +1096,14 @@ def order_checks(drawn) -> list[str]:
         want = [s.id for s in sheet.strands]
         got = _drawn_order(at[k])
         seen, wanted = got, want
-        if sheet.columns:  # strands sharing a column (sheets._columns) stand one above the other: read by column
-            column = {s.id: c for s, c in zip(sheet.strands, sheet.columns)}
-            seen, wanted = _by_column(got, column), _by_column(want, column)
+        if sheet.accessory:  # the track in order; each accessory strand in a column next to its parent's
+            drawn = {i: round(float(np.array([at[k][i].cx, at[k][i].cy]) @ _across(at[k])), 3) for i in at[k]}
+            place = {x: n for n, x in enumerate(sorted(set(drawn.values())))}
+            seen = [i for i in got if i in want]
+            for a in sheet.accessory:
+                i, p = a.strand.id, a.parent.id
+                if i in drawn and p in drawn and abs(place[drawn[i]] - place[drawn[p]]) != 1:
+                    out.append(f"sheet {k}: {i} not drawn beside {p}, the strand it pairs with")
         if not _same_order(seen, wanted, sheet.closed):
             out.append(f"sheet {k}: drawn {', '.join(got)}, paired {', '.join(want)}")
         for (a, da), (b, db) in zip(zip(want, sheet.directions), zip(want[1:], sheet.directions[1:])):
@@ -1106,26 +1114,19 @@ def order_checks(drawn) -> list[str]:
     return out
 
 
+def _across(at: dict) -> np.ndarray:
+    """The page direction across drawn strands (id -> its drawn strand or ghost): normal to their mean direction."""
+    ps = list(at.values())
+    ref = ps[0].direction
+    mean = sum(p.direction * (1.0 if p.direction @ ref >= 0 else -1.0) for p in ps)
+    return np.array([mean[1], -mean[0]])
+
+
 def _drawn_order(at: dict) -> list[str]:
     """Strand ids (id -> its drawn strand, or the ghost standing for it) in the order they stand side by side on
     the page: across their mean direction."""
-    ids, ps = list(at), list(at.values())
-    ref = ps[0].direction
-    mean = sum(p.direction * (1.0 if p.direction @ ref >= 0 else -1.0) for p in ps)
-    across = np.array([mean[1], -mean[0]])
-    return [k for _, k in sorted(((float(np.array([p.cx, p.cy]) @ across), k) for k, p in zip(ids, ps)))]
-
-
-def _by_column(ids: list[str], column: dict[str, int]) -> list[str]:
-    """Strand ids in order, the strands of one column (side by side in that order) as one entry, their ids
-    joined in sorted order: the order of the columns, whichever way the strands sharing one stand."""
-    out: list[str] = []
-    for k in ids:
-        if out and column[k] == column[out[-1].split("|")[0]]:
-            out[-1] = "|".join(sorted([*out[-1].split("|"), k]))
-        else:
-            out.append(k)
-    return out
+    across = _across(at)
+    return [k for _, k in sorted(((float(np.array([p.cx, p.cy]) @ across), k) for k, p in at.items()))]
 
 
 def _same_order(got: list[str], want: list[str], closed: bool) -> bool:
@@ -1145,9 +1146,7 @@ def drawn_columns(layout, k: int) -> list[list[tuple[str, bool]]]:
     column (stacked one above the other)."""
     at = [(i, layout.placed[i], False) for i in layout.sheets[k]]
     at += [(g.sse.id, g, True) for g in block_ghosts(layout, k)]
-    ref = at[0][1].direction
-    mean = sum(p.direction * (1.0 if p.direction @ ref >= 0 else -1.0) for _, p, _ in at)
-    across = np.array([mean[1], -mean[0]])
+    across = _across({n: p for n, (_, p, _) in enumerate(at)})
     cols: dict[float, list[tuple[str, bool]]] = {}
     for i, p, ghost in at:
         cols.setdefault(round(float(np.array([p.cx, p.cy]) @ across), 3), []).append((i, ghost))
@@ -1170,11 +1169,10 @@ def science_checks(drawn) -> dict[str, list[str] | None]:
         s1, s2 = neighbour_findings(columns, count)
         out["S1"] += [f"sheet {k}: {t}" for t in s1]
         out["S2"] += [f"sheet {k}: {t}" for t in s2]
-        ghosts = [(c, i) for c, col in enumerate(columns) for i, g in col if g]
-        if not ghosts:
-            continue
-        ring = [i for i in ids if i not in lay.accessory] + [i for _, i in ghosts if i not in ids]  # lent: drawn
-        # in another block, standing here for a strand of this ring
+        ghosts = [i for col in columns for i, g in col if g]
+        if not any(i in ids for i in ghosts):  # no barrel (a ghost repeating one of its own strands): ghosts lent
+            continue  # by a symmetric copy only stand beside their partners (layout._unwrap)
+        ring = [i for i in ids if i not in lay.accessory] + [i for i in ghosts if i not in ids]
         others = [i for i in ids if i in lay.accessory]
         found = count_finding(f"sheet {k}", ring, others, count, adjacent_pairs(columns))
         if found:

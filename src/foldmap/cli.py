@@ -69,6 +69,7 @@ def summarize(path: str) -> str:
             lines.append(f"  helix  {s.id}")
     for n, sh in enumerate(sheets, 1):
         flags = ("closed " if sh.closed else "") + ("ambiguous" if sh.ambiguous else "")
+        flags += " drawn open: closure not supported by pairing" if sh.unclosed else ""
         lines.append(f"sheet {n}: {len(sh.strands)} strand(s) {flags}".rstrip())
         parts = []
         for k, (s, d) in enumerate(zip(sh.strands, sh.directions)):
@@ -76,6 +77,11 @@ def summarize(path: str) -> str:
             if k < len(sh.pair_kinds):
                 parts.append({"P": "=par=", "A": "=anti=", "?": "=?="}[sh.pair_kinds[k]])
         lines.append("  " + " ".join(parts))
+        by_parent: dict[str, list[str]] = {}  # strands off the run of paired strands, drawn beside their partner
+        for a in sh.accessory:
+            by_parent.setdefault(a.parent.id, []).append(a.strand.id)
+        lines += [f"  beside {p} (off the run): {', '.join(ids)}" for p, ids in by_parent.items()]
+        lines += [f"  pairs with {b.id}, in another sheet: {a.id}" for a, b in sh.joined]
     if sheets:  # the science checks of the sheets as built (figcheck.science_checks reads them as drawn)
         lines.append("science checks (the sheets as built):")
         lines += [f"  {line}" for line in science_lines(sheet_checks(sheets, sses, dssp.bridges))]
@@ -1272,6 +1278,8 @@ def _cmd_figure(args: argparse.Namespace) -> int:
                 file=sys.stderr,
             )
         for note in drawn.page_notes:  # a page past layout.MAX_PAGE_IN; a PNG under 300 dpi (random-100 C4)
+            print(f"foldmap: {note}", file=sys.stderr)
+        for note in drawn.sheet_notes:  # a barrel drawn open; strands drawn beside their partner (plan 12)
             print(f"foldmap: {note}", file=sys.stderr)
         for out in args.output:
             print(f"wrote {save(drawn.figure, out)}")

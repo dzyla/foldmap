@@ -155,6 +155,7 @@ def figure_view(ws: Workspace) -> None:
                 result["over_labels"],
                 result.get("crowded_marks", []),
                 result.get("page_notes", []),
+                result.get("sheet_notes", []),
             )
             if result
             else ""

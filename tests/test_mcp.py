@@ -384,6 +384,19 @@ def test_a_page_held_at_its_largest_is_noted(tmp_path, monkeypatch):
     assert "; the page (3 x 2 in) is held at 3 in on its longer side" in r.content[0].text
 
 
+def test_strands_drawn_beside_their_partner_are_noted(tmp_path):
+    """Plan 12 Task 2: the MCP note says which strands are drawn beside their partner, off a sheet's run of paired
+    strands (9FWZ's D:662-666), as the command line and the app say it."""
+    fimd = str(Path(__file__).parent / "data" / "r100" / "9FWZ-DB.cif.gz")
+    r = call("draw_topology", {"source": fimd, "output_path": str(tmp_path / "f.svg")})
+    assert (
+        "; 1 strand(s) drawn beside their partner, off the sheet's run of paired strands: D:662-666 beside D:645-659"
+        in (r.content[0].text)
+    )
+    r = call("draw_topology", {"source": UBQ, "output_path": str(tmp_path / "u.svg")})
+    assert "beside their partner" not in r.content[0].text
+
+
 def test_the_preview_of_a_large_page_is_capped(tmp_path, monkeypatch):
     """Batch C1 review (finding 3): a page grown for 6 pt text (up to 48 in) made a 4320 px preview at 90 dpi; the
     preview's longer side is capped at PREVIEW_PX, and a small page keeps 90 dpi."""

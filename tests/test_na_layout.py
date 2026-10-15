@@ -1215,8 +1215,9 @@ def test_runs_keep_off_the_strands_drawn_before_them(pdb, runs, protein):
 # two strands whose nucleotides sit within a bead of each other, held at their measured pairs (a held pair that clears
 # must be removed): on 4YBB the runs P6 -> P7a and P20a2 -> P20b are drawn along one another through a corridor no
 # route off the strands reaches, once short internal loops hold their helices together (Task 13b step 4, fix round 1);
-# their spacings differ (1.43 and 2.05), so no slide clears every nucleotide
-CROWDED = {"4YBB": {frozenset({((1, 20), (1, 27)), ((3, 29), (3, 36))})}}
+# their spacings differ (1.43 and 2.05), so no slide clears every nucleotide. Plan 12 Task 2: with its branch strand
+# AH:86-87 stacked beside its partner the layout no longer runs them along one another: none is crowded
+CROWDED: dict[str, set] = {}
 
 
 @pytest.mark.parametrize("pdb", [*FIXTURES, "2GIS", "2OEU"])

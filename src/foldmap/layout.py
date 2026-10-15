@@ -256,11 +256,14 @@ class Layout:
     ba_rows: list[list[str]] = field(default_factory=list)  # each βα template row's elements (no ghost), as drawn
     # left to right: the strands and the helices between them (_ba_template)
     on_sheet: dict[str, list[str]] = field(default_factory=dict)  # a helix drawn over a sheet -> the sheet's strands
-    # the gaps between two strands sharing a column (Sheet.columns), as boxes (_stack_gaps): the loops leaving
+    # the gaps between two strands sharing a column (Sheet.accessory), as boxes (_stack_gaps): the loops leaving
     # their facing ends are kept apart there (route._apart_in_stack_gaps)
     stack_gaps: list[tuple] = field(default_factory=list)
     accessory: dict[str, str] = field(default_factory=dict)  # a strand drawn off its sheet's track (Sheet.accessory),
     # beside its parent -> that parent's id: no barrel strand (science S3)
+    sheet_notes: list[str] = field(default_factory=list)  # what is said of the sheets as drawn (sheet_notes)
+    sheet_joins: list[tuple[str, str]] = field(default_factory=list)  # strand pairs joining two sheets built apart
+    # (Sheet.joined: two barrels of one pairing network, 1EYG's OB folds)
     res_cons: list[float] = field(default_factory=list)  # alignment conservation of each residue (nan: none)
     res_grade: list[int] = field(default_factory=list)  # conservation grade 1..9 of each residue (0: none)
     cons_label: str = ""  # legend text saying where the grades come from
@@ -369,13 +372,23 @@ def _anchor(strands: list[SSE]) -> tuple[int, str]:
     return first.start, first.chain
 
 
+def _drawn_strands(sheet: Sheet) -> tuple[list[SSE], list[int]]:
+    """Every strand a sheet's block draws, its track (Sheet.strands) then its accessory strands, with their
+    directions."""
+    return [*sheet.strands, *(a.strand for a in sheet.accessory)], [
+        *sheet.directions,
+        *(a.direction for a in sheet.accessory),
+    ]
+
+
 def _sheet_order(sheet: Sheet, frame: Frame) -> tuple[list[int], int, np.ndarray]:
-    """How a sheet is drawn: the strands' indices left to right, s = +1 when strands[0] points up (else -1), and
-    the strands' projected centroids (Å)."""
+    """How a sheet is drawn: the track strands' indices left to right, s = +1 when strands[0] points up (else -1),
+    and the projected centroids (Å) of every strand drawn (_drawn_strands: the track's, then the accessory's)."""
     strands = sheet.strands
-    cents = frame.project(np.array([s.centroid for s in strands]), [s.chain for s in strands])
-    mean_dir = sum(d * s.axis for d, s in zip(sheet.directions, strands))
-    at = np.mean([x.centroid for x in strands], axis=0)
+    every, senses = _drawn_strands(sheet)
+    cents = frame.project(np.array([s.centroid for s in every]), [s.chain for s in every])
+    mean_dir = sum(d * s.axis for d, s in zip(senses, every))
+    at = np.mean([x.centroid for x in every], axis=0)
     seen = frame.direction(at, mean_dir)
     s = 1 if seen[1] >= 0 else -1  # +1: strands[0] points up
     # Drawing the strands vertical turns the projected sheet in the page plane; the strand order must turn
@@ -383,7 +396,7 @@ def _sheet_order(sheet: Sheet, frame: Frame) -> tuple[list[int], int, np.ndarray
     up2d = s * seen
     right = np.array([up2d[1], -up2d[0]]) if np.linalg.norm(up2d) > 1e-6 else np.array([1.0, 0.0])
     order = list(range(len(strands)))
-    if len(strands) > 1 and (cents[-1] - cents[0]) @ right < 0:
+    if len(strands) > 1 and (cents[len(strands) - 1] - cents[0]) @ right < 0:
         order.reverse()
     return order, s, cents
 
@@ -408,50 +421,109 @@ def _stack_gaps(lay: Layout) -> list[tuple[float, float, float, float]]:
     return out
 
 
-def _column_heights(sheet: Sheet, order: list[int], s: int) -> dict[int, float]:
-    """The heights (page units) of the strands that share a column (Sheet.columns), each as its centroid lies along
-    the sheet's drawn up (its strands' mean direction, by their senses, times the flip s) from the column's middle,
-    moved apart evenly from that middle until they keep _STACK_PAD between them; snapped."""
-    up3 = _unit(s * sum(d * x.axis for d, x in zip(sheet.directions, sheet.strands)))
+_END_ROOM = END_LABEL + 1.2  # more room in a stack gap a chain end faces: its stub, its N/C letter and tail count
+
+
+def _column_heights(
+    sheet: Sheet, column: dict[int, int], s: int, ends: dict[str, str] | None = None
+) -> dict[int, float]:
+    """The heights (page units) of the strands that share a drawn column (`column`: index into _drawn_strands, the
+    ghost as -1, -> drawn column): branch strands stacked beside their parent (Sheet.accessory), as C2a stacked two
+    strands end to end along one edge of a partner (5KQJ's F above B). A track strand (or the ghost) keeps its row
+    (height 0), so the sheet's run of paired strands stays in line; the others stand as their centroids lie along
+    the sheet's drawn up (its strands' mean direction, by their senses, times the flip s) from it, moved out until
+    each keeps _STACK_PAD from the one nearer the row. A column past the track's end, of accessory strands alone,
+    stands as they lie from the parent of its first, at that parent's height (a branch of several strands a sub-row
+    beside its parent: 1EYG's B barrel beside A's), its middle kept there. A gap a chain end faces (`ends`: element
+    id -> "N", "C" or both, the chain ends drawn) is _END_ROOM wider, room for its stub and letter (9FWZ's C end,
+    D:662-666, above D:634-641). Snapped."""
+    every, senses = _drawn_strands(sheet)
+    ends = ends or {}
+    sense = dict(zip(range(len(senses)), senses)) | {-1: senses[0]}
+
+    def room(lo: int, hi: int) -> float:  # lo stands below hi: lo's top end and hi's bottom end face the gap
+        up_lo, up_hi = sense[lo] * s > 0, sense[hi] * s > 0
+        facing = ("C" if up_lo else "N") in ends.get(strand(lo).id, "") if lo >= 0 else False
+        facing |= ("N" if up_hi else "C") in ends.get(strand(hi).id, "") if hi >= 0 else False
+        return _STACK_PAD + (_END_ROOM if facing else 0.0)
+
+    n = len(sheet.strands)
+    up3 = _unit(s * sum(d * x.axis for d, x in zip(senses, every)))
+    strand = lambda k: every[k] if k >= 0 else sheet.strands[0]  # noqa: E731
+    index = {id(x): k for k, x in enumerate(every)}
+    parent = {n + i: index[id(a.parent)] for i, a in enumerate(sheet.accessory)}
+    height = lambda k, ref: float(_snap((_snap(strand(k).centroid) - _snap(strand(ref).centroid)) @ up3 * SCALE))  # noqa: E731
+
+    def need(a: int, b: int) -> float:  # a below b, at least their reach apart
+        return (_strand_length(strand(a)) + _strand_length(strand(b))) / 2 + room(a, b)
+
     out: dict[int, float] = {}
-    for c in sorted(set(sheet.columns)):
-        ks = [k for k in order if sheet.columns[k] == c]
-        if len(ks) < 2:
+    cols: dict[int, list[int]] = {}
+    for k in sorted(column, key=lambda k: (k >= n, k)):
+        cols.setdefault(column[k], []).append(k)
+    track = [c for c, ks in cols.items() if ks[0] < n]
+    rest = sorted((c for c in cols if c not in track), key=lambda c: min(cols[c]))
+    for c in [*track, *rest]:  # a track strand's column first; then a branch's, from its parent's height
+        ks = cols[c]
+        if ks[0] < n:  # the track strand (or the ghost) keeps its row; the others go out from it
+            ys = sorted((height(k, ks[0]), k) for k in ks)
+            at = next(i for i, (_, k) in enumerate(ys) if k == ks[0])
+            placed = {at: 0.0}
+            for i in range(at + 1, len(ys)):
+                placed[i] = max(ys[i][0], placed[i - 1] + need(ys[i - 1][1], ys[i][1]))
+            for i in range(at - 1, -1, -1):
+                placed[i] = min(ys[i][0], placed[i + 1] - need(ys[i][1], ys[i + 1][1]))
+            out.update({k: float(_snap(placed[i])) for i, (_, k) in enumerate(ys) if i != at})
             continue
-        cents = [_snap(sheet.strands[k].centroid) for k in ks]
-        mid = _snap(np.mean(cents, axis=0))
-        ys = sorted(((float(_snap((x - mid) @ up3 * SCALE)), k) for x, k in zip(cents, ks)))
-        placed = [ys[0][0]]
-        for (_, a), (y, b) in zip(ys, ys[1:]):  # each above the one below it, at least its reach apart
-            need = (_strand_length(sheet.strands[a]) + _strand_length(sheet.strands[b])) / 2 + _STACK_PAD
-            placed.append(max(y, placed[-1] + need))
-        shift = (ys[0][0] + ys[-1][0]) / 2 - (placed[0] + placed[-1]) / 2  # the column's middle kept where it was
-        out.update({k: float(_snap(y + shift)) for y, (_, k) in zip(placed, ys)})
+        ref = parent[ks[0]]  # past the track's end: as they lie from the parent of the first, at its height
+        ys = sorted((out.get(ref, 0.0) + height(k, ref), k) for k in ks)
+        placed_ = [ys[0][0]]
+        for (_, a), (y, b) in zip(ys, ys[1:]):
+            placed_.append(max(y, placed_[-1] + need(a, b)))
+        shift = (ys[0][0] + ys[-1][0]) / 2 - (placed_[0] + placed_[-1]) / 2  # the column's middle kept where it was
+        out.update({k: float(_snap(y + shift)) for y, (_, k) in zip(placed_, ys)})
     return out
 
 
 def _sheet_item(
-    sheet: Sheet, frame: Frame, pitch: float = PITCH, over: list[SSE] = (), helix_w: float = HELIX_W
+    sheet: Sheet,
+    frame: Frame,
+    pitch: float = PITCH,
+    over: list[SSE] = (),
+    helix_w: float = HELIX_W,
+    ends: dict[str, str] | None = None,
 ) -> _Item:
     """A sheet as one block of strands at `pitch`, each pointing as it runs relative to strands[0]; a closed
-    barrel's first strand repeated as a ghost after the last. `over` (helices packed on its face, in sequence): each
-    drawn over the strands where it packs (_over_sheet), unless it would lie on one drawn there before it."""
+    barrel's first strand repeated as a ghost after the last. Each accessory strand (Sheet.accessory) stands in its
+    column (Accessory.column, turned with the track when the track is drawn right to left), stacked with what stands
+    there (_column_heights) or past the track's end: beside its parent, never between two strands that pair. `over`
+    (helices packed on its face, in sequence): each drawn over the strands where it packs (_over_sheet), unless it
+    would lie on one drawn there before it. `ends`: the chain ends drawn (_column_heights)."""
     strands = sheet.strands
+    n = len(strands)
     order, s, cents = _sheet_order(sheet, frame)
+    forward = order[0] == 0
+    drawn = {k: d for d, k in enumerate(order)}  # index into _drawn_strands (the ghost: -1) -> drawn column
+    drawn.update({n + i: a.column if forward else n - 1 - a.column for i, a in enumerate(sheet.accessory)})
+    if sheet.closed:
+        drawn[-1] = n  # the ghost, after the last
+    slot_of = {c: i for i, c in enumerate(sorted(set(drawn.values())))}
+    slots = len(slot_of)
+    heights = _column_heights(sheet, drawn, s, ends) if sheet.accessory else {}
     members, offsets = [], []
-    column = sheet.columns or list(range(len(strands)))  # strands sharing a column (sheets._columns) stand in it
-    slot_of = {c: n for n, c in enumerate(dict.fromkeys(column[k] for k in order))}
-    slots = len(slot_of) + (1 if sheet.closed else 0)
-    heights = _column_heights(sheet, order, s) if sheet.columns else {}
-    for k in order:
-        up = sheet.directions[k] * s > 0
-        sse = strands[k]
-        members.append(Placed(sse, 0, 0, _strand_length(sse), np.pi / 2 if up else -np.pi / 2, pitch))
-        offsets.append(((slot_of[column[k]] - (slots - 1) / 2) * pitch, heights.get(k, 0.0)))
-    if sheet.closed:  # the barrel wraps: its first strand pairs again with the last
-        f = members[0]
-        members.append(Placed(f.sse, 0, 0, f.length, f.angle, f.width, ghost=True))
-        offsets.append(((slots - 1) / 2 * pitch, 0.0))
+    every, senses = _drawn_strands(sheet)
+
+    def put(k: int) -> None:
+        if k < 0:  # the barrel wraps: its first strand pairs again with the last
+            f = members[0]
+            members.append(Placed(f.sse, 0, 0, f.length, f.angle, f.width, ghost=True))
+        else:
+            up = senses[k] * s > 0
+            members.append(Placed(every[k], 0, 0, _strand_length(every[k]), np.pi / 2 if up else -np.pi / 2, pitch))
+        offsets.append(((slot_of[drawn[k]] - (slots - 1) / 2) * pitch, heights.get(k, 0.0)))
+
+    for k in [*order, *([-1] if sheet.closed else []), *range(n, len(every))]:  # track, ghost, accessory strands
+        put(k)
     laid: list[tuple[float, float, float, float]] = []
     for h in over:  # in sequence; one that would lie on a helix already over the sheet stays beside it
         member, (ox, oy) = _over_sheet(
@@ -465,7 +537,7 @@ def _sheet_item(
         members.append(member)
         offsets.append((ox, oy))
     home = tuple(cents.mean(axis=0) * SCALE)
-    return _Item(members, offsets, home[0], home[1], home, *_anchor(strands))
+    return _Item(members, offsets, home[0], home[1], home, *_anchor(every))
 
 
 def _unit(v) -> np.ndarray:
@@ -2256,16 +2328,18 @@ def _unwrap(items: list[_Item], ties: dict[int, tuple[int, int]], frame) -> dict
 
 
 def _partners(it: _Item, ps: list[int]) -> list[Placed]:
-    """The strands of item `it` beside its strands `ps` in the sheet (one strand pitch from one of them, centre to
-    centre), not among them: those they pair with, whose ghosts stand beside them where they leave (_unwrap)."""
+    """The strands of item `it` beside its strands `ps` in the sheet (at most one strand pitch across from one of
+    them, their spans meeting along it), not among them: those they pair with, whose ghosts stand beside them where
+    they leave (_unwrap)."""
     out = []
     for q, m in enumerate(it.members):
         if q in ps or not isinstance(m, Placed) or m.ghost or m.sse.kind != "E":
             continue
         if any(
             it.members[p].sse.kind == "E"
-            and np.hypot(*np.subtract(it.offsets[q], it.offsets[p])) <= max(m.width, it.members[p].width) + 1e-6
-            for p in ps
+            and abs(it.offsets[q][0] - it.offsets[p][0]) <= max(m.width, it.members[p].width) + 1e-6
+            and abs(it.offsets[q][1] - it.offsets[p][1]) < (m.length + it.members[p].length) / 2  # side by side: a
+            for p in ps  # strand stacked in the next column (Sheet.accessory) is beside it where their spans meet
         ):
             out.append(m)
     return out
@@ -2519,6 +2593,11 @@ def build_layout(
         if mode == "projected"
         else {}
     )
+    chain_ends: dict[str, str] = {}  # the chain ends drawn (as set on the members below), for stacked columns
+    for chain, mine in group_by_chain([s for s in sses if s.kind in ("H", "G", "E")]).items():
+        if chain not in (partial or ()):
+            chain_ends[mine[0].id] = chain_ends.get(mine[0].id, "") + "N"
+            chain_ends[mine[-1].id] = chain_ends.get(mine[-1].id, "") + "C"
     items = [
         templates[k]
         if k in templates
@@ -2528,6 +2607,7 @@ def build_layout(
             PITCH * style.strand_scale,
             [by_id[h] for h, at in sorted(on_sheet.items(), key=lambda x: by_id[x[0]].start) if at == k],
             HELIX_W * style.helix_scale,
+            chain_ends,
         )
         for k, sh in enumerate(sheets)
     ]
@@ -2672,6 +2752,9 @@ def build_layout(
     lay.ligands = style.ligands
     lay.ba_rows = _ba_rows(items)  # after the user's swaps
     lay.stack_gaps = _stack_gaps(lay)
+    lay.accessory = {a.strand.id: a.parent.id for sh in sheets for a in sh.accessory if a.strand.id in real}
+    lay.sheet_notes = sheet_notes(sheets)
+    lay.sheet_joins = sorted({tuple(sorted((a.id, b.id))) for sh in sheets for a, b in sh.joined})
     lay.on_sheet = {
         m.sse.id: [x.sse.id for x in it.members if x.sse.kind == "E" and not x.ghost]
         for it in items
@@ -2935,6 +3018,29 @@ def _domain_units(
         if find(m) in used:
             members.setdefault(find(m), []).append(m)
     return unit, members
+
+
+UNCLOSED = "barrel closure not supported by pairing: drawn open"
+_NOTE_MAX = 6  # accessory strands a note names; summary lists every one
+
+
+def sheet_notes(sheets: list[Sheet]) -> list[str]:
+    """What the figure says of its sheets: each sheet whose pairing closes a cycle but whose ends do not pair
+    (Sheet.unclosed), drawn open (UNCLOSED, then its end strands); the pairings joining barrels drawn apart
+    (Sheet.joined); then the strands drawn beside their parent off a
+    sheet's track (Sheet.accessory), the first _NOTE_MAX of them named."""
+    out = [f"{UNCLOSED} ({sh.strands[0].id} … {sh.strands[-1].id})" for sh in sheets if sh.unclosed]
+    joins = sorted({" with ".join(sorted((a.id, b.id))) for sh in sheets for a, b in sh.joined})
+    if joins:  # two barrels of one pairing network (sheets._other_rings), drawn each as its own
+        out.append(f"barrels drawn apart, each closed, that also pair: {', '.join(joins)}")
+    acc = [f"{a.strand.id} beside {a.parent.id}" for sh in sheets for a in sh.accessory]
+    if acc:
+        more = f" and {len(acc) - _NOTE_MAX} more (foldmap summary lists them)" if len(acc) > _NOTE_MAX else ""
+        out.append(
+            f"{len(acc)} strand(s) drawn beside their partner, off the sheet's run of paired strands: "
+            f"{', '.join(acc[:_NOTE_MAX])}{more}"
+        )
+    return out
 
 
 def block_ghosts(layout: Layout, k: int) -> list[Placed]:

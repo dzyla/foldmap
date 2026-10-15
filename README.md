@@ -453,9 +453,17 @@ Every figure (command line, app, MCP or Python) goes through the same steps:
 2. **Secondary structure.** A DSSP implementation assigns hydrogen bonds from the backbone and calls α-, 3₁₀- and
    π-helices, β-strands (with bulges) and turns, exactly as mkdssp 3.1.2 does on every test structure.
 3. **Sheets and bundles.** Strands joined by backbone H-bond ladders form sheets; their order and directions come
-   from the ladder network, and a sheet whose ends pair is a closed barrel. Two strands end to end along one edge of a
-   partner (both pairing with it, on its same side) share a column, one above the other as along the partner.
-   Helices packed along their length across chains form bundles.
+   from the ladder network, and a sheet whose ends pair is a closed barrel. Each strand drawn side by side with
+   another pairs with it: a branched sheet's run of paired strands is its ladder network's longest path (a closed
+   barrel's: its longest pairing cycle, so FimD 9FWZ has 24 barrel strands and OmpF 16), and a strand off that run
+   (a short strand pairing with one barrel strand, or a branch of several) is drawn beside its partner, stacked in
+   the column next to it, one above the other as along the partner; never between two strands that pair.
+   `foldmap summary` lists these strands ("beside … (off the run)") and the figure's note names them. Barrels that
+   pair with one another (the four OB folds of the SSB tetramer 1EYG) are each drawn closed, as a sheet of its own;
+   the note and the summary name the pairings joining them. A barrel whose ends do not pair is drawn open, with the
+   note "barrel closure not supported by pairing: drawn open". Two strands
+   end to end along one edge of a partner share a column the same way. Helices packed along their length across
+   chains form bundles.
 4. **Context.** Symmetry (cyclic, dihedral, cubic, helical) is found by superposing chains of the same sequence;
    disulfides, glycans and ligands are read from the atoms; a membrane is estimated on request. Nucleic acids:
    base pairs grouped into stems; long bent duplexes cut where the axis turns by 25°.

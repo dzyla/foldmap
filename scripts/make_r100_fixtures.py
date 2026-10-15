@@ -127,6 +127,11 @@ ENTRIES = {  # fixture name -> (PDB id, what it is for)
         "(two strands end to end along one edge of a partner): it was drawn as a column of its own between E and B "
         "(random-100 C34)",
     ),
+    "2OMF-A": (
+        "2OMF",
+        "OmpF porin, chain A, N/CA/C/O: its N-terminal strand A:2-6 pairs with A:9-23 only, and was drawn in the "
+        "barrel between A:9-23 and A:36-50, a 17-strand barrel of the 16-strand ring (plan 12 Task 2, the review's R1)",
+    ),
     "6JO6-AB": (
         "6JO6",
         "photosystem I, chains A and B cut to the residues within 18 Å of the estimated mid-plane, N/CA/C/O: a slab "
@@ -187,6 +192,7 @@ WINDOWS: dict[str, dict[str, Span | list[Span] | None]] = {  # fixture -> {chain
     "7FAB-HL": {"H": None, "L": None},
     "1IGT-AB": {"A": None, "B": None},
     "9FWZ-DB": {"D": (116, 700), "B": None},
+    "2OMF-A": {"A": None},
     "9ON5-A": {"A": (100, 200)},
     "4UM3-two": {c: (30, 40) for c in "KLMNOPQRST"},  # the barrel (139-659), its plug, the start of CTD1; FimA
     "5LJ3-V": {  # found by a seeded search over the page neighbours of the gap (plan 10 Task 5 report)
@@ -218,6 +224,7 @@ TRIMS: dict[str, dict] = {
     "6SO9": {"first_model": True, "backbone": True},
     "3L9G-A": {"atoms": ("N", "CA", "C", "O"), "no_protein_sequence": True, "drop": ("_atom_site_anisotrop.",)},
     "6JO6-AB": {"atoms": ("N", "CA", "C", "O"), "no_protein_sequence": True, "drop": ("_atom_site_anisotrop.",)},
+    "2OMF-A": {"atoms": ("N", "CA", "C", "O"), "no_protein_sequence": True, "drop": ("_atom_site_anisotrop.",)},
     "5KQJ": {"first_model": True, "atoms": ("N", "CA", "C", "O"), "no_protein_sequence": True},
     "8XZE": {"drop": ("_atom_site_anisotrop.", "_pdbx_refine_tls.", "_pdbx_refine_tls_group.")},
     "3OWW-P5": {"drop": ("_atom_site_anisotrop.", "_pdbx_refine_tls.", "_pdbx_refine_tls_group.")},

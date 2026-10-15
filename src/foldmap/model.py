@@ -262,21 +262,21 @@ class Accessory(NamedTuple):
 
 @dataclass(eq=False)
 class Sheet:
-    """Strands in sheet order. directions[k] is +1 if strands[k] runs the same way as
-    strands[0], else -1. pair_kinds[k] relates strands[k] and strands[k+1] ('P', 'A' or '?')."""
+    """Strands in sheet order (its track: each pairs with the next; a closed sheet's last with its first).
+    directions[k] is +1 if strands[k] runs the same way as strands[0], else -1. pair_kinds[k] relates strands[k] and
+    strands[k+1] ('P' or 'A'; '?' in a sheet made by hand)."""
 
     strands: list[SSE]
     directions: list[int]
     pair_kinds: list[str]
-    closed: bool = False  # barrel: a cycle was cut at its weakest pairing
-    ambiguous: bool = False  # branched: ordering is a heuristic
-    # column of each strand side by side (sheets._columns): two strands end to end along one edge of a partner (both
-    # pairing with it, on its same side; not necessarily one strand) share one; empty: each strand its own
-    columns: list[int] = field(default_factory=list)
+    closed: bool = False  # barrel: a cycle was cut at its weakest pairing (its track's ends pair)
+    ambiguous: bool = False  # branched (strands off the track), or two end-to-end pieces flank one partner
     # strands off the track (a branched sheet's), each beside its parent (Accessory); a closed sheet's are no barrel
     # strand (membrane.py ignores them)
     accessory: list[Accessory] = field(default_factory=list)
     unclosed: bool = False  # its pairing has a cycle, but its track's ends do not pair: drawn open, with a note
+    # (own strand, a strand of another sheet) pairs joining it to a barrel built apart from it (sheets._other_rings)
+    joined: list[tuple[SSE, SSE]] = field(default_factory=list)
 
 
 @dataclass(eq=False)

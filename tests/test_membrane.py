@@ -502,3 +502,14 @@ def test_a_users_move_never_pushes_a_transmembrane_helix_off_its_height():
     moved, _, _ = make_layout(path, membrane="auto", move=[("res:A:62-74", (2.64, 10.6))])
     assert moved.placed["A:86-112"].cy == plain.placed["A:86-112"].cy
     assert moved.placed["A:62-74"].cy > plain.placed["A:62-74"].cy + 10
+
+
+def test_fimd_band_survives_its_pendant_strand_leaving_the_barrel():
+    """Plan 12 Task 2: D:662-666, off FimD's 24-strand ring, is no barrel strand (membrane._barrels reads the track
+    only). The band is still found, its normal within 10° of the one found before (fbcee15)."""
+    path = R100 / "9FWZ-DB.cif.gz"
+    found = find_membrane(path, load_backbone(path, "auto"))
+    assert found is not None and found.source == "estimate"
+    before = np.array([-0.0211, -0.225, 0.9741])
+    assert np.degrees(np.arccos(abs(found.normal @ before) / np.linalg.norm(before))) <= 10.0
+

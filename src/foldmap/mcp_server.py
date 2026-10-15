@@ -252,6 +252,8 @@ def draw_topology(
             note += f"; {n} ligand mark(s) with no clear spot: {', '.join(drawn.crowded_marks)}"
         for page in drawn.page_notes:  # a page past layout.MAX_PAGE_IN; a PNG under 300 dpi
             note += f"; {page}"
+        for sheet in drawn.sheet_notes:  # a barrel drawn open; strands drawn beside their partner
+            note += f"; {sheet}"
         scope = scope_note(drawn_scope(drawn.model, drawn.layout, spec.assembly, spec.focus), how="mcp")
         if scope:  # an automatic choice drew part of the file
             note += f"; {scope}"
