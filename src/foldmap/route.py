@@ -686,7 +686,8 @@ def _off_na_text(layout: Layout, router: _Router, loops: list[Loop]) -> None:
             best, over = router.route(pa.c_port, ea, pa, pb.n_port, eb, pb, loose=(pa.over, pb.over))
             if best is not None:
                 break
-        if best is not None and _better(best, lp.points, boxes, router.keep_out):
+        over = over and _text_hits(best, router.keep_out) > 0  # routed with the keep-outs open: does it cross one?
+        if best is not None and _better(best, lp.points, boxes, router.keep_out) and over <= lp.crosses_labels:
             loops[k] = Loop(lp.a_id, lp.b_id, [(float(x), float(y)) for x, y in best], lp.dashed, False, over)
             continue
         if best is not None:  # not taken: give back the cells drawn() marked

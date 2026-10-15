@@ -751,5 +751,6 @@ def test_protein_loops_keep_off_the_nucleotide_letters():
 
     d = draw_spec(figure_spec(DATA / "r100" / "6SO9.cif.gz"))
     assert len(d.layout.na_letters) == 6 and not any(lp.fallback for lp in d.loops)
+    assert d.over_labels == []  # and no route over a name instead (the campaign's A4: a reroute flagged over)
     hits = [h for h in figcheck.text_collisions(d) if h.startswith("na:")]
     assert hits == [], hits
