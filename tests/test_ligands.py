@@ -221,3 +221,23 @@ def test_tethers_cross_no_label(path, kw):
     assert [h for h in hits if "ligand-tether" in h] == []
     pts = _drawn_points(d.figure, "ligand-tether:")
     assert len(pts) and bodies_under(d.figure, "ligand-tether:") == {}  # never over a body, as drawn
+
+
+def test_tethers_run_over_fewer_bodies():
+    """C9 (random-100): a mark's spot was the first clear one on rings round its anchor, whatever its straight
+    tethers ran over (5Q42's Ni tether over strand B, 9YLM's Zn tethers across the hairpins, 7LX9's YGM). Where the
+    first spot's tethers cross element bodies (other than the one each target lies on), the spot a few rings out
+    whose tethers cross the least is taken, lengthening no tether past the first spot's reach. 1GOX's FMN, tethered
+    to four elements of its barrel: 12.0 page units of tether over bodies before; every mark still drawn."""
+    from foldmap.render import _over_bodies, ligand_marks
+    from foldmap.spec import draw_spec, figure_spec
+
+    spec = figure_spec(Path(__file__).parent / "data" / "r100" / "1GOX-A.cif.gz")
+    d = draw_spec(spec)
+    bodies = [p.rect for p in d.layout.placed.values()]
+    marks = ligand_marks(d.layout, d.loops, d.sses, spec.look)
+    assert len(marks) == 4
+    over = sum(_over_bodies(m["centre"], m["targets"], bodies) for m in marks)
+    assert over < 11.5, over
+    assert _over_bodies((0.0, 0.0), [(1.0, 0.5)], [(0.5, 0.0, 1.5, 1.0)]) == 0.0  # its own target's body
+    assert _over_bodies((0.0, 0.0), [(3.0, 0.5)], [(0.5, 0.0, 1.5, 1.0)]) > 0.9

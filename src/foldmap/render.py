@@ -1224,12 +1224,31 @@ def _local_targets(layout: Layout, loops: list[Loop], sses: list[SSE], g, metal:
     return targets, weights, residues
 
 
-def _mark_spot(anchor, half, targets, taken, texts, tethers):
+_SPOT_MORE_RINGS = 4  # rings past the first clear spot's where a spot whose tethers cross fewer bodies is looked for
+
+
+def _over_bodies(c, targets, bodies) -> float:
+    """How much of the tethers from spot c runs over element bodies (`bodies`, their boxes): each tether counted
+    over every body but the one its target lies on (random-100 C9)."""
+    total = 0.0
+    for t in targets:
+        for b in bodies:
+            if not (b[0] <= t[0] <= b[2] and b[1] <= t[1] <= b[3]):
+                total += clip_len(c, t, b)
+    return total
+
+
+def _mark_spot(anchor, half, targets, taken, texts, tethers, bodies=()):
     """The first spot on rings round the anchor whose mark (grown by 0.08) is clear of `taken` and of the tethers
     drawn before, and whose own tethers cross no text, lengthening none past the first clear spot's (the plan-11
-    spot); else that first clear spot; None when there is none within _SPOT_RADIUS."""
+    spot); where its tethers run over element bodies (`bodies`), the spot within _SPOT_MORE_RINGS rings further whose
+    tethers run over the least of them (C9: straight tethers cross strands and helices); else that first clear spot;
+    None when there is none within _SPOT_RADIUS."""
     spot = free = None
-    for ring in np.arange(0.0, _SPOT_RADIUS, 0.35):
+    best, last_ring = None, None
+    for n, ring in enumerate(np.arange(0.0, _SPOT_RADIUS, 0.35)):
+        if last_ring is not None and n > last_ring:
+            break
         for angle in np.linspace(0, 2 * np.pi, max(1, int(ring * 10)), endpoint=False):
             c = anchor + ring * np.array([np.cos(angle), np.sin(angle)])
             box = (c[0] - half[0] - 0.08, c[1] - half[1] - 0.08, c[0] + half[0] + 0.08, c[1] + half[1] + 0.08)
@@ -1241,19 +1260,25 @@ def _mark_spot(anchor, half, targets, taken, texts, tethers):
             if all(np.hypot(*(np.subtract(t, c))) <= reach for t in targets) and not any(
                 clip_len(c, t, b) > 1e-9 for t in targets for b in texts
             ):
-                spot = c
-                break
-        if spot is not None:
+                over = _over_bodies(c, targets, bodies)
+                if best is None or over < best[0] - 1e-9:
+                    best = (over, c)
+                if over <= 1e-9:
+                    break
+                if last_ring is None:
+                    last_ring = n + _SPOT_MORE_RINGS
+        if best is not None and best[0] <= 1e-9:
             break
+    spot = best[1] if best is not None else None
     return spot if spot is not None else free
 
 
-def _place_mark(anchor, half, targets, taken, lines, texts, tethers):
+def _place_mark(anchor, half, targets, taken, lines, texts, tethers, bodies=()):
     """A ligand's spot: clear of the loops' lines and the tethers drawn before where there is room, else of the
     elements and text only (the tethers' crossings given up), else of the elements and text with every tether given
     up: a chosen ligand is never left without a mark (C5 fix round 1: 6JO6 lost 24 on a crowded page)."""
     for blocked, drawn in ((taken + lines, tethers), (taken, tethers), (taken, ())):
-        spot = _mark_spot(anchor, half, targets, blocked, texts, drawn)
+        spot = _mark_spot(anchor, half, targets, blocked, texts, drawn, bodies)
         if spot is not None:
             return spot
     return None
@@ -1292,6 +1317,7 @@ def ligand_marks(layout: Layout, loops: list[Loop], sses: list[SSE], look: Style
     if layout.focus_chains:  # one subunit of an assembly: only what binds it
         chosen = [g for g in chosen if any(layout.res_chain[r] in layout.focus_chains for r in g.contacts)]
     taken = [p.rect for p in layout.placed.values()] + [g.rect for g in layout.ghosts]
+    bodies = list(taken)  # what a tether should not run over (C9)
     labels = [box for _, box in label_boxes(layout, sses)]
     if counts is None:
         counts = [t["box"] for t in [*tail_counts(layout, sses, loops), *loop_counts(layout, loops, sses)]]
@@ -1315,7 +1341,7 @@ def ligand_marks(layout: Layout, loops: list[Loop], sses: list[SSE], look: Style
             continue
         anchor = np.average(np.asarray(targets), axis=0, weights=weights)
         half = (0.3, 0.3) if g.metal else (0.12 * len(g.name) + 0.2, 0.27)
-        spot = _place_mark(anchor, half, targets, taken, lines, texts, tethers)
+        spot = _place_mark(anchor, half, targets, taken, lines, texts, tethers, bodies)
         if spot is None:
             continue
         mark = (spot[0] - half[0], spot[1] - half[1], spot[0] + half[0], spot[1] + half[1])
