@@ -932,6 +932,7 @@ def _separate(
     mirror: float | None = None,
     room: float = _SEP_SYM_ROOM,
     level: np.ndarray | None = None,
+    shared: set[int] = frozenset(),
 ) -> None:
     """Push overlapping items apart, then slide any left over clear. With `ties` (_symmetry_ties) the pushes
     keep every protomer drawn alike (_push_apart), and that result is kept if it clears every overlap within
@@ -942,7 +943,9 @@ def _separate(
     which stay where they are. `mirror`: the copies are their mates' mirror images about that page x (_push_apart);
     then the tied pushes run as many passes as the one-by-one ones and may take up to _SEP_MIRROR_ROOM. `level`
     (bool per item): items that keep their height (the transmembrane elements of a membrane view), only ever pushed
-    and slid sideways (_push_apart, _slide_clear)."""
+    and slid sideways (_push_apart, _slide_clear). `shared`: items holding elements of several protomers with no
+    copy of their own (a dimer's continuous sheet, 1SLV): they yield to the tied items, which keep their copies alike
+    (_push_apart), and slide clear last (_slide_clear)."""
     halves = np.array([it.half for it in items], float).reshape(-1, 2)
     mids = np.array([it.mid for it in items], float).reshape(-1, 2)
     start = np.array([(it.cx, it.cy) for it in items], float).reshape(-1, 2)
@@ -956,12 +959,21 @@ def _separate(
         sweeps, room = _SEP_SWEEPS, max(room, _SEP_MIRROR_ROOM)
     else:
         sweeps = _SEP_ORBIT_SWEEPS
-    together = ties and _push_apart(xy, halves, mids, home, ties, sweeps, apart, fixed, mirror, level)
+    together = ties and _push_apart(xy, halves, mids, home, ties, sweeps, apart, fixed, mirror, level, shared)
+    lone = sorted(shared)
+    if ties and lone and not together and _lone_left(xy, halves, mids, apart, set(lone)):
+        together = True  # what is left overlaps only items with no copies: they slide clear, the copies stay alike
     if not together or _box_area(xy, halves, mids) > room * _box_area(alone, halves, mids):
-        xy = alone
+        xy, lone = alone, []
     for it, (x, y) in zip(items, xy.tolist()):
         it.cx, it.cy = x, y
-    _slide_clear(items, joints, fixed, level)
+    _slide_clear(items, joints, fixed, level, lone)
+
+
+def _lone_left(xy, halves, mids, apart, lone: set[int]) -> bool:
+    """Does every overlap left after the tied pushes (_push_apart) involve one of the `lone` (shared) items?"""
+    pairs = _overlapping(xy, halves, mids, apart)
+    return bool(len(pairs)) and all(i in lone or j in lone for i, j in pairs.tolist())
 
 
 def _components(n: int, links) -> np.ndarray:
@@ -1040,6 +1052,7 @@ def _push_apart(
     fixed: Walls | None = None,
     mirror: float | None = None,
     level: np.ndarray | None = None,
+    shared: set[int] = frozenset(),
 ) -> bool:
     """Push overlapping footprints apart in place (axis of least penetration); spring back to home early on.
     Each sweep finds the overlapping pairs at once and resolves them in order. With `ties` a push moves an
@@ -1087,6 +1100,16 @@ def _push_apart(
                 py = np.inf
             if held is not None and held[i] and held[j]:  # both keep their height: sideways
                 py = np.inf
+            lone = [q for q in (i, j) if q in shared and cid[i] != cid[j]]
+            if ties and len(lone) == 1 and protomer[j if lone[0] == i else i] is not None:
+                # an item of several protomers with no copy (`shared`: a dimer's sheet, 1SLV) yields to an orbit, the
+                # whole way: moving the orbit moves its copies too, each against its own neighbours, and they part
+                q, sign = lone[0], (-1 if lone[0] == i else 1)
+                if px < py:
+                    xy[group[q], 0] += sign * ((1 if dx > 0 else -1) if dx != 0 else 1) * (px + _SEP_PUSH)
+                else:
+                    xy[group[q], 1] += sign * ((1 if dy > 0 else -1) if dy != 0 else 1) * (py + _SEP_PUSH)
+                continue
             if px < py:
                 s = (1 if dx > 0 else -1) if dx != 0 else 1
                 if mirror is None and None not in (protomer[i], protomer[j]) and protomer[i] != protomer[j]:
@@ -1148,10 +1171,13 @@ def _slide_clear(
     joints: set[tuple[int, int]] = frozenset(),
     fixed: Walls | None = None,
     level: np.ndarray | None = None,
+    last: list[int] = (),
 ) -> None:
     """Guarantee: each item in turn, if it still overlaps one already settled (other than a piece it is joined
     to, `joints`) or a `fixed` box it must keep off, takes the nearest clear spot straight right, left, up or down
-    (in that order on a tie), in _SLIDE_STEP steps; one that keeps its height (`level`) right or left only."""
+    (in that order on a tie), in _SLIDE_STEP steps; one that keeps its height (`level`) right or left only. The
+    items in `last` (with no symmetry copies, _separate) are settled after every other, so they move, not the copies
+    (1SLV: the dimer's shared sheet between the two copies' eta2 helices)."""
     halves = [it.half for it in items]
     mids = [it.mid for it in items]
     boxes = [] if fixed is None else np.asarray(fixed.boxes, float).tolist()
@@ -1159,10 +1185,13 @@ def _slide_clear(
         (SimpleNamespace(cx=(x0 + x1) / 2, cy=(y0 + y1) / 2), ((x1 - x0) / 2, (y1 - y0) / 2), (0.0, 0.0))
         for x0, y0, x1, y1 in boxes
     ]
-    for i, it in enumerate(items):
+    later = set(last)
+    order = [i for i in range(len(items)) if i not in later] + [i for i in range(len(items)) if i in later]
+    for n, i in enumerate(order):
+        it = items[i]
         x0, y0 = it.cx, it.cy
         mine = [w for k, w in enumerate(walls) if fixed.hard[i, k]] if walls else []
-        settled = mine + [(items[j], halves[j], mids[j]) for j in range(i) if (j, i) not in joints]
+        settled = mine + [(items[j], halves[j], mids[j]) for j in order[:n] if (j, i) not in joints]
         k = 0
         ways = ((1, 0), (-1, 0)) if level is not None and level[i] else ((1, 0), (-1, 0), (0, 1), (0, -1))
         while any(_collide(it, halves[i], mids[i], *other) for other in settled):
@@ -2660,6 +2689,7 @@ def build_layout(
         _centre_dna_over_binders(items, contacts)
     else:
         ties = _symmetry_ties(items, frame, mirror is not None, {c: off for c, (_, off) in (copies or {}).items()})
+        sector_of = getattr(frame, "sector", None) or {}
         left = _unwrap(items, ties, frame) if mirror is None else {}
         if left and walls is not None:  # an element that left its item keeps off the traces it kept off
             walls = Walls(walls.boxes, np.vstack([walls.hard, walls.hard[list(left.values())]]))
@@ -2715,10 +2745,19 @@ def build_layout(
                 y = float(_snap(heights[k] + shift))
                 items[k].cy = y
                 items[k].home = (items[k].home[0], y)
-        _separate(items, ties, joints, walls, mirror=mirror if ties else None, level=kept)
+        shared = {  # an item of several protomers that no tie holds: a dimer's continuous sheet (1SLV)
+            k
+            for k, it in enumerate(items)
+            if k not in ties
+            and k not in {j for j, _ in ties.values()}
+            and len({sector_of.get(m.sse.chain) for m in it.members if isinstance(m, Placed)} - {None}) > 1
+        }
+        _separate(items, ties, joints, walls, mirror=mirror if ties else None, level=kept, shared=shared)
         if domains and _part_domains(items, domains, ties, mirror if ties else None):
             # the domains, parted with their copies, keep them alike whatever room that takes
-            _separate(items, ties, joints, walls, mirror=mirror if ties else None, room=np.inf, level=kept)
+            _separate(
+                items, ties, joints, walls, mirror=mirror if ties else None, room=np.inf, level=kept, shared=shared
+            )
     for it in items:
         it.apply()
     dna = [m for it in items for m in it.members if isinstance(m, PlacedStem)]

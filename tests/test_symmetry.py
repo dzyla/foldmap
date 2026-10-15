@@ -274,3 +274,29 @@ def test_symmetry_can_be_switched_off(tmp_path):
 
     out = tmp_path / "x.svg"
     assert main(["plot", str(DATA / "2HHB.cif"), "-o", str(out), "--symmetry", "off"]) == 0
+
+
+def test_a_shared_sheet_between_two_copies_yields_and_the_copies_stay_alike():
+    """Plan 12 fix round 2 (1SLV): a dimer's continuous sheet is one item holding both protomers' strands, with no
+    copy of its own. Squeezed between elements whose copies were tied, every push of it moved an orbit (an element
+    and its copy together), each against its own neighbours: at stack pad 1.45 the tied pushes never cleared, the
+    items were moved one by one and the copies drawn unalike (A15 1.28; 0.0 at 1.35, 1.10 at 1.55). Now such a
+    `shared` item yields to an orbit the whole way (the orbit stays put), and slides clear last (_slide_clear), so
+    the copies keep their tie; 1SLV draws alike (0.0) at pads 1.35, 1.45 and 1.55."""
+    import numpy as np
+
+    from foldmap import layout
+
+    items = [_box(0.0, 0.0, 1, tall=3.0), _box(0.6, 0.2, 30, tall=4.0), _box(5.0, 0.0, 1, "B", tall=3.0)]
+    halves = np.array([it.half for it in items])
+    mids = np.array([it.mid for it in items])
+    xy = np.array([(it.cx, it.cy) for it in items])
+    layout._push_apart(xy, halves, mids, xy.copy(), {2: (0, 1)}, 1, shared={1})
+    assert xy[0].tolist() == [0.0, 0.0] and xy[2].tolist() == [5.0, 0.0]  # the orbit kept its place
+    assert xy[1][0] > 1.7  # the shared item went the whole way (1.6 to clear, less the first sweeps' pull home)
+    xy = np.array([(it.cx, it.cy) for it in items])
+    layout._push_apart(xy, halves, mids, xy.copy(), {2: (0, 1)}, 1)  # without: the orbit moves
+    assert xy[0].tolist() != [0.0, 0.0] and xy[2].tolist() != [5.0, 0.0]
+    a, b = _box(0.0, 0.0, 1), _box(0.3, 0.0, 30)  # left over: the shared item slides, not the tied one
+    layout._slide_clear([b, a], last=[0])
+    assert (a.cx, a.cy) == (0.0, 0.0) and (b.cx, b.cy) != (0.3, 0.0)

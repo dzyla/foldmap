@@ -4,6 +4,7 @@ count is its pairing cycle."""
 
 from pathlib import Path
 
+import numpy as np
 import pytest
 
 from foldmap.dssp import assign_dssp
@@ -265,3 +266,16 @@ def test_fimd_pendant_strand_stands_at_its_partner():
     sses, sheets, bridges = _built(R100 / "9FWZ-DB.cif.gz")
     assert sheet_checks(sheets, sses, bridges)["S6"] == []
     assert science_checks(_drawn(R100 / "9FWZ-DB.cif.gz"))["S6"] == []
+
+
+@pytest.mark.parametrize("path", [R100 / "2OMF-A.cif.gz", DATA / "8UTF.cif"])
+def test_an_accessory_stands_on_the_same_side_of_its_partner_in_every_copy(path):
+    """Fix round 2: copies draw an accessory strand alike: towards the same end of its partner (seen along the
+    partner's own direction) in every copy (2OMF's three A:2-6, 8UTF's three 266-273 and 227-228)."""
+    lay = _drawn(path).layout
+    sides: dict[tuple, set] = {}
+    for a, p in lay.accessory.items():
+        acc, par = lay.placed[a], lay.placed[p]
+        key = (acc.sse.first.seq, par.sse.first.seq)
+        sides.setdefault(key, set()).add(np.sign((acc.cy - par.cy) * par.direction[1]))
+    assert sides and all(len(s) == 1 for s in sides.values()), sides
