@@ -539,6 +539,11 @@ campaign rerun (constraint).
 **Fixture:** 3OWW chain B (glycine riboswitch, 2 chains). **Effort:** M. **Bench:** NA snapshots; NA campaign
 rerun.
 
+**Batch B result:** `na_labels._place_letters` counts a spot a drawn strand (run, end, gap) passes through, within
+the line clearance of the letter's ink, as having no room, so the letter takes its next spot (8SA2 14 hits -> 0;
+3OWW-AB fixture A:87 -> 0; 30QM 1:59/1:60). Snapshots re-recorded: 1EHZ-trna (A:48's letter moves off the corner
+of the strand to the P4 loop) and 30QM-ncrna (1:59 and 1:60 off run 2).
+
 ### C15 (a): a protein chain with no helix or strand draws nothing, silently (4 entries, 2 last)
 
 **Entries:** 6B5W (the whole entry is one 19-residue lasso peptide: an empty page, area 0), 7MW8 chain K, 7PIU

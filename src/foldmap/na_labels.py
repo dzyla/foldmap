@@ -10,7 +10,18 @@ import math
 
 import numpy as np
 
-from .layout import _GLYPH_H, _GLYPH_W, NT_ROW, Layout, _stem_label_box, label_boxes, text_em
+from .layout import (
+    _GLYPH_H,
+    _GLYPH_W,
+    _LETTER_EM,
+    NT_ROW,
+    Layout,
+    _ink_points,
+    _reach,
+    _stem_label_box,
+    label_boxes,
+    text_em,
+)
 from .na_paths import _BEAD, NAPath, NATie, _dot, _near, _seg_dist, _spaced, crosses_body, in_body, midway
 from .route import clip_len
 
@@ -59,14 +70,32 @@ def _unbunch(layout: Layout, paths: list[NAPath]) -> None:
 
 
 _LETTER_GAP = 0.38  # page units: closest two base letters (or a letter and a nucleotide) may sit
+_LETTER_CLEAR = 0.07  # ems of the figure's text: a line keeps this far from a base letter's ink (2 px at 7 pt,
+# figcheck.LINE_TEXT_CLEARANCE_PX)
 
 
 def _place_letters(layout: Layout, paths: list[NAPath]) -> dict[tuple[int, int], tuple[float, float]]:
     """A letter for each single-stranded nucleotide beside its strand: on the side away from the stems it leaves
     and enters (outside a hairpin loop, in the row of the stem's letters along a free end), else the other, else
     further out on either side, or a little along the strand, whichever first keeps clear of other letters,
-    nucleotides, end labels, elements and stem names; when none is clear, the one furthest from the others."""
+    nucleotides, end labels, elements, stem names and the strands drawn (runs, ends, gaps: a letter a line passes
+    through has no room, random-100 C14); when none is clear, the one furthest from the others."""
     where = {key: d.point(key) for d in layout.stems for key in d.axial}
+    lines = [np.asarray(p.points, float).reshape(-1, 2) for p in paths if len(p.points) > 1]
+    strand_segs = np.vstack([np.hstack([q[:-1], q[1:]]) for q in lines]) if lines else np.empty((0, 4))
+    seg_lo = np.minimum(strand_segs[:, :2], strand_segs[:, 2:])
+    seg_hi = np.maximum(strand_segs[:, :2], strand_segs[:, 2:])
+    em = _em(layout)
+    line_clear = _LETTER_CLEAR * em  # figcheck.LINE_TEXT_CLEARANCE_PX (2 px) at the figure's text size
+    ink = {b: _reach(_ink_points(b, False, _LETTER_EM * em, 0.0)) for b in "ACGUTIN"}
+
+    def struck(q, key) -> bool:  # a strand drawn through the letter's ink, or within the line clearance of it
+        base = layout.nucleic.strands[key[0]].bases[key[1]]
+        x0, y0, x1, y1 = ink.get(base, ink["N"]) + np.array([q[0], q[1], q[0], q[1]])
+        box = (x0 - line_clear, y0 - line_clear, x1 + line_clear, y1 + line_clear)
+        near = (seg_lo[:, 0] < box[2]) & (seg_hi[:, 0] > box[0]) & (seg_lo[:, 1] < box[3]) & (seg_hi[:, 1] > box[1])
+        return any(clip_len(g[:2], g[2:], box) > 0 for g in strand_segs[near])
+
     where.update({(p.strand, i): np.asarray(xy) for p in paths for i, xy in zip(p.nts, p.nt_xy)})
     taken = _Points(1.0)  # every letter, nucleotide and end label so far: nearer than 1 is measured exactly
     for d in layout.stems:
@@ -80,8 +109,10 @@ def _place_letters(layout: Layout, paths: list[NAPath]) -> dict[tuple[int, int],
     boxes = [np.add(_stem_label_box(d), (-g, -g, g, g)) for d in layout.stems]
     out: dict[tuple[int, int], tuple[float, float]] = {}
 
-    def room(q, own: int) -> float:
+    def room(q, own: int, key=None) -> float:
         if any(x0 < q[0] < x1 and y0 < q[1] < y1 for x0, y0, x1, y1 in boxes) or any(_near(q, e) for e in bodies):
+            return 0.0
+        if key is not None and struck(q, key):
             return 0.0
         return taken.nearest(q, own)
 
@@ -101,12 +132,12 @@ def _place_letters(layout: Layout, paths: list[NAPath]) -> dict[tuple[int, int],
                 side = -side
             options = [xy + side * NT_ROW * f for f in (1.0, -1.0, 1.7, -1.7, 2.4, -2.4)]
             options += [xy + side * NT_ROW * f + ahead * t for f in (1.0, -1.0) for t in (0.4, -0.4)]
-            spaces = [room(q, index[(p.strand, i)]) for q in options]
+            spaces = [room(q, index[(p.strand, i)], (p.strand, i)) for q in options]
             if max(spaces) < _LETTER_GAP:  # crowded: further out, and further along the strand
                 more = [xy + side * NT_ROW * f for f in (3.1, -3.1)]
                 more += [xy + side * NT_ROW * f + ahead * t for f in (1.0, -1.0, 1.7, -1.7) for t in (0.8, -0.8)]
                 options += more
-                spaces += [room(q, index[(p.strand, i)]) for q in more]
+                spaces += [room(q, index[(p.strand, i)], (p.strand, i)) for q in more]
             clear = [q for q, r in zip(options, spaces) if r >= _LETTER_GAP]
             spot = clear[0] if clear else options[int(np.argmax(spaces))]
             out[(p.strand, i)] = (float(spot[0]), float(spot[1]))

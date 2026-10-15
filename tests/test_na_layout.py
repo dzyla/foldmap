@@ -2386,3 +2386,17 @@ def test_stem_names_and_letters_are_drawn_where_the_layout_measures_them(pdb):
             t.get_gid(),
             got - want,
         )
+
+
+def test_single_stranded_letters_keep_off_the_strands():
+    """C14 (random-100): a single-stranded nucleotide's letter is placed after every strand is routed, but its
+    spot was tested against letters, nucleotides, names and bodies only, so a run or a cropped gap could pass
+    through it (3OWW: A:87 under the dashed gap; 8SA2 had 14 such letters). Spots a strand passes through are not
+    clear."""
+    from foldmap import figcheck
+    from foldmap.spec import draw_spec, figure_spec
+
+    d = draw_spec(figure_spec(NA.parent / "r100" / "3OWW-AB.cif.gz"))
+    assert d.layout.na_letters
+    hits = [h for h in figcheck.text_collisions(d) if h.startswith("na:nt:") and "× na:run:" in h]
+    assert hits == [], hits
