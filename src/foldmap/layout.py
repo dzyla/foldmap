@@ -1965,7 +1965,9 @@ def _protomers(items: list[_Item], frame, mirror: bool) -> list[int | None]:
     return out
 
 
-def _symmetry_ties(items: list[_Item], frame, mirror: bool = True) -> dict[int, tuple[int, int]]:
+def _symmetry_ties(
+    items: list[_Item], frame, mirror: bool = True, shift: dict[str, int] | None = None
+) -> dict[int, tuple[int, int]]:
     """Copy item -> (its protomer-0 mate, protomer index k): matched by chain class and shared residue numbers.
     The copy also takes the mate's shape and orientation, so every protomer is drawn the same; in a frame with a
     mirror line (`mirror_x`, a dyad in the page) it takes them mirrored, protomer 1 drawn as protomer 0's mirror
@@ -1974,7 +1976,9 @@ def _symmetry_ties(items: list[_Item], frame, mirror: bool = True) -> dict[int, 
     each element's protomer counted from the item's own, round the ring (_ring). A copy whose elements each match
     one of its mate's, but not all of them (DSSP missed a strand in one copy), is tied too when they share at least
     half the smaller one's residues; and when no element of a copy matches two of its mate's, those it shares take
-    the mate's shape and place, the rest keep theirs beside them."""
+    the mate's shape and place, the rest keep theirs beside them. Residue numbers are taken to the first copy's by
+    `shift` (chain -> offset, model.homolog_chains: 2MJW numbers chain D 95-188 where B is 1-94)."""
+    shift = shift or {}
     sector, classes = getattr(frame, "sector", None), getattr(frame, "classes", None)
     if not sector or not classes:
         return {}
@@ -1987,7 +1991,8 @@ def _symmetry_ties(items: list[_Item], frame, mirror: bool = True) -> dict[int, 
             return set()
         d = sector[m.sse.chain] - k
         place = (classes[m.sse.chain], d % ring if ring else d)
-        return {(place, r) for r in range(m.sse.first.seq, m.sse.last.seq + 1)}
+        off = shift.get(m.sse.chain, 0)
+        return {(place, r - off) for r in range(m.sse.first.seq, m.sse.last.seq + 1)}
 
     def residues(i):  # chains outside every protomer (bound peptides, unpaired chains) take no part
         return set().union(*(span(m, homes[i]) for m in items[i].members if isinstance(m, Placed) and not m.ghost))
@@ -2399,7 +2404,7 @@ def build_layout(
         rows = _stack(items, keep_depth)
         _centre_dna_over_binders(items, contacts)
     else:
-        ties = _symmetry_ties(items, frame, mirror is not None)
+        ties = _symmetry_ties(items, frame, mirror is not None, {c: off for c, (_, off) in (copies or {}).items()})
         left = _unwrap(items, ties, frame) if mirror is None else {}
         if left and walls is not None:  # an element that left its item keeps off the traces it kept off
             walls = Walls(walls.boxes, np.vstack([walls.hard, walls.hard[list(left.values())]]))

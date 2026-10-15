@@ -174,3 +174,16 @@ def test_an_item_of_two_protomers_belongs_to_the_one_holding_most_of_it():
     assert _host([m("A", 61, 62), m("F", 445, 446)], sector, classes) == 0
     # two protomers' copies of one element first: symmetric in itself
     assert _host([m("A", 10, 20), m("E", 10, 20)], sector, classes) is None
+
+
+def test_copies_numbered_apart_are_tied():
+    """2MJW (random-100, revealed by C18): S100P chain D is numbered 95-188 where its copy B is 1-94. Copies were
+    tied by shared residue numbers, so B and D shared none, were never tied, and were drawn unlike (A15 B~D 3.34).
+    Numbers are taken to the first copy's by homolog_chains' offset before matching: D is tied to B, drawn alike."""
+    from foldmap import figcheck
+    from foldmap.spec import draw_spec, figure_spec
+
+    d = draw_spec(figure_spec(Path(__file__).parent / "data" / "r100" / "2MJW-BD.cif.gz"))
+    assert d.layout.copy_ties == {"D": ("B", False)}
+    got = figcheck.copies_alike(d)
+    assert got[("D", "B")] <= 0.5, got

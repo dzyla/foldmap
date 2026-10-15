@@ -94,11 +94,17 @@ ENTRIES = {  # fixture name -> (PDB id, what it is for)
         "an RRM and its bound 6-nt RNA (NMR model 1; protein backbone only): two protein loops ran across the RNA's "
         "letters, routed before the RNA was (random-100 C11)",
     ),
+    "2MJW-BD": (
+        "2MJW",
+        "S100P dimer (chains B and D, NMR model 1, backbone only): D is numbered 95-188 where B is 1-94, so the copies "
+        "shared no residue number and were never tied (random-100 C18/A15: B~D 3.34)",
+    ),
 }
 Span = tuple[int, int]
 WINDOWS: dict[str, dict[str, Span | list[Span] | None]] = {  # fixture -> {chain: windows (first, last), None: whole}
     "3OWW-AB": {c: [(5, 12), (38, 45), (60, 70), (80, 88)] for c in "AB"},
-    "3L9G-A": {"A": None},  # where the two RNAs pair
+    "3L9G-A": {"A": None},
+    "2MJW-BD": {"B": None, "D": None},  # where the two RNAs pair
     "7FAB-HL": {"H": None, "L": None},
     "1IGT-AB": {"A": None, "B": None},
     "9FWZ-DB": {"D": (116, 700), "B": None},
@@ -129,6 +135,7 @@ TRIMS: dict[str, dict] = {
     },
     "6B5W": {"first_model": True, "backbone": True},
     "8Q4O": {"first_model": True},
+    "2MJW-BD": {"first_model": True, "backbone": True},
     "6SO9": {"first_model": True, "backbone": True},
     "3L9G-A": {"atoms": ("N", "CA", "C", "O"), "no_protein_sequence": True, "drop": ("_atom_site_anisotrop.",)},
     "1BXI": {
