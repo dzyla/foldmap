@@ -313,6 +313,12 @@ layout when the label's side holds a port.
 
 **Fixture:** 6MHS chain A window 228–306 (4 elements). **Effort:** S–M. **Bench:** any bench helix whose own
 loop now has to go round its label. Measure first.
+**Batch A result (interim):** `route._clear_helix_names` moves a helix name off the lines that strike it, after
+routing (bench unchanged). Snapshots re-recorded: 1KX5-nucleosome and 30QM-ncrna (batch A, helix names only; 1KX5
+re-recorded again in fix round 1 when NA traces and paths became obstacles). The router-side keep-out sized from the
+drawn text moves to batch C with C4. No fixture under 150 KB reproduces the defect on a real page: it needs a page
+wide enough that 2 px is a large part of a loop spacing (6MHS windows, 8UUP and 1GOX cuts all draw clean), so the tests
+are synthetic.
 
 ### C7 (a, visual): parallel loops 10–20 px apart cannot be told apart (15 entries)
 

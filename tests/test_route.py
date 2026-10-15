@@ -651,14 +651,16 @@ def test_a_loop_out_of_a_helix_over_a_sheet_keeps_off_text_unless_flagged():
             assert segments_clear(lp.points, boxes), (lp.a_id, lp.b_id)
 
 
-def _name_in_the_way(bounds=(-4.0, -3.0, 4.0, 3.0)):
+def _name_in_the_way(bounds=(-8.0, -6.0, 8.0, 6.0)):
     """A horizontal helix whose name sits above it, and a loop line that runs just above the name's ink: outside the
     name's keep-out box (so the router would not mind it), inside the room figcheck keeps between a line and text."""
     from foldmap.figcheck import LINE_TEXT_CLEARANCE_PX
     from foldmap.layout import page_text
 
     h = bar(10, 0.0, 0.0, 3.0, 0.0)
+    h.label = "α10"
     lay = Layout({h.sse.id: h}, bounds)
+    lay.font_scale = 1.8  # text larger than its keep-out box, as on a wide page (4 pt floor)
     em = route._ink_em(lay, lay.font_scale)
     room = (LINE_TEXT_CLEARANCE_PX + 0.5) * 0.72 * page_text(lay)[1]
     top = route._name_ink(lay, h, em)[3]
@@ -685,7 +687,41 @@ def test_a_helix_name_no_loop_runs_near_stays():
 
 
 def test_a_helix_name_with_no_better_spot_stays():
-    lay, h, loop, y, room = _name_in_the_way(bounds=(-4.0, -0.5, 4.0, 3.0))  # no room below the helix
+    lay, h, loop, y, room = _name_in_the_way(bounds=(-8.0, -0.5, 8.0, 6.0))  # no room below the helix
     other = [(-2.0, y - 0.9), (2.0, y - 0.9)]
     route._clear_helix_names(lay, [h.sse], [loop, route.Loop("x", "z", other, False, False)])
     assert h.label_side == 1
+
+
+def test_a_helix_name_keeps_off_a_nucleotide_trace():
+    """Fix round 1: nucleic-acid traces count where a name may go (a name the mover put on a strand would undo
+    layout._element_label_sides, 1EYG)."""
+    lay, h, loop, y, room = _name_in_the_way()
+    loop.points[:] = [(-2.0, 5.0), (2.0, 5.0)]  # a line far away: only the trace strikes the name
+    lay.na_traces = {0: np.array([[-0.2, 1.0], [0.2, 1.0]])}  # nucleotides where the name stands above the helix
+    route._clear_helix_names(lay, [h.sse], [loop])
+    assert h.label_side == -1
+
+
+def test_a_mirror_copys_name_follows_its_mate():
+    """Fix round 1: copies drawn as mirror images are named alike (_mirror_sides): when the mate's name moves to
+    the other side, its mirror copy's goes with it."""
+    lay, mate, loop, y, room = _name_in_the_way()
+    copy = bar(30, 5.0, 0.0, 3.0, np.pi)
+    copy.label = mate.label
+    lay.placed[copy.sse.id] = copy
+    lay.mirror_pairs = [(copy.sse.id, mate.sse.id)]
+    route._clear_helix_names(lay, [mate.sse, copy.sse], [loop])
+    assert mate.label_side == -1 and copy.label_side == -1
+
+
+def test_no_helix_name_of_1eyg_sits_on_a_nucleotide_trace():
+    """Fix round 1: 1EYG's single strand runs over chain A's α1 and layout._element_label_sides put the name on the
+    other side; the post-route mover must not undo that."""
+    from foldmap.layout import _element_label_box, _trace_hits
+    from foldmap.spec import draw_spec, figure_spec
+
+    lay = draw_spec(figure_spec(DATA / "na" / "1EYG.cif.gz")).layout
+    traces = [np.asarray(p, float).reshape(-1, 2) for _, p in sorted(lay.na_traces.items())]
+    assert traces
+    assert [k for k, p in lay.placed.items() if p.sse.kind in "HG" and _trace_hits(_element_label_box(p), traces)] == []
