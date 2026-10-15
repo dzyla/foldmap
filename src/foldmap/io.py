@@ -263,26 +263,30 @@ def _polymer_kinds(chains) -> set[str]:
     return out
 
 
-PAIRED_MIN = 4  # residue pairs of two chains with polar base or backbone atoms this near: held together (_paired)
+PAIRED_MIN = 2  # residue pairs of two chains' nucleotides with polar base atoms this near: held together (_paired)
 _PAIR_DIST = 3.4  # angstrom
 _BASE_POLAR = frozenset({"N1", "N3", "N2", "N4", "N6", "N7", "O2", "O4", "O6"})
+# 3OWW's two RNAs pair in 4 residue pairs at _PAIR_DIST (A41-B84, A84-B41, A64-B7, A65-B65): twice PAIRED_MIN. Chains
+# of a protein only never count (their backbone contacts in a crystal or an assembly are no pairing: 7OKA's ten
+# trimers touch in up to 10 residue pairs).
 
 
 def _pair_atoms(chain) -> list[tuple[tuple[float, float, float], int]]:
-    """(position, residue index) of a chain's polar atoms that hold a pair: a nucleotide's base N and O, a protein
-    residue's backbone N and O (the donors and acceptors of a base pair and of strands side by side)."""
+    """(position, residue index) of the base N and O atoms of a chain's nucleotides (not amino acids)."""
     out = []
     for k, r in enumerate(chain):
         info = gemmi.find_tabulated_residue(r.name)
-        names = {"N", "O"} if info is not None and info.is_amino_acid() else _BASE_POLAR
-        out += [(a.pos.tolist(), k) for a in r if a.name in names]
+        if info is not None and info.is_amino_acid():
+            continue
+        out += [(a.pos.tolist(), k) for a in r if a.name in _BASE_POLAR]
     return out
 
 
 def _paired(members, others) -> bool:
-    """Are chains of `members` held to chains of `others` by base pairs or β-strands between them (at least
-    PAIRED_MIN residue pairs with polar base or backbone atoms within _PAIR_DIST)? Such chains are one object (3OWW:
-    the two chains of a glycine riboswitch dimer pair their RNAs), however alike their sequences."""
+    """Are chains of `members` held to chains of `others` by base pairs between their nucleic acids (at least
+    PAIRED_MIN residue pairs with polar base atoms within _PAIR_DIST)? Such chains are one object (3OWW: the two
+    chains of a glycine riboswitch dimer pair their RNAs), however alike their sequences (3OWW ruling; protein
+    β-strand pairing is not used)."""
     from scipy.spatial import cKDTree
 
     for a in members:

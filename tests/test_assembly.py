@@ -485,3 +485,35 @@ def test_chains_that_pair_are_one_object_and_auto_keeps_both(tmp_path):
 
     model = read_model(DATA / "r100" / "3OWW-AB.cif.gz")
     assert sorted(c.name for c in model[0]) == ["A", "B"] and model.several is None
+
+
+def _chain(name, resname, atoms, n, shift):
+    """A synthetic chain: n residues `resname`, each holding atoms (name, dx, dy), 4 A apart along x from `shift`."""
+    import gemmi
+
+    ch = gemmi.Chain(name)
+    for i in range(n):
+        r = gemmi.Residue()
+        r.name, r.seqid = resname, gemmi.SeqId(i + 1, " ")
+        for an, dx, dy in atoms:
+            a = gemmi.Atom()
+            a.name, a.element = an, gemmi.Element(an[0])
+            a.pos = gemmi.Position(4.0 * i + dx + shift, dy, 0.0)
+            r.add_atom(a)
+        ch.add_residue(r)
+    return ch
+
+
+def test_protein_copies_in_contact_are_not_paired_but_base_pairs_are():
+    """Fix round 2: 7OKA's ten trimers touch in up to 10 residue pairs of backbone N and O (crystal and assembly
+    contacts), which merged them into one object (and drew chain A alone). Only nucleotides' base pairs count: two
+    protein chains with 20 backbone N...O contacts are not paired; two RNAs with 4 base-atom contacts (3OWW's measured
+    count; PAIRED_MIN is 2) are, and one contact pair is not."""
+    from foldmap.io import PAIRED_MIN, _paired
+
+    prot = [("N", 0.0, 0.0), ("O", 1.0, 0.0)]
+    assert not _paired([_chain("A", "ALA", prot, 20, 0.0)], [_chain("B", "ALA", prot, 20, 0.2)])
+    base = [("N1", 0.0, 0.0), ("O6", 1.0, 0.0)]
+    rna = lambda name, shift, n: _chain(name, "G", base, n, shift)  # noqa: E731
+    assert PAIRED_MIN == 2 and _paired([rna("A", 0.0, 4)], [rna("B", 0.2, 4)])
+    assert not _paired([rna("A", 0.0, 1)], [rna("B", 0.2, 1)]) and PAIRED_MIN > 1
