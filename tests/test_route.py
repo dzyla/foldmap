@@ -551,6 +551,21 @@ def test_the_router_goes_over_the_slab_rather_than_along_it():
     assert max(grid.center(c)[1] for c in path) > 6.5  # over the band
 
 
+def test_a_loop_leaves_the_slab_rather_than_run_along_it_over_an_element():
+    """C26 (random-100, ruling: loops inside the slab are real defects). An element reaching 0.3 into the band
+    between two ports below it (7SMR B:171-173>B:190-201 ran over such an end at 0.4 inside the bottom face): the
+    slab cost per cell made the run along the slab over it cheaper than the way under it; a step along the slab
+    now costs _SLAB_RUN, so the route goes under. Across the slab (TM loops between faces) costs as before."""
+    lay = Layout({}, (0.0, -18.0, 20.0, 14.0))
+    lay.membrane = {"y": (5.0, 12.0), "inside": "below"}
+    grid = _Grid(lay, [(6.0, -15.0, 14.0, 5.3)])  # the element between the ports, its top inside the band
+    path = route._astar(grid, grid.cell((2.0, 4.5)), 0, grid.cell((18.0, 4.5)), 0)
+    assert path is not None
+    sideways = [a for a, b in zip(path, path[1:]) if a[1] == b[1] and grid.slab[a] and grid.slab[b]]
+    assert not sideways, [grid.center(c) for c in sideways[:3]]
+    assert min(grid.center(c)[1] for c in path) < -15.0  # under the element
+
+
 def test_only_the_over_helix_port_walks_loose(monkeypatch):
     """A loop between a helix drawn over a sheet and another element: only the helix's own port may walk out over
     blocked cells (loose); the other port leaves as any port does (Task 14 review)."""

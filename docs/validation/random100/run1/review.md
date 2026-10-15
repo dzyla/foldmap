@@ -740,6 +740,14 @@ than the slab one.
 **Ruling or fix:** decide whether a loop joining two in-slab ports counts (it is in the slab in 3D too), or
 route such loops out to the nearer face. **Effort:** M.
 
+**Batch B result:** a step along the slab costs `route._SLAB_RUN` (24) where a step across it costs `_SLAB_COST`
+(3), so a loop leaves the slab at a face instead of running along it over an element that reaches into the band
+(7SMR B:117-129, B:171-173). A18's port rule measures the port against the band itself, not its 0.3 margin (7SMR
+E:162-163 and E:166-167 end 0.29 inside the face). 7SMR: 4 loops in the slab -> 0. 8W9Y keeps C/F:225-249>271-280:
+the loop leaves an interfacial helix's end inside the slab with α8 right above it; the way out through the near
+face (tried at cost 30) is a long detour that strikes the α7 and α10 names. Snapshot re-recorded: 1C3W-membrane
+(one A1 loop above the band takes the other side of a strand end; crossings 6 -> 3).
+
 ### C27 (b/c, ruling): A18 requires 75 % band cover from TM helices that are tilted or offset (2 entries, 1 last)
 
 **Entries:** 6PS3 (β2AR, TM A:267-298 covers 0.73 of the band), 7PIU (R:48-70 0.70).

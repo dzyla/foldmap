@@ -642,3 +642,20 @@ def test_a18_tm_helix_passes_when_it_reaches_both_leaflets(r100):
     assert [x.split()[0] for x in r100.membrane_checks(d, path)["tm_short"]] == [hid]
     lay.placed[hid] = replace(p, cy=mid + 0.05 + half)  # the upper leaflet only
     assert [x.split()[0] for x in r100.membrane_checks(d, path)["tm_short"]] == [hid]
+
+
+def test_a18_a_run_into_a_port_just_inside_the_band_is_at_that_port(r100):
+    """C26 (random-100): a loop runs sideways inside the band only next to one of its own ports inside the band.
+    A port 0.2 inside a face (7SMR E:162-163, a helix end at 3.46 in the band 3.17..10.24) was not "inside" by the
+    0.3 margin the run itself is measured with, so the run that must reach it from above counted as in the slab.
+    The port is measured against the band itself; a run between two ports outside the band still counts."""
+    from foldmap.route import Loop
+    from foldmap.spec import draw_spec, figure_spec
+
+    path = DATA / "1C3W.cif"
+    d = draw_spec(figure_spec(path, membrane="auto", assembly="asu"))
+    y0, _ = d.layout.membrane["y"]
+    run = [(-30.0, y0 - 1.0), (-30.0, y0 + 0.6), (-27.0, y0 + 0.6)]
+    d.loops.append(Loop("p:1-2", "p:3-4", [*run, (-27.0, y0 + 0.2)], False, False))  # into a port 0.2 inside
+    d.loops.append(Loop("q:1-2", "q:3-4", [*run, (-27.0, y0 - 1.0)], False, False))  # back out below the face
+    assert r100.membrane_checks(d, path)["loops_in_slab"] == ["q:1-2>q:3-4"]

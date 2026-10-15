@@ -1233,7 +1233,7 @@ def membrane_checks(drawn, path) -> dict:
             short.append(f"{s.id} {frac:.2f}")
     margin = LIMITS["slab_margin"]
 
-    def inside(y):
+    def inside(y, margin=margin):
         return any(lo + margin < y < hi - margin for lo, hi in bands)
 
     in_slab = []
@@ -1241,7 +1241,8 @@ def membrane_checks(drawn, path) -> dict:
         pts, n = lp.points, len(lp.points)
         for k, ((xa, ya), (xb, yb)) in enumerate(zip(pts, pts[1:])):
             if abs(ya - yb) < 1e-9 and abs(xa - xb) > 0.5 and inside(ya):
-                if not ((k <= 1 and inside(pts[0][1])) or (k >= n - 3 and inside(pts[-1][1]))):
+                # a port in the band (at any depth: a helix end just inside a face) is entered or left inside it
+                if not ((k <= 1 and inside(pts[0][1], 0.0)) or (k >= n - 3 and inside(pts[-1][1], 0.0))):
                     in_slab.append(f"{lp.a_id}>{lp.b_id}")
                     break
     return {"band": True, "tm_helices": tm, "tm_short": short, "loops_in_slab": in_slab}

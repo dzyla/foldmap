@@ -37,6 +37,7 @@ _TOUCH = 0.02
 _TURN = 2.5
 _REUSE = 6.0  # extra cost for a cell an earlier loop already uses
 _SLAB_COST = 3.0  # extra cost for a cell inside the membrane slab: loops between TM helices go round it
+_SLAB_RUN = 24.0  # ... a step along the slab, not across it: a loop leaves the slab at a face (random-100 C26)
 _PAD = 3.0
 _MAX_NODES = 200_000
 _MAX_CELLS = 1_500_000
@@ -297,7 +298,7 @@ def _astar(grid: _Grid, start, start_dir, goal, goal_dir, max_nodes: int = _MAX_
             if not grid.free((nx_, ny_)):
                 continue
             cost = g + 1 + (_TURN if nd != d else 0) + (_REUSE if grid.used[nx_, ny_] else 0)
-            cost += _SLAB_COST if grid.slab[nx_, ny_] else 0
+            cost += (_SLAB_RUN if nd in (0, 2) else _SLAB_COST) if grid.slab[nx_, ny_] else 0
             key = (nx_, ny_, nd)
             if cost < best.get(key, math.inf):
                 best[key] = cost
