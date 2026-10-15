@@ -259,6 +259,8 @@ class Layout:
     # the gaps between two strands sharing a column (Sheet.columns), as boxes (_stack_gaps): the loops leaving
     # their facing ends are kept apart there (route._apart_in_stack_gaps)
     stack_gaps: list[tuple] = field(default_factory=list)
+    accessory: dict[str, str] = field(default_factory=dict)  # a strand drawn off its sheet's track (Sheet.accessory),
+    # beside its parent -> that parent's id: no barrel strand (science S3)
     res_cons: list[float] = field(default_factory=list)  # alignment conservation of each residue (nan: none)
     res_grade: list[int] = field(default_factory=list)  # conservation grade 1..9 of each residue (0: none)
     cons_label: str = ""  # legend text saying where the grades come from

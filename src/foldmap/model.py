@@ -247,6 +247,19 @@ def shared_labels(sses: list[SSE], copies: dict[str, tuple[str, int]], labels: d
     return out
 
 
+class Accessory(NamedTuple):
+    """A strand of a sheet off its track (sheets._order_tree: off the longest path of the pairing tree), drawn beside
+    `parent`, the strand it pairs with on the way to the track, never between two strands that pair. `column`: the
+    track position whose column it shares (0 .. len(strands) - 1), stacked end to end with what stands there, or past
+    either end (-1, -2 ...; len(strands) ...: a closed sheet's ghost stands at len(strands)). `direction` as
+    Sheet.directions."""
+
+    strand: SSE
+    parent: SSE
+    column: int
+    direction: int
+
+
 @dataclass(eq=False)
 class Sheet:
     """Strands in sheet order. directions[k] is +1 if strands[k] runs the same way as
@@ -260,6 +273,10 @@ class Sheet:
     # column of each strand side by side (sheets._columns): two strands end to end along one edge of a partner (both
     # pairing with it, on its same side; not necessarily one strand) share one; empty: each strand its own
     columns: list[int] = field(default_factory=list)
+    # strands off the track (a branched sheet's), each beside its parent (Accessory); a closed sheet's are no barrel
+    # strand (membrane.py ignores them)
+    accessory: list[Accessory] = field(default_factory=list)
+    unclosed: bool = False  # its pairing has a cycle, but its track's ends do not pair: drawn open, with a note
 
 
 @dataclass(eq=False)

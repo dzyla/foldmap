@@ -28,6 +28,7 @@ from .nucleic import StemView, stem_views, straight_duplex
 from .palette import PALETTES
 from .render import LOOP_STYLES, STYLES, draw, save
 from .route import route_loops
+from .science import science_lines, sheet_checks
 from .scope import drawn_scope, scope_note
 from .sheets import build_sheets
 from .spec import (
@@ -75,6 +76,9 @@ def summarize(path: str) -> str:
             if k < len(sh.pair_kinds):
                 parts.append({"P": "=par=", "A": "=anti=", "?": "=?="}[sh.pair_kinds[k]])
         lines.append("  " + " ".join(parts))
+    if sheets:  # the science checks of the sheets as built (figcheck.science_checks reads them as drawn)
+        lines.append("science checks (the sheets as built):")
+        lines += [f"  {line}" for line in science_lines(sheet_checks(sheets, sses, dssp.bridges))]
     try:
         sym = detect_symmetry(bb, sses)
     except ValueError:
@@ -1016,17 +1020,28 @@ def build_parser() -> argparse.ArgumentParser:
         "deposited atoms (an independent atom search). Prints a summary and one line per problem bead; exits 1 "
         "on a false, unmatched or wrong-colour bead, 0 otherwise.",
     )
-    for cmd in (q, iq, cq):
+    kq = sub.add_parser(
+        "check",
+        help="check the science of the figure against the coordinates: sheet neighbours, barrel closure and strand "
+        "count (exit 1 on a problem)",
+        description="Draw the figure as `plot` would and check what it says about the structure against the "
+        "coordinates, apart from how the page looks: S1, two strands drawn side by side in a sheet are joined by a "
+        "bridge (a branch strand drawn in a shared column beside one of its partners); S2, a closed barrel's "
+        "closure is; S3, a barrel's strand count is the cycle its pairing makes. S4 (residue marks) and S5 "
+        "(automatic domains) are not yet measured. Prints one line per check and one per problem; exits 1 on a "
+        "problem, 0 otherwise.",
+    )
+    for cmd in (q, iq, cq, kq):
         q = cmd
         q.add_argument("structure")
         q.add_argument(
             "-o",
             "--output",
             action="append",
-            required=cmd is not cq,
+            required=cmd not in (cq, kq),
             default=[],
             help=".svg, .pdf or .png (repeatable)"
-            + ("; optional here: also save the figure checked" if cmd is cq else ""),
+            + ("; optional here: also save the figure checked" if cmd in (cq, kq) else ""),
         )
         q.add_argument("--mode", choices=["projected", "stack"], help="projected (default) or stack")
         q.add_argument("--rotate", type=float, help="turn the picture counter-clockwise (degrees)")
@@ -1298,6 +1313,21 @@ def _cmd_contacts(args: argparse.Namespace) -> int:
     return 1 if report.false or report.unmatched or report.wrong_colour else 0
 
 
+def _cmd_check(args: argparse.Namespace) -> int:
+    """Draw the figure `plot` would and print its science checks (figcheck.science_checks): one line per check, one
+    per problem. Exit 1 when any check found a problem."""
+    from . import figcheck
+    from .science import science_lines
+
+    drawn = draw_spec(_spec_of(args))
+    for out in args.output:
+        print(f"wrote {save(drawn.figure, out)}")
+    found = figcheck.science_checks(drawn)
+    for line in science_lines(found):
+        print(line)
+    return 1 if any(found.values()) else 0
+
+
 def contact_problems(report) -> list[str]:
     """One line per problem of a nacheck.ContactReport: each bead with a problem, then each missing contact."""
     lines = []
@@ -1318,6 +1348,7 @@ _COMMANDS: dict[str, Callable[[argparse.Namespace], int]] = {
     "plot": _cmd_figure,
     "interactive": _cmd_figure,
     "contacts": _cmd_contacts,
+    "check": _cmd_check,
 }
 
 

@@ -1136,6 +1136,52 @@ def _same_order(got: list[str], want: list[str], closed: bool) -> bool:
     return got in (want, want[::-1])
 
 
+# ------------------------------------------------------------------------------------------- science (S1-S5)
+
+
+def drawn_columns(layout, k: int) -> list[list[tuple[str, bool]]]:
+    """Sheet block k (Layout.sheets) as drawn: its columns left to right (across the strands' mean direction, as
+    _drawn_order reads them), each the (strand id, is a ghost) standing in it; strands at one place across share a
+    column (stacked one above the other)."""
+    at = [(i, layout.placed[i], False) for i in layout.sheets[k]]
+    at += [(g.sse.id, g, True) for g in block_ghosts(layout, k)]
+    ref = at[0][1].direction
+    mean = sum(p.direction * (1.0 if p.direction @ ref >= 0 else -1.0) for _, p, _ in at)
+    across = np.array([mean[1], -mean[0]])
+    cols: dict[float, list[tuple[str, bool]]] = {}
+    for i, p, ghost in at:
+        cols.setdefault(round(float(np.array([p.cx, p.cy]) @ across), 3), []).append((i, ghost))
+    return [sorted(cols[x]) for x in sorted(cols)]
+
+
+def science_checks(drawn) -> dict[str, list[str] | None]:
+    """The science checks (science.SCIENCE) of a drawn figure, apart from the page checks: findings per check, None
+    for those not yet measured (S4, S5). Sheet block k is named "sheet <k>" (Layout.sheets, from 0)."""
+    from .dssp import assign_dssp
+    from .science import NOT_YET, adjacent_pairs, bridge_counts, count_finding, neighbour_findings
+
+    lay = drawn.layout
+    out: dict[str, list[str] | None] = {"S1": [], "S2": [], "S3": [], **dict.fromkeys(NOT_YET)}
+    if not lay.sheets:
+        return out
+    count = bridge_counts(drawn.sses, assign_dssp(drawn.bb).bridges)
+    for k, ids in enumerate(lay.sheets):
+        columns = drawn_columns(lay, k)
+        s1, s2 = neighbour_findings(columns, count)
+        out["S1"] += [f"sheet {k}: {t}" for t in s1]
+        out["S2"] += [f"sheet {k}: {t}" for t in s2]
+        ghosts = [(c, i) for c, col in enumerate(columns) for i, g in col if g]
+        if not ghosts:
+            continue
+        ring = [i for i in ids if i not in lay.accessory] + [i for _, i in ghosts if i not in ids]  # lent: drawn
+        # in another block, standing here for a strand of this ring
+        others = [i for i in ids if i in lay.accessory]
+        found = count_finding(f"sheet {k}", ring, others, count, adjacent_pairs(columns))
+        if found:
+            out["S3"].append(found)
+    return out
+
+
 # ------------------------------------------------------------------------------------------- membrane (A18)
 SLAB_MARGIN = 0.3  # page units: a loop's sideways run this far inside a band's faces is in the slab
 _RUN_MIN = 0.5  # page units: a shorter sideways step is no run along the slab

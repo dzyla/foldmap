@@ -161,7 +161,7 @@ Every command takes a file path, a PDB ID (downloaded from RCSB) or a UniProt ac
 Downloads are cached in `~/.cache/foldmap`.
 
 ```bash
-foldmap summary 1UBQ                              # elements, sheets, symmetry, ligands
+foldmap summary 1UBQ                              # elements, sheets, science checks, symmetry
 foldmap plot 1UBQ -o ubiquitin.svg                # .svg (editable text), .png (300 dpi, less past 50 MP) or .pdf
 foldmap plot 1UBQ -o fig.png --theme richardson --set residue_numbers=true
 foldmap plot P04637 -o p53.svg --theme alphafold  # AlphaFold model, pLDDT colours
@@ -169,6 +169,7 @@ foldmap sequence 1UBQ -o seq.svg --columns 50     # sequence with secondary stru
 foldmap sequence 1UBQ -o aln.svg --msa family.fasta
 foldmap interactive 8UTF -o explorer.html         # linked topology / 3D / contact map
 foldmap contacts 1LMB                             # check the contact beads against the atoms
+foldmap check 9FWZ                                # check the figure's sheets against the bridges
 foldmap app                                       # the Streamlit app
 foldmap styles                                    # every theme and style key
 ```
@@ -391,6 +392,15 @@ changes, never the layout. Example: `foldmap plot 1LMB.cif --set hbonds=na -o 1l
 
 On large complexes the lines can pile up into a hairball (30QM with `hbonds=na` draws 79). Restrict them with
 `chains:` (`--set hbonds=chains:A+B`) or lower `hbond_max` (`--set hbond_max=30`).
+
+**Checking the science.** A figure can look clean and still say something false about the structure, so foldmap
+checks what it draws against the coordinates, apart from how the page looks. `foldmap check 9FWZ` draws the figure
+`plot` would (same options, `-o` to save it) and prints one line per check and one per problem, exiting 1 on any:
+S1, two strands drawn side by side in a sheet are joined by at least one backbone bridge (a branch strand stacked in
+a shared column must sit beside one of its partners); S2, a closed barrel's closure (the ghost beside the last
+strand) is; S3, a barrel's strand count is the cycle its pairing makes. S4 (ligand and modified-residue marks at
+their residue) and S5 (automatic domains against a reference) are not yet measured. `foldmap summary` prints the
+same checks of the sheets as built.
 
 **Checking the contact beads.** `foldmap contacts 1LMB.cif` draws the figure `plot` would (it takes the same options),
 checks every contact bead against the deposited atoms with an independent search, and prints how many beads were
