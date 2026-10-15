@@ -188,7 +188,9 @@ foldmap styles                                    # every theme and style key
   wide (double column) while its text stays at 6 pt or larger; a larger figure's page grows instead (up to 48 in on
   its longer side, past which the whole figure is scaled to fit and the notes say its text is under 6 pt), and
   every keep-out round text and every legend row is sized from the text as drawn. Its PNG is 300 dpi up to 50
-  megapixels and takes a lower dpi past that (said in the notes); SVG and PDF keep the page whole.
+  megapixels and takes a lower dpi past that (said in the notes); SVG and PDF keep the page whole. The 6 pt floor is
+  at text size 1: a smaller text size (`--set font_scale=0.8`, the app's Text size, the journal theme's 0.9) draws
+  the text that much smaller.
 - **Fold conventions** of the published figures: all-parallel α/β sheets (TIM barrels, Rossmann folds) as one βα
   row, conventional names (`--names`), helices drawn over the sheet they pack on (opt-in); see
   [Conventions of the published figures](#conventions-of-the-published-figures).

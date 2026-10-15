@@ -2477,7 +2477,7 @@ def _canvas(
     entries = _legend_entries(layout, look, chains, colors, umarks, backbone[0], hb, linked)
 
     def legend_entry(x1: float) -> float:  # one legend entry's width in page units: swatch, text, gap
-        scale = page_scale(x1 - x0 + 2 * pad)  # as the figure below (the text's page units do not depend on it)
+        scale = page_scale(x1 - x0 + 2 * pad)  # any page's scale: the text's em is the same page units on every page
         font_u = _font_pt(scale) * look.font_scale / (scale * 72)  # text drawn at that size, in page units
         # the unhinted advance width, which is what is drawn (ink extents differ between matplotlib versions);
         # measured at a size matplotlib does not clamp (it floors font sizes at 1 pt) and scaled to font_u
@@ -2494,8 +2494,8 @@ def _canvas(
     per_row = max(1, int((x1 - x0 + 0.9) // entry))
     if not look.legend:
         entries = []
-    scale = page_scale(x1 - x0 + 2 * pad)  # as the figure below (the text's page units do not depend on it)
-    em = _font_pt(scale) * look.font_scale / (scale * 72)  # the text drawn, in page units
+    scale = page_scale(x1 - x0 + 2 * pad)  # not the figure's own (its height is not known yet), and need not be:
+    em = _font_pt(scale) * look.font_scale / (scale * 72)  # the text's em, page units, is the same at any scale
     row = _LEGEND_ROW * glyph_scale(em)  # a legend row, sized from the text drawn in it (C4)
     legend_h = 0.8 + row * -(-len(entries) // per_row) if entries else 0.3
     if layout.context and look.legend:
