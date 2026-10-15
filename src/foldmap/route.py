@@ -13,6 +13,7 @@ import numpy as np
 
 from .features import KINK_GAP
 from .layout import (
+    _GLYPH_W,
     Layout,
     Placed,
     _element_label_box,
@@ -20,6 +21,7 @@ from .layout import (
     _snap,
     _text_width,
     _trace_hits,
+    glyph,
     helix_label_pos,
     label_boxes,
     overlaps_any,
@@ -555,7 +557,8 @@ def _clear_helix_names(layout: Layout, sses: list[SSE], loops: list[Loop]) -> No
             total += struck(ink)
         return total
 
-    moved = 0  # names (with a mirror copy's) moved
+    moved = 0  # names moved, a mirror copy's counted with its mate's
+    k = glyph(layout)[0] / _GLYPH_W
     for p in names:
         if p.sse.id in mate_of:  # a mirror copy goes with its mate
             continue
@@ -572,10 +575,10 @@ def _clear_helix_names(layout: Layout, sses: list[SSE], loops: list[Loop]) -> No
                 got = place(group, side, along, taken)
                 if got is not None and got < best[0]:
                     best = (got, [(q.label_side, q.label_along) for q in group])
-        moved += best[1] != start
+        moved += len(group) if best[1] != start else 0
         for q, (side, along) in zip(group, best[1]):
             q.label_side, q.label_along = side, along
-            texts[f"label:{q.sse.id}"] = _element_label_box(q)
+            texts[f"label:{q.sse.id}"] = _element_label_box(q, k)  # as label_boxes sized it (layout.glyph)
     log.debug("%d helix names moved off lines", moved)  # random-100 C6: what the campaign reports of the mover
 
 

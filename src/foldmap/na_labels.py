@@ -11,7 +11,6 @@ import math
 import numpy as np
 
 from .layout import (
-    _GLYPH_H,
     _GLYPH_W,
     _LETTER_EM,
     NT_ROW,
@@ -20,6 +19,7 @@ from .layout import (
     _ink_points,
     _reach,
     _stem_label_box,
+    glyph,
     label_boxes,
     line_clearance,
     text_em,
@@ -106,8 +106,9 @@ def _place_letters(layout: Layout, paths: list[NAPath]) -> dict[tuple[int, int],
     for _, _, xy in layout.na_ends:
         taken.add(xy)
     bodies = [*layout.placed.values(), *layout.stems]  # by their true (tilted) outlines, not their boxes
-    g = 1.2 * _GLYPH_H  # a stem's name stands a letter and a half clear of any base letter
-    boxes = [np.add(_stem_label_box(d), (-g, -g, g, g)) for d in layout.stems]
+    gw, gh = glyph(layout)  # a letter's room, sized from the text drawn
+    g = 1.2 * gh  # a stem's name stands a letter and a half clear of any base letter
+    boxes = [np.add(_stem_label_box(d, gw / _GLYPH_W), (-g, -g, g, g)) for d in layout.stems]
     out: dict[tuple[int, int], tuple[float, float]] = {}
 
     def room(q, own: int) -> float:
@@ -143,8 +144,8 @@ def _place_letters(layout: Layout, paths: list[NAPath]) -> dict[tuple[int, int],
             if p.kind == "hairpin":  # a hairpin loop's letters stay in its stem's footprint (layout keeps it clear):
                 # a spot inside clear with the line clearance, else one no strand runs through; else outside (8SA2)
                 d = at[p.between[0]]
-                fx0, fy0, fx1, fy1 = _footprint(d)
-                g = _GLYPH_H / 2
+                fx0, fy0, fx1, fy1 = _footprint(d, gw / _GLYPH_W)
+                g = gh / 2
                 held = [
                     fx0 <= q[0] - d.cx - g
                     and q[0] - d.cx + g <= fx1
@@ -228,7 +229,8 @@ def _label_gaps(layout: Layout, paths: list[NAPath], loops=()) -> None:
     owner += [-1] * (len(segs) - len(owner))
     seg_box = np.array([(min(a[0], b[0]), min(a[1], b[1]), max(a[0], b[0]), max(a[1], b[1])) for a, b in segs])
     seg_box = seg_box.reshape(-1, 4)
-    g = _GLYPH_W / 2 + 0.05, _GLYPH_H / 2
+    gw, gh = glyph(layout)  # a letter's room, sized from the text drawn
+    g = gw / 2 + 0.05, gh / 2
     glyphs = [d.point(key, NT_ROW) for d in layout.stems for key in d.axial] + list(layout.na_letters.values())
     glyphs += [xy for _, _, xy in layout.na_ends]
     taken = [(x - g[0], y - g[1], x + g[0], y + g[1]) for x, y in glyphs] + [b for _, b in label_boxes(layout, [])]
@@ -299,12 +301,13 @@ def _ties(layout: Layout, paths: list[NAPath]) -> list[NATie]:
     letters.update({key: np.asarray(xy) for key, xy in layout.na_letters.items()})
     bodies = [*layout.placed.values(), *layout.stems]
     width = max((d.width for d in layout.stems), default=1.0)
+    gw, gh = glyph(layout)  # a letter's room, sized from the text drawn
     boxes = [b for _, b in label_boxes(layout, [])] + [
-        (x - _GLYPH_W / 2, y - _GLYPH_H / 2, x + _GLYPH_W / 2, y + _GLYPH_H / 2) for _, _, (x, y) in layout.na_ends
+        (x - gw / 2, y - gh / 2, x + gw / 2, y + gh / 2) for _, _, (x, y) in layout.na_ends
     ]
     segments = [(a, b) for p in paths for a, b in zip(p.points, p.points[1:])]
     taken = [*letters.values(), *where.values()]
-    hw, hh = _GLYPH_W / 2 + 0.05, _GLYPH_H / 2
+    hw, hh = gw / 2 + 0.05, gh / 2
 
     def clear(tick, at, own) -> bool:  # own: the tie's nucleotide, which the tick starts beside
         (a, b), (x, y) = tick, at
@@ -330,7 +333,7 @@ def _ties(layout: Layout, paths: list[NAPath]) -> list[NATie]:
         tie = NATie(ka, kb, [tuple(map(float, pa)), tuple(map(float, pb))])
         long = math.dist(pa, pb) > _TIE_SHORT * width
         hit = any(crosses_body(pa, pb, e) for e in bodies) or any(
-            _seg_dist(xy, pa, pb) < _GLYPH_H / 2 for key, xy in letters.items() if key not in (ka, kb)
+            _seg_dist(xy, pa, pb) < gh / 2 for key, xy in letters.items() if key not in (ka, kb)
         )
         if long or hit:
             tie.label = _tie_name(sum(1 for t in out if t.label))
@@ -387,9 +390,10 @@ class _Points:
 def _widen(layout: Layout, paths: list[NAPath]) -> None:
     """Grow layout.bounds to hold the strands, every base letter, the end labels, the gaps' labels and the
     ties' labels."""
-    pad = NT_ROW + max(_GLYPH_W, _GLYPH_H)
+    gw, gh = glyph(layout)  # a letter's room, sized from the text drawn
+    pad = NT_ROW + max(gw, gh)
     boxes = [(x - pad, y - pad, x + pad, y + pad) for p in paths for x, y in p.points]
-    g = max(_GLYPH_W, _GLYPH_H) / 2 + 0.05  # a letter turned any way
+    g = max(gw, gh) / 2 + 0.05  # a letter turned any way
     letters = [d.point(key, NT_ROW) for d in layout.stems for key in d.axial] + list(layout.na_letters.values())
     letters += [xy for _, _, xy in layout.na_ends]
     boxes += [(x - g, y - g, x + g, y + g) for x, y in letters]

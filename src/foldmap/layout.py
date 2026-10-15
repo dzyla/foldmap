@@ -10,6 +10,7 @@ import math
 import re
 from collections import Counter
 from collections.abc import Callable
+from contextvars import ContextVar
 from dataclasses import KW_ONLY, dataclass, field
 from types import SimpleNamespace
 from typing import NamedTuple
@@ -45,6 +46,9 @@ LONG_TAIL = 10  # a chain end with this many residues or more past its last elem
 TAIL_COUNT_SIZE = 0.72  # that count's text size, as a fraction of the figure's
 _TAIL_COUNT_GAP = 0.08  # page units between the N/C letter's ink and the count's
 _GLYPH_W, _GLYPH_H = 0.32, 0.42  # rough label glyph size in page units, for keep-out boxes (at _EM_TUNED: glyph_scale)
+_GLYPH_K: ContextVar[float] = ContextVar("foldmap_glyph_scale", default=1.0)  # glyph_scale of the text the layout
+# being built is drawn with (build_layout sets it from Style.font_scale): for the glyph room of things that hold no
+# layout (an item's footprint, a stem's name box, a trace's letters); layout.glyph(layout) wherever a layout is held
 IN_PER_UNIT = 0.30  # render: inches per page unit, at most
 MAX_WIDTH_IN = 7.2  # render: a figure is drawn at most this wide (double column), inches, while its text stays ...
 MIN_TEXT_PT = 6.0  # ... this size or larger: a wider page grows past MAX_WIDTH_IN instead (random-100 C4 ruling)
@@ -318,28 +322,31 @@ class _Item:
             m.cx, m.cy = self.cx + ox, self.cy + oy
 
 
-def _footprint(m) -> tuple[float, float, float, float]:
-    """A member's box relative to its own centre; a helix's or a stem's includes the room its label needs."""
+def _footprint(m, k: float | None = None) -> tuple[float, float, float, float]:
+    """A member's box relative to its own centre; a helix's or a stem's includes the room its label needs, glyphs
+    `k` (glyph_scale; the layout being built's, _GLYPH_K, when None) times _GLYPH_W x _GLYPH_H."""
+    k = _GLYPH_K.get() if k is None else k
+    gw, gh = _GLYPH_W * k, _GLYPH_H * k
     x0, y0, x1, y1 = m.rect
     box = (x0 - m.cx, y0 - m.cy, x1 - m.cx, y1 - m.cy)
     if isinstance(m, Placed) and m.sse.kind in ("H", "G"):
         lx, ly = helix_label_pos(Placed(m.sse, 0.0, 0.0, m.length, m.angle, m.width))
-        hx, hy = _GLYPH_W * 1.5 + 0.05, _GLYPH_H / 2  # up to three glyphs: α10
+        hx, hy = gw * 1.5 + 0.05, gh / 2  # up to three glyphs: α10
         box = (min(box[0], lx - hx), min(box[1], ly - hy), max(box[2], lx + hx), max(box[3], ly + hy))
     if isinstance(m, PlacedStem):  # a stem's name beside it
-        x0, y0, x1, y1 = _stem_label_box(m)
+        x0, y0, x1, y1 = _stem_label_box(m, k)
         box = (min(box[0], x0 - m.cx), min(box[1], y0 - m.cy), max(box[2], x1 - m.cx), max(box[3], y1 - m.cy))
     if isinstance(m, PlacedStem) and m.hairpin >= 0:  # and its hairpin loop over the tip, with the loop's letters
         a, i, b, j = m.pairs[-1]
         (x, y), r = m.hairpin_circle((a, i), (b, j), m.hairpin)
-        x, y, r = x - m.cx, y - m.cy, r + NT_ROW + _GLYPH_H / 2
+        x, y, r = x - m.cx, y - m.cy, r + NT_ROW + gh / 2
         box = (min(box[0], x - r), min(box[1], y - r), max(box[2], x + r), max(box[3], y + r))
     if isinstance(m, Placed) and m.ends:
         d = m.direction
         for end in m.ends:
             out = d if end == "C" else -d
             t = out * (m.length / 2 + END_LABEL)  # the N/C letter beyond the stub
-            hx, hy = _GLYPH_W / 2 + 0.05, _GLYPH_H / 2
+            hx, hy = gw / 2 + 0.05, gh / 2
             box = (min(box[0], t[0] - hx), min(box[1], t[1] - hy), max(box[2], t[0] + hx), max(box[3], t[1] + hy))
     return box
 
@@ -2304,6 +2311,24 @@ def _adjust(
             it.apply()
 
 
+def _text_scaled(build):
+    """build_layout with _GLYPH_K set, while it runs, to the glyph_scale of the text its style draws (Style.font_scale):
+    the glyph room of footprints and stem names follows the text size, as layout.glyph does where a layout is held."""
+    import functools
+
+    @functools.wraps(build)
+    def run(*args, **kwargs):
+        style = kwargs.get("style") or Style()
+        token = _GLYPH_K.set(glyph_scale(_EM_TUNED * style.font_scale))
+        try:
+            return build(*args, **kwargs)
+        finally:
+            _GLYPH_K.reset(token)
+
+    return run
+
+
+@_text_scaled
 def build_layout(
     sses: list[SSE],
     sheets: list[Sheet],
@@ -2912,7 +2937,7 @@ def _place_domain_names(layout: Layout, sses: list[SSE], font_scale: float = 1.0
     traces = [np.asarray(pts, float).reshape(-1, 2) for _, pts in sorted(layout.na_traces.items())]
     solid, ways = _name_obstacles(layout, sses)
 
-    letters = (0.0 if layout.na_cropped else NT_ROW + _GLYPH_H) + _NAME_CLEAR
+    letters = (0.0 if layout.na_cropped else NT_ROW + glyph(layout)[1]) + _NAME_CLEAR
 
     def clear(box, foot, margin) -> bool:
         if overlaps_any(_grown(box, margin), solid + ways) or _trace_hits(_grown(box, _NAME_NEAR_NT), traces):
@@ -3036,7 +3061,8 @@ def stem_label_pos(d: PlacedStem) -> tuple[float, float]:
     _INK_MARGIN em beyond its letters; before that (the room placement keeps for it) a glyph beyond them, level with
     its centre."""
     if d.label_at is None:
-        p = np.array([d.cx, d.cy]) + d.normal * d.label_side * (d.width / 2 + NT_ROW + _GLYPH_H + d.label_out)
+        room = NT_ROW + _GLYPH_H * _GLYPH_K.get() + d.label_out  # a glyph beyond its letters (glyph_scale)
+        p = np.array([d.cx, d.cy]) + d.normal * d.label_side * (d.width / 2 + room)
     else:
         p = np.array([d.cx, d.cy]) + d.direction * d.label_along + d.normal * d.label_side * d.label_at
     return float(p[0]), float(p[1])
@@ -3055,19 +3081,21 @@ def _middle_pair(d: PlacedStem, side: int, letters: bool) -> float:
     return float(_snap((at[(len(at) - 1) // 2] + at[len(at) // 2]) / 2))
 
 
-def stem_keep_box(d: PlacedStem) -> tuple[float, float, float, float]:
+def stem_keep_box(d: PlacedStem, k: float | None = None) -> tuple[float, float, float, float]:
     """The box routes keep out of round a stem's name: its ink grown by _INK_MARGIN em (label_keep) where its place
-    is chosen, else its text box (_stem_label_box)."""
+    is chosen, else its text box (_stem_label_box, glyphs `k`)."""
     if d.label_keep is None:
-        return _stem_label_box(d)
+        return _stem_label_box(d, k)
     x, y = stem_label_pos(d)
     x0, y0, x1, y1 = d.label_keep
     return x + x0, y + y0, x + x1, y + y1
 
 
-def _stem_label_box(d: PlacedStem) -> tuple[float, float, float, float]:
-    """The box around a stem's name, written along the stem."""
-    along, across = _GLYPH_W * len(d.name) / 2 + 0.05, _GLYPH_H / 2
+def _stem_label_box(d: PlacedStem, k: float | None = None) -> tuple[float, float, float, float]:
+    """The box around a stem's name, written along the stem: glyphs `k` (glyph_scale; the layout being built's,
+    _GLYPH_K, when None) times _GLYPH_W x _GLYPH_H."""
+    k = _GLYPH_K.get() if k is None else k
+    along, across = _GLYPH_W * k * len(d.name) / 2 + 0.05, _GLYPH_H * k / 2
     c, s = abs(np.cos(d.angle)), abs(np.sin(d.angle))
     return centred_box(*stem_label_pos(d), c * along + s * across, s * along + c * across)
 
@@ -3235,7 +3263,7 @@ def _trace_hits(box, traces: list[np.ndarray]) -> int:
     """How many nucleotides of the traces (unpaired strands drawn along their projection) a name's box would sit on,
     counting the room their letters take beside them, plus the trace segments it would cross."""
     x0, y0, x1, y1 = box
-    reach = NT_ROW + _GLYPH_H / 2  # a nucleotide's bead and its letter beside it
+    reach = NT_ROW + _GLYPH_H * _GLYPH_K.get() / 2  # a nucleotide's bead and its letter beside it (glyph_scale)
     n = 0
     for pts in traces:
         n += int(
@@ -3277,15 +3305,16 @@ def _element_label_sides(layout: Layout, sses: list[SSE]) -> None:
     traces = [np.asarray(pts, float).reshape(-1, 2) for _, pts in sorted(layout.na_traces.items())]
     if not traces:
         return
+    k = glyph(layout)[0] / _GLYPH_W
     for p in layout.placed.values():
         if p.sse.kind not in ("H", "G"):
             continue
         p.label_side = 1
-        first = _trace_hits(_element_label_box(p), traces)
+        first = _trace_hits(_element_label_box(p, k), traces)
         if not first:
             continue
         p.label_side = -1
-        box = _element_label_box(p)
+        box = _element_label_box(p, k)
         taken = [q.rect for q in [*layout.placed.values(), *layout.ghosts] if q is not p]
         taken += [b for name, b in label_boxes(layout, sses) if name != f"label:{p.sse.id}"]
         if (
@@ -3310,7 +3339,9 @@ def _over_label_sides(layout: Layout) -> None:
     and of the other names, then lies nearest the middle (_OVER_ALONG: the middle, or a third of the way to either
     end), upper side first on a tie; so the name stays readable and clear of the loops."""
     strands = [q for q in [*layout.placed.values(), *layout.ghosts] if q.sse.kind == "E"]
-    letters = [centred_box(q.cx, q.cy, _GLYPH_W * len(q.label) / 2 + 0.05, _GLYPH_H / 2) for q in strands]
+    gw, gh = glyph(layout)
+    kg = gw / _GLYPH_W
+    letters = [centred_box(q.cx, q.cy, gw * len(q.label) / 2 + 0.05, gh / 2) for q in strands]
     ends = []
     for q in strands:
         for port, out in ((q.n_port, q.exit_n), (q.c_port, q.exit_c)):
@@ -3323,12 +3354,12 @@ def _over_label_sides(layout: Layout) -> None:
     for p in layout.placed.values():
         if not p.over:
             continue
-        names = [_element_label_box(q) for q in layout.placed.values() if q is not p and q.sse.kind in ("H", "G")]
+        names = [_element_label_box(q, kg) for q in layout.placed.values() if q is not p and q.sse.kind in ("H", "G")]
         best = None
         for k, along in enumerate(_OVER_ALONG):
             for side in (1, -1):
                 p.label_side, p.label_along = side, float(_snap(along * p.length))
-                box = _element_label_box(p)
+                box = _element_label_box(p, kg)
                 cost = (
                     sum(_box_overlap(box, e) > 0 for e in ends),
                     float(_snap(sum(_box_overlap(box, b) for b in letters + names))),
@@ -3612,8 +3643,8 @@ def label_boxes(
         )
         t = np.add(port, ex * END_LABEL)
         out.append((f"{end}:{chain}", centred_box(float(t[0]), float(t[1]), gw / 2 + 0.05, gh / 2)))
-    for k, d in enumerate(layout.stems):
-        out.append((f"stem-label:{k}", stem_keep_box(d) if route else _stem_label_box(d)))
+    for n, d in enumerate(layout.stems):
+        out.append((f"stem-label:{n}", stem_keep_box(d, k) if route else _stem_label_box(d, k)))
     for n, tie in enumerate(layout.na_ties):  # a long tie's labels at its two marks
         for end, (_, _, (x, y)) in enumerate(tie.marks):
             out.append((f"tie-label:{n}:{end}", centred_box(x, y, gw / 2 + 0.05, gh / 2)))

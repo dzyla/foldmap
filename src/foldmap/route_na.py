@@ -115,7 +115,7 @@ def route_nucleic(layout: Layout, router: _Router | None = None, loops=()) -> li
             for label, a, b in (("5′", pts[0], pts[1]), ("3′", pts[-1], pts[-2])):
                 v = np.subtract(a, b)
                 v = v / max(float(np.hypot(*v)), 1e-9)
-                end(s, label, tuple(float(c) for c in np.add(a, v * (NT_ROW + _GLYPH_W))))
+                end(s, label, tuple(float(c) for c in np.add(a, v * (NT_ROW + glyph(layout)[0]))))
                 exits[(s, 0 if label == "5′" else n - 1)] = (np.add(a, v * NT_STEP / 2), v, None)
             continue
         held = [i for i in range(n) if (s, i) in at]
@@ -163,7 +163,7 @@ def route_nucleic(layout: Layout, router: _Router | None = None, loops=()) -> li
             _use(router.grid, p.points, beside)
     for pts in loops:
         _use(router.grid, pts, beside_loops)
-    names = [stem_keep_box(d) for d in layout.stems]  # each name with the margin routes keep from it
+    names = [stem_keep_box(d, glyph(layout)[0] / _GLYPH_W) for d in layout.stems]  # each name with its margin
     routed = {}
     for s, i, j, da, db, kind in between:
         # a run with nucleotides may pay for the cells beside strands and protein loops too, one without

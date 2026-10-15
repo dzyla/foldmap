@@ -56,11 +56,17 @@ def test_every_name_and_chain_end_ink_lies_inside_its_route_keep_out_on_a_wide_p
     assert seen > 40
 
 
-def test_legend_rows_are_sized_from_their_text():
+def test_legend_rows_are_sized_from_their_text(monkeypatch):
     """Text drawn four times its usual size (Style.font_scale): the legend's row step (layout.glyph_scale) grows with
-    it, so its rows do not run into each other (1BL8's four chains wrap to two rows; at f57887a 1.0 page unit apart
-    under 1.4-unit text)."""
-    fig = make_figure(DATA / "1BL8.cif", look=Style(font_scale=4.0))
+    it, so its rows do not run into each other (twelve chain entries on 1UBQ's small page wrap to several rows; at
+    f57887a rows stood 1.0 page unit apart under 1.4-unit text)."""
+    from foldmap import render
+
+    def twelve(*a, **k):  # twelve chain entries, so the legend wraps
+        return [("#0072b2", f"Chain {c}") for c in "ABCDEFGHIJKL"]
+
+    monkeypatch.setattr(render, "_legend_entries", twelve)
+    fig = make_figure(DATA / "1UBQ.cif", look=Style(font_scale=4.0))
     inv = fig.axes[0].transData.inverted()
     inks = [inv.transform(b.get_points())[:, 1] for t, b in figcheck._ink_boxes(fig) if _legend(t)]
     rows: dict[float, tuple[float, float]] = {}  # a row (its entries share a baseline): its ink's low and high y
@@ -113,3 +119,27 @@ def test_a_page_held_at_its_largest_and_a_lower_png_dpi_are_told_on_the_command_
     assert "its PNG is " in err and "dpi, not 300" in err
     w, h = int.from_bytes(out.read_bytes()[16:20], "big"), int.from_bytes(out.read_bytes()[20:24], "big")
     assert w * h <= 200_000
+
+
+def test_glyph_room_without_a_layout_follows_the_text_size(monkeypatch):
+    """Batch C1 review (finding 5): an item's footprint and a stem's name box hold no layout; while build_layout runs
+    they take the glyph scale of its style's text (layout._GLYPH_K), as layout.glyph does for a layout, and 1
+    outside it (so at text size 1 nothing changes: bench and snapshots identical)."""
+    seen = []
+    real = layout._footprint
+    monkeypatch.setattr(layout, "_footprint", lambda m, k=None: seen.append(layout._GLYPH_K.get()) or real(m, k))
+    make_layout(DATA / "1UBQ.cif", look=Style(font_scale=2.0))
+    assert seen and set(seen) == {2.0} and layout._GLYPH_K.get() == 1.0
+    seen.clear()
+    make_layout(DATA / "1UBQ.cif")
+    assert set(seen) == {1.0}
+
+
+def test_stem_name_boxes_grow_with_the_text():
+    """Batch C1 review (finding 5): a stem's name box (its keep-out where its ink is not measured) is sized from the
+    text drawn, through layout.glyph."""
+    lay, sses, _ = make_layout(DATA / "1LMB.cif")
+    small = {n: b for n, b in label_boxes(lay, sses) if n.startswith("stem-label:")}
+    lay.font_scale = 2.0
+    big = {n: b for n, b in label_boxes(lay, sses) if n.startswith("stem-label:")}
+    assert small and all((big[n][2] - big[n][0]) > (small[n][2] - small[n][0]) for n in small)

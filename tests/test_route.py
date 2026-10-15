@@ -720,9 +720,10 @@ def test_a_helix_name_keeps_off_a_nucleotide_trace():
     assert h.label_side == -1
 
 
-def test_a_mirror_copys_name_follows_its_mate():
+def test_a_mirror_copys_name_follows_its_mate(caplog):
     """Fix round 1: copies drawn as mirror images are named alike (_mirror_sides): when the mate's name moves to
-    the other side, its mirror copy's goes with it."""
+    the other side, its mirror copy's goes with it (and the campaign's count says two names moved)."""
+    caplog.set_level(logging.DEBUG, logger="foldmap.route")
     lay, mate, loop, y, room = _name_in_the_way()
     copy = bar(30, 5.0, 0.0, 3.0, np.pi)
     copy.label = mate.label
@@ -730,6 +731,7 @@ def test_a_mirror_copys_name_follows_its_mate():
     lay.mirror_pairs = [(copy.sse.id, mate.sse.id)]
     route._clear_helix_names(lay, [mate.sse, copy.sse], [loop])
     assert mate.label_side == -1 and copy.label_side == -1
+    assert "2 helix names moved off lines" in caplog.text
 
 
 def test_no_helix_name_of_1eyg_sits_on_a_nucleotide_trace():
