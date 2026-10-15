@@ -1099,8 +1099,9 @@ order check and the sheet plates to follow. Larger than an M change; left for a 
 partner p that lies on the same side of p as the strand q next to it in the order, both pairing with p, their
 spans along p at most 5 Å apart and overlapping by at most 1 Å, shares q's column (`Sheet.columns`).
 `layout._sheet_item` draws a column's strands one above the other as their centroids lie along the sheet's up
-(`_column_heights`), at least `_STACK_PAD` (1.0) apart, room for the loops leaving their facing ends (at 0.2,
-5KQJ's B and F loops had no route); the order check reads a block by its columns (`figcheck._by_column`). 5KQJ:
+(`_column_heights`), at least `_STACK_PAD` (1.2) apart, room for the loops leaving their facing ends (at 0.2,
+5KQJ's B and F loops had no route; at 1.0 5JB1's two, in the full run; 1.5 and 2.0 moved its loop counts onto a label
+and a loop, so 1.2 is set on these five entries); the order check reads a block by its columns (`figcheck._by_column`). 5KQJ:
 C D E [F above B] A, as 3D (passes in every view). In the sample only 5JB1, 5X4Z, 7AOD (giants) and 8R5X (still
 passing) gain a shared column; 8UTF's two partners of a:278-301 are 27.6 Å apart and stay side by side. Bench
 identical; no snapshot changed. Fixture 5KQJ (14 KB).

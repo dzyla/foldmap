@@ -383,8 +383,8 @@ def _sheet_order(sheet: Sheet, frame: Frame) -> tuple[list[int], int, np.ndarray
     return order, s, cents
 
 
-_STACK_PAD = 1.0  # page units between two strands drawn one above the other in one column: room for the loops
-# leaving their facing ends (0.2 left 5KQJ's B and F loops no route)
+_STACK_PAD = 1.2  # page units between two strands drawn one above the other in one column: room for the loops
+# leaving their facing ends (0.2 left 5KQJ's B and F loops no route, 1.0 5JB1's; set on the 5 sample entries)
 
 
 def _column_heights(sheet: Sheet, order: list[int], s: int) -> dict[int, float]:
