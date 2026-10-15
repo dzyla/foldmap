@@ -281,6 +281,19 @@ class _Strands:
                 self.cells[c] = True
                 self.fixed_cells[c] |= fixed
 
+    def near(self, points, r: float) -> bool:
+        """Does any of the points lie within r of a strand drawn so far?"""
+        q = np.asarray(points, float).reshape(-1, 2)
+        if not len(q) or not self._parts:
+            return False
+        segs = np.vstack([seg for seg, _, _ in self._parts])
+        a, b = segs[:, None, 0:2], segs[:, None, 2:4]
+        ab = b - a
+        t = ((q[None] - a) * ab).sum(axis=2) / np.maximum((ab * ab).sum(axis=2), 1e-12)
+        t = np.clip(t, 0.0, 1.0)[..., None]
+        d = q[None] - (a + t * ab)
+        return bool((np.hypot(d[..., 0], d[..., 1]) < r).any())
+
     def crosses(self, pts, skip=None, fixed_only: bool = False) -> bool:
         """Does the polyline cross (properly, not merely touch) a strand drawn so far (a hairpin loop or free end
         only, with `fixed_only`), but a joint between the pieces `skip` (ids)?"""

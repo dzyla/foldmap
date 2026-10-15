@@ -105,11 +105,18 @@ ENTRIES = {  # fixture name -> (PDB id, what it is for)
         "the viral DNA C and D whole (assembly 1 doubles them): each DNA end is held by both inner chains, so "
         "unrolling the C2 tetramer drew each one turned 18-58 degrees from its 3D axis (random-100 C16)",
     ),
+    "9CJI-AB": (
+        "9CJI",
+        "a Cas12 effector's crRNA (chain B whole) and the protein windows that touch it, backbone only: its 3' end was "
+        "drawn turned onto the 5' end's line, nucleotides and beads on top of each other (random-100 C16, A17 "
+        "bead_overlaps)",
+    ),
 }
 Span = tuple[int, int]
 WINDOWS: dict[str, dict[str, Span | list[Span] | None]] = {  # fixture -> {chain: windows (first, last), None: whole}
     "3OWW-AB": {c: [(5, 12), (38, 45), (60, 70), (80, 88)] for c in "AB"},
     "3L9G-A": {"A": None},
+    "9CJI-AB": {"B": None, "A": [(10, 22), (740, 765), (784, 812), (850, 875)]},
     "3L2V-A": {"A": [(60, 75), (100, 118), (205, 230)], "C": None, "D": None},
     "2MJW-BD": {"B": None, "D": None},  # where the two RNAs pair
     "7FAB-HL": {"H": None, "L": None},
@@ -145,6 +152,7 @@ TRIMS: dict[str, dict] = {
     "2MJW-BD": {"first_model": True, "backbone": True},
     "6SO9": {"first_model": True, "backbone": True},
     "3L9G-A": {"atoms": ("N", "CA", "C", "O"), "no_protein_sequence": True, "drop": ("_atom_site_anisotrop.",)},
+    "9CJI-AB": {"backbone": True, "no_protein_sequence": True, "drop": ("_atom_site_anisotrop.",)},
     "3L2V-A": {"atoms": ("N", "CA", "C", "O"), "no_protein_sequence": True, "drop": ("_atom_site_anisotrop.",)},
     "1BXI": {
         "atoms": ("N", "CA", "C", "O", "CB", "ND1", "NE2", "SG", "OD1", "OD2", "OE1", "OE2", "NZ", "OG", "OG1", "SD")

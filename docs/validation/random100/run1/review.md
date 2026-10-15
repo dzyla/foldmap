@@ -644,6 +644,14 @@ chains (angle_median 40.6 -> 0, angle_max 58.3 -> 0, contact_auc 0.481 -> 0.833,
 passes in every view). 30QM (one of six stems shared) stays unrolled, as the NA campaign's C4 ruling keeps it; over
 the 39 NA entries and the 18 random-100 NA entries only 3L2V changes frame. Fixture 3L2V-A (24 KB). Bench identical.
 
+**Batch C2a result (9CJI):** bead_overlaps 2 was not a placement of the beads: the crRNA's 7-nt 3' end (B:22-28)
+was turned onto the line of its 5' end (B:4-7), which leaves the same end of the stem, so nucleotides B4/B25 and
+B5/B26 were drawn 0.1 apart with their beads on top of each other (a free end's straight or turned drawing was
+checked against elements, hairpin loops, its label and its partner's doorway, never against the strands drawn
+before it). `na_ends._tail` now takes, before any other, a drawing whose nucleotides keep a bead's width (`_BEAD`) off
+every strand drawn so far (`_Strands.near`); only when none does are the old drawings tried. 9CJI passes in every
+view. NA campaign: every metric of the 39 entries identical; bench identical. Fixture 9CJI-AB (21 KB).
+
 ### C17 (a): large membrane complexes, with TM helices off the band or no band (3 entries, + visual 1)
 
 **Entries:**

@@ -12,6 +12,7 @@ import numpy as np
 
 from .layout import NT_ROW, NT_STEP, Layout, PlacedStem, glyph
 from .na_paths import (
+    _BEAD,
     NAPath,
     _bow,
     _crosses_segment,
@@ -94,37 +95,44 @@ def _tail(
     doorway (_doorway) comes first: (path, end label position, outward direction at its tip). No drawing comes into
     another stem's hairpin loop (`circles`: (centre, radius, stem) of every hairpin loop, _enters): a gap leaving
     the end from there would cross the loop (4YBB). A free end the protein touches tries its turns nearest its
-    touching elements first (_toward), so it lies along what holds it (1URN's loop on U1A's RRM)."""
+    touching elements first (_toward), so it lies along what holds it (1URN's loop on U1A's RRM). Every drawing
+    whose nucleotides keep a bead's width (_BEAD) off the strands drawn so far comes before any that does not (9CJI's
+    3' end was turned onto its 5' end's line, nucleotides on top of each other)."""
     found = None
     tries = (True, False) if labels is not None else (False,)
     door = _doorway(d, key, five)
     turns = _toward(layout, d, s, key, nts, five)
-    for keep_door in (True, False):
-        for need_label in tries:
-            for turn in turns:
-                pts, xy, tip = _free_end(d, key, len(nts), five, turn)
-                drawn = [*(pts[::-1] if five else pts), tip]
-                if (
-                    _na_clear(drawn, (d,), router.elements, both=False)  # its tip never back in its stem
-                    and not _enters(drawn, circles, d)
-                    and not (keep_door and door is not None and _crosses_segment(drawn[:-1], *door))
-                    and (not need_label or _label_room(router, layout, tip, labels))
-                ):
-                    found = pts, xy, tip
+    for apart in (True, False) if strands is not None else (False,):  # off the strands drawn so far first
+        for keep_door in (True, False):
+            for need_label in tries:
+                for turn in turns:
+                    pts, xy, tip = _free_end(d, key, len(nts), five, turn)
+                    drawn = [*(pts[::-1] if five else pts), tip]
+                    if (
+                        _na_clear(drawn, (d,), router.elements, both=False)  # its tip never back in its stem
+                        and not _enters(drawn, circles, d)
+                        and not (keep_door and door is not None and _crosses_segment(drawn[:-1], *door))
+                        and (not need_label or _label_room(router, layout, tip, labels))
+                        and not (apart and strands.near(xy, _BEAD))  # never along another strand (9CJI)
+                    ):
+                        found = pts, xy, tip
+                        break
+                if found:
                     break
+            # routed: first off every cell a loop or strand uses; crossing them only as a cost when the doorway is
+            # given up
+            for strict, need_label in [(True, n) for n in tries] + ([] if keep_door else [(False, n) for n in tries]):
+                if found is not None or len(nts) <= _TAIL_ROUTED:
+                    break
+                room = labels if need_label else None
+                found = _routed_end(
+                    router, layout, d, key, len(nts), five, room, strands, door if keep_door else None, strict
+                )
+                if found is not None and _enters(found[3], circles, d):  # along its line out to its label
+                    found = None
+                found = found[:3] if found is not None else None
             if found:
                 break
-        # routed: first off every cell a loop or strand uses; crossing them only as a cost when the doorway is given up
-        for strict, need_label in [(True, n) for n in tries] + ([] if keep_door else [(False, n) for n in tries]):
-            if found is not None or len(nts) <= _TAIL_ROUTED:
-                break
-            room = labels if need_label else None
-            found = _routed_end(
-                router, layout, d, key, len(nts), five, room, strands, door if keep_door else None, strict
-            )
-            if found is not None and _enters(found[3], circles, d):  # along its line out to its label
-                found = None
-            found = found[:3] if found is not None else None
         if found:
             break
     pts, xy, tip = found or _free_end(d, key, len(nts), five)

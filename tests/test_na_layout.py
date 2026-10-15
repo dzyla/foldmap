@@ -449,6 +449,22 @@ def test_dna_held_by_both_protomers_is_not_unrolled():
     assert m["stems_drawn"] == 2 and m["angle_max"] == 0.0
 
 
+def test_a_free_end_never_runs_along_another_strand():
+    """9CJI (random-100 C16, A17 bead_overlaps 2): the crRNA's 7-nt 3' end was turned onto the line of its 5' end,
+    which leaves the same end of the stem; nucleotides 3 and 24 were drawn 0.1 apart (their beads on top of each
+    other). A free end's drawing whose nucleotides come within a bead's width of a strand drawn so far is passed
+    over, as one that crosses its partner's doorway is."""
+    from foldmap.na_paths import _BEAD
+
+    lay, sses, bb = make_layout(NA.parent / "r100" / "9CJI-AB.cif.gz")
+    route_loops(lay, sses, bb)
+    pts = [(p.kind, k, np.asarray(xy, float)) for p in lay.na_paths for k, xy in zip(p.nts, p.nt_xy)]
+    assert sum(kind == "tail" for kind, _, _ in pts) == 11
+    close = [(a, b) for i, (_, a, p) in enumerate(pts) for _, b, q in pts[i + 1 :] if np.hypot(*(p - q)) < _BEAD]
+    assert close == []
+    assert not any(p.fallback for p in lay.na_paths)
+
+
 def test_one_shared_stem_among_several_stays_unrolled():
     """30QM: one of six stems (P3) is held by both RT protomers; the NA campaign's C4 ruling keeps it unrolled (the
     linked stems turn at most 57°): rule (c) of na_torn_by_unrolling needs most pieces shared."""
