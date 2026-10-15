@@ -508,12 +508,32 @@ def test_protein_copies_in_contact_are_not_paired_but_base_pairs_are():
     """Fix round 2: 7OKA's ten trimers touch in up to 10 residue pairs of backbone N and O (crystal and assembly
     contacts), which merged them into one object (and drew chain A alone). Only nucleotides' base pairs count: two
     protein chains with 20 backbone N...O contacts are not paired; two RNAs with 4 base-atom contacts (3OWW's measured
-    count; PAIRED_MIN is 2) are, and one contact pair is not."""
+    count; PAIRED_MIN is 3) are, and one contact pair is not."""
     from foldmap.io import PAIRED_MIN, _paired
 
     prot = [("N", 0.0, 0.0), ("O", 1.0, 0.0)]
     assert not _paired([_chain("A", "ALA", prot, 20, 0.0)], [_chain("B", "ALA", prot, 20, 0.2)])
     base = [("N1", 0.0, 0.0), ("O6", 1.0, 0.0)]
     rna = lambda name, shift, n: _chain(name, "G", base, n, shift)  # noqa: E731
-    assert PAIRED_MIN == 2 and _paired([rna("A", 0.0, 4)], [rna("B", 0.2, 4)])
+    assert PAIRED_MIN == 3 and _paired([rna("A", 0.0, 4)], [rna("B", 0.2, 4)])
     assert not _paired([rna("A", 0.0, 1)], [rna("B", 0.2, 1)]) and PAIRED_MIN > 1
+
+
+def test_a_lattice_contact_of_two_base_pairs_is_no_pairing():
+    """Batch B's NA campaign: 4PLX's three MALAT1 triple helices touch in the crystal by one swapped pair of bases (A28
+    with B71 and A71 with B28: 2 residue pairs), which made all three one object at PAIRED_MIN 2, drew the
+    asymmetric unit, and gave the NA campaign a run crossing. 3OWW's paired dimer has 4. Two contact pairs are no
+    pairing, three are."""
+    import gemmi
+
+    from foldmap.io import _paired
+
+    def rna(name, shift, n):  # n guanines 12 A apart: each pairs with the other chain's same one only
+        ch = _chain(name, "G", [("N1", 0.0, 0.0), ("O6", 1.0, 0.0)], n, shift)
+        for i, r in enumerate(ch):
+            for a in r:
+                a.pos = gemmi.Position(a.pos.x + 8.0 * i, a.pos.y, a.pos.z)
+        return ch
+
+    assert not _paired([rna("A", 0.0, 2)], [rna("B", 0.2, 2)])
+    assert _paired([rna("A", 0.0, 3)], [rna("B", 0.2, 3)])

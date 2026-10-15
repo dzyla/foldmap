@@ -263,10 +263,11 @@ def _polymer_kinds(chains) -> set[str]:
     return out
 
 
-PAIRED_MIN = 2  # residue pairs of two chains' nucleotides with polar base atoms this near: held together (_paired)
+PAIRED_MIN = 3  # residue pairs of two chains' nucleotides with polar base atoms this near: held together (_paired)
 _PAIR_DIST = 3.4  # angstrom
 _BASE_POLAR = frozenset({"N1", "N3", "N2", "N4", "N6", "N7", "O2", "O4", "O6"})
-# 3OWW's two RNAs pair in 4 residue pairs at _PAIR_DIST (A41-B84, A84-B41, A64-B7, A65-B65): twice PAIRED_MIN. Chains
+# 3OWW's two RNAs pair in 4 residue pairs at _PAIR_DIST (A41-B84, A84-B41, A64-B7, A65-B65); 4PLX's three copies touch
+# in the crystal by one swapped pair of bases (A28-B71, A71-B28: 2), which is no pairing (it drew the ASU). Chains
 # of a protein only never count (their backbone contacts in a crystal or an assembly are no pairing: 7OKA's ten
 # trimers touch in up to 10 residue pairs).
 
