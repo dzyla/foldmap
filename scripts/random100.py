@@ -1532,6 +1532,15 @@ def run_view(view: str, path: Path, name: str, work: Path, focus: str | None = N
     return r
 
 
+def focus_target(d: dict) -> str:
+    """The focus view's --focus: 'none' (the whole file) when the default view drew part of it (a scope the chains
+    or the nucleic-acid crop left out), else the first protein chain alone. A chain "not drawn" because it has
+    nothing to draw (C15) is no scope: 7ARD and 7PIU keep their single-chain focus view."""
+    scope = d.get("scope") or {}
+    scoped = scope.get("chains_reason") or scope.get("crop")
+    return "none" if scoped or not d.get("first_protein_chain") else d["first_protein_chain"]
+
+
 def run_entry(source: str, out: Path, views=VIEWS, info: dict | None = None) -> dict:
     """Draw and measure one entry (a sampled id, or a local file) in every view that applies; judged by criteria.
     info: the entry's line of sample.json (stratum, bin, pair ...); refusal: a CA-only or P-only id (A1c), drawn in
@@ -1565,8 +1574,7 @@ def run_entry(source: str, out: Path, views=VIEWS, info: dict | None = None) -> 
             run("deposited")
             run("beta")
         if f["chains"] >= 2:  # the whole file when the default drew part, else the first protein chain alone
-            scoped = (d.get("scope") or {}).get("reason")
-            run("focus", "none" if scoped or not d.get("first_protein_chain") else d["first_protein_chain"])
+            run("focus", focus_target(d))
         if len(d.get("protein_chains_drawn", [])) >= 2:
             run("domains")
         if e.get("stratum") == "S6":

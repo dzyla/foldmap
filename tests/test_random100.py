@@ -585,3 +585,26 @@ def test_stem_gap_limit_reads_a_block_name_at_its_own_size(r100):
     px = ax.transData.transform((1, 0))[0] - ax.transData.transform((0, 0))[0]
     em = label.get_fontsize() * d.figure.dpi / 72 / px
     assert r100.stem_gap_limit(d.figure) == pytest.approx(figcheck.stem_gap_tolerance(_INK_MARGIN * em))
+
+
+def test_a_chain_with_nothing_to_draw_does_not_widen_the_focus_view(r100):
+    """C15 fix round 1: "not drawn: chain P" is part of the scope's reason but no scope the default view left out of
+    the chains, so 7ARD and 7PIU keep their single-chain focus view (area 538, not 18,984)."""
+    r = r100.focus_target
+    assert (
+        r({"scope": {"reason": "not drawn: chain P", "chains_reason": "", "crop": ""}, "first_protein_chain": "A"})
+        == "A"
+    )
+    assert (
+        r(
+            {
+                "scope": {"reason": "x", "chains_reason": "assembly 1, one of 2 copies", "crop": ""},
+                "first_protein_chain": "A",
+            }
+        )
+        == "none"
+    )
+    assert (
+        r({"scope": {"reason": "x", "chains_reason": "", "crop": "RNA cropped"}, "first_protein_chain": "A"}) == "none"
+    )
+    assert r({"scope": {}, "first_protein_chain": ""}) == "none"
