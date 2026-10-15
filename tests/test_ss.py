@@ -272,3 +272,18 @@ def test_a_helix_broken_in_one_copy_is_broken_in_every_copy():
     for c in "AC":
         assert (c, helix[1], 27) in got and (c, 29, helix[2]) in got, sorted(h for h in got if h[0] == c)[:6]
     assert {h for h in got if h[0] in "BD"} == {h for h in whole if h[0] in "BD"}
+
+
+def test_a_helix_broken_in_one_copy_of_three_is_joined_again():
+    """The majority decides: bacteriorhodopsin's trimer (1C3W, assembly 1: three copies) with one copy's helix broken
+    by hand at one residue is joined there again, as the two others have it; their helices are not cut (one noisy
+    copy of many, as 7JU4's tubulins, does not split every copy)."""
+    bb = load_backbone(Path(__file__).parent / "data" / "1C3W.cif", "auto")
+    ss = list(assign_dssp(bb).ss)
+    plain = {(s.chain, s.first.seq, s.last.seq) for s in build_sses(bb, "".join(ss))}
+    chains = sorted({c for c, _, _ in plain})
+    assert len(chains) == 3
+    c, a, b = next(h for h in sorted(plain) if h[0] == chains[0] and h[2] - h[1] >= 20)
+    k = next(i for i, l in enumerate(bb.labels) if l.chain == c and l.seq == (a + b) // 2)
+    ss[k] = "T"
+    assert {(s.chain, s.first.seq, s.last.seq) for s in build_sses(bb, "".join(ss))} == plain

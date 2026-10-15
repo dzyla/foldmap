@@ -100,7 +100,7 @@ class _Grid:
         for cells in self.over.values():
             self.soft |= cells
         self.blocked |= self.soft
-        self.toll = np.zeros((self.nx, self.ny))  # extra cost of entering a cell (text placed after routing)
+        self.toll: np.ndarray | None = None  # extra cost of entering a cell (text placed after routing), when set
         self.slab = np.zeros((self.nx, self.ny), bool)  # cells strictly inside the membrane band (one per row)
         if layout.membrane:
             for lo, hi in layout.membrane.get("bands", [layout.membrane["y"]]):
@@ -274,6 +274,7 @@ def _astar(grid: _Grid, start, start_dir, goal, goal_dir, max_nodes: int = _MAX_
     heapq.heapify(heap)
     parent: dict = {}
     nodes = 0
+    toll = grid.toll
     while heap:
         _, _, g, x, y, d, done = heapq.heappop(heap)
         if done:
@@ -300,7 +301,8 @@ def _astar(grid: _Grid, start, start_dir, goal, goal_dir, max_nodes: int = _MAX_
                 continue
             cost = g + 1 + (_TURN if nd != d else 0) + (_REUSE if grid.used[nx_, ny_] else 0)
             cost += (_SLAB_RUN if nd in (0, 2) else _SLAB_COST) if grid.slab[nx_, ny_] else 0
-            cost += grid.toll[nx_, ny_]
+            if toll is not None:
+                cost += toll[nx_, ny_]
             key = (nx_, ny_, nd)
             if cost < best.get(key, math.inf):
                 best[key] = cost
@@ -672,7 +674,7 @@ def _off_na_text(layout: Layout, router: _Router, loops: list[Loop]) -> None:
         return
     grid = router.grid
     text = grid._mask(boxes)
-    grid.toll[text] += _NA_TEXT_TOLL
+    grid.toll = np.where(text, _NA_TEXT_TOLL, 0.0)
     for k in hit:
         lp = loops[k]
         pa, pb = layout.placed[lp.a_id], layout.placed[lp.b_id]
@@ -692,4 +694,4 @@ def _off_na_text(layout: Layout, router: _Router, loops: list[Loop]) -> None:
                 grid.used[c] = max(grid.used[c] - 1, 0)
         for c in cells:
             grid.used[c] += 1
-    grid.toll[text] -= _NA_TEXT_TOLL
+    grid.toll = None

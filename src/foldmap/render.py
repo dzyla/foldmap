@@ -1232,8 +1232,11 @@ def _over_bodies(c, targets, bodies) -> float:
     """How much of the tethers from spot c runs over element bodies (`bodies`, their boxes): each tether counted
     over every body but the one its target lies on (random-100 C9)."""
     total = 0.0
+    boxes = np.asarray(bodies, float).reshape(-1, 4)
     for t in targets:
-        for b in bodies:
+        lo, hi = np.minimum(c, t), np.maximum(c, t)
+        near = (boxes[:, 0] < hi[0]) & (boxes[:, 2] > lo[0]) & (boxes[:, 1] < hi[1]) & (boxes[:, 3] > lo[1])
+        for b in boxes[near]:
             if not (b[0] <= t[0] <= b[2] and b[1] <= t[1] <= b[3]):
                 total += clip_len(c, t, b)
     return total

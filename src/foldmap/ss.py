@@ -177,29 +177,57 @@ _BREAK_MAX = 2  # residues: a helix broken by this few in one copy of a protein 
 
 def _copy_breaks(helices: list[tuple[int, int]], bb: Backbone, copies) -> list[tuple[int, int]]:
     """Helix runs broken alike in every copy of a protein: where DSSP breaks a helix by up to _BREAK_MAX residues in
-    one copy (two runs, chain-contiguous) and a copy's run covers that place whole, the whole run is cut there, at
-    the same residue numbers (copies() as in model.homolog_chains), the residues between in no piece; each piece
-    still a helix's length (_MIN_HELIX_ANY). 7OKA: 225-231 + 233-238 in B and C, 225-238 in A."""
-    breaks = [
+    some copies (two runs, chain-contiguous) and other copies' runs cover that place whole, the majority decides, a
+    tie breaking: the whole runs are cut there, at the same residue numbers (copies() as in model.homolog_chains),
+    the residues between in no piece, each piece still a helix's length (_MIN_HELIX_ANY); or the broken copies' two
+    runs are joined into one. 7OKA: 225-231 + 233-238 in B and C, 225-238 in A: A is cut. One copy of many broken
+    does not cut all the others (7JU4's tubulins)."""
+    pairs = [
         (x, y)
         for x, y in zip(helices, helices[1:])
         if bb.labels[x[0]].chain == bb.labels[y[0]].chain
         and 1 <= y[0] - x[1] - 1 <= _BREAK_MAX
         and bool(bb.prev[x[1] + 1 : y[0] + 1].all())
     ]
-    if not breaks:
+    if not pairs:
         return helices
     at = {(l.chain, l.seq): k for k, l in enumerate(bb.labels)}
-    gaps = {}  # (root, last number before the break, first after) -> True
-    for x, y in breaks:
+    broken: dict[tuple, set[str]] = {}  # (root, last number before the break, first after) -> chains broken there
+    for x, y in pairs:
         root, _, xb, ya, _ = _span(bb, copies(), x, y)
-        gaps[(root, xb, ya)] = True
-    out = []
+        broken.setdefault((root, xb, ya), set()).add(bb.labels[x[0]].chain)
+
+    def ref(a: int, b: int) -> tuple[str, int, int]:
+        root, shift = copies()[bb.labels[a].chain]
+        return root, bb.labels[a].seq - shift, bb.labels[b].seq - shift
+
+    whole: dict[tuple, set[str]] = {g: set() for g in broken}
     for a, b in helices:
+        root, lo, hi = ref(a, b)
+        for g in broken:
+            if g[0] == root and lo <= g[1] and g[2] <= hi:
+                whole[g].add(bb.labels[a].chain)
+    cut = {g for g in broken if whole[g] and len(broken[g]) >= len(whole[g])}
+    join = {g for g in broken if whole[g] and len(broken[g]) < len(whole[g])}
+    merged: dict[int, int] = {}  # a broken run's start -> the end of the run it joins
+    for x, y in pairs:
+        root, _, xb, ya, _ = _span(bb, copies(), x, y)
+        if (root, xb, ya) in join:
+            merged[x[0]] = y[1]
+    out = []
+    skip = set()
+    for a, b in helices:
+        if a in skip:
+            continue
+        if a in merged:  # joined with the next run, as the other copies have it
+            b = merged[a]
+            skip |= {c for c, _ in helices if a < c <= b}
+            out.append((a, b))
+            continue
         chain = bb.labels[a].chain
-        root, shift = copies()[chain]
-        lo, hi = bb.labels[a].seq - shift, bb.labels[b].seq - shift
-        cuts = sorted((xb, ya) for r, xb, ya in gaps if r == root and lo <= xb and ya <= hi and xb < ya)
+        root, lo, hi = ref(a, b)
+        shift = copies()[chain][1]
+        cuts = sorted((xb, ya) for r, xb, ya in cut if r == root and lo <= xb and ya <= hi and xb < ya)
         pieces, start = [], a
         for xb, ya in cuts:
             end, nxt = at.get((chain, xb + shift)), at.get((chain, ya + shift))
