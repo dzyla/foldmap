@@ -740,3 +740,16 @@ def test_no_helix_name_of_1eyg_sits_on_a_nucleotide_trace():
     traces = [np.asarray(p, float).reshape(-1, 2) for _, p in sorted(lay.na_traces.items())]
     assert traces
     assert [k for k, p in lay.placed.items() if p.sse.kind in "HG" and _trace_hits(_element_label_box(p), traces)] == []
+
+
+def test_protein_loops_keep_off_the_nucleotide_letters():
+    """C11 (random-100): protein loops are routed before the nucleic acid's single strands, whose letters and 5'/3'
+    labels are placed after, so the RRM loops of 6SO9 ran across three letters and the 3' label of its bound
+    6-mer. A loop crossing NA text is routed again around it, once that text is placed (none dropped, none moved)."""
+    from foldmap import figcheck
+    from foldmap.spec import draw_spec, figure_spec
+
+    d = draw_spec(figure_spec(DATA / "r100" / "6SO9.cif.gz"))
+    assert len(d.layout.na_letters) == 6 and not any(lp.fallback for lp in d.loops)
+    hits = [h for h in figcheck.text_collisions(d) if h.startswith("na:")]
+    assert hits == [], hits

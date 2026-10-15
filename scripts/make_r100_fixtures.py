@@ -89,6 +89,11 @@ ENTRIES = {  # fixture name -> (PDB id, what it is for)
         "urate oxidase, chain A (assembly 1: four copies by symmetry), backbone only: its copies share sheets, so "
         "the domains view parted their domains for ever and exploded the page (random-100 C31)",
     ),
+    "6SO9": (
+        "6SO9",
+        "an RRM and its bound 6-nt RNA (NMR model 1; protein backbone only): two protein loops ran across the RNA's "
+        "letters, routed before the RNA was (random-100 C11)",
+    ),
 }
 Span = tuple[int, int]
 WINDOWS: dict[str, dict[str, Span | list[Span] | None]] = {  # fixture -> {chain: windows (first, last), None: whole}
@@ -124,6 +129,7 @@ TRIMS: dict[str, dict] = {
     },
     "6B5W": {"first_model": True, "backbone": True},
     "8Q4O": {"first_model": True},
+    "6SO9": {"first_model": True, "backbone": True},
     "3L9G-A": {"atoms": ("N", "CA", "C", "O"), "no_protein_sequence": True, "drop": ("_atom_site_anisotrop.",)},
     "1BXI": {
         "atoms": ("N", "CA", "C", "O", "CB", "ND1", "NE2", "SG", "OD1", "OD2", "OE1", "OE2", "NZ", "OG", "OG1", "SD")

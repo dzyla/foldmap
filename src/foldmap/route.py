@@ -100,6 +100,7 @@ class _Grid:
         for cells in self.over.values():
             self.soft |= cells
         self.blocked |= self.soft
+        self.toll = np.zeros((self.nx, self.ny))  # extra cost of entering a cell (text placed after routing)
         self.slab = np.zeros((self.nx, self.ny), bool)  # cells strictly inside the membrane band (one per row)
         if layout.membrane:
             for lo, hi in layout.membrane.get("bands", [layout.membrane["y"]]):
@@ -299,6 +300,7 @@ def _astar(grid: _Grid, start, start_dir, goal, goal_dir, max_nodes: int = _MAX_
                 continue
             cost = g + 1 + (_TURN if nd != d else 0) + (_REUSE if grid.used[nx_, ny_] else 0)
             cost += (_SLAB_RUN if nd in (0, 2) else _SLAB_COST) if grid.slab[nx_, ny_] else 0
+            cost += grid.toll[nx_, ny_]
             key = (nx_, ny_, nd)
             if cost < best.get(key, math.inf):
                 best[key] = cost
@@ -636,5 +638,58 @@ def route_loops(layout: Layout, sses: list[SSE], bb) -> list[Loop]:
         from .route_na import route_nucleic
 
         layout.na_paths = route_nucleic(layout, router, [pts for pts, _, _ in routed.values()])
+        _off_na_text(layout, router, out)
     _clear_helix_names(layout, sses, out)
     return out
+
+
+_NA_TEXT_PAD = 0.1  # ems a protein loop keeps from the nucleic acid's text (letters, 5'/3'), beyond its ink
+_NA_TEXT_TOLL = 25.0  # the extra cost of a cell of that text, while such a loop is routed again
+
+
+def _text_hits(points, boxes) -> int:
+    return sum(any(clip_len(p, q, b) > 0 for p, q in zip(points, points[1:])) for b in boxes)
+
+
+def _better(new, old, boxes, text) -> bool:
+    """Does route `new` cross less nucleic-acid text (`boxes`) than `old`, and no more text in all (`text`: the
+    names and stubs routes keep out of)?"""
+    fewer = _text_hits(new, boxes) < _text_hits(old, boxes)
+    return fewer and _text_hits(new, [*boxes, *text]) < _text_hits(old, [*boxes, *text])
+
+
+def _off_na_text(layout: Layout, router: _Router, loops: list[Loop]) -> None:
+    """In place: a protein loop crossing the nucleic acid's text (its letters and 5'/3' labels, placed only after the
+    loops were routed: layout.na_text_boxes) is routed again with that text as a keep-out, and takes the new route
+    when it crosses less of it (random-100 C11: 6SO9's RRM loops ran over the bound RNA's letters). Fallback
+    curves and kinks stay as they are; a loop with no better route keeps its own."""
+    from .layout import _ink_em, na_text_boxes
+
+    g = _NA_TEXT_PAD * _ink_em(layout, layout.font_scale)
+    boxes = [(x0 - g, y0 - g, x1 + g, y1 + g) for x0, y0, x1, y1 in na_text_boxes(layout)]
+    hit = [k for k, lp in enumerate(loops) if not lp.fallback and len(lp.points) > 2 and _text_hits(lp.points, boxes)]
+    if not hit:
+        return
+    grid = router.grid
+    text = grid._mask(boxes)
+    grid.toll[text] += _NA_TEXT_TOLL
+    for k in hit:
+        lp = loops[k]
+        pa, pb = layout.placed[lp.a_id], layout.placed[lp.b_id]
+        cells = sorted({c for p, q in zip(lp.points, lp.points[1:]) for c in grid.cells_along(p, q)})
+        for c in cells:  # its own cells free while it looks again
+            grid.used[c] = max(grid.used[c] - 1, 0)
+        best, over = None, False
+        for ea, eb in _over_exits(pa, pb):
+            best, over = router.route(pa.c_port, ea, pa, pb.n_port, eb, pb, loose=(pa.over, pb.over))
+            if best is not None:
+                break
+        if best is not None and _better(best, lp.points, boxes, router.keep_out):
+            loops[k] = Loop(lp.a_id, lp.b_id, [(float(x), float(y)) for x, y in best], lp.dashed, False, over)
+            continue
+        if best is not None:  # not taken: give back the cells drawn() marked
+            for c in sorted({c for p, q in zip(best, best[1:]) for c in grid.cells_along(p, q)}):
+                grid.used[c] = max(grid.used[c] - 1, 0)
+        for c in cells:
+            grid.used[c] += 1
+    grid.toll[text] -= _NA_TEXT_TOLL

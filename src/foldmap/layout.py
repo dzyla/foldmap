@@ -256,6 +256,8 @@ class Layout:
     tied_ids: set[str] = field(default_factory=set)  # ids of the elements of every item a symmetry tie holds, copy
     # and mate alike (a sheet block among them is drawn as its mate is: figcheck.shared_sheet_elements)
     font_scale: float = 1.0  # Style.font_scale the figure is drawn with (texts placed in the layout are sized by it)
+    na_letter_rows: tuple[float | None, bool] = (None, False)  # where a stem's base letters sit (NT_ROW, 0 on the
+    # rails, None: not drawn) and whether single-stranded letters are drawn, as render draws them (na_text_boxes)
     ligands: str = "auto"  # Style.ligands the figure is drawn with (auto hides additives: scope.drawn_scope names them)
     coil_chains: list[tuple[str, int]] = field(default_factory=list)  # (chain, residues) of each protein chain read
     # with no helix or strand: nothing of it can be drawn (scope.drawn_scope says so)
@@ -3291,6 +3293,7 @@ def _choose_label_sides(layout: Layout, sses: list[SSE], style: Style, mirrored:
     rects += [b for name, b in label_boxes(Layout(layout.placed, layout.bounds), []) if name.startswith("label:")]
     na_style = "block" if style.na_style == "ladder" and layout.na_cropped else style.na_style  # as render draws it
     row = {"ladder": NT_ROW, "letters": 0.0}.get(na_style) if style.nucleotide_labels else None  # stems' letters
+    layout.na_letter_rows = (row, bool(style.nucleotide_labels) and na_style != "block")
     bases = [s.bases for s in layout.nucleic.strands] if layout.nucleic is not None else []
     chains = [s.chain for s in layout.nucleic.strands] if layout.nucleic is not None else []
     seqs = [[lab.seq for lab in s.labels] for s in layout.nucleic.strands] if layout.nucleic is not None else []
@@ -3412,6 +3415,33 @@ def _grown(box, pad: float) -> tuple[float, float, float, float]:
 def _element_label_box(p: Placed) -> tuple[float, float, float, float]:
     """The box around a helix's name."""
     return centred_box(*helix_label_pos(p), _GLYPH_W * len(p.label) / 2 + 0.05, _GLYPH_H / 2)
+
+
+def na_text_boxes(layout: Layout) -> list[tuple[float, float, float, float]]:
+    """The ink boxes of the nucleic acid's text as render draws it, for protein loops to keep off once it is placed
+    (route.route_loops, random-100 C11): each single-stranded nucleotide's letter (Layout.na_letters), each stem's
+    base letters on their row (Layout.na_letter_rows) and the strands' 5'/3' labels (a full em, bold)."""
+    na = layout.nucleic
+    row, single = layout.na_letter_rows
+    if na is None:
+        return []
+    em = _ink_em(layout, layout.font_scale)
+    out = []
+
+    def add(text: str, bold: bool, size: float, angle: float, at) -> None:
+        if text.strip():
+            out.append(tuple(_reach(_ink_points(text, bold, size, angle) + np.asarray(at, float))))
+
+    if single:
+        for (s, i), xy in sorted(layout.na_letters.items()):
+            add(na.strands[s].bases[i], False, _LETTER_EM * em, 0.0, xy)
+    if row is not None:
+        for d in layout.stems:
+            for key in sorted(d.axial):
+                add(na.strands[key[0]].bases[key[1]], False, _LETTER_EM * em, d.angle, d.point(key, row))
+    for _, end, xy in layout.na_ends:
+        add(end, True, em, 0.0, xy)
+    return out
 
 
 def thin_boxes(points, pad: float = 0.06) -> list[tuple[float, float, float, float]]:
