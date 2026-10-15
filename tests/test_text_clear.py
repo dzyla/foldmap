@@ -147,6 +147,21 @@ def test_a_ligand_is_never_left_without_a_mark():
     assert spot is not None
 
 
+def test_a_ligand_boxed_in_by_elements_and_text_still_gets_a_mark():
+    """Batch B's campaign: on 7QUP's 65-chain page GTP:9E500 found no spot clear of elements and text within
+    _SPOT_RADIUS and was dropped (90 ligand names -> 89). The search widens ring by ring past that radius, and a mark
+    with nowhere clear at all is put at its anchor: never dropped."""
+    from foldmap.render import _SPOT_RADIUS, _place_mark
+
+    anchor, half = np.array([0.0, 0.0]), (0.3, 0.3)
+    r = _SPOT_RADIUS + 0.5
+    near = [(-r, -r, r, r)]  # an element box over every spot within the search radius
+    spot = _place_mark(anchor, half, [(1.0, 0.0)], near, [], [], [])
+    assert spot is not None and max(abs(spot[0]), abs(spot[1])) > r
+    everywhere = [(-1e3, -1e3, 1e3, 1e3)]
+    assert _place_mark(anchor, half, [(1.0, 0.0)], everywhere, [], [], []) is not None
+
+
 def test_every_chosen_ligand_of_a_crowded_page_has_a_mark():
     """Same, end to end: 1GOX's FMN and 1BXI's metal, with a loop line laid over every spot near each."""
     spec = figure_spec(R100 / "1BXI.cif.gz")

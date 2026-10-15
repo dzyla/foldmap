@@ -1158,6 +1158,7 @@ LIGAND_FILL, LIGAND_EDGE = "#fff1c1", "#b8860b"
 _LIGAND_TETHERS = 4  # a ligand is tethered to the elements it touches most, at most this many
 _TETHER_REACH = 6.5  # page units: a tether target farther than this from the heaviest one is another pocket
 _SPOT_RADIUS = 3.0  # the spot search stops at this ring radius
+_SPOT_FAR = 3  # ... and, when nothing is clear within it, at this many times it (then the mark goes on its anchor)
 # A tether to another chain's residue is at most _TETHER_REACH from the home chain's heaviest target, and the marker
 # is within _SPOT_RADIUS of the anchor (an average of the targets): TETHER_CAP bounds the cross-chain tethers
 # measured from the marker when the home targets are close to the heaviest.
@@ -1238,7 +1239,7 @@ def _over_bodies(c, targets, bodies) -> float:
     return total
 
 
-def _mark_spot(anchor, half, targets, taken, texts, tethers, bodies=()):
+def _mark_spot(anchor, half, targets, taken, texts, tethers, bodies=(), radius=_SPOT_RADIUS):
     """The first spot on rings round the anchor whose mark (grown by 0.08) is clear of `taken` and of the tethers
     drawn before, and whose own tethers cross no text, lengthening none past the first clear spot's (the plan-11
     spot); where its tethers run over element bodies (`bodies`), the spot within _SPOT_MORE_RINGS rings further whose
@@ -1246,7 +1247,7 @@ def _mark_spot(anchor, half, targets, taken, texts, tethers, bodies=()):
     None when there is none within _SPOT_RADIUS."""
     spot = free = None
     best, last_ring = None, None
-    for n, ring in enumerate(np.arange(0.0, _SPOT_RADIUS, 0.35)):
+    for n, ring in enumerate(np.arange(0.0, radius, 0.35)):
         if last_ring is not None and n > last_ring:
             break
         for angle in np.linspace(0, 2 * np.pi, max(1, int(ring * 10)), endpoint=False):
@@ -1276,12 +1277,15 @@ def _mark_spot(anchor, half, targets, taken, texts, tethers, bodies=()):
 def _place_mark(anchor, half, targets, taken, lines, texts, tethers, bodies=()):
     """A ligand's spot: clear of the loops' lines and the tethers drawn before where there is room, else of the
     elements and text only (the tethers' crossings given up), else of the elements and text with every tether given
-    up: a chosen ligand is never left without a mark (C5 fix round 1: 6JO6 lost 24 on a crowded page)."""
+    up; else further out, else on its anchor: a chosen ligand is never left without a mark (C5 fix round 1: 6JO6 lost
+    24 on a crowded page; batch B: 7QUP lost one with nothing clear within _SPOT_RADIUS)."""
     for blocked, drawn in ((taken + lines, tethers), (taken, tethers), (taken, ())):
         spot = _mark_spot(anchor, half, targets, blocked, texts, drawn, bodies)
         if spot is not None:
             return spot
-    return None
+    # nothing clear within _SPOT_RADIUS (7QUP's crowded page dropped GTP:9E500): further out, else on the anchor
+    spot = _mark_spot(anchor, half, targets, taken, texts, (), bodies, radius=_SPOT_FAR * _SPOT_RADIUS)
+    return spot if spot is not None else np.asarray(anchor, float)
 
 
 def _disulfide_lines(layout: Layout, loops: list[Loop], sses: list[SSE], look: Style) -> list[tuple]:
