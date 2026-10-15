@@ -2,6 +2,7 @@
 
 import dataclasses
 import math
+from itertools import combinations
 from pathlib import Path
 
 import numpy as np
@@ -147,6 +148,33 @@ def test_overlap_of_two_outlines_is_measured_on_their_area():
     assert figcheck.outline_overlap(square, corner) == pytest.approx(0.25, abs=0.03)  # 1 of the square's 4
     inside = MPath([(2, 2), (3.5, 2), (3.5, 3.5), (2, 3.5), (2, 2)], closed=True)  # in the L's box, not on the L
     assert figcheck.outline_overlap(l_shape, inside) == 0.0
+
+
+def test_a_panel_in_another_panels_hole_does_not_overlap_it():
+    """C21 (random-100): a panel with a hole (another domain's element interleaved in it: the contour's inner ring
+    runs the other way) is filled around the hole, as Agg fills by the nonzero rule; the overlap measure counted
+    the hole as inside (Path.contains_points tests each ring alone). A panel in the hole is clear of it; one across
+    the ring still overlaps."""
+    ring = MPath.make_compound_path(
+        MPath([(0, 0), (6, 0), (6, 6), (0, 6), (0, 0)], closed=True),
+        MPath([(2, 2), (2, 4), (4, 4), (4, 2), (2, 2)], closed=True),  # clockwise: the hole
+    )
+    island = MPath([(2.2, 2.2), (3.8, 2.2), (3.8, 3.8), (2.2, 3.8), (2.2, 2.2)], closed=True)
+    assert figcheck.outline_overlap(ring, island) == 0.0
+    across = MPath([(3, 3), (5, 3), (5, 3.8), (3, 3.8), (3, 3)], closed=True)  # half in the hole, half on the ring
+    assert figcheck.outline_overlap(ring, across) == pytest.approx(0.5, abs=0.05)
+
+
+def test_interleaved_copies_panels_are_measured_with_their_holes():
+    """C21: 3L9G's domains view (four copies, shared sheets): the panel fields share no cell, and neither do the
+    drawn outlines (D1 · A3 has a hole where D3 · A4's strand sits; measured 0.18 overlap before)."""
+    from foldmap.layout import domain_fields
+
+    d = drawn(DATA / "r100" / "3L9G-A.cif.gz", domains="auto")
+    fields = domain_fields(d.layout)
+    inside = {name: v > 0 for name, v in fields.values.items()}
+    assert not any((inside[a] & inside[b]).any() for a, b in combinations(sorted(inside), 2))
+    assert figcheck.domain_checks(d)["panel_overlaps"] == []
 
 
 def test_domain_panels_drawn_on_one_another_are_found():

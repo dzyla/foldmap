@@ -691,8 +691,8 @@ def outline_overlap(a: MPath, b: MPath, grid: float = PANEL_GRID) -> float:
 
 
 def _cells(path: MPath, grid: float = PANEL_GRID) -> np.ndarray:
-    """The cells of the shared raster (`grid`, anchored at the origin) whose centres lie inside the closed path, each
-    as one sorted integer key."""
+    """The cells of the shared raster (`grid`, anchored at the origin) whose centres lie inside the closed path (by
+    the nonzero rule, as the panel is filled: its holes are outside), each as one sorted integer key."""
     box = path.get_extents()
     i0, j0 = math.floor(box.x0 / grid), math.floor(box.y0 / grid)
     i1, j1 = math.ceil(box.x1 / grid), math.ceil(box.y1 / grid)
@@ -700,7 +700,12 @@ def _cells(path: MPath, grid: float = PANEL_GRID) -> np.ndarray:
         return np.empty(0, np.int64)
     gi, gj = np.meshgrid(np.arange(i0, i1), np.arange(j0, j1))
     gi, gj = gi.ravel(), gj.ravel()
-    hit = path.contains_points(np.c_[(gi + 0.5) * grid, (gj + 0.5) * grid])
+    centres = np.c_[(gi + 0.5) * grid, (gj + 0.5) * grid]
+    winding = np.zeros(len(centres), int)  # the nonzero rule Agg fills by: a ring turning the other way is a hole
+    for ring in path.to_polygons(closed_only=True):  # (Path.contains_points tests each ring alone: holes filled)
+        turn = np.sum(ring[:-1, 0] * ring[1:, 1] - ring[1:, 0] * ring[:-1, 1])
+        winding += np.where(MPath(ring).contains_points(centres), 1 if turn > 0 else -1, 0)
+    hit = winding != 0
     return np.sort((gi[hit].astype(np.int64) << 32) + (gj[hit].astype(np.int64) + (1 << 31)))
 
 
