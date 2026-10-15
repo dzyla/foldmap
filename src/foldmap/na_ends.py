@@ -87,6 +87,7 @@ def _tail(
     labels,
     strands=None,
     circles=(),
+    target=None,
 ):
     """A free end drawn straight on, or bent after its first nucleotide when that is what keeps it (and its end
     label) clear of the elements, and its label clear of loops and other text; one of more than _TAIL_ROUTED
@@ -97,11 +98,12 @@ def _tail(
     the end from there would cross the loop (4YBB). A free end the protein touches tries its turns nearest its
     touching elements first (_toward), so it lies along what holds it (1URN's loop on U1A's RRM). Every drawing
     whose nucleotides keep a bead's width (_BEAD) off the strands drawn so far comes before any that does not (9CJI's
-    3' end was turned onto its 5' end's line, nucleotides on top of each other)."""
+    3' end was turned onto its 5' end's line, nucleotides on top of each other). `target`: where the molecule goes on
+    past a gap at this 3' end (_toward)."""
     found = None
     tries = (True, False) if labels is not None else (False,)
     door = _doorway(d, key, five)
-    turns = _toward(layout, d, s, key, nts, five)
+    turns = _toward(layout, d, s, key, nts, five, target)
     for apart in (True, False) if strands is not None else (False,):  # off the strands drawn so far first
         for keep_door in (True, False):
             for need_label in tries:
@@ -153,15 +155,19 @@ def _touchers(layout: Layout, s: int, nts) -> dict[int, list[tuple[float, float,
     return out
 
 
-def _toward(layout: Layout, d: PlacedStem, s: int, key, nts: list[int], five: bool) -> tuple[float, ...]:
+def _toward(layout: Layout, d: PlacedStem, s: int, key, nts: list[int], five: bool, target=None) -> tuple[float, ...]:
     """_TURNS, of those at most a right angle off straight the ones that bring a free end's touched nucleotides
-    nearest their touching elements' boxes (mean gap) first, then the rest; as they are when the protein touches
-    none of it."""
+    nearest their touching elements' boxes (mean gap) first, then the rest. When the protein touches none of it, a
+    3' free end that runs into a gap (`target`: the stem point where the molecule goes on past it) turns its tip
+    nearest that first (3OWW: P5's loop is broken by a missing nucleotide; its 5' piece pointed away and the dashed
+    gap went round the stem across a run); else _TURNS as they are."""
     held = _touchers(layout, s, nts)
-    if not held:
+    if not held and target is None:
         return _TURNS
 
     def gap(turn: float) -> float:
+        if not held:
+            return math.dist(_free_end(d, key, len(nts), five, turn)[2], target)
         xy = dict(zip(nts, _free_end(d, key, len(nts), five, turn)[1]))
         return float(np.mean([_box_gap(xy[k], b) for k in sorted(held) for b in held[k]]))
 

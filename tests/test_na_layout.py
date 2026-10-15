@@ -465,6 +465,21 @@ def test_a_free_end_never_runs_along_another_strand():
     assert not any(p.fallback for p in lay.na_paths)
 
 
+def test_a_free_end_into_a_gap_turns_toward_where_the_molecule_goes_on():
+    """3OWW (random-100 C16, A17 na_crossings 2): P5's hairpin loop lacks B22, so it is drawn as the 4-nt 3' end
+    B:18-21 of one piece, a dashed gap and the 1-nt 5' end B:23 of the next. B:18-21 went straight on, away from
+    B:23, and the gap came back round the stem (5.5 long), across a run on the whole figure. A 3' free end the protein
+    does not touch, running into a gap, turns first toward the stem where the molecule goes on: the gap closes the
+    loop beside the stem's end."""
+    import math
+
+    lay, sses, bb = make_layout(NA.parent / "r100" / "3OWW-P5.cif.gz")
+    route_loops(lay, sses, bb)
+    (gap,) = [p for p in lay.na_paths if p.kind == "gap"]
+    length = sum(math.dist(a, b) for a, b in zip(gap.points, gap.points[1:]))
+    assert length < 2.5 and not gap.fallback  # 2.1; straight on, 5.5
+
+
 def test_one_shared_stem_among_several_stays_unrolled():
     """30QM: one of six stems (P3) is held by both RT protomers; the NA campaign's C4 ruling keeps it unrolled (the
     linked stems turn at most 57°): rule (c) of na_torn_by_unrolling needs most pieces shared."""

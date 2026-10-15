@@ -652,6 +652,20 @@ before it). `na_ends._tail` now takes, before any other, a drawing whose nucleot
 every strand drawn so far (`_Strands.near`); only when none does are the old drawings tried. 9CJI passes in every
 view. NA campaign: every metric of the 39 entries identical; bench identical. Fixture 9CJI-AB (21 KB).
 
+**Batch C2a result (3OWW, na_crossings):** both crossings came from P5's hairpin loop, which lacks B22: it is drawn as
+the 4-nt 3' end B:18-21 of one piece, a dashed gap and the 1-nt 5' end B:23 of the next. B:18-21 went straight on,
+away from B:23, and the gap came back round the stem across the run B:75-81 and its own end. A 3' free end the
+protein does not touch, running into a gap, now tries first the turns that bring its tip nearest the stem where the
+molecule goes on (`na_ends._toward`, `target`): na_crossings 2 -> 0 (na_run_crossings, reported, 2 -> 3). Only 3'
+ends: turning the 5' end after the gap too pulled 1URN's C15 onto C12 (tried, dropped). NA campaign: every metric
+of the 39 entries identical; bench identical. Fixture 3OWW-P5 (9 KB).
+
+**Batch C2a, 3OWW spearman 0.484 (for a ruling):** the drawn stem centres follow the projection poorly
+(projected vs 3D 0.792, drawn vs projected 0.592): the stems are drawn about twice their projected size (letter rows,
+rungs at the schematic step), so `_separate` pushes them apart by whichever way frees an overlap, and P4 (B:1-7 with
+B:82-88) lands 11 units below its projected place under P5. Holding the projected order through the expansion is a
+change to the shared placement (`_attract`/`_separate`) that all 39 NA entries go through; not done here.
+
 ### C17 (a): large membrane complexes, with TM helices off the band or no band (3 entries, + visual 1)
 
 **Entries:**

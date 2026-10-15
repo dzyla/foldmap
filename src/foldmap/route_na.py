@@ -106,6 +106,11 @@ def route_nucleic(layout: Layout, router: _Router | None = None, loops=()) -> li
             loop = at[(s, i)]
             if loop is at[(s, j)] and loop.side[(s, i)] != loop.side[(s, j)]:
                 circles.append((*loop.hairpin_circle((s, i), (s, j), j - i - 1), loop))
+    goes_on = {}  # strand whose 3' end runs into a gap -> the stem point where the molecule goes on past it (_tail)
+    for g in na.gaps:
+        nxt = [i for i in range(len(na.strands[g.after])) if (g.after, i) in at]
+        if nxt:
+            goes_on[g.before] = tuple(float(c) for c in at[(g.after, nxt[0])].point((g.after, nxt[0])))
     for s, strand in enumerate(na.strands):
         n = len(strand)
         if s in layout.na_traces:
@@ -144,7 +149,17 @@ def route_nucleic(layout: Layout, router: _Router | None = None, loops=()) -> li
         dn = at[(s, last)]
         if last < n - 1:
             path, tip, v = _tail(
-                router, layout, dn, s, (s, last), list(range(last + 1, n)), False, room(s, "3′"), strands, circles
+                router,
+                layout,
+                dn,
+                s,
+                (s, last),
+                list(range(last + 1, n)),
+                False,
+                room(s, "3′"),
+                strands,
+                circles,
+                goes_on.get(s),
             )
             fix((s, last), path)
             exits[(s, n - 1)] = (np.add(path.nt_xy[-1], v * NT_STEP / 2), v, dn)
