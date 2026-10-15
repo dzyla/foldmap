@@ -1332,6 +1332,7 @@ def measure_view(view: str, drawn, spec, path: Path, name: str, work: Path) -> d
     if view == "membrane":
         out["membrane"] = membrane_checks(drawn, path)
     if view == "default":
+        out["science"] = _jsonable(figcheck.science_checks(drawn))  # S1-S5, judged apart from A1-A20
         if lay.nucleic is not None:
             out["na"] = _jsonable(na_metrics(drawn, path))
         (work / f"{name}-trace.json").write_text(json.dumps(trace_of(drawn)), encoding="utf-8")
@@ -1574,6 +1575,7 @@ def run_entry(source: str, out: Path, views=VIEWS, info: dict | None = None) -> 
         if f["protein"] and "default" in wanted:
             e["dssp"] = dssp_agreement(path)
     e["criteria"] = criteria(e)
+    e["science"] = science(e)
     return _verdict(e)
 
 
@@ -2077,6 +2079,7 @@ def report(entries: list[dict], out: Path, sample_path: Path | None = None, tota
     ]
     for e in entries:
         lines.append(f"| {e['id']} | " + " | ".join(str(v) for v in reported(e).values()) + " |")
+    lines += science_section(entries)
     lines += ["", "## Criteria", ""] + [f"- **{k}** {v}" for k, v in CRITERIA.items()]
     lines += ["", "## Limits", ""] + [f"- {k}: {v}" for k, v in LIMITS.items()]
     lines += [f"- documented warnings: {', '.join(DOCUMENTED_WARNINGS) or 'none'}", ""]
@@ -2094,6 +2097,38 @@ def report(entries: list[dict], out: Path, sample_path: Path | None = None, tota
         encoding="utf-8",
     )
     return doc
+
+
+def science(e: dict) -> dict:
+    """The science checks (foldmap.science.SCIENCE) of the default view, apart from A1-A20 (never in "failed" or
+    "pass"): {"S1": {"pass": True, False or None (not measured), "detail"}, ...}."""
+    from foldmap.science import SCIENCE
+
+    found = ((e.get("views", {}).get("default") or {}).get("result") or {}).get("science")
+    out = {}
+    for key in SCIENCE:
+        got = None if found is None else found.get(key)
+        out[key] = _ok(None, "not measured") if got is None else _ok(not got, "; ".join(got))
+    return out
+
+
+def science_section(entries: list[dict]) -> list[str]:
+    """report.md's science checks: per check how many entries pass, fail or are not measured, then each entry
+    with its marks and findings."""
+    from foldmap.science import SCIENCE
+
+    rows = [(e, science(e)) for e in entries]
+    lines = ["", "## Science checks (S1-S5), apart from A1-A20", "", "| check | pass | fail | not measured |"]
+    lines.append("|---|---|---|---|")
+    for key, what in SCIENCE.items():
+        got = [s[key]["pass"] for _, s in rows]
+        lines.append(f"| {key} {what} | {got.count(True)} | {got.count(False)} | {got.count(None)} |")
+    lines += ["", "| id | " + " | ".join(SCIENCE) + " | findings |", "|" + "---|" * (len(SCIENCE) + 2)]
+    for e, s in rows:
+        marks = ["-" if s[k]["pass"] is None else "✓" if s[k]["pass"] else "✗" for k in SCIENCE]
+        found = "; ".join(f"{k}: {s[k]['detail']}" for k in SCIENCE if s[k]["pass"] is False)
+        lines.append(f"| {e['id']} | " + " | ".join(marks) + f" | {found.replace('|', '/')[:600]} |")
+    return lines
 
 
 REPORTED = (

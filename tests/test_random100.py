@@ -672,3 +672,23 @@ def test_a18_a_run_into_a_port_just_inside_the_band_is_at_that_port(r100):
     d.loops.append(Loop("p:1-2", "p:3-4", [*run, (-27.0, y0 + 0.2)], False, False))  # into a port 0.2 inside
     d.loops.append(Loop("q:1-2", "q:3-4", [*run, (-27.0, y0 - 1.0)], False, False))  # back out below the face
     assert r100.membrane_checks(d, path)["loops_in_slab"] == ["q:1-2>q:3-4"]
+
+
+def test_science_checks_are_reported_apart_from_the_criteria(r100, tmp_path):
+    """Plan 12 Task 1: the default view's science checks (S1-S5) get their own section in report.md and never make an
+    entry fail; the measure of a figure carries them."""
+    from foldmap.spec import draw_spec, figure_spec
+
+    spec = figure_spec(DATA / "1UBQ.cif")
+    got = r100.measure_view("default", draw_spec(spec), spec, DATA / "1UBQ.cif", "1UBQ", tmp_path)
+    assert got["science"] == {"S1": [], "S2": [], "S3": [], "S4": None, "S5": None}
+    crit = {k: {"pass": True, "detail": ""} for k in r100.CRITERIA}
+    found = {"S1": ["sheet 0: a | b drawn side by side with no bridge"], "S2": [], "S3": [], "S4": None, "S5": None}
+    e = {"id": "1ABC", "name": "1ABC", "views": {"default": {"result": {"science": found}}}, "criteria": crit}
+    e = r100._verdict(e)
+    assert e["pass"] and r100.science(e)["S1"] == {"pass": False, "detail": found["S1"][0]}
+    assert r100.science(e)["S4"]["pass"] is None
+    r100.report([e], tmp_path, None, total=1)
+    md = (tmp_path / "report.md").read_text(encoding="utf-8")
+    assert "1 of 1 pass." in md and "## Science checks (S1-S5), apart from A1-A20" in md
+    assert "| S1 sheet neighbours pair | 0 | 1 | 0 |" in md and "S1: sheet 0: a / b drawn side by side" in md
