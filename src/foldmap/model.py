@@ -470,9 +470,10 @@ def _cut(na: Nucleic, windows: dict[int, list[tuple[int, int]]]) -> Nucleic:
 
 @dataclass
 class Ligand:
-    """A small molecule or ion bound to the protein. contacts: Backbone indices of the residues holding it
-    (coordinating a metal, or within reach of a ligand); additive: a common buffer, cryoprotectant, detergent or
-    counter-ion, hidden unless asked for."""
+    """A small molecule or ion bound to the protein, or a small molecule bound to the nucleic acid alone. contacts:
+    Backbone indices of the residues holding it (coordinating a metal, or within reach of a ligand); nucleotides:
+    for one touching no protein residue, the nucleotides holding it; additive: a common buffer, cryoprotectant,
+    detergent or counter-ion, hidden unless asked for."""
 
     name: str
     chain: str
@@ -483,6 +484,8 @@ class Ligand:
     additive: bool = False
     members: list[tuple[str, int]] = field(default_factory=list)  # (chain, residue number) of each part
     codes: list[str] = field(default_factory=list)  # residue codes of a covalently joined ligand, in bond order
+    # (chain, number, icode) of the nucleotides holding a ligand that touches no protein residue (contacts empty)
+    nucleotides: list[tuple[str, int, str]] = field(default_factory=list)
 
 
 @dataclass(eq=False)
@@ -494,3 +497,5 @@ class Links:
     glycans: list[tuple[int, list[str]]] = field(default_factory=list)
     ligands: list[Ligand] = field(default_factory=list)
     glycan_members: list[list[tuple[str, int]]] = field(default_factory=list)  # sugar residues of each glycan
+    # metal ions held by nucleotides alone, by name: not marked (a ribosome holds hundreds), named by the scope note
+    na_ions: dict[str, int] = field(default_factory=dict)

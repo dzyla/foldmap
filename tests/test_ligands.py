@@ -241,3 +241,28 @@ def test_tethers_run_over_fewer_bodies():
     assert over < 11.5, over
     assert _over_bodies((0.0, 0.0), [(1.0, 0.5)], [(0.5, 0.0, 1.5, 1.0)]) == 0.0  # its own target's body
     assert _over_bodies((0.0, 0.0), [(3.0, 0.5)], [(0.5, 0.0, 1.5, 1.0)]) > 0.9
+
+
+def test_ligands_held_by_the_nucleic_acid_alone_are_marked_and_its_ions_said(tmp_path, capsys):
+    """8XZE (random-100 C33): a THF-II riboswitch's SPM and THG touch only RNA, so io._ligands left them out (no
+    protein residue holds them) and nothing said so. A small molecule held by nucleotides alone is now a ligand with
+    those nucleotides (Ligand.nucleotides), marked and tethered to the stems and strands holding it, off the RNA's
+    stems, paths and text; metal ions held by nucleotides alone are counted (Links.na_ions) and the note names them
+    (a ribosome holds hundreds: 7Y7C's 283 Mg)."""
+    from foldmap.cli import main
+    from foldmap.render import ligand_marks
+    from foldmap.spec import draw_spec, figure_spec
+
+    path = DATA / "r100" / "8XZE.cif.gz"
+    spec = figure_spec(path)
+    d = draw_spec(spec)
+    marks = {m["ligand"].name: m for m in ligand_marks(d.layout, d.loops, d.sses, spec.look)}
+    assert sorted(marks) == ["SPM", "THG"]
+    assert all(m["targets"] and not m["residues"] and m["ligand"].nucleotides for m in marks.values())
+    stems = [s.rect for s in d.layout.stems]
+    for m in marks.values():
+        (cx, cy), (hw, hh) = m["centre"], m["half"]
+        assert not any(cx - hw < x1 and x0 < cx + hw and cy - hh < y1 and y0 < cy + hh for x0, y0, x1, y1 in stems)
+    assert d.layout.links.na_ions == {"MG": 1}
+    assert main(["plot", str(path), "-o", str(tmp_path / "f.svg")]) == 0
+    assert "not drawn: metal ions held by the nucleic acid alone (MG)" in capsys.readouterr().err

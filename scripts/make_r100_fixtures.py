@@ -116,6 +116,11 @@ ENTRIES = {  # fixture name -> (PDB id, what it is for)
         "glycine riboswitch chain B, the P5 hairpin (B:12-28), whose loop lacks B22: its 4-nt 5' piece pointed away "
         "from the 3' piece and the dashed gap went round the stem across a run (random-100 C16, A17 na_crossings)",
     ),
+    "8XZE": (
+        "8XZE",
+        "THF-II riboswitch (one RNA chain) with SPM and THG, which touch only the RNA, and Mg ions: neither ligand "
+        "was drawn and nothing said so (random-100 C33)",
+    ),
 }
 Span = tuple[int, int]
 WINDOWS: dict[str, dict[str, Span | list[Span] | None]] = {  # fixture -> {chain: windows (first, last), None: whole}
@@ -158,6 +163,7 @@ TRIMS: dict[str, dict] = {
     "2MJW-BD": {"first_model": True, "backbone": True},
     "6SO9": {"first_model": True, "backbone": True},
     "3L9G-A": {"atoms": ("N", "CA", "C", "O"), "no_protein_sequence": True, "drop": ("_atom_site_anisotrop.",)},
+    "8XZE": {"drop": ("_atom_site_anisotrop.", "_pdbx_refine_tls.", "_pdbx_refine_tls_group.")},
     "3OWW-P5": {"drop": ("_atom_site_anisotrop.", "_pdbx_refine_tls.", "_pdbx_refine_tls_group.")},
     "9CJI-AB": {"backbone": True, "no_protein_sequence": True, "drop": ("_atom_site_anisotrop.",)},
     "3L2V-A": {"atoms": ("N", "CA", "C", "O"), "no_protein_sequence": True, "drop": ("_atom_site_anisotrop.",)},

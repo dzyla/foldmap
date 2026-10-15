@@ -207,7 +207,9 @@ foldmap styles                                    # every theme and style key
   hydrogen bonds on request; see [RNA and DNA](#rna-and-dna).
 - **Annotations**: disulfides, glycans (SNFG symbols, sialic acids included), ligands and metal ions, chromophores
   and other residues fused into the chain (starred), membrane bands, named domain panels with a domain bar, residue
-  numbers, marked elements.
+  numbers, marked elements. A small molecule held by the nucleic acid alone (a riboswitch's ligand) is marked and
+  tethered to the stems that hold it; metal ions held by the nucleic acid alone are not marked (a ribosome holds
+  hundreds), and the note names them.
 - **Colouring**: by chain, N→C, per-element shade, secondary-structure type, domain, B-factor, hydropathy,
   AlphaFold pLDDT or conservation from an alignment. Chains take the palette's colours in order; past its first
   pass (the ninth chain on the default palette) each chain takes a lighter or darker step of the colour it repeats,

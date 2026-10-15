@@ -675,10 +675,13 @@ def load_links(
             glycans.append((where[k_res], [r.name for _, r in tree]))
             members.append([(c.name, r.seqid.num) for c, r in tree])
     in_glycans = {key(c, r) for c, r in sugars if id(r) in used}
-    return Links(sorted(set(disulfides)), glycans, _ligands(model, where, in_glycans), members)
+    ligands, na_ions = _ligands(model, where, in_glycans)
+    return Links(sorted(set(disulfides)), glycans, ligands, members, na_ions)
 
 
 ADDITIVES = {  # crystallisation and purification leftovers: hidden from figures unless asked for
+    "IRI",  # iridium and cobalt hexammine: RNA crystallisation and phasing agents (2GIS, 1GID), batch C2a
+    "NCO",
     "SO4",
     "PO4",
     "GOL",
@@ -776,12 +779,21 @@ def _ligand_label(codes: list[str]) -> str:
     return "·".join(out)
 
 
-def _ligands(model, where, skip: set | None = None) -> list[Ligand]:
-    """Ligands touching the protein, with the residues that hold them. Non-polymer residues bonded to each other
-    (a lipid-linked oligosaccharide, a cofactor built of parts) are one ligand; metals stay single ions. skip:
-    (chain, number, icode) of residues drawn otherwise (the sugars of glycans)."""
+def _ligands(model, where, skip: set | None = None) -> tuple[list[Ligand], dict[str, int]]:
+    """Ligands touching the protein, with the residues that hold them, and small molecules touching only nucleotides,
+    with those (random-100 C33: 8XZE's SPM and THG on a riboswitch were left out unsaid); metal ions touching only
+    nucleotides are counted by name, not listed. Non-polymer residues bonded to each other (a lipid-linked
+    oligosaccharide, a cofactor built of parts) are one ligand; metals stay single ions. skip: (chain, number, icode)
+    of residues drawn otherwise (the sugars of glycans)."""
     skip = skip or set()
     search = gemmi.NeighborSearch(model, gemmi.UnitCell(), 5).populate()
+    nucleotides = {
+        (ch.name, r.seqid.num, r.seqid.icode.strip())
+        for ch in model
+        for r in ch.get_polymer()
+        if (info := gemmi.find_tabulated_residue(r.name)) is not None and info.is_nucleic_acid()
+    }
+    na_ions: dict[str, int] = {}
     parts = _ligand_parts(model, skip)
     group = list(range(len(parts)))
 
@@ -801,7 +813,7 @@ def _ligands(model, where, skip: set | None = None) -> list[Ligand]:
     out = []
     for ks in members.values():
         ks = _bond_order(ks, bonded)
-        touching = set()
+        touching, held = set(), set()
         for k in ks:
             _, res, heavy, metal = parts[k]
             reach = _METAL_REACH if metal else _LIGAND_REACH
@@ -809,11 +821,16 @@ def _ligands(model, where, skip: set | None = None) -> list[Ligand]:
                 for mark in search.find_atoms(atom.pos, radius=reach):
                     cra = mark.to_cra(model)
                     key = (cra.chain.name, cra.residue.seqid.num, cra.residue.seqid.icode.strip())
-                    if key in where and (not metal or cra.atom.element.name in ("O", "N", "S")):
-                        touching.add(where[key])
-        if not touching:
-            continue
+                    if not metal or cra.atom.element.name in ("O", "N", "S"):
+                        if key in where:
+                            touching.add(where[key])
+                        elif key in nucleotides:
+                            held.add(key)
         chain, res, heavy, metal = parts[ks[0]]
+        if not touching and held and metal:
+            na_ions[res.name] = na_ions.get(res.name, 0) + 1
+        if not touching and (metal or not held):
+            continue
         codes = [parts[k][1].name for k in ks]
         symbol = heavy[0].element.name.capitalize() if metal else _ligand_label(codes)
         name = codes[0] if len(codes) == 1 else "+".join(dict.fromkeys(codes))
@@ -828,9 +845,10 @@ def _ligands(model, where, skip: set | None = None) -> list[Ligand]:
                 all(c in ADDITIVES for c in codes),
                 [(parts[k][0], parts[k][1].seqid.num) for k in ks],
                 codes,
+                [] if touching else sorted(held),
             )
         )
-    return out
+    return out, na_ions
 
 
 def _ligand_parts(model, skip: set | None = None) -> list[tuple[str, gemmi.Residue, list[gemmi.Atom], bool]]:

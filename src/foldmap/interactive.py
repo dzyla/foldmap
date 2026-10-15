@@ -704,7 +704,8 @@ def _links(layout, loops, sses, bb, look) -> dict:
     for m in ligand_marks(layout, loops, sses, look):
         g = m["ligand"]
         key = f"{g.name}:{g.chain}{g.seq}"
-        held = ", ".join(label(r) for r in g.contacts[:6]) + (" …" if len(g.contacts) > 6 else "")
+        names = [label(r) for r in g.contacts] or [f"{c}:{n}{i}" for c, n, i in g.nucleotides]  # nucleotides (C33)
+        held = ", ".join(names[:6]) + (" …" if len(names) > 6 else "")
         out["ligands"].append(
             {
                 "key": key,

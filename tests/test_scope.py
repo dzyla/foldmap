@@ -59,11 +59,12 @@ def test_nucleosome_is_drawn_whole_with_nothing_to_report():
 @pytest.mark.parametrize("path", [DATA / "na" / "4OO8.cif.gz", DATA / "na" / "1KX5.cif.gz", DATA / "1UBQ.cif"])
 def test_nothing_left_out_reports_nothing(path):
     """Nothing left out: no reason, no settings; the note names only the additives hidden on purpose (C20: 1KX5's
-    CL), when there are any."""
+    CL), when there are any, and the metal ions the nucleic acid alone holds, never marked (C33: 1KX5's 12 MN)."""
     s = scope_of(path)
     assert s["drawn_chains"] == s["file_chains"] and s["reason"] == "" and s["all_options"] == {}
-    hidden = f"not drawn: additives {', '.join(s['additives'])} (--set ligands=all draws them)"
-    assert scope_note(s) == (hidden if s["additives"] else "")
+    said = [f"additives {', '.join(s['additives'])} (--set ligands=all draws them)"] if s["additives"] else []
+    said += ["metal ions held by the nucleic acid alone (MN ×12)"] if path.name.startswith("1KX5") else []
+    assert scope_note(s) == (f"not drawn: {'; '.join(said)}" if said else "")
 
 
 def test_choices_the_user_made_are_not_reported():

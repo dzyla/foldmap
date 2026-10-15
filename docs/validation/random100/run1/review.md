@@ -1061,6 +1061,16 @@ profiled) and NA letter placement (7Y7C).
 
 **Fixture:** 8XZE (1 RNA chain, small). **Effort:** M. **Bench:** none; NA snapshots with ligands, if any.
 
+**Batch C2a result (C33):** `io._ligands` keeps a small molecule touching nucleotides but no protein residue, with
+those nucleotides (`Ligand.nucleotides`); it is marked (`render._na_targets`: one tether per stem or strand it sits
+on, up to four) and kept off the nucleic acid's stems, paths, letters and names (`_na_spots`). Metal ions held by
+nucleotides alone are counted (`Links.na_ions`), not marked (7Y7C holds 283 Mg, 8VWQ 586), and the CLI, MCP and app
+notes name them ("not drawn: metal ions held by the nucleic acid alone (MG)"). Drawn tethers now keep off stem names'
+margin and the nucleic acid's letters, which are drawn after them (2GIS's SAM tether by P1, 8XZE's THG by A21).
+Iridium and cobalt hexammine (IRI, NCO: RNA crystallisation and phasing agents) are additives. 8XZE passes in every
+view. Figures that gain marks in the NA campaign (metrics identical): 1Y26 ADE, 2GDI TPP, 2GIS SAM, 2NZ4 GLP, 3D0U
+LYS, 4LVV FFO, 4YBB PUT and SPD; their notes name the ions. Bench identical; no snapshot changed.
+
 ### C34 (a, visual): a bulged strand drawn as its own column between paired strands (1 entry)
 
 **Entry:** 5KQJ. The sheet is drawn C D E F B A. B–E are paired (4.2 Å), but F is wedged between them. F pairs with

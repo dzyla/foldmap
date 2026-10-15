@@ -1202,10 +1202,14 @@ def tether_lengths(drawn, look) -> list[tuple[str, float, str, str]]:
     lay, out = drawn.layout, []
     for m in ligand_marks(lay, drawn.loops, drawn.sses, look):
         g, (cx, cy) = m["ligand"], m["centre"]
-        home = lay.res_chain[m["residues"][0]]
-        for k, ((tx, ty), r) in enumerate(zip(m["targets"], m["residues"])):
+        if not m["residues"]:  # held by nucleotides alone (C33): tethered to them, its own chain's, reported only
+            chains = [g.chain] * len(m["targets"])
+        else:
+            chains = [lay.res_chain[r] for r in m["residues"]]
+        home = chains[0]
+        for k, ((tx, ty), chain) in enumerate(zip(m["targets"], chains)):
             gid, length = f"ligand-tether:{g.name}:{g.chain}{g.seq}:{k}", round(float(np.hypot(tx - cx, ty - cy)), 3)
-            out.append((gid, length, home, lay.res_chain[r]))
+            out.append((gid, length, home, chain))
     return out
 
 

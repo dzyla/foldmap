@@ -133,7 +133,10 @@ def summarize_structure(source: str, assembly: str = "auto") -> str:
         for r, sugars in links.glycans:
             lines.append(f"glycan on {bb.labels[r].chain} {bb.labels[r].name}{bb.labels[r].tag}: {'-'.join(sugars)}")
         for g in links.ligands:
-            held = ", ".join(f"{bb.labels[r].name}{bb.labels[r].tag}" for r in g.contacts[:8])
+            held = ", ".join(
+                [f"{bb.labels[r].name}{bb.labels[r].tag}" for r in g.contacts[:8]]
+                or [f"nucleotide {c}:{n}{i}" for c, n, i in g.nucleotides[:8]]  # held by the nucleic acid alone
+            )
             extra = " (buffer additive, hidden by default)" if g.additive else ""
             lines.append(f"{'metal' if g.metal else 'ligand'} {g.name} {g.chain}{g.seq}: held by {held}{extra}")
     return "\n".join(lines)

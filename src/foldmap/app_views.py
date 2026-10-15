@@ -159,6 +159,11 @@ def figure_view(ws: Workspace) -> None:
             if result
             else ""
         )
+        ions = (good.get("scope") or {}).get("na_ions")
+        if ions:  # never marked: said, as the command line and MCP notes say it (C33)
+            from foldmap.scope import na_ions_text
+
+            notes = "; ".join(part for part in (notes, f"Not drawn: {na_ions_text(ions)}.") if part)
         if notes:
             st.caption(shown(notes))
         if result and result.get("domains_note"):  # as the command line warns

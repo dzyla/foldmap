@@ -30,6 +30,7 @@ from matplotlib.transforms import Affine2D
 from . import text_metrics
 from .hbonds import find_hbonds, parse_selection
 from .layout import (
+    _GLYPH_W,
     DNA_MINOR,
     DNA_PITCH,
     DNA_TUBE,
@@ -59,15 +60,18 @@ from .layout import (
     domain_fields,
     first_pair_text,
     font_pt,
+    glyph,
     glyph_scale,
     helix_label_pos,
     label_boxes,
+    na_text_boxes,
     overlaps_any,
     page_fit,
     page_scale,
     page_text,
     panel_members,
     resolve,
+    stem_keep_box,
     stem_label_pos,
     tail_counts,
     termini,
@@ -1361,6 +1365,44 @@ def _disulfide_lines(layout: Layout, loops: list[Loop], sses: list[SSE], look: S
     return out
 
 
+def _na_spots(layout: Layout, look: Style) -> tuple[dict, list]:
+    """Where each drawn nucleotide sits (nucleotide_points, in the figure's stem style), and the boxes a mark held by
+    nucleotides keeps off: the stems, the strands' paths and the nucleic acid's text (letters and ends:
+    layout.na_text_boxes; stem names with their margin, as routes keep off them: layout.stem_keep_box)."""
+    if layout.nucleic is None:
+        return {}, []
+    paths = [box for p in layout.na_paths for box in thin_boxes(p.points)]
+    paths += [stem_keep_box(d, glyph(layout)[0] / _GLYPH_W) for d in layout.stems]
+    return nucleotide_points(layout, _na_style(layout, look)), [d.rect for d in layout.stems] + paths + na_text_boxes(
+        layout
+    )
+
+
+def _na_targets(layout: Layout, g, where: dict):
+    """The tether targets of a ligand held by nucleotides alone (Ligand.nucleotides): one per stem (or strand) it
+    sits on, at its middle nucleotide there, the _LIGAND_TETHERS it touches most; weights: nucleotides held there;
+    no protein residues."""
+    na = layout.nucleic
+    if na is None or not g.nucleotides:
+        return [], [], []
+    key = {
+        (lab.chain, lab.seq, lab.icode): (s, i) for s, st in enumerate(na.strands) for i, lab in enumerate(st.labels)
+    }
+    stem = {k: d.id for d in layout.stems for k in d.axial}
+    groups: dict = {}
+    for lab in g.nucleotides:
+        k = key.get(lab)
+        if k is not None and k in where:
+            groups.setdefault(stem.get(k, f"strand {k[0]}"), []).append(k)
+    targets, weights = [], []
+    for ks in sorted(groups.values(), key=len, reverse=True)[:_LIGAND_TETHERS]:
+        x, y = (float(v) for v in where[sorted(ks)[len(ks) // 2]])
+        if all(np.hypot(x - t[0], y - t[1]) > 0.3 for t in targets):
+            targets.append((x, y))
+            weights.append(len(ks))
+    return targets, weights, []
+
+
 def ligand_marks(layout: Layout, loops: list[Loop], sses: list[SSE], look: Style, counts=None) -> list[dict]:
     """Where each shown ligand/ion goes: as close as possible to the residues holding it, clear of elements,
     labels and other markers. Each mark: ligand, centre, half size, tether targets, tethered residues."""
@@ -1396,14 +1438,22 @@ def ligand_marks(layout: Layout, loops: list[Loop], sses: list[SSE], look: Style
     # a mark is kept off the loops' lines (C5) ...
     tethers: list[tuple] = []  # ... and the tethers drawn before: (from, to)
     out = []
-    for g in sorted(chosen, key=lambda g: g.contacts[0]):
-        targets, weights, tethered = _local_targets(layout, loops, sses, g, g.metal)
+    na_spots = None  # where nucleotides are drawn, and the nucleic acid's own boxes: for ligands held by it alone
+    for g in sorted(chosen, key=lambda g: (not g.contacts, g.contacts[0] if g.contacts else 0, g.chain, g.seq)):
+        if g.contacts:
+            targets, weights, tethered = _local_targets(layout, loops, sses, g, g.metal)
+            keep_off, words = taken, texts
+        else:  # held by nucleotides alone (C33: 8XZE): tethered to them, kept off stems, letters and names
+            if na_spots is None:
+                na_spots = _na_spots(layout, look)
+            targets, weights, tethered = _na_targets(layout, g, na_spots[0])
+            keep_off, words = taken + na_spots[1], texts + na_spots[1]
         if not targets:
             continue
         anchor = np.average(np.asarray(targets), axis=0, weights=weights)
         half = (0.3, 0.3) if g.metal else (0.12 * len(g.name) + 0.2, 0.27)
-        spot = _place_mark(anchor, half, targets, taken, lines, texts, tethers, bodies, runs)
-        crowded = overlaps_any((spot[0] - half[0], spot[1] - half[1], spot[0] + half[0], spot[1] + half[1]), taken)
+        spot = _place_mark(anchor, half, targets, keep_off, lines, words, tethers, bodies, runs)
+        crowded = overlaps_any((spot[0] - half[0], spot[1] - half[1], spot[0] + half[0], spot[1] + half[1]), keep_off)
         mark = (spot[0] - half[0], spot[1] - half[1], spot[0] + half[0], spot[1] + half[1])
         taken.append(mark)
         texts.append(mark)  # a later ligand's tether keeps off this one's name
@@ -1425,7 +1475,11 @@ def _draw_ligands(ax, marks: list[dict], lw: float, font: float, layout: Layout,
     """Each ligand's mark and name, and its tethers: drawn under the bodies and the text (only what shows of each,
     visible_pieces), so none runs over a letter."""
     bodies = link_bodies(layout, ax)
-    halos = text_halos(ax, pt_per_unit, link_keep(lw * 0.7, pt_per_unit, ax.figure.dpi))
+    keep = link_keep(lw * 0.7, pt_per_unit, ax.figure.dpi)
+    halos = text_halos(ax, pt_per_unit, keep)
+    halos += [stem_keep_box(d, glyph(layout)[0] / _GLYPH_W) for d in layout.stems]  # names' margin, as routes keep
+    # and the nucleic acid's letters and ends, drawn after the tethers (as the layout measures their ink)
+    halos += [(x0 - keep, y0 - keep, x1 + keep, y1 + keep) for x0, y0, x1, y1 in na_text_boxes(layout)]
     for m in marks:
         g, (cx, cy), (hw, hh) = m["ligand"], m["centre"], m["half"]
         key = f"{g.name}:{g.chain}{g.seq}"

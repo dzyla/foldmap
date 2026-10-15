@@ -63,6 +63,13 @@ def _hidden_additives(layout) -> list[str]:
     )
 
 
+def _na_ions(layout) -> dict[str, int]:
+    """Metal ions held by nucleotides alone (Links.na_ions), by name: never marked (a ribosome holds hundreds), so
+    the note names them (random-100 C33)."""
+    links = getattr(layout, "links", None)
+    return dict(sorted((getattr(links, "na_ions", None) or {}).items())) if layout.nucleic is not None else {}
+
+
 def _tetrads(layout) -> int:
     """G-tetrads of the drawn nucleic acid: foldmap draws none, their guanines unpaired (C29 ruling: said)."""
     return len(layout.nucleic.tetrads) if layout.nucleic is not None else 0
@@ -82,7 +89,8 @@ def drawn_scope(model, layout, assembly: str = "auto", focus: str = "auto") -> d
         for, when some were); undrawn_chains: chains the figure has nothing of (_undrawn_chains), not_drawn: them
         with why ('' when none), part of the reason (random-100 C15); additives: the additives it hides on purpose
         (_hidden_additives), named by scope_note but not part of the reason (C20 ruling); tetrads: the G-tetrads of
-        the drawn nucleic acid, drawn unpaired, named by scope_note but not part of the reason (C29 ruling);
+        the drawn nucleic acid, drawn unpaired, named by scope_note but not part of the reason (C29 ruling); na_ions:
+        metal ions held by nucleotides alone, by name, never marked, named by scope_note likewise (C33);
         helix_matched: how many helix runs were cut or joined so copies of a protein match (ss._copy_breaks: a fact,
         not part of the reason or the note; fix round 1 ruling)."""
     several = getattr(model, "several", None) if assembly == "auto" else None
@@ -124,6 +132,7 @@ def drawn_scope(model, layout, assembly: str = "auto", focus: str = "auto") -> d
         "additives": additives,
         "not_drawn": not_drawn,
         "tetrads": _tetrads(layout),
+        "na_ions": _na_ions(layout),
         "helix_matched": {"cut": 0, "joined": 0, **(getattr(layout, "helix_matched", None) or {})},
     }
     if not reasons and not crop and not not_drawn:
@@ -153,10 +162,11 @@ def drawn_scope(model, layout, assembly: str = "auto", focus: str = "auto") -> d
 
 def scope_note(scope: dict, how: str = "cli") -> str:
     """One line saying what was drawn of the structure and how to draw everything ('' when nothing was left out
-    and no chain asked for), then what it has not drawn (chains with nothing to draw, additives hidden): with
+    and no chain asked for), then what it has not drawn (chains with nothing to draw, additives hidden, metal ions
+    held by the nucleic acid alone): with
     command-line flags (how='cli') or MCP tool arguments (how='mcp'); the chain count when chains were left out;
     G-tetrads, which no setting draws."""
-    if not scope.get("reason") and not scope.get("additives") and not scope.get("tetrads"):
+    if not scope.get("reason") and not scope.get("additives") and not scope.get("tetrads") and not scope.get("na_ions"):
         return ""
     options = scope["all_options"]
     if how == "mcp":
@@ -172,12 +182,23 @@ def scope_note(scope: dict, how: str = "cli") -> str:
     if scope.get("additives"):  # hidden on purpose, but named (C20 ruling)
         shows = 'style={"ligands": "all"}' if how == "mcp" else "--set ligands=all"
         unsaid.append(f"additives {', '.join(scope['additives'])} ({shows} draws them)")
+    if scope.get("na_ions"):  # read, never marked (C33)
+        unsaid.append(na_ions_text(scope["na_ions"]))
     if scope.get("tetrads"):  # read, never drawn (C29 ruling)
         n = scope["tetrads"]
         unsaid.append(f"{n} G-tetrad{'' if n == 1 else 's'} of a G-quadruplex (their Gs drawn unpaired)")
     if unsaid:
         parts.append(f"not drawn: {'; '.join(unsaid)}")
     return "; ".join(parts)
+
+
+def na_ions_text(ions: dict[str, int]) -> str:
+    """The metal ions held by the nucleic acid alone (drawn_scope na_ions), as the notes say them."""
+    return (
+        "metal ions held by the nucleic acid alone ("
+        + ", ".join(f"{name} ×{n}" if n > 1 else name for name, n in ions.items())
+        + ")"
+    )
 
 
 def scope_what(scope: dict, count: str = ": {drawn} of {total} chains") -> str:
