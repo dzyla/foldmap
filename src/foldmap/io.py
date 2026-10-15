@@ -267,7 +267,8 @@ PAIRED_MIN = 3  # residue pairs of two chains' nucleotides with polar base atoms
 _PAIR_DIST = 3.4  # angstrom
 _BASE_POLAR = frozenset({"N1", "N3", "N2", "N4", "N6", "N7", "O2", "O4", "O6"})
 # 3OWW's two RNAs pair in 4 residue pairs at _PAIR_DIST (A41-B84, A84-B41, A64-B7, A65-B65); 4PLX's three copies touch
-# in the crystal by one swapped pair of bases (A28-B71, A71-B28: 2), which is no pairing (it drew the ASU). Chains
+# in the crystal by one swapped pair of bases (A28-B71, A71-B28: 2), which is no pairing (it drew the ASU); 2NZ4's E-F
+# and G-H touch in 3, but no assembly holds both (_assembled_together). Chains
 # of a protein only never count (their backbone contacts in a crystal or an assembly are no pairing: 7OKA's ten
 # trimers touch in up to 10 residue pairs).
 
@@ -283,18 +284,34 @@ def _pair_atoms(chain) -> list[tuple[tuple[float, float, float], int]]:
     return out
 
 
-def _paired(members, others) -> bool:
+def _assembled_together(st, a, b) -> bool:
+    """Does some deposited assembly hold both chains (by name or by a subchain of theirs)? True when the file has no
+    assembly records (nothing to tell crystal packing from biology)."""
+    if st is None or not st.assemblies:
+        return True
+    subs = {c.name: {r.subchain for r in c} for c in (a, b)}
+    for assembly in st.assemblies:
+        names = {n for g in assembly.generators for n in g.chains}
+        sub = {x for g in assembly.generators for x in g.subchains}
+        if all(c.name in names or subs[c.name] & sub for c in (a, b)):
+            return True
+    return False
+
+
+def _paired(members, others, st=None) -> bool:
     """Are chains of `members` held to chains of `others` by base pairs between their nucleic acids (at least
-    PAIRED_MIN residue pairs with polar base atoms within _PAIR_DIST)? Such chains are one object (3OWW: the two
-    chains of a glycine riboswitch dimer pair their RNAs), however alike their sequences (3OWW ruling; protein
-    β-strand pairing is not used)."""
+    PAIRED_MIN residue pairs with polar base atoms within _PAIR_DIST), two chains some deposited assembly of `st`
+    holds together (fix round 1 ruling: 2NZ4's E and F, in assemblies 1 and 2, touch in 3 pairs by crystal packing;
+    a file with no assembly records: base pairs alone)? Such chains are one object (3OWW: the two chains of a glycine
+    riboswitch dimer pair their RNAs, and assembly 3 holds both), however alike their sequences (3OWW ruling;
+    protein β-strand pairing is not used)."""
     from scipy.spatial import cKDTree
 
     for a in members:
         pa = _pair_atoms(a)
         for b in others:
             pb = _pair_atoms(b)
-            if not pa or not pb:
+            if not pa or not pb or not _assembled_together(st, a, b):
                 continue
             tree = cKDTree([x for x, _ in pb])
             found = {(k, pb[j][1]) for x, k in pa for j in tree.query_ball_point(x, _PAIR_DIST)}
@@ -326,7 +343,7 @@ def _one_complex_of_several(st, assembly, model) -> bool:
         return False
     if not all(deposited.count(e) >= 2 * held.count(e) for e in set(held)):
         return False
-    return not _paired(members, [c for c in model if c not in members])  # copies paired to it are one object
+    return not _paired(members, [c for c in model if c not in members], st)  # copies paired to it: one object
 
 
 class ModelRead(tuple):

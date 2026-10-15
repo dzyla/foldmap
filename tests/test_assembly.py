@@ -537,3 +537,21 @@ def test_a_lattice_contact_of_two_base_pairs_is_no_pairing():
 
     assert not _paired([rna("A", 0.0, 2)], [rna("B", 0.2, 2)])
     assert _paired([rna("A", 0.0, 3)], [rna("B", 0.2, 3)])
+
+
+def test_paired_chains_must_be_assembled_together():
+    """Fix round 1 ruling: chains are one object by pairing only when a deposited assembly holds both and they share
+    PAIRED_MIN base pairs; a file with no assembly records counts base pairs alone. 3OWW's A and B pair in 4 and
+    assembly 3 holds both: paired. Without assembly 3 (A and B only in assemblies of their own, as 2NZ4's E and F are
+    in its assemblies 1 and 2, touching in 3 pairs by crystal packing): not paired. With no assemblies: paired."""
+    import gemmi
+
+    from foldmap.io import _paired
+
+    st = gemmi.read_structure(str(DATA / "r100" / "3OWW-AB.cif.gz"))
+    a, b = st[0]["A"], st[0]["B"]
+    assert _paired([a], [b], st)
+    del st.assemblies[2]  # assembly 3: A and B
+    assert [x.name for x in st.assemblies] == ["1", "2"] and not _paired([a], [b], st)
+    st.assemblies.clear()
+    assert _paired([a], [b], st)
