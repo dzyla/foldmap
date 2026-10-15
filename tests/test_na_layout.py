@@ -2,6 +2,7 @@
 
 import copy
 import json
+import math
 import os
 import shutil
 import subprocess
@@ -812,6 +813,30 @@ def test_a_straight_joint_may_cross_its_partner_strand_but_no_other():
     other.add(across)
     assert _straight_joint(router, da, db, fa, ea, fb, partner)
     assert not _straight_joint(router, da, db, fa, ea, fb, other)
+
+
+def test_a_joint_no_route_reaches_is_drawn_straight_a_little_further():
+    """C24 (random-100): a joint between two pieces of a bent duplex that no route reaches fell back to a plain
+    curve when its faces were 1.5 or more apart and the pieces did not touch, though the straight line between them
+    was clear (9C75 P2b -> P2a, faces 1.83 apart). Such a joint is drawn straight up to _JOINT_REACH, as a kink
+    joins two pieces of a helix; further apart it is not."""
+    from foldmap.na_paths import _face, _Strands
+    from foldmap.na_runs import _JOINT_REACH, _straight_joint
+    from foldmap.route import _element_obstacles, _Grid, _Router
+
+    lay, _, _, _ = _routed("1AOI")
+    at = {key: d for d in lay.stems for key in d.axial}
+    router = _Router(_Grid(lay), _element_obstacles(lay))
+    reach = {}
+    for p in (p for p in lay.na_paths if p.kind == "joint"):
+        a, b = p.between
+        (fa, ea), (fb, _) = _face(at[a], a, True), _face(at[b], b, False)
+        reach[(at[a].name, at[b].name)] = (
+            math.dist(fa, fb),
+            _straight_joint(router, at[a], at[b], fa, ea, fb, _Strands(router.grid)),
+        )
+    assert any(1.5 < d < _JOINT_REACH and ok for d, ok in reach.values()), reach  # DNA 1b -> 1a, 1u -> 1t
+    assert not any(ok for d, ok in reach.values() if d >= _JOINT_REACH)
 
 
 def _enters_core(p, q, d) -> bool:

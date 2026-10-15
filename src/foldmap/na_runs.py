@@ -28,6 +28,7 @@ from .route import _INFLATE, _clear, _curve, _Router, clip_len
 
 _BOW_MAX = 8  # internal-loop sides up to this many nucleotides are drawn as bows, not routed
 _JOINT_STRAIGHT = 1.5  # a joint between two pieces of a bent duplex shorter than this may be drawn straight
+_JOINT_REACH = 2.5  # ... and, when no route reaches it, one shorter than this (9C75 P2b -> P2a, 1.83: random-100 C24)
 # a run keeps off every strand drawn before it (and every protein loop) by a detour at most this many times as
 # long as its plain drawing, which keeps off the hairpin loops and free ends only. Measured on 24 campaign entries,
 # crossing a strand only a cost: run-run crossings 250 -> 239, protein loops crossed 178 -> 175, no entry worse in
@@ -98,14 +99,14 @@ def _elbow(router: _Router, da: PlacedStem, db: PlacedStem, fa, ea, fb, eb, stra
 
 def _straight_joint(router: _Router, da: PlacedStem, db: PlacedStem, fa, ea, fb, strands=None) -> bool:
     """May a joint no route reaches be drawn straight from face fa to face fb, as a kink joins two pieces of one
-    helix? Only between pieces that are near (faces closer than _JOINT_STRAIGHT) or whose boxes touch, going on
+    helix? Only between pieces that are near (faces closer than _JOINT_REACH) or whose boxes touch, going on
     forward (along fa's outward direction ea), clear by _INFLATE of every element and stem but its own two (a
     line that runs into one of those beyond a bead's radius is drawn as an _elbow instead where one is clear),
     and crossing no nucleic-acid strand drawn so far (`strands`, a _Strands) other than the partner strand of this
     same joint (two strands may cross where the duplex carries on, as in a helix)."""
     a, b = da.rect, db.rect
     touching = min(a[2], b[2]) - max(a[0], b[0]) >= -1e-9 and min(a[3], b[3]) - max(a[1], b[1]) >= -1e-9
-    if not (math.dist(fa, fb) < _JOINT_STRAIGHT or touching) or _dot(np.subtract(fb, fa), ea) <= 0:
+    if not (math.dist(fa, fb) < _JOINT_REACH or touching) or _dot(np.subtract(fb, fa), ea) <= 0:
         return False
     if not _clear(_xy([fa, fb]), (da, db), *router.elements, grow=_INFLATE, kink=True):
         return False
