@@ -649,3 +649,43 @@ def test_a_loop_out_of_a_helix_over_a_sheet_keeps_off_text_unless_flagged():
     for lp in route_loops(lay, sses, bb):
         if not lp.fallback and not lp.crosses_labels:
             assert segments_clear(lp.points, boxes), (lp.a_id, lp.b_id)
+
+
+def _name_in_the_way(bounds=(-4.0, -3.0, 4.0, 3.0)):
+    """A horizontal helix whose name sits above it, and a loop line that runs just above the name's ink: outside the
+    name's keep-out box (so the router would not mind it), inside the room figcheck keeps between a line and text."""
+    from foldmap.figcheck import LINE_TEXT_CLEARANCE_PX
+    from foldmap.layout import page_text
+
+    h = bar(10, 0.0, 0.0, 3.0, 0.0)
+    lay = Layout({h.sse.id: h}, bounds)
+    em = route._ink_em(lay, lay.font_scale)
+    room = (LINE_TEXT_CLEARANCE_PX + 0.5) * 0.72 * page_text(lay)[1]
+    top = route._name_ink(lay, h, em)[3]
+    y = top + room / 2
+    loop = route.Loop("x", "y", [(-2.0, y), (2.0, y)], False, False)
+    return lay, h, loop, y, room
+
+
+def test_a_helix_name_a_loop_runs_too_near_moves_to_the_clear_side():
+    """random-100 C6: the route keeps out of a name's rough box (smaller than its text on a wide page) and its own
+    helix's loops may leave through it, so the name is set clear of every loop's line after routing."""
+    lay, h, loop, y, room = _name_in_the_way()
+    assert h.label_side == 1 and label_boxes(lay, [h.sse])[0][1][3] < y  # outside the keep-out box
+    route._clear_helix_names(lay, [h.sse], [loop])
+    ink = route._name_ink(lay, h, route._ink_em(lay, lay.font_scale))
+    assert h.label_side == -1 and ink[3] < y - room  # below the helix, with the room a line keeps from text
+
+
+def test_a_helix_name_no_loop_runs_near_stays():
+    lay, h, loop, y, room = _name_in_the_way()
+    loop.points[:] = [(-2.0, y + 3 * room), (2.0, y + 3 * room)]
+    route._clear_helix_names(lay, [h.sse], [loop])
+    assert (h.label_side, h.label_along) == (1, 0.0)
+
+
+def test_a_helix_name_with_no_better_spot_stays():
+    lay, h, loop, y, room = _name_in_the_way(bounds=(-4.0, -0.5, 4.0, 3.0))  # no room below the helix
+    other = [(-2.0, y - 0.9), (2.0, y - 0.9)]
+    route._clear_helix_names(lay, [h.sse], [loop, route.Loop("x", "z", other, False, False)])
+    assert h.label_side == 1

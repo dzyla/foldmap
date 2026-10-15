@@ -12,7 +12,18 @@ from dataclasses import dataclass
 import numpy as np
 
 from .features import KINK_GAP
-from .layout import Layout, Placed, label_boxes
+from .layout import (
+    _GLYPH_H,
+    Layout,
+    Placed,
+    _element_label_box,
+    _ink_em,
+    _snap,
+    helix_label_pos,
+    label_boxes,
+    overlaps_any,
+    page_text,
+)
 from .model import SSE
 
 RES = 0.25  # grid cell size, page units
@@ -450,6 +461,60 @@ def _strands_under(layout: Layout, sid: str, port) -> set[str]:
     return out
 
 
+_NAME_INK_W, _NAME_INK_UP, _NAME_INK_DOWN = 0.29, 0.46, 0.30  # em: a helix name's ink, per character either side
+# of its centre, then above and below it (measured on Liberation Sans digits and Greek letters)
+_NAME_ALONG = (0.0, -0.25, 0.25, -0.4, 0.4)  # where along its helix a name that must move may sit: helix lengths
+
+
+def _name_ink(layout: Layout, p: Placed, em: float) -> tuple[float, float, float, float]:
+    """A helix name's drawn ink as a box (the keep-out box is a rough glyph size, smaller than the text on a wide
+    page, where the text is held at 4 pt or more)."""
+    x0, y0, x1, y1 = _element_label_box(p)
+    cx, cy = helix_label_pos(p)
+    hw = max(cx - x0, _NAME_INK_W * em * len(p.label) + 0.05)
+    return (cx - hw, cy - max(_GLYPH_H / 2, _NAME_INK_DOWN * em), cx + hw, cy + max(y1 - cy, _NAME_INK_UP * em))
+
+
+def _clear_helix_names(layout: Layout, sses: list[SSE], loops: list[Loop]) -> None:
+    """A helix name that a loop's line runs through or nearer than figcheck.LINE_TEXT_CLEARANCE_PX of its ink (a
+    loop out of the helix's own end included: the route keeps out of the name's rough box only, and a crowded page
+    leaves no way round it) moves to the spot that lines run nearest least: the other side of the helix, or along it
+    (_NAME_ALONG), the earlier spot (the current side first) on a tie. A spot must be on the page and meet no
+    element, other name, stub or letter. A name no spot improves stays. Set after routing: routes are unchanged."""
+    from .figcheck import LINE_TEXT_CLEARANCE_PX
+
+    names = sorted((p for p in layout.placed.values() if p.sse.kind in ("H", "G") and p.label), key=lambda p: p.sse.id)
+    if not names or not loops:
+        return
+    em = _ink_em(layout, layout.font_scale)
+    grow = (LINE_TEXT_CLEARANCE_PX + 0.5) * 0.72 * page_text(layout)[1]  # clearance and a line's half width
+    segs = [(a, b) for lp in loops for a, b in zip(lp.points, lp.points[1:])]
+    solid = [q.rect for q in [*layout.placed.values(), *layout.ghosts, *layout.stems]]
+    x0, y0, x1, y1 = layout.bounds
+    texts = dict(label_boxes(layout, sses))
+
+    def struck(box) -> int:
+        big = (box[0] - grow, box[1] - grow, box[2] + grow, box[3] + grow)
+        return sum(clip_len(a, b, big) > 1e-9 for a, b in segs)
+
+    for p in names:
+        now = struck(_name_ink(layout, p, em))
+        if not now:
+            continue
+        key = f"label:{p.sse.id}"
+        taken = solid + [box for name, box in texts.items() if name != key]
+        start = (p.label_side, p.label_along)
+        best = (now, start)  # the fewest lines struck, the earliest spot on a tie
+        for along in _NAME_ALONG:
+            for side in (start[0], -start[0]):
+                p.label_side, p.label_along = side, float(_snap(along * p.length))
+                ink = _name_ink(layout, p, em)
+                if ink[0] >= x0 and ink[1] >= y0 and ink[2] <= x1 and ink[3] <= y1 and not overlaps_any(ink, taken):
+                    best = min(best, (struck(ink), (side, p.label_along)), key=lambda c: c[0])
+        p.label_side, p.label_along = best[1]
+        texts[key] = _element_label_box(p)
+
+
 def route_loops(layout: Layout, sses: list[SSE], bb) -> list[Loop]:
     """The loop between each pair of sequence-adjacent elements, routed around everything placed. When the layout
     holds nucleic acid it also routes the single strands (route_na.route_nucleic): that sets layout.na_paths,
@@ -540,6 +605,7 @@ def route_loops(layout: Layout, sses: list[SSE], bb) -> list[Loop]:
         pts, fb, over = routed[(a.id, b.id)]
         dashed = any(not bb.prev[k] for k in range(a.end + 1, b.start + 1))
         out.append(Loop(a.id, b.id, [(float(x), float(y)) for x, y in pts], dashed, fb, over))
+    _clear_helix_names(layout, sses, out)
     if layout.nucleic is not None:  # after the loops, so strands see the cells they use
         from .route_na import route_nucleic
 
