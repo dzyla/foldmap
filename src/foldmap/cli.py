@@ -216,7 +216,8 @@ def make_layout(
     if (look or Style()).color_by == "conservation" and not msa:
         raise ValueError("conservation colouring needs an alignment: add --msa ALIGNMENT")
     dssp = assign_dssp(bb)
-    sses = build_sses(bb, dssp.ss, short_helices=(look or Style()).helices_310, bridges=dssp.bridges)
+    matched: dict = {}  # helix pieces cut or joined so copies match (ss._copy_breaks): told by scope.drawn_scope
+    sses = build_sses(bb, dssp.ss, short_helices=(look or Style()).helices_310, bridges=dssp.bridges, matched=matched)
     sheets = build_sheets(sses, dssp.bridges)
     nucleic = load_nucleic(path, bb, assembly, model=model) if dna else None
     if chains:
@@ -360,6 +361,7 @@ def make_layout(
         else None,
         over=over,
     )
+    lay.helix_matched = {"cut": matched.get("cut", 0), "joined": matched.get("joined", 0)}
     if lay.domains:  # copies of one domain share a tone
         from .features import domain_tones
 

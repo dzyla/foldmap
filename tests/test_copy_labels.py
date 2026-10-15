@@ -78,17 +78,20 @@ def test_helicase_neighbours_keep_their_primes():
 
 def test_a_name_given_to_one_copy_reaches_one_element_of_each_other():
     """7TIM: A holds helix 178-203 as 178-196 + 198-203 (DSSP breaks it at 197) where B's run is whole; B is broken
-    there too (ss._copy_breaks, random-100 7OKA), so each copy has both pieces. Named in B only, the name reaches A's
-    178-196 and not 198-203 too."""
+    there too (ss._copy_breaks, random-100 7OKA), so each copy has both pieces. Named in B only, by the helix's
+    whole range (res:B:178-203, as a names file written before the cut has it) or by its larger piece, the name
+    reaches each copy's 178-196 (the larger overlap) and not 198-203: a range spanning a cut helix names its larger
+    piece, it does not raise (fix round 1)."""
     import tempfile
 
-    with tempfile.TemporaryDirectory() as tmp:
-        names = Path(tmp) / "b.yaml"
-        names.write_text("elements:\n  res:B:178-196: H8\n", encoding="utf-8")
-        lay, _, _ = make_layout(FID / "7TIM.cif.gz", names=[str(names)])
-    assert lay.placed["B:178-196"].label == lay.placed["A:178-196"].label == "H8"
-    assert lay.placed["A:198-203"].label != "H8" and lay.placed["B:198-203"].label != "H8"
-    assert _repeats(lay) == {}
+    for ref in ("res:B:178-203", "res:B:178-196"):
+        with tempfile.TemporaryDirectory() as tmp:
+            names = Path(tmp) / "b.yaml"
+            names.write_text(f"elements:\n  {ref}: H8\n", encoding="utf-8")
+            lay, _, _ = make_layout(FID / "7TIM.cif.gz", names=[str(names)])
+        assert lay.placed["B:178-196"].label == lay.placed["A:178-196"].label == "H8", ref
+        assert lay.placed["A:198-203"].label != "H8" and lay.placed["B:198-203"].label != "H8", ref
+        assert _repeats(lay) == {}
 
 
 def test_tim_copies_name_each_helix_once():

@@ -5,12 +5,15 @@
 from __future__ import annotations
 
 import functools
+import logging
 import re
 
 import numpy as np
 
 from .model import SSE, Backbone, Bridge, homolog_chains, same_place
 from .sheets import _MIN_PAIRS, _SPLIT_GAP, _edge_table
+
+log = logging.getLogger(__name__)
 
 _MIN_STRAND = 2
 _MIN_HELIX_H = 4  # an alpha run needs this many H residues ...
@@ -175,13 +178,14 @@ def _split_kinks(a: int, b: int, cuts) -> tuple[list[tuple[int, int]], list[int]
 _BREAK_MAX = 2  # residues: a helix broken by this few in one copy of a protein is broken there in every copy
 
 
-def _copy_breaks(helices: list[tuple[int, int]], bb: Backbone, copies) -> list[tuple[int, int]]:
+def _copy_breaks(helices: list[tuple[int, int]], bb: Backbone, copies) -> tuple[list[tuple[int, int]], int, int]:
     """Helix runs broken alike in every copy of a protein: where DSSP breaks a helix by up to _BREAK_MAX residues in
     some copies (two runs, chain-contiguous) and other copies' runs cover that place whole, the majority decides, a
     tie breaking: the whole runs are cut there, at the same residue numbers (copies() as in model.homolog_chains),
     the residues between in no piece, each piece still a helix's length (_MIN_HELIX_ANY); or the broken copies' two
-    runs are joined into one. 7OKA: 225-231 + 233-238 in B and C, 225-238 in A: A is cut. One copy of many broken
-    does not cut all the others (7JU4's tubulins)."""
+    runs are joined into one (and a run broken twice so, all three). 7OKA: 225-231 + 233-238 in B and C, 225-238 in
+    A: A is cut. One copy of many broken does not cut all the others (7JU4's tubulins). Returns the runs and how
+    many cuts and joins were made (logged at INFO: the README tells the rule)."""
     pairs = [
         (x, y)
         for x, y in zip(helices, helices[1:])
@@ -190,7 +194,8 @@ def _copy_breaks(helices: list[tuple[int, int]], bb: Backbone, copies) -> list[t
         and bool(bb.prev[x[1] + 1 : y[0] + 1].all())
     ]
     if not pairs:
-        return helices
+        return helices, 0, 0
+    n_cut = n_joined = 0
     at = {(l.chain, l.seq): k for k, l in enumerate(bb.labels)}
     broken: dict[tuple, set[str]] = {}  # (root, last number before the break, first after) -> chains broken there
     for x, y in pairs:
@@ -209,19 +214,22 @@ def _copy_breaks(helices: list[tuple[int, int]], bb: Backbone, copies) -> list[t
                 whole[g].add(bb.labels[a].chain)
     cut = {g for g in broken if whole[g] and len(broken[g]) >= len(whole[g])}
     join = {g for g in broken if whole[g] and len(broken[g]) < len(whole[g])}
-    merged: dict[int, int] = {}  # a broken run's start -> the end of the run it joins
+    following: dict[int, tuple[int, int]] = {}  # a broken run's start -> the run it is joined to
     for x, y in pairs:
         root, _, xb, ya, _ = _span(bb, copies(), x, y)
         if (root, xb, ya) in join:
-            merged[x[0]] = y[1]
+            following[x[0]] = y
     out = []
     skip = set()
     for a, b in helices:
         if a in skip:
             continue
-        if a in merged:  # joined with the next run, as the other copies have it
-            b = merged[a]
-            skip |= {c for c, _ in helices if a < c <= b}
+        if a in following:  # joined with the next run, and that with its next (x|y|z), as the other copies have it
+            at = a
+            while at in following:
+                at, b = following[at]
+                skip.add(at)
+                n_joined += 1
             out.append((a, b))
             continue
         chain = bb.labels[a].chain
@@ -236,18 +244,25 @@ def _copy_breaks(helices: list[tuple[int, int]], bb: Backbone, copies) -> list[t
             if end - start + 1 >= _MIN_HELIX_ANY and b - nxt + 1 >= _MIN_HELIX_ANY:
                 pieces.append((start, end))
                 start = nxt
+                n_cut += 1
         pieces.append((start, b))
         out += pieces
-    return out
+    if n_cut or n_joined:
+        log.info("helix pieces matched across copies: %d cut, %d joined", n_cut, n_joined)
+    return out, n_cut, n_joined
 
 
-def build_sses(bb: Backbone, ss: str, short_helices: bool = False, bridges: list[Bridge] | None = None) -> list[SSE]:
+def build_sses(
+    bb: Backbone, ss: str, short_helices: bool = False, bridges: list[Bridge] | None = None, *, matched=None
+) -> list[SSE]:
     """Strands (E) and helices (H); with short_helices, isolated 3-10 runs too short to count as helices
     become their own kind G (drawn as small boxes, labelled η). Pass the DSSP bridges so that strand pieces
     split at a beta-bulge are joined into one strand (without them, strands stay as DSSP runs). A helix run is
     split where two of its alpha segments meet through 3-10/pi residues at more than KINK_SPLIT degrees (the
     globin AB corner; _kinks). A kink split or a bulge join in one copy of a protein is made in its other copies
-    too, whatever their angle and up to two residues further apart, so that identical chains are drawn alike."""
+    too, whatever their angle and up to two residues further apart, so that identical chains are drawn alike; a helix
+    DSSP breaks by one or two residues in some copies and not in others is drawn as most copies have it (_copy_breaks;
+    `matched`, a dict, gets the numbers of cuts and joins)."""
     copies = functools.cache(lambda: homolog_chains(bb))  # computed only when some copy splits or joins
     out = [_sse("E", bb, a, b) for a, b in _runs(ss, "E", bb.prev) if b - a + 1 >= _MIN_STRAND]
     helices = [
@@ -255,7 +270,9 @@ def build_sses(bb: Backbone, ss: str, short_helices: bool = False, bridges: list
         for a, b in _runs(ss, "HGI", bb.prev)
         if ss[a : b + 1].count("H") >= _MIN_HELIX_H or b - a + 1 >= _MIN_HELIX_ANY
     ]
-    helices = _copy_breaks(helices, bb, copies)
+    helices, cut, joined = _copy_breaks(helices, bb, copies)
+    if matched is not None:
+        matched.update(cut=cut, joined=joined)
     kinks = {h: _kinks(*h, ss, bb) for h in helices}
     sharp = [_span(bb, copies(), x, y) for h in helices for x, y, angle in kinks[h] if angle > KINK_SPLIT]
     corners: list[int] = []  # residues of a kink between two helix pieces: no element of their own

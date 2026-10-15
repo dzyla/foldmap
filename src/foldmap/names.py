@@ -238,7 +238,7 @@ def _file_names(path: Path, layout: Layout, sses, nucleic, whole, chains) -> tup
     given: dict[tuple[str, str], tuple[str, str]] = {}  # (chain, name) -> (ref, element) that took it
     for ref, name in (doc.get("elements") or {}).items():
         ref, name = str(ref), str(name)
-        ids = _resolves(layout, sses, ref)
+        ids = _one_piece(_resolves(layout, sses, ref), sses, ref)
         if not ids and not _left_out(ref, sses, whole, chains):
             raise ValueError(
                 f"{path}: no element {ref!r} in the figure; use a label such as A or α1, chain:label, #k or res:a-b"
@@ -258,6 +258,36 @@ def _file_names(path: Path, layout: Layout, sses, nucleic, whole, chains) -> tup
                 _one_each(path, taken, (chain, name), (key, d.parent or d.id), "stem")
         stems.update(named)
     return elements, stems
+
+
+_PIECE_GAP = 2  # residues: helices of one chain this close are pieces of one helix (ss: a kink, a copy's break)
+
+
+def _one_piece(ids: list[str], sses: list[SSE], ref: str) -> list[str]:
+    """A res: range that spans the pieces of one helix (consecutive helices of a chain no more than _PIECE_GAP
+    residues apart: a kink split, or a break made alike in every copy, ss._copy_breaks) names the piece it overlaps
+    most, the first on a tie, not every piece (fix round 1: 7TIM's res:B:178-203 named B:178-196 and B:198-203 once
+    B was cut like A). Other references are returned as they are."""
+    m = re.fullmatch(r"res:(?:[^:]+:)?(-?\d+)[A-Za-z]?(?:-(-?\d+)[A-Za-z]?)?", ref.strip())
+    if m is None or len(ids) < 2:
+        return ids
+    lo, hi = sorted((int(m[1]), int(m[2] if m[2] is not None else m[1])))
+    by_id = {s.id: s for s in sses}
+    els = sorted((by_id[k] for k in ids), key=lambda s: s.start)
+
+    def overlap(s: SSE) -> int:
+        return max(0, min(hi, s.last.seq) - max(lo, s.first.seq) + 1)
+
+    out, run = [], [els[0]]
+    for s in els[1:]:
+        last = run[-1]
+        if s.kind == last.kind == "H" and s.chain == last.chain and s.start - last.end - 1 <= _PIECE_GAP:
+            run.append(s)
+            continue
+        out.append(max(run, key=lambda x: (overlap(x), -x.start)))
+        run = [s]
+    out.append(max(run, key=lambda x: (overlap(x), -x.start)))
+    return [k for k in ids if k in {s.id for s in out}]
 
 
 def _one_each(path: Path, given: dict, at: tuple[str, str], by: tuple[str, str], what: str) -> None:
@@ -341,7 +371,7 @@ def apply_names(
         elements, stems = load_names(spec, path, layout, sses, layout.nucleic, whole=whole, chains=chains)
         given = set()
         for ref, name in elements.items():
-            for sid in resolve(layout, sses, ref):
+            for sid in _one_piece(resolve(layout, sses, ref), sses, ref):
                 layout.placed[sid].label = named[sid] = name
                 given.add(sid)
         for k, name in stems.items():

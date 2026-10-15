@@ -287,3 +287,40 @@ def test_a_helix_broken_in_one_copy_of_three_is_joined_again():
     k = next(i for i, l in enumerate(bb.labels) if l.chain == c and l.seq == (a + b) // 2)
     ss[k] = "T"
     assert {(s.chain, s.first.seq, s.last.seq) for s in build_sses(bb, "".join(ss))} == plain
+
+
+def test_helix_pieces_matched_across_copies_are_told(caplog):
+    """Fix round 1 ruling: the copy-majority cuts and joins are told: build_sses counts them (`matched`), logs
+    "helix pieces matched across copies: n cut, n joined" at INFO, and the figure's scope carries the counts (7TIM:
+    B's 178-203 cut like A's; 1UBQ, one chain: nothing)."""
+    import logging
+
+    from foldmap.cli import make_layout
+    from foldmap.io import read_model
+    from foldmap.scope import drawn_scope
+
+    bb = load_backbone(FID / "7TIM.cif.gz")
+    matched: dict = {}
+    with caplog.at_level(logging.INFO, logger="foldmap.ss"):
+        build_sses(bb, assign_dssp(bb).ss, matched=matched)
+    assert matched == {"cut": 1, "joined": 0}
+    assert "helix pieces matched across copies: 1 cut, 0 joined" in caplog.text
+    lay, _, _ = make_layout(FID / "7TIM.cif.gz")
+    assert drawn_scope(read_model(FID / "7TIM.cif.gz"), lay)["helix_matched"] == {"cut": 1, "joined": 0}
+    plain, _, _ = make_layout(Path(__file__).parent / "data" / "1UBQ.cif")
+    assert drawn_scope(read_model(Path(__file__).parent / "data" / "1UBQ.cif"), plain)["helix_matched"] == {
+        "cut": 0,
+        "joined": 0,
+    }
+
+
+def test_a_helix_broken_twice_in_one_copy_of_three_is_joined_whole():
+    """Fix round 1 (minor): a run broken twice by joined breaks (x|y|z) is joined into one, not just x+y."""
+    bb = load_backbone(Path(__file__).parent / "data" / "1C3W.cif", "auto")
+    ss = list(assign_dssp(bb).ss)
+    plain = {(s.chain, s.first.seq, s.last.seq) for s in build_sses(bb, "".join(ss))}
+    chains = sorted({c for c, _, _ in plain})
+    c, a, b = next(h for h in sorted(plain) if h[0] == chains[0] and h[2] - h[1] >= 20)
+    for seq in (a + 7, a + 14):
+        ss[next(i for i, l in enumerate(bb.labels) if l.chain == c and l.seq == seq)] = "T"
+    assert {(s.chain, s.first.seq, s.last.seq) for s in build_sses(bb, "".join(ss))} == plain

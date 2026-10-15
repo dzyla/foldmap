@@ -179,7 +179,9 @@ foldmap styles                                    # every theme and style key
   α-, 3₁₀- and π-helices (π before α, as in DSSP ≥ 2.1), β-strands with bulges, turns; β-sheets
   with strand order and direction, closed barrels shown with a ghost of the first strand. A helix kinked by more
   than 30° is split into pieces drawn end to end; a strand that a bulge splits stays one strand when both pieces
-  pair with the same partner.
+  pair with the same partner. Copies of one protein are drawn alike: a kink split or bulge join in one copy is made
+  in all, and a helix that DSSP breaks by one or two residues in some copies and not in others is drawn as most
+  copies have it (a tie breaks it); the figure's scope facts count these cuts and joins.
 - **Layout** from the 3D structure: elements projected onto the page, then arranged so sheets stay in order,
   contacting elements and disulfide partners stay close, and nothing overlaps; loops routed orthogonally around
   elements and labels. The layout is deterministic: the same figure on every machine.

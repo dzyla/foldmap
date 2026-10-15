@@ -256,6 +256,7 @@ class Layout:
     tied_ids: set[str] = field(default_factory=set)  # ids of the elements of every item a symmetry tie holds, copy
     # and mate alike (a sheet block among them is drawn as its mate is: figcheck.shared_sheet_elements)
     font_scale: float = 1.0  # Style.font_scale the figure is drawn with (texts placed in the layout are sized by it)
+    helix_matched: dict = field(default_factory=dict)  # {"cut", "joined"}: helix pieces made alike in copies (ss)
     na_letter_rows: tuple[float | None, bool] = (None, False)  # where a stem's base letters sit (NT_ROW, 0 on the
     # rails, None: not drawn) and whether single-stranded letters are drawn, as render draws them (na_text_boxes)
     ligands: str = "auto"  # Style.ligands the figure is drawn with (auto hides additives: scope.drawn_scope names them)

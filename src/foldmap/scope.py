@@ -82,7 +82,9 @@ def drawn_scope(model, layout, assembly: str = "auto", focus: str = "auto") -> d
         for, when some were); undrawn_chains: chains the figure has nothing of (_undrawn_chains), not_drawn: them
         with why ('' when none), part of the reason (random-100 C15); additives: the additives it hides on purpose
         (_hidden_additives), named by scope_note but not part of the reason (C20 ruling); tetrads: the G-tetrads of
-        the drawn nucleic acid, drawn unpaired, named by scope_note but not part of the reason (C29 ruling)."""
+        the drawn nucleic acid, drawn unpaired, named by scope_note but not part of the reason (C29 ruling);
+        helix_matched: how many helix runs were cut or joined so copies of a protein match (ss._copy_breaks: a fact,
+        not part of the reason or the note; fix round 1 ruling)."""
     several = getattr(model, "several", None) if assembly == "auto" else None
     read = list(getattr(layout, "chains_read", None) or [])
     asked = list(getattr(layout, "chains_asked", None) or [])
@@ -122,6 +124,7 @@ def drawn_scope(model, layout, assembly: str = "auto", focus: str = "auto") -> d
         "additives": additives,
         "not_drawn": not_drawn,
         "tetrads": _tetrads(layout),
+        "helix_matched": {"cut": 0, "joined": 0, **(getattr(layout, "helix_matched", None) or {})},
     }
     if not reasons and not crop and not not_drawn:
         return {
