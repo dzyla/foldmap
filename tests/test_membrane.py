@@ -513,3 +513,24 @@ def test_fimd_band_survives_its_pendant_strand_leaving_the_barrel():
     before = np.array([-0.0211, -0.225, 0.9741])
     assert np.degrees(np.arccos(abs(found.normal @ before) / np.linalg.norm(before))) <= 10.0
 
+
+def test_a_slab_many_long_elements_cross_but_not_oily_enough_is_refused():
+    """Plan 10 review (C17): the 0.20 polar allowance for a slab 10 or more long elements cross never waives the
+    0.55 hydrophobic minimum. 6JO6-AB (21 crossing, 0.567 hydrophobic) with enough of its slab's oily residues made
+    Ser (neither oily nor polar) to fall under 0.55 finds no membrane."""
+    import dataclasses
+
+    from foldmap import membrane
+
+    path = DATA / "r100" / "6JO6-AB.cif.gz"
+    bb = load_backbone(path, "auto")
+    assert membrane._estimate(bb, membrane.build_sses(bb, membrane.assign_dssp(bb).ss)) is not None
+    oily = [k for k, l in enumerate(bb.labels) if l.name in membrane._HYDROPHOBIC]
+    labels = list(bb.labels)
+    for k in oily[::8]:  # one in eight oily residues
+        labels[k] = labels[k]._replace(name="SER")
+    thin = dataclasses.replace(bb, labels=labels)
+    sses = membrane.build_sses(thin, membrane.assign_dssp(thin).ss)
+    long = [s for s in sses if (s.kind == "H" and len(s) >= 16) or (s.kind == "E" and len(s) >= 8)]
+    assert len(long) >= membrane._MANY_CROSSING
+    assert membrane._estimate(thin, sses) is None
