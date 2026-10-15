@@ -608,3 +608,31 @@ def test_a_chain_with_nothing_to_draw_does_not_widen_the_focus_view(r100):
         r({"scope": {"reason": "x", "chains_reason": "", "crop": "RNA cropped"}, "first_protein_chain": "A"}) == "none"
     )
     assert r({"scope": {}, "first_protein_chain": ""}) == "none"
+
+
+def test_a18_tm_helix_passes_when_it_reaches_both_leaflets(r100):
+    """C27 (random-100, ruling): a TM helix passes A18 when it spans the band, entering it on both sides of the
+    bilayer's middle (both leaflets), not by covering 75 % of the band's height: a tilted or offset helix that
+    crosses one face and reaches past the middle (6PS3 A:267-298 covers 0.73, 7PIU R:48-70 0.70) passes; one
+    that stays in one leaflet fails. Bacteriorhodopsin's five helices whose CA runs reach both faces pass as drawn."""
+    from dataclasses import replace
+
+    import numpy as np
+
+    from foldmap.spec import draw_spec, figure_spec
+
+    path = DATA / "1C3W.cif"
+    d = draw_spec(figure_spec(path, membrane="auto", assembly="asu"))
+    m = r100.membrane_checks(d, path)
+    assert m["band"] and m["tm_helices"] == 5 and m["tm_short"] == [], m
+    lay = d.layout
+    (y0, y1), mid = lay.membrane["y"], sum(lay.membrane["y"]) / 2
+    hid = next(k for k, p in lay.placed.items() if abs(np.sin(p.angle)) > 0.9 and p.length > y1 - y0)
+    p = lay.placed[hid]
+    half = abs(p.c_port[1] - p.n_port[1]) / 2
+    lay.placed[hid] = replace(p, cy=y0 + 0.7 * (y1 - y0) - half)  # crosses the lower face, ends at 0.70: spans
+    assert r100.membrane_checks(d, path)["tm_short"] == []
+    lay.placed[hid] = replace(p, cy=mid - 0.05 - half)  # crosses the lower face, ends short of the middle
+    assert [x.split()[0] for x in r100.membrane_checks(d, path)["tm_short"]] == [hid]
+    lay.placed[hid] = replace(p, cy=mid + 0.05 + half)  # the upper leaflet only
+    assert [x.split()[0] for x in r100.membrane_checks(d, path)["tm_short"]] == [hid]

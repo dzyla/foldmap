@@ -912,7 +912,6 @@ LIMITS = {
     # A17: page units from a stem name to its own letters, at most layout._INK_MARGIN em in the drawn figure's page
     # units plus 1e-3 (figcheck.stem_gap_tolerance; plan 10 Task 4 fix round 2 ruling), measured per figure
     "stem_name_gap": "figcheck.stem_gap_tolerance(layout._INK_MARGIN em)",
-    "tm_overlap": 0.75,  # A18: a TM helix overlaps the band by this fraction of the band's height
     "slab_margin": 0.3,  # A18: a loop's sideways run inside the band, this far from its faces, is in the slab
     "tether_length": 6.5,  # A20: page units, a ligand tether from its mark to another chain than its home
 }
@@ -1207,8 +1206,9 @@ def tether_lengths(drawn, look) -> list[tuple[str, float, str, str]]:
 
 def membrane_checks(drawn, path) -> dict:
     """A18 on a --membrane auto figure: each TM helix (its CA run reaches both membrane faces, as cli._face_medians
-    counts it) overlaps its band by at least tm_overlap of the band's height; loops run sideways inside a band
-    (slab_margin from its faces) only next to one of their own ports inside it."""
+    counts it) spans its band, entering it on both sides of its middle (both leaflets; C27 ruling: not by a share
+    of the band's height, so a tilted or offset helix with one end a little short passes); loops run sideways
+    inside a band (slab_margin from its faces) only next to one of their own ports inside it."""
     from foldmap.membrane import find_membrane
 
     lay, bb = drawn.layout, drawn.bb
@@ -1229,7 +1229,7 @@ def membrane_checks(drawn, path) -> dict:
         lo, hi = sorted((p.n_port[1], p.c_port[1]))
         y0, y1 = min(bands, key=lambda b: abs((b[0] + b[1]) / 2 - (lo + hi) / 2))
         frac = (min(hi, y1) - max(lo, y0)) / max(y1 - y0, 1e-9)
-        if frac < LIMITS["tm_overlap"]:
+        if not lo < (y0 + y1) / 2 < hi:  # in one leaflet only, or off the band
             short.append(f"{s.id} {frac:.2f}")
     margin = LIMITS["slab_margin"]
 
