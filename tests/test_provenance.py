@@ -190,15 +190,19 @@ def test_the_app_job_carries_the_list():
     assert got["provenance"][0]["text"] == T4L_AUTO
 
 
-def test_the_app_shows_the_list_under_the_figure():
+def test_the_app_folds_the_list_away_under_the_figure():
+    """The author (2026-10-16): the list is not needed under every figure; it sits in a closed section."""
     pytest.importorskip("streamlit")
     from app_helpers import opened, visible
 
     at = opened(DATA / "1EMA.cif")
-    said = [visible(c.value) for c in at.caption if "How this figure was made" in visible(c.value)]
-    assert len(said) == 1 and "A:160-170" in said[0], [c.value for c in at.caption]
+    (made,) = [e for e in at.expander if e.label == "How this figure was made"]
+    assert not made.proto.expanded
+    said = [visible(c.value) for c in made.caption]
+    assert len(said) == 1 and "A:160-170" in said[0] and "How this figure" not in said[0], said
+    assert not any("A:160-170" in visible(c.value) for c in at.caption if c not in made.caption)
     at = opened(DATA / "1UBQ.cif")
-    assert not any("How this figure was made" in visible(c.value) for c in at.caption)
+    assert not any(e.label == "How this figure was made" for e in at.expander)
 
 
 def test_a_helix_name_flipped_by_default_off_a_nucleic_acid_axis_is_not_moved():

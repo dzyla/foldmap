@@ -228,6 +228,7 @@ def test_how_a_figure_was_made_reads_as_a_list():
         "- 1 loop(s) drawn over a label: c>d.",
         "- Pairings not drawn side by side: O:29-36.",
     ]
+    assert provenance_caption(items, heading=False) == said.split("\n\n", 1)[1]  # the app's folded section
 
 
 def test_a_table_row_picks_its_structure():
