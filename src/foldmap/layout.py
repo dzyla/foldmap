@@ -3202,12 +3202,12 @@ def _unshown(placed: dict[str, Placed], sheets: list[Sheet], ghosts: list[Placed
 
 def accessory_lines(sheet: Sheet, unshown: list[tuple[str, str]] = (), level: set[str] | None = None) -> list[str]:
     """One line per pairing a sheet draws off its run of paired strands or not at all, worded once for the notes
-    (sheet_note_items) and `foldmap summary`: each accessory strand with its partner,
-    "D:662-666 drawn beside its partner D:645-659", or, drawn away from it (`unshown`: not beside it and level, _unshown),
-    "x:67-68 also pairs with x:79-86"; and each pairing of its track not drawn side by side (Sheet.chords: 9P1X's ring chords),
-    "O:29-36 also pairs with P:28-35". `level`, for `foldmap summary` (which reads a figure from outside): the
-    accessories that figure draws level beside their partner; any other, drawn away or not drawn (focus), reads
-    "A1:2-6 pairs with A1:9-23 (off the run)"."""
+    (sheet_note_items) and `foldmap summary`: each accessory strand with its partner, "D:662-666 drawn beside its
+    partner D:645-659", or, drawn away from it (`unshown`: not beside it and level, _unshown), "x:67-68 also pairs
+    with x:79-86"; and each pairing of its track not drawn side by side (Sheet.chords: 9P1X's ring chords), or of an
+    accessory with another strand of its sheet likewise, "O:29-36 also pairs with P:28-35". `level`, for `foldmap
+    summary` (which reads a figure from outside): the accessories that figure draws level beside their partner; any
+    other, drawn away or not drawn (focus), reads "A1:2-6 pairs with A1:9-23 (off the run)"."""
     away = set(unshown)
 
     def line(a) -> str:
