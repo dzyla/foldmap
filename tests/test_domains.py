@@ -1022,3 +1022,34 @@ def test_parting_domains_sums_no_overlap_unless_it_may_stop(monkeypatch):
     calls.update(overlap=0, tries=[])
     make_layout(DATA / "r100" / "3L9G-A.cif.gz", domains="auto")
     assert calls["tries"] == [False, True] and calls["overlap"] > 0
+
+
+# ------------------------------------------------------------------------- where the domains come from (plan 12 R2)
+
+
+def _source_caption(fig):
+    return [t.get_text() for t in fig.axes[0].texts if (t.get_gid() or "").startswith("domain-bar-source")]
+
+
+def test_the_domain_bar_says_automatic_domains_are_inferred():
+    """R2: an automatic domain is a guess from contacts, not a published assignment, and the figure says so."""
+    assert _source_caption(make_figure(T4L, domains="auto")) == ["domains inferred from contacts"]
+    assert _source_caption(make_figure(T4L, domains=T4L_DOMAINS)) == []  # the user's own: nothing to say
+
+
+def test_the_caption_shares_the_chain_line_when_there_are_several_bars():
+    fig = make_figure(FID / "1LDM.cif.gz", domains="auto")
+    chains = [t.get_text() for t in fig.axes[0].texts if (t.get_gid() or "").startswith("domain-bar-chain:")]
+    assert chains[0] == "chain A1 · domains inferred from contacts" and chains[1] == "chain A2"
+
+
+def test_cath_domains_are_captioned_cath(monkeypatch, tmp_path):
+    import shutil
+
+    from foldmap import cath
+
+    (tmp_path / "cath").mkdir()
+    shutil.copy(DATA / "cath" / "cath_1ldm.json", tmp_path / "cath")
+    monkeypatch.setattr(cath, "CACHE", tmp_path)
+    fig = make_figure(FID / "1LDM.cif.gz", domains="cath", assembly="asu")
+    assert _source_caption(fig) == ["domains: CATH"]

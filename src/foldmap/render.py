@@ -2993,12 +2993,25 @@ def _spread(centres: list[float], widths: list[float], lo: float, hi: float, gap
     return xs
 
 
+DOMAIN_SOURCE_CAPTIONS = {  # Layout.domain_source -> what the domain bar says of the domains (plan 12 R2)
+    "inferred": "domains inferred from contacts",
+    "CATH": "domains: CATH",
+    "UniProt": "domains: UniProt",
+}
+
+
+def domain_source_caption(layout: Layout) -> str:
+    """The domain bar's word on where its domains come from: inferred (automatic ones are a guess from contacts,
+    not a published assignment), CATH or UniProt; '' for domains the user named."""
+    return DOMAIN_SOURCE_CAPTIONS.get(getattr(layout, "domain_source", ""), "")
+
+
 def _draw_domain_bar(c: _Canvas, layout: Layout) -> None:
     """Under the figure, one bar per chain holding domain elements (domain_bars), each in a band of c.bar_h, from the
     content's left edge on one residue scale for every bar (the longest chain spans the content width; Zyla 2024 Fig
     3A draws F2 and F1 so), each segment in its domain's tone, named inside when the name fits at 0.7 of the text
-    size, else below on a short tick; the chain's end residue numbers over its ends (and the chain's name between
-    them when there are several bars)."""
+    size, else below on a short tick; the chain's end residue numbers over its ends, and between them the chain's
+    name when there are several bars, and over the first bar where the domains come from (domain_source_caption)."""
     em = c.font / c.pt_per_unit  # page units of one em of the figure's text
     bars = domain_bars(layout, c.look)
     x0 = c.content[0]
@@ -3010,17 +3023,19 @@ def _draw_domain_bar(c: _Canvas, layout: Layout) -> None:
         for text, x, ha, end in ((first, x0, "left", "N"), (last, x1, "right", "C")):
             t = c.ax.text(x, y + em + 0.08, f"{text:g}", ha=ha, color=c.look.ink, **small)
             t.set_gid(f"domain-bar-end:{chain}:{end}")
-        if len(bars) > 1:
+        source = domain_source_caption(layout) if k == 0 else ""
+        if len(bars) > 1 or source:
+            text = " · ".join(t for t in (f"chain {chain}" if len(bars) > 1 else "", source) if t)
             t = c.ax.text(
                 (x0 + x1) / 2,
                 y + em + 0.08,
-                f"chain {chain}",
+                text,
                 ha="center",
                 style="italic",
                 color=_legible("#5d6877"),
                 **small,
             )
-            t.set_gid(f"domain-bar-chain:{chain}")
+            t.set_gid(f"domain-bar-chain:{chain}" if len(bars) > 1 else "domain-bar-source")
         below = []  # segments too narrow for their name: (segment centre, name width, segment)
         for seg in segments:
             xa, xb = x0 + (seg.lo - first) * unit, x0 + (seg.hi - first) * unit

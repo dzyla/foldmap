@@ -48,6 +48,20 @@
     "D2"
    ]
   },
+  "domain-bar-source": {
+   "bbox": [
+    259.2,
+    274.6,
+    259.2,
+    274.6
+   ],
+   "colours": [
+    "fill:#5d6877"
+   ],
+   "text": [
+    "domains inferred from contacts"
+   ]
+  },
   "domain-bar:A:D1": {
    "bbox": [
     19.0,

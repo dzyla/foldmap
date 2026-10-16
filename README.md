@@ -252,7 +252,7 @@ Change any key with `--set KEY=VALUE` (repeatable) or a YAML file for `--style-f
 | Rename an element | `--rename res:A:167-182=Gd` |
 | Conventional names | `--names deposited` (the file's helix ids, e.g. globin A–H), `--names beta` (β1…βn) or `--names docs/names/2HHB-globin.yaml` (repeatable) |
 | Highlight elements | `--set mark=α4=#2ca02c` |
-| Named domain panels | `--domain N-lobe=res:A:13-59` (repeatable), `--domains auto` or `--domains uniprot` |
+| Named domain panels | `--domain N-lobe=res:A:13-59` (repeatable), `--domains auto` (inferred), `--domains cath` (CATH's published domains, needs network) or `--domains uniprot` |
 | Domain colours and bar | `--set color_by=domain`, `--set domain_bar=on\|off`, `--set domain_colours=false` |
 | βα row | `--set fold_template=off` draws an all-parallel α/β sheet as projected |
 | Helices over a sheet | `--set helix_on_sheet=auto` (opt-in) |
@@ -268,6 +268,16 @@ Elements are named by label (`A`, `α2`, `η1`), `chain:label`, position (`#3`) 
 
 A label reference reads the labels the figure shows: the label copies of one protein share, the primed labels of
 elements a neighbour lends in focus mode (`α2′`) and any `--names`; `--rename` is applied last and wins over all of them.
+
+**Automatic domains are inferred, not published.** `--domains auto` cuts each chain where it has few residue
+contacts across (normalized cuts over CA atoms within 12 Å; a domain may be two pieces of the chain, as T4
+lysozyme's C-domain holds helix A). It is a guess from the coordinates, and the figure says so: the domain bar reads
+"domains inferred from contacts", and the command line, app and MCP notes say "inferred from residue contacts, not a
+published domain assignment". On 33 multi-domain chains chopped by CATH it matches 85 % of the residues to the right
+domain (calling each chain one domain matches 54 %) and finds 88 % of CATH's domain boundaries within 20 residues
+(boundary F1 0.79); the calibration is `tests/test_domain_score.py`. For a published assignment, `--domains cath`
+draws CATH's chopping of a PDB entry (fetched once from the PDBe API, panels named by CATH id such as `1ldmA01`,
+captioned "domains: CATH"); when CATH has none the note says so and the figure is drawn without domains.
 
 **Domains and βα rows.** `--domains auto` never splits a sheet drawn as a βα row (a TIM barrel, a Rossmann fold):
 the row and its helices fall in one domain. A `--domain` set of your own that splits a row is drawn as given, but the
