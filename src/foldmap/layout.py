@@ -3154,12 +3154,15 @@ def sheet_notes(sheets: list[Sheet], unshown: list[tuple[str, str]] = ()) -> lis
     joins = sorted({" with ".join(sorted((a.id, b.id))) for sh in sheets for a, b in sh.joined})
     if joins:  # two barrels of one pairing network (sheets._other_rings), drawn each as its own
         out.append(f"barrels drawn apart, each closed, that also pair: {', '.join(joins)}")
-    lines = [line for sh in sheets for line in accessory_lines(sh, unshown)]
-    lone = sum(len(sh.accessory) for sh in sheets)
+    lone, chords = [], []  # each sheet's own lines: its accessories first, then its chords (accessory_lines)
+    for sh in sheets:
+        lines = accessory_lines(sh, unshown)
+        lone += lines[: len(sh.accessory)]
+        chords += lines[len(sh.accessory) :]
     if lone:
-        out.append(f"{lone} strand(s) off a sheet's run of paired strands: {'; '.join(lines[:lone])}")
-    if lines[lone:]:
-        out.append(f"pairings not drawn side by side: {'; '.join(lines[lone:])}")
+        out.append(f"{len(lone)} strand(s) off a sheet's run of paired strands: {'; '.join(lone)}")
+    if chords:
+        out.append(f"pairings not drawn side by side: {'; '.join(chords)}")
     return out
 
 

@@ -328,3 +328,23 @@ def test_a_rings_chords_are_named():
     (sh,) = ring2
     assert [(a.start, b.start) for a, b in sh.chords] in ([(20, 80)], [(80, 20)])
     assert any("pairings not drawn side by side" in n for n in sheet_notes([sh]))
+
+
+def test_notes_file_each_sheets_lines_under_their_own_heading():
+    """Fix round 4 (the re-review's N1, 9P1X --focus none): sheet_notes joined every sheet's accessory lines and
+    chord lines into one list and cut it at the total accessory count, so with a chord in one sheet and an accessory
+    in a later one the chord was listed among the strands off the run and the accessory under "pairings not drawn
+    side by side". Each line now stays under its own heading."""
+    from foldmap.layout import sheet_notes
+
+    t = [fake(20 * k, 20 * k + 9) for k in range(6)]  # sheet 1: a 3-cycle, then a run; its chord t0/t2
+    br = ladder(t[0], t[1], "A", 5) + ladder(t[1], t[2], "A", 5) + ladder(t[0], t[2], "A", 3)
+    br += ladder(t[2], t[3], "A", 5) + ladder(t[3], t[4], "A", 5) + ladder(t[4], t[5], "A", 5)
+    c, a, b, d = fake(200, 209), fake(220, 229), fake(240, 249), fake(260, 269)  # sheet 2: d off the run, at c
+    br += ladder(c, a, "A") + ladder(c, b, "A") + ladder(c, d, "A")
+    one, two = build_sheets([*t, c, a, b, d], br)
+    assert one.chords and not one.accessory and two.accessory and not two.chords
+    assert sheet_notes([one, two]) == [
+        f"1 strand(s) off a sheet's run of paired strands: {d.id} drawn beside its partner {c.id}",
+        f"pairings not drawn side by side: {t[0].id} also pairs with {t[2].id}",
+    ]
