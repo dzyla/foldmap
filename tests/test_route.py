@@ -10,7 +10,8 @@ from foldmap import route
 from foldmap.frame import view_frame
 from foldmap.layout import ETA_W, HELIX_W, PITCH, Layout, Placed, build_layout, label_boxes
 from foldmap.route import _INFLATE, _MAX_CELLS, _Grid, route_loops
-from helpers import fake_sse, pipeline
+from foldmap.spec import draw_spec, figure_spec
+from helpers import fake_sse, pipeline, r100_entry
 
 DATA = Path(__file__).parent / "data"
 
@@ -905,3 +906,59 @@ def test_a_stack_gap_toll_is_never_negative(monkeypatch):
     loops = route_loops(lay, sses, bb)
     assert seen and min(seen) >= 0.0, seen
     assert not [(l.a_id, l.b_id) for l in loops if not l.fallback and self_crossing(l.points)]
+
+
+def _walled(n_wall=60.0):
+    """Two strands either side of a long wall (a helix), whose loop must go round the wall's end."""
+    a = strand(0, 0, 0)  # C port on top
+    b = strand(20, 4, 0, angle=-np.pi / 2)  # N port on top
+    wall = bar(40, 2, n_wall / 2 - 3, n_wall, np.pi / 2)
+    return a, b, wall
+
+
+def test_a_search_out_of_budget_is_run_again_wider_when_a_route_exists(monkeypatch):
+    """Random-100 C2b-2 (7JU4, 7QUP, 8QEM): on a large page a loop round a wall of long elements needs more A* nodes
+    than _MAX_NODES; it was drawn as a fallback curve through them. When free cells join its two ends the search runs
+    once more with _MAX_NODES_WIDE (here _MAX_NODES is cut so this small page needs the second search)."""
+    a, b, wall = _walled()
+    monkeypatch.setattr(route, "_MAX_NODES", 500)
+    (loop,) = route_loops(layout_of(a, b, wall), [a.sse, b.sse], stub_bb())
+    assert not loop.fallback
+    assert segments_clear(loop.points, [wall.rect])
+    assert min(p[1] for p in loop.points) < wall.rect[1] or max(p[1] for p in loop.points) > wall.rect[3]  # round
+    monkeypatch.setattr(route, "_MAX_NODES_WIDE", 0)  # no second search: the first runs out
+    (loop,) = route_loops(layout_of(a, b, wall), [a.sse, b.sse], stub_bb())
+    assert loop.fallback
+
+
+def test_no_second_search_when_no_free_cells_join_the_ends(monkeypatch):
+    """A port shut in a box of elements has no route, however far the search goes: the second search is not run
+    (its time is saved), and the loop stays a reported fallback. A guard: the first search does run."""
+    a = strand(0, 0, 0)
+    b = strand(20, 4, 0, length=2.0, angle=-np.pi / 2)  # N port on top, room above it inside the box
+    walls = [bar(40, 4, 2.6, 7, 0), bar(50, 4, -2.6, 7, 0)]
+    walls += [bar(60, 1.2, 0, 6, np.pi / 2), bar(70, 6.8, 0, 6, np.pi / 2)]
+    searches = []
+    real = route._astar
+
+    def counted(*args):
+        searches.append(args[-1])
+        return real(*args)
+
+    monkeypatch.setattr(route, "_MAX_NODES", 5)  # the first search runs out of budget, not of cells
+    monkeypatch.setattr(route, "_astar", counted)
+    (loop,) = route_loops(layout_of(a, b, *walls), [a.sse, b.sse], stub_bb())
+    assert loop.fallback
+    assert searches and route._MAX_NODES_WIDE not in searches
+
+
+@pytest.mark.parametrize(
+    "entry, view",
+    [("8QEM", {"focus": "none"}), ("7JU4", {})],
+    ids=["8QEM-focus", "7JU4-default"],
+)
+def test_large_pages_route_their_long_loops(entry, view):
+    """Random-100 C2b-2 A3/A4: 8QEM's focus view (A:221-239>A:248-255 and its copy in B) and 7JU4's default view
+    (four J and K loops round its wall of long helices, four loops over labels) ran out of the A* budget."""
+    d = draw_spec(figure_spec(r100_entry(entry), **view))
+    assert d.stuck == [] and d.over_labels == []

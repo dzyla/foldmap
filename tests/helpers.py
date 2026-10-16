@@ -1,8 +1,10 @@
 """Shared test helpers: run the step-1 pipeline, build synthetic SSEs."""
 
+import os
 from pathlib import Path
 
 import numpy as np
+import pytest
 
 from foldmap.dssp import assign_dssp
 from foldmap.figcheck import honest_crossings, loop_crossings  # noqa: F401 - moved to figcheck (plan 10)
@@ -12,6 +14,17 @@ from foldmap.sheets import build_sheets
 from foldmap.ss import build_sses
 
 FID = Path(__file__).parent / "data" / "fidelity"  # plan-11 protein fixtures (.cif.gz, outside the bench)
+# the random-100 campaign's downloads (scripts/random100.py run, through foldmap.fetch): whole entries too large for a
+# fixture, used where they are; a test on one is skipped where they are not
+R100_CACHE = Path(os.environ.get("FOLDMAP_R100_CACHE") or Path.home() / ".cache" / "foldmap")
+
+
+def r100_entry(entry: str) -> Path:
+    """The random-100 campaign's download of `entry` (R100_CACHE), or skip the test."""
+    path = R100_CACHE / f"{entry}.cif"
+    if not path.is_file():
+        pytest.skip(f"{entry} not downloaded to {R100_CACHE} (python scripts/random100.py run --ids {entry})")
+    return path
 
 
 def pipeline(path, assembly="asu"):

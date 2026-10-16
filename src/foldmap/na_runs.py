@@ -246,14 +246,14 @@ def _drawing(router: _Router, s, nts, between, da, db, ends, need, joint, kind, 
         elif off_names(bowed):
             return NAPath("run", s, nts, bowed, _spaced(bowed, m), between=between)
     if hard:
-        saved, budget = grid.blocked.copy(), router.max_nodes
+        saved, budget = grid.blocked.copy(), (router.max_nodes, router.wide_nodes)
         grid.blocked |= (strands.cells | (grid.used > 0)) if level == 2 else strands.fixed_cells
         if level == 2:  # a detour longer than _DETOUR times the second stage's is not taken: no need to search far
-            router.max_nodes = _FIRST_NODES
+            router.max_nodes, router.wide_nodes = _FIRST_NODES, 0
         try:
             route, _ = router.route(fa, ea, da, fb, eb, db, own_body=True)
         finally:
-            grid.blocked, router.max_nodes = saved, budget
+            grid.blocked, (router.max_nodes, router.wide_nodes) = saved, budget
     else:
         route, _ = router.route(fa, ea, da, fb, eb, db, own_body=True)
     if route is None and joint and _straight_joint(router, da, db, fa, ea, fb, strands):

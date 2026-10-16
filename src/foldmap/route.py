@@ -41,6 +41,11 @@ _SLAB_COST = 3.0  # extra cost for a cell inside the membrane slab: loops betwee
 _SLAB_RUN = 12.0  # ... a step along the slab, not across it: a loop leaves the slab at a face (random-100 C26)
 _PAD = 3.0
 _MAX_NODES = 200_000
+# a search that ran out of _MAX_NODES with its two ends joined by free cells is run once more with this budget
+# (random-100 C2b-2): on a large page a route round a wall of long elements, or between ends far apart, takes more.
+# Measured on the batch's pages: 7JU4's, 7QUP's and 8QEM's stuck loops (and their loops over labels) need at most
+# 800 000; 8VWQ's and 7Y7C's longest nucleic-acid runs 1 600 000, at about 5 s a search
+_MAX_NODES_WIDE = 1_600_000
 _MAX_CELLS = 1_500_000
 _DIRS = [(1, 0), (0, 1), (-1, 0), (0, -1)]
 _PUSH = [0.4 + 0.25 * k for k in range(12)]  # how far out along the exit the path may start
@@ -393,10 +398,21 @@ def _curve(pa, ea, pb, eb, n=24):
     return [(float(x), float(y)) for x, y in pts]
 
 
-def _route_ports(grid: _Grid, pa, ea, own_a, pb, eb, own_b, loose=False, max_nodes: int = _MAX_NODES):
+def _joined(grid: _Grid, a, b) -> bool:
+    """Are cells a and b joined by free cells (side by side, as A* steps)?"""
+    from scipy.ndimage import label
+
+    marks, _ = label(~grid.blocked)
+    return bool(marks[a] and marks[a] == marks[b])
+
+
+def _route_ports(
+    grid: _Grid, pa, ea, own_a, pb, eb, own_b, loose=False, max_nodes: int = _MAX_NODES, wide_nodes: int = 0
+):
     """Grid cells of the cheapest orthogonal route from port pa (leaving along ea) to port pb (entered against
     eb), or None; own_a and own_b (anything with a rect) are what the ports belong to. `loose`: see
-    _Grid.free_cell_along; a pair (for pa, for pb) or one value for both."""
+    _Grid.free_cell_along; a pair (for pa, for pb) or one value for both. A search that finds no route within
+    max_nodes is run again within `wide_nodes` (when larger) if free cells join its two ends: a route exists."""
     la, lb = loose if isinstance(loose, tuple) else (loose, loose)
     start = grid.free_cell_along(pa, ea, own_a, la)
     goal = grid.free_cell_along(pb, eb, own_b, lb)
@@ -406,6 +422,8 @@ def _route_ports(grid: _Grid, pa, ea, own_a, pb, eb, own_b, loose=False, max_nod
     for c in stubs:
         grid.blocked[c] = True
     cells = _astar(grid, start, _axis(ea), goal, _axis(-np.asarray(eb)), max_nodes)
+    if cells is None and wide_nodes > max_nodes and _joined(grid, start, goal):
+        cells = _astar(grid, start, _axis(ea), goal, _axis(-np.asarray(eb)), wide_nodes)
     for c in stubs:
         grid.blocked[c] = False
     return cells
@@ -428,12 +446,13 @@ class _Router:
         self.keep_out = list(keep_out)  # the text and stub boxes the grid's soft cells were made from
         self.tight = self.rejected = 0  # debug counts: routes drawn tight, drawings rejected as crossing
         self.max_nodes = _MAX_NODES  # the A* search's budget
+        self.wide_nodes = _MAX_NODES_WIDE  # ... and its second search's, when a route exists (_route_ports)
 
     def drawn(self, pa, ea, own_a, pb, eb, own_b, own_body=False, loose=False, under=((), ()), exempt=()):
         """The A* route from port pa to port pb as drawn, snapped to the ports or else unsnapped; None if there
         is no route or every drawing of it crosses an element (`under`: see _clear)."""
         grid = self.grid
-        cells = _route_ports(grid, pa, ea, own_a, pb, eb, own_b, loose, self.max_nodes)
+        cells = _route_ports(grid, pa, ea, own_a, pb, eb, own_b, loose, self.max_nodes, self.wide_nodes)
         if cells is None:
             return None
         for snap in (True, False):
