@@ -3353,14 +3353,14 @@ def domain_fields(layout: Layout, names: bool = True) -> panels.Fields:
     return panels.panel_fields(owned, free, DOMAIN_PAD, on_edge, stems)
 
 
-def _name_obstacles(layout: Layout, sses: list[SSE]) -> tuple[list[tuple], list[tuple]]:
+def _name_obstacles(layout: Layout, sses: list[SSE], plates: bool = True) -> tuple[list[tuple], list[tuple]]:
     """What a domain's name must keep clear of: (solid) elements and ghosts, stems with their letters, sheet plates
-    and the other names (labels, chain ends and their stubs, stem names, tie letters, domain names placed before),
-    and (ways) the straight run of a loop out of each element's end and a short loop's way between its two ends. A
-    name's leader keeps off the solid ones only: it may cross a loop."""
+    (unless not `plates`) and the other names (labels, chain ends and their stubs, stem names, tie letters, domain
+    names placed before), and (ways) the straight run of a loop out of each element's end and a short loop's way
+    between its two ends. A name's leader keeps off the solid ones only: it may cross a loop."""
     solid = [_grown(p.rect, _NAME_CLEAR) for p in [*layout.placed.values(), *layout.ghosts]]
     for k, ids in enumerate(layout.sheets):
-        if len(ids) > 1:
+        if plates and len(ids) > 1:
             r = np.array([layout.placed[i].rect for i in ids] + [g.rect for g in block_ghosts(layout, k)])
             solid.append((*(r[:, :2].min(axis=0) - _PLATE_PAD), *(r[:, 2:].max(axis=0) + _PLATE_PAD)))
     solid += [_grown(b, _NAME_CLEAR) for _, b in label_boxes(layout, sses)]
@@ -3388,8 +3388,10 @@ def _name_obstacles(layout: Layout, sses: list[SSE]) -> tuple[list[tuple], list[
 def _place_domain_names(layout: Layout, sses: list[SSE], font_scale: float = 1.0) -> None:
     """Each drawn domain's name (Layout.domain_names), in domain order, at the first clear place (_name_obstacles,
     and the unpaired strands' traces) of _name_spots: its panel's top left and top right on the top edge, then
-    along that edge, then outside with a short leader (Layout.domain_leaders). When nothing is clear, the top
-    left."""
+    along that edge, then outside with a short leader (Layout.domain_leaders). When nothing is clear, the first
+    place clear of all but the sheet plates (a name reads on a plate; random-100 C2b-2: 7JU4's D2 of chain m lies
+    inside a large sheet's plate, and its name took the top left, on four loops' ways out of their ends); else the
+    top left."""
     layout.domain_names, layout.domain_leaders = {}, {}
     fields = domain_fields(layout, names=False)
     if not fields.values:
@@ -3397,10 +3399,11 @@ def _place_domain_names(layout: Layout, sses: list[SSE], font_scale: float = 1.0
     em = _ink_em(layout, font_scale) or text_em(layout.width or 1.0) * font_scale
     traces = [np.asarray(pts, float).reshape(-1, 2) for _, pts in sorted(layout.na_traces.items())]
     solid, ways = _name_obstacles(layout, sses)
+    bare, _ = _name_obstacles(layout, sses, plates=False)
 
     letters = (0.0 if layout.na_cropped else NT_ROW + glyph(layout)[1]) + _NAME_CLEAR
 
-    def clear(box, foot, margin) -> bool:
+    def clear(box, foot, margin, solid=solid) -> bool:
         if overlaps_any(_grown(box, margin), solid + ways) or _trace_hits(_grown(box, _NAME_NEAR_NT), traces):
             return False
         if any(_box_meets_body(_grown(box, letters), d) for d in layout.stems):  # a stem, with its letters
@@ -3415,8 +3418,15 @@ def _place_domain_names(layout: Layout, sses: list[SSE], font_scale: float = 1.0
         spots = list(_name_spots(value > 0, fields.xs, fields.ys, size * _text_width(name) + 0.1, size * _NAME_HEIGHT))
         if not spots:
             continue
-        box, foot = next(  # a place with room for the margin loops keep (_NAME_KEEP), else one without
-            (spot for margin in (_NAME_KEEP, 0.0) for spot in spots if clear(*spot, margin)), spots[0]
+        box, foot = next(  # a place with room for the margin loops keep (_NAME_KEEP), else one without; else on a plate
+            (
+                spot
+                for under in (solid, bare)
+                for margin in (_NAME_KEEP, 0.0)
+                for spot in spots
+                if clear(*spot, margin, under)
+            ),
+            spots[0],
         )
         layout.domain_names[name] = box
         if foot is not None:

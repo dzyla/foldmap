@@ -1053,3 +1053,18 @@ def test_cath_domains_are_captioned_cath(monkeypatch, tmp_path):
     monkeypatch.setattr(cath, "CACHE", tmp_path)
     fig = make_figure(FID / "1LDM.cif.gz", domains="cath", assembly="asu")
     assert _source_caption(fig) == ["domains: CATH"]
+
+
+def test_a_domain_name_inside_a_sheet_plate_keeps_off_the_loops_way_out():
+    """Random-100 C2b-2 A4 (7JU4 --domains auto, m:108-113>m:119-124): D2 of chain m lies inside a large sheet's
+    plate, so no spot was clear and the name took the first spot (_name_spots), on four loops' straight ways out of
+    their elements' ends: the loop into m:119-124 could only cross the name. With no spot clear, a name takes the
+    first spot clear of all but sheet plates (it reads on a plate), before the first spot."""
+    from foldmap.layout import _name_obstacles, overlaps_any
+    from foldmap.spec import draw_spec, figure_spec
+    from helpers import r100_entry
+
+    d = draw_spec(figure_spec(r100_entry("7JU4"), domains="auto"))
+    assert d.over_labels == [] and d.stuck == []
+    _, ways = _name_obstacles(d.layout, d.sses)
+    assert not overlaps_any(d.layout.domain_names["D2 · m"], ways)
