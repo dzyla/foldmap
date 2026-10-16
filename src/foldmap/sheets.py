@@ -109,7 +109,7 @@ def _branch_columns(track: list[int], off: list[tuple[int, int]], strands: list[
         axis = _unit(strands[parent].axis)
         v = _snap(strands[node].centroid) - _snap(strands[parent].centroid)
         side = float((v - (v @ axis) * axis) @ (across - (across @ axis) * axis))
-        column[node] = c + (1 if side >= 0 else -1)
+        column[node] = c + (1 if float(_snap(side)) >= 0 else -1)
     return {node: column[node] for node, _ in off}
 
 
