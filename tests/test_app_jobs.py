@@ -106,7 +106,7 @@ def test_draw_job_reports_what_the_pickers_need():
         "first": "2",
         "last": "7",
     }
-    assert out["fallback"] == [] and out["over_labels"] == [] and out["files"] == {}
+    assert out["provenance"] == [] and out["files"] == {}
 
 
 def test_summary_never_reads_like_a_fault():
@@ -465,10 +465,11 @@ def test_a_crowded_ligand_mark_is_in_the_draw_result(monkeypatch):
     from foldmap import render
 
     out = app_jobs.draw_job(DATA / "fidelity" / "1MBN.cif.gz", _blob())
-    assert out["crowded_marks"] == []
+    assert not [i for i in out["provenance"] if i["kind"] == "crowded_marks"]
     monkeypatch.setattr(render, "_place_mark", lambda anchor, half, targets, *a, **k: np.asarray(targets[0], float))
     out = app_jobs.draw_job(DATA / "fidelity" / "1MBN.cif.gz", _blob())
-    assert out["crowded_marks"] and all(m.startswith(("HEM:", "OH:")) for m in out["crowded_marks"])
+    (item,) = [i for i in out["provenance"] if i["kind"] == "crowded_marks"]
+    assert item["elements"] and all(m.startswith(("HEM:", "OH:")) for m in item["elements"])
 
 
 def test_a_page_held_at_its_largest_is_in_the_draw_result(monkeypatch):
@@ -478,10 +479,10 @@ def test_a_page_held_at_its_largest_is_in_the_draw_result(monkeypatch):
     from foldmap.app_edits import provenance_caption
     from test_page_text import past_the_largest_page
 
-    assert app_jobs.draw_job(DATA / "1UBQ.cif", _blob())["page_notes"] == []
+    assert app_jobs.draw_job(DATA / "1UBQ.cif", _blob())["provenance"] == []
     past_the_largest_page(monkeypatch)
     out = app_jobs.draw_job(DATA / "1UBQ.cif", _blob())
-    assert len(out["page_notes"]) == 2
+    assert len([i for i in out["provenance"] if i["kind"] == "page_scaled"]) == 2
     said = visible(provenance_caption(out["provenance"]))
     assert "\n- The page (3 x 2 in) is held at 3 in" in said
 

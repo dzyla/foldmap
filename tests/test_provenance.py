@@ -205,12 +205,11 @@ def test_a_helix_name_flipped_by_default_off_a_nucleic_acid_axis_is_not_moved():
     only a name displaced from its default side or along its helix is listed."""
     from types import SimpleNamespace
 
+    import numpy as np
+
     from foldmap.layout import Placed
     from foldmap.model import SSE, ResLabel
     from foldmap.provenance import _names_moved
-
-    import numpy as np
-
 
     def helix(k, **kw):
         lab = ResLabel("A", 10 * k + 1, "", "ALA")

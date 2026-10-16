@@ -267,7 +267,7 @@ class Layout:
     stack_gaps: list[tuple] = field(default_factory=list)
     accessory: dict[str, str] = field(default_factory=dict)  # a strand drawn off its sheet's track (Sheet.accessory),
     # beside its parent -> that parent's id: no barrel strand (science S3)
-    sheet_notes: list[str] = field(default_factory=list)  # what is said of the sheets as drawn (sheet_notes)
+    sheet_notes: list[str] = field(default_factory=list)  # what is said of the sheets as drawn (sheet_note_items)
     sheet_items: list[dict] = field(default_factory=list)  # the same as provenance items (sheet_note_items)
     # (accessory, partner) pairings drawn apart: no height level with the partner was free (_column_heights); the
     # notes name them ("also pairs with"), science S6 reads them
@@ -459,7 +459,6 @@ def _column_heights(
     column: dict[int, int],
     s: int,
     ends: dict[str, str] | None = None,
-    unshown: list[tuple[str, str]] | None = None,
     ghost: int = 0,
 ) -> dict[int, float]:
     """The heights (page units) of a sheet's accessory strands (`column`: index into _drawn_strands, the ghost as -1,
@@ -470,8 +469,8 @@ def _column_heights(
     strands' mean direction, by their senses, times the flip s), _STACK_PAD apart, _END_ROOM more where a chain end
     faces the gap (`ends`: element id -> "N", "C" or both, the chain ends drawn; 9FWZ's C end, D:662-666). One that
     cannot stand level with its partner stands level with another partner of its own (Accessory.others), in a column
-    beside that one, when it can; else as near its partner as it can; (accessory, partner) then goes to `unshown`
-    (the note says "also pairs with"; fix round 2/3 rulings, 7ARD). Snapped."""
+    beside that one, when it can; else as near its partner as it can (_unshown reads that off the drawing, and the
+    note says "also pairs with"; fix round 2/3 rulings, 7ARD). Snapped."""
     every, senses = _drawn_strands(sheet)
     ends = ends or {}
     n = len(sheet.strands)
@@ -516,8 +515,6 @@ def _column_heights(
         k, p = n + i, index[id(a.parent)]
         y = spot(k, column[k], height[p])
         if not level(k, p, y):
-            if unshown is not None:
-                unshown.append((a.strand.id, a.parent.id))
             for x in a.others:  # level with another partner of its own, in a column beside it, if it can
                 q = index.get(id(x))
                 if q is None or q not in height:
@@ -542,15 +539,13 @@ def _sheet_item(
     over: list[SSE] = (),
     helix_w: float = HELIX_W,
     ends: dict[str, str] | None = None,
-    unshown: list[tuple[str, str]] | None = None,
 ) -> _Item:
     """A sheet as one block of strands at `pitch`, each pointing as it runs relative to strands[0]; a closed
     barrel's first strand repeated as a ghost after the last. Each accessory strand (Sheet.accessory) stands in its
     column (Accessory.column, turned with the track when the track is drawn right to left), stacked with what stands
     there (_column_heights) or past the track's end: beside its parent, never between two strands that pair. `over`
     (helices packed on its face, in sequence): each drawn over the strands where it packs (_over_sheet), unless it
-    would lie on one drawn there before it. `ends`: the chain ends drawn, `unshown`: the pairings an accessory strand
-    could not be drawn at (_column_heights)."""
+    would lie on one drawn there before it. `ends`: the chain ends drawn."""
     strands = sheet.strands
     n = len(strands)
     order, s, cents = _sheet_order(sheet, frame)
@@ -559,7 +554,7 @@ def _sheet_item(
     drawn.update({n + i: a.column if forward else n - 1 - a.column for i, a in enumerate(sheet.accessory)})
     if sheet.closed:
         drawn[-1] = n  # the ghost, after the last
-    heights = _column_heights(sheet, drawn, s, ends, unshown, order[0]) if sheet.accessory else {}  # may move some
+    heights = _column_heights(sheet, drawn, s, ends, order[0]) if sheet.accessory else {}  # may move some
     slot_of = {c: i for i, c in enumerate(sorted(set(drawn.values())))}
     slots = len(slot_of)
     members, offsets = [], []
@@ -2717,7 +2712,6 @@ def build_layout(
         if mode == "projected"
         else {}
     )
-    unshown: list[tuple[str, str]] = []  # accessory strands drawn away from their partner (_column_heights)
     chain_ends: dict[str, str] = {}  # the chain ends drawn (as set on the members below), for stacked columns
     for chain, mine in group_by_chain([s for s in sses if s.kind in ("H", "G", "E")]).items():
         if chain not in (partial or ()):
@@ -2733,7 +2727,6 @@ def build_layout(
             [by_id[h] for h, at in sorted(on_sheet.items(), key=lambda x: by_id[x[0]].start) if at == k],
             HELIX_W * style.helix_scale,
             chain_ends,
-            unshown,
         )
         for k, sh in enumerate(sheets)
     ]
@@ -3187,9 +3180,7 @@ def extra_pairs(sheet: Sheet) -> list[tuple]:
     return out
 
 
-def _unshown(
-    placed: dict[str, Placed], sheets: list[Sheet], ghosts: list[Placed] = ()
-) -> list[tuple[str, str]]:
+def _unshown(placed: dict[str, Placed], sheets: list[Sheet], ghosts: list[Placed] = ()) -> list[tuple[str, str]]:
     """The (accessory, partner) pairings the figure does not draw side by side, as drawn (after copies take their
     mates' shapes): an accessory not in a column next to its partner's, or not level with it (spans apart). The
     partner's ghost (a barrel's closure strand) standing level beside it counts as the partner. Also every pairing
@@ -3211,9 +3202,9 @@ def _unshown(
 
 def accessory_lines(sheet: Sheet, unshown: list[tuple[str, str]] = (), level: set[str] | None = None) -> list[str]:
     """One line per pairing a sheet draws off its run of paired strands or not at all, worded once for the notes
-    (sheet_notes) and `foldmap summary`: each accessory strand with its partner, "D:662-666 drawn beside its partner
-    D:645-659", or, drawn away from it (`unshown`: no height level with it was free, _column_heights), "x:67-68 also
-    pairs with x:79-86"; and each pairing of its track not drawn side by side (Sheet.chords: 9P1X's ring chords),
+    (sheet_note_items) and `foldmap summary`: each accessory strand with its partner,
+    "D:662-666 drawn beside its partner D:645-659", or, drawn away from it (`unshown`: not beside it and level, _unshown),
+    "x:67-68 also pairs with x:79-86"; and each pairing of its track not drawn side by side (Sheet.chords: 9P1X's ring chords),
     "O:29-36 also pairs with P:28-35". `level`, for `foldmap summary` (which reads a figure from outside): the
     accessories that figure draws level beside their partner; any other, drawn away or not drawn (focus), reads
     "A1:2-6 pairs with A1:9-23 (off the run)"."""
@@ -3267,11 +3258,6 @@ def sheet_note_items(sheets: list[Sheet], unshown: list[tuple[str, str]] = ()) -
     if chords:
         out.append(item(f"pairings not drawn side by side: {'; '.join(chords)}", len(chords), chord_pairs))
     return out
-
-
-def sheet_notes(sheets: list[Sheet], unshown: list[tuple[str, str]] = ()) -> list[str]:
-    """What the figure says of its sheets, as text (sheet_note_items)."""
-    return [i["text"] for i in sheet_note_items(sheets, unshown)]
 
 
 def block_ghosts(layout: Layout, k: int) -> list[Placed]:

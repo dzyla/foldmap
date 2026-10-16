@@ -131,7 +131,8 @@ def test_app_job_result_says_the_domains_are_inferred():
 
     got = app_jobs.draw_job(DATA / "2LZM.cif", json.dumps({"domains": "auto"}))
     assert (
-        got["domain_source_note"] == "domains D1, D2 inferred from residue contacts, not a published domain assignment"
+        got["provenance"][0]["text"]
+        == "domains D1, D2 inferred from residue contacts, not a published domain assignment"
     )
 
 

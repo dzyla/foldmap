@@ -336,11 +336,6 @@ def draw_job(path, settings_json: str, eager_after: float | None = None) -> dict
     na_chains = list(dict.fromkeys(s.chain for s in nucleic.strands)) if nucleic is not None else []
     out = {
         "svg": svg,
-        "fallback": drawn.stuck,
-        "over_labels": drawn.over_labels,
-        "crowded_marks": drawn.crowded_marks,  # ligand marks with no clear spot, drawn over other ink
-        "page_notes": drawn.page_notes,  # a page held at its largest (text under 6 pt); a PNG under 300 dpi
-        "sheet_notes": drawn.sheet_notes,  # strands off a sheet's run, with their partner
         "png_dpi": render.png_dpi(drawn.figure),  # what its PNG is written at (the download button says it)
         "elements": elements_of(drawn),
         "chains": chains,
@@ -348,7 +343,6 @@ def draw_job(path, settings_json: str, eager_after: float | None = None) -> dict
         "summary": summary_of(drawn),
         "chain_count": len(chains_of(drawn)),  # what the summary counts: protein and nucleic-acid chains
         "domains_note": stale_domains_note(spec.domains, drawn.sses),  # a layout file's stale ids, dropped
-        "domain_source_note": drawn.layout.domain_note,  # inferred domains said to be; CATH's, or why none
         "provenance": drawn.provenance,  # how it was made: the list under the figure (provenance)
         "scope": drawn_scope(drawn.model, drawn.layout, spec.assembly, spec.focus),  # what auto choices left out
         "seconds": seconds,

@@ -478,9 +478,10 @@ def test_1ema_chromophore_star_passes_s4_and_the_old_fraction_would_not(monkeypa
 def _unshown_case(ox, ghost_at=None):
     """An accessory x (parent p, also pairing with o), strands standing vertically (angle pi/2, length 4, width 1):
     x at column 0, p at column 5 (apart), o at column `ox`; optionally a ghost of p at column `ghost_at`."""
+    from tests.test_sheets import fake
+
     from foldmap.layout import Placed, _unshown, accessory_lines
     from foldmap.model import Accessory
-    from tests.test_sheets import fake
 
     x, p, o = fake(0, 9), fake(20, 29), fake(40, 49)
     sh = Sheet([p, o], [1, 1], ["P"], accessory=[Accessory(x, p, 0, 1, (o,))])

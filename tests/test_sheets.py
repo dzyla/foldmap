@@ -79,7 +79,10 @@ def test_a_three_strand_cycle_is_no_barrel_and_draws_open_without_a_note():
     """Three strands pairing in a triangle, then a run of three more off one of them: a cycle of 3 is no barrel
     (_BARREL_MIN 5), so the sheet is drawn open, the run in a row; no note calls it a barrel drawn open (fix round 3,
     the review: the note named a barrel here); the note names the pairing it does not draw side by side."""
-    from foldmap.layout import sheet_notes
+    from foldmap.layout import sheet_note_items
+
+    def sheet_notes(sheets):
+        return [i["text"] for i in sheet_note_items(sheets)]
 
     t = [fake(20 * k, 20 * k + 9) for k in range(6)]
     br = ladder(t[0], t[1], "A", 5) + ladder(t[1], t[2], "A", 5) + ladder(t[0], t[2], "A", 3)
@@ -318,7 +321,10 @@ def test_ompf_barrel_has_16_strands_its_n_terminal_strand_beside_a9_23():
 def test_a_rings_chords_are_named():
     """Fix round 3 (the review): 9P1X's 9-ring has chords (O:29-36/P:28-35) its drawing cannot show side by side;
     Sheet.chords holds them, and the notes and summary name them ("also pairs with")."""
-    from foldmap.layout import sheet_notes
+    from foldmap.layout import sheet_note_items
+
+    def sheet_notes(sheets):
+        return [i["text"] for i in sheet_note_items(sheets)]
 
     ring, _, (sh,) = _ring_sheet(6)
     extra = ladder(ring[1], ring[4], "A", 4)
@@ -336,7 +342,10 @@ def test_notes_file_each_sheets_lines_under_their_own_heading():
     chord lines into one list and cut it at the total accessory count, so with a chord in one sheet and an accessory
     in a later one the chord was listed among the strands off the run and the accessory under "pairings not drawn
     side by side". Each line now stays under its own heading."""
-    from foldmap.layout import sheet_notes
+    from foldmap.layout import sheet_note_items
+
+    def sheet_notes(sheets):
+        return [i["text"] for i in sheet_note_items(sheets)]
 
     t = [fake(20 * k, 20 * k + 9) for k in range(6)]  # sheet 1: a 3-cycle, then a run; its chord t0/t2
     br = ladder(t[0], t[1], "A", 5) + ladder(t[1], t[2], "A", 5) + ladder(t[0], t[2], "A", 3)
