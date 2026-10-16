@@ -18,7 +18,10 @@ wrong sheet (plan 12, the external review's FimD 9FWZ: a strand wedged between t
   end than its residue puts it, less MARK_SLACK (T4 review: a mark left at the element end passed for any residue).
   Measured on a drawn figure only (figcheck.science_checks); `foldmap summary` has no marks, so it reports it not yet
   measured (None).
-- S5: automatic domains against a reference (plan 12 Task 3): a hook, not yet measured (None).
+- S5: automatic domains against a reference chopping (plan 12 Task 3): where the committed CATH reference
+  (tests/data/domains/cath_reference.json) holds the entry, each chain's `--domains auto` domains are scored
+  (domain_score: overlap, boundary F1 within 20 residues) and a chain under the ruled targets (domain_score.TARGETS)
+  is a finding (domain_findings). Measured by the random-100 campaign only; elsewhere None (no reference).
 - S6: an accessory strand (Sheet.accessory, Layout.accessory: off its sheet's run of paired strands) is drawn at its
   partner: in a column next to the partner's, their drawn spans overlapping; or its pairing is named in the notes
   (Layout.unshown: no height beside the partner was free). Fix round 3 ruling: a shared column means collinear, so an
@@ -44,7 +47,7 @@ SCIENCE = {
     "S5": "automatic domains agree with a reference",
     "S6": "accessory drawn at its partner",
 }
-NOT_YET = ("S4", "S5")  # None where not measured: S4 off a drawn figure, S5 until Task 3
+NOT_YET = ("S4", "S5")  # None where not measured: S4 off a drawn figure, S5 without a reference chopping
 RESIDUE_STEP = 0.5  # page units along a loop's route per residue from the nearer element end (render.residue_point)
 MARK_SLACK = 0.5  # page units a mark may stand off its place and its bound (a star is drawn 0.38 across)
 
@@ -215,6 +218,19 @@ def sheet_checks(sheets: list[Sheet], sses: Iterable[SSE], bridges: list[Bridge]
         if found:
             out["S3"].append(found)
     return out
+
+
+def domain_findings(scores: Iterable[dict]) -> list[str]:
+    """S5: each chain (domain_score.chain_score) whose automatic domains fall under the ruled targets against its
+    reference (overlap or boundary F1 below domain_score.TARGETS), with its measures and domain counts."""
+    from .domain_score import TARGETS
+
+    return [
+        f"{s['chain']}: overlap {s['overlap']:.2f}, boundary F1 {s['f1']:.2f} "
+        f"({s['n_ref']} reference domains, {s['n_auto']} automatic)"
+        for s in scores
+        if s["overlap"] < TARGETS["overlap"] or s["f1"] < TARGETS["f1"]
+    ]
 
 
 def science_lines(found: dict[str, list[str] | None]) -> list[str]:

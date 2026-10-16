@@ -16,6 +16,7 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "scripts" / "random100.py"
 DATA = Path(__file__).parent / "data"
+FID = DATA / "fidelity"
 
 
 def _load():
@@ -716,3 +717,28 @@ def test_accessories_named_are_reported_per_view_and_never_gate(r100, tmp_path):
     md = (tmp_path / "report.md").read_text(encoding="utf-8")
     assert "2 of 2 pass." in md and "## Accessories named, not drawn level beside their partner" in md
     assert "| 3L9G | default 8 of 16; focus 6 of 16 |" in md and "| 1UBQ |" not in md.split("## Accessories")[1]
+
+
+def test_s5_scores_auto_domains_where_a_cath_reference_exists(r100, tmp_path):
+    """Plan 12 Task 3: S5 measures an entry's automatic domains against its CATH chopping in the committed reference
+    (tests/data/domains/cath_reference.json), per chain: overlap and boundary F1; a chain under the ruled targets is a
+    finding. Entries without a reference are not measured. Reported, never gating."""
+    from foldmap.domain_score import TARGETS
+
+    got = r100.domain_reference(FID / "1LDM.cif.gz", "1LDM")
+    assert [g["chain"] for g in got] == ["A"] and got[0]["overlap"] > 0.9 and got[0]["n_ref"] == 2
+    assert r100.domain_reference(DATA / "1UBQ.cif", "1UBQ") is None
+    crit = {k: {"pass": True, "detail": ""} for k in r100.CRITERIA}
+    found = {"S1": [], "S2": [], "S3": [], "S4": [], "S5": None, "S6": []}
+    low = {"pdb": "1ABC", "chain": "A", "overlap": 0.6, "f1": 0.5, "recall": 1.0, "precision": 0.33, "n_ref": 2}
+    e = {"id": "1ABC", "name": "1ABC", "views": {"default": {"result": {"science": found}}}, "criteria": crit}
+    e = r100._verdict({**e, "domains_cath": [{**low, "n_auto": 4}]})
+    assert e["pass"] and r100.science(e)["S5"]["pass"] is False
+    assert "A: overlap 0.60, boundary F1 0.50" in r100.science(e)["S5"]["detail"]
+    ok = {**low, "overlap": TARGETS["overlap"], "f1": TARGETS["f1"], "n_auto": 2}
+    assert r100.science({**e, "domains_cath": [ok]})["S5"]["pass"] is True
+    assert r100.science({**e, "domains_cath": None})["S5"]["pass"] is None
+    r100.report([e], tmp_path, None, total=1)
+    md = (tmp_path / "report.md").read_text(encoding="utf-8")
+    assert "## S5: automatic domains against CATH (reported, not gated)" in md
+    assert "| 1ABC | A | 2 | 4 | 0.60 | 0.50 | 1.00 | 0.33 |" in md

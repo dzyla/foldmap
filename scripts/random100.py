@@ -1574,6 +1574,7 @@ def run_entry(source: str, out: Path, views=VIEWS, info: dict | None = None) -> 
         run("app")
         if f["protein"] and "default" in wanted:
             e["dssp"] = dssp_agreement(path)
+            e["domains_cath"] = domain_reference(path, e["id"])  # S5, where the CATH reference holds the entry
     e["criteria"] = criteria(e)
     e["science"] = science(e)
     return _verdict(e)
@@ -2081,6 +2082,7 @@ def report(entries: list[dict], out: Path, sample_path: Path | None = None, tota
     for e in entries:
         lines.append(f"| {e['id']} | " + " | ".join(str(v) for v in reported(e).values()) + " |")
     lines += science_section(entries)
+    lines += domains_section(entries)
     lines += accessories_section(entries)
     lines += ["", "## Criteria", ""] + [f"- **{k}** {v}" for k, v in CRITERIA.items()]
     lines += ["", "## Limits", ""] + [f"- {k}: {v}" for k, v in LIMITS.items()]
@@ -2101,12 +2103,27 @@ def report(entries: list[dict], out: Path, sample_path: Path | None = None, tota
     return doc
 
 
+DOMAIN_REFERENCE = ROOT / "tests" / "data" / "domains" / "cath_reference.json"  # S5's choppings (CATH, CC BY 4.0)
+
+
+def domain_reference(path: Path, pdb: str) -> list[dict] | None:
+    """S5's measures: each reference chain of entry `pdb` (DOMAIN_REFERENCE's multi-domain CATH chains) scored with
+    its automatic domains (domain_score.chain_score: overlap, boundary recall, precision and F1); None when the
+    reference does not hold the entry."""
+    from foldmap import domain_score
+
+    chains = [c for c in domain_score.load_reference(DOMAIN_REFERENCE) if c["pdb"] == pdb.upper()]
+    return [domain_score.chain_score(path, c) for c in chains] or None
+
+
 def science(e: dict) -> dict:
     """The science checks (foldmap.science.SCIENCE) of the default view, apart from A1-A20 (never in "failed" or
     "pass"): {"S1": {"pass": True, False or None (not measured), "detail"}, ...}."""
-    from foldmap.science import SCIENCE
+    from foldmap.science import SCIENCE, domain_findings
 
     found = ((e.get("views", {}).get("default") or {}).get("result") or {}).get("science")
+    if found is not None and e.get("domains_cath"):  # S5: measured against the CATH reference
+        found = {**found, "S5": domain_findings(e["domains_cath"])}
     out = {}
     for key in SCIENCE:
         got = None if found is None else found.get(key)
@@ -2130,6 +2147,28 @@ def science_section(entries: list[dict]) -> list[str]:
         marks = ["-" if s[k]["pass"] is None else "✓" if s[k]["pass"] else "✗" for k in SCIENCE]
         found = "; ".join(f"{k}: {s[k]['detail']}" for k in SCIENCE if s[k]["pass"] is False)
         lines.append(f"| {e['id']} | " + " | ".join(marks) + f" | {found.replace('|', '/')[:600]} |")
+    return lines
+
+
+def domains_section(entries: list[dict]) -> list[str]:
+    """report.md's S5 measures: each entry the CATH reference holds, per chain its reference and automatic domain
+    counts, overlap, boundary F1, recall and precision (domain_reference), then their means. Reported, not gated."""
+    rows = [(e["id"], s) for e in entries for s in e.get("domains_cath") or []]
+    lines = ["", "## S5: automatic domains against CATH (reported, not gated)", ""]
+    if not rows:
+        return [*lines, "No entry is in the CATH reference."]
+    lines += ["| id | chain | CATH domains | automatic | overlap | boundary F1 | recall | precision |"]
+    lines.append("|---|---|---|---|---|---|---|---|")
+    for name, s in rows:
+        lines.append(
+            f"| {name} | {s['chain']} | {s['n_ref']} | {s['n_auto']} | {s['overlap']:.2f} | {s['f1']:.2f} | "
+            f"{s['recall']:.2f} | {s['precision']:.2f} |"
+        )
+    mean = {k: sum(s[k] for _, s in rows) / len(rows) for k in ("overlap", "f1", "recall", "precision")}
+    lines.append(
+        f"| mean of {len(rows)} | | | | {mean['overlap']:.2f} | {mean['f1']:.2f} | {mean['recall']:.2f} | "
+        f"{mean['precision']:.2f} |"
+    )
     return lines
 
 
