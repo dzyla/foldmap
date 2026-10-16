@@ -191,6 +191,7 @@ def test_the_app_job_carries_the_list():
 
 
 def test_the_app_shows_the_list_under_the_figure():
+    pytest.importorskip("streamlit")
     from app_helpers import opened, visible
 
     at = opened(DATA / "1EMA.cif")
