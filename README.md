@@ -177,7 +177,7 @@ foldmap styles                                    # every theme and style key
 ## What it handles
 
 - **Secondary structure** by a DSSP implementation checked against mkdssp 3.1.2 (no bends, S; the random-100
-  campaign requires at least 99% of residues to agree on helix, strand or neither):
+  campaign requires at least 99% of residues to get the same DSSP code, with mkdssp's bends read as none):
   α-, 3₁₀- and π-helices (π before α, as in DSSP ≥ 2.1), β-strands with bulges, turns; β-sheets
   with strand order and direction, closed barrels shown with a ghost of the first strand. A helix kinked by more
   than 30° is split into pieces drawn end to end; a strand that a bulge splits stays one strand when both pieces
