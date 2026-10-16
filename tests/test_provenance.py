@@ -166,3 +166,16 @@ def test_the_command_line_prints_one_block(tmp_path, capsys):
 def test_the_command_line_says_automatic_domains_are_inferred(tmp_path, capsys):
     assert main(["plot", str(DATA / "2LZM.cif"), "-o", str(tmp_path / "t.svg"), "--domains", "auto"]) == 0
     assert f"How this figure was made:\n  - {T4L_AUTO}\n" in capsys.readouterr().err
+
+
+def test_the_mcp_result_carries_the_list(tmp_path):
+    pytest.importorskip("mcp")
+    from test_mcp import call
+
+    r = call("draw_topology", {"source": str(FIMD), "output_path": str(tmp_path / "f.svg")})
+    assert [c.type for c in r.content] == ["text", "image"]
+    items = r.structured_content["provenance"]
+    assert items == draw_spec(figure_spec(FIMD)).provenance
+    assert f"; {PENDANT}" in r.content[0].text  # the note, as before
+    r = call("draw_topology", {"source": str(DATA / "1UBQ.cif"), "output_path": str(tmp_path / "u.svg")})
+    assert r.structured_content["provenance"] == []

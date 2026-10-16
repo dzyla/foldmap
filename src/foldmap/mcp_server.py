@@ -17,6 +17,7 @@ from pathlib import Path
 
 from mcp.server.mcpserver import Image, MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
+from mcp.types import CallToolResult, TextContent
 
 from . import CREDIT, __version__
 from .fetch import fetch
@@ -186,11 +187,13 @@ def draw_topology(
     mode: str | None = None,
     layout_file: str | None = None,
     save_layout: str | None = None,
-) -> list:
+) -> CallToolResult:
     """Draw the topology diagram and write it to output_path (.svg, .png or .pdf; default: a temporary .svg).
     Returns where it was written plus a PNG preview of the same figure; when assembly or focus auto drew part of
     the file (one copy of a complex, one subunit of a large assembly), the note says so and which arguments draw
-    every chain.
+    every chain. The note also says how the figure was made: what in it is inferred (automatic domains), ambiguous
+    (strands drawn off a sheet's run) or moved for readability; the structured result's `provenance` lists the same
+    as {kind, text, count, elements} (empty when nothing beyond the standard method).
 
     Options left out come from layout_file (if given), otherwise the defaults: theme publication, assembly auto,
     symmetry auto, membrane off, focus auto, mode projected, rotate 0.
@@ -210,6 +213,7 @@ def draw_topology(
     layout_file / save_layout: load or write a YAML layout file that re-creates the figure
     (save_layout must end in .yaml or .yml)."""
     from . import layoutfile
+    from .provenance import lines
     from .render import save
     from .scope import drawn_scope, scope_note
     from .spec import draw_spec, figure_spec, layout_document
@@ -250,23 +254,16 @@ def draw_topology(
         note = f"wrote {out}"
         if keep is not None:
             note += f" and layout file {layoutfile.save(keep, layout_document(spec, drawn=drawn))}"
-        if drawn.stuck:
-            note += f"; no clear route for {', '.join(drawn.stuck)} (drawn as plain curves)"
-        if drawn.over_labels:
-            note += f"; drawn over a label or chain end: {', '.join(drawn.over_labels)}"
-        if drawn.crowded_marks:
-            n = len(drawn.crowded_marks)
-            note += f"; {n} ligand mark(s) with no clear spot: {', '.join(drawn.crowded_marks)}"
-        for page in drawn.page_notes:  # a page past layout.MAX_PAGE_IN; a PNG under 300 dpi
-            note += f"; {page}"
-        for sheet in drawn.sheet_notes:  # strands off a sheet's run, with their partner
-            note += f"; {sheet}"
-        if drawn.layout.domain_note:  # inferred domains said to be; CATH's named, or why there are none
-            note += f"; {drawn.layout.domain_note}"
-        scope = scope_note(drawn_scope(drawn.model, drawn.layout, spec.assembly, spec.focus), how="mcp")
-        if scope:  # an automatic choice drew part of the file
-            note += f"; {scope}"
-        return [note, _preview(drawn.figure)]
+        items = drawn.provenance  # how it was made: the note says it, the structured result lists it
+        note += "".join(f"; {text}" for text in lines(items))
+        scope = drawn_scope(drawn.model, drawn.layout, spec.assembly, spec.focus)
+        said = scope_note({**scope, "additives": []}, how="mcp")  # the additives hidden are in the list
+        if said:  # an automatic choice drew part of the file
+            note += f"; {said}"
+        return CallToolResult(
+            content=[TextContent(type="text", text=note), _preview(drawn.figure).to_image_content()],
+            structured_content={"provenance": items},
+        )
 
 
 @tool
