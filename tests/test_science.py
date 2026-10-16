@@ -229,7 +229,11 @@ def test_every_accessory_is_named_with_its_partner_in_the_notes():
     d = _drawn(R100 / "3L9G-A.cif.gz")
     (note,) = [n for n in d.layout.sheet_notes if "off a sheet's run" in n]
     assert note.startswith("16 strand(s) off a sheet's run of paired strands: ")
-    assert all(f"{a} drawn beside its partner {p}" in note for a, p in d.layout.accessory.items())
+    away = dict(d.layout.unshown)
+    assert all(
+        f"{a} {'also pairs with' if away.get(a) == p else 'drawn beside its partner'} {p}" in note
+        for a, p in d.layout.accessory.items()
+    )
 
 
 def test_summary_names_the_accessory_strands():
@@ -331,10 +335,13 @@ def _branch_sheet():
 
 
 def test_a_strand_with_more_accessories_than_ends_names_the_one_drawn_away():
-    """Fix round 2 (7ARD S6): a's ends hold t3 (below) and c1 (above); c2, with no other partner, stands in the
-    column beside a, and the note says "also pairs with". S6 passes."""
+    """Fix round 2/3 (7ARD): a has three partners. Each accessory stands in the column beside its partner, level with
+    it where a height is free there; one that cannot is drawn as near as it can and named (Layout.unshown, "also
+    pairs with"). S1 (spans) and S6 pass on the drawn block."""
+    from foldmap import figcheck
     from foldmap.frame import Frame
     from foldmap.layout import build_layout
+    from foldmap.science import bridge_counts, neighbour_findings, partner_findings
 
     sses, bridges = _branch_sheet()
     sheets = build_sheets(sses, bridges)
@@ -342,23 +349,14 @@ def test_a_strand_with_more_accessories_than_ends_names_the_one_drawn_away():
     assert [x.strand.start for x in sh.accessory] == [140, 160, 180]  # a, then c1 and c2 hanging from a
     frame = Frame(np.zeros(3), np.array([1.0, 0, 0]), np.array([0, 1.0, 0]), np.array([0, 0, 1.0]))
     lay = build_layout(sses, sheets, frame, attract=False)
-    a, c1, c2 = (lay.placed[x.strand.id] for x in sh.accessory)
-    assert abs(a.cx - lay.placed[sh.strands[3].id].cx) < 1e-9 and abs(c1.cx - a.cx) < 1e-9  # end to end up a's column
-    assert abs(abs(c2.cx - a.cx) - lay.placed[sh.strands[4].id].width) < 1e-6  # beside a
-    (note,) = [n for n in lay.sheet_notes if "off a sheet's run" in n]
-    assert f"{c2.sse.id} also pairs with {a.sse.id}" in note and f"{c1.sse.id} drawn beside its partner" in note
-
-    from foldmap import figcheck
-    from foldmap.science import partner_findings
-
-    noted = {tuple(m) for m in figcheck.re.findall(r"(\S+) also pairs with ([^\s;,]+)", note)}
-    assert noted == {(c2.sse.id, a.sse.id)}
     (k,) = range(len(lay.sheets))
     spots = [
         (i, c, figcheck._span(lay.placed[i]), g) for c, col in enumerate(figcheck.drawn_columns(lay, k)) for i, g in col
     ]
-    assert [t.split(" drawn")[0] for t in partner_findings(spots, lay.accessory)] == [c2.sse.id]  # not at a
-    assert partner_findings(spots, lay.accessory, noted) == []
+    assert neighbour_findings(spots, bridge_counts(sses, bridges)) == ([], [])
+    assert partner_findings(spots, lay.accessory, set(lay.unshown)) == []
+    (note,) = [n for n in lay.sheet_notes if "off a sheet's run" in n]
+    assert all(f"{x} also pairs with {p}" in note for x, p in lay.unshown)
 
 
 def test_s3_flags_a_ring_of_five_drawn_open():

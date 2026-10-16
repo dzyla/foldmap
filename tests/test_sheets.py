@@ -45,7 +45,7 @@ def test_a_branch_strand_is_kept_off_the_track_beside_its_parent():
     (sh,) = build_sheets([c, a, b, d], br)
     assert sh.ambiguous and [s.start for s in sh.strands] == [20, 0, 40]  # a c b: each pairs with the next
     ((acc, parent, column, direction, _),) = sh.accessory
-    assert acc is d and parent is c and column == 1 and direction == 1  # a c d: + - +; in c's own column
+    assert acc is d and parent is c and abs(column - 1) == 1 and direction == 1  # a c d: + - +; beside c
     assert sorted(s.start for s in [*sh.strands, acc]) == [0, 20, 40, 60]
 
 
@@ -71,7 +71,7 @@ def test_a_barrel_keeps_its_ring_and_draws_a_pendant_strand_off_it():
     assert sh.closed and not sh.unclosed and len(sh.strands) == 6 and set(sh.strands) == set(ring)
     assert {sh.strands[0].start, sh.strands[-1].start} in ({0, 100}, {100, 0})  # cut at the weakest pairing
     ((acc, parent, column, _, _),) = sh.accessory
-    assert acc is x and parent is ring[2] and column == sh.strands.index(ring[2])  # end to end with its partner
+    assert acc is x and parent is ring[2] and abs(column - sh.strands.index(ring[2])) == 1  # beside its partner
 
 
 def test_a_three_strand_cycle_is_no_barrel_and_draws_open_without_a_note():
@@ -201,8 +201,8 @@ def test_bulged_strands_take_their_true_place_in_the_sheet():
 def test_a_strand_continuing_another_along_their_partner_shares_its_column():
     """5KQJ (random-100 C34): F pairs with E end to end with B, on E's same side (F at 3D y +11.8, B at -1.1, 0.8 Å
     apart along E). The sheet's one path of strands drew F as a column of its own, wedged between E and B (C D E F B
-    A); C34 stacked it in B's column. Plan 12 fix round 1 ruling: an accessory strand stands in its own partner's
-    column, end to end with it, never in another strand's (B's column read as F pairing with B): F above or below E."""
+    A); C34 stacked it in B's column, end to end with B, as it lies (0.6 Å apart). Plan 12 fix round 3 ruling (one
+    column means collinear): F stands in B's column, end to end with B, level with E, its partner."""
     from foldmap import figcheck
     from foldmap.cli import make_layout
     from foldmap.spec import draw_spec, figure_spec
@@ -210,9 +210,11 @@ def test_a_strand_continuing_another_along_their_partner_shares_its_column():
     path = Path(__file__).parent / "data" / "r100" / "5KQJ.cif.gz"
     lay, sses, _ = make_layout(path)
     b, e, f = lay.placed["A:44-50"], lay.placed["A:83-93"], lay.placed["A:96-99"]
-    assert abs(e.cx - f.cx) < 1e-9 and abs(e.cx - b.cx) > 0.5
-    (ey0, ey1), (fy0, fy1) = sorted((e.n_port[1], e.c_port[1])), sorted((f.n_port[1], f.c_port[1]))
-    assert ey1 <= fy0 or fy1 <= ey0  # one above the other
+    assert abs(b.cx - f.cx) < 1e-9 and abs(e.cx - b.cx) > 0.5
+    span = lambda p: sorted((p.n_port[1], p.c_port[1]))  # noqa: E731
+    (by0, by1), (ey0, ey1), (fy0, fy1) = span(b), span(e), span(f)
+    assert by1 <= fy0 or fy1 <= by0  # end to end with B
+    assert min(ey1, fy1) > max(ey0, fy0)  # level with E
     block = next(ids for ids in lay.sheets if "A:96-99" in ids)
     assert len({round(lay.placed[k].cx, 6) for k in block}) == len(block) - 1
     d = draw_spec(figure_spec(path))
@@ -259,10 +261,9 @@ def test_the_loops_out_of_a_shared_column_never_meet_in_its_gap():
 def test_partners_far_apart_along_a_long_strand_share_its_edge_in_one_column():
     """C34's controls (batch C2a review Q3), revised by plan 12: 8UTF's a:266-273 and a:318-322 both pair with
     a:278-301 on one side, 27.6 Å apart along it. C2a kept each in a column of its own, so one stood between
-    a:278-301 and the other, which do not pair (an S1 failure); the one off the track now stands in a:278-301's own
-    column, end to end with it (fix round 1 ruling). A sheet with no branch (1TIM's barrel) has no accessory strand
-    and no
-    stack gap."""
+    a:278-301 and the other, which do not pair (an S1 failure); the one off the track now stands in the other's
+    column, end to end with it (collinear along a:278-301's edge, fix round 3 ruling). A sheet with no branch (1TIM's
+    barrel) has no accessory strand and no stack gap."""
     from foldmap.cli import make_layout
 
     data = Path(__file__).parent / "data"
@@ -272,7 +273,7 @@ def test_partners_far_apart_along_a_long_strand_share_its_edge_in_one_column():
     pair = {"a:266-273", "a:318-322"}
     (sh,) = [sh for sh in sheets if any(a.strand.id in pair for a in sh.accessory)]
     (acc,) = [a for a in sh.accessory if a.strand.id in pair]
-    assert acc.parent.id == "a:278-301" and sh.strands[acc.column].id == "a:278-301"  # its partner's own column
+    assert acc.parent.id == "a:278-301" and sh.strands[acc.column].id in pair  # end to end with the other
     lay, _, _ = make_layout(data / "1TIM.cif")
     assert lay.stack_gaps == [] and lay.accessory == {}
     bb = load_backbone(data / "1TIM.cif", "auto")
@@ -294,6 +295,7 @@ def test_fimd_barrel_has_24_strands_and_its_pendant_strand_beside_its_partner():
     ids = [s.id for s in barrel.strands]
     assert len(ids) == 24 and abs(ids.index("D:645-659") - ids.index("D:139-153")) == 1
     assert [(a.strand.id, a.parent.id) for a in barrel.accessory] == [("D:662-666", "D:645-659")]
+    assert ids[barrel.accessory[0].column] == "D:634-641"  # beside D:645-659, on D:634-641's side (the review)
     assert sheet_checks(sheets, sses, d.bridges) == dict.fromkeys(("S1", "S2", "S3", "S6"), []) | {
         "S4": None,
         "S5": None,

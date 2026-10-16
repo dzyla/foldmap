@@ -109,8 +109,8 @@ def neighbour_findings(
         for b, cb, sb, gb in ordered[k + 1 :]:
             if cb > ca + 1:
                 break
-            if not _meet(sa, sb) or a == b:
-                continue
+            if sa is None or sb is None or not _meet(sa, sb) or a == b:
+                continue  # an accessory's height is the figure's: the sheets as built do not judge it here
             if cb == ca:
                 if sa is not None and sb is not None:
                     put = s2 if closing(a, ga) or closing(b, gb) else s1

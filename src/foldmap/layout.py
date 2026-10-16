@@ -262,6 +262,9 @@ class Layout:
     accessory: dict[str, str] = field(default_factory=dict)  # a strand drawn off its sheet's track (Sheet.accessory),
     # beside its parent -> that parent's id: no barrel strand (science S3)
     sheet_notes: list[str] = field(default_factory=list)  # what is said of the sheets as drawn (sheet_notes)
+    # (accessory, partner) pairings drawn apart: no height level with the partner was free (_column_heights); the
+    # notes name them ("also pairs with"), science S6 reads them
+    unshown: list[tuple[str, str]] = field(default_factory=list)
     sheet_joins: list[tuple[str, str]] = field(default_factory=list)  # strand pairs joining two sheets built apart
     # (Sheet.joined: two barrels of one pairing network, 1EYG's OB folds)
     res_cons: list[float] = field(default_factory=list)  # alignment conservation of each residue (nan: none)
@@ -424,7 +427,10 @@ def _stack_gaps(lay: Layout) -> list[tuple[float, float, float, float]]:
     return out
 
 
-_END_ROOM = END_LABEL + 1.2  # more room in a stack gap a chain end faces: its stub, its N/C letter and tail count
+# more room in a stack gap a chain end faces: its stub and N/C letter. Fix round 3: at most this, so 9FWZ's
+# D:662-666, end to end with D:634-641, still stands level with its partner D:645-659 (END_LABEL + 0.6 left it above
+# D:645-659's end; the D:618-629 loop into that gap then passes the letter, a route over a label)
+_END_ROOM = END_LABEL - 0.15
 
 
 def _column_heights(
@@ -433,25 +439,26 @@ def _column_heights(
     s: int,
     ends: dict[str, str] | None = None,
     unshown: list[tuple[str, str]] | None = None,
+    ghost: int = 0,
 ) -> dict[int, float]:
-    """The heights (page units) of the strands in a column with accessory strands (`column`: index into _drawn_strands,
-    the ghost as -1, -> drawn column). Each accessory strand stands in its partner's column (Accessory.column), end to
-    end with its partner (fix round 1 ruling: never in another strand's column): next to it, above when its centroid
-    lies above the partner's along the sheet's drawn up (its strands' mean direction, by their senses, times the flip
-    s), else below; on the other side when that one is taken; a branch of several strands so up the column, each next to
-    its own partner. The track strand keeps its row (height 0), so the run of paired strands stays in line (a barrel
-    across a membrane band, 9FWZ; an open sheet's loops route round it: keeping a column's middle instead, as C2a did,
-    left 2B9V, 4XG1, 5JB1 and 8RVL loops with no route). End to end, _STACK_PAD apart, _END_ROOM more where a chain end
-    faces the gap (`ends`: element id -> "N", "C" or both, the chain ends drawn; 9FWZ's C end, D:662-666). A partner
-    with both ends taken (fix round 2 ruling, 7ARD's x:79-86: its own partner below, x:58-59 above, x:67-68 left):
-    the accessory stands next to another partner of its own (Accessory.others) that has an end free, else in the
-    column beside its partner on its side in 3D, at its partner's height (beyond that column's strands where they
-    meet it); `column` is changed in place, and (accessory, partner) appended to `unshown` (the note: "also pairs
-    with"). Snapped."""
+    """The heights (page units) of a sheet's accessory strands (`column`: index into _drawn_strands, the ghost as -1,
+    -> drawn column; `ghost`: the index of the strand the ghost repeats). The track strands and the ghost keep the row
+    (height 0). Each accessory stands in its column (Accessory.column: beside its partner on its 3D side), level with
+    its partner where it can: at its partner's height when nothing in that column meets it there, else end to end
+    with what does (one column means collinear), on the side its centroid lies on along the sheet's drawn up (its
+    strands' mean direction, by their senses, times the flip s), _STACK_PAD apart, _END_ROOM more where a chain end
+    faces the gap (`ends`: element id -> "N", "C" or both, the chain ends drawn; 9FWZ's C end, D:662-666). One that
+    cannot stand level with its partner stands level with another partner of its own (Accessory.others), in a column
+    beside that one, when it can; else as near its partner as it can; (accessory, partner) then goes to `unshown`
+    (the note says "also pairs with"; fix round 2/3 rulings, 7ARD). Snapped."""
     every, senses = _drawn_strands(sheet)
     ends = ends or {}
-    sense = dict(zip(range(len(senses)), senses)) | {-1: senses[0]}
-    strand = lambda k: every[k] if k >= 0 else sheet.strands[0]  # noqa: E731
+    n = len(sheet.strands)
+    sense = dict(zip(range(len(senses)), senses)) | {-1: senses[ghost]}
+    strand = lambda k: every[k] if k >= 0 else every[ghost]  # noqa: E731
+    length = lambda k: _strand_length(strand(k))  # noqa: E731
+    up3 = _unit(s * sum(d * x.axis for d, x in zip(senses, every)))
+    index = {id(x): k for k, x in enumerate(every)}
 
     def room(lo: int, hi: int) -> float:  # lo stands below hi: lo's top end and hi's bottom end face the gap
         up_lo, up_hi = sense[lo] * s > 0, sense[hi] * s > 0
@@ -459,90 +466,51 @@ def _column_heights(
         facing |= ("N" if up_hi else "C") in ends.get(strand(hi).id, "") if hi >= 0 else False
         return _STACK_PAD + (_END_ROOM if facing else 0.0)
 
-    def need(a: int, b: int) -> float:  # a below b, end to end
-        return (_strand_length(strand(a)) + _strand_length(strand(b))) / 2 + room(a, b)
+    height: dict[int, float] = {k: 0.0 for k in range(n)} | ({-1: 0.0} if -1 in column else {})
+    occupied: dict[int, list[int]] = {}
+    for k in height:
+        occupied.setdefault(column[k], []).append(k)
 
-    n = len(sheet.strands)
-    up3 = _unit(s * sum(d * x.axis for d, x in zip(senses, every)))
-    index = {id(x): k for k, x in enumerate(every)}
-    stacks: dict[int, list[int]] = {column[k]: [k] for k in range(n)}  # each column bottom to top
-    beside: list[tuple[int, int]] = []  # (accessory, partner) drawn in the column beside the partner's
+    def spot(k: int, c: int, want: float) -> float:  # the height nearest `want` where k meets nothing in column c
+        half = length(k) / 2
+        blocks = sorted(
+            (height[q] - length(q) / 2 - room(k, q) - half, height[q] + length(q) / 2 + room(q, k) + half, q)
+            for q in occupied.get(c, [])
+        )
+        y = want
+        for _ in range(len(blocks) + 1):
+            hit = next(((lo, hi, q) for lo, hi, q in blocks if lo < y < hi), None)
+            if hit is None:
+                return y
+            lo, hi, q = hit
+            rise = float(_snap((_snap(strand(k).centroid) - _snap(strand(q).centroid)) @ up3))
+            y = hi if rise >= 0 else lo  # past its end on the side it lies on in 3D
+        return y
 
-    def free(q: int) -> bool:  # has q a free end in its column?
-        stack = stacks.get(column[q], [q])
-        return q in stack and (stack.index(q) in (0, len(stack) - 1))
+    def level(k: int, q: int, y: float) -> bool:
+        return abs(y - height[q]) < (length(k) + length(q)) / 2
 
-    def next_to(k: int, q: int, rise: float) -> None:  # end to end with q, on its free side (rise's when both are)
-        stack = stacks.setdefault(column[q], [q])
-        j = stack.index(q)
-        top, bottom = j == len(stack) - 1, j == 0
-        up = (rise >= 0 and top) or (not bottom and top) or (rise >= 0 and not bottom)
-        stack.insert(j + 1 if up else j, k)
-        column[k] = column[q]
-
-    def rise_of(a: SSE, q: SSE) -> float:
-        return float(_snap((_snap(a.centroid) - _snap(q.centroid)) @ up3))
-
-    placed: set[int] = set(range(n))
     for i, a in enumerate(sheet.accessory):
         k, p = n + i, index[id(a.parent)]
-        if free(p):
-            next_to(k, p, rise_of(a.strand, a.parent))
-        else:  # its partner's ends are taken: at another partner of its own, else beside it; the note says so
+        y = spot(k, column[k], height[p])
+        if not level(k, p, y):
             if unshown is not None:
                 unshown.append((a.strand.id, a.parent.id))
-            q = next(
-                (index[id(x)] for x in a.others if id(x) in index and index[id(x)] in placed and free(index[id(x)])),
-                None,
-            )
-            if q is not None:
-                next_to(k, q, rise_of(a.strand, strand(q)))
-            else:
-                beside.append((k, p))
-                column[k] = column[p] + _side(sheet, column, p, a.strand)
-        placed.add(k)
-    out: dict[int, float] = {}
-    for stack in stacks.values():
-        if len(stack) < 2:
-            continue
-        at = next(j for j, k in enumerate(stack) if k < n)
-        placed = {at: 0.0}
-        for j in range(at + 1, len(stack)):
-            placed[j] = placed[j - 1] + need(stack[j - 1], stack[j])
-        for j in range(at - 1, -1, -1):
-            placed[j] = placed[j + 1] - need(stack[j], stack[j + 1])
-        out.update({k: float(_snap(placed[j])) for j, k in enumerate(stack) if j != at})
-    for k, p in beside:  # at its partner's height, beyond the strands of that column where they meet it
-        half = _strand_length(strand(k)) / 2
-        taken = [
-            (
-                out.get(q, 0.0) - _strand_length(strand(q)) / 2 - _STACK_PAD,
-                out.get(q, 0.0) + _strand_length(strand(q)) / 2 + _STACK_PAD,
-            )
-            for q in [*stacks.get(column[k], []), *(b for b, _ in beside if b != k and b in out)]
-            if column.get(q) == column[k]
-        ]
-        h = out.get(p, 0.0)
-        if any(lo < h + half and h - half < hi for lo, hi in taken):
-            up = max(hi for _, hi in taken) + half
-            down = min(lo for lo, _ in taken) - half
-            h = up if abs(up - h) <= abs(down - h) else down
-        out[k] = float(_snap(h))
-    return out
-
-
-def _side(sheet: Sheet, column: dict[int, int], p: int, a: SSE) -> int:
-    """+1 or -1: the column beside strand p's (`column`: drawn columns) that strand `a` lies towards in 3D, across
-    p's axis, from the track strands standing in the columns on either side of p's (the sheet's ends, when none)."""
-    every, _ = _drawn_strands(sheet)
-    n = len(sheet.strands)
-    track = {column[k]: k for k in range(n)}
-    c = column[p]
-    left, right = track.get(c - 1, track.get(min(track), p)), track.get(c + 1, track.get(max(track), p))
-    across = _snap(every[right].centroid) - _snap(every[left].centroid)
-    axis = _unit(every[p].axis)
-    v = _snap(a.centroid) - _snap(every[p].centroid)
-    return 1 if float((v - (v @ axis) * axis) @ (across - (across @ axis) * axis)) >= 0 else -1
+            for x in a.others:  # level with another partner of its own, in a column beside it, if it can
+                q = index.get(id(x))
+                if q is None or q not in height:
+                    continue
+                for c in (column[q] - 1, column[q] + 1):
+                    z = spot(k, c, height[q])
+                    if level(k, q, z):
+                        column[k], y = c, z
+                        break
+                else:
+                    continue
+                break
+        height[k] = float(_snap(y))
+        occupied.setdefault(column[k], []).append(k)
+    return {k: h for k, h in height.items() if k >= n}
 
 
 def _sheet_item(
@@ -569,7 +537,7 @@ def _sheet_item(
     drawn.update({n + i: a.column if forward else n - 1 - a.column for i, a in enumerate(sheet.accessory)})
     if sheet.closed:
         drawn[-1] = n  # the ghost, after the last
-    heights = _column_heights(sheet, drawn, s, ends, unshown) if sheet.accessory else {}  # may move some (drawn)
+    heights = _column_heights(sheet, drawn, s, ends, unshown, order[0]) if sheet.accessory else {}  # may move some
     slot_of = {c: i for i, c in enumerate(sorted(set(drawn.values())))}
     slots = len(slot_of)
     members, offsets = [], []
@@ -2872,7 +2840,8 @@ def build_layout(
     lay.ba_rows = _ba_rows(items)  # after the user's swaps
     lay.stack_gaps = _stack_gaps(lay)
     lay.accessory = {a.strand.id: a.parent.id for sh in sheets for a in sh.accessory if a.strand.id in real}
-    lay.sheet_notes = sheet_notes(sheets, unshown)
+    lay.unshown = sorted(set(unshown))
+    lay.sheet_notes = sheet_notes(sheets, lay.unshown)
     lay.sheet_joins = sorted({tuple(sorted((a.id, b.id))) for sh in sheets for a, b in sh.joined})
     lay.on_sheet = {
         m.sse.id: [x.sse.id for x in it.members if x.sse.kind == "E" and not x.ghost]
