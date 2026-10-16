@@ -12,5 +12,21 @@ Changes: chains and domains selected as above, reshaped into this JSON.
 
 The "literature" entries (2LZM, 4AKE) are hand choppings named per entry, not CATH data.
 
-The structures themselves are not committed (about 40 MB): scripts/make_domain_cache.py puts them in
-$FOLDMAP_DOMAIN_CACHE (default ~/.cache/foldmap-domains); the calibration test skips without them.
+Each chain also carries its CATH superfamilies (from the same PDBe responses, fetched again 2026-10-16) and its
+homology group: the chains sharing a superfamily with it, directly or through another. The groups with more than one
+chain are 1LDM/1RM5/2HKI (Rossmann 3.40.50.720), the hexokinases 1BDG/1CZA/1HKB/2YHX with 4XEI (3.30.420.40),
+1CSH/5CSC, 2YBE/3PGK, 1GPB/2C4M and 6FY9/6FYF.
+
+cath_inputs.npz: what foldmap finds the automatic domains of each of the 33 chains from (domain_score.ChainInputs:
+CA coordinates in thousandths of an Å, residue numbers, elements, their contacts, βα rows), so the ruled targets are
+checked in CI (tests/test_domain_score.py). scripts/make_domain_fixture.py builds it from the structures and checks
+that it gives the same domains as they do. The structures themselves are not committed (about 40 MB):
+scripts/make_domain_cache.py puts them in $FOLDMAP_DOMAIN_CACHE (default ~/.cache/foldmap-domains), and the
+end-to-end check on them skips without them.
+
+How far the calibration generalises (plan 12 Task 3, fix round 1): the parameters were chosen on a seeded two thirds
+of the 33 chains. The held-out third, drawn chain by chain, held near-duplicates of training chains (6FY9 of 6FYF,
+2YBE of 3PGK, hexokinases 1CZA and 1HKB of 2YHX and 1BDG), so its numbers (overlap .81, recall .87) overstated it.
+The seven held-out chains with no training homologue give overlap .82, recall .80, precision .70, F1 .72: recall
+under the ruled .85. The held-out third is now drawn by homology group (domain_score.held_out); after the fact, it
+gives overlap .80, recall .81, precision .68, F1 .72. All 33: overlap .85, recall .88, precision .76, F1 .79.

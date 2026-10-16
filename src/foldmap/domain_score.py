@@ -22,6 +22,7 @@ TARGETS["f1"], mean recall at least TARGETS["recall"])."""
 from __future__ import annotations
 
 import json
+from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
@@ -122,11 +123,21 @@ def layout_labels(domains, sses, labels, chain: str) -> np.ndarray:
     return element_labels(len(idx), spans)
 
 
-def auto_chain(path, chain: str) -> tuple[list, np.ndarray, list]:
-    """One chain's automatic domains as `--domains auto --chains <chain> --assembly asu` finds them, without the
-    figure: (its residue labels, per residue its domain (layout_labels), the domains). The same inputs as
-    cli.make_layout: the elements, their contacts and disulfide ties, and the βα rows a template draws whole."""
-    from .cli import _bridge_contacts, _domains
+@dataclass
+class ChainInputs:
+    """What one chain's automatic domains are found from (features.auto_domains): its residues (labels and CA
+    coordinates), its elements, their contacts (with disulfide ties) and the βα rows a template draws whole."""
+
+    labels: list
+    ca: np.ndarray
+    sses: list
+    contacts: dict
+    rows: list
+
+
+def chain_inputs(path, chain: str) -> ChainInputs:
+    """A chain's ChainInputs as `--domains auto --chains <chain> --assembly asu` reads them (cli.make_layout)."""
+    from .cli import _bridge_contacts
     from .dssp import assign_dssp
     from .features import sse_contacts
     from .io import load_backbone, load_links, read_model
@@ -140,12 +151,97 @@ def auto_chain(path, chain: str) -> tuple[list, np.ndarray, list]:
     dssp = assign_dssp(bb)
     sses = build_sses(bb, dssp.ss, short_helices=True, bridges=dssp.bridges, matched={})
     sheets = build_sheets(sses, dssp.bridges)
-    copies = homolog_chains(bb)
     contacts = sse_contacts(bb, sses)
     for key, n in _bridge_contacts(bb, sses, load_links(path, bb, "asu", model=model)).items():
         contacts[key] = contacts.get(key, 0) + n
-    domains = _domains("auto", sses, contacts, template_rows(sheets, sses, copies), copies, bb=bb)
-    return list(bb.labels), layout_labels(domains, sses, bb.labels, chain), domains
+    rows = template_rows(sheets, sses, homolog_chains(bb))
+    return ChainInputs(list(bb.labels), np.asarray(bb.ca, dtype=float), sses, contacts, rows)
+
+
+def inputs_domains(inputs: ChainInputs) -> list:
+    """The automatic domains of one chain's inputs (features.auto_domains, as cli._domains calls it)."""
+    from types import SimpleNamespace
+
+    from .features import auto_domains
+
+    bb = SimpleNamespace(labels=inputs.labels, ca=inputs.ca)
+    return auto_domains(inputs.sses, inputs.contacts, inputs.rows, {}, frozenset(), bb=bb)
+
+
+def auto_chain(path, chain: str) -> tuple[list, np.ndarray, list]:
+    """One chain's automatic domains, without the figure: (its residue labels, per residue its domain
+    (layout_labels), the domains)."""
+    inputs = chain_inputs(path, chain)
+    domains = inputs_domains(inputs)
+    return inputs.labels, layout_labels(domains, inputs.sses, inputs.labels, chain), domains
+
+
+def inputs_score(inputs: ChainInputs, entry: dict) -> dict:
+    """One reference entry scored from its chain's inputs (a fixture's, or chain_inputs')."""
+    chain = entry["chain"]
+    auto = layout_labels(inputs_domains(inputs), inputs.sses, inputs.labels, chain)
+    ref = reference_labels([l.seq for l in inputs.labels if l.chain == chain], entry["domains"])
+    return {"pdb": entry["pdb"], "chain": chain, **score(ref, auto)}
+
+
+# A fixture of ChainInputs (tests/data/domains/*.npz, scripts/make_domain_fixture.py): per chain "<PDB>_<chain>",
+# CA coordinates in thousandths of an Å (as the mmCIF file writes them), residue numbers and insertion codes,
+# element spans (indices into the residues) and kinds, element contacts (element index pairs and counts) and the
+# βα rows (element indices, -1 between rows).
+def fixture_arrays(inputs: ChainInputs) -> dict[str, np.ndarray]:
+    """One chain's inputs as the fixture's arrays."""
+    at = {s.id: k for k, s in enumerate(inputs.sses)}
+    contacts = sorted(
+        (min(at[a], at[b]), max(at[a], at[b]), n)
+        for (a, b), n in ((sorted(k), n) for k, n in inputs.contacts.items())
+        if a in at and b in at
+    )
+    rows = [k for row in inputs.rows for k in [*(at[i] for i in row if i in at), -1]]
+    return {
+        "ca": np.round(np.asarray(inputs.ca) * 1000).astype(np.int32),
+        "seq": np.array([l.seq for l in inputs.labels], dtype=np.int32),
+        "icode": np.array([l.icode for l in inputs.labels], dtype="<U2"),
+        "chain": np.array([inputs.labels[0].chain if inputs.labels else ""], dtype="<U4"),
+        "sse": np.array([[s.start, s.end] for s in inputs.sses], dtype=np.int32).reshape(-1, 2),
+        "kind": np.array([s.kind for s in inputs.sses], dtype="<U1"),
+        "contacts": np.array(contacts, dtype=np.int32).reshape(-1, 3),
+        "rows": np.array(rows, dtype=np.int32),
+    }
+
+
+def save_fixture(path, chains: dict[str, ChainInputs]) -> None:
+    """Write a fixture of ChainInputs, keyed "<PDB>_<chain>" (np.savez_compressed)."""
+    arrays = {f"{key}__{name}": a for key, inputs in chains.items() for name, a in fixture_arrays(inputs).items()}
+    np.savez_compressed(path, **arrays)
+
+
+def load_fixture(path) -> dict[str, ChainInputs]:
+    """A fixture's ChainInputs by "<PDB>_<chain>": the elements rebuilt from their spans (no centroid or axis:
+    auto_domains does not read them)."""
+    from .model import SSE, ResLabel
+
+    data = np.load(path)
+    keys = sorted({name.split("__")[0] for name in data.files})
+    out = {}
+    for key in keys:
+        a = {name.split("__")[1]: data[name] for name in data.files if name.split("__")[0] == key}
+        chain = str(a["chain"][0])
+        labels = [ResLabel(chain, int(n), str(i), "") for n, i in zip(a["seq"], a["icode"])]
+        zero = np.zeros(3)
+        sses = [
+            SSE(str(kind), chain, int(lo), int(hi), labels[lo], labels[hi], zero, zero)
+            for (lo, hi), kind in zip(a["sse"], a["kind"])
+        ]
+        contacts = {frozenset((sses[i].id, sses[j].id)): int(n) for i, j, n in a["contacts"]}
+        rows, row = [], []
+        for k in a["rows"]:
+            if k < 0:
+                rows.append(row)
+                row = []
+            else:
+                row.append(sses[k].id)
+        out[key] = ChainInputs(labels, a["ca"].astype(float) / 1000, sses, contacts, rows)
+    return out
 
 
 def load_reference(path) -> list[dict]:
@@ -154,18 +250,32 @@ def load_reference(path) -> list[dict]:
 
 
 def chain_score(path, entry: dict) -> dict:
-    """One reference entry scored: its auto_chain domains against entry["domains"]."""
-    labels, auto, domains = auto_chain(path, entry["chain"])
-    ref = reference_labels([l.seq for l in labels if l.chain == entry["chain"]], entry["domains"])
-    return {"pdb": entry["pdb"], "chain": entry["chain"], **score(ref, auto)}
+    """One reference entry scored from its structure file: its automatic domains against entry["domains"]."""
+    return inputs_score(chain_inputs(path, entry["chain"]), entry)
 
 
-HELD_OUT_SEED = "20261016:domains"  # random.Random seed of the held-out third (plan 12 Task 3: tuned on the rest)
+HELD_OUT_SEED = "20261016:domains"  # random.Random seed of the held-out third
 
 
 def held_out(entries: list[dict]) -> set[tuple[str, str]]:
-    """The held-out third of the calibration chains, (pdb, chain): drawn once with HELD_OUT_SEED, never tuned on."""
+    """The held-out third of the calibration chains, (pdb, chain), drawn by homology group (each entry's "group":
+    chains sharing a CATH superfamily) so that no held-out chain has a homologue among the rest: the groups in the
+    order HELD_OUT_SEED shuffles them, taken whole until a third of the chains is held out.
+
+    Fix round 1 (plan 12 Task 3 review): the first split drew chains, not groups, and leaked near-duplicates of
+    training chains into the held-out third (6FY9/6FYF, 2YBE/3PGK, the hexokinases). The parameters were chosen on
+    that split's training two thirds, and that split was looked at twice, so this one is not untouched either: it
+    is reported, and the never-seen check is the fresh set (cath_fresh.json)."""
     import random
 
-    keys = sorted((e["pdb"], e["chain"]) for e in entries)
-    return set(random.Random(HELD_OUT_SEED).sample(keys, len(keys) // 3))
+    groups: dict[str, list[tuple[str, str]]] = {}
+    for e in sorted(entries, key=lambda e: (e["pdb"], e["chain"])):
+        groups.setdefault(e.get("group") or e["pdb"], []).append((e["pdb"], e["chain"]))
+    order = sorted(groups)
+    random.Random(HELD_OUT_SEED).shuffle(order)
+    held: set[tuple[str, str]] = set()
+    for g in order:
+        if len(held) >= len(entries) // 3:
+            break
+        held.update(groups[g])
+    return held

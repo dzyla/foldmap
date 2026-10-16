@@ -1,5 +1,14 @@
 """Automatic domains against reference choppings (plan 12 Task 3, R2): the scoring, the reference set, and the
-calibration on the 33 CATH chains (needs the structures in the domain cache: scripts/make_domain_cache.py)."""
+calibration on the 33 CATH chains. The ruled targets are checked in CI on a committed fixture of what the domains are
+found from (cath_inputs.npz, scripts/make_domain_fixture.py); the same check on the structure files themselves runs
+when they are in the domain cache (scripts/make_domain_cache.py).
+
+What the numbers mean (fix round 1): the parameters were chosen on a seeded two thirds of the 33 chains, and the
+other third, drawn chain by chain, held near-duplicates of training chains (6FY9/6FYF, 2YBE/3PGK, the hexokinases).
+On the seven held-out chains with no training homologue: overlap .82, recall .80, precision .70, F1 .72. The
+held-out third is now drawn by homology group (overlap .80, recall .81, precision .68, F1 .72), but that is after
+the fact. The never-seen check is the fresh set (cath_fresh.json): eleven chains of superfamilies none of the 33
+has, scored once with the final algorithm and gated only at a sanity floor."""
 
 import json
 import os
@@ -12,6 +21,9 @@ from foldmap import domain_score as ds
 
 DATA = Path(__file__).parent / "data"
 REFERENCE = DATA / "domains" / "cath_reference.json"
+FIXTURE = DATA / "domains" / "cath_inputs.npz"
+FRESH = DATA / "domains" / "cath_fresh.json"
+FRESH_FIXTURE = DATA / "domains" / "fresh_inputs.npz"
 CACHE = Path(os.environ.get("FOLDMAP_DOMAIN_CACHE") or Path.home() / ".cache" / "foldmap-domains")
 
 
@@ -68,30 +80,65 @@ def test_boundaries_within_the_tolerance():
     assert ds.boundary_scores(ref, np.zeros(200, int))[1] == 0.0  # a split missed: nothing right either
 
 
-def test_held_out_is_a_fixed_third():
+def test_held_out_is_a_fixed_third_of_whole_homology_groups():
     entries = ds.load_reference(REFERENCE)
     held = ds.held_out(entries)
     assert len(held) == 11 and held == ds.held_out(list(reversed(entries)))
+    side = {}
+    for e in entries:  # no group on both sides: a held-out chain has no homologue among the rest
+        assert side.setdefault(e["group"], (e["pdb"], e["chain"]) in held) == ((e["pdb"], e["chain"]) in held), e
+    groups = {e["group"] for e in entries if e["pdb"] in ("1CZA", "1HKB", "2YHX", "1BDG")}
+    assert len(groups) == 1  # the hexokinases are one group
 
 
-def _scores(entries):
-    return [ds.chain_score(CACHE / f"{e['pdb']}.cif", e) for e in entries]
+def _fixture_scores(fixture, entries):
+    chains = ds.load_fixture(fixture)
+    return [ds.inputs_score(chains[f"{e['pdb']}_{e['chain']}"], e) for e in entries]
 
 
-@needs_cache
 def test_auto_domains_meet_the_ruled_targets_on_the_cath_set():
-    """Plan 12 ruling R2: mean overlap >= .80, boundary F1 >= .70 and recall >= .85 on the 33 chains, and on the
-    held-out third alone (never tuned on) no worse than the targets less .05."""
+    """Plan 12 ruling R2, in CI: on the 33 chains (their committed inputs) mean overlap >= .80, boundary F1 >= .70
+    and recall >= .85. The held-out third (by homology group, reported in the module docstring) only above a sanity
+    floor: it was not untouched (see above)."""
     entries = ds.load_reference(REFERENCE)
     held = ds.held_out(entries)
-    scores = _scores(entries)
+    scores = _fixture_scores(FIXTURE, entries)
     every = ds.summary(scores)
-    rest = ds.summary([s for s in scores if (s["pdb"], s["chain"]) in held])
     assert every["overlap"] >= ds.TARGETS["overlap"], every
     assert every["f1"] >= ds.TARGETS["f1"], every
     assert every["recall"] >= ds.TARGETS["recall"], every
-    for key in ("overlap", "f1", "recall"):
-        assert rest[key] >= ds.TARGETS[key] - 0.05, rest
+    assert ds.summary([s for s in scores if (s["pdb"], s["chain"]) in held])["overlap"] >= 0.70
+
+
+@pytest.mark.parametrize(
+    "key, path",
+    [
+        ("1LDM_A", "fidelity/1LDM.cif.gz"),
+        ("7FAB_H", "r100/7FAB-HL.cif.gz"),
+        ("1SLV_B", "r100/1SLV.cif.gz"),
+        ("2ILU_A", "r100/2ILU.cif.gz"),
+    ],
+)
+def test_the_fixture_gives_the_domains_the_structure_gives(key, path):
+    """The fixture cannot drift from the pipeline: for the reference chains whose structure is committed, its
+    inputs give the same domains as reading the file (DSSP, elements, contacts, rows) does now."""
+    inputs = ds.load_fixture(FIXTURE)[key]
+    assert ds.inputs_domains(inputs) == ds.inputs_domains(ds.chain_inputs(DATA / path, key.split("_")[1]))
+
+
+@needs_cache
+def test_the_structures_give_the_fixtures_domains_and_meet_the_targets():
+    """End to end on the structure files (the domain cache): every chain's domains as the fixture's, and the ruled
+    targets on the 33."""
+    entries = ds.load_reference(REFERENCE)
+    chains = ds.load_fixture(FIXTURE)
+    scores = []
+    for e in entries:
+        inputs = ds.chain_inputs(CACHE / f"{e['pdb']}.cif", e["chain"])
+        assert ds.inputs_domains(inputs) == ds.inputs_domains(chains[f"{e['pdb']}_{e['chain']}"]), e["pdb"]
+        scores.append(ds.inputs_score(inputs, e))
+    every = ds.summary(scores)
+    assert all(every[k] >= ds.TARGETS[k] for k in ("overlap", "f1", "recall")), every
 
 
 def test_t4_lysozyme_finds_the_literature_boundary():
