@@ -1012,8 +1012,9 @@ def _separate(
     then the tied pushes run as many passes as the one-by-one ones and may take up to _SEP_MIRROR_ROOM. `level`
     (bool per item): items that keep their height (the transmembrane elements of a membrane view), only ever pushed
     and slid sideways (_push_apart, _slide_clear). `shared`: items holding elements of several protomers with no
-    copy of their own (a dimer's continuous sheet, 1SLV): they yield to the tied items, which keep their copies alike
-    (_push_apart), and slide clear last (_slide_clear)."""
+    copy of their own (a dimer's continuous sheet, 1SLV): when the tied pushes fail, they are run again with these
+    yielding to the tied items, which keep their copies alike (_push_apart), and sliding clear last
+    (_slide_clear)."""
     halves = np.array([it.half for it in items], float).reshape(-1, 2)
     mids = np.array([it.mid for it in items], float).reshape(-1, 2)
     start = np.array([(it.cx, it.cy) for it in items], float).reshape(-1, 2)
@@ -1027,10 +1028,13 @@ def _separate(
         sweeps, room = _SEP_SWEEPS, max(room, _SEP_MIRROR_ROOM)
     else:
         sweeps = _SEP_ORBIT_SWEEPS
-    together = ties and _push_apart(xy, halves, mids, home, ties, sweeps, apart, fixed, mirror, level, shared)
-    lone = sorted(shared)
-    if ties and lone and not together and _lone_left(xy, halves, mids, apart, set(lone)):
-        together = True  # what is left overlaps only items with no copies: they slide clear, the copies stay alike
+    together = ties and _push_apart(xy, halves, mids, home, ties, sweeps, apart, fixed, mirror, level)
+    lone: list[int] = []
+    if ties and shared and not together:  # the tied pushes fail: again, the shared items yielding to the copies
+        xy, lone = start.copy(), sorted(shared)
+        together = _push_apart(xy, halves, mids, home, ties, sweeps, apart, fixed, mirror, level, shared)
+        if not together and _lone_left(xy, halves, mids, apart, set(lone)):
+            together = True  # what is left overlaps only the shared items: they slide clear, the copies stay alike
     if not together or _box_area(xy, halves, mids) > room * _box_area(alone, halves, mids):
         xy, lone = alone, []
     for it, (x, y) in zip(items, xy.tolist()):
@@ -2825,9 +2829,7 @@ def build_layout(
         _separate(items, ties, joints, walls, mirror=mirror if ties else None, level=kept, shared=shared)
         if domains and _part_domains(items, domains, ties, mirror if ties else None):
             # the domains, parted with their copies, keep them alike whatever room that takes
-            _separate(
-                items, ties, joints, walls, mirror=mirror if ties else None, room=np.inf, level=kept, shared=shared
-            )
+            _separate(items, ties, joints, walls, mirror=mirror if ties else None, room=np.inf, level=kept)
     for it in items:
         it.apply()
     dna = [m for it in items for m in it.members if isinstance(m, PlacedStem)]
