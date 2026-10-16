@@ -81,6 +81,7 @@ from .layout import (
     panel_members,
     resolve,
     segments_of,
+    spans_crossed,
     stem_keep_box,
     stem_label_pos,
     tail_counts,
@@ -2693,15 +2694,23 @@ def _count_spots(pts: np.ndarray, half) -> list[tuple[int, tuple[float, float, f
     return out
 
 
+def _foot(p, q, c) -> tuple[float, float]:
+    """The point of segment p-q nearest c."""
+    p, q, c = (np.asarray(v, float) for v in (p, q, c))
+    d = q - p
+    t = float(np.clip(np.dot(c - p, d) / max(float(np.dot(d, d)), 1e-12), 0.0, 1.0))
+    return float(p[0] + d[0] * t), float(p[1] + d[1] * t)
+
+
 def loop_counts(layout: Layout, loops: list[Loop], sses: list[SSE], tails=None, hidden=None, drawn=None) -> list[dict]:
     """The residue count ("NN aa") of each loop of at least LONG_LOOP residues: name (a>b), text, centre and ink box
     (page units, sized from the drawn text as tail counts are). Its place is the first of its spots (_count_spots:
     beside its runs, longest first) where its ink is clear (layout.clear_inks, as figcheck's A6 reads it) of
     elements, text (label_boxes, tail counts), the counts placed before, every other loop's line as drawn (`drawn`:
     drawn_lines, else the routes), every nucleic-acid strand's and its own route's but the run it sits beside, on
-    the page. A count with no clear spot is left out, never drawn over ink:
-    {"kind": "loop", "name", "text"} is appended to `hidden` (a list), which the figure's provenance lists
-    (counts_hidden). Placed after routing: no keep-out."""
+    the page, with no other line between it and its run (layout.spans_crossed: it reads as its loop's). A count
+    with no clear spot is left out, never drawn over ink: {"kind": "loop", "name", "text"} is appended to `hidden`
+    (a list), which the figure's provenance lists (counts_hidden). Placed after routing: no keep-out."""
     em = _ink_em(layout, layout.font_scale) or text_em(layout.width or 1.0) * layout.font_scale
     by_id = {s.id: s for s in sses}
     taken = [p.rect for p in [*layout.placed.values(), *layout.ghosts, *layout.stems]]
@@ -2724,6 +2733,10 @@ def loop_counts(layout: Layout, loops: list[Loop], sses: list[SSE], tails=None, 
         inks = [centred_box((x0 + x1) / 2, (y0 + y1) / 2, *ink) for _, (x0, y0, x1, y1) in spots]
         others = np.concatenate([strands, *(seg for k, seg in enumerate(seen) if k != i)])
         ok = clear_inks(inks, taken, others, layout, page)
+        pts = np.asarray(loop.points, float)
+        centres = [((x0 + x1) / 2, (y0 + y1) / 2) for _, (x0, y0, x1, y1) in spots]
+        spans = [(*c, *_foot(pts[j], pts[j + 1], c)) for (j, _), c in zip(spots, centres)]
+        ok &= ~spans_crossed(spans, others)  # no other line between it and its run: it reads as its loop's
         own = lines_meeting(inks, lines[i], line_band(layout))  # its own segments, but the run it sits beside
         ok &= ~np.array([own[np.arange(len(own)) != j, k].any() for k, (j, _) in enumerate(spots)], bool)
         name = f"{loop.a_id}>{loop.b_id}"

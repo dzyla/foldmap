@@ -45,6 +45,7 @@ END_LABEL = 1.15  # distance from a chain-end port to its N/C letter
 LONG_TAIL = 10  # a chain end with this many residues or more past its last element gets a count ("14 aa")
 TAIL_COUNT_SIZE = 0.72  # that count's text size, as a fraction of the figure's
 _TAIL_COUNT_GAP = 0.08  # page units between the N/C letter's ink and the count's
+_TAIL_COUNT_NEAR = 1.5  # em: the most a tail count's ink stands from its letter's (it reads as the letter's)
 _TAIL_COUNT_FAR = (0.3, 0.6, 0.9, 1.2)  # page units further out a count looks when its near spots are all taken
 _GLYPH_W, _GLYPH_H = 0.32, 0.42  # rough label glyph size in page units, for keep-out boxes (at _EM_TUNED: glyph_scale)
 _GLYPH_K: ContextVar[float] = ContextVar("foldmap_glyph_scale", default=1.0)  # glyph_scale of the text the layout
@@ -3745,6 +3746,30 @@ def lines_meeting(boxes, segments, band: float) -> np.ndarray:
     return out
 
 
+def spans_crossed(spans, segments, bodies=()) -> np.ndarray:
+    """Which spans (x0, y0, x1, y1: from a text to what it names) a line or a body runs across: each span turned to
+    lie flat along x, the segments turned with it, then lines_meeting on the flat span (a hair of band: a crossing,
+    not a line beside it); a body (x0, y0, x1, y1) by route.clip_lengths. What says a count sits beside what it
+    counts, with nothing drawn between (batch C2b-1 fix round 2, 7SMR)."""
+    from .route import clip_lengths
+
+    span = np.asarray(spans, float).reshape(-1, 4)
+    seg = np.asarray(segments, float).reshape(-1, 4)
+    out = np.zeros(len(span), bool)
+    for k, (x0, y0, x1, y1) in enumerate(span):
+        length = math.hypot(x1 - x0, y1 - y0)
+        if length < 1e-9:
+            continue
+        c, s = (x1 - x0) / length, (y1 - y0) / length
+        turn = np.array([[c, -s], [s, c]])  # page -> the span's frame: (x - x0, y - y0) @ turn
+        flat = (seg.reshape(-1, 2, 2) - [x0, y0]) @ turn
+        out[k] = lines_meeting((0.0, 0.0, length, 0.0), flat.reshape(-1, 4), 1e-6).any()
+    rect = np.asarray(bodies, float).reshape(-1, 4)
+    if len(rect) and len(span):
+        out |= (clip_lengths(span, rect) > 1e-9).any(axis=1)
+    return out
+
+
 def segments_of(lines) -> np.ndarray:
     """The segments (x0, y0, x1, y1) of point lists (loops' and nucleic-acid strands' points), as one array."""
     segs = [
@@ -4116,7 +4141,8 @@ def tail_counts(layout: Layout, sses: list[SSE], loops=(), hidden=None) -> list[
     end, chain, text ("14 aa"), centre and ink box (page units). Placed after routing, so not a route keep-out: the
     box is sized from the figure's text (TAIL_COUNT_SIZE em of _ink_em) and set from the N/C letter's far edge,
     along the stub, beside the letter on either side, then further along, then further out beside the letter and along
-    the stub (_TAIL_COUNT_FAR), the first where its ink is clear (clear_inks, as figcheck's A6 reads it) of elements,
+    the stub (_TAIL_COUNT_FAR), the first beside its letter (within _TAIL_COUNT_NEAR em, no line or body between them:
+    spans_crossed) where its ink is clear (clear_inks, as figcheck's A6 reads it) of elements,
     text (label_boxes), the loops' lines (`loops`, route.Loop), the nucleic-acid strands' lines and the counts placed
     before, on the page. A count with no clear spot is left
     out, never drawn over ink: {"kind": "tail", "name": "<end>:<chain>", "text"} is appended to `hidden` (a list),
@@ -4133,6 +4159,7 @@ def tail_counts(layout: Layout, sses: list[SSE], loops=(), hidden=None) -> list[
     taken += [b for _, b in label_boxes(layout, sses)]
     segs = segments_of([line.points for line in [*loops, *layout.na_paths]])  # loop and nucleic-acid strand lines
     page = count_page(layout, segs)
+    bodies = [p.rect for p in [*layout.placed.values(), *layout.ghosts, *layout.stems]]
     out = []
     for end, chain, port, ex in termini(layout, sses):
         mine, ours = groups.get(chain, []), rows.get(chain, [])
@@ -4159,6 +4186,10 @@ def tail_counts(layout: Layout, sses: list[SSE], loops=(), hidden=None) -> list[
         boxes = [centred_box(float(c[0]), float(c[1]), *half) for c in spots]
         ink = count_half(text, size, 0.0)
         ok = clear_inks([centred_box(float(c[0]), float(c[1]), *ink) for c in spots], taken, segs, layout, page)
+        # beside its letter (fix round 2, 7SMR): within _TAIL_COUNT_NEAR em of the letter's ink, nothing between
+        gap = [max(abs(c[0] - letter[0]) - own[0] - ink[0], abs(c[1] - letter[1]) - own[1] - ink[1]) for c in spots]
+        ok &= np.array(gap) <= _TAIL_COUNT_NEAR * em
+        ok &= ~spans_crossed([(*letter, *c) for c in spots], segs, bodies)
         box = next((b for b, clear in zip(boxes, ok.tolist()) if clear), None)
         if box is None:  # nowhere clear: left out (batch C2b-1: 7SMR, 5LDW, 8OZJ)
             if hidden is not None:

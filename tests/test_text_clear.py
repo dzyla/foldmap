@@ -9,6 +9,7 @@ import pytest
 
 from foldmap import figcheck
 from foldmap.layout import (
+    END_LABEL,
     TAIL_COUNT_SIZE,
     _ink_em,
     count_half,
@@ -19,7 +20,9 @@ from foldmap.layout import (
     overlaps_any,
     page_text,
     segments_of,
+    spans_crossed,
     tail_counts,
+    termini,
     thin_boxes,
 )
 from foldmap.provenance import figure_provenance
@@ -55,11 +58,15 @@ def test_tail_count_sits_clear_beyond_its_letter(scale):
     test, so loops ran through it (2DGS: the loop A:156-161>A:164-173 through the N tail's "11 aa"), and on big
     pages it overlapped its own letter (8W9Y, 8QEM). It is placed after routing (a keep-out moved the
     nucleosome's loops onto its DNA) from the letter's far edge, sized from the drawn text, clear of elements,
-    text and loops; the page holds it."""
+    text and loops; the page holds it. At twice the text, the N count's one clear spot stands 1.9 em off its letter,
+    past where it reads as the letter's (fix round 2, _TAIL_COUNT_NEAR): it is left out and listed."""
     d = drawn(R100 / "2DGS-A.cif.gz", style=[f"font_scale={scale}"])
     lay = d.layout
     counts = tail_counts(lay, d.sses, d.loops)
-    assert [(t["end"], t["text"]) for t in counts] == [("N", "11 aa"), ("C", "14 aa")]
+    shown = [("N", "11 aa"), ("C", "14 aa")] if scale == 1.0 else [("C", "14 aa")]
+    assert [(t["end"], t["text"]) for t in counts] == shown
+    listed = [e for i in d.provenance if i["kind"] == "counts_hidden" for e in i["elements"]]
+    assert listed == ([] if scale == 1.0 else ["N:A"])
     boxes = dict(label_boxes(lay, d.sses))
     texts = {t.get_gid(): t for t in d.figure.axes[0].texts}
     for t in counts:
@@ -75,20 +82,52 @@ def test_tail_count_sits_clear_beyond_its_letter(scale):
 
 def test_tail_count_looks_further_when_its_near_spots_are_crossed():
     """7BBH, 6JO6, 5LDW (random-100 A6 tail-length x loop, batch C2a): on a crowded page every one of the five spots
-    beside the N/C letter was crossed by a loop, and the count went on the first of them, over the loop. Here a loop
-    is laid through each spot the count takes, one after another; past the five near spots it looks further out
-    beside the letter and along its stub, and takes a spot no loop crosses."""
+    beside the N/C letter was crossed by a loop, and the count went on the first of them, over the loop. Here a short
+    line is laid in a corner of each spot the count takes, one after another (off the way from the letter to the
+    spots further out); it looks further out beside the letter and along its stub, and takes a spot no line
+    crosses, still beside its letter: near it, nothing between them (fix round 2)."""
     from foldmap.route import Loop
 
     d = drawn(R100 / "2DGS-A.cif.gz")
     lay, loops = d.layout, list(d.loops)
-    for _ in range(5):
-        (x0, y0, x1, y1) = next(t["box"] for t in tail_counts(lay, d.sses, loops) if t["end"] == "N")
-        cy = (y0 + y1) / 2
-        loops.append(Loop("x", "y", [(x0 - 0.3, cy), (x1 + 0.3, cy)], False, False))
-    box = next(t["box"] for t in tail_counts(lay, d.sses, loops) if t["end"] == "N")
+    near = []  # the three spots right beside the letter, each crossed in turn
+    for _ in range(3):
+        (x0, y0, x1, y1) = box = next(t["box"] for t in tail_counts(lay, d.sses, loops) if t["end"] == "N")
+        near.append(box)
+        loops.append(Loop("x", "y", [(x0 + 0.06, y1 - 0.06), (x0 + 0.12, y1 - 0.06)], False, False))
+    count = next(t for t in tail_counts(lay, d.sses, loops) if t["end"] == "N")
+    assert count["box"] not in near
     lines = [(p, q) for lp in loops[len(d.loops) :] for p, q in zip(lp.points, lp.points[1:])]
-    assert not any(clip_len(p, q, box) > 1e-9 for p, q in lines)
+    assert not any(clip_len(p, q, count["box"]) > 1e-9 for p, q in lines)
+    port, ex = next((p, e) for end, _, p, e in termini(lay, d.sses) if end == "N")
+    letter = np.add(port, np.asarray(ex) * END_LABEL)
+    assert np.hypot(*np.subtract(count["centre"], letter)) < 1.5 * _ink_em(lay, lay.font_scale) + 1.0
+    assert not spans_crossed([(*letter, *count["centre"])], segments_of([lp.points for lp in loops]))
+
+
+def test_a_tail_count_reads_as_its_letters():
+    """Fix round 2 (controller ruling, 7SMR: the C tail's "18 aa" of chain E stood 2.8 page units below its letter,
+    past four loops): a tail count sits beside its letter, within _TAIL_COUNT_NEAR em of its ink with no line or
+    body between them (layout.spans_crossed), or is left out and listed. A line laid across the stub just beyond
+    the letter, wider than every spot, leaves it nowhere beside the letter."""
+    from foldmap.route import Loop
+
+    d = drawn(R100 / "2DGS-A.cif.gz")
+    lay = d.layout
+    port, ex = next((p, e) for end, _, p, e in termini(lay, d.sses) if end == "N")
+    letter = np.add(port, np.asarray(ex) * END_LABEL)
+    ex = np.asarray(ex, float)
+    side = np.array([-ex[1], ex[0]])
+    ring = [letter + ex * 0.32 + side * 3, letter + ex * 0.32 - side * 3]  # across the stub's way, past the letter
+    ring += [letter - side * 0.45 + ex * 3, letter - side * 0.45 - ex * 3]  # and down each side of it
+    ring2 = [letter + side * 0.45 + ex * 3, letter + side * 0.45 - ex * 3]
+    walls = [Loop("x", "y", [tuple(a), tuple(b)], False, False) for a, b in (ring[:2], ring[2:], ring2)]
+    hidden: list = []
+    counts = tail_counts(lay, d.sses, [*d.loops, *walls], hidden)
+    assert "N" not in [t["end"] for t in counts] and {"kind": "tail", "name": "N:A", "text": "11 aa"} in hidden
+    assert spans_crossed([(0, 0, 2, 0)], [(1, -1, 1, 1)]).tolist() == [True]  # a line across the way
+    assert spans_crossed([(0, 0, 2, 0)], [(0, 1, 2, 1)]).tolist() == [False]  # a line beside it
+    assert spans_crossed([(0, 0, 2, 2)], [], [(0.9, 0.9, 1.1, 1.1)]).tolist() == [True]  # a body on the way
 
 
 def test_loop_count_sits_clear_of_elements_lines_and_text():
