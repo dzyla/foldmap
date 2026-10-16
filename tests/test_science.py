@@ -241,7 +241,7 @@ def test_summary_names_the_accessory_strands():
 
     text = summarize(str(R100 / "9FWZ-DB.cif.gz"))
     assert "sheet 1: 24 strand(s) closed ambiguous" in text
-    assert "  beside D:645-659 (off the run): D:662-666" in text
+    assert "  D:662-666 drawn beside its partner D:645-659" in text  # worded as the figure's note (accessory_lines)
 
 
 def test_ssb_draws_each_subunit_its_own_ob_fold_barrel():
@@ -369,3 +369,10 @@ def test_s3_flags_a_ring_of_five_drawn_open():
     assert open_finding("sheet 1", ring, counts(pairs)) == "sheet 1: drawn open, its pairing closes a ring of 5 strands"
     del pairs[(ring[4], ring[0])]
     assert open_finding("sheet 1", ring, counts(pairs)) is None
+
+
+def test_check_help_names_s6():
+    from foldmap.cli import build_parser
+
+    sub = next(a for a in build_parser()._actions if a.dest == "command")
+    assert "S6" in sub.choices["check"].description

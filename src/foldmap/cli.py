@@ -21,7 +21,7 @@ from .dssp import assign_dssp
 from .features import helices_on_sheets, sse_contacts
 from .frame import Frame, RadialFrame, dna_radial_frame, dna_view_frame, protomer_maps, symmetric_frame, view_frame
 from .io import load_backbone, load_links, load_nucleic, read_model
-from .layout import SCALE, _snap, build_layout, na_torn_by_unrolling, resolve, template_rows
+from .layout import SCALE, _snap, accessory_lines, build_layout, na_torn_by_unrolling, resolve, template_rows
 from .model import AUTO_NT, crop_nucleic, homolog_chains, nucleic_of_chains, nucleic_touching, res_ref
 from .names import apply_names, check_spec
 from .nucleic import StemView, stem_views, straight_duplex
@@ -77,10 +77,7 @@ def summarize(path: str) -> str:
             if k < len(sh.pair_kinds):
                 parts.append({"P": "=par=", "A": "=anti=", "?": "=?="}[sh.pair_kinds[k]])
         lines.append("  " + " ".join(parts))
-        by_parent: dict[str, list[str]] = {}  # strands off the run of paired strands, drawn beside their partner
-        for a in sh.accessory:
-            by_parent.setdefault(a.parent.id, []).append(a.strand.id)
-        lines += [f"  beside {p} (off the run): {', '.join(ids)}" for p, ids in by_parent.items()]
+        lines += [f"  {line}" for line in accessory_lines(sh)]  # off the run, or not drawn side by side
         lines += [f"  pairs with {b.id}, in another sheet: {a.id}" for a, b in sh.joined]
     if sheets:  # the science checks of the sheets as built (figcheck.science_checks reads them as drawn)
         lines.append("science checks (the sheets as built):")
@@ -1029,13 +1026,15 @@ def build_parser() -> argparse.ArgumentParser:
     kq = sub.add_parser(
         "check",
         help="check the science of the figure against the coordinates: sheet neighbours, barrel closure and strand "
-        "count (exit 1 on a problem)",
+        "count, strands drawn beside their partner (exit 1 on a problem)",
         description="Draw the figure as `plot` would and check what it says about the structure against the "
-        "coordinates, apart from how the page looks: S1, two strands drawn side by side in a sheet are joined by a "
-        "bridge (a branch strand drawn in a shared column beside one of its partners); S2, a closed barrel's "
-        "closure is; S3, a barrel's strand count is the cycle its pairing makes. S4 (residue marks) and S5 "
-        "(automatic domains) are not yet measured. Prints one line per check and one per problem; exits 1 on a "
-        "problem, 0 otherwise.",
+        "coordinates, apart from how the page looks: S1, two strands drawn side by side in a sheet (adjacent "
+        "columns, level) are joined by a bridge, and two in one column (collinear) never overlap; S2, a barrel's "
+        "closure is joined; S3, a barrel's strand count is the cycle its pairing makes, and no sheet drawn open "
+        "holds a ring of 5 or more; S6, a strand off a sheet's run of paired strands stands beside its partner, "
+        "level with it, or its pairing is named in the notes. S4 (residue marks) and S5 (automatic domains) are "
+        "not yet measured. "
+        "Prints one line per check and one per problem; exits 1 on a problem, 0 otherwise.",
     )
     for cmd in (q, iq, cq, kq):
         q = cmd

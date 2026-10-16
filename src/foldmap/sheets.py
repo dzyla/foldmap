@@ -183,6 +183,13 @@ def build_sheets(sses: list[SSE], bridges: list[Bridge]) -> list[Sheet]:
             )
             for k, p in off
         ]
+        n = len(order)
+        chords = [
+            (strands[order[i]], strands[order[j]])
+            for i in range(n)
+            for j in range(i + 2, n)
+            if sub.has_edge(order[i], order[j]) and not (closed and i == 0 and j == n - 1)
+        ]
         apart = set(comp_of[comp[0]]) - mine  # strands of its component drawn in another sheet
         joined = [(strands[a], strands[b]) for a in sorted(mine) for b in sorted(graph.neighbors(a)) if b in apart]
         sheets.append(
@@ -195,6 +202,7 @@ def build_sheets(sses: list[SSE], bridges: list[Bridge]) -> list[Sheet]:
                 accessory=accessory,
                 unclosed=unclosed,
                 joined=joined,
+                chords=chords,
             )
         )
     return sheets

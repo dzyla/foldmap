@@ -396,13 +396,12 @@ On large complexes the lines can pile up into a hairball (30QM with `hbonds=na` 
 **Checking the science.** A figure can look clean and still say something false about the structure, so foldmap
 checks what it draws against the coordinates, apart from how the page looks. `foldmap check 9FWZ` draws the figure
 `plot` would (same options, `-o` to save it) and prints one line per check and one per problem, exiting 1 on any:
-S1, two strands drawn side by side in a sheet are joined by at least one backbone bridge (a strand stacked in a
-shared column must pair with a strand of its column or the next); S2, a closed barrel's closure (the ghost beside the
-last strand) is; S3, a barrel's strand count is the cycle its pairing makes; S6, a strand off a sheet's run of
-paired strands stands at its partner: end to end with it in its column, or alone in the column beside it, never in
-another strand's column; a strand whose partner has both ends taken stands at another partner of its own, else
-beside it, and the note names the pairing ("x:67-68 also pairs with x:79-86"). S4 (ligand and modified-residue marks at their residue) and S5 (automatic domains against a
-reference) are not yet measured. `foldmap summary` prints the
+S1, two strands drawn side by side in a sheet (adjacent columns, level with each other) are joined by at least one
+backbone bridge, and two strands in one column (collinear, end to end) never overlap; S2, a closed barrel's closure
+(the ghost beside the last strand) is joined; S3, a barrel's strand count is the cycle its pairing makes, and no sheet
+drawn open holds a ring of 5 strands or more; S6, a strand off a sheet's run of paired strands stands beside its
+partner, level with it, or the notes name the pairing ("x:67-68 also pairs with x:79-86"). S4 (ligand and
+modified-residue marks at their residue) and S5 (automatic domains against a reference) are not yet measured. `foldmap summary` prints the
 same checks of the sheets as built.
 
 **Checking the contact beads.** `foldmap contacts 1LMB.cif` draws the figure `plot` would (it takes the same options),
@@ -459,13 +458,14 @@ Every figure (command line, app, MCP or Python) goes through the same steps:
    from the ladder network, and a sheet whose ends pair is a closed barrel. Each strand drawn side by side with
    another pairs with it: a branched sheet's run of paired strands is its ladder network's longest path (a closed
    barrel's: its longest pairing cycle, so FimD 9FWZ has 24 barrel strands and OmpF 16), and a strand off that run
-   (a short strand pairing with one barrel strand, or a branch of several) is drawn at its partner, end to end with
-   it in the partner's own column, above or below as it lies along it; never between two strands that pair, nor in
-   another strand's column. `foldmap summary` lists these strands ("beside … (off the run)") and the figure's note
-   names each with its partner ("D:662-666 drawn beside its partner D:645-659"). Barrels that
-   pair with one another (the four OB folds of the SSB tetramer 1EYG) are each drawn closed, as a sheet of its own;
-   the note and the summary name the pairings joining them. A barrel whose ends do not pair is drawn open, with the
-   note "barrel closure not supported by pairing: drawn open". Helices packed along their length across chains
+   (a short strand pairing with one barrel strand, or a branch of several) is drawn beside its partner on the side it
+   lies on in 3D, level with it: in the next strand's column, end to end with that strand (one column means
+   collinear), or in a new column past the sheet's end; never between two strands that pair. When no height level with
+   its partner is free there, it stands as near as it can and the note names the pairing ("also pairs with"); so do
+   pairings a ring cannot draw side by side (its chords). `foldmap summary` and the figure's note name each such
+   strand with its partner ("D:662-666 drawn beside its partner D:645-659"). Barrels that pair with one another (the
+   four OB folds of the SSB tetramer 1EYG) are each drawn closed, as a sheet of its own; the note and the summary name
+   the pairings joining them. Helices packed along their length across chains
    form bundles.
 4. **Context.** Symmetry (cyclic, dihedral, cubic, helical) is found by superposing chains of the same sequence;
    disulfides, glycans and ligands are read from the atoms; a membrane is estimated on request. Nucleic acids:

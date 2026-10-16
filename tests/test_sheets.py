@@ -77,7 +77,7 @@ def test_a_barrel_keeps_its_ring_and_draws_a_pendant_strand_off_it():
 def test_a_three_strand_cycle_is_no_barrel_and_draws_open_without_a_note():
     """Three strands pairing in a triangle, then a run of three more off one of them: a cycle of 3 is no barrel
     (_BARREL_MIN 5), so the sheet is drawn open, the run in a row; no note calls it a barrel drawn open (fix round 3,
-    the review: the note named a barrel here)."""
+    the review: the note named a barrel here); the note names the pairing it does not draw side by side."""
     from foldmap.layout import sheet_notes
 
     t = [fake(20 * k, 20 * k + 9) for k in range(6)]
@@ -85,7 +85,7 @@ def test_a_three_strand_cycle_is_no_barrel_and_draws_open_without_a_note():
     br += ladder(t[2], t[3], "A", 5) + ladder(t[3], t[4], "A", 5) + ladder(t[4], t[5], "A", 5)
     (sh,) = build_sheets(t, br)
     assert not sh.closed and not sh.unclosed and len(sh.strands) == 6
-    assert sheet_notes([sh]) == []
+    assert sheet_notes([sh]) == [f"pairings not drawn side by side: {t[0].id} also pairs with {t[2].id}"]
 
 
 def test_a_five_ring_with_a_tail_on_a_path_tree_draws_closed():
@@ -312,3 +312,19 @@ def test_ompf_barrel_has_16_strands_its_n_terminal_strand_beside_a9_23():
     ids = [s.id for s in barrel.strands]
     assert len(ids) == 16 and abs(ids.index("A:9-23") - ids.index("A:36-50")) == 1
     assert [(a.strand.id, a.parent.id) for a in barrel.accessory] == [("A:2-6", "A:9-23")]
+
+
+def test_a_rings_chords_are_named():
+    """Fix round 3 (the review): 9P1X's 9-ring has chords (O:29-36/P:28-35) its drawing cannot show side by side;
+    Sheet.chords holds them, and the notes and summary name them ("also pairs with")."""
+    from foldmap.layout import sheet_notes
+
+    ring, _, (sh,) = _ring_sheet(6)
+    extra = ladder(ring[1], ring[4], "A", 4)
+    ring2 = build_sheets(
+        ring,
+        [b for k in range(5) for b in ladder(ring[k], ring[k + 1], "A", 6)] + ladder(ring[-1], ring[0], "A", 3) + extra,
+    )
+    (sh,) = ring2
+    assert [(a.start, b.start) for a, b in sh.chords] in ([(20, 80)], [(80, 20)])
+    assert any("pairings not drawn side by side" in n for n in sheet_notes([sh]))

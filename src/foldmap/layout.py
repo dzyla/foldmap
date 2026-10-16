@@ -3111,26 +3111,36 @@ def _domain_units(
 UNCLOSED = "barrel closure not supported by pairing: drawn open"
 
 
+def accessory_lines(sheet: Sheet, unshown: list[tuple[str, str]] = ()) -> list[str]:
+    """One line per pairing a sheet draws off its run of paired strands or not at all, worded once for the notes
+    (sheet_notes) and `foldmap summary`: each accessory strand with its partner, "D:662-666 drawn beside its partner
+    D:645-659", or, drawn away from it (`unshown`: no height level with it was free, _column_heights), "x:67-68 also
+    pairs with x:79-86"; and each pairing of its track not drawn side by side (Sheet.chords: 9P1X's ring chords),
+    "O:29-36 also pairs with P:28-35"."""
+    away = set(unshown)
+    out = [
+        f"{a.strand.id} also pairs with {a.parent.id}"
+        if (a.strand.id, a.parent.id) in away
+        else f"{a.strand.id} drawn beside its partner {a.parent.id}"
+        for a in sheet.accessory
+    ]
+    return out + [f"{a.id} also pairs with {b.id}" for a, b in sheet.chords]
+
+
 def sheet_notes(sheets: list[Sheet], unshown: list[tuple[str, str]] = ()) -> list[str]:
     """What the figure says of its sheets: each sheet whose pairing closes a cycle but whose ends do not pair
     (Sheet.unclosed), drawn open (UNCLOSED, then its end strands); the pairings joining barrels drawn apart
-    (Sheet.joined); then every strand drawn off a sheet's run of paired strands (Sheet.accessory), each named with
-    its partner: "D:662-666 drawn beside its partner D:645-659" (fix round 1), or, drawn away from it (`unshown`,
-    _column_heights: its partner's ends were taken), "x:67-68 also pairs with x:79-86" (fix round 2)."""
+    (Sheet.joined); then every pairing drawn off a sheet's run of paired strands or not drawn (accessory_lines)."""
     out = [f"{UNCLOSED} ({sh.strands[0].id} … {sh.strands[-1].id})" for sh in sheets if sh.unclosed]
     joins = sorted({" with ".join(sorted((a.id, b.id))) for sh in sheets for a, b in sh.joined})
     if joins:  # two barrels of one pairing network (sheets._other_rings), drawn each as its own
         out.append(f"barrels drawn apart, each closed, that also pair: {', '.join(joins)}")
-    away = dict(unshown)
-    acc = [
-        f"{a.strand.id} also pairs with {a.parent.id}"
-        if away.get(a.strand.id) == a.parent.id
-        else f"{a.strand.id} drawn beside its partner {a.parent.id}"
-        for sh in sheets
-        for a in sh.accessory
-    ]
-    if acc:
-        out.append(f"{len(acc)} strand(s) off a sheet's run of paired strands: {'; '.join(acc)}")
+    lines = [line for sh in sheets for line in accessory_lines(sh, unshown)]
+    lone = sum(len(sh.accessory) for sh in sheets)
+    if lone:
+        out.append(f"{lone} strand(s) off a sheet's run of paired strands: {'; '.join(lines[:lone])}")
+    if lines[lone:]:
+        out.append(f"pairings not drawn side by side: {'; '.join(lines[lone:])}")
     return out
 
 
