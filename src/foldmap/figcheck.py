@@ -1169,12 +1169,15 @@ def science_checks(drawn) -> dict[str, list[str] | None]:
     if not lay.sheets:
         return out
     count = bridge_counts(drawn.sses, assign_dssp(drawn.bb).bridges)
+    noted = {  # pairings the notes name as not drawn ("x:67-68 also pairs with x:79-86")
+        tuple(m) for note in lay.sheet_notes for m in re.findall(r"(\S+) also pairs with ([^\s;,]+)", note)
+    }
     for k, ids in enumerate(lay.sheets):
         columns = drawn_columns(lay, k)
         where = {(i, g): c for c, col in enumerate(columns) for i, g in col}
         ghosts = {g.sse.id: g for g in block_ghosts(lay, k)}
         spots = [(i, c, _span(ghosts[i] if g else lay.placed[i]), g) for (i, g), c in where.items()]
-        out["S6"] += [f"sheet {k}: {t}" for t in partner_findings(spots, lay.accessory)]
+        out["S6"] += [f"sheet {k}: {t}" for t in partner_findings(spots, lay.accessory, noted)]
         s1, s2 = neighbour_findings(columns, count)
         out["S1"] += [f"sheet {k}: {t}" for t in s1]
         out["S2"] += [f"sheet {k}: {t}" for t in s2]

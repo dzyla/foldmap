@@ -45,14 +45,16 @@ Columns = list[list[tuple[str, bool]]]
 Spot = tuple[str, int, tuple[float, float] | None, bool]
 
 
-def partner_findings(spots: list[Spot], partner: dict[str, str]) -> list[str]:
+def partner_findings(spots: list[Spot], partner: dict[str, str], noted=frozenset()) -> list[str]:
     """S6 of one sheet: each accessory strand (`partner`: accessory id -> its partner's id) whose partner stands in
     the sheet too must stand in the partner's column, next to it when the spans are known (no strand between them),
-    or in the column beside the partner's, alone there, their spans overlapping when known."""
+    or in the column beside the partner's, alone there, their spans overlapping when known; or, when its partner
+    had no end free for it (fix round 2 ruling: 7ARD), its pairing must be named in the notes (`noted`: (accessory,
+    partner) pairs a note says "also pairs with")."""
     out = []
     real = {i: (c, span) for i, c, span, ghost in spots if not ghost}
     for a, p in sorted(partner.items()):
-        if a not in real or p not in real:
+        if a not in real or p not in real or (a, p) in noted:
             continue
         (ca, sa), (cp, sp) = real[a], real[p]
         others = [(i, span) for i, c, span, _ in spots if c == ca and i != a]

@@ -279,3 +279,64 @@ def test_an_accessory_stands_on_the_same_side_of_its_partner_in_every_copy(path)
         key = (acc.sse.first.seq, par.sse.first.seq)
         sides.setdefault(key, set()).add(np.sign((acc.cy - par.cy) * par.direction[1]))
     assert sides and all(len(s) == 1 for s in sides.values()), sides
+
+
+def test_s6_a_pairing_not_drawn_passes_when_the_notes_name_it():
+    """Fix round 2 ruling: an accessory whose partner has no end free is drawn at another partner of its own, else
+    beside; its pairing with the partner must then be named in the notes."""
+    from foldmap.science import partner_findings
+
+    spots = [spot("p", 1, -5, 5), spot("q", 2, -5, 5), spot("x", 2, 6, 8)]
+    assert partner_findings(spots, {"x": "p"}) == ["x drawn in q's column, not at its partner p"]
+    assert partner_findings(spots, {"x": "p"}, {("x", "p")}) == []
+
+
+def _branch_sheet():
+    """Seven strands in a row (t0-t6) and a branch off t3: a pairs with t3, c1 and c2 with a only (as 7ARD's
+    x:79-86 with x:97-107, x:58-59 and x:67-68): a has three partners, two ends."""
+    from foldmap.model import Bridge
+    from helpers import fake_sse
+
+    def strand(i, x, y, up=True):
+        return fake_sse("E", 20 * i, 20 * i + 6, (x, y, 0.0), (0.0, 1.0 if up else -1.0, 0.0))
+
+    track = [strand(i, 4.8 * i, 0.0, i % 2 == 0) for i in range(7)]
+    a, c1, c2 = strand(7, 4.8 * 3, 25.0, False), strand(8, 4.8 * 3, 50.0), strand(9, 4.8 * 4, 25.0)
+
+    def ladder(x, y):
+        return [Bridge(x.start + k, y.start + k, "A") for k in range(3)]
+
+    bridges = [b for p, q in zip(track, track[1:]) for b in ladder(p, q)]
+    bridges += ladder(track[3], a) + ladder(a, c1) + ladder(a, c2)
+    return [*track, a, c1, c2], bridges
+
+
+def test_a_strand_with_more_accessories_than_ends_names_the_one_drawn_away():
+    """Fix round 2 (7ARD S6): a's ends hold t3 (below) and c1 (above); c2, with no other partner, stands in the
+    column beside a, and the note says "also pairs with". S6 passes."""
+    from foldmap.frame import Frame
+    from foldmap.layout import build_layout
+
+    sses, bridges = _branch_sheet()
+    sheets = build_sheets(sses, bridges)
+    (sh,) = sheets
+    assert [x.strand.start for x in sh.accessory] == [140, 160, 180]  # a, then c1 and c2 hanging from a
+    frame = Frame(np.zeros(3), np.array([1.0, 0, 0]), np.array([0, 1.0, 0]), np.array([0, 0, 1.0]))
+    lay = build_layout(sses, sheets, frame, attract=False)
+    a, c1, c2 = (lay.placed[x.strand.id] for x in sh.accessory)
+    assert abs(a.cx - lay.placed[sh.strands[3].id].cx) < 1e-9 and abs(c1.cx - a.cx) < 1e-9  # end to end up a's column
+    assert abs(abs(c2.cx - a.cx) - lay.placed[sh.strands[4].id].width) < 1e-6  # beside a
+    (note,) = [n for n in lay.sheet_notes if "off a sheet's run" in n]
+    assert f"{c2.sse.id} also pairs with {a.sse.id}" in note and f"{c1.sse.id} drawn beside its partner" in note
+
+    from foldmap import figcheck
+    from foldmap.science import partner_findings
+
+    noted = {tuple(m) for m in figcheck.re.findall(r"(\S+) also pairs with ([^\s;,]+)", note)}
+    assert noted == {(c2.sse.id, a.sse.id)}
+    (k,) = range(len(lay.sheets))
+    spots = [
+        (i, c, figcheck._span(lay.placed[i]), g) for c, col in enumerate(figcheck.drawn_columns(lay, k)) for i, g in col
+    ]
+    assert [t.split(" drawn")[0] for t in partner_findings(spots, lay.accessory)] == [c2.sse.id]  # not at a
+    assert partner_findings(spots, lay.accessory, noted) == []

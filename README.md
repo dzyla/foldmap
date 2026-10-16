@@ -400,7 +400,8 @@ S1, two strands drawn side by side in a sheet are joined by at least one backbon
 shared column must pair with a strand of its column or the next); S2, a closed barrel's closure (the ghost beside the
 last strand) is; S3, a barrel's strand count is the cycle its pairing makes; S6, a strand off a sheet's run of
 paired strands stands at its partner: end to end with it in its column, or alone in the column beside it, never in
-another strand's column. S4 (ligand and modified-residue marks at their residue) and S5 (automatic domains against a
+another strand's column; a strand whose partner has both ends taken stands at another partner of its own, else
+beside it, and the note names the pairing ("x:67-68 also pairs with x:79-86"). S4 (ligand and modified-residue marks at their residue) and S5 (automatic domains against a
 reference) are not yet measured. `foldmap summary` prints the
 same checks of the sheets as built.
 

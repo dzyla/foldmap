@@ -257,6 +257,7 @@ class Accessory(NamedTuple):
     parent: SSE
     column: int
     direction: int
+    others: tuple = ()  # the other strands of its sheet it pairs with (layout draws it at one when its parent is full)
 
 
 @dataclass(eq=False)

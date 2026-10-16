@@ -159,8 +159,17 @@ def build_sheets(sses: list[SSE], bridges: list[Bridge]) -> list[Sheet]:
         if not cyclic and not ambiguous and len(order) >= _BARREL_MIN and ends in weak:
             closed = True  # a barrel whose last pairing is a lone bridge (DSSP counts it as a ladder too)
         columns = _branch_columns(order, off)
-        accessory = [Accessory(strands[k], strands[p], columns[k], direction[k]) for k, p in off]
         mine = {*order, *(k for k, _ in off)}
+        accessory = [
+            Accessory(
+                strands[k],
+                strands[p],
+                columns[k],
+                direction[k],
+                tuple(strands[q] for q in sorted(sub.neighbors(k)) if q != p and q in mine),
+            )
+            for k, p in off
+        ]
         apart = set(comp_of[comp[0]]) - mine  # strands of its component drawn in another sheet
         joined = [(strands[a], strands[b]) for a in sorted(mine) for b in sorted(graph.neighbors(a)) if b in apart]
         sheets.append(

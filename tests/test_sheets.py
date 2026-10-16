@@ -44,7 +44,7 @@ def test_a_branch_strand_is_kept_off_the_track_beside_its_parent():
     br = ladder(c, a, "A") + ladder(c, b, "A") + ladder(c, d, "A")
     (sh,) = build_sheets([c, a, b, d], br)
     assert sh.ambiguous and [s.start for s in sh.strands] == [20, 0, 40]  # a c b: each pairs with the next
-    ((acc, parent, column, direction),) = sh.accessory
+    ((acc, parent, column, direction, _),) = sh.accessory
     assert acc is d and parent is c and column == 1 and direction == 1  # a c d: + - +; in c's own column
     assert sorted(s.start for s in [*sh.strands, acc]) == [0, 20, 40, 60]
 
@@ -70,7 +70,7 @@ def test_a_barrel_keeps_its_ring_and_draws_a_pendant_strand_off_it():
     ring, (x,), (sh,) = _ring_sheet(6, [(fake(500, 504), 2)])
     assert sh.closed and not sh.unclosed and len(sh.strands) == 6 and set(sh.strands) == set(ring)
     assert {sh.strands[0].start, sh.strands[-1].start} in ({0, 100}, {100, 0})  # cut at the weakest pairing
-    ((acc, parent, column, _),) = sh.accessory
+    ((acc, parent, column, _, _),) = sh.accessory
     assert acc is x and parent is ring[2] and column == sh.strands.index(ring[2])  # end to end with its partner
 
 
