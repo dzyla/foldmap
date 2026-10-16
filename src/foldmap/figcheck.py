@@ -1206,9 +1206,7 @@ def residue_marks(drawn) -> list:
         k = by_key.get(gid[len("linked:") :]) if gid.startswith("linked:") else None
         if k is None:
             continue
-        place = residue_places(drawn, k)
-        if place is not None:
-            out.append((gid[len("linked:") :], tuple(np.mean(patch.get_xy()[:10], axis=0)), place))
+        out.append((gid[len("linked:") :], tuple(np.mean(patch.get_xy()[:10], axis=0)), residue_places(drawn, k)))
     return out
 
 

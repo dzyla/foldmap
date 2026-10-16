@@ -511,3 +511,20 @@ def test_an_accessory_pairing_with_one_of_its_others_is_named_when_not_drawn_bes
     assert f"{x.id} also pairs with {o.id}" in lines(sh, away)
     sh, x, p, o, away, lines = _unshown_case(ox=1.0)
     assert (x.id, o.id) not in away and f"{x.id} also pairs with {o.id}" not in lines(sh, away)
+
+
+def test_s3_reports_an_open_sheet_whose_cycles_cannot_be_counted(monkeypatch):
+    """Final review 6: pairing_cycle gives up (None) past _MAX_CYCLES; an open sheet reports it, as a barrel does."""
+    from foldmap import science
+
+    ring = [f"s{k}" for k in range(5)]
+    pairs = {(ring[k], ring[(k + 1) % 5]): 4 for k in range(5)}
+    monkeypatch.setattr(science, "_MAX_CYCLES", 0)
+    assert science.open_finding("sheet 1", ring, counts(pairs)) == "sheet 1: too many pairing cycles to count"
+
+
+def test_s4_reports_a_mark_with_no_place_found():
+    """Final review 5: a drawn mark whose residue has no place to be judged against is a finding, not skipped."""
+    from foldmap.science import mark_findings
+
+    assert mark_findings([("A:66", (1.0, 1.0), None)]) == ["A:66 is drawn, but no place was found for its residue"]

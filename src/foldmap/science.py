@@ -173,7 +173,9 @@ def open_finding(label: str, ids: Iterable[str], count) -> str | None:
     from .sheets import _BARREL_MIN
 
     cycle = pairing_cycle(ids, count)
-    if cycle is not None and cycle >= _BARREL_MIN:
+    if cycle is None:
+        return f"{label}: too many pairing cycles to count"
+    if cycle >= _BARREL_MIN:
         return f"{label}: drawn open, its pairing closes a ring of {cycle} strands"
     return None
 
@@ -271,9 +273,13 @@ def along(pts, q) -> tuple[float, float]:
 def mark_findings(marks: Iterable[tuple[str, tuple[float, float], Place]]) -> list[str]:
     """S4: each mark (label, centre, place) lies within MARK_SLACK of its place's polyline, and along it, from the
     place's end, no farther than the place's bound plus MARK_SLACK and no nearer than its expected arc less
-    MARK_SLACK. One finding per mark that does not."""
+    MARK_SLACK. One finding per mark that does not, and per mark with no place (None) to be judged against."""
     out = []
-    for label, at, (pts, end, bound, expected) in marks:
+    for label, at, place in marks:
+        if place is None:  # drawn, but no element or loop of its own to judge it against
+            out.append(f"{label} is drawn, but no place was found for its residue")
+            continue
+        pts, end, bound, expected = place
         line = pts if end == 0 else pts[::-1]
         off, arc = along(line, at)
         if off > MARK_SLACK:
