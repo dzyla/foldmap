@@ -471,21 +471,16 @@ def control_for(message: str, last_changed: str | None) -> str | None:
     return f"{label} ({section})" if label else None
 
 
-def notes_text(
-    fallback: list[str], over_labels: list[str], crowded: list[str] = (), page: list[str] = (), sheets: list[str] = ()
-) -> str:
-    """The routing and placement notes under a figure, as one line ('' when there are none): loops with no clear
-    route, loops over a label, ligand marks with no clear spot (Drawn.crowded_marks), what is said of its page
-    (Drawn.page_notes: held at its largest with text under 6 pt; a PNG under 300 dpi) and of its sheets
-    (Drawn.sheet_notes: barrels drawn apart that pair; strands off a sheet's run; pairings not drawn side by side)."""
-    notes = [f"{note[0].upper()}{note[1:]}." for note in [*page, *sheets]]
-    if fallback:
-        notes.append(f"No clear route for {', '.join(fallback)} (drawn as plain curves).")
-    if over_labels:
-        notes.append(f"Drawn over a label or chain end, the only route found: {', '.join(over_labels)}.")
-    if crowded:
-        notes.append(f"{len(crowded)} ligand mark(s) with no clear spot, drawn over other ink: {', '.join(crowded)}.")
-    return " ".join(notes)
+def provenance_caption(items: list[dict]) -> str:
+    """The caption under a figure saying how it was made (Drawn.provenance: what is inferred, ambiguous or moved for
+    readability, as the command line, the MCP server and the figure files say it): the heading and one bullet per
+    item, each text Markdown-escaped (shown); '' when the list is empty."""
+    from foldmap.provenance import HEADING
+
+    if not items:
+        return ""
+    bullets = "\n".join(f"- {shown(i['text'][0].upper() + i['text'][1:], limit=2000)}." for i in items)
+    return f"{HEADING}\n\n{bullets}"
 
 
 def row_source(rows: list[int], choices: list[tuple[str, str]]) -> str | None:

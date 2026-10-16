@@ -349,6 +349,7 @@ def draw_job(path, settings_json: str, eager_after: float | None = None) -> dict
         "chain_count": len(chains_of(drawn)),  # what the summary counts: protein and nucleic-acid chains
         "domains_note": stale_domains_note(spec.domains, drawn.sses),  # a layout file's stale ids, dropped
         "domain_source_note": drawn.layout.domain_note,  # inferred domains said to be; CATH's, or why none
+        "provenance": drawn.provenance,  # how it was made: the list under the figure (provenance)
         "scope": drawn_scope(drawn.model, drawn.layout, spec.assembly, spec.focus),  # what auto choices left out
         "seconds": seconds,
         "files": files,

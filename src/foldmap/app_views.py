@@ -149,26 +149,14 @@ def figure_view(ws: Workspace) -> None:
     with st.container(key="canvas"):
         background = json.loads(good["blob"]).get("background", "#ffffff")
         st.markdown(figure_card(good["svg"], background, ws.name), unsafe_allow_html=True)
-        notes = (
-            app_edits.notes_text(
-                result["fallback"],
-                result["over_labels"],
-                result.get("crowded_marks", []),
-                result.get("page_notes", []),
-                result.get("sheet_notes", []),
-            )
-            if result
-            else ""
-        )
+        made = app_edits.provenance_caption(result.get("provenance", [])) if result else ""
+        if made:  # how it was made: what is inferred, ambiguous or moved, as the command line says it
+            st.caption(made)
         ions = (good.get("scope") or {}).get("na_ions")
         if ions:  # never marked: said, as the command line and MCP notes say it (C33)
             from foldmap.scope import na_ions_text
 
-            notes = "; ".join(part for part in (notes, f"Not drawn: {na_ions_text(ions)}.") if part)
-        if notes:
-            st.caption(shown(notes))
-        if result and result.get("domain_source_note"):  # inferred domains said to be, as the command line does
-            st.caption(shown(result["domain_source_note"][0].upper() + result["domain_source_note"][1:] + "."))
+            st.caption(shown(f"Not drawn: {na_ions_text(ions)}."))
         if result and result.get("domains_note"):  # as the command line warns
             note = result["domains_note"]
             st.warning(shown(f"{note[0].upper()}{note[1:]}. {DOMAINS_EDIT}"))

@@ -474,13 +474,16 @@ def test_a_crowded_ligand_mark_is_in_the_draw_result(monkeypatch):
 def test_a_page_held_at_its_largest_is_in_the_draw_result(monkeypatch):
     """random-100 C4: what is said of the page (Drawn.page_notes: held at layout.MAX_PAGE_IN with its text under
     6 pt; a PNG under 300 dpi) reaches the app's notes under the figure."""
-    from foldmap.app_edits import notes_text
+    from app_helpers import visible
+    from foldmap.app_edits import provenance_caption
     from test_page_text import past_the_largest_page
 
     assert app_jobs.draw_job(DATA / "1UBQ.cif", _blob())["page_notes"] == []
     past_the_largest_page(monkeypatch)
-    notes = app_jobs.draw_job(DATA / "1UBQ.cif", _blob())["page_notes"]
-    assert len(notes) == 2 and notes_text([], [], [], notes).startswith("The page (3 x 2 in) is held at 3 in")
+    out = app_jobs.draw_job(DATA / "1UBQ.cif", _blob())
+    assert len(out["page_notes"]) == 2
+    said = visible(provenance_caption(out["provenance"]))
+    assert "\n- The page (3 x 2 in) is held at 3 in" in said
 
 
 def test_the_png_button_says_the_dpi_its_png_is_written_at(monkeypatch):

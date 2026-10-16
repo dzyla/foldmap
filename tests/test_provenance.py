@@ -179,3 +179,22 @@ def test_the_mcp_result_carries_the_list(tmp_path):
     assert f"; {PENDANT}" in r.content[0].text  # the note, as before
     r = call("draw_topology", {"source": str(DATA / "1UBQ.cif"), "output_path": str(tmp_path / "u.svg")})
     assert r.structured_content["provenance"] == []
+
+
+def test_the_app_job_carries_the_list():
+    import json
+
+    from foldmap import app_jobs
+
+    got = app_jobs.draw_job(DATA / "2LZM.cif", json.dumps({"domains": "auto"}))
+    assert got["provenance"][0]["text"] == T4L_AUTO
+
+
+def test_the_app_shows_the_list_under_the_figure():
+    from app_helpers import opened, visible
+
+    at = opened(DATA / "1EMA.cif")
+    said = [visible(c.value) for c in at.caption if "How this figure was made" in visible(c.value)]
+    assert len(said) == 1 and "A:160-170" in said[0], [c.value for c in at.caption]
+    at = opened(DATA / "1UBQ.cif")
+    assert not any("How this figure was made" in visible(c.value) for c in at.caption)

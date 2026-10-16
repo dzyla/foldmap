@@ -14,8 +14,8 @@ from foldmap.app_edits import (
     control_for,
     element_choices,
     hex_colour,
-    notes_text,
     palette_used,
+    provenance_caption,
     row_source,
     rows_of,
     sync_composites,
@@ -212,16 +212,22 @@ def test_the_failing_control_is_named():
     assert control_for("something else", None) is None
 
 
-def test_route_notes_read_as_one_line():
-    assert notes_text([], []) == ""
-    assert notes_text(["a>b"], ["c>d"]) == (
-        "No clear route for a>b (drawn as plain curves). Drawn over a label or chain end, the only route found: c>d."
-    )
-    assert notes_text([], [], ["HEM:A154"]) == (  # batch B fix round 2: crowded ligand marks are told in the app too
-        "1 ligand mark(s) with no clear spot, drawn over other ink: HEM:A154."
-    )
-    note = "pairings not drawn side by side: O:29-36 also pairs with P:28-35"  # plan 12 Task 2: sheet notes
-    assert notes_text([], [], [], [], [note]) == f"P{note[1:]}."
+def test_how_a_figure_was_made_reads_as_a_list():
+    """Plan 12 R7: the app says how the figure was made under it, as the command line does (Drawn.provenance): the
+    heading, then one escaped bullet per item."""
+    from app_helpers import visible
+
+    assert provenance_caption([]) == ""
+    items = [
+        {"kind": "loops_over_text", "text": "1 loop(s) drawn over a label: c>d", "count": 1, "elements": ["c>d"]},
+        {"kind": "ambiguous_pairing", "text": "pairings not drawn side by side: O:29-36", "count": 1, "elements": []},
+    ]
+    said = provenance_caption(items)
+    assert said.startswith("How this figure was made:\n\n- ")
+    assert visible(said).split("\n\n")[1].split("\n") == [
+        "- 1 loop(s) drawn over a label: c>d.",
+        "- Pairings not drawn side by side: O:29-36.",
+    ]
 
 
 def test_a_table_row_picks_its_structure():
