@@ -775,12 +775,13 @@ def _apart_in_stack_gaps(layout: Layout, router: _Router, loops: list[Loop]) -> 
         grid.near_ports = {(round(cx, 6), round(y0, 6)), (round(cx, 6), round(y1, 6))}
         near = grid._mask([(x0 - (x1 - x0), y0, x1 + (x1 - x0), y1)])
         rows = np.broadcast_to(grid.ys[None, :], near.shape)
-        grid.toll = np.where(near, _GAP_TOLL * (rows - y0) / max(y1 - y0, 1e-9), 0.0)
+        # clipped at 0: cells beside the gap reach past its bottom and top, where a negative toll paid A* to curl
+        grid.toll = np.where(near, _GAP_TOLL * np.clip((rows - y0) / max(y1 - y0, 1e-9), 0.0, None), 0.0)
         new_lo = _route_again(layout, router, lo)
         if new_lo is None:
             grid.toll, grid.near_ports = None, set()
             continue
-        grid.toll = np.where(near, _GAP_TOLL * (y1 - rows) / max(y1 - y0, 1e-9), 0.0)
+        grid.toll = np.where(near, _GAP_TOLL * np.clip((y1 - rows) / max(y1 - y0, 1e-9), 0.0, None), 0.0)
         for c in _cells(grid, new_lo[0]):
             grid.toll[c] += _GAP_TOLL
         new_up = _route_again(layout, router, up)

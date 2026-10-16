@@ -864,3 +864,24 @@ def test_keep_out_boxes_grow_with_larger_text():
         (a0, b0, a1, b1), (c0, d0, c1, d1) = small[key], big[key]
         assert d1 - d0 == pytest.approx(3 * (b1 - b0)) and c1 - c0 == pytest.approx(3 * (a1 - a0 - 0.1) + 0.1)
         assert less[key] == small[key]
+
+
+def test_a_stack_gap_toll_is_never_negative(monkeypatch):
+    """Fix round 4: the toll _apart_in_stack_gaps lays on a gap's cells (rising with the height, or the depth) took
+    cells whose centres lie just past the gap's bottom or top, where it went below zero (8UTF: -4.9). A* then found
+    loops through them cheaper than a turn: a:428-431>a:440-442 curled back over itself (test_matrix). The toll is 0
+    or more, and no loop of 8UTF crosses itself."""
+    from foldmap.cli import make_layout
+
+    seen = []
+    real = route._route_again
+
+    def spy(layout, router, lp):
+        seen.append(float(router.grid.toll.min()))
+        return real(layout, router, lp)
+
+    monkeypatch.setattr(route, "_route_again", spy)
+    lay, sses, bb = make_layout(DATA / "8UTF.cif", "projected")
+    loops = route_loops(lay, sses, bb)
+    assert seen and min(seen) >= 0.0, seen
+    assert not [(l.a_id, l.b_id) for l in loops if not l.fallback and self_crossing(l.points)]
