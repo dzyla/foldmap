@@ -1265,7 +1265,7 @@ def accessories_named(layout) -> list[str]:
     return [
         f"{a} also pairs with {b}"
         for a, b in sorted(map(tuple, getattr(layout, "unshown", [])))
-        if a in layout.accessory
+        if layout.accessory.get(a) == b
     ]
 
 

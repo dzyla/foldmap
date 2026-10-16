@@ -76,12 +76,16 @@ def partner_findings(spots: list[Spot], partner: dict[str, str], unshown=frozens
     else its pairing is among `unshown` (Layout.unshown: (accessory, partner) pairs the notes name)."""
     out = []
     real = {i: (c, span) for i, c, span, ghost in spots if not ghost}
+    stands: dict[str, list] = {}
+    for i, c, span, _ in spots:  # the partner's ghost standing level beside the strand is the partner there
+        stands.setdefault(i, []).append((c, span))
     for a, p in sorted(partner.items()):
         if a not in real or p not in real or (a, p) in unshown:
             continue
-        (ca, sa), (cp, sp) = real[a], real[p]
-        if abs(ca - cp) == 1 and _meet(sa, sp):
+        (ca, sa) = real[a]
+        if any(abs(ca - cp) == 1 and _meet(sa, sp) for cp, sp in stands[p]):
             continue
+        cp = real[p][0]
         where = (
             "in its partner's column"
             if ca == cp

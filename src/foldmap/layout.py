@@ -2895,7 +2895,7 @@ def build_layout(
     lay.ba_rows = _ba_rows(items)  # after the user's swaps
     lay.stack_gaps = _stack_gaps(lay)
     lay.accessory = {a.strand.id: a.parent.id for sh in sheets for a in sh.accessory if a.strand.id in real}
-    lay.unshown = _unshown(real, sheets)
+    lay.unshown = _unshown(real, sheets, ghosts)
     lay.sheet_items = sheet_note_items(sheets, lay.unshown)
     lay.sheet_notes = [i["text"] for i in lay.sheet_items]
     lay.sheet_joins = sorted({tuple(sorted((a.id, b.id))) for sh in sheets for a, b in sh.joined})
@@ -3164,19 +3164,47 @@ def _domain_units(
     return unit, members
 
 
-def _unshown(placed: dict[str, Placed], sheets: list[Sheet]) -> list[tuple[str, str]]:
+def _level_beside(x: Placed, p: Placed) -> bool:
+    """x stands in a column next to p's, their spans overlapping (level with it)."""
+    beside = 1e-6 < abs(x.cx - p.cx) <= max(x.width, p.width) + 1e-6
+    (x0, x1), (p0, p1) = sorted((x.n_port[1], x.c_port[1])), sorted((p.n_port[1], p.c_port[1]))
+    return beside and min(x1, p1) - max(x0, p0) > 1e-6
+
+
+def extra_pairs(sheet: Sheet) -> list[tuple]:
+    """The pairings of a sheet's accessory strands other than with their parent: with a strand in Accessory.others,
+    a strand of the track or another accessory (a pair of two accessories once). Not those of a parent's child,
+    which is that child's own (accessory, parent) pairing."""
+    own = {frozenset((a.strand.id, a.parent.id)) for a in sheet.accessory}
+    out, seen = [], set(own)
+    for a in sheet.accessory:
+        for o in a.others:
+            key = frozenset((a.strand.id, o.id))
+            if key not in seen:
+                seen.add(key)
+                out.append((a.strand, o))
+    return out
+
+
+def _unshown(
+    placed: dict[str, Placed], sheets: list[Sheet], ghosts: list[Placed] = ()
+) -> list[tuple[str, str]]:
     """The (accessory, partner) pairings the figure does not draw side by side, as drawn (after copies take their
-    mates' shapes): an accessory not in a column next to its partner's, or not level with it (spans apart)."""
+    mates' shapes): an accessory not in a column next to its partner's, or not level with it (spans apart). The
+    partner's ghost (a barrel's closure strand) standing level beside it counts as the partner. Also every pairing
+    of an accessory with a strand of Accessory.others (the track, or another accessory) not drawn so."""
+    ghost_of: dict[str, list[Placed]] = {}
+    for g in ghosts:
+        ghost_of.setdefault(g.sse.id, []).append(g)
     out = []
     for sh in sheets:
-        for a in sh.accessory:
-            x, p = placed.get(a.strand.id), placed.get(a.parent.id)
+        pairs = [(a.strand, a.parent) for a in sh.accessory] + extra_pairs(sh)
+        for xs, ps in pairs:
+            x, p = placed.get(xs.id), placed.get(ps.id)
             if x is None or p is None:
                 continue
-            beside = 1e-6 < abs(x.cx - p.cx) <= max(x.width, p.width) + 1e-6
-            (x0, x1), (p0, p1) = sorted((x.n_port[1], x.c_port[1])), sorted((p.n_port[1], p.c_port[1]))
-            if not (beside and min(x1, p1) - max(x0, p0) > 1e-6):
-                out.append((a.strand.id, a.parent.id))
+            if not any(_level_beside(x, q) for q in (p, *ghost_of.get(ps.id, ()))):
+                out.append((xs.id, ps.id))
     return sorted(out)
 
 
@@ -3202,7 +3230,8 @@ def accessory_lines(sheet: Sheet, unshown: list[tuple[str, str]] = (), level: se
         return f"{a.strand.id} drawn beside its partner {a.parent.id}"
 
     out = [line(a) for a in sheet.accessory]
-    return out + [f"{a.id} also pairs with {b.id}" for a, b in sheet.chords]
+    extras = [(a, b) for a, b in extra_pairs(sheet) if (a.id, b.id) in away]  # drawn side by side: nothing to say
+    return out + [f"{a.id} also pairs with {b.id}" for a, b in [*sheet.chords, *extras]]
 
 
 def sheet_note_items(sheets: list[Sheet], unshown: list[tuple[str, str]] = ()) -> list[dict]:
@@ -3227,6 +3256,7 @@ def sheet_note_items(sheets: list[Sheet], unshown: list[tuple[str, str]] = ()) -
         chords += lines[len(sh.accessory) :]
         lone_pairs += [(a.strand.id, a.parent.id) for a in sh.accessory]
         chord_pairs += [(a.id, b.id) for a, b in sh.chords]
+        chord_pairs += [(a.id, b.id) for a, b in extra_pairs(sh) if (a.id, b.id) in set(unshown)]
     if lone:
         named = sum(pair in set(unshown) for pair in lone_pairs)
         text = f"{len(lone)} strand(s) off a sheet's run of paired strands: {'; '.join(lone)}"

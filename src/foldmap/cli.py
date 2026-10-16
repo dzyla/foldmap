@@ -57,7 +57,7 @@ def _level_accessories(path: str) -> set[str]:
         layout, _, _ = make_layout(path, spec.mode, spec.rotate, spec.flip_v, **spec.layout_kwargs())
     except ValueError:
         return set()
-    away = {a for a, _ in layout.unshown}
+    away = {a for a, b in layout.unshown if layout.accessory.get(a) == b}
     return {a for a in layout.accessory if a not in away}
 
 

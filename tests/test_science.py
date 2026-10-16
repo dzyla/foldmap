@@ -473,3 +473,41 @@ def test_1ema_chromophore_star_passes_s4_and_the_old_fraction_would_not(monkeypa
 
     monkeypatch.setattr(render, "residue_point", by_fraction)
     assert science_checks(_drawn(DATA / "1EMA.cif"))["S4"]
+
+
+def _unshown_case(ox, ghost_at=None):
+    """An accessory x (parent p, also pairing with o), strands standing vertically (angle pi/2, length 4, width 1):
+    x at column 0, p at column 5 (apart), o at column `ox`; optionally a ghost of p at column `ghost_at`."""
+    from foldmap.layout import Placed, _unshown, accessory_lines
+    from foldmap.model import Accessory
+    from tests.test_sheets import fake
+
+    x, p, o = fake(0, 9), fake(20, 29), fake(40, 49)
+    sh = Sheet([p, o], [1, 1], ["P"], accessory=[Accessory(x, p, 0, 1, (o,))])
+
+    def at(s, cx, ghost=False):
+        return Placed(s, cx, 0.0, 4.0, np.pi / 2, 1.0, ghost=ghost)
+
+    placed = {x.id: at(x, 0.0), p.id: at(p, 5.0), o.id: at(o, ox)}
+    ghosts = [at(p, ghost_at, True)] if ghost_at is not None else []
+    return sh, x, p, o, _unshown(placed, [sh], ghosts), accessory_lines
+
+
+def test_a_partners_ghost_beside_the_accessory_counts_as_shown():
+    """Final review 3 (8UTF c:440-442): the partner drawn as a ghost level beside the accessory is drawn beside."""
+    _, x, p, o, away, _ = _unshown_case(ox=1.0)
+    assert (x.id, p.id) in away and (x.id, o.id) not in away
+    _, x, p, o, away, _ = _unshown_case(ox=1.0, ghost_at=1.0)
+    assert away == []
+    d = _drawn(DATA / "8UTF.cif")
+    (note,) = [n for n in d.layout.sheet_notes if "c:440-442" in n]
+    assert "c:440-442 drawn beside its partner A:35-57" in note
+
+
+def test_an_accessory_pairing_with_one_of_its_others_is_named_when_not_drawn_beside():
+    """Final review 4: Accessory.others pairings that are not side by side are carried into unshown and named."""
+    sh, x, p, o, away, lines = _unshown_case(ox=8.0)
+    assert sorted(away) == sorted([(x.id, p.id), (x.id, o.id)])
+    assert f"{x.id} also pairs with {o.id}" in lines(sh, away)
+    sh, x, p, o, away, lines = _unshown_case(ox=1.0)
+    assert (x.id, o.id) not in away and f"{x.id} also pairs with {o.id}" not in lines(sh, away)
