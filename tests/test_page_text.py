@@ -115,7 +115,7 @@ def test_a_page_held_at_its_largest_and_a_lower_png_dpi_are_told_on_the_command_
     past_the_largest_page(monkeypatch)
     assert main(["plot", str(DATA / "1UBQ.cif"), "-o", str(out)]) == 0
     err = capsys.readouterr().err
-    assert "foldmap: the page (3 x 2 in) is held at 3 in on its longer side" in err
+    assert "How this figure was made:\n  - the page (3 x 2 in) is held at 3 in on its longer side" in err
     assert "its PNG is " in err and "dpi, not 300" in err
     w, h = int.from_bytes(out.read_bytes()[16:20], "big"), int.from_bytes(out.read_bytes()[20:24], "big")
     assert w * h <= 200_000

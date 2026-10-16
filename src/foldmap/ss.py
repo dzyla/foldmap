@@ -118,8 +118,16 @@ def _join_bulged_pieces(sses: list[SSE], ss: str, bb: Backbone, bridges: list[Br
                 break
             x, y = strands[i], strands[i + 1]
             joined.append(_span(bb, copies(), *_ends([x, y])))
-            sses = [_sse("E", bb, x.start, y.end) if s is x else s for s in sses if s is not y]
+            whole = _sse("E", bb, x.start, y.end)
+            whole.bulges = (*x.bulges, _residues(bb, x.end + 1, y.start - 1), *y.bulges)  # where DSSP split it
+            sses = [whole if s is x else s for s in sses if s is not y]
     return sses
+
+
+def _residues(bb: Backbone, a: int, b: int) -> str:
+    """Residues a..b (indices, one chain) as the notes name them: "A:45-46", or "A:45" for one."""
+    first, last = bb.labels[a], bb.labels[b]
+    return f"{first.chain}:{first.tag}" + (f"-{last.tag}" if b > a else "")
 
 
 def _fit_axis(ca: np.ndarray) -> np.ndarray:
@@ -185,7 +193,8 @@ def _copy_breaks(helices: list[tuple[int, int]], bb: Backbone, copies) -> tuple[
     the residues between in no piece, each piece still a helix's length (_MIN_HELIX_ANY); or the broken copies' two
     runs are joined into one (and a run broken twice so, all three). 7OKA: 225-231 + 233-238 in B and C, 225-238 in
     A: A is cut. One copy of many broken does not cut all the others (7JU4's tubulins). Returns the runs and how
-    many cuts and joins were made (logged at INFO: the README tells the rule)."""
+    many cuts and joins were made (logged at INFO: the README tells the rule), and a residue of each run joined and
+    each piece cut (their elements are named in the notes: provenance)."""
     pairs = [
         (x, y)
         for x, y in zip(helices, helices[1:])
@@ -194,8 +203,9 @@ def _copy_breaks(helices: list[tuple[int, int]], bb: Backbone, copies) -> tuple[
         and bool(bb.prev[x[1] + 1 : y[0] + 1].all())
     ]
     if not pairs:
-        return helices, 0, 0
+        return helices, 0, 0, []
     n_cut = n_joined = 0
+    changed: list[int] = []  # a residue of each run joined and of each piece cut, to name its element by
     at = {(l.chain, l.seq): k for k, l in enumerate(bb.labels)}
     broken: dict[tuple, set[str]] = {}  # (root, last number before the break, first after) -> chains broken there
     for x, y in pairs:
@@ -231,6 +241,7 @@ def _copy_breaks(helices: list[tuple[int, int]], bb: Backbone, copies) -> tuple[
                 skip.add(run)
                 n_joined += 1
             out.append((a, b))
+            changed.append(a)
             continue
         chain = bb.labels[a].chain
         root, lo, hi = ref(a, b)
@@ -243,13 +254,14 @@ def _copy_breaks(helices: list[tuple[int, int]], bb: Backbone, copies) -> tuple[
                 continue
             if end - start + 1 >= _MIN_HELIX_ANY and b - nxt + 1 >= _MIN_HELIX_ANY:
                 pieces.append((start, end))
+                changed += [start, nxt]
                 start = nxt
                 n_cut += 1
         pieces.append((start, b))
         out += pieces
     if n_cut or n_joined:
         log.info("helix pieces matched across copies: %d cut, %d joined", n_cut, n_joined)
-    return out, n_cut, n_joined
+    return out, n_cut, n_joined, changed
 
 
 def build_sses(
@@ -262,7 +274,7 @@ def build_sses(
     globin AB corner; _kinks). A kink split or a bulge join in one copy of a protein is made in its other copies
     too, whatever their angle and up to two residues further apart, so that identical chains are drawn alike; a helix
     DSSP breaks by one or two residues in some copies and not in others is drawn as most copies have it (_copy_breaks;
-    `matched`, a dict, gets the numbers of cuts and joins)."""
+    `matched`, a dict, gets the numbers of cuts and joins, and the ids of the helices they made)."""
     copies = functools.cache(lambda: homolog_chains(bb))  # computed only when some copy splits or joins
     out = [_sse("E", bb, a, b) for a, b in _runs(ss, "E", bb.prev) if b - a + 1 >= _MIN_STRAND]
     helices = [
@@ -270,9 +282,7 @@ def build_sses(
         for a, b in _runs(ss, "HGI", bb.prev)
         if ss[a : b + 1].count("H") >= _MIN_HELIX_H or b - a + 1 >= _MIN_HELIX_ANY
     ]
-    helices, cut, joined = _copy_breaks(helices, bb, copies)
-    if matched is not None:
-        matched.update(cut=cut, joined=joined)
+    helices, n_cut, n_joined, changed = _copy_breaks(helices, bb, copies)
     kinks = {h: _kinks(*h, ss, bb) for h in helices}
     sharp = [_span(bb, copies(), x, y) for h in helices for x, y, angle in kinks[h] if angle > KINK_SPLIT]
     corners: list[int] = []  # residues of a kink between two helix pieces: no element of their own
@@ -291,4 +301,7 @@ def build_sses(
             if b - a + 1 >= _MIN_310 and not taken & set(range(a, b + 1)):
                 out.append(_sse("G", bb, a, b))
     out.sort(key=lambda s: s.start)
+    if matched is not None:
+        ids = [s.id for s in out if s.kind == "H" and any(s.start <= r <= s.end for r in changed)]
+        matched.update(cut=n_cut, joined=n_joined, ids=ids)
     return out

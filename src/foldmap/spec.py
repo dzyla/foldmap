@@ -269,13 +269,17 @@ class Drawn:
         return verify_contacts(self.model, self.beads, self.layout, self.bb) if self.beads else None
 
     @property
+    def provenance(self) -> list[dict]:
+        """How the figure was made (provenance.figure_provenance): what in it is inferred, ambiguous or moved for
+        readability, each {kind, text, count, elements}; [] when nothing beyond the standard method."""
+        return [dict(i) for i in getattr(self.figure, "foldmap_provenance", [])]
+
+    @property
     def stuck(self) -> list[str]:
         """Loops with no clear route, drawn as plain curves, then nucleic-acid strands drawn with no clear way."""
-        from .na_paths import path_name
+        from .provenance import stuck
 
-        out = [f"{l.a_id}>{l.b_id}" for l in self.loops if l.fallback]
-        na = getattr(self.layout, "nucleic", None)
-        return out + [path_name(p, na) for p in getattr(self.layout, "na_paths", []) if p.fallback]
+        return stuck(self.loops, self.layout)
 
     @property
     def crowded_marks(self) -> list[str]:
@@ -300,7 +304,9 @@ class Drawn:
     @property
     def over_labels(self) -> list[str]:
         """Loops routed over a label or a chain-end stub, the only route found (route.Loop.crosses_labels)."""
-        return [f"{l.a_id}>{l.b_id}" for l in self.loops if l.crosses_labels and not l.fallback]
+        from .provenance import over_labels
+
+        return over_labels(self.loops)
 
 
 def draw_spec(spec: FigureSpec) -> Drawn:

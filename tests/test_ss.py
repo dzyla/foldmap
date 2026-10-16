@@ -303,7 +303,7 @@ def test_helix_pieces_matched_across_copies_are_told(caplog):
     matched: dict = {}
     with caplog.at_level(logging.INFO, logger="foldmap.ss"):
         build_sses(bb, assign_dssp(bb).ss, matched=matched)
-    assert matched == {"cut": 1, "joined": 0}
+    assert matched == {"cut": 1, "joined": 0, "ids": ["B:178-196", "B:198-203"]}  # the pieces cut (provenance)
     assert "helix pieces matched across copies: 1 cut, 0 joined" in caplog.text
     lay, _, _ = make_layout(FID / "7TIM.cif.gz")
     assert drawn_scope(read_model(FID / "7TIM.cif.gz"), lay)["helix_matched"] == {"cut": 1, "joined": 0}

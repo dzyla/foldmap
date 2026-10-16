@@ -90,6 +90,8 @@ class SSE:
     centroid: np.ndarray
     axis: np.ndarray  # unit vector, points N-terminal -> C-terminal end
     kinked: bool = False  # a helix piece continuing the one before it past a 3-10/pi kink (ss.build_sses split them)
+    bulges: tuple[str, ...] = ()  # a strand joined across beta-bulges (ss._join_bulged_pieces): each bulge's residues,
+    # e.g. "A:45-46", where DSSP splits it (the notes say so: provenance)
 
     @property
     def id(self) -> str:

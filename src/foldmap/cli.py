@@ -391,6 +391,7 @@ def make_layout(
 
     def finish(lay, faces=None):  # what make_layout sets on a layout after build_layout
         lay.helix_matched = {"cut": matched.get("cut", 0), "joined": matched.get("joined", 0)}
+        lay.helix_matched_ids = list(matched.get("ids", []))
         lay.domain_source, lay.domain_note = (source if lay.domains else ""), named_note
         if lay.domains:  # copies of one domain share a tone
             from .features import domain_tones
@@ -1302,33 +1303,11 @@ def _cmd_figure(args: argparse.Namespace) -> int:
             print(f"wrote {write_page(spec.structure, out, viewer=args.viewer, **spec.page_kwargs())}")
     else:
         drawn = draw_spec(spec)
-        note = scope_note(drawn_scope(drawn.model, drawn.layout, spec.assembly, spec.focus))
+        scope = drawn_scope(drawn.model, drawn.layout, spec.assembly, spec.focus)
+        note = scope_note({**scope, "additives": []})  # the additives hidden are in the list below
         if note:  # an automatic choice drew part of the file
             print(f"foldmap: {note}", file=sys.stderr)
-        if drawn.stuck:
-            print(
-                f"foldmap: warning: no clear route for {len(drawn.stuck)} loop(s) or strand(s), drawn as plain "
-                f"curves that may cross elements: {', '.join(drawn.stuck)}",
-                file=sys.stderr,
-            )
-        if drawn.over_labels:
-            print(
-                f"foldmap: warning: {len(drawn.over_labels)} loop(s) drawn over a label or chain end, the only route "
-                f"found: {', '.join(drawn.over_labels)}",
-                file=sys.stderr,
-            )
-        if drawn.crowded_marks:
-            print(
-                f"foldmap: warning: {len(drawn.crowded_marks)} ligand mark(s) with no clear spot, drawn over other "
-                f"ink: {', '.join(drawn.crowded_marks)}",
-                file=sys.stderr,
-            )
-        for note in drawn.page_notes:  # a page past layout.MAX_PAGE_IN; a PNG under 300 dpi (random-100 C4)
-            print(f"foldmap: {note}", file=sys.stderr)
-        for note in drawn.sheet_notes:  # strands off a sheet's run, with their partner (plan 12)
-            print(f"foldmap: {note}", file=sys.stderr)
-        if drawn.layout.domain_note:  # inferred domains said to be; CATH's named, or why there are none
-            print(f"foldmap: {drawn.layout.domain_note}", file=sys.stderr)
+        print(provenance_block(drawn.provenance), file=sys.stderr, end="")
         for out in args.output:
             print(f"wrote {save(drawn.figure, out)}")
     method = experimental_method(spec.structure) if spec.look.color_by == "plddt" else None
@@ -1342,6 +1321,14 @@ def _cmd_figure(args: argparse.Namespace) -> int:
         laid = drawn if args.command != "interactive" else None  # the figure's own layout, when it has no edits
         print(f"wrote {layoutfile.save(args.save_layout, layout_document(spec, drawn=laid))}")
     return 0
+
+
+def provenance_block(items: list[dict]) -> str:
+    """The command line's "How this figure was made:" block (provenance): the heading, then one indented line per
+    item, those the command line has always warned of starting "warning: "; '' when the list is empty."""
+    from .provenance import HEADING, lines
+
+    return "".join(f"{line}\n" for line in [HEADING, *(f"  - {t}" for t in lines(items, warn=True))]) if items else ""
 
 
 def _cmd_contacts(args: argparse.Namespace) -> int:

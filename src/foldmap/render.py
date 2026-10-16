@@ -83,6 +83,7 @@ from .layout import (
 from .model import SSE, group_by_chain
 from .na_paths import midway
 from .palette import BACK_SHADE, PALETTES, chain_colors, darken, delta_e, text_color_on, tint
+from .provenance import as_text, figure_provenance, with_desc
 from .route import Loop, boxes_meeting, clip_len, clip_lengths
 from .style import _ALIASES, CHOICES, MODALITIES, Style, backbone_overrides
 
@@ -3133,6 +3134,7 @@ def _draw_elements(c: _Canvas, layout: Layout, bars=()) -> None:
     """The strands, 3-10 helices and helices, with their labels; a strand's letter slides along its shaft off the
     disulfide bars (`bars`: their routes) that pass under it (strand_label_spot)."""
     keep = link_keep(c.lw * 2.4, c.pt_per_unit, c.fig.dpi)
+    c.fig.foldmap_moved_letters = []  # strand letters off their arrow's centre (provenance: names moved)
     for p in layout.placed.values():
         color = c.element_colour[p.sse.id]
         outline = c.look.fill == "outline"
@@ -3147,8 +3149,11 @@ def _draw_elements(c: _Canvas, layout: Layout, bars=()) -> None:
             patch.set_gid(f"strand:{p.sse.id}")
             c.ax.add_patch(patch)
             if c.look.labels:
+                spot = strand_label_spot(p, p.label, bars, c.font / c.pt_per_unit, keep)
+                if spot != (p.cx, p.cy):
+                    c.fig.foldmap_moved_letters.append(p.sse.id)
                 t = c.ax.text(
-                    *strand_label_spot(p, p.label, bars, c.font / c.pt_per_unit, keep),
+                    *spot,
                     p.label,
                     ha="center",
                     va="center",
@@ -3495,6 +3500,8 @@ def _draw(
     _draw_legend(c, layout, legend)
     if title:
         _draw_title(c, title)
+    # how it was made, last: what is inferred, ambiguous or moved (Drawn.provenance; save writes it into the file)
+    c.fig.foldmap_provenance = figure_provenance(c.fig, layout, loops, labels=c.look.labels)
     return c.fig
 
 
@@ -3505,7 +3512,7 @@ def save_svg(fig: Figure) -> str:
     buf = _io.StringIO()
     with rc_context({"svg.fonttype": "none", "svg.hashsalt": "foldmap", **_RC}):
         fig.savefig(buf, format="svg", metadata={"Date": None}, facecolor=fig.get_facecolor())
-    text = buf.getvalue()
+    text = with_desc(buf.getvalue(), getattr(fig, "foldmap_provenance", []))
     return text[text.index("<svg") :]
 
 
@@ -3531,15 +3538,27 @@ def page_notes(fig: Figure) -> list[str]:
 
 
 def save(fig: Figure, path: str | FsPath, dpi: int = PNG_DPI) -> FsPath:
-    """The figure as .svg, .pdf or .png (at `dpi`, at most png_dpi's)."""
+    """The figure as .svg, .pdf or .png (at `dpi`, at most png_dpi's), with how it was made (Drawn.provenance) in
+    the file: the SVG's <desc>, the PDF's Subject, the PNG's Description (none when there is nothing to say)."""
+    import io as _io
+
     path = FsPath(path)
     fmt = _EXT.get(path.suffix.lower())
     if fmt is None:
         raise ValueError(f"unsupported extension {path.suffix!r}; use .svg, .pdf or .png")
     path.parent.mkdir(parents=True, exist_ok=True)
     meta = {"svg": {"Date": None}, "pdf": {"CreationDate": None}, "png": {"Software": None}}[fmt]
+    items = getattr(fig, "foldmap_provenance", [])
+    if items and fmt != "svg":
+        meta[{"pdf": "Subject", "png": "Description"}[fmt]] = as_text(items)
     if fmt == "png":
         dpi = min(dpi, png_dpi(fig))
     with rc_context({"svg.fonttype": "none", "pdf.fonttype": 42, "svg.hashsalt": "foldmap", **_RC}):
-        fig.savefig(path, format=fmt, dpi=dpi, metadata=meta, facecolor=fig.get_facecolor())
+        if items and fmt == "svg":  # written as matplotlib writes it, with the <desc> added
+            buf = _io.StringIO()
+            fig.savefig(buf, format=fmt, dpi=dpi, metadata=meta, facecolor=fig.get_facecolor())
+            with open(path, "w", encoding="utf-8") as fh:
+                fh.write(with_desc(buf.getvalue(), items))
+        else:
+            fig.savefig(path, format=fmt, dpi=dpi, metadata=meta, facecolor=fig.get_facecolor())
     return path

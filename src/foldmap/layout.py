@@ -267,6 +267,7 @@ class Layout:
     accessory: dict[str, str] = field(default_factory=dict)  # a strand drawn off its sheet's track (Sheet.accessory),
     # beside its parent -> that parent's id: no barrel strand (science S3)
     sheet_notes: list[str] = field(default_factory=list)  # what is said of the sheets as drawn (sheet_notes)
+    sheet_items: list[dict] = field(default_factory=list)  # the same as provenance items (sheet_note_items)
     # (accessory, partner) pairings drawn apart: no height level with the partner was free (_column_heights); the
     # notes name them ("also pairs with"), science S6 reads them
     unshown: list[tuple[str, str]] = field(default_factory=list)
@@ -284,6 +285,7 @@ class Layout:
     # and mate alike (a sheet block among them is drawn as its mate is: figcheck.shared_sheet_elements)
     font_scale: float = 1.0  # Style.font_scale the figure is drawn with (texts placed in the layout are sized by it)
     helix_matched: dict = field(default_factory=dict)  # {"cut", "joined"}: helix pieces made alike in copies (ss)
+    helix_matched_ids: list[str] = field(default_factory=list)  # the helices those cuts and joins made
     na_letter_rows: tuple[float | None, bool] = (None, False)  # where a stem's base letters sit (NT_ROW, 0 on the
     # rails, None: not drawn) and whether single-stranded letters are drawn, as render draws them (na_text_boxes)
     ligands: str = "auto"  # Style.ligands the figure is drawn with (auto hides additives: scope.drawn_scope names them)
@@ -2894,7 +2896,8 @@ def build_layout(
     lay.stack_gaps = _stack_gaps(lay)
     lay.accessory = {a.strand.id: a.parent.id for sh in sheets for a in sh.accessory if a.strand.id in real}
     lay.unshown = _unshown(real, sheets)
-    lay.sheet_notes = sheet_notes(sheets, lay.unshown)
+    lay.sheet_items = sheet_note_items(sheets, lay.unshown)
+    lay.sheet_notes = [i["text"] for i in lay.sheet_items]
     lay.sheet_joins = sorted({tuple(sorted((a.id, b.id))) for sh in sheets for a, b in sh.joined})
     lay.on_sheet = {
         m.sse.id: [x.sse.id for x in it.members if x.sse.kind == "E" and not x.ghost]
@@ -3202,23 +3205,42 @@ def accessory_lines(sheet: Sheet, unshown: list[tuple[str, str]] = (), level: se
     return out + [f"{a.id} also pairs with {b.id}" for a, b in sheet.chords]
 
 
-def sheet_notes(sheets: list[Sheet], unshown: list[tuple[str, str]] = ()) -> list[str]:
-    """What the figure says of its sheets: the pairings joining barrels drawn apart (Sheet.joined); then every
-    pairing drawn off a sheet's run of paired strands or not drawn (accessory_lines)."""
+def sheet_note_items(sheets: list[Sheet], unshown: list[tuple[str, str]] = ()) -> list[dict]:
+    """What the figure says of its sheets, as provenance items (kind ambiguous_pairing: text, count, elements): the
+    pairings joining barrels drawn apart (Sheet.joined); then every pairing drawn off a sheet's run of paired strands
+    or not drawn (accessory_lines), with how many accessories are named only, not drawn level with their partner
+    (`unshown`, plan 12 ruling); then the pairings of a track not drawn side by side (Sheet.chords)."""
     out = []
-    joins = sorted({" with ".join(sorted((a.id, b.id))) for sh in sheets for a, b in sh.joined})
-    if joins:  # two barrels of one pairing network (sheets._other_rings), drawn each as its own
-        out.append(f"barrels drawn apart, each closed, that also pair: {', '.join(joins)}")
-    lone, chords = [], []  # each sheet's own lines: its accessories first, then its chords (accessory_lines)
+
+    def item(text: str, count: int, pairs) -> dict:
+        ids = list(dict.fromkeys(i for pair in pairs for i in pair))
+        return {"kind": "ambiguous_pairing", "text": text, "count": count, "elements": ids}
+
+    joined = sorted({tuple(sorted((a.id, b.id))) for sh in sheets for a, b in sh.joined})
+    if joined:  # two barrels of one pairing network (sheets._other_rings), drawn each as its own
+        joins = ", ".join(" with ".join(pair) for pair in joined)
+        out.append(item(f"barrels drawn apart, each closed, that also pair: {joins}", len(joined), joined))
+    lone, chords, lone_pairs, chord_pairs = [], [], [], []  # each sheet's accessories first, then its chords
     for sh in sheets:
         lines = accessory_lines(sh, unshown)
         lone += lines[: len(sh.accessory)]
         chords += lines[len(sh.accessory) :]
+        lone_pairs += [(a.strand.id, a.parent.id) for a in sh.accessory]
+        chord_pairs += [(a.id, b.id) for a, b in sh.chords]
     if lone:
-        out.append(f"{len(lone)} strand(s) off a sheet's run of paired strands: {'; '.join(lone)}")
+        named = sum(pair in set(unshown) for pair in lone_pairs)
+        text = f"{len(lone)} strand(s) off a sheet's run of paired strands: {'; '.join(lone)}"
+        if named:  # drawn away from their partner: the note is all that pairs them
+            text += f" ({named} not level with their partner, named only)"
+        out.append(item(text, len(lone), lone_pairs))
     if chords:
-        out.append(f"pairings not drawn side by side: {'; '.join(chords)}")
+        out.append(item(f"pairings not drawn side by side: {'; '.join(chords)}", len(chords), chord_pairs))
     return out
+
+
+def sheet_notes(sheets: list[Sheet], unshown: list[tuple[str, str]] = ()) -> list[str]:
+    """What the figure says of its sheets, as text (sheet_note_items)."""
+    return [i["text"] for i in sheet_note_items(sheets, unshown)]
 
 
 def block_ghosts(layout: Layout, k: int) -> list[Placed]:
