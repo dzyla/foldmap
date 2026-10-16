@@ -125,28 +125,29 @@ def test_residue_point_lies_on_its_element():
 
 @pytest.mark.parametrize("name, strict", [("2JTY", True), ("6ZS5", False)])  # 6ZS5: bridges inside one sheet
 def test_layout_pulls_bridged_cysteines_together(name, strict, monkeypatch):
+    """Measured where the layout's springs act (cli._bridge_springs): each cysteine at cli._cys_place, its own
+    element's axis or the nearest element end, not where render.residue_point marks a loop residue (R3: along the
+    routed loop, which the springs do not see)."""
     import foldmap.cli as cli
-    from foldmap.render import residue_point
-    from foldmap.route import route_loops
 
     path = DATA / f"{name}.cif"
 
     def mean_bar():
         lay, sses, bb = make_layout(path)
-        loops = route_loops(lay, sses, bb)
-        ends = [
-            (residue_point(lay, loops, sses, bb, i), residue_point(lay, loops, sses, bb, j))
-            for i, j in lay.links.disulfides
-        ]
-        return np.mean([np.hypot(a[0] - b[0], a[1] - b[1]) for a, b in ends])
+
+        def at(r):
+            sid, t = cli._cys_place(bb, sses, r)
+            p = lay.placed[sid]
+            return np.add(p.n_port, t * np.subtract(p.c_port, p.n_port))
+
+        ends = [(at(i), at(j)) for i, j in lay.links.disulfides]
+        return np.mean([np.hypot(*(a - b)) for a, b in ends])
 
     pulled = mean_bar()
     monkeypatch.setattr(cli, "_bridge_contacts", lambda *a: {})
     monkeypatch.setattr(cli, "_bridge_springs", lambda *a: [])
     free = mean_bar()
-    # shorter where blocks can move, never longer; 0.05 for a loop residue's bar end, now a step of 0.5 per residue
-    # from its element's end (R3), not a fraction of the loop
-    assert pulled < free if strict else pulled <= free + 0.05
+    assert pulled < free if strict else pulled <= free + 1e-3  # shorter where blocks can move, never longer
 
 
 @pytest.mark.parametrize("name", ["2JTY", "8UTF"])
