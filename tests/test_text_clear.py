@@ -18,11 +18,21 @@ from foldmap.layout import (
     lines_meeting,
     overlaps_any,
     page_text,
+    segments_of,
     tail_counts,
     thin_boxes,
 )
 from foldmap.provenance import figure_provenance
-from foldmap.render import _COUNT_AT, _COUNT_RUNS, _count_spots, _draw, ligand_marks, linked_marks, loop_counts
+from foldmap.render import (
+    _COUNT_AT,
+    _COUNT_RUNS,
+    _count_spots,
+    _draw,
+    drawn_lines,
+    ligand_marks,
+    linked_marks,
+    loop_counts,
+)
 from foldmap.route import clip_len
 from foldmap.spec import draw_spec, figure_spec
 
@@ -125,6 +135,24 @@ def test_a_count_keeps_from_the_line_itself_as_figcheck_reads_it():
     assert lines_meeting(box, [(-1.0, near, 2.0, near), (-1.0, far, 2.0, far)], band)[:, 0].tolist() == [True, False]
     unit = page_text(lay)[1]
     assert band == pytest.approx((line_pt(1 / (72 * unit)) * lay.loop_stroke / 2 + 0.72) * unit)
+
+
+def test_a_count_keeps_off_a_loop_as_drawn_not_its_route():
+    """Fix round 1 (random-100 6FY9, newly failing on the exact test): a count tucked into the inside of a loop's
+    corner, clear of the route's two legs, sat on the rounded corner drawn there. Counts keep off the loops as drawn
+    (render.drawn_lines: the corners rounded or smoothed as _draw_loops draws them, flattened as figcheck reads
+    them)."""
+    from foldmap.route import Loop
+    from foldmap.style import Style
+
+    lay = drawn(R100 / "9ON5-A.cif.gz").layout
+    band = line_band(lay)
+    corner = Loop("x", "y", [(0.0, -3.0), (0.0, 0.0), (3.0, 0.0)], False, False)  # up, then right: an L
+    d = band * 1.2  # inside the corner, just clear of both legs
+    box = (d, -d - 0.25, d + 0.6, -d)
+    route = segments_of([corner.points])
+    (curve,) = drawn_lines(lay, [corner], Style())
+    assert not lines_meeting(box, route, band).any() and lines_meeting(box, segments_of([curve]), band).any()
 
 
 def test_loop_count_spots_run_along_its_runs_until_none_is_clear():

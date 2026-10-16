@@ -13,6 +13,7 @@ from contextlib import contextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass, replace
 from pathlib import Path as FsPath
+from types import SimpleNamespace
 from typing import NamedTuple
 
 import numpy as np
@@ -2692,12 +2693,13 @@ def _count_spots(pts: np.ndarray, half) -> list[tuple[int, tuple[float, float, f
     return out
 
 
-def loop_counts(layout: Layout, loops: list[Loop], sses: list[SSE], tails=None, hidden=None) -> list[dict]:
+def loop_counts(layout: Layout, loops: list[Loop], sses: list[SSE], tails=None, hidden=None, drawn=None) -> list[dict]:
     """The residue count ("NN aa") of each loop of at least LONG_LOOP residues: name (a>b), text, centre and ink box
     (page units, sized from the drawn text as tail counts are). Its place is the first of its spots (_count_spots:
     beside its runs, longest first) where its ink is clear (layout.clear_inks, as figcheck's A6 reads it) of
-    elements, text (label_boxes, tail counts), the counts placed before and every loop's and nucleic-acid strand's
-    line but the run itself, on the page. A count with no clear spot is left out, never drawn over ink:
+    elements, text (label_boxes, tail counts), the counts placed before, every other loop's line as drawn (`drawn`:
+    drawn_lines, else the routes), every nucleic-acid strand's and its own route's but the run it sits beside, on
+    the page. A count with no clear spot is left out, never drawn over ink:
     {"kind": "loop", "name", "text"} is appended to `hidden` (a list), which the figure's provenance lists
     (counts_hidden). Placed after routing: no keep-out."""
     em = _ink_em(layout, layout.font_scale) or text_em(layout.width or 1.0) * layout.font_scale
@@ -2707,8 +2709,9 @@ def loop_counts(layout: Layout, loops: list[Loop], sses: list[SSE], tails=None, 
         t["box"] for t in (tails if tails is not None else tail_counts(layout, sses, loops))
     ]
     lines = [segments_of([lp.points]) for lp in loops]
+    seen = lines if drawn is None else [segments_of([pts]) for pts in drawn]  # other loops: as drawn
     strands = segments_of([path.points for path in layout.na_paths])  # nucleic-acid strands' lines
-    page = count_page(layout, np.concatenate([strands, *lines]))
+    page = count_page(layout, np.concatenate([strands, *seen]))
     out = []
     for i, loop in enumerate(loops):
         a, b = by_id.get(loop.a_id), by_id.get(loop.b_id)
@@ -2719,7 +2722,7 @@ def loop_counts(layout: Layout, loops: list[Loop], sses: list[SSE], tails=None, 
         spots = _count_spots(np.asarray(loop.points, float), count_half(text, size))
         ink = count_half(text, size, 0.0)
         inks = [centred_box((x0 + x1) / 2, (y0 + y1) / 2, *ink) for _, (x0, y0, x1, y1) in spots]
-        others = np.concatenate([strands, *(seg for k, seg in enumerate(lines) if k != i)])
+        others = np.concatenate([strands, *(seg for k, seg in enumerate(seen) if k != i)])
         ok = clear_inks(inks, taken, others, layout, page)
         own = lines_meeting(inks, lines[i], line_band(layout))  # its own segments, but the run it sits beside
         ok &= ~np.array([own[np.arange(len(own)) != j, k].any() for k, (j, _) in enumerate(spots)], bool)
@@ -2734,22 +2737,43 @@ def loop_counts(layout: Layout, loops: list[Loop], sses: list[SSE], tails=None, 
     return out
 
 
+def _loop_boxes(layout: Layout) -> np.ndarray:
+    """The element boxes a curved loop's corners keep out of (_smooth_path), a hair inside each."""
+    boxes = np.array([p.rect for p in [*layout.placed.values(), *layout.ghosts]]).reshape(-1, 4)  # none: DNA only
+    return boxes + [1e-6, 1e-6, -1e-6, -1e-6]
+
+
+def _loop_path(loop: Loop, look: Style, boxes: np.ndarray) -> Path:
+    """A loop's line as drawn: a fallback curve as it is, else the route with smooth (Style.loops curved) or rounded
+    corners."""
+    if loop.fallback:  # already a smooth curve
+        return _polyline(loop.points)
+    if look.loops == "curved":
+        return _smooth_path(loop.points, boxes)
+    return _rounded_path(loop.points)
+
+
+def drawn_lines(layout: Layout, loops: list[Loop], look: Style) -> list[np.ndarray]:
+    """Each loop's line as drawn (_loop_path), its curves flattened as figcheck reads them (Path.to_polygons): the
+    lines the counts placed after routing keep from (loop_counts, layout.tail_counts)."""
+    boxes = _loop_boxes(layout)
+    out = []
+    for loop in loops:
+        pieces = _loop_path(loop, look, boxes).to_polygons(closed_only=False) if len(loop.points) > 1 else []
+        out.append(np.concatenate(pieces) if pieces else np.asarray(loop.points, float).reshape(-1, 2))
+    return out
+
+
 def _draw_loops(c: _Canvas, layout: Layout, loops: list[Loop], sses: list[SSE], lcounts=None) -> None:
     """Each loop: a casing in the background colour, its coloured line, arrows, residue runs and length labels."""
-    boxes = np.array([p.rect for p in [*layout.placed.values(), *layout.ghosts]]).reshape(-1, 4)  # none: DNA only
-    boxes = boxes + [1e-6, 1e-6, -1e-6, -1e-6]
+    boxes = _loop_boxes(layout)
     sse_by_id = {s.id: s for s in sses}
     over = c.backbone[1]
     counts = {count["name"]: count for count in (lcounts if lcounts is not None else loop_counts(layout, loops, sses))}
     lifted = {k for k, p in layout.placed.items() if p.over}  # helices over a sheet: their loops lie on it too
     for i, loop in enumerate(loops):
         z = (_OVER_LOOP_Z if lifted & {loop.a_id, loop.b_id} else Z["loop"]) + i * 1e-3
-        if loop.fallback:  # already a smooth curve
-            path = _polyline(loop.points)
-        elif c.look.loops == "curved":
-            path = _smooth_path(loop.points, boxes)
-        else:
-            path = _rounded_path(loop.points)
+        path = _loop_path(loop, c.look, boxes)
         name = f"{loop.a_id}>{loop.b_id}"
         casing = PathPatch(
             path,
@@ -3482,8 +3506,10 @@ def _draw(
     if not layout.placed and not layout.stems and not layout.na_paths:
         return _empty_figure()
     hidden: list[dict] = []  # counts with no clear spot, left out (provenance: counts_hidden)
-    tails = tail_counts(layout, sses, loops, hidden)  # placed once: every text that keeps off them gets these boxes
-    lcounts = loop_counts(layout, loops, sses, tails, hidden)
+    drawn = drawn_lines(layout, loops, look)  # the loops' lines as drawn, which the counts keep off
+    as_drawn = [SimpleNamespace(points=pts) for pts in drawn]
+    tails = tail_counts(layout, sses, as_drawn, hidden)  # placed once: every text that keeps off them gets these boxes
+    lcounts = loop_counts(layout, loops, sses, tails, hidden, drawn)
     counts = [t["box"] for t in [*tails, *lcounts]]
     marks = ligand_marks(layout, loops, sses, look, counts)
     linked = linked_marks(layout, loops, sses, marks)
