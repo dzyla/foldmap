@@ -3130,19 +3130,28 @@ def _unshown(placed: dict[str, Placed], sheets: list[Sheet]) -> list[tuple[str, 
     return sorted(out)
 
 
-def accessory_lines(sheet: Sheet, unshown: list[tuple[str, str]] = ()) -> list[str]:
+def accessory_lines(sheet: Sheet, unshown: list[tuple[str, str]] = (), level: set[str] | None = None) -> list[str]:
     """One line per pairing a sheet draws off its run of paired strands or not at all, worded once for the notes
     (sheet_notes) and `foldmap summary`: each accessory strand with its partner, "D:662-666 drawn beside its partner
     D:645-659", or, drawn away from it (`unshown`: no height level with it was free, _column_heights), "x:67-68 also
     pairs with x:79-86"; and each pairing of its track not drawn side by side (Sheet.chords: 9P1X's ring chords),
-    "O:29-36 also pairs with P:28-35"."""
+    "O:29-36 also pairs with P:28-35". `level`, for `foldmap summary` (which reads a figure from outside): the
+    accessories that figure draws level beside their partner; any other, drawn away or not drawn (focus), reads
+    "A1:2-6 pairs with A1:9-23 (off the run)"."""
     away = set(unshown)
-    out = [
-        f"{a.strand.id} also pairs with {a.parent.id}"
-        if (a.strand.id, a.parent.id) in away
-        else f"{a.strand.id} drawn beside its partner {a.parent.id}"
-        for a in sheet.accessory
-    ]
+
+    def line(a) -> str:
+        if level is not None:
+            return (
+                f"{a.strand.id} drawn beside its partner {a.parent.id}"
+                if a.strand.id in level
+                else f"{a.strand.id} pairs with {a.parent.id} (off the run)"
+            )
+        if (a.strand.id, a.parent.id) in away:
+            return f"{a.strand.id} also pairs with {a.parent.id}"
+        return f"{a.strand.id} drawn beside its partner {a.parent.id}"
+
+    out = [line(a) for a in sheet.accessory]
     return out + [f"{a.id} also pairs with {b.id}" for a, b in sheet.chords]
 
 

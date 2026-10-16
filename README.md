@@ -462,8 +462,9 @@ Every figure (command line, app, MCP or Python) goes through the same steps:
    lies on in 3D, level with it: in the next strand's column, end to end with that strand (one column means
    collinear), or in a new column past the sheet's end; never between two strands that pair. When no height level with
    its partner is free there, it stands as near as it can and the note names the pairing ("also pairs with"); so do
-   pairings a ring cannot draw side by side (its chords). `foldmap summary` and the figure's note name each such
-   strand with its partner ("D:662-666 drawn beside its partner D:645-659"). Barrels that pair with one another (the
+   pairings a ring cannot draw side by side (its chords). The figure's note names each such strand with its partner
+   ("D:662-666 drawn beside its partner D:645-659"); `foldmap summary` words each as the default figure draws it,
+   level ("drawn beside its partner") or not ("A1:2-6 pairs with A1:9-23 (off the run)"). Barrels that pair with one another (the
    four OB folds of the SSB tetramer 1EYG) are each drawn closed, as a sheet of its own; the note and the summary name
    the pairings joining them. Helices packed along their length across chains
    form bundles.

@@ -244,6 +244,24 @@ def test_summary_names_the_accessory_strands():
     assert "  D:662-666 drawn beside its partner D:645-659" in text  # worded as the figure's note (accessory_lines)
 
 
+@pytest.mark.parametrize("name", ["2OMF-A", "3L9G-A"])
+def test_summary_words_each_accessory_as_the_figure_draws_it(name):
+    """Fix round 4 (the re-review's N2): summary said "drawn beside its partner" for every accessory, also those the
+    figure draws away from their partner and names (OmpF's three A:2-6, 8 of 3L9G's 16). It now reads the default
+    figure: a level one is "drawn beside its partner Y", the others "pairs with Y (off the run)"."""
+    from foldmap.cli import summarize
+
+    lay = _drawn(R100 / f"{name}.cif.gz").layout
+    away = set(lay.unshown)
+    assert away and len(away) < len(lay.accessory) or name == "2OMF-A"
+    text = summarize(str(R100 / f"{name}.cif.gz"))
+    for a, p in lay.accessory.items():
+        if (a, p) in away:
+            assert f"  {a} pairs with {p} (off the run)" in text and f"{a} drawn beside" not in text
+        else:
+            assert f"  {a} drawn beside its partner {p}" in text and f"{a} pairs with" not in text
+
+
 def test_ssb_draws_each_subunit_its_own_ob_fold_barrel():
     """1EYG (SSB tetramer): the four OB-fold barrels pair across subunits (A:1005-1021 with B:2005-2021). They were
     drawn as two 10-strand "barrels", each with two neighbours that do not pair; a part of a component closing a ring

@@ -48,6 +48,19 @@ from .symmetry import TOLERANCE, detect_symmetry
 _vector, _protomers, _domain_spec = parse_vector, parse_protomers, parse_domains  # older names, used by the app
 
 
+def _level_accessories(path: str) -> set[str]:
+    """The accessory strands the figure `foldmap plot FILE` draws level beside their partner (Layout.accessory less
+    Layout.unshown): `summary` words each accessory as that figure shows it (plan 12 fix round 4). Laid out only,
+    not routed or drawn; none when it cannot be laid out."""
+    spec = figure_spec(path)
+    try:
+        layout, _, _ = make_layout(path, spec.mode, spec.rotate, spec.flip_v, **spec.layout_kwargs())
+    except ValueError:
+        return set()
+    away = {a for a, _ in layout.unshown}
+    return {a for a in layout.accessory if a not in away}
+
+
 def summarize(path: str) -> str:
     model = read_model(path)  # once, for both loaders
     bb = load_backbone(path, model=model)
@@ -67,6 +80,7 @@ def summarize(path: str) -> str:
     for s in sses:
         if s.kind == "H":
             lines.append(f"  helix  {s.id}")
+    level = _level_accessories(path) if any(sh.accessory for sh in sheets) else None
     for n, sh in enumerate(sheets, 1):
         flags = ("closed " if sh.closed else "") + ("ambiguous" if sh.ambiguous else "")
         flags += " drawn open: closure not supported by pairing" if sh.unclosed else ""
@@ -77,7 +91,7 @@ def summarize(path: str) -> str:
             if k < len(sh.pair_kinds):
                 parts.append({"P": "=par=", "A": "=anti=", "?": "=?="}[sh.pair_kinds[k]])
         lines.append("  " + " ".join(parts))
-        lines += [f"  {line}" for line in accessory_lines(sh)]  # off the run, or not drawn side by side
+        lines += [f"  {line}" for line in accessory_lines(sh, level=level)]  # off the run, or not side by side
         lines += [f"  pairs with {b.id}, in another sheet: {a.id}" for a, b in sh.joined]
     if sheets:  # the science checks of the sheets as built (figcheck.science_checks reads them as drawn)
         lines.append("science checks (the sheets as built):")
