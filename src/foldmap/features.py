@@ -184,7 +184,7 @@ DOMAIN_CONTACT = 12.0  # Å between CA atoms: two residues in contact, counted f
 DOMAIN_SEPARATION = 6  # residues apart in sequence at least: nearer pairs are the chain, not the fold
 DOMAIN_NCUT = 0.37  # a part splits when its best cut's normalized cut is below this
 DOMAIN_MIN_RESIDUES = 40  # residues a domain needs
-DOMAIN_MIN_SEGMENT = 20  # residues each piece of a cut needs (a domain may be two pieces: 2LZM's helix A)
+DOMAIN_MIN_SEGMENT = 20  # residues each piece of a cut needs (a domain may be two pieces: 5JDN's alternate)
 DOMAIN_MAX_POINTS = 800  # longer chains are split on blocks of consecutive residues, this many blocks at most
 
 
@@ -192,7 +192,7 @@ def residue_domains(ca: np.ndarray, keep=()) -> np.ndarray:
     """One chain's domains, residue by residue (CA coordinates in chain order): the domain number of each residue,
     numbered by first residue. The chain is cut in two again and again, as long as a part splits clearly: each cut
     takes one or two runs of the part's residues (in sequence) as one side and the rest as the other, so a domain
-    may be discontinuous (T4 lysozyme's C-domain holds helix A, 1-12, and 76-164). The best cut has the lowest
+    may be discontinuous (5JDN's two domains alternate along its chain, as CATH chops it). The best cut has the lowest
     normalized cut (contacts across / contacts of either side, summed: Shi and Malik 2000) over residue contacts
     (DOMAIN_CONTACT, DOMAIN_SEPARATION); it is made when that is below DOMAIN_NCUT and both sides keep
     DOMAIN_MIN_RESIDUES, each piece DOMAIN_MIN_SEGMENT (_best_cut). No cut parts the residues of a group of
@@ -241,7 +241,8 @@ def _best_cut(graph: np.ndarray, least: int, piece: int, whole=()) -> np.ndarray
     size = j - i
     counts = [np.concatenate([[0], np.cumsum(mask)]) for mask in whole]
 
-    def ncut(within, volume, ok):  # rounded: alike on any CPU
+    def ncut(within, volume, ok):  # alike on any CPU: the sums are exact integer counts, each division correctly
+        # rounded; the rounding to 1e-9 only keeps the printed values short, it guards no tie
         with np.errstate(divide="ignore", invalid="ignore"):
             across = volume - within
             value = across / volume + across / (total - volume)
@@ -416,18 +417,28 @@ def _no_strays(domain: list[int], size: list[int]) -> list[int]:
     """Each element's domain (in chain order) with the strays taken home: a run of one domain's elements holding
     fewer than DOMAIN_STRAY element residues, with one other domain's elements on both sides, joins that domain (a
     helix a cut left in the domain across: 1LDM's 247-261 in the Rossmann domain, its panel then reaching over the
-    catalytic one). A run at either end of the chain stays (2LZM's helix A, in the C-domain)."""
+    catalytic one). A run at either end of the chain stays (a terminal helix packed on the other domain). One run
+    moves at a time, the first from the N-terminus, and the runs are read again after each move."""
     out = list(domain)
-    runs = []
-    for k, d in enumerate(out):
-        if runs and runs[-1][0] == d:
-            runs[-1][2] = k + 1
-        else:
-            runs.append([d, k, k + 1])
-    for (before, _, _), (d, a, b), (after, _, _) in zip(runs, runs[1:], runs[2:]):
-        if before == after != d and sum(size[a:b]) < DOMAIN_STRAY:
-            out[a:b] = [before] * (b - a)
-    return out
+    while True:
+        runs = []
+        for k, d in enumerate(out):
+            if runs and runs[-1][0] == d:
+                runs[-1][2] = k + 1
+            else:
+                runs.append([d, k, k + 1])
+        stray = next(
+            (
+                (a, b, before)
+                for (before, _, _), (d, a, b), (after, _, _) in zip(runs, runs[1:], runs[2:])
+                if before == after != d and sum(size[a:b]) < DOMAIN_STRAY
+            ),
+            None,
+        )
+        if stray is None:
+            return out
+        a, b, home = stray
+        out[a:b] = [home] * (b - a)
 
 
 def _chain_domains(

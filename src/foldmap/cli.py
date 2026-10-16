@@ -795,7 +795,11 @@ def _domains(spec, sses, contacts, rows=(), copies=None, lent=frozenset(), bb=No
                 f"domain {name!r}: {i!r} is no element; write a residue range as res:{i}, "
                 "or name elements by label (α1, A:G)"
             )
-        kept = [(name, [i for i in ids if i in known]) for name, ids in spec]
+        seen: set[str] = set()  # each element in one domain: the first that names it
+        kept = []
+        for name, ids in spec:
+            kept.append((name, [i for i in dict.fromkeys(ids) if i in known and i not in seen]))
+            seen.update(kept[-1][1])
         if stale and not getattr(spec, "quiet", False):
             print(f"foldmap: warning: {stale_domains_note(spec, sses)}", file=sys.stderr)
         return [(name, ids) for name, ids in kept if ids]  # already element ids (UniProt domains, a layout file)

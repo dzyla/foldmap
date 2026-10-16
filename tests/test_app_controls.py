@@ -599,3 +599,22 @@ def test_a_consurf_table_has_no_reference_row_and_clears_the_old_one():
     ss = at.session_state
     assert not at.exception and ss["msa_path"].endswith(".txt") and ss["msa_reference"] == ""
     assert "msa_reference" not in widget_keys(at.sidebar, skip=())
+
+
+def test_the_cath_switch_says_it_replaces_the_other_domains(monkeypatch, tmp_path):
+    """Plan 12 Task 3 fix round 1: with CATH domains on, the automatic domains (or a typed table) are not drawn;
+    the domains block says so instead of overriding them silently."""
+    import shutil
+
+    from foldmap import cath
+
+    (tmp_path / "cath").mkdir()
+    shutil.copy(DATA / "cath" / "cath_2lzm.json", tmp_path / "cath")
+    monkeypatch.setattr(cath, "CACHE", tmp_path)
+    at = opened(DATA / "2LZM.cif")
+    at.toggle(key="domains__auto").set_value(True).run()
+    note = "CATH domains are drawn in place of the automatic domains while this is on."
+    assert note not in [c.value for c in at.caption]
+    at.toggle(key="cath_domains").set_value(True).run()
+    assert not at.exception and note in [c.value for c in at.caption]
+    assert 'id="domain:2lzmA00"' in svg_of(at)

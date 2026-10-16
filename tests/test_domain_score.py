@@ -193,9 +193,10 @@ def test_residue_domains_keep_a_group_whole_and_one_domain_alone():
 
 def test_a_stray_element_goes_home():
     """An element run of under DOMAIN_STRAY residues between two runs of another domain joins it (1LDM's 247-261
-    left in the Rossmann domain); a run at the chain's end stays (2LZM's helix A)."""
+    left in the Rossmann domain); a run at the chain's end stays."""
     from foldmap.features import _no_strays
 
     assert _no_strays([0, 0, 1, 0, 0], [10, 10, 15, 10, 10]) == [0, 0, 0, 0, 0]
     assert _no_strays([0, 0, 1, 1, 0], [10, 10, 15, 15, 10]) == [0, 0, 1, 1, 0]  # 30 residues: a domain's piece
     assert _no_strays([1, 0, 0, 0], [12, 10, 10, 10]) == [1, 0, 0, 0]
+    assert _no_strays([0, 1, 0, 1, 0], [5, 5, 5, 5, 5]) == [0, 0, 0, 0, 0]  # the runs as they stand after each move

@@ -7,6 +7,7 @@ import shutil
 import urllib.error
 from pathlib import Path
 
+import numpy as np
 import pytest
 
 from foldmap import cath
@@ -132,3 +133,93 @@ def test_app_job_result_says_the_domains_are_inferred():
     assert (
         got["domain_source_note"] == "domains D1, D2 inferred from residue contacts, not a published domain assignment"
     )
+
+
+def test_a_200_answer_that_is_not_json_is_a_clear_error(cache, monkeypatch):
+    class Page:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+        def read(self):
+            return b"<html>maintenance</html>"
+
+    monkeypatch.setattr(cath.urllib.request, "urlopen", lambda req, timeout=None: Page())
+    with pytest.raises(ValueError, match="PDBe's CATH answer for 1abc is not JSON"):
+        cath.chopping("1ABC")
+    assert not (cache / "cath_1abc.json").exists()
+
+
+def test_no_chopping_is_asked_again_after_30_days(cache, monkeypatch):
+    import os
+    import time
+
+    (cache / "cath_9abc.json").write_text("{}")
+    asked = []
+
+    def answer(req, timeout=None):
+        asked.append(req.full_url)
+        raise urllib.error.HTTPError(req.full_url, 404, "Not Found", {}, io.BytesIO(b"{}"))
+
+    monkeypatch.setattr(cath.urllib.request, "urlopen", answer)
+    assert cath.chopping("9ABC") == [] and asked == []  # fresh: the cached answer
+    old = time.time() - 31 * 24 * 3600
+    os.utime(cache / "cath_9abc.json", (old, old))
+    assert cath.chopping("9ABC") == [] and len(asked) == 1  # a month on: CATH may have chopped it since
+
+
+def test_a_chain_named_like_a_copy_takes_only_its_own_domains(cache):
+    """An author chain "A1" is not a copy of chain "A" when CATH chops both: each takes its own domains, once."""
+    from types import SimpleNamespace
+
+    from foldmap.model import SSE, ResLabel
+
+    labels = [ResLabel(c, n, "", "ALA") for c in ("A", "A1") for n in range(1, 41)]
+    zero = np.zeros(3)
+    sses = [
+        SSE("H", c, k * 40 + 2, k * 40 + 30, labels[k * 40 + 2], labels[k * 40 + 30], zero, zero)
+        for k, c in enumerate(("A", "A1"))
+    ]
+    (cache / "cath_1abc.json").write_text(
+        json.dumps(
+            {
+                "1abc": {
+                    "CATH": {
+                        "1.10.10.10": {
+                            "topology": "t",
+                            "mappings": [
+                                {
+                                    "domain": d,
+                                    "chain_id": c,
+                                    "segment_id": 1,
+                                    "start": {"author_residue_number": 1},
+                                    "end": {"author_residue_number": 40},
+                                }
+                                for d, c in (("1abcA00", "A"), ("1abcA100", "A1"))
+                            ],
+                        }
+                    }
+                }
+            }
+        )
+    )
+    path = cache / "x.cif"
+    path.write_text("data_1ABC\n_entry.id 1ABC\n")
+    got, _ = cath.domains(path, SimpleNamespace(labels=labels), sses)
+    assert got == [("1abcA00 · A", ["A:3-31"]), ("1abcA100 · A1", ["A1:3-31"])]
+
+
+def test_element_id_domains_hold_each_element_once():
+    from foldmap.cli import _domains
+
+    assert _domains([("X", ["A:3-11"]), ("Y", ["A:3-11", "A:14-19"])], _t4l_sses(), {}) == [
+        ("X", ["A:3-11"]),
+        ("Y", ["A:14-19"]),
+    ]
+
+
+def _t4l_sses():
+    _, sses, _ = make_layout(DATA / "2LZM.cif")
+    return sses

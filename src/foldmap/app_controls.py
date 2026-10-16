@@ -486,6 +486,9 @@ def domains_block(st, ss: MutableMapping) -> None:
         help="the published CATH chopping of a PDB entry (fetched from PDBe); with none, the note says so",
         **setting(ss, "cath_domains"),
     )
+    if ss.get("cath_domains") and (ss.get("domains") or "").strip():  # app.layout_options: CATH's win
+        what = "the automatic domains" if ss.get("domains__auto") else "the domains below"
+        st.caption(f"CATH domains are drawn in place of {what} while this is on.")
     if not ss.get("domains__auto"):
         text = st.column_config.TextColumn
         ranges = text("Ranges", width=CELL + 10, help="residue ranges and elements, e.g. A:1-80, α3")

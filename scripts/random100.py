@@ -2152,9 +2152,15 @@ def science_section(entries: list[dict]) -> list[str]:
 
 def domains_section(entries: list[dict]) -> list[str]:
     """report.md's S5 measures: each entry the CATH reference holds, per chain its reference and automatic domain
-    counts, overlap, boundary F1, recall and precision (domain_reference), then their means. Reported, not gated."""
+    counts, overlap, boundary F1, recall and precision (domain_reference), then their means. Reported, not gated;
+    in-sample (the reference chains are the calibration set)."""
     rows = [(e["id"], s) for e in entries for s in e.get("domains_cath") or []]
     lines = ["", "## S5: automatic domains against CATH (reported, not gated)", ""]
+    lines += [
+        "In-sample: these chains are among the 33 the automatic domains were calibrated on "
+        "(tests/data/domains/cath_reference.json); the never-seen check is the fresh set (cath_fresh.json).",
+        "",
+    ]
     if not rows:
         return [*lines, "No entry is in the CATH reference."]
     lines += ["| id | chain | CATH domains | automatic | overlap | boundary F1 | recall | precision |"]

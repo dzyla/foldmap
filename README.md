@@ -270,8 +270,8 @@ A label reference reads the labels the figure shows: the label copies of one pro
 elements a neighbour lends in focus mode (`α2′`) and any `--names`; `--rename` is applied last and wins over all of them.
 
 **Automatic domains are inferred, not published.** `--domains auto` cuts each chain where it has few residue
-contacts across (normalized cuts over CA atoms within 12 Å; a domain may be two pieces of the chain, as T4
-lysozyme's C-domain holds helix A). It is a guess from the coordinates, and the figure says so: the domain bar reads
+contacts across (normalized cuts over CA atoms within 12 Å; a domain may be two pieces of the chain, as in 5JDN,
+whose two domains alternate along it). It is a guess from the coordinates, and the figure says so: the domain bar reads
 "domains inferred from contacts", and the command line, app and MCP notes say "inferred from residue contacts, not a
 published domain assignment". On 33 multi-domain chains chopped by CATH it matches 85 % of the residues to the right
 domain (calling each chain one domain matches 54 %) and finds 88 % of CATH's domain boundaries within 20 residues

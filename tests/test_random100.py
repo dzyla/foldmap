@@ -734,11 +734,14 @@ def test_s5_scores_auto_domains_where_a_cath_reference_exists(r100, tmp_path):
     e = {"id": "1ABC", "name": "1ABC", "views": {"default": {"result": {"science": found}}}, "criteria": crit}
     e = r100._verdict({**e, "domains_cath": [{**low, "n_auto": 4}]})
     assert e["pass"] and r100.science(e)["S5"]["pass"] is False
-    assert "A: overlap 0.60, boundary F1 0.50" in r100.science(e)["S5"]["detail"]
+    assert "A: overlap 0.60, boundary F1 0.50, recall 1.00" in r100.science(e)["S5"]["detail"]
     ok = {**low, "overlap": TARGETS["overlap"], "f1": TARGETS["f1"], "n_auto": 2}
     assert r100.science({**e, "domains_cath": [ok]})["S5"]["pass"] is True
     assert r100.science({**e, "domains_cath": None})["S5"]["pass"] is None
+    missed = {**ok, "recall": 0.5}  # a CATH boundary missed: recall under .85 is a finding too
+    assert "recall 0.50" in r100.science({**e, "domains_cath": [missed]})["S5"]["detail"]
     r100.report([e], tmp_path, None, total=1)
     md = (tmp_path / "report.md").read_text(encoding="utf-8")
     assert "## S5: automatic domains against CATH (reported, not gated)" in md
+    assert "In-sample: these chains are among the 33" in md
     assert "| 1ABC | A | 2 | 4 | 0.60 | 0.50 | 1.00 | 0.33 |" in md

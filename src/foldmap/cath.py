@@ -12,6 +12,7 @@ from __future__ import annotations
 import http.client
 import json
 import re
+import time
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
@@ -21,6 +22,7 @@ from .fetch import AGENT, CACHE, atomic_write
 
 CATH_URL = "https://www.ebi.ac.uk/pdbe/api/mappings/cath/{pdb}"
 SOURCE = "CATH"  # Layout.domain_source of these domains
+NO_CHOPPING_MAX_AGE = 30 * 24 * 3600  # seconds a cached "no CATH chopping" (404) is trusted: CATH grows
 
 
 @dataclass
@@ -43,12 +45,20 @@ def chopping(pdb_id: str, cache_dir: Path | None = None) -> list[CathDomain]:
             data = json.loads(cache.read_text(encoding="utf-8"))
         except (ValueError, UnicodeDecodeError):  # cut off: fetch it again
             cache.unlink(missing_ok=True)
+        if data == {} and time.time() - cache.stat().st_mtime > NO_CHOPPING_MAX_AGE:
+            data = None  # no chopping a month ago: ask again
     if data is None:
         url = CATH_URL.format(pdb=pdb)
         try:
             req = urllib.request.Request(url, headers={"User-Agent": AGENT, "Accept": "application/json"})
             with urllib.request.urlopen(req, timeout=30) as r:
-                data = json.loads(r.read().decode())
+                body = r.read()
+            try:
+                data = json.loads(body.decode())
+            except (ValueError, UnicodeDecodeError):
+                raise ValueError(
+                    f"PDBe's CATH answer for {pdb} is not JSON (the service may be down); try again later"
+                ) from None
         except urllib.error.HTTPError as err:
             if err.code != 404:
                 raise ValueError(f"could not reach www.ebi.ac.uk ({err})") from None
@@ -89,9 +99,13 @@ def domains(path, bb, sses, cache_dir: Path | None = None) -> tuple[list[tuple[s
     for k, l in enumerate(bb.labels):
         of_chain.setdefault(l.chain, []).append(k)
     present = list(of_chain)
+    chopped = {d.chain for d in found}  # an author chain CATH chops itself is nobody's copy (an "A1" beside "A")
     panels = []
     for d in found:
-        for copy in (c for c in present if c == d.chain or re.fullmatch(re.escape(d.chain) + r"-?\d+", c)):
+        copies = [
+            c for c in present if c == d.chain or (c not in chopped and re.fullmatch(re.escape(d.chain) + r"-?\d+", c))
+        ]
+        for copy in copies:
             inside: set[int] = set()
             for (a, ai), (b, bi) in d.segments:
                 lo, hi = order.get((copy, a, ai)), order.get((copy, b, bi))

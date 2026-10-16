@@ -20,7 +20,7 @@ wrong sheet (plan 12, the external review's FimD 9FWZ: a strand wedged between t
   measured (None).
 - S5: automatic domains against a reference chopping (plan 12 Task 3): where the committed CATH reference
   (tests/data/domains/cath_reference.json) holds the entry, each chain's `--domains auto` domains are scored
-  (domain_score: overlap, boundary F1 within 20 residues) and a chain under the ruled targets (domain_score.TARGETS)
+  (domain_score: overlap, boundary F1 and recall within 20 residues) and a chain under the ruled targets (TARGETS)
   is a finding (domain_findings). Measured by the random-100 campaign only; elsewhere None (no reference).
 - S6: an accessory strand (Sheet.accessory, Layout.accessory: off its sheet's run of paired strands) is drawn at its
   partner: in a column next to the partner's, their drawn spans overlapping; or its pairing is named in the notes
@@ -222,14 +222,15 @@ def sheet_checks(sheets: list[Sheet], sses: Iterable[SSE], bridges: list[Bridge]
 
 def domain_findings(scores: Iterable[dict]) -> list[str]:
     """S5: each chain (domain_score.chain_score) whose automatic domains fall under the ruled targets against its
-    reference (overlap or boundary F1 below domain_score.TARGETS), with its measures and domain counts."""
+    reference (overlap, boundary F1 or boundary recall below domain_score.TARGETS), with its measures and domain
+    counts."""
     from .domain_score import TARGETS
 
     return [
-        f"{s['chain']}: overlap {s['overlap']:.2f}, boundary F1 {s['f1']:.2f} "
+        f"{s['chain']}: overlap {s['overlap']:.2f}, boundary F1 {s['f1']:.2f}, recall {s['recall']:.2f} "
         f"({s['n_ref']} reference domains, {s['n_auto']} automatic)"
         for s in scores
-        if s["overlap"] < TARGETS["overlap"] or s["f1"] < TARGETS["f1"]
+        if any(s[k] < TARGETS[k] for k in ("overlap", "f1", "recall"))
     ]
 
 
