@@ -12,7 +12,7 @@ helix records keep their deposited ids. TRIMS shrinks an entry further: `assembl
 biological assembly, `backbone` keeps only a protein's N, CA, C, O and CB atoms (`atoms`: these names instead, e.g. with
 the cysteines' SG for disulfides), `first_model` keeps an NMR ensemble's model 1, `drop` erases the mmCIF categories
 named, `no_protein_sequence` drops the protein entities' full sequences (a big complex's are most of a small window's
-file). Each fixture stays under 100 KB and all of them under 900 KB (tests/test_r100_fixtures.py). Files are written
+file). Each fixture stays under 100 KB and all of them under 1 MB (tests/test_r100_fixtures.py). Files are written
 gzipped, outside tests/data/*.cif, so scripts/bench.py never reads them.
 """
 
@@ -132,6 +132,12 @@ ENTRIES = {  # fixture name -> (PDB id, what it is for)
         "OmpF porin, chain A, N/CA/C/O: its N-terminal strand A:2-6 pairs with A:9-23 only, and was drawn in the "
         "barrel between A:9-23 and A:36-50, a 17-strand barrel of the 16-strand ring (plan 12 Task 2, the review's R1)",
     ),
+    "1SLV": (
+        "1SLV",
+        "a heterodimer whose assembly (A and B twice) has one continuous sheet across its two copies, N/CA/C/O: that "
+        "shared sheet sat between A1's eta2 and its copy, the tied pushes never cleared and the copies were drawn "
+        "unalike (plan 12 Task 2 fix round 2, A15 1.28 at stack pad 1.45)",
+    ),
     "6JO6-AB": (
         "6JO6",
         "photosystem I, chains A and B cut to the residues within 18 Å of the estimated mid-plane, N/CA/C/O: a slab "
@@ -225,6 +231,7 @@ TRIMS: dict[str, dict] = {
     "3L9G-A": {"atoms": ("N", "CA", "C", "O"), "no_protein_sequence": True, "drop": ("_atom_site_anisotrop.",)},
     "6JO6-AB": {"atoms": ("N", "CA", "C", "O"), "no_protein_sequence": True, "drop": ("_atom_site_anisotrop.",)},
     "2OMF-A": {"atoms": ("N", "CA", "C", "O"), "no_protein_sequence": True, "drop": ("_atom_site_anisotrop.",)},
+    "1SLV": {"atoms": ("N", "CA", "C", "O"), "no_protein_sequence": True, "drop": ("_atom_site_anisotrop.",)},
     "5KQJ": {"first_model": True, "atoms": ("N", "CA", "C", "O"), "no_protein_sequence": True},
     "8XZE": {"drop": ("_atom_site_anisotrop.", "_pdbx_refine_tls.", "_pdbx_refine_tls_group.")},
     "3OWW-P5": {"drop": ("_atom_site_anisotrop.", "_pdbx_refine_tls.", "_pdbx_refine_tls_group.")},

@@ -193,3 +193,25 @@ def test_copies_numbered_apart_are_tied():
     assert d.layout.copy_ties == {"D": ("B", False)}
     got = figcheck.copies_alike(d)
     assert got[("D", "B")] <= 0.5, got
+
+
+def test_a_dimer_sheet_shared_by_two_copies_keeps_them_alike(monkeypatch):
+    """1SLV (plan 12 Task 2 fix round 2, pinned in fix round 4 on a cut fixture): assembly 1 is the A-B heterodimer
+    twice, with one continuous sheet across the two copies, an item no tie holds. It sat between A1's eta2 and its
+    copy, the tied pushes never cleared and _separate drew the copies one by one, unalike (A15). The shared items now
+    yield to the tied copies: A2~A1 and B2~B1 are drawn exactly alike. Without that (b029264's parent: no `shared`)
+    the fixture is drawn unalike, so it holds the case."""
+    import foldmap.layout as layout
+
+    path = DATA / "r100" / "1SLV.cif.gz"
+    got = figcheck.copies_alike(drawn(path))
+    assert set(got) == {("A2", "A1"), ("B2", "B1")} and max(got.values()) <= 1e-6, got
+    real = layout._separate
+
+    def without_shared(*args, **kw):
+        kw.pop("shared", None)
+        return real(*args, **kw)
+
+    monkeypatch.setattr(layout, "_separate", without_shared)
+    before = figcheck.copies_alike(drawn(path))
+    assert max(before.values()) > ALIKE, before  # the fixture still exercises the shared-sheet case
