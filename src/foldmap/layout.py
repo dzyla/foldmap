@@ -477,14 +477,15 @@ def _column_heights(
             (height[q] - length(q) / 2 - room(k, q) - half, height[q] + length(q) / 2 + room(q, k) + half, q)
             for q in occupied.get(c, [])
         )
-        y = want
+        y, way = want, 0
         for _ in range(len(blocks) + 1):
             hit = next(((lo, hi, q) for lo, hi, q in blocks if lo < y < hi), None)
             if hit is None:
                 return y
             lo, hi, q = hit
-            rise = float(_snap((_snap(strand(k).centroid) - _snap(strand(q).centroid)) @ up3))
-            y = hi if rise >= 0 else lo  # past its end on the side it lies on in 3D
+            if not way:  # past the end of what meets it, on the side it lies on in 3D; then on the same way
+                way = 1 if float(_snap((_snap(strand(k).centroid) - _snap(strand(q).centroid)) @ up3)) >= 0 else -1
+            y = hi if way > 0 else lo
         return y
 
     def level(k: int, q: int, y: float) -> bool:
@@ -2840,7 +2841,7 @@ def build_layout(
     lay.ba_rows = _ba_rows(items)  # after the user's swaps
     lay.stack_gaps = _stack_gaps(lay)
     lay.accessory = {a.strand.id: a.parent.id for sh in sheets for a in sh.accessory if a.strand.id in real}
-    lay.unshown = sorted(set(unshown))
+    lay.unshown = _unshown(real, sheets)
     lay.sheet_notes = sheet_notes(sheets, lay.unshown)
     lay.sheet_joins = sorted({tuple(sorted((a.id, b.id))) for sh in sheets for a, b in sh.joined})
     lay.on_sheet = {
@@ -3109,6 +3110,22 @@ def _domain_units(
 
 
 UNCLOSED = "barrel closure not supported by pairing: drawn open"
+
+
+def _unshown(placed: dict[str, Placed], sheets: list[Sheet]) -> list[tuple[str, str]]:
+    """The (accessory, partner) pairings the figure does not draw side by side, as drawn (after copies take their
+    mates' shapes): an accessory not in a column next to its partner's, or not level with it (spans apart)."""
+    out = []
+    for sh in sheets:
+        for a in sh.accessory:
+            x, p = placed.get(a.strand.id), placed.get(a.parent.id)
+            if x is None or p is None:
+                continue
+            beside = 1e-6 < abs(x.cx - p.cx) <= max(x.width, p.width) + 1e-6
+            (x0, x1), (p0, p1) = sorted((x.n_port[1], x.c_port[1])), sorted((p.n_port[1], p.c_port[1]))
+            if not (beside and min(x1, p1) - max(x0, p0) > 1e-6):
+                out.append((a.strand.id, a.parent.id))
+    return sorted(out)
 
 
 def accessory_lines(sheet: Sheet, unshown: list[tuple[str, str]] = ()) -> list[str]:
