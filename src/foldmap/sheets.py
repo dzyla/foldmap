@@ -152,8 +152,9 @@ def build_sheets(sses: list[SSE], bridges: list[Bridge]) -> list[Sheet]:
         tree = nx.maximum_spanning_tree(sub, weight="weight")
         cyclic = tree.number_of_edges() < sub.number_of_edges()  # a cycle was cut at its weakest pairing
         order, off = _order_tree(tree, min(comp))
-        ring = _ring(tree, sub) if cyclic and off else None  # a branched barrel: its ring, every other strand off it
-        if ring is not None:
+        ring = _ring(tree, sub) if cyclic else None  # a barrel: its longest ring of _BARREL_MIN strands or more
+        if ring is not None and (off or len(ring) < len(order)):  # every other strand off it (8C3A: a path tree whose
+            # 5-ring a tail strand hangs from)
             order, off = ring, _hanging(tree, ring)
             split = _other_rings(graph, set(comp), ring)
             gone = {k for part in split for k in part}
@@ -161,7 +162,7 @@ def build_sheets(sses: list[SSE], bridges: list[Bridge]) -> list[Sheet]:
             pending[:0] = split  # next, in order
         ends = (min(order[0], order[-1]), max(order[0], order[-1]))
         closed = cyclic and (ring is not None or not off) and ends in weak
-        unclosed = cyclic and not closed  # drawn open: its closure is not supported by pairing
+        unclosed = ring is not None and not closed  # a ring of _BARREL_MIN or more drawn open (its ends do not pair)
         ambiguous = bool(off) or _flank_one_partner(tree, strands)
         direction = {order[0]: 1}
         for parent, child in nx.bfs_edges(tree, order[0]):
