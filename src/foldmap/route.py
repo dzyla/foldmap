@@ -520,17 +520,21 @@ def _clear_helix_names(layout: Layout, sses: list[SSE], loops: list[Loop]) -> No
     from the drawn text, label_boxes and layout.glyph, at the 6 pt floor); this is the fallback for lines no route
     holds: a fallback curve where no route exists, a nucleic-acid path or trace. It moves a name to the spot lines
     run nearest least: the other side of the helix, or along it (_NAME_ALONG), the earlier spot (the current side
-    first) on a tie. A spot must be on the page and meet no element, other name, stub or letter. A name no spot
+    first) on a tie. Lines through the name's ink (within a pixel at figcheck's 100 dpi: a stroke's half width)
+    count before lines near it: on a page of small text the room is wider than the name and every spot may have a
+    line within it, and a spot with fewer such lines, one of them through the name, is no better (batch C2b-1, 6YF9
+    focus). A spot must be on the page and meet no element, other name, stub or letter. A name no spot
     improves stays. A mirror copy's name (Layout.mirror_pairs) follows its mate's, as _mirror_sides sets it, and both
     must be clear. Run after the strands are routed (route_nucleic): their paths and traces count. Routes are
     unchanged."""
-    from .layout import _mirror_sides, line_clearance
+    from .layout import _mirror_sides, line_clearance, page_text
 
     names = sorted((p for p in layout.placed.values() if p.sse.kind in ("H", "G") and p.label), key=lambda p: p.sse.id)
     if not names:
         return
     em = _ink_em(layout, layout.font_scale)
     grow = line_clearance(layout)  # clearance and a line's half width
+    touch = 0.72 * page_text(layout)[1]  # a pixel at 100 dpi: a loop's half stroke (at most 0.6 pt), to spare
     runs = [lp.points for lp in loops] + [path.points for path in layout.na_paths]
     segs = [(a, b) for pts in runs for a, b in zip(pts, pts[1:])]
     traces = [np.asarray(pts, float).reshape(-1, 2) for _, pts in sorted(layout.na_traces.items())]
@@ -542,13 +546,21 @@ def _clear_helix_names(layout: Layout, sses: list[SSE], loops: list[Loop]) -> No
     mate_of = dict(layout.mirror_pairs)  # copy id -> mate id
     copy_of = {m: c for c, m in mate_of.items()}
 
-    def struck(box) -> int:
-        big = (box[0] - grow, box[1] - grow, box[2] + grow, box[3] + grow)
-        return sum(clip_len(a, b, big) > 1e-9 for a, b in segs) + (_trace_hits(box, traces) if traces else 0)
+    def struck(box) -> tuple[int, int]:
+        """(lines through the ink, lines within the clearance of it); a nucleotide's bead and letter count as both."""
+        on = _trace_hits(box, traces) if traces else 0
+        through, near = (
+            sum(clip_len(a, b, (box[0] - r, box[1] - r, box[2] + r, box[3] + r)) > 1e-9 for a, b in segs) + on
+            for r in (touch, grow)
+        )
+        return through, near
+
+    def strikes(group) -> tuple[int, int]:
+        got = [struck(_name_ink(layout, q, em)) for q in group]
+        return sum(t for t, _ in got), sum(n for _, n in got)
 
     def place(group, side, along, taken):
         """The group's names at (side, along): their strikes, or None when a name is off the page or on something."""
-        total = 0
         for q in group:
             q.label_side, q.label_along = side, float(_snap(along * q.length))
         if len(group) > 1:
@@ -557,8 +569,7 @@ def _clear_helix_names(layout: Layout, sses: list[SSE], loops: list[Loop]) -> No
             ink = _name_ink(layout, q, em)
             if not (ink[0] >= x0 and ink[1] >= y0 and ink[2] <= x1 and ink[3] <= y1) or overlaps_any(ink, taken):
                 return None
-            total += struck(ink)
-        return total
+        return strikes(group)
 
     moved = 0  # names moved, a mirror copy's counted with its mate's
     k = glyph(layout)[0] / _GLYPH_W
@@ -566,8 +577,8 @@ def _clear_helix_names(layout: Layout, sses: list[SSE], loops: list[Loop]) -> No
         if p.sse.id in mate_of:  # a mirror copy goes with its mate
             continue
         group = [p] + [layout.placed[copy_of[p.sse.id]]] if p.sse.id in copy_of else [p]
-        now = sum(struck(_name_ink(layout, q, em)) for q in group)
-        if not now:
+        now = strikes(group)
+        if not now[1]:
             continue
         keys = {f"label:{q.sse.id}" for q in group}
         taken = solid + [box for name, box in texts.items() if name not in keys]

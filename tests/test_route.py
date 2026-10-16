@@ -710,6 +710,26 @@ def test_a_helix_name_with_no_better_spot_stays():
     assert h.label_side == 1
 
 
+def test_a_helix_name_is_not_moved_onto_a_line_to_keep_further_from_others():
+    """Batch C2b-1 (random-100 6YF9 focus: α2 of BN, DM, EB, EK, EN under a loop of another chain): on a page of
+    small text the room a line keeps from a name is wider than the name, so every spot had a line within it; the
+    mover counted those lines alike, near or through, and took the spot with the fewest: under the helix, on the
+    loop. A line through the name now weighs more than any number of lines near it."""
+    lay, h, loop, y, room = _name_in_the_way()
+    em = route._ink_em(lay, lay.font_scale)
+    top = route._name_ink(lay, h, em)[3]
+    near = [
+        route.Loop("x", f"n{k}", [(-6.0, top + f * room), (6.0, top + f * room)], False, True)
+        for k, f in enumerate((0.6, 0.9))
+    ]  # two lines near the name, above it, all along the helix
+    h.label_side = -1
+    below = route._name_ink(lay, h, em)
+    h.label_side = 1
+    through = route.Loop("x", "t", [(-6.0, (below[1] + below[3]) / 2), (6.0, (below[1] + below[3]) / 2)], False, True)
+    route._clear_helix_names(lay, [h.sse], [*near, through])  # one line through every spot below it
+    assert h.label_side == 1
+
+
 def test_a_helix_name_keeps_off_a_nucleotide_trace():
     """Fix round 1: nucleic-acid traces count where a name may go (a name the mover put on a strand would undo
     layout._element_label_sides, 1EYG)."""

@@ -13,6 +13,7 @@ elements (their ids: element ids, or domain, stem and ligand names). Kinds, in t
     helix_matched      helices cut or joined so copies of a protein are drawn alike (ss._copy_breaks)
     ghost_strands      strands drawn again as dashed copies: a barrel's closure, or in another copy's sheet
     names_moved        names set off their usual spot to stay readable
+    counts_hidden      residue counts of long loops and chain ends left out: no spot clear of other ink
     additives_hidden   crystallisation and purification additives not marked (Style.ligands auto)
     crowded_marks      ligand marks with no clear spot, drawn over other ink
     loops_unrouted     loops or nucleic-acid strands with no clear route, drawn as plain curves
@@ -147,6 +148,21 @@ def _names_moved(fig, layout, labels: bool) -> list[dict]:
     return [_item("names_moved", text, elements)]
 
 
+def _counts_hidden(fig) -> list[dict]:
+    """Loop-length and tail-length labels with no spot clear of other ink, left out (render.loop_counts,
+    layout.tail_counts)."""
+    hidden = list(getattr(fig, "foldmap_counts_hidden", []))
+    if not hidden:
+        return []
+    loops = [h for h in hidden if h["kind"] == "loop"]
+    tails = [h for h in hidden if h["kind"] == "tail"]
+    what = [f"{len(group)} {kind}-length" for kind, group in (("loop", loops), ("tail", tails)) if group]
+    said = [f"{h['name']} ({h['text']})" for h in loops]
+    said += [f"{end} end of chain {chain} ({h['text']})" for h in tails for end, chain in [h["name"].split(":", 1)]]
+    text = f"{' and '.join(what)} label(s) left out: no clear spot: {', '.join(said)}"
+    return [_item("counts_hidden", text, [h["name"] for h in hidden])]
+
+
 def _names(placed) -> str:
     return ", ".join(f"{p.label} ({p.sse.id})" if p.label else p.sse.id for p in placed)
 
@@ -163,6 +179,7 @@ def figure_provenance(fig, layout, loops=(), labels: bool = True) -> list[dict]:
     out += _helix_matched(layout)
     out += _ghosts(layout)
     out += _names_moved(fig, layout, labels)
+    out += _counts_hidden(fig)
     additives = _hidden_additives(layout)
     if additives:
         text = (

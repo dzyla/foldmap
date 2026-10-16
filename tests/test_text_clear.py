@@ -8,8 +8,8 @@ import numpy as np
 import pytest
 
 from foldmap import figcheck
-from foldmap.layout import label_boxes, overlaps_any, tail_counts
-from foldmap.render import ligand_marks, linked_marks, loop_counts
+from foldmap.layout import TAIL_COUNT_SIZE, _ink_em, count_half, label_boxes, overlaps_any, tail_counts
+from foldmap.render import _COUNT_AT, _COUNT_RUNS, _count_spots, ligand_marks, linked_marks, loop_counts
 from foldmap.route import clip_len
 from foldmap.spec import draw_spec, figure_spec
 
@@ -84,6 +84,67 @@ def test_loop_count_sits_clear_of_elements_lines_and_text():
         x0, y0, x1, y1 = c["box"]
         assert ax.get_xlim()[0] < x0 < x1 < ax.get_xlim()[1] and ax.get_ylim()[0] < y0 < y1 < ax.get_ylim()[1]
     assert figcheck.off_page(d) == []
+
+
+def test_a_loop_count_with_no_clear_spot_is_left_out_and_listed():
+    """Batch C2b-1 (random-100 A6 loop-length x loop or helix: 5X4Z, 7AOD, 8ESZ, 8RRX, 5LDW focus): every spot beside
+    a loop's four longest runs met ink, and its count went on the first of them anyway (p53's A:18-24>A:110-112 on
+    the loop A:264-274>A:278-293). The count now looks along every run, then nearer their ends; p53's short, boxed-in
+    route has no clear spot, so its count is left out and the figure says so."""
+    d = drawn(DATA / "AF-P04637.cif")
+    assert figcheck.text_collisions(d) == []
+    assert "loop-length:A:18-24>A:110-112" not in {t.get_gid() for t in d.figure.axes[0].texts}
+    (item,) = [i for i in d.provenance if i["kind"] == "counts_hidden"]
+    assert item["text"] == "1 loop-length label(s) left out: no clear spot: A:18-24>A:110-112 (85 aa)"
+    assert item["elements"] == ["A:18-24>A:110-112"] and item["count"] == 1
+
+
+def test_loop_count_spots_run_along_its_runs_until_none_is_clear():
+    """The candidate search: a line laid through each spot the count takes, one after another, sends it to the next
+    spot clear of every line, past the four longest runs' middles and thirds; when every spot is crossed the count
+    is left out and named in `hidden`, never placed over a line."""
+    from foldmap.route import Loop
+
+    d = drawn(R100 / "9ON5-A.cif.gz")
+    lay, loops, name = d.layout, list(d.loops), "A:121-126>A:154-161"
+    seen = []
+    for k in range(200):
+        hidden: list = []
+        got = [c for c in loop_counts(lay, loops, d.sses, hidden=hidden) if c["name"] == name]
+        if not got:
+            assert hidden == [{"kind": "loop", "name": name, "text": "27 aa"}]
+            break
+        x0, y0, x1, y1 = box = got[0]["box"]
+        lines = [(p, q) for lp in loops[len(d.loops) :] for p, q in zip(lp.points, lp.points[1:])]
+        assert not any(clip_len(p, q, box) > 1e-9 for p, q in lines)
+        seen.append(box)
+        loops.append(Loop("x", f"y{k}", [(x0 - 0.3, (y0 + y1) / 2), (x1 + 0.3, (y0 + y1) / 2)], False, False))
+    else:
+        pytest.fail("the count never ran out of spots")
+    lp = next(lp for lp in d.loops if f"{lp.a_id}>{lp.b_id}" == name)
+    half = count_half("27 aa", TAIL_COUNT_SIZE * _ink_em(lay, lay.font_scale))  # as loop_counts sizes it
+    spots = [bx for _, bx in _count_spots(np.asarray(lp.points, float), half)]
+    first = spots[: 2 * len(_COUNT_AT) * min(_COUNT_RUNS, len(lp.points) - 1)]
+    assert any(box not in first for box in seen) and len(set(seen)) == len(seen)  # past the old spots, none twice
+
+
+def test_a_tail_count_with_no_clear_spot_is_left_out_and_listed():
+    """Batch C2b-1 (random-100 A6 tail-length x loop or label: 7SMR, 5LDW, 8OZJ): with every spot beside and beyond
+    its letter crossed, a tail's count went on the spot meeting the fewest things, over a loop (9FWZ's C tail of D on
+    the loop D:618-629>D:634-641). Now it is left out and listed."""
+    d = drawn(R100 / "9FWZ-DB.cif.gz")
+    assert hits(d, "tail-length") == []
+    assert "tail-length:C:D" not in {t.get_gid() for t in d.figure.axes[0].texts}
+    (item,) = [i for i in d.provenance if i["kind"] == "counts_hidden"]
+    assert item["text"] == "1 tail-length label(s) left out: no clear spot: C end of chain D (34 aa)"
+    assert item["elements"] == ["C:D"]
+
+
+def test_a_tail_count_keeps_off_nucleic_acid_strands():
+    """Batch C2b-1: a tail count's spots were tested against the protein loops only, so the nucleosome's N tail of
+    histone H3 (1KX5, chain E) sat on a DNA strand's line (na:run:12)."""
+    d = drawn(DATA / "na" / "1KX5.cif.gz")
+    assert figcheck.text_collisions(d) == []
 
 
 def _mark_box(m) -> tuple[float, float, float, float]:

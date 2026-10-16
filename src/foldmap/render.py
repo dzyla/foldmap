@@ -51,6 +51,7 @@ from .layout import (
     _ink_em,
     _ink_line,
     _reach,
+    _snap,
     _text_width,
     block_ghosts,
     centred_box,
@@ -2657,21 +2658,46 @@ _OVER_LOOP_Z = Z["over-loop"]  # the loops of a helix over a sheet: above the st
 
 
 _COUNT_GAP = 0.15  # page units from a loop's line to its residue count's ink
-_COUNT_RUNS = 4  # the loop's longest straight runs tried for its count
+_COUNT_RUNS = 4  # the loop's longest straight runs tried first for its count
+_COUNT_AT = (0.5, 1 / 3, 2 / 3)  # where along a run its count is tried: its middle and thirds ...
+_COUNT_AT_ENDS = (1 / 6, 5 / 6)  # ... then nearer its ends
 
 
-def loop_counts(layout: Layout, loops: list[Loop], sses: list[SSE], tails=None) -> list[dict]:
+def _count_spots(pts: np.ndarray, half) -> list[tuple[int, tuple[float, float, float, float]]]:
+    """A loop count's candidate places, in order, each with the run it sits beside (index into pts): beside the
+    _COUNT_RUNS longest runs at _COUNT_AT, then beside the other runs at _COUNT_AT, then beside every run at
+    _COUNT_AT_ENDS; each on either side of its run (right then left of an upright run, above then below a level
+    one), its ink _COUNT_GAP from the line. Longer runs first, the earlier on a tie; centres snapped (layout._snap)."""
+    runs = sorted(range(len(pts) - 1), key=lambda j: (-np.hypot(*(pts[j + 1] - pts[j])), j))
+    out = []
+    for group, along in ((runs[:_COUNT_RUNS], _COUNT_AT), (runs[_COUNT_RUNS:], _COUNT_AT), (runs, _COUNT_AT_ENDS)):
+        for j in group:
+            p, q = pts[j], pts[j + 1]
+            d = q - p
+            vertical = abs(d[1]) > abs(d[0])
+            sides = ((1.0, 0.0), (-1.0, 0.0)) if vertical else ((0.0, 1.0), (0.0, -1.0))
+            for t in along:
+                for n in map(np.array, sides):
+                    reach = _COUNT_GAP + abs(n[0]) * half[0] + abs(n[1]) * half[1]
+                    c = _snap(p + d * t + n * reach)
+                    out.append((j, centred_box(float(c[0]), float(c[1]), *half)))
+    return out
+
+
+def loop_counts(layout: Layout, loops: list[Loop], sses: list[SSE], tails=None, hidden=None) -> list[dict]:
     """The residue count ("NN aa") of each loop of at least LONG_LOOP residues: name (a>b), text, centre and ink box
-    (page units, sized from the drawn text as tail counts are). Its place is the first of a few spots, the loop's
-    longest straight runs (at most _COUNT_RUNS), each at its middle, a third and two thirds, on either side, that is
-    clear of elements, text (label_boxes, tail counts), every loop's line but the run itself and the counts placed
-    before; else the first spot (beside the longest run, at its middle). Placed after routing: no keep-out."""
+    (page units, sized from the drawn text as tail counts are). Its place is the first of its spots (_count_spots:
+    beside its runs, longest first) clear of elements, text (label_boxes, tail counts), every loop's and
+    nucleic-acid strand's line but the run itself and the counts placed before. A count with no clear spot is left
+    out, never drawn over ink: {"kind": "loop", "name", "text"} is appended to `hidden` (a list), which the figure's
+    provenance lists (counts_hidden). Placed after routing: no keep-out."""
     em = _ink_em(layout, layout.font_scale) or text_em(layout.width or 1.0) * layout.font_scale
     by_id = {s.id: s for s in sses}
     taken = [p.rect for p in [*layout.placed.values(), *layout.ghosts, *layout.stems]]
     taken += [b for _, b in label_boxes(layout, sses)] + [
         t["box"] for t in (tails if tails is not None else tail_counts(layout, sses, loops))
     ]
+    taken += [b for path in layout.na_paths for b in thin_boxes(path.points)]  # nucleic-acid strands' lines
     lines = [thin_boxes(lp.points) for lp in loops]
     out = []
     for i, loop in enumerate(loops):
@@ -2679,34 +2705,22 @@ def loop_counts(layout: Layout, loops: list[Loop], sses: list[SSE], tails=None) 
         if a is None or b is None or b.start - a.end - 1 < LONG_LOOP:
             continue
         text = f"{b.start - a.end - 1} aa"
-        size = TAIL_COUNT_SIZE * em
-        half = count_half(text, size)
-        pts = np.asarray(loop.points, float)
-        runs = sorted(range(len(pts) - 1), key=lambda j: (-np.hypot(*(pts[j + 1] - pts[j])), j))[:_COUNT_RUNS]
-        others = [box for k, boxes in enumerate(lines) if k != i for box in boxes]
-        spots = []
-        for j in runs:
-            p, q = pts[j], pts[j + 1]
-            d = q - p
-            vertical = abs(d[1]) > abs(d[0])
-            sides = (
-                (np.array([1.0, 0.0]), np.array([-1.0, 0.0]))
-                if vertical
-                else (np.array([0.0, 1.0]), np.array([0.0, -1.0]))
-            )
-            for t in (0.5, 1 / 3, 2 / 3):
-                for n in sides:
-                    reach = _COUNT_GAP + abs(n[0]) * half[0] + abs(n[1]) * half[1]
-                    c = p + d * t + n * reach
-                    own = [box for k, box in enumerate(lines[i]) if k != j]
-                    spots.append((centred_box(float(c[0]), float(c[1]), *half), own))
+        half = count_half(text, TAIL_COUNT_SIZE * em)
+        others = taken + [box for k, boxes in enumerate(lines) if k != i for box in boxes]
         box = next(
-            (bx for bx, own in spots if not overlaps_any(bx, taken + others + own)), spots[0][0] if spots else None
+            (
+                bx
+                for j, bx in _count_spots(np.asarray(loop.points, float), half)
+                if not overlaps_any(bx, others) and not overlaps_any(bx, lines[i][:j] + lines[i][j + 1 :])
+            ),
+            None,
         )
+        name = f"{loop.a_id}>{loop.b_id}"
         if box is None:
+            if hidden is not None:
+                hidden.append({"kind": "loop", "name": name, "text": text})
             continue
         taken.append(box)
-        name = f"{loop.a_id}>{loop.b_id}"
         out.append({"name": name, "text": text, "centre": ((box[0] + box[2]) / 2, (box[1] + box[3]) / 2), "box": box})
     return out
 
@@ -3458,8 +3472,9 @@ def _draw(
     element_colour, residue_colour = element_colours(layout, sses, look)
     if not layout.placed and not layout.stems and not layout.na_paths:
         return _empty_figure()
-    tails = tail_counts(layout, sses, loops)  # placed once: every text that keeps off them gets these boxes
-    lcounts = loop_counts(layout, loops, sses, tails)
+    hidden: list[dict] = []  # counts with no clear spot, left out (provenance: counts_hidden)
+    tails = tail_counts(layout, sses, loops, hidden)  # placed once: every text that keeps off them gets these boxes
+    lcounts = loop_counts(layout, loops, sses, tails, hidden)
     counts = [t["box"] for t in [*tails, *lcounts]]
     marks = ligand_marks(layout, loops, sses, look, counts)
     linked = linked_marks(layout, loops, sses, marks)
@@ -3474,6 +3489,7 @@ def _draw(
     _draw_sheet_panels(c, layout, outlines)
     _draw_hbonds(c, hb)
     c.fig.foldmap_hbonds = hb  # for the interactive page's hover notes
+    c.fig.foldmap_counts_hidden = hidden
     c.fig.foldmap_crowded_marks = [  # ligand marks with no clear spot, drawn over other ink (Drawn.crowded_marks)
         f"{m['ligand'].name}:{m['ligand'].chain}{m['ligand'].seq}" for m in marks if m.get("crowded")
     ]

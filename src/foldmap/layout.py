@@ -4026,13 +4026,15 @@ def count_half(text: str, size: float) -> tuple[float, float]:
     return size * _text_width(text, bold=False) / 2 + 0.04, size * 0.4 + 0.04
 
 
-def tail_counts(layout: Layout, sses: list[SSE], loops=()) -> list[dict]:
+def tail_counts(layout: Layout, sses: list[SSE], loops=(), hidden=None) -> list[dict]:
     """The residue count written beyond each long chain end (at least LONG_TAIL residues past its last element):
     end, chain, text ("14 aa"), centre and ink box (page units). Placed after routing, so not a route keep-out: the
     box is sized from the figure's text (TAIL_COUNT_SIZE em of _ink_em) and set from the N/C letter's far edge,
     along the stub, beside the letter on either side, then further along, then further out beside the letter and along
     the stub (_TAIL_COUNT_FAR), the first clear of elements, text (label_boxes), the loops' lines (`loops`,
-    route.Loop) and the counts placed before; else the one of them meeting the fewest of those."""
+    route.Loop), the nucleic-acid strands' lines and the counts placed before. A count with no clear spot is left
+    out, never drawn over ink: {"kind": "tail", "name": "<end>:<chain>", "text"} is appended to `hidden` (a list),
+    which the figure's provenance lists (counts_hidden)."""
     if not layout.res_chain:
         return []
     em = _ink_em(layout, layout.font_scale) or text_em(layout.width or 1.0) * layout.font_scale
@@ -4043,8 +4045,8 @@ def tail_counts(layout: Layout, sses: list[SSE], loops=()) -> list[dict]:
         rows.setdefault(ch, []).append(r)
     taken = [p.rect for p in [*layout.placed.values(), *layout.ghosts, *layout.stems]]
     taken += [b for _, b in label_boxes(layout, sses)]
-    for loop in loops:  # loop lines as thin boxes along each segment
-        taken += thin_boxes(loop.points)
+    for line in [*loops, *layout.na_paths]:  # loop and nucleic-acid strand lines as thin boxes along each segment
+        taken += thin_boxes(line.points)
     out = []
     for end, chain, port, ex in termini(layout, sses):
         mine, ours = groups.get(chain, []), rows.get(chain, [])
@@ -4070,8 +4072,10 @@ def tail_counts(layout: Layout, sses: list[SSE], loops=()) -> list[dict]:
         spots += [_snap(spots[0] + ex * k) for k in _TAIL_COUNT_FAR[2:]]
         boxes = [centred_box(float(c[0]), float(c[1]), *half) for c in spots]
         box = next((b for b in boxes if not overlaps_any(b, taken)), None)
-        if box is None:  # nowhere clear: the spot meeting the fewest things, the first of them
-            box = min(boxes, key=lambda b: sum(overlaps_any(b, (t,)) for t in taken))
+        if box is None:  # nowhere clear: left out (batch C2b-1: 7SMR, 5LDW, 8OZJ)
+            if hidden is not None:
+                hidden.append({"kind": "tail", "name": f"{end}:{chain}", "text": text})
+            continue
         taken.append(box)
         out.append(
             {
