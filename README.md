@@ -275,8 +275,9 @@ whose two domains alternate along it). It is a guess from the coordinates, and t
 "domains inferred from contacts", and the command line, app and MCP notes say "inferred from residue contacts, not a
 published domain assignment". On 33 multi-domain chains chopped by CATH it matches 85 % of the residues to the right
 domain (calling each chain one domain matches 54 %) and finds 88 % of CATH's domain boundaries within 20 residues
-(boundary F1 0.79); the calibration is `tests/test_domain_score.py`. For a published assignment, `--domains cath`
-draws CATH's chopping of a PDB entry (fetched once from the PDBe API, panels named by CATH id such as `1ldmA01`,
+(boundary F1 0.79), the chains its parameters were chosen on; on eleven more chains from CATH superfamilies none
+of those has, never tuned on, 86 % and 85 % (F1 0.78). The calibration is `tests/test_domain_score.py`. For a
+published assignment, `--domains cath` draws CATH's chopping of a PDB entry (fetched once from the PDBe API, panels named by CATH id such as `1ldmA01`,
 captioned "domains: CATH"); when CATH has none the note says so and the figure is drawn without domains.
 
 **Domains and βα rows.** `--domains auto` never splits a sheet drawn as a βα row (a TIM barrel, a Rossmann fold):

@@ -30,3 +30,11 @@ of the 33 chains. The held-out third, drawn chain by chain, held near-duplicates
 The seven held-out chains with no training homologue give overlap .82, recall .80, precision .70, F1 .72: recall
 under the ruled .85. The held-out third is now drawn by homology group (domain_score.held_out); after the fact, it
 gives overlap .80, recall .81, precision .68, F1 .72. All 33: overlap .85, recall .88, precision .76, F1 .79.
+
+cath_fresh.json, fresh_inputs.npz: a fresh check (fix round 1). Eleven multi-domain chains (1ANF A, 7AAT A, 1CLL A,
+1EFC A, 1DDT A, 3GRS A, 4APE A, 4PFK A, 8TLN E, 1TRK A, 2DRI A; 147 to 680 residues; five with a discontinuous
+domain), CATH choppings from the PDBe API fetched 2026-10-16 (CC BY 4.0, as above). They were picked before foldmap
+ran on any of them, and none shares a CATH superfamily with the 33 (2PTN and 1LFG were dropped for sharing one with
+1SLV and 1ANF; 9PAP for being one CATH domain). Scored once with the final algorithm, never tuned on: overlap .86,
+recall .85, precision .80, F1 .78. 2DRI is left undivided, 3GRS's third domain is not found, and 7AAT and 4APE get
+an extra cut. CI gates it only at overlap >= .70.

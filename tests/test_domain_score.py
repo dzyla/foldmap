@@ -8,7 +8,8 @@ other third, drawn chain by chain, held near-duplicates of training chains (6FY9
 On the seven held-out chains with no training homologue: overlap .82, recall .80, precision .70, F1 .72. The
 held-out third is now drawn by homology group (overlap .80, recall .81, precision .68, F1 .72), but that is after
 the fact. The never-seen check is the fresh set (cath_fresh.json): eleven chains of superfamilies none of the 33
-has, scored once with the final algorithm and gated only at a sanity floor."""
+has, picked before foldmap ran on them and scored once with the final algorithm: overlap .86, recall .85, precision
+.80, F1 .78 (2DRI undivided, 3GRS's third domain and 4APE's split off target). Gated only at a sanity floor."""
 
 import json
 import os
@@ -28,8 +29,8 @@ CACHE = Path(os.environ.get("FOLDMAP_DOMAIN_CACHE") or Path.home() / ".cache" / 
 
 
 def _cached() -> bool:
-    doc = json.loads(REFERENCE.read_text(encoding="utf-8"))
-    return all((CACHE / f"{e['pdb']}.cif").is_file() for e in doc["chains"])
+    docs = [json.loads(p.read_text(encoding="utf-8")) for p in (REFERENCE, FRESH)]
+    return all((CACHE / f"{e['pdb']}.cif").is_file() for doc in docs for e in doc["chains"])
 
 
 needs_cache = pytest.mark.skipif(
@@ -126,6 +127,16 @@ def test_the_fixture_gives_the_domains_the_structure_gives(key, path):
     assert ds.inputs_domains(inputs) == ds.inputs_domains(ds.chain_inputs(DATA / path, key.split("_")[1]))
 
 
+def test_the_fresh_set_stays_above_a_sanity_floor():
+    """The fresh set (never tuned on; its numbers are reported above): overlap at least .70, so a change that breaks
+    the automatic domains on proteins outside the calibration shows."""
+    entries = json.loads(FRESH.read_text(encoding="utf-8"))["chains"]
+    reference = {x for e in ds.load_reference(REFERENCE) for x in e["superfamilies"]}
+    assert len(entries) == 11 and not reference & {x for e in entries for x in e["superfamilies"]}  # no homologue
+    assert sum(len(d) > 1 for e in entries for d in e["domains"]) >= 2  # discontinuous domains
+    assert ds.summary(_fixture_scores(FRESH_FIXTURE, entries))["overlap"] >= 0.70
+
+
 @needs_cache
 def test_the_structures_give_the_fixtures_domains_and_meet_the_targets():
     """End to end on the structure files (the domain cache): every chain's domains as the fixture's, and the ruled
@@ -139,6 +150,10 @@ def test_the_structures_give_the_fixtures_domains_and_meet_the_targets():
         scores.append(ds.inputs_score(inputs, e))
     every = ds.summary(scores)
     assert all(every[k] >= ds.TARGETS[k] for k in ("overlap", "f1", "recall")), every
+    fresh = ds.load_fixture(FRESH_FIXTURE)
+    for e in json.loads(FRESH.read_text(encoding="utf-8"))["chains"]:
+        inputs = ds.chain_inputs(CACHE / f"{e['pdb']}.cif", e["chain"])
+        assert ds.inputs_domains(inputs) == ds.inputs_domains(fresh[f"{e['pdb']}_{e['chain']}"]), e["pdb"]
 
 
 def test_t4_lysozyme_finds_the_literature_boundary():
