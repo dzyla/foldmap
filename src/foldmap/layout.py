@@ -2395,9 +2395,10 @@ def _unwrap(items: list[_Item], ties: dict[int, tuple[int, int]], frame) -> dict
 
 def _partners(it: _Item, ps: list[int]) -> list[Placed]:
     """The strands of item `it` beside its strands `ps` in the sheet, not among them: those they pair with, whose
-    ghosts stand beside them where they leave (_unwrap). A strand standing in another's column (an accessory strand,
-    end to end with its partner: Sheet.accessory) has that partner, the strand next to it in its column; any other has
-    the strands at most one pitch across whose spans meet its own."""
+    ghosts stand beside them where they leave (_unwrap): the strands in the next column, at most one pitch across,
+    whose spans meet its own. A strand in its own column stands end to end with it (one column means collinear, no
+    pairing: an accessory beside its partner shares a neighbour's column), so it lends no ghost (fix round 4: 8UTF's
+    c:440-442 took the ghost of a:340-343, which paired with nothing it was drawn with)."""
 
     def strand(q):
         m = it.members[q]
@@ -2408,19 +2409,14 @@ def _partners(it: _Item, ps: list[int]) -> list[Placed]:
         if not strand(p):
             continue
         mp, (x, y) = it.members[p], it.offsets[p]
-        column = [q for q in range(len(it.members)) if q != p and strand(q) and abs(it.offsets[q][0] - x) < 1e-6]
-        if column:  # stacked: the nearest above or below, end to end
-            near = min(column, key=lambda q: (abs(it.offsets[q][1] - y), q))
-            found = [near]
-        else:
-            found = [
-                q
-                for q in range(len(it.members))
-                if q != p
-                and strand(q)
-                and abs(it.offsets[q][0] - x) <= max(mp.width, it.members[q].width) + 1e-6
-                and abs(it.offsets[q][1] - y) < (mp.length + it.members[q].length) / 2
-            ]
+        found = [
+            q
+            for q in range(len(it.members))
+            if q != p
+            and strand(q)
+            and 1e-6 < abs(it.offsets[q][0] - x) <= max(mp.width, it.members[q].width) + 1e-6
+            and abs(it.offsets[q][1] - y) < (mp.length + it.members[q].length) / 2
+        ]
         out += [it.members[q] for q in found if q not in ps and it.members[q] not in out]
     return out
 

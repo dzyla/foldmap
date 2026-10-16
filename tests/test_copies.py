@@ -138,8 +138,9 @@ def test_copies_of_one_domain_get_alike_panels():
 def test_a_lent_strand_past_the_row_end_shows_the_strands_it_pairs_with(name):
     """A strand drawn past the row's end (it pairs in protomer 0's sheet, across the cut) stands beside dashed ghosts
     of its partners, one strand pitch across, their spans meeting, as it stands beside the real ones in every other
-    copy (plan 12 Task 2 fix round 1: 8UTF's 440-442, off its sheet's track, stands end to end with its partner in
-    the partner's column)."""
+    copy. Never a ghost in its own column: one column means collinear, no pairing (fix round 4, the re-review: 8UTF's
+    c:440-442, an accessory end to end with a:340-343 beside its partner A:35-57, took a:340-343's ghost, which pairs
+    with nothing in its block)."""
     from foldmap.layout import PITCH, block_ghosts
 
     d = drawn(DATA / f"{name}.cif")
@@ -150,10 +151,13 @@ def test_a_lent_strand_past_the_row_end_shows_the_strands_it_pairs_with(name):
     for k in lent:
         partners = [g for g in block_ghosts(lay, k) if g.sse.id not in lay.sheets[k]]
         assert partners, lay.sheets[k]
+        mine = [lay.placed[j] for j in lay.sheets[k]]
+        for g in partners:  # each ghost stands beside a strand of the block, not end to end with one
+            assert any(abs(g.cx - p.cx) > 1e-6 and abs(g.cy - p.cy) < (g.length + p.length) / 2 for p in mine), g.sse.id
         for i in lay.sheets[k]:
             p = lay.placed[i]
-            near = min(  # across, spans meeting; or in its column, end to end (an accessory strand, fix round 1)
-                abs(g.cx - p.cx) if abs(g.cy - p.cy) < (g.length + p.length) / 2 or abs(g.cx - p.cx) < 1e-6 else np.inf
+            near = min(  # across, spans meeting
+                abs(g.cx - p.cx) if abs(g.cy - p.cy) < (g.length + p.length) / 2 and abs(g.cx - p.cx) > 1e-6 else np.inf
                 for g in [*partners, *(lay.placed[j] for j in lay.sheets[k] if j != i)]
             )
             assert near <= PITCH + 1e-6, (i, near)
