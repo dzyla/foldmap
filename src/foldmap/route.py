@@ -470,7 +470,9 @@ class _Router:
 
     def route(self, pa, ea, own_a, pb, eb, own_b, own_body=False, loose=False, under=((), ()), exempt=()):
         """(points, over labels): a drawn route, kept off text and stubs unless nothing else routes; None
-        points if there is no clear route at all."""
+        points if there is no clear route at all. Over labels: found with the keep-outs open, it runs through one of
+        their boxes (keep_out). A label's margin cells by a port can end the strict search though the route drawn
+        passes beside the label (random-100 C2b-2: 8RRX's D and G loops)."""
         grid = self.grid
         pts = self.drawn(pa, ea, own_a, pb, eb, own_b, own_body, loose, under, exempt)
         if pts is not None or not grid.soft.any():
@@ -478,7 +480,7 @@ class _Router:
         grid.blocked &= ~grid.soft
         pts = self.drawn(pa, ea, own_a, pb, eb, own_b, own_body, loose, under, exempt)
         grid.blocked |= grid.soft
-        return pts, pts is not None
+        return pts, pts is not None and _text_hits(pts, self.keep_out) > 0
 
 
 def _cardinal(v) -> np.ndarray:
@@ -750,7 +752,7 @@ def _route_again(layout: Layout, router: _Router, lp: Loop):
             grid.used[c] = max(grid.used[c] - 1, 0)
     for c in cells:
         grid.used[c] += 1
-    return None if best is None else (best, over and _text_hits(best, router.keep_out) > 0)
+    return None if best is None else (best, over)
 
 
 def _in_box(points, box) -> list[tuple[float, float]]:
@@ -898,7 +900,6 @@ def _off_na_text(layout: Layout, router: _Router, loops: list[Loop]) -> None:
                 break
         for h in exempt:
             grid.blocked |= grid.over[h]
-        over = over and _text_hits(best, router.keep_out) > 0  # routed with the keep-outs open: does it cross one?
         better = best is not None and _better(best, lp.points, boxes, router.keep_out, strands, ink)
         if better and over <= lp.crosses_labels:
             loops[k] = Loop(lp.a_id, lp.b_id, [(float(x), float(y)) for x, y in best], lp.dashed, False, over)

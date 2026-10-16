@@ -962,3 +962,29 @@ def test_large_pages_route_their_long_loops(entry, view):
     (four J and K loops round its wall of long helices, four loops over labels) ran out of the A* budget."""
     d = draw_spec(figure_spec(r100_entry(entry), **view))
     assert d.stuck == [] and d.over_labels == []
+
+
+def test_a_route_found_with_the_keep_outs_open_is_over_a_label_only_if_it_crosses_one():
+    """Random-100 C2b-2 A4 (8RRX's D and G loops, 9P1X Q:98-103): a label's soft cells beside a port's way out end
+    its first, strict search (_Grid.free_cell_along), so the route is found with the keep-outs open; drawn, it
+    passes beside the label, in no keep-out box. It is no loop over a label: the flag is the drawn route's own test,
+    as _route_again's (2ACY's loop through its label, test_cli, stays flagged)."""
+    a = strand(0, 0, 0)  # C port on top at (0, 1.5), leaving up
+    b = strand(20, 4, 0, angle=-np.pi / 2)
+    lay = layout_of(a, b)
+    grid = _Grid(lay)
+    cx, _ = grid.center(grid.cell((a.c_port[0], a.c_port[1] + route._PUSH[0])))  # the first cell out of a's port
+    # a label beside the port's axis line, near enough that its keep-out margin covers that cell's centre
+    box = (cx + 0.1, 1.7, cx + 1.0, 2.3) if cx > 0.1 else (cx - 1.0, 1.7, cx - 0.1, 2.3)
+    router = route._Router(_Grid(lay, [box]), route._element_obstacles(lay), [box])
+    assert router.grid.free_cell_along(a.c_port, a.exit_c, a) is None  # the strict search cannot leave the port
+    pts, over = router.route(a.c_port, a.exit_c, a, b.n_port, b.exit_n, b)
+    assert pts is not None and route._text_hits(pts, [box]) == 0
+    assert not over
+
+
+@pytest.mark.parametrize("view", [{"domains": "auto"}, {"focus": "none"}], ids=["domains", "focus"])
+def test_8rrx_loops_beside_labels_are_not_over_them(view):
+    """Random-100 C2b-2 A4: 8RRX's D:4985-4997>D:5000-5002 (domains) and G:4158-4166>G:4168-4174 (focus)."""
+    d = draw_spec(figure_spec(r100_entry("8RRX"), **view))
+    assert d.stuck == [] and d.over_labels == []
