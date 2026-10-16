@@ -1158,9 +1158,57 @@ def _span(p) -> tuple[float, float]:
     return tuple(sorted((float(p.n_port[1]), float(p.c_port[1]))))
 
 
+def residue_places(drawn, k: int):
+    """science.Place of residue k (Backbone index) on its drawn figure: its element's axis (whole length), the loop
+    route it is in (from its nearer element end, RESIDUE_STEP per residue), or a chain end's stub; None when its chain
+    or element is not drawn. Worked out apart from render.residue_point, which S4 judges."""
+    from .layout import END_STUB
+    from .science import RESIDUE_STEP
+
+    lay, loops = drawn.layout, drawn.loops
+    mine = [s for s in drawn.sses if s.chain == lay.res_chain[k] and s.id in lay.placed]
+    for s in mine:
+        if s.start <= k <= s.end:
+            p = lay.placed[s.id]
+            axis = [tuple(p.n_port), tuple(p.c_port)]
+            return axis, 0, float(math.hypot(*np.subtract(axis[1], axis[0])))
+    before, after = [s for s in mine if s.end < k], [s for s in mine if s.start > k]
+    if before and after:
+        a, b = before[-1], after[0]
+        loop = next((lp for lp in loops if lp.a_id == a.id and lp.b_id == b.id), None)
+        if loop is None:
+            return None
+        d_a, d_b = k - a.end, b.start - k
+        return [tuple(q) for q in loop.points], 0 if d_a <= d_b else -1, min(d_a, d_b) * RESIDUE_STEP
+    if before:
+        p = lay.placed[before[-1].id]
+        return [tuple(p.c_port), tuple(np.add(p.c_port, p.exit_c * END_STUB))], 0, END_STUB
+    if after:
+        p = lay.placed[after[0].id]
+        return [tuple(p.n_port), tuple(np.add(p.n_port, p.exit_n * END_STUB))], 0, END_STUB
+    return None
+
+
+def residue_marks(drawn) -> list:
+    """The residue marks of a drawn figure for science.mark_findings: each linked residue's star (gid
+    "linked:<chain>:<number>"), its drawn centre against the place of its own residue."""
+    lay = drawn.layout
+    by_key = {f"{lay.res_labels[k].chain}:{lay.res_labels[k].tag}": k for k in lay.res_linked}
+    out = []
+    for patch in drawn.figure.axes[0].patches:
+        gid = patch.get_gid() or ""
+        k = by_key.get(gid[len("linked:") :]) if gid.startswith("linked:") else None
+        if k is None:
+            continue
+        place = residue_places(drawn, k)
+        if place is not None:
+            out.append((gid[len("linked:") :], tuple(np.mean(patch.get_xy()[:10], axis=0)), place))
+    return out
+
+
 def science_checks(drawn) -> dict[str, list[str] | None]:
     """The science checks (science.SCIENCE) of a drawn figure, apart from the page checks: findings per check, None
-    for those not yet measured (S4, S5). Sheet block k is named "sheet <k>" (Layout.sheets, from 0). Every strand and
+    for those not yet measured (S5). Sheet block k is named "sheet <k>" (Layout.sheets, from 0). Every strand and
     ghost stands in its drawn column with its drawn span (drawn_columns, _span); S6 reads the pairings the layout
     could not draw (Layout.unshown)."""
     from .dssp import assign_dssp
@@ -1169,6 +1217,7 @@ def science_checks(drawn) -> dict[str, list[str] | None]:
         adjacent_pairs,
         bridge_counts,
         count_finding,
+        mark_findings,
         neighbour_findings,
         open_finding,
         partner_findings,
@@ -1176,6 +1225,7 @@ def science_checks(drawn) -> dict[str, list[str] | None]:
 
     lay = drawn.layout
     out: dict[str, list[str] | None] = {"S1": [], "S2": [], "S3": [], **dict.fromkeys(NOT_YET), "S6": []}
+    out["S4"] = mark_findings(residue_marks(drawn))
     if not lay.sheets:
         return out
     count = bridge_counts(drawn.sses, assign_dssp(drawn.bb).bridges)

@@ -681,7 +681,7 @@ def test_science_checks_are_reported_apart_from_the_criteria(r100, tmp_path):
 
     spec = figure_spec(DATA / "1UBQ.cif")
     got = r100.measure_view("default", draw_spec(spec), spec, DATA / "1UBQ.cif", "1UBQ", tmp_path)
-    assert got["science"] == {"S1": [], "S2": [], "S3": [], "S4": None, "S5": None, "S6": []}
+    assert got["science"] == {"S1": [], "S2": [], "S3": [], "S4": [], "S5": None, "S6": []}
     crit = {k: {"pass": True, "detail": ""} for k in r100.CRITERIA}
     found = {"S1": ["sheet 0: a | b drawn side by side with no bridge"], "S2": [], "S3": [], "S4": None, "S5": None}
     e = {"id": "1ABC", "name": "1ABC", "views": {"default": {"result": {"science": found}}}, "criteria": crit}

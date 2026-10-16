@@ -144,7 +144,9 @@ def test_layout_pulls_bridged_cysteines_together(name, strict, monkeypatch):
     monkeypatch.setattr(cli, "_bridge_contacts", lambda *a: {})
     monkeypatch.setattr(cli, "_bridge_springs", lambda *a: [])
     free = mean_bar()
-    assert pulled < free if strict else pulled <= free + 1e-3  # shorter where blocks can move, never longer
+    # shorter where blocks can move, never longer; 0.05 for a loop residue's bar end, now a step of 0.5 per residue
+    # from its element's end (R3), not a fraction of the loop
+    assert pulled < free if strict else pulled <= free + 0.05
 
 
 @pytest.mark.parametrize("name", ["2JTY", "8UTF"])
@@ -455,3 +457,40 @@ def test_letters_slide_off_the_bars_drawn(monkeypatch):
         for poly in a.get_path().to_polygons(closed_only=False):
             gap = [float(np.hypot(*(route - q).T).min()) for q in poly]
             assert max(gap) < 0.02, a.get_gid()
+
+
+def _along(pts, q):
+    """(distance of q from the polyline pts, arc length from pts[0] to the nearest point)."""
+    pts = np.asarray(pts, float)
+    best, run = (np.inf, 0.0), 0.0
+    for a, b in zip(pts, pts[1:]):
+        ab = b - a
+        t = float(np.clip(np.dot(q - a, ab) / max(np.dot(ab, ab), 1e-12), 0.0, 1.0))
+        d = float(np.hypot(*(q - a - t * ab)))
+        if d < best[0]:
+            best = (d, run + t * float(np.hypot(*ab)))
+        run += float(np.hypot(*ab))
+    return best
+
+
+def test_1ema_chromophore_sits_by_its_helix_not_the_ghost_strand():
+    """GFP's CRO66 is 3 residues past helix A:57-64, in the loop to the 3-10 helix A:69-71, which the router takes all
+    the way round the barrel (24 units). Its star is placed by its residue distance from the nearer element end, a
+    bounded step along the route (R3), so it stays beside A:57-64 and not by the ghost closure strand."""
+    from foldmap.render import residue_point
+    from foldmap.route import route_loops
+
+    path = DATA / "1EMA.cif"
+    lay, sses, bb = make_layout(path)
+    loops = route_loops(lay, sses, bb)
+    (k,) = [r for r in lay.res_linked if lay.res_labels[r].seq == 66]
+    helix = next(s for s in sses if s.id == "A:57-64")
+    loop = next(lp for lp in loops if lp.a_id == "A:57-64" and lp.b_id == "A:69-71")
+    at = np.array(residue_point(lay, loops, sses, lay.res_chain, k))
+    port = np.array(lay.placed[helix.id].c_port)
+    assert np.hypot(*(at - port)) < 1.5
+    off, arc = _along(loop.points, at)
+    assert off < 1e-6 and arc < 1.5
+    for g in lay.ghosts:  # never beside a ghost: farther than a star's reach from its rectangle
+        x0, y0, x1, y1 = g.rect
+        assert np.hypot(max(x0 - at[0], 0, at[0] - x1), max(y0 - at[1], 0, at[1] - y1)) > 1.0

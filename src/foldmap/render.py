@@ -927,9 +927,13 @@ _SNFG = {  # Symbol Nomenclature for Glycans: (shape, colour)
 }
 
 
+_RESIDUE_STEP = 0.5  # page units along a loop's route per residue from the nearer element end (R3)
+
+
 def residue_point(layout: Layout, loops: list[Loop], sses: list[SSE], bb, r: int) -> tuple[float, float] | None:
-    """Where residue r (Backbone index) sits on the page: along its element, or along the loop it is in, in
-    proportion to its place in the sequence; past a chain end, at the end of the terminal stub."""
+    """Where residue r (Backbone index) sits on the page: along its element, or along the loop it is in,
+    the number of residues from the nearer element end (a bounded step each, _RESIDUE_STEP); past a chain end, at
+    the end of the terminal stub."""
     chains = [l.chain for l in bb.labels] if hasattr(bb, "labels") else bb
     chain = chains[r]
     mine = [s for s in sses if s.chain == chain and s.id in layout.placed]
@@ -946,10 +950,15 @@ def residue_point(layout: Layout, loops: list[Loop], sses: list[SSE], bb, r: int
         if loop is not None:
             pts = np.asarray(loop.points, float)
             seg = np.hypot(*np.diff(pts, axis=0).T)
-            target = (r - a.end) / max(b.start - a.end, 1) * seg.sum()
-            k = int(np.searchsorted(np.cumsum(seg), target))
-            k = min(k, len(seg) - 1)
-            into = (target - (np.cumsum(seg)[k] - seg[k])) / max(seg[k], 1e-9)
+            run = np.cumsum(seg)
+            d_a, d_b = r - a.end, b.start - r
+            # residue distance from the nearer end, a bounded step along the route from that end (R3: never a
+            # fraction of the routed length, which a loop round a barrel stretches far from either element); a
+            # short route keeps the residues in order inside it
+            walk = min(min(d_a, d_b) * _RESIDUE_STEP, run[-1] * min(d_a, d_b) / max(d_a + d_b, 1))
+            target = walk if d_a <= d_b else run[-1] - walk
+            k = min(int(np.searchsorted(run, target)), len(seg) - 1)
+            into = (target - (run[k] - seg[k])) / max(seg[k], 1e-9)
             return tuple(float(v) for v in pts[k] + into * (pts[k + 1] - pts[k]))
     if before:
         p = layout.placed[before[-1].id]

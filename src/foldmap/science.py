@@ -12,8 +12,11 @@ wrong sheet (plan 12, the external review's FimD 9FWZ: a strand wedged between t
 - S3: a closed barrel's strand count (its accessory strands left out) equals the longest cycle of the pairing graph
   (strands joined by at least sheets._MIN_PAIRS bridges, and the drawn closure by one) among its strands; and a sheet
   drawn open holds no such cycle of _BARREL_MIN (5) strands or more.
-- S4, S5: residue marks at their residue, automatic domains against a reference (plan 12 Tasks 4 and 3): hooks, not
-  yet measured (None).
+- S4: a residue mark (a linked residue's star) lies on its own residue's place: on its element's axis, or on the
+  loop route it is in, within RESIDUE_STEP per residue (plus MARK_SLACK) of the nearer element end along the route, or
+  at a chain end's stub (plan 12 Task 4, R3: GFP's CRO66 star beside the ghost closure strand). Measured on a drawn
+  figure only (figcheck.science_checks); `foldmap summary` has no marks, so it reports it not yet measured (None).
+- S5: automatic domains against a reference (plan 12 Task 3): a hook, not yet measured (None).
 - S6: an accessory strand (Sheet.accessory, Layout.accessory: off its sheet's run of paired strands) is drawn at its
   partner: in a column next to the partner's, their drawn spans overlapping; or its pairing is named in the notes
   (Layout.unshown: no height beside the partner was free). Fix round 3 ruling: a shared column means collinear, so an
@@ -39,7 +42,13 @@ SCIENCE = {
     "S5": "automatic domains agree with a reference",
     "S6": "accessory drawn at its partner",
 }
-NOT_YET = ("S4", "S5")  # hooks: measured by later tasks; None until then
+NOT_YET = ("S4", "S5")  # None where not measured: S4 off a drawn figure, S5 until Task 3
+RESIDUE_STEP = 0.5  # page units along a loop's route per residue from the nearer element end (render.residue_point)
+MARK_SLACK = 0.5  # page units a mark may stand off its place and its bound (a star is drawn 0.38 across)
+
+# Where a residue's mark may stand: a polyline, the end of it to measure from (0 first point, -1 last), and the
+# longest arc from that end. Mark: (label, drawn centre, place).
+Place = tuple[list[tuple[float, float]], int, float]
 _MAX_CYCLES = 20_000  # simple cycles looked at before S3 gives up on a sheet (sheet graphs are sparse)
 
 # A drawn sheet: its columns left to right, each the (strand id, is a ghost) standing in it.
@@ -217,3 +226,34 @@ def science_lines(found: dict[str, list[str] | None]) -> list[str]:
         lines.append(f"{key} {what}: {'pass' if not got else f'{len(got)} problem(s)'}")
         lines += [f"  {t}" for t in got]
     return lines
+
+
+def along(pts, q) -> tuple[float, float]:
+    """(distance of q from the polyline pts, arc length from pts[0] to the nearest point on it)."""
+    import numpy as np
+
+    pts = np.asarray(pts, float)
+    q = np.asarray(q, float)
+    best, run = (float("inf"), 0.0), 0.0
+    for a, b in zip(pts, pts[1:]):
+        ab = b - a
+        t = float(np.clip(np.dot(q - a, ab) / max(np.dot(ab, ab), 1e-12), 0.0, 1.0))
+        d = float(np.hypot(*(q - a - t * ab)))
+        if d < best[0]:
+            best = (d, run + t * float(np.hypot(*ab)))
+        run += float(np.hypot(*ab))
+    return best
+
+
+def mark_findings(marks: Iterable[tuple[str, tuple[float, float], Place]]) -> list[str]:
+    """S4: each mark (label, centre, place) lies within MARK_SLACK of its place's polyline and no farther along it,
+    from the place's end, than the place's bound plus MARK_SLACK. One finding per mark that does not."""
+    out = []
+    for label, at, (pts, end, bound) in marks:
+        line = pts if end == 0 else pts[::-1]
+        off, arc = along(line, at)
+        if off > MARK_SLACK:
+            out.append(f"{label} stands {off:.1f} off its own place")
+        elif arc > bound + MARK_SLACK:
+            out.append(f"{label} stands {arc:.1f} along its route, more than {bound:.1f} from its element's end")
+    return out

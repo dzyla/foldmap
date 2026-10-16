@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import numpy as np
+import pytest
 
 from foldmap.dssp import assign_dssp
 from foldmap.io import load_backbone
@@ -386,3 +387,23 @@ def test_a_sheet_drawn_open_holds_no_ring_the_builder_finds():
             sub = graph.subgraph([t.index(x) for x in [*sh.strands, *(a.strand for a in sh.accessory)]])
             assert _ring(nx.maximum_spanning_tree(sub), sub) is None
     assert opened > 50 and not hasattr(layout, "UNCLOSED")
+
+
+@pytest.mark.parametrize("weights, drawn_closed", [((4,) * 6, True), ((2, 4, 2, 2, 2, 2), False)])
+def test_a_two_cycle_pairing_network_is_flagged_by_s3_when_drawn_open(weights, drawn_closed):
+    """M1 (plan 12 T1+T2 re-review): pairings 0-20, 20-40, 40-60, 60-80, 0-40, 20-80 make two cycles sharing the
+    pairing 20-40 (0-20-40 and 20-40-60-80), whose sum is a five-strand ring (0-20-80-60-40) that is no single tree
+    cycle. `_ring` finds it only when the spanning tree happens to lie along it: with equal pairings it does (drawn
+    closed, S3 passes), with 20-40 stronger it misses it (drawn open, a gap recorded for the sheet builder) and S3
+    flags the ring the open sheet holds. Over all 729 weightings of three levels, no sheet is open and unflagged."""
+    from foldmap.science import sheet_checks
+
+    s = [fake(20 * k, 20 * k + 9) for k in range(5)]
+    for k, x in enumerate(s):
+        x.centroid, x.axis = np.array([np.cos(1.2 * k), np.sin(1.2 * k), 0.0]) * 10, np.array([0.0, 0.0, 1.0])
+    pairs = [(0, 1), (1, 2), (2, 3), (3, 4), (0, 2), (1, 4)]
+    br = [b for (i, j), w in zip(pairs, weights) for b in ladder(s[i], s[j], "A", w)]
+    sheets = build_sheets(s, br)
+    found = sheet_checks(sheets, s, br)
+    assert any(sh.closed for sh in sheets) is drawn_closed
+    assert bool(found["S3"]) is (not drawn_closed)

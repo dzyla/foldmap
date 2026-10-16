@@ -107,7 +107,7 @@ def test_fimd_drawn_with_its_accessory_strand_in_the_ring_fails_s1_and_s3():
     assert s1.startswith("sheet 1: D:662-666 | D:") and s1.endswith(" drawn side by side with no bridge")
     assert found["S2"] == []  # its closure, D:197-209 | D:214-223, pairs
     assert found["S3"] == ["sheet 1: 25 barrel strands drawn, the pairing cycle has 24"]
-    assert found["S4"] is None and found["S5"] is None  # hooks, not yet measured
+    assert found["S4"] is None and found["S5"] is None  # S4 needs a drawn figure, S5 a reference: not measured
 
 
 @pytest.mark.parametrize("path", [DATA / "1EMA.cif", DATA / "1TIM.cif", R100 / "1BXW-A.cif.gz", DATA / "1UBQ.cif"])
@@ -128,7 +128,7 @@ def test_a_control_barrel_figure_passes_and_a_moved_strand_fails(path):
     from foldmap.figcheck import drawn_columns, science_checks
 
     d = _drawn(path)
-    assert science_checks(d) == {"S1": [], "S2": [], "S3": [], "S4": None, "S5": None, "S6": []}
+    assert science_checks(d) == {"S1": [], "S2": [], "S3": [], "S4": [], "S5": None, "S6": []}
     k = next(k for k, ids in enumerate(d.layout.sheets) if len(ids) >= 8)
     cols = drawn_columns(d.layout, k)
     a, b = d.layout.placed[cols[1][0][0]], d.layout.placed[cols[4][0][0]]
@@ -168,7 +168,7 @@ def test_check_command_prints_the_figures_science_and_exits_1_on_a_problem(capsy
 
     assert main(["check", str(DATA / "1UBQ.cif")]) == 0
     out = capsys.readouterr().out
-    assert "S1 sheet neighbours pair: pass" in out and "S4 residue marks at their residue: not yet measured" in out
+    assert "S1 sheet neighbours pair: pass" in out and "S4 residue marks at their residue: pass" in out
     monkeypatch.setattr(
         figcheck,
         "science_checks",
@@ -394,3 +394,43 @@ def test_check_help_names_s6():
 
     sub = next(a for a in build_parser()._actions if a.dest == "command")
     assert "S6" in sub.choices["check"].description
+
+
+def test_s4_flags_a_mark_far_along_a_long_loop_from_its_residue():
+    from foldmap.science import mark_findings
+
+    loop = [(0.0, 0.0), (0.0, 10.0), (10.0, 10.0)]  # a 20-unit route; the residue is 2 past its first element
+    near = ("A:66", (0.0, 1.0), (loop, 0, 2 * 0.5))
+    far = ("A:66", (5.0, 10.0), (loop, 0, 2 * 0.5))
+    off = ("A:66", (3.0, 3.0), (loop, 0, 2 * 0.5))
+    assert mark_findings([near]) == []
+    assert "along its route" in mark_findings([far])[0]
+    assert "off its own place" in mark_findings([off])[0]
+    assert mark_findings([("A:66", (10.0, 9.5), (loop, -1, 0.5))]) == []  # measured from the far end
+
+
+def test_1ema_chromophore_star_passes_s4_and_the_old_fraction_would_not(monkeypatch):
+    from foldmap import render
+    from foldmap.figcheck import science_checks
+
+    d = _drawn(DATA / "1EMA.cif")
+    assert science_checks(d)["S4"] == []
+    # the pre-R3 rule: a fraction of the routed loop's length, 8 units along a 24-unit route for CRO66
+    real = render.residue_point
+
+    def by_fraction(layout, loops, sses, bb, r):
+        at = real(layout, loops, sses, bb, r)
+        lp = next((lp for lp in loops if lp.a_id == "A:57-64" and lp.b_id == "A:69-71"), None)
+        if lp is None or r != 63:
+            return at
+        pts = lp.points
+        seg = [((a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2) ** 0.5 for a, b in zip(pts, pts[1:])]
+        target, k = sum(seg) / 3, 0
+        while target > seg[k]:
+            target -= seg[k]
+            k += 1
+        t = target / seg[k]
+        return tuple(pts[k][i] + t * (pts[k + 1][i] - pts[k][i]) for i in (0, 1))
+
+    monkeypatch.setattr(render, "residue_point", by_fraction)
+    assert science_checks(_drawn(DATA / "1EMA.cif"))["S4"]
