@@ -144,7 +144,7 @@ def auto_chain(path, chain: str) -> tuple[list, np.ndarray, list]:
     contacts = sse_contacts(bb, sses)
     for key, n in _bridge_contacts(bb, sses, load_links(path, bb, "asu", model=model)).items():
         contacts[key] = contacts.get(key, 0) + n
-    domains = _domains("auto", sses, contacts, template_rows(sheets, sses, copies), copies)
+    domains = _domains("auto", sses, contacts, template_rows(sheets, sses, copies), copies, bb=bb)
     return list(bb.labels), layout_labels(domains, sses, bb.labels, chain), domains
 
 

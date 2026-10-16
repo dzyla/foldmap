@@ -343,7 +343,7 @@ def make_layout(
     rows = (  # βα rows are rigid units: automatic domains never split one
         template_rows(sheets, sses, copies) if mode == "projected" and (look or Style()).fold_template == "auto" else []
     )
-    named = _domains(domains, sses, contacts, rows, copies, partial)
+    named = _domains(domains, sses, contacts, rows, copies, partial, bb)
     for _, ids in named:  # a domain holds together: its elements pull on each other
         for a in range(len(ids)):
             for b in range(a + 1, len(ids)):
@@ -746,7 +746,7 @@ def stale_domains_note(spec, sses) -> str:
     )
 
 
-def _domains(spec, sses, contacts, rows=(), copies=None, lent=frozenset()) -> list[tuple[str, list[str]]]:
+def _domains(spec, sses, contacts, rows=(), copies=None, lent=frozenset(), bb=None) -> list[tuple[str, list[str]]]:
     """[(name, element ids)] from 'auto' (chain by chain, copies of a protein (`copies`) alike, chains that only
     lend elements (`lent`) in their mates' domains, never splitting a βα row of `rows`) or [(name, [refs])]; every
     element in at most one domain."""
@@ -756,7 +756,7 @@ def _domains(spec, sses, contacts, rows=(), copies=None, lent=frozenset()) -> li
     if not spec:
         return []
     if spec == "auto":
-        return auto_domains(sses, contacts, rows, copies, lent)
+        return auto_domains(sses, contacts, rows, copies, lent, bb=bb)
     if _element_ids(spec):
         known = {s.id for s in sses}
         stale = stale_domain_ids(spec, sses)

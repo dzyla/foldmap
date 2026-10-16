@@ -978,7 +978,8 @@ def test_domains_sharing_a_sheet_of_copies_are_not_parted():
     """C31 (random-100): urate oxidase's four copies share their sheets (one item holds strands of every copy's
     domains), so _part_domains could never part those domains and widened the spread on every sweep: the domains
     view of 3L9G was 2160 x 292 px (area 109 times the default's), its legend off the page. Domains sharing an item
-    stay together, and the sweeps stop when they no longer shrink the overlap."""
+    stay together, and the sweeps stop when they no longer shrink the overlap. Each copy holds urate oxidase's two
+    T-fold domains (2-135, 140-293; plan 12 Task 3: the element communities gave three)."""
     from foldmap import figcheck
     from foldmap.spec import draw_spec, figure_spec
 
@@ -986,7 +987,7 @@ def test_domains_sharing_a_sheet_of_copies_are_not_parted():
     plain = draw_spec(figure_spec(path)).layout
     d = draw_spec(figure_spec(path, domains="auto"))
     lay = d.layout
-    assert len(lay.domains) == 12 and d.stuck == []
+    assert len(lay.domains) == 8 and d.stuck == []
     assert lay.width * lay.height < 1.5 * plain.width * plain.height
     assert lay.width < 1.5 * plain.width
     assert figcheck.off_page(d) == []

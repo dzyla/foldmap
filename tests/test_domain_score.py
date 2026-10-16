@@ -78,7 +78,6 @@ def _scores(entries):
     return [ds.chain_score(CACHE / f"{e['pdb']}.cif", e) for e in entries]
 
 
-@pytest.mark.xfail(strict=True, reason="auto domains over-split: plan 12 Task 3 step 2")
 @needs_cache
 def test_auto_domains_meet_the_ruled_targets_on_the_cath_set():
     """Plan 12 ruling R2: mean overlap >= .80, boundary F1 >= .70 and recall >= .85 on the 33 chains, and on the
@@ -95,7 +94,6 @@ def test_auto_domains_meet_the_ruled_targets_on_the_cath_set():
         assert rest[key] >= ds.TARGETS[key] - 0.05, rest
 
 
-@pytest.mark.xfail(strict=True, reason="auto domains over-split: plan 12 Task 3 step 2")
 def test_t4_lysozyme_finds_the_literature_boundary():
     """2LZM (R2): the literature's domains are N 13-75 and C 1-12 + 76-164; the cut near 75/76 is found and none is
     made near 112/115 (the old split, 37 residues off)."""
@@ -103,3 +101,54 @@ def test_t4_lysozyme_finds_the_literature_boundary():
     got = ds.chain_score(DATA / "2LZM.cif", entry)
     assert got["n_auto"] == 2 and got["recall"] >= 0.5 and got["precision"] == 1.0, got
     assert got["overlap"] >= 0.85, got
+
+
+def _blob(n: int, centre) -> np.ndarray:
+    """n points 3.8 Å apart on a snake through a cube about `centre`: a compact domain's CA atoms."""
+    side = int(np.ceil(n ** (1 / 3)))
+    pts = [
+        (x if (y + z * side) % 2 == 0 else side - 1 - x, y if z % 2 == 0 else side - 1 - y, z)
+        for z in range(side)
+        for y in range(side)
+        for x in range(side)
+    ]
+    return np.array(pts[:n], float) * 3.8 + np.asarray(centre, float)
+
+
+def test_residue_domains_find_a_discontinuous_domain():
+    """T4 lysozyme's pattern: the chain starts in one domain (30 residues), makes the other (60), and comes back
+    (60): two domains, the first holding both ends."""
+    from foldmap.features import residue_domains
+
+    far = _blob(90, (0, 0, 0))
+    near = _blob(60, (60, 0, 0))
+    ca = np.vstack([far[:30], near, far[30:]])
+    assert residue_domains(ca).tolist() == [0] * 30 + [1] * 60 + [0] * 60
+
+
+def test_residue_domains_find_domains_that_alternate_twice():
+    """5JDN's pattern: A, B, A, B along the chain, each run 50 residues: one cut of two runs."""
+    from foldmap.features import residue_domains
+
+    a, b = _blob(100, (0, 0, 0)), _blob(100, (60, 0, 0))
+    ca = np.vstack([a[:50], b[:50], a[50:], b[50:]])
+    assert residue_domains(ca).tolist() == ([0] * 50 + [1] * 50) * 2
+
+
+def test_residue_domains_keep_a_group_whole_and_one_domain_alone():
+    from foldmap.features import residue_domains
+
+    ca = np.vstack([_blob(80, (0, 0, 0)), _blob(80, (60, 0, 0))])
+    assert residue_domains(ca).tolist() == [0] * 80 + [1] * 80
+    assert residue_domains(ca, keep=[[10, 150]]).tolist() == [0] * 160  # a βα row spanning both is never cut
+    assert residue_domains(_blob(160, (0, 0, 0))).tolist() == [0] * 160
+
+
+def test_a_stray_element_goes_home():
+    """An element run of under DOMAIN_STRAY residues between two runs of another domain joins it (1LDM's 247-261
+    left in the Rossmann domain); a run at the chain's end stays (2LZM's helix A)."""
+    from foldmap.features import _no_strays
+
+    assert _no_strays([0, 0, 1, 0, 0], [10, 10, 15, 10, 10]) == [0, 0, 0, 0, 0]
+    assert _no_strays([0, 0, 1, 1, 0], [10, 10, 15, 15, 10]) == [0, 0, 1, 1, 0]  # 30 residues: a domain's piece
+    assert _no_strays([1, 0, 0, 0], [12, 10, 10, 10]) == [1, 0, 0, 0]

@@ -178,6 +178,100 @@ def helices_on_sheets(bb: Backbone, sses: list[SSE], sheets: list[Sheet]) -> dic
 
 
 DOMAIN_MIN_SSE_RESIDUES = 30  # residues in helices/strands an automatic domain needs
+# The residue-level split (residue_domains), calibrated on 22 of the 33 CATH chains of
+# tests/data/domains/cath_reference.json (plan 12 Task 3; tests/test_domain_score.py holds the targets):
+DOMAIN_CONTACT = 12.0  # Å between CA atoms: two residues in contact, counted for the split
+DOMAIN_SEPARATION = 6  # residues apart in sequence at least: nearer pairs are the chain, not the fold
+DOMAIN_NCUT = 0.37  # a part splits when its best cut's normalized cut is below this
+DOMAIN_MIN_RESIDUES = 40  # residues a domain needs
+DOMAIN_MIN_SEGMENT = 20  # residues each piece of a cut needs (a domain may be two pieces: 2LZM's helix A)
+DOMAIN_MAX_POINTS = 800  # longer chains are split on blocks of consecutive residues, this many blocks at most
+
+
+def residue_domains(ca: np.ndarray, keep=()) -> np.ndarray:
+    """One chain's domains, residue by residue (CA coordinates in chain order): the domain number of each residue,
+    numbered by first residue. The chain is cut in two again and again, as long as a part splits clearly: each cut
+    takes one or two runs of the part's residues (in sequence) as one side and the rest as the other, so a domain
+    may be discontinuous (T4 lysozyme's C-domain holds helix A, 1-12, and 76-164). The best cut has the lowest
+    normalized cut (contacts across / contacts of either side, summed: Shi and Malik 2000) over residue contacts
+    (DOMAIN_CONTACT, DOMAIN_SEPARATION); it is made when that is below DOMAIN_NCUT and both sides keep
+    DOMAIN_MIN_RESIDUES, each piece DOMAIN_MIN_SEGMENT (_best_cut). No cut parts the residues of a group of
+    `keep` (residue indices: a βα row's elements, drawn as one rigid unit)."""
+    n = len(ca)
+    block = max(1, -(-n // DOMAIN_MAX_POINTS))  # residues per point: a long chain is split on blocks of residues
+    m = -(-n // block)
+    pairs = cKDTree(ca).query_pairs(DOMAIN_CONTACT, output_type="ndarray") if n > 1 else np.zeros((0, 2), int)
+    pairs = pairs[np.abs(pairs[:, 0] - pairs[:, 1]) >= DOMAIN_SEPARATION]
+    graph = np.zeros((m, m))
+    np.add.at(graph, (pairs[:, 0] // block, pairs[:, 1] // block), 1.0)
+    graph += graph.T
+    least, piece = -(-DOMAIN_MIN_RESIDUES // block), -(-DOMAIN_MIN_SEGMENT // block)
+    groups = [np.unique(np.asarray(g, dtype=int) // block) for g in keep if len(g)]
+    parts, done = [np.arange(m)], []
+    while parts:
+        part = parts.pop()
+        whole = [np.isin(part, g) for g in groups]
+        side = _best_cut(graph[np.ix_(part, part)], least, piece, [w for w in whole if w.any()])
+        if side is None:
+            done.append(part)
+        else:
+            parts += [part[~side], part[side]]
+    out = np.zeros(m, dtype=int)
+    for d, part in enumerate(sorted(done, key=lambda p: int(p.min()))):
+        out[part] = d
+    return np.repeat(out, block)[:n]
+
+
+def _best_cut(graph: np.ndarray, least: int, piece: int, whole=()) -> np.ndarray | None:
+    """The side of the part's best cut (residue_domains) as a mask over the part's points, None when the part does
+    not split: the run [a, b) of lowest normalized cut, or that run with one more run of the rest when that cuts
+    lower (5JDN's domains alternate four times along the chain). Each side keeps `least` points and each piece
+    `piece`; no side holds only some of a group of `whole` (masks over the part's points). Every run is weighed at
+    once from the cumulative sums of the contact matrix."""
+    m = len(graph)
+    if m < 2 * least:
+        return None
+    cum = np.zeros((m + 1, m + 1))
+    cum[1:, 1:] = graph.cumsum(0).cumsum(1)
+    degree = np.concatenate([[0.0], graph.sum(1).cumsum()])
+    total = degree[m]
+    i, j = np.meshgrid(np.arange(m + 1), np.arange(m + 1), indexing="ij")
+    inner = cum[j, j] - cum[i, j] - cum[j, i] + cum[i, i]  # contacts within the run [i, j) (each counted twice)
+    vol = degree[j] - degree[i]  # contacts of the run's points
+    size = j - i
+    counts = [np.concatenate([[0], np.cumsum(mask)]) for mask in whole]
+
+    def ncut(within, volume, ok):  # rounded: alike on any CPU
+        with np.errstate(divide="ignore", invalid="ignore"):
+            across = volume - within
+            value = across / volume + across / (total - volume)
+        return np.where(ok & (volume > 0) & (total - volume > 0), np.round(value, 9), np.inf)
+
+    ok = (size >= least) & (m - size >= least) & (size >= piece) & ~((i == 0) & (j == m))
+    ok &= ((i == 0) | (i >= piece)) & ((j == m) | (m - j >= piece))
+    for count in counts:
+        inside = count[j] - count[i]
+        ok &= (inside == 0) | (inside == count[-1])
+    one = ncut(inner, vol, ok)
+    a, b = np.unravel_index(int(np.argmin(one)), one.shape)
+    if not np.isfinite(one[a, b]):
+        return None
+    side = np.zeros(m, dtype=bool)
+    side[a:b] = True
+    best = one[a, b]
+    with_a = np.concatenate([[0.0], graph[:, a:b].sum(1).cumsum()])  # each point's contacts with [a, b), summed
+    ok = (size >= piece) & (m - (b - a) - size >= least)  # a second run [i, j) beside [a, b), the rest kept whole
+    ok &= ((j <= a) & ((i == 0) | (i >= piece)) & ((j == a) | (a - j >= piece))) | (
+        (i >= b) & ((i == b) | (i - b >= piece)) & ((j == m) | (m - j >= piece))
+    )
+    for count in counts:
+        inside = count[b] - count[a] + count[j] - count[i]
+        ok &= (inside == 0) | (inside == count[-1])
+    two = ncut(inner[a, b] + 2 * (with_a[j] - with_a[i]) + inner, vol[a, b] + vol, ok)
+    c, d = np.unravel_index(int(np.argmin(two)), two.shape)
+    if two[c, d] < best:
+        side[c:d], best = True, two[c, d]
+    return side if best < DOMAIN_NCUT else None
 
 
 def auto_domains(
@@ -186,30 +280,38 @@ def auto_domains(
     together: list[list[str]] = (),
     copies: dict[str, tuple[str, int]] | None = None,
     lent: set[str] = frozenset(),
+    *,
+    bb: Backbone,
 ) -> list[tuple[str, list[str]]]:
-    """Domains, chain by chain: each chain's split (_chain_domains), named D1, D2... in sequence order (with
-    " · chain" when several chains are split). Copies of one protein (`copies`, model.homolog_chains) share their
-    reference copy's split (model.copy_classes): each element joins the domain of its mate there, an element the
-    reference lacks the domain of the element before it (else after it) in its chain. Chains lending a few
-    elements to the drawn subunit (`lent`, focus mode) add them to their mates' domains instead of having their own.
-    [] when no chain reads as more than one domain."""
+    """Domains, chain by chain: each chain's split (_chain_domains, from its residues in the backbone `bb`), named
+    D1, D2... in sequence order (with " · chain" when several chains are split). Copies of one protein (`copies`,
+    model.homolog_chains) share their reference copy's split (model.copy_classes): each element joins the domain
+    of its mate there, an element the reference lacks the domain of the element before it (else after it) in its
+    chain. Chains lending a few elements to the drawn subunit (`lent`, focus mode) add them to the domain they
+    complete instead of having their own: the drawn domain they have most contacts with (1LDM's N-terminal strand
+    of a neighbour pairs in the catalytic domain's sheet, though its mate is in the Rossmann domain), else their
+    mates'. [] when no chain reads as more than one domain."""
     classes = copy_classes(sses, copies or {})
     mine = group_by_chain(sses)
     root = {c: (copies or {}).get(c, (c, 0))[0] for c in mine}
     owner: dict[str, tuple[str, int]] = {}  # element -> (chain, its domain's number there)
     for chain, els in mine.items():
         if classes.reference.get(root[chain], chain) == chain:
-            for d, ids in enumerate(_chain_domains(els, contacts, together)):
+            index = [k for k, l in enumerate(bb.labels) if l.chain == chain]
+            for d, ids in enumerate(_chain_domains(els, contacts, together, (bb.ca[index], index))):
                 owner.update({k: (chain, d) for k in ids})
-    for chain, els in mine.items():
+    drawn: dict[str, tuple[str, int]] = {}  # the drawn chains' elements and their domains, once all are known
+    for chain, els in sorted(mine.items(), key=lambda kv: kv[0] in lent):  # the lending chains last
         if classes.reference.get(root[chain], chain) == chain:
             continue
+        if chain in lent and not drawn:
+            drawn = {k: key for k, key in owner.items() if key[0] not in lent}
         got = [owner.get(classes.mate[s.id]) for s in els]
         if not any(got):
             continue
         for k, s in enumerate(els):
             near = got[k] or next((g for g in reversed(got[:k]) if g), None) or next(g for g in got[k:] if g)
-            owner[s.id] = near if chain in lent else (chain, near[1])
+            owner[s.id] = (_host(s.id, drawn, contacts) or near) if chain in lent else (chain, near[1])
     ref = {c: classes.reference.get(root[c], c) for c in mine}
     _fold_small_copies(owner, ref, sses, contacts)
     groups: dict[tuple[str, int], list[str]] = {}
@@ -222,6 +324,16 @@ def auto_domains(
         for d in sorted(d for c, d in groups if c == chain):  # a copy's domains are numbered as its reference's
             out.append((f"D{d + 1}" if len(split) == 1 else f"D{d + 1} · {chain}", groups[(chain, d)]))
     return out
+
+
+def _host(k: str, drawn: dict[str, tuple[str, int]], contacts: dict[frozenset[str], int]) -> tuple | None:
+    """The domain of the `drawn` elements (element -> its domain) element `k` has most contacts with, None when it
+    touches none; a tie goes to the earlier domain."""
+    near: Counter = Counter()
+    for m, key in drawn.items():
+        near[key] += contacts.get(frozenset((k, m)), 0)
+    best = [key for key in sorted(near) if near[key] > 0]
+    return max(best, key=lambda key: near[key]) if best else None
 
 
 def _fold_small_copies(
@@ -297,14 +409,39 @@ def domain_tones(
     return [tone.setdefault(root(d), len(tone)) for d in range(len(domains))]
 
 
-def _chain_domains(sses: list[SSE], contacts: dict[frozenset[str], int], together=()) -> list[list[str]]:
-    """One chain's domains, in sequence order: communities of its element contact graph (plus chain connectivity),
-    each with at least DOMAIN_MIN_SSE_RESIDUES residues of elements (smaller ones fold into their best-connected
-    neighbour), when they split the chain clearly (modularity at least 0.3). A βα row of `together`
-    (layout.template_rows, drawn as one rigid unit) is never split: the communities holding its strands merge and
-    its helices follow its strands, so the row lies in one domain's panel (1LDM's Rossmann sheet: the contacts alone
-    cut it in two and put its α2 in the catalytic domain); what that leaves too small folds again (1TIM: a
-    10-residue domain of two helices). [] when the chain reads as a single domain."""
+DOMAIN_STRAY = 20  # residues of elements: a run of one domain's elements this small, between two runs of another
+
+
+def _no_strays(domain: list[int], size: list[int]) -> list[int]:
+    """Each element's domain (in chain order) with the strays taken home: a run of one domain's elements holding
+    fewer than DOMAIN_STRAY element residues, with one other domain's elements on both sides, joins that domain (a
+    helix a cut left in the domain across: 1LDM's 247-261 in the Rossmann domain, its panel then reaching over the
+    catalytic one). A run at either end of the chain stays (2LZM's helix A, in the C-domain)."""
+    out = list(domain)
+    runs = []
+    for k, d in enumerate(out):
+        if runs and runs[-1][0] == d:
+            runs[-1][2] = k + 1
+        else:
+            runs.append([d, k, k + 1])
+    for (before, _, _), (d, a, b), (after, _, _) in zip(runs, runs[1:], runs[2:]):
+        if before == after != d and sum(size[a:b]) < DOMAIN_STRAY:
+            out[a:b] = [before] * (b - a)
+    return out
+
+
+def _chain_domains(
+    sses: list[SSE], contacts: dict[frozenset[str], int], together, residues: tuple[np.ndarray, list[int]]
+) -> list[list[str]]:
+    """One chain's domains, in sequence order: its residue domains (residue_domains; `residues`: the CA coordinates
+    of the chain's residues and their indices in the backbone), each element in the one holding most of its
+    residues, a stray element taken home (_no_strays). Each holds at least DOMAIN_MIN_SSE_RESIDUES residues of
+    elements (smaller ones fold into their best-connected neighbour: element contacts, plus one per neighbour in
+    sequence). A βα row of `together` (layout.template_rows, drawn as one rigid unit) is never split: no cut
+    parts its residues, and should its elements still lie in several domains, the domains holding its strands
+    merge and its helices follow its strands, so the row lies in one domain's panel (1LDM's Rossmann sheet); what
+    that leaves too small folds again (1TIM: a 10-residue domain of two helices). [] when the chain reads as a
+    single domain."""
     import networkx as nx
 
     graph = nx.Graph()
@@ -316,8 +453,6 @@ def _chain_domains(sses: list[SSE], contacts: dict[frozenset[str], int], togethe
     for a, b in zip(sses, sses[1:]):
         w = graph.get_edge_data(a.id, b.id, {}).get("weight", 0.0)
         graph.add_edge(a.id, b.id, weight=w + 1.0)
-    if graph.number_of_edges() == 0:
-        return []
     size = {s.id: len(s) for s in sses}
 
     def fold(groups: list[set[str]]) -> list[set[str]]:  # a domain needs enough structure: the smallest folds
@@ -331,8 +466,20 @@ def _chain_domains(sses: list[SSE], contacts: dict[frozenset[str], int], togethe
             groups[int(np.argmax(link))] |= small
         return groups
 
-    groups = fold(set(g) for g in nx.community.greedy_modularity_communities(graph, weight="weight"))
-    if len(groups) < 2 or nx.community.modularity(graph, [sorted(g) for g in groups], weight="weight") < 0.3:
+    ca, index = residues
+    at = {k: n for n, k in enumerate(index)}
+    span = {s.id: range(s.start, s.end + 1) for s in sses}
+    keep = [[at[k] for i in row if i in span for k in span[i] if k in at] for row in together]
+    label = dict(zip(index, residue_domains(ca, keep).tolist()))
+    mine = []
+    for s in sses:
+        votes = Counter(label[k] for k in span[s.id] if k in label)
+        mine.append(min(votes, key=lambda d: (-votes[d], d)) if votes else 0)
+    found: dict[int, set[str]] = {}
+    for s, d in zip(sses, _no_strays(mine, [len(s) for s in sses])):
+        found.setdefault(d, set()).add(s.id)
+    groups = fold(found.values())
+    if len(groups) < 2:
         return []
     kind = {s.id: s.kind for s in sses}
     for keep in together:  # a βα row stays whole: its strands' communities merge, its helices follow its strands
