@@ -451,6 +451,18 @@ def _stack_gaps(lay: Layout) -> list[tuple[float, float, float, float]]:
     return out
 
 
+# a stack gap's way out: the longest run of its height beside which the column on one side has no strand. Less
+# than _STACK_SHUT both sides (the columns either side standing past the gap's ends but for a sliver: 9P1X 0.15,
+# 8OZJ 0.54), the loops leaving its facing ends have no way out, or squeeze through one grid cell together (8OZJ's
+# default view): the strand stacked last stands further off, by at most _STACK_NUDGE, meeting nothing and as level
+# with its partner as it was, until a side is open by _STACK_OPEN (two loops' grid cells, route.RES, each _INFLATE
+# clear of the strands), else by _STACK_SHUT (one cell, 0.55, and a margin), else it stays (random-100 C2b-2)
+_STACK_SHUT = 0.6
+_STACK_OPEN = 0.85
+_STACK_NUDGE = 1.0
+_NUDGE_STEP = 0.05
+
+
 # more room in a stack gap a chain end faces: its stub and N/C letter. Fix round 3: at most this, so 9FWZ's
 # D:662-666, end to end with D:634-641, still stands level with its partner D:645-659 (END_LABEL + 0.6 left it above
 # D:645-659's end; the D:618-629 loop into that gap then passes the letter, a route over a label)
@@ -514,6 +526,62 @@ def _column_heights(
     def level(k: int, q: int, y: float) -> bool:
         return abs(y - height[q]) < (length(k) + length(q)) / 2
 
+    def way_out(g0: float, g1: float, c: int, need: float) -> bool:  # does gap (g0, g1) in column c open so far?
+        cols = sorted(set(column.values()))
+        for side in (-1, 1):
+            at = cols.index(c) + side
+            if not 0 <= at < len(cols):
+                return True  # the sheet's edge
+            spans = sorted((height[q] - length(q) / 2, height[q] + length(q) / 2) for q in occupied.get(cols[at], []))
+            best, y = 0.0, g0
+            for lo, hi in spans:
+                if lo < g1 and hi > g0:
+                    best, y = max(best, lo - y), max(y, hi)
+            if max(best, g1 - y) >= need - 1e-9:
+                return True
+        return False
+
+    def shut(k: int, c: int, y: float, need: float) -> list[int]:  # what k stands end to end with, gap shut
+        half, out = length(k) / 2, []
+        for q in occupied.get(c, []):
+            top, bottom = height[q] + length(q) / 2, height[q] - length(q) / 2
+            if 0 < (y - half) - top <= room(q, k) + _STACK_NUDGE + 1e-9:
+                gap = (top, y - half)
+            elif 0 < bottom - (y + half) <= room(k, q) + _STACK_NUDGE + 1e-9:
+                gap = (y + half, bottom)
+            else:
+                continue
+            if not way_out(*gap, c, need):
+                out.append(q)
+        return out
+
+    def meets(k: int, c: int, y: float) -> bool:  # does k at height y come nearer than its room to anything in c?
+        half = length(k) / 2
+        return any(
+            height[q] - length(q) / 2 - room(k, q) - half + 1e-9
+            < y
+            < height[q] + length(q) / 2 + room(q, k) + half - 1e-9
+            for q in occupied.get(c, [])
+        )
+
+    def opened(k: int, c: int, y: float, p: int) -> float:
+        """k's height, moved off the one strand it stands end to end with across a gap shut (_STACK_SHUT) until
+        the gap opens to a side by _STACK_OPEN, else by _STACK_SHUT, by at most _STACK_NUDGE, meeting nothing else
+        and as level with its partner p as it was; else as it stands."""
+        walls = shut(k, c, y, _STACK_SHUT)
+        if len(walls) != 1:
+            return y
+        way, was, some = (1 if y > height[walls[0]] else -1), level(k, p, y), None
+        for step in range(1, round(_STACK_NUDGE / _NUDGE_STEP) + 1):
+            z = float(_snap(y + way * step * _NUDGE_STEP))
+            if meets(k, c, z) or level(k, p, z) != was:
+                break
+            if not shut(k, c, z, _STACK_OPEN):
+                return z
+            if some is None and not shut(k, c, z, _STACK_SHUT):
+                some = z
+        return y if some is None else some
+
     for i, a in enumerate(sheet.accessory):
         k, p = n + i, index[id(a.parent)]
         y = spot(k, column[k], height[p])
@@ -530,7 +598,7 @@ def _column_heights(
                 else:
                     continue
                 break
-        height[k] = float(_snap(y))
+        height[k] = float(_snap(opened(k, column[k], y, p)))
         occupied.setdefault(column[k], []).append(k)
     return {k: h for k, h in height.items() if k >= n}
 

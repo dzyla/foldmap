@@ -694,3 +694,41 @@ def test_helix_hairpins_in_a_bundle_route_their_loops(entry):
 
     d = draw_spec(figure_spec(r100_entry(entry)))
     assert d.stuck == [] and d.over_labels == []
+
+
+def _gap_openings(lay):
+    """Each stack gap's (Layout.stack_gaps) longest run of height, on its left and on its right, beside which no
+    element stands: the way out of the gap for the loops leaving its two facing ends."""
+    rects = [p.rect for p in lay.placed.values()]
+    out = []
+    for x0, y0, x1, y1 in lay.stack_gaps:
+        sides = []
+        for lo, hi in ((x0 - 0.5, x0 - 0.05), (x1 + 0.05, x1 + 0.5)):
+            cover = sorted(
+                (max(r[1], y0), min(r[3], y1)) for r in rects if r[0] < hi and r[2] > lo and r[1] < y1 and r[3] > y0
+            )
+            best, at = 0.0, y0
+            for a, b in cover:
+                best, at = max(best, a - at), max(at, b)
+            sides.append(max(best, y1 - at))
+        out.append(max(sides))
+    return out
+
+
+@pytest.mark.parametrize(
+    "entry, view",
+    [("9P1X", {}), ("9P1X", {"focus": "none"}), ("8OZJ", {"domains": "auto"})],
+    ids=["9P1X-default", "9P1X-focus", "8OZJ-domains"],
+)
+def test_a_stack_gap_opens_to_a_side(entry, view):
+    """Random-100 C2b-2 A3 (9P1X: a:29-32 under b:28-35 and a:34-36 over c:29-37; 8OZJ domains: H:700-717 over
+    H:769-777): two strands end to end in a sheet's column, the columns either side standing past the gap's ends
+    but for a sliver (0.15 and 0.54 page units), so the loops leaving the gap's facing ends had no way out. The
+    strand stacked last stands further off, until the gap opens to one side (at least _STACK_SHUT)."""
+    from foldmap.layout import _STACK_SHUT
+    from foldmap.spec import draw_spec, figure_spec
+    from helpers import r100_entry
+
+    d = draw_spec(figure_spec(r100_entry(entry), **view))
+    assert d.stuck == [] and d.over_labels == []
+    assert min(_gap_openings(d.layout)) >= _STACK_SHUT - 1e-6
