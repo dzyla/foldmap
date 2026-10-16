@@ -275,7 +275,6 @@ class Sheet:
     # strands off the track (a branched sheet's), each beside its parent (Accessory); a closed sheet's are no barrel
     # strand (membrane.py ignores them)
     accessory: list[Accessory] = field(default_factory=list)
-    unclosed: bool = False  # its pairing has a cycle, but its track's ends do not pair: drawn open, with a note
     # (own strand, a strand of another sheet) pairs joining it to a barrel built apart from it (sheets._other_rings)
     joined: list[tuple[SSE, SSE]] = field(default_factory=list)
     # pairs of its track that pair but are not drawn side by side: a ring's chords (9P1X), a short cycle's closure

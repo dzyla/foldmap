@@ -68,7 +68,7 @@ def test_a_barrel_keeps_its_ring_and_draws_a_pendant_strand_off_it():
     """9FWZ's case in small: a 6-strand ring and a short strand pairing with one ring strand only. The barrel is the
     6 ring strands (closed, its ends pair); the pendant is an accessory strand beside its partner."""
     ring, (x,), (sh,) = _ring_sheet(6, [(fake(500, 504), 2)])
-    assert sh.closed and not sh.unclosed and len(sh.strands) == 6 and set(sh.strands) == set(ring)
+    assert sh.closed and len(sh.strands) == 6 and set(sh.strands) == set(ring)
     assert {sh.strands[0].start, sh.strands[-1].start} in ({0, 100}, {100, 0})  # cut at the weakest pairing
     ((acc, parent, column, _, _),) = sh.accessory
     assert acc is x and parent is ring[2] and abs(column - sh.strands.index(ring[2])) == 1  # beside its partner
@@ -84,7 +84,7 @@ def test_a_three_strand_cycle_is_no_barrel_and_draws_open_without_a_note():
     br = ladder(t[0], t[1], "A", 5) + ladder(t[1], t[2], "A", 5) + ladder(t[0], t[2], "A", 3)
     br += ladder(t[2], t[3], "A", 5) + ladder(t[3], t[4], "A", 5) + ladder(t[4], t[5], "A", 5)
     (sh,) = build_sheets(t, br)
-    assert not sh.closed and not sh.unclosed and len(sh.strands) == 6
+    assert not sh.closed and len(sh.strands) == 6
     assert sheet_notes([sh]) == [f"pairings not drawn side by side: {t[0].id} also pairs with {t[2].id}"]
 
 
@@ -95,7 +95,7 @@ def test_a_five_ring_with_a_tail_on_a_path_tree_draws_closed():
     t = [fake(20 * k, 20 * k + 9) for k in range(6)]
     br = [b for p, q in zip(t, t[1:]) for b in ladder(p, q, "A", 5)] + ladder(t[1], t[5], "A", 2)
     (sh,) = build_sheets(t, br)
-    assert sh.closed and not sh.unclosed and {s.start for s in sh.strands} == {20, 40, 60, 80, 100}
+    assert sh.closed and {s.start for s in sh.strands} == {20, 40, 60, 80, 100}
     assert [(a.strand.start, a.parent.start) for a in sh.accessory] == [(0, 20)]
 
 
@@ -348,3 +348,41 @@ def test_notes_file_each_sheets_lines_under_their_own_heading():
         f"1 strand(s) off a sheet's run of paired strands: {d.id} drawn beside its partner {c.id}",
         f"pairings not drawn side by side: {t[0].id} also pairs with {t[2].id}",
     ]
+
+
+def test_a_sheet_drawn_open_holds_no_ring_the_builder_finds():
+    """Fix round 4 (the re-review, section 3): `Sheet.unclosed` and its note ("barrel closure not supported by
+    pairing: drawn open") could no longer fire. _ring is the tree path between the two ends of a pairing left out of
+    the maximum spanning tree, so whenever it finds a ring of _BARREL_MIN strands or more the track's ends pair and
+    the sheet is closed; and a found ring always becomes the track (it is never longer than the tree's longest path,
+    and when as long it covers it). Both are gone; this pins why over random pairing networks: no sheet drawn open
+    holds a ring _ring finds. (A ring that is no single tree cycle, the sum of two, is not found: science S3 flags such
+    a sheet drawn open, open_finding; none in the scan set or the sample.)"""
+    import random
+
+    import networkx as nx
+
+    import foldmap.layout as layout
+    from foldmap.sheets import _edge_table, _ring
+
+    rng = random.Random(12)
+    opened = 0
+    for _ in range(400):
+        n = rng.randint(5, 10)
+        t = [fake(20 * k, 20 * k + 9) for k in range(n)]
+        for s in t:
+            s.centroid, s.axis = np.array([rng.uniform(-10, 10) for _ in range(3)]), np.array([0.0, 0.0, 1.0])
+        br = [b for a, c in zip(t, t[1:]) for b in ladder(a, c, "A", rng.randint(2, 6))]
+        for _ in range(rng.randint(1, 4)):
+            i, j = rng.sample(range(n), 2)
+            br += ladder(t[i], t[j], "A", rng.randint(1, 6))
+        graph = nx.Graph()
+        graph.add_weighted_edges_from((a, b, sum(c.values())) for (a, b), c in _edge_table(t, br).items())
+        for sh in build_sheets(t, br):
+            assert not hasattr(sh, "unclosed")
+            if sh.closed:
+                continue
+            opened += 1
+            sub = graph.subgraph([t.index(x) for x in [*sh.strands, *(a.strand for a in sh.accessory)]])
+            assert _ring(nx.maximum_spanning_tree(sub), sub) is None
+    assert opened > 50 and not hasattr(layout, "UNCLOSED")

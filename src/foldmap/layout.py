@@ -3111,9 +3111,6 @@ def _domain_units(
     return unit, members
 
 
-UNCLOSED = "barrel closure not supported by pairing: drawn open"
-
-
 def _unshown(placed: dict[str, Placed], sheets: list[Sheet]) -> list[tuple[str, str]]:
     """The (accessory, partner) pairings the figure does not draw side by side, as drawn (after copies take their
     mates' shapes): an accessory not in a column next to its partner's, or not level with it (spans apart)."""
@@ -3156,10 +3153,9 @@ def accessory_lines(sheet: Sheet, unshown: list[tuple[str, str]] = (), level: se
 
 
 def sheet_notes(sheets: list[Sheet], unshown: list[tuple[str, str]] = ()) -> list[str]:
-    """What the figure says of its sheets: each sheet whose pairing closes a cycle but whose ends do not pair
-    (Sheet.unclosed), drawn open (UNCLOSED, then its end strands); the pairings joining barrels drawn apart
-    (Sheet.joined); then every pairing drawn off a sheet's run of paired strands or not drawn (accessory_lines)."""
-    out = [f"{UNCLOSED} ({sh.strands[0].id} … {sh.strands[-1].id})" for sh in sheets if sh.unclosed]
+    """What the figure says of its sheets: the pairings joining barrels drawn apart (Sheet.joined); then every
+    pairing drawn off a sheet's run of paired strands or not drawn (accessory_lines)."""
+    out = []
     joins = sorted({" with ".join(sorted((a.id, b.id))) for sh in sheets for a, b in sh.joined})
     if joins:  # two barrels of one pairing network (sheets._other_rings), drawn each as its own
         out.append(f"barrels drawn apart, each closed, that also pair: {', '.join(joins)}")

@@ -83,7 +83,6 @@ def summarize(path: str) -> str:
     level = _level_accessories(path) if any(sh.accessory for sh in sheets) else None
     for n, sh in enumerate(sheets, 1):
         flags = ("closed " if sh.closed else "") + ("ambiguous" if sh.ambiguous else "")
-        flags += " drawn open: closure not supported by pairing" if sh.unclosed else ""
         lines.append(f"sheet {n}: {len(sh.strands)} strand(s) {flags}".rstrip())
         parts = []
         for k, (s, d) in enumerate(zip(sh.strands, sh.directions)):
@@ -1292,7 +1291,7 @@ def _cmd_figure(args: argparse.Namespace) -> int:
             )
         for note in drawn.page_notes:  # a page past layout.MAX_PAGE_IN; a PNG under 300 dpi (random-100 C4)
             print(f"foldmap: {note}", file=sys.stderr)
-        for note in drawn.sheet_notes:  # a barrel drawn open; strands drawn beside their partner (plan 12)
+        for note in drawn.sheet_notes:  # strands off a sheet's run, with their partner (plan 12)
             print(f"foldmap: {note}", file=sys.stderr)
         for out in args.output:
             print(f"wrote {save(drawn.figure, out)}")

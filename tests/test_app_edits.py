@@ -220,8 +220,8 @@ def test_route_notes_read_as_one_line():
     assert notes_text([], [], ["HEM:A154"]) == (  # batch B fix round 2: crowded ligand marks are told in the app too
         "1 ligand mark(s) with no clear spot, drawn over other ink: HEM:A154."
     )
-    note = "barrel closure not supported by pairing: drawn open (A:1-5 … A:60-66)"  # plan 12 Task 2: sheet notes
-    assert notes_text([], [], [], [], [note]) == f"B{note[1:]}."
+    note = "pairings not drawn side by side: O:29-36 also pairs with P:28-35"  # plan 12 Task 2: sheet notes
+    assert notes_text([], [], [], [], [note]) == f"P{note[1:]}."
 
 
 def test_a_table_row_picks_its_structure():

@@ -132,9 +132,9 @@ def build_sheets(sses: list[SSE], bridges: list[Bridge]) -> list[Sheet]:
     maximum spanning tree. The track (Sheet.strands): the tree's longest path; a closed sheet's (its pairing has a
     cycle): a branched tree's longest cycle (_ring), a path tree's path. A part off that ring closing a barrel of its
     own is a sheet of its own (_other_rings). Every other strand is an accessory strand (Sheet.accessory), drawn
-    beside the strand it hangs from (_branch_columns), never between two strands that pair. A sheet whose
-    pairing closes a ring of _BARREL_MIN strands or more whose ends do not pair is drawn open, flagged `unclosed`; a
-    shorter cycle is no barrel (drawn open unless a path's two ends pair, no note)."""
+    beside the strand it hangs from (_branch_columns), never between two strands that pair. A ring _ring finds is
+    always closed (its ends are a pairing left out of the tree); a shorter cycle is no barrel (drawn open unless a
+    path's two ends pair; the pairing it does not draw side by side is a chord)."""
     strands = [s for s in sses if s.kind == "E"]
     table = _edge_table(strands, bridges)
     weak = _edge_table(strands, bridges, minimum=1)  # single bridges, used only to close barrels
@@ -162,7 +162,6 @@ def build_sheets(sses: list[SSE], bridges: list[Bridge]) -> list[Sheet]:
             pending[:0] = split  # next, in order
         ends = (min(order[0], order[-1]), max(order[0], order[-1]))
         closed = cyclic and (ring is not None or not off) and ends in weak
-        unclosed = ring is not None and not closed  # a ring of _BARREL_MIN or more drawn open (its ends do not pair)
         ambiguous = bool(off) or _flank_one_partner(tree, strands)
         direction = {order[0]: 1}
         for parent, child in nx.bfs_edges(tree, order[0]):
@@ -200,7 +199,6 @@ def build_sheets(sses: list[SSE], bridges: list[Bridge]) -> list[Sheet]:
                 closed,
                 ambiguous,
                 accessory=accessory,
-                unclosed=unclosed,
                 joined=joined,
                 chords=chords,
             )

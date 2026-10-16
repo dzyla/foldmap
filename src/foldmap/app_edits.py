@@ -475,7 +475,7 @@ def notes_text(
     """The routing and placement notes under a figure, as one line ('' when there are none): loops with no clear
     route, loops over a label, ligand marks with no clear spot (Drawn.crowded_marks), what is said of its page
     (Drawn.page_notes: held at its largest with text under 6 pt; a PNG under 300 dpi) and of its sheets
-    (Drawn.sheet_notes: a barrel drawn open; strands drawn beside their partner)."""
+    (Drawn.sheet_notes: barrels drawn apart that pair; strands off a sheet's run; pairings not drawn side by side)."""
     notes = [f"{note[0].upper()}{note[1:]}." for note in [*page, *sheets]]
     if fallback:
         notes.append(f"No clear route for {', '.join(fallback)} (drawn as plain curves).")

@@ -292,8 +292,8 @@ class Drawn:
 
     @property
     def sheet_notes(self) -> list[str]:
-        """What is said of the sheets as drawn (layout.sheet_notes): a barrel whose closure its pairing does not
-        support, drawn open; the strands drawn beside their partner, off a sheet's run of paired strands."""
+        """What is said of the sheets as drawn (layout.sheet_notes): barrels drawn apart that pair; the strands off
+        a sheet's run of paired strands, each with its partner; the pairings not drawn side by side."""
         return list(getattr(self.layout, "sheet_notes", []))
 
     @property
