@@ -176,7 +176,8 @@ foldmap styles                                    # every theme and style key
 
 ## What it handles
 
-- **Secondary structure** by a DSSP implementation that matches mkdssp 3.1.2 residue for residue on the test set:
+- **Secondary structure** by a DSSP implementation checked against mkdssp 3.1.2 (no bends, S; the random-100
+  campaign requires at least 99% of residues to agree on helix, strand or neither):
   α-, 3₁₀- and π-helices (π before α, as in DSSP ≥ 2.1), β-strands with bulges, turns; β-sheets
   with strand order and direction, closed barrels shown with a ghost of the first strand. A helix kinked by more
   than 30° is split into pieces drawn end to end; a strand that a bulge splits stays one strand when both pieces
@@ -419,9 +420,10 @@ S1, two strands drawn side by side in a sheet (adjacent columns, level with each
 backbone bridge, and two strands in one column (collinear, end to end) never overlap; S2, a closed barrel's closure
 (the ghost beside the last strand) is joined; S3, a barrel's strand count is the cycle its pairing makes, and no sheet
 drawn open holds a ring of 5 strands or more; S6, a strand off a sheet's run of paired strands stands beside its
-partner, level with it, or the notes name the pairing ("x:67-68 also pairs with x:79-86"). S4 (ligand and
-modified-residue marks at their residue) and S5 (automatic domains against a reference) are not yet measured. `foldmap summary` prints the
-same checks of the sheets as built.
+partner, level with it, or the notes name the pairing ("x:67-68 also pairs with x:79-86"). S4, a linked residue's star (a chromophore, say) stands at its residue on the
+drawn figure; it judges only linked-residue stars, not ligand tethers, glycans, disulfide ends or UniProt site marks,
+and `foldmap summary` (which draws no marks) reports it not measured. S5 (automatic domains against a reference) is
+measured only in the campaign. `foldmap summary` prints the same checks of the sheets as built.
 
 **Checking the contact beads.** `foldmap contacts 1LMB.cif` draws the figure `plot` would (it takes the same options),
 checks every contact bead against the deposited atoms with an independent search, and prints how many beads were
@@ -472,7 +474,8 @@ Every figure (command line, app, MCP or Python) goes through the same steps:
 1. **Read the structure.** gemmi reads the mmCIF/PDB file (or the file downloaded for a PDB ID or UniProt
    accession). With `--assembly auto` the biological assembly is built from the file's own operators.
 2. **Secondary structure.** A DSSP implementation assigns hydrogen bonds from the backbone and calls α-, 3₁₀- and
-   π-helices, β-strands (with bulges) and turns, exactly as mkdssp 3.1.2 does on every test structure.
+   π-helices, β-strands (with bulges) and turns, following mkdssp 3.1.2 (bends, S, are not assigned; agreement
+   with mkdssp is measured on the random-100 campaign, which requires at least 99% of residues to agree).
 3. **Sheets and bundles.** Strands joined by backbone H-bond ladders form sheets; their order and directions come
    from the ladder network, and a sheet whose ends pair is a closed barrel. Each strand drawn side by side with
    another pairs with it: a branched sheet's run of paired strands is its ladder network's longest path (a closed
@@ -487,8 +490,10 @@ Every figure (command line, app, MCP or Python) goes through the same steps:
    four OB folds of the SSB tetramer 1EYG) are each drawn closed, as a sheet of its own; the note and the summary name
    the pairings joining them. Helices packed along their length across chains
    form bundles.
-4. **Context.** Symmetry (cyclic, dihedral, cubic, helical) is found by superposing chains of the same sequence;
-   disulfides, glycans and ligands are read from the atoms; a membrane is estimated on request. Nucleic acids:
+4. **Context.** Symmetry (cyclic, dihedral, cubic, helical) is found by superposing chains that are copies of one another (at least 90% of the shorter sequence matches the
+   other by difflib's matching blocks, so point mutants and different constructs count);
+   disulfides, glycans and ligands are read from the atoms; a membrane is estimated on request (the normal is the dominant axis of the long helices and strands, or a barrel's
+   axis; a fixed-thickness slab is slid along it to the most hydrophobic, least charged position; no tilt search). Nucleic acids:
    base pairs grouped into stems; long bent duplexes cut where the axis turns by 25°.
 5. **Projection.** A frame turns 3D into page coordinates: the dominant element direction points up and the
    widest spread runs left–right (single chains); a symmetric assembly is unrolled around its axis, protein–DNA

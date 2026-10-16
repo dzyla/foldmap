@@ -1079,8 +1079,9 @@ def build_parser() -> argparse.ArgumentParser:
         "columns, level) are joined by a bridge, and two in one column (collinear) never overlap; S2, a barrel's "
         "closure is joined; S3, a barrel's strand count is the cycle its pairing makes, and no sheet drawn open "
         "holds a ring of 5 or more; S6, a strand off a sheet's run of paired strands stands beside its partner, "
-        "level with it, or its pairing is named in the notes. S4 (residue marks) and S5 (automatic domains) are "
-        "not yet measured. "
+        "level with it, or its pairing is named in the notes. S4, a linked residue's star stands at its "
+        "residue (linked-residue stars only: not ligand tethers, glycans, disulfide ends or UniProt marks); S5 "
+        "(automatic domains) is not measured here. "
         "Prints one line per check and one per problem; exits 1 on a problem, 0 otherwise.",
     )
     for cmd in (q, iq, cq, kq):
