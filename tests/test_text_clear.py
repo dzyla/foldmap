@@ -8,8 +8,21 @@ import numpy as np
 import pytest
 
 from foldmap import figcheck
-from foldmap.layout import TAIL_COUNT_SIZE, _ink_em, count_half, label_boxes, overlaps_any, tail_counts
-from foldmap.render import _COUNT_AT, _COUNT_RUNS, _count_spots, ligand_marks, linked_marks, loop_counts
+from foldmap.layout import (
+    TAIL_COUNT_SIZE,
+    _ink_em,
+    count_half,
+    label_boxes,
+    line_band,
+    line_pt,
+    lines_meeting,
+    overlaps_any,
+    page_text,
+    tail_counts,
+    thin_boxes,
+)
+from foldmap.provenance import figure_provenance
+from foldmap.render import _COUNT_AT, _COUNT_RUNS, _count_spots, _draw, ligand_marks, linked_marks, loop_counts
 from foldmap.route import clip_len
 from foldmap.spec import draw_spec, figure_spec
 
@@ -86,17 +99,32 @@ def test_loop_count_sits_clear_of_elements_lines_and_text():
     assert figcheck.off_page(d) == []
 
 
-def test_a_loop_count_with_no_clear_spot_is_left_out_and_listed():
+def test_a_loop_count_is_drawn_clear_or_left_out_and_listed():
     """Batch C2b-1 (random-100 A6 loop-length x loop or helix: 5X4Z, 7AOD, 8ESZ, 8RRX, 5LDW focus): every spot beside
     a loop's four longest runs met ink, and its count went on the first of them anyway (p53's A:18-24>A:110-112 on
-    the loop A:264-274>A:278-293). The count now looks along every run, then nearer their ends; p53's short, boxed-in
-    route has no clear spot, so its count is left out and the figure says so."""
+    the loop A:264-274>A:278-293). The count now looks along every run, then nearer their ends, tested as figcheck
+    reads a text (layout.clear_inks); it is drawn clear of everything, or left out and listed."""
     d = drawn(DATA / "AF-P04637.cif")
     assert figcheck.text_collisions(d) == []
-    assert "loop-length:A:18-24>A:110-112" not in {t.get_gid() for t in d.figure.axes[0].texts}
-    (item,) = [i for i in d.provenance if i["kind"] == "counts_hidden"]
-    assert item["text"] == "1 loop-length label(s) left out: no clear spot: A:18-24>A:110-112 (85 aa)"
-    assert item["elements"] == ["A:18-24>A:110-112"] and item["count"] == 1
+    drawn_counts = {t.get_gid() for t in d.figure.axes[0].texts if (t.get_gid() or "").startswith("loop-length:")}
+    listed = [e for i in d.provenance if i["kind"] == "counts_hidden" for e in i["elements"]]
+    assert ("loop-length:A:18-24>A:110-112" in drawn_counts) != ("A:18-24>A:110-112" in listed)
+
+
+def test_a_count_keeps_from_the_line_itself_as_figcheck_reads_it():
+    """Fix round 1 (controller ruling: placement no stricter than A6): a count is tested against a line's segments,
+    exactly, at the band A6 reads a line by a text (half the drawn stroke) and a pixel to spare (layout.line_band),
+    not against the segment's bounding box padded by a fixed 0.06 page units (a diagonal's box covers its whole
+    rectangle; 7AOD and 7ARD default lost readable counts to it)."""
+    lay = drawn(R100 / "9ON5-A.cif.gz").layout
+    band = line_band(lay)
+    box = (0.0, 0.0, 1.0, 0.3)
+    diagonal = (-2.0, -1.0, 3.0, 4.0)  # y = x + 1: above the box all along it, its bounding box over it
+    assert not lines_meeting(box, [diagonal], band).any() and overlaps_any(box, thin_boxes([(-2, -1), (3, 4)]))
+    near, far = 0.3 + band / 2, 0.3 + band * 1.5
+    assert lines_meeting(box, [(-1.0, near, 2.0, near), (-1.0, far, 2.0, far)], band)[:, 0].tolist() == [True, False]
+    unit = page_text(lay)[1]
+    assert band == pytest.approx((line_pt(1 / (72 * unit)) * lay.loop_stroke / 2 + 0.72) * unit)
 
 
 def test_loop_count_spots_run_along_its_runs_until_none_is_clear():
@@ -126,6 +154,11 @@ def test_loop_count_spots_run_along_its_runs_until_none_is_clear():
     spots = [bx for _, bx in _count_spots(np.asarray(lp.points, float), half)]
     first = spots[: 2 * len(_COUNT_AT) * min(_COUNT_RUNS, len(lp.points) - 1)]
     assert any(box not in first for box in seen) and len(set(seen)) == len(seen)  # past the old spots, none twice
+    fig = _draw(lay, loops, d.sses)  # drawn with every spot crossed: not drawn, listed
+    assert f"loop-length:{name}" not in {t.get_gid() for t in fig.axes[0].texts}
+    (item,) = [i for i in figure_provenance(fig, lay, loops) if i["kind"] == "counts_hidden"]
+    assert item["text"] == f"1 loop-length label(s) left out: no clear spot: {name} (27 aa)"
+    assert item["elements"] == [name] and item["count"] == 1
 
 
 def test_a_tail_count_with_no_clear_spot_is_left_out_and_listed():

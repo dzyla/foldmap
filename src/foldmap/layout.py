@@ -285,6 +285,8 @@ class Layout:
     tied_ids: set[str] = field(default_factory=set)  # ids of the elements of every item a symmetry tie holds, copy
     # and mate alike (a sheet block among them is drawn as its mate is: figcheck.shared_sheet_elements)
     font_scale: float = 1.0  # Style.font_scale the figure is drawn with (texts placed in the layout are sized by it)
+    loop_stroke: float = 1.0  # a loop's drawn stroke in line_pt: Style.loop_width, RUN_EDGE_W times it under
+    # residue colours (its dark edge); for line_band
     helix_matched: dict = field(default_factory=dict)  # {"cut", "joined"}: helix pieces made alike in copies (ss)
     helix_matched_ids: list[str] = field(default_factory=list)  # the helices those cuts and joins made
     na_letter_rows: tuple[float | None, bool] = (None, False)  # where a stem's base letters sit (NT_ROW, 0 on the
@@ -2885,6 +2887,7 @@ def build_layout(
     lay.tied_ids = tied_ids
     lay.mirror_pairs = [(a.sse.id, b.sse.id) for a, b in mirrored if isinstance(a, Placed) and a.sse.kind in ("H", "G")]
     lay.font_scale = style.font_scale
+    lay.loop_stroke = style.loop_width * (RUN_EDGE_W if style.loop_color == "residue" else 1.0)
     lay.ligands = style.ligands
     lay.ba_rows = _ba_rows(items)  # after the user's swaps
     lay.stack_gaps = _stack_gaps(lay)
@@ -3702,6 +3705,54 @@ def line_clearance(layout: Layout) -> float:
     return (LINE_TEXT_CLEARANCE_PX + 0.5) * 0.72 * page_text(layout)[1]
 
 
+RUN_EDGE_W = 1.8  # render: the dark edge under residue-coloured loops, in loop widths
+NA_RUN_W = 1.4  # render: a nucleic-acid strand's run, in line_pt
+
+
+def line_pt(scale: float) -> float:
+    """The width (points) render draws an element outline at, on a page of `scale` inches per page unit; a loop is
+    drawn this times Style.loop_width."""
+    return float(np.clip(0.9 * scale / IN_PER_UNIT, 0.5, 1.2))
+
+
+def line_band(layout: Layout) -> float:
+    """How far (page units) a loop's ink reaches from its centre line as figcheck's A6 reads a line by a text
+    (text_collisions at clearance 0: half the drawn stroke, line_pt times Layout.loop_stroke, or a nucleic-acid
+    strand's NA_RUN_W if wider), plus one pixel at figcheck's 100 dpi to spare (page_text): what a text placed after
+    routing keeps from every line (lines_meeting)."""
+    unit = page_text(layout)[1]  # page units per point
+    stroke = max(layout.loop_stroke, NA_RUN_W if layout.na_paths else 0.0)
+    return (line_pt(1.0 / (72 * unit)) * stroke / 2 + 0.72) * unit
+
+
+def lines_meeting(boxes, segments, band: float) -> np.ndarray:
+    """Which segments meet which boxes: a (segment, box) bool array, true where the segment (x0, y0, x1, y1) runs
+    within `band` of the box (x0, y0, x1, y1), exact (route.clip_lengths); segments far from every box are not
+    clipped. The one line-by-text test of the texts placed after routing: loop and tail counts, helix names
+    (route._clear_helix_names), with band line_band (A6's) or wider."""
+    from .route import clip_lengths
+
+    box = np.asarray(boxes, float).reshape(-1, 4) + np.array([-band, -band, band, band])
+    seg = np.asarray(segments, float).reshape(-1, 4)
+    out = np.zeros((len(seg), len(box)), bool)
+    if not len(seg) or not len(box):
+        return out
+    lo, hi = box[:, :2].min(axis=0), box[:, 2:].max(axis=0)  # the boxes' neighbourhood
+    near = (np.minimum(seg[:, 0], seg[:, 2]) < hi[0]) & (np.maximum(seg[:, 0], seg[:, 2]) > lo[0])
+    near &= (np.minimum(seg[:, 1], seg[:, 3]) < hi[1]) & (np.maximum(seg[:, 1], seg[:, 3]) > lo[1])
+    if near.any():
+        out[near] = clip_lengths(seg[near], box) > 1e-9
+    return out
+
+
+def segments_of(lines) -> np.ndarray:
+    """The segments (x0, y0, x1, y1) of point lists (loops' and nucleic-acid strands' points), as one array."""
+    segs = [
+        (*p[k], *p[k + 1]) for pts in lines for p in [np.asarray(pts, float).reshape(-1, 2)] for k in range(len(p) - 1)
+    ]
+    return np.asarray(segs, float).reshape(-1, 4)
+
+
 def _ink_em(layout: Layout, font_scale: float) -> float:
     """Page units of one em of the drawn text, from the page the placed elements, stems and traces span so far
     (the drawn page is at most 4% wider on the NA fixtures drawn with letters, whose text then grows with it)."""
@@ -4021,9 +4072,43 @@ def thin_boxes(points, pad: float = 0.06) -> list[tuple[float, float, float, flo
     return [(*(np.minimum(a, b) - pad), *(np.maximum(a, b) + pad)) for a, b in zip(pts, pts[1:])]
 
 
-def count_half(text: str, size: float) -> tuple[float, float]:
-    """Half the width and height of a count's or note's ink box: `text` at `size` page units per em."""
-    return size * _text_width(text, bold=False) / 2 + 0.04, size * 0.4 + 0.04
+def count_half(text: str, size: float, pad: float = 0.04) -> tuple[float, float]:
+    """Half the width and height of a count's or note's ink box: `text` at `size` page units per em, grown by `pad`
+    (the room it is placed with; 0: its ink, as figcheck measures it)."""
+    return size * _text_width(text, bold=False) / 2 + pad, size * 0.4 + pad
+
+
+COUNT_ROOM = 1.0  # page units a count may stand past the layout's bounds and lines (render's page margin, `pad`)
+
+
+def count_page(layout: Layout, segments) -> tuple[float, float, float, float]:
+    """Where a text placed after routing may go: the layout's bounds and every line's extent, and COUNT_ROOM around
+    them (render's page holds the counts, growing to them: this keeps one from wandering off the figure)."""
+    x0, y0, x1, y1 = layout.bounds
+    if len(segments):
+        seg = np.asarray(segments, float).reshape(-1, 4)
+        x0, x1 = min(x0, seg[:, [0, 2]].min()), max(x1, seg[:, [0, 2]].max())
+        y0, y1 = min(y0, seg[:, [1, 3]].min()), max(y1, seg[:, [1, 3]].max())
+    return (float(x0) - COUNT_ROOM, float(y0) - COUNT_ROOM, float(x1) + COUNT_ROOM, float(y1) + COUNT_ROOM)
+
+
+def clear_inks(inks, boxes, segments, layout: Layout, page) -> np.ndarray:
+    """Which ink boxes (x0, y0, x1, y1) a count may be drawn at, as figcheck's A6 reads a text: inside `page`, on no
+    box (elements, names, letters, earlier counts) within one pixel at figcheck's 100 dpi, and no line within
+    line_band (lines_meeting: the exact segments)."""
+    ink = np.asarray(inks, float).reshape(-1, 4)
+    px = 0.72 * page_text(layout)[1]
+    grown = ink + np.array([-px, -px, px, px])
+    ok = (ink[:, 0] >= page[0]) & (ink[:, 1] >= page[1]) & (ink[:, 2] <= page[2]) & (ink[:, 3] <= page[3])
+    rect = np.asarray(boxes, float).reshape(-1, 4)
+    if len(rect):
+        ok &= ~(
+            (grown[:, None, 0] < rect[None, :, 2])
+            & (rect[None, :, 0] < grown[:, None, 2])
+            & (grown[:, None, 1] < rect[None, :, 3])
+            & (rect[None, :, 1] < grown[:, None, 3])
+        ).any(axis=1)
+    return ok & ~lines_meeting(ink, segments, line_band(layout)).any(axis=0)
 
 
 def tail_counts(layout: Layout, sses: list[SSE], loops=(), hidden=None) -> list[dict]:
@@ -4031,8 +4116,9 @@ def tail_counts(layout: Layout, sses: list[SSE], loops=(), hidden=None) -> list[
     end, chain, text ("14 aa"), centre and ink box (page units). Placed after routing, so not a route keep-out: the
     box is sized from the figure's text (TAIL_COUNT_SIZE em of _ink_em) and set from the N/C letter's far edge,
     along the stub, beside the letter on either side, then further along, then further out beside the letter and along
-    the stub (_TAIL_COUNT_FAR), the first clear of elements, text (label_boxes), the loops' lines (`loops`,
-    route.Loop), the nucleic-acid strands' lines and the counts placed before. A count with no clear spot is left
+    the stub (_TAIL_COUNT_FAR), the first where its ink is clear (clear_inks, as figcheck's A6 reads it) of elements,
+    text (label_boxes), the loops' lines (`loops`, route.Loop), the nucleic-acid strands' lines and the counts placed
+    before, on the page. A count with no clear spot is left
     out, never drawn over ink: {"kind": "tail", "name": "<end>:<chain>", "text"} is appended to `hidden` (a list),
     which the figure's provenance lists (counts_hidden)."""
     if not layout.res_chain:
@@ -4045,8 +4131,8 @@ def tail_counts(layout: Layout, sses: list[SSE], loops=(), hidden=None) -> list[
         rows.setdefault(ch, []).append(r)
     taken = [p.rect for p in [*layout.placed.values(), *layout.ghosts, *layout.stems]]
     taken += [b for _, b in label_boxes(layout, sses)]
-    for line in [*loops, *layout.na_paths]:  # loop and nucleic-acid strand lines as thin boxes along each segment
-        taken += thin_boxes(line.points)
+    segs = segments_of([line.points for line in [*loops, *layout.na_paths]])  # loop and nucleic-acid strand lines
+    page = count_page(layout, segs)
     out = []
     for end, chain, port, ex in termini(layout, sses):
         mine, ours = groups.get(chain, []), rows.get(chain, [])
@@ -4071,7 +4157,9 @@ def tail_counts(layout: Layout, sses: list[SSE], loops=(), hidden=None) -> list[
         spots += [_snap(spots[1 + j] + side[j] * k) for k in _TAIL_COUNT_FAR for j in (0, 1)]
         spots += [_snap(spots[0] + ex * k) for k in _TAIL_COUNT_FAR[2:]]
         boxes = [centred_box(float(c[0]), float(c[1]), *half) for c in spots]
-        box = next((b for b in boxes if not overlaps_any(b, taken)), None)
+        ink = count_half(text, size, 0.0)
+        ok = clear_inks([centred_box(float(c[0]), float(c[1]), *ink) for c in spots], taken, segs, layout, page)
+        box = next((b for b, clear in zip(boxes, ok.tolist()) if clear), None)
         if box is None:  # nowhere clear: left out (batch C2b-1: 7SMR, 5LDW, 8OZJ)
             if hidden is not None:
                 hidden.append({"kind": "tail", "name": f"{end}:{chain}", "text": text})

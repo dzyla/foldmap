@@ -520,25 +520,24 @@ def _clear_helix_names(layout: Layout, sses: list[SSE], loops: list[Loop]) -> No
     from the drawn text, label_boxes and layout.glyph, at the 6 pt floor); this is the fallback for lines no route
     holds: a fallback curve where no route exists, a nucleic-acid path or trace. It moves a name to the spot lines
     run nearest least: the other side of the helix, or along it (_NAME_ALONG), the earlier spot (the current side
-    first) on a tie. Lines through the name's ink (within a pixel at figcheck's 100 dpi: a stroke's half width)
+    first) on a tie. Lines through the name's ink (within layout.line_band: as figcheck's A6 reads a line by a text)
     count before lines near it: on a page of small text the room is wider than the name and every spot may have a
     line within it, and a spot with fewer such lines, one of them through the name, is no better (batch C2b-1, 6YF9
     focus). A spot must be on the page and meet no element, other name, stub or letter. A name no spot
     improves stays. A mirror copy's name (Layout.mirror_pairs) follows its mate's, as _mirror_sides sets it, and both
     must be clear. Run after the strands are routed (route_nucleic): their paths and traces count. Routes are
     unchanged."""
-    from .layout import _mirror_sides, line_clearance, page_text
+    from .layout import _mirror_sides, line_band, line_clearance, lines_meeting, segments_of
 
     names = sorted((p for p in layout.placed.values() if p.sse.kind in ("H", "G") and p.label), key=lambda p: p.sse.id)
     if not names:
         return
     em = _ink_em(layout, layout.font_scale)
     grow = line_clearance(layout)  # clearance and a line's half width
-    touch = 0.72 * page_text(layout)[1]  # a pixel at 100 dpi: a loop's half stroke (at most 0.6 pt), to spare
-    runs = [lp.points for lp in loops] + [path.points for path in layout.na_paths]
-    segs = [(a, b) for pts in runs for a, b in zip(pts, pts[1:])]
+    band = line_band(layout)  # a line through the name, as A6 reads it
+    segs = segments_of([lp.points for lp in loops] + [path.points for path in layout.na_paths])
     traces = [np.asarray(pts, float).reshape(-1, 2) for _, pts in sorted(layout.na_traces.items())]
-    if not segs and not traces:
+    if not len(segs) and not traces:
         return
     solid = [q.rect for q in [*layout.placed.values(), *layout.ghosts, *layout.stems]]
     x0, y0, x1, y1 = layout.bounds
@@ -549,10 +548,7 @@ def _clear_helix_names(layout: Layout, sses: list[SSE], loops: list[Loop]) -> No
     def struck(box) -> tuple[int, int]:
         """(lines through the ink, lines within the clearance of it); a nucleotide's bead and letter count as both."""
         on = _trace_hits(box, traces) if traces else 0
-        through, near = (
-            sum(clip_len(a, b, (box[0] - r, box[1] - r, box[2] + r, box[3] + r)) > 1e-9 for a, b in segs) + on
-            for r in (touch, grow)
-        )
+        through, near = (int(lines_meeting(box, segs, r).sum()) + on for r in (band, grow))
         return through, near
 
     def strikes(group) -> tuple[int, int]:

@@ -41,8 +41,10 @@ from .layout import (
     HEAD,
     HEAD_LEN,
     IN_PER_UNIT,
+    NA_RUN_W,
     NT_ROW,
     PITCH,
+    RUN_EDGE_W,
     SHAFT,
     TAIL_COUNT_SIZE,
     Layout,
@@ -55,7 +57,9 @@ from .layout import (
     _text_width,
     block_ghosts,
     centred_box,
+    clear_inks,
     count_half,
+    count_page,
     dna_to_page,
     dna_y,
     domain_fields,
@@ -65,6 +69,9 @@ from .layout import (
     glyph_scale,
     helix_label_pos,
     label_boxes,
+    line_band,
+    line_pt,
+    lines_meeting,
     na_text_boxes,
     overlaps_any,
     page_fit,
@@ -72,6 +79,7 @@ from .layout import (
     page_text,
     panel_members,
     resolve,
+    segments_of,
     stem_keep_box,
     stem_label_pos,
     tail_counts,
@@ -110,7 +118,7 @@ logging.getLogger("matplotlib.font_manager").addFilter(_QuietMissingFonts())
 _PANEL = "#eef1f4"
 _LIPID, _HEADS, _HEAD_EDGE = "#f7f0de", "#e6d3a3", "#c2a765"  # membrane band, lipid head groups
 _LIPID_ALPHA = 0.8  # the band over a sheet's plate lets the plate show through
-_RUN_EDGE, _RUN_EDGE_W = "#3a3a3a", 1.8  # dark edge under residue-coloured loops (pale colours stay legible)
+_RUN_EDGE, _RUN_EDGE_W = "#3a3a3a", RUN_EDGE_W  # dark edge under residue-coloured loops (pale colours stay legible)
 _SHORT_HELIX = 1.6  # helices/3-10 boxes shorter than this hold their residue numbers past the ends
 LONG_LOOP = 25  # loops at least this many residues get a residue-count label (chain ends: layout.LONG_TAIL)
 _DOMAIN_TONES = (  # one hue per domain: Paul Tol's muted set less its indigo (too near the RNA purple), ordered so
@@ -542,7 +550,7 @@ def _draw_strands(ink: _NAInk, layout: Layout, style: str, where: dict, letters:
             pts[:, 0],
             pts[:, 1],
             color=ink.colour(path.strand),
-            lw=ink.lw * (1.0 if gap else 1.4),
+            lw=ink.lw * (1.0 if gap else NA_RUN_W),
             ls=((0, (2, 2)) if path.label else (0, (1, 1.5))) if gap else "-",
             solid_capstyle="round",
             solid_joinstyle="round",
@@ -2629,7 +2637,7 @@ def _canvas(
     ax.axis("off")
     pt_per_unit = scale * 72
     font = _font_pt(scale) * look.font_scale
-    lw = float(np.clip(0.9 * scale / _IN_PER_UNIT, 0.5, 1.2))
+    lw = line_pt(scale)
     canvas = _Canvas(
         fig,
         ax,
@@ -2687,35 +2695,36 @@ def _count_spots(pts: np.ndarray, half) -> list[tuple[int, tuple[float, float, f
 def loop_counts(layout: Layout, loops: list[Loop], sses: list[SSE], tails=None, hidden=None) -> list[dict]:
     """The residue count ("NN aa") of each loop of at least LONG_LOOP residues: name (a>b), text, centre and ink box
     (page units, sized from the drawn text as tail counts are). Its place is the first of its spots (_count_spots:
-    beside its runs, longest first) clear of elements, text (label_boxes, tail counts), every loop's and
-    nucleic-acid strand's line but the run itself and the counts placed before. A count with no clear spot is left
-    out, never drawn over ink: {"kind": "loop", "name", "text"} is appended to `hidden` (a list), which the figure's
-    provenance lists (counts_hidden). Placed after routing: no keep-out."""
+    beside its runs, longest first) where its ink is clear (layout.clear_inks, as figcheck's A6 reads it) of
+    elements, text (label_boxes, tail counts), the counts placed before and every loop's and nucleic-acid strand's
+    line but the run itself, on the page. A count with no clear spot is left out, never drawn over ink:
+    {"kind": "loop", "name", "text"} is appended to `hidden` (a list), which the figure's provenance lists
+    (counts_hidden). Placed after routing: no keep-out."""
     em = _ink_em(layout, layout.font_scale) or text_em(layout.width or 1.0) * layout.font_scale
     by_id = {s.id: s for s in sses}
     taken = [p.rect for p in [*layout.placed.values(), *layout.ghosts, *layout.stems]]
     taken += [b for _, b in label_boxes(layout, sses)] + [
         t["box"] for t in (tails if tails is not None else tail_counts(layout, sses, loops))
     ]
-    taken += [b for path in layout.na_paths for b in thin_boxes(path.points)]  # nucleic-acid strands' lines
-    lines = [thin_boxes(lp.points) for lp in loops]
+    lines = [segments_of([lp.points]) for lp in loops]
+    strands = segments_of([path.points for path in layout.na_paths])  # nucleic-acid strands' lines
+    page = count_page(layout, np.concatenate([strands, *lines]))
     out = []
     for i, loop in enumerate(loops):
         a, b = by_id.get(loop.a_id), by_id.get(loop.b_id)
-        if a is None or b is None or b.start - a.end - 1 < LONG_LOOP:
+        if a is None or b is None or b.start - a.end - 1 < LONG_LOOP or len(loop.points) < 2:
             continue
         text = f"{b.start - a.end - 1} aa"
-        half = count_half(text, TAIL_COUNT_SIZE * em)
-        others = taken + [box for k, boxes in enumerate(lines) if k != i for box in boxes]
-        box = next(
-            (
-                bx
-                for j, bx in _count_spots(np.asarray(loop.points, float), half)
-                if not overlaps_any(bx, others) and not overlaps_any(bx, lines[i][:j] + lines[i][j + 1 :])
-            ),
-            None,
-        )
+        size = TAIL_COUNT_SIZE * em
+        spots = _count_spots(np.asarray(loop.points, float), count_half(text, size))
+        ink = count_half(text, size, 0.0)
+        inks = [centred_box((x0 + x1) / 2, (y0 + y1) / 2, *ink) for _, (x0, y0, x1, y1) in spots]
+        others = np.concatenate([strands, *(seg for k, seg in enumerate(lines) if k != i)])
+        ok = clear_inks(inks, taken, others, layout, page)
+        own = lines_meeting(inks, lines[i], line_band(layout))  # its own segments, but the run it sits beside
+        ok &= ~np.array([own[np.arange(len(own)) != j, k].any() for k, (j, _) in enumerate(spots)], bool)
         name = f"{loop.a_id}>{loop.b_id}"
+        box = next((bx for (_, bx), clear in zip(spots, ok.tolist()) if clear), None)
         if box is None:
             if hidden is not None:
                 hidden.append({"kind": "loop", "name": name, "text": text})

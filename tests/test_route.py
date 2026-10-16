@@ -720,7 +720,7 @@ def test_a_helix_name_is_not_moved_onto_a_line_to_keep_further_from_others():
     top = route._name_ink(lay, h, em)[3]
     near = [
         route.Loop("x", f"n{k}", [(-6.0, top + f * room), (6.0, top + f * room)], False, True)
-        for k, f in enumerate((0.6, 0.9))
+        for k, f in enumerate((0.75, 0.95))
     ]  # two lines near the name, above it, all along the helix
     h.label_side = -1
     below = route._name_ink(lay, h, em)
