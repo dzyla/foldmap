@@ -192,6 +192,14 @@ foldmap styles                                    # every theme and style key
   megapixels and takes a lower dpi past that (said in the notes); SVG and PDF keep the page whole. The 6 pt floor is
   at text size 1: a smaller text size (`--set font_scale=0.8`, the app's Text size, the journal theme's 0.9) draws
   the text that much smaller.
+- **How each figure was made** comes with it: one list of what it infers, leaves ambiguous or moves for
+  readability — domains inferred from contacts (or CATH's, UniProt's, or given), strands drawn off a sheet's run and
+  pairings only named, strands joined across a β-bulge, helix pieces matched across copies, ghost strands, names
+  moved off their usual spot, additives not marked, ligand marks with no clear spot, loops with no clear route or
+  over a label, a page scaled down or a PNG under 300 dpi. The command line prints it ("How this figure was made:"),
+  the app shows it under the figure, the MCP result carries it as structured `provenance`, and the files keep it
+  (the SVG's `<desc>`, the PDF's Subject, the PNG's Description); in Python it is `Drawn.provenance`. An empty list
+  means the standard method alone.
 - **Fold conventions** of the published figures: all-parallel α/β sheets (TIM barrels, Rossmann folds) as one βα
   row, conventional names (`--names`), helices drawn over the sheet they pack on (opt-in); see
   [Conventions of the published figures](#conventions-of-the-published-figures).
