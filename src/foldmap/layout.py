@@ -50,6 +50,9 @@ _GLYPH_W, _GLYPH_H = 0.32, 0.42  # rough label glyph size in page units, for kee
 _GLYPH_K: ContextVar[float] = ContextVar("foldmap_glyph_scale", default=1.0)  # glyph_scale of the text the layout
 # being built is drawn with (build_layout sets it from Style.font_scale): for the glyph room of things that hold no
 # layout (an item's footprint, a stem's name box, a trace's letters); layout.glyph(layout) wherever a layout is held
+# The shared sheets whose way up is a symmetry tie that the layout being built draws with strands[0] down, and a dict
+# it reports into (build_layout, _both_ways): the turnable sheets and whether the copies were drawn alike
+_TIE_TURN: ContextVar[tuple[frozenset[str], dict | None]] = ContextVar("foldmap_tie_turn", default=(frozenset(), None))
 IN_PER_UNIT = 0.30  # render: inches per page unit, at most
 MAX_WIDTH_IN = 7.2  # render: a figure is drawn at most this wide (double column), inches, while its text stays ...
 MIN_TEXT_PT = 6.0  # ... this size or larger: a wider page grows past MAX_WIDTH_IN instead (random-100 C4 ruling)
@@ -384,20 +387,27 @@ def _drawn_strands(sheet: Sheet) -> tuple[list[SSE], list[int]]:
     ]
 
 
+def _sheet_seen(sheet: Sheet, frame: Frame) -> np.ndarray:
+    """The page direction (snapped) of a sheet's strands, each by its sense: its drawn up, strands[0]'s way."""
+    every, senses = _drawn_strands(sheet)
+    mean_dir = sum(d * s.axis for d, s in zip(senses, every))
+    at = np.mean([x.centroid for x in every], axis=0)
+    return _snap(frame.direction(at, mean_dir))
+
+
 def _sheet_order(sheet: Sheet, frame: Frame) -> tuple[list[int], int, np.ndarray]:
     """How a sheet is drawn: the track strands' indices left to right, s = +1 when strands[0] points up (else -1),
     and the projected centroids (Å) of every strand drawn (_drawn_strands: the track's, then the accessory's)."""
     strands = sheet.strands
-    every, senses = _drawn_strands(sheet)
+    every, _ = _drawn_strands(sheet)
     cents = frame.project(np.array([s.centroid for s in every]), [s.chain for s in every])
-    mean_dir = sum(d * s.axis for d, s in zip(senses, every))
-    at = np.mean([x.centroid for x in every], axis=0)
     # Both decisions below are made on the grid (_snap): a sheet straddling a dyad in the page (1SLV's, shared by the
     # two copies) runs straight across the page by symmetry, and its end strands, dyad mates, stand level: its
     # height and their step across it are 0 up to the last bits of the element axes, which differ between BLAS
-    # kernels (Windows). Such a sheet draws strands[0] up, and its strands in their own order.
-    seen = _snap(frame.direction(at, mean_dir))
-    s = 1 if seen[1] >= 0 else -1  # +1: strands[0] points up
+    # kernels (Windows). Such a sheet draws strands[0] up, and its strands in their own order; unless the layout
+    # being built turns it down (_TIE_TURN: _both_ways lays out a shared one both ways).
+    seen = _sheet_seen(sheet, frame)
+    s = 1 if seen[1] > 0 or (seen[1] == 0 and strands[0].id not in _TIE_TURN.get()[0]) else -1  # +1: strands[0] up
     # Drawing the strands vertical turns the projected sheet in the page plane; the strand order must turn
     # with it (left to right = across the drawn-up direction), or the sheet shows its back face (mirror image).
     up2d = s * seen
@@ -976,7 +986,7 @@ def _separate(
     room: float = _SEP_SYM_ROOM,
     level: np.ndarray | None = None,
     shared: set[int] = frozenset(),
-) -> None:
+) -> bool:
     """Push overlapping items apart, then slide any left over clear. With `ties` (_symmetry_ties) the pushes
     keep every protomer drawn alike (_push_apart), and that result is kept if it clears every overlap within
     _SEP_ORBIT_SWEEPS sweeps and its box takes at most `room` times the area of moving the items one by
@@ -989,7 +999,7 @@ def _separate(
     and slid sideways (_push_apart, _slide_clear). `shared`: items holding elements of several protomers with no
     copy of their own (a dimer's continuous sheet, 1SLV): when the tied pushes fail, they are run again with these
     yielding to the tied items, which keep their copies alike (_push_apart), and sliding clear last
-    (_slide_clear)."""
+    (_slide_clear). True when the tied pushes are kept: the copies drawn alike."""
     halves = np.array([it.half for it in items], float).reshape(-1, 2)
     mids = np.array([it.mid for it in items], float).reshape(-1, 2)
     start = np.array([(it.cx, it.cy) for it in items], float).reshape(-1, 2)
@@ -1015,6 +1025,7 @@ def _separate(
     for it, (x, y) in zip(items, xy.tolist()):
         it.cx, it.cy = x, y
     _slide_clear(items, joints, fixed, level, lone)
+    return bool(ties) and xy is not alone
 
 
 def _lone_left(xy, halves, mids, apart, lone: set[int]) -> bool:
@@ -2589,7 +2600,35 @@ def _text_scaled(build):
     return run
 
 
+def _both_ways(build):
+    """build_layout over a symmetry tie: a sheet shared by tied copies (_separate's `shared`) that runs straight
+    across the page may point either way (_sheet_order draws strands[0] up), and one way the tied copies can need
+    more room than _SEP_SYM_ROOM allows (2ILU: 1.07). When the copies are not drawn alike and such sheets exist, the
+    layout is made again with them turned down (_TIE_TURN), and that one is kept if it draws the copies alike; else
+    (both or neither alike) the first, strands[0] up. Only those layouts are made twice (CI ruling, plan 12)."""
+    import functools
+
+    @functools.wraps(build)
+    def run(*args, **kwargs):
+        def made(down: frozenset[str]):
+            report: dict = {}
+            token = _TIE_TURN.set((down, report))
+            try:
+                return build(*args, **kwargs), report
+            finally:
+                _TIE_TURN.reset(token)
+
+        lay, first = made(frozenset())
+        if first.get("alike", True) or not first.get("turnable"):
+            return lay
+        other, second = made(first["turnable"])
+        return other if second.get("alike") else lay
+
+    return run
+
+
 @_text_scaled
+@_both_ways
 def build_layout(
     sses: list[SSE],
     sheets: list[Sheet],
@@ -2797,10 +2836,19 @@ def build_layout(
             and k not in {j for j, _ in ties.values()}
             and len({sector_of.get(m.sse.chain) for m in it.members if isinstance(m, Placed)} - {None}) > 1
         }
-        _separate(items, ties, joints, walls, mirror=mirror if ties else None, level=kept, shared=shared)
+        alike = _separate(items, ties, joints, walls, mirror=mirror if ties else None, level=kept, shared=shared)
         if domains and _part_domains(items, domains, ties, mirror if ties else None):
             # the domains, parted with their copies, keep them alike whatever room that takes
-            _separate(items, ties, joints, walls, mirror=mirror if ties else None, room=np.inf, level=kept)
+            alike = _separate(items, ties, joints, walls, mirror=mirror if ties else None, room=np.inf, level=kept)
+        report = _TIE_TURN.get()[1]
+        if report is not None:  # the shared sheets whose way up is a symmetry tie: _both_ways may turn them
+            held = {m.sse.id for k in shared for m in items[k].members}
+            report["turnable"] = frozenset(
+                sh.strands[0].id
+                for k, sh in enumerate(sheets)
+                if k not in templates and sh.strands[0].id in held and _sheet_seen(sh, frame)[1] == 0
+            )
+            report["alike"] = alike
     for it in items:
         it.apply()
     dna = [m for it in items for m in it.members if isinstance(m, PlacedStem)]

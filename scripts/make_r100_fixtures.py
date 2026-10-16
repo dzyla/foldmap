@@ -138,6 +138,12 @@ ENTRIES = {  # fixture name -> (PDB id, what it is for)
         "shared sheet sat between A1's eta2 and its copy, the tied pushes never cleared and the copies were drawn "
         "unalike (plan 12 Task 2 fix round 2, A15 1.28 at stack pad 1.45)",
     ),
+    "2ILU": (
+        "2ILU",
+        "aldehyde dehydrogenase, a D2 tetramer built from one deposited chain, N/CA/C/O: two 20-strand sheets each "
+        "shared by two copies run straight across the page, their orientation a symmetry tie; one way up the copies "
+        "are drawn alike, the other way the tied pushes take 1.07 times the room and they are not (plan 12 CI ruling)",
+    ),
     "6JO6-AB": (
         "6JO6",
         "photosystem I, chains A and B cut to the residues within 18 Å of the estimated mid-plane, N/CA/C/O: a slab "
@@ -232,6 +238,7 @@ TRIMS: dict[str, dict] = {
     "6JO6-AB": {"atoms": ("N", "CA", "C", "O"), "no_protein_sequence": True, "drop": ("_atom_site_anisotrop.",)},
     "2OMF-A": {"atoms": ("N", "CA", "C", "O"), "no_protein_sequence": True, "drop": ("_atom_site_anisotrop.",)},
     "1SLV": {"atoms": ("N", "CA", "C", "O"), "no_protein_sequence": True, "drop": ("_atom_site_anisotrop.",)},
+    "2ILU": {"atoms": ("N", "CA", "C", "O"), "no_protein_sequence": True, "drop": ("_atom_site_anisotrop.",)},
     "5KQJ": {"first_model": True, "atoms": ("N", "CA", "C", "O"), "no_protein_sequence": True},
     "8XZE": {"drop": ("_atom_site_anisotrop.", "_pdbx_refine_tls.", "_pdbx_refine_tls_group.")},
     "3OWW-P5": {"drop": ("_atom_site_anisotrop.", "_pdbx_refine_tls.", "_pdbx_refine_tls_group.")},

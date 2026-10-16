@@ -288,3 +288,38 @@ def test_a_dyad_points_the_same_way_on_any_cpu(monkeypatch):
     assert _placed(path) == want
     one, other = found
     assert one.n == 2 and np.array_equal(one.axis, other.axis)
+
+
+@pytest.mark.parametrize("name, layouts", [("1SLV", 1), ("2ILU", 2)])
+def test_a_shared_sheet_whose_way_up_is_a_symmetry_tie_is_laid_out_both_ways(monkeypatch, name, layouts):
+    """A sheet shared by two tied copies that runs straight across the page (_sheet_order) may point either way, and
+    drawn one way the copies can take too much room to stay alike: 2ILU's two 20-strand sheets, strands[0] up, need
+    1.07 times the one-by-one room (_SEP_SYM_ROOM 1.05) and its copies were drawn 3.1 apart. Such a layout is made
+    again with those sheets turned down, and the turned one is kept when only it draws the copies alike (CI ruling,
+    plan 12). 1SLV is alike the first way and is laid out once."""
+    import foldmap.layout as layout
+
+    real, runs = layout._attract, []
+
+    def counted(*args, **kw):
+        runs.append(1)
+        return real(*args, **kw)
+
+    monkeypatch.setattr(layout, "_attract", counted)
+    got = figcheck.copies_alike(drawn(DATA / "r100" / f"{name}.cif.gz"))
+    assert len(got) == 2 and max(got.values()) <= 1e-6, got
+    assert len(runs) == layouts
+
+
+@pytest.mark.parametrize("seed", [None, 0, 1])
+def test_a_sheet_laid_out_both_ways_is_drawn_the_same_on_any_cpu(monkeypatch, seed):
+    """2ILU's choice between its two layouts depends on no float noise: the element axes nudged by an ulp (seed) or
+    eigh's eigenvectors negated (None) give the identical layout."""
+    path = DATA / "r100" / "2ILU.cif.gz"
+    want = _placed(path)
+    if seed is None:
+        eigh = np.linalg.eigh
+        monkeypatch.setattr(np.linalg, "eigh", lambda a, *args, **kw: (lambda w, v: (w, -v))(*eigh(a, *args, **kw)))
+        assert _placed(path) == want
+    else:
+        assert _placed(path, monkeypatch, nudge=seed) == want
