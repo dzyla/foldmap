@@ -622,3 +622,17 @@ def test_same_protein_needs_a_length_ratio():
     short = long[100:130]
     assert not figcheck.same_protein(long, short, figcheck.aligned_positions(long, short))
     assert figcheck.same_protein(long, long[:260], figcheck.aligned_positions(long, long[:260]))
+
+
+@pytest.mark.parametrize("name, named, of", [("2OMF-A", 3, 3), ("3L9G-A", 8, 16)])
+def test_accessories_named_not_drawn_level_are_reported(name, named, of):
+    """Plan 12 ruling (fix round 4): S6 passes an accessory drawn level beside its partner or named in the notes, so
+    the count named rather than drawn level is the measure of placement. figure_checks reports it (not a gate):
+    OmpF's three A:2-6 are named, 8 of 3L9G's 16 accessories."""
+    path = R100 / f"{name}.cif.gz"
+    d = drawn(path)
+    lines = figcheck.accessories_named(d.layout)
+    assert len(lines) == named and all(" also pairs with " in line for line in lines)
+    got = figcheck.figure_checks(d, path)
+    assert (got["accessories_named"], got["accessories"]) == (named, of)
+    assert got["details"]["accessories_named"] == lines

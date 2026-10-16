@@ -1887,6 +1887,7 @@ def _metric_items(e: dict) -> list[str]:
             items.append(f"route.{k}={v}")
     if e.get("dssp"):
         items.append(f"dssp={e['dssp'].get('agree')}")
+    items += [f"accessories_named.{v}={n}/{of}" for v, (n, of) in accessories_named(e).items() if of]
     for k, v in (d.get("na") or {}).items():
         if k not in ("failed", "note", "missed_pairs", "extra_pairs") and v is not None:
             items.append(f"{k}={v}")
@@ -2080,6 +2081,7 @@ def report(entries: list[dict], out: Path, sample_path: Path | None = None, tota
     for e in entries:
         lines.append(f"| {e['id']} | " + " | ".join(str(v) for v in reported(e).values()) + " |")
     lines += science_section(entries)
+    lines += accessories_section(entries)
     lines += ["", "## Criteria", ""] + [f"- **{k}** {v}" for k, v in CRITERIA.items()]
     lines += ["", "## Limits", ""] + [f"- {k}: {v}" for k, v in LIMITS.items()]
     lines += [f"- documented warnings: {', '.join(DOCUMENTED_WARNINGS) or 'none'}", ""]
@@ -2128,6 +2130,30 @@ def science_section(entries: list[dict]) -> list[str]:
         marks = ["-" if s[k]["pass"] is None else "✓" if s[k]["pass"] else "✗" for k in SCIENCE]
         found = "; ".join(f"{k}: {s[k]['detail']}" for k in SCIENCE if s[k]["pass"] is False)
         lines.append(f"| {e['id']} | " + " | ".join(marks) + f" | {found.replace('|', '/')[:600]} |")
+    return lines
+
+
+def accessories_named(e: dict) -> dict[str, tuple[int, int]]:
+    """Per figure view, (accessory strands named rather than drawn level beside their partner, accessory strands):
+    figcheck.figure_checks' "accessories_named" of "accessories" (plan 12 ruling: S6 passes a named one, so this
+    count measures placement). Reported, never in "failed" or "pass"; views without a measure are left out."""
+    out = {}
+    for v, r in e.get("views", {}).items():
+        ch = (r.get("result") or {}).get("checks") or {}
+        if ch.get("accessories") is not None:
+            out[v] = (ch.get("accessories_named") or 0, ch["accessories"])
+    return out
+
+
+def accessories_section(entries: list[dict]) -> list[str]:
+    """report.md's accessory placement: each entry with accessory strands, per view how many are named rather than
+    drawn level beside their partner (accessories_named)."""
+    lines = ["", "## Accessories named, not drawn level beside their partner (reported, not gated)", ""]
+    lines += ["| id | named of accessory strands, per view |", "|---|---|"]
+    for e in entries:
+        got = accessories_named(e)
+        if any(of for _, of in got.values()):
+            lines.append(f"| {e['id']} | " + "; ".join(f"{v} {n} of {of}" for v, (n, of) in got.items()) + " |")
     return lines
 
 

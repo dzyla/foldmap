@@ -692,3 +692,27 @@ def test_science_checks_are_reported_apart_from_the_criteria(r100, tmp_path):
     md = (tmp_path / "report.md").read_text(encoding="utf-8")
     assert "1 of 1 pass." in md and "## Science checks (S1-S6), apart from A1-A20" in md
     assert "| S1 sheet neighbours pair | 0 | 1 | 0 |" in md and "S1: sheet 0: a / b drawn side by side" in md
+
+
+def test_accessories_named_are_reported_per_view_and_never_gate(r100, tmp_path):
+    """Plan 12 ruling (fix round 4): the count of accessories named rather than drawn level beside their partner is
+    reported per entry and view (OmpF 3 of 3, 3L9G 8 of 16), apart from A1-A20: it never makes an entry fail."""
+    from foldmap.spec import draw_spec, figure_spec
+
+    path = DATA / "r100" / "2OMF-A.cif.gz"
+    spec = figure_spec(path)
+    got = r100.measure_view("default", draw_spec(spec), spec, path, "2OMF-A", tmp_path)
+    assert (got["checks"]["accessories_named"], got["checks"]["accessories"]) == (3, 3)
+    crit = {k: {"pass": True, "detail": ""} for k in r100.CRITERIA}
+
+    def view(named, of):
+        return {"result": {"checks": {"accessories_named": named, "accessories": of}}}
+
+    e = {"id": "3L9G", "name": "3L9G", "views": {"default": view(8, 16), "focus": view(6, 16)}, "criteria": crit}
+    e = r100._verdict(e)
+    assert e["pass"] and r100.accessories_named(e) == {"default": (8, 16), "focus": (6, 16)}
+    plain = r100._verdict({"id": "1UBQ", "name": "1UBQ", "views": {"default": view(0, 0)}, "criteria": dict(crit)})
+    r100.report([e, plain], tmp_path, None, total=2)
+    md = (tmp_path / "report.md").read_text(encoding="utf-8")
+    assert "2 of 2 pass." in md and "## Accessories named, not drawn level beside their partner" in md
+    assert "| 3L9G | default 8 of 16; focus 6 of 16 |" in md and "| 1UBQ |" not in md.split("## Accessories")[1]

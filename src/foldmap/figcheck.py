@@ -1201,6 +1201,18 @@ def science_checks(drawn) -> dict[str, list[str] | None]:
     return out
 
 
+def accessories_named(layout) -> list[str]:
+    """The accessory strands (Layout.accessory) the figure names rather than draws level beside their partner
+    (Layout.unshown, read from the drawing), worded as the notes word them: "A1:2-6 also pairs with A1:9-23". S6
+    passes such a strand because its pairing is named, so this count is the measure of accessory placement; it is
+    reported (figure_checks), not a gate (plan 12 ruling)."""
+    return [
+        f"{a} also pairs with {b}"
+        for a, b in sorted(map(tuple, getattr(layout, "unshown", [])))
+        if a in layout.accessory
+    ]
+
+
 # ------------------------------------------------------------------------------------------- membrane (A18)
 SLAB_MARGIN = 0.3  # page units: a loop's sideways run this far inside a band's faces is in the slab
 _RUN_MIN = 0.5  # page units: a shorter sideways step is no run along the slab
@@ -1301,6 +1313,7 @@ def figure_checks(drawn, path, *, assembly: str = "auto", focus: str = "auto", c
         "stem_name_gaps": None if skip else stem_name_gaps(drawn, page=page),
         "scope_silent": scope_honest(drawn, path, assembly, focus, chains=chains),
         "order": order_checks(drawn),
+        "accessories_named": accessories_named(drawn.layout),  # reported, not gated (plan 12 ruling)
     }
     domains = details["domains"]
     gaps = details["stem_name_gaps"]
@@ -1316,6 +1329,8 @@ def figure_checks(drawn, path, *, assembly: str = "auto", focus: str = "auto", c
         "stem_name_gap": None if skip else max((own for own, _ in gaps.values()), default=0.0),
         "scope_silent": len(details["scope_silent"]),
         "order": len(details["order"]),
+        "accessories": len(drawn.layout.accessory),  # accessory strands drawn off a sheet's track
+        "accessories_named": len(details["accessories_named"]),  # of them, named rather than drawn level: reported
         "loop_crossings": loop_crossings(drawn.loops),
         "honest_crossings": honest_crossings(drawn.layout, drawn.loops),
         "font": page.fonts,
