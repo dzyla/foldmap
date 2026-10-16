@@ -392,14 +392,18 @@ def _sheet_order(sheet: Sheet, frame: Frame) -> tuple[list[int], int, np.ndarray
     cents = frame.project(np.array([s.centroid for s in every]), [s.chain for s in every])
     mean_dir = sum(d * s.axis for d, s in zip(senses, every))
     at = np.mean([x.centroid for x in every], axis=0)
-    seen = frame.direction(at, mean_dir)
+    # Both decisions below are made on the grid (_snap): a sheet straddling a dyad in the page (1SLV's, shared by the
+    # two copies) runs straight across the page by symmetry, and its end strands, dyad mates, stand level: its
+    # height and their step across it are 0 up to the last bits of the element axes, which differ between BLAS
+    # kernels (Windows). Such a sheet draws strands[0] up, and its strands in their own order.
+    seen = _snap(frame.direction(at, mean_dir))
     s = 1 if seen[1] >= 0 else -1  # +1: strands[0] points up
     # Drawing the strands vertical turns the projected sheet in the page plane; the strand order must turn
     # with it (left to right = across the drawn-up direction), or the sheet shows its back face (mirror image).
     up2d = s * seen
     right = np.array([up2d[1], -up2d[0]]) if np.linalg.norm(up2d) > 1e-6 else np.array([1.0, 0.0])
     order = list(range(len(strands)))
-    if len(strands) > 1 and (cents[len(strands) - 1] - cents[0]) @ right < 0:
+    if len(strands) > 1 and float(_snap((cents[len(strands) - 1] - cents[0]) @ right)) < 0:
         order.reverse()
     return order, s, cents
 

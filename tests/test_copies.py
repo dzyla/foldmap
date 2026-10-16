@@ -215,3 +215,39 @@ def test_a_dimer_sheet_shared_by_two_copies_keeps_them_alike(monkeypatch):
     monkeypatch.setattr(layout, "_separate", without_shared)
     before = figcheck.copies_alike(drawn(path))
     assert max(before.values()) > ALIKE, before  # the fixture still exercises the shared-sheet case
+
+
+def _placed(path, monkeypatch=None, nudge=None):
+    """Every placed element's centre and angle (cli.make_layout, as draw_spec lays it out); `nudge` (seed): each
+    element axis moved by -1, 0 or +1 ulp per component first, as another CPU's BLAS kernel computes them."""
+    import foldmap.cli as cli
+
+    if nudge is not None:
+        import dataclasses
+
+        real = cli.build_sses
+        rng = np.random.default_rng(nudge)
+
+        def nudged(*args, **kw):
+            out = real(*args, **kw)
+            return [
+                dataclasses.replace(s, axis=s.axis + rng.integers(-1, 2, 3) * np.spacing(np.abs(s.axis))) for s in out
+            ]
+
+        monkeypatch.setattr(cli, "build_sses", nudged)
+    spec = figure_spec(path)
+    lay = cli.make_layout(spec.structure, spec.mode, spec.rotate, spec.flip_v, **spec.layout_kwargs())[0]
+    return {k: (p.cx, p.cy, p.angle) for k, p in sorted(lay.placed.items())}
+
+
+@pytest.mark.parametrize("seed", range(4))
+def test_a_sheet_seen_across_the_page_is_drawn_the_same_on_any_cpu(monkeypatch, seed):
+    """1SLV's sheet shared by the two copies runs across the page: by symmetry its strands' mean direction is
+    perpendicular to the dyad (page-up) and its end strands, dyad mates, stand level, so its height and their step
+    across it are 0 up to the last bits of the element axes, which differ between BLAS kernels
+    (OPENBLAS_CORETYPE=Nehalem, Windows, numpy 1.24's OpenBLAS). Their signs chose which way the strands point and
+    in which order (layout._sheet_order), and with them the whole figure (on Windows the copies were drawn 1.49
+    apart). The figure no longer depends on those bits."""
+    path = DATA / "r100" / "1SLV.cif.gz"
+    want = _placed(path)
+    assert _placed(path, monkeypatch, nudge=seed) == want
