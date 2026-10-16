@@ -4,18 +4,21 @@
 apart from the page checks (figcheck A1-A20: overlaps, text, order as drawn), since a clean page can still draw a
 wrong sheet (plan 12, the external review's FimD 9FWZ: a strand wedged between two strands that pair).
 
-- S1: every two strands drawn as plain neighbours in a sheet (adjacent columns of one strand each) are joined by at
-  least one DSSP bridge; every two adjacent columns are; and a strand drawn in a shared column (an accessory strand
-  end to end with its partner) pairs with a strand of its column or of a column next to it.
-- S2: a closed barrel's closure (its ghost, repeating the first strand beside the last) is joined by a bridge.
+- S1: any two strands drawn side by side in a sheet (adjacent columns, their drawn spans overlapping) are joined by
+  at least one DSSP bridge; two strands in one column (collinear, end to end: no pairing) never overlap in height
+  (fix round 3 ruling: 8UTF's a:266-273 stood beside the ghost of c:440-442, 0 bridges).
+- S2: the same for a pair naming a ghost: a closed barrel's closure (its ghost, repeating the first strand beside the
+  last) is joined by a bridge.
 - S3: a closed barrel's strand count (its accessory strands left out) equals the longest cycle of the pairing graph
-  (strands joined by at least sheets._MIN_PAIRS bridges, and the drawn closure by one) among its strands.
+  (strands joined by at least sheets._MIN_PAIRS bridges, and the drawn closure by one) among its strands; and a sheet
+  drawn open holds no such cycle of _BARREL_MIN (5) strands or more.
 - S4, S5: residue marks at their residue, automatic domains against a reference (plan 12 Tasks 4 and 3): hooks, not
   yet measured (None).
 - S6: an accessory strand (Sheet.accessory, Layout.accessory: off its sheet's run of paired strands) is drawn at its
-  partner: in its partner's own column, next to it (end to end), or in a column beside the partner's that holds no
-  other strand, their spans overlapping; never in another strand's column, which reads as pairing with that strand
-  (fix round 1: 9FWZ's D:662-666 stood in D:634-641's column, beside its partner D:645-659).
+  partner: in a column next to the partner's, their drawn spans overlapping; or its pairing is named in the notes
+  (Layout.unshown: no height beside the partner was free). Fix round 3 ruling: a shared column means collinear, so an
+  accessory stands in the column on its 3D side of the partner, end to end with the strand there (9FWZ's D:662-666
+  beside D:645-659, on D:634-641's side).
 
 Two readings, one rule: sheet_checks reads the sheets as built (sheets.build_sheets, for `foldmap summary`), and
 figcheck.science_checks reads the drawn figure (its sheet blocks, columns by where the strands stand)."""
@@ -45,32 +48,32 @@ Columns = list[list[tuple[str, bool]]]
 Spot = tuple[str, int, tuple[float, float] | None, bool]
 
 
-def partner_findings(spots: list[Spot], partner: dict[str, str], noted=frozenset()) -> list[str]:
+def _meet(a: tuple[float, float] | None, b: tuple[float, float] | None) -> bool:
+    """Do two drawn spans (bottom, top) overlap? Unknown spans (None) count as overlapping."""
+    return a is None or b is None or min(a[1], b[1]) - max(a[0], b[0]) > _TOUCH
+
+
+_TOUCH = 1e-6  # page units two spans must share to overlap
+
+
+def partner_findings(spots: list[Spot], partner: dict[str, str], unshown=frozenset()) -> list[str]:
     """S6 of one sheet: each accessory strand (`partner`: accessory id -> its partner's id) whose partner stands in
-    the sheet too must stand in the partner's column, next to it when the spans are known (no strand between them),
-    or in the column beside the partner's, alone there, their spans overlapping when known; or, when its partner
-    had no end free for it (fix round 2 ruling: 7ARD), its pairing must be named in the notes (`noted`: (accessory,
-    partner) pairs a note says "also pairs with")."""
+    the sheet too stands in a column next to the partner's, their spans overlapping (unknown spans: by column only);
+    else its pairing is among `unshown` (Layout.unshown: (accessory, partner) pairs the notes name)."""
     out = []
     real = {i: (c, span) for i, c, span, ghost in spots if not ghost}
     for a, p in sorted(partner.items()):
-        if a not in real or p not in real or (a, p) in noted:
+        if a not in real or p not in real or (a, p) in unshown:
             continue
         (ca, sa), (cp, sp) = real[a], real[p]
-        others = [(i, span) for i, c, span, _ in spots if c == ca and i != a]
-        if ca == cp:
-            if sa is None or sp is None:
-                continue
-            lo, hi = sorted((sa, sp))
-            between = [i for i, span in others if i != p and span and lo[1] <= (span[0] + span[1]) / 2 <= hi[0]]
-            if between:
-                out.append(f"{a} drawn in its partner {p}'s column but not next to it ({', '.join(between)} between)")
+        if abs(ca - cp) == 1 and _meet(sa, sp):
             continue
-        if abs(ca - cp) == 1 and not others and (sa is None or sp is None or min(sa[1], sp[1]) > max(sa[0], sp[0])):
-            continue
-        held = [i for i, _ in others]
-        where = f"in {', '.join(held)}'s column" if held else "away from it"
-        out.append(f"{a} drawn {where}, not at its partner {p}")
+        where = (
+            "in its partner's column"
+            if ca == cp
+            else ("beside it, not level with it" if abs(ca - cp) == 1 else "away from it")
+        )
+        out.append(f"{a} drawn {where}, not beside its partner {p}")
     return out
 
 
@@ -84,39 +87,43 @@ def bridge_counts(sses: Iterable[SSE], bridges: list[Bridge]) -> Callable[[str, 
     return lambda a, b: by_pair.get(frozenset((a, b)), 0)
 
 
-def neighbour_findings(columns: Columns, count: Callable[[str, str], int]) -> tuple[list[str], list[str]]:
-    """S1 and S2 findings of one drawn sheet. Adjacent columns must share a bridge (two plain neighbours: the two
-    strands); a strand in a shared column must pair with a strand of its column (an accessory end to end with its
-    partner, fix round 1) or of a column beside it. A finding naming a ghost is the closure's (S2)."""
+def neighbour_findings(
+    spots: list[Spot], count: Callable[[str, str], int], closure: Iterable[str] | None = None
+) -> tuple[list[str], list[str]]:
+    """S1 and S2 findings of one drawn sheet (`spots`): two strands in adjacent columns whose spans overlap must
+    share a bridge; two strands in one column must not overlap. A finding naming a ghost of the barrel's own closure
+    (`closure`: those ghosts' ids; None: every ghost) is S2; a ghost lent by a symmetric copy is S1's."""
+    closure = None if closure is None else set(closure)
+
+    def closing(i: str, ghost: bool) -> bool:
+        return ghost and (closure is None or i in closure)
+
     s1: list[str] = []
     s2: list[str] = []
 
-    def put(text: str, ghost: bool) -> None:
-        (s2 if ghost else s1).append(text)
+    def name(i: str, ghost: bool) -> str:
+        return f"{i} (ghost)" if ghost else i
 
-    def name(entry: tuple[str, bool]) -> str:
-        return f"{entry[0]} (ghost)" if entry[1] else entry[0]
-
-    for a, b in zip(columns, columns[1:]):
-        if not any(count(x, y) for x, _ in a for y, _ in b):
-            ghost = any(g for _, g in a + b)
-            if len(a) == 1 and len(b) == 1:
-                put(f"{name(a[0])} | {name(b[0])} drawn side by side with no bridge", ghost)
-            else:
-                put(f"columns {'/'.join(map(name, a))} | {'/'.join(map(name, b))} share no bridge", ghost)
-    for k, col in enumerate(columns):
-        if len(col) < 2:
-            continue
-        beside = [y for j in (k - 1, k, k + 1) if 0 <= j < len(columns) for y, _ in columns[j]]
-        for entry in col:
-            if not any(count(entry[0], y) for y in beside if y != entry[0]):
-                put(f"{name(entry)} drawn in a shared column beside none of its partners", entry[1])
+    ordered = sorted(spots, key=lambda sp: (sp[1], sp[0], sp[3]))
+    for k, (a, ca, sa, ga) in enumerate(ordered):
+        for b, cb, sb, gb in ordered[k + 1 :]:
+            if cb > ca + 1:
+                break
+            if not _meet(sa, sb) or a == b:
+                continue
+            if cb == ca:
+                if sa is not None and sb is not None:
+                    put = s2 if closing(a, ga) or closing(b, gb) else s1
+                    put.append(f"{name(a, ga)} and {name(b, gb)} overlap in one column")
+            elif not count(a, b):
+                put = s2 if closing(a, ga) or closing(b, gb) else s1
+                put.append(f"{name(a, ga)} | {name(b, gb)} drawn side by side with no bridge")
     return s1, s2
 
 
-def adjacent_pairs(columns: Columns) -> list[tuple[str, str]]:
-    """The strand pairs a drawn sheet stands side by side: each strand (or ghost) with each in the next column."""
-    return [(x, y) for a, b in zip(columns, columns[1:]) for x, _ in a for y, _ in b]
+def adjacent_pairs(spots: list[Spot]) -> list[tuple[str, str]]:
+    """The strand pairs a drawn sheet stands side by side: adjacent columns, spans overlapping."""
+    return [(a, b) for a, ca, sa, _ in spots for b, cb, sb, _ in spots if cb == ca + 1 and _meet(sa, sb) and a != b]
 
 
 def pairing_cycle(ids: Iterable[str], count: Callable[[str, str], int], closure=()) -> int | None:
@@ -143,6 +150,16 @@ def pairing_cycle(ids: Iterable[str], count: Callable[[str, str], int], closure=
     return best
 
 
+def open_finding(label: str, ids: Iterable[str], count) -> str | None:
+    """S3 of a sheet drawn open: a cycle of its pairing of _BARREL_MIN (5) strands or more is a barrel drawn open."""
+    from .sheets import _BARREL_MIN
+
+    cycle = pairing_cycle(ids, count)
+    if cycle is not None and cycle >= _BARREL_MIN:
+        return f"{label}: drawn open, its pairing closes a ring of {cycle} strands"
+    return None
+
+
 def count_finding(label: str, ring: list[str], others: Iterable[str], count, closure) -> str | None:
     """S3 of one closed barrel: `ring` its drawn barrel strands, `others` its accessory strands, `closure` the pairs
     it draws side by side (adjacent_pairs)."""
@@ -154,41 +171,38 @@ def count_finding(label: str, ring: list[str], others: Iterable[str], count, clo
     return None
 
 
-def sheet_columns(sheet: Sheet) -> Columns:
-    """A built sheet's drawn columns (layout._sheet_item draws it so): its strands in order, a closed sheet's ghost of
-    the first after the last, and each accessory strand in its column (Sheet.accessory)."""
+def sheet_spots(sheet: Sheet) -> list[Spot]:
+    """A built sheet as layout._sheet_item draws it, by column: its strands in order (on the row: spans (-1, 1)), a
+    closed sheet's ghost of the first after the last, and each accessory strand in its column (Sheet.accessory; its
+    height is the figure's: None)."""
     n = len(sheet.strands)
-    cols: dict[int, list[tuple[str, bool]]] = {}
-    for k, s in enumerate(sheet.strands):
-        cols.setdefault(k, []).append((s.id, False))
+    out: list[Spot] = [(s.id, k, (-1.0, 1.0), False) for k, s in enumerate(sheet.strands)]
     if sheet.closed:
-        cols.setdefault(n, []).append((sheet.strands[0].id, True))
-    for acc in sheet.accessory:
-        cols.setdefault(acc.column, []).append((acc.strand.id, False))
-    return [cols[k] for k in sorted(cols)]
+        out.append((sheet.strands[0].id, n, (-1.0, 1.0), True))
+    out += [(acc.strand.id, acc.column, None, False) for acc in sheet.accessory]
+    return out
 
 
 def sheet_checks(sheets: list[Sheet], sses: Iterable[SSE], bridges: list[Bridge]) -> dict[str, list[str] | None]:
     """S1-S3 and S6 of the sheets as built (sheets.build_sheets), sheet k named "sheet k" from 1 as `foldmap summary`
-    numbers them (S6 by column only: where in a column layout stacks them is the figure's); S4 and S5 None (not yet
+    numbers them (an accessory's height is the figure's: judged by column only); S4 and S5 None (not yet
     measured)."""
     count = bridge_counts(sses, bridges)
     out: dict[str, list[str] | None] = {"S1": [], "S2": [], "S3": [], **dict.fromkeys(NOT_YET), "S6": []}
     for n, sheet in enumerate(sheets, 1):
-        columns = sheet_columns(sheet)
-        spots = [(i, c, None, ghost) for c, col in enumerate(columns) for i, ghost in col]
+        spots = sheet_spots(sheet)
         partner = {a.strand.id: a.parent.id for a in sheet.accessory}
         out["S6"] += [f"sheet {n}: {t}" for t in partner_findings(spots, partner)]
-        s1, s2 = neighbour_findings(columns, count)
+        s1, s2 = neighbour_findings(spots, count)
         out["S1"] += [f"sheet {n}: {t}" for t in s1]
         out["S2"] += [f"sheet {n}: {t}" for t in s2]
+        ids = [s.id for s in sheet.strands]
         if sheet.closed and len(sheet.strands) > 2:
-            ring = [s.id for s in sheet.strands]
-            found = count_finding(
-                f"sheet {n}", ring, [a.strand.id for a in sheet.accessory], count, adjacent_pairs(columns)
-            )
-            if found:
-                out["S3"].append(found)
+            found = count_finding(f"sheet {n}", ids, partner, count, adjacent_pairs(spots))
+        else:
+            found = open_finding(f"sheet {n}", [*ids, *partner], count)
+        if found:
+            out["S3"].append(found)
     return out
 
 

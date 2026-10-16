@@ -74,18 +74,29 @@ def test_a_barrel_keeps_its_ring_and_draws_a_pendant_strand_off_it():
     assert acc is x and parent is ring[2] and column == sh.strands.index(ring[2])  # end to end with its partner
 
 
-def test_a_cycle_whose_ends_do_not_pair_is_drawn_open():
-    """Three strands pairing in a triangle, then a run of three more off one of them: the pairing has a cycle, but
-    the track's ends (the run's) do not pair. It was drawn closed, its ghost beside a strand it does not pair with;
-    it is drawn open, flagged unclosed (layout.sheet_notes says so)."""
-    from foldmap.layout import UNCLOSED, sheet_notes
+def test_a_three_strand_cycle_is_no_barrel_and_draws_open_without_a_note():
+    """Three strands pairing in a triangle, then a run of three more off one of them: a cycle of 3 is no barrel
+    (_BARREL_MIN 5), so the sheet is drawn open, the run in a row; no note calls it a barrel drawn open (fix round 3,
+    the review: the note named a barrel here)."""
+    from foldmap.layout import sheet_notes
 
     t = [fake(20 * k, 20 * k + 9) for k in range(6)]
     br = ladder(t[0], t[1], "A", 5) + ladder(t[1], t[2], "A", 5) + ladder(t[0], t[2], "A", 3)
     br += ladder(t[2], t[3], "A", 5) + ladder(t[3], t[4], "A", 5) + ladder(t[4], t[5], "A", 5)
     (sh,) = build_sheets(t, br)
-    assert sh.unclosed and not sh.closed and len(sh.strands) == 6
-    assert sheet_notes([sh]) == [f"{UNCLOSED} ({sh.strands[0].id} … {sh.strands[-1].id})"]
+    assert not sh.closed and not sh.unclosed and len(sh.strands) == 6
+    assert sheet_notes([sh]) == []
+
+
+def test_a_five_ring_with_a_tail_on_a_path_tree_draws_closed():
+    """8C3A sheets 103 and 220 (fix round 3, the review): the spanning tree is a path (tail t0, then t1 .. t5), and
+    t1 and t5 pair (2 bridges), closing a 5-ring: it was never searched for (only branched trees were), so the sheet
+    was drawn open with a false note. Every cyclic sheet takes its longest ring: a closed 5-ring and t0 beside it."""
+    t = [fake(20 * k, 20 * k + 9) for k in range(6)]
+    br = [b for p, q in zip(t, t[1:]) for b in ladder(p, q, "A", 5)] + ladder(t[1], t[5], "A", 2)
+    (sh,) = build_sheets(t, br)
+    assert sh.closed and not sh.unclosed and {s.start for s in sh.strands} == {20, 40, 60, 80, 100}
+    assert [(a.strand.start, a.parent.start) for a in sh.accessory] == [(0, 20)]
 
 
 def test_weak_pairing_and_isolated_strand_make_separate_sheets():

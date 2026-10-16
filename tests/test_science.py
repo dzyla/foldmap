@@ -23,31 +23,48 @@ def counts(pairs: dict) -> callable:
     return lambda a, b: table.get(frozenset((a, b)), 0)
 
 
-def col(*ids, ghost=False):
-    return [(i, ghost) for i in ids]
+def row(*ids, ghost=()):
+    """Strands side by side on one row (spans -5..5), one per column from 0."""
+    return [(i, k, (-5.0, 5.0), i in ghost) for k, i in enumerate(ids)]
+
+
+def spot(i, c, lo=None, hi=None, ghost=False):
+    return (i, c, None if lo is None else (lo, hi), ghost)
 
 
 def test_a_strand_wedged_between_two_that_pair_fails_s1():
     count = counts({("a", "b"): 4, ("b", "c"): 5, ("b", "x"): 3})  # x pairs with b only, as 9FWZ's D:662-666
-    s1, s2 = neighbour_findings([col("a"), col("b"), col("x"), col("c")], count)
+    s1, s2 = neighbour_findings(row("a", "b", "x", "c"), count)
     assert s1 == ["x | c drawn side by side with no bridge"] and s2 == []
 
 
-def test_a_strand_stacked_beside_its_parent_passes_and_one_beside_none_fails():
-    cols = [col("a"), col("b"), col("c", "x")]  # x stacked with c, b's other partner, beside b
-    assert neighbour_findings(cols, counts({("a", "b"): 4, ("b", "c"): 5, ("b", "x"): 3})) == ([], [])
-    s1, _ = neighbour_findings(cols, counts({("a", "b"): 4, ("b", "c"): 5, ("a", "x"): 3}))  # x pairs with a only
-    assert s1 == ["x drawn in a shared column beside none of its partners"]
-    s1, _ = neighbour_findings([col("a"), col("b", "x")], counts({("b", "x"): 3}))  # no bridge across at all
-    assert s1 == ["columns a | b/x share no bridge"]  # x end to end with its partner b (fix round 1): both pair
-    s1, _ = neighbour_findings([col("a"), col("b", "x")], counts({("a", "b"): 3}))  # x pairs with nothing here
-    assert s1 == ["x drawn in a shared column beside none of its partners"]
+def test_s1_reads_spans_strands_beside_each_other_must_pair_and_one_column_is_collinear():
+    """Fix round 3 ruling: any two strands in adjacent columns whose drawn spans overlap must share a bridge; two in
+    one column are collinear (end to end) and must not overlap."""
+    count = counts({("a", "b"): 4, ("b", "c"): 5, ("b", "x"): 3})
+    track = row("a", "b", "c")
+    assert neighbour_findings([*track, spot("x", 2, 6, 9)], count) == ([], [])  # end to end with c, level with b
+    s1, _ = neighbour_findings([*track, spot("x", 2, 6, 9), spot("y", 3, 6, 9)], count)
+    assert s1 == ["x | y drawn side by side with no bridge"]  # beside x at its height: 0 bridges
+    assert neighbour_findings([*track, spot("y", 3, 6, 9)], count)[0] == []  # beside nothing at its height
+    s1, _ = neighbour_findings([*track, spot("x", 2, 4, 9)], count)
+    assert s1 == ["c and x overlap in one column"]
 
 
 def test_an_unpaired_closure_fails_s2():
     count = counts({("a", "b"): 4, ("b", "c"): 5})
-    s1, s2 = neighbour_findings([col("a"), col("b"), col("c"), col("a", ghost=True)], count)
+    s1, s2 = neighbour_findings([*row("a", "b", "c"), ("a", 3, (-5.0, 5.0), True)], count)
     assert s1 == [] and s2 == ["c | a (ghost) drawn side by side with no bridge"]
+
+
+def test_8utf_a_strand_beside_an_unpaired_ghost_fails_s1():
+    """Fix round 3 (review): 8UTF's a:266-273, stacked above a:278-301 in its column, stood beside the ghost of
+    c:440-442 (spans overlapping by 1.14, 0 bridges); the column reading passed it. S1 must flag any such pair: the
+    figure is clean."""
+    from foldmap.figcheck import science_checks
+
+    found = science_checks(_drawn(DATA / "8UTF.cif"))
+    assert found["S1"] == found["S2"] == [], found
 
 
 def test_the_pairing_cycle_leaves_a_pendant_strand_out():
@@ -239,28 +256,30 @@ def test_ssb_draws_each_subunit_its_own_ob_fold_barrel():
     assert "barrels drawn apart, each closed, that also pair: A:1005-1021 with B:2005-2021, " in d.layout.sheet_notes[0]
 
 
-def spot(i, c, lo=None, hi=None, ghost=False):
-    return (i, c, None if lo is None else (lo, hi), ghost)
-
-
-def test_s6_an_accessory_stands_at_its_own_partner():
-    """Fix round 1 ruling: an accessory strand stands in its partner's own column, next to it (end to end), or in a
-    column beside the partner's that it has alone, their spans overlapping; never in another strand's column."""
+def test_s6_an_accessory_stands_beside_its_own_partner():
+    """Fix round 3 ruling: an accessory strand stands in a column next to its partner's, level with it (spans
+    overlapping); one in its partner's own column is collinear with it (end to end) and does not read as pairing."""
     from foldmap.science import partner_findings
 
     track = [spot("p", 1, -5, 5), spot("q", 2, -5, 5)]
-    assert partner_findings([*track, spot("x", 1, 6, 8)], {"x": "p"}) == []  # end to end with p
-    assert partner_findings([*track, spot("x", 2, 6, 8)], {"x": "p"}) == ["x drawn in q's column, not at its partner p"]
-    assert partner_findings([*track, spot("x", 0, -2, 2)], {"x": "p"}) == []  # beside p, alone, overlapping
-    assert partner_findings([*track, spot("x", 0, 6, 8)], {"x": "p"}) == ["x drawn away from it, not at its partner p"]
-    found = partner_findings([*track, spot("y", 1, 6, 8), spot("x", 1, 9, 11)], {"x": "p", "y": "p"})
-    assert found == ["x drawn in its partner p's column but not next to it (y between)"]
-    assert partner_findings([*track, spot("x", 2)], {"x": "p"}) == ["x drawn in q's column, not at its partner p"]
+    assert partner_findings([*track, spot("x", 2, 6, 8)], {"x": "p"}) == [
+        "x drawn beside it, not level with it, not beside its partner p"
+    ]
+    assert partner_findings([*track, spot("x", 2, 3, 8)], {"x": "p"}) == []  # q's column, level with p
+    assert partner_findings([*track, spot("x", 0, -2, 2)], {"x": "p"}) == []  # a new column beside p
+    assert partner_findings([*track, spot("x", 1, 6, 8)], {"x": "p"}) == [
+        "x drawn in its partner's column, not beside its partner p"
+    ]
+    assert partner_findings([*track, spot("x", 3, 6, 8)], {"x": "p"}) == [
+        "x drawn away from it, not beside its partner p"
+    ]
+    assert partner_findings([*track, spot("x", 2)], {"x": "p"}) == []  # by column only, when the height is not known
 
 
 def test_fimd_pendant_strand_stands_at_its_partner():
-    """Fix round 1 (controller VIEW of 9FWZ): S31, D:662-666, stood in S29's (D:634-641) column, beside its partner
-    S30 (D:645-659): it read as pairing with S29. S6 holds for the sheets as built and for the figure."""
+    """Fix round 3 (the review): S31, D:662-666, lies beside its partner S30 (D:645-659) on S29's side (D:634-641),
+    8.6 Å past S29's end: drawn in S29's column, end to end with it, level with S30. S6 holds for the sheets as built
+    and for the figure."""
     from foldmap.figcheck import science_checks
 
     sses, sheets, bridges = _built(R100 / "9FWZ-DB.cif.gz")
@@ -281,13 +300,13 @@ def test_an_accessory_stands_on_the_same_side_of_its_partner_in_every_copy(path)
     assert sides and all(len(s) == 1 for s in sides.values()), sides
 
 
-def test_s6_a_pairing_not_drawn_passes_when_the_notes_name_it():
-    """Fix round 2 ruling: an accessory whose partner has no end free is drawn at another partner of its own, else
-    beside; its pairing with the partner must then be named in the notes."""
+def test_s6_a_pairing_not_drawn_passes_when_it_is_named():
+    """Fix round 2/3 rulings: an accessory that cannot stand level with its partner (no height free beside it) is
+    drawn as near as it can, and its pairing is named (Layout.unshown, in the notes)."""
     from foldmap.science import partner_findings
 
     spots = [spot("p", 1, -5, 5), spot("q", 2, -5, 5), spot("x", 2, 6, 8)]
-    assert partner_findings(spots, {"x": "p"}) == ["x drawn in q's column, not at its partner p"]
+    assert partner_findings(spots, {"x": "p"}) == ["x drawn beside it, not level with it, not beside its partner p"]
     assert partner_findings(spots, {"x": "p"}, {("x", "p")}) == []
 
 
@@ -340,3 +359,15 @@ def test_a_strand_with_more_accessories_than_ends_names_the_one_drawn_away():
     ]
     assert [t.split(" drawn")[0] for t in partner_findings(spots, lay.accessory)] == [c2.sse.id]  # not at a
     assert partner_findings(spots, lay.accessory, noted) == []
+
+
+def test_s3_flags_a_ring_of_five_drawn_open():
+    """Fix round 3 (the review): S3 ran on closed sheets only; a sheet drawn open whose pairing closes a ring of 5 or
+    more strands is a barrel drawn open (8C3A's 5-ring was)."""
+    from foldmap.science import open_finding
+
+    ring = [f"s{k}" for k in range(5)]
+    pairs = {(ring[k], ring[(k + 1) % 5]): 4 for k in range(5)}
+    assert open_finding("sheet 1", ring, counts(pairs)) == "sheet 1: drawn open, its pairing closes a ring of 5 strands"
+    del pairs[(ring[4], ring[0])]
+    assert open_finding("sheet 1", ring, counts(pairs)) is None

@@ -1160,33 +1160,42 @@ def _span(p) -> tuple[float, float]:
 
 def science_checks(drawn) -> dict[str, list[str] | None]:
     """The science checks (science.SCIENCE) of a drawn figure, apart from the page checks: findings per check, None
-    for those not yet measured (S4, S5). Sheet block k is named "sheet <k>" (Layout.sheets, from 0)."""
+    for those not yet measured (S4, S5). Sheet block k is named "sheet <k>" (Layout.sheets, from 0). Every strand and
+    ghost stands in its drawn column with its drawn span (drawn_columns, _span); S6 reads the pairings the layout
+    could not draw (Layout.unshown)."""
     from .dssp import assign_dssp
-    from .science import NOT_YET, adjacent_pairs, bridge_counts, count_finding, neighbour_findings, partner_findings
+    from .science import (
+        NOT_YET,
+        adjacent_pairs,
+        bridge_counts,
+        count_finding,
+        neighbour_findings,
+        open_finding,
+        partner_findings,
+    )
 
     lay = drawn.layout
     out: dict[str, list[str] | None] = {"S1": [], "S2": [], "S3": [], **dict.fromkeys(NOT_YET), "S6": []}
     if not lay.sheets:
         return out
     count = bridge_counts(drawn.sses, assign_dssp(drawn.bb).bridges)
-    noted = {  # pairings the notes name as not drawn ("x:67-68 also pairs with x:79-86")
-        tuple(m) for note in lay.sheet_notes for m in re.findall(r"(\S+) also pairs with ([^\s;,]+)", note)
-    }
+    unshown = {tuple(p) for p in getattr(lay, "unshown", [])}
     for k, ids in enumerate(lay.sheets):
         columns = drawn_columns(lay, k)
-        where = {(i, g): c for c, col in enumerate(columns) for i, g in col}
         ghosts = {g.sse.id: g for g in block_ghosts(lay, k)}
-        spots = [(i, c, _span(ghosts[i] if g else lay.placed[i]), g) for (i, g), c in where.items()]
-        out["S6"] += [f"sheet {k}: {t}" for t in partner_findings(spots, lay.accessory, noted)]
-        s1, s2 = neighbour_findings(columns, count)
+        spots = [(i, c, _span(ghosts[i] if g else lay.placed[i]), g) for c, col in enumerate(columns) for i, g in col]
+        out["S6"] += [f"sheet {k}: {t}" for t in partner_findings(spots, lay.accessory, unshown)]
+        own_ghosts = [i for i in ghosts if i in ids]
+        s1, s2 = neighbour_findings(spots, count, own_ghosts)
         out["S1"] += [f"sheet {k}: {t}" for t in s1]
         out["S2"] += [f"sheet {k}: {t}" for t in s2]
-        ghosts = [i for col in columns for i, g in col if g]
-        if not any(i in ids for i in ghosts):  # no barrel (a ghost repeating one of its own strands): ghosts lent
-            continue  # by a symmetric copy only stand beside their partners (layout._unwrap)
-        ring = [i for i in ids if i not in lay.accessory] + [i for i in ghosts if i not in ids]
-        others = [i for i in ids if i in lay.accessory]
-        found = count_finding(f"sheet {k}", ring, others, count, adjacent_pairs(columns))
+        lent = [i for i in ghosts if i not in ids]
+        if own_ghosts:  # a barrel: its ring is its strands (accessories aside) and the ghosts lent to it
+            ring = [i for i in ids if i not in lay.accessory] + lent
+            others = [i for i in ids if i in lay.accessory]
+            found = count_finding(f"sheet {k}", ring, others, count, adjacent_pairs(spots))
+        else:  # drawn open: no ring of _BARREL_MIN strands or more among its own strands
+            found = open_finding(f"sheet {k}", ids, count)
         if found:
             out["S3"].append(found)
     return out
