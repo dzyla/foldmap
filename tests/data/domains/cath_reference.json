@@ -1,0 +1,48 @@
+{
+ "about": "Domain choppings for calibrating foldmap's automatic domains (plan 12 Task 3, R2). 'chains': the 33 chains of classic multi-domain proteins and random-100 entries with at least two CATH domains (one chain per entry, the one with most domains); each domain is a list of [first, last] segments in author residue numbers, discontinuous domains as several segments; 'cath' names the CATH domain ids. 'single': entries CATH keeps as one domain. 'literature': hand choppings from the papers named.",
+ "source": "CATH, through the PDBe API https://www.ebi.ac.uk/pdbe/api/mappings/cath/<pdb id>, fetched 2026-10-15",
+ "license": "CATH data: Creative Commons Attribution 4.0 International (CC BY 4.0), https://www.cathdb.info; cite Sillitoe et al. 2021, Nucleic Acids Res 49:D266. Literature choppings: as cited per entry.",
+ "chains": [
+  {"pdb": "1LDM", "chain": "A", "tag": "classic", "domains": [[[1, 162]], [[163, 329]]], "cath": ["1ldmA01", "1ldmA02"]},
+  {"pdb": "1CZA", "chain": "N", "tag": "classic", "domains": [[[16, 53], [223, 445]], [[481, 512], [671, 890]], [[54, 222], [446, 463]], [[513, 670], [894, 913]]], "cath": ["1czaN02", "1czaN04", "1czaN01", "1czaN03"]},
+  {"pdb": "1HKB", "chain": "A", "tag": "classic", "domains": [[[16, 53], [223, 445]], [[481, 512], [671, 892]], [[54, 222], [446, 463]], [[513, 670], [894, 914]]], "cath": ["1hkbA02", "1hkbA04", "1hkbA01", "1hkbA03"]},
+  {"pdb": "2YHX", "chain": "A", "tag": "classic", "domains": [[[2, 58]], [[59, 188]], [[189, 458]]], "cath": ["2yhxA01", "2yhxA02", "2yhxA03"]},
+  {"pdb": "1BDG", "chain": "A", "tag": "classic", "domains": [[[13, 65], [220, 446]], [[66, 219], [447, 459]]], "cath": ["1bdgA01", "1bdgA02"]},
+  {"pdb": "1CSH", "chain": "A", "tag": "classic", "domains": [[[3, 276], [392, 423]], [[277, 391]]], "cath": ["1cshA01", "1cshA02"]},
+  {"pdb": "5CSC", "chain": "A", "tag": "classic", "domains": [[[1, 276], [392, 423]], [[277, 391]]], "cath": ["5cscA01", "5cscA02"]},
+  {"pdb": "7FAB", "chain": "H", "tag": "classic", "domains": [[[1, 117]], [[118, 216]]], "cath": ["7fabH01", "7fabH02"]},
+  {"pdb": "3PGK", "chain": "A", "tag": "classic", "domains": [[[1, 186]], [[193, 401]]], "cath": ["3pgkA01", "3pgkA02"]},
+  {"pdb": "1AOZ", "chain": "A", "tag": "classic", "domains": [[[1, 130]], [[131, 336]], [[337, 552]]], "cath": ["1aozA01", "1aozA02", "1aozA03"]},
+  {"pdb": "1PKN", "chain": "A", "tag": "classic", "domains": [[[12, 41], [385, 529]], [[42, 115], [219, 384]], [[116, 218]]], "cath": ["1pknA01", "1pknA02", "1pknA03"]},
+  {"pdb": "2CPK", "chain": "E", "tag": "classic", "domains": [[[15, 32], [127, 317]], [[33, 126], [318, 350]]], "cath": ["2cpkE01", "2cpkE02"]},
+  {"pdb": "1RHD", "chain": "A", "tag": "classic", "domains": [[[1, 156]], [[157, 293]]], "cath": ["1rhdA01", "1rhdA02"]},
+  {"pdb": "1LGR", "chain": "A", "tag": "classic", "domains": [[[1, 103]], [[104, 456]]], "cath": ["1lgrA02", "1lgrA01"]},
+  {"pdb": "1GPB", "chain": "A", "tag": "classic", "domains": [[[19, 485], [813, 836]], [[486, 812]]], "cath": ["1gpbA01", "1gpbA02"]},
+  {"pdb": "5Q42", "chain": "A", "tag": "r100", "domains": [[[700, 846], [995, 1040]], [[847, 994]]], "cath": ["5q42A01", "5q42A02"]},
+  {"pdb": "5HI7", "chain": "A", "tag": "r100", "domains": [[[3, 47], [183, 273]], [[48, 96]], [[97, 182]], [[274, 353]], [[354, 428]]], "cath": ["5hi7A01", "5hi7A02", "5hi7A03", "5hi7A04", "5hi7A05"]},
+  {"pdb": "2YBE", "chain": "A", "tag": "r100", "domains": [[[2, 188]], [[195, 403]]], "cath": ["2ybeA01", "2ybeA02"]},
+  {"pdb": "4XG1", "chain": "A", "tag": "r100", "domains": [[[2, 34], [277, 421]], [[35, 276]]], "cath": ["4xg1A01", "4xg1A02"]},
+  {"pdb": "2C4M", "chain": "A", "tag": "r100", "domains": [[[5, 438], [773, 793]], [[439, 772]]], "cath": ["2c4mA01", "2c4mA02"]},
+  {"pdb": "2ILU", "chain": "A", "tag": "r100", "domains": [[[3, 253], [445, 479]], [[254, 444]]], "cath": ["2iluA01", "2iluA02"]},
+  {"pdb": "2B9V", "chain": "A", "tag": "r100", "domains": [[[50, 238], [316, 432]], [[240, 315]], [[433, 666]]], "cath": ["2b9vA01", "2b9vA02", "2b9vA03"]},
+  {"pdb": "4XEI", "chain": "A", "tag": "r100", "domains": [[[4, 34], [78, 141], [375, 411]], [[143, 196], [292, 370]], [[35, 75]], [[197, 288]]], "cath": ["4xeiA01", "4xeiA03", "4xeiA02", "4xeiA04"]},
+  {"pdb": "5DWZ", "chain": "C", "tag": "r100", "domains": [[[1, 190]], [[191, 348]]], "cath": ["5dwzC01", "5dwzC02"]},
+  {"pdb": "1SLV", "chain": "B", "tag": "r100", "domains": [[[16, 27], [121, 232]], [[28, 120], [233, 243]]], "cath": ["1slvB01", "1slvB02"]},
+  {"pdb": "6DPV", "chain": "A", "tag": "r100", "domains": [[[1, 268]], [[269, 383]], [[384, 437]]], "cath": ["6dpvA01", "6dpvA02", "6dpvA03"]},
+  {"pdb": "5JDN", "chain": "A", "tag": "r100", "domains": [[[1, 35], [157, 196]], [[36, 156], [197, 301]]], "cath": ["5jdnA01", "5jdnA02"]},
+  {"pdb": "3L2V", "chain": "A", "tag": "r100", "domains": [[[12, 104]], [[105, 112], [311, 372]], [[123, 256]], [[257, 302]]], "cath": ["3l2vA01", "3l2vA02", "3l2vA03", "3l2vA04"]},
+  {"pdb": "3MHT", "chain": "A", "tag": "r100", "domains": [[[1, 186], [285, 327]], [[187, 284]]], "cath": ["3mhtA01", "3mhtA02"]},
+  {"pdb": "1RM5", "chain": "A", "tag": "r100", "domains": [[[1, 147], [314, 333]], [[148, 313]]], "cath": ["1rm5A01", "1rm5A02"]},
+  {"pdb": "2HKI", "chain": "A", "tag": "r100", "domains": [[[2, 151], [317, 335]], [[152, 316]]], "cath": ["2hkiA01", "2hkiA02"]},
+  {"pdb": "6FYF", "chain": "A", "tag": "r100", "domains": [[[20, 98]], [[99, 210], [421, 448]], [[211, 420]]], "cath": ["6fyfA01", "6fyfA02", "6fyfA03"]},
+  {"pdb": "6FY9", "chain": "A", "tag": "r100", "domains": [[[19, 97]], [[98, 209], [420, 447]], [[210, 419]]], "cath": ["6fy9A01", "6fy9A02", "6fy9A03"]}
+ ],
+ "single": [
+  {"pdb": "2LZM", "chain": "A", "tag": "classic", "domains": [[[1, 164]]], "cath": ["2lzmA00"]},
+  {"pdb": "4AKE", "chain": "A", "tag": "classic", "domains": [[[1, 214]]], "cath": ["4akeA00"]}
+ ],
+ "literature": [
+  {"pdb": "2LZM", "chain": "A", "tag": "classic", "domains": [[[13, 75]], [[1, 12], [76, 164]]], "reference": "the external review (plan 12, R2): N-domain 13-75, C-domain 1-12 + 76-164 (helix A packs into the C-domain)"},
+  {"pdb": "4AKE", "chain": "A", "tag": "classic", "domains": [[[1, 29], [60, 121], [160, 214]], [[30, 59]], [[122, 159]]], "reference": "the CORE / NMP-binding / LID division used in the adenylate kinase literature (e.g. Müller et al. 1996, Structure 4:147): CORE 1-29 + 60-121 + 160-214, NMP 30-59, LID 122-159"}
+ ]
+}

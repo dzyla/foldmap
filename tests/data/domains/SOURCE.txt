@@ -1,0 +1,16 @@
+cath_reference.json: domain choppings for calibrating foldmap's automatic domains (plan 12 Task 3, R2).
+
+Source: CATH domain boundaries, through the PDBe API (https://www.ebi.ac.uk/pdbe/api/mappings/cath/<pdb id>),
+fetched 2026-10-15 for 26 classic multi-domain entries and the random-100 sample; one chain per entry (the one with
+most domains); 33 chains with at least two CATH domains, plus 2LZM and 4AKE, which CATH keeps as one domain.
+Residue numbers are the author numbers; a discontinuous domain is several [first, last] segments.
+
+License: CATH data is licensed under Creative Commons Attribution 4.0 International (CC BY 4.0).
+Attribution: CATH (https://www.cathdb.info); Sillitoe I. et al. (2021) CATH: increased structural coverage of
+functional space. Nucleic Acids Res 49:D266-D273. Accessed through PDBe (EMBL-EBI).
+Changes: chains and domains selected as above, reshaped into this JSON.
+
+The "literature" entries (2LZM, 4AKE) are hand choppings named per entry, not CATH data.
+
+The structures themselves are not committed (about 40 MB): scripts/make_domain_cache.py puts them in
+$FOLDMAP_DOMAIN_CACHE (default ~/.cache/foldmap-domains); the calibration test skips without them.
