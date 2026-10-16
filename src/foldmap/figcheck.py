@@ -1159,9 +1159,11 @@ def _span(p) -> tuple[float, float]:
 
 
 def residue_places(drawn, k: int):
-    """science.Place of residue k (Backbone index) on its drawn figure: its element's axis (whole length), the loop
-    route it is in (from its nearer element end, RESIDUE_STEP per residue), or a chain end's stub; None when its chain
-    or element is not drawn. Worked out apart from render.residue_point, which S4 judges."""
+    """science.Place of residue k (Backbone index) on its drawn figure: its element's axis (whole length; expected at
+    its residue's fraction along it), the loop route it is in (from its nearer element end, RESIDUE_STEP per residue;
+    expected there, or in proportion to its residue distances when the route is too short to hold that), or a chain
+    end's stub (expected at its end); None when its chain or element is not drawn. Worked out apart from
+    render.residue_point, which S4 judges."""
     from .layout import END_STUB
     from .science import RESIDUE_STEP
 
@@ -1171,7 +1173,8 @@ def residue_places(drawn, k: int):
         if s.start <= k <= s.end:
             p = lay.placed[s.id]
             axis = [tuple(p.n_port), tuple(p.c_port)]
-            return axis, 0, float(math.hypot(*np.subtract(axis[1], axis[0])))
+            length = float(math.hypot(*np.subtract(axis[1], axis[0])))
+            return axis, 0, length, length * (k - s.start) / max(s.end - s.start, 1)
     before, after = [s for s in mine if s.end < k], [s for s in mine if s.start > k]
     if before and after:
         a, b = before[-1], after[0]
@@ -1179,13 +1182,16 @@ def residue_places(drawn, k: int):
         if loop is None:
             return None
         d_a, d_b = k - a.end, b.start - k
-        return [tuple(q) for q in loop.points], 0 if d_a <= d_b else -1, min(d_a, d_b) * RESIDUE_STEP
+        pts = [tuple(q) for q in loop.points]
+        run = sum(math.hypot(*np.subtract(q, p)) for p, q in zip(pts, pts[1:]))
+        bound = min(d_a, d_b) * RESIDUE_STEP
+        return pts, 0 if d_a <= d_b else -1, bound, min(bound, run * min(d_a, d_b) / (d_a + d_b))
     if before:
         p = lay.placed[before[-1].id]
-        return [tuple(p.c_port), tuple(np.add(p.c_port, p.exit_c * END_STUB))], 0, END_STUB
+        return [tuple(p.c_port), tuple(np.add(p.c_port, p.exit_c * END_STUB))], 0, END_STUB, END_STUB
     if after:
         p = lay.placed[after[0].id]
-        return [tuple(p.n_port), tuple(np.add(p.n_port, p.exit_n * END_STUB))], 0, END_STUB
+        return [tuple(p.n_port), tuple(np.add(p.n_port, p.exit_n * END_STUB))], 0, END_STUB, END_STUB
     return None
 
 

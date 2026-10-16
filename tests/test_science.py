@@ -400,13 +400,52 @@ def test_s4_flags_a_mark_far_along_a_long_loop_from_its_residue():
     from foldmap.science import mark_findings
 
     loop = [(0.0, 0.0), (0.0, 10.0), (10.0, 10.0)]  # a 20-unit route; the residue is 2 past its first element
-    near = ("A:66", (0.0, 1.0), (loop, 0, 2 * 0.5))
-    far = ("A:66", (5.0, 10.0), (loop, 0, 2 * 0.5))
-    off = ("A:66", (3.0, 3.0), (loop, 0, 2 * 0.5))
+    near = ("A:66", (0.0, 1.0), (loop, 0, 2 * 0.5, 2 * 0.5))
+    far = ("A:66", (5.0, 10.0), (loop, 0, 2 * 0.5, 2 * 0.5))
+    off = ("A:66", (3.0, 3.0), (loop, 0, 2 * 0.5, 2 * 0.5))
     assert mark_findings([near]) == []
     assert "along its route" in mark_findings([far])[0]
     assert "off its own place" in mark_findings([off])[0]
-    assert mark_findings([("A:66", (10.0, 9.5), (loop, -1, 0.5))]) == []  # measured from the far end
+    assert mark_findings([("A:66", (10.0, 9.5), (loop, -1, 0.5, 0.5))]) == []  # measured from the far end
+
+
+def test_s4_flags_a_mark_at_the_element_end_for_a_residue_well_into_the_loop():
+    """T4 review item 2: S4 bounded a mark's arc only from above, so a mark left at the element end passed for any
+    residue. The place now carries the arc its residue distance puts the mark at, and a mark short of it by more
+    than MARK_SLACK is flagged: here the residue is 6 into a 20-unit route, expected 3 units along it."""
+    from foldmap.science import mark_findings
+
+    loop = [(0.0, 0.0), (0.0, 10.0), (10.0, 10.0)]
+    assert mark_findings([("A:70", (0.0, 3.0), (loop, 0, 6 * 0.5, 6 * 0.5))]) == []
+    got = mark_findings([("A:70", (0.0, 0.0), (loop, 0, 6 * 0.5, 6 * 0.5))])
+    assert len(got) == 1 and "short of" in got[0], got
+
+
+def test_s4_places_a_loop_residue_by_its_residue_distance_on_a_drawn_figure():
+    """figcheck.residue_places carries the expected arc: on 1EMA's drawn loops, every loop residue's mark at
+    render.residue_point passes S4, and the same mark at its nearer element's end fails once the residue is two or
+    more residues in (expected arc 1.0 or more against MARK_SLACK 0.5), unless the route is too short to hold it."""
+    from foldmap.figcheck import residue_places
+    from foldmap.render import residue_point
+    from foldmap.science import MARK_SLACK, mark_findings
+
+    d = _drawn(DATA / "1EMA.cif")
+    chains = [lab.chain for lab in d.bb.labels]
+    ids = {s.id: s for s in d.sses}
+    flagged = 0
+    for lp in d.loops:
+        a, b = ids.get(lp.a_id), ids.get(lp.b_id)
+        if a is None or b is None or a.chain != b.chain:
+            continue
+        for k in range(a.end + 1, b.start):
+            place = residue_places(d, k)
+            pts, end, _, expected = place
+            assert mark_findings([(str(k), residue_point(d.layout, d.loops, d.sses, chains, k), place)]) == []
+            at_end = tuple(pts[0] if end == 0 else pts[-1])
+            got = mark_findings([(str(k), at_end, place)])
+            assert bool(got) == (expected > MARK_SLACK), (k, expected, got)
+            flagged += bool(got)
+    assert flagged > 10
 
 
 def test_1ema_chromophore_star_passes_s4_and_the_old_fraction_would_not(monkeypatch):
