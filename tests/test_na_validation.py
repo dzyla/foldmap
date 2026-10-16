@@ -60,11 +60,11 @@ NEARER: dict[str, float] = {"30QM": 0.833}
 # which pair with 130-137 only, are no longer wedged between 130-137 and 251-252 but stand end to end with 130-137 in
 # its column (fix round 1 ruling); the layout resettles: spearman 0.521 -> 0.446 (re-held, as ruled for 0.493 when
 # they stood in the next strand's column), procrustes 0.776 -> 0.759. Fix round 3 (beside their partner, level with
-# it; stack pad 1.35): spearman 0.507 (held 0.446, as ruled), procrustes 0.811 (0.79-0.83 at every pad from 1.2 to
+# it; stack pad 1.3): spearman 0.496 (held 0.446, as ruled), procrustes 0.794 (0.79-0.83 at every pad from 1.2 to
 # 1.6): re-held there.
 HELD = {
     ("3CRX", "procrustes"): 0.817,
-    ("30QM", "procrustes"): 0.811,
+    ("30QM", "procrustes"): 0.794,
     ("30QM", "angle_median"): 35.7,
     ("30QM", "angle_max"): 109.6,
     ("30QM", "spearman"): 0.446,

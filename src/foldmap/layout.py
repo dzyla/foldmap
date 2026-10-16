@@ -404,12 +404,13 @@ def _sheet_order(sheet: Sheet, frame: Frame) -> tuple[list[int], int, np.ndarray
     return order, s, cents
 
 
-_STACK_PAD = 1.35  # page units between two strands drawn end to end in one column: room for the loops leaving
+_STACK_PAD = 1.3  # page units between two strands drawn end to end in one column: room for the loops leaving
 # their facing ends (0.2 left 5KQJ's B and F loops no route, 1.0 5JB1's; C34 set 1.2 on 5 sample entries). Plan 12
 # fix round 3 (accessories beside their partner): swept 1.2-1.6 on the 37 sample entries with accessory strands (5
-# views) and the 30QM and 4YBB fixtures; entries newly failing against t12c2b: 1.2: 7 (and 4YBB's run crossing), 1.3:
-# 8RRX, 1.35: 5JB1, 8RRX, 1.4: 5JB1, 8RRX (and 30QM's beads), 1.45: 7GLY, 7XSP, 8RRX (and 30QM's beads), 1.5: 5, 1.6:
-# 5. 1.35 is the middle of the 1.3-1.4 plateau, where one step either way changes at most one entry
+# views) and the 30QM and 4YBB fixtures; entries newly failing against t12c2b: 1.2: 7 (and 4YBB's run crossing),
+# 1.25: 5, 1.3: 8RRX, 1.35: 5JB1, 8RRX, 1.4: 5JB1, 8RRX (and 30QM's beads), 1.45: 7GLY, 7XSP, 8RRX (and 30QM's
+# beads), 1.5: 5, 1.6: 5. The stable plateau is 1.3-1.4 (a step changes at most one entry); within it 1.3 alone also
+# keeps 6ZS5's disulfide bars no longer with their springs than without (1.35 and 1.4: 0.008 longer)
 
 
 def _stack_gaps(lay: Layout) -> list[tuple[float, float, float, float]]:
