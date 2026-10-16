@@ -1300,8 +1300,12 @@ def _cmd_figure(args: argparse.Namespace) -> int:
     if args.command == "interactive":
         from .interactive import write_page
 
-        for out in args.output:
-            print(f"wrote {write_page(spec.structure, out, viewer=args.viewer, **spec.page_kwargs())}")
+        for n, out in enumerate(args.output):
+            made: list[dict] = []
+            page = write_page(spec.structure, out, viewer=args.viewer, provenance_out=made, **spec.page_kwargs())
+            if n == 0:  # the same figure for every output
+                print(provenance_block(made), file=sys.stderr, end="")
+            print(f"wrote {page}")
     else:
         drawn = draw_spec(spec)
         scope = drawn_scope(drawn.model, drawn.layout, spec.assembly, spec.focus)
@@ -1364,6 +1368,7 @@ def _cmd_check(args: argparse.Namespace) -> int:
     from .science import science_lines
 
     drawn = draw_spec(_spec_of(args))
+    print(provenance_block(drawn.provenance), file=sys.stderr, end="")
     for out in args.output:
         print(f"wrote {save(drawn.figure, out)}")
     found = figcheck.science_checks(drawn)

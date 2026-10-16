@@ -99,6 +99,7 @@ class Placed:
     label_side: int = 1  # a helix's label: 1 on its upper side, -1 on the other (_choose_label_sides)
     over: bool = False  # a helix packed on a sheet face, drawn over the sheet's strands (_over_sheet)
     label_along: float = 0.0  # its name moved this far along its axis, N -> C (_over_label_sides)
+    label_side_default: int = 1  # the side its name was given before any later move (_element_label_sides, mirrors)
 
     @property
     def direction(self) -> np.ndarray:
@@ -3790,6 +3791,7 @@ def _element_label_sides(layout: Layout, sses: list[SSE]) -> None:
             or any(_box_meets_body(box, d) for d in layout.stems)
         ):
             p.label_side = 1
+        p.label_side_default = p.label_side  # a deliberate flip off a nucleic-acid trace is no later move
 
 
 _OVER_STUB = 0.6  # page units: the straight run of a loop out of a strand's end, kept clear of a name over the sheet
@@ -3852,6 +3854,8 @@ def _mirror_sides(mirrored: list[tuple]) -> None:
             copy.label_out = mate.label_out
         if float(np.dot(np.subtract(where(copy), (copy.cx, copy.cy)), (-mx, my))) < 0:
             copy.label_side = -1
+        if isinstance(copy, Placed):
+            copy.label_side_default = copy.label_side
 
 
 def _choose_label_sides(layout: Layout, sses: list[SSE], style: Style, mirrored: list[tuple] = ()) -> None:

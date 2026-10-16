@@ -785,9 +785,11 @@ def build_page(
     look: Style | None = None,
     title: str | None = None,
     viewer: str = "molstar",
+    provenance_out: list | None = None,
     **layout_options,
 ) -> str:
     """The HTML page as a string. viewer: 'molstar' (Mol*, PDBe build) or '3dmol' for the 3D panel.
+    provenance_out: a list the figure's provenance items (how it was made) are added to, for the caller to say.
     layout_options go to cli.make_layout (symmetry, assembly, swap, ...)."""
     from .cli import make_layout
 
@@ -800,6 +802,8 @@ def build_page(
     loops = route_loops(layout, sses, bb)
     fig = draw(layout, loops, sses, title, model=model, look=look)
     svg = save_svg(fig)
+    if provenance_out is not None:
+        provenance_out.extend(dict(i) for i in getattr(fig, "foldmap_provenance", []))
     colours, _ = element_colours(layout, sses, look)
     data = {
         "title": title or Path(path).stem,

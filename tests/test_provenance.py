@@ -198,3 +198,49 @@ def test_the_app_shows_the_list_under_the_figure():
     assert len(said) == 1 and "A:160-170" in said[0], [c.value for c in at.caption]
     at = opened(DATA / "1UBQ.cif")
     assert not any("How this figure was made" in visible(c.value) for c in at.caption)
+
+
+def test_a_helix_name_flipped_by_default_off_a_nucleic_acid_axis_is_not_moved():
+    """Final review (T5 names_moved): label_side -1 chosen deliberately by _element_label_sides is no later move;
+    only a name displaced from its default side or along its helix is listed."""
+    from types import SimpleNamespace
+
+    from foldmap.layout import Placed
+    from foldmap.model import SSE, ResLabel
+    from foldmap.provenance import _names_moved
+
+    import numpy as np
+
+
+    def helix(k, **kw):
+        lab = ResLabel("A", 10 * k + 1, "", "ALA")
+        s = SSE("H", "A", 10 * k, 10 * k + 8, lab, lab, np.zeros(3), np.array([1.0, 0, 0]))
+        return Placed(s, 0.0, 0.0, 3.0, 1.5, 1.0, label="a", **kw)
+
+    flipped = helix(0, label_side=-1, label_side_default=-1)  # the default off an axis
+    pushed = helix(1, label_side=-1)  # moved from its default side later
+    along = helix(2, label_along=0.4)
+    lay = SimpleNamespace(
+        placed={p.sse.id: p for p in (flipped, pushed, along)}, domain_leaders=[], stems=[], mirror_pairs=[]
+    )
+    (item,) = _names_moved(SimpleNamespace(), lay, True)
+    assert item["elements"] == [pushed.sse.id, along.sse.id]
+
+
+def test_domains_reloaded_from_a_layout_file_say_where_they_came_from():
+    """Final review 9: CATH's domains read back from a layout file are CATH's, not "as given"."""
+    from types import SimpleNamespace
+
+    from foldmap.provenance import _domains
+
+    lay = SimpleNamespace(domains=[("D1", ["A:1-9"])], domain_note="", domain_source="CATH")
+    (item,) = _domains(lay)
+    assert "CATH" in item["text"] and "as given" not in item["text"]
+
+
+@pytest.mark.parametrize("command", ["check", "interactive"])
+def test_check_and_interactive_print_the_same_block(command, tmp_path, capsys):
+    out = tmp_path / ("f.html" if command == "interactive" else "f.svg")
+    main([command, str(FIMD), "-o", str(out)])
+    err = capsys.readouterr().err
+    assert err.count("How this figure was made:") == 1 and f"\n  - {PENDANT}\n" in err

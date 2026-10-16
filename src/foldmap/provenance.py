@@ -58,6 +58,8 @@ def _domains(layout) -> list[dict]:
         return []
     if layout.domain_source == "UniProt":
         return [_item("domains", f"domains {stems} from UniProt's annotation, not inferred", named)]
+    if layout.domain_source == "CATH":  # reloaded from a layout file: CATH's note is not kept
+        return [_item("domains", f"domains {stems} from CATH's published chopping, not inferred", named)]
     return [_item("domains", f"domains {stems} as given, not inferred", named)]
 
 
@@ -113,7 +115,7 @@ def _names_moved(fig, layout, labels: bool) -> list[dict]:
     parts, elements = [], []
 
     def moved(p) -> bool:
-        return p.label_along != 0 or p.label_side == -1
+        return p.label_along != 0 or p.label_side != p.label_side_default  # not a default flip (_element_label_sides)
 
     if labels:
         mate_of = dict(getattr(layout, "mirror_pairs", []))  # copy id -> mate id
@@ -122,7 +124,7 @@ def _names_moved(fig, layout, labels: bool) -> list[dict]:
             if p.sse.kind not in ("H", "G") or not p.label:
                 continue
             mate = layout.placed.get(mate_of.get(i, ""))
-            if p.label_along != 0 or (moved(mate) if mate is not None else p.label_side == -1):
+            if p.label_along != 0 or (moved(mate) if mate is not None else moved(p)):
                 helices.append(p)
         if helices:
             parts.append(f"helix names on the other side of their helix or along it: {_names(helices)}")
