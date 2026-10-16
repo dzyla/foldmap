@@ -660,3 +660,37 @@ def test_helix_on_sheet_skips_nucleic_acid(path):
         )
         pts = np.array([q for path_ in lay.na_paths for q in path_.points]).reshape(-1, 2)
         assert not ((pts[:, 0] > x0) & (pts[:, 0] < x1) & (pts[:, 1] > y0) & (pts[:, 1] < y1)).any()
+
+
+def _bundle_columns(second_axis):
+    """The lateral offsets (across the bundle) of A's two pieces, two residues apart, in a bundle with B."""
+    from foldmap.layout import _bundle_item
+
+    f = Frame(np.zeros(3), np.array([1.0, 0, 0]), np.array([0, 1.0, 0]), np.array([0, 0, 1.0]))
+    first = fake_sse("H", 1, 20, centroid=(0, 0, 0), axis=(0, 1, 0))
+    second = fake_sse("H", 23, 30, centroid=(1, 20 if second_axis[1] > 0 else -10, 0), axis=second_axis)
+    other = fake_sse("H", 1, 30, centroid=(10, 0, 0), axis=(0, 1, 0), chain="B")
+    item = _bundle_item([first, second, other], f, "free", HELIX_W)
+    at = {m.sse.id: off for m, off in zip(item.members, item.offsets)}
+    return at[first.id], at[second.id], item
+
+
+def test_a_bundle_piece_drawn_the_other_way_takes_its_own_column():
+    """Random-100 C2b-2 A3 (6JLN E:17-39 then E:42-47, 7ARD H:107-118 then H:121-151): a helix piece two residues on
+    from the last that points back along the bundle was stacked end to end in that piece's column, 0.3 apart, its
+    near end facing the other's: the two loops between them had no way out. Only pieces drawn the same way (a kink)
+    share a column."""
+    a, b, item = _bundle_columns((0, -1, 0))
+    assert abs(a[0] - b[0]) >= HELIX_W  # side by side
+    a, b, item = _bundle_columns((0, 1, 0))  # the next piece the same way (a kink): end to end in one column
+    assert abs(a[0] - b[0]) < 1e-6 and b[1] > a[1]
+
+
+@pytest.mark.parametrize("entry", ["6JLN", "7ARD"])
+def test_helix_hairpins_in_a_bundle_route_their_loops(entry):
+    """Random-100 C2b-2 A3: 6JLN's E:17-39>E:42-47 and E:42-47>E:72-81, 7ARD's three H loops (default view)."""
+    from foldmap.spec import draw_spec, figure_spec
+    from helpers import r100_entry
+
+    d = draw_spec(figure_spec(r100_entry(entry)))
+    assert d.stuck == [] and d.over_labels == []

@@ -889,7 +889,9 @@ def _bundle_item(group: list[SSE], frame: Frame, angle_mode: str, width: float) 
     """Helices of several chains packed along their length, drawn as one unit: one column per helix (kinked
     pieces of one helix share a column, end to end), columns side by side in their order across the bundle at
     their true spacing (at least a label's width apart), staggered along the shared axis as in 3D;
-    antiparallel helices point the other way."""
+    antiparallel helices point the other way. A piece drawn the other way from the last is no kink but a hairpin:
+    it takes a column of its own (end to end, the two ends facing across 0.3 left their loops no way out:
+    random-100 C2b-2, 6JLN's E:42-47 and 7ARD's H:121-151)."""
     from .features import KINK_GAP
 
     ref = group[0].axis
@@ -900,9 +902,10 @@ def _bundle_item(group: list[SSE], frame: Frame, angle_mode: str, width: float) 
     angle = _angle(float(np.arctan2(a2[1], a2[0])), float(a2[1]), angle_mode)
     d2, side2 = np.array([np.cos(angle), np.sin(angle)]), np.array([-np.sin(angle), np.cos(angle)])
     columns: list[list[SSE]] = []
+    up = lambda s: float(s.axis @ m) >= 0  # noqa: E731 - drawn along the bundle (else the other way), as below
     for s in sorted(group, key=lambda s: (s.chain, s.start)):
         last = columns[-1][-1] if columns else None
-        if last is not None and last.chain == s.chain and s.start - last.end - 1 <= KINK_GAP:
+        if last is not None and last.chain == s.chain and s.start - last.end - 1 <= KINK_GAP and up(s) == up(last):
             columns[-1].append(s)  # the next piece of a kinked helix
         else:
             columns.append([s])
