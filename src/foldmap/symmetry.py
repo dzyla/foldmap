@@ -162,6 +162,11 @@ def _rotation(r: np.ndarray) -> tuple[float, np.ndarray]:
     if np.linalg.norm(axis) < 1e-6:  # 0 or 180 degrees: the eigenvector of eigenvalue +1
         w, v = np.linalg.eigh((r + r.T) / 2)
         axis = v[:, np.argmax(w)]
+        # LAPACK leaves an eigenvector's sign free, and builds differ (1SLV's crystallographic dyad pointed down on
+        # Linux and macOS, up on Windows: the figure turned over); a half-turn about either sign is the same motion,
+        # so its first component off zero is made positive
+        if axis[np.flatnonzero(np.abs(axis) > 1e-6)[0]] < 0:
+            axis = -axis
     return angle, axis / np.linalg.norm(axis)
 
 

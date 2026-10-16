@@ -195,17 +195,30 @@ def test_copies_numbered_apart_are_tied():
     assert got[("D", "B")] <= 0.5, got
 
 
-def test_a_dimer_sheet_shared_by_two_copies_keeps_them_alike(monkeypatch):
+@pytest.mark.parametrize("turned", [False, True])
+def test_a_dimer_sheet_shared_by_two_copies_keeps_them_alike(monkeypatch, turned):
     """1SLV (plan 12 Task 2 fix round 2, pinned in fix round 4 on a cut fixture): assembly 1 is the A-B heterodimer
     twice, with one continuous sheet across the two copies, an item no tie holds. It sat between A1's eta2 and its
     copy, the tied pushes never cleared and _separate drew the copies one by one, unalike (A15). The shared items now
-    yield to the tied copies: A2~A1 and B2~B1 are drawn exactly alike. Without that (b029264's parent: no `shared`)
-    the fixture is drawn unalike, so it holds the case."""
+    yield to the tied copies: A2~A1 and B2~B1 are drawn exactly alike. The dyad is a half-turn whose axis may point
+    either way (symmetry._rotation signs it): the copies are alike drawn either way up, and turned over against
+    that sign the fixture still needs the shared items to yield (without that, b029264's parent: no `shared`, it is
+    drawn unalike), so it holds the case whatever the sign."""
+    import dataclasses
+
+    import foldmap.cli as cli
     import foldmap.layout as layout
 
+    if turned:
+        real_sym = cli.detect_symmetry
+        monkeypatch.setattr(
+            cli, "detect_symmetry", lambda *a, **k: (lambda s: dataclasses.replace(s, axis=-s.axis))(real_sym(*a, **k))
+        )
     path = DATA / "r100" / "1SLV.cif.gz"
     got = figcheck.copies_alike(drawn(path))
     assert set(got) == {("A2", "A1"), ("B2", "B1")} and max(got.values()) <= 1e-6, got
+    if not turned:
+        return
     real = layout._separate
 
     def without_shared(*args, **kw):
@@ -251,3 +264,27 @@ def test_a_sheet_seen_across_the_page_is_drawn_the_same_on_any_cpu(monkeypatch, 
     path = DATA / "r100" / "1SLV.cif.gz"
     want = _placed(path)
     assert _placed(path, monkeypatch, nudge=seed) == want
+
+
+def test_a_dyad_points_the_same_way_on_any_cpu(monkeypatch):
+    """1SLV's dyad is a crystallographic half-turn: the copies' rotation has no antisymmetric part, and
+    symmetry._rotation took the axis from np.linalg.eigh, whose sign LAPACK leaves free (OPENBLAS_CORETYPE=Nehalem,
+    Windows and numpy 1.24's OpenBLAS turned it over, and the figure upside down). It is now signed by a rule of its
+    own, whatever sign eigh returns."""
+    import foldmap.cli as cli
+
+    path = DATA / "r100" / "1SLV.cif.gz"
+    found = []
+    real = cli.detect_symmetry
+
+    def kept(*args, **kw):
+        found.append(real(*args, **kw))
+        return found[-1]
+
+    monkeypatch.setattr(cli, "detect_symmetry", kept)
+    want = _placed(path)
+    eigh = np.linalg.eigh
+    monkeypatch.setattr(np.linalg, "eigh", lambda a, *args, **kw: (lambda w, v: (w, -v))(*eigh(a, *args, **kw)))
+    assert _placed(path) == want
+    one, other = found
+    assert one.n == 2 and np.array_equal(one.axis, other.axis)
