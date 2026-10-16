@@ -478,13 +478,19 @@ def domains_block(st, ss: MutableMapping) -> None:
         on_change=switch_domains,
         args=(ss,),
         persist_state="session",
-        help="found from how the elements pack, chain by chain (copies of a protein alike)",
+        help="inferred from residue contacts, chain by chain (copies of a protein alike): not a published "
+        "domain assignment",
+    )
+    st.toggle(
+        "CATH domains",
+        help="the published CATH chopping of a PDB entry (fetched from PDBe); with none, the note says so",
+        **setting(ss, "cath_domains"),
     )
     if not ss.get("domains__auto"):
         text = st.column_config.TextColumn
         ranges = text("Ranges", width=CELL + 10, help="residue ranges and elements, e.g. A:1-80, α3")
         editor(st, ss, "domains", "Domains", {"name": text("Name", width=CELL - 10), "ranges": ranges})
-    if ss.get("domains") or ss.get("uniprot_domains"):
+    if ss.get("domains") or ss.get("uniprot_domains") or ss.get("cath_domains"):
         st.toggle(
             "Colour by domain",
             help="elements in eight colour-blind-safe tones, one per domain, instead of the chain colours (a theme "

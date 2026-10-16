@@ -112,10 +112,12 @@ LAYOUT_DEFAULTS = {
     "focus": "auto",
     "uniprot": "off",
     "uniprot_domains": False,
+    "cath_domains": False,  # --domains cath: CATH's published domains (PDBe)
     "msa_path": "",
     "msa_reference": "",
     "domains": "",
     "domains_from_file": "",  # the domains text a layout file gave, while unchanged: ids it names may be stale
+    "domain_source": "",  # ... and where they came from (inferred, CATH, UniProt): said again while unchanged
     "chains": "",
     "names": [],  # --names: deposited, beta or a YAML file (later ones win)
     # layout-file options the app has no control for: kept as loaded and saved again
@@ -183,10 +185,13 @@ def layout_options(settings: dict) -> dict:
     lines = [p.strip() for p in re.split(r"[;\n]", settings.get("domains", "") or "") if p.strip()]
     domains = "auto" if lines == ["auto"] else _domain_spec(lines) or None
     if isinstance(domains, list) and settings.get("domains_from_file") == settings.get("domains"):
-        domains = SavedDomains(domains, quiet=True)  # a layout file's: ids this structure lacks are dropped; the
+        domains = SavedDomains(domains, quiet=True, source=settings.get("domain_source") or "")  # a layout file's: ids
+        # this structure lacks are dropped; the
         # app shows the note (app_jobs.draw_job), so the pipeline prints none
     if settings.get("uniprot_domains") and (settings.get("uniprot") or "off") not in ("off", ""):
         domains = "uniprot"
+    if settings.get("cath_domains"):
+        domains = "cath"
     return {
         "symmetry": settings.get("symmetry", "auto") or "auto",
         "assembly": settings.get("assembly", "auto") or "auto",
@@ -428,6 +433,7 @@ def settings_from_document(doc: dict) -> dict:
     else:
         out["domains"] = "\n".join(f"{name}={','.join(refs)}" for name, refs in _domains(domains))
         out["domains_from_file"] = out["domains"]
+        out["domain_source"] = doc.get("domain_source") or ""
     names = [_text("names", n) for n in doc.get("names") or []]
     out["names"] = [n for n in names if n in NAME_KEYWORDS or (local_files() and Path(n).is_file())]
     out["names_missing"] = [n for n in names if n not in out["names"]]  # saved elsewhere; never a server path hosted

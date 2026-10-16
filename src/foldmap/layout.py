@@ -221,6 +221,8 @@ class Layout:
     # barrel's repeated strand, a strand lent across the cut of an unrolled ring: _unwrap); [] when not recorded
     domains: list[tuple[str, list[str]]] = field(default_factory=list)  # named domains and their element ids
     domain_lent: dict[str, list[str]] = field(default_factory=dict)  # domain -> elements a neighbour lends to it
+    domain_source: str = ""  # where the domains come from: "inferred" (--domains auto), "CATH", "UniProt", "" (given)
+    domain_note: str = ""  # what the notes say of them (cli.domain_note): inferred, or CATH's, or none found
     # (focus mode, chains in `partial`, drawn grey): inside its panel (panel_members), not its members (random-100 C23)
     domain_names: dict[str, tuple[float, float, float, float]] = field(default_factory=dict)  # each drawn domain's
     # name box (_place_domain_names), on the top edge of its panel or, with a leader, above it

@@ -428,6 +428,8 @@ CONTROLS: dict[str, tuple[str, str, tuple[str, ...]]] = {
     "mark": ("Mark", _LAYOUT, ("mark__as_text", "mark")),
     "domains": ("Domains", _LAYOUT, ("domains__auto", "domains__as_text", "domains")),
     "domains_from_file": ("Domains", _LAYOUT, ("domains__auto", "domains__as_text", "domains")),
+    "domain_source": ("Domains", _LAYOUT, ("domains__auto", "domains__as_text", "domains")),
+    "cath_domains": ("CATH domains", _LAYOUT, ("cath_domains",)),
     "domain_colours": ("Colour by domain", _LAYOUT, ("domain_colours",)),
     "domain_bar": ("Domain bar", _LAYOUT, ("domain_bar",)),
     # Conservation & UniProt

@@ -336,6 +336,11 @@ def make_layout(
         from .uniprot import annotate
 
         ann = annotate(path, bb, None if uniprot == "auto" else uniprot)
+    source, found_note = _domain_source(domains), ""
+    if domains == "cath":  # CATH's published chopping (PDBe), or a note that there is none
+        from .cath import domains as cath_domains
+
+        domains, found_note = cath_domains(path, bb, sses)
     if domains == "uniprot":
         if ann is None:
             raise ValueError("--domains uniprot needs UniProt annotation: add --uniprot auto (or an accession)")
@@ -344,6 +349,7 @@ def make_layout(
         template_rows(sheets, sses, copies) if mode == "projected" and (look or Style()).fold_template == "auto" else []
     )
     named = _domains(domains, sses, contacts, rows, copies, partial, bb)
+    named_note = domain_note(source, named, found_note)
     for _, ids in named:  # a domain holds together: its elements pull on each other
         for a in range(len(ids)):
             for b in range(a + 1, len(ids)):
@@ -385,6 +391,7 @@ def make_layout(
 
     def finish(lay, faces=None):  # what make_layout sets on a layout after build_layout
         lay.helix_matched = {"cut": matched.get("cut", 0), "joined": matched.get("joined", 0)}
+        lay.domain_source, lay.domain_note = (source if lay.domains else ""), named_note
         if lay.domains:  # copies of one domain share a tone
             from .features import domain_tones
 
@@ -693,6 +700,28 @@ _DOMAIN_PULL = 6  # CA-pair-equivalents of attraction between any two elements o
 
 
 UNIPROT_DOMAINS = ("Domain", "Repeat", "Zinc finger", "DNA binding")
+DOMAIN_SOURCES = {"auto": "inferred", "cath": "CATH", "uniprot": "UniProt"}  # --domains -> Layout.domain_source
+
+
+def _domain_source(spec) -> str:
+    """Layout.domain_source of a domains spec: inferred (auto), CATH, UniProt, a layout file's saved source, or ''
+    for domains given by name and ranges."""
+    if isinstance(spec, str):
+        return DOMAIN_SOURCES.get(spec, "")
+    return getattr(spec, "source", "") or ""
+
+
+def domain_note(source: str, named, found: str = "") -> str:
+    """What the notes say of the domains (Layout.domain_note): automatic ones are inferred, not published (plan 12
+    R2); CATH's come with their ids (`found`, cath.domains' note), or the note says why there are none."""
+    if source == "CATH":
+        return found
+    if source != "inferred":
+        return ""
+    stems = list(dict.fromkeys(name.split(" · ")[0] for name, _ in named))
+    if not stems:
+        return "no domains inferred: each chain reads as one domain from its residue contacts"
+    return f"domains {', '.join(stems)} inferred from residue contacts, not a published domain assignment"
 
 
 def _uniprot_domains(ann, sses) -> list[tuple[str, list[str]]]:
@@ -725,7 +754,7 @@ def _element_ids(spec) -> bool:
 def stale_domain_ids(spec, sses) -> list[tuple[str, str]]:
     """(domain, element id) for each element id the domains name that `sses` lack: none unless the domains are given
     as element ids. A layout file's (SavedDomains) are dropped with a warning; given otherwise, an error."""
-    if spec in (None, "auto", "uniprot") or not _element_ids(spec):
+    if spec in (None, "auto", "cath", "uniprot") or not _element_ids(spec):
         return []
     known = {s.id for s in sses}
     return [(name, i) for name, ids in spec for i in ids if i not in known]
@@ -1143,8 +1172,9 @@ def build_parser() -> argparse.ArgumentParser:
         )
         q.add_argument(
             "--domains",
-            choices=["auto", "uniprot"],
-            help="auto: from element contacts (D1, D2...); uniprot: UniProt's domains (with --uniprot)",
+            choices=["auto", "cath", "uniprot"],
+            help="auto: inferred from residue contacts (D1, D2...); cath: CATH's published domains (PDBe, needs "
+            "network); uniprot: UniProt's domains (with --uniprot)",
         )
         q.add_argument(
             "--uniprot",
@@ -1293,6 +1323,8 @@ def _cmd_figure(args: argparse.Namespace) -> int:
             print(f"foldmap: {note}", file=sys.stderr)
         for note in drawn.sheet_notes:  # strands off a sheet's run, with their partner (plan 12)
             print(f"foldmap: {note}", file=sys.stderr)
+        if drawn.layout.domain_note:  # inferred domains said to be; CATH's named, or why there are none
+            print(f"foldmap: {drawn.layout.domain_note}", file=sys.stderr)
         for out in args.output:
             print(f"wrote {save(drawn.figure, out)}")
     method = experimental_method(spec.structure) if spec.look.color_by == "plddt" else None

@@ -167,6 +167,8 @@ def figure_view(ws: Workspace) -> None:
             notes = "; ".join(part for part in (notes, f"Not drawn: {na_ions_text(ions)}.") if part)
         if notes:
             st.caption(shown(notes))
+        if result and result.get("domain_source_note"):  # inferred domains said to be, as the command line does
+            st.caption(shown(result["domain_source_note"][0].upper() + result["domain_source_note"][1:] + "."))
         if result and result.get("domains_note"):  # as the command line warns
             note = result["domains_note"]
             st.warning(shown(f"{note[0].upper()}{note[1:]}. {DOMAINS_EDIT}"))

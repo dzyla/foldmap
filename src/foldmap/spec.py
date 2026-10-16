@@ -143,7 +143,7 @@ def figure_spec(
     domains = given.get("domains") or saved or None
     if isinstance(domains, dict):  # {name: [refs]}; auto, uniprot and [(name, [refs])] are taken as they are
         pairs = [(name, list(refs)) for name, refs in domains.items()]
-        domains = SavedDomains(pairs) if domains is saved else pairs
+        domains = SavedDomains(pairs, source=str(doc.get("domain_source") or "")) if domains is saved else pairs
     edits = layoutfile.edits_of(doc)
     edits["rename"].update(given.get("rename") or {})
     edits["swap"] += [_pair(p) for p in given.get("swap") or []]
@@ -228,11 +228,12 @@ class SavedDomains(list):
     """Domains read from a layout file, [(name, [refs])]. A file outlives the structure it was saved from, so
     element ids it names that the structure no longer has are dropped with a warning (cli._domains); given on the
     command line, they are an error. quiet: the caller shows the warning itself (cli.stale_domains_note); none is
-    printed."""
+    printed. source: where the saved domains came from (the file's domain_source)."""
 
-    def __init__(self, items=(), quiet: bool = False):
+    def __init__(self, items=(), quiet: bool = False, source: str = ""):
         super().__init__(items)
         self.quiet = quiet
+        self.source = source  # the saved figure's Layout.domain_source: "inferred" domains stay said to be
 
 
 def parse_domains(items: list[str]) -> list[tuple[str, list[str]]]:

@@ -32,7 +32,8 @@ from .style import _KEY_ALIASES, THEMES, Style
 from .yamlfile import read_yaml
 
 VERSION = 1
-TOP = ("foldmap", "structure", "theme", "style", "layout", "domains", "names", "edits")
+DOMAIN_SOURCES = ("inferred", "CATH", "UniProt")  # Layout.domain_source, as a layout file keeps it
+TOP = ("foldmap", "structure", "theme", "style", "layout", "domains", "domain_source", "names", "edits")
 LAYOUT = (
     "mode",
     "rotate",
@@ -91,6 +92,8 @@ def document(
         doc["domains"] = {  # with the elements neighbours lend (panel_members): read back, they are lent again
             name: [_range(by_id[k]) for k in panel_members(layout, name)] for name, _ in layout.domains
         }
+        if layout.domain_source:  # inferred, CATH or UniProt: said again when the file is read back
+            doc["domain_source"] = layout.domain_source
     if names:
         doc["names"] = [str(n) for n in names]
     doc["edits"] = {"rename": rename, "swap": swap, "move": move}
@@ -135,6 +138,9 @@ def load(path) -> dict:
     for key in doc.get("layout") or {}:
         if key not in LAYOUT:
             raise ValueError(f"{path}: unknown layout key {_brief(key)}; use {', '.join(LAYOUT)}")
+    source = doc.get("domain_source")
+    if source is not None and source not in DOMAIN_SOURCES:
+        raise ValueError(f"{path}: domain_source is one of {', '.join(DOMAIN_SOURCES)}; got {_brief(source)}")
     names = doc.get("names")
     if names is not None and not (isinstance(names, list) and all(isinstance(n, str) for n in names)):
         raise ValueError(f"{path}: names is a list, e.g. [deposited] or [beta, my-names.yaml]")

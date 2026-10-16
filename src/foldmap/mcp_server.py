@@ -176,6 +176,7 @@ def draw_topology(
     uniprot: str | None = None,
     uniprot_domains: bool = False,
     domains: dict[str, list[str]] | None = None,
+    domains_from: str | None = None,
     swap: list[list[str]] | None = None,
     move: dict[str, list[float]] | None = None,
     rename: dict[str, str] | None = None,
@@ -194,7 +195,9 @@ def draw_topology(
     Options left out come from layout_file (if given), otherwise the defaults: theme publication, assembly auto,
     symmetry auto, membrane off, focus auto, mode projected, rotate 0.
     style: style keys to change, e.g. {"color_by": "sequence", "residue_numbers": "true", "mark": "α2=#d1495b"}.
-    domains: named domain panels, e.g. {"N-lobe": ["res:A:13-59"]}. swap: pairs of elements to exchange, e.g.
+    domains: named domain panels, e.g. {"N-lobe": ["res:A:13-59"]}. domains_from: "auto" (inferred from residue
+    contacts, not a published assignment: the note says so) or "cath" (CATH's published chopping of a PDB entry,
+    fetched from PDBe; the note names its domains, or says there are none). swap: pairs of elements to exchange, e.g.
     [["α1", "α3"]]. move: nudges in page units, e.g. {"α2": [1, -2]}. rename: {"res:A:167-182": "Gd"}.
     names: conventional names, in order (later win, rename wins over all): "deposited" (the file's own helix ids,
     e.g. globin A-H), "beta" (strands β1…βn, αn after βn in a βα row) or a YAML file of element and stem names.
@@ -211,6 +214,8 @@ def draw_topology(
     from .scope import drawn_scope, scope_note
     from .spec import draw_spec, figure_spec, layout_document
 
+    if domains_from not in (None, "auto", "cath"):
+        raise ValueError(f"domains_from is auto or cath; got {domains_from!r}")
     path = _structure(source)
     keep = _checked(save_layout, LAYOUT_SUFFIXES) if save_layout else None  # checked first
     with _output(output_path, ".svg", path.stem, FIGURE_SUFFIXES) as out:
@@ -231,7 +236,9 @@ def draw_topology(
             focus=focus,
             chains=chains,
             uniprot=uniprot,
-            domains=[(n, list(r)) for n, r in (domains or {}).items()] or ("uniprot" if uniprot_domains else None),
+            domains=[(n, list(r)) for n, r in (domains or {}).items()]
+            or domains_from
+            or ("uniprot" if uniprot_domains else None),
             msa=msa_path,
             rename=rename,
             names=names,
@@ -254,6 +261,8 @@ def draw_topology(
             note += f"; {page}"
         for sheet in drawn.sheet_notes:  # strands off a sheet's run, with their partner
             note += f"; {sheet}"
+        if drawn.layout.domain_note:  # inferred domains said to be; CATH's named, or why there are none
+            note += f"; {drawn.layout.domain_note}"
         scope = scope_note(drawn_scope(drawn.model, drawn.layout, spec.assembly, spec.focus), how="mcp")
         if scope:  # an automatic choice drew part of the file
             note += f"; {scope}"
