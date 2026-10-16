@@ -43,7 +43,7 @@ FLOORS = {
     "gemmi": "0.7",
     "numpy": "1.24",
     "scipy": "1.10",
-    "networkx": "3.0",
+    "networkx": "3.1",  # science.pairing_cycle: nx.simple_cycles on an undirected graph (new in 3.1)
     "matplotlib": "3.10",
     "PyYAML": "6.0.1",
 }
