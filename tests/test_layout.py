@@ -662,38 +662,57 @@ def test_helix_on_sheet_skips_nucleic_acid(path):
         assert not ((pts[:, 0] > x0) & (pts[:, 0] < x1) & (pts[:, 1] > y0) & (pts[:, 1] < y1)).any()
 
 
-def _bundle_columns(second_axis):
-    """The lateral offsets (across the bundle) of A's two pieces, two residues apart, in a bundle with B."""
+def _bundle_columns(second_axis, n=8):
+    """The offsets (page x across the bundle, y along it) of A's two pieces, two residues apart (the second n
+    residues long), in a bundle with B, and the item."""
     from foldmap.layout import _bundle_item
 
     f = Frame(np.zeros(3), np.array([1.0, 0, 0]), np.array([0, 1.0, 0]), np.array([0, 0, 1.0]))
     first = fake_sse("H", 1, 20, centroid=(0, 0, 0), axis=(0, 1, 0))
-    second = fake_sse("H", 23, 30, centroid=(1, 20 if second_axis[1] > 0 else -10, 0), axis=second_axis)
+    second = fake_sse("H", 23, 22 + n, centroid=(1, 20 if second_axis[1] > 0 else -10, 0), axis=second_axis)
     other = fake_sse("H", 1, 30, centroid=(10, 0, 0), axis=(0, 1, 0), chain="B")
     item = _bundle_item([first, second, other], f, "free", HELIX_W)
     at = {m.sse.id: off for m, off in zip(item.members, item.offsets)}
     return at[first.id], at[second.id], item
 
 
-def test_a_bundle_piece_drawn_the_other_way_takes_its_own_column():
-    """Random-100 C2b-2 A3 (6JLN E:17-39 then E:42-47, 7ARD H:107-118 then H:121-151): a helix piece two residues on
+def test_a_bundle_piece_drawn_the_other_way_leaves_its_loops_room():
+    """Random-100 C2b-2 A3 (7ARD H:107-118 then H:121-151, 6JLN E:17-39 then E:42-47): a helix piece two residues on
     from the last that points back along the bundle was stacked end to end in that piece's column, 0.3 apart, its
-    near end facing the other's: the two loops between them had no way out. Only pieces drawn the same way (a kink)
-    share a column."""
-    a, b, item = _bundle_columns((0, -1, 0))
+    near end facing the other's: the two loops between them had no way out. A hairpin (both pieces at least
+    KINK_SHORT, bent more than KINK_COS: not one kinked helix by features' rule) takes its own column; a short piece
+    drawn the other way stays in the column, _STACK_PAD from it; a piece drawn the same way (a kink) stays 0.3 on."""
+    from foldmap.layout import _STACK_PAD
+
+    a, b, item = _bundle_columns((0, -1, 0))  # 8 residues, antiparallel: a hairpin
     assert abs(a[0] - b[0]) >= HELIX_W  # side by side
+    a, b, item = _bundle_columns((0, -1, 0), n=6)  # 6 residues, drawn the other way: end to end, room between
+    (pa, pb) = (m for m in item.members if m.sse.chain == "A")
+    assert abs(a[0] - b[0]) < 1e-6
+    assert min(abs(pa.rect[1] - pb.rect[3]), abs(pb.rect[1] - pa.rect[3])) >= _STACK_PAD - 1e-6
     a, b, item = _bundle_columns((0, 1, 0))  # the next piece the same way (a kink): end to end in one column
     assert abs(a[0] - b[0]) < 1e-6 and b[1] > a[1]
 
 
-@pytest.mark.parametrize("entry", ["6JLN", "7ARD"])
-def test_helix_hairpins_in_a_bundle_route_their_loops(entry):
-    """Random-100 C2b-2 A3: 6JLN's E:17-39>E:42-47 and E:42-47>E:72-81, 7ARD's three H loops (default view)."""
+@pytest.mark.parametrize(
+    "entry, view",
+    [("6JLN", {}), ("7ARD", {}), ("7ARD", {"domains": "auto"}), ("6JLN", {"membrane": "auto"})],
+    ids=["6JLN", "7ARD", "7ARD-domains", "6JLN-membrane"],
+)
+def test_helix_hairpins_in_a_bundle_route_their_loops(entry, view):
+    """Random-100 C2b-2 A3: 6JLN's E:17-39>E:42-47 and E:42-47>E:72-81, 7ARD's three H loops. In 6JLN's membrane
+    view every TM helix still crosses its band (a first fix that gave E:42-47 a column of its own moved eleven
+    off it)."""
+    from foldmap import figcheck
+    from foldmap.membrane import find_membrane
     from foldmap.spec import draw_spec, figure_spec
     from helpers import r100_entry
 
-    d = draw_spec(figure_spec(r100_entry(entry)))
+    path = r100_entry(entry)
+    d = draw_spec(figure_spec(path, **view))
     assert d.stuck == [] and d.over_labels == []
+    if view.get("membrane"):
+        assert figcheck.membrane_view(d.layout, d.sses, d.bb, find_membrane(path, d.bb), d.loops)["tm_short"] == []
 
 
 def _gap_openings(lay):

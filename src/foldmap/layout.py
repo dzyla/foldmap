@@ -957,10 +957,13 @@ def _bundle_item(group: list[SSE], frame: Frame, angle_mode: str, width: float) 
     """Helices of several chains packed along their length, drawn as one unit: one column per helix (kinked
     pieces of one helix share a column, end to end), columns side by side in their order across the bundle at
     their true spacing (at least a label's width apart), staggered along the shared axis as in 3D;
-    antiparallel helices point the other way. A piece drawn the other way from the last is no kink but a hairpin:
-    it takes a column of its own (end to end, the two ends facing across 0.3 left their loops no way out:
-    random-100 C2b-2, 6JLN's E:42-47 and 7ARD's H:121-151)."""
-    from .features import KINK_GAP
+    antiparallel helices point the other way. A piece drawn the other way from the last faces it end to end, both
+    ends' loops leaving into the gap between (0.3 left them no way out: random-100 C2b-2, 6JLN's E:42-47, 7ARD's
+    H:121-151). One that is no kinked piece of it by features' rule (both at least KINK_SHORT long, their axes
+    bent more than KINK_COS: 7ARD's, cos -1.0, a hairpin) is another helix: it takes a column of its own. A kinked
+    piece drawn the other way (a short one, whose axis is no guide: 6JLN's six residues) stays in the column,
+    _STACK_PAD from it, as two strands end to end in a sheet's column."""
+    from .features import KINK_COS, KINK_GAP, KINK_SHORT
 
     ref = group[0].axis
     mean = sum(np.sign(float(s.axis @ ref)) * s.axis * len(s) for s in group)
@@ -971,9 +974,14 @@ def _bundle_item(group: list[SSE], frame: Frame, angle_mode: str, width: float) 
     d2, side2 = np.array([np.cos(angle), np.sin(angle)]), np.array([-np.sin(angle), np.cos(angle)])
     columns: list[list[SSE]] = []
     up = lambda s: float(s.axis @ m) >= 0  # noqa: E731 - drawn along the bundle (else the other way), as below
+
+    def hairpin(a: SSE, b: SSE) -> bool:  # b drawn the other way from a, and no kinked piece of it
+        bent = float(_snap(float(a.axis @ b.axis))) <= KINK_COS
+        return up(a) != up(b) and min(len(a), len(b)) >= KINK_SHORT and bent
+
     for s in sorted(group, key=lambda s: (s.chain, s.start)):
         last = columns[-1][-1] if columns else None
-        if last is not None and last.chain == s.chain and s.start - last.end - 1 <= KINK_GAP and up(s) == up(last):
+        if last is not None and last.chain == s.chain and s.start - last.end - 1 <= KINK_GAP and not hairpin(last, s):
             columns[-1].append(s)  # the next piece of a kinked helix
         else:
             columns.append([s])
@@ -984,11 +992,12 @@ def _bundle_item(group: list[SSE], frame: Frame, angle_mode: str, width: float) 
     spacing = max(width + 1.2, float(np.mean(gaps)) * SCALE if gaps else 0.0)
     members, offsets = [], []
     for k, col in enumerate(columns):
-        last_end = -np.inf
+        last_end, prev = -np.inf, None
         for s in sorted(col, key=lambda s: float((s.centroid - centre) @ m)):
             length = max(width, (len(s) - 1) * HELIX_RISE * SCALE)
-            along = max(float((s.centroid - centre) @ m) * SCALE, last_end + 0.3 + length / 2)  # kinked pieces in a row
-            last_end = along + length / 2
+            gap = 0.3 if prev is None or up(s) == up(prev) else _STACK_PAD  # ends facing: room for their loops
+            along = max(float((s.centroid - centre) @ m) * SCALE, last_end + gap + length / 2)  # kinked pieces in a row
+            last_end, prev = along + length / 2, s
             members.append(Placed(s, 0, 0, length, angle if float(s.axis @ m) >= 0 else angle + np.pi, width))
             lat = (k - (len(columns) - 1) / 2) * spacing
             offsets.append(tuple(float(v) for v in _snap(d2 * along + side2 * lat)))  # on the grid, like positions
