@@ -1455,9 +1455,10 @@ def _slide_clear(
     (in that order on a tie), in _SLIDE_STEP steps; one that keeps its height (`level`) right or left only. Pieces
     of a bent duplex `joints` holds together (_rigid_joints) slide as one, their offsets kept, each exempt from the
     others (random-100 C2b-4: slid one at a time, 7Y7C's P138c2 landed on P138c1 and P85a2 28 units from P85a1); the
-    group settles when its first item comes up. The items in `last` (with no symmetry copies, _separate) are settled
-    after every other, so they move, not the copies (1SLV: the dimer's shared sheet between the two copies' eta2
-    helices)."""
+    group settles when its first item comes up in that order (so a group with one item in `last` and one not settles
+    early; unreachable today: stems never yield in _tied_again, so none is in `last`). The items in `last` (with no
+    symmetry copies, _separate) are settled after every other, so they move, not the copies (1SLV: the dimer's shared
+    sheet between the two copies' eta2 helices)."""
     halves = [it.half for it in items]
     mids = [it.mid for it in items]
     boxes = [] if fixed is None else np.asarray(fixed.boxes, float).tolist()
@@ -1877,7 +1878,8 @@ _STEM_ROOM = 1.5  # the room a nucleic acid's stems take on the page: their foot
 
 
 def _room_for_stems(items: list[_Item]) -> None:
-    """A nucleic acid drawn without protein (every item a stem): its projected places spread about their middle, all
+    """A nucleic acid drawn with no protein element (every item a stem; a protein with no helix or strand, drawn as
+    coil only, does not count): its projected places spread about their middle, all
     by one factor, until the box round their footprints holds _STEM_ROOM times the footprints' area, before _attract
     pulls and parts them. Packed tighter than that, the overlaps were cleared by pushes each stem took its own way, and
     the stems' order was lost (random-100 C2b-4: 3OWW's ten stems in a box of 0.98 times their footprints' area,
