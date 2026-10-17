@@ -1640,7 +1640,7 @@ def test_explorer_page_of_a_nucleic_acid_only_file_has_no_contact_map():
 
 
 _HARNESS = r"""
-// Runs the explorer's app script against stub DOM and viewer objects; drives viewer.on / viewer.fly.
+// Runs the explorer's app script against stub DOM and viewer objects; drives viewer.on and records any camera move.
 const fs = require('fs');
 const job = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
 const calls = [];
@@ -1678,7 +1678,9 @@ globalThis.PDBeMolstarPlugin = class {
     this.events = { loadComplete: { subscribe: cb => { this.done = cb; } } };
     this.visual = { select: async p => { calls.push(['select', p]); }, focus: async q => { calls.push(['focus', q]); },
                     reset() {} };
-    this.plugin = { canvas3d: { handleResize() {},
+    this.plugin = { managers: { camera: { focusLoci: () => calls.push(['focusLoci']),
+                                          focusSpheres: () => calls.push(['focusSpheres']) } },
+                    canvas3d: { handleResize() {},
                                 camera: { getSnapshot: () => ({ target: [0, 0, 0], position: [1, 1, 1],
                                                                                   radius: 1 }), setState() {} } } };
   }
@@ -1689,7 +1691,7 @@ eval(job.app);
 setTimeout(async () => {
   const out = [];
   for (const c of job.cases) {
-    for (const op of ['on', 'fly']) {
+    for (const op of ['on']) {
       calls.length = 0;
       let error = null;
       const het = c.het === null ? undefined : c.het;
@@ -1698,6 +1700,11 @@ setTimeout(async () => {
       out.push({ case: c.name, op, error, calls: JSON.parse(JSON.stringify(calls)) });
     }
   }
+  calls.length = 0;  // a click in Mol*'s own canvas goes through the camera manager: it must not move the camera
+  const cam = window.foldmapViewer.plugin && window.foldmapViewer.plugin.plugin.managers.camera;
+  if (cam) { cam.focusLoci(); cam.focusSpheres(); }
+  out.push({ case: '-', op: 'camera', error: null, fly: typeof window.foldmapViewer.fly,
+             calls: JSON.parse(JSON.stringify(calls)) });
   console.log(JSON.stringify(out));
   process.exit(0);
 }, 100);
@@ -1748,27 +1755,24 @@ def test_explorer_viewers_take_protein_nucleic_and_mixed_selections(tmp_path, vi
     for r in got.values():
         assert r["error"] is None, r
     key = "setStyle" if viewer == "3dmol" else "select"
-    for op in ("on", "fly"):
-        assert got[("protein", op)]["calls"], op  # something was sent to the viewer
+    assert got[("protein", "on")]["calls"]  # something was sent to the viewer
+    camera = got[("-", "camera")]  # the camera moves only when the reader moves it (the author: no zoom-in)
+    assert camera["fly"] == "undefined" and camera["calls"] == []
+    for r in got.values():
+        assert not any(c[0] in ("zoomTo", "focus") for c in r["calls"]), r
     if viewer == "3dmol":
         on = got[("protein", "on")]["calls"]
         assert any(c[0] == "setStyle" and len(c[1].get("or", [])) == n for c in on)
         assert not any("stick" in c[2] and c[2]["stick"].get("color") for c in on)  # no nucleotide styling
-        assert len(got[("protein", "fly")]["calls"][0][1]["or"]) == n
         on = got[("mixed", "on")]["calls"]
         assert any(len(c[1].get("or", [])) == len(mixed["residues"]) for c in on if c[0] == key)
         assert sum(1 for c in on if c[0] == key and "resi" in c[1]) == len(mixed["het"])
-        assert len(got[("mixed", "fly")]["calls"][0][1]["or"]) == len(mixed["residues"]) + len(mixed["het"])
-        assert got[("protein-no-het-argument", "fly")]["calls"][0][1]["or"]
     else:
         parts = got[("protein", "on")]["calls"][0][1]["data"]
         assert sum(p["end_auth_seq_id"] - p["beg_auth_seq_id"] + 1 for p in parts) >= n
         assert not any(p.get("representation") for p in parts)
         parts = got[("mixed", "on")]["calls"][0][1]["data"]
         assert sum(1 for p in parts if p.get("representation") == "ball-and-stick") == len(mixed["het"])
-        focus = got[("mixed", "fly")]["calls"][0][1]
-        assert sum(1 for q in focus if "auth_seq_id" in q) == len(mixed["het"])
-        assert got[("protein-no-het-argument", "fly")]["calls"]
 
 
 @pytest.mark.skipif(node is None, reason="node is not installed; the explorer's viewer code cannot be exercised")
@@ -1780,14 +1784,12 @@ def test_explorer_viewers_take_a_nucleic_acid_only_selection(tmp_path, viewer):
 
     data, got = _drive(tmp_path, "1EHZ", viewer, cases)
     het = data["links"]["nucleics"][0]["het"]
-    assert got[("rna", "on")]["error"] is None and got[("rna", "fly")]["error"] is None
+    assert got[("rna", "on")]["error"] is None
     if viewer == "3dmol":
         styled = [c for c in got[("rna", "on")]["calls"] if c[0] == "setStyle" and "resi" in c[1]]
         assert len(styled) == len(het)
-        assert len(got[("rna", "fly")]["calls"][0][1]["or"]) == len(het)
     else:
         assert len(got[("rna", "on")]["calls"][0][1]["data"]) == len(het)
-        assert len(got[("rna", "fly")]["calls"][0][1]) == len(het)
 
 
 def test_explorer_texts_name_both_chains_and_single_nucleotides():
