@@ -942,7 +942,7 @@ def test_no_second_search_when_no_free_cells_join_the_ends(monkeypatch):
     real = route._astar
 
     def counted(*args):
-        searches.append(args[-1])
+        searches.append(args[5])  # its budget
         return real(*args)
 
     monkeypatch.setattr(route, "_MAX_NODES", 5)  # the first search runs out of budget, not of cells
@@ -988,3 +988,45 @@ def test_8rrx_loops_beside_labels_are_not_over_them(view):
     """Random-100 C2b-2 A4: 8RRX's D:4985-4997>D:5000-5002 (domains) and G:4158-4166>G:4168-4174 (focus)."""
     d = draw_spec(figure_spec(r100_entry("8RRX"), **view))
     assert d.stuck == [] and d.over_labels == []
+
+
+def _two_walls():
+    """Two pairs of strands, each either side of its own long wall: two loops that each need the second search."""
+    a, b, wall = _walled()
+    c = strand(100, 20, 0)
+    d = strand(120, 24, 0, angle=-np.pi / 2)
+    wall2 = bar(140, 22, 27, 60, np.pi / 2)
+    return [a, b, c, d], [wall, wall2]
+
+
+def test_the_second_searches_share_one_budget_per_page(monkeypatch):
+    """Fix round 1 (review: the wide search had no per-page cap; 7QUP's focus view took 158 s): every second
+    search of one figure's routing draws on _MAX_NODES_PAGE nodes, counted as A* expands them (never time). Once
+    it is spent a search that runs out falls back as before, a reported fallback curve; the order is routing
+    order, so the same page always spends it alike."""
+    strands, walls = _two_walls()
+    pairs = [strands[0].sse, strands[1].sse], [strands[2].sse, strands[3].sse]
+    spends = []
+    real = route._astar
+
+    def counted(*args):
+        got = real(*args)
+        if len(args) > 6:  # a second search: what it spent
+            spends.append(args[6][0])
+        return got
+
+    def draw():
+        lay = layout_of(*strands, *walls)
+        sses = [*pairs[0], *pairs[1]]
+        return [(lp.fallback, lp.points) for lp in route_loops(lay, sses, stub_bb()) if lp.a_id != "A:20-27"]
+
+    monkeypatch.setattr(route, "_MAX_NODES", 500)
+    monkeypatch.setattr(route, "_astar", counted)
+    assert [fb for fb, _ in draw()] == [False, False]  # budget enough for both
+    first = spends[0]
+    assert len(spends) == 2 and first > 500
+    monkeypatch.setattr(route, "_MAX_NODES_PAGE", first)  # enough for the first loop's second search only
+    spends.clear()
+    once = draw()
+    assert sorted(fb for fb, _ in once) == [False, True] and spends == [first]
+    assert draw() == once  # the same page spends it alike

@@ -46,6 +46,10 @@ _MAX_NODES = 200_000
 # Measured on the batch's pages: 7JU4's, 7QUP's and 8QEM's stuck loops (and their loops over labels) need at most
 # 800 000; 8VWQ's and 7Y7C's longest nucleic-acid runs 1 600 000, at about 5 s a search
 _MAX_NODES_WIDE = 1_600_000
+# ... and every second search of one figure's routing (loops, exits and passes, nucleic-acid strands) together
+# spends at most this many nodes, counted as A* expands them; once spent, a search that runs out of _MAX_NODES
+# falls back as before (fix round 1: 7QUP's focus view took 158 s of its 180). About 25 s at most on a large page
+_MAX_NODES_PAGE = 8_000_000
 _MAX_CELLS = 1_500_000
 _DIRS = [(1, 0), (0, 1), (-1, 0), (0, -1)]
 _PUSH = [0.4 + 0.25 * k for k in range(12)]  # how far out along the exit the path may start
@@ -296,10 +300,12 @@ def _axis(vec) -> int:
     return 1 if y > 0 else 3
 
 
-def _astar(grid: _Grid, start, start_dir, goal, goal_dir, max_nodes: int = _MAX_NODES):
+def _astar(grid: _Grid, start, start_dir, goal, goal_dir, max_nodes: int = _MAX_NODES, spent: list | None = None):
     """Cheapest orthogonal path. Either end may be taken in any heading but one pointing back into its
     element, paying a turn when it is not the port's own axis; the goal pushes a terminal node. (Insisting
-    on the port's heading made paths circle the end cell to take it: a visible curl.)"""
+    on the port's heading made paths circle the end cell to take it: a visible curl.) `spent` (a one-item list):
+    the nodes expanded are added to it."""
+    spent = spent if spent is not None else [0]
     tie = 0
     h0 = abs(goal[0] - start[0]) + abs(goal[1] - start[1])
     best, heap = {}, []
@@ -321,6 +327,7 @@ def _astar(grid: _Grid, start, start_dir, goal, goal_dir, max_nodes: int = _MAX_
             while key in parent:
                 key = parent[key]
                 cells.append((key[0], key[1]))
+            spent[0] += nodes
             return cells[::-1]
         if g > best.get((x, y, d), math.inf):
             continue
@@ -330,6 +337,7 @@ def _astar(grid: _Grid, start, start_dir, goal, goal_dir, max_nodes: int = _MAX_
             continue
         nodes += 1
         if nodes > max_nodes:
+            spent[0] += nodes
             return None
         for nd in range(4):
             if nd == (d + 2) % 4:
@@ -348,6 +356,7 @@ def _astar(grid: _Grid, start, start_dir, goal, goal_dir, max_nodes: int = _MAX_
                 tie += 1
                 h = abs(goal[0] - nx_) + abs(goal[1] - ny_)
                 heapq.heappush(heap, (cost + h, tie, cost, nx_, ny_, nd, False))
+    spent[0] += nodes
     return None
 
 
@@ -398,21 +407,14 @@ def _curve(pa, ea, pb, eb, n=24):
     return [(float(x), float(y)) for x, y in pts]
 
 
-def _joined(grid: _Grid, a, b) -> bool:
-    """Are cells a and b joined by free cells (side by side, as A* steps)?"""
-    from scipy.ndimage import label
-
-    marks, _ = label(~grid.blocked)
-    return bool(marks[a] and marks[a] == marks[b])
-
-
 def _route_ports(
-    grid: _Grid, pa, ea, own_a, pb, eb, own_b, loose=False, max_nodes: int = _MAX_NODES, wide_nodes: int = 0
+    grid: _Grid, pa, ea, own_a, pb, eb, own_b, loose=False, max_nodes: int = _MAX_NODES, wide: "_Router | None" = None
 ):
     """Grid cells of the cheapest orthogonal route from port pa (leaving along ea) to port pb (entered against
     eb), or None; own_a and own_b (anything with a rect) are what the ports belong to. `loose`: see
     _Grid.free_cell_along; a pair (for pa, for pb) or one value for both. A search that finds no route within
-    max_nodes is run again within `wide_nodes` (when larger) if free cells join its two ends: a route exists."""
+    max_nodes is run again (_Router.second) when `wide` (the router) allows: free cells join its two ends, and the
+    page's budget is not spent."""
     la, lb = loose if isinstance(loose, tuple) else (loose, loose)
     start = grid.free_cell_along(pa, ea, own_a, la)
     goal = grid.free_cell_along(pb, eb, own_b, lb)
@@ -422,8 +424,8 @@ def _route_ports(
     for c in stubs:
         grid.blocked[c] = True
     cells = _astar(grid, start, _axis(ea), goal, _axis(-np.asarray(eb)), max_nodes)
-    if cells is None and wide_nodes > max_nodes and _joined(grid, start, goal):
-        cells = _astar(grid, start, _axis(ea), goal, _axis(-np.asarray(eb)), wide_nodes)
+    if cells is None and wide is not None:
+        cells = wide.second(start, _axis(ea), goal, _axis(-np.asarray(eb)), max_nodes, stubs)
     for c in stubs:
         grid.blocked[c] = False
     return cells
@@ -447,12 +449,48 @@ class _Router:
         self.tight = self.rejected = 0  # debug counts: routes drawn tight, drawings rejected as crossing
         self.max_nodes = _MAX_NODES  # the A* search's budget
         self.wide_nodes = _MAX_NODES_WIDE  # ... and its second search's, when a route exists (_route_ports)
+        self.wide_left = _MAX_NODES_PAGE  # what the second searches of this page may still spend
+        self.wide_searches = self.wide_refused = 0  # debug counts: second searches run, refused for the budget
+        self._free: tuple[bytes, np.ndarray] | None = None  # the last free-cell labelling (_joined) and its key
+
+    def _joined(self, a, b, stubs) -> bool:
+        """Are cells a and b joined by free cells (side by side, as A* steps)? The grid as it stands without the
+        port stubs `route` blocked for this search, labelled once per grid state (successive loops' searches see
+        the same one)."""
+        from hashlib import blake2b
+
+        from scipy.ndimage import label
+
+        free = ~self.grid.blocked
+        for c in stubs:
+            free[c] = True
+        key = blake2b(np.packbits(free).tobytes(), digest_size=16).digest()
+        if self._free is None or self._free[0] != key:
+            self._free = (key, label(free)[0])
+        marks = self._free[1]
+        return bool(marks[a] and marks[a] == marks[b])
+
+    def second(self, start, start_dir, goal, goal_dir, max_nodes: int, stubs):
+        """The second search of a route the first (within max_nodes) did not find: within wide_nodes, or what the
+        page has left of _MAX_NODES_PAGE if less, only when free cells join its ends; None if not run or no
+        route."""
+        budget = min(self.wide_nodes, self.wide_left)
+        if budget <= max_nodes:
+            self.wide_refused += self.wide_nodes > max_nodes  # a wider search would have run but for the budget
+            return None
+        if not self._joined(start, goal, stubs):
+            return None
+        spent = [0]
+        cells = _astar(self.grid, start, start_dir, goal, goal_dir, budget, spent)
+        self.wide_left -= spent[0]
+        self.wide_searches += 1
+        return cells
 
     def drawn(self, pa, ea, own_a, pb, eb, own_b, own_body=False, loose=False, under=((), ()), exempt=()):
         """The A* route from port pa to port pb as drawn, snapped to the ports or else unsnapped; None if there
         is no route or every drawing of it crosses an element (`under`: see _clear)."""
         grid = self.grid
-        cells = _route_ports(grid, pa, ea, own_a, pb, eb, own_b, loose, self.max_nodes, self.wide_nodes)
+        cells = _route_ports(grid, pa, ea, own_a, pb, eb, own_b, loose, self.max_nodes, self)
         if cells is None:
             return None
         for snap in (True, False):
@@ -711,6 +749,13 @@ def route_loops(layout: Layout, sses: list[SSE], bb) -> list[Loop]:
         layout.na_paths = route_nucleic(layout, router, [pts for pts, _, _ in routed.values()])
         _off_na_text(layout, router, out)
     _clear_helix_names(layout, sses, out)
+    log.debug(  # fix round 1: what the second searches spent of the page's budget
+        "%d second-search nodes spent of %d: %d searches, %d refused for the budget",
+        _MAX_NODES_PAGE - router.wide_left,
+        _MAX_NODES_PAGE,
+        router.wide_searches,
+        router.wide_refused,
+    )
     return out
 
 

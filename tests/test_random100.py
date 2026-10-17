@@ -435,6 +435,7 @@ def test_route_summary_record_is_the_one_route_logs(r100, caplog):
         handler.emit(record)
     s = handler.summary()
     assert s["records"] == 1 and s["loops"] > 0 and s["kink_links_rejected"] >= 0
+    assert s["second_search_nodes"] == 0 and s["second_searches"] == 0  # ubiquitin routes within the first budget
 
 
 def test_pair_check_matches_elements_by_residue_range(r100):

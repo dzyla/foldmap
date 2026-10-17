@@ -1098,11 +1098,19 @@ class _RouteLog(logging.Handler):
         super().__init__(logging.DEBUG)
         self.sums = {k: 0 for k in self.KEYS if k != "inflate"}
         self.sums["names_moved"] = 0  # helix names route._clear_helix_names moved off lines (random-100 C6)
+        # route's second searches (C2b-2 fix round 1): nodes spent of the page's budget, searches run, refused
+        self.sums.update(second_search_nodes=0, second_searches=0, second_searches_refused=0)
         self.records = 0
 
     def emit(self, record):
         if str(record.msg).startswith("%d helix names moved"):
             self.sums["names_moved"] += int(record.args[0])
+            return
+        if str(record.msg).startswith("%d second-search nodes spent"):
+            spent, _, runs, refused = record.args
+            self.sums["second_search_nodes"] += int(spent)
+            self.sums["second_searches"] += int(runs)
+            self.sums["second_searches_refused"] += int(refused)
             return
         if not str(record.msg).startswith("%d loops:") or len(record.args) != len(self.KEYS):
             return
