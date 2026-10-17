@@ -478,3 +478,11 @@ def test_a_block_another_chain_finds_grouped_apart_differs_for_every_chain_in_it
         assert (copy, ref) in notes, sorted(notes)
     got = figcheck.copies_alike(d)
     assert max(got.values()) <= ALIKE, {f"{a}~{b}": round(v, 3) for (a, b), v in got.items() if v > ALIKE}
+
+
+def test_a_filaments_copies_keep_their_own_strands_beside_their_partners():
+    """Random-100 C2b-S: 6Y7S drawn whole. Each copy's sheet takes its mate's places for the strands they share,
+    which run the other way across the page; the mean step left B:122-123 (which A's sheet lacks) beside B:29-38,
+    0 bridges (and C's, D's, E's likewise). It turns with the shared strands, beside B:68-74, which it pairs with."""
+    found = figcheck.science_checks(drawn(DATA / "6Y7S.cif", focus="none"))
+    assert {k: v for k, v in found.items() if v} == {}
