@@ -349,3 +349,16 @@ def test_crowded_copies_are_drawn_alike_in_more_room():
     assert len(got) == 22 and max(got.values()) <= ALIKE, {
         f"{a}~{b}": round(v, 3) for (a, b), v in got.items() if v > ALIKE
     }
+
+
+def test_the_pieces_of_a_copy_cut_in_two_move_as_one():
+    """Random-100 C2b-3 A15, cause C (7QUP focus: 59 of its 60 ties 0.99 to 1.34 apart once drawn alike): a copy's
+    sheet cut in two where its mate's is whole (2B's 10 strands, 1B's one sheet) is two items tied to one mate, at
+    one place; their boxes overlap, and they were pushed apart alone, each piece leaving the rest of its copy behind,
+    and every other copy moved round them. The pieces are one unit (_twins). (7D~1D and 13D~1D are left to cause B:
+    7D's sheet holds a strand 1D's lacks, 13D's is tied to 1D's in part.)"""
+    from helpers import r100_entry
+
+    got = figcheck.copies_alike(_laid_out(r100_entry("7QUP"), focus="none"))
+    bad = {f"{a}~{b}": round(v, 3) for (a, b), v in got.items() if v > ALIKE and a not in ("7D", "13D")}
+    assert len(got) == 60 and not bad, bad

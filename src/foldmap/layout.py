@@ -1087,15 +1087,15 @@ def _separate(
     and slid sideways (_push_apart, _slide_clear). `shared`: items holding elements of several protomers with no
     copy of their own (a dimer's continuous sheet, 1SLV): when the tied pushes fail, they are run again with these
     yielding to the tied items, which keep their copies alike (_push_apart), and sliding clear last
-    (_slide_clear). With `wide` (a list: build_layout's `alike_first`), tied pushes not kept get a second chance
-    (_tied_again): every item with no copy yields, and the result is kept if it takes at most _SEP_TIE_ROOM times
-    the one-by-one room (both measured after their slides); `wide` then gets True appended. True when the tied
-    pushes are kept: the copies drawn alike."""
+    (_slide_clear). With `wide` (a list: build_layout's `alike_first`), the pieces of a copy cut in two are one
+    unit (_twins), and tied pushes not kept get a second chance (_tied_again): every item with no copy yields, and
+    the result is kept if it takes at most _SEP_TIE_ROOM times the one-by-one room (both measured after their
+    slides); `wide` then gets True appended. True when the tied pushes are kept: the copies drawn alike."""
     halves = np.array([it.half for it in items], float).reshape(-1, 2)
     mids = np.array([it.mid for it in items], float).reshape(-1, 2)
     start = np.array([(it.cx, it.cy) for it in items], float).reshape(-1, 2)
     home = np.array([it.home for it in items], float).reshape(-1, 2)
-    joints = _rigid_joints(items, joints)
+    joints = _rigid_joints(items, joints) | (_twins(ties or {}) if wide is not None else set())
     apart = _joint_matrix(len(items), joints)
     xy = start.copy()
     alone = start.copy()
@@ -1171,6 +1171,18 @@ def _tied_again(
     for it, (x, y) in zip(items, alone):
         it.cx, it.cy = x, y
     return False
+
+
+def _twins(ties: dict[int, tuple[int, int]]) -> set[tuple[int, int]]:
+    """(i, j), i < j, for every two items of one copy tied to the same protomer-0 item (_symmetry_ties): the copy's
+    sheet was cut in two where its mate's is whole (7QUP's 2B sheet, 9P1X's T and S strands), and each piece took
+    its elements' places in the mate, in the same orbit. They are one unit, moved together and never pushed apart
+    (_separate counts them as `joints`): their boxes overlap, and pushed apart alone, each piece left the rest of its
+    copy behind (random-100 C2b-3: 7QUP's ties 1.0 to 1.3 apart, 9P1X T~b 0.58)."""
+    pieces: dict[tuple[int, int], list[int]] = {}
+    for i, (j, k) in sorted(ties.items()):
+        pieces.setdefault((j, k), []).append(i)
+    return {(a, b) for got in pieces.values() for n, a in enumerate(got) for b in got[n + 1 :]}
 
 
 def _lone_left(xy, halves, mids, apart, lone: set[int]) -> bool:
