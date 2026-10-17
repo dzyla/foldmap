@@ -367,7 +367,7 @@ def test_panel_fields_equal_the_domain_by_domain_rivals(seed):
         assert np.array_equal(got.values[d], want[d]), d
 
 
-def test_panel_fields_keep_each_domain_s_window_not_the_page():
+def test_panel_fields_keep_each_domain_s_window_not_the_page(monkeypatch):
     """Final review A-I1: each domain's field was kept as a page-sized raster, every one at once (7JU4's domains
     view: 4.6 GB). Each is kept as its window and given whole on request, one at a time: 40 small domains spread
     over a page hold less than one page's raster between them, and each reads as it did (-1 outside its window)."""
@@ -376,8 +376,13 @@ def test_panel_fields_keep_each_domain_s_window_not_the_page():
     at = {f"D{k}": (10.0 * (k % 8), 10.0 * (k // 8)) for k in range(40)}
     owned = {d: [(x, y, x + 1.5, y + 1.0)] for d, (x, y) in at.items()}
     got = panel_fields(owned, [], 0.4)
+    real_full = np.full
     page = got.xs.size * got.ys.size * 8
     assert got.values.nbytes < page
+    built = []
+    monkeypatch.setattr(np, "full", lambda *a, **k: built.append(a) or real_full(*a, **k))
+    assert "D9" in got.values and "D99" not in got.values and built == []  # asking costs no page
+    monkeypatch.undo()
     field = got.values["D9"]
     assert field.shape == (got.ys.size, got.xs.size) and field.max() > 0 and (field == -1.0).mean() > 0.9
 

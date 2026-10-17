@@ -126,6 +126,7 @@ _LOCK = threading.Lock()
 # the job slots are the process's, not this module's: app._drop_changed_foldmap loads this module afresh after an
 # in-place update while jobs of the old code still hold their slots, which must count against the cap (final
 # review C-I3: else twice HOSTED.jobs could run while a deploy settles)
+# (keyed by the cap: an update that changes the cap starts new slots, which the old jobs do not hold)
 _SLOTS: dict[int, threading.BoundedSemaphore] = sys.__dict__.setdefault("_foldmap_job_slots", {})
 _SLOTS_LOCK: threading.Lock = sys.__dict__.setdefault("_foldmap_job_slots_lock", threading.Lock())
 
@@ -228,17 +229,39 @@ def run_job(fn, *args, limits: Limits):
             slots.release()
 
 
+def _server_stopped() -> bool:
+    """Whether the forkserver is stopping or stopped (app._stop_job_server: its alive pipe closed)."""
+    from multiprocessing import forkserver
+
+    server = getattr(forkserver, "_forkserver", None)
+    return server is not None and getattr(server, "_forkserver_alive_fd", 0) is None
+
+
+def _start(fn, args, limits: Limits):
+    """A job process started (its pipe's receiving end, the process). A job whose start met the forkserver as an
+    in-place update stopped it (app._stop_job_server; inside multiprocessing, a TypeError or OSError) starts once
+    more, on a fresh server; else it fails saying so (F2 review)."""
+    for attempt in (1, 2):
+        ctx = _context()
+        here, there = ctx.Pipe(duplex=False)
+        proc = ctx.Process(target=_child, args=(there, fn, args, limits.memory_mb, RESULT_MAX, _set_cap), daemon=True)
+        try:
+            proc.start()
+        except BaseException as err:
+            here.close()
+            there.close()
+            if not isinstance(err, (TypeError, OSError)) or not _server_stopped():
+                raise
+            if attempt == 2:
+                raise JobFailed("the job server was restarting for an update of the app; try again") from err
+            continue
+        there.close()  # the job holds the only sending end: its death reads as end of file here
+        return here, proc
+    raise AssertionError("unreachable")
+
+
 def _isolated(fn, args, limits: Limits):
-    ctx = _context()
-    here, there = ctx.Pipe(duplex=False)
-    proc = ctx.Process(target=_child, args=(there, fn, args, limits.memory_mb, RESULT_MAX, _set_cap), daemon=True)
-    try:
-        proc.start()
-    except BaseException:
-        here.close()
-        there.close()
-        raise
-    there.close()  # the job holds the only sending end: its death reads as end of file here
+    here, proc = _start(fn, args, limits)
     answered = False
     try:
         if not here.poll(limits.timeout or None):

@@ -49,14 +49,21 @@ def _drop_changed_foldmap(here: str = __name__) -> list[str]:
 
 
 def _stop_job_server() -> None:
-    """Stop the forkserver that hosted jobs fork from (app_jobs._context), if one runs: app_jobs starts it again,
-    with fresh preloads, for the next job. Jobs already forked from it run on and hand back their results through
-    their own pipes. Python's own (private, since 3.8) way to stop it; nothing where it has none."""
+    """Stop the forkserver that hosted jobs fork from (app_jobs._context), if one runs, so the next job forks from a
+    fresh one that preloads the code now on disk. Python's own (private, since 3.8) way to stop it; nothing where it
+    has none.
+
+    The old server exits only when the last job forked from it ends (each job holds its alive pipe), up to a job's
+    time limit, and the stop waits for it holding the server's lock. So it runs in a thread of its own: this rerun
+    goes on at once (F2 review). A job running then finishes and hands back its result through its own pipe as
+    before (its exit code reads 255: the server that reports it is gone); a job asked for meanwhile waits for the
+    old server to go (its slot taken, so the cap holds), then starts from a fresh one (app_jobs._isolated)."""
+    import threading
     from multiprocessing import forkserver
 
     stop = getattr(getattr(forkserver, "_forkserver", None), "_stop", None)
     if stop is not None:
-        stop()
+        threading.Thread(target=stop, name="foldmap-stop-job-server", daemon=True).start()
 
 
 _drop_changed_foldmap()

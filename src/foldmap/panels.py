@@ -45,6 +45,9 @@ class Windows(Mapping):
         out[w] = part
         return out
 
+    def __contains__(self, d) -> bool:  # without building the page (Mapping's own would)
+        return d in self.windows
+
     def __iter__(self):
         return iter(self.windows)
 

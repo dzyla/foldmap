@@ -33,6 +33,12 @@ def _sleep(seconds):
     return seconds
 
 
+def _started_then_sleep(path, seconds):
+    Path(path).write_text("started", encoding="utf-8")
+    time.sleep(seconds)
+    return seconds
+
+
 def _hog():
     return len(bytearray(4 * 1024**3))
 
@@ -271,7 +277,11 @@ def test_a_code_change_restarts_the_job_server_and_keeps_the_job_slots(monkeypat
     kept = dict(sys.modules)
     try:
         assert "foldmap.app_jobs" in app._drop_changed_foldmap()
-        assert forkserver._forkserver._forkserver_pid is None  # stopped
+        for _ in range(200):  # stopped (in a thread of its own: nothing to wait for here)
+            if forkserver._forkserver._forkserver_pid is None:
+                break
+            time.sleep(0.05)
+        assert forkserver._forkserver._forkserver_pid is None
         fresh = importlib.import_module("foldmap.app_jobs")
         assert fresh is not app_jobs and fresh._semaphore(2) is slots
         assert fresh.run_job(_sleep, 0, limits=fresh.Limits(timeout=60)) == 0
@@ -279,6 +289,80 @@ def test_a_code_change_restarts_the_job_server_and_keeps_the_job_slots(monkeypat
     finally:
         sys.modules.update(kept)
         seen.clear()
+
+
+def _fake_change(app, monkeypatch):
+    """Record every foldmap module's stamp, then mark app_jobs.py as changed since it was loaded."""
+    seen = sys.__dict__.setdefault("_foldmap_file_stamps", {})
+    seen.clear()
+    assert app._drop_changed_foldmap() == []
+    monkeypatch.setitem(seen, "foldmap.app_jobs", -1)
+    return seen
+
+
+@needs_fork
+def test_a_code_change_with_a_job_running_waits_for_nothing(tmp_path, monkeypatch):
+    """F2 review, Important 1: the old forkserver exits only when the last job forked from it ends (each job holds
+    the server's alive pipe), so stopping it waits up to a job's whole time limit. The reload must not: it returns
+    at once, the running job's answer still arrives, and a new job starts from a fresh server once the old one is
+    gone."""
+    import importlib
+    import threading
+    from multiprocessing import forkserver
+
+    pytest.importorskip("streamlit")
+    from foldmap import app
+
+    started = tmp_path / "started"
+    got = {}
+    old = threading.Thread(
+        target=lambda: got.update(old=run_job(_started_then_sleep, str(started), 4, limits=Limits(timeout=60)))
+    )
+    old.start()
+    for _ in range(600):  # the job process is running (its server started once, before the reload)
+        if started.exists():
+            break
+        time.sleep(0.05)
+    assert started.exists()
+    server = forkserver._forkserver._forkserver_pid
+    seen = _fake_change(app, monkeypatch)
+    kept = dict(sys.modules)
+    try:
+        t0 = time.monotonic()
+        assert "foldmap.app_jobs" in app._drop_changed_foldmap()
+        assert time.monotonic() - t0 < 1.0  # not waiting on the running job
+        fresh = importlib.import_module("foldmap.app_jobs")
+        assert fresh.run_job(_sleep, 0, limits=fresh.Limits(timeout=60)) == 0  # waits for the old server, then runs
+        assert forkserver._forkserver._forkserver_pid not in (None, server)
+        old.join(60)
+        assert got == {"old": 4}  # the running job answered
+    finally:
+        old.join(60)
+        sys.modules.update(kept)
+        seen.clear()
+
+
+@needs_fork
+def test_a_job_started_as_the_server_stops_still_runs(monkeypatch):
+    """F2 review, Minor 1: a job whose connection to the server found it running, just before the server was
+    stopped, finds no server to connect to; it starts again on a fresh server and runs, not a TypeError from inside
+    multiprocessing."""
+    from multiprocessing import forkserver
+
+    assert run_job(_sleep, 0, limits=Limits(timeout=60)) == 0  # a server runs
+    server = forkserver._forkserver
+    real = server.ensure_running
+    stops = []
+
+    def running_then_stopped():  # connect_to_new_process checks the server, then the reload stops it
+        real()
+        if not stops:
+            stops.append(1)
+            server._stop()
+
+    monkeypatch.setattr(server, "ensure_running", running_then_stopped)
+    assert run_job(_sleep, 0, limits=Limits(timeout=60)) == 0
+    assert stops == [1] and forkserver._forkserver._forkserver_pid is not None
 
 
 def test_failures_are_remembered_by_layout_not_by_colour():
