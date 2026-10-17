@@ -92,7 +92,7 @@ from .layout import (
     upright_deg,
 )
 from .model import SSE, group_by_chain
-from .na_paths import midway
+from .na_paths import _local, midway
 from .palette import BACK_SHADE, PALETTES, chain_colors, darken, delta_e, text_color_on, tint
 from .provenance import as_text, figure_provenance, with_desc
 from .route import Loop, boxes_meeting, clip_len, clip_lengths
@@ -1252,6 +1252,10 @@ def _local_targets(layout: Layout, loops: list[Loop], sses: list[SSE], g, metal:
 
 
 _SPOT_MORE_RINGS = 4  # rings past the first clear spot's where a spot whose tethers cross fewer bodies is looked for
+# ... for a mark held by nucleotides, its tethers kept off the stems' ladders (_over_stems): 8SA2's crowded B1Z found
+# its least crossing within 4 rings across all of P2 (4.6 units inside its body), within 8 none past a rail's inset
+# (random-100 C2b-4 fix round 1)
+_SPOT_MORE_RINGS_NA = 8
 
 
 def _over_bodies(c, targets, bodies) -> float:
@@ -1302,12 +1306,34 @@ def _along_loops(c, targets, runs) -> float:
     return total
 
 
-def _mark_spot(anchor, half, targets, taken, texts, tethers, bodies=(), radius=_SPOT_RADIUS, runs=()):
+def _over_stems(c, targets, stems) -> float:
+    """How much of the tethers from spot c runs inside stems' true (tilted) bodies (`stems`, PlacedStem): a tether
+    to a nucleotide on a stem's near rail enters it by the rail's inset only, one from the far side crosses the ladder
+    (random-100 C2b-4 fix round 1: 3OWW's GLY A89, after the stems were spread, tethered across P3b's rungs)."""
+    total = 0.0
+    c = np.asarray(c, float)
+    for t in np.asarray(targets, float).reshape(-1, 2):
+        lo, hi = np.minimum(c, t), np.maximum(c, t)
+        for d in stems:
+            x0, y0, x1, y1 = d.rect
+            if x0 > hi[0] or lo[0] > x1 or y0 > hi[1] or lo[1] > y1:
+                continue
+            body = (-d.length / 2, -d.width / 2, d.length / 2, d.width / 2)
+            total += clip_len(_local(c, d), _local(t, d), body)
+    return total
+
+
+def _mark_spot(
+    anchor, half, targets, taken, texts, tethers, bodies=(), radius=_SPOT_RADIUS, runs=(), stems=(), retarget=None
+):
     """The first spot on rings round the anchor whose mark (grown by 0.08) is clear of `taken` and of the tethers
     drawn before, and whose own tethers cross no text, lengthening none past the first clear spot's (the plan-11
     spot); where its tethers run over element bodies (`bodies`), the spot within _SPOT_MORE_RINGS rings further whose
-    tethers run over the least of them (C9: straight tethers cross strands and helices), and along the least of the
-    loops' lines (`runs`, _along_loops); else that first clear spot; None when there is none within _SPOT_RADIUS."""
+    tethers run over the least of them (C9: straight tethers cross strands and helices), along the least of the
+    loops' lines (`runs`, _along_loops) and inside the least of the stems' bodies (`stems`, _over_stems: a mark held
+    by nucleotides alone); else that first clear spot; None when there is none within _SPOT_RADIUS. `retarget` (spot ->
+    targets): the tethers a spot gets, when they depend on it (a mark held by nucleotides is tethered to those drawn
+    nearest it, _na_targets), judged as drawn."""
     spot = free = None
     best, last_ring = None, None
     for n, ring in enumerate(np.arange(0.0, radius, 0.35)):
@@ -1318,36 +1344,51 @@ def _mark_spot(anchor, half, targets, taken, texts, tethers, bodies=(), radius=_
             box = (c[0] - half[0] - 0.08, c[1] - half[1] - 0.08, c[0] + half[0] + 0.08, c[1] + half[1] + 0.08)
             if overlaps_any(box, taken) or any(clip_len(a, b, box) > 1e-9 for a, b in tethers):
                 continue
+            ts = targets if retarget is None else retarget(c)
             if free is None:
                 free = c
-                reach = max(_TETHER_REACH, *(np.hypot(*(np.subtract(t, c))) for t in targets))
-            if all(np.hypot(*(np.subtract(t, c))) <= reach for t in targets) and not any(
-                clip_len(c, t, b) > 1e-9 for t in targets for b in texts
+                reach = max(_TETHER_REACH, *(np.hypot(*(np.subtract(t, c))) for t in ts))
+            if all(np.hypot(*(np.subtract(t, c))) <= reach for t in ts) and not any(
+                clip_len(c, t, b) > 1e-9 for t in ts for b in texts
             ):
-                over = _over_bodies(c, targets, bodies) + _along_loops(c, targets, runs)
+                over = _over_bodies(c, ts, bodies) + _along_loops(c, ts, runs) + _over_stems(c, ts, stems)
                 if best is None or over < best[0] - 1e-9:
                     best = (over, c)
                 if over <= 1e-9:
                     break
                 if last_ring is None:
-                    last_ring = n + _SPOT_MORE_RINGS
+                    last_ring = n + (_SPOT_MORE_RINGS_NA if len(stems) else _SPOT_MORE_RINGS)
         if best is not None and best[0] <= 1e-9:
             break
     spot = best[1] if best is not None else None
     return spot if spot is not None else free
 
 
-def _place_mark(anchor, half, targets, taken, lines, texts, tethers, bodies=(), runs=()):
+def _place_mark(anchor, half, targets, taken, lines, texts, tethers, bodies=(), runs=(), stems=(), retarget=None):
     """A ligand's spot: clear of the loops' lines and the tethers drawn before where there is room, else of the
     elements and text only (the tethers' crossings given up), else of the elements and text with every tether given
     up; else further out, else on its anchor: a chosen ligand is never left without a mark (C5 fix round 1: 6JO6 lost
     24 on a crowded page; batch B: 7QUP lost one with nothing clear within _SPOT_RADIUS)."""
     for blocked, drawn in ((taken + lines, tethers), (taken, tethers), (taken, ())):
-        spot = _mark_spot(anchor, half, targets, blocked, texts, drawn, bodies, runs=runs)
+        spot = _mark_spot(
+            anchor, half, targets, blocked, texts, drawn, bodies, runs=runs, stems=stems, retarget=retarget
+        )
         if spot is not None:
             return spot
     # nothing clear within _SPOT_RADIUS (7QUP's crowded page dropped GTP:9E500): further out, else the least bad
-    spot = _mark_spot(anchor, half, targets, taken, texts, (), bodies, radius=_SPOT_FAR * _SPOT_RADIUS, runs=runs)
+    spot = _mark_spot(
+        anchor,
+        half,
+        targets,
+        taken,
+        texts,
+        (),
+        bodies,
+        radius=_SPOT_FAR * _SPOT_RADIUS,
+        runs=runs,
+        stems=stems,
+        retarget=retarget,
+    )
     return spot if spot is not None else _least_bad_spot(anchor, half, taken, bodies)
 
 
@@ -1386,17 +1427,20 @@ def _disulfide_lines(layout: Layout, loops: list[Loop], sses: list[SSE], look: S
     return out
 
 
-def _na_spots(layout: Layout, look: Style) -> tuple[dict, list]:
-    """Where each drawn nucleotide sits (nucleotide_points, in the figure's stem style), and the boxes a mark held by
+def _na_spots(layout: Layout, look: Style) -> tuple[dict, list, list]:
+    """Where each drawn nucleotide sits (nucleotide_points, in the figure's stem style); the boxes a mark held by
     nucleotides keeps off: the stems, the strands' paths and the nucleic acid's text (letters and ends:
-    layout.na_text_boxes; stem names with their margin, as routes keep off them: layout.stem_keep_box)."""
+    layout.na_text_boxes; stem names with their margin, as routes keep off them: layout.stem_keep_box); and the boxes
+    its tethers keep off, the stem names' own (label_boxes). A tether ends on a stem's rail, past the stem's box, its
+    letters and the strand it touches: held to those too, no spot's tethers passed and the mark took the first clear
+    spot whatever its tethers crossed (random-100 C2b-4 fix round 1: 3OWW's GLY A89 across P3b's rungs)."""
     if layout.nucleic is None:
-        return {}, []
+        return {}, [], []
     paths = [box for p in layout.na_paths for box in thin_boxes(p.points)]
     paths += [stem_keep_box(d, glyph(layout)[0] / _GLYPH_W) for d in layout.stems]
-    return nucleotide_points(layout, _na_style(layout, look)), [d.rect for d in layout.stems] + paths + na_text_boxes(
-        layout
-    )
+    keep = [d.rect for d in layout.stems] + paths + na_text_boxes(layout)
+    names = [box for name, box in label_boxes(layout, []) if name.startswith("stem-label:")]
+    return nucleotide_points(layout, _na_style(layout, look)), keep, names
 
 
 def _na_targets(layout: Layout, g, where: dict, near=None):
@@ -1474,12 +1518,16 @@ def ligand_marks(layout: Layout, loops: list[Loop], sses: list[SSE], look: Style
             if na_spots is None:
                 na_spots = _na_spots(layout, look)
             targets, weights, tethered = _na_targets(layout, g, na_spots[0])
-            keep_off, words = taken + na_spots[1], texts + na_spots[1]
+            keep_off, words = taken + na_spots[1], texts + na_spots[2]
         if not targets:
             continue
         anchor = np.average(np.asarray(targets), axis=0, weights=weights)
         half = (0.3, 0.3) if g.metal else (0.12 * len(g.name) + 0.2, 0.27)
-        spot = _place_mark(anchor, half, targets, keep_off, lines, words, tethers, bodies, runs)
+        stems, retarget = (), None
+        if not g.contacts:  # held by nucleotides alone: its tethers, as drawn from each spot, off the stems' ladders
+            stems = layout.stems
+            retarget = lambda c, g=g, where=na_spots[0]: _na_targets(layout, g, where, np.asarray(c, float))[0]  # noqa: E731
+        spot = _place_mark(anchor, half, targets, keep_off, lines, words, tethers, bodies, runs, stems, retarget)
         if not g.contacts:  # held by nucleotides alone: each tether to the touched nucleotide nearest the mark
             targets = _na_targets(layout, g, na_spots[0], np.asarray(spot, float))[0]
         crowded = overlaps_any((spot[0] - half[0], spot[1] - half[1], spot[0] + half[0], spot[1] + half[1]), keep_off)

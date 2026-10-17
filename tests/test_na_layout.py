@@ -2746,3 +2746,28 @@ def test_strands_keep_their_drawings_off_domain_names(monkeypatch):
     boxes = [box for name, box in label_boxes(lay, []) if name.startswith("domain-label:")]
     assert boxes and seen
     assert all(b in names for names in seen if names for b in boxes)
+
+
+def test_a_mark_held_by_nucleotides_tethers_off_the_stems_ladders():
+    """Random-100 C2b-4 fix round 1 (review I2): a ligand held by nucleotides alone took the first clear spot whatever
+    its tethers crossed, since its tethers were held off the stems' own boxes, which every tether to a rail meets; once
+    the stems were spread (_room_for_stems), 3OWW's GLY A89 sat below P3b and its tethers crossed P3b's rungs. Its
+    spot is now chosen, as a protein's ligand's is, for the tethers as drawn, inside the stems' bodies the least
+    (_over_stems): each tether enters a stem by no more than its rail's inset."""
+    from foldmap.layout import RAIL_IN
+    from foldmap.na_paths import _local
+    from foldmap.render import ligand_marks
+    from foldmap.route import clip_len
+    from foldmap.spec import draw_spec, figure_spec
+    from helpers import r100_entry
+
+    spec = figure_spec(r100_entry("3OWW"))
+    d = draw_spec(spec)
+    marks = [m for m in ligand_marks(d.layout, d.loops, d.sses, spec.look) if not m["ligand"].contacts]
+    assert len(marks) == 2
+    for m in marks:
+        for t in m["targets"]:
+            for s in d.layout.stems:
+                body = (-s.length / 2, -s.width / 2, s.length / 2, s.width / 2)
+                inside = clip_len(_local(m["centre"], s), _local(t, s), body)
+                assert inside <= RAIL_IN + 0.1, (m["ligand"].name, s.name, inside)
