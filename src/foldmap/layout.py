@@ -432,6 +432,7 @@ def _sheet_order(sheet: Sheet, frame: Frame) -> tuple[list[int], int, np.ndarray
     return order, s, cents
 
 
+_PIECE_GAP = 0.3  # page units between two pieces of one helix drawn end to end (_bundle_item, _regroup_copies)
 _STACK_PAD = 1.3  # page units between two strands drawn end to end in one column: room for the loops leaving
 # their facing ends (0.2 left 5KQJ's B and F loops no route, 1.0 5JB1's; C34 set 1.2 on 5 sample entries). Plan 12
 # fix round 3 (accessories beside their partner): swept 1.2-1.6 on the 37 sample entries with accessory strands (5
@@ -1002,7 +1003,7 @@ def _bundle_item(group: list[SSE], frame: Frame, angle_mode: str, width: float) 
         last_end, prev = -np.inf, None
         for s in sorted(col, key=lambda s: float((s.centroid - centre) @ m)):
             length = max(width, (len(s) - 1) * HELIX_RISE * SCALE)
-            gap = 0.3 if prev is None or up(s) == up(prev) else _STACK_PAD  # ends facing: room for their loops
+            gap = _PIECE_GAP if prev is None or up(s) == up(prev) else _STACK_PAD  # ends facing: room for loops
             along = max(float((s.centroid - centre) @ m) * SCALE, last_end + gap + length / 2)  # kinked pieces in a row
             last_end, prev = along + length / 2, s
             members.append(Placed(s, 0, 0, length, angle if float(s.axis @ m) >= 0 else angle + np.pi, width))
@@ -1098,7 +1099,7 @@ def _separate(
     mids = np.array([it.mid for it in items], float).reshape(-1, 2)
     start = np.array([(it.cx, it.cy) for it in items], float).reshape(-1, 2)
     home = np.array([it.home for it in items], float).reshape(-1, 2)
-    joints = _rigid_joints(items, joints) | (_twins(ties or {}) if wide is not None else set())
+    joints = _rigid_joints(items, joints) | (_twins(items, ties or {}) if wide is not None else set())
     apart = _joint_matrix(len(items), joints)
     xy = start.copy()
     alone = start.copy()
@@ -1176,16 +1177,32 @@ def _tied_again(
     return False
 
 
-def _twins(ties: dict[int, tuple[int, int]]) -> set[tuple[int, int]]:
-    """(i, j), i < j, for every two items of one copy tied to the same protomer-0 item (_symmetry_ties): the copy's
-    sheet was cut in two where its mate's is whole (7QUP's 2B sheet, 9P1X's T and S strands), and each piece took
-    its elements' places in the mate, in the same orbit. They are one unit, moved together and never pushed apart
-    (_separate counts them as `joints`): their boxes overlap, and pushed apart alone, each piece left the rest of its
-    copy behind (random-100 C2b-3: 7QUP's ties 1.0 to 1.3 apart, 9P1X T~b 0.58)."""
+def _twins(items: list[_Item], ties: dict[int, tuple[int, int]]) -> set[tuple[int, int]]:
+    """(i, j), i < j, for every two items of one copy tied to the same protomer-0 item (_symmetry_ties) whose
+    elements do not meet: the copy's sheet was cut in two where its mate's is whole (7QUP's 2B sheet, 9P1X's T and S
+    strands), and each piece took its elements' places in the mate, in the same orbit. They are one unit, moved
+    together and never pushed apart (_separate counts them as `joints`): their boxes overlap, and pushed apart alone,
+    each piece left the rest of its copy behind (random-100 C2b-3: 7QUP's ties 1.0 to 1.3 apart, 9P1X T~b 0.58).
+    Two pieces whose elements meet (both took the place of one mate strand: 7QUP 10B:265-266 and 10B:268-271 under
+    1B:265-271) are no twins: they must part (fix round 1)."""
     pieces: dict[tuple[int, int], list[int]] = {}
     for i, (j, k) in sorted(ties.items()):
         pieces.setdefault((j, k), []).append(i)
-    return {(a, b) for got in pieces.values() for n, a in enumerate(got) for b in got[n + 1 :]}
+
+    def meet(a: _Item, b: _Item) -> bool:
+        return any(
+            _boxes_meet(np.add(_footprint(m), (*o, *o)), np.add(_footprint(x), (*q, *q)))
+            for m, o in zip(a.members, a.offsets)
+            for x, q in zip(b.members, b.offsets)
+        )
+
+    return {
+        (a, b)
+        for got in pieces.values()
+        for n, a in enumerate(got)
+        for b in got[n + 1 :]
+        if not meet(items[a], items[b])
+    }
 
 
 def _lone_left(xy, halves, mids, apart, lone: set[int]) -> bool:
@@ -2487,34 +2504,41 @@ def _symmetry_ties(
 
 def _regroup_copies(
     items: list[_Item], ties: dict[int, tuple[int, int]], frame, shift: dict[str, int], keep: set[int]
-) -> tuple[dict[int, tuple[int, int]], set[tuple[str, str]], list]:
-    """A copy's elements grouped into items as its protomer-0 mate's are, where _symmetry_ties could not tie them
-    item to item: DSSP joined or cut the copies' sheets differently (9P1X: J's strands a sheet of their own in
-    protomer 0, one with O, P and R in protomer 1; G's sheet closed into a barrel, a's not), a sheet holds a strand
-    its mate's lacks (7QUP 7D), or the elements share too few residues for an item tie (9P1X C's strands);
-    random-100 C2b-3 A15. Elements are paired by model.pair_places (the same kind at the same place, residue numbers
-    taken to the first copy's by `shift`), in the order the figure holds them, as figcheck.copies_alike pairs them,
-    chain to chain of one class (one chain of the class in each protomer). A copy item is clean when it is tied to
-    the item holding its paired elements' mates, holds every element paired with that item's, and each sits at its
-    mate's offset with its shape (_symmetry_ties may pair them otherwise, or leave them where they were). The copy
-    items holding paired elements that are not clean are dissolved, and their paired elements regrouped, one item
-    per mate item, at the mate's offsets with its shape, tied to it. The elements no mate's pairs with stay together
-    where they were, untied; a dissolved item's ghosts go. Consecutive helix pieces whose mates are a kink (at most
-    features.KINK_GAP apart) while they are not are returned as kink links (Layout.kink_links: their loop is drawn
-    as their mates', 6JLN e:10-13 and e:17-39 three residues apart). Items with elements of several protomers, the
-    βα rows (`keep`, by id) and the copies of a mirror are left as they are. Returns the ties, the kink links and,
-    for each untied group of unpaired elements, the regrouped item it stays beside with its step (build_layout
-    places it so once the copies are placed: 7QUP's 7D:244-246 stood 42 page units from its copy); `items` changed
-    in place (dissolved items dropped, new ones appended)."""
+) -> tuple[dict[int, tuple[int, int]], set[tuple[str, str]], set[int]]:
+    """A copy's helices and loose elements grouped into items as its protomer-0 mate's are, where _symmetry_ties
+    could not tie them item to item (random-100 C2b-3 A15: 6JLN e's helices, bundled in E's copy with R, a chain
+    with no copy; 7QUP 13D's; 9P1X's). Elements are paired by model.pair_places (the same kind at the same place,
+    residue numbers taken to the first copy's by `shift`), in the order the figure holds them, as
+    figcheck.copies_alike pairs them, chain to chain of one class (one chain of the class in each protomer).
+    - A copy item is clean when it is tied to the item holding its paired elements' mates, holds every element
+      paired with that item's, and each sits at its mate's offset with its shape. A copy item holding paired
+      elements that is not clean is dissolved (with the other holders of the same mate items), and its paired
+      elements regrouped, one item per mate item, at the mate's offsets with its shape, tied to it; its unpaired
+      elements join that group by their mean step, slid clear of its members. A helix piece let go (tied, with no
+      pair, to a mate item another copy item pairs with) joins its own helix end to end (_on_end).
+    - A sheet is never dissolved, split, merged or reshaped, nor are its ghosts dropped: a copy's strands are placed
+      by that copy's own pairing (science S1-S3, S6; fix round 1, ruling R2: 6JLN b's sheet had been split as B's,
+      drawing b:353-356 beside b:398-402 with no bridge). Nor is a βα row (`keep`, by id). A copy item no tie holds
+      but whose elements pair (a sheet DSSP grouped otherwise: 7QUP 7D's) keeps its own shape and is tied to the
+      mate item holding most of its pairs' mates, its offsets moved by their mean step: it stands with its copy.
+    - Consecutive helix pieces whose mates are a kink (at most features.KINK_GAP apart) while they are not are
+      returned as kink links (Layout.kink_links: their loop is drawn as their mates', 6JLN e:10-13>e:17-39).
+    Items with elements of several protomers and the copies of a mirror are left as they are. Returns the ties, the
+    kink links and the ids of the items tied in their own shape (kept out of Layout.tied_ids: not drawn as their
+    mates'); `items` is changed in place (dissolved items dropped, new ones appended)."""
     sector, classes = getattr(frame, "sector", None) or {}, getattr(frame, "classes", None) or {}
     if not sector or not classes:
-        return ties, set(), []
+        return ties, set(), set()
 
     def plain(it: _Item, ks: set) -> bool:  # every element (ghosts aside) in protomers ks (None: outside every one)
         return (
             all(isinstance(m, Placed) for m in it.members)
             and {sector.get(m.sse.chain) for m in it.members if not m.ghost} <= ks
         )
+
+    def fixed(it: _Item) -> bool:  # a sheet (its strands placed by this copy's own pairing, ghosts and barrel
+        # closure too: C2b-3 fix round 1, ruling R2) or a βα row (`keep`): never dissolved
+        return id(it) in keep or any(m.ghost or m.sse.kind == "E" for m in it.members)
 
     def at(members: list, m) -> int:  # the index of member m itself (equal members are not it)
         return next(q for q, x in enumerate(members) if x is m)
@@ -2533,9 +2557,26 @@ def _regroup_copies(
     ties = dict(ties)
     drop: set[int] = set()
     new: list[tuple[_Item, int, int]] = []  # (item, mate, protomer)
-    left: list[_Item] = []  # what dissolved items held that no mate's element pairs with
-    beside: list[tuple] = []  # (left item, (mate, protomer) of its regrouped item, or an item kept, step)
+    left: list[_Item] = []  # unpaired elements of a dissolved item with no pair: untied, where they were
     kinks: set[tuple[str, str]] = set()
+    own: set[int] = set()  # ids of the copy items tied in their own shape (not drawn as their mates': no tied_ids)
+
+    def step_to(it: _Item, mine: _Item, ps) -> np.ndarray:  # mean move of it's members ps onto their mates in mine
+        return np.mean(
+            [np.subtract(mine.offsets[at(mine.members, mate[id(it.members[p])])], it.offsets[p]) for p in ps], axis=0
+        )
+
+    def into_group(got: list, extra: list) -> None:  # unpaired members join their group, clear of its members
+        for m, o in extra:
+            box = _footprint(m)
+            o = np.asarray(o, float)
+            way = 1.0 if o[0] >= np.mean([q[0] for _, q in got] or [0.0]) else -1.0
+            for _ in range(_JOIN_TRIES):
+                if not any(_boxes_meet(np.add(box, (*o, *o)), np.add(_footprint(x), (*q, *q))) for x, q in got):
+                    break
+                o = o + (way * _SLIDE_STEP, 0.0)
+            got.append((m, tuple(float(v) for v in _snap(o))))
+
     for k in sorted({v for v in sector.values() if v > 0}):
         copies = {i for i, it in enumerate(items) if plain(it, {k})}
         mate: dict[int, Placed] = {}  # id of a copy element -> its protomer-0 element
@@ -2592,14 +2633,26 @@ def _regroup_copies(
         while grown:  # a mate item's other holders are regrouped too, and theirs in turn
             more = {i for held_by in held.values() if held_by & dirty for i in held_by}
             grown, dirty = bool(more - dirty), dirty | more
-        locked = {i for i in dirty if id(items[i]) in keep}  # a βα row (`keep`) is never dissolved: what shares a
+        locked = {i for i in dirty if fixed(items[i])}  # a sheet or a βα row is never dissolved: what shares a
         while locked:  # mate with one stays as it is, and so on
             more = {i for held_by in held.values() if held_by & locked for i in held_by} - locked
             dirty, locked = dirty - more, locked | more if more else set()
-        dirty = {i for i in dirty if id(items[i]) not in keep}
+        dirty = {i for i in dirty if not fixed(items[i])}
+        for i in sorted(copies - dirty - set(ties)):  # a copy item no tie holds (a sheet its mate's groups otherwise:
+            # 7QUP 7D's) keeps its own shape, tied to the mate item holding most of its pairs' mates: it stands where
+            # its mates' copy stands, not where it was projected (42 page units off), and moves with its copy
+            ps = [p for p, m in enumerate(items[i].members) if id(m) in mate]
+            if ps:
+                to = [owner[id(mate[id(items[i].members[p])])] for p in ps]
+                most = min(set(to), key=lambda r: (-to.count(r), r))
+                step = step_to(items[i], items[most], [p for p, r in zip(ps, to) if r == most])
+                items[i].offsets = [tuple(float(v) for v in _snap(np.add(o, step))) for o in items[i].offsets]
+                ties[i] = (most, k)
+                own.add(id(items[i]))
         if not dirty:
             continue
         groups: dict[int, list[tuple[Placed, tuple[float, float]]]] = {}
+        extras: dict[int, list[tuple[Placed, tuple[float, float]]]] = {}
         for i in sorted(dirty):
             it = items[i]
             to = {p: owner[id(mate[id(m)])] for p, m in enumerate(it.members) if id(m) in mate}
@@ -2607,60 +2660,73 @@ def _regroup_copies(
                 q = at(items[r].members, mate[id(it.members[p])])
                 it.members[p].angle, it.members[p].length = items[r].members[q].angle, items[r].members[q].length
                 groups.setdefault(r, []).append((it.members[p], items[r].offsets[q]))
-            rest = [p for p, m in enumerate(it.members) if p not in to and not m.ghost]  # a ghost (a barrel closed in
-            # this copy only, 9P1X G's sheet) is drawn as the mate is: not at all
-            if rest:  # what the mate lacks stays together, untied (placed among its mates' copies, it would meet
-                # them: 9P1X I:29-30 over I's A), beside the group that took most of its old item's elements
+            rest = [p for p, m in enumerate(it.members) if p not in to and not m.ghost]
+            if not rest:
+                continue
+            if to:  # what the mate lacks joins the group that took most of its item's elements, by their mean step
+                most = min(set(to.values()), key=lambda r: (-sum(v == r for v in to.values()), r))
+                step = step_to(it, items[most], [p for p, r in to.items() if r == most])
+                extras.setdefault(most, []).extend((it.members[p], tuple(np.add(it.offsets[p], step))) for p in rest)
+            elif not _on_end(items, ties, held, dirty, fixed, i, it, rest):  # a helix piece let go joins its helix
                 mine_m = [it.members[p] for p in rest]
-                lone = _Item(
-                    mine_m, [it.offsets[p] for p in rest], it.cx, it.cy, it.home, *_anchor([m.sse for m in mine_m])
-                )
-                left.append(lone)
-                if to:
-                    most = min(set(to.values()), key=lambda r: (-sum(v == r for v in to.values()), r))
-                    step = np.mean(
-                        [
-                            np.subtract(items[r].offsets[at(items[r].members, mate[id(it.members[p])])], it.offsets[p])
-                            for p, r in to.items()
-                            if r == most
-                        ],
-                        axis=0,
+                left.append(
+                    _Item(
+                        mine_m, [it.offsets[p] for p in rest], it.cx, it.cy, it.home, *_anchor([m.sse for m in mine_m])
                     )
-                    beside.append((lone, (most, k), (float(step[0]), float(step[1]))))
-                elif i in ties and len(held.get(ties[i][0], ())) == 1:  # let go: beside the copy of its mate's pairs,
-                    # where it stood (its separation then moves it off them)
-                    (h,) = held[ties[i][0]]
-                    beside.append((lone, (ties[i][0], k) if h in dirty else items[h], (0.0, 0.0)))
+                )
         drop |= dirty
         for r, got in sorted(groups.items()):
             mates = items[r].members
-            got.sort(key=lambda x: (at(mates, mate[id(x[0])]) if id(x[0]) in mate else len(mates), x[0].sse.start))
+            got.sort(key=lambda x: (at(mates, mate[id(x[0])]), x[0].sse.start))
+            into_group(got, extras.get(r, []))
             mine_m = [m for m, _ in got]
-            new.append(
-                (
-                    _Item(
-                        mine_m,
-                        [o for _, o in got],
-                        items[r].cx,
-                        items[r].cy,
-                        items[r].home,
-                        *_anchor([m.sse for m in mine_m]),
-                    ),
-                    r,
-                    k,
-                )
+            item = _Item(
+                mine_m, [o for _, o in got], items[r].cx, items[r].cy, items[r].home, *_anchor([m.sse for m in mine_m])
             )
+            new.append((item, r, k))
     if not drop:
-        return ties, kinks, []
+        return ties, kinks, own
     kept = [i for i in range(len(items)) if i not in drop]
     index = {old: n for n, old in enumerate(kept)}
     out = {index[i]: (index[j], k) for i, (j, k) in sorted(ties.items()) if i in index}
     items[:] = [items[i] for i in kept] + [it for it, _, _ in new] + left
     for n, (_, r, k) in enumerate(new):
         out[len(kept) + n] = (index[r], k)
-    group = {(r, k): it for it, r, k in new}
-    by = [(lone, group.get(to) if isinstance(to, tuple) else to, step) for lone, to, step in beside]
-    return dict(sorted(out.items())), kinks, [(lone, it, step) for lone, it, step in by if it is not None]
+    return dict(sorted(out.items())), kinks, own
+
+
+def _boxes_meet(a, b) -> bool:
+    """Do two boxes (x0, y0, x1, y1), MARGIN round each, overlap?"""
+    return a[0] - MARGIN < b[2] and b[0] - MARGIN < a[2] and a[1] - MARGIN < b[3] and b[1] - MARGIN < a[3]
+
+
+_JOIN_TRIES = 40  # _SLIDE_STEP moves an unpaired member joining its regrouped copy may take to clear its members
+
+
+def _on_end(items, ties, held, dirty, fixed, i: int, it: _Item, rest: list[int]) -> bool:
+    """A helix piece let go by _regroup_copies (tied to a mate item whose elements another copy item pairs with:
+    7QUP 9C:240-243, cut from 9C:224-238 where 1C:224-243 is whole) joins that copy item when it is no sheet: end to
+    end with the helix of its own chain next to it in sequence, along its axis, _PIECE_GAP apart (as a kinked
+    helix's pieces stand), so it stays with its copy (it drifted 62 page units off as an item of its own)."""
+    if i not in ties or len(held.get(ties[i][0], ())) != 1:
+        return False
+    (h,) = held[ties[i][0]]
+    host = items[h]
+    pieces = [it.members[p] for p in rest]
+    if h in dirty or fixed(host) or any(m.sse.kind not in ("H", "G") for m in pieces):
+        return False
+    for m in sorted(pieces, key=lambda m: m.sse.start):
+        near = [x for x in host.members if x.sse.chain == m.sse.chain and x.sse.kind in ("H", "G")]
+        if not near:
+            return False
+        x = min(near, key=lambda x: (min(abs(m.sse.start - x.sse.end), abs(x.sse.start - m.sse.end)), x.sse.start))
+        q = next(n for n, y in enumerate(host.members) if y is x)
+        way = 1.0 if m.sse.start > x.sse.end else -1.0
+        reach = way * (x.length / 2 + m.length / 2 + _PIECE_GAP)
+        m.angle = x.angle
+        host.members.append(m)
+        host.offsets.append(tuple(float(v) for v in _snap(np.add(host.offsets[q], reach * x.direction))))
+    return True
 
 
 def _part_mate(it: _Item, k: int, zero: list[int], items: list[_Item], mine: set, sets: list[set], span) -> int | None:
@@ -3111,7 +3177,7 @@ def build_layout(
     copy_ties: dict[str, tuple[str, bool]] = {}
     tied_ids: set[str] = set()
     kink_links: set[tuple[str, str]] = set()
-    beside: list = []  # _regroup_copies: (untied item, the regrouped copy item it stays beside, step)
+    own: set[int] = set()
     if mode == "stack":
         rows = _stack(items, keep_depth)
         _centre_dna_over_binders(items, contacts)
@@ -3119,13 +3185,15 @@ def build_layout(
         shift = {c: off for c, (_, off) in (copies or {}).items()}
         ties = _symmetry_ties(items, frame, mirror is not None, shift)
         if alike_first and mirror is None and not pieces and walls is None:  # (no stem or trace indexes items yet)
-            ties, kink_links, beside = _regroup_copies(items, ties, frame, shift, {id(it) for it in templates.values()})
+            ties, kink_links, own = _regroup_copies(items, ties, frame, shift, {id(it) for it in templates.values()})
         sector_of = getattr(frame, "sector", None) or {}
         left = _unwrap(items, ties, frame) if mirror is None else {}
         if left and walls is not None:  # an element that left its item keeps off the traces it kept off
             walls = Walls(walls.boxes, np.vstack([walls.hard, walls.hard[list(left.values())]]))
         copy_ties = _copy_ties(items, ties, frame, mirror is not None)
-        tied_ids = {m.sse.id for i, (j, _) in ties.items() for k in (i, j) for m in items[k].members}
+        tied_ids = {
+            m.sse.id for i, (j, _) in ties.items() for k in (i, j) if id(items[k]) not in own for m in items[k].members
+        }
         spread, lift = 0.0, 0.0
         if ties and mirror is not None:  # a dyad in the page: each copy starts at its mate's mirror image
             mirrored = [
@@ -3146,9 +3214,6 @@ def build_layout(
             for i, (j, k) in ties.items():
                 items[i].cx, items[i].cy = items[j].cx + k * spread, items[j].cy + k * lift
                 items[i].home = (items[j].home[0] + k * spread, items[j].home[1] + k * lift)
-            for it, by, (sx, sy) in beside:  # what a regrouped copy holds alone stays beside its copy
-                it.cx, it.cy = (float(v) for v in _snap(np.add((by.cx, by.cy), (sx, sy))))
-                it.home = tuple(float(v) for v in _snap(np.add(by.home, (sx, sy))))
         kept = (
             np.array(
                 [any(getattr(m, "sse", None) is not None and m.sse.id in level for m in it.members) for it in items]

@@ -395,3 +395,37 @@ def test_what_a_regrouped_copy_holds_alone_stays_beside_it():
     mine = np.array([(p.cx, p.cy) for p in lay.placed.values() if p.sse.chain == "7D"])
     lone = lay.placed["7D:244-246"]
     assert np.hypot(*(np.subtract((lone.cx, lone.cy), np.median(mine, axis=0)))) < 25
+
+
+def test_a_copys_sheet_is_drawn_by_its_own_pairing():
+    """C2b-3 fix round 1, ruling R2 (science outranks A15): _regroup_copies split 6JLN b's one DSSP sheet as B's two
+    to draw b like B, which put b:353-356 beside b:398-402 with no bridge (S1) and drew panels no sheet of the
+    bridges (A11). A sheet is never dissolved, split, merged or reshaped: S1-S3, S6 and A11 hold, the copies' differing
+    sheets are left out of A15 and reported (figcheck.copies_sheets_differ), the rest drawn alike."""
+    from helpers import r100_entry
+
+    d = drawn(r100_entry("6JLN"))
+    assert {k: v for k, v in figcheck.science_checks(d).items() if v} == {}
+    assert figcheck.order_checks(d) == []
+    assert "b" in {c for c, _ in figcheck.copies_sheets_differ(d)}
+    got = figcheck.copies_alike(d)
+    assert got and max(got.values()) <= ALIKE, {f"{a}~{b}": round(v, 3) for (a, b), v in got.items() if v > ALIKE}
+
+
+def test_a_copys_barrel_keeps_its_ghost():
+    """C2b-3 fix round 1, ruling R2: 9P1X G's sheet closes into a barrel (a's does not); regrouping G's strands as a's
+    dropped its ghost. The copy keeps its own closure."""
+    from helpers import r100_entry
+
+    lay = _laid_out(r100_entry("9P1X"), focus="none").layout
+    assert any(g.sse.chain == "G" for g in lay.ghosts)
+
+
+def test_a_helix_piece_let_go_stays_with_its_helix():
+    """C2b-3 fix round 1 (concern 3): 7QUP 9C:240-243, cut from 9C:224-238 where 1C:224-243 is one helix, was let go
+    by _regroup_copies and drifted 59 to 62 page units from its copy. It joins its helix end to end (_on_end)."""
+    from helpers import r100_entry
+
+    lay = _laid_out(r100_entry("7QUP"), focus="none").layout
+    piece, helix = lay.placed["9C:240-243"], lay.placed["9C:224-238"]
+    assert np.hypot(piece.cx - helix.cx, piece.cy - helix.cy) < (piece.length + helix.length) / 2 + 1.0
