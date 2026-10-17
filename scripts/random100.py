@@ -1828,11 +1828,19 @@ def report(entries: list[dict], out: Path, sample_path: Path | None = None, tota
     strata: dict[str, list] = {}
     for e in entries:
         strata.setdefault(e.get("stratum") or "-", []).append(e)
+    drawn = json.loads(sample_path.read_text(encoding="utf-8")) if sample_path and sample_path.is_file() else {}
     lines = [
         "# foldmap random-100 campaign",
         "",
         f"{passed} of {total} pass.",
         "",
+        "An entry passes when no criterion fails. A criterion with nothing to judge in an entry is not judged (or does "
+        "not apply), never counted as a pass: see the outcomes per criterion below.",
+        "",
+    ]
+    if drawn:
+        lines += [f"Sample: seed {drawn.get('seed')}, release-date cutoff {drawn.get('query_date')}.", ""]
+    lines += [
         "| stratum | entries | pass |",
         "|---|---|---|",
     ]
