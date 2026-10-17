@@ -4709,16 +4709,16 @@ def _choose_label_sides(layout: Layout, sses: list[SSE], style: Style, mirrored:
         d.label_keep = None if block else _grown(tuple(float(v) for v in _reach(ink[id(d)])), _INK_MARGIN * em)
 
 
-_FIRST_STEP = 0.4  # route._PUSH[0]: a route's first step straight out of a stem's end face
-
-
 def _leaving_stretches(layout: Layout) -> np.ndarray:
     """Where single strands leave the stems' ends (x0, y0, x1, y1 rows): along its rail from the stem's outermost
-    nucleotide there through the end face and a first step (_FIRST_STEP) beyond, as every run, joint, hairpin loop,
-    free end or cropped gap leaving that end is drawn, before routing decides where it goes. A strand that carries on
-    along the same rail (a bulge) or ends there (a 5' or 3' end with no gap) leaves no stretch. What block style's
-    first-pair numbers keep off (random-100 C2b-6 D: on a short stem the numbers, as long as the stem, lay beside the
-    rail stretch of a run leaving its end: 8VWQ's P49b, P53b, P95, P141c and 7Y7C's P141 in every view)."""
+    nucleotide there through the end face and a route's first step (route._PUSH[0]) beyond, as every run, joint,
+    hairpin loop, free end or cropped gap leaving that end is drawn, before routing decides where it goes. A strand
+    that carries on along the same rail (a bulge) or ends there (a 5' or 3' end with no gap) leaves no stretch. What
+    block style's first-pair numbers keep off (random-100 C2b-6 D: on a short stem the numbers, as long as the stem,
+    lay beside the rail stretch of a run leaving its end: 8VWQ's P49b, P53b, P95, P141c and 7Y7C's P141 in every
+    view)."""
+    from .route import _PUSH  # route imports layout: read when called
+
     na = layout.nucleic
     if na is None or not layout.stems:
         return np.empty((0, 4))
@@ -4741,7 +4741,7 @@ def _leaving_stretches(layout: Layout) -> np.ndarray:
                     continue  # the strand's own end, no gap beyond: its 5' or 3' label, no line
                 _, ex = d.port(key, way == 1)
                 reach = max(d.length / 2 - d.axial[key] * float(np.dot(ex, d.direction)), 0.0)
-                tip = d.point(key) + ex * (reach + _FIRST_STEP)
+                tip = d.point(key) + ex * (reach + _PUSH[0])
                 out.append((*d.point(key), *tip))
     return np.asarray(out, float).reshape(-1, 4)
 
