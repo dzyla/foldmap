@@ -1905,37 +1905,6 @@ def _room_for_stems(items: list[_Item]) -> None:
         it.home = (hx, hy)
 
 
-def ligand_mark_half(g) -> tuple[float, float]:
-    """The half size (page units) of a ligand's mark as render draws it: a metal ion's dot, else its name's box."""
-    return (0.3, 0.3) if g.metal else (0.12 * len(g.name) + 0.2, 0.27)
-
-
-def _ligand_walls(items: list[_Item], room: list) -> Walls | None:
-    """Room for the marks of ligands held by nucleotides alone, in a nucleic acid drawn without protein (every item a
-    stem): a box of each mark's size (`room`: (half size, the nucleotides holding it)) at the middle of its
-    nucleotides as placed (after _room_for_stems), which the stems keep MARGIN off as they keep off a trace (Walls),
-    so the mark has a clear spot near its nucleotides (random-100 C2b-4 ruling R4 follow-up: after the spread, 8SA2's
-    B1Z found no clear spot within 6.6 of its nucleotides, and its tethers ran 13.5 long across P2's hairpin loop).
-    None when there is no such mark."""
-    if not room or not all(isinstance(m, PlacedStem) for it in items for m in it.members):
-        return None
-    where = {}
-    for it in items:
-        for m, (ox, oy) in zip(it.members, it.offsets):
-            centre = np.array([it.cx + ox, it.cy + oy])
-            for key in sorted(m.axial):
-                where[key] = centre + m.axial[key] * m.direction + m.rail * m.side[key] * m.normal
-    boxes = []
-    for (hx, hy), keys in room:
-        pts = [where[k] for k in keys if k in where]
-        if pts:
-            cx, cy = (float(v) for v in _snap(np.sum(pts, axis=0) / len(pts)))
-            boxes.append((cx - hx, cy - hy, cx + hx, cy + hy))
-    if not boxes:
-        return None
-    return Walls(_snap(np.array(boxes, float)), np.ones((len(items), len(boxes)), bool))
-
-
 def _collide(a: _Item, ha, ma, b: _Item, hb, mb) -> bool:
     """Do the footprints (half extents h, centre offsets m) of a and b, plus MARGIN, overlap?"""
     dx, dy = b.cx + mb[0] - a.cx - ma[0], b.cy + mb[1] - a.cy - ma[1]
@@ -3337,12 +3306,8 @@ def build_layout(
     level: set[str] | None = None,
     band: tuple[float, float] | None = None,
     alike_first: bool = True,
-    ligand_room: list | None = None,
 ) -> Layout:
-    """`ligand_room` (cli._ligand_room): for each ligand mark held by nucleotides alone, (its half size, the
-    nucleotides holding it); a nucleic acid drawn without protein keeps room for each mark among the stems
-    (_ligand_walls).
-    Labels: the generic ones (_assign_labels), then `relabel` (ref -> label: copies' shared labels, primes of
+    """Labels: the generic ones (_assign_labels), then `relabel` (ref -> label: copies' shared labels, primes of
     elements lent by neighbours), then `names` (names.apply_names: --names, given the placed layout with its stems
     and ba_rows), then `rename` (the user's own, through _adjust like `swap` and `move`); the label sides and boxes
     are chosen after (_choose_label_sides).
@@ -3513,7 +3478,6 @@ def build_layout(
             extra = _stem_springs(items, nucleic) if pieces else []
             if pieces and not ties and walls is None:
                 _room_for_stems(items)
-                walls = _ligand_walls(items, ligand_room or [])
             rise = getattr(frame, "rise", 0.0) * SCALE
             _attract(
                 items,

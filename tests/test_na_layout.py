@@ -2938,30 +2938,6 @@ def test_a_strand_end_label_another_strands_run_crosses_moves_round_its_end():
     assert [h for h in figcheck.text_collisions(d) if h.startswith("na:end:")] == []
 
 
-def test_a_crowded_rna_keeps_room_for_a_ligand_its_nucleotides_hold():
-    """Random-100 C2b-4 ruling R4, follow-up (8SA2's B1Z): spread to their room, the stems of a nucleic acid drawn
-    without protein covered every spot within 6.6 of the B1Z its nucleotides hold, so its mark sat far off and its
-    tethers ran up to 13.5 long, one across P2's hairpin loop. The stems now keep room for each such mark at the
-    middle of its nucleotides (layout._ligand_walls): its tethers are no longer than at BASE (12.6) and cross no
-    hairpin loop."""
-    from foldmap.na_paths import _crosses_segment, among
-    from foldmap.render import ligand_marks
-    from foldmap.spec import draw_spec, figure_spec
-    from helpers import r100_entry
-
-    spec = figure_spec(r100_entry("8SA2"))
-    d = draw_spec(spec)
-    lay = d.layout
-    at = {key: e for e in lay.stems for key in e.axial}
-    loops = [among(p, at) for p in lay.na_paths if p.kind == "hairpin"]
-    marks = [m for m in ligand_marks(lay, d.loops, d.sses, spec.look) if m["ligand"].name == "B1Z"]
-    assert marks
-    for m in marks:
-        for t in m["targets"]:
-            assert math.dist(m["centre"], t) <= 12.6
-            assert not any(_crosses_segment(q, m["centre"], t) for q in loops)
-
-
 def test_no_joint_runs_through_its_own_pieces_on_a_ribosome():
     """Random-100 C2b-6 J (7Y7C's a:2710-2711 through P138c1's corner, 8VWQ's domains view 2:253-254): two pieces of
     one bent duplex side by side, their joint's bend out of and into the faces' axes cut a corner of a piece unless

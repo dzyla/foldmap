@@ -21,16 +21,7 @@ from .dssp import assign_dssp
 from .features import helices_on_sheets, sse_contacts
 from .frame import Frame, RadialFrame, dna_radial_frame, dna_view_frame, protomer_maps, symmetric_frame, view_frame
 from .io import load_backbone, load_links, load_nucleic, read_model
-from .layout import (
-    SCALE,
-    _snap,
-    accessory_lines,
-    build_layout,
-    ligand_mark_half,
-    na_torn_by_unrolling,
-    resolve,
-    template_rows,
-)
+from .layout import SCALE, _snap, accessory_lines, build_layout, na_torn_by_unrolling, resolve, template_rows
 from .model import AUTO_NT, crop_nucleic, homolog_chains, nucleic_of_chains, nucleic_touching, res_ref
 from .names import apply_names, check_spec
 from .nucleic import StemView, stem_views, straight_duplex
@@ -397,7 +388,6 @@ def make_layout(
         else None,
         over=over,
         alike_first=mem is None,  # a membrane view is judged by its bands (C17), not its copies (A15)
-        ligand_room=_ligand_room(links, nucleic, look or Style()),
     )
 
     def finish(lay, faces=None):  # what make_layout sets on a layout after build_layout
@@ -840,32 +830,6 @@ def _cys_place(bb, sses, r: int):
     if s.start <= r <= s.end:
         return s.id, (r - s.start) / max(s.end - s.start, 1)
     return s.id, (1.0 if r > s.end else 0.0)
-
-
-def _ligand_room(links, nucleic, look: Style) -> list:
-    """For each ligand held by nucleotides alone that the figure marks (as render.ligand_marks chooses them: look's
-    ligands; no metal ion, which is listed, not drawn), its mark's half size and the nucleotides holding it (strand,
-    index): what build_layout keeps room for among the stems of a nucleic acid drawn without protein."""
-    if nucleic is None or links is None or look.ligands == "none" or not getattr(links, "ligands", None):
-        return []
-    codes = None if look.ligands in ("auto", "all") else {c.upper() for c in look.ligands.split(",")}
-    key = {
-        (lab.chain, lab.seq, lab.icode): (s, i)
-        for s, st in enumerate(nucleic.strands)
-        for i, lab in enumerate(st.labels)
-    }
-    out = []
-    for g in links.ligands:
-        if g.contacts or g.metal or not g.nucleotides:
-            continue
-        if codes is not None and not {c.upper() for c in (g.codes or [g.name])} & codes:
-            continue
-        if codes is None and look.ligands != "all" and g.additive:
-            continue
-        keys = sorted(key[lab] for lab in g.nucleotides if lab in key)
-        if keys:
-            out.append((ligand_mark_half(g), keys))
-    return out
 
 
 def _bridge_springs(bb, sses, links) -> list[tuple[str, float, str, float]]:
