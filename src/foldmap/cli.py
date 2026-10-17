@@ -1085,7 +1085,8 @@ def build_parser() -> argparse.ArgumentParser:
         "(automatic domains) is not measured here. Then the figure criteria A1-A20 the random-100 campaign judges "
         "every figure by, with the same limits: route fallbacks, loops over labels, overlapping elements, text "
         "collisions, text off the page, repeated labels, chains left out without a note, N->C and sheet order, "
-        "copies drawn alike, domains (with --domains), membrane (with --membrane), ligand tethers. Those that need "
+        "copies drawn alike, domains (with --domains), membrane (with --membrane), ligand tethers; a --membrane or "
+        "--domains figure is judged as the campaign's membrane or domains view. Those that need "
         "more than one drawing or a tool foldmap does not use (process exit and time, the app, mkdssp, a second "
         "seed, a saved-layout round trip, RNApolis, a two-state partner) are named 'not measured here' with the "
         "reason. Prints one line per check and one per problem; exits 1 on a problem, 0 otherwise.",

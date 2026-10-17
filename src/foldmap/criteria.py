@@ -462,19 +462,22 @@ INK_READ = {"A6": ("text_collisions",), "A7": ("off_page",), "A16": ("domain_nam
 
 
 def check_figure(drawn, spec, path) -> dict:
-    """One drawn figure judged as the campaign judges a view of it (measure_figure, figure_criteria): {"science":
-    figcheck.science_checks' findings, "criteria": {criterion: {"pass", "detail"}, ...}, every criterion of
-    CRITERIA}. The figure stands as the default view, and as the domains view (A16) when it draws domains and the
-    membrane view (A18) when it draws a band. A criterion it cannot judge has pass None and its reason under "here"
-    (NOT_HERE; and a check the text font keeps from being measured, figcheck.ink_font_reason)."""
+    """One drawn figure judged as the campaign judges the view of it its options make (measure_figure,
+    figure_criteria): the membrane view when it asks for a membrane (or draws a band), else the domains view when it
+    asks for domains (or draws them), else the default view. {"science": figcheck.science_checks' findings,
+    "criteria": {criterion: {"pass", "detail"}, ...}, every criterion of CRITERIA}. A criterion it cannot judge has
+    pass None and its reason under "here": NOT_HERE; one the campaign judges on other views, not on this one; a check
+    the text font keeps from being measured (figcheck.ink_font_reason; for A16 only its domain names, its domain rules
+    and panels are judged); a measure that reads "unmeasured" (unmeasured)."""
     lay = drawn.layout
-    view = "membrane" if lay.membrane is not None else "default"
+    membrane = getattr(spec, "membrane", "off") not in (None, "off") or lay.membrane is not None
+    domains = getattr(spec, "domains", None) not in (None, "", "none", "off") or bool(lay.domains)
+    view = "membrane" if membrane else "domains" if domains else "default"  # as the options asked, as the campaign
     result = measure_figure(view, drawn, spec, path)
-    judged = figure_criteria({"default": {"result": result}})
-    if lay.domains:
+    judged = figure_criteria({view: {"result": result}})
+    if view == "membrane" and domains:  # the campaign has no view with both: the domains are judged as its own
         judged["A16"] = figure_criteria({"domains": {"result": result}})["A16"]
-    if lay.membrane is not None:
-        judged["A18"] = figure_criteria({"membrane": {"result": result}})["A18"]
+    as_default = judged if view == "default" else figure_criteria({"default": {"result": result}})
     skipped = result["checks"].get("skipped") or {}
     here = {k: why for k, why in NOT_HERE.items() if k != "A10" or len(drawn.bb)}
     if lay.nucleic is None:
@@ -483,19 +486,45 @@ def check_figure(drawn, spec, path) -> dict:
     for key in CRITERIA:
         got = judged.get(key, _ok(None))
         font = next((skipped[c] for c in INK_READ.get(key, ()) if c in skipped), None)
-        if font:
-            got = {**_ok(None), "here": str(font)}
+        if got["pass"] is not None and font:
+            got = _domains_off_font(result, str(font)) if key == "A16" else {**_ok(None), "here": str(font)}
+        elif got["pass"] is None and as_default.get(key, _ok(None))["pass"] is not None:
+            got = {
+                **got,
+                "here": f"the campaign judges it on other views, not on its {view} view: draw the figure "
+                f"without --{view} to check it",
+            }
         elif key in here:
             got = {**got, "here": here[key]}
-        out[key] = got
+        out[key] = unmeasured(got)
     return {"science": result["science"], "criteria": out}
+
+
+def _domains_off_font(result: dict, font: str) -> dict:
+    """A16 when the domain names cannot be measured (the text off figcheck.INK_FONT): its domain rules and panel
+    overlaps measure no ink and are judged; a failure among them fails it, else it is not measured here."""
+    dom = {"domains": result}
+    parts = [_count(dom, "domain_rules"), _count(dom, "domain_overlap", LIMITS["domain_overlap"])]
+    names = f"domain names not measured here ({font})"
+    if all(p["pass"] for p in parts):
+        return {**_ok(None), "here": f"{names}; domain rules and panel overlaps pass"}
+    return _ok(False, "; ".join([p["detail"] for p in parts if p["detail"]] + [names]))
+
+
+def unmeasured(got: dict) -> dict:
+    """A result whose detail reads "unmeasured: <reason>" (the campaign's A10 without mkdssp, which it counts as a
+    pass) as not measured: pass None, the reason under "here"."""
+    detail = str(got.get("detail") or "")
+    if got.get("pass") and detail.startswith("unmeasured"):
+        return {**_ok(None), "here": detail.removeprefix("unmeasured").lstrip(": ") or "unmeasured"}
+    return got
 
 
 def criteria_lines(found: dict[str, dict]) -> list[str]:
     """One line per criterion (pass, fail, not measured here and why, or does not apply), its detail indented."""
     lines = []
     for key, what in CRITERIA.items():
-        got = found.get(key) or _ok(None)
+        got = unmeasured(found.get(key) or _ok(None))
         if got["pass"] is None:
             why = f"not measured here ({got['here']})" if got.get("here") else "does not apply"
             lines.append(f"{key} {what}: {why}")

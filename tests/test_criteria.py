@@ -91,3 +91,73 @@ def test_the_script_and_the_package_judge_one_figure_alike(r100, tmp_path, name)
         k: {"pass": package[k]["pass"], "detail": package[k]["detail"]} for k in FIGURE_JUDGED
     }
     assert all(script[k]["pass"] is not None for k in FIGURE_JUDGED)
+
+
+OFF_FONT = "the text resolved to DejaVu Sans, not Liberation Sans"
+
+
+def _off_font(real):
+    def off_font(*args, **kw):
+        got = real(*args, **kw)
+        return {
+            **got,
+            "text_collisions": None,
+            "off_page": None,
+            "domain_name_collisions": None,
+            "skipped": dict.fromkeys(figcheck.INK_CHECKS, OFF_FONT),
+        }
+
+    return off_font
+
+
+def test_off_font_a16_still_judges_the_domain_rules_and_panels(monkeypatch):
+    """T13a review Important 1: off the calibration font only A16's domain names go unmeasured; its domain rules and
+    panel overlaps measure no ink and are judged (a cross-chain domain fails), and a figure without domains reports A16
+    as not applying, not as unmeasured."""
+    real_checks, real_domains = figcheck.figure_checks, figcheck.domain_checks
+    monkeypatch.setattr(figcheck, "figure_checks", _off_font(real_checks))
+    spec = figure_spec(DATA / "1UBQ.cif")
+    got = criteria.check_figure(draw_spec(spec), spec, DATA / "1UBQ.cif")["criteria"]
+    assert got["A16"] == {"pass": None, "detail": ""}  # no domains: does not apply
+
+    spec = figure_spec(DATA / "2LZM.cif", domains="auto")  # two automatic domains
+    drawn = draw_spec(spec)
+    got = criteria.check_figure(drawn, spec, DATA / "2LZM.cif")["criteria"]
+    assert got["A16"]["pass"] is None and OFF_FONT in got["A16"]["here"] and "names" in got["A16"]["here"]
+
+    def crossing(d, collisions=None):
+        return {**real_domains(d, collisions), "cross_chain": ["D1 holds A:10-20 and B:30-40"]}
+
+    monkeypatch.setattr(figcheck, "domain_checks", crossing)
+    got = criteria.check_figure(drawn, spec, DATA / "2LZM.cif")["criteria"]
+    assert got["A16"]["pass"] is False and "domains 1" in got["A16"]["detail"]
+    assert OFF_FONT in got["A16"]["detail"]  # the names part is said to be unmeasured
+
+
+@pytest.mark.parametrize(
+    "name, options, view",
+    [("1C3W.cif", {"membrane": "auto", "assembly": "asu"}, "membrane"), ("2HHB.cif", {"domains": "auto"}, "domains")],
+)
+def test_a_membrane_or_domains_figure_is_judged_as_the_campaign_judges_that_view(name, options, view):
+    """T13a review Important 2: a --membrane or --domains figure is judged by the criteria the campaign applies to its
+    membrane or domains view (figure_criteria under that view's name), value and detail; the criteria the campaign
+    judges on the default view only (A8, A11, A15 ...) are not measured here, with the reason."""
+    path = DATA / name
+    spec = figure_spec(path, **options)
+    drawn = draw_spec(spec)
+    campaign = criteria.figure_criteria({view: {"result": criteria.measure_figure(view, drawn, spec, path)}})
+    got = criteria.check_figure(drawn, spec, path)["criteria"]
+    judged = {k for k, v in campaign.items() if v["pass"] is not None}
+    assert {"A3", "A5", "A6", f"A1{6 if view == 'domains' else 8}"} <= judged
+    for k in judged:
+        assert {"pass": got[k]["pass"], "detail": got[k]["detail"]} == campaign[k], k
+    for k in ("A8", "A11", "A15", "A20"):
+        assert got[k]["pass"] is None and f"{view} view" in got[k]["here"], (k, got[k])
+
+
+def test_an_unmeasured_criterion_never_prints_as_a_pass():
+    """T13a review Minor 6 ruling: in `foldmap check` a criterion that was not measured prints as not measured, never
+    as a pass (the campaign's A10 reads pass with "unmeasured: <reason>")."""
+    lines = criteria.criteria_lines({"A10": {"pass": True, "detail": "unmeasured: no mkdssp on PATH"}})
+    assert "A10 secondary structure agrees with mkdssp: not measured here (no mkdssp on PATH)" in lines
+    assert not any(line.endswith(": pass") for line in lines if line.startswith("A10"))

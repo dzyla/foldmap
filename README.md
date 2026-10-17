@@ -431,10 +431,13 @@ figure by, with the same limits (`src/foldmap/criteria.py`): no route fallbacks 
 overlapping elements (A5), no text collisions (A6) or text off the page (A7), labels unique per chain (A8), nothing
 left out without a note (A9), N→C and sheet order (A11), copies drawn alike (A15), domains with `--domains` (A16),
 the membrane band with `--membrane` (A18) and local ligand tethers (A20); each line reads pass or fail with what
-failed, or "does not apply". The criteria that need more than this one drawing or a tool foldmap does not use (the
+failed, or "does not apply". A `--membrane` or `--domains` figure is judged as the campaign judges its membrane or
+domains view: the criteria it keeps for the default figure (A8, A9 on a membrane figure, A11, A15, A20) read "not
+measured here", to be checked on the figure drawn without that option. The criteria that need more than this one drawing or a tool foldmap does not use (the
 process's exit and time, the app's hosted job, mkdssp, a second hash seed, a saved-layout round trip, RNApolis base
 pairs, a two-state partner) read "not measured here" with the reason, as do the text checks when the text is not
-set in the font they are calibrated on (Liberation Sans); they are never counted as passing. A failed criterion
+set in the font they are calibrated on (Liberation Sans; A16 then still judges its domain rules and panel overlaps,
+only the domain names go unmeasured); they are never counted as passing. A failed criterion
 also exits 1.
 
 **Checking the contact beads.** `foldmap contacts 1LMB.cif` draws the figure `plot` would (it takes the same options),
