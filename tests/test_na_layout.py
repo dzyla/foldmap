@@ -2776,3 +2776,18 @@ def test_a_mark_held_by_nucleotides_tethers_off_the_stems_ladders():
                 body = (-s.length / 2, -s.width / 2, s.length / 2, s.width / 2)
                 inside = clip_len(_local(m["centre"], s), _local(t, s), body)
                 assert inside <= RAIL_IN + 0.1, (m["ligand"].name, s.name, inside)
+
+
+def test_a_mark_held_by_nucleotides_keeps_its_tethers_off_strands():
+    """Random-100 C2b-4 fix round 2 (ruling): a mark held by nucleotides judges every clear spot by the stems its
+    tethers cross, then the strands (hairpin loops, runs), then their length; scored on the stems alone, it took the
+    first clear spot here, its tether across the strand. A protein's mark (no `na`) keeps its first clear spot."""
+    from foldmap.render import _mark_spot, _strands_crossed
+
+    strand = np.array([[-0.3, -1.0, 0.1, -1.0]])  # a strand's segment between the anchor and the target
+    target = [(0.0, -2.0)]
+    assert _strands_crossed((0.0, 0.0), target, [strand]) == 1
+    spot = _mark_spot(np.zeros(2), (0.1, 0.1), target, [], [], [], na=([], [strand]))
+    assert _strands_crossed(spot, target, [strand]) == 0
+    assert np.hypot(*np.subtract(spot, target[0])) < 0.2  # of those, the one with the shortest tether
+    assert list(_mark_spot(np.zeros(2), (0.1, 0.1), target, [], [], [])) == [0.0, 0.0]
