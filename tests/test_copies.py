@@ -383,3 +383,15 @@ def test_copies_whose_elements_are_grouped_apart_are_drawn_alike(entry, view, ti
     got = figcheck.copies_alike(d)
     bad = {f"{a}~{b}": round(v, 3) for (a, b), v in got.items() if v > ALIKE}
     assert len(got) + len(figcheck.copies_not_judged(d)) == ties and not bad, bad
+
+
+def test_what_a_regrouped_copy_holds_alone_stays_beside_it():
+    """Random-100 C2b-3 VIEW: 7QUP's 7D:244-246, a strand 1D lacks, was left untied where its dissolved sheet had
+    been projected, 42 page units from its copy drawn alike with 1D. It stays beside the regrouped copy, as it stood
+    beside those strands in its own sheet."""
+    from helpers import r100_entry
+
+    lay = _laid_out(r100_entry("7QUP"), focus="none").layout
+    mine = np.array([(p.cx, p.cy) for p in lay.placed.values() if p.sse.chain == "7D"])
+    lone = lay.placed["7D:244-246"]
+    assert np.hypot(*(np.subtract((lone.cx, lone.cy), np.median(mine, axis=0)))) < 25
