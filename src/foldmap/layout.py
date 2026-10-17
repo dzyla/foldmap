@@ -2458,7 +2458,8 @@ def _symmetry_ties(
     `shift` (chain -> offset, model.homolog_chains: 2MJW numbers chain D 95-188 where B is 1-94). `honest`: the
     strand pairs that pair (_sheet_pairs of every sheet) and each accessory's partner; a copy takes its mate's places
     only when that draws no strand side by side with one it does not pair with, and no accessory away from a partner
-    it stood beside, that its own drawing did not (_drawn_wrong; else it keeps its own, turned as its mate is:
+    it stood beside (but one given its mate's place, the pairing named in the notes), that its own drawing did not
+    (_drawn_wrong, worse; else it keeps its own, turned as its mate is:
     ruling C2b-3/R2, science outranks A15; random-100 C2b-S, 9P1X focus: L's sheet took V's places the other way
     round, O's barrel took E's for two of R's strands, its ghost between them). The id of each copy item that so keeps
     its own goes in `own` (tied in its own shape, as _regroup_copies' are: no Layout.tied_ids)."""
@@ -2476,6 +2477,13 @@ def _symmetry_ties(
 
     def wrong(it: _Item) -> set:
         return set() if paired is None else _drawn_wrong(it, paired, partner)
+
+    def worse(it: _Item, before: set, taken: set[str]) -> bool:
+        """Does the take draw anything against the pairing that the copy's own drawing did not? An accessory the
+        take draws away from its partner, named in the notes, is the mate's own drawing when the take gave it its
+        mate's place (`taken`: those strands' ids; 4XG1 B:174-175), never when it only moved with them (9P1X R:2-8,
+        which E's sheet lacks, would leave R:52-61)."""
+        return any(w[0] != "named" or w[1] not in taken for w in wrong(it) - before)
 
     sector, classes = getattr(frame, "sector", None), getattr(frame, "classes", None)
     if not sector or not classes:
@@ -2538,7 +2546,7 @@ def _symmetry_ties(
                 a = mate.members[q].angle
                 m.angle, m.length = (_mirrored(a) if mirror else a), mate.members[q].length
             it.offsets = [(-mate.offsets[q][0], mate.offsets[q][1]) if mirror else mate.offsets[q] for q in pairs]
-            if not wrong(it) <= before:  # its mate's places draw its strands against their own pairing
+            if worse(it, before, {m.sse.id for m in it.members if isinstance(m, Placed)}):  # against its pairing
                 undo(it, was)
                 one_to_one = False
                 if own is not None:
@@ -2556,7 +2564,7 @@ def _symmetry_ties(
             if not mirror and shared and len({q for _, q in shared}) == len(shared):
                 was, before = keep(it), wrong(it)
                 _take_shared(it, mate, shared)
-                if not wrong(it) <= before:
+                if worse(it, before, {it.members[p].sse.id for p, _ in shared}):
                     undo(it, was)
                     if own is not None:
                         own.add(id(it))
@@ -2858,28 +2866,35 @@ def _drawn_wrong(it: _Item, pairs: set, partner: dict[str, str]) -> set:
     """What an item's strands, at its offsets, draw against their pairing (figcheck.science_checks' reading of S1 and
     S6, inside one item): two strands side by side (adjacent columns, across the page, spans overlapping) that do not
     pair (`pairs`: frozensets of strand ids), two overlapping in one column, and an accessory (`partner`: its id ->
-    its partner's) not level beside its partner or the partner's ghost. Columns by x rounded to 1e-3."""
+    its partner's) not level beside its partner or the partner's ghost by columns: "away" when it is within a strand's
+    width of it and level, so that _unshown counts it beside and the notes do not name the pairing (9P1X O's ghost
+    wedged between R:29-35 and R:52-61), else "named" (the notes name it: S6's ruled case). Columns by x rounded to
+    1e-3."""
     spots = []
     for m, (ox, oy) in zip(it.members, it.offsets):
         if isinstance(m, Placed) and m.sse.kind == "E" and not m.over:
             half = abs(np.sin(m.angle)) * m.length / 2
-            spots.append((m.sse.id, round(float(ox), 3), (oy - half, oy + half), m.ghost))
-    xs = sorted({x for _, x, _, _ in spots})
+            spots.append((m.sse.id, round(float(ox), 3), (oy - half, oy + half), m.ghost, m.width))
+    xs = sorted({x for _, x, _, _, _ in spots})
     col = {x: n for n, x in enumerate(xs)}
 
     def meet(a, b) -> bool:
         return min(a[1], b[1]) - max(a[0], b[0]) > _TOUCH
 
     out = set()
-    for a, xa, sa, ga in spots:
-        for b, xb, sb, _ in spots:
+    for a, xa, sa, ga, wa in spots:
+        for b, xb, sb, _, _ in spots:
             if a < b and meet(sa, sb):
                 d = abs(col[xa] - col[xb])
                 if d == 0 or (d == 1 and frozenset((a, b)) not in pairs):
                     out.add(("column" if d == 0 else "side", a, b))
-        if not ga and a in partner and any(i == partner[a] for i, *_ in spots):
-            if not any(i == partner[a] and abs(col[x] - col[xa]) == 1 and meet(sa, sp) for i, x, sp, _ in spots):
-                out.add(("away", a, partner[a]))
+        if ga or a not in partner:
+            continue
+        at = [(x, sp, w) for i, x, sp, _, w in spots if i == partner[a]]
+        level = any(abs(col[x] - col[xa]) == 1 and meet(sa, sp) for x, sp, _ in at)
+        counted = any(_TOUCH < abs(x - xa) <= max(w, wa) + _TOUCH and meet(sa, sp) for x, sp, w in at)  # _unshown
+        if not level and at:
+            out.add(("away" if counted else "named", a, partner[a]))
     return out
 
 

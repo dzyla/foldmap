@@ -486,3 +486,15 @@ def test_a_filaments_copies_keep_their_own_strands_beside_their_partners():
     0 bridges (and C's, D's, E's likewise). It turns with the shared strands, beside B:68-74, which it pairs with."""
     found = figcheck.science_checks(drawn(DATA / "6Y7S.cif", focus="none"))
     assert {k: v for k, v in found.items() if v} == {}
+
+
+def test_a_copy_given_its_mates_place_may_name_a_pairing_its_mate_names():
+    """Random-100 C2b-S: 4XG1's B barrel takes A's places one to one; B:174-175 then stands where A:174-175 does, not
+    level with its partner B:145-152, and the notes name the pairing, as A's do (S6's ruled case). That is no reason
+    to keep B's own shape (2.36 page units from A's). Only a strand that merely moves with the taken ones must keep
+    every partner it stood beside (9P1X R:2-8)."""
+    from helpers import r100_entry
+
+    d = _laid_out(r100_entry("4XG1"))
+    got = figcheck.copies_alike(d)
+    assert got and max(got.values()) <= ALIKE, {f"{a}~{b}": round(v, 3) for (a, b), v in got.items()}
