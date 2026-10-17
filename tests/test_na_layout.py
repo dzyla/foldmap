@@ -2679,3 +2679,25 @@ def test_joined_pieces_kept_end_to_end_may_join_straight_farther_apart():
     fb, _ = _face(db, (0, j), False)
     assert math.dist(fa, fb) == pytest.approx(4.4)
     assert _straight_joint(router, da, db, fa, ea, fb)
+
+
+def test_strands_keep_their_drawings_off_domain_names(monkeypatch):
+    """Random-100 C2b-4 (7Y7C domains view, A16: "D1 · B" under run A:1256-1257): a run's bow is not routed on the grid,
+    so of the text it keeps off only what route_nucleic hands it as names, and that was the stems' names alone. The
+    domains' names (their boxes as routes keep out of them, label_boxes) are now among them."""
+    import foldmap.route_na as route_na
+    from foldmap.layout import label_boxes
+
+    seen = []
+    real = route_na._strand_between
+
+    def spy(router, s, i, j, da, db, kind, names=(), *rest, **kw):
+        seen.append(list(names))
+        return real(router, s, i, j, da, db, kind, names, *rest, **kw)
+
+    monkeypatch.setattr(route_na, "_strand_between", spy)
+    lay, sses, bb = make_layout(_path("4OO8"), domains="auto")
+    route_loops(lay, sses, bb)
+    boxes = [box for name, box in label_boxes(lay, []) if name.startswith("domain-label:")]
+    assert boxes and seen
+    assert all(b in names for names in seen if names for b in boxes)
