@@ -169,7 +169,8 @@ def _place_letters(layout: Layout, paths: list[NAPath]) -> dict[tuple[int, int],
 
 
 _GAP_ALONG = tuple(0.5 + s * k / 20 for k in range(9) for s in ((1,) if k == 0 else (-1, 1)))  # middle out
-_GAP_OUT = (1.0, 2.0, 3.0)  # how far beside its gap a label may sit, in multiples of the least that clears it
+_GAP_OUT = (1.0, 2.0, 3.0, 4.0, 6.0)  # how far beside its gap a label may sit, in multiples of the least that clears
+# it (4 and 6, random-100 C2b-6: 7Y7C's "... 62 nt ..." beside a gap 0.57 across, between stems)
 
 
 _GAP_TEXT = 0.75  # a gap label's text size, in ems of the figure's text (render draws it at 0.75 of the font)
@@ -215,7 +216,7 @@ def _along(pts, f: float):
 def _label_gaps(layout: Layout, paths: list[NAPath], loops=()) -> None:
     """Put each labelled gap's "... N nt ..." beside its dashed path (NAPath.label_xy), as base letters are placed:
     at a fraction of the way along it (_GAP_ALONG, the middle first), on either side, then further out, the
-    first spot whose box meets nothing: no element's or stem's body, strand or protein loop (`loops`, polylines),
+    first spot whose box meets nothing: no element's or stem's body, strand, tie or protein loop (`loops`, polylines),
     base letter, nucleotide (where its bead goes), end label, name or gap label placed before it, nor its own
     dashed line; when every spot meets something, the one meeting the fewest other things, then the least of its
     own line (a label beside its own gap reads as its own)."""
@@ -227,6 +228,10 @@ def _label_gaps(layout: Layout, paths: list[NAPath], loops=()) -> None:
     segs = [(a, b) for p in paths for a, b in zip(p.points, p.points[1:])]
     owner = [k for k, p in enumerate(paths) for _ in p.points[1:]]  # the path each segment is part of
     segs += [(a, b) for pts in loops for a, b in zip(pts, pts[1:])]
+    # and the ties as drawn: a dotted line, or a tick at each end (random-100 C2b-6: 7Y7C's "... 62 nt ..." on a tick)
+    segs += [(a, b) for t in layout.na_ties for a, b, _ in t.marks] + [
+        tuple(t.ends) for t in layout.na_ties if not t.label
+    ]
     owner += [-1] * (len(segs) - len(owner))
     seg_box = np.array([(min(a[0], b[0]), min(a[1], b[1]), max(a[0], b[0]), max(a[1], b[1])) for a, b in segs])
     seg_box = seg_box.reshape(-1, 4)

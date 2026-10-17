@@ -2982,3 +2982,16 @@ def test_no_joint_runs_through_its_own_pieces_on_a_ribosome():
         if _through_stem(_segments(among(p, at)), d)
     ]
     assert through == []
+
+
+def test_a_gap_label_keeps_off_tie_marks_and_may_stand_further_out():
+    """Random-100 C2b-6 L (7Y7C, "... 62 nt ..." beside a gap 0.57 across between stems): a gap's label kept off the
+    strands and protein loops but not off the ties' marks, and among spots at most three times the least that clears
+    its gap it found none clear, so it sat on a run and a tie's tick, then on a stem. It now keeps off the ties as
+    drawn and may stand four and six times as far out (na_labels._GAP_OUT)."""
+    from foldmap import figcheck
+    from foldmap.spec import draw_spec, figure_spec
+    from helpers import r100_entry
+
+    d = draw_spec(figure_spec(r100_entry("7Y7C")))
+    assert [h for h in figcheck.text_collisions(d) if h.startswith("na:gap:")] == []
