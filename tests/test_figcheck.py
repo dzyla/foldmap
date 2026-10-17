@@ -636,3 +636,23 @@ def test_accessories_named_not_drawn_level_are_reported(name, named, of):
     got = figcheck.figure_checks(d, path)
     assert (got["accessories_named"], got["accessories"]) == (named, of)
     assert got["details"]["accessories_named"] == lines
+
+
+def test_strands_of_sheets_the_copies_group_differently_are_left_out():
+    """C2b-3 ruling R2: where DSSP groups two tied copies' sheets differently, each copy's strands are placed by its
+    own pairing, so A15 leaves them out (as C10 leaves out a shared sheet) and reports them. 1TIM's B barrel cut into
+    two blocks: B's strands no longer count, wherever they are drawn; A~B's other elements still do."""
+    d = drawn(DATA / "1TIM.cif")
+    lay = d.layout
+    (n,) = [n for n, ids in enumerate(lay.sheets) if {lay.placed[k].sse.chain for k in ids} == {"B"}]
+    ids = lay.sheets[n]
+    lay.sheets = [*lay.sheets[:n], ids[: len(ids) // 2], ids[len(ids) // 2 :], *lay.sheets[n + 1 :]]
+    lay.sheet_ghosts = [*lay.sheet_ghosts[:n], [], [], *lay.sheet_ghosts[n + 1 :]]
+    notes = figcheck.copies_sheets_differ(d)
+    assert list(notes) == [("B", "A")] and notes[("B", "A")].startswith("copies' sheets differ: B sheets "), notes
+    for k in ids:
+        lay.placed[k].cx += 5.0  # strands left out: still alike
+    assert figcheck.copies_alike(d)[("B", "A")] <= 0.5
+    helix = next(k for k, p in lay.placed.items() if p.sse.chain == "B" and p.sse.kind == "H")
+    lay.placed[helix].cx += 5.0
+    assert figcheck.copies_alike(d)[("B", "A")] > 1.0

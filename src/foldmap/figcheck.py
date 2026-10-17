@@ -656,19 +656,22 @@ def _aligned(residues: dict[str, list[str]], a: str, b: str) -> list[tuple[int, 
     return aligned_positions(residues[a], residues[b])
 
 
-def _copy_pairs(drawn) -> dict[tuple[str, str], tuple[float | None, int, int, str]]:
+def _copy_pairs(drawn, notes: dict | None = None) -> dict[tuple[str, str], tuple[float | None, int, int, str]]:
     """(copy, reference) -> (deviation, elements matched, elements of the smaller of the two, why not judged) for each
     tie of Layout.copy_ties, and for each copy no tie holds (_untied_copies). The copies' elements pair one-to-one
     by sequence (C18 ruling): the copy's residues aligned to the reference's (aligned_positions), its element ranges
     taken to the reference's residues, then model.pair_places (the same kind, sharing at least half of the shorter).
-    Strands of a sheet shared between the two copies are left out (shared_sheet_elements). The deviation is that of
-    fit_deviation (a reflection for a mirror tie; for an untied copy only when the figure mirrors a tie). When fewer
-    than COPY_MIN_MATCHED or than half the smaller copy's elements match (two points always fit), the tie is not
-    judged (deviation None) if the smaller copy has fewer than COPY_MIN_MATCHED elements to match ("n/a: k
-    elements") or a shared sheet took the rest ("n/a: shared sheet"), C22 and C10 rulings; else it is inf."""
-    from .model import pair_places
+    Strands of a sheet shared between the two copies are left out (shared_sheet_elements), and so are the strands
+    of sheets the two copies group differently (_sheets_differ, C2b-3 ruling R2; a note for each such tie goes in
+    `notes`). The deviation is that of fit_deviation (a reflection for a mirror tie; for an untied copy only when
+    the figure mirrors a tie). When fewer than COPY_MIN_MATCHED or than half the smaller copy's elements match (two
+    points always fit), the tie is not judged (deviation None) if the smaller copy has fewer than COPY_MIN_MATCHED
+    elements to match ("n/a: k elements") or a shared or differing sheet took the rest ("n/a: shared sheet",
+    "n/a: sheets differ"), C22 and C10 rulings; else it is inf."""
+    from .model import overlap, pair_places
 
     lay = drawn.layout
+    differ_note = {} if notes is None else notes
     residues: dict[str, list[str]] = {}
     first: dict[str, int] = {}
     for k, label in enumerate(drawn.bb.labels):
@@ -695,6 +698,27 @@ def _copy_pairs(drawn) -> dict[tuple[str, str], tuple[float | None, int, int, st
             return (p.sse.kind, min(got), max(got)) if got else (p.sse.kind, -2, -3)
 
         found = sorted(pair_places([place(p, ref) for p in a], [place(p, copy, to_ref) for p in b]).items())
+        pa_, pb_ = [place(p, ref) for p in a], [place(p, copy, to_ref) for p in b]
+
+        def lacking(xs, ys, els):  # strands with no element of the other copy at their place, of any kind
+            return {
+                e.sse.id
+                for e, x in zip(els, xs)
+                if e.sse.kind == "E" and not any(overlap(x[1:], y[1:]) > 0 for y in ys)
+            }
+
+        alone = lacking(pa_, pb_, a) | lacking(pb_, pa_, b)
+        differ = _sheets_differ(lay, copy, ref, [(a[i], b[j]) for i, j in found], alone)
+        if differ:  # their strands are placed by each copy's own pairing: left out, reported (C2b-3 R2)
+            gone = {k for block in differ for k in block}
+            a = [p for p in a if p.sse.id not in gone]
+            b = [p for p in b if p.sse.id not in gone]
+            found = sorted(pair_places([place(p, ref) for p in a], [place(p, copy, to_ref) for p in b]).items())
+            differ_note[(copy, ref)] = "copies' sheets differ: " + "; ".join(
+                f"{copy} sheet{'s' if len(c) > 1 else ''} {'+'.join(map(str, c))} vs "
+                f"{ref} sheet{'s' if len(r) > 1 else ''} {'+'.join(map(str, r))}"
+                for c, r in _differ_names(lay, differ, copy)
+            )
         smaller = min(len(a), len(b))
         why = ""
         if len(found) >= COPY_MIN_MATCHED and 2 * len(found) >= smaller:
@@ -705,12 +729,81 @@ def _copy_pairs(drawn) -> dict[tuple[str, str], tuple[float | None, int, int, st
             dev, why = None, f"n/a: {smaller} element{'s' if smaller > 1 else ''}"
         elif shared and smaller == 0:
             dev, why = None, "n/a: shared sheet"
+        elif differ and smaller == 0:
+            dev, why = None, "n/a: sheets differ"
         elif shared and len(found) == COPY_MIN_MATCHED - 1 and 2 * len(found) >= smaller:
             dev, why = None, f"n/a: {len(found)} matched"  # a shared sheet left two to match, too few to fit (6YQD)
         else:
             dev = math.inf
         out[(copy, ref)] = (dev, len(found), smaller, why)
     return out
+
+
+def _blocks(lay) -> list[tuple[list[str], list[str]]]:
+    """Each drawn sheet block (Layout.sheets: its strands) with its ghosts (Layout.sheet_ghosts)."""
+    ghosts = list(getattr(lay, "sheet_ghosts", []) or [])
+    return [(list(ids), ghosts[n] if n < len(ghosts) else []) for n, ids in enumerate(lay.sheets)]
+
+
+def _sheets_differ(lay, copy: str, ref: str, pairs, alone: set[str] = frozenset()) -> list[set[str]]:
+    """The strands (ids, both copies) of the sheet blocks two tied copies group differently (C2b-3 ruling R2): the
+    paired strands (`pairs`: (reference element, copy element)) of a block of one copy lie in more than one block of
+    the other, a block no tie draws as its mate's (Layout.tied_ids) holds a strand the other copy lacks (`alone`: no
+    element of the other copy at its place; 7QUP 7D's sheet, which keeps its own shape), or the two blocks close
+    differently (one draws a barrel's ghost of its own strand, the other not; a strand lent across a ring's cut
+    leaves a ghost that is no closure). Each copy's strands are placed by its own pairing (S1-S3), so these cannot
+    sit alike: A15 leaves them out, as C10 leaves out a shared sheet, and reports them (copies_sheets_differ). One
+    set per group of blocks so joined, the strands of `copy` and `ref` in them."""
+    blocks = _blocks(lay)
+    where = {k: n for n, (ids, _) in enumerate(blocks) for k in ids}
+    links = sorted(
+        {(where[pa.sse.id], where[pb.sse.id]) for pa, pb in pairs if pa.sse.id in where and pb.sse.id in where}
+    )
+    if not links:
+        return []
+    comp = {}  # union-find over ("r", n) and ("c", n)
+
+    def root(x):
+        while comp.setdefault(x, x) != x:
+            x = comp[x]
+        return x
+
+    for r, c in links:
+        comp[root(("r", r))] = root(("c", c))
+    groups: dict = {}
+    for r, c in links:
+        groups.setdefault(root(("r", r)), set()).update({("r", r), ("c", c)})
+    out = []
+    for g in (groups[k] for k in sorted(groups, key=str)):
+        refs = sorted(n for side, n in g if side == "r")
+        mine = sorted(n for side, n in g if side == "c")
+        closed = {any(g in blocks[n][0] for g in blocks[n][1]) for n in refs + mine}
+        tied = any(k in lay.tied_ids for n in mine for k in blocks[n][0])  # drawn as its mate's, by the tie
+        lacks = not tied and any(k in alone for n in refs + mine for k in blocks[n][0])
+        if len(refs) == 1 and len(mine) == 1 and len(closed) == 1 and not lacks:
+            continue
+        strands = {
+            k for n in refs + mine for k in blocks[n][0] if k in lay.placed and lay.placed[k].sse.chain in (copy, ref)
+        }
+        out.append(strands)
+    return out
+
+
+def _differ_names(lay, differ: list[set[str]], copy: str):
+    """(copy's block numbers, reference's block numbers) of each differing group, as A11 numbers sheets."""
+    where = {k: n for n, ids in enumerate(lay.sheets) for k in ids}
+    for strands in differ:
+        mine = sorted({where[k] for k in strands if lay.placed[k].sse.chain == copy})
+        theirs = sorted({where[k] for k in strands if lay.placed[k].sse.chain != copy})
+        yield mine, theirs
+
+
+def copies_sheets_differ(drawn) -> dict[tuple[str, str], str]:
+    """(copy chain, reference chain) -> a note naming the sheet blocks the two copies group differently, whose
+    strands A15 leaves out (reported, not judged: C2b-3 ruling R2)."""
+    notes: dict[tuple[str, str], str] = {}
+    _copy_pairs(drawn, notes)
+    return notes
 
 
 def copies_alike(drawn) -> dict[tuple[str, str], float]:
