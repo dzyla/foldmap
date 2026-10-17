@@ -2589,6 +2589,17 @@ def test_a_hairpin_loop_holds_its_nucleotides_a_bead_apart(m):
     assert np.hypot(*np.diff(xy, axis=0).T).min() >= _BEAD - 1e-6
 
 
+def test_an_empty_hairpin_loop_on_a_narrow_stem_has_a_circle():
+    """Fix round 1 (review M1): with no nucleotide on the loop the step between its feet is the chord whatever the
+    radius, so on a stem narrower than a bead (dna_scale under about 0.36) the circle's growth never ended."""
+    stem = PlacedStem(
+        "s", "P1", [0, 0], [(0, 0, 0, 1)], 0.0, 0.0, 4.0, 0.0, 0.8, {(0, 0): 2.0, (0, 1): 2.0}, {(0, 0): 1, (0, 1): -1}
+    )
+    _, r = stem.hairpin_circle((0, 0), (0, 1), 0)
+    half = float(np.hypot(*(stem.point((0, 1)) - stem.point((0, 0))))) / 2
+    assert half < 0.4545 / 2 and r == pytest.approx(half * 1.02)
+
+
 def test_a_nucleic_acid_without_protein_keeps_the_order_of_its_stems():
     """Random-100 C2b-4 (3OWW, A17 spearman 0.484): the domain-swapped dimer's ten stems were projected into a box
     of 0.98 times their footprints' area; _attract cleared the overlaps by pushing each stem its own way, and

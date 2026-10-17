@@ -222,7 +222,8 @@ class PlacedStem:
         r = max(half * 1.02, (m + 1) * NT_STEP / (1.6 * np.pi))
         # a bead apart (_TRACE_HALF): sized by the stem's width, the arc is only about half a circle and its
         # nucleotides stood closer (random-100 C2b-4: 7Y7C's 13- to 18-nucleotide loops, 0.40-0.44)
-        while _hairpin_step(half, r, m) < _HAIRPIN_STEP:
+        # (with no nucleotide the step is the chord whatever the radius: nothing to space)
+        while m > 0 and _hairpin_step(half, r, m) < _HAIRPIN_STEP:
             r = float(_snap(r + 0.01))
         return (pa + pb) / 2 + out * np.sqrt(max(r * r - half * half, 0.0)), r
 
