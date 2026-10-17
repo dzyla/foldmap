@@ -816,3 +816,23 @@ def test_an_unpaired_member_joins_its_regrouped_copy_only_where_clear():
     m = _helix_item((90, 94, "B", np.pi / 2, (0.0, 0.0))).members[0]
     refused = _into_group(got, [(m, (1.0, 0.0), group, (3.0, 4.0))])
     assert refused == [(m, group, (3.0, 4.0))] and all(x is not m for x, _ in got)
+
+
+def test_joined_duplex_pieces_slide_clear_as_one():
+    """Random-100 C2b-4 (7Y7C): two consecutive pieces of one bent duplex that _separate moves together (a rigid
+    joint, _rigid_joints) were slid clear one at a time, each exempt from the other, so one slid onto its partner
+    (P138c1 and P138c2 0.9 apart, their names on each other) or away from it (P85a2 28 units from P85a1, its joint a
+    straight fallback across the page). The pieces slide as one: their offset is kept, and nothing overlaps."""
+    from foldmap import layout
+    from foldmap.layout import Placed, _collide, _Item
+
+    def piece(x, start):
+        s = fake_sse("E", start, start + 6)
+        return _Item([Placed(s, 0.0, 0.0, 2.0, np.pi / 2, 1.0)], [(0.0, 0.0)], x, 0.0, (x, 0.0), start, "A")
+
+    a, b, wall = piece(0.0, 1), piece(1.0, 20), piece(2.2, 40)  # b, joined to a, overlaps the settled wall
+    items = [wall, a, b]
+    layout._slide_clear(items, joints={(1, 2)})
+    assert (b.cx - a.cx, b.cy - a.cy) == (1.0, 0.0)
+    h, m = [it.half for it in items], [it.mid for it in items]
+    assert not any(_collide(items[0], h[0], m[0], items[k], h[k], m[k]) for k in (1, 2))

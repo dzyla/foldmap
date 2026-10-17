@@ -1438,9 +1438,12 @@ def _slide_clear(
 ) -> None:
     """Guarantee: each item in turn, if it still overlaps one already settled (other than a piece it is joined
     to, `joints`) or a `fixed` box it must keep off, takes the nearest clear spot straight right, left, up or down
-    (in that order on a tie), in _SLIDE_STEP steps; one that keeps its height (`level`) right or left only. The
-    items in `last` (with no symmetry copies, _separate) are settled after every other, so they move, not the copies
-    (1SLV: the dimer's shared sheet between the two copies' eta2 helices)."""
+    (in that order on a tie), in _SLIDE_STEP steps; one that keeps its height (`level`) right or left only. Pieces
+    of a bent duplex `joints` holds together (_rigid_joints) slide as one, their offsets kept, each exempt from the
+    others (random-100 C2b-4: slid one at a time, 7Y7C's P138c2 landed on P138c1 and P85a2 28 units from P85a1); the
+    group settles when its first item comes up. The items in `last` (with no symmetry copies, _separate) are settled
+    after every other, so they move, not the copies (1SLV: the dimer's shared sheet between the two copies' eta2
+    helices)."""
     halves = [it.half for it in items]
     mids = [it.mid for it in items]
     boxes = [] if fixed is None else np.asarray(fixed.boxes, float).tolist()
@@ -1450,19 +1453,29 @@ def _slide_clear(
     ]
     later = set(last)
     order = [i for i in range(len(items)) if i not in later] + [i for i in range(len(items)) if i in later]
-    for n, i in enumerate(order):
-        it = items[i]
-        x0, y0 = it.cx, it.cy
-        mine = [w for k, w in enumerate(walls) if fixed.hard[i, k]] if walls else []
-        settled = mine + [(items[j], halves[j], mids[j]) for j in order[:n] if (j, i) not in joints]
+    cid = _components(len(items), sorted(joints)).tolist()
+    done: set[int] = set()  # the groups settled
+    settled: list[int] = []
+    for i in order:
+        if cid[i] in done:
+            continue
+        group = [j for j in order if cid[j] == cid[i]]  # i alone, or its rigid chain of duplex pieces
+        start = [(items[j].cx, items[j].cy) for j in group]
+        others = [(items[j], halves[j], mids[j]) for j in settled]
+        mine = {j: [w for k, w in enumerate(walls) if fixed.hard[j, k]] if walls else [] for j in group}
+        pairs = [(j, o) for j in group for o in mine[j] + others]
         k = 0
-        ways = ((1, 0), (-1, 0)) if level is not None and level[i] else ((1, 0), (-1, 0), (0, 1), (0, -1))
-        while any(_collide(it, halves[i], mids[i], *other) for other in settled):
+        sideways = level is not None and any(level[j] for j in group)
+        ways = ((1, 0), (-1, 0)) if sideways else ((1, 0), (-1, 0), (0, 1), (0, -1))
+        while any(_collide(items[j], halves[j], mids[j], *o) for j, o in pairs):
             k += 1
             for dx, dy in ways:
-                it.cx, it.cy = x0 + k * dx * _SLIDE_STEP, y0 + k * dy * _SLIDE_STEP
-                if not any(_collide(it, halves[i], mids[i], *other) for other in settled):
+                for j, (x0, y0) in zip(group, start):
+                    items[j].cx, items[j].cy = x0 + k * dx * _SLIDE_STEP, y0 + k * dy * _SLIDE_STEP
+                if not any(_collide(items[j], halves[j], mids[j], *o) for j, o in pairs):
                     break
+        settled += group
+        done.add(cid[i])
 
 
 def _owner(items: list[_Item]) -> dict[str, tuple[int, Placed, tuple[float, float]]]:
