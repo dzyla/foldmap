@@ -254,7 +254,7 @@ def route_nucleic(layout: Layout, router: _Router | None = None, loops=()) -> li
     _unbunch(layout, out)
     layout.na_ends = [e for e in ends if (e[0], e[1]) not in gapped]
     layout.na_letters = _place_letters(layout, out)
-    layout.na_ties = _ties(layout, out)
+    layout.na_ties = _ties(layout, out, loops)
     _label_gaps(layout, out, loops)
     _widen(layout, out)
     if log.isEnabledFor(logging.DEBUG):

@@ -30,6 +30,7 @@ from .route import clip_len, clip_lengths
 _TIE_SHORT = 3.0  # stem widths: a longer tie is drawn as two labelled marks, not a line
 _TICK_GAP, _TICK = 0.15, 0.35  # a tie mark: a tick this far out from its nucleotide, this long
 _TIE_TURNS = (0.0, 45.0, -45.0, 90.0, -90.0, 135.0, -135.0, 180.0)  # degrees from the partner a mark may point
+_TICK_REACH = (1.0, 2.0, 3.0)  # times _TICK a mark's tick is drawn, the shortest that leaves its label clear
 
 
 _SLIDES = tuple(f * k for k in (0.1, 0.2, 0.3, 0.4, 0.48) for f in (1, -1))  # spacings a run's nucleotides may slide
@@ -289,11 +290,13 @@ def _tie_name(n: int) -> str:
     return _tie_name(n // 26 - 1) + chr(97 + n % 26) if n >= 26 else chr(97 + n)
 
 
-def _ties(layout: Layout, paths: list[NAPath]) -> list[NATie]:
+def _ties(layout: Layout, paths: list[NAPath], loops=()) -> list[NATie]:
     """Each isolated pair as drawn: a straight dotted line when it is short (at most _TIE_SHORT stem widths) and
     crosses no stem, element or letter, otherwise a tick at each nucleotide with the same label (a, b, ... in
     the order of the ties), each tick turned from its partner as little as keeps it and its label clear of
-    bodies, letters, nucleotides, labels and strands."""
+    bodies, letters, nucleotides, labels, strands and protein loops (`loops`, polylines); where no turn does, the
+    tick is drawn longer (_TICK_REACH) and the turns tried again (random-100 C2b-4: 4P9R's and 7Y7C's labels took
+    the first turn, on a strand or loop); where none does at any length, the first turn."""
     na = layout.nucleic
     where = {key: d.point(key) for d in layout.stems for key in d.axial}
     where.update({(p.strand, i): np.asarray(xy) for p in paths for i, xy in zip(p.nts, p.nt_xy)})
@@ -306,8 +309,17 @@ def _ties(layout: Layout, paths: list[NAPath]) -> list[NATie]:
         (x - gw / 2, y - gh / 2, x + gw / 2, y + gh / 2) for _, _, (x, y) in layout.na_ends
     ]
     segments = [(a, b) for p in paths for a, b in zip(p.points, p.points[1:])]
+    segments += [(a, b) for pts in loops for a, b in zip(pts, pts[1:])]
+    seg = np.asarray(segments, float).reshape(-1, 4)
+    seg_lo, seg_hi = np.minimum(seg[:, :2], seg[:, 2:]), np.maximum(seg[:, :2], seg[:, 2:])
     taken = [*letters.values(), *where.values()]
     hw, hh = gw / 2 + 0.05, gh / 2
+
+    def near_segments(box, b) -> list:  # only these can meet the box or come within 0.15 of b (protein loops: many)
+        lo = np.minimum(box[:2], np.subtract(b, 0.15))
+        hi = np.maximum(box[2:], np.add(b, 0.15))
+        rows = np.flatnonzero(((seg_lo <= hi) & (seg_hi >= lo)).all(axis=1))
+        return [segments[k] for k in rows.tolist()]
 
     def clear(tick, at, own) -> bool:  # own: the tie's nucleotide, which the tick starts beside
         (a, b), (x, y) = tick, at
@@ -322,7 +334,7 @@ def _ties(layout: Layout, paths: list[NAPath]) -> list[NATie]:
             return False
         if any(min(box[2], o[2]) > max(box[0], o[0]) and min(box[3], o[3]) > max(box[1], o[1]) for o in boxes):
             return False
-        return not any(clip_len(p, q, box) > 1e-9 or _seg_dist(b, p, q) < 0.15 for p, q in segments)
+        return not any(clip_len(p, q, box) > 1e-9 or _seg_dist(b, p, q) < 0.15 for p, q in near_segments(box, b))
 
     out: list[NATie] = []
     for p in na.structure.ties:
@@ -341,11 +353,12 @@ def _ties(layout: Layout, paths: list[NAPath]) -> list[NATie]:
                 toward = np.subtract(other, xy)
                 toward = toward / max(float(np.hypot(*toward)), 1e-9)
                 options = []
-                for deg in _TIE_TURNS:
-                    c, s_ = math.cos(math.radians(deg)), math.sin(math.radians(deg))
-                    u = np.array([toward[0] * c - toward[1] * s_, toward[0] * s_ + toward[1] * c])
-                    a, b = xy + u * _TICK_GAP, xy + u * (_TICK_GAP + _TICK)
-                    options.append(((a, b), b + u * (hh + 0.1)))
+                for reach in _TICK_REACH:
+                    for deg in _TIE_TURNS:
+                        c, s_ = math.cos(math.radians(deg)), math.sin(math.radians(deg))
+                        u = np.array([toward[0] * c - toward[1] * s_, toward[0] * s_ + toward[1] * c])
+                        a, b = xy + u * _TICK_GAP, xy + u * (_TICK_GAP + _TICK * reach)
+                        options.append(((a, b), b + u * (hh + 0.1)))
                 (a, b), at = next((o for o in options if clear(*o, xy)), options[0])
                 tie.marks.append(((float(a[0]), float(a[1])), (float(b[0]), float(b[1])), (float(at[0]), float(at[1]))))
                 boxes.append((at[0] - hw, at[1] - hh, at[0] + hw, at[1] + hh))

@@ -2623,3 +2623,16 @@ def test_spreading_stems_to_their_room_keeps_every_distance_ratio():
     roomy = [stem_item(0.0, 0.0), stem_item(40.0, 0.0)]
     _room_for_stems(roomy)
     assert [it.home for it in roomy] == [(0.0, 0.0), (40.0, 0.0)]
+
+
+def test_a_tie_label_finds_a_clear_spot_with_a_longer_tick():
+    """Random-100 C2b-4 (A6 on 7Y7C and 8VWQ: tie labels on strands and protein loops): a tertiary pair's mark took
+    the first turn whose label crossed nothing, and when no turn's did, the first, on a strand (4P9R's tie 3-284 on
+    run 23). The tick is now drawn longer (2 and 3 times) before giving up, and protein loops count as strands."""
+    from foldmap import figcheck
+    from foldmap.spec import draw_spec, figure_spec
+    from helpers import r100_entry
+
+    d = draw_spec(figure_spec(r100_entry("4P9R")))
+    assert [t for t in d.layout.na_ties if t.label]
+    assert [h for h in figcheck.text_collisions(d) if h.startswith("na:tie:")] == []
