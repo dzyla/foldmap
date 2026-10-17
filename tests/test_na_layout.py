@@ -1947,7 +1947,7 @@ def test_a_gap_with_no_way_on_the_grid_is_curved_before_it_is_a_fallback():
     from types import SimpleNamespace
 
     from foldmap.na_ends import _gap
-    from foldmap.route import _element_obstacles
+    from foldmap.route import _element_obstacles, _Grid
 
     lay, _, _, _ = _routed("1URN")
     (p,) = [q for q in lay.na_paths if q.kind == "gap"]
@@ -1955,7 +1955,7 @@ def test_a_gap_with_no_way_on_the_grid_is_curved_before_it_is_a_fallback():
     ea, eb = pts[1] - pts[0], pts[-2] - pts[-1]
     ea, eb = ea / np.hypot(*ea), eb / np.hypot(*eb)
     (own,) = lay.stems  # both free ends leave the hairpin's one stem
-    stuck = SimpleNamespace(route=lambda *a, **k: (None, None), elements=_element_obstacles(lay))
+    stuck = SimpleNamespace(route=lambda *a, **k: (None, None), elements=_element_obstacles(lay), grid=_Grid(lay))
     drawn = _gap(stuck, lay.nucleic.gaps[0], (pts[0], ea, own), (pts[-1], -eb, own))
     assert not drawn.fallback and len(drawn.points) > 2
 
@@ -2831,3 +2831,29 @@ def test_a_cropped_gap_from_a_traces_end_is_routed():
     path = _gap(router, SimpleNamespace(before=0, after=1, count=5), (pa, ea, None), (fb, eb, db))
     assert not path.fallback
     assert not any(crosses_body(p, q, wall) for p, q in zip(path.points, path.points[1:]))
+
+
+def test_a_cropped_gap_whose_end_faces_a_stem_starts_from_the_nearest_free_cell():
+    """Random-100 C2b-6 (7Y7C's domains view, gap after a:1439): the way straight out of a gap's end ran through a
+    neighbouring stem's margin for the whole of _PUSH, so no route started, even with its ends loose, and with no curve
+    or bow clear the gap was drawn straight across three stems. A gap may leave its end in any direction ahead of it:
+    it now starts from the nearest free cell ahead whose straight stub is clear, and routes on from there."""
+    from types import SimpleNamespace
+
+    from foldmap.layout import Layout
+    from foldmap.na_ends import _gap
+    from foldmap.na_paths import _face, crosses_body
+    from foldmap.route import _element_obstacles, _Grid, _Router
+
+    da = PlacedStem("P1", "P1", [0, 0], [], -6.0, 0.0, 3.0, 0.0, 4.6, {(0, 0): 1.0}, {(0, 0): 1})
+    wall = PlacedStem("W", "W", [1, 1], [], 0.0, 0.0, 3.0, 0.0, 30.0, {(1, 0): 1.0}, {(1, 0): 1})
+    db = PlacedStem("P2", "P2", [0, 0], [], 9.0, 0.0, 3.0, 0.0, 4.6, {(0, 3): -1.0}, {(0, 3): 1})
+    fb, eb = _face(db, (0, 3), False)
+    front = PlacedStem("N", "N", [2, 2], [], fb[0] - 1.8, fb[1], 3.0, 0.0, 1.0, {(2, 0): 1.0}, {(2, 0): 1})
+    lay = Layout({}, (-9.0, -18.0, 12.0, 18.0), stems=[da, wall, db, front])
+    router = _Router(_Grid(lay), _element_obstacles(lay))
+    assert router.grid.free_cell_along(fb, eb, db, True) is None  # straight out: the neighbour's margin all the way
+    fa, ea = _face(da, (0, 0), True)
+    path = _gap(router, SimpleNamespace(before=0, after=1, count=5), (fa, ea, da), (fb, eb, db))
+    assert not path.fallback
+    assert not any(crosses_body(p, q, e) for e in (wall, front) for p, q in zip(path.points, path.points[1:]))

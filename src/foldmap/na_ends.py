@@ -28,6 +28,7 @@ from .na_paths import (
 )
 from .route import (
     _DIRS,
+    _PUSH,
     _REUSE,
     _TURN,
     _clear,
@@ -400,6 +401,56 @@ class _TraceEnd:
         return self.cx, self.cy, self.cx, self.cy
 
 
+def _from_beside(router: _Router, a, b):
+    """A gap's route when the way straight out of an end has no free cell, even loose (_Grid.free_cell_along): from
+    the nearest free cell ahead of that end (_side_start), reached by a straight stub, to the other end; None if
+    neither end needs it or no route is found (random-100 C2b-6: 7Y7C's domains view, the gap after a:1439, whose end
+    faced P80a 0.4 to 3.15 out, was drawn straight across three stems)."""
+    grid = router.grid
+    ends = []
+    for port, out, own in (a, b):
+        side = _side_start(router, port, out, own) if grid.free_cell_along(port, out, own, True) is None else None
+        if side is None:
+            ends.append((port, out, own, False))
+        else:
+            v = side - np.asarray(port, float)
+            ends.append((side, v / float(np.hypot(*v)), _TraceEnd(float(side[0]), float(side[1])), True))
+    if not (ends[0][3] or ends[1][3]):
+        return None
+    (qa, ua, oa, sa), (qb, ub, ob, sb) = ends
+    mid, _ = router.route(qa, ua, oa, qb, ub, ob, own_body=True, loose=True)
+    if mid is None:
+        return None
+    return ([tuple(map(float, a[0]))] if sa else []) + list(mid) + ([tuple(map(float, b[0]))] if sb else [])
+
+
+def _side_start(router: _Router, port, out, own):
+    """The nearest free grid cell ahead of a port (within _PUSH's reach), whose centre a straight stub from the port
+    reaches clear of every element and stem (its own by its body): where a gap starts when the way straight out of its
+    end runs through a neighbouring stem's margin for the whole of _PUSH. None if there is none. Nearest first, the
+    lower cell on a tie."""
+    grid = router.grid
+    port, out = np.asarray(port, float), np.asarray(out, float)
+    reach = _PUSH[-1]
+    c0 = grid.cell(port)
+    n = int(math.ceil(reach / grid.res)) + 1
+    found = []
+    for dx in range(-n, n + 1):
+        for dy in range(-n, n + 1):
+            c = (c0[0] + dx, c0[1] + dy)
+            if not grid.free(c):
+                continue
+            v = np.subtract(grid.center(c), port)
+            d = float(np.hypot(*v))
+            if d <= reach and float(v @ out) > 0:
+                found.append((round(d, 6), c))
+    for _, c in sorted(found):
+        q = tuple(float(x) for x in grid.center(c))
+        if _clear([tuple(port), q], (own,), *router.elements, own_body=True):
+            return np.array(q)
+    return None
+
+
 def _gap(router: _Router, g, a, b) -> NAPath:
     """A cropped gap from one strand piece's 3' end to the next one's 5' end: routed, dashed and (unless short)
     labelled with the number of nucleotides left out. An end no stem holds (a trace's: a strand drawn along its
@@ -412,6 +463,8 @@ def _gap(router: _Router, g, a, b) -> NAPath:
     route, _ = router.route(pa, ea, own_a, pb, eb, own_b, own_body=True)
     if route is None:  # an end in another element's clearance margin
         route, _ = router.route(pa, ea, own_a, pb, eb, own_b, own_body=True, loose=True)
+    if route is None:  # an end whose way straight out lies in a neighbour's margin all along: from beside it
+        route = _from_beside(router, (pa, ea, own_a), (pb, eb, own_b))
     if route is None:  # no way on the grid: a curve leaving and entering along the ends, or a bow either side
         chord = math.dist(pa, pb)
         shapes = [_xy(_curve(pa, ea, pb, eb))]
