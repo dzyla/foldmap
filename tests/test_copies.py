@@ -362,3 +362,24 @@ def test_the_pieces_of_a_copy_cut_in_two_move_as_one():
     got = figcheck.copies_alike(_laid_out(r100_entry("7QUP"), focus="none"))
     bad = {f"{a}~{b}": round(v, 3) for (a, b), v in got.items() if v > ALIKE and a not in ("7D", "13D")}
     assert len(got) == 60 and not bad, bad
+
+
+@pytest.mark.parametrize(
+    "entry, view, ties",
+    [("9P1X", {"focus": "none"}, 20), ("7QUP", {"focus": "none"}, 60), ("6JLN", {}, 19)],
+    ids=["9P1X-focus", "7QUP-focus", "6JLN-default"],
+)
+def test_copies_whose_elements_are_grouped_apart_are_drawn_alike(entry, view, ties):
+    """Random-100 C2b-3 A15, cause B: DSSP joins and cuts the copies' sheets differently, so a copy's elements sit in
+    items that differ from its mate's, and were tied in part or not at all. 9P1X: J's four strands and E:106-109 are
+    a sheet of their own in protomer 0, one sheet with O, P and R in protomer 1 (Y~E 16.9, d~J 12.3); C's two strands
+    share too few residues with V's for an item tie (C~V 10.0). 7QUP: 7D's sheet holds a strand 1D's lacks (7D~1D
+    32.5). 6JLN: B:336-340 and B:430-433 are a sheet of their own, b's are in b's sheet (b~B 3.8); E's helices are
+    bundled with R, a chain with no copy (e~E 18.3). A copy's matched elements are grouped as its mate's are
+    (_regroup_copies), each group tied to the mate's item, so every copy is drawn alike."""
+    from helpers import r100_entry
+
+    d = _laid_out(r100_entry(entry), **view)
+    got = figcheck.copies_alike(d)
+    bad = {f"{a}~{b}": round(v, 3) for (a, b), v in got.items() if v > ALIKE}
+    assert len(got) + len(figcheck.copies_not_judged(d)) == ties and not bad, bad

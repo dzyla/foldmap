@@ -289,6 +289,8 @@ class Layout:
     )  # (copy, mate) helix ids of mirror-image protomers
     tied_ids: set[str] = field(default_factory=set)  # ids of the elements of every item a symmetry tie holds, copy
     # and mate alike (a sheet block among them is drawn as its mate is: figcheck.shared_sheet_elements)
+    kink_links: set[tuple[str, str]] = field(default_factory=set)  # consecutive helix pieces of a copy whose mates
+    # are a kink (features.KINK_GAP): drawn as their mates, their loop is a kink link too (_regroup_copies, route)
     font_scale: float = 1.0  # Style.font_scale the figure is drawn with (texts placed in the layout are sized by it)
     loop_stroke: float = 1.0  # a loop's drawn stroke in line_pt: Style.loop_width, RUN_EDGE_W times it under
     # residue colours (its dark edge); for line_band
@@ -2482,6 +2484,165 @@ def _symmetry_ties(
     return ties
 
 
+def _regroup_copies(
+    items: list[_Item], ties: dict[int, tuple[int, int]], frame, shift: dict[str, int], keep: set[int]
+) -> tuple[dict[int, tuple[int, int]], set[tuple[str, str]]]:
+    """A copy's elements grouped into items as its protomer-0 mate's are, where _symmetry_ties could not tie them
+    item to item: DSSP joined or cut the copies' sheets differently (9P1X: J's strands a sheet of their own in
+    protomer 0, one with O, P and R in protomer 1; G's sheet closed into a barrel, a's not), a sheet holds a strand
+    its mate's lacks (7QUP 7D), or the elements share too few residues for an item tie (9P1X C's strands);
+    random-100 C2b-3 A15. Elements are paired by model.pair_places (the same kind at the same place, residue numbers
+    taken to the first copy's by `shift`), in the order the figure holds them, as figcheck.copies_alike pairs them,
+    chain to chain of one class (one chain of the class in each protomer). A copy item is clean when it is tied to
+    the item holding its paired elements' mates, holds every element paired with that item's, and each sits at its
+    mate's offset with its shape (_symmetry_ties may pair them otherwise, or leave them where they were). The copy
+    items holding paired elements that are not clean are dissolved, and their paired elements regrouped, one item
+    per mate item, at the mate's offsets with its shape, tied to it. The elements no mate's pairs with stay together
+    where they were, untied; a dissolved item's ghosts go. Consecutive helix pieces whose mates are a kink (at most
+    features.KINK_GAP apart) while they are not are returned as kink links (Layout.kink_links: their loop is drawn
+    as their mates', 6JLN e:10-13 and e:17-39 three residues apart). Items with elements of several protomers, the
+    βα rows (`keep`, by id) and the copies of a mirror are left as they are. Returns the ties and the kink links,
+    `items` changed in place (dissolved items dropped, new ones appended)."""
+    sector, classes = getattr(frame, "sector", None) or {}, getattr(frame, "classes", None) or {}
+    if not sector or not classes:
+        return ties, set()
+
+    def plain(it: _Item, ks: set) -> bool:  # every element (ghosts aside) in protomers ks (None: outside every one)
+        return (
+            all(isinstance(m, Placed) for m in it.members)
+            and {sector.get(m.sse.chain) for m in it.members if not m.ghost} <= ks
+        )
+
+    def at(members: list, m) -> int:  # the index of member m itself (equal members are not it)
+        return next(q for q, x in enumerate(members) if x is m)
+
+    owner = {id(m): i for i, it in enumerate(items) for m in it.members}
+    chains: dict[tuple[int, int], list[str]] = {}  # (protomer, class) -> its chains
+    for c in sorted(sector):
+        if c in classes:
+            chains.setdefault((sector[c], classes[c]), []).append(c)
+    roots = [
+        i
+        for i, it in enumerate(items)
+        if plain(it, {0, None}) and any(sector.get(m.sse.chain) == 0 for m in it.members)
+    ]
+    root_set = set(roots)
+    ties = dict(ties)
+    drop: set[int] = set()
+    new: list[tuple[_Item, int, int]] = []  # (item, mate, protomer)
+    left: list[_Item] = []  # what dissolved items held that no mate's element pairs with
+    kinks: set[tuple[str, str]] = set()
+    for k in sorted({v for v in sector.values() if v > 0}):
+        copies = {i for i, it in enumerate(items) if plain(it, {k})}
+        mate: dict[int, Placed] = {}  # id of a copy element -> its protomer-0 element
+        for (p, cls), mine in sorted(chains.items()):
+            if p != k or len(mine) != 1 or len(chains.get((0, cls), [])) != 1:
+                continue
+            c0, ck = chains[(0, cls)][0], mine[0]
+
+            def elements(chain: str, pool: set[int]) -> list[Placed]:  # in the order the figure holds them, as
+                # figcheck._copy_pairs pairs them (lay.placed: item by item), which breaks ties between overlaps
+                return [m for i in sorted(pool) for m in items[i].members if m.sse.chain == chain and not m.ghost]
+
+            xs, ys = elements(c0, root_set), elements(ck, copies)
+
+            def place(m: Placed) -> tuple[str, int, int]:
+                off = shift.get(m.sse.chain, 0)
+                return m.sse.kind, m.sse.first.seq - off, m.sse.last.seq - off
+
+            for a, b in pair_places([place(m) for m in xs], [place(m) for m in ys]).items():
+                mate[id(ys[b])] = xs[a]
+            helices = sorted((m for m in ys if m.sse.kind == "H" and id(m) in mate), key=lambda m: m.sse.start)
+            for a, b in zip(helices, helices[1:]):  # drawn as their mates, a kink of the mate's is a kink here too
+                ma, mb = mate[id(a)].sse, mate[id(b)].sse
+                if 0 <= mb.start - ma.end - 1 <= KINK_GAP and b.sse.start - a.sse.end - 1 > KINK_GAP:
+                    kinks.add((a.sse.id, b.sse.id))
+
+        def at_mates(it: _Item, mine: _Item, mate: dict[int, Placed] = mate) -> bool:  # each paired element at its
+            # mate's offset, with its shape
+            return all(
+                it.offsets[p] == mine.offsets[q] and (m.angle, m.length) == (x.angle, x.length)
+                for p, m in enumerate(it.members)
+                if id(m) in mate
+                for q, x in enumerate(mine.members)
+                if x is mate[id(m)]
+            )
+
+        held: dict[int, set[int]] = {}  # mate item -> copy items holding its elements' pairs
+        for i in sorted(copies):
+            for m in items[i].members:
+                if id(m) in mate:
+                    held.setdefault(owner[id(mate[id(m)])], set()).add(i)
+        dirty = set()
+        for i in sorted(copies):
+            got = {owner[id(mate[id(m)])] for m in items[i].members if id(m) in mate}
+            if not got:  # tied to an item whose elements others pair with, it took the place of one of them (9P1X
+                # U:227-229 on U:231-237, both under A:226-236)
+                if i in ties and ties[i][0] in held and ties[i][1] == k:
+                    dirty.add(i)
+                continue
+            (r,) = got if len(got) == 1 else (None,)
+            if r is None or held[r] != {i} or ties.get(i) != (r, k) or not at_mates(items[i], items[r]):
+                dirty.add(i)
+        grown = True
+        while grown:  # a mate item's other holders are regrouped too, and theirs in turn
+            more = {i for held_by in held.values() if held_by & dirty for i in held_by}
+            grown, dirty = bool(more - dirty), dirty | more
+        locked = {i for i in dirty if id(items[i]) in keep}  # a βα row (`keep`) is never dissolved: what shares a
+        while locked:  # mate with one stays as it is, and so on
+            more = {i for held_by in held.values() if held_by & locked for i in held_by} - locked
+            dirty, locked = dirty - more, locked | more if more else set()
+        dirty = {i for i in dirty if id(items[i]) not in keep}
+        if not dirty:
+            continue
+        groups: dict[int, list[tuple[Placed, tuple[float, float]]]] = {}
+        for i in sorted(dirty):
+            it = items[i]
+            to = {p: owner[id(mate[id(m)])] for p, m in enumerate(it.members) if id(m) in mate}
+            for p, r in to.items():
+                q = at(items[r].members, mate[id(it.members[p])])
+                it.members[p].angle, it.members[p].length = items[r].members[q].angle, items[r].members[q].length
+                groups.setdefault(r, []).append((it.members[p], items[r].offsets[q]))
+            rest = [p for p, m in enumerate(it.members) if p not in to and not m.ghost]  # a ghost (a barrel closed in
+            # this copy only, 9P1X G's sheet) is drawn as the mate is: not at all
+            if rest:  # what the mate lacks stays together where it was, untied (placed among its mates' copies,
+                # it would meet them: 9P1X I:29-30 over I's A)
+                mine_m = [it.members[p] for p in rest]
+                left.append(
+                    _Item(
+                        mine_m, [it.offsets[p] for p in rest], it.cx, it.cy, it.home, *_anchor([m.sse for m in mine_m])
+                    )
+                )
+        drop |= dirty
+        for r, got in sorted(groups.items()):
+            mates = items[r].members
+            got.sort(key=lambda x: (at(mates, mate[id(x[0])]) if id(x[0]) in mate else len(mates), x[0].sse.start))
+            mine_m = [m for m, _ in got]
+            new.append(
+                (
+                    _Item(
+                        mine_m,
+                        [o for _, o in got],
+                        items[r].cx,
+                        items[r].cy,
+                        items[r].home,
+                        *_anchor([m.sse for m in mine_m]),
+                    ),
+                    r,
+                    k,
+                )
+            )
+    if not new:
+        return ties, kinks
+    kept = [i for i in range(len(items)) if i not in drop]
+    index = {old: n for n, old in enumerate(kept)}
+    out = {index[i]: (index[j], k) for i, (j, k) in sorted(ties.items()) if i in index}
+    items[:] = [items[i] for i in kept] + [it for it, _, _ in new] + left
+    for n, (_, r, k) in enumerate(new):
+        out[len(kept) + n] = (index[r], k)
+    return dict(sorted(out.items())), kinks
+
+
 def _part_mate(it: _Item, k: int, zero: list[int], items: list[_Item], mine: set, sets: list[set], span) -> int | None:
     """The protomer-0 item whose elements hold each of this copy's elements, one each, or the other way round (DSSP
     missed a strand in one copy), sharing at least half the smaller one's residues; the most shared first."""
@@ -2834,9 +2995,9 @@ def build_layout(
     cross the band where the membrane is; the rest moves round them (_separate). `band` (page y of the membrane's
     two faces as projected): a lone transmembrane helix drawn wholly between them (a tilted helix drawn upright at
     its length is shorter than the slab it crosses) is moved, the least way, until one end meets a face.
-    `alike_first`: the copies the symmetry ties may be drawn alike in up to _SEP_TIE_ROOM (_separate's second chance,
-    _tied_again), random-100 C2b-3; cli turns it off in a membrane view, where the transmembrane helices' heights
-    are judged instead (C17)."""
+    `alike_first`: a copy's elements are grouped as its mate's (_regroup_copies) and the copies the symmetry ties may
+    be drawn alike in up to _SEP_TIE_ROOM (_separate's second chance, _tied_again), random-100 C2b-3; cli turns it
+    off in a membrane view, where the transmembrane helices' heights are judged instead (C17)."""
     if mode not in ("projected", "stack"):
         raise ValueError(f"unknown layout mode {mode!r}")
     style = style or Style()
@@ -2929,11 +3090,15 @@ def build_layout(
     mirrored: list[tuple] = []  # (copy, mate) members of protomers drawn as mirror images
     copy_ties: dict[str, tuple[str, bool]] = {}
     tied_ids: set[str] = set()
+    kink_links: set[tuple[str, str]] = set()
     if mode == "stack":
         rows = _stack(items, keep_depth)
         _centre_dna_over_binders(items, contacts)
     else:
-        ties = _symmetry_ties(items, frame, mirror is not None, {c: off for c, (_, off) in (copies or {}).items()})
+        shift = {c: off for c, (_, off) in (copies or {}).items()}
+        ties = _symmetry_ties(items, frame, mirror is not None, shift)
+        if alike_first and mirror is None and not pieces and walls is None:  # (no stem or trace indexes items yet)
+            ties, kink_links = _regroup_copies(items, ties, frame, shift, {id(it) for it in templates.values()})
         sector_of = getattr(frame, "sector", None) or {}
         left = _unwrap(items, ties, frame) if mirror is None else {}
         if left and walls is not None:  # an element that left its item keeps off the traces it kept off
@@ -3053,6 +3218,7 @@ def build_layout(
     lay.frame = frame
     lay.copy_ties = copy_ties
     lay.tied_ids = tied_ids
+    lay.kink_links = kink_links
     lay.mirror_pairs = [(a.sse.id, b.sse.id) for a, b in mirrored if isinstance(a, Placed) and a.sse.kind in ("H", "G")]
     lay.font_scale = style.font_scale
     lay.loop_stroke = style.loop_width * (RUN_EDGE_W if style.loop_color == "residue" else 1.0)

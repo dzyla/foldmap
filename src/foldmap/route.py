@@ -683,7 +683,9 @@ def route_loops(layout: Layout, sses: list[SSE], bb) -> list[Loop]:
         pa, pb = layout.placed[a.id], layout.placed[b.id]
         gap = np.subtract(pb.n_port, pa.c_port)
         # a kink is drawn straight with no grid clearance, so it clears by the full _INFLATE (drawn routes use _TOUCH)
-        if b.start - a.end - 1 <= KINK_GAP and np.hypot(*gap) < 1.5 and gap @ pa.exit_c > 0:
+        kinked = b.start - a.end - 1 <= KINK_GAP or (a.id, b.id) in getattr(layout, "kink_links", ())  # a copy's
+        # pieces drawn as their mates', a kink there (layout._regroup_copies)
+        if kinked and np.hypot(*gap) < 1.5 and gap @ pa.exit_c > 0:
             if _clear(  # and labels
                 [pa.c_port, pb.n_port],
                 (pa, pb),
