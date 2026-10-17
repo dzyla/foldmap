@@ -2923,3 +2923,16 @@ def test_a_crowded_tie_label_takes_the_spot_fewest_lines_cross():
 
     d = draw_spec(figure_spec(r100_entry("8VWQ")))
     assert [h for h in figcheck.text_collisions(d) if h.startswith("na:tie:")] == []
+
+
+def test_a_strand_end_label_another_strands_run_crosses_moves_round_its_end():
+    """Random-100 C2b-6 L (7Y7C: the 3' label of X:37-49 under run A:652-653): a strand end's label is moved round its
+    end once the runs are drawn only when it lay nearer another nucleotide than its own; a run of another strand
+    drawn through it left it there. It now moves as well when another strand's line runs through it
+    (route_na._own_ends), to the first turn where its own end is nearest and it has room."""
+    from foldmap import figcheck
+    from foldmap.spec import draw_spec, figure_spec
+    from helpers import r100_entry
+
+    d = draw_spec(figure_spec(r100_entry("7Y7C")))
+    assert [h for h in figcheck.text_collisions(d) if h.startswith("na:end:")] == []

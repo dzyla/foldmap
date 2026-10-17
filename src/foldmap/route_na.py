@@ -11,7 +11,18 @@ import math
 
 import numpy as np
 
-from .layout import _GLYPH_W, NT_ROW, NT_STEP, Layout, glyph, label_boxes, stem_keep_box
+from .layout import (
+    _GLYPH_W,
+    NT_ROW,
+    NT_STEP,
+    Layout,
+    _run_band,
+    glyph,
+    label_boxes,
+    lines_meeting,
+    segments_of,
+    stem_keep_box,
+)
 from .na_ends import SHORT_GAP, _face_label, _gap, _label_room, _tail, _trace_clear
 from .na_labels import _label_gaps, _place_letters, _ties, _unbunch, _widen
 from .na_paths import (
@@ -69,7 +80,7 @@ _END_FINE = tuple(  # every 5° between those, the least turn first, when none o
 _END_REACH = (1.0, 1.4, 1.8)  # times the label's distance from its end: the same first, then further out
 
 
-def _own_ends(router, layout: Layout, fixed: dict, at: dict, ends: list, gapped: set) -> list:
+def _own_ends(router, layout: Layout, fixed: dict, at: dict, ends: list, gapped: set, lines=()) -> list:
     """The strands' end labels once every free end is drawn (fix round 1, review Q6: 9CJI's 3' end, drawn after the
     5' label was placed, started beside that label, so "5′" read as naming it): a label of a free end that lies
     nearer another drawn nucleotide (a free end's, a hairpin loop's, a stem's rail) than its own end nucleotide moves
@@ -77,7 +88,9 @@ def _own_ends(router, layout: Layout, fixed: dict, at: dict, ends: list, gapped:
     where its own end is the nearest and it has room (_label_room), else at the next distance out (_END_REACH; plan 12:
     30QM's 3' end, laid out anew once its sheets' branch strands moved, between nucleotides 103, 104 and 119, has room
     only about 100° round); else it stays. Run once the free ends and hairpin loops are drawn (`fixed`), and again
-    with the runs (30QM's 3' label lay 0.61 from a run's nucleotide, 1.1 from its own end)."""
+    with the runs (30QM's 3' label lay 0.61 from a run's nucleotide, 1.1 from its own end), when a label another
+    strand's drawn line (`lines`: (strand, points) of the runs) runs through, as figcheck's A6 reads a line by a text,
+    moves the same way (random-100 C2b-6: 7Y7C's 3' end of X:37-49 under run A:652-653)."""
     pts = [
         (key, np.asarray(xy, float)) for p in fixed.values() for key, xy in zip(((p.strand, k) for k in p.nts), p.nt_xy)
     ]
@@ -87,6 +100,16 @@ def _own_ends(router, layout: Layout, fixed: dict, at: dict, ends: list, gapped:
     def nearest(xy):
         return min(pts, key=lambda kp: (float(np.hypot(*(kp[1] - xy))), kp[0]))[0] if pts else None
 
+    gh = glyph(layout)[1] / 2 + 0.05  # an end label's box, as routes keep off it
+    band = _run_band(layout)
+    every = segments_of([q for _, q in lines])
+    segs = {s: segments_of([q for t, q in lines if t != s]) for s in sorted({t for t, _ in lines})}
+
+    def crossed(s: int, xy) -> bool:  # another strand's line through the label at xy
+        other = segs.get(s, every)
+        box = (xy[0] - gh, xy[1] - gh, xy[0] + gh, xy[1] + gh)
+        return bool(len(other)) and bool(lines_meeting(box, other, band).any())
+
     out = []
     for s, e, xy in ends:
         path = tails.get((s, e))
@@ -95,7 +118,7 @@ def _own_ends(router, layout: Layout, fixed: dict, at: dict, ends: list, gapped:
             continue
         own = (s, path.nts[0] if e == "5′" else path.nts[-1])
         end_xy = np.asarray(path.nt_xy[0] if e == "5′" else path.nt_xy[-1], float)
-        if nearest(np.asarray(xy, float)) == own:
+        if nearest(np.asarray(xy, float)) == own and not crossed(s, xy):
             out.append((s, e, xy))
             continue
         v = np.subtract(xy, end_xy)
@@ -105,7 +128,7 @@ def _own_ends(router, layout: Layout, fixed: dict, at: dict, ends: list, gapped:
         for reach, turn in ((k, t) for k in _END_REACH for t in (*_END_TURNS, *_END_FINE)):
             c, n = math.cos(turn), math.sin(turn)
             spot = end_xy + reach * np.array([v[0] * c - v[1] * n, v[0] * n + v[1] * c])
-            if r > 0 and nearest(spot) == own and _label_room(router, layout, spot, others):
+            if r > 0 and nearest(spot) == own and _label_room(router, layout, spot, others) and not crossed(s, spot):
                 moved = (float(spot[0]), float(spot[1]))
                 break
         out.append((s, e, moved))
@@ -244,7 +267,8 @@ def route_nucleic(layout: Layout, router: _Router | None = None, loops=()) -> li
         strands.add(among(p, at), frozenset((da.id, db.id)) if p.kind == "joint" else None)
         _use(router.grid, among(p, at), beside)
     out = [p for _, p in sorted({**fixed, **routed}.items())]
-    ends = _own_ends(router, layout, {**fixed, **routed}, at, ends, gapped)  # again, the runs drawn too
+    lines = [(p.strand, p.points) for _, p in sorted(routed.items())]
+    ends = _own_ends(router, layout, {**fixed, **routed}, at, ends, gapped, lines)  # again, the runs drawn too
     for g in na.gaps:  # cropped away: the 3' end of one piece to the 5' end of the next, dashed
         a, b = exits.get((g.before, len(na.strands[g.before]) - 1)), exits.get((g.after, 0))
         if a is not None and b is not None:
