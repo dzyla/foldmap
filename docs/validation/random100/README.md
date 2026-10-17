@@ -29,7 +29,8 @@ the file.
 Each entry is drawn in every view that applies (default, `--names deposited`, `--names beta`, focus,
 `--domains auto`, `--membrane auto` for membrane proteins, `PYTHONHASHSEED=1`, a saved layout redrawn, the
 interactive page, the sequence plot and the app's hosted job), each view in its own process, and judged on the
-criteria A1-A20 of the plan with the limits in `scripts/random100.py: LIMITS`. Written here:
+criteria A1-A20 of the plan with the limits in `src/foldmap/criteria.py: LIMITS` (`foldmap check` judges one figure
+by the same criteria). Written here:
 
 - `report.md` and `report.json` (committed): the pass count, a table per stratum and per entry, what failed, the
   statistics reported but not gated, the limits, versions, the foldmap commit and the SHA-256 of `sample.json`;

@@ -13,6 +13,8 @@ from pathlib import Path
 
 import pytest
 
+from foldmap import criteria
+
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "scripts" / "random100.py"
 DATA = Path(__file__).parent / "data"
@@ -336,8 +338,8 @@ def test_stem_gap_limit_is_the_margin_in_page_units(r100):
     letter = next(t for t in ax.texts if (t.get_gid() or "").startswith("na:nt:"))
     px_per_unit = ax.transData.transform((1, 0))[0] - ax.transData.transform((0, 0))[0]
     em = letter.get_fontsize() / 0.75 * d.figure.dpi / 72 / px_per_unit
-    assert r100.stem_gap_limit(d.figure) == pytest.approx(figcheck.stem_gap_tolerance(_INK_MARGIN * em))
-    assert 0.3 < r100.stem_gap_limit(d.figure) < 1.0
+    assert criteria.stem_gap_limit(d.figure) == pytest.approx(figcheck.stem_gap_tolerance(_INK_MARGIN * em))
+    assert 0.3 < criteria.stem_gap_limit(d.figure) < 1.0
 
 
 def test_tether_lengths_are_measured_from_mark_to_target(r100):
@@ -347,7 +349,7 @@ def test_tether_lengths_are_measured_from_mark_to_target(r100):
     from foldmap.style import Style
 
     d = draw_spec(figure_spec(DATA / "fidelity" / "1MBN.cif.gz"))
-    got = r100.tether_lengths(d, Style())
+    got = criteria.tether_lengths(d, Style())
     assert len(got) == 6 and all(g.startswith("ligand-tether:") for g, *_ in got)
     assert max(n for _, n, _, _ in got) == pytest.approx(6.06, abs=0.01)
 
@@ -360,7 +362,7 @@ def test_a20_gates_only_tethers_to_other_chains(r100):
     from foldmap.style import Style
 
     d = draw_spec(figure_spec(DATA / "fidelity" / "1MBN.cif.gz"))
-    got = r100.tether_lengths(d, Style())
+    got = criteria.tether_lengths(d, Style())
     assert got and all(home == target == "A" for _, _, home, target in got)
     view = {"exit": 0, "timed_out": False, "traceback": False, "python_warnings": [], "written": {}, "seconds": 1.0}
 
@@ -600,7 +602,7 @@ def test_stem_gap_limit_reads_a_block_name_at_its_own_size(r100):
     label = next(t for t in ax.texts if (t.get_gid() or "").startswith("label:"))  # drawn at one em
     px = ax.transData.transform((1, 0))[0] - ax.transData.transform((0, 0))[0]
     em = label.get_fontsize() * d.figure.dpi / 72 / px
-    assert r100.stem_gap_limit(d.figure) == pytest.approx(figcheck.stem_gap_tolerance(_INK_MARGIN * em))
+    assert criteria.stem_gap_limit(d.figure) == pytest.approx(figcheck.stem_gap_tolerance(_INK_MARGIN * em))
 
 
 def test_a_chain_with_nothing_to_draw_does_not_widen_the_focus_view(r100):
@@ -649,7 +651,7 @@ def test_a18_tm_helix_passes_when_it_reaches_both_leaflets(r100):
 
     path = DATA / "1C3W.cif"
     d = draw_spec(figure_spec(path, membrane="auto", assembly="asu"))
-    m = r100.membrane_checks(d, path)
+    m = criteria.membrane_checks(d, path)
     assert m["band"] and m["tm_helices"] == 5 and m["tm_short"] == [], m
     lay = d.layout
     (y0, y1), mid = lay.membrane["y"], sum(lay.membrane["y"]) / 2
@@ -657,14 +659,14 @@ def test_a18_tm_helix_passes_when_it_reaches_both_leaflets(r100):
     p = lay.placed[hid]
     half = abs(p.c_port[1] - p.n_port[1]) / 2
     lay.placed[hid] = replace(p, cy=y0 + 0.7 * (y1 - y0) - half)  # crosses the lower face, ends at 0.70: spans
-    assert r100.membrane_checks(d, path)["tm_short"] == []
+    assert criteria.membrane_checks(d, path)["tm_short"] == []
     lay.placed[hid] = replace(p, cy=mid - 0.05 - half)  # crosses the lower face, ends short of the middle
-    assert [x.split()[0] for x in r100.membrane_checks(d, path)["tm_short"]] == [hid]
+    assert [x.split()[0] for x in criteria.membrane_checks(d, path)["tm_short"]] == [hid]
     lay.placed[hid] = replace(p, cy=mid + 0.05 + half)  # the upper leaflet only
-    assert [x.split()[0] for x in r100.membrane_checks(d, path)["tm_short"]] == [hid]
+    assert [x.split()[0] for x in criteria.membrane_checks(d, path)["tm_short"]] == [hid]
     short = (y1 - y0) / 3  # a short helix centred in the band, entering it through neither face (fix round 1)
     lay.placed[hid] = replace(p, cy=mid, length=short * abs(p.length) / max(2 * half, 1e-9))
-    assert [x.split()[0] for x in r100.membrane_checks(d, path)["tm_short"]] == [hid]
+    assert [x.split()[0] for x in criteria.membrane_checks(d, path)["tm_short"]] == [hid]
 
 
 def test_a18_a_run_into_a_port_just_inside_the_band_is_at_that_port(r100):
@@ -681,7 +683,7 @@ def test_a18_a_run_into_a_port_just_inside_the_band_is_at_that_port(r100):
     run = [(-30.0, y0 - 1.0), (-30.0, y0 + 0.6), (-27.0, y0 + 0.6)]
     d.loops.append(Loop("p:1-2", "p:3-4", [*run, (-27.0, y0 + 0.2)], False, False))  # into a port 0.2 inside
     d.loops.append(Loop("q:1-2", "q:3-4", [*run, (-27.0, y0 - 1.0)], False, False))  # back out below the face
-    assert r100.membrane_checks(d, path)["loops_in_slab"] == ["q:1-2>q:3-4"]
+    assert criteria.membrane_checks(d, path)["loops_in_slab"] == ["q:1-2>q:3-4"]
 
 
 def test_science_checks_are_reported_apart_from_the_criteria(r100, tmp_path):

@@ -1073,8 +1073,8 @@ def build_parser() -> argparse.ArgumentParser:
     )
     kq = sub.add_parser(
         "check",
-        help="check the science of the figure against the coordinates: sheet neighbours, barrel closure and strand "
-        "count, strands drawn beside their partner (exit 1 on a problem)",
+        help="check the figure: its science against the coordinates (sheet neighbours, barrel closure and strand "
+        "count, strands drawn beside their partner) and its page (criteria A1-A20; exit 1 on a problem)",
         description="Draw the figure as `plot` would and check what it says about the structure against the "
         "coordinates, apart from how the page looks: S1, two strands drawn side by side in a sheet (adjacent "
         "columns, level) are joined by a bridge, and two in one column (collinear) never overlap; S2, a barrel's "
@@ -1082,8 +1082,13 @@ def build_parser() -> argparse.ArgumentParser:
         "holds a ring of 5 or more; S6, a strand off a sheet's run of paired strands stands beside its partner, "
         "level with it, or its pairing is named in the notes. S4, a linked residue's star stands at its "
         "residue (linked-residue stars only: not ligand tethers, glycans, disulfide ends or UniProt marks); S5 "
-        "(automatic domains) is not measured here. "
-        "Prints one line per check and one per problem; exits 1 on a problem, 0 otherwise.",
+        "(automatic domains) is not measured here. Then the figure criteria A1-A20 the random-100 campaign judges "
+        "every figure by, with the same limits: route fallbacks, loops over labels, overlapping elements, text "
+        "collisions, text off the page, repeated labels, chains left out without a note, N->C and sheet order, "
+        "copies drawn alike, domains (with --domains), membrane (with --membrane), ligand tethers. Those that need "
+        "more than one drawing or a tool foldmap does not use (process exit and time, the app, mkdssp, a second "
+        "seed, a saved-layout round trip, RNApolis, a two-state partner) are named 'not measured here' with the "
+        "reason. Prints one line per check and one per problem; exits 1 on a problem, 0 otherwise.",
     )
     for cmd in (q, iq, cq, kq):
         q = cmd
@@ -1363,19 +1368,22 @@ def _cmd_contacts(args: argparse.Namespace) -> int:
 
 
 def _cmd_check(args: argparse.Namespace) -> int:
-    """Draw the figure `plot` would and print its science checks (figcheck.science_checks): one line per check, one
-    per problem. Exit 1 when any check found a problem."""
-    from . import figcheck
+    """Draw the figure `plot` would and print its science checks (figcheck.science_checks), one line per check and
+    one per problem, then its figure criteria A1-A20 (criteria.check_figure), one line per criterion and its detail.
+    Exit 1 when any check found a problem or any criterion judged here fails."""
+    from .criteria import check_figure, criteria_lines
     from .science import science_lines
 
-    drawn = draw_spec(_spec_of(args))
+    spec = _spec_of(args)
+    drawn = draw_spec(spec)
     print(provenance_block(drawn.provenance), file=sys.stderr, end="")
     for out in args.output:
         print(f"wrote {save(drawn.figure, out)}")
-    found = figcheck.science_checks(drawn)
-    for line in science_lines(found):
+    found = check_figure(drawn, spec, args.structure)
+    for line in science_lines(found["science"]) + criteria_lines(found["criteria"]):
         print(line)
-    return 1 if any(found.values()) else 0
+    failed = any(c["pass"] is False for c in found["criteria"].values())
+    return 1 if any(found["science"].values()) or failed else 0
 
 
 def contact_problems(report) -> list[str]:

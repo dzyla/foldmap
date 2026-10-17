@@ -169,7 +169,7 @@ foldmap sequence 1UBQ -o seq.svg --columns 50     # sequence with secondary stru
 foldmap sequence 1UBQ -o aln.svg --msa family.fasta
 foldmap interactive 8UTF -o explorer.html         # linked topology / 3D / contact map
 foldmap contacts 1LMB                             # check the contact beads against the atoms
-foldmap check 9FWZ                                # check the figure's sheets against the bridges
+foldmap check 9FWZ                                # check the figure's science and page (S1-S6, A1-A20)
 foldmap app                                       # the Streamlit app
 foldmap styles                                    # every theme and style key
 ```
@@ -424,6 +424,17 @@ partner, level with it, or the notes name the pairing ("x:67-68 also pairs with 
 drawn figure; it judges only linked-residue stars, not ligand tethers, glycans, disulfide ends or UniProt site marks,
 and `foldmap summary` (which draws no marks) reports it not measured. S5 (automatic domains against a reference) is
 measured only in the campaign. `foldmap summary` prints the same checks of the sheets as built.
+
+Under them `foldmap check` prints the figure criteria A1-A20, the page checks the random-100 campaign judges every
+figure by, with the same limits (`src/foldmap/criteria.py`): no route fallbacks (A3) or loops over labels (A4), no
+overlapping elements (A5), no text collisions (A6) or text off the page (A7), labels unique per chain (A8), nothing
+left out without a note (A9), N→C and sheet order (A11), copies drawn alike (A15), domains with `--domains` (A16),
+the membrane band with `--membrane` (A18) and local ligand tethers (A20); each line reads pass or fail with what
+failed, or "does not apply". The criteria that need more than this one drawing or a tool foldmap does not use (the
+process's exit and time, the app's hosted job, mkdssp, a second hash seed, a saved-layout round trip, RNApolis base
+pairs, a two-state partner) read "not measured here" with the reason, as do the text checks when the text is not
+set in the font they are calibrated on (Liberation Sans); they are never counted as passing. A failed criterion
+also exits 1.
 
 **Checking the contact beads.** `foldmap contacts 1LMB.cif` draws the figure `plot` would (it takes the same options),
 checks every contact bead against the deposited atoms with an independent search, and prints how many beads were
