@@ -688,12 +688,58 @@ def test_science_checks_are_reported_apart_from_the_criteria(r100, tmp_path):
     found = {"S1": ["sheet 0: a | b drawn side by side with no bridge"], "S2": [], "S3": [], "S4": None, "S5": None}
     e = {"id": "1ABC", "name": "1ABC", "views": {"default": {"result": {"science": found}}}, "criteria": crit}
     e = r100._verdict(e)
-    assert e["pass"] and r100.science(e)["S1"] == {"pass": False, "detail": found["S1"][0]}
+    assert e["pass"] and r100.science(e)["S1"] == {"pass": False, "detail": "default: " + found["S1"][0]}
     assert r100.science(e)["S4"]["pass"] is None
     r100.report([e], tmp_path, None, total=1)
     md = (tmp_path / "report.md").read_text(encoding="utf-8")
     assert "1 of 1 pass." in md and "## Science checks (S1-S6), apart from A1-A20" in md
-    assert "| S1 sheet neighbours pair | 0 | 1 | 0 |" in md and "S1: sheet 0: a / b drawn side by side" in md
+    assert "| S1 sheet neighbours pair | 0 | 1 | 0 |" in md and "default: S1 sheet 0: a / b drawn side by side" in md
+
+
+def test_science_checks_run_in_every_drawn_view(r100, tmp_path):
+    """Batch C2b-S: the science checks run on every drawn view (default, deposited, beta, focus, domains, membrane,
+    and the app's figure), not the default view alone: the code that ties, regroups and shares copies' sheets is
+    drawn only in some views (9P1X focus). An entry fails S_k when any view has a finding; each finding names its
+    view; report.md adds a breakdown per view. S5 stays once per entry (chain-level, against CATH)."""
+    from foldmap.spec import draw_spec, figure_spec
+
+    clean = {"S1": [], "S2": [], "S3": [], "S4": [], "S5": None, "S6": []}
+    for view, kw in (("focus", {"focus": "A"}), ("beta", {"names": ["beta"]})):
+        spec = figure_spec(DATA / "1UBQ.cif", **kw)
+        got = r100.measure_view(view, draw_spec(spec), spec, DATA / "1UBQ.cif", "1UBQ", tmp_path)
+        assert got["science"] == clean, view
+    assert r100.app_view(DATA / "1UBQ.cif", "1UBQ")["science"] == clean
+    crit = {k: {"pass": True, "detail": ""} for k in r100.CRITERIA}
+    focus = {**clean, "S1": ["sheet 27: a | b drawn side by side with no bridge"]}
+    domains = {**clean, "S6": ["sheet 3: c drawn away from it, not beside its partner d"]}
+    views = {
+        "default": {"result": {"science": clean}},
+        "focus": {"result": {"science": focus}},
+        "domains": {"result": {"science": domains}},
+        "app": {"result": {"app": {"refused": None}, "science": clean}},
+        "seed1": {"result": {}},  # not judged for science (A12 holds it to the default view)
+    }
+    e = r100._verdict({"id": "1ABC", "name": "1ABC", "views": views, "criteria": crit})
+    s = r100.science(e)
+    assert e["pass"] and s["S1"] == {
+        "pass": False,
+        "detail": "focus: sheet 27: a | b drawn side by side with no bridge",
+    }
+    assert s["S6"]["pass"] is False and s["S6"]["detail"].startswith("domains: sheet 3: c drawn away")
+    assert s["S2"]["pass"] is True and s["S4"]["pass"] is True and s["S5"]["pass"] is None
+    assert r100.science_views(e) == {"default": {}, "focus": {"S1": 1}, "domains": {"S6": 1}, "app": {}}
+    none = r100.science({"id": "2ABC", "views": {"default": {"result": None}}})
+    assert none["S1"]["pass"] is None
+    plain = r100._verdict(
+        {"id": "1UBQ", "name": "1UBQ", "views": {"default": {"result": {"science": clean}}}, "criteria": dict(crit)}
+    )
+    r100.report([e, plain], tmp_path, None, total=2)
+    md = (tmp_path / "report.md").read_text(encoding="utf-8")
+    assert "2 of 2 pass." in md and "| S1 sheet neighbours pair | 1 | 1 | 0 |" in md
+    assert "### Science by view" in md
+    assert "| focus | 1 | 1 | 0 | 0 | 0 | 0 |" in md and "| default | 2 | 0 | 0 | 0 | 0 | 0 |" in md
+    assert "| domains | 1 | 0 | 0 | 0 | 0 | 1 |" in md
+    assert "focus: S1 sheet 27: a / b drawn side by side" in md and "domains: S6 sheet 3: c drawn away" in md
 
 
 def test_accessories_named_are_reported_per_view_and_never_gate(r100, tmp_path):

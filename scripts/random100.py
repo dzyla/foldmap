@@ -1339,8 +1339,9 @@ def measure_view(view: str, drawn, spec, path: Path, name: str, work: Path) -> d
         }
     if view == "membrane":
         out["membrane"] = membrane_checks(drawn, path)
+    if view in FIGURE_VIEWS:  # S1-S4, S6 in every drawn view, judged apart from A1-A20 (batch C2b-S)
+        out["science"] = _jsonable(figcheck.science_checks(drawn))
     if view == "default":
-        out["science"] = _jsonable(figcheck.science_checks(drawn))  # S1-S5, judged apart from A1-A20
         if lay.nucleic is not None:
             out["na"] = _jsonable(na_metrics(drawn, path))
         (work / f"{name}-trace.json").write_text(json.dumps(trace_of(drawn)), encoding="utf-8")
@@ -1361,7 +1362,29 @@ def app_view(path: Path, name: str) -> dict:
         got = app_jobs.run_job(app_jobs.draw_job, str(path), settings, lim.slow, limits=lim)
     except app_jobs.JobLimit as err:
         return {"refused": err.kind, "residues": size["residues"], "message": app_jobs.limit_message(name, err, lim)}
-    return {"refused": None, "residues": size["residues"], "svg_bytes": len(got["svg"])}
+    out = {"refused": None, "residues": size["residues"], "svg_bytes": len(got["svg"])}
+    try:
+        out["science"] = app_science(path)
+    except Exception:  # not measured, which fails the view (fail closed, as measure_view's errors)
+        import traceback
+
+        out["measure_error"] = traceback.format_exc()[-2000:]
+    return out
+
+
+def app_science(path: Path) -> dict:
+    """The science checks of the figure the app drew: the job process hands back its SVG, not the figure, so the
+    same spec (app.spec_of, the app's default settings) is drawn again here, outside the hosted limits, and
+    measured. The job's own warnings are the app view's; this measuring's are not."""
+    import warnings
+
+    from foldmap import app, figcheck
+    from foldmap.spec import draw_spec
+
+    settings = {**app.LAYOUT_DEFAULTS, "theme": "publication"}
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        return _jsonable(figcheck.science_checks(draw_spec(app.spec_of(path, settings))))
 
 
 def cmd_view(args) -> int:
@@ -1392,6 +1415,9 @@ def cmd_view(args) -> int:
         warnings.simplefilter("default")
         if args.view == "app":
             result: dict = {"app": app_view(path, args.name)}
+            for key in ("science", "measure_error"):  # judged with the other views' (science_views, A1)
+                if key in result["app"]:
+                    result[key] = result["app"].pop(key)
             code = 0
         else:
             result = {}
@@ -2125,37 +2151,84 @@ def domain_reference(path: Path, pdb: str) -> list[dict] | None:
     return [domain_score.chain_score(path, c) for c in chains] or None
 
 
-def science(e: dict) -> dict:
-    """The science checks (foldmap.science.SCIENCE) of the default view, apart from A1-A20 (never in "failed" or
-    "pass"): {"S1": {"pass": True, False or None (not measured), "detail"}, ...}."""
-    from foldmap.science import SCIENCE, domain_findings
+SCIENCE_VIEWS = (*FIGURE_VIEWS, "app")  # the views whose figure the science checks judge (batch C2b-S)
 
-    found = ((e.get("views", {}).get("default") or {}).get("result") or {}).get("science")
-    if found is not None and e.get("domains_cath"):  # S5: measured against the CATH reference
-        found = {**found, "S5": domain_findings(e["domains_cath"])}
+
+def _view_science(e: dict) -> dict[str, dict]:
+    """Each measured view's science findings ({check: [findings] or None}), in SCIENCE_VIEWS order."""
+    views = e.get("views") or {}
     out = {}
-    for key in SCIENCE:
-        got = None if found is None else found.get(key)
-        out[key] = _ok(None, "not measured") if got is None else _ok(not got, "; ".join(got))
+    for v in SCIENCE_VIEWS:
+        found = ((views.get(v) or {}).get("result") or {}).get("science")
+        if found is not None:
+            out[v] = found
     return out
 
 
+def science(e: dict) -> dict:
+    """The science checks (foldmap.science.SCIENCE) of every drawn view (SCIENCE_VIEWS), apart from A1-A20 (never in
+    "failed" or "pass"): {"S1": {"pass": True, False or None (not measured), "detail"}, ...}. A check fails when any
+    view has a finding, each named by its view ("focus: sheet 27: ..."); it is not measured when no view measured
+    it. S5 is the entry's, once (chain-level, against the CATH reference)."""
+    from foldmap.science import SCIENCE, domain_findings
+
+    per_view = _view_science(e)
+    out = {}
+    for key in SCIENCE:
+        if key == "S5":
+            got = domain_findings(e["domains_cath"]) if per_view and e.get("domains_cath") else None
+            out[key] = _ok(None, "not measured") if got is None else _ok(not got, "; ".join(got))
+            continue
+        measured = [(v, f[key]) for v, f in per_view.items() if f.get(key) is not None]
+        if not measured:
+            out[key] = _ok(None, "not measured")
+            continue
+        found = [f"{v}: {t}" for v, got in measured for t in got]
+        out[key] = _ok(not found, "; ".join(found))
+    return out
+
+
+def science_views(e: dict) -> dict[str, dict[str, int]]:
+    """Per measured view, its count of findings per check (checks with none left out); S5 is the entry's."""
+    return {v: {k: len(t) for k, t in f.items() if k != "S5" and t} for v, f in _view_science(e).items()}
+
+
 def science_section(entries: list[dict]) -> list[str]:
-    """report.md's science checks: per check how many entries pass, fail or are not measured, then each entry
-    with its marks and findings."""
+    """report.md's science checks: per check how many entries pass, fail or are not measured (an entry fails a check
+    when any of its views has a finding), then per view how many entries it was measured in and how many of them it
+    fails per check, then each entry with its marks and findings (each named by its view)."""
     from foldmap.science import SCIENCE
 
     rows = [(e, science(e)) for e in entries]
-    lines = ["", "## Science checks (S1-S6), apart from A1-A20", "", "| check | pass | fail | not measured |"]
-    lines.append("|---|---|---|---|")
+    lines = ["", "## Science checks (S1-S6), apart from A1-A20", ""]
+    lines += [f"Judged in every drawn view ({', '.join(SCIENCE_VIEWS)}); S5 once per entry.", ""]
+    lines += ["| check | pass | fail | not measured |", "|---|---|---|---|"]
     for key, what in SCIENCE.items():
         got = [s[key]["pass"] for _, s in rows]
         lines.append(f"| {key} {what} | {got.count(True)} | {got.count(False)} | {got.count(None)} |")
+    keys = [k for k in SCIENCE if k != "S5"]
+    lines += [
+        "",
+        "### Science by view",
+        "",
+        "Entries measured in each view, and how many of them fail each check there.",
+        "",
+    ]
+    lines += ["| view | measured | " + " | ".join(keys) + " |", "|" + "---|" * (len(keys) + 2)]
+    counts = [science_views(e) for e, _ in rows]
+    for v in SCIENCE_VIEWS:
+        here = [c[v] for c in counts if v in c]
+        if here:
+            lines.append(
+                f"| {v} | {len(here)} | " + " | ".join(str(sum(1 for c in here if c.get(k))) for k in keys) + " |"
+            )
     lines += ["", "| id | " + " | ".join(SCIENCE) + " | findings |", "|" + "---|" * (len(SCIENCE) + 2)]
-    for e, s in rows:
+    for (e, s), per in zip(rows, (_view_science(e) for e, _ in rows)):
         marks = ["-" if s[k]["pass"] is None else "✓" if s[k]["pass"] else "✗" for k in SCIENCE]
-        found = "; ".join(f"{k}: {s[k]['detail']}" for k in SCIENCE if s[k]["pass"] is False)
-        lines.append(f"| {e['id']} | " + " | ".join(marks) + f" | {found.replace('|', '/')[:600]} |")
+        found = [f"{v}: {k} {t}" for v, f in per.items() for k in keys for t in (f.get(k) or [])]
+        if s["S5"]["pass"] is False:
+            found.append(f"S5 {s['S5']['detail']}")
+        lines.append(f"| {e['id']} | " + " | ".join(marks) + f" | {'; '.join(found).replace('|', '/')[:600]} |")
     return lines
 
 
