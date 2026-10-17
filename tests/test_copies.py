@@ -419,3 +419,35 @@ def test_a_helix_piece_let_go_stays_with_its_helix():
     lay = _laid_out(r100_entry("7QUP"), focus="none").layout
     piece, helix = lay.placed["9C:240-243"], lay.placed["9C:224-238"]
     assert np.hypot(piece.cx - helix.cx, piece.cy - helix.cy) < (piece.length + helix.length) / 2 + 1.0
+
+
+@pytest.fixture(scope="module")
+def p1x_focus_science():
+    """9P1X --focus none (the whole file: 8 D3 protomers, 20 copy ties) laid out as draw_spec lays it out, and the
+    sheet science checks of that layout (S1-S3, S6; no marks drawn, so S4 has none to judge): random-100 C2b-S."""
+    from types import SimpleNamespace
+
+    from foldmap.cli import make_layout
+    from helpers import r100_entry
+
+    spec = figure_spec(r100_entry("9P1X"), focus="none")
+    lay, sses, bb = make_layout(spec.structure, spec.mode, spec.rotate, spec.flip_v, **spec.layout_kwargs())
+    page = SimpleNamespace(axes=[SimpleNamespace(patches=[])])
+    found = figcheck.science_checks(SimpleNamespace(layout=lay, sses=sses, bb=bb, figure=page))
+    return lay, found
+
+
+def _findings_naming(found: dict, *ids: str) -> list[str]:
+    return [f"{k}: {t}" for k, got in found.items() for t in got or [] if any(i in t for i in ids)]
+
+
+def test_an_accessory_never_stands_beside_a_strand_it_does_not_pair_with(p1x_focus_science):
+    """Random-100 C2b-S, 9P1X focus: _column_heights stood an accessory where its own column was free, but beside
+    strands of the next columns it does not pair with. a:106-109 (partner c:85-91, no room level with it) stood
+    below c:2-8, beside c:50-61 (0 bridges); I:94-97, level with its partner H:85-97, stood beside I:2-8 and I:29-30
+    (0 bridges); Q:106-109 is a:106-109's copy. An accessory's height must also keep it off every strand it does not
+    pair with in the columns beside its own: where it cannot stand level with its partner so, it stands as near as
+    it can and the notes name the pairing (S6, Layout.unshown)."""
+    _, found = p1x_focus_science
+    assert _findings_naming(found, "a:106-109", "Q:106-109", "I:94-97") == []
+

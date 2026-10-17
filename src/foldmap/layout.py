@@ -468,12 +468,27 @@ _STACK_SHUT = 0.6
 _STACK_OPEN = 0.85
 _STACK_NUDGE = 1.0
 _NUDGE_STEP = 0.05
+_TOUCH = 1e-6  # page units two drawn spans must share to stand level (science._TOUCH)
+_CLEAR = 1e-4  # page units past a block's end a cleared height stands, one snap step (_column_heights)
 
 
 # more room in a stack gap a chain end faces: its stub and N/C letter. Fix round 3: at most this, so 9FWZ's
 # D:662-666, end to end with D:634-641, still stands level with its partner D:645-659 (END_LABEL + 0.6 left it above
 # D:645-659's end; the D:618-629 loop into that gap then passes the letter, a route over a label)
 _END_ROOM = END_LABEL - 0.15
+
+
+def _sheet_pairs(sheet: Sheet) -> set[frozenset]:
+    """The strand-id pairs of a sheet that pair (may stand side by side): its track's neighbours, a closed sheet's
+    ends, its chords, and each accessory with its parent and its other partners (Accessory.others)."""
+    s = sheet.strands
+    out = {frozenset((a.id, b.id)) for a, b in zip(s, s[1:])}
+    if sheet.closed and len(s) > 2:
+        out.add(frozenset((s[0].id, s[-1].id)))
+    out |= {frozenset((a.id, b.id)) for a, b in sheet.chords}
+    for a in sheet.accessory:
+        out |= {frozenset((a.strand.id, x.id)) for x in (a.parent, *a.others)}
+    return out
 
 
 def _column_heights(
@@ -493,7 +508,10 @@ def _column_heights(
     two, chain E's N end under chain f's C end, whose letters met with room for one, random-100 C2b-3). One that
     cannot stand level with its partner stands level with another partner of its own (Accessory.others), in a column
     beside that one, when it can; else as near its partner as it can (_unshown reads that off the drawing, and the
-    note says "also pairs with"; fix round 2/3 rulings, 7ARD). Snapped."""
+    note says "also pairs with"; fix round 2/3 rulings, 7ARD). Wherever it stands, it is never level with a strand
+    it does not pair with (_sheet_pairs) in the column on either side of its own (random-100 C2b-S, 9P1X focus:
+    a:106-109 under c:2-8 stood beside c:50-61; I:94-97, level with H:85-97, beside I:2-8 and I:29-30): such a height
+    is given up for the free one nearest its partner's, in its own column. Snapped."""
     every, senses = _drawn_strands(sheet)
     ends = ends or {}
     n = len(sheet.strands)
@@ -572,6 +590,41 @@ def _column_heights(
             for q in occupied.get(c, [])
         )
 
+    pairs = _sheet_pairs(sheet)
+
+    def beside(c: int) -> list[int]:  # the columns standing next to column c: the nearest taken on either side
+        taken = sorted(x for x in occupied if x != c and occupied[x])
+        lower, higher = [x for x in taken if x < c], [x for x in taken if x > c]
+        return lower[-1:] + higher[:1]
+
+    def strangers(k: int, c: int) -> list[int]:  # the strands beside column c that k does not pair with
+        me = strand(k).id
+        return [
+            q
+            for x in beside(c)
+            for q in occupied[x]
+            if strand(q).id != me and frozenset((me, strand(q).id)) not in pairs
+        ]
+
+    def clash(k: int, c: int, y: float) -> bool:  # does k at height y in column c stand level with a stranger?
+        half = length(k) / 2
+        return any(
+            min(y + half, height[q] + length(q) / 2) - max(y - half, height[q] - length(q) / 2) > _TOUCH
+            for q in strangers(k, c)
+        )
+
+    def clear(k: int, c: int, want: float) -> float:
+        """The height nearest `want` where k meets nothing in column c and no stranger beside it (the lower on a
+        tie)."""
+        half = length(k) / 2
+        ends = [want]  # past each block's ends by _CLEAR, so snapping never brings it back in
+        for q in occupied.get(c, []):
+            ends += [height[q] - length(q) / 2 - room(k, q) - half, height[q] + length(q) / 2 + room(q, k) + half]
+        for q in strangers(k, c):
+            ends += [height[q] - length(q) / 2 - half, height[q] + length(q) / 2 + half]
+        ys = sorted({float(_snap(y + _CLEAR * np.sign(y - want))) for y in ends}, key=lambda y: (abs(y - want), y))
+        return next(y for y in ys if not meets(k, c, y) and not clash(k, c, y))
+
     def opened(k: int, c: int, y: float, p: int) -> float:
         """k's height, moved off the one strand it stands end to end with across a gap shut (_STACK_SHUT) until
         the gap opens to a side by _STACK_OPEN, else by _STACK_SHUT, by at most _STACK_NUDGE, meeting nothing else
@@ -582,7 +635,7 @@ def _column_heights(
         way, was, some = (1 if y > height[walls[0]] else -1), level(k, p, y), None
         for step in range(1, round(_STACK_NUDGE / _NUDGE_STEP) + 1):
             z = float(_snap(y + way * step * _NUDGE_STEP))
-            if meets(k, c, z) or level(k, p, z) != was:
+            if meets(k, c, z) or level(k, p, z) != was or clash(k, c, z):
                 break
             if not shut(k, c, z, _STACK_OPEN):
                 return z
@@ -600,13 +653,16 @@ def _column_heights(
                     continue
                 for c in (column[q] - 1, column[q] + 1):
                     z = spot(k, c, height[q])
-                    if level(k, q, z):
+                    if level(k, q, z) and not clash(k, c, z):
                         column[k], y = c, z
                         break
                 else:
                     continue
                 break
-        height[k] = float(_snap(opened(k, column[k], y, p)))
+        y = opened(k, column[k], y, p)
+        if clash(k, column[k], y):
+            y = clear(k, column[k], height[p])
+        height[k] = float(_snap(y))
         occupied.setdefault(column[k], []).append(k)
     return {k: h for k, h in height.items() if k >= n}
 
