@@ -567,25 +567,52 @@ def test_a_loop_leaves_the_slab_rather_than_run_along_it_over_an_element():
     assert min(grid.center(c)[1] for c in path) < -15.0  # under the element
 
 
-def test_a_route_out_of_a_port_whose_first_step_lands_in_the_slab_turns_at_the_port():
-    """Random-100 C2b-5 (6JO6 5:167-169>5:179-207): a helix ending 0.03 below the band's lower face, its C port
-    pointing up into the slab. Every route started 0.4 out along its exit (_PUSH), so the first cell lay 0.42 inside
-    the face and the turn round the helix's end ran there, in the slab (A18). A port whose first step lands in the
-    slab starts nearer (_PUSH_NEAR, as a port facing a stack gap does), and the turn stays within SLAB_MARGIN of the
-    face. A port whose first step leaves the slab, or that leaves sideways, starts as before."""
+def _slab_case(case: str, dy: float):
+    """The two slab-port geometries of random-100 C2b-5, shifted up by dy against a fixed grid origin (an element
+    far below holds the page's bounds): `outside`, 6JO6's helix ending 0.03 below the lower face, its C port up into
+    the slab, the next element's port inside the band; `inband`, 5LDW's short helix in the band, its C port up into
+    a 0.81 gap under the helix stacked on it, with a tall helix 0.81 to its right whose loop enters that gap."""
+    anchor = bar(90, -20.0, -10.0, 1.0, np.pi / 2)
+    if case == "outside":
+        els = [bar(0, 0.0, dy - 1.03, 2.0, np.pi / 2), bar(20, 3.0, dy + 3.0, 5.0, np.pi / 2)]
+        band = (dy, dy + 8.0)
+    else:
+        els = [
+            bar(0, 1.81, dy + 1.2, 6.4, -np.pi / 2),  # right of the corridor, its C port at the bottom
+            bar(10, 0.0, dy + 2.71, 3.8, np.pi / 2),  # stacked above, its N port at 0.81
+            bar(20, 0.0, dy - 1.035, 2.07, np.pi / 2),  # C port at (0, 0), up into the gap
+            bar(30, 5.28, dy - 1.71, 1.72, np.pi / 2),  # N port below the band
+        ]
+        band = (dy - 2.10, dy + 4.80)
+    lay = layout_of(*els, anchor)
+    lay.membrane = {"y": band, "bands": [band], "inside": "below"}
+    return lay, [p.sse for p in [*els, anchor]], band
+
+
+@pytest.mark.parametrize("case", ["outside", "inband"])
+def test_a_route_out_of_a_port_whose_first_step_lands_in_the_slab_turns_at_the_port(case):
+    """Random-100 C2b-5 (6JO6 5:167-169>5:179-207; 5LDW L:448-454 in C17's second layout). Every route started 0.4
+    out along its exit (_PUSH): out of a port at a face, pointing in, the turn round its element's end lay 0.42 inside
+    the face; out of an in-band port facing a narrow gap, the 0.4 row was the one the loop entering the gap took,
+    and the route jogged to run mid-slab (A18). Fix round 1 (review I1): whatever the grid's phase (the elements
+    shifted across one cell in 0.025 steps), a port whose first step lands in the slab starts in the first free row
+    past its clearance (fifth-of-a-cell steps from _INFLATE), and a port just outside a face has its first turn
+    drawn at its clearance when that is clear: no loop runs in the slab, none falls back. A port whose first step
+    leaves the slab, or that leaves sideways, starts as before."""
     from foldmap.figcheck import slab_runs
 
-    a = bar(0, 0.0, -0.03 - 0.9625, 1.925, np.pi / 2)  # C port at (0, -0.03), pointing up
-    b = bar(20, 3.0, 0.5 + 2.5, 5.0, np.pi / 2)  # N port at (3, 0.5) inside the band, pointing down
-    lay = layout_of(a, b)
-    lay.membrane = {"y": (0.0, 8.0), "bands": [(0.0, 8.0)], "inside": "below"}
-    grid = _Grid(lay, [])
-    assert abs((-0.03 - grid.y0) % grid.res - 0.175) < 1e-9  # the port 0.05 above a row's centre, as in 6JO6
-    assert grid.slab[grid.cell((0.0, -0.03 + 0.4))]  # the usual first step is in the slab
-    (loop,) = route_loops(lay, [a.sse, b.sse], stub_bb())
-    assert not loop.fallback
-    assert slab_runs([loop], [(0.0, 8.0)], lay.placed) == [], loop.points
-    assert max(y for _, y in loop.points[:3]) < 0.3, loop.points  # turned within the margin of the face
+    for k in range(10):
+        lay, sses, band = _slab_case(case, k * 0.025)
+        grid = _Grid(lay, [])
+        a = lay.placed[sses[0 if case == "outside" else 2].id]
+        assert grid.slab[grid.cell((a.c_port[0], a.c_port[1] + 0.4))]  # the usual first step is in the slab
+        start = grid.center(grid.free_cell_along(a.c_port, a.exit_c, a))[1] - a.c_port[1]
+        assert _INFLATE < start <= _INFLATE + grid.res + 1e-9, (k, start)  # the first free row past the clearance
+        loops = route_loops(lay, sses, stub_bb())
+        assert not any(lp.fallback for lp in loops), k
+        assert slab_runs(loops, [band], lay.placed) == [], (k, [lp.points for lp in loops])
+    if case == "inband":
+        return
     c = bar(40, 0.0, 9.0, 2.0, np.pi / 2)  # a port above the band, its first step out of it: as before
     up = _Grid(layout_of(c), [])
     port, out = c.c_port, c.exit_c

@@ -115,8 +115,9 @@ class _Grid:
         # ports a route may start nearer (_PUSH_NEAR), when set; so may any port whose first step is in the slab
         self.near_ports: set[tuple[float, float]] = set()
         self.slab = np.zeros((self.nx, self.ny), bool)  # cells strictly inside the membrane band (one per row)
+        self.bands = list(layout.membrane.get("bands", [layout.membrane["y"]])) if layout.membrane else []
         if layout.membrane:
-            for lo, hi in layout.membrane.get("bands", [layout.membrane["y"]]):
+            for lo, hi in self.bands:
                 self.slab[:, (self.ys > lo + 0.1) & (self.ys < hi - 0.1)] = True
 
     def _mask(self, rects) -> np.ndarray:
@@ -172,19 +173,30 @@ class _Grid:
         c = self.cell((port[0] + exit_vec[0] * _PUSH[0], port[1] + exit_vec[1] * _PUSH[0]))
         return bool(0 <= c[0] < self.nx and 0 <= c[1] < self.ny and self.slab[c])
 
+    def at_face(self, port, exit_vec) -> bool:
+        """A port outside every band whose first step lands in the slab (_into_slab): it lies just outside a face,
+        pointing in (6JO6's 5:167-169, 0.03 below it). Its route's first turn is drawn at the port's clearance
+        (_pull_turns), so it runs along the face, not inside it, whatever the grid's phase (C2b-5 fix round 1)."""
+        return self._into_slab(port, exit_vec) and not any(lo <= port[1] <= hi for lo, hi in self.bands)
+
     def free_cell_along(self, port, exit_vec, own: Placed, loose: bool = False):
         """First free cell on the way out of a port. Only the cells the element's own bounding box blocks
         (a tilted helix end can sit inside it) may be skipped; any other obstacle in the way means no route.
         `loose` (a strand's loose end, which may sit in another element's clearance margin; any end of a helix
         drawn over a sheet, which lies on the strands): any blocked cell may be skipped, and the drawn route's
         final check decides. From a helix over a sheet the way out runs over the strands to the sheet's edge
-        (_PUSH_OVER) and stops there: a soft cell (text, another helix) next means no way out this side."""
+        (_PUSH_OVER) and stops there: a soft cell (text, another helix) next means no way out this side. A port
+        whose first step lands in the membrane slab (_into_slab) walks out in fifth-of-a-cell steps from _INFLATE:
+        its route starts in the first free row past its own clearance, whatever the grid's phase, so the turn round
+        its element's end is its port turn (5LDW's L:448-454 under the helix stacked on it; C2b-5 fix round 1)."""
         g = _INFLATE + self.reach
         rx0, ry0, rx1, ry1 = own.rect
         over = loose and getattr(own, "over", False)
         near = (round(float(port[0]), 6), round(float(port[1]), 6)) in self.near_ports
-        near = near or self._into_slab(port, exit_vec)
-        for t in _PUSH_OVER if over else _PUSH_NEAR if near else _PUSH:
+        steps = _PUSH_OVER if over else _PUSH_NEAR if near else _PUSH
+        if not over and self._into_slab(port, exit_vec):  # the nearest free cell past the clearance, any phase
+            steps = _INFLATE + self.res / 5 * np.arange(int((_PUSH[-1] - _INFLATE) / (self.res / 5)) + 1)
+        for t in steps:
             pt = (port[0] + exit_vec[0] * t, port[1] + exit_vec[1] * t)
             c = self.cell(pt)
             if self.free(c):
@@ -454,6 +466,31 @@ def _polyline(grid: _Grid, cells, pa, ea, pb, eb, snap: bool):
     return _simplify([tuple(pa)] + [(x, y) for x, y in pts] + [tuple(pb)])
 
 
+def _pull_turns(pts, pa, ea, pb, eb, at_a: bool, at_b: bool) -> list:
+    """The drawn route with the first turn out of a port at a face (_Grid.at_face) moved back to the port's own
+    clearance, _INFLATE out along its exit: the stub out of the port and the run after it, when the run is followed
+    by a turn the move keeps square (C2b-5 fix round 1: 6JO6's turn lay 0.17 to 0.42 inside the face as the grid's
+    phase went, the turn the check reads as in the slab past 0.3). The caller keeps it only when it is clear."""
+
+    def pull(p, port, out) -> list:
+        if len(p) < 4 or abs(out[0]) > 1e-9:
+            return p
+        (x0, y0), (x1, y1), (x2, y2), (x3, y3) = p[:4]
+        y = port[1] + out[1] * _INFLATE
+        if abs(x1 - x0) > 1e-9 or abs(y2 - y1) > 1e-9 or abs(x3 - x2) > 1e-9 or abs(y1 - y0) <= _INFLATE + 1e-9:
+            return p
+        if (y3 - y) * (y3 - y1) < 0:  # the run after the turn would double back on itself
+            return p
+        return [p[0], (x1, y), (x2, y), *p[3:]]
+
+    out = [tuple(q) for q in pts]
+    if at_a:
+        out = pull(out, pa, ea)
+    if at_b:
+        out = pull(out[::-1], pb, eb)[::-1]
+    return _simplify(out)
+
+
 class _Router:
     """Draws routes on one grid and validates each drawing by _clear against the elements (and stems)."""
 
@@ -509,6 +546,15 @@ class _Router:
             return None
         for snap in (True, False):
             pts = _polyline(grid, cells, pa, ea, pb, eb, snap)
+            if grid.at_face(pa, ea) or grid.at_face(pb, eb):
+                pulled = _pull_turns(pts, pa, ea, pb, eb, grid.at_face(pa, ea), grid.at_face(pb, eb))
+                kw = dict(own_body=own_body, under=under, exempt=exempt)
+                if (
+                    pulled != pts
+                    and _clear(pulled, (own_a, own_b), *self.elements, grow=_INFLATE - 1e-6, **kw)
+                    and _text_hits(pulled, self.keep_out) <= _text_hits(pts, self.keep_out)
+                ):
+                    pts = pulled
             if _clear(pts, (own_a, own_b), *self.elements, own_body=own_body, under=under, exempt=exempt):
                 for c in cells:
                     grid.used[c] += 1
