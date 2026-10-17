@@ -1387,9 +1387,11 @@ def _mark_spot(
     `retarget` (spot -> targets): the tethers a spot gets, when they depend on it (a mark held by nucleotides is
     tethered to those drawn nearest it, _na_targets), judged as drawn.
     `bound` (the home chain's main contact and the targets on other chains, _place_mark): a spot is taken only when
-    each of them lies within _TETHER_REACH of it, its other home tethers no longer held to the first clear spot's
-    reach (they are drawn whatever their length, the plan-11 ruling; 8ESZ's 3PE 5604 has no spot within both), and
-    None is returned when no spot within `radius` does (never the first clear spot)."""
+    each of them lies within _TETHER_REACH of it; its other home tethers are not held to the plan-11 reach (the
+    longest tether from the first clear spot): they are drawn whatever their length (the plan-11 ruling), and 8ESZ's
+    3PE 5604 has no spot keeping its B2 target within _TETHER_REACH and its far home target within that reach
+    (18.8 apart > 12.10 + 6.5). None is returned when no spot within `radius` meets the bound (never the first clear
+    spot)."""
     spot = free = None
     best, last_ring = None, None
     for n, ring in enumerate(np.arange(0.0, radius, 0.35)):
@@ -1403,7 +1405,8 @@ def _mark_spot(
             ts = targets if retarget is None else retarget(c)
             if free is None:
                 free = c
-                reach = max(_TETHER_REACH, *(np.hypot(*(np.subtract(t, c))) for t in ts))
+                if not bound:  # a bounded search holds the other home tethers to no reach
+                    reach = max(_TETHER_REACH, *(np.hypot(*(np.subtract(t, c))) for t in ts))
             if _beyond_reach(c, bound):
                 continue
             if (na is not None or bound or all(np.hypot(*(np.subtract(t, c))) <= reach for t in ts)) and not any(

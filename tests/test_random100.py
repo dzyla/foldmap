@@ -372,6 +372,14 @@ def test_a20_gates_only_tethers_to_other_chains(r100):
     other = a20([["ligand-tether:CLA:B609:2", 7.08, "B", "H"], ["ligand-tether:CLA:B609:0", 3.0, "B", "B"]])
     assert other["pass"] is False and other["detail"].startswith("ligand-tether:CLA:B609:2 7.08 (B to H)")
     assert a20([["ligand-tether:CLA:B609:2", 6.4, "B", "H"]])["pass"] is True
+    # the detail names the first four of each kind and says how many more there are (C2b-5 fix round 1, M1)
+    many = a20([[f"ligand-tether:CLA:A{k}:1", 9.0 + k, "A", "A"] for k in range(6)])
+    assert many["pass"] is True and many["detail"].endswith("ligand-tether:CLA:A3:1 12.0 (home A) (+2 more)")
+    crossed = a20([[f"ligand-tether:CLA:B{k}:3", 7.0 + k, "B", "H"] for k in range(5)])
+    assert crossed["pass"] is False and crossed["detail"] == (
+        "ligand-tether:CLA:B0:3 7.0 (B to H); ligand-tether:CLA:B1:3 8.0 (B to H); "
+        "ligand-tether:CLA:B2:3 9.0 (B to H); ligand-tether:CLA:B3:3 10.0 (B to H); (+1 more)"
+    )
 
 
 def test_a_ca_only_entry_must_be_refused_in_one_line(r100):

@@ -1783,7 +1783,9 @@ def criteria(e: dict) -> dict:
         long = [(g, n, h, t) for g, n, h, t in d.get("tethers", []) if n > LIMITS["tether_length"]]
         other = [f"{g} {n} ({h} to {t})" for g, n, h, t in long if t != h]
         same = [f"{g} {n} (home {h})" for g, n, h, t in long if t == h]
-        shown = other[:4] + ([f"reported: {'; '.join(same[:4])}"] if same else [])
+        more = lambda items: [f"(+{len(items) - 4} more)"] if len(items) > 4 else []  # noqa: E731
+        shown = other[:4] + more(other)
+        shown += [f"reported: {'; '.join(same[:4])}" + "".join(f" {m}" for m in more(same))] if same else []
         out["A20"] = _ok(not other, "; ".join(shown))
     return out
 
