@@ -149,9 +149,12 @@ def figure_view(ws: Workspace) -> None:
     with st.container(key="canvas"):
         background = json.loads(good["blob"]).get("background", "#ffffff")
         st.markdown(figure_card(good["svg"], background, ws.name), unsafe_allow_html=True)
-        made = app_edits.provenance_caption(result.get("provenance", [])) if result else ""
-        if made:  # how it was made: what is inferred, ambiguous or moved, as the command line says it
-            st.caption(made)
+        made = app_edits.provenance_caption(result.get("provenance", []), heading=False) if result else ""
+        if made:  # how it was made: folded away, opened on demand (the author: not needed under every figure)
+            from foldmap.provenance import HEADING
+
+            with st.expander(HEADING.rstrip(":"), expanded=False):
+                st.caption(made)
         ions = (good.get("scope") or {}).get("na_ions")
         if ions:  # never marked: said, as the command line and MCP notes say it (C33)
             from foldmap.scope import na_ions_text

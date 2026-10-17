@@ -471,16 +471,17 @@ def control_for(message: str, last_changed: str | None) -> str | None:
     return f"{label} ({section})" if label else None
 
 
-def provenance_caption(items: list[dict]) -> str:
-    """The caption under a figure saying how it was made (Drawn.provenance: what is inferred, ambiguous or moved for
-    readability, as the command line, the MCP server and the figure files say it): the heading and one bullet per
-    item, each text Markdown-escaped (shown); '' when the list is empty."""
+def provenance_caption(items: list[dict], heading: bool = True) -> str:
+    """The caption saying how a figure was made (Drawn.provenance: what is inferred, ambiguous or moved for
+    readability, as the command line, the MCP server and the figure files say it): the heading (unless the caller
+    shows it, as the app's folded section does) and one bullet per item, each text Markdown-escaped (shown); ''
+    when the list is empty."""
     from foldmap.provenance import HEADING
 
     if not items:
         return ""
     bullets = "\n".join(f"- {shown(i['text'][0].upper() + i['text'][1:], limit=2000)}." for i in items)
-    return f"{HEADING}\n\n{bullets}"
+    return f"{HEADING}\n\n{bullets}" if heading else bullets
 
 
 def row_source(rows: list[int], choices: list[tuple[str, str]]) -> str | None:
