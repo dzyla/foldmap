@@ -470,7 +470,8 @@ def _pull_turns(pts, pa, ea, pb, eb, at_a: bool, at_b: bool) -> list:
     """The drawn route with the first turn out of a port at a face (_Grid.at_face) moved back to the port's own
     clearance, _INFLATE out along its exit: the stub out of the port and the run after it, when the run is followed
     by a turn the move keeps square (C2b-5 fix round 1: 6JO6's turn lay 0.17 to 0.42 inside the face as the grid's
-    phase went, the turn the check reads as in the slab past 0.3). The caller keeps it only when it is clear."""
+    phase went, the turn the check reads as in the slab past 0.3). The caller keeps it only when it is clear. A
+    second pull that would move the points the first moved (one run between two ports at faces) is not made."""
 
     def pull(p, port, out) -> list:
         if len(p) < 4 or abs(out[0]) > 1e-9:
@@ -486,7 +487,9 @@ def _pull_turns(pts, pa, ea, pb, eb, at_a: bool, at_b: bool) -> list:
     out = [tuple(q) for q in pts]
     if at_a:
         out = pull(out, pa, ea)
-    if at_b:
+    pulled = out != [tuple(q) for q in pts]
+    if at_b and not (pulled and len(out) < 6):  # the second pull would move the points the first moved (C2b-5
+        # parked minor: on one run between two ports, the run inside the first port's clearance)
         out = pull(out[::-1], pb, eb)[::-1]
     return _simplify(out)
 
@@ -546,6 +549,7 @@ class _Router:
             return None
         for snap in (True, False):
             pts = _polyline(grid, cells, pa, ea, pb, eb, snap)
+            pulled_ok = False
             if grid.at_face(pa, ea) or grid.at_face(pb, eb):
                 pulled = _pull_turns(pts, pa, ea, pb, eb, grid.at_face(pa, ea), grid.at_face(pb, eb))
                 kw = dict(own_body=own_body, under=under, exempt=exempt)
@@ -554,9 +558,12 @@ class _Router:
                     and _clear(pulled, (own_a, own_b), *self.elements, grow=_INFLATE - 1e-6, **kw)
                     and _text_hits(pulled, self.keep_out) <= _text_hits(pts, self.keep_out)
                 ):
-                    pts = pulled
+                    pts, pulled_ok = pulled, True
             if _clear(pts, (own_a, own_b), *self.elements, own_body=own_body, under=under, exempt=exempt):
-                for c in cells:
+                drawn = cells
+                if pulled_ok:  # the cells under the route as drawn, not those of its search (C2b-5 parked minor)
+                    drawn = sorted({c for p, q in zip(pts, pts[1:]) for c in grid.cells_along(p, q)})
+                for c in drawn:
                     grid.used[c] += 1
                 if log.isEnabledFor(logging.DEBUG):
                     self.tight += not _clear(

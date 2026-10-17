@@ -1132,3 +1132,27 @@ def test_a_chain_ends_letter_a_line_runs_through_moves_round_its_stub():
     d = draw_spec(figure_spec(Path(__file__).parent / "data" / "r100" / "9FWZ-DB.cif.gz", membrane="auto"))
     assert [h for h in figcheck.text_collisions(d) if h.startswith("terminus:")] == []
     assert d.layout.end_labels  # moved, not hidden
+
+
+def test_both_turns_pulled_on_one_run_keep_the_first_ports_clearance():
+    """Random-100 C2b-5 parked minor (a): on a route of one run between two ports at a face (up, across, down), the
+    pull at the second port moved the same two points the first had moved, to its own clearance, though that left the
+    run inside the first port's clearance (_pull_turns). A point the first pull moved is not moved again."""
+    pts = [(0.0, 0.1), (0.0, 0.5), (2.0, 0.5), (2.0, 0.0)]  # both ports below the run, the first 0.1 higher
+    out = route._pull_turns(pts, (0.0, 0.1), (0.0, 1.0), (2.0, 0.0), (0.0, 1.0), True, True)
+    assert out == [(0.0, 0.1), (0.0, 0.1 + _INFLATE), (2.0, 0.1 + _INFLATE), (2.0, 0.0)]
+
+
+def test_the_cells_a_pulled_route_uses_are_the_cells_under_it():
+    """Random-100 C2b-5 parked minor (b): a route whose first turn was pulled to its port's clearance (_pull_turns)
+    marked the grid cells of its search, before the pull, as used, so later routes paid to share cells it does not
+    run in and not those it does. The cells marked are those under the route as drawn."""
+    for k in range(10):  # every grid phase, as the slab tests sweep it
+        lay, sses, _ = _slab_case("outside", k * 0.025)
+        a, b = (lay.placed[s.id] for s in sses[:2])
+        router = route._Router(_Grid(lay, []), route._element_obstacles(lay))
+        pts = router.drawn(a.c_port, a.exit_c, a, b.n_port, b.exit_n, b)
+        assert pts is not None and abs(pts[1][1] - (a.c_port[1] + _INFLATE)) < 1e-9, k  # pulled to the clearance
+        grid = router.grid
+        under = {c for p, q in zip(pts, pts[1:]) for c in grid.cells_along(p, q)}
+        assert {tuple(c) for c in np.argwhere(grid.used > 0).tolist()} == under, k
