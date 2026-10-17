@@ -317,7 +317,8 @@ def _faces_route(router: _Router, fa, ea, da: PlacedStem, fb, eb, db: PlacedStem
     beside it, as two pieces of one bent duplex kept end to end do into each other's (random-100 C2b-4: 7Y7C's
     a:843-844 and 8VWQ's 1:836 were plain curves)."""
     route, _ = router.route(fa, ea, da, fb, eb, db, own_body=True)
-    if route is None:
+    grid = router.grid
+    if route is None and (grid.free_cell_along(fa, ea, da) is None or grid.free_cell_along(fb, eb, db) is None):
         route, _ = router.route(fa, ea, da, fb, eb, db, own_body=True, loose=True)
     return route
 
