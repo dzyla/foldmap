@@ -70,6 +70,7 @@ from .layout import (
     glyph_scale,
     helix_label_pos,
     label_boxes,
+    ligand_mark_half,
     line_band,
     line_pt,
     lines_meeting,
@@ -1620,7 +1621,7 @@ def ligand_marks(layout: Layout, loops: list[Loop], sses: list[SSE], look: Style
         if not targets:
             continue
         anchor = np.average(np.asarray(targets), axis=0, weights=weights)
-        half = (0.3, 0.3) if g.metal else (0.12 * len(g.name) + 0.2, 0.27)
+        half = ligand_mark_half(g)
         na, retarget = None, None
         if not g.contacts:  # held by nucleotides alone: its tethers, as drawn from each spot, off the stems and strands
             if na_lines is None:  # a run's stretches along its own stems' rails are the stems' (na_paths.among)
