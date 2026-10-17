@@ -617,13 +617,16 @@ def _column_heights(
         """The height nearest `want` where k meets nothing in column c and no stranger beside it (the lower on a
         tie)."""
         half = length(k) / 2
-        ends = [want]  # past each block's ends by _CLEAR, so snapping never brings it back in
+        cands = [want]  # past each block's ends by _CLEAR, so snapping never brings it back in
         for q in occupied.get(c, []):
-            ends += [height[q] - length(q) / 2 - room(k, q) - half, height[q] + length(q) / 2 + room(q, k) + half]
+            cands += [height[q] - length(q) / 2 - room(k, q) - half, height[q] + length(q) / 2 + room(q, k) + half]
         for q in strangers(k, c):
-            ends += [height[q] - length(q) / 2 - half, height[q] + length(q) / 2 + half]
-        ys = sorted({float(_snap(y + _CLEAR * np.sign(y - want))) for y in ends}, key=lambda y: (abs(y - want), y))
-        return next(y for y in ys if not meets(k, c, y) and not clash(k, c, y))
+            cands += [height[q] - length(q) / 2 - half, height[q] + length(q) / 2 + half]
+        ys = sorted({float(_snap(y + _CLEAR * np.sign(y - want))) for y in cands}, key=lambda y: (abs(y - want), y))
+        free = next((y for y in ys if not meets(k, c, y) and not clash(k, c, y)), None)
+        # the farthest block end is always free (each block is an open interval, cleared by _CLEAR past its end)
+        assert free is not None, f"no free height for {strand(k).id} in column {c}"
+        return free
 
     def opened(k: int, c: int, y: float, p: int) -> float:
         """k's height, moved off the one strand it stands end to end with across a gap shut (_STACK_SHUT) until
