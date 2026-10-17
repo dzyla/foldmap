@@ -1355,7 +1355,18 @@ def _strands_crossed(c, targets, strands) -> int:
 
 
 def _mark_spot(
-    anchor, half, targets, taken, texts, tethers, bodies=(), radius=_SPOT_RADIUS, runs=(), na=None, retarget=None
+    anchor,
+    half,
+    targets,
+    taken,
+    texts,
+    tethers,
+    bodies=(),
+    radius=_SPOT_RADIUS,
+    runs=(),
+    na=None,
+    retarget=None,
+    bound=(),
 ):
     """The first spot on rings round the anchor whose mark (grown by 0.08) is clear of `taken` and of the tethers
     drawn before, and whose own tethers cross no text, lengthening none past the first clear spot's (the plan-11
@@ -1369,7 +1380,11 @@ def _mark_spot(
     fix rounds 2 and 3 rulings: scored on the stems alone, 8SA2's B1Z was blind to the hairpin loop and runs its
     tethers crossed; the two counts come before the continuous lengths, which almost never tie).
     `retarget` (spot -> targets): the tethers a spot gets, when they depend on it (a mark held by nucleotides is
-    tethered to those drawn nearest it, _na_targets), judged as drawn."""
+    tethered to those drawn nearest it, _na_targets), judged as drawn.
+    `bound` (targets on chains other than the ligand's home, _place_mark): a spot is taken only when each of them
+    lies within _TETHER_REACH of it, its home tethers no longer held to the first clear spot's reach (they are drawn
+    whatever their length, the plan-11 ruling; 8ESZ's 3PE 5604 has no spot within both), and None is returned when
+    no spot within `radius` does (never the first clear spot)."""
     spot = free = None
     best, last_ring = None, None
     for n, ring in enumerate(np.arange(0.0, radius, 0.35)):
@@ -1384,7 +1399,9 @@ def _mark_spot(
             if free is None:
                 free = c
                 reach = max(_TETHER_REACH, *(np.hypot(*(np.subtract(t, c))) for t in ts))
-            if (na is not None or all(np.hypot(*(np.subtract(t, c))) <= reach for t in ts)) and not any(
+            if bound and any(np.hypot(*(np.subtract(t, c))) > _TETHER_REACH for t in bound):
+                continue
+            if (na is not None or bound or all(np.hypot(*(np.subtract(t, c))) <= reach for t in ts)) and not any(
                 clip_len(c, t, b) > 1e-9 for t in ts for b in texts
             ):
                 over = _over_bodies(c, ts, bodies) + _along_loops(c, ts, runs)
@@ -1408,18 +1425,37 @@ def _mark_spot(
         if best is not None and na is None and best[0] <= 1e-9:
             break
     spot = best[1] if best is not None else None
-    return spot if spot is not None else free
+    return spot if spot is not None or bound else free
 
 
-def _place_mark(anchor, half, targets, taken, lines, texts, tethers, bodies=(), runs=(), na=None, retarget=None):
+def _place_mark(
+    anchor, half, targets, taken, lines, texts, tethers, bodies=(), runs=(), na=None, retarget=None, bound=()
+):
     """A ligand's spot: clear of the loops' lines and the tethers drawn before where there is room, else of the
     elements and text only (the tethers' crossings given up), else of the elements and text with every tether given
     up; else further out, else on its anchor: a chosen ligand is never left without a mark (C5 fix round 1: 6JO6 lost
-    24 on a crowded page; batch B: 7QUP lost one with nothing clear within _SPOT_RADIUS)."""
-    for blocked, drawn in ((taken + lines, tethers), (taken, tethers), (taken, ())):
+    24 on a crowded page; batch B: 7QUP lost one with nothing clear within _SPOT_RADIUS).
+    `bound`: its targets on other chains than its home. Each lies within _TETHER_REACH of the home chain's main
+    contact (_local_targets), but the anchor, the mean of all its targets, follows home contacts drawn far from it:
+    a spot that leaves one of them farther than _TETHER_REACH gives way to the first spot, kept off as much (the same
+    keep-outs, or stricter), out to _SPOT_FAR times _SPOT_RADIUS, that keeps them all within it (random-100 C2b-5:
+    6JLN's CLA B609 drawn 10.15 from H's helix, 3.80 from the main contact)."""
+    layers = ((taken + lines, tethers), (taken, tethers), (taken, ()))
+
+    def kept(spot, upto: int):
+        if not bound or all(np.hypot(*(np.subtract(t, spot))) <= _TETHER_REACH for t in bound):
+            return spot
+        for blocked, drawn in layers[: upto + 1]:
+            far = _SPOT_FAR * _SPOT_RADIUS
+            near = _mark_spot(anchor, half, targets, blocked, texts, drawn, bodies, far, runs, na, retarget, bound)
+            if near is not None:
+                return near
+        return spot
+
+    for k, (blocked, drawn) in enumerate(layers):
         spot = _mark_spot(anchor, half, targets, blocked, texts, drawn, bodies, runs=runs, na=na, retarget=retarget)
         if spot is not None:
-            return spot
+            return kept(spot, k)
     # nothing clear within _SPOT_RADIUS (7QUP's crowded page dropped GTP:9E500): further out, else the least bad
     spot = _mark_spot(
         anchor,
@@ -1434,7 +1470,7 @@ def _place_mark(anchor, half, targets, taken, lines, texts, tethers, bodies=(), 
         na=na,
         retarget=retarget,
     )
-    return spot if spot is not None else _least_bad_spot(anchor, half, taken, bodies)
+    return kept(spot, 2) if spot is not None else _least_bad_spot(anchor, half, taken, bodies)
 
 
 def _least_bad_spot(anchor, half, taken, bodies) -> np.ndarray:
@@ -1557,9 +1593,12 @@ def ligand_marks(layout: Layout, loops: list[Loop], sses: list[SSE], look: Style
     # among the elements (each a segment array): for ligands held by it alone, built once per page
     # by first holding residue, in the file's order on a tie (as before C33), those held by nucleotides alone last
     for g in sorted(chosen, key=lambda g: (not g.contacts, g.contacts[0] if g.contacts else 0)):
+        bound: list = []  # its targets on other chains than its home (the first target's), kept within reach
         if g.contacts:
             targets, weights, tethered = _local_targets(layout, loops, sses, g, g.metal)
             keep_off, words = taken, texts
+            chains = [layout.res_chain[r] for r in tethered]
+            bound = [t for t, c in zip(targets, chains) if c != chains[0]]
         else:  # held by nucleotides alone (C33: 8XZE): tethered to them, kept off stems, letters and names
             if na_spots is None:
                 na_spots = _na_spots(layout, look)
@@ -1577,7 +1616,7 @@ def ligand_marks(layout: Layout, loops: list[Loop], sses: list[SSE], look: Style
                 na_lines = [np.hstack([q[:-1], q[1:]]) for q in strands if len(q) > 1]
             na = (layout.stems, na_lines)
             retarget = lambda c, g=g, where=na_spots[0]: _na_targets(layout, g, where, np.asarray(c, float))[0]  # noqa: E731
-        spot = _place_mark(anchor, half, targets, keep_off, lines, words, tethers, bodies, runs, na, retarget)
+        spot = _place_mark(anchor, half, targets, keep_off, lines, words, tethers, bodies, runs, na, retarget, bound)
         if not g.contacts:  # held by nucleotides alone: each tether to the touched nucleotide nearest the mark
             targets = _na_targets(layout, g, na_spots[0], np.asarray(spot, float))[0]
         crowded = overlaps_any((spot[0] - half[0], spot[1] - half[1], spot[0] + half[0], spot[1] + half[1]), keep_off)

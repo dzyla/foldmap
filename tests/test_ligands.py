@@ -171,6 +171,32 @@ def test_ligand_tethers_stay_in_their_own_pocket():
                 assert float(np.hypot(*(np.array(t) - c))) <= TETHER_CAP, (m["ligand"].name, chain)
 
 
+@pytest.mark.parametrize("entry, ligands", [("6JLN", 3), ("8ESZ", 1)])
+def test_a_tether_to_another_chain_stays_within_reach_of_the_mark(entry, ligands):
+    """Random-100 C2b-5 (A20). A target on another chain is kept within _TETHER_REACH of the home chain's main contact
+    (_local_targets), but the mark goes near the mean of all its targets, which home contacts drawn far away pull off
+    the main one: 6JLN's CLA B609 sat 10.15 from H's helix (3.80 from the main contact; its other B contact 14.91 off),
+    b617 7.58 from h, c508 7.53 from k, and 8ESZ's 3PE 5604 6.94 from B2. Such a mark now takes the first spot, out to
+    _SPOT_FAR rings, that keeps every tether to another chain within _TETHER_REACH; its home tethers stay drawn."""
+    import numpy as np
+
+    from foldmap.render import _TETHER_REACH, ligand_marks
+    from foldmap.route import route_loops
+    from helpers import r100_entry
+
+    lay, sses, bb = make_layout(r100_entry(entry))
+    marks = ligand_marks(lay, route_loops(lay, sses, bb), sses, Style())
+    shared = 0
+    for m in marks:
+        chains = [lay.res_chain[r] for r in m["residues"]]
+        c = np.array(m["centre"])
+        far = [(ch, round(float(np.hypot(*(np.array(t) - c))), 2)) for t, ch in zip(m["targets"], chains)]
+        far = [(ch, d) for ch, d in far if ch != chains[0] and d > _TETHER_REACH]
+        shared += len(set(chains)) > 1
+        assert not far, (m["ligand"].name, m["ligand"].chain, m["ligand"].seq, far)
+    assert shared >= ligands
+
+
 def test_a_ligand_whose_home_chain_is_not_drawn_is_tethered_to_the_drawn_one():
     """Focus on one protomer of 1LDM: the OXM of chain A3 touches A1 as well; A3 is not drawn, so it is tethered to
     A1 alone (_local_targets falls back to the drawn chain rather than dropping the ligand)."""
