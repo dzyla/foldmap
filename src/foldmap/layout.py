@@ -1077,8 +1077,8 @@ def _separate(
     room: float = _SEP_SYM_ROOM,
     level: np.ndarray | None = None,
     shared: set[int] = frozenset(),
-    wide: list[bool] | None = None,
-) -> bool:
+    again: bool = False,
+) -> str:
     """Push overlapping items apart, then slide any left over clear. With `ties` (_symmetry_ties) the pushes
     keep every protomer drawn alike (_push_apart), and that result is kept if it clears every overlap within
     _SEP_ORBIT_SWEEPS sweeps and its box takes at most `room` times the area of moving the items one by
@@ -1091,15 +1091,16 @@ def _separate(
     and slid sideways (_push_apart, _slide_clear). `shared`: items holding elements of several protomers with no
     copy of their own (a dimer's continuous sheet, 1SLV): when the tied pushes fail, they are run again with these
     yielding to the tied items, which keep their copies alike (_push_apart), and sliding clear last
-    (_slide_clear). With `wide` (a list: build_layout's `alike_first`), the pieces of a copy cut in two are one
-    unit (_twins), and tied pushes not kept get a second chance (_tied_again): every item with no copy yields, and
-    the result is kept if it takes at most _SEP_TIE_ROOM times the one-by-one room (both measured after their
-    slides); `wide` then gets True appended. True when the tied pushes are kept: the copies drawn alike."""
+    (_slide_clear). With `again` (build_layout's `alike_first`), tied pushes not kept get a second chance
+    (_tied_again): every item with no copy yields, and the result is kept if it takes at most _SEP_TIE_ROOM times
+    the one-by-one room (both measured after their slides). Returns "alike" when the tied pushes are kept (the
+    copies drawn alike), "wide" when the second chance keeps them, else "alone" (moved one by one; also with no
+    ties)."""
     halves = np.array([it.half for it in items], float).reshape(-1, 2)
     mids = np.array([it.mid for it in items], float).reshape(-1, 2)
     start = np.array([(it.cx, it.cy) for it in items], float).reshape(-1, 2)
     home = np.array([it.home for it in items], float).reshape(-1, 2)
-    joints = _rigid_joints(items, joints) | (_twins(items, ties or {}) if wide is not None else set())
+    joints = _rigid_joints(items, joints)
     apart = _joint_matrix(len(items), joints)
     xy = start.copy()
     alone = start.copy()
@@ -1120,15 +1121,11 @@ def _separate(
     for it, (x, y) in zip(items, xy.tolist()):
         it.cx, it.cy = x, y
     _slide_clear(items, joints, fixed, level, lone)
-    if (
-        ties
-        and wide is not None
-        and xy is alone
-        and _tied_again(items, ties, start, halves, mids, home, joints, apart, fixed, mirror, level)
-    ):
-        wide.append(True)
-        return True
-    return bool(ties) and xy is not alone
+    if ties and xy is not alone:
+        return "alike"
+    if ties and again and _tied_again(items, ties, start, halves, mids, home, joints, apart, fixed, mirror, level):
+        return "wide"
+    return "alone"
 
 
 def _tied_again(
@@ -1175,34 +1172,6 @@ def _tied_again(
     for it, (x, y) in zip(items, alone):
         it.cx, it.cy = x, y
     return False
-
-
-def _twins(items: list[_Item], ties: dict[int, tuple[int, int]]) -> set[tuple[int, int]]:
-    """(i, j), i < j, for every two items of one copy tied to the same protomer-0 item (_symmetry_ties) whose
-    elements do not meet: the copy's sheet was cut in two where its mate's is whole (7QUP's 2B sheet, 9P1X's T and S
-    strands), and each piece took its elements' places in the mate, in the same orbit. They are one unit, moved
-    together and never pushed apart (_separate counts them as `joints`): their boxes overlap, and pushed apart alone,
-    each piece left the rest of its copy behind (random-100 C2b-3: 7QUP's ties 1.0 to 1.3 apart, 9P1X T~b 0.58).
-    Two pieces whose elements meet (both took the place of one mate strand: 7QUP 10B:265-266 and 10B:268-271 under
-    1B:265-271) are no twins: they must part (fix round 1)."""
-    pieces: dict[tuple[int, int], list[int]] = {}
-    for i, (j, k) in sorted(ties.items()):
-        pieces.setdefault((j, k), []).append(i)
-
-    def meet(a: _Item, b: _Item) -> bool:
-        return any(
-            _boxes_meet(np.add(_footprint(m), (*o, *o)), np.add(_footprint(x), (*q, *q)))
-            for m, o in zip(a.members, a.offsets)
-            for x, q in zip(b.members, b.offsets)
-        )
-
-    return {
-        (a, b)
-        for got in pieces.values()
-        for n, a in enumerate(got)
-        for b in got[n + 1 :]
-        if not meet(items[a], items[b])
-    }
 
 
 def _lone_left(xy, halves, mids, apart, lone: set[int]) -> bool:
@@ -2566,20 +2535,10 @@ def _regroup_copies(
             [np.subtract(mine.offsets[at(mine.members, mate[id(it.members[p])])], it.offsets[p]) for p in ps], axis=0
         )
 
-    def into_group(got: list, extra: list) -> None:  # unpaired members join their group, clear of its members
-        for m, o in extra:
-            box = _footprint(m)
-            o = np.asarray(o, float)
-            way = 1.0 if o[0] >= np.mean([q[0] for _, q in got] or [0.0]) else -1.0
-            for _ in range(_JOIN_TRIES):
-                if not any(_boxes_meet(np.add(box, (*o, *o)), np.add(_footprint(x), (*q, *q))) for x, q in got):
-                    break
-                o = o + (way * _SLIDE_STEP, 0.0)
-            got.append((m, tuple(float(v) for v in _snap(o))))
-
     for k in sorted({v for v in sector.values() if v > 0}):
         copies = {i for i, it in enumerate(items) if plain(it, {k})}
         mate: dict[int, Placed] = {}  # id of a copy element -> its protomer-0 element
+        kinked: list[tuple[Placed, Placed]] = []  # consecutive copy helices whose mates are a kink
         for (p, cls), mine in sorted(chains.items()):
             if p != k or len(mine) != 1 or len(chains.get((0, cls), [])) != 1:
                 continue
@@ -2598,10 +2557,10 @@ def _regroup_copies(
             for a, b in pair_places([place(m) for m in xs], [place(m) for m in ys]).items():
                 mate[id(ys[b])] = xs[a]
             helices = sorted((m for m in ys if m.sse.kind == "H" and id(m) in mate), key=lambda m: m.sse.start)
-            for a, b in zip(helices, helices[1:]):  # drawn as their mates, a kink of the mate's is a kink here too
+            for a, b in zip(helices, helices[1:]):  # regrouped as their mates, a kink of the mate's is a kink here
                 ma, mb = mate[id(a)].sse, mate[id(b)].sse
                 if 0 <= mb.start - ma.end - 1 <= KINK_GAP and b.sse.start - a.sse.end - 1 > KINK_GAP:
-                    kinks.add((a.sse.id, b.sse.id))
+                    kinked.append((a, b))
 
         def at_mates(it: _Item, mine: _Item, mate: dict[int, Placed] = mate) -> bool:  # each paired element at its
             # mate's offset, with its shape
@@ -2666,7 +2625,9 @@ def _regroup_copies(
             if to:  # what the mate lacks joins the group that took most of its item's elements, by their mean step
                 most = min(set(to.values()), key=lambda r: (-sum(v == r for v in to.values()), r))
                 step = step_to(it, items[most], [p for p, r in to.items() if r == most])
-                extras.setdefault(most, []).extend((it.members[p], tuple(np.add(it.offsets[p], step))) for p in rest)
+                extras.setdefault(most, []).extend(
+                    (it.members[p], np.add(it.offsets[p], step), it, it.offsets[p]) for p in rest
+                )
             elif not _on_end(items, ties, held, dirty, fixed, i, it, rest):  # a helix piece let go joins its helix
                 mine_m = [it.members[p] for p in rest]
                 left.append(
@@ -2675,10 +2636,19 @@ def _regroup_copies(
                     )
                 )
         drop |= dirty
+        regrouped = {id(m) for got in groups.values() for m, _ in got}
+        kinks |= {(a.sse.id, b.sse.id) for a, b in kinked if id(a) in regrouped and id(b) in regrouped}
         for r, got in sorted(groups.items()):
             mates = items[r].members
             got.sort(key=lambda x: (at(mates, mate[id(x[0])]), x[0].sse.start))
-            into_group(got, extras.get(r, []))
+            refused: dict[int, list] = {}
+            for m, old, at_old in _into_group(got, extras.get(r, [])):
+                refused.setdefault(id(old), [old]).append((m, at_old))
+            for old, *those in refused.values():
+                mine_m = [m for m, _ in those]
+                left.append(
+                    _Item(mine_m, [o for _, o in those], old.cx, old.cy, old.home, *_anchor([m.sse for m in mine_m]))
+                )
             mine_m = [m for m, _ in got]
             item = _Item(
                 mine_m, [o for _, o in got], items[r].cx, items[r].cy, items[r].home, *_anchor([m.sse for m in mine_m])
@@ -2703,11 +2673,39 @@ def _boxes_meet(a, b) -> bool:
 _JOIN_TRIES = 40  # _SLIDE_STEP moves an unpaired member joining its regrouped copy may take to clear its members
 
 
+def _into_group(got: list, extra: list) -> list:
+    """_regroup_copies: the unpaired members of a dissolved copy item (`extra`: (member, offset by the mean step,
+    its old item, its old offset)) join the regrouped item `got` ((member, offset) pairs, appended to), each slid
+    sideways away from the group's middle, _SLIDE_STEP at a time on snapped offsets, to the first spot clear of every
+    member (at most _JOIN_TRIES steps). Those with no clear spot are returned as (member, old item, old offset), to
+    stay untied where they were: never drawn over another element of the item (fix round 2)."""
+    refused = []
+    for m, o, old, at_old in extra:
+        o = _snap(np.asarray(o, float))
+        way = 1.0 if o[0] >= float(_snap(np.mean([q[0] for _, q in got] or [0.0]))) else -1.0
+        for _ in range(_JOIN_TRIES):
+            if _clear_of(m, o, got):
+                got.append((m, tuple(float(v) for v in o)))
+                break
+            o = _snap(o + (way * _SLIDE_STEP, 0.0))
+        else:
+            refused.append((m, old, at_old))
+    return refused
+
+
+def _clear_of(m: Placed, o, placed: list) -> bool:
+    """Is member m, at offset o of an item, clear (by MARGIN) of each (member, offset) of `placed`, by footprint?"""
+    box = np.add(_footprint(m), (o[0], o[1], o[0], o[1]))
+    return not any(_boxes_meet(box, np.add(_footprint(x), (q[0], q[1], q[0], q[1]))) for x, q in placed)
+
+
 def _on_end(items, ties, held, dirty, fixed, i: int, it: _Item, rest: list[int]) -> bool:
     """A helix piece let go by _regroup_copies (tied to a mate item whose elements another copy item pairs with:
     7QUP 9C:240-243, cut from 9C:224-238 where 1C:224-243 is whole) joins that copy item when it is no sheet: end to
     end with the helix of its own chain next to it in sequence, along its axis, _PIECE_GAP apart (as a kinked
-    helix's pieces stand), so it stays with its copy (it drifted 62 page units off as an item of its own)."""
+    helix's pieces stand), so it stays with its copy (it drifted 62 page units off as an item of its own). A spot
+    another element of the item takes is passed by: the piece moves on along the axis, _SLIDE_STEP at a time, to the
+    first clear spot (at most _JOIN_TRIES steps); with none, False and nothing joins (it stays untied)."""
     if i not in ties or len(held.get(ties[i][0], ())) != 1:
         return False
     (h,) = held[ties[i][0]]
@@ -2715,6 +2713,8 @@ def _on_end(items, ties, held, dirty, fixed, i: int, it: _Item, rest: list[int])
     pieces = [it.members[p] for p in rest]
     if h in dirty or fixed(host) or any(m.sse.kind not in ("H", "G") for m in pieces):
         return False
+    placed = list(zip(host.members, host.offsets))
+    joins = []
     for m in sorted(pieces, key=lambda m: m.sse.start):
         near = [x for x in host.members if x.sse.chain == m.sse.chain and x.sse.kind in ("H", "G")]
         if not near:
@@ -2722,10 +2722,20 @@ def _on_end(items, ties, held, dirty, fixed, i: int, it: _Item, rest: list[int])
         x = min(near, key=lambda x: (min(abs(m.sse.start - x.sse.end), abs(x.sse.start - m.sse.end)), x.sse.start))
         q = next(n for n, y in enumerate(host.members) if y is x)
         way = 1.0 if m.sse.start > x.sse.end else -1.0
-        reach = way * (x.length / 2 + m.length / 2 + _PIECE_GAP)
-        m.angle = x.angle
+        shape = Placed(m.sse, 0.0, 0.0, m.length, x.angle, m.width)  # the piece as it would be drawn
+        for n in range(_JOIN_TRIES):
+            reach = way * (x.length / 2 + m.length / 2 + _PIECE_GAP + n * _SLIDE_STEP)
+            o = _snap(np.add(host.offsets[q], reach * x.direction))
+            if _clear_of(shape, o, placed):
+                break
+        else:
+            return False
+        placed.append((shape, o))
+        joins.append((m, x.angle, tuple(float(v) for v in o)))
+    for m, angle, o in joins:
+        m.angle = angle
         host.members.append(m)
-        host.offsets.append(tuple(float(v) for v in _snap(np.add(host.offsets[q], reach * x.direction))))
+        host.offsets.append(o)
     return True
 
 
@@ -3251,16 +3261,13 @@ def build_layout(
             and k not in {j for j, _ in ties.values()}
             and len({sector_of.get(m.sse.chain) for m in it.members if isinstance(m, Placed)} - {None}) > 1
         }
-        # the copies drawn alike only by _separate's second chance, in more room (None: no second chance)
-        wide: list[bool] | None = [] if alike_first else None
-        alike = _separate(
-            items, ties, joints, walls, mirror=mirror if ties else None, level=kept, shared=shared, wide=wide
+        state = _separate(  # "alike", "wide" (alike only by the second chance, in more room) or "alone"
+            items, ties, joints, walls, mirror=mirror if ties else None, level=kept, shared=shared, again=alike_first
         )
         if domains and _part_domains(items, domains, ties, mirror if ties else None):
             # the domains, parted with their copies, keep them alike whatever room that takes
-            wide = [] if wide is not None else None
-            alike = _separate(
-                items, ties, joints, walls, mirror=mirror if ties else None, room=np.inf, level=kept, wide=wide
+            state = _separate(
+                items, ties, joints, walls, mirror=mirror if ties else None, room=np.inf, level=kept, again=alike_first
             )
         report = _TIE_TURN.get()[1]
         if report is not None:  # the shared sheets whose way up is a symmetry tie: _both_ways may turn them
@@ -3270,7 +3277,7 @@ def build_layout(
                 for k, sh in enumerate(sheets)
                 if k not in templates and sh.strands[0].id in held and _sheet_seen(sh, frame)[1] == 0
             )
-            report["alike"], report["wide"] = alike and not wide, alike and bool(wide)
+            report["alike"], report["wide"] = state == "alike", state == "wide"
     for it in items:
         it.apply()
     dna = [m for it in items for m in it.members if isinstance(m, PlacedStem)]

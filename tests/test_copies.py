@@ -351,19 +351,6 @@ def test_crowded_copies_are_drawn_alike_in_more_room():
     }
 
 
-def test_the_pieces_of_a_copy_cut_in_two_move_as_one():
-    """Random-100 C2b-3 A15, cause C (7QUP focus: 59 of its 60 ties 0.99 to 1.34 apart once drawn alike): a copy's
-    sheet cut in two where its mate's is whole (2B's 10 strands, 1B's one sheet) is two items tied to one mate, at
-    one place; their boxes overlap, and they were pushed apart alone, each piece leaving the rest of its copy behind,
-    and every other copy moved round them. The pieces are one unit (_twins). (7D~1D and 13D~1D are left to cause B:
-    7D's sheet holds a strand 1D's lacks, 13D's is tied to 1D's in part.)"""
-    from helpers import r100_entry
-
-    got = figcheck.copies_alike(_laid_out(r100_entry("7QUP"), focus="none"))
-    bad = {f"{a}~{b}": round(v, 3) for (a, b), v in got.items() if v > ALIKE and a not in ("7D", "13D")}
-    assert len(got) == 60 and not bad, bad
-
-
 @pytest.mark.parametrize(
     "entry, view, ties",
     [("9P1X", {"focus": "none"}, 20), ("7QUP", {"focus": "none"}, 60), ("6JLN", {}, 19)],
@@ -386,15 +373,15 @@ def test_copies_whose_elements_are_grouped_apart_are_drawn_alike(entry, view, ti
 
 
 def test_what_a_regrouped_copy_holds_alone_stays_beside_it():
-    """Random-100 C2b-3 VIEW: 7QUP's 7D:244-246, a strand 1D lacks, was left untied where its dissolved sheet had
-    been projected, 42 page units from its copy drawn alike with 1D. It stays beside the regrouped copy, as it stood
-    beside those strands in its own sheet."""
+    """Random-100 C2b-3 VIEW: 7QUP's 7D:244-246, a strand 1D lacks, was left untied where its sheet had been
+    projected, 42 page units from its copy drawn alike with 1D. Its sheet (which keeps its own shape, R2) is tied
+    beside its mates' copy: the strand stands 4 page units from 7D's median element."""
     from helpers import r100_entry
 
     lay = _laid_out(r100_entry("7QUP"), focus="none").layout
     mine = np.array([(p.cx, p.cy) for p in lay.placed.values() if p.sse.chain == "7D"])
     lone = lay.placed["7D:244-246"]
-    assert np.hypot(*(np.subtract((lone.cx, lone.cy), np.median(mine, axis=0)))) < 25
+    assert np.hypot(*(np.subtract((lone.cx, lone.cy), np.median(mine, axis=0)))) < 6.0  # 4.0 drawn
 
 
 def test_a_copys_sheet_is_drawn_by_its_own_pairing():
@@ -413,12 +400,15 @@ def test_a_copys_sheet_is_drawn_by_its_own_pairing():
 
 
 def test_a_copys_barrel_keeps_its_ghost():
-    """C2b-3 fix round 1, ruling R2: 9P1X G's sheet closes into a barrel (a's does not); regrouping G's strands as a's
-    dropped its ghost. The copy keeps its own closure."""
+    """C2b-3 fix round 1, ruling R2: 9P1X G's sheet (G, H and I strands) closes into a barrel, a's does not;
+    regrouping G's strands as a's dropped its closure (4787c55). The copy keeps its own: G:29-35 repeated as the
+    ghost of the very block that holds it, as at 20bb525 (which never lost it)."""
     from helpers import r100_entry
 
     lay = _laid_out(r100_entry("9P1X"), focus="none").layout
-    assert any(g.sse.chain == "G" for g in lay.ghosts)
+    (n,) = [n for n, ids in enumerate(lay.sheets) if "G:29-35" in ids]
+    assert lay.sheet_ghosts[n] == ["G:29-35"]
+    assert {lay.placed[k].sse.chain for k in lay.sheets[n]} == {"G", "H", "I"}
 
 
 def test_a_helix_piece_let_go_stays_with_its_helix():

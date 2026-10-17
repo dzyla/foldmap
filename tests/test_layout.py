@@ -763,3 +763,56 @@ def test_two_chain_ends_facing_one_stack_gap_keep_their_letters_apart():
 
     d = draw_spec(figure_spec(r100_entry("7JU4")))
     assert [h for h in figcheck.text_collisions(d) if h.count("terminus:") == 2] == []
+
+
+def _helix_item(*members):
+    from foldmap.layout import Placed, _Item
+    from helpers import fake_sse
+
+    placed, offsets = [], []
+    for start, end, chain, angle, offset in members:
+        placed.append(Placed(fake_sse("H", start, end, chain=chain), 0.0, 0.0, (end - start) * 0.5, angle, 1.0))
+        offsets.append(offset)
+    return _Item(placed, offsets, 0.0, 0.0, (0.0, 0.0), members[0][0], members[0][2])
+
+
+def test_a_helix_piece_let_go_passes_a_taken_spot():
+    """C2b-3 fix round 2: _on_end puts a let-go helix piece end to end past its own helix in the copy item; when
+    another element of that item stands there, the piece moves on along the axis to the first clear spot, never over
+    it, and with no clear spot it does not join."""
+    from foldmap.layout import _clear_of, _on_end
+
+    host = _helix_item((10, 30, "B", 0.0, (0.0, 0.0)), (50, 60, "C", 0.0, (6.0, 0.0)))  # C's helix past B's end
+    piece = _helix_item((32, 36, "B", 0.0, (0.0, 0.0)))
+    items, ties, held = [host, piece], {1: (9, 1)}, {9: {0}}
+    assert _on_end(items, ties, held, set(), lambda it: False, 1, piece, [0])
+    m = piece.members[0]
+    q = host.offsets[host.members.index(m)]
+    others = [(x, o) for x, o in zip(host.members, host.offsets) if x is not m]
+    assert _clear_of(m, q, others) and q[0] > 6.0  # passed C's helix
+    walled = _helix_item(
+        (10, 30, "B", 0.0, (0.0, 0.0)), *[(50 + k, 51 + k, "C", np.pi / 2, (5.6 + 0.5 * k, 0.0)) for k in range(50)]
+    )
+    piece = _helix_item((32, 36, "B", 0.0, (0.0, 0.0)))
+    before = len(walled.members)
+    assert not _on_end([walled, piece], ties, held, set(), lambda it: False, 1, piece, [0])
+    assert len(walled.members) == before
+
+
+def test_an_unpaired_member_joins_its_regrouped_copy_only_where_clear():
+    """C2b-3 fix round 2: _into_group slides an unpaired member of a dissolved copy item off its regrouped group's
+    members to the first clear spot; with none within _JOIN_TRIES it is refused (left untied where it was), never
+    added over another element."""
+    from foldmap.layout import _clear_of, _into_group
+
+    group = _helix_item((10, 30, "B", 0.0, (0.0, 0.0)))
+    got = list(zip(group.members, group.offsets))
+    m = _helix_item((40, 44, "B", np.pi / 2, (0.0, 0.0))).members[0]
+    assert _into_group(got, [(m, (0.5, 0.0), group, (0.0, 0.0))]) == []
+    (_, o) = got[-1]
+    assert got[-1][0] is m and _clear_of(m, o, got[:-1]) and o[0] > 0.5  # slid off B's helix, right of the middle
+    wall = _helix_item(*[(k, k + 40, "C", np.pi / 2, (0.5 * k, 0.0)) for k in range(-60, 60)])  # x -30 to 30
+    got = list(zip(wall.members, wall.offsets))
+    m = _helix_item((90, 94, "B", np.pi / 2, (0.0, 0.0))).members[0]
+    refused = _into_group(got, [(m, (1.0, 0.0), group, (3.0, 4.0))])
+    assert refused == [(m, group, (3.0, 4.0))] and all(x is not m for x, _ in got)

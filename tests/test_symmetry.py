@@ -199,7 +199,7 @@ def test_a_sideways_overlap_between_protomers_widens_the_spread(monkeypatch):
 def test_copies_move_alone_when_moving_them_together_cannot_clear(monkeypatch):
     """A free element (u) wedged between protomer 1's copies, where protomer 0 has room: the symmetric pushes
     go round in circles. After _SEP_ORBIT_SWEEPS sweeps the items start again from where they were and move
-    one by one (with no second chance, _separate's `wide` None: as if there were no copies)."""
+    one by one (with no second chance, _separate's `again` False: as if there were no copies)."""
     from foldmap import layout
 
     sweeps = []
@@ -240,8 +240,7 @@ def test_symmetric_separation_never_costs_much_more_room_than_moving_items_alone
 
     items, ties = build()
     alone, _ = build()
-    wide = []
-    assert layout._separate(items, ties, wide=wide) and wide == [True]
+    assert layout._separate(items, ties, again=True) == "wide"
     layout._separate(alone)
     assert _overlaps(items) == 0
     assert 1.05 * _area(alone) < _area(items) <= layout._SEP_TIE_ROOM * _area(alone)
@@ -318,8 +317,7 @@ def test_copies_that_need_more_room_are_kept_alike_when_free_items_yield():
 
     a, b = (0.8, 0.3), (3.4, 3.4)
     items = [_box(*a, 1), _box(*b, 20), _box(a[0] + 3, a[1], 1, "B"), _box(b[0] + 3, b[1], 20, "B"), _box(5.3, 2.8, 40)]
-    wide = []
-    assert layout._separate(items, {2: (0, 1), 3: (1, 1)}, wide=wide) and wide == [True]
+    assert layout._separate(items, {2: (0, 1), 3: (1, 1)}, again=True) == "wide"
     assert _overlaps(items) == 0
     for i, j in ((2, 0), (3, 1)):
         assert (items[i].cx - items[j].cx, items[i].cy - items[j].cy) == pytest.approx(
