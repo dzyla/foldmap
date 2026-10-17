@@ -112,7 +112,8 @@ class _Grid:
             self.soft |= cells
         self.blocked |= self.soft
         self.toll: np.ndarray | None = None  # extra cost of entering a cell (text placed after routing), when set
-        self.near_ports: set[tuple[float, float]] = set()  # ports a route may start nearer (_PUSH_NEAR), when set
+        # ports a route may start nearer (_PUSH_NEAR), when set; so may any port whose first step is in the slab
+        self.near_ports: set[tuple[float, float]] = set()
         self.slab = np.zeros((self.nx, self.ny), bool)  # cells strictly inside the membrane band (one per row)
         if layout.membrane:
             for lo, hi in layout.membrane.get("bands", [layout.membrane["y"]]):

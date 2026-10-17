@@ -1354,6 +1354,11 @@ def _strands_crossed(c, targets, strands) -> int:
     return n
 
 
+def _beyond_reach(c, bound) -> bool:
+    """Does any of `bound` lie farther than _TETHER_REACH from spot c (the distances snapped, layout._snap)?"""
+    return any(float(_snap(np.hypot(*np.subtract(t, c)))) > _TETHER_REACH for t in bound)
+
+
 def _mark_spot(
     anchor,
     half,
@@ -1399,7 +1404,7 @@ def _mark_spot(
             if free is None:
                 free = c
                 reach = max(_TETHER_REACH, *(np.hypot(*(np.subtract(t, c))) for t in ts))
-            if bound and any(np.hypot(*(np.subtract(t, c))) > _TETHER_REACH for t in bound):
+            if _beyond_reach(c, bound):
                 continue
             if (na is not None or bound or all(np.hypot(*(np.subtract(t, c))) <= reach for t in ts)) and not any(
                 clip_len(c, t, b) > 1e-9 for t in ts for b in texts
@@ -1443,7 +1448,7 @@ def _place_mark(
     layers = ((taken + lines, tethers), (taken, tethers), (taken, ()))
 
     def kept(spot, upto: int):
-        if not bound or all(np.hypot(*(np.subtract(t, spot))) <= _TETHER_REACH for t in bound):
+        if not _beyond_reach(spot, bound):
             return spot
         for blocked, drawn in layers[: upto + 1]:
             far = _SPOT_FAR * _SPOT_RADIUS
