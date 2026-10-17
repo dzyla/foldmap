@@ -197,6 +197,28 @@ def test_a_tether_to_another_chain_stays_within_reach_of_the_mark(entry, ligands
     assert shared >= ligands
 
 
+def test_a_mark_moved_for_another_chain_keeps_its_main_contact_within_reach():
+    """Random-100 C2b-5 (review of the run): held only to its tethers to other chains, the spot search took 1SLV's Cu
+    B1248 (chain B1) in the beta view (its first clear spot left A1's target 6.6 away) to the one text-free spot that
+    kept A1 within _TETHER_REACH, 7.35 from its anchor and 7.67 from its main contact, its tethers back across the
+    sheet. A spot moved for another chain also keeps the home chain's main contact (its heaviest target) within
+    reach; with none such, the first spot stays."""
+    import numpy as np
+
+    from foldmap.render import _TETHER_REACH, ligand_marks
+    from foldmap.route import route_loops
+    from helpers import r100_entry
+
+    lay, sses, bb = make_layout(r100_entry("1SLV"), names=["beta"])
+    marks = ligand_marks(lay, route_loops(lay, sses, bb), sses, Style())
+    cus = [m for m in marks if m["ligand"].name == "CU"]
+    assert [m["ligand"].chain for m in cus] == ["B1", "B2"]  # one per copy of the assembly
+    for cu in cus:
+        assert len({lay.res_chain[r] for r in cu["residues"]}) > 1  # held by two chains
+        main = cu["targets"][0]  # the heaviest home target comes first here (two residues on B, the loop 143)
+        assert float(np.hypot(*np.subtract(main, cu["centre"]))) <= _TETHER_REACH, (cu["centre"], main)
+
+
 def test_a_ligand_whose_home_chain_is_not_drawn_is_tethered_to_the_drawn_one():
     """Focus on one protomer of 1LDM: the OXM of chain A3 touches A1 as well; A3 is not drawn, so it is tethered to
     A1 alone (_local_targets falls back to the drawn chain rather than dropping the ligand)."""

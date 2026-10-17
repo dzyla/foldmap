@@ -1386,10 +1386,10 @@ def _mark_spot(
     tethers crossed; the two counts come before the continuous lengths, which almost never tie).
     `retarget` (spot -> targets): the tethers a spot gets, when they depend on it (a mark held by nucleotides is
     tethered to those drawn nearest it, _na_targets), judged as drawn.
-    `bound` (targets on chains other than the ligand's home, _place_mark): a spot is taken only when each of them
-    lies within _TETHER_REACH of it, its home tethers no longer held to the first clear spot's reach (they are drawn
-    whatever their length, the plan-11 ruling; 8ESZ's 3PE 5604 has no spot within both), and None is returned when
-    no spot within `radius` does (never the first clear spot)."""
+    `bound` (the home chain's main contact and the targets on other chains, _place_mark): a spot is taken only when
+    each of them lies within _TETHER_REACH of it, its other home tethers no longer held to the first clear spot's
+    reach (they are drawn whatever their length, the plan-11 ruling; 8ESZ's 3PE 5604 has no spot within both), and
+    None is returned when no spot within `radius` does (never the first clear spot)."""
     spot = free = None
     best, last_ring = None, None
     for n, ring in enumerate(np.arange(0.0, radius, 0.35)):
@@ -1440,15 +1440,17 @@ def _place_mark(
     elements and text only (the tethers' crossings given up), else of the elements and text with every tether given
     up; else further out, else on its anchor: a chosen ligand is never left without a mark (C5 fix round 1: 6JO6 lost
     24 on a crowded page; batch B: 7QUP lost one with nothing clear within _SPOT_RADIUS).
-    `bound`: its targets on other chains than its home. Each lies within _TETHER_REACH of the home chain's main
-    contact (_local_targets), but the anchor, the mean of all its targets, follows home contacts drawn far from it:
-    a spot that leaves one of them farther than _TETHER_REACH gives way to the first spot, kept off as much (the same
-    keep-outs, or stricter), out to _SPOT_FAR times _SPOT_RADIUS, that keeps them all within it (random-100 C2b-5:
-    6JLN's CLA B609 drawn 10.15 from H's helix, 3.80 from the main contact)."""
+    `bound`: the home chain's main contact (its heaviest target), then its targets on other chains. Each of those lies
+    within _TETHER_REACH of the main contact (_local_targets), but the anchor, the mean of all its targets, follows
+    home contacts drawn far from it: a spot that leaves one of them farther than _TETHER_REACH gives way to the first
+    spot, kept off as much (the same keep-outs, or stricter), out to _SPOT_FAR times _SPOT_RADIUS, that keeps them
+    and the main contact within it, so the mark stays in its pocket (random-100 C2b-5: 6JLN's CLA B609 drawn 10.15
+    from H's helix, 3.80 from the main contact; held to the other chains alone, 1SLV's Cu went 7.35 from its anchor,
+    7.67 from its main contact, in the beta view); else the spot stays."""
     layers = ((taken + lines, tethers), (taken, tethers), (taken, ()))
 
     def kept(spot, upto: int):
-        if not _beyond_reach(spot, bound):
+        if not _beyond_reach(spot, bound[1:]):
             return spot
         for blocked, drawn in layers[: upto + 1]:
             far = _SPOT_FAR * _SPOT_RADIUS
@@ -1598,12 +1600,15 @@ def ligand_marks(layout: Layout, loops: list[Loop], sses: list[SSE], look: Style
     # among the elements (each a segment array): for ligands held by it alone, built once per page
     # by first holding residue, in the file's order on a tie (as before C33), those held by nucleotides alone last
     for g in sorted(chosen, key=lambda g: (not g.contacts, g.contacts[0] if g.contacts else 0)):
-        bound: list = []  # its targets on other chains than its home (the first target's), kept within reach
+        bound: list = []  # its main contact, then its targets on other chains than its home (the first target's)
         if g.contacts:
             targets, weights, tethered = _local_targets(layout, loops, sses, g, g.metal)
             keep_off, words = taken, texts
             chains = [layout.res_chain[r] for r in tethered]
-            bound = [t for t, c in zip(targets, chains) if c != chains[0]]
+            others = [t for t, c in zip(targets, chains) if c != chains[0]]
+            home = len(targets) - len(others)  # the home chain's targets come first (_local_targets)
+            if others:
+                bound = [targets[int(np.argmax(weights[:home]))], *others]
         else:  # held by nucleotides alone (C33: 8XZE): tethered to them, kept off stems, letters and names
             if na_spots is None:
                 na_spots = _na_spots(layout, look)
