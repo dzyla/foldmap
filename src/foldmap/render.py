@@ -1364,9 +1364,10 @@ def _mark_spot(
     loops' lines (`runs`, _along_loops); else that first clear spot; None when there is none within _SPOT_RADIUS.
     `na` (stems, strands: a mark held by nucleotides alone) judges every clear spot within `radius`, its tethers no
     longer held to the first clear spot's reach, in this order: the stems its tethers cross (past the rail each
-    enters, _stems_crossed), their length over elements and along loop lines (as above), the strands they cross as
-    drawn among the elements (hairpin loops, runs, _strands_crossed), their length (random-100 C2b-4 fix round 2
-    ruling: scored on the stems alone, 8SA2's B1Z was blind to the hairpin loop and runs its tethers crossed).
+    enters, _stems_crossed), the strands they cross as drawn among the elements (hairpin loops, runs,
+    _strands_crossed), their length over elements and along loop lines (as above), their length (random-100 C2b-4
+    fix rounds 2 and 3 rulings: scored on the stems alone, 8SA2's B1Z was blind to the hairpin loop and runs its
+    tethers crossed; the two counts come before the continuous lengths, which almost never tie).
     `retarget` (spot -> targets): the tethers a spot gets, when they depend on it (a mark held by nucleotides is
     tethered to those drawn nearest it, _na_targets), judged as drawn."""
     spot = free = None
@@ -1391,8 +1392,8 @@ def _mark_spot(
                     length = sum(float(np.hypot(*(np.subtract(t, c)))) for t in ts)
                     over = (
                         _stems_crossed(c, ts, na[0]),
-                        round(over, 4),
                         _strands_crossed(c, ts, na[1]),
+                        round(over, 4),
                         round(length, 4),
                     )
                     if best is None or over < best[0]:
@@ -1552,7 +1553,8 @@ def ligand_marks(layout: Layout, loops: list[Loop], sses: list[SSE], look: Style
     # a mark is kept off the loops' lines (C5) ...
     tethers: list[tuple] = []  # ... and the tethers drawn before: (from, to)
     out = []
-    na_spots = None  # where nucleotides are drawn, and the nucleic acid's own boxes: for ligands held by it alone
+    na_spots = na_lines = None  # where nucleotides are drawn, the nucleic acid's own boxes, and its strands as drawn
+    # among the elements (each a segment array): for ligands held by it alone, built once per page
     # by first holding residue, in the file's order on a tie (as before C33), those held by nucleotides alone last
     for g in sorted(chosen, key=lambda g: (not g.contacts, g.contacts[0] if g.contacts else 0)):
         if g.contacts:
@@ -1569,10 +1571,11 @@ def ligand_marks(layout: Layout, loops: list[Loop], sses: list[SSE], look: Style
         half = (0.3, 0.3) if g.metal else (0.12 * len(g.name) + 0.2, 0.27)
         na, retarget = None, None
         if not g.contacts:  # held by nucleotides alone: its tethers, as drawn from each spot, off the stems and strands
-            at = {key: d for d in layout.stems for key in d.axial}  # each strand as drawn among the elements: a
-            # run's stretches along its own stems' rails are the stems' (na_paths.among)
-            strands = [np.asarray(among(p, at), float).reshape(-1, 2) for p in layout.na_paths]
-            na = (layout.stems, [np.hstack([q[:-1], q[1:]]) for q in strands if len(q) > 1])
+            if na_lines is None:  # a run's stretches along its own stems' rails are the stems' (na_paths.among)
+                at = {key: d for d in layout.stems for key in d.axial}
+                strands = [np.asarray(among(p, at), float).reshape(-1, 2) for p in layout.na_paths]
+                na_lines = [np.hstack([q[:-1], q[1:]]) for q in strands if len(q) > 1]
+            na = (layout.stems, na_lines)
             retarget = lambda c, g=g, where=na_spots[0]: _na_targets(layout, g, where, np.asarray(c, float))[0]  # noqa: E731
         spot = _place_mark(anchor, half, targets, keep_off, lines, words, tethers, bodies, runs, na, retarget)
         if not g.contacts:  # held by nucleotides alone: each tether to the touched nucleotide nearest the mark

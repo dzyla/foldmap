@@ -125,6 +125,7 @@ def _straight_joint(
     if not (gap < _JOINT_NEAR or touching):
         if gap >= _JOINT_REACH or forward < _JOINT_FORWARD * gap or _grazes(line, (da, db)):
             return False
+        # _off_names judges a route between its faces (it drops the first and last point): doubled, the line itself
         if not _off_names([fa, fa, fb, fb], names) or (loops is not None and loops.crosses(line)):
             return False
     if not _clear(line, (da, db), *router.elements, grow=_INFLATE, kink=True):

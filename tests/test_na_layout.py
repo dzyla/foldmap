@@ -2791,3 +2791,18 @@ def test_a_mark_held_by_nucleotides_keeps_its_tethers_off_strands():
     assert _strands_crossed(spot, target, [strand]) == 0
     assert np.hypot(*np.subtract(spot, target[0])) < 0.2  # of those, the one with the shortest tether
     assert list(_mark_spot(np.zeros(2), (0.1, 0.1), target, [], [], [])) == [0.0, 0.0]
+
+
+def test_a_mark_held_by_nucleotides_crosses_fewer_strands_before_it_keeps_off_bodies():
+    """Random-100 C2b-4 fix round 3 (ruling): for a mark held by nucleotides the strands its tethers cross are judged
+    before their length over element bodies, a continuous measure that almost never ties. Here every spot whose tether
+    misses the strand runs a little over a body, and every spot clear of the body crosses the strand: the first kind
+    wins."""
+    from foldmap.render import _mark_spot, _over_bodies, _strands_crossed
+
+    strand = np.array([[-5.0, -1.0, 0.1, -1.0]])
+    body = (0.15, -0.8, 3.0, -0.6)
+    target = [(0.0, -2.0)]
+    spot = _mark_spot(np.zeros(2), (0.05, 0.05), target, [], [], [], [body], radius=1.0, na=([], [strand]))
+    assert _strands_crossed(spot, target, [strand]) == 0
+    assert _over_bodies(spot, target, [body]) > 0
