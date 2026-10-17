@@ -2910,3 +2910,16 @@ def test_block_numbers_keep_off_the_strands_leaving_their_stems_ends():
     d = draw_spec(figure_spec(r100_entry("8VWQ")))
     hits = [h for h in figcheck.text_collisions(d) if h.split(" × ")[0].endswith(":first")]
     assert hits == []
+
+
+def test_a_crowded_tie_label_takes_the_spot_fewest_lines_cross():
+    """Random-100 C2b-6 L (8VWQ's ties 2507-2582 and 817-1529, 7Y7C's 752-2609 and 1196-1250): on a crowded ribosome
+    no turn or length of a tie's tick leaves its label clear of every nucleotide, letter and line, and the mark took
+    the first turn, across runs and protein loops. It now takes the one whose label the fewest lines, bodies and texts
+    meet (na_labels._ties)."""
+    from foldmap import figcheck
+    from foldmap.spec import draw_spec, figure_spec
+    from helpers import r100_entry
+
+    d = draw_spec(figure_spec(r100_entry("8VWQ")))
+    assert [h for h in figcheck.text_collisions(d) if h.startswith("na:tie:")] == []

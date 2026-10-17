@@ -296,7 +296,8 @@ def _ties(layout: Layout, paths: list[NAPath], loops=()) -> list[NATie]:
     the order of the ties), each tick turned from its partner as little as keeps it and its label clear of
     bodies, letters, nucleotides, labels, strands and protein loops (`loops`, polylines); where no turn does, the
     tick is drawn longer (_TICK_REACH) and the turns tried again (random-100 C2b-4: 4P9R's and 7Y7C's labels took
-    the first turn, on a strand or loop); where none does at any length, the first turn."""
+    the first turn, on a strand or loop); where none does at any length, the one that meets the fewest lines, bodies
+    and texts (random-100 C2b-6), the first such on a tie."""
     na = layout.nucleic
     where = {key: d.point(key) for d in layout.stems for key in d.axial}
     where.update({(p.strand, i): np.asarray(xy) for p in paths for i, xy in zip(p.nts, p.nt_xy)})
@@ -336,6 +337,19 @@ def _ties(layout: Layout, paths: list[NAPath], loops=()) -> list[NATie]:
             return False
         return not any(clip_len(p, q, box) > 1e-9 or _seg_dist(b, p, q) < 0.15 for p, q in near_segments(box, b))
 
+    def misses(tick, at, own) -> tuple:  # how badly a mark that is not clear sits: what a reader sees first
+        (a, b), (x, y) = tick, at
+        box = (x - hw, y - hh, x + hw, y + hh)
+        through = sum(1 for p, q in near_segments(box, b) if clip_len(p, q, box) > 1e-9)  # lines across its label
+        on = sum(1 for e in bodies if _near(at, e, 0.0)) + sum(  # bodies and text under it
+            1 for o in boxes if min(box[2], o[2]) > max(box[0], o[0]) and min(box[3], o[3]) > max(box[1], o[1])
+        )
+        tick_on = sum(1 for e in bodies if crosses_body(a, b, e))
+        pts = np.asarray(taken, float).reshape(-1, 2)
+        near = pts[np.hypot(*(pts - np.asarray(own, float)).T) > 1e-9]
+        crowd = int((np.hypot(*(near - np.asarray(at, float)).T) < _LETTER_GAP + hh).sum())
+        return through + on, tick_on, crowd
+
     out: list[NATie] = []
     for p in na.structure.ties:
         ka, kb = (p.a, p.i), (p.b, p.j)
@@ -359,7 +373,12 @@ def _ties(layout: Layout, paths: list[NAPath], loops=()) -> list[NATie]:
                         u = np.array([toward[0] * c - toward[1] * s_, toward[0] * s_ + toward[1] * c])
                         a, b = xy + u * _TICK_GAP, xy + u * (_TICK_GAP + _TICK * reach)
                         options.append(((a, b), b + u * (hh + 0.1)))
-                (a, b), at = next((o for o in options if clear(*o, xy)), options[0])
+                found = next((o for o in options if clear(*o, xy)), None)
+                if found is None:  # none clear: the one whose label the fewest lines, bodies and texts meet, then
+                    # whose tick crosses fewest bodies, then nearest fewest nucleotides; the first on a tie
+                    # (random-100 C2b-6: 7Y7C's and 8VWQ's crowded ties took the first turn, across runs)
+                    found = min(options, key=lambda o: misses(*o, xy))
+                (a, b), at = found
                 tie.marks.append(((float(a[0]), float(a[1])), (float(b[0]), float(b[1])), (float(at[0]), float(at[1]))))
                 boxes.append((at[0] - hw, at[1] - hh, at[0] + hw, at[1] + hh))
                 taken.append(np.asarray(at))
