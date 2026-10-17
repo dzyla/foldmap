@@ -697,8 +697,9 @@ def _copy_pairs(drawn, notes: dict | None = None) -> dict[tuple[str, str], tuple
             got = [mapping[j] for j in local if j in mapping] if mapping is not None else list(local)
             return (p.sse.kind, min(got), max(got)) if got else (p.sse.kind, -2, -3)
 
-        found = sorted(pair_places([place(p, ref) for p in a], [place(p, copy, to_ref) for p in b]).items())
-        pa_, pb_ = [place(p, ref) for p in a], [place(p, copy, to_ref) for p in b]
+        xs, ys = [place(p, ref) for p in a], [place(p, copy, to_ref) for p in b]
+        found = sorted(pair_places(xs, ys).items())
+        judgeable = len(found) >= COPY_MIN_MATCHED and 2 * len(found) >= min(len(a), len(b))
 
         def lacking(xs, ys, els):  # strands with no element of the other copy at their place, of any kind
             return {
@@ -707,17 +708,25 @@ def _copy_pairs(drawn, notes: dict | None = None) -> dict[tuple[str, str], tuple
                 if e.sse.kind == "E" and not any(overlap(x[1:], y[1:]) > 0 for y in ys)
             }
 
-        alone = lacking(pa_, pb_, a) | lacking(pb_, pa_, b)
-        differ = _sheets_differ(lay, copy, ref, [(a[i], b[j]) for i, j in found], alone)
+        differ = _sheets_differ(
+            lay, copy, ref, [(a[i], b[j]) for i, j in found], lacking(xs, ys, a) | lacking(ys, xs, b)
+        )
         if differ:  # their strands are placed by each copy's own pairing: left out, reported (C2b-3 R2)
-            gone = {k for block in differ for k in block}
-            a = [p for p in a if p.sse.id not in gone]
-            b = [p for p in b if p.sse.id not in gone]
-            found = sorted(pair_places([place(p, ref) for p in a], [place(p, copy, to_ref) for p in b]).items())
-            differ_note[(copy, ref)] = "copies' sheets differ: " + "; ".join(
-                f"{copy} sheet{'s' if len(c) > 1 else ''} {'+'.join(map(str, c))} vs "
-                f"{ref} sheet{'s' if len(r) > 1 else ''} {'+'.join(map(str, r))}"
-                for c, r in _differ_names(lay, differ, copy)
+            gone = {k for strands, _, _ in differ for k in strands}
+            kept_a, kept_b = (
+                [n for n, p in enumerate(a) if p.sse.id not in gone],
+                [n for n, p in enumerate(b) if p.sse.id not in gone],
+            )
+            a, b = [a[n] for n in kept_a], [b[n] for n in kept_b]
+            found = sorted(pair_places([xs[n] for n in kept_a], [ys[n] for n in kept_b]).items())
+            differ_note[(copy, ref)] = (
+                "copies' sheets differ: "
+                + "; ".join(
+                    f"{copy} sheet{'s' if len(c) > 1 else ''} {'+'.join(map(str, c))} vs "
+                    f"{ref} sheet{'s' if len(r) > 1 else ''} {'+'.join(map(str, r))}"
+                    for _, c, r in differ
+                )
+                + f"; {len(gone)} strands not judged"
             )
         smaller = min(len(a), len(b))
         why = ""
@@ -725,12 +734,12 @@ def _copy_pairs(drawn, notes: dict | None = None) -> dict[tuple[str, str], tuple
             pa = [(a[i].cx, a[i].cy) for i, _ in found]
             pb = [(b[j].cx, b[j].cy) for _, j in found]
             dev: float | None = min(fit_deviation(pa, pb, m) for m in mirrors)
+        elif differ and judgeable:  # R2 left too few to fit: its own reason, never C22's, never inf
+            dev, why = None, f"n/a: sheets differ ({len(found)} matched)"
         elif 0 < smaller < COPY_MIN_MATCHED:
             dev, why = None, f"n/a: {smaller} element{'s' if smaller > 1 else ''}"
         elif shared and smaller == 0:
             dev, why = None, "n/a: shared sheet"
-        elif differ and smaller == 0:
-            dev, why = None, "n/a: sheets differ"
         elif shared and len(found) == COPY_MIN_MATCHED - 1 and 2 * len(found) >= smaller:
             dev, why = None, f"n/a: {len(found)} matched"  # a shared sheet left two to match, too few to fit (6YQD)
         else:
@@ -745,15 +754,18 @@ def _blocks(lay) -> list[tuple[list[str], list[str]]]:
     return [(list(ids), ghosts[n] if n < len(ghosts) else []) for n, ids in enumerate(lay.sheets)]
 
 
-def _sheets_differ(lay, copy: str, ref: str, pairs, alone: set[str] = frozenset()) -> list[set[str]]:
+def _sheets_differ(
+    lay, copy: str, ref: str, pairs, alone: set[str] = frozenset()
+) -> list[tuple[set[str], list[int], list[int]]]:
     """The strands (ids, both copies) of the sheet blocks two tied copies group differently (C2b-3 ruling R2): the
     paired strands (`pairs`: (reference element, copy element)) of a block of one copy lie in more than one block of
     the other, a block no tie draws as its mate's (Layout.tied_ids) holds a strand the other copy lacks (`alone`: no
     element of the other copy at its place; 7QUP 7D's sheet, which keeps its own shape), or the two blocks close
     differently (one draws a barrel's ghost of its own strand, the other not; a strand lent across a ring's cut
     leaves a ghost that is no closure). Each copy's strands are placed by its own pairing (S1-S3), so these cannot
-    sit alike: A15 leaves them out, as C10 leaves out a shared sheet, and reports them (copies_sheets_differ). One
-    set per group of blocks so joined, the strands of `copy` and `ref` in them."""
+    sit alike: A15 leaves them out, as C10 leaves out a shared sheet, and reports them (copies_sheets_differ). For
+    each group of blocks so joined: the strands of `copy` and `ref` in it, and its copy's and reference's block
+    numbers (Layout.sheets indices, as A11 numbers sheets)."""
     blocks = _blocks(lay)
     where = {k: n for n, (ids, _) in enumerate(blocks) for k in ids}
     links = sorted(
@@ -774,10 +786,10 @@ def _sheets_differ(lay, copy: str, ref: str, pairs, alone: set[str] = frozenset(
     for r, c in links:
         groups.setdefault(root(("r", r)), set()).update({("r", r), ("c", c)})
     out = []
-    for g in (groups[k] for k in sorted(groups, key=str)):
-        refs = sorted(n for side, n in g if side == "r")
-        mine = sorted(n for side, n in g if side == "c")
-        closed = {any(g in blocks[n][0] for g in blocks[n][1]) for n in refs + mine}
+    for group in (groups[k] for k in sorted(groups, key=str)):
+        refs = sorted(n for side, n in group if side == "r")
+        mine = sorted(n for side, n in group if side == "c")
+        closed = {any(ghost in blocks[n][0] for ghost in blocks[n][1]) for n in refs + mine}
         tied = any(k in lay.tied_ids for n in mine for k in blocks[n][0])  # drawn as its mate's, by the tie
         lacks = not tied and any(k in alone for n in refs + mine for k in blocks[n][0])
         if len(refs) == 1 and len(mine) == 1 and len(closed) == 1 and not lacks:
@@ -785,17 +797,8 @@ def _sheets_differ(lay, copy: str, ref: str, pairs, alone: set[str] = frozenset(
         strands = {
             k for n in refs + mine for k in blocks[n][0] if k in lay.placed and lay.placed[k].sse.chain in (copy, ref)
         }
-        out.append(strands)
+        out.append((strands, mine, refs))
     return out
-
-
-def _differ_names(lay, differ: list[set[str]], copy: str):
-    """(copy's block numbers, reference's block numbers) of each differing group, as A11 numbers sheets."""
-    where = {k: n for n, ids in enumerate(lay.sheets) for k in ids}
-    for strands in differ:
-        mine = sorted({where[k] for k in strands if lay.placed[k].sse.chain == copy})
-        theirs = sorted({where[k] for k in strands if lay.placed[k].sse.chain != copy})
-        yield mine, theirs
 
 
 def copies_sheets_differ(drawn) -> dict[tuple[str, str], str]:
@@ -1446,7 +1449,8 @@ def figure_checks(drawn, path, *, assembly: str = "auto", focus: str = "auto", c
     page = measure(drawn)
     skip = page.font_reason
     collisions = None if skip else text_collisions(drawn, page=page)
-    pairs = _copy_pairs(drawn)
+    differ: dict[tuple[str, str], str] = {}
+    pairs = _copy_pairs(drawn, differ)
     details = {
         "element_overlaps": element_overlaps(drawn.layout),
         "text_collisions": collisions,
@@ -1454,6 +1458,7 @@ def figure_checks(drawn, path, *, assembly: str = "auto", focus: str = "auto", c
         "label_repeats": label_repeats(drawn.layout),
         "copies_alike": {
             pair: {"deviation": dev, "matched": n, "of": m, "judged": why or "yes"}
+            | ({"sheets_differ": differ[pair]} if pair in differ else {})  # left out of A15 (C2b-3 R2)
             for pair, (dev, n, m, why) in pairs.items()
         },
         "domains": domain_checks(drawn, collisions or []) if drawn.layout.domains else {},

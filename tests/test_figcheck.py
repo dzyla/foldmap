@@ -656,3 +656,25 @@ def test_strands_of_sheets_the_copies_group_differently_are_left_out():
     helix = next(k for k, p in lay.placed.items() if p.sse.chain == "B" and p.sse.kind == "H")
     lay.placed[helix].cx += 5.0
     assert figcheck.copies_alike(d)[("B", "A")] > 1.0
+
+
+def test_a_tie_sheets_differ_leaves_too_few_is_reported_not_failed():
+    """C2b-3 fix round 2: a tie judged before R2 left its differing sheets out, and left with fewer than three
+    elements by it, is "n/a: sheets differ (k matched)": R2's own reason, never C22's "n/a: k elements" and never inf.
+    figure_checks carries R2's note on the tie (the campaign lists it)."""
+    d = drawn(DATA / "1TIM.cif")
+    lay = d.layout
+    (n,) = [n for n, ids in enumerate(lay.sheets) if {lay.placed[k].sse.chain for k in ids} == {"B"}]
+    ids = lay.sheets[n]
+    lay.sheets = [*lay.sheets[:n], ids[: len(ids) // 2], ids[len(ids) // 2 :], *lay.sheets[n + 1 :]]
+    lay.sheet_ghosts = [*lay.sheet_ghosts[:n], [], [], *lay.sheet_ghosts[n + 1 :]]
+    for k in [k for k, p in lay.placed.items() if p.sse.chain == "B" and k not in ids][2:]:
+        del lay.placed[k]  # B keeps its barrel and two other elements
+    assert figcheck.copies_not_judged(d) == {("B", "A"): "n/a: sheets differ (2 matched)"}
+    assert ("B", "A") not in figcheck.copies_alike(d)
+    got = figcheck.figure_checks(d, DATA / "1TIM.cif")["details"]["copies_alike"][("B", "A")]
+    assert got["judged"] == "n/a: sheets differ (2 matched)"
+    assert (
+        got["sheets_differ"].startswith("copies' sheets differ: B sheets ")
+        and "strands not judged" in got["sheets_differ"]
+    )

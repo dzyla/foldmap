@@ -2092,6 +2092,7 @@ def report(entries: list[dict], out: Path, sample_path: Path | None = None, tota
     lines += science_section(entries)
     lines += domains_section(entries)
     lines += accessories_section(entries)
+    lines += sheets_differ_section(entries)
     lines += ["", "## Criteria", ""] + [f"- **{k}** {v}" for k, v in CRITERIA.items()]
     lines += ["", "## Limits", ""] + [f"- {k}: {v}" for k, v in LIMITS.items()]
     lines += [f"- documented warnings: {', '.join(DOCUMENTED_WARNINGS) or 'none'}", ""]
@@ -2196,6 +2197,25 @@ def accessories_named(e: dict) -> dict[str, tuple[int, int]]:
         if ch.get("accessories") is not None:
             out[v] = (ch.get("accessories_named") or 0, ch["accessories"])
     return out
+
+
+def sheets_differ_section(entries: list[dict]) -> list[str]:
+    """report.md's copies whose sheets DSSP groups differently (figcheck._sheets_differ, ruling C2b-3/R2): for each
+    entry and A15 view, every tie whose differing sheets' strands A15 left out, in the ruling's own words, with
+    what was still judged."""
+    lines = ["", "## Copies' sheets that differ, left out of A15 (ruling C2b-3/R2: reported, not judged)", ""]
+    lines += ["| id | view | tie | sheets left out | judged |", "|---|---|---|---|---|"]
+    for e in entries:
+        for v in ("default", "focus"):
+            details = ((((e.get("views") or {}).get(v) or {}).get("result") or {}).get("checks") or {}).get(
+                "details"
+            ) or {}
+            for tie, got in sorted((details.get("copies_alike") or {}).items()):
+                if got.get("sheets_differ"):
+                    judged = got.get("judged")
+                    judged = f"yes, {got.get('matched')} matched" if judged == "yes" else judged
+                    lines.append(f"| {e['id']} | {v} | {tie} | {got['sheets_differ']} | {judged} |")
+    return lines
 
 
 def accessories_section(entries: list[dict]) -> list[str]:
