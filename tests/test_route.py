@@ -1030,3 +1030,13 @@ def test_the_second_searches_share_one_budget_per_page(monkeypatch):
     once = draw()
     assert sorted(fb for fb, _ in once) == [False, True] and spends == [first]
     assert draw() == once  # the same page spends it alike
+
+
+def test_a_search_out_of_budget_spends_exactly_its_budget():
+    """The page's budget is never overdrawn: a search stopped by its budget counts the nodes it expanded, its
+    budget, not one more (7Y7C's domains view showed 8 000 001 of 8 000 000)."""
+    a, b, wall = _walled()
+    grid = _Grid(layout_of(a, b, wall))
+    start, goal = grid.free_cell_along(a.c_port, a.exit_c, a), grid.free_cell_along(b.n_port, b.exit_n, b)
+    spent = [0]
+    assert route._astar(grid, start, 1, goal, 3, 5, spent) is None and spent == [5]

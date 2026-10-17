@@ -336,8 +336,8 @@ def _astar(grid: _Grid, start, start_dir, goal, goal_dir, max_nodes: int = _MAX_
             heapq.heappush(heap, (g + (_TURN if d != goal_dir else 0), tie, g, x, y, d, True))
             continue
         nodes += 1
-        if nodes > max_nodes:
-            spent[0] += nodes
+        if nodes > max_nodes:  # this node is not expanded: the budget is spent exactly
+            spent[0] += max_nodes
             return None
         for nd in range(4):
             if nd == (d + 2) % 4:
