@@ -2971,3 +2971,48 @@ def test_a_gap_label_keeps_off_tie_marks_and_may_stand_further_out():
 
     d = draw_spec(figure_spec(r100_entry("7Y7C")))
     assert [h for h in figcheck.text_collisions(d) if h.startswith("na:gap:")] == []
+
+
+def test_a_route_from_beside_a_face_keeps_off_the_strands_drawn_before_it():
+    """C2b-6 review minor 3 (7Y7C's joint a:520-521 ran about 1.2 along another strand, through its nucleotide): the
+    last pass's route from the free cells beside a face (na_ends._from_beside) did not see the strands drawn before
+    it. It now pays a high toll (na_runs._BESIDE_TOLL) for their cells, so it runs on top of one only where nothing
+    else routes. Here another strand lies on the middle third of the route the last pass draws alone; drawn again
+    with that strand on the page, the route goes round it."""
+    from foldmap.layout import NT_STEP
+    from foldmap.na_paths import _face, _Strands
+    from foldmap.na_runs import _drawing
+    from foldmap.route import _PUSH
+
+    def last_pass(strands_from=None):
+        da, db, j, router = _two_stems(6.0)
+        fa, ea = _face(da, (0, 0), True)
+        for t in _PUSH:  # every cell straight out of P1's face taken by a margin (no body there)
+            router.grid.blocked[router.grid.cell(fa + ea * t)] = True
+        fb, eb = _face(db, (0, j), False)
+        ends = (da.point((0, 0)), fa, ea, fb, eb, db.point((0, j)))
+        strands = None
+        if strands_from is not None:
+            strands = _Strands(router.grid)
+            strands.add([tuple(q) for q in strands_from])
+        nts = list(range(1, j))
+        path = _drawing(router, 0, nts, ((0, 0), (0, j)), da, db, ends, j * NT_STEP, False, None, (), strands, None, 0)
+        return np.asarray(path.points, float), path
+
+    def walk_of(q):  # the polyline sampled every 0.02 along its length
+        return np.vstack(
+            [a + (b - a) * t for a, b in zip(q, q[1:]) for t in np.arange(0, 1, 0.02 / max(math.dist(a, b), 1e-9))]
+        )
+
+    alone, _ = last_pass()
+    walk = walk_of(alone)
+    run = np.concatenate([[0.0], np.cumsum(np.hypot(*np.diff(walk, axis=0).T))])
+    mid = walk[(run > run[-1] / 3) & (run < 2 * run[-1] / 3)]  # its middle third, as another strand drawn before
+    pts, path = last_pass(mid)
+    assert not path.fallback
+    samples = walk_of(pts)
+    seg_a, seg_b = mid[:-1], mid[1:]
+    ab = seg_b - seg_a
+    t = np.clip(((samples[:, None] - seg_a) * ab).sum(-1) / np.maximum((ab * ab).sum(-1), 1e-12), 0, 1)
+    d = np.hypot(*(samples[:, None] - (seg_a + t[..., None] * ab)).transpose(2, 0, 1)).min(axis=1)
+    assert (d < 0.1).mean() < 0.05, (d < 0.1).mean()  # it no longer runs along the strand drawn before it

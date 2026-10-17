@@ -44,6 +44,10 @@ _JOINT_BENDS = (1.0, 1.5, 2.0, 0.5, 3.0)
 # rail's side first (pieces turned back from each other, 8VWQ's P124a and 7Y7C's P103, meet past the corners of their
 # bodies, which reach beyond the rails), then the other way (pieces side by side, 7Y7C's P138c1 and P138c2)
 _JOINT_SWINGS = (0.0, 1.0, 2.0, -1.0, -2.0)
+# the extra cost of a grid cell under a strand drawn before, for a route from the free cells beside a face (the last
+# pass's, _from_beside): it runs on top of another strand only where nothing else routes, as a loop keeps off a stack
+# gap's cells (route._GAP_TOLL); C2b-6 review minor 3: 7Y7C's a:520-521 ran 1.2 along a strand, through its nucleotide
+_BESIDE_TOLL = 50.0
 # a run keeps off every strand drawn before it (and every protein loop) by a detour at most this many times as
 # long as its plain drawing, which keeps off the hairpin loops and free ends only. Measured on 24 campaign entries,
 # crossing a strand only a cost: run-run crossings 250 -> 239, protein loops crossed 178 -> 175, no entry worse in
@@ -338,8 +342,8 @@ def _drawing(router: _Router, s, nts, between, da, db, ends, need, joint, kind, 
     elif route is None and joint:  # no straight line may join them: a bend, when one is clear
         line = _joint_bend(*bend)
     if route is None and line is None and not hard:  # no way straight out of a face, even loose (the last pass:
-        # not where the strands drawn before block the way): from the free cells beside it
-        route = _from_beside(router, (fa, ea, da), (fb, eb, db))
+        # not where the strands drawn before block the way): from the free cells beside it, off those strands
+        route = _beside_off_strands(router, (fa, ea, da), (fb, eb, db), strands)
     # a grazing line only in the last pass, once the routes from beside its faces are tried
     line = line if line is not None or route is not None or hard else grazing
     if line is not None:
@@ -369,6 +373,20 @@ def _drawing(router: _Router, s, nts, between, da, db, ends, need, joint, kind, 
     pts = next((q for q in shapes if not fallback and ok(q) and off_names(q)), soft[0])
     kind_drawn = "joint" if joint else "run"
     return NAPath(kind_drawn, s, nts, pts, _spaced(pts, m), fallback=fallback and pts is not bowed, between=between)
+
+
+def _beside_off_strands(router: _Router, a, b, strands=None):
+    """_from_beside with every grid cell under a strand drawn so far (`strands`, a _Strands) costing _BESIDE_TOLL more
+    to enter, so the route keeps off those strands unless nothing else routes."""
+    grid = router.grid
+    saved = grid.toll
+    if strands is not None and strands.cells is not None:
+        toll = strands.cells * _BESIDE_TOLL
+        grid.toll = toll if saved is None else saved + toll
+    try:
+        return _from_beside(router, a, b)
+    finally:
+        grid.toll = saved
 
 
 def _faces_route(router: _Router, fa, ea, da: PlacedStem, fb, eb, db: PlacedStem):
