@@ -16,6 +16,7 @@ to place the name. Pure geometry: boxes in, fields out."""
 from __future__ import annotations
 
 import math
+from collections.abc import Mapping
 from typing import NamedTuple
 
 import numpy as np
@@ -30,10 +31,36 @@ Box = tuple[float, float, float, float]
 Turned = tuple[float, float, float, float, float]  # a turned box: centre x, y, half length, half width, angle
 
 
+class Windows(Mapping):
+    """Each domain's field, kept as its window of the raster (rows, columns and the values there) and given whole,
+    -1 outside the window, when asked for: one page-sized array at a time where a dict held every domain's at once
+    (final review A-I1: 7JU4's domains view, 4.6 GB). Domains in the order given."""
+
+    def __init__(self, shape: tuple[int, int], windows: dict[str, tuple[tuple[slice, slice], np.ndarray]]):
+        self.shape, self.windows = shape, windows
+
+    def __getitem__(self, d: str) -> np.ndarray:
+        w, part = self.windows[d]
+        out = np.full(self.shape, -1.0)
+        out[w] = part
+        return out
+
+    def __iter__(self):
+        return iter(self.windows)
+
+    def __len__(self) -> int:
+        return len(self.windows)
+
+    @property
+    def nbytes(self) -> int:
+        """The bytes the windows hold."""
+        return sum(part.nbytes for _, part in self.windows.values())
+
+
 class Fields(NamedTuple):
     xs: np.ndarray  # cell centres along x
     ys: np.ndarray  # ... and y
-    values: dict[str, np.ndarray]  # domain -> (len(ys), len(xs)) field, positive inside its panel
+    values: Mapping[str, np.ndarray]  # domain -> (len(ys), len(xs)) field, positive inside its panel (Windows)
 
 
 def _axis(lo: float, hi: float) -> np.ndarray:
@@ -132,9 +159,8 @@ def panel_fields(
     values = {}
     for k, d in enumerate(owned):
         w = windows[d]
-        out = np.full(shape_all, -1.0)
-        values[d] = out
-        if out[w].size == 0:
+        values[d] = (w, np.full((w[0].stop - w[0].start, w[1].stop - w[1].start), -1.0))
+        if values[d][1].size == 0:
             continue
         elements, named, own = own_of(d, w)
         rival = np.minimum(loose[w], np.where(which[w] == k, second[w], first[w]))
@@ -145,5 +171,5 @@ def panel_fields(
         with np.errstate(invalid="ignore"):  # inf - inf far from everything: outside
             split = np.maximum((rival - own - GUTTER) / 2, np.minimum(EDGE - own, (rival - own) / 2))
         split = np.where(np.isinf(rival), np.inf, split)
-        out[w] = np.clip(np.nan_to_num(np.minimum(shape, split), nan=-1.0), -1.0, 1.0)
-    return Fields(xs, ys, values)
+        values[d] = (w, np.clip(np.nan_to_num(np.minimum(shape, split), nan=-1.0), -1.0, 1.0))
+    return Fields(xs, ys, Windows(shape_all, values))

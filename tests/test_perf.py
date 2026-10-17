@@ -367,6 +367,21 @@ def test_panel_fields_equal_the_domain_by_domain_rivals(seed):
         assert np.array_equal(got.values[d], want[d]), d
 
 
+def test_panel_fields_keep_each_domain_s_window_not_the_page():
+    """Final review A-I1: each domain's field was kept as a page-sized raster, every one at once (7JU4's domains
+    view: 4.6 GB). Each is kept as its window and given whole on request, one at a time: 40 small domains spread
+    over a page hold less than one page's raster between them, and each reads as it did (-1 outside its window)."""
+    from foldmap.panels import panel_fields
+
+    at = {f"D{k}": (10.0 * (k % 8), 10.0 * (k // 8)) for k in range(40)}
+    owned = {d: [(x, y, x + 1.5, y + 1.0)] for d, (x, y) in at.items()}
+    got = panel_fields(owned, [], 0.4)
+    page = got.xs.size * got.ys.size * 8
+    assert got.values.nbytes < page
+    field = got.values["D9"]
+    assert field.shape == (got.ys.size, got.xs.size) and field.max() > 0 and (field == -1.0).mean() > 0.9
+
+
 def _plain_text_collisions(drawn, page):
     """figcheck.text_collisions as it was: every pair of texts, every text against every body and line."""
     from itertools import combinations
