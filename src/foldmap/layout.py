@@ -1869,6 +1869,36 @@ def _attract(
         it.home = (it.cx, it.cy)
 
 
+_STEM_ROOM = 1.5  # the room a nucleic acid's stems take on the page: their footprints' area (with half a MARGIN round
+# each) times this, about what rectangles packed with gaps fill. Measured on the NA-only entries of the NA campaign and
+# random-100 (random-100 C2b-4): 3OWW's Spearman 0.484 -> 0.651, 1GID 0.601 -> 0.737, 3IGI 0.83 -> 0.856, the rest
+# within 0.001 (1.2: 4LVV 0.961 -> 0.886; 2.0: 4P9R 0.82 -> 0.798)
+
+
+def _room_for_stems(items: list[_Item]) -> None:
+    """A nucleic acid drawn without protein (every item a stem): its projected places spread about their middle, all
+    by one factor, until the box round their footprints holds _STEM_ROOM times the footprints' area, before _attract
+    pulls and parts them. Packed tighter than that, the overlaps were cleared by pushes each stem took its own way, and
+    the stems' order was lost (random-100 C2b-4: 3OWW's ten stems in a box of 0.98 times their footprints' area,
+    Spearman 0.792 as projected, 0.493 after _attract). One factor keeps every ratio of the projected distances, so
+    their rank. Nothing moves when the room is there, or when any item holds a protein element."""
+    if not items or not all(isinstance(m, PlacedStem) for it in items for m in it.members):
+        return
+    q = _snap([it.home for it in items]) + _snap([it.mid for it in items])
+    h = _snap([it.half for it in items]) + MARGIN / 2
+    need = float(sum(4.0 * float(x) * float(y) for x, y in h.tolist()))
+    lo, hi = (q - h).min(axis=0), (q + h).max(axis=0)
+    have = float((hi[0] - lo[0]) * (hi[1] - lo[1]))
+    s = float(_snap(math.sqrt(_STEM_ROOM * need / have))) if have > 0 else 1.0
+    if s <= 1.0:
+        return
+    c = _snap(q.sum(axis=0) / len(items))
+    for it in items:
+        hx, hy = (float(v) for v in _snap(c + s * (np.asarray(it.home, float) - c)))
+        it.cx, it.cy = float(_snap(it.cx + hx - it.home[0])), float(_snap(it.cy + hy - it.home[1]))
+        it.home = (hx, hy)
+
+
 def _collide(a: _Item, ha, ma, b: _Item, hb, mb) -> bool:
     """Do the footprints (half extents h, centre offsets m) of a and b, plus MARGIN, overlap?"""
     dx, dy = b.cx + mb[0] - a.cx - ma[0], b.cy + mb[1] - a.cy - ma[1]
@@ -3440,6 +3470,8 @@ def build_layout(
         heights = [it.home[1] for it in items]
         if attract and len(items) > 1:
             extra = _stem_springs(items, nucleic) if pieces else []
+            if pieces and not ties and walls is None:
+                _room_for_stems(items)
             rise = getattr(frame, "rise", 0.0) * SCALE
             _attract(
                 items,

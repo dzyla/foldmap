@@ -2587,3 +2587,39 @@ def test_a_hairpin_loop_holds_its_nucleotides_a_bead_apart(m):
     pts = _arc(stem, (0, 0), (0, 40), m)
     xy = np.array([pts[0], *_spaced(pts, m), pts[-1]])
     assert np.hypot(*np.diff(xy, axis=0).T).min() >= _BEAD - 1e-6
+
+
+def test_a_nucleic_acid_without_protein_keeps_the_order_of_its_stems():
+    """Random-100 C2b-4 (3OWW, A17 spearman 0.484): the domain-swapped dimer's ten stems were projected into a box
+    of 0.98 times their footprints' area; _attract cleared the overlaps by pushing each stem its own way, and
+    the pairwise distances lost their order (0.792 as projected, 0.493 after). The projection is now spread by one
+    factor to the room the stems take (_room_for_stems) before the pull, which keeps every distance ratio."""
+    from foldmap.nacheck import THRESHOLDS, shape
+    from helpers import r100_entry
+
+    lay, _, _ = make_layout(r100_entry("3OWW"))
+    assert not lay.placed and len(lay.stems) == 10
+    assert shape(lay)["spearman"] >= THRESHOLDS["spearman"]
+
+
+def test_spreading_stems_to_their_room_keeps_every_distance_ratio():
+    """_room_for_stems moves stem items by one factor about their middle, homes and places alike, and only when
+    every item is a stem and their box lacks the room."""
+    from foldmap.layout import _Item, _room_for_stems
+
+    def stem_item(x, y):
+        d = PlacedStem("s", "P", [0, 0], [], 0.0, 0.0, 4.0, 0.0, 4.0, {}, {})
+        return _Item([d], [(0.0, 0.0)], x, y, (x, y), 0, "A")
+
+    items = [stem_item(0.0, 0.0), stem_item(1.0, 0.0), stem_item(0.0, 2.0)]
+    before = np.array([it.home for it in items])
+    _room_for_stems(items)
+    after = np.array([it.home for it in items])
+    d0 = np.hypot(*(before[:, None] - before[None]).transpose(2, 0, 1))
+    d1 = np.hypot(*(after[:, None] - after[None]).transpose(2, 0, 1))
+    ratio = d1[d0 > 0] / d0[d0 > 0]
+    assert ratio.min() > 1.5 and np.ptp(ratio) < 1e-3
+    assert [(it.cx, it.cy) for it in items] == [tuple(h) for h in after.tolist()]
+    roomy = [stem_item(0.0, 0.0), stem_item(40.0, 0.0)]
+    _room_for_stems(roomy)
+    assert [it.home for it in roomy] == [(0.0, 0.0), (40.0, 0.0)]
