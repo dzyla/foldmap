@@ -1679,12 +1679,25 @@ globalThis.PDBeMolstarPlugin = class {
     this.visual = { select: async p => { calls.push(['select', p]); }, focus: async q => { calls.push(['focus', q]); },
                     reset() {} };
     this.plugin = { managers: { camera: { focusLoci: () => calls.push(['focusLoci']),
-                                          focusSpheres: () => calls.push(['focusSpheres']) } },
+                                          focusSpheres: () => calls.push(['focusSpheres']),
+                                          reset: () => calls.push(['reset']) } },
                     canvas3d: { handleResize() {},
                                 camera: { getSnapshot: () => ({ target: [0, 0, 0], position: [1, 1, 1],
                                                                                   radius: 1 }), setState() {} } } };
   }
-  render() { setTimeout(() => this.done(true), 0); }
+  render(target, options) { this.options = options; setTimeout(() => this.done(true), 0); }
+  // pdbe-molstar 3.12.0's camera-focus-loci behaviour (PluginBehaviors.Camera.FocusLoci, read from the pinned
+  // build): its bindings are render's focusBindings when given (the pinned build's own defaults otherwise); a
+  // primary click on nothing that clickResetCameraOnEmpty matches runs PluginCommands.Camera.Reset (the camera
+  // manager's reset), one on an element that clickCenterFocus matches focuses the camera on it
+  click(onNothing) {
+    const primary = { triggers: [{ buttons: 1 }] };
+    const b = this.options.focusBindings || { clickCenterFocus: primary, clickResetCameraOnEmpty: primary };
+    const match = binding => binding.triggers.some(t => t.buttons === 1 && !t.modifiers);
+    const cam = this.plugin.managers.camera;
+    if (onNothing && match(b.clickResetCameraOnEmpty || primary)) return cam.reset();
+    if (!onNothing && match(b.clickCenterFocus)) cam.focusLoci();
+  }
 };
 eval(job.lib);
 eval(job.app);
@@ -1700,11 +1713,14 @@ setTimeout(async () => {
       out.push({ case: c.name, op, error, calls: JSON.parse(JSON.stringify(calls)) });
     }
   }
-  calls.length = 0;  // a click in Mol*'s own canvas goes through the camera manager: it must not move the camera
-  const cam = window.foldmapViewer.plugin && window.foldmapViewer.plugin.plugin.managers.camera;
-  if (cam) { cam.focusLoci(); cam.focusSpheres(); }
+  calls.length = 0;  // a click in Mol*'s own canvas, on an element or on nothing: it must not move the camera
+  const viewer = window.foldmapViewer.plugin;
+  if (viewer) { viewer.click(false); viewer.click(true); }
   out.push({ case: '-', op: 'camera', error: null, fly: typeof window.foldmapViewer.fly,
              calls: JSON.parse(JSON.stringify(calls)) });
+  calls.length = 0;  // Mol*'s reset control (PluginCommands.Camera.Reset): the reader's own move, still made
+  if (viewer) viewer.plugin.managers.camera.reset();
+  out.push({ case: '-', op: 'reset control', error: null, calls: JSON.parse(JSON.stringify(calls)) });
   console.log(JSON.stringify(out));
   process.exit(0);
 }, 100);
@@ -1756,8 +1772,11 @@ def test_explorer_viewers_take_protein_nucleic_and_mixed_selections(tmp_path, vi
         assert r["error"] is None, r
     key = "setStyle" if viewer == "3dmol" else "select"
     assert got[("protein", "on")]["calls"]  # something was sent to the viewer
-    camera = got[("-", "camera")]  # the camera moves only when the reader moves it (the author: no zoom-in)
+    camera = got[("-", "camera")]  # the camera moves only when the reader moves it (the author: no zoom-in, and
+    # no zoom-out on a click between atoms either: final review C-I1)
     assert camera["fly"] == "undefined" and camera["calls"] == []
+    if viewer == "molstar":
+        assert got[("-", "reset control")]["calls"] == [["reset"]]
     for r in got.values():
         assert not any(c[0] in ("zoomTo", "focus") for c in r["calls"]), r
     if viewer == "3dmol":

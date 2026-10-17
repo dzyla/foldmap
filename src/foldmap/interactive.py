@@ -271,7 +271,15 @@ _APP = r"""
       if (pending) { const next = pending; pending = null; apply(next); }
     }
     const base = () => apply({ data: baseData, nonSelectedColor: LOOP });
+    // pdbe-molstar 3.12.0's camera-focus-loci behaviour moves the camera on a click: onto the element clicked
+    // (clickCenterFocus) and, on nothing, back to the whole model (clickResetCameraOnEmpty, PluginCommands.Camera.
+    // Reset). Its bindings, emptied here (render's focusBindings), match no click: the camera moves only when the
+    // reader drags, scrolls or presses a reset control, which call the camera manager directly
+    const never = { triggers: [], action: '', description: '' };  // Mol*'s Binding.Empty
+    const focusBindings = { clickCenterFocus: never, clickCenterFocusSelectMode: never,
+                            clickResetCameraOnEmpty: never, clickResetCameraOnEmptySelectMode: never };
     plugin.render(molDiv, {
+      focusBindings,
       customData: { url, format: 'mmcif', binary: false }, bgColor: '#ffffff', hideControls: true,
       sequencePanel: false, leftPanel: false, pdbeLink: false, expanded: false, landscape: false,
       loadingOverlay: false, visualStyle: 'cartoon', hideStructure: ['water'],
