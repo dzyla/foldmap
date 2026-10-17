@@ -123,7 +123,11 @@ class JobFailed(RuntimeError):
 # ---------------------------------------------------------------------------------------------- running a job
 _CONTEXT = None
 _LOCK = threading.Lock()
-_SLOTS: dict[int, threading.BoundedSemaphore] = {}
+# the job slots are the process's, not this module's: app._drop_changed_foldmap loads this module afresh after an
+# in-place update while jobs of the old code still hold their slots, which must count against the cap (final
+# review C-I3: else twice HOSTED.jobs could run while a deploy settles)
+_SLOTS: dict[int, threading.BoundedSemaphore] = sys.__dict__.setdefault("_foldmap_job_slots", {})
+_SLOTS_LOCK: threading.Lock = sys.__dict__.setdefault("_foldmap_job_slots_lock", threading.Lock())
 
 
 _ONE_THREAD = {"OPENBLAS_NUM_THREADS": "1", "OMP_NUM_THREADS": "1"}
@@ -154,8 +158,8 @@ def _context():
 
 
 def _semaphore(jobs: int) -> threading.BoundedSemaphore:
-    """The process-wide slots for `jobs` jobs at once."""
-    with _LOCK:
+    """The process-wide slots for `jobs` jobs at once (kept across a reload of this module)."""
+    with _SLOTS_LOCK:
         if jobs not in _SLOTS:
             _SLOTS[jobs] = threading.BoundedSemaphore(jobs)
         return _SLOTS[jobs]

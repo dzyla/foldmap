@@ -246,6 +246,41 @@ def test_a_busy_app_says_so(monkeypatch):
     assert run_job(_sleep, 0, limits=Limits(timeout=60, jobs=1)) == 0  # the slot is free again
 
 
+@needs_fork
+def test_a_code_change_restarts_the_job_server_and_keeps_the_job_slots(monkeypatch):
+    """Final review C-I3: Streamlit Cloud updates the code in place and app._drop_changed_foldmap reloads foldmap in
+    the app's process, but the forkserver keeps the modules it preloaded, so every job would still run the old code.
+    A changed module stamp stops the server: the next job starts a fresh one. The job slots are the process's, not
+    the module's: the reloaded app_jobs takes the same ones, so the jobs running old code still count against the
+    cap."""
+    import importlib
+    from multiprocessing import forkserver
+
+    pytest.importorskip("streamlit")
+    from foldmap import app
+
+    assert run_job(_sleep, 0, limits=Limits(timeout=60)) == 0
+    server = forkserver._forkserver._forkserver_pid
+    assert server is not None
+    slots = app_jobs._semaphore(2)
+    seen = sys.__dict__.setdefault("_foldmap_file_stamps", {})
+    seen.clear()
+    assert app._drop_changed_foldmap() == []  # first look records the stamps
+    assert forkserver._forkserver._forkserver_pid == server  # nothing changed: the server stays
+    monkeypatch.setitem(seen, "foldmap.app_jobs", -1)  # as if app_jobs.py changed since it was loaded
+    kept = dict(sys.modules)
+    try:
+        assert "foldmap.app_jobs" in app._drop_changed_foldmap()
+        assert forkserver._forkserver._forkserver_pid is None  # stopped
+        fresh = importlib.import_module("foldmap.app_jobs")
+        assert fresh is not app_jobs and fresh._semaphore(2) is slots
+        assert fresh.run_job(_sleep, 0, limits=fresh.Limits(timeout=60)) == 0
+        assert forkserver._forkserver._forkserver_pid not in (None, server)  # a fresh server
+    finally:
+        sys.modules.update(kept)
+        seen.clear()
+
+
 def test_failures_are_remembered_by_layout_not_by_colour():
     app_jobs.clear()
     err = JobLimit("time", "slow")

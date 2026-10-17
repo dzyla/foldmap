@@ -26,7 +26,8 @@ def _drop_changed_foldmap(here: str = __name__) -> list[str]:
     """Streamlit Cloud updates the code in place and reruns this script, but the foldmap modules it already imported
     keep their old code in memory, so a new app.py can ask an old module for a name it does not have yet (an
     ImportError until the app is rebooted). When any foldmap file changed on disk since it was loaded, forget every
-    foldmap module (not this one) so all of them load fresh and agree. Returns the names forgotten."""
+    foldmap module (not this one) so all of them load fresh and agree, and stop the jobs' forkserver, which
+    preloaded the old modules: the next job starts a fresh one (final review C-I3). Returns the names forgotten."""
     seen = sys.__dict__.setdefault("_foldmap_file_stamps", {})
     mods = {n: m for n, m in sys.modules.items() if (n == "foldmap" or n.startswith("foldmap.")) and n != here}
 
@@ -41,9 +42,21 @@ def _drop_changed_foldmap(here: str = __name__) -> list[str]:
         for n in mods:
             del sys.modules[n]
         seen.clear()
+        _stop_job_server()
         return sorted(mods)
     seen.update(now)
     return []
+
+
+def _stop_job_server() -> None:
+    """Stop the forkserver that hosted jobs fork from (app_jobs._context), if one runs: app_jobs starts it again,
+    with fresh preloads, for the next job. Jobs already forked from it run on and hand back their results through
+    their own pipes. Python's own (private, since 3.8) way to stop it; nothing where it has none."""
+    from multiprocessing import forkserver
+
+    stop = getattr(getattr(forkserver, "_forkserver", None), "_stop", None)
+    if stop is not None:
+        stop()
 
 
 _drop_changed_foldmap()
