@@ -1149,6 +1149,34 @@ def test_both_turns_pulled_on_one_run_keep_both_ports_clearances(first, second):
     assert out == [(0.0, first), (0.0, run), (2.0, run), (2.0, second)]
 
 
+def test_a_second_ports_pull_on_five_points_is_judged_on_the_run_it_moved():
+    """Random-100 C2b-6 re-review (a): on a route of five points the two pulls move different runs (the first port's
+    points 1-2, the second's 3-2), so a drawing is judged on the run its own pull moved (_pull_turns), not on point 1,
+    which the second port's pull leaves where it was. Here only the second port's pull applies (the first port's
+    stub runs across): the drawing keeps it, its run at the second port's clearance."""
+    pa, pb = (0.0, 0.0), (3.0, 0.2)
+    pts = [pa, (1.0, 0.0), (1.0, 0.6), (3.0, 0.6), pb]
+    out = route._pull_turns(pts, pa, (0.0, 1.0), pb, (0.0, 1.0), True, True)
+    run = pb[1] + _INFLATE
+    assert out == [pa, (1.0, 0.0), (1.0, run), (3.0, run), pb]
+
+
+@pytest.mark.parametrize(
+    "pb, run",
+    [((2.0, 0.25), 0.2), ((2.0, -0.5), -0.25)],
+    ids=["facing-too-close", "both-pulled"],
+)
+def test_no_drawing_keeps_both_clearances_falls_back_to_the_first_ports_pull(pb, run):
+    """Random-100 C2b-6 re-review (b): two ports at a face whose exits point opposite ways (the first up, the second
+    down) with no room for both clearances: no drawing keeps both ports clear (_pull_turns), and the run goes to the
+    first port's clearance, whether only its pull applies (ports facing each other 0.25 apart, closer than two
+    clearances) or both do (the second's would take the run to its own clearance, under the first port)."""
+    pa = (0.0, 0.0)
+    pts = [pa, (0.0, run), (2.0, run), pb]
+    out = route._pull_turns(pts, pa, (0.0, 1.0), pb, (0.0, -1.0), True, True)
+    assert out == [pa, (0.0, _INFLATE), (2.0, _INFLATE), pb]
+
+
 def test_the_cells_a_pulled_route_uses_are_the_cells_under_it():
     """Random-100 C2b-5 parked minor (b): a route whose first turn was pulled to its port's clearance (_pull_turns)
     marked the grid cells of its search, before the pull, as used, so later routes paid to share cells it does not
