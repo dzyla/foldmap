@@ -226,6 +226,7 @@ def test_a_dimer_sheet_shared_by_two_copies_keeps_them_alike(monkeypatch, turned
         return real(*args, **kw)
 
     monkeypatch.setattr(layout, "_separate", without_shared)
+    monkeypatch.setattr(layout, "_tied_again", lambda *a, **k: False)  # nor the second chance (C2b-3), which yields
     before = figcheck.copies_alike(drawn(path))
     assert max(before.values()) > ALIKE, before  # the fixture still exercises the shared-sheet case
 
@@ -323,3 +324,28 @@ def test_a_sheet_laid_out_both_ways_is_drawn_the_same_on_any_cpu(monkeypatch, se
         assert _placed(path) == want
     else:
         assert _placed(path, monkeypatch, nudge=seed) == want
+
+
+def _laid_out(path, **kw):
+    """The figure's layout and backbone (cli.make_layout, as draw_spec makes them; no loops routed or drawn): enough
+    for figcheck.copies_alike, which measures element centres."""
+    from types import SimpleNamespace
+
+    from foldmap.cli import make_layout
+
+    spec = figure_spec(path, **kw)
+    lay, _, bb = make_layout(spec.structure, spec.mode, spec.rotate, spec.flip_v, **spec.layout_kwargs())
+    return SimpleNamespace(layout=lay, bb=bb)
+
+
+def test_crowded_copies_are_drawn_alike_in_more_room():
+    """Random-100 C2b-3 A15, cause A (8QEM focus 26.2): the twelve copies of a C12 ring drawn whole cleared their
+    overlaps together, but in 1.61 times the one-by-one room (_SEP_SYM_ROOM 1.05), so every item was moved alone and
+    the copies drifted 2.3 to 26.2 page units apart. The tied pushes are kept, the copy-less items yielding to them,
+    within _SEP_TIE_ROOM."""
+    from helpers import r100_entry
+
+    got = figcheck.copies_alike(_laid_out(r100_entry("8QEM"), focus="none"))
+    assert len(got) == 22 and max(got.values()) <= ALIKE, {
+        f"{a}~{b}": round(v, 3) for (a, b), v in got.items() if v > ALIKE
+    }

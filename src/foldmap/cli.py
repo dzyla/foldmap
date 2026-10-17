@@ -387,6 +387,7 @@ def make_layout(
         if names
         else None,
         over=over,
+        alike_first=mem is None,  # a membrane view is judged by its bands (C17), not its copies (A15)
     )
 
     def finish(lay, faces=None):  # what make_layout sets on a layout after build_layout

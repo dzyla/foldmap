@@ -79,6 +79,10 @@ _SEP_SYM_ROOM = 1.05  # copies drawn alike may take at most this much more area 
 # ... and copies drawn as mirror images about a dyad in the page, pushed for as many passes as items moved one by
 # one: the figure says they are mirror images (9GEP's nucleosome needed 1.07 and about 3,000 passes)
 _SEP_MIRROR_ROOM = 1.10
+# ... and, when neither holds, copies drawn alike with every item that has no copy yielding to them (_separate's
+# second chance) may take up to this much (random-100 C2b-3: 8QEM's twelve ring copies drawn whole need 1.61 times
+# the room of moving items one by one; 6JLN 1.31, 7QUP 1.10, 9P1X 1.06). Copies drawn alike are the rule.
+_SEP_TIE_ROOM = 2.0
 _SEP_PUSH = 0.005  # each push clears an overlap by this much more, so touching boxes cannot trade it back and forth
 _SLIDE_STEP = 0.5  # the guaranteed slide moves an item by this much at a time
 _LAMBDAS = (0.3, 3.0, 30.0, 300.0)  # overlap penalty, stage by stage
@@ -1069,6 +1073,7 @@ def _separate(
     room: float = _SEP_SYM_ROOM,
     level: np.ndarray | None = None,
     shared: set[int] = frozenset(),
+    wide: list[bool] | None = None,
 ) -> bool:
     """Push overlapping items apart, then slide any left over clear. With `ties` (_symmetry_ties) the pushes
     keep every protomer drawn alike (_push_apart), and that result is kept if it clears every overlap within
@@ -1082,7 +1087,10 @@ def _separate(
     and slid sideways (_push_apart, _slide_clear). `shared`: items holding elements of several protomers with no
     copy of their own (a dimer's continuous sheet, 1SLV): when the tied pushes fail, they are run again with these
     yielding to the tied items, which keep their copies alike (_push_apart), and sliding clear last
-    (_slide_clear). True when the tied pushes are kept: the copies drawn alike."""
+    (_slide_clear). With `wide` (a list: build_layout's `alike_first`), tied pushes not kept get a second chance
+    (_tied_again): every item with no copy yields, and the result is kept if it takes at most _SEP_TIE_ROOM times
+    the one-by-one room (both measured after their slides); `wide` then gets True appended. True when the tied
+    pushes are kept: the copies drawn alike."""
     halves = np.array([it.half for it in items], float).reshape(-1, 2)
     mids = np.array([it.mid for it in items], float).reshape(-1, 2)
     start = np.array([(it.cx, it.cy) for it in items], float).reshape(-1, 2)
@@ -1108,7 +1116,61 @@ def _separate(
     for it, (x, y) in zip(items, xy.tolist()):
         it.cx, it.cy = x, y
     _slide_clear(items, joints, fixed, level, lone)
+    if (
+        ties
+        and wide is not None
+        and xy is alone
+        and _tied_again(items, ties, start, halves, mids, home, joints, apart, fixed, mirror, level)
+    ):
+        wide.append(True)
+        return True
     return bool(ties) and xy is not alone
+
+
+def _tied_again(
+    items: list[_Item],
+    ties: dict[int, tuple[int, int]],
+    start: np.ndarray,
+    halves: np.ndarray,
+    mids: np.ndarray,
+    home: np.ndarray,
+    joints: set[tuple[int, int]],
+    apart: np.ndarray,
+    fixed: Walls | None,
+    mirror: float | None,
+    level: np.ndarray | None,
+) -> bool:
+    """_separate's second chance for copies drawn alike, the items already placed one by one (and slid clear). The
+    tied pushes run again from `start` for _SEP_SWEEPS passes with every item that has no copy (no tie holds it or
+    holds it as a mate: elements one copy lacks, a bundle with a chain outside every protomer, a shared sheet)
+    yielding to the orbits (_push_apart's `shared`), and sliding clear last. Pushed against an orbit, such an item
+    would otherwise widen the whole spread at each push (random-100 C2b-3: 6JLN's from 80 to 215 page units).
+    Nucleic-acid stems never yield: they are placed by the protein they touch, and pushed off it they lose the shape
+    the structure has (30QM's Spearman 0.496 -> 0.436, held at 0.446). Kept, and True, when what is left overlaps
+    only the yielding items and the result takes at most _SEP_TIE_ROOM times the one-by-one room; else the items are
+    put back."""
+    free = {
+        i
+        for i in set(range(len(items))) - set(ties) - {j for j, _ in ties.values()}
+        if not any(isinstance(m, PlacedStem) for m in items[i].members)
+    }
+    xy = start.copy()
+    done = _push_apart(xy, halves, mids, home, ties, _SEP_SWEEPS, apart, fixed, mirror, level, free)
+    if not done and not _lone_left(xy, halves, mids, apart, free):
+        return False
+    alone = [(it.cx, it.cy) for it in items]
+    room = _box_area(np.array(alone, float).reshape(-1, 2), halves, mids)
+    for it, (x, y) in zip(items, xy.tolist()):
+        it.cx, it.cy = x, y
+    _slide_clear(items, joints, fixed, level, sorted(free))
+    if (
+        _box_area(np.array([(it.cx, it.cy) for it in items], float).reshape(-1, 2), halves, mids)
+        <= _SEP_TIE_ROOM * room
+    ):
+        return True
+    for it, (x, y) in zip(items, alone):
+        it.cx, it.cy = x, y
+    return False
 
 
 def _lone_left(xy, halves, mids, apart, lone: set[int]) -> bool:
@@ -2688,7 +2750,9 @@ def _both_ways(build):
     across the page may point either way (_sheet_order draws strands[0] up), and one way the tied copies can need
     more room than _SEP_SYM_ROOM allows (2ILU: 1.07). When the copies are not drawn alike and such sheets exist, the
     layout is made again with them turned down (_TIE_TURN), and that one is kept if it draws the copies alike; else
-    (both or neither alike) the first, strands[0] up. Only those layouts are made twice (CI ruling, plan 12)."""
+    (both or neither alike) the first, strands[0] up. Only those layouts are made twice (CI ruling, plan 12). Copies
+    drawn alike only in _separate's wider room (_tied_again: report "wide") count as not alike here, but beat copies
+    not drawn alike at all (random-100 C2b-3)."""
     import functools
 
     @functools.wraps(build)
@@ -2705,7 +2769,7 @@ def _both_ways(build):
         if first.get("alike", True) or not first.get("turnable"):
             return lay
         other, second = made(first["turnable"])
-        return other if second.get("alike") else lay
+        return other if second.get("alike") or (second.get("wide") and not first.get("wide")) else lay
 
     return run
 
@@ -2737,6 +2801,7 @@ def build_layout(
     over: dict[str, int] | None = None,
     level: set[str] | None = None,
     band: tuple[float, float] | None = None,
+    alike_first: bool = True,
 ) -> Layout:
     """Labels: the generic ones (_assign_labels), then `relabel` (ref -> label: copies' shared labels, primes of
     elements lent by neighbours), then `names` (names.apply_names: --names, given the placed layout with its stems
@@ -2756,7 +2821,10 @@ def build_layout(
     transmembrane elements of a membrane view, cli): the items holding them keep their projected height, so they
     cross the band where the membrane is; the rest moves round them (_separate). `band` (page y of the membrane's
     two faces as projected): a lone transmembrane helix drawn wholly between them (a tilted helix drawn upright at
-    its length is shorter than the slab it crosses) is moved, the least way, until one end meets a face."""
+    its length is shorter than the slab it crosses) is moved, the least way, until one end meets a face.
+    `alike_first`: the copies the symmetry ties may be drawn alike in up to _SEP_TIE_ROOM (_separate's second chance,
+    _tied_again), random-100 C2b-3; cli turns it off in a membrane view, where the transmembrane helices' heights
+    are judged instead (C17)."""
     if mode not in ("projected", "stack"):
         raise ValueError(f"unknown layout mode {mode!r}")
     style = style or Style()
@@ -2917,10 +2985,17 @@ def build_layout(
             and k not in {j for j, _ in ties.values()}
             and len({sector_of.get(m.sse.chain) for m in it.members if isinstance(m, Placed)} - {None}) > 1
         }
-        alike = _separate(items, ties, joints, walls, mirror=mirror if ties else None, level=kept, shared=shared)
+        # the copies drawn alike only by _separate's second chance, in more room (None: no second chance)
+        wide: list[bool] | None = [] if alike_first else None
+        alike = _separate(
+            items, ties, joints, walls, mirror=mirror if ties else None, level=kept, shared=shared, wide=wide
+        )
         if domains and _part_domains(items, domains, ties, mirror if ties else None):
             # the domains, parted with their copies, keep them alike whatever room that takes
-            alike = _separate(items, ties, joints, walls, mirror=mirror if ties else None, room=np.inf, level=kept)
+            wide = [] if wide is not None else None
+            alike = _separate(
+                items, ties, joints, walls, mirror=mirror if ties else None, room=np.inf, level=kept, wide=wide
+            )
         report = _TIE_TURN.get()[1]
         if report is not None:  # the shared sheets whose way up is a symmetry tie: _both_ways may turn them
             held = {m.sse.id for k in shared for m in items[k].members}
@@ -2929,7 +3004,7 @@ def build_layout(
                 for k, sh in enumerate(sheets)
                 if k not in templates and sh.strands[0].id in held and _sheet_seen(sh, frame)[1] == 0
             )
-            report["alike"] = alike
+            report["alike"], report["wide"] = alike and not wide, alike and bool(wide)
     for it in items:
         it.apply()
     dna = [m for it in items for m in it.members if isinstance(m, PlacedStem)]
