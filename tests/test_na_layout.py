@@ -2746,6 +2746,11 @@ def test_strands_keep_their_drawings_off_domain_names(monkeypatch):
     boxes = [box for name, box in label_boxes(lay, []) if name.startswith("domain-label:")]
     assert boxes and seen
     assert all(b in names for names in seen if names for b in boxes)
+    # and as drawn (review M5): no run or joint passes through a domain's name between its faces
+    from foldmap.na_runs import _off_names
+
+    drawn = [p for p in lay.na_paths if p.kind in ("run", "joint")]
+    assert drawn and all(_off_names(p.points, boxes) for p in drawn)
 
 
 def test_a_mark_held_by_nucleotides_tethers_off_the_stems_ladders():
