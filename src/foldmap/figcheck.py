@@ -685,7 +685,7 @@ def _copy_pairs(drawn, notes: dict | None = None) -> dict[tuple[str, str], tuple
     ties = [(copy, ref, (mirrored,)) for copy, (ref, mirrored) in sorted(lay.copy_ties.items())]
     hands = (False, True) if any(m for _, m in lay.copy_ties.values()) else (False,)
     ties += [(copy, ref, hands) for copy, ref in _untied_copies(lay, residues, chains)]
-    out = {}
+    tie_parts = []
     for copy, ref, mirrors in ties:
         shared = shared_sheet_elements(lay, copy, ref)
         a = [p for k, p in mine.get(ref, []) if k not in shared]
@@ -711,6 +711,31 @@ def _copy_pairs(drawn, notes: dict | None = None) -> dict[tuple[str, str], tuple
         differ = _sheets_differ(
             lay, copy, ref, [(a[i], b[j]) for i, j in found], lacking(xs, ys, a) | lacking(ys, xs, b)
         )
+        tie_parts.append((copy, ref, mirrors, shared, a, b, xs, ys, found, judgeable, differ))
+    # a copy's block another of its chains finds grouped apart from its mate's (9P1X O's 9-strand barrel holding R's
+    # strands against E's 8 with J's beside: O~E and R~J differ, so P's strands in it differ too: C2b-S)
+    apart = {n for *_, differ in tie_parts for _, mine, _ in differ for n in mine}
+    where = {k: n for n, (ids, _) in enumerate(_blocks(lay)) for k in ids}
+    out = {}
+    for copy, ref, mirrors, shared, a, b, xs, ys, found, judgeable, differ in tie_parts:
+        own_groups = {n for _, mine, _ in differ for n in mine}
+        through = sorted(
+            {
+                (where[b[j].sse.id], where.get(a[i].sse.id, -1))
+                for i, j in found
+                if where.get(b[j].sse.id) in apart - own_groups
+            }
+        )
+        if through:
+            differ = differ + [
+                (
+                    {a[i].sse.id for i, j in found if where.get(b[j].sse.id) == c}
+                    | {k for k in _blocks(lay)[c][0] if k in lay.placed and lay.placed[k].sse.chain == copy},
+                    [c],
+                    sorted({r for cc, r in through if cc == c and r >= 0}),
+                )
+                for c in sorted({c for c, _ in through})
+            ]
         if differ:  # their strands are placed by each copy's own pairing: left out, reported (C2b-3 R2)
             gone = {k for strands, _, _ in differ for k in strands}
             kept_a, kept_b = (

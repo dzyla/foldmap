@@ -451,3 +451,18 @@ def test_an_accessory_never_stands_beside_a_strand_it_does_not_pair_with(p1x_foc
     _, found = p1x_focus_science
     assert _findings_naming(found, "a:106-109", "Q:106-109", "I:94-97") == []
 
+
+def test_a_block_another_chain_finds_grouped_apart_differs_for_every_chain_in_it():
+    """Random-100 C2b-S, ruling C2b-3/R2 read per copy, not per chain: 9P1X protomer 1's O/P/R block is a 9-strand
+    barrel (R:29-35 in its ring), protomer 0's E/F/J block an 8-strand one with J's strands beside it and J's others
+    in a block of their own. O~E and R~J find the blocks grouped differently; P's strands lie in the same block, so
+    they are placed by its own pairing too (the copy keeps its own shape: its mate's places drew R:52-61 away from
+    R:29-35) and are left out of A15 and reported, not judged against F's (4.2 page units)."""
+    from helpers import r100_entry
+
+    d = _laid_out(r100_entry("9P1X"), focus="none")
+    notes = figcheck.copies_sheets_differ(d)
+    for copy, ref in (("P", "F"), ("Z", "F")):
+        assert (copy, ref) in notes, sorted(notes)
+    got = figcheck.copies_alike(d)
+    assert max(got.values()) <= ALIKE, {f"{a}~{b}": round(v, 3) for (a, b), v in got.items() if v > ALIKE}
