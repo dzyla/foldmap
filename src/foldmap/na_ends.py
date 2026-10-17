@@ -7,6 +7,7 @@ the dashed gaps where nucleotides are cropped away."""
 from __future__ import annotations
 
 import math
+from dataclasses import dataclass
 
 import numpy as np
 
@@ -381,16 +382,36 @@ def _trace_clear(layout: Layout, s: int, pts) -> bool:
 _GAP_BOWS = (1.2, 1.6, 2.2)  # a gap with no way on the grid may bow out to this many times its chord
 
 
+@dataclass(eq=False)
+class _TraceEnd:
+    """The end of a strand drawn along its projection (a trace, which no stem holds) as the owner of the port a
+    cropped gap leaves from or enters: a point, whose rect is the point and whose body is empty, so no route must keep
+    out of it."""
+
+    cx: float
+    cy: float
+    id: str = "trace-end"
+    length: float = 0.0
+    width: float = 0.0
+    angle: float = 0.0
+
+    @property
+    def rect(self) -> tuple[float, float, float, float]:
+        return self.cx, self.cy, self.cx, self.cy
+
+
 def _gap(router: _Router, g, a, b) -> NAPath:
     """A cropped gap from one strand piece's 3' end to the next one's 5' end: routed, dashed and (unless short)
-    labelled with the number of nucleotides left out."""
+    labelled with the number of nucleotides left out. An end no stem holds (a trace's: a strand drawn along its
+    projection) is routed from as a point (_TraceEnd): random-100 C2b-6, 7Y7C's gaps after Z:37, Z:61 and V:21 were
+    never routed and, with no curve or bow clear, drawn straight across six stems and a terminus."""
     (pa, ea, own_a), (pb, eb, own_b) = a, b
-    own = tuple(d for d in (own_a, own_b) if d is not None)
-    route = None
-    if own_a is not None and own_b is not None:
-        route, _ = router.route(pa, ea, own_a, pb, eb, own_b, own_body=True)
-        if route is None:  # an end in another element's clearance margin
-            route, _ = router.route(pa, ea, own_a, pb, eb, own_b, own_body=True, loose=True)
+    own_a = own_a if own_a is not None else _TraceEnd(float(pa[0]), float(pa[1]))
+    own_b = own_b if own_b is not None else _TraceEnd(float(pb[0]), float(pb[1]))
+    own = (own_a, own_b)
+    route, _ = router.route(pa, ea, own_a, pb, eb, own_b, own_body=True)
+    if route is None:  # an end in another element's clearance margin
+        route, _ = router.route(pa, ea, own_a, pb, eb, own_b, own_body=True, loose=True)
     if route is None:  # no way on the grid: a curve leaving and entering along the ends, or a bow either side
         chord = math.dist(pa, pb)
         shapes = [_xy(_curve(pa, ea, pb, eb))]

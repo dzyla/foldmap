@@ -2808,3 +2808,26 @@ def test_a_mark_held_by_nucleotides_crosses_fewer_strands_before_it_keeps_off_bo
     spot = _mark_spot(np.zeros(2), (0.05, 0.05), target, [], [], [], [body], radius=1.0, na=([], [strand]))
     assert _strands_crossed(spot, target, [strand]) == 0
     assert _over_bodies(spot, target, [body]) > 0
+
+
+def test_a_cropped_gap_from_a_traces_end_is_routed():
+    """Random-100 C2b-6 (7Y7C's gaps after Z:37, Z:61 and V:21): a gap with an end on a strand drawn along its
+    projection (a trace, which no stem holds) had no owner there, so it was never routed: a curve or a bow when one
+    was clear, else drawn straight across whatever lay between (six stems and a terminus). Its trace's end is now a
+    point a route leaves from, so it goes round."""
+    from types import SimpleNamespace
+
+    from foldmap.layout import Layout
+    from foldmap.na_ends import _gap
+    from foldmap.na_paths import _face, crosses_body
+    from foldmap.route import _element_obstacles, _Grid, _Router
+
+    wall = PlacedStem("P1", "P1", [0, 0], [], 0.0, 0.0, 3.0, 0.0, 20.0, {(0, 0): 1.0}, {(0, 0): 1})
+    db = PlacedStem("P2", "P2", [0, 0], [], 6.0, 0.0, 3.0, 0.0, 4.6, {(0, 3): -1.0}, {(0, 3): 1})
+    lay = Layout({}, (-9.0, -13.0, 10.0, 13.0), stems=[wall, db])
+    router = _Router(_Grid(lay), _element_obstacles(lay))
+    fb, eb = _face(db, (0, 3), False)
+    pa, ea = np.array([-5.0, 0.0]), np.array([-1.0, 0.0])  # a trace's end left of the wall, pointing away
+    path = _gap(router, SimpleNamespace(before=0, after=1, count=5), (pa, ea, None), (fb, eb, db))
+    assert not path.fallback
+    assert not any(crosses_body(p, q, wall) for p, q in zip(path.points, path.points[1:]))
