@@ -161,10 +161,14 @@ class _Grid:
         return self.cells_along(port, self.center(end)) - {end}
 
     def _into_slab(self, port, exit_vec) -> bool:
-        """Does a route's usual first step out of this port (_PUSH[0] along its exit) land in the membrane slab? Such
-        a route starts nearer (_PUSH_NEAR), so it turns round its own element's end at the port's own row, not 0.4
-        into the slab: 6JO6's helix ending 0.03 below a face, 5LDW's in-slab helix facing a 0.81 gap under the one
-        stacked on it (random-100 C2b-5)."""
+        """Does a route's usual first step out of this port (_PUSH[0] along its exit, up or down: across the slab's
+        rows) land in the membrane slab? Such a route starts nearer (_PUSH_NEAR), so it turns round its own element's
+        end at the port's own row, not 0.4 into the slab: 6JO6's helix ending 0.03 below a face, 5LDW's in-slab helix
+        facing a 0.81 gap under the one stacked on it (random-100 C2b-5). A port leaving sideways starts as before: a
+        nearer start only moves its turn up or down beside its own element, in the slab (6JLN's c:81-83 entered from
+        below, its last run 0.75 long in mid-slab)."""
+        if abs(exit_vec[1]) <= abs(exit_vec[0]):
+            return False
         c = self.cell((port[0] + exit_vec[0] * _PUSH[0], port[1] + exit_vec[1] * _PUSH[0]))
         return bool(0 <= c[0] < self.nx and 0 <= c[1] < self.ny and self.slab[c])
 

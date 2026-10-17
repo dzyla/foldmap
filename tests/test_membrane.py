@@ -493,7 +493,7 @@ def test_the_second_membrane_layout_is_kept_only_when_it_does_better(monkeypatch
     assert next(scores, None) is None
 
 
-@pytest.mark.parametrize("entry", ["5LDW", "6JO6"])
+@pytest.mark.parametrize("entry", ["5LDW", "6JO6", "6JLN"])
 def test_a_route_turning_out_of_a_port_at_or_in_the_slab_turns_at_the_port(entry):
     """Random-100 C2b-5 (A18). 6JO6: 5:167-169's C port lies 0.03 below the lower face and points up; its route's
     first cell, 0.4 out, lay 0.42 inside the face, and the turn round the helix's end ran there. 5LDW: in C17's second
@@ -501,7 +501,9 @@ def test_a_route_turning_out_of_a_port_at_or_in_the_slab_turns_at_the_port(entry
     of the loop entering L:369-380, and the route jogged down to run 1.0 sideways in mid-slab, one loop in the slab
     (scored (0, 1, 0) against the first layout's (6, 0, 0), so C17 kept six TM helices off the band). A port whose
     first step lands in the slab now starts nearer (route._Grid._into_slab): 5LDW keeps the second layout, every TM
-    helix across the band, and neither view has a loop in the slab."""
+    helix across the band, and neither view has a loop in the slab. 6JLN: c:81-83's N port, inside the band, leaves
+    sideways; starting it nearer moved its route's turn beside the element, 0.75 along mid-slab, so a port leaving
+    sideways starts as before."""
     from foldmap.figcheck import membrane_view
     from foldmap.route import route_loops
     from helpers import r100_entry

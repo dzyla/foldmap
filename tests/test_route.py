@@ -572,7 +572,7 @@ def test_a_route_out_of_a_port_whose_first_step_lands_in_the_slab_turns_at_the_p
     pointing up into the slab. Every route started 0.4 out along its exit (_PUSH), so the first cell lay 0.42 inside
     the face and the turn round the helix's end ran there, in the slab (A18). A port whose first step lands in the
     slab starts nearer (_PUSH_NEAR, as a port facing a stack gap does), and the turn stays within SLAB_MARGIN of the
-    face. A port whose first step leaves the slab starts as before."""
+    face. A port whose first step leaves the slab, or that leaves sideways, starts as before."""
     from foldmap.figcheck import slab_runs
 
     a = bar(0, 0.0, -0.03 - 0.9625, 1.925, np.pi / 2)  # C port at (0, -0.03), pointing up
@@ -590,6 +590,15 @@ def test_a_route_out_of_a_port_whose_first_step_lands_in_the_slab_turns_at_the_p
     up = _Grid(layout_of(c), [])
     port, out = c.c_port, c.exit_c
     assert up.free_cell_along(port, out, c) == up.cell((port[0] + out[0] * 0.4, port[1] + out[1] * 0.4))
+    # a port leaving sideways inside the band (6JLN's c:81-83): its first step is in the slab, it starts as before
+    d = bar(60, 4.0, 4.0, 1.175, 0.0)
+    side = layout_of(d)
+    side.membrane = {"y": (0.0, 8.0), "bands": [(0.0, 8.0)], "inside": "below"}
+    grid = _Grid(side, [])
+    port, out = d.c_port, d.exit_c
+    assert abs((port[0] - grid.x0) % grid.res - 0.175) < 1e-9  # a nearer start would find a free cell
+    assert grid.slab[grid.cell((port[0] + 0.4, port[1]))]
+    assert grid.free_cell_along(port, out, d) == grid.cell((port[0] + out[0] * 0.4, port[1] + out[1] * 0.4))
 
 
 def test_only_the_over_helix_port_walks_loose(monkeypatch):
