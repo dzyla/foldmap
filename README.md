@@ -176,8 +176,9 @@ foldmap styles                                    # every theme and style key
 
 ## What it handles
 
-- **Secondary structure** by a DSSP implementation checked against mkdssp 3.1.2 (no bends, S; the random-100
-  campaign requires at least 99% of residues to get the same DSSP code, with mkdssp's bends read as none):
+- **Secondary structure** by a DSSP implementation checked against mkdssp 3.1.2. It assigns no bends (S); with
+  mkdssp's bends read as none, 268,834 of the 268,835 residues of the random-100 campaign's 96 protein entries got
+  mkdssp's code (one residue differs, in 8K8E; the campaign requires 99% per entry):
   α-, 3₁₀- and π-helices (π before α, as in DSSP ≥ 2.1), β-strands with bulges, turns; β-sheets
   with strand order and direction, closed barrels shown with a ghost of the first strand. A helix kinked by more
   than 30° is split into pieces drawn end to end; a strand that a bulge splits stays one strand when both pieces
@@ -485,8 +486,9 @@ Every figure (command line, app, MCP or Python) goes through the same steps:
 1. **Read the structure.** gemmi reads the mmCIF/PDB file (or the file downloaded for a PDB ID or UniProt
    accession). With `--assembly auto` the biological assembly is built from the file's own operators.
 2. **Secondary structure.** A DSSP implementation assigns hydrogen bonds from the backbone and calls α-, 3₁₀- and
-   π-helices, β-strands (with bulges) and turns, following mkdssp 3.1.2 (bends, S, are not assigned; agreement
-   with mkdssp is measured on the random-100 campaign, which requires at least 99% of residues to agree).
+   π-helices, β-strands (with bulges) and turns, following mkdssp 3.1.2. Bends (S) are not assigned; with mkdssp's
+   bends read as none, 268,834 of 268,835 residues agree over the random-100 campaign's 96 protein entries (it
+   requires 99% per entry).
 3. **Sheets and bundles.** Strands joined by backbone H-bond ladders form sheets; their order and directions come
    from the ladder network, and a sheet whose ends pair is a closed barrel. Each strand drawn side by side with
    another pairs with it: a branched sheet's run of paired strands is its ladder network's longest path (a closed

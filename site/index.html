@@ -102,9 +102,9 @@
   </div>
   <ol class="steps">
     <li><h3>Read</h3><p>gemmi reads the file, or the one downloaded for a PDB ID or UniProt accession; biological assemblies are built from its operators.</p></li>
-    <li><h3>Secondary structure</h3><p>A DSSP implementation, checked residue by residue against mkdssp, finds backbone hydrogen bonds and calls α-, 3₁₀- and π-helices, strands with bulges, and turns.</p></li>
+    <li><h3>Secondary structure</h3><p>A DSSP implementation, checked residue by residue against mkdssp 3.1.2, finds backbone hydrogen bonds and calls α-, 3₁₀- and π-helices, strands with bulges, and turns (no bends: with mkdssp's bends read as none, 268,834 of 268,835 residues of 96 random PDB entries agree).</p></li>
     <li><h3>Sheets</h3><p>Strands joined by H-bond ladders form sheets; order and direction come from the ladders; closed barrels are recognised.</p></li>
-    <li><h3>Context</h3><p>Symmetry from chain superposition; disulfides, glycans and ligands from the atoms; the membrane estimated on request.</p></li>
+    <li><h3>Context</h3><p>Symmetry from superposing chains that are copies (90% of the shorter sequence matched); disulfides, glycans and ligands from the atoms; the membrane estimated on request (a slab slid along the long elements' axis, no tilt search).</p></li>
     <li><h3>Projection</h3><p>3D is turned into the page: dominant direction up, assemblies unrolled around their axis, DNA complexes around the DNA. Never mirrored.</p></li>
     <li><h3>Layout</h3><p>One energy is minimised: springs to projected positions, short loops, contacts and disulfides pulling together, no overlaps.</p></li>
     <li><h3>Loops</h3><p>Each loop is routed on a grid by A* search: orthogonal lines around elements and labels.</p></li>

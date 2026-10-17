@@ -128,7 +128,8 @@ def show_section(st, ss: MutableMapping) -> None:
                 "Membrane",
                 ("off", "auto", "flip"),
                 setting(ss, "membrane"),
-                help="auto: find the bilayer and draw it; flip: the same, other side on top",
+                help="auto: the bilayer from OPM's atoms in the file, else estimated (a slab slid along the long "
+                "elements' axis, no tilt search), drawn; flip: the same, other side on top",
             )
         if ss.get("ligands__mode") == "codes":
             st.text_input(
