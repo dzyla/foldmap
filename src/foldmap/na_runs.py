@@ -28,7 +28,9 @@ from .route import _INFLATE, _clear, _curve, _Router, clip_len
 
 _BOW_MAX = 8  # internal-loop sides up to this many nucleotides are drawn as bows, not routed
 _JOINT_STRAIGHT = 1.5  # a joint between two pieces of a bent duplex shorter than this may be drawn straight
-_JOINT_REACH = 2.5  # ... and, when no route reaches it, one shorter than this (9C75 P2b -> P2a, 1.83: random-100 C24)
+# ... and, when no route reaches it, one shorter than this (9C75 P2b -> P2a, 1.83: random-100 C24; C2b-4: 8VWQ's
+# 1:594-595 and 1:662-663, pieces kept end to end 4.41 and 4.21 apart, were plain curves at 2.5)
+_JOINT_REACH = 5.0
 # a run keeps off every strand drawn before it (and every protein loop) by a detour at most this many times as
 # long as its plain drawing, which keeps off the hairpin loops and free ends only. Measured on 24 campaign entries,
 # crossing a strand only a cost: run-run crossings 250 -> 239, protein loops crossed 178 -> 175, no entry worse in

@@ -2665,3 +2665,17 @@ def test_a_strand_whose_face_looks_into_a_margin_still_routes():
         router.grid.blocked[router.grid.cell(fa + ea * t)] = True
     path = _strand_between(router, 0, 0, j, da, db, None)
     assert path.kind == "run" and not path.fallback
+
+
+def test_joined_pieces_kept_end_to_end_may_join_straight_farther_apart():
+    """Random-100 C2b-4 (8VWQ 1:594-595, 1:662-663): two pieces of one bent duplex kept end to end 4.4 apart, whose
+    faces look into each other's margins, so no route reaches the joint, were drawn as plain curves: a straight joint
+    was allowed only under 2.5. The duplex carries on straight up to _JOINT_REACH when the line is clear and forward."""
+    from foldmap.na_paths import _face
+    from foldmap.na_runs import _straight_joint
+
+    da, db, j, router = _two_stems(4.4, parent="P")
+    fa, ea = _face(da, (0, 0), True)
+    fb, _ = _face(db, (0, j), False)
+    assert math.dist(fa, fb) == pytest.approx(4.4)
+    assert _straight_joint(router, da, db, fa, ea, fb)
