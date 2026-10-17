@@ -451,7 +451,7 @@ def _route_ports(
         grid.blocked[c] = True
     cells = _astar(grid, start, _axis(ea), goal, _axis(-np.asarray(eb)), max_nodes)
     if cells is None and wide is not None:
-        cells = wide.second(start, _axis(ea), goal, _axis(-np.asarray(eb)), max_nodes, stubs)
+        cells = wide.second(start, _axis(ea), goal, _axis(-np.asarray(eb)), max_nodes)
     for c in stubs:
         grid.blocked[c] = False
     return cells
@@ -504,32 +504,32 @@ class _Router:
         self.wide_searches = self.wide_refused = 0  # debug counts: second searches run, refused for the budget
         self._free: tuple[bytes, np.ndarray] | None = None  # the last free-cell labelling (_joined) and its key
 
-    def _joined(self, a, b, stubs) -> bool:
-        """Are cells a and b joined by free cells (side by side, as A* steps)? The grid as it stands without the
-        port stubs `route` blocked for this search, labelled once per grid state (successive loops' searches see
-        the same one)."""
+    def _joined(self, a, b) -> bool:
+        """Are cells a and b joined by free cells (side by side, as A* steps)? The grid as the search sees it, the
+        port stubs _route_ports blocked for it included (random-100 C2b-6: with the stubs open, 7Y7C's gap between
+        two ports 0.57 apart on one face, cut apart by their stubs, ran four wide searches that could not succeed and
+        spent 5.8 M of the page's 8 M nodes); labelled once per grid state (successive searches with the same stubs
+        see the same one)."""
         from hashlib import blake2b
 
         from scipy.ndimage import label
 
         free = ~self.grid.blocked
-        for c in stubs:
-            free[c] = True
         key = blake2b(np.packbits(free).tobytes(), digest_size=16).digest()
         if self._free is None or self._free[0] != key:
             self._free = (key, label(free)[0])
         marks = self._free[1]
         return bool(marks[a] and marks[a] == marks[b])
 
-    def second(self, start, start_dir, goal, goal_dir, max_nodes: int, stubs):
+    def second(self, start, start_dir, goal, goal_dir, max_nodes: int):
         """The second search of a route the first (within max_nodes) did not find: within wide_nodes, or what the
-        page has left of _MAX_NODES_PAGE if less, only when free cells join its ends; None if not run or no
-        route."""
+        page has left of _MAX_NODES_PAGE if less, only when free cells join its ends (_joined: on the grid as
+        searched, its port stubs blocked); None if not run or no route."""
         budget = min(self.wide_nodes, self.wide_left)
         if budget <= max_nodes:
             self.wide_refused += self.wide_nodes > max_nodes  # a wider search would have run but for the budget
             return None
-        if not self._joined(start, goal, stubs):
+        if not self._joined(start, goal):
             return None
         spent = [0]
         cells = _astar(self.grid, start, start_dir, goal, goal_dir, budget, spent)
