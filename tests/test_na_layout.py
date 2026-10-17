@@ -2857,3 +2857,42 @@ def test_a_cropped_gap_whose_end_faces_a_stem_starts_from_the_nearest_free_cell(
     path = _gap(router, SimpleNamespace(before=0, after=1, count=5), (fa, ea, da), (fb, eb, db))
     assert not path.fallback
     assert not any(crosses_body(p, q, e) for e in (wall, front) for p, q in zip(path.points, path.points[1:]))
+
+
+def test_a_joint_no_route_or_line_reaches_is_drawn_as_a_clear_curve():
+    """Random-100 C2b-6 (8VWQ's P26a <-> P26b 73-76° off their faces, P124a's pieces turned back from each other, A3
+    in six views; 7Y7C's domains view): two pieces of one bent duplex that no route reaches and no straight line or
+    elbow may join were drawn as a plain fallback curve, whatever it crossed. The joint is now drawn as a smooth curve
+    leaving and entering along the faces' axes when one is clear of every element and stem (its own two by their
+    bodies), of the strands but its partner, of names and protein loops; only when none is does it fall back."""
+    from foldmap.na_paths import _face, in_body
+    from foldmap.na_runs import _strand_between
+    from foldmap.route import _PUSH
+
+    da, db, j, router = _two_stems(1.5, parent="P", rise=4.2)  # the partner 70° off the face's axis: no straight line
+    fa, ea = _face(da, (0, 0), True)
+    fb, eb = _face(db, (0, j), False)
+    for port, out in ((fa, ea), (fb, eb)):  # no route: every cell straight out of both faces taken
+        for t in _PUSH:
+            router.grid.blocked[router.grid.cell(port + out * t)] = True
+    path = _strand_between(router, 0, 0, j, da, db, None)
+    assert path.kind == "joint" and not path.fallback
+    mid = path.points[2:-2]
+    assert mid and not any(in_body(p, d) for p in mid for d in (da, db))
+
+
+def test_a_strand_whose_face_looks_into_a_margin_all_along_routes_from_beside_it():
+    """Random-100 C2b-6 (8VWQ's 2:834-835 between P124a's pieces turned back from each other; 7Y7C's domains view): the
+    way straight out of a face ran through a neighbouring margin for the whole of _PUSH, so even loose no route
+    started and the strand was a plain fallback curve. It now starts from the nearest free cell ahead of the face,
+    reached by a clear straight stub (na_ends._from_beside, as a cropped gap does)."""
+    from foldmap.na_paths import _face
+    from foldmap.na_runs import _strand_between
+    from foldmap.route import _PUSH
+
+    da, db, j, router = _two_stems(6.0)
+    fa, ea = _face(da, (0, 0), True)
+    for t in _PUSH:  # every cell straight out of P1's face taken by a margin (no body there)
+        router.grid.blocked[router.grid.cell(fa + ea * t)] = True
+    path = _strand_between(router, 0, 0, j, da, db, None)
+    assert path.kind == "run" and not path.fallback

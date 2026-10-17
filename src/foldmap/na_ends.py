@@ -384,14 +384,14 @@ _GAP_BOWS = (1.2, 1.6, 2.2)  # a gap with no way on the grid may bow out to this
 
 
 @dataclass(eq=False)
-class _TraceEnd:
-    """The end of a strand drawn along its projection (a trace, which no stem holds) as the owner of the port a
-    cropped gap leaves from or enters: a point, whose rect is the point and whose body is empty, so no route must keep
-    out of it."""
+class _Point:
+    """A point a strand's route leaves from or enters, as the owner of that port: the end of a strand drawn along its
+    projection (a trace, which no stem holds) or the free cell beside a stem's end a route starts from (_side_start).
+    Its rect is the point and its body is empty, so no route must keep out of it."""
 
     cx: float
     cy: float
-    id: str = "trace-end"
+    id: str = "point"
     length: float = 0.0
     width: float = 0.0
     angle: float = 0.0
@@ -402,10 +402,11 @@ class _TraceEnd:
 
 
 def _from_beside(router: _Router, a, b):
-    """A gap's route when the way straight out of an end has no free cell, even loose (_Grid.free_cell_along): from
-    the nearest free cell ahead of that end (_side_start), reached by a straight stub, to the other end; None if
-    neither end needs it or no route is found (random-100 C2b-6: 7Y7C's domains view, the gap after a:1439, whose end
-    faced P80a 0.4 to 3.15 out, was drawn straight across three stems)."""
+    """A strand's route (a gap's, a run's or a joint's) when the way straight out of an end (a = (port, outward
+    direction, owner), b the same) has no free cell, even loose (_Grid.free_cell_along): from the nearest free cell
+    ahead of that end (_side_start), reached by a straight stub, to the other end; None if neither end needs it or no
+    route is found (random-100 C2b-6: 7Y7C's domains view, the gap after a:1439, whose end faced P80a 0.4 to 3.15 out,
+    was drawn straight across three stems)."""
     grid = router.grid
     ends = []
     for port, out, own in (a, b):
@@ -414,7 +415,7 @@ def _from_beside(router: _Router, a, b):
             ends.append((port, out, own, False))
         else:
             v = side - np.asarray(port, float)
-            ends.append((side, v / float(np.hypot(*v)), _TraceEnd(float(side[0]), float(side[1])), True))
+            ends.append((side, v / float(np.hypot(*v)), _Point(float(side[0]), float(side[1])), True))
     if not (ends[0][3] or ends[1][3]):
         return None
     (qa, ua, oa, sa), (qb, ub, ob, sb) = ends
@@ -454,11 +455,11 @@ def _side_start(router: _Router, port, out, own):
 def _gap(router: _Router, g, a, b) -> NAPath:
     """A cropped gap from one strand piece's 3' end to the next one's 5' end: routed, dashed and (unless short)
     labelled with the number of nucleotides left out. An end no stem holds (a trace's: a strand drawn along its
-    projection) is routed from as a point (_TraceEnd): random-100 C2b-6, 7Y7C's gaps after Z:37, Z:61 and V:21 were
+    projection) is routed from as a point (_Point): random-100 C2b-6, 7Y7C's gaps after Z:37, Z:61 and V:21 were
     never routed and, with no curve or bow clear, drawn straight across six stems and a terminus."""
     (pa, ea, own_a), (pb, eb, own_b) = a, b
-    own_a = own_a if own_a is not None else _TraceEnd(float(pa[0]), float(pa[1]))
-    own_b = own_b if own_b is not None else _TraceEnd(float(pb[0]), float(pb[1]))
+    own_a = own_a if own_a is not None else _Point(float(pa[0]), float(pa[1]))
+    own_b = own_b if own_b is not None else _Point(float(pb[0]), float(pb[1]))
     own = (own_a, own_b)
     route, _ = router.route(pa, ea, own_a, pb, eb, own_b, own_body=True)
     if route is None:  # an end in another element's clearance margin

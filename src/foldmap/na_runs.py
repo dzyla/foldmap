@@ -11,6 +11,7 @@ import math
 import numpy as np
 
 from .layout import NT_STEP, PlacedStem
+from .na_ends import _from_beside
 from .na_paths import (
     _BEAD,
     NAPath,
@@ -35,6 +36,14 @@ _JOINT_NEAR = 2.5  # ... and, when no route reaches it, one shorter than this (9
 # (random-100 C2b-4: 8VWQ's P26a -> P26b, 4.41 apart but 76° off its face, stays a curve)
 _JOINT_REACH = 5.0
 _JOINT_FORWARD = 0.5
+# a joint no route reaches and no line or elbow may take is drawn as a smooth curve out of its face along the axis and
+# into the partner's face along its axis, its control points this far out (page units), the first clear taken: the
+# duplex bends round; random-100 C2b-6 (8VWQ's P26a <-> P26b, 73-76° off their faces; P124a's pieces turned back)
+_JOINT_BENDS = (1.0, 1.5, 2.0, 0.5, 3.0)
+# ... and when none of those is clear, the same swung out sideways by this much at each end (page units), away from its
+# own piece on its rail's side: pieces turned back from each other (8VWQ's P124a, 7Y7C's P103) meet past the corners
+# of their bodies, which reach beyond the rails
+_JOINT_SWINGS = (0.0, 1.0, 2.0)
 # a run keeps off every strand drawn before it (and every protein loop) by a detour at most this many times as
 # long as its plain drawing, which keeps off the hairpin loops and free ends only. Measured on 24 campaign entries,
 # crossing a strand only a cost: run-run crossings 250 -> 239, protein loops crossed 178 -> 175, no entry worse in
@@ -100,6 +109,43 @@ def _elbow(router: _Router, da: PlacedStem, db: PlacedStem, fa, ea, fb, eb, stra
                 continue
             if strands is None or not strands.crosses(pts, skip=frozenset((da.id, db.id))):
                 return pts
+    return None
+
+
+def _bend(fa, ea, fb, eb, h: float, n: int = 24, sa=(0.0, 0.0), sb=(0.0, 0.0)) -> list[tuple[float, float]]:
+    """The cubic from face fa (leaving along ea) to face fb (entered against its outward eb), its control points h
+    out along each, and swung sideways by sa and sb."""
+    p0, p3 = np.asarray(fa, float), np.asarray(fb, float)
+    p1 = p0 + np.asarray(ea, float) * h + np.asarray(sa, float)
+    p2 = p3 + np.asarray(eb, float) * h + np.asarray(sb, float)
+    t = np.linspace(0.0, 1.0, n)[:, None]
+    pts = (1 - t) ** 3 * p0 + 3 * (1 - t) ** 2 * t * p1 + 3 * (1 - t) * t**2 * p2 + t**3 * p3
+    pts[0], pts[-1] = p0, p3
+    return _xy(pts)
+
+
+def _joint_bend(
+    router: _Router, da: PlacedStem, db: PlacedStem, fa, ea, fb, eb, strands=None, names=(), loops=None, keys=()
+):
+    """A joint no route reaches and no straight line or elbow may take, drawn as a smooth curve (_bend, its control
+    points _JOINT_BENDS out, then swung sideways _JOINT_SWINGS away from its pieces on its rails' sides: `keys`, the
+    joined nucleotides; the first that is clear): clear by _INFLATE of every element and stem but its own two, into
+    neither of those at all, crossing no strand drawn so far but its partner, off every name (`names`, as _off_names)
+    and protein loop (`loops`); None if none is."""
+    own = (da, db)
+    side_a = da.normal * da.side[keys[0]] if keys else np.zeros(2)
+    side_b = db.normal * db.side[keys[1]] if keys else np.zeros(2)
+    for k, h in ((k, h) for k in _JOINT_SWINGS for h in _JOINT_BENDS):
+        if k and not keys:
+            break
+        pts = _bend(fa, ea, fb, eb, h, sa=side_a * k, sb=side_b * k)
+        if not _clear(pts, own, *router.elements, grow=_INFLATE, own_body=True):
+            continue
+        if strands is not None and strands.crosses(pts, skip=frozenset((da.id, db.id))):
+            continue
+        if not _off_names([pts[0], *pts, pts[-1]], names) or (loops is not None and loops.crosses(pts)):
+            continue
+        return pts
     return None
 
 
@@ -265,24 +311,38 @@ def _drawing(router: _Router, s, nts, between, da, db, ends, need, joint, kind, 
             bowed = None
         elif off_names(bowed):
             return NAPath("run", s, nts, bowed, _spaced(bowed, m), between=between)
-    if hard:
+
+    def search(find):  # a route search on the grid as this pass makes it (hard: the strands it keeps off blocked)
+        if not hard:
+            return find()
         saved, budget = grid.blocked.copy(), (router.max_nodes, router.wide_nodes)
         grid.blocked |= (strands.cells | (grid.used > 0)) if level == 2 else strands.fixed_cells
         if level == 2:  # a detour longer than _DETOUR times the second stage's is not taken: no need to search far
             router.max_nodes, router.wide_nodes = _FIRST_NODES, 0
         try:
-            route = _faces_route(router, fa, ea, da, fb, eb, db)
+            return find()
         finally:
             grid.blocked, (router.max_nodes, router.wide_nodes) = saved, budget
-    else:
-        route = _faces_route(router, fa, ea, da, fb, eb, db)
+
+    route = search(lambda: _faces_route(router, fa, ea, da, fb, eb, db))
+    bend = (router, da, db, fa, ea, fb, eb, strands, names, loops, between)
+    line = grazing = None
     if route is None and joint and _straight_joint(router, da, db, fa, ea, fb, strands, names, loops):
         # pieces that touch (no margin is kept between them): the duplex carries on straight across their meeting
         # corner, as a kink joins two pieces of one helix; past one of them, not through it (a shallow graze of a
-        # corner by the line leaving its face, as 4OO8 P6b -> P6a, is kept), round an elbow where one is clear
+        # corner by the line leaving its face, as 4OO8 P6b -> P6a, is kept), round an elbow or a bend where one is
+        # clear, else routed from beside its faces (random-100 C2b-6: 7Y7C's a:520-521 ran into P50a's corner)
         line = [fa, fb]
         if _grazes(line, (da, db)):
-            line = _elbow(router, da, db, fa, ea, fb, eb, strands) or line
+            line, grazing = _elbow(router, da, db, fa, ea, fb, eb, strands) or _joint_bend(*bend), line
+    elif route is None and joint:  # no straight line may join them: a bend, when one is clear
+        line = _joint_bend(*bend)
+    if route is None and line is None and not hard:  # no way straight out of a face, even loose (the last pass:
+        # not where the strands drawn before block the way): from the free cells beside it
+        route = _from_beside(router, (fa, ea, da), (fb, eb, db))
+    # a grazing line only in the last pass, once the routes from beside its faces are tried
+    line = line if line is not None or route is not None or hard else grazing
+    if line is not None:
         for a, b in zip(line, line[1:]):
             for c in grid.cells_along(a, b):
                 grid.used[c] += 1
