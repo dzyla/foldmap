@@ -134,7 +134,7 @@ side.
 | Action | Effect |
 | --- | --- |
 | Hover an element, loop, map cell or residue in 3D | preview: the same residues light up in all three views |
-| Click | select it (stays lit) and fly the 3D view to it |
+| Click | select it (stays lit; the 3D view keeps its camera) |
 | Click it again, click empty paper, or press Esc | clear the selection |
 | Shift-click | add to (or remove from) the selection |
 | Click a chain in the legend, or its N/C terminus | select the whole chain |

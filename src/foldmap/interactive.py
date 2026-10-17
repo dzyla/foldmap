@@ -234,7 +234,8 @@ _APP = r"""
     }
   }
 
-  // ---- 3D: one interface over Mol* (default) or 3Dmol: base colours, highlight, fly-to, reset, hover callbacks
+  // ---- 3D: one interface over Mol* (default) or 3Dmol: base colours, highlight, reset, hover callbacks;
+  // the camera moves only when the reader moves it (or presses reset), never on a selection
   const molDiv = document.getElementById('mol');
   const LOOP = '#9aa3ad', PALE = '#dde2e7', LOOP_ON = '#4a4f57', HET = '#e69f00';
   function colourOfResidue(k) {
@@ -276,7 +277,13 @@ _APP = r"""
       loadingOverlay: false, visualStyle: 'cartoon', hideStructure: ['water'],
       hideCanvasControls: ['expand', 'selection', 'animation', 'controlToggle', 'controlInfo'],
     });
-    plugin.events.loadComplete.subscribe(ok => { if (ok) { ready = true; base(); } });
+    plugin.events.loadComplete.subscribe(ok => {
+      if (!ok) return;
+      ready = true;
+      const cam = plugin.plugin && plugin.plugin.managers && plugin.plugin.managers.camera;
+      if (cam) ['focusLoci', 'focusSpheres'].forEach(f => { if (cam[f]) cam[f] = () => {}; });  // no zoom on a click in 3D
+      base();
+    });
     function key(d) { return idx.byKey[d.auth_asym_id + ':' + d.auth_seq_id + ((d.ins_code || '').trim())]; }
     molDiv.addEventListener('PDB.molstar.mouseover', ev => {
       const k = key(ev.eventData || {});
@@ -298,17 +305,6 @@ _APP = r"""
         het.forEach(([chain, seq]) => parts.push({ auth_asym_id: chain, auth_seq_id: seq, color: HET,
                                                    representation: 'ball-and-stick', representationColor: HET }));
         apply({ data: parts, nonSelectedColor: PALE });
-      },
-      async fly(residues, het = []) {  // focus, then step back so the element sits in its surroundings
-        if (!ready || !(residues.length || het.length)) return;
-        await plugin.visual.focus(runs(residues).map(query).concat(het.map(([chain, seq]) => ({ auth_asym_id: chain, auth_seq_id: seq }))));
-        setTimeout(() => {
-          const c = plugin.plugin && plugin.plugin.canvas3d;
-          if (!c) return;
-          const snap = c.camera.getSnapshot(), k = 2.4;
-          const position = [0, 1, 2].map(i => snap.target[i] + (snap.position[i] - snap.target[i]) * k);
-          c.camera.setState({ position, radius: snap.radius * k }, 300);
-        }, 450);
       },
       reset() { if (ready) plugin.visual.reset({ camera: true }); },
       plugin,
@@ -349,9 +345,6 @@ _APP = r"""
                                                                               sphere: { scale: 0.3, color: HET } }));
         viewer.render();
       },
-      fly(residues, het = []) {
-        if (residues.length || het.length) { viewer.zoomTo(sel(residues, het)); viewer.zoom(0.35); viewer.render(); }
-      },
       reset() { viewer.zoomTo({}, 400); viewer.render(); },
       viewer,
     };
@@ -361,7 +354,6 @@ _APP = r"""
   window.foldmapViewer = mol;
   document.getElementById('molreset').onclick = () => mol.reset();
   const molOn = (residues, het) => mol.on(residues, het || []);
-  const fly = (residues, het) => mol.fly(residues, het || []);
 
   // ---- linking: hover previews, click pins (shift-click adds), chains via legend or termini
   function range(a, b) { const out = []; for (let k = a; k <= b; k++) out.push(k); return out; }
@@ -442,12 +434,7 @@ _APP = r"""
   function pick(item, additive) {
     pinned = lib.toggle(pinned, item, additive);
     hovered = null;
-    render();
-    if (pinned.length) {
-      const ks = new Set(), het = [];
-      pinned.forEach(p => { const st = stateOf(p); st.residues.forEach(k => ks.add(k)); (st.het || []).forEach(h => het.push(h)); });
-      fly(Array.from(ks), het);
-    }
+    render();  // the 3D view keeps its camera: a selection lights up in place (the author: no zoom-in)
   }
   function clearPins() { pinned = []; hovered = null; render(); }
   window.foldmapSelection = () => pinned.map(lib.itemKey);  // for tests and scripting
@@ -849,7 +836,7 @@ def build_page(
 {_viewer_head(viewer)}
 </head><body>
 <header><h1>{name}</h1><p>{counts} · hover anything: the
-same residues light up in all three views · click an element to fly the 3D view to it</p></header>
+same residues light up in all three views · click an element to keep it lit</p></header>
 <main>
   <section class="panel" id="topology"><h2>Topology <span class="tools"><button id="zin" title="zoom in">+</button>
     <button id="zout" title="zoom out">−</button><button id="zfit" title="fit the whole figure">fit</button></span></h2>
