@@ -61,7 +61,7 @@ New in this version:
 </tr>
 <tr>
 <td><img src="https://raw.githubusercontent.com/dzyla/foldmap/main/docs/images/tim-barrel-rainbow.png" alt="TIM barrel chain A drawn as one beta-alpha row with strands named beta1 to beta8"><br>
-<sub><b>βα rows.</b> Triosephosphate isomerase (1TIM, chain A), rainbow theme, <code>--names beta</code>: the closed (βα)₈ barrel as one row, each helix between the strands it joins, opened between β8 and β1, β8 repeated as a ghost.</sub></td>
+<sub><b>βα rows.</b> Triosephosphate isomerase (1TIM, chain A), rainbow theme, <code>--names beta</code>: the closed (βα)₈ barrel as one row, each helix between the strands it joins, opened between β8 and β1, β1 repeated as a ghost after β8.</sub></td>
 <td><img src="https://raw.githubusercontent.com/dzyla/foldmap/main/docs/images/myoglobin-names.png" alt="Myoglobin with its helices named A to H"><br>
 <sub><b>Conventional names.</b> Myoglobin (1MBN), <code>--names deposited</code>: helices A–H as the file names them (a short helix it leaves unnamed keeps its generic α4), the heme tethered to the helices that hold it.</sub></td>
 </tr>
@@ -86,14 +86,19 @@ New in this version:
 <tr>
 <td><img src="https://raw.githubusercontent.com/dzyla/foldmap/main/docs/images/trna-1ehz.png" alt="Yeast tRNA-Phe with its four arms as ladders, named acceptor, D, anticodon and T"><br>
 <sub><b>RNA folds.</b> tRNA-Phe (1EHZ), arms named from <code>docs/names/1EHZ-trna.yaml</code>: four stems as ladders with their loops and base letters, the tertiary pair marked by tie letters.</sub></td>
-<td><img src="https://raw.githubusercontent.com/dzyla/foldmap/main/docs/images/ncrna-30qm.png" alt="DRT10 RT-ncRNA complex with six RNA stems drawn as ladders under the two protomers"><br>
-<sub><b>RNA–protein complexes.</b> DRT10 RT–ncRNA (30QM): the 121-nt ncRNA's six stems (P1–P6) as ladders under the two RT protomers, contact beads in the colour of the chain that touches them.</sub></td>
+<td><img src="https://raw.githubusercontent.com/dzyla/foldmap/main/docs/images/ncrna-30qm.png" alt="DRT10 RT-ncRNA complex with six RNA stems drawn as ladders beside and between the two protomers"><br>
+<sub><b>RNA–protein complexes.</b> DRT10 RT–ncRNA (30QM): the 121-nt ncRNA's six stems (P1–P6) as ladders beside and between the two RT protomers, contact beads in the colour of the chain that touches them.</sub></td>
 </tr>
 <tr>
 <td><img src="https://raw.githubusercontent.com/dzyla/foldmap/main/docs/images/lambda-hbonds.png" alt="Lambda repressor dimer on DNA with protein-DNA hydrogen bonds as dashed lines"><br>
 <sub><b>Hydrogen bonds.</b> λ repressor (1LMB), <code>--set hbonds=na --set hbond_max=16</code>: the 16 shortest of 30 protein–DNA hydrogen bonds as dashed lines.</sub></td>
 <td><img src="https://raw.githubusercontent.com/dzyla/foldmap/main/docs/images/nucleosome-1kx5.png" alt="Nucleosome core particle with the DNA as a chain of straight duplex pieces round the histones"><br>
 <sub><b>Bent DNA.</b> Nucleosome (1KX5): 146 base pairs in 22 straight pieces round the histones.</sub></td>
+</tr>
+<tr>
+<td><img src="https://raw.githubusercontent.com/dzyla/foldmap/main/docs/images/measles-f-trimer.png" alt="Measles fusion protein trimer with one protomer highlighted"><br>
+<sub><b>Symmetry.</b> Measles F trimer (8UTF): C3 found, protomers drawn alike, one highlighted, disulfides and glycans marked.</sub></td>
+<td></td>
 </tr>
 </table>
 
@@ -453,6 +458,16 @@ contact beads against the atoms, and overlaps, crossings and text on the page. 3
 the six that fail (30QM, 4PJO, 3KTQ, 4YBB, 1YTB, 3CRX) is explained with its cause in
 [docs/validation/na/review.md](docs/validation/na/review.md). The full table is in
 [docs/validation/na/report.md](docs/validation/na/report.md).
+
+**Random-100.** One hundred PDB entries and AlphaFold models drawn at random in twelve strata (X-ray, cryo-EM and
+NMR; oligomers and hetero-complexes; membrane proteins; protein–DNA, protein–RNA and RNA alone; glycoproteins; one
+protein in two states; AlphaFold models; up to ribosomes near the app's 30,000-residue cap) are drawn by
+`scripts/random100.py` in every view and judged on the twenty criteria `foldmap check` prints, from crashes, time,
+route fallbacks and text collisions to secondary structure against mkdssp (268,834 of 268,835 residues agree),
+determinism and copies drawn alike. 96 of 100 pass every criterion; the four that fail (the ribosomes 7Y7C and 8VWQ,
+and the protein–DNA entries 9YLM and 8BW5) are explained with their causes in
+[docs/validation/random100/review.md](docs/validation/random100/review.md), and the full table is in
+[docs/validation/random100/report.md](docs/validation/random100/report.md).
 
 ## UniProt annotation
 

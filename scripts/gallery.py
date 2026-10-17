@@ -77,6 +77,14 @@ FIGURES = [
         {},
     ),
     (
+        "measles-f-trimer",
+        "8UTF.cif",
+        "Measles F trimer (8UTF) · C3, one protomer highlighted",
+        "publication",
+        ["highlight=asu"],
+        {},
+    ),
+    (
         "tim-barrel-rainbow",
         "1TIM.cif",
         "Triosephosphate isomerase (1TIM, chain A) · βα row, strands β1–β8",
