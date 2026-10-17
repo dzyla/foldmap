@@ -2455,14 +2455,18 @@ def _symmetry_ties(
     one of its mate's, but not all of them (DSSP missed a strand in one copy), is tied too when they share at least
     half the smaller one's residues; and when no element of a copy matches two of its mate's, those it shares take
     the mate's shape and place, the rest keep theirs beside them. Residue numbers are taken to the first copy's by
-    `shift` (chain -> offset, model.homolog_chains: 2MJW numbers chain D 95-188 where B is 1-94). `honest`: the
-    strand pairs that pair (_sheet_pairs of every sheet) and each accessory's partner; a copy takes its mate's places
-    only when that draws no strand side by side with one it does not pair with, and no accessory away from a partner
-    it stood beside (but one given its mate's place, the pairing named in the notes), that its own drawing did not
-    (_drawn_wrong, worse; else it keeps its own, turned as its mate is:
-    ruling C2b-3/R2, science outranks A15; random-100 C2b-S, 9P1X focus: L's sheet took V's places the other way
-    round, O's barrel took E's for two of R's strands, its ghost between them). The id of each copy item that so keeps
-    its own goes in `own` (tied in its own shape, as _regroup_copies' are: no Layout.tied_ids)."""
+    `shift` (chain -> offset, model.homolog_chains: 2MJW numbers chain D 95-188 where B is 1-94).
+    `honest` holds the strand pairs that pair (_sheet_pairs of every sheet) and each accessory's partner. A copy
+    takes its mate's places only when that draws nothing against its pairing that its own drawing did not
+    (_drawn_wrong, worse): no strand side by side with one it does not pair with, and no accessory away from a
+    partner it stood beside, unless the mate's drawing names that same pairing. Otherwise the take is undone and the
+    copy keeps its own drawing, turned as its mate is (ruling C2b-3/R2: science outranks A15; random-100 C2b-S,
+    9P1X focus: L's sheet took V's places the other way round, and O's barrel took E's for two of R's strands with
+    its ghost between them). A one-to-one take that is undone falls through to the partial take below: the copy is
+    turned 180 degrees if its mate points the other way, then takes the places of the elements it shares
+    (_take_shared, reflected when they run the other way), which `worse` judges again; if that passes, the copy is
+    drawn as its mate's in part. The id of each copy item that keeps its own drawing goes in `own` (tied in its own
+    shape, as _regroup_copies' are: no Layout.tied_ids)."""
     shift = shift or {}
     paired, partner = honest if honest is not None else (None, {})
 
@@ -2478,12 +2482,18 @@ def _symmetry_ties(
     def wrong(it: _Item) -> set:
         return set() if paired is None else _drawn_wrong(it, paired, partner)
 
-    def worse(it: _Item, before: set, taken: set[str]) -> bool:
+    def worse(it: _Item, before: set, mate: _Item, taken: dict[str, str]) -> bool:
         """Does the take draw anything against the pairing that the copy's own drawing did not? An accessory the
-        take draws away from its partner, named in the notes, is the mate's own drawing when the take gave it its
-        mate's place (`taken`: those strands' ids; 4XG1 B:174-175), never when it only moved with them (9P1X R:2-8,
-        which E's sheet lacks, would leave R:52-61)."""
-        return any(w[0] != "named" or w[1] not in taken for w in wrong(it) - before)
+        take draws away from its partner, named in the notes, is allowed only as its mate's own drawing: the take
+        gave it its mate's place and its partner its mate's partner's (`taken`: copy strand id -> its mate's), and
+        the mate's drawing names that very pairing (4XG1 B:174-175, as A:174-175); never when it only moved with
+        them (9P1X R:2-8, which E's sheet lacks, would leave R:52-61), nor where its mate stands level beside its
+        partner (fix round 1)."""
+        added = wrong(it) - before
+        if not added:
+            return False
+        named = {(w[1], w[2]) for w in wrong(mate) if w[0] == "named"}
+        return any(w[0] != "named" or (taken.get(w[1]), taken.get(w[2])) not in named for w in added)
 
     sector, classes = getattr(frame, "sector", None), getattr(frame, "classes", None)
     if not sector or not classes:
@@ -2546,7 +2556,12 @@ def _symmetry_ties(
                 a = mate.members[q].angle
                 m.angle, m.length = (_mirrored(a) if mirror else a), mate.members[q].length
             it.offsets = [(-mate.offsets[q][0], mate.offsets[q][1]) if mirror else mate.offsets[q] for q in pairs]
-            if worse(it, before, {m.sse.id for m in it.members if isinstance(m, Placed)}):  # against its pairing
+            taken = {
+                m.sse.id: mate.members[q].sse.id
+                for m, q in zip(it.members, pairs)
+                if isinstance(m, Placed) and not m.ghost and not mate.members[q].ghost
+            }
+            if worse(it, before, mate, taken):  # against its pairing
                 undo(it, was)
                 one_to_one = False
                 if own is not None:
@@ -2564,7 +2579,8 @@ def _symmetry_ties(
             if not mirror and shared and len({q for _, q in shared}) == len(shared):
                 was, before = keep(it), wrong(it)
                 _take_shared(it, mate, shared)
-                if worse(it, before, {it.members[p].sse.id for p, _ in shared}):
+                taken = {it.members[p].sse.id: mate.members[q].sse.id for p, q in shared if not it.members[p].ghost}
+                if worse(it, before, mate, taken):
                     undo(it, was)
                     if own is not None:
                         own.add(id(it))

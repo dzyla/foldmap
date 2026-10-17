@@ -498,3 +498,33 @@ def test_a_copy_given_its_mates_place_may_name_a_pairing_its_mate_names():
     d = _laid_out(r100_entry("4XG1"))
     got = figcheck.copies_alike(d)
     assert got and max(got.values()) <= ALIKE, {f"{a}~{b}": round(v, 3) for (a, b), v in got.items()}
+
+
+def _strand_item(chain: str, strands: list[tuple[int, int, float]]):
+    """A sheet item of upright strands (start, end, x), 2 long and 1 wide, all at height 0."""
+    from foldmap.layout import Placed, _Item
+    from helpers import fake_sse
+
+    members = [Placed(fake_sse("E", a, b, chain=chain), 0.0, 0.0, 2.0, np.pi / 2, 1.0) for a, b, _ in strands]
+    return _Item(members, [(x, 0.0) for _, _, x in strands], 0.0, 0.0, (0.0, 0.0), strands[0][0], chain)
+
+
+def test_a_copy_names_a_pairing_by_taking_its_mates_place_only_where_its_mate_names_it():
+    """C2b-S fix round 1 (review minor 1): a strand given its mate's place may leave a partner the notes then name
+    only when the mate's own drawing names the matching pairing (4XG1 B:174-175, as A:174-175). Here B:20-22 pairs
+    with B:1-7 (its partner) and B:10-16, A:20-22 with A:10-16 alone, drawn level beside it: A's places would leave
+    B:20-22 away from B:1-7 where A names nothing, so B keeps its own drawing, B:20-22 beside B:1-7."""
+    from types import SimpleNamespace
+
+    from foldmap.layout import _symmetry_ties
+
+    mate = _strand_item("A", [(1, 7, 0.0), (10, 16, 1.1), (20, 22, 2.2)])
+    copy = _strand_item("B", [(1, 7, 0.0), (10, 16, 1.1), (20, 22, -1.1)])
+    frame = SimpleNamespace(sector={"A": 0, "B": 1}, classes={"A": "p", "B": "p"}, mirror_x=None, rise=0.0)
+    pairs = {frozenset(p) for p in [("A:1-7", "A:10-16"), ("A:10-16", "A:20-22")]}
+    pairs |= {frozenset(p) for p in [("B:1-7", "B:10-16"), ("B:1-7", "B:20-22"), ("B:10-16", "B:20-22")]}
+    partner = {"A:20-22": "A:10-16", "B:20-22": "B:1-7"}
+    own: set[int] = set()
+    ties = _symmetry_ties([mate, copy], frame, False, None, (pairs, partner), own)
+    assert ties == {1: (0, 1)}
+    assert copy.offsets == [(0.0, 0.0), (1.1, 0.0), (-1.1, 0.0)] and id(copy) in own
