@@ -2896,3 +2896,17 @@ def test_a_strand_whose_face_looks_into_a_margin_all_along_routes_from_beside_it
         router.grid.blocked[router.grid.cell(fa + ea * t)] = True
     path = _strand_between(router, 0, 0, j, da, db, None)
     assert path.kind == "run" and not path.fallback
+
+
+def test_block_numbers_keep_off_the_strands_leaving_their_stems_ends():
+    """Random-100 C2b-6 D (8VWQ's P49b, P53b, P95, P141c in every view; 7Y7C's P141): in block style the slot beside a
+    stem holds its first pair's numbers ("1323·1331"), as long as a short stem; its slot was chosen before routing and
+    lay beside the rail stretch along which a run leaves the stem's end, so the run read as crossing the numbers. The
+    slot now keeps off those stretches (layout._leaving_stretches), as A6 reads a line by a text."""
+    from foldmap import figcheck
+    from foldmap.spec import draw_spec, figure_spec
+    from helpers import r100_entry
+
+    d = draw_spec(figure_spec(r100_entry("8VWQ")))
+    hits = [h for h in figcheck.text_collisions(d) if h.split(" × ")[0].endswith(":first")]
+    assert hits == []

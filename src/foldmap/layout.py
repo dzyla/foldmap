@@ -4655,15 +4655,24 @@ def _choose_label_sides(layout: Layout, sses: list[SSE], style: Style, mirrored:
     }
     named: list[tuple[float, float, float, float]] = []
     slots = [(side, out) for out in (0.0, *_SLOTS) for side in (1, -1)]
+    leaving = _leaving_stretches(layout) if block else np.empty((0, 4))
+    band = _run_band(layout) if block else 0.0
     for d in layout.stems:
         others = [e for e in layout.stems if e is not d]
         reach = _reach(ink[id(d)])
-        rooms = []
+        rooms, free = [], []
         for s in slots:
             rooms.append(_name_room(d, s, beside, others, named, rects, reach, others_letters[id(d)]))
-            if _pick_slot(rooms[-1:], _INK_MARGIN * em) == (0, False):
+            # block style: the first pair's numbers off the strands leaving the stems' ends along their rails, as
+            # figcheck's A6 reads a line by a text (its page box)
+            box = _reach(ink[id(d)] + np.asarray(stem_label_pos(d)))
+            free.append(not len(leaving) or not lines_meeting(box, leaving, band).any())
+            if _pick_slot(rooms[-1:], _INK_MARGIN * em) == (0, False) and free[-1]:
                 break
-        k, fallback = _pick_slot(rooms, _INK_MARGIN * em)
+        k, fallback = next(
+            ((k, False) for k, r in enumerate(rooms) if free[k] and _pick_slot([r], _INK_MARGIN * em) == (0, False)),
+            _pick_slot(rooms, _INK_MARGIN * em),
+        )
         if fallback:
             clear, nearer, room = rooms[k]
             log.info(
@@ -4686,6 +4695,51 @@ def _choose_label_sides(layout: Layout, sses: list[SSE], style: Style, mirrored:
     for d in layout.stems:  # what routes keep out of: the name's ink and the margin round it; a block's name is
         # drawn on its body, its slot holds only the first pair's numbers (4YBB's 23 % more crossings with a margin)
         d.label_keep = None if block else _grown(tuple(float(v) for v in _reach(ink[id(d)])), _INK_MARGIN * em)
+
+
+_FIRST_STEP = 0.4  # route._PUSH[0]: a route's first step straight out of a stem's end face
+
+
+def _leaving_stretches(layout: Layout) -> np.ndarray:
+    """Where single strands leave the stems' ends (x0, y0, x1, y1 rows): along its rail from the stem's outermost
+    nucleotide there through the end face and a first step (_FIRST_STEP) beyond, as every run, joint, hairpin loop,
+    free end or cropped gap leaving that end is drawn, before routing decides where it goes. A strand that carries on
+    along the same rail (a bulge) or ends there (a 5' or 3' end with no gap) leaves no stretch. What block style's
+    first-pair numbers keep off (random-100 C2b-6 D: on a short stem the numbers, as long as the stem, lay beside the
+    rail stretch of a run leaving its end: 8VWQ's P49b, P53b, P95, P141c and 7Y7C's P141 in every view)."""
+    na = layout.nucleic
+    if na is None or not layout.stems:
+        return np.empty((0, 4))
+    at = {key: d for d in layout.stems for key in d.axial}
+    held = {s: sorted(i for t, i in at if t == s) for s in sorted({t for t, _ in at})}
+    gapped = {(g.before, 1) for g in na.gaps} | {(g.after, -1) for g in na.gaps}
+    out = []
+    for d in layout.stems:
+        for key in sorted(d.axial):
+            s, i = key
+            row = held[s]
+            k = row.index(i)
+            for way in (1, -1):
+                k2 = k + way
+                if 0 <= k2 < len(row):
+                    e = at[(s, row[k2])]
+                    if e is d and d.side[(s, row[k2])] == d.side[key]:
+                        continue  # along its rail (a bulge on it)
+                elif not (0 <= i + way < len(na.strands[s]) or (s, way) in gapped):
+                    continue  # the strand's own end, no gap beyond: its 5' or 3' label, no line
+                _, ex = d.port(key, way == 1)
+                reach = max(d.length / 2 - d.axial[key] * float(np.dot(ex, d.direction)), 0.0)
+                tip = d.point(key) + ex * (reach + _FIRST_STEP)
+                out.append((*d.point(key), *tip))
+    return np.asarray(out, float).reshape(-1, 4)
+
+
+def _run_band(layout: Layout) -> float:
+    """How far a nucleic-acid run's ink reaches from its centre line as figcheck's A6 reads a line by a text (as
+    line_band, with a run's NA_RUN_W stroke), on the page as it stands."""
+    unit = page_text(layout)[1]
+    stroke = max(layout.loop_stroke, NA_RUN_W)
+    return (line_pt(1.0 / (72 * unit)) * stroke / 2 + 0.72) * unit
 
 
 def _pick_slot(rooms: list[tuple[bool, bool, float]], margin: float) -> tuple[int, bool]:
