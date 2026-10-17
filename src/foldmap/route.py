@@ -473,8 +473,8 @@ def _pull_turns(pts, pa, ea, pb, eb, at_a: bool, at_b: bool) -> list:
     phase went, the turn the check reads as in the slab past 0.3). The caller keeps it only when it is clear. When
     both ports are at a face and the two pulls would move the same run (one run between them), the run goes to the
     first of their clearances that keeps both ports clear (the one farther out along exits that point alike),
-    whichever port is higher (C2b-6 review minor 1). Each drawing is judged on the run its own pull moved: on a
-    route of five points the first port's pull moves points 1-2 and the second's points 3-2 (C2b-6 re-review)."""
+    whichever port is higher (C2b-6 review minor 1). Each drawing is judged on the run its own pull moved, at point 2:
+    on a route of five points the first port's pull moves points 1-2 and the second's points 3-2 (C2b-6 re-review)."""
 
     def pull(p, port, out) -> list:
         if len(p) < 4 or abs(out[0]) > 1e-9:
@@ -489,14 +489,14 @@ def _pull_turns(pts, pa, ea, pb, eb, at_a: bool, at_b: bool) -> list:
 
     out = [tuple(q) for q in pts]
     if at_a and at_b and len(out) < 6:  # both pulls move the same run: the clearance that keeps both ports clear
-        firsts = [(pull(out, pa, ea), 1), (pull(out[::-1], pb, eb)[::-1], -2)]  # each with a point its pull moved
-        moved = [(q, k) for q, k in firsts if q != out]
+        firsts = [pull(out, pa, ea), pull(out[::-1], pb, eb)[::-1]]
+        moved = [q for q in firsts if q != out]
 
-        def keeps(q, k) -> bool:  # the moved run at least _INFLATE out of both ports along their exits
-            y = q[k][1]
+        def keeps(q) -> bool:  # the moved run (point 2: both pulls move it) at least _INFLATE out of both ports
+            y = q[2][1]
             return all((y - port[1]) * e[1] >= _INFLATE - 1e-9 for port, e in ((pa, ea), (pb, eb)))
 
-        return _simplify(next((q for q, k in moved if keeps(q, k)), moved[0][0] if moved else out))
+        return _simplify(next((q for q in moved if keeps(q)), moved[0] if moved else out))
     if at_a:
         out = pull(out, pa, ea)
     if at_b:
