@@ -1134,13 +1134,15 @@ def test_a_chain_ends_letter_a_line_runs_through_moves_round_its_stub():
     assert d.layout.end_labels  # moved, not hidden
 
 
-def test_both_turns_pulled_on_one_run_keep_the_first_ports_clearance():
-    """Random-100 C2b-5 parked minor (a): on a route of one run between two ports at a face (up, across, down), the
-    pull at the second port moved the same two points the first had moved, to its own clearance, though that left the
-    run inside the first port's clearance (_pull_turns). A point the first pull moved is not moved again."""
-    pts = [(0.0, 0.1), (0.0, 0.5), (2.0, 0.5), (2.0, 0.0)]  # both ports below the run, the first 0.1 higher
-    out = route._pull_turns(pts, (0.0, 0.1), (0.0, 1.0), (2.0, 0.0), (0.0, 1.0), True, True)
-    assert out == [(0.0, 0.1), (0.0, 0.1 + _INFLATE), (2.0, 0.1 + _INFLATE), (2.0, 0.0)]
+@pytest.mark.parametrize("first, second", [(0.1, 0.0), (0.0, 0.1)], ids=["first-higher", "second-higher"])
+def test_both_turns_pulled_on_one_run_keep_both_ports_clearances(first, second):
+    """Random-100 C2b-5 parked minor (a), C2b-6 review minor 1: on a route of one run between two ports at a face (up,
+    across, down), both pulls move the same run (_pull_turns). It goes to the clearance that keeps both ports clear,
+    the one farther out along their exits, whichever port is higher."""
+    pts = [(0.0, first), (0.0, 0.5), (2.0, 0.5), (2.0, second)]  # both ports below the run, 0.1 apart in height
+    out = route._pull_turns(pts, (0.0, first), (0.0, 1.0), (2.0, second), (0.0, 1.0), True, True)
+    run = max(first, second) + _INFLATE
+    assert out == [(0.0, first), (0.0, run), (2.0, run), (2.0, second)]
 
 
 def test_the_cells_a_pulled_route_uses_are_the_cells_under_it():

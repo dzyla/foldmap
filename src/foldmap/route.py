@@ -470,8 +470,10 @@ def _pull_turns(pts, pa, ea, pb, eb, at_a: bool, at_b: bool) -> list:
     """The drawn route with the first turn out of a port at a face (_Grid.at_face) moved back to the port's own
     clearance, _INFLATE out along its exit: the stub out of the port and the run after it, when the run is followed
     by a turn the move keeps square (C2b-5 fix round 1: 6JO6's turn lay 0.17 to 0.42 inside the face as the grid's
-    phase went, the turn the check reads as in the slab past 0.3). The caller keeps it only when it is clear. A
-    second pull that would move the points the first moved (one run between two ports at faces) is not made."""
+    phase went, the turn the check reads as in the slab past 0.3). The caller keeps it only when it is clear. When
+    both ports are at a face and the two pulls would move the same run (one run between them), the run goes to the
+    first of their clearances that keeps both ports clear (the one farther out along exits that point alike),
+    whichever port is higher (C2b-6 review minor 1)."""
 
     def pull(p, port, out) -> list:
         if len(p) < 4 or abs(out[0]) > 1e-9:
@@ -485,11 +487,18 @@ def _pull_turns(pts, pa, ea, pb, eb, at_a: bool, at_b: bool) -> list:
         return [p[0], (x1, y), (x2, y), *p[3:]]
 
     out = [tuple(q) for q in pts]
+    if at_a and at_b and len(out) < 6:  # both pulls move the same run: the clearance that keeps both ports clear
+        firsts = [pull(out, pa, ea), pull(out[::-1], pb, eb)[::-1]]
+        moved = [q for q in firsts if q != out]
+
+        def keeps(q) -> bool:  # the run at least _INFLATE out of both ports along their exits
+            y = q[1][1]
+            return all((y - port[1]) * e[1] >= _INFLATE - 1e-9 for port, e in ((pa, ea), (pb, eb)))
+
+        return _simplify(next((q for q in moved if keeps(q)), moved[0] if moved else out))
     if at_a:
         out = pull(out, pa, ea)
-    pulled = out != [tuple(q) for q in pts]
-    if at_b and not (pulled and len(out) < 6):  # the second pull would move the points the first moved (C2b-5
-        # parked minor: on one run between two ports, the run inside the first port's clearance)
+    if at_b:
         out = pull(out[::-1], pb, eb)[::-1]
     return _simplify(out)
 
