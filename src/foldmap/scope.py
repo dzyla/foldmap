@@ -94,12 +94,22 @@ def drawn_scope(model, layout, assembly: str = "auto", focus: str = "auto") -> d
         helix_matched: how many helix runs were cut or joined so copies of a protein match (ss._copy_breaks: a fact,
         not part of the reason or the note; fix round 1 ruling)."""
     several = getattr(model, "several", None) if assembly == "auto" else None
+    left_out = list(getattr(model, "left_out", None) or []) if assembly == "auto" else []
     read = list(getattr(layout, "chains_read", None) or [])
     asked = list(getattr(layout, "chains_asked", None) or [])
     reasons, options = [], {}
     total, drawn, residues = len(read), len(read), None
     if asked:  # the visitor chose the chains: nothing an automatic choice left out of them
-        several = None
+        several, left_out = None, []
+    if left_out:  # assembly 1 holds no copy of some chains of the file (1RM5's chain O: final review B, Important 2)
+        name = getattr(model, "assembly", None) or "1"
+        held = f"chain{'s' if len(left_out) > 1 else ''} {', '.join(left_out)}"
+        reasons.append(f"assembly {name}, which holds no copy of {held} of the file")
+        options["assembly"] = "asu"
+        if focus == "auto":
+            options["focus"] = "none"
+        total += len(left_out)
+        residues = getattr(model, "asu_residues", None)
     if several:
         reasons.append(f"assembly {several['assembly']}, one of {several['copies']} copies in the file")
         options["assembly"] = "asu"

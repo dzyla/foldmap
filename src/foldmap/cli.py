@@ -28,7 +28,7 @@ from .nucleic import StemView, stem_views, straight_duplex
 from .palette import PALETTES
 from .render import LOOP_STYLES, STYLES, draw, save
 from .route import route_loops
-from .science import science_lines, sheet_checks
+from .science import science_lines, sheet_checks, sheet_judged
 from .scope import drawn_scope, scope_note
 from .sheets import build_sheets
 from .spec import (
@@ -94,7 +94,8 @@ def summarize(path: str) -> str:
         lines += [f"  pairs with {b.id}, in another sheet: {a.id}" for a, b in sh.joined]
     if sheets:  # the science checks of the sheets as built (figcheck.science_checks reads them as drawn)
         lines.append("science checks (the sheets as built):")
-        lines += [f"  {line}" for line in science_lines(sheet_checks(sheets, sses, dssp.bridges))]
+        found = sheet_checks(sheets, sses, dssp.bridges)
+        lines += [f"  {line}" for line in science_lines(found, sheet_judged(sheets))]
     try:
         sym = detect_symmetry(bb, sses)
     except ValueError:
@@ -1381,7 +1382,7 @@ def _cmd_check(args: argparse.Namespace) -> int:
     for out in args.output:
         print(f"wrote {save(drawn.figure, out)}")
     found = check_figure(drawn, spec, args.structure)
-    for line in science_lines(found["science"]) + criteria_lines(found["criteria"]):
+    for line in science_lines(found["science"], found["science_judged"]) + criteria_lines(found["criteria"]):
         print(line)
     failed = any(c["pass"] is False for c in found["criteria"].values())
     return 1 if any(found["science"].values()) or failed else 0

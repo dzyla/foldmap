@@ -22,9 +22,22 @@ from matplotlib.transforms import Affine2D, Bbox
 
 from .layout import block_ghosts, joined_pieces, lying_over
 
-# Lines a text can be crossed by (render's gids, matched by prefix). A loop's casing (loopcase:) is drawn in the
-# page colour and a chain-end stub belongs to its terminus letter: neither is read.
-LINE_GIDS = ("loop:", "loop-seg:", "loop-arrow:", "na:run:", "na:tie:", "ligand-tether:", "disulfide:", "hbond:")
+# Lines a text can be crossed by (render's gids, matched by prefix). A loop's casing (loopcase:) and a stub's edge
+# (stub-edge:) are drawn under their line in the page or a pale colour: neither is read. A chain-end stub is its
+# terminus letter's and its tail length's line, a domain leader its name's (Page.own_lines): read against every
+# other text (final review B, Minor 1).
+LINE_GIDS = (
+    "loop:",
+    "loop-seg:",
+    "loop-arrow:",
+    "na:run:",
+    "na:tie:",
+    "ligand-tether:",
+    "disulfide:",
+    "hbond:",
+    "stub:",
+    "domain-leader:",
+)
 GLYCAN_STEM = re.compile(r"glycan:[^:]+:stem$")
 # Bodies: opaque shapes a text must not sit on unless it is theirs, and that hide a line drawn under them. Element
 # bodies are owned by their element id (label:<id>, resnum:<id>:<end>, ghostlabel:<id> are theirs).
@@ -321,7 +334,8 @@ class Page:
 
     def own_lines(self) -> dict[str, set[str]]:
         """Text gid -> the gids of the lines it belongs to: a loop's length, a gap's label, a tie's letters, a
-        ligand's tethers, a strand's letters and ends to its own drawn runs."""
+        ligand's tethers, a strand's letters and ends to its own drawn runs, a chain end's letter and tail length
+        to its stub, a domain's name to its leader."""
         out: dict[str, set[str]] = {}
         for gid, *_ in self.lines:
             if gid.startswith("loop"):
@@ -332,6 +346,12 @@ class Page:
                 out.setdefault("ligand-label:" + gid[len("ligand-tether:") :].rsplit(":", 1)[0], set()).add(gid)
             elif gid.startswith("na:tie:"):
                 out.setdefault(gid.removesuffix(":mark") + ":label", set()).add(gid)
+            elif gid.startswith("stub:"):  # stub:<end>:<chain>: its letter and its tail's length
+                end_chain = gid[len("stub:") :]
+                for text in (f"terminus:{end_chain}", f"tail-length:{end_chain}"):
+                    out.setdefault(text, set()).add(gid)
+            elif gid.startswith("domain-leader:"):
+                out.setdefault("domain-label:" + gid[len("domain-leader:") :], set()).add(gid)
         lay = self.layout
         na = getattr(lay, "nucleic", None)
         for n, p in enumerate(getattr(lay, "na_paths", None) or []):
@@ -1073,14 +1093,19 @@ def scope_honest(drawn, path, assembly: str = "auto", focus: str = "auto", *, ch
     checked nucleotide by nucleotide), and what na_extent auto crops from a large nucleic acid once the drawn_scope
     reason says so (plan 10 Task 8): its ends and the gaps between the pieces it kept (_cropped_away); a run missing
     inside a kept piece is still counted. A protein chain with no helix or strand is counted as said when the
-    reason says it is not drawn (random-100 C15)."""
+    reason says it is not drawn (random-100 C15).
+
+    The file's own chains are then counted again with gemmi, apart from the assembly foldmap built (final review B,
+    Important 2: 1RM5's assembly 1 is built from A and B alone): a chain of the file that no drawn chain was built
+    from is left out, unless the reason says so (io.ModelRead.left_out)."""
     import gemmi
 
     from .scope import drawn_scope
 
     lay, model = drawn.layout, drawn.model
     several = getattr(model, "several", None) if assembly == "auto" else None
-    read = gemmi.read_structure(str(path))[0] if several else model[0]
+    in_file = gemmi.read_structure(str(path))[0]
+    read = in_file if several else model[0]
     expected = _polymer_chains(read)
     na = lay.nucleic
     strands = na.strands if na is not None else []
@@ -1114,6 +1139,16 @@ def scope_honest(drawn, path, assembly: str = "auto", focus: str = "auto", *, ch
         if cropped and chain in _nucleic_chains(read):
             continue
         out.append(f"chain {chain}")
+    file_chains = _polymer_chains(in_file)
+    built_from = {_file_chain(c.name, file_chains) for c in model[0]}
+    said_out = set(getattr(model, "left_out", None) or []) if scope["chains_reason"] else set()
+    asked = {_file_chain(c, file_chains) for c in chains} if chains else None
+    for chain in sorted(set(file_chains) - built_from - set(expected)):  # no copy of it in the model drawn from
+        if chain in said_out or chosen or (asked is not None and chain not in asked):
+            continue
+        if cropped and chain in _nucleic_chains(in_file):
+            continue
+        out.append(f"chain {chain}")
     said = _cropped_away(na, expected) if cropped else {}  # the note says these were cropped, and how to draw them
     for chain in sorted(shown):
         drawn_nts = shown[chain] | said.get(chain, set())
@@ -1126,6 +1161,15 @@ def scope_honest(drawn, path, assembly: str = "auto", focus: str = "auto", *, ch
                 out.append(f"nt {chain}:{run[0][0]}{run[0][1]}-{run[-1][0]}{run[-1][1]}")
             run = []
     return out
+
+
+def _file_chain(name: str, file_chains) -> str:
+    """The chain of the file a drawn chain was built from: itself, or for an assembly copy (io.read_model names
+    copies AddNumber: A -> A1, A2) the longest chain of the file its name is followed by digits after."""
+    if name in file_chains:
+        return name
+    found = [c for c in file_chains if name.startswith(c) and name[len(c) :].isdigit()]
+    return max(found, key=len) if found else name
 
 
 def _cropped_away(na, expected: dict) -> dict[str, set[tuple[int, str]]]:
@@ -1374,6 +1418,21 @@ def science_checks(drawn) -> dict[str, list[str] | None]:
         if found:
             out["S3"].append(found)
     return out
+
+
+def science_judged(drawn) -> dict[str, int]:
+    """What each science check had to judge on the drawn figure: S1 and S3 its sheet blocks, S2 its closed barrels
+    (a block drawing a ghost of its own strand), S4 its residue marks, S6 its accessory strands. A check with nothing
+    to judge (0) is not judged, never passed (final review B, Important 3); S5 is the campaign's."""
+    lay = drawn.layout
+    closed = sum(1 for k, ids in enumerate(lay.sheets) if any(g.sse.id in set(ids) for g in block_ghosts(lay, k)))
+    return {
+        "S1": len(lay.sheets),
+        "S2": closed,
+        "S3": len(lay.sheets),
+        "S4": len(residue_marks(drawn)),
+        "S6": len(lay.accessory),
+    }
 
 
 def accessories_named(layout) -> list[str]:

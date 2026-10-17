@@ -40,3 +40,10 @@ docs/validation/random100/*.json
 !docs/validation/random100/sample.json
 !docs/validation/random100/report.json
 docs/validation/random100/*/report.json
+# the held-out random-100 sample (final review A, Important 2): the same, report.json committed gzipped
+docs/validation/random100-heldout/*.png
+docs/validation/random100-heldout/*.svg
+docs/validation/random100-heldout/*.html
+docs/validation/random100-heldout/work/
+docs/validation/random100-heldout/*.json
+!docs/validation/random100-heldout/sample.json

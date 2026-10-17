@@ -370,13 +370,14 @@ def test_a20_gates_only_tethers_to_other_chains(r100):
         return r100.criteria({"views": {"default": {**view, "result": {"tethers": tethers}}}})["A20"]
 
     home = a20([["ligand-tether:URC:A300:0", 9.01, "A", "A"], ["ligand-tether:URC:A300:1", 2.0, "A", "A"]])
-    assert home["pass"] is True and "reported: ligand-tether:URC:A300:0 9.01 (home A)" in home["detail"]
+    assert home["pass"] is None and home["status"] == "not judged"  # no tether A20 bounds (final review B, I3)
+    assert "reported: ligand-tether:URC:A300:0 9.01 (home A)" in home["detail"]
     other = a20([["ligand-tether:CLA:B609:2", 7.08, "B", "H"], ["ligand-tether:CLA:B609:0", 3.0, "B", "B"]])
     assert other["pass"] is False and other["detail"].startswith("ligand-tether:CLA:B609:2 7.08 (B to H)")
     assert a20([["ligand-tether:CLA:B609:2", 6.4, "B", "H"]])["pass"] is True
     # the detail names the first four of each kind and says how many more there are (C2b-5 fix round 1, M1)
     many = a20([[f"ligand-tether:CLA:A{k}:1", 9.0 + k, "A", "A"] for k in range(6)])
-    assert many["pass"] is True and many["detail"].endswith("ligand-tether:CLA:A3:1 12.0 (home A) (+2 more)")
+    assert many["pass"] is None and many["detail"].endswith("ligand-tether:CLA:A3:1 12.0 (home A) (+2 more)")
     crossed = a20([[f"ligand-tether:CLA:B{k}:3", 7.0 + k, "B", "H"] for k in range(5)])
     assert crossed["pass"] is False and crossed["detail"] == (
         "ligand-tether:CLA:B0:3 7.0 (B to H); ligand-tether:CLA:B1:3 8.0 (B to H); "
@@ -497,7 +498,7 @@ def test_pair_check_allows_an_extra_element_and_its_numbering(r100):
     renamed = [dict(x) for x in extra]
     renamed[3]["label"] = "β3"  # a strand renamed with no extra strand before it: a real naming difference
     got = r100.pair_check(entry(a), entry(renamed))
-    assert got["pass"] is True  # after the extra helix B:10-11 names are not compared
+    assert got["pass"] is False and "β2~β3 (A:34-40~B:34-41)" in got["detail"]  # final review B, Important 1
 
 
 def test_pair_check_pairs_elements_by_sequence_not_numbers(r100):
@@ -703,7 +704,9 @@ def test_science_checks_are_reported_apart_from_the_criteria(r100, tmp_path):
     r100.report([e], tmp_path, None, total=1)
     md = (tmp_path / "report.md").read_text(encoding="utf-8")
     assert "1 of 1 pass." in md and "## Science checks (S1-S6), apart from A1-A20" in md
-    assert "| S1 sheet neighbours pair | 0 | 1 | 0 |" in md and "default: S1 sheet 0: a / b drawn side by side" in md
+    assert (
+        "| S1 sheet neighbours pair | 0 | 1 | 0 | 0 |" in md and "default: S1 sheet 0: a / b drawn side by side" in md
+    )
 
 
 def test_science_checks_run_in_every_drawn_view(r100, tmp_path):
@@ -745,7 +748,7 @@ def test_science_checks_run_in_every_drawn_view(r100, tmp_path):
     )
     r100.report([e, plain], tmp_path, None, total=2)
     md = (tmp_path / "report.md").read_text(encoding="utf-8")
-    assert "2 of 2 pass." in md and "| S1 sheet neighbours pair | 1 | 1 | 0 |" in md
+    assert "2 of 2 pass." in md and "| S1 sheet neighbours pair | 1 | 1 | 0 | 0 |" in md
     assert "### Science by view" in md
     assert "| focus | 1 | 1 | 0 | 0 | 0 | 0 |" in md and "| default | 2 | 0 | 0 | 0 | 0 | 0 |" in md
     assert "| domains | 1 | 0 | 0 | 0 | 0 | 1 |" in md
@@ -815,3 +818,228 @@ def test_s5_scores_auto_domains_where_a_cath_reference_exists(r100, tmp_path):
     assert "## S5: automatic domains against CATH (reported, not gated)" in md
     assert "In-sample: these chains are among the 33" in md
     assert "| 1ABC | A | 2 | 4 | 0.60 | 0.50 | 1.00 | 0.33 |" in md
+
+
+# ------------------------------------------------------------------------------------- final review B (fix F1)
+
+VIEW = {"exit": 0, "timed_out": False, "traceback": False, "python_warnings": [], "written": {}, "seconds": 1.0}
+
+
+def _judged(r100, views: dict, **entry) -> dict:
+    return r100.criteria({"views": {v: {**VIEW, "result": res} for v, res in views.items()}, **entry})
+
+
+def test_nothing_to_judge_is_never_a_pass(r100):
+    """Final review B, Important 3: a criterion with nothing to judge reads not judged (it applies, the entry gave it
+    nothing) or does not apply, never pass: A15 with no tie judged, A20 with no tether to another chain, A16 on a
+    domains view that drew no domain, A10 unmeasured, A2b refused over the cap."""
+
+    def a15(ties):
+        return _judged(r100, {"default": {"checks": {"copies_alike": 0.0, "details": {"copies_alike": ties}}}})["A15"]
+
+    assert a15({}) == {"pass": None, "detail": "no copies to compare", "status": "does not apply"}
+    got = a15({"B~A": {"deviation": None, "matched": 2, "of": 2, "judged": "n/a: 2 elements"}})
+    assert got["pass"] is None and got["status"] == "not judged" and "n/a: 2 elements" in got["detail"]
+    assert a15({"B~A": {"deviation": 0.1, "matched": 9, "of": 9, "judged": "yes"}})["pass"] is True
+
+    def a20(tethers):
+        return _judged(r100, {"default": {"tethers": tethers}})["A20"]
+
+    assert a20([]) == {"pass": None, "detail": "no ligand tether", "status": "does not apply"}
+    home = a20([["ligand-tether:HEM:A1:0", 9.0, "A", "A"]])
+    assert (
+        home["pass"] is None and home["status"] == "not judged" and "reported: ligand-tether:HEM:A1:0" in home["detail"]
+    )
+    assert a20([["ligand-tether:HEM:A1:0", 3.0, "A", "B"]])["pass"] is True
+
+    counts = {"domain_rules": 0, "domain_overlap": 0.0, "domain_name_collisions": 0}
+    none = _judged(r100, {"domains": {"checks": {**counts, "details": {"domains": {}}}}})["A16"]
+    assert none["pass"] is None and none["status"] == "not judged"
+    drew = {"cross_chain": [], "unalike": [], "small": [], "panel_overlaps": [], "name_collisions": []}
+    assert _judged(r100, {"domains": {"checks": {**counts, "details": {"domains": drew}}}})["A16"]["pass"] is True
+
+    a10 = _judged(r100, {}, dssp={"agree": None, "unmeasured": "no mkdssp on PATH"})["A10"]
+    assert a10 == {"pass": None, "detail": "unmeasured: no mkdssp on PATH", "status": "not judged"}
+    app = {"app": {"refused": "size", "residues": 31_000, "message": "too big"}}
+    assert _judged(r100, {"app": app})["A2b"]["status"] == "does not apply"
+    assert [criteria.outcome(x) for x in (a10, {"pass": True}, {"pass": False}, {"pass": None})] == [
+        "not judged",
+        "pass",
+        "fail",
+        "does not apply",
+    ]
+
+
+def test_a_count_that_is_not_a_number_fails(r100):
+    """Final review B, Minor 8: a NaN count fails (NaN > limit is False); jsonable turns a numpy NaN into None."""
+    import numpy as np
+
+    assert _judged(r100, {"default": {"checks": {"element_overlaps": float("nan")}}})["A5"]["pass"] is False
+    assert criteria.jsonable({"x": np.float64("nan"), "y": np.float64(1.5)}) == {"x": None, "y": 1.5}
+
+
+def test_pair_check_compares_names_along_the_whole_alignment(r100):
+    """Final review B, Important 1: names are compared on every pair, each number less the unpaired elements of its
+    kind before it (6YPX/6YQD: an extra η before η1~η2, an extra α before α2~α1), so a pair whose first element is
+    unpaired is still compared; a different naming (9YKJ's αN~α2 against 10UJ's generic α2) fails."""
+
+    def entry(els):
+        return {"views": {"beta": {"result": {"elements": els}}}}
+
+    def el(chain, kind, first, last, label):
+        return {
+            "id": f"{chain}:{first}-{last}",
+            "chain": chain,
+            "kind": kind,
+            "first": first,
+            "last": last,
+            "label": label,
+        }
+
+    a = [
+        el("A", "H", 55, 60, "α1"),
+        el("A", "E", 68, 71, "β1"),
+        el("A", "E", 75, 79, "β2"),
+        el("A", "G", 100, 102, "η1"),
+    ]
+    a += [el("A", "H", 105, 124, "α2"), el("A", "E", 131, 137, "β3")]
+    b = [
+        el("B", "G", 65, 67, "η1"),
+        el("B", "E", 68, 71, "β1"),
+        el("B", "E", 75, 79, "β2"),
+        el("B", "G", 100, 102, "η2"),
+    ]
+    b += [el("B", "H", 105, 124, "α1"), el("B", "E", 131, 137, "β3")]
+    got = r100.pair_check(entry(a), entry(b))
+    assert got["pass"] is True and got["detail"].startswith("names compared on all 5 pairs"), got
+    other = [dict(x) for x in b]
+    other[4]["label"] = "αN"  # another naming of the same helix
+    got = r100.pair_check(entry(a), entry(other))
+    assert got["pass"] is False and "α2~αN (A:105-124~B:105-124)" in got["detail"], got
+    assert criteria.same_name("α10a", "α11a", [], ["α3"]) and not criteria.same_name("α10a", "α10b", [], [])
+
+
+def test_a17_is_judged_on_the_view_that_draws_the_nucleic_acid(r100):
+    """Final review B, Important 5: 8QEM's default view draws one subunit of its C12 ring and no DNA; its focus
+    view (--focus none) draws the DNA, so A17 is measured there (the focus view's process is asked to: --na). An entry
+    with nucleic acid that no view measured fails when a view drew it, and is not judged when none did."""
+    na = {"na": {"failed": ["pair_f1 0.5"]}, "checks": {"details": {"stem_name_gaps": {}}}, "stem_gap_limit": 0.4}
+    got = _judged(r100, {"default": {}, "focus": na})["A17"]
+    assert (
+        got["pass"] is False and got["detail"].startswith("measured on the focus view") and "pair_f1" in got["detail"]
+    )
+    facts = {"na": True, "protein": True}
+    drawn = _judged(r100, {"default": {}, "focus": {"na_chains_drawn": ["Y"]}}, facts=facts)["A17"]
+    assert drawn["pass"] is False and "measured in none" in drawn["detail"]
+    assert _judged(r100, {"default": {}}, facts=facts)["A17"]["status"] == "not judged"
+    cmd, _ = r100.view_command("focus", Path("x.cif"), "x", Path("w"), "none", na=True)
+    assert "--na" in cmd and cmd.index("--na") < cmd.index("focus")
+
+
+def test_science_with_nothing_to_judge_is_not_judged(r100):
+    """Final review B, Important 3: a science check passes only where a view had something to judge (science_judged:
+    sheets, barrels, marks, accessories); with protein and nothing it is not judged, with no protein it does not
+    apply."""
+    clean = {"S1": [], "S2": [], "S3": [], "S4": [], "S5": None, "S6": []}
+    judged = {"S1": 1, "S2": 0, "S3": 1, "S4": 0, "S6": 0}
+    e = {"facts": {"protein": True}, "views": {"default": {"result": {"science": clean, "science_judged": judged}}}}
+    got = r100.science(e)
+    assert got["S1"]["pass"] is True and got["S3"]["pass"] is True
+    assert {k: got[k].get("status") for k in ("S2", "S4", "S5", "S6")} == dict.fromkeys(
+        ("S2", "S4", "S5", "S6"), "not judged"
+    )
+    assert got["S2"]["detail"] == "no closed barrel drawn in any view"
+    rna = {
+        "facts": {"protein": False},
+        "views": {"default": {"result": {"science": clean, "science_judged": dict.fromkeys(judged, 0)}}},
+    }
+    assert {v.get("status") for v in r100.science(rna).values()} == {"does not apply"}
+
+
+def test_report_md_counts_each_outcome_per_criterion(r100, tmp_path):
+    """report.md gives every criterion's pass / fail / not judged / does not apply, and lists each entry a criterion did
+    not judge, with why (A10's unmeasured, as the plan asks)."""
+    crit = {k: {"pass": None, "detail": "", "status": "does not apply"} for k in r100.CRITERIA}
+    crit["A5"] = {"pass": True, "detail": ""}
+    crit["A10"] = {"pass": None, "detail": "unmeasured: no mkdssp on PATH", "status": "not judged"}
+    e = r100._verdict({"id": "1ABC", "name": "1ABC", "stratum": "S1", "views": {}, "criteria": crit})
+    r100.report([e], tmp_path, None, total=1)
+    md = (tmp_path / "report.md").read_text(encoding="utf-8")
+    assert "| criterion | pass | fail | not judged | does not apply |" in md
+    assert "| A5 no element or stem boxes overlapping | 1 | 0 | 0 | 0 |" in md
+    assert "| A10 secondary structure agrees with mkdssp | 0 | 0 | 1 | 0 |" in md
+    assert "- **A10** (1): 1ABC (unmeasured: no mkdssp on PATH)" in md
+
+
+def test_additives_are_no_ligand(r100, tmp_path):
+    """Final review B, Important 4: the ligands the sampler counts (and apo/holo reads) leave out the additives
+    foldmap hides (io.ADDITIVES): 6YPX was holo by glycerol alone. The same residue under another name is one."""
+    import gemmi
+
+    def with_residue(name):
+        st = gemmi.read_structure(str(DATA / "1UBQ.cif"))
+        st.remove_waters()
+        chain = gemmi.Chain("Z")
+        res = gemmi.Residue()
+        res.name, res.seqid, res.het_flag = name, gemmi.SeqId(1, " "), "H"
+        ca = st[0]["A"][0]["CA"][0].pos
+        for k, el in enumerate("CCCOOO"):
+            atom = gemmi.Atom()
+            atom.name, atom.element = f"{el}{k}", gemmi.Element(el)
+            atom.pos = gemmi.Position(ca.x + 2.5 + 0.1 * k, ca.y, ca.z)
+            res.add_atom(atom)
+        chain.add_residue(res)
+        st[0].add_chain(chain)
+        st.setup_entities()
+        path = tmp_path / f"{name}.cif"
+        st.make_mmcif_document().write_file(str(path))
+        return r100.features(path, contacts=True)
+
+    gol = with_residue("GOL")
+    assert gol["ligands"] == [] and "ligand" not in gol["has"] and gol["ligand_touching"] is False
+    other = with_residue("XYZ")
+    assert other["ligands"] == ["XYZ"] and "ligand" in other["has"] and other["ligand_touching"] is True
+
+
+def test_ca_rmsd_aligns_residues_by_sequence(r100, monkeypatch):
+    """Final review B, Minor 9: the open/closed RMSD pairs residues by sequence, not by author number (C18)."""
+    import gemmi
+    import numpy as np
+
+    names = random.Random("rmsd").choices(["ALA", "GLY", "SER", "LEU", "LYS", "TRP"], k=40)
+    a = [(n, gemmi.Position(1.5 * k, 2.3 * np.cos(k), 2.3 * np.sin(k))) for k, n in enumerate(names)]
+    b = [("GLY", gemmi.Position(0, 50, 0))] * 3 + a  # three extra residues ahead: numbers shifted by three
+    monkeypatch.setattr(r100, "ca_trace", lambda path: a if path == "a" else b)
+    assert r100.ca_rmsd("a", "b") == pytest.approx(0.0, abs=1e-6)
+
+
+def test_the_sampler_never_draws_an_excluded_id(r100):
+    """The held-out sample (final review A, Important 2) draws none of the tuned sample's ids."""
+    s = r100.Sampler(20261017, "2026-10-13", exclude=["1ABC"])
+    s.feats["1ABC"] = s.feats["2DEF"] = {"protein": True, "na": False, "ca_only": False}
+    assert s.check("1ABC") == (False, "in the excluded sample") and s.check("2DEF") == (True, "")
+
+
+def test_an_entrys_work_folder_starts_empty(r100, tmp_path):
+    """Final review B, Minor 5: a view that writes nothing is never judged on an earlier run's files."""
+    work = tmp_path / "work" / "1ABC"
+    work.mkdir(parents=True)
+    for name in ("1ABC-default.svg", "1ABC-default.json", "entry.out", "entry.err"):
+        (work / name).write_text("old")
+    r100.clear_work(work)
+    assert sorted(p.name for p in work.iterdir()) == ["entry.err", "entry.out"]
+
+
+def test_the_commit_can_come_from_the_environment(r100, monkeypatch):
+    """Final review B, Minor 6: each entry records its commit; a copy with no .git (zl) names it FOLDMAP_COMMIT."""
+    monkeypatch.setenv("FOLDMAP_COMMIT", "abc123")
+    assert r100._commit() == "abc123"
+
+
+def test_a_gzipped_report_is_read(r100, tmp_path):
+    """A report.json over 5 MB is committed gzipped; --failed-from reads it either way."""
+    import gzip
+
+    doc = {"entries": [{"id": "1ABC", "pass": False}]}
+    (tmp_path / "report.json.gz").write_bytes(gzip.compress(json.dumps(doc).encode()))
+    assert r100.read_report(tmp_path / "report.json") == doc == r100.read_report(tmp_path / "report.json.gz")

@@ -240,13 +240,37 @@ def domain_findings(scores: Iterable[dict]) -> list[str]:
     ]
 
 
-def science_lines(found: dict[str, list[str] | None]) -> list[str]:
-    """One line per check (pass, its count of findings, or not yet measured), then each finding indented."""
+NOTHING = {  # why a check had nothing to judge (judged count 0): it is not judged, never passed
+    "S1": "no sheet drawn",
+    "S2": "no closed barrel drawn",
+    "S3": "no sheet drawn",
+    "S4": "no residue mark drawn",
+    "S6": "no accessory strand",
+}
+
+
+def sheet_judged(sheets: list[Sheet]) -> dict[str, int]:
+    """What S1-S3 and S6 have to judge in the sheets as built (sheet_checks): sheets, closed barrels, accessory
+    strands (figcheck.science_judged reads the same of a drawn figure)."""
+    return {
+        "S1": len(sheets),
+        "S2": sum(1 for s in sheets if s.closed and len(s.strands) > 2),
+        "S3": len(sheets),
+        "S6": sum(len(s.accessory) for s in sheets),
+    }
+
+
+def science_lines(found: dict[str, list[str] | None], judged: dict[str, int] | None = None) -> list[str]:
+    """One line per check (pass, its count of findings, not judged when `judged` says it had nothing to judge, or
+    not yet measured), then each finding indented."""
     lines = []
     for key, what in SCIENCE.items():
         got = found.get(key)
         if got is None:
             lines.append(f"{key} {what}: not yet measured")
+            continue
+        if not got and judged is not None and judged.get(key) == 0:
+            lines.append(f"{key} {what}: not judged ({NOTHING[key]})")
             continue
         lines.append(f"{key} {what}: {'pass' if not got else f'{len(got)} problem(s)'}")
         lines += [f"  {t}" for t in got]

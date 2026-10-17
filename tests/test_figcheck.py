@@ -123,8 +123,14 @@ def test_text_collisions_on_a_synthetic_page():
     assert figcheck.text_collisions(d) == []  # its own body, over the loop
     d = _page(_text("label:A:1-5"), _body("strand:B:1-5", 2, 4, 8, 6))
     assert figcheck.text_collisions(d) == ["label:A:1-5 × strand:B:1-5"]
-    d = _page(_text("label:A:1-5"), _text("label:B:1-5", (5.3, 5.1)), _line("stub:N:A", (0, 5), (10, 5)))
-    assert figcheck.text_collisions(d) == ["label:A:1-5 × label:B:1-5"]  # a stub is no line the check reads
+    d = _page(_text("label:A:1-5"), _line("stub:N:A", (0, 5), (10, 5)))
+    assert figcheck.text_collisions(d) == ["label:A:1-5 × stub:N:A"]  # a stub crossing a text (final review B, Minor 1)
+    d = _page(_text("terminus:N:A"), _text("tail-length:N:A", (5, 2)), _line("stub:N:A", (0, 5), (10, 5)))
+    assert figcheck.text_collisions(d) == []  # ... but not its own letter or tail length
+    d = _page(_text("domain-label:D1"), _line("domain-leader:D1", (5, 0), (5, 10)))
+    assert figcheck.text_collisions(d) == []  # a domain leader crosses only other texts
+    d = _page(_text("label:A:1-5"), _line("domain-leader:D1", (5, 0), (5, 10)))
+    assert figcheck.text_collisions(d) == ["label:A:1-5 × domain-leader:D1"]
     assert figcheck.off_page(_page(_text("label:A:1-5", (9.9, 5)))) == ["label:A:1-5"]
 
 

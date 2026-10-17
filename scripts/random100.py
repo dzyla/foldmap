@@ -4,6 +4,7 @@
 view foldmap offers, measured and shown on a contact sheet (plan 10, needs network; not run in CI).
 
     python scripts/random100.py sample [--seed 20261013] [--date YYYY-MM-DD] [--out .../sample.json] [--check]
+                                       [--exclude other/sample.json]
 
 sample draws the sample from the RCSB search API (https://search.rcsb.org/rcsbsearch/v2/query) and writes
 docs/validation/random100/sample.json. Every pool is one stratum x size-bin query, all hits, sorted; it is drawn
@@ -12,8 +13,10 @@ PYTHONHASHSEED cannot change the draw), at most LOOK candidates deep. A candidat
 ~/.cache/foldmap) and read with gemmi; it is skipped, with the reason logged, when it is obsolete or cannot be
 downloaded, holds no protein or nucleic-acid polymer, is CA-only or P-only, or is in the sample already. The extra
 quotas inside a stratum (S4 helical, big, cap; S8 ribosome) are drawn first from their own sub-pools; the pairs of S11
-follow PAIR_TYPES; the cross-cutting quotas (QUOTAS) are then topped up. The same seed, date and pools give the same
-file byte for byte. --check re-queries the ids and lists those now obsolete, without changing the file.
+follow PAIR_TYPES; the cross-cutting quotas (QUOTAS) are then topped up. --exclude takes another sample's ids out of
+every pool (the held-out sample: final review A, Important 2). The same seed, date, pools and files give the same
+draw; the file also records the foldmap commit, the gemmi version and the SHA-256 of every candidate file read, so a
+changed file is seen. --check re-queries the ids and lists those now obsolete, without changing the file.
 
     python scripts/random100.py run [--ids A,B | --failed-from report.json] [--views all|quick|v1,v2]
                                     [--out docs/validation/random100] [--jobs 1]
@@ -51,7 +54,7 @@ import tempfile
 import time
 import urllib.request
 from collections import Counter
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Iterable, Mapping
 from pathlib import Path
 
 import numpy as np
@@ -69,9 +72,13 @@ from foldmap.criteria import (  # noqa: E402
     DOCUMENTED_WARNINGS,
     FIGURE_VIEWS,
     LIMITS,
+    NOT_APPLICABLE,
+    NOT_JUDGED,
+    OUTCOMES,
     _ok,
     criteria,
     measure_figure,
+    outcome,
     pair_check,
 )
 from foldmap.criteria import jsonable as _jsonable  # noqa: E402
@@ -448,8 +455,12 @@ def features(path, contacts: bool = False) -> dict:
     (non-polymer, not water or sugar, >= LIGAND_ATOMS heavy atoms), glycans (branched entities and saccharides)
     and whether one is linked to an ASN ND2, modified polymer residues (a linking type, not one of the 20 + 8
     standard ones), polymer chains of assembly 1, UniProt accessions, and the quota features it holds (`has`).
-    contacts: also whether a ligand touches the protein (within TOUCH Å)."""
+    contacts: also whether a ligand touches the protein (within TOUCH Å). The additives foldmap hides from its
+    figures (io.ADDITIVES: glycerol, sulfate ...) are no ligand here either (final review B, Important 4: 6YPX was
+    "holo" by glycerol alone)."""
     import gemmi
+
+    from foldmap.io import ADDITIVES
 
     block, st = _gemmi_structure(path)
     types = {
@@ -490,7 +501,7 @@ def features(path, contacts: bool = False) -> dict:
                 continue
             elif res.name in sugar or res.entity_type == gemmi.EntityType.Branched:
                 glycans.add(res.name)
-            elif len(res) >= LIGAND_ATOMS:
+            elif len(res) >= LIGAND_ATOMS and res.name not in ADDITIVES:
                 ligands.add(res.name)
                 ligand_res.append(res)
     n_linked = any(
@@ -545,33 +556,31 @@ def features(path, contacts: bool = False) -> dict:
     return out
 
 
-def ca_trace(path) -> dict[tuple[int, str], object]:
-    """(author number, insertion code) -> CA position, of the first protein chain of the first model."""
+def ca_trace(path) -> list[tuple[str, object]]:
+    """(residue name, CA position) of each residue with a CA of the first protein chain of the first model, in order."""
     import gemmi
 
     _, st = _gemmi_structure(path)
     for chain in st[0]:
         span = chain.get_polymer()
         if len(span) and span.check_polymer_type() in (gemmi.PolymerType.PeptideL, gemmi.PolymerType.PeptideD):
-            out = {}
-            for res in span:
-                ca = res.find_atom("CA", "*")
-                if ca is not None:
-                    out[(res.seqid.num, res.seqid.icode.strip())] = ca.pos
-            return out
-    return {}
+            return [(res.name, ca.pos) for res in span if (ca := res.find_atom("CA", "*")) is not None]
+    return []
 
 
 def ca_rmsd(path_a, path_b, least: int = 30) -> float | None:
-    """CA RMSD (Å) of the first protein chains over their common residues (by author number) after superposition;
-    None under `least` common residues."""
+    """CA RMSD (Å) of the first protein chains over their residues aligned by sequence (figcheck.aligned_positions,
+    as A19 pairs them: one protein numbered differently in two entries, C18) after superposition; None under `least`
+    aligned residues."""
     import gemmi
 
+    from foldmap.figcheck import aligned_positions
+
     a, b = ca_trace(path_a), ca_trace(path_b)
-    common = sorted(a.keys() & b.keys())
+    common = aligned_positions([n for n, _ in a], [n for n, _ in b])
     if len(common) < least:
         return None
-    sup = gemmi.superpose_positions([a[k] for k in common], [b[k] for k in common])
+    sup = gemmi.superpose_positions([a[i][1] for i, _ in common], [b[j][1] for _, j in common])
     return round(float(sup.rmsd), 3)
 
 
@@ -601,6 +610,9 @@ def af_accession(entry_id: str) -> str | None:
 
 
 def _commit() -> str:
+    """HEAD of this checkout, or FOLDMAP_COMMIT where there is no .git (a copy synced to another machine)."""
+    if os.environ.get("FOLDMAP_COMMIT"):
+        return os.environ["FOLDMAP_COMMIT"]
     try:
         done = subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True, text=True, cwd=ROOT, check=True)
         return done.stdout.strip()
@@ -625,9 +637,11 @@ def resolve(entry_id: str) -> Path:
 class Sampler:
     """The network side of the draw: pools from the search service, files from foldmap.fetch, features cached."""
 
-    def __init__(self, seed: int, date: str):
+    def __init__(self, seed: int, date: str, exclude: Iterable[str] = ()):
         self.seed, self.date = seed, date
+        self.exclude = set(exclude)  # another sample's ids, never drawn (the held-out sample)
         self.feats: dict[str, dict] = {}
+        self.files: dict[str, str] = {}  # id -> SHA-256 of the file its features were read from
         self.taken: set[str] = set()
         self.records: list[dict] = []  # per stratum, what sample.json says of it
         self.entries: list[dict] = []
@@ -642,7 +656,9 @@ class Sampler:
     def feature(self, i: str, contacts: bool = False) -> dict:
         f = self.feats.get(i)
         if f is None or (contacts and "ligand_touching" not in f):
-            f = self.feats[i] = features(resolve(i), contacts=contacts)
+            path = resolve(i)
+            f = self.feats[i] = features(path, contacts=contacts)
+            self.files[i] = _sha256(path.read_bytes())
         return f
 
     def check(self, i: str, also: Callable[[dict], str] | None = None) -> tuple[bool, str]:
@@ -650,6 +666,8 @@ class Sampler:
         `also`'s reason."""
         if i in self.taken:
             return False, "already in the sample"
+        if i in self.exclude:
+            return False, "in the excluded sample"
         try:
             f = self.feature(i)
         except Exception as err:  # obsolete, withdrawn or unreadable: one id, not the campaign
@@ -809,9 +827,12 @@ class Sampler:
         self.records.append(rec)
 
 
-def sample(seed: int, date: str) -> dict:
-    """Draw the whole sample (network): every stratum, the pairs, then the cross-cutting top-up."""
-    s = Sampler(seed, date)
+def sample(seed: int, date: str, exclude: Iterable[str] = ()) -> dict:
+    """Draw the whole sample (network): every stratum, the pairs, then the cross-cutting top-up; `exclude`: ids never
+    drawn (another sample's)."""
+    import gemmi
+
+    s = Sampler(seed, date, exclude)
     rest: dict = {}
     for st in STRATA:
         if st["name"] == "S11":
@@ -824,6 +845,8 @@ def sample(seed: int, date: str) -> dict:
             return set(s.feature(i)["has"])
 
     def accept(i: str) -> tuple[bool, str]:  # TOP_UP strata add no check on the file
+        if i in s.exclude:
+            return False, "in the excluded sample"
         if any(e["id"] == i for e in s.entries):
             return False, "already in the sample"
         return s.check(i)
@@ -856,10 +879,11 @@ def sample(seed: int, date: str) -> dict:
             quotas[f"S11:{t}"] = {"target": k, "reached": n}
     names = [st["name"] for st in STRATA]
     entries = sorted(s.entries, key=lambda e: (names.index(e["stratum"]), e.get("pair", ""), e["bin"], e["order"]))
-    return {
+    out = {
         "seed": seed,
         "query_date": date,
         "foldmap_commit": _commit(),
+        "gemmi": gemmi.__version__,
         "look": LOOK,
         "bins": {b: [lo or 0, hi - 1] for b, (lo, hi) in BINS.items()},
         "strata": s.records,
@@ -868,6 +892,10 @@ def sample(seed: int, date: str) -> dict:
         "skipped": s.skipped,
         "quotas": quotas,
     }
+    if s.exclude:
+        out["excluded"] = {"ids": len(s.exclude), "sha256": _sha256("\n".join(sorted(s.exclude)).encode())}
+    out["files"] = dict(sorted(s.files.items()))  # every candidate file read, by id: its SHA-256
+    return out
 
 
 def dump(doc: dict) -> str:
@@ -901,7 +929,8 @@ def cmd_sample(args) -> int:
         gone = obsolete(doc)
         print(f"{len(gone)} obsolete id(s){': ' + ', '.join(gone) if gone else ''}")
         return 1 if gone else 0
-    doc = sample(args.seed, args.date)
+    exclude = [e["id"] for e in _sample_entries(Path(args.exclude))] if args.exclude else []
+    doc = sample(args.seed, args.date, exclude)
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(dump(doc), encoding="utf-8")
     print(quota_table(doc))
@@ -1029,10 +1058,13 @@ def view_argv(view: str, path: Path, name: str, work: Path, focus: str | None = 
     }[view]
 
 
-def view_command(view: str, path: Path, name: str, work: Path, focus: str | None = None) -> tuple[list[str], dict]:
+def view_command(
+    view: str, path: Path, name: str, work: Path, focus: str | None = None, na: bool = False
+) -> tuple[list[str], dict]:
     """The command and environment of one view's process: python -I, warnings shown (-W default), one BLAS thread,
-    PYTHONHASHSEED 0 (1 for seed1)."""
+    PYTHONHASHSEED 0 (1 for seed1). na: measure its nucleic acid (A17) though it is not the default view."""
     cmd = [sys.executable, "-I", "-W", "default", str(SCRIPT), "view", "--name", name, "--work", str(work)]
+    cmd += ["--na"] if na else []
     cmd += [view, str(path), "--", *view_argv(view, path, name, work, focus)]
     env = {**os.environ, "OPENBLAS_NUM_THREADS": "1", "PYTHONHASHSEED": "1" if view == "seed1" else "0"}
     return cmd, env
@@ -1189,10 +1221,11 @@ def na_metrics(drawn, path) -> dict:
     return m
 
 
-def measure_view(view: str, drawn, spec, path: Path, name: str, work: Path) -> dict:
+def measure_view(view: str, drawn, spec, path: Path, name: str, work: Path, na: bool = False) -> dict:
     """Everything one drawn figure view is judged on: what the figure gives (criteria.measure_figure), then what the
     campaign measures apart: its layout signature, loops and SVG hashes (A12, A13), na_validate's nucleic-acid
-    measures (A17), and its 3D trace for the contact sheet."""
+    measures (A17: the default view's, or with `na` this view's, when the default draws no nucleic acid: 8QEM's
+    focus view, final review B, Important 5), and its 3D trace for the contact sheet."""
     bench = _script_module("bench")
     lay = drawn.layout
     out = measure_figure(view, drawn, spec, path)
@@ -1202,9 +1235,9 @@ def measure_view(view: str, drawn, spec, path: Path, name: str, work: Path) -> d
     out["signature_sha256"] = _sha256(sig.encode())
     out["loops_sha256"] = _sha256(loops.encode())
     out["svg_sha256"] = _sha256(svg.read_bytes()) if svg.is_file() else None
+    if (view == "default" or na) and lay.nucleic is not None:
+        out["na"] = _jsonable(na_metrics(drawn, path))
     if view == "default":
-        if lay.nucleic is not None:
-            out["na"] = _jsonable(na_metrics(drawn, path))
         (work / f"{name}-trace.json").write_text(json.dumps(trace_of(drawn)), encoding="utf-8")
     return out
 
@@ -1225,7 +1258,7 @@ def app_view(path: Path, name: str) -> dict:
         return {"refused": err.kind, "residues": size["residues"], "message": app_jobs.limit_message(name, err, lim)}
     out = {"refused": None, "residues": size["residues"], "svg_bytes": len(got["svg"])}
     try:
-        out["science"] = app_science(path, got["svg"])
+        out["science"], out["science_judged"] = app_science(path, got["svg"])
     except Exception:  # not measured, which fails the view (fail closed, as measure_view's errors)
         import traceback
 
@@ -1233,11 +1266,11 @@ def app_view(path: Path, name: str) -> dict:
     return out
 
 
-def app_science(path: Path, svg: str) -> dict:
+def app_science(path: Path, svg: str) -> tuple[dict, dict]:
     """The science checks of the figure the app drew: the job process hands back its SVG (`svg`), not the figure, so
     the same spec (app.spec_of, the app's default settings) is drawn again here, outside the hosted limits, and
     measured, once its SVG is found equal to the app's (else ValueError: not that figure). The job's own warnings
-    are the app view's; this measuring's are not."""
+    are the app view's; this measuring's are not. With what each check had to judge (figcheck.science_judged)."""
     import warnings
 
     from foldmap import app, figcheck, render
@@ -1253,7 +1286,7 @@ def app_science(path: Path, svg: str) -> dict:
                 f"the redraw differs from the figure the app drew (SVG sha256 {_sha256(again.encode())[:12]} vs "
                 f"{_sha256(svg.encode())[:12]})"
             )
-        return _jsonable(figcheck.science_checks(drawn))
+        return _jsonable(figcheck.science_checks(drawn)), figcheck.science_judged(drawn)
 
 
 def cmd_view(args) -> int:
@@ -1284,7 +1317,7 @@ def cmd_view(args) -> int:
         warnings.simplefilter("default")
         if args.view == "app":
             result: dict = {"app": app_view(path, args.name)}
-            for key in ("science", "measure_error"):  # judged with the other views' (science_views, A1)
+            for key in ("science", "science_judged", "measure_error"):  # judged with the other views' (science, A1)
                 if key in result["app"]:
                     result[key] = result["app"].pop(key)
             code = 0
@@ -1307,7 +1340,8 @@ def cmd_view(args) -> int:
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")  # the measuring's own warnings are not the figure's
             try:
-                result.update(measure_view(args.view, caught["drawn"], caught["spec"], path, args.name, work))
+                drawn, spec = caught["drawn"], caught["spec"]
+                result.update(measure_view(args.view, drawn, spec, path, args.name, work, na=args.na))
             except Exception:  # the measure failed: the view is not measured, which fails it (fail closed)
                 import traceback
 
@@ -1372,9 +1406,9 @@ def _outputs(view: str, name: str, work: Path) -> list[Path]:
     return [stem.with_suffix(".svg"), stem.with_suffix(".png")]
 
 
-def run_view(view: str, path: Path, name: str, work: Path, focus: str | None = None) -> dict:
+def run_view(view: str, path: Path, name: str, work: Path, focus: str | None = None, na: bool = False) -> dict:
     """One view in its own process: what it exited with, its time and memory, what it printed, what it measured."""
-    cmd, env = view_command(view, path, name, work, focus)
+    cmd, env = view_command(view, path, name, work, focus, na)
     err = work / f"{name}-{view}.err"
     r = run_child(cmd, env=env, timeout=LIMITS["view_timeout_s"], out=work / f"{name}-{view}.out", err=err)
     stderr = err.read_text(encoding="utf-8", errors="replace") if err.is_file() else ""
@@ -1411,13 +1445,14 @@ def run_entry(source: str, out: Path, views=VIEWS, info: dict | None = None) -> 
     info = dict(info or {})
     name = entry_name(source)
     work = out / "work" / name
-    work.mkdir(parents=True, exist_ok=True)
+    clear_work(work)
     keep = ("stratum", "bin", "order", "quota", "pair", "pair_type", "role", "partner", "refusal")
     e: dict = {"id": info.get("id", name), "name": name, **{k: info[k] for k in keep if k in info}, "views": {}}
+    e["foldmap_commit"] = _commit()  # this entry's own: a report may join runs (final review B, Minor 6)
     try:
         path = resolve(source)
         e["file"], e["sha256"] = str(path), _sha256(path.read_bytes())
-        e["facts"] = features(path)
+        e["facts"] = features(path, contacts=bool(e.get("pair")))  # a pair's type is re-derived (pair_retyped)
     except Exception as err:  # a download that fails fails the entry, not the campaign
         e["error"] = f"{type(err).__name__}: {err}"
         e["criteria"] = criteria(e)
@@ -1425,9 +1460,9 @@ def run_entry(source: str, out: Path, views=VIEWS, info: dict | None = None) -> 
     e["facts"]["resolution"] = _resolution(path)
     wanted = ("default",) if e.get("refusal") else tuple(views)
 
-    def run(view: str, focus: str | None = None) -> None:
+    def run(view: str, focus: str | None = None, na: bool = False) -> None:
         if view in wanted:
-            e["views"][view] = run_view(view, path, name, work, focus)
+            e["views"][view] = run_view(view, path, name, work, focus, na)
 
     run("default")
     d = e["views"].get("default", {}).get("result") or {}
@@ -1437,7 +1472,7 @@ def run_entry(source: str, out: Path, views=VIEWS, info: dict | None = None) -> 
             run("deposited")
             run("beta")
         if f["chains"] >= 2:  # the whole file when the default drew part, else the first protein chain alone
-            run("focus", focus_target(d))
+            run("focus", focus_target(d), na=bool(f["na"]) and not d.get("na_chains_drawn"))
         if len(d.get("protein_chains_drawn", [])) >= 2:
             run("domains")
         if e.get("stratum") == "S6":
@@ -1453,6 +1488,22 @@ def run_entry(source: str, out: Path, views=VIEWS, info: dict | None = None) -> 
     e["criteria"] = criteria(e)
     e["science"] = science(e)
     return _verdict(e)
+
+
+KEEP_IN_WORK = ("entry.out", "entry.err")  # the entry process's own output, written by `run` before it starts
+
+
+def clear_work(work: Path) -> None:
+    """An entry's work folder, emptied of an earlier run's files (a view that writes nothing must not be judged on
+    them: final review B, Minor 5), the entry process's own output kept."""
+    work.mkdir(parents=True, exist_ok=True)
+    for f in sorted(work.iterdir()):
+        if f.name in KEEP_IN_WORK:
+            continue
+        if f.is_dir():
+            shutil.rmtree(f)
+        else:
+            f.unlink()
 
 
 def _resolution(path: Path) -> float | None:
@@ -1698,6 +1749,62 @@ def mkdssp_version() -> str | None:
         return None
 
 
+MARKS = {"pass": "✓", "fail": "✗", NOT_JUDGED: "○", NOT_APPLICABLE: "-"}
+
+
+def criteria_counts(entries: list[dict]) -> list[str]:
+    """report.md's per-criterion outcomes: pass, fail, not judged, does not apply (an entry passes when no criterion
+    fails, so a criterion's pass count is the entries it judged and passed, never one with nothing to judge: final
+    review B, Important 3), then every entry a criterion did not judge, with why (the plan lists A10's unmeasured)."""
+    lines = ["", "## Outcomes per criterion", ""]
+    lines += [
+        f"✓ pass, ✗ fail, ○ {NOT_JUDGED} (the criterion applies but the entry gave it nothing to judge: no tie, "
+        f"no tether to another chain, no domain drawn, mkdssp unmeasured ...), - {NOT_APPLICABLE}.",
+        "",
+        "| criterion | " + " | ".join(OUTCOMES) + " |",
+        "|---|---|---|---|---|",
+    ]
+    for key, what in CRITERIA.items():
+        got = Counter(outcome((e.get("criteria") or {}).get(key)) for e in entries)
+        lines.append(f"| {key} {what} | " + " | ".join(str(got[o]) for o in OUTCOMES) + " |")
+    lines += ["", "### Not judged, per criterion", ""]
+    for key in CRITERIA:
+        left = [
+            f"{e['id']} ({((e.get('criteria') or {})[key].get('detail') or 'no detail')[:160]})".replace("|", "/")
+            for e in entries
+            if outcome((e.get("criteria") or {}).get(key)) == NOT_JUDGED
+        ]
+        if left:
+            lines.append(f"- **{key}** ({len(left)}): " + "; ".join(left))
+    if not any(line.startswith("- **") for line in lines):
+        lines.append("None.")
+    return lines
+
+
+def pairs_section(entries: list[dict]) -> list[str]:
+    """report.md's two-state pairs (S11): each pair's type as sampled and as its files read now (pair_retyped, with
+    the additives foldmap hides left out of the ligands, final review B, Important 4; CA RMSD over residues aligned
+    by sequence, Minor 9), and A19 on both entries."""
+    seeds = [e for e in entries if e.get("role") == "seed"]
+    if not seeds:
+        return []
+    lines = ["", "## Two-state pairs (S11)", ""]
+    lines += [
+        "| pair | seed | partner | sampled as | types now | ligand touching | assembly 1 chains | CA RMSD Å | A19 |"
+    ]
+    lines.append("|---|---|---|---|---|---|---|---|---|")
+    for e in seeds:
+        r = e.get("pair_retyped") or {}
+        a19 = (e.get("criteria") or {}).get("A19")
+        lines.append(
+            f"| {e.get('pair')} | {e['id']} | {e.get('partner')} | {e.get('pair_type')} | "
+            f"{r.get('note') if r.get('types') is None else ', '.join(r['types']) or 'none'} | "
+            f"{r.get('ligand_touching')} | {r.get('assembly1_chains')} | "
+            f"{r.get('ca_rmsd')} | {MARKS[outcome(a19)]} {(a19 or {}).get('detail', '')[:300].replace('|', '/')} |"
+        )
+    return lines
+
+
 def report(entries: list[dict], out: Path, sample_path: Path | None = None, total: int | None = None) -> dict:
     """report.json (every value, LIMITS, commit, versions, sample.json's SHA-256, date), report.md (the counts,
     a table per stratum and per entry with the A1-A20 marks and what failed, the reported-only statistics, the
@@ -1730,19 +1837,30 @@ def report(entries: list[dict], out: Path, sample_path: Path | None = None, tota
         "|---|---|---|",
     ]
     lines += [f"| {s} | {len(es)} | {sum(1 for e in es if e.get('pass'))} |" for s, es in strata.items()]
-    lines += ["", "| id | stratum | bin | chains | seconds | " + " | ".join(keys) + " | failed |"]
-    lines.append("|" + "---|" * (len(keys) + 6))
+    lines += criteria_counts(entries)
+    lines += [
+        "",
+        "## Entries",
+        "",
+        "process s: the default view's whole process (drawing, measuring and, for nucleic acid, RNApolis), which A2 "
+        "gates; drawing s: the drawing inside it.",
+        "",
+        "| id | stratum | bin | chains | process s | drawing s | " + " | ".join(keys) + " | failed |",
+    ]
+    lines.append("|" + "---|" * (len(keys) + 7))
     for e in entries:
         crit = e.get("criteria") or {}
-        marks = ["-" if crit.get(k, {}).get("pass") is None else "✓" if crit[k]["pass"] else "✗" for k in keys]
-        took = (e.get("views", {}).get("default") or {}).get("seconds", "")
+        marks = [MARKS[outcome(crit.get(k))] for k in keys]
+        default = e.get("views", {}).get("default") or {}
+        took, inside = default.get("seconds", ""), (default.get("result") or {}).get("seconds_inside", "")
         detail = "; ".join(e.get("failed", [])).replace("|", "/")[:600]
         chains = (e.get("facts") or {}).get("chains", "")
         lines.append(
-            f"| {e['id']} | {e.get('stratum', '')} | {e.get('bin', '')} | {chains} | {took} | "
+            f"| {e['id']} | {e.get('stratum', '')} | {e.get('bin', '')} | {chains} | {took} | {inside} | "
             + " | ".join(marks)
             + f" | {detail} |"
         )
+    lines += pairs_section(entries)
     lines += [
         "",
         "## Reported, not gated",
@@ -1802,26 +1920,41 @@ def _view_science(e: dict) -> dict[str, dict]:
     return out
 
 
+def _view_judged(e: dict) -> dict[str, dict]:
+    """Each measured view's science_judged (what each check had to judge there: figcheck.science_judged)."""
+    views = e.get("views") or {}
+    return {v: (views[v].get("result") or {}).get("science_judged") for v in _view_science(e)}
+
+
 def science(e: dict) -> dict:
     """The science checks (foldmap.science.SCIENCE) of every drawn view (SCIENCE_VIEWS), apart from A1-A20 (never in
-    "failed" or "pass"): {"S1": {"pass": True, False or None (not measured), "detail"}, ...}. A check fails when any
-    view has a finding, each named by its view ("focus: sheet 27: ..."); it is not measured when no view measured
-    it. S5 is the entry's, once (chain-level, against the CATH reference)."""
-    from foldmap.science import SCIENCE, domain_findings
+    "failed" or "pass"): {"S1": {"pass": True, False or None, "detail", and for None its "status"}, ...}. A check
+    fails when any view has a finding, each named by its view ("focus: sheet 27: ..."); it passes when some view had
+    something to judge (science_judged: a sheet, a barrel, a mark, an accessory) and none has a finding; else it
+    does not apply to an entry with no protein, and is not judged for one with protein (final review B, Important 3:
+    nothing to judge is no pass). S5 is the entry's, once (chain-level, against the CATH reference)."""
+    from foldmap.science import NOTHING, SCIENCE, domain_findings
 
-    per_view = _view_science(e)
+    per_view, judged = _view_science(e), _view_judged(e)
+    protein = bool((e.get("facts") or {}).get("protein"))
     out = {}
     for key in SCIENCE:
         if key == "S5":
             got = domain_findings(e["domains_cath"]) if per_view and e.get("domains_cath") else None
-            out[key] = _ok(None, "not measured") if got is None else _ok(not got, "; ".join(got))
+            if got is not None:
+                out[key] = _ok(not got, "; ".join(got))
+            else:
+                out[key] = _ok(None, "no CATH reference chopping", NOT_JUDGED if protein else NOT_APPLICABLE)
             continue
         measured = [(v, f[key]) for v, f in per_view.items() if f.get(key) is not None]
-        if not measured:
-            out[key] = _ok(None, "not measured")
-            continue
         found = [f"{v}: {t}" for v, got in measured for t in got]
-        out[key] = _ok(not found, "; ".join(found))
+        some = any((judged.get(v) or {}).get(key, 1) for v, _ in measured)  # a view from before: judged
+        if found or (measured and some):
+            out[key] = _ok(not found, "; ".join(found))
+        elif not measured:
+            out[key] = _ok(None, "not measured", NOT_JUDGED if protein else NOT_APPLICABLE)
+        else:
+            out[key] = _ok(None, f"{NOTHING[key]} in any view", NOT_JUDGED if protein else NOT_APPLICABLE)
     return out
 
 
@@ -1839,10 +1972,16 @@ def science_section(entries: list[dict]) -> list[str]:
     rows = [(e, science(e)) for e in entries]
     lines = ["", "## Science checks (S1-S6), apart from A1-A20", ""]
     lines += [f"Judged in every drawn view ({', '.join(SCIENCE_VIEWS)}); S5 once per entry.", ""]
-    lines += ["| check | pass | fail | not measured |", "|---|---|---|---|"]
+    lines += [
+        "A check passes only where it had something to judge; an entry with protein and nothing to judge (no sheet "
+        "drawn, no barrel, no residue mark, no accessory strand, no CATH reference) is not judged, one with no "
+        "protein does not apply.",
+        "",
+    ]
+    lines += ["| check | " + " | ".join(OUTCOMES) + " |", "|---|---|---|---|---|"]
     for key, what in SCIENCE.items():
-        got = [s[key]["pass"] for _, s in rows]
-        lines.append(f"| {key} {what} | {got.count(True)} | {got.count(False)} | {got.count(None)} |")
+        got = Counter(outcome(s[key]) for _, s in rows)
+        lines.append(f"| {key} {what} | " + " | ".join(str(got[o]) for o in OUTCOMES) + " |")
     keys = [k for k in SCIENCE if k != "S5"]
     lines += [
         "",
@@ -1861,7 +2000,7 @@ def science_section(entries: list[dict]) -> list[str]:
             )
     lines += ["", "| id | " + " | ".join(SCIENCE) + " | findings |", "|" + "---|" * (len(SCIENCE) + 2)]
     for (e, s), per in zip(rows, (_view_science(e) for e, _ in rows)):
-        marks = ["-" if s[k]["pass"] is None else "✓" if s[k]["pass"] else "✗" for k in SCIENCE]
+        marks = [MARKS[outcome(s[k])] for k in SCIENCE]
         found = [f"{v}: {k} {t}" for v, f in per.items() for k in keys for t in (f.get(k) or [])]
         if s["S5"]["pass"] is False:
             found.append(f"S5 {s['S5']['detail']}")
@@ -2022,6 +2161,8 @@ def finish(out: Path, sample_path: Path, ids: list[str] | None = None) -> dict:
     entries = {x["id"]: e for x in listed if (e := _load_entry(out, x)) is not None}
     for e in entries.values():
         partner = entries.get(e.get("partner"))
+        if e.get("role") == "seed" and partner is not None:
+            e["pair_retyped"] = pair_retyped(e, partner)
         if e.get("pair") and partner is not None and e.get("criteria"):
             e["pair_check"] = pair_check(e, partner)
             e["criteria"] = criteria(e)
@@ -2035,6 +2176,31 @@ def finish(out: Path, sample_path: Path, ids: list[str] | None = None) -> dict:
     return report(list(entries.values()), out, sample_path, total=len(listed))
 
 
+def pair_retyped(seed: dict, partner: dict) -> dict:
+    """A pair's S11 types as its files read now (pair_types: features with contacts, the additives left out, and CA
+    RMSD over sequence-aligned residues): sample.json keeps the type it was drawn as, the report says both."""
+    fa, fb = seed.get("facts") or {}, partner.get("facts") or {}
+    if "ligand_touching" not in fa or "ligand_touching" not in fb:
+        return {"types": None, "note": "no contacts measured"}
+    rmsd = ca_rmsd(seed["file"], partner["file"]) if seed.get("file") and partner.get("file") else None
+    return {
+        "types": sorted(pair_types(fa, fb, rmsd)),
+        "ligand_touching": [fa["ligand_touching"], fb["ligand_touching"]],
+        "ligands": [fa.get("ligands"), fb.get("ligands")],
+        "assembly1_chains": [fa.get("assembly1_chains"), fb.get("assembly1_chains")],
+        "ca_rmsd": rmsd,
+    }
+
+
+def read_report(path: Path) -> dict:
+    """A report.json, or the report.json.gz a large report is committed as."""
+    path = Path(path)
+    if not path.is_file() and Path(f"{path}.gz").is_file():
+        path = Path(f"{path}.gz")
+    data = path.read_bytes()
+    return json.loads(gzip.decompress(data) if path.suffix == ".gz" else data)
+
+
 def cmd_run(args) -> int:
     from concurrent.futures import ThreadPoolExecutor
 
@@ -2043,7 +2209,7 @@ def cmd_run(args) -> int:
     if args.ids:
         ids = args.ids.split(",")
     elif args.failed_from:
-        old = json.loads(Path(args.failed_from).read_text(encoding="utf-8"))
+        old = read_report(Path(args.failed_from))
         ids = [e["id"] for e in old["entries"] if not e.get("pass")]
     else:
         ids = [x["id"] for x in listed]
@@ -2109,6 +2275,7 @@ def main(argv=None) -> int:
     s.add_argument("--date", default=datetime.date.today().isoformat(), help="release-date cutoff (YYYY-MM-DD)")
     s.add_argument("--out", default=str(OUT / "sample.json"))
     s.add_argument("--check", action="store_true", help="list the sampled ids now obsolete; change nothing")
+    s.add_argument("--exclude", metavar="SAMPLE", help="another sample.json whose ids are never drawn (held-out)")
     s.set_defaults(func=cmd_sample)
     views = "all, quick (default, seed1, roundtrip) or a comma-separated list of " + ", ".join(VIEWS)
     r = sub.add_parser("run", help="draw, measure and report every sampled entry (network for downloads)")
@@ -2130,6 +2297,7 @@ def main(argv=None) -> int:
     v.add_argument("path")
     v.add_argument("--name", required=True)
     v.add_argument("--work", required=True)
+    v.add_argument("--na", action="store_true", help="measure the nucleic acid (A17) in this view too")
     v.add_argument("argv", nargs=argparse.REMAINDER, help="-- then the foldmap command line")
     v.set_defaults(func=cmd_view)
     c = sub.add_parser("sheet", help="draw the contact sheets of measured entries again")

@@ -263,3 +263,45 @@ def test_a_g_quadruplex_is_said_drawn_unpaired():
     assert scope_note(s) == "not drawn: 3 G-tetrads of a G-quadruplex (their Gs drawn unpaired)"
     trna = scope_of(DATA / "na" / "1EHZ.cif.gz")
     assert trna["tetrads"] == 0 and "tetrad" not in scope_note(trna)
+
+
+def _assembly_leaving_out_a_chain(tmp_path):
+    """2HHB's chains A, B, C (D removed), assembly 1 built from A and B by two operators, assembly 2 from C: assembly
+    1 holds no copy of chain C (1RM5's pattern: A and B form the tetramer, chain O is assembly 2's)."""
+    import gemmi
+
+    st = gemmi.read_structure(str(DATA / "2HHB.cif"))
+    st.remove_ligands_and_waters()
+    del st[0]["D"]
+    sub = {c.name: c.get_polymer().subchain_id() for c in st[0]}
+    st.assemblies.clear()
+    for name, subs, shifts in (("1", [sub["A"], sub["B"]], (0, 120)), ("2", [sub["C"]], (0,))):
+        assembly, gen = gemmi.Assembly(name), gemmi.Assembly.Gen()
+        gen.subchains = subs
+        for k, dx in enumerate(shifts):
+            op = gemmi.Assembly.Operator()
+            op.name, op.transform = str(k + 1), gemmi.Transform(gemmi.Mat33(), gemmi.Vec3(dx, 0, 0))
+            gen.operators.append(op)
+        assembly.generators.append(gen)
+        st.assemblies.append(assembly)
+    path = tmp_path / "abc-assembly.cif"
+    st.make_mmcif_document().write_file(str(path))
+    return path
+
+
+def test_an_assembly_that_holds_no_copy_of_a_chain_says_so(tmp_path):
+    """Final review B, Important 2 (1RM5): assembly 1 built from chains A and B leaves the file's chain C out. The
+    note names it, with the setting that draws it; figcheck.scope_honest counts the file's chains with gemmi, apart
+    from the assembly built, and finds chain C left out when the note does not say so."""
+    from foldmap import figcheck
+    from foldmap.spec import draw_spec, figure_spec
+
+    path = _assembly_leaving_out_a_chain(tmp_path)
+    s = scope_of(path)
+    assert s["reason"] == "assembly 1, which holds no copy of chain C of the file"
+    assert s["all_options"] == {"assembly": "asu", "focus": "none"} and (s["drawn_chains"], s["file_chains"]) == (4, 5)
+    assert scope_note(s).startswith("drew assembly 1, which holds no copy of chain C of the file: 4 of 5 chains; ")
+    drawn = draw_spec(figure_spec(path))
+    assert figcheck.scope_honest(drawn, path) == []
+    drawn.model.left_out = []  # the note silent about it, as it was
+    assert figcheck.scope_honest(drawn, path) == ["chain C"]

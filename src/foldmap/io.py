@@ -349,13 +349,22 @@ def _one_complex_of_several(st, assembly, model) -> bool:
 class ModelRead(tuple):
     """read_model's result: (model, deposited chain names), unpacked as a pair. `several`: when 'auto' drew assembly
     1 as one of several copies of a complex the asymmetric unit holds, what the asymmetric unit holds (assembly
-    name, copies, polymer chains, polymer residues); else None."""
+    name, copies, polymer chains, polymer residues); else None. `left_out`: when 'auto' built an assembly that holds
+    no copy of some polymer chains of the file (1RM5: assembly 1 is built from A and B, chain O is assembly 2's), those
+    chains, sorted; else []. `assembly`: the name of the assembly built, or None; `asu_residues`: with left_out, the
+    polymer residues of the asymmetric unit (what --assembly asu draws)."""
 
     several: dict | None
+    left_out: list[str]
+    assembly: str | None
+    asu_residues: int | None
 
-    def __new__(cls, model, names, several: dict | None = None):
+    def __new__(cls, model, names, several: dict | None = None, left_out=(), assembly=None, asu_residues=None):
         out = super().__new__(cls, (model, names))
         out.several = several
+        out.left_out = sorted(left_out)
+        out.assembly = assembly
+        out.asu_residues = asu_residues
         return out
 
 
@@ -416,7 +425,23 @@ def read_model(path: str | Path, assembly: str = "auto"):
     _drop_coincident(built, keep=asu, tags=tags)
     if assembly == "auto" and len(asu) == len(built) == len(model):  # every added copy dropped: as deposited
         return ModelRead(model, deposited)
-    return ModelRead(built, asu)
+    left = _left_out(chosen, model) if assembly == "auto" else []
+    asu_residues = _polymers(model)[1] if left else None
+    return ModelRead(built, asu, left_out=left, assembly=chosen.name, asu_residues=asu_residues)
+
+
+def _left_out(assembly, model) -> list[str]:
+    """The polymer chains of the model the assembly builds no copy of: no generator names the chain (PDB files) or
+    the subchain of its polymer (mmCIF files)."""
+    out = []
+    for c in model:
+        polymer = c.get_polymer()
+        if not len(polymer):
+            continue
+        own = {r.subchain for r in polymer}
+        if not any(c.name in g.chains or own & set(g.subchains) for g in assembly.generators):
+            out.append(c.name)
+    return out
 
 
 def load_backbone(

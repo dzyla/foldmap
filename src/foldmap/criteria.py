@@ -8,8 +8,11 @@ all its views, each drawn in a process of its own; `foldmap check` judges the on
 - measure_figure: what one drawn figure gives to be judged on (figcheck.figure_checks, route fallbacks, loops over
   labels, scope, tethers, stem-name limit, membrane, science). The campaign adds what it measures apart (layout
   signature and SVG hashes, mkdssp's codes, RNApolis base pairs) and passes it in.
-- criteria: A1-A20 of one entry from its views' results ({"pass": True, False or None (does not apply), "detail"});
-  figure_criteria: those judged on the drawn figures alone; pair_check: A19 of a two-state pair.
+- criteria: A1-A20 of one entry from its views' results ({"pass": True, False or None, "detail"}, and for None its
+  "status": NOT_JUDGED, the criterion applies but the entry gave it nothing to judge, or NOT_APPLICABLE);
+  figure_criteria: those judged on the drawn figures alone; pair_check: A19 of a two-state pair; outcome: one result
+  as a word. An entry passes when no criterion fails: nothing to judge is never counted as a pass (final review B,
+  Important 3).
 - check_figure, criteria_lines: one figure's criteria as `foldmap check` prints them; the criteria one figure in one
   process cannot give are named not measured here, with the reason (NOT_HERE), never passed."""
 
@@ -67,14 +70,15 @@ CRITERIA = {
 
 
 def jsonable(x):
-    """x with tuple keys joined by '~', sets and tuples as lists, numpy numbers as Python ones."""
+    """x with tuple keys joined by '~', sets and tuples as lists, numpy numbers as Python ones, NaN as None (a numpy
+    NaN too: final review B, Minor 8)."""
     if isinstance(x, dict):
         return {("~".join(map(str, k)) if isinstance(k, tuple) else str(k)): jsonable(v) for k, v in x.items()}
     if isinstance(x, (list, tuple, set, frozenset)):
         items = sorted(x, key=str) if isinstance(x, (set, frozenset)) else x
         return [jsonable(v) for v in items]
     if hasattr(x, "item") and not isinstance(x, (str, bytes)):
-        return x.item()
+        x = x.item()
     if isinstance(x, float) and x != x:
         return None
     return x
@@ -219,14 +223,35 @@ def measure_figure(view: str, drawn, spec, path: Path) -> dict:
         out["membrane"] = membrane_checks(drawn, path)
     if view in FIGURE_VIEWS:  # S1-S4, S6 in every drawn view, judged apart from A1-A20 (batch C2b-S)
         out["science"] = jsonable(figcheck.science_checks(drawn))
+        out["science_judged"] = figcheck.science_judged(drawn)  # what each had to judge: none is no pass
     return out
 
 
 # ------------------------------------------------------------------------------------------------ judging
 
 
-def _ok(passed: bool | None, detail: str = "") -> dict:
+NOT_JUDGED = "not judged"  # the criterion applies to the entry, but the entry gave it nothing to judge
+NOT_APPLICABLE = "does not apply"  # the criterion has no meaning for the entry (A17 with no nucleic acid)
+OUTCOMES = ("pass", "fail", NOT_JUDGED, NOT_APPLICABLE)
+
+
+def _ok(passed: bool | None, detail: str = "", status: str = NOT_APPLICABLE) -> dict:
+    """A criterion's result; `status` says which of the two None is (NOT_JUDGED or NOT_APPLICABLE)."""
+    if passed is None:
+        return {"pass": None, "detail": detail, "status": status}
     return {"pass": passed, "detail": detail}
+
+
+def _not_judged(detail: str) -> dict:
+    return _ok(None, detail, NOT_JUDGED)
+
+
+def outcome(got: dict | None) -> str:
+    """One result as a word of OUTCOMES: pass, fail, not judged or does not apply (a None with no status, as reports
+    from before the final review B fix wrote it, does not apply)."""
+    if not got or got.get("pass") is None:
+        return (got or {}).get("status") or NOT_APPLICABLE
+    return "pass" if got["pass"] else "fail"
 
 
 def _views(e: dict, names) -> dict[str, dict]:
@@ -236,11 +261,13 @@ def _views(e: dict, names) -> dict[str, dict]:
 
 def _count(results: dict[str, dict], key: str, limit: float = 0) -> dict:
     """A check counted in each view's figcheck results: pass when every view's count is at most limit; a count
-    that could not be measured (None) fails."""
+    that could not be measured (None) or is not a finite number fails."""
     bad = []
     for v, r in results.items():
         got = (r.get("checks") or {}).get(key, None) if "checks" in r else None
-        if got is None:
+        if got is not None and not (isinstance(got, (int, float)) and np.isfinite(got)) and got != float("inf"):
+            bad.append(f"{v} {key} is not a number ({got!r})")
+        elif got is None:
             why = ((r.get("checks") or {}).get("skipped") or {}).get(key) or r.get("measure_error", "not measured")
             bad.append(f"{v} not measured ({str(why).strip().splitlines()[-1][:120]})")
         elif got > limit:
@@ -250,7 +277,8 @@ def _count(results: dict[str, dict], key: str, limit: float = 0) -> dict:
 
 
 def criteria(e: dict) -> dict:
-    """A1-A20 of one entry (plan 10, "Pass criteria"): {"pass": True, False or None (does not apply), "detail"}."""
+    """A1-A20 of one entry (plan 10, "Pass criteria"): {"pass": True, False or None, "detail"}, a None with its
+    "status" (not judged, or does not apply: _ok)."""
     out = {k: _ok(None) for k in CRITERIA}
     if e.get("error"):
         out["A1"] = _ok(False, f"cannot read the entry: {e['error']}")
@@ -295,14 +323,15 @@ def criteria(e: dict) -> dict:
             out["A2b"] = _ok(False, "the app view gave no answer")
         elif app["refused"] is None:
             out["A2b"] = _ok(True)
+        elif app["refused"] == "size" and app["residues"] > LIMITS["app_max_residues"]:  # refused as it should be
+            out["A2b"] = _ok(None, f"{app['residues']:,} residues, over the hosted cap: refused with the size message")
         else:
-            fine = app["refused"] == "size" and app["residues"] > LIMITS["app_max_residues"]
-            out["A2b"] = _ok(fine, "" if fine else f"{app['refused']}: {app['message']}")
+            out["A2b"] = _ok(False, f"{app['refused']}: {app['message']}")
     out.update(figure_criteria(views))
     dssp = e.get("dssp")
     if dssp is not None:
-        if dssp["agree"] is None:
-            out["A10"] = _ok(True, f"unmeasured: {dssp['unmeasured']}")
+        if dssp["agree"] is None:  # not a fail, listed (plan): never a pass
+            out["A10"] = _not_judged(f"unmeasured: {dssp['unmeasured']}")
         else:
             out["A10"] = _ok(dssp["agree"] >= LIMITS["dssp_agree"], f"{dssp['agree']:.4f} of {dssp['residues']}")
     for key, other, fields in (
@@ -319,6 +348,14 @@ def criteria(e: dict) -> dict:
         out["A14"] = _ok(not bad, ", ".join(bad))
     if e.get("pair_check") is not None:
         out["A19"] = e["pair_check"]
+    facts = e.get("facts") or {}
+    if facts.get("na") and out["A17"]["pass"] is None:  # nucleic acid in the file, measured on no view
+        drew = [v for v, r in _views(e, FIGURE_VIEWS).items() if r.get("na_chains_drawn")]
+        out["A17"] = (
+            _ok(False, f"nucleic acid drawn in the {', '.join(drew)} view(s), measured in none")
+            if drew
+            else _not_judged("no view draws the nucleic acid")
+        )
     return out
 
 
@@ -341,7 +378,7 @@ def figure_criteria(views: dict[str, dict]) -> dict:
     out["A8"] = _count(_views(e, LABEL_VIEWS), "label_repeats")
     out["A9"] = _count(_views(e, ["default", "domains"]), "scope_silent")
     out["A11"] = _count(_views(e, ["default"]), "order")
-    out["A15"] = _count(_views(e, ["default", "focus"]), "copies_alike", LIMITS["copies_alike"])
+    out["A15"] = _copies(_views(e, ["default", "focus"]))
     dom = _views(e, ["domains"])
     if dom:
         parts = [
@@ -350,17 +387,12 @@ def figure_criteria(views: dict[str, dict]) -> dict:
             _count(dom, "domain_name_collisions"),
         ]
         out["A16"] = _ok(all(p["pass"] for p in parts), "; ".join(p["detail"] for p in parts if p["detail"]))
-    if "na" in d:
-        bad = list(d["na"].get("failed", []))
-        gaps = ((d.get("checks") or {}).get("details") or {}).get("stem_name_gaps")
-        limit = d.get("stem_gap_limit")
-        if gaps is None or (gaps and limit is None):
-            bad.append("stem-name gaps not measured")
-        else:
-            for k, (own, other) in sorted(gaps.items()):
-                if own > limit or own >= other:
-                    bad.append(f"stem name {k} {own:.3f} from its letters, {other:.3f} from another stem")
-        out["A17"] = _ok(not bad, "; ".join(bad))
+        drew = [v for v, r in dom.items() if _details(r).get("domains") != {}]
+        if out["A16"]["pass"] and not drew:  # domain_checks gives {} for a figure that drew no domain
+            out["A16"] = _not_judged("the domains view drew no domain")
+    na = next(((v, r) for v, r in (("default", d), *_views(e, ["focus"]).items()) if "na" in r), None)
+    if na is not None:  # the default view, else the focus view when only it draws the nucleic acid (8QEM)
+        out["A17"] = _nucleic(*na)
     mem = _views(e, ["membrane"]).get("membrane")
     if mem is not None:
         m = mem.get("membrane")
@@ -372,14 +404,55 @@ def figure_criteria(views: dict[str, dict]) -> dict:
             out["A18"] = _ok(not bad, "; ".join(bad))
     if "default" in views and d:
         # only a tether to another chain is bounded (ruling); a long one to the home chain is reported
-        long = [(g, n, h, t) for g, n, h, t in d.get("tethers", []) if n > LIMITS["tether_length"]]
+        tethers = d.get("tethers", [])
+        long = [(g, n, h, t) for g, n, h, t in tethers if n > LIMITS["tether_length"]]
         other = [f"{g} {n} ({h} to {t})" for g, n, h, t in long if t != h]
         same = [f"{g} {n} (home {h})" for g, n, h, t in long if t == h]
         more = lambda items: [f"(+{len(items) - 4} more)"] if len(items) > 4 else []  # noqa: E731
         shown = other[:4] + more(other)
         shown += [f"reported: {'; '.join(same[:4])}" + "".join(f" {m}" for m in more(same))] if same else []
         out["A20"] = _ok(not other, "; ".join(shown))
+        if not other and not any(t != h for _, _, h, t in tethers):  # nothing A20 bounds
+            why = "no tether to another chain" + (f"; {out['A20']['detail']}" if out["A20"]["detail"] else "")
+            out["A20"] = _not_judged(why) if tethers else _ok(None, "no ligand tether")
     return out
+
+
+def _details(r: dict) -> dict:
+    return (r.get("checks") or {}).get("details") or {}
+
+
+def _copies(results: dict[str, dict]) -> dict:
+    """A15 over the views given: copies_alike counted (a count not measured fails), then by the ties' details
+    (figcheck.figure_checks: deviation None for a tie too small to judge) does not apply when no view has copies to
+    compare, not judged when none of its ties could be judged."""
+    got = _count(results, "copies_alike", LIMITS["copies_alike"])
+    if not got["pass"] or any("copies_alike" not in _details(r) for r in results.values()):
+        return got
+    ties = {f"{v} {tie}": t for v, r in results.items() for tie, t in sorted(_details(r)["copies_alike"].items())}
+    if not ties:
+        return _ok(None, "no copies to compare")
+    if all(t.get("deviation") is None for t in ties.values()):
+        return _not_judged("; ".join(f"{k} {t.get('judged')}" for k, t in ties.items()))
+    return got
+
+
+def _nucleic(view: str, r: dict) -> dict:
+    """A17 on one view's measures: na_validate's failures, then each stem name within its limit of its own letters
+    and nearer them than any other stem's (named by the view when it is not the default)."""
+    bad = list(r["na"].get("failed", []))
+    gaps = _details(r).get("stem_name_gaps")
+    limit = r.get("stem_gap_limit")
+    if gaps is None or (gaps and limit is None):
+        bad.append("stem-name gaps not measured")
+    else:
+        for k, (own, other) in sorted(gaps.items()):
+            if own > limit or own >= other:
+                bad.append(f"stem name {k} {own:.3f} from its letters, {other:.3f} from another stem")
+    detail = "; ".join(bad)
+    if view != "default":
+        detail = f"measured on the {view} view, as the default draws no nucleic acid" + (f": {detail}" if bad else "")
+    return _ok(not bad, detail)
 
 
 def _to_first_numbering(a: dict, b: dict) -> Callable[[int, int], tuple[int, int] | None] | None:
@@ -407,7 +480,9 @@ def pair_check(a: dict, b: dict) -> dict:
     shorter, the largest overlaps first), b's ranges taken to a's numbering by sequence alignment (C18 ruling:
     2HKI numbers GAPDH ahead of 1RM5). The pairs must keep one order, and pair at least half of the larger
     chain's elements (and 3, when both have that many). One entry may hold an element the other lacks (listed, not
-    failed); the generic names after it then differ, so names are compared only up to the first unpaired element."""
+    failed); the generic numbers after it then shift, so every pair's names are compared modulo that shift
+    (same_name; final review B, Important 1: comparing only up to the first unpaired element compared none in
+    9YKJ/10UJ and 6YPX/6YQD). Not judged when no names could be compared."""
     from .model import pair_places
 
     ra = (a["views"].get("beta", {}).get("result") or {}).get("elements")
@@ -432,14 +507,37 @@ def pair_check(a: dict, b: dict) -> dict:
         bad.append("elements in another order")
     if len(pairs) < max(min(3, len(ea), len(eb)), max(len(ea), len(eb)) / 2):
         bad.append(f"only {len(pairs)} of {len(ea)} and {len(eb)} elements paired")
-    for i, k in pairs:  # names, while every element before is paired (generic numbering shifts after an extra one)
-        if any(j not in found for j in range(i)) or any(j not in found.values() for j in range(k)):
-            break
-        if ea[i]["label"] != eb[k]["label"]:
-            bad.append(f"{ea[i]['label']}~{eb[k]['label']} ({ea[i]['id']}~{eb[k]['id']})")
+    paired_b, differ = set(found.values()), []
+    for i, k in pairs:  # every pair's names, each number less the unpaired elements of its kind before it
+        before_a = [x["label"] for j, x in enumerate(ea[:i]) if j not in found]
+        before_b = [y["label"] for j, y in enumerate(eb[:k]) if j not in paired_b]
+        if not same_name(ea[i]["label"], eb[k]["label"], before_a, before_b):
+            differ.append(f"{ea[i]['label']}~{eb[k]['label']} ({ea[i]['id']}~{eb[k]['id']})")
+    if not pairs and not bad:
+        return _not_judged("no names to compare")
+    bad += differ
     shown = bad + notes
-    detail = "; ".join(shown[:8]) + (f" (+{len(shown) - 8} more)" if len(shown) > 8 else "")
+    detail = f"names compared on all {len(pairs)} pairs" + (f", {len(differ)} differ" if differ else "")
+    detail += "; " + "; ".join(shown[:8]) + (f" (+{len(shown) - 8} more)" if len(shown) > 8 else "") if shown else ""
     return _ok(not bad, detail)
+
+
+_NUMBERED = re.compile(r"(\D*?)(\d+)(\D*)")  # a generic name: its kind (α, β, η ...), number, any mark after it
+
+
+def same_name(a: str, b: str, before_a: list[str], before_b: list[str]) -> bool:
+    """Are two paired elements' names the same, given the names of the unpaired elements before each in its own
+    chain (A19)? Two numbered names of one kind and mark (α3, α3′) are the same when their numbers, each less the
+    unpaired elements of that kind before it, agree (an extra helix in one entry shifts every later α by one); any
+    other name (αN, a deposited letter) must be equal."""
+    ma, mb = _NUMBERED.fullmatch(a), _NUMBERED.fullmatch(b)
+    if not ma or not mb or (ma[1], ma[3]) != (mb[1], mb[3]):
+        return a == b
+
+    def shift(before: list[str], kind: str) -> int:
+        return sum(1 for x in before if (m := _NUMBERED.fullmatch(x)) and m[1] == kind)
+
+    return int(ma[2]) - shift(before_a, ma[1]) == int(mb[2]) - shift(before_b, mb[1])
 
 
 # ------------------------------------------------------------------------------------------------ one figure
@@ -488,7 +586,7 @@ def check_figure(drawn, spec, path) -> dict:
         font = next((skipped[c] for c in INK_READ.get(key, ()) if c in skipped), None)
         if got["pass"] is not None and font:
             got = _domains_off_font(result, str(font)) if key == "A16" else {**_ok(None), "here": str(font)}
-        elif got["pass"] is None and as_default.get(key, _ok(None))["pass"] is not None:
+        elif got["pass"] is None and view != "default" and key in as_default:
             got = {
                 **got,
                 "here": f"the campaign judges it on other views, not on its {view} view: draw the figure "
@@ -497,7 +595,7 @@ def check_figure(drawn, spec, path) -> dict:
         elif key in here:
             got = {**got, "here": here[key]}
         out[key] = unmeasured(got)
-    return {"science": result["science"], "criteria": out}
+    return {"science": result["science"], "science_judged": result["science_judged"], "criteria": out}
 
 
 def _domains_off_font(result: dict, font: str) -> dict:
@@ -512,21 +610,27 @@ def _domains_off_font(result: dict, font: str) -> dict:
 
 
 def unmeasured(got: dict) -> dict:
-    """A result whose detail reads "unmeasured: <reason>" (the campaign's A10 without mkdssp, which it counts as a
-    pass) as not measured: pass None, the reason under "here"."""
+    """A result whose detail reads "unmeasured: <reason>" (the campaign's A10 without mkdssp: not judged; a pass in
+    reports from before the final review B fix) as not measured: pass None, the reason under "here"."""
     detail = str(got.get("detail") or "")
-    if got.get("pass") and detail.startswith("unmeasured"):
+    if got.get("pass") is not False and detail.startswith("unmeasured"):
         return {**_ok(None), "here": detail.removeprefix("unmeasured").lstrip(": ") or "unmeasured"}
     return got
 
 
 def criteria_lines(found: dict[str, dict]) -> list[str]:
-    """One line per criterion (pass, fail, not measured here and why, or does not apply), its detail indented."""
+    """One line per criterion (pass, fail, not measured here and why, not judged and why, or does not apply), its
+    detail indented."""
     lines = []
     for key, what in CRITERIA.items():
         got = unmeasured(found.get(key) or _ok(None))
         if got["pass"] is None:
-            why = f"not measured here ({got['here']})" if got.get("here") else "does not apply"
+            if got.get("here"):
+                why = f"not measured here ({got['here']})"
+            elif outcome(got) == NOT_JUDGED:
+                why = NOT_JUDGED + (f" ({got['detail']})" if got.get("detail") else "")
+            else:
+                why = NOT_APPLICABLE
             lines.append(f"{key} {what}: {why}")
             continue
         lines.append(f"{key} {what}: {'pass' if got['pass'] else 'fail'}")

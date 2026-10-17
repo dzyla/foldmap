@@ -28,7 +28,8 @@ def test_check_prints_the_figure_criteria_under_the_science_checks(capsys):
     out = capsys.readouterr().out.splitlines()
     assert "S1 sheet neighbours pair: pass" in out
     assert "A5 no element or stem boxes overlapping: pass" in out and "A11 N->C and sheet order: pass" in out
-    assert out.index("S6 accessory drawn at its partner: pass") < out.index(
+    assert "S2 barrel closure pairs: not judged (no closed barrel drawn)" in out  # nothing to judge: never a pass
+    assert out.index("S6 accessory drawn at its partner: not judged (no accessory strand)") < out.index(
         "A1 no crash: exit 0, files written, "
         "no traceback, no Python warning: "
         f"not measured here ({criteria.NOT_HERE['A1']})"
@@ -88,9 +89,12 @@ def test_the_script_and_the_package_judge_one_figure_alike(r100, tmp_path, name)
     script = r100.criteria(e)
     package = criteria.check_figure(drawn, spec, path)["criteria"]
     assert {k: script[k] for k in FIGURE_JUDGED} == {
-        k: {"pass": package[k]["pass"], "detail": package[k]["detail"]} for k in FIGURE_JUDGED
+        k: {x: v for x, v in package[k].items() if x != "here"} for k in FIGURE_JUDGED
     }
-    assert all(script[k]["pass"] is not None for k in FIGURE_JUDGED)
+    assert all(script[k]["pass"] is not None for k in FIGURE_JUDGED if k not in ("A15", "A20"))
+    # nothing to judge is no pass (final review B, Important 3): ubiquitin has no copies and no ligand
+    want = {"1UBQ.cif": ("does not apply", "does not apply"), "2HHB.cif": ("pass", "not judged")}[name]
+    assert (criteria.outcome(script["A15"]), criteria.outcome(script["A20"])) == want
 
 
 OFF_FONT = "the text resolved to DejaVu Sans, not Liberation Sans"
@@ -118,7 +122,7 @@ def test_off_font_a16_still_judges_the_domain_rules_and_panels(monkeypatch):
     monkeypatch.setattr(figcheck, "figure_checks", _off_font(real_checks))
     spec = figure_spec(DATA / "1UBQ.cif")
     got = criteria.check_figure(draw_spec(spec), spec, DATA / "1UBQ.cif")["criteria"]
-    assert got["A16"] == {"pass": None, "detail": ""}  # no domains: does not apply
+    assert got["A16"] == {"pass": None, "detail": "", "status": "does not apply"}  # no domains
 
     spec = figure_spec(DATA / "2LZM.cif", domains="auto")  # two automatic domains
     drawn = draw_spec(spec)
@@ -161,3 +165,13 @@ def test_an_unmeasured_criterion_never_prints_as_a_pass():
     lines = criteria.criteria_lines({"A10": {"pass": True, "detail": "unmeasured: no mkdssp on PATH"}})
     assert "A10 secondary structure agrees with mkdssp: not measured here (no mkdssp on PATH)" in lines
     assert not any(line.endswith(": pass") for line in lines if line.startswith("A10"))
+
+
+def test_a_criterion_with_nothing_to_judge_prints_not_judged():
+    """Final review B, Important 3: `foldmap check` prints a criterion the figure gave nothing to judge as not judged,
+    with why, never as a pass."""
+    lines = criteria.criteria_lines(
+        {"A15": {"pass": None, "detail": "default B~A n/a: 2 elements", "status": "not judged"}}
+    )
+    assert "A15 copies drawn alike: not judged (default B~A n/a: 2 elements)" in lines
+    assert "A16 domains: one chain, alike, not tiny, panels apart, names clear: does not apply" in lines

@@ -160,6 +160,15 @@ def test_summary_prints_the_science_checks():
 
     text = summarize(str(R100 / "1BXW-A.cif.gz"))
     assert "S1 sheet neighbours pair: pass" in text and "S3 barrel strand count is its pairing cycle: pass" in text
+    # final review B, Important 3: a check with nothing to judge in the sheets as built is not judged, never a pass
+    assert "S6 accessory drawn at its partner: not judged (no accessory strand)" in text
+
+
+def test_science_lines_say_not_judged_with_nothing_to_judge():
+    lines = science_lines({"S1": [], "S2": [], "S3": [], "S4": None, "S5": None, "S6": []}, {"S1": 2, "S2": 0, "S6": 0})
+    assert lines[0] == "S1 sheet neighbours pair: pass"
+    assert lines[1] == "S2 barrel closure pairs: not judged (no closed barrel drawn)"
+    assert lines[5] == "S6 accessory drawn at its partner: not judged (no accessory strand)"
 
 
 def test_check_command_prints_the_figures_science_and_exits_1_on_a_problem(capsys, monkeypatch):
@@ -168,7 +177,8 @@ def test_check_command_prints_the_figures_science_and_exits_1_on_a_problem(capsy
 
     assert main(["check", str(DATA / "1UBQ.cif")]) == 0
     out = capsys.readouterr().out
-    assert "S1 sheet neighbours pair: pass" in out and "S4 residue marks at their residue: pass" in out
+    assert "S1 sheet neighbours pair: pass" in out  # 1UBQ draws no residue mark: S4 has nothing to judge
+    assert "S4 residue marks at their residue: not judged (no residue mark drawn)" in out
     monkeypatch.setattr(
         figcheck,
         "science_checks",
