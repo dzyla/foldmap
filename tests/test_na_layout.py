@@ -2559,3 +2559,31 @@ def test_each_end_label_names_its_own_end(path):
         assert nearest == own, (s, e)
         checked += 1
     assert checked >= 1
+
+
+@pytest.mark.parametrize("m", [4, 8, 13, 15, 18, 24])
+def test_a_hairpin_loop_holds_its_nucleotides_a_bead_apart(m):
+    """Random-100 C2b-4 (7Y7C, 8VWQ bead_overlaps): a hairpin loop's circle was sized as if its arc were 0.8 of a
+    circle, but on a stem wider than the loop needs the circle is the stem's own width and the arc only about half
+    of it, so 13 to 18 nucleotides stood 0.40-0.44 apart and their contact beads (one bead width, na_paths._BEAD)
+    overlapped: 25 of 7Y7C's 26 overlaps. Every two neighbours on the arc, and the stem nucleotides at its feet, now
+    stand at least a bead apart."""
+    from foldmap.na_paths import _BEAD
+    from foldmap.na_runs import _arc, _spaced
+
+    stem = PlacedStem(
+        "s",
+        "P1",
+        [0, 0],
+        [(0, 0, 0, 40)],
+        0.0,
+        0.0,
+        4.0,
+        0.0,
+        4.6,
+        {(0, 0): 2.0, (0, 40): 2.0},
+        {(0, 0): 1, (0, 40): -1},
+    )
+    pts = _arc(stem, (0, 0), (0, 40), m)
+    xy = np.array([pts[0], *_spaced(pts, m), pts[-1]])
+    assert np.hypot(*np.diff(xy, axis=0).T).min() >= _BEAD - 1e-6

@@ -144,6 +144,15 @@ DNA_MINOR = 0.37  # the second backbone trails the first by this fraction of a t
 NA_W = DNA_W  # stem width: a double helix is about 20 Å across, A-form RNA as B-DNA
 RAIL_IN = 0.6  # ladder rails sit this far inside the stem's long sides, base letters outside them
 NT_STEP = 0.55  # spacing of unpaired nucleotides along a drawn single strand (schematic, not to scale)
+_HAIRPIN_STEP = 0.4545  # page units: the least step between neighbours on a hairpin loop, a bead's width (_TRACE_HALF,
+# 0.45) and the 1 % the drawn polyline cuts off the arc
+
+
+def _hairpin_step(half: float, r: float, m: int) -> float:
+    """The straight step between neighbours of m nucleotides spaced over a hairpin loop's arc: radius r, its feet
+    `half` either side of its chord's middle, the arc the long way round beyond the chord."""
+    span = 2 * np.pi - 2 * np.arcsin(min(half / r, 1.0))
+    return float(2 * r * np.sin(span / (2 * (m + 1))))
 
 
 @dataclass(eq=False)
@@ -211,6 +220,10 @@ class PlacedStem:
         out = self.direction if self.axial[ka] >= 0 else -self.direction
         half = float(np.hypot(*(pb - pa))) / 2
         r = max(half * 1.02, (m + 1) * NT_STEP / (1.6 * np.pi))
+        # a bead apart (_TRACE_HALF): sized by the stem's width, the arc is only about half a circle and its
+        # nucleotides stood closer (random-100 C2b-4: 7Y7C's 13- to 18-nucleotide loops, 0.40-0.44)
+        while _hairpin_step(half, r, m) < _HAIRPIN_STEP:
+            r = float(_snap(r + 0.01))
         return (pa + pb) / 2 + out * np.sqrt(max(r * r - half * half, 0.0)), r
 
 
