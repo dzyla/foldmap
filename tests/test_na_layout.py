@@ -2636,3 +2636,32 @@ def test_a_tie_label_finds_a_clear_spot_with_a_longer_tick():
     d = draw_spec(figure_spec(r100_entry("4P9R")))
     assert [t for t in d.layout.na_ties if t.label]
     assert [h for h in figcheck.text_collisions(d) if h.startswith("na:tie:")] == []
+
+
+def _two_stems(gap: float, parent: str = ""):
+    """Stems P1 (strand 0's nucleotide 0, leaving rightwards) and P2 (nucleotide 3 or, for joined pieces, 1, entered
+    from the left), their facing ends `gap` apart, and a router on a page holding only them."""
+    from foldmap.layout import Layout
+    from foldmap.route import _element_obstacles, _Grid, _Router
+
+    j = 1 if parent else 3
+    da = PlacedStem("P1", "P1", [0, 0], [], 0.0, 0.0, 3.0, 0.0, 4.6, {(0, 0): 1.0}, {(0, 0): 1}, parent=parent)
+    db = PlacedStem("P2", "P2", [0, 0], [], 3.0 + gap, 0.0, 3.0, 0.0, 4.6, {(0, j): -1.0}, {(0, j): 1}, parent=parent)
+    lay = Layout({}, (-3.0, -4.0, 6.0 + gap, 4.0), stems=[da, db])
+    return da, db, j, _Router(_Grid(lay), _element_obstacles(lay))
+
+
+def test_a_strand_whose_face_looks_into_a_margin_still_routes():
+    """Random-100 C2b-4 (7Y7C a:843-844, 8VWQ 1:836): a strand's first free cell out of its stem's end face lay in
+    another stem's clearance margin, so no route started and it was drawn as a plain curve. Routed again with its
+    ends loose (as a cropped gap is), the drawn route's own check decides."""
+    from foldmap.na_paths import _face
+    from foldmap.na_runs import _strand_between
+    from foldmap.route import _PUSH
+
+    da, db, j, router = _two_stems(6.0)
+    fa, ea = _face(da, (0, 0), True)
+    for t in _PUSH[:3]:  # the cells in front of P1's face, taken by a margin (no body there)
+        router.grid.blocked[router.grid.cell(fa + ea * t)] = True
+    path = _strand_between(router, 0, 0, j, da, db, None)
+    assert path.kind == "run" and not path.fallback

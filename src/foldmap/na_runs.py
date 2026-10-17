@@ -251,11 +251,11 @@ def _drawing(router: _Router, s, nts, between, da, db, ends, need, joint, kind, 
         if level == 2:  # a detour longer than _DETOUR times the second stage's is not taken: no need to search far
             router.max_nodes, router.wide_nodes = _FIRST_NODES, 0
         try:
-            route, _ = router.route(fa, ea, da, fb, eb, db, own_body=True)
+            route = _faces_route(router, fa, ea, da, fb, eb, db)
         finally:
             grid.blocked, (router.max_nodes, router.wide_nodes) = saved, budget
     else:
-        route, _ = router.route(fa, ea, da, fb, eb, db, own_body=True)
+        route = _faces_route(router, fa, ea, da, fb, eb, db)
     if route is None and joint and _straight_joint(router, da, db, fa, ea, fb, strands):
         # pieces that touch (no margin is kept between them): the duplex carries on straight across their meeting
         # corner, as a kink joins two pieces of one helix; past one of them, not through it (a shallow graze of a
@@ -289,6 +289,18 @@ def _drawing(router: _Router, s, nts, between, da, db, ends, need, joint, kind, 
     pts = next((q for q in shapes if not fallback and ok(q) and off_names(q)), soft[0])
     kind_drawn = "joint" if joint else "run"
     return NAPath(kind_drawn, s, nts, pts, _spaced(pts, m), fallback=fallback and pts is not bowed, between=between)
+
+
+def _faces_route(router: _Router, fa, ea, da: PlacedStem, fb, eb, db: PlacedStem):
+    """The route from end face fa to end face fb (router.route, its own two stems checked by their true bodies); when
+    none starts or ends clear of the other obstacles' margins, again with its ends loose (_Grid.free_cell_along), the
+    drawn route's own check deciding, as for a cropped gap (na_ends._gap): a face may look into the margin of a stem
+    beside it, as two pieces of one bent duplex kept end to end do into each other's (random-100 C2b-4: 7Y7C's
+    a:843-844 and 8VWQ's 1:836 were plain curves)."""
+    route, _ = router.route(fa, ea, da, fb, eb, db, own_body=True)
+    if route is None:
+        route, _ = router.route(fa, ea, da, fb, eb, db, own_body=True, loose=True)
+    return route
 
 
 def _side_bow(d: PlacedStem, key, fa, fb, reach: float) -> list[tuple[float, float]]:
