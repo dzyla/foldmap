@@ -1107,18 +1107,22 @@ def test_no_second_search_when_the_port_stubs_cut_the_ends_apart():
     """Random-100 C2b-6 (7Y7C): a cropped gap whose two ends lie 0.57 apart on one stem's face ran four wide searches
     and spent 5.8 M of the page's 8 M nodes, though no route existed: the stubs drawn straight to its ports, which the
     search may not cross, cut its ends apart, and the free-cell test of the second search (_Router._joined) opened
-    them. The test now reads the grid as searched, so the search is not run and the page keeps its budget for the
-    strands routed after it."""
+    them. Driven through _route_ports (review minor 2): a port sits in the only hole of a wall, its stub fills the
+    hole, the other port is beyond the wall; the test now reads the grid as searched, so no second search runs and
+    the page keeps its budget."""
     lay = Layout({}, (0.0, 0.0, 10.0, 10.0))
     router = route._Router(_Grid(lay), route._element_obstacles(lay))
     grid = router.grid
-    wall = grid.nx // 2
+    wall, row = grid.nx // 2, grid.ny // 2
     grid.blocked[wall, :] = True
-    hole = (wall, grid.ny // 2)
-    grid.blocked[hole] = False  # the one way through the wall ...
-    start, goal = (wall - 3, grid.ny // 2), (wall + 3, grid.ny // 2)
-    grid.blocked[hole] = True  # ... taken by a port's stub, blocked for this search as _route_ports blocks it
-    assert router.second(start, 0, goal, 0, 10) is None
+    grid.blocked[wall, row] = False  # the one way through the wall, where port a sits, leaving rightwards
+    pa = grid.center((wall, row))
+    pb = grid.center((wall - 8, row))  # leaving leftwards, beyond the wall
+    own_a = SimpleNamespace(rect=(pa[0], pa[1], pa[0], pa[1]))
+    own_b = SimpleNamespace(rect=(pb[0], pb[1], pb[0], pb[1]))
+    assert (wall, row) in grid.stub_cells(pa, grid.free_cell_along(pa, (1.0, 0.0), own_a))  # its stub fills the hole
+    cells = route._route_ports(grid, pa, (1.0, 0.0), own_a, pb, (-1.0, 0.0), own_b, False, 10, router)
+    assert cells is None
     assert router.wide_searches == 0 and router.wide_left == route._MAX_NODES_PAGE
 
 
