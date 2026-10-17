@@ -2960,3 +2960,25 @@ def test_a_crowded_rna_keeps_room_for_a_ligand_its_nucleotides_hold():
         for t in m["targets"]:
             assert math.dist(m["centre"], t) <= 12.6
             assert not any(_crosses_segment(q, m["centre"], t) for q in loops)
+
+
+def test_no_joint_runs_through_its_own_pieces_on_a_ribosome():
+    """Random-100 C2b-6 J (7Y7C's a:2710-2711 through P138c1's corner, 8VWQ's domains view 2:253-254): two pieces of
+    one bent duplex side by side, their joint's bend out of and into the faces' axes cut a corner of a piece unless
+    swung away from the other piece, and the bend was swung only outward on each rail's side. It is now swung
+    either way (na_runs._JOINT_SWINGS), so no joint is left on a line through a corner."""
+    from foldmap.na_paths import among
+    from foldmap.nacheck import _segments, _through_stem
+    from helpers import r100_entry
+
+    lay, sses, bb = make_layout(r100_entry("7Y7C"))
+    route_loops(lay, sses, bb)
+    at = {key: d for d in lay.stems for key in d.axial}
+    through = [
+        (p.between, d.name)
+        for p in lay.na_paths
+        if p.kind == "joint" and len(p.between) == 2
+        for d in {at[k].id: at[k] for k in p.between}.values()
+        if _through_stem(_segments(among(p, at)), d)
+    ]
+    assert through == []

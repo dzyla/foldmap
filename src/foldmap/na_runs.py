@@ -40,10 +40,10 @@ _JOINT_FORWARD = 0.5
 # into the partner's face along its axis, its control points this far out (page units), the first clear taken: the
 # duplex bends round; random-100 C2b-6 (8VWQ's P26a <-> P26b, 73-76° off their faces; P124a's pieces turned back)
 _JOINT_BENDS = (1.0, 1.5, 2.0, 0.5, 3.0)
-# ... and when none of those is clear, the same swung out sideways by this much at each end (page units), away from its
-# own piece on its rail's side: pieces turned back from each other (8VWQ's P124a, 7Y7C's P103) meet past the corners
-# of their bodies, which reach beyond the rails
-_JOINT_SWINGS = (0.0, 1.0, 2.0)
+# ... and when none of those is clear, the same swung sideways by this much at each end (page units): outward on its
+# rail's side first (pieces turned back from each other, 8VWQ's P124a and 7Y7C's P103, meet past the corners of their
+# bodies, which reach beyond the rails), then the other way (pieces side by side, 7Y7C's P138c1 and P138c2)
+_JOINT_SWINGS = (0.0, 1.0, 2.0, -1.0, -2.0)
 # a run keeps off every strand drawn before it (and every protein loop) by a detour at most this many times as
 # long as its plain drawing, which keeps off the hairpin loops and free ends only. Measured on 24 campaign entries,
 # crossing a strand only a cost: run-run crossings 250 -> 239, protein loops crossed 178 -> 175, no entry worse in
@@ -128,7 +128,7 @@ def _joint_bend(
     router: _Router, da: PlacedStem, db: PlacedStem, fa, ea, fb, eb, strands=None, names=(), loops=None, keys=()
 ):
     """A joint no route reaches and no straight line or elbow may take, drawn as a smooth curve (_bend, its control
-    points _JOINT_BENDS out, then swung sideways _JOINT_SWINGS away from its pieces on its rails' sides: `keys`, the
+    points _JOINT_BENDS out, then swung sideways _JOINT_SWINGS, outward on its rails' sides first: `keys`, the
     joined nucleotides; the first that is clear): clear by _INFLATE of every element and stem but its own two, into
     neither of those at all, crossing no strand drawn so far but its partner, off every name (`names`, as _off_names)
     and protein loop (`loops`); None if none is."""
