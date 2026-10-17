@@ -487,8 +487,9 @@ def _column_heights(
     (height 0). Each accessory stands in its column (Accessory.column: beside its partner on its 3D side), level with
     its partner where it can: at its partner's height when nothing in that column meets it there, else end to end
     with what does (one column means collinear), on the side its centroid lies on along the sheet's drawn up (its
-    strands' mean direction, by their senses, times the flip s), _STACK_PAD apart, _END_ROOM more where a chain end
-    faces the gap (`ends`: element id -> "N", "C" or both, the chain ends drawn; 9FWZ's C end, D:662-666). One that
+    strands' mean direction, by their senses, times the flip s), _STACK_PAD apart, _END_ROOM more for each chain end
+    facing the gap (`ends`: element id -> "N", "C" or both, the chain ends drawn; 9FWZ's C end, D:662-666; 7JU4's
+    two, chain E's N end under chain f's C end, whose letters met with room for one, random-100 C2b-3). One that
     cannot stand level with its partner stands level with another partner of its own (Accessory.others), in a column
     beside that one, when it can; else as near its partner as it can (_unshown reads that off the drawing, and the
     note says "also pairs with"; fix round 2/3 rulings, 7ARD). Snapped."""
@@ -503,9 +504,9 @@ def _column_heights(
 
     def room(lo: int, hi: int) -> float:  # lo stands below hi: lo's top end and hi's bottom end face the gap
         up_lo, up_hi = sense[lo] * s > 0, sense[hi] * s > 0
-        facing = ("C" if up_lo else "N") in ends.get(strand(lo).id, "") if lo >= 0 else False
-        facing |= ("N" if up_hi else "C") in ends.get(strand(hi).id, "") if hi >= 0 else False
-        return _STACK_PAD + (_END_ROOM if facing else 0.0)
+        facing = int(("C" if up_lo else "N") in ends.get(strand(lo).id, "")) if lo >= 0 else 0
+        facing += int(("N" if up_hi else "C") in ends.get(strand(hi).id, "")) if hi >= 0 else 0
+        return _STACK_PAD + _END_ROOM * facing  # each chain end facing the gap: its own stub and letter
 
     height: dict[int, float] = {k: 0.0 for k in range(n)} | ({-1: 0.0} if -1 in column else {})
     occupied: dict[int, list[int]] = {}

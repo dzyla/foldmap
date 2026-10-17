@@ -751,3 +751,15 @@ def test_a_stack_gap_opens_to_a_side(entry, view):
     d = draw_spec(figure_spec(r100_entry(entry), **view))
     assert d.stuck == [] and d.over_labels == []
     assert min(_gap_openings(d.layout)) >= _STACK_SHUT - 1e-6
+
+
+def test_two_chain_ends_facing_one_stack_gap_keep_their_letters_apart():
+    """Random-100 C2b-3 A6 (7JU4, every view): chain E's first strand stands end to end under chain f's last, in one
+    sheet column, and both chain ends face the gap between them. The gap held _END_ROOM once, for one end's stub and
+    letter, so both letters stood on the same spot (terminus:N:E over terminus:C:f). Each facing end has its room."""
+    from foldmap import figcheck
+    from foldmap.spec import draw_spec, figure_spec
+    from helpers import r100_entry
+
+    d = draw_spec(figure_spec(r100_entry("7JU4")))
+    assert [h for h in figcheck.text_collisions(d) if h.count("terminus:") == 2] == []
