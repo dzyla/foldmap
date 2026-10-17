@@ -159,6 +159,14 @@ class _Grid:
         so no other part of the same loop can pass between the two and be crossed by the stub."""
         return self.cells_along(port, self.center(end)) - {end}
 
+    def _into_slab(self, port, exit_vec) -> bool:
+        """Does a route's usual first step out of this port (_PUSH[0] along its exit) land in the membrane slab? Such
+        a route starts nearer (_PUSH_NEAR), so it turns round its own element's end at the port's own row, not 0.4
+        into the slab: 6JO6's helix ending 0.03 below a face, 5LDW's in-slab helix facing a 0.81 gap under the one
+        stacked on it (random-100 C2b-5)."""
+        c = self.cell((port[0] + exit_vec[0] * _PUSH[0], port[1] + exit_vec[1] * _PUSH[0]))
+        return bool(0 <= c[0] < self.nx and 0 <= c[1] < self.ny and self.slab[c])
+
     def free_cell_along(self, port, exit_vec, own: Placed, loose: bool = False):
         """First free cell on the way out of a port. Only the cells the element's own bounding box blocks
         (a tilted helix end can sit inside it) may be skipped; any other obstacle in the way means no route.
@@ -170,6 +178,7 @@ class _Grid:
         rx0, ry0, rx1, ry1 = own.rect
         over = loose and getattr(own, "over", False)
         near = (round(float(port[0]), 6), round(float(port[1]), 6)) in self.near_ports
+        near = near or self._into_slab(port, exit_vec)
         for t in _PUSH_OVER if over else _PUSH_NEAR if near else _PUSH:
             pt = (port[0] + exit_vec[0] * t, port[1] + exit_vec[1] * t)
             c = self.cell(pt)

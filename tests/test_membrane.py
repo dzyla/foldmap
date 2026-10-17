@@ -493,6 +493,25 @@ def test_the_second_membrane_layout_is_kept_only_when_it_does_better(monkeypatch
     assert next(scores, None) is None
 
 
+@pytest.mark.parametrize("entry", ["5LDW", "6JO6"])
+def test_a_route_turning_out_of_a_port_at_or_in_the_slab_turns_at_the_port(entry):
+    """Random-100 C2b-5 (A18). 6JO6: 5:167-169's C port lies 0.03 below the lower face and points up; its route's
+    first cell, 0.4 out, lay 0.42 inside the face, and the turn round the helix's end ran there. 5LDW: in C17's second
+    layout L:448-454's C port, inside the band, points up into a 0.81 gap under L:369-380; the 0.4 step met the row
+    of the loop entering L:369-380, and the route jogged down to run 1.0 sideways in mid-slab, one loop in the slab
+    (scored (0, 1, 0) against the first layout's (6, 0, 0), so C17 kept six TM helices off the band). A port whose
+    first step lands in the slab now starts nearer (route._Grid._into_slab): 5LDW keeps the second layout, every TM
+    helix across the band, and neither view has a loop in the slab."""
+    from foldmap.figcheck import membrane_view
+    from foldmap.route import route_loops
+    from helpers import r100_entry
+
+    path = r100_entry(entry)
+    lay, sses, bb = make_layout(path, membrane="auto")
+    view = membrane_view(lay, sses, bb, find_membrane(path, bb), route_loops(lay, sses, bb))
+    assert view["tm_helices"] >= 14 and view["tm_short"] == [] and view["loops_in_slab"] == [], view
+
+
 def test_a_users_move_never_pushes_a_transmembrane_helix_off_its_height():
     """C17 fix round 1 (Q8): the transmembrane elements of a membrane view laid out at their projected height keep it
     through the user's own moves (_adjust's _separate) and the pushes off unpaired strands (_off_walls). In 1BL8, the

@@ -567,6 +567,31 @@ def test_a_loop_leaves_the_slab_rather_than_run_along_it_over_an_element():
     assert min(grid.center(c)[1] for c in path) < -15.0  # under the element
 
 
+def test_a_route_out_of_a_port_whose_first_step_lands_in_the_slab_turns_at_the_port():
+    """Random-100 C2b-5 (6JO6 5:167-169>5:179-207): a helix ending 0.03 below the band's lower face, its C port
+    pointing up into the slab. Every route started 0.4 out along its exit (_PUSH), so the first cell lay 0.42 inside
+    the face and the turn round the helix's end ran there, in the slab (A18). A port whose first step lands in the
+    slab starts nearer (_PUSH_NEAR, as a port facing a stack gap does), and the turn stays within SLAB_MARGIN of the
+    face. A port whose first step leaves the slab starts as before."""
+    from foldmap.figcheck import slab_runs
+
+    a = bar(0, 0.0, -0.03 - 0.9625, 1.925, np.pi / 2)  # C port at (0, -0.03), pointing up
+    b = bar(20, 3.0, 0.5 + 2.5, 5.0, np.pi / 2)  # N port at (3, 0.5) inside the band, pointing down
+    lay = layout_of(a, b)
+    lay.membrane = {"y": (0.0, 8.0), "bands": [(0.0, 8.0)], "inside": "below"}
+    grid = _Grid(lay, [])
+    assert abs((-0.03 - grid.y0) % grid.res - 0.175) < 1e-9  # the port 0.05 above a row's centre, as in 6JO6
+    assert grid.slab[grid.cell((0.0, -0.03 + 0.4))]  # the usual first step is in the slab
+    (loop,) = route_loops(lay, [a.sse, b.sse], stub_bb())
+    assert not loop.fallback
+    assert slab_runs([loop], [(0.0, 8.0)], lay.placed) == [], loop.points
+    assert max(y for _, y in loop.points[:3]) < 0.3, loop.points  # turned within the margin of the face
+    c = bar(40, 0.0, 9.0, 2.0, np.pi / 2)  # a port above the band, its first step out of it: as before
+    up = _Grid(layout_of(c), [])
+    port, out = c.c_port, c.exit_c
+    assert up.free_cell_along(port, out, c) == up.cell((port[0] + out[0] * 0.4, port[1] + out[1] * 0.4))
+
+
 def test_only_the_over_helix_port_walks_loose(monkeypatch):
     """A loop between a helix drawn over a sheet and another element: only the helix's own port may walk out over
     blocked cells (loose); the other port leaves as any port does (Task 14 review)."""
