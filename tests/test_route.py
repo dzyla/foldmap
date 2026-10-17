@@ -1120,3 +1120,15 @@ def test_no_second_search_when_the_port_stubs_cut_the_ends_apart():
     grid.blocked[hole] = True  # ... taken by a port's stub, blocked for this search as _route_ports blocks it
     assert router.second(start, 0, goal, 0, 10) is None
     assert router.wide_searches == 0 and router.wide_left == route._MAX_NODES_PAGE
+
+
+def test_a_chain_ends_letter_a_line_runs_through_moves_round_its_stub():
+    """Random-100 C2b-6 T (review zip example 08, 9FWZ --membrane auto): chain D's C letter, END_LABEL out of S31's
+    stub in the stack gap under S29, stood in the D:618-629 loop that runs up into S29's N end (A6: terminus:C:D x
+    loop; no route passes it). A letter a line runs through now turns round its stub's tip, or stands further out,
+    to the spot lines cross least (route._clear_termini)."""
+    from foldmap import figcheck
+
+    d = draw_spec(figure_spec(Path(__file__).parent / "data" / "r100" / "9FWZ-DB.cif.gz", membrane="auto"))
+    assert [h for h in figcheck.text_collisions(d) if h.startswith("terminus:")] == []
+    assert d.layout.end_labels  # moved, not hidden

@@ -37,7 +37,6 @@ from .layout import (
     DNA_TUBE,
     DNA_W,
     DOMAIN_NAME_SIZE,
-    END_LABEL,
     END_STUB,
     HEAD,
     HEAD_LEN,
@@ -64,6 +63,7 @@ from .layout import (
     dna_to_page,
     dna_y,
     domain_fields,
+    end_label_pos,
     first_pair_text,
     font_pt,
     glyph,
@@ -3538,8 +3538,7 @@ def _draw_termini(c: _Canvas, layout: Layout, sses: list[SSE], loops: list[Loop]
         stub.set_gid(f"stub:{end}:{chain}")
         c.ax.add_patch(stub)
         t = c.ax.text(
-            port[0] + ex[0] * END_LABEL,
-            port[1] + ex[1] * END_LABEL,
+            *end_label_pos(layout, end, chain, port, ex),
             end,
             ha="center",
             va="center",

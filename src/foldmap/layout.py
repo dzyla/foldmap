@@ -253,6 +253,9 @@ class Layout:
     na_ends: list = field(default_factory=list)  # (strand, "5′" or "3′", label position), filled by route_loops
     na_letters: dict = field(default_factory=dict)  # single-stranded (strand, nt) -> its letter's place (route_loops)
     na_ties: list = field(default_factory=list)  # na_paths.NATie: isolated pairs as drawn (route_loops)
+    # (N or C, chain) -> where that chain end's letter is drawn when a line ran through its usual spot (route_loops:
+    # route._clear_termini); end_label_pos reads it
+    end_labels: dict = field(default_factory=dict)
     na_cropped: bool = False  # na_extent auto cropped a large nucleic acid to the stems the protein touches
     na_read: int = 0  # nucleotides read before that crop (scope.drawn_scope says how many of them were drawn)
     frame: object = None  # the frame.Frame (or RadialFrame, CylinderFrame) that took 3D to the page
@@ -4158,6 +4161,15 @@ def helix_label_pos(p: Placed) -> tuple[float, float]:
     return float(p.cx + nx * side + ny * p.label_along), float(p.cy + ny * side - nx * p.label_along)
 
 
+def end_label_pos(layout: Layout, end: str, chain: str, port, ex) -> tuple[float, float]:
+    """Where a chain end's N or C letter is drawn: END_LABEL out along its stub, or where route._clear_termini moved it
+    (Layout.end_labels)."""
+    moved = layout.end_labels.get((end, chain))
+    if moved is not None:
+        return moved
+    return float(port[0] + ex[0] * END_LABEL), float(port[1] + ex[1] * END_LABEL)
+
+
 def termini(layout: Layout, sses: list[SSE]) -> list[tuple[str, str, tuple[float, float], np.ndarray]]:
     """(N or C, chain, port, outward direction) for each chain's first and last placed element."""
     out = []
@@ -4906,7 +4918,7 @@ def tail_counts(layout: Layout, sses: list[SSE], loops=(), hidden=None) -> list[
         size = TAIL_COUNT_SIZE * em
         half = count_half(text, size)
         ex = np.asarray(ex, float)
-        letter = np.add(port, ex * END_LABEL)
+        letter = np.asarray(end_label_pos(layout, end, chain, port, ex), float)
         own = (max(gw / 2 + 0.05, em * _text_width(end) / 2), max(gh / 2, em * 0.4))  # its keep-out (label_boxes)
         spots = []
         for u in (ex, np.array([-ex[1], ex[0]]), np.array([ex[1], -ex[0]])):
@@ -4962,7 +4974,7 @@ def label_boxes(
                 (min(a[0], b[0]) - 0.05, min(a[1], b[1]) - 0.05, max(a[0], b[0]) + 0.05, max(a[1], b[1]) + 0.05),
             )
         )
-        t = np.add(port, ex * END_LABEL)
+        t = end_label_pos(layout, end, chain, port, ex)
         out.append((f"{end}:{chain}", centred_box(float(t[0]), float(t[1]), gw / 2 + 0.05, gh / 2)))
     for n, d in enumerate(layout.stems):
         out.append((f"stem-label:{n}", stem_keep_box(d, k) if route else _stem_label_box(d, k)))

@@ -711,6 +711,80 @@ def _clear_helix_names(layout: Layout, sses: list[SSE], loops: list[Loop]) -> No
     log.debug("%d helix names moved off lines", moved)  # random-100 C6: what the campaign reports of the mover
 
 
+_END_TURNS = (0.0, 45.0, -45.0, 90.0, -90.0)  # degrees a chain end's letter may turn round its stub's tip ...
+_END_OUT = (0.0, 0.3, 0.6)  # ... and page units further out than END_LABEL, nearest first
+
+
+def _clear_termini(layout: Layout, sses: list[SSE], loops: list[Loop]) -> None:
+    """A chain end's N or C letter that a line runs through (a loop's, a nucleic-acid strand's; within
+    layout.line_band of its ink, as figcheck's A6 reads it) turns round its stub's tip, or stands further out
+    (_END_TURNS x _END_OUT), to the spot lines run through and near least, on the page and on no element, stem or
+    other text; the earlier spot on a tie, and only to a spot better than its own (Layout.end_labels; render and
+    label_boxes read it through end_label_pos). Its stub stays. Random-100 C2b-6: 9FWZ's C of chain D in the stack
+    gap under S29, where the D:618-629 loop runs up into S29's N end (no route passes it), and the ribosomes' chain
+    ends crossed by strands. Run after every line is drawn (route_loops)."""
+    from .layout import (
+        END_LABEL,
+        END_STUB,
+        _box_meets_body,
+        centred_box,
+        end_label_pos,
+        line_band,
+        line_clearance,
+        lines_meeting,
+        na_text_boxes,
+        segments_of,
+        termini,
+    )
+
+    ends = termini(layout, sses)
+    if not ends:
+        return
+    segs = segments_of([lp.points for lp in loops] + [path.points for path in layout.na_paths])
+    if not len(segs):
+        return
+    em = _ink_em(layout, layout.font_scale)
+    gw, gh = glyph(layout)
+    band, grow = line_band(layout), line_clearance(layout)
+    x0, y0, x1, y1 = layout.bounds
+    rects = [q.rect for q in [*layout.placed.values(), *layout.ghosts]]
+    texts = dict(label_boxes(layout, sses))
+    texts.update({f"na-text:{k}": b for k, b in enumerate(na_text_boxes(layout))})
+    for end, chain, port, ex in ends:
+        ex = np.asarray(ex, float)
+        half = (max(gw / 2 + 0.05, em * _text_width(end) / 2), max(gh / 2, em * 0.4))
+
+        def box_at(xy, half=half):
+            return centred_box(float(xy[0]), float(xy[1]), *half)
+
+        def strikes(box) -> tuple[int, int]:
+            return tuple(int(lines_meeting(box, segs, r).sum()) for r in (band, grow))
+
+        here = end_label_pos(layout, end, chain, port, ex)
+        now = strikes(box_at(here))
+        if not now[0]:
+            continue
+        taken = [b for name, b in texts.items() if name not in (f"{end}:{chain}", f"{end}-stub:{chain}")]
+        tip = np.add(port, ex * END_STUB)
+        best = (now, here)
+        for out in _END_OUT:
+            for deg in _END_TURNS:
+                t = math.radians(deg)
+                u = np.array([ex[0] * math.cos(t) - ex[1] * math.sin(t), ex[0] * math.sin(t) + ex[1] * math.cos(t)])
+                xy = tuple(float(v) for v in _snap(tip + u * (END_LABEL - END_STUB + out)))
+                box = box_at(xy)
+                if not (box[0] >= x0 and box[1] >= y0 and box[2] <= x1 and box[3] <= y1):
+                    continue
+                if overlaps_any(box, rects + taken) or any(_box_meets_body(box, d) for d in layout.stems):
+                    continue
+                got = strikes(box)
+                if got < best[0]:
+                    best = (got, xy)
+        if best[1] != here:
+            layout.end_labels[(end, chain)] = best[1]
+            texts[f"{end}:{chain}"] = box_at(best[1])
+
+
 def route_loops(layout: Layout, sses: list[SSE], bb) -> list[Loop]:
     """The loop between each pair of sequence-adjacent elements, routed around everything placed. When the layout
     holds nucleic acid it also routes the single strands (route_na.route_nucleic): that sets layout.na_paths,
@@ -811,6 +885,7 @@ def route_loops(layout: Layout, sses: list[SSE], bb) -> list[Loop]:
         layout.na_paths = route_nucleic(layout, router, [pts for pts, _, _ in routed.values()])
         _off_na_text(layout, router, out)
     _clear_helix_names(layout, sses, out)
+    _clear_termini(layout, sses, out)
     log.debug(  # fix round 1: what the second searches spent of the page's budget
         "%d second-search nodes spent of %d: %d searches, %d refused for the budget",
         _MAX_NODES_PAGE - router.wide_left,
