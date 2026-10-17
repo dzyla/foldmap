@@ -3967,11 +3967,6 @@ def domain_panel(layout: Layout, name: str) -> tuple[float, float, float, float]
     return (float(x0 - DOMAIN_PAD), float(y0 - DOMAIN_PAD), float(x1 + DOMAIN_PAD), float(y1 + DOMAIN_PAD + 0.6))
 
 
-def domain_name_box(layout: Layout, name: str) -> tuple[float, float, float, float]:
-    """The box a domain's name is drawn in (_place_domain_names), on its plate."""
-    return layout.domain_names[name]
-
-
 _PLATE_PAD = 0.3  # a sheet's plate reaches this far beyond its strands (render._draw_sheet_panels)
 DOMAIN_NAME_SIZE = 1.05  # a domain's name, in ems of the figure's text (render draws it bold at this size)
 _NAME_HEIGHT = 1.0  # ems of its own size a name's box takes up and down (capitals, a descender, the plate's room)

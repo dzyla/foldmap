@@ -4,6 +4,8 @@
 
 from __future__ import annotations
 
+import threading
+
 PALETTES = {
     "okabe-ito": ["#0072B2", "#E69F00", "#CC79A7", "#009E73", "#56B4E9", "#D55E00", "#F0E442", "#999999"],
     "tol-bright": ["#4477AA", "#EE6677", "#228833", "#CCBB44", "#66CCEE", "#AA3377", "#BBBBBB"],
@@ -26,13 +28,32 @@ def chain_colors(chains: list[str], palette: str = "okabe-ito") -> dict[str, str
     from every colour already assigned, from the white page and from the helix back faces (BACK_SHADE) of the colours
     it repeats; else the step of its L* (_LAB_STEPS) that stands furthest from them. A palette with few hues (greys)
     cannot keep CHAIN_DE past its first passes; its colours still differ. Deterministic: the order given, ties by
-    the colour's hex."""
+    the colour's hex. A chain's colour depends only on its place in the order, so each palette's colours are worked
+    out once in this process and kept (_KEPT; final review C: 3.7 s for 240 chains, asked two or three times a
+    figure)."""
     if palette not in PALETTES:
         raise ValueError(f"unknown palette {palette!r}; choose from {', '.join(PALETTES)}")
-    cols = PALETTES[palette]
+    with _KEPT_LOCK:
+        out = _KEPT.setdefault(palette, [])
+        _more_colours(out, PALETTES[palette], len(chains))
+        return dict(zip(chains, out))
+
+
+_KEPT: dict[str, list[str]] = {}  # palette -> its chain colours in order, as many as asked for so far
+_KEPT_LOCK = threading.Lock()  # figures are drawn in threads (the app's downloads)
+
+
+def _more_colours(out: list[str], cols: list[str], count: int) -> None:
+    """Extend `out`, the first chain colours of the palette `cols` (chain_colors), to `count` colours."""
     n = len(cols)
-    out: list[str] = []
-    for i in range(len(chains)):
+    labs: dict[str, tuple[float, float, float]] = {}
+
+    def lab(colour: str) -> tuple[float, float, float]:  # _lab, each colour once
+        if colour not in labs:
+            labs[colour] = _lab(colour)
+        return labs[colour]
+
+    for i in range(len(out), count):
         base = cols[i % n]
         if i < n:
             out.append(base)
@@ -40,19 +61,18 @@ def chain_colors(chains: list[str], palette: str = "okabe-ito") -> dict[str, str
         family = out[i % n :: n]  # the colours of the earlier passes over this palette colour
         refs = [*out, "#ffffff", *(darken(c, BACK_SHADE) for c in family)]
 
-        def apart(colour: str, refs=refs) -> float:
-            return min(delta_e(colour, r) for r in refs)
+        def apart(colour: str, refs=refs) -> float:  # delta_e, its colours' L*a*b* kept
+            return min(delta_e_lab(lab(colour), lab(r)) for r in refs)
 
         k = (i // n - 1) % len(_PASS_STEPS)
         steps = _PASS_STEPS[k:] + _PASS_STEPS[:k]
         made = [tint(base, a) if how == "tint" else darken(base, a) for how, a in steps]
         pick = next((c for c in made if apart(c) >= CHAIN_DE), None)
         if pick is None:
-            lab = _lab(base)
-            ladder = [_from_lab(lab[0] + d, lab[1], lab[2]) for d in _LAB_STEPS if 8 <= lab[0] + d <= 92]
+            at = _lab(base)
+            ladder = [_from_lab(at[0] + d, at[1], at[2]) for d in _LAB_STEPS if 8 <= at[0] + d <= 92]
             pick = max(ladder, key=lambda c: (apart(c), c))
         out.append(pick)
-    return dict(zip(chains, out))
 
 
 def _rgb(hex_color: str) -> tuple[float, float, float]:

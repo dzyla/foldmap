@@ -192,10 +192,12 @@ foldmap styles                                    # every theme and style key
   copies have it (a tie breaks it); the figure's scope facts count these cuts and joins.
 - **Layout** from the 3D structure: elements projected onto the page, then arranged so sheets stay in order,
   contacting elements and disulfide partners stay close, and nothing overlaps; loops routed orthogonally around
-  elements and labels. The layout is deterministic: the same figure on every machine. A figure is at most 7.2 in
-  wide (double column) while its text stays at 6 pt or larger; a larger figure's page grows instead (up to 48 in on
-  its longer side, past which the whole figure is scaled to fit and the notes say its text is under 6 pt), and
-  every keep-out round text and every legend row is sized from the text as drawn. Its PNG is 300 dpi up to 50
+  elements and labels. The layout is deterministic: the same figure on every machine where the same font is
+  installed (the legend is sized from the font the figure's text resolves to, which `foldmap check` records; CI and
+  the hosted app use Liberation Sans). A figure is at most 7.2 in wide (double column) while its text stays at 6 pt
+  or larger; a larger figure's page grows instead (up to 48 in on its longer side, past which the whole figure is
+  scaled to fit and the notes say its text is under 6 pt), and every keep-out round text and every legend row is
+  sized from the text as drawn. Its PNG is 300 dpi up to 50
   megapixels and takes a lower dpi past that (said in the notes); SVG and PDF keep the page whole. The 6 pt floor is
   at text size 1: a smaller text size (`--set font_scale=0.8`, the app's Text size, the journal theme's 0.9) draws
   the text that much smaller.
@@ -290,8 +292,10 @@ whose two domains alternate along it). It is a guess from the coordinates, and t
 "domains inferred from contacts", and the command line, app and MCP notes say "inferred from residue contacts, not a
 published domain assignment". On 33 multi-domain chains chopped by CATH it matches 85 % of the residues to the right
 domain (calling each chain one domain matches 54 %) and finds 88 % of CATH's domain boundaries within 20 residues
-(boundary F1 0.79), the chains its parameters were chosen on; on eleven more chains from CATH superfamilies none
-of those has, never tuned on, 86 % and 85 % (F1 0.78). The calibration is `tests/test_domain_score.py`. For a
+(boundary F1 0.79). Its parameters were tuned on 22 of those chains, the other 11 held out (drawn chain by chain, so
+some had a homologue among the 22). Eleven more chains, from CATH superfamilies none of the 33 has, were picked
+before foldmap ran on them and never tuned on: on those it matches 86 % of the residues and finds 85 % of the
+boundaries (F1 0.78). The calibration is `tests/test_domain_score.py`. For a
 published assignment, `--domains cath` draws CATH's chopping of a PDB entry (fetched once from the PDBe API, panels named by CATH id such as `1ldmA01`,
 captioned "domains: CATH"); when CATH has none the note says so and the figure is drawn without domains.
 
@@ -537,7 +541,7 @@ Every figure (command line, app, MCP or Python) goes through the same steps:
    between disulfide-bonded cysteines, and an overlap penalty; then any remaining overlaps are cleared.
    Symmetry copies are tied to look identical (two copies across a dyad in the page as mirror images); an
    all-parallel α/β sheet is placed as one βα row; stems are placed as rigid items. The optimiser is
-   deterministic, so a figure comes out the same on every machine.
+   deterministic, so a figure comes out the same on every machine where the same font is installed.
 7. **Loops.** Each loop is routed on a grid with A* search: orthogonal lines that go around elements and labels;
    single strands are routed the same way, hairpin loops as arcs.
 8. **Drawing.** matplotlib draws the elements to scale (one helix turn tiled along each helix, arrows for

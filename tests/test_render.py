@@ -514,3 +514,33 @@ def test_helix_over_a_sheet_of_another_colour_is_see_through_at_0_6():
     helix, strand = by["helix:A:23-34"], by["strand:A:2-7"]
     assert to_hex(helix.get_facecolor()) != to_hex(strand.get_facecolor())
     assert helix.get_alpha() == 0.6 and by["helix-back:A:23-34"].get_alpha() == 0.6
+
+
+_COLOURS_240 = {  # sha256 of the 240 colours, space-joined, as chain_colors gave them before it kept them (0e51849)
+    "okabe-ito": "cb016017057262915c31addcaf33fd2b6201b74327a9346d3072175cd8884f71",
+    "tol-bright": "f13ab1542e15c6adce23a768d91afbb26beed5651199acc86523cd09c09bbd76",
+    "tol-muted": "5e209d2210beefdbb382eb88f147986f2b92a9834b6a11055884855cc9b5ca50",
+    "blueprint": "5b0e6294e1ea2ae95d129a3e9bbaeb84e3fa56f8852a17f4f8435e9e1f3ac9f1",
+    "greys": "e409c154bd3c1f54c88295dd3390eead2c31a1b02146318dc0960f43f66bf846",
+}
+
+
+def test_chain_colours_are_worked_out_once_per_palette(monkeypatch):
+    """Final review C (Minor 1): chain_colors compares each new colour with every one assigned, 3.7 s for 240 chains,
+    and a figure asks for them two or three times. A palette's colours depend on the count only, each a prefix of
+    the next, so they are kept: a second figure's call compares no colours again. The colours are the ones it gave
+    before (6YF9's 180 chains and more)."""
+    import hashlib
+
+    from foldmap import palette
+
+    chains = [f"c{k}" for k in range(240)]
+    first = chain_colors(chains)
+    compared = []
+    real = palette.delta_e_lab
+    monkeypatch.setattr(palette, "delta_e_lab", lambda a, b: compared.append(1) or real(a, b))
+    assert chain_colors(chains[:200]) == {c: first[c] for c in chains[:200]} and chain_colors(chains) == first
+    assert compared == []
+    for name, digest in _COLOURS_240.items():
+        got = chain_colors(chains, name)
+        assert hashlib.sha256(" ".join(got.values()).encode()).hexdigest() == digest, name

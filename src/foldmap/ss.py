@@ -186,7 +186,9 @@ def _split_kinks(a: int, b: int, cuts) -> tuple[list[tuple[int, int]], list[int]
 _BREAK_MAX = 2  # residues: a helix broken by this few in one copy of a protein is broken there in every copy
 
 
-def _copy_breaks(helices: list[tuple[int, int]], bb: Backbone, copies) -> tuple[list[tuple[int, int]], int, int]:
+def _copy_breaks(
+    helices: list[tuple[int, int]], bb: Backbone, copies
+) -> tuple[list[tuple[int, int]], int, int, list[int]]:
     """Helix runs broken alike in every copy of a protein: where DSSP breaks a helix by up to _BREAK_MAX residues in
     some copies (two runs, chain-contiguous) and other copies' runs cover that place whole, the majority decides, a
     tie breaking: the whole runs are cut there, at the same residue numbers (copies() as in model.homolog_chains),
