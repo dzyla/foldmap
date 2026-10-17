@@ -462,10 +462,10 @@ the six that fail (30QM, 4PJO, 3KTQ, 4YBB, 1YTB, 3CRX) is explained with its cau
 **Random-100.** One hundred PDB entries and AlphaFold models drawn at random in twelve strata (X-ray, cryo-EM and
 NMR; oligomers and hetero-complexes; membrane proteins; protein–DNA, protein–RNA and RNA alone; glycoproteins; one
 protein in two states; AlphaFold models; up to ribosomes near the app's 30,000-residue cap) are drawn by
-`scripts/random100.py` in every view and judged on the twenty criteria `foldmap check` prints, from crashes, time,
+`scripts/random100.py` in every view and judged on the twenty criteria A1–A20 (two with a sub-check) that `foldmap check` prints, from crashes, time,
 route fallbacks and text collisions to secondary structure against mkdssp (268,834 of 268,835 residues agree),
 determinism and copies drawn alike. 96 of 100 pass every criterion; the four that fail (the ribosomes 7Y7C and 8VWQ,
-and the protein–DNA entries 9YLM and 8BW5) are explained with their causes in
+9YLM, three zinc fingers on DNA, and 8BW5, a DNA aptamer) are explained with their causes in
 [docs/validation/random100/review.md](docs/validation/random100/review.md), and the full table is in
 [docs/validation/random100/report.md](docs/validation/random100/report.md).
 
