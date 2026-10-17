@@ -2439,7 +2439,12 @@ def _protomers(items: list[_Item], frame, mirror: bool) -> list[int | None]:
 
 
 def _symmetry_ties(
-    items: list[_Item], frame, mirror: bool = True, shift: dict[str, int] | None = None
+    items: list[_Item],
+    frame,
+    mirror: bool = True,
+    shift: dict[str, int] | None = None,
+    honest: tuple[set, dict[str, str]] | None = None,
+    own: set[int] | None = None,
 ) -> dict[int, tuple[int, int]]:
     """Copy item -> (its protomer-0 mate, protomer index k): matched by chain class and shared residue numbers.
     The copy also takes the mate's shape and orientation, so every protomer is drawn the same; in a frame with a
@@ -2450,8 +2455,28 @@ def _symmetry_ties(
     one of its mate's, but not all of them (DSSP missed a strand in one copy), is tied too when they share at least
     half the smaller one's residues; and when no element of a copy matches two of its mate's, those it shares take
     the mate's shape and place, the rest keep theirs beside them. Residue numbers are taken to the first copy's by
-    `shift` (chain -> offset, model.homolog_chains: 2MJW numbers chain D 95-188 where B is 1-94)."""
+    `shift` (chain -> offset, model.homolog_chains: 2MJW numbers chain D 95-188 where B is 1-94). `honest`: the
+    strand pairs that pair (_sheet_pairs of every sheet) and each accessory's partner; a copy takes its mate's places
+    only when that draws no strand side by side with one it does not pair with, and no accessory away from a partner
+    it stood beside, that its own drawing did not (_drawn_wrong; else it keeps its own, turned as its mate is:
+    ruling C2b-3/R2, science outranks A15; random-100 C2b-S, 9P1X focus: L's sheet took V's places the other way
+    round, O's barrel took E's for two of R's strands, its ghost between them). The id of each copy item that so keeps
+    its own goes in `own` (tied in its own shape, as _regroup_copies' are: no Layout.tied_ids)."""
     shift = shift or {}
+    paired, partner = honest if honest is not None else (None, {})
+
+    def keep(it: _Item):  # what a take changes: each member's strand, angle and length, and the offsets
+        return [(m.sse, m.angle, m.length) if isinstance(m, Placed) else None for m in it.members], list(it.offsets)
+
+    def undo(it: _Item, kept) -> None:
+        for m, was in zip(it.members, kept[0]):
+            if was is not None:
+                m.sse, m.angle, m.length = was
+        it.offsets = kept[1]
+
+    def wrong(it: _Item) -> set:
+        return set() if paired is None else _drawn_wrong(it, paired, partner)
+
     sector, classes = getattr(frame, "sector", None), getattr(frame, "classes", None)
     if not sector or not classes:
         return {}
@@ -2495,7 +2520,9 @@ def _symmetry_ties(
             )
             for m in it.members
         ]
-        if len(mate.members) == len(it.members) and sorted(pairs) == list(range(len(pairs))):
+        one_to_one = len(mate.members) == len(it.members) and sorted(pairs) == list(range(len(pairs)))
+        if one_to_one:
+            was, before = keep(it), wrong(it)
             for m, q in zip(it.members, pairs):
                 if m.ghost:  # it repeats the strand that pairs with the one the mate's ghost repeats (a barrel seen
                     # from its other face opened its row at the other end)
@@ -2511,7 +2538,12 @@ def _symmetry_ties(
                 a = mate.members[q].angle
                 m.angle, m.length = (_mirrored(a) if mirror else a), mate.members[q].length
             it.offsets = [(-mate.offsets[q][0], mate.offsets[q][1]) if mirror else mate.offsets[q] for q in pairs]
-        else:  # DSSP split, merged or missed an element in one copy: match the orientation
+            if not wrong(it) <= before:  # its mate's places draw its strands against their own pairing
+                undo(it, was)
+                one_to_one = False
+                if own is not None:
+                    own.add(id(it))
+        if not one_to_one:  # DSSP split, merged or missed an element in one copy: match the orientation
             shared = [(p, q) for p, q in enumerate(pairs) if span(it.members[p], k) & span(mate.members[q], 0)]
             votes = [
                 np.cos(it.members[p].angle - (np.pi - mate.members[q].angle if mirror else mate.members[q].angle))
@@ -2522,7 +2554,14 @@ def _symmetry_ties(
                     m.angle += np.pi
                 it.offsets = [(-ox, -oy) for ox, oy in it.offsets]
             if not mirror and shared and len({q for _, q in shared}) == len(shared):
+                was, before = keep(it), wrong(it)
                 _take_shared(it, mate, shared)
+                if not wrong(it) <= before:
+                    undo(it, was)
+                    if own is not None:
+                        own.add(id(it))
+                elif own is not None:
+                    own.discard(id(it))  # drawn as its mate's, in part
         ties[i] = (best, k)
     return ties
 
@@ -2815,11 +2854,55 @@ def _part_mate(it: _Item, k: int, zero: list[int], items: list[_Item], mine: set
     return min(found)[1] if found else None
 
 
+def _drawn_wrong(it: _Item, pairs: set, partner: dict[str, str]) -> set:
+    """What an item's strands, at its offsets, draw against their pairing (figcheck.science_checks' reading of S1 and
+    S6, inside one item): two strands side by side (adjacent columns, across the page, spans overlapping) that do not
+    pair (`pairs`: frozensets of strand ids), two overlapping in one column, and an accessory (`partner`: its id ->
+    its partner's) not level beside its partner or the partner's ghost. Columns by x rounded to 1e-3."""
+    spots = []
+    for m, (ox, oy) in zip(it.members, it.offsets):
+        if isinstance(m, Placed) and m.sse.kind == "E" and not m.over:
+            half = abs(np.sin(m.angle)) * m.length / 2
+            spots.append((m.sse.id, round(float(ox), 3), (oy - half, oy + half), m.ghost))
+    xs = sorted({x for _, x, _, _ in spots})
+    col = {x: n for n, x in enumerate(xs)}
+
+    def meet(a, b) -> bool:
+        return min(a[1], b[1]) - max(a[0], b[0]) > _TOUCH
+
+    out = set()
+    for a, xa, sa, ga in spots:
+        for b, xb, sb, _ in spots:
+            if a < b and meet(sa, sb):
+                d = abs(col[xa] - col[xb])
+                if d == 0 or (d == 1 and frozenset((a, b)) not in pairs):
+                    out.add(("column" if d == 0 else "side", a, b))
+        if not ga and a in partner and any(i == partner[a] for i, *_ in spots):
+            if not any(i == partner[a] and abs(col[x] - col[xa]) == 1 and meet(sa, sp) for i, x, sp, _ in spots):
+                out.add(("away", a, partner[a]))
+    return out
+
+
 def _take_shared(it: _Item, mate: _Item, shared: list[tuple[int, int]]) -> None:
     """A copy's elements `shared` (member, its mate's member) take the mate's shape and place; the copy's other
-    elements move with them, by their mean step, so each keeps its place beside the elements it is drawn with."""
-    step = np.mean([np.subtract(mate.offsets[q], it.offsets[p]) for p, q in shared], axis=0)
-    offsets = [tuple(float(v) for v in _snap(np.add(o, step))) for o in it.offsets]
+    elements move with them, by their mean step, so each keeps its place beside the elements it is drawn with. When
+    the mate's places run the other way across the page (the shared elements' x in reverse order: 6Y7S's FimA
+    sheets, 9P1X L's against V's), the others are turned with them, mirrored across the page (x and angle), so a
+    strand the mate lacks still stands beside the strand it pairs with, on the same side (random-100 C2b-S: B:122-123
+    stood beside B:29-38, 0 bridges)."""
+    own = np.array([it.offsets[p][0] for p, _ in shared])
+    theirs = np.array([mate.offsets[q][0] for _, q in shared])
+    turn = float(_snap(np.dot(own - own.mean(), theirs - theirs.mean()))) < 0  # on snapped offsets
+    sign = -1.0 if turn else 1.0
+    step = np.mean(
+        [np.subtract(mate.offsets[q], (sign * it.offsets[p][0], it.offsets[p][1])) for p, q in shared], axis=0
+    )
+    offsets = [tuple(float(v) for v in _snap(np.add((sign * ox, oy), step))) for ox, oy in it.offsets]
+    if turn:
+        taken = {p for p, _ in shared}
+        for p, m in enumerate(it.members):
+            if p not in taken and isinstance(m, Placed):
+                m.angle = _mirrored(m.angle)
     for p, q in shared:
         it.members[p].angle, it.members[p].length = mate.members[q].angle, mate.members[q].length
         offsets[p] = mate.offsets[q]
@@ -3249,9 +3332,16 @@ def build_layout(
         _centre_dna_over_binders(items, contacts)
     else:
         shift = {c: off for c, (_, off) in (copies or {}).items()}
-        ties = _symmetry_ties(items, frame, mirror is not None, shift)
+        honest = (
+            set().union(*map(_sheet_pairs, sheets)),
+            {a.strand.id: a.parent.id for sh in sheets for a in sh.accessory},
+        )
+        kept_own: set[int] = set()  # copy items whose mates' places would misdraw their pairing: their own shape
+        ties = _symmetry_ties(items, frame, mirror is not None, shift, honest, kept_own)
+        own = set(kept_own)
         if alike_first and mirror is None and not pieces and walls is None:  # (no stem or trace indexes items yet)
             ties, kink_links, own = _regroup_copies(items, ties, frame, shift, {id(it) for it in templates.values()})
+            own |= kept_own
         sector_of = getattr(frame, "sector", None) or {}
         left = _unwrap(items, ties, frame) if mirror is None else {}
         if left and walls is not None:  # an element that left its item keeps off the traces it kept off

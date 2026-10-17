@@ -452,6 +452,18 @@ def test_an_accessory_never_stands_beside_a_strand_it_does_not_pair_with(p1x_foc
     assert _findings_naming(found, "a:106-109", "Q:106-109", "I:94-97") == []
 
 
+def test_a_copy_takes_its_mates_places_only_where_its_pairing_holds(p1x_focus_science):
+    """Random-100 C2b-S, 9P1X focus: a copy tied in part (_symmetry_ties' else branch, DSSP grouped the copies' strands
+    differently) took its mate's places for the strands they share (_take_shared), the rest moving by the mean step.
+    L's sheet (N:16-17, L:110-111, L:74-79, L:142-147, L:172-176) took V's three strands in V's order, which runs the
+    other way, so L:110-111 stood beside L:172-176 (0 bridges); O's barrel took E's places for R:29-35 and R:52-61
+    with its ghost of O:29-36 between them, R:52-61 drawn away from its partner R:29-35 though the notes said beside.
+    A copy takes its mate's places only when every strand it then draws side by side pairs, and every accessory
+    drawn beside its partner stays so; else it keeps its own (ruling R2: S1-S3, S6 outrank A15)."""
+    _, found = p1x_focus_science
+    assert _findings_naming(found, "L:110-111", "R:52-61") == []
+
+
 def test_a_block_another_chain_finds_grouped_apart_differs_for_every_chain_in_it():
     """Random-100 C2b-S, ruling C2b-3/R2 read per copy, not per chain: 9P1X protomer 1's O/P/R block is a 9-strand
     barrel (R:29-35 in its ring), protomer 0's E/F/J block an 8-strand one with J's strands beside it and J's others
