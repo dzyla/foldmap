@@ -131,3 +131,48 @@ def test_the_bar_says_the_nucleic_acid_was_cropped_and_shows_all_of_it():
     assert bar(at) == ["scope_all", "scope_keep"]
     at.button(key="scope_all").click().run()
     assert not at.exception and at.session_state["na_extent"] == "all"
+
+
+def test_a_chain_drawn_as_nothing_is_said_with_nothing_to_offer():
+    """C15 in the app (final review C-I2): 6B5W's one chain, a 19-residue peptide with no helix or strand, is drawn
+    as nothing. No setting draws it, so the bar offers nothing, but it says so, in the command line's words."""
+    at = opened(DATA / "r100" / "6B5W.cif.gz")
+    assert bar(at) == []
+    assert "Not drawn: chain A (19 residues, no helix or strand)." in visible(rendered_text(at))
+
+
+def test_g_tetrads_are_said():
+    """C29 in the app (final review C-I2): 8Q4O's three G-tetrads are drawn unpaired, and the app says so, as the
+    command line and MCP do."""
+    at = opened(DATA / "r100" / "8Q4O.cif.gz")
+    assert bar(at) == []
+    assert "Not drawn: 3 G-tetrads of a G-quadruplex (their Gs drawn unpaired)." in visible(rendered_text(at))
+
+
+def test_the_bar_says_what_it_drew_and_what_it_did_not():
+    """The bar's line: what an automatic choice drew, then what no setting draws, each in the notes' words; a fact
+    left out stays said after Keep this."""
+    from foldmap.app_views import scope_text
+
+    scope = {
+        "reason": "assembly 1, one of 2 copies in the file; not drawn: chain E (19 residues, no helix or strand)",
+        "chains_reason": "assembly 1, one of 2 copies in the file",
+        "crop": "",
+        "drawn_chains": 2,
+        "file_chains": 5,
+        "not_drawn": "chain E (19 residues, no helix or strand)",
+        "tetrads": 1,
+        "na_ions": {"MG": 2},
+        "additives": ["GOL"],
+        "all_options": {"assembly": "asu"},
+    }
+    assert scope_text(scope) == (
+        "Drawn: assembly 1, one of 2 copies in the file — 2 of 5 chains. Not drawn: chain E (19 residues, no helix or "
+        "strand); metal ions held by the nucleic acid alone (MG ×2); 1 G-tetrad of a G-quadruplex (their Gs drawn "
+        "unpaired)."
+    )
+    assert scope_text({**scope, "all_options": {}}, offer=False) == (
+        "Not drawn: chain E (19 residues, no helix or strand); metal ions held by the nucleic acid alone (MG ×2); "
+        "1 G-tetrad of a G-quadruplex (their Gs drawn unpaired)."
+    )
+    assert scope_text({**scope, "not_drawn": "", "tetrads": 0, "na_ions": {}}, offer=False) == ""

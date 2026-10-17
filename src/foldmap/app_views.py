@@ -155,11 +155,6 @@ def figure_view(ws: Workspace) -> None:
 
             with st.expander(HEADING.rstrip(":"), expanded=False):
                 st.caption(made)
-        ions = (good.get("scope") or {}).get("na_ions")
-        if ions:  # never marked: said, as the command line and MCP notes say it (C33)
-            from foldmap.scope import na_ions_text
-
-            st.caption(shown(f"Not drawn: {na_ions_text(ions)}."))
         if result and result.get("domains_note"):  # as the command line warns
             note = result["domains_note"]
             st.warning(shown(f"{note[0].upper()}{note[1:]}. {DOMAINS_EDIT}"))
@@ -182,12 +177,16 @@ def missing_files(ws: Workspace) -> None:
 
 
 # ---------------------------------------------------------------------------------------------- scope bar
-def scope_text(scope: dict) -> str:
+def scope_text(scope: dict, offer: bool = True) -> str:
     """The bar's line: what an automatic choice drew, how many of the chains (when not all of them), then what of
-    the nucleic acid (scope.scope_what)."""
-    from foldmap.scope import scope_what
+    the nucleic acid (scope.scope_what; only with an `offer` to draw all of it); then what no setting draws, in the
+    command line's words (scope.not_drawn: chains with nothing to draw, metal ions held by the nucleic acid alone,
+    G-tetrads; final review C-I2). '' when there is nothing to say."""
+    from foldmap.scope import not_drawn, scope_what
 
-    return f"Drawn: {scope_what(scope, ' — {drawn} of {total} chains')}."
+    what = scope_what(scope, " — {drawn} of {total} chains") if offer else ""
+    unsaid = not_drawn(scope, how="app")
+    return " ".join([*([f"Drawn: {what}."] if what else []), *([f"Not drawn: {'; '.join(unsaid)}."] if unsaid else [])])
 
 
 def scope_flags(scope: dict) -> str:
@@ -230,12 +229,20 @@ def keep_scope(ss: MutableMapping) -> None:
 
 def scope_bar(ws: Workspace, scope: dict | None, blob: str) -> None:
     """Above the figure, when an automatic choice drew part of the file (scope.drawn_scope): what was drawn, a
-    button that draws every chain (or why this app cannot) and one that keeps the figure as it is."""
+    button that draws every chain (or why this app cannot) and one that keeps the figure as it is; and what no
+    setting draws, said even when there is nothing to offer or the visitor kept the figure (final review C-I2: the
+    command line and MCP say it)."""
     st, ss = ws.st, ws.ss
-    if not scope or not scope.get("all_options") or ss.get("scope_kept"):  # chains asked for: nothing to offer
+    if not scope:
+        return
+    offer = bool(scope.get("all_options")) and not ss.get("scope_kept")  # chains asked for: nothing to offer
+    text = scope_text(scope, offer)
+    if not text:
         return
     with st.container(key="scope_bar", horizontal=True, vertical_alignment="center", gap="small"):
-        st.markdown(shown(scope_text(scope)), width="stretch")
+        st.markdown(shown(text), width="stretch")
+        if not offer:
+            return
         if too_large(ws, scope, blob):
             st.caption(shown(too_large_text(scope, ws.name)), width="stretch")
         else:

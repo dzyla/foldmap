@@ -178,8 +178,19 @@ def scope_note(scope: dict, how: str = "cli") -> str:
         draw = " ".join(f"--{k} {v}" for k, v in options.items())
     what = scope_what(scope)
     parts = [f"drew {what}" + (f"; {draw} draws all of them" if options else "")] if what else []
+    unsaid = not_drawn(scope, how)
+    if unsaid:
+        parts.append(f"not drawn: {'; '.join(unsaid)}")
+    return "; ".join(parts)
+
+
+def not_drawn(scope: dict, how: str = "cli") -> list[str]:
+    """What the figure has not drawn, each as the notes say it: chains with nothing to draw, additives hidden (with
+    the command-line flag, how='cli', or MCP tool argument, how='mcp', that draws them; none named for how='app',
+    whose Ligands control says it hides them), metal ions held by the nucleic acid alone, G-tetrads. The command
+    line, MCP and the app say these in the same words (final review C-I2)."""
     unsaid = [scope["not_drawn"]] if scope.get("not_drawn") else []
-    if scope.get("additives"):  # hidden on purpose, but named (C20 ruling)
+    if scope.get("additives") and how != "app":  # hidden on purpose, but named (C20 ruling)
         shows = 'style={"ligands": "all"}' if how == "mcp" else "--set ligands=all"
         unsaid.append(f"additives {', '.join(scope['additives'])} ({shows} draws them)")
     if scope.get("na_ions"):  # read, never marked (C33)
@@ -187,9 +198,7 @@ def scope_note(scope: dict, how: str = "cli") -> str:
     if scope.get("tetrads"):  # read, never drawn (C29 ruling)
         n = scope["tetrads"]
         unsaid.append(f"{n} G-tetrad{'' if n == 1 else 's'} of a G-quadruplex (their Gs drawn unpaired)")
-    if unsaid:
-        parts.append(f"not drawn: {'; '.join(unsaid)}")
-    return "; ".join(parts)
+    return unsaid
 
 
 def na_ions_text(ions: dict[str, int]) -> str:
