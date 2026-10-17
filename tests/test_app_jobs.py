@@ -332,6 +332,10 @@ def test_a_code_change_with_a_job_running_waits_for_nothing(tmp_path, monkeypatc
         assert "foldmap.app_jobs" in app._drop_changed_foldmap()
         assert time.monotonic() - t0 < 1.0  # not waiting on the running job
         fresh = importlib.import_module("foldmap.app_jobs")
+        for _ in range(200):  # the stop thread has taken the server (else a job could still fork from the old one)
+            if forkserver._forkserver._forkserver_alive_fd is None:
+                break
+            time.sleep(0.05)
         assert fresh.run_job(_sleep, 0, limits=fresh.Limits(timeout=60)) == 0  # waits for the old server, then runs
         assert forkserver._forkserver._forkserver_pid not in (None, server)
         old.join(60)
