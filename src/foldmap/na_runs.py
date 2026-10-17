@@ -28,9 +28,13 @@ from .route import _INFLATE, _clear, _curve, _Router, clip_len
 
 _BOW_MAX = 8  # internal-loop sides up to this many nucleotides are drawn as bows, not routed
 _JOINT_STRAIGHT = 1.5  # a joint between two pieces of a bent duplex shorter than this may be drawn straight
-# ... and, when no route reaches it, one shorter than this (9C75 P2b -> P2a, 1.83: random-100 C24; C2b-4: 8VWQ's
-# 1:594-595 and 1:662-663, pieces kept end to end 4.41 and 4.21 apart, were plain curves at 2.5)
+_JOINT_NEAR = 2.5  # ... and, when no route reaches it, one shorter than this (9C75 P2b -> P2a, 1.83: random-100 C24),
+# or between pieces whose boxes touch
+# ... or, farther apart, one shorter than this that leaves its face at most 60° off its axis (_JOINT_FORWARD), keeps off
+# the stems' and domains' names and the protein loops, and runs into neither piece: the duplex reads as carrying on
+# (random-100 C2b-4: 8VWQ's P26a -> P26b, 4.41 apart but 76° off its face, stays a curve)
 _JOINT_REACH = 5.0
+_JOINT_FORWARD = 0.5
 # a run keeps off every strand drawn before it (and every protein loop) by a detour at most this many times as
 # long as its plain drawing, which keeps off the hairpin loops and free ends only. Measured on 24 campaign entries,
 # crossing a strand only a cost: run-run crossings 250 -> 239, protein loops crossed 178 -> 175, no entry worse in
@@ -99,20 +103,33 @@ def _elbow(router: _Router, da: PlacedStem, db: PlacedStem, fa, ea, fb, eb, stra
     return None
 
 
-def _straight_joint(router: _Router, da: PlacedStem, db: PlacedStem, fa, ea, fb, strands=None) -> bool:
+def _straight_joint(
+    router: _Router, da: PlacedStem, db: PlacedStem, fa, ea, fb, strands=None, names=(), loops=None
+) -> bool:
     """May a joint no route reaches be drawn straight from face fa to face fb, as a kink joins two pieces of one
-    helix? Only between pieces that are near (faces closer than _JOINT_REACH) or whose boxes touch, going on
-    forward (along fa's outward direction ea), clear by _INFLATE of every element and stem but its own two (a
-    line that runs into one of those beyond a bead's radius is drawn as an _elbow instead where one is clear),
-    and crossing no nucleic-acid strand drawn so far (`strands`, a _Strands) other than the partner strand of this
-    same joint (two strands may cross where the duplex carries on, as in a helix)."""
+    helix? Only going on forward (along fa's outward direction ea), clear by _INFLATE of every element and stem but its
+    own two (a line that runs into one of those beyond a bead's radius is drawn as an _elbow instead where one is
+    clear), and crossing no nucleic-acid strand drawn so far (`strands`, a _Strands) other than the partner strand of
+    this same joint (two strands may cross where the duplex carries on, as in a helix). Between pieces that are near
+    (faces closer than _JOINT_NEAR) or whose boxes touch; or farther apart, up to _JOINT_REACH, only when the line
+    also leaves its face within 60° of its axis (_JOINT_FORWARD), runs into neither piece, and keeps off every name
+    (`names`, as _off_names) and protein loop (`loops`, a _Strands). The near and touching joints keep the old test:
+    held to the names and loops too, two more of 4YBB's became plain curves, which cross more than a line does
+    (random-100 C2b-4 fix round 1)."""
     a, b = da.rect, db.rect
     touching = min(a[2], b[2]) - max(a[0], b[0]) >= -1e-9 and min(a[3], b[3]) - max(a[1], b[1]) >= -1e-9
-    if not (math.dist(fa, fb) < _JOINT_REACH or touching) or _dot(np.subtract(fb, fa), ea) <= 0:
+    gap, forward = math.dist(fa, fb), _dot(np.subtract(fb, fa), ea)
+    line = _xy([fa, fb])
+    if forward <= 0:
         return False
-    if not _clear(_xy([fa, fb]), (da, db), *router.elements, grow=_INFLATE, kink=True):
+    if not (gap < _JOINT_NEAR or touching):
+        if gap >= _JOINT_REACH or forward < _JOINT_FORWARD * gap or _grazes(line, (da, db)):
+            return False
+        if not _off_names([fa, fa, fb, fb], names) or (loops is not None and loops.crosses(line)):
+            return False
+    if not _clear(line, (da, db), *router.elements, grow=_INFLATE, kink=True):
         return False
-    return strands is None or not strands.crosses(_xy([fa, fb]), skip=frozenset((da.id, db.id)))
+    return strands is None or not strands.crosses(line, skip=frozenset((da.id, db.id)))
 
 
 def _strand_between(
@@ -258,7 +275,7 @@ def _drawing(router: _Router, s, nts, between, da, db, ends, need, joint, kind, 
             grid.blocked, (router.max_nodes, router.wide_nodes) = saved, budget
     else:
         route = _faces_route(router, fa, ea, da, fb, eb, db)
-    if route is None and joint and _straight_joint(router, da, db, fa, ea, fb, strands):
+    if route is None and joint and _straight_joint(router, da, db, fa, ea, fb, strands, names, loops):
         # pieces that touch (no margin is kept between them): the duplex carries on straight across their meeting
         # corner, as a kink joins two pieces of one helix; past one of them, not through it (a shallow graze of a
         # corner by the line leaving its face, as 4OO8 P6b -> P6a, is kept), round an elbow where one is clear

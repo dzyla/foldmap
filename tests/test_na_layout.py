@@ -2638,16 +2638,17 @@ def test_a_tie_label_finds_a_clear_spot_with_a_longer_tick():
     assert [h for h in figcheck.text_collisions(d) if h.startswith("na:tie:")] == []
 
 
-def _two_stems(gap: float, parent: str = ""):
+def _two_stems(gap: float, parent: str = "", rise: float = 0.0):
     """Stems P1 (strand 0's nucleotide 0, leaving rightwards) and P2 (nucleotide 3 or, for joined pieces, 1, entered
-    from the left), their facing ends `gap` apart, and a router on a page holding only them."""
+    from the left), their facing ends `gap` apart along x and P2 `rise` higher, and a router on a page holding only
+    them."""
     from foldmap.layout import Layout
     from foldmap.route import _element_obstacles, _Grid, _Router
 
     j = 1 if parent else 3
     da = PlacedStem("P1", "P1", [0, 0], [], 0.0, 0.0, 3.0, 0.0, 4.6, {(0, 0): 1.0}, {(0, 0): 1}, parent=parent)
-    db = PlacedStem("P2", "P2", [0, 0], [], 3.0 + gap, 0.0, 3.0, 0.0, 4.6, {(0, j): -1.0}, {(0, j): 1}, parent=parent)
-    lay = Layout({}, (-3.0, -4.0, 6.0 + gap, 4.0), stems=[da, db])
+    db = PlacedStem("P2", "P2", [0, 0], [], 3.0 + gap, rise, 3.0, 0.0, 4.6, {(0, j): -1.0}, {(0, j): 1}, parent=parent)
+    lay = Layout({}, (-3.0, -4.0 + min(rise, 0.0), 6.0 + gap, 4.0 + max(rise, 0.0)), stems=[da, db])
     return da, db, j, _Router(_Grid(lay), _element_obstacles(lay))
 
 
@@ -2668,9 +2669,9 @@ def test_a_strand_whose_face_looks_into_a_margin_still_routes():
 
 
 def test_joined_pieces_kept_end_to_end_may_join_straight_farther_apart():
-    """Random-100 C2b-4 (8VWQ 1:594-595, 1:662-663): two pieces of one bent duplex kept end to end 4.4 apart, whose
-    faces look into each other's margins, so no route reaches the joint, were drawn as plain curves: a straight joint
-    was allowed only under 2.5. The duplex carries on straight up to _JOINT_REACH when the line is clear and forward."""
+    """Random-100 C2b-4: two pieces of one bent duplex 4.4 apart whose joint no route reaches were drawn as a plain
+    curve: a straight joint was allowed only under 2.5. Up to _JOINT_REACH the duplex now carries on straight when the
+    line leaves the face along its axis, as here, and is clear (the refusals: the next two tests)."""
     from foldmap.na_paths import _face
     from foldmap.na_runs import _straight_joint
 
@@ -2679,6 +2680,39 @@ def test_joined_pieces_kept_end_to_end_may_join_straight_farther_apart():
     fb, _ = _face(db, (0, j), False)
     assert math.dist(fa, fb) == pytest.approx(4.4)
     assert _straight_joint(router, da, db, fa, ea, fb)
+
+
+def test_a_long_straight_joint_keeps_off_names_and_protein_loops():
+    """Random-100 C2b-4 fix round 1 (review I1): beyond _JOINT_NEAR a straight joint is drawn only when it keeps off
+    the stems' and domains' names and the protein loops, as a routed strand does; a name box or a loop across the
+    line refuses it."""
+    from foldmap.na_paths import _face, _Strands
+    from foldmap.na_runs import _straight_joint
+
+    da, db, j, router = _two_stems(4.4, parent="P")
+    fa, ea = _face(da, (0, 0), True)
+    fb, _ = _face(db, (0, j), False)
+    mid = (fa + fb) / 2
+    name = (mid[0] - 0.3, mid[1] - 0.2, mid[0] + 0.3, mid[1] + 0.2)
+    assert not _straight_joint(router, da, db, fa, ea, fb, names=[name])
+    loops = _Strands(None)
+    loops.add([(mid[0], mid[1] - 1.0), (mid[0], mid[1] + 1.0)])
+    assert not _straight_joint(router, da, db, fa, ea, fb, loops=loops)
+
+
+def test_a_long_straight_joint_leaves_its_face_along_its_axis():
+    """Random-100 C2b-4 fix round 1 (review I1; 8VWQ P26a -> P26b, 4.41 apart and 76° off its face, had been drawn
+    straight): beyond _JOINT_NEAR the line must leave its face within 60° of its axis (_JOINT_FORWARD); a partner 4.4
+    away and 70° off the axis is refused."""
+    from foldmap.na_paths import _face
+    from foldmap.na_runs import _straight_joint
+
+    da, db, j, router = _two_stems(1.5, parent="P", rise=4.2)
+    fa, ea = _face(da, (0, 0), True)
+    fb, _ = _face(db, (0, j), False)
+    gap = math.dist(fa, fb)
+    assert 4.0 < gap < 5.0 and float(np.dot(fb - fa, ea)) / gap < 0.5
+    assert not _straight_joint(router, da, db, fa, ea, fb)
 
 
 def test_strands_keep_their_drawings_off_domain_names(monkeypatch):
