@@ -1364,7 +1364,7 @@ def app_view(path: Path, name: str) -> dict:
         return {"refused": err.kind, "residues": size["residues"], "message": app_jobs.limit_message(name, err, lim)}
     out = {"refused": None, "residues": size["residues"], "svg_bytes": len(got["svg"])}
     try:
-        out["science"] = app_science(path)
+        out["science"] = app_science(path, got["svg"])
     except Exception:  # not measured, which fails the view (fail closed, as measure_view's errors)
         import traceback
 
@@ -1372,19 +1372,27 @@ def app_view(path: Path, name: str) -> dict:
     return out
 
 
-def app_science(path: Path) -> dict:
-    """The science checks of the figure the app drew: the job process hands back its SVG, not the figure, so the
-    same spec (app.spec_of, the app's default settings) is drawn again here, outside the hosted limits, and
-    measured. The job's own warnings are the app view's; this measuring's are not."""
+def app_science(path: Path, svg: str) -> dict:
+    """The science checks of the figure the app drew: the job process hands back its SVG (`svg`), not the figure, so
+    the same spec (app.spec_of, the app's default settings) is drawn again here, outside the hosted limits, and
+    measured, once its SVG is found equal to the app's (else ValueError: not that figure). The job's own warnings
+    are the app view's; this measuring's are not."""
     import warnings
 
-    from foldmap import app, figcheck
+    from foldmap import app, figcheck, render
     from foldmap.spec import draw_spec
 
     settings = {**app.LAYOUT_DEFAULTS, "theme": "publication"}
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        return _jsonable(figcheck.science_checks(draw_spec(app.spec_of(path, settings))))
+        drawn = draw_spec(app.spec_of(path, settings))
+        again = render.save_svg(drawn.figure)
+        if again != svg:
+            raise ValueError(
+                f"the redraw differs from the figure the app drew (SVG sha256 {_sha256(again.encode())[:12]} vs "
+                f"{_sha256(svg.encode())[:12]})"
+            )
+        return _jsonable(figcheck.science_checks(drawn))
 
 
 def cmd_view(args) -> int:

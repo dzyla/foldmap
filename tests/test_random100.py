@@ -742,6 +742,19 @@ def test_science_checks_run_in_every_drawn_view(r100, tmp_path):
     assert "focus: S1 sheet 27: a / b drawn side by side" in md and "domains: S6 sheet 3: c drawn away" in md
 
 
+def test_the_app_views_science_is_measured_on_the_figure_the_app_drew(r100, monkeypatch):
+    """C2b-S fix round 1 (review minor 2): the app view's science is measured on a second drawing of the app's spec;
+    its SVG must equal the one the app's job returned, or the view is not measured (measure_error, which fails A1)."""
+    got = r100.app_view(DATA / "1UBQ.cif", "1UBQ")
+    assert "measure_error" not in got and got["science"]["S1"] == []
+    with pytest.raises(ValueError, match="differs from the figure the app drew"):
+        r100.app_science(DATA / "1UBQ.cif", "<svg/>")
+    real = r100.app_science
+    monkeypatch.setattr(r100, "app_science", lambda path, svg: real(path, svg + " "))
+    got = r100.app_view(DATA / "1UBQ.cif", "1UBQ")
+    assert "science" not in got and "differs from the figure the app drew" in got["measure_error"]
+
+
 def test_accessories_named_are_reported_per_view_and_never_gate(r100, tmp_path):
     """Plan 12 ruling (fix round 4): the count of accessories named rather than drawn level beside their partner is
     reported per entry and view (OmpF 3 of 3, 3L9G 8 of 16), apart from A1-A20: it never makes an entry fail."""
