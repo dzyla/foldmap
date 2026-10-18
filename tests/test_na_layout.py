@@ -675,6 +675,31 @@ def test_layout_is_the_same_whatever_the_hash_seed():
     assert len(runs) == 1
 
 
+@pytest.mark.parametrize("name", ["1LMB", "1ZAA"])
+@pytest.mark.parametrize("seed", range(4))
+def test_a_duplex_along_the_page_is_laid_out_the_same_on_any_cpu(monkeypatch, name, seed):
+    """1LMB's and 1ZAA's view is turned so that their DNA duplex lies along the page: its drawn angle is 0 up to
+    the last bits of the stem axis (np.linalg.svd), which differ between BLAS kernels (OPENBLAS_CORETYPE=Prescott,
+    NumPy's AVX dispatch off). Snapped to the grid, the angle came out 0.0 on one CPU and -0.0 on the other: the
+    same figure, but a different layout (sin and atan2 tell them apart) and a different signature hash."""
+    import foldmap.layout as layout
+
+    def stems():
+        lay = make_layout(Path(__file__).parent / "data" / f"{name}.cif")[0]
+        return json.dumps([[d.id, d.angle, d.cx, d.cy, sorted(d.axial.values())] for d in lay.stems])
+
+    want = stems()
+    real = layout.stem_axis
+    rng = np.random.default_rng(seed)
+
+    def nudged(*args, **kw):  # each axis component moved by -1, 0 or +1 ulp, as another CPU's kernel computes it
+        centre, axis = real(*args, **kw)
+        return centre, axis + rng.integers(-1, 2, 3) * np.spacing(np.abs(axis))
+
+    monkeypatch.setattr(layout, "stem_axis", nudged)
+    assert stems() == want
+
+
 def test_wobble_pairs_are_dotted_rungs():
     fig, _ = make_figure_and_loops(_path("30QM"))
     rungs = [a for a in _gid(fig, "na:stem:") if a.get_gid().endswith(":rung")]

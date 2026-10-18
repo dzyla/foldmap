@@ -1783,8 +1783,10 @@ def _snap(v) -> np.ndarray:
     """Round to the 1/_GRID grid, so noise of ~1e-16 in a projection (np.linalg.svd and small dot products
     differ between BLAS kernels) never reaches the optimiser, which would amplify it, nor the drawn geometry.
     The rounding removes that noise except when a value sits within noise of a half-grid point (probability
-    ~1e-12 per value); exact libm values such as cos 0 = 1 are safe."""
-    return np.round(np.asarray(v, float) * _GRID) / _GRID
+    ~1e-12 per value); exact libm values such as cos 0 = 1 are safe. A value a hair either side of zero snaps to
+    0.0, never -0.0 (+ 0.0): the two compare equal but sin, atan2 and the layout signature tell them apart, and
+    which one noise gives depends on the CPU (1LMB's duplex drawn along the page, angle 0, under AVX off)."""
+    return np.round(np.asarray(v, float) * _GRID) / _GRID + 0.0
 
 
 def _lbfgs(fun, x0, maxiter=300, m=10, pgtol=1e-5, ftol=2.2e-9):
@@ -2198,8 +2200,7 @@ def _stem_item(piece: Stem, na: Nucleic, frame: Frame, flat: bool, width: float 
     centre, axis = stem_axis(piece, na.strands)
     (a, i0, i1), (b, j0, j1) = piece.arm5, piece.arm3
     keys = [(a, i) for i in range(i0, i1 + 1)] + [(b, j) for j in range(j0, j1 + 1)]
-    # on the grid; + 0.0 turns a -0.0 (a centre pair a hair below zero) into 0.0
-    along = {key: float(_snap(v)) + 0.0 for key, v in _rungs(piece, na, centre, axis).items()}
+    along = {key: float(_snap(v)) for key, v in _rungs(piece, na, centre, axis).items()}  # on the grid
     length = float(_snap(max(along.values()) - min(along.values()) + DNA_RISE * SCALE))  # half a step beyond each end
     a2 = frame.direction(centre, axis)
     angle = 0.0 if flat or np.linalg.norm(a2) < 1e-6 else float(_snap(np.arctan2(a2[1], a2[0])))

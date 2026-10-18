@@ -2,6 +2,7 @@
 
 import json
 import os
+import platform
 import subprocess
 import sys
 import time
@@ -41,6 +42,53 @@ def test_layout_does_not_depend_on_the_hash_seed():
         runs.append(json.loads(done.stdout))
     assert runs[0] and all(runs[0][f] for f in runs[0])
     assert runs[0] == runs[1] == runs[2]
+
+
+_FIGURE = """
+import hashlib, json, sys, tempfile
+from pathlib import Path
+sys.path.insert(0, sys.argv[1])
+import bench
+from foldmap import cli
+drawn = []
+real = cli.draw_spec
+cli.draw_spec = lambda spec: drawn.append(real(spec)) or drawn[-1]
+out = {}
+with tempfile.TemporaryDirectory() as tmp:
+    for f in sys.argv[2:]:
+        svg = Path(tmp) / "figure.svg"
+        assert cli.main(["plot", f, "-o", str(svg)]) == 0
+        sig = bench.signature(drawn[-1].layout)
+        sig = json.dumps(sig, sort_keys=True, default=lambda o: getattr(o, "tolist", o.__str__)())
+        out[f] = [sig, hashlib.sha256(svg.read_bytes()).hexdigest()]
+print(json.dumps(out))
+"""
+# the paper's determinism run (M2, Linux leg): PYTHONHASHSEED 0 and 1, and 0 with NumPy's AVX dispatch off and
+# OpenBLAS's oldest x86-64 kernels
+_NO_AVX = {"NPY_DISABLE_CPU_FEATURES": "AVX512F AVX512_SKX AVX2 FMA3", "OPENBLAS_CORETYPE": "Prescott"}
+_CONFIGURATIONS = [{"PYTHONHASHSEED": "0"}, {"PYTHONHASHSEED": "1"}, {"PYTHONHASHSEED": "0", **_NO_AVX}]
+
+
+@pytest.mark.slow
+@pytest.mark.skipif(platform.machine().lower() not in ("x86_64", "amd64"), reason="AVX and OpenBLAS's x86-64 kernels")
+def test_figure_does_not_depend_on_the_hash_seed_or_the_cpu_features():
+    """Every committed test structure's default figure (SVG) and layout signature, compared as text (0.0 and -0.0
+    compare equal but hash apart, as random100's A12 and the paper's determinism run hash them), is the same in the
+    three configurations of the paper's determinism run. With AVX off, 1LMB's duplex, drawn along the page, had
+    angle -0.0 (the last bits of np.linalg.svd, snapped) where it has 0.0 otherwise. ~21 s on zyla-lab."""
+    files = [str(p) for p in sorted(DATA.glob("*.cif"))]
+    runs = []
+    for extra in _CONFIGURATIONS:
+        env = {k: v for k, v in os.environ.items() if k not in _NO_AVX}
+        env |= {"OPENBLAS_NUM_THREADS": "1", **extra}
+        done = subprocess.run(
+            [sys.executable, "-c", _FIGURE, str(ROOT / "scripts"), *files], env=env, capture_output=True, text=True
+        )
+        assert done.returncode == 0, done.stderr[-2000:]
+        runs.append(json.loads(done.stdout.splitlines()[-1]))
+    assert sorted(runs[0]) == files
+    for run in runs[1:]:
+        assert run == runs[0], [Path(f).stem for f in files if run[f] != runs[0][f]]
 
 
 def _pile(n):
