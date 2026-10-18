@@ -44,6 +44,69 @@ def test_a_slab_crossed_by_many_long_elements_may_be_more_polar():
     assert membrane._MAX_POLAR < 0.174 <= membrane._MAX_POLAR_CROSSED and membrane._MANY_CROSSING == 10
 
 
+class _Element:  # an element as membrane._estimate reads it: kind, length, axis, residue span and chain
+    def __init__(self, kind, start, end, chain):
+        self.kind, self.start, self.end, self.chain, self.axis = kind, start, end, chain, np.array([0.0, 0.0, 1.0])
+
+    def __len__(self):
+        return self.end - self.start + 1
+
+
+def _synthetic(helices, others):
+    """A backbone (CA and residue labels only) and its elements: `helices` are (chain, x, z0, z1, name) runs along z,
+    one CA every 1.5 Å named name(z); `others` are (chain, xyz, name) residues in no element."""
+    from types import SimpleNamespace
+
+    ca, labels, elements = [], [], []
+    for chain, x, z0, z1, name in helices:
+        start = len(ca)
+        for z in np.arange(z0, z1 + 1e-9, 1.5):
+            ca.append((x, 0.0, z))
+            labels.append(SimpleNamespace(chain=chain, name=name(z)))
+        elements.append(_Element("H", start, len(ca) - 1, chain))
+    for chain, xyz, name in others:
+        ca.append(xyz)
+        labels.append(SimpleNamespace(chain=chain, name=name))
+    return SimpleNamespace(ca=np.array(ca, float), labels=labels), elements
+
+
+def test_a_slab_no_element_spans_moves_to_one_the_elements_span():
+    """random-100 held-out 6MJ2 (TRPM2): the summed score put the slab 4-5 Å into the dense cytoplasmic domain,
+    where no S1-S4 helix reaches both faces, so the membrane view found none to draw its band by. Four helices along
+    z from 0 to 31.5 Å and an oily blob just below them (z = -6): the best-scoring slab takes in the blob (centre 8),
+    where no helix spans it (nor crosses it: refused); the best-scoring slab the helices span (centre 14) is the
+    membrane."""
+    from foldmap import membrane
+
+    helices = [("A", x, 0.0, 31.5, lambda z: "LEU") for x in (0.0, 10.0, 20.0, 30.0)]
+    blob = [("A", (40.0 + k % 8, float(k // 8), -6.0), "ALA") for k in range(60)]
+    bb, sses = _synthetic(helices, blob)
+    m = membrane._estimate(bb, sses)
+    assert m is not None and m.half == membrane.HALF
+    for s in sses:
+        d = m.depth(bb.ca[s.start : s.end + 1])
+        assert d.min() <= -m.half + membrane.FACE_REACH and d.max() >= m.half - membrane.FACE_REACH
+
+
+def test_a_slab_is_judged_by_the_chains_that_cross_it():
+    """random-100 held-out 7VVK (PTH1R-Gs): the hormone in the receptor's pocket and Gs's α5 in its cytoplasmic cavity
+    made the slab 0.189 polar, over the 0.15 limit, and no membrane was found. A chain with no element across the slab
+    is a partner reaching into it, not lipid-facing: four helices oily in the slab and charged beyond it (chain A) and
+    a charged peptide lying in the mid-plane (chain P, no element) are a membrane, judged by chain A's residues."""
+    from foldmap import membrane
+
+    def name(z):
+        return "LYS" if abs(z) > membrane.HALF else ("GLY" if round(z / 1.5) % 5 == 0 else "LEU")
+
+    helices = [("A", x, -25.0, 25.0, name) for x in (0.0, 10.0, 20.0, 30.0)]
+    peptide = [("P", (5.0 + k, 5.0, 0.0), "LYS" if k % 2 else "GLU") for k in range(24)]
+    bb, sses = _synthetic(helices, peptide)
+    polar = np.mean([l.name in membrane._POLAR for l, z in zip(bb.labels, bb.ca[:, 2]) if abs(z) < membrane.HALF])
+    assert polar > membrane._MAX_POLAR  # every residue in the slab counted: refused
+    m = membrane._estimate(bb, sses)
+    assert m is not None and abs(m.centre) <= 1.0
+
+
 def test_opm_dummy_atoms_give_the_exact_membrane(tmp_path):
     import gemmi
 
@@ -80,6 +143,32 @@ def test_band_drawn_across_the_transmembrane_helices():
     assert len(_band(fig)) == 1
     texts = {t.get_text() for t in fig.axes[0].texts}
     assert {"in", "out"} <= texts
+
+
+def test_a_band_is_drawn_by_helices_that_only_reach_a_face():
+    """random-100 held-out 6MJ2 (TRPM2): its S1-S4 helices reach the inner face within 2 Å, so the membrane view
+    counts them transmembrane (as A18 does), but none passes it, and no band was drawn. When no element passes both
+    faces, those that reach them give the band at their CA nearest the face; one that passes both still decides alone."""
+    from types import SimpleNamespace
+
+    from foldmap.cli import _face_medians
+    from foldmap.membrane import Membrane
+
+    mem = Membrane(np.array([0.0, 0.0, 1.0]), 0.0, 15.0, "estimate")
+    z = np.arange(-13.5, 16.6, 1.5)  # 21 CAs, 1.5 Å short of the inner face, past the outer one
+    near = SimpleNamespace(id="near", start=0, end=len(z) - 1)
+    place = SimpleNamespace(n_port=(0.0, 0.0), c_port=(0.0, 10.0))  # N -> C up the page, 0.5 a CA
+    bb = SimpleNamespace(ca=np.column_stack([np.zeros_like(z), np.zeros_like(z), z]))
+    lay = SimpleNamespace(placed={"near": place})
+    y_out, y_in = _face_medians(lay, [near], bb, mem)
+    assert y_in == pytest.approx(0.0) and y_out == pytest.approx(10.0 * (15.0 + 13.5) / 30.0)
+    deep = np.arange(-16.5, 16.6, 1.5)  # 23 CAs past both faces
+    through = SimpleNamespace(id="through", start=len(z), end=len(z) + len(deep) - 1)
+    bb.ca = np.vstack([bb.ca, np.column_stack([np.zeros_like(deep), np.zeros_like(deep), deep])])
+    lay.placed["through"] = SimpleNamespace(n_port=(5.0, 20.0), c_port=(5.0, 30.0))
+    y_out, y_in = _face_medians(lay, [near, through], bb, mem)
+    assert y_in == pytest.approx(20.0 + 10.0 * (16.5 - 15.0) / 33.0)
+    assert y_out == pytest.approx(20.0 + 10.0 * (16.5 + 15.0) / 33.0)
 
 
 def test_positive_inside_rule_puts_bacteriorhodopsin_c_terminus_inside():

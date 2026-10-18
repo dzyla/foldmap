@@ -586,9 +586,12 @@ def _faces_on_page(frame, sses, bb, mem, tm: set[str]) -> tuple[float, float]:
     return float(_snap(y_out)), float(_snap(y_in))
 
 
-def _face_medians(lay, sses, bb, mem) -> tuple[float, float] | None:
+def _face_medians(lay, sses, bb, mem, reach: bool = False) -> tuple[float, float] | None:
     """Where these elements pass the outer and the inner membrane face on the page (medians), if any is TM and
-    defines the membrane (Membrane.defining: a beta-barrel's strands, not a subunit lying in its lumen)."""
+    defines the membrane (Membrane.defining: a beta-barrel's strands, not a subunit lying in its lumen). When none
+    passes both faces, the TM elements that only reach a face (within membrane.FACE_REACH, as they are counted TM)
+    give it at their CA nearest it (`reach`: random-100 held-out 6MJ2, whose S1-S4 helices stop 1-2 Å short of the
+    inner face)."""
     depth = mem.depth(bb.ca)
     outs, ins = [], []
     for s in sses:
@@ -602,7 +605,10 @@ def _face_medians(lay, sses, bb, mem) -> tuple[float, float] | None:
         def page_y(face: float, seg=seg, p=p) -> float | None:
             k = np.flatnonzero(np.diff(np.sign(seg - face)) != 0)
             if not k.size:
-                return None
+                if not reach:
+                    return None
+                k = int(np.argmin(np.abs(seg - face)))  # the run's CA nearest the face it reaches
+                return float(p.n_port[1] + k / (len(seg) - 1) * (p.c_port[1] - p.n_port[1]))
             k = int(k[0])
             t = (k + (face - seg[k]) / (seg[k + 1] - seg[k])) / (len(seg) - 1)
             return float(p.n_port[1] + t * (p.c_port[1] - p.n_port[1]))
@@ -612,7 +618,7 @@ def _face_medians(lay, sses, bb, mem) -> tuple[float, float] | None:
             outs.append(o)
             ins.append(i)
     if not outs:
-        return None
+        return None if reach else _face_medians(lay, sses, bb, mem, reach=True)
     return float(np.median(outs)), float(np.median(ins))
 
 

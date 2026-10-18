@@ -210,6 +210,10 @@ def _barrel_sides(m: Membrane, bb: Backbone, strands: list[SSE]) -> Membrane:
 
 
 def _estimate(bb: Backbone, sses: list[SSE]) -> Membrane | None:
+    """The best-scoring HALF slab across the long elements' common axis, if it is membrane (_membrane_like). When no
+    long element spans that slab face to face (_spans), so the view would find no transmembrane element to draw
+    its band by, the best-scoring slab that one spans and that is membrane takes its place (random-100 held-out
+    6MJ2, TRPM2: the dense cytoplasmic domain pulls the summed score 4-5 Å below the S1-S4 helices)."""
     long = [s for s in sses if (s.kind == "H" and len(s) >= 16) or (s.kind == "E" and len(s) >= 8)]
     if not long:
         return None
@@ -217,27 +221,55 @@ def _estimate(bb: Backbone, sses: list[SSE]) -> Membrane | None:
     z = bb.ca @ normal
     hyd = np.array([l.name in _HYDROPHOBIC for l in bb.labels])
     pol = np.array([l.name in _POLAR for l in bb.labels])
-    best = None
+    chain = np.array([l.chain for l in bb.labels])
+    slabs = []  # (score, centre, inside), bottom up
     for c in np.arange(z.min(), z.max() + 1.0, 1.0):
         inside = np.abs(z - c) < HALF
         if inside.sum() < 20:
             continue
-        score = hyd[inside].sum() - 1.5 * pol[inside].sum()
-        if best is None or score > best[0]:
-            best = (score, c, inside)
-    if best is None:
+        slabs.append((hyd[inside].sum() - 1.5 * pol[inside].sum(), c, inside))
+    if not slabs:
         return None
-    _, centre, inside = best
+    best = max(slabs, key=lambda t: t[0])  # the first of equal scores, as before
+    if not _spans(long, z, best[1]):
+        spanned = [t for t in slabs if _spans(long, z, t[1]) and _membrane_like(long, z, t, hyd, pol, chain)]
+        best = max(spanned, key=lambda t: t[0]) if spanned else best
+    if not _membrane_like(long, z, best, hyd, pol, chain):
+        return None
+    return Membrane(normal, float(best[1]), HALF, "estimate")
+
+
+FACE_REACH = 2.0  # Å: an element whose CA run comes this near both faces crosses the membrane (figcheck A18, cli)
+
+
+def _spans(long: list[SSE], z: np.ndarray, centre: float) -> bool:
+    """Does a long element's CA run reach both faces of the HALF slab at `centre` (within FACE_REACH, as the membrane
+    view finds the transmembrane elements it draws the band by, cli._face_medians)?"""
+    return any(
+        z[s.start : s.end + 1].min() <= centre - HALF + FACE_REACH
+        and z[s.start : s.end + 1].max() >= centre + HALF - FACE_REACH
+        for s in long
+    )
+
+
+def _membrane_like(long, z, slab, hyd, pol, chain) -> bool:
+    """Is this slab membrane: crossed by a long element (_MIN_CROSSING beyond its centre both ways), and oily and
+    uncharged enough over the residues of the chains that cross it? A chain with no element across the slab is a
+    soluble partner reaching into it, not facing lipid (random-100 held-out 7VVK, PTH1R-Gs: the hormone in the
+    receptor's pocket and Gs's α5 in its cytoplasmic cavity make the slab 0.189 polar; the receptor's own residues
+    are 0.149)."""
+    _, centre, inside = slab
     crossing = [
         s
         for s in long
         if z[s.start : s.end + 1].min() < centre - _MIN_CROSSING
         and z[s.start : s.end + 1].max() > centre + _MIN_CROSSING
     ]
+    if not crossing:
+        return False
+    held = inside & np.isin(chain, sorted({s.chain for s in crossing}))
     polar = _MAX_POLAR_CROSSED if len(crossing) >= _MANY_CROSSING else _MAX_POLAR
-    if hyd[inside].mean() < _MIN_HYDROPHOBIC or pol[inside].mean() > polar or not crossing:
-        return None
-    return Membrane(normal, float(centre), HALF, "estimate")
+    return hyd[held].mean() >= _MIN_HYDROPHOBIC and pol[held].mean() <= polar
 
 
 def _orient(m: Membrane, bb: Backbone) -> Membrane:

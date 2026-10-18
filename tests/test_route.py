@@ -567,6 +567,27 @@ def test_a_loop_leaves_the_slab_rather_than_run_along_it_over_an_element():
     assert min(grid.center(c)[1] for c in path) < -15.0  # under the element
 
 
+def test_a_loop_between_ports_below_the_band_stays_out_of_the_slab():
+    """random-100 held-out 7JI3 (A18: C:101-108>C:116-119): a loop from a strand's foot to the next strand, both ports
+    below the band, ran up into the slab and over the head of a strand reaching into it, the way round the crowded
+    sheet below costing more than the run along the slab. Two ports below the band and a long element between them
+    whose head is 0.6 inside it: ports on one side of every band are joined with the slab closed first, so the loop
+    goes the long way under the element and nothing runs in the slab."""
+    from foldmap.figcheck import slab_runs
+
+    a = bar(0, 0.0, 1.0, 4.0, np.pi / 2)  # C port at (0, 3), below the band, pointing up
+    b = bar(10, 10.0, 1.0, 4.0, -np.pi / 2)  # N port at (10, 3)
+    wall = bar(40, 5.0, -27.2, 65.6, np.pi / 2)  # from y = -60 up to 5.6, 0.6 inside the band's lower face
+    lay = layout_of(a, b, wall)
+    band = (5.0, 12.0)
+    lay.membrane = {"y": band, "bands": [band], "inside": "below"}
+    loops = route_loops(lay, [a.sse, b.sse, wall.sse], stub_bb())
+    (ab,) = [lp for lp in loops if (lp.a_id, lp.b_id) == (a.sse.id, b.sse.id)]
+    assert not ab.fallback
+    assert slab_runs([ab], [band], lay.placed) == []
+    assert max(y for _, y in ab.points) < band[0]
+
+
 def _slab_case(case: str, dy: float):
     """The two slab-port geometries of random-100 C2b-5, shifted up by dy against a fixed grid origin (an element
     far below holds the page's bounds): `outside`, 6JO6's helix ending 0.03 below the lower face, its C port up into

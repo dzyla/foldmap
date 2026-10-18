@@ -174,6 +174,13 @@ class _Grid:
         c = self.cell((port[0] + exit_vec[0] * _PUSH[0], port[1] + exit_vec[1] * _PUSH[0]))
         return bool(0 <= c[0] < self.nx and 0 <= c[1] < self.ny and self.slab[c])
 
+    def one_side(self, pa, pb) -> bool:
+        """Do ports pa and pb lie outside every band (and its slab cells), both above it or both below?"""
+        return bool(self.slab.any()) and all(
+            (pa[1] <= lo + 0.1 and pb[1] <= lo + 0.1) or (pa[1] >= hi - 0.1 and pb[1] >= hi - 0.1)
+            for lo, hi in self.bands
+        )
+
     def at_face(self, port, exit_vec) -> bool:
         """A port outside every band whose first step lands in the slab (_into_slab): it lies just outside a face,
         pointing in (6JO6's 5:167-169, 0.03 below it). Its route's first turn is drawn at the port's clearance
@@ -551,11 +558,14 @@ class _Router:
         self.wide_searches += 1
         return cells
 
-    def drawn(self, pa, ea, own_a, pb, eb, own_b, own_body=False, loose=False, under=((), ()), exempt=()):
+    def drawn(
+        self, pa, ea, own_a, pb, eb, own_b, own_body=False, loose=False, under=((), ()), exempt=(), wide=True
+    ):
         """The A* route from port pa to port pb as drawn, snapped to the ports or else unsnapped; None if there
-        is no route or every drawing of it crosses an element (`under`: see _clear)."""
+        is no route or every drawing of it crosses an element (`under`: see _clear). `wide`: a search that runs out
+        of its nodes may run again on the page's second-search budget (_route_ports)."""
         grid = self.grid
-        cells = _route_ports(grid, pa, ea, own_a, pb, eb, own_b, loose, self.max_nodes, self)
+        cells = _route_ports(grid, pa, ea, own_a, pb, eb, own_b, loose, self.max_nodes, self if wide else None)
         if cells is None:
             return None
         for snap in (True, False):
@@ -592,8 +602,21 @@ class _Router:
         their boxes (keep_out). A label's margin cells by a port can end the strict search though the route drawn
         passes beside the label (random-100 C2b-2: 8RRX's D and G loops). `text_toll`: with the keep-outs open, the
         extra cost of each of their cells entered, so the route crosses as little text as it can (a nucleic-acid
-        strand's: random-100 held-out 8ZTU's run beside α3 ran up through its name, the shortest way once open)."""
+        strand's: random-100 held-out 8ZTU's run beside α3 ran up through its name, the shortest way once open).
+        Ports on one side of every membrane band (_Grid.one_side) are first joined with the slab closed, on the
+        search's own budget: a loop between two elements outside the membrane stays out of it when it can (A18;
+        random-100 held-out 7JI3's loop from a strand's foot ran up into the slab and over the strand's head, the
+        cheapest way past a crowded sheet below)."""
         grid = self.grid
+        if grid.one_side(pa, pb):
+            held = grid.slab & ~grid.blocked
+            grid.blocked |= held
+            try:
+                pts = self.drawn(pa, ea, own_a, pb, eb, own_b, own_body, loose, under, exempt, wide=False)
+            finally:
+                grid.blocked &= ~held
+            if pts is not None:
+                return pts, False
         pts = self.drawn(pa, ea, own_a, pb, eb, own_b, own_body, loose, under, exempt)
         if pts is not None or not grid.soft.any():
             return pts, False
