@@ -1034,14 +1034,17 @@ def _within_extents(pts: np.ndarray, paths: list[Path]) -> np.ndarray:
     """(points x paths) which points lie within each path's vertices' extent, edges included: only those can lie
     inside it (plan 15 Task 7: 8D3D's focus view, 848 disulfides under about 1,800 bodies, asked every body of
     every point)."""
-    if not paths:
-        return np.zeros((len(pts), 0), bool)
-    sizes = [len(p.vertices) for p in paths]
-    v = np.concatenate([p.vertices for p in paths])
-    starts = np.cumsum([0, *sizes[:-1]])
+    out = np.zeros((len(pts), len(paths)), bool)
+    sizes = np.array([len(p.vertices) for p in paths], int)
+    some = np.flatnonzero(sizes > 0)  # a path of no vertices holds no point (and has no extent to reduce)
+    if not len(some):
+        return out
+    v = np.concatenate([paths[k].vertices for k in some.tolist()])
+    starts = np.cumsum(sizes[some]) - sizes[some]
     lo, hi = np.minimum.reduceat(v, starts), np.maximum.reduceat(v, starts)
     x, y = pts[:, :1], pts[:, 1:2]
-    return (x >= lo[:, 0]) & (x <= hi[:, 0]) & (y >= lo[:, 1]) & (y <= hi[:, 1])
+    out[:, some] = (x >= lo[:, 0]) & (x <= hi[:, 0]) & (y >= lo[:, 1]) & (y <= hi[:, 1])
+    return out
 
 
 def disulfide_points(layout, loops, sses, chains, i: int, j: int, avoid=()):

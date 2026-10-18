@@ -114,6 +114,24 @@ def test_outlines_are_asked_only_of_the_points_within_their_extent(monkeypatch):
     assert [[q.tolist() for q in r] for r in fast[1]] == [[q.tolist() for q in r] for r in every[1]]
 
 
+def test_an_outline_of_no_vertices_covers_nothing():
+    """Task 7 review: a Path of no vertices among the bodies (last, first or between) made the extents' reduceat raise
+    IndexError; it holds no point, and the others are asked as before."""
+    from matplotlib.path import Path as MPath
+
+    from foldmap import render
+
+    square = MPath([(0.0, 0.0), (2.0, 0.0), (2.0, 2.0), (0.0, 2.0), (0.0, 0.0)])
+    empty = MPath(np.zeros((0, 2)))
+    pts = np.array([[1.0, 1.0], [3.0, 3.0]])
+    for shapes in ([square, empty], [empty, square], [empty, square, empty], [empty]):
+        within = render._within_extents(pts, shapes)
+        assert within.shape == (2, len(shapes)) and not within[:, [s is empty for s in shapes]].any()
+        assert render._covered(pts, shapes).tolist() == [square in shapes, False]
+        render.visible_pieces([(-1.0, 1.0), (3.0, 1.0)], shapes)
+    assert render._within_extents(pts, []).shape == (2, 0)
+
+
 # ----------------------------------------------------------------------------------------- one search budget
 
 
