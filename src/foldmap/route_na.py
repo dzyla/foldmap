@@ -24,7 +24,7 @@ from .layout import (
     stem_keep_box,
 )
 from .na_ends import SHORT_GAP, _face_label, _gap, _label_room, _tail, _trace_clear
-from .na_labels import _label_gaps, _place_letters, _ties, _unbunch, _widen
+from .na_labels import _boxes_of, _in_sight, _label_gaps, _place_letters, _ties, _unbunch, _widen
 from .na_paths import (
     NAPath,
     NATie,
@@ -79,7 +79,7 @@ _END_FINE = tuple(  # every 5° between those, the least turn first, when none o
     x for k in range(1, 36) if k % 9 for x in (k * np.pi / 36, -k * np.pi / 36)
 )
 _END_REACH = (1.0, 1.4, 1.8, 2.4, 3.0)  # times the label's distance from its end: the same first, then further out
-# (2.4 and 3: random-100 held-out 2FD8, a trace's 5' end over a sheet, whose nearest room is past the sheet's edge)
+# (2.4 and 3, only where the line to its end crosses no element but the one the end lies under: na_labels._in_sight)
 
 
 def _own_ends(router, layout: Layout, fixed: dict, at: dict, ends: list, gapped: set, lines=(), loops=()) -> list:
@@ -96,7 +96,9 @@ def _own_ends(router, layout: Layout, fixed: dict, at: dict, ends: list, gapped:
     (`loops`, polylines) runs through, the label of a strand ending in a stem too (random-100 held-out 7NZ2's 5' end
     of K2:4-80 on A4:1270-1279>A4:1281-1292, where _face_label found no spot clear and took the first). A
     trace's end labels (strands drawn at their projected place, laid over the protein that holds them) move too, and
-    also when the label stands on an element or stem (held-out 2FD8: the 5' end of B:501-503 on a strand)."""
+    also when the label stands on an element or stem (held-out 2FD8: the 5' end of B:501-503 on a strand). A spot
+    further out than _END_REACH[2] must be in sight of its end (na_labels._in_sight): 2FD8's 5' end, under strand E,
+    has no such spot with room, and its label stays where it was."""
     pts = [
         (key, np.asarray(xy, float)) for p in fixed.values() for key, xy in zip(((p.strand, k) for k in p.nts), p.nt_xy)
     ]
@@ -113,6 +115,7 @@ def _own_ends(router, layout: Layout, fixed: dict, at: dict, ends: list, gapped:
     every = segments_of([q for _, q in lines] + list(loops))
     segs = {s: segments_of([q for t, q in lines if t != s] + list(loops)) for s in sorted({t for t, _ in lines})}
     bodies = [*layout.placed.values(), *layout.stems]
+    rects = _boxes_of(bodies)
 
     def crossed(s: int, xy) -> bool:  # another strand's line, or a protein loop, through the label at xy
         other = segs.get(s, every)
@@ -148,6 +151,8 @@ def _own_ends(router, layout: Layout, fixed: dict, at: dict, ends: list, gapped:
             c, n = math.cos(turn), math.sin(turn)
             spot = end_xy + reach * np.array([v[0] * c - v[1] * n, v[0] * n + v[1] * c])
             if r > 0 and nearest(spot) == own and _label_room(router, layout, spot, others) and not crossed(s, spot):
+                if reach > _END_REACH[2] and not _in_sight(spot, end_xy, bodies, rects):
+                    continue  # further out: only in sight of its own end
                 moved = (float(spot[0]), float(spot[1]))
                 break
         out.append((s, e, moved))

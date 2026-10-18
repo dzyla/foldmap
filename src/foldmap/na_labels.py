@@ -91,15 +91,33 @@ def _outline(e) -> list:
     u = np.array([math.cos(e.angle), math.sin(e.angle)])
     n = np.array([-u[1], u[0]])
     if getattr(getattr(e, "sse", None), "kind", None) != "E":
-        return [SimpleNamespace(cx=e.cx, cy=e.cy, length=e.length, width=e.width, direction=u, normal=n)]
+        return [SimpleNamespace(cx=e.cx, cy=e.cy, length=e.length, width=e.width, angle=e.angle, direction=u, normal=n)]
     k = e.width / PITCH  # Style.strand_scale, carried by the strand's width
     head = min(HEAD_LEN, e.length * 0.45)
     shaft = SimpleNamespace(cx=e.cx - u[0] * head / 2, cy=e.cy - u[1] * head / 2, length=e.length - head)
     tip = SimpleNamespace(cx=e.cx + u[0] * (e.length - head) / 2, cy=e.cy + u[1] * (e.length - head) / 2, length=head)
     shaft.width, tip.width = SHAFT * k, HEAD * k
     for part in (shaft, tip):
-        part.direction, part.normal = u, n
+        part.direction, part.normal, part.angle = u, n, e.angle
     return [shaft, tip]
+
+
+def _in_sight(label, anchor, bodies, rects: np.ndarray) -> bool:
+    """Does the straight line from a label at `label` to what it names at `anchor` (its nucleotide, its gap's middle,
+    its end's nucleotide) cross no body's drawn outline (_outline) but the one the anchor lies under? A label set
+    further out than beside its anchor (rings, outlines, far reaches) must not stand across an element from what it
+    names: it would read as another's (review of held-out 2FD8: a letter left of strand L naming a nucleotide right
+    of it). `rects`: the bodies' boxes (_boxes_of)."""
+    (ax, ay), (bx, by) = label, anchor
+    lo_x, hi_x, lo_y, hi_y = min(ax, bx), max(ax, bx), min(ay, by), max(ay, by)
+    near = (rects[:, 0] <= hi_x) & (lo_x <= rects[:, 2]) & (rects[:, 1] <= hi_y) & (lo_y <= rects[:, 3])
+    for k in np.flatnonzero(near).tolist():
+        parts = _outline(bodies[k])
+        if any(in_body(anchor, part) for part in parts):
+            continue  # the body its anchor lies under
+        if any(crosses_body(label, anchor, part) for part in parts):
+            return False
+    return True
 
 
 def _boxes_of(bodies) -> np.ndarray:
@@ -123,7 +141,8 @@ def _place_letters(
     and B:8 on loops) and the elements' names. When none is clear (a strand lying over the protein that holds it:
     held-out 2FD8's three nucleotides across a jelly roll), the same spots judged by the elements' drawn outlines (a
     strand's shaft is narrower than its box: a letter fits between two shafts), then rings further out
-    (_LETTER_RINGS), nearest first; when none of those is clear either, the one furthest from the other letters.
+    (_LETTER_RINGS), nearest first, each in sight of its nucleotide (_in_sight); when none of those is clear either,
+    the one furthest from the other letters.
     `only` (a set of (strand, nucleotide)): place those letters again, every other letter staying where
     layout.na_letters has it, clear of the ties' and gaps' labels placed since too (_letters_off_loops)."""
     where = {key: d.point(key) for d in layout.stems for key in d.axial}
@@ -180,6 +199,9 @@ def _place_letters(
 
     rects = _boxes_of(bodies)
 
+    def seen(q, xy) -> bool:  # a spot further out than beside it names its own nucleotide (_in_sight)
+        return _in_sight(q, xy, bodies, rects)
+
     def outline_room(q, key, own: int) -> float:  # room, judged by the letter's ink (pad 0.05) on the drawn outlines
         if any(x0 < q[0] < x1 and y0 < q[1] < y1 for x0, y0, x1, y1 in boxes):
             return 0.0
@@ -219,10 +241,16 @@ def _place_letters(
                 spaces += [room(q, index[key]) for q in more]
                 free += [r >= _LETTER_GAP and not struck(q, key) for q, r in zip(more, spaces[-len(more) :])]
             if not any(free) and p.kind != "hairpin":  # by the drawn outlines, then on rings further out
-                ok = [outline_room(q, key, index[key]) >= _LETTER_GAP and not struck(q, key) for q in options]
+                ok = [
+                    outline_room(q, key, index[key]) >= _LETTER_GAP and not struck(q, key) and seen(q, xy)
+                    for q in options
+                ]
                 if not any(ok):
                     ring = [xy + r * np.array([math.cos(t), math.sin(t)]) for r in _LETTER_RINGS for t in _RING_TURNS]
-                    found = next((q for q in ring if room(q, index[key]) >= _LETTER_GAP and not struck(q, key)), None)
+                    found = next(
+                        (q for q in ring if room(q, index[key]) >= _LETTER_GAP and not struck(q, key) and seen(q, xy)),
+                        None,
+                    )
                     if found is not None:
                         options, spaces, ok = [*options, found], [*spaces, _LETTER_GAP], [*ok, True]
                 free = ok if any(ok) else free
@@ -336,7 +364,8 @@ def _label_gaps(layout: Layout, paths: list[NAPath], loops=()) -> None:
     first spot whose box meets nothing: no element's or stem's body, strand, tie or protein loop (`loops`, polylines),
     base letter, nucleotide (where its bead goes), end label, name or gap label placed before it, nor its own
     dashed line; when every spot meets something, the first spot round the gap's midpoint (_GAP_RINGS, nearest
-    first) that meets nothing; when none does, the spot beside it meeting the fewest other things, then the least
+    first) that meets nothing and is in sight of the gap (_in_sight); when none does, the spot beside it meeting the
+    fewest other things, then the least
     of its own line (a label beside its own gap reads as its own)."""
     gaps = [p for p in paths if p.kind == "gap" and p.label and len(p.points) > 1]
     if not gaps:
@@ -413,7 +442,7 @@ def _label_gaps(layout: Layout, paths: list[NAPath], loops=()) -> None:
                 for t in _GAP_TURNS:
                     x, y = mid + f * (hw + hh) * np.array([math.cos(t), math.sin(t)])
                     box = (x - hw, y - hh, x + hw, y + hh)
-                    if meets(box, own) == (0, 0):
+                    if meets(box, own) == (0, 0) and _in_sight((x, y), mid, bodies, body_box):
                         best = ((0, 0), (float(x), float(y)), box)
                         break
                 if best[0] == (0, 0):

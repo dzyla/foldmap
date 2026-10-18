@@ -316,3 +316,48 @@ def test_a_protein_held_ligand_keeps_off_the_stems():
     moved = [m for m in ligand_marks(lay, loops, sses, look) if m["ligand"] is marks[0]["ligand"]][0]
     (mx, my), (hx, hy) = moved["centre"], moved["half"]
     assert not _box_meets_body((mx - hx, my - hy, mx + hx, my + hy), lay.stems[0])
+
+
+def test_a_label_never_stands_across_a_body_from_what_it_names():
+    """Review of held-out 2FD8: rings, outlines and far reaches put B:502's letter left of strand L naming a nucleotide
+    right of it, and the 5' label past strand B. A spot found so must see what it names: the line between them crosses
+    no body's drawn outline but the one the named point lies under (_in_sight)."""
+    from foldmap.na_labels import _boxes_of, _in_sight
+
+    wall = Placed(fake_sse("E", 1, 6), 0.0, 0.0, 4.0, np.pi / 2, PITCH)  # a strand standing up at x = 0
+    bodies = [wall]
+    rects = _boxes_of(bodies)
+    assert not _in_sight((-1.0, 0.0), (1.0, 0.0), bodies, rects)  # across its shaft
+    assert _in_sight((1.0, 1.0), (1.0, -1.0), bodies, rects)  # beside it
+    assert _in_sight((-1.0, 0.0), (0.1, 0.0), bodies, rects)  # to a point under it: its own body
+    assert _in_sight((0.6, 0.0), (0.6, 3.0), bodies, rects)  # beside the shaft and its head, past the tip
+
+
+def test_a_crowded_letter_with_no_spot_in_sight_keeps_the_nearest_least_bad_one():
+    """With every near spot covered and every spot further out across a frame of bodies from its nucleotide, a
+    letter keeps the least bad spot beside it (the collision stays, honestly counted) rather than a far one that would
+    name what lies beyond the frame."""
+    from foldmap.na_labels import _boxes_of, _in_sight, _place_letters
+
+    lay, _, _, _ = _routed("1EHZ")
+    tail = next(p for p in lay.na_paths if p.kind == "tail")
+    key = (tail.strand, tail.nts[1])
+    x, y = tail.nt_xy[1]
+    reach = 3.1 * NT_ROW + 0.5
+    frame = [
+        Placed(fake_sse("H", 9100 + 10 * k, 9101 + 10 * k, chain="Z"), x + dx, y + dy, 2 * reach + 1.0, a, 0.1)
+        for k, (dx, dy, a) in enumerate(
+            (
+                (reach + 0.2, 0.0, np.pi / 2),
+                (-reach - 0.2, 0.0, np.pi / 2),
+                (0.0, reach + 0.2, 0.0),
+                (0.0, -reach - 0.2, 0.0),
+            )
+        )
+    ]
+    block = _block(x, y, 2 * reach, 2 * reach)
+    lay.placed = {**lay.placed, "block": block, **{f"frame{k}": f for k, f in enumerate(frame)}}
+    spot = _place_letters(lay, lay.na_paths)[key]
+    assert np.hypot(spot[0] - x, spot[1] - y) <= 3.1 * NT_ROW + 1e-6  # one of the spots beside it
+    bodies = list(lay.placed.values())
+    assert _in_sight(spot, (x, y), bodies, _boxes_of(bodies))
