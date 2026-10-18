@@ -237,3 +237,9 @@ report.json was compared field by field with the fix round 1 run (4ff6c88). Only
 Summed over the campaign, na_run_crossings went from 205 to 203 (-1.0 %) and na_protein_crossings from 102 to 104 (+2.0 %).
 
 Seconds differ by at most 1.1 s on any entry (5B43; the machine was shared).
+
+## Rerun at the end of plan 10 (2026-10-17, main 1ef0706; report.md, report.json, run.log): **34/39 pass**
+
+4YBB now passes: fallbacks 2 → 0, na_crossings 1 → 0, bead_overlaps 1 → 0 (the plan 10 routing and layout work). The other five failures are the same entries for the same causes: 30QM, 4PJO, 3KTQ, 1YTB and 3CRX. No entry that passed now fails.
+
+report.json was compared field by field with the plan 10 T4 run. Apart from 4YBB, only measured values moved, none across a limit: 30QM spearman 0.521 → 0.496 and procrustes 0.776 → 0.794 (it already failed both); 1GID spearman 0.601 → 0.737; summed na_run_crossings fell (1GID 6 → 2, 1Y26 5 → 3, 2OEU 3 → 1, 4YBB 110 → 106) and na_protein_crossings moved by one on six entries (4YBB 45 → 52).

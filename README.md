@@ -460,8 +460,8 @@ figure.
 **Validation.** Thirty-nine DNA and RNA entries (tRNAs, riboswitches, ribozymes, CRISPR complexes, RNPs,
 polymerases, a ribosome, bent protein–DNA complexes, junctions and non-canonical structures) are drawn and scored
 by `scripts/na_validate.py`: base pairs and stems against RNApolis, the drawn layout against the 3D structure,
-contact beads against the atoms, and overlaps, crossings and text on the page. 33 of 39 pass every limit; each of
-the six that fail (30QM, 4PJO, 3KTQ, 4YBB, 1YTB, 3CRX) is explained with its cause in
+contact beads against the atoms, and overlaps, crossings and text on the page. 34 of 39 pass every limit; each of
+the five that fail (30QM, 4PJO, 3KTQ, 1YTB, 3CRX) is explained with its cause in
 [docs/validation/na/review.md](docs/validation/na/review.md). The full table is in
 [docs/validation/na/report.md](docs/validation/na/report.md).
 
