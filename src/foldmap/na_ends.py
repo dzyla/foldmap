@@ -14,6 +14,7 @@ import numpy as np
 from .layout import NT_ROW, NT_STEP, Layout, PlacedStem, glyph
 from .na_paths import (
     _BEAD,
+    TEXT_TOLL,
     NAPath,
     _bow,
     _crosses_segment,
@@ -345,11 +346,12 @@ def _label_room(router: _Router, layout: Layout, xy, labels: list) -> bool:
 _TRACE_NEAR = 2  # nucleotides: an element touching a trace lies under it this far either side of what it holds
 
 
-def _trace_clear(layout: Layout, s: int, pts) -> bool:
-    """Is strand s's trace (drawn at its projected place) clear of every element, each segment but of the
-    elements touching its own nucleotides or a neighbour's (_TRACE_NEAR) and the sheets holding them? A single
-    strand lies on the protein it wraps where it holds it (1EYG's ssDNA over the SSB tetramer; layout keeps the
-    others off it), not along the whole trace. A ghost is the strand it copies, so it is exempt where that is."""
+def _trace_segments(layout: Layout, s: int):
+    """ok(i, a, b): may segment i of strand s's trace (from nucleotide i to i + 1) be drawn from a to b? Clear of
+    every element but of the elements touching its own nucleotides or a neighbour's (_TRACE_NEAR) and the sheets
+    holding them. A single strand lies on the protein it wraps where it holds it (1EYG's ssDNA over the SSB tetramer;
+    layout keeps the others off it), not along the whole trace. A ghost is the strand it copies, so it is exempt
+    where that is."""
     na = layout.nucleic
     holds: dict[str, set[int]] = {}  # element -> the nucleotides of strand s it touches
     for p in [*layout.placed.values(), *layout.ghosts]:
@@ -367,17 +369,67 @@ def _trace_clear(layout: Layout, s: int, pts) -> bool:
         for e in sorted(block) if got else ():
             holds[e] = got
     rects, owners = _element_obstacles(layout, ghost_owner=True)  # the router's obstacles; a ghost is its strand's
-    xy = _xy(pts)
-    free = [k for k, o in enumerate(owners) if o not in holds]  # never exempt: the whole trace at once
-    if not _clear(xy, (), rects[:, free], [owners[k] for k in free], own_body=True):
-        return False
+    free = [k for k, o in enumerate(owners) if o not in holds]  # never exempt
+    free_rects, free_owners = rects[:, free], [owners[k] for k in free]
     held = [k for k, o in enumerate(owners) if o in holds]
-    for i in range(len(xy) - 1):
+
+    def ok(i: int, a, b) -> bool:
+        seg = _xy([a, b])
+        if not _clear(seg, (), free_rects, free_owners, own_body=True):
+            return False
         lo, hi = i - _TRACE_NEAR, i + 1 + _TRACE_NEAR
         keep = [k for k in held if not any(lo <= t <= hi for t in holds[owners[k]])]
-        if keep and not _clear(xy[i : i + 2], (), rects[:, keep], [owners[k] for k in keep], own_body=True):
-            return False
-    return True
+        return not keep or _clear(seg, (), rects[:, keep], [owners[k] for k in keep], own_body=True)
+
+    return ok
+
+
+def _trace_clear(layout: Layout, s: int, pts) -> bool:
+    """Is strand s's trace (drawn at its projected place) clear of every element, each segment as _trace_segments
+    judges it?"""
+    ok = _trace_segments(layout, s)
+    xy = _xy(pts)
+    return all(ok(i, xy[i], xy[i + 1]) for i in range(len(xy) - 1))
+
+
+_OFF_STEPS = tuple(1.0 + k / 4 for k in range(7))  # beads (_TRACE_HALF) a trace nucleotide may be nudged off an
+# element not holding it, nearest first: up to 2.5 (random-100 held-out 13FZ: B:3 lay 1.07 inside A:1027-1031's end)
+_OFF_TURNS = tuple(np.radians(a) for a in range(0, 360, 5))  # in any direction, the first that clears
+
+
+def off_unheld(layout: Layout, s: int, pts) -> np.ndarray:
+    """Strand s's trace with each nucleotide whose two segments are not clear (_trace_segments: they cross an element
+    that does not hold them) nudged, as little as clears them both (_OFF_STEPS, _OFF_TURNS), to a spot at least a
+    bead's width (_TRACE_HALF) from every other trace nucleotide; one no nudge clears stays (the trace is then a
+    fallback). Run once the elements are placed (layout.layout): random-100 held-out 13FZ's RNA B, held by its sheet at
+    nucleotides 5-6, projected 1.07 inside the end of A:1027-1031 of that sheet at B:3, which nothing holds there."""
+    from .layout import _TRACE_HALF, _snap
+
+    ok = _trace_segments(layout, s)
+    xy = np.array(pts, float).reshape(-1, 2)
+    n = len(xy)
+    others = [np.asarray(q, float).reshape(-1, 2) for t, q in sorted(layout.na_traces.items()) if t != s]
+
+    def fine(i: int, q) -> bool:  # both of nucleotide i's segments clear with it at q
+        return (i == 0 or ok(i - 1, xy[i - 1], q)) and (i == n - 1 or ok(i, q, xy[i + 1]))
+
+    for i in range(n):
+        if fine(i, xy[i]):
+            continue
+        rest = np.vstack([np.delete(xy, i, axis=0), *others])
+        spot = next(
+            (
+                q
+                for step in _OFF_STEPS
+                for t in _OFF_TURNS
+                for q in [_snap(xy[i] + step * _TRACE_HALF * np.array([math.cos(t), math.sin(t)]))]
+                if (not len(rest) or float(np.hypot(*(rest - q).T).min()) >= _TRACE_HALF) and fine(i, q)
+            ),
+            None,
+        )
+        if spot is not None:
+            xy[i] = spot
+    return xy
 
 
 _GAP_BOWS = (1.2, 1.6, 2.2)  # a gap with no way on the grid may bow out to this many times its chord
@@ -419,7 +471,7 @@ def _from_beside(router: _Router, a, b):
     if not (ends[0][3] or ends[1][3]):
         return None
     (qa, ua, oa, sa), (qb, ub, ob, sb) = ends
-    mid, _ = router.route(qa, ua, oa, qb, ub, ob, own_body=True, loose=True)
+    mid, _ = router.route(qa, ua, oa, qb, ub, ob, own_body=True, loose=True, text_toll=TEXT_TOLL)
     if mid is None:
         return None
     return ([tuple(map(float, a[0]))] if sa else []) + list(mid) + ([tuple(map(float, b[0]))] if sb else [])
@@ -461,9 +513,9 @@ def _gap(router: _Router, g, a, b) -> NAPath:
     own_a = own_a if own_a is not None else _Point(float(pa[0]), float(pa[1]))
     own_b = own_b if own_b is not None else _Point(float(pb[0]), float(pb[1]))
     own = (own_a, own_b)
-    route, _ = router.route(pa, ea, own_a, pb, eb, own_b, own_body=True)
+    route, _ = router.route(pa, ea, own_a, pb, eb, own_b, own_body=True, text_toll=TEXT_TOLL)
     if route is None:  # an end in another element's clearance margin
-        route, _ = router.route(pa, ea, own_a, pb, eb, own_b, own_body=True, loose=True)
+        route, _ = router.route(pa, ea, own_a, pb, eb, own_b, own_body=True, loose=True, text_toll=TEXT_TOLL)
     if route is None:  # an end whose way straight out lies in a neighbour's margin all along: from beside it
         route = _from_beside(router, (pa, ea, own_a), (pb, eb, own_b))
     if route is None:  # no way on the grid: a curve leaving and entering along the ends, or a bow either side

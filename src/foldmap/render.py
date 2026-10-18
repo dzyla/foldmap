@@ -1566,7 +1566,8 @@ def _na_targets(layout: Layout, g, where: dict, near=None):
 
 def ligand_marks(layout: Layout, loops: list[Loop], sses: list[SSE], look: Style, counts=None) -> list[dict]:
     """Where each shown ligand/ion goes: as close as possible to the residues holding it, clear of elements,
-    labels and other markers. Each mark: ligand, centre, half size, tether targets, tethered residues."""
+    labels and other markers, and of the nucleic acid's stems, strands and text (_na_spots) where there is one. Each
+    mark: ligand, centre, half size, tether targets, tethered residues."""
     links = layout.links
     if links is None or look.ligands == "none" or not getattr(links, "ligands", None):
         return []
@@ -1607,6 +1608,10 @@ def ligand_marks(layout: Layout, loops: list[Loop], sses: list[SSE], look: Style
         if g.contacts:
             targets, weights, tethered = _local_targets(layout, loops, sses, g, g.metal)
             keep_off, words = taken, texts
+            if layout.nucleic is not None:  # kept off the stems, strands and their text too
+                if na_spots is None:  # (random-100 held-out 8ZTU: Mg a6201, held by a protein residue, on P stem 188)
+                    na_spots = _na_spots(layout, look)
+                keep_off, words = taken + na_spots[1], texts + na_spots[2]
             chains = [layout.res_chain[r] for r in tethered]
             others = [t for t, c in zip(targets, chains) if c != chains[0]]
             home = len(targets) - len(others)  # the home chain's targets come first (_local_targets)

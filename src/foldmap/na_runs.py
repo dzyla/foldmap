@@ -14,6 +14,7 @@ from .layout import NT_STEP, PlacedStem
 from .na_ends import _from_beside
 from .na_paths import (
     _BEAD,
+    TEXT_TOLL,
     NAPath,
     _bow,
     _dot,
@@ -395,10 +396,10 @@ def _faces_route(router: _Router, fa, ea, da: PlacedStem, fb, eb, db: PlacedStem
     drawn route's own check deciding, as for a cropped gap (na_ends._gap): a face may look into the margin of a stem
     beside it, as two pieces of one bent duplex kept end to end do into each other's (random-100 C2b-4: 7Y7C's
     a:843-844 and 8VWQ's 1:836 were plain curves)."""
-    route, _ = router.route(fa, ea, da, fb, eb, db, own_body=True)
+    route, _ = router.route(fa, ea, da, fb, eb, db, own_body=True, text_toll=TEXT_TOLL)
     grid = router.grid
     if route is None and (grid.free_cell_along(fa, ea, da) is None or grid.free_cell_along(fb, eb, db) is None):
-        route, _ = router.route(fa, ea, da, fb, eb, db, own_body=True, loose=True)
+        route, _ = router.route(fa, ea, da, fb, eb, db, own_body=True, loose=True, text_toll=TEXT_TOLL)
     return route
 
 

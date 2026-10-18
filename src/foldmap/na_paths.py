@@ -89,6 +89,8 @@ def _spaced(pts, m: int, shift: float = 0.0) -> list[tuple[float, float]]:
 
 
 _NA_CORNER = 0.6  # radius of a routed strand's rounded corners
+TEXT_TOLL = 25.0  # the cost of a text cell a strand's route enters once no route keeps off text (_Router.route's
+# text_toll: as route._NA_TEXT_TOLL, the cost of a nucleic-acid text cell to a protein loop routed again)
 
 
 def _rounded(pts, radius: float = _NA_CORNER, n: int = 8) -> list[tuple[float, float]]:

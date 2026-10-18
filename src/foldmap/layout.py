@@ -3677,6 +3677,11 @@ def build_layout(
         for m in it.members
         if isinstance(m, Placed) and m.over
     }
+    if traces:  # a trace's nucleotides nudged off the elements that do not hold them (na_ends.off_unheld)
+        from .na_ends import off_unheld
+
+        for s in sorted(traces):
+            traces[s] = off_unheld(lay, s, traces[s])
     if keep_depth and len(rows) > 1:  # wrapped into rows of whole chains: each row gets its own band
         lay.stack_rows = [[m.sse.id for it in row for m in it.members if isinstance(m, Placed)] for row in rows]
     if traces:

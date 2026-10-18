@@ -7,14 +7,21 @@ labelled marks, and the page bounds that hold them all."""
 from __future__ import annotations
 
 import math
+from types import SimpleNamespace
 
 import numpy as np
 
 from .layout import (
     _GLYPH_W,
     _LETTER_EM,
+    HEAD,
+    HEAD_LEN,
     NT_ROW,
+    PITCH,
+    SHAFT,
     Layout,
+    _box_meets_body,
+    _element_label_box,
     _footprint,
     _ink_points,
     _reach,
@@ -73,16 +80,55 @@ def _unbunch(layout: Layout, paths: list[NAPath]) -> None:
 
 
 _LETTER_GAP = 0.38  # page units: closest two base letters (or a letter and a nucleotide) may sit
+_LETTER_RINGS = tuple(NT_ROW * f for f in (3.8, 4.6, 5.5, 6.5))  # how far out a crowded letter looks last, nearest
+_RING_TURNS = tuple(np.radians(a) for a in range(0, 360, 15))  # first, every 15° round its nucleotide
 
 
-def _place_letters(layout: Layout, paths: list[NAPath]) -> dict[tuple[int, int], tuple[float, float]]:
+def _outline(e) -> list:
+    """The parts of an element's drawn outline as bodies (cx, cy, length, width, direction, normal): a strand's shaft
+    and its arrowhead (as render's _arrow draws them, the head taken as wide at its base all along), not its box, which
+    is the strand pitch wide; any other element or stem, its body."""
+    u = np.array([math.cos(e.angle), math.sin(e.angle)])
+    n = np.array([-u[1], u[0]])
+    if getattr(getattr(e, "sse", None), "kind", None) != "E":
+        return [SimpleNamespace(cx=e.cx, cy=e.cy, length=e.length, width=e.width, direction=u, normal=n)]
+    k = e.width / PITCH  # Style.strand_scale, carried by the strand's width
+    head = min(HEAD_LEN, e.length * 0.45)
+    shaft = SimpleNamespace(cx=e.cx - u[0] * head / 2, cy=e.cy - u[1] * head / 2, length=e.length - head)
+    tip = SimpleNamespace(cx=e.cx + u[0] * (e.length - head) / 2, cy=e.cy + u[1] * (e.length - head) / 2, length=head)
+    shaft.width, tip.width = SHAFT * k, HEAD * k
+    for part in (shaft, tip):
+        part.direction, part.normal = u, n
+    return [shaft, tip]
+
+
+def _boxes_of(bodies) -> np.ndarray:
+    """Each body's (element's, stem's, turned) box (x0, y0, x1, y1), from its centre, length, width and angle."""
+    if not bodies:
+        return np.empty((0, 4))
+    b = np.array([(e.cx, e.cy, e.length, e.width, e.angle) for e in bodies], float)
+    c, s = np.abs(np.cos(b[:, 4])), np.abs(np.sin(b[:, 4]))
+    hx, hy = c * b[:, 2] / 2 + s * b[:, 3] / 2, s * b[:, 2] / 2 + c * b[:, 3] / 2
+    return np.stack([b[:, 0] - hx, b[:, 1] - hy, b[:, 0] + hx, b[:, 1] + hy], axis=1)
+
+
+def _place_letters(
+    layout: Layout, paths: list[NAPath], loops=(), only=None
+) -> dict[tuple[int, int], tuple[float, float]]:
     """A letter for each single-stranded nucleotide beside its strand: on the side away from the stems it leaves
     and enters (outside a hairpin loop, in the row of the stem's letters along a free end), else the other, else
     further out on either side, or a little along the strand, whichever first keeps clear of other letters,
-    nucleotides, end labels, elements, stem names and the strands drawn (runs, ends, gaps: a spot a line passes
-    through is not clear, random-100 C14); when none is clear, the one furthest from the other letters."""
+    nucleotides, end labels, elements, stem names, the strands drawn (runs, ends, gaps: a spot a line passes
+    through is not clear, random-100 C14), the protein loops (`loops`, polylines: random-100 held-out 13FZ's B:2
+    and B:8 on loops) and the elements' names. When none is clear (a strand lying over the protein that holds it:
+    held-out 2FD8's three nucleotides across a jelly roll), the same spots judged by the elements' drawn outlines (a
+    strand's shaft is narrower than its box: a letter fits between two shafts), then rings further out
+    (_LETTER_RINGS), nearest first; when none of those is clear either, the one furthest from the other letters.
+    `only` (a set of (strand, nucleotide)): place those letters again, every other letter staying where
+    layout.na_letters has it, clear of the ties' and gaps' labels placed since too (_letters_off_loops)."""
     where = {key: d.point(key) for d in layout.stems for key in d.axial}
     lines = [np.asarray(p.points, float).reshape(-1, 2) for p in paths if len(p.points) > 1]
+    lines += [np.asarray(pts, float).reshape(-1, 2) for pts in loops if len(pts) > 1]
     strand_segs = np.vstack([np.hstack([q[:-1], q[1:]]) for q in lines]) if lines else np.empty((0, 4))
     seg_lo = np.minimum(strand_segs[:, :2], strand_segs[:, 2:])
     seg_hi = np.maximum(strand_segs[:, :2], strand_segs[:, 2:])
@@ -106,14 +152,41 @@ def _place_letters(layout: Layout, paths: list[NAPath]) -> dict[tuple[int, int],
     index = {key: taken.add(xy) for key, xy in where.items()}  # a letter's own nucleotide does not count
     for _, _, xy in layout.na_ends:
         taken.add(xy)
+    stay = {} if only is None else {k: xy for k, xy in layout.na_letters.items() if k not in only}
+    for xy in stay.values():
+        taken.add(xy)
     bodies = [*layout.placed.values(), *layout.stems]  # by their true (tilted) outlines, not their boxes
     gw, gh = glyph(layout)  # a letter's room, sized from the text drawn
     g = 1.2 * gh  # a stem's name stands a letter and a half clear of any base letter
     boxes = [np.add(_stem_label_box(d, gw / _GLYPH_W), (-g, -g, g, g)) for d in layout.stems]
+    # and the elements' names, a letter's half size round them (held-out 13FZ: B:1's letter on A:987-990's name)
+    half = (-gw / 2, -gh / 2, gw / 2, gh / 2)
+    named = [p for p in layout.placed.values() if getattr(getattr(p, "sse", None), "kind", None) in ("H", "G")]
+    boxes += [np.add(_element_label_box(p, gw / _GLYPH_W), half) for p in named]  # as label_boxes has them
+    if only is not None:  # the ties' and gaps' labels, placed after the letters
+        tie = (gw / 2 + 0.05, gh / 2)
+        boxes += [
+            (x - tie[0] - half[2], y - tie[1] - half[3], x + tie[0] + half[2], y + tie[1] + half[3])
+            for t in layout.na_ties
+            for _, _, (x, y) in t.marks
+        ]
+        boxes += [np.add(_gap_box(p, _em(layout)), half) for p in paths if p.kind == "gap" and p.label]
     out: dict[tuple[int, int], tuple[float, float]] = {}
 
     def room(q, own: int) -> float:
         if any(x0 < q[0] < x1 and y0 < q[1] < y1 for x0, y0, x1, y1 in boxes) or any(_near(q, e) for e in bodies):
+            return 0.0
+        return taken.nearest(q, own)
+
+    rects = _boxes_of(bodies)
+
+    def outline_room(q, key, own: int) -> float:  # room, judged by the letter's ink (pad 0.05) on the drawn outlines
+        if any(x0 < q[0] < x1 and y0 < q[1] < y1 for x0, y0, x1, y1 in boxes):
+            return 0.0
+        base = layout.nucleic.strands[key[0]].bases[key[1]]
+        box = ink.get(base, ink["N"]) + np.array([q[0] - 0.05, q[1] - 0.05, q[0] + 0.05, q[1] + 0.05])
+        near = (rects[:, 0] < box[2]) & (box[0] < rects[:, 2]) & (rects[:, 1] < box[3]) & (box[1] < rects[:, 3])
+        if near.any() and any(_box_meets_body(box, part) for k in np.flatnonzero(near) for part in _outline(bodies[k])):
             return 0.0
         return taken.nearest(q, own)
 
@@ -134,6 +207,9 @@ def _place_letters(layout: Layout, paths: list[NAPath]) -> dict[tuple[int, int],
             options = [xy + side * NT_ROW * f for f in (1.0, -1.0, 1.7, -1.7, 2.4, -2.4)]
             options += [xy + side * NT_ROW * f + ahead * t for f in (1.0, -1.0) for t in (0.4, -0.4)]
             key = (p.strand, i)
+            if key in stay:
+                out[key] = stay[key]
+                continue
             spaces = [room(q, index[key]) for q in options]
             free = [r >= _LETTER_GAP and not struck(q, key) for q, r in zip(options, spaces)]
             if not any(free):  # crowded: further out, and further along the strand
@@ -142,6 +218,14 @@ def _place_letters(layout: Layout, paths: list[NAPath]) -> dict[tuple[int, int],
                 options += more
                 spaces += [room(q, index[key]) for q in more]
                 free += [r >= _LETTER_GAP and not struck(q, key) for q, r in zip(more, spaces[-len(more) :])]
+            if not any(free) and p.kind != "hairpin":  # by the drawn outlines, then on rings further out
+                ok = [outline_room(q, key, index[key]) >= _LETTER_GAP and not struck(q, key) for q in options]
+                if not any(ok):
+                    ring = [xy + r * np.array([math.cos(t), math.sin(t)]) for r in _LETTER_RINGS for t in _RING_TURNS]
+                    found = next((q for q in ring if room(q, index[key]) >= _LETTER_GAP and not struck(q, key)), None)
+                    if found is not None:
+                        options, spaces, ok = [*options, found], [*spaces, _LETTER_GAP], [*ok, True]
+                free = ok if any(ok) else free
             if p.kind == "hairpin":  # a hairpin loop's letters stay in its stem's footprint (layout keeps it clear):
                 # a spot inside clear with the line clearance, else one no strand runs through; else outside (8SA2)
                 d = at[p.between[0]]
@@ -168,9 +252,42 @@ def _place_letters(layout: Layout, paths: list[NAPath]) -> dict[tuple[int, int],
     return out
 
 
+def _letters_off_loops(layout: Layout, loops) -> None:
+    """In place: the base letters a protein loop (`loops`, polylines) still runs through, or nearer than the line
+    clearance, once route._off_na_text has routed such loops again where it could, placed again clear of the loops
+    (_place_letters, `only`); every other letter stays. Random-100 held-out 13FZ: B:2's and B:8's letters on loops
+    no route could take off them. Letters are placed blind to the protein loops first so that a loop routed off a
+    letter, as before, keeps that route (a letter kept off the loop from the start left the loop crossing the strand
+    it would have been routed off: one more protein-loop crossing in 1IHF, 1QBJ, 1QTQ and 1URN)."""
+    lines = [np.asarray(pts, float).reshape(-1, 2) for pts in loops if len(pts) > 1]
+    if not lines or not layout.na_letters:
+        return
+    segs = np.vstack([np.hstack([q[:-1], q[1:]]) for q in lines])
+    em = _em(layout)
+    c = line_clearance(layout)
+    ink = {b: _reach(_ink_points(b, False, _LETTER_EM * em, 0.0)) for b in "ACGUTIN"}
+    strands = layout.nucleic.strands
+    hit = set()
+    for (s, i), (x, y) in sorted(layout.na_letters.items()):
+        x0, y0, x1, y1 = ink.get(strands[s].bases[i], ink["N"]) + np.array([x - c, y - c, x + c, y + c])
+        near = (np.minimum(segs[:, 0], segs[:, 2]) < x1) & (np.maximum(segs[:, 0], segs[:, 2]) > x0)
+        near &= (np.minimum(segs[:, 1], segs[:, 3]) < y1) & (np.maximum(segs[:, 1], segs[:, 3]) > y0)
+        if near.any() and (clip_lengths(segs[near], [(x0, y0, x1, y1)]) > 0).any():
+            hit.add((s, i))
+    if hit:
+        again = _place_letters(layout, layout.na_paths, [q.tolist() for q in lines], only=hit)
+        layout.na_letters.update({k: again[k] for k in sorted(hit)})
+
+
 _GAP_ALONG = tuple(0.5 + s * k / 20 for k in range(9) for s in ((1,) if k == 0 else (-1, 1)))  # middle out
 _GAP_OUT = (1.0, 2.0, 3.0, 4.0, 6.0)  # how far beside its gap a label may sit, in multiples of the least that clears
 # it (4 and 6, random-100 C2b-6: 7Y7C's "... 62 nt ..." beside a gap 0.57 across, between stems)
+
+
+_GAP_RINGS = tuple(1.0 + k / 4 for k in range(9))  # then round its midpoint, in multiples of its half width and half
+_GAP_TURNS = tuple(math.radians(a) for a in range(0, 360, 5))  # height, every 5°, nearest first (random-100 held-out
+# 8ZTU: "... 5 nt ..." by a gap 0.54 long among runs, where every spot beside it met one; the one clear spot, between
+# two runs 0.7 apart, 2.7 such steps out)
 
 
 _GAP_TEXT = 0.75  # a gap label's text size, in ems of the figure's text (render draws it at 0.75 of the font)
@@ -218,8 +335,9 @@ def _label_gaps(layout: Layout, paths: list[NAPath], loops=()) -> None:
     at a fraction of the way along it (_GAP_ALONG, the middle first), on either side, then further out, the
     first spot whose box meets nothing: no element's or stem's body, strand, tie or protein loop (`loops`, polylines),
     base letter, nucleotide (where its bead goes), end label, name or gap label placed before it, nor its own
-    dashed line; when every spot meets something, the one meeting the fewest other things, then the least of its
-    own line (a label beside its own gap reads as its own)."""
+    dashed line; when every spot meets something, the first spot round the gap's midpoint (_GAP_RINGS, nearest
+    first) that meets nothing; when none does, the spot beside it meeting the fewest other things, then the least
+    of its own line (a label beside its own gap reads as its own)."""
     gaps = [p for p in paths if p.kind == "gap" and p.label and len(p.points) > 1]
     if not gaps:
         return
@@ -243,12 +361,15 @@ def _label_gaps(layout: Layout, paths: list[NAPath], loops=()) -> None:
     beads = [d.point(key) for d in layout.stems for key in d.axial] + [q for p in paths for q in p.nt_xy]
     beads = np.asarray(beads, float).reshape(-1, 2)
 
+    body_box = _boxes_of(bodies)
+
     def meets(box, own: int) -> tuple[int, int]:  # (other things met, segments of its own gap met)
         x0, y0, x1, y1 = box
         edges = [((x0, y0), (x1, y0)), ((x1, y0), (x1, y1)), ((x1, y1), (x0, y1)), ((x0, y1), (x0, y0))]
-        n = sum(
+        under = (body_box[:, 0] < x1) & (x0 < body_box[:, 2]) & (body_box[:, 1] < y1) & (y0 < body_box[:, 3])
+        n = sum(  # only a body whose box meets the box can meet it
             1
-            for e in bodies
+            for e in (bodies[k] for k in np.flatnonzero(under).tolist())
             if _near(((x0 + x1) / 2, (y0 + y1) / 2), e, 0.0)
             or x0 < e.cx < x1
             and y0 < e.cy < y1
@@ -286,6 +407,17 @@ def _label_gaps(layout: Layout, paths: list[NAPath], loops=()) -> None:
                     break
             if best[0] == (0, 0):
                 break
+        if best[0] != (0, 0):  # nowhere beside it: round its midpoint, nearest first, a spot that meets nothing
+            mid = np.asarray(midway(p.points), float)
+            for f in _GAP_RINGS:
+                for t in _GAP_TURNS:
+                    x, y = mid + f * (hw + hh) * np.array([math.cos(t), math.sin(t)])
+                    box = (x - hw, y - hh, x + hw, y + hh)
+                    if meets(box, own) == (0, 0):
+                        best = ((0, 0), (float(x), float(y)), box)
+                        break
+                if best[0] == (0, 0):
+                    break
         p.label_xy = best[1]
         taken.append(best[2])
 
@@ -302,13 +434,23 @@ def _ties(layout: Layout, paths: list[NAPath], loops=()) -> list[NATie]:
     bodies, letters, nucleotides, labels, strands and protein loops (`loops`, polylines); where no turn does, the
     tick is drawn longer (_TICK_REACH) and the turns tried again (random-100 C2b-4: 4P9R's and 7Y7C's labels took
     the first turn, on a strand or loop); where none does at any length, the one that meets the fewest lines, bodies
-    and texts (random-100 C2b-6), the first such on a tie."""
+    and texts (random-100 C2b-6), the first such on a tie. A label is clear of a body when its box is (held-out 6S13:
+    a label whose centre stood just off a stem had half its box on it)."""
     na = layout.nucleic
     where = {key: d.point(key) for d in layout.stems for key in d.axial}
     where.update({(p.strand, i): np.asarray(xy) for p in paths for i, xy in zip(p.nts, p.nt_xy)})
     letters = {key: d.point(key, NT_ROW) for d in layout.stems for key in d.axial}
     letters.update({key: np.asarray(xy) for key, xy in layout.na_letters.items()})
     bodies = [*layout.placed.values(), *layout.stems]
+    outlines = [_outline(e) for e in bodies]  # as drawn: a label's box is clear of a strand's shaft and head
+    rects = _boxes_of(bodies)
+
+    def _under(box) -> list[int]:  # the bodies whose boxes the box meets: only those can be under it
+        x0, y0, x1, y1 = box
+        return np.flatnonzero(
+            (rects[:, 0] < x1) & (x0 < rects[:, 2]) & (rects[:, 1] < y1) & (y0 < rects[:, 3])
+        ).tolist()
+
     width = max((d.width for d in layout.stems), default=1.0)
     gw, gh = glyph(layout)  # a letter's room, sized from the text drawn
     boxes = [b for _, b in label_boxes(layout, [])] + [
@@ -330,7 +472,9 @@ def _ties(layout: Layout, paths: list[NAPath], loops=()) -> list[NATie]:
     def clear(tick, at, own) -> bool:  # own: the tie's nucleotide, which the tick starts beside
         (a, b), (x, y) = tick, at
         box = (x - hw, y - hh, x + hw, y + hh)
-        if any(_near(at, e, 0.0) or crosses_body(a, b, e) for e in bodies):
+        if any(_box_meets_body(box, part) for k in _under(box) for part in outlines[k]):  # its box, not its centre
+            return False
+        if any(crosses_body(a, b, e) for e in bodies):
             return False
         pts = np.asarray(taken, float).reshape(-1, 2)  # vectorised (batch B: 37 s of 7Y7C's 140 s was here)
         near = pts[np.hypot(*(pts - np.asarray(own, float)).T) > 1e-9]
@@ -346,7 +490,7 @@ def _ties(layout: Layout, paths: list[NAPath], loops=()) -> list[NATie]:
         (a, b), (x, y) = tick, at
         box = (x - hw, y - hh, x + hw, y + hh)
         through = sum(1 for p, q in near_segments(box, b) if clip_len(p, q, box) > 1e-9)  # lines across its label
-        on = sum(1 for e in bodies if _near(at, e, 0.0)) + sum(  # bodies and text under it
+        on = sum(1 for k in _under(box) if any(_box_meets_body(box, part) for part in outlines[k])) + sum(  # text
             1 for o in boxes if min(box[2], o[2]) > max(box[0], o[0]) and min(box[3], o[3]) > max(box[1], o[1])
         )
         tick_on = sum(1 for e in bodies if crosses_body(a, b, e))

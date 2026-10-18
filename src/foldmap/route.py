@@ -584,18 +584,29 @@ class _Router:
             self.rejected += 1
         return None
 
-    def route(self, pa, ea, own_a, pb, eb, own_b, own_body=False, loose=False, under=((), ()), exempt=()):
+    def route(
+        self, pa, ea, own_a, pb, eb, own_b, own_body=False, loose=False, under=((), ()), exempt=(), text_toll=0.0
+    ):
         """(points, over labels): a drawn route, kept off text and stubs unless nothing else routes; None
         points if there is no clear route at all. Over labels: found with the keep-outs open, it runs through one of
         their boxes (keep_out). A label's margin cells by a port can end the strict search though the route drawn
-        passes beside the label (random-100 C2b-2: 8RRX's D and G loops)."""
+        passes beside the label (random-100 C2b-2: 8RRX's D and G loops). `text_toll`: with the keep-outs open, the
+        extra cost of each of their cells entered, so the route crosses as little text as it can (a nucleic-acid
+        strand's: random-100 held-out 8ZTU's run beside α3 ran up through its name, the shortest way once open)."""
         grid = self.grid
         pts = self.drawn(pa, ea, own_a, pb, eb, own_b, own_body, loose, under, exempt)
         if pts is not None or not grid.soft.any():
             return pts, False
+        saved = grid.toll
+        if text_toll:
+            toll = np.where(grid.soft, text_toll, 0.0)
+            grid.toll = toll if saved is None else saved + toll
         grid.blocked &= ~grid.soft
-        pts = self.drawn(pa, ea, own_a, pb, eb, own_b, own_body, loose, under, exempt)
-        grid.blocked |= grid.soft
+        try:
+            pts = self.drawn(pa, ea, own_a, pb, eb, own_b, own_body, loose, under, exempt)
+        finally:
+            grid.blocked |= grid.soft
+            grid.toll = saved
         return pts, pts is not None and _text_hits(pts, self.keep_out) > 0
 
 
@@ -747,6 +758,14 @@ _END_TURNS = (0.0, 45.0, -45.0, 90.0, -90.0)  # degrees a chain end's letter may
 _END_OUT = (0.0, 0.3, 0.6)  # ... and page units further out than END_LABEL, nearest first
 
 
+def _lines_struck(box, segs: np.ndarray, owner: np.ndarray, band: float) -> int:
+    """How many lines (not segments: a rounded corner is many short ones) run within `band` of the box; `owner`: the
+    line each of `segs` is part of."""
+    from .layout import lines_meeting
+
+    return len(set(owner[lines_meeting(box, segs, band)[:, 0]].tolist()))
+
+
 def _clear_termini(layout: Layout, sses: list[SSE], loops: list[Loop]) -> None:
     """A chain end's N or C letter that a line runs through (a loop's, a nucleic-acid strand's; within
     layout.line_band of its ink, as figcheck's A6 reads it) turns round its stub's tip, or stands further out
@@ -754,7 +773,10 @@ def _clear_termini(layout: Layout, sses: list[SSE], loops: list[Loop]) -> None:
     other text; the earlier spot on a tie, and only to a spot better than its own (Layout.end_labels; render and
     label_boxes read it through end_label_pos). Its stub stays. Random-100 C2b-6: 9FWZ's C of chain D in the stack
     gap under S29, where the D:618-629 loop runs up into S29's N end (no route passes it), and the ribosomes' chain
-    ends crossed by strands. Run after every line is drawn (route_loops)."""
+    ends crossed by strands. Lines are counted, not their segments (random-100 held-out 6L9Z's domains view: N of
+    chain A, grazed by a strand's rounded corner, two short segments within the clearance, moved onto another strand
+    running straight through it, one segment).
+    Run after every line is drawn (route_loops)."""
     from .layout import (
         END_LABEL,
         END_STUB,
@@ -763,7 +785,6 @@ def _clear_termini(layout: Layout, sses: list[SSE], loops: list[Loop]) -> None:
         end_label_pos,
         line_band,
         line_clearance,
-        lines_meeting,
         na_text_boxes,
         segments_of,
         termini,
@@ -772,9 +793,11 @@ def _clear_termini(layout: Layout, sses: list[SSE], loops: list[Loop]) -> None:
     ends = termini(layout, sses)
     if not ends:
         return
-    segs = segments_of([lp.points for lp in loops] + [path.points for path in layout.na_paths])
+    drawn = [lp.points for lp in loops] + [path.points for path in layout.na_paths]
+    segs = segments_of(drawn)
     if not len(segs):
         return
+    owner = np.repeat(np.arange(len(drawn)), [max(len(pts) - 1, 0) for pts in drawn])  # each segment's line
     em = _ink_em(layout, layout.font_scale)
     gw, gh = glyph(layout)
     band, grow = line_band(layout), line_clearance(layout)
@@ -790,7 +813,7 @@ def _clear_termini(layout: Layout, sses: list[SSE], loops: list[Loop]) -> None:
             return centred_box(float(xy[0]), float(xy[1]), *half)
 
         def strikes(box) -> tuple[int, int]:
-            return tuple(int(lines_meeting(box, segs, r).sum()) for r in (band, grow))
+            return tuple(_lines_struck(box, segs, owner, r) for r in (band, grow))
 
         here = end_label_pos(layout, end, chain, port, ex)
         now = strikes(box_at(here))
@@ -921,6 +944,9 @@ def route_loops(layout: Layout, sses: list[SSE], bb) -> list[Loop]:
 
         layout.na_paths = route_nucleic(layout, router, [pts for pts, _, _ in routed.values()])
         _off_na_text(layout, router, out)
+        from .na_labels import _letters_off_loops
+
+        _letters_off_loops(layout, [lp.points for lp in out])
     _clear_helix_names(layout, sses, out)
     _clear_termini(layout, sses, out)
     _still_over(layout, sses, out)
