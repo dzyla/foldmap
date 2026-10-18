@@ -1021,6 +1021,27 @@ def test_the_sampler_never_draws_an_excluded_id(r100):
     assert s.check("1ABC") == (False, "in the excluded sample") and s.check("2DEF") == (True, "")
 
 
+def test_sample_excludes_the_ids_of_every_sample_named(r100, tmp_path, monkeypatch):
+    """Plan 15 Task 9: the third sample draws none of the tuned or the held-out ids (--exclude given twice), and a
+    CA-only replacement of either counts as one of its ids."""
+    tuned, held = tmp_path / "tuned.json", tmp_path / "held.json"
+    tuned.write_text(json.dumps({"entries": [{"id": "1ABC"}, {"id": "2DEF"}], "replaced": []}))
+    held.write_text(json.dumps({"entries": [{"id": "3GHI"}, {"id": "1ABC"}],
+                                "replaced": [{"id": "4JKL", "replacement": None}]}))
+    seen = {}
+
+    def fake(seed, date, exclude=()):
+        seen["exclude"] = list(exclude)
+        return {"entries": [], "quotas": {}}
+
+    monkeypatch.setattr(r100, "sample", fake)
+    out = tmp_path / "third.json"
+    r100.main(["sample", "--date", "2026-10-13", "--exclude", str(tuned), "--exclude", str(held), "--out", str(out)])
+    assert seen["exclude"] == ["1ABC", "2DEF", "3GHI", "4JKL"]
+    r100.main(["sample", "--date", "2026-10-13", "--out", str(out)])
+    assert seen["exclude"] == []
+
+
 def test_an_entrys_work_folder_starts_empty(r100, tmp_path):
     """Final review B, Minor 5: a view that writes nothing is never judged on an earlier run's files."""
     work = tmp_path / "work" / "1ABC"

@@ -4,7 +4,7 @@
 view foldmap offers, measured and shown on a contact sheet (plan 10, needs network; not run in CI).
 
     python scripts/random100.py sample [--seed 20261013] [--date YYYY-MM-DD] [--out .../sample.json] [--check]
-                                       [--exclude other/sample.json]
+                                       [--exclude other/sample.json [--exclude another/sample.json ...]]
 
 sample draws the sample from the RCSB search API (https://search.rcsb.org/rcsbsearch/v2/query) and writes
 docs/validation/random100/sample.json. Every pool is one stratum x size-bin query, all hits, sorted; it is drawn
@@ -15,9 +15,10 @@ downloaded, holds no protein or nucleic-acid polymer, is CA-only or P-only, or i
 quotas inside a stratum (S4 helical, big, cap; S8 ribosome) are drawn first from their own sub-pools; the pairs of S11
 follow PAIR_TYPES (one UniProt accession and one protein by sequence: same_protein); the cross-cutting quotas
 (QUOTAS) are then topped up. --exclude takes another sample's ids out of every pool (the held-out sample: final review
-A, Important 2). The same seed, date, pools and files give the same draw; the file also records the foldmap commit,
-the gemmi version and the SHA-256 of every candidate file read, so a changed file is seen. --check re-queries the ids
-and lists those now obsolete, without changing the file.
+A, Important 2); given more than once, the ids of every sample it names (the third sample: none of the tuned or the
+held-out ids). The same seed, date, pools and files give the same draw; the file also records the foldmap commit, the
+gemmi version and the SHA-256 of every candidate file read, so a changed file is seen. --check re-queries the ids and
+lists those now obsolete, without changing the file.
 
     python scripts/random100.py run [--ids A,B | --failed-from report.json] [--views all|quick|v1,v2]
                                     [--out docs/validation/random100] [--jobs 1]
@@ -949,7 +950,7 @@ def cmd_sample(args) -> int:
         gone = obsolete(doc)
         print(f"{len(gone)} obsolete id(s){': ' + ', '.join(gone) if gone else ''}")
         return 1 if gone else 0
-    exclude = [e["id"] for e in _sample_entries(Path(args.exclude))] if args.exclude else []
+    exclude = sorted({e["id"] for f in args.exclude or [] for e in _sample_entries(Path(f))})
     doc = sample(args.seed, args.date, exclude)
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(dump(doc), encoding="utf-8")
@@ -2416,7 +2417,8 @@ def main(argv=None) -> int:
     s.add_argument("--date", default=datetime.date.today().isoformat(), help="release-date cutoff (YYYY-MM-DD)")
     s.add_argument("--out", default=str(OUT / "sample.json"))
     s.add_argument("--check", action="store_true", help="list the sampled ids now obsolete; change nothing")
-    s.add_argument("--exclude", metavar="SAMPLE", help="another sample.json whose ids are never drawn (held-out)")
+    s.add_argument("--exclude", metavar="SAMPLE", action="append",
+                   help="another sample.json whose ids are never drawn (held-out); may be given more than once")
     s.set_defaults(func=cmd_sample)
     views = "all, quick (default, seed1, roundtrip) or a comma-separated list of " + ", ".join(VIEWS)
     r = sub.add_parser("run", help="draw, measure and report every sampled entry (network for downloads)")
