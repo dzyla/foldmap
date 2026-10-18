@@ -1,6 +1,6 @@
 # foldmap random-100 campaign
 
-77 of 100 pass.
+80 of 100 pass.
 
 An entry passes when no criterion fails. A criterion with nothing to judge in an entry is not judged (or does not apply), never counted as a pass: see the outcomes per criterion below.
 
@@ -18,7 +18,7 @@ Sample: seed 20261017, release-date cutoff 2026-10-13.
 | S8 | 7 | 3 |
 | S9 | 3 | 3 |
 | S10 | 5 | 5 |
-| S11 | 10 | 6 |
+| S11 | 10 | 9 |
 | S12 | 3 | 3 |
 
 ## Outcomes per criterion
@@ -36,10 +36,10 @@ Sample: seed 20261017, release-date cutoff 2026-10-13.
 | A5 no element or stem boxes overlapping | 98 | 2 | 0 | 0 |
 | A6 no text collisions | 89 | 11 | 0 | 0 |
 | A7 text and legend inside the page | 99 | 1 | 0 | 0 |
-| A8 labels unique per chain, stem names per figure | 99 | 1 | 0 | 0 |
+| A8 labels unique per chain, stem names per figure | 98 | 1 | 1 | 0 |
 | A9 nothing left out without a note | 100 | 0 | 0 | 0 |
 | A10 secondary structure agrees with mkdssp | 97 | 0 | 0 | 3 |
-| A11 N->C and sheet order | 100 | 0 | 0 | 0 |
+| A11 N->C and sheet order | 96 | 0 | 1 | 3 |
 | A12 same figure for any PYTHONHASHSEED | 100 | 0 | 0 | 0 |
 | A13 a saved layout redraws the same figure | 100 | 0 | 0 | 0 |
 | A14 interactive page and sequence plot written | 100 | 0 | 0 | 0 |
@@ -47,11 +47,13 @@ Sample: seed 20261017, release-date cutoff 2026-10-13.
 | A16 domains: one chain, alike, not tiny, panels apart, names clear | 47 | 4 | 12 | 37 |
 | A17 nucleic-acid metrics and stem names by their letters | 11 | 6 | 0 | 83 |
 | A18 membrane: TM helices in the band, loops out of the slab | 5 | 3 | 0 | 92 |
-| A19 two states: same names in the same order | 6 | 4 | 0 | 90 |
+| A19 two states: same names in the same order | 8 | 0 | 0 | 92 |
 | A20 ligand tethers local | 12 | 0 | 53 | 35 |
 
 ### Not judged, per criterion
 
+- **A8** (1): 9BVV (no element or stem drawn)
+- **A11** (1): 9BVV (no protein element drawn)
 - **A16** (12): 3KSI (the domains view drew no domain); 5YUH (the domains view drew no domain); 6B7J (the domains view drew no domain); 2O4P (the domains view drew no domain); 3B6N (the domains view drew no domain); 3KTK (the domains view drew no domain); 2YJA (the domains view drew no domain); 3JBE (the domains view drew no domain); 1TKW (the domains view drew no domain); 2VBO (the domains view drew no domain); 5K7Z (the domains view drew no domain); 9WB3 (the domains view drew no domain)
 - **A20** (53): 1PTY (no tether to another chain; reported: ligand-tether:PTR:A323:1 7.246 (home A)); 1HMY (no tether to another chain); 6EJ3 (no tether to another chain; reported: ligand-tether:B7T:A501:0 7.443 (home A); ligand-tether:B7T:A501:1 6.648 (home A)); 5RFU (no tether to another chain); 8F03 (no tether to another chain); 5YUH (no tether to another chain); 2W6W (no tether to another chain); 3LIL (no tether to another chain); 7P46 (no tether to another chain; reported: ligand-tether:HEM+CYN:B301:1 7.452 (home B); ligand-tether:HEM+CYN:A301:2 6.984 (home A); ligand-tether:KYN:D303:0 7.308 (); 8HRP (no tether to another chain; reported: ligand-tether:NAD:A401:2 7.085 (home A); ligand-tether:G3H:C402:1 8.142 (home C); ligand-tether:NAD:D401:2 8.264 (home D)); 6SNU (no tether to another chain; reported: ligand-tether:PLP:A502:1 7.162 (home A); ligand-tether:PLP:A502:3 6.731 (home A); ligand-tether:PLP:B504:1 7.148 (home B);); 3AMZ (no tether to another chain; reported: ligand-tether:FAD:A3005:2 10.299 (home A); ligand-tether:FES:A3001:2 19.25 (home A); ligand-tether:ZXF:A3009:2 7.767 (home); 8ZT9 (no tether to another chain); 7X8H (no tether to another chain); 2NAD (no tether to another chain); 2O4P (no tether to another chain; reported: ligand-tether:TPV:A300:0 7.055 (home A)); 3B6N (no tether to another chain); 5EUJ (no tether to another chain; reported: ligand-tether:TPP:A602:2 6.904 (home A); ligand-tether:TPP:A602:3 6.548 (home A)); 9SLB (no tether to another chain); 6HW8 (no tether to another chain; reported: ligand-tether:MG:G301:2 9.455 (home G); ligand-tether:GT8:H301:0 7.81 (home H); ligand-tether:GT8:V301:0 6.703 (home V); l); 6XER (no tether to another chain; reported: ligand-tether:GTP:A501:1 9.82 (home A); ligand-tether:GTP:A501:2 6.856 (home A); ligand-tether:GDP:B501:3 7.63 (home B); l); 3ULQ (no tether to another chain); 2UZU (no tether to another chain); 6N9A (no tether to another chain; reported: ligand-tether:ZN:D1402:2 8.962 (home D1); ligand-tether:KG4:D1401:3 8.415 (home D1); ligand-tether:ZN:D2402:2 8.983 (home ); 2YJA (no tether to another chain; reported: ligand-tether:EST:B11550:0 7.343 (home B1); ligand-tether:EST:B11550:3 9.438 (home B1); ligand-tether:EST:B21550:0 7.343 (); 4N9F (no tether to another chain); 3L4G (no tether to another chain); 8D3D (no tether to another chain; reported: ligand-tether:CA:A2001:4 8.03 (home A)); 6V6S (no tether to another chain; reported: ligand-tether:ADP:U800:0 15.067 (home U); ligand-tether:ADP:U800:1 25.094 (home U); ligand-tether:ADP:U800:2 12.144 (home ); 12BM (no tether to another chain; reported: ligand-tether:ADP:A501:2 10.784 (home A); ligand-tether:ADP:A501:3 7.069 (home A); ligand-tether:AGS:C501:1 17.008 (home C); 7BKC (no tether to another chain; reported: ligand-tether:FAD:A702:3 13.647 (home A); ligand-tether:FAD:a702:0 7.359 (home a); ligand-tether:FAD:a702:3 11.157 (home a); 9Y05 (no tether to another chain; reported: ligand-tether:JDP:A901:2 6.657 (home A)); 1TKW (no tether to another chain); 6MJ2 (no tether to another chain; reported: ligand-tether:CA:A1601:2 6.912 (home A)); 6QFA (no tether to another chain); 8JWF (no tether to another chain; reported: ligand-tether:YMZ:A1500:1 6.779 (home A); ligand-tether:YMZ:A1500:2 8.191 (home A)); 8WH0 (no tether to another chain; reported: ligand-tether:ANP:A802:3 8.21 (home A); ligand-tether:ANP:C802:1 7.546 (home C); ligand-tether:ANP:F802:1 6.752 (home F); ); 4NLG (no tether to another chain); 2FD8 (no tether to another chain); 13FZ (no tether to another chain; reported: ligand-tether:AGS:A2000:2 11.751 (home A); ligand-tether:AGS:C2000:2 15.164 (home C); ligand-tether:AGS:C2000:3 10.606 (ho); 4E8Q (no tether to another chain); 9IWF (no tether to another chain); 9YER (no tether to another chain); 9QK1 (no tether to another chain); 3IB0 (no tether to another chain; reported: ligand-tether:CO3:A687:3 6.71 (home A)); 6A4Y (no tether to another chain; reported: ligand-tether:HEM:A601:0 8.952 (home A)); 8JXD (no tether to another chain); 1C6A (no tether to another chain); 244L (no tether to another chain); 8U9T (no tether to another chain; reported: ligand-tether:W1L:A1401:3 7.845 (home A1); ligand-tether:W1L:A2401:3 7.884 (home A2)); 3U3H (no tether to another chain; reported: ligand-tether:03W+FMT:A1400:1 10.047 (home A1); ligand-tether:MRD:A12000:2 7.095 (home A1); ligand-tether:MRD:A32000:2 7.0); 6QND (no tether to another chain; reported: ligand-tether:MG:A402:0 8.701 (home A); ligand-tether:MG:A402:2 10.774 (home A); ligand-tether:MG:A402:3 7.584 (home A); l); 2BBH (no tether to another chain; reported: ligand-tether:DMU:A402:2 6.502 (home A); ligand-tether:DMU:A402:3 9.734 (home A))
 
@@ -104,9 +106,9 @@ process s: the default view's whole process (drawing, measuring and, for nucleic
 | 6WUT | S4 | M | 3 | 1.4 | 0.63 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | ✓ | - | - | - | - |  |
 | 8D3D | S4 | XL | 16 | 22.09 | 19.43 | ✗ | - | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | - | - | - | ○ | A1: focus: killed after 900 s; A5: focus not measured (not measured); A6: focus not measured (not measured); A7: focus not measured (not measured); A8: focus not measured (not measured); A15: focus not measured (not measured) |
 | 6V6S | S4 | XL | 38 | 31.06 | 26.34 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | ✓ | - | - | - | ○ |  |
-| 12BM | S4 | XL | 19 | 12.32 | 9.79 | ✓ | - | ✓ | ✓ | ✗ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | ✗ | - | - | - | ○ | A3: default: A:93-101>A:111-115, B:98-101>B:107-116, C:21-66>C:71-79, C:84-89>C:94-98; deposited: A:93-101>A:111-115, B:98-101>B:107-116, C:21-66>C:71-79, C:84-89>C:94-98; beta: A:93-101>A:111-115, B:98-101>B:107-116, C:21-66>C:71-79, C:84-89>C:94-98; domains: A:93-101>A:111-115, B:98-101>B:107-116, C:21-66>C:71-79, C:84-89>C:94-98; A6: domains 1 (domain-label:D1 · B × loop:B:98-101>B:107-116); A16: domains 1 () |
+| 12BM | S4 | XL | 19 | 12.32 | 9.79 | ✓ | - | ✓ | ✓ | ✗ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | ✗ | - | - | - | ○ | A3: default: A:93-101>A:111-115, B:98-101>B:107-116, C:21-66>C:71-79, C:84-89>C:94-98; deposited: A:93-101>A:111-115, B:98-101>B:107-116, C:21-66>C:71-79, C:84-89>C:94-98; beta: A:93-101>A:111-115, B:98-101>B:107-116, C:21-66>C:71-79, C:84-89>C:94-98; domains: A:93-101>A:111-115, B:98-101>B:107-116, C:21-66>C:71-79, C:84-89>C:94-98; A6: domains 1 (domain-label:D1 · B × loop:B:98-101>B:107-116); A16: domains 1 (domain-label:D1 · B × loop:B:98-101>B:107-116) |
 | 9GTP | S4 | XL | 60 | 5.91 | 3.96 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | - | - | - | - | A15: focus 52.108405597395176 |
-| 7BKC | S4 | XL | 26 | 18.39 | 13.76 | ✓ | - | ✓ | ✓ | ✗ | ✗ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | - | - | - | ○ | A3: domains: E:15-20>E:26-37, E:188-192>E:203-206, C:27-37>C:41-43, C:49-53>C:57-59; A4: domains: D:183-195>D:198-201, d:183-195>d:198-201; A6: domains 70 (domain-label:D2 · A × loop:A:351-353>A:365-367; domain-label:D2 · A × loop:A:368-375>A:396-403; domain-label:D2 · D × loop:D:170-174>D:183-195); A16: domains 6 () |
+| 7BKC | S4 | XL | 26 | 18.39 | 13.76 | ✓ | - | ✓ | ✓ | ✗ | ✗ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | - | - | - | ○ | A3: domains: E:15-20>E:26-37, E:188-192>E:203-206, C:27-37>C:41-43, C:49-53>C:57-59; A4: domains: D:183-195>D:198-201, d:183-195>d:198-201; A6: domains 70 (domain-label:D2 · A × loop:A:351-353>A:365-367; domain-label:D2 · A × loop:A:368-375>A:396-403; domain-label:D2 · D × loop:D:170-174>D:183-195); A16: domains 6 (domain-label:D2 · A × loop:A:351-353>A:365-367; domain-label:D2 · A × loop:A:368-375>A:396-403; domain-label:D2 · D × loop:D:170-174>D:183-195) |
 | 7SPB | S4 | XL | 78 | 2.15 | 1.02 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | - | - |  |
 | 7ZDP | S4 | XL | 45 | 14.02 | 11.25 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | ✓ | - | - | - | ✓ |  |
 | 9Y05 | S4 | XL | 12 | 2.31 | 1.13 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | - | ○ |  |
@@ -117,7 +119,7 @@ process s: the default view's whole process (drawing, measuring and, for nucleic
 | 2N5J | S5 | S | 1 | 0.85 | 0.14 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | - | - | - | - |  |
 | 8SKX | S5 | S | 1 | 0.85 | 0.11 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | - | - | - | - |  |
 | 1RCH | S5 | S | 1 | 1.05 | 0.24 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | - | - | - | - |  |
-| 9BVV | S5 | S | 1 | 0.65 | 0.03 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | - | - | - | - |  |
+| 9BVV | S5 | S | 1 | 0.5 | 0.03 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ○ | ✓ | ✓ | ○ | ✓ | ✓ | ✓ | - | - | - | - | - | - |  |
 | 9CZH | S6 | L | 8 | 3.01 | 2.09 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | ✓ | - | ✓ |  |
 | 6MJ2 | S6 | L | 4 | 2.15 | 1.04 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | ✗ | - | ○ | A18: no band drawn |
 | 6QFA | S6 | L | 10 | 1.85 | 0.95 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | ✓ | - | ○ |  |
@@ -132,17 +134,17 @@ process s: the default view's whole process (drawing, measuring and, for nucleic
 | 2VBO | S7 | M | 4 | 2.66 | 0.52 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | ○ | ✓ | - | - | ✓ |  |
 | 5K7Z | S7 | M | 6 | 3.31 | 1.08 | ✓ | - | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ○ | ✗ | - | - | ✓ | A3: default: strand F:1-16; deposited: strand F:1-16; beta: strand F:1-16; domains: strand F:1-16; A15: default 1.106238016241444; A17: pair_f1 0.182 (limit 0.95); stem_recall 0.0 (limit 0.85); fallbacks 1 (limit 0) |
 | 2FD8 | S7 | S | 2 | 2.05 | 0.26 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | ✓ | - | - | ○ | A6: default 5 (na:nt:B:501 × strand:A:116-122; na:nt:B:502 × strand:A:204-210; na:nt:B:503 × ligand:AKG:A400); deposited 5 (na:nt:B:501 × strand:A:116-122; na:nt:B:502 × strand:A:204-210; na:nt:B:503 × ligand:AKG:A400); beta 3 (na:nt:B:501 × strand:A:116-122; na:nt:B:502 × strand:A:204-210; na:end:B:501-503:5′ × strand:A:60-65); focus 5 (na:nt:B:501 × strand:A:116-122; na:nt:B:502 × strand:A:204-210; na:nt:B:503 × ligand:AKG:A400) |
-| 7NZ2 | S7 | XL | 44 | 74.99 | 55.73 | ✓ | - | ✓ | ✓ | ✗ | ✗ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | ✗ | ✗ | - | - | ✓ | A3: domains: B1:211-221>B1:227-408, B3:211-221>B3:227-408, B3:1051-1123>B3:1136-1140, F3:182-186>F3:197-205; A4: domains: A1:1180-1196>A1:1208-1262, A4:217-221>A4:226-400, A4:986-1045>A4:1051-1124, B1:934-971>B1:983-1044; A6: domains 9 (domain-label:D7 · A1 × loop:B3:211-221>B3:227-408; domain-label:D12 · A1 × loop:A1:1180-1196>A1:1208-1262; domain-label:D1 · A3 × loop:F3:182-186>F3:197-205); A16: domains 6 (); A17: spearman 0.446 (limit 0.6) |
+| 7NZ2 | S7 | XL | 44 | 74.99 | 55.73 | ✓ | - | ✓ | ✓ | ✗ | ✗ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | ✗ | ✗ | - | - | ✓ | A3: domains: B1:211-221>B1:227-408, B3:211-221>B3:227-408, B3:1051-1123>B3:1136-1140, F3:182-186>F3:197-205; A4: domains: A1:1180-1196>A1:1208-1262, A4:217-221>A4:226-400, A4:986-1045>A4:1051-1124, B1:934-971>B1:983-1044; A6: domains 9 (domain-label:D7 · A1 × loop:B3:211-221>B3:227-408; domain-label:D12 · A1 × loop:A1:1180-1196>A1:1208-1262; domain-label:D1 · A3 × loop:F3:182-186>F3:197-205); A16: domains 6 (domain-label:D7 · A1 × loop:B3:211-221>B3:227-408; domain-label:D12 · A1 × loop:A1:1180-1196>A1:1208-1262; domain-label:D1 · A3 × loop:F3:182-186>F3:197-205); A17: spearman 0.446 (limit 0. |
 | 9K4F | S8 | L | 4 | 5.11 | 1.87 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | ✗ | - | - | - | A17: stems_nearer_frac 0.875 (limit 1.0) |
 | 13FZ | S8 | L | 4 | 10.84 | 7.52 | ✓ | - | ✓ | ✓ | ✗ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✗ | - | - | ○ | A3: default: strand B:1-13; deposited: strand B:1-13; beta: strand B:1-13; A6: default 3 (na:nt:B:2 × loop:A:1013-1019>A:1027-1031; na:nt:B:3 × strand:A:614-618; na:nt:B:8 × loop:A:1003-1006>A:1013-1019); deposited 3 (na:nt:B:2 × loop:A:1013-1019>A:1027-1031; na:nt:B:3 × strand:A:614-618; na:nt:B:8 × loop:A:1003-1006>A:1013-1019); beta 4 (na:nt:B:2 × loop:A:1013-1019>A:1027-1031; na:nt:B:3 × strand:A:614-618; na:nt:B:8 × loop:A:1003-1006>A:1013-1019); A15: default 17.0586549756951; A17: fallbacks 1 (limit 0) |
 | 9WB3 | S8 | M | 4 | 3.01 | 0.63 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | ○ | ✓ | - | - | - |  |
 | 7F3J | S8 | M | 8 | 2.81 | 0.19 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | ✓ | - | - | - |  |
 | 2XLJ | S8 | S | 2 | 3.06 | 0.36 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | ✓ | - | - | - |  |
 | 6S13 | S8 | XL | 52 | 54.59 | 34.71 | ✓ | - | ✓ | ✓ | ✗ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | ✓ | ✗ | - | - | - | A3: domains: strand A:2729-2729, strand A:2732-2733, strand A:2737-2738; A6: default 1 (na:tie:448-506:label × na:stem:166); deposited 1 (na:tie:448-506:label × na:stem:166); beta 1 (na:tie:448-506:label × na:stem:166); focus 1 (na:tie:448-506:label × na:stem:166); domains 3 (na:stem:80:first × na:run:239; na:stem:129:first × na:run:239; na:stem:129:first × na:run:240); A17: pair_f1 0.944 (limit 0.95); beads_missing 134 (limit 0); na_crossings 2 (limit 0); bead_overlaps 7 (limit 0) |
-| 8ZTU | S8 | XL | 56 | 75.91 | 53.28 | ✓ | - | ✓ | ✓ | ✗ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | ✗ | ✗ | - | - | ✓ | A3: domains: strand a:2701-2702, strand a:2705-2705, strand a:2710-2711; A6: default 2 (na:gap:499 × na:run:477; ligand-label:MG:a6201 × na:stem:188); deposited 2 (na:gap:499 × na:run:477; ligand-label:MG:a6201 × na:stem:188); beta 2 (na:gap:499 × na:run:477; ligand-label:MG:a6201 × na:stem:188); focus 2 (na:gap:499 × na:run:477; ligand-label:MG:a6201 × na:stem:188); domains 7 (domain-label:D2 · H × na:run:485; na:gap:499 × na:stem:244; na:gap:499 × na:run:371); A16: domains 1 (); A17: beads_missing 1 (limit 0); bead_overlaps 2 (limit 0); gap_label_collisions 1 (limit 0) |
-| 4E8Q | S9 | M | 1 | 4.01 | 1.17 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | ✓ | ✓ | ✓ | ✓ | - | - | ✓ | - | - | ○ |  |
-| 9IWF | S9 | S | 2 | 2.41 | 0.38 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | ✓ | ✓ | ✓ | ✓ | - | - | ✓ | - | - | ○ |  |
-| 1Z43 | S9 | S | 1 | 2.31 | 0.38 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | ✓ | ✓ | ✓ | ✓ | - | - | ✓ | - | - | - |  |
+| 8ZTU | S8 | XL | 56 | 75.91 | 53.28 | ✓ | - | ✓ | ✓ | ✗ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | ✗ | ✗ | - | - | ✓ | A3: domains: strand a:2701-2702, strand a:2705-2705, strand a:2710-2711; A6: default 2 (na:gap:499 × na:run:477; ligand-label:MG:a6201 × na:stem:188); deposited 2 (na:gap:499 × na:run:477; ligand-label:MG:a6201 × na:stem:188); beta 2 (na:gap:499 × na:run:477; ligand-label:MG:a6201 × na:stem:188); focus 2 (na:gap:499 × na:run:477; ligand-label:MG:a6201 × na:stem:188); domains 7 (domain-label:D2 · H × na:run:485; na:gap:499 × na:stem:244; na:gap:499 × na:run:371); A16: domains 1 (domain-label:D2 · H × na:run:485); A17: beads_missing 1 (limit 0); bead_overlaps 2 (limit 0); gap_label_collisions 1  |
+| 4E8Q | S9 | M | 1 | 3.51 | 1.11 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | ✓ | ✓ | ✓ | - | - | ✓ | - | - | ○ |  |
+| 9IWF | S9 | S | 2 | 2.0 | 0.3 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | ✓ | ✓ | ✓ | - | - | ✓ | - | - | ○ |  |
+| 1Z43 | S9 | S | 1 | 1.95 | 0.36 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | ✓ | ✓ | ✓ | - | - | ✓ | - | - | - |  |
 | 9YER | S10 | L | 5 | 6.06 | 4.86 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | ✓ | - | - | - | ○ |  |
 | 9QK1 | S10 | L | 9 | 10.42 | 9.1 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | ✓ | - | - | - | ○ |  |
 | 3IB0 | S10 | M | 1 | 3.01 | 2.31 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | - | - | - | ○ |  |
@@ -152,12 +154,12 @@ process s: the default view's whole process (drawing, measuring and, for nucleic
 | 3HQB | S11 | S | 2 | 1.26 | 0.35 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | - | - | ✓ | - |  |
 | 1C6A | S11 | S | 1 | 1.0 | 0.25 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | - | - | ✓ | ○ |  |
 | 244L | S11 | S | 1 | 1.0 | 0.28 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | - | - | ✓ | ○ |  |
-| 8U9T | S11 | M | 1 | 1.3 | 0.52 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | ✗ | ○ | A19: names compared on all 3 pairs; only 3 of 24 and 11 elements paired; A1:11-14 unpaired; A1:17-22 unpaired; A1:35-39 unpaired; A1:48-50 unpaired; A1:54-59 unpaired; A1:63-65 unpaired; A1:67-70 unpaired (+22 more) |
-| 7IT6 | S11 | S | 1 | 0.85 | 0.15 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | - | - | ✗ | - | A19: names compared on all 4 pairs; only 4 of 11 and 24 elements paired; A:35-48 unpaired; A:61-63 unpaired; A:68-73 unpaired; A:80-82 unpaired; A:95-97 unpaired; A:103-109 unpaired; A:117-124 unpaired (+20 more) |
+| 8U9T | S11 | M | 1 | 1.05 | 0.47 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | - | ○ |  |
+| 7IT6 | S11 | S | 1 | 0.65 | 0.14 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | - | - | - | - |  |
 | 3U3H | S11 | M | 1 | 3.66 | 2.26 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | ✓ | ○ |  |
 | 6QND | S11 | M | 1 | 1.4 | 0.54 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | - | - | ✓ | ○ |  |
-| 2BBJ | S11 | L | 5 | 2.76 | 1.64 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | - | - | ✗ | - | A15: default 1.4176624736566856; A19: names compared on all 13 pairs, 1 differ; η2~η2 (A:52-55~A:51-55); A:193-201 unpaired; A:244-273 unpaired; A:275-299 unpaired; A:302-310 unpaired; A:330-344 unpaired; A:47-49 unpaired; A:161-163 unpaired |
-| 2BBH | S11 | S | 1 | 1.25 | 0.39 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | - | - | ✗ | ○ | A19: names compared on all 13 pairs, 1 differ; η2~η2 (A:51-55~A:52-55); A:47-49 unpaired; A:161-163 unpaired; A:193-201 unpaired; A:244-273 unpaired; A:275-299 unpaired; A:302-310 unpaired; A:330-344 unpaired |
+| 2BBJ | S11 | L | 5 | 2.05 | 1.33 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | - | - | ✓ | - | A15: default 1.4176624736566856 |
+| 2BBH | S11 | S | 1 | 0.85 | 0.25 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | - | - | ✓ | ○ |  |
 | AF_AFQ387E4F1 | S12 | M | 1 | 0.9 | 0.26 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | - | - | - | - |  |
 | AF_AFQ8W0Z7F1 | S12 | M | 1 | 1.55 | 0.63 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | - | - | - | - |  |
 | AF_AFC7J156F1 | S12 | S | 1 | 0.75 | 0.13 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | - | - | - | - |  |
@@ -168,9 +170,9 @@ process s: the default view's whole process (drawing, measuring and, for nucleic
 |---|---|---|---|---|---|---|---|---|
 | P1 | 3HQB | 4P39 | open/closed | open/closed | [False, False] | [1, 1] | 4.297 | ✓ names compared on all 3 pairs; A:3-11 unpaired |
 | P2 | 1C6A | 244L | apo/holo | apo/holo | [False, True] | [1, 1] | 0.219 | ✓ names compared on all 13 pairs |
-| P3 | 8U9T | 7IT6 | apo/holo | apo/holo, monomer/oligomer | [True, False] | [2, 1] | 20.979 | ✗ names compared on all 3 pairs; only 3 of 24 and 11 elements paired; A1:11-14 unpaired; A1:17-22 unpaired; A1:35-39 unpaired; A1:48-50 unpaired; A1:54-59 unpaired; A1:63-65 unpaired; A1:67-70 unpaired (+22 more) |
+| P3 | 8U9T | 7IT6 | apo/holo | not one protein (50% identity over 113 aligned residues) | None | None | None | - not one protein: 50% identity over 113 aligned residues (306 and 113 residues) |
 | P4 | 3U3H | 6QND | monomer/oligomer | apo/holo, monomer/oligomer | [True, False] | [4, 1] | 0.439 | ✓ names compared on all 30 pairs; A1:146-148 unpaired |
-| P5 | 2BBJ | 2BBH | monomer/oligomer | monomer/oligomer, open/closed | [False, False] | [5, 1] | 3.962 | ✗ names compared on all 13 pairs, 1 differ; η2~η2 (A:52-55~A:51-55); A:193-201 unpaired; A:244-273 unpaired; A:275-299 unpaired; A:302-310 unpaired; A:330-344 unpaired; A:47-49 unpaired; A:161-163 unpaired |
+| P5 | 2BBJ | 2BBH | monomer/oligomer | monomer/oligomer, open/closed | [False, False] | [5, 1] | 3.962 | ✓ names compared on all 13 pairs; A:193-201 unpaired; A:244-273 unpaired; A:275-299 unpaired; A:302-310 unpaired; A:330-344 unpaired; A:47-49 unpaired; A:161-163 unpaired |
 
 ## Reported, not gated
 
@@ -232,7 +234,7 @@ process s: the default view's whole process (drawing, measuring and, for nucleic
 | 2N5J | 0 | 0 | None | 0 | 0 | 0 | 0 | 0 | 0 | 45.29 | 161.6 |
 | 8SKX | 1 | 1 | None | 0 | 0 | 0 | 0 | 0 | 0 | 54.42 | 165.6 |
 | 1RCH | 6 | 6 | None | 0 | 0 | 0 | 0 | 0 | 0 | 136.41 | 166.5 |
-| 9BVV | 0 | 0 | None | 0 | 0 | 0 | 0 | 0 | 0 | 0.0 | 157.3 |
+| 9BVV | 0 | 0 | None | 0 | 0 | 0 | 0 | 0 | 0 | 0.0 | 157.1 |
 | 9CZH | 42 | 42 | None | 0 | 0 | 0 | 0 | 0 | 0 | 1787.96 | 305.3 |
 | 6MJ2 | 60 | 60 | None | 0 | 0 | 0 | 0 | 0 | 0 | 1561.16 | 268.3 |
 | 6QFA | 18 | 18 | None | 0 | 0 | 0 | 0 | 0 | 0 | 643.24 | 224.2 |
@@ -255,9 +257,9 @@ process s: the default view's whole process (drawing, measuring and, for nucleic
 | 2XLJ | 4 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 272.1 | 167.0 |
 | 6S13 | 111 | 111 | 328 | 0 | 0 | 0 | 0 | 0 | 0 | 23431.42 | 736.8 |
 | 8ZTU | 293 | 293 | 712 | 0 | 0 | 0 | 2 | 0 | 0 | 35176.31 | 633.4 |
-| 4E8Q | 0 | 0 | 10 | 0 | 0 | 0 | 0 | 0 | 0 | 2288.24 | 198.7 |
-| 9IWF | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 232.25 | 170.8 |
-| 1Z43 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 341.76 | 168.8 |
+| 4E8Q | 0 | 0 | 10 | 0 | 0 | 0 | 0 | 0 | 0 | 2288.24 | 198.1 |
+| 9IWF | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 232.25 | 170.2 |
+| 1Z43 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 341.76 | 168.5 |
 | 9YER | 99 | 99 | None | 0 | 0 | 0 | 0 | 0 | 0 | 2856.02 | 343.2 |
 | 9QK1 | 92 | 92 | None | 0 | 0 | 0 | 0 | 0 | 0 | 3730.69 | 311.8 |
 | 3IB0 | 27 | 27 | None | 0 | 0 | 0 | 0 | 0 | 0 | 429.17 | 164.5 |
@@ -267,12 +269,12 @@ process s: the default view's whole process (drawing, measuring and, for nucleic
 | 3HQB | 0 | 0 | None | 0 | 0 | 0 | 0 | 0 | 0 | 66.99 | 158.9 |
 | 1C6A | 6 | 6 | None | 0 | 0 | 0 | 0 | 0 | 0 | 190.57 | 161.3 |
 | 244L | 6 | 6 | None | 0 | 0 | 0 | 0 | 0 | 0 | 190.57 | 160.8 |
-| 8U9T | 20 | 20 | None | 0 | 0 | 0 | 0 | 0 | 0 | 652.69 | 169.7 |
-| 7IT6 | 10 | 10 | None | 0 | 0 | 0 | 1 | 0 | 0 | 101.47 | 159.6 |
+| 8U9T | 20 | 20 | None | 0 | 0 | 0 | 0 | 0 | 0 | 652.69 | 167.2 |
+| 7IT6 | 10 | 10 | None | 0 | 0 | 0 | 1 | 0 | 0 | 101.47 | 159.8 |
 | 3U3H | 71 | 71 | None | 0 | 0 | 0 | 0 | 0 | 0 | 2235.22 | 256.0 |
 | 6QND | 12 | 12 | None | 0 | 0 | 0 | 0 | 0 | 0 | 627.23 | 164.2 |
-| 2BBJ | 45 | 45 | None | 0 | 0 | 0 | 0 | 0 | 0 | 2544.46 | 311.8 |
-| 2BBH | 2 | 2 | None | 0 | 0 | 0 | 0 | 0 | 0 | 331.67 | 162.2 |
+| 2BBJ | 45 | 45 | None | 0 | 0 | 0 | 0 | 0 | 0 | 2544.46 | 310.4 |
+| 2BBH | 2 | 2 | None | 0 | 0 | 0 | 0 | 0 | 0 | 331.67 | 161.9 |
 | AF_AFQ387E4F1 | 6 | 6 | None | 0 | 0 | 0 | 0 | 0 | 0 | 373.18 | 162.9 |
 | AF_AFQ8W0Z7F1 | 32 | 32 | None | 0 | 0 | 0 | 0 | 0 | 0 | 719.99 | 165.0 |
 | AF_AFC7J156F1 | 0 | 0 | None | 0 | 0 | 0 | 0 | 0 | 0 | 113.42 | 159.2 |

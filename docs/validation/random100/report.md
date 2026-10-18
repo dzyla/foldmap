@@ -36,10 +36,10 @@ Sample: seed 20261013, release-date cutoff 2026-10-13.
 | A5 no element or stem boxes overlapping | 100 | 0 | 0 | 0 |
 | A6 no text collisions | 97 | 3 | 0 | 0 |
 | A7 text and legend inside the page | 100 | 0 | 0 | 0 |
-| A8 labels unique per chain, stem names per figure | 100 | 0 | 0 | 0 |
+| A8 labels unique per chain, stem names per figure | 99 | 0 | 1 | 0 |
 | A9 nothing left out without a note | 100 | 0 | 0 | 0 |
 | A10 secondary structure agrees with mkdssp | 96 | 0 | 0 | 4 |
-| A11 N->C and sheet order | 100 | 0 | 0 | 0 |
+| A11 N->C and sheet order | 95 | 0 | 1 | 4 |
 | A12 same figure for any PYTHONHASHSEED | 100 | 0 | 0 | 0 |
 | A13 a saved layout redraws the same figure | 100 | 0 | 0 | 0 |
 | A14 interactive page and sequence plot written | 100 | 0 | 0 | 0 |
@@ -52,6 +52,8 @@ Sample: seed 20261013, release-date cutoff 2026-10-13.
 
 ### Not judged, per criterion
 
+- **A8** (1): 6B5W (no element or stem drawn)
+- **A11** (1): 6B5W (no protein element drawn)
 - **A15** (1): 6YQD (default BBB~AAA n/a: 2 matched)
 - **A16** (14): 7IMM (the domains view drew no domain); 7FDN (the domains view drew no domain); 6YF9 (the domains view drew no domain); 1SLV (the domains view drew no domain); 1BXI (the domains view drew no domain); 4UM3 (the domains view drew no domain); 8R5X (the domains view drew no domain); 6AD0 (the domains view drew no domain); 2MJW (the domains view drew no domain); 8W9Y (the domains view drew no domain); 8BW5 (the domains view drew no domain); 6YPX (the domains view drew no domain); 6YQD (the domains view drew no domain); 8P3N (the domains view drew no domain)
 - **A17** (1): 7MW8 (no view draws the nucleic acid)
@@ -104,7 +106,7 @@ process s: the default view's whole process (drawing, measuring and, for nucleic
 | 8PQV | S4 | L | 1 | 3.81 | 2.48 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | - | - | - | ○ |  |
 | 6AD0 | S4 | M | 6 | 1.95 | 0.98 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | ○ | - | - | - | ○ |  |
 | 9ON5 | S4 | M | 3 | 4.36 | 3.45 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | - | ○ |  |
-| 7JU4 | S4 | XL | 61 | 55.06 | 48.88 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | ✗ | - | - | - | ✓ | A6: domains 2 (domain-label:D2 · 4 × stub:C:4; domain-label:D3 · A × stub:C:A); A16: domains 2 () |
+| 7JU4 | S4 | XL | 61 | 41.21 | 36.54 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | ✗ | - | - | - | ✓ | A6: domains 2 (domain-label:D2 · 4 × stub:C:4; domain-label:D3 · A × stub:C:A); A16: domains 2 (domain-label:D2 · 4 × stub:C:4; domain-label:D3 · A × stub:C:A) |
 | 7AOD | S4 | XL | 24 | 12.27 | 9.1 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | - | ○ |  |
 | 7QUP | S4 | XL | 65 | 29.2 | 26.8 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | - | ○ |  |
 | 9P1X | S4 | XL | 30 | 3.01 | 1.66 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | - | ✓ |  |
@@ -114,11 +116,11 @@ process s: the default view's whole process (drawing, measuring and, for nucleic
 | 7ARD | S4 | XL | 51 | 21.59 | 17.86 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | ✓ | - | - | - | ✓ |  |
 | 2MJW | S5 | M | 4 | 1.25 | 0.46 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ○ | - | - | - | - |  |
 | 2DGS | S5 | S | 1 | 0.8 | 0.13 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | - | - | - | - |  |
-| 8Q4O | S5 | S | 1 | 2.2 | 0.11 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | ✓ | ✓ | ✓ | ✓ | - | - | ✓ | - | - | - |  |
+| 8Q4O | S5 | S | 1 | 1.8 | 0.12 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | ✓ | ✓ | ✓ | - | - | ✓ | - | - | - |  |
 | 1MG8 | S5 | S | 1 | 0.85 | 0.14 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | - | - | - | - |  |
 | 5KQJ | S5 | S | 1 | 0.9 | 0.27 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | - | - | - | - |  |
 | 8OH7 | S5 | S | 1 | 1.25 | 0.4 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | - | - | - | - |  |
-| 6B5W | S5 | S | 1 | 0.9 | 0.06 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | - | - | - | - |  |
+| 6B5W | S5 | S | 1 | 0.6 | 0.04 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ○ | ✓ | ✓ | ○ | ✓ | ✓ | ✓ | - | - | - | - | - | - |  |
 | 8B4R | S5 | S | 1 | 0.7 | 0.08 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | - | - | - | - |  |
 | 6JLN | S6 | L | 39 | 31.51 | 27.33 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | ✓ | - | ✓ |  |
 | 7SMR | S6 | L | 5 | 5.51 | 4.45 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | ✓ | - | ✓ | - | ○ |  |
@@ -134,7 +136,7 @@ process s: the default view's whole process (drawing, measuring and, for nucleic
 | 8BW5 | S7 | M | 3 | 3.81 | 1.43 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | ○ | ✗ | - | - | ○ | A17: pair_f1 0.8 (limit 0.95); stem_recall 0.5 (limit 0.85) |
 | 3MHT | S7 | M | 3 | 2.91 | 0.52 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | ✓ | - | - | ○ |  |
 | 9YLM | S7 | S | 3 | 1.9 | 0.23 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | ✗ | - | - | ○ | A17: stems_nearer_frac 0.0 (limit 1.0) |
-| 8QEM | S7 | XL | 26 | 2.36 | 1.21 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | - | - | - | A17: measured on the focus view, as the default draws no nucleic acid: angle_median 3.2 (limit 0.05); angle_max 4.6 (limit 0.05); joint_error_max 3.4 (limit 0.05) |
+| 8QEM | S7 | XL | 26 | 2.1 | 1.11 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | - | - | - | A17: measured on the focus view, as the default draws no nucleic acid: angle_median 3.2 (limit 0.05); angle_max 4.6 (limit 0.05); joint_error_max 3.4 (limit 0.05) |
 | 7XSP | S8 | L | 3 | 3.66 | 1.16 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | ✓ | - | - | ○ |  |
 | 7MW8 | S8 | L | 12 | 1.3 | 0.47 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | ○ | - | - | ○ |  |
 | 9C75 | S8 | M | 3 | 4.38 | 1.74 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | ✓ | ✓ | - | - | - |  |
@@ -142,15 +144,15 @@ process s: the default view's whole process (drawing, measuring and, for nucleic
 | 6SO9 | S8 | S | 2 | 3.73 | 0.31 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | ✓ | - | - | - |  |
 | 7Y7C | S8 | XL | 55 | 72.71 | 53.67 | ✓ | - | ✓ | ✓ | ✗ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | ✓ | ✗ | - | - | ✓ | A3: domains: strand a:2705-2705, gap after a:1439; A6: domains 1 (na:stem:228:first × na:run:443); A17: na_crossings 4 (limit 0); bead_overlaps 1 (limit 0) |
 | 8VWQ | S8 | XL | 56 | 72.02 | 52.41 | ✓ | - | ✓ | ✓ | ✗ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | ✓ | ✗ | - | - | ○ | A3: domains: strand 1:836-836; A6: default 1 (ligand-label:LYS:5101 × na:stem:114); deposited 1 (ligand-label:LYS:5101 × na:stem:114); beta 1 (ligand-label:LYS:5101 × na:stem:114); focus 1 (ligand-label:LYS:5101 × na:stem:114); domains 1 (na:tie:1401-1501:label × na:stem:209); A17: na_crossings 1 (limit 0); bead_overlaps 1 (limit 0) |
-| 8SA2 | S9 | M | 2 | 5.43 | 1.68 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | ✓ | ✓ | ✓ | ✓ | - | - | ✓ | - | - | ○ |  |
-| 3OWW | S9 | S | 2 | 4.32 | 1.35 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | ✓ | ✓ | ✓ | ✓ | - | - | ✓ | - | - | ○ |  |
-| 8XZE | S9 | S | 1 | 2.1 | 0.26 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | ✓ | ✓ | ✓ | ✓ | - | - | ✓ | - | - | ○ |  |
+| 8SA2 | S9 | M | 2 | 3.81 | 1.3 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | ✓ | ✓ | ✓ | - | - | ✓ | - | - | ○ |  |
+| 3OWW | S9 | S | 2 | 3.11 | 0.83 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | ✓ | ✓ | ✓ | - | - | ✓ | - | - | ○ |  |
+| 8XZE | S9 | S | 1 | 1.9 | 0.2 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | ✓ | ✓ | ✓ | - | - | ✓ | - | - | ○ |  |
 | 8K8E | S10 | L | 5 | 5.26 | 4.32 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | ✓ | - | - | - | ○ |  |
 | 7BBH | S10 | L | 3 | 4.36 | 3.36 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | - | - |  |
 | 1WWL | S10 | M | 2 | 2.46 | 1.63 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | - | - |  |
 | 7BRG | S10 | M | 3 | 2.25 | 1.5 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | - | - |  |
 | 8OZJ | S10 | XL | 11 | 18.24 | 17.0 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | ✓ | - | - | - | ✓ |  |
-| 1RM5 | S11 | M | 3 | 2.76 | 1.73 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | ✓ | ○ |  |
+| 1RM5 | S11 | M | 3 | 2.56 | 1.74 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | ✓ | ○ |  |
 | 2HKI | S11 | M | 1 | 3.31 | 2.16 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | ✓ | - |  |
 | 9YKJ | S11 | L | 2 | 2.71 | 1.62 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | ✓ | - | - | ✗ | - | A19: names compared on all 43 pairs, 27 differ; αN~α2 (A:37-47~A:37-50); αN′~α3 (A:72-85~A:72-85); α1~α4 (A:100-108~A:98-111); α2~α7 (A:164-175~A:164-174); α3~α8 (A:184-192~A:184-198); α3″~α9 (A:204-210~A:203-210); α4~α10 (A:221-226~A:221-226); α4′~α11 (A:228-236~A:228-237) (+49 more) |
 | 10UJ | S11 | M | 1 | 1.9 | 0.95 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | - | - | ✗ | - | A19: names compared on all 43 pairs, 27 differ; α2~αN (A:37-50~A:37-47); α3~αN′ (A:72-85~A:72-85); α4~α1 (A:98-111~A:100-108); α7~α2 (A:164-174~A:164-175); α8~α3 (A:184-198~A:184-192); α9~α3″ (A:203-210~A:204-210); α10~α4 (A:221-226~A:221-226); α11~α4′ (A:228-237~A:228-236) (+49 more) |
@@ -219,7 +221,7 @@ process s: the default view's whole process (drawing, measuring and, for nucleic
 | 8PQV | 201 | 201 | None | 0 | 0 | 0 | 0 | 0 | 0 | 4188.14 | 250.8 |
 | 6AD0 | 66 | 66 | None | 0 | 0 | 0 | 0 | 0 | 0 | 1133.97 | 171.4 |
 | 9ON5 | 127 | 127 | None | 0 | 0 | 0 | 0 | 0 | 0 | 1605.1 | 215.1 |
-| 7JU4 | 2571 | 2571 | None | 0 | 0 | 0 | 6 | 0 | 0 | 29826.53 | 594.8 |
+| 7JU4 | 2571 | 2571 | None | 0 | 0 | 0 | 6 | 0 | 0 | 29826.53 | 592.3 |
 | 7AOD | 499 | 499 | None | 0 | 0 | 0 | 0 | 0 | 0 | 8034.48 | 515.6 |
 | 7QUP | 25 | 25 | None | 0 | 0 | 0 | 0 | 0 | 0 | 1077.17 | 710.3 |
 | 9P1X | 58 | 58 | None | 0 | 0 | 0 | 0 | 0 | 0 | 1693.39 | 421.0 |
@@ -233,7 +235,7 @@ process s: the default view's whole process (drawing, measuring and, for nucleic
 | 1MG8 | 0 | 0 | None | 0 | 0 | 0 | 0 | 0 | 0 | 36.96 | 161.5 |
 | 5KQJ | 5 | 5 | None | 0 | 0 | 0 | 0 | 0 | 0 | 384.61 | 208.9 |
 | 8OH7 | 3 | 3 | None | 0 | 0 | 0 | 0 | 0 | 0 | 429.12 | 164.5 |
-| 6B5W | 0 | 0 | None | 0 | 0 | 0 | 0 | 0 | 0 | 0.0 | 157.5 |
+| 6B5W | 0 | 0 | None | 0 | 0 | 0 | 0 | 0 | 0 | 0.0 | 157.7 |
 | 8B4R | 0 | 0 | None | 0 | 0 | 0 | 0 | 0 | 0 | 12.71 | 159.6 |
 | 6JLN | 137 | 137 | None | 0 | 0 | 0 | 4 | 0 | 0 | 12050.57 | 502.8 |
 | 7SMR | 85 | 85 | None | 0 | 0 | 0 | 0 | 0 | 0 | 3148.74 | 333.9 |
@@ -249,7 +251,7 @@ process s: the default view's whole process (drawing, measuring and, for nucleic
 | 8BW5 | 8 | 8 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 720.85 | 174.5 |
 | 3MHT | 18 | 18 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 396.7 | 173.0 |
 | 9YLM | 3 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 155.92 | 166.2 |
-| 8QEM | 33 | 33 | None | 0 | 0 | 0 | 0 | 0 | 0 | 1473.25 | 382.6 |
+| 8QEM | 33 | 33 | None | 0 | 0 | 0 | 0 | 0 | 0 | 1473.25 | 383.0 |
 | 7XSP | 101 | 101 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1757.19 | 194.6 |
 | 7MW8 | 34 | 34 | None | 0 | 0 | 0 | 2 | 0 | 0 | 490.56 | 168.8 |
 | 9C75 | 25 | 25 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 1141.8 | 179.7 |
@@ -257,15 +259,15 @@ process s: the default view's whole process (drawing, measuring and, for nucleic
 | 6SO9 | 4 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 86.66 | 240.7 |
 | 7Y7C | 335 | 335 | 724 | 0 | 0 | 0 | 1 | 0 | 0 | 31653.95 | 629.2 |
 | 8VWQ | 443 | 443 | 637 | 0 | 0 | 0 | 1 | 0 | 0 | 32645.44 | 665.3 |
-| 8SA2 | 0 | 0 | 13 | 0 | 0 | 0 | 0 | 0 | 0 | 1973.64 | 193.5 |
-| 3OWW | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 695.11 | 179.5 |
-| 8XZE | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 122.15 | 164.9 |
+| 8SA2 | 0 | 0 | 13 | 0 | 0 | 0 | 0 | 0 | 0 | 1973.64 | 193.4 |
+| 3OWW | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 695.11 | 179.1 |
+| 8XZE | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 122.15 | 163.9 |
 | 8K8E | 99 | 99 | None | 0 | 0 | 0 | 0 | 0 | 0 | 2311.75 | 240.4 |
 | 7BBH | 52 | 52 | None | 0 | 0 | 0 | 0 | 0 | 0 | 1415.51 | 255.6 |
 | 1WWL | 184 | 184 | None | 0 | 0 | 0 | 0 | 0 | 0 | 539.7 | 175.3 |
 | 7BRG | 71 | 71 | None | 0 | 0 | 0 | 0 | 0 | 0 | 869.36 | 176.7 |
 | 8OZJ | 242 | 242 | None | 0 | 0 | 0 | 0 | 0 | 0 | 4678.64 | 440.1 |
-| 1RM5 | 97 | 97 | None | 0 | 0 | 0 | 0 | 0 | 0 | 1541.86 | 220.7 |
+| 1RM5 | 97 | 97 | None | 0 | 0 | 0 | 0 | 0 | 0 | 1541.86 | 221.0 |
 | 2HKI | 87 | 87 | None | 0 | 0 | 0 | 0 | 0 | 0 | 1526.49 | 209.4 |
 | 9YKJ | 85 | 85 | None | 0 | 0 | 0 | 0 | 0 | 0 | 1707.13 | 230.8 |
 | 10UJ | 83 | 83 | None | 0 | 0 | 0 | 1 | 0 | 0 | 1232.29 | 168.6 |

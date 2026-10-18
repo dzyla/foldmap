@@ -475,7 +475,7 @@ criterion reads pass, fail, not judged (nothing to judge in that entry: no copie
 domain drawn) or does not apply, and an entry passes when none fails; nothing to judge is never counted as a pass
 (A15, copies drawn alike, judged 37 entries and passed all 37). The layout's constants were tuned on this sample, so
 a second, held-out sample (new seed, same strata, none of the first's entries) was drawn once with no fix: **92 of
-100 pass on the tuned sample, 77 of 100 on the held-out sample.** The tuned sample's eight failures (the ribosomes
+100 pass on the tuned sample, 80 of 100 on the held-out sample.** The tuned sample's eight failures (the ribosomes
 7Y7C and 8VWQ, 9YLM and 8BW5 as ruled, the two-state pair 9YKJ/10UJ named two ways, a domain name on a chain-end
 stub in 7JU4, and 8QEM's DNA shape in its whole-ring view) are explained in
 [docs/validation/random100/review.md](docs/validation/random100/review.md), with the full table in

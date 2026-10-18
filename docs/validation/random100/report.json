@@ -1,6 +1,6 @@
 {
  "date": "2026-10-17",
- "foldmap_commit": "5650dbd49c7b002d5664559c05949fde0ce36fff",
+ "foldmap_commit": "44a1c1b04223645799d1278783e02156e037761e",
  "versions": {
   "gemmi": "0.7.5",
   "matplotlib": "3.11.2",
@@ -307128,8 +307128,8 @@
    "views": {
     "default": {
      "exit": 0,
-     "seconds": 55.06,
-     "max_rss_mb": 501.9,
+     "seconds": 41.21,
+     "max_rss_mb": 501.7,
      "timed_out": false,
      "traceback": false,
      "python_warnings": [],
@@ -307152,14 +307152,14 @@
        "plot",
        "/home/dzyla/.cache/foldmap/7JU4.cif",
        "-o",
-       "/tmp/f1-r100-20261017-174130/work/7JU4/7JU4-default.svg",
+       "/home/dzyla/.claude/jobs/23e71d62/tmp/f1/r100/work/7JU4/7JU4-default.svg",
        "-o",
-       "/tmp/f1-r100-20261017-174130/work/7JU4/7JU4-default.png",
+       "/home/dzyla/.claude/jobs/23e71d62/tmp/f1/r100/work/7JU4/7JU4-default.png",
        "--save-layout",
-       "/tmp/f1-r100-20261017-174130/work/7JU4/7JU4-layout.yaml"
+       "/home/dzyla/.claude/jobs/23e71d62/tmp/f1/r100/work/7JU4/7JU4-layout.yaml"
       ],
       "exit": 0,
-      "seconds_inside": 48.88,
+      "seconds_inside": 36.54,
       "warnings": [],
       "route": {
        "loops": 1004,
@@ -307223,6 +307223,7 @@
        "crop": "",
        "all_options": {},
        "residues": 0,
+       "na_outside": [],
        "undrawn_chains": [],
        "additives": [],
        "not_drawn": "",
@@ -316697,8 +316698,8 @@
     },
     "deposited": {
      "exit": 0,
-     "seconds": 52.24,
-     "max_rss_mb": 503.4,
+     "seconds": 39.56,
+     "max_rss_mb": 503.2,
      "timed_out": false,
      "traceback": false,
      "python_warnings": [],
@@ -316721,14 +316722,14 @@
        "plot",
        "/home/dzyla/.cache/foldmap/7JU4.cif",
        "-o",
-       "/tmp/f1-r100-20261017-174130/work/7JU4/7JU4-deposited.svg",
+       "/home/dzyla/.claude/jobs/23e71d62/tmp/f1/r100/work/7JU4/7JU4-deposited.svg",
        "-o",
-       "/tmp/f1-r100-20261017-174130/work/7JU4/7JU4-deposited.png",
+       "/home/dzyla/.claude/jobs/23e71d62/tmp/f1/r100/work/7JU4/7JU4-deposited.png",
        "--names",
        "deposited"
       ],
       "exit": 0,
-      "seconds_inside": 46.78,
+      "seconds_inside": 35.24,
       "warnings": [],
       "route": {
        "loops": 1004,
@@ -316792,6 +316793,7 @@
        "crop": "",
        "all_options": {},
        "residues": 0,
+       "na_outside": [],
        "undrawn_chains": [],
        "additives": [],
        "not_drawn": "",
@@ -326266,8 +326268,8 @@
     },
     "beta": {
      "exit": 0,
-     "seconds": 55.97,
-     "max_rss_mb": 502.4,
+     "seconds": 39.31,
+     "max_rss_mb": 500.9,
      "timed_out": false,
      "traceback": false,
      "python_warnings": [],
@@ -326290,14 +326292,14 @@
        "plot",
        "/home/dzyla/.cache/foldmap/7JU4.cif",
        "-o",
-       "/tmp/f1-r100-20261017-174130/work/7JU4/7JU4-beta.svg",
+       "/home/dzyla/.claude/jobs/23e71d62/tmp/f1/r100/work/7JU4/7JU4-beta.svg",
        "-o",
-       "/tmp/f1-r100-20261017-174130/work/7JU4/7JU4-beta.png",
+       "/home/dzyla/.claude/jobs/23e71d62/tmp/f1/r100/work/7JU4/7JU4-beta.png",
        "--names",
        "beta"
       ],
       "exit": 0,
-      "seconds_inside": 50.2,
+      "seconds_inside": 34.71,
       "warnings": [],
       "route": {
        "loops": 1004,
@@ -326361,6 +326363,7 @@
        "crop": "",
        "all_options": {},
        "residues": 0,
+       "na_outside": [],
        "undrawn_chains": [],
        "additives": [],
        "not_drawn": "",
@@ -336532,8 +336535,8 @@
     },
     "focus": {
      "exit": 0,
-     "seconds": 4.46,
-     "max_rss_mb": 374.4,
+     "seconds": 3.56,
+     "max_rss_mb": 372.1,
      "timed_out": false,
      "traceback": false,
      "python_warnings": [],
@@ -336552,14 +336555,14 @@
        "plot",
        "/home/dzyla/.cache/foldmap/7JU4.cif",
        "-o",
-       "/tmp/f1-r100-20261017-174130/work/7JU4/7JU4-focus.svg",
+       "/home/dzyla/.claude/jobs/23e71d62/tmp/f1/r100/work/7JU4/7JU4-focus.svg",
        "-o",
-       "/tmp/f1-r100-20261017-174130/work/7JU4/7JU4-focus.png",
+       "/home/dzyla/.claude/jobs/23e71d62/tmp/f1/r100/work/7JU4/7JU4-focus.png",
        "--focus",
        "u"
       ],
       "exit": 0,
-      "seconds_inside": 2.94,
+      "seconds_inside": 2.46,
       "warnings": [],
       "route": {
        "loops": 34,
@@ -336620,6 +336623,7 @@
        "crop": "",
        "all_options": {},
        "residues": 0,
+       "na_outside": [],
        "undrawn_chains": [],
        "additives": [],
        "not_drawn": "",
@@ -337041,8 +337045,8 @@
     },
     "domains": {
      "exit": 0,
-     "seconds": 108.27,
-     "max_rss_mb": 594.8,
+     "seconds": 92.64,
+     "max_rss_mb": 592.3,
      "timed_out": false,
      "traceback": false,
      "python_warnings": [],
@@ -337065,14 +337069,14 @@
        "plot",
        "/home/dzyla/.cache/foldmap/7JU4.cif",
        "-o",
-       "/tmp/f1-r100-20261017-174130/work/7JU4/7JU4-domains.svg",
+       "/home/dzyla/.claude/jobs/23e71d62/tmp/f1/r100/work/7JU4/7JU4-domains.svg",
        "-o",
-       "/tmp/f1-r100-20261017-174130/work/7JU4/7JU4-domains.png",
+       "/home/dzyla/.claude/jobs/23e71d62/tmp/f1/r100/work/7JU4/7JU4-domains.png",
        "--domains",
        "auto"
       ],
       "exit": 0,
-      "seconds_inside": 85.3,
+      "seconds_inside": 70.64,
       "warnings": [],
       "route": {
        "loops": 1004,
@@ -337149,6 +337153,7 @@
        "crop": "",
        "all_options": {},
        "residues": 0,
+       "na_outside": [],
        "undrawn_chains": [],
        "additives": [],
        "not_drawn": "",
@@ -346617,8 +346622,8 @@
     },
     "seed1": {
      "exit": 0,
-     "seconds": 40.86,
-     "max_rss_mb": 506.1,
+     "seconds": 40.16,
+     "max_rss_mb": 502.1,
      "timed_out": false,
      "traceback": false,
      "python_warnings": [],
@@ -346641,12 +346646,12 @@
        "plot",
        "/home/dzyla/.cache/foldmap/7JU4.cif",
        "-o",
-       "/tmp/f1-r100-20261017-174130/work/7JU4/7JU4-seed1.svg",
+       "/home/dzyla/.claude/jobs/23e71d62/tmp/f1/r100/work/7JU4/7JU4-seed1.svg",
        "-o",
-       "/tmp/f1-r100-20261017-174130/work/7JU4/7JU4-seed1.png"
+       "/home/dzyla/.claude/jobs/23e71d62/tmp/f1/r100/work/7JU4/7JU4-seed1.png"
       ],
       "exit": 0,
-      "seconds_inside": 36.24,
+      "seconds_inside": 36.0,
       "warnings": [],
       "route": {
        "loops": 1004,
@@ -346710,6 +346715,7 @@
        "crop": "",
        "all_options": {},
        "residues": 0,
+       "na_outside": [],
        "undrawn_chains": [],
        "additives": [],
        "not_drawn": "",
@@ -356169,8 +356175,8 @@
     },
     "roundtrip": {
      "exit": 0,
-     "seconds": 40.51,
-     "max_rss_mb": 501.5,
+     "seconds": 38.46,
+     "max_rss_mb": 505.0,
      "timed_out": false,
      "traceback": false,
      "python_warnings": [],
@@ -356193,14 +356199,14 @@
        "plot",
        "/home/dzyla/.cache/foldmap/7JU4.cif",
        "-o",
-       "/tmp/f1-r100-20261017-174130/work/7JU4/7JU4-roundtrip.svg",
+       "/home/dzyla/.claude/jobs/23e71d62/tmp/f1/r100/work/7JU4/7JU4-roundtrip.svg",
        "-o",
-       "/tmp/f1-r100-20261017-174130/work/7JU4/7JU4-roundtrip.png",
+       "/home/dzyla/.claude/jobs/23e71d62/tmp/f1/r100/work/7JU4/7JU4-roundtrip.png",
        "--layout-file",
-       "/tmp/f1-r100-20261017-174130/work/7JU4/7JU4-layout.yaml"
+       "/home/dzyla/.claude/jobs/23e71d62/tmp/f1/r100/work/7JU4/7JU4-layout.yaml"
       ],
       "exit": 0,
-      "seconds_inside": 35.95,
+      "seconds_inside": 34.41,
       "warnings": [],
       "route": {
        "loops": 1004,
@@ -356264,6 +356270,7 @@
        "crop": "",
        "all_options": {},
        "residues": 0,
+       "na_outside": [],
        "undrawn_chains": [],
        "additives": [],
        "not_drawn": "",
@@ -365723,8 +365730,8 @@
     },
     "interactive": {
      "exit": 0,
-     "seconds": 37.77,
-     "max_rss_mb": 564.2,
+     "seconds": 34.7,
+     "max_rss_mb": 566.0,
      "timed_out": false,
      "traceback": false,
      "python_warnings": [],
@@ -365746,10 +365753,10 @@
        "interactive",
        "/home/dzyla/.cache/foldmap/7JU4.cif",
        "-o",
-       "/tmp/f1-r100-20261017-174130/work/7JU4/7JU4.html"
+       "/home/dzyla/.claude/jobs/23e71d62/tmp/f1/r100/work/7JU4/7JU4.html"
       ],
       "exit": 0,
-      "seconds_inside": 37.01,
+      "seconds_inside": 34.03,
       "warnings": [],
       "route": {
        "loops": 1004,
@@ -365768,8 +365775,8 @@
     },
     "sequence": {
      "exit": 0,
-     "seconds": 10.47,
-     "max_rss_mb": 359.0,
+     "seconds": 10.07,
+     "max_rss_mb": 356.8,
      "timed_out": false,
      "traceback": false,
      "python_warnings": [],
@@ -365784,10 +365791,10 @@
        "sequence",
        "/home/dzyla/.cache/foldmap/7JU4.cif",
        "-o",
-       "/tmp/f1-r100-20261017-174130/work/7JU4/7JU4-sequence.svg"
+       "/home/dzyla/.claude/jobs/23e71d62/tmp/f1/r100/work/7JU4/7JU4-sequence.svg"
       ],
       "exit": 0,
-      "seconds_inside": 10.0,
+      "seconds_inside": 9.66,
       "warnings": [],
       "route": {
        "loops": 0,
@@ -365806,8 +365813,8 @@
     },
     "app": {
      "exit": 0,
-     "seconds": 74.51,
-     "max_rss_mb": 366.8,
+     "seconds": 70.7,
+     "max_rss_mb": 367.7,
      "timed_out": false,
      "traceback": false,
      "python_warnings": [],
@@ -365838,7 +365845,7 @@
       "view": "app",
       "argv": [],
       "exit": 0,
-      "seconds_inside": 73.82,
+      "seconds_inside": 70.08,
       "warnings": [],
       "route": {
        "loops": 1004,
@@ -365856,7 +365863,7 @@
      }
     }
    },
-   "foldmap_commit": "5650dbd49c7b002d5664559c05949fde0ce36fff",
+   "foldmap_commit": "44a1c1b04223645799d1278783e02156e037761e",
    "file": "/home/dzyla/.cache/foldmap/7JU4.cif",
    "sha256": "a11c242ec1060a47ddf11a974d05e7489c326dffeee4b1636ec0e2b4944cca8e",
    "facts": {
@@ -365924,7 +365931,7 @@
     },
     "A2": {
      "pass": true,
-     "detail": "55.06 s (limit 180 s)"
+     "detail": "41.21 s (limit 180 s)"
     },
     "A2b": {
      "pass": true,
@@ -365985,7 +365992,7 @@
     },
     "A16": {
      "pass": false,
-     "detail": "domains 2 ()"
+     "detail": "domains 2 (domain-label:D2 \u00b7 4 \u00d7 stub:C:4; domain-label:D3 \u00b7 A \u00d7 stub:C:A)"
     },
     "A17": {
      "pass": null,
@@ -366038,13 +366045,13 @@
    },
    "failed": [
     "A6: domains 2 (domain-label:D2 \u00b7 4 \u00d7 stub:C:4; domain-label:D3 \u00b7 A \u00d7 stub:C:A)",
-    "A16: domains 2 ()"
+    "A16: domains 2 (domain-label:D2 \u00b7 4 \u00d7 stub:C:4; domain-label:D3 \u00b7 A \u00d7 stub:C:A)"
    ],
    "pass": false,
    "process": {
     "exit": 1,
-    "seconds": 483.69,
-    "max_rss_mb": 594.8,
+    "seconds": 413.57,
+    "max_rss_mb": 592.3,
     "timed_out": false
    }
   },
@@ -580089,7 +580096,7 @@
    "views": {
     "default": {
      "exit": 0,
-     "seconds": 2.2,
+     "seconds": 1.8,
      "max_rss_mb": 174.9,
      "timed_out": false,
      "traceback": false,
@@ -580110,14 +580117,14 @@
        "plot",
        "/home/dzyla/.cache/foldmap/8Q4O.cif",
        "-o",
-       "/tmp/f1-r100-20261017-174130/work/8Q4O/8Q4O-default.svg",
+       "/home/dzyla/.claude/jobs/23e71d62/tmp/f1/r100/work/8Q4O/8Q4O-default.svg",
        "-o",
-       "/tmp/f1-r100-20261017-174130/work/8Q4O/8Q4O-default.png",
+       "/home/dzyla/.claude/jobs/23e71d62/tmp/f1/r100/work/8Q4O/8Q4O-default.png",
        "--save-layout",
-       "/tmp/f1-r100-20261017-174130/work/8Q4O/8Q4O-layout.yaml"
+       "/home/dzyla/.claude/jobs/23e71d62/tmp/f1/r100/work/8Q4O/8Q4O-layout.yaml"
       ],
       "exit": 0,
-      "seconds_inside": 0.11,
+      "seconds_inside": 0.12,
       "warnings": [],
       "route": {
        "loops": 0,
@@ -580177,6 +580184,7 @@
        "crop": "",
        "all_options": {},
        "residues": 0,
+       "na_outside": [],
        "undrawn_chains": [],
        "additives": [],
        "not_drawn": "",
@@ -580263,7 +580271,7 @@
     },
     "seed1": {
      "exit": 0,
-     "seconds": 0.8,
+     "seconds": 0.75,
      "max_rss_mb": 145.8,
      "timed_out": false,
      "traceback": false,
@@ -580284,9 +580292,9 @@
        "plot",
        "/home/dzyla/.cache/foldmap/8Q4O.cif",
        "-o",
-       "/tmp/f1-r100-20261017-174130/work/8Q4O/8Q4O-seed1.svg",
+       "/home/dzyla/.claude/jobs/23e71d62/tmp/f1/r100/work/8Q4O/8Q4O-seed1.svg",
        "-o",
-       "/tmp/f1-r100-20261017-174130/work/8Q4O/8Q4O-seed1.png"
+       "/home/dzyla/.claude/jobs/23e71d62/tmp/f1/r100/work/8Q4O/8Q4O-seed1.png"
       ],
       "exit": 0,
       "seconds_inside": 0.11,
@@ -580349,6 +580357,7 @@
        "crop": "",
        "all_options": {},
        "residues": 0,
+       "na_outside": [],
        "undrawn_chains": [],
        "additives": [],
        "not_drawn": "",
@@ -580380,8 +580389,8 @@
     },
     "roundtrip": {
      "exit": 0,
-     "seconds": 1.0,
-     "max_rss_mb": 145.8,
+     "seconds": 0.7,
+     "max_rss_mb": 146.3,
      "timed_out": false,
      "traceback": false,
      "python_warnings": [],
@@ -580401,14 +580410,14 @@
        "plot",
        "/home/dzyla/.cache/foldmap/8Q4O.cif",
        "-o",
-       "/tmp/f1-r100-20261017-174130/work/8Q4O/8Q4O-roundtrip.svg",
+       "/home/dzyla/.claude/jobs/23e71d62/tmp/f1/r100/work/8Q4O/8Q4O-roundtrip.svg",
        "-o",
-       "/tmp/f1-r100-20261017-174130/work/8Q4O/8Q4O-roundtrip.png",
+       "/home/dzyla/.claude/jobs/23e71d62/tmp/f1/r100/work/8Q4O/8Q4O-roundtrip.png",
        "--layout-file",
-       "/tmp/f1-r100-20261017-174130/work/8Q4O/8Q4O-layout.yaml"
+       "/home/dzyla/.claude/jobs/23e71d62/tmp/f1/r100/work/8Q4O/8Q4O-layout.yaml"
       ],
       "exit": 0,
-      "seconds_inside": 0.17,
+      "seconds_inside": 0.12,
       "warnings": [],
       "route": {
        "loops": 0,
@@ -580468,6 +580477,7 @@
        "crop": "",
        "all_options": {},
        "residues": 0,
+       "na_outside": [],
        "undrawn_chains": [],
        "additives": [],
        "not_drawn": "",
@@ -580499,8 +580509,8 @@
     },
     "interactive": {
      "exit": 0,
-     "seconds": 1.2,
-     "max_rss_mb": 159.2,
+     "seconds": 0.9,
+     "max_rss_mb": 159.1,
      "timed_out": false,
      "traceback": false,
      "python_warnings": [],
@@ -580515,10 +580525,10 @@
        "interactive",
        "/home/dzyla/.cache/foldmap/8Q4O.cif",
        "-o",
-       "/tmp/f1-r100-20261017-174130/work/8Q4O/8Q4O.html"
+       "/home/dzyla/.claude/jobs/23e71d62/tmp/f1/r100/work/8Q4O/8Q4O.html"
       ],
       "exit": 0,
-      "seconds_inside": 0.4,
+      "seconds_inside": 0.27,
       "warnings": [],
       "route": {
        "loops": 0,
@@ -580537,8 +580547,8 @@
     },
     "app": {
      "exit": 0,
-     "seconds": 1.45,
-     "max_rss_mb": 130.8,
+     "seconds": 1.2,
+     "max_rss_mb": 131.6,
      "timed_out": false,
      "traceback": false,
      "python_warnings": [],
@@ -580569,7 +580579,7 @@
       "view": "app",
       "argv": [],
       "exit": 0,
-      "seconds_inside": 0.72,
+      "seconds_inside": 0.62,
       "warnings": [],
       "route": {
        "loops": 0,
@@ -580587,7 +580597,7 @@
      }
     }
    },
-   "foldmap_commit": "5650dbd49c7b002d5664559c05949fde0ce36fff",
+   "foldmap_commit": "44a1c1b04223645799d1278783e02156e037761e",
    "file": "/home/dzyla/.cache/foldmap/8Q4O.cif",
    "sha256": "53e82cbef557620a72f35e5a7e121c749d1e9b3f456ece742f1e1e8131843697",
    "facts": {
@@ -580622,7 +580632,7 @@
     },
     "A2": {
      "pass": true,
-     "detail": "2.2 s (limit 60 s)"
+     "detail": "1.8 s (limit 60 s)"
     },
     "A2b": {
      "pass": true,
@@ -580662,8 +580672,9 @@
      "status": "does not apply"
     },
     "A11": {
-     "pass": true,
-     "detail": ""
+     "pass": null,
+     "detail": "no protein",
+     "status": "does not apply"
     },
     "A12": {
      "pass": true,
@@ -580743,7 +580754,7 @@
    "pass": true,
    "process": {
     "exit": 0,
-    "seconds": 7.11,
+    "seconds": 5.71,
     "max_rss_mb": 174.9,
     "timed_out": false
    }
@@ -587018,8 +587029,8 @@
    "views": {
     "default": {
      "exit": 0,
-     "seconds": 0.9,
-     "max_rss_mb": 136.1,
+     "seconds": 0.6,
+     "max_rss_mb": 136.2,
      "timed_out": false,
      "traceback": false,
      "python_warnings": [],
@@ -587039,144 +587050,11 @@
        "plot",
        "/home/dzyla/.cache/foldmap/6B5W.cif",
        "-o",
-       "/tmp/f1-r100-20261017-174130/work/6B5W/6B5W-default.svg",
+       "/home/dzyla/.claude/jobs/23e71d62/tmp/f1/r100/work/6B5W/6B5W-default.svg",
        "-o",
-       "/tmp/f1-r100-20261017-174130/work/6B5W/6B5W-default.png",
+       "/home/dzyla/.claude/jobs/23e71d62/tmp/f1/r100/work/6B5W/6B5W-default.png",
        "--save-layout",
-       "/tmp/f1-r100-20261017-174130/work/6B5W/6B5W-layout.yaml"
-      ],
-      "exit": 0,
-      "seconds_inside": 0.06,
-      "warnings": [],
-      "route": {
-       "loops": 0,
-       "fallback_curves": 0,
-       "fallback_curves_crossing_an_element": 0,
-       "kink_links_rejected": 0,
-       "tighter_than_inflate": 0,
-       "rejected_as_crossing": 0,
-       "names_moved": 0,
-       "second_search_nodes": 0,
-       "second_searches": 0,
-       "second_searches_refused": 0,
-       "records": 0
-      },
-      "checks": {
-       "element_overlaps": 0,
-       "text_collisions": 0,
-       "off_page": 0,
-       "label_repeats": 0,
-       "copies_alike": 0.0,
-       "domain_rules": 0,
-       "domain_overlap": 0.0,
-       "domain_name_collisions": 0,
-       "stem_name_gap": 0.0,
-       "scope_silent": 0,
-       "order": 0,
-       "accessories": 0,
-       "accessories_named": 0,
-       "loop_crossings": 0,
-       "honest_crossings": 0,
-       "font": [
-        "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf"
-       ],
-       "skipped": {},
-       "details": {
-        "element_overlaps": [],
-        "text_collisions": [],
-        "off_page": [],
-        "label_repeats": {},
-        "copies_alike": {},
-        "domains": {},
-        "stem_name_gaps": {},
-        "scope_silent": [],
-        "order": [],
-        "accessories_named": []
-       }
-      },
-      "stuck": [],
-      "over_labels": [],
-      "crowded_marks": [],
-      "scope": {
-       "file_chains": 1,
-       "drawn_chains": 0,
-       "reason": "not drawn: chain A (19 residues, no helix or strand)",
-       "chains_reason": "",
-       "crop": "",
-       "all_options": {},
-       "residues": 0,
-       "undrawn_chains": [
-        "A"
-       ],
-       "additives": [],
-       "not_drawn": "chain A (19 residues, no helix or strand)",
-       "tetrads": 0,
-       "na_ions": {},
-       "helix_matched": {
-        "cut": 0,
-        "joined": 0
-       }
-      },
-      "chains_read": [
-       "A"
-      ],
-      "protein_chains_drawn": [],
-      "first_protein_chain": "A",
-      "na_chains_drawn": [],
-      "elements": [],
-      "area": 0.0,
-      "context": null,
-      "copy_ties": 0,
-      "tethers": [],
-      "stem_gap_limit": null,
-      "science": {
-       "S1": [],
-       "S2": [],
-       "S3": [],
-       "S4": [],
-       "S5": null,
-       "S6": []
-      },
-      "science_judged": {
-       "S1": 0,
-       "S2": 0,
-       "S3": 0,
-       "S4": 0,
-       "S6": 0
-      },
-      "signature_sha256": "733e3ffb4cd4475610fc3d3103726fb5a828cc5da4bf20880889f88109b707ad",
-      "loops_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "svg_sha256": "d22a4a35cf83dec81cb07e15c6cbe48a4e81a8133e32159bb127b556f827a4ad"
-     }
-    },
-    "deposited": {
-     "exit": 0,
-     "seconds": 0.8,
-     "max_rss_mb": 136.0,
-     "timed_out": false,
-     "traceback": false,
-     "python_warnings": [],
-     "foldmap_said": [
-      "foldmap: not drawn: chain A (19 residues, no helix or strand)"
-     ],
-     "stderr_tail": [
-      "foldmap: not drawn: chain A (19 residues, no helix or strand)"
-     ],
-     "written": {
-      "6B5W-deposited.svg": 1289,
-      "6B5W-deposited.png": 9862
-     },
-     "result": {
-      "view": "deposited",
-      "argv": [
-       "plot",
-       "/home/dzyla/.cache/foldmap/6B5W.cif",
-       "-o",
-       "/tmp/f1-r100-20261017-174130/work/6B5W/6B5W-deposited.svg",
-       "-o",
-       "/tmp/f1-r100-20261017-174130/work/6B5W/6B5W-deposited.png",
-       "--names",
-       "deposited"
+       "/home/dzyla/.claude/jobs/23e71d62/tmp/f1/r100/work/6B5W/6B5W-layout.yaml"
       ],
       "exit": 0,
       "seconds_inside": 0.04,
@@ -587238,6 +587116,141 @@
        "crop": "",
        "all_options": {},
        "residues": 0,
+       "na_outside": [],
+       "undrawn_chains": [
+        "A"
+       ],
+       "additives": [],
+       "not_drawn": "chain A (19 residues, no helix or strand)",
+       "tetrads": 0,
+       "na_ions": {},
+       "helix_matched": {
+        "cut": 0,
+        "joined": 0
+       }
+      },
+      "chains_read": [
+       "A"
+      ],
+      "protein_chains_drawn": [],
+      "first_protein_chain": "A",
+      "na_chains_drawn": [],
+      "elements": [],
+      "area": 0.0,
+      "context": null,
+      "copy_ties": 0,
+      "tethers": [],
+      "stem_gap_limit": null,
+      "science": {
+       "S1": [],
+       "S2": [],
+       "S3": [],
+       "S4": [],
+       "S5": null,
+       "S6": []
+      },
+      "science_judged": {
+       "S1": 0,
+       "S2": 0,
+       "S3": 0,
+       "S4": 0,
+       "S6": 0
+      },
+      "signature_sha256": "733e3ffb4cd4475610fc3d3103726fb5a828cc5da4bf20880889f88109b707ad",
+      "loops_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "svg_sha256": "d22a4a35cf83dec81cb07e15c6cbe48a4e81a8133e32159bb127b556f827a4ad"
+     }
+    },
+    "deposited": {
+     "exit": 0,
+     "seconds": 0.55,
+     "max_rss_mb": 135.0,
+     "timed_out": false,
+     "traceback": false,
+     "python_warnings": [],
+     "foldmap_said": [
+      "foldmap: not drawn: chain A (19 residues, no helix or strand)"
+     ],
+     "stderr_tail": [
+      "foldmap: not drawn: chain A (19 residues, no helix or strand)"
+     ],
+     "written": {
+      "6B5W-deposited.svg": 1289,
+      "6B5W-deposited.png": 9862
+     },
+     "result": {
+      "view": "deposited",
+      "argv": [
+       "plot",
+       "/home/dzyla/.cache/foldmap/6B5W.cif",
+       "-o",
+       "/home/dzyla/.claude/jobs/23e71d62/tmp/f1/r100/work/6B5W/6B5W-deposited.svg",
+       "-o",
+       "/home/dzyla/.claude/jobs/23e71d62/tmp/f1/r100/work/6B5W/6B5W-deposited.png",
+       "--names",
+       "deposited"
+      ],
+      "exit": 0,
+      "seconds_inside": 0.03,
+      "warnings": [],
+      "route": {
+       "loops": 0,
+       "fallback_curves": 0,
+       "fallback_curves_crossing_an_element": 0,
+       "kink_links_rejected": 0,
+       "tighter_than_inflate": 0,
+       "rejected_as_crossing": 0,
+       "names_moved": 0,
+       "second_search_nodes": 0,
+       "second_searches": 0,
+       "second_searches_refused": 0,
+       "records": 0
+      },
+      "checks": {
+       "element_overlaps": 0,
+       "text_collisions": 0,
+       "off_page": 0,
+       "label_repeats": 0,
+       "copies_alike": 0.0,
+       "domain_rules": 0,
+       "domain_overlap": 0.0,
+       "domain_name_collisions": 0,
+       "stem_name_gap": 0.0,
+       "scope_silent": 0,
+       "order": 0,
+       "accessories": 0,
+       "accessories_named": 0,
+       "loop_crossings": 0,
+       "honest_crossings": 0,
+       "font": [
+        "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf"
+       ],
+       "skipped": {},
+       "details": {
+        "element_overlaps": [],
+        "text_collisions": [],
+        "off_page": [],
+        "label_repeats": {},
+        "copies_alike": {},
+        "domains": {},
+        "stem_name_gaps": {},
+        "scope_silent": [],
+        "order": [],
+        "accessories_named": []
+       }
+      },
+      "stuck": [],
+      "over_labels": [],
+      "crowded_marks": [],
+      "scope": {
+       "file_chains": 1,
+       "drawn_chains": 0,
+       "reason": "not drawn: chain A (19 residues, no helix or strand)",
+       "chains_reason": "",
+       "crop": "",
+       "all_options": {},
+       "residues": 0,
+       "na_outside": [],
        "undrawn_chains": [
         "A"
        ],
@@ -587284,8 +587297,8 @@
     },
     "beta": {
      "exit": 0,
-     "seconds": 0.8,
-     "max_rss_mb": 136.0,
+     "seconds": 0.6,
+     "max_rss_mb": 136.2,
      "timed_out": false,
      "traceback": false,
      "python_warnings": [],
@@ -587305,14 +587318,14 @@
        "plot",
        "/home/dzyla/.cache/foldmap/6B5W.cif",
        "-o",
-       "/tmp/f1-r100-20261017-174130/work/6B5W/6B5W-beta.svg",
+       "/home/dzyla/.claude/jobs/23e71d62/tmp/f1/r100/work/6B5W/6B5W-beta.svg",
        "-o",
-       "/tmp/f1-r100-20261017-174130/work/6B5W/6B5W-beta.png",
+       "/home/dzyla/.claude/jobs/23e71d62/tmp/f1/r100/work/6B5W/6B5W-beta.png",
        "--names",
        "beta"
       ],
       "exit": 0,
-      "seconds_inside": 0.05,
+      "seconds_inside": 0.04,
       "warnings": [],
       "route": {
        "loops": 0,
@@ -587371,6 +587384,7 @@
        "crop": "",
        "all_options": {},
        "residues": 0,
+       "na_outside": [],
        "undrawn_chains": [
         "A"
        ],
@@ -587417,8 +587431,8 @@
     },
     "seed1": {
      "exit": 0,
-     "seconds": 0.7,
-     "max_rss_mb": 136.1,
+     "seconds": 0.6,
+     "max_rss_mb": 136.3,
      "timed_out": false,
      "traceback": false,
      "python_warnings": [],
@@ -587438,12 +587452,12 @@
        "plot",
        "/home/dzyla/.cache/foldmap/6B5W.cif",
        "-o",
-       "/tmp/f1-r100-20261017-174130/work/6B5W/6B5W-seed1.svg",
+       "/home/dzyla/.claude/jobs/23e71d62/tmp/f1/r100/work/6B5W/6B5W-seed1.svg",
        "-o",
-       "/tmp/f1-r100-20261017-174130/work/6B5W/6B5W-seed1.png"
+       "/home/dzyla/.claude/jobs/23e71d62/tmp/f1/r100/work/6B5W/6B5W-seed1.png"
       ],
       "exit": 0,
-      "seconds_inside": 0.06,
+      "seconds_inside": 0.04,
       "warnings": [],
       "route": {
        "loops": 0,
@@ -587502,6 +587516,7 @@
        "crop": "",
        "all_options": {},
        "residues": 0,
+       "na_outside": [],
        "undrawn_chains": [
         "A"
        ],
@@ -587533,8 +587548,8 @@
     },
     "roundtrip": {
      "exit": 0,
-     "seconds": 0.85,
-     "max_rss_mb": 136.2,
+     "seconds": 0.6,
+     "max_rss_mb": 135.6,
      "timed_out": false,
      "traceback": false,
      "python_warnings": [],
@@ -587554,14 +587569,14 @@
        "plot",
        "/home/dzyla/.cache/foldmap/6B5W.cif",
        "-o",
-       "/tmp/f1-r100-20261017-174130/work/6B5W/6B5W-roundtrip.svg",
+       "/home/dzyla/.claude/jobs/23e71d62/tmp/f1/r100/work/6B5W/6B5W-roundtrip.svg",
        "-o",
-       "/tmp/f1-r100-20261017-174130/work/6B5W/6B5W-roundtrip.png",
+       "/home/dzyla/.claude/jobs/23e71d62/tmp/f1/r100/work/6B5W/6B5W-roundtrip.png",
        "--layout-file",
-       "/tmp/f1-r100-20261017-174130/work/6B5W/6B5W-layout.yaml"
+       "/home/dzyla/.claude/jobs/23e71d62/tmp/f1/r100/work/6B5W/6B5W-layout.yaml"
       ],
       "exit": 0,
-      "seconds_inside": 0.05,
+      "seconds_inside": 0.04,
       "warnings": [],
       "route": {
        "loops": 0,
@@ -587620,6 +587635,7 @@
        "crop": "",
        "all_options": {},
        "residues": 0,
+       "na_outside": [],
        "undrawn_chains": [
         "A"
        ],
@@ -587651,8 +587667,8 @@
     },
     "interactive": {
      "exit": 0,
-     "seconds": 0.9,
-     "max_rss_mb": 157.5,
+     "seconds": 0.85,
+     "max_rss_mb": 157.7,
      "timed_out": false,
      "traceback": false,
      "python_warnings": [],
@@ -587667,10 +587683,10 @@
        "interactive",
        "/home/dzyla/.cache/foldmap/6B5W.cif",
        "-o",
-       "/tmp/f1-r100-20261017-174130/work/6B5W/6B5W.html"
+       "/home/dzyla/.claude/jobs/23e71d62/tmp/f1/r100/work/6B5W/6B5W.html"
       ],
       "exit": 0,
-      "seconds_inside": 0.22,
+      "seconds_inside": 0.23,
       "warnings": [],
       "route": {
        "loops": 0,
@@ -587689,8 +587705,8 @@
     },
     "sequence": {
      "exit": 0,
-     "seconds": 0.7,
-     "max_rss_mb": 133.3,
+     "seconds": 0.6,
+     "max_rss_mb": 133.1,
      "timed_out": false,
      "traceback": false,
      "python_warnings": [],
@@ -587705,7 +587721,7 @@
        "sequence",
        "/home/dzyla/.cache/foldmap/6B5W.cif",
        "-o",
-       "/tmp/f1-r100-20261017-174130/work/6B5W/6B5W-sequence.svg"
+       "/home/dzyla/.claude/jobs/23e71d62/tmp/f1/r100/work/6B5W/6B5W-sequence.svg"
       ],
       "exit": 0,
       "seconds_inside": 0.05,
@@ -587727,8 +587743,8 @@
     },
     "app": {
      "exit": 0,
-     "seconds": 1.61,
-     "max_rss_mb": 127.8,
+     "seconds": 1.05,
+     "max_rss_mb": 127.0,
      "timed_out": false,
      "traceback": false,
      "python_warnings": [],
@@ -587759,7 +587775,7 @@
       "view": "app",
       "argv": [],
       "exit": 0,
-      "seconds_inside": 0.77,
+      "seconds_inside": 0.5,
       "warnings": [],
       "route": {
        "loops": 0,
@@ -587777,7 +587793,7 @@
      }
     }
    },
-   "foldmap_commit": "5650dbd49c7b002d5664559c05949fde0ce36fff",
+   "foldmap_commit": "44a1c1b04223645799d1278783e02156e037761e",
    "file": "/home/dzyla/.cache/foldmap/6B5W.cif",
    "sha256": "bbc257ab5a8c3b3c79808d49da7024e838a202ecf2f8f2570da28742663a4d68",
    "facts": {
@@ -587822,7 +587838,7 @@
     },
     "A2": {
      "pass": true,
-     "detail": "0.9 s (limit 60 s)"
+     "detail": "0.6 s (limit 60 s)"
     },
     "A2b": {
      "pass": true,
@@ -587849,8 +587865,9 @@
      "detail": ""
     },
     "A8": {
-     "pass": true,
-     "detail": ""
+     "pass": null,
+     "detail": "no element or stem drawn",
+     "status": "not judged"
     },
     "A9": {
      "pass": true,
@@ -587861,8 +587878,9 @@
      "detail": "1.0000 of 19"
     },
     "A11": {
-     "pass": true,
-     "detail": ""
+     "pass": null,
+     "detail": "no protein element drawn",
+     "status": "not judged"
     },
     "A12": {
      "pass": true,
@@ -587943,8 +587961,8 @@
    "pass": true,
    "process": {
     "exit": 0,
-    "seconds": 7.82,
-    "max_rss_mb": 157.5,
+    "seconds": 5.81,
+    "max_rss_mb": 157.7,
     "timed_out": false
    }
   },
@@ -771871,16 +771889,16 @@
    "views": {
     "default": {
      "exit": 0,
-     "seconds": 2.36,
-     "max_rss_mb": 268.5,
+     "seconds": 2.1,
+     "max_rss_mb": 263.8,
      "timed_out": false,
      "traceback": false,
      "python_warnings": [],
      "foldmap_said": [
-      "foldmap: drew one of 12 subunits (C12 symmetry): 2 of 26 chains; --focus none draws all of them"
+      "foldmap: drew one of 12 subunits (C12 symmetry), without the DNA Z, Y: 2 of 26 chains; --focus none draws all of them"
      ],
      "stderr_tail": [
-      "foldmap: drew one of 12 subunits (C12 symmetry): 2 of 26 chains; --focus none draws all of them",
+      "foldmap: drew one of 12 subunits (C12 symmetry), without the DNA Z, Y: 2 of 26 chains; --focus none draws all of them",
       "How this figure was made:",
       "  - helix pieces cut or joined so copies of a protein are drawn alike, where DSSP breaks a helix in some copies only (0 cut, 1 joined): N:395-417"
      ],
@@ -771894,14 +771912,14 @@
        "plot",
        "/home/dzyla/.cache/foldmap/8QEM.cif",
        "-o",
-       "/tmp/f1-r100-20261017-174130/work/8QEM/8QEM-default.svg",
+       "/home/dzyla/.claude/jobs/23e71d62/tmp/f1/r100/work/8QEM/8QEM-default.svg",
        "-o",
-       "/tmp/f1-r100-20261017-174130/work/8QEM/8QEM-default.png",
+       "/home/dzyla/.claude/jobs/23e71d62/tmp/f1/r100/work/8QEM/8QEM-default.png",
        "--save-layout",
-       "/tmp/f1-r100-20261017-174130/work/8QEM/8QEM-layout.yaml"
+       "/home/dzyla/.claude/jobs/23e71d62/tmp/f1/r100/work/8QEM/8QEM-layout.yaml"
       ],
       "exit": 0,
-      "seconds_inside": 1.21,
+      "seconds_inside": 1.11,
       "warnings": [],
       "route": {
        "loops": 44,
@@ -771957,13 +771975,17 @@
       "scope": {
        "file_chains": 26,
        "drawn_chains": 2,
-       "reason": "one of 12 subunits (C12 symmetry)",
-       "chains_reason": "one of 12 subunits (C12 symmetry)",
+       "reason": "one of 12 subunits (C12 symmetry), without the DNA Z, Y",
+       "chains_reason": "one of 12 subunits (C12 symmetry), without the DNA Z, Y",
        "crop": "",
        "all_options": {
         "focus": "none"
        },
        "residues": 8637,
+       "na_outside": [
+        "Z",
+        "Y"
+       ],
        "undrawn_chains": [],
        "additives": [],
        "not_drawn": "",
@@ -772457,16 +772479,16 @@
     },
     "deposited": {
      "exit": 0,
-     "seconds": 2.4,
-     "max_rss_mb": 265.7,
+     "seconds": 2.21,
+     "max_rss_mb": 266.3,
      "timed_out": false,
      "traceback": false,
      "python_warnings": [],
      "foldmap_said": [
-      "foldmap: drew one of 12 subunits (C12 symmetry): 2 of 26 chains; --focus none draws all of them"
+      "foldmap: drew one of 12 subunits (C12 symmetry), without the DNA Z, Y: 2 of 26 chains; --focus none draws all of them"
      ],
      "stderr_tail": [
-      "foldmap: drew one of 12 subunits (C12 symmetry): 2 of 26 chains; --focus none draws all of them",
+      "foldmap: drew one of 12 subunits (C12 symmetry), without the DNA Z, Y: 2 of 26 chains; --focus none draws all of them",
       "How this figure was made:",
       "  - helix pieces cut or joined so copies of a protein are drawn alike, where DSSP breaks a helix in some copies only (0 cut, 1 joined): N:395-417"
      ],
@@ -772480,14 +772502,14 @@
        "plot",
        "/home/dzyla/.cache/foldmap/8QEM.cif",
        "-o",
-       "/tmp/f1-r100-20261017-174130/work/8QEM/8QEM-deposited.svg",
+       "/home/dzyla/.claude/jobs/23e71d62/tmp/f1/r100/work/8QEM/8QEM-deposited.svg",
        "-o",
-       "/tmp/f1-r100-20261017-174130/work/8QEM/8QEM-deposited.png",
+       "/home/dzyla/.claude/jobs/23e71d62/tmp/f1/r100/work/8QEM/8QEM-deposited.png",
        "--names",
        "deposited"
       ],
       "exit": 0,
-      "seconds_inside": 1.2,
+      "seconds_inside": 1.16,
       "warnings": [],
       "route": {
        "loops": 44,
@@ -772543,13 +772565,17 @@
       "scope": {
        "file_chains": 26,
        "drawn_chains": 2,
-       "reason": "one of 12 subunits (C12 symmetry)",
-       "chains_reason": "one of 12 subunits (C12 symmetry)",
+       "reason": "one of 12 subunits (C12 symmetry), without the DNA Z, Y",
+       "chains_reason": "one of 12 subunits (C12 symmetry), without the DNA Z, Y",
        "crop": "",
        "all_options": {
         "focus": "none"
        },
        "residues": 8637,
+       "na_outside": [
+        "Z",
+        "Y"
+       ],
        "undrawn_chains": [],
        "additives": [],
        "not_drawn": "",
@@ -773043,16 +773069,16 @@
     },
     "beta": {
      "exit": 0,
-     "seconds": 2.66,
-     "max_rss_mb": 268.0,
+     "seconds": 2.15,
+     "max_rss_mb": 266.2,
      "timed_out": false,
      "traceback": false,
      "python_warnings": [],
      "foldmap_said": [
-      "foldmap: drew one of 12 subunits (C12 symmetry): 2 of 26 chains; --focus none draws all of them"
+      "foldmap: drew one of 12 subunits (C12 symmetry), without the DNA Z, Y: 2 of 26 chains; --focus none draws all of them"
      ],
      "stderr_tail": [
-      "foldmap: drew one of 12 subunits (C12 symmetry): 2 of 26 chains; --focus none draws all of them",
+      "foldmap: drew one of 12 subunits (C12 symmetry), without the DNA Z, Y: 2 of 26 chains; --focus none draws all of them",
       "How this figure was made:",
       "  - helix pieces cut or joined so copies of a protein are drawn alike, where DSSP breaks a helix in some copies only (0 cut, 1 joined): N:395-417"
      ],
@@ -773066,14 +773092,14 @@
        "plot",
        "/home/dzyla/.cache/foldmap/8QEM.cif",
        "-o",
-       "/tmp/f1-r100-20261017-174130/work/8QEM/8QEM-beta.svg",
+       "/home/dzyla/.claude/jobs/23e71d62/tmp/f1/r100/work/8QEM/8QEM-beta.svg",
        "-o",
-       "/tmp/f1-r100-20261017-174130/work/8QEM/8QEM-beta.png",
+       "/home/dzyla/.claude/jobs/23e71d62/tmp/f1/r100/work/8QEM/8QEM-beta.png",
        "--names",
        "beta"
       ],
       "exit": 0,
-      "seconds_inside": 1.44,
+      "seconds_inside": 1.12,
       "warnings": [],
       "route": {
        "loops": 44,
@@ -773129,13 +773155,17 @@
       "scope": {
        "file_chains": 26,
        "drawn_chains": 2,
-       "reason": "one of 12 subunits (C12 symmetry)",
-       "chains_reason": "one of 12 subunits (C12 symmetry)",
+       "reason": "one of 12 subunits (C12 symmetry), without the DNA Z, Y",
+       "chains_reason": "one of 12 subunits (C12 symmetry), without the DNA Z, Y",
        "crop": "",
        "all_options": {
         "focus": "none"
        },
        "residues": 8637,
+       "na_outside": [
+        "Z",
+        "Y"
+       ],
        "undrawn_chains": [],
        "additives": [],
        "not_drawn": "",
@@ -774670,8 +774700,8 @@
     },
     "focus": {
      "exit": 0,
-     "seconds": 31.04,
-     "max_rss_mb": 382.6,
+     "seconds": 20.53,
+     "max_rss_mb": 383.0,
      "timed_out": false,
      "traceback": false,
      "python_warnings": [],
@@ -774693,14 +774723,14 @@
        "plot",
        "/home/dzyla/.cache/foldmap/8QEM.cif",
        "-o",
-       "/tmp/f1-r100-20261017-174130/work/8QEM/8QEM-focus.svg",
+       "/home/dzyla/.claude/jobs/23e71d62/tmp/f1/r100/work/8QEM/8QEM-focus.svg",
        "-o",
-       "/tmp/f1-r100-20261017-174130/work/8QEM/8QEM-focus.png",
+       "/home/dzyla/.claude/jobs/23e71d62/tmp/f1/r100/work/8QEM/8QEM-focus.png",
        "--focus",
        "none"
       ],
       "exit": 0,
-      "seconds_inside": 25.08,
+      "seconds_inside": 15.71,
       "warnings": [],
       "route": {
        "loops": 516,
@@ -774906,6 +774936,7 @@
        "crop": "",
        "all_options": {},
        "residues": 0,
+       "na_outside": [],
        "undrawn_chains": [],
        "additives": [],
        "not_drawn": "",
@@ -779412,16 +779443,16 @@
     },
     "domains": {
      "exit": 0,
-     "seconds": 3.11,
-     "max_rss_mb": 279.8,
+     "seconds": 2.6,
+     "max_rss_mb": 271.5,
      "timed_out": false,
      "traceback": false,
      "python_warnings": [],
      "foldmap_said": [
-      "foldmap: drew one of 12 subunits (C12 symmetry): 2 of 26 chains; --focus none draws all of them"
+      "foldmap: drew one of 12 subunits (C12 symmetry), without the DNA Z, Y: 2 of 26 chains; --focus none draws all of them"
      ],
      "stderr_tail": [
-      "foldmap: drew one of 12 subunits (C12 symmetry): 2 of 26 chains; --focus none draws all of them",
+      "foldmap: drew one of 12 subunits (C12 symmetry), without the DNA Z, Y: 2 of 26 chains; --focus none draws all of them",
       "How this figure was made:",
       "  - domains D1, D2, D3, D4, D5, D6 inferred from residue contacts, not a published domain assignment",
       "  - helix pieces cut or joined so copies of a protein are drawn alike, where DSSP breaks a helix in some copies only (0 cut, 1 joined): N:395-417",
@@ -779437,14 +779468,14 @@
        "plot",
        "/home/dzyla/.cache/foldmap/8QEM.cif",
        "-o",
-       "/tmp/f1-r100-20261017-174130/work/8QEM/8QEM-domains.svg",
+       "/home/dzyla/.claude/jobs/23e71d62/tmp/f1/r100/work/8QEM/8QEM-domains.svg",
        "-o",
-       "/tmp/f1-r100-20261017-174130/work/8QEM/8QEM-domains.png",
+       "/home/dzyla/.claude/jobs/23e71d62/tmp/f1/r100/work/8QEM/8QEM-domains.png",
        "--domains",
        "auto"
       ],
       "exit": 0,
-      "seconds_inside": 1.68,
+      "seconds_inside": 1.52,
       "warnings": [],
       "route": {
        "loops": 44,
@@ -779506,13 +779537,17 @@
       "scope": {
        "file_chains": 26,
        "drawn_chains": 2,
-       "reason": "one of 12 subunits (C12 symmetry)",
-       "chains_reason": "one of 12 subunits (C12 symmetry)",
+       "reason": "one of 12 subunits (C12 symmetry), without the DNA Z, Y",
+       "chains_reason": "one of 12 subunits (C12 symmetry), without the DNA Z, Y",
        "crop": "",
        "all_options": {
         "focus": "none"
        },
        "residues": 8637,
+       "na_outside": [
+        "Z",
+        "Y"
+       ],
        "undrawn_chains": [],
        "additives": [],
        "not_drawn": "",
@@ -780006,16 +780041,16 @@
     },
     "seed1": {
      "exit": 0,
-     "seconds": 1.95,
-     "max_rss_mb": 268.6,
+     "seconds": 1.7,
+     "max_rss_mb": 264.4,
      "timed_out": false,
      "traceback": false,
      "python_warnings": [],
      "foldmap_said": [
-      "foldmap: drew one of 12 subunits (C12 symmetry): 2 of 26 chains; --focus none draws all of them"
+      "foldmap: drew one of 12 subunits (C12 symmetry), without the DNA Z, Y: 2 of 26 chains; --focus none draws all of them"
      ],
      "stderr_tail": [
-      "foldmap: drew one of 12 subunits (C12 symmetry): 2 of 26 chains; --focus none draws all of them",
+      "foldmap: drew one of 12 subunits (C12 symmetry), without the DNA Z, Y: 2 of 26 chains; --focus none draws all of them",
       "How this figure was made:",
       "  - helix pieces cut or joined so copies of a protein are drawn alike, where DSSP breaks a helix in some copies only (0 cut, 1 joined): N:395-417"
      ],
@@ -780029,12 +780064,12 @@
        "plot",
        "/home/dzyla/.cache/foldmap/8QEM.cif",
        "-o",
-       "/tmp/f1-r100-20261017-174130/work/8QEM/8QEM-seed1.svg",
+       "/home/dzyla/.claude/jobs/23e71d62/tmp/f1/r100/work/8QEM/8QEM-seed1.svg",
        "-o",
-       "/tmp/f1-r100-20261017-174130/work/8QEM/8QEM-seed1.png"
+       "/home/dzyla/.claude/jobs/23e71d62/tmp/f1/r100/work/8QEM/8QEM-seed1.png"
       ],
       "exit": 0,
-      "seconds_inside": 1.07,
+      "seconds_inside": 0.97,
       "warnings": [],
       "route": {
        "loops": 44,
@@ -780090,13 +780125,17 @@
       "scope": {
        "file_chains": 26,
        "drawn_chains": 2,
-       "reason": "one of 12 subunits (C12 symmetry)",
-       "chains_reason": "one of 12 subunits (C12 symmetry)",
+       "reason": "one of 12 subunits (C12 symmetry), without the DNA Z, Y",
+       "chains_reason": "one of 12 subunits (C12 symmetry), without the DNA Z, Y",
        "crop": "",
        "all_options": {
         "focus": "none"
        },
        "residues": 8637,
+       "na_outside": [
+        "Z",
+        "Y"
+       ],
        "undrawn_chains": [],
        "additives": [],
        "not_drawn": "",
@@ -780575,16 +780614,16 @@
     },
     "roundtrip": {
      "exit": 0,
-     "seconds": 2.3,
-     "max_rss_mb": 268.2,
+     "seconds": 1.7,
+     "max_rss_mb": 267.0,
      "timed_out": false,
      "traceback": false,
      "python_warnings": [],
      "foldmap_said": [
-      "foldmap: drew one of 12 subunits (C12 symmetry): 2 of 26 chains; --focus none draws all of them"
+      "foldmap: drew one of 12 subunits (C12 symmetry), without the DNA Z, Y: 2 of 26 chains; --focus none draws all of them"
      ],
      "stderr_tail": [
-      "foldmap: drew one of 12 subunits (C12 symmetry): 2 of 26 chains; --focus none draws all of them",
+      "foldmap: drew one of 12 subunits (C12 symmetry), without the DNA Z, Y: 2 of 26 chains; --focus none draws all of them",
       "How this figure was made:",
       "  - helix pieces cut or joined so copies of a protein are drawn alike, where DSSP breaks a helix in some copies only (0 cut, 1 joined): N:395-417"
      ],
@@ -780598,14 +780637,14 @@
        "plot",
        "/home/dzyla/.cache/foldmap/8QEM.cif",
        "-o",
-       "/tmp/f1-r100-20261017-174130/work/8QEM/8QEM-roundtrip.svg",
+       "/home/dzyla/.claude/jobs/23e71d62/tmp/f1/r100/work/8QEM/8QEM-roundtrip.svg",
        "-o",
-       "/tmp/f1-r100-20261017-174130/work/8QEM/8QEM-roundtrip.png",
+       "/home/dzyla/.claude/jobs/23e71d62/tmp/f1/r100/work/8QEM/8QEM-roundtrip.png",
        "--layout-file",
-       "/tmp/f1-r100-20261017-174130/work/8QEM/8QEM-layout.yaml"
+       "/home/dzyla/.claude/jobs/23e71d62/tmp/f1/r100/work/8QEM/8QEM-layout.yaml"
       ],
       "exit": 0,
-      "seconds_inside": 1.33,
+      "seconds_inside": 0.98,
       "warnings": [],
       "route": {
        "loops": 44,
@@ -780661,13 +780700,17 @@
       "scope": {
        "file_chains": 26,
        "drawn_chains": 2,
-       "reason": "one of 12 subunits (C12 symmetry)",
-       "chains_reason": "one of 12 subunits (C12 symmetry)",
+       "reason": "one of 12 subunits (C12 symmetry), without the DNA Z, Y",
+       "chains_reason": "one of 12 subunits (C12 symmetry), without the DNA Z, Y",
        "crop": "",
        "all_options": {
         "focus": "none"
        },
        "residues": 8637,
+       "na_outside": [
+        "Z",
+        "Y"
+       ],
        "undrawn_chains": [],
        "additives": [],
        "not_drawn": "",
@@ -781146,8 +781189,8 @@
     },
     "interactive": {
      "exit": 0,
-     "seconds": 2.2,
-     "max_rss_mb": 321.2,
+     "seconds": 1.45,
+     "max_rss_mb": 319.2,
      "timed_out": false,
      "traceback": false,
      "python_warnings": [],
@@ -781165,10 +781208,10 @@
        "interactive",
        "/home/dzyla/.cache/foldmap/8QEM.cif",
        "-o",
-       "/tmp/f1-r100-20261017-174130/work/8QEM/8QEM.html"
+       "/home/dzyla/.claude/jobs/23e71d62/tmp/f1/r100/work/8QEM/8QEM.html"
       ],
       "exit": 0,
-      "seconds_inside": 1.52,
+      "seconds_inside": 1.01,
       "warnings": [],
       "route": {
        "loops": 44,
@@ -781187,8 +781230,8 @@
     },
     "sequence": {
      "exit": 0,
-     "seconds": 2.25,
-     "max_rss_mb": 246.2,
+     "seconds": 1.35,
+     "max_rss_mb": 246.5,
      "timed_out": false,
      "traceback": false,
      "python_warnings": [],
@@ -781203,10 +781246,10 @@
        "sequence",
        "/home/dzyla/.cache/foldmap/8QEM.cif",
        "-o",
-       "/tmp/f1-r100-20261017-174130/work/8QEM/8QEM-sequence.svg"
+       "/home/dzyla/.claude/jobs/23e71d62/tmp/f1/r100/work/8QEM/8QEM-sequence.svg"
       ],
       "exit": 0,
-      "seconds_inside": 1.58,
+      "seconds_inside": 0.95,
       "warnings": [],
       "route": {
        "loops": 0,
@@ -781225,8 +781268,8 @@
     },
     "app": {
      "exit": 0,
-     "seconds": 3.56,
-     "max_rss_mb": 202.7,
+     "seconds": 2.5,
+     "max_rss_mb": 200.8,
      "timed_out": false,
      "traceback": false,
      "python_warnings": [],
@@ -781257,7 +781300,7 @@
       "view": "app",
       "argv": [],
       "exit": 0,
-      "seconds_inside": 2.81,
+      "seconds_inside": 2.05,
       "warnings": [],
       "route": {
        "loops": 44,
@@ -781275,7 +781318,7 @@
      }
     }
    },
-   "foldmap_commit": "5650dbd49c7b002d5664559c05949fde0ce36fff",
+   "foldmap_commit": "44a1c1b04223645799d1278783e02156e037761e",
    "file": "/home/dzyla/.cache/foldmap/8QEM.cif",
    "sha256": "7caed8ffbb1789df432348e6531fa5c7d7d7c0a16a29f7b21bde66731b8a1749",
    "facts": {
@@ -781321,7 +781364,7 @@
     },
     "A2": {
      "pass": true,
-     "detail": "2.36 s (limit 180 s)"
+     "detail": "2.1 s (limit 180 s)"
     },
     "A2b": {
      "pass": true,
@@ -781438,8 +781481,8 @@
    "pass": false,
    "process": {
     "exit": 1,
-    "seconds": 55.8,
-    "max_rss_mb": 382.6,
+    "seconds": 39.56,
+    "max_rss_mb": 383.0,
     "timed_out": false
    }
   },
@@ -884908,7 +884951,7 @@
    "views": {
     "default": {
      "exit": 0,
-     "seconds": 5.43,
+     "seconds": 3.81,
      "max_rss_mb": 193.4,
      "timed_out": false,
      "traceback": false,
@@ -884925,14 +884968,14 @@
        "plot",
        "/home/dzyla/.cache/foldmap/8SA2.cif",
        "-o",
-       "/tmp/f1-r100-20261017-174130/work/8SA2/8SA2-default.svg",
+       "/home/dzyla/.claude/jobs/23e71d62/tmp/f1/r100/work/8SA2/8SA2-default.svg",
        "-o",
-       "/tmp/f1-r100-20261017-174130/work/8SA2/8SA2-default.png",
+       "/home/dzyla/.claude/jobs/23e71d62/tmp/f1/r100/work/8SA2/8SA2-default.png",
        "--save-layout",
-       "/tmp/f1-r100-20261017-174130/work/8SA2/8SA2-layout.yaml"
+       "/home/dzyla/.claude/jobs/23e71d62/tmp/f1/r100/work/8SA2/8SA2-layout.yaml"
       ],
       "exit": 0,
-      "seconds_inside": 1.68,
+      "seconds_inside": 1.3,
       "warnings": [],
       "route": {
        "loops": 0,
@@ -885093,6 +885136,7 @@
        "crop": "",
        "all_options": {},
        "residues": 0,
+       "na_outside": [],
        "undrawn_chains": [],
        "additives": [],
        "not_drawn": "",
@@ -885311,8 +885355,8 @@
     },
     "focus": {
      "exit": 0,
-     "seconds": 3.16,
-     "max_rss_mb": 193.3,
+     "seconds": 2.45,
+     "max_rss_mb": 193.0,
      "timed_out": false,
      "traceback": false,
      "python_warnings": [],
@@ -885328,14 +885372,14 @@
        "plot",
        "/home/dzyla/.cache/foldmap/8SA2.cif",
        "-o",
-       "/tmp/f1-r100-20261017-174130/work/8SA2/8SA2-focus.svg",
+       "/home/dzyla/.claude/jobs/23e71d62/tmp/f1/r100/work/8SA2/8SA2-focus.svg",
        "-o",
-       "/tmp/f1-r100-20261017-174130/work/8SA2/8SA2-focus.png",
+       "/home/dzyla/.claude/jobs/23e71d62/tmp/f1/r100/work/8SA2/8SA2-focus.png",
        "--focus",
        "none"
       ],
       "exit": 0,
-      "seconds_inside": 1.89,
+      "seconds_inside": 1.31,
       "warnings": [],
       "route": {
        "loops": 0,
@@ -885496,6 +885540,7 @@
        "crop": "",
        "all_options": {},
        "residues": 0,
+       "na_outside": [],
        "undrawn_chains": [],
        "additives": [],
        "not_drawn": "",
@@ -885593,8 +885638,8 @@
     },
     "seed1": {
      "exit": 0,
-     "seconds": 3.01,
-     "max_rss_mb": 193.5,
+     "seconds": 2.35,
+     "max_rss_mb": 192.0,
      "timed_out": false,
      "traceback": false,
      "python_warnings": [],
@@ -885610,12 +885655,12 @@
        "plot",
        "/home/dzyla/.cache/foldmap/8SA2.cif",
        "-o",
-       "/tmp/f1-r100-20261017-174130/work/8SA2/8SA2-seed1.svg",
+       "/home/dzyla/.claude/jobs/23e71d62/tmp/f1/r100/work/8SA2/8SA2-seed1.svg",
        "-o",
-       "/tmp/f1-r100-20261017-174130/work/8SA2/8SA2-seed1.png"
+       "/home/dzyla/.claude/jobs/23e71d62/tmp/f1/r100/work/8SA2/8SA2-seed1.png"
       ],
       "exit": 0,
-      "seconds_inside": 1.86,
+      "seconds_inside": 1.28,
       "warnings": [],
       "route": {
        "loops": 0,
@@ -885776,6 +885821,7 @@
        "crop": "",
        "all_options": {},
        "residues": 0,
+       "na_outside": [],
        "undrawn_chains": [],
        "additives": [],
        "not_drawn": "",
@@ -885858,8 +885904,8 @@
     },
     "roundtrip": {
      "exit": 0,
-     "seconds": 2.71,
-     "max_rss_mb": 193.5,
+     "seconds": 2.25,
+     "max_rss_mb": 192.9,
      "timed_out": false,
      "traceback": false,
      "python_warnings": [],
@@ -885875,14 +885921,14 @@
        "plot",
        "/home/dzyla/.cache/foldmap/8SA2.cif",
        "-o",
-       "/tmp/f1-r100-20261017-174130/work/8SA2/8SA2-roundtrip.svg",
+       "/home/dzyla/.claude/jobs/23e71d62/tmp/f1/r100/work/8SA2/8SA2-roundtrip.svg",
        "-o",
-       "/tmp/f1-r100-20261017-174130/work/8SA2/8SA2-roundtrip.png",
+       "/home/dzyla/.claude/jobs/23e71d62/tmp/f1/r100/work/8SA2/8SA2-roundtrip.png",
        "--layout-file",
-       "/tmp/f1-r100-20261017-174130/work/8SA2/8SA2-layout.yaml"
+       "/home/dzyla/.claude/jobs/23e71d62/tmp/f1/r100/work/8SA2/8SA2-layout.yaml"
       ],
       "exit": 0,
-      "seconds_inside": 1.48,
+      "seconds_inside": 1.29,
       "warnings": [],
       "route": {
        "loops": 0,
@@ -886043,6 +886089,7 @@
        "crop": "",
        "all_options": {},
        "residues": 0,
+       "na_outside": [],
        "undrawn_chains": [],
        "additives": [],
        "not_drawn": "",
@@ -886125,8 +886172,8 @@
     },
     "interactive": {
      "exit": 0,
-     "seconds": 1.9,
-     "max_rss_mb": 174.4,
+     "seconds": 1.65,
+     "max_rss_mb": 173.3,
      "timed_out": false,
      "traceback": false,
      "python_warnings": [],
@@ -886141,10 +886188,10 @@
        "interactive",
        "/home/dzyla/.cache/foldmap/8SA2.cif",
        "-o",
-       "/tmp/f1-r100-20261017-174130/work/8SA2/8SA2.html"
+       "/home/dzyla/.claude/jobs/23e71d62/tmp/f1/r100/work/8SA2/8SA2.html"
       ],
       "exit": 0,
-      "seconds_inside": 1.25,
+      "seconds_inside": 1.13,
       "warnings": [],
       "route": {
        "loops": 0,
@@ -886163,8 +886210,8 @@
     },
     "app": {
      "exit": 0,
-     "seconds": 3.41,
-     "max_rss_mb": 141.2,
+     "seconds": 2.55,
+     "max_rss_mb": 141.9,
      "timed_out": false,
      "traceback": false,
      "python_warnings": [],
@@ -886195,7 +886242,7 @@
       "view": "app",
       "argv": [],
       "exit": 0,
-      "seconds_inside": 2.67,
+      "seconds_inside": 2.07,
       "warnings": [],
       "route": {
        "loops": 0,
@@ -886213,7 +886260,7 @@
      }
     }
    },
-   "foldmap_commit": "5650dbd49c7b002d5664559c05949fde0ce36fff",
+   "foldmap_commit": "44a1c1b04223645799d1278783e02156e037761e",
    "file": "/home/dzyla/.cache/foldmap/8SA2.cif",
    "sha256": "706862dfc4efc2fbc0edd8473a84becd0e6221a9e5abc5a698d6537709b95f0b",
    "facts": {
@@ -886252,7 +886299,7 @@
     },
     "A2": {
      "pass": true,
-     "detail": "5.43 s (limit 60 s)"
+     "detail": "3.81 s (limit 60 s)"
     },
     "A2b": {
      "pass": true,
@@ -886292,8 +886339,9 @@
      "status": "does not apply"
     },
     "A11": {
-     "pass": true,
-     "detail": ""
+     "pass": null,
+     "detail": "no protein",
+     "status": "does not apply"
     },
     "A12": {
      "pass": true,
@@ -886373,8 +886421,8 @@
    "pass": true,
    "process": {
     "exit": 0,
-    "seconds": 20.16,
-    "max_rss_mb": 193.5,
+    "seconds": 15.38,
+    "max_rss_mb": 193.4,
     "timed_out": false
    }
   },
@@ -886387,8 +886435,8 @@
    "views": {
     "default": {
      "exit": 0,
-     "seconds": 4.32,
-     "max_rss_mb": 179.5,
+     "seconds": 3.11,
+     "max_rss_mb": 179.1,
      "timed_out": false,
      "traceback": false,
      "python_warnings": [],
@@ -886408,14 +886456,14 @@
        "plot",
        "/home/dzyla/.cache/foldmap/3OWW.cif",
        "-o",
-       "/tmp/f1-r100-20261017-174130/work/3OWW/3OWW-default.svg",
+       "/home/dzyla/.claude/jobs/23e71d62/tmp/f1/r100/work/3OWW/3OWW-default.svg",
        "-o",
-       "/tmp/f1-r100-20261017-174130/work/3OWW/3OWW-default.png",
+       "/home/dzyla/.claude/jobs/23e71d62/tmp/f1/r100/work/3OWW/3OWW-default.png",
        "--save-layout",
-       "/tmp/f1-r100-20261017-174130/work/3OWW/3OWW-layout.yaml"
+       "/home/dzyla/.claude/jobs/23e71d62/tmp/f1/r100/work/3OWW/3OWW-layout.yaml"
       ],
       "exit": 0,
-      "seconds_inside": 1.35,
+      "seconds_inside": 0.83,
       "warnings": [],
       "route": {
        "loops": 0,
@@ -886516,6 +886564,7 @@
        "crop": "",
        "all_options": {},
        "residues": 0,
+       "na_outside": [],
        "undrawn_chains": [],
        "additives": [],
        "not_drawn": "",
@@ -886636,8 +886685,8 @@
     },
     "focus": {
      "exit": 0,
-     "seconds": 2.36,
-     "max_rss_mb": 163.3,
+     "seconds": 1.91,
+     "max_rss_mb": 163.0,
      "timed_out": false,
      "traceback": false,
      "python_warnings": [],
@@ -886657,14 +886706,14 @@
        "plot",
        "/home/dzyla/.cache/foldmap/3OWW.cif",
        "-o",
-       "/tmp/f1-r100-20261017-174130/work/3OWW/3OWW-focus.svg",
+       "/home/dzyla/.claude/jobs/23e71d62/tmp/f1/r100/work/3OWW/3OWW-focus.svg",
        "-o",
-       "/tmp/f1-r100-20261017-174130/work/3OWW/3OWW-focus.png",
+       "/home/dzyla/.claude/jobs/23e71d62/tmp/f1/r100/work/3OWW/3OWW-focus.png",
        "--focus",
        "none"
       ],
       "exit": 0,
-      "seconds_inside": 1.17,
+      "seconds_inside": 0.81,
       "warnings": [],
       "route": {
        "loops": 0,
@@ -886765,6 +886814,7 @@
        "crop": "",
        "all_options": {},
        "residues": 0,
+       "na_outside": [],
        "undrawn_chains": [],
        "additives": [],
        "not_drawn": "",
@@ -886840,8 +886890,8 @@
     },
     "seed1": {
      "exit": 0,
-     "seconds": 2.0,
-     "max_rss_mb": 163.6,
+     "seconds": 1.85,
+     "max_rss_mb": 161.8,
      "timed_out": false,
      "traceback": false,
      "python_warnings": [],
@@ -886861,12 +886911,12 @@
        "plot",
        "/home/dzyla/.cache/foldmap/3OWW.cif",
        "-o",
-       "/tmp/f1-r100-20261017-174130/work/3OWW/3OWW-seed1.svg",
+       "/home/dzyla/.claude/jobs/23e71d62/tmp/f1/r100/work/3OWW/3OWW-seed1.svg",
        "-o",
-       "/tmp/f1-r100-20261017-174130/work/3OWW/3OWW-seed1.png"
+       "/home/dzyla/.claude/jobs/23e71d62/tmp/f1/r100/work/3OWW/3OWW-seed1.png"
       ],
       "exit": 0,
-      "seconds_inside": 0.82,
+      "seconds_inside": 0.78,
       "warnings": [],
       "route": {
        "loops": 0,
@@ -886967,6 +887017,7 @@
        "crop": "",
        "all_options": {},
        "residues": 0,
+       "na_outside": [],
        "undrawn_chains": [],
        "additives": [],
        "not_drawn": "",
@@ -887028,7 +887079,7 @@
     "roundtrip": {
      "exit": 0,
      "seconds": 1.85,
-     "max_rss_mb": 163.6,
+     "max_rss_mb": 162.2,
      "timed_out": false,
      "traceback": false,
      "python_warnings": [],
@@ -887048,14 +887099,14 @@
        "plot",
        "/home/dzyla/.cache/foldmap/3OWW.cif",
        "-o",
-       "/tmp/f1-r100-20261017-174130/work/3OWW/3OWW-roundtrip.svg",
+       "/home/dzyla/.claude/jobs/23e71d62/tmp/f1/r100/work/3OWW/3OWW-roundtrip.svg",
        "-o",
-       "/tmp/f1-r100-20261017-174130/work/3OWW/3OWW-roundtrip.png",
+       "/home/dzyla/.claude/jobs/23e71d62/tmp/f1/r100/work/3OWW/3OWW-roundtrip.png",
        "--layout-file",
-       "/tmp/f1-r100-20261017-174130/work/3OWW/3OWW-layout.yaml"
+       "/home/dzyla/.claude/jobs/23e71d62/tmp/f1/r100/work/3OWW/3OWW-layout.yaml"
       ],
       "exit": 0,
-      "seconds_inside": 0.84,
+      "seconds_inside": 0.83,
       "warnings": [],
       "route": {
        "loops": 0,
@@ -887156,6 +887207,7 @@
        "crop": "",
        "all_options": {},
        "residues": 0,
+       "na_outside": [],
        "undrawn_chains": [],
        "additives": [],
        "not_drawn": "",
@@ -887216,8 +887268,8 @@
     },
     "interactive": {
      "exit": 0,
-     "seconds": 1.8,
-     "max_rss_mb": 166.8,
+     "seconds": 1.55,
+     "max_rss_mb": 166.6,
      "timed_out": false,
      "traceback": false,
      "python_warnings": [],
@@ -887232,10 +887284,10 @@
        "interactive",
        "/home/dzyla/.cache/foldmap/3OWW.cif",
        "-o",
-       "/tmp/f1-r100-20261017-174130/work/3OWW/3OWW.html"
+       "/home/dzyla/.claude/jobs/23e71d62/tmp/f1/r100/work/3OWW/3OWW.html"
       ],
       "exit": 0,
-      "seconds_inside": 1.05,
+      "seconds_inside": 1.04,
       "warnings": [],
       "route": {
        "loops": 0,
@@ -887254,8 +887306,8 @@
     },
     "app": {
      "exit": 0,
-     "seconds": 2.81,
-     "max_rss_mb": 136.0,
+     "seconds": 1.9,
+     "max_rss_mb": 135.3,
      "timed_out": false,
      "traceback": false,
      "python_warnings": [],
@@ -887286,7 +887338,7 @@
       "view": "app",
       "argv": [],
       "exit": 0,
-      "seconds_inside": 2.17,
+      "seconds_inside": 1.45,
       "warnings": [],
       "route": {
        "loops": 0,
@@ -887304,7 +887356,7 @@
      }
     }
    },
-   "foldmap_commit": "5650dbd49c7b002d5664559c05949fde0ce36fff",
+   "foldmap_commit": "44a1c1b04223645799d1278783e02156e037761e",
    "file": "/home/dzyla/.cache/foldmap/3OWW.cif",
    "sha256": "c2a7d162b57cc8141e31f2575bc39674214c0a2b18de71d5763ecfeac54c5a92",
    "facts": {
@@ -887344,7 +887396,7 @@
     },
     "A2": {
      "pass": true,
-     "detail": "4.32 s (limit 60 s)"
+     "detail": "3.11 s (limit 60 s)"
     },
     "A2b": {
      "pass": true,
@@ -887384,8 +887436,9 @@
      "status": "does not apply"
     },
     "A11": {
-     "pass": true,
-     "detail": ""
+     "pass": null,
+     "detail": "no protein",
+     "status": "does not apply"
     },
     "A12": {
      "pass": true,
@@ -887465,8 +887518,8 @@
    "pass": true,
    "process": {
     "exit": 0,
-    "seconds": 15.69,
-    "max_rss_mb": 179.5,
+    "seconds": 12.47,
+    "max_rss_mb": 179.1,
     "timed_out": false
    }
   },
@@ -887479,8 +887532,8 @@
    "views": {
     "default": {
      "exit": 0,
-     "seconds": 2.1,
-     "max_rss_mb": 164.9,
+     "seconds": 1.9,
+     "max_rss_mb": 163.9,
      "timed_out": false,
      "traceback": false,
      "python_warnings": [],
@@ -887500,14 +887553,14 @@
        "plot",
        "/home/dzyla/.cache/foldmap/8XZE.cif",
        "-o",
-       "/tmp/f1-r100-20261017-174130/work/8XZE/8XZE-default.svg",
+       "/home/dzyla/.claude/jobs/23e71d62/tmp/f1/r100/work/8XZE/8XZE-default.svg",
        "-o",
-       "/tmp/f1-r100-20261017-174130/work/8XZE/8XZE-default.png",
+       "/home/dzyla/.claude/jobs/23e71d62/tmp/f1/r100/work/8XZE/8XZE-default.png",
        "--save-layout",
-       "/tmp/f1-r100-20261017-174130/work/8XZE/8XZE-layout.yaml"
+       "/home/dzyla/.claude/jobs/23e71d62/tmp/f1/r100/work/8XZE/8XZE-layout.yaml"
       ],
       "exit": 0,
-      "seconds_inside": 0.26,
+      "seconds_inside": 0.2,
       "warnings": [],
       "route": {
        "loops": 0,
@@ -887580,6 +887633,7 @@
        "crop": "",
        "all_options": {},
        "residues": 0,
+       "na_outside": [],
        "undrawn_chains": [],
        "additives": [],
        "not_drawn": "",
@@ -887703,8 +887757,8 @@
     },
     "seed1": {
      "exit": 0,
-     "seconds": 0.85,
-     "max_rss_mb": 138.8,
+     "seconds": 0.8,
+     "max_rss_mb": 138.6,
      "timed_out": false,
      "traceback": false,
      "python_warnings": [],
@@ -887724,9 +887778,175 @@
        "plot",
        "/home/dzyla/.cache/foldmap/8XZE.cif",
        "-o",
-       "/tmp/f1-r100-20261017-174130/work/8XZE/8XZE-seed1.svg",
+       "/home/dzyla/.claude/jobs/23e71d62/tmp/f1/r100/work/8XZE/8XZE-seed1.svg",
        "-o",
-       "/tmp/f1-r100-20261017-174130/work/8XZE/8XZE-seed1.png"
+       "/home/dzyla/.claude/jobs/23e71d62/tmp/f1/r100/work/8XZE/8XZE-seed1.png"
+      ],
+      "exit": 0,
+      "seconds_inside": 0.19,
+      "warnings": [],
+      "route": {
+       "loops": 0,
+       "fallback_curves": 0,
+       "fallback_curves_crossing_an_element": 0,
+       "kink_links_rejected": 0,
+       "tighter_than_inflate": 0,
+       "rejected_as_crossing": 0,
+       "names_moved": 0,
+       "second_search_nodes": 0,
+       "second_searches": 0,
+       "second_searches_refused": 0,
+       "records": 1
+      },
+      "checks": {
+       "element_overlaps": 0,
+       "text_collisions": 0,
+       "off_page": 0,
+       "label_repeats": 0,
+       "copies_alike": 0.0,
+       "domain_rules": 0,
+       "domain_overlap": 0.0,
+       "domain_name_collisions": 0,
+       "stem_name_gap": 0.3410169394531244,
+       "scope_silent": 0,
+       "order": 0,
+       "accessories": 0,
+       "accessories_named": 0,
+       "loop_crossings": 0,
+       "honest_crossings": 0,
+       "font": [
+        "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
+        "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf"
+       ],
+       "skipped": {},
+       "details": {
+        "element_overlaps": [],
+        "text_collisions": [],
+        "off_page": [],
+        "label_repeats": {},
+        "copies_alike": {},
+        "domains": {},
+        "stem_name_gaps": {
+         "na:label:0": [
+          0.3403168417968745,
+          2.765927022999737
+         ],
+         "na:label:1": [
+          0.3410000644531239,
+          2.0240948791489353
+         ],
+         "na:label:2": [
+          0.3410169394531244,
+          3.420138870300999
+         ]
+        },
+        "scope_silent": [],
+        "order": [],
+        "accessories_named": []
+       }
+      },
+      "stuck": [],
+      "over_labels": [],
+      "crowded_marks": [],
+      "scope": {
+       "file_chains": 1,
+       "drawn_chains": 1,
+       "reason": "",
+       "chains_reason": "",
+       "crop": "",
+       "all_options": {},
+       "residues": 0,
+       "na_outside": [],
+       "undrawn_chains": [],
+       "additives": [],
+       "not_drawn": "",
+       "tetrads": 0,
+       "na_ions": {
+        "MG": 1
+       },
+       "helix_matched": {
+        "cut": 0,
+        "joined": 0
+       }
+      },
+      "chains_read": [
+       "A"
+      ],
+      "protein_chains_drawn": [],
+      "first_protein_chain": null,
+      "na_chains_drawn": [
+       "A"
+      ],
+      "elements": [],
+      "area": 122.15,
+      "context": null,
+      "copy_ties": 0,
+      "tethers": [
+       [
+        "ligand-tether:THG:A101:0",
+        1.743,
+        "A",
+        "A"
+       ],
+       [
+        "ligand-tether:THG:A101:1",
+        2.294,
+        "A",
+        "A"
+       ],
+       [
+        "ligand-tether:THG:A101:2",
+        1.773,
+        "A",
+        "A"
+       ],
+       [
+        "ligand-tether:SPM:A106:0",
+        1.202,
+        "A",
+        "A"
+       ],
+       [
+        "ligand-tether:SPM:A106:1",
+        1.222,
+        "A",
+        "A"
+       ]
+      ],
+      "stem_gap_limit": 0.3420000000000002,
+      "signature_sha256": "992167d4b825949047b8ad923fadd2b930b709f4594c4b921db535e75505c109",
+      "loops_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "svg_sha256": "633b69c6b5bca5ead47fe5cf2dcbb4cda72b202309306533f5e4452c56f60d50"
+     }
+    },
+    "roundtrip": {
+     "exit": 0,
+     "seconds": 0.85,
+     "max_rss_mb": 138.8,
+     "timed_out": false,
+     "traceback": false,
+     "python_warnings": [],
+     "foldmap_said": [
+      "foldmap: not drawn: metal ions held by the nucleic acid alone (MG)"
+     ],
+     "stderr_tail": [
+      "foldmap: not drawn: metal ions held by the nucleic acid alone (MG)"
+     ],
+     "written": {
+      "8XZE-roundtrip.svg": 30481,
+      "8XZE-roundtrip.png": 118401
+     },
+     "result": {
+      "view": "roundtrip",
+      "argv": [
+       "plot",
+       "/home/dzyla/.cache/foldmap/8XZE.cif",
+       "-o",
+       "/home/dzyla/.claude/jobs/23e71d62/tmp/f1/r100/work/8XZE/8XZE-roundtrip.svg",
+       "-o",
+       "/home/dzyla/.claude/jobs/23e71d62/tmp/f1/r100/work/8XZE/8XZE-roundtrip.png",
+       "--layout-file",
+       "/home/dzyla/.claude/jobs/23e71d62/tmp/f1/r100/work/8XZE/8XZE-layout.yaml"
       ],
       "exit": 0,
       "seconds_inside": 0.2,
@@ -887802,171 +888022,7 @@
        "crop": "",
        "all_options": {},
        "residues": 0,
-       "undrawn_chains": [],
-       "additives": [],
-       "not_drawn": "",
-       "tetrads": 0,
-       "na_ions": {
-        "MG": 1
-       },
-       "helix_matched": {
-        "cut": 0,
-        "joined": 0
-       }
-      },
-      "chains_read": [
-       "A"
-      ],
-      "protein_chains_drawn": [],
-      "first_protein_chain": null,
-      "na_chains_drawn": [
-       "A"
-      ],
-      "elements": [],
-      "area": 122.15,
-      "context": null,
-      "copy_ties": 0,
-      "tethers": [
-       [
-        "ligand-tether:THG:A101:0",
-        1.743,
-        "A",
-        "A"
-       ],
-       [
-        "ligand-tether:THG:A101:1",
-        2.294,
-        "A",
-        "A"
-       ],
-       [
-        "ligand-tether:THG:A101:2",
-        1.773,
-        "A",
-        "A"
-       ],
-       [
-        "ligand-tether:SPM:A106:0",
-        1.202,
-        "A",
-        "A"
-       ],
-       [
-        "ligand-tether:SPM:A106:1",
-        1.222,
-        "A",
-        "A"
-       ]
-      ],
-      "stem_gap_limit": 0.3420000000000002,
-      "signature_sha256": "992167d4b825949047b8ad923fadd2b930b709f4594c4b921db535e75505c109",
-      "loops_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "svg_sha256": "633b69c6b5bca5ead47fe5cf2dcbb4cda72b202309306533f5e4452c56f60d50"
-     }
-    },
-    "roundtrip": {
-     "exit": 0,
-     "seconds": 1.1,
-     "max_rss_mb": 138.9,
-     "timed_out": false,
-     "traceback": false,
-     "python_warnings": [],
-     "foldmap_said": [
-      "foldmap: not drawn: metal ions held by the nucleic acid alone (MG)"
-     ],
-     "stderr_tail": [
-      "foldmap: not drawn: metal ions held by the nucleic acid alone (MG)"
-     ],
-     "written": {
-      "8XZE-roundtrip.svg": 30481,
-      "8XZE-roundtrip.png": 118401
-     },
-     "result": {
-      "view": "roundtrip",
-      "argv": [
-       "plot",
-       "/home/dzyla/.cache/foldmap/8XZE.cif",
-       "-o",
-       "/tmp/f1-r100-20261017-174130/work/8XZE/8XZE-roundtrip.svg",
-       "-o",
-       "/tmp/f1-r100-20261017-174130/work/8XZE/8XZE-roundtrip.png",
-       "--layout-file",
-       "/tmp/f1-r100-20261017-174130/work/8XZE/8XZE-layout.yaml"
-      ],
-      "exit": 0,
-      "seconds_inside": 0.29,
-      "warnings": [],
-      "route": {
-       "loops": 0,
-       "fallback_curves": 0,
-       "fallback_curves_crossing_an_element": 0,
-       "kink_links_rejected": 0,
-       "tighter_than_inflate": 0,
-       "rejected_as_crossing": 0,
-       "names_moved": 0,
-       "second_search_nodes": 0,
-       "second_searches": 0,
-       "second_searches_refused": 0,
-       "records": 1
-      },
-      "checks": {
-       "element_overlaps": 0,
-       "text_collisions": 0,
-       "off_page": 0,
-       "label_repeats": 0,
-       "copies_alike": 0.0,
-       "domain_rules": 0,
-       "domain_overlap": 0.0,
-       "domain_name_collisions": 0,
-       "stem_name_gap": 0.3410169394531244,
-       "scope_silent": 0,
-       "order": 0,
-       "accessories": 0,
-       "accessories_named": 0,
-       "loop_crossings": 0,
-       "honest_crossings": 0,
-       "font": [
-        "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
-        "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf"
-       ],
-       "skipped": {},
-       "details": {
-        "element_overlaps": [],
-        "text_collisions": [],
-        "off_page": [],
-        "label_repeats": {},
-        "copies_alike": {},
-        "domains": {},
-        "stem_name_gaps": {
-         "na:label:0": [
-          0.3403168417968745,
-          2.765927022999737
-         ],
-         "na:label:1": [
-          0.3410000644531239,
-          2.0240948791489353
-         ],
-         "na:label:2": [
-          0.3410169394531244,
-          3.420138870300999
-         ]
-        },
-        "scope_silent": [],
-        "order": [],
-        "accessories_named": []
-       }
-      },
-      "stuck": [],
-      "over_labels": [],
-      "crowded_marks": [],
-      "scope": {
-       "file_chains": 1,
-       "drawn_chains": 1,
-       "reason": "",
-       "chains_reason": "",
-       "crop": "",
-       "all_options": {},
-       "residues": 0,
+       "na_outside": [],
        "undrawn_chains": [],
        "additives": [],
        "not_drawn": "",
@@ -888031,8 +888087,8 @@
     },
     "interactive": {
      "exit": 0,
-     "seconds": 1.31,
-     "max_rss_mb": 160.8,
+     "seconds": 0.95,
+     "max_rss_mb": 160.5,
      "timed_out": false,
      "traceback": false,
      "python_warnings": [],
@@ -888047,10 +888103,10 @@
        "interactive",
        "/home/dzyla/.cache/foldmap/8XZE.cif",
        "-o",
-       "/tmp/f1-r100-20261017-174130/work/8XZE/8XZE.html"
+       "/home/dzyla/.claude/jobs/23e71d62/tmp/f1/r100/work/8XZE/8XZE.html"
       ],
       "exit": 0,
-      "seconds_inside": 0.49,
+      "seconds_inside": 0.33,
       "warnings": [],
       "route": {
        "loops": 0,
@@ -888069,8 +888125,8 @@
     },
     "app": {
      "exit": 0,
-     "seconds": 1.75,
-     "max_rss_mb": 131.2,
+     "seconds": 1.3,
+     "max_rss_mb": 130.3,
      "timed_out": false,
      "traceback": false,
      "python_warnings": [],
@@ -888101,7 +888157,7 @@
       "view": "app",
       "argv": [],
       "exit": 0,
-      "seconds_inside": 1.0,
+      "seconds_inside": 0.72,
       "warnings": [],
       "route": {
        "loops": 0,
@@ -888119,7 +888175,7 @@
      }
     }
    },
-   "foldmap_commit": "5650dbd49c7b002d5664559c05949fde0ce36fff",
+   "foldmap_commit": "44a1c1b04223645799d1278783e02156e037761e",
    "file": "/home/dzyla/.cache/foldmap/8XZE.cif",
    "sha256": "c2d90df66f246792ed7d63bcb8554d464de62abce9ada170162ad2d48b898b1e",
    "facts": {
@@ -888159,7 +888215,7 @@
     },
     "A2": {
      "pass": true,
-     "detail": "2.1 s (limit 60 s)"
+     "detail": "1.9 s (limit 60 s)"
     },
     "A2b": {
      "pass": true,
@@ -888199,8 +888255,9 @@
      "status": "does not apply"
     },
     "A11": {
-     "pass": true,
-     "detail": ""
+     "pass": null,
+     "detail": "no protein",
+     "status": "does not apply"
     },
     "A12": {
      "pass": true,
@@ -888280,8 +888337,8 @@
    "pass": true,
    "process": {
     "exit": 0,
-    "seconds": 7.66,
-    "max_rss_mb": 164.9,
+    "seconds": 6.11,
+    "max_rss_mb": 163.9,
     "timed_out": false
    }
   },
@@ -930799,16 +930856,16 @@
    "views": {
     "default": {
      "exit": 0,
-     "seconds": 2.76,
-     "max_rss_mb": 181.4,
+     "seconds": 2.56,
+     "max_rss_mb": 181.6,
      "timed_out": false,
      "traceback": false,
      "python_warnings": [],
      "foldmap_said": [
-      "foldmap: drew assembly 1, which holds no copy of chain O of the file: 4 of 5 chains; --assembly asu --focus none draws all of them"
+      "foldmap: drew assembly 1, which holds no copy of chain O of the file: 2 of 3 chains; --assembly asu --focus none draws all of them"
      ],
      "stderr_tail": [
-      "foldmap: drew assembly 1, which holds no copy of chain O of the file: 4 of 5 chains; --assembly asu --focus none draws all of them",
+      "foldmap: drew assembly 1, which holds no copy of chain O of the file: 2 of 3 chains; --assembly asu --focus none draws all of them",
       "How this figure was made:",
       "  - 4 strand(s) off a sheet's run of paired strands: A1:298-300 drawn beside its partner A1:304-311; B1:298-300 drawn beside its partner B1:304-311; A2:298-300 drawn beside its partner A2:304-311; B2:298-300 drawn beside its partner B2:304-311",
       "  - additives SO4 not marked: crystallisation and purification leftovers (the style ligands=all marks them)"
@@ -930823,14 +930880,14 @@
        "plot",
        "/home/dzyla/.cache/foldmap/1RM5.cif",
        "-o",
-       "/tmp/f1-r100-20261017-174130/work/1RM5/1RM5-default.svg",
+       "/home/dzyla/.claude/jobs/23e71d62/tmp/f1/r100/work/1RM5/1RM5-default.svg",
        "-o",
-       "/tmp/f1-r100-20261017-174130/work/1RM5/1RM5-default.png",
+       "/home/dzyla/.claude/jobs/23e71d62/tmp/f1/r100/work/1RM5/1RM5-default.png",
        "--save-layout",
-       "/tmp/f1-r100-20261017-174130/work/1RM5/1RM5-layout.yaml"
+       "/home/dzyla/.claude/jobs/23e71d62/tmp/f1/r100/work/1RM5/1RM5-layout.yaml"
       ],
       "exit": 0,
-      "seconds_inside": 1.73,
+      "seconds_inside": 1.74,
       "warnings": [],
       "route": {
        "loops": 114,
@@ -930896,8 +930953,8 @@
       "over_labels": [],
       "crowded_marks": [],
       "scope": {
-       "file_chains": 5,
-       "drawn_chains": 4,
+       "file_chains": 3,
+       "drawn_chains": 2,
        "reason": "assembly 1, which holds no copy of chain O of the file",
        "chains_reason": "assembly 1, which holds no copy of chain O of the file",
        "crop": "",
@@ -930906,6 +930963,7 @@
         "focus": "none"
        },
        "residues": 1011,
+       "na_outside": [],
        "undrawn_chains": [],
        "additives": [
         "SO4"
@@ -932002,16 +932060,16 @@
     },
     "deposited": {
      "exit": 0,
-     "seconds": 3.16,
-     "max_rss_mb": 181.8,
+     "seconds": 2.61,
+     "max_rss_mb": 180.2,
      "timed_out": false,
      "traceback": false,
      "python_warnings": [],
      "foldmap_said": [
-      "foldmap: drew assembly 1, which holds no copy of chain O of the file: 4 of 5 chains; --assembly asu --focus none draws all of them"
+      "foldmap: drew assembly 1, which holds no copy of chain O of the file: 2 of 3 chains; --assembly asu --focus none draws all of them"
      ],
      "stderr_tail": [
-      "foldmap: drew assembly 1, which holds no copy of chain O of the file: 4 of 5 chains; --assembly asu --focus none draws all of them",
+      "foldmap: drew assembly 1, which holds no copy of chain O of the file: 2 of 3 chains; --assembly asu --focus none draws all of them",
       "How this figure was made:",
       "  - 4 strand(s) off a sheet's run of paired strands: A1:298-300 drawn beside its partner A1:304-311; B1:298-300 drawn beside its partner B1:304-311; A2:298-300 drawn beside its partner A2:304-311; B2:298-300 drawn beside its partner B2:304-311",
       "  - additives SO4 not marked: crystallisation and purification leftovers (the style ligands=all marks them)"
@@ -932026,14 +932084,14 @@
        "plot",
        "/home/dzyla/.cache/foldmap/1RM5.cif",
        "-o",
-       "/tmp/f1-r100-20261017-174130/work/1RM5/1RM5-deposited.svg",
+       "/home/dzyla/.claude/jobs/23e71d62/tmp/f1/r100/work/1RM5/1RM5-deposited.svg",
        "-o",
-       "/tmp/f1-r100-20261017-174130/work/1RM5/1RM5-deposited.png",
+       "/home/dzyla/.claude/jobs/23e71d62/tmp/f1/r100/work/1RM5/1RM5-deposited.png",
        "--names",
        "deposited"
       ],
       "exit": 0,
-      "seconds_inside": 2.25,
+      "seconds_inside": 1.76,
       "warnings": [],
       "route": {
        "loops": 114,
@@ -932099,8 +932157,8 @@
       "over_labels": [],
       "crowded_marks": [],
       "scope": {
-       "file_chains": 5,
-       "drawn_chains": 4,
+       "file_chains": 3,
+       "drawn_chains": 2,
        "reason": "assembly 1, which holds no copy of chain O of the file",
        "chains_reason": "assembly 1, which holds no copy of chain O of the file",
        "crop": "",
@@ -932109,6 +932167,7 @@
         "focus": "none"
        },
        "residues": 1011,
+       "na_outside": [],
        "undrawn_chains": [],
        "additives": [
         "SO4"
@@ -933205,16 +933264,16 @@
     },
     "beta": {
      "exit": 0,
-     "seconds": 2.91,
-     "max_rss_mb": 181.8,
+     "seconds": 2.6,
+     "max_rss_mb": 181.6,
      "timed_out": false,
      "traceback": false,
      "python_warnings": [],
      "foldmap_said": [
-      "foldmap: drew assembly 1, which holds no copy of chain O of the file: 4 of 5 chains; --assembly asu --focus none draws all of them"
+      "foldmap: drew assembly 1, which holds no copy of chain O of the file: 2 of 3 chains; --assembly asu --focus none draws all of them"
      ],
      "stderr_tail": [
-      "foldmap: drew assembly 1, which holds no copy of chain O of the file: 4 of 5 chains; --assembly asu --focus none draws all of them",
+      "foldmap: drew assembly 1, which holds no copy of chain O of the file: 2 of 3 chains; --assembly asu --focus none draws all of them",
       "How this figure was made:",
       "  - 4 strand(s) off a sheet's run of paired strands: A1:298-300 drawn beside its partner A1:304-311; B1:298-300 drawn beside its partner B1:304-311; A2:298-300 drawn beside its partner A2:304-311; B2:298-300 drawn beside its partner B2:304-311",
       "  - additives SO4 not marked: crystallisation and purification leftovers (the style ligands=all marks them)"
@@ -933229,14 +933288,14 @@
        "plot",
        "/home/dzyla/.cache/foldmap/1RM5.cif",
        "-o",
-       "/tmp/f1-r100-20261017-174130/work/1RM5/1RM5-beta.svg",
+       "/home/dzyla/.claude/jobs/23e71d62/tmp/f1/r100/work/1RM5/1RM5-beta.svg",
        "-o",
-       "/tmp/f1-r100-20261017-174130/work/1RM5/1RM5-beta.png",
+       "/home/dzyla/.claude/jobs/23e71d62/tmp/f1/r100/work/1RM5/1RM5-beta.png",
        "--names",
        "beta"
       ],
       "exit": 0,
-      "seconds_inside": 1.84,
+      "seconds_inside": 1.71,
       "warnings": [],
       "route": {
        "loops": 114,
@@ -933302,8 +933361,8 @@
       "over_labels": [],
       "crowded_marks": [],
       "scope": {
-       "file_chains": 5,
-       "drawn_chains": 4,
+       "file_chains": 3,
+       "drawn_chains": 2,
        "reason": "assembly 1, which holds no copy of chain O of the file",
        "chains_reason": "assembly 1, which holds no copy of chain O of the file",
        "crop": "",
@@ -933312,6 +933371,7 @@
         "focus": "none"
        },
        "residues": 1011,
+       "na_outside": [],
        "undrawn_chains": [],
        "additives": [
         "SO4"
@@ -935761,16 +935821,16 @@
     },
     "focus": {
      "exit": 0,
-     "seconds": 3.41,
-     "max_rss_mb": 181.6,
+     "seconds": 2.55,
+     "max_rss_mb": 180.7,
      "timed_out": false,
      "traceback": false,
      "python_warnings": [],
      "foldmap_said": [
-      "foldmap: drew assembly 1, which holds no copy of chain O of the file: 4 of 5 chains; --assembly asu draws all of them"
+      "foldmap: drew assembly 1, which holds no copy of chain O of the file: 2 of 3 chains; --assembly asu draws all of them"
      ],
      "stderr_tail": [
-      "foldmap: drew assembly 1, which holds no copy of chain O of the file: 4 of 5 chains; --assembly asu draws all of them",
+      "foldmap: drew assembly 1, which holds no copy of chain O of the file: 2 of 3 chains; --assembly asu draws all of them",
       "How this figure was made:",
       "  - 4 strand(s) off a sheet's run of paired strands: A1:298-300 drawn beside its partner A1:304-311; B1:298-300 drawn beside its partner B1:304-311; A2:298-300 drawn beside its partner A2:304-311; B2:298-300 drawn beside its partner B2:304-311",
       "  - additives SO4 not marked: crystallisation and purification leftovers (the style ligands=all marks them)"
@@ -935785,14 +935845,14 @@
        "plot",
        "/home/dzyla/.cache/foldmap/1RM5.cif",
        "-o",
-       "/tmp/f1-r100-20261017-174130/work/1RM5/1RM5-focus.svg",
+       "/home/dzyla/.claude/jobs/23e71d62/tmp/f1/r100/work/1RM5/1RM5-focus.svg",
        "-o",
-       "/tmp/f1-r100-20261017-174130/work/1RM5/1RM5-focus.png",
+       "/home/dzyla/.claude/jobs/23e71d62/tmp/f1/r100/work/1RM5/1RM5-focus.png",
        "--focus",
        "none"
       ],
       "exit": 0,
-      "seconds_inside": 2.44,
+      "seconds_inside": 1.75,
       "warnings": [],
       "route": {
        "loops": 114,
@@ -935858,8 +935918,8 @@
       "over_labels": [],
       "crowded_marks": [],
       "scope": {
-       "file_chains": 5,
-       "drawn_chains": 4,
+       "file_chains": 3,
+       "drawn_chains": 2,
        "reason": "assembly 1, which holds no copy of chain O of the file",
        "chains_reason": "assembly 1, which holds no copy of chain O of the file",
        "crop": "",
@@ -935867,6 +935927,7 @@
         "assembly": "asu"
        },
        "residues": 1011,
+       "na_outside": [],
        "undrawn_chains": [],
        "additives": [
         "SO4"
@@ -936963,16 +937024,16 @@
     },
     "domains": {
      "exit": 0,
-     "seconds": 3.96,
-     "max_rss_mb": 220.7,
+     "seconds": 3.26,
+     "max_rss_mb": 221.0,
      "timed_out": false,
      "traceback": false,
      "python_warnings": [],
      "foldmap_said": [
-      "foldmap: drew assembly 1, which holds no copy of chain O of the file: 4 of 5 chains; --assembly asu --focus none draws all of them"
+      "foldmap: drew assembly 1, which holds no copy of chain O of the file: 2 of 3 chains; --assembly asu --focus none draws all of them"
      ],
      "stderr_tail": [
-      "foldmap: drew assembly 1, which holds no copy of chain O of the file: 4 of 5 chains; --assembly asu --focus none draws all of them",
+      "foldmap: drew assembly 1, which holds no copy of chain O of the file: 2 of 3 chains; --assembly asu --focus none draws all of them",
       "How this figure was made:",
       "  - domains D1, D2 inferred from residue contacts, not a published domain assignment",
       "  - 4 strand(s) off a sheet's run of paired strands: A1:298-300 drawn beside its partner A1:304-311; B1:298-300 drawn beside its partner B1:304-311; A2:298-300 drawn beside its partner A2:304-311; B2:298-300 drawn beside its partner B2:304-311",
@@ -936989,14 +937050,14 @@
        "plot",
        "/home/dzyla/.cache/foldmap/1RM5.cif",
        "-o",
-       "/tmp/f1-r100-20261017-174130/work/1RM5/1RM5-domains.svg",
+       "/home/dzyla/.claude/jobs/23e71d62/tmp/f1/r100/work/1RM5/1RM5-domains.svg",
        "-o",
-       "/tmp/f1-r100-20261017-174130/work/1RM5/1RM5-domains.png",
+       "/home/dzyla/.claude/jobs/23e71d62/tmp/f1/r100/work/1RM5/1RM5-domains.png",
        "--domains",
        "auto"
       ],
       "exit": 0,
-      "seconds_inside": 2.68,
+      "seconds_inside": 2.06,
       "warnings": [],
       "route": {
        "loops": 114,
@@ -937069,8 +937130,8 @@
       "over_labels": [],
       "crowded_marks": [],
       "scope": {
-       "file_chains": 5,
-       "drawn_chains": 4,
+       "file_chains": 3,
+       "drawn_chains": 2,
        "reason": "assembly 1, which holds no copy of chain O of the file",
        "chains_reason": "assembly 1, which holds no copy of chain O of the file",
        "crop": "",
@@ -937079,6 +937140,7 @@
         "focus": "none"
        },
        "residues": 1011,
+       "na_outside": [],
        "undrawn_chains": [],
        "additives": [
         "SO4"
@@ -938175,16 +938237,16 @@
     },
     "seed1": {
      "exit": 0,
-     "seconds": 3.46,
-     "max_rss_mb": 181.6,
+     "seconds": 2.3,
+     "max_rss_mb": 181.2,
      "timed_out": false,
      "traceback": false,
      "python_warnings": [],
      "foldmap_said": [
-      "foldmap: drew assembly 1, which holds no copy of chain O of the file: 4 of 5 chains; --assembly asu --focus none draws all of them"
+      "foldmap: drew assembly 1, which holds no copy of chain O of the file: 2 of 3 chains; --assembly asu --focus none draws all of them"
      ],
      "stderr_tail": [
-      "foldmap: drew assembly 1, which holds no copy of chain O of the file: 4 of 5 chains; --assembly asu --focus none draws all of them",
+      "foldmap: drew assembly 1, which holds no copy of chain O of the file: 2 of 3 chains; --assembly asu --focus none draws all of them",
       "How this figure was made:",
       "  - 4 strand(s) off a sheet's run of paired strands: A1:298-300 drawn beside its partner A1:304-311; B1:298-300 drawn beside its partner B1:304-311; A2:298-300 drawn beside its partner A2:304-311; B2:298-300 drawn beside its partner B2:304-311",
       "  - additives SO4 not marked: crystallisation and purification leftovers (the style ligands=all marks them)"
@@ -938199,12 +938261,12 @@
        "plot",
        "/home/dzyla/.cache/foldmap/1RM5.cif",
        "-o",
-       "/tmp/f1-r100-20261017-174130/work/1RM5/1RM5-seed1.svg",
+       "/home/dzyla/.claude/jobs/23e71d62/tmp/f1/r100/work/1RM5/1RM5-seed1.svg",
        "-o",
-       "/tmp/f1-r100-20261017-174130/work/1RM5/1RM5-seed1.png"
+       "/home/dzyla/.claude/jobs/23e71d62/tmp/f1/r100/work/1RM5/1RM5-seed1.png"
       ],
       "exit": 0,
-      "seconds_inside": 2.44,
+      "seconds_inside": 1.58,
       "warnings": [],
       "route": {
        "loops": 114,
@@ -938270,8 +938332,8 @@
       "over_labels": [],
       "crowded_marks": [],
       "scope": {
-       "file_chains": 5,
-       "drawn_chains": 4,
+       "file_chains": 3,
+       "drawn_chains": 2,
        "reason": "assembly 1, which holds no copy of chain O of the file",
        "chains_reason": "assembly 1, which holds no copy of chain O of the file",
        "crop": "",
@@ -938280,6 +938342,7 @@
         "focus": "none"
        },
        "residues": 1011,
+       "na_outside": [],
        "undrawn_chains": [],
        "additives": [
         "SO4"
@@ -939361,16 +939424,16 @@
     },
     "roundtrip": {
      "exit": 0,
-     "seconds": 2.81,
-     "max_rss_mb": 181.7,
+     "seconds": 2.3,
+     "max_rss_mb": 181.5,
      "timed_out": false,
      "traceback": false,
      "python_warnings": [],
      "foldmap_said": [
-      "foldmap: drew assembly 1, which holds no copy of chain O of the file: 4 of 5 chains; --assembly asu --focus none draws all of them"
+      "foldmap: drew assembly 1, which holds no copy of chain O of the file: 2 of 3 chains; --assembly asu --focus none draws all of them"
      ],
      "stderr_tail": [
-      "foldmap: drew assembly 1, which holds no copy of chain O of the file: 4 of 5 chains; --assembly asu --focus none draws all of them",
+      "foldmap: drew assembly 1, which holds no copy of chain O of the file: 2 of 3 chains; --assembly asu --focus none draws all of them",
       "How this figure was made:",
       "  - 4 strand(s) off a sheet's run of paired strands: A1:298-300 drawn beside its partner A1:304-311; B1:298-300 drawn beside its partner B1:304-311; A2:298-300 drawn beside its partner A2:304-311; B2:298-300 drawn beside its partner B2:304-311",
       "  - additives SO4 not marked: crystallisation and purification leftovers (the style ligands=all marks them)"
@@ -939385,14 +939448,14 @@
        "plot",
        "/home/dzyla/.cache/foldmap/1RM5.cif",
        "-o",
-       "/tmp/f1-r100-20261017-174130/work/1RM5/1RM5-roundtrip.svg",
+       "/home/dzyla/.claude/jobs/23e71d62/tmp/f1/r100/work/1RM5/1RM5-roundtrip.svg",
        "-o",
-       "/tmp/f1-r100-20261017-174130/work/1RM5/1RM5-roundtrip.png",
+       "/home/dzyla/.claude/jobs/23e71d62/tmp/f1/r100/work/1RM5/1RM5-roundtrip.png",
        "--layout-file",
-       "/tmp/f1-r100-20261017-174130/work/1RM5/1RM5-layout.yaml"
+       "/home/dzyla/.claude/jobs/23e71d62/tmp/f1/r100/work/1RM5/1RM5-layout.yaml"
       ],
       "exit": 0,
-      "seconds_inside": 1.8,
+      "seconds_inside": 1.58,
       "warnings": [],
       "route": {
        "loops": 114,
@@ -939458,8 +939521,8 @@
       "over_labels": [],
       "crowded_marks": [],
       "scope": {
-       "file_chains": 5,
-       "drawn_chains": 4,
+       "file_chains": 3,
+       "drawn_chains": 2,
        "reason": "assembly 1, which holds no copy of chain O of the file",
        "chains_reason": "assembly 1, which holds no copy of chain O of the file",
        "crop": "",
@@ -939468,6 +939531,7 @@
         "focus": "none"
        },
        "residues": 1011,
+       "na_outside": [],
        "undrawn_chains": [],
        "additives": [
         "SO4"
@@ -940549,8 +940613,8 @@
     },
     "interactive": {
      "exit": 0,
-     "seconds": 2.21,
-     "max_rss_mb": 176.4,
+     "seconds": 2.05,
+     "max_rss_mb": 174.2,
      "timed_out": false,
      "traceback": false,
      "python_warnings": [],
@@ -940569,10 +940633,10 @@
        "interactive",
        "/home/dzyla/.cache/foldmap/1RM5.cif",
        "-o",
-       "/tmp/f1-r100-20261017-174130/work/1RM5/1RM5.html"
+       "/home/dzyla/.claude/jobs/23e71d62/tmp/f1/r100/work/1RM5/1RM5.html"
       ],
       "exit": 0,
-      "seconds_inside": 1.64,
+      "seconds_inside": 1.5,
       "warnings": [],
       "route": {
        "loops": 114,
@@ -940591,8 +940655,8 @@
     },
     "sequence": {
      "exit": 0,
-     "seconds": 1.5,
-     "max_rss_mb": 146.5,
+     "seconds": 1.15,
+     "max_rss_mb": 145.3,
      "timed_out": false,
      "traceback": false,
      "python_warnings": [],
@@ -940607,10 +940671,10 @@
        "sequence",
        "/home/dzyla/.cache/foldmap/1RM5.cif",
        "-o",
-       "/tmp/f1-r100-20261017-174130/work/1RM5/1RM5-sequence.svg"
+       "/home/dzyla/.claude/jobs/23e71d62/tmp/f1/r100/work/1RM5/1RM5-sequence.svg"
       ],
       "exit": 0,
-      "seconds_inside": 0.82,
+      "seconds_inside": 0.71,
       "warnings": [],
       "route": {
        "loops": 0,
@@ -940629,8 +940693,8 @@
     },
     "app": {
      "exit": 0,
-     "seconds": 3.96,
-     "max_rss_mb": 146.5,
+     "seconds": 3.46,
+     "max_rss_mb": 145.7,
      "timed_out": false,
      "traceback": false,
      "python_warnings": [],
@@ -940661,7 +940725,7 @@
       "view": "app",
       "argv": [],
       "exit": 0,
-      "seconds_inside": 3.32,
+      "seconds_inside": 3.0,
       "warnings": [],
       "route": {
        "loops": 114,
@@ -940679,7 +940743,7 @@
      }
     }
    },
-   "foldmap_commit": "5650dbd49c7b002d5664559c05949fde0ce36fff",
+   "foldmap_commit": "44a1c1b04223645799d1278783e02156e037761e",
    "file": "/home/dzyla/.cache/foldmap/1RM5.cif",
    "sha256": "48dc1a7de35c5171394456f1dd0fabeaa53e1beb270926144179124f93f8caa5",
    "facts": {
@@ -940740,7 +940804,7 @@
     },
     "A2": {
      "pass": true,
-     "detail": "2.76 s (limit 60 s)"
+     "detail": "2.56 s (limit 60 s)"
     },
     "A2b": {
      "pass": true,
@@ -940854,8 +940918,8 @@
    "pass": true,
    "process": {
     "exit": 0,
-    "seconds": 31.15,
-    "max_rss_mb": 220.7,
+    "seconds": 25.49,
+    "max_rss_mb": 221.0,
     "timed_out": false
    },
    "pair_retyped": {
