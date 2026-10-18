@@ -15,7 +15,8 @@ For every entry it measures
   pairing   foldmap's canonical and wobble pairs against RNApolis (run from its own venv): precision, recall, F1;
             stems against stems grouped the same way from the RNApolis pairs (none closing a loop under
             MIN_LOOP), matched one to one, recalled when the match holds two thirds of its pairs; the reference
-            stems foldmap's rule calls pseudoknotted (nucleic._knots) counted apart (pk_reference, pk_found)
+            stems foldmap's rule calls pseudoknotted (nucleic._knots) counted apart (pk_reference, pk_found), and
+            how many of those recalled are drawn as a knot too (pk_drawn_as_knot: the matched stem's helix is -1)
   shape     drawn stem centres against the 3D centres: Spearman rho of pairwise distances, similarity-Procrustes
             RMSD (no reflection) normalised by the spread; stem angle against the projected 3D axis; bends between
             the pieces of a bent duplex; whether any stem's arms are drawn mirrored
@@ -236,12 +237,13 @@ def _score(strands, ours, theirs: set[frozenset], where: dict, drawn_only: bool,
     shared = sorted(
         ((-len(steps(r) & steps(g)), a, b) for a, r in enumerate(ref) for b, g in enumerate(got)),
     )
-    taken_ref, taken_got, recalled = set(), set(), set()
+    taken_ref, taken_got, recalled, match = set(), set(), set(), {}
     for n, a, b in shared:
         if n == 0 or a in taken_ref or b in taken_got:
             continue
         taken_ref.add(a)
         taken_got.add(b)
+        match[a] = b
         if 3 * -n >= 2 * len(ref[a]):
             recalled.add(a)
     matched = len(recalled)
@@ -264,6 +266,7 @@ def _score(strands, ours, theirs: set[frozenset], where: dict, drawn_only: bool,
         "stem_recall": round(matched / len(ref), 3) if ref else 1.0,
         "pk_reference": len(knots),
         "pk_found": len(recalled.intersection(knots)),
+        "pk_drawn_as_knot": sum(1 for a in recalled.intersection(knots) if got[match[a]].helix == -1),
         "missed_pairs": missed[:20],
         "extra_pairs": sorted(named(xy) for xy in mine - expected.keys())[:20],
     }
@@ -603,6 +606,7 @@ def main(argv=None) -> int:
         "stem_recall",
         "pk_reference",
         "pk_found",
+        "pk_drawn_as_knot",
         "deposited_pair_f1",
         "deposited_stem_recall",
         "unmapped_chains",
