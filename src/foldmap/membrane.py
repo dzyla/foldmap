@@ -10,6 +10,7 @@ cytoplasmic side comes from the positive-inside rule (more Lys/Arg)."""
 from __future__ import annotations
 
 import dataclasses
+import gzip
 from dataclasses import dataclass
 
 import gemmi
@@ -66,12 +67,35 @@ class Membrane:
         return np.asarray(xyz) @ self.normal - self.centre
 
 
+def _dummies_after_end(path) -> list[tuple[str, float]]:
+    """DUM atoms (name, z) of a PDB file's records after its first END record. Many OPM files put their dummy atoms
+    there, where gemmi stops reading; nothing else after END is taken, so the model is unchanged."""
+    p = str(path)
+    try:
+        opener = gzip.open if p.endswith(".gz") else open
+        with opener(p, "rt", errors="replace") as fh:
+            lines = fh.read().splitlines()
+    except (OSError, EOFError):
+        return []
+    out, ended = [], False
+    for line in lines:
+        if not ended:
+            ended = line[:6].rstrip() == "END"
+        elif line[:6] in ("ATOM  ", "HETATM") and line[17:20] == "DUM":
+            try:
+                out.append((line[12:16].strip(), float(line[46:54])))
+            except ValueError:
+                continue
+    return out
+
+
 def _opm(path) -> Membrane | None:
     """The bilayer from OPM/PPM dummy atoms. Those files are in the membrane frame (normal along z) and mark the
     hydrophobic boundaries with DUM atoms: 'O' on the outer (extracellular, periplasmic, lumenal) boundary and
     'N' on the inner (cytoplasmic) one, so they give the sides as well as the planes."""
     st = gemmi.read_structure(str(path))
     dummies = [(a.name, a.pos.z) for ch in st[0] for r in ch if r.name == "DUM" for a in r]
+    dummies += _dummies_after_end(path)
     if not dummies:
         return None
     inner = [z for name, z in dummies if name == "N"]

@@ -127,6 +127,26 @@ def test_opm_dummy_atoms_give_the_exact_membrane(tmp_path):
     assert m.source == "opm" and m.half == pytest.approx(14.2) and abs(m.normal[2]) == pytest.approx(1.0)
 
 
+def test_opm_dummy_atoms_after_end_give_the_membrane(tmp_path):
+    """OPM files often put the DUM records after END; they give the planes, and nothing else after END is read."""
+    import gemmi
+
+    st = gemmi.read_structure(str(DATA / "1UBQ.cif"))
+    out = tmp_path / "opm_after_end.pdb"
+    st.write_pdb(str(out))
+    body = [ln for ln in out.read_text().splitlines() if ln[:6].rstrip() not in ("END", "MASTER")]
+    dum = [
+        f"HETATM{9000 + k:5d} {name:<4s} DUM  {900 + k:4d}    {0:8.3f}{0:8.3f}{z:8.3f}  1.00  0.00"
+        for k, (name, z) in enumerate((("N", 14.2), ("O", -14.2)))
+    ]
+    stray = "ATOM   9100  CA  ALA A 999       0.000   0.000   0.000  1.00  0.00           C"
+    out.write_text("\n".join(body + ["END"] + dum + [stray]) + "\n")
+    bb = load_backbone(out, "asu")
+    assert len(bb.labels) == len(load_backbone(DATA / "1UBQ.cif", "asu").labels)  # the stray record is not in the model
+    m = find_membrane(out, bb)
+    assert m.source == "opm" and m.half == pytest.approx(14.2) and m.sided
+
+
 def _band(fig):
     return [a for a in fig.axes[0].patches if (a.get_gid() or "") == "membrane"]
 
