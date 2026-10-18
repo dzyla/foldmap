@@ -5,7 +5,7 @@
 python scripts/bench.py                          # every tests/data structure plus the 32-chain complex
 python scripts/bench.py 6ZYA 8UTF                # some of them
 python scripts/bench.py --record before.json     # keep each layout (positions, bounds)
-python scripts/bench.py --check before.json --exact      # fail unless every layout is bit-identical
+python scripts/bench.py --check before.json --exact      # fail unless every layout's values are equal
 python scripts/bench.py --check before.json --area 1.01  # fail if a figure's area grew by more than 1 %
 
 A signature holds every placed element, ghost and nucleic-acid stem with all its geometry, plus sheets, domains,
@@ -13,6 +13,9 @@ unjoined pairs and whether base letters are drawn (under the keys "_dna" and "_n
 Loop points are derived from the layout at render time, so identical layouts give identical loops. A layout holding
 nucleic acid is also routed: its strands as drawn, their end labels and letters (key "_na") and the bounds they
 widen are part of its signature.
+
+--exact compares the parsed values, so 0.0 equals -0.0 there although the two hash apart and sin and atan2 tell them
+apart; scripts/paper/determinism.py compares signatures as text (and SVGs by hash), which shows that difference.
 """
 
 from __future__ import annotations
@@ -144,7 +147,9 @@ def main(argv=None) -> int:
     ap.add_argument("names", nargs="*", help="tests/data entries (e.g. 6ZYA) or 'big32'; default: all")
     ap.add_argument("--record", help="write every layout to this JSON file")
     ap.add_argument("--check", help="compare with layouts recorded earlier")
-    ap.add_argument("--exact", action="store_true", help="with --check: fail unless layouts are bit-identical")
+    ap.add_argument(
+        "--exact", action="store_true", help="with --check: fail unless layouts are equal (parsed values: 0.0 == -0.0)"
+    )
     ap.add_argument("--area", type=float, help="with --check: fail if a figure's area grew by more than this factor")
     args = ap.parse_args(argv)
     if args.check and not (args.exact or args.area):

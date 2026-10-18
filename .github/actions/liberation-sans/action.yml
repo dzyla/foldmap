@@ -1,0 +1,34 @@
+name: Liberation Sans 2.1.5
+description: >-
+  The same font on every platform (plan 15 Task 8): Liberation Sans 2.1.5, the version Ubuntu's fonts-liberation
+  ships. macOS: Homebrew cask font-liberation (it installs this release's TTFs in ~/Library/Fonts). Windows: the same
+  release tarball, pinned by its SHA-256 (the one the Homebrew cask checks), installed for the user and registered
+  where Windows (and matplotlib's font search) looks for user fonts.
+runs:
+  using: composite
+  steps:
+    - name: Install Liberation Sans (Linux)
+      if: runner.os == 'Linux'
+      shell: bash
+      run: sudo apt-get update && sudo apt-get install -y fonts-liberation
+    - name: Install Liberation Sans (macOS)
+      if: runner.os == 'macOS'
+      shell: bash
+      run: brew install --cask font-liberation
+    - name: Install Liberation Sans (Windows)
+      if: runner.os == 'Windows'
+      shell: pwsh
+      run: |
+        $url = "https://github.com/liberationfonts/liberation-fonts/files/7261482/liberation-fonts-ttf-2.1.5.tar.gz"
+        Invoke-WebRequest $url -OutFile liberation.tar.gz
+        $sum = (Get-FileHash liberation.tar.gz -Algorithm SHA256).Hash.ToLower()
+        if ($sum -ne "7191c669bf38899f73a2094ed00f7b800553364f90e2637010a69c0e268f25d0") { throw "SHA-256 $sum" }
+        tar -xzf liberation.tar.gz
+        $fonts = "$env:LOCALAPPDATA\Microsoft\Windows\Fonts"
+        New-Item -ItemType Directory -Force $fonts | Out-Null
+        $reg = "HKCU:\Software\Microsoft\Windows NT\CurrentVersion\Fonts"
+        if (-not (Test-Path $reg)) { New-Item $reg | Out-Null }
+        foreach ($f in Get-ChildItem liberation-fonts-ttf-2.1.5\*.ttf) {
+          Copy-Item $f.FullName $fonts
+          New-ItemProperty $reg -Name "$($f.BaseName) (TrueType)" -Value "$fonts\$($f.Name)" -Force | Out-Null
+        }

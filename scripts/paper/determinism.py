@@ -3,7 +3,7 @@ each figure's layout signature and SVG hash, and compare runs.
 
     python scripts/paper/determinism.py --out RUN.json [--label NAME] [--svg-dir DIR] [--any-font] [STRUCTURE ...]
     python scripts/paper/determinism.py --configurations DIR [--any-font] [STRUCTURE ...]
-    python scripts/paper/determinism.py --compare [--systems N] RUN.json RUN.json ...
+    python scripts/paper/determinism.py --compare [--systems N] RUN.json|DIR|GLOB ...
 
 Draw (--out): the default view (`foldmap plot STRUCTURE -o x.svg`, in this process, cli.draw_spec wrapped to keep the
 drawn layout) of every committed test structure (tests/data/*.cif, sorted) unless structures are given. Each figure
@@ -12,23 +12,28 @@ gets
   signature_sha256   sha256 of that text
   svg_sha256         sha256 of the SVG foldmap wrote (kept in --svg-dir if given)
 and the run records fonts.font_report() (the font resolved after fonts.force_liberation_sans(), asserted per figure
-with fonts.assert_figure_font), the platform, Python, numpy, matplotlib and gemmi versions, PYTHONHASHSEED and the
-CPU-feature environment. Exits 1 when a figure was not drawn. --any-font draws with whatever font resolves (for
-comparing runs on one machine without Liberation Sans; never for the cross-platform run).
+with fonts.assert_figure_font; with the font file's revision), the platform, the Python, numpy, scipy, networkx,
+matplotlib and gemmi versions, PYTHONHASHSEED and the CPU-feature environment. Exits 1 when a figure was not drawn.
+--any-font draws with whatever font resolves (for comparing runs on one machine without Liberation Sans; never for
+the cross-platform run).
 
 Configurations (--configurations): one draw per CONFIGURATIONS entry, each in its own process, written to
 DIR/<system>-<name>.json, then compared. On x86-64 Linux this is the paper's Linux leg: PYTHONHASHSEED 0 and 1, and 0
 with NumPy's AVX dispatch off and OpenBLAS's oldest x86-64 kernels.
 
-Compare (--compare): exits 1 unless every run drew the same figures with the same signature TEXT and SVG hash (text,
-not parsed floats: 0.0 == -0.0 would hide a difference), with the same font and package versions, and (--systems N)
-on at least N platform.system() values. CI runs the draw on Linux, macOS and Windows (tests.yml, test job) and the
-compare in its determinism job; the compare needs nothing but the standard library.
+Compare (--compare): the runs are the JSON files given, found under a directory given, or matched by a pattern given
+(none found: "0 run(s)"). Exits 1 unless every run drew the same figures with the same signature TEXT and SVG hash
+(text, not parsed floats: 0.0 == -0.0 would hide a difference), and (--systems N) on at least N platform.system()
+values. Runs whose package versions or font (family, revision) differ are "not comparable": that is the verdict,
+and a figure difference is listed as "(versions differ)", not taken for the platform's. CI's determinism workflow
+(.github/workflows/determinism.yml, pinned by determinism-constraints.txt) draws on Linux, macOS and Windows and
+compares; the compare needs nothing but the standard library.
 """
 
 from __future__ import annotations
 
 import argparse
+import glob
 import hashlib
 import importlib.util
 import json
@@ -48,7 +53,8 @@ CONFIGURATIONS = {
     "seed1": {"PYTHONHASHSEED": "1"},
     "seed0-noavx": {"PYTHONHASHSEED": "0", **NO_AVX},
 }
-VERSIONS = ("python", "numpy", "matplotlib", "gemmi")  # runs that differ in these (or the font) are not comparable
+VERSIONS = ("python", "numpy", "scipy", "networkx", "matplotlib", "gemmi")  # differing: not comparable (or the font)
+TIMEOUT = 1800  # s for one configuration's draw (~10 s on zyla-lab)
 
 
 def _fonts():
@@ -103,7 +109,9 @@ def draw(paths: list[Path], label: str = "", svg_dir: Path | None = None, force_
     import gemmi
     import matplotlib
     import matplotlib.pyplot as plt
+    import networkx
     import numpy as np
+    import scipy
 
     sys.path.insert(0, str(REPO / "scripts"))
     import bench
@@ -145,6 +153,8 @@ def draw(paths: list[Path], label: str = "", svg_dir: Path | None = None, force_
         "processor": platform.processor(),
         "python": platform.python_version(),
         "numpy": np.__version__,
+        "scipy": scipy.__version__,
+        "networkx": networkx.__version__,
         "matplotlib": matplotlib.__version__,
         "gemmi": gemmi.__version__,
         "font": fonts.font_report() | {"forced_file": font_file},
@@ -168,7 +178,7 @@ def run_configurations(out_dir: Path, structures: list[Path], force_font: bool =
         out = out_dir / f"{label}.json"
         cmd = [sys.executable, str(Path(__file__).resolve()), "--out", str(out), "--label", label]
         cmd += [] if force_font else ["--any-font"]
-        subprocess.run([*cmd, *map(str, structures)], env=configuration_env(extra), check=True)
+        subprocess.run([*cmd, *map(str, structures)], env=configuration_env(extra), check=True, timeout=TIMEOUT)
         runs.append(json.loads(out.read_text(encoding="utf-8")))
     return runs
 
@@ -178,19 +188,34 @@ def _first_difference(a: str, b: str) -> str:
     return f"first difference at character {i}: {a[max(0, i - 30) : i + 30]!r} vs {b[max(0, i - 30) : i + 30]!r}"
 
 
-def compare(runs: list[dict], systems: int = 0) -> list[str]:
-    """Every difference between the runs ([] when they drew the same figures identically)."""
-    problems = []
+def _font(run: dict) -> str:
+    return f"{run['font']['font_family']} {run['font'].get('font_revision', '?')}"
+
+
+def not_comparable(runs: list[dict]) -> list[str]:
+    """What differs between the runs other than the figures: package versions, the font (family and revision)."""
     labels = [r.get("label") or f"run {i}" for i, r in enumerate(runs)]
+    out = []
+    for key in (*VERSIONS, "font"):
+        got = [_font(r) if key == "font" else r.get(key) for r in runs]
+        if len(set(got)) > 1:
+            out.append(f"{key} differs: " + ", ".join(f"{lab} {v}" for lab, v in zip(labels, got)))
+    return out
+
+
+def compare(runs: list[dict], systems: int = 0) -> list[str]:
+    """Every difference between the runs ([] when they drew the same figures identically): first what makes them
+    not comparable ("not comparable: ..."), then the figures' (marked "(versions differ)" when there is any)."""
+    labels = [r.get("label") or f"run {i}" for i, r in enumerate(runs)]
+    problems = []
     if len(runs) < 2:
         problems.append(f"{len(runs)} run(s): nothing to compare")
     found = sorted({r["system"] for r in runs})
     if len(found) < systems:
         problems.append(f"{len(found)} platform(s) ({', '.join(found)}), expected {systems}")
-    for key in (*VERSIONS, "font"):
-        got = [r["font"]["font_family"] if key == "font" else r[key] for r in runs]
-        if len(set(got)) > 1:
-            problems.append(f"{key} differs: " + ", ".join(f"{lab} {v}" for lab, v in zip(labels, got)))
+    apart = not_comparable(runs)
+    problems += [f"not comparable: {why}" for why in apart]
+    mark = " (versions differ)" if apart else ""
     names = [[f["structure"] for f in r["figures"]] for r in runs]
     for lab, n in zip(labels[1:], names[1:]):
         if n != names[0]:
@@ -210,8 +235,17 @@ def compare(runs: list[dict], systems: int = 0) -> list[str]:
                 if key == "signature" and None not in groups:
                     a, b = list(groups)[:2]
                     why += "; " + _first_difference(a, b)
-                problems.append(f"{name}: {key} differs: {why}")
+                problems.append(f"{name}: {key} differs{mark}: {why}")
     return problems
+
+
+def find_runs(args: list[str]) -> list[Path]:
+    """The run files: each argument a file, a directory (every *.json under it) or a pattern; nothing found, none."""
+    out: list[Path] = []
+    for a in args:
+        p = Path(a)
+        out += sorted(p.rglob("*.json")) if p.is_dir() else sorted(Path(m) for m in glob.glob(a))
+    return out
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -227,7 +261,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("paths", nargs="*", type=Path, help="structures to draw (default tests/data/*.cif), or runs")
     args = ap.parse_args(argv)
     if args.compare:
-        runs = [json.loads(p.read_text(encoding="utf-8")) for p in args.paths]
+        runs = [json.loads(p.read_text(encoding="utf-8")) for p in find_runs(list(map(str, args.paths)))]
     else:
         structures = args.paths or sorted((REPO / "tests" / "data").glob("*.cif"))
         if args.out:
@@ -241,8 +275,9 @@ def main(argv: list[str] | None = None) -> int:
         print(line)
     systems = sorted({r["system"] for r in runs})
     figures = len(runs[0]["figures"]) if runs else 0
-    verdict = "differ" if problems else "identical"
-    print(f"{len(runs)} runs on {', '.join(systems)}: {figures} figures, {verdict}")
+    apart = [line.removeprefix("not comparable: ") for line in problems if line.startswith("not comparable: ")]
+    verdict = f"not comparable: {'; '.join(apart)}" if apart else "differ" if problems else "identical"
+    print(f"{len(runs)} run(s) on {', '.join(systems) or 'no platform'}: {figures} figures, {verdict}")
     return 1 if problems else 0
 
 

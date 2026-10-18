@@ -38,7 +38,7 @@ def test_layout_does_not_depend_on_the_hash_seed():
     for seed in ("0", "12345", "777"):
         env = dict(os.environ, PYTHONHASHSEED=seed)
         done = subprocess.run(
-            [sys.executable, "-c", _SIGNATURE, *files], env=env, capture_output=True, text=True, check=True
+            [sys.executable, "-c", _SIGNATURE, *files], env=env, capture_output=True, text=True, check=True, timeout=600
         )
         runs.append(json.loads(done.stdout))
     assert runs[0] and all(runs[0][f] for f in runs[0])

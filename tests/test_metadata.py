@@ -83,11 +83,21 @@ def test_linux_jobs_that_run_pytest_install_the_snapshot_font():
         if not str(job["runs-on"]).startswith("ubuntu") and "matrix.os" not in str(job["runs-on"]):
             continue
         installs = [s for s in steps if "fonts-liberation" in s.get("run", "")]
+        installs += [s for x in steps if x.get("uses") == FONT_ACTION for s in _font_action_steps()]
         assert installs, f"job {name} runs pytest on Linux without installing fonts-liberation"
         if "matrix.os" in str(job["runs-on"]):
             assert all(s.get("if") == "runner.os == 'Linux'" for s in installs), f"job {name}: guard the install"
         checked += 1
     assert checked >= 3
+
+
+FONT_ACTION = "./.github/actions/liberation-sans"  # Liberation Sans 2.1.5 on every OS (tests.yml, determinism.yml)
+
+
+def _font_action_steps() -> list[dict]:
+    """The composite action's steps that install fonts-liberation (apt: Linux only)."""
+    action = yaml.safe_load((ROOT / FONT_ACTION / "action.yml").read_text(encoding="utf-8"))
+    return [s for s in action["runs"]["steps"] if "fonts-liberation" in s.get("run", "")]
 
 
 @needs_workflow

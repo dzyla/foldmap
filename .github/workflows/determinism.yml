@@ -1,0 +1,58 @@
+name: determinism
+
+# The same figures on Linux, macOS and Windows: every committed test structure's default figure drawn with Liberation
+# Sans forced (scripts/paper/determinism.py), then the three runs' layout signatures (as text) and SVG hashes
+# compared. Apart from tests.yml, so a platform difference never blocks a release.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: determinism-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  draw:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    env:
+      PYTHONUTF8: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13.13"  # one patch release on every OS (and the Linux leg's)
+      - uses: ./.github/actions/liberation-sans
+      - run: pip install . -c scripts/paper/determinism-constraints.txt
+      - name: Draw (Liberation Sans forced)
+        env:
+          PYTHONHASHSEED: "0"
+          OPENBLAS_NUM_THREADS: "1"
+        run: >-
+          python scripts/paper/determinism.py --label ${{ matrix.os }} --out determinism/${{ matrix.os }}.json
+          --svg-dir determinism/${{ matrix.os }}-svg
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: determinism-${{ matrix.os }}
+          path: determinism/
+          overwrite: true
+
+  compare:
+    needs: draw
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: determinism-*
+          merge-multiple: true
+          path: determinism
+      - name: The same figures on Linux, macOS and Windows (signature text and SVG hash)
+        run: python3 scripts/paper/determinism.py --compare --systems 3 determinism

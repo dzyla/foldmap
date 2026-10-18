@@ -1,8 +1,10 @@
 """Liberation Sans forced, for the cross-platform determinism run (determinism.py, same directory).
 
 render._FONTS lists Arial first, so macOS and Windows draw with Arial even where Liberation Sans 2.1.5 is installed
-(CI installs it on all three): same metrics, different glyph paths, different SVG hashes. The determinism run must
-therefore force Liberation Sans before any figure is drawn, on every platform, and assert what the text resolved to.
+(CI installs it on all three). foldmap writes SVG text as text (svg.fonttype "none"), not as glyph paths, but the
+layout measures every label in the resolved font and the SVG names it: another font gives other positions and other
+SVG hashes. The determinism run must therefore force Liberation Sans before any figure is drawn, on every platform,
+and assert what the text resolved to; font_report() records the font file's revision too.
 
 render binds the list at import: _MEASURE = FontProperties(family=_FONTS), _RC["font.sans-serif"] is _FONTS, and
 set_fontfamily(_FONTS) is called with it. So the list is mutated IN PLACE (rebinding the name would leave those
@@ -64,6 +66,9 @@ def font_report() -> dict:
 
     path = findfont(render._MEASURE, fallback_to_default=False)
     font = FT2Font(path)
+    head = font.get_sfnt_table("head") or {}
+    major, minor = head.get("fontRevision", (0, 0))
+    version = font.get_sfnt().get((3, 1, 0x409, 5)) or font.get_sfnt().get((1, 0, 0, 5)) or b""  # name ID 5
     return {
         "platform": platform.platform(),
         "python": platform.python_version(),
@@ -72,4 +77,6 @@ def font_report() -> dict:
         "font_file": path,
         "font_family": font.family_name,
         "font_style": font.style_name,
+        "font_revision": f"{major + minor / 65536:.3f}",  # head.fontRevision (16.16)
+        "font_version": version.decode("utf-16-be" if b"\x00" in version else "latin-1").strip(),
     }
