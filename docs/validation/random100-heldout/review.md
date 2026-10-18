@@ -13,9 +13,11 @@ Run 2026-10-18 at 7696947 on zyla-lab (32 cores), every view, `--jobs 10`, 862 s
     python scripts/random100.py run --views all --jobs 10 \
         --sample docs/validation/random100-heldout/sample.json --out DIR
 
-`report.md`, `report.json.gz` and `run.log` are that run, judged by the same criteria and limits as before (no limit
-in `criteria.py` or `random100.py` was raised in plan 15). A1, A2, A2b, A4, A5, A7-A14 and A18-A20 pass on every
-entry that has something to judge; A3, A6, A15, A16 and A17 fail on the five entries below.
+`report.md`, `report.json.gz` and `run.log` are that run, judged by the same criteria and limits as before (no limit in
+`criteria.py` or `random100.py` was raised in plan 15). A1, A2, A2b, A4, A5, A7-A14 and A18-A20 pass on every entry that
+has something to judge; A3, A6, A15, A16 and A17 fail on the five entries below. The run itself recorded its commit as
+"unknown" (zyla-lab's synced copy of the tree has no .git); 7696947 was stamped into the reports afterwards from that
+synced tree, and the reports were judged again from the measurements, with the same counts.
 
 ### The 20 failures of the first run
 
@@ -61,6 +63,13 @@ The page is the same size (3456 × 3143 pt, below the 200 in cap Task 7 added), 
 tripled, which points at Task 7's shared page search budget (window routers now draw on the page's budget instead of
 a fresh one each), exercised in full only by a full run. Not isolated further and not fixed here: 7NZ2 already
 counts as a failure (A17), so the count does not change; the domains-view failure is new since Task 6.
+
+**After the run (2026-10-18, plan 15's final fix round).** The cause was Task 7's window budget: a coarse page's fine
+windows (`route._fine_route`) drew on the page's own second-search budget, which a huge page has mostly spent by the
+time its windows run, so every window search was refused. The windows now share a pool of their own
+(`_MAX_NODES_WINDOWS`, 8,000,000 nodes per page). Drawn again (zyla-lab), 7NZ2's domains view has its Task 6 drawing
+back: signature 4987d5a72ecd, 0 fallback curves, 6 second searches refused, no text collision; 7NZ2 still fails
+A17 (spearman 0.446). The counts above are as measured at 7696947 and are not re-quoted.
 
 ### Changes against the first run (field by field, `report.json`)
 

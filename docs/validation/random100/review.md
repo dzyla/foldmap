@@ -6,11 +6,13 @@ Measure notes (M1…) record where a metric, not the drawing, is what falls shor
 ## The plan 15 run: 93 of 100
 
 Run 2026-10-18 at 7696947 on zyla-lab, every view, `--jobs 10`, 864 s wall, after plan 15 fixed the second sample's
-failures (`docs/superpowers/plans/2026-10-17-15-heldout-failures.md`); `report.md`, `report.json` and `run.log` are
-that run. The layout's constants were tuned on this sample, so 93 measures fit. The count for structures foldmap was
-not tuned on is the third sample's, 83 of 100, in the same run of the same code
+failures (`docs/superpowers/plans/2026-10-17-15-heldout-failures.md`); `report.md`, `report.json` and `run.log` are that
+run. The layout's constants were tuned on this sample, so 93 measures fit. The count for structures foldmap was not
+tuned on is the third sample's, 83 of 100, in the same run of the same code
 ([docs/validation/random100-third/review.md](../random100-third/review.md)); the second sample, which plan 15 fixed
-against, passes 95 of 100.
+against, passes 95 of 100. The run itself recorded its commit as "unknown" (zyla-lab's synced copy of the tree has no
+.git); 7696947 was stamped into the reports afterwards from that synced tree, and the reports were judged again from the
+measurements, with the same counts.
 
 Against the final run below (92 of 100 at 44a1c1b), field by field in `report.json`:
 
@@ -33,9 +35,10 @@ Against the final run below (92 of 100 at 44a1c1b), field by field in `report.js
 - **Nucleic-acid metrics**: only 7Y7C (na_crossings 4 → 1, na_run_crossings 724 → 723, bead_overlaps 1 → 0) and 8VWQ
   (na_run_crossings 637 → 639, bead_overlaps 1 → 0) moved.
 - **sheets_differ**: 40 over all views, as before, entry by entry.
-- **Route fallbacks**: none on any entry, before or after. Second-search nodes moved on 7JU4 domains (+681),
-  9P1X focus (694,501 → 816,673), 5LDW membrane (0 → 415,299), 7Y7C and 8VWQ (Task 7 now counts window and
-  slab-closed searches in these totals).
+- **Route fallbacks** (protein loops drawn as plain curves): none on any entry, before or after; nucleic-acid strands
+  are counted under A3 and A17 (7Y7C and 8VWQ fail A3 on them, above). Second-search nodes moved on 7JU4 domains (+681),
+  9P1X focus (694,501 → 816,673), 5LDW membrane (0 → 415,299), 7Y7C and 8VWQ (Task 7 now counts window and slab-closed
+  searches in these totals).
 - **Time** (10 entries at once): A2 passes on every entry, the slowest default view being 7Y7C's, 66.9 s (limit 180 s
   for XL); the slowest view is 7QUP focus, 148.5 s.
 

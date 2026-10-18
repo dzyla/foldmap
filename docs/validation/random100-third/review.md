@@ -2,9 +2,11 @@
 
 **83 of 100 pass.** This is the count for structures foldmap was not tuned on: the sample was drawn after plan 15's
 fixes, with none of the tuned or the second sample's ids, and run once with every view and no fix (2026-10-18, at
-7696947, zyla-lab, `--jobs 10`, 1329 s wall), judged by the same criteria and limits as the other two samples. In
-the same run of the same code the tuned sample (`docs/validation/random100/`) passes 93 of 100 and the second sample
-(`docs/validation/random100-heldout/`, which plan 15 fixed against) 95 of 100.
+7696947, zyla-lab, `--jobs 10`, 1329 s wall), judged by the same criteria and limits as the other two samples. In the
+same run of the same code the tuned sample (`docs/validation/random100/`) passes 93 of 100 and the second sample
+(`docs/validation/random100-heldout/`, which plan 15 fixed against) 95 of 100. The run itself recorded its commit as
+"unknown" (zyla-lab's synced copy of the tree has no .git); 7696947 was stamped into the reports afterwards from that
+synced tree, and the reports were judged again from the measurements, with the same counts.
 
 | stratum | entries | pass | | stratum | entries | pass |
 |---|---|---|---|---|---|---|
@@ -61,6 +63,19 @@ Tie labels on other ties (3G6E, 6QIK, 7F5S) are a collision the tuned and second
 | 6QIK | default, deposited, beta, focus, domains | strand y:8-9 |
 | 7F5S | domains | strand L5:694-695 |
 | 9FZL | domains | loops 4E:88-89>4E:119-131, 4K:15-17>4K:33-35 and their copies 4e, 4k |
+
+9FZL's domains view, as measured (98 chains): the page is held at the 200 in cap (200 x 11 in; its notes: "some text
+is under 1 pt and drawn at 1 pt, larger than the room kept for it", the figure's text 1.6 pt); its route record is
+878 loops, 5 fallback curves, each crossing an element (the four loops above and 4x:94-101>4x:104-105), 9 second
+searches run and 30 refused for the budget, 7,976,402 of the page's 8,000,000 second-search nodes spent.
+
+**After the run (2026-10-18, plan 15's final fix round): 9FZL has now been looked at.** Its route record is the
+profile of the regression found on the second sample's 7NZ2 (`docs/validation/random100-heldout/review.md`): a coarse
+page's fine windows drew on the page's own second-search budget, already spent. With the windows given a pool of
+their own (`route._MAX_NODES_WINDOWS`, 8,000,000 nodes), its domains view drawn again (zyla-lab) has 2 fallback curves
+(4K:15-17>4K:33-35 and its copy 4k; 4E, 4e and 4x now route), 14 searches refused, the window pool spent; A4 is
+unchanged (the same 11 loops over a label), A6 has 6 collisions (one new: 3A:274-282>3A:291-301 across the N end of
+4G). 9FZL still fails; the 83 of 100 above stays as measured at 7696947.
 
 ### A15, copies drawn alike (3 entries)
 
