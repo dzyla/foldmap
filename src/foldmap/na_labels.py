@@ -46,7 +46,8 @@ _SLIDES = tuple(f * k for k in (0.1, 0.2, 0.3, 0.4, 0.48) for f in (1, -1))  # s
 def _unbunch(layout: Layout, paths: list[NAPath]) -> None:
     """Slide each run's nucleotides along it, as little as keeps them a bead's width (_BEAD) from every nucleotide of
     another strand or stem, where its own spacing puts one on top of another's (two runs crossing or passing close);
-    if no slide does, the one that keeps them furthest. Never into its own stems' bodies."""
+    if no slide does, the one that keeps them furthest, and then each nucleotide still on another's spot slides alone
+    within the room its neighbours leave (_slide_each). Never into its own stems' bodies."""
     at = {key: d for d in layout.stems for key in d.axial}
     taken = _Points(_BEAD)
     for d in layout.stems:
@@ -63,20 +64,73 @@ def _unbunch(layout: Layout, paths: list[NAPath]) -> None:
             return -1.0
         return min(taken.nearest(q) for q in xy)
 
+    def room_one(xy, i, mine, own) -> float:  # room(): one nucleotide of a run, its run's others (mine) counted too
+        if any(in_body(xy, d) for d in own):
+            return -1.0
+        near = [math.dist(xy, q) for k, q in enumerate(mine) if k != i]
+        return min([taken.nearest(xy), *near])
+
     for p in runs:
         own = [at[key] for key in p.between]
 
-        best, space = p.nt_xy, room(p.nt_xy, own)
+        best, space, best_shift = p.nt_xy, room(p.nt_xy, own), 0.0
         for shift in _SLIDES if space < _BEAD else ():
             xy = _spaced(p.points, len(p.nts), shift)
             r = room(xy, own)
             if r > space:
-                best, space = xy, r
+                best, space, best_shift = xy, r, shift
             if r >= _BEAD:
                 break
+        if space < _BEAD:  # no slide of the whole run clears it: each nucleotide still on another's spot alone
+            best = _slide_each(
+                p.points, len(p.nts), best_shift, lambda xy, i, mine, own=own: room_one(xy, i, mine, own)
+            )
         p.nt_xy = best
         for xy in best:
             taken.add(xy)
+
+
+_EACH_STEP = 0.05  # page units: the steps a nucleotide still on another's spot slides alone along its run (_slide_each)
+
+
+def _slide_each(pts, m: int, shift: float, room) -> list[tuple[float, float]]:
+    """The m nucleotides of a run spaced along `pts` (as _spaced with `shift`), each one whose room(xy, i, all) is under
+    a bead's width slid alone along the run, the least distance that clears it (else the one that leaves it most
+    room), never nearer than a bead's width (along the run) to its neighbours or the run's two ends: two runs side by
+    side, spaced differently, whose nucleotides no slide of a whole run keeps apart (6S13 a:692-694 beside
+    a:713-716)."""
+    p = np.asarray(pts, float)
+    seg = np.hypot(*np.diff(p, axis=0).T)
+    cum = np.concatenate([[0.0], np.cumsum(seg)])
+    total = float(cum[-1])
+
+    def at(t: float) -> tuple[float, float]:
+        k = min(int(np.searchsorted(cum, t, side="right")) - 1, len(seg) - 1)
+        f = 0.0 if seg[k] == 0 else (t - cum[k]) / seg[k]
+        q = p[k] + f * (p[k + 1] - p[k])
+        return float(q[0]), float(q[1])
+
+    ts = [float(t) for t in (np.arange(1, m + 1) + shift) / (m + 1) * total]
+    xy = [at(t) for t in ts]
+    for i in range(m):
+        space = room(xy[i], i, xy)
+        if space >= _BEAD:
+            continue
+        t0 = ts[i]
+        lo = (ts[i - 1] if i > 0 else 0.0) + _BEAD
+        hi = (ts[i + 1] if i < m - 1 else total) - _BEAD
+        for k in range(1, int(max(t0 - lo, hi - t0, 0.0) / _EACH_STEP) + 1):
+            for t in (t0 + k * _EACH_STEP, t0 - k * _EACH_STEP):
+                if lo <= t <= hi:
+                    q = at(t)
+                    r = room(q, i, xy)
+                    if r > space:
+                        ts[i], xy[i], space = t, q, r
+                    if r >= _BEAD:
+                        break
+            if space >= _BEAD:
+                break
+    return xy
 
 
 _LETTER_GAP = 0.38  # page units: closest two base letters (or a letter and a nucleotide) may sit
@@ -364,8 +418,8 @@ def _label_gaps(layout: Layout, paths: list[NAPath], loops=()) -> None:
     first spot whose box meets nothing: no element's or stem's body, strand, tie or protein loop (`loops`, polylines),
     base letter, nucleotide (where its bead goes), end label, name or gap label placed before it, nor its own
     dashed line; when every spot meets something, the first spot round the gap's midpoint (_GAP_RINGS, nearest
-    first) that meets nothing and is in sight of the gap (_in_sight); when none does, the spot beside it meeting the
-    fewest other things, then the least
+    first) that meets nothing and is in sight of the gap (_in_sight) at its midpoint or either end (_gap_ring); when
+    none does, the spot beside it meeting the fewest other things, then the least
     of its own line (a label beside its own gap reads as its own)."""
     gaps = [p for p in paths if p.kind == "gap" and p.label and len(p.points) > 1]
     if not gaps:
@@ -437,18 +491,27 @@ def _label_gaps(layout: Layout, paths: list[NAPath], loops=()) -> None:
             if best[0] == (0, 0):
                 break
         if best[0] != (0, 0):  # nowhere beside it: round its midpoint, nearest first, a spot that meets nothing
-            mid = np.asarray(midway(p.points), float)
-            for f in _GAP_RINGS:
-                for t in _GAP_TURNS:
-                    x, y = mid + f * (hw + hh) * np.array([math.cos(t), math.sin(t)])
-                    box = (x - hw, y - hh, x + hw, y + hh)
-                    if meets(box, own) == (0, 0) and _in_sight((x, y), mid, bodies, body_box):
-                        best = ((0, 0), (float(x), float(y)), box)
-                        break
-                if best[0] == (0, 0):
-                    break
+            ring = _gap_ring(p.points, hw, hh, lambda box, own=own: meets(box, own) == (0, 0), bodies, body_box)
+            if ring is not None:
+                best = ((0, 0), *ring)
         p.label_xy = best[1]
         taken.append(best[2])
+
+
+def _gap_ring(points, hw: float, hh: float, clear, bodies, body_box):
+    """(centre, box) of the first spot round a gap's midpoint (_GAP_RINGS times hw + hh out, every _GAP_TURNS step,
+    nearest first) whose box (hw, hh: half extents) is clear(box) and that is in sight (_in_sight) of the gap's
+    midpoint or of either end: a dashed line bent round a stem is read from any part of it (held-out 8ZTU's gap 499,
+    whose one clear spot lay across a stem from its midpoint, beside its end); None if there is none."""
+    mid = np.asarray(midway(points), float)
+    anchors = (mid, np.asarray(points[0], float), np.asarray(points[-1], float))
+    for f in _GAP_RINGS:
+        for t in _GAP_TURNS:
+            x, y = mid + f * (hw + hh) * np.array([math.cos(t), math.sin(t)])
+            box = (x - hw, y - hh, x + hw, y + hh)
+            if clear(box) and any(_in_sight((x, y), q, bodies, body_box) for q in anchors):
+                return (float(x), float(y)), box
+    return None
 
 
 def _tie_name(n: int) -> str:

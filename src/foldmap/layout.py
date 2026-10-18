@@ -4993,6 +4993,16 @@ def _element_label_box(p: Placed, k: float = 1.0) -> tuple[float, float, float, 
     return centred_box(*helix_label_pos(p), _GLYPH_W * k * len(p.label) / 2 + 0.05, _GLYPH_H * k / 2)
 
 
+def na_strand_lines(layout: Layout) -> list:
+    """Every nucleic-acid line drawn: the strands (Layout.na_paths) and the isolated pairs (Layout.na_ties), a short
+    tie's dotted line or a long one's two ticks; for the counts placed after routing to keep off (held-out 6S13: a
+    loop's "NN aa" on the dotted line of the tie 448-506)."""
+    out = [path.points for path in layout.na_paths]
+    for tie in layout.na_ties:
+        out += [[a, b] for a, b, _ in tie.marks] if tie.label else [list(tie.ends)]
+    return out
+
+
 def na_text_boxes(layout: Layout) -> list[tuple[float, float, float, float]]:
     """The ink boxes of the nucleic acid's text as render draws it, for protein loops to keep off once it is placed
     (route.route_loops, random-100 C11): each single-stranded nucleotide's letter (Layout.na_letters), each stem's
@@ -5086,7 +5096,7 @@ def tail_counts(layout: Layout, sses: list[SSE], loops=(), hidden=None) -> list[
         rows.setdefault(ch, []).append(r)
     taken = [p.rect for p in [*layout.placed.values(), *layout.ghosts, *layout.stems]]
     taken += [b for _, b in label_boxes(layout, sses)]
-    segs = segments_of([line.points for line in [*loops, *layout.na_paths]])  # loop and nucleic-acid strand lines
+    segs = segments_of([line.points for line in loops] + na_strand_lines(layout))  # loop and nucleic-acid lines
     page = count_page(layout, segs)
     bodies = [p.rect for p in [*layout.placed.values(), *layout.ghosts, *layout.stems]]
     out = []

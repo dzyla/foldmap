@@ -327,7 +327,11 @@ def _face_label(router: _Router, layout: Layout, d: PlacedStem, key, leaving: bo
 
 def _label_room(router: _Router, layout: Layout, xy, labels: list) -> bool:
     """An end label at xy keeps clear of the loops routed so far (their grid cells), every element's and stem's
-    body, the text and stub boxes, and the end labels already placed."""
+    body (an element by its drawn outline, na_labels._outline: a strand's shaft and head, not the pitch-wide box
+    round it, as base letters are judged; held-out 2FD8's 5′ between two strands of its sheet), the text and stub
+    boxes, and the end labels already placed."""
+    from .na_labels import _outline
+
     gw, gh = glyph(layout)  # sized from the text drawn (C4)
     hw, hh = gw / 2 + 0.05, gh / 2
     x0, y0, x1, y1 = xy[0] - hw, xy[1] - hh, xy[0] + hw, xy[1] + hh
@@ -340,7 +344,8 @@ def _label_room(router: _Router, layout: Layout, xy, labels: list) -> bool:
         return False
     if any(abs(x - xy[0]) < 2 * hw and abs(y - xy[1]) < 2 * hh for x, y in labels):
         return False
-    return not any(_near(xy, e, hh + 0.05) for e in [*layout.placed.values(), *layout.stems])
+    parts = [q for e in layout.placed.values() for q in _outline(e)] + list(layout.stems)
+    return not any(_near(xy, e, hh + 0.05) for e in parts)
 
 
 _TRACE_NEAR = 2  # nucleotides: an element touching a trace lies under it this far either side of what it holds
@@ -504,16 +509,31 @@ def _side_start(router: _Router, port, out, own):
     return None
 
 
-def _gap(router: _Router, g, a, b) -> NAPath:
+def _gap(router: _Router, g, a, b, strands=None) -> NAPath:
     """A cropped gap from one strand piece's 3' end to the next one's 5' end: routed, dashed and (unless short)
     labelled with the number of nucleotides left out. An end no stem holds (a trace's: a strand drawn along its
     projection) is routed from as a point (_Point): random-100 C2b-6, 7Y7C's gaps after Z:37, Z:61 and V:21 were
-    never routed and, with no curve or bow clear, drawn straight across six stems and a terminus."""
+    never routed and, with no curve or bow clear, drawn straight across six stems and a terminus. As a run's first
+    pass does, it keeps off the hairpin loops and free ends drawn (`strands`, a _Strands: their cells blocked) when a
+    route does, and only then crosses them at the reuse cost (6S13's gaps after a:36 and a:462 ran across the free
+    5' end of a:37-72 they lead to)."""
     (pa, ea, own_a), (pb, eb, own_b) = a, b
     own_a = own_a if own_a is not None else _Point(float(pa[0]), float(pa[1]))
     own_b = own_b if own_b is not None else _Point(float(pb[0]), float(pb[1]))
     own = (own_a, own_b)
-    route, _ = router.route(pa, ea, own_a, pb, eb, own_b, own_body=True, text_toll=TEXT_TOLL)
+    route = None
+    if strands is not None and strands.fixed_cells is not None and strands.fixed_cells.any():
+        grid = router.grid
+        saved, used = grid.blocked.copy(), grid.used.copy()
+        grid.blocked |= strands.fixed_cells
+        try:
+            route, _ = router.route(pa, ea, own_a, pb, eb, own_b, own_body=True, text_toll=TEXT_TOLL)
+        finally:
+            grid.blocked = saved
+        if route is not None and strands.crosses(_xy(route), fixed_only=True):
+            route, grid.used = None, used  # the cells it marked used are not drawn
+    if route is None:
+        route, _ = router.route(pa, ea, own_a, pb, eb, own_b, own_body=True, text_toll=TEXT_TOLL)
     if route is None:  # an end in another element's clearance margin
         route, _ = router.route(pa, ea, own_a, pb, eb, own_b, own_body=True, loose=True, text_toll=TEXT_TOLL)
     if route is None:  # an end whose way straight out lies in a neighbour's margin all along: from beside it

@@ -547,15 +547,42 @@ def test_the_crop_keeps_stemless_pieces_when_no_stem_is_touched():
 
 
 def test_the_crop_to_stems_keeps_a_piece_holding_one_end_of_a_tie():
-    # a touched hairpin, and a touched nucleotide far from it that pairs, alone, with one in the hairpin's loop
+    # a touched hairpin, and a touched stretch far from it, one of whose nucleotides pairs, alone, with one in the
+    # hairpin's loop
+    hairpin = _pairs(*[(k, 35 - k) for k in range(10, 14)])  # 10-13 / 22-25, loop 14-21
+    tie = _pairs((17, 200))
+    touched = {1: {(0, 11)}, 2: {(0, 200)}, 3: {(0, 201)}}
+    na = nucleic_from_pairs(_strands(400), hairpin + tie, touched, dict.fromkeys(touched, "X"))
+    assert na.structure.ties == tie
+    cut = crop_nucleic(na, by="stems")
+    assert [s.id for s in cut.strands] == ["A:11-26", "A:201-202"]
+    assert len(cut.structure.ties) == 1  # drawn as the isolated pair it is
+
+
+def test_the_crop_to_stems_drops_a_piece_cut_down_to_one_nucleotide():
+    # held-out 8ZTU: tRNA Y is modelled in three strands (Y:1-15, Y:18-19, Y:21-76); the crop kept of Y:18-19 only
+    # Y:19, the end of the tie G19-C56, a piece of one nucleotide that is never drawn (a trace needs two, it holds no
+    # stem), so its toucher had no bead (beads_missing). It goes into the gap, as a strand of one nucleotide does; its
+    # partner stays, single-stranded, and its toucher is cropped.
     hairpin = _pairs(*[(k, 35 - k) for k in range(10, 14)])  # 10-13 / 22-25, loop 14-21
     tie = _pairs((17, 200))
     touched = {1: {(0, 11)}, 2: {(0, 200)}}
     na = nucleic_from_pairs(_strands(400), hairpin + tie, touched, dict.fromkeys(touched, "X"))
-    assert na.structure.ties == tie
     cut = crop_nucleic(na, by="stems")
-    assert [s.id for s in cut.strands] == ["A:11-26", "A:201-201"]
-    assert len(cut.structure.ties) == 1  # drawn as the isolated pair it is
+    assert [s.id for s in cut.strands] == ["A:11-26"]
+    assert not cut.structure.ties and sorted(cut.contacts) == [1]
+    # a two-nucleotide strand of a broken chain, cut down to the one that ends a tie
+    a, b, c = _strands(40, 2, 40)
+    b.chain = c.chain = "A"
+    pairs = _pairs(*[(k, 35 - k) for k in range(10, 14)]) + [BasePair(1, 1, 2, 20, "WC")]
+    pairs += [BasePair(2, i, 2, 35 - i, "WC") for i in range(5, 9)]
+    touched = {1: {(0, 11)}, 2: {(1, 1)}, 3: {(2, 6)}}
+    na = nucleic_from_pairs([a, b, c], pairs, touched, dict.fromkeys(touched, "X"), [NAGap(0, 1, 2), NAGap(1, 2, 1)])
+    assert any({(t.a, t.i), (t.b, t.j)} == {(1, 1), (2, 20)} for t in na.structure.ties)
+    cut = crop_nucleic(na, by="stems")
+    assert all(len(s) > 1 for s in cut.strands)
+    assert not any(s.labels[0].seq == 2 and len(s) == 1 for s in cut.strands)
+    assert sorted(cut.contacts) == [1, 3]
 
 
 def test_crop_drops_a_one_nucleotide_piece_that_only_ends_a_tie():

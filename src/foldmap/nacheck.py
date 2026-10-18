@@ -67,7 +67,8 @@ class Missed:
 
     nucleotide: str
     pair: Pair
-    reason: str  # "missing" (a defect), or why none is expected: "focus", "no backbone", "first toucher", "cropped"
+    reason: str  # "missing" (a defect), or why none is expected: "focus", "no backbone", "not drawn", "first toucher",
+    # "cropped"
 
     @property
     def counted(self) -> bool:
@@ -179,8 +180,10 @@ def verify_contacts(model, drawn, layout, bb, *, path=None) -> ContactReport:
     its nucleotide, its colour is drawn.colour(residue index, that chain), and it names the first (lowest
     Backbone index) of the residues touching the nucleotide that the figure colours. Every other protein residue
     touching a drawn nucleotide is in `missed`: reason "missing" is a defect; "focus" (a chain outside
-    layout.focus_chains), "no backbone" (a residue the figure does not hold) and "first toucher" (the nucleotide's
-    bead names an earlier residue) are expected. Touched nucleotides the figure does not draw are in `cropped`.
+    layout.focus_chains), "no backbone" (a residue the figure does not hold), "not drawn" (a protein chain with no
+    helix or strand, Layout.coil_chains: the figure draws nothing of it and says so, so no colour of its can mark a
+    bead) and "first toucher" (the nucleotide's bead names an earlier residue) are expected. Touched nucleotides the
+    figure does not draw are in `cropped`.
     path: also read the file's deposited hydrogen bonds into the report."""
     if isinstance(model, tuple):
         model = model[0]
@@ -237,6 +240,7 @@ def verify_contacts(model, drawn, layout, bb, *, path=None) -> ContactReport:
                     )
     around = {key: near[n] for n, (key, _, _) in enumerate(nts) if key is not None}
     focus = layout.focus_chains
+    undrawn = {c for c, _ in getattr(layout, "coil_chains", None) or []}
     colour_of = drawn.colour
     for chain, items in sorted(drawn.marks.items()):
         for key, r, colour in items:
@@ -275,6 +279,8 @@ def verify_contacts(model, drawn, layout, bb, *, path=None) -> ContactReport:
                 continue
             if pid not in index:
                 reason = "no backbone"
+            elif pid[0] in undrawn:
+                reason = "not drawn"
             elif focus and pid[0] not in focus:
                 reason = "focus"
             else:

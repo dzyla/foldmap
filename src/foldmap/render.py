@@ -73,6 +73,7 @@ from .layout import (
     line_band,
     line_pt,
     lines_meeting,
+    na_strand_lines,
     na_text_boxes,
     overlaps_any,
     page_fit,
@@ -2874,7 +2875,7 @@ def loop_counts(layout: Layout, loops: list[Loop], sses: list[SSE], tails=None, 
     ]
     lines = [segments_of([lp.points]) for lp in loops]
     seen = lines if drawn is None else [segments_of([pts]) for pts in drawn]  # other loops: as drawn
-    strands = segments_of([path.points for path in layout.na_paths])  # nucleic-acid strands' lines
+    strands = segments_of(na_strand_lines(layout))  # nucleic-acid strands' and ties' lines
     page = count_page(layout, np.concatenate([strands, *seen]))
     out = []
     for i, loop in enumerate(loops):

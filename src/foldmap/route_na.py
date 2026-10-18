@@ -296,7 +296,7 @@ def route_nucleic(layout: Layout, router: _Router | None = None, loops=()) -> li
     for g in na.gaps:  # cropped away: the 3' end of one piece to the 5' end of the next, dashed
         a, b = exits.get((g.before, len(na.strands[g.before]) - 1)), exits.get((g.after, 0))
         if a is not None and b is not None:
-            out.append(_gap(router, g, a, b))
+            out.append(_gap(router, g, a, b, strands))
         elif a is not None or b is not None:  # one end drawn only (a piece too short to draw): a short break mark
             p, e, _ = a if a is not None else b
             mark = _xy([p, np.add(p, np.multiply(e, NT_STEP))])
