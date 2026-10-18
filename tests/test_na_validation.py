@@ -524,6 +524,19 @@ def test_stem_recall_leaves_out_reference_pairs_closing_too_short_a_loop():
     assert (m["stems_reference"], m["stem_recall"]) == (1, 1.0)
 
 
+def test_pseudoknotted_reference_stems_are_counted_and_recalled_like_any_stem():
+    """Plan 14 M2: the report counts the reference stems foldmap's own rule (nucleic._knots) calls pseudoknotted
+    and how many of them a drawn stem recalls (the same two-thirds match as stem_recall)."""
+    nested = [(10 + k, 30 - k) for k in range(4)]  # A11-14 / A28-31, kept nested (the longer)
+    knot = [(20 + k, 40 - k) for k in range(3)]  # A21-23 / A39-41: crosses it, so it is the knot
+    m = _score_synthetic(nested + knot, nested + knot)
+    assert (m["stems_reference"], m["pk_reference"], m["pk_found"]) == (2, 1, 1)
+    m = _score_synthetic(nested, nested + knot)  # the knot not drawn
+    assert (m["pk_reference"], m["pk_found"], m["stem_recall"]) == (1, 0, 0.5)
+    m = _score_synthetic(nested, nested)  # nothing crosses: no knot
+    assert (m["pk_reference"], m["pk_found"]) == (0, 0)
+
+
 def test_a_polyline_is_broken_where_it_jumps_across_an_unrolled_seam():
     nv = _na_validate()
     q = np.array([[0.0, 0.0], [3.0, 0.0], [90.0, 1.0], [93.0, 1.0]])

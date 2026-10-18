@@ -14,7 +14,8 @@ Without it the pairing columns are empty and the other checks still run.
 For every entry it measures
   pairing   foldmap's canonical and wobble pairs against RNApolis (run from its own venv): precision, recall, F1;
             stems against stems grouped the same way from the RNApolis pairs (none closing a loop under
-            MIN_LOOP), matched one to one, recalled when the match holds two thirds of its pairs
+            MIN_LOOP), matched one to one, recalled when the match holds two thirds of its pairs; the reference
+            stems foldmap's rule calls pseudoknotted (nucleic._knots) counted apart (pk_reference, pk_found)
   shape     drawn stem centres against the 3D centres: Spearman rho of pairwise distances, similarity-Procrustes
             RMSD (no reflection) normalised by the spread; stem angle against the projected 3D axis; bends between
             the pieces of a bent duplex; whether any stem's arms are drawn mirrored
@@ -235,13 +236,16 @@ def _score(strands, ours, theirs: set[frozenset], where: dict, drawn_only: bool,
     shared = sorted(
         ((-len(steps(r) & steps(g)), a, b) for a, r in enumerate(ref) for b, g in enumerate(got)),
     )
-    taken_ref, taken_got, matched = set(), set(), 0
+    taken_ref, taken_got, recalled = set(), set(), set()
     for n, a, b in shared:
         if n == 0 or a in taken_ref or b in taken_got:
             continue
         taken_ref.add(a)
         taken_got.add(b)
-        matched += 3 * -n >= 2 * len(ref[a])
+        if 3 * -n >= 2 * len(ref[a]):
+            recalled.add(a)
+    matched = len(recalled)
+    knots = [a for a, r in enumerate(ref) if r.helix == -1]  # pseudoknotted by foldmap's own rule (nucleic._knots)
 
     def named(xy):  # a drawn pair as [[chain, number, icode], ...], chains as drawn
         return sorted([strands[s].chain, strands[s].labels[i].seq, strands[s].labels[i].icode] for s, i in xy)
@@ -258,6 +262,8 @@ def _score(strands, ours, theirs: set[frozenset], where: dict, drawn_only: bool,
         "stems_foldmap": len(got),
         "stems_reference": len(ref),
         "stem_recall": round(matched / len(ref), 3) if ref else 1.0,
+        "pk_reference": len(knots),
+        "pk_found": len(recalled.intersection(knots)),
         "missed_pairs": missed[:20],
         "extra_pairs": sorted(named(xy) for xy in mine - expected.keys())[:20],
     }
@@ -595,6 +601,8 @@ def main(argv=None) -> int:
         "stems_foldmap",
         "stems_reference",
         "stem_recall",
+        "pk_reference",
+        "pk_found",
         "deposited_pair_f1",
         "deposited_stem_recall",
         "unmapped_chains",
