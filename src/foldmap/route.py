@@ -50,6 +50,11 @@ _MAX_NODES_WIDE = 1_600_000
 # spends at most this many nodes, counted as A* expands them; once spent, a search that runs out of _MAX_NODES
 # falls back as before (fix round 1: 7QUP's focus view took 158 s of its 180). About 25 s at most on a large page
 _MAX_NODES_PAGE = 8_000_000
+# ... and the second searches of the fine windows a coarse page's loops are routed again in (_fine_route) together
+# spend at most this many more, a pool of their own: windows run only on huge pages, by when the page's own second
+# searches have often spent its budget (plan 15 final review: drawing them from it, 7NZ2's domains view went from 0 to
+# 3 fallback curves, 9FZL's had 5), and a fresh budget per window had no bound
+_MAX_NODES_WINDOWS = 8_000_000
 _MAX_CELLS = 1_500_000
 _DIRS = [(1, 0), (0, 1), (-1, 0), (0, -1)]
 _PUSH = [0.4 + 0.25 * k for k in range(12)]  # how far out along the exit the path may start
@@ -533,6 +538,7 @@ class _Router:
         self.max_nodes = _MAX_NODES  # the A* search's budget
         self.wide_nodes = _MAX_NODES_WIDE  # ... and its second search's, when a route exists (_route_ports)
         self.wide_left = _MAX_NODES_PAGE  # what the second searches of this page may still spend
+        self.window_left = _MAX_NODES_WINDOWS  # ... and those of its fine windows (_fine_route)
         self.wide_searches = self.wide_refused = 0  # debug counts: second searches run, refused for the budget
         self.closed_searches = self.closed_nodes = 0  # debug counts: slab-closed searches (route) and their nodes
         self._free: tuple[bytes, np.ndarray] | None = None  # the last free-cell labelling (_joined) and its key
@@ -571,8 +577,9 @@ class _Router:
         return cells
 
     def share(self, window: "_Router") -> None:
-        """Take back what a window's router (_fine_route), started on this page's budget left, spent of it."""
-        self.wide_left = window.wide_left
+        """Take back what a window's router (_fine_route), started on what this page's windows have left
+        (window_left), spent of it."""
+        self.window_left = window.wide_left
         self.wide_searches += window.wide_searches
         self.wide_refused += window.wide_refused
         self.closed_searches += window.closed_searches
@@ -1017,10 +1024,10 @@ def route_loops(layout: Layout, sses: list[SSE], bb) -> list[Loop]:
     _clear_helix_names(layout, sses, out)
     _clear_termini(layout, sses, out)
     _still_over(layout, sses, out)
-    log.debug(  # fix round 1: what the second searches (and slab-closed searches) spent of the page's budget
+    log.debug(  # fix round 1: what the second searches (and slab-closed searches) spent of the budgets, windows' with
         "%d second-search nodes spent of %d: %d searches, %d refused for the budget; %d slab-closed searches, %d nodes",
-        _MAX_NODES_PAGE - router.wide_left,
-        _MAX_NODES_PAGE,
+        _MAX_NODES_PAGE - router.wide_left + _MAX_NODES_WINDOWS - router.window_left,
+        _MAX_NODES_PAGE + _MAX_NODES_WINDOWS,
         router.wide_searches,
         router.wide_refused,
         router.closed_searches,
@@ -1037,15 +1044,16 @@ def _fine_route(layout: Layout, keep_out, elements, pa: Placed, pb: Placed, unde
     of more than _MAX_CELLS cells at RES: random-100 held-out 7BKC's domains view, 2269 x 116 page units, at 0.42, where
     G:550-552 stands 0.8 under G:532-544, port facing port, a gap no coarse cell fits): routed again on a grid at RES
     over a window round its two ports, each of _FINE_PADS in turn, its drawing checked against every element as any
-    route is; (None, False) if none. Each window's router draws on the page router's budget (`page`: wide_left), and
-    gives back what it spent, so the second searches of all windows and of the page together stay within
-    _MAX_NODES_PAGE (a fresh budget per window left a page of many such loops no bound)."""
+    route is; (None, False) if none. Each window's router draws on the pool the page router keeps for its windows
+    (`page`: window_left, _MAX_NODES_WINDOWS), and gives back what it spent, so the second searches of all its windows
+    together stay within it (a fresh budget per window left a page of many such loops no bound; the page's own
+    budget, spent by then on a huge page, starved them)."""
     xs, ys = (pa.c_port[0], pb.n_port[0]), (pa.c_port[1], pb.n_port[1])
     for pad in _FINE_PADS:
         window = (min(xs) - pad, min(ys) - pad, max(xs) + pad, max(ys) + pad)
         grid = _Grid(layout, [b for _, b in keep_out], window)
         router = _Router(grid, elements, [b for _, b in keep_out])
-        router.wide_left = page.wide_left
+        router.wide_left = page.window_left
         for h in exempt:
             grid.blocked &= ~grid.over[h]
         try:

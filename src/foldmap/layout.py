@@ -75,7 +75,8 @@ _SS_SLACK = 0.6
 # bridge, so a page of many chains and bridges had no bound (random-100 held-out 8D3D's focus view: 896 items, 848
 # bridges, about 2 s a start, killed after 900 s). Measured at plan 15 Task 7 on the default and focus views of both
 # random-100 samples and every tests/data structure (419 layouts): the most spent was 3.1e9 (8RRX's focus view, 16 s),
-# so none of them reaches it; 8D3D's focus view spends 3.0e9 a bridge
+# so none of them reaches it; 8D3D's focus view spends 3.0e9 a bridge. The budget is per _attract, and cli.make_layout
+# can lay a figure out up to three times (the let_go second layout, the membrane view's relayout), each with its own
 _SS_RESTART_PAIRS = 5_000_000_000
 _W_CONTACT = 0.3  # pull between elements that touch in 3D (at _CONTACT_CAP CA pairs)
 _CONTACT_CAP = 20

@@ -156,19 +156,27 @@ def _coarse_gap():
 def test_the_window_routers_of_a_coarse_page_draw_on_its_budget(monkeypatch):
     """Plan 15 Task 7 (carried from Task 2): route._fine_route gave each window router a fresh _MAX_NODES_PAGE, so a
     page of many loops its coarse grid cannot route had no bound on its searches. A window's router starts on what
-    the page's router has left and gives back what it spent: with nothing left a window runs no second search."""
+    the page's windows have left of their own pool (window_left, _MAX_NODES_WINDOWS) and gives back what it spent:
+    with nothing left a window runs no second search. The pool is not the page's own budget (plan 15 final review:
+    drawn from it, already spent on a huge page, 7NZ2's domains view lost three loops to fallback curves): a page
+    that has spent its own still routes its windows."""
     a, b, lay = _coarse_gap()
     monkeypatch.setattr(route, "_MAX_NODES", 0)  # no first search finds the route: only a second search can
     keep = layout.label_boxes(lay, [a.sse, b.sse], route=True)
     elements = route._element_obstacles(lay)
-    page = route._Router(route._Grid(lay, [r for _, r in keep]), elements)
-    pts, _ = route._fine_route(lay, keep, elements, a, b, (set(), set()), [], page)
-    spent = route._MAX_NODES_PAGE - page.wide_left
-    assert pts is not None and spent > 0 and page.wide_searches >= 1
-    page = route._Router(route._Grid(lay, [r for _, r in keep]), elements)
-    page.wide_left = 0
-    pts, _ = route._fine_route(lay, keep, elements, a, b, (set(), set()), [], page)
-    assert pts is None and page.wide_left == 0 and page.wide_searches == 0
+
+    def fine(page_left, window_left):
+        page = route._Router(route._Grid(lay, [r for _, r in keep]), elements)
+        page.wide_left, page.window_left = page_left, window_left
+        pts, _ = route._fine_route(lay, keep, elements, a, b, (set(), set()), [], page)
+        return pts, page
+
+    pts, page = fine(0, route._MAX_NODES_WINDOWS)  # the page's own budget spent: the windows' pool is not
+    spent = route._MAX_NODES_WINDOWS - page.window_left
+    assert pts is not None and spent > 0 and page.wide_searches >= 1 and page.wide_left == 0
+    pts, page = fine(route._MAX_NODES_PAGE, 0)
+    assert pts is None and page.window_left == 0 and page.wide_searches == 0
+    assert page.wide_left == route._MAX_NODES_PAGE  # nor do the windows touch the page's own
 
 
 def test_a_slab_closed_search_is_counted_and_drawn_from_the_page_budget():
