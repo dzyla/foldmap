@@ -729,6 +729,20 @@ def _clear_helix_names(layout: Layout, sses: list[SSE], loops: list[Loop]) -> No
     log.debug("%d helix names moved off lines", moved)  # random-100 C6: what the campaign reports of the mover
 
 
+def _still_over(layout: Layout, sses: list[SSE], loops: list[Loop]) -> None:
+    """Loop.crosses_labels as the figure is drawn: a loop found only with the keep-outs open ran through a keep-out
+    box (label_boxes) where the box stood while it was routed; the names a line runs through move after routing
+    (_clear_helix_names, _clear_termini). A loop whose drawing runs through no keep-out box once they have moved runs
+    over no label: random-100 held-out 7BKC's domains view, D:183-195>D:198-201 (and its copy's) through D:253-260's
+    name, which then moved off it, the figure's text crossed by no line, yet flagged (A4). A loop not flagged stays
+    so (its route kept out of every box)."""
+    flagged = [lp for lp in loops if lp.crosses_labels]
+    if flagged:
+        boxes = [b for _, b in label_boxes(layout, sses, route=True)]
+        for lp in flagged:
+            lp.crosses_labels = _text_hits(lp.points, boxes) > 0
+
+
 _END_TURNS = (0.0, 45.0, -45.0, 90.0, -90.0)  # degrees a chain end's letter may turn round its stub's tip ...
 _END_OUT = (0.0, 0.3, 0.6)  # ... and page units further out than END_LABEL, nearest first
 
@@ -909,6 +923,7 @@ def route_loops(layout: Layout, sses: list[SSE], bb) -> list[Loop]:
         _off_na_text(layout, router, out)
     _clear_helix_names(layout, sses, out)
     _clear_termini(layout, sses, out)
+    _still_over(layout, sses, out)
     log.debug(  # fix round 1: what the second searches spent of the page's budget
         "%d second-search nodes spent of %d: %d searches, %d refused for the budget",
         _MAX_NODES_PAGE - router.wide_left,

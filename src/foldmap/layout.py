@@ -58,7 +58,8 @@ IN_PER_UNIT = 0.30  # render: inches per page unit, at most
 MAX_WIDTH_IN = 7.2  # render: a figure is drawn at most this wide (double column), inches, while its text stays ...
 MIN_TEXT_PT = 6.0  # ... this size or larger: a wider page grows past MAX_WIDTH_IN instead (random-100 C4 ruling)
 MAX_PAGE_IN = 48.0  # render: the longest side a page grows to (A0's, about); past it the whole figure, its text
-# with it, is scaled to fit: text under MIN_TEXT_PT, said by the figure's notes (page_fit)
+# with it, is scaled to fit: text under MIN_TEXT_PT, said by the figure's notes (page_fit); never so far that text
+# falls under matplotlib's 1 pt (page_scale: past that the page passes MAX_PAGE_IN)
 _MAX_ROW = 30.0
 _MIN_STRAND = 1.0  # shortest drawn strand (room for the arrow head)
 # items: at or below it the dense energy keeps recorded layouts bit-identical (the pair-list summation order
@@ -4077,6 +4078,11 @@ _NAME_CLEAR = 0.08  # page units a name keeps from anything else
 _NAME_KEEP = 0.3  # page units loops and nucleic-acid strands keep from a name: room kept round it where there is
 # any, and its routing keep-out (label_boxes) grown by _NAME_ROUTE
 _NAME_ROUTE = 0.15  # (a wider keep-out forces loops over it where room is short)
+_NAME_OPEN = _NAME_ROUTE + 0.1  # page units a name keeps from a loop's way out of an element's end (_ways_out, 0.2
+# either side of it) at the least: its routing keep-out (_NAME_ROUTE out) 0.1 off the way, with a route's clearance
+# (route._INFLATE, 0.15), leaves the cells along the way's middle free, half a cell (route.RES) either side of it, so
+# a route can leave the end (random-100 held-out 7NZ2's domains view: "D1 · B1" 0.08 from A1:1330-1337's way out,
+# with no room to keep, closed it); a leader's keep-out keeps the same 0.1
 _NAME_NEAR_NT = 0.3  # page units a name keeps from a nucleotide of an unpaired strand, beyond its letter
 _NAME_STUB = 0.8  # page units: the straight run of a loop out of an element's end, kept clear of a name
 _SHORT_LOOP = 6.0  # page units: a loop whose ends are this near takes the short way between them, kept clear too
@@ -4118,22 +4124,55 @@ def domain_fields(layout: Layout, names: bool = True) -> panels.Fields:
     return panels.panel_fields(owned, free, DOMAIN_PAD, on_edge, stems)
 
 
+def _ways_out(layout: Layout) -> list[tuple]:
+    """The straight run of a loop out of each element's (and ghost's) end, _NAME_STUB long, 0.2 either side."""
+    ways = []
+    for q in [*layout.placed.values(), *layout.ghosts]:
+        for port, out in ((q.n_port, q.exit_n), (q.c_port, q.exit_c)):
+            (ax, ay), (bx, by) = port, np.add(port, out * _NAME_STUB)
+            ways.append((min(ax, bx) - 0.2, min(ay, by) - 0.2, max(ax, bx) + 0.2, max(ay, by) + 0.2))
+    return ways
+
+
+@dataclass(frozen=True, eq=False)
+class _Way:
+    """A turned box (length along `direction`, width across it) centred at (cx, cy), as _box_meets_body reads one."""
+
+    cx: float
+    cy: float
+    direction: np.ndarray
+    normal: np.ndarray
+    length: float
+    width: float
+
+
+def _stem_ways(layout: Layout) -> list[_Way]:
+    """The straight way of a strand out of each end of each stem: _NAME_STUB along the stem's axis past its end
+    face, as wide as the stem and 0.2 either side, as a protein loop's (_ways_out). A nucleic-acid run, a cropped
+    gap or a free end leaves a stem's end along its axis (na_paths._face): a domain's name there is crossed by it
+    (random-100 held-out 8ZTU's domains view: "D2 · H" 0.6 past a stem's end, on the cropped gap leaving it)."""
+    out = []
+    for d in layout.stems:
+        for sense in (1, -1):
+            c = np.array([d.cx, d.cy]) + d.direction * sense * (d.length + _NAME_STUB) / 2
+            out.append(_Way(float(c[0]), float(c[1]), d.direction, d.normal, _NAME_STUB, d.width + 0.4))
+    return out
+
+
 def _name_obstacles(layout: Layout, sses: list[SSE], plates: bool = True) -> tuple[list[tuple], list[tuple]]:
     """What a domain's name must keep clear of: (solid) elements and ghosts, stems with their letters, sheet plates
     (unless not `plates`) and the other names (labels, chain ends and their stubs, stem names, tie letters, domain
     names placed before), and (ways) the straight run of a loop out of each element's end and a short loop's way
-    between its two ends. A name's leader keeps off the solid ones only: it may cross a loop."""
+    between its two ends. A name's leader keeps off the solid ones and the ways out of the ends (_ways_out): it may
+    cross a loop, not stand on a loop's way out of an element's end, which leaves that loop only a route over it
+    (random-100 held-out 6ZKT, 7NZ2, 8BCU's domains view: a leader 0.2-0.6 from a port, across its way out)."""
     solid = [_grown(p.rect, _NAME_CLEAR) for p in [*layout.placed.values(), *layout.ghosts]]
     for k, ids in enumerate(layout.sheets):
         if plates and len(ids) > 1:
             r = np.array([layout.placed[i].rect for i in ids] + [g.rect for g in block_ghosts(layout, k)])
             solid.append((*(r[:, :2].min(axis=0) - _PLATE_PAD), *(r[:, 2:].max(axis=0) + _PLATE_PAD)))
     solid += [_grown(b, _NAME_CLEAR) for _, b in label_boxes(layout, sses)]
-    ways = []
-    for q in [*layout.placed.values(), *layout.ghosts]:
-        for port, out in ((q.n_port, q.exit_n), (q.c_port, q.exit_c)):
-            (ax, ay), (bx, by) = port, np.add(port, out * _NAME_STUB)
-            ways.append((min(ax, bx) - 0.2, min(ay, by) - 0.2, max(ax, bx) + 0.2, max(ay, by) + 0.2))
+    ways = _ways_out(layout)
     for mine in group_by_chain(sses, keep=layout.placed).values():
         for a, b in zip(mine, mine[1:]):
             p, q = layout.placed[a.id], layout.placed[b.id]
@@ -4153,10 +4192,13 @@ def _name_obstacles(layout: Layout, sses: list[SSE], plates: bool = True) -> tup
 def _place_domain_names(layout: Layout, sses: list[SSE], font_scale: float = 1.0) -> None:
     """Each drawn domain's name (Layout.domain_names), in domain order, at the first clear place (_name_obstacles,
     and the unpaired strands' traces) of _name_spots: its panel's top left and top right on the top edge, then
-    along that edge, then outside with a short leader (Layout.domain_leaders). When nothing is clear, the first
-    place clear of all but the sheet plates (a name reads on a plate; random-100 C2b-2: 7JU4's D2 of chain m lies
-    inside a large sheet's plate, and its name took the top left, on four loops' ways out of their ends); else the
-    top left."""
+    along that edge, then outside with a short leader (Layout.domain_leaders). Clear: of the obstacles with the room
+    loops keep (_NAME_KEEP), then without it, and in both with room for a route out of every element's end
+    (_NAME_OPEN: by the name and its leader). When nothing is clear, the first place clear of all but the sheet
+    plates (a name reads on a plate; random-100 C2b-2: 7JU4's D2 of chain m lies inside a large sheet's plate, and
+    its name took the top left, on four loops' ways out of their ends); else, of the places clear but for that room
+    (else of all), the one that leaves the ways out the most (random-100 held-out 7NZ2: a name falling back to the
+    top left of a panel round one helix stood on its way out)."""
     layout.domain_names, layout.domain_leaders = {}, {}
     fields = domain_fields(layout, names=False)
     if not fields.values:
@@ -4165,25 +4207,51 @@ def _place_domain_names(layout: Layout, sses: list[SSE], font_scale: float = 1.0
     traces = [np.asarray(pts, float).reshape(-1, 2) for _, pts in sorted(layout.na_traces.items())]
     solid, ways = _name_obstacles(layout, sses)
     bare, _ = _name_obstacles(layout, sses, plates=False)
+    outs = _ways_out(layout)  # a leader's too (_name_obstacles)
 
     letters = (0.0 if layout.na_cropped else NT_ROW + glyph(layout)[1]) + _NAME_CLEAR
 
-    def clear(box, foot, margin, solid=solid) -> bool:
+    stem_ways = _stem_ways(layout)
+
+    def clear(box, foot, margin, solid=solid, room=True) -> bool:
+        """Is the place clear: with `room`, leaving every way out of an end room for a route (_NAME_OPEN)."""
         if overlaps_any(_grown(box, margin), solid + ways) or _trace_hits(_grown(box, _NAME_NEAR_NT), traces):
             return False
+        if room and overlaps_any(_grown(box, max(margin, _NAME_OPEN)), outs):  # room for a route out of every end
+            return False
         if any(_box_meets_body(_grown(box, letters), d) for d in layout.stems):  # a stem, with its letters
+            return False
+        if any(_box_meets_body(_grown(box, margin), w) for w in stem_ways):  # a strand's way out of a stem's end
             return False
         if foot is None:
             return True
         (x, ya), (_, yb) = foot
-        return not overlaps_any((x - 0.05, min(ya, yb), x + 0.05, max(ya, yb)), solid)
+        if overlaps_any((x - 0.05, min(ya, yb), x + 0.05, max(ya, yb)), solid):
+            return False
+        if not room:
+            return True
+        # a leader may cross a loop, not stand on a loop's way out of an element's (or a stem's) end: its routing
+        # keep-out (label_boxes), with the room a name keeps, off the ways out, and room for a route out at the least
+        keep = _grown((x - 0.1, min(ya, yb), x + 0.1, max(ya, yb)), max(margin, _NAME_OPEN - _NAME_ROUTE))
+        return not overlaps_any(keep, outs) and not any(_box_meets_body(keep, w) for w in stem_ways)
+
+    def room(box, foot) -> float:
+        """The room a place leaves the ways out of the ends: the least gap between its routing keep-outs (the name's,
+        its leader's: label_boxes) and a way out (_ways_out), negative where they overlap; at most what a route
+        needs (_NAME_OPEN - _NAME_ROUTE), so places with enough room tie."""
+        keep = [_grown(box, _NAME_ROUTE)]
+        if foot is not None:
+            (x, ya), (_, yb) = foot
+            keep.append((x - 0.1, min(ya, yb), x + 0.1, max(ya, yb)))
+        gaps = [max(a[0] - b[2], b[0] - a[2], a[1] - b[3], b[1] - a[3]) for a in keep for b in outs]
+        return min([_NAME_OPEN - _NAME_ROUTE, *gaps])
 
     for name, value in fields.values.items():
         size = DOMAIN_NAME_SIZE * em
         spots = list(_name_spots(value > 0, fields.xs, fields.ys, size * _text_width(name) + 0.1, size * _NAME_HEIGHT))
         if not spots:
             continue
-        box, foot = next(  # a place with room for the margin loops keep (_NAME_KEEP), else one without; else on a plate
+        spot = next(  # a place with room for the margin loops keep (_NAME_KEEP), else one without; else on a plate
             (
                 spot
                 for under in (solid, bare)
@@ -4191,8 +4259,11 @@ def _place_domain_names(layout: Layout, sses: list[SSE], font_scale: float = 1.0
                 for spot in spots
                 if clear(*spot, margin, under)
             ),
-            spots[0],
+            None,
         )
+        if spot is None:  # else of the places clear but for that room (else of all), the one leaving the ways most
+            spot = max([s for s in spots if clear(*s, 0.0, bare, room=False)] or spots, key=lambda s: room(*s))
+        box, foot = spot
         layout.domain_names[name] = box
         if foot is not None:
             layout.domain_leaders[name] = foot
@@ -4204,13 +4275,17 @@ def _name_spots(inside: np.ndarray, xs: np.ndarray, ys: np.ndarray, w: float, h:
     leader or None): on the top edge (the name's middle _NAME_SINK inside it, its plate over the edge) at the top
     left, the top right, then along the edge left to right, _NAME_INSET from the panel's sides; then outside, _LEADER
     and twice that above the edge, with a leader down to it; then the same on the bottom edge. The largest piece of
-    a panel in pieces first, at each of these steps; on a piece narrower than the name, the name centred over it."""
+    a panel in pieces first, at each of these steps; on a piece narrower than the name, the name centred over it.
+    Last, each place outside again with its leader off the name's middle, at either end of the edge under the name
+    (_NAME_INSET in): a leader from the middle of a name over a helix on end stands on the helix's way out, and
+    leaves its loop only a route over the name or the leader (random-100 held-out 7NZ2's domains view, D10 · B1)."""
     from scipy.ndimage import label as pieces
 
     marks, n = pieces(inside)
     order = sorted(range(1, n + 1), key=lambda m: (-int((marks == m).sum()), m))
     rows = np.arange(len(ys))[:, None]
     half = panels.GRID / 2
+    later = []  # (box, up, the edge's columns under it and their heights): the places outside, for leaders off middle
     for up in (1, -1):
         for lift in (0.0, _LEADER, 2 * _LEADER):
             for m in order:
@@ -4238,7 +4313,15 @@ def _name_spots(inside: np.ndarray, xs: np.ndarray, ys: np.ndarray, w: float, h:
                         x = float(_snap(bx + w / 2))
                         below = float(_snap(edge[span][np.argmin(np.abs(xs[span] - x))]))
                         foot = ((x, box[1] if up > 0 else box[3]), (x, below))
+                        later.append((box, up, xs[span], edge[span]))
                     yield box, foot
+    for box, up, sx, se in later:
+        mid = float(_snap((box[0] + box[2]) / 2))
+        ends = (max(sx.min() + _NAME_INSET, box[0] + 0.05), min(sx.max() - _NAME_INSET, box[2] - 0.05))
+        for x in dict.fromkeys(float(_snap(v)) for v in ends):
+            if abs(x - mid) > 1e-6 and ends[0] <= ends[1]:
+                below = float(_snap(se[np.argmin(np.abs(sx - x))]))
+                yield box, ((x, box[1] if up > 0 else box[3]), (x, below))
 
 
 def provisional(sses: list[SSE]) -> Layout:
@@ -5085,6 +5168,9 @@ def label_boxes(
 
 _EM_TUNED = 0.55 * SHAFT  # page units per em of the figure's text (before Style.font_scale), on every page
 _MIN_SCALE = MIN_TEXT_PT / (_EM_TUNED * 72)  # inches per page unit at which the text is MIN_TEXT_PT
+MPL_MIN_PT = 1.0  # matplotlib draws no text smaller than this (FontProperties.set_size floors a size under 1 pt)
+SMALLEST_TEXT = 0.6  # ems of the figure's text: the smallest render draws (a ligand's name, a residue number)
+_FLOOR_SCALE = MPL_MIN_PT / (SMALLEST_TEXT * _EM_TUNED * 72)  # inches per page unit at which that is MPL_MIN_PT
 
 
 def page_scale(width: float, height: float = 0.0) -> float:
@@ -5092,9 +5178,12 @@ def page_scale(width: float, height: float = 0.0) -> float:
     page wider than MAX_WIDTH_IN, but never so little that the text falls under MIN_TEXT_PT (the page grows past
     MAX_WIDTH_IN instead; random-100 C4: on wide pages text held at 4 pt outgrew every keep-out sized in page
     units), nor so much that a side passes MAX_PAGE_IN (past it the whole figure is scaled to fit, its text with
-    it: the text keeps its page units, so nothing it keeps clear of changes; only its print size falls)."""
+    it: the text keeps its page units, so nothing it keeps clear of changes; only its print size falls), but never
+    so far that its smallest text (SMALLEST_TEXT) falls under MPL_MIN_PT: matplotlib would draw it at 1 pt, larger
+    than every keep-out sized for it, and the page grows past MAX_PAGE_IN instead (random-100 held-out 7BKC's
+    domains view, 2263 x 110 units: held at 48 in its text was 0.5 pt, drawn at 1 pt, 62 texts on loops)."""
     scale = max(min(IN_PER_UNIT, MAX_WIDTH_IN / width), _MIN_SCALE)
-    return min(scale, MAX_PAGE_IN / max(width, height))
+    return min(scale, max(MAX_PAGE_IN / max(width, height), _FLOOR_SCALE))
 
 
 def font_pt(scale: float) -> float:
@@ -5129,13 +5218,19 @@ def glyph(layout: Layout) -> tuple[float, float]:
 def page_fit(width_in: float, height_in: float, font: float) -> str:
     """What the figure's notes say of its page (random-100 C4): '' while its text is MIN_TEXT_PT or larger (before
     Style.font_scale: `font`, the text size drawn, is compared at font_scale 1); past MAX_PAGE_IN, that the
-    whole figure was scaled to fit and its text is smaller (rounded down: 5.97 pt is "5.9 pt", under 6)."""
+    whole figure was scaled to fit and its text is smaller (rounded down: 5.97 pt is "5.9 pt", under 6); a page
+    past MAX_PAGE_IN (page_scale's MPL_MIN_PT floor), that it is."""
     if font >= MIN_TEXT_PT - 1e-6:
         return ""
+    held = (
+        f"held at {MAX_PAGE_IN:.0f} in on its longer side"
+        if max(width_in, height_in) <= MAX_PAGE_IN + 1e-6
+        else f"past {MAX_PAGE_IN:.0f} in, so that no text is under {MPL_MIN_PT:.0f} pt"
+    )
     return (
-        f"the page ({width_in:.0f} x {height_in:.0f} in) is held at {MAX_PAGE_IN:.0f} in on its longer side, so its "
-        f"text is {math.floor(font * 10) / 10:.1f} pt, under {MIN_TEXT_PT:.0f} pt; draw fewer chains (--chains, "
-        "--focus) for larger text"
+        f"the page ({width_in:.0f} x {height_in:.0f} in) is {held}, so its text is "
+        f"{math.floor(font * 10) / 10:.1f} pt, under {MIN_TEXT_PT:.0f} pt; draw fewer chains (--chains, --focus) for "
+        "larger text"
     )
 
 

@@ -2,6 +2,7 @@
 
 import re
 from pathlib import Path
+from types import SimpleNamespace
 
 import numpy as np
 import pytest
@@ -1068,3 +1069,126 @@ def test_a_domain_name_inside_a_sheet_plate_keeps_off_the_loops_way_out():
     assert d.over_labels == [] and d.stuck == []
     _, ways = _name_obstacles(d.layout, d.sses)
     assert not overlaps_any(d.layout.domain_names["D2 · m"], ways)
+
+
+# ------------------------------------------------------------------- names and leaders off the ways out (plan 15 T2)
+
+
+def _domain_layout(members, *others, stems=(), na_cropped=False, name="D1"):
+    """A synthetic layout: the elements `members` in one domain, `name`, and `others` and `stems` in none."""
+    from foldmap.layout import Layout
+
+    placed = [*members, *others]
+    rects = np.array([p.rect for p in [*placed, *stems]])
+    lay = Layout({p.sse.id: p for p in placed}, tuple(float(v) for v in [*rects[:, :2].min(0), *rects[:, 2:].max(0)]))
+    lay.stems = list(stems)
+    lay.na_cropped = na_cropped
+    lay.domains = [(name, [p.sse.id for p in members])]
+    return lay, [p.sse for p in placed]
+
+
+def _helix(start, cx, cy, length, angle):
+    from foldmap.layout import HELIX_W, Placed
+    from helpers import fake_sse
+
+    return Placed(fake_sse("H", start, start + 9), cx, cy, length, angle, HELIX_W, "α")
+
+
+def _first_spot(lay, name="D1"):
+    """The first place _name_spots offers the name, as _place_domain_names sizes it."""
+    from foldmap import layout as L
+
+    fields = L.domain_fields(lay, names=False)
+    size = L.DOMAIN_NAME_SIZE * L._ink_em(lay, 1.0)
+    return next(L._name_spots(fields.values[name] > 0, fields.xs, fields.ys, size * L._text_width(name) + 0.1, size))
+
+
+def test_a_leader_keeps_off_the_way_out_of_a_helix_on_end():
+    """Random-100 held-out 6ZKT, 8BCU and 7NZ2's domains views: a name lifted above its panel stood on a leader from
+    its middle, and over a panel round one helix on end (a piece narrower than the name: the name centred over it)
+    that leader stood on the helix's way out of its top end: its loop could leave only over the leader (A4), and took
+    the names' room on the way (A6). A leader keeps its routing keep-out (x +- 0.1) off every way out of an end
+    (_ways_out), by the name's room (_NAME_KEEP) where it can and by the room a route out needs at the least
+    (_NAME_OPEN); a name over a narrow piece tries its leader at either end of the edge under it (_name_spots), and
+    the loop leaves its port clear of every label."""
+    from foldmap import layout as L
+    from foldmap.route import route_loops
+
+    name = "D1 · chain A"  # wider than the helix's panel
+    a = _helix(0, 0.0, 0.0, 4.0, np.pi / 2)  # on end: its C port on top, (0, 2), its way out up
+    b = _helix(20, 5.0, 0.0, 4.0, -np.pi / 2)  # in no domain: its N port on top, 5 to the right
+    lay, sses = _domain_layout([a], b, name=name)
+    box, _ = _first_spot(lay, name)
+    assert abs((box[0] + box[2]) / 2 - a.c_port[0]) < 0.05  # centred over it: a leader from its middle on the way
+    L._place_domain_names(lay, sses)
+    (x, ya), (_, yb) = lay.domain_leaders[name]  # on its edge the name meets the way out, so it stands above
+    keep = L._grown((x - 0.1, min(ya, yb), x + 0.1, max(ya, yb)), L._NAME_OPEN - L._NAME_ROUTE)
+    assert not L.overlaps_any(keep, L._ways_out(lay)) and abs(x - a.c_port[0]) > 0.3
+    (loop,) = route_loops(lay, sses, SimpleNamespace(prev=np.ones(40, bool)))
+    assert not loop.fallback and not loop.crosses_labels
+
+
+def test_a_name_leaves_room_for_a_route_out_of_an_end(monkeypatch):
+    """Random-100 held-out 7NZ2's domains view (A1:1330-1337>A1:1341-1343): with no place with room (_NAME_KEEP)
+    clear, "D1 · B1" took one 0.08 from a helix's way out of its end; its routing keep-out with the routes'
+    clearance closed the way and the loop ran over two names. A name keeps _NAME_OPEN from every way out of an end,
+    room or not (here _NAME_KEEP is 0, so the first place clear is taken without room)."""
+    from foldmap import layout as L
+    from foldmap.layout import PITCH, Placed
+    from helpers import fake_sse
+
+    monkeypatch.setattr(L, "_NAME_KEEP", 0.0)
+    a = _helix(0, 0.0, 0.0, 8.0, 0.0)  # lying flat: the panel's top edge is long, the name's first place its left
+    lay, _ = _domain_layout([a])
+    box, _ = _first_spot(lay)
+    port = (box[2] + 0.2 + 0.1, (box[1] + box[3]) / 2 + 0.8)  # its way out (0.2 either side) 0.1 from the name
+    s = Placed(fake_sse("E", 20, 27, chain="B"), port[0], port[1] + 1.5, 3.0, -np.pi / 2, PITCH, "A")  # pointing down
+    lay, sses = _domain_layout([a], s)
+    first, _ = _first_spot(lay)  # the strand's panel margin dents the edge: the first place may sink a little
+    outs = L._ways_out(lay)
+    assert np.allclose(s.c_port, port) and not L.overlaps_any(first, outs)
+    assert L.overlaps_any(L._grown(first, L._NAME_OPEN), outs)  # 0.1 from the way
+    L._place_domain_names(lay, sses)
+    got = lay.domain_names["D1"]
+    assert got != first and not L.overlaps_any(L._grown(got, L._NAME_OPEN), outs)
+    monkeypatch.setattr(L, "_NAME_OPEN", 0.0)
+    L._place_domain_names(lay, sses)
+    assert lay.domain_names["D1"] == first  # without it, the first place, closing the way
+
+
+def test_a_name_keeps_off_a_strands_way_out_of_a_stem_end(monkeypatch):
+    """Random-100 held-out 8ZTU's domains view: "D2 · H" stood 0.6 past a stem's end, on the way a cropped gap leaves
+    it along its axis (na_paths._face), and the gap was routed through the name. A name keeps off the straight way
+    out of each end of each stem (_stem_ways: _NAME_STUB past its end face, as wide as the stem and 0.2 either
+    side), as off a loop's out of an element's end (here _NAME_KEEP is 0, so the first place clear is taken)."""
+    from foldmap import layout as L
+    from foldmap.layout import PlacedStem
+
+    monkeypatch.setattr(L, "_NAME_KEEP", 0.0)
+    a = _helix(0, 0.0, 0.0, 8.0, 0.0)
+    lay, _ = _domain_layout([a], na_cropped=True)
+    box, _ = _first_spot(lay)
+    mid = (box[1] + box[3]) / 2
+    stem = PlacedStem("s1", "P1", [0, 0], [], box[0] - 0.3 - 1.5, mid + 0.8, 3.0, 0.0, 2.0, {}, {})  # its end 0.3 off
+    lay, sses = _domain_layout([a], stems=[stem], na_cropped=True)
+    first, _ = _first_spot(lay)
+    assert any(L._box_meets_body(first, w) for w in L._stem_ways(lay))  # on the way out of its right end
+    L._place_domain_names(lay, sses)
+    got = lay.domain_names["D1"]
+    assert got != first and not any(L._box_meets_body(got, w) for w in L._stem_ways(lay))
+    monkeypatch.setattr(L, "_stem_ways", lambda lay: [])
+    L._place_domain_names(lay, sses)
+    assert lay.domain_names["D1"] == first  # without them, the first place
+
+
+@pytest.mark.parametrize("entry", ["6ZKT", "8BCU"])
+def test_domain_names_and_leaders_leave_every_loop_its_way(entry):
+    """Random-100 held-out domains views: 6ZKT's i:3-16>i:19-30 and 8BCU's H:261-268>H:276-286 ran over a label (A4;
+    6ZKT's over i:3-16's own name, A6), each with a domain's leader on its way out of an end."""
+    from foldmap import figcheck
+    from foldmap.spec import draw_spec, figure_spec
+    from helpers import r100_entry
+
+    d = draw_spec(figure_spec(r100_entry(entry), domains="auto"))
+    assert d.over_labels == [] and d.stuck == []
+    assert figcheck.text_collisions(d) == []

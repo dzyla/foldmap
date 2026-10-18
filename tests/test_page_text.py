@@ -37,7 +37,10 @@ def test_a_small_page_is_drawn_as_before():
 
 
 def test_every_name_and_chain_end_ink_lies_inside_its_route_keep_out_on_a_wide_page():
-    path = DATA / "8UUP.cif"
+    _inks_inside_their_keep_outs(DATA / "8UUP.cif")
+
+
+def _inks_inside_their_keep_outs(path):
     fig = make_figure(path)
     inv = fig.axes[0].transData.inverted()
     lay, sses, bb = make_layout(path)
@@ -97,6 +100,21 @@ def test_past_the_largest_page_the_whole_figure_is_scaled_and_said(monkeypatch):
     assert "held at 3 in" in fig.foldmap_page_fit and "under 6 pt" in fig.foldmap_page_fit
     assert "its text is 5.9 pt, under 6 pt" in layout.page_fit(48.0, 44.0, 5.97)  # not "6.0 pt, under 6" (7Y7C)
     assert layout.page_fit(48.0, 44.0, 6.0) == ""
+
+
+def test_no_text_is_drawn_under_one_point(monkeypatch):
+    """Random-100 held-out 7BKC's domains view (2263 x 110 page units): held at MAX_PAGE_IN its text was 0.5 pt, and
+    matplotlib draws no text under 1 pt (layout.MPL_MIN_PT): drawn at 1 pt, every name's ink ran past the box loops
+    keep out of, 62 texts on loops. The page is never scaled so far that its smallest text (layout.SMALLEST_TEXT)
+    falls under 1 pt: it grows past MAX_PAGE_IN instead, and the notes say so."""
+    from foldmap.layout import _EM_TUNED, MPL_MIN_PT, SMALLEST_TEXT, page_scale
+
+    assert SMALLEST_TEXT * _EM_TUNED * 72 * page_scale(2263.0, 110.0) == pytest.approx(MPL_MIN_PT)
+    monkeypatch.setattr(layout, "MAX_PAGE_IN", 2.0)  # 8UUP's 84 units held at 2 in: 0.6 pt text
+    fig = make_figure(DATA / "8UUP.cif")
+    assert max(fig.get_size_inches()) > 5.0
+    assert "past 2 in, so that no text is under 1 pt" in fig.foldmap_page_fit
+    _inks_inside_their_keep_outs(DATA / "8UUP.cif")
 
 
 def past_the_largest_page(monkeypatch):

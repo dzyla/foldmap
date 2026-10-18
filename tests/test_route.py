@@ -1212,6 +1212,28 @@ def test_a_coarse_pages_narrow_gap_is_routed_on_a_fine_grid(monkeypatch):
 
 
 def test_a_large_domain_view_routes_every_loop():
-    """Random-100 held-out 7BKC's domains view (28 fallback curves, 7NZ2's 4 alike): no fallback curve."""
+    """Random-100 held-out 7BKC's domains view (28 fallback curves, 7NZ2's 4 alike): no fallback curve; and no loop
+    flagged over a label (D:183-195>D:198-201 and its copy's, through a helix name moved off them afterwards:
+    _still_over)."""
     d = draw_spec(figure_spec(r100_entry("7BKC"), domains="auto"))
-    assert d.stuck == []
+    assert d.stuck == [] and d.over_labels == []
+
+
+def test_a_loop_is_over_a_label_only_while_the_label_is_there():
+    """Random-100 held-out 7BKC's domains view: D:183-195>D:198-201 was found only with the keep-outs open, through
+    D:253-260's name; _clear_helix_names then moved that name off it, and the figure's text was crossed by no line,
+    yet the loop stayed flagged (A4). Loop.crosses_labels is read again once the names have moved (_still_over): a
+    flagged loop through no keep-out box is over no label; one through a box stays flagged; an unflagged loop is
+    never flagged."""
+    from foldmap.route import Loop, _still_over
+
+    h = bar(0, 0.0, 0.0, 4.0, 0.0)  # its name above it
+    lay = layout_of(h)
+    (box,) = [b for n, b in label_boxes(lay, [h.sse], route=True) if n == f"label:{h.sse.id}"]
+    mid = ((box[0] + box[2]) / 2, (box[1] + box[3]) / 2)
+    through = [(mid[0], mid[1] - 2.0), (mid[0], mid[1] + 2.0)]
+    beside = [(box[2] + 1.0, mid[1] - 2.0), (box[2] + 1.0, mid[1] + 2.0)]
+    loops = [Loop("a", "b", beside, False, False, True), Loop("c", "d", through, False, False, True)]
+    loops.append(Loop("e", "f", through, False, False, False))
+    _still_over(lay, [h.sse], loops)
+    assert [lp.crosses_labels for lp in loops] == [False, True, False]
