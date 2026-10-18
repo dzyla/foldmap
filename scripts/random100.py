@@ -2417,8 +2417,12 @@ def main(argv=None) -> int:
     s.add_argument("--date", default=datetime.date.today().isoformat(), help="release-date cutoff (YYYY-MM-DD)")
     s.add_argument("--out", default=str(OUT / "sample.json"))
     s.add_argument("--check", action="store_true", help="list the sampled ids now obsolete; change nothing")
-    s.add_argument("--exclude", metavar="SAMPLE", action="append",
-                   help="another sample.json whose ids are never drawn (held-out); may be given more than once")
+    s.add_argument(
+        "--exclude",
+        metavar="SAMPLE",
+        action="append",
+        help="another sample.json whose ids are never drawn (held-out); may be given more than once",
+    )
     s.set_defaults(func=cmd_sample)
     views = "all, quick (default, seed1, roundtrip) or a comma-separated list of " + ", ".join(VIEWS)
     r = sub.add_parser("run", help="draw, measure and report every sampled entry (network for downloads)")

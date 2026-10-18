@@ -1026,8 +1026,9 @@ def test_sample_excludes_the_ids_of_every_sample_named(r100, tmp_path, monkeypat
     CA-only replacement of either counts as one of its ids."""
     tuned, held = tmp_path / "tuned.json", tmp_path / "held.json"
     tuned.write_text(json.dumps({"entries": [{"id": "1ABC"}, {"id": "2DEF"}], "replaced": []}))
-    held.write_text(json.dumps({"entries": [{"id": "3GHI"}, {"id": "1ABC"}],
-                                "replaced": [{"id": "4JKL", "replacement": None}]}))
+    held.write_text(
+        json.dumps({"entries": [{"id": "3GHI"}, {"id": "1ABC"}], "replaced": [{"id": "4JKL", "replacement": None}]})
+    )
     seen = {}
 
     def fake(seed, date, exclude=()):
