@@ -798,7 +798,7 @@ def test_s5_scores_auto_domains_where_a_cath_reference_exists(r100, tmp_path):
     finding. Entries without a reference are not measured. Reported, never gating."""
     from foldmap.domain_score import TARGETS
 
-    got, note = r100.domain_reference(FID / "1LDM.cif.gz", "1LDM", fetch=False)
+    got, note, _ = r100.domain_reference(FID / "1LDM.cif.gz", "1LDM", fetch=False)
     assert [g["chain"] for g in got] == ["A"] and got[0]["overlap"] > 0.9 and got[0]["n_ref"] == 2
     assert got[0]["source"] == "reference" and note == "a local file: CATH not fetched"
     assert r100.domain_reference(DATA / "1UBQ.cif", "1UBQ", fetch=False)[0] is None
@@ -1186,26 +1186,27 @@ def test_s5_scores_every_chain_cath_chops(r100, cath_offline, monkeypatch):
     an id that is no PDB entry, or PDBe unreachable: not judged, with the reason, never failed."""
     import urllib.error
 
-    got, note = r100.domain_reference(DATA / "2LZM.cif", "2LZM")  # not in the reference: CATH's one domain
+    got, note, unscored = r100.domain_reference(DATA / "2LZM.cif", "2LZM")  # not in the reference: CATH's one domain
     assert note == "" and [(g["chain"], g["source"], g["cath"], g["n_ref"]) for g in got] == [
         ("A", "CATH", ["2lzmA00"], 1)
     ]
-    got, _ = r100.domain_reference(FID / "1LDM.cif.gz", "1LDM")  # in the reference: scored on it, once
+    got, _, _ = r100.domain_reference(FID / "1LDM.cif.gz", "1LDM")  # in the reference: scored on it, once
     assert [(g["chain"], g["source"], g["n_ref"]) for g in got] == [("A", "reference", 2)]
     assert r100.cath_chains("1LDM") == [
         {"pdb": "1LDM", "chain": "A", "domains": [[[1, 162]], [[163, 329]]], "cath": ["1ldmA01", "1ldmA02"]}
     ]  # shaped as the reference's own chain
-    assert r100.domain_reference(DATA / "1UBQ.cif", "1UBQ") == (None, "CATH chops none of its chains")
+    assert r100.domain_reference(DATA / "1UBQ.cif", "1UBQ") == (None, "CATH chops none of its chains", [])
     assert r100.domain_reference(DATA / "1UBQ.cif", "AF_AFP0CG48F1") == (
         None,
         "not a PDB entry (CATH chops PDB entries)",
+        [],
     )
 
     def down(req, timeout=None):
         raise urllib.error.URLError("no route")
 
     monkeypatch.setattr(cath_offline.urllib.request, "urlopen", down)
-    none, why = r100.domain_reference(DATA / "1UBQ.cif", "9XYZ")
+    none, why, _ = r100.domain_reference(DATA / "1UBQ.cif", "9XYZ")
     assert none is None and why.startswith("CATH chopping not fetched (ValueError: could not reach www.ebi.ac.uk")
     e = {"id": "9XYZ", "facts": {"protein": True}, "views": {"default": {"result": {"science": {}}}}}
     s5 = r100.science({**e, "domains_cath": None, "domains_cath_note": why})["S5"]
@@ -1255,3 +1256,40 @@ def test_report_counts_the_s5_chains_and_credits_cath(r100, tmp_path):
     assert "| 1ABC | B | CATH | 1 | 1 | 0.90 | 1.00 | 1.00 | 1.00 |" in md
     assert "| mean of 2 (two domains or more) |" in md and "| mean of 1 (one domain) |" in md
     assert "- CATH chops none of its chains: 1" in md
+
+
+def test_a_chain_whose_s5_scoring_crashes_is_counted_in_the_report(r100, cath_offline, monkeypatch, tmp_path):
+    """Task 8 fix round 1: a chain CATH chops whose scoring raises (chain_inputs or auto_domains crashing) is never
+    silently left out when another chain of the entry is scored: domain_reference lists it with the exception's type,
+    and report.md counts the unscored chains by reason (grouped by type, not message) and names them."""
+    from foldmap import domain_score
+
+    real = domain_score.chain_score
+
+    def crashing(path, c):
+        if c["chain"] == "B":
+            raise RuntimeError(f"auto_domains broke on {path}")
+        return real(path, c)
+
+    monkeypatch.setattr(domain_score, "chain_score", crashing)
+    chopped = r100.cath_chains("2LZM")[0]
+    monkeypatch.setattr(
+        r100, "cath_chains", lambda pdb: [chopped, {**chopped, "chain": "B"}, {**chopped, "chain": "C"}]
+    )
+    got, note, unscored = r100.domain_reference(DATA / "2LZM.cif", "2LZM")
+    assert [g["chain"] for g in got] == ["A"]  # C has no residue in the file
+    assert [(u["chain"], u["reason"]) for u in unscored] == [("B", "RuntimeError"), ("C", r100.NO_RESIDUE)]
+    assert "chain B not scored (RuntimeError: auto_domains broke" in note
+    crit = {k: {"pass": True, "detail": ""} for k in r100.CRITERIA}
+    view = {"default": {"result": {"science": {}}}}
+
+    def entry(i, scores, unscored):
+        e = {"id": i, "name": i, "facts": {"protein": True}, "views": view, "criteria": crit, "domains_cath": scores}
+        return r100._verdict({**e, "domains_cath_unscored": unscored, "domains_cath_note": "x (y)"})
+
+    other = [{"chain": "D", "reason": "RuntimeError", "detail": "another message"}]
+    r100.report([entry("2LZM", got, unscored), entry("1ABC", None, other)], tmp_path, None, total=2)
+    md = (tmp_path / "report.md").read_text(encoding="utf-8")
+    assert "3 chains CATH chops not scored, by reason:" in md
+    assert "- RuntimeError: 2 (2LZM B, 1ABC D)" in md and f"- {r100.NO_RESIDUE}: 1 (2LZM C)" in md
+    assert "- no chain CATH chops could be scored: 1" in md

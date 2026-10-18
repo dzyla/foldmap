@@ -1509,7 +1509,7 @@ def run_entry(source: str, out: Path, views=VIEWS, info: dict | None = None) -> 
         if f["protein"] and "default" in wanted:
             e["dssp"] = dssp_agreement(path)
             # S5: every chain CATH chops (fetched for a sampled id; a local file has the committed reference only)
-            e["domains_cath"], e["domains_cath_note"] = domain_reference(
+            e["domains_cath"], e["domains_cath_note"], e["domains_cath_unscored"] = domain_reference(
                 path, e["id"], fetch=not Path(source).is_file()
             )
     e["criteria"] = criteria(e)
@@ -1955,14 +1955,19 @@ def cath_chains(pdb: str) -> list[dict]:
     return out
 
 
-def domain_reference(path: Path, pdb: str, fetch: bool = True) -> tuple[list[dict] | None, str]:
+NO_RESIDUE = "no residue of its CATH domains in the file"  # why a chain CATH chops is not scored, besides a crash
+
+
+def domain_reference(path: Path, pdb: str, fetch: bool = True) -> tuple[list[dict] | None, str, list[dict]]:
     """S5's measures: every chain of entry `pdb` that CATH chops, scored with its automatic domains
     (domain_score.chain_score: overlap, boundary recall, precision and F1, as the reference chains are), and a note
     of what was not scored. A chain DOMAIN_REFERENCE holds (the calibration set, in-sample) is scored on its committed
     chopping, "source": "reference"; every other on CATH's as fetched (cath_chains), "source": "CATH". A chain CATH
-    keeps as one domain is scored too. (None, why) when no chain is scored (not a PDB entry, CATH chops none of its
+    keeps as one domain is scored too. Scores None when no chain is scored (not a PDB entry, CATH chops none of its
     chains, PDBe unreachable): S5 is then not judged, never failed. fetch=False scores the committed reference only (a
-    local file: its name is no PDB id to trust)."""
+    local file: its name is no PDB id to trust). The third item lists the chains CATH chops that were not scored,
+    {chain, reason: the exception's type or NO_RESIDUE, detail}, so report.md counts them (Task 8 fix round 1: a
+    chain whose scoring crashes is never silently left out)."""
     from foldmap import domain_score
 
     pdb = pdb.upper()
@@ -1982,18 +1987,20 @@ def domain_reference(path: Path, pdb: str, fetch: bool = True) -> tuple[list[dic
             chains += [{**c, "source": "CATH"} for c in fetched if c["chain"] not in have]
             if not fetched:
                 notes.append("CATH chops none of its chains")
-    scores = []
+    scores, unscored = [], []
     for c in sorted(chains, key=lambda c: c["chain"]):
         try:
             got = domain_score.chain_score(path, c)
-        except Exception as err:  # a chain foldmap cannot read alone: said, not failed
-            notes.append(f"chain {c['chain']} not scored ({type(err).__name__}: {str(err)[:120]})")
+        except Exception as err:  # a chain foldmap cannot read alone, or auto_domains crashing: counted, not failed
+            unscored.append({"chain": c["chain"], "reason": type(err).__name__, "detail": str(err)[:160]})
             continue
         if not got["n_ref"]:
-            notes.append(f"chain {c['chain']} not scored (no residue of its CATH domains in the file)")
+            unscored.append({"chain": c["chain"], "reason": NO_RESIDUE, "detail": ""})
             continue
         scores.append({**got, "source": c["source"], "cath": c.get("cath", [])})
-    return scores or None, "; ".join(notes)
+    for u in unscored:
+        notes.append(f"chain {u['chain']} not scored ({u['reason']}{': ' + u['detail'] if u['detail'] else ''})")
+    return scores or None, "; ".join(notes), unscored
 
 
 SCIENCE_VIEWS = (*FIGURE_VIEWS, "app")  # the views whose figure the science checks judge (batch C2b-S)
@@ -2136,15 +2143,31 @@ def domains_section(entries: list[dict]) -> list[str]:
                     f"| mean of {len(group)} ({what}) | | | | | {mean['overlap']:.2f} | {mean['f1']:.2f} | "
                     f"{mean['recall']:.2f} | {mean['precision']:.2f} |"
                 )
-    unscored = Counter(
-        e.get("domains_cath_note") or "no CATH chopping"
-        for e in entries
-        if (e.get("facts") or {}).get("protein") and not e.get("domains_cath")
+    failed: dict[str, list[str]] = {}  # reason -> "id chain" of each chain CATH chops that was not scored
+    for e in entries:
+        for u in e.get("domains_cath_unscored") or []:
+            failed.setdefault(u["reason"], []).append(f"{e['id']} {u['chain']}")
+    if failed:
+        k = sum(len(v) for v in failed.values())
+        lines += ["", f"{k} chains CATH chops not scored, by reason:", ""]
+        for why, where in sorted(failed.items(), key=lambda x: (-len(x[1]), x[0])):
+            lines.append(f"- {why}: {len(where)} ({', '.join(where)})")
+    unjudged = Counter(
+        _unjudged_reason(e) for e in entries if (e.get("facts") or {}).get("protein") and not e.get("domains_cath")
     )
-    if unscored:
+    if unjudged:
         lines += ["", "Protein entries with no chain scored (S5 not judged), by reason:", ""]
-        lines += [f"- {why}: {n}" for why, n in sorted(unscored.items(), key=lambda x: (-x[1], x[0]))]
+        lines += [f"- {why}: {n}" for why, n in sorted(unjudged.items(), key=lambda x: (-x[1], x[0]))]
     return lines
+
+
+def _unjudged_reason(e: dict) -> str:
+    """Why an entry has no S5 score, grouped: its chains CATH chops all unscored (counted per chain above), else its
+    note's first reason without the detail in brackets (one row per kind, not per message)."""
+    if e.get("domains_cath_unscored"):
+        return "no chain CATH chops could be scored"
+    note = (e.get("domains_cath_note") or "no CATH chopping").split("; ")[0]
+    return note.split(" (")[0] if not note.startswith("not a PDB entry") else note
 
 
 def accessories_named(e: dict) -> dict[str, tuple[int, int]]:
