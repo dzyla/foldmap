@@ -69,6 +69,14 @@ _W_SEQ = 1.0  # pull between the two ends of a loop
 _LOOP_SLACK = 1.5  # loop ends closer than this are left alone
 _W_SS = 2.0  # pull between two bridged cysteines (twice a loop: disulfides should read as short bars)
 _SS_SLACK = 0.6
+# the second starts of one layout's stretched disulfides (_attract) spend at most this many pair evaluations of the
+# energy (each evaluation counts its items squared, what it costs), counted as they run, never time; once spent, a
+# disulfide still stretched keeps the first minimum. A second start solves the whole page again, up to five per
+# bridge, so a page of many chains and bridges had no bound (random-100 held-out 8D3D's focus view: 896 items, 848
+# bridges, about 2 s a start, killed after 900 s). Measured at plan 15 Task 7 on the default and focus views of both
+# random-100 samples and every tests/data structure (419 layouts): the most spent was 3.1e9 (8RRX's focus view, 16 s),
+# so none of them reaches it; 8D3D's focus view spends 3.0e9 a bridge
+_SS_RESTART_PAIRS = 5_000_000_000
 _W_CONTACT = 0.3  # pull between elements that touch in 3D (at _CONTACT_CAP CA pairs)
 _CONTACT_CAP = 20
 _K_HOME = 0.02  # pull back toward the projected position, keeps the fold recognisable
@@ -1643,15 +1651,37 @@ def _mass(it: _Item) -> float:
     return sum(len(m.axial) / 4 if isinstance(m, PlacedStem) else 1 for m in it.members)
 
 
-def _energy(flat, home, anchor_w, want, pull, loops, lam, mids=None, fixed=None):
+def _x_overlaps(Q, want, reach=None) -> tuple[np.ndarray, np.ndarray]:
+    """The pairs (i, j), i < j, whose footprints (centres Q) overlap along x: want[i, j, 0] > |Q_j - Q_i| in x, in
+    row-major order, as np.nonzero(np.triu(...)) gives them, element for element (the summation order of the terms
+    over them moves L-BFGS minima). `reach` (want[..., 0].max(axis=1), once per want): only the items within an
+    item's reach in x are compared with it, found by sorting, not all n x n (plan 15 Task 7: 8D3D's 896 items)."""
+    n = len(Q)
+    if reach is None:
+        return np.nonzero(np.triu(want[..., 0] > np.abs(Q[None, :, 0] - Q[:, None, 0]), 1))
+    x = Q[:, 0]
+    order = np.argsort(x, kind="stable")
+    xs = x[order]
+    pad = reach * (1 + 1e-9) + 1e-9  # a wider window than the test: the test below decides
+    lo, hi = np.searchsorted(xs, x - pad, "left"), np.searchsorted(xs, x + pad, "right")
+    counts = hi - lo
+    i = np.repeat(np.arange(n), counts)
+    j = order[np.arange(int(counts.sum())) - np.repeat(np.cumsum(counts) - counts - lo, counts)]
+    hit = (j > i) & (want[i, j, 0] > np.abs(x[j] - x[i]))
+    i, j = i[hit], j[hit]
+    k = np.lexsort((j, i))
+    return i[k], j[k]
+
+
+def _energy(flat, home, anchor_w, want, pull, loops, lam, mids=None, fixed=None, reach=None):
     """Layout energy and gradient over only the overlapping boxes and the contact pairs `pull` = (i, j, w), i < j.
-    Same terms as _energy_dense."""
+    Same terms as _energy_dense. `reach`: see _x_overlaps."""
     P = flat.reshape(-1, 2)
     grad = 2 * anchor_w * (P - home)
     E = float((anchor_w[:, 0] * ((P - home) ** 2).sum(1)).sum())
     Q = P if mids is None else P + mids  # footprint centres
     E += _fixed_overlap(Q, fixed, lam, grad)
-    oi, oj = np.nonzero(np.triu(want[..., 0] > np.abs(Q[None, :, 0] - Q[:, None, 0]), 1))
+    oi, oj = _x_overlaps(Q, want, reach)
     keep = want[oi, oj, 1] > np.abs(Q[oj, 1] - Q[oi, 1])
     oi, oj = oi[keep], oj[keep]
     if len(oi):  # overlapping boxes: pushed apart along the axis of least overlap
@@ -1930,8 +1960,9 @@ def _attract(
         return P
 
     def tied(z):  # one position per orbit of symmetry copies, plus the spread between protomers
+        evals[0] += 1
         if n > _PAIR_ENERGY_ABOVE:
-            E, g = _energy(expand(z).ravel(), home, anchor_w, want, pull, loops, lam, mids, walls)
+            E, g = _energy(expand(z).ravel(), home, anchor_w, want, pull, loops, lam, mids, walls, reach)
         else:
             E, g = _energy_dense(expand(z).ravel(), home, anchor_w, want, W, loops, lam, mids, walls)
         g = g.reshape(-1, 2)
@@ -1948,11 +1979,14 @@ def _attract(
             z = _lbfgs(tied, z)
         return z
 
+    evals = [0]  # energy evaluations so far
+    reach = want[..., 0].max(axis=1) if n > _PAIR_ENERGY_ABOVE else None  # _x_overlaps
     lam = _LAMBDAS[0]
     z = solve(np.append(_snap([[items[i].cx, items[i].cy] for i in free]).ravel(), spread))
     lam = _LAMBDAS[-1]
     best = tied(z)[0]
     mass = np.array([_mass(it) for it in items])
+    restart_from, starts, unstarted = evals[0], 0, 0  # the second starts' budget (_SS_RESTART_PAIRS), debug counts
     for k in range(len(springs) - len(bridges_used), len(springs)):  # disulfides still stretched: a second start
         i, oi, j, oj = springs[k]
         P = expand(z)
@@ -1964,6 +1998,10 @@ def _attract(
             continue
         hm, ha = h[mover], h[anchor]
         gap_x, gap_y = hm[0] + ha[0] + MARGIN, hm[1] + ha[1] + MARGIN
+        if (evals[0] - restart_from) * n * n >= _SS_RESTART_PAIRS:
+            unstarted += 1
+            continue
+        starts += 1
         for side in ((0.0, -1.0), (-gap_x, 0.0), (gap_x, 0.0), (0.0, gap_y), (0.0, -gap_y)):
             # the lighter element brought beside its partner: just below the cysteine, or clear of its footprint
             trial = _snap(z)  # every start on the grid
@@ -1973,6 +2011,14 @@ def _attract(
             energy = tied(trial)[0]
             if energy < best:
                 z, best = trial, energy
+    if unstarted:
+        log.debug(
+            "%d stretched disulfides started again, %d not for the budget (%d items, %d pair evaluations)",
+            starts,
+            unstarted,
+            n,
+            (evals[0] - restart_from) * n * n,
+        )
     x = expand(z).ravel()
     for it, p in zip(items, x.reshape(n, 2)):
         it.cx, it.cy = float(p[0]), float(p[1])
@@ -4627,7 +4673,7 @@ def page_text(layout: Layout) -> tuple[float, float]:
         width, height = float(r[:, 2].max() - r[:, 0].min()) + 2.0, float(r[:, 3].max() - r[:, 1].min()) + 2.0
     else:
         width, height = layout.width or 1.0, layout.height or 0.0
-    scale = page_scale(width, height)
+    scale = page_scale(width, height, layout.font_scale)
     return font_pt(scale) * layout.font_scale, 1.0 / (scale * 72)
 
 
@@ -5245,9 +5291,11 @@ _MIN_SCALE = MIN_TEXT_PT / (_EM_TUNED * 72)  # inches per page unit at which the
 MPL_MIN_PT = 1.0  # matplotlib draws no text smaller than this (FontProperties.set_size floors a size under 1 pt)
 SMALLEST_TEXT = 0.6  # ems of the figure's text: the smallest render draws (a ligand's name, a residue number)
 _FLOOR_SCALE = MPL_MIN_PT / (SMALLEST_TEXT * _EM_TUNED * 72)  # inches per page unit at which that is MPL_MIN_PT
+MAX_GROWN_IN = 200.0  # the longest side that floor grows a page to: PDF readers open no page past 200 in (14 400 pt;
+# matplotlib writes no UserUnit), so past it the page is held there and its smallest text falls under MPL_MIN_PT
 
 
-def page_scale(width: float, height: float = 0.0) -> float:
+def page_scale(width: float, height: float = 0.0, font_scale: float = 1.0) -> float:
     """Inches per page unit of a page `width` x `height` page units, as render draws it: IN_PER_UNIT, less on a
     page wider than MAX_WIDTH_IN, but never so little that the text falls under MIN_TEXT_PT (the page grows past
     MAX_WIDTH_IN instead; random-100 C4: on wide pages text held at 4 pt outgrew every keep-out sized in page
@@ -5255,9 +5303,14 @@ def page_scale(width: float, height: float = 0.0) -> float:
     it: the text keeps its page units, so nothing it keeps clear of changes; only its print size falls), but never
     so far that its smallest text (SMALLEST_TEXT) falls under MPL_MIN_PT: matplotlib would draw it at 1 pt, larger
     than every keep-out sized for it, and the page grows past MAX_PAGE_IN instead (random-100 held-out 7BKC's
-    domains view, 2263 x 110 units: held at 48 in its text was 0.5 pt, drawn at 1 pt, 62 texts on loops)."""
+    domains view, 2263 x 110 units: held at 48 in its text was 0.5 pt, drawn at 1 pt, 62 texts on loops). The floor
+    is for the text as drawn: a Style.font_scale under 1 (the journal theme's 0.9) raises it; and it grows a page to
+    MAX_GROWN_IN at most (a PDF reader's largest page), past which the page is held there, its smallest text under
+    MPL_MIN_PT (page_fit says so)."""
     scale = max(min(IN_PER_UNIT, MAX_WIDTH_IN / width), _MIN_SCALE)
-    return min(scale, max(MAX_PAGE_IN / max(width, height), _FLOOR_SCALE))
+    longest = max(width, height)
+    floor = min(_FLOOR_SCALE / min(font_scale, 1.0), MAX_GROWN_IN / longest)
+    return min(scale, max(MAX_PAGE_IN / longest, floor))
 
 
 def font_pt(scale: float) -> float:
@@ -5293,14 +5346,20 @@ def page_fit(width_in: float, height_in: float, font: float) -> str:
     """What the figure's notes say of its page (random-100 C4): '' while its text is MIN_TEXT_PT or larger (before
     Style.font_scale: `font`, the text size drawn, is compared at font_scale 1); past MAX_PAGE_IN, that the
     whole figure was scaled to fit and its text is smaller (rounded down: 5.97 pt is "5.9 pt", under 6); a page
-    past MAX_PAGE_IN (page_scale's MPL_MIN_PT floor), that it is."""
+    past MAX_PAGE_IN (page_scale's MPL_MIN_PT floor), that it is; a page held at MAX_GROWN_IN, that it is and that
+    some text is under MPL_MIN_PT (drawn at it, larger than the room kept for it)."""
     if font >= MIN_TEXT_PT - 1e-6:
         return ""
-    held = (
-        f"held at {MAX_PAGE_IN:.0f} in on its longer side"
-        if max(width_in, height_in) <= MAX_PAGE_IN + 1e-6
-        else f"past {MAX_PAGE_IN:.0f} in, so that no text is under {MPL_MIN_PT:.0f} pt"
-    )
+    longest = max(width_in, height_in)
+    if longest <= MAX_PAGE_IN + 1e-6:
+        held = f"held at {MAX_PAGE_IN:.0f} in on its longer side"
+    elif longest < MAX_GROWN_IN - 1e-6:
+        held = f"past {MAX_PAGE_IN:.0f} in, so that no text is under {MPL_MIN_PT:.0f} pt"
+    else:
+        held = (
+            f"held at {MAX_GROWN_IN:.0f} in on its longer side (the largest page a PDF reader opens), so some text is "
+            f"under {MPL_MIN_PT:.0f} pt and drawn at {MPL_MIN_PT:.0f} pt, larger than the room kept for it"
+        )
     return (
         f"the page ({width_in:.0f} x {height_in:.0f} in) is {held}, so its text is "
         f"{math.floor(font * 10) / 10:.1f} pt, under {MIN_TEXT_PT:.0f} pt; draw fewer chains (--chains, --focus) for "

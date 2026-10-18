@@ -1089,6 +1089,8 @@ class _RouteLog(logging.Handler):
         self.sums["names_moved"] = 0  # helix names route._clear_helix_names moved off lines (random-100 C6)
         # route's second searches (C2b-2 fix round 1): nodes spent of the page's budget, searches run, refused
         self.sums.update(second_search_nodes=0, second_searches=0, second_searches_refused=0)
+        # ... of which the slab-closed first searches (plan 15 Task 7: drawn from the same budget): runs, nodes
+        self.sums.update(slab_closed_searches=0, slab_closed_nodes=0)
         self.records = 0
 
     def emit(self, record):
@@ -1096,7 +1098,9 @@ class _RouteLog(logging.Handler):
             self.sums["names_moved"] += int(record.args[0])
             return
         if str(record.msg).startswith("%d second-search nodes spent"):
-            spent, _, runs, refused = record.args
+            spent, _, runs, refused, closed, closed_nodes = record.args
+            self.sums["slab_closed_searches"] += int(closed)
+            self.sums["slab_closed_nodes"] += int(closed_nodes)
             self.sums["second_search_nodes"] += int(spent)
             self.sums["second_searches"] += int(runs)
             self.sums["second_searches_refused"] += int(refused)

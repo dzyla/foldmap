@@ -442,13 +442,23 @@ def _curve(pa, ea, pb, eb, n=24):
 
 
 def _route_ports(
-    grid: _Grid, pa, ea, own_a, pb, eb, own_b, loose=False, max_nodes: int = _MAX_NODES, wide: "_Router | None" = None
+    grid: _Grid,
+    pa,
+    ea,
+    own_a,
+    pb,
+    eb,
+    own_b,
+    loose=False,
+    max_nodes: int = _MAX_NODES,
+    wide: "_Router | None" = None,
+    spent: list | None = None,
 ):
     """Grid cells of the cheapest orthogonal route from port pa (leaving along ea) to port pb (entered against
     eb), or None; own_a and own_b (anything with a rect) are what the ports belong to. `loose`: see
     _Grid.free_cell_along; a pair (for pa, for pb) or one value for both. A search that finds no route within
     max_nodes is run again (_Router.second) when `wide` (the router) allows: free cells join its two ends, and the
-    page's budget is not spent."""
+    page's budget is not spent. `spent` (a one-item list): the first search's nodes are added to it."""
     la, lb = loose if isinstance(loose, tuple) else (loose, loose)
     start = grid.free_cell_along(pa, ea, own_a, la)
     goal = grid.free_cell_along(pb, eb, own_b, lb)
@@ -457,7 +467,8 @@ def _route_ports(
     stubs = grid.stub_cells(pa, start) | grid.stub_cells(pb, goal)  # the straight ends drawn to each port
     for c in stubs:
         grid.blocked[c] = True
-    cells = _astar(grid, start, _axis(ea), goal, _axis(-np.asarray(eb)), max_nodes)
+    ends = (grid, start, _axis(ea), goal, _axis(-np.asarray(eb)), max_nodes)
+    cells = _astar(*ends) if spent is None else _astar(*ends, spent)
     if cells is None and wide is not None:
         cells = wide.second(start, _axis(ea), goal, _axis(-np.asarray(eb)), max_nodes)
     for c in stubs:
@@ -523,6 +534,7 @@ class _Router:
         self.wide_nodes = _MAX_NODES_WIDE  # ... and its second search's, when a route exists (_route_ports)
         self.wide_left = _MAX_NODES_PAGE  # what the second searches of this page may still spend
         self.wide_searches = self.wide_refused = 0  # debug counts: second searches run, refused for the budget
+        self.closed_searches = self.closed_nodes = 0  # debug counts: slab-closed searches (route) and their nodes
         self._free: tuple[bytes, np.ndarray] | None = None  # the last free-cell labelling (_joined) and its key
 
     def _joined(self, a, b) -> bool:
@@ -558,14 +570,37 @@ class _Router:
         self.wide_searches += 1
         return cells
 
+    def share(self, window: "_Router") -> None:
+        """Take back what a window's router (_fine_route), started on this page's budget left, spent of it."""
+        self.wide_left = window.wide_left
+        self.wide_searches += window.wide_searches
+        self.wide_refused += window.wide_refused
+        self.closed_searches += window.closed_searches
+        self.closed_nodes += window.closed_nodes
+
     def drawn(
-        self, pa, ea, own_a, pb, eb, own_b, own_body=False, loose=False, under=((), ()), exempt=(), wide=True
+        self,
+        pa,
+        ea,
+        own_a,
+        pb,
+        eb,
+        own_b,
+        own_body=False,
+        loose=False,
+        under=((), ()),
+        exempt=(),
+        wide=True,
+        max_nodes: int | None = None,
+        spent: list | None = None,
     ):
         """The A* route from port pa to port pb as drawn, snapped to the ports or else unsnapped; None if there
         is no route or every drawing of it crosses an element (`under`: see _clear). `wide`: a search that runs out
-        of its nodes may run again on the page's second-search budget (_route_ports)."""
+        of its nodes may run again on the page's second-search budget (_route_ports). `max_nodes`: the first
+        search's budget if not the router's; `spent`: its nodes are added to it."""
         grid = self.grid
-        cells = _route_ports(grid, pa, ea, own_a, pb, eb, own_b, loose, self.max_nodes, self if wide else None)
+        first = self.max_nodes if max_nodes is None else max_nodes
+        cells = _route_ports(grid, pa, ea, own_a, pb, eb, own_b, loose, first, self if wide else None, spent)
         if cells is None:
             return None
         for snap in (True, False):
@@ -603,18 +638,23 @@ class _Router:
         passes beside the label (random-100 C2b-2: 8RRX's D and G loops). `text_toll`: with the keep-outs open, the
         extra cost of each of their cells entered, so the route crosses as little text as it can (a nucleic-acid
         strand's: random-100 held-out 8ZTU's run beside α3 ran up through its name, the shortest way once open).
-        Ports on one side of every membrane band (_Grid.one_side) are first joined with the slab closed, on the
-        search's own budget: a loop between two elements outside the membrane stays out of it when it can (A18;
-        random-100 held-out 7JI3's loop from a strand's foot ran up into the slab and over the strand's head, the
-        cheapest way past a crowded sheet below)."""
+        Ports on one side of every membrane band (_Grid.one_side) are first joined with the slab closed, its nodes
+        drawn from the page's budget (wide_left, as second searches' are; not run once that is spent): a loop between
+        two elements outside the membrane stays out of it when it can (A18; random-100 held-out 7JI3's loop from a
+        strand's foot ran up into the slab and over the strand's head, the cheapest way past a crowded sheet below)."""
         grid = self.grid
-        if grid.one_side(pa, pb):
+        if grid.one_side(pa, pb) and self.wide_left > 0:
             held = grid.slab & ~grid.blocked
             grid.blocked |= held
+            spent = [0]
             try:
-                pts = self.drawn(pa, ea, own_a, pb, eb, own_b, own_body, loose, under, exempt, wide=False)
+                budget = min(self.max_nodes, self.wide_left)
+                pts = self.drawn(pa, ea, own_a, pb, eb, own_b, own_body, loose, under, exempt, False, budget, spent)
             finally:
                 grid.blocked &= ~held
+                self.wide_left -= spent[0]
+                self.closed_searches += 1
+                self.closed_nodes += spent[0]
             if pts is not None:
                 return pts, False
         pts = self.drawn(pa, ea, own_a, pb, eb, own_b, own_body, loose, under, exempt)
@@ -931,7 +971,7 @@ def route_loops(layout: Layout, sses: list[SSE], bb) -> list[Loop]:
         for h in exempt:
             grid.blocked |= grid.over[h]
         if pts is None and grid.res > RES + 1e-9:  # a page so large its grid is coarse: a fine grid round the ports
-            pts, over = _fine_route(layout, keep_out, elements, pa, pb, under, exempt)
+            pts, over = _fine_route(layout, keep_out, elements, pa, pb, under, exempt, router)
             for p, q in zip(pts or (), (pts or ())[1:]):
                 for c in grid.cells_along(p, q):
                     grid.used[c] += 1
@@ -977,12 +1017,14 @@ def route_loops(layout: Layout, sses: list[SSE], bb) -> list[Loop]:
     _clear_helix_names(layout, sses, out)
     _clear_termini(layout, sses, out)
     _still_over(layout, sses, out)
-    log.debug(  # fix round 1: what the second searches spent of the page's budget
-        "%d second-search nodes spent of %d: %d searches, %d refused for the budget",
+    log.debug(  # fix round 1: what the second searches (and slab-closed searches) spent of the page's budget
+        "%d second-search nodes spent of %d: %d searches, %d refused for the budget; %d slab-closed searches, %d nodes",
         _MAX_NODES_PAGE - router.wide_left,
         _MAX_NODES_PAGE,
         router.wide_searches,
         router.wide_refused,
+        router.closed_searches,
+        router.closed_nodes,
     )
     return out
 
@@ -990,25 +1032,31 @@ def route_loops(layout: Layout, sses: list[SSE], bb) -> list[Loop]:
 _FINE_PADS = (3.0, 8.0)  # page units round a loop's two ports: the windows _fine_route searches at RES, nearest first
 
 
-def _fine_route(layout: Layout, keep_out, elements, pa: Placed, pb: Placed, under, exempt):
+def _fine_route(layout: Layout, keep_out, elements, pa: Placed, pb: Placed, under, exempt, page: _Router):
     """(points, over labels) of a loop the page's grid found no route for when that grid is coarser than RES (a page
     of more than _MAX_CELLS cells at RES: random-100 held-out 7BKC's domains view, 2269 x 116 page units, at 0.42, where
     G:550-552 stands 0.8 under G:532-544, port facing port, a gap no coarse cell fits): routed again on a grid at RES
     over a window round its two ports, each of _FINE_PADS in turn, its drawing checked against every element as any
-    route is; (None, False) if none."""
+    route is; (None, False) if none. Each window's router draws on the page router's budget (`page`: wide_left), and
+    gives back what it spent, so the second searches of all windows and of the page together stay within
+    _MAX_NODES_PAGE (a fresh budget per window left a page of many such loops no bound)."""
     xs, ys = (pa.c_port[0], pb.n_port[0]), (pa.c_port[1], pb.n_port[1])
     for pad in _FINE_PADS:
         window = (min(xs) - pad, min(ys) - pad, max(xs) + pad, max(ys) + pad)
         grid = _Grid(layout, [b for _, b in keep_out], window)
         router = _Router(grid, elements, [b for _, b in keep_out])
+        router.wide_left = page.wide_left
         for h in exempt:
             grid.blocked &= ~grid.over[h]
-        for ea, eb in _over_exits(pa, pb):
-            pts, over = router.route(
-                pa.c_port, ea, pa, pb.n_port, eb, pb, loose=(pa.over, pb.over), under=under, exempt=exempt
-            )
-            if pts is not None:
-                return pts, over
+        try:
+            for ea, eb in _over_exits(pa, pb):
+                pts, over = router.route(
+                    pa.c_port, ea, pa, pb.n_port, eb, pb, loose=(pa.over, pb.over), under=under, exempt=exempt
+                )
+                if pts is not None:
+                    return pts, over
+        finally:
+            page.share(router)
     return None, False
 
 

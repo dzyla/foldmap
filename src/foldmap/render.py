@@ -1018,12 +1018,30 @@ def _nearest_on(pts: np.ndarray, q, avoid=()) -> tuple[float, float]:
 
 
 def _covered(pts: np.ndarray, avoid) -> np.ndarray:
-    """Which of the points lie inside any of `avoid`: boxes (x0, y0, x1, y1) and outlines (Path)."""
+    """Which of the points lie inside any of `avoid`: boxes (x0, y0, x1, y1) and outlines (Path; each asked only of
+    the points within its vertices' extent, _within_extents)."""
     shapes = [a for a in avoid if isinstance(a, Path)]
     out = _in_boxes(pts, [a for a in avoid if not isinstance(a, Path)])
-    for shape in shapes:
-        out |= shape.contains_points(pts)
+    inside = _within_extents(pts, shapes)
+    for k in np.flatnonzero(inside.any(axis=0)).tolist():
+        near = inside[:, k] & ~out
+        if near.any():
+            out[near] |= shapes[k].contains_points(pts[near])
     return out
+
+
+def _within_extents(pts: np.ndarray, paths: list[Path]) -> np.ndarray:
+    """(points x paths) which points lie within each path's vertices' extent, edges included: only those can lie
+    inside it (plan 15 Task 7: 8D3D's focus view, 848 disulfides under about 1,800 bodies, asked every body of
+    every point)."""
+    if not paths:
+        return np.zeros((len(pts), 0), bool)
+    sizes = [len(p.vertices) for p in paths]
+    v = np.concatenate([p.vertices for p in paths])
+    starts = np.cumsum([0, *sizes[:-1]])
+    lo, hi = np.minimum.reduceat(v, starts), np.maximum.reduceat(v, starts)
+    x, y = pts[:, :1], pts[:, 1:2]
+    return (x >= lo[:, 0]) & (x <= hi[:, 0]) & (y >= lo[:, 1]) & (y <= hi[:, 1])
 
 
 def disulfide_points(layout, loops, sses, chains, i: int, j: int, avoid=()):
@@ -1961,11 +1979,11 @@ def visible_pieces(points, bodies: list[Path], halos=()) -> list[np.ndarray]:
     pts = np.asarray(points, float)
     dense, seg = _dense(pts)
     hidden = _in_boxes(dense, halos)
-    for body in bodies:
-        lo, hi = body.vertices.min(axis=0), body.vertices.max(axis=0)
-        near = np.all((dense >= lo) & (dense <= hi), axis=1) & ~hidden
+    within = _within_extents(dense, bodies)
+    for k in np.flatnonzero(within.any(axis=0)).tolist():
+        near = within[:, k] & ~hidden
         if near.any():
-            hidden[near] |= body.contains_points(dense[near])
+            hidden[near] |= bodies[k].contains_points(dense[near])
     pieces, start = [], None
     for k, h in enumerate([*hidden, True]):
         if not h and start is None:
@@ -2758,7 +2776,8 @@ def _canvas(
     entries = _legend_entries(layout, look, chains, colors, umarks, backbone[0], hb, linked)
 
     def legend_entry(x1: float) -> float:  # one legend entry's width in page units: swatch, text, gap
-        scale = page_scale(x1 - x0 + 2 * pad)  # any page's scale: the text's em is the same page units on every page
+        # any page's scale: the text's em is the same page units on every page
+        scale = page_scale(x1 - x0 + 2 * pad, font_scale=look.font_scale)
         font_u = _font_pt(scale) * look.font_scale / (scale * 72)  # text drawn at that size, in page units
         # the unhinted advance width, which is what is drawn (ink extents differ between matplotlib versions);
         # measured at a size matplotlib does not clamp (it floors font sizes at 1 pt) and scaled to font_u
@@ -2775,7 +2794,8 @@ def _canvas(
     per_row = max(1, int((x1 - x0 + 0.9) // entry))
     if not look.legend:
         entries = []
-    scale = page_scale(x1 - x0 + 2 * pad)  # not the figure's own (its height is not known yet), and need not be:
+    # not the figure's own scale (its height is not known yet), and need not be: see em below
+    scale = page_scale(x1 - x0 + 2 * pad, font_scale=look.font_scale)
     em = _font_pt(scale) * look.font_scale / (scale * 72)  # the text's em, page units, is the same at any scale
     row = _LEGEND_ROW * glyph_scale(em)  # a legend row, sized from the text drawn in it (C4)
     legend_h = 0.8 + row * -(-len(entries) // per_row) if entries else 0.3
@@ -2785,7 +2805,7 @@ def _canvas(
     bar_h = max(_DOMAIN_BAR_H, 2.4 * em + _BAR_TICK) if bars else 0.0
     xmin, xmax, ymin, ymax = x0 - pad, x1 + pad, y0 - pad - len(bars) * bar_h - legend_h, y1 + pad + top
     w_u, h_u = xmax - xmin, ymax - ymin
-    scale = page_scale(w_u, h_u)  # text at MIN_TEXT_PT or larger: past MAX_WIDTH_IN the page grows (C4)
+    scale = page_scale(w_u, h_u, look.font_scale)  # text at MIN_TEXT_PT or larger: past MAX_WIDTH_IN it grows (C4)
     fig = Figure(figsize=(w_u * scale, h_u * scale), facecolor=look.background)
     fig.foldmap_page_fit = page_fit(w_u * scale, h_u * scale, _font_pt(scale))  # the notes' page line, if any
     ax = fig.add_axes([0, 0, 1, 1])

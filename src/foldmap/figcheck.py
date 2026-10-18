@@ -21,6 +21,7 @@ from matplotlib.path import Path as MPath
 from matplotlib.transforms import Affine2D, Bbox
 
 from .layout import block_ghosts, joined_pieces, lying_over
+from .membrane import FACE_REACH
 
 # Lines a text can be crossed by (render's gids, matched by prefix). A loop's casing (loopcase:) and a stub's edge
 # (stub-edge:) are drawn under their line in the page or a pale colour: neither is read. A chain-end stub is its
@@ -1500,8 +1501,8 @@ def crosses_band(ends: tuple[float, float], band: tuple[float, float]) -> bool:
 
 def membrane_view(layout, sses, bb, mem, loops=None) -> dict:
     """A18 on a membrane view (layout.membrane, the membrane `mem` it was drawn for): tm_helices, the helices whose
-    CA run reaches both faces (within 2 Å); tm_short, those that do not cross their band (crosses_band), with the
-    share of the band they cover; loops_in_slab, slab_runs of `loops` (None: not measured)."""
+    CA run reaches both faces (within membrane.FACE_REACH); tm_short, those that do not cross their band
+    (crosses_band), with the share of the band they cover; loops_in_slab, slab_runs of `loops` (None: not measured)."""
     bands = layout.membrane.get("bands") or [layout.membrane["y"]]
     depth = mem.depth(bb.ca)
     short, tm = [], 0
@@ -1510,7 +1511,7 @@ def membrane_view(layout, sses, bb, mem, loops=None) -> dict:
         if p is None or s.kind != "H":
             continue
         seg = depth[s.start : s.end + 1]
-        if len(seg) < 2 or seg.min() > -mem.half + 2 or seg.max() < mem.half - 2:
+        if len(seg) < 2 or seg.min() > -mem.half + FACE_REACH or seg.max() < mem.half - FACE_REACH:
             continue
         tm += 1
         lo, hi = sorted((p.n_port[1], p.c_port[1]))

@@ -22,6 +22,7 @@ from .features import helices_on_sheets, sse_contacts
 from .frame import Frame, RadialFrame, dna_radial_frame, dna_view_frame, protomer_maps, symmetric_frame, view_frame
 from .io import load_backbone, load_links, load_nucleic, read_model
 from .layout import SCALE, _snap, accessory_lines, build_layout, na_torn_by_unrolling, resolve, template_rows
+from .membrane import FACE_REACH
 from .model import AUTO_NT, crop_nucleic, homolog_chains, nucleic_of_chains, nucleic_touching, res_ref
 from .names import apply_names, check_spec
 from .nucleic import StemView, stem_views, straight_duplex
@@ -566,7 +567,7 @@ def _transmembrane(sses, bb, mem) -> set[str]:
     out = set()
     for s in sses:
         seg = depth[s.start : s.end + 1]
-        if len(seg) < 2 or seg.min() > -mem.half + 2 or seg.max() < mem.half - 2:
+        if len(seg) < 2 or seg.min() > -mem.half + FACE_REACH or seg.max() < mem.half - FACE_REACH:
             continue
         if mem.defining is not None and mem.defining.isdisjoint(range(s.start, s.end + 1)):
             continue
@@ -597,7 +598,7 @@ def _face_medians(lay, sses, bb, mem, reach: bool = False) -> tuple[float, float
     for s in sses:
         p = lay.placed.get(s.id)
         seg = depth[s.start : s.end + 1]
-        if p is None or len(seg) < 2 or seg.min() > -mem.half + 2 or seg.max() < mem.half - 2:
+        if p is None or len(seg) < 2 or seg.min() > -mem.half + FACE_REACH or seg.max() < mem.half - FACE_REACH:
             continue
         if mem.defining is not None and mem.defining.isdisjoint(range(s.start, s.end + 1)):
             continue
