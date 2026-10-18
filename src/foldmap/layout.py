@@ -856,7 +856,7 @@ def _over_sheet(
         x = (xs[i] / dist[i] + xs[j] / dist[j]) / (1 / dist[i] + 1 / dist[j])
     reach = max(m.length for m in strands if not m.ghost) / 2
     y = float(np.clip((centre - mid) @ up3 * SCALE, -reach, reach))
-    angle = float(_snap(np.arctan2(axis @ up3, axis @ across3)))
+    angle = _half_turn(_snap(np.arctan2(axis @ up3, axis @ across3)))
     length = max(width, (len(h) - 1) * HELIX_RISE * SCALE)
     return Placed(h, 0, 0, length, angle, width, over=True), (float(_snap(x)), float(_snap(y)))
 
@@ -1102,11 +1102,18 @@ def _kink_item(group: list[SSE], frame: Frame, angle_mode: str, width: float = H
 
 
 def _angle(seen: float, av: float, mode: str) -> float:
+    """The drawn angle of an element seen at angle `seen` (page-up component av). Wherever the sign of av decides
+    (up or down; pointing left as +pi or -pi) it is av on the grid, so noise either side of zero, which depends on
+    the CPU, decides nothing: a helix along the page points up, or left as +pi."""
+    up = float(_snap(av)) >= 0
     if mode == "upright":
-        return np.pi / 2 if av >= 0 else -np.pi / 2
+        return np.pi / 2 if up else -np.pi / 2
     if mode == "snap":
-        return float(np.round(seen / (np.pi / 2)) * (np.pi / 2))
-    return float(_snap(seen))  # as seen, on the grid (radians)
+        k = float(np.round(seen / (np.pi / 2)))
+        if abs(k) == 2:  # left: +pi or -pi as av's side (on the grid)
+            k = 2.0 if up else -2.0
+        return k * (np.pi / 2) + 0.0
+    return _half_turn(_snap(seen))  # as seen, on the grid (radians)
 
 
 def _bundle_item(group: list[SSE], frame: Frame, angle_mode: str, width: float) -> _Item:
@@ -1789,6 +1796,17 @@ def _snap(v) -> np.ndarray:
     return np.round(np.asarray(v, float) * _GRID) / _GRID + 0.0
 
 
+_HALF_TURN = min(np.pi, round(np.pi * _GRID) / _GRID)  # the lesser of pi and pi on the grid
+
+
+def _half_turn(angle) -> float:
+    """A snapped angle (or a multiple of pi/2) in (-pi, pi]: -0.0 is 0.0 and -pi (or pi on the grid, negated) is
+    +pi. atan2 of a direction along the page gives +-0.0 or +-pi by the sign of a component that is zero up to
+    noise (the last bits of np.linalg.svd or a dot product), and which one depends on the CPU."""
+    a = float(angle) + 0.0
+    return -a if a <= -_HALF_TURN else a
+
+
 def _lbfgs(fun, x0, maxiter=300, m=10, pgtol=1e-5, ftol=2.2e-9):
     """Minimise fun (x -> (value, gradient)) from x0 by L-BFGS (two-loop recursion, last m steps) with a
     strong-Wolfe line search; stops like scipy's L-BFGS-B: largest gradient component <= pgtol, relative
@@ -2203,7 +2221,7 @@ def _stem_item(piece: Stem, na: Nucleic, frame: Frame, flat: bool, width: float 
     along = {key: float(_snap(v)) for key, v in _rungs(piece, na, centre, axis).items()}  # on the grid
     length = float(_snap(max(along.values()) - min(along.values()) + DNA_RISE * SCALE))  # half a step beyond each end
     a2 = frame.direction(centre, axis)
-    angle = 0.0 if flat or np.linalg.norm(a2) < 1e-6 else float(_snap(np.arctan2(a2[1], a2[0])))
+    angle = 0.0 if flat or np.linalg.norm(a2) < 1e-6 else _half_turn(_snap(np.arctan2(a2[1], a2[0])))
     signal = _side_signal(piece, na, frame, centre, angle)
     first = 1 if signal >= 0 else -1
     side = {k: first if n <= i1 - i0 else -first for n, k in enumerate(keys)}  # keys: first arm, then second

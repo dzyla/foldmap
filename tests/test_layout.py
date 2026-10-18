@@ -851,3 +851,46 @@ def test_stacked_accessories_leave_every_gap_a_way_out(entry):
 
     d = draw_spec(figure_spec(r100_entry(entry)))
     assert d.stuck == []
+
+
+_FLAT = (0.0, -0.0, 1e-17, -1e-17, np.spacing(1.0), -np.spacing(1.0))  # zero up to the last bits, as CPUs give it
+
+
+@pytest.mark.parametrize("mode", ["snap", "tilted", "upright"])
+@pytest.mark.parametrize("au", [1.0, -1.0])
+def test_a_helix_along_the_page_has_one_angle_on_any_cpu(mode, au):
+    """A helix along the page (right or left): its page-up component is zero up to the last bits of a projection,
+    whose sign depends on the CPU kernel. atan2 then gives +-0.0 or +-pi, and 'upright' tested its sign: the angle
+    (compared as text, so -0.0 shows) must be one value whichever sign the noise has, alone or in a bundle."""
+    import foldmap.layout as L
+
+    f = Frame(np.zeros(3), np.array([1.0, 0, 0]), np.array([0, 1.0, 0]), np.array([0, 0, 1.0]))
+    one = {repr(L._helix_item(fake_sse("H", 1, 12, axis=(au, av, 0)), f, mode).members[0].angle) for av in _FLAT}
+    assert len(one) == 1, one
+    pair = {
+        repr(
+            L._bundle_item(
+                [fake_sse("H", 1, 12, axis=(au, av, 0)), fake_sse("H", 1, 12, (0, 8, 0), (au, av, 0), "B")],
+                f,
+                mode,
+                HELIX_W,
+            )
+            .members[0]
+            .angle
+        )
+        for av in _FLAT
+    }
+    assert len(pair) == 1, pair
+
+
+def test_half_turn_puts_a_snapped_angle_in_minus_pi_to_pi():
+    from foldmap.layout import _half_turn, _snap
+
+    pi_grid = float(_snap(np.pi))
+    assert repr(_half_turn(-0.0)) == "0.0" and _half_turn(-np.pi) == np.pi and _half_turn(-pi_grid) == pi_grid
+    assert _half_turn(np.pi) == np.pi and _half_turn(pi_grid) == pi_grid
+    for a in (-np.pi / 2, -pi_grid + 1e-4, 1.0, -2.5):  # every other angle, the grid point next to -pi included
+        assert _half_turn(a) == a
+    for noise in _FLAT:  # a direction along the page's -x: atan2 gives +-pi, snapped, then one value
+        assert repr(_half_turn(_snap(np.arctan2(noise, -1.0)))) == repr(pi_grid)
+        assert repr(_half_turn(_snap(np.arctan2(noise, 1.0)))) == "0.0"
