@@ -440,7 +440,9 @@ figure by, with the same limits (`src/foldmap/criteria.py`): no route fallbacks 
 overlapping elements (A5), no text collisions (A6) or text off the page (A7), labels unique per chain (A8), nothing
 left out without a note (A9), N→C and sheet order (A11), copies drawn alike (A15), domains with `--domains` (A16),
 the membrane band with `--membrane` (A18) and local ligand tethers (A20); each line reads pass or fail with what
-failed, or "does not apply". A `--membrane` or `--domains` figure is judged as the campaign judges its membrane or
+failed, "not judged" with why when the figure gives it nothing to judge (no copies, no tether to another chain), or
+"does not apply". The science checks read "not judged" likewise when nothing is drawn for them (no sheet, no barrel,
+no residue mark, no accessory strand). A `--membrane` or `--domains` figure is judged as the campaign judges its membrane or
 domains view: the criteria it keeps for the default figure (A8, A9 on a membrane figure, A11, A15, A20) read "not
 measured here", to be checked on the figure drawn without that option. The criteria that need more than this one drawing or a tool foldmap does not use (the
 process's exit and time, the app's hosted job, mkdssp, a second hash seed, a saved-layout round trip, RNApolis base
@@ -466,12 +468,19 @@ the six that fail (30QM, 4PJO, 3KTQ, 4YBB, 1YTB, 3CRX) is explained with its cau
 **Random-100.** One hundred PDB entries and AlphaFold models drawn at random in twelve strata (X-ray, cryo-EM and
 NMR; oligomers and hetero-complexes; membrane proteins; protein–DNA, protein–RNA and RNA alone; glycoproteins; one
 protein in two states; AlphaFold models; up to ribosomes near the app's 30,000-residue cap) are drawn by
-`scripts/random100.py` in every view and judged on the twenty criteria A1–A20 (two with a sub-check) that `foldmap check` prints, from crashes, time,
-route fallbacks and text collisions to secondary structure against mkdssp (268,834 of 268,835 residues agree),
-determinism and copies drawn alike. 96 of 100 pass every criterion; the four that fail (the ribosomes 7Y7C and 8VWQ,
-9YLM, three zinc fingers on DNA, and 8BW5, a DNA aptamer) are explained with their causes in
-[docs/validation/random100/review.md](docs/validation/random100/review.md), and the full table is in
-[docs/validation/random100/report.md](docs/validation/random100/report.md).
+`scripts/random100.py` in every view and judged on the twenty criteria A1–A20 that `foldmap check` prints (A1c, a
+CA-only entry refused in one line, met no such entry), from crashes, time, route fallbacks and text collisions to
+secondary structure against mkdssp (268,834 of 268,835 residues agree), determinism and copies drawn alike. Each
+criterion reads pass, fail, not judged (nothing to judge in that entry: no copies, no tether to another chain, no
+domain drawn) or does not apply, and an entry passes when none fails; nothing to judge is never counted as a pass
+(A15, copies drawn alike, judged 37 entries and passed all 37). The layout's constants were tuned on this sample, so
+a second, held-out sample (new seed, same strata, none of the first's entries) was drawn once with no fix: **92 of
+100 pass on the tuned sample, 77 of 100 on the held-out sample.** The tuned sample's eight failures (the ribosomes
+7Y7C and 8VWQ, 9YLM and 8BW5 as ruled, the two-state pair 9YKJ/10UJ named two ways, a domain name on a chain-end
+stub in 7JU4, and 8QEM's DNA shape in its whole-ring view) are explained in
+[docs/validation/random100/review.md](docs/validation/random100/review.md), with the full table in
+[report.md](docs/validation/random100/report.md); the held-out failures are listed with the checks they fail in
+[docs/validation/random100-heldout/review.md](docs/validation/random100-heldout/review.md).
 
 ## UniProt annotation
 
