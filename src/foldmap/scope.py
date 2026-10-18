@@ -13,6 +13,37 @@ from .io import _polymers
 CAGES = ("T", "O", "I")
 
 
+def _nucleic_kinds(model) -> dict[str, str]:
+    """Chain -> DNA, RNA or nucleic acid, for each nucleic-acid chain of the model read."""
+    import gemmi
+
+    kinds = {gemmi.PolymerType.Dna: "DNA", gemmi.PolymerType.Rna: "RNA", gemmi.PolymerType.DnaRnaHybrid: "nucleic acid"}
+    out = {}
+    for c in model[0]:
+        polymer = c.get_polymer()
+        kind = kinds.get(polymer.check_polymer_type()) if len(polymer) else None
+        if kind:
+            out[c.name] = kind
+    return out
+
+
+def _na_outside(model, layout) -> list[str]:
+    """The nucleic-acid chains read that a subunit focus leaves out: in no focus chain and no strand drawn (8QEM: a
+    C12 ring's 63-bp duplex, held by no protomer; F1 review, Important 3)."""
+    strands = {s.chain for s in layout.nucleic.strands} if layout.nucleic is not None else set()
+    focus = set(layout.focus_chains or [])
+    kinds = _nucleic_kinds(model)
+    return [c for c in getattr(layout, "chains_read", None) or [] if c in kinds and c not in strands | focus]
+
+
+def na_outside_text(model, chains: list[str]) -> str:
+    """'DNA Y, Z' (or RNA, or nucleic acid when mixed) for the nucleic-acid chains a focus leaves out."""
+    kinds = {_nucleic_kinds(model).get(c, "nucleic acid") for c in chains}
+    kind = kinds.pop() if len(kinds) == 1 else "nucleic acid"
+    shown = chains[:6] + ([f"+{len(chains) - 6} more"] if len(chains) > 6 else [])
+    return f"{kind} {', '.join(shown)}"
+
+
 def _subunits_reason(n: int, kind: str) -> str:
     if kind == "helical":
         return f"one of {n} subunits of a helical filament"
@@ -97,7 +128,7 @@ def drawn_scope(model, layout, assembly: str = "auto", focus: str = "auto") -> d
     left_out = list(getattr(model, "left_out", None) or []) if assembly == "auto" else []
     read = list(getattr(layout, "chains_read", None) or [])
     asked = list(getattr(layout, "chains_asked", None) or [])
-    reasons, options = [], {}
+    reasons, options, na_outside = [], {}, []
     total, drawn, residues = len(read), len(read), None
     if asked:  # the visitor chose the chains: nothing an automatic choice left out of them
         several, left_out = None, []
@@ -108,7 +139,9 @@ def drawn_scope(model, layout, assembly: str = "auto", focus: str = "auto") -> d
         options["assembly"] = "asu"
         if focus == "auto":
             options["focus"] = "none"
-        total += len(left_out)
+        # counted in the file's chains, as --assembly asu draws them (F1 review, Minor 1: not copies and file chains)
+        total = getattr(model, "asu_chains", None) or total + len(left_out)
+        drawn = total - len(left_out)
         residues = getattr(model, "asu_residues", None)
     if several:
         reasons.append(f"assembly {several['assembly']}, one of {several['copies']} copies in the file")
@@ -120,7 +153,10 @@ def drawn_scope(model, layout, assembly: str = "auto", focus: str = "auto") -> d
     if focus == "auto" and layout.focus_chains and subunits and not asked:
         strands = layout.nucleic.strands if layout.nucleic is not None else []
         drawn = len(set(layout.focus_chains) | {s.chain for s in strands})
-        reasons.append(_subunits_reason(*subunits))
+        na_outside = _na_outside(model, layout)
+        reasons.append(
+            _subunits_reason(*subunits) + (f", without the {na_outside_text(model, na_outside)}" if na_outside else "")
+        )
         options["focus"] = "none"
     if reasons and drawn >= total:  # every chain drawn after all
         reasons, options = [], {}
@@ -138,6 +174,7 @@ def drawn_scope(model, layout, assembly: str = "auto", focus: str = "auto") -> d
     not_drawn = "; ".join(f"chain {c} ({why})" for c, why in undrawn)
     drawn -= len(undrawn)
     unsaid = {
+        "na_outside": na_outside,
         "undrawn_chains": [c for c, _ in undrawn],
         "additives": additives,
         "not_drawn": not_drawn,

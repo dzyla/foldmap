@@ -299,9 +299,52 @@ def test_an_assembly_that_holds_no_copy_of_a_chain_says_so(tmp_path):
     path = _assembly_leaving_out_a_chain(tmp_path)
     s = scope_of(path)
     assert s["reason"] == "assembly 1, which holds no copy of chain C of the file"
-    assert s["all_options"] == {"assembly": "asu", "focus": "none"} and (s["drawn_chains"], s["file_chains"]) == (4, 5)
-    assert scope_note(s).startswith("drew assembly 1, which holds no copy of chain C of the file: 4 of 5 chains; ")
+    assert s["all_options"] == {"assembly": "asu", "focus": "none"} and (s["drawn_chains"], s["file_chains"]) == (2, 3)
+    assert scope_note(s).startswith("drew assembly 1, which holds no copy of chain C of the file: 2 of 3 chains; ")
     drawn = draw_spec(figure_spec(path))
     assert figcheck.scope_honest(drawn, path) == []
     drawn.model.left_out = []  # the note silent about it, as it was
     assert figcheck.scope_honest(drawn, path) == ["chain C"]
+
+
+def test_a_nucleic_acid_outside_the_focused_subunit_is_named(tmp_path):
+    """F1 review, Important 3 (8QEM: one C12 protomer drawn, its 63-bp duplex Y, Z held by none): the note names the
+    nucleic acid the subunit leaves out, and figcheck.scope_honest counts a nucleic-acid chain outside the focus as
+    left out unless the note names it."""
+    from types import SimpleNamespace
+
+    from foldmap import figcheck
+
+    path = DATA / "na" / "1RVA.cif.gz"
+    model = read_model(path, "asu")
+    lay = SimpleNamespace(
+        chains_read=["C", "D", "A", "B"],
+        chains_asked=None,
+        focus_chains=["A"],
+        subunits=(2, "C2"),
+        partial=set(),
+        coil_chains=[],
+        res_chain=["A"],
+        nucleic=None,
+        na_cropped=False,
+        links=None,
+        ligands="auto",
+        helix_matched={},
+    )
+    s = drawn_scope(model, lay)
+    assert s["reason"] == "one of 2 subunits (C2 symmetry), without the DNA C, D"
+    assert s["na_outside"] == ["C", "D"]
+    assert scope_note(s).startswith("drew one of 2 subunits (C2 symmetry), without the DNA C, D: 1 of 4 chains; ")
+    expected = {"A", "B", "C", "D"}
+
+    def silent(chains_named):
+        return figcheck._focus_covered(expected, lay, {"C", "D"}, set(chains_named))
+
+    assert silent(["C", "D"]) == {"B", "C", "D"} and silent([]) == {"B"}
+
+
+def test_an_assembly_count_is_of_the_files_chains(tmp_path):
+    """F1 review, Minor 1 (1RM5 "4 of 5 chains"): the note counts the file's chains, with a copy drawn or not: 2 of
+    3; --assembly asu draws those 3."""
+    s = scope_of(_assembly_leaving_out_a_chain(tmp_path))
+    assert (s["drawn_chains"], s["file_chains"]) == (2, 3)

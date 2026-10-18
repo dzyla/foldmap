@@ -2167,13 +2167,16 @@ def finish(out: Path, sample_path: Path, ids: list[str] | None = None) -> dict:
     entries' JSON files in out."""
     listed = _sample_entries(sample_path) if sample_path.is_file() else [{"id": i} for i in ids or []]
     entries = {x["id"]: e for x in listed if (e := _load_entry(out, x)) is not None}
-    for e in entries.values():
+    for e in entries.values():  # judged again from what was measured: the criteria are the code's, not the run's
         partner = entries.get(e.get("partner"))
         if e.get("role") == "seed" and partner is not None:
             e["pair_retyped"] = pair_retyped(e, partner)
         if e.get("pair") and partner is not None and e.get("criteria"):
             e["pair_check"] = pair_check(e, partner)
+        if e.get("criteria") is not None:
             e["criteria"] = criteria(e)
+            if not e.get("error"):
+                e["science"] = science(e)
             _verdict(e)
             (out / f"{e['name']}.json").write_text(json.dumps(_jsonable(e), indent=1) + "\n", encoding="utf-8")
     redo = set(ids) if ids is not None else set(entries)
@@ -2190,6 +2193,10 @@ def pair_retyped(seed: dict, partner: dict) -> dict:
     fa, fb = seed.get("facts") or {}, partner.get("facts") or {}
     if "ligand_touching" not in fa or "ligand_touching" not in fb:
         return {"types": None, "note": "no contacts measured"}
+    seq = criteria_module.one_protein(seed, partner)
+    if seq is not None and not seq["one"]:  # one accession, two proteins (a polyprotein): no two-state pair
+        note = f"not one protein ({seq['identity']:.0%} identity over {seq['aligned']} aligned residues)"
+        return {"types": None, "note": note, "sequence": seq}
     rmsd = ca_rmsd(seed["file"], partner["file"]) if seed.get("file") and partner.get("file") else None
     return {
         "types": sorted(pair_types(fa, fb, rmsd)),

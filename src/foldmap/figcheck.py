@@ -1129,7 +1129,7 @@ def scope_honest(drawn, path, assembly: str = "auto", focus: str = "auto", *, ch
         if several:
             covered |= set(expected) - {c.name for c in model[0]}
         if focus == "auto" and lay.focus_chains and lay.subunits:
-            covered |= set(expected) - set(lay.focus_chains)
+            covered |= _focus_covered(set(expected), lay, _nucleic_chains(read), set(scope.get("na_outside", [])))
     chosen = focus not in ("auto", "none")
     cropped = bool(lay.na_cropped and scope.get("crop"))
     out = []
@@ -1161,6 +1161,13 @@ def scope_honest(drawn, path, assembly: str = "auto", focus: str = "auto", *, ch
                 out.append(f"nt {chain}:{run[0][0]}{run[0][1]}-{run[-1][0]}{run[-1][1]}")
             run = []
     return out
+
+
+def _focus_covered(expected: set[str], lay, nucleic: set[str], named: set[str]) -> set[str]:
+    """The chains a subunit focus's note covers: every chain outside the focus that is another subunit's, and a
+    nucleic-acid chain only when the note names it (F1 review, Important 3: 8QEM's duplex was covered by "one of 12
+    subunits")."""
+    return {c for c in expected - set(lay.focus_chains) if c not in nucleic or c in named}
 
 
 def _file_chain(name: str, file_chains) -> str:

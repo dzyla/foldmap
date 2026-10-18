@@ -259,9 +259,15 @@ def _views(e: dict, names) -> dict[str, dict]:
     return {v: (e["views"][v].get("result") or {}) for v in names if v in e["views"]}
 
 
-def _count(results: dict[str, dict], key: str, limit: float = 0) -> dict:
+def _domain_found(*keys: str) -> Callable[[dict], list]:
+    """A16's findings in one view's results: figure_checks keeps them under details["domains"][key]."""
+    return lambda r: [x for k in keys for x in (_details(r).get("domains") or {}).get(k, [])]
+
+
+def _count(results: dict[str, dict], key: str, limit: float = 0, found: Callable[[dict], list] | None = None) -> dict:
     """A check counted in each view's figcheck results: pass when every view's count is at most limit; a count
-    that could not be measured (None) or is not a finite number fails."""
+    that could not be measured (None) or is not a finite number fails. `found`: where its findings are, when not
+    under details[key]."""
     bad = []
     for v, r in results.items():
         got = (r.get("checks") or {}).get(key, None) if "checks" in r else None
@@ -271,7 +277,7 @@ def _count(results: dict[str, dict], key: str, limit: float = 0) -> dict:
             why = ((r.get("checks") or {}).get("skipped") or {}).get(key) or r.get("measure_error", "not measured")
             bad.append(f"{v} not measured ({str(why).strip().splitlines()[-1][:120]})")
         elif got > limit:
-            details = ((r["checks"].get("details") or {}).get(key)) or []
+            details = (found(r) if found else (r["checks"].get("details") or {}).get(key)) or []
             bad.append(f"{v} {got}" + (f" ({'; '.join(map(str, details[:3]))})" if isinstance(details, list) else ""))
     return _ok(None if not results else not bad, "; ".join(bad))
 
@@ -378,13 +384,22 @@ def figure_criteria(views: dict[str, dict]) -> dict:
     out["A8"] = _count(_views(e, LABEL_VIEWS), "label_repeats")
     out["A9"] = _count(_views(e, ["default", "domains"]), "scope_silent")
     out["A11"] = _count(_views(e, ["default"]), "order")
+    if out["A11"]["pass"] and "elements" in d and not d["elements"]:  # no protein element: no order to judge
+        out["A11"] = (
+            _not_judged("no protein element drawn") if d.get("first_protein_chain") else _ok(None, "no protein")
+        )
+    labelled = _views(e, LABEL_VIEWS)
+    if out["A8"]["pass"] and all(
+        "elements" in r and not r["elements"] and not r.get("na_chains_drawn") for r in labelled.values()
+    ):
+        out["A8"] = _not_judged("no element or stem drawn")
     out["A15"] = _copies(_views(e, ["default", "focus"]))
     dom = _views(e, ["domains"])
     if dom:
         parts = [
-            _count(dom, "domain_rules"),
-            _count(dom, "domain_overlap", LIMITS["domain_overlap"]),
-            _count(dom, "domain_name_collisions"),
+            _count(dom, "domain_rules", found=_domain_found("cross_chain", "unalike", "small")),
+            _count(dom, "domain_overlap", LIMITS["domain_overlap"], found=_domain_found("panel_overlaps")),
+            _count(dom, "domain_name_collisions", found=_domain_found("name_collisions")),
         ]
         out["A16"] = _ok(all(p["pass"] for p in parts), "; ".join(p["detail"] for p in parts if p["detail"]))
         drew = [v for v, r in dom.items() if _details(r).get("domains") != {}]
@@ -474,6 +489,28 @@ def _to_first_numbering(a: dict, b: dict) -> Callable[[int, int], tuple[int, int
     return taken
 
 
+PAIR_IDENTITY = 0.9  # A19: two entries' first chains are one protein at this identity over their aligned residues
+PAIR_COVERAGE = 0.5  # ... with this fraction of the shorter chain's residues identical
+
+
+def one_protein(a: dict, b: dict) -> dict | None:
+    """Are the two entries' first chains (their beta views' chain_residues) one protein, by sequence: identity over
+    the residues the global alignment pairs (figcheck.aligned_positions) at least PAIR_IDENTITY, and that many
+    identical residues at least PAIR_COVERAGE of the shorter chain? A UniProt accession is not enough: a polyprotein
+    (SARS-CoV-2 pp1ab, P0DTD1) names nsp1 and nsp5 alike. None when either view lacks its residues."""
+    from .figcheck import aligned_positions
+
+    ra, rb = ((x["views"].get("beta", {}).get("result") or {}).get("chain_residues") for x in (a, b))
+    if not ra or not rb:
+        return None
+    xs, ys = [n for _, n in ra["residues"]], [n for _, n in rb["residues"]]
+    pairs = aligned_positions(xs, ys)
+    same = sum(xs[i] == ys[j] for i, j in pairs)
+    identity = same / len(pairs) if pairs else 0.0
+    one = identity >= PAIR_IDENTITY and same >= PAIR_COVERAGE * min(len(xs), len(ys))
+    return {"one": one, "identity": round(identity, 3), "aligned": len(pairs), "lengths": [len(xs), len(ys)]}
+
+
 def pair_check(a: dict, b: dict) -> dict:
     """A19: the beta views of the two entries of a pair, the first protein chain of each. Elements pair one-to-one
     by residue range as copies of one protein do (model.pair_places: the same kind, sharing at least half of the
@@ -482,7 +519,8 @@ def pair_check(a: dict, b: dict) -> dict:
     chain's elements (and 3, when both have that many). One entry may hold an element the other lacks (listed, not
     failed); the generic numbers after it then shift, so every pair's names are compared modulo that shift
     (same_name; final review B, Important 1: comparing only up to the first unpaired element compared none in
-    9YKJ/10UJ and 6YPX/6YQD). Not judged when no names could be compared."""
+    9YKJ/10UJ and 6YPX/6YQD). Not judged when no names could be compared; does not apply when the two chains are
+    not one protein by sequence (one_protein)."""
     from .model import pair_places
 
     ra = (a["views"].get("beta", {}).get("result") or {}).get("elements")
@@ -494,6 +532,13 @@ def pair_check(a: dict, b: dict) -> dict:
         chain = els[0]["chain"]
         return sorted((x for x in els if x["chain"] == chain), key=lambda x: (x["first"], x["last"]))
 
+    seq = one_protein(a, b)
+    if seq is not None and not seq["one"]:  # held-out P3: nsp5 against nsp1 of one polyprotein accession
+        return _ok(
+            None,
+            f"not one protein: {seq['identity']:.0%} identity over {seq['aligned']} aligned residues "
+            f"({seq['lengths'][0]} and {seq['lengths'][1]} residues)",
+        )
     ea, eb = first_chain(ra), first_chain(rb)
     taken = _to_first_numbering(a, b) or (lambda first, last: (first, last))
     places_b = [(x["kind"], *(taken(x["first"], x["last"]) or (-2, -3))) for x in eb]
@@ -529,7 +574,10 @@ def same_name(a: str, b: str, before_a: list[str], before_b: list[str]) -> bool:
     """Are two paired elements' names the same, given the names of the unpaired elements before each in its own
     chain (A19)? Two numbered names of one kind and mark (α3, α3′) are the same when their numbers, each less the
     unpaired elements of that kind before it, agree (an extra helix in one entry shifts every later α by one); any
-    other name (αN, a deposited letter) must be equal."""
+    other name (αN, a deposited letter) must be equal. Equal names always match (2BBJ/2BBH: an η1 drawn in one entry
+    only, the other's not among its drawn elements, must not make η2~η2 differ)."""
+    if a == b:  # the same name is what A19 asks for; the shift only forgives different numbers (F1 review, I1)
+        return True
     ma, mb = _NUMBERED.fullmatch(a), _NUMBERED.fullmatch(b)
     if not ma or not mb or (ma[1], ma[3]) != (mb[1], mb[3]):
         return a == b

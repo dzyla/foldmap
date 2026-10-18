@@ -1043,3 +1043,71 @@ def test_a_gzipped_report_is_read(r100, tmp_path):
     doc = {"entries": [{"id": "1ABC", "pass": False}]}
     (tmp_path / "report.json.gz").write_bytes(gzip.compress(json.dumps(doc).encode()))
     assert r100.read_report(tmp_path / "report.json") == doc == r100.read_report(tmp_path / "report.json.gz")
+
+
+# ------------------------------------------------------------------------------------- F1 review, fix round 1
+
+
+def _pair(els_a, els_b, seq_a=None, seq_b=None):
+    def entry(chain, els, seq):
+        result = {"elements": els}
+        if seq is not None:
+            result["chain_residues"] = {"chain": chain, "residues": [[k + 1, n] for k, n in enumerate(seq)]}
+        return {"views": {"beta": {"result": result}}}
+
+    return entry("A", els_a, seq_a), entry("B", els_b, seq_b)
+
+
+def _el(chain, kind, first, last, label):
+    return {"id": f"{chain}:{first}-{last}", "chain": chain, "kind": kind, "first": first, "last": last, "label": label}
+
+
+def test_pair_check_equal_names_always_match(r100):
+    """F1 review, Important 1 (2BBJ/2BBH): η2~η2 with an unpaired η1 drawn on one side only (the other's η1 is not
+    among its drawn elements) is the same name: equal names pass before any shift."""
+    a = [_el("A", "E", 10, 15, "β1"), _el("A", "E", 20, 25, "β2"), _el("A", "G", 52, 55, "η2")]
+    a += [_el("A", "H", 60, 80, "α1")]
+    b = [_el("B", "E", 10, 15, "β1"), _el("B", "E", 20, 25, "β2"), _el("B", "G", 47, 49, "η1")]
+    b += [_el("B", "G", 51, 55, "η2"), _el("B", "H", 60, 80, "α1")]
+    got = r100.pair_check(*_pair(a, b))
+    assert got["pass"] is True, got
+    assert criteria.same_name("η2", "η2", [], ["η1"])
+
+
+def test_a_pair_of_two_proteins_is_not_judged_as_one(r100):
+    """F1 review, Important 2 (held-out P3, 8U9T/7IT6: nsp5 and nsp1 of one polyprotein accession, P0DTD1): when the
+    two first chains are not one protein by sequence (identity over the aligned residues under PAIR_IDENTITY), A19
+    does not apply; a pair of one protein is judged."""
+    rng = random.Random("nsp")
+    aa = ["ALA", "GLY", "SER", "LEU", "LYS", "GLU", "ASP", "PHE", "TRP", "VAL", "ILE", "PRO", "THR", "ASN"]
+    one, other = rng.choices(aa, k=120), rng.choices(aa, k=110)
+    a = [_el("A", "E", 5, 10, "β1"), _el("A", "H", 20, 40, "α1"), _el("A", "E", 50, 55, "β2")]
+    b = [_el("B", "H", 3, 30, "α1"), _el("B", "E", 40, 45, "β1"), _el("B", "H", 60, 90, "α2")]
+    got = r100.pair_check(*_pair(a, b, one, other))
+    assert got["pass"] is None and got["status"] == "does not apply" and got["detail"].startswith("not one protein")
+    same = r100.pair_check(*_pair(a, [dict(x, chain="B", id="B" + x["id"][1:]) for x in a], one, one))
+    assert same["pass"] is True
+
+
+def test_a11_and_a8_with_nothing_drawn_are_not_passed(r100):
+    """F1 review, Important 4: A11 (N->C and sheet order) on a default view with no protein element does not apply
+    when the figure has no protein (8Q4O, 3OWW) and is not judged when its protein has no element drawn; A8 with no
+    element and no nucleic acid drawn in any label view is not judged."""
+    empty = {"checks": {"order": 0, "label_repeats": 0}, "elements": [], "na_chains_drawn": []}
+    rna = {**empty, "na_chains_drawn": ["A"], "first_protein_chain": None}
+    got = _judged(r100, {"default": rna})
+    assert got["A11"]["status"] == "does not apply" and got["A8"]["pass"] is True  # its stem names are judged
+    coil = {**empty, "first_protein_chain": "A"}
+    got = _judged(r100, {"default": coil})
+    assert got["A11"]["status"] == "not judged" and got["A8"]["status"] == "not judged"
+    drawn = {**coil, "elements": [{"id": "A:1-5", "chain": "A", "kind": "E", "first": 1, "last": 5, "label": "β1"}]}
+    assert _judged(r100, {"default": drawn})["A11"]["pass"] is True
+
+
+def test_a16_names_its_domain_name_collisions(r100):
+    """F1 review, Minor 6 (7JU4 "domains 2 ()"): A16's detail names what failed."""
+    counts = {"domain_rules": 0, "domain_overlap": 0.0, "domain_name_collisions": 1}
+    hit = "domain-label:D2 · 4 × stub:C:4"
+    doms = {"cross_chain": [], "unalike": [], "small": [], "panel_overlaps": [], "name_collisions": [hit]}
+    got = _judged(r100, {"domains": {"checks": {**counts, "details": {"domains": doms}}}})["A16"]
+    assert got["pass"] is False and hit in got["detail"], got

@@ -352,19 +352,23 @@ class ModelRead(tuple):
     name, copies, polymer chains, polymer residues); else None. `left_out`: when 'auto' built an assembly that holds
     no copy of some polymer chains of the file (1RM5: assembly 1 is built from A and B, chain O is assembly 2's), those
     chains, sorted; else []. `assembly`: the name of the assembly built, or None; `asu_residues`: with left_out, the
-    polymer residues of the asymmetric unit (what --assembly asu draws)."""
+    polymer residues of the asymmetric unit (what --assembly asu draws); `asu_chains`: its polymer chains."""
 
     several: dict | None
     left_out: list[str]
     assembly: str | None
     asu_residues: int | None
+    asu_chains: int | None
 
-    def __new__(cls, model, names, several: dict | None = None, left_out=(), assembly=None, asu_residues=None):
+    def __new__(
+        cls, model, names, several: dict | None = None, left_out=(), assembly=None, asu_residues=None, asu_chains=None
+    ):
         out = super().__new__(cls, (model, names))
         out.several = several
         out.left_out = sorted(left_out)
         out.assembly = assembly
         out.asu_residues = asu_residues
+        out.asu_chains = asu_chains
         return out
 
 
@@ -426,8 +430,8 @@ def read_model(path: str | Path, assembly: str = "auto"):
     if assembly == "auto" and len(asu) == len(built) == len(model):  # every added copy dropped: as deposited
         return ModelRead(model, deposited)
     left = _left_out(chosen, model) if assembly == "auto" else []
-    asu_residues = _polymers(model)[1] if left else None
-    return ModelRead(built, asu, left_out=left, assembly=chosen.name, asu_residues=asu_residues)
+    asu_chains, asu_residues = _polymers(model) if left else (None, None)
+    return ModelRead(built, asu, left_out=left, assembly=chosen.name, asu_residues=asu_residues, asu_chains=asu_chains)
 
 
 def _left_out(assembly, model) -> list[str]:
