@@ -672,6 +672,36 @@ def _untied_copies(lay, residues: dict[str, list[str]], chains: list[str]) -> li
     return out
 
 
+def copies_untied(drawn) -> list[str]:
+    """The "copy~reference" of each drawn chain that is a copy of one protein (by sequence, same_protein) with an
+    earlier drawn chain, when the figure ties no copies (Layout.copy_ties empty): copies drawn with no symmetry tie,
+    which A15 reports as not judged rather than as no copies (random-100 held-out 5K7Z: two dimers on a duplex frame,
+    untied, said "no copies to compare"). Chains lent by neighbours (Layout.partial: a focus view's fragments) are
+    left out; [] when the figure ties any copy (_untied_copies judges those)."""
+    lay = drawn.layout
+    if lay.copy_ties:
+        return []
+    residues: dict[str, list[str]] = {}
+    first: dict[str, int] = {}
+    for k, label in enumerate(drawn.bb.labels):
+        residues.setdefault(label.chain, []).append(label.name)
+        first.setdefault(label.chain, k)
+    partial = getattr(lay, "partial", set()) or set()
+    chains = sorted(
+        {p.sse.chain for p in lay.placed.values() if not p.ghost and p.sse.chain in residues} - set(partial),
+        key=first.__getitem__,
+    )
+    roots: list[str] = []
+    out = []
+    for c in chains:
+        root = next((r for r in roots if same_protein(residues[r], residues[c], _aligned(residues, r, c))), None)
+        if root is None:
+            roots.append(c)
+        else:
+            out.append(f"{c}~{root}")
+    return out
+
+
 def _aligned(residues: dict[str, list[str]], a: str, b: str) -> list[tuple[int, int]]:
     return aligned_positions(residues[a], residues[b])
 
@@ -1552,6 +1582,7 @@ def figure_checks(drawn, path, *, assembly: str = "auto", focus: str = "auto", c
             | ({"sheets_differ": differ[pair]} if pair in differ else {})  # left out of A15 (C2b-3 R2)
             for pair, (dev, n, m, why) in pairs.items()
         },
+        "copies_untied": copies_untied(drawn),  # copies with no tie when none is drawn: A15 not judged, not n/a
         "domains": domain_checks(drawn, collisions or []) if drawn.layout.domains else {},
         "stem_name_gaps": None if skip else stem_name_gaps(drawn, page=page),
         "scope_silent": scope_honest(drawn, path, assembly, focus, chains=chains),

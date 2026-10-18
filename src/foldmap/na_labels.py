@@ -328,22 +328,23 @@ def _place_letters(
                 elif not any(free) and any(held):  # none clear anywhere: the roomiest inside
                     spaces = [r if h else -1.0 for r, h in zip(spaces, held)]
             clear = [q for q, ok in zip(options, free) if ok]  # clear of letters and of every strand drawn
-            spot = clear[0] if clear else options[int(np.argmax(spaces))]  # else the furthest from other letters
+            spot = clear[0] if clear else options[int(np.argmax(spaces))]
             out[(p.strand, i)] = (float(spot[0]), float(spot[1]))
             taken.add(spot)
     return out
 
 
-def _letters_off_loops(layout: Layout, loops) -> None:
+def _letters_off_loops(layout: Layout, loops) -> set[tuple[int, int]]:
     """In place: the base letters a protein loop (`loops`, polylines) still runs through, or nearer than the line
     clearance, once route._off_na_text has routed such loops again where it could, placed again clear of the loops
     (_place_letters, `only`); every other letter stays. Random-100 held-out 13FZ: B:2's and B:8's letters on loops
     no route could take off them. Letters are placed blind to the protein loops first so that a loop routed off a
     letter, as before, keeps that route (a letter kept off the loop from the start left the loop crossing the strand
-    it would have been routed off: one more protein-loop crossing in 1IHF, 1QBJ, 1QTQ and 1URN)."""
+    it would have been routed off: one more protein-loop crossing in 1IHF, 1QBJ, 1QTQ and 1URN). Returns the
+    letters placed again."""
     lines = [np.asarray(pts, float).reshape(-1, 2) for pts in loops if len(pts) > 1]
     if not lines or not layout.na_letters:
-        return
+        return set()
     segs = np.vstack([np.hstack([q[:-1], q[1:]]) for q in lines])
     em = _em(layout)
     c = line_clearance(layout)
@@ -359,6 +360,7 @@ def _letters_off_loops(layout: Layout, loops) -> None:
     if hit:
         again = _place_letters(layout, layout.na_paths, [q.tolist() for q in lines], only=hit)
         layout.na_letters.update({k: again[k] for k in sorted(hit)})
+    return hit
 
 
 _GAP_ALONG = tuple(0.5 + s * k / 20 for k in range(9) for s in ((1,) if k == 0 else (-1, 1)))  # middle out

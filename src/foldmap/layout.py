@@ -1266,6 +1266,34 @@ def _separate(
     return "alone"
 
 
+def _one_per_mate(
+    items: list[_Item], ties: dict[int, tuple[int, int]], helices: bool = True
+) -> dict[int, tuple[int, int]]:
+    """`ties` with one copy item per mate and protomer: of several tied to one mate as one protomer (_symmetry_ties'
+    partial mates: a copy's sheet DSSP split into two blocks where its mate's is one, a helix cut in two), the one
+    with the most elements (ghosts aside), then the larger footprint, then the first, stays tied; the others are
+    items of their own. Two items held to one place in one orbit overlap and the pushes, which move an orbit as one,
+    can only part them by halves, each off its mate's place (random-100 held-out A15: 2BBJ E~A 1.42, 5K7Z C~A 1.10;
+    9GTP's 1K~1l and S~X). With `helices` False (_regroup_copies runs next and joins a helix piece let go to its
+    helix: 7QUP 9C) only items holding strands are judged; helix pieces stay tied."""
+
+    def sheet(i: int) -> bool:
+        return helices or any(isinstance(m, Placed) and m.sse.kind == "E" and not m.ghost for m in items[i].members)
+
+    best: dict[tuple[int, int], tuple[tuple[int, float], int]] = {}
+    for i, (j, k) in sorted(ties.items()):
+        if not sheet(i):
+            continue
+        size = (
+            sum(isinstance(m, Placed) and not m.ghost for m in items[i].members),
+            float(np.prod(items[i].half)),
+        )
+        if (j, k) not in best or size > best[(j, k)][0]:
+            best[(j, k)] = (size, i)
+    keep = {i for _, i in best.values()}
+    return {i: t for i, t in ties.items() if i in keep or not sheet(i)}
+
+
 def _tied_again(
     items: list[_Item],
     ties: dict[int, tuple[int, int]],
@@ -1285,27 +1313,31 @@ def _tied_again(
     yielding to the orbits (_push_apart's `shared`), and sliding clear last. Pushed against an orbit, such an item
     would otherwise widen the whole spread at each push (random-100 C2b-3: 6JLN's from 80 to 215 page units).
     Nucleic-acid stems never yield: they are placed by the protein they touch, and pushed off it they lose the shape
-    the structure has (30QM's Spearman 0.496 -> 0.436, held at 0.446). Kept, and True, when what is left overlaps
-    only the yielding items and the result takes at most _SEP_TIE_ROOM times the one-by-one room; else the items are
-    put back."""
+    the structure has (30QM's Spearman 0.496 -> 0.436, held at 0.446). What the pushes leave overlapping slides
+    clear with each orbit moved as one (_slide_clear's `ties`: a jam the pushes trade back and forth between items
+    and the walls of a trace, the same in every copy, 13FZ's A and C), the yielding items last. Kept, and True, when
+    nothing is left overlapping and the result takes at most _SEP_TIE_ROOM times the one-by-one room; else the items
+    are put back. Not where nucleic-acid stems are drawn: they never yield, and orbits slid round them leave the
+    protein off the stems it holds (30QM: four more crossings of its RNA over protein, Procrustes 0.794 -> 0.795);
+    there the second chance stands only when what the pushes leave overlaps only the yielding items, as before."""
     free = {
         i
         for i in set(range(len(items))) - set(ties) - {j for j, _ in ties.values()}
         if not any(isinstance(m, PlacedStem) for m in items[i].members)
     }
+    stems = any(isinstance(m, PlacedStem) for it in items for m in it.members)
     xy = start.copy()
     done = _push_apart(xy, halves, mids, home, ties, _SEP_SWEEPS, apart, fixed, mirror, level, free)
-    if not done and not _lone_left(xy, halves, mids, apart, free):
+    if stems and not done and not _lone_left(xy, halves, mids, apart, free):
         return False
     alone = [(it.cx, it.cy) for it in items]
     room = _box_area(np.array(alone, float).reshape(-1, 2), halves, mids)
     for it, (x, y) in zip(items, xy.tolist()):
         it.cx, it.cy = x, y
-    _slide_clear(items, joints, fixed, level, sorted(free))
-    if (
-        _box_area(np.array([(it.cx, it.cy) for it in items], float).reshape(-1, 2), halves, mids)
-        <= _SEP_TIE_ROOM * room
-    ):
+    _slide_clear(items, joints, fixed, level, sorted(free), None if stems else ties, mirror)
+    now = np.array([(it.cx, it.cy) for it in items], float).reshape(-1, 2)
+    clear = stems or not len(_overlapping(now, halves, mids, apart))
+    if clear and _box_area(now, halves, mids) <= _SEP_TIE_ROOM * room:
         return True
     for it, (x, y) in zip(items, alone):
         it.cx, it.cy = x, y
@@ -1514,6 +1546,8 @@ def _slide_clear(
     fixed: Walls | None = None,
     level: np.ndarray | None = None,
     last: list[int] = (),
+    ties: dict[int, tuple[int, int]] | None = None,
+    mirror: float | None = None,
 ) -> None:
     """Guarantee: each item in turn, if it still overlaps one already settled (other than a piece it is joined
     to, `joints`) or a `fixed` box it must keep off, takes the nearest clear spot straight right, left, up or down
@@ -1523,7 +1557,9 @@ def _slide_clear(
     group settles when its first item comes up in that order (so a group with one item in `last` and one not settles
     early; unreachable today: stems never yield in _tied_again, so none is in `last`). The items in `last` (with no
     symmetry copies, _separate) are settled after every other, so they move, not the copies (1SLV: the dimer's shared
-    sheet between the two copies' eta2 helices)."""
+    sheet between the two copies' eta2 helices). With `ties` (_symmetry_ties) an item and its symmetry copies (its
+    orbit) slide as one, by the same step, so the copies stay alike (a copy of a `mirror` the other way across);
+    they may still overlap one another, which the caller checks."""
     halves = [it.half for it in items]
     mids = [it.mid for it in items]
     boxes = [] if fixed is None else np.asarray(fixed.boxes, float).tolist()
@@ -1533,7 +1569,12 @@ def _slide_clear(
     ]
     later = set(last)
     order = [i for i in range(len(items)) if i not in later] + [i for i in range(len(items)) if i in later]
-    cid = _components(len(items), sorted(joints)).tolist()
+    links = sorted(joints) + [(i, j) for i, (j, _) in sorted((ties or {}).items())]
+    cid = _components(len(items), links).tolist()
+    turn = [1.0] * len(items)  # a mirrored copy slides the other way across (as _push_apart's sx)
+    if mirror is not None:
+        for i, (_, k) in (ties or {}).items():
+            turn[i] = -1.0 if k > 0 else 1.0
     done: set[int] = set()  # the groups settled
     settled: list[int] = []
     for i in order:
@@ -1551,7 +1592,7 @@ def _slide_clear(
             k += 1
             for dx, dy in ways:
                 for j, (x0, y0) in zip(group, start):
-                    items[j].cx, items[j].cy = x0 + k * dx * _SLIDE_STEP, y0 + k * dy * _SLIDE_STEP
+                    items[j].cx, items[j].cy = x0 + k * dx * turn[j] * _SLIDE_STEP, y0 + k * dy * _SLIDE_STEP
                 if not any(_collide(items[j], halves[j], mids[j], *o) for j, o in pairs):
                     break
         settled += group
@@ -3535,10 +3576,15 @@ def build_layout(
         )
         kept_own: set[int] = set()  # copy items whose mates' places would misdraw their pairing: their own shape
         ties = _symmetry_ties(items, frame, mirror is not None, shift, honest, kept_own)
+        regroup = alike_first and mirror is None and not pieces and walls is None  # (no stem or trace indexes items)
+        # a copy split in two (_one_per_mate): the larger part tied, the other let go once _regroup_copies has run
+        # (let go before it, a sheet is tied again beside its copy: 9GTP's whole file spread 35 % wider)
+        alone = {id(items[i]) for i in set(ties) - set(_one_per_mate(items, ties, helices=not regroup))}
         own = set(kept_own)
-        if alike_first and mirror is None and not pieces and walls is None:  # (no stem or trace indexes items yet)
+        if regroup:
             ties, kink_links, own = _regroup_copies(items, ties, frame, shift, {id(it) for it in templates.values()})
             own |= kept_own
+        ties = {i: t for i, t in ties.items() if id(items[i]) not in alone}
         sector_of = getattr(frame, "sector", None) or {}
         left = _unwrap(items, ties, frame) if mirror is None else {}
         if left and walls is not None:  # an element that left its item keeps off the traces it kept off

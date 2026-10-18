@@ -190,6 +190,16 @@ def _mirror_frame(frame, sym) -> None:
     frame.mirror_x = float(_snap(frame.project(sym.centre)[0, 0] * SCALE))
 
 
+def _side_by_side(frame, sym, nucleic, bb) -> None:
+    """Copies of an assembly on a straight duplex frame (no dyad in the page: _mirror_frame) drawn alike, side by
+    side, as symmetric_frame draws an assembly: the frame learns the protomers (sector, classes) and no mirror line.
+    Not when a strand is held by two or more protomers (_na_shared): unrolled side by side, the copies would pull
+    the duplex they share apart (random-100 held-out A15: 5K7Z's two dimers, the duplex on A and B alone, were
+    drawn unalike with no tie)."""
+    if not _na_shared(nucleic, sym, bb):
+        frame.sector, frame.classes = protomer_maps(sym)
+
+
 def _na_extent(na, extent: str):
     """(the nucleic acid to draw, whether `auto` cropped a large one to the stems the protein touches)."""
     if extent == "contacts":
@@ -307,7 +317,8 @@ def make_layout(
                 sym = dataclasses.replace(
                     sym, axis=-sym.axis, angles=[-a for a in sym.angles], rise=-sym.rise, twist=-sym.twist
                 )
-    if nucleic is not None and straight_duplex(nucleic.structure, nucleic.strands):
+    duplex = nucleic is not None and straight_duplex(nucleic.structure, nucleic.strands)
+    if duplex:
         frame = (  # protein on a straight duplex: the duplex across the page, the protein below it
             dna_radial_frame(sses, nucleic)
             if not rotate and not flip_v
@@ -328,6 +339,8 @@ def make_layout(
         frame = view_frame(sses + stems, rotate, flip_v, up, view)
     if sym is not None and sym.kind == "C" and sym.n == 2 and isinstance(frame, (RadialFrame, Frame)):
         _mirror_frame(frame, sym)
+    if duplex and sym is not None and not getattr(frame, "sector", None):
+        _side_by_side(frame, sym, nucleic, bb)
     links = load_links(path, bb, assembly, model=model)
     contacts = sse_contacts(bb, sses)
     for key, n in _bridge_contacts(bb, sses, links).items():

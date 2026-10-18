@@ -440,12 +440,18 @@ def _details(r: dict) -> dict:
 def _copies(results: dict[str, dict]) -> dict:
     """A15 over the views given: copies_alike counted (a count not measured fails), then by the ties' details
     (figcheck.figure_checks: deviation None for a tie too small to judge) does not apply when no view has copies to
-    compare, not judged when none of its ties could be judged."""
+    compare, not judged when none of its ties could be judged or when copies are drawn with no tie at all
+    (figcheck.copies_untied: no symmetry drew them alike; random-100 held-out 5K7Z said "no copies to compare")."""
     got = _count(results, "copies_alike", LIMITS["copies_alike"])
     if not got["pass"] or any("copies_alike" not in _details(r) for r in results.values()):
         return got
     ties = {f"{v} {tie}": t for v, r in results.items() for tie, t in sorted(_details(r)["copies_alike"].items())}
     if not ties:
+        untied = {v: _details(r).get("copies_untied") or [] for v, r in results.items()}
+        if any(untied.values()):  # copies drawn with no symmetry tie: nothing promised alike, but copies there are
+            return _not_judged(
+                "copies drawn with no symmetry tie: " + "; ".join(f"{v} {', '.join(c)}" for v, c in untied.items() if c)
+            )
         return _ok(None, "no copies to compare")
     if all(t.get("deviation") is None for t in ties.values()):
         return _not_judged("; ".join(f"{k} {t.get('judged')}" for k, t in ties.items()))

@@ -946,7 +946,11 @@ def route_loops(layout: Layout, sses: list[SSE], bb) -> list[Loop]:
         _off_na_text(layout, router, out)
         from .na_labels import _letters_off_loops
 
-        _letters_off_loops(layout, [lp.points for lp in out])
+        if _letters_off_loops(layout, [lp.points for lp in out]):
+            # a letter placed again may land on another loop, routed off it in turn (held-out 13FZ: B:6's letter, off
+            # one loop, on A:1027-1031>A:1044-1048, its every other spot on the sheet under the strand)
+            _off_na_text(layout, router, out)
+            _letters_off_loops(layout, [lp.points for lp in out])
     _clear_helix_names(layout, sses, out)
     _clear_termini(layout, sses, out)
     _still_over(layout, sses, out)
