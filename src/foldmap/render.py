@@ -3796,11 +3796,11 @@ def save(fig: Figure, path: str | FsPath, dpi: int = PNG_DPI) -> FsPath:
     if fmt == "png":
         dpi = min(dpi, png_dpi(fig))
     with rc_context({"svg.fonttype": "none", "pdf.fonttype": 42, "svg.hashsalt": "foldmap", **_RC}):
-        if items and fmt == "svg":  # written as matplotlib writes it, with the <desc> added
-            buf = _io.StringIO()
+        if fmt == "svg":  # as matplotlib writes it, with the <desc> added, and LF line ends on every platform
+            buf = _io.StringIO()  # (matplotlib, given a path, writes in text mode: CRLF on Windows)
             fig.savefig(buf, format=fmt, dpi=dpi, metadata=meta, facecolor=fig.get_facecolor())
-            with open(path, "w", encoding="utf-8") as fh:
-                fh.write(with_desc(buf.getvalue(), items))
+            with open(path, "w", encoding="utf-8", newline="\n") as fh:
+                fh.write(with_desc(buf.getvalue(), items) if items else buf.getvalue())
         else:
             fig.savefig(path, format=fmt, dpi=dpi, metadata=meta, facecolor=fig.get_facecolor())
     return path

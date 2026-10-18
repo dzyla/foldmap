@@ -87,6 +87,24 @@ def test_identical_runs_give_identical_svg(zs5, tmp_path):
     assert (tmp_path / "a.svg").read_bytes() == (tmp_path / "b.svg").read_bytes()
 
 
+def test_svg_has_lf_line_ends_on_every_platform(ubq, tmp_path, monkeypatch):
+    """matplotlib writes an SVG given a path in text mode (CRLF on Windows), so every cross-platform SVG hash would
+    differ: save() writes it from a buffer with newline='\\n', with or without provenance (<desc>)."""
+    from matplotlib.figure import Figure
+
+    targets = []
+    real = Figure.savefig
+    monkeypatch.setattr(Figure, "savefig", lambda self, fname, **kw: targets.append(fname) or real(self, fname, **kw))
+    for n, items in (("with", None), ("without", [])):
+        fig = make_figure(ubq)
+        if items is not None:
+            fig.foldmap_provenance = items
+        save(fig, tmp_path / f"{n}.svg")
+        data = (tmp_path / f"{n}.svg").read_bytes()
+        assert b"\n" in data and b"\r" not in data
+    assert targets and not any(isinstance(t, (str, Path)) for t in targets)  # never a path: no text-mode write
+
+
 def test_structure_without_secondary_structure_renders_a_note(ubq, tmp_path):
     out = tmp_path / "t.svg"
     save(make_figure(tripeptide(ubq, tmp_path)), out)
