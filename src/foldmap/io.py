@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 # Copyright (C) 2026 Dawid Zyla. Additional terms (AGPL-3.0 section 7(b)): see NOTICE.
-"""Read PDB/mmCIF into a Backbone (first model, first altloc, amino acids only)."""
+"""Read PDB/mmCIF into a Backbone (first model, one conformer: _one_conformer, amino acids only)."""
 
 from __future__ import annotations
 
@@ -378,6 +378,27 @@ def _polymers(model) -> tuple[int, int]:
     return sum(n > 0 for n in sizes), sum(sizes)
 
 
+def _one_conformer(model) -> None:
+    """In place: each residue drawn in one conformer. Where a residue is modelled in alternative locations, only the
+    atoms with no altloc and those of one conformer stay: the model's first altloc letter (alphabetically, A as a
+    rule) where the residue has it, else the residue's own first. Picking each atom's first location by name
+    (find_atom's "*") mixes conformers where one lacks an atom: 5K7Z's DNA, bound in two orientations, A at 0.52 and
+    B at 0.48, F:1's 5' phosphate only in B, 50 Å from the rest of F in A (random-100 held-out: F drawn as an
+    unpaired trace across the page, its pairs, read from both conformers' atoms at once, mostly missed)."""
+    alts = {
+        (c, r): sorted({a.altloc for a in res} - {"\0"}) for c, chain in enumerate(model) for r, res in enumerate(chain)
+    }
+    letters = sorted({x for got in alts.values() for x in got})
+    for (c, r), got in alts.items():
+        if not got:
+            continue
+        res = model[c][r]
+        keep = letters[0] if letters[0] in got else got[0]
+        for k in range(len(res) - 1, -1, -1):
+            if res[k].altloc not in ("\0", keep):
+                del res[k]
+
+
 def read_model(path: str | Path, assembly: str = "auto"):
     """(model, deposited chain names). assembly: 'asu' as deposited; an assembly id from the file; or 'auto':
     the first assembly when it adds copies and stays within AUTO_MAX chains, or when it is one of several copies
@@ -393,6 +414,7 @@ def read_model(path: str | Path, assembly: str = "auto"):
     if len(st) == 0:
         raise ValueError(f"{path}: no models")
     model = st[0]
+    _one_conformer(model)
     deposited = {c.name for c in model}
     if assembly == "asu" or not st.assemblies:
         if assembly not in ("asu", "auto"):

@@ -485,6 +485,11 @@ _STACK_SHUT = 0.6
 _STACK_OPEN = 0.85
 _STACK_NUDGE = 1.0
 _NUDGE_STEP = 0.05
+# an accessory that closes a run of free height in a column all round (stacks beside stacks: no run beside it leads
+# out, however tall the run) moves by at most this, level with its partner or not, until it closes none (random-100
+# held-out 8BCU: G:111-114, level with G:119-122, closed the run four loops needed; 12BM: C:71-79 closed the gap
+# between C:84-89 and B:107-116)
+_POCKET_REACH = 2.0
 _TOUCH = 1e-6  # page units two drawn spans must share to stand level (science._TOUCH)
 _CLEAR = 1e-4  # page units past a block's end a cleared height stands, one snap step (_column_heights)
 
@@ -528,7 +533,12 @@ def _column_heights(
     note says "also pairs with"; fix round 2/3 rulings, 7ARD). Wherever it stands, it is never level with a strand
     it does not pair with (_sheet_pairs) in the column on either side of its own (random-100 C2b-S, 9P1X focus:
     a:106-109 under c:2-8 stood beside c:50-61; I:94-97, level with H:85-97, beside I:2-8 and I:29-30): such a height
-    is given up for the free one nearest its partner's, in its own column. Snapped."""
+    is given up for the free one nearest its partner's, in its own column. One whose stack gap stays shut there
+    (_STACK_SHUT: the loops leaving its facing ends have no way out) stands on its partner's other side instead, by
+    the same end of its partner, when it stands level with its partner there, beside no stranger, its gap open
+    (random-100 held-out 2FR2: A:115-118 under A:103-109, beside its partner A:89-100 and A:125-135, both standing
+    past the gap's ends; held level with the partner, no nudge could open it). Last, one that closes a run of free
+    height in any column (unpocketed) moves clear of it. Snapped."""
     every, senses = _drawn_strands(sheet)
     ends = ends or {}
     n = len(sheet.strands)
@@ -549,13 +559,14 @@ def _column_heights(
     for k in height:
         occupied.setdefault(column[k], []).append(k)
 
-    def spot(k: int, c: int, want: float) -> float:  # the height nearest `want` where k meets nothing in column c
+    def spot(k: int, c: int, want: float, way: int = 0) -> float:  # the height nearest `want` where k meets
+        # nothing in column c (`way`: past what it meets that way, else on the side it lies on in 3D)
         half = length(k) / 2
         blocks = sorted(
             (height[q] - length(q) / 2 - room(k, q) - half, height[q] + length(q) / 2 + room(q, k) + half, q)
             for q in occupied.get(c, [])
         )
-        y, way = want, 0
+        y = want
         for _ in range(len(blocks) + 1):
             hit = next(((lo, hi, q) for lo, hi, q in blocks if lo < y < hi), None)
             if hit is None:
@@ -569,19 +580,38 @@ def _column_heights(
     def level(k: int, q: int, y: float) -> bool:
         return abs(y - height[q]) < (length(k) + length(q)) / 2
 
-    def way_out(g0: float, g1: float, c: int, need: float) -> bool:  # does gap (g0, g1) in column c open so far?
+    def runs(x: int, own: tuple = ()) -> list[tuple[float, float]]:
+        """The free runs of height of column x (`own`: k's (column, bottom, top), not yet placed), the ends open."""
+        spans = [(height[q] - length(q) / 2, height[q] + length(q) / 2) for q in occupied.get(x, [])]
+        spans += [own[1:]] if own and own[0] == x else []
+        out, y = [], -np.inf
+        for lo, hi in sorted(spans):
+            if lo > y:
+                out.append((y, lo))
+            y = max(y, hi)
+        return out + [(y, np.inf)]
+
+    def way_out(g0: float, g1: float, c: int, need: float, own: tuple = ()) -> bool:
+        """Does gap (g0, g1) in column c open so far: a run of free height at least `need` beside it, in the next
+        column, that leads on, run beside run, to the sheet's edge or past a column's last strand? A run between two
+        strands of the next column shut on its own far side is no way out (random-100 held-out 12BM, 8BCU: stacks
+        beside stacks, each gap open only into another closed one). `own`: k's (column, bottom, top), not yet placed."""
         cols = sorted(set(column.values()))
-        for side in (-1, 1):
-            at = cols.index(c) + side
-            if not 0 <= at < len(cols):
-                return True  # the sheet's edge
-            spans = sorted((height[q] - length(q) / 2, height[q] + length(q) / 2) for q in occupied.get(cols[at], []))
-            best, y = 0.0, g0
-            for lo, hi in spans:
-                if lo < g1 and hi > g0:
-                    best, y = max(best, lo - y), max(y, hi)
-            if max(best, g1 - y) >= need - 1e-9:
-                return True
+        todo, seen = [(c, g0, g1)], set()
+        while todo:
+            x, lo, hi = todo.pop()
+            for side in (-1, 1):
+                at = cols.index(x) + side
+                if not 0 <= at < len(cols):
+                    return True  # the sheet's edge
+                for a, b in runs(cols[at], own):
+                    if min(hi, b) - max(lo, a) < need - 1e-9:
+                        continue
+                    if np.isinf(a) or np.isinf(b):
+                        return True  # past the column's last strand
+                    if (cols[at], a, b) not in seen:
+                        seen.add((cols[at], a, b))
+                        todo.append((cols[at], a, b))
         return False
 
     def shut(k: int, c: int, y: float, need: float) -> list[int]:  # what k stands end to end with, gap shut
@@ -594,7 +624,7 @@ def _column_heights(
                 gap = (y + half, bottom)
             else:
                 continue
-            if not way_out(*gap, c, need):
+            if not way_out(*gap, c, need, (c, y - half, y + half)):
                 out.append(q)
         return out
 
@@ -663,6 +693,31 @@ def _column_heights(
                 some = z
         return y if some is None else some
 
+    def closed(own: tuple = ()) -> int:
+        """How many runs of free height between two strands of a column (`own`: k's (column, bottom, top) among
+        them) have no way out (way_out, by _STACK_SHUT): the loops leaving the ends facing one have no route."""
+        return sum(
+            not way_out(a, b, x, _STACK_SHUT, own)
+            for x in sorted(set(column.values()))
+            for a, b in runs(x, own)
+            if not (np.isinf(a) or np.isinf(b))
+        )
+
+    def unpocketed(k: int, c: int, y: float) -> float:
+        """k's height, moved when standing at y it closes a run of free height that had a way out, or faces one
+        closed (closed: stacks beside stacks, however tall the run), to the nearest height within _POCKET_REACH,
+        _NUDGE_STEP at a time, up first on a tie, that closes none, meeting nothing and level with no stranger,
+        level with its partner or not (the notes then name the pairing); else as it stands."""
+        half, base = length(k) / 2, closed()
+        if closed((c, y - half, y + half)) <= base:
+            return y
+        for step in range(1, round(_POCKET_REACH / _NUDGE_STEP) + 1):
+            for way in (1, -1):
+                z = float(_snap(y + way * step * _NUDGE_STEP))
+                if not meets(k, c, z) and not clash(k, c, z) and closed((c, z - half, z + half)) <= base:
+                    return z
+        return y
+
     for i, a in enumerate(sheet.accessory):
         k, p = n + i, index[id(a.parent)]
         y = spot(k, column[k], height[p])
@@ -682,6 +737,12 @@ def _column_heights(
         y = opened(k, column[k], y, p)
         if clash(k, column[k], y):
             y = clear(k, column[k], height[p])
+        if shut(k, column[k], y, _STACK_SHUT):  # still no way out of its stack gap: beside its partner's other side
+            c = 2 * column[p] - column[k]
+            z = opened(k, c, spot(k, c, y, 1 if y >= height[p] else -1), p)  # at its partner's same end
+            if c != column[k] and level(k, p, z) and not clash(k, c, z) and not shut(k, c, z, _STACK_SHUT):
+                column[k], y = c, z
+        y = unpocketed(k, column[k], y)
         height[k] = float(_snap(y))
         occupied.setdefault(column[k], []).append(k)
     return {k: h for k, h in height.items() if k >= n}
@@ -2986,6 +3047,10 @@ def _take_shared(it: _Item, mate: _Item, shared: list[tuple[int, int]]) -> None:
     sheets, 9P1X L's against V's), the others are turned with them, mirrored across the page (x and angle), so a
     strand the mate lacks still stands beside the strand it pairs with, on the same side (random-100 C2b-S: B:122-123
     stood beside B:29-38, 0 bridges)."""
+    taken = {p for p, _ in shared}
+    crowded = {  # the copy's other elements already on another of its elements before the take: not the take's doing
+        p for p, m in enumerate(it.members) if p not in taken and _on_member(m, it.offsets[p], _others(it, p))
+    }
     own = np.array([it.offsets[p][0] for p, _ in shared])
     theirs = np.array([mate.offsets[q][0] for _, q in shared])
     turn = float(_snap(np.dot(own - own.mean(), theirs - theirs.mean()))) < 0  # on snapped offsets
@@ -2995,7 +3060,6 @@ def _take_shared(it: _Item, mate: _Item, shared: list[tuple[int, int]]) -> None:
     )
     offsets = [tuple(float(v) for v in _snap(np.add((sign * ox, oy), step))) for ox, oy in it.offsets]
     if turn:
-        taken = {p for p, _ in shared}
         for p, m in enumerate(it.members):
             if p not in taken and isinstance(m, Placed):
                 m.angle = _mirrored(m.angle)
@@ -3003,6 +3067,42 @@ def _take_shared(it: _Item, mate: _Item, shared: list[tuple[int, int]]) -> None:
         it.members[p].angle, it.members[p].length = mate.members[q].angle, mate.members[q].length
         offsets[p] = mate.offsets[q]
     it.offsets = offsets
+    for p, m in enumerate(it.members):  # an element the mate lacks, landed on the shared ones: slid off them
+        if p in taken or p in crowded or not _on_member(m, it.offsets[p], _others(it, p)):
+            continue
+        it.offsets[p] = _slid_off(m, it.offsets[p], _others(it, p))
+
+
+def _others(it: _Item, p: int) -> list:
+    """The (member, offset) pairs of item `it` but its member p."""
+    return [(x, o) for q, (x, o) in enumerate(zip(it.members, it.offsets)) if q != p]
+
+
+def _on_member(m, o, placed: list) -> bool:
+    """Does member m, at offset o of an item, overlap any (member, offset) of `placed` by footprint (no margin)?"""
+    a = np.add(_footprint(m), (o[0], o[1], o[0], o[1]))
+    for x, q in placed:
+        b = np.add(_footprint(x), (q[0], q[1], q[0], q[1]))
+        if a[0] < b[2] and b[0] < a[2] and a[1] < b[3] and b[1] < a[3]:
+            return True
+    return False
+
+
+def _slid_off(m, o, placed: list) -> tuple[float, float]:
+    """_take_shared: the nearest spot to offset o, _SLIDE_STEP at a time up, down, or sideways away from the item's
+    middle (in that order at each distance), where member m stands clear (by MARGIN) of every (member, offset) of
+    `placed` (random-100 held-out 2NAD: chain B's helix B:267-270, in its βα row, where chain A's row has none, took
+    the place between two strands that its mate's row draws side by side, so it lay on both and its two loops had no
+    route). At most _JOIN_TRIES steps; none clear: o as it was."""
+    o = np.asarray(o, float)
+    mid = float(_snap(np.mean([q[0] for _, q in placed] or [0.0])))
+    way = 1.0 if o[0] >= mid else -1.0
+    for n in range(1, _JOIN_TRIES + 1):
+        for d in ((0.0, 1.0), (0.0, -1.0), (way, 0.0)):
+            at = _snap(o + np.multiply(d, n * _SLIDE_STEP))
+            if _clear_of(m, at, placed):
+                return tuple(float(v) for v in at)
+    return tuple(float(v) for v in o)
 
 
 def _unwrap(items: list[_Item], ties: dict[int, tuple[int, int]], frame) -> dict[int, int]:

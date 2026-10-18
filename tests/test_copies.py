@@ -528,3 +528,41 @@ def test_a_copy_names_a_pairing_by_taking_its_mates_place_only_where_its_mate_na
     ties = _symmetry_ties([mate, copy], frame, False, None, (pairs, partner), own)
     assert ties == {1: (0, 1)}
     assert copy.offsets == [(0.0, 0.0), (1.1, 0.0), (-1.1, 0.0)] and id(copy) in own
+
+
+def test_an_element_the_mate_lacks_is_slid_off_the_shared_ones():
+    """Random-100 held-out 2NAD (A3, A5): chain B's βα row holds a helix, B:267-270, between two strands where chain
+    A's row has none. Taking A's places for the shared strands (_take_shared) stood them side by side and the helix,
+    moved by the mean step, between them, on both: its two loops had no route. It is slid off them, clear by MARGIN,
+    and the shared strands keep the mate's places."""
+    from foldmap.layout import HELIX_W, PITCH, Placed, _clear_of, _Item, _take_shared
+    from helpers import fake_sse
+
+    def member(kind, start, chain):
+        width = PITCH if kind == "E" else HELIX_W
+        return Placed(fake_sse(kind, start, start + 5, chain=chain), 0.0, 0.0, 3.0, np.pi / 2, width)
+
+    mate = _Item([member("E", 0, "A"), member("E", 20, "A")], [(0.0, 0.0), (1.4, 0.0)], 0.0, 0.0, (0.0, 0.0), 0, "A")
+    copy = _Item(
+        [member("E", 0, "B"), member("H", 10, "B"), member("E", 20, "B")],
+        [(0.0, 0.0), (2.0, 0.0), (4.0, 0.0)],
+        0.0,
+        0.0,
+        (0.0, 0.0),
+        0,
+        "B",
+    )
+    _take_shared(copy, mate, [(0, 0), (2, 1)])
+    assert copy.offsets[0] == (0.0, 0.0) and copy.offsets[2] == (1.4, 0.0)
+    others = [(m, o) for k, (m, o) in enumerate(zip(copy.members, copy.offsets)) if k != 1]
+    assert _clear_of(copy.members[1], copy.offsets[1], others)
+
+
+@pytest.mark.parametrize("view", [{}, {"domains": "auto"}], ids=["default", "domains"])
+def test_2nad_copy_helix_stands_off_its_rows_strands(view):
+    """Random-100 held-out 2NAD: no element on another, every loop routed."""
+    from helpers import r100_entry
+
+    d = draw_spec(figure_spec(r100_entry("2NAD"), **view))
+    assert d.stuck == []
+    assert figcheck.element_overlaps(d.layout) == []

@@ -87,8 +87,9 @@ def _element_obstacles(layout: Layout, ghost_owner: bool = False) -> tuple[np.nd
 
 
 class _Grid:
-    def __init__(self, layout: Layout, keep_out: list[tuple[float, float, float, float]] = ()):
-        x0, y0, x1, y1 = layout.bounds
+    def __init__(self, layout: Layout, keep_out: list[tuple[float, float, float, float]] = (), window=None):
+        """The routing grid over the page (layout.bounds), or over `window` (x0, y0, x1, y1) only: _fine_route's."""
+        x0, y0, x1, y1 = layout.bounds if window is None else window
         w, h = x1 - x0 + 2 * _PAD, y1 - y0 + 2 * _PAD
         self.res = max(RES, math.sqrt(w * h / _MAX_CELLS))
         self.x0, self.y0 = x0 - _PAD, y0 - _PAD
@@ -869,6 +870,11 @@ def route_loops(layout: Layout, sses: list[SSE], bb) -> list[Loop]:
                 break
         for h in exempt:
             grid.blocked |= grid.over[h]
+        if pts is None and grid.res > RES + 1e-9:  # a page so large its grid is coarse: a fine grid round the ports
+            pts, over = _fine_route(layout, keep_out, elements, pa, pb, under, exempt)
+            for p, q in zip(pts or (), (pts or ())[1:]):
+                for c in grid.cells_along(p, q):
+                    grid.used[c] += 1
         if pts is None:
             routed[(a.id, b.id)] = (_curve(pa.c_port, pa.exit_c, pb.n_port, pb.exit_n), True, False)
         else:
@@ -911,6 +917,31 @@ def route_loops(layout: Layout, sses: list[SSE], bb) -> list[Loop]:
         router.wide_refused,
     )
     return out
+
+
+_FINE_PADS = (3.0, 8.0)  # page units round a loop's two ports: the windows _fine_route searches at RES, nearest first
+
+
+def _fine_route(layout: Layout, keep_out, elements, pa: Placed, pb: Placed, under, exempt):
+    """(points, over labels) of a loop the page's grid found no route for when that grid is coarser than RES (a page
+    of more than _MAX_CELLS cells at RES: random-100 held-out 7BKC's domains view, 2269 x 116 page units, at 0.42, where
+    G:550-552 stands 0.8 under G:532-544, port facing port, a gap no coarse cell fits): routed again on a grid at RES
+    over a window round its two ports, each of _FINE_PADS in turn, its drawing checked against every element as any
+    route is; (None, False) if none."""
+    xs, ys = (pa.c_port[0], pb.n_port[0]), (pa.c_port[1], pb.n_port[1])
+    for pad in _FINE_PADS:
+        window = (min(xs) - pad, min(ys) - pad, max(xs) + pad, max(ys) + pad)
+        grid = _Grid(layout, [b for _, b in keep_out], window)
+        router = _Router(grid, elements, [b for _, b in keep_out])
+        for h in exempt:
+            grid.blocked &= ~grid.over[h]
+        for ea, eb in _over_exits(pa, pb):
+            pts, over = router.route(
+                pa.c_port, ea, pa, pb.n_port, eb, pb, loose=(pa.over, pb.over), under=under, exempt=exempt
+            )
+            if pts is not None:
+                return pts, over
+    return None, False
 
 
 _NA_TEXT_TOLL = 25.0  # the extra cost of a cell of that text, while such a loop is routed again

@@ -1190,3 +1190,28 @@ def test_the_cells_a_pulled_route_uses_are_the_cells_under_it():
         grid = router.grid
         under = {c for p, q in zip(pts, pts[1:]) for c in grid.cells_along(p, q)}
         assert {tuple(c) for c in np.argwhere(grid.used > 0).tolist()} == under, k
+
+
+def test_a_coarse_pages_narrow_gap_is_routed_on_a_fine_grid(monkeypatch):
+    """Random-100 held-out 7BKC and 7NZ2 domains views (pages of 2269 x 116 and 430 x 358 page units): past _MAX_CELLS
+    the grid is coarser than RES (0.42, 0.32), and G:550-552, standing 0.8 under G:532-544, port facing port, had no
+    free cell between them: a fallback curve. A loop the page's grid cannot route is routed again on a grid at RES
+    round its two ports (_fine_route), its drawing checked against every element as any route is."""
+    a = bar(0, 0.0, 5.0, 4.0, -np.pi / 2)  # C port at the bottom, (0, 3)
+    b = bar(20, 0.15, 1.7, 1.0, -np.pi / 2)  # N port on top, (0.15, 2.2): 0.8 under a's
+    far = Placed(fake_sse("H", 100, 109, chain="B"), 4000.0, 400.0, 3.0, 0.0, HELIX_W)  # a vast page: cells of 1.03
+    lay = layout_of(a, b, far)
+    assert _Grid(lay).res > 1.0
+    (loop,) = route_loops(lay, [a.sse, b.sse, far.sse], stub_bb())
+    assert not loop.fallback
+    assert np.allclose(loop.points[0], a.c_port) and np.allclose(loop.points[-1], b.n_port)
+    assert route._clear(loop.points, (a, b), *route._element_obstacles(lay))
+    monkeypatch.setattr(route, "_FINE_PADS", ())
+    (loop,) = route_loops(layout_of(a, b, far), [a.sse, b.sse, far.sse], stub_bb())
+    assert loop.fallback  # the page's grid alone finds none
+
+
+def test_a_large_domain_view_routes_every_loop():
+    """Random-100 held-out 7BKC's domains view (28 fallback curves, 7NZ2's 4 alike): no fallback curve."""
+    d = draw_spec(figure_spec(r100_entry("7BKC"), domains="auto"))
+    assert d.stuck == []

@@ -189,3 +189,37 @@ def test_backbone_only_keeps_and_remaps_linked_residues():
     (k,) = bb.linked
     assert bb.only({"A"}).linked == bb.linked
     assert not bb.only({"Z"}).linked
+
+
+def test_a_residue_is_read_in_one_conformer():
+    """Random-100 held-out 5K7Z: DNA modelled in two orientations, A (0.52) and B (0.48); F:1's 5' phosphate only in
+    B. Each atom's first location by name took that P from B and the rest from A, 50 Å apart, and the pairs, read from
+    both conformers' atoms, were mostly missed: F was drawn as an unpaired trace across the page. Only the atoms with
+    no altloc and those of the model's first altloc letter, A, (where the residue has it) stay."""
+    from foldmap.io import _one_conformer
+
+    st = gemmi.Structure()
+    model = gemmi.Model("1")
+    chain = gemmi.Chain("F")
+    res = gemmi.Residue()
+    res.name, res.seqid = "DC", gemmi.SeqId(1, " ")
+    for name, alt, x in (("P", "B", 26.5), ("C1'", "A", 69.0), ("C1'", "B", 25.7), ("N1", "\0", 1.0)):
+        atom = gemmi.Atom()
+        atom.name, atom.altloc, atom.pos = name, alt, gemmi.Position(x, 0, 0)
+        res.add_atom(atom)
+    chain.add_residue(res)
+    model.add_chain(chain)
+    st.add_model(model)
+    m = st[0]
+    _one_conformer(m)
+    kept = [(a.name, a.altloc, a.pos.x) for a in m["F"][0]]
+    assert kept == [("C1'", "A", 69.0), ("N1", "\0", 1.0)]
+
+
+def test_5k7z_dna_pairs_and_routes():
+    """Random-100 held-out 5K7Z: read in one conformer, E and F pair into a duplex, no strand drawn as a fallback."""
+    from foldmap.spec import draw_spec, figure_spec
+    from helpers import r100_entry
+
+    d = draw_spec(figure_spec(r100_entry("5K7Z")))
+    assert d.stuck == [] and d.layout.nucleic.structure.stems

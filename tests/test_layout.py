@@ -836,3 +836,18 @@ def test_joined_duplex_pieces_slide_clear_as_one():
     assert (b.cx - a.cx, b.cy - a.cy) == (1.0, 0.0)
     h, m = [it.half for it in items], [it.mid for it in items]
     assert not any(_collide(items[0], h[0], m[0], items[k], h[k], m[k]) for k in (1, 2))
+
+
+@pytest.mark.parametrize("entry", ["2FR2", "8BCU"])
+def test_stacked_accessories_leave_every_gap_a_way_out(entry):
+    """Random-100 held-out A3. 2FR2: A:115-118 stood end to end under A:103-109, level with its partner A:89-100,
+    and A:89-100 and A:125-135 either side stood past the gap's ends; held level with the partner, no nudge opened it,
+    so the loops into A:103-109 and out of A:115-118 had no route. It stands on its partner's other side, by the
+    same end. 8BCU: chain G's accessories stood in a staircase, each level with its partner, and G:111-114 closed a
+    run whose only openings led into runs closed on their far sides (a way out is now followed run beside run to the
+    sheet's edge or past a column's last strand): four loops had no route. It stands clear of it."""
+    from foldmap.spec import draw_spec, figure_spec
+    from helpers import r100_entry
+
+    d = draw_spec(figure_spec(r100_entry(entry)))
+    assert d.stuck == []
