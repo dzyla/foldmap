@@ -23,7 +23,7 @@ record the gemmi version and the SHA-256 of every candidate file read (this one 
 `python scripts/random100.py sample --check` lists the sampled ids that are obsolete now, without changing
 the file.
 
-## The held-out sample
+## The held-out and third samples
 
 The layout's constants were tuned on this sample (plan 10, Task 12), so its pass rate measures fit. A second sample
 that no constant was tuned on is in `docs/validation/random100-heldout/`: drawn with
@@ -31,7 +31,11 @@ that no constant was tuned on is in `docs/validation/random100-heldout/`: drawn 
     python scripts/random100.py sample --seed 20261017 --date 2026-10-13 \
         --exclude docs/validation/random100/sample.json --out docs/validation/random100-heldout/sample.json
 
-(the same strata, quotas and pools, none of this sample's ids), and run once with every view and no fix.
+(the same strata, quotas and pools, none of this sample's ids), and run once with every view and no fix (80 of 100).
+Plan 15 then fixed the mechanisms behind its failures, so it is held out no longer. A third sample, drawn after
+those fixes with none of either sample's ids (`--exclude` given twice, seed 20261018), is the one foldmap was not
+tuned on: `docs/validation/random100-third/`. In plan 15's full run (7696947) the three pass 93 (this sample), 95
+(the second) and 83 (the third) of 100.
 
 ## The run
 

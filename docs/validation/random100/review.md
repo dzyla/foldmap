@@ -3,6 +3,46 @@
 Causes (C1…Cn) are written here by Task 12, each with the entries it explains and the test that pins its fix.
 Measure notes (M1…) record where a metric, not the drawing, is what falls short.
 
+## The plan 15 run: 93 of 100
+
+Run 2026-10-18 at 7696947 on zyla-lab, every view, `--jobs 10`, 864 s wall, after plan 15 fixed the second sample's
+failures (`docs/superpowers/plans/2026-10-17-15-heldout-failures.md`); `report.md`, `report.json` and `run.log` are
+that run. The layout's constants were tuned on this sample, so 93 measures fit. The count for structures foldmap was
+not tuned on is the third sample's, 83 of 100, in the same run of the same code
+([docs/validation/random100-third/review.md](../random100-third/review.md)); the second sample, which plan 15 fixed
+against, passes 95 of 100.
+
+Against the final run below (92 of 100 at 44a1c1b), field by field in `report.json`:
+
+- **One entry changed verdict: 7JU4 now passes** (its two domain names on chain-end stubs are gone: A6 and A16
+  2 → 0; leaders 14 → 16). No entry that passed fails. Not attributed to one plan 15 task.
+- **The seven that fail**, all with the same checks except 8VWQ: 7Y7C (A3, A6, A17: na_crossings 4 → 1,
+  bead_overlaps 1 → 0), 8VWQ (A3, A17; its A6 is gone: the LYS:5101 ligand label off stem 114 in four views and the
+  tie label off stem 209 in the domains view; bead_overlaps 1 → 0), 9YLM and 8BW5 (A17, as ruled), 9YKJ/10UJ (A19,
+  27 of 43 names differ, as before) and 8QEM (A17 on the focus view, the same values). The causes below stand.
+- **A10** (DSSP agreement, after plan 15 Task 1's one-conformer read): identical detail on all 100 entries; the
+  268,834 of 268,835 residues stand.
+- **A15 "does not apply" → "not judged"** on 10 entries (Task 5: copies drawn untied are not judged, with the reason):
+  5SB5, 6DPV, 5JB1, 7JU4, 8ESZ, 7ARD, 7SMR, 6JO6, 5LDW, 8OZJ. A15 still judges 37 entries and passes all 37.
+- **Domains view**: A4, A6 and A16 change only on 7JU4 and 8VWQ (above); domain-name counts are unchanged on every
+  entry; leader counts moved on 1A0Z (4 → 2), 7ARD (8 → 7), 9GEP (5 → 4), 8VWQ (10 → 9) and 7JU4 (14 → 16).
+- **A20 tethers** (default view): lengths moved on 7OKA, 6JLN (489 → 493 tethers), 7Y7C and 8VWQ (on the two
+  ribosomes the magnesium tethers grew from 0.7-1.05 to 1.05-2.8, consistent with Task 3 moving protein-held ligand
+  marks off the nucleic acid; the other two are not attributed); A20's verdict is unchanged on all four (pass on
+  6JLN and 7Y7C, not judged on 7OKA and 8VWQ).
+- **Nucleic-acid metrics**: only 7Y7C (na_crossings 4 → 1, na_run_crossings 724 → 723, bead_overlaps 1 → 0) and 8VWQ
+  (na_run_crossings 637 → 639, bead_overlaps 1 → 0) moved.
+- **sheets_differ**: 40 over all views, as before, entry by entry.
+- **Route fallbacks**: none on any entry, before or after. Second-search nodes moved on 7JU4 domains (+681),
+  9P1X focus (694,501 → 816,673), 5LDW membrane (0 → 415,299), 7Y7C and 8VWQ (Task 7 now counts window and
+  slab-closed searches in these totals).
+- **Time** (10 entries at once): A2 passes on every entry, the slowest default view being 7Y7C's, 66.9 s (limit 180 s
+  for XL); the slowest view is 7QUP focus, 148.5 s.
+
+S5 (automatic domains against CATH, reported, not gated, not in the count): 124 chains scored in 30 entries.
+One-domain chains: 57 pass, 8 fail (split by the automatic domains); chains with two or more CATH domains: 14 pass,
+45 fail.
+
 ## Measure notes
 
 **M1. 1ZBI `contact_auc` 0.65 (limit 0.60, higher is better): the metric, not the drawing** (plan 10 Task 7(h),

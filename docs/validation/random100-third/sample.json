@@ -1,0 +1,2798 @@
+{
+ "seed": 20261018,
+ "query_date": "2026-10-13",
+ "foldmap_commit": "76969474ca5bd64e295d6401b4bec32bc7f3c828",
+ "gemmi": "0.7.5",
+ "look": 200,
+ "bins": {
+  "S": [
+   0,
+   299
+  ],
+  "M": [
+   300,
+   1499
+  ],
+  "L": [
+   1500,
+   7999
+  ],
+  "XL": [
+   8000,
+   30000
+  ]
+ },
+ "strata": [
+  {
+   "name": "S1",
+   "title": "X-ray, 1 protein chain",
+   "n": 12,
+   "query": {
+    "query": {
+     "type": "group",
+     "logical_operator": "and",
+     "nodes": [
+      {
+       "type": "terminal",
+       "service": "text",
+       "parameters": {
+        "attribute": "rcsb_entry_info.experimental_method",
+        "operator": "exact_match",
+        "value": "X-ray"
+       }
+      },
+      {
+       "type": "terminal",
+       "service": "text",
+       "parameters": {
+        "attribute": "rcsb_entry_info.selected_polymer_entity_types",
+        "operator": "exact_match",
+        "value": "Protein (only)"
+       }
+      },
+      {
+       "type": "terminal",
+       "service": "text",
+       "parameters": {
+        "attribute": "rcsb_entry_info.deposited_polymer_entity_instance_count",
+        "operator": "equals",
+        "value": 1
+       }
+      },
+      {
+       "type": "terminal",
+       "service": "text",
+       "parameters": {
+        "attribute": "rcsb_accession_info.initial_release_date",
+        "operator": "less_or_equal",
+        "value": "2026-10-13"
+       }
+      }
+     ]
+    },
+    "return_type": "entry",
+    "request_options": {
+     "return_all_hits": true,
+     "results_verbosity": "compact",
+     "results_content_type": [
+      "experimental"
+     ]
+    }
+   },
+   "bins": {
+    "S": {
+     "n": 6,
+     "residues": [
+      0,
+      299
+     ],
+     "count": 37562,
+     "sha256": "a1d400b76b430cc9c3c3b93fde22500c1c2955e9977ac35dc3c9436e33874da5"
+    },
+    "M": {
+     "n": 6,
+     "residues": [
+      300,
+      1499
+     ],
+     "count": 31308,
+     "sha256": "60ac46697f84b1ecb90ff885c2b8d47d51c3520e91e55fef2ae1ad35b2f5b863"
+    }
+   },
+   "extra": []
+  },
+  {
+   "name": "S2",
+   "title": "X-ray homo-oligomer (symmetric)",
+   "n": 12,
+   "query": {
+    "query": {
+     "type": "group",
+     "logical_operator": "and",
+     "nodes": [
+      {
+       "type": "terminal",
+       "service": "text",
+       "parameters": {
+        "attribute": "rcsb_entry_info.experimental_method",
+        "operator": "exact_match",
+        "value": "X-ray"
+       }
+      },
+      {
+       "type": "terminal",
+       "service": "text",
+       "parameters": {
+        "attribute": "rcsb_entry_info.selected_polymer_entity_types",
+        "operator": "exact_match",
+        "value": "Protein (only)"
+       }
+      },
+      {
+       "type": "terminal",
+       "service": "text",
+       "parameters": {
+        "attribute": "rcsb_entry_info.polymer_entity_count_protein",
+        "operator": "equals",
+        "value": 1
+       }
+      },
+      {
+       "type": "terminal",
+       "service": "text",
+       "parameters": {
+        "attribute": "rcsb_assembly_info.polymer_entity_instance_count",
+        "operator": "greater_or_equal",
+        "value": 2
+       }
+      },
+      {
+       "type": "terminal",
+       "service": "text",
+       "parameters": {
+        "attribute": "rcsb_struct_symmetry.symbol",
+        "operator": "exact_match",
+        "value": "C1",
+        "negation": true
+       }
+      },
+      {
+       "type": "terminal",
+       "service": "text",
+       "parameters": {
+        "attribute": "rcsb_accession_info.initial_release_date",
+        "operator": "less_or_equal",
+        "value": "2026-10-13"
+       }
+      }
+     ]
+    },
+    "return_type": "entry",
+    "request_options": {
+     "return_all_hits": true,
+     "results_verbosity": "compact",
+     "results_content_type": [
+      "experimental"
+     ]
+    }
+   },
+   "bins": {
+    "S": {
+     "n": 2,
+     "residues": [
+      0,
+      299
+     ],
+     "count": 14183,
+     "sha256": "966db668afe5f7cb0d609c82af6ed18b39468ae1c9786b9e7afb671d1a437307"
+    },
+    "M": {
+     "n": 4,
+     "residues": [
+      300,
+      1499
+     ],
+     "count": 43257,
+     "sha256": "ebfffe54607b559b298d4f1426559d771ce8cf1797b307a7abbf3917ffbf2e55"
+    },
+    "L": {
+     "n": 4,
+     "residues": [
+      1500,
+      7999
+     ],
+     "count": 8815,
+     "sha256": "25862f997011acfeda484b22f81e4f4ea902bbd1b3a8a410b7b97de7ff07353d"
+    },
+    "XL": {
+     "n": 2,
+     "residues": [
+      8000,
+      30000
+     ],
+     "count": 106,
+     "sha256": "3ad1612df74a3eb779c3011f4c931cfb52f658d54a521f8ac4ee8a13db5c9abc"
+    }
+   },
+   "extra": []
+  },
+  {
+   "name": "S3",
+   "title": "X-ray hetero-complex",
+   "n": 10,
+   "query": {
+    "query": {
+     "type": "group",
+     "logical_operator": "and",
+     "nodes": [
+      {
+       "type": "terminal",
+       "service": "text",
+       "parameters": {
+        "attribute": "rcsb_entry_info.experimental_method",
+        "operator": "exact_match",
+        "value": "X-ray"
+       }
+      },
+      {
+       "type": "terminal",
+       "service": "text",
+       "parameters": {
+        "attribute": "rcsb_entry_info.selected_polymer_entity_types",
+        "operator": "exact_match",
+        "value": "Protein (only)"
+       }
+      },
+      {
+       "type": "terminal",
+       "service": "text",
+       "parameters": {
+        "attribute": "rcsb_entry_info.polymer_entity_count_protein",
+        "operator": "greater_or_equal",
+        "value": 2
+       }
+      },
+      {
+       "type": "terminal",
+       "service": "text",
+       "parameters": {
+        "attribute": "rcsb_accession_info.initial_release_date",
+        "operator": "less_or_equal",
+        "value": "2026-10-13"
+       }
+      }
+     ]
+    },
+    "return_type": "entry",
+    "request_options": {
+     "return_all_hits": true,
+     "results_verbosity": "compact",
+     "results_content_type": [
+      "experimental"
+     ]
+    }
+   },
+   "bins": {
+    "S": {
+     "n": 1,
+     "residues": [
+      0,
+      299
+     ],
+     "count": 6181,
+     "sha256": "8db3e1100791882507af9d9db50d3608f43657ce0dcd6a0b214a5b2188170391"
+    },
+    "M": {
+     "n": 3,
+     "residues": [
+      300,
+      1499
+     ],
+     "count": 22788,
+     "sha256": "e86601a62601e07f268d051ca02e5ccd6d1c21c1dc7a7fe0d6683ddd7e314f84"
+    },
+    "L": {
+     "n": 4,
+     "residues": [
+      1500,
+      7999
+     ],
+     "count": 5455,
+     "sha256": "51b697dda674de6a15b90136689da68fcead4735cbcba01570702818e52a598c"
+    },
+    "XL": {
+     "n": 2,
+     "residues": [
+      8000,
+      30000
+     ],
+     "count": 157,
+     "sha256": "57887a1f3ad8006eec52cc5f7f0ef9e2abe5694708e52fb585b1b0ad378faeae"
+    }
+   },
+   "extra": []
+  },
+  {
+   "name": "S4",
+   "title": "cryo-EM",
+   "n": 15,
+   "query": {
+    "query": {
+     "type": "group",
+     "logical_operator": "and",
+     "nodes": [
+      {
+       "type": "terminal",
+       "service": "text",
+       "parameters": {
+        "attribute": "rcsb_entry_info.experimental_method",
+        "operator": "exact_match",
+        "value": "EM"
+       }
+      },
+      {
+       "type": "terminal",
+       "service": "text",
+       "parameters": {
+        "attribute": "rcsb_entry_info.selected_polymer_entity_types",
+        "operator": "exact_match",
+        "value": "Protein (only)"
+       }
+      },
+      {
+       "type": "terminal",
+       "service": "text",
+       "parameters": {
+        "attribute": "rcsb_accession_info.initial_release_date",
+        "operator": "less_or_equal",
+        "value": "2026-10-13"
+       }
+      }
+     ]
+    },
+    "return_type": "entry",
+    "request_options": {
+     "return_all_hits": true,
+     "results_verbosity": "compact",
+     "results_content_type": [
+      "experimental"
+     ]
+    }
+   },
+   "bins": {
+    "M": {
+     "n": 2,
+     "residues": [
+      300,
+      1499
+     ],
+     "count": 8545,
+     "sha256": "95533696836b8d8d67ee86ba250aca594e4cfeab78128a3a109e1a096c64e28f"
+    },
+    "L": {
+     "n": 5,
+     "residues": [
+      1500,
+      7999
+     ],
+     "count": 13594,
+     "sha256": "1ded49a651646e8bcf0048bc871a55b7c305d7f3104ec815b24009130a3e558e"
+    },
+    "XL": {
+     "n": 8,
+     "residues": [
+      8000,
+      30000
+     ],
+     "count": 2441,
+     "sha256": "fcd226eb8edf5a7073d6f853f9867c181b6675ea9f738d7fb4879072e57243b0"
+    }
+   },
+   "extra": [
+    {
+     "tag": "helical",
+     "n": 1,
+     "nodes": [
+      {
+       "type": "terminal",
+       "service": "text",
+       "parameters": {
+        "attribute": "rcsb_struct_symmetry.symbol",
+        "operator": "exact_match",
+        "value": "H"
+       }
+      }
+     ],
+     "count": 1306,
+     "sha256": "acd5badc18700e6078b7edd2728ca0198ad25ebdef8f99105d4bcdc8649d8995"
+    },
+    {
+     "tag": "big",
+     "n": 2,
+     "nodes": [
+      {
+       "type": "terminal",
+       "service": "text",
+       "parameters": {
+        "attribute": "rcsb_assembly_info.polymer_entity_instance_count",
+        "operator": "greater",
+        "value": 20
+       }
+      }
+     ],
+     "count": 3822,
+     "sha256": "8411055db401244a51d4eac6d0989c200aabd53ade13ece42f30fc58b0a0d982"
+    },
+    {
+     "tag": "cap",
+     "n": 3,
+     "nodes": [
+      {
+       "type": "terminal",
+       "service": "text",
+       "parameters": {
+        "attribute": "rcsb_entry_info.deposited_polymer_monomer_count",
+        "operator": "range",
+        "value": {
+         "from": 20000,
+         "to": 30001,
+         "include_lower": true,
+         "include_upper": false
+        }
+       }
+      }
+     ],
+     "count": 359,
+     "sha256": "66906222b5c73a2a8ba14d35d69ee568803a1aaf5767e2057b2c7f3bdf474ff5"
+    }
+   ]
+  },
+  {
+   "name": "S5",
+   "title": "NMR, multi-model",
+   "n": 8,
+   "query": {
+    "query": {
+     "type": "group",
+     "logical_operator": "and",
+     "nodes": [
+      {
+       "type": "terminal",
+       "service": "text",
+       "parameters": {
+        "attribute": "rcsb_entry_info.experimental_method",
+        "operator": "exact_match",
+        "value": "NMR"
+       }
+      },
+      {
+       "type": "terminal",
+       "service": "text",
+       "parameters": {
+        "attribute": "rcsb_entry_info.deposited_model_count",
+        "operator": "greater",
+        "value": 1
+       }
+      },
+      {
+       "type": "terminal",
+       "service": "text",
+       "parameters": {
+        "attribute": "rcsb_accession_info.initial_release_date",
+        "operator": "less_or_equal",
+        "value": "2026-10-13"
+       }
+      }
+     ]
+    },
+    "return_type": "entry",
+    "request_options": {
+     "return_all_hits": true,
+     "results_verbosity": "compact",
+     "results_content_type": [
+      "experimental"
+     ]
+    }
+   },
+   "bins": {
+    "S": {
+     "n": 7,
+     "residues": [
+      0,
+      299
+     ],
+     "count": 13278,
+     "sha256": "6f789899fa5244a989a191a2f6e8754af85f232e847d98476eb86f73f894f797"
+    },
+    "M": {
+     "n": 1,
+     "residues": [
+      300,
+      1499
+     ],
+     "count": 231,
+     "sha256": "9daa63796c4a583138860f3b4c35bb9c68c06b929e1c3d0e1bc6e8b6071b89bb"
+    }
+   },
+   "extra": []
+  },
+  {
+   "name": "S6",
+   "title": "Membrane",
+   "n": 8,
+   "query": {
+    "query": {
+     "type": "group",
+     "logical_operator": "and",
+     "nodes": [
+      {
+       "type": "group",
+       "logical_operator": "or",
+       "nodes": [
+        {
+         "type": "terminal",
+         "service": "text",
+         "parameters": {
+          "attribute": "rcsb_polymer_entity_annotation.type",
+          "operator": "exact_match",
+          "value": "OPM"
+         }
+        },
+        {
+         "type": "terminal",
+         "service": "text",
+         "parameters": {
+          "attribute": "rcsb_polymer_entity_annotation.type",
+          "operator": "exact_match",
+          "value": "PDBTM"
+         }
+        }
+       ]
+      },
+      {
+       "type": "terminal",
+       "service": "text",
+       "parameters": {
+        "attribute": "rcsb_accession_info.initial_release_date",
+        "operator": "less_or_equal",
+        "value": "2026-10-13"
+       }
+      }
+     ]
+    },
+    "return_type": "entry",
+    "request_options": {
+     "return_all_hits": true,
+     "results_verbosity": "compact",
+     "results_content_type": [
+      "experimental"
+     ]
+    }
+   },
+   "bins": {
+    "M": {
+     "n": 3,
+     "residues": [
+      300,
+      1499
+     ],
+     "count": 6401,
+     "sha256": "d81c2791ffab17e612e7cb8f8cdd02b93837fb77cbd432b93878a5194200f0ca"
+    },
+    "L": {
+     "n": 4,
+     "residues": [
+      1500,
+      7999
+     ],
+     "count": 5280,
+     "sha256": "dbc23d98c0ece01633bfa86758c3129af6139fe3e726f5e3df4eee099c4bbcce"
+    },
+    "XL": {
+     "n": 1,
+     "residues": [
+      8000,
+      30000
+     ],
+     "count": 422,
+     "sha256": "f3396c0a0a382a024a9b909e42f6a563f95d4dbfd5b392589a2cf59d358f0775"
+    }
+   },
+   "extra": []
+  },
+  {
+   "name": "S7",
+   "title": "Protein-DNA",
+   "n": 7,
+   "query": {
+    "query": {
+     "type": "group",
+     "logical_operator": "and",
+     "nodes": [
+      {
+       "type": "terminal",
+       "service": "text",
+       "parameters": {
+        "attribute": "rcsb_entry_info.polymer_entity_count_DNA",
+        "operator": "greater",
+        "value": 0
+       }
+      },
+      {
+       "type": "terminal",
+       "service": "text",
+       "parameters": {
+        "attribute": "rcsb_entry_info.polymer_entity_count_protein",
+        "operator": "greater",
+        "value": 0
+       }
+      },
+      {
+       "type": "terminal",
+       "service": "text",
+       "parameters": {
+        "attribute": "rcsb_entry_info.polymer_entity_count_RNA",
+        "operator": "equals",
+        "value": 0
+       }
+      },
+      {
+       "type": "terminal",
+       "service": "text",
+       "parameters": {
+        "attribute": "rcsb_accession_info.initial_release_date",
+        "operator": "less_or_equal",
+        "value": "2026-10-13"
+       }
+      }
+     ]
+    },
+    "return_type": "entry",
+    "request_options": {
+     "return_all_hits": true,
+     "results_verbosity": "compact",
+     "results_content_type": [
+      "experimental"
+     ]
+    }
+   },
+   "bins": {
+    "S": {
+     "n": 1,
+     "residues": [
+      0,
+      299
+     ],
+     "count": 1515,
+     "sha256": "dfad9735899394b40287b231d3ebf66d156bd78503ddc5d77157228b6d1d0176"
+    },
+    "M": {
+     "n": 3,
+     "residues": [
+      300,
+      1499
+     ],
+     "count": 5087,
+     "sha256": "2f19708175cb3e7f349aca169b4311439208c071c7ed7e67a2881c8018bc20c4"
+    },
+    "L": {
+     "n": 2,
+     "residues": [
+      1500,
+      7999
+     ],
+     "count": 2278,
+     "sha256": "949f9ce7a899f9b988f8dd6421efa6cd672d396bbeb813515986ac79ae642be2"
+    },
+    "XL": {
+     "n": 1,
+     "residues": [
+      8000,
+      30000
+     ],
+     "count": 207,
+     "sha256": "ec443b6ac1ba2ea95645ad83d8bb64cc6f7c3134fa796deee2e8f40d543ad640"
+    }
+   },
+   "extra": []
+  },
+  {
+   "name": "S8",
+   "title": "Protein-RNA",
+   "n": 7,
+   "query": {
+    "query": {
+     "type": "group",
+     "logical_operator": "and",
+     "nodes": [
+      {
+       "type": "terminal",
+       "service": "text",
+       "parameters": {
+        "attribute": "rcsb_entry_info.polymer_entity_count_RNA",
+        "operator": "greater",
+        "value": 0
+       }
+      },
+      {
+       "type": "terminal",
+       "service": "text",
+       "parameters": {
+        "attribute": "rcsb_entry_info.polymer_entity_count_protein",
+        "operator": "greater",
+        "value": 0
+       }
+      },
+      {
+       "type": "terminal",
+       "service": "text",
+       "parameters": {
+        "attribute": "rcsb_accession_info.initial_release_date",
+        "operator": "less_or_equal",
+        "value": "2026-10-13"
+       }
+      }
+     ]
+    },
+    "return_type": "entry",
+    "request_options": {
+     "return_all_hits": true,
+     "results_verbosity": "compact",
+     "results_content_type": [
+      "experimental"
+     ]
+    }
+   },
+   "bins": {
+    "S": {
+     "n": 1,
+     "residues": [
+      0,
+      299
+     ],
+     "count": 541,
+     "sha256": "65deb07233dd1c1beaf3d2533445ba50288be18dba766fa5ac4deed05bf2c94e"
+    },
+    "M": {
+     "n": 2,
+     "residues": [
+      300,
+      1499
+     ],
+     "count": 2104,
+     "sha256": "3047a0693807f574bd51d1a753062ab952e437488b62e227d070b6429fbdf96a"
+    },
+    "L": {
+     "n": 2,
+     "residues": [
+      1500,
+      7999
+     ],
+     "count": 3000,
+     "sha256": "43f2c85332b38a77d21fdb454f2a0b841b0c56b34ba64e9093be0f55da92466b"
+    },
+    "XL": {
+     "n": 2,
+     "residues": [
+      8000,
+      30000
+     ],
+     "count": 2341,
+     "sha256": "e30897eeb26cce17a9c60bde05288e66d8f1be39158b6596c8dc828415b7b6fa"
+    }
+   },
+   "extra": [
+    {
+     "tag": "ribosome",
+     "n": 1,
+     "nodes": [
+      {
+       "type": "terminal",
+       "service": "text",
+       "parameters": {
+        "attribute": "entity_poly.rcsb_sample_sequence_length",
+        "operator": "greater_or_equal",
+        "value": 2500
+       }
+      }
+     ],
+     "count": 2205,
+     "sha256": "923f167158a7ce3fbe41dfd7d3261251ca1654e4d62ec61492cfe07a87586c00"
+    }
+   ]
+  },
+  {
+   "name": "S9",
+   "title": "RNA only",
+   "n": 3,
+   "query": {
+    "query": {
+     "type": "group",
+     "logical_operator": "and",
+     "nodes": [
+      {
+       "type": "terminal",
+       "service": "text",
+       "parameters": {
+        "attribute": "rcsb_entry_info.selected_polymer_entity_types",
+        "operator": "exact_match",
+        "value": "Nucleic acid (only)"
+       }
+      },
+      {
+       "type": "terminal",
+       "service": "text",
+       "parameters": {
+        "attribute": "rcsb_entry_info.polymer_entity_count_RNA",
+        "operator": "greater",
+        "value": 0
+       }
+      },
+      {
+       "type": "terminal",
+       "service": "text",
+       "parameters": {
+        "attribute": "rcsb_entry_info.polymer_entity_count_DNA",
+        "operator": "equals",
+        "value": 0
+       }
+      },
+      {
+       "type": "terminal",
+       "service": "text",
+       "parameters": {
+        "attribute": "rcsb_accession_info.initial_release_date",
+        "operator": "less_or_equal",
+        "value": "2026-10-13"
+       }
+      }
+     ]
+    },
+    "return_type": "entry",
+    "request_options": {
+     "return_all_hits": true,
+     "results_verbosity": "compact",
+     "results_content_type": [
+      "experimental"
+     ]
+    }
+   },
+   "bins": {
+    "S": {
+     "n": 2,
+     "residues": [
+      0,
+      299
+     ],
+     "count": 1960,
+     "sha256": "0e3e8b9d401b72b3896eba1b02eed8426d62d8f11cc1022f49b9b0a6c69a9f25"
+    },
+    "M": {
+     "n": 1,
+     "residues": [
+      300,
+      1499
+     ],
+     "count": 265,
+     "sha256": "75e9cf7ede84e828165baff6317c6ef59e47652fef5ee61d7c658e6473c23465"
+    }
+   },
+   "extra": []
+  },
+  {
+   "name": "S10",
+   "title": "Glycoproteins",
+   "n": 5,
+   "query": {
+    "query": {
+     "type": "group",
+     "logical_operator": "and",
+     "nodes": [
+      {
+       "type": "terminal",
+       "service": "text",
+       "parameters": {
+        "attribute": "rcsb_entry_info.branched_entity_count",
+        "operator": "greater",
+        "value": 0
+       }
+      },
+      {
+       "type": "terminal",
+       "service": "text",
+       "parameters": {
+        "attribute": "rcsb_entry_info.polymer_entity_count_protein",
+        "operator": "greater",
+        "value": 0
+       }
+      },
+      {
+       "type": "terminal",
+       "service": "text",
+       "parameters": {
+        "attribute": "rcsb_accession_info.initial_release_date",
+        "operator": "less_or_equal",
+        "value": "2026-10-13"
+       }
+      }
+     ]
+    },
+    "return_type": "entry",
+    "request_options": {
+     "return_all_hits": true,
+     "results_verbosity": "compact",
+     "results_content_type": [
+      "experimental"
+     ]
+    }
+   },
+   "bins": {
+    "M": {
+     "n": 2,
+     "residues": [
+      300,
+      1499
+     ],
+     "count": 8590,
+     "sha256": "f91254db3946640407193891d9cac199c70a5dcdfaa5ee5a5cd6392962ff0feb"
+    },
+    "L": {
+     "n": 2,
+     "residues": [
+      1500,
+      7999
+     ],
+     "count": 4966,
+     "sha256": "48c963e2a567977f07ad9f41932b4f2c66402d1befdabd54bde85b241a91fff1"
+    },
+    "XL": {
+     "n": 1,
+     "residues": [
+      8000,
+      30000
+     ],
+     "count": 81,
+     "sha256": "07a5ec609d3cba4b6f6183d5a946047aeb9e684d1997f99ea114e02a0bae1ef9"
+    }
+   },
+   "extra": []
+  },
+  {
+   "name": "S11",
+   "title": "One protein, two states (5 pairs)",
+   "n": 10,
+   "query": {
+    "query": {
+     "type": "group",
+     "logical_operator": "and",
+     "nodes": [
+      {
+       "type": "group",
+       "logical_operator": "or",
+       "nodes": [
+        {
+         "type": "terminal",
+         "service": "text",
+         "parameters": {
+          "attribute": "rcsb_entry_info.experimental_method",
+          "operator": "exact_match",
+          "value": "X-ray"
+         }
+        },
+        {
+         "type": "terminal",
+         "service": "text",
+         "parameters": {
+          "attribute": "rcsb_entry_info.experimental_method",
+          "operator": "exact_match",
+          "value": "EM"
+         }
+        }
+       ]
+      },
+      {
+       "type": "terminal",
+       "service": "text",
+       "parameters": {
+        "attribute": "rcsb_entry_info.selected_polymer_entity_types",
+        "operator": "exact_match",
+        "value": "Protein (only)"
+       }
+      },
+      {
+       "type": "terminal",
+       "service": "text",
+       "parameters": {
+        "attribute": "rcsb_entry_info.polymer_entity_count_protein",
+        "operator": "equals",
+        "value": 1
+       }
+      },
+      {
+       "type": "terminal",
+       "service": "text",
+       "parameters": {
+        "attribute": "rcsb_entry_info.deposited_polymer_monomer_count",
+        "operator": "less",
+        "value": 8000
+       }
+      },
+      {
+       "type": "terminal",
+       "service": "text",
+       "parameters": {
+        "attribute": "rcsb_polymer_entity_container_identifiers.reference_sequence_identifiers.database_name",
+        "operator": "exact_match",
+        "value": "UniProt"
+       }
+      },
+      {
+       "type": "terminal",
+       "service": "text",
+       "parameters": {
+        "attribute": "rcsb_accession_info.initial_release_date",
+        "operator": "less_or_equal",
+        "value": "2026-10-13"
+       }
+      }
+     ]
+    },
+    "return_type": "entry",
+    "request_options": {
+     "return_all_hits": true,
+     "results_verbosity": "compact",
+     "results_content_type": [
+      "experimental"
+     ]
+    }
+   },
+   "seed_pool": {
+    "count": 156139,
+    "sha256": "95f9e0835ddaf99b4c6ea667f24953b39677056e4d83795787e741c477a7b258"
+   },
+   "pairs": {
+    "apo/holo": 2,
+    "monomer/oligomer": 2,
+    "open/closed": 1
+   }
+  },
+  {
+   "name": "S12",
+   "title": "AlphaFold DB models",
+   "n": 3,
+   "query": {
+    "query": {
+     "type": "group",
+     "logical_operator": "and",
+     "nodes": [
+      {
+       "type": "terminal",
+       "service": "text",
+       "parameters": {
+        "attribute": "rcsb_comp_model_provenance.source_db",
+        "operator": "exact_match",
+        "value": "AlphaFoldDB"
+       }
+      },
+      {
+       "type": "terminal",
+       "service": "text",
+       "parameters": {
+        "attribute": "rcsb_accession_info.initial_release_date",
+        "operator": "less_or_equal",
+        "value": "2026-10-13"
+       }
+      }
+     ]
+    },
+    "return_type": "entry",
+    "request_options": {
+     "return_all_hits": true,
+     "results_verbosity": "compact",
+     "results_content_type": [
+      "computational"
+     ]
+    }
+   },
+   "bins": {
+    "S": {
+     "n": 1,
+     "residues": [
+      0,
+      299
+     ],
+     "count": 475106,
+     "sha256": "13c78a2e6949525652c5247317f5e822559abefe93ffd9ac916ad4f744457ecf"
+    },
+    "M": {
+     "n": 2,
+     "residues": [
+      300,
+      1499
+     ],
+     "count": 505369,
+     "sha256": "8e4d9cce608218e9bcb8961025785497a19d60d28616d3c102b07d29551111c7"
+    }
+   },
+   "extra": []
+  }
+ ],
+ "entries": [
+  {
+   "id": "9DU3",
+   "stratum": "S1",
+   "bin": "M",
+   "order": 0,
+   "method": "X-RAY DIFFRACTION",
+   "chains": 1,
+   "residues": 315,
+   "has": [
+    "ligand"
+   ]
+  },
+  {
+   "id": "9SP9",
+   "stratum": "S1",
+   "bin": "M",
+   "order": 1,
+   "method": "X-RAY DIFFRACTION",
+   "chains": 1,
+   "residues": 314,
+   "has": [
+    "ligand"
+   ]
+  },
+  {
+   "id": "10LI",
+   "stratum": "S1",
+   "bin": "M",
+   "order": 2,
+   "method": "X-RAY DIFFRACTION",
+   "chains": 1,
+   "residues": 478,
+   "has": [
+    "ligand",
+    "modified"
+   ]
+  },
+  {
+   "id": "5ES7",
+   "stratum": "S1",
+   "bin": "M",
+   "order": 3,
+   "method": "X-RAY DIFFRACTION",
+   "chains": 1,
+   "residues": 685,
+   "has": [
+    "ligand"
+   ]
+  },
+  {
+   "id": "4GWY",
+   "stratum": "S1",
+   "bin": "M",
+   "order": 4,
+   "method": "X-RAY DIFFRACTION",
+   "chains": 1,
+   "residues": 337,
+   "has": [
+    "ligand",
+    "glycan"
+   ]
+  },
+  {
+   "id": "1RKA",
+   "stratum": "S1",
+   "bin": "M",
+   "order": 5,
+   "method": "X-RAY DIFFRACTION",
+   "chains": 1,
+   "residues": 309,
+   "has": []
+  },
+  {
+   "id": "2AIQ",
+   "stratum": "S1",
+   "bin": "S",
+   "order": 0,
+   "method": "X-RAY DIFFRACTION",
+   "chains": 1,
+   "residues": 231,
+   "has": [
+    "ligand",
+    "glycan"
+   ]
+  },
+  {
+   "id": "9GET",
+   "stratum": "S1",
+   "bin": "S",
+   "order": 1,
+   "method": "X-RAY DIFFRACTION",
+   "chains": 1,
+   "residues": 119,
+   "has": [
+    "ligand"
+   ]
+  },
+  {
+   "id": "1N6K",
+   "stratum": "S1",
+   "bin": "S",
+   "order": 2,
+   "method": "X-RAY DIFFRACTION",
+   "chains": 1,
+   "residues": 170,
+   "has": [
+    "ligand"
+   ]
+  },
+  {
+   "id": "2LYO",
+   "stratum": "S1",
+   "bin": "S",
+   "order": 3,
+   "method": "X-RAY DIFFRACTION",
+   "chains": 1,
+   "residues": 129,
+   "has": []
+  },
+  {
+   "id": "5JNN",
+   "stratum": "S1",
+   "bin": "S",
+   "order": 4,
+   "method": "X-RAY DIFFRACTION",
+   "chains": 1,
+   "residues": 190,
+   "has": [
+    "ligand"
+   ]
+  },
+  {
+   "id": "3CYR",
+   "stratum": "S1",
+   "bin": "S",
+   "order": 5,
+   "method": "X-RAY DIFFRACTION",
+   "chains": 1,
+   "residues": 107,
+   "has": [
+    "ligand"
+   ]
+  },
+  {
+   "id": "9PDH",
+   "stratum": "S2",
+   "bin": "L",
+   "order": 0,
+   "method": "X-RAY DIFFRACTION",
+   "chains": 4,
+   "residues": 1736,
+   "has": [
+    "ligand"
+   ]
+  },
+  {
+   "id": "9UY1",
+   "stratum": "S2",
+   "bin": "L",
+   "order": 1,
+   "method": "X-RAY DIFFRACTION",
+   "chains": 18,
+   "residues": 4464,
+   "has": [
+    "ligand"
+   ]
+  },
+  {
+   "id": "4YJ5",
+   "stratum": "S2",
+   "bin": "L",
+   "order": 2,
+   "method": "X-RAY DIFFRACTION",
+   "chains": 4,
+   "residues": 2072,
+   "has": [
+    "ligand",
+    "glycan"
+   ]
+  },
+  {
+   "id": "3EOM",
+   "stratum": "S2",
+   "bin": "L",
+   "order": 3,
+   "method": "X-RAY DIFFRACTION",
+   "chains": 4,
+   "residues": 1584,
+   "has": []
+  },
+  {
+   "id": "3WAU",
+   "stratum": "S2",
+   "bin": "M",
+   "order": 0,
+   "method": "X-RAY DIFFRACTION",
+   "chains": 2,
+   "residues": 780,
+   "has": [
+    "glycan"
+   ]
+  },
+  {
+   "id": "4YP6",
+   "stratum": "S2",
+   "bin": "M",
+   "order": 1,
+   "method": "X-RAY DIFFRACTION",
+   "chains": 3,
+   "residues": 543,
+   "has": [
+    "ligand"
+   ]
+  },
+  {
+   "id": "6PO4",
+   "stratum": "S2",
+   "bin": "M",
+   "order": 2,
+   "method": "X-RAY DIFFRACTION",
+   "chains": 6,
+   "residues": 1404,
+   "has": [
+    "ligand"
+   ]
+  },
+  {
+   "id": "1NID",
+   "stratum": "S2",
+   "bin": "M",
+   "order": 3,
+   "method": "X-RAY DIFFRACTION",
+   "chains": 1,
+   "residues": 340,
+   "has": []
+  },
+  {
+   "id": "3KGS",
+   "stratum": "S2",
+   "bin": "S",
+   "order": 0,
+   "method": "X-RAY DIFFRACTION",
+   "chains": 2,
+   "residues": 254,
+   "has": []
+  },
+  {
+   "id": "1VSK",
+   "stratum": "S2",
+   "bin": "S",
+   "order": 1,
+   "method": "X-RAY DIFFRACTION",
+   "chains": 1,
+   "residues": 146,
+   "has": []
+  },
+  {
+   "id": "5C1A",
+   "stratum": "S2",
+   "bin": "XL",
+   "order": 0,
+   "method": "X-RAY DIFFRACTION",
+   "chains": 12,
+   "residues": 9660,
+   "has": [
+    "ligand"
+   ]
+  },
+  {
+   "id": "1GQ2",
+   "stratum": "S2",
+   "bin": "XL",
+   "order": 1,
+   "method": "X-RAY DIFFRACTION",
+   "chains": 16,
+   "residues": 8880,
+   "has": [
+    "ligand",
+    "modified"
+   ]
+  },
+  {
+   "id": "5S4U",
+   "stratum": "S3",
+   "bin": "L",
+   "order": 0,
+   "method": "X-RAY DIFFRACTION",
+   "chains": 6,
+   "residues": 2319,
+   "has": [
+    "ligand"
+   ]
+  },
+  {
+   "id": "7F1V",
+   "stratum": "S3",
+   "bin": "L",
+   "order": 1,
+   "method": "X-RAY DIFFRACTION",
+   "chains": 4,
+   "residues": 1592,
+   "has": [
+    "ligand",
+    "modified"
+   ]
+  },
+  {
+   "id": "8PIN",
+   "stratum": "S3",
+   "bin": "L",
+   "order": 2,
+   "method": "X-RAY DIFFRACTION",
+   "chains": 7,
+   "residues": 1720,
+   "has": [
+    "ligand"
+   ]
+  },
+  {
+   "id": "3ABR",
+   "stratum": "S3",
+   "bin": "L",
+   "order": 3,
+   "method": "X-RAY DIFFRACTION",
+   "chains": 4,
+   "residues": 1518,
+   "has": [
+    "ligand"
+   ]
+  },
+  {
+   "id": "6A7T",
+   "stratum": "S3",
+   "bin": "M",
+   "order": 0,
+   "method": "X-RAY DIFFRACTION",
+   "chains": 2,
+   "residues": 317,
+   "has": []
+  },
+  {
+   "id": "1XZ4",
+   "stratum": "S3",
+   "bin": "M",
+   "order": 1,
+   "method": "X-RAY DIFFRACTION",
+   "chains": 4,
+   "residues": 574,
+   "has": [
+    "ligand"
+   ]
+  },
+  {
+   "id": "2YNR",
+   "stratum": "S3",
+   "bin": "M",
+   "order": 2,
+   "method": "X-RAY DIFFRACTION",
+   "chains": 3,
+   "residues": 485,
+   "has": []
+  },
+  {
+   "id": "4ODQ",
+   "stratum": "S3",
+   "bin": "S",
+   "order": 0,
+   "method": "X-RAY DIFFRACTION",
+   "chains": 2,
+   "residues": 126,
+   "has": []
+  },
+  {
+   "id": "4B2T",
+   "stratum": "S3",
+   "bin": "XL",
+   "order": 0,
+   "method": "X-RAY DIFFRACTION",
+   "chains": 16,
+   "residues": 8682,
+   "has": []
+  },
+  {
+   "id": "4ZH4",
+   "stratum": "S3",
+   "bin": "XL",
+   "order": 1,
+   "method": "X-RAY DIFFRACTION",
+   "chains": 12,
+   "residues": 8246,
+   "has": [
+    "ligand"
+   ]
+  },
+  {
+   "id": "7XBK",
+   "stratum": "S4",
+   "bin": "L",
+   "order": 0,
+   "quota": "helical",
+   "method": "ELECTRON MICROSCOPY",
+   "chains": 10,
+   "residues": 6110,
+   "has": [
+    "ligand"
+   ]
+  },
+  {
+   "id": "9Y70",
+   "stratum": "S4",
+   "bin": "L",
+   "order": 0,
+   "method": "ELECTRON MICROSCOPY",
+   "chains": 4,
+   "residues": 2264,
+   "has": [
+    "ligand"
+   ]
+  },
+  {
+   "id": "6TIK",
+   "stratum": "S4",
+   "bin": "L",
+   "order": 1,
+   "quota": "big",
+   "method": "ELECTRON MICROSCOPY",
+   "chains": 4,
+   "residues": 2356,
+   "has": []
+  },
+  {
+   "id": "12DV",
+   "stratum": "S4",
+   "bin": "L",
+   "order": 1,
+   "method": "ELECTRON MICROSCOPY",
+   "chains": 9,
+   "residues": 6273,
+   "has": []
+  },
+  {
+   "id": "9BZD",
+   "stratum": "S4",
+   "bin": "L",
+   "order": 2,
+   "method": "ELECTRON MICROSCOPY",
+   "chains": 4,
+   "residues": 2100,
+   "has": [
+    "ligand"
+   ]
+  },
+  {
+   "id": "8U1N",
+   "stratum": "S4",
+   "bin": "M",
+   "order": 0,
+   "method": "ELECTRON MICROSCOPY",
+   "chains": 2,
+   "residues": 1444,
+   "has": [
+    "ligand"
+   ]
+  },
+  {
+   "id": "9N2E",
+   "stratum": "S4",
+   "bin": "M",
+   "order": 1,
+   "method": "ELECTRON MICROSCOPY",
+   "chains": 2,
+   "residues": 1149,
+   "has": []
+  },
+  {
+   "id": "6ZTQ",
+   "stratum": "S4",
+   "bin": "XL",
+   "order": 0,
+   "quota": "big",
+   "method": "ELECTRON MICROSCOPY",
+   "chains": 45,
+   "residues": 9214,
+   "has": [
+    "ligand",
+    "modified"
+   ]
+  },
+  {
+   "id": "9NMN",
+   "stratum": "S4",
+   "bin": "XL",
+   "order": 0,
+   "quota": "cap",
+   "method": "ELECTRON MICROSCOPY",
+   "chains": 8,
+   "residues": 20572,
+   "has": [
+    "ligand"
+   ]
+  },
+  {
+   "id": "8FZN",
+   "stratum": "S4",
+   "bin": "XL",
+   "order": 0,
+   "method": "ELECTRON MICROSCOPY",
+   "chains": 60,
+   "residues": 30000,
+   "has": []
+  },
+  {
+   "id": "7SPI",
+   "stratum": "S4",
+   "bin": "XL",
+   "order": 1,
+   "quota": "cap",
+   "method": "ELECTRON MICROSCOPY",
+   "chains": 78,
+   "residues": 23478,
+   "has": []
+  },
+  {
+   "id": "7U9Z",
+   "stratum": "S4",
+   "bin": "XL",
+   "order": 1,
+   "method": "ELECTRON MICROSCOPY",
+   "chains": 8,
+   "residues": 20300,
+   "has": [
+    "ligand"
+   ]
+  },
+  {
+   "id": "9HEO",
+   "stratum": "S4",
+   "bin": "XL",
+   "order": 2,
+   "quota": "cap",
+   "method": "ELECTRON MICROSCOPY",
+   "chains": 12,
+   "residues": 21040,
+   "has": [
+    "ligand"
+   ]
+  },
+  {
+   "id": "7ADZ",
+   "stratum": "S4",
+   "bin": "XL",
+   "order": 2,
+   "method": "ELECTRON MICROSCOPY",
+   "chains": 30,
+   "residues": 8742,
+   "has": []
+  },
+  {
+   "id": "9FZL",
+   "stratum": "S4",
+   "bin": "XL",
+   "order": 3,
+   "method": "ELECTRON MICROSCOPY",
+   "chains": 98,
+   "residues": 16196,
+   "has": [
+    "ligand"
+   ]
+  },
+  {
+   "id": "5NF8",
+   "stratum": "S5",
+   "bin": "M",
+   "order": 0,
+   "method": "SOLUTION NMR",
+   "chains": 2,
+   "residues": 348,
+   "has": []
+  },
+  {
+   "id": "1UG2",
+   "stratum": "S5",
+   "bin": "S",
+   "order": 0,
+   "method": "SOLUTION NMR",
+   "chains": 1,
+   "residues": 95,
+   "has": []
+  },
+  {
+   "id": "2LLF",
+   "stratum": "S5",
+   "bin": "S",
+   "order": 1,
+   "method": "SOLUTION NMR",
+   "chains": 1,
+   "residues": 107,
+   "has": []
+  },
+  {
+   "id": "2KQV",
+   "stratum": "S5",
+   "bin": "S",
+   "order": 2,
+   "method": "SOLUTION NMR",
+   "chains": 1,
+   "residues": 198,
+   "has": []
+  },
+  {
+   "id": "2MAH",
+   "stratum": "S5",
+   "bin": "S",
+   "order": 3,
+   "method": "SOLUTION NMR",
+   "chains": 1,
+   "residues": 128,
+   "has": []
+  },
+  {
+   "id": "2KVK",
+   "stratum": "S5",
+   "bin": "S",
+   "order": 4,
+   "method": "SOLUTION NMR",
+   "chains": 1,
+   "residues": 144,
+   "has": []
+  },
+  {
+   "id": "2MXC",
+   "stratum": "S5",
+   "bin": "S",
+   "order": 5,
+   "method": "SOLUTION NMR",
+   "chains": 1,
+   "residues": 172,
+   "has": []
+  },
+  {
+   "id": "6Y1H",
+   "stratum": "S5",
+   "bin": "S",
+   "order": 6,
+   "method": "SOLUTION NMR",
+   "chains": 1,
+   "residues": 71,
+   "has": []
+  },
+  {
+   "id": "7Y63",
+   "stratum": "S6",
+   "bin": "L",
+   "order": 0,
+   "method": "ELECTRON MICROSCOPY",
+   "chains": 2,
+   "residues": 1664,
+   "has": [
+    "glycan"
+   ]
+  },
+  {
+   "id": "6BO8",
+   "stratum": "S6",
+   "bin": "L",
+   "order": 1,
+   "method": "ELECTRON MICROSCOPY",
+   "chains": 4,
+   "residues": 2968,
+   "has": []
+  },
+  {
+   "id": "6QUE",
+   "stratum": "S6",
+   "bin": "L",
+   "order": 2,
+   "method": "ELECTRON MICROSCOPY",
+   "chains": 2,
+   "residues": 2172,
+   "has": [
+    "ligand"
+   ]
+  },
+  {
+   "id": "6UW4",
+   "stratum": "S6",
+   "bin": "L",
+   "order": 3,
+   "method": "ELECTRON MICROSCOPY",
+   "chains": 4,
+   "residues": 3160,
+   "has": [
+    "ligand"
+   ]
+  },
+  {
+   "id": "6VBG",
+   "stratum": "S6",
+   "bin": "M",
+   "order": 0,
+   "method": "X-RAY DIFFRACTION",
+   "chains": 4,
+   "residues": 1076,
+   "has": [
+    "glycan"
+   ]
+  },
+  {
+   "id": "4D5B",
+   "stratum": "S6",
+   "bin": "M",
+   "order": 1,
+   "method": "X-RAY DIFFRACTION",
+   "chains": 2,
+   "residues": 678,
+   "has": [
+    "glycan"
+   ]
+  },
+  {
+   "id": "8GG4",
+   "stratum": "S6",
+   "bin": "M",
+   "order": 2,
+   "method": "ELECTRON MICROSCOPY",
+   "chains": 4,
+   "residues": 1254,
+   "has": [
+    "ligand"
+   ]
+  },
+  {
+   "id": "6DQN",
+   "stratum": "S6",
+   "bin": "XL",
+   "order": 0,
+   "method": "ELECTRON MICROSCOPY",
+   "chains": 4,
+   "residues": 10684,
+   "has": [
+    "ligand"
+   ]
+  },
+  {
+   "id": "6LAB",
+   "stratum": "S7",
+   "bin": "L",
+   "order": 0,
+   "method": "X-RAY DIFFRACTION",
+   "chains": 22,
+   "residues": 3044,
+   "has": []
+  },
+  {
+   "id": "6ZY7",
+   "stratum": "S7",
+   "bin": "L",
+   "order": 1,
+   "method": "ELECTRON MICROSCOPY",
+   "chains": 6,
+   "residues": 3122,
+   "has": [
+    "ligand"
+   ]
+  },
+  {
+   "id": "9XSF",
+   "stratum": "S7",
+   "bin": "M",
+   "order": 0,
+   "method": "ELECTRON MICROSCOPY",
+   "chains": 10,
+   "residues": 1276,
+   "has": [
+    "glycan"
+   ]
+  },
+  {
+   "id": "8VBG",
+   "stratum": "S7",
+   "bin": "M",
+   "order": 1,
+   "method": "ELECTRON MICROSCOPY",
+   "chains": 3,
+   "residues": 1039,
+   "has": [
+    "ligand",
+    "modified"
+   ]
+  },
+  {
+   "id": "3W96",
+   "stratum": "S7",
+   "bin": "M",
+   "order": 2,
+   "method": "X-RAY DIFFRACTION",
+   "chains": 10,
+   "residues": 1288,
+   "has": []
+  },
+  {
+   "id": "6VTX",
+   "stratum": "S7",
+   "bin": "S",
+   "order": 0,
+   "method": "X-RAY DIFFRACTION",
+   "chains": 3,
+   "residues": 108,
+   "has": []
+  },
+  {
+   "id": "8XJV",
+   "stratum": "S7",
+   "bin": "XL",
+   "order": 0,
+   "method": "ELECTRON MICROSCOPY",
+   "chains": 110,
+   "residues": 18408,
+   "has": []
+  },
+  {
+   "id": "6JCY",
+   "stratum": "S8",
+   "bin": "L",
+   "order": 0,
+   "method": "X-RAY DIFFRACTION",
+   "chains": 9,
+   "residues": 3595,
+   "has": []
+  },
+  {
+   "id": "3G6E",
+   "stratum": "S8",
+   "bin": "L",
+   "order": 1,
+   "method": "X-RAY DIFFRACTION",
+   "chains": 31,
+   "residues": 7217,
+   "has": [
+    "ligand",
+    "modified"
+   ]
+  },
+  {
+   "id": "8S8X",
+   "stratum": "S8",
+   "bin": "M",
+   "order": 0,
+   "method": "X-RAY DIFFRACTION",
+   "chains": 3,
+   "residues": 447,
+   "has": [
+    "ligand"
+   ]
+  },
+  {
+   "id": "4AS1",
+   "stratum": "S8",
+   "bin": "M",
+   "order": 1,
+   "method": "X-RAY DIFFRACTION",
+   "chains": 2,
+   "residues": 967,
+   "has": []
+  },
+  {
+   "id": "3EGZ",
+   "stratum": "S8",
+   "bin": "S",
+   "order": 0,
+   "method": "X-RAY DIFFRACTION",
+   "chains": 2,
+   "residues": 163,
+   "has": [
+    "ligand",
+    "modified"
+   ]
+  },
+  {
+   "id": "7F5S",
+   "stratum": "S8",
+   "bin": "XL",
+   "order": 0,
+   "quota": "ribosome",
+   "method": "ELECTRON MICROSCOPY",
+   "chains": 45,
+   "residues": 12558,
+   "has": [
+    "modified"
+   ]
+  },
+  {
+   "id": "6QIK",
+   "stratum": "S8",
+   "bin": "XL",
+   "order": 0,
+   "method": "ELECTRON MICROSCOPY",
+   "chains": 47,
+   "residues": 12026,
+   "has": []
+  },
+  {
+   "id": "9OWM",
+   "stratum": "S9",
+   "bin": "M",
+   "order": 0,
+   "method": "ELECTRON MICROSCOPY",
+   "chains": 2,
+   "residues": 492,
+   "has": []
+  },
+  {
+   "id": "2FCY",
+   "stratum": "S9",
+   "bin": "S",
+   "order": 0,
+   "method": "X-RAY DIFFRACTION",
+   "chains": 2,
+   "residues": 46,
+   "has": [
+    "ligand",
+    "modified"
+   ]
+  },
+  {
+   "id": "6IZP",
+   "stratum": "S9",
+   "bin": "S",
+   "order": 1,
+   "method": "SOLUTION NMR",
+   "chains": 1,
+   "residues": 29,
+   "has": [
+    "ligand"
+   ]
+  },
+  {
+   "id": "7UKO",
+   "stratum": "S10",
+   "bin": "L",
+   "order": 0,
+   "method": "X-RAY DIFFRACTION",
+   "chains": 8,
+   "residues": 2728,
+   "has": [
+    "ligand",
+    "glycan"
+   ]
+  },
+  {
+   "id": "7KMZ",
+   "stratum": "S10",
+   "bin": "L",
+   "order": 1,
+   "method": "ELECTRON MICROSCOPY",
+   "chains": 5,
+   "residues": 5058,
+   "has": [
+    "glycan"
+   ]
+  },
+  {
+   "id": "7G33",
+   "stratum": "S10",
+   "bin": "M",
+   "order": 0,
+   "method": "X-RAY DIFFRACTION",
+   "chains": 1,
+   "residues": 846,
+   "has": [
+    "ligand",
+    "glycan"
+   ]
+  },
+  {
+   "id": "3O6N",
+   "stratum": "S10",
+   "bin": "M",
+   "order": 1,
+   "method": "X-RAY DIFFRACTION",
+   "chains": 1,
+   "residues": 390,
+   "has": [
+    "glycan"
+   ]
+  },
+  {
+   "id": "8EM7",
+   "stratum": "S10",
+   "bin": "XL",
+   "order": 0,
+   "method": "ELECTRON MICROSCOPY",
+   "chains": 2,
+   "residues": 9320,
+   "has": [
+    "glycan"
+   ]
+  },
+  {
+   "id": "8OJZ",
+   "stratum": "S11",
+   "bin": "L",
+   "order": 0,
+   "pair": "P1",
+   "pair_type": "apo/holo",
+   "role": "seed",
+   "partner": "8QX1",
+   "ligand_touching": false,
+   "assembly1_chains": 4,
+   "ca_rmsd": 3.415,
+   "method": "X-RAY DIFFRACTION",
+   "chains": 2,
+   "residues": 1948,
+   "has": []
+  },
+  {
+   "id": "8QX1",
+   "stratum": "S11",
+   "bin": "L",
+   "order": 0,
+   "pair": "P1",
+   "pair_type": "apo/holo",
+   "role": "partner",
+   "partner": "8OJZ",
+   "ligand_touching": true,
+   "assembly1_chains": 4,
+   "ca_rmsd": 3.415,
+   "method": "X-RAY DIFFRACTION",
+   "chains": 3,
+   "residues": 2922,
+   "has": [
+    "ligand"
+   ]
+  },
+  {
+   "id": "3P2W",
+   "stratum": "S11",
+   "bin": "S",
+   "order": 1,
+   "pair": "P2",
+   "pair_type": "apo/holo",
+   "role": "seed",
+   "partner": "8CRC",
+   "ligand_touching": false,
+   "assembly1_chains": 1,
+   "ca_rmsd": 3.839,
+   "method": "X-RAY DIFFRACTION",
+   "chains": 1,
+   "residues": 232,
+   "has": []
+  },
+  {
+   "id": "8CRC",
+   "stratum": "S11",
+   "bin": "S",
+   "order": 1,
+   "pair": "P2",
+   "pair_type": "apo/holo",
+   "role": "partner",
+   "partner": "3P2W",
+   "ligand_touching": true,
+   "assembly1_chains": 1,
+   "ca_rmsd": 3.839,
+   "method": "X-RAY DIFFRACTION",
+   "chains": 1,
+   "residues": 228,
+   "has": [
+    "ligand"
+   ]
+  },
+  {
+   "id": "2YEJ",
+   "stratum": "S11",
+   "bin": "S",
+   "order": 9,
+   "pair": "P3",
+   "pair_type": "monomer/oligomer",
+   "role": "seed",
+   "partner": "3FT8",
+   "ligand_touching": true,
+   "assembly1_chains": 1,
+   "ca_rmsd": 0.285,
+   "method": "X-RAY DIFFRACTION",
+   "chains": 1,
+   "residues": 252,
+   "has": [
+    "ligand"
+   ]
+  },
+  {
+   "id": "3FT8",
+   "stratum": "S11",
+   "bin": "S",
+   "order": 9,
+   "pair": "P3",
+   "pair_type": "monomer/oligomer",
+   "role": "partner",
+   "partner": "2YEJ",
+   "ligand_touching": true,
+   "assembly1_chains": 2,
+   "ca_rmsd": 0.285,
+   "method": "X-RAY DIFFRACTION",
+   "chains": 1,
+   "residues": 249,
+   "has": [
+    "ligand"
+   ]
+  },
+  {
+   "id": "5U3R",
+   "stratum": "S11",
+   "bin": "M",
+   "order": 11,
+   "pair": "P4",
+   "pair_type": "monomer/oligomer",
+   "role": "seed",
+   "partner": "5XMX",
+   "ligand_touching": true,
+   "assembly1_chains": 1,
+   "ca_rmsd": 0.426,
+   "method": "X-RAY DIFFRACTION",
+   "chains": 2,
+   "residues": 544,
+   "has": [
+    "ligand",
+    "glycan"
+   ]
+  },
+  {
+   "id": "5XMX",
+   "stratum": "S11",
+   "bin": "M",
+   "order": 11,
+   "pair": "P4",
+   "pair_type": "monomer/oligomer",
+   "role": "partner",
+   "partner": "5U3R",
+   "ligand_touching": true,
+   "assembly1_chains": 2,
+   "ca_rmsd": 0.426,
+   "method": "X-RAY DIFFRACTION",
+   "chains": 2,
+   "residues": 550,
+   "has": [
+    "ligand"
+   ]
+  },
+  {
+   "id": "6M67",
+   "stratum": "S11",
+   "bin": "L",
+   "order": 20,
+   "pair": "P5",
+   "pair_type": "open/closed",
+   "role": "seed",
+   "partner": "6LTO",
+   "ligand_touching": false,
+   "assembly1_chains": 7,
+   "ca_rmsd": 8.376,
+   "method": "ELECTRON MICROSCOPY",
+   "chains": 7,
+   "residues": 3080,
+   "has": []
+  },
+  {
+   "id": "6LTO",
+   "stratum": "S11",
+   "bin": "L",
+   "order": 20,
+   "pair": "P5",
+   "pair_type": "open/closed",
+   "role": "partner",
+   "partner": "6M67",
+   "ligand_touching": false,
+   "assembly1_chains": 7,
+   "ca_rmsd": 8.376,
+   "method": "ELECTRON MICROSCOPY",
+   "chains": 7,
+   "residues": 3052,
+   "has": []
+  },
+  {
+   "id": "AF_AFQ8ZPJ0F1",
+   "stratum": "S12",
+   "bin": "M",
+   "order": 0,
+   "source": "Q8ZPJ0",
+   "model_version": "AlphaFold DB v6: AlphaFold Monomer v2.0 model",
+   "method": "COMPUTED MODEL",
+   "chains": 1,
+   "residues": 339,
+   "has": []
+  },
+  {
+   "id": "AF_AFQ5AGV5F1",
+   "stratum": "S12",
+   "bin": "M",
+   "order": 1,
+   "source": "Q5AGV5",
+   "model_version": "AlphaFold DB v6: AlphaFold Monomer v2.0 model",
+   "method": "COMPUTED MODEL",
+   "chains": 1,
+   "residues": 1006,
+   "has": []
+  },
+  {
+   "id": "AF_AFI1K7U1F1",
+   "stratum": "S12",
+   "bin": "S",
+   "order": 0,
+   "source": "I1K7U1",
+   "model_version": "AlphaFold DB v6: AlphaFold Monomer v2.0 model",
+   "method": "COMPUTED MODEL",
+   "chains": 1,
+   "residues": 223,
+   "has": []
+  }
+ ],
+ "replaced": [],
+ "skipped": [
+  {
+   "id": "3PYE",
+   "stratum": "S11",
+   "pool": "seeds",
+   "reason": "no partner"
+  },
+  {
+   "id": "5KZY",
+   "stratum": "S11",
+   "pool": "seeds",
+   "reason": "no partner of an open type"
+  },
+  {
+   "id": "6XKS",
+   "stratum": "S11",
+   "pool": "seeds",
+   "reason": "no partner"
+  },
+  {
+   "id": "5Q7D",
+   "stratum": "S11",
+   "pool": "seeds",
+   "reason": "no partner of an open type"
+  },
+  {
+   "id": "5NH6",
+   "stratum": "S11",
+   "pool": "seeds",
+   "reason": "no partner"
+  },
+  {
+   "id": "3K06",
+   "stratum": "S11",
+   "pool": "seeds",
+   "reason": "no partner of an open type"
+  },
+  {
+   "id": "6HLK",
+   "stratum": "S11",
+   "pool": "seeds",
+   "reason": "no partner"
+  },
+  {
+   "id": "1MBT",
+   "stratum": "S11",
+   "pool": "seeds",
+   "reason": "no partner of an open type"
+  },
+  {
+   "id": "7ZNB",
+   "stratum": "S11",
+   "pool": "seeds",
+   "reason": "no partner"
+  },
+  {
+   "id": "7CRY",
+   "stratum": "S11",
+   "pool": "seeds",
+   "reason": "no partner of an open type"
+  },
+  {
+   "id": "2GVI",
+   "stratum": "S11",
+   "pool": "seeds",
+   "reason": "no partner"
+  },
+  {
+   "id": "8T97",
+   "stratum": "S11",
+   "pool": "seeds",
+   "reason": "no partner of an open type"
+  },
+  {
+   "id": "1YI8",
+   "stratum": "S11",
+   "pool": "seeds",
+   "reason": "no partner of an open type"
+  },
+  {
+   "id": "7DE0",
+   "stratum": "S11",
+   "pool": "seeds",
+   "reason": "no partner"
+  },
+  {
+   "id": "2HIP",
+   "stratum": "S11",
+   "pool": "seeds",
+   "reason": "no partner"
+  },
+  {
+   "id": "28ZL",
+   "stratum": "S11",
+   "pool": "seeds",
+   "reason": "no partner of an open type"
+  }
+ ],
+ "quotas": {
+  "ligand": {
+   "target": 30,
+   "reached": 51
+  },
+  "glycan": {
+   "target": 8,
+   "reached": 14
+  },
+  "modified": {
+   "target": 8,
+   "reached": 9
+  },
+  "S1:S": {
+   "target": 6,
+   "reached": 6
+  },
+  "S1:M": {
+   "target": 6,
+   "reached": 6
+  },
+  "S2:S": {
+   "target": 2,
+   "reached": 2
+  },
+  "S2:M": {
+   "target": 4,
+   "reached": 4
+  },
+  "S2:L": {
+   "target": 4,
+   "reached": 4
+  },
+  "S2:XL": {
+   "target": 2,
+   "reached": 2
+  },
+  "S3:S": {
+   "target": 1,
+   "reached": 1
+  },
+  "S3:M": {
+   "target": 3,
+   "reached": 3
+  },
+  "S3:L": {
+   "target": 4,
+   "reached": 4
+  },
+  "S3:XL": {
+   "target": 2,
+   "reached": 2
+  },
+  "S4:helical": {
+   "target": 1,
+   "reached": 1
+  },
+  "S4:big": {
+   "target": 2,
+   "reached": 2
+  },
+  "S4:cap": {
+   "target": 3,
+   "reached": 3
+  },
+  "S4:M": {
+   "target": 2,
+   "reached": 2
+  },
+  "S4:L": {
+   "target": 5,
+   "reached": 5
+  },
+  "S4:XL": {
+   "target": 8,
+   "reached": 8
+  },
+  "S5:S": {
+   "target": 7,
+   "reached": 7
+  },
+  "S5:M": {
+   "target": 1,
+   "reached": 1
+  },
+  "S6:M": {
+   "target": 3,
+   "reached": 3
+  },
+  "S6:L": {
+   "target": 4,
+   "reached": 4
+  },
+  "S6:XL": {
+   "target": 1,
+   "reached": 1
+  },
+  "S7:S": {
+   "target": 1,
+   "reached": 1
+  },
+  "S7:M": {
+   "target": 3,
+   "reached": 3
+  },
+  "S7:L": {
+   "target": 2,
+   "reached": 2
+  },
+  "S7:XL": {
+   "target": 1,
+   "reached": 1
+  },
+  "S8:ribosome": {
+   "target": 1,
+   "reached": 1
+  },
+  "S8:S": {
+   "target": 1,
+   "reached": 1
+  },
+  "S8:M": {
+   "target": 2,
+   "reached": 2
+  },
+  "S8:L": {
+   "target": 2,
+   "reached": 2
+  },
+  "S8:XL": {
+   "target": 2,
+   "reached": 2
+  },
+  "S9:S": {
+   "target": 2,
+   "reached": 2
+  },
+  "S9:M": {
+   "target": 1,
+   "reached": 1
+  },
+  "S10:M": {
+   "target": 2,
+   "reached": 2
+  },
+  "S10:L": {
+   "target": 2,
+   "reached": 2
+  },
+  "S10:XL": {
+   "target": 1,
+   "reached": 1
+  },
+  "S11:apo/holo": {
+   "target": 2,
+   "reached": 2
+  },
+  "S11:monomer/oligomer": {
+   "target": 2,
+   "reached": 2
+  },
+  "S11:open/closed": {
+   "target": 1,
+   "reached": 1
+  },
+  "S12:S": {
+   "target": 1,
+   "reached": 1
+  },
+  "S12:M": {
+   "target": 2,
+   "reached": 2
+  }
+ },
+ "excluded": {
+  "ids": 200,
+  "sha256": "38d73a529577ea14f88f02e2ebc96ffcbb226374fc2d71859bdf71138a5518e4"
+ },
+ "files": {
+  "10LI": "d223e1a29926c77a05a2c7e86291043ffa5f648bdcc12a7b1f7b2f2cdd5b631e",
+  "12DV": "1da9d21f5021bf547c001690ec14f08bad5095293b01147a95a21635a0747180",
+  "1GQ2": "8b9a155178d94c4ae69125604b4468b544797a62234c197de2c20626c3c8db15",
+  "1MBB": "275063d5077ae9fc5a14e9f18ecd051b6b00f01d7c1204abe9890cd58abe5f75",
+  "1MBT": "e56cbe6ae129065a77cb7ffc010eab0c6038f9c43635bb1e31901e51f8450246",
+  "1N6K": "568037c458324d293e90c2d7b38e7325047883cbc5b8ac151ef8f910f82e54de",
+  "1NID": "b4853621636cf99d4b72c6e359a9781b5b091ccb0e0e9b7886eee82c4b9713bc",
+  "1RKA": "9ce3843fd136986ae2a2dda01a035e5a0ac1b6648dc1ab6ecc26a4fa6051e292",
+  "1UG2": "86208e7e9ae873fbc5db6fc4fd58d5a89b92ba3dacc6dc34e945351700dafedb",
+  "1UXY": "556fe92b2140bd756a593a0d2121dad289f536d0951dc1b6a15981dd61d3e7a1",
+  "1VSK": "f154fc1ccf8a39313954e44aca9b030bcd4d7ec9a38a156cbfc90468599ac1eb",
+  "1XZ4": "43fa0487f81ee606a25dddbc491cc836250c98461b97a15534e2a703b72d8b67",
+  "1YI8": "72075c29c949c6d65034ccd3c51cd581b1b6eb3349051d71d05b6613ee557f8f",
+  "1YIA": "93addf4b3139b1fd8ed4466d28f8dae9ab89d7358aea4dc174c5ee530d12f504",
+  "1YID": "2fab019c0c1d246ad1bbd6a634cfe18607a0cea20b59833b9aacf3d0a83cce4a",
+  "28ZI": "bf7e2e8571ece4a53f5c743ce5d96bcfbd0fd159c34cc6f13a189f0f3e9bdd93",
+  "28ZJ": "d8e60f0e7130fe8e03d514c2afbd918fbccb63402167919c206beaca407fc445",
+  "28ZL": "d1bd72ed8f15f53922f76d0fbeb12c1e23cca0518421c7a80dbdeca70f26b174",
+  "28ZM": "9767200640abb67080251e67262acebe18be9cf4f8ab42b373a3e43c16c2f89a",
+  "28ZP": "1497473b5effc64bded46f49c7d13d25ff0b7fa8c3f68b56aaa9409f3b73fcab",
+  "28ZQ": "3aadfc846fb3b288ed06b3fbf24fe1d5d005ae733b829ba3a0402117ac1666e1",
+  "28ZS": "d802fba90af53cfb190038f44eeceaa408dd3a42f0ed7f099c2f5b9023e13612",
+  "2A4M": "a6d2d81e4b7a9afa559282bc2635ea6e4375f310d736681be742e7f1c7fe7daa",
+  "2AIQ": "bebb27c78212df112c67fc96cc746653e9f24bfb311496bd6ee67d80b8d60011",
+  "2FCY": "31186be8678072c863da34fd2b0cc7a05ca025fef9825377d631a6ded9cb765c",
+  "2GVI": "0e22ac1e373d31bdc0dda62eb621906b32e80025556a1caaba2c48f45ee48970",
+  "2HIP": "85c723d8b78a57f7c11a2363cbe842ca02ea7346ea75563e511a8269e885c2f6",
+  "2KQV": "d405bbfc9c071e71cead0eda7c6f55b9c72b0db275bdf962066c40918966f96b",
+  "2KVK": "c8dc0d59acd8bfe1d1e4c57c99c789de0945a4588b4b4f859061169305bfc6e9",
+  "2LLF": "5bd38758a8ea9ddba791176046fbd6b35b1632ce282ba431102a45c05dec3e9d",
+  "2LYO": "bf45043374ff91944bb1f63fa865a1aa7822c3c1ca51fb979d449ec33fdce5c3",
+  "2MAH": "da4bf8929bcd1e526e6aad935c665adf6567481f131e5744905c01385750162f",
+  "2MBR": "7492d724685dfa8a5e5634a2d6c1157adcec168e6a796eed7edcd0d39b1ea539",
+  "2MXC": "235a10f07645f23741881fecfff0f60609040715bf43857b18722e0b5b3c2991",
+  "2OWB": "0e75c5339c11d272f5822510503e4a211e972d1c23ff974c62e2eedb44d89946",
+  "2Q85": "85afa80fdc04a6a1c6f8ffcae04a8f19d88cc99107edbde8e0dc43c05b0fa9e7",
+  "2YEJ": "9658a54ce7ad9450c8f91efe1497e8c185e85306b84509b72749fa02b75e9977",
+  "2YNR": "1cd82dd2a6ab27d22b67c9dd6106082e3e8930e0fc633aaf0b157ead3c16881e",
+  "3ABR": "9eb1c98505341a836de36ee84a3bbe885b65aad63675ed9c980e074366a908b7",
+  "3CYR": "7df5c3b7acac8b6b2a018c423ca820b35b5d603f8d05fdc210286793292d52f2",
+  "3EGZ": "89945ee35215f0d2459fdec223f79df0f1bab5a09cb3c67659ced814561ff7ac",
+  "3EOM": "8dc6cd6e670a5b12fa585dff404ce50e77f7ef461c5689ba4df7d0ab076f149c",
+  "3FC2": "a5fd90373a4af0939e98b1a19920a3fd4d9fe95a65510076f8f4107d1fbddde4",
+  "3FT8": "015c4858c0ae176a475f2957f071e28b03604dad1d5a59c4ba1f05d65cec695b",
+  "3G6E": "bd913d5d301a359af82e07a05ffab071ac14be164690deb6f5453c7a492c8a55",
+  "3K06": "93c60b7e30849b4c0971780e12cf53d6b4149be85b4191fa2d47a49a7a9cf609",
+  "3K0D": "3ec6e4c0600112cc933a6221d148c53dfe9dc954ce93c7080ee39c445db12d84",
+  "3K0G": "5003319112149e576a35b8611931f3a9b2db9dae33a37ae049a19262c6534d48",
+  "3KGS": "17aaefffe0a9c273b4b92ced13edcdbe7933c1e5d55cd080b39efb82a1b85340",
+  "3O6N": "8e7a0d7f43d1d3fd725898ce0874ef10870b78d11b1b16a697d23461dbe19484",
+  "3OUF": "bc46a5ec4a03fe36ce65ea33422235279f85b1dd364402040f4228a95311ba12",
+  "3P2W": "6dc5714d43c61b4e8ba1ad7256069994338b6eb60115ec0deeecec972f670c04",
+  "3PYE": "a34152f4d5630eff6aba8b053ef0144c87b775c885fae9f5c733f82e742cba97",
+  "3T4Z": "73cc2d6b320fc2ab4b819db160f9629bbe5c69fa8bb5bcf3d82d4f6544b41be3",
+  "3THB": "745dfa7f1a5b49d1abd9126bf213fcc6593eb5f3f3a9013b66f1b2f2b0ee08fe",
+  "3W96": "9af341f8dfeec1484b00898caf173c89532ab0eac1815174f3b20dd8e6b27388",
+  "3WAU": "915fe6d7680870aa49995f8fe27c68eb95eab0ee815e6f35b5814e75629bad0f",
+  "4A4O": "49f3b33769c22092b5d826a699b71295b4e176dde0090bfe6314249bdf8fdcea",
+  "4AS1": "d64674da093ebe085b04bc5280982e32d373ae6d6d3c6caf9912f9286d423602",
+  "4B2T": "2d711a3da685ba0f5c5914813d6fdc278c440b6447946fbde3f7c55aba99d916",
+  "4D5B": "19fef51097f1adea5af396152e6714b7522d5f86b94ee35f007d742b94fbf19d",
+  "4GWY": "d94c92bd4d5b9b5c6d35f7e293b1c51eee5a914ceb2c4c4fa17edccfbdfec4ec",
+  "4H5X": "89fd1f7e878156c75a631c2b5d16d8cfda2babbfdcd7f812192ad4cfc30f80c4",
+  "4ODQ": "08aa975895f648107eb976ff8d3104538b422f4fdeb0ffa649d6c41d5ed61f81",
+  "4YJ5": "7c228d21fe1ed147da7954579f7c0fe30c33a585d4dd5bf697fff50db7d15382",
+  "4YP6": "693c39740d97fcfb58a5e737d8ac6649a88eda22c3d8a88eab2773aa4f7460d0",
+  "4ZBM": "0b9ddec6d0357f0cec304c8cefc3758bf2e4f8f5e7e285f2c7ee27de5fc813ec",
+  "4ZH4": "4799a383bdc1a12f3bd75802e76f09e14c36388fb27ea679ca1c26458743a278",
+  "5B2N": "14d67167795b92e6188468135f4bb3084a9556377ba11491ecc5f3dc061b1f57",
+  "5C1A": "9d0c8263ea21b4b8f1c563b87d5b91929049893df3eb708df758fe03b219175a",
+  "5ES7": "344429cc35248c479a5b948071b5eb55130e065cae8a5de6f055563c45c81579",
+  "5G54": "dc0aa84c5d6d6a4b23a45f2d025c7190b31663f11149bd48d8fd192ef607a31e",
+  "5JNN": "af0be2dece93741a20f63234ecce7f4accd90390262f3385190bf2e7e8aaaadf",
+  "5KZV": "e11716e1289b61ecb565e3a7df7297c0f63bd42fed5f9b16ff21a8e0fcfed8e7",
+  "5KZY": "31deceae301c7a9c5d51ef8fcd1048623041b459e75c76d2cd68d1716a9c19dc",
+  "5KZZ": "bf00f75b9d93e214a38a1c421a346f4fea50f627a8be686363e65b69e65e290f",
+  "5NF8": "0940697aab37c7156c8bd433a7b5c6fcfb4ec236e498241ef4f1f987e7df451a",
+  "5NH6": "707eb72a8389c34c21221c7673c84c454bb3425913e54b04b6dd79c8e233b415",
+  "5NN1": "fb738e61727840c03caccfce24fe6e607de9c626958ef90edd428203edfcca74",
+  "5Q2I": "c1b0f0aba270107bc015b6964d89a9c462a4ec0f81dbfcfa7a95a64fb2705868",
+  "5Q2S": "82f47a5bef4bc54200ce1b052e095295e337698e0c46cb32be689f92652a0a83",
+  "5Q4T": "e43b8b2d1f1557dd5d49875d1cdc494f17511bd3f046c9ddf656bf72d1ede281",
+  "5Q69": "91e91c16000f55a42b2495c7d76a280cf1ccb8346279d84436d0b437b2479e03",
+  "5Q6F": "1926f7671136d075ee8349cfb66012fa96fc06c2631930949a8d8110bcc46e60",
+  "5Q7D": "40740030208d47fddc9e1646158cbab85d67a45c18e75815d4fd21b88d6a9a02",
+  "5Q88": "7539d79269ecc0d7e50145c0aaa92fb689785aa9b9aff688f668fb3218c24fb2",
+  "5Q9F": "5faccfe6a35e03900de31e7c5bd2719e122657328d052987ee8c615afea042b5",
+  "5Q9M": "ee189a5f8ebf198eac7c6c694c8d6fcc2843a902217487da3a235ee382ee139b",
+  "5S4U": "4d66d08b293fde60cbc3611d403e3b7c7d555c8b4485fde2f2678ffa8179fd1b",
+  "5TA6": "91e2eebf3214493a014c2fafa5a797016de5210238aec897d72f04a1b73520dc",
+  "5U3R": "25851f43a49701353576737c852884ece9019ad6e154a036e23c9a3c100e5b5a",
+  "5XMX": "479a1b79f564c02defeec950a62eb513113997441c60ecbfb7fd5b670c390625",
+  "5ZTK": "bba494d173e5c083fb8ea91ae113f6c075ad99de058a481162b1debf5e89647a",
+  "6A7T": "5a74b64ef7808f604f6a2796c32cfb6c1982ce3940d4e123c37b1ae7c424e9e8",
+  "6BO8": "7e32adb913cbb4c457a4d86dd04a6dac93ea2959c6a56d5a67e1c29b363fd0a4",
+  "6D32": "39fb2e8c1d4eccb412ed2ee728827015f59f0b34e409acb8a58f97eba4b3e395",
+  "6D35": "8e2bea3a1ab1f37ab87d781086f4d5a7e6baadb008f236a29cdc39f423006e48",
+  "6DQN": "1aaa9458b6669020af1f3f036c06dd4356fe02014698aa2c341b7367e6b59f25",
+  "6HLK": "2e69769e627364054c44c254c17b7bd3f3becf7f12c1bca520e19fab4b8a2048",
+  "6HYS": "7c82024885c00547d421346f03467b68ecf93803fe6bad1bb5f87476116ef3ad",
+  "6HYT": "469bddc3a4030afb52cebb1dc7a34bac8eb43fd569e9a20fb5fd7d6129fe21eb",
+  "6IZP": "19da36c075bb1ae712d4dcf2ae7c93d75d148514439138429a1663e74fc5280f",
+  "6JCY": "629014456637f6dc628f58b97736e18da6dac932ac1a0d943514e04cbf1161be",
+  "6JYD": "fa2caf7eebfb7fec935728131e808972ad7821a125efab4051d4add7589b5a48",
+  "6LAB": "f3fb84259e709b419083bdf56506be9014899ccbf2ee96def9ae95eb01adaad2",
+  "6LR9": "592b0b29965fa62020ef33d152f30c9d90b64b58637b18af1d8b597c6bceba8f",
+  "6LTO": "607cc3c990878ef0c91cecc75c34fe33253c9d4e70a24269f4364f890ee07d03",
+  "6M67": "4faf53d9d487ce67a9b159db5bf9e3cd958473599421432b4e904f612aeb7cb4",
+  "6PO4": "708d828f9343020e82ea9db708c7fecb47c75d63bd06d9714e6b1e6e0db3f7af",
+  "6QIK": "718af2fba069dd9c9846023069cb727248d88fd365a766f39f89b944d4980e24",
+  "6QUE": "8ab7e8749cd330e083534a7589a4b9a74e7b5991202d68d51cb02ecc7ba61d0f",
+  "6TIK": "cc17fe3e2d832b0efc3527787f4e8cf4e795d35a43d95cce96fc14abdc0000e2",
+  "6UFE": "1dbd56832d3bf10dd4c4bdfaf00f8b3cf9b22f0c7aab5382fc1d61e2ba99174c",
+  "6UW4": "13405531bea23328d19c2463fa6b4017e2cbee4f094682e1ee48421292feb975",
+  "6VBG": "36c291d4630db8e6ffb95dfab4ff79ce80d3b562f69d020017ef08551c00956f",
+  "6VTX": "4c77b5196f325a3d06ac0047d988bc1079697e97b3db4486803100547e82c4f8",
+  "6WBM": "a16520b1ce2fb4900385908b970b7a2a25776e9c351caf64af1168b60fa2564e",
+  "6XKS": "f7789c78b4c3fbf7e029f09efccbb38dce5be224c6570f59ec4793403d79878a",
+  "6Y1H": "6680f9db65f0e51f1d79a62601179daae102dff925dc030974db89e6e111bbd1",
+  "6ZTQ": "7e743adcbb501e35888691ce17f9b2cec9b78ece501f83f6ef8ceea3300d8835",
+  "6ZY7": "59ba670d119706f8885562fb07c9b72a6258c263de1fb3f3d3e879239cdbadcc",
+  "7ADZ": "d073852869916f7d27879afbbb520b63924e9cb03fdb4358c36e033d0c638711",
+  "7CRJ": "5c68ed45296b1e7f08ee667bb840f5996d2e1c4311f4aefa16efc463c80629fb",
+  "7CRT": "c61453780d468b6f79701b1717aabf101542824f10b6ce870cdabdca1d7e6683",
+  "7CRY": "931d2c26632a43bcb864cdabcac93316564e2e71bb75fcac29ed8cd7c77be759",
+  "7DE0": "32bb6c7d5315adeea6878453ad50f4c677ebdd67b486c0401b6c96e027429519",
+  "7F1V": "98ac0e1bf79d2376e113ba854b4084cf3ef9c98665eb1c7afdc69a47318466f0",
+  "7F5S": "b192eceeb434d39a39b6f1040d8aeb859764aeb286427d431aa90c938c1579a0",
+  "7G33": "e5f1e82b7711eea31ed9ef1907cc4cf157b5d41d2ef23b42f63c9b8f7abf2d98",
+  "7HBL": "5cd5ef1667b50d0648c1be7334c6098798ff85e88e8cb67740fc7a2ba020a081",
+  "7KMZ": "4134ac545a3bee7666341fff7ae2157380edb46925d46a2ca1f857bcd5940de9",
+  "7O8J": "bca9dd9b7d26857f2e7c5311e9c02e68baf52a55d13099590b209d2832103a5e",
+  "7O8L": "99c5f4acac832936a4bb69b44dbf0975fab47aa74081eaa4d402e461601dad70",
+  "7OOR": "f285d94cbb50b9da9a897a5c209200e4b27b0e7d09051c7d9ebcf9fd8f4d2533",
+  "7SPI": "b01cba616ca6464369a84f5b0150ef9944096f02038932c9d8d530abd245d878",
+  "7U9Z": "29c156fef7107637f29177ae035d0c4337fba56e4462a94f961e4583a7b3b161",
+  "7UKO": "186d21fbd202dc8df33cc7ea971fd70518576206f981839a98dbc8aa48593d33",
+  "7XBK": "0f215a20dbcce294cd42edf302a24132d5fe6f9d12ba8950736333f88be2d551",
+  "7Y63": "5b0c00755867a087cdf4f58463cf68dba52a2f511b4088c15cc445f51bf4ce7d",
+  "7ZNB": "fb22ed4b3f95fd96e8043916dc16bf1d2f47fc9b3e99020bfbd44c310866cda4",
+  "8A35": "1c097289adfee3a89ae27d1d523e15ab42832a13fd3fc3ca0d9821d68bd3e0ef",
+  "8CRC": "776863ddabb09d5c2102f9e3e585ae87647a69d7f2a6e09591a83f42647b5106",
+  "8EM7": "133797ac83d08cc3ae8c603072f93b33d902928d6b8541cec89dfea6b31a9b59",
+  "8FZN": "c8f2301019e851e3827ed58c07578e33edc358d0d0bb2f06b00dd6c334771ff4",
+  "8GG4": "ca49e06e7eeb0907e7ef7f8b28b17129c839e3921e4213314387cad2ca27a091",
+  "8OJF": "871e2a0131372f596716bd6bc37134ac0033eae12cfbbe86fe74746338454b6e",
+  "8OJZ": "0ff13f99387ff7dfd1add6c6f9e1601f0fc26cfc8b50ad52dd9f501e50ab64db",
+  "8PIN": "94b32b41105a8ec5a3d7ddef0c451f832074d7e2f5415accff4b2afc04e03d35",
+  "8QX1": "25c42586ff9084b7f301ee1f67a39f5ac06267bd2fe9e2f798243fe0cd169712",
+  "8S8X": "e37f0df2393135ce6fa0f367a82cfa2db5642089dba3fafc7d6093b3f0308021",
+  "8T8U": "97c2f0bce08577fc8afe174aae71f0a7ddac41df5d6f659fe0fc0501a50ae4e4",
+  "8T8V": "61aaaf0a678173d2c60ac3d56535dcc4030ca755b5f5ce5ff7ac987c05fb75da",
+  "8T8W": "106cfa61df3377490fa17f47b4e4b166c05a24717bf47075f302c77b00842d05",
+  "8T8X": "a2cf4f939173f99c0dd3ea396c23a9229df1038d9a7e113267a59b9f875d2217",
+  "8T8Y": "04cb6502f92c2ede5ae89322b1ac624cf54794456df5c9132eefe1b22141af75",
+  "8T8Z": "d2fc6b4e17a7a5e4aca15901ae89fea7ff850d4b5651bd212434e5c36f33b91e",
+  "8T91": "32df7d0a99ab99fc2731627443104b7a0e1ce44b33aaa7f9e50384611a3fcbb7",
+  "8T95": "57c556bb92c9b113d5e32101c314983fc8eaf4243729022471f6c297d7274a6c",
+  "8T97": "9158d3436b4ef96d72155bdf337409c337c70e8fc3806c6c478b18cd7d751e95",
+  "8U1N": "8392763f12741690a4ac8e60f72cd64c1cc9f971603425948e60c3289eeab4ee",
+  "8VBG": "03c24ad1804c63121f1d9943d81be993095d3806b84543ef0962887f42cca36c",
+  "8XJV": "34877839a6611314952a5dc14b49ab287b163d4808f0ad6f4dee6798e54a7d04",
+  "9BZD": "50b137866e622392286aa98ac7490f091d8907feefc107de9fcb8b158f032c2b",
+  "9DU3": "76f5432ecaea606a0cecd1c6e079153c4a31188ccc0b5d3061453f82e683831a",
+  "9FZL": "e2432cda89c2033e60a26ff9b79f715e2954d15cfad1fd1231b72d7f89856268",
+  "9GET": "2812a9845ba9212e2484c5dd1d77991a98c9726f73e2ab8fb22d0d85b1340a49",
+  "9HEO": "a2bc6777e2e82674a146aa28cadb64cd2991070ced45be951c203d82389d3abf",
+  "9N2E": "4322edcf4efbe434585c95a8a5dfdd1f96092a9b0d55d96faa76fc949cc69b20",
+  "9NMN": "187ca7a9fd0c6f3c7c931cc6f2f6dbf907209afc3d72348bea03217f4f395a1a",
+  "9OQN": "d43c560f90113e0e52441efa95392abed658ac5f479353224e9b2b52e0779633",
+  "9OQP": "c577d713ea4e4177eea566d6384817ca2aaf71da3917ecb6159952953bf60f10",
+  "9OWM": "57707e6598cdd8df55cfcab6f290c4848c85a43ad9dc52bdf8421eed92aedd45",
+  "9PDH": "cac275b7612b2abcd98996f13d18c1e858c20d3597b5f495d759215363a52ac3",
+  "9SP9": "d8a41c7250ee35ac5d3be778e24fd4e1eff6a263307d2875ce60e9f697d1ff30",
+  "9UY1": "5951ef34f0a6d60d85ab8af6a209281af64264c920cec9271e19f55785d82042",
+  "9XSF": "09705113408e82585d85840ddc2e764fb0b45abd4255f36a82b1748d683c3b27",
+  "9Y70": "4914fed4c77fb1db38914ab21be12dfac01aa692e86771514463d3b47386ed14",
+  "AF_AFI1K7U1F1": "2db001870c3d13d4e810a877930071968c9bd6b795a20457de745a04898362fb",
+  "AF_AFQ5AGV5F1": "db9a331901126d118bae2f18c7d549ef7353abbda2c69c36613f33b21981f758",
+  "AF_AFQ8ZPJ0F1": "8fa1062a5b204d1ced3b56ed21ac8914c1eaf03a2da651e8684d9905a3117429"
+ }
+}

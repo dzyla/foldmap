@@ -243,3 +243,10 @@ Seconds differ by at most 1.1 s on any entry (5B43; the machine was shared).
 4YBB now passes: fallbacks 2 → 0, na_crossings 1 → 0, bead_overlaps 1 → 0 (the plan 10 routing and layout work). The other five failures are the same entries for the same causes: 30QM, 4PJO, 3KTQ, 1YTB and 3CRX. No entry that passed now fails.
 
 report.json was compared field by field with the plan 10 T4 run. Apart from 4YBB, only measured values moved, none across a limit: 30QM spearman 0.521 → 0.496 and procrustes 0.776 → 0.794 (it already failed both); 1GID spearman 0.601 → 0.737; summed na_run_crossings fell (1GID 6 → 2, 1Y26 5 → 3, 2OEU 3 → 1, 4YBB 110 → 106) and na_protein_crossings moved by one on six entries (4YBB 45 → 52).
+
+## Rerun at the end of plan 15 (2026-10-18, 7696947; report.md, report.json): **34/39 pass**
+
+The same 34 pass and the same five fail (30QM, 4PJO, 3KTQ, 1YTB, 3CRX) with the same values. report.json was
+compared field by field with the plan 10 rerun above: the only measured value that moved is 1Y26 na_run_crossings
+3 → 5 (not gated; first seen in plan 15 Task 3's NA campaign, after its routing changes), and seconds by at most
+0.3 s. run.log is unchanged.

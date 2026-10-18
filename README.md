@@ -473,13 +473,17 @@ CA-only entry refused in one line, met no such entry), from crashes, time, route
 secondary structure against mkdssp (268,834 of 268,835 residues agree), determinism and copies drawn alike. Each
 criterion reads pass, fail, not judged (nothing to judge in that entry: no copies, no tether to another chain, no
 domain drawn) or does not apply, and an entry passes when none fails; nothing to judge is never counted as a pass
-(A15, copies drawn alike, judged 37 entries and passed all 37). The layout's constants were tuned on this sample, so
-a second, held-out sample (new seed, same strata, none of the first's entries) was drawn once with no fix: **92 of
-100 pass on the tuned sample, 80 of 100 on the held-out sample.** The tuned sample's eight failures (the ribosomes
-7Y7C and 8VWQ, 9YLM and 8BW5 as ruled, the two-state pair 9YKJ/10UJ named two ways, a domain name on a chain-end
-stub in 7JU4, and 8QEM's DNA shape in its whole-ring view) are explained in
+(A15, copies drawn alike, judged 37 entries and passed all 37). The layout's constants were tuned on this first
+sample, and a second sample (new seed, same strata, none of the first's entries), held out at first, became the input
+of the plan that fixed its failures, so a third sample was drawn after those fixes, with none of the other two's
+entries, and run once with no fix. **On structures foldmap was not tuned on (the third sample), 83 of 100 pass**,
+in the same run as 93 of 100 on the tuned sample and 95 of 100 on the second sample (80 of 100 before it was
+fixed against). The third sample's failures are listed by check in
+[docs/validation/random100-third/review.md](docs/validation/random100-third/review.md); the tuned sample's seven
+(the ribosomes 7Y7C and 8VWQ, 9YLM and 8BW5 as ruled, the two-state pair 9YKJ/10UJ named two ways, and 8QEM's DNA
+shape in its whole-ring view) are explained in
 [docs/validation/random100/review.md](docs/validation/random100/review.md), with the full table in
-[report.md](docs/validation/random100/report.md); the held-out failures are listed with the checks they fail in
+[report.md](docs/validation/random100/report.md); the second sample's in
 [docs/validation/random100-heldout/review.md](docs/validation/random100-heldout/review.md).
 
 ## UniProt annotation
