@@ -798,9 +798,10 @@ def test_s5_scores_auto_domains_where_a_cath_reference_exists(r100, tmp_path):
     finding. Entries without a reference are not measured. Reported, never gating."""
     from foldmap.domain_score import TARGETS
 
-    got = r100.domain_reference(FID / "1LDM.cif.gz", "1LDM")
+    got, note = r100.domain_reference(FID / "1LDM.cif.gz", "1LDM", fetch=False)
     assert [g["chain"] for g in got] == ["A"] and got[0]["overlap"] > 0.9 and got[0]["n_ref"] == 2
-    assert r100.domain_reference(DATA / "1UBQ.cif", "1UBQ") is None
+    assert got[0]["source"] == "reference" and note == "a local file: CATH not fetched"
+    assert r100.domain_reference(DATA / "1UBQ.cif", "1UBQ", fetch=False)[0] is None
     crit = {k: {"pass": True, "detail": ""} for k in r100.CRITERIA}
     found = {"S1": [], "S2": [], "S3": [], "S4": [], "S5": None, "S6": []}
     low = {"pdb": "1ABC", "chain": "A", "overlap": 0.6, "f1": 0.5, "recall": 1.0, "precision": 0.33, "n_ref": 2}
@@ -816,8 +817,8 @@ def test_s5_scores_auto_domains_where_a_cath_reference_exists(r100, tmp_path):
     r100.report([e], tmp_path, None, total=1)
     md = (tmp_path / "report.md").read_text(encoding="utf-8")
     assert "## S5: automatic domains against CATH (reported, not gated)" in md
-    assert "In-sample: these chains are among the 33" in md
-    assert "| 1ABC | A | 2 | 4 | 0.60 | 0.50 | 1.00 | 0.33 |" in md
+    assert "the 33 chains the automatic domains were calibrated on" in md
+    assert "| 1ABC | A | reference | 2 | 4 | 0.60 | 0.50 | 1.00 | 0.33 |" in md  # a report from before: the reference
 
 
 # ------------------------------------------------------------------------------------- final review B (fix F1)
@@ -1111,3 +1112,146 @@ def test_a16_names_its_domain_name_collisions(r100):
     doms = {"cross_chain": [], "unalike": [], "small": [], "panel_overlaps": [], "name_collisions": [hit]}
     got = _judged(r100, {"domains": {"checks": {**counts, "details": {"domains": doms}}}})["A16"]
     assert got["pass"] is False and hit in got["detail"], got
+
+
+# ------------------------------------------------------------------------------------------ plan 15 Task 8
+
+
+def test_the_sampler_pairs_one_protein_not_one_accession(r100, monkeypatch):
+    """Plan 15 Task 8 (held-out P3: two proteins of one polyprotein accession, nsp5 with nsp1, drawn as an apo/holo
+    pair): Sampler.pairs keeps a pair only when its two first protein chains are one protein by sequence
+    (criteria.one_protein, the rule A19 judges by), not by UniProt accession alone. A polyprotein-shaped fixture:
+    three entries of one accession, the seed and one partner the same protein, the other partner another protein cut
+    from the same polyprotein (ligand-bound, so it would be an apo/holo partner)."""
+    import gemmi
+    import numpy as np
+
+    rng = random.Random("polyprotein")
+    aa = ["ALA", "GLY", "SER", "LEU", "LYS", "GLU", "ASP", "PHE", "TRP", "VAL", "ILE", "PRO", "THR", "ASN"]
+    first, second = rng.choices(aa, k=120), rng.choices(aa, k=110)  # two proteins of one polyprotein
+
+    def trace(names):
+        return [(n, gemmi.Position(1.5 * k, 2.3 * np.cos(k), 2.3 * np.sin(k))) for k, n in enumerate(names)]
+
+    traces = {"1AAA": trace(first), "2BBB": trace(second), "3CCC": trace(first)}
+    monkeypatch.setattr(r100, "resolve", lambda i: i)  # no download: the files are their traces
+    monkeypatch.setattr(r100, "ca_trace", lambda path: traces[path])
+    one = {"protein": True, "na": False, "ca_only": False, "accessions": ["P00001"], "assembly1_chains": 1}
+    one.update(deposited_residues=130, method="X-RAY DIFFRACTION", chains=1, has=[])
+    s11 = next(st for st in r100.STRATA if st["name"] == "S11")
+
+    def drawn(partners):
+        s = r100.Sampler(20261017, "2026-10-13")
+        s.feats = {i: {**one, "ligand_touching": i != "1AAA"} for i in traces}
+        pools = iter([["1AAA"], ["1AAA", *partners]])  # the seed pool, then the accession's entries
+        monkeypatch.setattr(s, "pool", lambda nodes, content="experimental": next(pools))
+        s.pairs(s11)
+        return s
+
+    other = drawn(["2BBB"])  # the only partner of the accession is another protein: no pair
+    assert other.entries == [] and [x["id"] for x in other.skipped] == ["1AAA"]
+    assert r100.same_protein("1AAA", "2BBB")["one"] is False and r100.same_protein("1AAA", "3CCC")["one"] is True
+    both = drawn(["2BBB", "3CCC"])  # the partner that is the same protein is taken, whatever the seeded order
+    assert [(e["id"], e["role"], e["pair_type"]) for e in both.entries] == [
+        ("1AAA", "seed", "apo/holo"),
+        ("3CCC", "partner", "apo/holo"),
+    ]
+
+
+@pytest.fixture
+def cath_offline(tmp_path, monkeypatch):
+    """foldmap.cath's cache holding the fixtures of tests/data/cath (1LDM, 2LZM); any other entry is a 404."""
+    import shutil
+    import urllib.error
+
+    from foldmap import cath
+
+    folder = tmp_path / "cath-cache" / "cath"
+    folder.mkdir(parents=True)
+    for f in (DATA / "cath").iterdir():
+        shutil.copy(f, folder / f.name)
+    monkeypatch.setattr(cath, "CACHE", tmp_path / "cath-cache")
+
+    def not_found(req, timeout=None):
+        raise urllib.error.HTTPError(req.full_url, 404, "Not Found", {}, io.BytesIO(b"{}"))
+
+    monkeypatch.setattr(cath.urllib.request, "urlopen", not_found)
+    return cath
+
+
+def test_s5_scores_every_chain_cath_chops(r100, cath_offline, monkeypatch):
+    """Plan 15 Task 8: S5 is judged on every sampled entry whose chains CATH chops, not only on the 33 calibration
+    chains: each chain's chopping is fetched (foldmap.cath: the PDBe API, cached) and scored as the reference chains
+    are (one-domain chains too); a calibration chain keeps its committed chopping. An entry CATH chops no chain of,
+    an id that is no PDB entry, or PDBe unreachable: not judged, with the reason, never failed."""
+    import urllib.error
+
+    got, note = r100.domain_reference(DATA / "2LZM.cif", "2LZM")  # not in the reference: CATH's one domain
+    assert note == "" and [(g["chain"], g["source"], g["cath"], g["n_ref"]) for g in got] == [
+        ("A", "CATH", ["2lzmA00"], 1)
+    ]
+    got, _ = r100.domain_reference(FID / "1LDM.cif.gz", "1LDM")  # in the reference: scored on it, once
+    assert [(g["chain"], g["source"], g["n_ref"]) for g in got] == [("A", "reference", 2)]
+    assert r100.cath_chains("1LDM") == [
+        {"pdb": "1LDM", "chain": "A", "domains": [[[1, 162]], [[163, 329]]], "cath": ["1ldmA01", "1ldmA02"]}
+    ]  # shaped as the reference's own chain
+    assert r100.domain_reference(DATA / "1UBQ.cif", "1UBQ") == (None, "CATH chops none of its chains")
+    assert r100.domain_reference(DATA / "1UBQ.cif", "AF_AFP0CG48F1") == (
+        None,
+        "not a PDB entry (CATH chops PDB entries)",
+    )
+
+    def down(req, timeout=None):
+        raise urllib.error.URLError("no route")
+
+    monkeypatch.setattr(cath_offline.urllib.request, "urlopen", down)
+    none, why = r100.domain_reference(DATA / "1UBQ.cif", "9XYZ")
+    assert none is None and why.startswith("CATH chopping not fetched (ValueError: could not reach www.ebi.ac.uk")
+    e = {"id": "9XYZ", "facts": {"protein": True}, "views": {"default": {"result": {"science": {}}}}}
+    s5 = r100.science({**e, "domains_cath": None, "domains_cath_note": why})["S5"]
+    assert s5["pass"] is None and s5["status"] == "not judged" and s5["detail"] == why
+
+
+def test_report_counts_the_s5_chains_and_credits_cath(r100, tmp_path):
+    """Plan 15 Task 8: report.md says how many chains S5 scored and how many of them CATH divides into two domains
+    or more, with CATH's attribution (CC BY 4.0), each chain's source, and why the other protein entries were not
+    judged."""
+    crit = {k: {"pass": True, "detail": ""} for k in r100.CRITERIA}
+    view = {"default": {"result": {"science": {}}}}
+    two = {"chain": "A", "overlap": 0.9, "f1": 0.8, "recall": 1.0, "precision": 0.67, "n_ref": 2, "n_auto": 3}
+    one = {**two, "chain": "B", "f1": 1.0, "precision": 1.0, "n_ref": 1, "n_auto": 1, "source": "CATH"}
+    entries = [
+        {
+            "id": "1ABC",
+            "name": "1ABC",
+            "facts": {"protein": True},
+            "views": view,
+            "criteria": crit,
+            "domains_cath": [two, one],
+        },
+        {
+            "id": "2DEF",
+            "name": "2DEF",
+            "facts": {"protein": True},
+            "views": view,
+            "criteria": crit,
+            "domains_cath": [{**two}],
+        },
+        {
+            "id": "3GHI",
+            "name": "3GHI",
+            "facts": {"protein": True},
+            "views": view,
+            "criteria": crit,
+            "domains_cath": None,
+        },
+    ]
+    entries[1]["domains_cath"][0]["source"] = "CATH"
+    entries[2]["domains_cath_note"] = "CATH chops none of its chains"
+    r100.report([r100._verdict(e) for e in entries], tmp_path, None, total=3)
+    md = (tmp_path / "report.md").read_text(encoding="utf-8")
+    assert "3 chains scored in 2 entries; 2 of them with at least two CATH domains." in md
+    assert "CC BY 4.0" in md and "https://www.cathdb.info" in md and "Sillitoe" in md
+    assert "| 1ABC | B | CATH | 1 | 1 | 0.90 | 1.00 | 1.00 | 1.00 |" in md
+    assert "| mean of 2 (two domains or more) |" in md and "| mean of 1 (one domain) |" in md
+    assert "- CATH chops none of its chains: 1" in md

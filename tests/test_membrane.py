@@ -148,7 +148,8 @@ def test_band_drawn_across_the_transmembrane_helices():
 def test_a_band_is_drawn_by_helices_that_only_reach_a_face():
     """random-100 held-out 6MJ2 (TRPM2): its S1-S4 helices reach the inner face within 2 Å, so the membrane view
     counts them transmembrane (as A18 does), but none passes it, and no band was drawn. When no element passes both
-    faces, those that reach them give the band at their CA nearest the face; one that passes both still decides alone."""
+    faces, those that reach them give the band at their CA nearest the face; one that passes both still decides
+    alone."""
     from types import SimpleNamespace
 
     from foldmap.cli import _face_medians

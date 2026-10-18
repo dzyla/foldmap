@@ -22,11 +22,13 @@ def zya():
 
 @pytest.fixture(autouse=True)
 def _temp_cache(tmp_path, monkeypatch):
-    """No test reads, writes or prunes the real ~/.cache/foldmap (uploads, downloads, UniProt entries)."""
-    from foldmap import fetch, uniprot
+    """No test reads, writes or prunes the real ~/.cache/foldmap (uploads, downloads, UniProt entries, CATH
+    choppings)."""
+    from foldmap import cath, fetch, uniprot
 
     monkeypatch.setattr(fetch, "CACHE", tmp_path / "cache")
     monkeypatch.setattr(uniprot, "CACHE", tmp_path / "cache")
+    monkeypatch.setattr(cath, "CACHE", tmp_path / "cache")
 
 
 def pytest_addoption(parser):

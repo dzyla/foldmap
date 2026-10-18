@@ -13,10 +13,11 @@ PYTHONHASHSEED cannot change the draw), at most LOOK candidates deep. A candidat
 ~/.cache/foldmap) and read with gemmi; it is skipped, with the reason logged, when it is obsolete or cannot be
 downloaded, holds no protein or nucleic-acid polymer, is CA-only or P-only, or is in the sample already. The extra
 quotas inside a stratum (S4 helical, big, cap; S8 ribosome) are drawn first from their own sub-pools; the pairs of S11
-follow PAIR_TYPES; the cross-cutting quotas (QUOTAS) are then topped up. --exclude takes another sample's ids out of
-every pool (the held-out sample: final review A, Important 2). The same seed, date, pools and files give the same
-draw; the file also records the foldmap commit, the gemmi version and the SHA-256 of every candidate file read, so a
-changed file is seen. --check re-queries the ids and lists those now obsolete, without changing the file.
+follow PAIR_TYPES (one UniProt accession and one protein by sequence: same_protein); the cross-cutting quotas
+(QUOTAS) are then topped up. --exclude takes another sample's ids out of every pool (the held-out sample: final review
+A, Important 2). The same seed, date, pools and files give the same draw; the file also records the foldmap commit,
+the gemmi version and the SHA-256 of every candidate file read, so a changed file is seen. --check re-queries the ids
+and lists those now obsolete, without changing the file.
 
     python scripts/random100.py run [--ids A,B | --failed-from report.json] [--views all|quick|v1,v2]
                                     [--out docs/validation/random100] [--jobs 1]
@@ -27,10 +28,12 @@ a grandchild of its own (`view`, run with -W default), killed after LIMITS["view
 one view does not hide the others; wall time and max RSS come from os.wait4 (where there is one: run_child). Each view
 writes what it measured (figcheck.figure_checks, route statistics from foldmap.route's DEBUG summary record, layout
 signature and SVG hashes, na_validate's nucleic-acid measures, membrane and tether checks); the entry adds mkdssp
-agreement and judges A1-A20 (foldmap.criteria: criteria, LIMITS; `foldmap check` judges one figure by them too)
-into <out>/<id>.json. Then the pairs are compared (A19), a contact sheet <out>/<id>.png is drawn per entry (the
-figure, the 3D CA/P traces seen through the figure's page axes in its element colours, the same turned 90° about
-page-up, the partner's figure for a pair, facts and criteria), and report.json, report.md and index.html are written.
+agreement and S5's domain scores (every chain CATH chops: domain_reference, the chopping fetched through the PDBe API
+into ~/.cache/foldmap/cath) and judges A1-A20 (foldmap.criteria: criteria, LIMITS; `foldmap check` judges one
+figure by them too) into <out>/<id>.json. Then the pairs are compared (A19), a contact sheet <out>/<id>.png is drawn
+per entry (the figure, the 3D CA/P traces seen through the figure's page axes in its element colours, the same turned
+90° about page-up, the partner's figure for a pair, facts and criteria), and report.json, report.md and index.html are
+written.
 Exit 0 only if every entry passes. Each view's files are kept in <out>/work/<id>/. Pairing against RNApolis needs
 NA_RNAPOLIS_PYTHON (the Python of a venv that has it); mkdssp 3.1.2 is found on PATH or as MKDSSP.
 """
@@ -584,6 +587,18 @@ def ca_rmsd(path_a, path_b, least: int = 30) -> float | None:
     return round(float(sup.rmsd), 3)
 
 
+def same_protein(path_a, path_b) -> dict | None:
+    """criteria.one_protein, the rule A19 judges a drawn pair by, on two files' first protein chains (their residues
+    with a CA, as ca_trace reads them): one UniProt accession is not one protein (a polyprotein, P0DTD1, names nsp1
+    and nsp5 alike). None when either file has no protein chain."""
+
+    def as_drawn(path) -> dict:  # one_protein reads a beta view's chain_residues: [number, residue name] in order
+        residues = [[k, name] for k, (name, _) in enumerate(ca_trace(path), 1)]
+        return {"views": {"beta": {"result": {"chain_residues": {"residues": residues}}}}}
+
+    return criteria_module.one_protein(as_drawn(path_a), as_drawn(path_b))
+
+
 def pair_types(fa: dict, fb: dict, rmsd: float | None) -> set[str]:
     """The S11 types a pair of entries (their features, with contacts) can stand for."""
     out = set()
@@ -772,7 +787,8 @@ class Sampler:
         return None
 
     def pairs(self, s: dict) -> None:
-        """S11: pairs of entries of one protein (one UniProt accession) in two states."""
+        """S11: pairs of entries of one protein (one UniProt accession, and one protein by sequence: same_protein) in
+        two states."""
         seed_pool = self.pool(s["nodes"])
         rec = {"name": s["name"], "title": s["title"], "n": s["n"], "query": query(s["nodes"], self.date)}
         rec["seed_pool"] = pool_record(seed_pool)
@@ -797,6 +813,10 @@ class Sampler:
                 return set()
             fa, fb = self.feature(a, contacts=True), self.feature(b, contacts=True)
             if fb["accessions"] != fa["accessions"]:
+                return set()
+            seq = same_protein(resolve(a), resolve(b))
+            if seq is None or not seq["one"]:  # one accession, two proteins (a polyprotein's): no two-state pair
+                _log(f"S11 {a} {b}: not one protein by sequence ({seq})")
                 return set()
             types = pair_types(fa, fb, None)
             if fa["ligand_touching"] == fb["ligand_touching"]:
@@ -1488,7 +1508,10 @@ def run_entry(source: str, out: Path, views=VIEWS, info: dict | None = None) -> 
         run("app")
         if f["protein"] and "default" in wanted:
             e["dssp"] = dssp_agreement(path)
-            e["domains_cath"] = domain_reference(path, e["id"])  # S5, where the CATH reference holds the entry
+            # S5: every chain CATH chops (fetched for a sampled id; a local file has the committed reference only)
+            e["domains_cath"], e["domains_cath_note"] = domain_reference(
+                path, e["id"], fetch=not Path(source).is_file()
+            )
     e["criteria"] = criteria(e)
     e["science"] = science(e)
     return _verdict(e)
@@ -1906,16 +1929,71 @@ def report(entries: list[dict], out: Path, sample_path: Path | None = None, tota
 
 
 DOMAIN_REFERENCE = ROOT / "tests" / "data" / "domains" / "cath_reference.json"  # S5's choppings (CATH, CC BY 4.0)
+CATH_ATTRIBUTION = (
+    "CATH domain boundaries (https://www.cathdb.info) through the PDBe API (EMBL-EBI), licensed under CC BY 4.0; "
+    "Sillitoe I. et al. (2021) CATH: increased structural coverage of functional space. Nucleic Acids Res 49:D266-D273."
+)
+PDB_ID = re.compile(r"[0-9][A-Za-z0-9]{3}")  # what CATH chops: PDB entries (not an AlphaFold DB model, not a file)
 
 
-def domain_reference(path: Path, pdb: str) -> list[dict] | None:
-    """S5's measures: each reference chain of entry `pdb` (DOMAIN_REFERENCE's multi-domain CATH chains) scored with
-    its automatic domains (domain_score.chain_score: overlap, boundary recall, precision and F1); None when the
-    reference does not hold the entry."""
+def cath_chains(pdb: str) -> list[dict]:
+    """CATH's chopping of entry `pdb`, per chain shaped as DOMAIN_REFERENCE's chains (tests/data/domains/SOURCE.txt:
+    author residue numbers, insertion codes dropped, a discontinuous domain as several [first, last] segments):
+    {pdb, chain, domains, cath: the domain ids}, domains in the order of their first residue. Fetched by
+    foldmap.cath.chopping (the PDBe API, cached in ~/.cache/foldmap/cath like other downloads); [] when CATH chops no
+    chain of the entry; ValueError when PDBe cannot be reached."""
+    from foldmap import cath
+
+    per: dict[str, list] = {}
+    for d in cath.chopping(pdb):
+        per.setdefault(d.chain, []).append(d)
+    out = []
+    for chain, found in per.items():
+        found = sorted(found, key=lambda d: (min(a for (a, _), _ in d.segments), d.domain))
+        domains = [[[a, b] for (a, _), (b, _) in d.segments] for d in found]
+        out.append({"pdb": pdb.upper(), "chain": chain, "domains": domains, "cath": [d.domain for d in found]})
+    return out
+
+
+def domain_reference(path: Path, pdb: str, fetch: bool = True) -> tuple[list[dict] | None, str]:
+    """S5's measures: every chain of entry `pdb` that CATH chops, scored with its automatic domains
+    (domain_score.chain_score: overlap, boundary recall, precision and F1, as the reference chains are), and a note
+    of what was not scored. A chain DOMAIN_REFERENCE holds (the calibration set, in-sample) is scored on its committed
+    chopping, "source": "reference"; every other on CATH's as fetched (cath_chains), "source": "CATH". A chain CATH
+    keeps as one domain is scored too. (None, why) when no chain is scored (not a PDB entry, CATH chops none of its
+    chains, PDBe unreachable): S5 is then not judged, never failed. fetch=False scores the committed reference only (a
+    local file: its name is no PDB id to trust)."""
     from foldmap import domain_score
 
-    chains = [c for c in domain_score.load_reference(DOMAIN_REFERENCE) if c["pdb"] == pdb.upper()]
-    return [domain_score.chain_score(path, c) for c in chains] or None
+    pdb = pdb.upper()
+    chains = [{**c, "source": "reference"} for c in domain_score.load_reference(DOMAIN_REFERENCE) if c["pdb"] == pdb]
+    notes = []
+    if not fetch:
+        notes.append("a local file: CATH not fetched")
+    elif not PDB_ID.fullmatch(pdb):
+        notes.append("not a PDB entry (CATH chops PDB entries)")
+    else:
+        try:
+            fetched = cath_chains(pdb)
+        except Exception as err:  # PDBe down or answering nonsense: S5 not judged, the entry not failed
+            notes.append(f"CATH chopping not fetched ({type(err).__name__}: {str(err)[:160]})")
+        else:
+            have = {c["chain"] for c in chains}
+            chains += [{**c, "source": "CATH"} for c in fetched if c["chain"] not in have]
+            if not fetched:
+                notes.append("CATH chops none of its chains")
+    scores = []
+    for c in sorted(chains, key=lambda c: c["chain"]):
+        try:
+            got = domain_score.chain_score(path, c)
+        except Exception as err:  # a chain foldmap cannot read alone: said, not failed
+            notes.append(f"chain {c['chain']} not scored ({type(err).__name__}: {str(err)[:120]})")
+            continue
+        if not got["n_ref"]:
+            notes.append(f"chain {c['chain']} not scored (no residue of its CATH domains in the file)")
+            continue
+        scores.append({**got, "source": c["source"], "cath": c.get("cath", [])})
+    return scores or None, "; ".join(notes)
 
 
 SCIENCE_VIEWS = (*FIGURE_VIEWS, "app")  # the views whose figure the science checks judge (batch C2b-S)
@@ -1944,7 +2022,7 @@ def science(e: dict) -> dict:
     fails when any view has a finding, each named by its view ("focus: sheet 27: ..."); it passes when some view had
     something to judge (science_judged: a sheet, a barrel, a mark, an accessory) and none has a finding; else it
     does not apply to an entry with no protein, and is not judged for one with protein (final review B, Important 3:
-    nothing to judge is no pass). S5 is the entry's, once (chain-level, against the CATH reference)."""
+    nothing to judge is no pass). S5 is the entry's, once (chain-level, against CATH's chopping: domain_reference)."""
     from foldmap.science import NOTHING, SCIENCE, domain_findings
 
     per_view, judged = _view_science(e), _view_judged(e)
@@ -1956,7 +2034,8 @@ def science(e: dict) -> dict:
             if got is not None:
                 out[key] = _ok(not got, "; ".join(got))
             else:
-                out[key] = _ok(None, "no CATH reference chopping", NOT_JUDGED if protein else NOT_APPLICABLE)
+                why = e.get("domains_cath_note") or "no CATH chopping"
+                out[key] = _ok(None, why, NOT_JUDGED if protein else NOT_APPLICABLE)
             continue
         measured = [(v, f[key]) for v, f in per_view.items() if f.get(key) is not None]
         found = [f"{v}: {t}" for v, got in measured for t in got]
@@ -1986,7 +2065,7 @@ def science_section(entries: list[dict]) -> list[str]:
     lines += [f"Judged in every drawn view ({', '.join(SCIENCE_VIEWS)}); S5 once per entry.", ""]
     lines += [
         "A check passes only where it had something to judge; an entry with protein and nothing to judge (no sheet "
-        "drawn, no barrel, no residue mark, no accessory strand, no CATH reference) is not judged, one with no "
+        "drawn, no barrel, no residue mark, no accessory strand, no CATH chopping) is not judged, one with no "
         "protein does not apply.",
         "",
     ]
@@ -2021,30 +2100,50 @@ def science_section(entries: list[dict]) -> list[str]:
 
 
 def domains_section(entries: list[dict]) -> list[str]:
-    """report.md's S5 measures: each entry the CATH reference holds, per chain its reference and automatic domain
-    counts, overlap, boundary F1, recall and precision (domain_reference), then their means. Reported, not gated;
-    in-sample (the reference chains are the calibration set)."""
+    """report.md's S5 measures: how many chains were scored (and how many of them CATH divides into two domains or
+    more), CATH's attribution, then per chain its source (the calibration reference, in-sample, or CATH as fetched),
+    reference and automatic domain counts, overlap, boundary F1, recall and precision (domain_reference), their means
+    (all chains, those with two domains or more, those with one), and why the other protein entries were not judged.
+    Reported, not gated."""
     rows = [(e["id"], s) for e in entries for s in e.get("domains_cath") or []]
     lines = ["", "## S5: automatic domains against CATH (reported, not gated)", ""]
-    lines += [
-        "In-sample: these chains are among the 33 the automatic domains were calibrated on "
-        "(tests/data/domains/cath_reference.json); the never-seen check is the fresh set (cath_fresh.json).",
-        "",
-    ]
+    lines += [f"Source: {CATH_ATTRIBUTION}", ""]
     if not rows:
-        return [*lines, "No entry is in the CATH reference."]
-    lines += ["| id | chain | CATH domains | automatic | overlap | boundary F1 | recall | precision |"]
-    lines.append("|---|---|---|---|---|---|---|---|")
-    for name, s in rows:
-        lines.append(
-            f"| {name} | {s['chain']} | {s['n_ref']} | {s['n_auto']} | {s['overlap']:.2f} | {s['f1']:.2f} | "
-            f"{s['recall']:.2f} | {s['precision']:.2f} |"
-        )
-    mean = {k: sum(s[k] for _, s in rows) / len(rows) for k in ("overlap", "f1", "recall", "precision")}
-    lines.append(
-        f"| mean of {len(rows)} | | | | {mean['overlap']:.2f} | {mean['f1']:.2f} | {mean['recall']:.2f} | "
-        f"{mean['precision']:.2f} |"
+        lines.append("No chain scored.")
+    else:
+        multi = [s for _, s in rows if s["n_ref"] >= 2]
+        ref = [s for _, s in rows if s.get("source", "reference") == "reference"]
+        lines += [
+            f"{len(rows)} chains scored in {len({i for i, _ in rows})} entries; {len(multi)} of them with at least two "
+            "CATH domains. Every chain CATH chops is scored, one-domain chains too (a one-domain chain keeps boundary "
+            f"F1 1 only when the automatic domains leave it whole). {len(ref)} of the chains are in the calibration "
+            'set (source "reference": in-sample, tests/data/domains/cath_reference.json, the 33 chains the '
+            "automatic domains were calibrated on); the never-seen check is the fresh set (cath_fresh.json).",
+            "",
+            "| id | chain | source | CATH domains | automatic | overlap | boundary F1 | recall | precision |",
+            "|---|---|---|---|---|---|---|---|---|",
+        ]
+        for name, s in rows:
+            lines.append(
+                f"| {name} | {s['chain']} | {s.get('source', 'reference')} | {s['n_ref']} | {s['n_auto']} | "
+                f"{s['overlap']:.2f} | {s['f1']:.2f} | {s['recall']:.2f} | {s['precision']:.2f} |"
+            )
+        single = [s for _, s in rows if s["n_ref"] < 2]
+        for what, group in (("all", [s for _, s in rows]), ("two domains or more", multi), ("one domain", single)):
+            if group:
+                mean = {k: sum(s[k] for s in group) / len(group) for k in ("overlap", "f1", "recall", "precision")}
+                lines.append(
+                    f"| mean of {len(group)} ({what}) | | | | | {mean['overlap']:.2f} | {mean['f1']:.2f} | "
+                    f"{mean['recall']:.2f} | {mean['precision']:.2f} |"
+                )
+    unscored = Counter(
+        e.get("domains_cath_note") or "no CATH chopping"
+        for e in entries
+        if (e.get("facts") or {}).get("protein") and not e.get("domains_cath")
     )
+    if unscored:
+        lines += ["", "Protein entries with no chain scored (S5 not judged), by reason:", ""]
+        lines += [f"- {why}: {n}" for why, n in sorted(unscored.items(), key=lambda x: (-x[1], x[0]))]
     return lines
 
 
