@@ -309,6 +309,7 @@ class Layout:
     # and mate alike (a sheet block among them is drawn as its mate is: figcheck.shared_sheet_elements)
     kink_links: set[tuple[str, str]] = field(default_factory=set)  # consecutive helix pieces of a copy whose mates
     # are a kink (features.KINK_GAP): drawn as their mates, their loop is a kink link too (_regroup_copies, route)
+    let_go: int = 0  # copy items build_layout let go (_one_per_mate): make_layout keeps them only if more alike
     font_scale: float = 1.0  # Style.font_scale the figure is drawn with (texts placed in the layout are sized by it)
     loop_stroke: float = 1.0  # a loop's drawn stroke in line_pt: Style.loop_width, RUN_EDGE_W times it under
     # residue colours (its dark edge); for line_band
@@ -1273,9 +1274,10 @@ def _one_per_mate(
     partial mates: a copy's sheet DSSP split into two blocks where its mate's is one, a helix cut in two), the one
     with the most elements (ghosts aside), then the larger footprint, then the first, stays tied; the others are
     items of their own. Two items held to one place in one orbit overlap and the pushes, which move an orbit as one,
-    can only part them by halves, each off its mate's place (random-100 held-out A15: 2BBJ E~A 1.42, 5K7Z C~A 1.10;
-    9GTP's 1K~1l and S~X). With `helices` False (_regroup_copies runs next and joins a helix piece let go to its
-    helix: 7QUP 9C) only items holding strands are judged; helix pieces stay tied."""
+    can only part them by halves, each off its mate's place (random-100 held-out A15: 2BBJ E~A 1.42; 5K7Z, once
+    cli._side_by_side ties its dimers, C~A 1.10 without this; 9GTP's 1K~1l and S~X). With `helices` False
+    (_regroup_copies runs next and joins a helix piece let go to its helix: 7QUP 9C) only items holding strands are
+    judged; helix pieces stay tied."""
 
     def sheet(i: int) -> bool:
         return helices or any(isinstance(m, Placed) and m.sse.kind == "E" and not m.ghost for m in items[i].members)
@@ -3448,6 +3450,7 @@ def build_layout(
     level: set[str] | None = None,
     band: tuple[float, float] | None = None,
     alike_first: bool = True,
+    let_go: bool = True,
 ) -> Layout:
     """Labels: the generic ones (_assign_labels), then `relabel` (ref -> label: copies' shared labels, primes of
     elements lent by neighbours), then `names` (names.apply_names: --names, given the placed layout with its stems
@@ -3470,7 +3473,10 @@ def build_layout(
     its length is shorter than the slab it crosses) is moved, the least way, until one end meets a face.
     `alike_first`: a copy's elements are grouped as its mate's (_regroup_copies) and the copies the symmetry ties may
     be drawn alike in up to _SEP_TIE_ROOM (_separate's second chance, _tied_again), random-100 C2b-3; cli turns it
-    off in a membrane view, where the transmembrane helices' heights are judged instead (C17)."""
+    off in a membrane view, where the transmembrane helices' heights are judged instead (C17).
+    `let_go`: of several copy items tied to one mate in one protomer, only the largest stays tied (_one_per_mate);
+    Layout.let_go counts the others, and cli.make_layout lays out again without letting them go and keeps the more
+    alike of the two (random-100 held-out A15)."""
     if mode not in ("projected", "stack"):
         raise ValueError(f"unknown layout mode {mode!r}")
     style = style or Style()
@@ -3565,6 +3571,7 @@ def build_layout(
     tied_ids: set[str] = set()
     kink_links: set[tuple[str, str]] = set()
     own: set[int] = set()
+    gone = 0  # copy items _one_per_mate let go
     if mode == "stack":
         rows = _stack(items, keep_depth)
         _centre_dna_over_binders(items, contacts)
@@ -3579,7 +3586,12 @@ def build_layout(
         regroup = alike_first and mirror is None and not pieces and walls is None  # (no stem or trace indexes items)
         # a copy split in two (_one_per_mate): the larger part tied, the other let go once _regroup_copies has run
         # (let go before it, a sheet is tied again beside its copy: 9GTP's whole file spread 35 % wider)
-        alone = {id(items[i]) for i in set(ties) - set(_one_per_mate(items, ties, helices=not regroup))}
+        alone = (
+            {id(items[i]) for i in set(ties) - set(_one_per_mate(items, ties, helices=not regroup))}
+            if let_go
+            else set()
+        )
+        gone = len(alone)
         own = set(kept_own)
         if regroup:
             ties, kink_links, own = _regroup_copies(items, ties, frame, shift, {id(it) for it in templates.values()})
@@ -3706,6 +3718,7 @@ def build_layout(
     lay.copy_ties = copy_ties
     lay.tied_ids = tied_ids
     lay.kink_links = kink_links
+    lay.let_go = gone
     lay.mirror_pairs = [(a.sse.id, b.sse.id) for a, b in mirrored if isinstance(a, Placed) and a.sse.kind in ("H", "G")]
     lay.font_scale = style.font_scale
     lay.loop_stroke = style.loop_width * (RUN_EDGE_W if style.loop_color == "residue" else 1.0)

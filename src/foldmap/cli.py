@@ -200,6 +200,18 @@ def _side_by_side(frame, sym, nucleic, bb) -> None:
         frame.sector, frame.classes = protomer_maps(sym)
 
 
+def _unalike(lay, bb) -> float:
+    """The largest deviation between copies drawn (figcheck.copies_alike, A15's measure; inf where too few match), 0
+    with none judged: how unalike a layout draws its copies. Letting a split copy block go (layout._one_per_mate)
+    draws 2BBJ's and 5K7Z's copies alike, but on 9GTP's whole file it moved untied sheets further from their copies'
+    (M~Q 25.8 -> 52.3, c~a 1.1 -> 9.9): make_layout lays out both ways and keeps the more alike."""
+    from types import SimpleNamespace
+
+    from .figcheck import copies_alike
+
+    return max(copies_alike(SimpleNamespace(layout=lay, bb=bb)).values(), default=0.0)
+
+
 def _na_extent(na, extent: str):
     """(the nucleic acid to draw, whether `auto` cropped a large one to the stems the protein touches)."""
     if extent == "contacts":
@@ -437,6 +449,10 @@ def make_layout(
         return lay
 
     lay = finish(lay_out())
+    if lay.let_go:  # copy items let go (layout._one_per_mate): kept only when the copies come out more alike (A15)
+        held = finish(lay_out(let_go=False))
+        if _unalike(held, bb) <= _unalike(lay, bb):
+            lay, lay_out = held, functools.partial(lay_out, let_go=False)
     if mem is not None and mode == "projected" and lay.membrane is not None:
         from .figcheck import membrane_view
 

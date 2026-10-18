@@ -40,9 +40,8 @@ def test_of_two_copy_items_tied_to_one_mate_the_larger_keeps_its_place():
     """2BBJ E~A 1.42 (9GTP's 1K, S, 2e-2i, 3e-3i alike): DSSP split E's sheet into two blocks where A's is one, and
     _symmetry_ties tied both to A's sheet as protomer 4. Starting on one place, the two overlapped, and the pushes,
     which move an orbit as one, could only part them by halves: each stood off its mate's place by half the
-    overlap, and E's other items with it were drawn unlike A's. Only the block with the most elements is tied (in
-    build_layout, straight after _symmetry_ties); the other is an item of its own, which the copies' pushes leave
-    where they hold."""
+    overlap, and E's other items with it were drawn unlike A's. Only the block with the most elements stays tied; the
+    other is an item of its own, which the copies' pushes leave where they hold."""
 
     def made():
         mate = _item(0.0, 0.0, ("A", 1, 6, 0.0), ("A", 10, 15, 0.6), ("A", 20, 25, 1.2))
@@ -64,11 +63,6 @@ def test_of_two_copy_items_tied_to_one_mate_the_larger_keeps_its_place():
     got = _offsets(items, {2: (0, 1), 4: (1, 1)})
     assert got[2] == got[4], got  # the copy's sheet and helix stand as its mate's do
     assert _clear(items)
-    src = Path(layout.__file__).read_text()  # and build_layout ties them so
-    assert (
-        "_one_per_mate(items, ties, helices=not regroup)"
-        in src[src.index("ties = _symmetry_ties(items, frame") :][:900]
-    )
     # a helix cut in two: judged too, unless _regroup_copies runs next (it joins the pieces end to end)
     piece = [_item(0.0, 0.0, ("A", 1, 20, 0.0))]
     h1 = Placed(fake_sse("H", 1, 9, chain="B"), 0.0, 0.0, 2.0, 0.0, 0.5)
@@ -76,6 +70,21 @@ def test_of_two_copy_items_tied_to_one_mate_the_larger_keeps_its_place():
     pieces = piece + [_Item([h], [(0.0, 0.0)], 20.0, 0.0, (20.0, 0.0), 1, "B") for h in (h1, h2)]
     assert layout._one_per_mate(pieces, {1: (0, 1), 2: (0, 1)}) == {1: (0, 1)}
     assert layout._one_per_mate(pieces, {1: (0, 1), 2: (0, 1)}, helices=False) == {1: (0, 1), 2: (0, 1)}
+
+
+def test_a_split_block_is_let_go_only_when_the_copies_come_out_more_alike(monkeypatch):
+    """2BBJ: build_layout lets E's hairpin block go (E:112-115 untied, E's main sheet tied to A's) and make_layout keeps
+    that layout, its copies drawn more alike than with both tied. 9GTP's whole file (fix round 1): letting its split
+    blocks go moved untied sheets further from their copies' (M~Q 25.8 -> 52.3, c~a 1.1 -> 9.9), so make_layout lays
+    out both ways and keeps the more alike: here, made to judge the let-go one worse, it keeps both tied."""
+    from foldmap import cli
+
+    path = r100_entry("2BBJ")
+    lay, _, _ = cli.make_layout(path)
+    assert lay.let_go >= 1 and "E:105-109" in lay.tied_ids and "E:112-115" not in lay.tied_ids
+    monkeypatch.setattr(cli, "_unalike", lambda lay, bb: float(lay.let_go))  # letting go judged worse
+    lay, _, _ = cli.make_layout(path)
+    assert lay.let_go == 0 and "E:112-115" in lay.tied_ids
 
 
 # --------------------------------------------------------------------------------------- orbits slide as one
@@ -172,7 +181,6 @@ def test_a_letter_placed_again_onto_another_loop_sends_that_loop_round_it(monkey
     """13FZ B:6: placed again off one loop (_letters_off_loops), its only spot not on the sheet under it lay on another
     loop, which had been routed before the letter moved there. When a letter moves, the loops are routed off the
     nucleic acid's text once more (_off_na_text), then the letters still on a loop placed again."""
-    from pathlib import Path
 
     from foldmap import na_labels, route
     from foldmap.cli import make_layout
