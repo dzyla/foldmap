@@ -415,11 +415,13 @@ def test_nucleic_acid_torn_by_unrolling_is_drawn_in_the_plain_frame(pdb):
 def test_a_nucleic_acid_the_unrolling_does_not_tear_keeps_the_side_by_side_frame():
     """30QM: one strand is held by both protomers, but unrolling tears none of its duplexes (each stem is drawn
     whole where its centre is seen) and turns no linked stems against one another by more than 57°, so the two
-    protomers stay side by side, the figure the author chose (the plain frame interleaved them into one tangle)."""
-    from foldmap.frame import CylinderFrame
+    protomers stay side by side, the figure the author chose (the plain frame interleaved them into one tangle). A
+    two-fold assembly kept from the plain frame is seen from the side of its dyad since plan 18, one protomer the
+    other's mirror image."""
+    from foldmap.frame import Frame
 
     lay, _, _ = make_layout(_path("30QM"))
-    assert type(lay.frame) is CylinderFrame
+    assert type(lay.frame) is Frame and lay.frame.mirror_x is not None
 
 
 def test_a_kinked_duplex_across_a_dimer_is_no_longer_a_hairpin():
@@ -482,11 +484,12 @@ def test_a_free_end_into_a_gap_turns_toward_where_the_molecule_goes_on():
 
 def test_one_shared_stem_among_several_stays_unrolled():
     """30QM: one of six stems (P3) is held by both RT protomers; the NA campaign's C4 ruling keeps it unrolled (the
-    linked stems turn at most 57°): rule (c) of na_torn_by_unrolling needs most pieces shared."""
-    from foldmap.frame import CylinderFrame
+    linked stems turn at most 57°): rule (c) of na_torn_by_unrolling needs most pieces shared. Not torn, the dimer
+    is drawn as one protomer and its mirror image since plan 18 (the dyad view), not in the plain frame."""
+    from foldmap.frame import Frame
 
     lay, _, _ = make_layout(_path("30QM"))
-    assert type(lay.frame) is CylinderFrame
+    assert type(lay.frame) is Frame and lay.frame.mirror_x is not None
 
 
 def test_unrolled_frame_kept_when_each_strand_is_held_by_one_protomer():

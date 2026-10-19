@@ -346,7 +346,10 @@ def test_overlapping_bars_are_drawn_as_brackets_that_keep_their_cysteines(monkey
     assert np.allclose(marks, sorted([tuple(a), tuple(b)]))
 
 
-def test_4ch9_bond_lying_on_another_detours_in_a_bracket():
+def test_4ch9_bond_lying_on_another_detours_in_a_bracket(monkeypatch):
+    import foldmap.cli as cli
+
+    monkeypatch.setattr(cli, "_dyad_frame", lambda *a: None)  # unrolled, where bond 249-512 lies on another (plan 18)
     fig = make_figure(DATA / "4CH9.cif", assembly="asu")
     bars = {b.get_gid(): b.get_path().vertices for b in _gids(fig, "disulfide:")}
     assert [len(v) for _, v in sorted(bars.items())].count(4) == 1

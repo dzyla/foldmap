@@ -185,12 +185,13 @@ def test_an_item_of_two_protomers_belongs_to_the_one_holding_most_of_it():
 def test_copies_numbered_apart_are_tied():
     """2MJW (random-100, revealed by C18): S100P chain D is numbered 95-188 where its copy B is 1-94. Copies were
     tied by shared residue numbers, so B and D shared none, were never tied, and were drawn unlike (A15 B~D 3.34).
-    Numbers are taken to the first copy's by homolog_chains' offset before matching: D is tied to B, drawn alike."""
+    Numbers are taken to the first copy's by homolog_chains' offset before matching: D is tied to B, drawn alike (as
+    its mirror image: a two-fold assembly, plan 18)."""
     from foldmap import figcheck
     from foldmap.spec import draw_spec, figure_spec
 
     d = draw_spec(figure_spec(Path(__file__).parent / "data" / "r100" / "2MJW-BD.cif.gz"))
-    assert d.layout.copy_ties == {"D": ("B", False)}
+    assert d.layout.copy_ties == {"D": ("B", True)}
     got = figcheck.copies_alike(d)
     assert got[("D", "B")] <= 0.5, got
 
@@ -203,11 +204,14 @@ def test_a_dimer_sheet_shared_by_two_copies_keeps_them_alike(monkeypatch, turned
     yield to the tied copies: A2~A1 and B2~B1 are drawn exactly alike. The dyad is a half-turn whose axis may point
     either way (symmetry._rotation signs it): the copies are alike drawn either way up, and turned over against
     that sign the fixture still needs the shared items to yield (without that, b029264's parent: no `shared`, it is
-    drawn unalike), so it holds the case whatever the sign."""
+    drawn unalike), so it holds the case whatever the sign. Drawn unrolled side by side, as before plan 18: in the
+    dyad view (one copy and its mirror image) the shared sheet no longer stands between the copies."""
     import dataclasses
 
     import foldmap.cli as cli
     import foldmap.layout as layout
+
+    monkeypatch.setattr(cli, "_dyad_frame", lambda *a: None)
 
     if turned:
         real_sym = cli.detect_symmetry

@@ -27,7 +27,7 @@ New in this version:
   contact beads checked against the file, and protein–nucleic acid hydrogen bonds on request.
 - **Figures that follow the published conventions**: TIM barrels and Rossmann folds as a βα row, kinked helices
   split (globin A/B), bulged strands kept whole, chromophores kept in the chain, symmetric dimers drawn as mirror
-  images, conventional names (`--names`) and domain colours with a domain bar.
+  images (a two-fold assembly seen from the side of its dyad, one copy the other's mirror image), conventional names (`--names`) and domain colours with a domain bar.
 - **A redesigned app** at <https://foldmap.streamlit.app>: one box to start, share links, light and dark themes,
   every option in tidy sections, downloads built from the figure on screen.
 
@@ -214,8 +214,8 @@ foldmap styles                                    # every theme and style key
   [Conventions of the published figures](#conventions-of-the-published-figures).
 - **Assemblies and symmetry**: `--assembly auto` builds the file's first biological assembly when it adds copies
   (up to 24 chains) or when the file holds several copies of one complex, and never one that leaves out the DNA or
-  RNA; cyclic, dihedral, cubic and helical symmetry is detected and the protomers are drawn alike (two copies across a
-  dyad in the page as mirror images; interleaved protomers such as the measles F trimer's too, a strand lent across
+  RNA; cyclic, dihedral, cubic and helical symmetry is detected and the protomers are drawn alike (a two-fold
+  assembly seen from the side of its dyad, the two copies drawn as mirror images; interleaved protomers such as the measles F trimer's too, a strand lent across
   the cut of the unrolled ring drawn past its end, with a dashed ghost where it pairs); highlight one protomer or the
   asymmetric unit; filaments, cages and large assemblies drawn as one subunit with the neighbouring parts that
   complete its fold. When either automatic choice draws part of the file, foldmap says so (a note on stderr, a bar
@@ -360,8 +360,12 @@ element. It is marked with a star on the chain and the legend entry "chromophore
 
 **Mirrored dimers.** Two copies related by a two-fold axis lying in the page (λ repressor on its operator, 1LMB) are
 drawn as exact mirror images about that axis, names included, even where that takes up to a tenth more room than
-placing the copies one by one (other copies: a twentieth). Other symmetric copies, and the unrolled cylinders of
-filaments, are drawn alike.
+placing the copies one by one (other copies: a twentieth). A two-fold (C2) assembly is seen from the side of its dyad
+for this: the dyad points up the page and the first protomer sits on the left, so the copies meet at the line where
+their interface lies (TrmD, 1UAM). Where no mirror image can be drawn (a βα row such as a TIM barrel's would cross the
+line), or one draws the copies less alike, or a membrane dimer's transmembrane helices off their band, the copies are
+unrolled side by side instead. Other symmetric copies, and the unrolled cylinders of rings and filaments, are drawn
+alike.
 
 **Layout files.** `--save-layout fig.yaml` records everything that defines a figure: theme, style changes,
 layout options, domains and edits, with element references stored as residue ranges so they survive a new model.
@@ -544,8 +548,10 @@ Every figure (command line, app, MCP or Python) goes through the same steps:
    axis; a fixed-thickness slab is slid along it to the most hydrophobic, least charged position; no tilt search). Nucleic acids:
    base pairs grouped into stems; long bent duplexes cut where the axis turns by 25°.
 5. **Projection.** A frame turns 3D into page coordinates: the dominant element direction points up and the
-   widest spread runs left–right (single chains); a symmetric assembly is unrolled around its axis, protein–DNA
-   complexes around the DNA axis, membrane proteins with the bilayer horizontal. Never mirrored. An assembly whose
+   widest spread runs left–right (single chains); a two-fold assembly is seen from the side of its dyad, the dyad up
+   the page (its copies drawn as mirror images, step 6); any other symmetric assembly is unrolled around its axis,
+   protein–DNA complexes around the DNA axis, membrane proteins with the bilayer horizontal. The frame itself is
+   never a mirror. An assembly whose
    nucleic acid unrolling would tear apart stays in the plain projected view: a duplex kinked across protomers,
    linked stems that would turn against one another, or most stems each held by two protomers (the PFV intasome
    3L2V, whose viral DNA ends are gripped by both inner integrase chains).

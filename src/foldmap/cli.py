@@ -17,6 +17,7 @@ from pathlib import Path
 import numpy as np
 
 from . import layoutfile
+from .criteria import LIMITS
 from .dssp import assign_dssp
 from .features import helices_on_sheets, sse_contacts
 from .frame import Frame, RadialFrame, dna_radial_frame, dna_view_frame, protomer_maps, symmetric_frame, view_frame
@@ -191,6 +192,26 @@ def _mirror_frame(frame, sym) -> None:
     frame.mirror_x = float(_snap(frame.project(sym.centre)[0, 0] * SCALE))
 
 
+def _dyad_frame(sses, sym) -> Frame | None:
+    """A two-fold assembly seen from the side (plan 18): the dyad up the page, protomer 0 on the left and protomer 1
+    to its right, so that _mirror_frame draws one as the other's mirror image. Page-right runs from protomer 0's
+    element centroids toward protomer 1's, perpendicular to the dyad; the view is their cross product (a rotation,
+    never a mirror). Both axes are snapped before they choose the page axes (the dyad and the centroids differ in
+    the last bit between BLAS kernels). None when a protomer has no element, or the two sit on the dyad."""
+    if sym.kind != "C" or sym.n != 2 or len(sym.protomers) != 2:
+        return None
+    cents = [[s.centroid for s in sses if s.chain in p] for p in sym.protomers]
+    if not all(cents):
+        return None
+    axis = sym.axis / np.linalg.norm(sym.axis)
+    right = np.mean(cents[1], axis=0) - np.mean(cents[0], axis=0)
+    right = right - (right @ axis) * axis
+    if np.linalg.norm(right) < 1.0:  # Å: the two halves on the dyad, no side to see them from
+        return None
+    up, right = _snap(axis), _snap(right / np.linalg.norm(right))
+    return view_frame(sses, up=up, view=np.cross(right, up))
+
+
 def _side_by_side(frame, sym, nucleic, bb) -> None:
     """Copies of an assembly on a straight duplex frame (no dyad in the page: _mirror_frame) drawn alike, side by
     side, as symmetric_frame draws an assembly: the frame learns the protomers (sector, classes) and no mirror line.
@@ -331,6 +352,7 @@ def make_layout(
                     sym, axis=-sym.axis, angles=[-a for a in sym.angles], rise=-sym.rise, twist=-sym.twist
                 )
     duplex = nucleic is not None and straight_duplex(nucleic.structure, nucleic.strands)
+    dyad = None  # a two-fold assembly seen from the side, drawn as one copy and its mirror image (plan 18)
     if duplex:
         frame = (  # protein on a straight duplex: the duplex across the page, the protein below it
             dna_radial_frame(sses, nucleic)
@@ -345,7 +367,8 @@ def make_layout(
         and view is None
         and not (_na_across_protomers(nucleic, sym, bb) and na_torn_by_unrolling(nucleic, sses, sym))
     ):
-        frame = symmetric_frame(sses, sym)
+        dyad = _dyad_frame(sses, sym)
+        frame = dyad or symmetric_frame(sses, sym)
     else:  # stem axes differ in the last bit between BLAS kernels: snapped before they choose the page axes
         stems = stem_views(nucleic.structure, nucleic.strands) if nucleic is not None else []
         stems = [StemView(_snap(v.centroid), _snap(v.axis), v.n) for v in stems]
@@ -449,23 +472,57 @@ def make_layout(
             lay.membrane = _membrane_band(lay, sses, bb, mem, faces)
         return lay
 
-    lay = finish(lay_out())
-    if lay.let_go:  # copy items let go (layout._one_per_mate): kept only when the copies come out more alike (A15)
-        held = finish(lay_out(let_go=False))
-        if _unalike(held, bb) <= _unalike(lay, bb):
-            lay, lay_out = held, functools.partial(lay_out, let_go=False)
-    if mem is not None and mode == "projected" and lay.membrane is not None:
+    def settle(lay_out):
+        lay = finish(lay_out())
+        if lay.let_go:  # copy items let go (layout._one_per_mate): kept only when the copies come out more alike (A15)
+            held = finish(lay_out(let_go=False))
+            if _unalike(held, bb) <= _unalike(lay, bb):
+                lay, lay_out = held, functools.partial(lay_out, let_go=False)
+        return lay, lay_out
+
+    def banded(lay, lay_out):
+        if mem is not None and mode == "projected" and lay.membrane is not None:
+            from .figcheck import membrane_view
+
+            if membrane_view(lay, sses, bb, mem)["tm_short"]:  # a transmembrane helix drawn off its band: laid out
+                before = _membrane_score(lay, sses, bb, mem)  # again with every one at its projected height (C17)
+                level = _transmembrane(sses, bb, mem)
+                faces = _faces_on_page(frame, sses, bb, mem, level)
+                again = finish(lay_out(level=level, band=tuple(sorted(faces))), faces)
+                after = _membrane_score(again, sses, bb, mem)
+                # kept only when it helps: fewer helices off the band, no more loops in the slab, no more fallbacks
+                if after[0] < before[0] and after[1] <= before[1] and after[2] <= before[2]:
+                    lay = again
+        return lay
+
+    def off_band(lay) -> int:  # transmembrane helices drawn off their band (A18; 0 off a membrane view)
+        if mem is None or mode != "projected" or lay.membrane is None:
+            return 0
         from .figcheck import membrane_view
 
-        if membrane_view(lay, sses, bb, mem)["tm_short"]:  # a transmembrane helix drawn off its band: laid out
-            before = _membrane_score(lay, sses, bb, mem)  # again with every one at its projected height (C17)
-            level = _transmembrane(sses, bb, mem)
-            faces = _faces_on_page(frame, sses, bb, mem, level)
-            again = finish(lay_out(level=level, band=tuple(sorted(faces))), faces)
-            after = _membrane_score(again, sses, bb, mem)
-            # kept only when it helps: fewer helices off the band, no more loops in the slab, no more fallbacks
-            if after[0] < before[0] and after[1] <= before[1] and after[2] <= before[2]:
-                lay = again
+        return len(membrane_view(lay, sses, bb, mem)["tm_short"])
+
+    lay, lay_out = settle(lay_out)
+    lay = banded(lay, lay_out)
+    if dyad is not None:  # the dyad view is for the mirror image of copies drawn alike
+        mirrored = any(m for _, m in lay.copy_ties.values())
+        unalike = mem is None and _unalike(lay, bb) > LIMITS["copies_alike"]  # a membrane view is judged by its bands
+        if not mirrored or unalike or off_band(lay):
+            # where no mirror image is drawn (a βα row across the mirror line, build_layout), the copies are unrolled
+            # side by side as for any assembly; where it is drawn unalike (A15) or a transmembrane helix off its band
+            # (A18), they are unrolled when that does better
+            frame = symmetric_frame(sses, sym)
+            keywords = {k: v for k, v in lay_out.keywords.items() if k != "let_go"}
+            unrolled, unrolled_out = settle(functools.partial(build_layout, sses, sheets, frame, mode, **keywords))
+            unrolled = banded(unrolled, unrolled_out)
+            if (
+                not mirrored
+                or (unalike and _unalike(unrolled, bb) < _unalike(lay, bb))
+                or off_band(unrolled) < off_band(lay)
+            ):
+                lay, lay_out = unrolled, unrolled_out
+            else:
+                frame = dyad
     if msa:
         from .sequence import grades, is_consurf, read_alignment, read_consurf, residue_conservation
 

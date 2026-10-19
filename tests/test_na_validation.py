@@ -46,9 +46,10 @@ CAMPAIGN = {
     "bead_overlaps": {},  # every fixture at 0
     "gap_label_collisions": {},  # every fixture at 0
 }
-# stems_nearer_frac (target 1.0) held at its measured value (absent: 1.0). 30QM is drawn unrolled, its two protomers
-# side by side (the C4 revision of Task 13b step 3: unrolling tears none of its duplexes): one stem held by both
-# protomers (P3, touched by A:288-306, A:346-362 and B:37-57) sits between them, nearer neither than the median.
+# stems_nearer_frac (target 1.0) held at its measured value (absent: 1.0). 30QM was drawn unrolled (before plan 18,
+# which draws it as one protomer and its mirror image; the holds stand), its two protomers side by side (the C4
+# revision of Task 13b step 3: unrolling tears none of its duplexes): one stem held by both protomers (P3, touched
+# by A:288-306, A:346-362 and B:37-57) sits between them, nearer neither than the median.
 NEARER: dict[str, float] = {"30QM": 0.833}
 # LIMITS held at a fixture's measured value until a later step: 3CRX's four-Cre assembly (C5) is seen edge-on to
 # the junction plane (arms 3, 4, 1, 2 in a row), drawn as an X (C2 and C3 leave it at 0.817: it has no runs or
@@ -61,13 +62,13 @@ NEARER: dict[str, float] = {"30QM": 0.833}
 # its column (fix round 1 ruling); the layout resettles: spearman 0.521 -> 0.446 (re-held, as ruled for 0.493 when
 # they stood in the next strand's column), procrustes 0.776 -> 0.759. Fix round 3 (beside their partner, level with
 # it; stack pad 1.3): spearman 0.496 (held 0.446, as ruled), procrustes 0.794 (0.79-0.83 at every pad from 1.2 to
-# 1.6): re-held there.
+# 1.6): re-held there. Plan 18: a two-fold assembly is drawn as one copy and its mirror image, seen from the side
+# of the dyad, no longer unrolled; 30QM meets the limits of procrustes (0.433), angle_median and angle_max
+# (0.0): those holds went; spearman rises 0.446 -> 0.639, past THRESHOLDS (0.60) but short of LIMITS (0.85):
+# re-held there.
 HELD = {
     ("3CRX", "procrustes"): 0.817,
-    ("30QM", "procrustes"): 0.794,
-    ("30QM", "angle_median"): 35.7,
-    ("30QM", "angle_max"): 109.6,
-    ("30QM", "spearman"): 0.446,
+    ("30QM", "spearman"): 0.639,
 }
 # what each fixture cannot measure (None): Spearman under 5 stems, contacts without protein, bends without a
 # split duplex; every other metric must be there, so a check that stops measuring fails
@@ -138,13 +139,18 @@ def test_contacted_stems_stay_nearer_their_touching_elements(measured):
 
 def test_every_hold_still_fails_its_real_limit(measured):
     """A hold (HELD, NEARER, CAMPAIGN) excuses a fixture from nacheck.THRESHOLDS at its measured value. Once the
-    drawing meets the real limit the hold must go: this fails until it is removed (strict-xfail style)."""
+    drawing meets the real limit the hold must go: this fails until it is removed (strict-xfail style). A HELD
+    metric excuses the fixture from LIMITS, which may be stricter than THRESHOLDS (spearman 0.85 against 0.60): it
+    goes once the fixture meets both (plan 18: 30QM's spearman 0.639 meets THRESHOLDS, not LIMITS)."""
     pdb, m, _ = measured
-    holds = [metric for (p, metric) in HELD if p == pdb]
+    held = {metric for (p, metric) in HELD if p == pdb}
+    holds = sorted(held)
     holds += ["stems_nearer_frac"] if pdb in NEARER else []
     holds += [metric for metric, bound in CAMPAIGN.items() if pdb in bound]
     for metric in holds:
-        assert judge({metric: m[metric]}), f"{pdb}: {metric} {m[metric]} meets THRESHOLDS now: remove its hold"
+        limit, kind = LIMITS.get(metric, (None, None))
+        short = metric in held and (m[metric] < limit if kind == "min" else m[metric] > limit)
+        assert short or judge({metric: m[metric]}), f"{pdb}: {metric} {m[metric]} meets its limits now: remove its hold"
 
 
 def test_crossings_count_proper_crossings_only():
@@ -461,6 +467,7 @@ def test_an_unrolled_frame_is_measured_against_the_plain_projection(monkeypatch)
     from foldmap.nacheck import measuring_frame
 
     monkeypatch.setattr(cli, "_na_across_protomers", lambda *a: False)
+    monkeypatch.setattr(cli, "_dyad_frame", lambda *a: None)  # unrolled, not drawn as a mirror image (plan 18)
     lay, _, _ = make_layout(NA / "1RVA.cif.gz")
     assert isinstance(lay.frame, CylinderFrame)
     plain = measuring_frame(lay)
@@ -568,6 +575,7 @@ def test_the_contact_sheet_of_an_unrolled_frame_draws_no_seam_and_fits_its_title
 
     nv = _na_validate()
     monkeypatch.setattr(cli, "_na_across_protomers", lambda *a: False)
+    monkeypatch.setattr(cli, "_dyad_frame", lambda *a: None)  # unrolled, not drawn as a mirror image (plan 18)
     lay, sses, bb = make_layout(NA / "1RVA.cif.gz")
     assert isinstance(lay.frame, CylinderFrame)
     fig = draw(lay, route_loops(lay, sses, bb), sses, "1RVA")

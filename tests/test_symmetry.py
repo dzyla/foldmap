@@ -82,7 +82,7 @@ def test_unrolled_frame_is_a_rotation_everywhere():
         assert np.allclose(m @ m.T, np.eye(3), atol=1e-9) and np.linalg.det(m) == pytest.approx(1.0)
 
 
-@pytest.mark.parametrize("name", ["8UUP", "2HHB", "1TIM"])
+@pytest.mark.parametrize("name", ["8UUP", "1TIM"])
 def test_symmetric_layout_repeats_the_protomer(name):
     from foldmap.cli import make_layout
 
@@ -99,10 +99,35 @@ def test_symmetric_layout_repeats_the_protomer(name):
     assert (np.abs(rel - typical).max(axis=2) < 1.5).mean() > 0.8  # most elements sit at the same place in each copy
 
 
+@pytest.mark.parametrize("name", ["2HHB", "25IN"])
+def test_a_two_fold_assembly_is_drawn_as_one_copy_and_its_mirror_image(name):
+    """Plan 18: a C2 assembly is seen from the side of its dyad, the dyad up the page and protomer 0 on the left;
+    every element of protomer 1 sits at its mate's mirror image about one vertical line (x -> 2 * mirror_x - x, the
+    same y), its direction mirrored."""
+    from foldmap.cli import make_layout
+    from foldmap.frame import Frame
+
+    bb, sses, s = sym(name)
+    assert s.kind == "C" and s.n == 2
+    lay, _, _ = make_layout(DATA / f"{name}.cif")
+    assert type(lay.frame) is Frame and lay.frame.mirror_x is not None
+    assert abs(float(lay.frame.v @ s.axis)) == pytest.approx(1.0)  # the dyad up the page
+    m = lay.frame.mirror_x
+    pairs = [o for o in _mates(sses, s) if all(e.id in lay.placed for e in o)]
+    assert len(pairs) >= 8
+    for a, b in pairs:
+        p, q = lay.placed[a.id], lay.placed[b.id]
+        assert q.cx == pytest.approx(2 * m - p.cx, abs=1e-6) and q.cy == pytest.approx(p.cy, abs=1e-6)
+        assert np.cos(q.angle) == pytest.approx(-np.cos(p.angle), abs=1e-6)
+        assert np.sin(q.angle) == pytest.approx(np.sin(p.angle), abs=1e-6)
+    assert np.mean([lay.placed[a.id].cx for a, _ in pairs]) < m  # protomer 0 on the left
+
+
 @pytest.mark.parametrize("name", ["8UUP", "2HHB", "1TIM", "4CH9", "9TX7"])
 def test_separation_keeps_every_copy_where_its_mate_is(name, monkeypatch):
     """Overlaps are cleared by moving each element together with its symmetry copies, so after separation
-    every copy still sits at the same offset from its protomer-0 mate as the others of its protomer."""
+    every copy still sits at the same offset from its protomer-0 mate as the others of its protomer (a mirrored copy,
+    plan 18: at its mate's mirror image, the sum of their x and the difference of their y the same for all)."""
     from foldmap import layout
     from foldmap.cli import make_layout
 
@@ -110,7 +135,7 @@ def test_separation_keeps_every_copy_where_its_mate_is(name, monkeypatch):
     real = layout._symmetry_ties
 
     def spy(items, frame, *rest):
-        seen["items"], seen["ties"] = items, real(items, frame, *rest)
+        seen["items"], seen["ties"], seen["mirror"] = items, real(items, frame, *rest), rest[0]
         return seen["ties"]
 
     monkeypatch.setattr(layout, "_symmetry_ties", spy)
@@ -118,7 +143,8 @@ def test_separation_keeps_every_copy_where_its_mate_is(name, monkeypatch):
     items, ties = seen["items"], seen["ties"]
     offsets: dict[int, list[tuple[float, float]]] = {}
     for i, (j, k) in ties.items():
-        offsets.setdefault(k, []).append((items[i].cx - items[j].cx, items[i].cy - items[j].cy))
+        x = items[i].cx + items[j].cx if seen["mirror"] else items[i].cx - items[j].cx
+        offsets.setdefault(k, []).append((x, items[i].cy - items[j].cy))
     assert offsets
     for o in offsets.values():
         assert np.ptp(np.array(o), axis=0).max() < 1e-9

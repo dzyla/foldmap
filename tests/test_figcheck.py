@@ -550,7 +550,7 @@ def test_strands_of_a_sheet_shared_between_copies_are_left_out():
     sheet, so its strands cannot sit at their copy's tied place (5.63 page units from it); A15 leaves them out
     (ruling) and judges the rest. A sheet with a third copy's strand, tied round the ring, stays in (8UTF)."""
     d = drawn(R100 / "7IMM-A.cif.gz")
-    assert d.layout.copy_ties == {"A2": ("A1", False)}
+    assert d.layout.copy_ties == {"A2": ("A1", True)}  # a two-fold assembly: drawn as a mirror image (plan 18)
     assert figcheck.shared_sheet_elements(d.layout, "A2", "A1") == {
         "A1:319-325",
         "A1:328-338",
