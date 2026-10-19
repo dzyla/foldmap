@@ -88,13 +88,26 @@ def test_the_script_and_the_package_judge_one_figure_alike(r100, tmp_path, name)
     assert r100.criteria is criteria.criteria and r100.criteria(e) == criteria.criteria(e)
     script = r100.criteria(e)
     package = criteria.check_figure(drawn, spec, path)["criteria"]
-    assert {k: script[k] for k in FIGURE_JUDGED} == {
-        k: {x: v for x, v in package[k].items() if x != "here"} for k in FIGURE_JUDGED
-    }
+    off = _font_off(result)
+    assert bool(off) == bool(figcheck.ink_font_reason(drawn.figure))  # none where text is in Liberation Sans
+    alike = [k for k in FIGURE_JUDGED if k not in off]
+    assert {k: script[k] for k in alike} == {k: {x: v for x, v in package[k].items() if x != "here"} for k in alike}
+    for k in set(FIGURE_JUDGED) & set(off):  # the campaign fails it closed; `foldmap check` names it not measured
+        assert script[k]["pass"] is False and script[k]["detail"].startswith("default not measured ("), k
+        assert package[k]["pass"] is None and package[k]["here"] == off[k], k
     assert all(script[k]["pass"] is not None for k in FIGURE_JUDGED if k not in ("A15", "A20"))
     # nothing to judge is no pass (final review B, Important 3): ubiquitin has no copies and no ligand
     want = {"1UBQ.cif": ("does not apply", "does not apply"), "2HHB.cif": ("pass", "not judged")}[name]
     assert (criteria.outcome(script["A15"]), criteria.outcome(script["A20"])) == want
+
+
+def _font_off(result: dict) -> dict[str, str]:
+    """The criteria whose ink checks the text font kept from being measured in this drawing (criteria.INK_READ), and
+    the reason figcheck gave. The ink checks are calibrated on Liberation Sans (figcheck.INK_FONT); where text resolves
+    to another font (Arial on macOS and Windows: render._FONTS lists it first) the campaign fails these closed and
+    `foldmap check` names them not measured here, so there the two say different things by design. None on Linux."""
+    skipped = result["checks"].get("skipped") or {}
+    return {k: str(skipped[c]) for k, reads in criteria.INK_READ.items() for c in reads if c in skipped}
 
 
 OFF_FONT = "the text resolved to DejaVu Sans, not Liberation Sans"
@@ -149,12 +162,19 @@ def test_a_membrane_or_domains_figure_is_judged_as_the_campaign_judges_that_view
     path = DATA / name
     spec = figure_spec(path, **options)
     drawn = draw_spec(spec)
-    campaign = criteria.figure_criteria({view: {"result": criteria.measure_figure(view, drawn, spec, path)}})
+    result = criteria.measure_figure(view, drawn, spec, path)
+    campaign = criteria.figure_criteria({view: {"result": result}})
     got = criteria.check_figure(drawn, spec, path)["criteria"]
     judged = {k for k, v in campaign.items() if v["pass"] is not None}
     assert {"A3", "A5", "A6", f"A1{6 if view == 'domains' else 8}"} <= judged
-    for k in judged:
+    off = _font_off(result)  # none where text is in Liberation Sans
+    assert bool(off) == bool(figcheck.ink_font_reason(drawn.figure))
+    for k in judged - set(off):
         assert {"pass": got[k]["pass"], "detail": got[k]["detail"]} == campaign[k], k
+    for k in judged & set(off):  # the campaign fails it closed; `foldmap check` says the font kept it unmeasured
+        assert campaign[k]["pass"] is False and f"{view} not measured (" in campaign[k]["detail"], k
+        assert got[k]["pass"] is not True and off[k] in (got[k].get("here") or got[k]["detail"]), (k, got[k])
+        assert k == "A16" or got[k]["pass"] is None  # A16 still judges its domain rules and panels (above)
     for k in ("A8", "A11", "A15", "A20"):
         assert got[k]["pass"] is None and f"{view} view" in got[k]["here"], (k, got[k])
 
