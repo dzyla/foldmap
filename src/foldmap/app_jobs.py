@@ -239,8 +239,9 @@ def _server_stopped() -> bool:
 
 def _start(fn, args, limits: Limits):
     """A job process started (its pipe's receiving end, the process). A job whose start met the forkserver as an
-    in-place update stopped it (app._stop_job_server; inside multiprocessing, a TypeError or OSError) starts once
-    more, on a fresh server; else it fails saying so (F2 review)."""
+    in-place update stopped it (app._stop_job_server; inside multiprocessing, a TypeError or OSError, or from Python
+    3.14 an AssertionError: connect_to_new_process asserts the authkey the stop cleared) starts once more, on a fresh
+    server; else it fails saying so (F2 review)."""
     for attempt in (1, 2):
         ctx = _context()
         here, there = ctx.Pipe(duplex=False)
@@ -250,7 +251,7 @@ def _start(fn, args, limits: Limits):
         except BaseException as err:
             here.close()
             there.close()
-            if not isinstance(err, (TypeError, OSError)) or not _server_stopped():
+            if not isinstance(err, (TypeError, OSError, AssertionError)) or not _server_stopped():
                 raise
             if attempt == 2:
                 raise JobFailed("the job server was restarting for an update of the app; try again") from err
