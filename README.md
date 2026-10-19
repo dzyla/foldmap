@@ -365,8 +365,8 @@ placing the copies one by one (other copies: a twentieth). By default (no `--up`
 for this: the dyad points up the page and the first protomer sits on the left, so the copies meet at the line where
 their interface lies (TrmD, 1UAM). Where no mirror image can be drawn (a βα row such as a TIM barrel's would cross the
 line), or where the mirror image draws the copies unalike or leaves a membrane dimer's transmembrane helices off their
-band and unrolling does better, the copies are unrolled side by side instead. Other symmetric copies, and the unrolled cylinders of rings and filaments, are drawn
-alike.
+band and unrolling does better, the copies are unrolled side by side instead. Other symmetric copies, and the
+unrolled cylinders of rings and filaments, are drawn alike.
 
 **Layout files.** `--save-layout fig.yaml` records everything that defines a figure: theme, style changes,
 layout options, domains and edits, with element references stored as residue ranges so they survive a new model.

@@ -519,10 +519,16 @@ def make_layout(
             # where no copy is tied as a mirror image, the copies are unrolled side by side as for any assembly;
             # where the mirror image leaves a transmembrane helix off its band
             # (A18) or draws the copies unalike (A15), they are unrolled when that leaves fewer helices off the
-            # band, or as many and the copies more alike (bands first: alikeness never bought with a helix off)
+            # band, or as many and the copies more alike (bands first: alikeness never bought with a helix off). A
+            # mirror image A15 passes is never traded for a smaller deviation: the choice stays off float noise.
             unrolled = laid_out(symmetric_frame(sses, sym))
             off_unrolled = off_band(unrolled)
-            if not mirrored or off_unrolled < off or (off_unrolled == off and _unalike(unrolled, bb) < gap):
+            alike = gap <= LIMITS["copies_alike"]
+            if (
+                not mirrored
+                or off_unrolled < off
+                or (off_unrolled == off and not alike and _unalike(unrolled, bb) < gap)
+            ):
                 lay = unrolled
     if msa:
         from .sequence import grades, is_consurf, read_alignment, read_consurf, residue_conservation
