@@ -46,10 +46,10 @@ CAMPAIGN = {
     "bead_overlaps": {},  # every fixture at 0
     "gap_label_collisions": {},  # every fixture at 0
 }
-# stems_nearer_frac (target 1.0) held at its measured value (absent: 1.0). 30QM was drawn unrolled (before plan 18,
-# which draws it as one protomer and its mirror image; the holds stand), its two protomers side by side (the C4
-# revision of Task 13b step 3: unrolling tears none of its duplexes): one stem held by both protomers (P3, touched
-# by A:288-306, A:346-362 and B:37-57) sits between them, nearer neither than the median.
+# stems_nearer_frac (target 1.0) held at its measured value (absent: 1.0). 30QM, a C2 dimer drawn as one protomer
+# and its mirror image (plan 18; unrolling tears none of its duplexes, the C4 revision of Task 13b step 3): one stem
+# held by both protomers (P3, touched by A:288-306, A:346-362 and B:37-57) sits at the mirror line between them,
+# nearer neither than the median (0.833).
 NEARER: dict[str, float] = {"30QM": 0.833}
 # LIMITS held at a fixture's measured value until a later step: 3CRX's four-Cre assembly (C5) is seen edge-on to
 # the junction plane (arms 3, 4, 1, 2 in a row), drawn as an X (C2 and C3 leave it at 0.817: it has no runs or

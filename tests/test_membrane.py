@@ -665,3 +665,25 @@ def test_a_slab_many_long_elements_cross_but_not_oily_enough_is_refused():
     long = [s for s in sses if (s.kind == "H" and len(s) >= 16) or (s.kind == "E" and len(s) >= 8)]
     assert len(long) >= membrane._MANY_CROSSING
     assert membrane._estimate(thin, sses) is None
+
+
+def test_a_membrane_two_fold_dimer_is_drawn_no_worse_than_unrolled(monkeypatch):
+    """Plan 18 fix round 1: a C2 dimer seen from the side of its dyad is laid out again unrolled when its mirror image
+    leaves a transmembrane helix off its band (A18) or draws the copies unalike (A15, judged on membrane views too);
+    the unrolled layout is kept when it leaves fewer helices off the band, or as many and the copies more alike. 6JLN
+    --membrane (its dyad along the normal): the drawn figure is no worse than the unrolled one on bands, then copies."""
+    import foldmap.cli as cli
+    from foldmap.cli import _unalike
+    from foldmap.figcheck import membrane_view
+    from helpers import r100_entry
+
+    path = r100_entry("6JLN")
+
+    def scored():
+        lay, sses, bb = make_layout(path, membrane="auto")
+        return len(membrane_view(lay, sses, bb, find_membrane(path, bb))["tm_short"]), _unalike(lay, bb)
+
+    drawn = scored()
+    monkeypatch.setattr(cli, "_dyad_frame", lambda *a: None)
+    unrolled = scored()
+    assert drawn <= unrolled, (drawn, unrolled)

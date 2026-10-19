@@ -463,10 +463,14 @@ def test_mirror_energy_gradient_is_exact(monkeypatch):
 
 
 def test_cylinder_frames_are_not_mirrored():
+    """1TIM, a C2 dimer: in the dyad view (plan 18) each copy's βα row would cross the mirror line, so no mirror
+    image is drawn and the copies are unrolled side by side as before: a CylinderFrame, no tie mirrored."""
     from foldmap.cli import make_layout
+    from foldmap.frame import CylinderFrame
 
     lay, _, _ = make_layout(DATA / "1TIM.cif")
-    assert getattr(lay.frame, "mirror_x", None) is None
+    assert isinstance(lay.frame, CylinderFrame) and getattr(lay.frame, "mirror_x", None) is None
+    assert lay.copy_ties and not any(m for _, m in lay.copy_ties.values())
 
 
 def test_a_mirror_copy_overlapping_its_mate_is_pushed_apart_sideways_about_the_line():

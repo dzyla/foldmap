@@ -3517,7 +3517,8 @@ def build_layout(
     band: tuple[float, float] | None = None,
     alike_first: bool = True,
     let_go: bool = True,
-) -> Layout:
+    mirror_only: bool = False,
+) -> Layout | None:
     """Labels: the generic ones (_assign_labels), then `relabel` (ref -> label: copies' shared labels, primes of
     elements lent by neighbours), then `names` (names.apply_names: --names, given the placed layout with its stems
     and ba_rows), then `rename` (the user's own, through _adjust like `swap` and `move`); the label sides and boxes
@@ -3542,7 +3543,8 @@ def build_layout(
     off in a membrane view, where the transmembrane helices' heights are judged instead (C17).
     `let_go`: of several copy items tied to one mate in one protomer, only the largest stays tied (_one_per_mate);
     Layout.let_go counts the others, and cli.make_layout lays out again without letting them go and keeps the more
-    alike of the two (random-100 held-out A15)."""
+    alike of the two (random-100 held-out A15). `mirror_only` (cli's dyad view of a two-fold assembly, plan 18): None
+    at once where the frame's mirror line is dropped (a βα row across it), for cli to unroll the copies instead."""
     if mode not in ("projected", "stack"):
         raise ValueError(f"unknown layout mode {mode!r}")
     style = style or Style()
@@ -3568,6 +3570,8 @@ def build_layout(
     rows_x = [(it.cx + it.box[0], it.cx + it.box[2]) for it in templates.values()]
     if mirror is not None and any(x0 < mirror < x1 for x0, x1 in rows_x):
         mirror = None  # a βα row across the mirror line would meet its own image: the copies go side by side instead
+        if mirror_only:
+            return None
     by_id = {s.id: s for s in sses}
     bundles = helix_bundles([s for s in sses if s.id not in in_rows])  # bundles are coiled coils, never a row's
     if getattr(frame, "sector", None):  # each protomer's part of a bundle drawn with its own copy

@@ -411,36 +411,40 @@ def make_layout(
         if (look or Style()).helix_on_sheet == "auto" and sym is None and (nucleic is None or not nucleic.strands)
         else {}
     )
-    lay_out = functools.partial(
-        build_layout,
-        sses,
-        sheets,
-        frame,
-        mode,
-        contacts=contacts,
-        nucleic=nucleic,
-        style=look,
-        bridges=_bridge_springs(bb, sses, links),
-        partial=partial,
-        domains=named,
-        rename=rename,
-        swap=swap,
-        move=move,
-        keep_depth=mem is not None and mode == "stack",
-        na_cropped=na_cropped,
-        template=(look or Style()).fold_template,
-        copies=copies,
-        relabel=relabel,
-        names=functools.partial(
-            apply_names, list(names), path, whole=whole, chains=set(present), copies=copies, primes=primes
-        )
-        if names
-        else None,
-        over=over,
-        alike_first=mem is None,  # a membrane view is judged by its bands (C17), not its copies (A15)
-    )
 
-    def finish(lay, faces=None):  # what make_layout sets on a layout after build_layout
+    springs = _bridge_springs(bb, sses, links)
+
+    def lay_out_in(frame):  # build_layout through a frame (the dyad view's, or the unrolled one's), as a partial
+        return functools.partial(
+            build_layout,
+            sses,
+            sheets,
+            frame,
+            mode,
+            contacts=contacts,
+            nucleic=nucleic,
+            style=look,
+            bridges=springs,
+            partial=partial,
+            domains=named,
+            rename=rename,
+            swap=swap,
+            move=move,
+            keep_depth=mem is not None and mode == "stack",
+            na_cropped=na_cropped,
+            template=(look or Style()).fold_template,
+            copies=copies,
+            relabel=relabel,
+            names=functools.partial(
+                apply_names, list(names), path, whole=whole, chains=set(present), copies=copies, primes=primes
+            )
+            if names
+            else None,
+            over=over,
+            alike_first=mem is None,  # a membrane view is judged by its bands (C17), not its copies (A15)
+        )
+
+    def finish(lay, frame, faces=None):  # what make_layout sets on a layout after build_layout through `frame`
         lay.helix_matched = {"cut": matched.get("cut", 0), "joined": matched.get("joined", 0)}
         lay.helix_matched_ids = list(matched.get("ids", []))
         lay.domain_source, lay.domain_note = (source if lay.domains else ""), named_note
@@ -472,15 +476,18 @@ def make_layout(
             lay.membrane = _membrane_band(lay, sses, bb, mem, faces)
         return lay
 
-    def settle(lay_out):
-        lay = finish(lay_out())
+    def laid_out(frame, mirror_only=False):
+        """The layout through `frame`, as make_layout keeps it; None with `mirror_only` where build_layout drops the
+        frame's mirror line (a βα row across it), before laying anything out."""
+        lay_out = lay_out_in(frame)
+        lay = lay_out(mirror_only=True) if mirror_only else lay_out()
+        if lay is None:
+            return None
+        lay = finish(lay, frame)
         if lay.let_go:  # copy items let go (layout._one_per_mate): kept only when the copies come out more alike (A15)
-            held = finish(lay_out(let_go=False))
+            held = finish(lay_out(let_go=False), frame)
             if _unalike(held, bb) <= _unalike(lay, bb):
                 lay, lay_out = held, functools.partial(lay_out, let_go=False)
-        return lay, lay_out
-
-    def banded(lay, lay_out):
         if mem is not None and mode == "projected" and lay.membrane is not None:
             from .figcheck import membrane_view
 
@@ -488,7 +495,7 @@ def make_layout(
                 before = _membrane_score(lay, sses, bb, mem)  # again with every one at its projected height (C17)
                 level = _transmembrane(sses, bb, mem)
                 faces = _faces_on_page(frame, sses, bb, mem, level)
-                again = finish(lay_out(level=level, band=tuple(sorted(faces))), faces)
+                again = finish(lay_out(level=level, band=tuple(sorted(faces))), frame, faces)
                 after = _membrane_score(again, sses, bb, mem)
                 # kept only when it helps: fewer helices off the band, no more loops in the slab, no more fallbacks
                 if after[0] < before[0] and after[1] <= before[1] and after[2] <= before[2]:
@@ -502,27 +509,21 @@ def make_layout(
 
         return len(membrane_view(lay, sses, bb, mem)["tm_short"])
 
-    lay, lay_out = settle(lay_out)
-    lay = banded(lay, lay_out)
-    if dyad is not None:  # the dyad view is for the mirror image of copies drawn alike
+    lay = laid_out(frame, mirror_only=dyad is not None)
+    if lay is None:  # no mirror image to draw in the dyad view (a βα row across the line): the copies unrolled
+        lay = laid_out(symmetric_frame(sses, sym))
+    elif dyad is not None:  # the dyad view is for the mirror image of copies drawn alike
         mirrored = any(m for _, m in lay.copy_ties.values())
-        unalike = mem is None and _unalike(lay, bb) > LIMITS["copies_alike"]  # a membrane view is judged by its bands
-        if not mirrored or unalike or off_band(lay):
-            # where no mirror image is drawn (a βα row across the mirror line, build_layout), the copies are unrolled
-            # side by side as for any assembly; where it is drawn unalike (A15) or a transmembrane helix off its band
-            # (A18), they are unrolled when that does better
-            frame = symmetric_frame(sses, sym)
-            keywords = {k: v for k, v in lay_out.keywords.items() if k != "let_go"}
-            unrolled, unrolled_out = settle(functools.partial(build_layout, sses, sheets, frame, mode, **keywords))
-            unrolled = banded(unrolled, unrolled_out)
-            if (
-                not mirrored
-                or (unalike and _unalike(unrolled, bb) < _unalike(lay, bb))
-                or off_band(unrolled) < off_band(lay)
-            ):
-                lay, lay_out = unrolled, unrolled_out
-            else:
-                frame = dyad
+        gap, off = _unalike(lay, bb), off_band(lay)
+        if not mirrored or gap > LIMITS["copies_alike"] or off:
+            # where no copy is tied as a mirror image, the copies are unrolled side by side as for any assembly;
+            # where the mirror image leaves a transmembrane helix off its band
+            # (A18) or draws the copies unalike (A15), they are unrolled when that leaves fewer helices off the
+            # band, or as many and the copies more alike (bands first: alikeness never bought with a helix off)
+            unrolled = laid_out(symmetric_frame(sses, sym))
+            off_unrolled = off_band(unrolled)
+            if not mirrored or off_unrolled < off or (off_unrolled == off and _unalike(unrolled, bb) < gap):
+                lay = unrolled
     if msa:
         from .sequence import grades, is_consurf, read_alignment, read_consurf, residue_conservation
 

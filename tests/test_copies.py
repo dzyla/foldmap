@@ -197,6 +197,25 @@ def test_copies_numbered_apart_are_tied():
 
 
 @pytest.mark.parametrize("turned", [False, True])
+def test_a_dimer_sheet_shared_by_two_copies_is_drawn_as_its_mirror_image(monkeypatch, turned):
+    """1SLV as drawn (plan 18): seen from the side of its dyad, A2 and B2 are A1's and B1's mirror images, exactly
+    alike, whichever way the dyad's axis points (it sets which way up the page is)."""
+    import dataclasses
+
+    import foldmap.cli as cli
+
+    if turned:
+        real_sym = cli.detect_symmetry
+        monkeypatch.setattr(
+            cli, "detect_symmetry", lambda *a, **k: (lambda s: dataclasses.replace(s, axis=-s.axis))(real_sym(*a, **k))
+        )
+    d = drawn(DATA / "r100" / "1SLV.cif.gz")
+    assert d.layout.copy_ties == {"A2": ("A1", True), "B2": ("B1", True)}
+    got = figcheck.copies_alike(d)
+    assert set(got) == {("A2", "A1"), ("B2", "B1")} and max(got.values()) <= 1e-6, got
+
+
+@pytest.mark.parametrize("turned", [False, True])
 def test_a_dimer_sheet_shared_by_two_copies_keeps_them_alike(monkeypatch, turned):
     """1SLV (plan 12 Task 2 fix round 2, pinned in fix round 4 on a cut fixture): assembly 1 is the A-B heterodimer
     twice, with one continuous sheet across the two copies, an item no tie holds. It sat between A1's eta2 and its

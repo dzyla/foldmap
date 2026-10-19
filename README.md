@@ -360,11 +360,12 @@ element. It is marked with a star on the chain and the legend entry "chromophore
 
 **Mirrored dimers.** Two copies related by a two-fold axis lying in the page (λ repressor on its operator, 1LMB) are
 drawn as exact mirror images about that axis, names included, even where that takes up to a tenth more room than
-placing the copies one by one (other copies: a twentieth). A two-fold (C2) assembly is seen from the side of its dyad
+placing the copies one by one (other copies: a twentieth). By default (no `--up`, `--view`, `--rotate` or
+`--flip-v` asked for, and no straight duplex to draw along) a two-fold (C2) assembly is seen from the side of its dyad
 for this: the dyad points up the page and the first protomer sits on the left, so the copies meet at the line where
 their interface lies (TrmD, 1UAM). Where no mirror image can be drawn (a βα row such as a TIM barrel's would cross the
-line), or one draws the copies less alike, or a membrane dimer's transmembrane helices off their band, the copies are
-unrolled side by side instead. Other symmetric copies, and the unrolled cylinders of rings and filaments, are drawn
+line), or where the mirror image draws the copies unalike or leaves a membrane dimer's transmembrane helices off their
+band and unrolling does better, the copies are unrolled side by side instead. Other symmetric copies, and the unrolled cylinders of rings and filaments, are drawn
 alike.
 
 **Layout files.** `--save-layout fig.yaml` records everything that defines a figure: theme, style changes,
@@ -551,8 +552,7 @@ Every figure (command line, app, MCP or Python) goes through the same steps:
    widest spread runs left–right (single chains); a two-fold assembly is seen from the side of its dyad, the dyad up
    the page (its copies drawn as mirror images, step 6); any other symmetric assembly is unrolled around its axis,
    protein–DNA complexes around the DNA axis, membrane proteins with the bilayer horizontal. The frame itself is
-   never a mirror. An assembly whose
-   nucleic acid unrolling would tear apart stays in the plain projected view: a duplex kinked across protomers,
+   never a mirror. An assembly whose nucleic acid unrolling would tear apart stays in the plain projected view: a duplex kinked across protomers,
    linked stems that would turn against one another, or most stems each held by two protomers (the PFV intasome
    3L2V, whose viral DNA ends are gripped by both inner integrase chains).
 6. **Layout.** Sheets (as rigid blocks), helices and DNA are placed by minimising one energy: springs to their
