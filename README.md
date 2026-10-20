@@ -139,7 +139,7 @@ side.
 | Action | Effect |
 | --- | --- |
 | Hover an element, loop, map cell or residue in 3D | preview: the same residues light up in all three views |
-| Click | select it (stays lit; the 3D view keeps its camera) |
+| Click | select it (stays lit); a click in the figure also brings the 3D view to it, a click in 3D keeps the camera |
 | Click it again, click empty paper, or press Esc | clear the selection |
 | Shift-click | add to (or remove from) the selection |
 | Click a chain in the legend, or its N/C terminus | select the whole chain |
@@ -590,7 +590,7 @@ draw it. The examples are one click, and a `.cif` or `.pdb` file can be dropped 
 
 **Workspace.** The figure is drawn at once in the current theme. The top bar names the structure, summarises it,
 and switches between three views: Figure, Sequence (the sequence, or an uploaded alignment, with the secondary
-structure on top) and 3D (the interactive page). Only the chosen view is drawn. Download makes each file when you
+structure on top) and 3D (the interactive page: click an element of the figure and the 3D view glides to it). Only the chosen view is drawn. Download makes each file when you
 click it, from what was drawn: SVG, PNG (300 dpi, less past 50 megapixels; the button says which), PDF and the
 layout file for the figure, the sequence figure, and the 3D page as HTML. A setting that fails keeps the last good figure on screen and names the control to check.
 

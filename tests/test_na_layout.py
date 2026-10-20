@@ -1668,12 +1668,15 @@ def test_explorer_page_of_a_nucleic_acid_only_file_has_no_contact_map():
 
 
 _HARNESS = r"""
-// Runs the explorer's app script against stub DOM and viewer objects; drives viewer.on and records any camera move.
+// Runs the explorer's app script against stub DOM and viewer objects; drives viewer.on, clicks in the figure and the
+// 3D view, and records any camera move.
 const fs = require('fs');
 const job = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
 const calls = [];
-const generic = () => new Proxy(function () {}, {
+const listeners = {};  // element name -> event -> handler: the figure and the 3D panel take dispatched clicks
+const generic = name => new Proxy(function () {}, {
   get(_, k) {
+    if (k === 'addEventListener') return (ev, fn) => { if (name) (listeners[name] = listeners[name] || {})[ev] = fn; };
     if (k === 'getAttribute') return () => '0 0 10 10';
     if (k === 'textContent') return '';
     if (k === 'dataset') return {};
@@ -1690,23 +1693,25 @@ const generic = () => new Proxy(function () {}, {
   apply() { return generic(); },
 });
 const elements = {};
+let figure = null;  // the topology's svg: a clicked node's parent chain ends at it
 globalThis.document = {
-  getElementById: id => id === 'topo-data' ? { textContent: job.blob } : (elements[id] = elements[id] || generic()),
-  querySelector: () => generic(), querySelectorAll: () => [], addEventListener() {},
+  getElementById: id => id === 'topo-data' ? { textContent: job.blob } : (elements[id] = elements[id] || generic(id)),
+  querySelector: q => q === '#stage svg' ? (figure = figure || generic('svg')) : generic(),
+  querySelectorAll: () => [], addEventListener() {},
 };
 globalThis.window = globalThis;
 globalThis.addEventListener = () => {};
 globalThis.ResizeObserver = class { observe() {} };
 globalThis.URL.createObjectURL = () => 'blob:x';
 globalThis.$3Dmol = { createViewer: () => new Proxy({
-  setStyle: (s, st) => calls.push(['setStyle', s, st]), zoomTo: s => calls.push(['zoomTo', s]),
+  setStyle: (s, st) => calls.push(['setStyle', s, st]), zoomTo: (s, ms) => calls.push(['zoomTo', s, ms]),
 }, { get: (t, k) => k in t ? t[k] : () => {} }) };
 globalThis.PDBeMolstarPlugin = class {
   constructor() {
     this.events = { loadComplete: { subscribe: cb => { this.done = cb; } } };
     this.visual = { select: async p => { calls.push(['select', p]); }, focus: async q => { calls.push(['focus', q]); },
                     reset() {} };
-    this.plugin = { managers: { camera: { focusLoci: () => calls.push(['focusLoci']),
+    this.plugin = { managers: { camera: { focusLoci: (loci, o) => calls.push(['focusLoci', loci, o]),
                                           focusSpheres: () => calls.push(['focusSpheres']),
                                           reset: () => calls.push(['reset']) } },
                     canvas3d: { handleResize() {},
@@ -1714,6 +1719,7 @@ globalThis.PDBeMolstarPlugin = class {
                                                                                   radius: 1 }), setState() {} } } };
   }
   render(target, options) { this.options = options; setTimeout(() => this.done(true), 0); }
+  getLociForParams(params) { return { params }; }  // pdbe-molstar's query: the stub's loci are the query itself
   // pdbe-molstar 3.12.0's camera-focus-loci behaviour (PluginBehaviors.Camera.FocusLoci, read from the pinned
   // build): its bindings are render's focusBindings when given (the pinned build's own defaults otherwise); a
   // primary click on nothing that clickResetCameraOnEmpty matches runs PluginCommands.Camera.Reset (the camera
@@ -1749,6 +1755,28 @@ setTimeout(async () => {
   calls.length = 0;  // Mol*'s reset control (PluginCommands.Camera.Reset): the reader's own move, still made
   if (viewer) viewer.plugin.managers.camera.reset();
   out.push({ case: '-', op: 'reset control', error: null, calls: JSON.parse(JSON.stringify(calls)) });
+  // clicks in the figure (an element's helix or strand node, or the bare paper) and in the 3D view, one after another
+  const node = id => ({ id: 'helix:' + id, parentNode: figure });
+  const [first, second] = job.clicks;
+  const steps = !first ? [] : [
+    ['hover', () => listeners.svg.mouseover({ target: node(first) })],
+    ['click', () => listeners.svg.click({ target: node(first), shiftKey: false })],
+    ['click again', () => listeners.svg.click({ target: node(first), shiftKey: false })],
+    ['click once more', () => listeners.svg.click({ target: node(first), shiftKey: false })],
+    ['shift-click another', () => listeners.svg.click({ target: node(second), shiftKey: true })],
+    ['shift-click it again', () => listeners.svg.click({ target: node(second), shiftKey: true })],
+    ['click paper', () => listeners.svg.click({ target: figure, shiftKey: false })],
+    ['click in 3D', () => listeners.mol && listeners.mol['PDB.molstar.click']
+                            && listeners.mol['PDB.molstar.click']({ eventData: job.atom })],
+  ];
+  for (const [op, act] of steps) {
+    calls.length = 0;
+    let error = null;
+    try { act(); } catch (e) { error = String(e); }
+    await new Promise(r => setTimeout(r, 50));
+    out.push({ case: 'click', op, error, calls: JSON.parse(JSON.stringify(calls)),
+               selection: window.foldmapSelection() });
+  }
   console.log(JSON.stringify(out));
   process.exit(0);
 }, 100);
@@ -1766,7 +1794,13 @@ def _explorer_cases(pdb, viewer):
 
 def _drive(tmp_path, pdb, viewer, cases):
     data, blob, lib, app = _explorer_cases(pdb, viewer)
-    job = {"blob": blob, "lib": lib, "app": app, "cases": cases(data)}
+    clicks, atom = [e["id"] for e in data["elements"][:2]], None  # two elements to click, and a residue in 3D
+    if len(clicks) == 2:
+        residue = data["residues"][data["elements"][0]["start"]]
+        atom = {"auth_asym_id": residue["c"], "auth_seq_id": residue["n"], "ins_code": residue.get("i") or ""}
+    else:
+        clicks = []
+    job = {"blob": blob, "lib": lib, "app": app, "cases": cases(data), "clicks": clicks, "atom": atom}
     (tmp_path / "job.json").write_text(json.dumps(job), encoding="utf-8")
     (tmp_path / "harness.js").write_text(_HARNESS, encoding="utf-8")
     res = subprocess.run(
@@ -1806,7 +1840,8 @@ def test_explorer_viewers_take_protein_nucleic_and_mixed_selections(tmp_path, vi
     if viewer == "molstar":
         assert got[("-", "reset control")]["calls"] == [["reset"]]
     for r in got.values():
-        assert not any(c[0] in ("zoomTo", "focus") for c in r["calls"]), r
+        if r["case"] != "click":  # a selection made from code: no camera move (figure clicks: the test below)
+            assert not any(c[0] in ("zoomTo", "focus", "focusLoci") for c in r["calls"]), r
     if viewer == "3dmol":
         on = got[("protein", "on")]["calls"]
         assert any(c[0] == "setStyle" and len(c[1].get("or", [])) == n for c in on)
@@ -1820,6 +1855,45 @@ def test_explorer_viewers_take_protein_nucleic_and_mixed_selections(tmp_path, vi
         assert not any(p.get("representation") for p in parts)
         parts = got[("mixed", "on")]["calls"][0][1]["data"]
         assert sum(1 for p in parts if p.get("representation") == "ball-and-stick") == len(mixed["het"])
+
+
+@pytest.mark.skipif(node is None, reason="node is not installed; the explorer's viewer code cannot be exercised")
+@pytest.mark.parametrize("viewer", ["3dmol", "molstar"])
+def test_explorer_figure_click_takes_the_3d_camera_to_the_selection(tmp_path, viewer):
+    # the author: a click on an element of the figure brings the 3D view to it with a short glide; a hover, a click
+    # in the 3D view, a click that clears or removes, and a click on bare paper move nothing (no zoom-out, no spin)
+    data, got = _drive(tmp_path, "1IHF", viewer, lambda data: [])
+    first, second = data["elements"][:2]
+    one = [f"element:{first['id']}"]
+    moves = ("zoomTo",) if viewer == "3dmol" else ("focusLoci", "focusSpheres", "reset")
+
+    def camera(op):
+        r = got[("click", op)]
+        assert r["error"] is None, r
+        return r, [c for c in r["calls"] if c[0] in moves]
+
+    def framed(call):  # how many residues the camera was sent to, and the glide's length
+        if viewer == "3dmol":
+            assert call[0] == "zoomTo"
+            return len(call[1]["or"]), call[2]
+        assert call[0] == "focusLoci"
+        return sum(p["end_auth_seq_id"] - p["beg_auth_seq_id"] + 1 for p in call[1]["params"]), call[2]["durationMs"]
+
+    size = [e["end"] - e["start"] + 1 for e in (first, second)]
+    for op in ("click", "click once more"):
+        r, cam = camera(op)
+        assert r["selection"] == one and len(cam) == 1, r
+        assert framed(cam[0]) == (size[0], 250)  # under half a second: Mol*'s own default
+    r, cam = camera("shift-click another")  # a multi-element selection: the camera frames all of it
+    assert r["selection"] == one + [f"element:{second['id']}"] and len(cam) == 1, r
+    assert framed(cam[0]) == (sum(size), 250)
+    for op, selection in (("hover", []), ("click again", []), ("shift-click it again", one), ("click paper", [])):
+        r, cam = camera(op)
+        assert r["selection"] == selection and cam == [], r
+    r, cam = camera("click in 3D")  # Mol*'s canvas: the click selects, the camera stays (27a535f)
+    assert cam == [], r
+    if viewer == "molstar":
+        assert r["selection"] == one
 
 
 @pytest.mark.skipif(node is None, reason="node is not installed; the explorer's viewer code cannot be exercised")

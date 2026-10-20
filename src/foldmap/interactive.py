@@ -234,10 +234,12 @@ _APP = r"""
     }
   }
 
-  // ---- 3D: one interface over Mol* (default) or 3Dmol: base colours, highlight, reset, hover callbacks;
-  // the camera moves only when the reader moves it (or presses reset), never on a selection
+  // ---- 3D: one interface over Mol* (default) or 3Dmol: base colours, highlight, focus, reset, hover callbacks;
+  // the camera moves when the reader moves it (or presses reset) and when a click in the figure selects something
+  // (focus: a short glide onto it, the view's orientation kept), never on a hover, a click in 3D or a cleared selection
   const molDiv = document.getElementById('mol');
   const LOOP = '#9aa3ad', PALE = '#dde2e7', LOOP_ON = '#4a4f57', HET = '#e69f00';
+  const FOCUS_MS = 250;  // the glide onto a selection: Mol*'s own default, short enough to keep the reader's place
   function colourOfResidue(k) {
     const e = data.residues[k].e;
     return e ? idx.byElement[e].colour : LOOP;
@@ -262,7 +264,7 @@ _APP = r"""
     const query = run => ({ auth_asym_id: run.chain, beg_auth_seq_id: run.begin, end_auth_seq_id: run.end });
     const baseData = data.elements.map(e => ({ auth_asym_id: e.chain, beg_auth_seq_id: e.first,
                                                end_auth_seq_id: e.last, color: e.colour }));
-    let ready = false, busy = false, pending = null;
+    let ready = false, busy = false, pending = null, focusCamera = null;
     async function apply(params) {  // Mol* calls are asynchronous: keep only the latest request while one runs
       if (!ready || busy) { pending = params; return; }
       busy = true;
@@ -289,7 +291,9 @@ _APP = r"""
       if (!ok) return;
       ready = true;
       const cam = plugin.plugin && plugin.plugin.managers && plugin.plugin.managers.camera;
-      if (cam) ['focusLoci', 'focusSpheres'].forEach(f => { if (cam[f]) cam[f] = () => {}; });  // no zoom on a click in 3D
+      // the camera manager's own focus, kept for a click in the figure; Mol*'s callers get none (no zoom on a click in 3D)
+      if (cam && cam.focusLoci && !focusCamera) focusCamera = cam.focusLoci.bind(cam);
+      if (cam) ['focusLoci', 'focusSpheres'].forEach(f => { if (cam[f]) cam[f] = () => {}; });
       base();
     });
     function key(d) { return idx.byKey[d.auth_asym_id + ':' + d.auth_seq_id + ((d.ins_code || '').trim())]; }
@@ -313,6 +317,12 @@ _APP = r"""
         het.forEach(([chain, seq]) => parts.push({ auth_asym_id: chain, auth_seq_id: seq, color: HET,
                                                    representation: 'ball-and-stick', representationColor: HET }));
         apply({ data: parts, nonSelectedColor: PALE });
+      },
+      focus(residues, het = []) {  // centre and frame these residues: no turn, so the reader's orientation stays
+        if (!ready || !focusCamera || (!residues.length && !het.length)) return;
+        const params = runs(residues).map(query).concat(het.map(([chain, seq]) => ({ auth_asym_id: chain,
+                                                                                         auth_seq_id: seq })));
+        try { focusCamera(plugin.getLociForParams(params), { durationMs: FOCUS_MS }); } catch (err) { console.warn(err); }
       },
       reset() { if (ready) plugin.visual.reset({ camera: true }); },
       plugin,
@@ -352,6 +362,10 @@ _APP = r"""
         het.forEach(([chain, seq]) => viewer.setStyle({ chain, resi: seq }, { stick: { radius: 0.25, color: HET },
                                                                               sphere: { scale: 0.3, color: HET } }));
         viewer.render();
+      },
+      focus(residues, het = []) {  // centre and frame these residues (3Dmol's zoomTo keeps the rotation)
+        if (!residues.length && !het.length) return;
+        viewer.zoomTo(sel(residues, het), FOCUS_MS); viewer.render();
       },
       reset() { viewer.zoomTo({}, 400); viewer.render(); },
       viewer,
@@ -419,30 +433,41 @@ _APP = r"""
     return { keys: [], residues: [item.k], label: name(item.k), text: name(item.k) + ' (loop)' };
   }
   let pinned = [], hovered = null, shiftDown = false;
-  function render() {
-    const items = hovered ? pinned.concat([hovered]) : pinned, states = items.map(stateOf);
+  function gather(states) {  // the union of some selections: figure keys, residues, het groups, a map pair
     const keys = new Set(), res = new Set();
     let pair = null;
     const het = [];
     states.forEach(st => { st.keys.forEach(k => keys.add(k)); st.residues.forEach(k => res.add(k)); if (st.pair) pair = st.pair;
                            (st.het || []).forEach(h => het.push(h)); });
-    svgOn(Array.from(keys));
+    return { keys: Array.from(keys), res: Array.from(res), het, pair };
+  }
+  function render() {
+    const items = hovered ? pinned.concat([hovered]) : pinned, states = items.map(stateOf);
+    const { keys, res, het, pair } = gather(states);
+    svgOn(keys);
     states.forEach(st => { if (st.chain) (chainParts[st.chain] || []).forEach(n => n.classList.add('on')); });
-    mapOn(runsOf(Array.from(res)), pair);
-    molOn(Array.from(res), het);
+    mapOn(runsOf(res), pair);
+    molOn(res, het);
     let text = info.dataset.idle;
     if (states.length === 1) text = states[0].text;
-    else if (states.length > 1) text = states.length + ' selected: ' + states.map(st => st.label).join(', ') + ' — ' + res.size + ' residues';
+    else if (states.length > 1) text = states.length + ' selected: ' + states.map(st => st.label).join(', ') + ' — ' + res.length + ' residues';
     if (pinned.length) text += '   ·   click again or Esc to clear, shift-click to add';
     info.textContent = text;
     info.classList.toggle('pinned', pinned.length > 0);
   }
   function hover(item) { hovered = item; render(); }
   function unhover() { if (hovered) { hovered = null; render(); } }
-  function pick(item, additive) {
+  function pick(item, additive, focus) {
     pinned = lib.toggle(pinned, item, additive);
     hovered = null;
-    render();  // the 3D view keeps its camera: a selection lights up in place (the author: no zoom-in)
+    render();
+    // a click in the figure that selects (or adds) something takes the 3D camera to the whole selection; a click
+    // that clears or removes moves nothing (no zoom-out), and nor does a click in the 3D view or on the map
+    const key = lib.itemKey(item);
+    if (focus && pinned.some(p => lib.itemKey(p) === key)) {
+      const { res, het } = gather(pinned.map(stateOf));
+      mol.focus(res, het);
+    }
   }
   function clearPins() { pinned = []; hovered = null; render(); }
   window.foldmapSelection = () => pinned.map(lib.itemKey);  // for tests and scripting
@@ -486,7 +511,7 @@ _APP = r"""
   svg.addEventListener('click', ev => {
     if (drag && drag.moved) return;
     const item = itemAt(ev.target);
-    if (item) pick(item, ev.shiftKey);
+    if (item) pick(item, ev.shiftKey, true);
     else if (!ev.shiftKey) clearPins();  // a click on empty paper clears the selection
   });
   svg.querySelectorAll('[id^="legend-chain"], [id^="terminus:"]').forEach(n => { n.style.cursor = 'pointer'; });
