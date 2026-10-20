@@ -196,8 +196,9 @@ def _dyad_frame(sses, sym) -> Frame | None:
     """A two-fold assembly seen from the side (plan 18): the dyad up the page, protomer 0 on the left and protomer 1
     to its right, so that _mirror_frame draws one as the other's mirror image. Page-right runs from protomer 0's
     element centroids toward protomer 1's, perpendicular to the dyad; the view is their cross product (a rotation,
-    never a mirror). Both axes are snapped before they choose the page axes (the dyad and the centroids differ in
-    the last bit between BLAS kernels). None when a protomer has no element, or the two sit on the dyad."""
+    never a mirror), turned about the dyad as _dyad_turn chooses (plan 19), so that elements close in 3D stay close.
+    Both axes are snapped before they choose the page axes (the dyad and the centroids differ in the last bit between
+    BLAS kernels). None when a protomer has no element, or the two sit on the dyad."""
     if sym.kind != "C" or sym.n != 2 or len(sym.protomers) != 2:
         return None
     cents = [[s.centroid for s in sses if s.chain in p] for p in sym.protomers]
@@ -209,7 +210,50 @@ def _dyad_frame(sses, sym) -> Frame | None:
     if np.linalg.norm(right) < 1.0:  # Å: the two halves on the dyad, no side to see them from
         return None
     up, right = _snap(axis), _snap(right / np.linalg.norm(right))
-    return view_frame(sses, up=up, view=np.cross(right, up))
+    face = np.cross(right, up)  # the view at turn 0: protomer 1 straight to protomer 0's right
+    turn = _dyad_turn(np.array(cents[0] + cents[1]), up, right, face)
+    if turn:  # turned about the dyad: protomer 1 still to the right, a little behind or in front of protomer 0
+        t = np.radians(turn)  # (cos and sin may differ in the last bit between libms: snapped)
+        face = _snap(np.cos(t) * face + np.sin(t) * right)
+    return view_frame(sses, up=up, view=face)
+
+
+DYAD_TURNS = (0, 15, -15, 30, -30, 45, -45, 60, -60, 75, -75)  # degrees about the dyad, in order of preference
+DYAD_TURN_GAIN = 0.01  # turns this close to the best rank correlation count as tied: the earliest is taken
+
+
+def _dyad_turn(cents, up, right, face) -> int:
+    """The turn about the dyad (degrees, one of DYAD_TURNS) a two-fold assembly is seen at (plan 19): the one whose
+    projection keeps the order of the elements' distances best, by the rank correlation (Spearman) of their centroids'
+    distances on the page and in 3D, over every pair. Every view perpendicular to the dyad draws an exact mirror image,
+    but seen square-on to the line between the protomers (turn 0) an interface lying along the dyad can fall on the
+    mirror line, where the layout pulls its overlapping elements apart (TrmD, 1UAM: rank correlation 0.40 projected,
+    0.35 laid out; at 75°, 0.96 and 0.84, and cross-chain contacts drawn at their 3D distance instead of 4.6 times it).
+    The projection predicts the laid-out figure (plan 19 Task 1's table), so one layout is enough. Turns stay within
+    ±75°: protomer 1's centre stays to the right of protomer 0's (at ±90° one is behind the other). Ties, and turns
+    within DYAD_TURN_GAIN of the best, go to the earliest in DYAD_TURNS (the smallest turn). Distances are snapped and
+    tied ranks averaged, so the choice is the same on any CPU."""
+    from scipy.spatial.distance import pdist
+    from scipy.stats import rankdata
+
+    def ranks(d):
+        r = rankdata(_snap(d))
+        return r - r.mean()
+
+    if len(cents) < 3:
+        return DYAD_TURNS[0]
+    rel = cents - cents.mean(axis=0)
+    in3d = ranks(pdist(rel))
+    y = (rel * up).sum(axis=1)
+    score = {}
+    for turn in DYAD_TURNS:
+        t = np.radians(turn)
+        x = (rel * (np.cos(t) * right - np.sin(t) * face)).sum(axis=1)  # page-right at this turn
+        page = ranks(pdist(_snap(np.stack([x, y], axis=1))))
+        norm = np.sqrt((page * page).sum() * (in3d * in3d).sum())
+        score[turn] = round(float((page * in3d).sum() / norm), 9) if norm > 0 else 0.0
+    best = max(score.values())
+    return next(t for t in DYAD_TURNS if score[t] >= best - DYAD_TURN_GAIN)
 
 
 def _side_by_side(frame, sym, nucleic, bb) -> None:

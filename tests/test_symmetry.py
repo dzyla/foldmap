@@ -140,6 +140,60 @@ def test_two_fold_unrolled_draws_the_copies_side_by_side():
     assert unrolled.copy_ties and not any(m for _, m in unrolled.copy_ties.values())
 
 
+def _turned(monkeypatch, path):
+    """make_layout of `path`, with what _dyad_turn was given and chose."""
+    import foldmap.cli as cli
+
+    seen = {}
+    real = cli._dyad_turn
+
+    def turn(*args):
+        seen["args"], seen["turn"] = args, real(*args)
+        return seen["turn"]
+
+    monkeypatch.setattr(cli, "_dyad_turn", turn)
+    lay, sses, _ = cli.make_layout(path)
+    return lay, sses, seen
+
+
+def test_the_dyad_view_is_turned_to_keep_the_interface_together(monkeypatch):
+    """Plan 19 Task 1: TrmD (1UAM) seen square-on to the line between its protomers piles the interface (α1, α5, the
+    H/I hairpins of both chains) on the mirror line, and the layout scattered it (cross-chain elements closer than
+    16 Å drawn at a median 4.6 times their 3D distance, rank correlation of drawn and 3D distances 0.35). Turned
+    75° about the dyad, the projection keeps the distances' order best and the figure keeps the interface together;
+    protomer 0's centre stays left of the mirror line."""
+    from foldmap.layout import SCALE
+
+    lay, sses, seen = _turned(monkeypatch, DATA / "assemblies" / "1UAM.cif.gz")
+    assert seen["turn"] == 75 and lay.frame.mirror_x is not None
+    placed = [s for s in sses if s.id in lay.placed]
+    xy = {s.id: np.array([lay.placed[s.id].cx, lay.placed[s.id].cy]) / SCALE for s in placed}
+    pairs = [(a, b) for i, a in enumerate(placed) for b in placed[i + 1 :]]
+    d3 = np.array([np.linalg.norm(a.centroid - b.centroid) for a, b in pairs])
+    d2 = np.array([np.linalg.norm(xy[a.id] - xy[b.id]) for a, b in pairs])
+    near = np.array([a.chain != b.chain for a, b in pairs]) & (d3 < 16)
+    assert near.sum() >= 10 and np.median(d2[near] / d3[near]) < 1.25
+    ranks = [np.argsort(np.argsort(d)) for d in (d3, d2)]
+    assert np.corrcoef(*ranks)[0, 1] >= 0.8
+    first = [s.centroid for s in sses if s.chain == "A1"]
+    assert lay.frame.project(np.mean(first, axis=0))[0, 0] * SCALE < lay.frame.mirror_x
+
+
+def test_the_dyad_turn_is_the_same_on_any_cpu(monkeypatch):
+    """The turn is chosen on snapped distances with tied ranks averaged: noise in the last bits of the centroids and
+    axes (BLAS kernels) never changes it. Turns tied within DYAD_TURN_GAIN go to the smallest."""
+    import foldmap.cli as cli
+
+    _, _, seen = _turned(monkeypatch, DATA / "assemblies" / "1UAM.cif.gz")
+    cents, up, right, face = seen["args"]
+    rng = np.random.default_rng(0)
+    for _ in range(4):
+        nudged = [v * (1 + rng.uniform(-1e-15, 1e-15, v.shape)) for v in (cents, up, right, face)]
+        assert cli._dyad_turn(*nudged) == 75
+    monkeypatch.setattr(cli, "DYAD_TURN_GAIN", 1.0)
+    assert cli._dyad_turn(cents, up, right, face) == 0
+
+
 @pytest.mark.parametrize("name", ["8UUP", "2HHB", "1TIM", "4CH9", "9TX7"])
 def test_separation_keeps_every_copy_where_its_mate_is(name, monkeypatch):
     """Overlaps are cleared by moving each element together with its symmetry copies, so after separation

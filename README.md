@@ -360,16 +360,19 @@ backbone atom names (GFP's CRO66) keeps the chain whole: no dashed "missing" loo
 element. It is marked with a star on the chain and the legend entry "chromophore / linked residue".
 
 **Mirrored dimers.** Two copies related by a two-fold axis lying in the page (λ repressor on its operator, 1LMB) are
-drawn as exact mirror images about that axis, names included, even where that takes up to a tenth more room than
-placing the copies one by one (other copies: a twentieth). By default (no `--up`, `--view`, `--rotate` or
-`--flip-v` asked for, and no straight duplex to draw along) a two-fold (C2) assembly is seen from the side of its dyad
-for this: the dyad points up the page and the first protomer sits on the left, so the copies meet at the line where
-their interface lies (TrmD, 1UAM). Where no mirror image can be drawn (a βα row such as a TIM barrel's would cross the
-line), or where the mirror image draws the copies unalike or leaves a membrane dimer's transmembrane helices off their
-band and unrolling does better, the copies are unrolled side by side instead. `--set two_fold=unrolled` (the app's
-"Two-fold assemblies" choice, offered when one is drawn) always draws a two-fold assembly that way, its copies side
-by side around the axis as any other assembly's; `two_fold=mirror` is the default. Other symmetric copies, and the
-unrolled cylinders of rings and filaments, are drawn alike.
+drawn as exact mirror images about that axis, names included, even where that takes up to a tenth more room than placing
+the copies one by one (other copies: a twentieth). By default (no `--up`, `--view`, `--rotate` or `--flip-v` asked for,
+and no straight duplex to draw along) a two-fold (C2) assembly is seen from the side of its dyad for this: the dyad
+points up the page and the first protomer sits on the left, so the copies meet at the line where their interface lies.
+Of the views around the dyad (every 15°, up to 75° either way from square-on to the line between the protomers'
+centres), foldmap takes the one whose projection best keeps the order of the distances between elements (their rank
+correlation with the 3D distances), the smallest turn of those within 0.01 of the best, so that elements close in 3D
+across the two copies stay close on the page (TrmD, 1UAM, is seen turned by 75°). Where no mirror image can be drawn (a
+βα row such as a TIM barrel's would cross the line), or where the mirror image draws the copies unalike or leaves a
+membrane dimer's transmembrane helices off their band and unrolling does better, the copies are unrolled side by side
+instead. `--set two_fold=unrolled` (the app's "Two-fold assemblies" choice, offered when one is drawn) always draws a
+two-fold assembly that way, its copies side by side around the axis as any other assembly's; `two_fold=mirror` is the
+default. Other symmetric copies, and the unrolled cylinders of rings and filaments, are drawn alike.
 
 **Layout files.** `--save-layout fig.yaml` records everything that defines a figure: theme, style changes,
 layout options, domains and edits, with element references stored as residue ranges so they survive a new model.
