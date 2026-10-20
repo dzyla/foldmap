@@ -203,3 +203,17 @@ def test_two_fold_round_trips(tmp_path):
     lf.write_text(yaml.safe_dump(doc), encoding="utf-8")
     assert figure_spec(DATA / "1UBQ.cif", layout_file=lf).look.two_fold == "unrolled"
     assert "two_fold" not in layout_document(DATA / "1UBQ.cif", {"theme": "publication"})["style"]  # the default
+
+
+def test_copy_ghosts_round_trips(tmp_path):
+    """Plan 19 Task 2: the copy-ghosts choice is saved with the figure and read back (app and command line alike)."""
+    from foldmap.app import layout_document, settings_from_document
+    from foldmap.spec import figure_spec
+
+    doc = layout_document(DATA / "1UBQ.cif", {"theme": "publication", "copy_ghosts": "off"})
+    assert doc["style"]["copy_ghosts"] == "off"
+    assert settings_from_document(doc)["copy_ghosts"] == "off"
+    lf = tmp_path / "fig.yaml"
+    lf.write_text(yaml.safe_dump(doc), encoding="utf-8")
+    assert figure_spec(DATA / "1UBQ.cif", layout_file=lf).look.copy_ghosts == "off"
+    assert "copy_ghosts" not in layout_document(DATA / "1UBQ.cif", {"theme": "publication"})["style"]  # the default

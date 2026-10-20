@@ -12,6 +12,8 @@ elements (their ids: element ids, or domain, stem and ligand names). Kinds, in t
     bulge_joined       strands drawn whole across a beta-bulge DSSP splits them at (ss._join_bulged_pieces)
     helix_matched      helices cut or joined so copies of a protein are drawn alike (ss._copy_breaks)
     ghost_strands      strands drawn again as dashed copies: a barrel's closure, or in another copy's sheet
+    lent_apart         strands lent across an unrolled ring's cut drawn past the row's end, apart from the sheet they
+                       pair in, with no dashed copy (Style.copy_ghosts off)
     names_moved        names set off their usual spot to stay readable
     counts_hidden      residue counts of long loops and chain ends left out: no spot clear of other ink
     additives_hidden   crystallisation and purification additives not marked (Style.ligands auto)
@@ -105,6 +107,13 @@ def _ghosts(layout) -> list[dict]:
     if lent:
         text = f"{len(lent)} strand(s) drawn again, dashed, in the sheet of another copy they pair with"
         out.append(_item("ghost_strands", f"{text}: {', '.join(lent)}", lent))
+    apart = list(getattr(layout, "lent_apart", {}) or {})
+    if apart:
+        text = (
+            f"{len(apart)} strand(s) lent across the ring's cut drawn past the row's end, apart from the sheet of "
+            f"another copy they pair with"
+        )
+        out.append(_item("lent_apart", f"{text}: {', '.join(apart)}", apart))
     return out
 
 

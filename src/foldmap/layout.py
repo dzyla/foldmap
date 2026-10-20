@@ -321,6 +321,10 @@ class Layout:
     let_go: int = 0  # copy items build_layout let go (_one_per_mate): make_layout keeps them only if more alike
     two_fold_assembly: bool = False  # a two-fold (C2) assembly off a straight duplex: Style.two_fold chooses how
     # make_layout draws it (the app shows that choice only then)
+    lent_across_cut: bool = False  # a strand lent across an unrolled ring's cut (_unwrap): Style.copy_ghosts chooses
+    # whether its dashed copies are drawn (the app shows that choice only then)
+    lent_apart: dict[str, int] = field(default_factory=dict)  # copy_ghosts off: each strand lent across the cut, drawn
+    # past the row's end with no ghost -> the block of `sheets` it pairs in (figcheck.order_checks, provenance)
     font_scale: float = 1.0  # Style.font_scale the figure is drawn with (texts placed in the layout are sized by it)
     loop_stroke: float = 1.0  # a loop's drawn stroke in line_pt: Style.loop_width, RUN_EDGE_W times it under
     # residue colours (its dark edge); for line_band
@@ -3217,13 +3221,15 @@ def _slid_off(m, o, placed: list) -> tuple[float, float]:
     return tuple(float(v) for v in o)
 
 
-def _unwrap(items: list[_Item], ties: dict[int, tuple[int, int]], frame) -> dict[int, int]:
+def _unwrap(items: list[_Item], ties: dict[int, tuple[int, int]], frame, ghosts: bool = True) -> dict[int, int]:
     """Elements lent across the cut of a ring unrolled into a row. A copy's element drawn in its neighbour's item
     (a strand that pairs in the next protomer's sheet) sits on the same side of its own protomer in every copy but
     one: the copy whose neighbour lies across the cut, at the row's other end. There the element leaves the item
     for an item of its own, tied to the protomer-0 mate's place the same number of protomers along as in the other
     copies (one past the row's end), so every copy is drawn alike; a strand leaves a ghost (dashed, as a barrel's)
-    where it pairs, and takes ghosts of the strands it pairs with (_partners) to stand beside. New items are
+    where it pairs, and takes ghosts of the strands it pairs with (_partners) to stand beside; with `ghosts` False
+    (Style.copy_ghosts off) neither: the strand stands alone in its own item past the row's end, and no dashed copy
+    of another copy's strand is drawn (a barrel's closing ghost is not made here and stays). New items are
     appended to `items` and their ties to `ties`. Returns each new item's index -> the index of the item it left."""
     ring = _ring(frame)
     sector = getattr(frame, "sector", None) or {}
@@ -3246,7 +3252,7 @@ def _unwrap(items: list[_Item], ties: dict[int, tuple[int, int]], frame) -> dict
                 away.setdefault(g + usual, []).append(p)
         for k, ps in sorted(away.items()):
             moved = [it.members[p] for p in ps]
-            partners = _partners(it, ps)
+            partners = _partners(it, ps) if ghosts else []
             items.append(
                 _Item(
                     moved + [Placed(m.sse, 0, 0, m.length, m.angle, m.width, ghost=True) for m in partners],
@@ -3263,7 +3269,7 @@ def _unwrap(items: list[_Item], ties: dict[int, tuple[int, int]], frame) -> dict
                 m = it.members[p]
                 m.over = False
                 ghost = Placed(m.sse, 0, 0, m.length, m.angle, m.width, ghost=True)
-                it.members[p] = ghost if m.sse.kind == "E" else None
+                it.members[p] = ghost if m.sse.kind == "E" and ghosts else None
             keep = [p for p, m in enumerate(it.members) if m is not None]
             it.members, it.offsets = [it.members[p] for p in keep], [it.offsets[p] for p in keep]
     return out
@@ -3644,6 +3650,8 @@ def build_layout(
     kink_links: set[tuple[str, str]] = set()
     own: set[int] = set()
     gone = 0  # copy items _one_per_mate let go
+    lends = False  # a strand lent across an unrolled ring's cut (_unwrap): Style.copy_ghosts is a choice
+    apart: dict[str, int] = {}  # copy_ghosts off: a strand lent across the cut -> id() of the item it left
     if mode == "stack":
         rows = _stack(items, keep_depth)
         _centre_dna_over_binders(items, contacts)
@@ -3670,7 +3678,10 @@ def build_layout(
             own |= kept_own
         ties = {i: t for i, t in ties.items() if id(items[i]) not in alone}
         sector_of = getattr(frame, "sector", None) or {}
-        left = _unwrap(items, ties, frame) if mirror is None else {}
+        left = _unwrap(items, ties, frame, style.copy_ghosts == "on") if mirror is None else {}
+        lends = any(m.sse.kind == "E" for i in left for m in items[i].members if isinstance(m, Placed) and not m.ghost)
+        if style.copy_ghosts == "off":  # each lent strand -> the item it left, whose sheet it pairs in
+            apart = {m.sse.id: id(items[x]) for i, x in left.items() for m in items[i].members if m.sse.kind == "E"}
         if left and walls is not None:  # an element that left its item keeps off the traces it kept off
             walls = Walls(walls.boxes, np.vstack([walls.hard, walls.hard[list(left.values())]]))
         copy_ties = _copy_ties(items, ties, frame, mirror is not None)
@@ -3772,18 +3783,19 @@ def build_layout(
         g.label = real[g.sse.id].label
     rects = np.array([p.rect for p in placed + ghosts + dna]).reshape(-1, 4)
     blocks = [  # the strands of each item holding any: a βα row's helices lie between them, on its panel
-        (ids, [m.sse.id for m in it.members if isinstance(m, Placed) and m.ghost])
+        (ids, [m.sse.id for m in it.members if isinstance(m, Placed) and m.ghost], id(it))
         for it in items
         if (ids := [m.sse.id for m in it.members if isinstance(m, Placed) and m.sse.kind == "E" and not m.ghost])
     ]
+    block_of = {item: k for k, (_, _, item) in enumerate(blocks)}
     lay = Layout(
         real,
         (0.0, 0.0, 0.0, 0.0),
         ghosts=ghosts,
         stems=dna,
         nucleic=nucleic if dna or traces else None,
-        sheets=[ids for ids, _ in blocks],
-        sheet_ghosts=[ghost_ids for _, ghost_ids in blocks],
+        sheets=[ids for ids, _, _ in blocks],
+        sheet_ghosts=[ghost_ids for _, ghost_ids, _ in blocks],
     )
     lay.na_traces = traces
     lay.frame = frame
@@ -3791,6 +3803,8 @@ def build_layout(
     lay.tied_ids = tied_ids
     lay.kink_links = kink_links
     lay.let_go = gone
+    lay.lent_across_cut = lends
+    lay.lent_apart = {i: block_of[item] for i, item in apart.items() if i in real and item in block_of}
     lay.mirror_pairs = [(a.sse.id, b.sse.id) for a, b in mirrored if isinstance(a, Placed) and a.sse.kind in ("H", "G")]
     lay.font_scale = style.font_scale
     lay.loop_stroke = style.loop_width * (RUN_EDGE_W if style.loop_color == "residue" else 1.0)

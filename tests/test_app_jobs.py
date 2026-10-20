@@ -101,7 +101,7 @@ def test_draw_job_reports_what_the_pickers_need():
     out = app_jobs.draw_job(DATA / "1UBQ.cif", _blob())
     assert out["summary"] == "1 chain · 76 residues · 1 helix · 5 strands"
     assert out["chains"] == ["A"] and out["na_chains"] == []
-    assert out["two_fold_assembly"] is False
+    assert out["two_fold_assembly"] is False and out["lent_across_cut"] is False
     assert [(e["ref"], e["label"]) for e in out["elements"][:4]] == [
         ("res:A:2-7", "A"), ("res:A:12-16", "B"), ("res:A:23-34", "α1"), ("res:A:38-40", "η1"),
     ]  # fmt: skip

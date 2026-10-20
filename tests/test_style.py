@@ -193,6 +193,24 @@ def test_two_fold_is_a_layout_key_mirror_by_default(capsys):
     assert "two_fold          one of mirror, unrolled" in capsys.readouterr().out
 
 
+def test_copy_ghosts_is_a_layout_key_on_by_default(capsys):
+    """Plan 19 Task 2: dashed copies of a strand lent across an unrolled ring's cut, the author's choice
+    (`--set copy_ghosts=off`)."""
+    from foldmap.cli import main
+    from foldmap.spec import figure_spec
+    from foldmap.style import describe
+
+    assert Style().copy_ghosts == "on" and "copy_ghosts" in LAYOUT_KEYS
+    assert resolve_style(overrides=["copy_ghosts=off"]).copy_ghosts == "off"
+    ubq = __import__("pathlib").Path(__file__).parent / "data" / "1UBQ.cif"
+    assert figure_spec(ubq, style=["copy_ghosts=off"]).look.copy_ghosts == "off"
+    with pytest.raises(ValueError, match="copy_ghosts must be one of on, off"):
+        resolve_style(overrides=["copy_ghosts=dashed"])
+    assert "copy_ghosts: on" in describe(Style())
+    assert main(["styles"]) == 0
+    assert "copy_ghosts       one of on, off" in capsys.readouterr().out
+
+
 @pytest.mark.parametrize("old, new", [("classic", "bold"), ("flat", "pale")])
 def test_old_fill_names_still_work(old, new):
     assert resolve_style(overrides=[f"fill={old}"]).fill == new

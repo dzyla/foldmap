@@ -310,6 +310,7 @@ EDITOR_TABS = ["Swap", "Move", "Rename", "Mark", "Domains"]
 FOLD_TEMPLATE = {"auto": "βα row", "off": "as projected"}
 HELIX_ON_SHEET = {"off": "beside the sheet", "auto": "over the sheet"}
 TWO_FOLD = {"mirror": "mirror image", "unrolled": "side by side"}
+COPY_GHOSTS = {"on": "with dashed copies", "off": "drawn once"}
 EXAMPLE = {  # the syntax, as text
     "swap": "α1,α3",
     "move": "α2=1,-2",
@@ -330,8 +331,9 @@ EDITOR_HELP = {
 
 def layout_section(st, ss: MutableMapping) -> None:
     """Edit layout: the arrangement, rotation and element sizes, the fold options (a two-fold assembly's only with
-    one drawn), the element names (before the editors: a rename wins over them), then the editors (swap, move,
-    rename, mark), each a table of drawn elements or, "as text", the command line's syntax, and the domains."""
+    one drawn, the dashed copies of a strand lent across an unrolled ring's cut only with one lent), the element
+    names (before the editors: a rename wins over them), then the editors (swap, move, rename, mark), each a table of
+    drawn elements or, "as text", the command line's syntax, and the domains."""
     with st.expander("Edit layout", key="sec_layout"):
         with st.container(horizontal=True, key="layout_shape"):  # two short choices a row
             segmented(
@@ -367,6 +369,17 @@ def layout_section(st, ss: MutableMapping) -> None:
                 format_func=TWO_FOLD.get,
                 help="a two-fold assembly seen from the side of its dyad, one copy the other's mirror image · or its "
                 "copies side by side, unrolled around the axis as any assembly's",
+            )
+        if ss.get("lent_across_cut"):  # a ring unrolled with a strand lent across its cut: its dashed copies or not
+            segmented(
+                st,
+                "Strands lent across a ring's cut",
+                CHOICES["copy_ghosts"],
+                setting(ss, "copy_ghosts"),
+                format_func=COPY_GHOSTS.get,
+                help="a strand that pairs in the sheet of the copy across an unrolled ring's cut is drawn again there, "
+                "dashed, with dashed copies of its partners beside it · or drawn once, in its own copy's place past "
+                "the row's end",
             )
         with st.container(horizontal=True, key="layout_rotate"):  # two sliders a row
             st.slider("Rotate (°)", -180.0, 180.0, step=0.5, **setting(ss, "rotate"))

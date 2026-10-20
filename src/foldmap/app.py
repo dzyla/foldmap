@@ -956,6 +956,7 @@ def main() -> None:
             protein_chains=result["chains"],
             na_chains=result["na_chains"],
             two_fold_assembly=result.get("two_fold_assembly", False),
+            lent_across_cut=result.get("lent_across_cut", False),
             all_chains=chain_choices(size["chain_ids"], [*result["chains"], *result["na_chains"]]),
             chains_total={"assembly": "auto", "count": result["chain_count"]},  # reset_structure: auto
             assemblies=size["assemblies"],

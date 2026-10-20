@@ -164,6 +164,33 @@ def test_a_lent_strand_past_the_row_end_shows_the_strands_it_pairs_with(name):
     assert figcheck.order_checks(d) == []
 
 
+@pytest.mark.parametrize(
+    "name, apart", [("8UTF", ["c:440-442", "c:445-446"]), ("8UUP", ["A:98-100", "B:116-119"])], ids=["8UTF", "8UUP"]
+)
+def test_copy_ghosts_off_draws_each_lent_strand_once(name, apart):
+    """Plan 19 Task 2: `copy_ghosts=off` draws no dashed copy of another copy's strand. The strand lent across the
+    ring's cut stands past the row's end, in its own copy's place, with no ghost where it pairs nor ghosts of its
+    partners beside it; every real element is drawn once, as with them, the copies as alike, the sheet it pairs in
+    read with it by the order check, and the note names it apart instead of drawn again."""
+    path = DATA / f"{name}.cif"
+    on, off = drawn(path), drawn(path, style=["copy_ghosts=off"])
+    assert on.layout.ghosts and off.layout.ghosts == []
+    assert on.layout.lent_across_cut and off.layout.lent_across_cut  # the choice is offered either way
+    assert on.layout.lent_apart == {} and sorted(off.layout.lent_apart) == apart
+    assert sorted(off.layout.placed) == sorted(on.layout.placed)
+    assert sum(len(ids) for ids in off.layout.sheets) == len({i for ids in off.layout.sheets for i in ids})  # once
+    alike = figcheck.copies_alike(off)
+    assert alike.keys() == figcheck.copies_alike(on).keys() and max(alike.values()) <= ALIKE, alike
+    assert figcheck.copies_sheets_differ(off) == {} and figcheck.order_checks(off) == []
+    kinds = {i["kind"]: i for i in off.provenance}
+    assert "ghost_strands" not in kinds and kinds["lent_apart"]["elements"] == apart
+    assert not any("drawn again" in i["text"] for i in off.provenance)
+    if name == "8UTF":  # past the rest of copy c, as with ghosts
+        lay = off.layout
+        right = max(p.rect[2] for k, p in lay.placed.items() if p.sse.chain in "Cc" and k not in apart)
+        assert all(lay.placed[k].cx > right for k in apart)
+
+
 def test_an_item_of_two_protomers_belongs_to_the_one_holding_most_of_it():
     from foldmap.layout import Placed, _host
     from helpers import fake_sse

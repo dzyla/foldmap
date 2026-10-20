@@ -1252,7 +1252,10 @@ def order_checks(drawn) -> list[str]:
     - each sheet block (Layout.sheets) holds the strands of one sheet of sheets.build_sheets on the backbone's
       bridges, its track side by side in that sheet's order (either way round; a closed barrel from any strand) and
       each accessory strand (Sheet.accessory) in its parent's column or the next (science S6 judges which), each two
-      neighbours pointing the same way when they pair in parallel and opposite ways when antiparallel."""
+      neighbours pointing the same way when they pair in parallel and opposite ways when antiparallel. With
+      copy_ghosts off, a strand lent across an unrolled ring's cut stands past the row's end with no ghost
+      (Layout.lent_apart): the block it pairs in is read with it, its order and directions judged among the strands
+      it draws, and the strand's own block is no sheet to judge."""
     from .dssp import assign_dssp
     from .sheets import build_sheets
 
@@ -1288,15 +1291,20 @@ def order_checks(drawn) -> list[str]:
         k: {**{i: lay.placed[i] for i in ids}, **{g.sse.id: g for g in block_ghosts(lay, k) if g.sse.id not in ids}}
         for k, ids in enumerate(lay.sheets)
     }
+    apart = dict(getattr(lay, "lent_apart", {}) or {})
     whole = [k for k in at if frozenset(at[k]) in sheets]
     for k, ids in enumerate(lay.sheets):
         sheet = sheets.get(frozenset(at[k]))
         if sheet is None and any(set(ids) <= set(at[j]) for j in whole if j != k):
             continue  # strands lent across an unrolled ring's cut (layout._unwrap): checked where their ghosts stand
+        if sheet is None and set(ids) <= set(apart):
+            continue  # strands lent across the cut with no ghost (copy_ghosts off): read with the block they left
+        if sheet is None and (gone := [i for i, j in apart.items() if j == k]):
+            sheet = sheets.get(frozenset([*at[k], *gone]))
         if sheet is None:
             out.append(f"sheet {k}: {', '.join(at[k])} is no sheet of the bridges")
             continue
-        want = [s.id for s in sheet.strands]
+        want = [s.id for s in sheet.strands if s.id in at[k]]  # (one lent apart: the rest in order)
         got = _drawn_order(at[k])
         seen, wanted = got, want
         if sheet.accessory:  # the track in order; each accessory strand in a column next to its parent's
@@ -1309,7 +1317,10 @@ def order_checks(drawn) -> list[str]:
                     out.append(f"sheet {k}: {i} not drawn at {p}, the strand it pairs with")
         if not _same_order(seen, wanted, sheet.closed):
             out.append(f"sheet {k}: drawn {', '.join(got)}, paired {', '.join(want)}")
-        for (a, da), (b, db) in zip(zip(want, sheet.directions), zip(want[1:], sheet.directions[1:])):
+        track = [s.id for s in sheet.strands]
+        for (a, da), (b, db) in zip(zip(track, sheet.directions), zip(track[1:], sheet.directions[1:])):
+            if a not in at[k] or b not in at[k]:
+                continue
             pa, pb = at[k][a], at[k][b]
             same = float(pa.direction @ pb.direction) > 0
             if same != (da == db):

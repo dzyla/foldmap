@@ -62,6 +62,13 @@ def test_gfp_closes_its_barrel_with_a_ghost_strand():
     assert ghost["elements"] == ["A:160-170"] and ghost["count"] == 1
 
 
+def test_copy_ghosts_off_keeps_a_barrels_closure():
+    """Plan 19 Task 2: copy_ghosts=off drops only the dashed copies of strands lent across a ring's cut."""
+    d = draw_spec(figure_spec(DATA / "1EMA.cif", style=["copy_ghosts=off"]))
+    assert [g.sse.id for g in d.layout.ghosts] == ["A:160-170"] and not d.layout.lent_across_cut
+    assert _one(d.provenance, "ghost_strands")["elements"] == ["A:160-170"]
+
+
 def test_automatic_domains_are_said_to_be_inferred():
     items = draw_spec(figure_spec(DATA / "2LZM.cif", domains="auto")).provenance
     dom = _one(items, "domains")

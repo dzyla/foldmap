@@ -215,11 +215,12 @@ foldmap styles                                    # every theme and style key
 - **Assemblies and symmetry**: `--assembly auto` builds the file's first biological assembly when it adds copies
   (up to 24 chains) or when the file holds several copies of one complex, and never one that leaves out the DNA or
   RNA; cyclic, dihedral, cubic and helical symmetry is detected and the protomers are drawn alike (a two-fold
-  assembly seen from the side of its dyad, the two copies drawn as mirror images; interleaved protomers such as the measles F trimer's too, a strand lent across
-  the cut of the unrolled ring drawn past its end, with a dashed ghost where it pairs); highlight one protomer or the
-  asymmetric unit; filaments, cages and large assemblies drawn as one subunit with the neighbouring parts that
-  complete its fold. When either automatic choice draws part of the file, foldmap says so (a note on stderr, a bar
-  in the app, a line in the MCP result) and names the setting that draws everything (`--assembly asu`, `--focus none`).
+  assembly seen from the side of its dyad, the two copies drawn as mirror images; interleaved protomers such as the
+  measles F trimer's too, a strand lent across the cut of the unrolled ring drawn past its end, with a dashed ghost
+  where it pairs, or without with `--set copy_ghosts=off`); highlight one protomer or the asymmetric unit;
+  filaments, cages and large assemblies drawn as one subunit with the neighbouring parts that complete its fold.
+  When either automatic choice draws part of the file, foldmap says so (a note on stderr, a bar in the app, a line
+  in the MCP result) and names the setting that draws everything (`--assembly asu`, `--focus none`).
 - **DNA and RNA as their fold**: base pairs from the coordinates, stems, hairpins, pseudoknots, junctions and single
   strands placed beside the protein that holds them; bent duplexes as chains of straight pieces; protein–DNA/RNA
   hydrogen bonds on request; see [RNA and DNA](#rna-and-dna).
@@ -256,9 +257,10 @@ Change any key with `--set KEY=VALUE` (repeatable) or a YAML file for `--style-f
 `color_by`, `palette`, `fill`, `loops`, `loop_color` (`residue` colours loops residue by residue),
 `residue_numbers`, `highlight` (`asu`, `protomer` or chains), `mark` (elements in a colour of their own),
 `ligands` (`auto`, `all`, `none` or codes like `HEM,ZN`), `fold_template`, `helix_on_sheet`, `two_fold`,
-`domain_bar`, `domain_colours`, `na_backbone`, `backbone_colors`, `dna_color`, `rna_color`, `hbonds`, `hbond_color`,
-`hbond_max`, `disulfides`, `glycans`, `helices_310`, `na_extent`, `na_style`, `background`, `ink`, `helix_scale`,
-`strand_scale`, `font_scale` (`dna_extent` still works on the command line and in style and layout files).
+`copy_ghosts`, `domain_bar`, `domain_colours`, `na_backbone`, `backbone_colors`, `dna_color`, `rna_color`, `hbonds`,
+`hbond_color`, `hbond_max`, `disulfides`, `glycans`, `helices_310`, `na_extent`, `na_style`, `background`, `ink`,
+`helix_scale`, `strand_scale`, `font_scale` (`dna_extent` still works on the command line and in style and layout
+files).
 
 ## Shaping a figure
 
@@ -274,6 +276,7 @@ Change any key with `--set KEY=VALUE` (repeatable) or a YAML file for `--style-f
 | βα row | `--set fold_template=off` draws an all-parallel α/β sheet as projected |
 | Helices over a sheet | `--set helix_on_sheet=auto` (opt-in) |
 | Two-fold assemblies | `--set two_fold=unrolled` draws a C2 assembly's copies side by side instead of as mirror images |
+| Strands lent across a ring's cut | `--set copy_ghosts=off` draws such a strand once, past the row's end, with no dashed copies of it or its partners |
 | Hydrogen bonds | `--set hbonds=na`, `interchain` or `chains:A+B`; `--set hbond_max=30` |
 | Only some chains | `--chains A,B` |
 | Large assemblies | `--focus auto\|none\|protomer\|B` (one subunit plus what its neighbours add to its fold) |

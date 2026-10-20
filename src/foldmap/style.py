@@ -46,6 +46,7 @@ CHOICES = {
     "fold_template": ("auto", "off"),  # all-parallel α/β sheets as one βα row (TIM, Rossmann) / as projected
     "helix_on_sheet": ("off", "auto"),  # a helix packed on a sheet face beside it, as projected / drawn over the sheet
     "two_fold": ("mirror", "unrolled"),  # a two-fold assembly as one copy and its mirror image / copies side by side
+    "copy_ghosts": ("on", "off"),  # a strand lent across a ring's cut: with dashed copies where it pairs / none
     "domain_bar": ("auto", "on", "off"),  # the linear domain bar: with 2+ named domains drawn / with any / never
 }
 _ALIASES = {"fill": {"classic": "bold", "flat": "pale"}}
@@ -60,6 +61,7 @@ LAYOUT_KEYS = (
     "fold_template",
     "helix_on_sheet",
     "two_fold",
+    "copy_ghosts",
 )  # these move elements
 NA_BACKBONES = ("modality", "chain", "ink")
 MODALITIES = ("protein", "dna", "rna")
@@ -98,6 +100,9 @@ class Style:
     # puts it; auto (opt-in): drawn over the sheet, as it lies on it (ubiquitin's α1, Burroughs 2007)
     two_fold: str = "mirror"  # mirror: a two-fold (C2) assembly seen from the side of its dyad, one copy the other's
     # mirror image (plan 18, unrolled where that draws better); unrolled: the copies side by side, as any assembly
+    copy_ghosts: str = "on"  # on: a strand lent across the cut of an unrolled ring (layout._unwrap) is drawn again,
+    # dashed, in the sheet of the copy it pairs with, and dashed copies of its partners stand beside it past the row's
+    # end; off: no such dashed copy of another copy's strand (a barrel's closing ghost stays)
     helix_scale: float = 1.0  # helix ribbon diameter
     strand_scale: float = 1.0  # arrow width and the spacing of strands in a sheet
     dna_scale: float = 1.0  # duplex diameter

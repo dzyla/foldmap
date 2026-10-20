@@ -138,6 +138,7 @@ def figure_view(ws: Workspace) -> None:
             protein_chains=result["chains"],
             na_chains=result["na_chains"],
             two_fold_assembly=result.get("two_fold_assembly", False),
+            lent_across_cut=result.get("lent_across_cut", False),
         )
         ss["info"] = drawn_summary(ss, json.loads(target), result)
         slow = result["seconds"]  # the drawing itself, as at load (not the job's start-up or a cache hit)

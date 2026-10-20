@@ -333,6 +333,19 @@ def test_two_fold_choice_is_offered_for_a_two_fold_assembly():
     assert at.segmented_control(key="two_fold").value == "unrolled"  # still offered: the same assembly
 
 
+def test_copy_ghosts_choice_is_offered_for_a_strand_lent_across_a_rings_cut():
+    """Plan 19 Task 2: with dashed copies (the default) or drawn once, beside the fold options, only where a strand
+    is lent across an unrolled ring's cut (8UTF), and still offered once they are off."""
+    assert "copy_ghosts" not in widget_keys(opened(DATA / "2HHB.cif").sidebar, skip=())
+    at = opened(DATA / "8UTF.cif")
+    assert list(at.segmented_control(key="copy_ghosts").options) == ["with dashed copies", "drawn once"]
+    assert at.segmented_control(key="copy_ghosts").value == "on" and 'id="ghost:' in svg_of(at)
+    at.segmented_control(key="copy_ghosts").set_value("off").run()
+    assert at.session_state["copy_ghosts"] == "off" and not at.exception
+    assert "<svg" in svg_of(at) and 'id="ghost:' not in svg_of(at)
+    assert at.segmented_control(key="copy_ghosts").value == "off"  # still offered: the same ring
+
+
 def test_a_layout_file_drops_the_rows_waiting_in_the_tables():
     at = opened(DATA / "2LZM.cif")
     at.session_state["swap__blank"] = [{"a": "res:A:3-11", "b": ""}]  # a swap row half made in the table
@@ -505,7 +518,7 @@ def test_domain_colours_and_bar_only_with_domains():
 def test_every_setting_is_reachable():
     """Every figure setting has a control in the sidebar (expanders render their contents): on 1LMB with every
     "as text" switch off and every composite in its widest mode, then on 1UBQ with an alignment, then on 2HHB (a
-    two-fold assembly)."""
+    two-fold assembly) and 8UTF (a strand lent across a ring's cut)."""
     from foldmap.app import HIDDEN_LAYOUT, LAYOUT_DEFAULTS, STYLE_FIELDS
     from foldmap.app_edits import CONTROLS
 
@@ -527,6 +540,7 @@ def test_every_setting_is_reachable():
     ).run()
     seen |= shown(at)
     seen |= shown(opened(DATA / "2HHB.cif"))  # a two-fold assembly: the two_fold choice
+    seen |= shown(opened(DATA / "8UTF.cif"))  # a strand lent across a ring's cut: the copy_ghosts choice
     wanted = {*STYLE_FIELDS, *LAYOUT_DEFAULTS, "theme"} - set(HIDDEN_LAYOUT)
     missing = sorted(k for k in wanted if not seen & set(CONTROLS[k][2]))
     assert missing == []
