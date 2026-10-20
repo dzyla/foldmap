@@ -176,6 +176,23 @@ def test_themes_only_change_how_things_look_not_where_they_go():
     assert "helix_angle" in LAYOUT_KEYS and "fill" in THEME_KEYS
 
 
+def test_two_fold_is_a_layout_key_mirror_by_default(capsys):
+    """Plan 18 Task 2: how a two-fold assembly is drawn, the author's choice (`--set two_fold=unrolled`)."""
+    from foldmap.cli import main
+    from foldmap.spec import figure_spec
+    from foldmap.style import describe
+
+    assert Style().two_fold == "mirror" and "two_fold" in LAYOUT_KEYS
+    assert resolve_style(overrides=["two_fold=unrolled"]).two_fold == "unrolled"
+    ubq = __import__("pathlib").Path(__file__).parent / "data" / "1UBQ.cif"
+    assert figure_spec(ubq, style=["two_fold=unrolled"]).look.two_fold == "unrolled"
+    with pytest.raises(ValueError, match="two_fold must be one of mirror, unrolled"):
+        resolve_style(overrides=["two_fold=sideways"])
+    assert "two_fold: mirror" in describe(Style())
+    assert main(["styles"]) == 0
+    assert "two_fold          one of mirror, unrolled" in capsys.readouterr().out
+
+
 @pytest.mark.parametrize("old, new", [("classic", "bold"), ("flat", "pale")])
 def test_old_fill_names_still_work(old, new):
     assert resolve_style(overrides=[f"fill={old}"]).fill == new

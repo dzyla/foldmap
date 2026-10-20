@@ -321,6 +321,18 @@ def test_helices_stay_beside_the_sheet_unless_asked():
     assert at.session_state["helix_on_sheet"] == "off" and at.segmented_control(key="helix_on_sheet").value == "off"
 
 
+def test_two_fold_choice_is_offered_for_a_two_fold_assembly():
+    """Plan 18 Task 2: mirror image (the default) or side by side, beside the fold options, only where a two-fold
+    assembly is drawn."""
+    assert "two_fold" not in widget_keys(opened(DATA / "1UBQ.cif").sidebar, skip=())
+    at = opened(DATA / "2HHB.cif")
+    assert list(at.segmented_control(key="two_fold").options) == ["mirror image", "side by side"]
+    assert at.segmented_control(key="two_fold").value == "mirror"
+    at.segmented_control(key="two_fold").set_value("unrolled").run()
+    assert at.session_state["two_fold"] == "unrolled" and not at.exception and "<svg" in svg_of(at)
+    assert at.segmented_control(key="two_fold").value == "unrolled"  # still offered: the same assembly
+
+
 def test_a_layout_file_drops_the_rows_waiting_in_the_tables():
     at = opened(DATA / "2LZM.cif")
     at.session_state["swap__blank"] = [{"a": "res:A:3-11", "b": ""}]  # a swap row half made in the table
@@ -492,7 +504,8 @@ def test_domain_colours_and_bar_only_with_domains():
 
 def test_every_setting_is_reachable():
     """Every figure setting has a control in the sidebar (expanders render their contents): on 1LMB with every
-    "as text" switch off and every composite in its widest mode, then on 1UBQ with an alignment."""
+    "as text" switch off and every composite in its widest mode, then on 1UBQ with an alignment, then on 2HHB (a
+    two-fold assembly)."""
     from foldmap.app import HIDDEN_LAYOUT, LAYOUT_DEFAULTS, STYLE_FIELDS
     from foldmap.app_edits import CONTROLS
 
@@ -513,6 +526,7 @@ def test_every_setting_is_reachable():
         ("ubq.fasta", (DATA / "ubq_family.fasta").read_bytes(), "text/plain")
     ).run()
     seen |= shown(at)
+    seen |= shown(opened(DATA / "2HHB.cif"))  # a two-fold assembly: the two_fold choice
     wanted = {*STYLE_FIELDS, *LAYOUT_DEFAULTS, "theme"} - set(HIDDEN_LAYOUT)
     missing = sorted(k for k in wanted if not seen & set(CONTROLS[k][2]))
     assert missing == []

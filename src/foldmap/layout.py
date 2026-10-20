@@ -319,6 +319,8 @@ class Layout:
     kink_links: set[tuple[str, str]] = field(default_factory=set)  # consecutive helix pieces of a copy whose mates
     # are a kink (features.KINK_GAP): drawn as their mates, their loop is a kink link too (_regroup_copies, route)
     let_go: int = 0  # copy items build_layout let go (_one_per_mate): make_layout keeps them only if more alike
+    two_fold_assembly: bool = False  # a two-fold (C2) assembly off a straight duplex: Style.two_fold chooses how
+    # make_layout draws it (the app shows that choice only then)
     font_scale: float = 1.0  # Style.font_scale the figure is drawn with (texts placed in the layout are sized by it)
     loop_stroke: float = 1.0  # a loop's drawn stroke in line_pt: Style.loop_width, RUN_EDGE_W times it under
     # residue colours (its dark edge); for line_band

@@ -421,6 +421,7 @@ CONTROLS: dict[str, tuple[str, str, tuple[str, ...]]] = {
     "dna_scale": ("DNA size", _LAYOUT, ("dna_scale",)),
     "fold_template": ("Parallel α/β sheets", _LAYOUT, ("fold_template",)),
     "helix_on_sheet": ("Helices packed on a sheet", _LAYOUT, ("helix_on_sheet",)),
+    "two_fold": ("Two-fold assemblies", _LAYOUT, ("two_fold",)),
     "names": ("Element names", _LAYOUT, ("names__kw", "names_upload")),
     "swap": ("Swap", _LAYOUT, ("swap__as_text", "swap")),
     "move": ("Move", _LAYOUT, ("move__as_text", "move")),

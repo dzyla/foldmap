@@ -123,6 +123,23 @@ def test_a_two_fold_assembly_is_drawn_as_one_copy_and_its_mirror_image(name):
     assert np.mean([lay.placed[a.id].cx for a, _ in pairs]) < m  # protomer 0 on the left
 
 
+def test_two_fold_unrolled_draws_the_copies_side_by_side():
+    """Plan 18 Task 2: TrmD (1UAM, the author's example) by default seen from the side of its dyad, one copy the
+    other's mirror image; with two_fold=unrolled its copies side by side around the axis, as before plan 18 (a
+    cylinder frame, no copy tied as a mirror image)."""
+    from foldmap.cli import make_layout
+    from foldmap.frame import CylinderFrame, Frame
+    from foldmap.style import Style
+
+    uam = DATA / "assemblies" / "1UAM.cif.gz"
+    mirror, _, _ = make_layout(uam)
+    assert type(mirror.frame) is Frame and mirror.frame.mirror_x is not None
+    assert any(m for _, m in mirror.copy_ties.values()) and mirror.two_fold_assembly
+    unrolled, _, _ = make_layout(uam, look=Style(two_fold="unrolled"))
+    assert type(unrolled.frame) is CylinderFrame and unrolled.two_fold_assembly
+    assert unrolled.copy_ties and not any(m for _, m in unrolled.copy_ties.values())
+
+
 @pytest.mark.parametrize("name", ["8UUP", "2HHB", "1TIM", "4CH9", "9TX7"])
 def test_separation_keeps_every_copy_where_its_mate_is(name, monkeypatch):
     """Overlaps are cleared by moving each element together with its symmetry copies, so after separation

@@ -45,6 +45,7 @@ CHOICES = {
     "helix_angle": ("snap", "upright", "tilted"),  # nearest of vertical/horizontal / always vertical / as in 3D
     "fold_template": ("auto", "off"),  # all-parallel α/β sheets as one βα row (TIM, Rossmann) / as projected
     "helix_on_sheet": ("off", "auto"),  # a helix packed on a sheet face beside it, as projected / drawn over the sheet
+    "two_fold": ("mirror", "unrolled"),  # a two-fold assembly as one copy and its mirror image / copies side by side
     "domain_bar": ("auto", "on", "off"),  # the linear domain bar: with 2+ named domains drawn / with any / never
 }
 _ALIASES = {"fill": {"classic": "bold", "flat": "pale"}}
@@ -58,6 +59,7 @@ LAYOUT_KEYS = (
     "na_extent",
     "fold_template",
     "helix_on_sheet",
+    "two_fold",
 )  # these move elements
 NA_BACKBONES = ("modality", "chain", "ink")
 MODALITIES = ("protein", "dna", "rna")
@@ -94,6 +96,8 @@ class Style:
     # each crossover helix between the two strands it joins; off: helices where the projection puts them
     helix_on_sheet: str = "off"  # off: a helix packed on a sheet face stays beside the sheet, where the projection
     # puts it; auto (opt-in): drawn over the sheet, as it lies on it (ubiquitin's α1, Burroughs 2007)
+    two_fold: str = "mirror"  # mirror: a two-fold (C2) assembly seen from the side of its dyad, one copy the other's
+    # mirror image (plan 18, unrolled where that draws better); unrolled: the copies side by side, as any assembly
     helix_scale: float = 1.0  # helix ribbon diameter
     strand_scale: float = 1.0  # arrow width and the spacing of strands in a sheet
     dna_scale: float = 1.0  # duplex diameter

@@ -309,6 +309,7 @@ def heading(st, label: str, as_text: str, help: str) -> None:
 EDITOR_TABS = ["Swap", "Move", "Rename", "Mark", "Domains"]
 FOLD_TEMPLATE = {"auto": "βα row", "off": "as projected"}
 HELIX_ON_SHEET = {"off": "beside the sheet", "auto": "over the sheet"}
+TWO_FOLD = {"mirror": "mirror image", "unrolled": "side by side"}
 EXAMPLE = {  # the syntax, as text
     "swap": "α1,α3",
     "move": "α2=1,-2",
@@ -328,9 +329,9 @@ EDITOR_HELP = {
 
 
 def layout_section(st, ss: MutableMapping) -> None:
-    """Edit layout: the arrangement, rotation and element sizes, the two fold options, the element names (before the
-    editors: a rename wins over them), then the editors (swap, move, rename, mark), each a table of drawn elements
-    or, "as text", the command line's syntax, and the domains."""
+    """Edit layout: the arrangement, rotation and element sizes, the fold options (a two-fold assembly's only with
+    one drawn), the element names (before the editors: a rename wins over them), then the editors (swap, move,
+    rename, mark), each a table of drawn elements or, "as text", the command line's syntax, and the domains."""
     with st.expander("Edit layout", key="sec_layout"):
         with st.container(horizontal=True, key="layout_shape"):  # two short choices a row
             segmented(
@@ -357,6 +358,16 @@ def layout_section(st, ss: MutableMapping) -> None:
             format_func=HELIX_ON_SHEET.get,
             help="a helix packed on a sheet's face stays beside the sheet, or is drawn over it",
         )
+        if ss.get("two_fold_assembly"):  # a two-fold (C2) assembly drawn: how its two copies are drawn
+            segmented(
+                st,
+                "Two-fold assemblies",
+                CHOICES["two_fold"],
+                setting(ss, "two_fold"),
+                format_func=TWO_FOLD.get,
+                help="a two-fold assembly seen from the side of its dyad, one copy the other's mirror image · or its "
+                "copies side by side, unrolled around the axis as any assembly's",
+            )
         with st.container(horizontal=True, key="layout_rotate"):  # two sliders a row
             st.slider("Rotate (°)", -180.0, 180.0, step=0.5, **setting(ss, "rotate"))
             st.slider("Helix size", 0.5, 2.0, step=0.05, **setting(ss, "helix_scale"))

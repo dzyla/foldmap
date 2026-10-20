@@ -189,3 +189,17 @@ def test_na_extent_round_trips_and_dna_extent_is_read_as_its_old_name(tmp_path):
     lf.write_text("foldmap: 1\nstyle:\n  dna_extent: all\n")
     assert figure_spec(DATA / "1UBQ.cif", layout_file=lf).look.na_extent == "all"
     assert settings_from_document(layoutfile.load(lf))["na_extent"] == "all"
+
+
+def test_two_fold_round_trips(tmp_path):
+    """Plan 18 Task 2: the two-fold choice is saved with the figure and read back (app and command line alike)."""
+    from foldmap.app import layout_document, settings_from_document
+    from foldmap.spec import figure_spec
+
+    doc = layout_document(DATA / "1UBQ.cif", {"theme": "publication", "two_fold": "unrolled"})
+    assert doc["style"]["two_fold"] == "unrolled"
+    assert settings_from_document(doc)["two_fold"] == "unrolled"
+    lf = tmp_path / "fig.yaml"
+    lf.write_text(yaml.safe_dump(doc), encoding="utf-8")
+    assert figure_spec(DATA / "1UBQ.cif", layout_file=lf).look.two_fold == "unrolled"
+    assert "two_fold" not in layout_document(DATA / "1UBQ.cif", {"theme": "publication"})["style"]  # the default

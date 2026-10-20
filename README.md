@@ -255,9 +255,9 @@ Themes change only how things are drawn, never where. `foldmap styles` lists the
 Change any key with `--set KEY=VALUE` (repeatable) or a YAML file for `--style-file`. Commonly used keys:
 `color_by`, `palette`, `fill`, `loops`, `loop_color` (`residue` colours loops residue by residue),
 `residue_numbers`, `highlight` (`asu`, `protomer` or chains), `mark` (elements in a colour of their own),
-`ligands` (`auto`, `all`, `none` or codes like `HEM,ZN`), `fold_template`, `helix_on_sheet`, `domain_bar`,
-`domain_colours`, `na_backbone`, `backbone_colors`, `dna_color`, `rna_color`, `hbonds`, `hbond_color`, `hbond_max`,
-`disulfides`, `glycans`, `helices_310`, `na_extent`, `na_style`, `background`, `ink`, `helix_scale`,
+`ligands` (`auto`, `all`, `none` or codes like `HEM,ZN`), `fold_template`, `helix_on_sheet`, `two_fold`,
+`domain_bar`, `domain_colours`, `na_backbone`, `backbone_colors`, `dna_color`, `rna_color`, `hbonds`, `hbond_color`,
+`hbond_max`, `disulfides`, `glycans`, `helices_310`, `na_extent`, `na_style`, `background`, `ink`, `helix_scale`,
 `strand_scale`, `font_scale` (`dna_extent` still works on the command line and in style and layout files).
 
 ## Shaping a figure
@@ -273,6 +273,7 @@ Change any key with `--set KEY=VALUE` (repeatable) or a YAML file for `--style-f
 | Domain colours and bar | `--set color_by=domain`, `--set domain_bar=on\|off`, `--set domain_colours=false` |
 | βα row | `--set fold_template=off` draws an all-parallel α/β sheet as projected |
 | Helices over a sheet | `--set helix_on_sheet=auto` (opt-in) |
+| Two-fold assemblies | `--set two_fold=unrolled` draws a C2 assembly's copies side by side instead of as mirror images |
 | Hydrogen bonds | `--set hbonds=na`, `interchain` or `chains:A+B`; `--set hbond_max=30` |
 | Only some chains | `--chains A,B` |
 | Large assemblies | `--focus auto\|none\|protomer\|B` (one subunit plus what its neighbours add to its fold) |
@@ -365,7 +366,9 @@ placing the copies one by one (other copies: a twentieth). By default (no `--up`
 for this: the dyad points up the page and the first protomer sits on the left, so the copies meet at the line where
 their interface lies (TrmD, 1UAM). Where no mirror image can be drawn (a βα row such as a TIM barrel's would cross the
 line), or where the mirror image draws the copies unalike or leaves a membrane dimer's transmembrane helices off their
-band and unrolling does better, the copies are unrolled side by side instead. Other symmetric copies, and the
+band and unrolling does better, the copies are unrolled side by side instead. `--set two_fold=unrolled` (the app's
+"Two-fold assemblies" choice, offered when one is drawn) always draws a two-fold assembly that way, its copies side
+by side around the axis as any other assembly's; `two_fold=mirror` is the default. Other symmetric copies, and the
 unrolled cylinders of rings and filaments, are drawn alike.
 
 **Layout files.** `--save-layout fig.yaml` records everything that defines a figure: theme, style changes,

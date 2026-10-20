@@ -367,7 +367,8 @@ def make_layout(
         and view is None
         and not (_na_across_protomers(nucleic, sym, bb) and na_torn_by_unrolling(nucleic, sses, sym))
     ):
-        dyad = _dyad_frame(sses, sym)
+        # two_fold=unrolled: a two-fold assembly's copies side by side, as any assembly's (never the dyad view)
+        dyad = _dyad_frame(sses, sym) if (look or Style()).two_fold == "mirror" else None
         frame = dyad or symmetric_frame(sses, sym)
     else:  # stem axes differ in the last bit between BLAS kernels: snapped before they choose the page axes
         stems = stem_views(nucleic.structure, nucleic.strands) if nucleic is not None else []
@@ -530,6 +531,9 @@ def make_layout(
                 or (off_unrolled == off and not alike and _unalike(unrolled, bb) < gap)
             ):
                 lay = unrolled
+    lay.two_fold_assembly = (
+        sym is not None and sym.kind == "C" and sym.n == 2 and len(sym.protomers) == 2 and not duplex
+    )
     if msa:
         from .sequence import grades, is_consurf, read_alignment, read_consurf, residue_conservation
 
