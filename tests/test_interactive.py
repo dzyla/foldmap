@@ -358,3 +358,39 @@ def test_page_has_one_click_target_per_nucleic_run_stem_and_loop(name):
     static = save_svg(make_figure(DATA / f"{name}.cif"))
     assert ":hit" not in static
     assert _HIT.sub("", svg) == static.rstrip()
+
+
+_LINE_HIT = re.compile(r'<path id="((?:hbond|ia:[a-z-]+):[^"]+):hit" d="([^"]+)"[^>]*style="([^"]+)"/>\n   ')
+
+
+def test_page_holds_each_interaction_line_with_its_key_and_a_click_target():
+    """Plan 13c-5: the page's data holds every interaction line drawn (H-bonds' hbond: and the other kinds' ia:
+    lines) under its gid, the key the hover and the click select by; each line has an invisible click target along
+    its drawn path (its pieces, where it is broken at a letter), under the loops' and the nucleic acid's targets, so
+    a click on a loop or a strand an interaction ends on still selects that; the static figure is unchanged."""
+    from foldmap.cli import make_figure
+    from foldmap.interactive import HIT_PX
+    from foldmap.render import save_svg
+    from foldmap.style import Style
+
+    look = Style(interactions="hbond,salt,cation-pi", hbond_max=1000)
+    page = build_page(DATA / "1LMB.cif", look=look)
+    data, svg = _data(page), _page_svg(page)
+    gids = set(re.findall(r'<g id="((?:hbond|ia:[a-z-]+):[^"]+)">', svg))
+    keys = {x["key"] for x in data["interactions"]}
+    assert keys == gids and {k.split(":")[1] for k in keys if k.startswith("ia:")} == {"salt", "cation-pi"}
+    assert {x["kind"] for x in data["interactions"]} == {"hbond", "salt", "cation-pi"}
+    for x in data["interactions"]:
+        assert x["text"].startswith(x["label"] + " ") and " Å" in x["text"]
+        assert all(0 <= k < len(data["residues"]) for k in x["residues"]) and len(x["residues"]) + len(x["het"]) == 2
+    hits = {m[1]: m for m in _LINE_HIT.finditer(svg)}
+    assert set(hits) == gids
+    for key, m in hits.items():
+        line = re.search(rf'<g id="{re.escape(key)}">\s*<path d="([^"]+)"', svg).group(1)
+        assert m[2] == line.strip() and f"stroke-width: {HIT_PX}px" in m[3] and "pointer-events: stroke" in m[3]
+    others = [m.start() for m in _HIT.finditer(svg)]
+    assert max(m.start() for m in hits.values()) < min(others)  # under the loops' and the nucleic acid's targets
+    static = save_svg(make_figure(DATA / "1LMB.cif", look=look))
+    assert _LINE_HIT.sub("", _HIT.sub("", svg)) == static.rstrip()
+    plain = _data(build_page(DATA / "1LMB.cif"))
+    assert plain["interactions"] == []

@@ -185,7 +185,30 @@ const HELPERS = () => {
              close: close && { p: close, selection: await clickAt(close) } };
   }
 
-  const out = { errors, lines: [], loop: null };
+  // a hover and a click PX off an interaction line (ia:<kind>:...), where its target is the topmost thing there
+  async function offInteraction() {
+    await page.click('#zfit');
+    const found = await page.evaluate(px => {
+      const out = [];
+      for (const hit of document.querySelectorAll('path[id^="ia:"][id$=":hit"]')) {
+        const x = __t.data.interactions.find(x => x.key === hit.id.slice(0, -4));
+        const pts = x ? __t.offsets(hit, px, 40).filter(p => document.elementFromPoint(p.x, p.y) === hit) : [];
+        if (pts.length) out.push({ hit: hit.id, want: x.key, note: x.text, p: pts[Math.floor(pts.length / 2)] });
+      }
+      return out.slice(0, 3);
+    }, PX);
+    const res = [];
+    for (const f of found) {
+      await page.mouse.move(f.p.x, f.p.y);
+      await page.waitForTimeout(20);
+      const info = await page.evaluate(() => document.getElementById('info').textContent);
+      res.push({ ...f, info, selection: await clickAt(f.p), without: await control(f.hit, f.p) });
+    }
+    return res;
+  }
+
+  const out = { errors, lines: [], loop: null, interactions: [] };
+  if (wanted.includes('interactions')) out.interactions = await offInteraction();
   if (wanted.includes('lines')) {
     const strict = !wanted.includes('ink');
     out.lines.push(...await offLine('fit', strict));
@@ -252,3 +275,15 @@ def test_a_click_three_pixels_off_a_loop_beside_a_strand_still_selects_the_loop(
     assert loop["without"] == [loop["na"]], loop
     # just off its line, over its white casing, the loop is selected too (the casing lets clicks through to the target)
     assert loop["close"] is not None and loop["close"]["selection"] == [loop["want"]], loop
+
+
+@needs_browser
+def test_a_hover_or_click_three_pixels_off_an_interaction_line_shows_and_selects_it(tmp_path):
+    # plan 13c-5: an interaction line is a thin dash; its click target makes it a few pixels wide on screen, so a
+    # hover shows its note (residues, atoms, distances) and a click selects it, where without the target nothing is
+    page = build_page(DATA / "1LMB.cif", viewer="3dmol", look=Style(interactions="salt,cation-pi"))
+    found = _drive(tmp_path, page, "interactions")["interactions"]
+    assert len(found) == 3, found
+    for r in found:
+        assert r["info"] == r["note"] and r["selection"] == [r["want"]], r
+        assert r["want"] not in r["without"], r

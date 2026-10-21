@@ -141,6 +141,7 @@ side.
 | Hover an element, loop, map cell or residue in 3D | preview: the same residues light up in all three views |
 | Click | select it (stays lit); a click in the figure also brings the 3D view to it, a click in 3D keeps the camera |
 | Click within 4 px of a loop or a DNA/RNA strand or stem | select it, at any zoom (where a loop runs beside a strand, the loop) |
+| Hover or click an interaction line (H-bond, salt bridge, π-stacking, cation-π, hydrophobic) | its residues, atoms, distances (and angle, for stacking and cation-π) in the info bar; a click selects the line (within 4 px) and lights its residue and nucleotide in 3D |
 | Click a map cell | select the whole helix or strand of each of its two residues (for a loop residue, the nearest one along its chain) and bring the 3D view to them |
 | Click it again, click empty paper, or press Esc | clear the selection |
 | Shift-click | add to (or remove from) the selection |
@@ -551,6 +552,10 @@ hydrophobic, `all,hydrophobic` adds it; default `off`) chooses the kinds of inte
 figure holds nucleic acid, else `interchain`). `interaction_max` caps the lines of each kind (default 200; H-bonds keep
 `hbond_max`). `hbonds=na` keeps working and means `interactions=hbond` with `interactions_between=na`, so old layout
 files and app sessions draw the same figure; when both keys are given, `interactions` wins and a warning says so.
+In the app's Show section one set of controls covers both: a checkbox per kind, the partners, and the caps (an old
+file with `hbonds: na` opens as H-bonds ticked between protein and DNA/RNA, and is saved with the interaction keys
+once those controls change). The MCP tool `draw_topology` takes the keys in `style` and lists every line drawn in its
+structured result (`interactions`: kind, the two residues, the shortest distance, the atoms and the line's SVG id).
 
 Each kind is a thin line between the two residues, as the H-bond lines are, one line per kind and residue pair (a
 pair's several salt-bridge atom pairs, or a Trp's two stacked rings, make one line), with its own colour and dash:
@@ -753,7 +758,7 @@ The sidebar starts with the theme (Browse themes shows them all), the colouring,
 title. The rest is in sections:
 
 - **Style**: fill, helix shading, loops, background and ink.
-- **Show**: ligands, disulfides, glycans, membrane, DNA and RNA, hydrogen bonds, and the contacts check.
+- **Show**: ligands, disulfides, glycans, membrane, DNA and RNA, interactions (H-bonds, salt bridges, π-stacking, cation-π, hydrophobic; their partners and caps), and the contacts check.
 - **Chains & assembly**: chains to draw, highlight, assembly, symmetry, and how large assemblies are drawn.
 - **Edit layout**: arrangement, rotation, sizes, the βα template, helices packed on a sheet, swap, move, rename
   and mark (as tables or as text), element names, and domains with their colours and bar.

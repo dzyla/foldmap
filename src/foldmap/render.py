@@ -2769,6 +2769,70 @@ class InteractionOverlay(NamedTuple):
         """Every line drawn: the H-bonds', then each kind's."""
         return [*self.hbonds.lines, *(line for part in self.kinds for line in part.lines)]
 
+    def records(self) -> list[dict]:
+        """Every line drawn, as the interactive page's hover and the MCP result give it (interaction_record)."""
+        return [interaction_record(line) for line in self.lines()]
+
+
+INTERACTION_ONE = {  # kind -> what one line of it is called (the hover, the MCP result)
+    "hbond": "H-bond",
+    "salt": "Salt bridge",
+    "stack": "π-stacking",
+    "cation-pi": "Cation-π",
+    "hydrophobic": "Hydrophobic contact",
+}
+
+
+def residue_name(lab) -> str:
+    """A residue or nucleotide as the hover notes name it: A:Gln44, 1:DA4."""
+    return f"{lab.chain}:{lab.name.title() if len(lab.name) == 3 else lab.name}{lab.tag}"
+
+
+def _partner_name(atom: str) -> str:
+    """An interaction partner's atom as a reader reads it: NZ, ring:6 -> 6-ring, centre -> guanidinium."""
+    if atom.startswith("ring:"):
+        return f"{atom[len('ring:') :]}-ring"
+    return "guanidinium" if atom == "centre" else atom
+
+
+def interaction_record(line) -> dict:
+    """One drawn line (HBondLine or InteractionLine) as data: `key` (its gid), `kind`, `a` and `b` (its residues,
+    as residue_name, in the order of its ends), `residues` (Backbone indices of its protein ends), `het` (its
+    nucleotide ends, [chain, number], for a 3D view), `distance` (Å, the shortest of the pair) and `atoms`: one
+    {a, b, distance, angle, note} per interaction behind it (atoms in the order of a and b; angle in degrees or
+    None; note "" or a caveat), shortest first. `text`: the hover note, "Salt bridge A:Arg19 – 1:DT7: NH1 – OP1
+    3.1 Å; ...", H-bond lines as before ("H-bond A:Gln44 – 1:DA4: NE2 – N7 3.3 Å")."""
+    first, second = line.labels
+    kind = getattr(line, "kind", "hbond")
+    atoms = []
+    if kind == "hbond":
+        for x in line.bonds:
+            pair = (x.donor.name, x.acceptor.name) if x.donor.res == first else (x.acceptor.name, x.donor.name)
+            atoms.append({"a": pair[0], "b": pair[1], "distance": x.distance, "angle": None, "note": ""})
+    else:
+        for x in line.found:
+            pair = (x.a[2], x.b[2]) if (x.a[0], x.a[1]) == (first.chain, first.tag) else (x.b[2], x.a[2])
+            atoms.append({"a": pair[0], "b": pair[1], "distance": x.distance, "angle": x.angle, "note": x.note})
+
+    def said(x) -> str:
+        more = [f"{x['angle']:.0f}°"] if x["angle"] is not None else []
+        more += [x["note"]] if x["note"] else []
+        extra = f" ({', '.join(more)})" if more else ""
+        return f"{_partner_name(x['a'])} – {_partner_name(x['b'])} {x['distance']:.1f} Å{extra}"
+
+    return {
+        "key": line.gid,
+        "kind": kind,
+        "a": residue_name(first),
+        "b": residue_name(second),
+        "residues": list(line.residues),
+        "het": [[lab.chain, lab.seq] for lab in line.labels[len(line.residues) :]],  # protein ends sort first
+        "distance": min(x["distance"] for x in atoms),
+        "atoms": atoms,
+        "text": f"{INTERACTION_ONE[kind]} {residue_name(first)} – {residue_name(second)}: "
+        + "; ".join(said(x) for x in atoms),
+    }
+
 
 def _locator(layout: Layout, loops: list[Loop], sses: list[SSE], look: Style):
     """locate(ResLabel) -> (sort key, page point, Backbone index or None, ResLabel), or None when that residue (or
@@ -4194,7 +4258,7 @@ def _draw(
     outlines = _draw_domains(c, layout)
     _draw_sheet_panels(c, layout, outlines)
     _draw_hbonds(c, hb.hbonds, hb.slots)  # the other kinds after every text: they keep off the letters
-    c.fig.foldmap_hbonds = hb.hbonds  # for the interactive page's hover notes
+    c.fig.foldmap_hbonds = hb.hbonds  # the H-bond lines (the interactive page reads foldmap_interactions)
     c.fig.foldmap_interactions = hb  # every line drawn, and those the re-check flagged (provenance)
     c.fig.foldmap_counts_hidden = hidden
     c.fig.foldmap_crowded_marks = [  # ligand marks with no clear spot, drawn over other ink (Drawn.crowded_marks)

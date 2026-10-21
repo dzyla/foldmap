@@ -200,7 +200,10 @@ def draw_topology(
     the file (one copy of a complex, one subunit of a large assembly), the note says so and which arguments draw
     every chain. The note also says how the figure was made: what in it is inferred (automatic domains), ambiguous
     (strands drawn off a sheet's run) or moved for readability; the structured result's `provenance` lists the same
-    as {kind, text, count, elements} (empty when nothing beyond the standard method).
+    as {kind, text, count, elements} (empty when nothing beyond the standard method), and its `interactions` every
+    interaction line drawn as {kind, a, b, distance, atoms, id} (empty unless style asks for them: interactions
+    "all" or kinds like "hbond,salt,stack,cation-pi,hydrophobic", interactions_between "auto", "na", "interchain"
+    or "chains:A+B", interaction_max; the older hbonds key draws H-bond lines only).
 
     Options left out come from layout_file (if given), otherwise the defaults: theme publication, assembly auto,
     symmetry auto, membrane off, focus auto, mode projected, rotate 0.
@@ -289,8 +292,17 @@ def draw_topology(
             note += f"; {said}"
         return CallToolResult(
             content=[TextContent(type="text", text=note), _preview(drawn.figure).to_image_content()],
-            structured_content={"provenance": items},
+            structured_content={"provenance": items, "interactions": _interaction_lines(drawn.figure)},
         )
+
+
+def _interaction_lines(fig) -> list[dict]:
+    """The interaction lines a figure draws (style keys interactions / hbonds), one per line: {kind, a, b,
+    distance, atoms, id}: a and b its residues (A:Arg19, 1:DT7), distance the shortest of the pair (Å), atoms each
+    interaction behind it {a, b, distance, angle, note}, id the line's id in the SVG (hbond:..., ia:<kind>:...)."""
+    overlay = getattr(fig, "foldmap_interactions", None)
+    keep = ("kind", "a", "b", "distance", "atoms")
+    return [{**{k: x[k] for k in keep}, "id": x["key"]} for x in (overlay.records() if overlay else [])]
 
 
 @tool

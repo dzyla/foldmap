@@ -30,7 +30,6 @@ ROUND_TRIP = {
     "focus": ["auto", "none", "B", "B,C"],
     "ligands": ["auto", "all", "none", "HEM,ZN"],
     "na_backbone": ["modality", "chain", "ink", "#123456"],
-    "hbonds": ["off", "na", "interchain", "chains:A+B,C+D"],
     "interactions": ["off", "hbond", "salt,stack", "hbond,salt,stack,cation-pi,hydrophobic"],
     "interactions_between": ["auto", "na", "interchain", "chains:A+B,C+D"],
     "uniprot": ["off", "auto", "P0CG48"],
@@ -57,7 +56,6 @@ def test_named_colours_become_hex_for_the_pickers():
 
 def test_composites_normalise_what_people_type():
     assert COMPOSITES["ligands"][2]("codes", "hem  zn,") == "HEM,ZN"
-    assert COMPOSITES["hbonds"][2]("chains", "A + B, C+D") == "chains:A+B,C+D"
     assert COMPOSITES["highlight"][2]("chains", []) == "none"
     assert COMPOSITES["uniprot"][2]("accession", "p0cg48") == "P0CG48"
     assert COMPOSITES["interactions_between"][2]("chains", "A + B, C+D") == "chains:A+B,C+D"
@@ -82,6 +80,40 @@ def test_sync_keeps_a_half_made_choice():
     ss["ligands"] = "all"  # a layout file or a theme reset
     sync_composites(ss)
     assert ss["ligands__mode"] == "all"
+
+
+def test_the_older_hbonds_key_shows_in_the_interaction_controls():
+    """Plan 13c-5: one set of controls for interactions and the older hbonds: while interactions is off, hbonds=X
+    shows as H-bonds ticked between X; the first change writes both interaction keys from what the controls show and
+    turns hbonds off (the same lines); interactions, when given too, are what the controls show."""
+    from foldmap.app_edits import merged_interactions
+
+    ss = {"hbonds": "chains:A+B", "interactions": "off", "interactions_between": "auto"}
+    assert merged_interactions(ss) == ("hbond", "chains:A+B")
+    sync_composites(ss)
+    assert ss["interactions__hbond"] and not ss["interactions__salt"]
+    assert (ss["interactions_between__mode"], ss["interactions_between__pairs"]) == ("chains", "A+B")
+    sync_composites(ss)
+    assert ss["hbonds"] == "chains:A+B" and ss["interactions"] == "off"  # untouched until a control changes
+    ss["interactions__salt"] = True
+    compose_into(ss, "interactions")
+    assert (ss["hbonds"], ss["interactions"], ss["interactions_between"]) == ("off", "hbond,salt", "chains:A+B")
+    assert ss["last_changed"] == "interactions"
+    sync_composites(ss)
+    assert ss["interactions__salt"] and ss["interactions_between__mode"] == "chains"  # nothing snapped back
+    ss.update(hbonds="na")  # a layout file giving both: the interactions are shown
+    sync_composites(ss)
+    assert merged_interactions(ss) == ("hbond,salt", "chains:A+B") and ss["interactions__salt"]
+    ss["interactions_between__mode"] = "interchain"
+    compose_into(ss, "interactions_between")
+    assert (ss["hbonds"], ss["interactions"], ss["interactions_between"]) == ("off", "hbond,salt", "interchain")
+    ss = {"hbonds": False, "interactions": False, "interactions_between": "auto"}  # unquoted YAML off
+    assert merged_interactions(ss) == ("off", "auto")
+    ss = {"hbonds": "na", "interactions": "off", "interactions_between": "auto"}
+    sync_composites(ss)
+    ss["interactions__hbond"] = False  # unticked: no lines at all
+    compose_into(ss, "interactions")
+    assert (ss["hbonds"], ss["interactions"], ss["interactions_between"]) == ("off", "off", "na")
 
 
 EDITOR_TEXT = {

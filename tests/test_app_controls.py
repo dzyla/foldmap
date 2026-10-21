@@ -81,14 +81,18 @@ def test_reset_keeps_what_names_this_structure():
     at.selectbox(key="assembly").select("asu")
     at.segmented_control(key="highlight__mode").set_value("chains").run()
     at.multiselect(key="highlight__chains").set_value(["A"])
-    at.segmented_control(key="hbonds__mode").set_value("interchain").run()
+    at.checkbox(key="interactions__hbond").check().run()
+    at.segmented_control(key="interactions_between__mode").set_value("interchain").run()
     at.toggle(key="legend").set_value(False).run()
     assert not at.exception
     at.button(key="reset_theme").click().run()
     ss = at.session_state
     assert not at.exception and ss["legend"] is THEMES["publication"].legend and ss["last_changed"] == "theme"
-    assert {k: ss[k] for k in kept} == kept and ss["hbonds"] == "interchain"
-    assert at.segmented_control(key="hbonds__mode").value == "interchain"
+    assert {k: ss[k] for k in kept} == kept and (ss["interactions"], ss["interactions_between"]) == (
+        "hbond",
+        "interchain",
+    )
+    assert at.segmented_control(key="interactions_between__mode").value == "interchain"
 
 
 def test_style_choices_are_segmented_with_the_style_values():
@@ -112,13 +116,18 @@ def test_backbone_colour_and_hbonds_reach_the_figure():
     at.segmented_control(key="na_backbone__mode").set_value("colour").run()
     at.color_picker(key="na_backbone__colour").pick("#123456").run()
     assert at.session_state["na_backbone"] == "#123456"
-    at.segmented_control(key="hbonds__mode").set_value("na").run()
-    assert at.session_state["hbonds"] == "na" and 'id="hbond:' in svg_of(at)
+    at.checkbox(key="interactions__hbond").check().run()
+    assert at.session_state["interactions"] == "hbond" and 'id="hbond:' in svg_of(at)
 
 
-def test_interaction_checkboxes_write_interactions_and_say_when_they_win_over_hbonds():
-    """Plan 13c-3: a checkbox per kind writes `interactions` (none ticked: off); the partners and the cap appear once
-    one is ticked; with an H-bond choice made too, a warning says the interactions win."""
+def _wins(at):
+    return [visible(w.value) for w in at.warning if "is given too and wins" in visible(w.value)]
+
+
+def test_interaction_checkboxes_write_interactions():
+    """Plan 13c-3/13c-5: a checkbox per kind writes `interactions` (none ticked: off); the partners, the H-bonds'
+    colour and cap and the other kinds' cap appear once a kind is ticked; one set of controls (no H-bond picker
+    beside it)."""
     from foldmap.app_controls import INTERACTIONS
     from foldmap.app_edits import INTERACTION_KINDS
     from foldmap.interactions import KINDS
@@ -126,24 +135,56 @@ def test_interaction_checkboxes_write_interactions_and_say_when_they_win_over_hb
     assert tuple(INTERACTIONS) == INTERACTION_KINDS == KINDS
     at = opened(DATA / "1LMB.cif")
     keys = set(widget_keys(at.sidebar, skip=()))
-    assert {f"interactions__{k}" for k in KINDS} <= keys and "interaction_max" not in keys  # off: no partners
+    assert {f"interactions__{k}" for k in KINDS} <= keys and not any(k.startswith("hbond") for k in keys)
+    assert not {"interaction_max", "interactions_between__mode"} & keys  # off: no partners, no caps
     at.checkbox(key="interactions__salt").check().run()
     at.checkbox(key="interactions__stack").check().run()
     assert at.session_state["interactions"] == "salt,stack" and not at.exception
     assert at.session_state["interactions_between"] == "auto"
+    keys = set(widget_keys(at.sidebar, skip=()))
+    assert "interaction_max" in keys and "hbond_max" not in keys
     at.segmented_control(key="interactions_between__mode").set_value("interchain").run()
-
-    def wins(at):
-        return [visible(w.value) for w in at.warning if "is given too and wins" in visible(w.value)]
-
-    assert at.session_state["interactions_between"] == "interchain" and not wins(at)
-    at.selectbox(key="theme").select("print").run()  # kept through a theme change, as the H-bond choice is
+    assert at.session_state["interactions_between"] == "interchain" and not _wins(at)
+    at.selectbox(key="theme").select("print").run()  # kept through a theme change
     assert (at.session_state["interactions"], at.session_state["interactions_between"]) == ("salt,stack", "interchain")
-    at.segmented_control(key="hbonds__mode").set_value("na").run()
-    assert wins(at) and "interactions=salt,stack is given too and wins" in wins(at)[0]
-    at.checkbox(key="interactions__salt").uncheck().run()
-    at.checkbox(key="interactions__stack").uncheck().run()
-    assert at.session_state["interactions"] == "off" and not wins(at) and 'id="hbond:' in svg_of(at)
+    at.checkbox(key="interactions__hbond").check().run()
+    assert at.session_state["interactions"] == "hbond,salt,stack"
+    assert {"hbond_color", "hbond_max", "interaction_max"} <= set(widget_keys(at.sidebar, skip=()))
+    for kind in ("hbond", "salt", "stack"):
+        at.checkbox(key=f"interactions__{kind}").uncheck().run()
+    assert at.session_state["interactions"] == "off" and 'id="hbond:' not in svg_of(at) and not at.exception
+
+
+def test_an_old_layout_file_with_hbonds_shows_in_the_interaction_controls():
+    """Plan 13c-5: the older `hbonds` key has no control of its own. A layout file (or session) with hbonds: na shows
+    H-bonds ticked between protein and DNA/RNA and draws as before, the setting itself untouched until the controls
+    change; a change writes the same lines as interactions keys (hbonds off). A file with both keys says the
+    interactions win, until the controls are changed."""
+    at = opened(DATA / "1LMB.cif")
+    old = ("old.yaml", b"foldmap: 1\ntheme: publication\nstyle: {hbonds: na}\n", "application/x-yaml")
+    at.file_uploader(key="layout_upload").set_value(old).run()
+    ss = at.session_state
+    assert not at.exception and (ss["hbonds"], ss["interactions"]) == ("na", "off")
+    assert at.checkbox(key="interactions__hbond").value and not at.checkbox(key="interactions__salt").value
+    assert at.segmented_control(key="interactions_between__mode").value == "na" and not _wins(at)
+    before = svg_of(at)
+    assert 'id="hbond:' in before and 'id="ia:' not in before
+    at.checkbox(key="interactions__hbond").uncheck().run()
+    assert (ss["hbonds"], ss["interactions"], ss["interactions_between"]) == ("off", "off", "na")
+    assert 'id="hbond:' not in svg_of(at)
+    at.checkbox(key="interactions__hbond").check().run()
+    assert (ss["hbonds"], ss["interactions"], ss["interactions_between"]) == ("off", "hbond", "na")
+    assert svg_of(at) == before  # interactions=hbond between na: the figure hbonds=na drew
+    at.checkbox(key="interactions__hbond").uncheck().run()
+    at.file_uploader(key="layout_upload").set_value(("again.yaml", *old[1:])).run()  # again, then a kind ticked
+    at.checkbox(key="interactions__salt").check().run()
+    assert (ss["hbonds"], ss["interactions"], ss["interactions_between"]) == ("off", "hbond,salt", "na")
+    both = b"foldmap: 1\ntheme: publication\nstyle: {hbonds: na, interactions: salt}\n"
+    at.file_uploader(key="layout_upload").set_value(("both.yaml", both, "application/x-yaml")).run()
+    assert at.checkbox(key="interactions__salt").value and not at.checkbox(key="interactions__hbond").value
+    assert _wins(at) and "interactions=salt is given too and wins" in _wins(at)[0]
+    at.checkbox(key="interactions__stack").check().run()
+    assert (ss["hbonds"], ss["interactions"]) == ("off", "salt,stack") and not _wins(at)
 
 
 def test_named_colours_reach_the_pickers_as_hex():
@@ -325,12 +366,16 @@ def test_contacts_check_reruns_only_for_what_changes_the_contacts(monkeypatch):
         fresh_caches()
 
 
-def test_protein_dna_hbonds_offered_only_with_nucleic_acid():
-    from foldmap.app_controls import HBONDS
+def test_protein_dna_partners_offered_only_with_nucleic_acid():
+    from foldmap.app_controls import BETWEEN
 
-    shown = opened(DATA / "2HHB.cif").segmented_control(key="hbonds__mode").options  # the labels
-    assert list(shown) == [HBONDS[k] for k in ("off", "interchain", "chains")]
-    assert list(opened(DATA / "1LMB.cif").segmented_control(key="hbonds__mode").options) == list(HBONDS.values())
+    def partners(name):
+        at = opened(DATA / name)
+        at.checkbox(key="interactions__hbond").check().run()
+        return list(at.segmented_control(key="interactions_between__mode").options)  # the labels
+
+    assert partners("2HHB.cif") == [BETWEEN[k] for k in ("auto", "interchain", "chains")]
+    assert partners("1LMB.cif") == list(BETWEEN.values())
 
 
 # ---------------------------------------------------------------------------------------------- Edit layout
@@ -582,10 +627,11 @@ def test_every_setting_is_reachable():
 
     at = opened(DATA / "1LMB.cif")  # nucleic acid: the DNA/RNA block is shown
     seen = shown(at)
-    for key, value in (("hbonds__mode", "chains"), ("na_backbone__mode", "modality"), ("ligands__mode", "codes")):
+    for key, value in (("na_backbone__mode", "modality"), ("ligands__mode", "codes")):
         at.segmented_control(key=key).set_value(value).run()
         seen |= shown(at)
-    at.checkbox(key="interactions__salt").check().run()  # a kind ticked: the partners and the cap are shown
+    at.checkbox(key="interactions__hbond").check().run()  # H-bonds and another kind: the partners and the caps
+    at.checkbox(key="interactions__salt").check().run()
     at.segmented_control(key="interactions_between__mode").set_value("chains").run()
     seen |= shown(at)
     at.selectbox(key="color_by").select("sequence").run()  # sequence_map instead of palette
@@ -659,10 +705,10 @@ def test_an_editor_tab_shows_no_second_heading_but_keeps_its_help_and_switch():
 
 
 def test_option_labels_and_help_say_everything_in_full():
-    from foldmap.app_controls import ALIGNMENT_TYPES, CONSERVATION_NOTE, HBONDS
+    from foldmap.app_controls import ALIGNMENT_TYPES, BETWEEN, CONSERVATION_NOTE
 
     at = opened(DATA / "1UBQ.cif")
-    assert HBONDS["chains"] == "chain pairs" and "ConSurf grades file" in CONSERVATION_NOTE
+    assert BETWEEN["chains"] == "chain pairs" and "ConSurf grades file" in CONSERVATION_NOTE
     assert all(f".{t}" in at.file_uploader(key="msa_upload").proto.help for t in ALIGNMENT_TYPES)
     types = list(at.file_uploader(key="msa_upload").proto.type)  # the suffixes, and a MIME type: the app checks them
     assert [t for t in types if t.startswith(".")] == [f".{t}" for t in ALIGNMENT_TYPES] and "text/x-fasta" in types

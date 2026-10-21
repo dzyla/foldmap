@@ -355,7 +355,14 @@ def test_a_polymer_residue_type_bound_as_a_ligand_is_left_out():
 
 from foldmap.cli import make_layout  # noqa: E402
 from foldmap.nacheck import deposited_hydrog  # noqa: E402
-from foldmap.render import draw, hbond_overlay, nucleotide_points, residue_point  # noqa: E402
+from foldmap.render import (  # noqa: E402
+    INTERACTION_ONE,
+    draw,
+    hbond_overlay,
+    nucleotide_points,
+    residue_name,
+    residue_point,
+)
 from foldmap.route import route_loops  # noqa: E402
 from foldmap.style import Style, resolve_style  # noqa: E402
 
@@ -492,14 +499,39 @@ def test_chain_pairs_draw_only_lines_between_those_chains():
 
 
 def test_the_interactive_page_lists_the_bonds_of_each_line():
-    from foldmap.interactive import _hbonds
+    from foldmap.interactive import _interactions
 
     fig = _drawn("1LMB", "hbonds=na", "hbond_max=1000")[0]
-    notes = _hbonds(fig)
-    assert len(notes) == len(_lines(fig))
+    notes = _interactions(fig)
+    assert len(notes) == len(_lines(fig)) and {n["key"] for n in notes} == {l.get_gid() for l in _lines(fig)}
     by_key = {n["key"]: n for n in notes}
-    gln = next(n for k, n in by_key.items() if k.startswith("3:44-1:4"))
-    assert "Gln44" in gln["text"] and "DA4" in gln["text"] and "Å" in gln["text"] and len(gln["residues"]) == 1
+    gln = next(n for k, n in by_key.items() if k.startswith("hbond:3:44-1:4"))
+    assert gln["text"].startswith("H-bond 3:Gln44 – 1:DA4: ") and "Å" in gln["text"] and len(gln["residues"]) == 1
+    assert gln["het"] == [["1", 4]] and gln["label"] == "H-bond" and gln["kind"] == "hbond"
+
+
+def test_the_interactive_page_lists_every_interaction_line_with_its_atoms():
+    """Plan 13c-5: each line drawn (hbond: and ia: gids) is in the page's data under its gid, with its residues, its
+    nucleotides and a note naming its atoms (in the order of its residues), distances and, for stacking and
+    cation-π, the angle; a protein-protein line holds both residues."""
+    from foldmap.interactive import _interactions
+
+    fig = _drawn("1LMB", "interactions=all,hydrophobic", "interaction_max=1000", "hbond_max=1000")[0]
+    notes = {n["key"]: n for n in _interactions(fig)}
+    gids = {l.get_gid() for l in fig.axes[0].lines if (l.get_gid() or "").startswith(("hbond:", "ia:"))}
+    assert notes and set(notes) == gids and {n["kind"] for n in notes.values()} >= {"hbond", "salt", "cation-pi"}
+    for line in fig.foldmap_interactions.lines():
+        note = notes[line.gid]
+        first, second = (residue_name(lab) for lab in line.labels)
+        assert note["text"].startswith(f"{INTERACTION_ONE[note['kind']]} {first} – {second}: ")
+        assert note["residues"] == list(line.residues) and len(note["residues"]) + len(note["het"]) == 2
+    salt = next(n for n in notes.values() if n["kind"] == "salt" and n["het"])
+    line = next(l for l in fig.foldmap_interactions.lines() if l.gid == salt["key"])
+    x = line.found[0]
+    ours = x.a[2] if (x.a[0], x.a[1]) == (line.labels[0].chain, line.labels[0].tag) else x.b[2]
+    assert salt["text"].split(": ", 1)[1].startswith(f"{ours} – ") and f"{x.distance:.1f} Å" in salt["text"]
+    cation = next(n for n in notes.values() if n["kind"] == "cation-pi")
+    assert "-ring" in cation["text"] and "°" in cation["text"]
 
 
 def test_bad_hbond_keys_are_explained():
@@ -778,3 +810,63 @@ def test_interaction_lines_keep_off_every_letter_and_a6_reads_them(pdb):
     fig.axes[0].text(*at, "WWWW", ha="center", va="center", fontsize=9, zorder=9).set_gid("label:test")
     hits = figcheck.text_collisions(drawn)
     assert f"label:test × {line.get_gid()}" in hits
+
+
+@pytest.mark.parametrize(
+    "where, settings, focus",
+    [
+        ("6LTO.cif.gz", ["cyclic=rosette"], "none"),  # C7, each copy protomer 0 turned by k * 360 / 7 degrees
+        ("1BL8.cif", ["cyclic=rosette"], None),  # C4
+        ("8UTF.cif", [], None),  # a ring unrolled, a strand lent across its cut
+        ("assemblies/1UAM.cif.gz", [], None),  # a C2 drawn as one copy and its mirror image (two_fold=auto)
+    ],
+    ids=["6LTO-rosette", "1BL8-rosette", "8UTF", "1UAM-mirror"],
+)
+def test_interaction_lines_follow_turned_and_mirrored_copies(where, settings, focus):
+    """Review Focus 4 (plan 13c-5): on a page whose copies are turned (cyclic=rosette) or mirrored (two_fold), each
+    interaction line between copies ends on its residues as drawn in their copies (S4's rule, figcheck.residue_places
+    worked out apart from render.residue_point), its ink on the segment between them, and no line passes under the
+    rosette's axis symbol. A6: the new kinds cross no text; with H-bonds as well (interactions=all), the only texts
+    crossed are crossed by hbond: lines, drawn whole as before plan 13c (the parked lambda-hbonds problem, 13c-6)."""
+    from matplotlib.path import Path as MPath
+
+    from foldmap import figcheck
+    from foldmap.science import mark_findings
+    from foldmap.spec import draw_spec, figure_spec
+
+    path = DATA / where
+    new = draw_spec(figure_spec(path, style=[*settings, "interactions=salt,stack,cation-pi,hydrophobic"], focus=focus))
+    lay = new.layout
+    assert lay.rosette in (4, 7) if "cyclic=rosette" in settings else lay.rosette == 0
+    if "1UAM" in where:
+        assert lay.frame.mirror_x is not None
+    assert figcheck.text_collisions(new) == []
+    every = draw_spec(figure_spec(path, style=[*settings, "interactions=all,hydrophobic"], focus=focus))
+    assert all(" × hbond:" in h for h in figcheck.text_collisions(every))
+    for d in (new, every):
+        overlay = d.figure.foldmap_interactions
+        lines = overlay.lines()
+        between = [l for l in lines if l.labels[0].chain != l.labels[1].chain]
+        copies = {lab.chain for line in between for lab in line.labels}  # turned copies past the first two too
+        assert overlay.dropped == () and len(between) >= 4 and len(copies) >= (3 if d.layout.rosette else 2)
+        index = {(l.chain, l.tag): k for k, l in enumerate(d.layout.res_labels)}
+        marks = [
+            (f"{lab.chain}:{lab.tag}", end, figcheck.residue_places(d, index[(lab.chain, lab.tag)]))
+            for line in lines
+            for end, lab in zip(line.ends, line.labels)
+        ]
+        assert mark_findings(marks) == []
+        ink = [l for l in d.figure.axes[0].lines if (l.get_gid() or "").startswith(("ia:", "hbond:"))]
+        drawn = {l.get_gid(): _points(l) for l in ink}
+        for line in lines:
+            if line.gid in drawn and line.gid not in overlay.slots:
+                off, along = _across(drawn[line.gid], line.ends)
+                assert np.abs(off).max() < 1e-9 and along.min() > -1e-9 and along.max() < 1 + 1e-9
+        symbol = [p for p in d.figure.axes[0].patches if (p.get_gid() or "").startswith("axis:")]
+        assert bool(symbol) == bool(d.layout.rosette)
+        for p in symbol:
+            shape = MPath(p.get_xy())
+            for line in lines:
+                (x0, y0), (x1, y1) = line.ends
+                t = np.linspace(0, 1, 400)[:, None]
+                assert not shape.contains_points(np.c_[x0 + t * (x1 - x0), y0 + t * (y1 - y0)]).any(), line.gid

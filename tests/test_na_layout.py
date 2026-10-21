@@ -1804,17 +1804,19 @@ setTimeout(async () => {
 """
 
 
-def _explorer_cases(pdb, viewer):
+def _explorer_cases(pdb, viewer, look=None):
     from foldmap.interactive import _APP, _LIB, build_page
 
-    page = build_page(_path(pdb), viewer=viewer)
+    page = build_page(_path(pdb), viewer=viewer, look=look)
     blob = page.split('<script type="application/json" id="topo-data">', 1)[1].split("</script>", 1)[0]
     # the blob is HTML-safe JSON (< escapes); the script reads it back through JSON.parse unchanged
     return json.loads(blob), blob, _LIB, _APP
 
 
-def _drive(tmp_path, pdb, viewer, cases):
-    data, blob, lib, app = _explorer_cases(pdb, viewer)
+def _drive(tmp_path, pdb, viewer, cases, look=None, hits=None):
+    """Run the harness on pdb's page (drawn with `look`): `cases` (data -> viewer.on calls), clicks on two
+    elements, two map cells and `hits` (data -> figure ids to hover and click; default: _hit_targets)."""
+    data, blob, lib, app = _explorer_cases(pdb, viewer, look)
     clicks, atom = [e["id"] for e in data["elements"][:2]], None  # two elements to click, and a residue in 3D
     if len(clicks) == 2:
         residue = data["residues"][data["elements"][0]["start"]]
@@ -1830,7 +1832,7 @@ def _drive(tmp_path, pdb, viewer, cases):
         "atom": atom,
         "n": len(data["ca"]),
         "cells": _map_cells(data) if clicks else [],
-        "hits": _hit_targets(data),
+        "hits": (hits or _hit_targets)(data),
     }
     (tmp_path / "job.json").write_text(json.dumps(job), encoding="utf-8")
     (tmp_path / "harness.js").write_text(_HARNESS, encoding="utf-8")
@@ -1969,6 +1971,47 @@ def test_explorer_click_target_of_a_run_or_stem_selects_it(tmp_path, viewer):
         assert click["info"].startswith(nucleics[key]["text"])
         moved = [c for c in click["calls"] if c[0] in ("zoomTo", "focusLoci")]
         assert len(moved) == 1, click
+
+
+@pytest.mark.skipif(node is None, reason="node is not installed; the explorer's viewer code cannot be exercised")
+@pytest.mark.parametrize("viewer", ["3dmol", "molstar"])
+def test_explorer_interaction_line_hovers_and_selects_as_an_h_bond_line_does(tmp_path, viewer):
+    # plan 13c-5: an ia: line (or its click target, :hit) shows its note on hover and, clicked, is selected under its
+    # gid, lights its protein residue and its nucleotide in 3D and takes the camera to them (7586ac9); so does an
+    # hbond: line; two lines are two selections (shift-click adds)
+    from foldmap.style import Style
+
+    def lines(data):
+        salt = next(x for x in data["interactions"] if x["kind"] == "salt" and x["het"] and x["residues"])
+        hb = next(x for x in data["interactions"] if x["kind"] == "hbond")
+        # bare paper first (the earlier map clicks leave a cell selected), then each click selects that line alone
+        return ["paper", salt["key"], hb["key"], salt["key"] + ":hit"]
+
+    look = Style(interactions="hbond,salt")
+    data, got = _drive(tmp_path, "1IHF", viewer, lambda data: [], look=look, hits=lines)
+    notes = {x["key"]: x for x in data["interactions"]}
+    _, salt, hb, target = lines(data)
+    assert got[("click", "click paper")]["selection"] == []
+    first = got[("click", "hover " + salt)]  # nothing selected yet: the hover shows the line's note
+    assert first["error"] is None and first["selection"] == [] and first["info"] == notes[salt]["text"], first
+    for hit in (salt, hb, target):
+        key = hit.removesuffix(":hit")
+        hover, click = got[("click", "hover " + hit)], got[("click", "click " + hit)]
+        assert hover["error"] is None and click["error"] is None, (hover, click)
+        assert click["selection"] == [key] and click["info"].startswith(notes[key]["text"])
+        moved = [c for c in click["calls"] if c[0] in ("zoomTo", "focusLoci")]
+        assert len(moved) == 1, click
+        if key == salt:  # the camera frames the residue and the nucleotide
+            (chain, seq), k = notes[key]["het"][0], notes[key]["residues"][0]
+            res = data["residues"][k]
+            if viewer == "3dmol":
+                assert {"chain": chain, "resi": seq} in moved[0][1]["or"]
+                assert {"chain": res["c"], "resi": res["n"]} in moved[0][1]["or"]
+            else:
+                parts = moved[0][1]["params"]
+                assert any(p.get("auth_asym_id") == chain and p.get("auth_seq_id") == seq for p in parts), parts
+                assert any(p.get("auth_asym_id") == res["c"] for p in parts), parts
+    assert data["interactions"] and all(x["key"].startswith(("hbond:", "ia:salt:")) for x in data["interactions"])
 
 
 @pytest.mark.skipif(node is None, reason="node is not installed; the explorer's viewer code cannot be exercised")

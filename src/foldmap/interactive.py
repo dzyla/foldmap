@@ -18,7 +18,7 @@ import numpy as np
 
 from . import CREDIT
 from .io import read_model
-from .render import draw, element_colours, save_svg
+from .render import INTERACTION_ONE, draw, element_colours, save_svg
 from .route import route_loops
 from .style import Style
 
@@ -49,6 +49,8 @@ _NA_INK = re.compile(
     r'<path d="([^"]*)"(?: clip-path="([^"]*)")?'
 )
 _LOOP_INK = re.compile(r'<g id="loop:([^"]+)">\s*<path d="([^"]*)"(?: clip-path="([^"]*)")?')  # a loop's whole line
+# an interaction line (hbond:<a>-<b>, ia:<kind>:<a>-<b>): its dashed path, in pieces where it passes a letter
+_LINE_INK = re.compile(r'<g id="((?:hbond|ia:[a-z-]+):[^"]+)">\s*<path d="([^"]*)"(?: clip-path="([^"]*)")?')
 # the first group drawn at loop level or above (loops and their casings, nucleic-acid ink): the targets go just
 # under it, above the panels, plates and membrane band (which would hide them) and under every line a reader clicks
 _LOOP_LEVEL = re.compile(r'<g id="(?:loopcase:|loop:|loop-seg:|loop-arrow:|na:)')
@@ -65,6 +67,7 @@ _LIB = r"""
         case 'pair': return 'pair:' + item.i + '-' + item.j;
         case 'cell': return 'cell:' + item.i + '-' + item.j;
         case 'disulfide': case 'glycan': case 'ligand': case 'feature': case 'nucleic': return item.type + ':' + item.key;
+        case 'interaction': return item.key;  // its gid: hbond:A:44-1:4, ia:salt:A:19-1:7
         case 'bead': return 'bead:' + (item.mark || item.chain + ':' + item.idx);
         default: return 'residue:' + item.k;
       }
@@ -469,9 +472,9 @@ _APP = r"""
       const x = item.mark ? data.beads.marks[item.mark] : data.beads.chains[item.chain][item.idx];
       return { keys: [], residues: [x.k], label: x.text, text: x.text };
     }
-    if (item.type === 'hbond') {  // a hydrogen-bonded pair: the atoms and their distances
-      const x = data.hbonds.find(h => h.key === item.key);
-      return { keys: [], residues: x.residues, label: 'H-bond', text: x.text };
+    if (item.type === 'interaction') {  // an H-bond or other interaction line: its atoms, distances and angles
+      const x = data.interactions.find(h => h.key === item.key);
+      return { keys: [], residues: x.residues, het: x.het, label: x.label, text: x.text };
     }
     if (['disulfide', 'glycan', 'ligand', 'feature', 'nucleic'].includes(item.type)) {
       const list = data.links[item.type === 'disulfide' ? 'disulfides' : item.type + 's'];
@@ -549,7 +552,9 @@ _APP = r"""
       let l = n.id.match(/^(?:disulfide|ss-dot|disulfide-end):(.+)$/);
       if (l) return { type: 'disulfide', key: l[1] };
       if ((l = n.id.match(/^glycan:(\d+):/))) return { type: 'glycan', key: l[1] };
-      if ((l = n.id.match(/^hbond:(.+)$/)) && data.hbonds.some(h => h.key === l[1])) return { type: 'hbond', key: l[1] };
+      if ((l = n.id.match(/^((?:hbond|ia:[a-z-]+):.+?)(?::hit)?$/)) && data.interactions.some(h => h.key === l[1])) {
+        return { type: 'interaction', key: l[1] };  // a line or its click target (:hit)
+      }
       if ((l = n.id.match(/^feature(?:-ring)?:(\d+)$/))) return { type: 'feature', key: l[1] };
       if ((l = n.id.match(/^ligand(?:-label|-tether)?:(.+?)(?::\d+)?$/))) return { type: 'ligand', key: l[1] };
       const na = lib.nucleicKey(n.id);
@@ -624,7 +629,8 @@ main { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1
 #stage svg.focus [id^="feature"]:not(.on), #stage svg.focus [id^="na:stem:"]:not(.on),
 #stage svg.focus [id^="na:label:"]:not(.on), #stage svg.focus [id^="na:run:"]:not(.on) { opacity: .2; transition: opacity .12s }
 #stage svg [id^="disulfide:"], #stage svg [id^="ss-dot:"], #stage svg [id^="disulfide-end:"], #stage svg [id^="glycan:"], #stage svg [id^="ligand"],
-#stage svg [id^="na:stem:"], #stage svg [id^="na:label:"], #stage svg [id^="na:run:"] { cursor: pointer }
+#stage svg [id^="na:stem:"], #stage svg [id^="na:label:"], #stage svg [id^="na:run:"],
+#stage svg [id^="hbond:"], #stage svg [id^="ia:"] { cursor: pointer }
 #stage svg [id^="loopcase:"] { pointer-events: none }  /* a loop's white casing: clicks reach its click target */
 #molpanel { flex: 1.15 }
 #mol { flex: 1; min-height: 200px; position: relative; border-radius: 6px; overflow: hidden; background: #fff }
@@ -813,36 +819,27 @@ def _beads(fig, layout, bb, model) -> dict:
     return out
 
 
-def _hbonds(fig) -> list:
-    """The hydrogen-bond lines as drawn, for the hover: `key` (the gid after "hbond:"), the protein residues
-    (Backbone indices) and the note "H-bond A:Gln44 – 1:DA4: NE2 – N7 3.3 Å; ..." (atoms in the order of the residues)."""
-    overlay = getattr(fig, "foldmap_hbonds", None)
-    out = []
-    for line in overlay.lines if overlay else []:
-        first, second = line.labels
-        name = lambda lab: f"{lab.chain}:{lab.name.title() if len(lab.name) == 3 else lab.name}{lab.tag}"  # noqa: E731
-        atoms = "; ".join(
-            " – ".join((x.donor.name, x.acceptor.name) if x.donor.res == first else (x.acceptor.name, x.donor.name))
-            + f" {x.distance:.1f} Å"
-            for x in line.bonds
-        )
-        out.append(
-            {
-                "key": line.gid[len("hbond:") :],
-                "residues": list(line.residues),
-                "text": f"H-bond {name(first)} – {name(second)}: {atoms}",
-            }
-        )
-    return out
+def _interactions(fig) -> list:
+    """The interaction lines as drawn (the H-bonds' hbond: lines and the other kinds' ia: lines), for the hover and
+    the click: render.interaction_record's `key` (the line's gid), `kind`, `residues` (Backbone indices of the
+    protein ends), `het` (its nucleotides, for the 3D view) and `text`, the note "H-bond A:Gln44 – 1:DA4: NE2 – N7
+    3.3 Å; ..." or "Salt bridge A:Arg19 – 1:DT7: NH1 – OP1 3.1 Å" (atoms in the order of the residues, an angle
+    where the kind has one), and `label`, what one line of its kind is called (H-bond, Salt bridge)."""
+    overlay = getattr(fig, "foldmap_interactions", None)
+    keep = ("key", "kind", "residues", "het", "text")
+    return [
+        {**{k: x[k] for k in keep}, "label": INTERACTION_ONE[x["kind"]]} for x in (overlay.records() if overlay else [])
+    ]
 
 
 def _hit_targets(svg: str) -> str:
     """The page's copy of the figure with click targets: an invisible path HIT_PX screen pixels wide along the drawn
     lines of each nucleic-acid run and stem (na:run:K:hit, na:stem:K:hit; one per run and per stem, a stem's rails,
-    rungs and body together) and of each protein loop (loop:<name>:hit). All sit under the loops and the
-    nucleic-acid ink, so a click on anything drawn selects that thing; the loops' targets lie over the nucleic
-    acid's, so a click a few pixels off a loop that runs beside a strand still selects the loop. The static figure
-    (save_svg) has none."""
+    rungs and body together), of each protein loop (loop:<name>:hit) and of each interaction line (hbond:<a>-<b>:hit,
+    ia:<kind>:<a>-<b>:hit; plan 13c-5). All sit under the loops and the nucleic-acid ink, so a click on anything drawn
+    selects that thing; the loops' targets lie over the nucleic acid's, so a click a few pixels off a loop that runs
+    beside a strand still selects the loop, and both lie over the interaction lines', which end on them. The static
+    figure (save_svg) has none."""
     lines: dict[str, list[str]] = {}
     clips: dict[str, str | None] = {}
 
@@ -850,11 +847,13 @@ def _hit_targets(svg: str) -> str:
         lines.setdefault(key, []).append(d.strip())
         clips.setdefault(key, clip)
 
+    for m in _LINE_INK.finditer(svg):
+        add(f"{m[1]}:hit", m[2], m[3])
     for m in _NA_INK.finditer(svg):
         add(f"na:{m[1] or m[3]}:{m[2] or m[4]}:hit", m[5], m[6])
     for m in _LOOP_INK.finditer(svg):
         add(f"loop:{m[1]}:hit", m[2], m[3])
-    under = _LOOP_LEVEL.search(svg)
+    under = _LOOP_LEVEL.search(svg) or _LINE_INK.search(svg)
     if not lines or under is None:
         return svg
     style = (
@@ -935,7 +934,7 @@ def build_page(
         "viewer": viewer,
         "links": _links(layout, loops, sses, bb, look),
         "beads": _beads(fig, layout, bb, model),
-        "hbonds": _hbonds(fig),
+        "interactions": _interactions(fig),
     }
     blob = _script_json(data)
     name = html.escape(data["title"])

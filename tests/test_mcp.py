@@ -1,6 +1,7 @@
 """The MCP server: tools agents use to summarise structures and draw figures."""
 
 import asyncio
+import re
 import sys
 from pathlib import Path
 
@@ -474,3 +475,24 @@ def test_elements_are_named_in_every_convention(tmp_path):
             "draw_topology",
             {"source": str(DATA / "1TIM.cif"), "output_path": out, "chains": ["A"], "swap": [["α4", "α1"]]},
         )
+
+
+def test_draw_topology_returns_the_interaction_lines_drawn(tmp_path):
+    """Plan 13c-5: the interaction style keys reach the figure; the structured result lists each line drawn as
+    {kind, a, b, distance, atoms, id}, id its gid in the SVG, distance the shortest of the atoms listed; none
+    without them."""
+    out = tmp_path / "lmb.svg"
+    style = {"interactions": "hbond,salt,cation-pi", "interactions_between": "na", "interaction_max": "50"}
+    r = call("draw_topology", {"source": str(DATA / "1LMB.cif"), "output_path": str(out), "style": style})
+    lines = r.structured_content["interactions"]
+    gids = set(re.findall(r'<g id="((?:hbond|ia:[a-z-]+):[^"]+)">', out.read_text()))
+    assert lines and {x["id"] for x in lines} == gids and {x["kind"] for x in lines} == {"hbond", "salt", "cation-pi"}
+    for x in lines:
+        assert set(x) == {"kind", "a", "b", "distance", "atoms", "id"}
+        assert x["distance"] == min(a["distance"] for a in x["atoms"]) and 2.0 < x["distance"] <= 6.0
+        assert re.fullmatch(r"[^:]+:[A-Za-z]+-?\d+\w*", x["a"]) and re.fullmatch(r"[^:]+:[A-Za-z]+-?\d+\w*", x["b"])
+        assert all({"a", "b", "distance", "angle", "note"} == set(a) for a in x["atoms"])
+    salt = next(x for x in lines if x["kind"] == "salt")
+    assert salt["id"].startswith("ia:salt:") and salt["atoms"][0]["angle"] is None
+    plain = call("draw_topology", {"source": UBQ, "output_path": str(tmp_path / "u.svg")})
+    assert plain.structured_content["interactions"] == []

@@ -81,20 +81,6 @@ def _na_backbone_text(mode: str, colour: str) -> str:
     return (colour or NA_BACKBONE_COLOUR) if mode == "colour" else mode
 
 
-def _hbonds_parts(text: str) -> tuple:
-    text = (text or "").strip()
-    if text.startswith("chains:"):
-        return ("chains", ", ".join(_list(text[len("chains:") :])))
-    return (text or "off", "")
-
-
-def _hbonds_text(mode: str, pairs: str) -> str:
-    if mode != "chains":
-        return mode
-    pairs = [p.replace(" ", "") for p in _list(pairs)]
-    return "chains:" + ",".join(pairs) if pairs else "off"
-
-
 INTERACTION_KINDS = ("hbond", "salt", "stack", "cation-pi", "hydrophobic")  # interactions.KINDS (no pipeline here)
 
 
@@ -155,7 +141,6 @@ COMPOSITES: dict[str, tuple[tuple[str, ...], Callable, Callable]] = {
     "focus": (("focus__mode", "focus__chains"), _focus_parts, _focus_text),
     "ligands": (("ligands__mode", "ligands__codes"), _ligands_parts, _ligands_text),
     "na_backbone": (("na_backbone__mode", "na_backbone__colour"), _na_backbone_parts, _na_backbone_text),
-    "hbonds": (("hbonds__mode", "hbonds__pairs"), _hbonds_parts, _hbonds_text),
     "interactions": (tuple(f"interactions__{k}" for k in INTERACTION_KINDS), _interactions_parts, _interactions_text),
     "interactions_between": (
         ("interactions_between__mode", "interactions_between__pairs"),
@@ -211,6 +196,25 @@ def switch_domains(ss: MutableMapping) -> None:
     _noted(ss, "domains")
 
 
+MERGED = ("interactions", "interactions_between")  # one set of controls for these and the older hbonds key
+
+
+def merged_interactions(ss: MutableMapping) -> tuple[str, str]:
+    """(interactions, interactions_between) as the interaction controls show them: the two settings, or, while
+    `interactions` is off and the older `hbonds` is on (a layout file or session saved before plan 13c), the lines
+    that draws: hbonds=X is interactions=hbond with interactions_between=X (style.interactions_of)."""
+    older = ss.get("hbonds") or "off"
+    given = ss.get("interactions") or "off"  # an unquoted YAML off is False
+    if given == "off" and older != "off":
+        return "hbond", str(older)
+    return str(given), str(ss.get("interactions_between") or "auto")
+
+
+def _shown(ss: MutableMapping, key: str):
+    """The value a composite's widgets show: its setting's, the interaction pair's as merged_interactions has it."""
+    return merged_interactions(ss)[MERGED.index(key)] if key in MERGED else ss[key]
+
+
 def sync_composites(ss: MutableMapping) -> None:
     """Derive each composite's widget keys (and DERIVED's) from its canonical value, but only when that value changed
     since it was last derived or composed: a half-made choice (a mode picked, nothing typed yet) is never snapped
@@ -218,20 +222,29 @@ def sync_composites(ss: MutableMapping) -> None:
     synced = dict(ss.get("_synced") or {})
     every = {**{key: (derived, parts) for key, (derived, parts, _) in COMPOSITES.items()}, **DERIVED}
     for key, (derived, parts) in every.items():
-        if key not in ss or (key in synced and synced[key] == ss[key]):
+        if key not in ss:
             continue
-        for k, v in zip(derived, parts(ss[key])):
+        value = _shown(ss, key)
+        if key in synced and synced[key] == value:
+            continue
+        for k, v in zip(derived, parts(value)):
             ss[k] = v
-        synced[key] = ss[key]
+        synced[key] = value
     ss["_synced"] = synced
 
 
 def compose_into(ss: MutableMapping, key: str) -> None:
-    """Write a composite's canonical value from its widget keys (the widgets' callback)."""
-    derived, parts, text = COMPOSITES[key]
-    current = parts(ss.get(key, ""))
-    ss[key] = text(*(ss.get(k, d) for k, d in zip(derived, current)))
-    ss["_synced"] = {**(ss.get("_synced") or {}), key: ss[key]}
+    """Write a composite's canonical value from its widget keys (the widgets' callback). A change to the interaction
+    controls while the older `hbonds` is on writes both interaction settings from what the controls show and turns
+    hbonds off: the same lines, now said by the interaction keys (merged_interactions)."""
+    keys = MERGED if key in MERGED and (ss.get("hbonds") or "off") != "off" else (key,)
+    for each in keys:
+        derived, parts, text = COMPOSITES[each]
+        current = parts(_shown(ss, each))
+        ss[each] = text(*(ss.get(k, d) for k, d in zip(derived, current)))
+    if keys == MERGED:
+        ss["hbonds"] = "off"
+    ss["_synced"] = {**(ss.get("_synced") or {}), **{each: ss[each] for each in keys}}
     ss["last_changed"] = key
 
 
@@ -447,7 +460,7 @@ CONTROLS: dict[str, tuple[str, str, tuple[str, ...]]] = {
     "helices_310": ("3₁₀ helices as boxes", _SHOW, ("helices_310",)),
     "ligands": ("Ligands and ions", _SHOW, ("ligands__mode", "ligands__codes")),
     "membrane": ("Membrane", _SHOW, ("membrane",)),
-    "hbonds": ("Hydrogen bonds", _SHOW, ("hbonds__mode", "hbonds__pairs")),
+    "hbonds": ("H-bonds", _SHOW, ("interactions__hbond",)),  # the older key: one control with interactions
     "hbond_color": ("H-bond colour", _SHOW, ("hbond_color",)),
     "hbond_max": ("Most H-bonds drawn", _SHOW, ("hbond_max",)),
     "interactions": ("Interactions", _SHOW, tuple(f"interactions__{k}" for k in INTERACTION_KINDS)),

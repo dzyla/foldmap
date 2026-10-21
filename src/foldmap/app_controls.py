@@ -101,9 +101,6 @@ def style_section(st, ss: MutableMapping) -> None:
             st.slider("Loop weight", 0.4, 3.0, step=0.1, **setting(ss, "loop_width"))
 
 
-HBONDS = {"off": "off", "na": "protein–DNA/RNA", "interchain": "interchain", "chains": "chain pairs"}
-
-
 def show_section(st, ss: MutableMapping) -> None:
     """Show: optional features (bridges, sugars, panels, ligands, the membrane), hydrogen bonds, per-chain backbone
     colours (protein loops too, so always shown) and, with nucleic acid in the structure, how DNA and RNA are drawn
@@ -141,7 +138,6 @@ def show_section(st, ss: MutableMapping) -> None:
                 label_visibility="collapsed",
                 **part(ss, "ligands__codes", "ligands"),
             )
-        hbonds_block(st, ss)
         interactions_block(st, ss)
         st.text_input(
             "Per-chain colours",
@@ -151,22 +147,6 @@ def show_section(st, ss: MutableMapping) -> None:
         )
         if ss.get("na_chains"):
             nucleic_block(st, ss)
-
-
-def hbonds_block(st, ss: MutableMapping) -> None:
-    """Hydrogen bonds: which (none, protein with DNA/RNA where the structure has nucleic acid, between chains,
-    chosen chain pairs), their colour and the most lines drawn."""
-    mode = ss.get("hbonds__mode", "off")
-    options = [k for k in HBONDS if k != "na" or ss.get("na_chains") or mode == "na"]  # a layout file's na stays
-    segmented(st, "Hydrogen bonds", options, part(ss, "hbonds__mode", "hbonds"), format_func=HBONDS.get)
-    if mode == "chains":
-        st.text_input(
-            "Chain pairs", placeholder="A+B, C+D", label_visibility="collapsed", **part(ss, "hbonds__pairs", "hbonds")
-        )
-    if mode != "off":
-        with st.container(horizontal=True, vertical_alignment="bottom", key="hbond_look"):
-            colour(st, "H-bond colour", ss, "hbond_color")
-            st.number_input("Most H-bonds drawn", min_value=1, step=50, **setting(ss, "hbond_max"))
 
 
 INTERACTIONS = {  # interactions.KINDS -> the checkbox's label
@@ -181,12 +161,15 @@ BETWEEN = {"auto": "auto", "na": "protein–DNA/RNA", "interchain": "interchain"
 
 def interactions_block(st, ss: MutableMapping) -> None:
     """Interactions (plan 13c): a checkbox per kind (none ticked: off), then between which partners (auto:
-    protein–DNA/RNA where the structure has nucleic acid, else between chains) and the most lines of each kind.
-    Ticked, they win over the hydrogen-bond choice above, which then is said to be unused."""
+    protein–DNA/RNA where the structure has nucleic acid, else between chains), the H-bonds' colour and most lines
+    and the most lines of each other kind. One set of controls for these and the older `hbonds` key: a layout file
+    or session with hbonds=na shows H-bonds ticked between protein and DNA/RNA (app_edits.merged_interactions), and
+    a layout file giving both keys is said to draw the interactions only."""
+    st.markdown("**Interactions**")
     with st.container(horizontal=True, key="interaction_kinds"):
         for kind, label in INTERACTIONS.items():
             st.checkbox(label, **part(ss, f"interactions__{kind}", "interactions"))
-    if str(ss.get("interactions") or "off") == "off":
+    if not any(ss.get(f"interactions__{kind}") for kind in INTERACTIONS):
         return
     mode = ss.get("interactions_between__mode", "auto")
     options = [k for k in BETWEEN if k != "na" or ss.get("na_chains") or mode == "na"]  # a layout file's na stays
@@ -205,9 +188,14 @@ def interactions_block(st, ss: MutableMapping) -> None:
             label_visibility="collapsed",
             **part(ss, "interactions_between__pairs", "interactions_between"),
         )
-    st.number_input("Most lines of each interaction", min_value=1, step=50, **setting(ss, "interaction_max"))
+    with st.container(horizontal=True, vertical_alignment="bottom", key="interaction_look"):
+        if ss.get("interactions__hbond"):
+            colour(st, "H-bond colour", ss, "hbond_color")
+            st.number_input("Most H-bonds drawn", min_value=1, step=50, **setting(ss, "hbond_max"))
+        if any(ss.get(f"interactions__{kind}") for kind in INTERACTIONS if kind != "hbond"):
+            st.number_input("Most lines of each interaction", min_value=1, step=50, **setting(ss, "interaction_max"))
     try:
-        note = hbonds_superseded(ss.get("hbonds") or "off", ss["interactions"])
+        note = hbonds_superseded(ss.get("hbonds") or "off", ss.get("interactions") or "off")
     except ValueError:
         note = ""
     if note:
