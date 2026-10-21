@@ -111,10 +111,13 @@ def test_unknown_chain_or_match(ubq_a, tmp_path):
 
 def test_never_a_mirror(ubq_a):
     mirror = Backbone(list(ubq_a.labels), ubq_a.xyz * np.array([-1.0, 1.0, 1.0]), ubq_a.prev.copy())
-    out = align_chains(ubq_a, "A", _moved(mirror), "A")
+    out = align_chains(ubq_a, "A", _moved(mirror), "A", "sequence")
     assert out.pairs == tuple((i, i) for i in range(len(ubq_a)))
     assert np.linalg.det(out.rotation) == pytest.approx(1.0, abs=1e-9)
     assert out.tm_score < 0.5
+    auto = align_chains(ubq_a, "A", _moved(mirror), "A")  # its sequence pairs do not superpose: the structure route
+    assert auto.method == "structure" and auto.tm_score < 0.5
+    assert np.linalg.det(auto.rotation) == pytest.approx(1.0, abs=1e-9)
 
 
 _PRINT = """
@@ -204,6 +207,15 @@ def test_auto_switches_on_identity(ubq_a):
     assert out.tm_score == pytest.approx(1.0, abs=1e-9)
     assert align_chains(ubq_a, "A", _moved(ubq_a), "A").method == "sequence"
     assert align_chains(ubq_a, "A", other, "A", "sequence").method == "sequence"  # asked for: obeyed
+
+
+def test_auto_takes_the_sequence_only_when_its_pairs_superpose(ubq_a):
+    # the same residue names on a chain run backwards in space: identical by sequence, not one fold by it
+    back = Backbone(list(ubq_a.labels), ubq_a.xyz[::-1].copy() @ TURN.T + SHIFT, ubq_a.prev.copy())
+    seq = align_chains(ubq_a, "A", back, "A", "sequence")
+    assert seq.identity == 1.0 and seq.tm_score < SAME_FOLD_TM
+    out = align_chains(ubq_a, "A", back, "A")
+    assert out.method == "structure" and out.tm_score >= seq.tm_score
 
 
 def test_permutation_shows_as_low_coverage(ubq_a):

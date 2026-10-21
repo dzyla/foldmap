@@ -304,7 +304,10 @@ def test_not_the_same_fold_is_drawn_on_its_own():
     """T4 lysozyme (2LZM) is not drawn like ubiquitin: the note says why, and the figure is 2LZM's own."""
     lay, _, _ = cli.make_layout(DATA / "2LZM.cif", like=like_of(DATA / "1UBQ.cif"), **OPTIONS)
     alone, _, _ = cli.make_layout(DATA / "2LZM.cif", chains=["A"], **OPTIONS)
-    assert lay.like_note == "not drawn like 1UBQ.cif: not the same fold (TM-score 0.14; 4 of 13 elements matched)"
+    assert lay.like_note == (
+        "not drawn like 1UBQ.cif: not the same fold (TM-score 0.32; 3 of 13 elements matched); only 46% of the shorter "
+        "chain aligned"
+    )  # by structure: a gapped sequence alignment of the two reaches 40 % identity, its pairs do not superpose
     assert lay.like_colour == {} and lay.like_extras == []
     assert signature(lay) == signature(alone)
 

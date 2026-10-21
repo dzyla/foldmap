@@ -247,7 +247,7 @@ def test_check_like_a_refused_pair(capsys):
     out = capsys.readouterr().out.splitlines()
     assert "H1 drawn alike exactly when one fold: pass" in out
     assert out[out.index("H1 drawn alike exactly when one fold: pass") + 1].startswith(
-        "  not one fold, refused with the note: TM-score 0.14"
+        "  not one fold, refused with the note: TM-score 0.32"
     )
     for key in ("H2", "H3", "H4"):
         line = next(x for x in out if x.startswith(key))

@@ -1,0 +1,4 @@
+# images of the homologue campaign stay local (regenerate with scripts/homologues.py)
+*.png
+*.svg
+*.log

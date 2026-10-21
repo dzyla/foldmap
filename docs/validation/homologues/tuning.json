@@ -1,0 +1,95 @@
+{
+ "about": "Plan 13a homologue tuning set (spec 4.4): B drawn like the reference A, one protein chain each. Every id was checked against its PDB entry (title, entity name, organism, chain, observed CA range) on 2026-10-21 (Task 13a-3/13a-10); first-last is the observed CA range in the file's numbering. Pairs sorted by A's id and chain, then B's.",
+ "pairs": [
+  {
+   "a": {"id": "1EMA", "chain": "A"},
+   "b": {"id": "1G7K", "chain": "A"},
+   "kind": "positive",
+   "note": "GFP vs DsRed: 1EMA 'green fluorescent protein' (Aequorea victoria; A 2-229) vs 1G7K 'fluorescent protein FP583', DsRed (Discosoma sp.; A 6-225)."
+  },
+  {
+   "a": {"id": "1HDC", "chain": "A"},
+   "b": {"id": "1CYD", "chain": "A"},
+   "kind": "positive",
+   "note": "two Rossmann NAD(P) domains, single-domain short-chain dehydrogenases: 1HDC '3-alpha, 20 beta-hydroxysteroid dehydrogenase' (Streptomyces exfoliatus, NAD; A 2-255) vs 1CYD 'carbonyl reductase' (Mus musculus, NADPH; A 3-244). Chosen over LDH/MDH (1LDM, 4MDH), whose chains hold a second, catalytic domain."
+  },
+  {
+   "a": {"id": "1MBN", "chain": "A"},
+   "b": {"id": "1ECA", "chain": "A"},
+   "kind": "positive",
+   "note": "myoglobin vs a distant globin: 1MBN 'myoglobin' (Physeter catodon; A 1-153) vs 1ECA 'erythrocruorin' (Chironomus thummi thummi, an insect globin; A 1-136)."
+  },
+  {
+   "a": {"id": "1REI", "chain": "A"},
+   "b": {"id": "1TNF", "chain": "A"},
+   "kind": "negative",
+   "note": "Ig vs jelly roll: 1REI 'Bence-Jones protein REI (light chain)' V domain (Homo sapiens; A 1-107) vs 1TNF 'tumor necrosis factor-alpha' jelly roll (Homo sapiens; A 6-157)."
+  },
+  {
+   "a": {"id": "1SHG", "chain": "A"},
+   "b": {"id": "1CKA", "chain": "A"},
+   "kind": "positive",
+   "note": "two SH3 domains: 1SHG 'alpha-spectrin SH3 domain' (Gallus gallus; A 6-62) vs 1CKA 'c-Crk N-terminal SH3 domain' (Mus musculus; A 134-190; chain B is the C3G peptide)."
+  },
+  {
+   "a": {"id": "1TIM", "chain": "A"},
+   "b": {"id": "1HDC", "chain": "A"},
+   "kind": "negative",
+   "note": "TIM barrel vs Rossmann: 1TIM 'triosephosphate isomerase' (Gallus gallus; A 1-248) vs 1HDC (Rossmann, as above)."
+  },
+  {
+   "a": {"id": "1TIM", "chain": "A"},
+   "b": {"id": "1IGS", "chain": "A"},
+   "kind": "positive",
+   "note": "two TIM barrels of other superfamilies: 1TIM 'triosephosphate isomerase' (Gallus gallus; A 1-248) vs 1IGS 'indole-3-glycerolphosphate synthase' (Sulfolobus solfataricus; A 2-248)."
+  },
+  {
+   "a": {"id": "1UBQ", "chain": "A"},
+   "b": {"id": "1WM3", "chain": "A"},
+   "kind": "positive",
+   "note": "ubiquitin vs SUMO: 1UBQ 'ubiquitin' (Homo sapiens; A 1-76) vs 1WM3 'ubiquitin-like protein SMT3B', i.e. SUMO-2 (Homo sapiens, crystal; A 17-88). Chosen over 1A5R (SUMO-1, NMR, with its flexible N-terminal tail)."
+  },
+  {
+   "a": {"id": "1UBQ", "chain": "A"},
+   "b": {"id": "2ACY", "chain": "A"},
+   "kind": "negative",
+   "note": "ubiquitin vs ferredoxin-like: 1UBQ (beta-grasp, as above) vs 2ACY 'acylphosphatase' (Bos taurus, ferredoxin-like; A 1-98)."
+  },
+  {
+   "a": {"id": "256B", "chain": "A"},
+   "b": {"id": "1MBN", "chain": "A"},
+   "kind": "negative",
+   "note": "an all-alpha four-helix bundle vs a globin: 256B 'cytochrome b562' (Escherichia coli; A 1-106) vs 1MBN myoglobin (as above)."
+  },
+  {
+   "a": {"id": "2ACY", "chain": "A"},
+   "b": {"id": "1URN", "chain": "A"},
+   "kind": "positive",
+   "note": "acylphosphatase vs an RRM (both ferredoxin-like): 2ACY 'acylphosphatase' (Bos taurus; A 1-98) vs 1URN 'U1A' RRM (Homo sapiens; A 2-97)."
+  },
+  {
+   "a": {"id": "2VWD", "chain": "A"},
+   "b": {"id": "2X9M", "chain": "A"},
+   "kind": "positive",
+   "note": "Nipah G vs Hendra G (high identity: the sequence route): 2VWD 'Nipah virus attachment glycoprotein' head (Nipah virus; A 187-602) vs 2X9M 'Hendra virus attachment glycoprotein' head (Hendra virus, unbound: its four chains are all glycoprotein G; A 185-603). 2X9S, a guess for an unbound Hendra G, is a Thermus 70S ribosome with release factor 2: not used."
+  },
+  {
+   "a": {"id": "2VWD", "chain": "A"},
+   "b": {"id": "2ZB5", "chain": "A"},
+   "kind": "positive",
+   "note": "F7 (Q-P13-2): 2VWD 'Nipah virus attachment glycoprotein' six-bladed propeller head (Nipah virus; A 187-602; its entity is named 'hemagglutinin-neuraminidase') as the reference, 2ZB5 'measles virus hemagglutinin (complex-sugar-type)' head (Measles virus strain Edmonston-B; A 154-607) drawn like it."
+  },
+  {
+   "a": {"id": "2ZB5", "chain": "A"},
+   "b": {"id": "1E8T", "chain": "A"},
+   "kind": "positive",
+   "note": "measles H vs a paramyxovirus HN head: 2ZB5 (as above) vs 1E8T 'hemagglutinin-neuraminidase' (Newcastle disease virus strain Kansas; A 124-569). 1V2I (human parainfluenza virus 3 HN) and 1Z4V (parainfluenza virus 5 HN) were checked too and are the alternatives."
+  },
+  {
+   "a": {"id": "4CH9", "chain": "A"},
+   "b": {"id": "2VWD", "chain": "A"},
+   "kind": "positive",
+   "note": "same architecture, another superfamily: 4CH9 'KLHL3 Kelch domain' (Homo sapiens; A 300-585; chains C, D are a WNK4 peptide), a six-bladed Kelch propeller, vs 2VWD Nipah G (as above)."
+  }
+ ]
+}

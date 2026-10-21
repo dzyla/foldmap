@@ -5,9 +5,10 @@
 Three routes give the residue pairs: by sequence (the global alignment A19 uses, figcheck.aligned_positions), by
 structure (a TM-align-style aligner on Cα, Zhang & Skolnick 2005) or from a file (a two-row alignment, the escape
 hatch for any pair the aligner gets wrong). `auto` takes the sequence route when the sequence alignment is at least
-40 % identical, else the structure route. Every route then scores its pairs with the TM-score normalised by A's
-chain length, over the superposition of B on A that maximises it (TM-align's search: Kabsch on fragments of the
-pairs, then on the pairs within a cutoff, repeated), always a proper rotation (symmetry._kabsch, never a mirror).
+40 % identical and its pairs superpose as one fold (TM-score at least SAME_FOLD_TM), else the structure route. Every
+route then scores its pairs with the TM-score normalised by A's chain length, over the superposition of B on A that
+maximises it (TM-align's search: Kabsch on fragments of the pairs, then on the pairs within a cutoff, repeated),
+always a proper rotation (symmetry._kabsch, never a mirror).
 element_mates then says which of B's elements are which of A's (mates, pieces of a split helix, extras) and whether
 the two chains are one fold (H1).
 
@@ -333,8 +334,9 @@ def _identity(names_a, names_b, pairs) -> float:
 
 def align_chains(a: Backbone, chain_a: str, b: Backbone, chain_b: str, match: str = "auto") -> ChainAlignment:
     """Align chain_b of B to chain_a of A (the reference). match: auto (sequence at ≥ SEQUENCE_IDENTITY identity
-    over the sequence alignment's pairs, else structure), sequence, structure, or the path of a two-row alignment
-    (FASTA, Clustal or Stockholm; A's chain first). Residue indices count each chain's modelled residues from 0."""
+    over the sequence alignment's pairs when those pairs also superpose at TM-score ≥ SAME_FOLD_TM, else
+    structure), sequence, structure, or the path of a two-row alignment (FASTA, Clustal or Stockholm; A's chain
+    first). Residue indices count each chain's modelled residues from 0."""
     mine_a, mine_b = _chain(a, chain_a, "A"), _chain(b, chain_b, "B")
     names_a = [a.labels[k].name for k in mine_a]
     names_b = [b.labels[k].name for k in mine_b]
@@ -342,7 +344,13 @@ def align_chains(a: Backbone, chain_a: str, b: Backbone, chain_b: str, match: st
         from .figcheck import aligned_positions
 
         pairs, method, scored = aligned_positions(names_a, names_b), "sequence", None
-        if match == "structure" or (match == "auto" and _identity(names_a, names_b, pairs) < SEQUENCE_IDENTITY):
+        by_sequence = match == "sequence"
+        if match == "auto" and _identity(names_a, names_b, pairs) >= SEQUENCE_IDENTITY:
+            # a gapped alignment of two unrelated sequences can reach the identity (256B on 1MBN: 0.44 over 97
+            # pairs): the sequence route is taken only when its pairs also superpose as one fold (13a-10)
+            scored = tm_score(a.ca[mine_a], b.ca[mine_b], pairs, len(mine_a))
+            by_sequence = scored[0] >= SAME_FOLD_TM
+        if not by_sequence:
             pairs, scored = _structure_pairs(a.only([chain_a]), b.only([chain_b]), pairs)
             method = "structure"
     else:
