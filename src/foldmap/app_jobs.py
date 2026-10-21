@@ -369,6 +369,7 @@ def draw_job(path, settings_json: str, eager_after: float | None = None) -> dict
         "chains": chains,
         "na_chains": na_chains,
         "two_fold_assembly": bool(getattr(drawn.layout, "two_fold_assembly", False)),  # the two_fold choice shown
+        "cyclic_assembly": bool(getattr(drawn.layout, "cyclic_assembly", False)),  # the cyclic choice shown
         "lent_across_cut": bool(getattr(drawn.layout, "lent_across_cut", False)),  # the copy_ghosts choice shown
         "summary": summary_of(drawn),
         "chain_count": len(chains_of(drawn)),  # what the summary counts: protein and nucleic-acid chains

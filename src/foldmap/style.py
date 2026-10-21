@@ -47,6 +47,8 @@ CHOICES = {
     "helix_on_sheet": ("off", "auto"),  # a helix packed on a sheet face beside it, as projected / drawn over the sheet
     "two_fold": ("auto", "mirror", "unrolled"),  # a two-fold assembly as one copy and its mirror image where each
     # protomer is one protein chain, else side by side / always the mirror image / always side by side
+    "cyclic": ("unrolled", "rosette"),  # a cyclic assembly of 3 to 8 copies unrolled side by side / seen down its
+    # axis, each copy protomer 0's drawing turned (plan 21; opt-in)
     "copy_ghosts": ("on", "off"),  # a strand lent across a ring's cut: with dashed copies where it pairs / none
     "domain_bar": ("auto", "on", "off"),  # the linear domain bar: with 2+ named domains drawn / with any / never
 }
@@ -62,6 +64,7 @@ LAYOUT_KEYS = (
     "fold_template",
     "helix_on_sheet",
     "two_fold",
+    "cyclic",
     "copy_ghosts",
 )  # these move elements
 NA_BACKBONES = ("modality", "chain", "ink")
@@ -103,6 +106,9 @@ class Style:
     # mirror image (plan 18, unrolled where that draws better); unrolled: the copies side by side, as any assembly;
     # auto: mirror where every protomer is one protein chain (TrmD, 1UAM), else unrolled (haemoglobin, 2HHB: with
     # two or more chains a protomer, interfaces between different chains cross the dyad, which no mirror line keeps)
+    cyclic: str = "unrolled"  # unrolled: a cyclic assembly's copies side by side, each seen from outside the ring;
+    # rosette (opt-in, plan 21): a Cn assembly with n = 3..8 seen down its axis, copy k drawn as protomer 0's drawing
+    # turned k * 360 / n degrees about the axis and pushed out just enough to clear its neighbours
     copy_ghosts: str = "on"  # on: a strand lent across the cut of an unrolled ring (layout._unwrap) is drawn again,
     # dashed, in the sheet of the copy it pairs with, and dashed copies of its partners stand beside it past the row's
     # end; off: no such dashed copy of another copy's strand (a barrel's closing ghost stays)

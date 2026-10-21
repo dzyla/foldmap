@@ -19,8 +19,8 @@ import numpy as np
 
 from . import panels, text_metrics
 from .features import KINK_GAP, helix_bundles
-from .frame import Frame, symmetric_frame, view_frame
-from .model import SSE, Nucleic, Sheet, generic_label, group_by_chain, pair_places, same_place
+from .frame import Frame, RosetteFrame, symmetric_frame, view_frame
+from .model import SSE, Nucleic, Sheet, generic_label, group_by_chain, pair_places, res_ref, same_place
 from .nucleic import Stem, StemView, segment_stem, stem_axis, stem_views
 from .style import CHOICES, Style
 
@@ -321,6 +321,8 @@ class Layout:
     let_go: int = 0  # copy items build_layout let go (_one_per_mate): make_layout keeps them only if more alike
     two_fold_assembly: bool = False  # a two-fold (C2) assembly off a straight duplex: Style.two_fold chooses how
     # make_layout draws it (the app shows that choice only then)
+    cyclic_assembly: bool = False  # a Cn assembly (n = 3..8) off a straight duplex: Style.cyclic chooses how it is
+    # drawn (the app shows that choice only then)
     lent_across_cut: bool = False  # a strand lent across an unrolled ring's cut (_unwrap): Style.copy_ghosts chooses
     # whether its dashed copies are drawn (the app shows that choice only then)
     lent_apart: dict[str, int] = field(default_factory=dict)  # copy_ghosts off: each strand lent across the cut, drawn
@@ -335,6 +337,10 @@ class Layout:
     ligands: str = "auto"  # Style.ligands the figure is drawn with (auto hides additives: scope.drawn_scope names them)
     coil_chains: list[tuple[str, int]] = field(default_factory=list)  # (chain, residues) of each protein chain read
     # with no helix or strand: nothing of it can be drawn (scope.drawn_scope says so)
+    rosette: int = 0  # a Cn assembly drawn as a rosette (Style.cyclic, plan 21): n, its n-fold axis at page (0, 0)
+    rosette_push: float = 0.0  # page units each copy was pushed out from the axis to clear its neighbours
+    rosette_strays: list[str] = field(default_factory=list)  # copy elements with no protomer-0 mate, placed alone
+    cyclic_note: str = ""  # what the notes say of Style.cyclic: why a rosette asked for was drawn unrolled, or how
 
     @property
     def dna(self) -> list[PlacedStem]:  # earlier name
@@ -3496,6 +3502,257 @@ def _both_ways(build):
     return run
 
 
+AXIS_SYMBOL_R = 0.45  # page units: a rosette's n-fold symbol at the page centre (render), corner to centre
+_ROSETTE_STEP = 0.25  # page units: the rosette's radial push grows by this much until neighbouring copies clear
+_ROSETTE_GAP = 2 * MARGIN  # clear space kept between two copies' elements (with their names): room for loops
+_ROSETTE_SAMPLE = 0.4  # page units between the points an element is sampled at along its axis, for that clearance
+_ROSETTE_MAX_PUSH = 200.0  # page units: the push never grows past this (a copy farther out clears by then anyway)
+
+
+def _ref_chain(ref: str) -> str | None:
+    """The chain a reference (resolve) names: res:A:..., A:label; None for one naming every chain."""
+    ref = ref.strip()
+    if ref.startswith("res:"):
+        body = ref[4:]
+        return body.split(":")[0] if body.count(":") == 1 else None
+    if ref.startswith("#") or ":" not in ref:
+        return None
+    return ref.split(":", 1)[0]
+
+
+def _copy_matches(zero: list[SSE], sses: list[SSE], frame, shift: dict[str, int]) -> list[dict[str, SSE]]:
+    """For each protomer k, protomer 0's element id -> its copy in protomer k: of the same kind, in the chain of the
+    same class (frame.classes), whose residues (numbered as the first copy's, `shift`: model.homolog_chains) overlap
+    it most; one to one, the largest overlaps first (ties in sequence order)."""
+    sector, classes = frame.sector, frame.classes or {}
+    out = []
+    for k in range(frame.n):
+        if k == 0:
+            out.append({s.id: s for s in zero})
+            continue
+        mine = [s for s in sses if sector.get(s.chain) == k]
+        pairs = []
+        for i, s in enumerate(zero):
+            a0, b0 = s.first.seq - shift.get(s.chain, 0), s.last.seq - shift.get(s.chain, 0)
+            for j, t in enumerate(mine):
+                if t.kind != s.kind or classes.get(t.chain) != classes.get(s.chain):
+                    continue
+                a1, b1 = t.first.seq - shift.get(t.chain, 0), t.last.seq - shift.get(t.chain, 0)
+                both = min(b0, b1) - max(a0, a1) + 1
+                if both > 0:
+                    pairs.append((-both, i, j))
+        got: dict[str, SSE] = {}
+        taken: set[int] = set()
+        for _, i, j in sorted(pairs):
+            if zero[i].id not in got and j not in taken:
+                got[zero[i].id] = mine[j]
+                taken.add(j)
+        out.append(got)
+    return out
+
+
+def _rosette_samples(members: list[Placed]) -> tuple[np.ndarray, np.ndarray]:
+    """Points along each member's axis (page units) and the radius each stands for: half the member's footprint
+    across its axis (its name's room included, _footprint), so two copies clear when their points do."""
+    pts, rad = [], []
+    for m in members:
+        x0, y0, x1, y1 = _footprint(m)
+        across = max(-x0, x1) if abs(np.cos(m.angle)) < 0.5 else max(-y0, y1)
+        along = max(-x0, x1) if abs(np.cos(m.angle)) >= 0.5 else max(-y0, y1)
+        steps = max(2, int(np.ceil(2 * along / _ROSETTE_SAMPLE)) + 1)
+        for t in np.linspace(-along, along, steps):
+            pts.append([m.cx + m.direction[0] * t, m.cy + m.direction[1] * t])
+            rad.append(across)
+    return np.array(pts, float).reshape(-1, 2), np.array(rad, float)
+
+
+def _rosette_push(members: list[Placed], angles: list[float], out: np.ndarray) -> float:
+    """The smallest push (page units, a multiple of _ROSETTE_STEP) along `out` (each copy along its own turn of it)
+    that keeps every copy's members _ROSETTE_GAP clear of every other's: protomer 0's against each turned copy, which
+    by the symmetry covers every pair (the plan-21 spike's explode())."""
+    from scipy.spatial.distance import cdist
+
+    pts, rad = _rosette_samples(members)
+    if not len(pts):
+        return 0.0
+    reach = rad[:, None] + rad[None, :] + _ROSETTE_GAP
+    from .frame import turn2
+
+    delta = 0.0
+    while delta < _ROSETTE_MAX_PUSH:
+        q = pts + delta * out
+        if all((cdist(q, turn2(q, a)) - reach).min() >= 0 for a in angles[1:]):
+            break
+        delta += _ROSETTE_STEP
+    return float(delta)
+
+
+def _wrap_angle(a: float) -> float:
+    """An angle in (-pi, pi], on the grid."""
+    a = float(_snap((a + np.pi) % (2 * np.pi) - np.pi))
+    return float(_HALF_TURN) if a <= -_HALF_TURN + 1e-9 else a + 0.0
+
+
+def _rosette(sses: list[SSE], sheets: list[Sheet], frame, mode: str, kw: dict) -> Layout:
+    """A Cn assembly seen down its axis (frame.RosetteFrame; Style.cyclic rosette, plan 21 Task 1): protomer 0 laid
+    out alone in its own frame (frame.local(0): snapping, sheets, de-overlap as for any figure), then copy k drawn
+    as that layout turned by frame.angles[k] (exactly k * 360 / n degrees) about the axis, which projects to page
+    (0, 0), every copy pushed out from it by the smallest common push that clears its neighbours (_rosette_push).
+    An element's angle is snapped in protomer 0's frame and turned with its copy, so each copy's elements snap in
+    their own frame. Copy elements with no protomer-0 mate (DSSP found them in one copy only) are placed alone,
+    seen in their copy's own frame (frame.local(k)) and moved out from the axis until clear. `sheets` are the
+    sheets within protomers (cli makes them so: no sheet across two copies)."""
+    from .frame import turn2
+
+    style = kw.get("style") or Style()
+    sector = frame.sector
+    zero = [s for s in sses if sector.get(s.chain) == 0]
+    ids0 = {s.id for s in zero}
+    chains0 = {c for c, k in sector.items() if k == 0}
+    sheets0 = [sh for sh in sheets if all(sector.get(s.chain) == 0 for s in sh.strands)]
+
+    def mine(ref: str) -> bool:  # a reference to protomer 0 (or to every chain)
+        return _ref_chain(ref) in (None, *chains0)
+
+    sub = dict(kw)
+    sub["relabel"] = {r: v for r, v in (kw.get("relabel") or {}).items() if mine(r)}
+    sub["rename"] = {r: v for r, v in (kw.get("rename") or {}).items() if mine(r)}
+    sub["swap"] = [(a, b) for a, b in kw.get("swap") or [] if mine(a) and mine(b)]
+    sub["move"] = [(r, d) for r, d in kw.get("move") or [] if mine(r)]
+    sub["bridges"] = [b for b in kw.get("bridges") or [] if b[0] in ids0 and b[2] in ids0]
+    sub["domains"] = [(name, [i for i in ids if i in ids0]) for name, ids in kw.get("domains") or []]
+    lay = build_layout(zero, sheets0, frame.local(0), mode, **sub)
+    shift = {c: off for c, (_, off) in (kw.get("copies") or {}).items()}
+    maps = _copy_matches(zero, sses, frame, shift)
+    own = list(lay.placed.values())
+    mid = np.mean([[p.cx, p.cy] for p in own], axis=0) if own else np.zeros(2)
+    out = _snap(mid / np.linalg.norm(mid)) if np.linalg.norm(mid) > 1e-6 else np.array([0.0, 1.0])
+    delta = _rosette_push(own + list(lay.ghosts), frame.angles, out)
+    shove = out * delta
+
+    def turned(m: Placed, t: SSE, a: float) -> Placed:
+        x, y = (float(v) for v in _snap(turn2(np.array([m.cx, m.cy]) + shove, a)))
+        q = Placed(t, x, y, m.length, _wrap_angle(m.angle + a), m.width, label=m.label, ghost=m.ghost, over=m.over)
+        q.label_side = q.label_side_default = m.label_side
+        return q
+
+    placed: dict[str, Placed] = {}
+    ghosts: list[Placed] = []
+    for k, a in enumerate(frame.angles):
+        for p in own:
+            if p.sse.id in maps[k]:
+                q = turned(p, maps[k][p.sse.id], a)
+                placed[q.sse.id] = q
+        ghosts += [turned(g, maps[k][g.sse.id], a) for g in lay.ghosts if g.sse.id in maps[k]]
+    relabel = kw.get("relabel") or {}
+    angle_mode = "upright" if mode == "stack" else style.helix_angle
+    strays: list[Placed] = []
+    for k, a in enumerate(frame.angles):  # copy elements no protomer-0 element maps to: placed alone, clear
+        matched = {t.id for t in maps[k].values()}
+        local = frame.local(k)
+        for t in sses:
+            if sector.get(t.chain) != k or t.id in matched:
+                continue
+            if t.kind == "E":
+                it = _sheet_item(Sheet([t], [1], []), local, PITCH * style.strand_scale)
+            else:
+                width = HELIX_W * style.helix_scale * (ETA_W if t.kind == "G" else 1.0)
+                it = _helix_item(t, local, angle_mode, width, TEN_RISE if t.kind == "G" else HELIX_RISE)
+            m = it.members[0]
+            m.cx, m.cy = it.cx + it.offsets[0][0], it.cy + it.offsets[0][1]
+            q = turned(m, t, a)
+            q.label = relabel.get(res_ref(t.chain, t.first, t.last), generic_label(t.kind, 0))
+            radial = np.array([q.cx, q.cy])
+            radial = radial / np.linalg.norm(radial) if np.linalg.norm(radial) > 1e-6 else turn2(out, a)
+            taken = [r.rect for r in [*placed.values(), *ghosts, *strays]]
+            for _ in range(int(_ROSETTE_MAX_PUSH / _ROSETTE_STEP)):
+                x0, y0, x1, y1 = q.rect
+                if not overlaps_any((x0 - MARGIN, y0 - MARGIN, x1 + MARGIN, y1 + MARGIN), taken):
+                    break
+                q.cx, q.cy = (float(v) for v in _snap(np.array([q.cx, q.cy]) + radial * _ROSETTE_STEP))
+            strays.append(q)
+    order = {s.id: i for i, s in enumerate(sses)}
+    every = sorted([*placed.values(), *strays], key=lambda p: order[p.sse.id])
+    lay.placed = {p.sse.id: p for p in every}
+    lay.ghosts = ghosts
+    for p in every:
+        p.ends = ""
+    for chain, mine_ in group_by_chain(sses, keep=lay.placed).items():
+        if chain not in (kw.get("partial") or ()):
+            lay.placed[mine_[0].id].ends += "N"
+            lay.placed[mine_[-1].id].ends += "C"
+
+    def each(ids) -> list[list[str]]:  # protomer 0's ids as each copy's (those with a copy there)
+        return [[maps[k][i].id for i in ids if i in maps[k]] for k in range(frame.n)]
+
+    sheets_, ghosts_ = [], []
+    for ids, gids in zip(lay.sheets, lay.sheet_ghosts):
+        for got, gone in zip(each(ids), each(gids)):
+            if got:
+                sheets_.append(got)
+                ghosts_.append(gone)
+    for q in strays:
+        if q.sse.kind == "E":
+            sheets_.append([q.sse.id])
+            ghosts_.append([])
+    lay.sheets, lay.sheet_ghosts = sheets_, ghosts_
+    lay.ba_rows = [row for r in lay.ba_rows for row in each(r) if row]
+    lay.on_sheet = {
+        maps[k][h].id: [maps[k][s].id for s in strands if s in maps[k]]
+        for h, strands in lay.on_sheet.items()
+        for k in range(frame.n)
+        if h in maps[k]
+    }
+    lay.accessory = {
+        maps[k][a].id: maps[k][b].id
+        for a, b in lay.accessory.items()
+        for k in range(frame.n)
+        if a in maps[k] and b in maps[k]
+    }
+    lay.unshown = sorted(
+        (maps[k][a].id, maps[k][b].id) for a, b in lay.unshown for k in range(frame.n) if a in maps[k] and b in maps[k]
+    )
+    lay.kink_links = {
+        (maps[k][a].id, maps[k][b].id)
+        for a, b in lay.kink_links
+        for k in range(frame.n)
+        if a in maps[k] and b in maps[k]
+    }
+    lay.sheet_items = sheet_note_items(sheets, lay.unshown)
+    lay.sheet_notes = [i["text"] for i in lay.sheet_items]
+    lay.sheet_joins = sorted({tuple(sorted((a.id, b.id))) for sh in sheets for a, b in sh.joined})
+    zero_of = {c: k for c, k in (frame.classes or {}).items() if sector.get(c) == 0}
+    first = {i: c for c, i in zero_of.items()}
+    lay.copy_ties = {c: (first[frame.classes[c]], False) for c, k in sector.items() if k and frame.classes[c] in first}
+    lay.tied_ids = {t.id for k in range(1, frame.n) for i, t in maps[k].items()} | {
+        i for k in range(1, frame.n) for i in maps[k]
+    }
+    lay.mirror_pairs = []
+    chain_of = {k: p.sse.chain for k, p in lay.placed.items()}
+    lay.domains = [
+        (name, [k for k in ids if k in lay.placed and chain_of[k] not in lay.partial])
+        for name, ids in kw.get("domains") or []
+    ]
+    lay.domain_lent = {}
+    lay.frame = frame
+    lay.rosette = frame.n
+    lay.rosette_push = delta
+    lay.rosette_strays = [q.sse.id for q in strays]
+    lay.stack_gaps = _stack_gaps(lay)
+    _choose_label_sides(lay, sses, style, [])
+    _place_domain_names(lay, sses, style.font_scale)
+    rects = np.array([p.rect for p in [*lay.placed.values(), *lay.ghosts]]).reshape(-1, 4)
+    rects = np.vstack([rects, *[[domain_panel(lay, name)] for name, _ in lay.domains if _]]) if lay.domains else rects
+    rects = np.vstack([rects, [b for _, b in label_boxes(lay, sses)] or np.empty((0, 4))])
+    lay.bounds = (
+        float(rects[:, 0].min()),
+        float(rects[:, 1].min()),
+        float(rects[:, 2].max()),
+        float(rects[:, 3].max()),
+    )
+    return lay
+
+
 @_text_scaled
 @_both_ways
 def build_layout(
@@ -3555,6 +3812,12 @@ def build_layout(
     at once where the frame's mirror line is dropped (a βα row across it), for cli to unroll the copies instead."""
     if mode not in ("projected", "stack"):
         raise ValueError(f"unknown layout mode {mode!r}")
+    if isinstance(frame, RosetteFrame):  # a Cn assembly seen down its axis: protomer 0 laid out, the copies turned
+        given = dict(attract=attract, contacts=contacts, nucleic=nucleic, style=style, bridges=bridges)
+        given.update(domains=domains, partial=partial, rename=rename, swap=swap, move=move, keep_depth=keep_depth)
+        given.update(na_cropped=na_cropped, template=template, copies=copies, relabel=relabel, names=names, over=over)
+        given.update(level=level, band=band, alike_first=alike_first, let_go=let_go)
+        return _rosette(sses, sheets, frame, mode, given)
     style = style or Style()
     angle_mode = "upright" if mode == "stack" else style.helix_angle
     template = style.fold_template if template is None else template
@@ -5323,6 +5586,9 @@ def label_boxes(
         out.append((f"domain-label:{name}", _grown(box, _NAME_ROUTE)))  # room so no line or nucleotide runs by it
     for name, ((x, y0), (_, y1)) in layout.domain_leaders.items():
         out.append((f"domain-leader:{name}", (x - 0.1, min(y0, y1), x + 0.1, max(y0, y1))))
+    if getattr(layout, "rosette", 0):  # a rosette's axis symbol at the page centre: no line runs over it
+        r = AXIS_SYMBOL_R + 0.15
+        out.append(("axis", (-r, -r, r, r)))
     return out
 
 

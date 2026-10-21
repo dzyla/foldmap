@@ -310,6 +310,7 @@ EDITOR_TABS = ["Swap", "Move", "Rename", "Mark", "Domains"]
 FOLD_TEMPLATE = {"auto": "βα row", "off": "as projected"}
 HELIX_ON_SHEET = {"off": "beside the sheet", "auto": "over the sheet"}
 TWO_FOLD = {"auto": "automatic", "mirror": "mirror image", "unrolled": "side by side"}
+CYCLIC = {"unrolled": "side by side", "rosette": "down the axis"}
 COPY_GHOSTS = {"on": "with dashed copies", "off": "drawn once"}
 EXAMPLE = {  # the syntax, as text
     "swap": "α1,α3",
@@ -370,6 +371,16 @@ def layout_section(st, ss: MutableMapping) -> None:
                 help="automatic: a mirror image where each copy is one protein chain, else side by side · a two-fold "
                 "assembly seen from the side of its dyad, one copy the other's mirror image · or its copies side by "
                 "side, unrolled around the axis as any assembly's",
+            )
+        if ss.get("cyclic_assembly"):  # a Cn assembly (n = 3..8) drawn: unrolled or as a rosette (plan 21, opt-in)
+            segmented(
+                st,
+                "Cyclic assemblies",
+                CHOICES["cyclic"],
+                setting(ss, "cyclic"),
+                format_func=CYCLIC.get,
+                help="a ring of 3 to 8 copies unrolled side by side, each seen from outside · or seen down its axis, "
+                "each copy the first one's drawing turned about it",
             )
         if ss.get("lent_across_cut"):  # a ring unrolled with a strand lent across its cut: its dashed copies or not
             segmented(

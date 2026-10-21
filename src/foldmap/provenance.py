@@ -7,6 +7,7 @@ server returns it, and the SVG (<desc>), PDF (Subject) and PNG (Description) fil
 Each item is a dict: kind, text (one line, as every interface says it), count (how many things it concerns) and
 elements (their ids: element ids, or domain, stem and ligand names). Kinds, in the order listed:
 
+    cyclic             a cyclic assembly asked for as a rosette (Style.cyclic): how it is drawn, or why unrolled
     domains            where the domain panels come from: inferred from contacts, CATH's, UniProt's or as given
     ambiguous_pairing  pairings drawn off a sheet's run, named only, or joining barrels drawn apart (sheet_note_items)
     bulge_joined       strands drawn whole across a beta-bulge DSSP splits them at (ss._join_bulged_pieces)
@@ -50,6 +51,18 @@ def stuck(loops, layout) -> list[str]:
 def over_labels(loops) -> list[str]:
     """Loops routed over a label or a chain-end stub, the only route found (route.Loop.crosses_labels)."""
     return [f"{l.a_id}>{l.b_id}" for l in loops if l.crosses_labels and not l.fallback]
+
+
+def _cyclic(layout) -> list[dict]:
+    """How a cyclic assembly asked for as a rosette (Style.cyclic) was drawn, or why it was not (cli.make_layout); and
+    the copy elements with no protomer-0 mate a rosette placed alone (layout._rosette)."""
+    out = []
+    if note := getattr(layout, "cyclic_note", ""):
+        out.append(_item("cyclic", note, [], 1))
+    if strays := list(getattr(layout, "rosette_strays", [])):
+        text = f"{len(strays)} element(s) found in one copy only, placed alone beside it: {', '.join(strays)}"
+        out.append(_item("cyclic", text, strays))
+    return out
 
 
 def _domains(layout) -> list[dict]:
@@ -182,7 +195,8 @@ def figure_provenance(fig, layout, loops=(), labels: bool = True) -> list[dict]:
     from .render import page_notes
     from .scope import _hidden_additives
 
-    out = _domains(layout)
+    out = _cyclic(layout)
+    out += _domains(layout)
     out += [dict(i) for i in getattr(layout, "sheet_items", [])]
     out += _bulges(layout)
     out += _helix_matched(layout)

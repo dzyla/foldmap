@@ -96,6 +96,106 @@ class CylinderFrame:
         return np.array([float(vec @ u), float(vec @ v)])
 
 
+def _turn3(vec: np.ndarray, axis: np.ndarray, a: float) -> np.ndarray:
+    """`vec` turned by `a` radians about the unit `axis` (right-handed: anticlockwise seen from the axis' tip)."""
+    vec = np.asarray(vec, float)
+    return (
+        vec * np.cos(a)
+        + np.cross(axis, vec) * np.sin(a)
+        + np.outer(vec @ axis, axis).reshape(vec.shape) * (1 - np.cos(a))
+    )
+
+
+def turn2(points: np.ndarray, a: float) -> np.ndarray:
+    """Page points (or one point) turned by `a` radians anticlockwise about the page origin."""
+    c, s = np.cos(a), np.sin(a)
+    p = np.asarray(points, float)
+    return np.stack([c * p[..., 0] - s * p[..., 1], s * p[..., 0] + c * p[..., 1]], axis=-1)
+
+
+@dataclass(eq=False)
+class RosetteFrame:
+    """A cyclic assembly (Cn, n >= 3) seen down its n-fold axis (Style.cyclic rosette, plan 21): a point of protomer
+    k is turned by -angles[k] about the axis (onto protomer 0), projected down the axis with page-up toward protomer
+    0, then turned by +angles[k] about the page centre, where the axis projects (page origin). angles[k] is exactly
+    k * 2 pi / n for the copy at that place round the ring, so copy k is drawn as protomer 0 turned. Points of chains
+    outside every protomer are projected as they lie. Locally a proper rotation (never a mirror)."""
+
+    origin: np.ndarray  # a point on the axis: the page centre
+    axis: np.ndarray  # toward the viewer (w)
+    ref: np.ndarray  # page up: perpendicular to the axis, toward protomer 0
+    n: int
+    sector: dict  # chain -> protomer index
+    classes: dict = None  # chain -> chain class (its position within a protomer)
+    angles: list = None  # each protomer's exact turn about the axis, radians (k * 2 pi / n)
+
+    def __post_init__(self):
+        if self.angles is None:
+            self.angles = [2 * np.pi * k / self.n for k in range(self.n)]
+
+    @property
+    def u(self) -> np.ndarray:  # page right: u x v = w
+        return np.cross(self.ref, self.axis)
+
+    @property
+    def v(self) -> np.ndarray:
+        return self.ref
+
+    @property
+    def w(self) -> np.ndarray:
+        return self.axis
+
+    def local(self, k: int = 0) -> Frame:
+        """The plain frame protomer k is seen in as protomer 0 is: the page axes turned with it about the axis (its
+        elements' places and angles in that frame are protomer 0's, before the page turn)."""
+        from .layout import _snap
+
+        a = self.angles[k]
+        u, v = (_snap(_turn3(x, self.axis, a)) for x in (self.u, self.v))  # cos, sin: the last bit differs by libm
+        return Frame(self.origin, u, v, self.axis)
+
+    def project(self, points: np.ndarray, chains=None) -> np.ndarray:
+        pts = np.atleast_2d(points)
+        ks = [None] * len(pts) if chains is None else [self.sector.get(c) for c in chains]
+        out = []
+        for p, k in zip(pts, ks):
+            a = 0.0 if k is None else self.angles[k]
+            rel = _turn3(p - self.origin, self.axis, -a)
+            out.append(turn2(np.array([rel @ self.u, rel @ self.v]), a))
+        return np.array(out).reshape(-1, 2)
+
+    def depth(self, points: np.ndarray) -> np.ndarray:
+        return (np.atleast_2d(points) - self.origin) @ self.axis
+
+    def basis(self, point) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """Page-right, page-up and toward-viewer directions (one turn turns both a point and the page back)."""
+        return self.u, self.v, self.axis
+
+    def direction(self, point, vec) -> np.ndarray:
+        u, v, _ = self.basis(point)
+        return np.array([float(vec @ u), float(vec @ v)])
+
+
+def rosette_frame(sses: list[SSE], sym) -> RosetteFrame:
+    """The rosette of a Cn assembly (n >= 3): seen from the tip of its axis, page-up toward protomer 0's elements.
+    Each protomer's turn is the nearest whole k * 2 pi / n to the turn symmetry measured (Symmetry.angles). The axis
+    and page-up are snapped before they choose anything (they differ in the last bit between BLAS kernels)."""
+    from .layout import _snap
+
+    axis = _snap(_unit(sym.axis))
+    own = [s.centroid for s in sses if s.chain in sym.protomers[0]]
+    first = np.mean(own, axis=0) - sym.centre if own else np.zeros(3)
+    ref = first - (first @ axis) * axis
+    ref = _snap(_unit(ref)) if np.linalg.norm(ref) > 1e-6 else _any_perpendicular(axis)
+    ref = _snap(_unit(ref - (ref @ axis) * axis))
+    n = len(sym.protomers)
+    step = 2 * np.pi / n
+    measured = list(sym.angles) or [step * k for k in range(n)]
+    angles = [step * (round(float(a) / step) % n) for a in measured]
+    sector, classes = protomer_maps(sym)
+    return RosetteFrame(_snap(sym.centre), axis, ref, n, sector, classes, angles)
+
+
 def protomer_maps(sym) -> tuple[dict, dict]:
     """(sector, classes): each protomer chain's protomer index, and its chain class (its position within its
     protomer), which _symmetry_ties matches copies by."""

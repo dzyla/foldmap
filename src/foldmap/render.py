@@ -32,6 +32,7 @@ from . import text_metrics
 from .hbonds import find_hbonds, parse_selection
 from .layout import (
     _GLYPH_W,
+    AXIS_SYMBOL_R,
     DNA_MINOR,
     DNA_PITCH,
     DNA_TUBE,
@@ -1617,6 +1618,13 @@ def _na_targets(layout: Layout, g, where: dict, near=None):
     return targets, weights, []
 
 
+def _on_axis(layout: Layout, g) -> bool:
+    """Whether a ligand sits on a rosette's axis (Layout.rosette): held by residues of every one of its copies."""
+    n = getattr(layout, "rosette", 0)
+    sector = getattr(layout.frame, "sector", None) or {}
+    return bool(n) and len({sector.get(layout.res_chain[r]) for r in g.contacts} - {None}) == n
+
+
 def ligand_marks(layout: Layout, loops: list[Loop], sses: list[SSE], look: Style, counts=None) -> list[dict]:
     """Where each shown ligand/ion goes: as close as possible to the residues holding it, clear of elements,
     labels and other markers, and of the nucleic acid's stems, strands and text (_na_spots) where there is one. Each
@@ -1634,6 +1642,8 @@ def ligand_marks(layout: Layout, loops: list[Loop], sses: list[SSE], look: Style
     if layout.focus_chains:  # one subunit of an assembly: only what binds it
         chosen = [g for g in chosen if any(layout.res_chain[r] in layout.focus_chains for r in g.contacts)]
     taken = [p.rect for p in layout.placed.values()] + [g.rect for g in layout.ghosts]
+    if getattr(layout, "rosette", 0):  # a rosette's axis symbol at the page centre
+        taken.append(centred_box(0.0, 0.0, AXIS_SYMBOL_R, AXIS_SYMBOL_R))
     bodies = list(taken)  # what a tether should not run over (C9)
     labels = [box for _, box in label_boxes(layout, sses)]
     if counts is None:
@@ -1678,6 +1688,8 @@ def ligand_marks(layout: Layout, loops: list[Loop], sses: list[SSE], look: Style
         if not targets:
             continue
         anchor = np.average(np.asarray(targets), axis=0, weights=weights)
+        if _on_axis(layout, g):  # held by every copy of a rosette: drawn once, at its centre
+            anchor = np.zeros(2)
         half = (0.3, 0.3) if g.metal else (0.12 * len(g.name) + 0.2, 0.27)
         na, retarget = None, None
         if not g.contacts:  # held by nucleotides alone: its tethers, as drawn from each spot, off the stems and strands
@@ -3084,6 +3096,19 @@ def _draw_loops(c: _Canvas, layout: Layout, loops: list[Loop], sses: list[SSE], 
                 c.ax.add_patch(run)
 
 
+def _draw_axis_symbol(c: _Canvas, layout: Layout) -> None:
+    """A rosette's n-fold axis (Layout.rosette, Style.cyclic): a filled regular n-gon at the page centre, one corner
+    up, as crystallographers mark a rotation axis seen end on."""
+    n = getattr(layout, "rosette", 0)
+    if not n:
+        return
+    turns = np.pi / 2 + 2 * np.pi * np.arange(n) / n
+    corners = np.stack([AXIS_SYMBOL_R * np.cos(turns), AXIS_SYMBOL_R * np.sin(turns)], axis=1)
+    mark = Polygon(corners, closed=True, fc=c.look.ink, ec="none", zorder=Z["mark"])
+    mark.set_gid(f"axis:{n}")
+    c.ax.add_patch(mark)
+
+
 def _draw_membrane(c: _Canvas, layout: Layout) -> None:
     """The lipid bilayer: over the panels and plates, behind the loops and elements."""
     x0, y0, x1, y1 = c.content
@@ -3356,6 +3381,22 @@ def _draw_domain_bar(c: _Canvas, layout: Layout) -> None:
             t.set_gid(seg.gid.replace("domain-bar:", "domain-bar-label:", 1))
 
 
+def _copy_turn(layout: Layout, chain: str) -> float:
+    """The turn (radians) a rosette (Layout.rosette) draws a chain's copy at about the page centre; 0 elsewhere."""
+    if not getattr(layout, "rosette", 0):
+        return 0.0
+    k = layout.frame.sector.get(chain)
+    return float(layout.frame.angles[k]) if k is not None else 0.0
+
+
+def _turned_back(p: Placed, turn: float) -> Placed:
+    """An element as its copy's own frame draws it, before a rosette's turn (itself when `turn` is 0)."""
+    if not turn:
+        return p
+    c, s = np.cos(-turn), np.sin(-turn)
+    return Placed(p.sse, c * p.cx - s * p.cy, s * p.cx + c * p.cy, p.length, p.angle - turn, p.width)
+
+
 def _draw_sheet_panels(c: _Canvas, layout: Layout, outlines: dict[str, Path] | None = None) -> None:
     """A pale panel behind each sheet. With named domains (`outlines`, _draw_domains), a sheet whose strands are all
     one domain's takes that domain's tint, a little deeper than its panel; a sheet several domains share stays pale,
@@ -3366,7 +3407,9 @@ def _draw_sheet_panels(c: _Canvas, layout: Layout, outlines: dict[str, Path] | N
     for k, ids in enumerate(layout.sheets):
         if len(ids) < 2:
             continue
-        rects = np.array([layout.placed[i].rect for i in ids] + [g.rect for g in block_ghosts(layout, k)])
+        turn = _copy_turn(layout, layout.placed[ids[0]].sse.chain)  # a rosette's copy: its panel turned with it
+        members = [layout.placed[i] for i in ids] + list(block_ghosts(layout, k))
+        rects = np.array([_turned_back(m, turn).rect for m in members])
         x0, y0 = rects[:, 0].min() - 0.3, rects[:, 1].min() - 0.3
         x1, y1 = rects[:, 2].max() + 0.3, rects[:, 3].max() + 0.3
         fill = _mix(c.look.background, c.look.ink, 0.07) if c.look.background != "#ffffff" else _PANEL
@@ -3383,6 +3426,8 @@ def _draw_sheet_panels(c: _Canvas, layout: Layout, outlines: dict[str, Path] | N
             ec="none",
             zorder=Z["sheet-panel"],
         )
+        if turn:
+            panel.set_transform(Affine2D().rotate(turn) + c.ax.transData)
         panel.set_gid(f"sheet-panel:{k}")
         c.ax.add_patch(panel)
         if len(names) > 1:
@@ -3753,6 +3798,7 @@ def _draw(
     )
     _draw_loops(c, layout, loops, sses, lcounts)
     _draw_membrane(c, layout)
+    _draw_axis_symbol(c, layout)
     outlines = _draw_domains(c, layout)
     _draw_sheet_panels(c, layout, outlines)
     _draw_hbonds(c, hb)

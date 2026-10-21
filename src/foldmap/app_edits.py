@@ -422,6 +422,7 @@ CONTROLS: dict[str, tuple[str, str, tuple[str, ...]]] = {
     "fold_template": ("Parallel α/β sheets", _LAYOUT, ("fold_template",)),
     "helix_on_sheet": ("Helices packed on a sheet", _LAYOUT, ("helix_on_sheet",)),
     "two_fold": ("Two-fold assemblies", _LAYOUT, ("two_fold",)),
+    "cyclic": ("Cyclic assemblies", _LAYOUT, ("cyclic",)),
     "copy_ghosts": ("Strands lent across a ring's cut", _LAYOUT, ("copy_ghosts",)),
     "names": ("Element names", _LAYOUT, ("names__kw", "names_upload")),
     "swap": ("Swap", _LAYOUT, ("swap__as_text", "swap")),

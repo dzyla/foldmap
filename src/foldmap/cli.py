@@ -20,7 +20,16 @@ from . import layoutfile
 from .criteria import LIMITS
 from .dssp import assign_dssp
 from .features import helices_on_sheets, sse_contacts
-from .frame import Frame, RadialFrame, dna_radial_frame, dna_view_frame, protomer_maps, symmetric_frame, view_frame
+from .frame import (
+    Frame,
+    RadialFrame,
+    dna_radial_frame,
+    dna_view_frame,
+    protomer_maps,
+    rosette_frame,
+    symmetric_frame,
+    view_frame,
+)
 from .io import load_backbone, load_links, load_nucleic, read_model
 from .layout import SCALE, _snap, accessory_lines, build_layout, na_torn_by_unrolling, resolve, template_rows
 from .membrane import FACE_REACH
@@ -201,6 +210,36 @@ def _mirrors(two_fold: str, sym, bb) -> bool:
         return two_fold == "mirror"
     protein = {l.chain for l in bb.labels}
     return all(sum(c in protein for c in p) == 1 for p in sym.protomers)
+
+
+ROSETTE_ORDERS = range(3, 9)  # cyclic=rosette: Cn assemblies of these orders are drawn seen down their axis
+
+
+def _no_rosette(sses, sym, nucleic, mode: str, mem) -> str:
+    """Why a Cn assembly (n in ROSETTE_ORDERS) asked for as a rosette (Style.cyclic) is drawn unrolled ('' when it is
+    not): what the rosette does not draw yet. A rosette turns protomer 0's drawing for each copy, so everything
+    drawn must belong to a protomer: no nucleic acid (its stems are not turned yet), no element of a chain outside
+    every protomer (an unpaired chain), and each protomer must hold elements; a stack row and a membrane view are
+    not seen down the axis."""
+    if mode != "projected":
+        return "a rosette is drawn in projected mode only"
+    if mem is not None:
+        return "a membrane view keeps the bilayer across the page"
+    if nucleic is not None and nucleic.strands:
+        return "its nucleic acid is not yet drawn in a rosette (draw it with --no-dna for the protein alone)"
+    inside = {c for p in sym.protomers for c in p}
+    if any(s.chain not in inside for s in sses):
+        return "a chain outside every protomer is not yet drawn in a rosette"
+    if any(not any(s.chain in p for s in sses) for p in sym.protomers):
+        return "a protomer has no helix or strand"
+    return ""
+
+
+def _within_protomer(bridges, sym, bb) -> list:
+    """The bridges between residues of one protomer: a rosette's sheets (each copy's own; a sheet two copies share
+    is drawn as each copy's part, the pairings across copies left out)."""
+    sector = {c: k for k, p in enumerate(sym.protomers) for c in p}
+    return [b for b in bridges if sector.get(bb.labels[b.i].chain, -1) == sector.get(bb.labels[b.j].chain, -2)]
 
 
 def _dyad_frame(sses, sym) -> Frame | None:
@@ -408,6 +447,14 @@ def make_layout(
                 )
     duplex = nucleic is not None and straight_duplex(nucleic.structure, nucleic.strands)
     dyad = None  # a two-fold assembly seen from the side, drawn as one copy and its mirror image (plan 18)
+    rosette_asked = (  # Style.cyclic rosette: a cyclic assembly of ROSETTE_ORDERS copies seen down its axis
+        (look or Style()).cyclic == "rosette" and sym is not None and sym.kind == "C" and sym.n in ROSETTE_ORDERS
+    )
+    cyclic_note = ""
+    if rosette_asked and (duplex or rotate or flip_v or up is not None or view is not None):
+        cyclic_note = f"cyclic=rosette: the {sym.label} assembly not drawn as a rosette, " + (
+            "it sits on a straight duplex" if duplex else "a view, a turn or a flip was asked for"
+        )
     if duplex:
         frame = (  # protein on a straight duplex: the duplex across the page, the protein below it
             dna_radial_frame(sses, nucleic)
@@ -426,7 +473,23 @@ def make_layout(
         # side by side, as any assembly's (never the dyad view)
         dyad = _dyad_frame(sses, sym) if _mirrors((look or Style()).two_fold, sym, bb) else None
         frame = dyad or symmetric_frame(sses, sym)
+        if rosette_asked:  # cyclic=rosette (plan 21): seen down the axis, each copy protomer 0 turned, unless
+            why = _no_rosette(sses, sym, nucleic, mode, mem)  # what it cannot draw yet
+            if why:
+                cyclic_note = f"cyclic=rosette: the {sym.label} assembly drawn unrolled, {why}"
+            else:
+                frame = rosette_frame(sses, sym)
+                sheets = build_sheets(sses, _within_protomer(dssp.bridges, sym, bb))
+                cyclic_note = (
+                    f"{sym.label} assembly seen down its {sym.n}-fold axis (cyclic=rosette): each copy drawn as the "
+                    f"first turned by a multiple of {360 // sym.n if 360 % sym.n == 0 else round(360 / sym.n, 1)}°"
+                )
     else:  # stem axes differ in the last bit between BLAS kernels: snapped before they choose the page axes
+        if rosette_asked and not cyclic_note:
+            cyclic_note = (
+                f"cyclic=rosette: the {sym.label} assembly not drawn as a rosette, its nucleic acid is held by two or "
+                "more copies"
+            )
         stems = stem_views(nucleic.structure, nucleic.strands) if nucleic is not None else []
         stems = [StemView(_snap(v.centroid), _snap(v.axis), v.n) for v in stems]
         frame = view_frame(sses + stems, rotate, flip_v, up, view)
@@ -525,6 +588,7 @@ def make_layout(
         with_elements = {s.chain for s in sses}
         lay.coil_chains = [(c, n) for c, n in Counter(lay.res_chain).items() if c not in with_elements]
         lay.uniprot = ann
+        lay.cyclic_note = cyclic_note
         first = [s.centroid for s in sses if s.chain == sses[0].chain] if sses else [_any_centre(bb, nucleic)]
         centre = np.mean(first, axis=0)
         lay.page_axes = [list(map(float, a)) for a in frame.basis(centre)]
@@ -590,6 +654,7 @@ def make_layout(
     lay.two_fold_assembly = (
         sym is not None and sym.kind == "C" and sym.n == 2 and len(sym.protomers) == 2 and not duplex
     )
+    lay.cyclic_assembly = sym is not None and sym.kind == "C" and sym.n in ROSETTE_ORDERS and not duplex
     if msa:
         from .sequence import grades, is_consurf, read_alignment, read_consurf, residue_conservation
 
