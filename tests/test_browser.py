@@ -170,7 +170,19 @@ const HELPERS = () => {
       return null;
     }, PX);
     if (!f) return null;
-    return { zoom: zoomLabel, ...f, selection: await clickAt(f.p), without: await control(f.hit, f.p) };
+    // just off the same loop's line, over its white casing (and nothing else)
+    const close = await page.evaluate(id => {
+      const hit = document.getElementById(id), ink = __t.ink(id.slice(0, -4));
+      const casing = __t.ink(id.slice(0, -4).replace('loop:', 'loopcase:'));
+      const px = (__t.widthPx(ink) + __t.widthPx(casing)) / 4;  // halfway between the line's edge and the casing's
+      const pts = __t.around(ink, px, Math.ceil(ink.getTotalLength())).filter(p => {
+        const local = new DOMPoint(p.x, p.y).matrixTransform(casing.getScreenCTM().inverse());
+        return document.elementFromPoint(p.x, p.y) === hit && casing.isPointInStroke(local);
+      });
+      return pts.length ? { ...pts[Math.floor(pts.length / 2)], px } : null;
+    }, f.hit);
+    return { zoom: zoomLabel, ...f, selection: await clickAt(f.p), without: await control(f.hit, f.p),
+             close: close && { p: close, selection: await clickAt(close) } };
   }
 
   const out = { errors, lines: [], loop: null };
@@ -238,3 +250,5 @@ def test_a_click_three_pixels_off_a_loop_beside_a_strand_still_selects_the_loop(
     assert loop["selection"] == [loop["want"]], loop
     assert loop["ink"] < 2 * 3, loop  # 3 px off the loop's centre is off its drawn line
     assert loop["without"] == [loop["na"]], loop
+    # just off its line, over its white casing, the loop is selected too (the casing lets clicks through to the target)
+    assert loop["close"] is not None and loop["close"]["selection"] == [loop["want"]], loop

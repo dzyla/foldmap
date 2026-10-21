@@ -625,6 +625,7 @@ main { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1
 #stage svg.focus [id^="na:label:"]:not(.on), #stage svg.focus [id^="na:run:"]:not(.on) { opacity: .2; transition: opacity .12s }
 #stage svg [id^="disulfide:"], #stage svg [id^="ss-dot:"], #stage svg [id^="disulfide-end:"], #stage svg [id^="glycan:"], #stage svg [id^="ligand"],
 #stage svg [id^="na:stem:"], #stage svg [id^="na:label:"], #stage svg [id^="na:run:"] { cursor: pointer }
+#stage svg [id^="loopcase:"] { pointer-events: none }  /* a loop's white casing: clicks reach its click target */
 #molpanel { flex: 1.15 }
 #mol { flex: 1; min-height: 200px; position: relative; border-radius: 6px; overflow: hidden; background: #fff }
 #mappanel { flex: 1 }
