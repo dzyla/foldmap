@@ -333,9 +333,13 @@ def test_two_fold_choice_is_offered_for_a_two_fold_assembly():
     assert at.segmented_control(key="two_fold").value == "unrolled"  # still offered: the same assembly
 
 
-def test_copy_ghosts_choice_is_offered_for_a_strand_lent_across_a_rings_cut():
+def test_copy_ghosts_choice_is_offered_for_a_strand_lent_across_a_rings_cut(monkeypatch):
     """Plan 19 Task 2: with dashed copies (the default) or drawn once, beside the fold options, only where a strand
-    is lent across an unrolled ring's cut (8UTF), and still offered once they are off."""
+    is lent across an unrolled ring's cut (8UTF), and still offered once they are off. Auto-redraw stays on however
+    long 8UTF takes on this machine (on a slow CI runner it passed the slow limit and the switch drew nothing)."""
+    from foldmap import app_jobs
+
+    monkeypatch.setattr(app_jobs, "SLOW_SECONDS", float("inf"))
     assert "copy_ghosts" not in widget_keys(opened(DATA / "2HHB.cif").sidebar, skip=())
     at = opened(DATA / "8UTF.cif")
     assert list(at.segmented_control(key="copy_ghosts").options) == ["with dashed copies", "drawn once"]
