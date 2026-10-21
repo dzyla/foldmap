@@ -596,6 +596,18 @@ def test_a_hydrophobic_contact_is_within_4_angstroms(dist, count):
         assert found[0].distance == round(dist, 3) and found[0].angle is None
 
 
+def test_two_nucleotides_never_touch_but_a_protein_carbon_on_one_does():
+    """Thymine methyls of neighbouring base pairs across a duplex sit 3.6 Å apart (8XJV, 1AM9, 3MHT): the geometry of
+    pairing and stacking, which the ladder shows, so never a line under any selection; an Ala CB on one touches."""
+    strands = (("A", 1, "DT", {"C5": (0.0, 0.0, 0.0), "C7": (1.5, 0.0, 0.0)}), ("B", 9, "DT", {"C7": (5.1, 0.0, 0.0)}))
+    for select in ("interchain", "chains:A+B", "na"):
+        assert find_hydrophobic(_model_of(*strands), select) == []
+    ala = ("C", 1, "ALA", {"CB": (1.5, 3.7, 0.0)})
+    for select in ("interchain", "na"):
+        [x] = find_hydrophobic(_model_of(*strands, ala), select)
+        assert (x.a, x.b, x.distance) == (("A", "1", "C7"), ("C", "1", "CB"), 3.7)
+
+
 def test_each_lambda_residue_pair_touches_once_and_meets_the_rule():
     for select in ("na", "interchain"):
         found = find_hydrophobic(_lambda(), select)
@@ -689,6 +701,11 @@ def test_the_re_check_flags_each_broken_rule():
             "T-shaped",
         ),
         (ser, Interaction("hydrophobic", ("A", "1", "CB"), ("B", "1", "CB"), 3.6, None), "bonded"),
+        (
+            _model_of(("A", 1, "DT", {"C7": (0, 0, 0)}), ("B", 1, "DT", {"C7": (3.6, 0, 0)})),
+            Interaction("hydrophobic", ("A", "1", "C7"), ("B", "1", "C7"), 3.6, None),
+            "two nucleotides",
+        ),
         (ser, Interaction("hydrophobic", ("A", "1", "CB"), ("A", "1", "CB"), 0.0, None), "itself"),
         (ser, Interaction("hydrophobic", ("A", "1", "CB"), ("C", "1", "CB"), 3.6, None), "no residue"),
         (ser, Interaction("hbond", ("A", "1", "CB"), ("B", "1", "OG"), 5.025, None), "H-bond"),

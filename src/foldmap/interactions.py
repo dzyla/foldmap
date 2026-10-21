@@ -39,7 +39,10 @@ hydrophobic atom, a carbon with only carbon or hydrogen neighbours). Bonds are r
 atoms of one residue at most 2.0 Å apart (C-S is 1.8 Å, C-Se 1.95 Å; atoms two bonds apart sit 2.2 Å or more). That
 leaves the side-chain carbons (CA is bonded to N, C to O, and Ser CB, Thr CB, Cys CB, Met CG and CE, Pro CD to a
 heteroatom), and in nucleic acid the DNA C2' and the base carbons with no heteroatom neighbour (thymine C5 and C7,
-the C5 of U and C). One Interaction per residue pair, the shortest (ties to the first atoms by name).
+the C5 of U and C). One Interaction per residue pair, the shortest (ties to the first atoms by name). Two
+nucleotides never touch here, whatever the selection: across a duplex or between RNA chains the only such
+contacts are pyrimidine C5 or methyl C7 at neighbouring base pairs, the geometry of pairing and stacking that the
+ladder shows (as for stacking).
 
 Each Interaction names its partners as (chain, residue tag, atom): the residue tag as `ResLabel.tag` (number and
 insertion code), the atom its name, "centre" for the Arg guanidinium centre, "ring:6" or "ring:5" for a ring (its
@@ -414,7 +417,7 @@ def _hydrophobic_carbons(residues: list[_Residue]) -> tuple[np.ndarray, np.ndarr
 def find_hydrophobic(model, select) -> list[Interaction]:
     """The hydrophobic contacts of `model` between the partners `select` names: of each residue pair with two
     carbons bonded only to carbon within HYDROPHOBIC_MAX, the shortest such pair (ties: the first atoms by name);
-    `a` the residue that sorts first. Sorted by `sort_key`."""
+    never two nucleotides. `a` the residue that sorts first. Sorted by `sort_key`."""
     sel, residues, names = _residues(model, select)
     xyz, owner, atom = _hydrophobic_carbons(residues)
     if len(xyz) < 2:
@@ -423,7 +426,8 @@ def find_hydrophobic(model, select) -> list[Interaction]:
     if not len(ij):
         return []
     i, j = ij[:, 0], ij[:, 1]
-    keep = _allowed(sel, names, residues, owner[i], owner[j])
+    nucleic = np.array([r.kind == NUCLEIC for r in residues], bool)
+    keep = _allowed(sel, names, residues, owner[i], owner[j]) & ~(nucleic[owner[i]] & nucleic[owner[j]])
     i, j = i[keep], j[keep]
     dist = _snaps(np.linalg.norm(xyz[i] - xyz[j], axis=1))
     best: dict[tuple, tuple] = {}
@@ -647,6 +651,8 @@ def _v_stack(ra: _VRes, rb: _VRes, x: Interaction, bad: list[str]):
 
 
 def _v_hydrophobic(ra: _VRes, rb: _VRes, x: Interaction, bad: list[str]):
+    if not ra.protein and not rb.protein:
+        bad.append("two nucleotides: carbon contacts within nucleic acid are left out")
     pa, pb = _v_atom(ra, x.a, bad), _v_atom(rb, x.b, bad)
     for res, p, got in ((ra, x.a, pa), (rb, x.b, pb)):
         if got is None:

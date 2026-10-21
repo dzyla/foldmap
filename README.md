@@ -568,7 +568,8 @@ Criteria, from the heavy atoms: salt bridge, an anionic O (Asp, Glu, C-terminus,
 cationic N (Lys, Arg, N-terminus; His "if protonated"); π-stacking, ring centroids within 5.5 Å, parallel (≤ 30°)
 or T-shaped (60–90°), offset ≤ 2.0 Å, never two nucleobases (the ladder shows those); cation-π, Lys NZ or the Arg
 guanidinium centre within 6.0 Å of a ring centroid, offset ≤ 2.0 Å; hydrophobic, carbons bonded only to carbon
-within 4.0 Å. Before drawing, every interaction found is re-measured by an independent check
+within 4.0 Å, never two nucleotides (across a duplex those are pyrimidine carbons of neighbouring base pairs, which
+the ladder shows). Before drawing, every interaction found is re-measured by an independent check
 (`interactions.verify_interactions`); one it flags is not drawn and the figure's notes say so. Example:
 `foldmap plot 1LMB.cif --set interactions=all -o 1lmb.svg`.
 
