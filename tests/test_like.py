@@ -288,15 +288,16 @@ def test_note_on_itself():
 
 
 def test_note_names_the_extras_as_drawn():
-    """Haemoglobin β (2HHB chain B) drawn like α (chain A): β's D-helix region, which α lacks, is named after α's
-    helix before it, lettered (α3a, α3b), in the figure and in the note."""
+    """Haemoglobin β (2HHB chain B) drawn like α (chain A): of β's two elements α lacks, the α-helix is named after
+    α's helix before it, lettered (α3a), and the 3-10 helix, with no 3-10 helix of α before it, keeps its own name
+    (η1: never α3b, which would call a 3-10 helix an α-helix; 13a-7), in the figure and in the note."""
     path = DATA / "2HHB.cif"
     lay, _, _ = cli.make_layout(path, chains=["B"], like=like_of(path, "A"), **OPTIONS)
     assert lay.like_note == (
         "drawn like 2HHB.cif chain A: 7 of 9 elements matched (sequence alignment, TM-score 0.89 over 139 residues); "
-        "only in this structure: α3a, α3b"
+        "only in this structure: η1, α3a"
     )
-    assert [lay.placed[k].label for k in lay.like_extras] == ["α3a", "α3b"]
+    assert [lay.placed[k].label for k in lay.like_extras] == ["η1", "α3a"]
 
 
 def test_not_the_same_fold_is_drawn_on_its_own():
@@ -309,7 +310,8 @@ def test_not_the_same_fold_is_drawn_on_its_own():
 
 
 def test_note_words():
-    """The note's alignment words, and the low-coverage clause (a permuted chain aligns only in part)."""
+    """The note's alignment words, and the low-coverage clause: how much of the shorter chain aligned, rounded down,
+    with no guess at why (a hinge between domains, or a circular permutation; 13a-7)."""
     from foldmap.align import ChainAlignment
     from foldmap.like import like_note, refused_note
 
@@ -326,24 +328,25 @@ def test_note_words():
     )
     mates = Mates(mate={"b1": "a1"}, pieces={"b2": "a1"}, extras=("b3",), only_a=(), same_fold=False)
     assert refused_note("A.cif", aln, mates) == (
-        "not drawn like A.cif: not the same fold (TM-score 0.41; 2 of 3 elements matched); a circular permutation "
-        "is not aligned"
+        "not drawn like A.cif: not the same fold (TM-score 0.41; 2 of 3 elements matched); only 62% of the shorter "
+        "chain aligned"
     )
     filed = replace(aln, method="file", pairs=tuple((k, k) for k in range(80)))
-    assert like_note("A.cif", "B", filed, mates, ["α1a"], "x/pair.fasta") == (
+    assert like_note("A.cif", "B", filed, mates, ["α1a"], "x/pair.fasta", [("η3", "α3")]) == (
         "drawn like A.cif chain B: 2 of 3 elements matched (alignment pair.fasta, TM-score 0.41 over 80 residues); "
-        "only in this structure: α1a"
+        "only in this structure: α1a; named by their own helix type: η3 for α3"
     )
 
 
 def test_extras_named_after_the_element_before_them():
-    """An extra takes the name of the matched element of its family before it: a helix lettered (α1a), a strand
-    named by a capital letter primed, as Ig's C′ (never 'Ba')."""
+    """An extra takes the name of the matched element of its type before it: a 3-10 helix after η1 lettered (η1a,
+    never after the α-helix between them: 13a-7), a strand named by a capital letter primed, as Ig's C′ (never
+    'Ba')."""
     lay_a, sses, _ = cli.make_layout(DATA / "1UBQ.cif", chains=["A"], **OPTIONS)
     seq = sorted(sses, key=lambda s: s.start)
-    helices = [s for s in seq if s.kind != "E"]
+    helices = [s for s in seq if s.kind == "G"]  # η1, η2
     strands = [s for s in seq if s.kind == "E"]
-    helix, strand = helices[1], strands[2]  # each with a matched element of its family before it
+    helix, strand = helices[1], strands[2]  # each with a matched element of its type before it
     extras = (helix.id, strand.id)
     mates = Mates(
         mate={s.id: s.id for s in sses if s.id not in extras},
@@ -413,3 +416,147 @@ def test_like_with_two_chains_is_a_usage_error(tmp_path, capsys):
     assert "--chains" in capsys.readouterr().err
     assert cli.main(["plot", str(path), "--like-chain", "A", "-o", out]) == 2
     assert "--like-chain needs --like" in capsys.readouterr().err
+
+
+# the layout file, MCP and frames that cannot be carried (plan 13a-7) -----------------------------------------------
+
+
+def test_a_mate_of_the_other_helix_type_keeps_its_type():
+    """A mate of the other helix type takes its own type's sign with its mate's number (a 3-10 helix mated to α3:
+    η3), never the mate's sign; where the reference names another element so (its α1), it is named as an extra is
+    (lettered: α1a); Like.crossed records both for the note."""
+    from foldmap.like import _labels
+
+    _, sses, _ = cli.make_layout(DATA / "1UBQ.cif", **OPTIONS)
+    by_label = dict(zip(["A", "B", "α1", "η1", "C", "D", "η2", "E"], sses))
+    placed = {  # the reference: an α-helix α1, then α2 and α3, its own η1 elsewhere
+        "x1": SimpleNamespace(label="α2"),
+        "x2": SimpleNamespace(label="η1"),
+        "x3": SimpleNamespace(label="α3"),
+        "x4": SimpleNamespace(label="α1"),
+    }
+    mates = Mates(
+        mate={by_label["α1"].id: "x1", by_label["η1"].id: "x2", by_label["η2"].id: "x3"},
+        pieces={},
+        extras=(),
+        only_a=("x4",),
+        same_fold=True,
+    )
+    ref = {k: f"res:A:{s.first.tag}-{s.last.tag}" for k, s in by_label.items()}
+    labels, crossed = _labels(placed, sses, mates)
+    assert labels[ref["α1"]] == "α2"  # the same type: its mate's name
+    assert labels[ref["η1"]] == "η1"  # the same type
+    assert labels[ref["η2"]] == "η3"  # a 3-10 helix mated to α3: η3, free
+    assert crossed == {by_label["η2"].id: "α3"}
+    swapped = replace(mates, mate={by_label["α1"].id: "x2", by_label["η1"].id: "x1"})
+    labels, crossed = _labels(placed, sses, swapped)
+    assert labels[ref["α1"]] == "α1a"  # an α-helix mated to η1: α1 is the reference's other helix, so lettered
+    assert labels[ref["η1"]] == "η2"  # a 3-10 helix mated to α2: η2, free in the reference
+    assert crossed == {by_label["α1"].id: "η1", by_label["η1"].id: "α2"}
+
+
+UNCARRIED = {  # B drawn whole (no chain named) in a frame that cannot be carried: drawn on its own, with the note
+    "mirror": (
+        "1LMB.cif",
+        {},
+        "not drawn like 1UBQ.cif: this structure's frame (a C2 mirror image) cannot be carried; draw one chain of each",
+    ),
+    "cylinder": (
+        "2HHB.cif",
+        {},
+        "not drawn like 1UBQ.cif: this structure's frame (an unrolled C2 assembly) cannot be carried; draw one chain "
+        "of each",
+    ),
+    "rosette": (
+        "6LTO.cif.gz",
+        {"focus": "none", "look": Style(cyclic="rosette")},
+        "not drawn like 1UBQ.cif: this structure's frame (a C7 rosette) cannot be carried; draw one chain of each",
+    ),
+    "stack": (
+        "1UBQ.cif",
+        {"mode": "stack"},
+        "not drawn like 1UBQ.cif: this structure's frame (--mode stack) cannot be carried; draw it with --mode "
+        "projected",
+    ),
+}
+
+
+@pytest.mark.parametrize("case", list(UNCARRIED))
+def test_a_frame_that_cannot_be_carried_is_drawn_on_its_own(case):
+    """A figure whose frame is not a plain Frame (an assembly drawn by its symmetry: the C2 mirror, an unrolled
+    cylinder, a rosette; or a stack) is not drawn like the reference: it is drawn exactly as on its own, and the note
+    says why and what would draw it like the reference."""
+    name, options, note = UNCARRIED[case]
+    kw = {**OPTIONS, **options}
+    lay, _, _ = cli.make_layout(DATA / name, like=like_of(DATA / "1UBQ.cif"), **kw)
+    alone, _, _ = cli.make_layout(DATA / name, **kw)
+    assert lay.like_note == note
+    assert lay.like_colour == {} and lay.like_extras == [] and lay.like_chain == ""
+    assert signature(lay) == signature(alone)
+
+
+def test_a_reference_frame_that_cannot_be_carried(tmp_path):
+    """A reference laid out from its layout file as a stack: this figure is drawn on its own, the note naming the
+    reference's frame."""
+    path, saved = DATA / "1UBQ.cif", tmp_path / "ubq-stack.yaml"
+    argv = ["plot", str(path), "--mode", "stack", "-o", str(tmp_path / "s.svg"), "--save-layout", str(saved)]
+    assert cli.main(argv) == 0
+    lay, _, _ = cli.make_layout(path, like={**like_of(path), "layout": str(saved)}, **OPTIONS)
+    assert lay.like_note == (
+        "not drawn like 1UBQ.cif: its frame (--mode stack) cannot be carried; draw it with --mode projected"
+    )
+
+
+def test_a_reference_drawn_as_an_assembly_needs_its_chain(tmp_path, capsys):
+    """8UTF is drawn as an assembly by its symmetry: as the reference with no chain named it is a usage error (exit
+    2) naming --like-chain; with --like-chain A it draws."""
+    path, out = DATA / "8UTF.cif", tmp_path / "x.svg"
+    assert cli.main(["plot", str(path), "--chains", "B", "--like", str(path), "-o", str(out)]) == 2
+    err = capsys.readouterr().err
+    assert "8UTF.cif is drawn as an unrolled C3 assembly (chains A, B, C, a, b, c): name one with --like-chain" in err
+    assert cli.main(["plot", str(path), "--chains", "B", "--like", str(path), "--like-chain", "A", "-o", str(out)]) == 0
+    assert "drawn like 8UTF.cif chain A: 2 of 2 elements matched" in capsys.readouterr().err
+
+
+def test_a_chain_like_chose_is_not_said_as_asked_for():
+    """Of several protein chains in a plain frame with none named, --like draws the first: the scope line says so,
+    not "asked for"; a structure with one protein chain says nothing of chains."""
+    from foldmap.io import read_model
+    from foldmap.scope import drawn_scope
+
+    path = DATA / "2HHB.cif"
+    kw = {**OPTIONS, "symmetry": "off"}  # no assembly: a plain frame
+    lay, _, _ = cli.make_layout(path, like=like_of(path, "B"), **kw)
+    assert lay.like_chain == "A" and lay.chains_asked == []
+    assert lay.like_note.startswith("drawn like 2HHB.cif chain B: ")
+    scope = drawn_scope(read_model(path, "auto"), lay)
+    assert scope["chains_reason"] == "chain A (the first protein chain: one chain of each is drawn like a reference)"
+    assert "asked for" not in scope["reason"] and "nucleotide" not in scope["reason"]
+    ubq = DATA / "1UBQ.cif"
+    one, _, _ = cli.make_layout(ubq, like=like_of(ubq), **OPTIONS)
+    assert one.like_chain == "" and drawn_scope(read_model(ubq, "auto"), one)["reason"] == ""
+
+
+_SVG = """
+import hashlib, sys
+from foldmap import cli
+out = sys.argv[2]
+assert cli.main(["plot", sys.argv[1], "--chains", "B", "--like", sys.argv[1], "--like-chain", "A", "-o", out]) == 0
+print(hashlib.sha256(open(out, "rb").read()).hexdigest())
+"""
+
+
+def test_like_svg_does_not_depend_on_the_hash_seed(tmp_path):
+    """A12 for the drawn figure: the SVG of β drawn like α has the same hash under PYTHONHASHSEED 0 and 1."""
+    runs = []
+    for seed in ("0", "1"):
+        done = subprocess.run(
+            [sys.executable, "-c", _SVG, str(DATA / "2HHB.cif"), str(tmp_path / f"{seed}.svg")],
+            env={**os.environ, "PYTHONHASHSEED": seed},
+            capture_output=True,
+            text=True,
+            check=True,
+            timeout=600,
+        )
+        runs.append(done.stdout.split()[-1])
+    assert len(runs[0]) == 64 and runs[0] == runs[1]

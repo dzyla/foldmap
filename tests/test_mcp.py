@@ -413,3 +413,21 @@ def test_the_preview_of_a_large_page_is_capped(tmp_path, monkeypatch):
     monkeypatch.setattr(mcp_server, "PREVIEW_PX", 200)  # 1UBQ's 4.2 in page at 90 dpi is 375 px wide
     r = call("draw_topology", {"source": UBQ, "output_path": str(tmp_path / "v.svg")})
     assert small[0] > 300 and max(width(r)) <= 200
+
+
+def test_draw_topology_draws_like_a_reference(tmp_path):
+    """like_source (with like_chain): the note and the structured result's provenance say what it was drawn like;
+    like_chain without like_source is a message."""
+    from mcp.server.mcpserver.exceptions import ToolError
+
+    hb = str(DATA / "2HHB.cif")
+    r = call(
+        "draw_topology",
+        {"source": hb, "output_path": str(tmp_path / "b.svg"), "chains": ["B"], "like_source": hb, "like_chain": "A"},
+    )
+    said = "drawn like 2HHB.cif chain A: 7 of 9 elements matched (sequence alignment, TM-score 0.89 over 139 residues)"
+    like = [i for i in r.structured_content["provenance"] if i["kind"] == "like"]
+    assert len(like) == 1 and like[0]["text"].startswith(said)
+    assert said in r.content[0].text
+    with pytest.raises(ToolError, match="like_source"):
+        call("draw_topology", {"source": UBQ, "output_path": str(tmp_path / "x.svg"), "like_chain": "A"})

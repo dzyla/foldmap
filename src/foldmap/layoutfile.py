@@ -7,7 +7,8 @@ re-rendered later, after the model changes, or shared.
     structure: model.cif              # for the record; the structure is always given on the command line
     theme: trace
     style: {residue_numbers: true}    # only what differs from the theme
-    layout: {mode: projected, rotate: 0, symmetry: auto, assembly: auto}
+    layout: {mode: projected, rotate: 0, symmetry: auto, assembly: auto,
+             like: {structure: 2HHB, chain: B, match: auto}}   # --like, the reference as given
     names: [deposited, my-names.yaml]  # --names, as given
     edits:
       rename: {res:A:167-182: Gd}
@@ -52,6 +53,7 @@ LAYOUT = (
     "chains",
     "focus",
     "uniprot",
+    "like",
 )
 EDITS = ("rename", "swap", "move")
 

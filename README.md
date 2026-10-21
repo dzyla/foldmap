@@ -325,26 +325,36 @@ foldmap plot 1MBN --like 2HHB --like-chain B -o myoglobin-like-beta.svg     # my
 foldmap plot 2HHB --chains A --like 2HHB --like-chain B -o alpha-like-beta.svg
 ```
 
-- **One chain of each.** The chain drawn is the one `--chains` names, else the structure's first protein chain. The
-  reference's chain is `--like-chain`, else its first protein chain. Naming two protein chains with `--chains` is a
-  usage error (exit 2).
+- **One chain of each.** The chain drawn is the one `--chains` names, else the structure's only protein chain. Of
+  several with none named, the first is drawn (the notes say it was chosen, not asked for), unless the structure is
+  an assembly drawn by its symmetry: then it is drawn whole, on its own (see below). The reference's chain is
+  `--like-chain`, else its only or first protein chain; a reference drawn as an assembly needs `--like-chain`.
+  Naming two protein chains with `--chains` or `--like-chain` is a usage error (exit 2).
 - **Alignment.** `--like-match auto` (the default) aligns by sequence at 40 % identity or more, and otherwise by
   structure (TM-align's method). You can also force `sequence` or `structure`, or give a two-row alignment file with
   the reference's chain first.
 - **The reference's own layout.** `--like-layout A.yaml` lays the reference out with a saved layout's options and
   edits.
-- **Names.** An element only this structure has is named after the matched element of its kind before it, with a
-  letter (α3a, α3b). After a strand named by a capital letter it takes a prime instead (C′, C″), as Ig strands do.
-  Where this structure splits a helix the reference has whole, the second part is primed (α6, α6′).
+- **Names.** An element only this structure has is named after the matched element of its type (strand, α- or
+  3-10 helix) before it, with a letter (α3a, α3b). After a strand named by a capital letter it takes a prime instead
+  (C′, C″), as Ig strands do. Where this structure splits a helix the reference has whole, the second part is primed
+  (α6, α6′). A helix matched to one of the other type keeps its own type's sign with its mate's number (an α-helix
+  matched to η1 is α1, never η1); where the reference already uses that name, it is named as an extra is, and the
+  note says which mate it stands for ("named by their own helix type: α2a for η1").
 - **The notes** say what was done, for example "drawn like 2HHB.cif chain A: 7 of 9 elements matched (sequence
   alignment, TM-score 0.89 over 139 residues); only in this structure: α3a, α3b".
 - **When it is refused.** A structure that is not the reference's fold (TM-score under 0.5, or fewer than half the
   elements matched) is drawn on its own, and the note says why: "not drawn like 1UBQ.cif: not the same fold
   (TM-score 0.14; 4 of 13 elements matched)". When fewer than 70 % of the shorter chain's residues align, the note
-  adds that a circular permutation is not aligned.
-- **Frames that cannot be carried.** `--mode stack` is not drawn like a reference. Neither is a reference drawn in a
-  frame that cannot be carried over (a two-fold mirror, an unrolled or rosette assembly, a duplex). In both cases
-  the note says so.
+  says how much did ("only 62% of the shorter chain aligned": a hinge between domains, or a circular permutation).
+- **Frames that cannot be carried.** A figure is drawn like a reference through the reference's page frame, so only
+  a plain one carries (a membrane view, `--up`, `--view`, `--rotate` and `--flip-v` do). An assembly drawn by its
+  symmetry (the two-fold mirror image, an unrolled assembly, a rosette), `--mode stack` or protein on a straight
+  duplex, on either side, is drawn on its own, and the note says why and what would draw it: "not drawn like
+  1UBQ.cif: this structure's frame (a C7 rosette) cannot be carried; draw one chain of each".
+- **Saved and shared.** `--save-layout` records the reference as given, its chain and the match (`like:` under
+  `layout:`), so `--layout-file` draws the same figure again. The MCP tool `draw_topology` takes `like_source`,
+  `like_chain` and `like_match`.
 
 ### Conventions of the published figures
 

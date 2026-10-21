@@ -62,7 +62,9 @@ def _undrawn_chains(model, layout) -> list[tuple[str, str]]:
     """(chain, why) for each polymer chain read for the figure (and asked for, and in the focus) that it has nothing
     of: a protein chain with no helix or strand (Layout.coil_chains: a bound peptide, a lasso peptide), or a
     nucleic-acid chain no strand of the figure holds (7MW8 chain K: a single nucleotide)."""
-    focus, asked = layout.focus_chains, set(getattr(layout, "chains_asked", None) or [])
+    asked = set(getattr(layout, "chains_asked", None) or [])
+    asked |= {getattr(layout, "like_chain", "")} - {""}  # --like's chosen chain: the others as if not asked for
+    focus = layout.focus_chains
     coil = dict(getattr(layout, "coil_chains", None) or [])
     protein = set(getattr(layout, "res_chain", None) or [])
     strands = {s.chain for s in layout.nucleic.strands} if layout.nucleic is not None else set()
@@ -128,9 +130,10 @@ def drawn_scope(model, layout, assembly: str = "auto", focus: str = "auto") -> d
     left_out = list(getattr(model, "left_out", None) or []) if assembly == "auto" else []
     read = list(getattr(layout, "chains_read", None) or [])
     asked = list(getattr(layout, "chains_asked", None) or [])
+    chosen = getattr(layout, "like_chain", "") or ""  # one chain of several, chosen to draw like a reference
     reasons, options, na_outside = [], {}, []
     total, drawn, residues = len(read), len(read), None
-    if asked:  # the visitor chose the chains: nothing an automatic choice left out of them
+    if asked or chosen:  # the visitor chose the chains (or --like one): nothing an automatic choice left out of them
         several, left_out = None, []
     if left_out:  # assembly 1 holds no copy of some chains of the file (1RM5's chain O: final review B, Important 2)
         name = getattr(model, "assembly", None) or "1"
@@ -150,7 +153,7 @@ def drawn_scope(model, layout, assembly: str = "auto", focus: str = "auto") -> d
             options["focus"] = "none"
         total, residues = several["chains"], several["residues"]
     subunits = getattr(layout, "subunits", None)
-    if focus == "auto" and layout.focus_chains and subunits and not asked:
+    if focus == "auto" and layout.focus_chains and subunits and not asked and not chosen:
         strands = layout.nucleic.strands if layout.nucleic is not None else []
         drawn = len(set(layout.focus_chains) | {s.chain for s in strands})
         na_outside = _na_outside(model, layout)
@@ -169,6 +172,8 @@ def drawn_scope(model, layout, assembly: str = "auto", focus: str = "auto") -> d
         options["set"] = "na_extent=all"
     if asked:
         reasons.insert(0, f"chains {', '.join(asked)} (asked for)")
+    elif chosen:  # never said as asked for (13a-7): --like drew its first protein chain
+        reasons.insert(0, f"chain {chosen} (the first protein chain: one chain of each is drawn like a reference)")
     undrawn = _undrawn_chains(model, layout)
     additives = _hidden_additives(layout)
     not_drawn = "; ".join(f"chain {c} ({why})" for c, why in undrawn)
@@ -194,7 +199,9 @@ def drawn_scope(model, layout, assembly: str = "auto", focus: str = "auto") -> d
             **unsaid,
         }
     if residues is None and options:
-        residues = sum(len(c.get_polymer()) for c in model[0] if c.name in read) if asked else _polymers(model[0])[1]
+        residues = (
+            sum(len(c.get_polymer()) for c in model[0] if c.name in read) if asked or chosen else _polymers(model[0])[1]
+        )
     return {
         "file_chains": total,
         "drawn_chains": drawn,

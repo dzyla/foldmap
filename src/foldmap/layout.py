@@ -361,6 +361,9 @@ class Layout:
     # element id -> colour its mate in the reference has (Like.colour): render.element_colours draws these for the
     # identity colourings (like.IDENTITY_COLOURINGS); data colourings keep this structure's own values
     like_colour: dict[str, str] = field(default_factory=dict)
+    like_chain: str = ""  # the protein chain --like chose of several, none asked for (scope says so); '' otherwise
+    # why this figure's page cannot be carried to a structure drawn like it (cli._uncarried: (kind, what)), None: it can
+    uncarried: tuple[str, str] | None = None
 
     @property
     def dna(self) -> list[PlacedStem]:  # earlier name

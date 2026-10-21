@@ -40,8 +40,9 @@ EXTRA_TINT = 0.35  # an extra element's colour: its N-terminal neighbour's, mixe
 _LETTERS = "abcdefghijklmnopqrstuvwxyz"
 _PRIMES = ("′", "″", "‴")
 _STRAND_LETTER = re.compile(r"[A-Z][′″‴]*")  # a strand named by a capital letter (generic labels, Ig's A-G)
-LOW_COVERAGE = 0.7  # aligned residues under this fraction of the shorter chain: the note says a permutation is not
-_METHODS = {"sequence": "sequence alignment", "structure": "structure alignment"}  # aligned (the TM-align limit)
+LOW_COVERAGE = 0.7  # aligned residues under this fraction of the shorter chain: the note says how few aligned
+_METHODS = {"sequence": "sequence alignment", "structure": "structure alignment"}
+_HELIX_SIGN = {"H": "α", "G": "η"}  # the generic label's sign of each helix type (model.generic_label)
 
 
 @dataclass(frozen=True)
@@ -66,6 +67,9 @@ class Like:
     # reference's places (layout._attract); a disulfide only B has still pulls (a loop between two held items never
     # does: the reference places them). None: every pair
     settled: frozenset[frozenset[str]] | None = None
+    # B element id -> its mate's label, for a mate of the other helix type (an α-helix whose mate is a 3-10 helix, or
+    # the reverse): named by its own type (_labels), the note says which mate's name it stands for (like_note)
+    crossed: dict[str, str] = field(default_factory=dict)
 
 
 def _drawn_length(s: SSE, look: Style) -> float:
@@ -94,10 +98,13 @@ def like_from(
       mate and its pieces, Mates.pieces) is laid end to end along its mate as drawn, in sequence, PIECE_GAP apart,
       each at its own drawn length and the mate's angle, centred on the mate (those places on the grid).
     - Labels: a mate takes its mate's label; of a split helix's parts the first in sequence takes it and the next
-      ones the same primed (α3, α3′, α3″); an extra is named after the
-      matched element of its family (strand or helix) before it, lettered (α3a, β9a), the first name not taken; a
-      strand after one named by a capital letter is primed instead (C′, C″: Ig's extra strands); an extra with none
-      before it keeps its own label unless that is taken, then lettered (or primed) too.
+      ones the same primed (α3, α3′, α3″). A mate of the other helix type (an α-helix whose mate is the 3-10 helix
+      η1) keeps its own type's sign with its mate's number (α1), so no name calls an α-helix 3-10; where the
+      reference names another element so (its α1), it is named as an extra is (Like.crossed: the note says which
+      mate's name it stands for). An extra is named after the matched element of its own type (strand, α- or
+      3-10 helix) before it, lettered (α3a, η1a), the first name not taken; a strand after one named by a capital
+      letter is primed instead (C′, C″: Ig's extra strands); an extra with none before it keeps its own label
+      unless that is taken, then lettered (or primed) too.
     - Colours (identity colourings only, IDENTITY_COLOURINGS): a mate or piece takes its mate's colour as A draws it
       (render.element_colours), an extra a tint of its N-terminal neighbour's (the first coloured element after it
       when none comes before; coloured by type, sstype, the neighbour is one of its own kind).
@@ -132,10 +139,11 @@ def like_from(
             # on the grid: cos and sin differ in the last bit between CPUs (A12)
             target[b], angle[b] = tuple(float(v) for v in snap((p.cx + d[0] * t, p.cy + d[1] * t))), p.angle
             along += n + PIECE_GAP
+    label, crossed = _labels(placed, sses_b, mates)
     return Like(
         target=target,
         angle=angle,
-        label=_labels(placed, sses_b, mates),
+        label=label,
         colour=_colours(layout_a, sses_a, sses_b, mates, look),
         template=_template(layout_a, sses_b, mates, sheets_b) if sheets_b is not None else None,
         over={
@@ -146,6 +154,7 @@ def like_from(
         weight=LIKE_WEIGHT,
         unit=unit,
         settled=_settled(layout_a, sses_a, groups),
+        crossed=crossed,
     )
 
 
@@ -180,28 +189,37 @@ def _cys_element(layout_a: Layout, sses_a: list[SSE], r: int) -> str | None:
     return min(mine, key=lambda s: 0 if s.start <= r <= s.end else min(abs(r - s.start), abs(r - s.end))).id
 
 
-def _labels(placed: dict, sses_b: list[SSE], mates: Mates) -> dict[str, str]:
-    """B element ref -> label (like_from: mates, pieces, extras)."""
+def _labels(placed: dict, sses_b: list[SSE], mates: Mates) -> tuple[dict[str, str], dict[str, str]]:
+    """(B element ref -> label, Like.crossed) (like_from: mates, pieces, extras)."""
     names: dict[str, str] = {}  # B element id -> label
     start = {s.id: s.start for s in sses_b}
+    kind = {s.id: s.kind for s in sses_b}
     parts: dict[str, list[str]] = {}  # A element -> its mate and pieces in B
     for b, a in [*mates.mate.items(), *mates.pieces.items()]:
         if a in placed and b in start:
             parts.setdefault(a, []).append(b)
+    crossed: dict[str, str] = {}  # B element id -> its mate's name, of a mate of the other helix type
     for a, bs in parts.items():  # the first part in sequence takes the name, the next ones primed (α6, α6′)
         for k, b in enumerate(sorted(bs, key=lambda b: (start[b], b))):
             label = placed[a].label
-            names[b] = label if k == 0 else label + (_PRIMES[k - 1] if k <= len(_PRIMES) else "′" * k)
-    taken = {p.label for p in placed.values()} | set(names.values())
-    extras = set(mates.extras)
-    last: dict[tuple[str, str], str] = {}  # (chain, family) -> the label of the last matched element so far
+            label = label if k == 0 else label + (_PRIMES[k - 1] if k <= len(_PRIMES) else "′" * k)
+            names[b] = _own_type(label, kind[b])
+            if names[b] != label:
+                crossed[b] = label
+    reference = {p.label for p in placed.values()}
+    unnamed = {b for b in crossed if names[b] in reference}  # the reference's name of another element: as an extra
+    for b in unnamed:
+        del names[b]
+    taken = reference | set(names.values())
+    extras = set(mates.extras) | unnamed
+    last: dict[tuple[str, str], str] = {}  # (chain, type) -> the name of the last matched element so far
     counts: dict[tuple[str, str], int] = {}  # B's own generic labels, as layout._assign_labels gives them
     for s in sorted(sses_b, key=lambda s: (s.chain, s.start)):
-        key = (s.chain, _family(s))
-        n = counts.get((s.chain, s.kind), 0)
-        counts[(s.chain, s.kind)] = n + 1
+        key = (s.chain, s.kind)
+        n = counts.get(key, 0)
+        counts[key] = n + 1
         if s.id in names and s.id in mates.mate:
-            last[key] = placed[mates.mate[s.id]].label  # its mate's own name, unprimed
+            last[key] = _own_type(placed[mates.mate[s.id]].label, s.kind)  # its mate's name, unprimed
         elif s.id in extras:
             base = last.get(key)
             if base is None:
@@ -216,7 +234,17 @@ def _labels(placed: dict, sses_b: list[SSE], mates: Mates) -> dict[str, str]:
                 k += 1
             names[s.id] = extra(base, k)
             taken.add(names[s.id])
-    return {res_ref(s.chain, s.first, s.last): names[s.id] for s in sses_b if s.id in names}
+    labels = {res_ref(s.chain, s.first, s.last): names[s.id] for s in sses_b if s.id in names}
+    return labels, crossed
+
+
+def _own_type(label: str, kind: str) -> str:
+    """A generic helix name (α3, η1, primed or not) with the sign of the helix type `kind` (H α, G η): η1 for a 3-10
+    helix whose mate is α1; any other name as it is (strands, conventional names such as globins' A-H)."""
+    sign = _HELIX_SIGN.get(kind)
+    if sign and label[:1] in _HELIX_SIGN.values() and label[:1] != sign and label[1:2].isdigit():
+        return sign + label[1:]
+    return label
 
 
 def _lettered(name: str, k: int) -> str:
@@ -271,12 +299,14 @@ def counted(mates: Mates) -> tuple[int, int]:
     return matched, matched + len(mates.extras)
 
 
-def _permutation(aln: ChainAlignment) -> str:
-    """'; a circular permutation is not aligned' when the aligned residues are under LOW_COVERAGE of the shorter
-    chain (a permuted chain aligns only in part: out of scope, as for TM-align), else ''."""
+def _coverage(aln: ChainAlignment) -> str:
+    """'; only N% of the shorter chain aligned' when the aligned residues are under LOW_COVERAGE of the shorter chain
+    (a hinge between domains, a circular permutation, or a chain modelled only in part: the note does not guess
+    which), else ''. N is rounded down, so the clause never says more aligned than did."""
     shorter = min(len(aln.residues_a), len(aln.residues_b))
-    low = shorter and len(aln.pairs) < LOW_COVERAGE * shorter
-    return "; a circular permutation is not aligned" if low else ""
+    if not shorter or len(aln.pairs) >= LOW_COVERAGE * shorter:
+        return ""
+    return f"; only {100 * len(aln.pairs) // shorter}% of the shorter chain aligned"
 
 
 def reference_name(structure) -> str:
@@ -284,11 +314,20 @@ def reference_name(structure) -> str:
     return Path(str(structure)).name
 
 
-def like_note(name: str, chain: str, aln: ChainAlignment, mates: Mates, extras: list[str], match: str = "auto") -> str:
+def like_note(
+    name: str,
+    chain: str,
+    aln: ChainAlignment,
+    mates: Mates,
+    extras: list[str],
+    match: str = "auto",
+    crossed: list[tuple[str, str]] = (),
+) -> str:
     """The note of a figure drawn like the reference `name` (its chain `chain`): how many of this structure's
-    elements were matched, by which alignment, and the names of those only this structure has (`extras`, as drawn).
-    E.g. "drawn like A.cif chain A: 31 of 34 elements matched (structure alignment, TM-score 0.61 over 388
-    residues); only in this structure: α3a, β9a"."""
+    elements were matched, by which alignment, the names of those only this structure has (`extras`, as drawn) and
+    of the mates named by their own helix type (`crossed`: (name as drawn, the mate's name), Like.crossed). E.g.
+    "drawn like A.cif chain A: 31 of 34 elements matched (structure alignment, TM-score 0.61 over 388 residues);
+    only in this structure: α3a, β9a; named by their own helix type: α2a for η1"."""
     matched, total = counted(mates)
     method = _METHODS.get(aln.method) or f"alignment {Path(str(match)).name}"
     text = (
@@ -297,7 +336,26 @@ def like_note(name: str, chain: str, aln: ChainAlignment, mates: Mates, extras: 
     )
     if extras:
         text += f"; only in this structure: {', '.join(extras)}"
-    return text + _permutation(aln)
+    if crossed:
+        text += f"; named by their own helix type: {', '.join(f'{b} for {a}' for b, a in crossed)}"
+    return text + _coverage(aln)
+
+
+_ADVICE = {  # what draws a figure whose frame cannot be carried like the reference (uncarried_note)
+    "copies": "draw one chain of each",
+    "stack": "draw it with --mode projected",
+    "duplex": "draw it with --no-dna",
+}
+
+
+def uncarried_note(name: str, why: tuple[str, str], mine: bool) -> str:
+    """The note of a figure drawn on its own because a page frame cannot be carried (cli._uncarried's (kind, what)):
+    this figure's own (`mine`) or the reference's. E.g. "not drawn like A.cif: this structure's frame (a C5 rosette)
+    cannot be carried; draw one chain of each", "not drawn like A.cif: its frame (--mode stack) cannot be carried;
+    draw it with --mode projected"."""
+    kind, what = why
+    whose = "this structure's frame" if mine else "its frame"
+    return f"not drawn like {name}: {whose} ({what}) cannot be carried; {_ADVICE.get(kind, _ADVICE['copies'])}"
 
 
 def refused_note(name: str, aln: ChainAlignment, mates: Mates) -> str:
@@ -306,5 +364,5 @@ def refused_note(name: str, aln: ChainAlignment, mates: Mates) -> str:
     matched, total = counted(mates)
     return (
         f"not drawn like {name}: not the same fold (TM-score {aln.tm_score:.2f}; {matched} of {total} elements "
-        f"matched)" + _permutation(aln)
+        f"matched)" + _coverage(aln)
     )

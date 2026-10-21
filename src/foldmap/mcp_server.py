@@ -187,6 +187,9 @@ def draw_topology(
     mode: str | None = None,
     layout_file: str | None = None,
     save_layout: str | None = None,
+    like_source: str | None = None,
+    like_chain: str | None = None,
+    like_match: str | None = None,
 ) -> CallToolResult:
     """Draw the topology diagram and write it to output_path (.svg, .png or .pdf; default: a temporary .svg).
     Returns where it was written plus a PNG preview of the same figure; when assembly or focus auto drew part of
@@ -211,7 +214,13 @@ def draw_topology(
     msa_path: alignment for theme 'conservation'. uniprot: "auto" or an accession, to mark UniProt active and binding
     sites (style key uniprot_sites: all, or types like "active,modified"); uniprot_domains: UniProt domain panels.
     layout_file / save_layout: load or write a YAML layout file that re-creates the figure
-    (save_layout must end in .yaml or .yml)."""
+    (save_layout must end in .yaml or .yml).
+    like_source: draw this structure like a reference of the same fold (a file path or PDB ID): each element matched
+    to one of the reference's takes its place, angle, name and (coloured by identity) colour. One protein chain of
+    each: `chains` names this structure's (else its first; an assembly drawn by its symmetry is drawn on its own),
+    like_chain the reference's (needed when the reference is drawn as an assembly). like_match: auto (sequence at 40%
+    identity, else structure), sequence, structure, or a two-row alignment file (the reference's chain first). The
+    note, and the `provenance` item of kind "like", say how many elements matched, or why it was drawn on its own."""
     from . import layoutfile
     from .provenance import lines
     from .render import save
@@ -220,6 +229,9 @@ def draw_topology(
 
     if domains_from not in (None, "auto", "cath"):
         raise ValueError(f"domains_from is auto or cath; got {domains_from!r}")
+    if not like_source and (like_chain or like_match):
+        raise ValueError("like_chain and like_match need like_source (the reference structure)")
+    like = {"structure": like_source, "chain": like_chain, "match": like_match} if like_source else None
     path = _structure(source)
     keep = _checked(save_layout, LAYOUT_SUFFIXES) if save_layout else None  # checked first
     with _output(output_path, ".svg", path.stem, FIGURE_SUFFIXES) as out:
@@ -248,6 +260,7 @@ def draw_topology(
             names=names,
             swap=[tuple(p) for p in swap or []],
             move=[(ref, (d[0], d[1])) for ref, d in (move or {}).items()],
+            like=like,
         )
         drawn = draw_spec(spec)
         save(drawn.figure, out)

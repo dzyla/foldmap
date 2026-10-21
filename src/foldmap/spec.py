@@ -86,8 +86,11 @@ class FigureSpec:
         }
 
     def options(self) -> dict:
-        """The layout options as a layout file stores them."""
-        return {k: getattr(self, k) for k in layoutfile.LAYOUT}
+        """The layout options as a layout file stores them (like: the keys given, the reference as given)."""
+        out = {k: getattr(self, k) for k in layoutfile.LAYOUT}
+        if self.like:
+            out["like"] = {k: v for k, v in self.like.items() if v is not None}
+        return out
 
     def edits(self) -> dict:
         return {"rename": dict(self.rename), "swap": list(self.swap), "move": list(self.move)}
@@ -181,9 +184,36 @@ def figure_spec(
         chains=[c.strip() for c in chains.split(",") if c.strip()] if isinstance(chains, str) else chains,
         focus=str(pick("focus")),
         names=names,
-        like=pick("like"),
+        like=parse_like(pick("like")),
         **edits,
     )
+
+
+LIKE_KEYS = ("structure", "chain", "match", "layout")  # FigureSpec.like, as --like and its options give it
+
+
+def parse_like(value) -> dict | None:
+    """FigureSpec.like from --like's options or a layout file's `like` (a mapping of LIKE_KEYS, structure required),
+    checked and with every key: {structure, chain, match, layout}, match 'auto' when not given. None stays None."""
+    if value is None:
+        return None
+    if not isinstance(value, dict):
+        raise ValueError(
+            f"like is a mapping (structure, chain, match), e.g. {{structure: 2HHB, chain: B}}; got {value!r}"
+        )
+    unknown = [k for k in value if k not in LIKE_KEYS]
+    if unknown:
+        raise ValueError(f"like: unknown key(s) {', '.join(map(str, unknown))}; use {', '.join(LIKE_KEYS)}")
+    out = {}
+    for key in LIKE_KEYS:
+        v = value.get(key)
+        if v is not None and (isinstance(v, bool) or not isinstance(v, (str, int, float))):
+            raise ValueError(f"like: {key} is text; got {v!r}")
+        out[key] = str(v) if v is not None and str(v) != "" else None
+    if out["structure"] is None:
+        raise ValueError("like: structure (the reference, a file or PDB id) is required")
+    out["match"] = out["match"] or "auto"
+    return out
 
 
 def parse_flag(value, what: str) -> bool:

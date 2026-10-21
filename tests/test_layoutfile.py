@@ -232,3 +232,47 @@ def test_an_old_layout_file_with_two_fold_mirror_still_mirrors(tmp_path):
     assert look.two_fold == "mirror"
     lay, _, _ = make_layout(DATA / "2HHB.cif", look=look)
     assert type(lay.frame) is Frame and lay.frame.mirror_x is not None
+
+
+def test_a_figure_drawn_like_a_reference_round_trips(tmp_path):
+    """A13 with --like: the layout file records the reference as given, its chain and the match, and the figure
+    read back from it is the same (the SVG, and bench's signature of the layout)."""
+    import importlib.util
+
+    from foldmap.cli import make_layout
+    from foldmap.spec import figure_spec
+
+    script = Path(__file__).parent.parent / "scripts" / "bench.py"
+    bench = importlib.util.spec_from_file_location("foldmap_bench", script)
+    mod = importlib.util.module_from_spec(bench)
+    bench.loader.exec_module(mod)
+    path, lf = DATA / "2HHB.cif", tmp_path / "beta.yaml"
+    args = [str(path), "--chains", "B", "--like", str(path), "--like-chain", "A", "--set", "color_by=sequence"]
+    first = _svg(tmp_path, "a.svg", *args, "--save-layout", str(lf))
+    assert yaml.safe_load(lf.read_text(encoding="utf-8"))["layout"]["like"] == {
+        "structure": str(path),
+        "chain": "A",
+        "match": "auto",
+    }
+    again = _svg(tmp_path, "b.svg", str(path), "--layout-file", str(lf))
+    assert first == again
+    spec = figure_spec(path, layout_file=lf)
+    assert spec.like == {"structure": str(path), "chain": "A", "match": "auto", "layout": None}
+    read_back, _, _ = make_layout(path, spec.mode, spec.rotate, spec.flip_v, **spec.layout_kwargs())
+    direct, _, _ = make_layout(
+        path, chains=["B"], look=spec.look, like={"structure": str(path), "chain": "A", "match": "auto", "layout": None}
+    )
+    assert read_back.like_note.startswith("drawn like 2HHB.cif chain A: ")
+    assert mod.signature(read_back) == mod.signature(direct)
+
+
+@pytest.mark.parametrize(
+    "like, msg",
+    [("2HHB", "like is a mapping"), ({"chain": "A"}, "structure"), ({"structure": "2HHB", "colour": 1}, "colour")],
+    ids=["text", "no-structure", "unknown"],
+)
+def test_bad_like_in_a_layout_file_is_explained(tmp_path, like, msg, capsys):
+    lf = tmp_path / "bad.yaml"
+    lf.write_text(yaml.safe_dump({"foldmap": 1, "layout": {"like": like}}))
+    assert main(["plot", str(DATA / "1UBQ.cif"), "-o", str(tmp_path / "x.svg"), "--layout-file", str(lf)]) == 1
+    assert msg in capsys.readouterr().err
