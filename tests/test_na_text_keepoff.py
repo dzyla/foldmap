@@ -361,3 +361,93 @@ def test_a_crowded_letter_with_no_spot_in_sight_keeps_the_nearest_least_bad_one(
     assert np.hypot(spot[0] - x, spot[1] - y) <= 3.1 * NT_ROW + 1e-6  # one of the spots beside it
     bodies = list(lay.placed.values())
     assert _in_sight(spot, (x, y), bodies, _boxes_of(bodies))
+
+
+# ------------------------------------------------------------------------------------------------- na_line
+
+
+LMB = Path(__file__).parent / "data" / "1LMB.cif"
+
+
+def _widths(fig) -> dict[str, list[float]]:
+    """Each nucleic-acid backbone part's stroke width (points, as the SVG writes it), by kind."""
+    ax = fig.axes[0]
+    out: dict[str, list[float]] = {"run": [], "gap": [], "rails": [], "block": [], "legend-na": []}
+    for a in (*ax.lines, *ax.patches):
+        gid = a.get_gid() or ""
+        kind = gid.split(":")[3] if gid.startswith("na:stem:") and len(gid.split(":")) > 3 else gid
+        if gid.startswith("na:run:"):
+            out["gap" if a.get_linestyle() not in ("-", "solid") else "run"].append(float(a.get_linewidth()))
+        elif kind in ("rails", "block", "legend-na"):
+            out[kind].append(float(a.get_linewidth()))
+    return out
+
+
+@pytest.mark.parametrize("na_style", ["ladder", "block"])
+def test_na_line_widens_runs_rails_and_block_edges_in_proportion(na_style):
+    """At na_line 1.5 a run's stroke, a ladder's rails, a block's edge and the legend's backbone stroke are 1.5 times
+    as wide as at 1 (a cropped gap's dashes stay); the page is the same size, so the widths compare directly."""
+    from foldmap.cli import make_figure_and_loops
+    from foldmap.style import resolve_style
+
+    def widths(k):
+        look = resolve_style(None, None, [f"na_style={na_style}", f"na_line={k}"])
+        fig = make_figure_and_loops(LMB, look=look)[0]
+        return _widths(fig), tuple(fig.get_size_inches())
+
+    (one, size1), (wide, size2) = widths(1.0), widths(1.5)
+    assert size1 == size2
+    assert one["run"] and one[na_style if na_style == "block" else "rails"] and one["legend-na"]
+    for kind in ("run", "rails", "block", "legend-na"):
+        assert len(wide[kind]) == len(one[kind])
+        assert wide[kind] == pytest.approx([1.5 * w for w in one[kind]]), kind
+    assert wide["gap"] == one["gap"]
+
+
+def test_na_line_widens_the_ribbon_tube():
+    """The ribbon's backbone tube is na_line times as wide about the same centre line."""
+    from foldmap.render import _dna_turns
+
+    lay, _, _ = make_layout(LMB)
+    d = lay.stems[0]
+    for slot in (0, 1):
+        front, back = _dna_turns(d, slot)
+        front2, back2 = _dna_turns(d, slot, 1.5)
+        for q, q2 in zip(front + back, front2 + back2):
+            n = len(q) // 2  # a band: the centre line offset one way, then back the other
+            centre = (q[:n] + q[n:][::-1]) / 2
+            assert (q2[:n] + q2[n:][::-1]) / 2 == pytest.approx(centre)
+            assert q2[:n] - centre == pytest.approx(1.5 * (q[:n] - centre))
+
+
+def test_text_bands_grow_by_the_strand_stroke_only():
+    """line_band and _run_band (what texts keep from a line, as A6 reads it) grow by half the extra stroke of a
+    run, NA_RUN_W times na_line, and by nothing else; with a loop wider than the run, the loop's stroke rules."""
+    from dataclasses import replace
+
+    from foldmap.layout import NA_RUN_W, _run_band, line_band, line_pt, page_text
+    from foldmap.style import resolve_style
+
+    lay, sses, bb = make_layout(LMB)
+    route_loops(lay, sses, bb)  # the strands' drawn paths
+    assert lay.na_line == 1.0 and lay.na_paths and lay.loop_stroke < NA_RUN_W
+    unit = page_text(lay)[1]
+    pt = line_pt(1.0 / (72 * unit))
+    for k in (1.25, 1.5, 2.0):
+        wide = replace(lay, na_line=k)
+        extra = pt * NA_RUN_W * (k - 1.0) / 2 * unit
+        assert line_band(wide) - line_band(lay) == pytest.approx(extra)
+        assert _run_band(wide) - _run_band(lay) == pytest.approx(extra)
+    heavy = replace(lay, loop_stroke=3.0)
+    assert line_band(replace(heavy, na_line=2.0)) == line_band(heavy)  # 2.8 < 3: the loop rules
+    assert make_layout(LMB, look=resolve_style(None, None, ["na_line=2"]))[0].na_line == 2.0  # the layout carries it
+
+
+def test_text_keeps_off_a_strand_drawn_twice_as_wide():
+    """A6 (no text crossed by a line, bodies included) passes on 1LMB with the backbone twice as wide."""
+    from foldmap import criteria
+    from foldmap.spec import draw_spec, figure_spec
+
+    spec = figure_spec(LMB, style=["na_line=2", "na_backbone=chain"])
+    got = criteria.check_figure(draw_spec(spec), spec, LMB)["criteria"]
+    assert got["A6"]["pass"], got["A6"]

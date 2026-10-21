@@ -357,6 +357,7 @@ class Layout:
     font_scale: float = 1.0  # Style.font_scale the figure is drawn with (texts placed in the layout are sized by it)
     loop_stroke: float = 1.0  # a loop's drawn stroke in line_pt: Style.loop_width, RUN_EDGE_W times it under
     # residue colours (its dark edge); for line_band
+    na_line: float = 1.0  # Style.na_line the figure is drawn with: a nucleic-acid run's stroke is NA_RUN_W times it
     helix_matched: dict = field(default_factory=dict)  # {"cut", "joined"}: helix pieces made alike in copies (ss)
     helix_matched_ids: list[str] = field(default_factory=list)  # the helices those cuts and joins made
     na_letter_rows: tuple[float | None, bool] = (None, False)  # where a stem's base letters sit (NT_ROW, 0 on the
@@ -4459,6 +4460,7 @@ def build_layout(
     lay.mirror_pairs = [(a.sse.id, b.sse.id) for a, b in mirrored if isinstance(a, Placed) and a.sse.kind in ("H", "G")]
     lay.font_scale = style.font_scale
     lay.loop_stroke = style.loop_width * (RUN_EDGE_W if style.loop_color == "residue" else 1.0)
+    lay.na_line = style.na_line
     lay.ligands = style.ligands
     lay.ba_rows = _ba_rows(items)  # after the user's swaps
     lay.stack_gaps = _stack_gaps(lay)
@@ -5399,10 +5401,10 @@ def line_pt(scale: float) -> float:
 def line_band(layout: Layout) -> float:
     """How far (page units) a loop's ink reaches from its centre line as figcheck's A6 reads a line by a text
     (text_collisions at clearance 0: half the drawn stroke, line_pt times Layout.loop_stroke, or a nucleic-acid
-    strand's NA_RUN_W if wider), plus one pixel at figcheck's 100 dpi to spare (page_text): what a text placed after
-    routing keeps from every line (lines_meeting)."""
+    strand's NA_RUN_W times Layout.na_line if wider), plus one pixel at figcheck's 100 dpi to spare (page_text):
+    what a text placed after routing keeps from every line (lines_meeting)."""
     unit = page_text(layout)[1]  # page units per point
-    stroke = max(layout.loop_stroke, NA_RUN_W if layout.na_paths else 0.0)
+    stroke = max(layout.loop_stroke, NA_RUN_W * layout.na_line if layout.na_paths else 0.0)
     return (line_pt(1.0 / (72 * unit)) * stroke / 2 + 0.72) * unit
 
 
@@ -5646,7 +5648,8 @@ def _choose_label_sides(layout: Layout, sses: list[SSE], style: Style, mirrored:
     }
     beside = {}  # (stem, side) -> its name's (label_at, label_along) beside its letters (or its edge) there
     for d in layout.stems:
-        edge = (d.width + DNA_TUBE * d.width / DNA_W) / 2 if na_style == "ribbon" else d.rail  # drawn, without letters
+        tube = DNA_TUBE * layout.na_line * d.width / DNA_W  # render's ribbon tube
+        edge = (d.width + tube) / 2 if na_style == "ribbon" else d.rail  # drawn, without letters
         for side in (1, -1):
             beside[id(d), side] = _name_at(d, side, ink[id(d)], letter_ink[id(d)], edge, _INK_MARGIN * em)
     others_letters = {
@@ -5736,9 +5739,9 @@ def _leaving_stretches(layout: Layout) -> np.ndarray:
 
 def _run_band(layout: Layout) -> float:
     """How far a nucleic-acid run's ink reaches from its centre line as figcheck's A6 reads a line by a text (as
-    line_band, with a run's NA_RUN_W stroke), on the page as it stands."""
+    line_band, with a run's NA_RUN_W times Layout.na_line stroke), on the page as it stands."""
     unit = page_text(layout)[1]
-    stroke = max(layout.loop_stroke, NA_RUN_W)
+    stroke = max(layout.loop_stroke, NA_RUN_W * layout.na_line)
     return (line_pt(1.0 / (72 * unit)) * stroke / 2 + 0.72) * unit
 
 

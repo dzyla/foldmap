@@ -260,7 +260,7 @@ Change any key with `--set KEY=VALUE` (repeatable) or a YAML file for `--style-f
 `ligands` (`auto`, `all`, `none` or codes like `HEM,ZN`), `fold_template`, `helix_on_sheet`, `two_fold`, `cyclic`,
 `copy_ghosts`, `domain_bar`, `domain_colours`, `na_backbone`, `backbone_colors`, `dna_color`, `rna_color`, `hbonds`,
 `hbond_color`, `hbond_max`, `disulfides`, `glycans`, `helices_310`, `na_extent`, `na_style`, `background`, `ink`,
-`helix_scale`, `strand_scale`, `font_scale` (`dna_extent` still works on the command line and in style and layout
+`helix_scale`, `strand_scale`, `font_scale`, `na_line` (`dna_extent` still works on the command line and in style and layout
 files).
 
 ## Shaping a figure
@@ -518,6 +518,8 @@ an alias of `na_extent`.
 `#6a3d9a`), so they read apart from the black protein loops; contact beads keep the colour of the protein chain that
 touches them. `na_backbone` chooses the scheme: `modality` (the default: `dna_color` and `rna_color`), `chain` (one
 colour per nucleic-acid chain), `ink` (as the loops) or a single colour for all nucleic acid (`#rrggbb` or a name).
+`na_line` sets the backbone's weight (1 = the default; `1.5` draws runs, ladder rails, ribbon tubes and block edges
+half as thick again). It is a layout key: base letters and labels keep off a thicker strand, so they may move.
 `backbone_colors` overrides single backbones: a comma-separated list of `KEY=COLOUR`, where KEY is a chain id, or
 `protein`, `dna` or `rna`. A chain key beats a modality key, and `protein` or a protein chain id recolours the loops.
 Chain ids must exist in the figure (an unknown one is an error that lists the chains). Example, on a figure with

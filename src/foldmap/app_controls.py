@@ -200,6 +200,14 @@ def nucleic_block(st, ss: MutableMapping) -> None:
             colour(st, "RNA colour", ss, "rna_color")
         elif mode == "colour":
             st.color_picker("Backbone colour", **part(ss, "na_backbone__colour", "na_backbone"))
+    st.slider(
+        "Backbone width",
+        0.5,
+        3.0,
+        step=0.05,
+        help="the DNA/RNA backbone's line weight (1 = as before); texts keep off a thicker strand",
+        **setting(ss, "na_line"),
+    )
     st.toggle("Check contacts against the coordinates", **setting(ss, "check_contacts"))
 
 

@@ -416,6 +416,7 @@ CONTROLS: dict[str, tuple[str, str, tuple[str, ...]]] = {
     "na_style": ("Stems", _SHOW, ("na_style",)),
     "na_extent": ("Shown", _SHOW, ("na_extent",)),
     "na_backbone": ("Backbone", _SHOW, ("na_backbone__mode", "na_backbone__colour")),
+    "na_line": ("Backbone width", _SHOW, ("na_line",)),
     "dna_color": ("DNA colour", _SHOW, ("dna_color",)),
     "rna_color": ("RNA colour", _SHOW, ("rna_color",)),
     "backbone_colors": ("Per-chain colours", _SHOW, ("backbone_colors",)),

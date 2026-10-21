@@ -328,9 +328,10 @@ def _tube(pts: np.ndarray, width: float) -> np.ndarray:
     return np.vstack([pts + n, (pts - n)[::-1]])
 
 
-def _dna_turns(d: PlacedStem, slot: int) -> tuple[list[np.ndarray], list[np.ndarray]]:
+def _dna_turns(d: PlacedStem, slot: int, wide: float = 1.0) -> tuple[list[np.ndarray], list[np.ndarray]]:
     """Front and back half-turns of one backbone in duplex-local coordinates: the same half-turn fragment
-    repeated every turn (shifted by the minor groove for the second backbone), clipped to the duplex ends."""
+    repeated every turn (shifted by the minor groove for the second backbone), clipped to the duplex ends; the
+    tube `wide` times _DNA_TUBE (Style.na_line)."""
     x0, x1 = -d.length / 2, d.length / 2
     off = slot * DNA_MINOR * DNA_PITCH
     front, back = [], []
@@ -339,7 +340,7 @@ def _dna_turns(d: PlacedStem, slot: int) -> tuple[list[np.ndarray], list[np.ndar
             a, b = max(x0, off + (k + lo) * DNA_PITCH), min(x1, off + (k + hi) * DNA_PITCH)
             if b - a > 1e-6:
                 xs = np.linspace(a, b, _DNA_SEG)
-                dest.append(_tube(np.column_stack([xs, dna_y(slot, xs, d.width)]), _DNA_TUBE * d.width / DNA_W))
+                dest.append(_tube(np.column_stack([xs, dna_y(slot, xs, d.width)]), _DNA_TUBE * wide * d.width / DNA_W))
     return front, back
 
 
@@ -375,6 +376,7 @@ class _NAInk(NamedTuple):
     backbone: dict  # chain -> backbone colour (the shared nucleic-acid backbone helper's answer)
     seqs: list  # per strand, the residue number of each nucleotide as the structure file writes it
     em: float  # page units of one em of the text (font / points per page unit)
+    wide: float  # the backbone's weight (Layout.na_line): rails, runs, ribbon tubes and block edges
 
     def colour(self, strand: int) -> str:
         """The backbone colour of a strand: stem rails, ribbons, blocks, paths, hairpins, ties."""
@@ -415,7 +417,7 @@ def _ladder(ink: _NAInk, k: int, d: PlacedStem, where: dict, letters: dict) -> N
             _compound([r for r in parts if len(r) > 1], closed=False),
             fc="none",
             ec=colour,
-            lw=ink.lw * 2.2,
+            lw=ink.lw * 2.2 * ink.wide,
             capstyle="round",
             joinstyle="round",
             zorder=Z["na-front"],
@@ -471,7 +473,7 @@ def _ribbon(ink: _NAInk, k: int, d: PlacedStem, where: dict, letters: dict) -> N
     for n, (c, group) in enumerate(slots.items()):
         fronts, backs = [], []
         for slot in group:
-            f, b = _dna_turns(d, slot)
+            f, b = _dna_turns(d, slot, ink.wide)
             fronts += f
             backs += b
         suffix = "" if n == 0 else f":{n + 1}"
@@ -518,7 +520,7 @@ def _block(ink: _NAInk, k: int, d: PlacedStem, where: dict, letters: dict) -> No
             closed=True,
             fc="white" if ink.fill == "outline" else c,
             ec=c,
-            lw=ink.lw * 1.2,
+            lw=ink.lw * 1.2 * ink.wide,
             zorder=Z["na-front"],
         )
         body.set_gid(f"na:stem:{k}:block" if n == 0 else f"na:stem:{k}:block:{n + 1}")
@@ -572,7 +574,7 @@ def _draw_strands(ink: _NAInk, layout: Layout, style: str, where: dict, letters:
             pts[:, 0],
             pts[:, 1],
             color=ink.colour(path.strand),
-            lw=ink.lw * (1.0 if gap else NA_RUN_W),
+            lw=ink.lw * (1.0 if gap else NA_RUN_W * ink.wide),
             ls=((0, (2, 2)) if path.label else (0, (1, 1.5))) if gap else "-",
             solid_capstyle="round",
             solid_joinstyle="round",
@@ -723,6 +725,7 @@ def _draw_nucleic(
         backbone,
         [[lab.seq for lab in s.labels] for s in na.strands],
         font / pt_per_unit,
+        layout.na_line,
     )
     style = _na_style(layout, look)
     where = nucleotide_points(layout, style)  # nucleotide -> where it is drawn (bead and hydrogen bonds go there)
@@ -3816,7 +3819,9 @@ def _draw_legend(c: _Canvas, layout: Layout, legend: _Legend) -> None:
             (dash,) = c.ax.plot([x, x + 0.6], [y, y], color=colour, lw=c.loop_lw * 0.85, ls=(0, (3, 2)))
             dash.set_gid("legend-hbond")
         elif _NA_ENTRY.match(text):  # a nucleic-acid backbone: a short thick stroke, not a chain's square
-            (rail,) = c.ax.plot([x, x + 0.6], [y, y], color=colour, lw=c.lw * 2.4, solid_capstyle="butt")
+            (rail,) = c.ax.plot(  # as thick as the backbone is drawn (Style.na_line)
+                [x, x + 0.6], [y, y], color=colour, lw=c.lw * 2.4 * c.look.na_line, solid_capstyle="butt"
+            )
             rail.set_gid("legend-na")
         elif text == TIE_LEGEND:  # two short ticks, each with its letter, as a tie is drawn
             (ticks,) = c.ax.plot(

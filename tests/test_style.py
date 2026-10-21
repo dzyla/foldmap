@@ -522,3 +522,22 @@ def test_backbone_keys_are_listed_and_validated_with_clear_errors(capsys):
     assert all(k in text for k in ("na_backbone", "backbone_colors", "dna_color", "rna_color"))
     with pytest.raises(ValueError, match="dna_color"):
         resolve_style(None, None, ["dna_color=nope"])
+
+
+def test_na_line_is_a_layout_key_one_by_default(capsys):
+    """Plan 13b-4: the nucleic-acid backbone's weight (`--set na_line=1.5`); a layout key (texts keep off a thicker
+    strand), so no theme sets it; a positive number like the other scales."""
+    from foldmap.cli import main
+    from foldmap.style import SCALES, describe
+
+    assert Style().na_line == 1.0 and "na_line" in LAYOUT_KEYS and "na_line" in SCALES
+    assert all(theme.na_line == 1.0 for theme in THEMES.values())
+    assert resolve_style(overrides=["na_line=1.5"]).na_line == 1.5
+    for bad in ("0", "-1"):
+        with pytest.raises(ValueError, match="na_line must be a positive number"):
+            resolve_style(overrides=[f"na_line={bad}"])
+    with pytest.raises(ValueError, match="na_line must be a number"):
+        resolve_style(overrides=["na_line=thick"])
+    assert "na_line: 1.0" in describe(Style())
+    assert main(["styles"]) == 0
+    assert "na_line           positive number, 1 = default size" in capsys.readouterr().out.split("Layout keys")[1]

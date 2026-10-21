@@ -66,6 +66,7 @@ LAYOUT_KEYS = (
     "two_fold",
     "cyclic",
     "copy_ghosts",
+    "na_line",
 )  # these move elements
 NA_BACKBONES = ("modality", "chain", "ink")
 MODALITIES = ("protein", "dna", "rna")
@@ -88,7 +89,7 @@ def backbone_overrides(text: str) -> dict[str, str]:
     return out
 
 
-SCALES = ("helix_scale", "strand_scale", "dna_scale", "loop_width", "font_scale")
+SCALES = ("helix_scale", "strand_scale", "dna_scale", "loop_width", "font_scale", "na_line")
 
 
 @dataclass(frozen=True)
@@ -119,6 +120,8 @@ class Style:
     dna_scale: float = 1.0  # duplex diameter
     loop_width: float = 1.0  # line weight of loops
     font_scale: float = 1.0
+    na_line: float = 1.0  # line weight of DNA/RNA backbones (runs, ladder rails, ribbon tubes, block edges); a layout
+    # key: texts keep off a thicker run (layout.line_band)
     labels: bool = True  # strand letters, helix names
     legend: bool = True
     color_by: str = "chain"
