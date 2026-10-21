@@ -20,10 +20,25 @@ names deposited chains), and B alone (its same chain), judges both (criteria.che
 and the pair (criteria.like_checks, with the pair's kind for H1), and writes DIR/<stem>.json and two pages side by
 side (compare's page): DIR/<stem>-like.png (A | B drawn like A) and DIR/<stem>-alone.png (A | B drawn on its own).
 
+    python scripts/homologues.py sample --seed 20261021 --out docs/validation/homologues/heldout.json
+
+sample draws the held-out set (spec 4.4) from CATH's domain list (release CATH_RELEASE, downloaded once into
+~/.cache/foldmap/cath; CATH data CC BY 4.0, https://www.cathdb.info) with a seeded random.Random, in three strata
+drawn in this order: 20 "remote" pairs (one topology; two S35 clusters, of different superfamilies, or of one
+superfamily at structure-alignment identity under 30 %), 10 "close" pairs (one superfamily and S35 cluster, two S95
+clusters, identity 30-90 %) and 10 negatives (one architecture, two topologies). Only whole-chain domains (CATH's
+domain number 00: the chain is one domain) of 60-600 residues, of current entries, whose entries are not in the
+tuning set and not already in the held-out set. Each level (topology, cluster, domain) is chosen uniformly among the
+sorted keys. A drawn pair is kept when both chains are read (foldmap.fetch, --assembly asu) with 60-600 residues
+and the stratum's identity holds (foldmap.align.align_chains, structure route: identical / aligned pairs), else it
+is recorded under "rejected" with the reason and the next pair drawn. Positives are "remote" and "close".
+
     python scripts/homologues.py report --set docs/validation/homologues/tuning.json --out DIR [--md PATH]
 
 report reads DIR/<stem>.json of every pair and writes the table (DIR/report.md, or --md): per pair H1-H5, H2's and
-H3's values drawn alike and drawn independently, the checks B drawn like A loses, and the failures by check.
+H3's values drawn alike and drawn independently, the checks B drawn like A loses, and the failures by check. When
+the set's pairs carry a stratum (the held-out set), the table gains the stratum, and the report a summary (passes
+per check and stratum; the medians drawn independently and drawn alike), also written as JSON (DIR/summary.json).
 """
 
 from __future__ import annotations
@@ -31,17 +46,30 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import random
+import statistics
 import subprocess
 import sys
 import time
+import urllib.request
 from concurrent.futures import ThreadPoolExecutor
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = Path(__file__).resolve()
 CHECKS = ("H1", "H2", "H3", "H4", "H5")
 PAIR_TIMEOUT_S = 1800  # a pair's child is killed after this many seconds
+TUNING = ROOT / "docs" / "validation" / "homologues" / "tuning.json"
+CATH_RELEASE = "v4_3_0"  # CATH's domain list and names of this release (fixed: the sample does not move with CATH)
+CATH_URL = (
+    "https://download.cathdb.info/cath/releases/all-releases/{release}/cath-classification-data/{name}-{release}.txt"
+)
+STRATA = (("remote", 20, "positive"), ("close", 10, "positive"), ("negative", 10, "negative"))  # in draw order
+CHAIN_LENGTH = (60, 600)  # residues of a sampled chain (CATH's domain length, and as foldmap reads it)
+REMOTE_IDENTITY = 0.30  # a remote pair of one superfamily is kept under this identity
+CLOSE_IDENTITY = (0.30, 0.90)  # a close pair is kept at this identity (both inclusive)
+MAX_DRAWS = 400  # draws per stratum at most
 
 
 def read_set(path) -> list[dict]:
@@ -244,6 +272,254 @@ def cmd_run(args) -> int:
     return 0 if all(c == 0 for c in codes.values()) else 1
 
 
+# ------------------------------------------------------------------------------------------------------- sample
+
+
+@dataclass(frozen=True)
+class Domain:
+    """One line of CATH's domain list (CathDomainList v2.0)."""
+
+    name: str  # 1oaiA00: PDB id, chain, domain number (00: the whole chain is one domain)
+    cath: tuple[int, int, int, int]  # class, architecture, topology, homologous superfamily
+    s35: int
+    s95: int
+    length: int
+    resolution: float  # 999 NMR, 1000 obsolete entry
+
+    @property
+    def pdb(self) -> str:
+        return self.name[:4].upper()
+
+    @property
+    def chain(self) -> str:
+        return self.name[4]
+
+    def node(self, level: int) -> str:
+        """The CATH code to `level` (2 architecture, 3 topology, 4 superfamily)."""
+        return ".".join(str(x) for x in self.cath[:level])
+
+
+def read_domain_list(text: str) -> list[Domain]:
+    """CATH's domain list, every domain, in file order."""
+    out = []
+    for line in text.splitlines():
+        f = line.split()
+        if not f or line.startswith("#"):
+            continue
+        out.append(Domain(f[0], tuple(int(x) for x in f[1:5]), int(f[5]), int(f[7]), int(f[10]), float(f[11])))
+    return out
+
+
+def read_names(text: str) -> dict[str, str]:
+    """CATH's node names (cath-names: node, representative domain, ':' name)."""
+    out = {}
+    for line in text.splitlines():
+        if line.startswith("#") or ":" not in line:
+            continue
+        head, name = line.split(":", 1)
+        out[head.split()[0]] = name.strip()
+    return out
+
+
+def eligible(domains: list[Domain], exclude: set[str]) -> list[Domain]:
+    """The domains a held-out chain may be (module doc), one per entry, superfamily and S95 cluster (its first chain
+    by name), sorted by name."""
+    lo, hi = CHAIN_LENGTH
+    kept: dict[tuple, Domain] = {}
+    for d in sorted(domains, key=lambda d: d.name):
+        if d.name[5:7] != "00" or d.chain == "0" or not lo <= d.length <= hi or d.resolution >= 1000:
+            continue
+        if d.pdb in exclude:
+            continue
+        kept.setdefault((d.pdb, d.cath, d.s95), d)
+    return sorted(kept.values(), key=lambda d: d.name)
+
+
+def _tree(domains: list[Domain], keys) -> dict:
+    """Nested dicts by each key function in turn; the leaves are lists of domains in name order."""
+    root: dict = {}
+    for d in domains:
+        node = root
+        for k in keys[:-1]:
+            node = node.setdefault(k(d), {})
+        node.setdefault(keys[-1](d), []).append(d)
+    return root
+
+
+def _choose(rng: random.Random, options):
+    return options[rng.randrange(len(options))]
+
+
+def _down(rng: random.Random, node) -> Domain:
+    """One domain under a tree node, each level chosen uniformly among its sorted keys."""
+    while isinstance(node, dict):
+        node = node[_choose(rng, sorted(node))]
+    return _choose(rng, node)
+
+
+class Draws:
+    """The candidate pairs of each stratum, drawn from one seeded generator (module doc)."""
+
+    def __init__(self, domains: list[Domain], seed: int):
+        self.rng = random.Random(seed)
+        topology = _tree(domains, [lambda d: d.node(3), lambda d: (d.node(4), d.s35)])
+        self.remote = {t: c for t, c in topology.items() if len(c) >= 2}
+        close = _tree(domains, [lambda d: d.node(4), lambda d: d.s35, lambda d: d.s95])
+        self.close = {
+            h: {s: c for s, c in sub.items() if len(c) >= 2}
+            for h, sub in close.items()
+            if any(len(c) >= 2 for c in sub.values())
+        }
+        arch = _tree(domains, [lambda d: d.node(2), lambda d: d.node(3), lambda d: d.node(4), lambda d: d.s35])
+        self.negative = {a: t for a, t in arch.items() if len(t) >= 2}
+
+    def draw(self, stratum: str) -> tuple[Domain, Domain]:
+        rng = self.rng
+        if stratum == "remote":
+            clusters = self.remote[_choose(rng, sorted(self.remote))]
+            one, two = rng.sample(sorted(clusters), 2)
+            return _choose(rng, clusters[one]), _choose(rng, clusters[two])
+        if stratum == "close":
+            family = self.close[_choose(rng, sorted(self.close))]
+            clusters = family[_choose(rng, sorted(family))]
+            one, two = rng.sample(sorted(clusters), 2)
+            return _choose(rng, clusters[one]), _choose(rng, clusters[two])
+        topologies = self.negative[_choose(rng, sorted(self.negative))]
+        one, two = rng.sample(sorted(topologies), 2)
+        return _down(rng, topologies[one]), _down(rng, topologies[two])
+
+
+def _chain_read(pdb: str, chain: str):
+    """The chain's backbone as the campaign reads it (--assembly asu), and its residue count."""
+    from foldmap.cli import _resolve_structure
+    from foldmap.io import load_backbone, read_model
+
+    path = _resolve_structure(pdb)
+    bb = load_backbone(path, "asu", model=read_model(path, "asu"))
+    return bb, sum(1 for label in bb.labels if label.chain == chain)
+
+
+def verify(stratum: str, a: Domain, b: Domain) -> tuple[str, dict]:
+    """Why a drawn pair is not kept ('' when it is), and what was measured: each chain's residues as read, and the
+    structure alignment's identity, TM-score and aligned pairs."""
+    from foldmap.align import align_chains
+
+    lo, hi = CHAIN_LENGTH
+    got: dict = {}
+    sides = []
+    for side, d in (("a", a), ("b", b)):
+        try:
+            bb, n = _chain_read(d.pdb, d.chain)
+        except Exception as err:  # noqa: BLE001 - any failure to fetch or read rejects the pair, with its reason
+            return f"{d.pdb} not read: {type(err).__name__}: {err}", got
+        got[f"residues_{side}"] = n
+        if not lo <= n <= hi:
+            return f"{d.pdb} chain {d.chain}: {n} residues read", got
+        sides.append(bb)
+    aln = align_chains(sides[0], a.chain, sides[1], b.chain, "structure")
+    got.update(identity=_round(aln.identity), tm_score=_round(aln.tm_score), aligned=len(aln.pairs))
+    if stratum == "remote" and a.node(4) == b.node(4) and aln.identity >= REMOTE_IDENTITY:
+        return f"one superfamily at identity {aln.identity:.3f} (remote: under {REMOTE_IDENTITY:g})", got
+    if stratum == "close" and not CLOSE_IDENTITY[0] <= aln.identity <= CLOSE_IDENTITY[1]:
+        return f"identity {aln.identity:.3f} (close: {CLOSE_IDENTITY[0]:g}-{CLOSE_IDENTITY[1]:g})", got
+    return "", got
+
+
+def _cath_text(name: str) -> str:
+    """A CATH release file, downloaded once into ~/.cache/foldmap/cath."""
+    from foldmap.fetch import AGENT, CACHE, atomic_write
+
+    path = CACHE / "cath" / f"{name}-{CATH_RELEASE}.txt"
+    if not path.is_file():
+        req = urllib.request.Request(CATH_URL.format(release=CATH_RELEASE, name=name), headers={"User-Agent": AGENT})
+        with urllib.request.urlopen(req, timeout=300) as r:
+            atomic_write(path, r.read().decode("utf-8"))
+    return path.read_text(encoding="utf-8")
+
+
+def _describe(stratum: str, a: Domain, b: Domain, names: dict[str, str], got: dict) -> str:
+    def named(code: str) -> str:
+        return f"{code} ({names[code]})" if names.get(code) else code
+
+    if stratum == "negative":
+        head = f"negative: architecture {named(a.node(2))}; topologies {named(a.node(3))} / {named(b.node(3))}"
+    elif stratum == "close":
+        head = f"close: superfamily {named(a.node(4))}, S35 cluster {a.s35}, S95 clusters {a.s95} / {b.s95}"
+    else:
+        sf = named(a.node(4)) if a.node(4) == b.node(4) else f"{named(a.node(4))} / {named(b.node(4))}"
+        head = f"remote: topology {named(a.node(3))}; superfamilies {sf}"
+    return (
+        f"{head}. CATH {CATH_RELEASE} domains {a.name} ({a.length} residues) and {b.name} ({b.length}); read "
+        f"{got['residues_a']} and {got['residues_b']} residues; structure alignment: identity {got['identity']:.3f}, "
+        f"TM-score {got['tm_score']:.3f} over {got['aligned']} pairs."
+    )
+
+
+def sample(domains: list[Domain], names: dict[str, str], seed: int, exclude: set[str], check=verify) -> dict:
+    """The held-out set (module doc): {about, seed, cath_release, pairs (sorted as the tuning set), rejected (in
+    draw order)}. `check(stratum, a, b)` -> (reason, measured) is verify; tests pass their own."""
+    pool = eligible(domains, exclude)
+    draws = Draws(pool, seed)
+    used = set(exclude)
+    pairs, rejected = [], []
+    for stratum, wanted, kind in STRATA:
+        kept = 0
+        for _ in range(MAX_DRAWS):
+            if kept == wanted:
+                break
+            a, b = draws.draw(stratum)
+            if a.pdb == b.pdb or a.pdb in used or b.pdb in used:
+                reason, got = "an entry already in the set (or both chains of one entry)", {}
+            else:
+                reason, got = check(stratum, a, b)
+            if reason:
+                rejected.append({"stratum": stratum, "a": a.name, "b": b.name, "reason": reason, **got})
+                continue
+            used |= {a.pdb, b.pdb}
+            kept += 1
+            pairs.append(
+                {
+                    "a": {"id": a.pdb, "chain": a.chain},
+                    "b": {"id": b.pdb, "chain": b.chain},
+                    "kind": kind,
+                    "stratum": stratum,
+                    "cath": {"a": f"{a.name} {a.node(4)}", "b": f"{b.name} {b.node(4)}"},
+                    "note": _describe(stratum, a, b, names, got),
+                }
+            )
+        if kept < wanted:
+            raise RuntimeError(f"{stratum}: {kept} of {wanted} pairs in {MAX_DRAWS} draws")
+    pairs.sort(key=lambda p: (p["a"]["id"], p["a"]["chain"], p["b"]["id"], p["b"]["chain"]))
+    lo, hi = CHAIN_LENGTH
+    return {
+        "about": (
+            f"Plan 13a held-out homologue set (spec 4.4), drawn by `scripts/homologues.py sample --seed {seed}` from "
+            f"CATH {CATH_RELEASE} (CC BY 4.0, https://www.cathdb.info): whole-chain domains of {lo}-{hi} residues, "
+            "entries of the tuning set excluded, each entry at most once. A is the reference, B is drawn like it. "
+            "Strata: remote (one topology; other superfamily, or identity under 30 %), close (one superfamily, "
+            "identity 30-90 %), negative (one architecture, other topology). Identity: identical / aligned pairs of "
+            "foldmap's structure alignment. Measured once (Task 13a-11)."
+        ),
+        "seed": seed,
+        "cath_release": CATH_RELEASE,
+        "pairs": pairs,
+        "rejected": rejected,
+    }
+
+
+def cmd_sample(args) -> int:
+    exclude = {p[side]["id"].upper() for p in read_set(args.exclude) for side in ("a", "b")}
+    data = sample(
+        read_domain_list(_cath_text("cath-domain-list")), read_names(_cath_text("cath-names")), args.seed, exclude
+    )
+    out = Path(args.out)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(json.dumps(data, indent=1, ensure_ascii=False) + "\n", encoding="utf-8")
+    counts = {s: sum(p["stratum"] == s for p in data["pairs"]) for s, _, _ in STRATA}
+    print(f"wrote {out}: {counts}, {len(data['rejected'])} drawn pairs rejected")
+    return 0
+
+
 # ------------------------------------------------------------------------------------------------------- report
 
 
@@ -261,22 +537,91 @@ def _share(v: dict | None) -> str:
     return "–" if not v else f"{v['share']:.3f} ({v['pairs']})"
 
 
+def _outcome(c: dict | None) -> str:
+    if not c or c.get("pass") is None:
+        return "not judged"
+    return "pass" if c["pass"] else "fail"
+
+
+def _median(xs: list[float]) -> float | None:
+    return _round(statistics.median(xs)) if xs else None
+
+
+def summarize(pairs: list[dict], results: dict[str, dict]) -> dict:
+    """The held-out summary (module doc): per stratum the pairs, their results and each check's outcomes; the
+    positives that pass H1-H5 and the negatives refused (H1); H2's median and H3's share over the positives with H2
+    judged, drawn independently and drawn alike (the medians of the pairs' values); the alignment routes."""
+    out: dict = {"strata": {}, "positives": {}, "negatives": {}}
+    for stratum in dict.fromkeys(p.get("stratum", p["kind"]) for p in pairs):
+        group = [p for p in pairs if p.get("stratum", p["kind"]) == stratum]
+        got = [results[stem(p)] for p in group if stem(p) in results]
+        out["strata"][stratum] = {
+            "pairs": len(group),
+            "results": len(got),
+            "checks": {
+                k: {o: sum(_outcome(r["like"][k]) == o for r in got) for o in ("pass", "fail", "not judged")}
+                for k in CHECKS
+            },
+            "all_pass": sum(all(r["like"][k].get("pass") is True for k in CHECKS) for r in got),
+            "routes": {
+                m: sum((r["alignment"] or {}).get("method") == m for r in got) for m in ("sequence", "structure")
+            },
+            "tm_range": [
+                _round(min(t)) if (t := [r["alignment"]["tm_score"] for r in got if r["alignment"]]) else None,
+                _round(max(t)) if t else None,
+            ],
+        }
+    pos = [p for p in pairs if p["kind"] == "positive"]
+    neg = [p for p in pairs if p["kind"] == "negative"]
+    rp = [results[stem(p)] for p in pos if stem(p) in results]
+    rn = [results[stem(p)] for p in neg if stem(p) in results]
+    judged = [r for r in rp if (r["like"]["H2"].get("value") and r["like"]["H2"].get("baseline"))]
+    out["positives"] = {
+        "pairs": len(pos),
+        "results": len(rp),
+        "all_pass": sum(all(r["like"][k].get("pass") is True for k in CHECKS) for r in rp),
+        "pass": {k: sum(r["like"][k].get("pass") is True for r in rp) for k in CHECKS},
+        "judged_h2": len(judged),
+        "h2_median_independent": _median([r["like"]["H2"]["baseline"]["median"] for r in judged]),
+        "h2_median_alike": _median([r["like"]["H2"]["value"]["median"] for r in judged]),
+        "h2_p90_independent": _median([r["like"]["H2"]["baseline"]["p90"] for r in judged]),
+        "h2_p90_alike": _median([r["like"]["H2"]["value"]["p90"] for r in judged]),
+        "h3_share_independent": _median(
+            [r["like"]["H3"]["baseline"]["share"] for r in judged if r["like"]["H3"].get("baseline")]
+        ),
+        "h3_share_alike": _median([r["like"]["H3"]["value"]["share"] for r in judged if r["like"]["H3"].get("value")]),
+        "h2_closer_alike": sum(
+            r["like"]["H2"]["value"]["median"] < r["like"]["H2"]["baseline"]["median"] for r in judged
+        ),
+    }
+    out["negatives"] = {
+        "pairs": len(neg),
+        "results": len(rn),
+        "refused": sum(r["like"]["H1"].get("pass") is True for r in rn),
+        "h5_pass": sum(r["like"]["H5"].get("pass") is True for r in rn),
+    }
+    return out
+
+
 def write_report(pairs: list[dict], out: Path, md: Path) -> Path:
     """The table of every pair's result (module doc)."""
-    rows, failures, missing = [], {k: [] for k in CHECKS}, []
+    rows, failures, missing, results = [], {k: [] for k in CHECKS}, [], {}
+    strata = any("stratum" in p for p in pairs)
     for p in pairs:
         f = out / f"{stem(p)}.json"
         if not f.is_file():
             missing.append(stem(p))
             continue
         r = json.loads(f.read_text(encoding="utf-8"))
+        results[stem(p)] = r
         h, aln, m = r["like"], r["alignment"] or {}, r["mates"] or {}
         for k in CHECKS:
             if h[k].get("pass") is False:
-                failures[k].append(f"{r['pair']} ({r['kind']}): {h[k]['detail']}")
+                failures[k].append(f"{r['pair']} ({p.get('stratum', r['kind'])}): {h[k]['detail']}")
         lost = (h["H5"].get("value") or {}).get("lost") or []
+        kind = f"{r['kind']} | {p['stratum']}" if strata else r["kind"]
         rows.append(
-            f"| {r['pair']} | {r['kind']} | {aln.get('method', '–')} | {aln.get('tm_score', 0):.3f} | "
+            f"| {r['pair']} | {kind} | {aln.get('method', '–')} | {aln.get('tm_score', 0):.3f} | "
             f"{m.get('mates', 0)}/{m.get('pieces', 0)}/{m.get('extras', 0)}/{m.get('only_a', 0)} | "
             + " | ".join(_word(h[k]) for k in CHECKS)
             + f" | {_place(h['H2'].get('value'))} | {_place(h['H2'].get('baseline'))} | "
@@ -290,9 +635,9 @@ def write_report(pairs: list[dict], out: Path, md: Path) -> Path:
         "mate pairs whose page relation agrees (pairs judged). 'alike': B drawn like A; 'indep.': A and B drawn "
         "independently (the baseline). Lost: checks B drawn alone passes and B drawn like A does not (H5).",
         "",
-        "| pair | kind | route | TM | elements | H1 | H2 | H3 | H4 | H5 | H2 alike | H2 indep. | H3 alike | "
-        "H3 indep. | lost |",
-        "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|",
+        "| pair | kind | " + ("stratum | " if strata else "") + "route | TM | elements | H1 | H2 | H3 | H4 | H5 | "
+        "H2 alike | H2 indep. | H3 alike | H3 indep. | lost |",
+        "|---|---|" + ("---|" if strata else "") + "---|---|---|---|---|---|---|---|---|---|---|---|---|",
         *rows,
         "",
         "## Failures by check",
@@ -303,6 +648,32 @@ def write_report(pairs: list[dict], out: Path, md: Path) -> Path:
         lines += [f"  - {x}" for x in failures[k]]
     if missing:
         lines += ["", f"No result (the pair's child failed; see its log): {', '.join(missing)}"]
+    if strata:
+        summary = summarize(pairs, results)
+        (out / "summary.json").write_text(json.dumps(summary, indent=1, sort_keys=True) + "\n", encoding="utf-8")
+        lines += ["", "## Summary", "", "| stratum | pairs | results | all pass | " + " | ".join(CHECKS) + " |"]
+        lines.append("|---|---|---|---|" + "---|" * len(CHECKS))
+        for name, g in summary["strata"].items():
+            cells = [f"{g['checks'][k]['pass']} / {g['checks'][k]['fail']} / {g['checks'][k]['not judged']}"
+                     for k in CHECKS]  # fmt: skip
+            lines.append(f"| {name} | {g['pairs']} | {g['results']} | {g['all_pass']} | " + " | ".join(cells) + " |")
+        ps, ns = summary["positives"], summary["negatives"]
+
+        def num(x):
+            return "–" if x is None else f"{x:.2f}"
+
+        lines += [
+            "",
+            "Cells: pass / fail / not judged.",
+            "",
+            f"- Positives passing H1-H5: {ps['all_pass']} of {ps['pairs']}; negatives refused (H1): {ns['refused']} "
+            f"of {ns['pairs']}.",
+            f"- Over the {ps['judged_h2']} positives with H2 judged (medians of the pairs' values): H2 median "
+            f"drawn independently {num(ps['h2_median_independent'])}, drawn alike {num(ps['h2_median_alike'])}; "
+            f"H2 90th percentile {num(ps['h2_p90_independent'])} and {num(ps['h2_p90_alike'])}; H3 share "
+            f"{num(ps['h3_share_independent'])} and {num(ps['h3_share_alike'])}. Closer drawn alike (H2 median): "
+            f"{ps['h2_closer_alike']} of {ps['judged_h2']}.",
+        ]
     md.parent.mkdir(parents=True, exist_ok=True)
     md.write_text("\n".join(lines) + "\n", encoding="utf-8")
     print(f"wrote {md}")
@@ -332,12 +703,17 @@ def main(argv: list[str] | None = None) -> int:
     rn.add_argument("--jobs", type=int, default=4)
     rn.add_argument("--pairs", default="", help="only these stems (A_CHAIN-B_CHAIN), comma-separated")
     rn.add_argument("--md", default="")
+    sm = sub.add_parser("sample", help="draw the held-out set from CATH (needs network)")
+    sm.add_argument("--seed", type=int, required=True)
+    sm.add_argument("--out", required=True)
+    sm.add_argument("--exclude", default=str(TUNING), help="a set whose entries are left out (default: the tuning set)")
     rp = sub.add_parser("report", help="the table of a run")
     rp.add_argument("--set", required=True)
     rp.add_argument("--out", required=True)
     rp.add_argument("--md", default="")
     args = ap.parse_args(argv)
-    return {"align": cmd_align, "pair": cmd_pair, "run": cmd_run, "report": cmd_report}[args.command](args)
+    commands = {"align": cmd_align, "pair": cmd_pair, "run": cmd_run, "sample": cmd_sample, "report": cmd_report}
+    return commands[args.command](args)
 
 
 if __name__ == "__main__":
