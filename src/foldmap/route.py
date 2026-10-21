@@ -824,6 +824,28 @@ def _still_over(layout: Layout, sses: list[SSE], loops: list[Loop]) -> None:
             lp.crosses_labels = _text_hits(lp.points, boxes) > 0
 
 
+def _turned_over(layout: Layout, sses: list[SSE], loops: list[Loop]) -> None:
+    """Loop.crosses_labels of a rosette copy's loops (route._rosette_pairs: its mate's route turned, not routed round
+    the copy's own names, which stand upright with their sides chosen after the turn): true where the loop runs
+    within layout.line_band of a helix name's ink (_name_ink, as _clear_helix_names reads it) or of another text or
+    stub (label_boxes; not the axis symbol, which every copy's loops keep off alike), A6's reading of a line by a
+    text, once the names are final (_clear_helix_names, _clear_termini)."""
+    if not loops:
+        return
+    from .layout import line_band, lines_meeting, segments_of
+
+    em = _ink_em(layout, layout.font_scale)
+    names = [p for p in layout.placed.values() if p.sse.kind in ("H", "G") and p.label]
+    boxes = [_name_ink(layout, p, em) for p in names]
+    boxes += [b for n, b in label_boxes(layout, sses) if not n.startswith("label:") and n != "axis"]
+    if not boxes:
+        return
+    band = line_band(layout)
+    for lp in loops:
+        segs = segments_of([lp.points])
+        lp.crosses_labels = not lp.fallback and bool(len(segs)) and bool(lines_meeting(boxes, segs, band).any())
+
+
 _END_TURNS = (0.0, 45.0, -45.0, 90.0, -90.0)  # degrees a chain end's letter may turn round its stub's tip ...
 _END_OUT = (0.0, 0.3, 0.6)  # ... and page units further out than END_LABEL, nearest first
 
@@ -989,9 +1011,9 @@ def route_loops(layout: Layout, sses: list[SSE], bb) -> list[Loop]:
             routed[(a.id, b.id)] = (_curve(pa.c_port, pa.exit_c, pb.n_port, pb.exit_n), True, False)
         else:
             routed[(a.id, b.id)] = (pts, False, over)
-    for (a, b), (mate, k) in turned.items():
-        pts, fb, over = routed[mate]
-        routed[(a, b)] = (_turned_route(layout, pts, k, layout.placed[a], layout.placed[b]), fb, over)
+    for (a, b), (mate, k) in turned.items():  # over: not the mate's flag (the copy's names are upright, their sides
+        pts, fb, _ = routed[mate]  # chosen after the turn), set once the names are final (_turned_over)
+        routed[(a, b)] = (_turned_route(layout, pts, k, layout.placed[a], layout.placed[b]), fb, False)
     if log.isEnabledFor(logging.DEBUG):
         crossing = sum(  # fallback curves through an element (other than their own two)
             fb and not _clear(pts, (layout.placed[a], layout.placed[b]), *elements)
@@ -1030,6 +1052,7 @@ def route_loops(layout: Layout, sses: list[SSE], bb) -> list[Loop]:
     _clear_helix_names(layout, sses, out)
     _clear_termini(layout, sses, out)
     _still_over(layout, sses, out)
+    _turned_over(layout, sses, [lp for lp in out if (lp.a_id, lp.b_id) in turned])
     log.debug(  # fix round 1: what the second searches (and slab-closed searches) spent of the budgets, windows' with
         "%d second-search nodes spent of %d: %d searches, %d refused for the budget; %d slab-closed searches, %d nodes",
         _MAX_NODES_PAGE - router.wide_left + _MAX_NODES_WINDOWS - router.window_left,

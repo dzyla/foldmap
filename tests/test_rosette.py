@@ -267,3 +267,63 @@ def test_one_subunit_drawn_notes_the_rosette_needs_the_whole_assembly():
         "cyclic=rosette: the C7 assembly not drawn as a rosette, one subunit is drawn and the rosette needs the whole "
         "assembly (--focus none)"
     ]
+
+
+# ------------------------------------------------------------------ plan 21 final review: notes, edits, A11 columns
+
+
+@pytest.mark.parametrize(
+    ("kw", "why"),
+    [
+        ({"mode": "stack"}, "drawn unrolled, a rosette is drawn in projected mode only"),
+        ({"rotate": 30.0}, "not drawn as a rosette, a view, a turn or a flip was asked for"),
+        (
+            {"domains": "auto"},
+            "drawn unrolled, domain panels are not yet drawn in a rosette (drop --domains to draw the rosette)",
+        ),
+        (
+            {"focus": "A,B"},
+            "not drawn as a rosette, only chain(s) A, B are drawn and the rosette needs the whole "
+            "assembly (--focus none)",
+        ),
+    ],
+)
+def test_a_c4_the_rosette_cannot_draw_is_the_default_figure_with_a_note(kw, why):
+    """KcsA (1BL8, C4) asked for as a rosette in stack mode, turned, with domains or with chains named: drawn exactly
+    as without the key, and one note saying why."""
+    rosette, default = drawn(DATA / "1BL8.cif", "cyclic=rosette", **kw), drawn(DATA / "1BL8.cif", **kw)
+    assert not rosette.layout.rosette and not rosette.layout.cyclic_assembly
+    _same_figure(rosette, default)
+    assert _cyclic_notes(rosette) == [f"cyclic=rosette: the C4 assembly {why}"]
+
+
+def test_a_membrane_view_notes_the_membrane_not_a_view_asked_for():
+    """KcsA with --membrane auto and no view asked for: the note names the membrane, never a view or a turn."""
+    notes = _cyclic_notes(drawn(DATA / "1BL8.cif", "cyclic=rosette", membrane="auto"))
+    assert len(notes) == 1 and notes[0].endswith("a membrane view keeps the bilayer across the page")
+
+
+def test_edits_naming_a_copy_are_noted_not_applied(kcsa):
+    """A move naming a copy's element is not applied (each copy is protomer 0 turned): the same figure, and a note
+    naming the edit and the chain to edit instead."""
+    lay = kcsa.layout
+    p = next(p for p in lay.placed.values() if lay.frame.sector[p.sse.chain] == 1)
+    ref = f"{p.sse.chain}:{p.label}"
+    d = drawn(DATA / "1BL8.cif", "cyclic=rosette", move=[(ref, (0.0, 5.0))])
+    assert [(k, q.cx, q.cy) for k, q in d.layout.placed.items()] == [(k, q.cx, q.cy) for k, q in lay.placed.items()]
+    first = ", ".join(sorted(c for c, k in lay.frame.sector.items() if k == 0))
+    assert (
+        f"edits naming a copy ({ref}) are not applied: a rosette draws every copy as the first; edit chain {first}'s"
+    ) in _cyclic_notes(d)
+    assert not any("edits naming a copy" in t for t in _cyclic_notes(kcsa))
+
+
+def test_sheet_columns_group_by_the_column_first_value():
+    """A11's columns: values within COLUMN_TOL of a column's first value share it (3KGS's 23.2525 +- 8e-6), values a
+    pitch apart do not, and a run of close values cannot chain a column wider than COLUMN_TOL."""
+    from foldmap.figcheck import COLUMN_TOL, sheet_columns
+
+    assert set(sheet_columns([23.2525 - 8e-6, 23.2525, 23.2525 + 8e-6]).values()) == {0}
+    assert sheet_columns([23.2525, 24.2525]) == {23.2525: 0, 24.2525: 1}
+    step = 0.8 * COLUMN_TOL
+    assert sheet_columns([0.0, step, 2 * step]) == {0.0: 0, step: 0, 2 * step: 1}

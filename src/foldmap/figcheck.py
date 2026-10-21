@@ -117,6 +117,20 @@ def honest_crossings(lay, loops) -> int:
 
 
 COLUMN_TOL = 1e-3  # page units (in strand pitches across a sheet, _across): two strands this close share a column
+
+
+def sheet_columns(values) -> dict[float, int]:
+    """Each value across a sheet (_across) -> its column, counted from 0 in increasing order: a value within
+    COLUMN_TOL of its column's first value shares that column (3-decimal rounding split 3KGS's 23.2525 +- 8e-6 in
+    two); measured from the first, never the one before, so a run of close values cannot drift a column wide."""
+    place, n, first = {}, -1, None
+    for x in sorted(set(values)):
+        if first is None or x - first > COLUMN_TOL:
+            n, first = n + 1, x
+        place[x] = n
+    return place
+
+
 ROSETTE_TURN_TOL = 1e-3  # page units: a turned copy back within this of its mate stands exactly where its mate does
 
 
@@ -158,14 +172,19 @@ def local_layout(lay):
     return out
 
 
-BODY_TOUCH = 5e-3  # page units: bodies meeting by no more than this touch (angles on the 1e-4 rad grid tilt a
-# strand's corners by up to half its length times that: neighbours in a sheet touch)
+def _body_touch(p, q) -> float:
+    """Page units two bodies of different rosette copies may meet by and still only touch: what the grid can move a
+    corner by, a copy's angle on the 1/_GRID rad grid (half the longer body's length times that) and its centre on
+    the 1/_GRID page-unit grid (layout._rosette snaps both after the turn)."""
+    from .layout import _GRID
+
+    return (max(p.length, q.length) / 2 + 1.0) / _GRID
 
 
-def _bodies_meet(p, q) -> bool:
-    """Whether two elements' bodies (rectangles along their own axes, length x width) overlap, by separating axes:
-    a rosette's turned copies stand at any angle, where their rects (the boxes round them) meet without the bodies
-    meeting."""
+def _bodies_meet(p, q, touch: float = 1e-6) -> bool:
+    """Whether two elements' bodies (rectangles along their own axes, length x width) overlap by more than `touch`,
+    by separating axes: a rosette's turned copies stand at any angle, where their rects (the boxes round them) meet
+    without the bodies meeting."""
 
     def corners(e):
         d = np.array([math.cos(e.angle), math.sin(e.angle)])
@@ -177,32 +196,56 @@ def _bodies_meet(p, q) -> bool:
     (cp, ap), (cq, aq) = corners(p), corners(q)
     for axis in (*ap, *aq):
         a, b = cp @ axis, cq @ axis
-        if min(a.max(), b.max()) - max(a.min(), b.min()) <= BODY_TOUCH:
+        if min(a.max(), b.max()) - max(a.min(), b.min()) <= touch:
             return False
     return True
+
+
+def _own_rect(p) -> tuple[float, float, float, float]:
+    """A rosette element's rect in its copy's own frame (local_layout's `p`), its angle read on the page axis it was
+    laid out along when within one 1/_GRID rad step of it: layout._rosette stores every angle on that grid (π/2 as
+    1.5708), which tilts an upright strand's box by a few 1e-6 page units, and two sheet neighbours that touch in the
+    protomer's own layout would then meet by more than the default rule's 1e-6."""
+    from .layout import _GRID
+
+    quarter = round(p.angle / (math.pi / 2)) * (math.pi / 2)
+    a = quarter if abs(p.angle - quarter) <= 1.0 / _GRID else p.angle
+    hx = abs(math.cos(a)) * p.length / 2 + abs(math.sin(a)) * p.width / 2
+    hy = abs(math.sin(a)) * p.length / 2 + abs(math.cos(a)) * p.width / 2
+    return (p.cx - hx, p.cy - hy, p.cx + hx, p.cy + hy)
+
+
+def _rects_meet(a, b) -> bool:
+    """Whether two page boxes overlap by more than 1e-6 both ways (the default figure's element-overlap rule)."""
+    return min(a[2], b[2]) - max(a[0], b[0]) > 1e-6 and min(a[3], b[3]) - max(a[1], b[1]) > 1e-6
 
 
 def element_overlaps(lay) -> list[tuple[str, str]]:
     """Pairs of element or stem boxes (their rects) that overlap, except two consecutive pieces of one bent duplex,
     which meet at their joint (layout.joined_pieces), and a helix drawn over a sheet with that sheet's strands
     (layout.lying_over). nacheck.render_checks counts these as its overlaps. In a rosette (Layout.rosette) two
-    elements overlap when their bodies do (_bodies_meet): its turned copies' rects are boxes round tilted bodies."""
+    elements of one copy overlap when their rects do in the copy's own frame (local_layout, _own_rect: the default
+    rule); two
+    of different copies when their bodies do (_bodies_meet, by what the grid can move a corner: _body_touch), as
+    the turned copies' page rects are boxes round tilted bodies."""
     joined = joined_pieces(lay.stems, lay.nucleic) if lay.nucleic is not None else set()
     joined |= lying_over(lay)
     if getattr(lay, "rosette", 0):
-        bodies = list(lay.placed.values())
-        return [
-            (p.sse.id, q.sse.id)
-            for p, q in combinations(bodies, 2)
-            if frozenset((p.sse.id, q.sse.id)) not in joined and _bodies_meet(p, q)
-        ]
+        sector, own = lay.frame.sector, local_layout(lay).placed
+        out = []
+        for p, q in combinations(lay.placed.values(), 2):
+            if frozenset((p.sse.id, q.sse.id)) in joined:
+                continue
+            if sector.get(p.sse.chain) == sector.get(q.sse.chain):
+                meet = _rects_meet(_own_rect(own[p.sse.id]), _own_rect(own[q.sse.id]))
+            else:
+                meet = _bodies_meet(p, q, _body_touch(p, q))
+            if meet:
+                out.append((p.sse.id, q.sse.id))
+        return out
     boxes = [(p.sse.id, p.rect) for p in lay.placed.values()] + [(d.id, d.rect) for d in lay.stems]
     return [
-        (i, j)
-        for (i, a), (j, b) in combinations(boxes, 2)
-        if min(a[2], b[2]) - max(a[0], b[0]) > 1e-6
-        and min(a[3], b[3]) - max(a[1], b[1]) > 1e-6
-        and frozenset((i, j)) not in joined
+        (i, j) for (i, a), (j, b) in combinations(boxes, 2) if _rects_meet(a, b) and frozenset((i, j)) not in joined
     ]
 
 
@@ -1386,11 +1429,7 @@ def order_checks(drawn) -> list[str]:
         seen, wanted = got, want
         if sheet.accessory:  # the track in order; each accessory strand in a column next to its parent's
             drawn = {i: float(np.array([at[k][i].cx, at[k][i].cy]) @ _across(at[k])) for i in at[k]}
-            place, n, last = {}, -1, None  # columns: values within COLUMN_TOL of the one before share its column (a
-            for x in sorted(set(drawn.values())):  # 3-decimal rounding split 3KGS's 23.2525 +- 8e-6 in two)
-                if last is None or x - last > COLUMN_TOL:
-                    n += 1
-                place[x], last = n, x
+            place = sheet_columns(drawn.values())
             seen = [i for i in got if i in want]
             for a in sheet.accessory:
                 i, p = a.strand.id, a.parent.id

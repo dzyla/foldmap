@@ -340,6 +340,8 @@ class Layout:
     rosette: int = 0  # a Cn assembly drawn as a rosette (Style.cyclic, plan 21): n, its n-fold axis at page (0, 0)
     rosette_push: float = 0.0  # page units each copy was pushed out from the axis to clear its neighbours
     rosette_strays: list[str] = field(default_factory=list)  # copy elements with no protomer-0 mate, placed alone
+    rosette_dropped: list[str] = field(default_factory=list)  # edits (move, swap, rename) naming a copy's element,
+    # not applied: a rosette draws every copy as protomer 0 turned (provenance notes them)
     rosette_mates: dict[str, tuple[str, int]] = field(default_factory=dict)  # a rosette's copy element -> (its
     # protomer-0 mate, its protomer k): drawn as the mate turned by frame.angles[k] (route turns the mate's loops)
     cyclic_note: str = ""  # what the notes say of Style.cyclic: why a rosette asked for was drawn unrolled, or how
@@ -3583,7 +3585,8 @@ def _rosette_push(members: list[Placed], angles: list[float], out: np.ndarray) -
     delta = 0.0
     while delta < _ROSETTE_MAX_PUSH:
         q = pts + delta * out
-        if all((cdist(q, turn2(q, a)) - reach).min() >= 0 for a in angles[1:]):
+        # the turned copy snapped to the grid, as local() snaps it: a cos/sin ulp never decides the push
+        if all((cdist(q, _snap(turn2(q, a))) - reach).min() >= -1e-9 for a in angles[1:]):
             break
         delta += _ROSETTE_STEP
     return float(delta)
@@ -3668,6 +3671,11 @@ def _rosette(sses: list[SSE], sheets: list[Sheet], frame, mode: str, kw: dict) -
     sub["rename"] = {r: v for r, v in (kw.get("rename") or {}).items() if mine(r)}
     sub["swap"] = [(a, b) for a, b in kw.get("swap") or [] if mine(a) and mine(b)]
     sub["move"] = [(r, d) for r, d in kw.get("move") or [] if mine(r)]
+    dropped = [  # the user's edits naming a copy's element: not applied (each copy is protomer 0 turned), noted
+        *(r for r in kw.get("rename") or {} if not mine(r)),
+        *(r for pair in kw.get("swap") or [] for r in pair if not mine(r)),
+        *(r for r, _ in kw.get("move") or [] if not mine(r)),
+    ]
     sub["bridges"] = [b for b in kw.get("bridges") or [] if b[0] in ids0 and b[2] in ids0]
     sub["domains"] = [(name, [i for i in ids if i in ids0]) for name, ids in kw.get("domains") or []]
     lay = build_layout(zero, sheets0, frame.local(0), mode, **sub)
@@ -3695,7 +3703,6 @@ def _rosette(sses: list[SSE], sheets: list[Sheet], frame, mode: str, kw: dict) -
                 placed[q.sse.id] = q
         ghosts += [turned(g, maps[k][g.sse.id], a) for g in lay.ghosts if g.sse.id in maps[k]]
     relabel = kw.get("relabel") or {}
-    angle_mode = "upright" if mode == "stack" else style.helix_angle
     strays: list[Placed] = []
     for k, a in enumerate(frame.angles):  # copy elements no protomer-0 element maps to: placed alone, clear
         matched = {t.id for t in maps[k].values()}
@@ -3707,7 +3714,8 @@ def _rosette(sses: list[SSE], sheets: list[Sheet], frame, mode: str, kw: dict) -
                 it = _sheet_item(Sheet([t], [1], []), local, PITCH * style.strand_scale)
             else:
                 width = HELIX_W * style.helix_scale * (ETA_W if t.kind == "G" else 1.0)
-                it = _helix_item(t, local, angle_mode, width, TEN_RISE if t.kind == "G" else HELIX_RISE)
+                # projected mode only (cli._no_rosette keeps a stack row unrolled): the style's helix angles
+                it = _helix_item(t, local, style.helix_angle, width, TEN_RISE if t.kind == "G" else HELIX_RISE)
             m = it.members[0]
             m.cx, m.cy = it.cx + it.offsets[0][0], it.cy + it.offsets[0][1]
             q = turned(m, t, a)
@@ -3792,6 +3800,7 @@ def _rosette(sses: list[SSE], sheets: list[Sheet], frame, mode: str, kw: dict) -
     lay.rosette = frame.n
     lay.rosette_push = delta
     lay.rosette_strays = [q.sse.id for q in strays]
+    lay.rosette_dropped = list(dict.fromkeys(dropped))
     lay.rosette_mates = {t.id: (i, k) for k in range(1, frame.n) for i, t in maps[k].items()}
     lay.stack_gaps = _stack_gaps(lay)
     _rosette_label_sides(lay)

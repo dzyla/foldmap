@@ -60,7 +60,9 @@ def _cyclic(layout) -> list[dict]:
     if note := getattr(layout, "cyclic_note", ""):
         out.append(_item("cyclic", note, [], 1))
     links = getattr(layout, "links", None)
-    if getattr(layout, "rosette", 0) and links is not None:  # bonds between two copies: plain bars across the gap
+    # bonds between two copies: plain bars across the gap. Disulfides are the only covalent links drawn between
+    # residues (Links: glycans hang on one residue, a ligand is drawn by its own rules), so they are all a note names
+    if getattr(layout, "rosette", 0) and links is not None:
         sector, chain = layout.frame.sector, layout.res_chain
         across = [(i, j) for i, j in links.disulfides if sector.get(chain[i], -1) != sector.get(chain[j], -1)]
         if across:
@@ -70,6 +72,13 @@ def _cyclic(layout) -> list[dict]:
     if strays := list(getattr(layout, "rosette_strays", [])):
         text = f"{len(strays)} element(s) found in one copy only, placed alone beside it: {', '.join(strays)}"
         out.append(_item("cyclic", text, strays))
+    if dropped := list(getattr(layout, "rosette_dropped", [])):
+        first = sorted(c for c, k in layout.frame.sector.items() if k == 0)
+        text = (
+            f"edits naming a copy ({', '.join(dropped)}) are not applied: a rosette draws every copy as the first; "
+            f"edit chain {', '.join(first)}'s"
+        )
+        out.append(_item("cyclic", text, dropped))
     return out
 
 

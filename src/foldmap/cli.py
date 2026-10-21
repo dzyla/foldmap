@@ -217,18 +217,24 @@ ROSETTE_ORDERS = (4, 7)  # cyclic=rosette: Cn assemblies of these orders are dra
 # figures on most entries tried, with more check failures, so those stay unrolled with a note (_rosette_declined)
 
 
-def _rosette_declined(ring, one_subunit: bool) -> str:
+def _rosette_declined(ring, focus_chains=None, focus: str = "auto") -> str:
     """The note when cyclic=rosette is asked of a cyclic or dihedral assembly (`ring`, before focus) that is not drawn
     as a rosette for what it is or how much of it is drawn ('' otherwise; a two-fold has Style.two_fold): only C4 and
-    C7 are offered, and a rosette needs the whole assembly, not one subunit (focus)."""
+    C7 are offered, and a rosette needs the whole assembly, not one subunit (focus auto or protomer) or the chains
+    named (`focus_chains`, from --focus A,B)."""
     if ring is None or ring.kind not in ("C", "D") or (ring.kind == "C" and ring.n == 2):
         return ""
     if ring.kind == "C" and ring.n in ROSETTE_ORDERS:
-        if not one_subunit:
+        if not focus_chains:
             return ""
+        drawn = (
+            "one subunit is drawn"
+            if focus in ("auto", "protomer")
+            else f"only chain(s) {', '.join(sorted(focus_chains))} are drawn"
+        )
         return (
-            f"cyclic=rosette: the {ring.label} assembly not drawn as a rosette, one subunit is drawn and the rosette "
-            "needs the whole assembly (--focus none)"
+            f"cyclic=rosette: the {ring.label} assembly not drawn as a rosette, {drawn} and the rosette needs the "
+            "whole assembly (--focus none)"
         )
     return (
         f"cyclic=rosette: the {ring.label} assembly not drawn as a rosette, the rosette is offered for four- and "
@@ -236,16 +242,19 @@ def _rosette_declined(ring, one_subunit: bool) -> str:
     )
 
 
-def _no_rosette(sses, sym, nucleic, mode: str, mem) -> str:
+def _no_rosette(sses, sym, nucleic, mode: str, mem, domains=None) -> str:
     """Why a Cn assembly (n in ROSETTE_ORDERS) asked for as a rosette (Style.cyclic) is drawn unrolled ('' when it is
     not): what the rosette does not draw yet. A rosette turns protomer 0's drawing for each copy, so everything
     drawn must belong to a protomer: no nucleic acid (its stems are not turned yet), no element of a chain outside
     every protomer (an unpaired chain), and each protomer must hold elements; a stack row and a membrane view are
-    not seen down the axis."""
+    not seen down the axis; domains (`domains`, --domains or a layout's) are boxed on page axes, which do not follow
+    a turned copy, so their panels would cut across its neighbours."""
     if mode != "projected":
         return "a rosette is drawn in projected mode only"
     if mem is not None:
         return "a membrane view keeps the bilayer across the page"
+    if domains:
+        return "domain panels are not yet drawn in a rosette (drop --domains to draw the rosette)"
     if nucleic is not None and nucleic.strands:
         return "its nucleic acid is not yet drawn in a rosette (draw it with --no-dna for the protein alone)"
     inside = {c for p in sym.protomers for c in p}
@@ -464,6 +473,7 @@ def make_layout(
             if s.id in shared and s.chain not in partial:
                 relabel[res_ref(s.chain, s.first, s.last)] = shared[s.id]
     mem = None
+    up_from_membrane = False  # `up` set by the membrane (its normal), not asked for: the cyclic note says so
     if membrane not in ("off", None):
         from .membrane import find_membrane
 
@@ -476,7 +486,7 @@ def make_layout(
         elif up is None and view is None:  # the bilayer horizontal, outside on top (unless the symmetry axis
             along = sym is not None and abs(float(np.dot(sym.axis, mem.normal))) > 0.9  # already stands upright)
             if not along:
-                up = mem.normal
+                up, up_from_membrane = mem.normal, True
             elif (mem.sided and float(np.dot(sym.axis, mem.normal)) < 0) or (flip and not mem.sided):  # turn it over
                 sym = dataclasses.replace(
                     sym, axis=-sym.axis, angles=[-a for a in sym.angles], rise=-sym.rise, twist=-sym.twist
@@ -487,11 +497,15 @@ def make_layout(
     rosette_asked = (  # Style.cyclic rosette: a cyclic assembly of ROSETTE_ORDERS copies seen down its axis
         (look or Style()).cyclic == "rosette" and sym is not None and sym.kind == "C" and sym.n in ROSETTE_ORDERS
     )
-    cyclic_note = _rosette_declined(ring, bool(focus_chains)) if (look or Style()).cyclic == "rosette" else ""
+    cyclic_note = _rosette_declined(ring, focus_chains, focus) if (look or Style()).cyclic == "rosette" else ""
     if rosette_asked and (duplex or rotate or flip_v or up is not None or view is not None):
-        cyclic_note = f"cyclic=rosette: the {sym.label} assembly not drawn as a rosette, " + (
-            "it sits on a straight duplex" if duplex else "a view, a turn or a flip was asked for"
-        )
+        if duplex:
+            why = "it sits on a straight duplex"
+        elif up_from_membrane and not rotate and not flip_v:  # the membrane set `up`; nothing else was asked
+            why = "a membrane view keeps the bilayer across the page"
+        else:
+            why = "a view, a turn or a flip was asked for"
+        cyclic_note = f"cyclic=rosette: the {sym.label} assembly not drawn as a rosette, {why}"
     if duplex:
         frame = (  # protein on a straight duplex: the duplex across the page, the protein below it
             dna_radial_frame(sses, nucleic)
@@ -511,7 +525,7 @@ def make_layout(
         dyad = _dyad_frame(sses, sym) if _mirrors((look or Style()).two_fold, sym, bb) else None
         frame = dyad or symmetric_frame(sses, sym)
         if sym.kind == "C" and sym.n in ROSETTE_ORDERS:  # what a rosette cannot draw yet ('' when it can)
-            why = _no_rosette(sses, sym, nucleic, mode, mem)
+            why = _no_rosette(sses, sym, nucleic, mode, mem, domains)
             offered = not why  # the app shows the choice
         if rosette_asked:  # cyclic=rosette (plan 21): seen down the axis, each copy protomer 0 turned, unless
             if why:

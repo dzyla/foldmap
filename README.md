@@ -391,12 +391,14 @@ own frame, and every other copy is that drawing, loops included, turned by a who
 the axis, all pushed out from it just enough to clear their neighbours. Names stay upright, each on the side of its
 helix that is clear. Each copy's sheets are its own: a pairing between two copies' strands is not drawn. Ligands held
 by every copy (the ions of a channel's pore) are drawn once, as one untethered cluster at the centre. A ring with DNA
-or RNA, a chain outside the copies, a stack row or a membrane view stays unrolled, and the notes say why. Where the
-figure draws one subunit of a large assembly (`--focus auto` or `protomer`), no rosette is drawn and a note says it
-needs the whole assembly (`--focus none`). Other orders are not offered: in a look test on 56 assemblies, three-,
-five- and six-fold rosettes, and D2 assemblies drawn as two mirrored rings, read worse than their unrolled figures on
-most entries, with more check failures (route fallbacks, text collisions, sheet order); no eight-fold assembly was
-at hand. With `cyclic=rosette` those are drawn as the default figure, with a note saying so.
+or RNA, a chain outside the copies, a stack row, a membrane view or domains (`--domains`, whose panels do not turn
+with a copy) stays unrolled, and the notes say why. Where the figure draws one subunit of a large assembly (`--focus
+auto` or `protomer`) or only the chains named (`--focus A,B`), no rosette is drawn and a note says it needs the whole
+assembly (`--focus none`). Edits (move, swap, rename) name the first copy's elements, which every copy follows; an edit
+naming another copy's element is not applied, and a note says so. Other orders are not offered: in a look test on 56
+assemblies, three-, five- and six-fold rosettes, and D2 assemblies drawn as two mirrored rings, read worse than their
+unrolled figures on most entries, with more check failures (route fallbacks, text collisions, sheet order); no
+eight-fold assembly was at hand. With `cyclic=rosette` those are drawn as the default figure, with a note saying so.
 
 **Layout files.** `--save-layout fig.yaml` records everything that defines a figure: theme, style changes,
 layout options, domains and edits, with element references stored as residue ranges so they survive a new model.
