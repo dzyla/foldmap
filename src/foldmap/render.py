@@ -216,20 +216,38 @@ def _band(t0: float, t1: float, n: int = 12, taper: int = 0, width: float = _BAN
 # One helical turn, drawn once and reused: the front band rises across the near face (y -1/2 -> 1/2),
 # the back band falls across the far face. A whole helix is these two shapes shifted turn by turn, plus
 # half front bands so the ribbon starts and ends on the axis, where the loops attach.
-_FRONT = _band(-0.25, 0.25)
-_BACK = _band(0.25, 0.75)
-_FRONT_HEAD = _band(0.0, 0.25, 9, taper=+1)
-_FRONT_TAIL = _band(-0.25, 0.0, 9, taper=-1)
-_SHINE_BAND = _band(-0.16, 0.16, 14, taper=2, width=_BAND * _SHINE) + (_BAND * 0.1, 0)  # glint on the near face
+def _turn(band: float) -> tuple[np.ndarray, ...]:
+    """Front band, back band, front head, front tail and glint of one turn, for a ribbon `band` of a turn wide."""
+    return (
+        _band(-0.25, 0.25, width=band),
+        _band(0.25, 0.75, width=band),
+        _band(0.0, 0.25, 9, taper=+1, width=band),
+        _band(-0.25, 0.0, 9, taper=-1, width=band),
+        _band(-0.16, 0.16, 14, taper=2, width=band * _SHINE) + (band * 0.1, 0),  # glint on the near face
+    )
+
+
+_TURN = _turn(_BAND)
 
 
 def _coil(p: Placed, residues: int) -> tuple[Path, Path, Path]:
     """Front faces, back faces and front highlights of a helix as compound paths in page coordinates."""
     turns = int(max(1, min(round(residues / _RES_PER_TURN), p.length // _MIN_PITCH)))
-    front = [_FRONT_HEAD] + [_FRONT + (k, 0) for k in range(1, turns)] + [_FRONT_TAIL + (turns, 0)]
-    back = [_BACK + (k, 0) for k in range(turns)]
-    shine = [_SHINE_BAND + (k, 0) for k in range(1, turns)]
-    to_page = Affine2D().translate(-turns / 2, 0).scale(p.length / turns, p.width).rotate(p.angle).translate(p.cx, p.cy)
+    return helix_ribbon(p.cx, p.cy, p.length, p.width, p.angle, turns)
+
+
+def helix_ribbon(
+    cx: float, cy: float, length: float, width: float, angle: float, turns: int, band: float = _BAND
+) -> tuple[Path, Path, Path | None]:
+    """Front faces, back faces and front highlights (None for one turn) of a helix ribbon of `turns` turns, centred
+    on (cx, cy), `length` along its axis at `angle`, `width` across, as compound paths in page coordinates; it starts
+    and ends on its axis. band: the ribbon's width along the axis, as a fraction of one turn. The figure's helices
+    and the sequence view's track are both drawn with it."""
+    front_band, back_band, head, tail, glint = _TURN if band == _BAND else _turn(band)
+    front = [head] + [front_band + (k, 0) for k in range(1, turns)] + [tail + (turns, 0)]
+    back = [back_band + (k, 0) for k in range(turns)]
+    shine = [glint + (k, 0) for k in range(1, turns)]
+    to_page = Affine2D().translate(-turns / 2, 0).scale(length / turns, width).rotate(angle).translate(cx, cy)
 
     def compound(polys):
         verts = np.vstack([np.vstack([q, q[:1]]) for q in polys])
@@ -717,22 +735,35 @@ def _draw_nucleic(
 
 
 def _arrow(p: Placed) -> np.ndarray:
-    half, head = p.length / 2, min(_HEAD_LEN, p.length * 0.45)
     k = p.width / PITCH  # Style.strand_scale, carried by the strand's width
-    sh, hh = SHAFT * k / 2, _HEAD_HALF * k
-    local = np.array(
-        [
-            (-half, -sh),
-            (half - head, -sh),
-            (half - head, -hh),
-            (half, 0),
-            (half - head, hh),
-            (half - head, sh),
-            (-half, sh),
-        ]
-    )
-    c, s = np.cos(p.angle), np.sin(p.angle)
-    return local @ np.array([[c, s], [-s, c]]) + [p.cx, p.cy]
+    return strand_arrow(p.cx, p.cy, p.length, p.angle, k)
+
+
+def strand_arrow(
+    cx: float, cy: float, length: float, angle: float, k: float = 1.0, head: bool = True, tip: float = _HEAD_LEN
+) -> np.ndarray:
+    """A strand's arrow, centred on (cx, cy), `length` long at `angle`, its shaft and head k times as wide as the
+    figure's (Style.strand_scale), the head `tip` long (at most 0.45 of the arrow) and ending at the far end;
+    head=False: the shaft alone (a strand that runs on past a row of the sequence view). The figure's strands and
+    the sequence view's track are both drawn with it."""
+    half, sh = length / 2, SHAFT * k / 2
+    if not head:
+        local = np.array([(-half, -sh), (half, -sh), (half, sh), (-half, sh)])
+    else:
+        tip, hh = min(tip, length * 0.45), _HEAD_HALF * k
+        local = np.array(
+            [
+                (-half, -sh),
+                (half - tip, -sh),
+                (half - tip, -hh),
+                (half, 0),
+                (half - tip, hh),
+                (half - tip, sh),
+                (-half, sh),
+            ]
+        )
+    c, s = np.cos(angle), np.sin(angle)
+    return local @ np.array([[c, s], [-s, c]]) + [cx, cy]
 
 
 def _polyline(points: list[tuple[float, float]]) -> Path:
@@ -3369,6 +3400,36 @@ def _draw_sheet_panels(c: _Canvas, layout: Layout, outlines: dict[str, Path] | N
                 c.ax.add_patch(edge)
 
 
+def body_paint(kind: str, color: str, look: Style, lw: float) -> tuple[str, str, str, float]:
+    """(fill, shade, edge, edge width) of an element's body in `color` as look.fill and look.helix_shading paint it:
+    shade is a helix's back face (the fill for a strand or a 3-10 helix); lw: the figure's line width. The figure's
+    elements and the sequence view's track are both painted with it."""
+    outline = look.fill == "outline"
+    edge, edge_w = (color, lw * 1.2) if outline else (darken(color), lw * 0.8)
+    if kind == "E":
+        fill = look.background if outline else tint(color, 0.45) if look.fill == "pale" else color
+        if look.fill == "pale":
+            edge = darken(color, 0.5)  # pastel body, firm outline (illustration style)
+        return fill, fill, edge, edge_w
+    if kind == "G":
+        fill = {"bold": color, "pale": tint(color, 0.35), "outline": look.background}[look.fill]
+        return fill, fill, edge, edge_w
+    fill, shade = {
+        "bold": (color, darken(color, BACK_SHADE)),
+        "pale": (tint(color, 0.15), tint(color, 0.55)),
+        "outline": (look.background, _mix(color, look.background, 0.7)),
+    }[look.fill]
+    return fill, fill if look.helix_shading == "none" else shade, edge, edge_w
+
+
+def eta_box(cx: float, cy: float, length: float, width: float, **kw) -> FancyBboxPatch:
+    """A 3-10 helix's small rounded box, centred on (cx, cy) (the figure draws it at (0, 0) and rotates and moves it
+    with its transform); kw: the patch's paint. The figure's 3-10 helices and the sequence view's are both this."""
+    return FancyBboxPatch(
+        (cx - length / 2, cy - width / 2), length, width, boxstyle=f"round,pad=0,rounding_size={width * 0.3}", **kw
+    )
+
+
 def _draw_elements(c: _Canvas, layout: Layout, bars=()) -> None:
     """The strands, 3-10 helices and helices, with their labels; a strand's letter slides along its shaft off the
     disulfide bars (`bars`: their routes) that pass under it (strand_label_spot)."""
@@ -3377,11 +3438,9 @@ def _draw_elements(c: _Canvas, layout: Layout, bars=()) -> None:
     for p in layout.placed.values():
         color = c.element_colour[p.sse.id]
         outline = c.look.fill == "outline"
-        edge, edge_w = (color, c.lw * 1.2) if outline else (darken(color), c.lw * 0.8)
+        fill, shade, edge, edge_w = body_paint(p.sse.kind, color, c.look, c.lw)
         if p.sse.kind == "E":
-            strand_fill = c.look.background if outline else tint(color, 0.45) if c.look.fill == "pale" else color
-            if c.look.fill == "pale":
-                edge = darken(color, 0.5)  # pastel body, firm outline (illustration style)
+            strand_fill = fill
             patch = Polygon(
                 _arrow(p), closed=True, fc=strand_fill, ec=edge, lw=edge_w, joinstyle="round", zorder=Z["body"]
             )
@@ -3403,17 +3462,7 @@ def _draw_elements(c: _Canvas, layout: Layout, bars=()) -> None:
                 )
                 t.set_gid(f"label:{p.sse.id}")
         elif p.sse.kind == "G":  # a short 3-10 helix: a small rounded box
-            fill = {"bold": color, "pale": tint(color, 0.35), "outline": c.look.background}[c.look.fill]
-            box = FancyBboxPatch(
-                (-p.length / 2, -p.width / 2),
-                p.length,
-                p.width,
-                boxstyle=f"round,pad=0,rounding_size={p.width * 0.3}",
-                fc=fill,
-                ec=edge,
-                lw=edge_w,
-                zorder=Z["body"],
-            )
+            box = eta_box(0.0, 0.0, p.length, p.width, fc=fill, ec=edge, lw=edge_w, zorder=Z["body"])
             box.set_transform(Affine2D().rotate(p.angle).translate(p.cx, p.cy) + c.ax.transData)
             box.set_gid(f"eta:{p.sse.id}")
             c.ax.add_patch(box)
@@ -3429,13 +3478,6 @@ def _draw_elements(c: _Canvas, layout: Layout, bars=()) -> None:
                 )
                 t.set_gid(f"label:{p.sse.id}")
         else:
-            fill, shade = {
-                "bold": (color, darken(color, BACK_SHADE)),
-                "pale": (tint(color, 0.15), tint(color, 0.55)),
-                "outline": (c.look.background, _mix(color, c.look.background, 0.7)),
-            }[c.look.fill]
-            if c.look.helix_shading == "none":
-                shade = fill
             front, back, shine = _coil(p, len(p.sse))
             lift, alpha = (
                 (_OVER_Z - Z["body"], _OVER_ALPHA) if p.over else (0.0, None)

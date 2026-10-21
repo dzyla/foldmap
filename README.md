@@ -534,6 +534,10 @@ Options: `--chain`, `--columns` (residues per row), `--full-sequence` (unmodelle
 `--ss-colour figure|black`, `--similarity` (fraction that must agree for a similar column, default 0.7),
 `--no-conservation-bar`, `--theme`/`--set` (element colours follow the topology figure).
 
+Helices, strands and 3₁₀ helices are drawn over their residues as the figure draws them: the helix ribbon (one
+turn per 3.6 residues), the arrow with its head on the last residue and the rounded 3₁₀ box, with the figure's
+`fill` and `helix_shading`.
+
 ## How the topology is made
 
 Every figure (command line, app, MCP or Python) goes through the same steps:

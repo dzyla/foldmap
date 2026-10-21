@@ -10,10 +10,10 @@ from pathlib import Path as FsPath
 import numpy as np
 from matplotlib.figure import Figure
 from matplotlib.patches import Circle, PathPatch, Polygon, Rectangle
-from matplotlib.path import Path
 
-from .palette import darken, text_color_on
-from .render import _legible, page, pin_fonts
+from .layout import ETA_W, HEAD, HEAD_LEN
+from .palette import darken, text_color_on, tint
+from .render import _legible, _mix, body_paint, eta_box, helix_ribbon, page, pin_fonts, strand_arrow
 from .sequence import GAP, Alignment, chain_track, column_classes, conservation, map_alignment
 from .style import Style
 
@@ -331,11 +331,7 @@ def _draw(
         for piece, b in enumerate(range(c0 // columns, c1 // columns + 1)):
             lo, hi = max(c0, b * columns), min(c1, (b + 1) * columns - 1)
             x0, x1 = lo - b * columns - 0.5, hi - b * columns + 0.5
-            gid = f"ss:{e.id}:{piece}"
-            if e.kind == "E":
-                _strand(ax, x0, x1, glyph_y(b), colour, hi == c1, gid, font)
-            else:
-                _coil(ax, x0, x1, glyph_y(b), colour, lo - c0, e.kind, gid, font)
+            _body(ax, e.kind, x0, x1, glyph_y(b), colour, hi == c1, f"{e.id}:{piece}", look, font)
             if lo == c0:
                 t = ax.text(
                     x0,
@@ -368,39 +364,40 @@ def _draw(
     return fig
 
 
-def _coil(ax, x0: float, x1: float, y: float, colour: str, offset: int, kind: str, gid: str, font: float) -> None:
-    """A helix as a coiled line, one turn per 3.6 residues (3.0 for 3-10), phase continuous across rows."""
-    pitch, amp, lw = (3.6, 0.42, 1.9) if kind == "H" else (3.0, 0.3, 1.4)
-    xs = np.linspace(x0, x1, max(int((x1 - x0) * 14), 2))
-    ys = y + amp * np.sin(2 * np.pi * (xs - x0 + offset) / pitch)
-    line = PathPatch(
-        Path(np.column_stack([xs, ys])),
-        fc="none",
-        ec=colour,
-        lw=lw * font / 8,
-        capstyle="round",
-        joinstyle="round",
-        zorder=2,
-    )
-    line.set_gid(gid)
-    ax.add_patch(line)
+_BODY = 1.25  # a helix ribbon's diameter and an arrowhead's width, column widths (the figure: HELIX_W = HEAD)
+_RIBBON = 0.28  # the ribbon's width along its axis, a fraction of a turn: a turn here is 3.6 columns long, longer
+# for its diameter than the figure's (render._BAND, 0.36), so a narrower band keeps its faces as wide across
 
 
-def _strand(ax, x0: float, x1: float, y: float, colour: str, head: bool, gid: str, font: float) -> None:
-    shaft, wing = 0.24, 0.52
-    if head:
-        h = min(1.1, (x1 - x0) * 0.6)
-        pts = [
-            (x0, y - shaft),
-            (x1 - h, y - shaft),
-            (x1 - h, y - wing),
-            (x1, y),
-            (x1 - h, y + wing),
-            (x1 - h, y + shaft),
-            (x0, y + shaft),
-        ]
+def _body(ax, kind: str, x0: float, x1: float, y: float, colour: str, head: bool, key: str, look, font: float):
+    """An element's piece in one row, drawn from x0 to x1 as the figure draws it (render's ribbon, arrow and 3-10
+    box, painted by look.fill and look.helix_shading): a helix ribbon one turn per 3.6 residues, starting and ending
+    on its axis and spanning exactly its columns; a strand's arrow, its head (head) ending at its last residue; a
+    3-10 helix a rounded box. gids ss:<key> (the ribbon's front faces, the arrow, the box), ss-back:<key> and
+    ss-shine:<key>."""
+    lw = 0.6 * font / 8
+    fill, shade, edge, edge_w = body_paint(kind, colour, look, lw)
+    if colour == "#000000" and shade == fill and kind == "H" and look.helix_shading != "none":
+        shade = _mix(colour, look.background, 0.55)  # the plain black style: a grey back face keeps the twist
+    cx, length = (x0 + x1) / 2, x1 - x0
+    if kind == "E":
+        k = _BODY / HEAD
+        pts = strand_arrow(cx, y, length, 0.0, k, head, HEAD_LEN * k)
+        patch = Polygon(pts, closed=True, fc=fill, ec=edge, lw=edge_w, joinstyle="round", zorder=2)
+    elif kind == "G":
+        patch = eta_box(cx, y, length, _BODY * ETA_W, fc=fill, ec=edge, lw=edge_w, zorder=2)
     else:
-        pts = [(x0, y - shaft), (x1, y - shaft), (x1, y + shaft), (x0, y + shaft)]
-    arrow = Polygon(pts, closed=True, fc=colour, ec=darken(colour, 0.7), lw=0.5 * font / 8, joinstyle="round", zorder=2)
-    arrow.set_gid(gid)
-    ax.add_patch(arrow)
+        turns = max(1, round(length / 3.6))
+        front, back, shine = helix_ribbon(cx, y, length, _BODY, 0.0, turns, _RIBBON)
+        span = np.ptp(front.vertices[:, 0])  # its tapered ends reach a little past its length: drawn a little
+        front, back, shine = helix_ribbon(cx, y, length * length / span, _BODY, 0.0, turns, _RIBBON)  # shorter
+        behind = PathPatch(back, fc=shade, ec=edge, lw=edge_w * 0.8, joinstyle="round", zorder=1.9)
+        behind.set_gid(f"ss-back:{key}")
+        ax.add_patch(behind)
+        if shine is not None and look.helix_shading == "gloss" and look.fill != "outline":
+            gloss = PathPatch(shine, fc=tint(fill, 0.4), ec="none", alpha=0.85, zorder=2.05)
+            gloss.set_gid(f"ss-shine:{key}")
+            ax.add_patch(gloss)
+        patch = PathPatch(front, fc=fill, ec=edge, lw=edge_w, joinstyle="round", zorder=2)
+    patch.set_gid(f"ss:{key}")
+    ax.add_patch(patch)

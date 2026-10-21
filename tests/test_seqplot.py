@@ -69,8 +69,7 @@ def test_glyphs_take_the_topology_colours():
     fig = draw_sequence(UBQ, look=look)
     for e in chain_track(UBQ).elements:
         piece = _artists(fig, f"ss:{e.id}:")[0]
-        c = piece.get_facecolor() if e.kind == "E" else piece.get_edgecolor()
-        assert to_hex(c) == to_hex(colours[e.id])
+        assert to_hex(piece.get_facecolor()) == to_hex(colours[e.id])  # a body filled in its colour, as the figure
     plain = draw_sequence(UBQ, ss_colour="black")
     assert to_hex(_artists(plain, "ss:")[0].get_edgecolor()) == "#000000"
 
@@ -109,8 +108,66 @@ def test_alignment_structure_follows_the_reference_row():
 def test_cli_sequence(tmp_path):
     out = tmp_path / "seq.svg"
     assert main(["sequence", str(UBQ), "-o", str(out), "--columns", "50"]) == 0
-    assert "ss:" in out.read_text()
+    assert "ss:" in out.read_text() and "ss-back:" in out.read_text()  # ribbons stay vector paths in SVG
     out2 = tmp_path / "aln.png"
     assert main(["sequence", str(UBQ), "-o", str(out2), "--msa", str(FAMILY), "--reference", "1UBQ"]) == 0
     assert out2.stat().st_size > 1000
     assert main(["sequence", str(UBQ), "-o", str(out), "--chain", "Q"]) == 1
+
+
+def test_the_track_draws_the_figures_ribbons_arrows_and_3_10_boxes():
+    from matplotlib.patches import FancyBboxPatch, PathPatch, Polygon
+
+    from foldmap.render import helix_ribbon
+
+    track = chain_track(UBQ)
+    fig = draw_sequence(UBQ, columns=80)  # one row: one piece per element
+    kinds = {e.kind for e in track.elements}
+    assert {"H", "E", "G"} <= kinds
+    for e in track.elements:
+        (body,) = _artists(fig, f"ss:{e.id}:")
+        x0, x1 = e.start - 0.5, e.end + 0.5
+        if e.kind == "H":  # the figure's ribbon: one front path, one back path, one turn per 3.6 residues
+            (back,) = _artists(fig, f"ss-back:{e.id}:")
+            assert isinstance(body, PathPatch) and isinstance(back, PathPatch)
+            turns = max(1, round((x1 - x0) / 3.6))
+            front, behind, _ = helix_ribbon(0, 0, x1 - x0, 1, 0, turns, 0.28)
+            assert (body.get_path().codes == front.codes).all() and (back.get_path().codes == behind.codes).all()
+            assert sum(body.get_path().codes == 79) == turns + 1  # a band per turn, two half bands at the ends
+        elif e.kind == "E":  # the figure's arrow, its head ending at the last residue
+            assert isinstance(body, Polygon)
+            v = body.get_xy()
+            tip = v[np.argmax(v[:, 0])]
+            assert len(v) == 8 and tip[0] == pytest.approx(x1)
+            assert tip[1] == pytest.approx((v[:, 1].max() + v[:, 1].min()) / 2)
+        else:  # a 3-10 helix: the figure's rounded box
+            assert isinstance(body, FancyBboxPatch)
+    assert len(_artists(fig, "ss:")) == len(track.elements)
+    assert len(_artists(fig, "ss-back:")) == sum(e.kind == "H" for e in track.elements)
+
+
+def test_a_strand_split_across_rows_has_its_head_on_the_last_row_only():
+    track = chain_track(UBQ)
+    a = next(e for e in track.elements if e.kind == "E" and e.end - e.start >= 4 and e.start >= 10)
+    fig = draw_sequence(UBQ, columns=a.start + 2)  # break the row inside the strand
+    pieces = sorted(_artists(fig, f"ss:{a.id}:"), key=lambda p: int(p.get_gid().rsplit(":", 1)[1]))
+    assert len(pieces) >= 2
+    assert [len(p.get_xy()) for p in pieces] == [5] * (len(pieces) - 1) + [8]  # shafts, then the arrow
+
+
+def test_the_track_follows_the_figures_fill_and_helix_shading():
+    helix = next(e for e in chain_track(UBQ).elements if e.kind == "H")
+
+    def faces(look):
+        fig = draw_sequence(UBQ, look=look)
+        front = _artists(fig, f"ss:{helix.id}:")[0]
+        back = _artists(fig, f"ss-back:{helix.id}:")[0]
+        return to_hex(front.get_facecolor()), to_hex(back.get_facecolor()), _artists(fig, "ss-shine:")
+
+    front, back, shine = faces(Style())
+    assert front != back and not shine  # depth: a darker back face
+    front, back, _ = faces(Style(helix_shading="none"))
+    assert front == back
+    assert faces(Style(helix_shading="gloss"))[2]
+    front, _, _ = faces(Style(fill="outline"))
+    assert front == to_hex(Style().background)
