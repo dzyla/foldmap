@@ -1,0 +1,850 @@
+{
+ "about": "Plan 13a held-out homologue set (spec 4.4), drawn by `scripts/homologues.py sample --seed 20261021` from CATH v4_3_0 (CC BY 4.0, https://www.cathdb.info): whole-chain domains of 60-600 residues, entries of the tuning set excluded, each entry at most once. A is the reference, B is drawn like it. Strata: remote (one topology; other superfamily, or identity under 30 %), close (one superfamily, identity 30-90 %), negative (one architecture, other topology). Identity: identical / aligned pairs of foldmap's structure alignment. Measured once (Task 13a-11).",
+ "seed": 20261021,
+ "cath_release": "v4_3_0",
+ "pairs": [
+  {
+   "a": {
+    "id": "1CO6",
+    "chain": "A"
+   },
+   "b": {
+    "id": "1JDL",
+    "chain": "A"
+   },
+   "kind": "positive",
+   "stratum": "close",
+   "cath": {
+    "a": "1co6A00 1.10.760.10",
+    "b": "1jdlA00 1.10.760.10"
+   },
+   "note": "close: superfamily 1.10.760.10 (Cytochrome c-like domain), S35 cluster 6, S95 clusters 1 / 2. CATH v4_3_0 domains 1co6A00 (107 residues) and 1jdlA00 (118); read 107 and 118 residues; structure alignment: identity 0.485, TM-score 0.882 over 101 pairs."
+  },
+  {
+   "a": {
+    "id": "1G9R",
+    "chain": "A"
+   },
+   "b": {
+    "id": "1JYL",
+    "chain": "A"
+   },
+   "kind": "positive",
+   "stratum": "remote",
+   "cath": {
+    "a": "1g9rA00 3.90.550.10",
+    "b": "1jylA00 3.90.550.10"
+   },
+   "note": "remote: topology 3.90.550 (Spore Coat Polysaccharide Biosynthesis Protein SpsA; Chain A); superfamilies 3.90.550.10 (Spore Coat Polysaccharide Biosynthesis Protein SpsA; Chain A). CATH v4_3_0 domains 1g9rA00 (271 residues) and 1jylA00 (228); read 278 and 228 residues; structure alignment: identity 0.083, TM-score 0.502 over 192 pairs."
+  },
+  {
+   "a": {
+    "id": "1JBI",
+    "chain": "A"
+   },
+   "b": {
+    "id": "3U7Z",
+    "chain": "A"
+   },
+   "kind": "positive",
+   "stratum": "remote",
+   "cath": {
+    "a": "1jbiA00 2.170.130.20",
+    "b": "3u7zA00 2.170.130.30"
+   },
+   "note": "remote: topology 2.170.130 (Ferric Hydroxamate Uptake Protein; Chain A, domain 1); superfamilies 2.170.130.20 (LCCL-like domain) / 2.170.130.30. CATH v4_3_0 domains 1jbiA00 (100 residues) and 3u7zA00 (97); read 100 and 97 residues; structure alignment: identity 0.062, TM-score 0.246 over 48 pairs."
+  },
+  {
+   "a": {
+    "id": "1JK4",
+    "chain": "A"
+   },
+   "b": {
+    "id": "2HNW",
+    "chain": "A"
+   },
+   "kind": "positive",
+   "stratum": "close",
+   "cath": {
+    "a": "1jk4A00 2.60.9.10",
+    "b": "2hnwA00 2.60.9.10"
+   },
+   "note": "close: superfamily 2.60.9.10 (Neurohypophysial hormone domain), S35 cluster 1, S95 clusters 2 / 1. CATH v4_3_0 domains 1jk4A00 (79 residues) and 2hnwA00 (80); read 79 and 80 residues; structure alignment: identity 0.873, TM-score 0.894 over 79 pairs."
+  },
+  {
+   "a": {
+    "id": "1LSH",
+    "chain": "B"
+   },
+   "b": {
+    "id": "5MLC",
+    "chain": "3"
+   },
+   "kind": "negative",
+   "stratum": "negative",
+   "cath": {
+    "a": "1lshB00 2.20.90.10",
+    "b": "5mlc300 2.20.28.120"
+   },
+   "note": "negative: architecture 2.20 (Single Sheet); topologies 2.20.90 (Lipovitellin-phosvitin complex; beta-sheet shell regions) / 2.20.28 (Rubrerythrin, domain 2). CATH v4_3_0 domains 1lshB00 (174 residues) and 5mlc300 (60); read 174 and 60 residues; structure alignment: identity 0.077, TM-score 0.190 over 52 pairs."
+  },
+  {
+   "a": {
+    "id": "1NKP",
+    "chain": "A"
+   },
+   "b": {
+    "id": "1AM9",
+    "chain": "A"
+   },
+   "kind": "positive",
+   "stratum": "remote",
+   "cath": {
+    "a": "1nkpA00 4.10.280.10",
+    "b": "1am9A00 4.10.280.10"
+   },
+   "note": "remote: topology 4.10.280 (MYOD Basic-Helix-Loop-Helix Domain, subunit B); superfamilies 4.10.280.10 (Helix-loop-helix DNA-binding domain). CATH v4_3_0 domains 1nkpA00 (88 residues) and 1am9A00 (80); read 88 and 80 residues; structure alignment: identity 0.287, TM-score 0.742 over 80 pairs."
+  },
+  {
+   "a": {
+    "id": "1PZW",
+    "chain": "A"
+   },
+   "b": {
+    "id": "1QHL",
+    "chain": "A"
+   },
+   "kind": "negative",
+   "stratum": "negative",
+   "cath": {
+    "a": "1pzwA00 3.40.1800.20",
+    "b": "1qhlA00 3.40.1140.10"
+   },
+   "note": "negative: architecture 3.40 (3-Layer(aba) Sandwich); topologies 3.40.1800 (His-Me finger endonuclease fold) / 3.40.1140 (N-terminal domain of mukB). CATH v4_3_0 domains 1pzwA00 (80 residues) and 1qhlA00 (204); read 80 and 203 residues; structure alignment: identity 0.000, TM-score 0.284 over 42 pairs."
+  },
+  {
+   "a": {
+    "id": "1RPU",
+    "chain": "A"
+   },
+   "b": {
+    "id": "1ZWT",
+    "chain": "A"
+   },
+   "kind": "negative",
+   "stratum": "negative",
+   "cath": {
+    "a": "1rpuA00 3.30.390.180",
+    "b": "1zwtA00 3.30.1690.10"
+   },
+   "note": "negative: architecture 3.30 (2-Layer Sandwich); topologies 3.30.390 (Enolase-like; domain 1) / 3.30.1690 (TcpA-like pilin). CATH v4_3_0 domains 1rpuA00 (139 residues) and 1zwtA00 (158); read 138 and 158 residues; structure alignment: identity 0.087, TM-score 0.324 over 80 pairs."
+  },
+  {
+   "a": {
+    "id": "1T5B",
+    "chain": "A"
+   },
+   "b": {
+    "id": "2Z9C",
+    "chain": "A"
+   },
+   "kind": "positive",
+   "stratum": "close",
+   "cath": {
+    "a": "1t5bA00 3.40.50.360",
+    "b": "2z9cA00 3.40.50.360"
+   },
+   "note": "close: superfamily 3.40.50.360, S35 cluster 4, S95 clusters 3 / 1. CATH v4_3_0 domains 1t5bA00 (199 residues) and 2z9cA00 (197); read 199 and 197 residues; structure alignment: identity 0.873, TM-score 0.977 over 197 pairs."
+  },
+  {
+   "a": {
+    "id": "1TYY",
+    "chain": "A"
+   },
+   "b": {
+    "id": "3IQ0",
+    "chain": "A"
+   },
+   "kind": "positive",
+   "stratum": "remote",
+   "cath": {
+    "a": "1tyyA00 3.40.1190.20",
+    "b": "3iq0A00 3.40.1190.20"
+   },
+   "note": "remote: topology 3.40.1190 (UDP-N-acetylmuramoyl-L-alanine:D-glutamate ligase); superfamilies 3.40.1190.20. CATH v4_3_0 domains 1tyyA00 (293 residues) and 3iq0A00 (299); read 297 and 307 residues; structure alignment: identity 0.272, TM-score 0.887 over 291 pairs."
+  },
+  {
+   "a": {
+    "id": "1XU6",
+    "chain": "A"
+   },
+   "b": {
+    "id": "1PS2",
+    "chain": "A"
+   },
+   "kind": "positive",
+   "stratum": "remote",
+   "cath": {
+    "a": "1xu6A00 4.10.110.20",
+    "b": "1ps2A00 4.10.110.10"
+   },
+   "note": "remote: topology 4.10.110 (Spasmolytic Protein; domain 1); superfamilies 4.10.110.20 (Variant surface glycoprotein MITAT 1.2, VSG 221, C-terminal domain) / 4.10.110.10 (Spasmolytic Protein, domain 1). CATH v4_3_0 domains 1xu6A00 (80 residues) and 1ps2A00 (60); read 80 and 60 residues; structure alignment: identity 0.091, TM-score 0.223 over 33 pairs."
+  },
+  {
+   "a": {
+    "id": "2C3E",
+    "chain": "A"
+   },
+   "b": {
+    "id": "1HZF",
+    "chain": "A"
+   },
+   "kind": "negative",
+   "stratum": "negative",
+   "cath": {
+    "a": "2c3eA00 1.50.40.10",
+    "b": "1hzfA00 1.50.10.20"
+   },
+   "note": "negative: architecture 1.50 (Alpha/alpha barrel); topologies 1.50.40 (Mitochondrial carrier fold) / 1.50.10 (Glycosyltransferase). CATH v4_3_0 domains 2c3eA00 (293 residues) and 1hzfA00 (297); read 293 and 302 residues; structure alignment: identity 0.053, TM-score 0.283 over 133 pairs."
+  },
+  {
+   "a": {
+    "id": "2D46",
+    "chain": "A"
+   },
+   "b": {
+    "id": "3F42",
+    "chain": "B"
+   },
+   "kind": "positive",
+   "stratum": "remote",
+   "cath": {
+    "a": "2d46A00 3.30.1310.30",
+    "b": "3f42B00 3.30.1310.10"
+   },
+   "note": "remote: topology 3.30.1310 (Ybab; Chain: A;); superfamilies 3.30.1310.30 / 3.30.1310.10 (Nucleoid-associated protein YbaB-like domain). CATH v4_3_0 domains 2d46A00 (61 residues) and 3f42B00 (79); read 61 and 84 residues; structure alignment: identity 0.081, TM-score 0.352 over 37 pairs."
+  },
+  {
+   "a": {
+    "id": "2EWR",
+    "chain": "A"
+   },
+   "b": {
+    "id": "2FCL",
+    "chain": "A"
+   },
+   "kind": "positive",
+   "stratum": "close",
+   "cath": {
+    "a": "2ewrA00 3.30.460.40",
+    "b": "2fclA00 3.30.460.40"
+   },
+   "note": "close: superfamily 3.30.460.40, S35 cluster 1, S95 clusters 2 / 1. CATH v4_3_0 domains 2ewrA00 (154 residues) and 2fclA00 (142); read 156 and 157 residues; structure alignment: identity 0.891, TM-score 0.996 over 156 pairs."
+  },
+  {
+   "a": {
+    "id": "2EX5",
+    "chain": "A"
+   },
+   "b": {
+    "id": "4NTQ",
+    "chain": "A"
+   },
+   "kind": "negative",
+   "stratum": "negative",
+   "cath": {
+    "a": "2ex5A00 3.10.28.10",
+    "b": "4ntqA00 3.10.380.20"
+   },
+   "note": "negative: architecture 3.10 (Roll); topologies 3.10.28 (Endonuclease I-creI) / 3.10.380 (Ribonuclease domain of colicin e3 (Residues 456-551)). CATH v4_3_0 domains 2ex5A00 (207 residues) and 4ntqA00 (75); read 207 and 76 residues; structure alignment: identity 0.082, TM-score 0.148 over 49 pairs."
+  },
+  {
+   "a": {
+    "id": "2F20",
+    "chain": "A"
+   },
+   "b": {
+    "id": "1ZN6",
+    "chain": "A"
+   },
+   "kind": "positive",
+   "stratum": "remote",
+   "cath": {
+    "a": "2f20A00 3.90.1680.10",
+    "b": "1zn6A00 3.90.1680.10"
+   },
+   "note": "remote: topology 3.90.1680 (hypothetical protein yedk fold); superfamilies 3.90.1680.10 (SOS response associated peptidase-like). CATH v4_3_0 domains 2f20A00 (227 residues) and 1zn6A00 (205); read 233 and 211 residues; structure alignment: identity 0.213, TM-score 0.773 over 202 pairs."
+  },
+  {
+   "a": {
+    "id": "2H5F",
+    "chain": "A"
+   },
+   "b": {
+    "id": "4Z42",
+    "chain": "B"
+   },
+   "kind": "negative",
+   "stratum": "negative",
+   "cath": {
+    "a": "2h5fA00 2.10.60.10",
+    "b": "4z42B00 2.10.150.10"
+   },
+   "note": "negative: architecture 2.10 (Ribbon); topologies 2.10.60 (CD59) / 2.10.150 (Urease, subunit B). CATH v4_3_0 domains 2h5fA00 (75 residues) and 4z42B00 (114); read 74 and 114 residues; structure alignment: identity 0.128, TM-score 0.291 over 47 pairs."
+  },
+  {
+   "a": {
+    "id": "2IAY",
+    "chain": "A"
+   },
+   "b": {
+    "id": "4XZD",
+    "chain": "A"
+   },
+   "kind": "negative",
+   "stratum": "negative",
+   "cath": {
+    "a": "2iayA00 3.30.1820.10",
+    "b": "4xzdA00 3.30.1500.10"
+   },
+   "note": "negative: architecture 3.30 (2-Layer Sandwich); topologies 3.30.1820 (Lp2179-like fold) / 3.30.1500 (Heme-binding Protein A; Chain: A;). CATH v4_3_0 domains 2iayA00 (110 residues) and 4xzdA00 (179); read 114 and 179 residues; structure alignment: identity 0.000, TM-score 0.316 over 59 pairs."
+  },
+  {
+   "a": {
+    "id": "2IJE",
+    "chain": "S"
+   },
+   "b": {
+    "id": "3T6A",
+    "chain": "A"
+   },
+   "kind": "positive",
+   "stratum": "remote",
+   "cath": {
+    "a": "2ijeS00 1.10.840.10",
+    "b": "3t6aA00 1.10.840.10"
+   },
+   "note": "remote: topology 1.10.840 (Son of Sevenless (SoS) protein; Chain S, domain 2); superfamilies 1.10.840.10 (Ras guanine-nucleotide exchange factors catalytic domain). CATH v4_3_0 domains 2ijeS00 (237 residues) and 3t6aA00 (308); read 237 and 308 residues; structure alignment: identity 0.156, TM-score 0.731 over 205 pairs."
+  },
+  {
+   "a": {
+    "id": "2JCA",
+    "chain": "A"
+   },
+   "b": {
+    "id": "3LQ9",
+    "chain": "A"
+   },
+   "kind": "positive",
+   "stratum": "remote",
+   "cath": {
+    "a": "2jcaA00 3.90.470.20",
+    "b": "3lq9A00 3.90.470.40"
+   },
+   "note": "remote: topology 3.90.470 (Ribosomal Protein L22; Chain A); superfamilies 3.90.470.20 (4'-phosphopantetheinyl transferase domain) / 3.90.470.40 (RTP801-like). CATH v4_3_0 domains 2jcaA00 (123 residues) and 3lq9A00 (126); read 123 and 128 residues; structure alignment: identity 0.149, TM-score 0.369 over 87 pairs."
+  },
+  {
+   "a": {
+    "id": "2LSR",
+    "chain": "A"
+   },
+   "b": {
+    "id": "4YL6",
+    "chain": "A"
+   },
+   "kind": "positive",
+   "stratum": "remote",
+   "cath": {
+    "a": "2lsrA00 1.20.1160.20",
+    "b": "4yl6A00 1.20.1160.20"
+   },
+   "note": "remote: topology 1.20.1160 (Paired amphipathic helix 2 (pah2 repeat)); superfamilies 1.20.1160.20. CATH v4_3_0 domains 2lsrA00 (80 residues) and 4yl6A00 (88); read 80 and 88 residues; structure alignment: identity 0.141, TM-score 0.806 over 78 pairs."
+  },
+  {
+   "a": {
+    "id": "2MJ7",
+    "chain": "A"
+   },
+   "b": {
+    "id": "2EHB",
+    "chain": "D"
+   },
+   "kind": "positive",
+   "stratum": "remote",
+   "cath": {
+    "a": "2mj7A00 3.30.310.10",
+    "b": "2ehbD00 3.30.310.80"
+   },
+   "note": "remote: topology 3.30.310 (TATA-Binding Protein); superfamilies 3.30.310.10 (TATA-Binding Protein) / 3.30.310.80 (Kinase associated domain 1, KA1). CATH v4_3_0 domains 2mj7A00 (141 residues) and 2ehbD00 (126); read 141 and 126 residues; structure alignment: identity 0.102, TM-score 0.484 over 88 pairs."
+  },
+  {
+   "a": {
+    "id": "2OKF",
+    "chain": "A"
+   },
+   "b": {
+    "id": "2INB",
+    "chain": "A"
+   },
+   "kind": "positive",
+   "stratum": "close",
+   "cath": {
+    "a": "2okfA00 3.40.1350.10",
+    "b": "2inbA00 3.40.1350.10"
+   },
+   "note": "close: superfamily 3.40.1350.10, S35 cluster 2, S95 clusters 2 / 1. CATH v4_3_0 domains 2okfA00 (128 residues) and 2inbA00 (126); read 129 and 128 residues; structure alignment: identity 0.883, TM-score 0.976 over 128 pairs."
+  },
+  {
+   "a": {
+    "id": "2Q82",
+    "chain": "A"
+   },
+   "b": {
+    "id": "2JTR",
+    "chain": "A"
+   },
+   "kind": "positive",
+   "stratum": "remote",
+   "cath": {
+    "a": "2q82A00 3.40.250.20",
+    "b": "2jtrA00 3.40.250.10"
+   },
+   "note": "remote: topology 3.40.250 (Oxidized Rhodanese; domain 1); superfamilies 3.40.250.20 / 3.40.250.10 (Rhodanese-like domain). CATH v4_3_0 domains 2q82A00 (108 residues) and 2jtrA00 (85); read 114 and 85 residues; structure alignment: identity 0.040, TM-score 0.392 over 76 pairs."
+  },
+  {
+   "a": {
+    "id": "3BUU",
+    "chain": "A"
+   },
+   "b": {
+    "id": "3VDI",
+    "chain": "A"
+   },
+   "kind": "negative",
+   "stratum": "negative",
+   "cath": {
+    "a": "3buuA00 2.50.20.10",
+    "b": "3vdiA00 2.50.10.10"
+   },
+   "note": "negative: architecture 2.50 (Clam); topologies 2.50.20 (outer membrane lipoprotein receptor (LolB), chain A) / 2.50.10 (Bacteriochlorophyll-a Protein). CATH v4_3_0 domains 3buuA00 (218 residues) and 3vdiA00 (356); read 224 and 356 residues; structure alignment: identity 0.058, TM-score 0.267 over 86 pairs."
+  },
+  {
+   "a": {
+    "id": "3IE4",
+    "chain": "A"
+   },
+   "b": {
+    "id": "3AQX",
+    "chain": "A"
+   },
+   "kind": "positive",
+   "stratum": "close",
+   "cath": {
+    "a": "3ie4A00 2.60.40.2140",
+    "b": "3aqxA00 2.60.40.2140"
+   },
+   "note": "close: superfamily 2.60.40.2140 (Beta-1,3-glucan-recognition protein, N-terminal domain), S35 cluster 1, S95 clusters 1 / 3. CATH v4_3_0 domains 3ie4A00 (101 residues) and 3aqxA00 (101); read 101 and 101 residues; structure alignment: identity 0.630, TM-score 0.958 over 100 pairs."
+  },
+  {
+   "a": {
+    "id": "3N4H",
+    "chain": "A"
+   },
+   "b": {
+    "id": "4JCU",
+    "chain": "A"
+   },
+   "kind": "positive",
+   "stratum": "remote",
+   "cath": {
+    "a": "3n4hA00 3.30.429.10",
+    "b": "4jcuA00 3.30.429.10"
+   },
+   "note": "remote: topology 3.30.429 (Macrophage Migration Inhibitory Factor); superfamilies 3.30.429.10 (Macrophage Migration Inhibitory Factor). CATH v4_3_0 domains 3n4hA00 (117 residues) and 4jcuA00 (132); read 118 and 134 residues; structure alignment: identity 0.104, TM-score 0.738 over 115 pairs."
+  },
+  {
+   "a": {
+    "id": "3O7I",
+    "chain": "A"
+   },
+   "b": {
+    "id": "2O8I",
+    "chain": "A"
+   },
+   "kind": "positive",
+   "stratum": "remote",
+   "cath": {
+    "a": "3o7iA00 1.10.3330.10",
+    "b": "2o8iA00 1.10.3330.10"
+   },
+   "note": "remote: topology 1.10.3330 (UraD-like); superfamilies 1.10.3330.10 (Oxo-4-hydroxy-4-carboxy-5-ureidoimidazoline decarboxylase). CATH v4_3_0 domains 3o7iA00 (150 residues) and 2o8iA00 (153); read 150 and 155 residues; structure alignment: identity 0.234, TM-score 0.722 over 137 pairs."
+  },
+  {
+   "a": {
+    "id": "3OQL",
+    "chain": "A"
+   },
+   "b": {
+    "id": "4WWJ",
+    "chain": "A"
+   },
+   "kind": "positive",
+   "stratum": "close",
+   "cath": {
+    "a": "3oqlA00 1.20.910.10",
+    "b": "4wwjA00 1.20.910.10"
+   },
+   "note": "close: superfamily 1.20.910.10 (Heme oxygenase-like), S35 cluster 18, S95 clusters 2 / 1. CATH v4_3_0 domains 3oqlA00 (233 residues) and 4wwjA00 (256); read 243 and 256 residues; structure alignment: identity 0.774, TM-score 0.992 over 243 pairs."
+  },
+  {
+   "a": {
+    "id": "3VDJ",
+    "chain": "A"
+   },
+   "b": {
+    "id": "2JXW",
+    "chain": "A"
+   },
+   "kind": "negative",
+   "stratum": "negative",
+   "cath": {
+    "a": "3vdjA00 2.20.100.10",
+    "b": "2jxwA00 2.20.70.10"
+   },
+   "note": "negative: architecture 2.20 (Single Sheet); topologies 2.20.100 (TSP-1 type 1 repeat) / 2.20.70 (Ubiquitin Ligase Nedd4; Chain: W;). CATH v4_3_0 domains 3vdjA00 (71 residues) and 2jxwA00 (75); read 71 and 75 residues; structure alignment: identity 0.094, TM-score 0.188 over 32 pairs."
+  },
+  {
+   "a": {
+    "id": "3WZ0",
+    "chain": "A"
+   },
+   "b": {
+    "id": "2AV5",
+    "chain": "A"
+   },
+   "kind": "positive",
+   "stratum": "close",
+   "cath": {
+    "a": "3wz0A00 3.30.70.3250",
+    "b": "2av5A00 3.30.70.3250"
+   },
+   "note": "close: superfamily 3.30.70.3250 (Ribonuclease P, Pop5 subunit), S35 cluster 1, S95 clusters 2 / 3. CATH v4_3_0 domains 3wz0A00 (104 residues) and 2av5A00 (106); read 104 and 106 residues; structure alignment: identity 0.635, TM-score 0.970 over 104 pairs."
+  },
+  {
+   "a": {
+    "id": "4E2U",
+    "chain": "A"
+   },
+   "b": {
+    "id": "2LWY",
+    "chain": "A"
+   },
+   "kind": "positive",
+   "stratum": "remote",
+   "cath": {
+    "a": "4e2uA00 2.170.16.10",
+    "b": "2lwyA00 2.170.16.10"
+   },
+   "note": "remote: topology 2.170.16 (Endonuclease - Pi-scei; Chain A, domain 1); superfamilies 2.170.16.10 (Hedgehog/Intein (Hint) domain). CATH v4_3_0 domains 4e2uA00 (168 residues) and 2lwyA00 (138); read 168 and 138 residues; structure alignment: identity 0.185, TM-score 0.695 over 135 pairs."
+  },
+  {
+   "a": {
+    "id": "4IPV",
+    "chain": "A"
+   },
+   "b": {
+    "id": "4N2P",
+    "chain": "A"
+   },
+   "kind": "negative",
+   "stratum": "negative",
+   "cath": {
+    "a": "4ipvA00 3.55.40.10",
+    "b": "4n2pA00 3.55.10.10"
+   },
+   "note": "negative: architecture 3.55 (3-Layer(bab) Sandwich); topologies 3.55.40 (minor pseudopilin epsh fold) / 3.55.10 (Archease, Possible Chaperone; Chain: A; domain 1). CATH v4_3_0 domains 4ipvA00 (129 residues) and 4n2pA00 (139); read 129 and 143 residues; structure alignment: identity 0.015, TM-score 0.260 over 66 pairs."
+  },
+  {
+   "a": {
+    "id": "4U12",
+    "chain": "A"
+   },
+   "b": {
+    "id": "4NPX",
+    "chain": "A"
+   },
+   "kind": "positive",
+   "stratum": "remote",
+   "cath": {
+    "a": "4u12A00 1.10.3350.10",
+    "b": "4npxA00 1.10.3350.10"
+   },
+   "note": "remote: topology 1.10.3350 (HP0242-like fold); superfamilies 1.10.3350.10 (HP0242-like domain). CATH v4_3_0 domains 4u12A00 (79 residues) and 4npxA00 (78); read 80 and 80 residues; structure alignment: identity 0.253, TM-score 0.763 over 75 pairs."
+  },
+  {
+   "a": {
+    "id": "5E4E",
+    "chain": "A"
+   },
+   "b": {
+    "id": "3TGX",
+    "chain": "B"
+   },
+   "kind": "positive",
+   "stratum": "remote",
+   "cath": {
+    "a": "5e4eA00 1.20.1250.10",
+    "b": "3tgxB00 1.20.1250.70"
+   },
+   "note": "remote: topology 1.20.1250 (Growth Hormone; Chain: A;); superfamilies 1.20.1250.10 / 1.20.1250.70 (Interleukin-15/Interleukin-21). CATH v4_3_0 domains 5e4eA00 (111 residues) and 3tgxB00 (115); read 111 and 115 residues; structure alignment: identity 0.065, TM-score 0.609 over 93 pairs."
+  },
+  {
+   "a": {
+    "id": "5GL3",
+    "chain": "A"
+   },
+   "b": {
+    "id": "1WPN",
+    "chain": "A"
+   },
+   "kind": "positive",
+   "stratum": "remote",
+   "cath": {
+    "a": "5gl3A00 3.90.1640.20",
+    "b": "1wpnA00 3.90.1640.10"
+   },
+   "note": "remote: topology 3.90.1640 (inorganic pyrophosphatase (n-terminal core)); superfamilies 3.90.1640.20 (TON_0340) / 3.90.1640.10 (inorganic pyrophosphatase (n-terminal core)). CATH v4_3_0 domains 5gl3A00 (269 residues) and 1wpnA00 (187); read 269 and 187 residues; structure alignment: identity 0.112, TM-score 0.431 over 161 pairs."
+  },
+  {
+   "a": {
+    "id": "5GY2",
+    "chain": "C"
+   },
+   "b": {
+    "id": "2D4X",
+    "chain": "A"
+   },
+   "kind": "positive",
+   "stratum": "remote",
+   "cath": {
+    "a": "5gy2C00 1.20.1330.10",
+    "b": "2d4xA00 1.20.1330.10"
+   },
+   "note": "remote: topology 1.20.1330 (f41 fragment of flagellin, N-terminal domain); superfamilies 1.20.1330.10 (f41 fragment of flagellin, N-terminal domain). CATH v4_3_0 domains 5gy2C00 (169 residues) and 2d4xA00 (214); read 169 and 214 residues; structure alignment: identity 0.168, TM-score 0.785 over 161 pairs."
+  },
+  {
+   "a": {
+    "id": "5KDI",
+    "chain": "A"
+   },
+   "b": {
+    "id": "4NT2",
+    "chain": "A"
+   },
+   "kind": "positive",
+   "stratum": "remote",
+   "cath": {
+    "a": "5kdiA00 1.10.3520.10",
+    "b": "4nt2A00 1.10.3520.10"
+   },
+   "note": "remote: topology 1.10.3520 (Glycolipid transfer protein, GLTP); superfamilies 1.10.3520.10 (Glycolipid transfer protein). CATH v4_3_0 domains 5kdiA00 (211 residues) and 4nt2A00 (200); read 211 and 200 residues; structure alignment: identity 0.221, TM-score 0.793 over 195 pairs."
+  },
+  {
+   "a": {
+    "id": "5LNK",
+    "chain": "A"
+   },
+   "b": {
+    "id": "6G2J",
+    "chain": "A"
+   },
+   "kind": "positive",
+   "stratum": "close",
+   "cath": {
+    "a": "5lnkA00 1.20.58.1610",
+    "b": "6g2jA00 1.20.58.1610"
+   },
+   "note": "close: superfamily 1.20.58.1610 (NADH:ubiquinone/plastoquinone oxidoreductase, chain 3), S35 cluster 2, S95 clusters 3 / 1. CATH v4_3_0 domains 5lnkA00 (115 residues) and 6g2jA00 (114); read 115 and 115 residues; structure alignment: identity 0.532, TM-score 0.759 over 109 pairs."
+  },
+  {
+   "a": {
+    "id": "5U5S",
+    "chain": "A"
+   },
+   "b": {
+    "id": "2WP1",
+    "chain": "A"
+   },
+   "kind": "positive",
+   "stratum": "close",
+   "cath": {
+    "a": "5u5sA00 1.20.920.10",
+    "b": "2wp1A00 1.20.920.10"
+   },
+   "note": "close: superfamily 1.20.920.10 (Bromodomain-like), S35 cluster 1, S95 clusters 3 / 8. CATH v4_3_0 domains 5u5sA00 (112 residues) and 2wp1A00 (124); read 112 and 123 residues; structure alignment: identity 0.721, TM-score 0.936 over 111 pairs."
+  }
+ ],
+ "rejected": [
+  {
+   "stratum": "remote",
+   "a": "5dwyA00",
+   "b": "5llmA00",
+   "reason": "one superfamily at identity 0.356 (remote: under 0.3)",
+   "residues_a": 426,
+   "residues_b": 399,
+   "identity": 0.3558,
+   "tm_score": 0.7825,
+   "aligned": 371
+  },
+  {
+   "stratum": "remote",
+   "a": "3g2eA00",
+   "b": "3on3A00",
+   "reason": "one superfamily at identity 0.316 (remote: under 0.3)",
+   "residues_a": 184,
+   "residues_b": 169,
+   "identity": 0.3165,
+   "tm_score": 0.7831,
+   "aligned": 158
+  },
+  {
+   "stratum": "remote",
+   "a": "5fsdB00",
+   "b": "4z42B00",
+   "reason": "one superfamily at identity 0.468 (remote: under 0.3)",
+   "residues_a": 122,
+   "residues_b": 114,
+   "identity": 0.4679,
+   "tm_score": 0.8177,
+   "aligned": 109
+  },
+  {
+   "stratum": "remote",
+   "a": "5lmnG00",
+   "b": "5xyiF00",
+   "reason": "one superfamily at identity 0.315 (remote: under 0.3)",
+   "residues_a": 155,
+   "residues_b": 186,
+   "identity": 0.3154,
+   "tm_score": 0.7672,
+   "aligned": 130
+  },
+  {
+   "stratum": "remote",
+   "a": "2c3aA00",
+   "b": "1jmaA00",
+   "reason": "one superfamily at identity 0.996 (remote: under 0.3)",
+   "residues_a": 250,
+   "residues_b": 259,
+   "identity": 0.9956,
+   "tm_score": 0.8988,
+   "aligned": 228
+  },
+  {
+   "stratum": "remote",
+   "a": "2fi2A00",
+   "b": "4bhxA00",
+   "reason": "one superfamily at identity 0.306 (remote: under 0.3)",
+   "residues_a": 94,
+   "residues_b": 90,
+   "identity": 0.3059,
+   "tm_score": 0.633,
+   "aligned": 85
+  },
+  {
+   "stratum": "remote",
+   "a": "6fbzA00",
+   "b": "2idvA00",
+   "reason": "one superfamily at identity 0.380 (remote: under 0.3)",
+   "residues_a": 191,
+   "residues_b": 177,
+   "identity": 0.3795,
+   "tm_score": 0.7969,
+   "aligned": 166
+  },
+  {
+   "stratum": "remote",
+   "a": "6dftB00",
+   "b": "1rozA00",
+   "reason": "one superfamily at identity 0.405 (remote: under 0.3)",
+   "residues_a": 318,
+   "residues_b": 336,
+   "identity": 0.4046,
+   "tm_score": 0.9093,
+   "aligned": 304
+  },
+  {
+   "stratum": "close",
+   "a": "5dqxA00",
+   "b": "1qd6C00",
+   "reason": "identity 0.950 (close: 0.3-0.9)",
+   "residues_a": 252,
+   "residues_b": 240,
+   "identity": 0.95,
+   "tm_score": 0.9482,
+   "aligned": 240
+  },
+  {
+   "stratum": "close",
+   "a": "3gpvA00",
+   "b": "3gpvB00",
+   "reason": "an entry already in the set (or both chains of one entry)"
+  },
+  {
+   "stratum": "close",
+   "a": "4ae4B00",
+   "b": "4ae4A00",
+   "reason": "an entry already in the set (or both chains of one entry)"
+  },
+  {
+   "stratum": "close",
+   "a": "1xa7A00",
+   "b": "3q82A00",
+   "reason": "identity 0.950 (close: 0.3-0.9)",
+   "residues_a": 242,
+   "residues_b": 252,
+   "identity": 0.9504,
+   "tm_score": 0.987,
+   "aligned": 242
+  },
+  {
+   "stratum": "close",
+   "a": "3n7pA00",
+   "b": "3aqfB00",
+   "reason": "identity 1.000 (close: 0.3-0.9)",
+   "residues_a": 100,
+   "residues_b": 97,
+   "identity": 1.0,
+   "tm_score": 0.8697,
+   "aligned": 93
+  },
+  {
+   "stratum": "close",
+   "a": "4gvwA00",
+   "b": "1hjzA00",
+   "reason": "identity 0.969 (close: 0.3-0.9)",
+   "residues_a": 192,
+   "residues_b": 192,
+   "identity": 0.9688,
+   "tm_score": 0.9936,
+   "aligned": 192
+  },
+  {
+   "stratum": "close",
+   "a": "4y5oA00",
+   "b": "4ykdA00",
+   "reason": "identity 1.000 (close: 0.3-0.9)",
+   "residues_a": 78,
+   "residues_b": 84,
+   "identity": 1.0,
+   "tm_score": 0.8143,
+   "aligned": 78
+  },
+  {
+   "stratum": "negative",
+   "a": "2q82A00",
+   "b": "3cjmA00",
+   "reason": "an entry already in the set (or both chains of one entry)"
+  }
+ ]
+}

@@ -202,3 +202,17 @@ def test_the_held_out_summary_counts_by_stratum(hom, tmp_path):
     assert summary["positives"]["h2_median_independent"] == 2.0 and summary["positives"]["h2_median_alike"] == 0.3
     assert summary["positives"]["h2_closer_alike"] == 2 and summary["strata"]["negative"]["checks"]["H2"] == {
         "pass": 0, "fail": 0, "not judged": 1}  # fmt: skip
+
+
+def test_the_held_out_set_is_as_drawn(hom, pairs):
+    """heldout.json (sample --seed 20261021): 20 remote, 10 close, 10 negative pairs, sorted, each entry once, none
+    of the tuning set's entries."""
+    data = json.loads((SET.parent / "heldout.json").read_text(encoding="utf-8"))
+    held = data["pairs"]
+    assert data["seed"] == 20261021 and data["cath_release"] == hom.CATH_RELEASE
+    assert [sum(p["stratum"] == s for p in held) for s, _, _ in hom.STRATA] == [n for _, n, _ in hom.STRATA]
+    keys = [(p["a"]["id"], p["a"]["chain"], p["b"]["id"], p["b"]["chain"]) for p in held]
+    assert keys == sorted(keys)
+    ids = [p[s]["id"] for p in held for s in ("a", "b")]
+    assert len(ids) == len(set(ids)) == 80
+    assert not set(ids) & {p[s]["id"] for p in pairs for s in ("a", "b")}
