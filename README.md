@@ -290,6 +290,12 @@ files).
 
 Elements are named by label (`A`, `α2`, `η1`), `chain:label`, position (`#3`) or residue range (`res:A:10-25`). Negative numbers and insertion codes are written as in the file: `res:A:-7-4`, `res:H:100A-100K`.
 
+References are checked before anything is drawn, the same way on the command line, in the app (under the field) and
+in the MCP server: a range written without `res:` (`--domain N=A:1-60`) is read as `res:A:1-60` with a warning; a
+range that does not parse (`A:x-y`), a chain the structure lacks (the message lists its chains), a chain left out by
+`--chains` or `--focus` (the message says which), or a range that meets none of the chain's residues
+(`res:A:900-950` on a 164-residue chain) is an error (`foldmap: error: --domain N=A:x-y: …`, exit 2).
+
 A label reference reads the labels the figure shows: the label copies of one protein share, the primed labels of
 elements a neighbour lends in focus mode (`α2′`) and any `--names`; `--rename` is applied last and wins over all of them.
 

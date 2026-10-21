@@ -33,7 +33,16 @@ from .frame import (
     view_frame,
 )
 from .io import load_backbone, load_links, load_nucleic, read_model
-from .layout import SCALE, accessory_lines, build_layout, na_torn_by_unrolling, resolve, snap, template_rows
+from .layout import (
+    _RES_RANGE,
+    SCALE,
+    accessory_lines,
+    build_layout,
+    na_torn_by_unrolling,
+    resolve,
+    snap,
+    template_rows,
+)
 from .membrane import FACE_REACH
 from .model import AUTO_NT, crop_nucleic, homolog_chains, nucleic_of_chains, nucleic_touching, res_ref
 from .names import apply_names, check_spec
@@ -46,7 +55,9 @@ from .scope import drawn_scope, scope_note
 from .sheets import build_sheets
 from .spec import (
     FigureSpec,
+    Problem,
     SavedDomains,
+    check_references,
     draw_spec,
     figure_spec,
     layout_document,
@@ -63,6 +74,15 @@ _vector, _protomers, _domain_spec = parse_vector, parse_protomers, parse_domains
 
 class UsageError(ValueError):
     """Options that do not go together (the command line exits 2, as for an unknown option)."""
+
+
+class BadReference(UsageError):
+    """An element reference that cannot be drawn (spec.check_references), said before layout: 'WHERE: TEXT' (the
+    command line: 'foldmap: error: WHERE: TEXT', exit 2)."""
+
+    def __init__(self, problem: Problem):
+        super().__init__(str(problem))
+        self.problem = problem
 
 
 def _level_accessories(path: str) -> set[str]:
@@ -428,6 +448,7 @@ def make_layout(
         check_spec(spec)
     model = model or read_model(path, assembly)  # once, for every loader below (`model`: already read, same assembly)
     bb = load_backbone(path, assembly, model=model)
+    read_bb = bb  # every protein chain, before --chains: what the references are checked against
     present = list(dict.fromkeys(l.chain for l in bb.labels))
     asked = [c for c in chains or [] if c in present]  # the protein chains asked for (Layout.chains_asked)
     chain_b, chosen = None, False  # the chain drawn like the reference; chosen by --like, not asked for
@@ -493,6 +514,20 @@ def make_layout(
         for s in sses:
             if s.id in shared and s.chain not in partial:
                 relabel[res_ref(s.chain, s.first, s.last)] = shared[s.id]
+    refs = FigureSpec(  # the element references asked for, checked before anything is laid out (Q-A19)
+        Path(path),
+        look=look or Style(),
+        chains=chains,
+        focus=focus,
+        domains=domains,
+        rename=dict(rename or {}),
+        swap=list(swap or []),
+        move=list(move or []),
+    )
+    kept = set(focus_chains) | set(partial) if focus_chains else None  # the chains focus draws, lent ones included
+    for problem in check_references(refs, read_bb, drawn=kept):
+        if problem.fatal:  # the warnings were said where the spec was read (_spec_of, the app, the MCP server)
+            raise BadReference(problem)
     mem = None
     up_from_membrane = False  # `up` set by the membrane (its normal), not asked for: the cyclic note says so
     if membrane not in ("off", None):
@@ -870,8 +905,10 @@ def _drawn_like(
     if like.get("layout"):
         spec = figure_spec(ref, layout_file=like["layout"])
         args, kw = (spec.mode, spec.rotate, spec.flip_v), spec.layout_kwargs()
-    else:
-        args, kw = (mode, rotate, flip_v), {"dna": dna, "look": look, "assembly": assembly, "up": up, "view": view}
+    else:  # this figure's look, less its marks: they name this structure's elements, so the reference's references
+        # check (Q-A19) leaves them out; only render reads a mark, so the reference is laid out as before
+        mine = dataclasses.replace(look, mark="") if look is not None and look.mark else look
+        args, kw = (mode, rotate, flip_v), {"dna": dna, "look": mine, "assembly": assembly, "up": up, "view": view}
     model = read_model(ref, kw["assembly"])
     present = list(dict.fromkeys(l.chain for l in load_backbone(ref, kw["assembly"], model=model).labels))
     asked = [c.strip() for c in str(like.get("chain") or "").split(",") if c.strip()]
@@ -1241,15 +1278,16 @@ def _domains(spec, sses, contacts, rows=(), copies=None, lent=frozenset(), bb=No
         return []
     if spec == "auto":
         return auto_domains(sses, contacts, rows, copies, lent, bb=bb)
-    if _element_ids(spec):
+    typed = [] if isinstance(spec, SavedDomains) else stale_domain_ids(spec, sses)  # typed ids naming no element
+    for name, i in typed:  # A:1-60 is read as the range res:A:1-60 (Q-A19); a range that will not parse is an error
+        if _RES_RANGE.fullmatch(i.split(":", 1)[1]) is None:
+            raise ValueError(
+                f"domain {name!r}: {i!r} is no element; write a residue range as res:CHAIN:FIRST-LAST "
+                "(e.g. res:A:1-60), or name elements by label (α1, A:G)"
+            )
+    if _element_ids(spec) and not typed:
         known = {s.id for s in sses}
         stale = stale_domain_ids(spec, sses)
-        if stale and not isinstance(spec, SavedDomains):
-            name, i = stale[0]
-            raise ValueError(
-                f"domain {name!r}: {i!r} is no element; write a residue range as res:{i}, "
-                "or name elements by label (α1, A:G)"
-            )
         seen: set[str] = set()  # each element in one domain: the first that names it
         kept = []
         for name, ids in spec:
@@ -1394,7 +1432,11 @@ def _spec_of(args) -> FigureSpec:
         f"{k}={v}" for k, v in (("palette", args.palette), ("fill", args.style), ("loops", args.loops)) if v is not None
     ]
     edits = _adjustments(args)
-    return figure_spec(
+    try:
+        domains = _domain_spec(args.domain)
+    except ValueError as err:  # --domain N= : a usage error, as a reference that cannot be drawn is
+        raise UsageError(f"error: {err}") from None
+    spec = figure_spec(
         args.structure,
         theme=args.theme,
         style=shorthand + args.set,
@@ -1411,7 +1453,7 @@ def _spec_of(args) -> FigureSpec:
         assembly=args.assembly,
         up=edits["up"],
         view=edits["view"],
-        domains=_domain_spec(args.domain) or args.domains,
+        domains=domains or args.domains,
         msa=args.msa,
         msa_reference=args.msa_reference,
         membrane=args.membrane,
@@ -1424,6 +1466,11 @@ def _spec_of(args) -> FigureSpec:
         names=args.names,
         like=_like_of(args),
     )
+    for problem in check_references(spec):  # pass 1, before the structure is read (Q-A19); make_layout does pass 2
+        if problem.fatal:
+            raise BadReference(problem)
+        print(f"foldmap: warning: {problem}", file=sys.stderr)
+    return spec
 
 
 def _like_of(args) -> dict | None:
@@ -2004,7 +2051,7 @@ def main(argv: list[str] | None = None) -> int:
             args.structure = resolve_structure(args.structure)
         return _COMMANDS[args.command](args)
     except UsageError as err:  # options that do not go together: exit 2, as argparse does
-        print(f"foldmap: {err}", file=sys.stderr)
+        print(f"foldmap: {'error: ' if isinstance(err, BadReference) else ''}{err}", file=sys.stderr)
         return 2
     except (FileNotFoundError, ValueError, RuntimeError) as err:  # RuntimeError: gemmi cannot read the file
         print(f"foldmap: {err}", file=sys.stderr)

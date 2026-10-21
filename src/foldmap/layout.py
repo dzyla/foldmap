@@ -3466,7 +3466,8 @@ _RES_RANGE = re.compile(r"(-?\d+)([A-Za-z]?)(?:-(-?\d+)([A-Za-z]?))?")  # 150, 1
 def resolve(layout: Layout, sses: list[SSE], ref: str) -> list[str]:
     """Element ids for a reference: a label (G, α2; every chain), chain:label (A:G), #k (the k-th element
     from the N terminus, 1-based), or res:a-b / res:chain:a-b (elements overlapping those residues; negative
-    numbers and insertion codes as in the file, e.g. res:A:-7-4, res:H:100A-100K)."""
+    numbers and insertion codes as in the file, e.g. res:A:-7-4, res:H:100A-100K). A range written without res:
+    (A:1-60, 1-60) that is no element's label is read as that residue range (Q-A19)."""
     ref = ref.strip()
     placed = [s for s in sses if s.id in layout.placed]
     if ref.startswith("#"):
@@ -3504,11 +3505,12 @@ def resolve(layout: Layout, sses: list[SSE], ref: str) -> list[str]:
                 for s in in_chain
                 if min(s.first.seq, s.last.seq) <= hi[0] and max(s.first.seq, s.last.seq) >= lo[0]
             ]
-    elif ":" in ref:
-        chain, label = ref.split(":", 1)
-        out = [s.id for s in placed if s.chain == chain and layout.placed[s.id].label == label]
     else:
-        out = [s.id for s in placed if layout.placed[s.id].label == ref]
+        chain, label = ref.split(":", 1) if ":" in ref else (None, ref)
+        out = [s.id for s in placed if chain in (None, s.chain) and layout.placed[s.id].label == label]
+        m = _RES_RANGE.fullmatch(label)
+        if not out and m is not None and m[3] is not None:  # A:1-60, 1-60 naming no label: read as res:A:1-60
+            return resolve(layout, sses, f"res:{ref}")  # (spec.check_references warns that it was)
     if not out:
         raise ValueError(f"no element {ref!r}; use a label such as A or α1, chain:label, #k or res:a-b")
     return out

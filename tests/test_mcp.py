@@ -432,3 +432,29 @@ def test_draw_topology_draws_like_a_reference(tmp_path):
     assert said in r.content[0].text
     with pytest.raises(ToolError, match="like_source"):
         call("draw_topology", {"source": UBQ, "output_path": str(tmp_path / "x.svg"), "like_chain": "A"})
+
+
+def test_references_are_checked_before_drawing_as_the_command_line_checks_them(tmp_path):
+    """Q-A19: a range without res: is drawn with a warning in the note; a reference that cannot be drawn is an error
+    result (isError) with the command line's text, said before anything is laid out."""
+    from mcp.server.mcpserver.exceptions import ToolError
+
+    t4l, out = str(DATA / "2LZM.cif"), str(tmp_path / "t4l.svg")
+    r = call("draw_topology", {"source": t4l, "output_path": out, "domains": {"N": ["A:1-60"]}})
+    assert "; warning: --domain N=A:1-60: read A:1-60 as the residue range res:A:1-60" in r.content[0].text
+    assert "domain:N" in Path(out).read_text()
+    r = call("draw_topology", {"source": t4l, "output_path": out, "domains": {"N": ["res:A:1-60"]}})
+    assert "warning" not in r.content[0].text
+    for domains, said in [
+        ({"N": ["A:x-y"]}, "--domain N=A:x-y: A:x-y is neither a residue range nor an element"),
+        ({"N": ["res:B:1-20"]}, "--domain N=res:B:1-20: no protein chain B in the structure; its protein chains are A"),
+        ({"N": ["res:A:900-950"]}, "--domain N=res:A:900-950: res:A:900-950 meets no residue of chain A"),
+        ({"N": [""]}, "--domain N=: an empty reference"),
+        ({"N": []}, "--domain N=: a domain needs elements"),
+    ]:
+        with pytest.raises(ToolError) as caught:
+            call("draw_topology", {"source": t4l, "output_path": str(tmp_path / "x.svg"), "domains": domains})
+        assert said in str(caught.value), (domains, str(caught.value))
+    with pytest.raises(ToolError, match=r"--domain N=res:B:1-20: chain B is not drawn: --focus A draws"):
+        call("draw_topology", {"source": str(DATA / "2HHB.cif"), "assembly": "asu", "focus": "A",
+                               "domains": {"N": ["res:B:1-20"]}})  # fmt: skip

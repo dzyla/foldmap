@@ -9,7 +9,10 @@ dependency, for the editors' tables)."""
 
 from __future__ import annotations
 
+import re
 from collections.abc import MutableMapping
+from pathlib import Path
+from types import SimpleNamespace
 
 from foldmap.app_edits import (
     EDITORS,
@@ -609,6 +612,35 @@ def editor(st, ss: MutableMapping, kind: str, label: str, columns: dict) -> None
         )
     if ss.get(kind):
         st.caption(f"Writes: {shown(ss[kind])}".replace("\n", "  \n"))  # a line each (domains)
+    for problem in reference_problems(ss, kind):  # under the field, before the figure is drawn (Q-A19)
+        (st.error if problem.fatal else st.warning)(shown(str(problem)))
+
+
+def reference_problems(ss: MutableMapping, kind: str) -> list:
+    """What is wrong with an editor's element references (spec.check_references before the structure is read, as
+    the command line and the MCP server check them): a range written without res: read as one (a warning), a form
+    that will not parse (an error). Element ids of the figure drawn (an assembly copy's A1:3-7) are no warning; a
+    layout file's domains, unchanged, are its element ids and not checked."""
+    from foldmap.cli import _adjustments
+    from foldmap.spec import FigureSpec, Problem, check_references, parse_domains
+    from foldmap.style import Style
+
+    text = str(ss.get(kind) or "")
+    if not text.strip() or (kind == "domains" and (text.strip() == "auto" or ss.get("domains_from_file") == text)):
+        return []
+    items = [p.strip() for p in re.split(r"[;\n]", text) if p.strip()]
+    try:
+        if kind == "domains":
+            given = {"domains": parse_domains(items)}
+        elif kind == "mark":
+            given = {"look": Style(mark=text)}
+        else:  # the command line's own parsers, as app.layout_options reads them
+            args = SimpleNamespace(**{"rename": [], "swap": [], "move": [], "up": None, "view": None, kind: items})
+            given = {kind: _adjustments(args)[kind]}
+    except ValueError as err:
+        return [Problem(kind, str(err), True)]
+    elements = {f"{e['chain']}:{e['first']}-{e['last']}" for e in ss.get("elements") or []}
+    return check_references(FigureSpec(Path(), **given), elements=elements)
 
 
 UNIPROT = ("off", "auto", "accession")

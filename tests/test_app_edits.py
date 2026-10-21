@@ -375,3 +375,58 @@ def test_an_upload_name_cannot_carry_a_line_break():
     assert upload_name("a b c\x00d​e.yaml") == "abcde.yaml"
     assert upload_name("ü names #1: a.yaml") == "ü names #1: a.yaml"
     assert upload_name("\n\n") == "upload" and len(upload_name("n" * 500)) == 120
+
+
+# ------------------------------------------------------------------ references checked under the field (Q-A19)
+def _said(at):
+    from app_helpers import visible
+
+    return [visible(w.value) for w in at.warning], [visible(e.value) for e in at.error]
+
+
+def test_the_app_says_under_each_field_what_the_command_line_says(monkeypatch):
+    """Domains, rename, swap, move and mark typed as text: a range without res: drawn with the warning under the field,
+    a form that will not parse an error there (and the figure's own error), both the command line's text."""
+    pytest.importorskip("streamlit")
+    from app_helpers import as_text, opened, svg_of
+    from foldmap import app_jobs
+
+    monkeypatch.setattr(app_jobs, "SLOW_SECONDS", float("inf"))
+    at = opened(DATA / "2LZM.cif")
+    as_text(at, "domains", "N=A:1-60")
+    warned, errors = _said(at)
+    assert warned == ["--domain N=A:1-60: read A:1-60 as the residue range res:A:1-60"] and not errors
+    assert not at.exception and "domain:N" in svg_of(at)
+    as_text(at, "domains", "N=res:A:1-60")
+    assert _said(at) == ([], [])
+    as_text(at, "domains", "N=A:x-y")
+    warned, errors = _said(at)
+    said = "--domain N=A:x-y: A:x-y is neither a residue range nor an element"
+    assert not warned and any(e.startswith(said) for e in errors) and all(said in e for e in errors), errors
+    as_text(at, "domains", "")
+    for kind, text, said in [
+        ("rename", "A:1-60=N", "--rename A:1-60=N: read A:1-60 as the residue range res:A:1-60"),
+        ("swap", "A:1-60,α2", "--swap A:1-60,α2: read A:1-60 as the residue range res:A:1-60"),
+        ("move", "A:1-60=1,0", "--move A:1-60: read A:1-60 as the residue range res:A:1-60"),
+        ("mark", "A:1-60=red", "mark A:1-60=red: read A:1-60 as the residue range res:A:1-60"),
+    ]:
+        as_text(at, kind, text)
+        assert said in _said(at)[0] and not at.exception, (kind, _said(at))
+        as_text(at, kind, "")
+    as_text(at, "mark", "res:A:x")
+    assert any(e.startswith("mark res:A:x: res:A:x is no residue range") for e in _said(at)[1])
+
+
+def test_an_element_id_of_the_figure_drawn_is_no_warning():
+    from foldmap.app_controls import reference_problems
+
+    ss = {"domains": "N=A:3-11", "elements": [{"chain": "A", "first": "3", "last": "11"}]}
+    assert reference_problems(ss, "domains") == []
+    ss["elements"] = []
+    assert [str(p) for p in reference_problems(ss, "domains")] == [
+        "--domain N=A:3-11: read A:3-11 as the residue range res:A:3-11"
+    ]
+    assert reference_problems({"domains": "auto"}, "domains") == []
+    assert reference_problems({"domains": "N=A:9-99", "domains_from_file": "N=A:9-99"}, "domains") == []
+    (bad,) = reference_problems({"move": "α1"}, "move")
+    assert bad.fatal and "--move needs REF=DX,DY" in bad.text

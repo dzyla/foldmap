@@ -205,7 +205,10 @@ def draw_topology(
     domains: named domain panels, e.g. {"N-lobe": ["res:A:13-59"]}. domains_from: "auto" (inferred from residue
     contacts, not a published assignment: the note says so) or "cath" (CATH's published chopping of a PDB entry,
     fetched from PDBe; the note names its domains, or says there are none). swap: pairs of elements to exchange, e.g.
-    [["α1", "α3"]]. move: nudges in page units, e.g. {"α2": [1, -2]}. rename: {"res:A:167-182": "Gd"}.
+    [["α1", "α3"]]. move: nudges in page units, e.g. {"α2": [1, -2]}. rename: {"res:A:167-182": "Gd"}. Every
+    element reference is checked before drawing: one that cannot be drawn (a range that does not parse, a chain the
+    structure lacks or does not draw, residues it does not have) is an error saying so; a range written without res:
+    (A:1-60) is read as res:A:1-60 and the note warns that it was.
     names: conventional names, in order (later win, rename wins over all): "deposited" (the file's own helix ids,
     e.g. globin A-H), "beta" (strands β1…βn, αn after βn in a βα row) or a YAML file of element and stem names.
     membrane: off, auto (draw the lipid bilayer) or flip (the same, the two sides swapped). focus: auto draws
@@ -226,7 +229,7 @@ def draw_topology(
     from .provenance import lines
     from .render import save
     from .scope import drawn_scope, scope_note
-    from .spec import draw_spec, figure_spec, layout_document
+    from .spec import check_references, draw_spec, figure_spec, layout_document
 
     if domains_from not in (None, "auto", "cath"):
         raise ValueError(f"domains_from is auto or cath; got {domains_from!r}")
@@ -263,9 +266,14 @@ def draw_topology(
             move=[(ref, (d[0], d[1])) for ref, d in (move or {}).items()],
             like=like,
         )
+        warned = []  # element references checked before the structure is laid out (Q-A19), as the command line does
+        for problem in check_references(spec):
+            if problem.fatal:
+                raise ValueError(str(problem))
+            warned.append(problem)
         drawn = draw_spec(spec)
         save(drawn.figure, out)
-        note = f"wrote {out}"
+        note = f"wrote {out}" + "".join(f"; warning: {problem}" for problem in warned)
         if keep is not None:
             note += f" and layout file {layoutfile.save(keep, layout_document(spec, drawn=drawn))}"
         items = drawn.provenance  # how it was made: the note says it, the structured result lists it

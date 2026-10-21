@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any
 
 from . import layoutfile
+from .layout import _RES_RANGE
 from .render import draw
 from .route import route_loops
 from .style import THEMES, Style, resolve_style
@@ -278,6 +279,145 @@ def parse_domains(items: list[str]) -> list[tuple[str, list[str]]]:
             raise ValueError(f"--domain needs NAME=REF[,REF...], got {item!r}")
         out.append((name.strip(), [r.strip() for r in refs.split(",") if r.strip()]))
     return out
+
+
+@dataclass(frozen=True)
+class Problem:
+    """What is wrong with one element reference of a figure (check_references), said before it is laid out."""
+
+    where: str  # the option and the item: "--domain N=A:1-60", "--rename α1=Gd", "--swap α1,α3", "mark α3"
+    text: str  # what is wrong and the accepted forms
+    fatal: bool  # False: a warning (A:1-60 read as res:A:1-60), the figure is drawn
+
+    def __str__(self) -> str:
+        return f"{self.where}: {self.text}"
+
+
+FORMS = "a label (α1, A), chain:label (A:G), #k (the k-th element) or a residue range (res:A:1-60)"
+RANGE_FORMS = "res:150-159, res:A:150-159, res:A:-7-4 or res:H:100A-100K"
+
+
+def _range(text: str) -> tuple[int, int] | None:
+    """(first, last) residue numbers of a range written without res: (1-60, -7-4, 100A-100K); None for anything
+    else, a single number included (it may be a label)."""
+    m = _RES_RANGE.fullmatch(text)
+    return (int(m[1]), int(m[3])) if m is not None and m[3] is not None else None
+
+
+def _reference(ref: str, where: str, domain: bool, elements) -> tuple[list[Problem], tuple | None]:
+    """Pass 1 for one reference (layout.resolve's forms): its problems, and what pass 2 checks against the structure,
+    (chain or None, (first, last) residue numbers or None); None when it names no chain and no residues. A range
+    written without res: (A:1-60, 1-60) that is no element id (`elements`) is read as one, with a warning. A hyphen
+    in what can only be a label is an error in a domain (generic labels have none); elsewhere a name given by
+    --names or --rename may hold one."""
+    ref = ref.strip()
+    if not ref:
+        return [Problem(where, f"an empty reference; name an element as {FORMS}", True)], None
+    if ref.startswith("res:"):
+        chain, body = ref[4:].split(":") if ref[4:].count(":") == 1 else (None, ref[4:])
+        m = _RES_RANGE.fullmatch(body) if chain != "" else None
+        if m is None:
+            return [Problem(where, f"{ref} is no residue range; write {RANGE_FORMS}", True)], None
+        return [], (chain, (int(m[1]), int(m[3] if m[3] is not None else m[1])))
+    if ref.startswith("#"):
+        if not ref[1:].isdigit() or int(ref[1:]) < 1:
+            return [Problem(where, f"{ref}: #k counts elements from the N terminus, #1 the first", True)], None
+        return [], None
+    chain, label = ref.split(":", 1) if ":" in ref else (None, ref)
+    if chain is not None and (not chain.strip() or not label.strip()):
+        return [Problem(where, f"{ref} names no element; name one as {FORMS}", True)], None
+    span = _range(label)
+    if span is not None:
+        if ref in elements:  # an element id (a layout file's, an assembly copy's: A1:3-7): the element itself
+            return [], (chain, span)
+        return [Problem(where, f"read {ref} as the residue range res:{ref}", False)], (chain, span)
+    if domain and "-" in label:
+        return [
+            Problem(
+                where,
+                f"{ref} is neither a residue range nor an element; write a range as res:{chain or 'A'}:FIRST-LAST "
+                f"(e.g. res:{chain or 'A'}:1-60), an element as {FORMS}",
+                True,
+            )
+        ], None
+    return [], ((chain, None) if chain is not None else None)
+
+
+def _references(spec: FigureSpec) -> tuple[list[Problem], list[tuple[str, str, bool]]]:
+    """Every element reference the figure names, as (where, reference, in a domain), with the problems of the
+    domains themselves (one with no name or no reference). A layout file's domains (SavedDomains: element ids it
+    outlived are dropped with a warning) and automatic ones are not references."""
+    problems, refs = [], []
+    domains = spec.domains
+    if isinstance(domains, list) and not isinstance(domains, SavedDomains):
+        for name, items in domains:
+            items = [items] if isinstance(items, str) else list(items or [])
+            if not str(name).strip():
+                where = f"--domain ={','.join(map(str, items))}"
+                problems.append(Problem(where, "a domain needs a name: NAME=REF[,REF...]", True))
+            if not items:
+                text = f"a domain needs elements: NAME=REF[,REF...], each REF {FORMS}"
+                problems.append(Problem(f"--domain {name}=", text, True))
+            refs += [(f"--domain {name}={ref}", str(ref), True) for ref in items]
+    refs += [(f"--rename {ref}={new}", str(ref), False) for ref, new in (spec.rename or {}).items()]
+    refs += [(f"--swap {a},{b}", str(r), False) for a, b in spec.swap or [] for r in (a, b)]
+    refs += [(f"--move {ref}", str(ref), False) for ref, _ in spec.move or []]
+    marks = (getattr(spec.look, "mark", "") or "").split(",")
+    refs += [(f"mark {entry.strip()}", entry.partition("=")[0], False) for entry in marks if entry.strip()]
+    return problems, refs
+
+
+def check_references(spec: FigureSpec, bb=None, *, drawn: set[str] | None = None, elements=()) -> list[Problem]:
+    """What is wrong with the element references the figure names (domains given, rename, swap, move, mark), said
+    before it is laid out (Q-A19). Pass 1 (no structure): each reference's form; a range written without res:
+    (A:1-60, 1-60) is read as res:A:1-60 with a warning, unless it is one of `elements` (element ids: an assembly
+    copy's A1:3-7). Pass 2 (`bb`, the protein backbone as read, before --chains): the chain a reference names
+    exists, is drawn (--chains; `drawn`: the chains --focus keeps, None when it keeps all) and its residue range
+    meets residues of it. A reference that passes may still name no element (a loop's residues): the layout says
+    so."""
+    problems, refs = _references(spec)
+    elements = set(elements)
+    checked = []
+    for where, ref, domain in refs:
+        found, target = _reference(ref, where, domain, elements)
+        problems += found
+        if target is not None and not any(p.fatal for p in found):
+            checked.append((where, ref.strip(), *target))
+    if bb is None:
+        return problems
+    numbers: dict[str, list[int]] = {}
+    for label in bb.labels:
+        numbers.setdefault(label.chain, []).append(label.seq)
+    present = list(numbers)
+    asked = [c for c in spec.chains or [] if c in numbers]  # protein chains named: only those are drawn
+    kept = [c for c in present if (not asked or c in asked) and (drawn is None or c in drawn)]
+    for where, ref, chain, span in checked:
+        if chain is not None and chain not in numbers:
+            text = f"no protein chain {chain} in the structure; its protein chains are {', '.join(present) or 'none'}"
+            problems.append(Problem(where, text, True))
+            continue
+        if chain is not None and chain not in kept:
+            if asked and chain not in asked:
+                text = f"chain {chain} is not drawn: --chains draws {', '.join(asked)} only"
+            else:
+                text = (
+                    f"chain {chain} is not drawn: --focus {spec.focus} draws chain(s) {', '.join(kept)} "
+                    "(add --focus none to draw every chain)"
+                )
+            problems.append(Problem(where, text, True))
+            continue
+        if span is None:
+            continue
+        lo, hi = min(span), max(span)
+        chains = [chain] if chain is not None else kept
+        if not any(min(numbers[c]) <= hi and max(numbers[c]) >= lo for c in chains):
+            if chain is not None:
+                said = f"chain {chain}: its residues are numbered {min(numbers[chain])} to {max(numbers[chain])}"
+            else:
+                held = ", ".join(f"{c} {min(numbers[c])} to {max(numbers[c])}" for c in chains) or "none"
+                said = f"any chain drawn (numbered {held})"
+            problems.append(Problem(where, f"{ref} meets no residue of {said}", True))
+    return problems
 
 
 @dataclass

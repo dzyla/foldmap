@@ -82,10 +82,18 @@ def test_unknown_domain_reference_is_an_error():
         make_layout(UMOD, domains=[("X", ["Q"])])
 
 
-def test_a_residue_range_without_res_is_an_error_naming_the_domain():
-    """A:1-60 looks like an element id but is no element: a message, not an IndexError (Q-A19)."""
-    with pytest.raises(ValueError, match=r"domain 'N'.*'A:1-60'.*res:A:1-60"):
-        make_layout(DATA / "2LZM.cif", domains=[("N", ["A:1-60"])])
+def test_a_residue_range_without_res_is_read_as_one():
+    """A:1-60 looks like an element id but is no element: read as res:A:1-60, the domain drawn (Q-A19; 40b1f76 made
+    it an error, the author asked for it to be read and warned of: spec.check_references says the warning)."""
+    lay, _, _ = make_layout(DATA / "2LZM.cif", domains=[("N", ["A:1-60"])])
+    plain, _, _ = make_layout(DATA / "2LZM.cif", domains=[("N", ["res:A:1-60"])])
+    assert lay.domains == plain.domains and lay.domains[0][1]
+
+
+def test_a_range_that_will_not_parse_is_an_error_naming_the_domain():
+    """The check before layout says it first (BadReference); _domains keeps 40b1f76's error for any other caller."""
+    with pytest.raises(ValueError, match=r"--domain N=A:x-y: A:x-y is neither a residue range nor an element"):
+        make_layout(DATA / "2LZM.cif", domains=[("N", ["A:x-y"])])
 
 
 def test_a_domain_left_without_elements_is_an_error_naming_it():
@@ -109,8 +117,8 @@ def test_a_layout_file_naming_elements_the_structure_lacks_drops_them_with_a_war
     assert "foldmap: warning:" in err and "A:999-1005" in err and "A:2000-2010" in err
     svg = out.read_text()
     assert "domain:N" in svg and "domain:C" in svg and "domain:X" not in svg
-    assert main(["plot", str(T4L), "-o", str(out), "--domain", "N=A:3-11,A:999-1005"]) == 1
-    assert "'A:999-1005' is no element" in capsys.readouterr().err
+    assert main(["plot", str(T4L), "-o", str(out), "--domain", "N=A:3-11,A:999-1005"]) == 2  # checked before layout
+    assert "foldmap: error: --domain N=A:999-1005: A:999-1005 meets no residue of chain A" in capsys.readouterr().err
 
 
 def test_cli_domains_and_layout_file(tmp_path):
@@ -140,7 +148,7 @@ def test_cli_domains_and_layout_file(tmp_path):
     again = tmp_path / "v.svg"
     assert main(["plot", str(UMOD), "-o", str(again), "--layout-file", str(lf)]) == 0
     assert again.read_bytes() == out.read_bytes()
-    assert main(["plot", str(UMOD), "-o", str(out), "--domain", "ZPN"]) == 1  # no '='
+    assert main(["plot", str(UMOD), "-o", str(out), "--domain", "ZPN"]) == 2  # no '=': a usage error (Q-A19)
 
 
 def test_app_settings_carry_domains():

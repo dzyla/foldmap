@@ -314,7 +314,7 @@ def test_layout_file_domains_naming_elements_the_structure_lacks_are_a_warning(c
     assert any(w.endswith("Edit Domains to remove them; an edit there checks every range.") for w in warned)
     assert "warning" not in capsys.readouterr().err  # the app shows it; the command line's print is not made
     as_text(at, "domains", at.session_state["domains"] + " ")  # typed now: an error, as on the command line
-    assert any("'A:999-1005' is no element" in _visible(e.value) for e in at.error)
+    assert any("A:999-1005 meets no residue of chain A" in _visible(e.value) for e in at.error)
 
 
 def test_app_sequence_view_with_the_conservation_theme(tmp_path):
@@ -840,15 +840,16 @@ def test_a_failing_setting_keeps_the_last_figure_and_names_the_control():
 
 
 def test_a_pipeline_crash_is_a_message_not_a_traceback(monkeypatch, caplog):
-    """A domain range without res: is a ValueError naming Domains (R2); a crash inside the pipeline (an IndexError
-    here, made on purpose) is a message too, logged for the server, and the last figure stays."""
+    """A domain range that will not parse is a ValueError naming Domains (R2; A:1-60 is read as res:A:1-60 since
+    Q-A19); a crash inside the pipeline (an IndexError here, made on purpose) is a message too, logged for the server,
+    and the last figure stays."""
     from app_helpers import fresh_caches
     from foldmap import app_jobs
 
     fresh_caches()
     at = opened(DATA / "2LZM.cif")
     before = svg_of(at)
-    as_text(at, "domains", "N=A:1-60")
+    as_text(at, "domains", "N=A:x-y")
     assert not at.exception and svg_of(at) == before
     assert any("Check Domains (Edit layout)." in e.value for e in at.error)
     real = app_jobs.draw_job
