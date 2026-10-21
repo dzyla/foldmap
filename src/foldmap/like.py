@@ -12,11 +12,13 @@ strand order (science S1-S3, S6), and _separate clears every overlap as always.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
+from pathlib import Path
 
 import numpy as np
 
-from .align import Mates
+from .align import ChainAlignment, Mates
 from .layout import (
     ETA_W,
     HELIX_RISE,
@@ -37,6 +39,9 @@ IDENTITY_COLOURINGS = ("chain", "sequence", "shade", "sstype", "domain")  # a ma
 EXTRA_TINT = 0.35  # an extra element's colour: its N-terminal neighbour's, mixed this much with white
 _LETTERS = "abcdefghijklmnopqrstuvwxyz"
 _PRIMES = ("′", "″", "‴")
+_STRAND_LETTER = re.compile(r"[A-Z][′″‴]*")  # a strand named by a capital letter (generic labels, Ig's A-G)
+LOW_COVERAGE = 0.7  # aligned residues under this fraction of the shorter chain: the note says a permutation is not
+_METHODS = {"sequence": "sequence alignment", "structure": "structure alignment"}  # aligned (the TM-align limit)
 
 
 @dataclass(frozen=True)
@@ -90,11 +95,12 @@ def like_from(
       each at its own drawn length and the mate's angle, centred on the mate (those places on the grid).
     - Labels: a mate takes its mate's label; of a split helix's parts the first in sequence takes it and the next
       ones the same primed (α3, α3′, α3″); an extra is named after the
-      matched element of its family (strand or helix) before it, lettered (α3a, β9a), the first name not taken; an
-      extra with none before it keeps its own label unless that is taken, then lettered too.
+      matched element of its family (strand or helix) before it, lettered (α3a, β9a), the first name not taken; a
+      strand after one named by a capital letter is primed instead (C′, C″: Ig's extra strands); an extra with none
+      before it keeps its own label unless that is taken, then lettered (or primed) too.
     - Colours (identity colourings only, IDENTITY_COLOURINGS): a mate or piece takes its mate's colour as A draws it
       (render.element_colours), an extra a tint of its N-terminal neighbour's (the first coloured element after it
-      when none comes before).
+      when none comes before; coloured by type, sstype, the neighbour is one of its own kind).
     - Choices: `sheets_b` (B's sheets, as build_layout gets them) gives `template`: each sheet a βα row when most of
       its mated strands stand in one of A's rows (Layout.ba_rows), not when most do not, else (a tie, or no strand
       mated) as B's own choice (layout.template_choices); never a sheet that cannot be a row. `over`: each B helix
@@ -204,16 +210,23 @@ def _labels(placed: dict, sses_b: list[SSE], mates: Mates) -> dict[str, str]:
                     taken.add(own)
                     continue  # its own label, free
                 base = own
+            extra = _primed if s.kind == "E" and _STRAND_LETTER.fullmatch(base) else _lettered
             k = 0
-            while _lettered(base, k) in taken:
+            while extra(base, k) in taken:
                 k += 1
-            names[s.id] = _lettered(base, k)
+            names[s.id] = extra(base, k)
             taken.add(names[s.id])
     return {res_ref(s.chain, s.first, s.last): names[s.id] for s in sses_b if s.id in names}
 
 
 def _lettered(name: str, k: int) -> str:
     return name + (_LETTERS[k] if k < len(_LETTERS) else _LETTERS[-1] + "′" * (k - len(_LETTERS) + 1))
+
+
+def _primed(name: str, k: int) -> str:
+    """C′, C″, C‴, then C′′′′ …: an extra strand after strand C (Ig's C′ and C″), never a lower-case letter on an
+    upper-case one (Ca)."""
+    return name + (_PRIMES[k] if k < len(_PRIMES) else "′" * (k + 1))
 
 
 def _colours(layout_a: Layout, sses_a: list[SSE], sses_b: list[SSE], mates: Mates, look: Style) -> dict[str, str]:
@@ -226,11 +239,13 @@ def _colours(layout_a: Layout, sses_a: list[SSE], sses_b: list[SSE], mates: Mate
     fill, _ = element_colours(layout_a, sses_a, look)
     out = {b: fill[a] for b, a in [*mates.mate.items(), *mates.pieces.items()] if a in fill}
     order = sorted(sses_b, key=lambda s: (s.chain, s.start))
-    for k, s in enumerate(order):
+    for s in order:
         if s.id not in mates.extras:
             continue
-        before = [x for x in order[:k][::-1] if x.chain == s.chain and x.id in out]
-        after = [x for x in order[k + 1 :] if x.chain == s.chain and x.id in out and x.id not in mates.extras]
+        kin = [x for x in order if x.chain == s.chain and (look.color_by != "sstype" or x.kind == s.kind)]
+        at = kin.index(s)
+        before = [x for x in kin[:at][::-1] if x.id in out]
+        after = [x for x in kin[at + 1 :] if x.id in out and x.id not in mates.extras]
         nearest = before or after
         if nearest:
             out[s.id] = tint(out[nearest[0].id], EXTRA_TINT)
@@ -248,3 +263,48 @@ def _template(layout_a: Layout, sses_b: list[SSE], mates: Mates, sheets_b: list[
         choice = mine if 2 * inrow == len(mated) else 2 * inrow > len(mated)
         out.append(bool(choice) and can_be_row(sheet))
     return out
+
+
+def counted(mates: Mates) -> tuple[int, int]:
+    """(B's elements matched, B's elements): mates and the pieces of a helix A has whole count as matched."""
+    matched = len(mates.mate) + len(mates.pieces)
+    return matched, matched + len(mates.extras)
+
+
+def _permutation(aln: ChainAlignment) -> str:
+    """'; a circular permutation is not aligned' when the aligned residues are under LOW_COVERAGE of the shorter
+    chain (a permuted chain aligns only in part: out of scope, as for TM-align), else ''."""
+    shorter = min(len(aln.residues_a), len(aln.residues_b))
+    low = shorter and len(aln.pairs) < LOW_COVERAGE * shorter
+    return "; a circular permutation is not aligned" if low else ""
+
+
+def reference_name(structure) -> str:
+    """The reference as the notes name it: a file by its name (A.cif), a PDB id as given."""
+    return Path(str(structure)).name
+
+
+def like_note(name: str, chain: str, aln: ChainAlignment, mates: Mates, extras: list[str], match: str = "auto") -> str:
+    """The note of a figure drawn like the reference `name` (its chain `chain`): how many of this structure's
+    elements were matched, by which alignment, and the names of those only this structure has (`extras`, as drawn).
+    E.g. "drawn like A.cif chain A: 31 of 34 elements matched (structure alignment, TM-score 0.61 over 388
+    residues); only in this structure: α3a, β9a"."""
+    matched, total = counted(mates)
+    method = _METHODS.get(aln.method) or f"alignment {Path(str(match)).name}"
+    text = (
+        f"drawn like {name} chain {chain}: {matched} of {total} elements matched ({method}, TM-score "
+        f"{aln.tm_score:.2f} over {len(aln.pairs)} residues)"
+    )
+    if extras:
+        text += f"; only in this structure: {', '.join(extras)}"
+    return text + _permutation(aln)
+
+
+def refused_note(name: str, aln: ChainAlignment, mates: Mates) -> str:
+    """The note of a figure drawn on its own because it is not the reference's fold (Mates.same_fold), e.g. "not
+    drawn like A.cif: not the same fold (TM-score 0.31; 9 of 30 elements matched)"."""
+    matched, total = counted(mates)
+    return (
+        f"not drawn like {name}: not the same fold (TM-score {aln.tm_score:.2f}; {matched} of {total} elements "
+        f"matched)" + _permutation(aln)
+    )

@@ -59,6 +59,10 @@ from .symmetry import TOLERANCE, detect_symmetry
 _vector, _protomers, _domain_spec = parse_vector, parse_protomers, parse_domains  # older names, used by the app
 
 
+class UsageError(ValueError):
+    """Options that do not go together (the command line exits 2, as for an unknown option)."""
+
+
 def _level_accessories(path: str) -> set[str]:
     """The accessory strands the figure `foldmap plot FILE` draws level beside their partner (Layout.accessory less
     Layout.unshown): `summary` words each accessory as that figure shows it (plan 12 fix round 4). Laid out only,
@@ -406,14 +410,21 @@ def make_layout(
     uniprot: str | None = None,
     model=None,
     names: list[str] | None = None,
+    like: dict | None = None,
 ):
     """`names` (--names): conventional names, each `deposited`, `beta` or a YAML file (names.apply_names), applied
-    over the generic labels in order; `rename` wins over all of them."""
+    over the generic labels in order; `rename` wins over all of them. `like` (--like, plan 13a): drawn like a
+    reference structure, {structure, chain, match, layout} (_drawn_like): one protein chain of this structure, the
+    one `chains` names (two named is a UsageError) or else its first."""
     for spec in names or []:
         check_spec(spec)
     model = model or read_model(path, assembly)  # once, for every loader below (`model`: already read, same assembly)
     bb = load_backbone(path, assembly, model=model)
     present = list(dict.fromkeys(l.chain for l in bb.labels))
+    chain_b = None
+    if like:  # one protein chain drawn like one of the reference's (plan 13a ruling 6); nucleic-acid chains as asked
+        chain_b = _one_chain(chains, present, "--chains", str(path))
+        chains = [chain_b, *(c for c in chains or [] if c not in present)]
     if chains and any(c in present for c in chains):  # protein chains named: only those (else every one)
         bb = bb.only([c for c in chains if c in present])
     if (look or Style()).color_by == "conservation" and not msa:
@@ -592,6 +603,13 @@ def make_layout(
     )
 
     springs = _bridge_springs(bb, sses, links)
+    made = None  # drawn like a reference: what this layout takes from it (_drawn_like)
+    if like:
+        made = _drawn_like(
+            like, bb, chain_b, sses, sheets, look or Style(), mode, rotate, flip_v, up, view, dna, assembly
+        )
+        if made.like is not None:  # the reference's frame carried over: the page is the reference's
+            frame, dyad = made.frame, None
 
     def lay_out_in(frame):  # build_layout through a frame (the dyad view's, or the unrolled one's), as a partial
         return functools.partial(
@@ -621,6 +639,7 @@ def make_layout(
             else None,
             over=over,
             alike_first=mem is None,  # a membrane view is judged by its bands (C17), not its copies (A15)
+            **({"like": made.like} if made is not None and made.like is not None else {}),
         )
 
     def finish(lay, frame, faces=None):  # what make_layout sets on a layout after build_layout through `frame`
@@ -648,6 +667,10 @@ def make_layout(
         lay.coil_chains = [(c, n) for c, n in Counter(lay.res_chain).items() if c not in with_elements]
         lay.uniprot = ann
         lay.cyclic_note = cyclic_note
+        if made is not None:
+            lay.like_colour = dict(made.like.colour) if made.like is not None else {}
+            lay.like_extras = [e for e in made.extras if e in lay.placed]
+            lay.like_note = made.note(lay)
         first = [s.centroid for s in sses if s.chain == sses[0].chain] if sses else [_any_centre(bb, nucleic)]
         centre = np.mean(first, axis=0)
         lay.page_axes = [list(map(float, a)) for a in frame.basis(centre)]
@@ -768,6 +791,79 @@ def make_layout(
             lay.res_grade = grades(lay.res_cons)
             lay.cons_label = CONSERVATION_LEGEND
     return lay, sses, bb
+
+
+def _one_chain(asked, present: list[str], flag: str, structure: str) -> str:
+    """The protein chain of a structure drawn like another, or like which another is drawn (--like): the one of
+    `present` (its protein chains) that `asked` names, else its first; two named is a UsageError naming `flag`."""
+    named = [c for c in asked or [] if c in present]
+    if len(named) > 1:
+        raise UsageError(
+            f"--like draws one protein chain of each structure; {flag} names {len(named)} of {structure}'s "
+            f"({', '.join(named)}): name one"
+        )
+    if named:
+        return named[0]
+    if not present:
+        raise ValueError(f"{structure} has no protein chain to draw like another")
+    return present[0]
+
+
+def _drawn_like(like: dict, bb, chain_b, sses, sheets, look: Style, mode, rotate, flip_v, up, view, dna, assembly):
+    """What a figure drawn like a reference (make_layout's `like`: {structure, chain, match, layout}) takes from it:
+    the reference laid out first, one protein chain (like['chain'], --like-chain, else its first), with the options
+    and edits of like['layout'] (--like-layout, a saved layout of it) when given, else this figure's view and look;
+    its chain aligned to this structure's `chain_b` (like['match']: auto, sequence, structure or a two-row alignment
+    file; align.align_chains), the elements mated (align.element_mates) and like.like_from's Like built from the
+    reference's finished layout, with its frame carried over (frame.frame_like). A namespace: like (None: drawn on
+    its own), frame, extras (this structure's elements the reference lacks) and note(layout) (the notes' line,
+    naming the extras as drawn). Not the same fold (Mates.same_fold), stack mode or a frame that cannot be carried:
+    drawn on its own, the note says why."""
+    from types import SimpleNamespace
+
+    from .align import align_chains, element_mates
+    from .frame import frame_like
+    from .like import like_from, like_note, reference_name, refused_note
+
+    given = str(like["structure"])
+    name = reference_name(given)
+
+    def alone(note: str) -> SimpleNamespace:
+        return SimpleNamespace(like=None, frame=None, extras=(), note=lambda lay: note)
+
+    if mode != "projected":  # a stack keeps no places to carry
+        return alone(f"not drawn like {name}: --mode {mode} draws no page places to carry; drawn on its own")
+    ref = _resolve_structure(given)
+    if like.get("layout"):
+        spec = figure_spec(ref, layout_file=like["layout"])
+        args, kw = (spec.mode, spec.rotate, spec.flip_v), spec.layout_kwargs()
+    else:
+        args, kw = (mode, rotate, flip_v), {"dna": dna, "look": look, "assembly": assembly, "up": up, "view": view}
+    model = read_model(ref, kw["assembly"])
+    present = list(dict.fromkeys(l.chain for l in load_backbone(ref, kw["assembly"], model=model).labels))
+    asked = [c.strip() for c in str(like.get("chain") or "").split(",") if c.strip()]
+    missing = [c for c in asked if c not in present]
+    if missing:
+        raise ValueError(f"no protein chain {', '.join(missing)} in {given}; it has {', '.join(present) or 'none'}")
+    chain_a = _one_chain(asked or kw.get("chains"), present, "--like-chain", given)
+    kw.update(chains=[chain_a], like=None)
+    lay_a, sses_a, bb_a = make_layout(ref, *args, model=model, **kw)
+    match = like.get("match") or "auto"
+    aln = align_chains(bb_a, chain_a, bb, chain_b, match)
+    mates = element_mates(sses_a, sses, aln)
+    if not mates.same_fold:
+        return alone(refused_note(name, aln, mates))
+    try:
+        frame = frame_like(lay_a.frame, aln.rotation, aln.translation)
+    except TypeError:
+        return alone(f"not drawn like {name}: its frame ({type(lay_a.frame).__name__}) cannot be carried")
+    made = like_from(lay_a, sses_a, sses, mates, look, sheets)
+
+    def note(lay) -> str:
+        extras = [lay.placed[e].label or e for e in mates.extras if e in lay.placed]
+        return like_note(name, chain_a, aln, mates, extras, match)
+
+    return SimpleNamespace(like=made, frame=frame, extras=tuple(mates.extras), note=note)
 
 
 def _membrane_band(lay, sses, bb, mem, faces=None) -> dict | None:
@@ -1254,7 +1350,24 @@ def _spec_of(args) -> FigureSpec:
         swap=edits["swap"],
         move=edits["move"],
         names=args.names,
+        like=_like_of(args),
     )
+
+
+def _like_of(args) -> dict | None:
+    """--like and its options as FigureSpec.like (cli.make_layout's like); None without --like."""
+    given = {"chain": args.like_chain, "match": args.like_match, "layout": args.like_layout}
+    if not args.like:
+        stray = [f"--like-{k}" for k, v in given.items() if v]
+        if stray:
+            raise UsageError(f"{', '.join(stray)} needs --like (the reference structure)")
+        return None
+    return {
+        "structure": args.like,
+        "chain": given["chain"],
+        "match": given["match"] or "auto",
+        "layout": given["layout"],
+    }
 
 
 def experimental_method(path) -> str | None:
@@ -1501,6 +1614,26 @@ def build_parser() -> argparse.ArgumentParser:
             "each restricted only if some are named",
         )
         q.add_argument(
+            "--like",
+            metavar="REFERENCE",
+            help="draw this structure like a reference (a file or PDB id): each element matched to one of the "
+            "reference's takes its place, angle, name and colour; one protein chain of each (--chains, --like-chain)",
+        )
+        q.add_argument(
+            "--like-chain",
+            metavar="CHAIN",
+            help="the reference's chain to draw like (default: its first protein chain)",
+        )
+        q.add_argument(
+            "--like-match",
+            metavar="auto|sequence|structure|ALN",
+            help="how the chains are aligned: auto (sequence at 40%% identity, else structure), sequence, structure, "
+            "or a two-row alignment file (the reference's chain first)",
+        )
+        q.add_argument(
+            "--like-layout", metavar="YAML", help="a saved layout of the reference: its options and edits are used"
+        )
+        q.add_argument(
             "--msa",
             metavar="ALIGNMENT",
             help="alignment (or a ConSurf grades table) for conservation colouring (--theme conservation)",
@@ -1704,6 +1837,9 @@ def main(argv: list[str] | None = None) -> int:
         if getattr(args, "structure", None):
             args.structure = _resolve_structure(args.structure)
         return _COMMANDS[args.command](args)
+    except UsageError as err:  # options that do not go together: exit 2, as argparse does
+        print(f"foldmap: {err}", file=sys.stderr)
+        return 2
     except (FileNotFoundError, ValueError, RuntimeError) as err:  # RuntimeError: gemmi cannot read the file
         print(f"foldmap: {err}", file=sys.stderr)
         return 1

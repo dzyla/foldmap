@@ -2563,10 +2563,16 @@ def _by_domain(sses: list[SSE], layout: Layout):
 
 def element_colours(layout: Layout, sses: list[SSE], look: Style):
     """(element id -> fill colour, residue colour function) exactly as the figure draws them: the colouring
-    mode, then marked elements, then highlight greys."""
+    mode (drawn like a reference under an identity colouring: the reference's colours, Layout.like_colour), then
+    marked elements, then highlight greys."""
     chains = _chains_in_order(sses)
     colors = chain_colors(chains, look.palette)
     element_colour, residue_colour = _colouring(sses, chains, colors, look, layout)
+    if getattr(layout, "like_colour", None):  # drawn like a reference (--like): its mates' colours, by identity
+        from .like import IDENTITY_COLOURINGS
+
+        if look.color_by in IDENTITY_COLOURINGS:
+            element_colour.update({k: v for k, v in layout.like_colour.items() if k in element_colour})
     for entry in filter(None, (e.strip() for e in look.mark.split(","))):  # marked elements: their own colour
         ref, _, colour = entry.partition("=")
         try:

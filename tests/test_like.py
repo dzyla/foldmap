@@ -265,3 +265,151 @@ def test_like_figure_does_not_depend_on_the_hash_seed():
         )
         runs.append(done.stdout)
     assert json.loads(runs[0]) and runs[0] == runs[1]
+
+
+# --like on the command line, names, colours and the note (plan 13a-6) ---------------------------------------------
+
+
+def like_of(path, chain=None, match="auto"):
+    """make_layout's `like` (FigureSpec.like, --like): the reference `path`, its chain `chain`."""
+    return {"structure": str(path), "chain": chain, "match": match, "layout": None}
+
+
+def test_note_on_itself():
+    """1UBQ drawn like itself: the note, every element matched, and the figure its own (through make_layout)."""
+    path = DATA / "1UBQ.cif"
+    lay, _, _ = cli.make_layout(path, like=like_of(path), **OPTIONS)
+    plain, _, _ = cli.make_layout(path, chains=["A"], **OPTIONS)
+    assert lay.like_note == (
+        "drawn like 1UBQ.cif chain A: 8 of 8 elements matched (sequence alignment, TM-score 1.00 over 76 residues)"
+    )
+    assert lay.like_extras == []
+    assert signature(lay) == signature(plain)
+
+
+def test_note_names_the_extras_as_drawn():
+    """Haemoglobin β (2HHB chain B) drawn like α (chain A): β's D-helix region, which α lacks, is named after α's
+    helix before it, lettered (α3a, α3b), in the figure and in the note."""
+    path = DATA / "2HHB.cif"
+    lay, _, _ = cli.make_layout(path, chains=["B"], like=like_of(path, "A"), **OPTIONS)
+    assert lay.like_note == (
+        "drawn like 2HHB.cif chain A: 7 of 9 elements matched (sequence alignment, TM-score 0.89 over 139 residues); "
+        "only in this structure: α3a, α3b"
+    )
+    assert [lay.placed[k].label for k in lay.like_extras] == ["α3a", "α3b"]
+
+
+def test_not_the_same_fold_is_drawn_on_its_own():
+    """T4 lysozyme (2LZM) is not drawn like ubiquitin: the note says why, and the figure is 2LZM's own."""
+    lay, _, _ = cli.make_layout(DATA / "2LZM.cif", like=like_of(DATA / "1UBQ.cif"), **OPTIONS)
+    alone, _, _ = cli.make_layout(DATA / "2LZM.cif", chains=["A"], **OPTIONS)
+    assert lay.like_note == "not drawn like 1UBQ.cif: not the same fold (TM-score 0.14; 4 of 13 elements matched)"
+    assert lay.like_colour == {} and lay.like_extras == []
+    assert signature(lay) == signature(alone)
+
+
+def test_note_words():
+    """The note's alignment words, and the low-coverage clause (a permuted chain aligns only in part)."""
+    from foldmap.align import ChainAlignment
+    from foldmap.like import like_note, refused_note
+
+    aln = ChainAlignment(
+        pairs=tuple((k, k) for k in range(50)),
+        tm_score=0.414,
+        rmsd=1.0,
+        identity=0.2,
+        method="structure",
+        rotation=np.eye(3),
+        translation=np.zeros(3),
+        residues_a=(None,) * 100,
+        residues_b=(None,) * 80,
+    )
+    mates = Mates(mate={"b1": "a1"}, pieces={"b2": "a1"}, extras=("b3",), only_a=(), same_fold=False)
+    assert refused_note("A.cif", aln, mates) == (
+        "not drawn like A.cif: not the same fold (TM-score 0.41; 2 of 3 elements matched); a circular permutation "
+        "is not aligned"
+    )
+    filed = replace(aln, method="file", pairs=tuple((k, k) for k in range(80)))
+    assert like_note("A.cif", "B", filed, mates, ["α1a"], "x/pair.fasta") == (
+        "drawn like A.cif chain B: 2 of 3 elements matched (alignment pair.fasta, TM-score 0.41 over 80 residues); "
+        "only in this structure: α1a"
+    )
+
+
+def test_extras_named_after_the_element_before_them():
+    """An extra takes the name of the matched element of its family before it: a helix lettered (α1a), a strand
+    named by a capital letter primed, as Ig's C′ (never 'Ba')."""
+    lay_a, sses, _ = cli.make_layout(DATA / "1UBQ.cif", chains=["A"], **OPTIONS)
+    seq = sorted(sses, key=lambda s: s.start)
+    helices = [s for s in seq if s.kind != "E"]
+    strands = [s for s in seq if s.kind == "E"]
+    helix, strand = helices[1], strands[2]  # each with a matched element of its family before it
+    extras = (helix.id, strand.id)
+    mates = Mates(
+        mate={s.id: s.id for s in sses if s.id not in extras},
+        pieces={},
+        extras=tuple(s.id for s in seq if s.id in extras),
+        only_a=tuple(s.id for s in seq if s.id in extras),
+        same_fold=True,
+    )
+    like = like_from(lay_a, sses, sses, mates, Style())
+    named = {k: like.label[f"res:A:{s.first.tag}-{s.last.tag}"] for k, s in (("helix", helix), ("strand", strand))}
+    assert named["helix"] == lay_a.placed[helices[0].id].label + "a"
+    assert named["strand"] == lay_a.placed[strands[1].id].label + "′"
+    assert named["strand"][0].isupper() and named["strand"][1:] == "′"
+
+
+def _haemoglobins(colour: str):
+    """β (2HHB B) drawn like α (A) and α drawn alone, coloured by `colour`: (fill of β as drawn, of α, of β alone,
+    the mates)."""
+    from foldmap.render import element_colours
+
+    path, look = DATA / "2HHB.cif", Style(color_by=colour)
+    lay_b, sses_b, bb_b = cli.make_layout(path, chains=["B"], look=look, like=like_of(path, "A"), **OPTIONS)
+    lay_a, sses_a, bb_a = cli.make_layout(path, chains=["A"], look=look, **OPTIONS)
+    alone, sses_alone, _ = cli.make_layout(path, chains=["B"], look=look, **OPTIONS)
+    mates = element_mates(sses_a, sses_b, align_chains(bb_a, "A", bb_b, "B"))
+    return (
+        element_colours(lay_b, sses_b, look)[0],
+        element_colours(lay_a, sses_a, look)[0],
+        element_colours(alone, sses_alone, look)[0],
+        mates,
+    )
+
+
+@pytest.mark.parametrize("colour", ["chain", "sequence"])
+def test_identity_colouring_takes_the_reference_colours(colour):
+    """Coloured by identity, a mate is drawn in its mate's colour and an extra in a tint of its neighbour's."""
+    fill_b, fill_a, _, mates = _haemoglobins(colour)
+    assert mates.mate and mates.extras
+    for b, a in mates.mate.items():
+        assert fill_b[b] == fill_a[a], b
+    for e in mates.extras:
+        assert fill_b[e] not in fill_a.values(), e
+
+
+def test_data_colouring_keeps_its_own_values():
+    """Coloured by data (B-factors), each structure keeps its own values: β drawn like α is coloured as β alone."""
+    fill_b, fill_a, alone, mates = _haemoglobins("bfactor")
+    assert fill_b == alone
+    assert any(fill_b[b] != fill_a[a] for b, a in mates.mate.items())
+
+
+def test_like_on_the_command_line(tmp_path, capsys):
+    """`plot B --chains B --like A --like-chain A`: the figure is drawn and its notes (printed, and in the SVG's
+    <desc>) say what it was drawn like."""
+    path, out = DATA / "2HHB.cif", tmp_path / "beta.svg"
+    argv = ["plot", str(path), "--chains", "B", "--like", str(path), "--like-chain", "A", "-o", str(out)]
+    assert cli.main(argv) == 0
+    assert "drawn like 2HHB.cif chain A: 7 of 9 elements matched" in capsys.readouterr().err
+    assert "drawn like 2HHB.cif chain A: 7 of 9 elements matched" in out.read_text(encoding="utf-8")
+
+
+def test_like_with_two_chains_is_a_usage_error(tmp_path, capsys):
+    """One protein chain of each structure: --like with two chains named is a usage error (exit 2) naming
+    --chains; so is a --like option without --like."""
+    path, out = DATA / "2HHB.cif", str(tmp_path / "x.svg")
+    assert cli.main(["plot", str(path), "--chains", "A,B", "--like", str(path), "-o", out]) == 2
+    assert "--chains" in capsys.readouterr().err
+    assert cli.main(["plot", str(path), "--like-chain", "A", "-o", out]) == 2
+    assert "--like-chain needs --like" in capsys.readouterr().err

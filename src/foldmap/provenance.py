@@ -7,6 +7,8 @@ server returns it, and the SVG (<desc>), PDF (Subject) and PNG (Description) fil
 Each item is a dict: kind, text (one line, as every interface says it), count (how many things it concerns) and
 elements (their ids: element ids, or domain, stem and ligand names). Kinds, in the order listed:
 
+    like               drawn like a reference structure (--like): how many elements matched, by which alignment,
+                       and those only this structure has; or why it was drawn on its own
     cyclic             a cyclic assembly asked for as a rosette (Style.cyclic): how it is drawn, or why unrolled
     domains            where the domain panels come from: inferred from contacts, CATH's, UniProt's or as given
     ambiguous_pairing  pairings drawn off a sheet's run, named only, or joining barrels drawn apart (sheet_note_items)
@@ -80,6 +82,15 @@ def _cyclic(layout) -> list[dict]:
         )
         out.append(_item("cyclic", text, dropped))
     return out
+
+
+def _like(layout) -> list[dict]:
+    """Drawn like a reference (cli.make_layout's like): the note, naming this structure's elements the reference
+    lacks (the extras, Layout.like_extras) when it was."""
+    note = getattr(layout, "like_note", "")
+    if not note:
+        return []
+    return [_item("like", note, list(getattr(layout, "like_extras", [])), 1)]
 
 
 def _domains(layout) -> list[dict]:
@@ -212,7 +223,8 @@ def figure_provenance(fig, layout, loops=(), labels: bool = True) -> list[dict]:
     from .render import page_notes
     from .scope import _hidden_additives
 
-    out = _cyclic(layout)
+    out = _like(layout)
+    out += _cyclic(layout)
     out += _domains(layout)
     out += [dict(i) for i in getattr(layout, "sheet_items", [])]
     out += _bulges(layout)

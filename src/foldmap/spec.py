@@ -47,6 +47,8 @@ class FigureSpec:
     swap: list[tuple[str, str]] = field(default_factory=list)
     move: list[tuple[str, tuple[float, float]]] = field(default_factory=list)
     names: list[str] = field(default_factory=list)  # --names: deposited, beta or YAML files, later ones winning
+    # --like: drawn like a reference, {structure, chain, match, layout} (cli.make_layout's like); None: on its own
+    like: dict | None = None
 
     def layout_kwargs(self, edits: bool = True) -> dict:
         """Keyword arguments for cli.make_layout after (path, mode, rotate, flip_v)."""
@@ -67,6 +69,7 @@ class FigureSpec:
             "chains": self.chains,
             "focus": self.focus,
             "names": list(self.names),  # not an edit: the user's renames are written for the names
+            "like": dict(self.like) if self.like else None,
         }
         if edits:
             kw.update(self.edits())
@@ -178,6 +181,7 @@ def figure_spec(
         chains=[c.strip() for c in chains.split(",") if c.strip()] if isinstance(chains, str) else chains,
         focus=str(pick("focus")),
         names=names,
+        like=pick("like"),
         **edits,
     )
 

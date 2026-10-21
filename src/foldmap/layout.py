@@ -356,6 +356,11 @@ class Layout:
     # units: each element drawn -> (cx, cy) of the unit (sheet block, row, bundle, helix) it was laid out in and its
     # offset there (build_layout; a rosette records none): a structure drawn like this one takes its homes from them
     units: dict[str, tuple[float, float, float, float]] = field(default_factory=dict)
+    like_note: str = ""  # what the notes say of --like (cli.make_layout): drawn like the reference, or why not
+    like_extras: list[str] = field(default_factory=list)  # drawn like a reference: the elements it lacks (ids)
+    # element id -> colour its mate in the reference has (Like.colour): render.element_colours draws these for the
+    # identity colourings (like.IDENTITY_COLOURINGS); data colourings keep this structure's own values
+    like_colour: dict[str, str] = field(default_factory=dict)
 
     @property
     def dna(self) -> list[PlacedStem]:  # earlier name
