@@ -34,8 +34,8 @@ SS_GAP = -1.0  # the gap penalty of TM-align's secondary-structure seed (a match
 ROUNDS = 20  # superpose / score / re-align rounds per seed, at most; also the iterations of one fragment's search
 ROUND_STEP = 40  # fragment starts every ROUND_STEP pairs in the rounds' search (TM-align's simplify_step); 1 at the end
 SEQUENCE_IDENTITY = 0.4  # auto: the sequence route at this identity over the aligned residues, else the structure
-SAME_FOLD_TM = 0.5  # H1: one fold at this TM-score (normalised by A) ... (frozen in 13a-10)
-SAME_FOLD_FRACTION = 0.5  # ... with this fraction of the chain with fewer elements matched (frozen in 13a-10)
+SAME_FOLD_TM = 0.5  # H1: one fold at this TM-score (normalised by A) ... (frozen on the tuning set, 13a-10)
+SAME_FOLD_FRACTION = 0.5  # ... with this fraction of the chain with fewer elements matched (frozen, 13a-10)
 
 
 @dataclass(frozen=True)

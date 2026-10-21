@@ -1551,8 +1551,8 @@ def build_parser() -> argparse.ArgumentParser:
         "when one fold; H2, mates in the same places (median and 90th percentile after the best rigid 2D motion); "
         "H3, the map reads the same way (page dx, dy signs of mate pairs; each mated sheet's order); H4, mates carry "
         "one name; H5, it passes every S- and A-check the structure drawn alone passes. H2 and H3 also give the "
-        "two drawn independently, for comparison; their limits are provisional. Prints one line per check and one "
-        "per problem; exits 1 on a problem, 0 otherwise.",
+        "two drawn independently, for comparison; their limits are frozen on a homologue tuning set. Prints one line "
+        "per check and one per problem; exits 1 on a problem, 0 otherwise.",
     )
     for cmd in (q, iq, cq, kq):
         q = cmd

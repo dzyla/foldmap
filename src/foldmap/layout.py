@@ -86,8 +86,11 @@ _W_CONTACT = 0.3  # pull between elements that touch in 3D (at _CONTACT_CAP CA p
 _CONTACT_CAP = 20
 _K_HOME = 0.02  # pull back toward the projected position, keeps the fold recognisable
 # an item drawn like a reference (build_layout's `like`, plan 13a): pulled to its mates' place in the reference's
-# finished layout this much harder, so it stays there unless it must move to clear an overlap (tuned in 13a-10 only)
-_K_LIKE = 8 * _K_HOME
+# finished layout this much harder, so it stays there unless it must move to clear an overlap. Frozen on the homologue
+# tuning set (13a-10): 2, 8, 32, 64, 128 tried; H2 and H3 of every positive pair at 128 as good as or better than
+# at 8 (the three propeller pairs most: 2ZB5 on 1E8T median 4.63 -> 3.32), none worse; at 128 _attract's step
+# times the spring (_STEP * _K_LIKE = 0.38 per unit mass) stays well inside its stable range
+_K_LIKE = 128 * _K_HOME
 LIKE_WEIGHT = _K_LIKE / _K_HOME  # Like.weight: the reference's home spring in units of a projected home's
 _STEP = 0.15
 _SWEEPS = 400

@@ -16,8 +16,8 @@ all its views, each drawn in a process of its own; `foldmap check` judges the on
 - check_figure, criteria_lines: one figure's criteria as `foldmap check` prints them; the criteria one figure in one
   process cannot give are named not measured here, with the reason (NOT_HERE), never passed.
 - like_checks, like_lines: H1-H5 of a structure drawn like a reference (plan 13a, `foldmap check B --like A`), with
-  H2's and H3's baseline between the two drawn independently; their limits are provisional (PROVISIONAL) until the
-  homologue tuning set freezes them."""
+  H2's and H3's baseline between the two drawn independently; their limits are frozen on the homologue tuning set
+  (Task 13a-10)."""
 
 from __future__ import annotations
 
@@ -42,13 +42,15 @@ LIMITS = {
     # units plus 1e-3 (figcheck.stem_gap_tolerance; plan 10 Task 4 fix round 2 ruling), measured per figure
     "stem_name_gap": "figcheck.stem_gap_tolerance(layout._INK_MARGIN em)",
     "tether_length": 6.5,  # A20: page units, a ligand tether from its mark to another chain than its home
-    # H2, H3 (plan 13a, a figure drawn like a reference): PROVISIONAL, the spec's proposed starting limits (spec 4.5),
-    # set on the homologue tuning set and frozen in a commit of their own (Task 13a-10) before any held-out pair
+    # H2, H3 (plan 13a, a figure drawn like a reference): the spec's starting limits (spec 4.5), frozen on the homologue
+    # tuning set (Task 13a-10, docs/validation/homologues/tuning.json) before any held-out pair: 8 of its 11
+    # positives pass them with room (H2 at most 0.28 / 0.36, H3 1.0); the 3 cross-family six-bladed propeller pairs
+    # fail them (pairing differences, longer strands) and stay listed failures, not a reason to move them
     "like_place_median": 1.0,  # H2: median centre deviation of mates after the best rigid 2D motion, page units
     "like_place_p90": 2.5,  # H2: ... its 90th percentile
     "like_relations": 0.95,  # H3: share of mate pairs whose page dx, dy signs agree
 }
-PROVISIONAL = ("like_place_median", "like_place_p90", "like_relations")  # until Task 13a-10 freezes them
+PROVISIONAL: tuple[str, ...] = ()  # limits not yet frozen: none (Task 13a-10 froze H2's and H3's)
 DOCUMENTED_WARNINGS: tuple[str, ...] = ()  # Python warnings a view may print (regexes); none at the start
 FIGURE_VIEWS = ("default", "deposited", "beta", "focus", "domains", "membrane")
 LABEL_VIEWS = ("default", "deposited", "beta", "focus")
@@ -700,7 +702,7 @@ def place_deviation(lay_a, lay_b, pairs) -> dict | None:
 
 def h2_places(lay_a, lay_b, pairs, baseline: dict | None = None) -> dict:
     """H2: matched elements sit in the same places (place_deviation within LIMITS' like_place_median and
-    like_place_p90, provisional). `baseline`: the same measure between A and B drawn independently, reported."""
+    like_place_p90). `baseline`: the same measure between A and B drawn independently, reported."""
     got = place_deviation(lay_a, lay_b, pairs)
     if got is None:
         out = _too_few(pairs)
@@ -709,7 +711,7 @@ def h2_places(lay_a, lay_b, pairs, baseline: dict | None = None) -> dict:
         out = _ok(
             got["median"] <= median and got["p90"] <= p90,
             f"median {got['median']:.3f}, 90th percentile {got['p90']:.3f} page units over {got['mates']} mates "
-            f"(limits {median}, {p90}, provisional); farthest {got['farthest']}",
+            f"(limits {median}, {p90}); farthest {got['farthest']}",
         )
     return {**out, "detail": out["detail"] + _independently(baseline), "value": got, "baseline": baseline}
 
@@ -780,7 +782,7 @@ def sheet_orders(lay_a, lay_b, pairs) -> list[str]:
 
 
 def h3_relations(lay_a, lay_b, pairs, note: str = "", baseline: dict | None = None) -> dict:
-    """H3: the map reads the same way (relations' share at least LIMITS' like_relations, provisional) and each mated
+    """H3: the map reads the same way (relations' share at least LIMITS' like_relations) and each mated
     sheet keeps one order, unless the note names a pairing difference (PAIRING_NAMED). `baseline`: the share between
     A and B drawn independently, reported."""
     got = relations(lay_a, lay_b, pairs)
@@ -792,7 +794,7 @@ def h3_relations(lay_a, lay_b, pairs, note: str = "", baseline: dict | None = No
         bad = [f"{len(got['turned'])} turned: {', '.join(got['turned'][:6])}"] if got["share"] < limit else []
         named = " (the note names a pairing difference)" if excused else ""
         sheets = [f"sheet order {s}{named}" for s in got["sheets"]]
-        share = f"{got['share']:.4f} of {got['pairs']} pairs agree (limit {limit}, provisional)"
+        share = f"{got['share']:.4f} of {got['pairs']} pairs agree (limit {limit})"
         out = _ok(not bad and (excused or not got["sheets"]), "; ".join([share, *bad, *sheets]))
     return {**out, "detail": out["detail"] + _independently(baseline), "value": got, "baseline": baseline}
 

@@ -95,7 +95,7 @@ def test_like_itself_reproduces_the_layout(name):
     plain, sses, _ = cli.make_layout(path, chains=["A"], **OPTIONS)
     lay, _, _, _, like = drawn_like(path, "A", path, "A")
     assert set(like.target) == {s.id for s in sses}  # every element held at its own place
-    assert like.weight == LIKE_WEIGHT == 8
+    assert like.weight == LIKE_WEIGHT == 128
     if name == "1TIM":
         assert plain.ba_rows and like.template and any(like.template)
     assert signature(lay) == signature(plain)

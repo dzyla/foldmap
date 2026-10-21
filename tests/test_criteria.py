@@ -230,7 +230,7 @@ def test_check_like_itself_passes_every_h_check(capsys):
     assert detail["H1"].startswith("  one fold, drawn alike: TM-score 1.00")
     assert detail["H2"].startswith("  median 0.000, 90th percentile 0.000 page units over ")
     assert "drawn independently: median 0.000, 90th percentile 0.000" in detail["H2"]
-    assert detail["H3"].startswith("  1.0000 of ") and "provisional" in detail["H3"]
+    assert detail["H3"].startswith("  1.0000 of ") and "provisional" not in detail["H3"]
     assert detail["H4"].startswith("  names compared on all ") and "differ" not in detail["H4"]
     assert " of the " in detail["H5"] and "lost" not in detail["H5"]
 
