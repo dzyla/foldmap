@@ -218,6 +218,37 @@ console.log(JSON.stringify({ one, again, two, back, swap, n: chainRes.length,
     assert out["n"] == sum(r["c"] == data["residues"][0]["c"] for r in data["residues"]) and out["same"]
 
 
+@pytest.mark.skipif(node is None, reason="node not installed")
+def test_nearest_element_along_the_chain_in_node(tmp_path):
+    # a map click on a loop residue selects the element fewest residues away in its own chain, a tie going to the
+    # N-terminal one; a chain with no helix or strand keeps the residue itself (null here)
+    page = build_page(DATA / "1LMB.cif")
+    chains = "AAAAAAAAAABB"
+    marks = [None, None, "h1", "h1", None, None, None, "h2", "h2", None, None, None]
+    data = {
+        "residues": [{"c": c, "e": e} for c, e in zip(chains, marks)],
+        "elements": [
+            {"id": "h2", "chain": "A", "start": 7, "end": 8},
+            {"id": "h1", "chain": "A", "start": 2, "end": 3},
+        ],
+    }
+    probe = tmp_path / "near.js"
+    probe.write_text(
+        _script(page, "topo-lib")
+        + """
+const data = JSON.parse(require('fs').readFileSync(process.argv[2], 'utf8'));
+console.log(JSON.stringify(data.residues.map((_, k) => globalThis.TopoLib.nearestElement(data, k))
+                            .concat([globalThis.TopoLib.nearestElement(data, 99)])));
+"""
+    )
+    blob = tmp_path / "data.json"
+    blob.write_text(json.dumps(data))
+    res = subprocess.run([node, str(probe), str(blob)], capture_output=True, text=True)
+    assert res.returncode == 0, res.stderr
+    #                                 0     1     2     3     4     5 (tie) 6    7     8     9     B10   B11  none
+    assert json.loads(res.stdout) == ["h1", "h1", "h1", "h1", "h1", "h1", "h2", "h2", "h2", "h2", None, None, None]
+
+
 def test_links_are_listed_with_their_residues_for_selection():
     data = _data(build_page(DATA / "6ZS5.cif"))
     links = data["links"]

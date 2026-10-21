@@ -47,6 +47,7 @@ _LIB = r"""
         case 'loop': return 'loop:' + item.a + '>' + item.b;
         case 'chain': return 'chain:' + item.chain;
         case 'pair': return 'pair:' + item.i + '-' + item.j;
+        case 'cell': return 'cell:' + item.i + '-' + item.j;
         case 'disulfide': case 'glycan': case 'ligand': case 'feature': case 'nucleic': return item.type + ':' + item.key;
         case 'bead': return 'bead:' + (item.mark || item.chain + ':' + item.idx);
         default: return 'residue:' + item.k;
@@ -100,6 +101,19 @@ _LIB = r"""
       return { byKey, byElement };
     },
     elementAt(data, k) { return data.residues[k] ? data.residues[k].e : null; },
+    nearestElement(data, k) {  // a residue's element or, in a loop, the closest one along its own chain (fewest
+      // residues away, a tie to the N-terminal one); null for a residue whose chain has no helix or strand
+      const r = data.residues[k];
+      if (!r) return null;
+      if (r.e) return r.e;
+      let best = null, gap = Infinity;
+      data.elements.forEach(e => {
+        if (e.chain !== r.c) return;
+        const d = Math.max(e.start - k, k - e.end);
+        if (d < gap || (d === gap && e.start < best.start)) { best = e; gap = d; }
+      });
+      return best ? best.id : null;
+    },
     span(data, id) {
       const e = data.elements.find(x => x.id === id);
       return e ? [e.start, e.end] : null;
@@ -235,8 +249,9 @@ _APP = r"""
   }
 
   // ---- 3D: one interface over Mol* (default) or 3Dmol: base colours, highlight, focus, reset, hover callbacks;
-  // the camera moves when the reader moves it (or presses reset) and when a click in the figure selects something
-  // (focus: a short glide onto it, the view's orientation kept), never on a hover, a click in 3D or a cleared selection
+  // the camera moves when the reader moves it (or presses reset) and when a click in the figure or on the map selects
+  // something (focus: a short glide onto it, the view's orientation kept), never on a hover, a click in 3D or a cleared
+  // selection
   const molDiv = document.getElementById('mol');
   const LOOP = '#9aa3ad', PALE = '#dde2e7', LOOP_ON = '#4a4f57', HET = '#e69f00';
   const FOCUS_MS = 250;  // the glide onto a selection: Mol*'s own default, short enough to keep the reader's place
@@ -414,6 +429,25 @@ _APP = r"""
                residues: [item.i, item.j], label: name(item.i) + '·' + name(item.j),
                text: name(item.i) + ' · ' + name(item.j) + ' — ' + d.toFixed(1) + ' Å' + (d <= CUT ? ' (contact)' : '') };
     }
+    if (item.type === 'cell') {  // a click on the map: the whole element of each residue, or the nearest one along its chain
+      const d = lib.distance(data.ca, item.i, item.j), keys = [], res = new Set(), names = [];
+      [item.i, item.j].forEach(k => {
+        const id = lib.nearestElement(data, k);
+        if (!id) {  // a chain with no helix or strand: the residue itself
+          if (!res.has(k)) names.push(name(k) + ' (loop)');
+          res.add(k);
+          return;
+        }
+        if (keys.includes(id)) return;
+        const e = idx.byElement[id];
+        keys.push(id);
+        range(e.start, e.end).forEach(x => res.add(x));
+        names.push(e.label + ' (' + e.chain + ')');
+      });
+      return { keys, residues: Array.from(res), pair: [item.i, item.j], label: names.join('·'),
+               text: names.join(' · ') + ' — from ' + name(item.i) + ' · ' + name(item.j) + ', ' + d.toFixed(1) + ' Å'
+                     + (d <= CUT ? ' (contact)' : '') };
+    }
     if (item.type === 'bead') {  // a nucleotide the protein touches: who touches it, and how closely
       const x = item.mark ? data.beads.marks[item.mark] : data.beads.chains[item.chain][item.idx];
       return { keys: [], residues: [x.k], label: x.text, text: x.text };
@@ -461,8 +495,8 @@ _APP = r"""
     pinned = lib.toggle(pinned, item, additive);
     hovered = null;
     render();
-    // a click in the figure that selects (or adds) something takes the 3D camera to the whole selection; a click
-    // that clears or removes moves nothing (no zoom-out), and nor does a click in the 3D view or on the map
+    // a click in the figure or on the map that selects (or adds) something takes the 3D camera to the whole
+    // selection; a click that clears or removes moves nothing (no zoom-out), and nor does a click in the 3D view
     const key = lib.itemKey(item);
     if (focus && pinned.some(p => lib.itemKey(p) === key)) {
       const { res, het } = gather(pinned.map(stateOf));
@@ -525,7 +559,8 @@ _APP = r"""
   }
   over.addEventListener('mousemove', ev => hover(pairAt(ev)));
   over.addEventListener('mouseleave', unhover);
-  over.addEventListener('click', ev => pick(pairAt(ev), ev.shiftKey));
+  // a hover shows the residue pair; a click selects the whole elements the two residues belong to (or lie nearest)
+  over.addEventListener('click', ev => { const p = pairAt(ev); pick({ type: 'cell', i: p.i, j: p.j }, ev.shiftKey, true); });
 
   const residueItem = k => (data.residues[k].e ? { type: 'element', id: data.residues[k].e } : { type: 'residue', k });
   hooks.hover = k => hover(residueItem(k));  // the 3D model

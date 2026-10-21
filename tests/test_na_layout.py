@@ -1668,16 +1668,18 @@ def test_explorer_page_of_a_nucleic_acid_only_file_has_no_contact_map():
 
 
 _HARNESS = r"""
-// Runs the explorer's app script against stub DOM and viewer objects; drives viewer.on, clicks in the figure and the
-// 3D view, and records any camera move.
+// Runs the explorer's app script against stub DOM and viewer objects; drives viewer.on, clicks in the figure, on the
+// contact map and in the 3D view, and records any camera move and the info line.
 const fs = require('fs');
 const job = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
 const calls = [];
-const listeners = {};  // element name -> event -> handler: the figure and the 3D panel take dispatched clicks
+const listeners = {};  // element name -> event -> handler: the figure, the map and the 3D panel take dispatched clicks
+const texts = {};  // element name -> the last text written to it (the info line)
 const generic = name => new Proxy(function () {}, {
   get(_, k) {
     if (k === 'addEventListener') return (ev, fn) => { if (name) (listeners[name] = listeners[name] || {})[ev] = fn; };
     if (k === 'getAttribute') return () => '0 0 10 10';
+    if (k === 'getBoundingClientRect') return () => ({ left: 0, top: 0, width: job.n, height: job.n });  // 1 px a bin
     if (k === 'textContent') return '';
     if (k === 'dataset') return {};
     if (k === 'style') return {};
@@ -1689,7 +1691,7 @@ const generic = name => new Proxy(function () {}, {
     if (k === 'Symbol.toPrimitive') return undefined;
     return generic();
   },
-  set() { return true; },
+  set(_, k, v) { if (name && k === 'textContent') texts[name] = v; return true; },
   apply() { return generic(); },
 });
 const elements = {};
@@ -1769,13 +1771,25 @@ setTimeout(async () => {
     ['click in 3D', () => listeners.mol && listeners.mol['PDB.molstar.click']
                             && listeners.mol['PDB.molstar.click']({ eventData: job.atom })],
   ];
+  // clicks on contact-map cells: [row, column] residue indices, one map bin a residue (job.n <= 700)
+  const cell = ([i, j], shiftKey) => ({ clientX: j + 0.5, clientY: i + 0.5, shiftKey });
+  const map = () => listeners['map-over'];
+  const [a, b] = job.cells || [];
+  if (a) steps.push(
+    ['map hover', () => map().mousemove(cell(a))],
+    ['map click', () => map().click(cell(a, false))],
+    ['map click again', () => map().click(cell(a, false))],
+    ['map click once more', () => map().click(cell(a, false))],
+    ['map shift-click another', () => map().click(cell(b, true))],
+    ['map shift-click it again', () => map().click(cell(b, true))],
+  );
   for (const [op, act] of steps) {
     calls.length = 0;
     let error = null;
     try { act(); } catch (e) { error = String(e); }
     await new Promise(r => setTimeout(r, 50));
     out.push({ case: 'click', op, error, calls: JSON.parse(JSON.stringify(calls)),
-               selection: window.foldmapSelection() });
+               selection: window.foldmapSelection(), info: texts.info });
   }
   console.log(JSON.stringify(out));
   process.exit(0);
@@ -1800,7 +1814,16 @@ def _drive(tmp_path, pdb, viewer, cases):
         atom = {"auth_asym_id": residue["c"], "auth_seq_id": residue["n"], "ins_code": residue.get("i") or ""}
     else:
         clicks = []
-    job = {"blob": blob, "lib": lib, "app": app, "cases": cases(data), "clicks": clicks, "atom": atom}
+    job = {
+        "blob": blob,
+        "lib": lib,
+        "app": app,
+        "cases": cases(data),
+        "clicks": clicks,
+        "atom": atom,
+        "n": len(data["ca"]),
+        "cells": _map_cells(data) if clicks else [],
+    }
     (tmp_path / "job.json").write_text(json.dumps(job), encoding="utf-8")
     (tmp_path / "harness.js").write_text(_HARNESS, encoding="utf-8")
     res = subprocess.run(
@@ -1808,6 +1831,26 @@ def _drive(tmp_path, pdb, viewer, cases):
     )
     assert res.returncode == 0, res.stderr
     return data, {(r["case"], r["op"]): r for r in json.loads(res.stdout)}
+
+
+def _nearest_element(data, k):  # the page's rule, restated: fewest residues away in the chain, ties N-terminal
+    r = data["residues"][k]
+    if r.get("e"):
+        return r["e"]
+    near = [(max(e["start"] - k, k - e["end"]), e["start"], e["id"]) for e in data["elements"] if e["chain"] == r["c"]]
+    return min(near)[2] if near else None
+
+
+def _map_cells(data):
+    # two map cells: a residue of the first element against a loop residue that lies nearest another element, and
+    # the second element's first residue against itself
+    first, second = data["elements"][:2]
+    loop = next(
+        k
+        for k, r in enumerate(data["residues"][: len(data["ca"])])
+        if not r.get("e") and _nearest_element(data, k) not in (None, first["id"], second["id"])
+    )
+    return [[first["start"], loop], [second["start"], second["start"]]]
 
 
 def _stem_with_contacts(data):
@@ -1894,6 +1937,55 @@ def test_explorer_figure_click_takes_the_3d_camera_to_the_selection(tmp_path, vi
     assert cam == [], r
     if viewer == "molstar":
         assert r["selection"] == one
+
+
+@pytest.mark.skipif(node is None, reason="node is not installed; the explorer's viewer code cannot be exercised")
+@pytest.mark.parametrize("viewer", ["3dmol", "molstar"])
+def test_explorer_map_click_selects_whole_elements_and_takes_the_3d_camera_to_them(tmp_path, viewer):
+    # the author: a click on a contact-map cell selects the whole element of each of its two residues (for a loop
+    # residue, the nearest element along its chain), lights them in the figure and the map, and brings the 3D view to
+    # them as a figure click does; shift-click adds; a hover or a click that clears or removes moves nothing
+    data, got = _drive(tmp_path, "1IHF", viewer, lambda data: [])
+    assert len(data["ca"]) <= 700  # one map bin a residue: the harness clicks residue indices
+    (i, j), (s, _) = _map_cells(data)
+    by_id = {e["id"]: e for e in data["elements"]}
+    near, second = by_id[_nearest_element(data, j)], by_id[data["residues"][s]["e"]]
+    first = by_id[data["residues"][i]["e"]]
+    assert data["residues"][j].get("e") is None and near["id"] not in (first["id"], second["id"])
+    cell_a, cell_b = f"cell:{i}-{j}", f"cell:{s}-{s}"
+    moves = ("zoomTo",) if viewer == "3dmol" else ("focusLoci", "focusSpheres", "reset")
+
+    def step(op):
+        r = got[("click", op)]
+        assert r["error"] is None, r
+        return r, [c for c in r["calls"] if c[0] in moves]
+
+    def framed(call):  # how many residues the camera was sent to, and the glide's length
+        if viewer == "3dmol":
+            return len(call[1]["or"]), call[2]
+        return sum(p["end_auth_seq_id"] - p["beg_auth_seq_id"] + 1 for p in call[1]["params"]), call[2]["durationMs"]
+
+    def lit(r):  # the residues lit in 3D by the selection
+        on = [c for c in r["calls"] if c[0] == ("setStyle" if viewer == "3dmol" else "select")]
+        if viewer == "3dmol":
+            return max(len(c[1].get("or", [])) for c in on)
+        return sum(p["end_auth_seq_id"] - p["beg_auth_seq_id"] + 1 for p in on[-1][1]["data"])
+
+    size = {e["id"]: e["end"] - e["start"] + 1 for e in (first, near, second)}
+    pair = size[first["id"]] + size[near["id"]]
+    for op in ("map click", "map click once more"):
+        r, cam = step(op)
+        assert r["selection"] == [cell_a] and len(cam) == 1, r
+        assert framed(cam[0]) == (pair, 250)  # the same focus as a figure click
+        assert lit(r) == pair
+        assert r["info"].startswith(f"{first['label']} ({first['chain']}) · {near['label']} ({near['chain']}) — from ")
+    r, cam = step("map shift-click another")  # adds the second element; the camera frames all three
+    assert r["selection"] == [cell_a, cell_b] and len(cam) == 1, r
+    assert framed(cam[0]) == (pair + size[second["id"]], 250)
+    before = got[("click", "click in 3D")]["selection"]  # a hover on the map pins nothing
+    for op, selection in (("map hover", before), ("map click again", []), ("map shift-click it again", [cell_a])):
+        r, cam = step(op)
+        assert r["selection"] == selection and cam == [], r
 
 
 @pytest.mark.skipif(node is None, reason="node is not installed; the explorer's viewer code cannot be exercised")
