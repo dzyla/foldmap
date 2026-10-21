@@ -277,7 +277,7 @@ files).
 | βα row | `--set fold_template=off` draws an all-parallel α/β sheet as projected |
 | Helices over a sheet | `--set helix_on_sheet=auto` (opt-in) |
 | Two-fold assemblies | `--set two_fold=mirror` or `unrolled`: a C2 assembly's copies always as mirror images, or side by side (default `auto`: mirrored where each copy is one protein chain) |
-| Cyclic assemblies | `--set cyclic=rosette` (opt-in): a ring of 3 to 8 copies seen down its axis, each copy the first one's drawing turned about it; a D2 as two such rings, one the other's mirror image across a dashed dyad line (default `unrolled`: side by side) |
+| Cyclic assemblies | `--set cyclic=rosette` (opt-in): a four- or seven-fold ring (C4, C7) drawn whole, seen down its axis, each copy the first one's drawing turned about it (default `unrolled`: side by side) |
 | Strands lent across a ring's cut | `--set copy_ghosts=off` draws such a strand once, past the row's end, with no dashed copies of it or its partners |
 | Hydrogen bonds | `--set hbonds=na`, `interchain` or `chains:A+B`; `--set hbond_max=30` |
 | Only some chains | `--chains A,B` |
@@ -384,21 +384,19 @@ other assembly's; `two_fold=mirror` seeks the mirror image for any two-fold asse
 same fallbacks); `two_fold=auto`, the default, chooses by the chains of a copy as above. Other symmetric copies,
 and the unrolled cylinders of rings and filaments, are drawn alike.
 
-A ring of 3 to 8 copies (a Cn assembly) is unrolled side by side by default. `--set cyclic=rosette` (the app's
-"Cyclic assemblies" choice, offered when one is drawn: side by side, down the axis) draws it seen down its n-fold
-axis instead, marked by a filled n-gon at the centre: the first copy is laid out in its own frame, and every other
-copy is that drawing, loops included, turned by a whole multiple of 360/n degrees about the axis, all pushed out
-from it just enough to clear their neighbours. Names stay upright, each on the side of its helix that is clear. Each
-copy's sheets are its own: a pairing between two copies' strands is not drawn. Ligands held by every copy (the ions
-of a channel's pore) are drawn once, as one untethered cluster at the centre. A ring with DNA or RNA, a chain outside
-the copies, a stack row or a membrane view stays unrolled, and the notes say why.
-
-A D2 assembly (four copies: two rings of two about the main two-fold axis) with `cyclic=rosette` is drawn as two
-rows: ring A, the halves of the copies that a perpendicular two-fold takes onto the other halves, seen down the main
-axis as a two-copy rosette (each marked by a filled lens), and ring B below a dashed dyad line as ring A's mirror
-image in it, which is how ring B projects down the same axis. A pairing between the rings' strands is named in the
-notes, not drawn. Ligands are drawn with their own copy. A Dn with n of 3 or more stays unrolled, with a note: seen
-down its axis, the interface between its rings lies in depth.
+A ring of copies (a Cn assembly) is unrolled side by side by default. For a four- or seven-fold ring (C4, C7) drawn
+whole, `--set cyclic=rosette` (the app's "Cyclic assemblies" choice, offered only then: side by side, down the axis)
+draws it seen down its n-fold axis instead, marked by a filled n-gon at the centre: the first copy is laid out in its
+own frame, and every other copy is that drawing, loops included, turned by a whole multiple of 360/n degrees about
+the axis, all pushed out from it just enough to clear their neighbours. Names stay upright, each on the side of its
+helix that is clear. Each copy's sheets are its own: a pairing between two copies' strands is not drawn. Ligands held
+by every copy (the ions of a channel's pore) are drawn once, as one untethered cluster at the centre. A ring with DNA
+or RNA, a chain outside the copies, a stack row or a membrane view stays unrolled, and the notes say why. Where the
+figure draws one subunit of a large assembly (`--focus auto` or `protomer`), no rosette is drawn and a note says it
+needs the whole assembly (`--focus none`). Other orders are not offered: in a look test on 56 assemblies, three-,
+five- and six-fold rosettes, and D2 assemblies drawn as two mirrored rings, read worse than their unrolled figures on
+most entries, with more check failures (route fallbacks, text collisions, sheet order); no eight-fold assembly was
+at hand. With `cyclic=rosette` those are drawn as the default figure, with a note saying so.
 
 **Layout files.** `--save-layout fig.yaml` records everything that defines a figure: theme, style changes,
 layout options, domains and edits, with element references stored as residue ranges so they survive a new model.

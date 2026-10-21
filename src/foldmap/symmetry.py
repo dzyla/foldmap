@@ -328,37 +328,6 @@ def _dihedral(asm: _Assembly, axis: np.ndarray, centre: np.ndarray, tol: float) 
     return False
 
 
-DYAD_PERPENDICULAR = 0.15  # |cos| between a dihedral two-fold and the main axis: at most this (about 81-99 degrees)
-
-
-def protomer_dyad(bb: Backbone, sym: Symmetry, tolerance: float = TOLERANCE):
-    """A dihedral assembly's two-fold perpendicular to its main axis that takes protomer 0's chains onto one another
-    (none onto itself): (its unit axis, at right angles to the main one; the chain each clustered subunit goes to),
-    or None. Of several, the one with the smallest deviation (CA RMSD), the earlier candidate on a tie. A D2
-    (Style.cyclic rosette, plan 21 Task 3) draws protomer 0's half that this two-fold sends onto the other half as
-    one ring, the rest as its image across it."""
-    if sym.kind != "D" or not sym.protomers:
-        return None
-    asm = _Assembly(bb)
-    axis = sym.axis / np.linalg.norm(sym.axis)
-    first = set(sym.protomers[0])
-    best = None
-    for ax in _candidate_axes(asm, tolerance):
-        if abs(ax @ axis) >= DYAD_PERPENDICULAR:
-            continue
-        ax = ax - (ax @ axis) * axis
-        ax = ax / np.linalg.norm(ax)
-        found = _cyclic(asm, ax, sym.centre, 2, tolerance)
-        if found is None:
-            continue
-        perm, rmsd = found
-        if any(c not in perm or perm[c] not in first or perm[c] == c for c in first):
-            continue
-        if best is None or rmsd < best[2] - 1e-9:
-            best = (ax, perm, rmsd)
-    return None if best is None else (best[0], best[1])
-
-
 def _helical(asm: _Assembly, tol: float, min_copies: int):
     """A screw that walks each copy onto the next, chaining every clustered subunit along one axis in paths of at
     least `min_copies`."""

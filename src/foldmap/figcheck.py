@@ -138,16 +138,10 @@ def local_layout(lay):
         k = sector.get(p.sse.chain)
         if not k:
             return p
+        c, s = math.cos(-angles[k]), math.sin(-angles[k])
         q = _copy.copy(p)
-        if lay.frame.mirrors[k] or lay.rosette_shifts:  # a D2's ring B: its mirror and move undone too
-            from .layout import copy_unangle, copy_unplace
-
-            q.cx, q.cy = (float(v) for v in copy_unplace(lay, k, [p.cx, p.cy]))
-            q.angle = copy_unangle(lay, k, p.angle)
-        else:
-            c, s = math.cos(-angles[k]), math.sin(-angles[k])
-            q.cx, q.cy = c * p.cx - s * p.cy, s * p.cx + c * p.cy
-            q.angle = p.angle - angles[k]
+        q.cx, q.cy = c * p.cx - s * p.cy, s * p.cx + c * p.cy
+        q.angle = p.angle - angles[k]
         mate = mates.get(p.sse.id, (None,))[0]
         m = (ghost_of if p.ghost else lay.placed).get(mate)
         if (

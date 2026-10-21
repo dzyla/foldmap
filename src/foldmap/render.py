@@ -22,7 +22,7 @@ from matplotlib.axes import Axes
 from matplotlib.colors import to_hex, to_rgba
 from matplotlib.figure import Figure
 from matplotlib.font_manager import FontProperties
-from matplotlib.patches import Circle, Ellipse, FancyBboxPatch, PathPatch, Polygon, Rectangle
+from matplotlib.patches import Circle, FancyBboxPatch, PathPatch, Polygon, Rectangle
 from matplotlib.path import Path
 from matplotlib.text import Text
 from matplotlib.textpath import text_to_path
@@ -59,8 +59,6 @@ from .layout import (
     block_ghosts,
     centred_box,
     clear_inks,
-    copy_unangle,
-    copy_unplace,
     count_half,
     count_page,
     dna_to_page,
@@ -84,7 +82,6 @@ from .layout import (
     page_text,
     panel_members,
     resolve,
-    rosette_centres,
     segments_of,
     spans_crossed,
     stem_keep_box,
@@ -1624,10 +1621,8 @@ def _na_targets(layout: Layout, g, where: dict, near=None):
 def _on_axis(layout: Layout, g) -> bool:
     """Whether a ligand sits on a rosette's axis (Layout.rosette): held by residues of every one of its copies."""
     n = getattr(layout, "rosette", 0)
-    if not n or getattr(layout.frame, "dyad", None) is not None:  # a D2's: drawn with its home copy (no one centre)
-        return False
     sector = getattr(layout.frame, "sector", None) or {}
-    return len({sector.get(layout.res_chain[r]) for r in g.contacts} - {None}) == n
+    return bool(n) and len({sector.get(layout.res_chain[r]) for r in g.contacts} - {None}) == n
 
 
 _AXIS_MARK_GAP = 0.12  # page units between two marks of a rosette's axis cluster
@@ -1687,8 +1682,8 @@ def ligand_marks(layout: Layout, loops: list[Loop], sses: list[SSE], look: Style
     if layout.focus_chains:  # one subunit of an assembly: only what binds it
         chosen = [g for g in chosen if any(layout.res_chain[r] in layout.focus_chains for r in g.contacts)]
     taken = [p.rect for p in layout.placed.values()] + [g.rect for g in layout.ghosts]
-    for x, y in rosette_centres(layout):  # a rosette's axis symbols (a D2's two)
-        taken.append(centred_box(x, y, AXIS_SYMBOL_R, AXIS_SYMBOL_R))
+    if getattr(layout, "rosette", 0):  # a rosette's axis symbol at the page centre
+        taken.append(centred_box(0.0, 0.0, AXIS_SYMBOL_R, AXIS_SYMBOL_R))
     bodies = list(taken)  # what a tether should not run over (C9)
     labels = [box for _, box in label_boxes(layout, sses)]
     if counts is None:
@@ -3147,27 +3142,14 @@ def _draw_loops(c: _Canvas, layout: Layout, loops: list[Loop], sses: list[SSE], 
 def _draw_axis_symbol(c: _Canvas, layout: Layout) -> None:
     """A rosette's n-fold axis (Layout.rosette, Style.cyclic): a filled regular n-gon at the page centre, one corner
     up, as crystallographers mark a rotation axis seen end on."""
-    if not getattr(layout, "rosette", 0):
+    n = getattr(layout, "rosette", 0)
+    if not n:
         return
-    n = layout.frame.order
-    for k, (x, y) in enumerate(rosette_centres(layout)):  # a D2's two rings: one symbol each
-        if n == 2:  # a two-fold: a lens, upright
-            mark = Ellipse((x, y), 1.1 * AXIS_SYMBOL_R, 2 * AXIS_SYMBOL_R, fc=c.look.ink, ec="none", zorder=Z["mark"])
-        else:
-            turns = np.pi / 2 + 2 * np.pi * np.arange(n) / n
-            corners = np.stack([x + AXIS_SYMBOL_R * np.cos(turns), y + AXIS_SYMBOL_R * np.sin(turns)], axis=1)
-            mark = Polygon(corners, closed=True, fc=c.look.ink, ec="none", zorder=Z["mark"])
-        mark.set_gid(f"axis:{n}" if k == 0 else f"axis:{n}:{k}")
-        c.ax.add_patch(mark)
-    if layout.dyad_line:  # a D2's dyad in the page: a dashed line between the rings, a lens lying on its left end
-        x0, x1, y = layout.dyad_line
-        grey = _mix(c.look.background, c.look.ink, 0.55)
-        (line,) = c.ax.plot([x0, x1], [y, y], color=grey, lw=c.lw * 0.8, ls=(0, (6, 4)), zorder=Z["sheet-panel"])
-        line.set_gid("dyad")
-        r = 0.7 * AXIS_SYMBOL_R
-        mark = Ellipse((x0, y), 2 * r, 1.1 * r, fc=c.look.ink, ec="none", zorder=Z["mark"])
-        mark.set_gid("dyad:2")
-        c.ax.add_patch(mark)
+    turns = np.pi / 2 + 2 * np.pi * np.arange(n) / n
+    corners = np.stack([AXIS_SYMBOL_R * np.cos(turns), AXIS_SYMBOL_R * np.sin(turns)], axis=1)
+    mark = Polygon(corners, closed=True, fc=c.look.ink, ec="none", zorder=Z["mark"])
+    mark.set_gid(f"axis:{n}")
+    c.ax.add_patch(mark)
 
 
 def _draw_membrane(c: _Canvas, layout: Layout) -> None:
@@ -3442,30 +3424,20 @@ def _draw_domain_bar(c: _Canvas, layout: Layout) -> None:
             t.set_gid(seg.gid.replace("domain-bar:", "domain-bar-label:", 1))
 
 
-def _copy_of(layout: Layout, chain: str) -> int:
-    """The copy of a rosette (Layout.rosette) a chain is drawn in; 0 (protomer 0's, drawn as laid out) elsewhere."""
+def _copy_turn(layout: Layout, chain: str) -> float:
+    """The turn (radians) a rosette (Layout.rosette) draws a chain's copy at about the page centre; 0 elsewhere."""
     if not getattr(layout, "rosette", 0):
-        return 0
-    return layout.frame.sector.get(chain) or 0
+        return 0.0
+    k = layout.frame.sector.get(chain)
+    return float(layout.frame.angles[k]) if k is not None else 0.0
 
 
-def _turned_back(layout: Layout, p: Placed, k: int) -> Placed:
-    """An element as its copy's own frame draws it, before a rosette's turn (and a D2 ring B's mirror and move):
-    itself in copy 0."""
-    if not k:
+def _turned_back(p: Placed, turn: float) -> Placed:
+    """An element as its copy's own frame draws it, before a rosette's turn (itself when `turn` is 0)."""
+    if not turn:
         return p
-    (x, y) = copy_unplace(layout, k, [p.cx, p.cy])
-    return Placed(p.sse, float(x), float(y), p.length, copy_unangle(layout, k, p.angle), p.width)
-
-
-def _copy_transform(layout: Layout, k: int) -> Affine2D:
-    """Copy k's drawing from its own frame's (_turned_back undone): mirrored, turned, moved."""
-    move = Affine2D()
-    if layout.frame.mirrors[k]:
-        move = move.scale(1.0, -1.0)
-    move = move.rotate(layout.frame.angles[k])
-    shifts = layout.rosette_shifts
-    return move.translate(*shifts[k]) if shifts else move
+    c, s = np.cos(-turn), np.sin(-turn)
+    return Placed(p.sse, c * p.cx - s * p.cy, s * p.cx + c * p.cy, p.length, p.angle - turn, p.width)
 
 
 def _draw_sheet_panels(c: _Canvas, layout: Layout, outlines: dict[str, Path] | None = None) -> None:
@@ -3478,9 +3450,9 @@ def _draw_sheet_panels(c: _Canvas, layout: Layout, outlines: dict[str, Path] | N
     for k, ids in enumerate(layout.sheets):
         if len(ids) < 2:
             continue
-        copy = _copy_of(layout, layout.placed[ids[0]].sse.chain)  # a rosette's copy: its panel turned with it
+        turn = _copy_turn(layout, layout.placed[ids[0]].sse.chain)  # a rosette's copy: its panel turned with it
         members = [layout.placed[i] for i in ids] + list(block_ghosts(layout, k))
-        rects = np.array([_turned_back(layout, m, copy).rect for m in members])
+        rects = np.array([_turned_back(m, turn).rect for m in members])
         x0, y0 = rects[:, 0].min() - 0.3, rects[:, 1].min() - 0.3
         x1, y1 = rects[:, 2].max() + 0.3, rects[:, 3].max() + 0.3
         fill = _mix(c.look.background, c.look.ink, 0.07) if c.look.background != "#ffffff" else _PANEL
@@ -3497,8 +3469,8 @@ def _draw_sheet_panels(c: _Canvas, layout: Layout, outlines: dict[str, Path] | N
             ec="none",
             zorder=Z["sheet-panel"],
         )
-        if copy:
-            panel.set_transform(_copy_transform(layout, copy) + c.ax.transData)
+        if turn:
+            panel.set_transform(Affine2D().rotate(turn) + c.ax.transData)
         panel.set_gid(f"sheet-panel:{k}")
         c.ax.add_patch(panel)
         if len(names) > 1:

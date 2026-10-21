@@ -1,5 +1,6 @@
-"""Plan 21 Task 1: a cyclic assembly asked for as a rosette (Style.cyclic=rosette) is seen down its axis, copy k drawn
-as protomer 0's drawing turned by k * 360 / n degrees about the axis and pushed out just enough to clear."""
+"""Plan 21: a C4 or C7 assembly asked for as a rosette (Style.cyclic=rosette) is seen down its axis, copy k drawn as
+protomer 0's drawing turned by k * 360 / n degrees about the axis and pushed out just enough to clear. Other orders
+and a D2 are drawn unrolled with a note (Task 5, after the look test), as is one subunit of a large assembly."""
 
 import math
 from pathlib import Path
@@ -95,10 +96,11 @@ def test_axis_symbol_and_note(kcsa):
 
 
 def test_a_two_fold_assembly_ignores_the_key():
-    """cyclic=rosette is for n = 3..8: a dimer is drawn as before."""
+    """cyclic=rosette is for C4 and C7: a dimer is drawn as before, with no note (Style.two_fold is its choice)."""
     a = drawn(DATA / "2HHB.cif", "cyclic=rosette").layout
     b = drawn(DATA / "2HHB.cif").layout
     assert not a.rosette and [(p.cx, p.cy) for p in a.placed.values()] == [(p.cx, p.cy) for p in b.placed.values()]
+    assert not a.cyclic_note
 
 
 # ------------------------------------------------------------------ plan 21 Task 2: routes, labels, ligands, checks
@@ -166,7 +168,7 @@ def test_copy_names_keep_off_the_turned_bodies(kcsa):
             p.label_side = -p.label_side
 
 
-@pytest.mark.parametrize("name", ["1BL8", "8UUP"])
+@pytest.mark.parametrize("name", ["1BL8.cif", "6LTO.cif.gz"])
 def test_rosette_passes_the_checks(name):
     """figcheck reads a rosette in each copy's own frame where it reads page axes (sheet columns and spans), and
     element bodies at their angle: no element overlaps, sheets in order, the science checks, copies alike (A15, by
@@ -174,8 +176,8 @@ def test_rosette_passes_the_checks(name):
     from foldmap import figcheck
     from foldmap.spec import draw_spec as drawn_spec
 
-    d = drawn_spec(figure_spec(DATA / f"{name}.cif", style=["cyclic=rosette"]))
-    assert d.layout.rosette
+    d = drawn_spec(figure_spec(DATA / name, style=["cyclic=rosette"], focus="none"))
+    assert d.layout.rosette in (4, 7)
     assert figcheck.element_overlaps(d.layout) == []
     assert figcheck.order_checks(d) == []
     science = figcheck.science_checks(d)
@@ -206,105 +208,62 @@ def test_styles_lists_cyclic(capsys):
     assert "cyclic" in capsys.readouterr().out
 
 
-# ------------------------------------------------------------------ plan 21 Task 3: a D2 as two mirrored rings
-
-D2 = DATA / "r100" / "3L9G-A.cif.gz"  # a D2 tetramer (A1..A4)
+# ------------------------------------------------------------------ plan 21 Task 5: C4 and C7 only, notes otherwise
 
 
-@pytest.fixture(scope="module")
-def dihedral():
-    return drawn(D2, "cyclic=rosette")
+def test_a_seven_fold_ring_drawn_whole_is_a_rosette():
+    """6LTO (C7) with --focus none: seen down its 7-fold axis, each copy protomer 0 turned by k * 360 / 7 degrees."""
+    d = drawn(DATA / "6LTO.cif.gz", "cyclic=rosette", focus="none")
+    lay = d.layout
+    assert lay.rosette == 7 and lay.cyclic_assembly
+    assert lay.frame.angles == pytest.approx([2 * math.pi * k / 7 for k in range(7)])
+    items = d.figure.foldmap_provenance
+    assert any(i["kind"] == "cyclic" and "7-fold axis" in i["text"] for i in items)
 
 
-def test_d2_is_unrolled_by_default():
-    lay = drawn(D2).layout
-    assert not lay.rosette and lay.cyclic_assembly  # the app offers the choice
+def _same_figure(a, b):
+    """Two drawings with the same elements at the same places, the same loops and the same page, the cyclic note
+    apart (the SVG's <desc> holds the notes)."""
+    import re
 
-
-def test_d2_ring_b_is_ring_a_mirrored_below_the_dyad_line(dihedral):
-    """Ring A (copies 0 and 1) is protomer 0's half and its half-turn about the main axis; ring B (copies 2 and 3) is
-    ring A's mirror image in the dashed dyad line, drawn below it: each ring-B element at its protomer-0 mate's
-    place mirrored (page y -> -y), turned and moved down, its angle with it."""
-    from foldmap.layout import copy_place
-
-    lay = dihedral.layout
-    f = lay.frame
-    assert lay.rosette == 4 and f.order == 2 and f.dyad is not None
-    assert f.mirrors == [False, False, True, True]
-    x0, x1, y = lay.dyad_line
-    assert lay.rosette_shifts[2] == (0.0, 2 * y) and y < 0
-    zero = {(f.classes[p.sse.chain], p.sse.first.seq): p for p in lay.placed.values() if f.sector[p.sse.chain] == 0}
-    checked = 0
-    for p in lay.placed.values():
-        k = f.sector[p.sse.chain]
-        if not k or p.sse.id in lay.rosette_strays:
-            continue
-        m = zero[(f.classes[p.sse.chain], p.sse.first.seq)]
-        assert [p.cx, p.cy] == pytest.approx(copy_place(lay, k, [m.cx, m.cy]), abs=2e-4)
-        want = (-m.angle if f.mirrors[k] else m.angle) + f.angles[k]
-        assert math.cos(p.angle - want) == pytest.approx(1.0, abs=1e-6)
-        assert (p.cy < y) == f.mirrors[k]  # ring B below the line, ring A above
-        assert x0 < p.cx < x1
-        checked += 1
-    assert checked >= 3 * len(zero) - 2
-    ties = lay.copy_ties
-    assert all(mirrored == f.mirrors[f.sector[c]] for c, (_, mirrored) in ties.items())
-
-
-def test_d2_loops_are_their_mates_mirrored(dihedral):
-    from foldmap.layout import copy_place
-
-    lay = dihedral.layout
-    loops = {(lp.a_id, lp.b_id): lp for lp in dihedral.loops}
-    mirrored = 0
-    for (a, b), lp in loops.items():
-        if a not in lay.rosette_mates or b not in lay.rosette_mates:
-            continue
-        (ma, k), (mb, _) = lay.rosette_mates[a], lay.rosette_mates[b]
-        if (ma, mb) not in loops:
-            continue
-        want = copy_place(lay, k, np.array(loops[(ma, mb)].points))
-        assert np.abs(np.array(lp.points) - want).max() < 1e-3
-        mirrored += lay.frame.mirrors[k]
-    assert mirrored > 0
-    _, _, y = lay.dyad_line
-    for lp in dihedral.loops:  # no loop crosses the dyad line
-        ys = np.array(lp.points)[:, 1]
-        assert ys.min() > y or ys.max() < y
-
-
-def test_d2_symbols_note_and_checks(dihedral):
-    from foldmap import figcheck
     from foldmap.render import save_svg
 
-    svg = save_svg(dihedral.figure)
-    assert 'id="axis:2"' in svg and 'id="axis:2:1"' in svg and 'id="dyad"' in svg
-    items = dihedral.figure.foldmap_provenance
-    assert any(i["kind"] == "cyclic" and "mirror image" in i["text"] for i in items)
-    lay = dihedral.layout
-    assert figcheck.element_overlaps(lay) == []
-    assert figcheck.order_checks(dihedral) == []
-    science = figcheck.science_checks(dihedral)
-    assert all(not science[s] for s in ("S1", "S2", "S3", "S6"))
-    assert all(dev is not None and dev < 0.5 for dev in figcheck.copies_alike(dihedral).values())
+    la, lb = a.layout, b.layout
+    assert [(k, p.cx, p.cy, p.angle, p.label) for k, p in la.placed.items()] == [
+        (k, p.cx, p.cy, p.angle, p.label) for k, p in lb.placed.items()
+    ]
+    assert [(lp.a_id, lp.b_id, lp.points) for lp in a.loops] == [(lp.a_id, lp.b_id, lp.points) for lp in b.loops]
+    page = lambda d: re.sub(r"\s*<desc>.*?</desc>", "", save_svg(d.figure), flags=re.S)  # noqa: E731
+    assert page(a) == page(b)
+    other = lambda d: [i for i in d.figure.foldmap_provenance if i["kind"] != "cyclic"]  # noqa: E731
+    assert other(a) == other(b)
 
 
-def test_d2_local_frames_see_each_copy_as_copy_0():
-    """A D2 frame's ring-B local frame is ring A's moved by the half-turn about the dyad: a proper rotation, seen from
-    the other side of the main axis."""
-    from foldmap.frame import RosetteFrame
+def _cyclic_notes(d) -> list[str]:
+    return [i["text"] for i in d.figure.foldmap_provenance if i["kind"] == "cyclic"]
 
-    axis, ref, dyad = np.array([0.0, 0.0, 1.0]), np.array([0.0, 1.0, 0.0]), np.array([1.0, 0.0, 0.0])
-    sector = {"A": 0, "B": 1, "C": 2, "D": 3}
-    f = RosetteFrame(
-        np.zeros(3), axis, ref, 4, sector, {c: 0 for c in "ABCD"}, [0, math.pi, 0, math.pi], [False, False, True, True]
-    )
-    f.dyad = dyad
-    assert f.order == 2
-    p = np.array([2.0, 5.0, 3.0])  # a point of copy 0
-    turned = np.array([-2.0, -5.0, 3.0])  # copy 1: the half-turn about the axis
-    across = np.array([-2.0, 5.0, -3.0])  # copy 3: copy 1 taken by the half-turn about the dyad (x)
-    for k, q in ((1, turned), (3, across)):
-        local = f.local(k)
-        assert np.linalg.det(np.array([local.u, local.v, local.w])) == pytest.approx(1.0)
-        assert local.project(q)[0] == pytest.approx(f.local(0).project(p)[0])
+
+@pytest.mark.parametrize(("name", "label"), [("3B6N.cif.gz", "C3"), ("3KGS.cif.gz", "D2")])
+def test_other_orders_are_the_default_figure_with_a_note(name, label):
+    """A C3 (3B6N) and a D2 (3KGS) asked for as rosettes are drawn exactly as by default (the look test kept C4 and C7
+    only), with one note saying so; the app does not offer the choice for them."""
+    rosette, default = drawn(DATA / name, "cyclic=rosette"), drawn(DATA / name)
+    assert not rosette.layout.rosette and not rosette.layout.cyclic_assembly
+    _same_figure(rosette, default)
+    assert _cyclic_notes(default) == []
+    assert _cyclic_notes(rosette) == [
+        f"cyclic=rosette: the {label} assembly not drawn as a rosette, the rosette is offered for four- and "
+        "seven-fold assemblies only"
+    ]
+
+
+def test_one_subunit_drawn_notes_the_rosette_needs_the_whole_assembly():
+    """6LTO (C7) under --focus auto draws one subunit: no rosette, the default figure, and a note naming --focus none;
+    the app does not offer the choice there."""
+    rosette, default = drawn(DATA / "6LTO.cif.gz", "cyclic=rosette"), drawn(DATA / "6LTO.cif.gz")
+    assert rosette.layout.focus_chains and not rosette.layout.rosette and not rosette.layout.cyclic_assembly
+    _same_figure(rosette, default)
+    assert _cyclic_notes(rosette) == [
+        "cyclic=rosette: the C7 assembly not drawn as a rosette, one subunit is drawn and the rosette needs the whole "
+        "assembly (--focus none)"
+    ]

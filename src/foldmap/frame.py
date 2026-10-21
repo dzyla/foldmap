@@ -119,35 +119,19 @@ class RosetteFrame:
     k is turned by -angles[k] about the axis (onto protomer 0), projected down the axis with page-up toward protomer
     0, then turned by +angles[k] about the page centre, where the axis projects (page origin). angles[k] is exactly
     k * 2 pi / n for the copy at that place round the ring, so copy k is drawn as protomer 0 turned. Points of chains
-    outside every protomer are projected as they lie. Locally a proper rotation (never a mirror).
-
-    A D2 (dihedral_rosette_frame, plan 21 Task 3) has twice the copies: copies 0..order-1 are ring A, the halves of
-    the protomers one two-fold (`dyad`) takes onto the other halves, seen down the main axis; copy order + j is ring
-    B, the image of ring A's copy j under that two-fold, drawn mirrored in the page's dyad line (page y -> -y), turned
-    by angles[order + j] and moved below ring A (layout._rosette). Projecting down the axis, a half-turn about a
-    page-right two-fold is that mirror: angles[order + j] is -angles[j] with the dyad page-right, minus a further
-    half-turn with the other two-fold across the axis page-right (dihedral_rosette_frame)."""
+    outside every protomer are projected as they lie. Locally a proper rotation (never a mirror)."""
 
     origin: np.ndarray  # a point on the axis: the page centre
     axis: np.ndarray  # toward the viewer (w)
     ref: np.ndarray  # page up: perpendicular to the axis, toward protomer 0
-    n: int  # copies drawn
-    sector: dict  # chain -> copy index (its protomer's; a D2's half-protomer's)
+    n: int
+    sector: dict  # chain -> protomer index
     classes: dict = None  # chain -> chain class (its position within a protomer)
-    angles: list = None  # each copy's exact page turn about the axis, radians (k * 2 pi / n)
-    mirrors: list = None  # each copy drawn mirrored in the dyad line before its turn (a D2's ring B)
-    dyad: np.ndarray | None = None  # a D2's two-fold taking ring A's copy j onto ring B's (local frames)
+    angles: list = None  # each protomer's exact turn about the axis, radians (k * 2 pi / n)
 
     def __post_init__(self):
         if self.angles is None:
             self.angles = [2 * np.pi * k / self.n for k in range(self.n)]
-        if self.mirrors is None:
-            self.mirrors = [False] * self.n
-
-    @property
-    def order(self) -> int:
-        """The main axis' order: the copies in one ring (n, or half of a D2's)."""
-        return self.n // 2 if self.dyad is not None else self.n
 
     @property
     def u(self) -> np.ndarray:  # page right: u x v = w
@@ -166,16 +150,6 @@ class RosetteFrame:
         elements' places and angles in that frame are protomer 0's, before the page turn)."""
         from .layout import _snap
 
-        if self.mirrors[k]:  # ring B's copy j: ring A's copy j taken by the half-turn about the dyad
-            a = self.angles[k - self.order]
-            d = self.dyad
-
-            def move(x):
-                t = _turn3(x, self.axis, a)
-                return 2 * (t @ d) * d - t
-
-            u, v, w = (_snap(move(x)) for x in (self.u, self.v, self.axis))
-            return Frame(self.origin, u, v, w)
         a = self.angles[k]
         u, v = (_snap(_turn3(x, self.axis, a)) for x in (self.u, self.v))  # cos, sin: the last bit differs by libm
         return Frame(self.origin, u, v, self.axis)
@@ -220,66 +194,6 @@ def rosette_frame(sses: list[SSE], sym) -> RosetteFrame:
     angles = [step * (round(float(a) / step) % n) for a in measured]
     sector, classes = protomer_maps(sym)
     return RosetteFrame(_snap(sym.centre), axis, ref, n, sector, classes, angles)
-
-
-def dihedral_rings(sym, perm: dict) -> tuple[list[list[str]], list[list[str]]] | None:
-    """A D2's two rings (plan 21 Task 3), as lists of copies' chains: ring A's copy k is the part of protomer k whose
-    chains the two-fold `perm` (symmetry.protomer_dyad) takes onto the rest of it (protomer 0's in order, a chain
-    joining ring A unless its image already has: the same places in every protomer), ring B's copy k those chains'
-    images. None unless the two rings share no chain and hold every protomer's."""
-    first = sym.protomers[0]
-    places, claimed = [], set()
-    for i, c in enumerate(first):
-        if c in claimed or perm.get(c) not in first:
-            continue
-        places.append(i)
-        claimed |= {c, perm[c]}
-    ring_a = [[p[i] for i in places] for p in sym.protomers]
-    if any(c not in perm for copy in ring_a for c in copy):
-        return None
-    ring_b = [[perm[c] for c in copy] for copy in ring_a]
-    a = [c for copy in ring_a for c in copy]
-    b = [c for copy in ring_b for c in copy]
-    every = sorted(c for p in sym.protomers for c in p)
-    if len(set(a) | set(b)) != len(a) + len(b) or sorted(a + b) != every:
-        return None
-    return ring_a, ring_b
-
-
-def dihedral_rosette_frame(sses: list[SSE], sym, dyad: np.ndarray, rings) -> RosetteFrame:
-    """The mirrored rosette of a D2 (Style.cyclic rosette, plan 21 Task 3): ring A (dihedral_rings) seen down the main
-    axis from its own side (it lies nearer the viewer), the two-fold `dyad` that takes it onto ring B along
-    page-right, so ring B, seen down the same axis, is ring A mirrored in the dyad line (RosetteFrame). Ring A's
-    copies turn by the nearest whole multiples of 2 pi / order to Symmetry.angles; ring B's copy j by minus ring
-    A's copy j's turn, after its mirror. The axis and the dyad are snapped before they choose anything."""
-    from .layout import _snap
-
-    ring_a, ring_b = rings
-    order = len(ring_a)
-    axis = _snap(_unit(sym.axis))
-    own = [s.centroid for s in sses if any(s.chain in copy for copy in ring_a)]
-    side = 1.0 if not own or float((np.mean(own, axis=0) - sym.centre) @ axis) >= 0 else -1.0
-    axis = axis * side
-    d = np.asarray(dyad, float)
-    d = _snap(_unit(d - (d @ axis) * axis))
-    # page-right: the dyad, or the other two-fold across the axis (the dyad turned a quarter about it: the half-turn
-    # about the axis, then this one, is the dyad's), whichever lies nearer ring A's first copy's direction from the
-    # axis, so ring A's two copies stand side by side and the rings make two rows (layout._rosette pushes them apart
-    # along page-right). Seen down the axis, ring B is ring A mirrored in either line: with the other, each copy of
-    # ring B is the mirror of ring A's other copy, turned by a further half-turn.
-    other = _snap(_unit(np.cross(axis, d)))
-    mid = np.mean([s.centroid for s in sses if s.chain in ring_a[0]] or [sym.centre], axis=0) - sym.centre
-    across = abs(float(mid @ other)) > abs(float(mid @ d)) + 1e-6
-    right = other if across else d
-    ref = _snap(_unit(np.cross(axis, right)))  # page-right = ref x axis
-    step = 2 * np.pi / order
-    measured = list(sym.angles) or [step * k for k in range(order)]
-    turns = [step * (round(side * float(a) / step) % order) for a in measured]
-    angles = turns + [(-(a + (np.pi if across else 0.0))) % (2 * np.pi) for a in turns]
-    sector = {c: k for k, copy in enumerate(ring_a + ring_b) for c in copy}
-    classes = {c: i for copy in ring_a + ring_b for i, c in enumerate(copy)}
-    mirrors = [False] * order + [True] * order
-    return RosetteFrame(_snap(sym.centre), axis, ref, 2 * order, sector, classes, angles, mirrors, d)
 
 
 def protomer_maps(sym) -> tuple[dict, dict]:

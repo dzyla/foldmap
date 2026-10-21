@@ -339,9 +339,9 @@ def test_two_fold_choice_is_offered_for_a_two_fold_assembly(monkeypatch):
     assert at.segmented_control(key="two_fold").value == "mirror"  # still offered: the same assembly
 
 
-def test_cyclic_choice_is_offered_for_a_ring_of_three_to_eight(monkeypatch):
-    """Plan 21 Task 2: side by side (the default) or down the axis, beside the fold options, only where a Cn assembly
-    with n = 3..8 is drawn (KcsA, C4); the rosette draws its n-fold symbol, and the choice stays offered."""
+def test_cyclic_choice_is_offered_for_a_four_or_seven_fold_ring(monkeypatch):
+    """Plan 21 Tasks 2 and 5: side by side (the default) or down the axis, beside the fold options, only where a C4 or
+    C7 assembly is drawn whole (KcsA, C4); the rosette draws its n-fold symbol, and the choice stays offered."""
     from foldmap import app_jobs
 
     monkeypatch.setattr(app_jobs, "SLOW_SECONDS", float("inf"))
