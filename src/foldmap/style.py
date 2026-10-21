@@ -48,7 +48,7 @@ CHOICES = {
     "two_fold": ("auto", "mirror", "unrolled"),  # a two-fold assembly as one copy and its mirror image where each
     # protomer is one protein chain, else side by side / always the mirror image / always side by side
     "cyclic": ("unrolled", "rosette"),  # a cyclic assembly of 3 to 8 copies unrolled side by side / seen down its
-    # axis, each copy protomer 0's drawing turned (plan 21; opt-in)
+    # axis, each copy protomer 0's drawing turned; a D2 as two such rings mirrored in a dyad line (plan 21; opt-in)
     "copy_ghosts": ("on", "off"),  # a strand lent across a ring's cut: with dashed copies where it pairs / none
     "domain_bar": ("auto", "on", "off"),  # the linear domain bar: with 2+ named domains drawn / with any / never
 }

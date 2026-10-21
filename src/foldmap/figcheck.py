@@ -116,6 +116,7 @@ def honest_crossings(lay, loops) -> int:
 # ------------------------------------------------------------------------------------------- element boxes
 
 
+COLUMN_TOL = 1e-3  # page units (in strand pitches across a sheet, _across): two strands this close share a column
 ROSETTE_TURN_TOL = 1e-3  # page units: a turned copy back within this of its mate stands exactly where its mate does
 
 
@@ -137,10 +138,16 @@ def local_layout(lay):
         k = sector.get(p.sse.chain)
         if not k:
             return p
-        c, s = math.cos(-angles[k]), math.sin(-angles[k])
         q = _copy.copy(p)
-        q.cx, q.cy = c * p.cx - s * p.cy, s * p.cx + c * p.cy
-        q.angle = p.angle - angles[k]
+        if lay.frame.mirrors[k] or lay.rosette_shifts:  # a D2's ring B: its mirror and move undone too
+            from .layout import copy_unangle, copy_unplace
+
+            q.cx, q.cy = (float(v) for v in copy_unplace(lay, k, [p.cx, p.cy]))
+            q.angle = copy_unangle(lay, k, p.angle)
+        else:
+            c, s = math.cos(-angles[k]), math.sin(-angles[k])
+            q.cx, q.cy = c * p.cx - s * p.cy, s * p.cx + c * p.cy
+            q.angle = p.angle - angles[k]
         mate = mates.get(p.sse.id, (None,))[0]
         m = (ghost_of if p.ghost else lay.placed).get(mate)
         if (
@@ -1384,8 +1391,12 @@ def order_checks(drawn) -> list[str]:
         got = _drawn_order(at[k])
         seen, wanted = got, want
         if sheet.accessory:  # the track in order; each accessory strand in a column next to its parent's
-            drawn = {i: round(float(np.array([at[k][i].cx, at[k][i].cy]) @ _across(at[k])), 3) for i in at[k]}
-            place = {x: n for n, x in enumerate(sorted(set(drawn.values())))}
+            drawn = {i: float(np.array([at[k][i].cx, at[k][i].cy]) @ _across(at[k])) for i in at[k]}
+            place, n, last = {}, -1, None  # columns: values within COLUMN_TOL of the one before share its column (a
+            for x in sorted(set(drawn.values())):  # 3-decimal rounding split 3KGS's 23.2525 +- 8e-6 in two)
+                if last is None or x - last > COLUMN_TOL:
+                    n += 1
+                place[x], last = n, x
             seen = [i for i in got if i in want]
             for a in sheet.accessory:
                 i, p = a.strand.id, a.parent.id

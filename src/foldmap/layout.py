@@ -321,8 +321,8 @@ class Layout:
     let_go: int = 0  # copy items build_layout let go (_one_per_mate): make_layout keeps them only if more alike
     two_fold_assembly: bool = False  # a two-fold (C2) assembly off a straight duplex: Style.two_fold chooses how
     # make_layout draws it (the app shows that choice only then)
-    cyclic_assembly: bool = False  # a Cn assembly (n = 3..8) off a straight duplex: Style.cyclic chooses how it is
-    # drawn (the app shows that choice only then)
+    cyclic_assembly: bool = False  # a Cn (n = 3..8) or D2 assembly off a straight duplex: Style.cyclic chooses how
+    # it is drawn (the app shows that choice only then)
     lent_across_cut: bool = False  # a strand lent across an unrolled ring's cut (_unwrap): Style.copy_ghosts chooses
     # whether its dashed copies are drawn (the app shows that choice only then)
     lent_apart: dict[str, int] = field(default_factory=dict)  # copy_ghosts off: each strand lent across the cut, drawn
@@ -342,6 +342,9 @@ class Layout:
     rosette_strays: list[str] = field(default_factory=list)  # copy elements with no protomer-0 mate, placed alone
     rosette_mates: dict[str, tuple[str, int]] = field(default_factory=dict)  # a rosette's copy element -> (its
     # protomer-0 mate, its protomer k): drawn as the mate turned by frame.angles[k] (route turns the mate's loops)
+    rosette_shifts: list = field(default_factory=list)  # each copy's page move after its turn: a D2's ring B moved
+    # below ring A (copy_place); none in a Cn rosette
+    dyad_line: tuple | None = None  # a D2 rosette's dashed dyad line between its rings: (x0, x1, page y)
     cyclic_note: str = ""  # what the notes say of Style.cyclic: why a rosette asked for was drawn unrolled, or how
 
     @property
@@ -3612,11 +3615,10 @@ def _rosette_label_sides(lay: Layout) -> None:
     k = glyph(lay)[0] / _GLYPH_W
     mates = lay.rosette_mates
     bodies = [*lay.placed.values(), *lay.ghosts]
-    r = AXIS_SYMBOL_R + 0.15
     names = [
         _element_label_box(p, k) for p in lay.placed.values() if p.sse.kind in ("H", "G") and p.sse.id not in mates
     ]
-    names.append((-r, -r, r, r))
+    names += [box for _, box in rosette_keepouts(lay)]
     for i in sorted(mates):
         p = lay.placed.get(i)
         if p is None or p.sse.kind not in ("H", "G"):
@@ -3642,6 +3644,99 @@ def _wrap_angle(a: float) -> float:
     return float(_HALF_TURN) if a <= -_HALF_TURN + 1e-9 else a + 0.0
 
 
+_DYAD_GAP = 2 * MARGIN  # page units between a D2 rosette's ring A (names and chain ends included) and its mirror
+_DYAD_BAND = 0.15  # page units: half the height of the keep-out round a D2 rosette's dashed dyad line
+
+
+def _ring_bottom(members: list[Placed], sses: list[SSE], lay: Layout) -> float:
+    """The lowest page y a D2 rosette's ring A reaches: its members with their names' room (_rosette_samples) and its
+    chains' end stubs and N/C letters."""
+    pts, rad = _rosette_samples(members)
+    low = float((pts[:, 1] - rad).min()) if len(pts) else 0.0
+    keep = {m.sse.id: m for m in members if not m.ghost}
+    gh = glyph(lay)[1]
+    for mine in group_by_chain(sses, keep=keep).values():
+        first, last = keep[mine[0].id], keep[mine[-1].id]
+        for port, ex in ((first.n_port, first.exit_n), (last.c_port, last.exit_c)):
+            low = min(low, port[1] + ex[1] * END_STUB, port[1] + ex[1] * END_LABEL - gh / 2 - 0.05)
+    return low
+
+
+def _copy_xy(frame, shifts, k: int, pts) -> np.ndarray:
+    """Page points of a rosette's copy k (frame.RosetteFrame) from protomer 0's: mirrored in the dyad line where the
+    copy is (a D2's ring B), turned by its angle about the page origin, then moved by `shifts[k]` (none: 0)."""
+    from .frame import turn2
+
+    p = np.asarray(pts, float)
+    if frame.mirrors[k]:
+        p = p * np.array([1.0, -1.0])
+    out = turn2(p, frame.angles[k])
+    return out + np.asarray(shifts[k], float) if shifts and any(shifts[k]) else out
+
+
+def _copy_angle(frame, k: int, angle: float) -> float:
+    """An element's page angle in a rosette's copy k from its protomer-0 mate's (mirrored, then turned)."""
+    return (-angle if frame.mirrors[k] else angle) + frame.angles[k]
+
+
+def copy_place(layout: Layout, k: int, pts) -> np.ndarray:
+    """Page points of a rosette's (Layout.rosette) copy k from protomer 0's: what route draws a copy's loop with."""
+    return _copy_xy(layout.frame, layout.rosette_shifts, k, pts)
+
+
+def copy_unplace(layout: Layout, k: int, pts) -> np.ndarray:
+    """A rosette's copy k's page points taken back to protomer 0's place (copy_place undone)."""
+    from .frame import turn2
+
+    frame, shifts = layout.frame, layout.rosette_shifts
+    p = np.asarray(pts, float)
+    if shifts and any(shifts[k]):
+        p = p - np.asarray(shifts[k], float)
+    p = turn2(p, -frame.angles[k])
+    return p * np.array([1.0, -1.0]) if frame.mirrors[k] else p
+
+
+def copy_unangle(layout: Layout, k: int, angle: float) -> float:
+    """A rosette's copy k's element angle taken back to protomer 0's (_copy_angle undone)."""
+    a = layout.frame.angles[k]
+    return a - angle if layout.frame.mirrors[k] else angle - a
+
+
+def rosette_centres(layout: Layout) -> list[tuple[float, float]]:
+    """Where a rosette's (Layout.rosette) main axis is drawn: the page origin, and a D2's ring B centre below it."""
+    if not getattr(layout, "rosette", 0):
+        return []
+    frame, shifts = layout.frame, layout.rosette_shifts
+    out = [(0.0, 0.0)]
+    if frame.dyad is not None and shifts:
+        out.append(tuple(float(v) for v in shifts[frame.order]))
+    return out
+
+
+def rosette_keepouts(layout: Layout, route: bool = False) -> list[tuple[str, tuple[float, float, float, float]]]:
+    """What no line or name of a rosette runs over: its axis symbols (rosette_centres) and a D2's dashed dyad line
+    (Layout.dyad_line). With `route`, also that line turned as each of ring A's other copies is (none on the page):
+    protomer 0's loops are routed once and drawn turned for those copies (route._turned_route), so keeping off these
+    keeps each turned loop off the real line."""
+    r = AXIS_SYMBOL_R + 0.15
+    out = [
+        ("axis" if n == 0 else f"axis:{n}", (x - r, y - r, x + r, y + r))
+        for n, (x, y) in enumerate(rosette_centres(layout))
+    ]
+    line = getattr(layout, "dyad_line", None)
+    if line:
+        from .frame import turn2
+
+        x0, x1, y = line
+        band = np.array([[x0, y - _DYAD_BAND], [x1, y - _DYAD_BAND], [x0, y + _DYAD_BAND], [x1, y + _DYAD_BAND]])
+        out.append(("dyad", (x0, y - _DYAD_BAND, x1, y + _DYAD_BAND)))
+        if route:
+            for j, a in enumerate(layout.frame.angles[1 : layout.frame.order], start=1):
+                q = turn2(band, -a)
+                out.append((f"dyad:{j}", (*q.min(axis=0), *q.max(axis=0))))
+    return out
+
+
 def _rosette(sses: list[SSE], sheets: list[Sheet], frame, mode: str, kw: dict) -> Layout:
     """A Cn assembly seen down its axis (frame.RosetteFrame; Style.cyclic rosette, plan 21 Task 1): protomer 0 laid
     out alone in its own frame (frame.local(0): snapping, sheets, de-overlap as for any figure), then copy k drawn
@@ -3650,8 +3745,10 @@ def _rosette(sses: list[SSE], sheets: list[Sheet], frame, mode: str, kw: dict) -
     An element's angle is snapped in protomer 0's frame and turned with its copy, so each copy's elements snap in
     their own frame. Copy elements with no protomer-0 mate (DSSP found them in one copy only) are placed alone,
     seen in their copy's own frame (frame.local(k)) and moved out from the axis until clear. `sheets` are the
-    sheets within protomers (cli makes them so: no sheet across two copies)."""
-    from .frame import turn2
+    sheets within protomers (cli makes them so: no sheet across two copies).
+    A D2 (frame.dyad, plan 21 Task 3): ring A's two copies pushed apart along page-right, then ring B's copies drawn
+    as ring A's mirrored in a dyad line _DYAD_GAP / 2 below ring A's lowest reach (_ring_bottom) and moved below it
+    (Layout.rosette_shifts, Layout.dyad_line: copy_place)."""
 
     style = kw.get("style") or Style()
     sector = frame.sector
@@ -3676,28 +3773,36 @@ def _rosette(sses: list[SSE], sheets: list[Sheet], frame, mode: str, kw: dict) -
     own = list(lay.placed.values())
     mid = np.mean([[p.cx, p.cy] for p in own], axis=0) if own else np.zeros(2)
     out = _snap(mid / np.linalg.norm(mid)) if np.linalg.norm(mid) > 1e-6 else np.array([0.0, 1.0])
-    delta = _rosette_push(own + list(lay.ghosts), frame.angles, out)
+    if frame.dyad is not None:  # a D2: ring A's two copies pushed apart along the dyad line, side by side above it
+        out = np.array([-1.0 if mid[0] < 0 else 1.0, 0.0])
+    delta = _rosette_push(own + list(lay.ghosts), frame.angles[: frame.order], out)
     shove = out * delta
+    shifts: list = [(0.0, 0.0)] * frame.n
 
-    def turned(m: Placed, t: SSE, a: float) -> Placed:
-        x, y = (float(v) for v in _snap(turn2(np.array([m.cx, m.cy]) + shove, a)))
-        q = Placed(t, x, y, m.length, _wrap_angle(m.angle + a), m.width, label=m.label, ghost=m.ghost, over=m.over)
+    def turned(m: Placed, t: SSE, k: int) -> Placed:
+        x, y = (float(v) for v in _snap(_copy_xy(frame, shifts, k, np.array([m.cx, m.cy]) + shove)))
+        angle = _wrap_angle(_copy_angle(frame, k, m.angle))
+        q = Placed(t, x, y, m.length, angle, m.width, label=m.label, ghost=m.ghost, over=m.over)
         up = lambda angle: 1 if np.cos(angle) >= 0 else -1  # noqa: E731  the sign of the normal's page-up part
-        q.label_side = q.label_side_default = m.label_side * up(m.angle) * up(q.angle)  # the mate's side of it
+        flip = -1 if frame.mirrors[k] else 1  # a mirror turns the name's side of the body over
+        q.label_side = q.label_side_default = m.label_side * up(m.angle) * up(q.angle) * flip  # the mate's side
         return q
 
     placed: dict[str, Placed] = {}
     ghosts: list[Placed] = []
-    for k, a in enumerate(frame.angles):
+    for k in range(frame.n):
+        if k == frame.order:  # a D2's ring B: ring A mirrored in a dyad line just below it (names and ends clear)
+            y = _ring_bottom(list(placed.values()) + ghosts, sses, lay)
+            shifts = [(0.0, 0.0)] * frame.order + [(0.0, float(_snap(2 * (y - _DYAD_GAP / 2))))] * frame.order
         for p in own:
             if p.sse.id in maps[k]:
-                q = turned(p, maps[k][p.sse.id], a)
+                q = turned(p, maps[k][p.sse.id], k)
                 placed[q.sse.id] = q
-        ghosts += [turned(g, maps[k][g.sse.id], a) for g in lay.ghosts if g.sse.id in maps[k]]
+        ghosts += [turned(g, maps[k][g.sse.id], k) for g in lay.ghosts if g.sse.id in maps[k]]
     relabel = kw.get("relabel") or {}
     angle_mode = "upright" if mode == "stack" else style.helix_angle
     strays: list[Placed] = []
-    for k, a in enumerate(frame.angles):  # copy elements no protomer-0 element maps to: placed alone, clear
+    for k in range(frame.n):  # copy elements no protomer-0 element maps to: placed alone, clear
         matched = {t.id for t in maps[k].values()}
         local = frame.local(k)
         for t in sses:
@@ -3710,10 +3815,17 @@ def _rosette(sses: list[SSE], sheets: list[Sheet], frame, mode: str, kw: dict) -
                 it = _helix_item(t, local, angle_mode, width, TEN_RISE if t.kind == "G" else HELIX_RISE)
             m = it.members[0]
             m.cx, m.cy = it.cx + it.offsets[0][0], it.cy + it.offsets[0][1]
-            q = turned(m, t, a)
-            q.label = relabel.get(res_ref(t.chain, t.first, t.last), generic_label(t.kind, 0))
-            radial = np.array([q.cx, q.cy])
-            radial = radial / np.linalg.norm(radial) if np.linalg.norm(radial) > 1e-6 else turn2(out, a)
+            q = turned(m, t, k)
+            q.label = relabel.get(res_ref(t.chain, t.first, t.last))
+            if q.label is None:  # the first label of its kind its chain does not use (6KTL B's lone η)
+                used = {r.label for r in [*placed.values(), *strays] if r.sse.chain == t.chain}
+                free = (generic_label(t.kind, n) for n in range(len(used) + 1))
+                q.label = next(label for label in free if label not in used)
+            radial = np.array([q.cx, q.cy]) - np.asarray(shifts[k], float)  # out from its own ring's axis
+            if np.linalg.norm(radial) > 1e-6:
+                radial = radial / np.linalg.norm(radial)
+            else:
+                radial = _copy_xy(frame, [], k, out)
             taken = [r.rect for r in [*placed.values(), *ghosts, *strays]]
             for _ in range(int(_ROSETTE_MAX_PUSH / _ROSETTE_STEP)):
                 x0, y0, x1, y1 = q.rect
@@ -3773,7 +3885,11 @@ def _rosette(sses: list[SSE], sheets: list[Sheet], frame, mode: str, kw: dict) -
     lay.sheet_joins = sorted({tuple(sorted((a.id, b.id))) for sh in sheets for a, b in sh.joined})
     zero_of = {c: k for c, k in (frame.classes or {}).items() if sector.get(c) == 0}
     first = {i: c for c, i in zero_of.items()}
-    lay.copy_ties = {c: (first[frame.classes[c]], False) for c, k in sector.items() if k and frame.classes[c] in first}
+    lay.copy_ties = {  # a D2's ring B: mirror images of ring A
+        c: (first[frame.classes[c]], bool(frame.mirrors[k]))
+        for c, k in sector.items()
+        if k and frame.classes[c] in first
+    }
     lay.tied_ids = {t.id for k in range(1, frame.n) for i, t in maps[k].items()} | {
         i for k in range(1, frame.n) for i in maps[k]
     }
@@ -3789,6 +3905,11 @@ def _rosette(sses: list[SSE], sheets: list[Sheet], frame, mode: str, kw: dict) -
     lay.rosette_push = delta
     lay.rosette_strays = [q.sse.id for q in strays]
     lay.rosette_mates = {t.id: (i, k) for k in range(1, frame.n) for i, t in maps[k].items()}
+    lay.rosette_shifts = shifts if frame.dyad is not None else []
+    if frame.dyad is not None:  # the dashed dyad line midway between the rings, across both
+        rects = np.array([p.rect for p in [*lay.placed.values(), *lay.ghosts]]).reshape(-1, 4)
+        x0, x1 = (float(rects[:, 0].min()) - MARGIN, float(rects[:, 2].max()) + MARGIN) if len(rects) else (-1.0, 1.0)
+        lay.dyad_line = (x0, x1, float(shifts[frame.order][1]) / 2)
     lay.stack_gaps = _stack_gaps(lay)
     _rosette_label_sides(lay)
     _choose_label_sides(lay, sses, style, [])
@@ -5638,9 +5759,8 @@ def label_boxes(
         out.append((f"domain-label:{name}", _grown(box, _NAME_ROUTE)))  # room so no line or nucleotide runs by it
     for name, ((x, y0), (_, y1)) in layout.domain_leaders.items():
         out.append((f"domain-leader:{name}", (x - 0.1, min(y0, y1), x + 0.1, max(y0, y1))))
-    if getattr(layout, "rosette", 0):  # a rosette's axis symbol at the page centre: no line runs over it
-        r = AXIS_SYMBOL_R + 0.15
-        out.append(("axis", (-r, -r, r, r)))
+    if getattr(layout, "rosette", 0):  # a rosette's axis symbols and a D2's dyad line: no line runs over them
+        out += rosette_keepouts(layout, route)
     return out
 
 

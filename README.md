@@ -277,7 +277,7 @@ files).
 | βα row | `--set fold_template=off` draws an all-parallel α/β sheet as projected |
 | Helices over a sheet | `--set helix_on_sheet=auto` (opt-in) |
 | Two-fold assemblies | `--set two_fold=mirror` or `unrolled`: a C2 assembly's copies always as mirror images, or side by side (default `auto`: mirrored where each copy is one protein chain) |
-| Cyclic assemblies | `--set cyclic=rosette` (opt-in): a ring of 3 to 8 copies seen down its axis, each copy the first one's drawing turned about it (default `unrolled`: side by side) |
+| Cyclic assemblies | `--set cyclic=rosette` (opt-in): a ring of 3 to 8 copies seen down its axis, each copy the first one's drawing turned about it; a D2 as two such rings, one the other's mirror image across a dashed dyad line (default `unrolled`: side by side) |
 | Strands lent across a ring's cut | `--set copy_ghosts=off` draws such a strand once, past the row's end, with no dashed copies of it or its partners |
 | Hydrogen bonds | `--set hbonds=na`, `interchain` or `chains:A+B`; `--set hbond_max=30` |
 | Only some chains | `--chains A,B` |
@@ -392,6 +392,13 @@ from it just enough to clear their neighbours. Names stay upright, each on the s
 copy's sheets are its own: a pairing between two copies' strands is not drawn. Ligands held by every copy (the ions
 of a channel's pore) are drawn once, as one untethered cluster at the centre. A ring with DNA or RNA, a chain outside
 the copies, a stack row or a membrane view stays unrolled, and the notes say why.
+
+A D2 assembly (four copies: two rings of two about the main two-fold axis) with `cyclic=rosette` is drawn as two
+rows: ring A, the halves of the copies that a perpendicular two-fold takes onto the other halves, seen down the main
+axis as a two-copy rosette (each marked by a filled lens), and ring B below a dashed dyad line as ring A's mirror
+image in it, which is how ring B projects down the same axis. A pairing between the rings' strands is named in the
+notes, not drawn. Ligands are drawn with their own copy. A Dn with n of 3 or more stays unrolled, with a note: seen
+down its axis, the interface between its rings lies in depth.
 
 **Layout files.** `--save-layout fig.yaml` records everything that defines a figure: theme, style changes,
 layout options, domains and edits, with element references stored as residue ranges so they survive a new model.

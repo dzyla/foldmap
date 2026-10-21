@@ -1059,11 +1059,12 @@ def _rosette_pairs(layout: Layout, pairs) -> dict[tuple[str, str], tuple[tuple[s
 
 
 def _turned_route(layout: Layout, points, k: int, pa: Placed, pb: Placed) -> list:
-    """Protomer 0's route turned by copy k's turn about the axis (page origin), on the grid, its ends at the copy's
-    own ports (they are its mates' turned, to the grid)."""
-    from .frame import turn2
+    """Protomer 0's route turned by copy k's turn about the axis (page origin; a D2's ring B mirrored in the dyad line
+    first and moved below ring A: layout.copy_place), on the grid, its ends at the copy's own ports (they are its
+    mates' turned, to the grid)."""
+    from .layout import copy_place
 
-    pts = _snap(turn2(np.asarray(points, float), layout.frame.angles[k]))
+    pts = _snap(copy_place(layout, k, points))
     out = [tuple(float(v) for v in p) for p in pts]
     out[0], out[-1] = tuple(pa.c_port), tuple(pb.n_port)
     return out

@@ -204,3 +204,107 @@ def test_styles_lists_cyclic(capsys):
 
     main(["styles"])
     assert "cyclic" in capsys.readouterr().out
+
+
+# ------------------------------------------------------------------ plan 21 Task 3: a D2 as two mirrored rings
+
+D2 = DATA / "r100" / "3L9G-A.cif.gz"  # a D2 tetramer (A1..A4)
+
+
+@pytest.fixture(scope="module")
+def dihedral():
+    return drawn(D2, "cyclic=rosette")
+
+
+def test_d2_is_unrolled_by_default():
+    lay = drawn(D2).layout
+    assert not lay.rosette and lay.cyclic_assembly  # the app offers the choice
+
+
+def test_d2_ring_b_is_ring_a_mirrored_below_the_dyad_line(dihedral):
+    """Ring A (copies 0 and 1) is protomer 0's half and its half-turn about the main axis; ring B (copies 2 and 3) is
+    ring A's mirror image in the dashed dyad line, drawn below it: each ring-B element at its protomer-0 mate's
+    place mirrored (page y -> -y), turned and moved down, its angle with it."""
+    from foldmap.layout import copy_place
+
+    lay = dihedral.layout
+    f = lay.frame
+    assert lay.rosette == 4 and f.order == 2 and f.dyad is not None
+    assert f.mirrors == [False, False, True, True]
+    x0, x1, y = lay.dyad_line
+    assert lay.rosette_shifts[2] == (0.0, 2 * y) and y < 0
+    zero = {(f.classes[p.sse.chain], p.sse.first.seq): p for p in lay.placed.values() if f.sector[p.sse.chain] == 0}
+    checked = 0
+    for p in lay.placed.values():
+        k = f.sector[p.sse.chain]
+        if not k or p.sse.id in lay.rosette_strays:
+            continue
+        m = zero[(f.classes[p.sse.chain], p.sse.first.seq)]
+        assert [p.cx, p.cy] == pytest.approx(copy_place(lay, k, [m.cx, m.cy]), abs=2e-4)
+        want = (-m.angle if f.mirrors[k] else m.angle) + f.angles[k]
+        assert math.cos(p.angle - want) == pytest.approx(1.0, abs=1e-6)
+        assert (p.cy < y) == f.mirrors[k]  # ring B below the line, ring A above
+        assert x0 < p.cx < x1
+        checked += 1
+    assert checked >= 3 * len(zero) - 2
+    ties = lay.copy_ties
+    assert all(mirrored == f.mirrors[f.sector[c]] for c, (_, mirrored) in ties.items())
+
+
+def test_d2_loops_are_their_mates_mirrored(dihedral):
+    from foldmap.layout import copy_place
+
+    lay = dihedral.layout
+    loops = {(lp.a_id, lp.b_id): lp for lp in dihedral.loops}
+    mirrored = 0
+    for (a, b), lp in loops.items():
+        if a not in lay.rosette_mates or b not in lay.rosette_mates:
+            continue
+        (ma, k), (mb, _) = lay.rosette_mates[a], lay.rosette_mates[b]
+        if (ma, mb) not in loops:
+            continue
+        want = copy_place(lay, k, np.array(loops[(ma, mb)].points))
+        assert np.abs(np.array(lp.points) - want).max() < 1e-3
+        mirrored += lay.frame.mirrors[k]
+    assert mirrored > 0
+    _, _, y = lay.dyad_line
+    for lp in dihedral.loops:  # no loop crosses the dyad line
+        ys = np.array(lp.points)[:, 1]
+        assert ys.min() > y or ys.max() < y
+
+
+def test_d2_symbols_note_and_checks(dihedral):
+    from foldmap import figcheck
+    from foldmap.render import save_svg
+
+    svg = save_svg(dihedral.figure)
+    assert 'id="axis:2"' in svg and 'id="axis:2:1"' in svg and 'id="dyad"' in svg
+    items = dihedral.figure.foldmap_provenance
+    assert any(i["kind"] == "cyclic" and "mirror image" in i["text"] for i in items)
+    lay = dihedral.layout
+    assert figcheck.element_overlaps(lay) == []
+    assert figcheck.order_checks(dihedral) == []
+    science = figcheck.science_checks(dihedral)
+    assert all(not science[s] for s in ("S1", "S2", "S3", "S6"))
+    assert all(dev is not None and dev < 0.5 for dev in figcheck.copies_alike(dihedral).values())
+
+
+def test_d2_local_frames_see_each_copy_as_copy_0():
+    """A D2 frame's ring-B local frame is ring A's moved by the half-turn about the dyad: a proper rotation, seen from
+    the other side of the main axis."""
+    from foldmap.frame import RosetteFrame
+
+    axis, ref, dyad = np.array([0.0, 0.0, 1.0]), np.array([0.0, 1.0, 0.0]), np.array([1.0, 0.0, 0.0])
+    sector = {"A": 0, "B": 1, "C": 2, "D": 3}
+    f = RosetteFrame(
+        np.zeros(3), axis, ref, 4, sector, {c: 0 for c in "ABCD"}, [0, math.pi, 0, math.pi], [False, False, True, True]
+    )
+    f.dyad = dyad
+    assert f.order == 2
+    p = np.array([2.0, 5.0, 3.0])  # a point of copy 0
+    turned = np.array([-2.0, -5.0, 3.0])  # copy 1: the half-turn about the axis
+    across = np.array([-2.0, 5.0, -3.0])  # copy 3: copy 1 taken by the half-turn about the dyad (x)
+    for k, q in ((1, turned), (3, across)):
+        local = f.local(k)
+        assert np.linalg.det(np.array([local.u, local.v, local.w])) == pytest.approx(1.0)
+        assert local.project(q)[0] == pytest.approx(f.local(0).project(p)[0])

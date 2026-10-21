@@ -372,7 +372,7 @@ def layout_section(st, ss: MutableMapping) -> None:
                 "assembly seen from the side of its dyad, one copy the other's mirror image · or its copies side by "
                 "side, unrolled around the axis as any assembly's",
             )
-        if ss.get("cyclic_assembly"):  # a Cn assembly (n = 3..8) drawn: unrolled or as a rosette (plan 21, opt-in)
+        if ss.get("cyclic_assembly"):  # a Cn (n = 3..8) or D2 assembly drawn: unrolled or as a rosette (plan 21)
             segmented(
                 st,
                 "Cyclic assemblies",
@@ -380,7 +380,7 @@ def layout_section(st, ss: MutableMapping) -> None:
                 setting(ss, "cyclic"),
                 format_func=CYCLIC.get,
                 help="a ring of 3 to 8 copies unrolled side by side, each seen from outside · or seen down its axis, "
-                "each copy the first one's drawing turned about it",
+                "each copy the first one's drawing turned about it (a D2: two such rings, mirrored across its dyad)",
             )
         if ss.get("lent_across_cut"):  # a ring unrolled with a strand lent across its cut: its dashed copies or not
             segmented(

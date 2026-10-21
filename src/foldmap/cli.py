@@ -23,6 +23,8 @@ from .features import helices_on_sheets, sse_contacts
 from .frame import (
     Frame,
     RadialFrame,
+    dihedral_rings,
+    dihedral_rosette_frame,
     dna_radial_frame,
     dna_view_frame,
     protomer_maps,
@@ -54,7 +56,7 @@ from .spec import (
 )
 from .ss import build_sses
 from .style import CHOICES, LAYOUT_KEYS, SCALES, THEME_KEYS, THEMES, Style, describe, resolve_style
-from .symmetry import TOLERANCE, detect_symmetry
+from .symmetry import TOLERANCE, detect_symmetry, protomer_dyad
 
 _vector, _protomers, _domain_spec = parse_vector, parse_protomers, parse_domains  # older names, used by the app
 
@@ -235,17 +237,15 @@ def _no_rosette(sses, sym, nucleic, mode: str, mem) -> str:
     return ""
 
 
-def _within_protomer(bridges, sym, bb) -> list:
-    """The bridges between residues of one protomer: a rosette's sheets (each copy's own; a sheet two copies share
-    is drawn as each copy's part, the pairings across copies left out)."""
-    sector = {c: k for k, p in enumerate(sym.protomers) for c in p}
+def _within_protomer(bridges, sector: dict, bb) -> list:
+    """The bridges between residues of one copy (`sector`: chain -> copy, a rosette frame's): a rosette's sheets
+    (each copy's own; a sheet two copies share is drawn as each copy's part, the pairings across copies left out)."""
     return [b for b in bridges if sector.get(bb.labels[b.i].chain, -1) == sector.get(bb.labels[b.j].chain, -2)]
 
 
-def _pairings_across(bridges, sym, bb, sses) -> list[tuple[str, str]]:
-    """The strand pairs (element ids, in sequence order) that bridge two protomers: a rosette draws each copy's own
-    sheets, so these pairings are not drawn (the notes name them)."""
-    sector = {c: k for k, p in enumerate(sym.protomers) for c in p}
+def _pairings_across(bridges, sector: dict, bb, sses) -> list[tuple[str, str]]:
+    """The strand pairs (element ids, in sequence order) that bridge two copies (`sector`: chain -> copy): a rosette
+    draws each copy's own sheets, so these pairings are not drawn (the notes name them)."""
     of = {r: s.id for s in sses if s.kind == "E" for r in range(s.start, s.end + 1)}
     out = set()
     for b in bridges:
@@ -461,10 +461,17 @@ def make_layout(
                 )
     duplex = nucleic is not None and straight_duplex(nucleic.structure, nucleic.strands)
     dyad = None  # a two-fold assembly seen from the side, drawn as one copy and its mirror image (plan 18)
-    rosette_asked = (  # Style.cyclic rosette: a cyclic assembly of ROSETTE_ORDERS copies seen down its axis
-        (look or Style()).cyclic == "rosette" and sym is not None and sym.kind == "C" and sym.n in ROSETTE_ORDERS
+    rosette_asked = (  # Style.cyclic rosette: a cyclic assembly of ROSETTE_ORDERS copies seen down its axis, a D2 as
+        (look or Style()).cyclic == "rosette"  # two such rings mirrored in a dyad (plan 21 Task 3)
+        and sym is not None
+        and ((sym.kind == "C" and sym.n in ROSETTE_ORDERS) or (sym.kind == "D" and sym.n == 2))
     )
     cyclic_note = ""
+    if (look or Style()).cyclic == "rosette" and sym is not None and sym.kind == "D" and sym.n > 2:
+        cyclic_note = (
+            f"cyclic=rosette: the {sym.label} assembly drawn unrolled, only a D2 is drawn as a rosette (seen down its "
+            "main axis, the rings' interface lies in depth)"
+        )
     if rosette_asked and (duplex or rotate or flip_v or up is not None or view is not None):
         cyclic_note = f"cyclic=rosette: the {sym.label} assembly not drawn as a rosette, " + (
             "it sits on a straight duplex" if duplex else "a view, a turn or a flip was asked for"
@@ -489,16 +496,32 @@ def make_layout(
         frame = dyad or symmetric_frame(sses, sym)
         if rosette_asked:  # cyclic=rosette (plan 21): seen down the axis, each copy protomer 0 turned, unless
             why = _no_rosette(sses, sym, nucleic, mode, mem)  # what it cannot draw yet
+            rings = None
+            if not why and sym.kind == "D":  # a D2: the two-fold that takes one half of each protomer onto the other
+                found = protomer_dyad(bb, sym, symmetry_tol)
+                rings = dihedral_rings(sym, found[1]) if found is not None else None
+                if rings is None:
+                    why = "no two-fold across the main axis takes half of each protomer onto the other half"
             if why:
                 cyclic_note = f"cyclic=rosette: the {sym.label} assembly drawn unrolled, {why}"
             else:
-                frame = rosette_frame(sses, sym)
-                sheets = build_sheets(sses, _within_protomer(dssp.bridges, sym, bb))
-                cyclic_note = (
-                    f"{sym.label} assembly seen down its {sym.n}-fold axis (cyclic=rosette): each copy drawn as the "
-                    f"first turned by a multiple of {360 // sym.n if 360 % sym.n == 0 else round(360 / sym.n, 1)}°"
-                )
-                across = _pairings_across(dssp.bridges, sym, bb, sses)
+                if rings is not None:
+                    frame = dihedral_rosette_frame(sses, sym, found[0], rings)
+                    ring_a, ring_b = (", ".join(c for copy in ring for c in copy) for ring in rings)
+                    cyclic_note = (
+                        f"D2 assembly seen down its main two-fold axis (cyclic=rosette): ring A (chains {ring_a}) "
+                        f"drawn as one copy and that copy turned by 180°, ring B (chains {ring_b}) below the dashed "
+                        "dyad line as ring A's mirror image (the half-turn about the dyad, seen down the same axis)"
+                    )
+                else:
+                    frame = rosette_frame(sses, sym)
+                    step = 360 // sym.n if 360 % sym.n == 0 else round(360 / sym.n, 1)
+                    cyclic_note = (
+                        f"{sym.label} assembly seen down its {sym.n}-fold axis (cyclic=rosette): each copy drawn as "
+                        f"the first turned by a multiple of {step}°"
+                    )
+                sheets = build_sheets(sses, _within_protomer(dssp.bridges, frame.sector, bb))
+                across = _pairings_across(dssp.bridges, frame.sector, bb, sses)
                 if across:
                     cyclic_note += (
                         f"; {len(across)} strand pairing(s) between copies not drawn, each copy's sheets its own: "
@@ -674,7 +697,11 @@ def make_layout(
     lay.two_fold_assembly = (
         sym is not None and sym.kind == "C" and sym.n == 2 and len(sym.protomers) == 2 and not duplex
     )
-    lay.cyclic_assembly = sym is not None and sym.kind == "C" and sym.n in ROSETTE_ORDERS and not duplex
+    lay.cyclic_assembly = (
+        sym is not None
+        and ((sym.kind == "C" and sym.n in ROSETTE_ORDERS) or (sym.kind == "D" and sym.n == 2))
+        and not duplex
+    )
     if msa:
         from .sequence import grades, is_consurf, read_alignment, read_consurf, residue_conservation
 
