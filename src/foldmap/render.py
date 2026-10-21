@@ -2850,8 +2850,12 @@ def _canvas(
     linked=(),
     loops: list[Loop] = (),
     texts=(),
+    at=None,
 ) -> tuple[_Canvas, _Legend]:
-    """The figure, its axes and every size the steps share; also lays the legend out, as it sets the page width."""
+    """The figure, its axes and every size the steps share; also lays the legend out, as it sets the page width.
+    `at` (a panel of a page of several figures, compare.py): called with the page's width and height (page units)
+    and its legend entries, it gives (inches per page unit, the figure, the axes) to draw in; the legend is then
+    left to the page (no entries drawn here, no room kept for them)."""
     x0, y0, x1, y1 = layout.bounds
     for bx0, by0, bx1, by1 in texts:  # texts placed outside the elements' bounds (tail counts)
         x0, y0, x1, y1 = min(x0, bx0), min(y0, by0), max(x1, bx1), max(y1, by1)
@@ -2871,16 +2875,7 @@ def _canvas(
     entries = _legend_entries(layout, look, chains, colors, umarks, backbone[0], hb, linked)
 
     def legend_entry(x1: float) -> float:  # one legend entry's width in page units: swatch, text, gap
-        # any page's scale: the text's em is the same page units on every page
-        scale = page_scale(x1 - x0 + 2 * pad, font_scale=look.font_scale)
-        font_u = _font_pt(scale) * look.font_scale / (scale * 72)  # text drawn at that size, in page units
-        # the unhinted advance width, which is what is drawn (ink extents differ between matplotlib versions);
-        # measured at a size matplotlib does not clamp (it floors font sizes at 1 pt) and scaled to font_u
-        widest = max(
-            (text_to_path.get_text_width_height_descent(text, _MEASURE, ismath=False)[0] for _, text in entries),
-            default=0.0,
-        )
-        return 0.85 + widest * font_u / _MEASURE.get_size_in_points() + 0.9
+        return _legend_entry(entries, x1 - x0 + 2 * pad, look.font_scale)
 
     entry = legend_entry(x1)
     if x0 + entry - 0.9 > x1:  # never narrower than one legend entry; a wider page may shrink, so measure again
@@ -2889,21 +2884,23 @@ def _canvas(
     per_row = max(1, int((x1 - x0 + 0.9) // entry))
     if not look.legend:
         entries = []
-    # not the figure's own scale (its height is not known yet), and need not be: see em below
-    scale = page_scale(x1 - x0 + 2 * pad, font_scale=look.font_scale)
-    em = _font_pt(scale) * look.font_scale / (scale * 72)  # the text's em, page units, is the same at any scale
+    shown = entries if at is None else []  # a panel's entries go to its page's one legend
+    em = _legend_em(x1 - x0 + 2 * pad, look.font_scale)
     row = _LEGEND_ROW * glyph_scale(em)  # a legend row, sized from the text drawn in it (C4)
-    legend_h = 0.8 + row * -(-len(entries) // per_row) if entries else 0.3
-    if layout.context and look.legend:
+    legend_h = 0.8 + row * -(-len(shown) // per_row) if shown else 0.3
+    if layout.context and look.legend and at is None:
         legend_h += 1.3
     bars = domain_bars(layout) if domain_bar_shown(look, layout) else []
     bar_h = max(_DOMAIN_BAR_H, 2.4 * em + _BAR_TICK) if bars else 0.0
     xmin, xmax, ymin, ymax = x0 - pad, x1 + pad, y0 - pad - len(bars) * bar_h - legend_h, y1 + pad + top
     w_u, h_u = xmax - xmin, ymax - ymin
-    scale = page_scale(w_u, h_u, look.font_scale)  # text at MIN_TEXT_PT or larger: past MAX_WIDTH_IN it grows (C4)
-    fig = Figure(figsize=(w_u * scale, h_u * scale), facecolor=look.background)
+    if at is None:
+        scale = page_scale(w_u, h_u, look.font_scale)  # text at MIN_TEXT_PT or larger: past MAX_WIDTH_IN it grows (C4)
+        fig = Figure(figsize=(w_u * scale, h_u * scale), facecolor=look.background)
+        ax = fig.add_axes([0, 0, 1, 1])
+    else:
+        scale, fig, ax = at(w_u, h_u, list(entries))
     fig.foldmap_page_fit = page_fit(w_u * scale, h_u * scale, _font_pt(scale))  # the notes' page line, if any
-    ax = fig.add_axes([0, 0, 1, 1])
     ax.set_xlim(xmin, xmax)
     ax.set_ylim(ymin, ymax)
     ax.set_aspect("equal")
@@ -2928,7 +2925,69 @@ def _canvas(
         backbone,
         bar_h,
     )
-    return canvas, _Legend(entries, entry, per_row, legend_h, row)
+    return canvas, _Legend(shown, entry, per_row, legend_h, row)
+
+
+def _legend_entry(entries: list, width: float, font_scale: float) -> float:
+    """One legend entry's width in page units (swatch, text, gap) for the widest of `entries`, on a page `width`
+    page units wide (any page's scale: the text's em is the same page units on every page)."""
+    font_u = _legend_em(width, font_scale)  # text drawn at that size, in page units
+    # the unhinted advance width, which is what is drawn (ink extents differ between matplotlib versions);
+    # measured at a size matplotlib does not clamp (it floors font sizes at 1 pt) and scaled to font_u
+    widest = max(
+        (text_to_path.get_text_width_height_descent(text, _MEASURE, ismath=False)[0] for _, text in entries),
+        default=0.0,
+    )
+    return 0.85 + widest * font_u / _MEASURE.get_size_in_points() + 0.9
+
+
+def _legend_em(width: float, font_scale: float) -> float:
+    """The text's em, page units, on a page `width` page units wide: the same at any scale (not the figure's own
+    scale, as its height is not known yet, and need not be)."""
+    scale = page_scale(width, font_scale=font_scale)
+    return _font_pt(scale) * font_scale / (scale * 72)
+
+
+class _Measured(Exception):
+    """page_size's way out of draw once the page is known (nothing is drawn)."""
+
+
+def page_size(layout: Layout, loops: list[Loop], sses: list[SSE], title: str | None = None, **kw):
+    """(width, height, legend entries) of the page draw(layout, loops, sses, title, **kw) would make, in page units,
+    with no legend drawn on it (draw's `at`): for a page of several figures at one scale with one legend
+    (compare.py). None when there is nothing to draw."""
+
+    def measure(width: float, height: float, entries: list):
+        raise _Measured(width, height, entries)
+
+    try:
+        draw(layout, loops, sses, title, at=measure, **kw)
+    except _Measured as m:
+        return m.args
+    return None
+
+
+def page_legend(entries: list, width: float, look: Style) -> _Legend:
+    """The legend of a page `width` page units wide (a pad of 1 at each side) holding `entries`, laid out as a
+    figure's own (_canvas): for a page of several figures with one legend (compare.py). Its height is 0 with no
+    entries."""
+    entry = _legend_entry(entries, width, look.font_scale)
+    per_row = max(1, int((width - 2 + 0.9) // entry))
+    row = _LEGEND_ROW * glyph_scale(_legend_em(width, look.font_scale))
+    height = 0.8 + row * -(-len(entries) // per_row) if entries else 0.0
+    return _Legend(list(entries), entry, per_row, height, row)
+
+
+def draw_page_legend(fig: Figure, ax: Axes, legend: _Legend, bounds: tuple, look: Style, scale: float) -> None:
+    """Draw `legend` (page_legend) on `ax`, whose page units are `bounds` (xmin, xmax, ymin, ymax: the legend's rows
+    are laid from ymin up, as a figure's are), at `scale` inches per page unit."""
+    lw, font = line_pt(scale), _font_pt(scale) * look.font_scale
+    pt = scale * 72
+    c = _Canvas(
+        fig, ax, look, {}, {}, lambda *_: None, font, lw, lw * look.loop_width, pt, 1.0, bounds, bounds, ({}, {})
+    )
+    with page(look):
+        _draw_legend(c, SimpleNamespace(context=None), legend)
 
 
 _OVER_Z = Z["over"]  # a helix over a sheet (Placed.over): above the strands, below their letters; its name at 4.5
@@ -3826,6 +3885,7 @@ def _draw(
     style: str | None = None,
     loop_style: str | None = None,
     model=None,
+    at=None,
 ) -> Figure:
     look = _resolve_look(look, palette, style, loop_style)
     chains = _chains_in_order(sses)
@@ -3844,7 +3904,20 @@ def _draw(
     umarks = uniprot_marks(layout, loops, sses, look)
     hb = hbond_overlay(layout, loops, sses, look, model)
     c, legend = _canvas(
-        layout, look, title, chains, colors, element_colour, residue_colour, marks, umarks, hb, linked, loops, counts
+        layout,
+        look,
+        title,
+        chains,
+        colors,
+        element_colour,
+        residue_colour,
+        marks,
+        umarks,
+        hb,
+        linked,
+        loops,
+        counts,
+        at,
     )
     _draw_loops(c, layout, loops, sses, lcounts)
     _draw_membrane(c, layout)
@@ -3877,7 +3950,8 @@ def _draw(
     _draw_uniprot(c.ax, umarks, layout, c.lw, c.font)
     if c.bar_h:
         _draw_domain_bar(c, layout)
-    _draw_legend(c, layout, legend)
+    if at is None:  # a panel's legend is its page's (_canvas)
+        _draw_legend(c, layout, legend)
     if title:
         _draw_title(c, title)
     # how it was made, last: what is inferred, ambiguous or moved (Drawn.provenance; save writes it into the file)

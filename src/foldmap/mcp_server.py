@@ -56,6 +56,7 @@ def _structure(source: str) -> Path:
 FIGURE_SUFFIXES = (".svg", ".png", ".pdf")
 PAGE_SUFFIXES = (".html",)
 LAYOUT_SUFFIXES = (".yaml", ".yml")
+JSON_SUFFIXES = (".json",)
 
 
 def _checked(path: str, allowed: tuple[str, ...]) -> Path:
@@ -276,6 +277,45 @@ def draw_topology(
         return CallToolResult(
             content=[TextContent(type="text", text=note), _preview(drawn.figure).to_image_content()],
             structured_content={"provenance": items},
+        )
+
+
+@tool
+def compare_structures(
+    source_a: str,
+    source_b: str,
+    chain_a: str | None = None,
+    chain_b: str | None = None,
+    match: str = "auto",
+    output_path: str | None = None,
+    json_path: str | None = None,
+) -> CallToolResult:
+    """Draw two structures of one fold on one page: source_a (the reference) on the left, source_b drawn like it on
+    the right (each element matched to one of A's takes its place, angle, name and colour), at one page scale, with
+    one legend and the note under both. Writes output_path (.svg, .png or .pdf; default: a temporary .svg) and
+    returns where, the note and a PNG preview; the structured result is what was matched: alignment {method,
+    tm_score, rmsd, identity, pairs ([A's residue, B's residue])}, mates, pieces (of a helix A has whole), extras
+    (B's elements A lacks), only_a (A's elements B lacks), each element by its label and residues, plus the figure's
+    provenance. json_path (.json) writes the same, without provenance, to a file.
+
+    source_a, source_b: file path, PDB ID or UniProt accession. One protein chain of each: chain_a, chain_b (else each
+    its first). match: auto (sequence at 40% identity, else structure), sequence, structure, or a two-row alignment
+    file (A's chain first). Not the same fold: B is drawn on its own beside A, and the note says so."""
+    from .compare import compare, write_json
+    from .provenance import lines
+    from .render import save
+
+    keep = _checked(json_path, JSON_SUFFIXES) if json_path else None  # checked first
+    with _output(output_path, ".svg", f"{Path(str(source_b)).stem}-compare", FIGURE_SUFFIXES) as out:
+        made = compare(source_a, source_b, chain_a, chain_b, match or "auto")
+        save(made.figure, out)
+        note = f"wrote {out}"
+        if keep is not None:
+            note += f" and {write_json(made.data, keep)}"
+        note += "".join(f"; {text}" for text in lines(made.provenance))
+        return CallToolResult(
+            content=[TextContent(type="text", text=note), _preview(made.figure).to_image_content()],
+            structured_content={**made.data, "provenance": made.provenance},
         )
 
 

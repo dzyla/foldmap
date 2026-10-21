@@ -413,13 +413,16 @@ def make_layout(
     model=None,
     names: list[str] | None = None,
     like: dict | None = None,
+    like_out: dict | None = None,
 ):
     """`names` (--names): conventional names, each `deposited`, `beta` or a YAML file (names.apply_names), applied
     over the generic labels in order; `rename` wins over all of them. `like` (--like, plan 13a): drawn like a
     reference structure, {structure, chain, match, layout} (_drawn_like): one protein chain of this structure, the
     one `chains` names (two named is a UsageError), else its first (ruling 7: the scope line says it was chosen,
     Layout.like_chain). A frame that cannot be carried (_uncarried: a stack, a straight duplex) draws it on its own,
-    the note saying why."""
+    the note saying why. `like_out` (a dict, foldmap compare): given what the reference gave, as far as it got:
+    reference ((layout, sses, bb, model, chain) of the reference laid out, or None), alignment
+    (align.ChainAlignment or None) and mates (align.Mates or None)."""
     for spec in names or []:
         check_spec(spec)
     model = model or read_model(path, assembly)  # once, for every loader below (`model`: already read, same assembly)
@@ -617,6 +620,8 @@ def make_layout(
         )
         if made.like is not None:  # the reference's frame carried over: the page is the reference's
             frame, dyad = made.frame, None
+        if like_out is not None:
+            like_out.update(reference=made.reference, alignment=made.alignment, mates=made.mates)
 
     def lay_out_in(frame):  # build_layout through a frame (the dyad view's, or the unrolled one's), as a partial
         return functools.partial(
@@ -829,7 +834,8 @@ def _drawn_like(
     align.align_chains), the elements mated (align.element_mates) and like.like_from's Like built from the
     reference's finished layout, with its frame carried over (frame.frame_like). A namespace: like (None: drawn on
     its own), frame, extras (this structure's elements the reference lacks) and note(layout) (the notes' line,
-    naming the extras as drawn). Drawn on its own, the note says why: this figure's frame cannot be carried
+    naming the extras as drawn), and what compare reads (make_layout's like_out): reference, alignment and mates,
+    each None where it was not reached. Drawn on its own, the note says why: this figure's frame cannot be carried
     (`uncarried`, _uncarried: an assembly drawn by its symmetry, a stack, a straight duplex), nor the reference's, or
     it is not the reference's fold (Mates.same_fold)."""
     from types import SimpleNamespace
@@ -841,8 +847,16 @@ def _drawn_like(
     given = str(like["structure"])
     name = reference_name(given)
 
-    def alone(note: str) -> SimpleNamespace:
-        return SimpleNamespace(like=None, frame=None, extras=(), note=lambda lay: note)
+    def alone(note: str, reference=None, alignment=None, mates=None) -> SimpleNamespace:
+        return SimpleNamespace(
+            like=None,
+            frame=None,
+            extras=(),
+            note=lambda lay: note,
+            reference=reference,
+            alignment=alignment,
+            mates=mates,
+        )
 
     ref = _resolve_structure(given)
     if like.get("layout"):
@@ -863,17 +877,18 @@ def _drawn_like(
         return alone(uncarried_note(name, uncarried, mine=True))
     kw.update(chains=[chain_a], like=None)
     lay_a, sses_a, bb_a = make_layout(ref, *args, model=model, **kw)
+    reference = (lay_a, sses_a, bb_a, model, chain_a)
     if lay_a.uncarried is not None:  # the reference's frame (a stack, a straight duplex)
-        return alone(uncarried_note(name, lay_a.uncarried, mine=False))
+        return alone(uncarried_note(name, lay_a.uncarried, mine=False), reference)
     match = like.get("match") or "auto"
     aln = align_chains(bb_a, chain_a, bb, chain_b, match)
     mates = element_mates(sses_a, sses, aln)
     if not mates.same_fold:
-        return alone(refused_note(name, aln, mates))
+        return alone(refused_note(name, aln, mates), reference, aln, mates)
     try:
         frame = frame_like(lay_a.frame, aln.rotation, aln.translation)
     except TypeError:  # _uncarried names every frame frame_like refuses: not reached
-        return alone(uncarried_note(name, ("copies", type(lay_a.frame).__name__), mine=False))
+        return alone(uncarried_note(name, ("copies", type(lay_a.frame).__name__), mine=False), reference, aln, mates)
     made = like_from(lay_a, sses_a, sses, mates, look, sheets)
 
     def note(lay) -> str:
@@ -884,7 +899,9 @@ def _drawn_like(
         chain = f"{chain_a} (its first protein chain)" if first else chain_a
         return like_note(name, chain, aln, mates, extras, match, crossed)
 
-    return SimpleNamespace(like=made, frame=frame, extras=tuple(mates.extras), note=note)
+    return SimpleNamespace(
+        like=made, frame=frame, extras=tuple(mates.extras), note=note, reference=reference, alignment=aln, mates=mates
+    )
 
 
 def _uncarried(frame, dyad, mode: str, duplex: bool, sym) -> tuple[str, str] | None:
@@ -1689,6 +1706,36 @@ def build_parser() -> argparse.ArgumentParser:
             metavar="Å",
             help=f"how far copies may differ, CA RMSD (default {TOLERANCE:g}; raise it for low-resolution X-ray)",
         )
+    pq = sub.add_parser(
+        "compare",
+        help="two structures of one fold on one page: A on the left, B drawn like A on the right",
+        description="Draw one protein chain of A, and one of B drawn like it (as plot --like draws it), side by side "
+        "at one page scale, with one legend and the note under both: how many of B's elements were matched, by "
+        "which alignment, or why B was drawn on its own (not the same fold). Each panel's ids start a/ and b/.",
+    )
+    pq.add_argument("structure_a", metavar="A", help="the reference: a file or PDB id")
+    pq.add_argument("structure_b", metavar="B", help="the structure drawn like A: a file or PDB id")
+    pq.add_argument(
+        "-o", "--output", action="append", required=True, default=[], help=".svg, .pdf or .png (repeatable)"
+    )
+    pq.add_argument("--chain-a", metavar="CHAIN", help="A's protein chain (default: its first)")
+    pq.add_argument("--chain-b", metavar="CHAIN", help="B's protein chain (default: its first)")
+    pq.add_argument(
+        "--match",
+        metavar="auto|sequence|structure|ALN",
+        default="auto",
+        help="how the chains are aligned: auto (sequence at 40%% identity, else structure), sequence, structure, "
+        "or a two-row alignment file (A's chain first)",
+    )
+    pq.add_argument(
+        "--json",
+        metavar="PATH",
+        help="also write what was matched: the alignment (method, TM-score, RMSD, identity, residue pairs), the "
+        "mates, the pieces of a helix A has whole, B's extras and A's elements B lacks",
+    )
+    pq.add_argument("--theme", "--preset", dest="theme", choices=list(THEMES), help="a ready-made look")
+    pq.add_argument("--style-file", help="YAML file of style keys (may name a theme)")
+    pq.add_argument("--set", action="append", default=[], metavar="KEY=VALUE", help="one style key (repeatable)")
     return parser
 
 
@@ -1795,6 +1842,21 @@ def _cmd_figure(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_compare(args: argparse.Namespace) -> int:
+    """compare: A and B drawn like A on one page (compare.compare); the page written to every output, what was
+    matched to --json."""
+    from .compare import compare, write_json
+
+    look = resolve_style(args.theme or "publication", args.style_file, args.set)
+    made = compare(args.structure_a, args.structure_b, args.chain_a, args.chain_b, args.match, look)
+    print(provenance_block(made.provenance), file=sys.stderr, end="")
+    for out in args.output:
+        print(f"wrote {save(made.figure, out)}")
+    if args.json:
+        print(f"wrote {write_json(made.data, args.json)}")
+    return 0
+
+
 def provenance_block(items: list[dict]) -> str:
     """The command line's "How this figure was made:" block (provenance): the heading, then one indented line per
     item, those the command line has always warned of starting "warning: "; '' when the list is empty."""
@@ -1868,6 +1930,7 @@ _COMMANDS: dict[str, Callable[[argparse.Namespace], int]] = {
     "interactive": _cmd_figure,
     "contacts": _cmd_contacts,
     "check": _cmd_check,
+    "compare": _cmd_compare,
 }
 
 

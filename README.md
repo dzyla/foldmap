@@ -355,6 +355,23 @@ foldmap plot 2HHB --chains A --like 2HHB --like-chain B -o alpha-like-beta.svg
   `layout:`), so `--layout-file` draws the same figure again. The MCP tool `draw_topology` takes `like_source`,
   `like_chain` and `like_match`.
 
+#### Two structures on one page
+
+`foldmap compare A B` draws one protein chain of A on the left and one of B drawn like it on the right, both at one
+page scale (the larger panel's), with one legend and the note under both:
+
+```bash
+foldmap compare 2HHB 1MBN --chain-a B -o globins.svg --json mates.json   # haemoglobin β, myoglobin drawn like it
+```
+
+`--chain-a` and `--chain-b` name the chains (else each its first protein chain), `--match` aligns them as
+`--like-match` does, and `--theme`, `--style-file` and `--set` style both panels. A pair that is not one fold is
+drawn as two figures of their own, side by side, with the note saying why. Each panel keeps its own ids, prefixed
+`a/` and `b/`. `--json` writes what was matched: `alignment` (`method`, `tm_score`, `rmsd`, `identity`, and `pairs`
+of residue numbers, A's then B's), `mates`, `pieces` (of a helix A has whole), `extras` (B's elements A lacks) and
+`only_a` (A's elements B lacks), each element by its label as drawn and its residues; numbers to 0.001. The MCP
+tool `compare_structures` returns the same page's preview and the same record.
+
 ### Conventions of the published figures
 
 foldmap follows the conventions of the hand-drawn topology figures readers know (Richardson 1981, the TIM and
@@ -731,8 +748,9 @@ On your own machine there are no limits except `FOLDMAP_APP_SLOW`; each variable
 ## MCP server for AI agents
 
 `foldmap mcp` runs a [Model Context Protocol](https://modelcontextprotocol.io) server over stdio, so agents can
-summarise structures and draw figures. Tools: `summarize_structure`, `draw_topology`, `draw_sequence`,
-`interactive_page`, `list_styles`; the drawing tools return a PNG preview along with the file they wrote.
+summarise structures and draw figures. Tools: `summarize_structure`, `draw_topology`, `compare_structures`,
+`draw_sequence`, `interactive_page`, `list_styles`; the drawing tools return a PNG preview along with the file they
+wrote.
 
 ```bash
 claude mcp add foldmap -- foldmap mcp        # Claude Code
@@ -744,7 +762,8 @@ claude mcp add foldmap -- foldmap mcp        # Claude Code
 
 (the second form for clients configured by JSON, such as Claude Desktop).
 
-Figures must end in `.svg`, `.png` or `.pdf`, pages in `.html` and layout files in `.yaml` or `.yml`. Set
+Figures must end in `.svg`, `.png` or `.pdf`, pages in `.html`, layout files in `.yaml` or `.yml` and
+`compare_structures`' record in `.json`. Set
 `FOLDMAP_OUTPUT_DIR` in the server's environment to confine the figure, page and layout files the server writes (default outputs included) to one folder;
 the structure download cache (`~/.cache/foldmap`) is not covered.
 

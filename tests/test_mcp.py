@@ -30,6 +30,7 @@ def test_tools_are_listed_with_descriptions():
         "summarize_structure",
         "list_styles",
         "draw_topology",
+        "compare_structures",
         "draw_sequence",
         "interactive_page",
         "uniprot_info",
