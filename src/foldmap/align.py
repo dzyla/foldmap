@@ -8,6 +8,8 @@ hatch for any pair the aligner gets wrong). `auto` takes the sequence route when
 40 % identical, else the structure route. Every route then scores its pairs with the TM-score normalised by A's
 chain length, over the superposition of B on A that maximises it (TM-align's search: Kabsch on fragments of the
 pairs, then on the pairs within a cutoff, repeated), always a proper rotation (symmetry._kabsch, never a mirror).
+element_mates then says which of B's elements are which of A's (mates, pieces of a split helix, extras) and whether
+the two chains are one fold (H1).
 
 Determinism (A12): distances are snapped to 1/GRID Å and pair scores to 1/_SCORE before any choice, so every sum
 the dynamic programming and the TM-score compare is exact and independent of summation order; ties go to the
@@ -22,7 +24,7 @@ from pathlib import Path
 
 import numpy as np
 
-from .model import Backbone
+from .model import SSE, Backbone, ResLabel, overlap, pair_places
 
 GRID = 1024  # distances are snapped to 1/GRID Å before scoring: exact in binary floating point, the same on any CPU
 _SCORE = 2.0**20  # pair scores are snapped to 1/_SCORE: sums of up to 2^33 of them are exact in a double
@@ -31,6 +33,8 @@ SS_GAP = -1.0  # the gap penalty of TM-align's secondary-structure seed (a match
 ROUNDS = 20  # superpose / score / re-align rounds per seed, at most; also the iterations of one fragment's search
 ROUND_STEP = 40  # fragment starts every ROUND_STEP pairs in the rounds' search (TM-align's simplify_step); 1 at the end
 SEQUENCE_IDENTITY = 0.4  # auto: the sequence route at this identity over the aligned residues, else the structure
+SAME_FOLD_TM = 0.5  # H1: one fold at this TM-score (normalised by A) ... (frozen in 13a-10)
+SAME_FOLD_FRACTION = 0.5  # ... with this fraction of the chain with fewer elements matched (frozen in 13a-10)
 
 
 @dataclass(frozen=True)
@@ -42,6 +46,10 @@ class ChainAlignment:
     method: str  # "sequence" | "structure" | "file"
     rotation: np.ndarray = field(compare=False)  # 3x3 proper rotation, A ≈ R·B + t (the TM-score's superposition)
     translation: np.ndarray = field(compare=False)  # (3,)
+    # the residues `pairs` index (chain_a's of A, chain_b's of B): how element_mates finds a structure's elements,
+    # whose start/end count all its residues; empty: the elements' start/end are read as these indices
+    residues_a: tuple[ResLabel, ...] = field(default=(), repr=False)
+    residues_b: tuple[ResLabel, ...] = field(default=(), repr=False)
 
 
 def d0(length: int) -> float:
@@ -352,4 +360,74 @@ def align_chains(a: Backbone, chain_a: str, b: Backbone, chain_b: str, match: st
         method=method,
         rotation=r,
         translation=t,
+        residues_a=tuple(a.labels[k] for k in mine_a),
+        residues_b=tuple(b.labels[k] for k in mine_b),
+    )
+
+
+@dataclass(frozen=True)
+class Mates:
+    mate: dict[str, str]  # B element id -> A element id (one to one)
+    pieces: dict[str, str]  # B element id -> the A element it is a piece of (a split helix)
+    extras: tuple[str, ...]  # B element ids with no mate, N to C
+    only_a: tuple[str, ...]  # A element ids with no mate, N to C
+    same_fold: bool  # tm_score >= SAME_FOLD_TM and >= SAME_FOLD_FRACTION of the smaller chain's elements matched
+
+
+_PAIRS_AS = {"G": "H"}  # a 3-10 helix (G) and an alpha helix (H) may mate; a strand (E) only a strand
+
+
+def _chain_elements(sses: list[SSE], residues: tuple[ResLabel, ...]) -> list[tuple[int, int, SSE]]:
+    """The elements of the aligned chain as (first, last residue index in that chain, element), N to C (ties: by
+    last, then the given order). An element's start/end count all its structure's residues; the place of its first
+    residue among `residues` is its index in the chain. Elements whose first residue is not among them (other
+    chains) are left out. With no residues, start/end are read as the chain's indices."""
+    if not residues:
+        found = [(s.start, s.end, k, s) for k, s in enumerate(sses)]
+    else:
+        at: dict[ResLabel, int] = {}
+        for k, label in enumerate(residues):
+            at.setdefault(label, k)
+        found = [(at[s.first], at[s.first] + len(s) - 1, k, s) for k, s in enumerate(sses) if s.first in at]
+    return [(i, j, s) for i, j, _, s in sorted(found, key=lambda x: x[:3])]
+
+
+def element_mates(sses_a: list[SSE], sses_b: list[SSE], aln: ChainAlignment) -> Mates:
+    """Which elements of B's aligned chain are which of A's (the reference). Each B element's residues are taken to
+    A's through aln.pairs (the first and last A residue paired with one of them; none paired: no place). Then
+    model.pair_places pairs them one to one: the same kind (H and G alike), sharing at least half of the shorter
+    element, the largest overlaps first, ties to the earlier element (N to C). A B helix left over whose place lies
+    in a matched A helix (at least half of it, the largest overlap, then the earlier helix) is a piece of that
+    helix (a helix B splits in two at a kink, A does not). The rest are B's extras and A's elements alone. One fold
+    (H1): aln.tm_score >= SAME_FOLD_TM and the mates at least SAME_FOLD_FRACTION of the elements of the chain that
+    has fewer. Only the aligned chains' elements count (aln.residues_a/_b; see _chain_elements)."""
+    els_a, els_b = _chain_elements(sses_a, aln.residues_a), _chain_elements(sses_b, aln.residues_b)
+    to_a = {j: i for i, j in aln.pairs}
+    placed = []  # (index in els_b, (kind, first, last in A's indices))
+    for k, (first, last, s) in enumerate(els_b):
+        got = [to_a[j] for j in range(first, last + 1) if j in to_a]
+        if got:
+            placed.append((k, (_PAIRS_AS.get(s.kind, s.kind), min(got), max(got))))
+    ys = [(_PAIRS_AS.get(s.kind, s.kind), first, last) for first, last, s in els_a]
+    paired = pair_places([p for _, p in placed], ys)
+    mate = {placed[x][0]: y for x, y in sorted(paired.items())}
+    matched = set(mate.values())
+    pieces: dict[int, int] = {}
+    for k, (kind, first, last) in placed:
+        if k in mate or kind != "H":
+            continue
+        inside = [
+            (-overlap((first, last), y[1:]), n)
+            for n, y in enumerate(ys)
+            if n in matched and y[0] == "H" and 2 * overlap((first, last), y[1:]) >= last - first + 1
+        ]
+        if inside:
+            pieces[k] = min(inside)[1]
+    smaller = min(len(els_a), len(els_b))
+    return Mates(
+        mate={els_b[k][2].id: els_a[n][2].id for k, n in sorted(mate.items())},
+        pieces={els_b[k][2].id: els_a[n][2].id for k, n in sorted(pieces.items())},
+        extras=tuple(s.id for k, (_, _, s) in enumerate(els_b) if k not in mate and k not in pieces),
+        only_a=tuple(s.id for n, (_, _, s) in enumerate(els_a) if n not in matched),
+        same_fold=aln.tm_score >= SAME_FOLD_TM and len(mate) >= SAME_FOLD_FRACTION * smaller,
     )

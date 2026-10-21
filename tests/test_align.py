@@ -4,13 +4,14 @@ import os
 import subprocess
 import sys
 import time
+from dataclasses import replace
 from pathlib import Path
 
 import gemmi
 import numpy as np
 import pytest
 
-from foldmap.align import ChainAlignment, align_chains, d0, tm_score
+from foldmap.align import SAME_FOLD_TM, ChainAlignment, Mates, align_chains, d0, element_mates, tm_score
 from foldmap.io import load_backbone
 from foldmap.model import Backbone, ResLabel
 from foldmap.sequence import _one_letter
@@ -314,3 +315,106 @@ def test_budget():
     right = sum(keep[j] == i for i, j in out.pairs)
     assert right >= 0.95 * len(keep) and out.tm_score > 0.8
     assert took < 3.0, f"{took:.2f} s"
+
+
+# element mates (13a-4)
+
+
+def _elements(bb: Backbone):
+    from foldmap.dssp import assign_dssp
+    from foldmap.ss import build_sses
+
+    d = assign_dssp(bb)
+    return build_sses(bb, d.ss, short_helices=True, bridges=d.bridges)
+
+
+def _no_helix(tmp_path) -> Backbone:
+    """1UBQ's chain A without its helix (residues 23-34), turned and moved."""
+    st = gemmi.read_structure(str(DATA / "1UBQ.cif"))
+    chain = st[0]["A"]
+    for k in reversed(range(len(chain))):
+        if 23 <= chain[k].seqid.num <= 34 and chain[k].name != "HOH":
+            del chain[k]
+    path = tmp_path / "ubq_no_helix.pdb"
+    st.write_pdb(str(path))
+    return _moved(load_backbone(path).only(["A"]))
+
+
+def _swap(sses, old: str, new):
+    """The element list with element `old` replaced by the elements `new`."""
+    at = [s.id for s in sses].index(old)
+    return [*sses[:at], *new, *sses[at + 1 :]]
+
+
+def test_self_every_element_its_own_mate(ubq_a):
+    sses = _elements(ubq_a)
+    out = element_mates(sses, sses, align_chains(ubq_a, "A", _moved(ubq_a), "A"))
+    assert isinstance(out, Mates)
+    assert out.mate == {s.id: s.id for s in sses}
+    assert out.pieces == {} and out.extras == () and out.only_a == ()
+    assert out.same_fold
+
+
+def test_helix_deleted_leaves_it_only_in_a(ubq_a, tmp_path):
+    b = _no_helix(tmp_path)
+    sses_a, sses_b = _elements(ubq_a), _elements(b)
+    out = element_mates(sses_a, sses_b, align_chains(ubq_a, "A", b, "A"))
+    assert out.only_a == ("A:23-34",)
+    assert out.mate == {s.id: s.id for s in sses_a if s.id != "A:23-34"}
+    assert out.extras == () and out.pieces == {}
+    assert out.same_fold
+
+
+def test_split_helix_is_one_mate_and_one_piece(ubq_a):
+    from foldmap.ss import _sse
+
+    sses = _elements(ubq_a)
+    split = _swap(sses, "A:23-34", [_sse("H", ubq_a, 22, 28), _sse("H", ubq_a, 29, 33)])  # 23-29, 30-34
+    out = element_mates(sses, split, align_chains(ubq_a, "A", _moved(ubq_a), "A"))
+    assert out.mate["A:23-29"] == "A:23-34" and "A:30-34" not in out.mate
+    assert out.pieces == {"A:30-34": "A:23-34"}
+    assert out.extras == () and out.only_a == ()
+
+
+def test_strand_never_mates_a_helix(ubq_a):
+    from foldmap.ss import _sse
+
+    sses = _elements(ubq_a)
+    aln = align_chains(ubq_a, "A", _moved(ubq_a), "A")
+    other = _swap(sses, "A:23-34", [_sse("E", ubq_a, 22, 33)])  # a strand where A has its helix
+    out = element_mates(sses, other, aln)
+    assert "A:23-34" not in out.mate and out.extras == ("A:23-34",) and out.only_a == ("A:23-34",)
+    assert out.pieces == {}  # a strand is no piece of a helix
+    # a 3-10 helix (G) and an alpha helix (H) may mate
+    other = _swap(sses, "A:57-59", [_sse("H", ubq_a, 56, 58)])
+    assert element_mates(sses, other, aln).mate["A:57-59"] == "A:57-59"
+
+
+def test_same_fold_needs_the_tm_score_and_the_elements(ubq_a):
+    sses = _elements(ubq_a)
+    aln = align_chains(ubq_a, "A", _moved(ubq_a), "A")
+    low = replace(aln, tm_score=0.3)  # a negative pair's TM-score
+    out = element_mates(sses, sses, low)
+    assert len(out.mate) == len(sses) and out.same_fold is False
+    assert element_mates(sses, sses, replace(aln, tm_score=SAME_FOLD_TM)).same_fold
+    few = replace(aln, pairs=aln.pairs[:20])  # only the first two strands' residues paired
+    out = element_mates(sses, sses, few)
+    assert set(out.mate) == {"A:2-7", "A:12-16"} and out.same_fold is False
+    assert len(out.extras) == len(out.only_a) == len(sses) - 2
+
+
+def test_elements_of_other_chains_are_left_out(ubq_a):
+    """Element indices count the whole structure's residues; the alignment's count its chain's: chain B of a
+    two-chain B (after chain A's 76 residues) still finds its mates, and chain A's elements of B are left out."""
+    far = _moved(ubq_a, rot=np.eye(3), shift=np.array([100.0, 0.0, 0.0]))
+    two = Backbone(
+        [*ubq_a.labels, *(l._replace(chain="B") for l in far.labels)],
+        np.concatenate([ubq_a.xyz, far.xyz]),
+        np.concatenate([ubq_a.prev, far.prev]),
+        {"A", "B"},
+    )
+    sses_a, sses_two = _elements(ubq_a), _elements(two)
+    assert min(s.start for s in sses_two if s.chain == "B") >= len(ubq_a)
+    out = element_mates(sses_a, sses_two, align_chains(ubq_a, "A", two, "B"))
+    assert out.mate == {"B" + s.id[1:]: s.id for s in sses_a}
+    assert out.extras == () and out.only_a == () and out.same_fold
