@@ -257,7 +257,7 @@ Themes change only how things are drawn, never where. `foldmap styles` lists the
 Change any key with `--set KEY=VALUE` (repeatable) or a YAML file for `--style-file`. Commonly used keys:
 `color_by`, `palette`, `fill`, `loops`, `loop_color` (`residue` colours loops residue by residue),
 `residue_numbers`, `highlight` (`asu`, `protomer` or chains), `mark` (elements in a colour of their own),
-`ligands` (`auto`, `all`, `none` or codes like `HEM,ZN`), `fold_template`, `helix_on_sheet`, `two_fold`,
+`ligands` (`auto`, `all`, `none` or codes like `HEM,ZN`), `fold_template`, `helix_on_sheet`, `two_fold`, `cyclic`,
 `copy_ghosts`, `domain_bar`, `domain_colours`, `na_backbone`, `backbone_colors`, `dna_color`, `rna_color`, `hbonds`,
 `hbond_color`, `hbond_max`, `disulfides`, `glycans`, `helices_310`, `na_extent`, `na_style`, `background`, `ink`,
 `helix_scale`, `strand_scale`, `font_scale` (`dna_extent` still works on the command line and in style and layout
@@ -277,6 +277,7 @@ files).
 | βα row | `--set fold_template=off` draws an all-parallel α/β sheet as projected |
 | Helices over a sheet | `--set helix_on_sheet=auto` (opt-in) |
 | Two-fold assemblies | `--set two_fold=mirror` or `unrolled`: a C2 assembly's copies always as mirror images, or side by side (default `auto`: mirrored where each copy is one protein chain) |
+| Cyclic assemblies | `--set cyclic=rosette` (opt-in): a ring of 3 to 8 copies seen down its axis, each copy the first one's drawing turned about it (default `unrolled`: side by side) |
 | Strands lent across a ring's cut | `--set copy_ghosts=off` draws such a strand once, past the row's end, with no dashed copies of it or its partners |
 | Hydrogen bonds | `--set hbonds=na`, `interchain` or `chains:A+B`; `--set hbond_max=30` |
 | Only some chains | `--chains A,B` |
@@ -382,6 +383,15 @@ mirror image, side by side) always draws a two-fold assembly that way, its copie
 other assembly's; `two_fold=mirror` seeks the mirror image for any two-fold assembly, whatever its copies hold (with the
 same fallbacks); `two_fold=auto`, the default, chooses by the chains of a copy as above. Other symmetric copies,
 and the unrolled cylinders of rings and filaments, are drawn alike.
+
+A ring of 3 to 8 copies (a Cn assembly) is unrolled side by side by default. `--set cyclic=rosette` (the app's
+"Cyclic assemblies" choice, offered when one is drawn: side by side, down the axis) draws it seen down its n-fold
+axis instead, marked by a filled n-gon at the centre: the first copy is laid out in its own frame, and every other
+copy is that drawing, loops included, turned by a whole multiple of 360/n degrees about the axis, all pushed out
+from it just enough to clear their neighbours. Names stay upright, each on the side of its helix that is clear. Each
+copy's sheets are its own: a pairing between two copies' strands is not drawn. Ligands held by every copy (the ions
+of a channel's pore) are drawn once, as one untethered cluster at the centre. A ring with DNA or RNA, a chain outside
+the copies, a stack row or a membrane view stays unrolled, and the notes say why.
 
 **Layout files.** `--save-layout fig.yaml` records everything that defines a figure: theme, style changes,
 layout options, domains and edits, with element references stored as residue ranges so they survive a new model.

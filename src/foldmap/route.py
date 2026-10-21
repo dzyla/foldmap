@@ -937,8 +937,11 @@ def route_loops(layout: Layout, sses: list[SSE], bb) -> list[Loop]:
 
     dist = lambda ab: math.dist(layout.placed[ab[0].id].c_port, layout.placed[ab[1].id].n_port)  # noqa: E731
     routed: dict[tuple[str, str], tuple[list, bool, bool]] = {}  # points, fallback curve, over labels
+    turned = _rosette_pairs(layout, pairs)  # a rosette's copy loops: protomer 0's route, turned (below)
     kinks_rejected = 0  # debug count: kink links not drawn straight for something (a third element, text) in the way
     for a, b in sorted(pairs, key=dist):
+        if (a.id, b.id) in turned:
+            continue
         pa, pb = layout.placed[a.id], layout.placed[b.id]
         gap = np.subtract(pb.n_port, pa.c_port)
         # a kink is drawn straight with no grid clearance, so it clears by the full _INFLATE (drawn routes use _TOUCH)
@@ -986,6 +989,9 @@ def route_loops(layout: Layout, sses: list[SSE], bb) -> list[Loop]:
             routed[(a.id, b.id)] = (_curve(pa.c_port, pa.exit_c, pb.n_port, pb.exit_n), True, False)
         else:
             routed[(a.id, b.id)] = (pts, False, over)
+    for (a, b), (mate, k) in turned.items():
+        pts, fb, over = routed[mate]
+        routed[(a, b)] = (_turned_route(layout, pts, k, layout.placed[a], layout.placed[b]), fb, over)
     if log.isEnabledFor(logging.DEBUG):
         crossing = sum(  # fallback curves through an element (other than their own two)
             fb and not _clear(pts, (layout.placed[a], layout.placed[b]), *elements)
@@ -1033,6 +1039,33 @@ def route_loops(layout: Layout, sses: list[SSE], bb) -> list[Loop]:
         router.closed_searches,
         router.closed_nodes,
     )
+    return out
+
+
+def _rosette_pairs(layout: Layout, pairs) -> dict[tuple[str, str], tuple[tuple[str, str], int]]:
+    """A rosette's (Layout.rosette) loops drawn as protomer 0's turned: each loop (a, b) of copy k whose two elements'
+    mates (Layout.rosette_mates) are a loop of protomer 0 -> (that loop, k). Protomer 0's loops are routed among every
+    copy's elements, so each copy's turned route keeps off its own neighbours as protomer 0's keeps off its."""
+    mates = getattr(layout, "rosette_mates", None) or {}
+    if not getattr(layout, "rosette", 0) or not mates:
+        return {}
+    have = {(a.id, b.id) for a, b in pairs}
+    out = {}
+    for a, b in pairs:
+        ma, mb = mates.get(a.id), mates.get(b.id)
+        if ma is not None and mb is not None and ma[1] == mb[1] and (ma[0], mb[0]) in have:
+            out[(a.id, b.id)] = ((ma[0], mb[0]), ma[1])
+    return out
+
+
+def _turned_route(layout: Layout, points, k: int, pa: Placed, pb: Placed) -> list:
+    """Protomer 0's route turned by copy k's turn about the axis (page origin), on the grid, its ends at the copy's
+    own ports (they are its mates' turned, to the grid)."""
+    from .frame import turn2
+
+    pts = _snap(turn2(np.asarray(points, float), layout.frame.angles[k]))
+    out = [tuple(float(v) for v in p) for p in pts]
+    out[0], out[-1] = tuple(pa.c_port), tuple(pb.n_port)
     return out
 
 

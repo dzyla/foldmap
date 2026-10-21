@@ -116,12 +116,85 @@ def honest_crossings(lay, loops) -> int:
 # ------------------------------------------------------------------------------------------- element boxes
 
 
+ROSETTE_TURN_TOL = 1e-3  # page units: a turned copy back within this of its mate stands exactly where its mate does
+
+
+def local_layout(lay):
+    """A rosette's layout (Layout.rosette) with each element and ghost turned back by its copy's turn about the page
+    centre (frame.angles[k] of its chain's protomer): every copy then stands as protomer 0 does, in its own frame,
+    where a sheet's columns run across the page and its strands up and down as the layout drew protomer 0's. The
+    checks that read a sheet block in page axes (science_checks: columns and spans) read it so; a block is one copy's
+    (a rosette's sheets are within protomers). Any other layout as it is."""
+    if not getattr(lay, "rosette", 0):
+        return lay
+    import copy as _copy
+
+    sector, angles = lay.frame.sector, lay.frame.angles
+    mates = getattr(lay, "rosette_mates", {}) or {}
+    ghost_of = {g.sse.id: g for g in lay.ghosts if sector.get(g.sse.chain) == 0}
+
+    def back(p):
+        k = sector.get(p.sse.chain)
+        if not k:
+            return p
+        c, s = math.cos(-angles[k]), math.sin(-angles[k])
+        q = _copy.copy(p)
+        q.cx, q.cy = c * p.cx - s * p.cy, s * p.cx + c * p.cy
+        q.angle = p.angle - angles[k]
+        mate = mates.get(p.sse.id, (None,))[0]
+        m = (ghost_of if p.ghost else lay.placed).get(mate)
+        if (
+            m is not None
+            and math.hypot(q.cx - m.cx, q.cy - m.cy) < ROSETTE_TURN_TOL
+            and math.cos(q.angle - m.angle) > 0.99
+        ):
+            q.cx, q.cy, q.angle = m.cx, m.cy, m.angle  # its mate's place, which it is turned from (to the grid)
+        return q
+
+    out = _copy.copy(lay)
+    out.placed = {i: back(p) for i, p in lay.placed.items()}
+    out.ghosts = [back(g) for g in lay.ghosts]
+    return out
+
+
+BODY_TOUCH = 5e-3  # page units: bodies meeting by no more than this touch (angles on the 1e-4 rad grid tilt a
+# strand's corners by up to half its length times that: neighbours in a sheet touch)
+
+
+def _bodies_meet(p, q) -> bool:
+    """Whether two elements' bodies (rectangles along their own axes, length x width) overlap, by separating axes:
+    a rosette's turned copies stand at any angle, where their rects (the boxes round them) meet without the bodies
+    meeting."""
+
+    def corners(e):
+        d = np.array([math.cos(e.angle), math.sin(e.angle)])
+        n = np.array([-d[1], d[0]])
+        c = np.array([e.cx, e.cy])
+        hl, hw = e.length / 2, e.width / 2
+        return np.array([c + a * hl * d + b * hw * n for a in (-1, 1) for b in (-1, 1)]), (d, n)
+
+    (cp, ap), (cq, aq) = corners(p), corners(q)
+    for axis in (*ap, *aq):
+        a, b = cp @ axis, cq @ axis
+        if min(a.max(), b.max()) - max(a.min(), b.min()) <= BODY_TOUCH:
+            return False
+    return True
+
+
 def element_overlaps(lay) -> list[tuple[str, str]]:
     """Pairs of element or stem boxes (their rects) that overlap, except two consecutive pieces of one bent duplex,
     which meet at their joint (layout.joined_pieces), and a helix drawn over a sheet with that sheet's strands
-    (layout.lying_over). nacheck.render_checks counts these as its overlaps."""
+    (layout.lying_over). nacheck.render_checks counts these as its overlaps. In a rosette (Layout.rosette) two
+    elements overlap when their bodies do (_bodies_meet): its turned copies' rects are boxes round tilted bodies."""
     joined = joined_pieces(lay.stems, lay.nucleic) if lay.nucleic is not None else set()
     joined |= lying_over(lay)
+    if getattr(lay, "rosette", 0):
+        bodies = list(lay.placed.values())
+        return [
+            (p.sse.id, q.sse.id)
+            for p, q in combinations(bodies, 2)
+            if frozenset((p.sse.id, q.sse.id)) not in joined and _bodies_meet(p, q)
+        ]
     boxes = [(p.sse.id, p.rect) for p in lay.placed.values()] + [(d.id, d.rect) for d in lay.stems]
     return [
         (i, j)
@@ -1259,7 +1332,7 @@ def order_checks(drawn) -> list[str]:
     from .dssp import assign_dssp
     from .sheets import build_sheets
 
-    lay, sses = drawn.layout, drawn.sses
+    lay, sses = local_layout(drawn.layout), drawn.sses  # a rosette's sheets read in their own copy's frame
     out = []
     order = {s.id: k for k, s in enumerate(sses)}
     chain_of = {s.id: s.chain for s in sses}
@@ -1283,6 +1356,9 @@ def order_checks(drawn) -> list[str]:
     if not lay.sheets:
         return out
     bridges = assign_dssp(drawn.bb).bridges
+    if getattr(lay, "rosette", 0):  # a rosette's sheets are each protomer's own (cli._within_protomer)
+        sector, chain = lay.frame.sector, drawn.bb.labels
+        bridges = [b for b in bridges if sector.get(chain[b.i].chain, -1) == sector.get(chain[b.j].chain, -2)]
     sheets = {
         frozenset([*(s.id for s in sh.strands), *(a.strand.id for a in sh.accessory)]): sh
         for sh in build_sheets(sses, bridges)
@@ -1441,7 +1517,7 @@ def science_checks(drawn) -> dict[str, list[str] | None]:
         partner_findings,
     )
 
-    lay = drawn.layout
+    lay = local_layout(drawn.layout)  # a rosette's copies each in its own frame: sheets read across their strands
     out: dict[str, list[str] | None] = {"S1": [], "S2": [], "S3": [], **dict.fromkeys(NOT_YET), "S6": []}
     out["S4"] = mark_findings(residue_marks(drawn))
     if not lay.sheets:

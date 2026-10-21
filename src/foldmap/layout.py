@@ -340,6 +340,8 @@ class Layout:
     rosette: int = 0  # a Cn assembly drawn as a rosette (Style.cyclic, plan 21): n, its n-fold axis at page (0, 0)
     rosette_push: float = 0.0  # page units each copy was pushed out from the axis to clear its neighbours
     rosette_strays: list[str] = field(default_factory=list)  # copy elements with no protomer-0 mate, placed alone
+    rosette_mates: dict[str, tuple[str, int]] = field(default_factory=dict)  # a rosette's copy element -> (its
+    # protomer-0 mate, its protomer k): drawn as the mate turned by frame.angles[k] (route turns the mate's loops)
     cyclic_note: str = ""  # what the notes say of Style.cyclic: why a rosette asked for was drawn unrolled, or how
 
     @property
@@ -3587,6 +3589,53 @@ def _rosette_push(members: list[Placed], angles: list[float], out: np.ndarray) -
     return float(delta)
 
 
+def _box_on_body(box, e) -> bool:
+    """Whether a page box meets an element's body (its length x width rectangle along its own axis, at any angle), by
+    separating axes; touching is not meeting."""
+    x0, y0, x1, y1 = box
+    d = np.array([np.cos(e.angle), np.sin(e.angle)])
+    n = np.array([-d[1], d[0]])
+    c = np.array([e.cx, e.cy])
+    body = np.array([c + a * e.length / 2 * d + b * e.width / 2 * n for a in (-1, 1) for b in (-1, 1)])
+    square = np.array([[x0, y0], [x0, y1], [x1, y0], [x1, y1]])
+    for axis in (np.array([1.0, 0.0]), np.array([0.0, 1.0]), d, n):
+        a, b = body @ axis, square @ axis
+        if min(a.max(), b.max()) - max(a.min(), b.min()) <= 1e-6:
+            return False
+    return True
+
+
+def _rosette_label_sides(lay: Layout) -> None:
+    """A turned copy's helix names (text upright), each side chosen after the turn: the side its mate's name is on,
+    unless that box meets an element, a ghost, the axis symbol or a name chosen before it and the other side's does
+    not. Protomer 0 keeps its own sides; copies are taken in order of their elements' ids."""
+    k = glyph(lay)[0] / _GLYPH_W
+    mates = lay.rosette_mates
+    bodies = [*lay.placed.values(), *lay.ghosts]
+    r = AXIS_SYMBOL_R + 0.15
+    names = [
+        _element_label_box(p, k) for p in lay.placed.values() if p.sse.kind in ("H", "G") and p.sse.id not in mates
+    ]
+    names.append((-r, -r, r, r))
+    for i in sorted(mates):
+        p = lay.placed.get(i)
+        if p is None or p.sse.kind not in ("H", "G"):
+            continue
+
+        def meets(side: int, p: Placed = p) -> bool:  # its name's box on another (tilted) body, a name, the symbol
+            p.label_side = side
+            box = _element_label_box(p, k)
+            return overlaps_any(box, names) or any(_box_on_body(box, q) for q in bodies if q is not p)
+
+        first = p.label_side
+        if meets(first) and not meets(-first):
+            p.label_side = -first
+        else:
+            p.label_side = first
+        p.label_side_default = p.label_side
+        names.append(_element_label_box(p, k))
+
+
 def _wrap_angle(a: float) -> float:
     """An angle in (-pi, pi], on the grid."""
     a = float(_snap((a + np.pi) % (2 * np.pi) - np.pi))
@@ -3633,7 +3682,8 @@ def _rosette(sses: list[SSE], sheets: list[Sheet], frame, mode: str, kw: dict) -
     def turned(m: Placed, t: SSE, a: float) -> Placed:
         x, y = (float(v) for v in _snap(turn2(np.array([m.cx, m.cy]) + shove, a)))
         q = Placed(t, x, y, m.length, _wrap_angle(m.angle + a), m.width, label=m.label, ghost=m.ghost, over=m.over)
-        q.label_side = q.label_side_default = m.label_side
+        up = lambda angle: 1 if np.cos(angle) >= 0 else -1  # noqa: E731  the sign of the normal's page-up part
+        q.label_side = q.label_side_default = m.label_side * up(m.angle) * up(q.angle)  # the mate's side of it
         return q
 
     placed: dict[str, Placed] = {}
@@ -3738,7 +3788,9 @@ def _rosette(sses: list[SSE], sheets: list[Sheet], frame, mode: str, kw: dict) -
     lay.rosette = frame.n
     lay.rosette_push = delta
     lay.rosette_strays = [q.sse.id for q in strays]
+    lay.rosette_mates = {t.id: (i, k) for k in range(1, frame.n) for i, t in maps[k].items()}
     lay.stack_gaps = _stack_gaps(lay)
+    _rosette_label_sides(lay)
     _choose_label_sides(lay, sses, style, [])
     _place_domain_names(lay, sses, style.font_scale)
     rects = np.array([p.rect for p in [*lay.placed.values(), *lay.ghosts]]).reshape(-1, 4)

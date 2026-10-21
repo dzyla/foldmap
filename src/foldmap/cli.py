@@ -242,6 +242,20 @@ def _within_protomer(bridges, sym, bb) -> list:
     return [b for b in bridges if sector.get(bb.labels[b.i].chain, -1) == sector.get(bb.labels[b.j].chain, -2)]
 
 
+def _pairings_across(bridges, sym, bb, sses) -> list[tuple[str, str]]:
+    """The strand pairs (element ids, in sequence order) that bridge two protomers: a rosette draws each copy's own
+    sheets, so these pairings are not drawn (the notes name them)."""
+    sector = {c: k for k, p in enumerate(sym.protomers) for c in p}
+    of = {r: s.id for s in sses if s.kind == "E" for r in range(s.start, s.end + 1)}
+    out = set()
+    for b in bridges:
+        ka, kb = sector.get(bb.labels[b.i].chain), sector.get(bb.labels[b.j].chain)
+        if ka is not None and kb is not None and ka != kb and b.i in of and b.j in of:
+            out.add((of[b.i], of[b.j]))
+    order = {s.id: n for n, s in enumerate(sses)}
+    return sorted(out, key=lambda ab: (order[ab[0]], order[ab[1]]))
+
+
 def _dyad_frame(sses, sym) -> Frame | None:
     """A two-fold assembly seen from the side (plan 18): the dyad up the page, protomer 0 on the left and protomer 1
     to its right, so that _mirror_frame draws one as the other's mirror image. Page-right runs from protomer 0's
@@ -484,6 +498,12 @@ def make_layout(
                     f"{sym.label} assembly seen down its {sym.n}-fold axis (cyclic=rosette): each copy drawn as the "
                     f"first turned by a multiple of {360 // sym.n if 360 % sym.n == 0 else round(360 / sym.n, 1)}°"
                 )
+                across = _pairings_across(dssp.bridges, sym, bb, sses)
+                if across:
+                    cyclic_note += (
+                        f"; {len(across)} strand pairing(s) between copies not drawn, each copy's sheets its own: "
+                        + ", ".join(f"{a}~{b}" for a, b in across)
+                    )
     else:  # stem axes differ in the last bit between BLAS kernels: snapped before they choose the page axes
         if rosette_asked and not cyclic_note:
             cyclic_note = (

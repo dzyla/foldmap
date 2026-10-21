@@ -339,6 +339,21 @@ def test_two_fold_choice_is_offered_for_a_two_fold_assembly(monkeypatch):
     assert at.segmented_control(key="two_fold").value == "mirror"  # still offered: the same assembly
 
 
+def test_cyclic_choice_is_offered_for_a_ring_of_three_to_eight(monkeypatch):
+    """Plan 21 Task 2: side by side (the default) or down the axis, beside the fold options, only where a Cn assembly
+    with n = 3..8 is drawn (KcsA, C4); the rosette draws its n-fold symbol, and the choice stays offered."""
+    from foldmap import app_jobs
+
+    monkeypatch.setattr(app_jobs, "SLOW_SECONDS", float("inf"))
+    assert "cyclic" not in widget_keys(opened(DATA / "2HHB.cif").sidebar, skip=())  # a two-fold assembly: not offered
+    at = opened(DATA / "1BL8.cif")
+    assert list(at.segmented_control(key="cyclic").options) == ["side by side", "down the axis"]
+    assert at.segmented_control(key="cyclic").value == "unrolled"
+    at.segmented_control(key="cyclic").set_value("rosette").run()
+    assert at.session_state["cyclic"] == "rosette" and not at.exception and 'id="axis:4"' in svg_of(at)
+    assert at.segmented_control(key="cyclic").value == "rosette"
+
+
 def test_copy_ghosts_choice_is_offered_for_a_strand_lent_across_a_rings_cut(monkeypatch):
     """Plan 19 Task 2: with dashed copies (the default) or drawn once, beside the fold options, only where a strand
     is lent across an unrolled ring's cut (8UTF), and still offered once they are off. Auto-redraw stays on however
@@ -550,6 +565,7 @@ def test_every_setting_is_reachable():
     ).run()
     seen |= shown(at)
     seen |= shown(opened(DATA / "2HHB.cif"))  # a two-fold assembly: the two_fold choice
+    seen |= shown(opened(DATA / "1BL8.cif"))  # a C4 assembly: the cyclic choice
     seen |= shown(opened(DATA / "8UTF.cif"))  # a strand lent across a ring's cut: the copy_ghosts choice
     wanted = {*STYLE_FIELDS, *LAYOUT_DEFAULTS, "theme"} - set(HIDDEN_LAYOUT)
     missing = sorted(k for k in wanted if not seen & set(CONTROLS[k][2]))

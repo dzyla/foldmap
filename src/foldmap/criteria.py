@@ -96,6 +96,8 @@ def tether_lengths(drawn, look) -> list[tuple[str, float, str, str]]:
     lay, out = drawn.layout, []
     for m in ligand_marks(lay, drawn.loops, drawn.sses, look):
         g, (cx, cy) = m["ligand"], m["centre"]
+        if not m["targets"]:  # untethered (a rosette's axis cluster, render._axis_cluster): nothing to bound
+            continue
         if not m["residues"]:  # held by nucleotides alone (C33): tethered to them, its own chain's, reported only
             chains = [g.chain] * len(m["targets"])
         else:

@@ -59,6 +59,14 @@ def _cyclic(layout) -> list[dict]:
     out = []
     if note := getattr(layout, "cyclic_note", ""):
         out.append(_item("cyclic", note, [], 1))
+    links = getattr(layout, "links", None)
+    if getattr(layout, "rosette", 0) and links is not None:  # bonds between two copies: plain bars across the gap
+        sector, chain = layout.frame.sector, layout.res_chain
+        across = [(i, j) for i, j in links.disulfides if sector.get(chain[i], -1) != sector.get(chain[j], -1)]
+        if across:
+            names = [f"{chain[i]}:{layout.res_labels[i].tag}-{chain[j]}:{layout.res_labels[j].tag}" for i, j in across]
+            text = f"{len(across)} disulfide(s) between copies drawn as plain bars across the gap: {', '.join(names)}"
+            out.append(_item("cyclic", text, names))
     if strays := list(getattr(layout, "rosette_strays", [])):
         text = f"{len(strays)} element(s) found in one copy only, placed alone beside it: {', '.join(strays)}"
         out.append(_item("cyclic", text, strays))

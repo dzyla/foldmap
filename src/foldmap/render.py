@@ -1625,6 +1625,46 @@ def _on_axis(layout: Layout, g) -> bool:
     return bool(n) and len({sector.get(layout.res_chain[r]) for r in g.contacts} - {None}) == n
 
 
+_AXIS_MARK_GAP = 0.12  # page units between two marks of a rosette's axis cluster
+
+
+def _axis_cluster(ligands: list, taken: list, texts: list) -> list[dict]:
+    """The marks of the ligands on a rosette's axis (_on_axis: held by every copy), one compact cluster round the axis
+    symbol at the page centre, untethered (the cluster stands for the channel or pore every copy lines): on a square
+    grid of one mark's size, the spots nearest the centre first (then by angle from page-right), each clear of the
+    symbol, the elements, the names and the marks before it. In order of first holding residue; `taken` and `texts`
+    gain each mark."""
+    halves = [(0.3, 0.3) if g.metal else (0.12 * len(g.name) + 0.2, 0.27) for g in ligands]
+    step = 2 * max(max(h) for h in halves) + _AXIS_MARK_GAP
+    reach = int(np.ceil(np.sqrt(len(ligands)))) + 6
+    spots = sorted(
+        ((i * step, j * step) for i in range(-reach, reach + 1) for j in range(-reach, reach + 1)),
+        key=lambda s: (round(float(np.hypot(*s)), 6), round(float(np.arctan2(s[1], s[0]) % (2 * np.pi)), 6)),
+    )
+    out = []
+    order = sorted(range(len(ligands)), key=lambda i: ligands[i].contacts[0])
+    for i in order:
+        g, (hw, hh) = ligands[i], halves[i]
+        spot = next(
+            (s for s in spots if not overlaps_any((s[0] - hw, s[1] - hh, s[0] + hw, s[1] + hh), taken)), spots[0]
+        )
+        mark = (spot[0] - hw, spot[1] - hh, spot[0] + hw, spot[1] + hh)
+        crowded = overlaps_any(mark, taken)
+        taken.append(mark)
+        texts.append(mark)
+        out.append(
+            {
+                "ligand": g,
+                "centre": (float(spot[0]), float(spot[1])),
+                "half": (hw, hh),
+                "targets": [],
+                "residues": [],
+                "crowded": bool(crowded),
+            }
+        )
+    return out
+
+
 def ligand_marks(layout: Layout, loops: list[Loop], sses: list[SSE], look: Style, counts=None) -> list[dict]:
     """Where each shown ligand/ion goes: as close as possible to the residues holding it, clear of elements,
     labels and other markers, and of the nucleic acid's stems, strands and text (_na_spots) where there is one. Each
@@ -1666,7 +1706,12 @@ def ligand_marks(layout: Layout, loops: list[Loop], sses: list[SSE], look: Style
     na_spots = na_lines = None  # where nucleotides are drawn, the nucleic acid's own boxes, and its strands as drawn
     # among the elements (each a segment array): for ligands held by it alone, built once per page
     # by first holding residue, in the file's order on a tie (as before C33), those held by nucleotides alone last
+    axis = [g for g in chosen if g.contacts and _on_axis(layout, g)]  # a rosette's: one cluster at its centre
+    if axis:
+        out += _axis_cluster(axis, taken, texts)
     for g in sorted(chosen, key=lambda g: (not g.contacts, g.contacts[0] if g.contacts else 0)):
+        if any(g is a for a in axis):
+            continue
         bound: list = []  # its main contact, then its targets on other chains than its home (the first target's)
         if g.contacts:
             targets, weights, tethered = _local_targets(layout, loops, sses, g, g.metal)
@@ -1688,8 +1733,6 @@ def ligand_marks(layout: Layout, loops: list[Loop], sses: list[SSE], look: Style
         if not targets:
             continue
         anchor = np.average(np.asarray(targets), axis=0, weights=weights)
-        if _on_axis(layout, g):  # held by every copy of a rosette: drawn once, at its centre
-            anchor = np.zeros(2)
         half = (0.3, 0.3) if g.metal else (0.12 * len(g.name) + 0.2, 0.27)
         na, retarget = None, None
         if not g.contacts:  # held by nucleotides alone: its tethers, as drawn from each spot, off the stems and strands
