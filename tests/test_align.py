@@ -1,16 +1,18 @@
-"""The chain aligner (plan 13a): the sequence and file routes, TM-score, the superposition."""
+"""The chain aligner (plan 13a): the sequence, structure and file routes, TM-score, the superposition."""
 
 import os
 import subprocess
 import sys
+import time
 from pathlib import Path
 
+import gemmi
 import numpy as np
 import pytest
 
 from foldmap.align import ChainAlignment, align_chains, d0, tm_score
 from foldmap.io import load_backbone
-from foldmap.model import Backbone
+from foldmap.model import Backbone, ResLabel
 from foldmap.sequence import _one_letter
 
 DATA = Path(__file__).parent / "data"
@@ -99,11 +101,6 @@ def test_file_route_reads_two_rows(ubq_a, tmp_path):
         align_chains(ubq_a, "A", same, "A", str(bad))
 
 
-def test_structure_route_not_yet(ubq_a):
-    with pytest.raises(NotImplementedError):
-        align_chains(ubq_a, "A", _moved(ubq_a), "A", "structure")
-
-
 def test_unknown_chain_or_match(ubq_a, tmp_path):
     with pytest.raises(ValueError, match="chain 'Z'"):
         align_chains(ubq_a, "A", _moved(ubq_a), "Z")
@@ -124,7 +121,7 @@ import sys
 import numpy as np
 from foldmap.align import align_chains
 from foldmap.io import load_backbone
-from foldmap.model import Backbone
+from foldmap.model import Backbone, ResLabel
 
 a = load_backbone(sys.argv[1]).only(["A"])
 keep = [k for k in range(len(a)) if k not in (5, 6, 40, 70)]
@@ -151,3 +148,169 @@ def test_deterministic_across_hash_seeds():
     assert len(runs) == 1
     pairs, tm = runs.pop().splitlines()
     assert pairs.startswith("((0, 0), ") and float(tm) > 0.9
+
+
+def _run_twice(script, *args):
+    """stdout of `script` under PYTHONHASHSEED 0 and 1, which must agree."""
+    runs = set()
+    for seed in ("0", "1"):
+        done = subprocess.run(
+            [sys.executable, "-c", script, *map(str, args)],
+            env=dict(os.environ, PYTHONHASHSEED=seed),
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        runs.add(done.stdout)
+    assert len(runs) == 1
+    return runs.pop()
+
+
+# the structure route (13a-2)
+
+_NAMES = sorted("ALA ARG ASN ASP CYS GLN GLU GLY HIS ILE LEU LYS MET PHE PRO SER THR TRP TYR VAL".split())
+
+
+def _renamed(bb: Backbone) -> Backbone:
+    """bb with every residue renamed to the next standard amino acid (alphabetically): no identity left."""
+    swap = {x: _NAMES[(k + 1) % len(_NAMES)] for k, x in enumerate(_NAMES)}
+    return Backbone([l._replace(name=swap.get(l.name, "ALA")) for l in bb.labels], bb.xyz.copy(), bb.prev.copy())
+
+
+def test_helix_deleted_keeps_the_rest(ubq_a, tmp_path):
+    st = gemmi.read_structure(str(DATA / "1UBQ.cif"))
+    chain = st[0]["A"]
+    for k in reversed(range(len(chain))):
+        if 23 <= chain[k].seqid.num <= 34 and chain[k].name != "HOH":
+            del chain[k]
+    path = tmp_path / "ubq_no_helix.pdb"
+    st.write_pdb(str(path))
+    b = _moved(load_backbone(path).only(["A"]))
+    assert len(b) == len(ubq_a) - 12
+    out = align_chains(ubq_a, "A", b, "A", "structure")
+    assert out.method == "structure"
+    kept = [i for i in range(len(ubq_a)) if not 22 <= i <= 33]
+    assert out.pairs == tuple((i, j) for j, i in enumerate(kept))
+    assert out.tm_score > 0.8
+    assert np.abs(b.ca @ out.rotation.T + out.translation - ubq_a.ca[kept]).max() < 1e-6
+
+
+def test_auto_switches_on_identity(ubq_a):
+    other = _moved(_renamed(ubq_a))
+    out = align_chains(ubq_a, "A", other, "A")
+    assert out.identity < 0.4 and out.method == "structure"
+    assert out.pairs == tuple((i, i) for i in range(len(ubq_a)))  # the fold found without the sequence
+    assert out.tm_score == pytest.approx(1.0, abs=1e-9)
+    assert align_chains(ubq_a, "A", _moved(ubq_a), "A").method == "sequence"
+    assert align_chains(ubq_a, "A", other, "A", "sequence").method == "sequence"  # asked for: obeyed
+
+
+def test_permutation_shows_as_low_coverage(ubq_a):
+    order = list(range(39, 76)) + list(range(39))  # residues 40-76, then 1-39, as one chain
+    prev = ubq_a.prev[order].copy()
+    prev[0] = prev[37] = False
+    permuted = Backbone([ubq_a.labels[k] for k in order], ubq_a.xyz[order] @ TURN.T + SHIFT, prev)
+    out = align_chains(ubq_a, "A", permuted, "A", "structure")
+    assert out.method == "structure"
+    assert len(out.pairs) < 0.7 * 76
+    assert all(order[j] == i for i, j in out.pairs)  # what is paired is the right residue
+
+
+def test_never_a_mirror_on_the_structure_route(ubq_a):
+    mirror = Backbone(list(ubq_a.labels), ubq_a.xyz * np.array([-1.0, 1.0, 1.0]), ubq_a.prev.copy())
+    out = align_chains(ubq_a, "A", _moved(mirror), "A", "structure")
+    assert np.linalg.det(out.rotation) == pytest.approx(1.0, abs=1e-9)
+    assert out.tm_score < 0.5
+
+
+_PRINT_STRUCTURE = """
+import sys
+import numpy as np
+from foldmap.align import align_chains
+from foldmap.io import load_backbone
+from foldmap.model import Backbone
+
+a = load_backbone(sys.argv[1]).only(["A"])
+keep = [k for k in range(len(a)) if k not in (5, 6, 40, 70)]
+c, s = np.cos(0.7), np.sin(0.7)
+rot = np.array([[c, -s, 0.0], [s, c, 0.0], [0.0, 0.0, 1.0]])
+wobble = 0.4 * np.sin(np.arange(len(keep)))[:, None, None]
+b = Backbone([a.labels[k] for k in keep], a.xyz[keep] @ rot.T + [3.0, -4.0, 5.0] + wobble, a.prev[keep])
+out = align_chains(a, "A", b, "A", "structure")
+print(repr(out.pairs))
+print(repr(out.tm_score))
+"""
+
+
+def test_structure_route_deterministic():
+    pairs, tm = _run_twice(_PRINT_STRUCTURE, DATA / "1UBQ.cif").splitlines()
+    keep = [k for k in range(76) if k not in (5, 6, 40, 70)]
+    assert pairs == repr(tuple((i, j) for j, i in enumerate(keep)))
+    assert float(tm) > 0.8
+
+
+def _place(a, b, c, bond, angle, torsion):
+    """The point d with |cd| = bond, angle bcd and torsion abcd (degrees): NeRF."""
+    bc = (c - b) / np.linalg.norm(c - b)
+    n = np.cross(b - a, bc)
+    n /= np.linalg.norm(n)
+    m = np.cross(n, bc)
+    ang, tor = np.radians(angle), np.radians(torsion)
+    return c - bond * np.cos(ang) * bc + bond * np.sin(ang) * (np.cos(tor) * m + np.sin(tor) * n)
+
+
+def _helix(count, phi=-57.0, psi=-47.0):
+    """An ideal alpha helix's backbone (count, 4, 3): N, CA, C, O."""
+    n, ca = np.zeros(3), np.array([1.458, 0.0, 0.0])
+    c = _place(np.array([0.0, 1.0, 0.0]), n, ca, 1.525, 111.2, -60.0)
+    out = []
+    for k in range(count):
+        if k:
+            n = _place(out[-1][0], out[-1][1], out[-1][2], 1.329, 116.2, psi)
+            ca = _place(out[-1][1], out[-1][2], n, 1.458, 121.7, 180.0)
+            c = _place(out[-1][2], n, ca, 1.525, 111.2, phi)
+        out.append([n, ca, c, _place(n, ca, c, 1.231, 120.5, psi + 180.0)])
+    return np.array(out)
+
+
+def _bundle(helices=18, size=24, loop=4):
+    """A synthetic helix bundle of helices x size residues joined by straight loops of `loop` residues (500 with
+    the defaults): antiparallel neighbours on a 10 Å grid, 6 a row, a snake through the rows."""
+    h = _helix(size)
+    centre = h[:, 1].mean(axis=0)
+    _, _, vt = np.linalg.svd(h[:, 1] - centre)
+    if np.linalg.det(vt) < 0:
+        vt[2] *= -1  # a proper rotation: the helix stays right-handed
+    base = (h - centre) @ vt.T  # the helix axis along x
+    turn = np.diag([-1.0, -1.0, 1.0])  # a half turn about z: the next helix runs back
+    parts = []
+    for k in range(helices):
+        row, col = divmod(k, 6)
+        col = col if row % 2 == 0 else 5 - col
+        piece = (base @ turn.T if k % 2 else base) + [0.0, 10.0 * col, 10.0 * row]
+        if parts:
+            last, first = parts[-1][-1], piece[0]
+            parts.append(np.array([last + (first - last) * s / (loop + 1) for s in range(1, loop + 1)]))
+        parts.append(piece)
+    xyz = np.concatenate(parts)
+    labels = [ResLabel("A", k + 1, "", "ALA") for k in range(len(xyz))]
+    prev = np.ones(len(xyz), bool)
+    prev[0] = False
+    return Backbone(labels, xyz, prev, {"A"})
+
+
+@pytest.mark.slow
+def test_budget():
+    a = _bundle()
+    assert len(a) == 500
+    keep = [k for k in range(len(a)) if k not in (100, 101, 300)]
+    k = np.arange(len(a))[:, None]
+    wobble = 0.6 * np.hstack([np.sin(0.37 * k), np.cos(0.53 * k), np.sin(0.71 * k + 1.0)])
+    b = _moved(Backbone(a.labels, a.xyz + wobble[:, None, :], a.prev.copy(), {"A"}), keep=keep)
+    t0 = time.perf_counter()
+    out = align_chains(a, "A", b, "A", "structure")
+    took = time.perf_counter() - t0
+    assert out.method == "structure"
+    right = sum(keep[j] == i for i, j in out.pairs)
+    assert right >= 0.95 * len(keep) and out.tm_score > 0.8
+    assert took < 3.0, f"{took:.2f} s"
