@@ -325,11 +325,10 @@ foldmap plot 1MBN --like 2HHB --like-chain B -o myoglobin-like-beta.svg     # my
 foldmap plot 2HHB --chains A --like 2HHB --like-chain B -o alpha-like-beta.svg
 ```
 
-- **One chain of each.** The chain drawn is the one `--chains` names, else the structure's only protein chain. Of
-  several with none named, the first is drawn (the notes say it was chosen, not asked for), unless the structure is
-  an assembly drawn by its symmetry: then it is drawn whole, on its own (see below). The reference's chain is
-  `--like-chain`, else its only or first protein chain; a reference drawn as an assembly needs `--like-chain`.
-  Naming two protein chains with `--chains` or `--like-chain` is a usage error (exit 2).
+- **One chain of each.** The chain drawn is the one `--chains` names, else the structure's first protein chain (the
+  notes say it was chosen, not asked for). The reference's chain is `--like-chain`, else its first protein chain
+  (the note says "chain A (its first protein chain)"). Naming two protein chains with `--chains` or `--like-chain` is
+  a usage error (exit 2).
 - **Alignment.** `--like-match auto` (the default) aligns by sequence at 40 % identity or more, and otherwise by
   structure (TM-align's method). You can also force `sequence` or `structure`, or give a two-row alignment file with
   the reference's chain first.
@@ -348,10 +347,10 @@ foldmap plot 2HHB --chains A --like 2HHB --like-chain B -o alpha-like-beta.svg
   (TM-score 0.14; 4 of 13 elements matched)". When fewer than 70 % of the shorter chain's residues align, the note
   says how much did ("only 62% of the shorter chain aligned": a hinge between domains, or a circular permutation).
 - **Frames that cannot be carried.** A figure is drawn like a reference through the reference's page frame, so only
-  a plain one carries (a membrane view, `--up`, `--view`, `--rotate` and `--flip-v` do). An assembly drawn by its
-  symmetry (the two-fold mirror image, an unrolled assembly, a rosette), `--mode stack` or protein on a straight
-  duplex, on either side, is drawn on its own, and the note says why and what would draw it: "not drawn like
-  1UBQ.cif: this structure's frame (a C7 rosette) cannot be carried; draw one chain of each".
+  a plain one carries (a membrane view, `--up`, `--view`, `--rotate` and `--flip-v` do). With `--mode stack`, or a
+  chain drawn on a straight duplex, on either side, the structure is drawn on its own, and the note says why and
+  what would draw it: "not drawn like 1UBQ.cif: this structure's frame (--mode stack) cannot be carried; draw it
+  with --mode projected".
 - **Saved and shared.** `--save-layout` records the reference as given, its chain and the match (`like:` under
   `layout:`), so `--layout-file` draws the same figure again. The MCP tool `draw_topology` takes `like_source`,
   `like_chain` and `like_match`.

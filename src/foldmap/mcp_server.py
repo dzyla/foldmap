@@ -217,10 +217,10 @@ def draw_topology(
     (save_layout must end in .yaml or .yml).
     like_source: draw this structure like a reference of the same fold (a file path or PDB ID): each element matched
     to one of the reference's takes its place, angle, name and (coloured by identity) colour. One protein chain of
-    each: `chains` names this structure's (else its first; an assembly drawn by its symmetry is drawn on its own),
-    like_chain the reference's (needed when the reference is drawn as an assembly). like_match: auto (sequence at 40%
-    identity, else structure), sequence, structure, or a two-row alignment file (the reference's chain first). The
-    note, and the `provenance` item of kind "like", say how many elements matched, or why it was drawn on its own."""
+    each: `chains` names this structure's, like_chain the reference's (else each its first protein chain).
+    like_match: auto (sequence at 40% identity, else structure), sequence, structure, or a two-row alignment file
+    (the reference's chain first). The note, and the `provenance` item of kind "like", say how many elements
+    matched, or why it was drawn on its own."""
     from . import layoutfile
     from .provenance import lines
     from .render import save

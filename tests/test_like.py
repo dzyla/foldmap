@@ -455,22 +455,11 @@ def test_a_mate_of_the_other_helix_type_keeps_its_type():
     assert crossed == {by_label["α1"].id: "η1", by_label["η1"].id: "α2"}
 
 
-UNCARRIED = {  # B drawn whole (no chain named) in a frame that cannot be carried: drawn on its own, with the note
-    "mirror": (
+UNCARRIED = {  # one chain whose frame still cannot be carried: drawn on its own, with the note
+    "duplex": (
         "1LMB.cif",
         {},
-        "not drawn like 1UBQ.cif: this structure's frame (a C2 mirror image) cannot be carried; draw one chain of each",
-    ),
-    "cylinder": (
-        "2HHB.cif",
-        {},
-        "not drawn like 1UBQ.cif: this structure's frame (an unrolled C2 assembly) cannot be carried; draw one chain "
-        "of each",
-    ),
-    "rosette": (
-        "6LTO.cif.gz",
-        {"focus": "none", "look": Style(cyclic="rosette")},
-        "not drawn like 1UBQ.cif: this structure's frame (a C7 rosette) cannot be carried; draw one chain of each",
+        "not drawn like 1UBQ.cif: this structure's frame (a straight duplex) cannot be carried; draw it with --no-dna",
     ),
     "stack": (
         "1UBQ.cif",
@@ -483,16 +472,38 @@ UNCARRIED = {  # B drawn whole (no chain named) in a frame that cannot be carrie
 
 @pytest.mark.parametrize("case", list(UNCARRIED))
 def test_a_frame_that_cannot_be_carried_is_drawn_on_its_own(case):
-    """A figure whose frame is not a plain Frame (an assembly drawn by its symmetry: the C2 mirror, an unrolled
-    cylinder, a rosette; or a stack) is not drawn like the reference: it is drawn exactly as on its own, and the note
-    says why and what would draw it like the reference."""
+    """One chain (its first protein chain, none named) whose frame is not a plain Frame (protein on a straight
+    duplex, a stack) is not drawn like the reference: it is drawn exactly as that chain on its own, and the note says
+    why and what would draw it like the reference."""
     name, options, note = UNCARRIED[case]
     kw = {**OPTIONS, **options}
-    lay, _, _ = cli.make_layout(DATA / name, like=like_of(DATA / "1UBQ.cif"), **kw)
-    alone, _, _ = cli.make_layout(DATA / name, **kw)
+    lay, _, bb = cli.make_layout(DATA / name, like=like_of(DATA / "1UBQ.cif"), **kw)
+    alone, _, _ = cli.make_layout(DATA / name, chains=[bb.labels[0].chain], **kw)
     assert lay.like_note == note
-    assert lay.like_colour == {} and lay.like_extras == [] and lay.like_chain == ""
+    assert lay.like_colour == {} and lay.like_extras == []
     assert signature(lay) == signature(alone)
+
+
+@pytest.mark.parametrize(
+    "name, options",
+    [("2HHB.cif", {}), ("6LTO.cif.gz", {"focus": "none", "look": Style(cyclic="rosette")})],
+    ids=["unrolled", "rosette"],
+)
+def test_an_assembly_is_drawn_by_its_first_chain(name, options):
+    """Ruling 7: an assembly (2HHB unrolled, 6LTO as a rosette) with no chain named on either side is drawn by its
+    first protein chain like the reference's first: the note and the scope line say the chains were chosen, never
+    asked for, and the figure is that chain drawn like the reference."""
+    from foldmap.io import read_model
+    from foldmap.scope import drawn_scope
+
+    path, kw = DATA / name, {**OPTIONS, **options}
+    lay, _, _ = cli.make_layout(path, like=like_of(path), **kw)
+    named, _, _ = cli.make_layout(path, chains=["A"], like=like_of(path, "A"), **kw)
+    assert lay.like_note.startswith(f"drawn like {name} chain A (its first protein chain): ")
+    assert lay.like_chain == "A" and lay.chains_asked == [] and lay.uncarried is None
+    reason = drawn_scope(read_model(path, "auto"), lay)["reason"]
+    assert reason == "chain A (the first protein chain: one chain of each is drawn like a reference)"
+    assert signature(lay) == signature(named)
 
 
 def test_a_reference_frame_that_cannot_be_carried(tmp_path):
@@ -507,26 +518,24 @@ def test_a_reference_frame_that_cannot_be_carried(tmp_path):
     )
 
 
-def test_a_reference_drawn_as_an_assembly_needs_its_chain(tmp_path, capsys):
-    """8UTF is drawn as an assembly by its symmetry: as the reference with no chain named it is a usage error (exit
-    2) naming --like-chain; with --like-chain A it draws."""
+def test_a_reference_drawn_as_an_assembly_takes_its_first_chain(tmp_path, capsys):
+    """8UTF, drawn as an assembly by its symmetry, as the reference with no chain named: its first protein chain, the
+    note saying so (ruling 7); with --like-chain A the note names the chain as asked."""
     path, out = DATA / "8UTF.cif", tmp_path / "x.svg"
-    assert cli.main(["plot", str(path), "--chains", "B", "--like", str(path), "-o", str(out)]) == 2
-    err = capsys.readouterr().err
-    assert "8UTF.cif is drawn as an unrolled C3 assembly (chains A, B, C, a, b, c): name one with --like-chain" in err
+    assert cli.main(["plot", str(path), "--chains", "B", "--like", str(path), "-o", str(out)]) == 0
+    assert "drawn like 8UTF.cif chain A (its first protein chain): 2 of 2 elements matched" in capsys.readouterr().err
     assert cli.main(["plot", str(path), "--chains", "B", "--like", str(path), "--like-chain", "A", "-o", str(out)]) == 0
     assert "drawn like 8UTF.cif chain A: 2 of 2 elements matched" in capsys.readouterr().err
 
 
 def test_a_chain_like_chose_is_not_said_as_asked_for():
-    """Of several protein chains in a plain frame with none named, --like draws the first: the scope line says so,
-    not "asked for"; a structure with one protein chain says nothing of chains."""
+    """Of several protein chains with none named, --like draws the first: the scope line says so, not "asked for";
+    a structure with one protein chain says nothing of chains."""
     from foldmap.io import read_model
     from foldmap.scope import drawn_scope
 
     path = DATA / "2HHB.cif"
-    kw = {**OPTIONS, "symmetry": "off"}  # no assembly: a plain frame
-    lay, _, _ = cli.make_layout(path, like=like_of(path, "B"), **kw)
+    lay, _, _ = cli.make_layout(path, like=like_of(path, "B"), **OPTIONS)
     assert lay.like_chain == "A" and lay.chains_asked == []
     assert lay.like_note.startswith("drawn like 2HHB.cif chain B: ")
     scope = drawn_scope(read_model(path, "auto"), lay)

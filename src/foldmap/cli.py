@@ -413,16 +413,13 @@ def make_layout(
     model=None,
     names: list[str] | None = None,
     like: dict | None = None,
-    frame_only: bool = False,
 ):
     """`names` (--names): conventional names, each `deposited`, `beta` or a YAML file (names.apply_names), applied
     over the generic labels in order; `rename` wins over all of them. `like` (--like, plan 13a): drawn like a
     reference structure, {structure, chain, match, layout} (_drawn_like): one protein chain of this structure, the
-    one `chains` names (two named is a UsageError), else its only one; of several with none named, the first, where
-    the whole structure would be drawn in a plain frame, else (an assembly drawn by its symmetry) the whole structure
-    drawn on its own, the note saying why (_uncarried). `frame_only`: no layout, only _uncarried of the page frame
-    the figure would be drawn in (_drawn_like asks it of a reference)."""
-    call = dict(locals())  # the arguments, for drawing again with the chain --like chose
+    one `chains` names (two named is a UsageError), else its first (ruling 7: the scope line says it was chosen,
+    Layout.like_chain). A frame that cannot be carried (_uncarried: a stack, a straight duplex) draws it on its own,
+    the note saying why."""
     for spec in names or []:
         check_spec(spec)
     model = model or read_model(path, assembly)  # once, for every loader below (`model`: already read, same assembly)
@@ -431,12 +428,9 @@ def make_layout(
     asked = [c for c in chains or [] if c in present]  # the protein chains asked for (Layout.chains_asked)
     chain_b, chosen = None, False  # the chain drawn like the reference; chosen by --like, not asked for
     if like:  # one protein chain drawn like one of the reference's (plan 13a ruling 6); nucleic-acid chains as asked
-        if like.get("chosen"):  # several, none named, the whole in a plain frame: the first (drawn again, below)
-            chain_b, chosen = like["chosen"], True
-        elif asked or len(present) <= 1:
-            chain_b = _one_chain(chains, present, "--chains", str(path))
-        if chain_b is not None:
-            chains = [chain_b, *(c for c in chains or [] if c not in present)]
+        chain_b = _one_chain(chains, present, "--chains", str(path))
+        chosen = not asked and len(present) > 1  # several, none named: the first, said as chosen (not asked for)
+        chains = [chain_b, *(c for c in chains or [] if c not in present)]
     if chains and any(c in present for c in chains):  # protein chains named: only those (else every one)
         bb = bb.only([c for c in chains if c in present])
     if (look or Style()).color_by == "conservation" and not msa:
@@ -579,11 +573,7 @@ def make_layout(
         _mirror_frame(frame, sym)
     if duplex and sym is not None and not getattr(frame, "sector", None):
         _side_by_side(frame, sym, nucleic, bb)
-    if frame_only:
-        return _uncarried(frame, dyad, mode, duplex, sym)
     uncarried = _uncarried(frame, dyad, mode, duplex, sym) if like else None
-    if like and chain_b is None and uncarried is None:  # several protein chains, none named, in a plain frame
-        return make_layout(**{**call, "model": model, "like": {**like, "chosen": present[0]}})
     links = load_links(path, bb, assembly, model=model)
     contacts = sse_contacts(bb, sses)
     for key, n in _bridge_contacts(bb, sses, links).items():
@@ -832,7 +822,8 @@ def _drawn_like(
     like: dict, bb, chain_b, sses, sheets, look: Style, mode, rotate, flip_v, up, view, dna, assembly, uncarried=None
 ):
     """What a figure drawn like a reference (make_layout's `like`: {structure, chain, match, layout}) takes from it:
-    the reference laid out first, one protein chain (_reference_chain), with the options and edits of
+    the reference laid out first, one protein chain (the one like['chain'], --like-chain, or its layout file names,
+    else its first: the note says so), with the options and edits of
     like['layout'] (--like-layout, a saved layout of it) when given, else this figure's view and look; its chain
     aligned to this structure's `chain_b` (like['match']: auto, sequence, structure or a two-row alignment file;
     align.align_chains), the elements mated (align.element_mates) and like.like_from's Like built from the
@@ -865,7 +856,9 @@ def _drawn_like(
     missing = [c for c in asked if c not in present]
     if missing:
         raise ValueError(f"no protein chain {', '.join(missing)} in {given}; it has {', '.join(present) or 'none'}")
-    chain_a = _reference_chain(ref, name, asked or kw.get("chains"), present, args, kw, model)
+    named = asked or kw.get("chains")
+    chain_a = _one_chain(named, present, "--like-chain", given)
+    first = not any(c in present for c in named or []) and len(present) > 1  # chosen, not named: the note says so
     if uncarried is not None:  # this figure's own frame: drawn on its own
         return alone(uncarried_note(name, uncarried, mine=True))
     kw.update(chains=[chain_a], like=None)
@@ -888,25 +881,10 @@ def _drawn_like(
         crossed = [
             (lay.placed[s.id].label, made.crossed[s.id]) for s in sses if s.id in made.crossed and s.id in lay.placed
         ]
-        return like_note(name, chain_a, aln, mates, extras, match, crossed)
+        chain = f"{chain_a} (its first protein chain)" if first else chain_a
+        return like_note(name, chain, aln, mates, extras, match, crossed)
 
     return SimpleNamespace(like=made, frame=frame, extras=tuple(mates.extras), note=note)
-
-
-def _reference_chain(ref, name: str, asked, present: list[str], args, kw: dict, model) -> str:
-    """The reference's chain a figure is drawn like (_drawn_like): the protein chain `asked` names (--like-chain,
-    else its layout file's chains; two named is a UsageError), else its only one. Of several with none named: a
-    UsageError where the reference is drawn as an assembly by its symmetry (a mirror image, unrolled, a rosette:
-    which chain is meant cannot be guessed), else its first."""
-    if any(c in present for c in asked or []) or len(present) <= 1:
-        return _one_chain(asked, present, "--like-chain", name)
-    why = make_layout(ref, *args, model=model, **{**kw, "chains": None, "like": None, "frame_only": True})
-    if why is not None and why[0] == "copies":
-        raise UsageError(
-            f"--like draws one protein chain of each structure; {name} is drawn as {why[1]} (chains "
-            f"{', '.join(present)}): name one with --like-chain"
-        )
-    return present[0]
 
 
 def _uncarried(frame, dyad, mode: str, duplex: bool, sym) -> tuple[str, str] | None:
