@@ -306,7 +306,9 @@ name: myoglobin's helix E) or `beta:α4` (the β-scheme's), each also with a cha
 refused with the choices: on 1TIM, `--swap α4,α1` gives `foldmap: error: α4 is the figure's α4 (A 96–102) and the
 β-scheme's α4 (A 106–118); write fig:α4 or beta:α4` (exit 2; `fig:` is the label drawn). What a layout file stores
 does not change: residue ranges. In `--domain`, a βα-row helix has no β-scheme name yet (the rows are laid out
-after the domains are read); use its deposited name, its label or its range.
+after the domains are read); use its deposited name, its label or its range. In the app, an element picker's options
+show every name an element has (1TIM: `α5 · helix αD2 · β-scheme α4 · A 106–118`), so typing any of them finds it;
+the cell keeps the residue range.
 
 **Automatic domains are inferred, not published.** `--domains auto` cuts each chain where it has few residue
 contacts across (normalized cuts over CA atoms within 12 Å; a domain may be two pieces of the chain, as in 5JDN,

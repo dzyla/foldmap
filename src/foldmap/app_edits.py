@@ -330,8 +330,20 @@ def apply_table(ss: MutableMapping, kind: str) -> None:
 
 
 def element_choices(elements: list[dict]) -> list[tuple[str, str]]:
-    """(reference, what the picker shows) for each drawn element: ('res:A:23-34', 'α1 · A 23–34')."""
-    return [(e["ref"], f"{e['label']} · {e['chain']} {e['first']}–{e['last']}") for e in elements]
+    """(reference, what the picker shows) for each drawn element: its label, its names in the other conventions it
+    has (Q-A12: the deposited helix name, the β-scheme name; one the label already says is left out), its residues:
+    1MBN's ('res:A:4-17', 'α1 · helix A · A 4–17'), 1TIM's ('res:A:106-118', 'α5 · helix αD2 · β-scheme α4 · A
+    106–118'). The select box searches the whole text, so typing any name finds the element; the value stored is
+    still the reference."""
+
+    def text(e: dict) -> str:
+        names = [e["label"]]
+        for key, say in (("dep", "helix"), ("beta", "β-scheme")):  # app_jobs.elements_of: "" when it has none
+            if e.get(key) and e[key] != e["label"]:
+                names.append(f"{say} {e[key]}")
+        return " · ".join([*names, f"{e['chain']} {e['first']}–{e['last']}"])
+
+    return [(e["ref"], text(e)) for e in elements]
 
 
 def display(ref: str, choices: list[tuple[str, str]]) -> str:

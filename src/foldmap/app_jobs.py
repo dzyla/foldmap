@@ -487,10 +487,14 @@ def size_job(path) -> dict:
 
 
 def elements_of(drawn) -> list[dict]:
-    """The drawn elements (no ghosts) in sequence order, as the app's pickers show them."""
+    """The drawn elements (no ghosts) in sequence order, as the app's pickers show them: each with its names in the
+    conventions the figure does not show (Layout.other_names, Q-A12: "dep" the deposited helix name, "beta" the
+    β-scheme name; "" when it has none), so a picker finds it by any of them."""
     from .model import res_ref
 
     placed = drawn.layout.placed
+    shown = [s for s in drawn.sses if s.id in placed and not placed[s.id].ghost]
+    other = drawn.layout.other_names if shown else {}  # read once here, when a figure has elements to pick
     return [
         {
             "ref": res_ref(s.chain, s.first, s.last),
@@ -499,9 +503,10 @@ def elements_of(drawn) -> list[dict]:
             "kind": s.kind,
             "first": s.first.tag,
             "last": s.last.tag,
+            "dep": other.get("dep", {}).get(s.id, ""),
+            "beta": other.get("beta", {}).get(s.id, ""),
         }
-        for s in drawn.sses
-        if s.id in placed and not placed[s.id].ghost
+        for s in shown
     ]
 
 

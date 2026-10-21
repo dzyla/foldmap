@@ -191,6 +191,39 @@ def test_element_choices_name_the_drawn_element():
     assert element_choices(elements) == [("res:A:23-34", "α1 · A 23–34"), ("res:B:23-34", "α1 · B 23–34")]
 
 
+def test_element_choices_show_every_name_the_element_has():
+    """Q-A12 in the app: the label, then the deposited helix name and the β-scheme name when the element has them and
+    the label does not already say them, then the residues; the value stays the res: reference."""
+    base = {"ref": "res:A:3-11", "label": "α1", "chain": "A", "kind": "H", "first": "3", "last": "11"}
+    assert element_choices([{**base, "dep": "A", "beta": "α1a"}]) == [
+        ("res:A:3-11", "α1 · helix A · β-scheme α1a · A 3–11")
+    ]
+    assert element_choices([{**base, "dep": "", "beta": "α1a"}])[0][1] == "α1 · β-scheme α1a · A 3–11"
+    assert element_choices([{**base, "dep": "A", "beta": "α1"}])[0][1] == "α1 · helix A · A 3–11"  # α1 said once
+    assert element_choices([{**base, "label": "A", "dep": "A", "beta": ""}])[0][1] == "A · A 3–11"  # --names deposited
+
+
+def test_pickers_name_a_beta_alpha_barrel_s_elements_in_every_convention():
+    """1TIM chain A (deposited αA, αB … αD1, αD2; β-scheme β1-β8 and α1-α8): the option text carries every name, so
+    typing helix αD2, β-scheme α4 or α5 finds the same helix; the values stored are the res: references, as before."""
+    import json
+
+    from foldmap import app_jobs
+
+    out = app_jobs.draw_job(DATA / "1TIM.cif", json.dumps({"theme": "publication", "chains": "A"}))
+    choices = element_choices(out["elements"])
+    assert choices[:4] == [
+        ("res:A:7-11", "A · β-scheme β1 · A 7–11"),
+        ("res:A:18-30", "α1 · helix αA · A 18–30"),  # the β-scheme's α1 is the label: said once
+        ("res:A:38-42", "B · β-scheme β2 · A 38–42"),
+        ("res:A:47-54", "α2 · helix αB · A 47–54"),
+    ]
+    assert dict(choices)["res:A:96-102"] == "α4 · helix αD1 · β-scheme α4′ · A 96–102"
+    assert dict(choices)["res:A:106-118"] == "α5 · helix αD2 · β-scheme α4 · A 106–118"
+    assert dict(choices)["res:A:167-169"] == "η1 · A 167–169"  # a 3-10 helix with no other name
+    assert [ref for ref, _ in choices] == [f"res:{e['chain']}:{e['first']}-{e['last']}" for e in out["elements"]]
+
+
 def test_chain_choices_are_the_file_s_chains_unless_an_assembly_adds_copies():
     from foldmap.app_edits import chain_choices
 

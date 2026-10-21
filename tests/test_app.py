@@ -1529,3 +1529,32 @@ def test_a_foldmap_module_changed_on_disk_is_loaded_fresh(tmp_path, monkeypatch)
     finally:
         sys.modules.update(kept)
         seen.clear()
+
+
+def test_a_swap_picked_by_deposited_name_draws_the_command_line_swap():
+    """1MBN (deposited helices A-H): the pickers' option text carries the deposited name, so typing "helix A" finds
+    α1; picking it stores its res: reference, and the swap draws the figure --swap res:… draws."""
+    from foldmap.app_edits import element_choices, text_of
+    from foldmap.app_views import figure_card
+    from foldmap.render import save_svg
+    from foldmap.spec import draw_spec, figure_spec
+
+    path = DATA / "fidelity" / "1MBN.cif.gz"
+    at = opened(path)
+    choices = element_choices(at.session_state["elements"])
+    assert choices[:4] == [
+        ("res:A:4-17", "α1 · helix A · A 4–17"),
+        ("res:A:21-35", "α2 · helix B · A 21–35"),
+        ("res:A:37-41", "α3 · helix C · A 37–41"),
+        ("res:A:44-47", "α4 · A 44–47"),  # no deposited helix there
+    ]
+
+    def picked(typed: str) -> str:  # what the select box keeps when `typed` finds one option
+        (ref,) = [ref for ref, text in choices if typed in text.split(" · ")]
+        return ref
+
+    rows = [{"a": picked("helix A"), "b": picked("helix E")}]
+    assert rows == [{"a": "res:A:4-17", "b": "res:A:59-76"}]
+    as_text(at, "swap", text_of("swap", rows))
+    cli = save_svg(draw_spec(figure_spec(path, theme="publication", swap=["res:A:4-17,res:A:59-76"])).figure)
+    assert not at.exception and svg_of(at) == figure_card(cli, "#ffffff", at.session_state["name"])

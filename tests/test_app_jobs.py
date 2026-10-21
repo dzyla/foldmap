@@ -112,6 +112,8 @@ def test_draw_job_reports_what_the_pickers_need():
         "kind": "E",
         "first": "2",
         "last": "7",
+        "dep": "",  # 1UBQ's helix records are numbered: no deposited names
+        "beta": "β1",  # the β-scheme's name for strand A (Q-A12): the pickers show it
     }
     assert out["provenance"] == [] and out["files"] == {}
 
