@@ -13,7 +13,7 @@ from collections.abc import Callable
 from contextvars import ContextVar
 from dataclasses import KW_ONLY, dataclass, field
 from types import SimpleNamespace
-from typing import NamedTuple
+from typing import TYPE_CHECKING, NamedTuple
 
 import numpy as np
 
@@ -23,6 +23,9 @@ from .frame import Frame, RosetteFrame, symmetric_frame, view_frame
 from .model import SSE, Nucleic, Sheet, generic_label, group_by_chain, pair_places, res_ref, same_place
 from .nucleic import Stem, StemView, segment_stem, stem_axis, stem_views
 from .style import CHOICES, Style
+
+if TYPE_CHECKING:
+    from .like import Like
 
 log = logging.getLogger(__name__)
 
@@ -82,6 +85,9 @@ _SS_RESTART_PAIRS = 5_000_000_000
 _W_CONTACT = 0.3  # pull between elements that touch in 3D (at _CONTACT_CAP CA pairs)
 _CONTACT_CAP = 20
 _K_HOME = 0.02  # pull back toward the projected position, keeps the fold recognisable
+# an item drawn like a reference (build_layout's `like`, plan 13a): pulled to its mates' place in the reference's
+# finished layout this much harder, so it stays there unless it must move to clear an overlap (tuned in 13a-10 only)
+_K_LIKE = 8 * _K_HOME
 _STEP = 0.15
 _SWEEPS = 400
 _SEP_SWEEPS = 5000  # push-apart passes before the guaranteed slide
@@ -346,6 +352,9 @@ class Layout:
     rosette_mates: dict[str, tuple[str, int]] = field(default_factory=dict)  # a rosette's copy element -> (its
     # protomer-0 mate, its protomer k): drawn as the mate turned by frame.angles[k] (route turns the mate's loops)
     cyclic_note: str = ""  # what the notes say of Style.cyclic: why a rosette asked for was drawn unrolled, or how
+    # units: each element drawn -> (cx, cy) of the unit (sheet block, row, bundle, helix) it was laid out in and its
+    # offset there (build_layout; a rosette records none): a structure drawn like this one takes its homes from them
+    units: dict[str, tuple[float, float, float, float]] = field(default_factory=dict)
 
     @property
     def dna(self) -> list[PlacedStem]:  # earlier name
@@ -454,12 +463,17 @@ def _sheet_seen(sheet: Sheet, frame: Frame) -> np.ndarray:
     return _snap(frame.direction(at, mean_dir))
 
 
-def _sheet_order(sheet: Sheet, frame: Frame) -> tuple[list[int], int, np.ndarray]:
+def _sheet_order(
+    sheet: Sheet, frame: Frame, ref_angle: dict[str, float] | None = None
+) -> tuple[list[int], int, np.ndarray]:
     """How a sheet is drawn: the track strands' indices left to right, s = +1 when strands[0] points up (else -1),
-    and the projected centroids (Å) of every strand drawn (_drawn_strands: the track's, then the accessory's)."""
+    and the projected centroids (Å) of every strand drawn (_drawn_strands: the track's, then the accessory's).
+    `ref_angle` (strand id -> drawn angle, a reference's: Like.angle): the first track strand it names points as
+    there, the sheet's way up taken from it; the order follows from s as always (the front face, never a mirror)."""
     strands = sheet.strands
     every, _ = _drawn_strands(sheet)
     cents = frame.project(np.array([s.centroid for s in every]), [s.chain for s in every])
+    told = next(((k, ref_angle[x.id]) for k, x in enumerate(strands) if x.id in ref_angle), None) if ref_angle else None
     # Both decisions below are made on the grid (_snap): a sheet straddling a dyad in the page (1SLV's, shared by the
     # two copies) runs straight across the page by symmetry, and its end strands, dyad mates, stand level: its
     # height and their step across it are 0 up to the last bits of the element axes, which differ between BLAS
@@ -467,6 +481,8 @@ def _sheet_order(sheet: Sheet, frame: Frame) -> tuple[list[int], int, np.ndarray
     # being built turns it down (_TIE_TURN: _both_ways lays out a shared one both ways).
     seen = _sheet_seen(sheet, frame)
     s = 1 if seen[1] > 0 or (seen[1] == 0 and strands[0].id not in _TIE_TURN.get()[0]) else -1  # +1: strands[0] up
+    if told is not None:  # strand k drawn up exactly when directions[k] * s > 0
+        s = sheet.directions[told[0]] * (1 if np.sin(told[1]) > 0 else -1)
     # Drawing the strands vertical turns the projected sheet in the page plane; the strand order must turn
     # with it (left to right = across the drawn-up direction), or the sheet shows its back face (mirror image).
     up2d = s * seen
@@ -783,16 +799,18 @@ def _sheet_item(
     over: list[SSE] = (),
     helix_w: float = HELIX_W,
     ends: dict[str, str] | None = None,
+    ref_angle: dict[str, float] | None = None,
 ) -> _Item:
     """A sheet as one block of strands at `pitch`, each pointing as it runs relative to strands[0]; a closed
     barrel's first strand repeated as a ghost after the last. Each accessory strand (Sheet.accessory) stands in its
     column (Accessory.column, turned with the track when the track is drawn right to left), stacked with what stands
     there (_column_heights) or past the track's end: beside its parent, never between two strands that pair. `over`
     (helices packed on its face, in sequence): each drawn over the strands where it packs (_over_sheet), unless it
-    would lie on one drawn there before it. `ends`: the chain ends drawn."""
+    would lie on one drawn there before it. `ends`: the chain ends drawn. `ref_angle`: a reference's strand angles
+    (_sheet_order)."""
     strands = sheet.strands
     n = len(strands)
-    order, s, cents = _sheet_order(sheet, frame)
+    order, s, cents = _sheet_order(sheet, frame, ref_angle)
     forward = order[0] == 0
     drawn = {k: d for d, k in enumerate(order)}  # index into _drawn_strands (the ghost: -1) -> drawn column
     drawn.update({n + i: a.column if forward else n - 1 - a.column for i, a in enumerate(sheet.accessory)})
@@ -998,17 +1016,24 @@ def template_rows(sheets: list[Sheet], sses: list[SSE], copies: dict[str, tuple[
 
 
 def _ba_template(
-    sheet: Sheet, units: list[BAUnit], frame: Frame, pitch: float = PITCH, helix_w: float = HELIX_W
+    sheet: Sheet,
+    units: list[BAUnit],
+    frame: Frame,
+    pitch: float = PITCH,
+    helix_w: float = HELIX_W,
+    ref_angle: dict[str, float] | None = None,
 ) -> _Item:
     """An all-parallel α/β sheet (template_applies) as one row, as the hand-drawn TIM barrel and Rossmann figures
     draw it: the strands in sheet order and pointing as _sheet_item draws them (the front face), and after each
     strand, when an in-row unit joins it to the next, that unit's longest helix (the first on a tie), true length,
     running against the strands; a barrel's closing helix between the last strand and the ghost. Each footprint
     (labels included) starts _BA_GAP after the last one ends, all centred on one line, the row centred on the item.
-    Other helices are placed as free helices. Home: the strands' projected mean, as _sheet_item."""
+    Other helices are placed as free helices. Home: the strands' projected mean, as _sheet_item. `ref_angle`: a
+    reference's strand angles (_sheet_order), the row then pointing as the reference's does, never turned again."""
     strands = sheet.strands
-    order, s, cents = _sheet_order(sheet, frame)
-    if strands[order[0]].start > strands[order[-1]].start:  # the row reads left to right in sequence: turned
+    order, s, cents = _sheet_order(sheet, frame, ref_angle)
+    told = bool(ref_angle) and any(x.id in ref_angle for x in strands)
+    if not told and strands[order[0]].start > strands[order[-1]].start:  # the row reads in sequence: turned
         order, s = order[::-1], -s  # half round in the page (never mirrored), its strands then point down (K9: under
         # --up 1TIM read β8 ... β1; 1GOX's barrels and two of 1LDM's Rossmann rows did by default)
     n = len(order)
@@ -1043,13 +1068,20 @@ def _ba_template(
 
 
 def _helix_item(
-    sse: SSE, frame: Frame, angle_mode: str = "snap", width: float = HELIX_W, rise: float = HELIX_RISE
+    sse: SSE,
+    frame: Frame,
+    angle_mode: str = "snap",
+    width: float = HELIX_W,
+    rise: float = HELIX_RISE,
+    angle: float | None = None,
 ) -> _Item:
     """Always true length. angle_mode: 'tilted' as seen in the view; 'snap' to the nearest of up, down, left,
-    right (the topology-diagram convention); 'upright' up or down like a strand (stack mode)."""
+    right (the topology-diagram convention); 'upright' up or down like a strand (stack mode). `angle`: drawn so
+    instead (a reference's, Like.angle)."""
     au, av = frame.direction(sse.centroid, sse.axis)
     length = max(width, (len(sse) - 1) * rise * SCALE)  # true length even when tilted: equal pitch everywhere
-    angle = _angle(float(np.arctan2(av, au)), float(av), angle_mode)
+    if angle is None:
+        angle = _angle(float(np.arctan2(av, au)), float(av), angle_mode)
     pos = frame.project(sse.centroid, [sse.chain])[0] * SCALE
     placed = Placed(sse, 0, 0, length, angle, width)
     return _Item(
@@ -1081,15 +1113,18 @@ def _kink_groups(sses: list[SSE], skip: set[str]) -> list[list[SSE]]:
 _KINK_ROOM = 0.25  # one routing cell (route.RES): the corner loop's room on each leg between two kinked pieces
 
 
-def _kink_item(group: list[SSE], frame: Frame, angle_mode: str, width: float = HELIX_W) -> _Item:
+def _kink_item(
+    group: list[SSE], frame: Frame, angle_mode: str, width: float = HELIX_W, ref_angle: dict[str, float] | None = None
+) -> _Item:
     """The pieces of a kinked helix as one unit, end to end, so the corner reads as one helix turning (2HHB α's AB
     corner, which an element seen between the pieces kept five widths apart): each piece as _helix_item draws it
     (true length, its own angle). Each next piece starts where the loop from the last one's C port turns once into
     it: a piece across the last starts just beyond its end and just off its axis, both legs a routing cell clear of
     the two bodies (_KINK_ROOM); a piece running on starts a little further along; a piece turned back runs beside
     the last, MARGIN apart, on the side it is seen. The unit sits at the mean of the pieces' projected places,
-    offsets on the grid."""
-    parts = [_helix_item(s, frame, angle_mode, width) for s in group]
+    offsets on the grid. `ref_angle`: the pieces a reference draws at its angles (Like.angle)."""
+    ref_angle = ref_angle or {}
+    parts = [_helix_item(s, frame, angle_mode, width, angle=ref_angle.get(s.id)) for s in group]
     members = [p.members[0] for p in parts]
     at = [np.zeros(2)]
     for k, (a, b) in enumerate(zip(members, members[1:])):
@@ -1133,7 +1168,9 @@ def _angle(seen: float, av: float, mode: str) -> float:
     return _half_turn(_snap(seen))  # as seen, on the grid (radians)
 
 
-def _bundle_item(group: list[SSE], frame: Frame, angle_mode: str, width: float) -> _Item:
+def _bundle_item(
+    group: list[SSE], frame: Frame, angle_mode: str, width: float, ref_angle: dict[str, float] | None = None
+) -> _Item:
     """Helices of several chains packed along their length, drawn as one unit: one column per helix (kinked
     pieces of one helix share a column, end to end), columns side by side in their order across the bundle at
     their true spacing (at least a label's width apart), staggered along the shared axis as in 3D;
@@ -1142,7 +1179,8 @@ def _bundle_item(group: list[SSE], frame: Frame, angle_mode: str, width: float) 
     H:121-151). One that is no kinked piece of it by features' rule (both at least KINK_SHORT long, their axes
     bent more than KINK_COS: 7ARD's, cos -1.0, a hairpin) is another helix: it takes a column of its own. A kinked
     piece drawn the other way (a short one, whose axis is no guide: 6JLN's six residues) stays in the column,
-    _STACK_PAD from it, as two strands end to end in a sheet's column."""
+    _STACK_PAD from it, as two strands end to end in a sheet's column. `ref_angle` (Like.angle): the bundle turned
+    so the first helix (N to C) a reference draws, of those running along it if any, points as there."""
     from .features import KINK_COS, KINK_GAP, KINK_SHORT
 
     ref = group[0].axis
@@ -1150,10 +1188,15 @@ def _bundle_item(group: list[SSE], frame: Frame, angle_mode: str, width: float) 
     m = mean / np.linalg.norm(mean)
     centre = np.mean([s.centroid for s in group], axis=0)
     a2 = frame.direction(centre, m)
-    angle = _angle(float(np.arctan2(a2[1], a2[0])), float(a2[1]), angle_mode)
+    up = lambda s: float(s.axis @ m) >= 0  # noqa: E731 - drawn along the bundle (else the other way), as below
+    told = sorted((not up(s), s.start) + (s.id,) for s in group if s.id in ref_angle) if ref_angle else []
+    if not told:
+        angle = _angle(float(np.arctan2(a2[1], a2[0])), float(a2[1]), angle_mode)
+    else:  # each helix is drawn at the bundle's angle, or half a turn round when it runs the other way
+        back, _, sid = told[0]
+        angle = _wrap_angle(ref_angle[sid] - np.pi) if back else ref_angle[sid]
     d2, side2 = np.array([np.cos(angle), np.sin(angle)]), np.array([-np.sin(angle), np.cos(angle)])
     columns: list[list[SSE]] = []
-    up = lambda s: float(s.axis @ m) >= 0  # noqa: E731 - drawn along the bundle (else the other way), as below
 
     def hairpin(a: SSE, b: SSE) -> bool:  # b drawn the other way from a, and no kinked piece of it
         bent = float(_snap(float(a.axis @ b.axis))) <= KINK_COS
@@ -1922,6 +1965,8 @@ def _attract(
     joints: set[tuple[int, int]] = frozenset(),
     fixed: Walls | None = None,
     mirror: float | None = None,
+    held: dict[int, tuple[float, float]] | None = None,
+    held_k: float = _K_LIKE,
 ) -> None:
     """Minimise the layout energy (_energy) from the projected positions, raising the overlap penalty in
     stages. The result becomes each item's new home; _separate then guarantees no overlap remains. Every input
@@ -1931,15 +1976,28 @@ def _attract(
     boxes may touch and no element fits between them for long. `fixed` (Walls): boxes that stay where they are (the
     nucleotides of unpaired strands' traces), the items kept MARGIN off them, firmly or (an element touching that
     trace) not at all. `mirror` (page x of a dyad in the page): each copy of `ties` sits at its mate's mirror image
-    about it, at the same height, instead of `spread` along."""
+    about it, at the same height, instead of `spread` along.
+    `held` (item index -> home, plan 13a: items drawn like a reference, at their mates' places in its finished
+    layout, a copy's tie aside): each starts at its home, held there by a spring `held_k` per element (_K_LIKE) in
+    place of _K_HOME, and is moved as a displacement from it (the home itself is not snapped, so an item nothing
+    moves stays exactly where the reference has it); no loop, contact or disulfide spring acts between two held
+    items (the reference's layout already settled them), only between a held item and the rest."""
     n = len(items)
+    held = {i: h for i, h in (held or {}).items() if i not in (ties or {})}
     W = _contact_weights(items, contacts)
+    if held:  # two items held where a reference has them: no pull between them
+        both = np.array(sorted(held), int)
+        W[np.ix_(both, both)] = 0.0
     ci, cj = np.nonzero(np.triu(W > 0, 1))
     pull = (ci, cj, W[ci, cj])
     springs = _loop_springs(items, sses)
+    if held:
+        springs = [x for x in springs if not (x[0] in held and x[2] in held)]
     weight = [_W_SEQ] * len(springs)
     slack = [_LOOP_SLACK] * len(springs)
     for i, oi, j, oj, w, sl in extra:  # nucleic-acid strands from stem to stem
+        if i in held and j in held:
+            continue
         springs.append((i, oi, j, oj))
         weight.append(float(_snap(w)))
         slack.append(float(_snap(sl)))
@@ -1947,6 +2005,8 @@ def _attract(
     bridges_used = []
     for a, ta, b, tb in bridges:  # disulfides: the two cysteines themselves pulled together
         if a in owner and b in owner and owner[a][0] != owner[b][0]:
+            if owner[a][0] in held and owner[b][0] in held:
+                continue
             bridges_used.append((a, b))
             (i, ma, oa), (j, mb, ob) = owner[a], owner[b]
             springs.append(
@@ -1974,6 +2034,10 @@ def _attract(
     joined = _joint_matrix(n, joints)  # consecutive pieces of a bent duplex: they may touch, with no margin between
     want[joined] = (h[:, None, :] + h[None, :, :])[joined]
     anchor_w = _K_HOME * np.array([[_mass(it)] for it in items], float)
+    if held:  # at the reference's places, unsnapped, and held there harder
+        rows = np.array(sorted(held), int)
+        home[rows] = np.array([held[i] for i in sorted(held)], float)
+        anchor_w[rows] = held_k * np.array([[_mass(items[i])] for i in sorted(held)], float)
     mids = _snap([it.mid for it in items])
     boxes = np.asarray(fixed.boxes if fixed is not None else [], float).reshape(-1, 4)
     centres, halves = _snap((boxes[:, :2] + boxes[:, 2:]) / 2), _snap((boxes[:, 2:] - boxes[:, :2]) / 2)
@@ -1987,9 +2051,15 @@ def _attract(
     base = np.array([slot[ties[i][0]] if i in ties else slot[i] for i in range(n)])
     copy_k = np.array([ties[i][1] if i in ties else 0 for i in range(n)], float)
     flip = np.stack([np.where(copy_k > 0, -1.0, 1.0), np.ones(n)], axis=1)  # a mirrored copy: x against its mate
+    at = np.zeros((len(free), 2))  # a held item's z is its displacement from its home
+    for i, xy in held.items():
+        at[slot[i]] = xy
 
     def expand(z):
-        P = z[:-1].reshape(-1, 2)[base].copy()
+        if held:
+            P = (z[:-1].reshape(-1, 2) + at)[base]
+        else:
+            P = z[:-1].reshape(-1, 2)[base].copy()
         if mirror is not None:  # protomer 1 is protomer 0 seen in the mirror line
             P[copy_k > 0, 0] = 2 * mirror - P[copy_k > 0, 0]
             return P
@@ -2020,7 +2090,10 @@ def _attract(
     evals = [0]  # energy evaluations so far
     reach = want[..., 0].max(axis=1) if n > _PAIR_ENERGY_ABOVE else None  # _x_overlaps
     lam = _LAMBDAS[0]
-    z = solve(np.append(_snap([[items[i].cx, items[i].cy] for i in free]).ravel(), spread))
+    start = _snap([[items[i].cx, items[i].cy] for i in free]).reshape(-1, 2)
+    for i in held:
+        start[slot[i]] = 0.0
+    z = solve(np.append(start.ravel(), spread))
     lam = _LAMBDAS[-1]
     best = tied(z)[0]
     mass = np.array([_mass(it) for it in items])
@@ -2032,7 +2105,7 @@ def _attract(
         if np.sqrt(gx * gx + gy * gy) <= 2 * _SS_SLACK + 1.0:
             continue
         mover, anchor, om, oa = (i, j, oi, oj) if mass[i] <= mass[j] else (j, i, oj, oi)
-        if mover in ties:
+        if mover in ties or mover in held:  # (a held item stays at the reference's place)
             continue
         hm, ha = h[mover], h[anchor]
         gap_x, gap_y = hm[0] + ha[0] + MARGIN, hm[1] + ha[1] + MARGIN
@@ -3819,6 +3892,36 @@ def _rosette(sses: list[SSE], sheets: list[Sheet], frame, mode: str, kw: dict) -
     return lay
 
 
+def _like_homes(items: list[_Item], like: Like) -> dict[int, tuple[float, float]]:
+    """Each item holding an element with a place in the reference (Like.target) starts at the place they give it,
+    which becomes its home: the mean over those members of their mate's place less their own offset. A member's place
+    is read as its mate's unit centre plus the difference of the two offsets (Like.unit), else as its target less its
+    offset, and the mean is taken from the first one's, so an item laid out as its mate's unit (a structure drawn like
+    itself) lands exactly on that unit's centre. Returns item index -> home (_attract's `held`)."""
+    out: dict[int, tuple[float, float]] = {}
+    for k, it in enumerate(items):
+        got = []
+        for m, (ox, oy) in zip(it.members, it.offsets):
+            if not isinstance(m, Placed) or m.ghost or m.sse.id not in like.target:
+                continue
+            unit = like.unit.get(m.sse.id)
+            if unit is not None:
+                ux, uy, ax, ay = unit
+                got.append((ux + (ax - ox), uy + (ay - oy)))
+            else:
+                tx, ty = like.target[m.sse.id]
+                got.append((tx - ox, ty - oy))
+        if not got:
+            continue
+        x0, y0 = got[0]
+        x = x0 + math.fsum(x - x0 for x, _ in got) / len(got)
+        y = y0 + math.fsum(y - y0 for _, y in got) / len(got)
+        it.cx, it.cy = x, y
+        it.home = (x, y)
+        out[k] = (x, y)
+    return out
+
+
 @_text_scaled
 @_both_ways
 def build_layout(
@@ -3849,6 +3952,7 @@ def build_layout(
     alike_first: bool = True,
     let_go: bool = True,
     mirror_only: bool = False,
+    like: Like | None = None,
 ) -> Layout | None:
     """Labels: the generic ones (_assign_labels), then `relabel` (ref -> label: copies' shared labels, primes of
     elements lent by neighbours), then `names` (names.apply_names: --names, given the placed layout with its stems
@@ -3875,9 +3979,18 @@ def build_layout(
     `let_go`: of several copy items tied to one mate in one protomer, only the largest stays tied (_one_per_mate);
     Layout.let_go counts the others, and cli.make_layout lays out again without letting them go and keeps the more
     alike of the two (random-100 held-out A15). `mirror_only` (cli's dyad view of a two-fold assembly, plan 18): None
-    at once where the frame's mirror line is dropped (a βα row across it), for cli to unroll the copies instead."""
+    at once where the frame's mirror line is dropped (a βα row across it), for cli to unroll the copies instead.
+    `like` (like.Like, plan 13a; `frame` then frame.frame_like's, the reference's carried over): the elements are
+    labelled as their mates in the reference (merged over `relabel`); in projected mode a matched item (one holding an
+    element with a mate) starts at the reference's place for it, the mean over its matched members of their mates'
+    places less their offsets, and is held there (_attract's `held`, Like.weight times _K_HOME) while the others keep
+    their projected homes; _separate runs as always. Matched sheets take the reference's βα-row choices
+    (Like.template) and way up (_sheet_order: their own strand order, science S1-S3, S6), matched helices its drawn
+    angles and over-sheet choices (Like.over). With like=None nothing of this runs."""
     if mode not in ("projected", "stack"):
         raise ValueError(f"unknown layout mode {mode!r}")
+    if like is not None and (type(frame) is not Frame or frame.sector or frame.mirror_x is not None):
+        raise ValueError(f"a layout drawn like a reference takes a plain frame (frame_like): {type(frame).__name__}")
     if isinstance(frame, RosetteFrame):  # a Cn assembly seen down its axis: protomer 0 laid out, the copies turned
         given = dict(attract=attract, contacts=contacts, nucleic=nucleic, style=style, bridges=bridges)
         given.update(domains=domains, partial=partial, rename=rename, swap=swap, move=move, keep_depth=keep_depth)
@@ -3891,6 +4004,13 @@ def build_layout(
         raise ValueError(f"fold_template must be one of {', '.join(CHOICES['fold_template'])}; got {template!r}")
     as_rows = mode == "projected" and template == "auto"  # a stack row draws elements in sequence instead
     rowed = template_choices(sheets, sses, copies or {}) if as_rows else [False] * len(sheets)
+    seen_as = like.angle if like is not None and mode == "projected" else None  # the reference's drawn angles
+    if like is not None and as_rows and like.template is not None:  # each sheet a βα row as the reference's mate
+        if len(like.template) != len(sheets):
+            raise ValueError(f"Like.template has {len(like.template)} choices for {len(sheets)} sheets")
+        rowed = [bool(x) for x in like.template]
+    if like is not None and mode == "projected":  # over its sheet only where the reference's mate is
+        over = {h: k for h, k in (over or {}).items() if like.over.get(h, True)}
     templates = {
         k: _ba_template(
             ring := _open_at_ends(sh),
@@ -3898,6 +4018,7 @@ def build_layout(
             frame,
             PITCH * style.strand_scale,
             HELIX_W * style.helix_scale,
+            seen_as,
         )
         for k, (sh, row) in enumerate(zip(sheets, rowed))
         if row
@@ -3937,20 +4058,25 @@ def build_layout(
             [by_id[h] for h, at in sorted(on_sheet.items(), key=lambda x: by_id[x[0]].start) if at == k],
             HELIX_W * style.helix_scale,
             chain_ends,
+            seen_as,
         )
         for k, sh in enumerate(sheets)
     ]
-    items += [_bundle_item([by_id[k] for k in g], frame, angle_mode, HELIX_W * style.helix_scale) for g in bundles]
-    items += [_kink_item(g, frame, angle_mode, HELIX_W * style.helix_scale) for g in kinked]
+    helix_w = HELIX_W * style.helix_scale
+    items += [_bundle_item([by_id[k] for k in g], frame, angle_mode, helix_w, seen_as) for g in bundles]
+    items += [_kink_item(g, frame, angle_mode, helix_w, seen_as) for g in kinked]
     lying = {m.sse.id for it in items for m in it.members if m.over}  # over a sheet: on_sheet less any crowded out
     grouped = bundled | in_rows | {s.id for g in kinked for s in g} | lying
+    seen_as = seen_as or {}
     items += [
-        _helix_item(s, frame, angle_mode, HELIX_W * style.helix_scale)
+        _helix_item(s, frame, angle_mode, helix_w, angle=seen_as.get(s.id))
         for s in sses
         if s.kind == "H" and s.id not in grouped
     ]
     items += [
-        _helix_item(s, frame, angle_mode, HELIX_W * ETA_W * style.helix_scale, TEN_RISE) for s in sses if s.kind == "G"
+        _helix_item(s, frame, angle_mode, HELIX_W * ETA_W * style.helix_scale, TEN_RISE, angle=seen_as.get(s.id))
+        for s in sses
+        if s.kind == "G"
     ]
     contacts = dict(contacts or {})
     pieces = stem_pieces(nucleic) if nucleic is not None and nucleic.strands else []
@@ -3964,6 +4090,7 @@ def build_layout(
     if not items and not traces:
         return Layout({}, (0.0, 0.0, 0.0, 0.0))
     items.sort(key=lambda it: it.order)
+    held = _like_homes(items, like) if like is not None and mode == "projected" else {}
     members = {m.sse.id: m for it in items for m in it.members if isinstance(m, Placed) and not m.ghost}
     for chain, mine in group_by_chain(sses, keep=members).items():
         if chain not in (partial or ()):  # fragments of neighbours have no termini of their own
@@ -4062,6 +4189,8 @@ def build_layout(
                 joints=joints,
                 fixed=walls,
                 mirror=mirror if ties else None,
+                held=held,
+                held_k=_K_HOME * like.weight if like is not None else _K_LIKE,
             )
         if kept is not None and kept.any():  # transmembrane elements at their projected height, reaching a face
             for k in np.flatnonzero(kept).tolist():
@@ -4102,6 +4231,8 @@ def build_layout(
     real = {p.sse.id: p for p in placed}
     named = Layout(real, (0.0, 0.0, 0.0, 0.0), stems=dna, nucleic=nucleic if dna else None)
     named.ba_rows = _ba_rows(items)
+    if like is not None and like.label:  # the reference's labels for its mates (and B's extras named after them)
+        relabel = {**(relabel or {}), **like.label}
     if relabel:  # labels shared by copies, primes of lent elements: before any name
         _adjust(items, named, sses, relabel, [], [])
     if names is not None:  # conventional names (names.apply_names): before the user's own
@@ -4128,6 +4259,12 @@ def build_layout(
     )
     lay.na_traces = traces
     lay.frame = frame
+    lay.units = {
+        m.sse.id: (it.cx, it.cy, ox, oy)
+        for it in items
+        for m, (ox, oy) in zip(it.members, it.offsets)
+        if isinstance(m, Placed) and not m.ghost
+    }
     lay.copy_ties = copy_ties
     lay.tied_ids = tied_ids
     lay.kink_links = kink_links
