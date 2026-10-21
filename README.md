@@ -563,6 +563,13 @@ print the same measures for the two drawn independently, today's behaviour, for 
 judge (fewer than three mates, a pair refused) reads "not judged". The H1-H3 limits and the pull that holds a
 matched element at its reference place were set on a tuning set of 15 homologue pairs
 (`docs/validation/homologues/tuning.json`, `scripts/homologues.py`) and frozen before any held-out pair was drawn.
+Measured once on 40 held-out pairs drawn from CATH by a seeded script (`docs/validation/homologues/heldout.json`:
+20 of one topology at under 30 % identity or across superfamilies, 10 within a superfamily at 30-90 %, 10 negatives
+of one architecture), 16 of the 30 positives pass H1-H5 and 9 of the 10 negatives are refused (the tenth, whose
+reference is drawn as a DNA duplex, is not judged). Seven cross-superfamily pairs score under TM 0.5 and are refused;
+one close pair has a sheet carried mirrored, and others differ in strand pairing (`heldout-report.md`, `review.md`).
+Over the positives drawn alike, the mates' median deviation from the reference is 0.11 page units, against 1.89 for
+the two drawn independently.
 
 **Checking the contact beads.** `foldmap contacts 1LMB.cif` draws the figure `plot` would (it takes the same options),
 checks every contact bead against the deposited atoms with an independent search, and prints how many beads were

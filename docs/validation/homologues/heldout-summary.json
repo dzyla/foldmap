@@ -1,0 +1,163 @@
+{
+ "about": "Plan 13a held-out homologue pairs (docs/validation/homologues/heldout.json), measured once at c099787 on zyla-office (scripts/homologues.py run --jobs 20); written by the run's report as summary.json. The aligner against US-align was not measured (US-align not installed).",
+ "cath_release": "v4_3_0",
+ "limits": {
+  "like_place_median": 1.0,
+  "like_place_p90": 2.5,
+  "like_relations": 0.95,
+  "same_fold_fraction": 0.5,
+  "same_fold_tm": 0.5
+ },
+ "measured_at": "c099787",
+ "negatives": {
+  "h5_pass": 10,
+  "pairs": 10,
+  "refused": 9,
+  "results": 10
+ },
+ "positives": {
+  "all_pass": 16,
+  "h2_closer_alike": 22,
+  "h2_median_alike": 0.106,
+  "h2_median_independent": 1.887,
+  "h2_p90_alike": 0.7225,
+  "h2_p90_independent": 3.541,
+  "h3_share_alike": 1.0,
+  "h3_share_independent": 0.7118,
+  "judged_h2": 22,
+  "pairs": 30,
+  "pass": {
+   "H1": 23,
+   "H2": 17,
+   "H3": 17,
+   "H4": 23,
+   "H5": 30
+  },
+  "results": 30
+ },
+ "seed": 20261021,
+ "set": "docs/validation/homologues/heldout.json",
+ "strata": {
+  "close": {
+   "all_pass": 8,
+   "checks": {
+    "H1": {
+     "fail": 0,
+     "not judged": 0,
+     "pass": 10
+    },
+    "H2": {
+     "fail": 2,
+     "not judged": 0,
+     "pass": 8
+    },
+    "H3": {
+     "fail": 2,
+     "not judged": 0,
+     "pass": 8
+    },
+    "H4": {
+     "fail": 0,
+     "not judged": 0,
+     "pass": 10
+    },
+    "H5": {
+     "fail": 0,
+     "not judged": 0,
+     "pass": 10
+    }
+   },
+   "pairs": 10,
+   "results": 10,
+   "routes": {
+    "sequence": 10,
+    "structure": 0
+   },
+   "tm_range": [
+    0.6979,
+    0.9958
+   ]
+  },
+  "negative": {
+   "all_pass": 0,
+   "checks": {
+    "H1": {
+     "fail": 0,
+     "not judged": 1,
+     "pass": 9
+    },
+    "H2": {
+     "fail": 0,
+     "not judged": 10,
+     "pass": 0
+    },
+    "H3": {
+     "fail": 0,
+     "not judged": 10,
+     "pass": 0
+    },
+    "H4": {
+     "fail": 0,
+     "not judged": 10,
+     "pass": 0
+    },
+    "H5": {
+     "fail": 0,
+     "not judged": 0,
+     "pass": 10
+    }
+   },
+   "pairs": 10,
+   "results": 10,
+   "routes": {
+    "sequence": 0,
+    "structure": 9
+   },
+   "tm_range": [
+    0.1484,
+    0.3161
+   ]
+  },
+  "remote": {
+   "all_pass": 8,
+   "checks": {
+    "H1": {
+     "fail": 7,
+     "not judged": 0,
+     "pass": 13
+    },
+    "H2": {
+     "fail": 3,
+     "not judged": 8,
+     "pass": 9
+    },
+    "H3": {
+     "fail": 3,
+     "not judged": 8,
+     "pass": 9
+    },
+    "H4": {
+     "fail": 0,
+     "not judged": 7,
+     "pass": 13
+    },
+    "H5": {
+     "fail": 0,
+     "not judged": 0,
+     "pass": 20
+    }
+   },
+   "pairs": 20,
+   "results": 20,
+   "routes": {
+    "sequence": 0,
+    "structure": 20
+   },
+   "tm_range": [
+    0.2233,
+    0.8867
+   ]
+  }
+ },
+ "usalign": null
+}
