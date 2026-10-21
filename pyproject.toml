@@ -59,7 +59,10 @@ version = { attr = "foldmap.__version__" }
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-markers = ["slow: takes tens of seconds (deselect with -m 'not slow')"]
+markers = [
+    "slow: takes tens of seconds (deselect with -m 'not slow')",
+    "browser: drives the interactive page in Chromium via Playwright (skips when either is missing)",
+]
 
 [tool.ruff]
 line-length = 120

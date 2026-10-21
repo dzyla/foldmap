@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import html
 import json
+import re
 from pathlib import Path
 
 import gemmi
@@ -36,6 +37,21 @@ SRI = {
 }
 VIEWERS = ("molstar", "3dmol")
 _LOOP_GREY = "#9aa3ad"
+# The page's click targets (Q-N3): along each nucleic-acid run and stem, and each protein loop, an invisible stroke
+# HIT_PX screen pixels wide at any zoom (vector-effect: non-scaling-stroke), so a click up to HIT_PX / 2 px from the
+# drawn line's centre selects it; a backbone drawn wider than that (na_line, zoomed in) is its own target. 8, not 6:
+# a 6 px stroke ends exactly 3 px from the centre, where a click 3 px off the line would fall on its edge.
+HIT_PX = 8
+# the stroked parts of a run (na:run:K) and of a stem (na:stem:K:rails, :rung(s), :back, :front, :block, :N for a
+# second colour), each a group whose first child is the path matplotlib drew; a stem's texts (:first) are not ink
+_NA_INK = re.compile(
+    r'<g id="na:(?:(run):(\d+)|(stem):(\d+):(?:rails|rungs?|back|front|block)(?::\d+)?)">\s*'
+    r'<path d="([^"]*)"(?: clip-path="([^"]*)")?'
+)
+_LOOP_INK = re.compile(r'<g id="loop:([^"]+)">\s*<path d="([^"]*)"(?: clip-path="([^"]*)")?')  # a loop's whole line
+# the first group drawn at loop level or above (loops and their casings, nucleic-acid ink): the targets go just
+# under it, above the panels, plates and membrane band (which would hide them) and under every line a reader clicks
+_LOOP_LEVEL = re.compile(r'<g id="(?:loopcase:|loop:|loop-seg:|loop-arrow:|na:)')
 
 # DOM-free helpers: unit-tested under node (tests/test_interactive.py)
 _LIB = r"""
@@ -53,7 +69,8 @@ _LIB = r"""
         default: return 'residue:' + item.k;
       }
     },
-    nucleicKey(id) {  // na:stem:3, na:stem:3:rails, na:label:3 -> 'stem:3'; na:run:5 -> 'run:5'; anything else -> null
+    nucleicKey(id) {  // na:stem:3, na:stem:3:rails, na:stem:3:hit, na:label:3 -> 'stem:3'; na:run:5, na:run:5:hit
+      // (the page's wide click target) -> 'run:5'; anything else -> null
       const m = /^na:(stem|label|run):(\d+)(?::|$)/.exec(id || '');
       return m ? (m[1] === 'run' ? 'run:' : 'stem:') + m[2] : null;
     },
@@ -190,8 +207,8 @@ _APP = r"""
     const m = node.id.match(/^(strand|helix|helix-back|eta|label|ghost|ghostlabel|resnum):(.+?)(:[NC])?$/);
     if (m) (parts[m[2]] = parts[m[2]] || []).push(node);
   });
-  svg.querySelectorAll('[id^="loop:"], [id^="loop-arrow:"]').forEach(node => {
-    const [a, b] = node.id.split(':').slice(1).join(':').split('>');
+  svg.querySelectorAll('[id^="loop:"], [id^="loop-arrow:"]').forEach(node => {  // a loop's click target (:hit) too
+    const [a, b] = node.id.replace(/:hit$/, '').split(':').slice(1).join(':').split('>');
     const key = 'loop ' + a + '>' + b;
     (parts[key] = parts[key] || []).push(node);
   });
@@ -515,7 +532,7 @@ _APP = r"""
       const m = n.id.match(/^(strand|helix|helix-back|eta|label|ghost|resnum):(.+?)(:[NC])?$/);
       if (m && idx.byElement[m[2]]) return { type: 'element', id: m[2] };
       if (n.id.startsWith('loop:') || n.id.startsWith('loop-seg:')) {
-        const body = n.id.startsWith('loop:') ? n.id.slice(5) : n.id.slice(9).replace(/:\d+$/, '');
+        const body = n.id.startsWith('loop:') ? n.id.slice(5).replace(/:hit$/, '') : n.id.slice(9).replace(/:\d+$/, '');
         const [a, b] = body.split('>'), s = lib.loopSpan(data, a, b);
         if (s && s[1] >= s[0]) return { type: 'loop', a, b };
       }
@@ -818,6 +835,40 @@ def _hbonds(fig) -> list:
     return out
 
 
+def _hit_targets(svg: str) -> str:
+    """The page's copy of the figure with click targets: an invisible path HIT_PX screen pixels wide along the drawn
+    lines of each nucleic-acid run and stem (na:run:K:hit, na:stem:K:hit; one per run and per stem, a stem's rails,
+    rungs and body together) and of each protein loop (loop:<name>:hit). All sit under the loops and the
+    nucleic-acid ink, so a click on anything drawn selects that thing; the loops' targets lie over the nucleic
+    acid's, so a click a few pixels off a loop that runs beside a strand still selects the loop. The static figure
+    (save_svg) has none."""
+    lines: dict[str, list[str]] = {}
+    clips: dict[str, str | None] = {}
+
+    def add(key, d, clip):
+        lines.setdefault(key, []).append(d.strip())
+        clips.setdefault(key, clip)
+
+    for m in _NA_INK.finditer(svg):
+        add(f"na:{m[1] or m[3]}:{m[2] or m[4]}:hit", m[5], m[6])
+    for m in _LOOP_INK.finditer(svg):
+        add(f"loop:{m[1]}:hit", m[2], m[3])
+    under = _LOOP_LEVEL.search(svg)
+    if not lines or under is None:
+        return svg
+    style = (
+        f"fill: none; stroke: transparent; stroke-width: {HIT_PX}px; stroke-linecap: round; stroke-linejoin: round; "
+        "vector-effect: non-scaling-stroke; pointer-events: stroke"
+    )
+    hits = "".join(
+        f'<path id="{key}" d="{" ".join(d)}"'
+        + (f' clip-path="{clips[key]}"' if clips[key] else "")
+        + f' style="{style}"/>\n   '
+        for key, d in lines.items()
+    )
+    return svg[: under.start()] + hits + svg[under.start() :]
+
+
 def _viewer_head(viewer: str) -> str:
     def script(url: str) -> str:
         return f'<script src="{url}" integrity="{SRI[url]}" crossorigin="anonymous"></script>'
@@ -856,7 +907,7 @@ def build_page(
     layout, sses, bb = make_layout(path, mode, look=look, model=model, **layout_options)
     loops = route_loops(layout, sses, bb)
     fig = draw(layout, loops, sses, title, model=model, look=look)
-    svg = save_svg(fig)
+    svg = _hit_targets(save_svg(fig))
     if provenance_out is not None:
         provenance_out.extend(dict(i) for i in getattr(fig, "foldmap_provenance", []))
     colours, _ = element_colours(layout, sses, look)

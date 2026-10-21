@@ -316,3 +316,45 @@ def test_sri_hashes_match_the_cdn():
         with urllib.request.urlopen(url, timeout=60) as r:
             digest = base64.b64encode(hashlib.sha384(r.read()).digest()).decode()
         assert expected == f"sha384-{digest}", url
+
+
+def _page_svg(page: str) -> str:
+    return page[page.index("<svg") : page.index("</svg>") + len("</svg>")]
+
+
+_HIT = re.compile(r'<path id="((?:na:(?:run|stem):\d+|loop:[^"]+):hit)" d="([^"]+)"[^>]*style="([^"]+)"/>\n   ')
+
+
+@pytest.mark.parametrize("name", ["1LMB", "1ZAA", "1UBQ"])
+def test_page_has_one_click_target_per_nucleic_run_stem_and_loop(name):
+    # Q-N3: on the page an invisible stroke, HIT_PX screen pixels wide at any zoom, lies along each nucleic-acid run
+    # and stem (na:run:K:hit, na:stem:K:hit) and each protein loop (loop:<name>:hit), the loops' over the nucleic
+    # acid's, all under the loops and the nucleic-acid ink; the static figure has none
+    from foldmap.cli import make_figure
+    from foldmap.interactive import HIT_PX
+    from foldmap.render import save_svg
+
+    svg = _page_svg(build_page(DATA / f"{name}.cif"))
+    runs = {f"na:run:{k}" for k in re.findall(r'<g id="na:run:(\d+)">', svg)}
+    stems = {f"na:stem:{k}" for k in re.findall(r'<g id="na:stem:(\d+):(?:rails|rungs?|back|front|block)', svg)}
+    loops = {f"loop:{k}" for k in re.findall(r'<g id="loop:([^"]+)">', svg)}
+    hits = {m[1]: m for m in _HIT.finditer(svg)}
+    assert len(hits) == len(_HIT.findall(svg)) and loops
+    assert bool(runs and stems) == (name != "1UBQ")
+    assert set(hits) == {f"{k}:hit" for k in runs | stems | loops}
+    for m in hits.values():
+        assert m[2].strip().startswith("M")
+        rules = ("stroke: transparent", f"stroke-width: {HIT_PX}px", "pointer-events: stroke", "non-scaling-stroke")
+        assert all(rule in m[3] for rule in rules)
+    order = [m.start() for m in _HIT.finditer(svg)]
+    assert max(order) < min(svg.index(f'<g id="{p}') for p in ("loopcase:", "loop:", "na:") if f'<g id="{p}' in svg)
+    na = [hits[f"{k}:hit"].start() for k in runs | stems]
+    assert not na or max(na) < min(hits[f"{k}:hit"].start() for k in loops)
+    # a target follows its own line
+    for key in list(runs)[:1] + list(loops)[:1]:
+        line = re.search(rf'<g id="{re.escape(key)}">\s*<path d="([^"]+)"', svg).group(1)
+        assert hits[f"{key}:hit"][2] == line.strip()
+    # the static figure gains nothing: the page's copy is save_svg's output plus the targets
+    static = save_svg(make_figure(DATA / f"{name}.cif"))
+    assert ":hit" not in static
+    assert _HIT.sub("", svg) == static.rstrip()

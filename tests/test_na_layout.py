@@ -1646,14 +1646,15 @@ def test_explorer_maps_stem_artists_to_their_stem(tmp_path):
         _LIB
         + """
 const lib = globalThis.TopoLib;
-console.log(JSON.stringify(['na:stem:3', 'na:stem:3:rails', 'na:label:3', 'na:run:5', 'na:nt:A:12', 'helix:A:1-9']
-  .map(lib.nucleicKey)));
+console.log(JSON.stringify(['na:stem:3', 'na:stem:3:rails', 'na:label:3', 'na:run:5', 'na:nt:A:12', 'helix:A:1-9',
+                            'na:run:5:hit', 'na:stem:3:hit', 'na:run:12:hit'].map(lib.nucleicKey)));
 """,
         encoding="utf-8",
     )
     res = subprocess.run([node, str(probe)], capture_output=True, text=True)
     assert res.returncode == 0, res.stderr
-    assert json.loads(res.stdout) == ["stem:3", "stem:3", "stem:3", "run:5", None, None]
+    # the page's wide click targets (na:run:K:hit, na:stem:K:hit) select their run or stem
+    assert json.loads(res.stdout) == ["stem:3", "stem:3", "stem:3", "run:5", None, None, "run:5", "stem:3", "run:12"]
 
 
 def test_explorer_page_of_a_nucleic_acid_only_file_has_no_contact_map():
@@ -1783,6 +1784,12 @@ setTimeout(async () => {
     ['map shift-click another', () => map().click(cell(b, true))],
     ['map shift-click it again', () => map().click(cell(b, true))],
   );
+  // clicks on the page's invisible click targets of a nucleic-acid run and stem (na:run:K:hit, na:stem:K:hit)
+  const target = id => ({ id, parentNode: figure });
+  (job.hits || []).forEach(id => steps.push(
+    ['hover ' + id, () => listeners.svg.mouseover({ target: target(id) })],
+    ['click ' + id, () => listeners.svg.click({ target: target(id), shiftKey: false })],
+  ));
   for (const [op, act] of steps) {
     calls.length = 0;
     let error = null;
@@ -1823,6 +1830,7 @@ def _drive(tmp_path, pdb, viewer, cases):
         "atom": atom,
         "n": len(data["ca"]),
         "cells": _map_cells(data) if clicks else [],
+        "hits": _hit_targets(data),
     }
     (tmp_path / "job.json").write_text(json.dumps(job), encoding="utf-8")
     (tmp_path / "harness.js").write_text(_HARNESS, encoding="utf-8")
@@ -1851,6 +1859,11 @@ def _map_cells(data):
         if not r.get("e") and _nearest_element(data, k) not in (None, first["id"], second["id"])
     )
     return [[first["start"], loop], [second["start"], second["start"]]]
+
+
+def _hit_targets(data):  # the click-target ids of the first run and the first stem the page lists
+    keys = [x["key"] for x in data["links"]["nucleics"]]
+    return [f"na:{k}:hit" for k in [next((k for k in keys if k.startswith(p)), None) for p in ("run:", "stem:")] if k]
 
 
 def _stem_with_contacts(data):
@@ -1937,6 +1950,25 @@ def test_explorer_figure_click_takes_the_3d_camera_to_the_selection(tmp_path, vi
     assert cam == [], r
     if viewer == "molstar":
         assert r["selection"] == one
+
+
+@pytest.mark.skipif(node is None, reason="node is not installed; the explorer's viewer code cannot be exercised")
+@pytest.mark.parametrize("viewer", ["3dmol", "molstar"])
+def test_explorer_click_target_of_a_run_or_stem_selects_it(tmp_path, viewer):
+    # Q-N3: the page's invisible click target along a run or stem (na:run:K:hit, na:stem:K:hit) hovers and selects
+    # that run or stem, lights its nucleotides in 3D and takes the camera to it, as a click on its drawn line does
+    data, got = _drive(tmp_path, "1IHF", viewer, lambda data: [])
+    hits = _hit_targets(data)
+    assert [h.split(":")[1] for h in hits] == ["run", "stem"]
+    nucleics = {x["key"]: x for x in data["links"]["nucleics"]}
+    for hit in hits:
+        key = hit[len("na:") : -len(":hit")]
+        hover, click = got[("click", "hover " + hit)], got[("click", "click " + hit)]
+        assert hover["error"] is None and click["error"] is None, (hover, click)
+        assert click["selection"] == [f"nucleic:{key}"]
+        assert click["info"].startswith(nucleics[key]["text"])
+        moved = [c for c in click["calls"] if c[0] in ("zoomTo", "focusLoci")]
+        assert len(moved) == 1, click
 
 
 @pytest.mark.skipif(node is None, reason="node is not installed; the explorer's viewer code cannot be exercised")

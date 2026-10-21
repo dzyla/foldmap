@@ -140,6 +140,7 @@ side.
 | --- | --- |
 | Hover an element, loop, map cell or residue in 3D | preview: the same residues light up in all three views |
 | Click | select it (stays lit); a click in the figure also brings the 3D view to it, a click in 3D keeps the camera |
+| Click within 4 px of a loop or a DNA/RNA strand or stem | select it, at any zoom (where a loop runs beside a strand, the loop) |
 | Click a map cell | select the whole helix or strand of each of its two residues (for a loop residue, the nearest one along its chain) and bring the 3D view to them |
 | Click it again, click empty paper, or press Esc | clear the selection |
 | Shift-click | add to (or remove from) the selection |
