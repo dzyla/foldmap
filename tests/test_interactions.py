@@ -21,6 +21,7 @@ from foldmap.interactions import (
     Interaction,
     find_cation_pi,
     find_salt_bridges,
+    sort_key,
 )
 from foldmap.io import read_model
 
@@ -49,7 +50,16 @@ def _atoms(model):
 
 
 def _sort_key(x):
-    return (x.a, x.b, x.kind)
+    """a, then b, each (chain, residue number as a number, insertion code, atom), then kind."""
+
+    def partner(p):
+        digits = p[1].rstrip("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz")
+        return (p[0], int(digits), p[1][len(digits) :], p[2])
+
+    return (partner(x.a), partner(x.b), x.kind)
+
+
+_UP, _DOWN = math.nextafter(4.0, 5.0), math.nextafter(4.0, 3.0)
 
 
 # λ repressor (chains 3 and 4) on its operator (DNA chains 1 and 2): lysines on the backbone phosphates, in both
@@ -124,13 +134,26 @@ def _model_of(*residues):
     return model
 
 
-@pytest.mark.parametrize("dist, count", [(3.9, 1), (4.0, 1), (4.1, 0)])
-def test_a_salt_bridge_is_within_4_angstroms(dist, count):
+@pytest.mark.parametrize(
+    "dist, count",
+    [
+        (3.9, 1),
+        (4.0, 1),
+        (math.nextafter(4.0, 5.0), 1),
+        (math.nextafter(4.0, 3.0), 1),
+        (4.0004, 1),
+        (4.0006, 0),
+        (4.1, 0),
+    ],
+)
+def test_a_salt_bridge_is_within_4_angstroms_on_the_grid(dist, count):
+    """Distances are snapped to 1e-3 Å before the limit sees them: 1 ulp either side of 4.0 is 4.0, and so is
+    4.0004; 4.0006 is 4.001."""
     model = _model_of(("A", 1, "LYS", {"NZ": (0, 0, 0)}), ("B", 1, "ASP", {"OD1": (dist, 0, 0)}))
     found = find_salt_bridges(model, "interchain")
     assert len(found) == count
     if count:
-        assert found == [Interaction("salt", ("A", "1", "NZ"), ("B", "1", "OD1"), dist, None)]
+        assert found == [Interaction("salt", ("A", "1", "NZ"), ("B", "1", "OD1"), round(dist, 3), None)]
 
 
 def test_the_cation_is_a_whatever_the_model_order():
@@ -198,7 +221,18 @@ def _benzene(radius=1.39):
     }
 
 
-@pytest.mark.parametrize("offset, count", [(1.9, 1), (2.1, 0)])
+_EDGE_OFFSETS = [
+    (1.9, 1),
+    (2.0, 1),
+    (math.nextafter(2.0, 3.0), 1),
+    (math.nextafter(2.0, 1.0), 1),
+    (2.0004, 1),
+    (2.0006, 0),
+    (2.1, 0),
+]
+
+
+@pytest.mark.parametrize("offset, count", _EDGE_OFFSETS)
 def test_cation_pi_needs_the_cation_over_the_ring(offset, count):
     model = _model_of(("A", 1, "PHE", _benzene()), ("B", 1, "LYS", {"NZ": (offset, 0.0, 3.6)}))
     found = find_cation_pi(model, "interchain")
@@ -210,13 +244,34 @@ def test_cation_pi_needs_the_cation_over_the_ring(offset, count):
         assert x.angle == pytest.approx(math.degrees(math.atan2(offset, 3.6)), abs=1e-3)
 
 
-@pytest.mark.parametrize("height, count", [(5.9, 1), (6.1, 0)])
+_EDGE_HEIGHTS = [
+    (5.9, 1),
+    (6.0, 1),
+    (math.nextafter(6.0, 7.0), 1),
+    (math.nextafter(6.0, 5.0), 1),
+    (6.0004, 1),
+    (6.0006, 0),
+    (6.1, 0),
+]
+
+
+@pytest.mark.parametrize("height, count", _EDGE_HEIGHTS)
 def test_cation_pi_is_within_6_angstroms(height, count):
     model = _model_of(("A", 1, "PHE", _benzene()), ("B", 1, "LYS", {"NZ": (0.0, 0.0, -height)}))
     found = find_cation_pi(model, "interchain")
     assert len(found) == count
     if count:
-        assert found[0].distance == pytest.approx(height, abs=1e-3) and found[0].angle == pytest.approx(0.0, abs=1e-3)
+        assert found[0].distance == round(height, 3) and found[0].angle == 0.0
+
+
+def test_a_contact_at_the_limits_reports_the_limits():
+    """Offset exactly 2.0 Å with the cation 6.0 Å from the centroid: both on their limits, both kept, and the
+    reported distance and angle are on the 1e-3 grid."""
+    height = math.sqrt(6.0**2 - 2.0**2)
+    model = _model_of(("A", 1, "PHE", _benzene()), ("B", 1, "LYS", {"NZ": (2.0, 0.0, height)}))
+    [x] = find_cation_pi(model, "interchain")
+    assert x.distance == 6.0
+    assert x.angle == round(math.degrees(math.asin(2.0 / 6.0)), 3)
 
 
 def test_the_limits_are_the_stated_ones():
@@ -268,6 +323,20 @@ def test_the_lambda_cation_pi_contacts_meet_the_rule():
         assert offset <= CATION_PI_OFFSET + 1e-3
         if x.a[2] == "NZ":
             assert atoms[x.a][0] == "LYS"
+
+
+def test_residue_numbers_sort_as_numbers():
+    model = _model_of(
+        ("A", 19, "LYS", {"NZ": (0, 0, 0)}),
+        ("A", 5, "LYS", {"NZ": (20, 0, 0)}),
+        ("B", 1, "ASP", {"OD1": (3.0, 0, 0)}),
+        ("B", 2, "ASP", {"OD1": (23.0, 0, 0)}),
+    )
+    found = find_salt_bridges(model, "interchain")
+    assert [x.a[1] for x in found] == ["5", "19"]
+    tags = ["100A", "-7", "19", "100", "5", "101"]
+    keys = sorted(tags, key=lambda t: sort_key(Interaction("salt", ("A", t, "NZ"), ("B", "1", "OD1"), 3.0, None)))
+    assert keys == ["-7", "5", "19", "100", "100A", "101"]
 
 
 def test_output_is_sorted_by_a_then_b_then_kind():

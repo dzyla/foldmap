@@ -29,12 +29,18 @@ reported is between the ring normal and the centroid-cation line (0° straight a
 
 Each Interaction names its partners as (chain, residue tag, atom): the residue tag as `ResLabel.tag` (number and
 insertion code), the atom its name, "centre" for the Arg guanidinium centre, "ring:6" or "ring:5" for a ring (its
-size; one ring of each size per residue). `a` is the cationic partner. Output is sorted by (a, b, kind); distances
-and angles are rounded to 1e-3.
+size; one ring of each size per residue). `a` is the cationic partner. Output is sorted by `sort_key`: a, then b,
+each by chain, residue number, insertion code and atom, then kind.
+
+Every measured quantity (distance, offset, angle) is snapped to a 1e-3 grid (Å or degrees) before it meets a limit,
+and the limits sit on that grid, so a contact at a limit is judged the same on every CPU: the last bits a BLAS kernel
+or a SIMD sum leaves in a centroid or a ring normal never decide it (A12/A13). The reported values are the snapped
+ones, so a value shown at the limit always passed it.
 """
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from typing import NamedTuple
 
@@ -50,6 +56,8 @@ SALT_MAX = 4.0  # Å, anionic O to cationic N
 CATION_PI_MAX = 6.0  # Å, cation to ring centroid
 CATION_PI_OFFSET = 2.0  # Å, ring centroid to the cation's projection on the ring plane
 HIS_NOTE = "His if protonated"
+_GRID = 1e3  # measured values are snapped to 1/_GRID (Å, degrees) before any limit sees them
+_REACH = 0.5 / _GRID  # a tree search reaches this far past a limit, so a value that snaps onto it is not lost
 
 _ANION_SIDE = {"ASP": ("OD1", "OD2"), "GLU": ("OE1", "OE2")}
 _CATION_SIDE = {"LYS": ("NZ",), "ARG": ("NE", "NH1", "NH2"), "HIS": ("ND1", "NE2")}
@@ -157,8 +165,28 @@ def _key(res: _Residue, atom: str) -> tuple[str, str, str]:
     return (res.label.chain, res.label.tag, atom)
 
 
+def _snap(v: float) -> float:
+    """v on the 1/_GRID grid; never -0.0 (as layout._snap)."""
+    return float(np.round(float(v) * _GRID) / _GRID) + 0.0
+
+
+_TAG = re.compile(r"(-?\d+)(.*)")
+
+
+def _partner_key(p: tuple[str, str, str]) -> tuple[str, int, str, str]:
+    """(chain, residue number, insertion code, atom): residue numbers compare as numbers, so 5 comes before 19."""
+    chain, tag, atom = p
+    m = _TAG.fullmatch(tag)
+    return (chain, int(m.group(1)), m.group(2), atom) if m else (chain, 0, tag, atom)
+
+
+def sort_key(x: Interaction) -> tuple:
+    """The order of found interactions: a, then b (each by chain, residue number, insertion code, atom), then kind."""
+    return (_partner_key(x.a), _partner_key(x.b), x.kind)
+
+
 def _sorted(found: list[Interaction]) -> list[Interaction]:
-    return sorted(found, key=lambda x: (x.a, x.b, x.kind))
+    return sorted(found, key=sort_key)
 
 
 def _charged(residues: list[_Residue]) -> list[tuple[list[float], int, int, str]]:
@@ -185,7 +213,7 @@ def _charged(residues: list[_Residue]) -> list[tuple[list[float], int, int, str]
 def find_salt_bridges(model, select) -> list[Interaction]:
     """The salt bridges of `model` (a gemmi Model, or what io.read_model returns) between the partners `select`
     names (a hbonds Selection or its text): every cationic N - anionic O atom pair within SALT_MAX, the cation as
-    `a`, sorted by (a, b, kind)."""
+    `a`, sorted by `sort_key`."""
     sel, residues, names = _residues(model, select)
     rows = _charged(residues)
     if len(rows) < 2:
@@ -193,7 +221,7 @@ def find_salt_bridges(model, select) -> list[Interaction]:
     xyz = np.array([x[0] for x in rows], float)
     sign = np.array([x[1] for x in rows], int)
     owner = np.array([x[2] for x in rows], int)
-    ij = cKDTree(xyz).query_pairs(SALT_MAX, output_type="ndarray")
+    ij = cKDTree(xyz).query_pairs(SALT_MAX + _REACH, output_type="ndarray")
     if not len(ij):
         return []
     i, j = ij[:, 0], ij[:, 1]
@@ -202,16 +230,12 @@ def find_salt_bridges(model, select) -> list[Interaction]:
     cation, anion = np.where(sign[i] > 0, i, j), np.where(sign[i] > 0, j, i)
     dist = np.linalg.norm(xyz[cation] - xyz[anion], axis=1)
     out = []
-    for c, a, d in zip(cation, anion, dist):
+    for c, a, d in zip(cation, anion, map(_snap, dist)):
         if d > SALT_MAX:
             continue
         res = residues[owner[c]]
         note = HIS_NOTE if res.label.name == "HIS" and rows[c][3] != "N" else ""
-        out.append(
-            Interaction(
-                "salt", _key(res, rows[c][3]), _key(residues[owner[a]], rows[a][3]), round(float(d), 3), None, note
-            )
-        )
+        out.append(Interaction("salt", _key(res, rows[c][3]), _key(residues[owner[a]], rows[a][3]), d, None, note))
     return _sorted(out)
 
 
@@ -250,14 +274,14 @@ def _cations(residues: list[_Residue]) -> list[tuple[np.ndarray, int, str]]:
 def find_cation_pi(model, select) -> list[Interaction]:
     """The cation-π interactions of `model` between the partners `select` names: Lys NZ or the Arg guanidinium
     centre (`a`) within CATION_PI_MAX of a ring centroid (`b`) and at most CATION_PI_OFFSET off the ring's axis;
-    angle: between the ring normal and the centroid-cation line. Sorted by (a, b, kind)."""
+    angle: between the ring normal and the centroid-cation line. Sorted by `sort_key`."""
     sel, residues, names = _residues(model, select)
     rings, cations = _rings(residues), _cations(residues)
     if not rings or not cations:
         return []
     centres = np.array([x[0] for x in rings], float)
     tree = cKDTree(centres)
-    near = tree.query_ball_point(np.array([x[0] for x in cations], float), CATION_PI_MAX, return_sorted=True)
+    near = tree.query_ball_point(np.array([x[0] for x in cations], float), CATION_PI_MAX + _REACH, return_sorted=True)
     pairs = np.array([(c, k) for c, ks in enumerate(near) for k in ks], int).reshape(-1, 2)
     if not len(pairs):
         return []
@@ -269,13 +293,11 @@ def find_cation_pi(model, select) -> list[Interaction]:
         xyz, r, atom = cations[c]
         centre, normal, q, ring = rings[k]
         v = xyz - centre
-        d = float(np.linalg.norm(v))
+        length = float(np.linalg.norm(v))
         height = float(np.dot(v, normal))
-        offset = float(np.linalg.norm(v - height * normal))
+        d, offset = _snap(length), _snap(np.linalg.norm(v - height * normal))
         if d == 0.0 or d > CATION_PI_MAX or offset > CATION_PI_OFFSET:
             continue
-        angle = float(np.degrees(np.arccos(min(1.0, abs(height) / d))))
-        out.append(
-            Interaction("cation-pi", _key(residues[r], atom), _key(residues[q], ring), round(d, 3), round(angle, 3))
-        )
+        angle = _snap(np.degrees(np.arccos(min(1.0, abs(height) / length))))
+        out.append(Interaction("cation-pi", _key(residues[r], atom), _key(residues[q], ring), d, angle))
     return _sorted(out)
