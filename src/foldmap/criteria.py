@@ -14,7 +14,10 @@ all its views, each drawn in a process of its own; `foldmap check` judges the on
   as a word. An entry passes when no criterion fails: nothing to judge is never counted as a pass (final review B,
   Important 3).
 - check_figure, criteria_lines: one figure's criteria as `foldmap check` prints them; the criteria one figure in one
-  process cannot give are named not measured here, with the reason (NOT_HERE), never passed."""
+  process cannot give are named not measured here, with the reason (NOT_HERE), never passed.
+- like_checks, like_lines: H1-H5 of a structure drawn like a reference (plan 13a, `foldmap check B --like A`), with
+  H2's and H3's baseline between the two drawn independently; their limits are provisional (PROVISIONAL) until the
+  homologue tuning set freezes them."""
 
 from __future__ import annotations
 
@@ -39,7 +42,13 @@ LIMITS = {
     # units plus 1e-3 (figcheck.stem_gap_tolerance; plan 10 Task 4 fix round 2 ruling), measured per figure
     "stem_name_gap": "figcheck.stem_gap_tolerance(layout._INK_MARGIN em)",
     "tether_length": 6.5,  # A20: page units, a ligand tether from its mark to another chain than its home
+    # H2, H3 (plan 13a, a figure drawn like a reference): PROVISIONAL, the spec's proposed starting limits (spec 4.5),
+    # set on the homologue tuning set and frozen in a commit of their own (Task 13a-10) before any held-out pair
+    "like_place_median": 1.0,  # H2: median centre deviation of mates after the best rigid 2D motion, page units
+    "like_place_p90": 2.5,  # H2: ... its 90th percentile
+    "like_relations": 0.95,  # H3: share of mate pairs whose page dx, dy signs agree
 }
+PROVISIONAL = ("like_place_median", "like_place_p90", "like_relations")  # until Task 13a-10 freezes them
 DOCUMENTED_WARNINGS: tuple[str, ...] = ()  # Python warnings a view may print (regexes); none at the start
 FIGURE_VIEWS = ("default", "deposited", "beta", "focus", "domains", "membrane")
 LABEL_VIEWS = ("default", "deposited", "beta", "focus")
@@ -594,6 +603,343 @@ def same_name(a: str, b: str, before_a: list[str], before_b: list[str]) -> bool:
         return sum(1 for x in before if (m := _NUMBERED.fullmatch(x)) and m[1] == kind)
 
     return int(ma[2]) - shift(before_a, ma[1]) == int(mb[2]) - shift(before_b, mb[1])
+
+
+# ---------------------------------------------------------------------------- drawn like a reference: H1-H5
+
+LIKE_CHECKS = {  # plan 13a, spec 4.5: a structure B drawn like a reference A (--like); `foldmap check B --like A`
+    "H1": "drawn alike exactly when one fold",
+    "H2": "mates in the same places",
+    "H3": "the map reads the same way",
+    "H4": "mates carry one name",
+    "H5": "still a good figure",
+}
+LIKE_MIN_MATES = 3  # H2, H3: judged on this many mates drawn at least (as figcheck.COPY_MIN_MATCHED: 2 always fit)
+LIKE_APART = 1.0  # H3: two mates more than this many page units apart, in both figures, are compared ...
+LIKE_AXIS = 0.5  # ... on each page axis that parts them by more than this in both figures
+PAIRING_NAMED = "pairing"  # H3: a mated sheet's strands may stand in another order when the note names a pairing
+
+
+def like_pairs(lay_a, lay_b, mates) -> list[tuple[str, str, tuple[str, ...]]]:
+    """(A element id, B element id, B's parts) of every mate (Mates.mate: one to one) both layouts drew, not as a
+    ghost, in A's order. B's parts: the mate and the pieces of it (Mates.pieces: a helix B splits where A does not)
+    drawn, in sequence: like.like_from lays them end to end along the mate and names the first A's name."""
+    pa, pb = lay_a.placed, lay_b.placed
+
+    def drawn(placed, k):
+        return k in placed and not placed[k].ghost
+
+    parts: dict[str, list[str]] = {}
+    for b, a in [*mates.mate.items(), *mates.pieces.items()]:
+        if drawn(pb, b):
+            parts.setdefault(a, []).append(b)
+    found = [
+        (a, b, tuple(sorted(parts[a], key=lambda k: (pb[k].sse.start, k))))
+        for b, a in mates.mate.items()
+        if drawn(pa, a) and drawn(pb, b)
+    ]
+    return sorted(found, key=lambda x: (pa[x[0]].sse.start, x[0]))
+
+
+def _centres(lay, ids) -> np.ndarray:
+    return np.array([(lay.placed[k].cx, lay.placed[k].cy) for k in ids], float).reshape(-1, 2)
+
+
+def _part_centres(lay, pairs) -> np.ndarray:
+    """Each mate's centre on B's page (like_pairs' pairs): its own, or for a helix drawn in parts the middle of their
+    run, from its first end to its last along the mate's axis (like.like_from centres the run on A's helix)."""
+    out = []
+    for _, b, parts in pairs:
+        if len(parts) < 2:
+            out.append((lay.placed[b].cx, lay.placed[b].cy))
+            continue
+        ends = np.array([e for k in parts for e in (lay.placed[k].n_port, lay.placed[k].c_port)], float)
+        along = ends @ lay.placed[b].direction
+        out.append(tuple((ends[int(np.argmin(along))] + ends[int(np.argmax(along))]) / 2))
+    return np.array(out, float).reshape(-1, 2)
+
+
+def _name(lay, k: str) -> str:
+    return lay.placed[k].label or k
+
+
+def _independently(baseline: dict | None) -> str:
+    """The baseline (A and B drawn independently) as H2's or H3's detail ends with it; '' when there is none."""
+    if baseline is None:
+        return ""
+    if "median" in baseline:
+        return f"; drawn independently: median {baseline['median']:.3f}, 90th percentile {baseline['p90']:.3f}"
+    return f"; drawn independently: {baseline['share']:.4f} of {baseline['pairs']} pairs"
+
+
+def _too_few(pairs) -> dict | None:
+    if len(pairs) < LIKE_MIN_MATES:
+        return _not_judged(f"{len(pairs)} mate{'' if len(pairs) == 1 else 's'} drawn, fewer than {LIKE_MIN_MATES}")
+    return None
+
+
+def place_deviation(lay_a, lay_b, pairs) -> dict | None:
+    """H2's measure: the median and 90th percentile (numpy's linear interpolation) of the mates' centre deviations
+    after the best rigid 2D motion of B's centres (_part_centres) onto A's (figcheck.fit_deviations, A15's
+    Procrustes: a turn and a shift, no mirror), rounded to 1e-3 page units, and the farthest mate; None under
+    LIKE_MIN_MATES mates."""
+    from .figcheck import fit_deviations
+
+    if len(pairs) < LIKE_MIN_MATES:
+        return None
+    dev = fit_deviations(_centres(lay_a, [a for a, *_ in pairs]), _part_centres(lay_b, pairs))
+    far = int(np.argmax(dev))
+    a, b, _ = pairs[far]
+    return {
+        "median": round(float(np.median(dev)), 3),
+        "p90": round(float(np.percentile(dev, 90)), 3),
+        "mates": len(pairs),
+        "farthest": f"{_name(lay_b, b)}~{_name(lay_a, a)} {float(dev[far]):.3f}",
+    }
+
+
+def h2_places(lay_a, lay_b, pairs, baseline: dict | None = None) -> dict:
+    """H2: matched elements sit in the same places (place_deviation within LIMITS' like_place_median and
+    like_place_p90, provisional). `baseline`: the same measure between A and B drawn independently, reported."""
+    got = place_deviation(lay_a, lay_b, pairs)
+    if got is None:
+        out = _too_few(pairs)
+    else:
+        median, p90 = LIMITS["like_place_median"], LIMITS["like_place_p90"]
+        out = _ok(
+            got["median"] <= median and got["p90"] <= p90,
+            f"median {got['median']:.3f}, 90th percentile {got['p90']:.3f} page units over {got['mates']} mates "
+            f"(limits {median}, {p90}, provisional); farthest {got['farthest']}",
+        )
+    return {**out, "detail": out["detail"] + _independently(baseline), "value": got, "baseline": baseline}
+
+
+def relations(lay_a, lay_b, pairs) -> dict | None:
+    """H3's measure: of every two mates more than LIKE_APART page units apart in both figures, the share whose page
+    dx and dy have one sign in both, on each axis that parts them by more than LIKE_AXIS in both (none: the relation
+    turned, a disagreement), rounded to 1e-4; and the mated sheets whose mated strands stand in another order
+    (sheet_orders). None under LIKE_MIN_MATES mates or with no two mates far enough apart."""
+    if len(pairs) < LIKE_MIN_MATES:
+        return None
+    ca, cb = _centres(lay_a, [a for a, *_ in pairs]), _part_centres(lay_b, pairs)
+    judged, turned = 0, []
+    for i in range(len(pairs)):
+        for j in range(i + 1, len(pairs)):
+            da, db = ca[j] - ca[i], cb[j] - cb[i]
+            if np.hypot(*da) <= LIKE_APART or np.hypot(*db) <= LIKE_APART:
+                continue
+            judged += 1
+            axes = [k for k in (0, 1) if abs(da[k]) > LIKE_AXIS and abs(db[k]) > LIKE_AXIS]
+            if not axes or any(da[k] * db[k] <= 0 for k in axes):
+                turned.append(f"{_name(lay_b, pairs[i][1])}-{_name(lay_b, pairs[j][1])}")
+    if not judged:
+        return None
+    return {
+        "share": round(1 - len(turned) / judged, 4),
+        "pairs": judged,
+        "turned": turned,
+        "sheets": sheet_orders(lay_a, lay_b, pairs),
+    }
+
+
+def sheet_orders(lay_a, lay_b, pairs) -> list[str]:
+    """The mated sheets whose mated strands stand in another order: for each sheet block of B (Layout.sheets) and the
+    block of A its strands' mates are in (two or more strands), any two strands whose mates stand more than LIKE_AXIS
+    apart across A's sheet (the page direction square to its strands' mean axis) and do not stand so in B, along that
+    same direction. Each as "β2, β1, β3 for β1, β2, β3" (B's names in B's order, then A's in A's)."""
+    mate = {b: a for a, b, _ in pairs}
+    block_a = {k: n for n, ids in enumerate(lay_a.sheets) for k in ids}
+    out = []
+    for ids in lay_b.sheets:
+        groups: dict[int, list[str]] = {}
+        for b in ids:
+            if b in mate and mate[b] in block_a and b in lay_b.placed and lay_b.placed[b].sse.kind == "E":
+                groups.setdefault(block_a[mate[b]], []).append(b)
+        for n in sorted(groups):
+            strands = groups[n]
+            if len(strands) < 2:
+                continue
+            angles = np.array([lay_a.placed[mate[b]].angle for b in strands])
+            mean = 0.5 * np.arctan2(np.sin(2 * angles).sum(), np.cos(2 * angles).sum())  # an axis: modulo pi
+            across = np.array([-np.sin(mean), np.cos(mean)])
+            if across[0] < -1e-9 or (abs(across[0]) <= 1e-9 and across[1] < 0):  # read left to right (or upward)
+                across = -across
+            pa = _centres(lay_a, [mate[b] for b in strands]) @ across
+            pb = _centres(lay_b, strands) @ across
+            if all(
+                (pb[j] - pb[i]) * (pa[j] - pa[i]) > 0
+                for i in range(len(strands))
+                for j in range(i + 1, len(strands))
+                if abs(pa[j] - pa[i]) > LIKE_AXIS
+            ):
+                continue
+            order_b = [_name(lay_b, strands[k]) for k in np.argsort(pb, kind="stable")]
+            order_a = [_name(lay_a, mate[strands[k]]) for k in np.argsort(pa, kind="stable")]
+            out.append(f"{', '.join(order_b)} for {', '.join(order_a)}")
+    return out
+
+
+def h3_relations(lay_a, lay_b, pairs, note: str = "", baseline: dict | None = None) -> dict:
+    """H3: the map reads the same way (relations' share at least LIMITS' like_relations, provisional) and each mated
+    sheet keeps one order, unless the note names a pairing difference (PAIRING_NAMED). `baseline`: the share between
+    A and B drawn independently, reported."""
+    got = relations(lay_a, lay_b, pairs)
+    if got is None:
+        out = _too_few(pairs) or _not_judged(f"no two mates more than {LIKE_APART} page unit apart in both figures")
+    else:
+        limit = LIMITS["like_relations"]
+        excused = PAIRING_NAMED in note
+        bad = [f"{len(got['turned'])} turned: {', '.join(got['turned'][:6])}"] if got["share"] < limit else []
+        named = " (the note names a pairing difference)" if excused else ""
+        sheets = [f"sheet order {s}{named}" for s in got["sheets"]]
+        share = f"{got['share']:.4f} of {got['pairs']} pairs agree (limit {limit}, provisional)"
+        out = _ok(not bad and (excused or not got["sheets"]), "; ".join([share, *bad, *sheets]))
+    return {**out, "detail": out["detail"] + _independently(baseline), "value": got, "baseline": baseline}
+
+
+def h4_names(lay_a, lay_b, mates, note: str = "") -> dict:
+    """H4: mates carry one name, by A19's rule (same_name: each number less the elements of its kind before it that
+    have no mate, Mates.only_a in A and the extras in B). A helix B draws in parts carries its mate's name on its
+    first part in sequence, the next ones primed (like.like_from): that first part is compared. A mate named by its
+    own helix type (Like.crossed: an α-helix whose mate is a 3-10 helix) passes when the note names it so ("α1 for
+    η1", like.like_note)."""
+    pairs = like_pairs(lay_a, lay_b, mates)
+    if not pairs:
+        return _not_judged("no mates drawn")
+    chain_a, chain_b = lay_a.placed[pairs[0][0]].sse.chain, lay_b.placed[pairs[0][1]].sse.chain
+
+    def order(lay, chain):
+        els = [(p.sse.start, k) for k, p in lay.placed.items() if not p.ghost and p.sse.chain == chain]
+        return [k for _, k in sorted(els)]
+
+    order_a, order_b = order(lay_a, chain_a), order(lay_b, chain_b)
+    mated_a, mated_b = set(mates.mate.values()), set(mates.mate) | set(mates.pieces)
+    differ, crossed = [], []
+    for a, _, (b, *_) in pairs:  # the first part in sequence carries the name
+        before_a = [_name(lay_a, k) for k in order_a[: order_a.index(a)] if k not in mated_a]
+        before_b = [_name(lay_b, k) for k in order_b[: order_b.index(b)] if k not in mated_b]
+        na, nb = lay_a.placed[a].label, lay_b.placed[b].label
+        if same_name(na, nb, before_a, before_b):
+            continue
+        (crossed if f"{nb} for {na}" in note else differ).append(f"{nb}~{na}")
+    detail = f"names compared on all {len(pairs)} mates"
+    if differ:
+        detail += f", {len(differ)} differ: {', '.join(differ[:8])}"
+    if crossed:
+        detail += f"; named by their own helix type, as the note says: {', '.join(crossed)}"
+    return {**_ok(not differ, detail), "value": {"mates": len(pairs), "differ": differ}}
+
+
+def h1_matched(aln, mates, alike: bool, note: str, kind: str | None = None) -> dict:
+    """H1: the pair is drawn alike exactly when it is one fold (Mates.same_fold: align.SAME_FOLD_TM and
+    SAME_FOLD_FRACTION). `kind` (a tuning or held-out pair's): "positive" passes when one fold and drawn alike;
+    "negative" when not one fold and refused with the note (like.refused_note), so a forced negative (drawn alike)
+    fails; None (`foldmap check`, no kind known): the drawing agrees with same_fold either way. Not judged when the
+    chains were not aligned (a frame that cannot be carried: like.uncarried_note)."""
+    from .align import SAME_FOLD_FRACTION, SAME_FOLD_TM
+
+    if aln is None or mates is None:
+        return _not_judged(f"not aligned: {note}" if note else "not aligned")
+    one = mates.same_fold
+    refused = not alike and note.startswith("not drawn like") and "not the same fold" in note
+    fewer = len(mates.mate) + min(len(mates.only_a), len(mates.pieces) + len(mates.extras))  # the chain with fewer
+    facts = (
+        f"TM-score {aln.tm_score:.2f} (one fold at {SAME_FOLD_TM}), {len(mates.mate)} mates of the "
+        f"{fewer} elements of the chain with fewer (at {SAME_FOLD_FRACTION})"
+    )
+    said = "drawn alike" if alike else "refused with the note" if refused else "drawn on its own, not refused"
+    if kind == "negative":
+        ok = not one and refused
+        what = "a negative pair " + ("drawn alike: forced" if alike else said)
+    elif kind == "positive":
+        ok = one and alike
+        what = "a positive pair " + said
+    else:
+        ok = (one and alike) or (not one and refused)
+        what = ("one fold, " if one else "not one fold, ") + said
+    value = {"tm_score": round(float(aln.tm_score), 4), "same_fold": one, "alike": alike, "refused": refused}
+    return {**_ok(ok, f"{what}: {facts}"), "value": value}
+
+
+def h5_good_figure(judged_like: dict, judged_alone: dict) -> dict:
+    """H5: likeness is not bought with a broken page: B drawn like A passes every S- and A-check that B drawn alone
+    passes (each a check_figure result: {"science", "science_judged", "criteria"}; a check passes when it found
+    nothing and had something to judge, a criterion when its pass is True). Not judged when B alone passes none."""
+
+    def passed(found: dict) -> list[str]:
+        judged = found.get("science_judged") or {}
+        science = [k for k, v in found["science"].items() if v is not None and not v and judged.get(k) != 0]
+        return science + [k for k, v in found["criteria"].items() if v.get("pass") is True]
+
+    alone, like = passed(judged_alone), set(passed(judged_like))
+    if not alone:
+        return _not_judged("B drawn alone passes no S- or A-check")
+    lost = [k for k in alone if k not in like]
+
+    def why(k: str) -> str:
+        got = judged_like["criteria"].get(k)
+        if got is None:
+            return f"{k} ({len(judged_like['science'].get(k) or [])} problem(s))"
+        return f"{k} ({outcome(unmeasured(got))}{': ' + got['detail'][:120] if got.get('detail') else ''})"
+
+    detail = f"{len(alone) - len(lost)} of the {len(alone)} checks B alone passes"
+    detail += f"; lost: {'; '.join(why(k) for k in lost)}" if lost else ""
+    return {**_ok(not lost, detail), "value": {"alone": alone, "lost": lost}}
+
+
+def like_checks(
+    lay_a,
+    lay_b,
+    aln,
+    mates,
+    note: str,
+    alike: bool,
+    lay_alone=None,
+    judged_like: dict | None = None,
+    judged_alone: dict | None = None,
+    kind: str | None = None,
+) -> dict[str, dict]:
+    """H1-H5 of B drawn like A (spec 4.5): lay_a the reference's layout (None when it was not laid out), lay_b B's
+    drawn like it, aln and mates the alignment and element mates (None where not reached), note B's like note
+    (Layout.like_note), alike whether B took A's places (a Like was given to build_layout). `lay_alone`: B drawn on
+    its own (the same chain), for H2's and H3's baseline (drawn independently, the manuscript's sentence);
+    judged_like and judged_alone: check_figure's results of the two, for H5; `kind`: the pair's (h1_matched). A
+    check with nothing to judge is not judged, never a pass; H2-H4 are not judged where B was not drawn alike."""
+    out = {"H1": h1_matched(aln, mates, alike, note, kind)}
+    measured = lay_a is not None and mates is not None
+    pairs = like_pairs(lay_a, lay_b, mates) if measured else []
+    alone = like_pairs(lay_a, lay_alone, mates) if measured and lay_alone is not None else []
+    place, rel = place_deviation(lay_a, lay_alone, alone), relations(lay_a, lay_alone, alone)
+    if measured and alike:
+        out["H2"] = h2_places(lay_a, lay_b, pairs, place)
+        out["H3"] = h3_relations(lay_a, lay_b, pairs, note, rel)
+        out["H4"] = h4_names(lay_a, lay_b, mates, note)
+    else:
+        why = note or "not drawn alike"  # the note says why: not the same fold, a frame that cannot be carried
+        out["H2"] = {**_not_judged(why + _independently(place)), "value": None, "baseline": place}
+        out["H3"] = {**_not_judged(why + _independently(rel)), "value": None, "baseline": rel}
+        out["H4"] = _not_judged(why)
+    out["H5"] = (
+        h5_good_figure(judged_like, judged_alone)
+        if judged_like is not None and judged_alone is not None
+        else _not_judged("B was not drawn alone")
+    )
+    return out
+
+
+def like_lines(found: dict[str, dict]) -> list[str]:
+    """One line per check H1-H5 (pass, fail, not judged and why), its detail indented, as criteria_lines prints
+    A1-A20."""
+    lines = []
+    for key, what in LIKE_CHECKS.items():
+        got = found.get(key) or _not_judged("")
+        if got["pass"] is None:
+            lines.append(f"{key} {what}: {NOT_JUDGED}" + (f" ({got['detail']})" if got.get("detail") else ""))
+            continue
+        lines.append(f"{key} {what}: {'pass' if got['pass'] else 'fail'}")
+        if got["detail"]:
+            lines.append(f"  {got['detail']}")
+    return lines
 
 
 # ------------------------------------------------------------------------------------------------ one figure

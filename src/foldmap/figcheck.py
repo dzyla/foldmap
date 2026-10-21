@@ -716,6 +716,12 @@ def label_repeats(lay) -> dict[str, list[str]]:
 def fit_deviation(a, b, mirrored: bool = False) -> float:
     """The largest distance between matched points a[k] and b[k] after the best rigid motion of b onto a (least
     squares: a rotation and a translation; a reflection and a translation when `mirrored`)."""
+    return float(fit_deviations(a, b, mirrored).max())
+
+
+def fit_deviations(a, b, mirrored: bool = False) -> np.ndarray:
+    """The distance between each pair of matched points a[k] and b[k] after the best rigid motion of b onto a
+    (fit_deviation's: A15's, and H2's for a figure drawn like a reference, criteria.h2_places)."""
     a, b = np.asarray(a, float).reshape(-1, 2), np.asarray(b, float).reshape(-1, 2)
     if mirrored:
         b = b * [-1.0, 1.0]
@@ -726,7 +732,7 @@ def fit_deviation(a, b, mirrored: bool = False) -> float:
         u[:, -1] *= -1
         turn = u @ vt
     fitted = (b - cb) @ turn + ca
-    return float(np.hypot(*(fitted - a).T).max())
+    return np.hypot(*(fitted - a).T)
 
 
 COPY_MIN_MATCHED = 3  # a tied copy is compared on at least this many elements, and on half the smaller copy's

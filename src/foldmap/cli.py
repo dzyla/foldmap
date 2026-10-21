@@ -420,9 +420,10 @@ def make_layout(
     reference structure, {structure, chain, match, layout} (_drawn_like): one protein chain of this structure, the
     one `chains` names (two named is a UsageError), else its first (ruling 7: the scope line says it was chosen,
     Layout.like_chain). A frame that cannot be carried (_uncarried: a stack, a straight duplex) draws it on its own,
-    the note saying why. `like_out` (a dict, foldmap compare): given what the reference gave, as far as it got:
-    reference ((layout, sses, bb, model, chain) of the reference laid out, or None), alignment
-    (align.ChainAlignment or None) and mates (align.Mates or None)."""
+    the note saying why. `like_out` (a dict, foldmap compare, foldmap check's H1-H5): given what the reference gave,
+    as far as it got: reference ((layout, sses, bb, model, chain) of the reference laid out, or None), alignment
+    (align.ChainAlignment or None), mates (align.Mates or None) and like (the like.Like this layout took, or None:
+    drawn on its own)."""
     for spec in names or []:
         check_spec(spec)
     model = model or read_model(path, assembly)  # once, for every loader below (`model`: already read, same assembly)
@@ -621,7 +622,7 @@ def make_layout(
         if made.like is not None:  # the reference's frame carried over: the page is the reference's
             frame, dyad = made.frame, None
         if like_out is not None:
-            like_out.update(reference=made.reference, alignment=made.alignment, mates=made.mates)
+            like_out.update(reference=made.reference, alignment=made.alignment, mates=made.mates, like=made.like)
 
     def lay_out_in(frame):  # build_layout through a frame (the dyad view's, or the unrolled one's), as a partial
         return functools.partial(
@@ -1546,7 +1547,12 @@ def build_parser() -> argparse.ArgumentParser:
         "--domains figure is judged as the campaign's membrane or domains view. Those that need "
         "more than one drawing or a tool foldmap does not use (process exit and time, the app, mkdssp, a second "
         "seed, a saved-layout round trip, RNApolis, a two-state partner) are named 'not measured here' with the "
-        "reason. Prints one line per check and one per problem; exits 1 on a problem, 0 otherwise.",
+        "reason. With --like REFERENCE, then H1-H5 of the figure drawn like the reference: H1, drawn alike exactly "
+        "when one fold; H2, mates in the same places (median and 90th percentile after the best rigid 2D motion); "
+        "H3, the map reads the same way (page dx, dy signs of mate pairs; each mated sheet's order); H4, mates carry "
+        "one name; H5, it passes every S- and A-check the structure drawn alone passes. H2 and H3 also give the "
+        "two drawn independently, for comparison; their limits are provisional. Prints one line per check and one "
+        "per problem; exits 1 on a problem, 0 otherwise.",
     )
     for cmd in (q, iq, cq, kq):
         q = cmd
@@ -1893,12 +1899,14 @@ def _cmd_contacts(args: argparse.Namespace) -> int:
 def _cmd_check(args: argparse.Namespace) -> int:
     """Draw the figure `plot` would and print its science checks (figcheck.science_checks), one line per check and
     one per problem, then its figure criteria A1-A20 (criteria.check_figure), one line per criterion and its detail.
+    Drawn like a reference (--like), then H1-H5 (criteria.like_checks), B also drawn alone for H5 and the baseline.
     Exit 1 when any check found a problem or any criterion judged here fails."""
-    from .criteria import check_figure, criteria_lines
+    from .criteria import check_figure, criteria_lines, like_lines
     from .science import science_lines
 
     spec = _spec_of(args)
-    drawn = draw_spec(spec)
+    got: dict | None = {} if spec.like else None
+    drawn = draw_spec(spec, like_out=got)
     print(provenance_block(drawn.provenance), file=sys.stderr, end="")
     for out in args.output:
         print(f"wrote {save(drawn.figure, out)}")
@@ -1906,7 +1914,39 @@ def _cmd_check(args: argparse.Namespace) -> int:
     for line in science_lines(found["science"], found["science_judged"]) + criteria_lines(found["criteria"]):
         print(line)
     failed = any(c["pass"] is False for c in found["criteria"].values())
+    if got is not None:
+        like = _like_checks(spec, drawn, found, got)
+        for line in like_lines(like):
+            print(line)
+        failed = failed or any(c["pass"] is False for c in like.values())
     return 1 if any(found["science"].values()) or failed else 0
+
+
+def _like_checks(spec, drawn, found: dict, got: dict) -> dict:
+    """H1-H5 of the figure `drawn` like a reference (criteria.like_checks; `got`: make_layout's like_out, `found`:
+    its check_figure): its chain also drawn alone, with the nucleic-acid chains it was asked with, as `foldmap check`
+    draws it without --like."""
+    from dataclasses import replace
+
+    from .criteria import check_figure, like_checks
+
+    lay = drawn.layout
+    chain = drawn.bb.labels[0].chain if len(drawn.bb) else None
+    chains = [chain, *(c for c in spec.chains or [] if c != chain)] if chain else spec.chains
+    alone_spec = replace(spec, like=None, chains=chains)
+    alone = draw_spec(alone_spec)
+    reference = got.get("reference")
+    return like_checks(
+        reference[0] if reference else None,
+        lay,
+        got.get("alignment"),
+        got.get("mates"),
+        lay.like_note,
+        got.get("like") is not None,
+        alone.layout,
+        found,
+        check_figure(alone, alone_spec, spec.structure),
+    )
 
 
 def contact_problems(report) -> list[str]:

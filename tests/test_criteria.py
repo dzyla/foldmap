@@ -3,10 +3,13 @@ them, and `foldmap check` prints them under the science checks for the one figur
 
 import importlib.util
 from pathlib import Path
+from types import SimpleNamespace
 
+import numpy as np
 import pytest
 
 from foldmap import criteria, figcheck
+from foldmap.align import Mates
 from foldmap.cli import main
 from foldmap.spec import draw_spec, figure_spec
 
@@ -195,3 +198,176 @@ def test_a_criterion_with_nothing_to_judge_prints_not_judged():
     )
     assert "A15 copies drawn alike: not judged (default B~A n/a: 2 elements)" in lines
     assert "A16 domains: one chain, alike, not tiny, panels apart, names clear: does not apply" in lines
+
+
+# ------------------------------------------------------------------------- drawn like a reference: H1-H5 (13a-9)
+
+
+def _stub(points: dict, sheets=()):
+    """A layout stub as the H checks read it: placed {id: (cx, cy, label[, kind, angle])}, residue order by insertion,
+    and its sheet blocks."""
+    placed = {}
+    for n, (k, (x, y, label, *rest)) in enumerate(points.items()):
+        kind, angle = [*rest, "H", 0.0][:2]
+        sse = SimpleNamespace(start=10 * n, chain="A", kind=kind)
+        placed[k] = SimpleNamespace(cx=x, cy=y, label=label, ghost=False, sse=sse, angle=angle)
+    return SimpleNamespace(placed=placed, sheets=[list(s) for s in sheets])
+
+
+def _mates(pairs: dict, same_fold=True, extras=(), only_a=()):
+    return Mates(mate=dict(pairs), pieces={}, extras=tuple(extras), only_a=tuple(only_a), same_fold=same_fold)
+
+
+def test_check_like_itself_passes_every_h_check(capsys):
+    """1UBQ drawn like itself: H1 one fold and drawn alike, H2 0 (median and 90th percentile), H3 every pair agrees,
+    H4 every name the same, H5 nothing lost; drawn independently it is the same figure, so the baseline is 0 too."""
+    assert main(["check", str(DATA / "1UBQ.cif"), "--like", str(DATA / "1UBQ.cif")]) == 0
+    out = capsys.readouterr().out.splitlines()
+    assert [line.split()[0] for line in out if line[:1] == "H"] == list(criteria.LIKE_CHECKS)
+    for key, what in criteria.LIKE_CHECKS.items():
+        assert f"{key} {what}: pass" in out, key
+    detail = {out[k].split()[0]: out[k + 1] for k, line in enumerate(out) if line[:1] == "H"}
+    assert detail["H1"].startswith("  one fold, drawn alike: TM-score 1.00")
+    assert detail["H2"].startswith("  median 0.000, 90th percentile 0.000 page units over ")
+    assert "drawn independently: median 0.000, 90th percentile 0.000" in detail["H2"]
+    assert detail["H3"].startswith("  1.0000 of ") and "provisional" in detail["H3"]
+    assert detail["H4"].startswith("  names compared on all ") and "differ" not in detail["H4"]
+    assert " of the " in detail["H5"] and "lost" not in detail["H5"]
+
+
+def test_check_without_like_prints_no_h_check(capsys):
+    assert main(["check", str(DATA / "1UBQ.cif")]) == 0
+    assert not any(line[:1] == "H" for line in capsys.readouterr().out.splitlines())
+
+
+def test_check_like_a_refused_pair(capsys):
+    """2LZM is not ubiquitin's fold: H1 passes (refused with the note), H2-H4 are not judged, never passed; H5 still
+    compares the figure with the note against the figure alone."""
+    main(["check", str(DATA / "2LZM.cif"), "--like", str(DATA / "1UBQ.cif")])
+    out = capsys.readouterr().out.splitlines()
+    assert "H1 drawn alike exactly when one fold: pass" in out
+    assert out[out.index("H1 drawn alike exactly when one fold: pass") + 1].startswith(
+        "  not one fold, refused with the note: TM-score 0.14"
+    )
+    for key in ("H2", "H3", "H4"):
+        line = next(x for x in out if x.startswith(key))
+        assert f": {criteria.NOT_JUDGED} (not drawn like 1UBQ.cif: not the same fold" in line, line
+    assert any(x.startswith("H5 still a good figure: ") for x in out)
+
+
+def test_h2_is_zero_after_a_known_shift_and_turn():
+    pts = {"a1": (0.0, 0.0, "α1"), "a2": (3.0, 1.0, "β1"), "a3": (-2.0, 4.0, "β2"), "a4": (5.0, -3.0, "α2")}
+    turn = np.array([[np.cos(0.7), -np.sin(0.7)], [np.sin(0.7), np.cos(0.7)]])
+    moved = {f"b{k[1]}": (*(turn @ np.array(p[:2]) + [12.5, -7.25]), p[2]) for k, p in pts.items()}
+    lay_a, lay_b = _stub(pts), _stub(moved)
+    pairs = criteria.like_pairs(lay_a, lay_b, _mates({f"b{k[1]}": k for k in pts}))
+    got = criteria.h2_places(lay_a, lay_b, pairs)
+    assert got["pass"] is True and got["value"]["median"] == 0.0 and got["value"]["p90"] == 0.0
+    assert got["value"]["mates"] == 4
+    shifted = _stub({k: (p[0] + 0.5, p[1], p[2]) if k == "b2" else p for k, p in moved.items()})
+    assert criteria.h2_places(lay_a, shifted, pairs)["value"]["p90"] > 0
+
+
+def test_h2_h3_not_judged_under_three_mates_h4_under_one():
+    pts = {"a1": (0.0, 0.0, "α1"), "a2": (3.0, 1.0, "β1")}
+    lay = _stub(pts)
+    two = criteria.like_checks(lay, lay, SimpleNamespace(tm_score=1.0), _mates({"a1": "a1", "a2": "a2"}), "", True)
+    for key in ("H2", "H3"):
+        assert criteria.outcome(two[key]) == criteria.NOT_JUDGED and "2 mates drawn" in two[key]["detail"], key
+    assert two["H4"]["pass"] is True
+    none = criteria.like_checks(lay, lay, SimpleNamespace(tm_score=1.0), _mates({}), "", True)
+    assert criteria.outcome(none["H4"]) == criteria.NOT_JUDGED
+    assert criteria.outcome(none["H5"]) == criteria.NOT_JUDGED  # B not drawn alone: nothing to compare
+
+
+def test_h1_a_forced_negative_fails():
+    aln = SimpleNamespace(tm_score=0.31)
+    no = _mates({"b1": "a1"}, same_fold=False, extras=("b2", "b3"), only_a=("a2", "a3"))
+    refused = "not drawn like A.cif: not the same fold (TM-score 0.31; 1 of 3 elements matched)"
+    assert criteria.h1_matched(aln, no, False, refused, "negative")["pass"] is True
+    assert criteria.h1_matched(aln, no, False, refused)["pass"] is True  # check: refused as it should be
+    forced = criteria.h1_matched(aln, no, True, "drawn like A.cif chain A: 1 of 3 elements matched", "negative")
+    assert forced["pass"] is False and "forced" in forced["detail"]
+    yes = _mates({"b1": "a1", "b2": "a2"}, extras=("b3",), only_a=("a3",))
+    assert criteria.h1_matched(SimpleNamespace(tm_score=0.6), yes, True, "drawn like A.cif", "positive")["pass"]
+    assert criteria.h1_matched(aln, no, False, refused, "positive")["pass"] is False  # a positive refused
+    assert criteria.outcome(criteria.h1_matched(None, None, False, "not drawn like A.cif: ...")) == criteria.NOT_JUDGED
+
+
+def test_h3_a_turned_map_and_a_sheet_in_another_order():
+    pts = {
+        "a1": (0.0, 0.0, "β1", "E", np.pi / 2),
+        "a2": (1.5, 0.0, "β2", "E", -np.pi / 2),
+        "a3": (3.0, 0.0, "β3", "E", np.pi / 2),
+        "a4": (1.5, 5.0, "α1", "H", 0.0),
+    }
+    mates = _mates({k: k for k in pts})
+    lay_a = _stub(pts, sheets=[["a1", "a2", "a3"]])
+    pairs = criteria.like_pairs(lay_a, lay_a, mates)
+    same = criteria.h3_relations(lay_a, lay_a, pairs)
+    assert same["pass"] is True and same["value"]["share"] == 1.0 and same["value"]["sheets"] == []
+    mirrored = _stub({k: (-x, y, *rest) for k, (x, y, *rest) in pts.items()}, sheets=[["a1", "a2", "a3"]])
+    got = criteria.h3_relations(lay_a, mirrored, pairs)
+    assert got["pass"] is False and got["value"]["share"] < 0.95
+    swapped = dict(pts, a1=(1.5, 0.0, "β1", "E", np.pi / 2), a2=(0.0, 0.0, "β2", "E", -np.pi / 2))
+    lay_b = _stub(swapped, sheets=[["a2", "a1", "a3"]])
+    got = criteria.h3_relations(lay_a, lay_b, pairs)
+    assert got["pass"] is False and "sheet order β2, β1, β3 for β1, β2, β3" in got["detail"]
+    named = criteria.h3_relations(lay_a, lay_b, pairs, note="drawn like A.cif; β1 pairing differs")
+    assert named["value"]["sheets"] and ("names a pairing difference" in named["detail"])
+    assert named["pass"] is (named["value"]["share"] >= criteria.LIMITS["like_relations"])
+
+
+def test_h4_names_by_a19s_rule():
+    lay_a = _stub({"a1": (0, 0, "β1"), "a2": (2, 0, "α1"), "a3": (4, 0, "β2")})
+    alike = _stub({"b1": (0, 0, "β1"), "bx": (1, 0, "β2"), "b2": (2, 0, "α1"), "b3": (4, 0, "β3")})
+    mates = _mates({"b1": "a1", "b2": "a2", "b3": "a3"}, extras=("bx",))
+    assert criteria.h4_names(lay_a, alike, mates)["pass"] is True  # β3 less the extra strand before it is β2
+    other = _stub({"b1": (0, 0, "β1"), "b2": (2, 0, "α2"), "b3": (4, 0, "β2")})
+    got = criteria.h4_names(lay_a, other, _mates({"b1": "a1", "b2": "a2", "b3": "a3"}))
+    assert got["pass"] is False and "α2~α1" in got["detail"]
+    crossed = _stub({"b1": (0, 0, "β1"), "b2": (2, 0, "α1"), "b3": (4, 0, "β2")})
+    lay_eta = _stub({"a1": (0, 0, "β1"), "a2": (2, 0, "η1"), "a3": (4, 0, "β2")})
+    note = "drawn like A.cif chain A: 3 of 3 elements matched; named by their own helix type: α1 for η1"
+    assert criteria.h4_names(lay_eta, crossed, _mates({"b1": "a1", "b2": "a2", "b3": "a3"}), note)["pass"] is True
+    assert criteria.h4_names(lay_eta, crossed, _mates({"b1": "a1", "b2": "a2", "b3": "a3"}))["pass"] is False
+
+
+def test_h5_fails_when_the_like_figure_fails_a_check_b_alone_passes(monkeypatch):
+    spec = figure_spec(DATA / "1UBQ.cif")
+    alone = criteria.check_figure(draw_spec(spec), spec, DATA / "1UBQ.cif")
+    assert criteria.h5_good_figure(alone, alone)["pass"] is True
+    monkeypatch.setattr(figcheck, "element_overlaps", lambda lay: [("A:2-7", "A:12-17")])
+    broken = criteria.check_figure(draw_spec(spec), spec, DATA / "1UBQ.cif")
+    got = criteria.h5_good_figure(broken, alone)
+    assert got["pass"] is False and got["value"]["lost"] == ["A5"] and "A5 (fail" in got["detail"]
+    assert criteria.h5_good_figure(alone, broken)["pass"] is True  # only what B alone passes must hold
+
+
+def test_a_helix_drawn_in_parts_is_judged_as_its_run():
+    """A helix B splits where A does not (Mates.pieces) is laid end to end along its mate, the first part in
+    sequence named as A's helix and the next primed (like.like_from): H2 and H3 take the middle of the run, H4 the
+    first part's name."""
+    from foldmap.layout import Placed
+
+    def placed(k, x, y, label, start, length=1.0):
+        sse = SimpleNamespace(start=start, chain="A", kind="H")
+        return k, Placed(sse=sse, cx=x, cy=y, length=length, angle=0.0, width=0.5, label=label)
+
+    a = dict(
+        [placed("a1", 0, 5, "α1", 0), placed("a2", 5, 5, "α2", 10), placed("a3", 5, -4, "α3", 20)]
+        + [placed("a6", 0, 0, "α6", 30, 4.0)]
+    )
+    b = dict(
+        [placed("b1", 0, 5, "α1", 0), placed("b2", 5, 5, "α2", 10), placed("b3", 5, -4, "α3", 20)]
+        + [placed("p", -1.25, 0, "α6", 30, 1.5), placed("m", 1.25, 0, "α6′", 40, 1.5)]
+    )
+    lay_a, lay_b = SimpleNamespace(placed=a, sheets=[]), SimpleNamespace(placed=b, sheets=[])
+    mates = Mates(
+        mate={"b1": "a1", "b2": "a2", "b3": "a3", "m": "a6"}, pieces={"p": "a6"}, extras=(), only_a=(), same_fold=True
+    )
+    pairs = criteria.like_pairs(lay_a, lay_b, mates)
+    assert pairs[-1] == ("a6", "m", ("p", "m"))
+    assert criteria.place_deviation(lay_a, lay_b, pairs)["p90"] == 0.0
+    assert criteria.relations(lay_a, lay_b, pairs)["share"] == 1.0
+    assert criteria.h4_names(lay_a, lay_b, mates)["pass"] is True

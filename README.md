@@ -550,6 +550,17 @@ set in the font they are calibrated on (Liberation Sans; A16 then still judges i
 only the domain names go unmeasured); they are never counted as passing. A failed criterion
 also exits 1.
 
+A figure drawn like a reference (`foldmap check 1MBN --like 2HHB --like-chain B`) is also judged on H1-H5, after
+A1-A20: H1, it is drawn alike exactly when the two are one fold (TM-score at least 0.5 and half the smaller chain's
+elements matched), else refused with the note; H2, matched elements sit in the same places (the median and 90th
+percentile of the mates' centre deviations after the best rigid 2D motion, at most 1.0 and 2.5 page units); H3, the
+map reads the same way (of every two mates more than 1 unit apart, at least 95 % keep the signs of their page dx and
+dy, and each mated sheet keeps its strands' order unless the note names a pairing difference); H4, mates carry one
+name (A19's rule); H5, the figure still passes every S- and A-check the structure drawn alone passes. H2 and H3 also
+print the same measures for the two drawn independently, today's behaviour, for comparison. A check with nothing to
+judge (fewer than three mates, a pair refused) reads "not judged". The H2 and H3 limits are provisional: they are set
+on a tuning set of homologue pairs and then frozen.
+
 **Checking the contact beads.** `foldmap contacts 1LMB.cif` draws the figure `plot` would (it takes the same options),
 checks every contact bead against the deposited atoms with an independent search, and prints how many beads were
 drawn, verified, false, missing, unmatched, in the wrong colour or not on the first toucher, plus a line for each

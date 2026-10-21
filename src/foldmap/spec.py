@@ -343,14 +343,15 @@ class Drawn:
         return over_labels(self.loops)
 
 
-def draw_spec(spec: FigureSpec) -> Drawn:
-    """Lay out, route and draw the figure once."""
+def draw_spec(spec: FigureSpec, like_out: dict | None = None) -> Drawn:
+    """Lay out, route and draw the figure once. `like_out`: cli.make_layout's (a figure drawn like a reference: what
+    the reference gave, for the H checks)."""
     from .cli import make_layout
     from .io import read_model
 
     model = read_model(spec.structure, spec.assembly)
     layout, sses, bb = make_layout(
-        spec.structure, spec.mode, spec.rotate, spec.flip_v, model=model, **spec.layout_kwargs()
+        spec.structure, spec.mode, spec.rotate, spec.flip_v, model=model, like_out=like_out, **spec.layout_kwargs()
     )
     loops = route_loops(layout, sses, bb)
     return Drawn(draw(layout, loops, sses, spec.title, model=model, look=spec.look), loops, layout, sses, bb, model)
