@@ -602,7 +602,8 @@ def test_the_look_carries_to_the_next_structure_and_its_parts_do_not():
     at.segmented_control(key="ligands__mode").set_value("none").run()
     at.segmented_control(key="uniprot_sites__mode").set_value("all").run()  # Conservation & UniProt
     at.button(key="new_structure").click().run()
-    assert at.session_state["stage"] == "edit" and at.session_state["name"] == "2HHB"  # the dialog, over the figure
+    assert at.session_state["stage"] == "load" and "id" not in at.query_params
+    at.run()  # Start shows no look widget for two runs: the widgets keep their values (persist_state)
     at.text_input(key="source").input(str(DATA / "1UBQ.cif"))
     at.button(key="load").click().run()
     ss = at.session_state
@@ -615,37 +616,31 @@ def test_the_look_carries_to_the_next_structure_and_its_parts_do_not():
     assert not at.exception and "seq_chain" not in [s.key for s in at.selectbox]
 
 
-def test_new_structure_draws_in_place_and_keeps_the_theme(monkeypatch, tmp_path):
+def test_new_structure_returns_to_start_and_the_next_keeps_the_theme(monkeypatch, tmp_path):
     seed_cache(monkeypatch, tmp_path, "1UBQ", "1LMB")
     at = load(app_test(), "1UBQ")
     at.selectbox(key="theme").select("trace").run()
     as_text(at, "mark", "res:A:1-10=red")
     at.button(key="new_structure").click().run()
     ss = at.session_state
-    assert not at.exception and ss["stage"] == "edit" and ss["picking"] is True and at.text_input(key="source")
-    assert "<svg" in svg_of(at) and at.query_params["id"] == "1UBQ"  # the figure and its link stay meanwhile
-    assert at.pills(key="example").value is None and at.file_uploader(key="upload")  # Start's inputs, all of them
+    assert not at.exception and ss["stage"] == "load" and ss["source"] == "" and "id" not in at.query_params
+    assert at.text_input(key="source").value == "" and at.file_uploader(key="upload")  # Start, with all its inputs
     at.text_input(key="source").input("1LMB")
     at.button(key="load").click().run()
     ss = at.session_state
     assert not at.exception and not at.error and ss["stage"] == "edit" and ss["name"] == "1LMB"
-    assert ss["theme"] == "trace" and ss["mark"] == "" and ss["picking"] is False and "<svg" in svg_of(at)
-    assert not any(t.key == "source" for t in at.text_input)  # the dialog closed
+    assert ss["theme"] == "trace" and ss["mark"] == "" and "<svg" in svg_of(at)
     assert at.query_params["id"] == "1LMB" and at.query_params["theme"] == "trace"
 
 
-def test_new_structure_that_fails_keeps_the_figure_and_its_settings(monkeypatch, tmp_path):
+def test_new_structure_that_fails_shows_the_error_on_start(monkeypatch, tmp_path):
     from foldmap import app_jobs
 
     seed_cache(monkeypatch, tmp_path, "1UBQ", "1LMB")
     at = load(app_test(), "1UBQ")
-    as_text(at, "mark", "res:A:1-10=red")
     at.button(key="new_structure").click().run()
-    at.text_input(key="source").input("nonsense!").run()
-    at.button(key="load").click().run()
-    assert at.session_state["picking"] is True and at.error and at.text_input(key="source")  # said in the dialog
     real = app_jobs.known_failure
-    monkeypatch.setattr(  # 1LMB fails to draw after it was read (where load used to reset the session first)
+    monkeypatch.setattr(  # 1LMB fails to draw after it was read
         app_jobs,
         "known_failure",
         lambda path, *a: ValueError("1LMB cannot be drawn") if "1LMB" in str(path) else real(path, *a),
@@ -653,9 +648,8 @@ def test_new_structure_that_fails_keeps_the_figure_and_its_settings(monkeypatch,
     at.text_input(key="source").input("1LMB")
     at.button(key="load").click().run()
     ss = at.session_state
-    assert not at.exception and "cannot be drawn" in at.error[0].value and ss["picking"] is True
-    assert ss["name"] == "1UBQ" and ss["mark"] == "res:A:1-10=red" and ss["stage"] == "edit"  # nothing reset
-    assert at.query_params["id"] == "1UBQ" and "<svg" in svg_of(at)
+    assert not at.exception and "cannot be drawn" in at.error[0].value and ss["stage"] == "load"
+    assert at.text_input(key="source")  # still Start
 
 
 def test_a_share_link_opens_ids_only(monkeypatch):
