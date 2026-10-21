@@ -590,7 +590,7 @@ STYLESHEET = f"""
 [data-testid="stButtonGroup"] button[aria-checked="true"] p {{color:{_both(TEXT)}}}
 {SWITCH}:not(:checked)) > div:not([data-testid]) {{background:{_both(EDGE)}}}
 {SWITCH}:checked) > div:not([data-testid]) > div {{background:{_both(BACK)}}}
-.st-key-load button p, .st-key-redraw button p {{color:{_both(BUTTON_LABEL)}}}
+.st-key-start .st-key-load button p, .st-key-redraw button p {{color:{_both(BUTTON_LABEL)}}}
 """
 MARK = (  # the icon (scripts/make_app_icon.py) as the Start screen's mark
     '<img src="data:image/png;base64,{}" width="44" height="44" alt="">'.format(
@@ -933,13 +933,14 @@ def main() -> None:
         if lim.max_residues and size["residues"] > lim.max_residues:
             ss["load_error"] = shown(app_jobs.size_message(name, size, lim))
             return
-        reset_structure(ss)
-        settings = settings_of(ss)
+        fresh = settings_of(ss)  # the settings reset_structure leaves; the session keeps the figure on screen (New
+        reset_structure(fresh)  # structure draws over it) and its settings until the new structure is drawn
+        settings = settings_of(fresh)
         failed = app_jobs.known_failure(str(path), settings)
         try:
             if failed is not None:
                 raise failed
-            result = render(str(path), current_blob(ss))  # a structure that cannot be drawn never opens
+            result = render(str(path), current_blob(fresh))  # a structure that cannot be drawn never opens
         except Exception as err:  # every failure is a message here (a pipeline bug too: logged for the server)
             if isinstance(err, app_jobs.JobLimit):
                 app_jobs.remember_failure(str(path), settings, err)
@@ -947,6 +948,7 @@ def main() -> None:
                 _LOG.exception("drawing %s failed", name)
             ss["load_error"] = said(app_jobs.explain(err, name, lim)[0], path=path, name=name, paths=not local_files())
             return
+        reset_structure(ss)
         local_path = local_files() and bool(text) and Path(text).expanduser().is_file()
         ss.update(
             path=str(path),
@@ -964,12 +966,13 @@ def main() -> None:
             stage="edit",
             load_error="",
             uniprot_for="",
+            picking=False,  # the New structure dialog closes on the new figure
         )
         if result["seconds"] > lim.slow:
             ss.update(auto_redraw=False, slow_noted=str(path), slow_seconds=result["seconds"])
 
     def load_example() -> None:
-        if ss.get("example"):  # the pill stays selected: Start is not shown again until a new structure
+        if ss.get("example"):  # the pill stays selected: Start (or the dialog) closes on the figure
             load(ss["example"])
 
     def pick_row() -> None:
@@ -978,7 +981,63 @@ def main() -> None:
             load(picked)
 
     def new_structure() -> None:
-        ss["stage"], ss["share_id"], ss["source"] = "load", "", ""
+        """New structure (the top bar): Start's inputs in a dialog over the figure, which stays (and the link with
+        it) until the next structure is drawn in its place."""
+        ss.update(picking=True, source="", load_error="", uniprot_for="")
+
+    def dismissed() -> None:
+        ss["picking"] = False
+
+    def start_inputs(draw: str) -> None:
+        """Start's inputs, also the New structure dialog's: the box (`draw`: its button's type), its error, the
+        examples, the uploader and the structures of an accession."""
+        with st.form("start", border=False, enter_to_submit=True):
+            hint = "PDB ID, UniProt accession, or file path" if local_files() else "PDB ID or UniProt accession"
+            st.text_input("Structure", key="source", placeholder=hint, label_visibility="collapsed")
+            st.form_submit_button("Draw", key="load", type=draw, on_click=load)
+        if ss.get("load_error"):
+            st.error(ss["load_error"])
+        st.pills(
+            "Examples",
+            list(EXAMPLES),
+            key="example",
+            format_func=lambda k: f"{k} · {EXAMPLES[k]}",
+            on_change=load_example,
+        )
+        st.file_uploader(
+            "or drop a .cif / .pdb file",
+            type=upload_types("structure"),
+            key="upload",
+            on_change=load,
+            kwargs={"upload": True},
+        )
+        if ss.get("uniprot_for"):
+            acc = ss["uniprot_for"]
+            try:
+                rows = choices(acc)
+            except ValueError as err:
+                st.caption(f"UniProt: {shown(err)}")
+            else:
+                if rows:
+                    st.caption(f"Structures of {shown(acc)} (UniProt): pick one to draw it.")
+                    st.dataframe(
+                        {"id": [r[0] for r in rows], "what": [r[1] for r in rows]},
+                        key="uniprot_table",
+                        on_select=pick_row,
+                        selection_mode="single-row",
+                        hide_index=True,
+                    )
+                else:
+                    st.caption(f"UniProt lists no structure or AlphaFold model for {shown(acc)}.")
+
+    @st.dialog("New structure", width="medium", on_dismiss=dismissed)
+    def new_structure_dialog() -> None:
+        """Open while `picking`: a widget in it reruns the dialog alone, so once load has drawn the new structure
+        (picking off) the whole app reruns, on the new figure, without it. Its Draw button is secondary: the
+        stylesheet's primary label colour reaches Start only."""
+        if not ss.get("picking"):
+            st.rerun()
+        start_inputs("secondary")
 
     def redraw() -> None:
         ss["drawn_blob"] = current_blob(ss)
@@ -1004,44 +1063,7 @@ def main() -> None:
                 st.html(MARK, width="content")  # the mark beside the name: decorative (no image toolbar to tab to)
                 st.header("foldmap", anchor=False, width="content")
             st.caption("Protein topology diagrams from structures")
-            with st.form("start", border=False, enter_to_submit=True):
-                hint = "PDB ID, UniProt accession, or file path" if local_files() else "PDB ID or UniProt accession"
-                st.text_input("Structure", key="source", placeholder=hint, label_visibility="collapsed")
-                st.form_submit_button("Draw", key="load", type="primary", on_click=load)
-            if ss.get("load_error"):
-                st.error(ss["load_error"])
-            st.pills(
-                "Examples",
-                list(EXAMPLES),
-                key="example",
-                format_func=lambda k: f"{k} · {EXAMPLES[k]}",
-                on_change=load_example,
-            )
-            st.file_uploader(
-                "or drop a .cif / .pdb file",
-                type=upload_types("structure"),
-                key="upload",
-                on_change=load,
-                kwargs={"upload": True},
-            )
-            if ss.get("uniprot_for"):
-                acc = ss["uniprot_for"]
-                try:
-                    rows = choices(acc)
-                except ValueError as err:
-                    st.caption(f"UniProt: {shown(err)}")
-                else:
-                    if rows:
-                        st.caption(f"Structures of {shown(acc)} (UniProt): pick one to draw it.")
-                        st.dataframe(
-                            {"id": [r[0] for r in rows], "what": [r[1] for r in rows]},
-                            key="uniprot_table",
-                            on_select=pick_row,
-                            selection_mode="single-row",
-                            hide_index=True,
-                        )
-                    else:
-                        st.caption(f"UniProt lists no structure or AlphaFold model for {shown(acc)}.")
+            start_inputs("primary")
             with st.container(key="credit"):
                 st.caption(CREDIT)
         return
@@ -1104,6 +1126,8 @@ def main() -> None:
             layout_file_section(st, ss)
         with st.container(key="credit"):
             st.caption(CREDIT)
+    if ss.get("picking"):
+        new_structure_dialog()
 
 
 def run() -> None:

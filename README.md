@@ -599,6 +599,8 @@ and switches between three views: Figure, Sequence (the sequence, or an uploaded
 structure on top) and 3D (the interactive page: click an element of the figure, or a cell of the contact map, and the 3D view glides to it). Only the chosen view is drawn. Download makes each file when you
 click it, from what was drawn: SVG, PNG (300 dpi, less past 50 megapixels; the button says which), PDF and the
 layout file for the figure, the sequence figure, and the 3D page as HTML. A setting that fails keeps the last good figure on screen and names the control to check.
+**New structure** opens Start's box, examples and upload over the figure, and draws the next structure in its place:
+the theme and style stay, while the last structure's chains, edits, marks and alignment go.
 
 The sidebar starts with the theme (Browse themes shows them all), the colouring, labels, legend, text size and
 title. The rest is in sections:
