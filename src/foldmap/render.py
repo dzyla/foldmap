@@ -3521,6 +3521,7 @@ def eta_box(cx: float, cy: float, length: float, width: float, **kw) -> FancyBbo
 def _draw_elements(c: _Canvas, layout: Layout, bars=()) -> None:
     """The strands, 3-10 helices and helices, with their labels; a strand's letter slides along its shaft off the
     disulfide bars (`bars`: their routes) that pass under it (strand_label_spot)."""
+    k = glyph(layout)[0] / _GLYPH_W  # helix names stand as far out as the text drawn needs (helix_label_pos)
     keep = link_keep(c.lw * 2.4, c.pt_per_unit, c.fig.dpi)
     c.fig.foldmap_moved_letters = []  # strand letters off their arrow's centre (provenance: names moved)
     for p in layout.placed.values():
@@ -3556,7 +3557,7 @@ def _draw_elements(c: _Canvas, layout: Layout, bars=()) -> None:
             c.ax.add_patch(box)
             if c.look.labels:
                 t = c.ax.text(
-                    *helix_label_pos(p),
+                    *helix_label_pos(p, k),
                     p.label,
                     ha="center",
                     va="center",
@@ -3600,7 +3601,7 @@ def _draw_elements(c: _Canvas, layout: Layout, bars=()) -> None:
                 c.ax.add_patch(gloss)
             if c.look.labels:
                 t = c.ax.text(
-                    *helix_label_pos(p),
+                    *helix_label_pos(p, k),
                     p.label,
                     ha="center",
                     va="center",

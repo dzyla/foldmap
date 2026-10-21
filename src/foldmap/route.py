@@ -726,7 +726,7 @@ def _name_ink(layout: Layout, p: Placed, em: float) -> tuple[float, float, float
     """A helix name's drawn ink as a box: its width from the text's own metrics (_text_width, regular), its height
     from the digits' and Greek letters' ascent and descent. The keep-out box (_element_label_box) is a rough glyph
     size, smaller than the text on a wide page, where the text is held at 4 pt or more."""
-    cx, cy = helix_label_pos(p)
+    cx, cy = helix_label_pos(p, glyph(layout)[0] / _GLYPH_W)  # where render draws it
     hw = _text_width(p.label, bold=False) * em / 2
     return (cx - hw, cy - _NAME_INK_DOWN * em, cx + hw, cy + _NAME_INK_UP * em)
 

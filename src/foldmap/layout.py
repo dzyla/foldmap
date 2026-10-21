@@ -39,7 +39,8 @@ ETA_W = 0.7  # 3-10 box width as a fraction of the helix width
 MARGIN = 0.8  # clear space kept around each element so loops can pass
 _ROW_GAP = 2.5  # between neighbours in a stack row
 _ROW_SPACING = 3.2  # between stack rows: room for a chain-end label below one row and above the next
-LABEL_GAP = 0.3  # a helix label's centre sits this far beyond the side of the element box
+LABEL_GAP = 0.3  # a helix label's centre sits this far beyond the side of the element box (times glyph_scale)
+_NAME_PAD = 0.05  # a helix name's keep-out box reaches this far past its glyphs (times glyph_scale)
 END_STUB = 0.7  # chain-end stub length
 END_LABEL = 1.15  # distance from a chain-end port to its N/C letter
 LONG_TAIL = 10  # a chain end with this many residues or more past its last element gets a count ("14 aa")
@@ -406,8 +407,8 @@ def _footprint(m, k: float | None = None) -> tuple[float, float, float, float]:
     x0, y0, x1, y1 = m.rect
     box = (x0 - m.cx, y0 - m.cy, x1 - m.cx, y1 - m.cy)
     if isinstance(m, Placed) and m.sse.kind in ("H", "G"):
-        lx, ly = helix_label_pos(Placed(m.sse, 0.0, 0.0, m.length, m.angle, m.width))
-        hx, hy = gw * 1.5 + 0.05, gh / 2  # up to three glyphs: α10
+        lx, ly = helix_label_pos(Placed(m.sse, 0.0, 0.0, m.length, m.angle, m.width), k)
+        hx, hy = gw * 1.5 + _NAME_PAD * k, gh / 2  # up to three glyphs: α10
         box = (min(box[0], lx - hx), min(box[1], ly - hy), max(box[2], lx + hx), max(box[3], ly + hy))
     if isinstance(m, PlacedStem):  # a stem's name beside it
         x0, y0, x1, y1 = _stem_label_box(m, k)
@@ -4809,11 +4810,20 @@ def provisional(sses: list[SSE]) -> Layout:
     return Layout({p.sse.id: p for p in placed}, (0.0, 0.0, 0.0, 0.0))
 
 
-def helix_label_pos(p: Placed) -> tuple[float, float]:
+def helix_label_pos(p: Placed, k: float | None = None) -> tuple[float, float]:
     """Beside the bar, on its upper side (the other with label_side -1), clear of the body; label_along further
-    along it."""
+    along it. Its centre stands LABEL_GAP times `k` (glyph_scale of the text drawn; the layout being built's,
+    _GLYPH_K, when None) beyond the bar's side, so a name keeps its gap to its bar, in ems, at any Style.font_scale;
+    and, where its keep-out box (up to three glyphs, as _footprint's: α10) reaches further across the bar's side
+    than LABEL_GAP (a bar turned from the page's x: a name's width lies across it), further by that excess times
+    k - 1: the box then reaches no further into the bar, nor towards its ports, than at k = 1, where loops leave
+    the bar beside it (plan 22: at a fixed LABEL_GAP, names drawn at font_scale 2 or more sat on their bars; at
+    LABEL_GAP times k alone, η1's box on 1UBQ at 3 covered the port column of its vertical bar)."""
+    k = _GLYPH_K.get() if k is None else k
     nx, ny = -np.sin(p.angle), np.cos(p.angle)
-    side = (p.width / 2 + LABEL_GAP) * (1 if ny >= 0 else -1) * p.label_side
+    across = abs(nx) * (_GLYPH_W * 1.5 + _NAME_PAD) + abs(ny) * _GLYPH_H / 2  # the box's half-reach across the side
+    side = (p.width / 2 + LABEL_GAP * k + max(0.0, across - LABEL_GAP) * (k - 1)) * (1 if ny >= 0 else -1)
+    side *= p.label_side
     return float(p.cx + nx * side + ny * p.label_along), float(p.cy + ny * side - nx * p.label_along)
 
 
@@ -5462,8 +5472,9 @@ def _grown(box, pad: float) -> tuple[float, float, float, float]:
 
 
 def _element_label_box(p: Placed, k: float = 1.0) -> tuple[float, float, float, float]:
-    """The box around a helix's name: `k` (glyph_scale of the text drawn) glyphs of _GLYPH_W x _GLYPH_H a letter."""
-    return centred_box(*helix_label_pos(p), _GLYPH_W * k * len(p.label) / 2 + 0.05, _GLYPH_H * k / 2)
+    """The box around a helix's name, where it stands at `k` (helix_label_pos): `k` (glyph_scale of the text drawn)
+    glyphs of _GLYPH_W x _GLYPH_H a letter, and _NAME_PAD times `k` beyond them along the text."""
+    return centred_box(*helix_label_pos(p, k), _GLYPH_W * k * len(p.label) / 2 + _NAME_PAD * k, _GLYPH_H * k / 2)
 
 
 def na_strand_lines(layout: Layout) -> list:

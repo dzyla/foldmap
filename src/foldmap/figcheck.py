@@ -44,6 +44,8 @@ GLYCAN_STEM = re.compile(r"glycan:[^:]+:stem$")
 # bodies are owned by their element id (label:<id>, resnum:<id>:<end>, ghostlabel:<id> are theirs).
 ELEMENT_BODIES = ("strand:", "helix:", "helix-back:", "eta:", "ghost:")
 OWN_BODIES = {"ligand:": "ligand-label:", "linked:": "linked-label:", "domain-name-plate:": "domain-label:"}
+BESIDE_BODIES = ("helix:", "helix-back:", "eta:")  # bodies whose name stands beside them, never on them: A6 reads
+# their own name over them (plan 22: names over their own bars at font_scale 2-3.5 went unread, owned)
 TEXT_OVERLAP_PX2 = 1.0  # text over text or a body: overlaps up to this many square pixels are anti-aliasing
 TEXT_DEPTH_PX = 2.0  # ... and a text or body reaching no deeper than this into a text's ink is a near-touch (R13):
 # the same scale as LINE_TEXT_CLEARANCE_PX, wider than what matplotlib versions disagree by
@@ -615,10 +617,10 @@ def text_collisions(drawn, *, clearance_px: float = 0.0, page: Page | None = Non
       ways (a text's own parts, one gid, never); two texts turned alike are compared in their turned frame
       (Page.pair_boxes: a stem's name beside its letter row);
     - text over a body (an element, a stem, a ligand or linked mark, a domain name plate) it does not belong to (its
-      label, its residue numbers, its letters, its name), by more than TEXT_OVERLAP_PX2 of its ink deeper than
-      TEXT_DEPTH_PX inside it, once per element (a helix
-      is drawn as helix: and helix-back:); a helix drawn over a sheet and that sheet's strands are each other's
-      (layout.lying_over);
+      label, its residue numbers, its letters, its name) or a helix's or 3-10 helix's bar under its own name
+      (BESIDE_BODIES: the name stands beside its bar), by more than TEXT_OVERLAP_PX2 of its ink deeper than
+      TEXT_DEPTH_PX inside it, once per element (a helix is drawn as helix: and helix-back:); a helix drawn over a
+      sheet and that sheet's strands are each other's (layout.lying_over);
     - text crossed by a line (LINE_GIDS: loops, nucleic-acid runs and ties, tethers, disulfide bars, glycan stems,
       H-bonds) whose stroke comes within `clearance_px` of its ink box where no opaque body drawn above the line
       hides it there: a line under the text still runs through its letters, a loop under the strand its letter sits
@@ -649,12 +651,14 @@ def text_collisions(drawn, *, clearance_px: float = 0.0, page: Page | None = Non
     for t, name, box in page.texts:
         gid = t.get_gid() or ""
         mine = _owner(gid)
+        named = gid.startswith("label:")  # an element's name: a helix's stands beside its bar (BESIDE_BODIES)
         met: set[str] = set()
         core = _core(box)
         if core is not None:  # stems: their whole body below
             for k in _meeting(core.extents, body_rows, True).tolist():
                 body, path, theirs = bodies[k]
-                if theirs == mine or theirs in met or frozenset((theirs, mine)) in over:
+                owned = theirs == mine and not (named and body.startswith(BESIDE_BODIES))  # a bar: not under its name
+                if owned or theirs in met or frozenset((theirs, mine)) in over:
                     continue
                 if _on(box, path, Bbox(body_rows[k].reshape(2, 2))):
                     met.add(theirs)

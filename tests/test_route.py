@@ -954,7 +954,8 @@ def test_routed_loops_keep_off_every_helix_name_as_drawn(name, scale):
 
 def test_keep_out_boxes_grow_with_larger_text():
     """random-100 C6: a name's and a chain end's keep-out box is sized from the text drawn (layout.glyph): three
-    times the text, three times the glyph (the 0.05 pad aside); never smaller than at the usual size."""
+    times the text, three times the glyph (a chain end's 0.05 pad aside; a helix name's pad grows too, plan 22); never
+    smaller than at the usual size."""
     from foldmap.cli import make_layout
 
     lay, sses, _ = make_layout(DATA / "2HHB.cif")
@@ -963,9 +964,9 @@ def test_keep_out_boxes_grow_with_larger_text():
     big = dict(label_boxes(lay, sses))
     lay.font_scale = 0.6
     less = dict(label_boxes(lay, sses))
-    for key in ("N:A", next(k for k in small if k.startswith("label:"))):
+    for key, pad in (("N:A", 0.1), (next(k for k in small if k.startswith("label:")), 0.0)):
         (a0, b0, a1, b1), (c0, d0, c1, d1) = small[key], big[key]
-        assert d1 - d0 == pytest.approx(3 * (b1 - b0)) and c1 - c0 == pytest.approx(3 * (a1 - a0 - 0.1) + 0.1)
+        assert d1 - d0 == pytest.approx(3 * (b1 - b0)) and c1 - c0 == pytest.approx(3 * (a1 - a0 - pad) + pad)
         assert less[key] == small[key]
 
 
