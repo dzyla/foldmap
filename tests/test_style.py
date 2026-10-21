@@ -541,3 +541,113 @@ def test_na_line_is_a_layout_key_one_by_default(capsys):
     assert "na_line: 1.0" in describe(Style())
     assert main(["styles"]) == 0
     assert "na_line           positive number, 1 = default size" in capsys.readouterr().out.split("Layout keys")[1]
+
+
+def test_interaction_keys_are_theme_keys_off_by_default(capsys):
+    """Plan 13c-3: `interactions`, `interactions_between`, `interaction_max` move nothing (theme keys); off, auto, 200
+    by default, in every theme."""
+    from foldmap.cli import main
+    from foldmap.style import describe
+
+    look = Style()
+    assert (look.interactions, look.interactions_between, look.interaction_max) == ("off", "auto", 200)
+    assert {"interactions", "interactions_between", "interaction_max"} <= set(THEME_KEYS)
+    assert all(t.interactions == "off" and t.interactions_between == "auto" for t in THEMES.values())
+    assert "interactions: off" in describe(look) and "interaction_max: 200" in describe(look)
+    assert main(["styles"]) == 0
+    out = capsys.readouterr().out.split("Layout keys")[0]
+    assert "interactions      off, all or kinds like hbond,salt (hbond, salt, stack, cation-pi, hydrophobic" in out
+    assert "interactions_between auto, na, interchain or chains:A+B,C+D" in out
+    assert "interaction_max   whole number" in out
+
+
+@pytest.mark.parametrize("nucleic", [True, False])
+def test_hbonds_na_and_interactions_hbond_between_na_are_one_selection(nucleic):
+    """Plan 13c-3: the older `hbonds=na` means interactions=hbond, interactions_between=na, whatever the figure
+    holds; so do its other values."""
+    from foldmap.hbonds import Selection
+    from foldmap.style import interactions_of
+
+    for old in ("na", "interchain", "chains:A+B,C+D"):
+        before = interactions_of(resolve_style(overrides=[f"hbonds={old}"]), nucleic)
+        after = interactions_of(resolve_style(overrides=["interactions=hbond", f"interactions_between={old}"]), nucleic)
+        assert before == after and before.kinds == ("hbond",), old
+    assert interactions_of(resolve_style(overrides=["hbonds=na"]), nucleic).between == Selection("na")
+    assert interactions_of(Style(), nucleic) == ((), Selection("off"))  # nothing asked: no lines
+
+
+def test_interactions_between_auto_follows_the_nucleic_acid_and_interactions_win():
+    from foldmap.hbonds import Selection
+    from foldmap.style import interactions_of, parse_interactions
+
+    look = resolve_style(overrides=["interactions=salt"])
+    assert interactions_of(look, True) == (("salt",), Selection("na"))
+    assert interactions_of(look, False) == (("salt",), Selection("interchain"))
+    both = resolve_style(overrides=["hbonds=interchain", "interactions=stack,salt"])
+    assert interactions_of(both, False) == (("salt", "stack"), Selection("interchain"))  # no H-bonds: interactions win
+    assert parse_interactions("all") == ("hbond", "salt", "stack", "cation-pi")  # every kind but hydrophobic
+    assert parse_interactions("all,hydrophobic") == ("hbond", "salt", "stack", "cation-pi", "hydrophobic")
+    assert parse_interactions("Hydrophobic, SALT,salt") == ("salt", "hydrophobic")  # KINDS order, once each
+    assert parse_interactions("off") == () and parse_interactions(False) == ()  # unquoted off in YAML
+    assert resolve_style(overrides=["interactions=OFF"]).interactions == "OFF"  # kept as given; read as off
+
+
+def test_interactions_off_unquoted_in_a_style_file_is_off(tmp_path):
+    f = tmp_path / "s.yaml"
+    f.write_text("interactions: off\ninteractions_between: interchain\n")
+    assert resolve_style(style_file=f).interactions == "off"
+
+
+@pytest.mark.parametrize(
+    "setting, message",
+    [
+        ("interactions=salty", "interactions must be off, all or kinds like hbond,salt (hbond, salt, stack, cation-pi"),
+        ("interactions=", "interactions must be off, all or kinds like hbond,salt"),
+        ("interactions=hbond,,salt", "interactions must be off, all or kinds like hbond,salt"),
+        ("interactions_between=off", "interactions_between must be auto, na, interchain or chains:A+B,C+D"),
+        ("interactions_between=ligands", "interactions_between must be auto, na, interchain or chains:A+B,C+D"),
+        ("interactions_between=chains:A+A", "interactions_between must be auto, na, interchain or chains:A+B,C+D"),
+        ("interactions_between=chains:", "interactions_between must be auto, na, interchain or chains:A+B,C+D"),
+        ("interaction_max=0", "interaction_max must be a whole number of 1 or more"),
+        ("interaction_max=2.5", "interaction_max must be a whole number"),
+    ],
+)
+def test_bad_interaction_values_name_the_accepted_forms(setting, message):
+    with pytest.raises(ValueError) as err:
+        resolve_style(overrides=[setting])
+    assert str(err.value).startswith(message)
+
+
+def test_hbonds_and_interactions_both_given_warn_that_interactions_win():
+    """Plan 13c-3: said before layout, with the references (spec.check_references), so the command line, the app and
+    the MCP server say it; a warning, the figure is drawn."""
+    from pathlib import Path
+
+    from foldmap.spec import check_references, figure_spec
+    from foldmap.style import hbonds_superseded
+
+    ubq = Path(__file__).parent / "data" / "1UBQ.cif"
+    (problem,) = check_references(figure_spec(ubq, style=["hbonds=na", "interactions=salt"]))
+    assert not problem.fatal and str(problem).startswith("hbonds=na: interactions=salt is given too and wins")
+    assert "add hbond to interactions" in str(problem)
+    assert check_references(figure_spec(ubq, style=["hbonds=na"])) == []
+    assert check_references(figure_spec(ubq, style=["interactions=salt"])) == []
+    assert hbonds_superseded("off", "all") == "" and hbonds_superseded("na", "off") == ""
+
+
+def test_each_interaction_kind_has_its_ink_and_print_and_blueprint_tell_them_by_dash():
+    """Plan 13c-3: per-kind colour and dash in render; the print and blueprint themes draw every kind in their own
+    hbond_color (grey / pale), told apart by the dash alone (no new theme keys). H-bonds keep hbond_color and their
+    dash, so H-bond figures stay as they were."""
+    from foldmap.interactions import KINDS
+    from foldmap.render import interaction_ink
+
+    look = Style()
+    inks = {kind: interaction_ink(kind, look) for kind in KINDS}
+    assert inks["hbond"] == (look.hbond_color, (0, (3, 2)))
+    assert len({colour for colour, _ in inks.values()}) == len(KINDS)
+    assert len({dash for _, dash in inks.values()}) == len(KINDS)
+    for name in ("print", "blueprint"):
+        theme = THEMES[name]
+        assert {interaction_ink(kind, theme)[0] for kind in KINDS} == {theme.hbond_color}, name
+        assert [interaction_ink(kind, theme)[1] for kind in KINDS] == [dash for _, dash in inks.values()], name

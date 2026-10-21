@@ -116,6 +116,36 @@ def test_backbone_colour_and_hbonds_reach_the_figure():
     assert at.session_state["hbonds"] == "na" and 'id="hbond:' in svg_of(at)
 
 
+def test_interaction_checkboxes_write_interactions_and_say_when_they_win_over_hbonds():
+    """Plan 13c-3: a checkbox per kind writes `interactions` (none ticked: off); the partners and the cap appear once
+    one is ticked; with an H-bond choice made too, a warning says the interactions win."""
+    from foldmap.app_controls import INTERACTIONS
+    from foldmap.app_edits import INTERACTION_KINDS
+    from foldmap.interactions import KINDS
+
+    assert tuple(INTERACTIONS) == INTERACTION_KINDS == KINDS
+    at = opened(DATA / "1LMB.cif")
+    keys = set(widget_keys(at.sidebar, skip=()))
+    assert {f"interactions__{k}" for k in KINDS} <= keys and "interaction_max" not in keys  # off: no partners
+    at.checkbox(key="interactions__salt").check().run()
+    at.checkbox(key="interactions__stack").check().run()
+    assert at.session_state["interactions"] == "salt,stack" and not at.exception
+    assert at.session_state["interactions_between"] == "auto"
+    at.segmented_control(key="interactions_between__mode").set_value("interchain").run()
+
+    def wins(at):
+        return [visible(w.value) for w in at.warning if "is given too and wins" in visible(w.value)]
+
+    assert at.session_state["interactions_between"] == "interchain" and not wins(at)
+    at.selectbox(key="theme").select("print").run()  # kept through a theme change, as the H-bond choice is
+    assert (at.session_state["interactions"], at.session_state["interactions_between"]) == ("salt,stack", "interchain")
+    at.segmented_control(key="hbonds__mode").set_value("na").run()
+    assert wins(at) and "interactions=salt,stack is given too and wins" in wins(at)[0]
+    at.checkbox(key="interactions__salt").uncheck().run()
+    at.checkbox(key="interactions__stack").uncheck().run()
+    assert at.session_state["interactions"] == "off" and not wins(at) and 'id="hbond:' in svg_of(at)
+
+
 def test_named_colours_reach_the_pickers_as_hex():
     """A layout file may name colours (teal); the pickers take #rrggbb."""
     at = opened(DATA / "1LMB.cif")
@@ -555,6 +585,9 @@ def test_every_setting_is_reachable():
     for key, value in (("hbonds__mode", "chains"), ("na_backbone__mode", "modality"), ("ligands__mode", "codes")):
         at.segmented_control(key=key).set_value(value).run()
         seen |= shown(at)
+    at.checkbox(key="interactions__salt").check().run()  # a kind ticked: the partners and the cap are shown
+    at.segmented_control(key="interactions_between__mode").set_value("chains").run()
+    seen |= shown(at)
     at.selectbox(key="color_by").select("sequence").run()  # sequence_map instead of palette
     seen |= shown(at)
     at.toggle(key="domains__auto").set_value(True).run()  # with domains: colour by domain and the domain bar

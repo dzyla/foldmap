@@ -336,6 +336,8 @@ def _number(key: str, value, low: float, high: float) -> float:
 def _style_value(key: str, value):
     """A style value of a layout file, of its Style field's type."""
     kind = STYLE_FIELDS[key]
+    if key == "interactions" and value is False:  # unquoted `off` in YAML
+        return "off"
     if kind == "bool":
         if not isinstance(value, bool):
             raise ValueError(f"{key} must be true or false; got {layoutfile._brief(value)}")
@@ -609,7 +611,14 @@ def trouble(err: Exception) -> str:
 
 
 # ---------------------------------------------------------------------------------------------- session
-STRUCTURE_STYLE = ("mark", "highlight", "hbonds", "backbone_colors")  # Style fields that name this structure's parts
+STRUCTURE_STYLE = (  # Style fields that name this structure's parts
+    "mark",
+    "highlight",
+    "hbonds",
+    "interactions",  # with its partners, as hbonds holds both: kept through a theme change, reset with a structure
+    "interactions_between",
+    "backbone_colors",
+)
 NAMES_AND_DOMAINS = (  # what the names and domains controls hold besides the settings (a layout file replaces it)
     "names__kw",
     "names_upload",
@@ -634,8 +643,8 @@ def current_blob(ss: MutableMapping) -> str:
 
 def apply_theme(ss: MutableMapping, name: str | None = None) -> None:
     """Make `name` (default: the session's theme) the theme, with every style value of its own except those that
-    name this structure's parts (STRUCTURE_STYLE: marks, highlight, H-bond pairs, per-chain colours), which stay
-    once set; layout settings not yet in the session get their defaults."""
+    name this structure's parts (STRUCTURE_STYLE: marks, highlight, H-bond and interaction partners, per-chain
+    colours), which stay once set; layout settings not yet in the session get their defaults."""
     name = name or ss["theme"]
     ss["theme"] = name
     for key, value in vars(THEMES[name]).items():

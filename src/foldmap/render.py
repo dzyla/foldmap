@@ -29,7 +29,7 @@ from matplotlib.textpath import text_to_path
 from matplotlib.transforms import Affine2D
 
 from . import text_metrics
-from .hbonds import find_hbonds, parse_selection
+from .hbonds import find_hbonds
 from .layout import (
     _GLYPH_W,
     AXIS_SYMBOL_R,
@@ -98,7 +98,7 @@ from .na_paths import _local, among, midway
 from .palette import BACK_SHADE, PALETTES, chain_colors, darken, delta_e, text_color_on, tint
 from .provenance import as_text, figure_provenance, with_desc
 from .route import Loop, boxes_meeting, clip_len, clip_lengths
-from .style import _ALIASES, CHOICES, MODALITIES, Style, backbone_overrides
+from .style import _ALIASES, CHOICES, MODALITIES, Style, backbone_overrides, interactions_of
 
 _IN_PER_UNIT = IN_PER_UNIT
 _HEAD_HALF = HEAD / 2
@@ -2597,7 +2597,7 @@ def element_colours(layout: Layout, sses: list[SSE], look: Style):
 
 def draw(layout: Layout, loops: list[Loop], sses: list[SSE], title: str | None = None, **kw) -> Figure:
     """`look` carries every visual choice; palette/style (fill)/loop_style are shorthands that override it.
-    `model` (the io.read_model result the layout was built from) is needed only for look.hbonds."""
+    `model` (the io.read_model result the layout was built from) is needed only for look.hbonds / interactions."""
     look = (kw.get("look") or Style()).validate()
     with page(look):  # fonts/colours are fixed when text is made: set them here
         return pin_fonts(_draw(layout, loops, sses, title, **kw))
@@ -2639,17 +2639,38 @@ def nucleotide_points(layout: Layout, style: str = "ladder") -> dict[tuple[int, 
     return where
 
 
+INTERACTION_INK = {  # kind -> (colour, dash) of its lines (plan 13c): each kind its own colour and dash; H-bonds keep
+    # look.hbond_color (None here) and their dash
+    "hbond": (None, (0, (3, 2))),
+    "salt": ("#e8590c", (0, (6, 2))),  # orange, long dashes
+    "stack": ("#2b8a3e", (0, (1, 1.5))),  # green, dots
+    "cation-pi": ("#1971c2", (0, (5, 1.5, 1, 1.5))),  # blue, dash-dot
+    "hydrophobic": ("#868e96", (0, (1, 3))),  # grey, sparse dots
+}
+INK_ONLY_PALETTES = ("greys", "blueprint")  # the print and blueprint themes: every kind in hbond_color, by dash only
+
+
+def interaction_ink(kind: str, look: Style) -> tuple[str, tuple]:
+    """(colour, dash) of `kind`'s lines: INTERACTION_INK's, but in look.hbond_color for H-bonds and for every kind
+    under the print and blueprint palettes (grey on paper, pale on the dark page), told apart by the dash alone."""
+    colour, dash = INTERACTION_INK[kind]
+    return (look.hbond_color if colour is None or look.palette in INK_ONLY_PALETTES else colour), dash
+
+
 def hbond_overlay(layout: Layout, loops: list[Loop], sses: list[SSE], look: Style, model=None) -> HBondOverlay:
-    """The hydrogen-bond lines `look.hbonds` asks for, from the model the layout was built from: one per residue
-    pair (protein before nucleotide, else by tag), between their points on the page. Bonds with an end that is not
-    drawn (cropped nucleic acid, chains outside the focus, residues past a chain's elements) are left out. At most
-    `look.hbond_max` lines, the shortest on the page kept (not the shortest in Å). `model` is the io.read_model
-    result the layout was built from."""
-    sel = parse_selection(look.hbonds)
-    if sel.kind == "off":
+    """The hydrogen-bond lines the look asks for (style.interactions_of: `interactions` with hbond among its kinds,
+    else the older `hbonds`), from the model the layout was built from: one per residue pair (protein before
+    nucleotide, else by tag), between their points on the page. Bonds with an end that is not drawn (cropped nucleic
+    acid, chains outside the focus, residues past a chain's elements) are left out. At most `look.hbond_max` lines,
+    the shortest on the page kept (not the shortest in Å). `model` is the io.read_model result the layout was built
+    from."""
+    asked = interactions_of(look, layout.nucleic is not None)  # interactions=..., else the older hbonds=...
+    if "hbond" not in asked.kinds:
         return HBondOverlay([], 0)
+    sel = asked.between
     if model is None:
-        raise ValueError(f"hbonds={look.hbonds} needs the structure: pass model= (the io.read_model result)")
+        given = f"interactions={look.interactions}" if look.interactions != "off" else f"hbonds={look.hbonds}"
+        raise ValueError(f"{given} needs the structure: pass model= (the io.read_model result)")
     protein = {(l.chain, l.seq, l.icode): (k, l.name) for k, l in enumerate(layout.res_labels)}
     nts = {}
     if layout.nucleic is not None:
@@ -2714,12 +2735,13 @@ def _draw_hbonds(c: _Canvas, overlay: HBondOverlay) -> None:
     lines fade (alpha 1 up to 15% of the content's diagonal, 0.4 from 50% on), so a crowd of them stays legible."""
     x0, y0, x1, y1 = c.content
     diag = float(np.hypot(x1 - x0, y1 - y0))
+    colour, dash = interaction_ink("hbond", c.look)
     for line in overlay.lines:
         (artist,) = c.ax.plot(
             *np.c_[line.ends[0], line.ends[1]],
-            color=c.look.hbond_color,
+            color=colour,
             lw=c.loop_lw * 0.85,
-            ls=(0, (3, 2)),
+            ls=dash,
             alpha=hbond_alpha(line.length, diag),
             solid_capstyle="butt",
             zorder=Z["hbond"],

@@ -34,7 +34,7 @@ from foldmap.app_edits import (
     wrong_upload,
 )
 from foldmap.render import SITE_GROUPS
-from foldmap.style import CHOICES, THEMES
+from foldmap.style import CHOICES, THEMES, hbonds_superseded
 
 
 def touched(ss: MutableMapping, key: str) -> None:
@@ -142,6 +142,7 @@ def show_section(st, ss: MutableMapping) -> None:
                 **part(ss, "ligands__codes", "ligands"),
             )
         hbonds_block(st, ss)
+        interactions_block(st, ss)
         st.text_input(
             "Per-chain colours",
             placeholder="A=#1f77b4, dna=#555555",
@@ -166,6 +167,51 @@ def hbonds_block(st, ss: MutableMapping) -> None:
         with st.container(horizontal=True, vertical_alignment="bottom", key="hbond_look"):
             colour(st, "H-bond colour", ss, "hbond_color")
             st.number_input("Most H-bonds drawn", min_value=1, step=50, **setting(ss, "hbond_max"))
+
+
+INTERACTIONS = {  # interactions.KINDS -> the checkbox's label
+    "hbond": "H-bonds",
+    "salt": "Salt bridges",
+    "stack": "π-stacking",
+    "cation-pi": "Cation-π",
+    "hydrophobic": "Hydrophobic",
+}
+BETWEEN = {"auto": "auto", "na": "protein–DNA/RNA", "interchain": "interchain", "chains": "chain pairs"}
+
+
+def interactions_block(st, ss: MutableMapping) -> None:
+    """Interactions (plan 13c): a checkbox per kind (none ticked: off), then between which partners (auto:
+    protein–DNA/RNA where the structure has nucleic acid, else between chains) and the most lines of each kind.
+    Ticked, they win over the hydrogen-bond choice above, which then is said to be unused."""
+    with st.container(horizontal=True, key="interaction_kinds"):
+        for kind, label in INTERACTIONS.items():
+            st.checkbox(label, **part(ss, f"interactions__{kind}", "interactions"))
+    if str(ss.get("interactions") or "off") == "off":
+        return
+    mode = ss.get("interactions_between__mode", "auto")
+    options = [k for k in BETWEEN if k != "na" or ss.get("na_chains") or mode == "na"]  # a layout file's na stays
+    segmented(
+        st,
+        "Interactions between",
+        options,
+        part(ss, "interactions_between__mode", "interactions_between"),
+        format_func=BETWEEN.get,
+        help="auto: protein–DNA/RNA where the structure has nucleic acid, else between chains",
+    )
+    if mode == "chains":
+        st.text_input(
+            "Interaction chain pairs",
+            placeholder="A+B, C+D",
+            label_visibility="collapsed",
+            **part(ss, "interactions_between__pairs", "interactions_between"),
+        )
+    st.number_input("Most lines of each interaction", min_value=1, step=50, **setting(ss, "interaction_max"))
+    try:
+        note = hbonds_superseded(ss.get("hbonds") or "off", ss["interactions"])
+    except ValueError:
+        note = ""
+    if note:
+        st.warning(shown(note))
 
 
 def nucleic_block(st, ss: MutableMapping) -> None:

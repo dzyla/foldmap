@@ -67,7 +67,18 @@ from .spec import (
     parse_vector,
 )
 from .ss import build_sses
-from .style import CHOICES, LAYOUT_KEYS, SCALES, THEME_KEYS, THEMES, Style, describe, resolve_style
+from .style import (
+    BETWEEN_FORMS,
+    CHOICES,
+    INTERACTION_FORMS,
+    LAYOUT_KEYS,
+    SCALES,
+    THEME_KEYS,
+    THEMES,
+    Style,
+    describe,
+    resolve_style,
+)
 from .symmetry import TOLERANCE, detect_symmetry
 
 _vector, _protomers, _domain_spec = parse_vector, parse_protomers, parse_domains  # older names, used by the app
@@ -1522,7 +1533,13 @@ def styles_help() -> str:
         if key in ("dna_color", "rna_color", "background", "ink"):
             return "a colour (#rrggbb or a name)"
         if key == "hbonds":
-            return "off, na, interchain or chains:A+B,C+D"
+            return "off, na, interchain or chains:A+B,C+D (interactions=hbond with interactions_between=...)"
+        if key == "interactions":
+            return INTERACTION_FORMS
+        if key == "interactions_between":
+            return BETWEEN_FORMS + " (auto: na when the figure holds nucleic acid, else interchain)"
+        if key == "interaction_max":
+            return "whole number, at most this many lines of each kind (H-bonds: hbond_max)"
         if key == "hbond_color":
             return "a colour (#rrggbb or a name)"
         if key == "hbond_max":

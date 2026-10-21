@@ -10,8 +10,10 @@ from __future__ import annotations
 import re
 from dataclasses import asdict, dataclass, fields, replace
 from pathlib import Path
+from typing import NamedTuple
 
-from .hbonds import parse_selection
+from .hbonds import Selection, parse_selection
+from .interactions import KINDS as INTERACTION_KINDS
 from .palette import PALETTES
 from .yamlfile import read_yaml
 
@@ -89,6 +91,71 @@ def backbone_overrides(text: str) -> dict[str, str]:
     return out
 
 
+INTERACTIONS_ALL = ("hbond", "salt", "stack", "cation-pi")  # `interactions=all`: every kind but hydrophobic
+INTERACTION_FORMS = "off, all or kinds like hbond,salt (" + ", ".join(INTERACTION_KINDS) + "; all,hydrophobic adds it)"
+BETWEEN_FORMS = "auto, na, interchain or chains:A+B,C+D"
+
+
+def parse_interactions(text) -> tuple[str, ...]:
+    """The kinds an `interactions` value names, in interactions.KINDS order, each once: off -> (), all -> every kind
+    but hydrophobic (drawn only on request: it can crowd a figure), or a comma list (all may be one of its items).
+    Keywords in any case. ValueError names the accepted forms."""
+    value = "off" if text is False else str(text).strip()  # unquoted `off` in YAML is False
+    items = [item.strip() for item in value.lower().split(",")]
+    if items == ["off"]:
+        return ()
+    bad = [item for item in items if item not in (*INTERACTION_KINDS, "all")]
+    if bad:
+        raise ValueError(f"interactions must be {INTERACTION_FORMS}; got {value!r}")
+    asked = set(items) | (set(INTERACTIONS_ALL) if "all" in items else set())
+    return tuple(kind for kind in INTERACTION_KINDS if kind in asked)
+
+
+def parse_between(text) -> Selection | None:
+    """The partners an `interactions_between` value names: None for auto (cf. interactions_of), else the selection
+    (hbonds.parse_selection's forms but off, which interactions=off says). ValueError names the accepted forms."""
+    value = str(text).strip()
+    if value.lower() == "auto":
+        return None
+    try:
+        selection = parse_selection(value)
+    except ValueError:
+        selection = None
+    if selection is None or selection.kind == "off":
+        raise ValueError(f"interactions_between must be {BETWEEN_FORMS} (two different chains a pair); got {value!r}")
+    return selection
+
+
+class Interactions(NamedTuple):
+    """The interaction lines a look asks for: their kinds (interactions.KINDS order) and between which partners."""
+
+    kinds: tuple[str, ...]
+    between: Selection
+
+
+def interactions_of(look: Style, nucleic: bool) -> Interactions:
+    """The interactions a look draws. `interactions` (when not off) wins, between `interactions_between`'s partners
+    (auto: na when the figure holds nucleic acid, `nucleic`, else interchain); else the older key `hbonds`, which means
+    interactions=hbond with interactions_between=<its value> (hbonds=na draws what it drew before plan 13); else
+    none (kinds (), between off)."""
+    kinds = parse_interactions(look.interactions)
+    if kinds:
+        between = parse_between(look.interactions_between) or Selection("na" if nucleic else "interchain")
+        return Interactions(kinds, between)
+    selection = parse_selection(look.hbonds)
+    return Interactions(("hbond",) if selection.kind != "off" else (), selection)
+
+
+def hbonds_superseded(hbonds, interactions) -> str:
+    """The warning when both `hbonds` and `interactions` are given ('' otherwise): interactions wins."""
+    if parse_selection(hbonds).kind == "off" or not parse_interactions(interactions):
+        return ""
+    return (
+        f"interactions={interactions} is given too and wins, so hbonds={hbonds} is not used (it means "
+        f"interactions=hbond with interactions_between={hbonds}: add hbond to interactions to keep those lines)"
+    )
+
+
 SCALES = ("helix_scale", "strand_scale", "dna_scale", "loop_width", "font_scale", "na_line")
 
 
@@ -152,6 +219,11 @@ class Style:
     )
     hbond_color: str = "#d020f8"  # the dashed lines (a violet-magenta clear of every theme palette; see THEMES)
     hbond_max: int = 200  # at most this many lines, the shortest kept
+    interactions: str = "off"  # lines for the interactions between residues (plan 13c): off, all (every kind but
+    # hydrophobic) or kinds "hbond,salt,stack,cation-pi,hydrophobic"; given (not off), it wins over hbonds
+    interactions_between: str = "auto"  # their partners: auto (na when the figure holds nucleic acid, else
+    # interchain), na, interchain or chains:A+B,C+D
+    interaction_max: int = 200  # at most this many lines of each kind but H-bonds (hbond_max caps those)
     mark: str = ""  # elements in a colour of their own: "G", "A:G=#2ca02c", "#3", "res:150-159=red", comma-separated
     domain_bar: str = "auto"  # a linear bar of the named domains under the figure, one per chain, N to C (Nishimasu
     # 2014 Fig 1A): auto (2 or more domains drawn), on (any), off
@@ -178,8 +250,12 @@ class Style:
         parse_selection(self.hbonds)
         if not is_color_like(self.hbond_color):
             raise ValueError(f"hbond_color must be a colour such as #d020f8 or teal; got {self.hbond_color!r}")
-        if isinstance(self.hbond_max, bool) or not isinstance(self.hbond_max, int) or self.hbond_max < 1:
-            raise ValueError(f"hbond_max must be a whole number of 1 or more; got {self.hbond_max!r}")
+        parse_interactions(self.interactions)
+        parse_between(self.interactions_between)
+        for key in ("hbond_max", "interaction_max"):
+            value = getattr(self, key)
+            if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+                raise ValueError(f"{key} must be a whole number of 1 or more; got {value!r}")
         if not re.fullmatch(r"auto|all|none|[a-z-]+(,[a-z-]+)*", self.uniprot_sites):
             raise ValueError(
                 f"uniprot_sites must be auto, all, none or types like active,binding; got {self.uniprot_sites!r}"
@@ -243,6 +319,8 @@ def _coerce(key: str, value):
         raise ValueError(f"unknown style key {key!r}; valid keys: {', '.join(_TYPES)}")
     kind = _TYPES[key]
     value = _ALIASES.get(key, {}).get(value, value)
+    if key == "interactions" and value is False:  # unquoted `off` in a YAML file
+        return "off"
     if kind == "bool":
         if isinstance(value, bool):
             return value

@@ -31,6 +31,8 @@ ROUND_TRIP = {
     "ligands": ["auto", "all", "none", "HEM,ZN"],
     "na_backbone": ["modality", "chain", "ink", "#123456"],
     "hbonds": ["off", "na", "interchain", "chains:A+B,C+D"],
+    "interactions": ["off", "hbond", "salt,stack", "hbond,salt,stack,cation-pi,hydrophobic"],
+    "interactions_between": ["auto", "na", "interchain", "chains:A+B,C+D"],
     "uniprot": ["off", "auto", "P0CG48"],
     "uniprot_sites": ["auto", "all", "none", "active,binding"],
 }
@@ -58,6 +60,11 @@ def test_composites_normalise_what_people_type():
     assert COMPOSITES["hbonds"][2]("chains", "A + B, C+D") == "chains:A+B,C+D"
     assert COMPOSITES["highlight"][2]("chains", []) == "none"
     assert COMPOSITES["uniprot"][2]("accession", "p0cg48") == "P0CG48"
+    assert COMPOSITES["interactions_between"][2]("chains", "A + B, C+D") == "chains:A+B,C+D"
+    assert COMPOSITES["interactions_between"][2]("chains", "") == "auto"
+    assert COMPOSITES["interactions"][1]("all") == (True, True, True, True, False)  # every kind but hydrophobic
+    assert COMPOSITES["interactions"][1]("Salt, nonsense") == (False,) * 5  # a value the style refuses: none ticked
+    assert COMPOSITES["interactions"][2](False, False, False, False, False) == "off"
 
 
 def test_sync_keeps_a_half_made_choice():

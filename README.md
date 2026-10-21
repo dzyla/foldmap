@@ -260,7 +260,7 @@ Change any key with `--set KEY=VALUE` (repeatable) or a YAML file for `--style-f
 `residue_numbers`, `highlight` (`asu`, `protomer` or chains), `mark` (elements in a colour of their own),
 `ligands` (`auto`, `all`, `none` or codes like `HEM,ZN`), `fold_template`, `helix_on_sheet`, `two_fold`, `cyclic`,
 `copy_ghosts`, `domain_bar`, `domain_colours`, `na_backbone`, `backbone_colors`, `dna_color`, `rna_color`, `hbonds`,
-`hbond_color`, `hbond_max`, `disulfides`, `glycans`, `helices_310`, `na_extent`, `na_style`, `background`, `ink`,
+`hbond_color`, `hbond_max`, `interactions`, `interactions_between`, `interaction_max`, `disulfides`, `glycans`, `helices_310`, `na_extent`, `na_style`, `background`, `ink`,
 `helix_scale`, `strand_scale`, `font_scale`, `na_line` (`dna_extent` still works on the command line and in style and layout
 files).
 
@@ -281,6 +281,7 @@ files).
 | Cyclic assemblies | `--set cyclic=rosette` (opt-in): a four- or seven-fold ring (C4, C7) drawn whole, seen down its axis, each copy the first one's drawing turned about it (default `unrolled`: side by side) |
 | Strands lent across a ring's cut | `--set copy_ghosts=off` draws such a strand once, past the row's end, with no dashed copies of it or its partners |
 | Hydrogen bonds | `--set hbonds=na`, `interchain` or `chains:A+B`; `--set hbond_max=30` |
+| Interactions | `--set interactions=hbond,salt` (or `all`), `--set interactions_between=chains:A+B` |
 | Only some chains | `--chains A,B` |
 | Draw like a reference | `--like 2HHB --like-chain B` (one chain of each; see below) |
 | Large assemblies | `--focus auto\|none\|protomer\|B` (one subunit plus what its neighbours add to its fold) |
@@ -543,6 +544,14 @@ changes, never the layout. Example: `foldmap plot 1LMB.cif --set hbonds=na -o 1l
 
 On large complexes the lines can pile up into a hairball (30QM with `hbonds=na` draws 79). Restrict them with
 `chains:` (`--set hbonds=chains:A+B`) or lower `hbond_max` (`--set hbond_max=30`).
+
+**Interactions.** `--set interactions=hbond,salt,stack,cation-pi,hydrophobic` (any of these; `all` is every kind but
+hydrophobic, `all,hydrophobic` adds it; default `off`) chooses the kinds of interaction drawn, and
+`--set interactions_between=auto|na|interchain|chains:A+B,C+D` their partners (`auto`, the default: `na` when the
+figure holds nucleic acid, else `interchain`). `interaction_max` caps the lines of each kind (default 200; H-bonds keep
+`hbond_max`). `hbonds=na` keeps working and means `interactions=hbond` with `interactions_between=na`, so old layout
+files and app sessions draw the same figure; when both keys are given, `interactions` wins and a warning says so.
+For now only the H-bond lines are drawn; the other kinds' lines come with the interaction overlay (plan 13c).
 
 **Checking the science.** A figure can look clean and still say something false about the structure, so foldmap
 checks what it draws against the coordinates, apart from how the page looks. `foldmap check 9FWZ` draws the figure

@@ -95,6 +95,38 @@ def _hbonds_text(mode: str, pairs: str) -> str:
     return "chains:" + ",".join(pairs) if pairs else "off"
 
 
+INTERACTION_KINDS = ("hbond", "salt", "stack", "cation-pi", "hydrophobic")  # interactions.KINDS (no pipeline here)
+
+
+def _interactions_parts(text) -> tuple:
+    """A checkbox per kind, ticked when `interactions` names it (all: every kind but hydrophobic)."""
+    from foldmap.style import parse_interactions
+
+    try:
+        kinds = parse_interactions(text or "off")
+    except ValueError:
+        kinds = ()
+    return tuple(kind in kinds for kind in INTERACTION_KINDS)
+
+
+def _interactions_text(*ticked) -> str:
+    return ",".join(kind for kind, on in zip(INTERACTION_KINDS, ticked) if on) or "off"
+
+
+def _between_parts(text: str) -> tuple:
+    text = (text or "").strip()
+    if text.startswith("chains:"):
+        return ("chains", ", ".join(_list(text[len("chains:") :])))
+    return (text or "auto", "")
+
+
+def _between_text(mode: str, pairs: str) -> str:
+    if mode != "chains":
+        return mode
+    pairs = [p.replace(" ", "") for p in _list(pairs)]
+    return "chains:" + ",".join(pairs) if pairs else "auto"
+
+
 def _uniprot_parts(text: str) -> tuple:
     text = (text or "").strip()
     return (text or "off", "") if text in ("", "off", "auto") else ("accession", text)
@@ -124,6 +156,12 @@ COMPOSITES: dict[str, tuple[tuple[str, ...], Callable, Callable]] = {
     "ligands": (("ligands__mode", "ligands__codes"), _ligands_parts, _ligands_text),
     "na_backbone": (("na_backbone__mode", "na_backbone__colour"), _na_backbone_parts, _na_backbone_text),
     "hbonds": (("hbonds__mode", "hbonds__pairs"), _hbonds_parts, _hbonds_text),
+    "interactions": (tuple(f"interactions__{k}" for k in INTERACTION_KINDS), _interactions_parts, _interactions_text),
+    "interactions_between": (
+        ("interactions_between__mode", "interactions_between__pairs"),
+        _between_parts,
+        _between_text,
+    ),
     "uniprot": (("uniprot__mode", "uniprot__acc"), _uniprot_parts, _uniprot_text),
     "uniprot_sites": (("uniprot_sites__mode", "uniprot_sites__types"), _sites_parts, _sites_text),
 }
@@ -412,6 +450,13 @@ CONTROLS: dict[str, tuple[str, str, tuple[str, ...]]] = {
     "hbonds": ("Hydrogen bonds", _SHOW, ("hbonds__mode", "hbonds__pairs")),
     "hbond_color": ("H-bond colour", _SHOW, ("hbond_color",)),
     "hbond_max": ("Most H-bonds drawn", _SHOW, ("hbond_max",)),
+    "interactions": ("Interactions", _SHOW, tuple(f"interactions__{k}" for k in INTERACTION_KINDS)),
+    "interactions_between": (
+        "Interactions between",
+        _SHOW,
+        ("interactions_between__mode", "interactions_between__pairs"),
+    ),
+    "interaction_max": ("Most lines of each interaction", _SHOW, ("interaction_max",)),
     "nucleotide_labels": ("Base letters", _SHOW, ("nucleotide_labels",)),
     "na_style": ("Stems", _SHOW, ("na_style",)),
     "na_extent": ("Shown", _SHOW, ("na_extent",)),
@@ -470,6 +515,9 @@ _NEEDLES = (  # (in the lower-cased error message, the setting it points at); th
     ("focus", "focus"),
     ("ligands", "ligands"),
     ("hbonds", "hbonds"),
+    ("interactions_between", "interactions_between"),
+    ("interaction_max", "interaction_max"),
+    ("interactions", "interactions"),
     ("backbone_colors", "backbone_colors"),
     ("na_backbone", "na_backbone"),
     ("uniprot", "uniprot"),

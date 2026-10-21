@@ -276,3 +276,52 @@ def test_bad_like_in_a_layout_file_is_explained(tmp_path, like, msg, capsys):
     lf.write_text(yaml.safe_dump({"foldmap": 1, "layout": {"like": like}}))
     assert main(["plot", str(DATA / "1UBQ.cif"), "-o", str(tmp_path / "x.svg"), "--layout-file", str(lf)]) == 1
     assert msg in capsys.readouterr().err
+
+
+def test_an_old_layout_file_with_hbonds_draws_as_hbonds_does_and_as_interactions_do(tmp_path):
+    """Plan 13c-3: a layout file saved before the interaction keys (`hbonds: na`) draws the figure `--set hbonds=na`
+    draws, which is the figure of `interactions=hbond interactions_between=na` (the same H-bond lines, hbond: ids);
+    the file keeps saying hbonds, and no interaction key enters it."""
+    lmb = str(DATA / "1LMB.cif")
+    lf = tmp_path / "old.yaml"
+    lf.write_text("foldmap: 1\ntheme: publication\nstyle:\n  hbonds: na\n")
+    old = _svg(tmp_path, "old.svg", lmb, "--layout-file", str(lf), "--save-layout", str(tmp_path / "again.yaml"))
+    assert old == _svg(tmp_path, "set.svg", lmb, "--set", "hbonds=na")
+    new = ["--set", "interactions=hbond", "--set", "interactions_between=na"]
+    assert old == _svg(tmp_path, "new.svg", lmb, *new)
+    assert b'id="hbond:' in old and b'id="ia:' not in old
+    saved = yaml.safe_load((tmp_path / "again.yaml").read_text())["style"]
+    assert saved == {"hbonds": "na"}
+    auto = _svg(tmp_path, "auto.svg", lmb, "--set", "interactions=hbond")  # auto: na, the figure holds DNA
+    assert auto == old
+
+
+def test_interaction_keys_round_trip_and_an_old_app_session_reads_as_before(tmp_path):
+    """Plan 13c-3: the keys are saved with the figure and read back (app and command line alike); an app session
+    or layout file with hbonds: na (a share link opens one: its id and theme, the settings the visitor then makes)
+    reads as the same look, with the interaction keys at their defaults."""
+    from foldmap.app import layout_document, look_of, settings_from_document
+    from foldmap.spec import figure_spec
+    from foldmap.style import interactions_of, resolve_style
+
+    given = {"theme": "publication", "interactions": "salt,stack", "interactions_between": "chains:A+B"}
+    doc = layout_document(DATA / "1UBQ.cif", {**given, "interaction_max": 30})
+    assert {k: doc["style"][k] for k in ("interactions", "interactions_between", "interaction_max")} == {
+        "interactions": "salt,stack",
+        "interactions_between": "chains:A+B",
+        "interaction_max": 30,
+    }
+    assert settings_from_document(doc)["interactions"] == "salt,stack"
+    lf = tmp_path / "fig.yaml"
+    lf.write_text(yaml.safe_dump(doc), encoding="utf-8")
+    look = figure_spec(DATA / "1UBQ.cif", layout_file=lf).look
+    assert (look.interactions, look.interactions_between, look.interaction_max) == ("salt,stack", "chains:A+B", 30)
+    plain = layout_document(DATA / "1UBQ.cif", {"theme": "publication"})["style"]
+    assert not {"interactions", "interactions_between", "interaction_max"} & set(plain)  # the defaults
+    old = settings_from_document({"foldmap": 1, "theme": "publication", "style": {"hbonds": "na"}})
+    assert look_of(old) == resolve_style(overrides=["hbonds=na"])
+    assert interactions_of(look_of(old), True) == interactions_of(
+        resolve_style(overrides=["interactions=hbond", "interactions_between=na"]), True
+    )
+    off = settings_from_document({"foldmap": 1, "style": {"interactions": False}})  # unquoted off
+    assert off["interactions"] == "off"

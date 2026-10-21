@@ -14,7 +14,7 @@ from . import layoutfile
 from .layout import _RES_RANGE, CONVENTIONS
 from .render import draw
 from .route import route_loops
-from .style import THEMES, Style, resolve_style
+from .style import THEMES, Style, hbonds_superseded, resolve_style
 from .symmetry import TOLERANCE
 
 MODES = ("projected", "stack")
@@ -380,8 +380,12 @@ def check_references(spec: FigureSpec, bb=None, *, drawn: set[str] | None = None
     copy's A1:3-7). Pass 2 (`bb`, the protein backbone as read, before --chains): the chain a reference names
     exists, is drawn (--chains; `drawn`: the chains --focus keeps, None when it keeps all) and its residue range
     meets residues of it. A reference that passes may still name no element (a loop's residues): the layout says
-    so."""
+    so. Pass 1 also warns when the style gives both hbonds and interactions (style.hbonds_superseded)."""
     problems, refs = _references(spec)
+    look = spec.look or Style()
+    superseded = hbonds_superseded(look.hbonds, look.interactions)
+    if superseded:  # a style key the other overrides (plan 13c): said with the references, a warning
+        problems.append(Problem(f"hbonds={look.hbonds}", superseded, False))
     elements = set(elements)
     checked = []
     for where, ref, domain in refs:
