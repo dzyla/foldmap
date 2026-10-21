@@ -396,3 +396,78 @@ def test_beta_names_past_the_alphabet_fall_back_to_primes():
     names = [got[h.id] for h in many]
     assert names[:2] == ["α1a", "α1b"] and names[25] == "α1z" and names[26:] == ["α1z′", "α1z″"]
     assert len(set(names)) == 28
+
+
+# ---------------------------------------------------------------------------------------------- every convention
+
+
+def test_each_convention_names_one_residue_range_on_myoglobin():
+    """Q-A12: the deposited name (helix E), the figure label and a residue range are one element, stored as its
+    res: range; the names are known (Layout.other_names) but not applied."""
+    from foldmap.layoutfile import canonical
+    from foldmap.names import all_names
+
+    lay, sses, _ = make_layout(FID / "1MBN.cif.gz")
+    assert all_names(FID / "1MBN.cif.gz", lay, sses)["dep"] == lay.other_names["dep"]
+    assert lay.other_names["dep"]["A:59-76"] == "E" and lay.placed["A:59-76"].label == "α6"
+    for ref in ("dep:E", "dep:A:E", "E", "A:E", "α6", "fig:α6", "A:α6", "res:A:59-76", "res:A:60-70"):
+        assert canonical(lay, sses, ref) == ["res:A:59-76"], ref
+
+
+def test_each_convention_names_one_residue_range_on_a_beta_alpha_barrel():
+    """1TIM: deposited αD2, β-scheme α4 and the figure's α5 are one helix (unprefixed, α5 is refused: the β-scheme's
+    α5 is another); αB, α2 and the figure's α2 are one; β4 (β-scheme only) is the strand D."""
+    from foldmap.layoutfile import canonical
+
+    lay, sses, _ = make_layout(DATA / "1TIM.cif", chains=["A"])
+    for ref in ("dep:αD2", "beta:α4", "beta:A:α4", "fig:α5", "fig:A:α5", "res:A:106-118"):
+        assert canonical(lay, sses, ref) == ["res:A:106-118"], ref
+    for ref in ("dep:αB", "αB", "beta:α2", "α2", "res:A:47-54"):
+        assert canonical(lay, sses, ref) == ["res:A:47-54"], ref
+    assert canonical(lay, sses, "β4") == canonical(lay, sses, "D") == ["res:A:90-93"]
+
+
+def test_a_label_the_beta_scheme_gives_another_element_is_refused(tmp_path, capsys):
+    from foldmap.cli import main
+
+    out = str(tmp_path / "x.svg")
+    assert main(["plot", str(DATA / "1TIM.cif"), "--chains", "A", "--swap", "α4,α1", "-o", out]) == 2
+    assert capsys.readouterr().err.strip() == (
+        "foldmap: error: α4 is the figure's α4 (A 96–102) and the β-scheme's α4 (A 106–118); write fig:α4 or beta:α4"
+    )
+
+
+def test_a_swap_by_any_name_draws_the_residue_swap_and_saves_residue_ranges(tmp_path):
+    """A swap named by deposited and β-scheme names is the same figure as the swap by residue ranges, and the layout
+    file holds the ranges only (layoutfile.canonical)."""
+    import yaml
+
+    from foldmap.cli import main
+
+    tim = str(DATA / "1TIM.cif")
+    saved = tmp_path / "f.yaml"
+    by_name, by_range = tmp_path / "a.svg", tmp_path / "b.svg"
+    args = ["plot", tim, "--chains", "A"]
+    assert main([*args, "--swap", "dep:αD2,beta:α1", "--save-layout", str(saved), "-o", str(by_name)]) == 0
+    assert main([*args, "--swap", "res:A:106-118,res:A:18-30", "-o", str(by_range)]) == 0
+    assert by_name.read_bytes() == by_range.read_bytes()
+    assert yaml.safe_load(saved.read_text())["edits"]["swap"] == [["res:A:106-118", "res:A:18-30"]]
+
+
+def test_a_names_file_label_meaning_two_elements_is_refused(tmp_path):
+    bad = tmp_path / "bad.yaml"
+    bad.write_text("elements:\n  α4: X\n", encoding="utf-8")
+    with pytest.raises(ValueError, match=r"bad.yaml: α4 is the figure's α4 \(A 96–102\) and the β-scheme's α4"):
+        make_layout(DATA / "1TIM.cif", chains=["A"], names=[str(bad)])
+
+
+def test_the_default_figure_reads_no_other_names(monkeypatch):
+    """Off means identical: with no reference to resolve, the other names are never computed."""
+    from foldmap import cli
+
+    def boom(*a, **k):
+        raise AssertionError("all_names read for a figure that names no element")
+
+    monkeypatch.setattr(cli, "all_names", boom)
+    lay, _, _ = make_layout(FID / "1MBN.cif.gz", swap=[("res:A:4-17", "res:A:21-35")])
+    assert lay.placed

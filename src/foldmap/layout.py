@@ -249,6 +249,22 @@ class PlacedStem:
         return (pa + pb) / 2 + out * np.sqrt(max(r * r - half * half, 0.0)), r
 
 
+class _Once:
+    """A value computed on the first call and kept (Layout.names_source): a layout's other names are read from the
+    structure file only when a reference needs them. A copy of the layout shares it."""
+
+    def __init__(self, make: Callable[[], dict]):
+        self.make, self.value = make, None
+
+    def __call__(self) -> dict:
+        if self.value is None:
+            self.value, self.make = self.make(), None
+        return self.value
+
+    def __deepcopy__(self, memo) -> _Once:
+        return self
+
+
 @dataclass(eq=False)
 class Layout:
     placed: dict[str, Placed]
@@ -367,6 +383,19 @@ class Layout:
     like_chain: str = ""  # the protein chain --like chose of several, none asked for (scope says so); '' otherwise
     # why this figure's page cannot be carried to a structure drawn like it (cli._uncarried: (kind, what)), None: it can
     uncarried: tuple[str, str] | None = None
+    # what computes other_names on first need (build_layout's `conventions`; with_conventions): an element's names in
+    # the conventions the figure does not show, so resolve can take dep: and beta: references; None: none known
+    names_source: Callable[[], dict] | None = field(default=None, repr=False)
+
+    @property
+    def other_names(self) -> dict[str, dict[str, str]]:
+        """{"dep": {element id: deposited name}, "beta": {element id: β-scheme name}} (names.all_names): computed once,
+        when a reference first needs them, and never applied to the figure; {} when the layout knows none."""
+        return self.names_source() if self.names_source is not None else {}
+
+    @other_names.setter
+    def other_names(self, value: dict[str, dict[str, str]]) -> None:
+        self.names_source = _Once(lambda: value)
 
     @property
     def dna(self) -> list[PlacedStem]:  # earlier name
@@ -3463,11 +3492,32 @@ def _copy_ties(
 _RES_RANGE = re.compile(r"(-?\d+)([A-Za-z]?)(?:-(-?\d+)([A-Za-z]?))?")  # 150, 150-159, -7-4, 100A-100K
 
 
+_ANY_NAME = "a label such as A or α1, chain:label, #k, res:a-b, dep:name or beta:name"
+CONVENTIONS = {"fig": "the figure's", "dep": "the deposited", "beta": "the β-scheme's"}  # reference prefix -> its name
+
+
+class AmbiguousName(ValueError):
+    """A name that means different elements in two naming conventions (resolve): refused, the choices listed."""
+
+
+def with_conventions(layout: Layout, sses: list[SSE], conventions: Callable | None) -> Layout:
+    """`layout` given its other names (Layout.other_names): `conventions(layout, sses)` (names.all_names with the
+    structure file bound), computed when a reference first needs them. None leaves the layout as it is."""
+    if conventions is not None:
+        layout.names_source = _Once(lambda: conventions(layout, sses))
+    return layout
+
+
 def resolve(layout: Layout, sses: list[SSE], ref: str) -> list[str]:
     """Element ids for a reference: a label (G, α2; every chain), chain:label (A:G), #k (the k-th element
     from the N terminus, 1-based), or res:a-b / res:chain:a-b (elements overlapping those residues; negative
     numbers and insertion codes as in the file, e.g. res:A:-7-4, res:H:100A-100K). A range written without res:
-    (A:1-60, 1-60) that is no element's label is read as that residue range (Q-A19)."""
+    (A:1-60, 1-60) that is no element's label is read as that residue range (Q-A19).
+    A name in another convention (Q-A12; Layout.other_names) takes its prefix: dep:name (the deposited helix name,
+    as --names deposited gives it), beta:name (the β-scheme's, as --names beta), fig:name (the label on the
+    figure), each also as prefix:chain:name. An unprefixed name is the figure's label first (what is on screen), then
+    the deposited name, then the β-scheme's; one that means different elements in two of them is refused
+    (AmbiguousName), the choices listed."""
     ref = ref.strip()
     placed = [s for s in sses if s.id in layout.placed]
     if ref.startswith("#"):
@@ -3505,15 +3555,64 @@ def resolve(layout: Layout, sses: list[SSE], ref: str) -> list[str]:
                 for s in in_chain
                 if min(s.first.seq, s.last.seq) <= hi[0] and max(s.first.seq, s.last.seq) >= lo[0]
             ]
+    elif (prefix := ref.split(":", 1)[0]) in CONVENTIONS and ref[len(prefix) + 1 :].strip():
+        out = _named(layout, placed, prefix, ref[len(prefix) + 1 :].strip())
+        if not out:
+            raise ValueError(f"no element {ref!r}: {_no_name(layout, prefix)}; use {_ANY_NAME}")
     else:
-        chain, label = ref.split(":", 1) if ":" in ref else (None, ref)
-        out = [s.id for s in placed if chain in (None, s.chain) and layout.placed[s.id].label == label]
+        label = ref.split(":", 1)[1] if ":" in ref else ref
+        out = _named(layout, placed, "fig", ref)
         m = _RES_RANGE.fullmatch(label)
         if not out and m is not None and m[3] is not None:  # A:1-60, 1-60 naming no label: read as res:A:1-60
             return resolve(layout, sses, f"res:{ref}")  # (spec.check_references warns that it was)
+        meant = {k: ids for k in CONVENTIONS if (ids := out if k == "fig" else _named(layout, placed, k, ref))}
+        if len({tuple(ids) for ids in meant.values()}) > 1:
+            raise AmbiguousName(_ambiguous(layout, ref, meant))
+        out = next(iter(meant.values()), [])
     if not out:
-        raise ValueError(f"no element {ref!r}; use a label such as A or α1, chain:label, #k or res:a-b")
+        raise ValueError(f"no element {ref!r}; use {_ANY_NAME}")
     return out
+
+
+def _named(layout: Layout, placed: list[SSE], convention: str, ref: str) -> list[str]:
+    """The placed elements a name (name or chain:name) means in one convention: fig (the label drawn), dep or beta
+    (Layout.other_names: read only when the layout has a names_source)."""
+    chain, name = ref.split(":", 1) if ":" in ref else (None, ref)
+    if convention == "fig":
+        return [s.id for s in placed if chain in (None, s.chain) and layout.placed[s.id].label == name]
+    if layout.names_source is None:
+        return []
+    names = layout.other_names.get(convention, {})
+    return [s.id for s in placed if chain in (None, s.chain) and names.get(s.id) == name]
+
+
+_KNOWN = {"dep": "deposited helix names", "beta": "β-scheme names"}
+
+
+def _no_name(layout: Layout, convention: str) -> str:
+    """Why a prefixed name names nothing."""
+    if convention == "fig":
+        return "no element carries that label"
+    if not layout.other_names.get(convention):
+        return f"this figure has no {_KNOWN[convention]}"
+    return f"no element drawn has that name among the {_KNOWN[convention]}"
+
+
+def _ambiguous(layout: Layout, ref: str, meant: dict[str, list[str]]) -> str:
+    """The refusal of a name that means different elements in two conventions: what each means, and how to write
+    each choice, e.g. "α4 is the figure's α4 (A 96–102) and the β-scheme's α4 (A 106–118); write fig:α4 or
+    beta:α4"."""
+    name = ref.split(":", 1)[1] if ":" in ref else ref
+
+    def where(ids: list[str]) -> str:
+        return ", ".join(f"{p.sse.chain} {p.sse.first.tag}–{p.sse.last.tag}" for p in (layout.placed[k] for k in ids))
+
+    first = {}  # each meaning said once, by the first convention giving it (fig, dep, beta)
+    for k, ids in meant.items():
+        first.setdefault(tuple(ids), k)
+    said = [f"{CONVENTIONS[k]} {name} ({where(list(ids))})" for ids, k in first.items()]
+    forms = [f"{k}:{ref}" for k in meant]
+    return f"{ref} is {' and '.join(said)}; write {', '.join(forms[:-1])} or {forms[-1]}"
 
 
 def _one(layout: Layout, sses: list[SSE], ref: str) -> str:
@@ -3651,6 +3750,9 @@ def _ref_chain(ref: str) -> str | None:
     if ref.startswith("res:"):
         body = ref[4:]
         return body.split(":")[0] if body.count(":") == 1 else None
+    prefix = ref.split(":", 1)[0]
+    if prefix in CONVENTIONS and ref[len(prefix) + 1 :].strip():  # dep:A:name, beta:name
+        ref = ref[len(prefix) + 1 :].strip()
     if ref.startswith("#") or ":" not in ref:
         return None
     return ref.split(":", 1)[0]
@@ -3934,6 +4036,7 @@ def _rosette(sses: list[SSE], sheets: list[Sheet], frame, mode: str, kw: dict) -
     lay.rosette_strays = [q.sse.id for q in strays]
     lay.rosette_dropped = list(dict.fromkeys(dropped))
     lay.rosette_mates = {t.id: (i, k) for k in range(1, frame.n) for i, t in maps[k].items()}
+    with_conventions(lay, sses, kw.get("conventions"))  # every copy's names, not protomer 0's
     lay.stack_gaps = _stack_gaps(lay)
     _rosette_label_sides(lay)
     _choose_label_sides(lay, sses, style, [])
@@ -4018,6 +4121,7 @@ def build_layout(
     let_go: bool = True,
     mirror_only: bool = False,
     like: Like | None = None,
+    conventions: Callable[[Layout, list[SSE]], dict] | None = None,
 ) -> Layout | None:
     """Labels: the generic ones (_assign_labels), then `relabel` (ref -> label: copies' shared labels, primes of
     elements lent by neighbours), then `names` (names.apply_names: --names, given the placed layout with its stems
@@ -4055,7 +4159,9 @@ def build_layout(
     angles and over-sheet choices (Like.over), one way only: a helix whose mate the reference draws beside its sheet
     is drawn beside, but one whose mate lies over its sheet is drawn over only when `over` (features.helices_on_sheets)
     finds it packed on a sheet here too (an over-sheet helix needs its own sheet). With like=None nothing of this
-    runs."""
+    runs. `conventions` (names.all_names with the structure file bound): the layout's names in the conventions it
+    does not show (Layout.other_names), read when a reference first needs them (resolve's dep: and beta:, and the
+    check of an unprefixed name); never applied to the figure."""
     if mode not in ("projected", "stack"):
         raise ValueError(f"unknown layout mode {mode!r}")
     if like is not None and (type(frame) is not Frame or frame.sector or frame.mirror_x is not None):
@@ -4064,7 +4170,7 @@ def build_layout(
         given = dict(attract=attract, contacts=contacts, nucleic=nucleic, style=style, bridges=bridges)
         given.update(domains=domains, partial=partial, rename=rename, swap=swap, move=move, keep_depth=keep_depth)
         given.update(na_cropped=na_cropped, template=template, copies=copies, relabel=relabel, names=names, over=over)
-        given.update(level=level, band=band, alike_first=alike_first, let_go=let_go)
+        given.update(level=level, band=band, alike_first=alike_first, let_go=let_go, conventions=conventions)
         return _rosette(sses, sheets, frame, mode, given)
     style = style or Style()
     angle_mode = "upright" if mode == "stack" else style.helix_angle
@@ -4308,6 +4414,7 @@ def build_layout(
     real = {p.sse.id: p for p in placed}
     named = Layout(real, (0.0, 0.0, 0.0, 0.0), stems=dna, nucleic=nucleic if dna else None)
     named.ba_rows = _ba_rows(items)
+    with_conventions(named, sses, conventions)  # dep: and beta: references (resolve), read on first need
     if like is not None and like.label:  # the reference's labels for its mates (and B's extras named after them)
         relabel = {**(relabel or {}), **like.label}
     if relabel:  # labels shared by copies, primes of lent elements: before any name
@@ -4335,6 +4442,7 @@ def build_layout(
         sheet_ghosts=[ghost_ids for _, ghost_ids, _ in blocks],
     )
     lay.na_traces = traces
+    lay.names_source = named.names_source  # one reading: a swap leaves the βα rows' elements as they were
     lay.frame = frame
     lay.units = {
         m.sse.id: (it.cx, it.cy, ox, oy)

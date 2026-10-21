@@ -36,6 +36,7 @@ from .io import load_backbone, load_links, load_nucleic, read_model
 from .layout import (
     _RES_RANGE,
     SCALE,
+    AmbiguousName,
     accessory_lines,
     build_layout,
     na_torn_by_unrolling,
@@ -45,7 +46,7 @@ from .layout import (
 )
 from .membrane import FACE_REACH
 from .model import AUTO_NT, crop_nucleic, homolog_chains, nucleic_of_chains, nucleic_touching, res_ref
-from .names import apply_names, check_spec
+from .names import all_names, apply_names, check_spec
 from .nucleic import StemView, stem_views, straight_duplex
 from .palette import PALETTES
 from .render import LOOP_STYLES, STYLES, draw, save
@@ -634,7 +635,8 @@ def make_layout(
     rows = (  # βα rows are rigid units: automatic domains never split one
         template_rows(sheets, sses, copies) if mode == "projected" and (look or Style()).fold_template == "auto" else []
     )
-    named = _domains(domains, sses, contacts, rows, copies, partial, bb)
+    conventions = functools.partial(all_names, path, whole=whole)  # dep: and beta: references (layout.resolve)
+    named = _domains(domains, sses, contacts, rows, copies, partial, bb, conventions)
     named_note = domain_note(source, named, found_note)
     for _, ids in named:  # a domain holds together: its elements pull on each other
         for a in range(len(ids)):
@@ -692,6 +694,7 @@ def make_layout(
             if names
             else None,
             over=over,
+            conventions=conventions,
             alike_first=mem is None,  # a membrane view is judged by its bands (C17), not its copies (A15)
             **({"like": made.like} if made is not None and made.like is not None else {}),
         )
@@ -1267,12 +1270,15 @@ def stale_domains_note(spec, sses) -> str:
     )
 
 
-def _domains(spec, sses, contacts, rows=(), copies=None, lent=frozenset(), bb=None) -> list[tuple[str, list[str]]]:
+def _domains(
+    spec, sses, contacts, rows=(), copies=None, lent=frozenset(), bb=None, conventions=None
+) -> list[tuple[str, list[str]]]:
     """[(name, element ids)] from 'auto' (chain by chain, copies of a protein (`copies`) alike, chains that only
     lend elements (`lent`) in their mates' domains, never splitting a βα row of `rows`) or [(name, [refs])]; every
-    element in at most one domain."""
+    element in at most one domain. `conventions` (names.all_names, the structure bound): the names a reference may
+    give with dep: or beta: (before layout no βα row is known, so a row helix's β-scheme name is not)."""
     from .features import auto_domains
-    from .layout import provisional
+    from .layout import provisional, with_conventions
 
     if not spec:
         return []
@@ -1296,7 +1302,7 @@ def _domains(spec, sses, contacts, rows=(), copies=None, lent=frozenset(), bb=No
         if stale and not getattr(spec, "quiet", False):
             print(f"foldmap: warning: {stale_domains_note(spec, sses)}", file=sys.stderr)
         return [(name, ids) for name, ids in kept if ids]  # already element ids (UniProt domains, a layout file)
-    lay, out, seen = provisional(sses), [], set()
+    lay, out, seen = with_conventions(provisional(sses), sses, conventions), [], set()
     for name, refs in spec:
         ids = []
         for ref in refs:
@@ -1684,7 +1690,9 @@ def build_parser() -> argparse.ArgumentParser:
             action="append",
             default=[],
             metavar="REF=NAME",
-            help="your own element name, e.g. res:167-182=Gd or A:B=B' (repeatable)",
+            help="your own element name, e.g. res:167-182=Gd or A:B=B' (repeatable); here and in --swap, --move, "
+            "--domain and mark an element is a label, chain:label, #k, res:CHAIN:FIRST-LAST, or a name --names "
+            "would give it: dep:NAME (deposited, e.g. dep:E) or beta:NAME (β-scheme, e.g. beta:α4)",
         )
         q.add_argument(
             "--swap",
@@ -2052,6 +2060,9 @@ def main(argv: list[str] | None = None) -> int:
         return _COMMANDS[args.command](args)
     except UsageError as err:  # options that do not go together: exit 2, as argparse does
         print(f"foldmap: {'error: ' if isinstance(err, BadReference) else ''}{err}", file=sys.stderr)
+        return 2
+    except AmbiguousName as err:  # a name meaning different elements in two conventions: a usage error too
+        print(f"foldmap: error: {err}", file=sys.stderr)
         return 2
     except (FileNotFoundError, ValueError, RuntimeError) as err:  # RuntimeError: gemmi cannot read the file
         print(f"foldmap: {err}", file=sys.stderr)

@@ -299,6 +299,15 @@ range that does not parse (`A:x-y`), a chain the structure lacks (the message li
 A label reference reads the labels the figure shows: the label copies of one protein share, the primed labels of
 elements a neighbour lends in focus mode (`α2′`) and any `--names`; `--rename` is applied last and wins over all of them.
 
+An element can also be named as `--names` would name it, without applying those names: `dep:E` (the deposited helix
+name: myoglobin's helix E) or `beta:α4` (the β-scheme's), each also with a chain (`beta:A:α4`), in `--rename`,
+`--swap`, `--move`, `--domain` and `mark`, and in the MCP server. A name without a prefix is the figure's label first
+(what is on screen), then the deposited name, then the β-scheme's; one that means different elements in two of them is
+refused with the choices: on 1TIM, `--swap α4,α1` gives `foldmap: error: α4 is the figure's α4 (A 96–102) and the
+β-scheme's α4 (A 106–118); write fig:α4 or beta:α4` (exit 2; `fig:` is the label drawn). What a layout file stores
+does not change: residue ranges. In `--domain`, a βα-row helix has no β-scheme name yet (the rows are laid out
+after the domains are read); use its deposited name, its label or its range.
+
 **Automatic domains are inferred, not published.** `--domains auto` cuts each chain where it has few residue
 contacts across (normalized cuts over CA atoms within 12 Å; a domain may be two pieces of the chain, as in 5JDN,
 whose two domains alternate along it). It is a guess from the coordinates, and the figure says so: the domain bar reads

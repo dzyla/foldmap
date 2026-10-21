@@ -458,3 +458,19 @@ def test_references_are_checked_before_drawing_as_the_command_line_checks_them(t
     with pytest.raises(ToolError, match=r"--domain N=res:B:1-20: chain B is not drawn: --focus A draws"):
         call("draw_topology", {"source": str(DATA / "2HHB.cif"), "assembly": "asu", "focus": "A",
                                "domains": {"N": ["res:B:1-20"]}})  # fmt: skip
+
+
+def test_elements_are_named_in_every_convention(tmp_path):
+    """Q-A12: dep: and beta: names reach draw_topology as on the command line; a label meaning another element in
+    the β-scheme is an error result listing the choices."""
+    from mcp.server.mcpserver.exceptions import ToolError
+
+    fid = DATA / "fidelity"
+    out = str(tmp_path / "mb.svg")
+    call("draw_topology", {"source": str(fid / "1MBN.cif.gz"), "output_path": out, "swap": [["dep:A", "dep:E"]]})
+    assert Path(out).is_file()
+    with pytest.raises(ToolError, match=r"α4 is the figure's α4 \(A 96–102\) and the β-scheme's α4 \(A 106–118\)"):
+        call(
+            "draw_topology",
+            {"source": str(DATA / "1TIM.cif"), "output_path": out, "chains": ["A"], "swap": [["α4", "α1"]]},
+        )

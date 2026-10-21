@@ -18,7 +18,7 @@ import re
 from collections import Counter
 from pathlib import Path
 
-from .layout import Layout, provisional, resolve
+from .layout import AmbiguousName, Layout, provisional, resolve
 from .model import SSE, Nucleic, copy_classes, group_by_chain, pair_places, res_ref
 from .yamlfile import read_yaml
 
@@ -55,6 +55,22 @@ def load_names(
     if spec == "beta":
         return beta_names(layout, drawn, whole), {}
     return _file_names(Path(spec), layout, drawn, nucleic, whole, chains)
+
+
+def all_names(path, layout: Layout, sses: list[SSE], whole: list[SSE] | None = None) -> dict[str, dict[str, str]]:
+    """Every drawn element's names in the other conventions (Q-A12), computed and never applied: {"dep": {element id:
+    deposited name}, "beta": {element id: β-scheme name}}, as --names deposited and --names beta would name them
+    (before primes tell repeats apart). layout.resolve reads them for dep: and beta: references (Layout.other_names).
+    `path`: the structure file (None: no deposited names); `whole` as for load_names."""
+    drawn = [s for s in sses if s.id in layout.placed]
+
+    def ids(named: dict[str, str]) -> dict[str, str]:  # res:A:3-18 -> A:3-18, the element's id
+        return {ref.removeprefix("res:"): name for ref, name in named.items()}
+
+    return {
+        "dep": ids(deposited_names(path, drawn, whole)) if path is not None else {},
+        "beta": ids(beta_names(layout, drawn, whole)),
+    }
 
 
 # ---------------------------------------------------------------------------------------------- deposited
@@ -254,7 +270,10 @@ def _file_names(path: Path, layout: Layout, sses, nucleic, whole, chains) -> tup
     given: dict[tuple[str, str], tuple[str, str]] = {}  # (chain, name) -> (ref, element) that took it
     for ref, name in (doc.get("elements") or {}).items():
         ref, name = str(ref), str(name)
-        ids = _one_piece(_resolves(layout, sses, ref), sses, ref)
+        try:
+            ids = _one_piece(_resolves(layout, sses, ref), sses, ref)
+        except AmbiguousName as e:
+            raise ValueError(f"{path}: {e}") from None
         if not ids and not _left_out(ref, sses, whole, chains):
             raise ValueError(
                 f"{path}: no element {ref!r} in the figure; use a label such as A or α1, chain:label, #k or res:a-b"
@@ -322,6 +341,8 @@ def _one_each(path: Path, given: dict, at: tuple[str, str], by: tuple[str, str],
 def _resolves(layout: Layout, sses: list[SSE], ref: str) -> list[str]:
     try:
         return resolve(layout, sses, ref)
+    except AmbiguousName:
+        raise
     except ValueError:
         return []
 

@@ -894,3 +894,71 @@ def test_half_turn_puts_a_snapped_angle_in_minus_pi_to_pi():
     for noise in _FLAT:  # a direction along the page's -x: atan2 gives +-pi, snapped, then one value
         assert repr(_half_turn(_snap(np.arctan2(noise, -1.0)))) == repr(pi_grid)
         assert repr(_half_turn(_snap(np.arctan2(noise, 1.0)))) == "0.0"
+
+
+# ---------------------------------------------------------------------------------------------- names (Q-A12)
+
+
+def _named_layout(source=None):
+    """Three helices of chain A labelled α1-α3, with other names (Layout.other_names) given by `source`."""
+    from foldmap.layout import provisional
+
+    sses = [fake_sse("H", 3, 11), fake_sse("H", 20, 30), fake_sse("H", 60, 79)]
+    lay = provisional(sses)
+    lay.names_source = source
+    return lay, sses
+
+
+def test_a_name_in_another_convention_resolves_by_its_prefix():
+    from foldmap.layout import resolve
+
+    lay, sses = _named_layout()
+    lay.other_names = {"dep": {"A:3-11": "A", "A:20-30": "B"}, "beta": {"A:60-79": "α2a"}}
+    for ref in ("α1", "fig:α1", "dep:A", "dep:A:A", "A", "res:A:3-11", "#1"):
+        assert resolve(lay, sses, ref) == ["A:3-11"], ref
+    assert resolve(lay, sses, "beta:α2a") == resolve(lay, sses, "α2a") == ["A:60-79"]
+    with pytest.raises(ValueError, match="no element 'dep:Z': no element drawn has that name among the deposited"):
+        resolve(lay, sses, "dep:Z")
+    with pytest.raises(ValueError, match="no element 'dep:B:A'"):  # chain B holds no element
+        resolve(lay, sses, "dep:B:A")
+
+
+def test_a_name_meaning_two_elements_is_refused_with_the_choices():
+    from foldmap.layout import AmbiguousName, resolve
+
+    lay, sses = _named_layout()
+    lay.other_names = {"dep": {"A:3-11": "α1"}, "beta": {"A:60-79": "α1", "A:20-30": "α3"}}
+    with pytest.raises(AmbiguousName) as caught:
+        resolve(lay, sses, "α1")
+    assert str(caught.value) == (
+        "α1 is the figure's α1 (A 3–11) and the β-scheme's α1 (A 60–79); write fig:α1, dep:α1 or beta:α1"
+    )
+    with pytest.raises(AmbiguousName, match=r"^A:α3 is the figure's α3 \(A 60–79\) and the β-scheme's α3 \(A 20–30\)"):
+        resolve(lay, sses, "A:α3")
+    assert resolve(lay, sses, "fig:α1") == ["A:3-11"]  # each choice the refusal lists is taken
+    assert resolve(lay, sses, "dep:α1") == ["A:3-11"]
+    assert resolve(lay, sses, "beta:α1") == ["A:60-79"]
+    assert resolve(lay, sses, "α2") == ["A:20-30"]  # the figure's only
+
+
+def test_other_names_are_read_only_when_a_reference_needs_them():
+    """Layout.names_source is called once, and never for #k, res: or a range read as one (the default figure reads
+    no file it did not read before)."""
+    from foldmap.layout import _Once, resolve
+
+    calls = []
+
+    def source():
+        calls.append(1)
+        return {"dep": {"A:20-30": "B"}, "beta": {}}
+
+    lay, sses = _named_layout(_Once(source))
+    for ref in ("#2", "res:A:20-30", "A:20-30", "20-30"):
+        assert resolve(lay, sses, ref) == ["A:20-30"]
+    assert calls == []
+    assert resolve(lay, sses, "B") == resolve(lay, sses, "dep:B") == resolve(lay, sses, "α2") == ["A:20-30"]
+    assert calls == [1]
+    lay, sses = _named_layout()  # none known: a label is the figure's, a prefixed name is no element
+    assert resolve(lay, sses, "α1") == ["A:3-11"]
+    with pytest.raises(ValueError, match="this figure has no β-scheme names"):
+        resolve(lay, sses, "beta:β1")

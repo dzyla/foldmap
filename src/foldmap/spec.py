@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any
 
 from . import layoutfile
-from .layout import _RES_RANGE
+from .layout import _RES_RANGE, CONVENTIONS
 from .render import draw
 from .route import route_loops
 from .style import THEMES, Style, resolve_style
@@ -323,6 +323,12 @@ def _reference(ref: str, where: str, domain: bool, elements) -> tuple[list[Probl
         if not ref[1:].isdigit() or int(ref[1:]) < 1:
             return [Problem(where, f"{ref}: #k counts elements from the N terminus, #1 the first", True)], None
         return [], None
+    prefix = ref.split(":", 1)[0]
+    if prefix in CONVENTIONS and ":" in ref:  # dep:helix A, beta:A:α4 (Q-A12): a name, its chain checked in pass 2
+        chain, name = ref[len(prefix) + 1 :].split(":", 1) if ref.count(":") > 1 else (None, ref[len(prefix) + 1 :])
+        if not name.strip() or (chain is not None and not chain.strip()):
+            return [Problem(where, f"{ref} names no element; write {prefix}:NAME or {prefix}:CHAIN:NAME", True)], None
+        return [], ((chain.strip(), None) if chain is not None else None)
     chain, label = ref.split(":", 1) if ":" in ref else (None, ref)
     if chain is not None and (not chain.strip() or not label.strip()):
         return [Problem(where, f"{ref} names no element; name one as {FORMS}", True)], None

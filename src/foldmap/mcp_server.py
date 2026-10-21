@@ -26,7 +26,10 @@ INSTRUCTIONS = (
     """foldmap draws publication-grade protein topology diagrams (2D maps of helices, strands and loops) and
 sequence figures with secondary structure on top. Start with summarize_structure to see the elements and their
 labels (A, B... strands; α1, α2... helices; η1... 3-10 helices), then draw_topology. Refer to elements by label,
-chain:label, #k (k-th element) or residue range res:CHAIN:FIRST-LAST. Call list_styles for themes and style keys.
+chain:label, #k (k-th element), residue range res:CHAIN:FIRST-LAST, or a name in another convention: dep:NAME (the
+deposited helix name, e.g. dep:E in a globin) or beta:NAME (the β-scheme's, e.g. beta:α4); a label that means another
+element in one of those is refused with the choices (fig:NAME is the label drawn). Call list_styles for themes and
+style keys.
 """
     + CREDIT
 )
@@ -208,7 +211,9 @@ def draw_topology(
     [["α1", "α3"]]. move: nudges in page units, e.g. {"α2": [1, -2]}. rename: {"res:A:167-182": "Gd"}. Every
     element reference is checked before drawing: one that cannot be drawn (a range that does not parse, a chain the
     structure lacks or does not draw, residues it does not have) is an error saying so; a range written without res:
-    (A:1-60) is read as res:A:1-60 and the note warns that it was.
+    (A:1-60) is read as res:A:1-60 and the note warns that it was. An element may also be named as "names" would
+    name it, without applying them: dep:NAME (deposited, e.g. dep:E) or beta:NAME (β-scheme, e.g. beta:α4); a label
+    meaning another element in one of those is an error listing the choices (fig:NAME is the label drawn).
     names: conventional names, in order (later win, rename wins over all): "deposited" (the file's own helix ids,
     e.g. globin A-H), "beta" (strands β1…βn, αn after βn in a βα row) or a YAML file of element and stem names.
     membrane: off, auto (draw the lipid bilayer) or flip (the same, the two sides swapped). focus: auto draws
