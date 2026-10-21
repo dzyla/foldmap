@@ -54,10 +54,12 @@ def compare(
     chain_b: str | None = None,
     match: str = "auto",
     look: Style | None = None,
+    assembly: str = "auto",
 ) -> Compared:
     """The page of `source_b` (a file or PDB id) drawn like `source_a`, one protein chain of each (`chain_a`,
     `chain_b`, else each its first: ruling 7), aligned by `match` (auto, sequence, structure or a two-row alignment
-    file, the reference's chain first), drawn with `look`."""
+    file, the reference's chain first), drawn with `look`; both read as `assembly` reads them (auto, asu: as
+    deposited, under the deposited chain names; or an assembly id)."""
     from .align import align_chains, element_mates
     from .cli import _one_chain, _resolve_structure, make_layout
     from .io import load_backbone, read_model
@@ -65,19 +67,25 @@ def compare(
 
     look = (look or Style()).validate()
     path_b = _resolve_structure(str(source_b))
-    model_b = read_model(path_b, "auto")
+    model_b = read_model(path_b, assembly)
     like = {"structure": str(source_a), "chain": chain_a, "match": match, "layout": None}
     got: dict = {}
     lay_b, sses_b, bb_b = make_layout(
-        path_b, look=look, chains=[chain_b] if chain_b else None, like=like, model=model_b, like_out=got
+        path_b,
+        look=look,
+        chains=[chain_b] if chain_b else None,
+        assembly=assembly,
+        like=like,
+        model=model_b,
+        like_out=got,
     )
     chain_b = bb_b.labels[0].chain if len(bb_b) else (chain_b or "")
     if got.get("reference") is None:  # B's own frame cannot be carried: drawn on its own; A laid out here
         path_a = _resolve_structure(str(source_a))
-        model_a = read_model(path_a, "auto")
-        present = list(dict.fromkeys(l.chain for l in load_backbone(path_a, "auto", model=model_a).labels))
+        model_a = read_model(path_a, assembly)
+        present = list(dict.fromkeys(l.chain for l in load_backbone(path_a, assembly, model=model_a).labels))
         one = _one_chain([chain_a] if chain_a else None, present, "--chain-a", str(source_a))
-        lay_a, sses_a, bb_a = make_layout(path_a, look=look, chains=[one], model=model_a)
+        lay_a, sses_a, bb_a = make_layout(path_a, look=look, chains=[one], assembly=assembly, model=model_a)
         got["reference"] = (lay_a, sses_a, bb_a, model_a, one)
     lay_a, sses_a, bb_a, model_a, chain_a = got["reference"]
     aln, mates = got.get("alignment"), got.get("mates")

@@ -289,6 +289,7 @@ def compare_structures(
     match: str = "auto",
     output_path: str | None = None,
     json_path: str | None = None,
+    assembly: str = "auto",
 ) -> CallToolResult:
     """Draw two structures of one fold on one page: source_a (the reference) on the left, source_b drawn like it on
     the right (each element matched to one of A's takes its place, angle, name and colour), at one page scale, with
@@ -300,14 +301,15 @@ def compare_structures(
 
     source_a, source_b: file path, PDB ID or UniProt accession. One protein chain of each: chain_a, chain_b (else each
     its first). match: auto (sequence at 40% identity, else structure), sequence, structure, or a two-row alignment
-    file (A's chain first). Not the same fold: B is drawn on its own beside A, and the note says so."""
+    file (A's chain first). assembly: auto, asu (each file as deposited, under its deposited chain names) or an
+    assembly id. Not the same fold: B is drawn on its own beside A, and the note says so."""
     from .compare import compare, write_json
     from .provenance import lines
     from .render import save
 
     keep = _checked(json_path, JSON_SUFFIXES) if json_path else None  # checked first
     with _output(output_path, ".svg", f"{Path(str(source_b)).stem}-compare", FIGURE_SUFFIXES) as out:
-        made = compare(source_a, source_b, chain_a, chain_b, match or "auto")
+        made = compare(source_a, source_b, chain_a, chain_b, match or "auto", assembly=assembly or "auto")
         save(made.figure, out)
         note = f"wrote {out}"
         if keep is not None:

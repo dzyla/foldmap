@@ -1734,6 +1734,14 @@ def build_parser() -> argparse.ArgumentParser:
         "or a two-row alignment file (A's chain first)",
     )
     pq.add_argument(
+        "--assembly",
+        metavar="auto|asu|ID",
+        default="auto",
+        help="how both files are read: auto builds each file's first biological assembly when it adds copies (its "
+        "chains then renamed A1, A2, ...); asu keeps the files as deposited, under their deposited chain names; or "
+        "give an assembly id",
+    )
+    pq.add_argument(
         "--json",
         metavar="PATH",
         help="also write what was matched: the alignment (method, TM-score, RMSD, identity, residue pairs), the "
@@ -1854,7 +1862,7 @@ def _cmd_compare(args: argparse.Namespace) -> int:
     from .compare import compare, write_json
 
     look = resolve_style(args.theme or "publication", args.style_file, args.set)
-    made = compare(args.structure_a, args.structure_b, args.chain_a, args.chain_b, args.match, look)
+    made = compare(args.structure_a, args.structure_b, args.chain_a, args.chain_b, args.match, look, args.assembly)
     print(provenance_block(made.provenance), file=sys.stderr, end="")
     for out in args.output:
         print(f"wrote {save(made.figure, out)}")

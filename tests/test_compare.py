@@ -149,6 +149,50 @@ def test_json_schema_and_order(tmp_path):
     assert json.loads(out.read_text(encoding="utf-8"), object_pairs_hook=keys_sorted) == data
 
 
+def _two_copies(tmp_path):
+    """1UBQ with one assembly of two copies 100 Å apart: auto reads it as that assembly, chains A1 and A2."""
+    import gemmi
+
+    st = gemmi.read_structure(str(UBQ))
+    st.setup_entities()
+    gen = gemmi.Assembly.Gen()
+    gen.subchains = sorted({r.subchain for c in st[0] for r in c})
+    for k, shift in enumerate(((0.0, 0.0, 0.0), (100.0, 0.0, 0.0))):
+        op = gemmi.Assembly.Operator()
+        op.name = str(k + 1)
+        op.transform = gemmi.Transform(gemmi.Mat33(), gemmi.Vec3(*shift))
+        gen.operators.append(op)
+    assembly = gemmi.Assembly("1")
+    assembly.generators.append(gen)
+    st.assemblies.clear()
+    st.assemblies.append(assembly)
+    path = tmp_path / "ubq2.cif"
+    st.make_mmcif_document().write_file(str(path))
+    return path
+
+
+def test_assembly_asu_keeps_the_deposited_chain_names(tmp_path):
+    """compare --assembly asu reads both files as deposited: B's chain is A, as deposited, where auto builds the
+    assembly and names it A1 (2ZB5's case); either way B is the same chain drawn like A, every element matched."""
+    two = _two_copies(tmp_path)
+
+    def titled(made):
+        b = panel_axes(made.figure)[1]
+        return {l.chain for l in made.panels[1][2].labels}, [t.get_text() for t in b.texts if "chain" in t.get_text()]
+
+    auto = compare(UBQ, two)
+    asu = compare(UBQ, two, chain_b="A", assembly="asu")
+    assert titled(auto)[0] == {"A1"} and any("chain A1" in t for t in titled(auto)[1])
+    assert titled(asu)[0] == {"A"} and any(t.endswith("chain A") for t in titled(asu)[1])
+    assert asu.note == auto.note and " elements matched" in asu.note
+    assert asu.data["alignment"]["tm_score"] == auto.data["alignment"]["tm_score"]
+    assert len(asu.data["mates"]) == len(auto.data["mates"]) > 0
+    assert {m["b_residues"].split(":")[1] for m in asu.data["mates"]} == {"A"}
+    out = tmp_path / "page.png"
+    assert cli.main(["compare", str(UBQ), str(two), "--chain-b", "A", "--assembly", "asu", "-o", str(out)]) == 0
+    assert out.is_file()
+
+
 def test_negative_pair_draws_both_panels_on_their_own():
     """T4 lysozyme (2LZM) is not ubiquitin's fold: both panels are each structure drawn on its own (bench
     signature), the note says why under both, and the JSON still says what was aligned."""

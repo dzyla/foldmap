@@ -365,12 +365,14 @@ foldmap compare 2HHB 1MBN --chain-a B -o globins.svg --json mates.json   # haemo
 ```
 
 `--chain-a` and `--chain-b` name the chains (else each its first protein chain), `--match` aligns them as
-`--like-match` does, and `--theme`, `--style-file` and `--set` style both panels. A pair that is not one fold is
+`--like-match` does, `--assembly` reads both files as `plot --assembly` does (`asu` keeps the deposited chain
+names: under `auto` a chain of a built assembly is A1, A2, ...), and `--theme`, `--style-file` and `--set` style both
+panels. A pair that is not one fold is
 drawn as two figures of their own, side by side, with the note saying why. Each panel keeps its own ids, prefixed
 `a/` and `b/`. `--json` writes what was matched: `alignment` (`method`, `tm_score`, `rmsd`, `identity`, and `pairs`
 of residue numbers, A's then B's), `mates`, `pieces` (of a helix A has whole), `extras` (B's elements A lacks) and
 `only_a` (A's elements B lacks), each element by its label as drawn and its residues; numbers to 0.001. The MCP
-tool `compare_structures` returns the same page's preview and the same record.
+tool `compare_structures` (with `assembly`) returns the same page's preview and the same record.
 
 ### Conventions of the published figures
 
