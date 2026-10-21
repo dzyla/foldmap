@@ -36,6 +36,7 @@ LINE_GIDS = (
     "ligand-tether:",
     "disulfide:",
     "hbond:",
+    "ia:",
     "stub:",
     "domain-leader:",
 )
@@ -622,10 +623,10 @@ def text_collisions(drawn, *, clearance_px: float = 0.0, page: Page | None = Non
       TEXT_DEPTH_PX inside it, once per element (a helix is drawn as helix: and helix-back:); a helix drawn over a
       sheet and that sheet's strands are each other's (layout.lying_over);
     - text crossed by a line (LINE_GIDS: loops, nucleic-acid runs and ties, tethers, disulfide bars, glycan stems,
-      H-bonds) whose stroke comes within `clearance_px` of its ink box where no opaque body drawn above the line
-      hides it there: a line under the text still runs through its letters, a loop under the strand its letter sits
-      on does not show. A text's own line (a loop's length, a gap's label, a tie's letter, a ligand's tethers, a
-      strand's letters and ends) is not counted."""
+      H-bonds and the other interaction lines) whose stroke comes within `clearance_px` of its ink box where no
+      opaque body drawn above the line hides it there: a line under the text still runs through its letters, a
+      loop under the strand its letter sits on does not show. A text's own line (a loop's length, a gap's label,
+      a tie's letter, a ligand's tethers, a strand's letters and ends) is not counted."""
     page = page or measure(drawn)
     lay = page.layout
     over = {frozenset(f"el:{k}" for k in pair) for pair in lying_over(lay)} if lay is not None else set()

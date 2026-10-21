@@ -576,3 +576,205 @@ def test_the_nucleotide_end_of_every_line_is_a_drawn_bead_or_letter_in_every_sty
         ends = np.column_stack([line.get_xdata(), line.get_ydata()])
         near = [np.hypot(*(marks - e).T).min() for e in ends]
         assert min(near) < 1e-6, (line.get_gid(), near)
+
+
+# ---- plan 13c-4: the interaction overlay (salt bridges, stacking, cation-π, hydrophobic) beside the H-bonds ----------
+
+_TODAY = {  # sha256 of `foldmap plot X --set hbonds=na` drawn at 96aebc8, before the overlay generalised
+    "matplotlib": "3.11.2",
+    "1LMB": "10043b9df29b5c6a5dd6a0dd5efcc86fcea6387988590544a0cb93a1932565a4",
+    "1ZAA": "15b6ae433057122da3fe67654206a4e338a6d1df916c38a00eea507c710e35c8",
+}
+
+
+@pytest.mark.parametrize("name", ["1LMB", "1ZAA"])
+def test_hbond_figures_are_byte_identical_to_those_before_the_overlay(name, tmp_path):
+    """hbond_overlay is now interaction_overlay's H-bond part: an hbonds=na figure is the same file as before."""
+    import hashlib
+
+    import matplotlib
+
+    from foldmap.cli import main
+
+    if matplotlib.__version__ != _TODAY["matplotlib"]:
+        pytest.skip(f"recorded with matplotlib {_TODAY['matplotlib']}")
+    out = tmp_path / f"{name}.svg"
+    assert main(["plot", str(_path(name)), "--set", "hbonds=na", "-o", str(out)]) == 0
+    assert hashlib.sha256(out.read_bytes()).hexdigest() == _TODAY[name]
+
+
+def _ia(fig, kind=""):
+    return [l for l in fig.axes[0].lines if (l.get_gid() or "").startswith(f"ia:{kind}")]
+
+
+def _points(line):
+    """The drawn points of a line (page units), its breaks (NaN) left out."""
+    xy = np.column_stack([line.get_xdata(), line.get_ydata()]).astype(float)
+    return xy[np.isfinite(xy).all(axis=1)]
+
+
+def _across(points, ends):
+    """Each point's signed distance from the line through `ends`, and its fraction along it."""
+    p, q = np.asarray(ends, float)
+    d = (q - p) / np.hypot(*(q - p))
+    w = np.asarray(points, float) - p
+    return w[:, 1] * d[0] - w[:, 0] * d[1], (w @ d) / np.hypot(*(q - p))
+
+
+def test_salt_bridge_lines_end_on_their_residues():
+    """interactions=salt on λ repressor-DNA: ia:salt: lines between their residues, each protein end on its
+    residue's place (S4's rule, figcheck.residue_places and science.mark_findings) and each nucleotide end on its
+    nucleotide's point; what is drawn lies on that line, between its ends (broken only where it passes a letter)."""
+    from types import SimpleNamespace
+
+    from foldmap.figcheck import residue_places
+    from foldmap.science import mark_findings
+
+    fig, lay, loops, sses, bb, look = _drawn("1LMB", "interactions=salt")
+    lines = {l.get_gid(): l for l in _ia(fig, "salt:")}
+    assert len(lines) >= 4 and not _lines(fig) and not _ia(fig, "stack:")
+    drawn = SimpleNamespace(layout=lay, loops=loops, sses=sses)
+    index = {(l.chain, l.tag): k for k, l in enumerate(lay.res_labels)}
+    where = nucleotide_points(lay)
+    nts = {
+        (lab.chain, lab.tag): tuple(where[(s, i)])
+        for s, strand in enumerate(lay.nucleic.strands)
+        for i, lab in enumerate(strand.labels)
+        if (s, i) in where
+    }
+    overlay = fig.foldmap_interactions
+    assert set(lines) == {l.gid for l in overlay.kinds[0].lines}
+    marks = []
+    for line in overlay.kinds[0].lines:
+        for end, part in zip(line.ends, line.gid[len("ia:salt:") :].split("-")):
+            chain, tag = part.split(":")
+            if (chain, tag) in index:
+                marks.append((part, end, residue_places(drawn, index[(chain, tag)])))
+            else:
+                assert end == pytest.approx(nts[(chain, tag)])
+        off, along = _across(_points(lines[line.gid]), line.ends)
+        assert np.abs(off).max() < 1e-9 and along.min() > -1e-9 and along.max() < 1 + 1e-9
+    assert marks and mark_findings(marks) == []
+    lys = next(l for l in overlay.kinds[0].lines if any(x.a[2] == "NZ" for x in l.found))
+    assert all(x.kind == "salt" for x in lys.found) and [x.distance for x in lys.found] == sorted(
+        x.distance for x in lys.found
+    )
+
+
+def test_two_kinds_between_one_pair_lie_side_by_side():
+    """Two kinds between one residue pair: parallel lines a gap apart (INTERACTION_GAP line widths), one each side
+    of the line between the residues' points."""
+    from foldmap.render import INTERACTION_GAP
+
+    fig = _drawn("1LMB", "interactions=hbond,salt", "hbond_max=1000")[0]
+    hb = {l.get_gid()[len("hbond:") :]: l for l in _lines(fig)}
+    salt = {l.get_gid()[len("ia:salt:") :]: l for l in _ia(fig, "salt:")}
+    shared = sorted(hb.keys() & salt.keys())
+    assert shared
+    overlay = fig.foldmap_interactions
+    by_gid = {l.gid: l for l in overlay.lines()}
+    lw = hb[shared[0]].get_linewidth()  # points
+    ax = fig.axes[0]
+    pt_per_unit = (ax.transData.transform((1, 0)) - ax.transData.transform((0, 0)))[0] * 72 / fig.dpi
+    half = INTERACTION_GAP * lw / pt_per_unit / 2
+    for pair in shared:
+        centre = by_gid[f"hbond:{pair}"].ends
+        assert np.allclose(by_gid[f"ia:salt:{pair}"].ends, centre)
+        first, _ = _across(_points(hb[pair]), centre)
+        second, _ = _across(_points(salt[pair]), centre)
+        assert first == pytest.approx(np.full(len(first), -half))  # parallel, either side, a gap apart
+        assert second == pytest.approx(np.full(len(second), half))
+        assert overlay.slots[f"hbond:{pair}"] == (0, 2) and overlay.slots[f"ia:salt:{pair}"] == (1, 2)
+    alone = [g for g in hb if g not in salt]
+    assert alone and all(f"hbond:{g}" not in overlay.slots for g in alone)
+
+
+def test_each_kind_has_a_legend_line_and_the_cap_says_how_many():
+    from foldmap.render import INTERACTION_INK, KindOverlay
+
+    assert KindOverlay("salt", [1] * 5, 5).legend() == "Salt bridges (5)"
+    assert KindOverlay("salt", [1] * 200, 1412).legend() == "Salt bridges (200 of 1,412 shown)"
+    assert KindOverlay("stack", [1] * 3, 3, 2).legend() == "π-stacking (3, 2 with an end not drawn)"
+    every = _drawn("1LMB", "interactions=salt", "interaction_max=1000")[0]
+    n = len(_ia(every, "salt:"))
+    capped = _drawn("1LMB", "interactions=salt", "interaction_max=3")[0]
+    assert len(_ia(capped, "salt:")) == 3
+    texts = [t.get_text() for t in capped.axes[0].texts]
+    assert f"Salt bridges (3 of {n} shown)" in texts and not any(t.startswith("H-bonds") for t in texts)
+    shortest = sorted(every.foldmap_interactions.kinds[0].lines, key=lambda l: (l.length, l.gid))[:3]
+    assert [l.gid for l in capped.foldmap_interactions.kinds[0].lines] == [l.gid for l in shortest]
+    fig = _drawn("1LMB", "interactions=all,hydrophobic")[0]
+    marks = {l.get_gid(): l for l in fig.axes[0].lines if (l.get_gid() or "").startswith("legend-")}
+    drawn = {l.get_gid().split(":")[1] for l in _ia(fig)}
+    assert drawn and {f"legend-ia:{k}" for k in drawn} <= set(marks)
+    for kind in drawn:
+        line = next(l for l in _ia(fig, f"{kind}:"))
+        assert marks[f"legend-ia:{kind}"].get_color() == line.get_color() == INTERACTION_INK[kind][0]
+        assert marks[f"legend-ia:{kind}"].get_linestyle() == line.get_linestyle() != "-"
+
+
+def test_every_line_drawn_on_lambda_passes_the_independent_re_check():
+    from foldmap.interactions import Interaction, verify_interactions
+
+    fig = _drawn("1LMB", "interactions=all", "hbond_max=1000", "interaction_max=1000")[0]
+    overlay = fig.foldmap_interactions
+    assert overlay.dropped == () and {p.kind for p in overlay.kinds if p.lines} >= {"salt", "cation-pi"}
+    found = [x for part in overlay.kinds for line in part.lines for x in line.found]
+    found += [
+        Interaction(
+            "hbond",
+            (b.donor.res.chain, b.donor.res.tag, b.donor.name),
+            (b.acceptor.res.chain, b.acceptor.res.tag, b.acceptor.name),
+            b.distance,
+            None,
+        )
+        for line in overlay.hbonds.lines
+        for b in line.bonds
+    ]
+    assert len(found) > 30 and verify_interactions(_model("1LMB"), found) == []
+    assert not any(i["kind"] == "interactions_dropped" for i in fig.foldmap_provenance)
+
+
+def test_a_line_the_re_check_flags_is_not_drawn_and_the_notes_say_so(monkeypatch):
+    from foldmap import render
+    from foldmap.cli import make_layout
+    from foldmap.route import route_loops
+
+    real = render.failing_lines
+
+    def flag_first_salt(model, drawn):
+        n = next(k for k, x in enumerate(drawn) if x.kind == "salt")
+        return [*real(model, drawn), (n, f"salt {drawn[n].a} - {drawn[n].b}: moved")]
+
+    look = resolve_style(None, None, ["interactions=salt", "interaction_max=1000"])
+    lay, sses, bb = make_layout(_path("1LMB"), look=look, model=_model("1LMB"))
+    loops = route_loops(lay, sses, bb)
+    before = render.interaction_overlay(lay, loops, sses, look, _model("1LMB"))
+    monkeypatch.setattr(render, "failing_lines", flag_first_salt)
+    fig = draw(lay, loops, sses, look=look, model=_model("1LMB"))
+    after = fig.foldmap_interactions
+    assert len(after.dropped) == 1
+    assert sum(len(l.found) for l in after.kinds[0].lines) == sum(len(l.found) for l in before.kinds[0].lines) - 1
+    item = next(i for i in fig.foldmap_provenance if i["kind"] == "interactions_dropped")
+    assert item["count"] == 1 and "re-check" in item["text"] and "moved" in item["text"]
+
+
+@pytest.mark.parametrize("pdb", ["1LMB", "1URN"])
+def test_interaction_lines_keep_off_every_letter_and_a6_reads_them(pdb):
+    """The lines of the new kinds are drawn after every text and broken where they would pass a letter, so A6 finds
+    no text crossed by an ia: line (the H-bond lines are drawn as before plan 13c); figcheck reads ia: lines as lines
+    (LINE_GIDS): a text put across one afterwards is a collision."""
+    from types import SimpleNamespace
+
+    from foldmap import figcheck
+
+    fig, lay = _drawn(pdb, "interactions=salt,stack,cation-pi,hydrophobic", "interaction_max=199")[:2]
+    drawn = SimpleNamespace(figure=fig, layout=lay)
+    page = figcheck.measure(drawn)
+    assert any(gid.startswith("ia:") for gid, *_ in page.lines)
+    assert not [h for h in figcheck.text_collisions(drawn, page=page) if " × ia:" in h]
+    line = max(_ia(fig), key=lambda l: len(_points(l)))
+    at = _points(line)[:2].mean(axis=0)  # on its first drawn piece
+    fig.axes[0].text(*at, "WWWW", ha="center", va="center", fontsize=9, zorder=9).set_gid("label:test")
+    hits = figcheck.text_collisions(drawn)
+    assert f"label:test × {line.get_gid()}" in hits

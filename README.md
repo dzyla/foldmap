@@ -551,7 +551,21 @@ hydrophobic, `all,hydrophobic` adds it; default `off`) chooses the kinds of inte
 figure holds nucleic acid, else `interchain`). `interaction_max` caps the lines of each kind (default 200; H-bonds keep
 `hbond_max`). `hbonds=na` keeps working and means `interactions=hbond` with `interactions_between=na`, so old layout
 files and app sessions draw the same figure; when both keys are given, `interactions` wins and a warning says so.
-For now only the H-bond lines are drawn; the other kinds' lines come with the interaction overlay (plan 13c).
+
+Each kind is a thin line between the two residues, as the H-bond lines are, one line per kind and residue pair (a
+pair's several salt-bridge atom pairs, or a Trp's two stacked rings, make one line), with its own colour and dash:
+H-bonds magenta short dashes, salt bridges crimson long dashes, π-stacking dark green dense dots, cation-π blue
+dash-dot, hydrophobic contacts dark olive sparse dots. The colours stand clear of every chain palette, the H-bond
+magenta and the DNA/RNA backbones in normal and colour-blind sight; the dashes alone tell the kinds apart in print
+(the `print` and `blueprint` themes draw every kind in `hbond_color`, by dash only). Two kinds between one pair lie
+side by side. The legend names each kind drawn with its count ("Salt bridges (200 of 1,412 shown)" when capped).
+Criteria, from the heavy atoms: salt bridge, an anionic O (Asp, Glu, C-terminus, phosphate) within 4.0 Å of a
+cationic N (Lys, Arg, N-terminus; His "if protonated"); π-stacking, ring centroids within 5.5 Å, parallel (≤ 30°)
+or T-shaped (60–90°), offset ≤ 2.0 Å, never two nucleobases (the ladder shows those); cation-π, Lys NZ or the Arg
+guanidinium centre within 6.0 Å of a ring centroid, offset ≤ 2.0 Å; hydrophobic, carbons bonded only to carbon
+within 4.0 Å. Before drawing, every interaction found is re-measured by an independent check
+(`interactions.verify_interactions`); one it flags is not drawn and the figure's notes say so. Example:
+`foldmap plot 1LMB.cif --set interactions=all -o 1lmb.svg`.
 
 **Checking the science.** A figure can look clean and still say something false about the structure, so foldmap
 checks what it draws against the coordinates, apart from how the page looks. `foldmap check 9FWZ` draws the figure

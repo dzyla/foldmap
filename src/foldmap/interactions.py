@@ -684,11 +684,16 @@ def verify_interactions(model, drawn) -> list[str]:
     their limits, a stack's angle in its window and named by its note, and the drawn distance and angle the measured
     ones (to the finders' 1e-3 grid). Returns one text per line that fails, "<kind> <a> - <b>: <reasons>" with each
     partner chain:tag:atom, in the order drawn; empty when every line holds."""
+    return [text for _, text in failing_lines(model, drawn)]
+
+
+def failing_lines(model, drawn) -> list[tuple[int, str]]:
+    """verify_interactions with each failing line's place in `drawn`: (index, text), in the order drawn."""
     if isinstance(model, tuple):
         model = model[0]
     book = _v_book(model)
     out = []
-    for x in drawn:
+    for n, x in enumerate(drawn):
         bad: list[str] = []
         ra, rb = book.get(tuple(x.a[:2])), book.get(tuple(x.b[:2]))
         for p, res in ((x.a, ra), (x.b, rb)):
@@ -710,5 +715,5 @@ def verify_interactions(model, drawn) -> list[str]:
                 elif angle is not None and (x.angle is None or abs(x.angle - angle) > _V_SLACK):
                     bad.append(f"angle drawn {x.angle}, measured {angle:.3f}")
         if bad:
-            out.append(f"{x.kind} {_v_where(x.a)} - {_v_where(x.b)}: {'; '.join(bad)}")
+            out.append((n, f"{x.kind} {_v_where(x.a)} - {_v_where(x.b)}: {'; '.join(bad)}"))
     return out

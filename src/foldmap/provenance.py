@@ -21,6 +21,9 @@ elements (their ids: element ids, or domain, stem and ligand names). Kinds, in t
     counts_hidden      residue counts of long loops and chain ends left out: no spot clear of other ink
     additives_hidden   crystallisation and purification additives not marked (Style.ligands auto)
     crowded_marks      ligand marks with no clear spot, drawn over other ink
+    interactions_dropped  interaction lines left out: the independent re-check (interactions.verify_interactions)
+                       found they break their rule
+    interactions_hidden  interaction lines not drawn: they would run wholly under text
     loops_unrouted     loops or nucleic-acid strands with no clear route, drawn as plain curves
     loops_over_text    loops routed over a label or chain end, the only route found
     page_scaled        a page held at its largest with text under 6 pt; a PNG under 300 dpi
@@ -33,7 +36,8 @@ from __future__ import annotations
 from xml.sax.saxutils import escape
 
 HEADING = "How this figure was made:"
-WARNINGS = ("crowded_marks", "loops_unrouted", "loops_over_text")  # said as warnings on the command line
+# said as warnings on the command line
+WARNINGS = ("crowded_marks", "interactions_dropped", "loops_unrouted", "loops_over_text")
 
 
 def _item(kind: str, text: str, elements, count: int | None = None) -> dict:
@@ -243,6 +247,16 @@ def figure_provenance(fig, layout, loops=(), labels: bool = True) -> list[dict]:
     if crowded:
         text = f"{len(crowded)} ligand mark(s) with no clear spot, drawn over other ink: {', '.join(crowded)}"
         out.append(_item("crowded_marks", text, crowded))
+    overlay = getattr(fig, "foldmap_interactions", None)
+    if overlay is not None and overlay.dropped:
+        text = (
+            f"{len(overlay.dropped)} interaction(s) not drawn: the independent re-check found they break their rule: "
+            + "; ".join(overlay.dropped)
+        )
+        out.append(_item("interactions_dropped", text, [t.split(": ", 1)[0] for t in overlay.dropped]))
+    if hidden := list(getattr(fig, "foldmap_interactions_hidden", [])):
+        text = f"{len(hidden)} interaction line(s) not drawn: they would run wholly under text: {', '.join(hidden)}"
+        out.append(_item("interactions_hidden", text, hidden))
     if lost := stuck(loops, layout):
         text = (
             f"no clear route for {len(lost)} loop(s) or strand(s), drawn as plain curves that may cross elements: "
