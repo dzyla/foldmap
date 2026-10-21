@@ -288,7 +288,7 @@ def backbone_colours(
     """(nucleic-acid chain -> backbone colour, protein chain -> loop colour override) for this figure: the
     na_backbone mode, then `backbone_colors` (a modality key, then a chain key). Shared by every nucleic-acid
     style and the protein loops. Raises ValueError naming backbone_colors for a chain the figure lacks.
-    Every colour goes through `_legible`: on a dark page a user-given colour that is too dark is lightened (on a
+    Every colour goes through `legible`: on a dark page a user-given colour that is too dark is lightened (on a
     light page one that is too pale is darkened); colours that already stand out are used exactly as given."""
     over = backbone_overrides(look.backbone_colors)
     strands = layout.nucleic.strands if layout.nucleic is not None else []
@@ -311,8 +311,8 @@ def backbone_colours(
         else:
             colour = mode
         colour = over.get("rna" if is_rna else "dna", colour)
-        na[chain] = _legible(over.get(chain, colour))
-    loops = {c: _legible(over[c] if c in over else over["protein"]) for c in protein if c in over or "protein" in over}
+        na[chain] = legible(over.get(chain, colour))
+    loops = {c: legible(over[c] if c in over else over["protein"]) for c in protein if c in over or "protein" in over}
     return na, loops
 
 
@@ -533,7 +533,7 @@ def _block(ink: _NAInk, k: int, d: PlacedStem, where: dict, letters: dict) -> No
         rotation=_upright(d.angle),
         fontsize=ink.font * 0.9,
         fontweight="bold",
-        color=_legible(mixed) if ink.fill == "outline" else text_color_on(mixed),
+        color=legible(mixed) if ink.fill == "outline" else text_color_on(mixed),
         zorder=Z["label"],
     )
     t.set_gid(f"na:label:{k}")
@@ -635,7 +635,7 @@ def _draw_na_marks(ink: _NAInk, layout: Layout, style: str, residue_colour, pt_p
                 va="center",
                 fontsize=ink.font * _TIE_LABEL,  # a base letter's size, upright, bold, in the mark's colour
                 fontweight="bold",
-                color=_legible(ink.colour(tie.a[0])),
+                color=legible(ink.colour(tie.a[0])),
                 zorder=Z["label"],
             )
             t.set_gid(f"{gid}:label")
@@ -924,11 +924,11 @@ def domain_name_colour(tone: str, on: str) -> str:
 def _label_ink(colour: str) -> str:
     """Text in an element's own hue: a deeper shade on light pages, the colour itself on dark ones."""
     if _luminance(_BACKGROUND.get()) < 0.5:
-        return _legible(colour)
-    return _legible(darken(colour, 0.8))
+        return legible(colour)
+    return legible(darken(colour, 0.8))
 
 
-def _legible(colour: str, ceiling: float = 0.5) -> str:
+def legible(colour: str, ceiling: float = 0.5) -> str:
     """Shift a line colour until it stands out on the page: darker on light pages (pale shades are fine for
     fills, not for thin lines), lighter on dark ones."""
     from matplotlib.colors import to_rgb
@@ -1215,7 +1215,7 @@ def _symbol(ax, shape: str, colour: str, xy, size: float, lw: float, gid: str) -
         n, r0 = {"triangle": (3, 1.15), "diamond": (4, 1.2), "star": (5, 1.15)}[shape]
         ang = np.pi / 2 + np.arange(n) * 2 * np.pi / n
         patch = Polygon(np.column_stack([x + r0 * h * np.cos(ang), y + r0 * h * np.sin(ang)]), closed=True)
-    patch.set(facecolor=colour, edgecolor=_legible("#2b2b2b"), linewidth=lw * 0.6, zorder=Z["mark"])
+    patch.set(facecolor=colour, edgecolor=legible("#2b2b2b"), linewidth=lw * 0.6, zorder=Z["mark"])
     patch.set_gid(gid)
     ax.add_patch(patch)
 
@@ -1784,7 +1784,7 @@ def _draw_ligands(ax, marks: list[dict], lw: float, font: float, layout: Layout,
             tether = PathPatch(
                 _pieces_path(pieces),
                 fc="none",
-                ec=_legible("#6b6b6b"),
+                ec=legible("#6b6b6b"),
                 lw=lw * 0.7,
                 ls=(0, (1.2, 1.4)),
                 capstyle="round",
@@ -1973,7 +1973,7 @@ def _draw_uniprot(ax, marks: list[dict], layout, lw: float, font: float) -> None
     for n, m in enumerate(marks):
         f, (x, y) = m["feature"], m["at"]
         colour = SITE_COLOURS.get(f.type, "#555555")
-        halo = Circle((x, y), 0.27, fc=_BACKGROUND.get(), ec=_legible("#1d1d1f"), lw=lw * 0.9, zorder=Z["feature-ring"])
+        halo = Circle((x, y), 0.27, fc=_BACKGROUND.get(), ec=legible("#1d1d1f"), lw=lw * 0.9, zorder=Z["feature-ring"])
         halo.set_gid(f"feature-ring:{n}")
         ax.add_patch(halo)
         dot = Circle((x, y), 0.17, fc=colour, ec="none", zorder=Z["feature"])
@@ -2269,7 +2269,7 @@ def _draw_links(
             stem = PathPatch(
                 _pieces_path(pieces) if pieces else Path(np.empty((0, 2))),
                 fc="none",
-                ec=_legible("#2b2b2b"),
+                ec=legible("#2b2b2b"),
                 lw=lw * 0.8,
                 zorder=Z["bar-end"],
             )
@@ -3136,7 +3136,7 @@ def _draw_loops(c: _Canvas, layout: Layout, loops: list[Loop], sses: list[SSE], 
             "element": c.element_colour.get(loop.a_id, c.look.ink),
             "residue": c.look.ink,  # replaced by per-residue runs below
         }[c.look.loop_color]
-        loop_c = _legible(loop_c)
+        loop_c = legible(loop_c)
         mine = over.get(a_sse.chain) if a_sse else None  # backbone_colors for this protein chain
         if mine:
             loop_c = mine
@@ -3176,7 +3176,7 @@ def _draw_loops(c: _Canvas, layout: Layout, loops: list[Loop], sses: list[SSE], 
                 ha="center",
                 va="center",
                 fontsize=c.font * TAIL_COUNT_SIZE,
-                color=_legible("#5d6877"),
+                color=legible("#5d6877"),
                 zorder=Z["label"],
                 rotation=0,
             )
@@ -3436,7 +3436,7 @@ def _draw_domain_bar(c: _Canvas, layout: Layout) -> None:
                 text,
                 ha="center",
                 style="italic",
-                color=_legible("#5d6877"),
+                color=legible("#5d6877"),
                 **small,
             )
             t.set_gid(f"domain-bar-chain:{chain}" if len(bars) > 1 else "domain-bar-source")
@@ -3690,7 +3690,7 @@ def _draw_residue_numbers(c: _Canvas, layout: Layout) -> None:
                 if p.sse.kind in ("H", "G"):
                     away = -1.0 if nrm[1] >= 0 else 1.0  # the side opposite the helix name
                     along = 0.35 if p.length >= _SHORT_HELIX else -0.3  # a short box: just past each end instead
-                    xy, ink = np.asarray(port) + inward * along + nrm * away * (p.width / 2 + 0.38), _legible("#4a4a4a")
+                    xy, ink = np.asarray(port) + inward * along + nrm * away * (p.width / 2 + 0.38), legible("#4a4a4a")
                 elif p.length >= 3.0:  # room for both numbers and the strand letter between them
                     reach = 0.35 if end == "N" else min(_HEAD_LEN, p.length * 0.45) + 0.3  # clear of the head
                     xy, ink = (
@@ -3698,7 +3698,7 @@ def _draw_residue_numbers(c: _Canvas, layout: Layout) -> None:
                         darken(colour) if c.look.fill == "outline" else text_color_on(colour),
                     )
                 else:  # too short to hold numbers: just past the end, beside the loop stub
-                    xy, ink = np.asarray(port) - inward * 0.45 + nrm * 0.42, _legible("#4a4a4a")
+                    xy, ink = np.asarray(port) - inward * 0.45 + nrm * 0.42, legible("#4a4a4a")
                 t = c.ax.text(
                     *xy, str(num), ha="center", va="center", fontsize=c.font * 0.62, color=ink, zorder=Z["resnum"]
                 )
@@ -3781,7 +3781,7 @@ def _draw_termini(c: _Canvas, layout: Layout, sses: list[SSE], loops: list[Loop]
             ha="center",
             va="center",
             fontsize=c.font * TAIL_COUNT_SIZE,
-            color=_legible("#5d6877"),
+            color=legible("#5d6877"),
             zorder=Z["label"],
         )
         t.set_gid(f"tail-length:{count['end']}:{count['chain']}")
@@ -3836,7 +3836,7 @@ def _draw_legend(c: _Canvas, layout: Layout, legend: _Legend) -> None:
                     va="center",
                     fontsize=c.font * _TIE_LABEL,
                     fontweight="bold",
-                    color=_legible(colour),
+                    color=legible(colour),
                 )
                 a.set_gid(f"legend-tie-label:{n}")
         elif text.startswith("chromophore"):  # the mark itself: a star
@@ -3863,7 +3863,7 @@ def _draw_legend(c: _Canvas, layout: Layout, legend: _Legend) -> None:
             va="center",
             fontsize=c.font * 0.85,
             style="italic",
-            color=_legible("#5d6877"),
+            color=legible("#5d6877"),
         )
         t.set_gid("context")
 

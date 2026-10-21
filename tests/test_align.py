@@ -14,7 +14,7 @@ import pytest
 from foldmap.align import SAME_FOLD_TM, ChainAlignment, Mates, align_chains, d0, element_mates, tm_score
 from foldmap.io import load_backbone
 from foldmap.model import Backbone, ResLabel
-from foldmap.sequence import _one_letter
+from foldmap.sequence import one_letter
 
 DATA = Path(__file__).parent / "data"
 
@@ -73,7 +73,7 @@ def _fasta(path, rows):
 
 
 def test_file_route_reads_two_rows(ubq_a, tmp_path):
-    seq = _one_letter([l.name for l in ubq_a.labels])
+    seq = one_letter([l.name for l in ubq_a.labels])
     gone = 30
     b = _moved(ubq_a, keep=[k for k in range(len(ubq_a)) if k != gone])
     row_b = seq[:gone] + "-" + seq[gone + 1 :]

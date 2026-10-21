@@ -50,7 +50,6 @@ LIMITS = {
     "like_place_p90": 2.5,  # H2: ... its 90th percentile
     "like_relations": 0.95,  # H3: share of mate pairs whose page dx, dy signs agree
 }
-PROVISIONAL: tuple[str, ...] = ()  # limits not yet frozen: none (Task 13a-10 froze H2's and H3's)
 DOCUMENTED_WARNINGS: tuple[str, ...] = ()  # Python warnings a view may print (regexes); none at the start
 FIGURE_VIEWS = ("default", "deposited", "beta", "focus", "domains", "membrane")
 LABEL_VIEWS = ("default", "deposited", "beta", "focus")
@@ -619,7 +618,6 @@ LIKE_CHECKS = {  # plan 13a, spec 4.5: a structure B drawn like a reference A (-
 LIKE_MIN_MATES = 3  # H2, H3: judged on this many mates drawn at least (as figcheck.COPY_MIN_MATCHED: 2 always fit)
 LIKE_APART = 1.0  # H3: two mates more than this many page units apart, in both figures, are compared ...
 LIKE_AXIS = 0.5  # ... on each page axis that parts them by more than this in both figures
-PAIRING_NAMED = "pairing"  # H3: a mated sheet's strands may stand in another order when the note names a pairing
 
 
 def like_pairs(lay_a, lay_b, mates) -> list[tuple[str, str, tuple[str, ...]]]:
@@ -781,21 +779,19 @@ def sheet_orders(lay_a, lay_b, pairs) -> list[str]:
     return out
 
 
-def h3_relations(lay_a, lay_b, pairs, note: str = "", baseline: dict | None = None) -> dict:
+def h3_relations(lay_a, lay_b, pairs, baseline: dict | None = None) -> dict:
     """H3: the map reads the same way (relations' share at least LIMITS' like_relations) and each mated
-    sheet keeps one order, unless the note names a pairing difference (PAIRING_NAMED). `baseline`: the share between
-    A and B drawn independently, reported."""
+    sheet keeps one order (sheet_orders; a sheet whose pairing differs fails too: the excuse for one waits for its
+    redesign, ROADMAP). `baseline`: the share between A and B drawn independently, reported."""
     got = relations(lay_a, lay_b, pairs)
     if got is None:
         out = _too_few(pairs) or _not_judged(f"no two mates more than {LIKE_APART} page unit apart in both figures")
     else:
         limit = LIMITS["like_relations"]
-        excused = PAIRING_NAMED in note
         bad = [f"{len(got['turned'])} turned: {', '.join(got['turned'][:6])}"] if got["share"] < limit else []
-        named = " (the note names a pairing difference)" if excused else ""
-        sheets = [f"sheet order {s}{named}" for s in got["sheets"]]
+        sheets = [f"sheet order {s}" for s in got["sheets"]]
         share = f"{got['share']:.4f} of {got['pairs']} pairs agree (limit {limit})"
-        out = _ok(not bad and (excused or not got["sheets"]), "; ".join([share, *bad, *sheets]))
+        out = _ok(not bad and not got["sheets"], "; ".join([share, *bad, *sheets]))
     return {**out, "detail": out["detail"] + _independently(baseline), "value": got, "baseline": baseline}
 
 
@@ -832,22 +828,22 @@ def h4_names(lay_a, lay_b, mates, note: str = "") -> dict:
     return {**_ok(not differ, detail), "value": {"mates": len(pairs), "differ": differ}}
 
 
-def h1_matched(aln, mates, alike: bool, note: str, kind: str | None = None) -> dict:
+def h1_matched(aln, mates, alike: bool, refused: bool, kind: str | None = None, note: str = "") -> dict:
     """H1: the pair is drawn alike exactly when it is one fold (Mates.same_fold: align.SAME_FOLD_TM and
     SAME_FOLD_FRACTION). `kind` (a tuning or held-out pair's): "positive" passes when one fold and drawn alike;
     "negative" when not one fold and refused with the note (like.refused_note), so a forced negative (drawn alike)
-    fails; None (`foldmap check`, no kind known): the drawing agrees with same_fold either way. Not judged when the
-    chains were not aligned (a frame that cannot be carried: like.uncarried_note)."""
+    fails; None (`foldmap check`, no kind known): the drawing agrees with same_fold either way. `refused`: drawn on
+    its own because not one fold, with the note saying so (cli._drawn_like, make_layout's like_out). Not judged when
+    the chains were not aligned (a frame that cannot be carried: like.uncarried_note, `note`)."""
     from .align import SAME_FOLD_FRACTION, SAME_FOLD_TM
 
     if aln is None or mates is None:
         return _not_judged(f"not aligned: {note}" if note else "not aligned")
     one = mates.same_fold
-    refused = not alike and note.startswith("not drawn like") and "not the same fold" in note
-    fewer = len(mates.mate) + min(len(mates.only_a), len(mates.pieces) + len(mates.extras))  # the chain with fewer
+    refused = refused and not alike
     facts = (
         f"TM-score {aln.tm_score:.2f} (one fold at {SAME_FOLD_TM}), {len(mates.mate)} mates of the "
-        f"{fewer} elements of the chain with fewer (at {SAME_FOLD_FRACTION})"
+        f"{mates.smaller} elements of the chain with fewer (at {SAME_FOLD_FRACTION})"
     )
     said = "drawn alike" if alike else "refused with the note" if refused else "drawn on its own, not refused"
     if kind == "negative":
@@ -900,21 +896,23 @@ def like_checks(
     judged_like: dict | None = None,
     judged_alone: dict | None = None,
     kind: str | None = None,
+    refused: bool = False,
 ) -> dict[str, dict]:
     """H1-H5 of B drawn like A (spec 4.5): lay_a the reference's layout (None when it was not laid out), lay_b B's
     drawn like it, aln and mates the alignment and element mates (None where not reached), note B's like note
     (Layout.like_note), alike whether B took A's places (a Like was given to build_layout). `lay_alone`: B drawn on
     its own (the same chain), for H2's and H3's baseline (drawn independently, the manuscript's sentence);
-    judged_like and judged_alone: check_figure's results of the two, for H5; `kind`: the pair's (h1_matched). A
+    judged_like and judged_alone: check_figure's results of the two, for H5; `kind` and `refused` (B refused as not
+    the reference's fold: make_layout's like_out): h1_matched's. A
     check with nothing to judge is not judged, never a pass; H2-H4 are not judged where B was not drawn alike."""
-    out = {"H1": h1_matched(aln, mates, alike, note, kind)}
+    out = {"H1": h1_matched(aln, mates, alike, refused, kind, note)}
     measured = lay_a is not None and mates is not None
     pairs = like_pairs(lay_a, lay_b, mates) if measured else []
     alone = like_pairs(lay_a, lay_alone, mates) if measured and lay_alone is not None else []
     place, rel = place_deviation(lay_a, lay_alone, alone), relations(lay_a, lay_alone, alone)
     if measured and alike:
         out["H2"] = h2_places(lay_a, lay_b, pairs, place)
-        out["H3"] = h3_relations(lay_a, lay_b, pairs, note, rel)
+        out["H3"] = h3_relations(lay_a, lay_b, pairs, rel)
         out["H4"] = h4_names(lay_a, lay_b, mates, note)
     else:
         why = note or "not drawn alike"  # the note says why: not the same fold, a frame that cannot be carried

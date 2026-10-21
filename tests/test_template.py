@@ -277,7 +277,7 @@ def test_template_choices_do_not_depend_on_the_order_of_the_sheets(monkeypatch):
     a = Sheet([fake_sse("E", s, s + 2, chain="A") for s in (1, 5, 30, 40)], [1] * 4, ["P"] * 3)
     b = Sheet([fake_sse("E", s, e, chain="B") for s, e in ((1, 8), (50, 52), (60, 62), (70, 72))], [1] * 4, ["P"] * 3)
     monkeypatch.setattr(layout, "template_applies", lambda sh, sses: sh is a)
-    monkeypatch.setattr(layout, "_row_shape", lambda sh: True)
+    monkeypatch.setattr(layout, "can_be_row", lambda sh: True)
     copies = {"A": ("A", 0), "B": ("A", 0)}
     forward = layout.template_choices([a, b], [], copies)
     backward = layout.template_choices([b, a], [], copies)

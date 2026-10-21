@@ -307,10 +307,10 @@ def test_loops_can_take_the_colour_of_their_chain_or_element(zs5, mode):
     by_id = {s.id: s for s in sses}
     for loop in _artists(fig, "loop:"):
         a = loop.get_gid().split(":", 1)[1].split(">")[0]
-        from foldmap.render import _legible
+        from foldmap.render import legible
 
         want = chain[by_id[a].chain] if mode == "chain" else cols[a]
-        assert _hex(loop.get_edgecolor()) == _legible(want).lower()  # the colour, darkened if too pale for a line
+        assert _hex(loop.get_edgecolor()) == legible(want).lower()  # the colour, darkened if too pale for a line
 
 
 def test_loop_arrows_point_from_n_to_c(ubq):

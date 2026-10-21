@@ -13,7 +13,7 @@ from matplotlib.patches import Circle, PathPatch, Polygon, Rectangle
 
 from .layout import ETA_W, HEAD, HEAD_LEN
 from .palette import darken, text_color_on, tint
-from .render import _legible, _mix, body_paint, eta_box, helix_ribbon, page, pin_fonts, strand_arrow
+from .render import _mix, body_paint, eta_box, helix_ribbon, legible, page, pin_fonts, strand_arrow
 from .sequence import GAP, Alignment, chain_track, column_classes, conservation, map_alignment
 from .style import Style
 
@@ -185,7 +185,7 @@ def _draw(
     font = 8.0 * look.font_scale
     unit = font / 72 * 0.8  # inches per column
     fig = Figure(figsize=((margin + columns + 1.0) * unit, total_h * unit), facecolor=look.background)
-    ink, frame_c = look.ink, _legible(FRAME)
+    ink, frame_c = look.ink, legible(FRAME)
     ax = fig.add_axes([0, 0, 1, 1])
     ax.set_xlim(-margin, columns + 1.0)
     ax.set_ylim(-total_h, 0)
@@ -340,7 +340,7 @@ def _draw(
                     ha="left",
                     va="center",
                     fontsize=font * 0.9,
-                    color=_legible(darken(colour, 0.85)) if colour != "#000000" else ink,
+                    color=legible(darken(colour, 0.85)) if colour != "#000000" else ink,
                 )
                 t.set_gid(f"sslabel:{e.id}")
 

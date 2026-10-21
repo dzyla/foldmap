@@ -47,7 +47,7 @@ class Track:
     deposited: bool = True  # positions follow the deposited sequence (False: modelled residues only, no SEQRES)
 
 
-def _one_letter(names: list[str]) -> str:
+def one_letter(names: list[str]) -> str:
     return "".join(
         (gemmi.find_tabulated_residue(n).one_letter_code.upper() or "X").replace(" ", "X")
         if gemmi.find_tabulated_residue(n)
@@ -114,7 +114,7 @@ def chain_track(path, chain: str | None = None, full_sequence: bool = False) -> 
     shift = lambda e: Element(e.kind, e.label, e.start - lo, e.end - lo, e.id)  # noqa: E731
     return Track(
         chain,
-        _one_letter(names)[lo : hi + 1],
+        one_letter(names)[lo : hi + 1],
         numbers[lo : hi + 1],
         observed[lo : hi + 1],
         "".join(ss[lo : hi + 1]),
@@ -373,7 +373,7 @@ def residue_conservation(source, aln: Alignment, reference: str | None = None) -
     out: dict[int, float] = {}
     for chain in dict.fromkeys(l.chain for l in bb.labels):
         mine = [k for k, l in enumerate(bb.labels) if l.chain == chain]
-        seq = _one_letter([bb.labels[k].name for k in mine])
+        seq = one_letter([bb.labels[k].name for k in mine])
         best = None
         for r in rows:  # the alignment row this chain matches best
             plain = aln.rows[r].replace(GAP, "")

@@ -476,12 +476,17 @@ def _sheet_seen(sheet: Sheet, frame: Frame) -> np.ndarray:
 
 
 def _sheet_order(
-    sheet: Sheet, frame: Frame, ref_angle: dict[str, float] | None = None
+    sheet: Sheet, frame: Frame, ref_angle: dict[str, float] | None = None, ref_order: bool | None = None
 ) -> tuple[list[int], int, np.ndarray]:
     """How a sheet is drawn: the track strands' indices left to right, s = +1 when strands[0] points up (else -1),
     and the projected centroids (Å) of every strand drawn (_drawn_strands: the track's, then the accessory's).
     `ref_angle` (strand id -> drawn angle, a reference's: Like.angle): the first track strand it names points as
-    there, the sheet's way up taken from it; the order follows from s as always (the front face, never a mirror)."""
+    there, the sheet's way up taken from it; the order follows from s as always (the front face, never a mirror).
+    `ref_order` (a reference's, Like.order: True when it draws the track left to right in track order, False right
+    to left): the order taken from it instead, s still from `ref_angle`. The reference's sheet is this one through
+    the carried frame, so its face is this sheet's; a sheet seen nearly edge-on would otherwise decide its order by
+    a fraction of an ångström between its end strands, and one with an end strand the reference lacks by that
+    strand (3WZ0-2AV5: drawn as the reference's mirror image)."""
     strands = sheet.strands
     every, _ = _drawn_strands(sheet)
     cents = frame.project(np.array([s.centroid for s in every]), [s.chain for s in every])
@@ -500,13 +505,15 @@ def _sheet_order(
     up2d = s * seen
     right = np.array([up2d[1], -up2d[0]]) if np.linalg.norm(up2d) > 1e-6 else np.array([1.0, 0.0])
     order = list(range(len(strands)))
+    if ref_order is not None and len(strands) > 1:
+        return order if ref_order else order[::-1], s, cents
     if len(strands) > 1 and float(_snap((cents[len(strands) - 1] - cents[0]) @ right)) < 0:
         order.reverse()
     return order, s, cents
 
 
-_PIECE_GAP = 0.3  # page units between two pieces of one helix drawn end to end (_bundle_item, _regroup_copies)
-PIECE_GAP = _PIECE_GAP  # (its public name: like.like_from lays a split helix's pieces so)
+PIECE_GAP = 0.3  # page units between two pieces of one helix drawn end to end (_bundle_item, _regroup_copies,
+# like.like_from's split helix)
 _STACK_PAD = 1.3  # page units between two strands drawn end to end in one column: room for the loops leaving
 # their facing ends (0.2 left 5KQJ's B and F loops no route, 1.0 5JB1's; C34 set 1.2 on 5 sample entries). Plan 12
 # fix round 3 (accessories beside their partner): swept 1.2-1.6 on the 37 sample entries with accessory strands (5
@@ -813,17 +820,18 @@ def _sheet_item(
     helix_w: float = HELIX_W,
     ends: dict[str, str] | None = None,
     ref_angle: dict[str, float] | None = None,
+    ref_order: bool | None = None,
 ) -> _Item:
     """A sheet as one block of strands at `pitch`, each pointing as it runs relative to strands[0]; a closed
     barrel's first strand repeated as a ghost after the last. Each accessory strand (Sheet.accessory) stands in its
     column (Accessory.column, turned with the track when the track is drawn right to left), stacked with what stands
     there (_column_heights) or past the track's end: beside its parent, never between two strands that pair. `over`
     (helices packed on its face, in sequence): each drawn over the strands where it packs (_over_sheet), unless it
-    would lie on one drawn there before it. `ends`: the chain ends drawn. `ref_angle`: a reference's strand angles
-    (_sheet_order)."""
+    would lie on one drawn there before it. `ends`: the chain ends drawn. `ref_angle`, `ref_order`: a reference's
+    strand angles and order (_sheet_order)."""
     strands = sheet.strands
     n = len(strands)
-    order, s, cents = _sheet_order(sheet, frame, ref_angle)
+    order, s, cents = _sheet_order(sheet, frame, ref_angle, ref_order)
     forward = order[0] == 0
     drawn = {k: d for d, k in enumerate(order)}  # index into _drawn_strands (the ghost: -1) -> drawn column
     drawn.update({n + i: a.column if forward else n - 1 - a.column for i, a in enumerate(sheet.accessory)})
@@ -966,14 +974,10 @@ def _open_at_ends(sheet: Sheet) -> Sheet:
     )
 
 
-def _row_shape(sheet: Sheet) -> bool:
-    """Can the sheet be a βα row at all: all parallel, four to _BA_MAX strands, its order not a guess?"""
-    return 4 <= len(sheet.strands) <= _BA_MAX and not sheet.ambiguous and all(k == "P" for k in sheet.pair_kinds)
-
-
 def can_be_row(sheet: Sheet) -> bool:
-    """Can the sheet be drawn as a βα row at all (_row_shape)? Pure; like.like_from asks it of a mated sheet."""
-    return _row_shape(sheet)
+    """Can the sheet be a βα row at all: all parallel, four to _BA_MAX strands, its order not a guess? Pure;
+    like.like_from asks it of a mated sheet."""
+    return 4 <= len(sheet.strands) <= _BA_MAX and not sheet.ambiguous and all(k == "P" for k in sheet.pair_kinds)
 
 
 def template_applies(sheet: Sheet, sses: list[SSE]) -> bool:
@@ -981,7 +985,7 @@ def template_applies(sheet: Sheet, sses: list[SSE]) -> bool:
     order not a guess, with at least 3/5 of its βα units in the row (1TIM: 7 of 7, 1LDM: 4 of 5). Mixed and
     antiparallel sheets never are. Pure: it changes nothing. Copies of a protein share the decision: see
     template_choices."""
-    if not _row_shape(sheet):
+    if not can_be_row(sheet):
         return False
     units = _ba_units(sheet, sses)
     return bool(units) and _BA_SHARE[1] * sum(u.inrow for u in units) >= _BA_SHARE[0] * len(units)
@@ -993,7 +997,7 @@ def template_choices(sheets: list[Sheet], sses: list[SSE], copies: dict[str, tup
     one protein and at least half the strands of the smaller pair one-to-one with the other sheet's (model.pair_places,
     residue numbers taken to the first copy's).
     In each group of matching sheets: if any takes the template on its own (template_applies) and every one can be a
-    row (_row_shape), all of them take it (a copy missing a helix or two is drawn as its mates are); if any cannot
+    row (can_be_row), all of them take it (a copy missing a helix or two is drawn as its mates are); if any cannot
     be a row, none takes it, so the copies stay alike. Pure."""
     own = [template_applies(sh, sses) for sh in sheets]
 
@@ -1017,7 +1021,7 @@ def template_choices(sheets: list[Sheet], sses: list[SSE], copies: dict[str, tup
     out = []
     for i in range(len(sheets)):
         mine = [k for k in range(len(sheets)) if group[k] == group[i]]
-        out.append(any(own[k] for k in mine) and all(_row_shape(sheets[k]) for k in mine))
+        out.append(any(own[k] for k in mine) and all(can_be_row(sheets[k]) for k in mine))
     return out
 
 
@@ -1040,16 +1044,18 @@ def _ba_template(
     pitch: float = PITCH,
     helix_w: float = HELIX_W,
     ref_angle: dict[str, float] | None = None,
+    ref_order: bool | None = None,
 ) -> _Item:
     """An all-parallel α/β sheet (template_applies) as one row, as the hand-drawn TIM barrel and Rossmann figures
     draw it: the strands in sheet order and pointing as _sheet_item draws them (the front face), and after each
     strand, when an in-row unit joins it to the next, that unit's longest helix (the first on a tie), true length,
     running against the strands; a barrel's closing helix between the last strand and the ghost. Each footprint
     (labels included) starts _BA_GAP after the last one ends, all centred on one line, the row centred on the item.
-    Other helices are placed as free helices. Home: the strands' projected mean, as _sheet_item. `ref_angle`: a
-    reference's strand angles (_sheet_order), the row then pointing as the reference's does, never turned again."""
+    Other helices are placed as free helices. Home: the strands' projected mean, as _sheet_item. `ref_angle`,
+    `ref_order`: a reference's strand angles and order (_sheet_order), the row then pointing and reading as the
+    reference's does, never turned again."""
     strands = sheet.strands
-    order, s, cents = _sheet_order(sheet, frame, ref_angle)
+    order, s, cents = _sheet_order(sheet, frame, ref_angle, ref_order)
     told = bool(ref_angle) and any(x.id in ref_angle for x in strands)
     if not told and strands[order[0]].start > strands[order[-1]].start:  # the row reads in sequence: turned
         order, s = order[::-1], -s  # half round in the page (never mirrored), its strands then point down (K9: under
@@ -1085,6 +1091,20 @@ def _ba_template(
     return _Item(members, offsets, home[0], home[1], home, *_anchor(strands))
 
 
+def _true_length(sse: SSE, width: float, rise: float) -> float:
+    """A helix's drawn length: true length (`rise` per residue), at least its `width` (_helix_item)."""
+    return max(width, (len(sse) - 1) * rise * SCALE)
+
+
+def helix_length(sse: SSE, style: Style) -> float:
+    """A helix's drawn length as build_layout draws it under `style` (_helix_item: an α-helix HELIX_RISE per
+    residue, at least its width; a 3-10 helix TEN_RISE, at least ETA_W of that). like.like_from lays a split
+    helix's pieces so."""
+    if sse.kind == "G":
+        return _true_length(sse, HELIX_W * ETA_W * style.helix_scale, TEN_RISE)
+    return _true_length(sse, HELIX_W * style.helix_scale, HELIX_RISE)
+
+
 def _helix_item(
     sse: SSE,
     frame: Frame,
@@ -1097,7 +1117,7 @@ def _helix_item(
     right (the topology-diagram convention); 'upright' up or down like a strand (stack mode). `angle`: drawn so
     instead (a reference's, Like.angle)."""
     au, av = frame.direction(sse.centroid, sse.axis)
-    length = max(width, (len(sse) - 1) * rise * SCALE)  # true length even when tilted: equal pitch everywhere
+    length = _true_length(sse, width, rise)  # true length even when tilted: equal pitch everywhere
     if angle is None:
         angle = _angle(float(np.arctan2(av, au)), float(av), angle_mode)
     pos = frame.project(sse.centroid, [sse.chain])[0] * SCALE
@@ -1236,7 +1256,7 @@ def _bundle_item(
         last_end, prev = -np.inf, None
         for s in sorted(col, key=lambda s: float((s.centroid - centre) @ m)):
             length = max(width, (len(s) - 1) * HELIX_RISE * SCALE)
-            gap = _PIECE_GAP if prev is None or up(s) == up(prev) else _STACK_PAD  # ends facing: room for loops
+            gap = PIECE_GAP if prev is None or up(s) == up(prev) else _STACK_PAD  # ends facing: room for loops
             along = max(float((s.centroid - centre) @ m) * SCALE, last_end + gap + length / 2)  # kinked pieces in a row
             last_end, prev = along + length / 2, s
             members.append(Placed(s, 0, 0, length, angle if float(s.axis @ m) >= 0 else angle + np.pi, width))
@@ -1875,7 +1895,8 @@ def _snap(v) -> np.ndarray:
 
 
 def snap(v) -> np.ndarray:
-    """Page values on the layout's grid (_snap), for places computed outside layout.py (like.like_from)."""
+    """Page values on the layout's grid (_snap), the public name for places computed outside layout.py (cli,
+    like.like_from)."""
     return _snap(v)
 
 
@@ -2147,7 +2168,8 @@ def _attract(
         starts += 1
         for side in ((0.0, -1.0), (-gap_x, 0.0), (gap_x, 0.0), (0.0, gap_y), (0.0, -gap_y)):
             # the lighter element brought beside its partner: just below the cysteine, or clear of its footprint
-            trial = _snap(z)  # every start on the grid
+            trial = _snap(z)  # every start on the grid (the mover's place too; a held mover's z is that place less its
+            # home, which need not be on the grid: off it, but the same on every run)
             trial[2 * slot[mover] : 2 * slot[mover] + 2] = _snap(P[anchor] + oa - om + np.array(side))
             if mover in held:  # a held item's z is its displacement from its home
                 trial[2 * slot[mover] : 2 * slot[mover] + 2] -= at[slot[mover]]
@@ -3181,7 +3203,7 @@ def _clear_of(m: Placed, o, placed: list) -> bool:
 def _on_end(items, ties, held, dirty, fixed, i: int, it: _Item, rest: list[int]) -> bool:
     """A helix piece let go by _regroup_copies (tied to a mate item whose elements another copy item pairs with:
     7QUP 9C:240-243, cut from 9C:224-238 where 1C:224-243 is whole) joins that copy item when it is no sheet: end to
-    end with the helix of its own chain next to it in sequence, along its axis, _PIECE_GAP apart (as a kinked
+    end with the helix of its own chain next to it in sequence, along its axis, PIECE_GAP apart (as a kinked
     helix's pieces stand), so it stays with its copy (it drifted 62 page units off as an item of its own). A spot
     another element of the item takes is passed by: the piece moves on along the axis, _SLIDE_STEP at a time, to the
     first clear spot (at most _JOIN_TRIES steps); with none, False and nothing joins (it stays untied)."""
@@ -3203,7 +3225,7 @@ def _on_end(items, ties, held, dirty, fixed, i: int, it: _Item, rest: list[int])
         way = 1.0 if m.sse.start > x.sse.end else -1.0
         shape = Placed(m.sse, 0.0, 0.0, m.length, x.angle, m.width)  # the piece as it would be drawn
         for n in range(_JOIN_TRIES):
-            reach = way * (x.length / 2 + m.length / 2 + _PIECE_GAP + n * _SLIDE_STEP)
+            reach = way * (x.length / 2 + m.length / 2 + PIECE_GAP + n * _SLIDE_STEP)
             o = _snap(np.add(host.offsets[q], reach * x.direction))
             if _clear_of(shape, o, placed):
                 break
@@ -4026,7 +4048,8 @@ def build_layout(
     element with a mate) starts at the reference's place for it, the mean over its matched members of their mates'
     places less their offsets, and is held there (_attract's `held`, Like.weight times _K_HOME) while the others keep
     their projected homes; _separate runs as always. Matched sheets take the reference's βα-row choices
-    (Like.template) and way up (_sheet_order: their own strand order, science S1-S3, S6), matched helices its drawn
+    (Like.template), way up and left-right reading (_sheet_order, Like.order: their own pairing's strand order,
+    science S1-S3, S6, read as the reference reads the mates), matched helices its drawn
     angles and over-sheet choices (Like.over), one way only: a helix whose mate the reference draws beside its sheet
     is drawn beside, but one whose mate lies over its sheet is drawn over only when `over` (features.helices_on_sheets)
     finds it packed on a sheet here too (an over-sheet helix needs its own sheet). With like=None nothing of this
@@ -4049,6 +4072,11 @@ def build_layout(
     as_rows = mode == "projected" and template == "auto"  # a stack row draws elements in sequence instead
     rowed = template_choices(sheets, sses, copies or {}) if as_rows else [False] * len(sheets)
     seen_as = like.angle if like is not None and mode == "projected" else None  # the reference's drawn angles
+    read_as = [None] * len(sheets)  # each sheet's left-right order as the reference reads its mates (Like.order)
+    if seen_as is not None and like.order is not None:
+        if len(like.order) != len(sheets):
+            raise ValueError(f"Like.order has {len(like.order)} entries for {len(sheets)} sheets")
+        read_as = list(like.order)
     if like is not None and as_rows and like.template is not None:  # each sheet a βα row as the reference's mate
         if len(like.template) != len(sheets):
             raise ValueError(f"Like.template has {len(like.template)} choices for {len(sheets)} sheets")
@@ -4063,6 +4091,7 @@ def build_layout(
             PITCH * style.strand_scale,
             HELIX_W * style.helix_scale,
             seen_as,
+            read_as[k],
         )
         for k, (sh, row) in enumerate(zip(sheets, rowed))
         if row
@@ -4103,6 +4132,7 @@ def build_layout(
             HELIX_W * style.helix_scale,
             chain_ends,
             seen_as,
+            read_as[k],
         )
         for k, sh in enumerate(sheets)
     ]

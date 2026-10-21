@@ -128,26 +128,74 @@ def _strand_order(lay, ids):
 
 def test_sheet_order_kept():
     """A B whose strands' mates stand in another order in A (here 1UBQ's strands mated in reverse) keeps the strand
-    order of its own pairing: Like moves the sheet as a whole, never a strand out of its place in it."""
+    order of its own pairing: Like moves the sheet as a whole, never a strand out of its place in it. Its first
+    strand points as its mate (A's last), so the sheet is drawn turned half round: its own order reversed, every
+    strand turned, never the same order seen in a mirror, and never its own order (the mates pointing otherwise
+    than B's pairing has them, Like.order does not say)."""
     path = DATA / "1UBQ.cif"
     alone, sses, bb = cli.make_layout(path, chains=["A"], **OPTIONS)
     strands = [s.id for s in sses if s.kind == "E"]
     helices = [s.id for s in sses if s.kind != "E"]
     mate = {**dict(zip(strands, reversed(strands))), **{h: h for h in helices}}
-    mates = Mates(mate=mate, pieces={}, extras=(), only_a=(), same_fold=True)
+    mates = Mates(mate=mate, pieces={}, extras=(), only_a=(), same_fold=True, smaller=len(mate))
     lay, sses_b, bb_b, lay_a, like = drawn_like(path, "A", path, "A", mates=mates)
     assert like.target[strands[0]] == (lay_a.placed[strands[-1]].cx, lay_a.placed[strands[-1]].cy)
     assert len(lay.sheets) == len(alone.sheets) == 1
     mine, own = _strand_order(lay, lay.sheets[0]), _strand_order(alone, alone.sheets[0])
-    assert mine in (own, own[::-1])
-    # turned half round in the page (order reversed and every strand turned), never seen in a mirror
-    turned = mine != own
+    assert like.order == [None]
+    assert mine == own[::-1]  # turned half round in the page: order reversed and every strand turned
     for k in own:
-        up_alone, up_here = np.sin(alone.placed[k].angle) > 0, np.sin(lay.placed[k].angle) > 0
-        assert up_here == (not up_alone if turned else up_alone), k
+        assert (np.sin(lay.placed[k].angle) > 0) == (not np.sin(alone.placed[k].angle) > 0), k
     page = SimpleNamespace(axes=[SimpleNamespace(patches=[])])
     found = figcheck.science_checks(SimpleNamespace(layout=lay, sses=sses_b, bb=bb_b, figure=page))
     assert found["S1"] == found["S2"] == found["S3"] == [] and found["S6"] == []
+
+
+def test_a_mated_sheet_reads_as_the_reference():
+    """2AV5 drawn like 3WZ0 (the held-out pair, TM 0.97 by sequence; plan 13a-12): A's four-strand sheet B C A D is
+    seen nearly edge-on, and B's has an extra end strand (C′) A lacks, which alone used to decide B's order: the
+    sheet came out D A C B with every strand pointing as its mate, A's mirror image. With A's order carried
+    (Like.order) the mated strands read left to right as A's do, each pointing as its mate: no sheet order differs
+    (criteria.sheet_orders), and H3 passes."""
+    from foldmap.criteria import h3_relations, like_pairs, sheet_orders
+
+    got: dict = {}
+    like = {"structure": str(DATA / "like" / "3WZ0.cif.gz"), "chain": "A"}
+    lay, _, _ = cli.make_layout(DATA / "like" / "2AV5.cif.gz", chains=["A"], assembly="asu", like=like, like_out=got)
+    lay_a, mates, made = got["reference"][0], got["mates"], got["like"]
+    assert made is not None and len(made.order) == 1 and made.order[0] is not None
+    assert mates.extras  # C′: only B has it
+    pairs = like_pairs(lay_a, lay, mates)
+    assert sheet_orders(lay_a, lay, pairs) == []
+    mated = sorted((b for b in lay.sheets[0] if b in mates.mate), key=lambda b: lay.placed[b].cx)
+    assert [mates.mate[b] for b in mated] == sorted(lay_a.sheets[0], key=lambda a: lay_a.placed[a].cx)
+    for b in mated:
+        assert np.sin(lay.placed[b].angle) * np.sin(lay_a.placed[mates.mate[b]].angle) > 0, b
+    assert h3_relations(lay_a, lay, pairs)["pass"] is True
+
+
+def _order_of(xs, ups, directions, blocks=None):
+    """like._order of a B sheet whose strands b0, b1, ... are mated to a0, a1, ... drawn at x = xs, up (+1) or
+    down (-1), in A's sheet blocks `blocks` (one block: all of them)."""
+    from foldmap.like import _order
+
+    n = len(xs)
+    placed = {f"a{k}": SimpleNamespace(cx=x, angle=np.pi / 2 * u) for k, (x, u) in enumerate(zip(xs, ups))}
+    lay_a = SimpleNamespace(placed=placed, sheets=blocks or [[f"a{k}" for k in range(n)]])
+    sheet = SimpleNamespace(strands=[SimpleNamespace(id=f"b{k}") for k in range(n)], directions=directions)
+    mates = Mates(mate={f"b{k}": f"a{k}" for k in range(n)}, pieces={}, extras=(), only_a=(), same_fold=True, smaller=n)
+    return _order(lay_a, sheet, mates)
+
+
+def test_reference_order_of_a_sheet():
+    """Like.order: True when A draws the mates left to right in B's track order, False right to left; None when it
+    does not say: one mate, mates not in one order, in two sheet blocks, or pointing otherwise than B's pairing."""
+    assert _order_of([0.0, 1.1, 2.2], [1, -1, 1], [1, -1, 1]) is True
+    assert _order_of([2.2, 1.1, 0.0], [-1, 1, -1], [1, -1, 1]) is False  # one way up or the other: the same sheet
+    assert _order_of([0.0], [1], [1]) is None
+    assert _order_of([0.0, 2.2, 1.1], [1, -1, 1], [1, -1, 1]) is None
+    assert _order_of([0.0, 1.1, 2.2], [1, 1, 1], [1, -1, 1]) is None
+    assert _order_of([0.0, 1.1, 2.2], [1, -1, 1], [1, -1, 1], [["a0", "a1"], ["a2"]]) is None
 
 
 def test_homologue_takes_its_mates_places_names_and_angles():
@@ -329,7 +377,7 @@ def test_note_words():
         residues_a=(None,) * 100,
         residues_b=(None,) * 80,
     )
-    mates = Mates(mate={"b1": "a1"}, pieces={"b2": "a1"}, extras=("b3",), only_a=(), same_fold=False)
+    mates = Mates(mate={"b1": "a1"}, pieces={"b2": "a1"}, extras=("b3",), only_a=(), same_fold=False, smaller=1)
     assert refused_note("A.cif", aln, mates) == (
         "not drawn like A.cif: not the same fold (TM-score 0.41; 2 of 3 elements matched); only 62% of the shorter "
         "chain aligned"
@@ -357,6 +405,7 @@ def test_extras_named_after_the_element_before_them():
         extras=tuple(s.id for s in seq if s.id in extras),
         only_a=tuple(s.id for s in seq if s.id in extras),
         same_fold=True,
+        smaller=len(sses),
     )
     like = like_from(lay_a, sses, sses, mates, Style())
     named = {k: like.label[f"res:A:{s.first.tag}-{s.last.tag}"] for k, s in (("helix", helix), ("strand", strand))}
@@ -444,6 +493,7 @@ def test_a_mate_of_the_other_helix_type_keeps_its_type():
         extras=(),
         only_a=("x4",),
         same_fold=True,
+        smaller=3,
     )
     ref = {k: f"res:A:{s.first.tag}-{s.last.tag}" for k, s in by_label.items()}
     labels, crossed = _labels(placed, sses, mates)

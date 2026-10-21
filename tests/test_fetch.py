@@ -274,12 +274,12 @@ class _Large(_Endless):
 
 def test_the_command_line_downloads_entries_of_any_size(monkeypatch, tmp_path):
     """No cap outside the app: its size message sends visitors to `foldmap plot 3J3Q`, which must download it."""
-    from foldmap.cli import _resolve_structure
+    from foldmap.cli import resolve_structure
 
     server = _Large(150 * 1024 * 1024)
     monkeypatch.setattr(fetch_mod, "CACHE", tmp_path)
     monkeypatch.setattr(fetch_mod.urllib.request, "urlopen", lambda request, timeout=0: server)
-    path = Path(_resolve_structure("3J3Q"))
+    path = Path(resolve_structure("3J3Q"))
     assert path == tmp_path / "3J3Q.cif" and path.stat().st_size == 150 * 1024 * 1024
     assert server.sent == server.total
 

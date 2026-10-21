@@ -7,7 +7,8 @@ its homes and choices (build_layout's `like`): each of B's elements with a mate 
 its mate's place on A's page, held there harder than a projected home (layout.LIKE_WEIGHT), with its mate's angle,
 label and, for identity colourings, colour; B's sheets are drawn as βα rows where their mates' are, and B's helices
 over their sheet where their mates are. The optimiser itself is not changed: B's own pairing decides each sheet's
-strand order (science S1-S3, S6), and _separate clears every overlap as always.
+strand order (science S1-S3, S6), read left to right as A reads its mates (Like.order), and _separate clears every
+overlap as always.
 """
 
 from __future__ import annotations
@@ -19,19 +20,7 @@ from pathlib import Path
 import numpy as np
 
 from .align import ChainAlignment, Mates
-from .layout import (
-    ETA_W,
-    HELIX_RISE,
-    HELIX_W,
-    LIKE_WEIGHT,
-    PIECE_GAP,
-    SCALE,
-    TEN_RISE,
-    Layout,
-    can_be_row,
-    snap,
-    template_choices,
-)
+from .layout import LIKE_WEIGHT, PIECE_GAP, Layout, can_be_row, helix_length, snap, template_choices
 from .model import SSE, Sheet, generic_label, res_ref
 from .style import Style
 
@@ -70,13 +59,12 @@ class Like:
     # B element id -> its mate's label, for a mate of the other helix type (an α-helix whose mate is a 3-10 helix, or
     # the reverse): named by its own type (_labels), the note says which mate's name it stands for (like_note)
     crossed: dict[str, str] = field(default_factory=dict)
-
-
-def _drawn_length(s: SSE, look: Style) -> float:
-    """A helix's drawn length, as build_layout draws it (_helix_item: true length, at least its width)."""
-    if s.kind == "G":
-        return max(HELIX_W * ETA_W * look.helix_scale, (len(s) - 1) * TEN_RISE * SCALE)
-    return max(HELIX_W * look.helix_scale, (len(s) - 1) * HELIX_RISE * SCALE)
+    # per sheet of B (as `template`): True when A draws B's mated track strands left to right in B's track order,
+    # False when right to left, None when it does not say (fewer than two mated, mates in two of A's sheet blocks,
+    # not in one order there, or pointing otherwise than B's pairing has them: a pairing difference). None: B's own
+    # (layout._sheet_order). A sheet seen nearly edge-on has its left-right order decided by a fraction of an
+    # ångström; drawn like A it reads as A's does, never as A's mirror image (3WZ0-2AV5, plan 13a-12)
+    order: list[bool | None] | None = None
 
 
 def _family(s: SSE) -> str:
@@ -108,6 +96,7 @@ def like_from(
     - Colours (identity colourings only, IDENTITY_COLOURINGS): a mate or piece takes its mate's colour as A draws it
       (render.element_colours), an extra a tint of its N-terminal neighbour's (the first coloured element after it
       when none comes before; coloured by type, sstype, the neighbour is one of its own kind).
+    - Sheet order: `sheets_b` gives `order` (_order): each sheet's strands left to right as A draws their mates.
     - Choices: `sheets_b` (B's sheets, as build_layout gets them) gives `template`: each sheet a βα row when most of
       its mated strands stand in one of A's rows (Layout.ba_rows), not when most do not, else (a tie, or no strand
       mated) as B's own choice (layout.template_choices); never a sheet that cannot be a row. `over`: each B helix
@@ -131,7 +120,7 @@ def like_from(
                 unit[b] = layout_a.units[a]
             continue
         bs = sorted(bs, key=lambda b: (by_b[b].start, b))
-        lengths = [_drawn_length(by_b[b], look) for b in bs]
+        lengths = [helix_length(by_b[b], look) for b in bs]
         along = -(sum(lengths) + PIECE_GAP * (len(bs) - 1)) / 2
         d = np.array([np.cos(p.angle), np.sin(p.angle)])
         for b, n in zip(bs, lengths):
@@ -155,7 +144,34 @@ def like_from(
         unit=unit,
         settled=_settled(layout_a, sses_a, groups),
         crossed=crossed,
+        order=[_order(layout_a, sheet, mates) for sheet in sheets_b] if sheets_b is not None else None,
     )
+
+
+def _order(layout_a: Layout, sheet: Sheet, mates: Mates) -> bool | None:
+    """Does A draw this B sheet's mated track strands left to right in B's track order (True), right to left
+    (False), or not say (None: fewer than two mated strands drawn in one of A's sheet blocks, their mates not in
+    one order there, or pointing otherwise than B's pairing has them)? Like.order."""
+    placed = layout_a.placed
+    block = {k: n for n, ids in enumerate(layout_a.sheets) for k in ids}
+    mated = [
+        (k, mates.mate[s.id])
+        for k, s in enumerate(sheet.strands)
+        if s.id in mates.mate and mates.mate[s.id] in placed and mates.mate[s.id] in block
+    ]
+    if len(mated) < 2 or len({block[a] for _, a in mated}) != 1:
+        return None
+    # each strand drawn up or down as its mate, relative to the first: as B's own pairing has them (directions)
+    ups = [(1 if np.sin(placed[a].angle) > 0 else -1) * sheet.directions[k] for k, a in mated]
+    if len(set(ups)) != 1:
+        return None
+    xs = [placed[a].cx for _, a in mated]
+    steps = [y - x for x, y in zip(xs, xs[1:])]
+    if all(d > 0 for d in steps):
+        return True
+    if all(d < 0 for d in steps):
+        return False
+    return None
 
 
 def _settled(layout_a: Layout, sses_a: list[SSE], groups: dict[str, list[str]]) -> frozenset[frozenset[str]]:

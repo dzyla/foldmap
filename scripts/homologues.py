@@ -31,7 +31,9 @@ domain number 00: the chain is one domain) of 60-600 residues, of current entrie
 tuning set and not already in the held-out set. Each level (topology, cluster, domain) is chosen uniformly among the
 sorted keys. A drawn pair is kept when both chains are read (foldmap.fetch, --assembly asu) with 60-600 residues
 and the stratum's identity holds (foldmap.align.align_chains, structure route: identical / aligned pairs), else it
-is recorded under "rejected" with the reason and the next pair drawn. Positives are "remote" and "close".
+is recorded under "rejected" with the reason and the next pair drawn. Positives are "remote" and "close". The set
+is reproducible given the same fetches: a fetch that fails rejects that draw, so on another day the same seed can
+give another set (the committed heldout.json is the one measured).
 
     python scripts/homologues.py report --set docs/validation/homologues/tuning.json --out DIR [--md PATH]
 
@@ -93,12 +95,12 @@ def _align(pair: dict) -> dict:
     """The pair aligned and mated as `foldmap plot B --like A` aligns it (make_layout's _drawn_like): each chain laid
     out alone first, for its elements."""
     from foldmap.align import align_chains, element_mates
-    from foldmap.cli import _resolve_structure, make_layout
+    from foldmap.cli import make_layout, resolve_structure
     from foldmap.io import read_model
 
     sides = []
     for side in ("a", "b"):
-        path = _resolve_structure(pair[side]["id"])
+        path = resolve_structure(pair[side]["id"])
         model = read_model(path, "asu")
         lay, sses, bb = make_layout(path, chains=[pair[side]["chain"]], model=model, assembly="asu")
         sides.append((sses, bb))
@@ -159,7 +161,7 @@ def run_pair(pair: dict, out: Path) -> dict:
     a, b = pair["a"], pair["b"]
     args = cli.build_parser().parse_args(["check", b["id"], "--like", a["id"], "--like-chain", a["chain"],
                                           "--chains", b["chain"], "--assembly", "asu"])  # fmt: skip
-    args.structure = cli._resolve_structure(args.structure)
+    args.structure = cli.resolve_structure(args.structure)
     spec = cli._spec_of(args)
     t0 = time.perf_counter()
     got: dict = {}
@@ -182,6 +184,7 @@ def run_pair(pair: dict, out: Path) -> dict:
         found_like,
         found_alone,
         kind=pair["kind"],
+        refused=bool(got.get("refused")),
     )
     aln, mates = got.get("alignment"), got.get("mates")
     s = stem(pair)
@@ -391,10 +394,10 @@ class Draws:
 
 def _chain_read(pdb: str, chain: str):
     """The chain's backbone as the campaign reads it (--assembly asu), and its residue count."""
-    from foldmap.cli import _resolve_structure
+    from foldmap.cli import resolve_structure
     from foldmap.io import load_backbone, read_model
 
-    path = _resolve_structure(pdb)
+    path = resolve_structure(pdb)
     bb = load_backbone(path, "asu", model=read_model(path, "asu"))
     return bb, sum(1 for label in bb.labels if label.chain == chain)
 
@@ -498,7 +501,9 @@ def sample(domains: list[Domain], names: dict[str, str], seed: int, exclude: set
             "entries of the tuning set excluded, each entry at most once. A is the reference, B is drawn like it. "
             "Strata: remote (one topology; other superfamily, or identity under 30 %), close (one superfamily, "
             "identity 30-90 %), negative (one architecture, other topology). Identity: identical / aligned pairs of "
-            "foldmap's structure alignment. Measured once (Task 13a-11)."
+            "foldmap's structure alignment. Reproducible given the same fetches: a draw whose entry cannot be read "
+            "is rejected (listed under rejected, with the reason) and the next one drawn, so a fetch that fails on "
+            "another day gives another set from the same seed. Measured once (Task 13a-11)."
         ),
         "seed": seed,
         "cath_release": CATH_RELEASE,

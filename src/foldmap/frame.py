@@ -297,7 +297,8 @@ def frame_like(frame_a: Frame, rotation: np.ndarray, translation: np.ndarray) ->
     """Structure B's frame drawn like A's (plan 13a, --like): A's frame carried through the superposition A ≈ R·B + t
     (align.ChainAlignment's rotation and translation), so a point b of B lands on the page where its place R·b + t in
     A lands. B's page axes are Rᵀu, Rᵀv, Rᵀw and its origin Rᵀ(origin_A − t); A's --up, --view, --rotate, --flip-v and
-    membrane turn come with it. R is a proper rotation, so B is never seen in a mirror (w = u × v stays so). A plain
+    membrane turn come with it. R is a proper rotation, so B is seen as A is: in a mirror only where A's frame is one
+    (--flip-v negates v alone, so A's axes are then improper and B's are too, the two drawn alike). A plain
     Frame only: a frame drawing copies as mirror images, an unrolled cylinder or a rosette places each protomer its own
     way, and cannot be carried by one rotation (TypeError)."""
     if type(frame_a) is not Frame or frame_a.mirror_x is not None or frame_a.sector:

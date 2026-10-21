@@ -33,7 +33,7 @@ from .frame import (
     view_frame,
 )
 from .io import load_backbone, load_links, load_nucleic, read_model
-from .layout import SCALE, _snap, accessory_lines, build_layout, na_torn_by_unrolling, resolve, template_rows
+from .layout import SCALE, accessory_lines, build_layout, na_torn_by_unrolling, resolve, snap, template_rows
 from .membrane import FACE_REACH
 from .model import AUTO_NT, crop_nucleic, homolog_chains, nucleic_of_chains, nucleic_touching, res_ref
 from .names import apply_names, check_spec
@@ -204,7 +204,7 @@ def _mirror_frame(frame, sym) -> None:
     if not in_page:
         return
     frame.sector, frame.classes = protomer_maps(sym)
-    frame.mirror_x = float(_snap(frame.project(sym.centre)[0, 0] * SCALE))
+    frame.mirror_x = float(snap(frame.project(sym.centre)[0, 0] * SCALE))
 
 
 def _mirrors(two_fold: str, sym, bb) -> bool:
@@ -309,12 +309,12 @@ def _dyad_frame(sses, sym) -> Frame | None:
     right = right - (right @ axis) * axis
     if np.linalg.norm(right) < 1.0:  # Å: the two halves on the dyad, no side to see them from
         return None
-    up, right = _snap(axis), _snap(right / np.linalg.norm(right))
+    up, right = snap(axis), snap(right / np.linalg.norm(right))
     face = np.cross(right, up)  # the view at turn 0: protomer 1 straight to protomer 0's right
     turn = _dyad_turn(np.array(cents[0] + cents[1]), up, right, face)
     if turn:  # turned about the dyad: protomer 1 still to the right, a little behind or in front of protomer 0
         t = np.radians(turn)  # (cos and sin may differ in the last bit between libms: snapped)
-        face = _snap(np.cos(t) * face + np.sin(t) * right)
+        face = snap(np.cos(t) * face + np.sin(t) * right)
     return view_frame(sses, up=up, view=face)
 
 
@@ -337,7 +337,7 @@ def _dyad_turn(cents, up, right, face) -> int:
     from scipy.stats import rankdata
 
     def ranks(d):
-        r = rankdata(_snap(d))
+        r = rankdata(snap(d))
         return r - r.mean()
 
     if len(cents) < 3:
@@ -349,7 +349,7 @@ def _dyad_turn(cents, up, right, face) -> int:
     for turn in DYAD_TURNS:
         t = np.radians(turn)
         x = (rel * (np.cos(t) * right - np.sin(t) * face)).sum(axis=1)  # page-right at this turn
-        page = ranks(pdist(_snap(np.stack([x, y], axis=1))))
+        page = ranks(pdist(snap(np.stack([x, y], axis=1))))
         norm = np.sqrt((page * page).sum() * (in3d * in3d).sum())
         score[turn] = round(float((page * in3d).sum() / norm), 9) if norm > 0 else 0.0
     best = max(score.values())
@@ -422,8 +422,8 @@ def make_layout(
     Layout.like_chain). A frame that cannot be carried (_uncarried: a stack, a straight duplex) draws it on its own,
     the note saying why. `like_out` (a dict, foldmap compare, foldmap check's H1-H5): given what the reference gave,
     as far as it got: reference ((layout, sses, bb, model, chain) of the reference laid out, or None), alignment
-    (align.ChainAlignment or None), mates (align.Mates or None) and like (the like.Like this layout took, or None:
-    drawn on its own)."""
+    (align.ChainAlignment or None), mates (align.Mates or None), like (the like.Like this layout took, or None:
+    drawn on its own) and refused (True when drawn on its own as not the reference's fold, the note saying so: H1)."""
     for spec in names or []:
         check_spec(spec)
     model = model or read_model(path, assembly)  # once, for every loader below (`model`: already read, same assembly)
@@ -432,7 +432,7 @@ def make_layout(
     asked = [c for c in chains or [] if c in present]  # the protein chains asked for (Layout.chains_asked)
     chain_b, chosen = None, False  # the chain drawn like the reference; chosen by --like, not asked for
     if like:  # one protein chain drawn like one of the reference's (plan 13a ruling 6); nucleic-acid chains as asked
-        chain_b = _one_chain(chains, present, "--chains", str(path))
+        chain_b = one_chain(chains, present, "--chains", str(path))
         chosen = not asked and len(present) > 1  # several, none named: the first, said as chosen (not asked for)
         chains = [chain_b, *(c for c in chains or [] if c not in present)]
     if chains and any(c in present for c in chains):  # protein chains named: only those (else every one)
@@ -571,7 +571,7 @@ def make_layout(
                 "more copies"
             )
         stems = stem_views(nucleic.structure, nucleic.strands) if nucleic is not None else []
-        stems = [StemView(_snap(v.centroid), _snap(v.axis), v.n) for v in stems]
+        stems = [StemView(snap(v.centroid), snap(v.axis), v.n) for v in stems]
         frame = view_frame(sses + stems, rotate, flip_v, up, view)
     if sym is not None and sym.kind == "C" and sym.n == 2 and isinstance(frame, (RadialFrame, Frame)):
         _mirror_frame(frame, sym)
@@ -622,7 +622,13 @@ def make_layout(
         if made.like is not None:  # the reference's frame carried over: the page is the reference's
             frame, dyad = made.frame, None
         if like_out is not None:
-            like_out.update(reference=made.reference, alignment=made.alignment, mates=made.mates, like=made.like)
+            like_out.update(
+                reference=made.reference,
+                alignment=made.alignment,
+                mates=made.mates,
+                like=made.like,
+                refused=made.refused,
+            )
 
     def lay_out_in(frame):  # build_layout through a frame (the dyad view's, or the unrolled one's), as a partial
         return functools.partial(
@@ -808,7 +814,7 @@ def make_layout(
     return lay, sses, bb
 
 
-def _one_chain(asked, present: list[str], flag: str, structure: str) -> str:
+def one_chain(asked, present: list[str], flag: str, structure: str) -> str:
     """The protein chain of a structure drawn like another, or like which another is drawn (--like): the one of
     `present` (its protein chains) that `asked` names, else its first; two named is a UsageError naming `flag`."""
     named = [c for c in asked or [] if c in present]
@@ -836,9 +842,9 @@ def _drawn_like(
     reference's finished layout, with its frame carried over (frame.frame_like). A namespace: like (None: drawn on
     its own), frame, extras (this structure's elements the reference lacks) and note(layout) (the notes' line,
     naming the extras as drawn), and what compare reads (make_layout's like_out): reference, alignment and mates,
-    each None where it was not reached. Drawn on its own, the note says why: this figure's frame cannot be carried
-    (`uncarried`, _uncarried: an assembly drawn by its symmetry, a stack, a straight duplex), nor the reference's, or
-    it is not the reference's fold (Mates.same_fold)."""
+    each None where it was not reached, and refused (not the reference's fold). Drawn on its own, the note says
+    why: this figure's frame cannot be carried (`uncarried`, _uncarried: an assembly drawn by its symmetry, a stack,
+    a straight duplex), nor the reference's, or it is not the reference's fold (Mates.same_fold)."""
     from types import SimpleNamespace
 
     from .align import align_chains, element_mates
@@ -848,7 +854,7 @@ def _drawn_like(
     given = str(like["structure"])
     name = reference_name(given)
 
-    def alone(note: str, reference=None, alignment=None, mates=None) -> SimpleNamespace:
+    def alone(note: str, reference=None, alignment=None, mates=None, refused=False) -> SimpleNamespace:
         return SimpleNamespace(
             like=None,
             frame=None,
@@ -857,9 +863,10 @@ def _drawn_like(
             reference=reference,
             alignment=alignment,
             mates=mates,
+            refused=refused,
         )
 
-    ref = _resolve_structure(given)
+    ref = resolve_structure(given)
     if like.get("layout"):
         spec = figure_spec(ref, layout_file=like["layout"])
         args, kw = (spec.mode, spec.rotate, spec.flip_v), spec.layout_kwargs()
@@ -872,7 +879,7 @@ def _drawn_like(
     if missing:
         raise ValueError(f"no protein chain {', '.join(missing)} in {given}; it has {', '.join(present) or 'none'}")
     named = asked or kw.get("chains")
-    chain_a = _one_chain(named, present, "--like-chain", given)
+    chain_a = one_chain(named, present, "--like-chain", given)
     first = not any(c in present for c in named or []) and len(present) > 1  # chosen, not named: the note says so
     if uncarried is not None:  # this figure's own frame: drawn on its own
         return alone(uncarried_note(name, uncarried, mine=True))
@@ -885,7 +892,7 @@ def _drawn_like(
     aln = align_chains(bb_a, chain_a, bb, chain_b, match)
     mates = element_mates(sses_a, sses, aln)
     if not mates.same_fold:
-        return alone(refused_note(name, aln, mates), reference, aln, mates)
+        return alone(refused_note(name, aln, mates), reference, aln, mates, refused=True)
     try:
         frame = frame_like(lay_a.frame, aln.rotation, aln.translation)
     except TypeError:  # _uncarried names every frame frame_like refuses: not reached
@@ -901,7 +908,14 @@ def _drawn_like(
         return like_note(name, chain, aln, mates, extras, match, crossed)
 
     return SimpleNamespace(
-        like=made, frame=frame, extras=tuple(mates.extras), note=note, reference=reference, alignment=aln, mates=mates
+        like=made,
+        frame=frame,
+        extras=tuple(mates.extras),
+        note=note,
+        reference=reference,
+        alignment=aln,
+        mates=mates,
+        refused=False,
     )
 
 
@@ -986,7 +1000,7 @@ def _faces_on_page(frame, sses, bb, mem, tm: set[str]) -> tuple[float, float]:
     y_out, y_in = (
         float(frame.project(mid + mem.normal * h, [first.chain])[0, 1]) * SCALE for h in (mem.half, -mem.half)
     )
-    return float(_snap(y_out)), float(_snap(y_in))
+    return float(snap(y_out)), float(snap(y_in))
 
 
 def _face_medians(lay, sses, bb, mem, reach: bool = False) -> tuple[float, float] | None:
@@ -1753,7 +1767,7 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _resolve_structure(text: str) -> str:
+def resolve_structure(text: str) -> str:
     if Path(text).expanduser().is_file():
         return text
     from .fetch import fetch
@@ -1954,6 +1968,7 @@ def _like_checks(spec, drawn, found: dict, got: dict) -> dict:
         alone.layout,
         found,
         check_figure(alone, alone_spec, spec.structure),
+        refused=bool(got.get("refused")),
     )
 
 
@@ -1986,7 +2001,7 @@ def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
         if getattr(args, "structure", None):
-            args.structure = _resolve_structure(args.structure)
+            args.structure = resolve_structure(args.structure)
         return _COMMANDS[args.command](args)
     except UsageError as err:  # options that do not go together: exit 2, as argparse does
         print(f"foldmap: {err}", file=sys.stderr)

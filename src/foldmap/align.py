@@ -5,9 +5,9 @@
 Three routes give the residue pairs: by sequence (the global alignment A19 uses, figcheck.aligned_positions), by
 structure (a TM-align-style aligner on Cα, Zhang & Skolnick 2005) or from a file (a two-row alignment, the escape
 hatch for any pair the aligner gets wrong). `auto` takes the sequence route when the sequence alignment is at least
-40 % identical and its pairs superpose as one fold (TM-score at least SAME_FOLD_TM), else the structure route. Every
-route then scores its pairs with the TM-score normalised by A's chain length, over the superposition of B on A that
-maximises it (TM-align's search: Kabsch on fragments of the pairs, then on the pairs within a cutoff, repeated),
+40 % identical and its pairs superpose as one fold (TM-score at least SEQUENCE_ROUTE_TM), else the structure route.
+Every route then scores its pairs with the TM-score normalised by A's chain length, over the superposition of B on A
+that maximises it (TM-align's search: Kabsch on fragments of the pairs, then on the pairs within a cutoff, repeated),
 always a proper rotation (symmetry._kabsch, never a mirror).
 element_mates then says which of B's elements are which of A's (mates, pieces of a split helix, extras) and whether
 the two chains are one fold (H1).
@@ -34,6 +34,10 @@ SS_GAP = -1.0  # the gap penalty of TM-align's secondary-structure seed (a match
 ROUNDS = 20  # superpose / score / re-align rounds per seed, at most; also the iterations of one fragment's search
 ROUND_STEP = 40  # fragment starts every ROUND_STEP pairs in the rounds' search (TM-align's simplify_step); 1 at the end
 SEQUENCE_IDENTITY = 0.4  # auto: the sequence route at this identity over the aligned residues, else the structure
+# auto: ... and only when the sequence alignment's pairs superpose at this TM-score (normalised by A): a gapped
+# alignment of two unrelated sequences can reach the identity (13a-10). Its own constant, the value H1's SAME_FOLD_TM
+# had when it was set, so a retune of H1 does not move the routing
+SEQUENCE_ROUTE_TM = 0.5
 SAME_FOLD_TM = 0.5  # H1: one fold at this TM-score (normalised by A) ... (frozen on the tuning set, 13a-10)
 SAME_FOLD_FRACTION = 0.5  # ... with this fraction of the chain with fewer elements matched (frozen, 13a-10)
 
@@ -334,7 +338,7 @@ def _identity(names_a, names_b, pairs) -> float:
 
 def align_chains(a: Backbone, chain_a: str, b: Backbone, chain_b: str, match: str = "auto") -> ChainAlignment:
     """Align chain_b of B to chain_a of A (the reference). match: auto (sequence at ≥ SEQUENCE_IDENTITY identity
-    over the sequence alignment's pairs when those pairs also superpose at TM-score ≥ SAME_FOLD_TM, else
+    over the sequence alignment's pairs when those pairs also superpose at TM-score ≥ SEQUENCE_ROUTE_TM, else
     structure), sequence, structure, or the path of a two-row alignment (FASTA, Clustal or Stockholm; A's chain
     first). Residue indices count each chain's modelled residues from 0."""
     mine_a, mine_b = _chain(a, chain_a, "A"), _chain(b, chain_b, "B")
@@ -349,14 +353,14 @@ def align_chains(a: Backbone, chain_a: str, b: Backbone, chain_b: str, match: st
             # a gapped alignment of two unrelated sequences can reach the identity (256B on 1MBN: 0.44 over 97
             # pairs): the sequence route is taken only when its pairs also superpose as one fold (13a-10)
             scored = tm_score(a.ca[mine_a], b.ca[mine_b], pairs, len(mine_a))
-            by_sequence = scored[0] >= SAME_FOLD_TM
+            by_sequence = scored[0] >= SEQUENCE_ROUTE_TM
         if not by_sequence:
             pairs, scored = _structure_pairs(a.only([chain_a]), b.only([chain_b]), pairs)
             method = "structure"
     else:
-        from .sequence import _one_letter
+        from .sequence import one_letter
 
-        pairs = _file_pairs(str(match), _one_letter(names_a), _one_letter(names_b), chain_a, chain_b)
+        pairs = _file_pairs(str(match), one_letter(names_a), one_letter(names_b), chain_a, chain_b)
         method, scored = "file", None
     pairs = tuple((int(i), int(j)) for i, j in pairs)
     tm, r, t, rmsd = scored or tm_score(a.ca[mine_a], b.ca[mine_b], pairs, len(mine_a))
@@ -380,6 +384,7 @@ class Mates:
     extras: tuple[str, ...]  # B element ids with no mate, N to C
     only_a: tuple[str, ...]  # A element ids with no mate, N to C
     same_fold: bool  # tm_score >= SAME_FOLD_TM and >= SAME_FOLD_FRACTION of the smaller chain's elements matched
+    smaller: int  # the elements of the chain with fewer (aligned chains only): what SAME_FOLD_FRACTION is a share of
 
 
 _PAIRS_AS = {"G": "H"}  # a 3-10 helix (G) and an alpha helix (H) may mate; a strand (E) only a strand
@@ -438,4 +443,5 @@ def element_mates(sses_a: list[SSE], sses_b: list[SSE], aln: ChainAlignment) -> 
         extras=tuple(s.id for k, (_, _, s) in enumerate(els_b) if k not in mate and k not in pieces),
         only_a=tuple(s.id for n, (_, _, s) in enumerate(els_a) if n not in matched),
         same_fold=aln.tm_score >= SAME_FOLD_TM and len(mate) >= SAME_FOLD_FRACTION * smaller,
+        smaller=smaller,
     )

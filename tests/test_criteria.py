@@ -215,7 +215,10 @@ def _stub(points: dict, sheets=()):
 
 
 def _mates(pairs: dict, same_fold=True, extras=(), only_a=()):
-    return Mates(mate=dict(pairs), pieces={}, extras=tuple(extras), only_a=tuple(only_a), same_fold=same_fold)
+    smaller = len(pairs) + min(len(only_a), len(extras))
+    return Mates(
+        mate=dict(pairs), pieces={}, extras=tuple(extras), only_a=tuple(only_a), same_fold=same_fold, smaller=smaller
+    )
 
 
 def test_check_like_itself_passes_every_h_check(capsys):
@@ -283,15 +286,18 @@ def test_h2_h3_not_judged_under_three_mates_h4_under_one():
 def test_h1_a_forced_negative_fails():
     aln = SimpleNamespace(tm_score=0.31)
     no = _mates({"b1": "a1"}, same_fold=False, extras=("b2", "b3"), only_a=("a2", "a3"))
-    refused = "not drawn like A.cif: not the same fold (TM-score 0.31; 1 of 3 elements matched)"
-    assert criteria.h1_matched(aln, no, False, refused, "negative")["pass"] is True
-    assert criteria.h1_matched(aln, no, False, refused)["pass"] is True  # check: refused as it should be
-    forced = criteria.h1_matched(aln, no, True, "drawn like A.cif chain A: 1 of 3 elements matched", "negative")
+    assert criteria.h1_matched(aln, no, False, True, "negative")["pass"] is True
+    assert criteria.h1_matched(aln, no, False, True)["pass"] is True  # check: refused as it should be
+    assert criteria.h1_matched(aln, no, False, False, "negative")["pass"] is False  # on its own, but not refused
+    forced = criteria.h1_matched(aln, no, True, False, "negative")
     assert forced["pass"] is False and "forced" in forced["detail"]
+    assert criteria.h1_matched(aln, no, True, True, "negative")["pass"] is False  # drawn alike is never refused
     yes = _mates({"b1": "a1", "b2": "a2"}, extras=("b3",), only_a=("a3",))
-    assert criteria.h1_matched(SimpleNamespace(tm_score=0.6), yes, True, "drawn like A.cif", "positive")["pass"]
-    assert criteria.h1_matched(aln, no, False, refused, "positive")["pass"] is False  # a positive refused
-    assert criteria.outcome(criteria.h1_matched(None, None, False, "not drawn like A.cif: ...")) == criteria.NOT_JUDGED
+    assert criteria.h1_matched(SimpleNamespace(tm_score=0.6), yes, True, False, "positive")["pass"]
+    assert criteria.h1_matched(aln, no, False, True, "positive")["pass"] is False  # a positive refused
+    assert "1 mates of the 3 elements" in criteria.h1_matched(aln, no, False, True)["detail"]  # Mates.smaller
+    unaligned = criteria.h1_matched(None, None, False, False, note="not drawn like A.cif: ...")
+    assert criteria.outcome(unaligned) == criteria.NOT_JUDGED and "not drawn like A.cif" in unaligned["detail"]
 
 
 def test_h3_a_turned_map_and_a_sheet_in_another_order():
@@ -313,9 +319,6 @@ def test_h3_a_turned_map_and_a_sheet_in_another_order():
     lay_b = _stub(swapped, sheets=[["a2", "a1", "a3"]])
     got = criteria.h3_relations(lay_a, lay_b, pairs)
     assert got["pass"] is False and "sheet order β2, β1, β3 for β1, β2, β3" in got["detail"]
-    named = criteria.h3_relations(lay_a, lay_b, pairs, note="drawn like A.cif; β1 pairing differs")
-    assert named["value"]["sheets"] and ("names a pairing difference" in named["detail"])
-    assert named["pass"] is (named["value"]["share"] >= criteria.LIMITS["like_relations"])
 
 
 def test_h4_names_by_a19s_rule():
@@ -364,7 +367,12 @@ def test_a_helix_drawn_in_parts_is_judged_as_its_run():
     )
     lay_a, lay_b = SimpleNamespace(placed=a, sheets=[]), SimpleNamespace(placed=b, sheets=[])
     mates = Mates(
-        mate={"b1": "a1", "b2": "a2", "b3": "a3", "m": "a6"}, pieces={"p": "a6"}, extras=(), only_a=(), same_fold=True
+        mate={"b1": "a1", "b2": "a2", "b3": "a3", "m": "a6"},
+        pieces={"p": "a6"},
+        extras=(),
+        only_a=(),
+        same_fold=True,
+        smaller=4,
     )
     pairs = criteria.like_pairs(lay_a, lay_b, mates)
     assert pairs[-1] == ("a6", "m", ("p", "m"))
