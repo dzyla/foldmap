@@ -45,7 +45,8 @@ CHOICES = {
     "helix_angle": ("snap", "upright", "tilted"),  # nearest of vertical/horizontal / always vertical / as in 3D
     "fold_template": ("auto", "off"),  # all-parallel α/β sheets as one βα row (TIM, Rossmann) / as projected
     "helix_on_sheet": ("off", "auto"),  # a helix packed on a sheet face beside it, as projected / drawn over the sheet
-    "two_fold": ("mirror", "unrolled"),  # a two-fold assembly as one copy and its mirror image / copies side by side
+    "two_fold": ("auto", "mirror", "unrolled"),  # a two-fold assembly as one copy and its mirror image where each
+    # protomer is one protein chain, else side by side / always the mirror image / always side by side
     "copy_ghosts": ("on", "off"),  # a strand lent across a ring's cut: with dashed copies where it pairs / none
     "domain_bar": ("auto", "on", "off"),  # the linear domain bar: with 2+ named domains drawn / with any / never
 }
@@ -98,8 +99,10 @@ class Style:
     # each crossover helix between the two strands it joins; off: helices where the projection puts them
     helix_on_sheet: str = "off"  # off: a helix packed on a sheet face stays beside the sheet, where the projection
     # puts it; auto (opt-in): drawn over the sheet, as it lies on it (ubiquitin's α1, Burroughs 2007)
-    two_fold: str = "mirror"  # mirror: a two-fold (C2) assembly seen from the side of its dyad, one copy the other's
-    # mirror image (plan 18, unrolled where that draws better); unrolled: the copies side by side, as any assembly
+    two_fold: str = "auto"  # mirror: a two-fold (C2) assembly seen from the side of its dyad, one copy the other's
+    # mirror image (plan 18, unrolled where that draws better); unrolled: the copies side by side, as any assembly;
+    # auto: mirror where every protomer is one protein chain (TrmD, 1UAM), else unrolled (haemoglobin, 2HHB: with
+    # two or more chains a protomer, interfaces between different chains cross the dyad, which no mirror line keeps)
     copy_ghosts: str = "on"  # on: a strand lent across the cut of an unrolled ring (layout._unwrap) is drawn again,
     # dashed, in the sheet of the copy it pairs with, and dashed copies of its partners stand beside it past the row's
     # end; off: no such dashed copy of another copy's strand (a barrel's closing ghost stays)

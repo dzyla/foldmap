@@ -217,3 +217,18 @@ def test_copy_ghosts_round_trips(tmp_path):
     lf.write_text(yaml.safe_dump(doc), encoding="utf-8")
     assert figure_spec(DATA / "1UBQ.cif", layout_file=lf).look.copy_ghosts == "off"
     assert "copy_ghosts" not in layout_document(DATA / "1UBQ.cif", {"theme": "publication"})["style"]  # the default
+
+
+def test_an_old_layout_file_with_two_fold_mirror_still_mirrors(tmp_path):
+    """Plan 20 Task 1: two_fold gained auto as its default; a layout file written with mirror (plan 18's default,
+    written out by name) still draws haemoglobin as one copy and its mirror image, which auto no longer does."""
+    from foldmap.cli import make_layout
+    from foldmap.frame import Frame
+    from foldmap.spec import figure_spec
+
+    lf = tmp_path / "fig.yaml"
+    lf.write_text("foldmap: 1\nstyle:\n  two_fold: mirror\n")
+    look = figure_spec(DATA / "2HHB.cif", layout_file=lf).look
+    assert look.two_fold == "mirror"
+    lay, _, _ = make_layout(DATA / "2HHB.cif", look=look)
+    assert type(lay.frame) is Frame and lay.frame.mirror_x is not None

@@ -321,16 +321,22 @@ def test_helices_stay_beside_the_sheet_unless_asked():
     assert at.session_state["helix_on_sheet"] == "off" and at.segmented_control(key="helix_on_sheet").value == "off"
 
 
-def test_two_fold_choice_is_offered_for_a_two_fold_assembly():
-    """Plan 18 Task 2: mirror image (the default) or side by side, beside the fold options, only where a two-fold
-    assembly is drawn."""
+def test_two_fold_choice_is_offered_for_a_two_fold_assembly(monkeypatch):
+    """Plan 18 Task 2: automatic (the default, plan 20 Task 1), mirror image or side by side, beside the fold options,
+    only where a two-fold assembly is drawn. Haemoglobin (two chains a protomer) is drawn side by side automatically
+    and mirrored when asked: the figure changes (auto-redraw kept on however slow the runner, as cb23732)."""
+    from foldmap import app_jobs
+
+    monkeypatch.setattr(app_jobs, "SLOW_SECONDS", float("inf"))
     assert "two_fold" not in widget_keys(opened(DATA / "1UBQ.cif").sidebar, skip=())
     at = opened(DATA / "2HHB.cif")
-    assert list(at.segmented_control(key="two_fold").options) == ["mirror image", "side by side"]
-    assert at.segmented_control(key="two_fold").value == "mirror"
-    at.segmented_control(key="two_fold").set_value("unrolled").run()
-    assert at.session_state["two_fold"] == "unrolled" and not at.exception and "<svg" in svg_of(at)
-    assert at.segmented_control(key="two_fold").value == "unrolled"  # still offered: the same assembly
+    assert list(at.segmented_control(key="two_fold").options) == ["automatic", "mirror image", "side by side"]
+    assert at.segmented_control(key="two_fold").value == "auto"
+    before = svg_of(at)
+    at.segmented_control(key="two_fold").set_value("mirror").run()
+    assert at.session_state["two_fold"] == "mirror" and not at.exception and "<svg" in svg_of(at)
+    assert svg_of(at) != before
+    assert at.segmented_control(key="two_fold").value == "mirror"  # still offered: the same assembly
 
 
 def test_copy_ghosts_choice_is_offered_for_a_strand_lent_across_a_rings_cut(monkeypatch):

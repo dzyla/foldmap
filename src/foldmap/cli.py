@@ -192,6 +192,17 @@ def _mirror_frame(frame, sym) -> None:
     frame.mirror_x = float(_snap(frame.project(sym.centre)[0, 0] * SCALE))
 
 
+def _mirrors(two_fold: str, sym, bb) -> bool:
+    """Whether Style.two_fold asks for the dyad view (_dyad_frame) of a two-fold assembly: mirror always, unrolled
+    never, auto only where every protomer is one protein chain (TrmD, 1UAM; nucleic-acid chains do not count). With
+    two or more chains a protomer (haemoglobin, 2HHB: α1β1 | α2β2), interfaces between different chains cross the
+    dyad (α1β2, the molecule's main contact) and no mirror line keeps them together: the copies are unrolled."""
+    if two_fold != "auto":
+        return two_fold == "mirror"
+    protein = {l.chain for l in bb.labels}
+    return all(sum(c in protein for c in p) == 1 for p in sym.protomers)
+
+
 def _dyad_frame(sses, sym) -> Frame | None:
     """A two-fold assembly seen from the side (plan 18): the dyad up the page, protomer 0 on the left and protomer 1
     to its right, so that _mirror_frame draws one as the other's mirror image. Page-right runs from protomer 0's
@@ -411,8 +422,9 @@ def make_layout(
         and view is None
         and not (_na_across_protomers(nucleic, sym, bb) and na_torn_by_unrolling(nucleic, sses, sym))
     ):
-        # two_fold=unrolled: a two-fold assembly's copies side by side, as any assembly's (never the dyad view)
-        dyad = _dyad_frame(sses, sym) if (look or Style()).two_fold == "mirror" else None
+        # two_fold=unrolled (or auto with a protomer of two or more protein chains): a two-fold assembly's copies
+        # side by side, as any assembly's (never the dyad view)
+        dyad = _dyad_frame(sses, sym) if _mirrors((look or Style()).two_fold, sym, bb) else None
         frame = dyad or symmetric_frame(sses, sym)
     else:  # stem axes differ in the last bit between BLAS kernels: snapped before they choose the page axes
         stems = stem_views(nucleic.structure, nucleic.strands) if nucleic is not None else []

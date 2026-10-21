@@ -309,7 +309,7 @@ def heading(st, label: str, as_text: str, help: str) -> None:
 EDITOR_TABS = ["Swap", "Move", "Rename", "Mark", "Domains"]
 FOLD_TEMPLATE = {"auto": "βα row", "off": "as projected"}
 HELIX_ON_SHEET = {"off": "beside the sheet", "auto": "over the sheet"}
-TWO_FOLD = {"mirror": "mirror image", "unrolled": "side by side"}
+TWO_FOLD = {"auto": "automatic", "mirror": "mirror image", "unrolled": "side by side"}
 COPY_GHOSTS = {"on": "with dashed copies", "off": "drawn once"}
 EXAMPLE = {  # the syntax, as text
     "swap": "α1,α3",
@@ -367,8 +367,9 @@ def layout_section(st, ss: MutableMapping) -> None:
                 CHOICES["two_fold"],
                 setting(ss, "two_fold"),
                 format_func=TWO_FOLD.get,
-                help="a two-fold assembly seen from the side of its dyad, one copy the other's mirror image · or its "
-                "copies side by side, unrolled around the axis as any assembly's",
+                help="automatic: a mirror image where each copy is one protein chain, else side by side · a two-fold "
+                "assembly seen from the side of its dyad, one copy the other's mirror image · or its copies side by "
+                "side, unrolled around the axis as any assembly's",
             )
         if ss.get("lent_across_cut"):  # a ring unrolled with a strand lent across its cut: its dashed copies or not
             segmented(

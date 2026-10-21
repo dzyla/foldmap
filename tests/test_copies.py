@@ -225,8 +225,9 @@ def test_copies_numbered_apart_are_tied():
 
 @pytest.mark.parametrize("turned", [False, True])
 def test_a_dimer_sheet_shared_by_two_copies_is_drawn_as_its_mirror_image(monkeypatch, turned):
-    """1SLV as drawn (plan 18): seen from the side of its dyad, A2 and B2 are A1's and B1's mirror images, exactly
-    alike, whichever way the dyad's axis points (it sets which way up the page is)."""
+    """1SLV drawn with two_fold=mirror (plan 18; by default, two chains a protomer, it is unrolled: plan 20 Task 1):
+    seen from the side of its dyad, A2 and B2 are A1's and B1's mirror images, exactly alike, whichever way the
+    dyad's axis points (it sets which way up the page is)."""
     import dataclasses
 
     import foldmap.cli as cli
@@ -236,7 +237,7 @@ def test_a_dimer_sheet_shared_by_two_copies_is_drawn_as_its_mirror_image(monkeyp
         monkeypatch.setattr(
             cli, "detect_symmetry", lambda *a, **k: (lambda s: dataclasses.replace(s, axis=-s.axis))(real_sym(*a, **k))
         )
-    d = drawn(DATA / "r100" / "1SLV.cif.gz")
+    d = drawn(DATA / "r100" / "1SLV.cif.gz", style=["two_fold=mirror"])
     assert d.layout.copy_ties == {"A2": ("A1", True), "B2": ("B1", True)}
     got = figcheck.copies_alike(d)
     assert set(got) == {("A2", "A1"), ("B2", "B1")} and max(got.values()) <= 1e-6, got

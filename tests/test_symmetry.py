@@ -103,13 +103,14 @@ def test_symmetric_layout_repeats_the_protomer(name):
 def test_a_two_fold_assembly_is_drawn_as_one_copy_and_its_mirror_image(name):
     """Plan 18: a C2 assembly is seen from the side of its dyad, the dyad up the page and protomer 0 on the left;
     every element of protomer 1 sits at its mate's mirror image about one vertical line (x -> 2 * mirror_x - x, the
-    same y), its direction mirrored."""
+    same y), its direction mirrored. With two_fold=mirror, whatever the protomers hold (plan 20 Task 1)."""
     from foldmap.cli import make_layout
     from foldmap.frame import Frame
+    from foldmap.style import Style
 
     bb, sses, s = sym(name)
     assert s.kind == "C" and s.n == 2
-    lay, _, _ = make_layout(DATA / f"{name}.cif")
+    lay, _, _ = make_layout(DATA / f"{name}.cif", look=Style(two_fold="mirror"))
     assert type(lay.frame) is Frame and lay.frame.mirror_x is not None
     assert abs(float(lay.frame.v @ s.axis)) == pytest.approx(1.0)  # the dyad up the page
     m = lay.frame.mirror_x
@@ -138,6 +139,25 @@ def test_two_fold_unrolled_draws_the_copies_side_by_side():
     unrolled, _, _ = make_layout(uam, look=Style(two_fold="unrolled"))
     assert type(unrolled.frame) is CylinderFrame and unrolled.two_fold_assembly
     assert unrolled.copy_ties and not any(m for _, m in unrolled.copy_ties.values())
+
+
+def test_two_fold_auto_mirrors_only_where_a_protomer_is_one_chain():
+    """Plan 20 Task 1: by default (two_fold=auto) haemoglobin (2HHB, protomers α1β1 | α2β2) is unrolled side by
+    side, as before plan 18, so its α1β2 interface stays together (a mirror line would put α1 and β2 in opposite
+    corners); TrmD (1UAM, one chain a protomer) is drawn as one copy and its mirror image."""
+    from foldmap.cli import _mirrors, make_layout
+    from foldmap.frame import CylinderFrame, Frame
+
+    bb, _, s = sym("2HHB")
+    assert not _mirrors("auto", s, bb) and _mirrors("mirror", s, bb) and not _mirrors("unrolled", s, bb)
+    held = __import__("types").SimpleNamespace(protomers=[["A", "X"], ["C", "Y"]])  # X, Y: nucleic-acid chains
+    assert _mirrors("auto", held, bb)  # one protein chain a protomer: nucleic-acid chains do not count
+    hb, _, _ = make_layout(DATA / "2HHB.cif")
+    assert type(hb.frame) is CylinderFrame and hb.two_fold_assembly
+    assert not any(m for _, m in hb.copy_ties.values())
+    uam, _, _ = make_layout(DATA / "assemblies" / "1UAM.cif.gz")
+    assert type(uam.frame) is Frame and uam.frame.mirror_x is not None
+    assert any(m for _, m in uam.copy_ties.values())
 
 
 def _turned(monkeypatch, path):
