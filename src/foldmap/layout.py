@@ -1993,15 +1993,16 @@ def _attract(
     `held` (item index -> home, plan 13a: items drawn like a reference, at their mates' places in its finished
     layout, a copy's tie aside): each starts at its home, held there by a spring `held_k` per element (_K_LIKE) in
     place of _K_HOME, and is moved as a displacement from it (the home itself is not snapped, so an item nothing
-    moves stays exactly where the reference has it). No contact pull acts between two held items, and no loop or
-    disulfide spring whose two elements the reference relates the same way (`settled`: element id pairs, Like.settled;
-    None: every such pair); a loop or a disulfide only this structure has (between elements whose mates are not
-    neighbours or bridged in the reference) still pulls, and a stretched disulfide may still start again from beside
-    its partner, a held item too."""
+    moves stays exactly where the reference has it). No contact pull and no loop spring acts between two held items
+    (a loop only this structure has, round elements the reference has and it lacks, is routed as it is: pulled, it
+    dragged 2HHB α's E helix off β's place, median deviation 0.25 -> 1.41 page units); no disulfide spring either
+    where the reference bridges their mates the same way (`settled`: element id pairs, Like.settled; None: every
+    pair), but a disulfide only this structure has still pulls, and when stretched may start again from beside its
+    partner, a held item too (a bond drawn across the page is wrong whatever the reference)."""
     n = len(items)
     held = {i: h for i, h in (held or {}).items() if i not in (ties or {})}
 
-    def known(i: int, j: int, a: str, b: str) -> bool:  # two held items whose relation the reference settles
+    def known(i: int, j: int, a: str, b: str) -> bool:  # a bridge between two held items the reference has too
         return i in held and j in held and (settled is None or frozenset((a, b)) in settled)
 
     W = _contact_weights(items, contacts)
@@ -2011,14 +2012,8 @@ def _attract(
     ci, cj = np.nonzero(np.triu(W > 0, 1))
     pull = (ci, cj, W[ci, cj])
     springs = _loop_springs(items, sses)
-    if held:  # the loops' element pairs, in _loop_springs' order
-        own = _owner(items)
-        ends = [
-            (a.id, b.id)
-            for a, b in zip(sses, sses[1:])
-            if a.chain == b.chain and a.id in own and b.id in own and own[a.id][0] != own[b.id][0]
-        ]
-        springs = [x for x, (a, b) in zip(springs, ends, strict=True) if not known(x[0], x[2], a, b)]
+    if held:  # every loop between two held items is the reference's to place
+        springs = [x for x in springs if not (x[0] in held and x[2] in held)]
     weight = [_W_SEQ] * len(springs)
     slack = [_LOOP_SLACK] * len(springs)
     for i, oi, j, oj, w, sl in extra:  # nucleic-acid strands from stem to stem

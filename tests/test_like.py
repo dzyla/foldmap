@@ -173,8 +173,9 @@ def test_homologue_takes_its_mates_places_names_and_angles():
 def test_split_helix_parts_and_relations_only_b_has():
     """2HHB α drawn like β: α's helix split in two is laid end to end on its mate's place, the first part in
     sequence named as the mate and the next primed; neighbours in α whose mates in β are not neighbours (β's D helix
-    lies between) are no relation the reference settled, so their loop still pulls (Like.settled); in α drawn like
-    itself every neighbour pair is settled."""
+    lies between) are no relation the reference settled (Like.settled, which a disulfide only α had would be judged
+    by); in α drawn like itself every neighbour pair is settled. And α sits at β's places: the H2 starting limits
+    (spec 4.5: median <= 1.0, 90th percentile <= 2.5 page units from the targets)."""
     path = DATA / "2HHB.cif"
     lay, sses_b, _, lay_a, like = drawn_like(path, "B", path, "A")
     _, sses_a, bb_a = cli.make_layout(path, chains=["B"], **OPTIONS)
@@ -196,6 +197,36 @@ def test_split_helix_parts_and_relations_only_b_has():
     itself = drawn_like(path, "A", path, "A")[4]
     seq_a = sorted(cli.make_layout(path, chains=["A"], **OPTIONS)[1], key=lambda s: s.start)
     assert {frozenset((x.id, y.id)) for x, y in zip(seq_a, seq_a[1:])} <= itself.settled
+    off = [np.hypot(lay.placed[k].cx - x, lay.placed[k].cy - y) for k, (x, y) in like.target.items()]
+    assert np.median(off) <= 1.0 and np.percentile(off, 90) <= 2.5
+
+
+def _two_held(bridged: bool, settled):
+    """Two helices of one chain, consecutive in sequence (a loop), held 11.5 page units apart at their places
+    (_attract's `held`), optionally bridged by a disulfide: their centres' distance after _attract."""
+    from foldmap.layout import _attract, _helix_item
+    from helpers import fake_sse
+
+    frame = Frame(np.zeros(3), np.array([1.0, 0, 0]), np.array([0, 1.0, 0]), np.array([0, 0, 1.0]))
+    a = fake_sse("H", 0, 9, centroid=(0, 0, 0), axis=(0, 1, 0))
+    b = fake_sse("H", 14, 23, centroid=(50, 0, 0), axis=(0, 1, 0))
+    items = [_helix_item(a, frame), _helix_item(b, frame)]
+    held = {k: (it.cx, it.cy) for k, it in enumerate(items)}
+    bridges = [(a.id, 0.5, b.id, 0.5)] if bridged else []
+    _attract(items, [a, b], {}, bridges=bridges, held=held, settled=settled(a, b))
+    return float(np.hypot(items[1].cx - items[0].cx, items[1].cy - items[0].cy))
+
+
+def test_only_a_disulfide_this_structure_has_pulls_held_items():
+    """Between two items held at the reference's places a loop never pulls (the reference places them, a loop only
+    this structure has included), nor a disulfide the reference has too; a disulfide only this structure has does
+    (a bond drawn across the page is wrong whatever the reference)."""
+    apart = 50 * 0.23  # layout.SCALE
+    none = lambda a, b: frozenset()  # noqa: E731 - nothing settled: the loop and any bridge are this structure's own
+    both = lambda a, b: frozenset({frozenset((a.id, b.id))})  # noqa: E731 - the reference bridges their mates
+    assert _two_held(False, none) == pytest.approx(apart, abs=1e-12)  # the loop: no pull
+    assert _two_held(True, both) == pytest.approx(apart, abs=1e-12)  # the reference's own bridge: no pull
+    assert _two_held(True, none) < apart - 1.0  # a bridge only this structure has: pulled together
 
 
 def test_targets_a_bit_off_give_the_same_figure():

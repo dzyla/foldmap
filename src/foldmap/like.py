@@ -57,8 +57,9 @@ class Like:
     # Read only where it gives `target` (to 1e-9): a target edited without its unit is followed, on the grid
     unit: dict[str, tuple[float, float, float, float]] = field(default_factory=dict)
     # pairs of B element ids the reference relates as they are related here (their mates neighbours in sequence or
-    # bridged by a disulfide there; parts of one helix): no loop or disulfide spring between them when both are held
-    # at the reference's places (layout._attract); one only B has still pulls. None: every pair
+    # bridged by a disulfide there; parts of one helix): no disulfide spring between them when both are held at the
+    # reference's places (layout._attract); a disulfide only B has still pulls (a loop between two held items never
+    # does: the reference places them). None: every pair
     settled: frozenset[frozenset[str]] | None = None
 
 
