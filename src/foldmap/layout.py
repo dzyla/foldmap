@@ -88,6 +88,7 @@ _K_HOME = 0.02  # pull back toward the projected position, keeps the fold recogn
 # an item drawn like a reference (build_layout's `like`, plan 13a): pulled to its mates' place in the reference's
 # finished layout this much harder, so it stays there unless it must move to clear an overlap (tuned in 13a-10 only)
 _K_LIKE = 8 * _K_HOME
+LIKE_WEIGHT = _K_LIKE / _K_HOME  # Like.weight: the reference's home spring in units of a projected home's
 _STEP = 0.15
 _SWEEPS = 400
 _SEP_SWEEPS = 5000  # push-apart passes before the guaranteed slide
@@ -494,6 +495,7 @@ def _sheet_order(
 
 
 _PIECE_GAP = 0.3  # page units between two pieces of one helix drawn end to end (_bundle_item, _regroup_copies)
+PIECE_GAP = _PIECE_GAP  # (its public name: like.like_from lays a split helix's pieces so)
 _STACK_PAD = 1.3  # page units between two strands drawn end to end in one column: room for the loops leaving
 # their facing ends (0.2 left 5KQJ's B and F loops no route, 1.0 5JB1's; C34 set 1.2 on 5 sample entries). Plan 12
 # fix round 3 (accessories beside their partner): swept 1.2-1.6 on the 37 sample entries with accessory strands (5
@@ -956,6 +958,11 @@ def _open_at_ends(sheet: Sheet) -> Sheet:
 def _row_shape(sheet: Sheet) -> bool:
     """Can the sheet be a βα row at all: all parallel, four to _BA_MAX strands, its order not a guess?"""
     return 4 <= len(sheet.strands) <= _BA_MAX and not sheet.ambiguous and all(k == "P" for k in sheet.pair_kinds)
+
+
+def can_be_row(sheet: Sheet) -> bool:
+    """Can the sheet be drawn as a βα row at all (_row_shape)? Pure; like.like_from asks it of a mated sheet."""
+    return _row_shape(sheet)
 
 
 def template_applies(sheet: Sheet, sses: list[SSE]) -> bool:
@@ -1856,6 +1863,11 @@ def _snap(v) -> np.ndarray:
     return np.round(np.asarray(v, float) * _GRID) / _GRID + 0.0
 
 
+def snap(v) -> np.ndarray:
+    """Page values on the layout's grid (_snap), for places computed outside layout.py (like.like_from)."""
+    return _snap(v)
+
+
 _HALF_TURN = min(np.pi, round(np.pi * _GRID) / _GRID)  # the lesser of pi and pi on the grid
 
 
@@ -1967,6 +1979,7 @@ def _attract(
     mirror: float | None = None,
     held: dict[int, tuple[float, float]] | None = None,
     held_k: float = _K_LIKE,
+    settled: frozenset[frozenset[str]] | None = None,
 ) -> None:
     """Minimise the layout energy (_energy) from the projected positions, raising the overlap penalty in
     stages. The result becomes each item's new home; _separate then guarantees no overlap remains. Every input
@@ -1980,10 +1993,17 @@ def _attract(
     `held` (item index -> home, plan 13a: items drawn like a reference, at their mates' places in its finished
     layout, a copy's tie aside): each starts at its home, held there by a spring `held_k` per element (_K_LIKE) in
     place of _K_HOME, and is moved as a displacement from it (the home itself is not snapped, so an item nothing
-    moves stays exactly where the reference has it); no loop, contact or disulfide spring acts between two held
-    items (the reference's layout already settled them), only between a held item and the rest."""
+    moves stays exactly where the reference has it). No contact pull acts between two held items, and no loop or
+    disulfide spring whose two elements the reference relates the same way (`settled`: element id pairs, Like.settled;
+    None: every such pair); a loop or a disulfide only this structure has (between elements whose mates are not
+    neighbours or bridged in the reference) still pulls, and a stretched disulfide may still start again from beside
+    its partner, a held item too."""
     n = len(items)
     held = {i: h for i, h in (held or {}).items() if i not in (ties or {})}
+
+    def known(i: int, j: int, a: str, b: str) -> bool:  # two held items whose relation the reference settles
+        return i in held and j in held and (settled is None or frozenset((a, b)) in settled)
+
     W = _contact_weights(items, contacts)
     if held:  # two items held where a reference has them: no pull between them
         both = np.array(sorted(held), int)
@@ -1991,8 +2011,14 @@ def _attract(
     ci, cj = np.nonzero(np.triu(W > 0, 1))
     pull = (ci, cj, W[ci, cj])
     springs = _loop_springs(items, sses)
-    if held:
-        springs = [x for x in springs if not (x[0] in held and x[2] in held)]
+    if held:  # the loops' element pairs, in _loop_springs' order
+        own = _owner(items)
+        ends = [
+            (a.id, b.id)
+            for a, b in zip(sses, sses[1:])
+            if a.chain == b.chain and a.id in own and b.id in own and own[a.id][0] != own[b.id][0]
+        ]
+        springs = [x for x, (a, b) in zip(springs, ends, strict=True) if not known(x[0], x[2], a, b)]
     weight = [_W_SEQ] * len(springs)
     slack = [_LOOP_SLACK] * len(springs)
     for i, oi, j, oj, w, sl in extra:  # nucleic-acid strands from stem to stem
@@ -2005,7 +2031,7 @@ def _attract(
     bridges_used = []
     for a, ta, b, tb in bridges:  # disulfides: the two cysteines themselves pulled together
         if a in owner and b in owner and owner[a][0] != owner[b][0]:
-            if owner[a][0] in held and owner[b][0] in held:
+            if known(owner[a][0], owner[b][0], a, b):
                 continue
             bridges_used.append((a, b))
             (i, ma, oa), (j, mb, ob) = owner[a], owner[b]
@@ -2105,7 +2131,7 @@ def _attract(
         if np.sqrt(gx * gx + gy * gy) <= 2 * _SS_SLACK + 1.0:
             continue
         mover, anchor, om, oa = (i, j, oi, oj) if mass[i] <= mass[j] else (j, i, oj, oi)
-        if mover in ties or mover in held:  # (a held item stays at the reference's place)
+        if mover in ties:
             continue
         hm, ha = h[mover], h[anchor]
         gap_x, gap_y = hm[0] + ha[0] + MARGIN, hm[1] + ha[1] + MARGIN
@@ -2117,6 +2143,8 @@ def _attract(
             # the lighter element brought beside its partner: just below the cysteine, or clear of its footprint
             trial = _snap(z)  # every start on the grid
             trial[2 * slot[mover] : 2 * slot[mover] + 2] = _snap(P[anchor] + oa - om + np.array(side))
+            if mover in held:  # a held item's z is its displacement from its home
+                trial[2 * slot[mover] : 2 * slot[mover] + 2] -= at[slot[mover]]
             trial = solve(trial, _LAMBDAS[1:])
             lam = _LAMBDAS[-1]
             energy = tied(trial)[0]
@@ -3892,25 +3920,32 @@ def _rosette(sses: list[SSE], sheets: list[Sheet], frame, mode: str, kw: dict) -
     return lay
 
 
+_UNIT_AGREES = 1e-9  # page units: a Like.unit is read only when it gives its target's place to this
+
+
 def _like_homes(items: list[_Item], like: Like) -> dict[int, tuple[float, float]]:
     """Each item holding an element with a place in the reference (Like.target) starts at the place they give it,
     which becomes its home: the mean over those members of their mate's place less their own offset. A member's place
-    is read as its mate's unit centre plus the difference of the two offsets (Like.unit), else as its target less its
-    offset, and the mean is taken from the first one's, so an item laid out as its mate's unit (a structure drawn like
-    itself) lands exactly on that unit's centre. Returns item index -> home (_attract's `held`)."""
+    is read as its mate's unit centre plus the difference of the two offsets (Like.unit) when that unit agrees with
+    its target (within _UNIT_AGREES), else as its target on the grid (_snap: a place computed with sin and cos, which
+    differ in the last bit between CPUs, never reaches _attract unsnapped) less its offset; the mean is taken from the
+    first one's, so an item laid out as its mate's unit (a structure drawn like itself) lands exactly on that unit's
+    centre. Returns item index -> home (_attract's `held`)."""
     out: dict[int, tuple[float, float]] = {}
     for k, it in enumerate(items):
         got = []
         for m, (ox, oy) in zip(it.members, it.offsets):
             if not isinstance(m, Placed) or m.ghost or m.sse.id not in like.target:
                 continue
+            tx, ty = like.target[m.sse.id]
             unit = like.unit.get(m.sse.id)
-            if unit is not None:
+            agrees = unit is not None and max(abs(unit[0] + unit[2] - tx), abs(unit[1] + unit[3] - ty)) <= _UNIT_AGREES
+            if agrees:
                 ux, uy, ax, ay = unit
                 got.append((ux + (ax - ox), uy + (ay - oy)))
             else:
-                tx, ty = like.target[m.sse.id]
-                got.append((tx - ox, ty - oy))
+                sx, sy = (float(v) for v in _snap((tx, ty)))
+                got.append((sx - ox, sy - oy))
         if not got:
             continue
         x0, y0 = got[0]
@@ -3986,7 +4021,10 @@ def build_layout(
     places less their offsets, and is held there (_attract's `held`, Like.weight times _K_HOME) while the others keep
     their projected homes; _separate runs as always. Matched sheets take the reference's βα-row choices
     (Like.template) and way up (_sheet_order: their own strand order, science S1-S3, S6), matched helices its drawn
-    angles and over-sheet choices (Like.over). With like=None nothing of this runs."""
+    angles and over-sheet choices (Like.over), one way only: a helix whose mate the reference draws beside its sheet
+    is drawn beside, but one whose mate lies over its sheet is drawn over only when `over` (features.helices_on_sheets)
+    finds it packed on a sheet here too (an over-sheet helix needs its own sheet). With like=None nothing of this
+    runs."""
     if mode not in ("projected", "stack"):
         raise ValueError(f"unknown layout mode {mode!r}")
     if like is not None and (type(frame) is not Frame or frame.sector or frame.mirror_x is not None):
@@ -4191,6 +4229,7 @@ def build_layout(
                 mirror=mirror if ties else None,
                 held=held,
                 held_k=_K_HOME * like.weight if like is not None else _K_LIKE,
+                settled=like.settled if like is not None else None,
             )
         if kept is not None and kept.any():  # transmembrane elements at their projected height, reaching a face
             for k in np.flatnonzero(kept).tolist():

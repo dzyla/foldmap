@@ -18,7 +18,7 @@ from foldmap import cli, figcheck
 from foldmap.align import Mates, align_chains, element_mates
 from foldmap.dssp import assign_dssp
 from foldmap.frame import CylinderFrame, Frame, frame_like
-from foldmap.layout import _K_HOME, _K_LIKE
+from foldmap.layout import LIKE_WEIGHT
 from foldmap.like import Like, like_from
 from foldmap.sheets import build_sheets
 from foldmap.style import Style
@@ -88,33 +88,37 @@ def test_frame_like_carries_known_rotation():
             frame_like(other, r, t)
 
 
-@pytest.mark.parametrize("name", ["1UBQ", "2LZM"])
+@pytest.mark.parametrize("name", ["1UBQ", "2LZM", "1TIM"])  # 1TIM: βα rows (the reference's row way up)
 def test_like_itself_reproduces_the_layout(name):
     """The invariant that tests the design (spec 4.3): a structure drawn like itself is its own layout, exactly."""
     path = DATA / f"{name}.cif"
     plain, sses, _ = cli.make_layout(path, chains=["A"], **OPTIONS)
     lay, _, _, _, like = drawn_like(path, "A", path, "A")
     assert set(like.target) == {s.id for s in sses}  # every element held at its own place
-    assert like.weight == _K_LIKE / _K_HOME == 8
+    assert like.weight == LIKE_WEIGHT == 8
+    if name == "1TIM":
+        assert plain.ba_rows and like.template and any(like.template)
     assert signature(lay) == signature(plain)
-    # the places are the reference's, not the projection's: the reference moved, the layout moves with it
-    moved = replace(
-        like,
-        target={k: (x + 3.0, y - 2.0) for k, (x, y) in like.target.items()},
-        unit={k: (x + 3.0, y - 2.0, ox, oy) for k, (x, y, ox, oy) in like.unit.items()},
-    )
+    # the places are the reference's, not the projection's: the reference moved (its targets, not their units, which
+    # then no longer agree and are not read), the layout moves with it, to the grid
+    moved = replace(like, target={k: (x + 3.0, y - 2.0) for k, (x, y) in like.target.items()})
     shifted, _, _ = laid_out_like(path, moved, lay.frame, chains=["A"])
     for k, p in plain.placed.items():
-        assert (shifted.placed[k].cx, shifted.placed[k].cy) == pytest.approx((p.cx + 3.0, p.cy - 2.0), abs=1e-9)
+        assert (shifted.placed[k].cx, shifted.placed[k].cy) == pytest.approx((p.cx + 3.0, p.cy - 2.0), abs=1e-4)
+
+
+BEFORE = json.loads((DATA / "like" / "signatures-before.json").read_text(encoding="utf-8"))
 
 
 @pytest.mark.parametrize("name", ["1UBQ", "2LZM", "1TIM"])
 def test_like_none_changes_nothing(name):
+    """Off means identical: with like=None (the default) the three figures are the ones recorded before 13a-5
+    (bench signatures under bench's options, tests/data/like/signatures-before.json)."""
+    assert BEFORE["_options"] == OPTIONS
     path = DATA / f"{name}.cif"
-    plain, _, _ = cli.make_layout(path, **OPTIONS)
     with mock.patch.object(cli, "build_layout", functools.partial(cli.build_layout, like=None)):
         given, _, _ = cli.make_layout(path, **OPTIONS)
-    assert signature(given) == signature(plain)
+    assert json.loads(json.dumps(signature(given))) == BEFORE[name]
 
 
 def _strand_order(lay, ids):
@@ -136,6 +140,11 @@ def test_sheet_order_kept():
     assert len(lay.sheets) == len(alone.sheets) == 1
     mine, own = _strand_order(lay, lay.sheets[0]), _strand_order(alone, alone.sheets[0])
     assert mine in (own, own[::-1])
+    # turned half round in the page (order reversed and every strand turned), never seen in a mirror
+    turned = mine != own
+    for k in own:
+        up_alone, up_here = np.sin(alone.placed[k].angle) > 0, np.sin(lay.placed[k].angle) > 0
+        assert up_here == (not up_alone if turned else up_alone), k
     page = SimpleNamespace(axes=[SimpleNamespace(patches=[])])
     found = figcheck.science_checks(SimpleNamespace(layout=lay, sses=sses_b, bb=bb_b, figure=page))
     assert found["S1"] == found["S2"] == found["S3"] == [] and found["S6"] == []
@@ -159,6 +168,46 @@ def test_homologue_takes_its_mates_places_names_and_angles():
         near.append(np.hypot(p.cx - tx, p.cy - ty))
         far.append(np.hypot(alone.placed[s.id].cx - tx, alone.placed[s.id].cy - ty))
     assert np.median(near) < np.median(far)
+
+
+def test_split_helix_parts_and_relations_only_b_has():
+    """2HHB α drawn like β: α's helix split in two is laid end to end on its mate's place, the first part in
+    sequence named as the mate and the next primed; neighbours in α whose mates in β are not neighbours (β's D helix
+    lies between) are no relation the reference settled, so their loop still pulls (Like.settled); in α drawn like
+    itself every neighbour pair is settled."""
+    path = DATA / "2HHB.cif"
+    lay, sses_b, _, lay_a, like = drawn_like(path, "B", path, "A")
+    _, sses_a, bb_a = cli.make_layout(path, chains=["B"], **OPTIONS)
+    _, _, bb_b = cli.make_layout(path, chains=["A"], **OPTIONS)
+    mates = element_mates(sses_a, sses_b, align_chains(bb_a, "B", bb_b, "A"))
+    assert mates.pieces
+    by_id = {s.id: s for s in sses_b}
+    for a in sorted(set(mates.pieces.values())):
+        parts = sorted(
+            [b for b, x in [*mates.mate.items(), *mates.pieces.items()] if x == a], key=lambda b: by_id[b].start
+        )
+        names = [lay.placed[b].label for b in parts]
+        assert names[0] == lay_a.placed[a].label and names[1] == names[0] + "′"
+        for b in parts:  # its places on the grid (cos and sin of the mate's angle stay off the optimiser)
+            assert like.target[b] == tuple(np.round(np.array(like.target[b]) * 1e4) / 1e4)
+    seq = sorted(sses_b, key=lambda s: s.start)
+    neighbours = {frozenset((x.id, y.id)) for x, y in zip(seq, seq[1:]) if x.id in like.target and y.id in like.target}
+    assert neighbours - like.settled  # a relation only α has
+    itself = drawn_like(path, "A", path, "A")[4]
+    seq_a = sorted(cli.make_layout(path, chains=["A"], **OPTIONS)[1], key=lambda s: s.start)
+    assert {frozenset((x.id, y.id)) for x, y in zip(seq_a, seq_a[1:])} <= itself.settled
+
+
+def test_targets_a_bit_off_give_the_same_figure():
+    """Every target moved by one unit in the last place (as sin and cos may differ between CPUs) draws the same
+    figure: units read where they agree to 1e-9, targets on the grid otherwise (A12 on any CPU)."""
+    path = DATA / "2HHB.cif"
+    lay, _, _, _, like = drawn_like(path, "B", path, "A")
+    off = replace(
+        like, target={k: (np.nextafter(x, np.inf), np.nextafter(y, -np.inf)) for k, (x, y) in like.target.items()}
+    )
+    again, _, _ = laid_out_like(path, off, lay.frame, chains=["A"])
+    assert signature(again) == signature(lay)
 
 
 _SIGNATURE = """

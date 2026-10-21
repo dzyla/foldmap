@@ -4,7 +4,7 @@
 
 The reference enters B's layout at its frame (frame.frame_like: A's frame carried through the superposition) and at
 its homes and choices (build_layout's `like`): each of B's elements with a mate in A (align.element_mates) starts at
-its mate's place on A's page, held there harder than a projected home (layout._K_LIKE), with its mate's drawn angle,
+its mate's place on A's page, held there harder than a projected home (layout.LIKE_WEIGHT), with its mate's angle,
 label and, for identity colourings, colour; B's sheets are drawn as βα rows where their mates' are, and B's helices
 over their sheet where their mates are. The optimiser itself is not changed: B's own pairing decides each sheet's
 strand order (science S1-S3, S6), and _separate clears every overlap as always.
@@ -18,16 +18,16 @@ import numpy as np
 
 from .align import Mates
 from .layout import (
-    _K_HOME,
-    _K_LIKE,
-    _PIECE_GAP,
     ETA_W,
     HELIX_RISE,
     HELIX_W,
+    LIKE_WEIGHT,
+    PIECE_GAP,
     SCALE,
     TEN_RISE,
     Layout,
-    _row_shape,
+    can_be_row,
+    snap,
     template_choices,
 )
 from .model import SSE, Sheet, generic_label, res_ref
@@ -48,11 +48,18 @@ class Like:
     label: dict[str, str]  # B element ref (res:chain:a-b) -> label (mates, pieces, extras)
     colour: dict[str, str]  # B element id -> colour (identity colourings only; else empty)
     template: list[bool] | None  # A's βα-row choices, per sheet of B (its own for a sheet with no mate); None: B's own
-    over: dict[str, bool]  # A's helix-over-sheet choices, by B helix id
-    weight: float  # _K_LIKE / _K_HOME
+    # A's helix-over-sheet choices, by B helix id: False takes a helix off its sheet; True keeps it over only where
+    # B's own packing (features.helices_on_sheets) puts it on a sheet (one way: an over-sheet helix needs a sheet)
+    over: dict[str, bool]
+    weight: float  # _K_LIKE / _K_HOME (layout.LIKE_WEIGHT)
     # B element id -> (cx, cy) of the unit its mate was laid out in and the mate's offset there (Layout.units): a
-    # unit laid out like its mate's lands exactly on that unit's centre (build_layout's homes, layout._like_homes)
+    # unit laid out like its mate's lands exactly on that unit's centre (build_layout's homes, layout._like_homes).
+    # Read only where it gives `target` (to 1e-9): a target edited without its unit is followed, on the grid
     unit: dict[str, tuple[float, float, float, float]] = field(default_factory=dict)
+    # pairs of B element ids the reference relates as they are related here (their mates neighbours in sequence or
+    # bridged by a disulfide there; parts of one helix): no loop or disulfide spring between them when both are held
+    # at the reference's places (layout._attract); one only B has still pulls. None: every pair
+    settled: frozenset[frozenset[str]] | None = None
 
 
 def _drawn_length(s: SSE, look: Style) -> float:
@@ -78,9 +85,10 @@ def like_from(
     and A's as `sses_a`, the elements A's layout drew).
 
     - Places and angles: a mate takes its mate's page centre and drawn angle. A helix B splits where A does not (the
-      mate and its pieces, Mates.pieces) is laid end to end along its mate as drawn, in sequence, _PIECE_GAP apart,
-      each at its own drawn length and the mate's angle, centred on the mate.
-    - Labels: a mate takes its mate's label, a piece the same with a prime (α3′); an extra is named after the
+      mate and its pieces, Mates.pieces) is laid end to end along its mate as drawn, in sequence, PIECE_GAP apart,
+      each at its own drawn length and the mate's angle, centred on the mate (those places on the grid).
+    - Labels: a mate takes its mate's label; of a split helix's parts the first in sequence takes it and the next
+      ones the same primed (α3, α3′, α3″); an extra is named after the
       matched element of its family (strand or helix) before it, lettered (α3a, β9a), the first name not taken; an
       extra with none before it keeps its own label unless that is taken, then lettered too.
     - Colours (identity colourings only, IDENTITY_COLOURINGS): a mate or piece takes its mate's colour as A draws it
@@ -110,12 +118,13 @@ def like_from(
             continue
         bs = sorted(bs, key=lambda b: (by_b[b].start, b))
         lengths = [_drawn_length(by_b[b], look) for b in bs]
-        along = -(sum(lengths) + _PIECE_GAP * (len(bs) - 1)) / 2
+        along = -(sum(lengths) + PIECE_GAP * (len(bs) - 1)) / 2
         d = np.array([np.cos(p.angle), np.sin(p.angle)])
         for b, n in zip(bs, lengths):
             t = along + n / 2
-            target[b], angle[b] = (float(p.cx + d[0] * t), float(p.cy + d[1] * t)), p.angle
-            along += n + _PIECE_GAP
+            # on the grid: cos and sin differ in the last bit between CPUs (A12)
+            target[b], angle[b] = tuple(float(v) for v in snap((p.cx + d[0] * t, p.cy + d[1] * t))), p.angle
+            along += n + PIECE_GAP
     return Like(
         target=target,
         angle=angle,
@@ -127,24 +136,55 @@ def like_from(
             for b, a in [*mates.mate.items(), *mates.pieces.items()]
             if b in by_b and by_b[b].kind == "H"
         },
-        weight=_K_LIKE / _K_HOME,
+        weight=LIKE_WEIGHT,
         unit=unit,
+        settled=_settled(layout_a, sses_a, groups),
     )
+
+
+def _settled(layout_a: Layout, sses_a: list[SSE], groups: dict[str, list[str]]) -> frozenset[frozenset[str]]:
+    """Like.settled: the pairs of B elements (mates and pieces, `groups`: A element -> them) whose mates the
+    reference relates: one A element (a split helix's parts), A elements next to each other in sequence in one chain
+    (a loop), or two joined by a disulfide (each cysteine's element, or the nearest element end, as cli's bridge
+    springs place it)."""
+    seq = sorted(sses_a, key=lambda s: s.start)
+    related = {frozenset((a.id, b.id)) for a, b in zip(seq, seq[1:]) if a.chain == b.chain}
+    links = getattr(layout_a, "links", None)
+    for i, j in getattr(links, "disulfides", None) or []:
+        ends = [_cys_element(layout_a, sses_a, r) for r in (i, j)]
+        if None not in ends and ends[0] != ends[1]:
+            related.add(frozenset(ends))
+    out = set()
+    for bs in groups.values():
+        out |= {frozenset((x, y)) for x in bs for y in bs if x != y}
+    for pair in related:
+        x, y = sorted(pair)
+        out |= {frozenset((p, q)) for p in groups.get(x, []) for q in groups.get(y, [])}
+    return frozenset(out)
+
+
+def _cys_element(layout_a: Layout, sses_a: list[SSE], r: int) -> str | None:
+    """The element a residue (Backbone index of A's layout) is drawn on for a disulfide: its own, or the nearest."""
+    if r >= len(layout_a.res_chain):
+        return None
+    mine = [s for s in sses_a if s.chain == layout_a.res_chain[r]]
+    if not mine:
+        return None
+    return min(mine, key=lambda s: 0 if s.start <= r <= s.end else min(abs(r - s.start), abs(r - s.end))).id
 
 
 def _labels(placed: dict, sses_b: list[SSE], mates: Mates) -> dict[str, str]:
     """B element ref -> label (like_from: mates, pieces, extras)."""
     names: dict[str, str] = {}  # B element id -> label
-    for b, a in mates.mate.items():
-        if a in placed:
-            names[b] = placed[a].label
-    pieces: dict[str, int] = {}
-    for b in sorted(mates.pieces, key=lambda b: next(s.start for s in sses_b if s.id == b)):
-        a = mates.pieces[b]
-        if a in placed:
-            k = pieces.get(a, 0)
-            pieces[a] = k + 1
-            names[b] = placed[a].label + (_PRIMES[k] if k < len(_PRIMES) else "′" * (k + 1))
+    start = {s.id: s.start for s in sses_b}
+    parts: dict[str, list[str]] = {}  # A element -> its mate and pieces in B
+    for b, a in [*mates.mate.items(), *mates.pieces.items()]:
+        if a in placed and b in start:
+            parts.setdefault(a, []).append(b)
+    for a, bs in parts.items():  # the first part in sequence takes the name, the next ones primed (α6, α6′)
+        for k, b in enumerate(sorted(bs, key=lambda b: (start[b], b))):
+            label = placed[a].label
+            names[b] = label if k == 0 else label + (_PRIMES[k - 1] if k <= len(_PRIMES) else "′" * k)
     taken = {p.label for p in placed.values()} | set(names.values())
     extras = set(mates.extras)
     last: dict[tuple[str, str], str] = {}  # (chain, family) -> the label of the last matched element so far
@@ -154,7 +194,7 @@ def _labels(placed: dict, sses_b: list[SSE], mates: Mates) -> dict[str, str]:
         n = counts.get((s.chain, s.kind), 0)
         counts[(s.chain, s.kind)] = n + 1
         if s.id in names and s.id in mates.mate:
-            last[key] = names[s.id]
+            last[key] = placed[mates.mate[s.id]].label  # its mate's own name, unprimed
         elif s.id in extras:
             base = last.get(key)
             if base is None:
@@ -205,5 +245,5 @@ def _template(layout_a: Layout, sses_b: list[SSE], mates: Mates, sheets_b: list[
         mated = [mates.mate[s.id] for s in sheet.strands if s.id in mates.mate]
         inrow = sum(a in rows for a in mated)
         choice = mine if 2 * inrow == len(mated) else 2 * inrow > len(mated)
-        out.append(bool(choice) and _row_shape(sheet))
+        out.append(bool(choice) and can_be_row(sheet))
     return out
