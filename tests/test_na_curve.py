@@ -550,3 +550,20 @@ def test_the_curve_name_sits_at_the_stem_name_margin(pdb):
         return
     own, _ = stem_name_gaps(drawn, page=measure(drawn))["na:curve:0:label"]
     assert own <= stem_gap_limit(drawn.figure)
+
+
+def test_an_item_past_the_band_end_is_pushed_past_it_not_across():
+    """Fix round 2 (1HQ1's P1b): a band's wall ends where the band ends (Walls.band back/ahead). A footprint just past
+    the end along the band, overlapping the end square's box, leaves past the end, not sideways across the band; one
+    beyond the end and its MARGIN is not met at all."""
+    from foldmap.layout import MARGIN, Walls, _off_walls
+
+    # a band along +x from x=-3 to x=0 (half width 1), its last squares round x=0
+    boxes = np.array([[-0.5, 0.0, 0.5, 1.0], [-0.5, -1.0, 0.5, 0.0]])
+    band = np.array([[0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 0.0, 3.0, 0.0]] * 2)
+    walls = Walls(boxes, np.ones((1, 2), bool), band)
+    group = [np.array([0])]
+    xy, halves, mids = np.array([[0.9, 0.2]]), np.array([[0.3, 0.3]]), np.zeros((1, 2))
+    assert _off_walls(xy, halves, mids, walls, group)
+    assert xy[0, 0] >= 0.3 + MARGIN - 1e-9 and abs(xy[0, 1] - 0.2) < 1e-9  # past the end, at its own height
+    assert not _off_walls(np.array([[0.3 + MARGIN + 0.05, 0.0]]), halves, mids, walls, group, move=False)
