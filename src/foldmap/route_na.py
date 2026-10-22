@@ -303,6 +303,10 @@ def route_nucleic(layout: Layout, router: _Router | None = None, loops=()) -> li
             label = f"… {g.count} nt …" if g.count >= SHORT_GAP else ""
             out.append(NAPath("gap", g.before, [], mark, [], label))
     _unbunch(layout, out)
+    if getattr(layout, "na_bend", "pieces") == "curved":  # each bent duplex as one curve, strands leaving it follow
+        from .na_curve import bend
+
+        ends = bend(layout, out, ends)
     layout.na_ends = [e for e in ends if (e[0], e[1]) not in gapped]
     layout.na_letters = _place_letters(layout, out)  # blind to the loops: _letters_off_loops
     layout.na_ties = _ties(layout, out, loops)

@@ -290,6 +290,8 @@ class Layout:
     na_ends: list = field(default_factory=list)  # (strand, "5′" or "3′", label position), filled by route_loops
     na_letters: dict = field(default_factory=dict)  # single-stranded (strand, nt) -> its letter's place (route_loops)
     na_ties: list = field(default_factory=list)  # na_paths.NATie: isolated pairs as drawn (route_loops)
+    na_curves: list = field(default_factory=list)  # na_curve.NACurve: each bent duplex drawn as one curve
+    # (Style.na_bend curved; route_loops), its pieces left in `stems` as placed
     # (N or C, chain) -> where that chain end's letter is drawn when a line ran through its usual spot (route_loops:
     # route._clear_termini); end_label_pos reads it
     end_labels: dict = field(default_factory=dict)
@@ -360,6 +362,8 @@ class Layout:
     loop_stroke: float = 1.0  # a loop's drawn stroke in line_pt: Style.loop_width, RUN_EDGE_W times it under
     # residue colours (its dark edge); for line_band
     na_line: float = 1.0  # Style.na_line the figure is drawn with: a nucleic-acid run's stroke is NA_RUN_W times it
+    na_bend: str = "pieces"  # Style.na_bend the figure is drawn with: curved draws each bent duplex as one curve
+    # (route_nucleic, na_curve)
     # widths set by hand (Style.element_widths, elstyle; build_layout): element id -> factor (its Placed.width already
     # holds it), loop (by the element it leaves) -> factor of its stroke, nucleic-acid chain -> factor of its
     # backbone, ligands [(selectors, factor)] for their box's edge; all empty without any
@@ -4577,6 +4581,7 @@ def build_layout(
     lay.font_scale = style.font_scale
     lay.loop_stroke = style.loop_width * (RUN_EDGE_W if style.loop_color == "residue" else 1.0)
     lay.na_line = style.na_line
+    lay.na_bend = style.na_bend
     if hand is not None:  # widths set by hand: what render draws wider, and texts keep off (line_band)
         lay.element_widths, lay.loop_widths, lay.na_widths = dict(hand.elements), dict(hand.loops), dict(hand.chains)
         lay.ligand_widths = list(hand.ligands)

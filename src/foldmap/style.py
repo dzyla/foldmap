@@ -57,6 +57,7 @@ CHOICES = {
     # each copy protomer 0's drawing turned (plan 21; opt-in; other orders and a D2 stay unrolled, with a note)
     "copy_ghosts": ("on", "off"),  # a strand lent across a ring's cut: with dashed copies where it pairs / none
     "crosslink_layer": ("under", "over"),  # crosslink lines under the elements / over them
+    "na_bend": ("pieces", "curved"),  # a bent duplex as straight pieces joined by routed joints / one curve (plan 25)
     "domain_bar": ("auto", "on", "off"),  # the linear domain bar: with 2+ named domains drawn / with any / never
 }
 _ALIASES = {"fill": {"classic": "bold", "flat": "pale"}}
@@ -75,6 +76,7 @@ LAYOUT_KEYS = (
     "copy_ghosts",
     "na_line",
     "element_widths",
+    "na_bend",
 )  # these move elements
 NA_BACKBONES = ("modality", "chain", "ink")
 MODALITIES = ("protein", "dna", "rna")
@@ -196,6 +198,9 @@ class Style:
     # end; off: no such dashed copy of another copy's strand (a barrel's closing ghost stays)
     crosslink_layer: str = "under"  # under: crosslink lines (--crosslinks) at the interaction lines' depth, below the
     # elements; over: above the elements, each with a thin casing in the background colour so it reads on a ribbon
+    na_bend: str = "pieces"  # pieces: a bent duplex (cut where its axis turns, nucleic.segment_stem) as straight pieces
+    # joined by routed joints; curved (opt-in, plan 25): one ladder along a curve through the pieces in order, each
+    # keeping its own rung spacing, gyres that would cross drawn one inside the other (na_curve)
     helix_scale: float = 1.0  # helix ribbon diameter
     strand_scale: float = 1.0  # arrow width and the spacing of strands in a sheet
     dna_scale: float = 1.0  # duplex diameter

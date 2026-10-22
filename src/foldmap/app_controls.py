@@ -211,6 +211,13 @@ def nucleic_block(st, ss: MutableMapping) -> None:
     )
     segmented(
         st,
+        "Bent duplexes",
+        CHOICES["na_bend"],
+        setting(ss, "na_bend"),
+        help="pieces: straight pieces joined where the axis turns · curved: one ladder along a curve",
+    )
+    segmented(
+        st,
         "Shown",
         CHOICES["na_extent"],
         setting(ss, "na_extent"),

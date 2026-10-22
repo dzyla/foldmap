@@ -491,6 +491,7 @@ CONTROLS: dict[str, tuple[str, str, tuple[str, ...]]] = {
     "interaction_max": ("Most lines of each interaction", _SHOW, ("interaction_max",)),
     "nucleotide_labels": ("Base letters", _SHOW, ("nucleotide_labels",)),
     "na_style": ("Stems", _SHOW, ("na_style",)),
+    "na_bend": ("Bent duplexes", _SHOW, ("na_bend",)),
     "na_extent": ("Shown", _SHOW, ("na_extent",)),
     "na_backbone": ("Backbone", _SHOW, ("na_backbone__mode", "na_backbone__colour")),
     "na_line": ("Backbone width", _SHOW, ("na_line",)),

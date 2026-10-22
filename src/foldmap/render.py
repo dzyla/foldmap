@@ -594,10 +594,212 @@ def _letters(ink: _NAInk, k: int, d: PlacedStem, where: dict, letters: dict) -> 
 _STEM_STYLES = {"ladder": _ladder, "ribbon": _ribbon, "block": _block, "letters": _letters}  # na_style -> drawing
 
 
+# A bent duplex drawn as one curve (Style.na_bend curved, na_curve.NACurve): each style as on a straight stem, along
+# the curve. Its artists carry the gids of its first piece (k), as one stem.
+def _curve_rails(ink: _NAInk, k: int, c) -> None:
+    """A rail per strand along each side of the curve, from its first nucleotide to its last (through the stretches
+    where the pieces' joints were)."""
+    groups: dict[tuple[int, int], list[float]] = {}  # (side, strand) -> arc lengths of its nucleotides
+    for key, s in c.at.items():
+        groups.setdefault((c.side[key], key[0]), []).append(s)
+    rails: dict[tuple, list] = {}  # (backbone colour, weight) -> its rails
+    for (side, strand), at in groups.items():
+        if len(at) > 1:
+            drawn = (ink.colour(strand), ink.weight(strand))
+            rails.setdefault(drawn, []).append(c.offset_line(min(at), max(at), side * c.rail))
+    for n, ((colour, weight), parts) in enumerate(rails.items()):
+        rail = PathPatch(
+            _compound(parts, closed=False),
+            fc="none",
+            ec=colour,
+            lw=ink.lw * 2.2 * weight,
+            capstyle="round",
+            joinstyle="round",
+            zorder=Z["na-front"],
+        )
+        rail.set_gid(f"na:stem:{k}:rails" if n == 0 else f"na:stem:{k}:rails:{n + 1}")
+        ink.ax.add_patch(rail)
+
+
+def _curve_rungs(ink: _NAInk, k: int, c, inset: float = 0.0) -> None:
+    for pair in c.pairs:
+        a, i, b, j = pair
+        p, q = c.point((a, i)), c.point((b, j))
+        v = (q - p) / max(float(np.hypot(*(q - p))), 1e-9)
+        (line,) = ink.ax.plot(
+            *np.c_[p + v * inset, q - v * inset],
+            color=ink.rung,
+            lw=ink.lw * 1.4,
+            ls=(0, (1, 1.5)) if pair in ink.gu else "-",
+            solid_capstyle="round",
+            zorder=Z["na-rung"],
+        )
+        line.set_gid(f"na:stem:{k}:rung")
+
+
+def _curve_ladder(ink: _NAInk, k: int, c, letters: dict) -> None:
+    _curve_rails(ink, k, c)
+    _curve_rungs(ink, k, c)
+    for key in c.at:
+        letters[key] = (c.point(key, NT_ROW), _upright(c.angle(key)))
+
+
+def _curve_letters(ink: _NAInk, k: int, c, letters: dict) -> None:
+    _curve_rungs(ink, k, c, inset=0.3)
+    for key in c.at:
+        letters[key] = (c.point(key), _upright(c.angle(key)))
+
+
+def _curve_slot(c, key: tuple[int, int]) -> int:
+    """Which backbone of the curved double helix a nucleotide sits on: 0 for the left rail's, else 1."""
+    return 0 if c.side[key] > 0 else 1
+
+
+def curve_ribbon_point(c, key: tuple[int, int]) -> np.ndarray:
+    """Where a nucleotide sits on the curved double helix's backbone (as _ribbon_point on a straight stem)."""
+    x = c.at[key]
+    return c.to_page(x, dna_y(_curve_slot(c, key), x, c.width))[0]
+
+
+def _curve_turns(c, slot: int, wide: float) -> tuple[list[np.ndarray], list[np.ndarray]]:
+    """Front and back half-turns of one backbone along the curve (_dna_turns, mapped onto it)."""
+    x0, x1 = c.extent()
+    off = slot * DNA_MINOR * DNA_PITCH
+    front, back = [], []
+    for k in range(int(np.floor((x0 - off) / DNA_PITCH)) - 1, int(np.ceil((x1 - off) / DNA_PITCH)) + 1):
+        for lo, hi, dest in ((-0.25, 0.25, front), (0.25, 0.75, back)):
+            a, b = max(x0, off + (k + lo) * DNA_PITCH), min(x1, off + (k + hi) * DNA_PITCH)
+            if b - a > 1e-6:
+                xs = np.linspace(a, b, _DNA_SEG)
+                q = _tube(np.column_stack([xs, dna_y(slot, xs, c.width)]), _DNA_TUBE * wide * c.width / DNA_W)
+                dest.append(c.to_page(q[:, 0], q[:, 1]))
+    return front, back
+
+
+def _curve_ribbon(ink: _NAInk, k: int, c, letters: dict) -> None:
+    colour, weight = {}, {}  # backbone slot -> colour and weight of the strand drawn there
+    for key in sorted(c.at):
+        colour.setdefault(_curve_slot(c, key), ink.colour(key[0]))
+        weight.setdefault(_curve_slot(c, key), ink.weight(key[0]))
+    slots: dict[str, list[int]] = {}
+    for slot, col in sorted(colour.items()):
+        slots.setdefault(col, []).append(slot)
+    outline = ink.fill == "outline"
+    for n, (col, group) in enumerate(slots.items()):
+        fronts, backs = [], []
+        for slot in group:
+            f, b = _curve_turns(c, slot, weight[slot])
+            fronts += f
+            backs += b
+        suffix = "" if n == 0 else f":{n + 1}"
+        back = PathPatch(_compound(backs), fc=tint(col, 0.5), ec="none", zorder=Z["na-back"])
+        back.set_gid(f"na:stem:{k}:back{suffix}")
+        ink.ax.add_patch(back)
+        front = PathPatch(
+            _compound(fronts),
+            fc="white" if outline else col,
+            ec=col if outline else "none",
+            lw=ink.lw * 0.8,
+            zorder=Z["na-front"],
+        )
+        front.set_gid(f"na:stem:{k}:front{suffix}")
+        ink.ax.add_patch(front)
+    xs = [c.at[(a, i)] for a, i, _, _ in c.pairs]
+    rungs = [c.to_page([x, x], [dna_y(0, x, c.width), dna_y(1, x, c.width)]) for x in xs]
+    rung = PathPatch(
+        _compound(rungs, closed=False), fc="none", ec=ink.rung, lw=ink.lw * 2.2, capstyle="round", zorder=Z["na-rung"]
+    )
+    rung.set_gid(f"na:stem:{k}:rungs")
+    ink.ax.add_patch(rung)
+
+
+def _curve_block(ink: _NAInk, k: int, c, letters: dict) -> None:
+    """A band between the two rails along the curve, named inside at its middle; its first pair's numbers beside
+    it, where the ladder's name goes."""
+    colour = {}
+    for key in sorted(c.at):
+        colour.setdefault(c.side[key], ink.colour(key[0]))
+    halves = [colour.get(1, colour.get(-1)), colour.get(-1, colour.get(1))]
+    shown = [halves[0]] if halves[0] == halves[1] else halves
+    s0, s1 = c.extent()
+    r = c.rail
+    for n, col in enumerate(shown):
+        lo, hi = (-r, r) if len(shown) == 1 else ((0.0, r) if n == 0 else (-r, 0.0))
+        corners = np.vstack([c.offset_line(s0, s1, lo), c.offset_line(s0, s1, hi)[::-1]])
+        body = Polygon(
+            corners,
+            closed=True,
+            fc="white" if ink.fill == "outline" else col,
+            ec=col,
+            lw=ink.lw * 1.2 * max(ink.weight(key[0]) for key in c.at),
+            zorder=Z["na-front"],
+        )
+        body.set_gid(f"na:stem:{k}:block" if n == 0 else f"na:stem:{k}:block:{n + 1}")
+        ink.ax.add_patch(body)
+    mixed = _mix(shown[0], shown[-1], 0.5)
+    p, tan, _ = c.frames((s0 + s1) / 2)
+    t = ink.ax.text(
+        float(p[0, 0]),
+        float(p[0, 1]),
+        c.name,
+        ha="center",
+        va="center",
+        rotation=_upright(float(_snap(np.arctan2(tan[0, 1], tan[0, 0])))),
+        fontsize=ink.font * 0.9,
+        fontweight="bold",
+        color=legible(mixed) if ink.fill == "outline" else text_color_on(mixed),
+        zorder=Z["label"],
+    )
+    t.set_gid(f"na:label:{k}")
+    first = first_pair_text(c, ink.chains, ink.seqs)
+    rot = _upright(c.name_angle)
+    t = ink.ax.text(
+        *text_anchor(first, False, c.name_xy, ink.em * 0.75, rot),
+        first,
+        ha="left",
+        va="baseline",
+        rotation=rot,
+        rotation_mode="anchor",
+        fontsize=ink.font * 0.75,
+        color=ink.front,
+        zorder=Z["label"],
+    )
+    t.set_gid(f"na:stem:{k}:first")
+
+
+def _draw_curve_label(ink: _NAInk, k: int, c) -> None:
+    rot = _upright(c.name_angle)
+    t = ink.ax.text(
+        *text_anchor(c.name, True, c.name_xy, ink.em * 0.8, rot),
+        c.name,
+        ha="left",
+        va="baseline",
+        rotation=rot,
+        rotation_mode="anchor",
+        fontsize=ink.font * 0.8,
+        fontweight="bold",
+        color=ink.front,
+        zorder=Z["label"],
+    )
+    t.set_gid(f"na:label:{k}")
+
+
+_CURVE_STYLES = {"ladder": _curve_ladder, "ribbon": _curve_ribbon, "block": _curve_block, "letters": _curve_letters}
+
+
+def _curved_joints(layout: Layout) -> set[int]:
+    """The na_paths drawn as part of a curve (Layout.na_curves): the joints between its pieces."""
+    held = {key for c in layout.na_curves for key in c.at}
+    return {n for n, p in enumerate(layout.na_paths) if p.kind == "joint" and p.between and p.between[0] in held}
+
+
 def _draw_strands(ink: _NAInk, layout: Layout, style: str, where: dict, letters: dict) -> None:
     """Single strands along their drawn paths (cropped gaps dashed, labelled unless short); their letters beside
     them, where routing placed them (on the strand itself in the letters style)."""
+    curved = _curved_joints(layout) if getattr(layout, "na_curves", ()) else set()
     for n, path in enumerate(layout.na_paths):
+        if n in curved:
+            continue
         pts = np.asarray(path.points, float)
         gap = path.kind == "gap"
         (line,) = ink.ax.plot(
@@ -761,7 +963,16 @@ def _draw_nucleic(
     style = _na_style(layout, look)
     where = nucleotide_points(layout, style)  # nucleotide -> where it is drawn (bead and hydrogen bonds go there)
     letters: dict[tuple[int, int], tuple[np.ndarray, float]] = {}  # nucleotide -> letter position, rotation
+    # Style.na_bend curved: a bent duplex drawn as one curve (Layout.na_curves), its pieces not drawn
+    curve_of = {k: c for c in getattr(layout, "na_curves", ()) for k in c.pieces}
     for k, d in enumerate(layout.stems):
+        c = curve_of.get(k)
+        if c is not None:
+            if k == c.pieces[0]:
+                _CURVE_STYLES.get(style, _curve_ladder)(ink, k, c, letters)
+                if style != "block" and look.labels:
+                    _draw_curve_label(ink, k, c)
+            continue
         _STEM_STYLES.get(style, _ladder)(ink, k, d, where, letters)
         if style != "block" and look.labels:
             _draw_stem_label(ink, k, d)
@@ -2944,6 +3155,9 @@ def nucleotide_points(layout: Layout, style: str = "ladder") -> dict[tuple[int, 
     for d in layout.stems:
         for key in d.axial:
             where[key] = _ribbon_point(d, key) if style == "ribbon" else d.point(key)
+    for c in getattr(layout, "na_curves", ()):  # a bent duplex drawn as one curve (Style.na_bend curved)
+        for key in c.at:
+            where[key] = curve_ribbon_point(c, key) if style == "ribbon" else c.point(key)
     for path in layout.na_paths:
         for i, xy in zip(path.nts, path.nt_xy):
             where[(path.strand, i)] = np.asarray(xy)
