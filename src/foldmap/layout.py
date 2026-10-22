@@ -1386,23 +1386,34 @@ class Walls(NamedTuple):
     """Boxes that stay where they are (x0, y0, x1, y1 rows: each nucleotide of an unpaired strand's trace, a bead
     either side), and for each (item, box) whether the item must keep off it: an item holding an element that
     touches that trace is exempt (a single strand lies on the protein it wraps). `band` (rows px, py, nx, ny, half
-    width; NaN for a box that stands for no band): a box standing for a stretch of a curved duplex's band
-    (na_curve._band_boxes) is met only where a footprint reaches into the band itself (its strip: the half width either
-    side of the centreline point p, across the unit normal n), and is left along that normal (_off_walls)."""
+    width, tx, ty, back, ahead; NaN for a box that stands for no band): a box standing for a stretch of a curved
+    duplex's band (na_curve._band_boxes) is met only where a footprint reaches into the band itself (_band_out: its
+    strip, the half width either side of the centreline point p across the unit normal n, and no further along the
+    unit tangent t than the band's ends, `back` before p and `ahead` after it), and is left the shortest way out of
+    it: across, or past the band's end (an item stacked on the duplex's end stays there)."""
 
     boxes: np.ndarray  # (m, 4)
     hard: np.ndarray  # (items, m) bool
-    band: np.ndarray | None = None  # (m, 5) or None: no box stands for a band
+    band: np.ndarray | None = None  # (m, 9) or None: no box stands for a band
 
 
-def _band_reach(xy, halves, band: np.ndarray, rows: np.ndarray, cols: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-    """For footprints `rows` (centres xy, half extents) against band boxes `cols`: the signed distance of each centre
-    across the band from its centreline point, and how far the footprint must stand from it to clear the strip
-    (its reach along the normal, the band's half width and MARGIN)."""
-    p, n, hw = band[cols, :2], band[cols, 2:4], band[cols, 4]
-    s = ((xy[rows] - p) * n).sum(axis=1)
-    need = halves[rows, 0] * np.abs(n[:, 0]) + halves[rows, 1] * np.abs(n[:, 1]) + hw + MARGIN
-    return s, need
+def _band_out(centre, half, row, held: bool = False) -> tuple[float, np.ndarray] | None:
+    """None when the footprint (centre, half extents) does not reach, MARGIN kept, into the stretch of a band one
+    Walls.band row stands for; else how far it must move, and which way (a unit vector), to leave it: across the band
+    along its normal, or past the band's end along its tangent, whichever is shorter (`held`: sideways only)."""
+    p, n, hw, t, back, ahead = row[:2], row[2:4], row[4], row[5:7], row[7], row[8]
+    d = np.asarray(centre, float) - p
+    s, u = float(d @ n), float(d @ t)
+    across = half[0] * abs(n[0]) + half[1] * abs(n[1]) + hw + MARGIN
+    along = half[0] * abs(t[0]) + half[1] * abs(t[1]) + MARGIN
+    if abs(s) >= across - 1e-9 or u - along >= ahead - 1e-9 or u + along <= -back + 1e-9:
+        return None
+    ways = [(across - abs(s), n * (1.0 if s >= 0 else -1.0)), (ahead + along - u, t), (back + along + u, -t)]
+    if held:  # keeps its height: each way taken sideways, as far as clears it
+        ways = [(g / abs(v[0]), np.array([np.sign(v[0]), 0.0])) for g, v in ways if abs(v[0]) > 1e-6]
+        if not ways:
+            return None
+    return min(ways, key=lambda w: w[0])
 
 
 def _separate(
@@ -1730,10 +1741,10 @@ def _off_walls(
     along the axis of least overlap, moving its group (`group[i]`, the items moved with item i) in place; `sx`
     (-1 for a mirrored copy, _push_apart) turns a sideways move of a group's copies the other way; `held` (bool per
     item, _push_apart's): a group keeping its height is moved sideways only. A box standing for a stretch of a curved
-    duplex's band (Walls.band) counts only where the footprint reaches into the band's strip, and is left along the
-    band's normal, the whole strip at once: off one square of a diagonal band along x it would land on the next one,
-    and back (the staircase that kept 3IGI's pushes going all 5000 sweeps). True if any overlapped (with move=False,
-    only that is reported)."""
+    duplex's band (Walls.band) counts only where the footprint reaches into the band itself, and is left the shortest
+    way out of it (_band_out: across along its normal, or past its end), the whole way at once: off one square of a
+    diagonal band along x it would land on the next one, and back (the staircase that kept 3IGI's pushes going all
+    5000 sweeps). True if any overlapped (with move=False, only that is reported)."""
     if walls is None or not len(walls.boxes):
         return False
     boxes = np.asarray(walls.boxes, float)
@@ -1742,29 +1753,22 @@ def _off_walls(
     pen = halves[:, None, :] + half[None, :, :] + MARGIN - np.abs(d)
     hits = np.argwhere((pen[..., 0] > 1e-9) & (pen[..., 1] > 1e-9) & walls.hard)
     band = walls.band
-    if band is not None and len(hits):  # a band's box: met only where the footprint reaches into the band's strip
-        on = ~np.isnan(band[hits[:, 1], 0])
-        if on.any():
-            s, need = _band_reach(xy + mids, halves, band, hits[on, 0], hits[on, 1])
-            keep = np.ones(len(hits), bool)
-            keep[np.flatnonzero(on)] = np.abs(s) < need - 1e-9
-            hits = hits[keep]
+    if band is not None and len(hits):  # a band's box: met only where the footprint reaches into the band itself
+        keep = [
+            np.isnan(band[w, 0]) or _band_out(xy[i] + mids[i], halves[i], band[w]) is not None for i, w in hits.tolist()
+        ]
+        hits = hits[np.array(keep, bool)]
     if not move or not len(hits):
         return bool(len(hits))
     for i, w in hits.tolist():  # in order; an earlier push may already have cleared it
-        if band is not None and not np.isnan(band[w, 0]):  # off the band along its normal, the whole way
-            s, need = (float(v[0]) for v in _band_reach(xy + mids, halves, band, np.array([i]), np.array([w])))
-            gap = need - abs(s)
-            if gap <= 1e-9:
+        if band is not None and not np.isnan(band[w, 0]):  # off the band the shortest way, the whole way
+            out = _band_out(xy[i] + mids[i], halves[i], band[w], held is not None and bool(held[i]))
+            if out is None:
                 continue
-            n = band[w, 2:4] * (1.0 if s >= 0 else -1.0)
+            gap, v = out
             turn = 1.0 if sx is None else sx[group[i]] * sx[i]
-            if held is not None and held[i]:  # keeps its height: sideways, as far as clears the strip
-                if abs(n[0]) > 1e-6:
-                    xy[group[i], 0] += turn * np.sign(n[0]) * (gap / abs(n[0]) + _SEP_PUSH)
-                continue
-            xy[group[i], 0] += turn * n[0] * (gap + _SEP_PUSH)
-            xy[group[i], 1] += n[1] * (gap + _SEP_PUSH)
+            xy[group[i], 0] += turn * v[0] * (gap + _SEP_PUSH)
+            xy[group[i], 1] += v[1] * (gap + _SEP_PUSH)
             continue
         dx, dy = centres[w] - xy[i] - mids[i]
         px = halves[i, 0] + half[w, 0] + MARGIN - abs(dx)
@@ -1815,9 +1819,8 @@ def _slide_clear(
             return False
         if len(o) < 4:
             return True
-        p, n, hw = band[o[3], :2], band[o[3], 2:4], band[o[3], 4]
-        s = (items[j].cx + mids[j][0] - p[0]) * n[0] + (items[j].cy + mids[j][1] - p[1]) * n[1]
-        return abs(s) < halves[j][0] * abs(n[0]) + halves[j][1] * abs(n[1]) + hw + MARGIN - 1e-9
+        centre = (items[j].cx + mids[j][0], items[j].cy + mids[j][1])
+        return _band_out(centre, halves[j], band[o[3]]) is not None
 
     later = set(last)
     order = [i for i in range(len(items)) if i not in later] + [i for i in range(len(items)) if i in later]

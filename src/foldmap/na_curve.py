@@ -588,15 +588,22 @@ def _onto(c: NACurve, ps: list[PlacedStem], off: float, stretch: float) -> None:
 
 def _band_boxes(c: NACurve) -> tuple[list[tuple[float, float, float, float]], list[tuple[float, ...]]]:
     """The curve's band (rails and letters) as squares two across, a quarter of the band apart along it, and for each
-    the band it stands for (Walls.band: its centreline point, the unit normal there, half the band)."""
+    the band it stands for (Walls.band: its centreline point, the unit normal there, half the band, the unit tangent
+    there, and how far the band reaches back from it to its start and ahead to its end)."""
     lo, hi = c.extent()
     h = c.band / 4
     s = np.arange(lo, hi + h / 2, h)
-    p, _, n = c.frames(s)
+    p, t, n = c.frames(s)
     out = []
     for q in np.vstack([p + h * n, p - h * n]).tolist():
         out.append((q[0] - h, q[1] - h, q[0] + h, q[1] + h))
-    rows = [(*a, *b, c.band / 2) for a, b in zip(np.vstack([p, p]).tolist(), np.vstack([n, n]).tolist())]
+    ends = [(max(float(v - lo), 0.0), max(float(hi - v), 0.0)) for v in s]  # back to the band's start, ahead to its end
+    rows = [
+        (*a, *b, c.band / 2, *u, *e)
+        for a, b, u, e in zip(
+            np.vstack([p, p]).tolist(), np.vstack([n, n]).tolist(), np.vstack([t, t]).tolist(), ends + ends
+        )
+    ]
     return [tuple(float(v) for v in b) for b in _snap(out)], [tuple(float(v) for v in r) for r in rows]
 
 
@@ -674,9 +681,9 @@ def lay_out(items: list, na, style, contacts: dict, walls: Walls | None, ties: d
         rows += r
     hard = np.ones((len(items), len(boxes)), bool)
     hard[sorted(pinned)] = False
-    band = np.asarray(rows, float).reshape(-1, 5)
+    band = np.asarray(rows, float).reshape(-1, 9)
     if walls is not None:
-        before = walls.band if walls.band is not None else np.full((len(walls.boxes), 5), np.nan)
+        before = walls.band if walls.band is not None else np.full((len(walls.boxes), 9), np.nan)
         walls = Walls(
             np.vstack([walls.boxes, np.asarray(boxes, float).reshape(-1, 4)]),
             np.hstack([walls.hard, hard]),

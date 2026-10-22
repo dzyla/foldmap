@@ -516,7 +516,7 @@ def test_the_band_walls_settle():
         for side in (1.0, -1.0):
             c = np.array([t, t]) + side * 0.5 * n
             boxes.append([c[0] - 0.5, c[1] - 0.5, c[0] + 0.5, c[1] + 0.5])
-            band.append([t, t, n[0], n[1], 1.0])
+            band.append([t, t, n[0], n[1], 1.0, n[1], -n[0], np.inf, np.inf])  # a band with no end near
     walls = Walls(np.array(boxes), np.ones((1, len(boxes)), bool), np.array(band))
     group = [np.array([0])]
     xy, halves, mids = np.array([[0.2, 0.4]]), np.array([[0.3, 0.3]]), np.zeros((1, 2))
