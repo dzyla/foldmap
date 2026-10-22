@@ -322,3 +322,33 @@ def test_values_on_chains_the_figure_leaves_out_are_noted(tmp_path, capsys):
     assert f"foldmap: warning: --data {path}: chain B's values" in capsys.readouterr().err
     lay, _, _ = make_layout(hb, data=str(path), assembly="asu")  # every chain drawn: nothing to note
     assert lay.data_problems == []
+
+
+def test_a_crafted_table_is_refused_without_filling_memory(tmp_path):
+    """Section review 13b-13d, Critical 1: a few-KB table with thousands of columns and one-cell rows was padded to
+    the header's width row by row (4k x 4k: 123 MB from 30 KB). Wide headers, too many rows, a broken quote and an
+    unreadable path are each one fatal Problem, never a traceback or a large allocation."""
+    from foldmap import userdata
+
+    wide = tmp_path / "wide.csv"
+    wide.write_text(",".join(f"c{k}" for k in range(4000)) + "\n" + "x\n" * 4000)
+    header, rows, problems = userdata._rows(wide, "wide.csv")
+    assert (header, rows) == ([], []) and problems and problems[0].fatal and "columns" in problems[0].text
+
+    long = tmp_path / "long.csv"
+    long.write_text("chain,residue,value\n" + "A,1,0\n" * (userdata.MAX_ROWS + 1))
+    header, rows, problems = userdata._rows(long, "long.csv")
+    assert rows == [] and problems[0].fatal and "rows" in problems[0].text
+
+    quote = tmp_path / "quote.csv"
+    quote.write_text('chain,residue,value\nA,"1,' + "x" * 200_000 + "\n")
+    header, rows, problems = userdata._rows(quote, "quote.csv")
+    assert rows == [] and problems[0].fatal
+
+    header, rows, problems = userdata._rows(tmp_path, "a directory")
+    assert rows == [] and problems[0].fatal
+
+    short = tmp_path / "short.csv"
+    short.write_text("chain,residue,value,note\nA,5,1.5\n")
+    header, rows, problems = userdata._rows(short, "short.csv")
+    assert problems == [] and rows == [(2, ["A", "5", "1.5", ""])]

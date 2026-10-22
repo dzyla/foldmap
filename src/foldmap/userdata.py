@@ -86,6 +86,21 @@ def _rows(path, where: str) -> tuple[list[str], list[tuple[int, list[str]]], lis
         return [], [], [Problem(where, "no such file", True)]
     except UnicodeDecodeError:
         return [], [], [Problem(where, "not a text table (UTF-8): save it as CSV", True)]
+    except OSError as err:  # a directory, no permission: a message, never a traceback
+        return [], [], [Problem(where, f"cannot be read ({type(err).__name__})", True)]
+    try:
+        return _parse(text, where)
+    except csv.Error as err:  # an unbalanced quote, a field past the csv module's limit
+        return [], [], [Problem(where, f"not a readable table ({err})", True)]
+
+
+MAX_COLUMNS = 64  # a data or crosslink table has a few columns; more is refused before any row is kept
+MAX_ROWS = 100_000  # rows kept per table (a protein has far fewer residues; a crafted file must not fill memory)
+
+
+def _parse(text: str, where: str) -> tuple[list[str], list[tuple[int, list[str]]], list[Problem]]:
+    """_rows' parse of the text, its size bounded: header width and row count capped before rows are kept, so memory
+    stays proportional to the cells actually written (a short row is padded only up to MAX_COLUMNS)."""
     lines = text.splitlines()
     head = next((k for k, line in enumerate(lines) if line.strip() and not line.lstrip().startswith("#")), None)
     if head is None:
@@ -94,12 +109,17 @@ def _rows(path, where: str) -> tuple[list[str], list[tuple[int, list[str]]], lis
     delimiter = "\t" if "\t" in first and "," not in first else ";" if ";" in first and "," not in first else ","
     reader = csv.reader(io.StringIO("\n".join(lines[head:])), delimiter=delimiter)
     header = [h.strip() for h in next(reader)]
+    if len(header) > MAX_COLUMNS:
+        return [], [], [Problem(where, f"has {len(header)} columns; a table has at most {MAX_COLUMNS}", True)]
     rows = []
     for cells in reader:
         number = head + reader.line_num
         if not any(c.strip() for c in cells) or cells[0].lstrip().startswith("#"):
             continue
-        rows.append((number, [c.strip() for c in cells] + [""] * (len(header) - len(cells))))
+        if len(rows) == MAX_ROWS:
+            return [], [], [Problem(where, f"has more than {MAX_ROWS:,} rows; split it or keep one chain", True)]
+        cells = [c.strip() for c in cells[:MAX_COLUMNS]]  # a row longer than the header keeps its cells, capped
+        rows.append((number, cells + [""] * (len(header) - len(cells))))
     return header, rows, []
 
 
