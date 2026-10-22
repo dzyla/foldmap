@@ -710,6 +710,7 @@ def essentials(st, ss: MutableMapping) -> None:
         companions = [  # beside Colour by: the palette where it colours something, the N → C ramp of `sequence`
             ("palette", "Palette", palette_used(ss["color_by"], ss["loop_color"])),
             ("sequence_map", "N → C colours", ss["color_by"] == "sequence"),
+            ("data_style", "Data drawn as", ss["color_by"] == "data"),  # numbers: stripes per residue or a mean
         ]
         beside = [(key, label) for key, label, used in companions if used]
         cols = st.columns(1 + len(beside))  # side by side

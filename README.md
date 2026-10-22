@@ -263,7 +263,7 @@ Change any key with `--set KEY=VALUE` (repeatable) or a YAML file for `--style-f
 `color_by`, `palette`, `fill`, `loops`, `loop_color` (`residue` colours loops residue by residue),
 `residue_numbers`, `highlight` (`asu`, `protomer` or chains), `mark` (elements in a colour of their own),
 `ligands` (`auto`, `all`, `none` or codes like `HEM,ZN`), `fold_template`, `helix_on_sheet`, `two_fold`, `cyclic`,
-`copy_ghosts`, `domain_bar`, `domain_colours`, `na_backbone`, `backbone_colors`, `dna_color`, `rna_color`, `hbonds`,
+`copy_ghosts`, `domain_bar`, `domain_colours`, `data_style`, `na_backbone`, `backbone_colors`, `dna_color`, `rna_color`, `hbonds`,
 `hbond_color`, `hbond_max`, `interactions`, `interactions_between`, `interaction_max`, `disulfides`, `glycans`, `helices_310`, `na_extent`, `na_style`, `background`, `ink`,
 `helix_scale`, `strand_scale`, `font_scale`, `na_line` (`dna_extent` still works on the command line and in style and layout
 files).
@@ -503,7 +503,30 @@ lacks a needed column (a file with no column of numbers and no `--data-column` n
 rows names a residue of the structure, is an error before anything is laid out (exit 2). A chain an assembly drew
 as copies (`A1`, `A2`) takes its deposited chain's rows on every copy, and a warning says so; a crosslink between
 two such chains joins the copies of one number (`A1`-`B1`). `--save-layout` keeps the file paths and the column.
-Drawing the values and crosslinks comes next (plan 13d-5, 13d-6); for now they are read and checked.
+Rows not used are said one by one up to 20 per file, then counted ("and 5 more rows not used"). Values on a chain
+the figure leaves out (`--chains`, `--focus`) are read but not drawn, and a note says so; so are crosslinks that
+reach such a chain.
+
+**Drawing the values.** Given `--data`, the figure is coloured by it (`color_by=data`) unless you ask for another
+colouring (a theme's own, `--set color_by=...` or a style file's). A column of numbers is drawn as a stripe per
+residue along each element (`data_style=stripes`, the default), each at its residue's place, or as one colour per
+element, the mean of its residues (`--set data_style=mean`). The scale runs from the column's least value to its
+greatest, over every residue read: viridis, or a diverging blue-white-red scale centred on zero when the values
+span zero (both colour-blind safe). A residue with no value is grey. The legend shows the scale as a colour bar with
+the column's name and range ("uptake: 0.12 → 0.95"), and "no value" when grey is drawn. Loops stay as `loop_color`
+draws them; `--set loop_color=residue` colours each loop residue by its value too. A column of words (categories)
+is drawn as a mark on each residue that has one (on its element or loop, where disulfide ends stand), one
+colour-blind-safe colour per category (a new shape after seven), over grey elements; the legend shows each mark.
+`foldmap check` judges each mark at its residue (S4). `foldmap sequence --data FILE.csv [--data-column NAME]`
+draws the same stripes and marks on its track. Crosslinks are read and checked; drawing them comes next (plan
+13d-6).
+
+```bash
+foldmap plot 1UBQ -o ubq.svg --data hdx.csv --set loop_color=residue   # stripes, loops too
+foldmap plot 1UBQ -o ubq.svg --data ddg.csv --set data_style=mean      # one colour per element
+foldmap plot 2HHB -o hb.svg --data sites.csv --data-column site          # categories as residue marks
+foldmap sequence 1UBQ -o ubq-seq.svg --data hdx.csv
+```
 
 ### Conventions of the published figures
 

@@ -13,7 +13,20 @@ from matplotlib.patches import Circle, PathPatch, Polygon, Rectangle
 
 from .layout import ETA_W, HEAD, HEAD_LEN
 from .palette import darken, text_color_on, tint
-from .render import _mix, body_paint, eta_box, helix_ribbon, legible, page, pin_fonts, strand_arrow
+from .render import (
+    DATA_NONE,
+    _mix,
+    add_stripes,
+    body_paint,
+    data_symbol,
+    eta_box,
+    helix_ribbon,
+    legible,
+    page,
+    pin_fonts,
+    strand_arrow,
+    stripe_paint,
+)
 from .sequence import GAP, Alignment, chain_track, column_classes, conservation, map_alignment
 from .style import Style
 
@@ -51,10 +64,14 @@ def draw_sequence(
     title: str | None = None,
     uniprot: str | None = None,
     msa: str | None = None,
+    data: str | None = None,
+    data_column: str | None = None,
 ) -> Figure:
     """ss_colour: 'figure' paints each element as in the topology figure drawn with `look`; 'black' is the
     classic plain style. msa: the alignment or ConSurf table file the figure's colours come from (theme
-    'conservation'); `alignment` is what the sequence view shows."""
+    'conservation'); `alignment` is what the sequence view shows. data, data_column: the researcher's per-residue
+    values (--data, --data-column), drawn under color_by=data as the topology figure draws them: stripes (or each
+    element's mean colour) for numbers, a mark on the residue for categories."""
     if columns < 10:
         raise ValueError("columns must be at least 10")
     if ss_colour not in ("figure", "black"):
@@ -76,18 +93,32 @@ def draw_sequence(
                 title,
                 uniprot,
                 msa,
+                data,
+                data_column,
             )
         )
 
 
-def _element_colours(path, look: Style, ss_colour: str, msa=None, reference=None) -> dict[str, str]:
+def _element_colours(path, look: Style, ss_colour: str, msa=None, reference=None, data=None, data_column=None):
+    """(element id -> colour, element id -> its residues' stripe colours, residue index -> (colour, shape, key) of
+    its data mark), as the topology figure drawn with `look` paints them (render.element_colours, data_stripes,
+    data_marks' categories)."""
     if ss_colour == "black":
-        return {}
+        return {}, {}, {}
     from .cli import make_layout
-    from .render import element_colours
+    from .render import data_categories, data_stripes, data_values, element_colours
 
-    layout, sses, _ = make_layout(path, look=look, assembly="asu", msa=msa, msa_reference=reference)
-    return element_colours(layout, sses, look)[0]
+    layout, sses, _ = make_layout(
+        path, look=look, assembly="asu", msa=msa, msa_reference=reference, data=data, data_column=data_column
+    )
+    colours = element_colours(layout, sses, look)[0]
+    kinds = data_categories(layout) if look.color_by == "data" else {}
+    marks = {
+        k: (*kinds[v], f"{layout.res_labels[k].chain}:{layout.res_labels[k].tag}")
+        for k, v in enumerate(data_values(layout))
+        if v is not None and kinds
+    }
+    return colours, data_stripes(layout, sses, look, colours), marks
 
 
 REGION_COLOURS = {
@@ -158,11 +189,13 @@ def _draw(
     title,
     uniprot=None,
     msa=None,
+    data=None,
+    data_column=None,
 ):
     track = chain_track(path, chain, full_sequence)
     regions, lanes, sites = _uniprot_track(path, track, uniprot) if uniprot else ([], 0, [])
     feat_h = lanes * _FEAT_H + (_SITE_H if sites else 0.0) + (0.4 if lanes or sites else 0.0)
-    colour_of = _element_colours(path, look, ss_colour, msa, reference)
+    colour_of, stripes, marks = _element_colours(path, look, ss_colour, msa, reference, data, data_column)
     if alignment is not None:
         mapping = map_alignment(alignment, track, reference)
         rows, names, position, ref = alignment.rows, alignment.names, mapping.position, mapping.reference
@@ -331,7 +364,16 @@ def _draw(
         for piece, b in enumerate(range(c0 // columns, c1 // columns + 1)):
             lo, hi = max(c0, b * columns), min(c1, (b + 1) * columns - 1)
             x0, x1 = lo - b * columns - 0.5, hi - b * columns + 0.5
-            _body(ax, e.kind, x0, x1, glyph_y(b), colour, hi == c1, f"{e.id}:{piece}", look, font)
+            painted = None
+            if e.id in stripes:  # each column its residue's stripe, as the figure's element
+                first = track.residue[e.start]
+                painted = [
+                    stripes[e.id][track.residue[p] - first]
+                    if p is not None and track.residue[p] is not None
+                    else DATA_NONE
+                    for p in (position[c] for c in range(lo, hi + 1))
+                ]
+            _body(ax, e.kind, x0, x1, glyph_y(b), colour, hi == c1, f"{e.id}:{piece}", look, font, painted)
             if lo == c0:
                 t = ax.text(
                     x0,
@@ -343,6 +385,20 @@ def _draw(
                     color=legible(darken(colour, 0.85)) if colour != "#000000" else ink,
                 )
                 t.set_gid(f"sslabel:{e.id}")
+
+    for c, p in enumerate(position):  # data marks (categories) on their residues' columns, over the track
+        k = track.residue[p] if p is not None else None
+        if k in marks:
+            colour, shape, key = marks[k]
+            b = c // columns
+            at = (c - b * columns, glyph_y(b))
+            ring = Circle(at, _MARK_RING, fc=look.background, ec=legible(INK), lw=0.6 * font / 8 * 0.6, zorder=3)
+            ring.set_gid(f"data-ring:{key}")
+            ax.add_patch(ring)
+            mark = data_symbol(shape, at, _MARK)
+            mark.set(facecolor=colour, edgecolor="none", zorder=3.1)
+            mark.set_gid(f"data:{key}")
+            ax.add_patch(mark)
 
     ss = track.ss
     k = 0
@@ -369,12 +425,16 @@ _RIBBON = 0.28  # the ribbon's width along its axis, a fraction of a turn: a tur
 # for its diameter than the figure's (render._BAND, 0.36), so a narrower band keeps its faces as wide across
 
 
-def _body(ax, kind: str, x0: float, x1: float, y: float, colour: str, head: bool, key: str, look, font: float):
+def _body(
+    ax, kind: str, x0: float, x1: float, y: float, colour: str, head: bool, key: str, look, font: float, painted=None
+):
     """An element's piece in one row, drawn from x0 to x1 as the figure draws it (render's ribbon, arrow and 3-10
     box, painted by look.fill and look.helix_shading): a helix ribbon one turn per 3.6 residues, starting and ending
     on its axis and spanning exactly its columns; a strand's arrow, its head (head) ending at its last residue; a
     3-10 helix a rounded box. gids ss:<key> (the ribbon's front faces, the arrow, the box), ss-back:<key> and
-    ss-shine:<key>."""
+    ss-shine:<key>. painted (color_by=data stripes): each column's colour, a stripe each over the body (the
+    figure's render.add_stripes), gids ss-stripe:<key>:<k> and ss-stripe-back:<key>:<k>, the edge drawn again over
+    them (ss-edge:<key>, ss-edge-back:<key>)."""
     lw = 0.6 * font / 8
     fill, shade, edge, edge_w = body_paint(kind, colour, look, lw)
     if colour == "#000000" and shade == fill and kind == "H" and look.helix_shading != "none":
@@ -394,10 +454,40 @@ def _body(ax, kind: str, x0: float, x1: float, y: float, colour: str, head: bool
         behind = PathPatch(back, fc=shade, ec=edge, lw=edge_w * 0.8, joinstyle="round", zorder=1.9)
         behind.set_gid(f"ss-back:{key}")
         ax.add_patch(behind)
+        if painted:
+            _stripes(
+                ax, behind, np.vstack([front.vertices, back.vertices]), x0, x1, y, painted, kind, look, lw, key, True
+            )
         if shine is not None and look.helix_shading == "gloss" and look.fill != "outline":
-            gloss = PathPatch(shine, fc=tint(fill, 0.4), ec="none", alpha=0.85, zorder=2.05)
+            glint, see = ("#ffffff", 0.4) if painted else (tint(fill, 0.4), 0.85)  # over stripes: a white glint
+            gloss = PathPatch(shine, fc=glint, ec="none", alpha=see, zorder=2.05)
             gloss.set_gid(f"ss-shine:{key}")
             ax.add_patch(gloss)
         patch = PathPatch(front, fc=fill, ec=edge, lw=edge_w, joinstyle="round", zorder=2)
     patch.set_gid(f"ss:{key}")
     ax.add_patch(patch)
+    if painted:
+        if kind == "E":
+            extent = pts
+        elif kind == "G":
+            h = _BODY * ETA_W / 2
+            extent = np.array([(x0, y - h), (x1, y - h), (x1, y + h), (x0, y + h)])
+        else:
+            extent = np.vstack([front.vertices, back.vertices])
+        _stripes(ax, patch, extent, x0, x1, y, painted, kind, look, lw, key)
+
+
+_MARK, _MARK_RING = 0.24, 0.36  # a data mark's symbol and ring, column widths
+
+
+def _stripes(ax, body, extent, x0, x1, y, painted, kind, look, lw, key, back=False) -> None:
+    """One stripe per column over a body (clipped to it), and its edge drawn again over them."""
+    face = "-back" if back else ""
+    centres = [(i + 0.5) / len(painted) for i in range(len(painted))]
+    paint = stripe_paint(kind, look, lw, back)
+    z = 1.91 if back else 2.01
+    add_stripes(ax, body, extent, (x0, y), (x1, y), centres, painted, paint, z, f"ss-stripe{face}:{key}")
+    edge = PathPatch(body.get_path(), fc="none", ec=body.get_edgecolor(), lw=body.get_linewidth(), zorder=z + 0.01)
+    edge.set(transform=body.get_transform(), joinstyle="round")
+    edge.set_gid(f"ss-edge{face}:{key}")
+    ax.add_patch(edge)

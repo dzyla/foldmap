@@ -562,3 +562,158 @@ def test_chain_colours_are_worked_out_once_per_palette(monkeypatch):
     for name, digest in _COLOURS_240.items():
         got = chain_colors(chains, name)
         assert hashlib.sha256(" ".join(got.values()).encode()).hexdigest() == digest, name
+
+
+# ------------------------------------------------------------------------- the researcher's data (plan 13d-5)
+
+UBQ = DATA / "1UBQ.cif"
+
+
+def _table(tmp_path, rows, header="chain,residue,value", name="data.csv"):
+    path = tmp_path / name
+    path.write_text(header + "\n" + "\n".join(",".join(map(str, r)) for r in rows) + "\n", encoding="utf-8")
+    return str(path)
+
+
+def _data_figure(path, **kw):
+    from foldmap.spec import draw_spec, figure_spec
+
+    return draw_spec(figure_spec(UBQ, data=path, **kw))
+
+
+def _patches(fig, prefix):
+    return [p for p in fig.axes[0].patches if (p.get_gid() or "").startswith(prefix)]
+
+
+def _stripe_at(fig, sid, point, back=False):
+    """The facecolour of element sid's stripe (front faces, or back) holding a page point."""
+    from matplotlib.colors import to_hex
+    from matplotlib.path import Path as MplPath
+
+    face = "-back" if back else ""
+    held = [p for p in _patches(fig, f"data-stripe{face}:{sid}:") if MplPath(p.get_xy()).contains_point(point)]
+    assert len(held) == 1, (sid, point, len(held))
+    return to_hex(held[0].get_facecolor())
+
+
+def test_data_stripes_stand_at_their_residues_on_a_helix_and_a_strand(tmp_path):
+    """Numbers (default data_style stripes): each residue's stripe, in its value's colour, stands at its residue's
+    place along its element (render.residue_point, where disulfide ends and residue marks stand)."""
+    from foldmap.render import data_scale, residue_point
+
+    d = _data_figure(_table(tmp_path, [("A", n, n * 0.5) for n in range(1, 77)]))
+    lay, sses = d.layout, d.sses
+    assert d.layout.residue_data is not None and d.figure.foldmap_provenance is not None
+    scale = data_scale(lay)
+    assert (scale.column, scale.lo, scale.hi, scale.diverging) == ("value", 0.5, 38.0, False)
+    for kind in ("H", "E"):
+        s = max((s for s in sses if s.kind == kind and s.id in lay.placed), key=len)
+        for k in range(s.start, s.end + 1):
+            at = residue_point(lay, d.loops, sses, lay.res_chain, k)
+            assert _stripe_at(d.figure, s.id, at) == scale.colour((int(lay.res_labels[k].tag)) * 0.5), (s.id, k)
+        assert len(_patches(d.figure, f"data-edge:{s.id}")) == 1  # its edge drawn again over the stripes
+    helix = next(s for s in sses if s.kind == "H" and s.id in lay.placed)
+    assert _patches(d.figure, f"data-stripe-back:{helix.id}:")  # a helix's back faces are striped too (shaded)
+    texts = [t.get_text() for t in d.figure.axes[0].texts]
+    assert "value: 0.5 → 38" in texts  # the colour bar, named with its column and range
+
+
+def test_data_mean_colours_each_element_by_its_residues_mean(tmp_path):
+    from matplotlib.colors import to_hex
+
+    from foldmap.render import data_scale
+
+    d = _data_figure(_table(tmp_path, [("A", n, (n * 7) % 11) for n in range(1, 77)]), style=["data_style=mean"])
+    lay, scale = d.layout, data_scale(d.layout)
+    assert not _patches(d.figure, "data-stripe")
+    for s in d.sses:
+        if s.id in lay.placed and s.kind == "E":
+            mean = np.mean([(int(lay.res_labels[k].tag) * 7) % 11 for k in range(s.start, s.end + 1)])
+            body = _patches(d.figure, f"strand:{s.id}")[0]
+            assert to_hex(body.get_facecolor()) == scale.colour(float(mean))
+
+
+def test_data_scale_is_diverging_when_values_span_zero():
+    from matplotlib.colors import to_rgb
+
+    from foldmap.render import DataScale
+
+    seq, div = DataScale("x", 0.0, 2.0), DataScale("ddG", -1.0, 3.0)
+    assert not seq.diverging and div.diverging and not DataScale("x", -2.0, -1.0).diverging
+    assert seq.colour(0.0) == "#440154" and seq.colour(2.0) == "#fde725"  # viridis, least to greatest
+    white = to_rgb(div.colour(0.0))
+    assert min(white) > 0.95  # zero is white ...
+    low, high = to_rgb(div.colour(-1.0)), to_rgb(div.colour(3.0))
+    assert low[2] > low[0] and high[0] > high[2]  # ... below it blue, above it red
+    assert div.colour(-1.0) != div.colour(-3.0)  # one scale about zero, as far each way: -1 is a third of the way
+    assert seq.colour(None) == div.colour(None) == "#bdbdbd"
+
+
+def test_residues_with_no_value_are_grey_and_the_legend_says_so(tmp_path):
+    from foldmap.render import DATA_NONE, residue_point
+
+    d = _data_figure(_table(tmp_path, [("A", n, n) for n in range(1, 77) if n % 2]))
+    lay = d.layout
+    s = max((s for s in d.sses if s.kind == "H" and s.id in lay.placed), key=len)
+    for k in range(s.start, s.end + 1):
+        at = residue_point(lay, d.loops, d.sses, lay.res_chain, k)
+        if int(lay.res_labels[k].tag) % 2 == 0:
+            assert _stripe_at(d.figure, s.id, at) == DATA_NONE
+        else:
+            assert _stripe_at(d.figure, s.id, at) != DATA_NONE
+    assert "no value" in [t.get_text() for t in d.figure.axes[0].texts]
+
+
+def test_category_marks_stand_at_their_residues(tmp_path):
+    """Categories: a mark on each residue given one (elements and loops), S4 judging each against its residue's
+    place; the legend shows one mark per category; the elements stay a quiet grey."""
+    from matplotlib.colors import to_hex
+
+    from foldmap import figcheck
+    from foldmap.render import DATA_BODY, data_categories
+
+    rows = [("A", n, ("core", "rim", "loop")[n % 3]) for n in range(1, 77, 4)]
+    d = _data_figure(_table(tmp_path, rows, "chain,residue,site"), data_column="site")
+    marks = _patches(d.figure, "data:")
+    assert len(marks) == len(rows) and {m.get_gid() for m in marks} == {f"data:A:{n}" for _, n, _ in rows}
+    assert figcheck.science_checks(d)["S4"] == []
+    assert figcheck.science_judged(d)["S4"] == len(rows)
+    kinds = data_categories(d.layout)
+    assert list(kinds) == ["core", "loop", "rim"]
+    for m in marks:
+        n = int(m.get_gid().split(":")[2])
+        assert to_hex(m.get_facecolor()) == kinds[rows[(n - 1) // 4][2]][0]
+    assert {p.get_gid() for p in _patches(d.figure, "legend-datum:")} == {f"legend-datum:{k}" for k in kinds}
+    body = next(p for p in d.figure.axes[0].patches if (p.get_gid() or "").startswith("strand:"))
+    assert to_hex(body.get_facecolor()) == DATA_BODY
+
+
+def test_s4_names_a_data_mark_off_its_residue(tmp_path):
+    from foldmap import figcheck
+
+    d = _data_figure(_table(tmp_path, [("A", 3, "x"), ("A", 30, "y")], "chain,residue,site"), data_column="site")
+    mark = next(m for m in _patches(d.figure, "data:") if m.get_gid() == "data:A:30")
+    mark.center = (mark.center[0] + 3.0, mark.center[1] + 3.0)
+    assert [t.split(" stands")[0] for t in figcheck.science_checks(d)["S4"]] == ["data:A:30"]
+
+
+def test_data_is_drawn_when_given_unless_another_colouring_is_asked_for(tmp_path):
+    from foldmap.spec import figure_spec
+
+    path = _table(tmp_path, [("A", 1, 0.5)])
+    assert figure_spec(UBQ, data=path).look.color_by == "data"
+    assert figure_spec(UBQ, data=path, style=["color_by=chain"]).look.color_by == "chain"
+    assert figure_spec(UBQ, data=path, theme="rainbow").look.color_by == "sequence"
+    assert figure_spec(UBQ).look.color_by == "chain"
+    with pytest.raises(ValueError, match="color_by=data draws your own per-residue values"):
+        figure_spec(UBQ, style=["color_by=data"])
+
+
+def test_without_data_the_layout_holds_none_and_the_figure_draws_none():
+    from foldmap.cli import make_layout
+    from foldmap.spec import draw_spec, figure_spec
+
+    lay, _, _ = make_layout(UBQ)
+    assert (lay.residue_data, lay.crosslinks, lay.data_problems) == (None, [], [])
+    d = draw_spec(figure_spec(UBQ))
+    assert not [p for p in d.figure.axes[0].patches if (p.get_gid() or "").startswith(("data", "legend-data"))]

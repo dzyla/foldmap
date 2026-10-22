@@ -410,7 +410,7 @@ def chain_choices(deposited: list[str], drawn: list[str]) -> list[str]:
     return list(deposited) if set(drawn) <= set(deposited) else list(dict.fromkeys(drawn))
 
 
-_UNPALETTED = ("plddt", "bfactor", "hydropathy", "conservation", "sequence")  # colourings with their own scale
+_UNPALETTED = ("plddt", "bfactor", "hydropathy", "conservation", "sequence", "data")  # colourings with their own scale
 
 
 def palette_used(color_by: str, loop_color: str) -> bool:
@@ -438,6 +438,7 @@ CONTROLS: dict[str, tuple[str, str, tuple[str, ...]]] = {
     "color_by": ("Colour by", _TOP, ("color_by",)),
     "palette": ("Palette", _TOP, ("palette",)),
     "sequence_map": ("N → C colours", _TOP, ("sequence_map",)),
+    "data_style": ("Data drawn as", _TOP, ("data_style",)),
     "labels": ("Labels", _TOP, ("labels",)),
     "residue_numbers": ("Residue numbers", _TOP, ("residue_numbers",)),
     "legend": ("Legend", _TOP, ("legend",)),

@@ -59,6 +59,7 @@ from .spec import (
     Problem,
     SavedDomains,
     check_references,
+    data_look,
     draw_spec,
     figure_spec,
     layout_document,
@@ -419,6 +420,31 @@ def _na_extent(na, extent: str):
     return na, False
 
 
+SAID_ROWS = 20  # rows not used said one by one, per file; the rest counted (all kept in Layout.data_problems)
+
+
+def _left_out(values, links, drawn: set[str], data, crosslinks) -> list:
+    """Notes (spec.Problem warnings) for the values and crosslinks read on chains the figure leaves out (--chains,
+    --focus): read, not drawn."""
+    out = []
+    if values is not None:
+        missed: dict[str, int] = {}
+        for chain, _ in values.values:
+            if chain not in drawn:
+                missed[chain] = missed.get(chain, 0) + 1
+        for chain, n in missed.items():
+            text = f"chain {chain}'s values ({n} residue{'s' if n > 1 else ''}) are not drawn: the figure leaves "
+            out.append(Problem(f"--data {data}", text + f"chain {chain} out (--chains, --focus)", False))
+    if links:
+        away = [x for x in links if x[0][0] not in drawn or x[1][0] not in drawn]
+        if away:
+            chains = sorted({c for (a, _), (b, _), _ in away for c in (a, b) if c not in drawn})
+            n = len(away)
+            text = f"{n} crosslink{'s' if n > 1 else ''} reach{'' if n > 1 else 'es'} a chain the figure leaves out"
+            out.append(Problem(f"--crosslinks {crosslinks}", f"{text} ({', '.join(chains)}; --chains, --focus)", False))
+    return out
+
+
 def _read_user_data(data, column, crosslinks, bb, na_chains):
     """userdata.read_user_data for make_layout: the warnings (each row not used) printed to standard error, then the
     first fatal problem raised as a BadReference (exit 2, before layout), else one line saying what was read from
@@ -426,9 +452,20 @@ def _read_user_data(data, column, crosslinks, bb, na_chains):
     from .userdata import read_user_data, summary
 
     values, links, problems = read_user_data(data, column, crosslinks, bb, na_chains=na_chains)
+    said: dict[str, int] = {}  # file -> rows said: the first SAID_ROWS of each, then how many more
     for problem in problems:
-        if not problem.fatal:
-            print(f"foldmap: warning: {problem}", file=sys.stderr)
+        if problem.fatal:
+            continue
+        name, row, _ = problem.where.partition(" row ")
+        if row:
+            said[name] = said.get(name, 0) + 1
+            if said[name] > SAID_ROWS:
+                continue
+        print(f"foldmap: warning: {problem}", file=sys.stderr)
+    for name, count in said.items():
+        if count > SAID_ROWS:
+            more = count - SAID_ROWS
+            print(f"foldmap: warning: {name}: and {more} more row{'s' if more > 1 else ''} not used", file=sys.stderr)
     for problem in problems:
         if problem.fatal:
             raise BadReference(problem)
@@ -479,8 +516,9 @@ def make_layout(
     drawn on its own) and refused (True when drawn on its own as not the reference's fold, the note saying so: H1).
     `data`, `data_column`, `crosslinks` (--data, --data-column, --crosslinks; plan 13d): the researcher's tables,
     read on every protein chain (userdata) after the references are checked: a file that cannot be read is a
-    BadReference before layout, each row not used a warning on standard error; what was read is kept on the layout
-    (residue_data, crosslinks, data_problems), set only when a file is given."""
+    BadReference before layout, each row not used a warning on standard error (the first SAID_ROWS of a file, then
+    how many more); values and crosslinks on chains the figure leaves out are noted; what was read is kept on the
+    layout (Layout.residue_data, crosslinks, data_problems: their defaults, none, when no file is given)."""
     for spec in names or []:
         check_spec(spec)
     model = model or read_model(path, assembly)  # once, for every loader below (`model`: already read, same assembly)
@@ -835,8 +873,15 @@ def make_layout(
         sym is not None and sym.kind == "C" and sym.n == 2 and len(sym.protomers) == 2 and not duplex
     )
     lay.cyclic_assembly = offered
-    if user is not None:  # the researcher's data (plan 13d): set only when given, so a figure without is as before
-        lay.residue_data, lay.crosslinks, lay.data_problems = user
+    if user is not None:  # the researcher's data (plan 13d): Layout's defaults (none) when not given
+        values, links, problems = user
+        drawn = {l.chain for l in bb.labels}
+        if focus_chains:
+            drawn &= set(focus_chains) | set(partial)
+        notes = _left_out(values, links, drawn, data, crosslinks)
+        for note in notes:
+            print(f"foldmap: warning: {note}", file=sys.stderr)
+        lay.residue_data, lay.crosslinks, lay.data_problems = values, list(links or []), [*problems, *notes]
     if msa:
         from .sequence import grades, is_consurf, read_alignment, read_consurf, residue_conservation
 
@@ -1637,6 +1682,12 @@ def build_parser() -> argparse.ArgumentParser:
     sq.add_argument("--set", action="append", default=[], metavar="KEY=VALUE")
     sq.add_argument("--title")
     sq.add_argument("--uniprot", metavar="auto|ACCESSION", help="add a UniProt feature track (domains, sites)")
+    sq.add_argument(
+        "--data",
+        metavar="FILE.csv",
+        help="your own per-residue values (as plot's --data), drawn on the track as the topology figure draws them",
+    )
+    sq.add_argument("--data-column", metavar="NAME", help="the --data column to read (default: its first of numbers)")
     q = sub.add_parser("plot", help="draw the topology figure")
     iq = sub.add_parser("interactive", help="an HTML page linking the topology, the contact map and the 3D model")
     iq.add_argument("--viewer", choices=["molstar", "3dmol"], default="molstar", help="3D viewer (default Mol*)")
@@ -2032,13 +2083,17 @@ def _cmd_sequence(args: argparse.Namespace) -> int:
     from .seqplot import draw_sequence
     from .sequence import read_alignment
 
+    if args.data_column and not args.data:
+        raise UsageError("error: --data-column needs --data FILE.csv (the table it is a column of)")
+    theme = args.theme or "publication"
+    look = data_look(resolve_style(theme, args.style_file, args.set), args.data, theme, args.style_file, args.set)
     fig = draw_sequence(
         args.structure,
         chain=args.chain,
         alignment=read_alignment(args.msa) if args.msa else None,
         reference=args.reference,
         columns=args.columns,
-        look=resolve_style(args.theme or "publication", args.style_file, args.set),
+        look=look,
         full_sequence=args.full_sequence,
         ss_colour=args.ss_colour,
         threshold=args.similarity,
@@ -2046,6 +2101,8 @@ def _cmd_sequence(args: argparse.Namespace) -> int:
         title=args.title,
         uniprot=args.uniprot,
         msa=args.msa,
+        data=args.data,
+        data_column=args.data_column,
     )
     for out in args.output:
         print(f"wrote {save(fig, out)}")

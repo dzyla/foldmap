@@ -387,6 +387,11 @@ class Layout:
     symmetry: object = None  # symmetry.Symmetry of the assembly as read (cli.make_layout, before focus kept one
     # subunit), None: none found; for foldmap data (datafile), never read in drawing
     bilayer: object = None  # membrane.Membrane the figure is drawn with (--membrane, as flipped), None: none
+    # the researcher's own data (plan 13d, userdata; cli.make_layout): the per-residue values read (--data), None:
+    # none given; the crosslinks read (--crosslinks); every problem said of either file (rows not used, notes)
+    residue_data: object = None
+    crosslinks: list = field(default_factory=list)
+    data_problems: list = field(default_factory=list)
     # what computes other_names on first need (build_layout's `conventions`; with_conventions): an element's names in
     # the conventions the figure does not show, so resolve can take dep: and beta: references; None: none known
     names_source: Callable[[], dict] | None = field(default=None, repr=False)

@@ -171,3 +171,44 @@ def test_the_track_follows_the_figures_fill_and_helix_shading():
     assert faces(Style(helix_shading="gloss"))[2]
     front, _, _ = faces(Style(fill="outline"))
     assert front == to_hex(Style().background)
+
+
+def test_the_track_shows_the_figures_data_colours(tmp_path):
+    """color_by=data (plan 13d-5): each element's residues striped in the colours the topology figure gives them
+    (render.data_stripes), one column each; categories as marks on their residues' columns."""
+    from matplotlib.path import Path as MplPath
+
+    from foldmap.cli import make_layout
+    from foldmap.render import data_stripes, element_colours
+
+    path = tmp_path / "data.csv"
+    path.write_text("chain,residue,value\n" + "".join(f"A,{n},{(n * 5) % 17}\n" for n in range(1, 77)))
+    look = Style(color_by="data")
+    lay, sses, _ = make_layout(UBQ, look=look, assembly="asu", data=str(path))
+    want = data_stripes(lay, sses, look, element_colours(lay, sses, look)[0])
+    fig = draw_sequence(UBQ, look=look, data=str(path), columns=80)
+    for e in chain_track(UBQ).elements:
+        body = _artists(fig, f"ss:{e.id}:0")[0]
+        y = body.get_path().transformed(body.get_patch_transform()).get_extents()
+        y = (y.y0 + y.y1) / 2
+        stripes = _artists(fig, f"ss-stripe:{e.id}:0:")
+        for i, colour in enumerate(want[e.id]):
+            x = e.start + i  # one column per residue (columns=80: one row, the track from column 0)
+            held = [s for s in stripes if MplPath(s.get_xy()).contains_point((x, y))]
+            assert len(held) == 1 and to_hex(held[0].get_facecolor()) == colour, (e.id, i)
+    sites = tmp_path / "sites.csv"
+    sites.write_text("chain,residue,site\nA,3,core\nA,40,rim\n")
+    fig = draw_sequence(UBQ, look=look, data=str(sites), data_column="site", columns=80)
+    marks = {m.get_gid(): m for m in _artists(fig, "data:")}
+    assert set(marks) == {"data:A:3", "data:A:40"}
+    track = chain_track(UBQ)
+    assert marks["data:A:40"].center[0] == track.numbers.index(40)  # on its residue's column
+
+
+def test_cli_sequence_draws_the_data(tmp_path):
+    path = tmp_path / "data.csv"
+    path.write_text("chain,residue,value\nA,3,1\nA,40,2\n")
+    out = tmp_path / "seq.svg"
+    assert main(["sequence", str(UBQ), "-o", str(out), "--data", str(path)]) == 0
+    assert "ss-stripe:" in out.read_text()
+    assert main(["sequence", str(UBQ), "-o", str(out), "--data-column", "value"]) == 2

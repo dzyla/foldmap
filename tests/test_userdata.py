@@ -238,15 +238,15 @@ def test_make_layout_keeps_what_was_read_and_says_each_row_not_used(tmp_path, ca
     path = _csv(tmp_path, "chain,residue,uptake\nA,1,0.5\nA,76,0.25\nA,77,1\nA,78,1\n")
     lay, _, _ = make_layout(UBQ, data=str(path))
     assert lay.residue_data == ResidueData("uptake", "number", {("A", "1"): 0.5, ("A", "76"): 0.25})
-    assert lay.crosslinks is None and [p.where for p in lay.data_problems] == [
+    assert lay.crosslinks == [] and [p.where for p in lay.data_problems] == [
         f"--data {path} row 4",
         f"--data {path} row 5",
     ]
     err = capsys.readouterr().err
     assert f"foldmap: warning: --data {path} row 4: chain A has no residue 77 (the structure file numbers" in err
     assert f"foldmap: --data {path}: column uptake (numbers) on 2 residues" in err
-    plain, _, _ = make_layout(UBQ)  # without data: nothing set on the layout, nothing said
-    assert not any(hasattr(plain, k) for k in ("residue_data", "crosslinks", "data_problems"))
+    plain, _, _ = make_layout(UBQ)  # without data: the Layout's defaults (none), nothing said
+    assert (plain.residue_data, plain.crosslinks, plain.data_problems) == (None, [], [])
     assert capsys.readouterr().err == ""
 
 
@@ -288,3 +288,34 @@ def test_a_layout_file_keeps_the_data_files_and_one_without_has_none(tmp_path, c
     assert not {"data", "data_column", "crosslinks"} & set(yaml.safe_load(plain.read_text())["layout"])
     with pytest.raises(ValueError, match="data_column 'ddG' needs data"):
         figure_spec(UBQ, data_column="ddG")
+
+
+def test_many_rows_not_used_are_said_up_to_twenty_then_counted(tmp_path, capsys):
+    """13d-4 review: a large file with many residues the model lacks is said row by row up to SAID_ROWS, then 'and N
+    more'; the layout keeps every one."""
+    from foldmap.cli import SAID_ROWS
+
+    rows = "".join(f"A,{n},1\n" for n in range(100, 125))  # 25 residues 1UBQ lacks
+    path = _csv(tmp_path, "chain,residue,uptake\nA,1,0.5\n" + rows)
+    lay, _, _ = make_layout(UBQ, data=str(path))
+    assert len([p for p in lay.data_problems if " row " in p.where]) == 25
+    err = capsys.readouterr().err
+    assert err.count(f"foldmap: warning: --data {path} row ") == SAID_ROWS == 20
+    assert f"foldmap: warning: --data {path}: and 5 more rows not used\n" in err
+
+
+def test_values_on_chains_the_figure_leaves_out_are_noted(tmp_path, capsys):
+    """13d-4 review: rows that match the structure but on a chain --chains (or --focus) leaves out are read and kept,
+    and a note says they are not drawn."""
+    hb = DATA / "2HHB.cif"
+    path = _csv(tmp_path, "chain,residue,v\nA,10,1\nA,11,2\nB,10,3\n")
+    xl = _csv(tmp_path, "chain1,residue1,chain2,residue2\nA,10,B,10\nA,10,A,20\n", "xl.csv")
+    lay, _, _ = make_layout(hb, chains=["A"], data=str(path), crosslinks=str(xl), assembly="asu")
+    notes = {p.where: p.text for p in lay.data_problems}
+    assert notes[f"--data {path}"] == (
+        "chain B's values (1 residue) are not drawn: the figure leaves chain B out (--chains, --focus)"
+    )
+    assert notes[f"--crosslinks {xl}"] == "1 crosslink reaches a chain the figure leaves out (B; --chains, --focus)"
+    assert f"foldmap: warning: --data {path}: chain B's values" in capsys.readouterr().err
+    lay, _, _ = make_layout(hb, data=str(path), assembly="asu")  # every chain drawn: nothing to note
+    assert lay.data_problems == []

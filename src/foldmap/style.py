@@ -32,9 +32,13 @@ CHOICES = {
         "plddt",
         "conservation",
         "domain",
+        "data",
     ),  # chain / N->C ramp / chain hue
     # light N -> dark C / helix vs strand (Richardson) / mean B-factor, rigid -> flexible / Kyte-Doolittle /
-    # pLDDT bands / conservation grades / each named domain's tone (--domain, --domains; by chain without domains)
+    # pLDDT bands / conservation grades / each named domain's tone (--domain, --domains; by chain without domains) /
+    # the researcher's own values (--data; plan 13d)
+    "data_style": ("stripes", "mean"),  # color_by=data numbers: a stripe per residue along each element / one colour
+    # per element, the mean of its residues' values
     "loop_color": (
         "black",
         "chain",
@@ -193,6 +197,8 @@ class Style:
     legend: bool = True
     color_by: str = "chain"
     sequence_map: str = "turbo"  # blue (N) -> red (C), like PyMOL's spectrum
+    data_style: str = "stripes"  # color_by=data, a column of numbers: each residue's stripe along its element
+    # (stripes) or one colour per element, the mean of its residues' values (mean); categories are residue marks
     nucleotide_labels: bool = True  # base letters on DNA/RNA
     na_extent: str = "auto"  # DNA/RNA drawn: auto (all up to 300 nt, else the stems the protein touches),
     # contacts (the stretch the protein touches, +6 nt) or all

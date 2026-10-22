@@ -636,6 +636,9 @@ def test_every_setting_is_reachable():
     seen |= shown(at)
     at.selectbox(key="color_by").select("sequence").run()  # sequence_map instead of palette
     seen |= shown(at)
+    at.selectbox(key="color_by").select("data").run()  # data_style (the figure asks for --data: said, not drawn)
+    seen |= shown(at)
+    at.selectbox(key="color_by").select("chain").run()
     at.toggle(key="domains__auto").set_value(True).run()  # with domains: colour by domain and the domain bar
     seen |= shown(at)
     at = opened(DATA / "1UBQ.cif")  # an alignment: the reference row picker is shown

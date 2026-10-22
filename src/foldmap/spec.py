@@ -6,7 +6,7 @@ point; values given explicitly win; defaults fill the rest."""
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field, fields
+from dataclasses import dataclass, field, fields, replace
 from pathlib import Path
 from typing import Any
 
@@ -170,6 +170,8 @@ def figure_spec(
     protomers, chains = pick("protomers"), pick("chains")
     names = [*(doc.get("names") or []), *(given.get("names") or [])]
     names = [n for k, n in enumerate(names) if n not in names[k + 1 :]]
+    user = _user_data(pick("data"), pick("data_column"), pick("crosslinks"))
+    look = data_look(look, user["data"], theme, style_file, file_style + shorthand + list(style))
     return FigureSpec(
         structure=Path(structure),
         theme=theme,
@@ -194,7 +196,7 @@ def figure_spec(
         focus=str(pick("focus")),
         names=names,
         like=parse_like(pick("like")),
-        **_user_data(pick("data"), pick("data_column"), pick("crosslinks")),
+        **user,
         **edits,
     )
 
@@ -224,6 +226,30 @@ def parse_like(value) -> dict | None:
         raise ValueError("like: structure (the reference, a file or PDB id) is required")
     out["match"] = out["match"] or "auto"
     return out
+
+
+def colouring_asked(style_file, overrides) -> bool:
+    """Whether a colouring is asked for by name: color_by among the KEY=VALUE overrides or in the style file."""
+    if any(item.partition("=")[0].strip() == "color_by" for item in overrides):
+        return True
+    if style_file is None:
+        return False
+    from .yamlfile import read_yaml
+
+    loaded = read_yaml(Path(style_file).read_text(encoding="utf-8"), "style", str(style_file)) or {}
+    return isinstance(loaded, dict) and "color_by" in loaded
+
+
+def data_look(look: Style, data, theme: str, style_file=None, overrides=()) -> Style:
+    """The look of a figure given the researcher's values (`data`, a path or None): drawn by them (color_by=data)
+    unless a colouring is asked for (by the theme, an override or the style file); color_by=data with no data is a
+    ValueError."""
+    if data is not None and look.color_by == THEMES[theme].color_by == Style().color_by:
+        if not colouring_asked(style_file, overrides):
+            look = replace(look, color_by="data")
+    if look.color_by == "data" and data is None:
+        raise ValueError("color_by=data draws your own per-residue values: give them with --data FILE.csv")
+    return look
 
 
 def _user_data(data, column, crosslinks) -> dict:

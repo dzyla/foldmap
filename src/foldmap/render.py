@@ -173,7 +173,11 @@ Z = {  # the drawing order, back to front (plan 10 R8: panel < plate < membrane 
     "domain-bar": 2.0,  # the domain bar under the figure ...
     "domain-bar-label": 2.1,  # ... and the names in it
     "body-back": 2.9,  # a helix's back face (Z["body"] - 0.1)
+    "data-stripe-back": 2.91,  # color_by=data: its stripes (clipped to it) ...
+    "data-edge-back": 2.92,  # ... and its edge drawn again over them
     "body": 3.0,  # strands, helices, 3-10 boxes, ghosts
+    "data-stripe": 3.01,  # color_by=data: a body's stripes, one per residue (clipped to the body) ...
+    "data-edge": 3.02,  # ... and its edge drawn again over them
     "gloss": 3.05,  # a helix's shine (Z["body"] + 0.05)
     "over-loop": 3.2,  # the loops of a helix over a sheet: above the strands, below the helix
     "over": 3.5,  # a helix over a sheet (Placed.over): above the strands, below their letters
@@ -181,6 +185,8 @@ Z = {  # the drawing order, back to front (plan 10 R8: panel < plate < membrane 
     "bar": 3.7,  # is (visible_pieces), so they read as passing under them (plan 10 Task 6, Q-R10)
     "bar-end": 3.75,  # a disulfide's end dots and end marks (on a body's edge), glycan stems
     "mark": 3.8,  # ligand, linked and glycan marks
+    "data-ring": 3.82,  # color_by=data with categories: a residue mark's ring ...
+    "data-mark": 3.83,  # ... and its symbol
     "feature-ring": 3.84,  # a UniProt feature: its ring ...
     "feature": 3.85,  # ... and dot
     "mark-label": 3.9,  # ligand and linked names
@@ -2466,9 +2472,231 @@ def _residue_values(layout: Layout, kind: str) -> list[float]:
     return [KYTE_DOOLITTLE.get(n, 0.0) for n in layout.res_name]
 
 
+DATA_NONE = "#bdbdbd"  # color_by=data: a residue (or an element) with no value
+DATA_BODY = "#e4e4e4"  # color_by=data with categories: the elements, under the residue marks
+DATA_MAPS = ("viridis", "RdBu_r")  # colour-blind safe: sequential (viridis), diverging when values span zero (RdBu)
+_DIVERGING = (0.04, 0.96)  # the part of the diverging map used: its darkest ends left out
+DATA_CATEGORY_COLOURS = ("#e69f00", "#56b4e9", "#009e73", "#f0e442", "#0072b2", "#d55e00", "#cc79a7")  # Okabe-Ito
+DATA_SHAPES = ("circle", "diamond", "triangle", "square")  # a new shape each time the colours run out
+_DATA_MARK = 0.15  # page units: a category mark's radius ...
+_DATA_RING = 0.25  # ... and its ring's
+
+
+class DataScale(NamedTuple):
+    """The colour scale of a column of numbers (color_by=data): sequential from its least to its greatest value, or
+    diverging about zero (white there) when the values span it (lo < 0 < hi)."""
+
+    column: str
+    lo: float
+    hi: float
+
+    @property
+    def diverging(self) -> bool:
+        return self.lo < 0.0 < self.hi
+
+    def colour(self, v: float | None) -> str:
+        if v is None:
+            return DATA_NONE
+        if self.diverging:
+            m = max(-self.lo, self.hi)
+            a, b = _DIVERGING
+            return to_hex(colormaps[DATA_MAPS[1]](a + (0.5 + 0.5 * float(np.clip(v / m, -1.0, 1.0))) * (b - a)))
+        t = (v - self.lo) / (self.hi - self.lo) if self.hi > self.lo else 0.5
+        return to_hex(colormaps[DATA_MAPS[0]](float(np.clip(t, 0.0, 1.0))))
+
+
+def data_values(layout: Layout | None) -> list:
+    """The researcher's value (Layout.residue_data) of each Backbone residue of the layout, None where the file gives
+    none; [] without data."""
+    data = getattr(layout, "residue_data", None)
+    if data is None:
+        return []
+    return [data.values.get((lab.chain, lab.tag)) for lab in layout.res_labels]
+
+
+def data_scale(layout: Layout | None) -> DataScale | None:
+    """The scale of the layout's column of numbers, over every value read (every chain, drawn or not, so a figure
+    of some chains keeps the file's scale); None without numbers."""
+    data = getattr(layout, "residue_data", None)
+    if data is None or data.kind != "number" or not data.values:
+        return None
+    values = list(data.values.values())
+    return DataScale(data.column, float(min(values)), float(max(values)))
+
+
+def data_categories(layout: Layout | None) -> dict[str, tuple[str, str]]:
+    """The layout's categories (a column read as categories), each -> (colour, shape): Okabe-Ito colours in the
+    categories' sorted order, a new shape each time the colours run out; {} without categories."""
+    data = getattr(layout, "residue_data", None)
+    if data is None or data.kind != "category":
+        return {}
+    names = sorted(set(data.values.values()), key=lambda v: (str(v).lower(), str(v)))
+    n = len(DATA_CATEGORY_COLOURS)
+    return {v: (DATA_CATEGORY_COLOURS[k % n], DATA_SHAPES[(k // n) % len(DATA_SHAPES)]) for k, v in enumerate(names)}
+
+
+def _by_data(sses: list[SSE], layout: Layout | None, look: Style):
+    """color_by=data: numbers give each element the colour of its residues' mean value (no value: DATA_NONE) and
+    each residue its own; categories leave the elements DATA_BODY (their residue marks carry the colours)."""
+    values = data_values(layout)
+    scale = data_scale(layout)
+    if scale is None:
+        body = DATA_BODY if data_categories(layout) else DATA_NONE
+        return {s.id: body for s in sses}, (lambda r, chain=None: None)
+
+    def element(s: SSE) -> str:
+        mine = [v for v in values[s.start : s.end + 1] if v is not None]
+        return scale.colour(float(np.mean(mine))) if mine else DATA_NONE
+
+    def by_value(r: int, chain: str | None = None) -> str | None:
+        return scale.colour(values[r]) if 0 <= r < len(values) else None
+
+    return {s.id: element(s) for s in sses}, by_value
+
+
+def data_stripes(layout: Layout, sses: list[SSE], look: Style, element_colour: dict[str, str]) -> dict[str, list[str]]:
+    """color_by=data with numbers drawn as stripes: element id -> its residues' colours, N to C, for every element
+    still in its data colour (not marked in a colour of its own, not greyed outside a highlight); {} otherwise."""
+    scale = data_scale(layout)
+    if look.color_by != "data" or look.data_style != "stripes" or scale is None:
+        return {}
+    values = data_values(layout)
+    base, _ = _by_data(sses, layout, look)
+    return {
+        s.id: [scale.colour(v) for v in values[s.start : s.end + 1]]
+        for s in sses
+        if s.id in element_colour and element_colour[s.id] == base[s.id]
+    }
+
+
+def stripe_polygons(extent: np.ndarray, start, end, centres, colours: list[str]) -> list[tuple[str, np.ndarray]]:
+    """Stripes across a body whose axis runs start -> end: residue k's stripe reaches halfway to its neighbours'
+    centres (`centres`: fractions of the axis, N to C), the first and last out to the body's ends; across, the
+    body's whole width. `extent`: points of the body (page coordinates), for its ends and width. Runs of one colour
+    are one stripe. Each (colour, polygon) in page coordinates, to be clipped to the body."""
+    a, b = np.asarray(start, float), np.asarray(end, float)
+    length = float(np.hypot(*(b - a)))
+    u = (b - a) / length if length > 0 else np.array([1.0, 0.0])
+    n = np.array([-u[1], u[0]])
+    local = (np.asarray(extent, float) - a) @ np.column_stack([u, n])
+    lo, hi = local.min(axis=0), local.max(axis=0)
+    at = [c * length for c in centres]
+    cuts = [lo[0] - 0.05] + [(p + q) / 2 for p, q in zip(at, at[1:])] + [hi[0] + 0.05]
+    out, first = [], 0
+    for k in range(1, len(colours) + 1):
+        if k == len(colours) or colours[k] != colours[first]:
+            s, e, w0, w1 = cuts[first], cuts[k], lo[1] - 0.05, hi[1] + 0.05
+            corners = np.array([(s, w0), (e, w0), (e, w1), (s, w1)])
+            out.append((colours[first], a + corners[:, :1] * u + corners[:, 1:] * n))
+            first = k
+    return out
+
+
+def add_stripes(ax, body, extent, start, end, centres, colours, paint, zorder: float, gid: str, alpha=None) -> None:
+    """The stripes of `colours` (stripe_polygons) on `ax`, each painted paint(colour) and clipped to the patch
+    `body`, at `zorder`; gids <gid>:<k>."""
+    for k, (colour, poly) in enumerate(stripe_polygons(extent, start, end, centres, colours)):
+        stripe = Polygon(poly, closed=True, fc=paint(colour), ec="none", lw=0, zorder=zorder, alpha=alpha)
+        stripe.set_clip_path(body)
+        stripe.set_gid(f"{gid}:{k}")
+        ax.add_patch(stripe)
+
+
+def stripe_paint(kind: str, look: Style, lw: float, back: bool = False):
+    """colour -> a stripe's fill as body_paint fills a body of that colour (a helix's back face: its shade); white
+    fills (fill=outline) take the pale fill, so the values show."""
+    painted = look if look.fill != "outline" else replace(look, fill="pale")
+    return lambda colour: body_paint(kind, colour, painted, lw)[1 if back else 0]
+
+
+def data_marks(layout: Layout, loops: list[Loop], sses: list[SSE], look: Style) -> list[dict]:
+    """color_by=data with categories: a mark at each residue given one, on its element or loop (residue_point, where
+    disulfide ends and the other residue marks stand), for every drawn chain (not greyed outside a highlight, not
+    one lending elements to a focused subunit). Each {key (chain:residue), residue, category, colour, shape, at}."""
+    kinds = data_categories(layout)
+    if look.color_by != "data" or not kinds:
+        return []
+    drawn = {s.chain for s in sses if s.id in layout.placed} - set(layout.partial)
+    if layout.focus is not None:
+        drawn &= set(layout.focus)
+    values = data_values(layout)
+    out = []
+    for k, v in enumerate(values):
+        if v is None or layout.res_chain[k] not in drawn:
+            continue
+        at = residue_point(layout, loops, sses, layout.res_chain, k)
+        if at is None:
+            continue
+        label = layout.res_labels[k]
+        colour, shape = kinds[v]
+        out.append(
+            {
+                "key": f"{label.chain}:{label.tag}",
+                "residue": k,
+                "category": v,
+                "colour": colour,
+                "shape": shape,
+                "at": at,
+            }
+        )
+    return out
+
+
+def data_symbol(shape: str, xy, r: float) -> Circle | Polygon:
+    """A category mark's symbol of radius r at xy: a circle, or a regular polygon (diamond, triangle, square) whose
+    vertices' mean is its centre (S4 reads it so)."""
+    if shape == "circle":
+        return Circle(xy, r)
+    n, turn, grow = {"diamond": (4, np.pi / 2, 1.2), "triangle": (3, np.pi / 2, 1.25), "square": (4, np.pi / 4, 1.1)}[
+        shape
+    ]
+    ang = turn + np.arange(n) * 2 * np.pi / n
+    return Polygon(np.column_stack([xy[0] + grow * r * np.cos(ang), xy[1] + grow * r * np.sin(ang)]), closed=True)
+
+
+def _draw_data_marks(ax, marks: list[dict], lw: float) -> None:
+    for m in marks:
+        ring = Circle(
+            m["at"], _DATA_RING, fc=_BACKGROUND.get(), ec=legible("#1d1d1f"), lw=lw * 0.6, zorder=Z["data-ring"]
+        )
+        ring.set_gid(f"data-ring:{m['key']}")
+        ax.add_patch(ring)
+        mark = data_symbol(m["shape"], m["at"], _DATA_MARK)
+        mark.set(facecolor=m["colour"], edgecolor="none", zorder=Z["data-mark"])
+        mark.set_gid(f"data:{m['key']}")
+        ax.add_patch(mark)
+
+
+def _data_number(v: float) -> str:
+    return format(v, ".3g").replace("-", "−")
+
+
+def _data_entries(layout: Layout, look: Style, dmarks: list[dict]) -> list:
+    """The legend of color_by=data: numbers, a colour bar (from the least value to the greatest) named with its
+    column and range, and 'no value' when a drawn element shows grey; categories, one mark per category drawn."""
+    scale = data_scale(layout)
+    if scale is not None:
+        entries = [(("data", scale), f"{scale.column}: {_data_number(scale.lo)} → {_data_number(scale.hi)}")]
+        values = data_values(layout)
+        mine = [values[p.sse.start : p.sse.end + 1] for p in layout.placed.values() if not p.ghost]
+        grey = any(None in v for v in mine) if look.data_style == "stripes" else any(set(v) == {None} for v in mine)
+        if grey:
+            entries.append((DATA_NONE, "no value"))
+        return entries
+    data = getattr(layout, "residue_data", None)
+    shown = dict.fromkeys(m["category"] for m in dmarks)
+    return [
+        (("datum", colour, shape), f"{name}")
+        for name, (colour, shape) in data_categories(layout).items()
+        if name in shown
+    ] or ([(DATA_BODY, f"{data.column}: no residue drawn has a value")] if data is not None else [])
+
+
 def _colouring(sses: list[SSE], chains: list[str], colors: dict[str, str], look: Style, layout: Layout = None):
     """(element id -> colour, residue colour function). By chain: the chain's colour. By sequence: a ramp
     from the chain's first element (N) to its last (C), restarted for every chain."""
+    if look.color_by == "data":
+        return _by_data(sses, layout, look)
     if look.color_by == "sstype":
         return {s.id: _SSTYPE.get(s.kind, "#7f7f7f") for s in sses}, (lambda r, chain=None: "#7f7f7f")
     if look.color_by == "conservation":  # grades relative to this protein (sequence.grades), ConSurf's colours
@@ -3106,6 +3334,7 @@ def _legend_entries(
     na_colours: dict[str, str],
     hb: InteractionOverlay | None = None,
     linked: list[dict] = (),
+    dmarks: list[dict] = (),
 ) -> list:
     entries = [(colors[c], f"Chain {c}") for c in chains]
     if len(chains) == 1 and layout.focus is None and look.color_by == "chain":
@@ -3125,6 +3354,8 @@ def _legend_entries(
         entries = [(c, text) for _, c, text in PLDDT_BANDS]
     elif look.color_by == "conservation":
         entries = [(("grades",), (layout.cons_label or "conservation") + ": variable → conserved")]
+    elif look.color_by == "data":
+        entries = _data_entries(layout, look, dmarks)
     elif look.color_by == "sstype":
         kinds = {p.sse.kind for p in layout.placed.values()}
         entries = [
@@ -3178,6 +3409,7 @@ def _canvas(
     loops: list[Loop] = (),
     texts=(),
     at=None,
+    dmarks=(),
 ) -> tuple[_Canvas, _Legend]:
     """The figure, its axes and every size the steps share; also lays the legend out, as it sets the page width.
     `at` (a panel of a page of several figures, compare.py): called with the page's width and height (page units)
@@ -3199,7 +3431,7 @@ def _canvas(
         x0, y0, x1, y1 = min(x0, lx0 - room), min(y0, ly0 - room), max(x1, lx1 + room), max(y1, ly1 + room)
     top = 1.9 if title else 0.0
     backbone = backbone_colours(layout, chains, look, colors)  # once per figure
-    entries = _legend_entries(layout, look, chains, colors, umarks, backbone[0], hb, linked)
+    entries = _legend_entries(layout, look, chains, colors, umarks, backbone[0], hb, linked, dmarks)
 
     def legend_entry(x1: float) -> float:  # one legend entry's width in page units: swatch, text, gap
         return _legend_entry(entries, x1 - x0 + 2 * pad, look.font_scale)
@@ -3910,16 +4142,41 @@ def eta_box(cx: float, cy: float, length: float, width: float, **kw) -> FancyBbo
     )
 
 
-def _draw_elements(c: _Canvas, layout: Layout, bars=()) -> None:
+def residue_centres(n: int) -> list[float]:
+    """Where an element's n residues stand along its axis, as fractions N to C (residue_point's places)."""
+    return [i / max(n - 1, 1) for i in range(n)]
+
+
+def _striped(
+    c: _Canvas, p: Placed, body, extent, colours: list[str], back: bool = False, lift: float = 0.0, alpha=None
+):
+    """color_by=data stripes on one drawn body (its back faces: back) and its edge drawn again over them."""
+    face = "-back" if back else ""
+    paint = stripe_paint(p.sse.kind, c.look, c.lw, back)
+    centres = residue_centres(len(colours))
+    z = Z[f"data-stripe{face}"] + lift
+    add_stripes(
+        c.ax, body, extent, p.n_port, p.c_port, centres, colours, paint, z, f"data-stripe{face}:{p.sse.id}", alpha
+    )
+    edge = PathPatch(body.get_path(), fc="none", ec=body.get_edgecolor(), lw=body.get_linewidth(), alpha=alpha)
+    edge.set(transform=body.get_transform(), joinstyle="round", zorder=Z[f"data-edge{face}"] + lift)
+    edge.set_gid(f"data-edge{face}:{p.sse.id}")
+    c.ax.add_patch(edge)
+
+
+def _draw_elements(c: _Canvas, layout: Layout, bars=(), stripes=None) -> None:
     """The strands, 3-10 helices and helices, with their labels; a strand's letter slides along its shaft off the
-    disulfide bars (`bars`: their routes) that pass under it (strand_label_spot)."""
+    disulfide bars (`bars`: their routes) that pass under it (strand_label_spot). `stripes` (data_stripes): element id
+    -> its residues' colours, drawn as stripes on its body."""
     k = glyph(layout)[0] / _GLYPH_W  # helix names stand as far out as the text drawn needs (helix_label_pos)
     keep = link_keep(c.lw * 2.4, c.pt_per_unit, c.fig.dpi)
     c.fig.foldmap_moved_letters = []  # strand letters off their arrow's centre (provenance: names moved)
+    stripes = stripes or {}
     for p in layout.placed.values():
         color = c.element_colour[p.sse.id]
         outline = c.look.fill == "outline"
         fill, shade, edge, edge_w = body_paint(p.sse.kind, color, c.look, c.lw)
+        striped = stripes.get(p.sse.id)
         if p.sse.kind == "E":
             strand_fill = fill
             patch = Polygon(
@@ -3927,10 +4184,17 @@ def _draw_elements(c: _Canvas, layout: Layout, bars=()) -> None:
             )
             patch.set_gid(f"strand:{p.sse.id}")
             c.ax.add_patch(patch)
+            if striped:
+                _striped(c, p, patch, _arrow(p), striped)
             if c.look.labels:
                 spot = strand_label_spot(p, p.label, bars, c.font / c.pt_per_unit, keep)
                 if spot != (p.cx, p.cy):
                     c.fig.foldmap_moved_letters.append(p.sse.id)
+                if striped:  # the letter's ink for the stripe under it
+                    t = float(np.dot(np.subtract(spot, p.n_port), p.direction)) / max(p.length, 1e-9)
+                    under = striped[int(np.clip(round(t * (len(striped) - 1)), 0, len(striped) - 1))]
+                    strand_fill = stripe_paint("E", c.look, c.lw)(under)
+                    outline = False
                 t = c.ax.text(
                     *spot,
                     p.label,
@@ -3947,6 +4211,9 @@ def _draw_elements(c: _Canvas, layout: Layout, bars=()) -> None:
             box.set_transform(Affine2D().rotate(p.angle).translate(p.cx, p.cy) + c.ax.transData)
             box.set_gid(f"eta:{p.sse.id}")
             c.ax.add_patch(box)
+            if striped:
+                corners = np.array([(-1, -1), (1, -1), (1, 1), (-1, 1)]) * (p.length / 2, p.width / 2)
+                _striped(c, p, box, Affine2D().rotate(p.angle).translate(p.cx, p.cy).transform(corners), striped)
             if c.look.labels:
                 t = c.ax.text(
                     *helix_label_pos(p, k),
@@ -3985,10 +4252,13 @@ def _draw_elements(c: _Canvas, layout: Layout, bars=()) -> None:
             )
             bar.set_gid(f"helix:{p.sse.id}")
             c.ax.add_patch(bar)
+            if striped:
+                extent = np.vstack([front.vertices, back.vertices])
+                _striped(c, p, behind, extent, striped, back=True, lift=lift, alpha=alpha)
+                _striped(c, p, bar, extent, striped, lift=lift, alpha=alpha)
             if shine is not None and c.look.helix_shading == "gloss" and c.look.fill != "outline":
-                gloss = PathPatch(
-                    shine, fc=tint(fill, 0.4), ec="none", alpha=0.85 * (alpha or 1.0), zorder=Z["gloss"] + lift
-                )
+                glint, see = ("#ffffff", 0.4) if striped else (tint(fill, 0.4), 0.85)  # over stripes: a white glint
+                gloss = PathPatch(shine, fc=glint, ec="none", alpha=see * (alpha or 1.0), zorder=Z["gloss"] + lift)
                 gloss.set_gid(f"helix-shine:{p.sse.id}")
                 c.ax.add_patch(gloss)
             if c.look.labels:
@@ -4127,6 +4397,21 @@ def _draw_legend(c: _Canvas, layout: Layout, legend: _Legend) -> None:
             for q, shade in enumerate(CONSURF):
                 c.ax.add_patch(Rectangle((x + q * 0.6 / 9, y - 0.3), 0.6 / 9, 0.6, fc=shade, ec="none"))
             c.ax.add_patch(Rectangle((x, y - 0.3), 0.6, 0.6, fc="none", ec="#9a9a9a", lw=c.lw * 0.5))
+        elif isinstance(colour, tuple) and colour[0] == "data":  # the data's colour bar, least value to greatest
+            scale, steps = colour[1], 12
+            for q in range(steps):
+                v = scale.lo + (scale.hi - scale.lo) * q / (steps - 1)
+                step = Rectangle((x + q * 0.6 / steps, y - 0.3), 0.6 / steps, 0.6, fc=scale.colour(v), ec="none")
+                step.set_gid(f"legend-data:{q}")
+                c.ax.add_patch(step)
+            c.ax.add_patch(Rectangle((x, y - 0.3), 0.6, 0.6, fc="none", ec="#9a9a9a", lw=c.lw * 0.5))
+        elif isinstance(colour, tuple) and colour[0] == "datum":  # a category: its mark, as drawn
+            ring = Circle((x + 0.3, y), _DATA_RING * 1.2, fc=c.look.background, ec=legible("#1d1d1f"), lw=c.lw * 0.6)
+            c.ax.add_patch(ring)
+            mark = data_symbol(colour[2], (x + 0.3, y), _DATA_MARK * 1.2)
+            mark.set(facecolor=colour[1], edgecolor="none")
+            mark.set_gid(f"legend-datum:{text}")
+            c.ax.add_patch(mark)
         elif isinstance(colour, tuple) and colour[0] == "ia":  # an interaction kind: a short line, as drawn
             ink, dash = interaction_ink(colour[1], c.look)
             (mark,) = c.ax.plot([x, x + 0.6], [y, y], color=ink, lw=c.loop_lw * 0.85, ls=dash)
@@ -4235,6 +4520,8 @@ def _draw(
     marks = ligand_marks(layout, loops, sses, look, counts)
     linked = linked_marks(layout, loops, sses, marks)
     umarks = uniprot_marks(layout, loops, sses, look)
+    dmarks = data_marks(layout, loops, sses, look)  # color_by=data: categories as residue marks ...
+    stripes = data_stripes(layout, sses, look, element_colour)  # ... numbers as stripes along the elements
     hb = interaction_overlay(layout, loops, sses, look, model)
     c, legend = _canvas(
         layout,
@@ -4251,6 +4538,7 @@ def _draw(
         loops,
         counts,
         at,
+        dmarks,
     )
     _draw_loops(c, layout, loops, sses, lcounts)
     _draw_membrane(c, layout)
@@ -4275,13 +4563,14 @@ def _draw(
     keep = link_keep(c.lw * 2.4, c.pt_per_unit, c.fig.dpi)
     avoid = [*text_halos(c.ax, c.pt_per_unit, keep), *link_bodies(layout)]  # a loop's cysteine shows: not under
     bars = disulfide_bars(layout, loops, sses, look, c.lw, c.pt_per_unit, avoid)  # a letter, nor under a body
-    _draw_elements(c, layout, [] if look.residue_numbers else [route for *_, route in bars])
+    _draw_elements(c, layout, [] if look.residue_numbers else [route for *_, route in bars], stripes)
     _draw_ghosts(c, layout)
     # after every text but the marks' own: bars and tethers keep off the letters (text_halos)
     _draw_links(c.ax, layout, loops, sses, look, c.lw, c.pt_per_unit, bars=bars, counts=counts)
     _draw_ligands(c.ax, marks, c.lw, c.font, layout, c.pt_per_unit)
     _draw_linked(c.ax, linked, c.lw, c.font)
     _draw_uniprot(c.ax, umarks, layout, c.lw, c.font)
+    _draw_data_marks(c.ax, dmarks, c.lw)
     c.fig.foldmap_interactions_hidden = _draw_interactions(c, hb)  # lines wholly under text (provenance)
     if c.bar_h:
         _draw_domain_bar(c, layout)

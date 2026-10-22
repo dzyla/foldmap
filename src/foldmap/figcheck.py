@@ -1542,17 +1542,36 @@ def residue_places(drawn, k: int):
 
 def residue_marks(drawn) -> list:
     """The residue marks of a drawn figure for science.mark_findings: each linked residue's star (gid
-    "linked:<chain>:<number>"), its drawn centre against the place of its own residue."""
+    "linked:<chain>:<number>") and each data mark (color_by=data categories, gid "data:<chain>:<number>"), its drawn
+    centre against the place of its own residue. A mark naming no residue of the layout is judged with no place."""
     lay = drawn.layout
-    by_key = {f"{lay.res_labels[k].chain}:{lay.res_labels[k].tag}": k for k in lay.res_linked}
+    linked = {f"{lay.res_labels[k].chain}:{lay.res_labels[k].tag}": k for k in lay.res_linked}
+    every = None  # every residue by its key, built when a data mark is met
     out = []
     for patch in drawn.figure.axes[0].patches:
         gid = patch.get_gid() or ""
-        k = by_key.get(gid[len("linked:") :]) if gid.startswith("linked:") else None
-        if k is None:
-            continue
-        out.append((gid[len("linked:") :], tuple(np.mean(patch.get_xy()[:10], axis=0)), residue_places(drawn, k)))
+        if gid.startswith("linked:"):
+            k = linked.get(gid[len("linked:") :])
+            if k is not None:
+                out.append(
+                    (gid[len("linked:") :], tuple(np.mean(patch.get_xy()[:10], axis=0)), residue_places(drawn, k))
+                )
+        elif gid.startswith("data:"):
+            if every is None:
+                every = {f"{lab.chain}:{lab.tag}": k for k, lab in enumerate(lay.res_labels)}
+            k = every.get(gid[len("data:") :])
+            out.append((gid, _mark_centre(patch), None if k is None else residue_places(drawn, k)))
     return out
+
+
+def _mark_centre(patch) -> tuple[float, float]:
+    """A mark's centre: a circle's, else its outline's points' mean (the closing point counted once)."""
+    if hasattr(patch, "center"):
+        return tuple(float(v) for v in patch.center)
+    xy = np.asarray(patch.get_xy(), float)
+    if len(xy) > 1 and np.allclose(xy[0], xy[-1]):
+        xy = xy[:-1]
+    return tuple(float(v) for v in xy.mean(axis=0))
 
 
 def science_checks(drawn) -> dict[str, list[str] | None]:
