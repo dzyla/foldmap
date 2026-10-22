@@ -105,8 +105,9 @@ class NACurve:
         return float(_snap(math.atan2(t[1], t[0])))
 
     def span(self) -> tuple[float, float]:
-        """Arc lengths of the duplex's first and last nucleotides (the outermost rungs)."""
-        v = list(self.at.values())
+        """Arc lengths of the duplex's first and last nucleotides (the outermost rungs); the whole centreline for a
+        curve with none placed."""
+        v = list(self.at.values()) or [float(self.s[0]), float(self.s[-1])]
         return min(v), max(v)
 
     def extent(self) -> tuple[float, float]:
@@ -597,7 +598,8 @@ def _band_boxes(c: NACurve) -> tuple[list[tuple[float, float, float, float]], li
     out = []
     for q in np.vstack([p + h * n, p - h * n]).tolist():
         out.append((q[0] - h, q[1] - h, q[0] + h, q[1] + h))
-    ends = [(max(float(v - lo), 0.0), max(float(hi - v), 0.0)) for v in s]  # back to the band's start, ahead to its end
+    ends = [(float(v - lo), float(hi - v)) for v in s]  # back to the band's start, ahead to its end (the last row
+    # may stand past it, up to h / 2: its `ahead` below 0 ends its strip at the band's end all the same)
     rows = [
         (*a, *b, c.band / 2, *u, *e)
         for a, b, u, e in zip(
@@ -605,6 +607,26 @@ def _band_boxes(c: NACurve) -> tuple[list[tuple[float, float, float, float]], li
         )
     ]
     return [tuple(float(v) for v in b) for b in _snap(out)], [tuple(float(v) for v in r) for r in rows]
+
+
+def _laid_groups(items: list, na, ties: dict) -> tuple[list[PlacedStem], list[int], list[tuple[str, list[int]]]]:
+    """The stems among the items (in item order), the item each is a member of, and the bent duplexes lay_out lays
+    out as curves (bent_duplexes: curvable; none a symmetry tie holds). Reads, writes nothing."""
+    stems, item_of = [], []
+    for k, it in enumerate(items):
+        for m in it.members:
+            if isinstance(m, PlacedStem):
+                stems.append(m)
+                item_of.append(k)
+    tied = set(ties or {}) | {j for j, _ in (ties or {}).values()}
+    groups = [(p, ks) for p, ks in bent_duplexes(stems, na) if not any(item_of[k] in tied for k in ks)]
+    return stems, item_of, groups
+
+
+def lays_out(items: list, na, ties: dict) -> bool:
+    """Whether lay_out lays any bent duplex out as a curve: build_layout's switch (Style.na_bend curved). With none
+    (every bent duplex kept in pieces by curvable, or held by a tie) the figure is laid out exactly as pieces."""
+    return bool(_laid_groups(items, na, ties)[2])
 
 
 def lay_out(items: list, na, style, contacts: dict, walls: Walls | None, ties: dict) -> tuple[list, Walls | None, list]:
@@ -622,17 +644,13 @@ def lay_out(items: list, na, style, contacts: dict, walls: Walls | None, ties: d
     the band the way they find). An element no rung pulls whose neighbours in sequence all stand on its chain's side
     starts there too (_to_its_side). The contacts between the binding elements and the pieces are dropped from
     `contacts` (the springs pull instead). A duplex any of whose pieces a symmetry tie holds is left as pieces."""
-    stems, item_of = [], []
-    for k, it in enumerate(items):
+    stems, item_of, groups = _laid_groups(items, na, ties)
+    if not groups:
+        return [], walls, []
+    for it in items:  # the pieces where their items stand (written only when a curve is laid out)
         for m, (ox, oy) in zip(it.members, it.offsets):
             if isinstance(m, PlacedStem):
                 m.cx, m.cy = it.cx + ox, it.cy + oy
-                stems.append(m)
-                item_of.append(k)
-    tied = set(ties or {}) | {j for j, _ in (ties or {}).values()}
-    groups = [(p, ks) for p, ks in bent_duplexes(stems, na) if not any(item_of[k] in tied for k in ks)]
-    if not groups:
-        return [], walls, []
     gh = _GLYPH_H * max(1.0, float(style.font_scale))
     curves = []
     for parent, ks in groups:
@@ -761,19 +779,30 @@ def _centreline(c: NACurve) -> np.ndarray:
     return c.xy[:: max(1, int(round(0.5 / CURVE_STEP)))]
 
 
+def _boxes_meet(c: NACurve, n: int, e: NACurve, m: int, stems: list[PlacedStem]) -> bool:
+    """Whether a box round a stretch of c (chords: as figcheck's A5 reads a curve, element_overlaps) meets one round a
+    stretch of e."""
+    a = np.array([ch.rect for ch in chords(c, n, stems)], float).reshape(-1, 4)
+    b = np.array([ch.rect for ch in chords(e, m, stems)], float).reshape(-1, 4)
+    w = np.minimum(a[:, None, 2], b[None, :, 2]) - np.maximum(a[:, None, 0], b[None, :, 0])
+    h = np.minimum(a[:, None, 3], b[None, :, 3]) - np.maximum(a[:, None, 1], b[None, :, 1])
+    return bool(((w > 1e-6) & (h > 1e-6)).any())
+
+
 def _part(curves: list[NACurve], stems: list[PlacedStem]) -> None:
     """Each curve after the first moved whole (its pieces with it), away from the middle of each earlier curve its band
-    comes within MARGIN of, by what it lacks (at least _PART_STEP) at a time, until it keeps clear of all of them: each
-    curve is laid out on its own (_chain, _ring) and then pinned, so nothing else would part two (3D0U's P3 and P4
-    drawn over one another)."""
+    comes within MARGIN of, or a box round a stretch of which meets one round a stretch of it (A5 reads two curves
+    so: on diagonal curves the boxes reach past the bands), by what it lacks (at least _PART_STEP) at a time, until it
+    keeps clear of all of them: each curve is laid out on its own (_chain, _ring) and then pinned, so nothing else
+    would part two (3D0U's P3 and P4 drawn over one another)."""
     for i, c in enumerate(curves):
         for _ in range(_PART_TRIES):
             near = None
-            for e in curves[:i]:
+            for j, e in enumerate(curves[:i]):
                 a, b = _centreline(c), _centreline(e)
                 gap = float(np.hypot(a[:, None, 0] - b[None, :, 0], a[:, None, 1] - b[None, :, 1]).min())
                 need = (c.band + e.band) / 2 + MARGIN - gap
-                if need > 1e-9:
+                if need > 1e-9 or _boxes_meet(c, i, e, j, stems):
                     near = (e, need)
                     break
             if near is None:
@@ -1040,12 +1069,12 @@ def chords(c: NACurve, n: int, stems: list[PlacedStem]) -> list[Chord]:
         across = np.array([-seg[j, 1], seg[j, 0]]) / max(float(np.hypot(*seg[j])), 1e-12)
         sag = float(np.abs((bow - mid) @ across).max()) if len(bow) else 0.0
         mine = [key for key in keys if s0 <= c.at[key] < s1 or (j == m - 1 and c.at[key] == s1)]
-        owner = _owner(c, stems, (s0 + s1) / 2)
+        owner = _owner(c, stems, (s0 + s1) / 2) if c.pieces else None  # (no pieces: a curve under test)
         out.append(
             Chord(
-                owner.id,
+                owner.id if owner is not None else c.parent,
                 c.name,
-                list(owner.strands),
+                list(owner.strands) if owner is not None else [],
                 [],
                 float(mid[0]),
                 float(mid[1]),

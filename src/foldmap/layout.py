@@ -4557,7 +4557,11 @@ def build_layout(
             else None
         )
         heights = [it.home[1] for it in items]
-        curved = style.na_bend == "curved" and bool(pieces)  # each bent duplex laid out as one curve (na_curve)
+        curved = False  # each bent duplex laid out as one curve (na_curve); with none curvable, exactly as pieces
+        if style.na_bend == "curved" and pieces:
+            from .na_curve import lays_out
+
+            curved = lays_out(items, nucleic, ties)
         if curved and not (attract and len(items) > 1):
             from .na_curve import lay_out
 
@@ -6283,13 +6287,15 @@ def label_boxes(
         t = end_label_pos(layout, end, chain, port, ex)
         out.append((f"{end}:{chain}", centred_box(float(t[0]), float(t[1]), gw / 2 + 0.05, gh / 2)))
     curves = getattr(layout, "na_curves", None) or []  # bent duplexes drawn as curves: their names, not the pieces'
-    hidden = {i for c in curves for i in c.pieces}
+    hidden: set[int] = set()
+    if curves:
+        from .na_curve import label_box, on_curves
+
+        hidden = on_curves(layout)
     for n, d in enumerate(layout.stems):
         if n not in hidden:
             out.append((f"stem-label:{n}", stem_keep_box(d, k) if route else _stem_label_box(d, k)))
     if curves:
-        from .na_curve import label_box
-
         out += [(f"stem-label:curve:{n}", label_box(c, k, route)) for n, c in enumerate(curves) if c.named]
     for n, tie in enumerate(layout.na_ties):  # a long tie's labels at its two marks
         for end, (_, _, (x, y)) in enumerate(tie.marks):

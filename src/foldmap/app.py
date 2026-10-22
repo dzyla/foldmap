@@ -999,6 +999,7 @@ def reset_structure(ss: MutableMapping) -> None:
     look = THEMES[ss.get("theme", "publication")]
     for key in STRUCTURE_STYLE:
         ss[key] = getattr(look, key)
+    ss["na_bend"] = look.na_bend  # bent duplexes as pieces or one curve: chosen for a structure, back to the theme's
     for key in (
         "msa_path",
         "msa_error",

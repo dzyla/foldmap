@@ -443,6 +443,10 @@ def test_bent_duplex_choice_is_offered_only_where_a_duplex_is_drawn_in_pieces(mo
     at.segmented_control(key="na_bend").set_value("curved").run()
     assert at.session_state["na_bend"] == "curved" and not at.exception and 'id="na:curve:0:rails"' in svg_of(at)
     assert at.segmented_control(key="na_bend").value == "curved"  # still offered: the duplex is still bent
+    at.button(key="new_structure").click().run()  # another structure: the choice back to the theme's
+    at.text_input(key="source").input(str(DATA / "1LMB.cif"))
+    at.button(key="load").click().run()
+    assert at.session_state["na_bend"] == "pieces" and not at.exception
 
 
 def test_copy_ghosts_choice_is_offered_for_a_strand_lent_across_a_rings_cut(monkeypatch):

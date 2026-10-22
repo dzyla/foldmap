@@ -197,7 +197,9 @@ def _names_moved(fig, layout, labels: bool) -> list[dict]:
     if leaders:
         parts.append(f"domain names above their panel, with a leader: {', '.join(leaders)}")
         elements += leaders
-    hidden = {k for c in getattr(layout, "na_curves", ()) for k in c.pieces}  # drawn as a curve: no name of its own
+    from .na_curve import on_curves
+
+    hidden = on_curves(layout)  # drawn as a curve: no name of its own
     stems = [d.name for k, d in enumerate(layout.stems) if d.label_out > 0 and d.name and k not in hidden]
     if stems:
         parts.append(f"stem names set further out from their letters: {', '.join(stems)}")

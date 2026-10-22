@@ -478,28 +478,38 @@ def test_a_duplex_in_a_folded_rna_stays_in_pieces_with_a_note():
     assert _na_bend(ihf) == []
 
 
-def _straight_curve(x0: float, y: float, band: float = 4.0):
-    """A straight NACurve from (x0, y) ten units along x (no pieces), for _part."""
+def _straight_curve(x0: float, y: float, way=(1.0, 0.0)):
+    """A straight NACurve from (x0, y) ten units along `way` (no pieces), of 1IHF's band, width and rail, for _part."""
     from foldmap.na_curve import NACurve
 
-    xs = np.arange(0.0, 10.05, 0.1)
-    xy = np.column_stack([x0 + xs, np.full(len(xs), y)])
-    c = NACurve("p", "DNA", [], xy, xs.copy(), np.tile([1.0, 0.0], (len(xs), 1)), 1.0, 2.0, {}, {}, [])
-    c.band = band
+    u = np.asarray(way, float) / float(np.hypot(*way))
+    s = np.arange(0.0, 10.05, 0.1)
+    xy = np.array([x0, y]) + s[:, None] * u
+    c = NACurve("p", "DNA", [], xy, s.copy(), np.tile(u, (len(s), 1)), 1.7, 4.6, {}, {}, [])
+    c.band = 5.34
     return c
 
 
 def test_two_curves_are_parted_whole():
-    """na_curve._part: each curve is laid out on its own and pinned, so the later one of two that meet is moved whole
-    until its band keeps MARGIN off the earlier one's; one already clear stays."""
+    """na_curve._part: each curve is laid out on its own and pinned, so a later one that meets an earlier one is moved
+    whole until its band keeps MARGIN off the earlier one's and no box round a stretch of it meets one round a
+    stretch of the other (A5 reads two curves so); one already clear stays. Straight and diagonal curves of a real
+    band and width (1IHF's: band 5.34, width 4.6, rail 1.7)."""
     from foldmap.layout import MARGIN
-    from foldmap.na_curve import _part
+    from foldmap.na_curve import _boxes_meet, _part
 
-    a, b, far = _straight_curve(0.0, 0.0), _straight_curve(3.0, 1.0), _straight_curve(0.0, 40.0)
+    a = _straight_curve(0.0, 0.0)
+    b = _straight_curve(3.0, 1.0, way=(1.0, 1.0))  # across a, diagonal
+    c = _straight_curve(9.0, 8.0, way=(1.0, 1.0))  # beside b, parallel
+    far = _straight_curve(0.0, 80.0)
     before = far.xy.copy()
-    _part([a, b, far], [])
-    gap = float(np.hypot(b.xy[:, None, 0] - a.xy[None, :, 0], b.xy[:, None, 1] - a.xy[None, :, 1]).min())
-    assert gap >= (a.band + b.band) / 2 + MARGIN - 1e-6
+    curves = [a, b, c, far]
+    _part(curves, [])
+    for i, x in enumerate(curves):
+        for j, y in enumerate(curves[:i]):
+            gap = float(np.hypot(x.xy[:, None, 0] - y.xy[None, :, 0], x.xy[:, None, 1] - y.xy[None, :, 1]).min())
+            assert gap >= (x.band + y.band) / 2 + MARGIN - 0.1, (i, j)
+            assert not _boxes_meet(x, i, y, j, []), (i, j)
     assert np.array_equal(far.xy, before) and np.array_equal(a.xy, _straight_curve(0.0, 0.0).xy)
 
 
@@ -541,13 +551,13 @@ def test_the_curve_name_sits_at_the_stem_name_margin(pdb):
     (c,) = lay.na_curves
     keep = dict(label_boxes(lay, drawn.sses, route=True))["stem-label:curve:0"]
     assert keep == c.name_keep
+    if ink_font_reason(drawn.figure):  # the name's ink and the gap are measured on Liberation Sans's
+        return
     g = _INK_MARGIN * _ink_em(lay, lay.font_scale)  # the name's ink: its keep-out less the margin
     x0, y0, x1, y1 = c.name_keep[0] + g, c.name_keep[1] + g, c.name_keep[2] - g, c.name_keep[3] - g
     for p in lay.placed.values():
         r = p.rect
         assert not (r[0] < x1 and x0 < r[2] and r[1] < y1 and y0 < r[3]), p.sse.id
-    if ink_font_reason(drawn.figure):  # the gap is measured on Liberation Sans's ink
-        return
     own, _ = stem_name_gaps(drawn, page=measure(drawn))["na:curve:0:label"]
     assert own <= stem_gap_limit(drawn.figure)
 
@@ -567,3 +577,45 @@ def test_an_item_past_the_band_end_is_pushed_past_it_not_across():
     assert _off_walls(xy, halves, mids, walls, group)
     assert xy[0, 0] >= 0.3 + MARGIN - 1e-9 and abs(xy[0, 1] - 0.2) < 1e-9  # past the end, at its own height
     assert not _off_walls(np.array([[0.3 + MARGIN + 0.05, 0.0]]), halves, mids, walls, group, move=False)
+
+
+def test_the_guaranteed_slide_reads_the_band_as_the_pushes_do():
+    """layout._slide_clear's band walls (Walls.band, _band_out, as _off_walls): an item standing past the band's end,
+    in its last square's box and MARGIN only (1HQ1's P1b on P1a's end), stays put; one on the band slides off it."""
+    from types import SimpleNamespace
+
+    from foldmap.layout import MARGIN, Walls, _band_out, _slide_clear
+
+    boxes = np.array([[-0.5, 0.0, 0.5, 1.0], [-0.5, -1.0, 0.5, 0.0]])  # a band along +x ending at x=0, half width 1
+    band = np.array([[0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 0.0, 0.5, 0.0]] * 2)  # (its squares: its last half unit)
+    past = SimpleNamespace(cx=0.3 + MARGIN + 0.05, cy=0.0, half=(0.3, 0.3), mid=(0.0, 0.0))
+    on = SimpleNamespace(cx=-1.0, cy=0.2, half=(0.3, 0.3), mid=(0.0, 0.0))
+    _slide_clear([past, on], fixed=Walls(boxes, np.ones((2, 2), bool), band))
+    assert (past.cx, past.cy) == (0.3 + MARGIN + 0.05, 0.0)
+    assert all(_band_out((on.cx, on.cy), on.half, row) is None for row in band)
+
+
+@pytest.mark.parametrize("pdb", ["2GIS", "4YBB"])  # RNA only; protein and rRNA whose bent stems the gate keeps
+def test_with_no_curvable_duplex_curved_draws_the_pieces_figure(pdb, tmp_path):
+    """Fix round 3 (review-2 N1): with no duplex curvable keeps for a curve, na_bend=curved lays the figure out
+    exactly as pieces (build_layout's switch is na_curve.lays_out, the gate's own predicate): the same stems, elements
+    and bounds, and the same SVG but for its description (which says the bent stems stay in pieces). Compared within
+    this run, so nothing is pinned across machines."""
+    import re
+
+    from foldmap.render import save
+
+    figures = {}
+    for bend in ("pieces", "curved"):
+        drawn = _drawn_curved(pdb, f"na_bend={bend}")
+        lay = drawn.layout
+        assert lay.na_curves == [] and not lay.bent_duplex
+        save(drawn.figure, tmp_path / f"{bend}.svg")
+        svg = re.sub(r"<desc>.*?</desc>", "", (tmp_path / f"{bend}.svg").read_text(encoding="utf-8"), flags=re.S)
+        figures[bend] = (
+            [(d.id, d.cx, d.cy, d.angle, d.length) for d in lay.stems],
+            [(i, p.cx, p.cy, p.angle) for i, p in lay.placed.items()],
+            lay.bounds,
+            svg,
+        )
+    assert figures["pieces"] == figures["curved"]

@@ -736,7 +736,9 @@ def _nucleics(layout) -> list[dict]:
 
     out = []
     curves = getattr(layout, "na_curves", None) or []  # a bent duplex drawn as one curve: one entry, not its pieces
-    hidden = {k for c in curves for k in c.pieces}
+    from .na_curve import on_curves
+
+    hidden = on_curves(layout)
     for k, d in enumerate(layout.stems):
         if k in hidden:
             continue

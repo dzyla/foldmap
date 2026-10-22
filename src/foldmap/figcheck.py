@@ -498,16 +498,26 @@ class Page:
                 own |= {f"na:nt:{na.strands[s].labels[i].chain}:{na.strands[s].labels[i].tag}" for s, i in d.axial}
             out.append((f"na:stem:{k}", path, own))
 
+        to_data = self.ax.transData.inverted()
+        drawn_at = {gid: box for _, gid, box in self.texts}  # each text's ink box (pixels), by its gid
+
+        def arc_of(c, gid: str) -> float | None:  # where along the curve a text of it stands: nearest its ink
+            box = drawn_at.get(gid)
+            if box is None:
+                return None
+            x, y = to_data.transform(((box.x0 + box.x1) / 2, (box.y0 + box.y1) / 2))
+            return float(c.s[int(np.argmin(np.hypot(c.xy[:, 0] - x, c.xy[:, 1] - y)))])
+
         for n, c in enumerate(curves):  # one body a band long at a time, owning the texts within _FAR bands along
             lo, hi = c.extent()
-            near = int(np.argmin(np.hypot(c.xy[:, 0] - c.name_xy[0], c.xy[:, 1] - c.name_xy[1])))
-            named = float(c.s[near])  # where along the curve its name (and a block's :first) stands
+            # its name and :first own the stretches near where each is drawn (a block's name: inside, mid-curve)
+            texts = {g: arc_of(c, g) for g in (f"na:curve:{n}:label", f"na:curve:{n}:first")}
             edges = np.linspace(lo, hi, max(1, math.ceil((hi - lo) / max(c.band, 0.1))) + 1)
             for s0, s1 in zip(edges[:-1].tolist(), edges[1:].tolist()):
                 ring = np.vstack([c.offset_line(s0, s1, c.width / 2), c.offset_line(s0, s1, -c.width / 2)[::-1]])
                 path = MPath(self.ax.transData.transform(np.vstack([ring, ring[:1]])), closed=True)
                 reach = (s0 - _FAR * c.band, s1 + _FAR * c.band)
-                own = {f"na:curve:{n}:label", f"na:curve:{n}:first"} if reach[0] <= named <= reach[1] else set()
+                own = {g for g, at in texts.items() if at is not None and reach[0] <= at <= reach[1]}
                 if na is not None:
                     own |= {
                         f"na:nt:{na.strands[s].labels[i].chain}:{na.strands[s].labels[i].tag}"
@@ -776,7 +786,7 @@ def label_repeats(lay) -> dict[str, list[str]]:
     for p in lay.placed.values():
         count.setdefault(p.sse.chain, Counter())[p.label] += 1
     repeated = {c: sorted(k for k, n in got.items() if n > 1) for c, got in count.items()}
-    hidden = {k for c in getattr(lay, "na_curves", None) or [] for k in c.pieces}  # drawn as curves: their names
+    hidden = on_curves(lay)  # drawn as curves: their names
     names = Counter(d.name for k, d in enumerate(lay.stems) if not d.ghost and d.name and k not in hidden)
     names.update(c.name for c in getattr(lay, "na_curves", None) or [] if c.name)
     repeated["<na>"] = sorted(k for k, n in names.items() if n > 1)
