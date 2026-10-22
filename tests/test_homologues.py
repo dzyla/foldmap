@@ -314,3 +314,21 @@ def test_the_committed_comparison_matches_its_summary(hom):
         assert summary[name] == hom.usalign_summary(rows), name
     assert summary["all"] == hom.usalign_summary([r for rows in data["sets"].values() for r in rows])
     assert [x["pair"] for x in summary["h1_refused"]] == [r["pair"] for r in hom._h1_refused(data["sets"]["heldout"])]
+
+
+def test_the_new_seeds_lower_no_pair(hom):
+    """aligner-seeds/usalign.json (plan 24: TM-align's other seeds and gap-free rounds), measured post hoc beside the
+    committed usalign.json (plan 23, before): the same pairs and US-align runs; no pair's structure-route TM-score
+    lower, and fewer pairs where foldmap's search stops short of US-align's alignment."""
+    before_path, after_path = SET.parent / "usalign.json", SET.parent / "aligner-seeds" / "usalign.json"
+    if not before_path.exists() or not after_path.exists():
+        pytest.skip("docs/validation/homologues is not part of the sdist")
+    before = json.loads(before_path.read_text(encoding="utf-8"))["sets"]
+    after = json.loads(after_path.read_text(encoding="utf-8"))["sets"]
+    assert set(before) == set(after) == {"tuning", "heldout"}
+    for name in before:
+        assert [r["pair"] for r in before[name]] == [r["pair"] for r in after[name]]
+        for x, y in zip(before[name], after[name]):
+            assert y["usalign"]["usalign"]["tm_a"] == x["usalign"]["usalign"]["tm_a"], x["pair"]
+            assert y["usalign"]["structure"]["tm_score"] >= x["usalign"]["structure"]["tm_score"], x["pair"]
+        assert hom.usalign_summary(after[name])["search_short"] < hom.usalign_summary(before[name])["search_short"]

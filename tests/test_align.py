@@ -329,6 +329,73 @@ def test_budget():
     assert took < 3.0, f"{took:.2f} s"
 
 
+# TM-align's other seeds and its gap-free rounds (plan 24)
+
+
+def test_fit_is_kabsch_without_the_rmsd():
+    from foldmap.align import _fit
+    from foldmap.symmetry import kabsch
+
+    rng = np.random.default_rng(24)
+    for k in range(200):
+        size = int(rng.integers(3, 60))
+        p = rng.normal(size=(size, 3)) * 10
+        q = p @ _turn(rng.normal(size=3), rng.uniform(0, 3)).T + rng.normal(size=3) * 20
+        q = q + rng.normal(size=(size, 3)) * (k % 7)  # noisy, up to points that hardly superpose
+        if k % 5 == 0:
+            q = q * np.array([-1.0, 1.0, 1.0])  # a mirror image: still a proper rotation
+        r, t = _fit(p, q)
+        want_r, want_t, _ = kabsch(p, q)
+        assert np.array_equal(r, want_r) and np.array_equal(t, want_t)
+        assert np.linalg.det(r) == pytest.approx(1.0)
+
+
+def test_matrix_is_every_pair_term(ubq_a):
+    from foldmap.align import GRID, _matrix, _terms
+
+    b = _moved(ubq_a, keep=range(3, 70))
+    r, t = TURN.T, -SHIFT @ TURN  # roughly B back onto A
+    moved = b.ca @ r.T + t
+    d = np.round(np.sqrt(((ubq_a.ca[:, None, :] - moved[None, :, :]) ** 2).sum(axis=2)) * GRID) / GRID
+    assert np.array_equal(_matrix(ubq_a.ca, b.ca, r, t, d0(76)), _terms(d, d0(76)))
+
+
+def test_free_dp_is_the_best_alignment_without_gap_penalty():
+    from foldmap.align import _SCORE, _dp, _free_dp
+
+    rng = np.random.default_rng(7)
+    for _ in range(40):
+        n, m = (int(x) for x in rng.integers(1, 10, size=2))
+        scores = np.round(rng.uniform(0, 1, size=(3, n, m)) ** 4 * _SCORE) / _SCORE
+        for score, pairs in zip(scores, _free_dp(scores)):
+            assert all(i < k and j < l for (i, j), (k, l) in zip(pairs, pairs[1:]))
+            best = _dp(score, 0.0)  # the three-state alignment with a zero gap: the same optimum
+            assert sum(score[i, j] for i, j in pairs) == sum(score[i, j] for i, j in best)
+
+
+def test_local_starts_are_tm_aligns_and_bounded():
+    from foldmap.align import LOCAL_CELLS, _local_starts
+
+    assert len(_local_starts(500, 500)) == 11 * 11 + 9 * 9  # get_initial5's own: starts every 45, fragments 20, 100
+    assert _local_starts(60, 60)[:3] == [(0, 0, 20), (0, 15, 20), (0, 30, 20)]
+    for n, m in ((600, 600), (1500, 900), (3000, 40)):
+        got = _local_starts(n, m)
+        assert got and len(got) * n * m <= LOCAL_CELLS
+    assert _local_starts(9000, 9000) == []  # a single start per length is already over the cap
+    assert _local_starts(5, 100) == []  # no fragment of 3 or more
+
+
+def test_new_seeds_find_the_fold(ubq_a):
+    from foldmap.align import _local, _ss_plus, _three_state
+
+    b = _moved(_renamed(ubq_a))
+    same = [(i, i) for i in range(len(ubq_a))]
+    assert _local(ubq_a.ca, b.ca, d0(76)) == same
+    ss_a, ss_b = _three_state(ubq_a), _three_state(b)
+    assert _ss_plus(ubq_a.ca, b.ca, ss_a, ss_b, same[10:40], d0(76)) == same
+    assert _ss_plus(ubq_a.ca, b.ca, ss_a, ss_b, [], d0(76)) == []
+
+
 # element mates (13a-4)
 
 

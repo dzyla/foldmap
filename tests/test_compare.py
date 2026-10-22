@@ -203,13 +203,13 @@ def test_negative_pair_draws_both_panels_on_their_own():
     assert BENCH.signature(lay_a) == BENCH.signature(alone_a)
     assert BENCH.signature(lay_b) == BENCH.signature(alone_b)
     assert made.note == (
-        "not drawn like 1UBQ.cif: not the same fold (TM-score 0.32; 3 of 13 elements matched); only 46% of the shorter "
+        "not drawn like 1UBQ.cif: not the same fold (TM-score 0.33; 2 of 13 elements matched); only 63% of the shorter "
         "chain aligned"
     )
     (note,) = [t for t in made.figure.axes[0].texts if t.get_gid() == "compare-note"]
     assert " ".join(note.get_text().split("\n")) == made.note
-    assert round(made.data["alignment"]["tm_score"], 2) == 0.32
-    assert len(made.data["mates"]) == 3
+    assert round(made.data["alignment"]["tm_score"], 2) == 0.33
+    assert len(made.data["mates"]) == 2
     assert any(i["kind"] == "like" and i["text"].startswith("right: not drawn like") for i in made.provenance)
 
 
