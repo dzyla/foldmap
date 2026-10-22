@@ -22,6 +22,7 @@ from matplotlib.transforms import Affine2D, Bbox
 
 from .layout import block_ghosts, joined_pieces, lying_over
 from .membrane import FACE_REACH
+from .na_curve import _FAR, on_curves
 
 # Lines a text can be crossed by (render's gids, matched by prefix). A loop's casing (loopcase:) and a stub's edge
 # (stub-edge:) are drawn under their line in the page or a pale colour: neither is read. A chain-end stub is its
@@ -232,7 +233,9 @@ def element_overlaps(lay) -> list[tuple[str, str]]:
     elements of one copy overlap when their rects do in the copy's own frame (local_layout, _own_rect: the default
     rule); two
     of different copies when their bodies do (_bodies_meet, by what the grid can move a corner: _body_touch), as
-    the turned copies' page rects are boxes round tilted bodies."""
+    the turned copies' page rects are boxes round tilted bodies. A bent duplex drawn as a curve (Layout.na_curves) is
+    its stretches (_stem_boxes), named once by the curve's name, and overlaps itself also where its band (rails and
+    letters) comes over itself (NACurve.overlap): (name, name)."""
     joined = joined_pieces(lay.stems, lay.nucleic) if lay.nucleic is not None else set()
     joined |= lying_over(lay)
     if getattr(lay, "rosette", 0):
@@ -253,7 +256,9 @@ def element_overlaps(lay) -> list[tuple[str, str]]:
     if not getattr(lay, "na_curves", None):
         return out
     whole = lambda i: i.split("@", 1)[0]  # noqa: E731 - a curve's stretch: the curve, one thing however many meet
-    return list(dict.fromkeys((whole(i), whole(j)) for i, j in out))
+    out = list(dict.fromkeys((whole(i), whole(j)) for i, j in out))
+    over = [(c.name, c.name) for c in lay.na_curves if c.overlap]  # its band (rails and letters) over itself
+    return out + [pair for pair in over if pair not in out]
 
 
 def _stem_boxes(lay, joined: set) -> list[tuple[str, tuple[float, float, float, float]]]:
@@ -261,13 +266,12 @@ def _stem_boxes(lay, joined: set) -> list[tuple[str, tuple[float, float, float, 
     curve's straight stretches (layout.stem_bodies) in place of its pieces, named "<curve name>@<arc length>" (counted
     as the curve: element_overlaps). Two stretches of one curve less than two band widths apart along it
     (na_curve._FAR: one stretch of the band, not two that come together) are added to `joined`: they meet where the
-    curve turns, as two pieces at their joint; two further apart are judged by their bodies, not the boxes round them
-    (the band over itself: a gyre on the next, not two diagonal stretches whose boxes meet across the gap)."""
+    curve turns, as two consecutive pieces at their joint; two further apart overlap as any two stems do (their boxes
+    meet), as two pieces of one duplex that are not consecutive do."""
     curves = getattr(lay, "na_curves", None)
     if not curves:
         return [(d.id, d.rect) for d in lay.stems]
     from .layout import stem_bodies
-    from .na_curve import _FAR
 
     out, along = [], []
     for d in stem_bodies(lay):
@@ -282,7 +286,7 @@ def _stem_boxes(lay, joined: set) -> list[tuple[str, tuple[float, float, float, 
     for (n, a, x, d), (m, b, y, e) in combinations(along, 2):
         if n != m or not _rects_meet(d.rect, e.rect):  # (only boxes that meet can count)
             continue
-        if abs(a - b) < _FAR * curves[n].band or not _bodies_meet(d, e):
+        if abs(a - b) < _FAR * curves[n].band:
             joined.add(frozenset((x, y)))
     return out
 
@@ -471,7 +475,9 @@ class Page:
     def _stem_bodies(self) -> list[tuple[str, MPath, set[str]]]:
         """Each stem's body (its length x width box, turned) in pixels, with the texts that are its own: its name,
         its first pair's numbers and its nucleotides' letters. A bent duplex drawn as a curve (Layout.na_curves) is
-        one body in place of its pieces: its rails' width along it, end to end (na:curve:<n>)."""
+        its pieces' place: its rails' width along it in stretches a band long (na:curve:<n>), each owning the curve's
+        texts within na_curve._FAR bands of it along the curve only (its name, :first, its letters), as a piece owns
+        its own: one gyre's letters on another gyre are flagged (A6), as on another piece."""
         lay = self.layout
         if lay is None or not lay.stems or self.ax is None:
             return []
@@ -479,7 +485,7 @@ class Page:
 
         na = lay.nucleic
         curves = getattr(lay, "na_curves", None) or []
-        hidden = {k for c in curves for k in c.pieces}
+        hidden = on_curves(lay)
         out = []
         for k, d in enumerate(lay.stems):
             if k in hidden:
@@ -491,14 +497,24 @@ class Page:
             if na is not None:
                 own |= {f"na:nt:{na.strands[s].labels[i].chain}:{na.strands[s].labels[i].tag}" for s, i in d.axial}
             out.append((f"na:stem:{k}", path, own))
-        for n, c in enumerate(curves):
+
+        for n, c in enumerate(curves):  # one body a band long at a time, owning the texts within _FAR bands along
             lo, hi = c.extent()
-            ring = np.vstack([c.offset_line(lo, hi, c.width / 2), c.offset_line(lo, hi, -c.width / 2)[::-1]])
-            path = MPath(self.ax.transData.transform(np.vstack([ring, ring[:1]])), closed=True)
-            own = {f"na:curve:{n}:label", f"na:curve:{n}:first"}
-            if na is not None:
-                own |= {f"na:nt:{na.strands[s].labels[i].chain}:{na.strands[s].labels[i].tag}" for s, i in c.at}
-            out.append((f"na:curve:{n}", path, own))
+            near = int(np.argmin(np.hypot(c.xy[:, 0] - c.name_xy[0], c.xy[:, 1] - c.name_xy[1])))
+            named = float(c.s[near])  # where along the curve its name (and a block's :first) stands
+            edges = np.linspace(lo, hi, max(1, math.ceil((hi - lo) / max(c.band, 0.1))) + 1)
+            for s0, s1 in zip(edges[:-1].tolist(), edges[1:].tolist()):
+                ring = np.vstack([c.offset_line(s0, s1, c.width / 2), c.offset_line(s0, s1, -c.width / 2)[::-1]])
+                path = MPath(self.ax.transData.transform(np.vstack([ring, ring[:1]])), closed=True)
+                reach = (s0 - _FAR * c.band, s1 + _FAR * c.band)
+                own = {f"na:curve:{n}:label", f"na:curve:{n}:first"} if reach[0] <= named <= reach[1] else set()
+                if na is not None:
+                    own |= {
+                        f"na:nt:{na.strands[s].labels[i].chain}:{na.strands[s].labels[i].tag}"
+                        for (s, i), at in c.at.items()
+                        if reach[0] <= at <= reach[1]
+                    }
+                out.append((f"na:curve:{n}", path, own))
         return out
 
     def own_lines(self) -> dict[str, set[str]]:
@@ -713,9 +729,11 @@ def text_collisions(drawn, *, clearance_px: float = 0.0, page: Page | None = Non
                 if _on(box, path, Bbox(body_rows[k].reshape(2, 2))):
                     met.add(theirs)
                     hits.append(f"{name} × {body.replace('helix-back:', 'helix:', 1)}")
+            stems_met: set[str] = set()  # a curve is several stretches (Page._stem_bodies): met once
             for k in _meeting(core.extents, stem_rows, True).tolist():
                 body, path, own = page.stems[k]
-                if gid not in own and _on(box, path, Bbox(stem_rows[k].reshape(2, 2))):
+                if body not in stems_met and gid not in own and _on(box, path, Bbox(stem_rows[k].reshape(2, 2))):
+                    stems_met.add(body)
                     hits.append(f"{name} × {body}")
         r = pads + clearance_px  # each line's stroke meets the ink, or comes within the clearance
         near = (line_rows[:, 0] <= box.x1 + r) & (box.x0 - r <= line_rows[:, 2])
@@ -1205,8 +1223,10 @@ def stem_name_gaps(drawn, *, page: Page | None = None) -> dict[str, tuple[float,
     ink = {name: tuple(to_page.transform_bbox(box).extents) for _, name, box in page.texts}
     na = lay.nucleic
     curves = getattr(lay, "na_curves", None) or []
-    hidden = {k for c in curves for k in c.pieces}
-    bodies = _drawn_stems(lay)
+    hidden = on_curves(lay)
+    from .layout import stem_bodies
+
+    bodies = stem_bodies(lay)
     out = {}
     for k, d in enumerate(lay.stems):
         name = ink.get(f"na:label:{k}")
@@ -1229,18 +1249,17 @@ def stem_name_gaps(drawn, *, page: Page | None = None) -> dict[str, tuple[float,
         tags = [f"na:nt:{na.strands[s].labels[j].chain}:{na.strands[s].labels[j].tag}" for s, j in keys]
         turn = math.atan2(float(c.tangent[i, 1]), float(c.tangent[i, 0]))
         frame = Affine2D().translate(-float(c.xy[i, 0]), -float(c.xy[i, 1])).rotate(-turn)
-        mine = [e.rect for e in bodies if getattr(e, "curve", -1) == n]
+        at = float(c.s[i])
+
+        def far(e, at=at, reach=_FAR * c.band) -> bool:  # another stretch of the band, far along it
+            return max(e.s0 - at, at - e.s1, 0.0) > reach
+
+        mine = [e.rect for e in bodies if getattr(e, "curve", -1) == n and not far(e)]
         own = _own_gap(page, texts, to_page, label, tags, frame, name, mine)
-        others = [_box_gap(name, e.rect) for e in bodies if getattr(e, "curve", -1) != n]
+        # every other stem's body, and the curve's own stretches more than _FAR bands along it (a piece's siblings)
+        others = [_box_gap(name, e.rect) for e in bodies if getattr(e, "curve", -1) != n or far(e)]
         out[label] = (float(own), min(others) if others else math.inf)
     return out
-
-
-def _drawn_stems(lay) -> list:
-    """layout.stem_bodies: the stems' bodies as drawn."""
-    from .layout import stem_bodies
-
-    return stem_bodies(lay)
 
 
 def _own_gap(page: Page, texts: dict, to_page, label: str, tags: list[str], frame, name, rects) -> float:

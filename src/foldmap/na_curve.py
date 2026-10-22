@@ -41,7 +41,8 @@ from .layout import (
 
 CURVE_STEP = 0.1  # page units between the curve's samples
 _FAR = 2.0  # two places on the band this many band widths apart along it are different stretches (_far_gap)
-_GYRE_GAP = 0.2  # page units kept between two gyres' bands (their letters) beyond the band's width
+_GYRE_GAP = 0.7  # page units kept between two gyres' bands (their letters) beyond the band's width: enough that the
+# boxes round two of their stretches (figcheck A5: as any two stems, chords half a rail long) meet nowhere either
 _GYRE_GROW, _GYRE_TRIES = 1.15, 8  # gyres parted by too little: their spacing grows by this factor, this often
 _GYRE_SPREAD = math.radians(40)  # the ring's radius at an angle: its pieces' radii within about this angle
 _RAMP_MIN = 0.125  # turns: the shortest stretch over which the band goes from one gyre to the other
@@ -75,6 +76,7 @@ class NACurve:
     band: float = 0.0  # its rails and base letters across (2 x (rail + NT_ROW + a glyph's height))
     held: list = field(default_factory=list)  # laid out by build_layout (lay_out): each piece's (cx, cy, angle) there
     named: bool = False  # its name placed (build_curves: name_xy, name_angle); text keeps off it from then on
+    name_keep: tuple | None = None  # its name's ink grown by layout._INK_MARGIN em: what routes keep out of
     drawn: dict = field(default_factory=dict, repr=False, compare=False)  # its Chords, kept (chords: read often)
 
     def frames(self, s) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
@@ -119,19 +121,60 @@ class NACurve:
         return _snap(self.to_page(np.concatenate([[s0], inner, [s1]]), off))
 
 
-def bent_duplexes(stems: list[PlacedStem]) -> list[tuple[str, list[int]]]:
-    """(parent id, its pieces' indices in `stems` in order along the first arm 5'->3') of each duplex cut into two
-    or more pieces."""
+def curvable(na, parent: str) -> bool:
+    """Whether the bent duplex `parent` (a whole stem's id) may be drawn as one curve: none of its chains pairs with
+    itself in a stem outside the duplex's own helix (Stem.helix: stems continued across internal loops). A duplex
+    inside a folded RNA stays in pieces, which read with the stems round it; a lone duplex (DNA bent by a protein,
+    one RNA helix) curves. IHF's DNA 1 curves although its chain C also pairs in DNA 2: that stem pairs C with D."""
+    if na is None:
+        return True
+    own = next((st for st in na.structure.stems if st.id == parent), None)
+    if own is None:
+        return True
+    chains = {na.strands[own.a].chain, na.strands[own.b].chain}
+    for st in na.structure.stems:
+        if st.id == parent or st.parent == parent or (own.helix >= 0 and st.helix == own.helix):
+            continue
+        if na.strands[st.a].chain == na.strands[st.b].chain and na.strands[st.a].chain in chains:
+            return False
+    return True
+
+
+def _pieces_of(stems: list[PlacedStem]) -> dict[str, list[int]]:
+    """Parent id -> the indices in `stems` of its pieces, for each duplex cut into two or more pieces that follow
+    one another (piece numbers #1, #2, ... with none missing: a crop that left out a middle piece leaves pieces)."""
     groups: dict[str, list[int]] = {}
     for k, d in enumerate(stems):
         if d.parent:
             groups.setdefault(d.parent, []).append(k)
 
+    def number(k: int) -> int | None:
+        tail = stems[k].id.rpartition("#")[2]
+        return int(tail) if tail.isdigit() else None
+
+    out = {}
+    for parent, ks in groups.items():
+        nums = sorted(number(k) for k in ks) if all(number(k) is not None for k in ks) else None
+        if len(ks) > 1 and (nums is None or nums == list(range(nums[0], nums[0] + len(nums)))):
+            out[parent] = ks
+    return out
+
+
+def bent_duplexes(stems: list[PlacedStem], na) -> list[tuple[str, list[int]]]:
+    """(parent id, its pieces' indices in `stems` in order along the first arm 5'->3') of each duplex cut into two
+    or more pieces that is drawn as one curve (curvable)."""
+
     def start(k: int) -> tuple[int, int]:  # the piece's first-arm nucleotide nearest the 5' end
         return min(key for key in stems[k].axial if stems[k].side[key] == stems[k].first)
 
-    out = [(parent, sorted(ks, key=start)) for parent, ks in groups.items() if len(ks) > 1]
+    out = [(parent, sorted(ks, key=start)) for parent, ks in _pieces_of(stems).items() if curvable(na, parent)]
     return sorted(out, key=lambda g: g[1][0])
+
+
+def left_in_pieces(stems: list[PlacedStem], na) -> list[str]:
+    """The names of the bent duplexes curvable keeps in pieces (Style.na_bend curved: the figure's note)."""
+    names = {st.id: st.name for st in na.structure.stems} if na is not None else {}
+    return [names.get(p) or p for p in _pieces_of(stems) if not curvable(na, p)]
 
 
 def _arc(xy: np.ndarray) -> np.ndarray:
@@ -314,24 +357,106 @@ def _curve_of(stems: list[PlacedStem], ks: list[int], band: float) -> tuple[np.n
     return gxy, at[1:-1], True, _far_gap(gxy, _arc(gxy), band) < band
 
 
-def _name_place(c: NACurve, band: float, off: float) -> tuple[tuple[float, float], float]:
-    """Where the duplex's one name goes: beside the curve, `off` from its axis, at the first of _NAME_AT along the
-    duplex where no other stretch of the band comes nearer, on the side away from the middle of the curve first."""
+def _name_place(c: NACurve, layout: Layout, curves: list[NACurve], gh: float) -> None:
+    """Where the duplex's one name goes (c.name_xy, c.name_angle, and c.name_keep: its ink grown by _INK_MARGIN em,
+    what routes keep out of, as a stem's label_keep). Tried at each of _NAME_AT along the duplex, on the side away
+    from the middle of the curve first: beside its letters there as a straight stem's name stands beside its row
+    (layout._name_at): its ink, turned as drawn, _INK_MARGIN em beyond the ink of the letters on that side within
+    reach along the curve (figcheck.stem_name_gaps measures it so, A17); with no letters drawn, a glyph and a half
+    beyond their place. The first spot where no other stretch of the band comes nearer than that and its box meets
+    no element, element name, other stem's or curve's body, other stem's or curve's name; else the spot farthest
+    from all of those."""
+    from .layout import (
+        _INK_MARGIN,
+        _LETTER_EM,
+        _NAME_EM,
+        _box_meets_body,
+        _grown,
+        _ink_em,
+        _ink_points,
+        _reach,
+        stem_keep_box,
+    )
+
+    row = getattr(layout, "na_letter_rows", (None, False))[0]
+    na = layout.nucleic
+    em = _ink_em(layout, layout.font_scale)
+    margin = _INK_MARGIN * em
     lo, hi = c.span()
     middle = c.xy.mean(axis=0)
+    hidden = {k for cc in curves for k in cc.pieces}  # every curve being drawn: its pieces have no body or name
+    others = [d for k, d in enumerate(layout.stems) if k not in hidden]
+    for m, cc in enumerate(curves):
+        if cc is not c:
+            others += chords(cc, m, layout.stems)
+    rects = [p.rect for p in [*layout.placed.values(), *layout.ghosts]]
+    rects += [b for name, b in _element_names(layout)]
+    names = [stem_keep_box(d, glyph(layout)[0] / _GLYPH_W) for k, d in enumerate(layout.stems) if k not in hidden]
+    names += [cc.name_keep for cc in curves if cc is not c and cc.named and cc.name_keep is not None]
+    letters = {}
+    if row is not None and na is not None:
+        for key in c.at:
+            ink = _ink_points(na.strands[key[0]].bases[key[1]], False, _LETTER_EM * em, c.angle(key))
+            letters[key] = ink + c.point(key, row)
     best = None
+
+    def beside(s: float, side: float):  # the name centred beside the letters at arc length s, on `side`
+        p, t, nrm = (v[0] for v in c.frames(s))
+        angle = float(_snap(math.atan2(t[1], t[0])))
+        ink = _ink_points(c.name, True, _NAME_EM * em, angle)
+        reach = float(np.hypot(*(ink.max(axis=0) - ink.min(axis=0)))) / 2 + c.band if len(ink) else c.band
+        way = side * nrm
+        inner = float(np.max(ink @ -way, initial=0.0))
+        row_ink = [q for key, q in letters.items() if c.side[key] == side and abs(c.at[key] - s) <= reach]
+        if row_ink:
+            out = max(float(np.max((q - p) @ way)) for q in row_ink)
+            off = math.ceil((out + margin + inner) * 1e4) / 1e4
+        else:
+            off = c.rail + NT_ROW + 1.5 * gh
+        return _snap(p + off * way), angle, ink, off
+
     for f in _NAME_AT:
-        p, t, n = (v[0] for v in c.frames(lo + f * (hi - lo)))
-        away = 1.0 if math.hypot(*(p + n - middle)) >= math.hypot(*(p - n - middle)) else -1.0
+        s = lo + f * (hi - lo)
+        p, _, nrm = (v[0] for v in c.frames(s))
+        away = 1.0 if math.hypot(*(p + nrm - middle)) >= math.hypot(*(p - nrm - middle)) else -1.0
         for side in (away, -away):
-            q = p + side * off * n
-            room = float(np.hypot(c.xy[:, 0] - q[0], c.xy[:, 1] - q[1]).min())
-            if best is None or room > best[0] + 1e-9:
-                best = (room, q, t)
-            if room >= off - 0.01:
-                return tuple(float(v) for v in _snap(q)), float(_snap(math.atan2(t[1], t[0])))
-    _, q, t = best
-    return tuple(float(v) for v in _snap(q)), float(_snap(math.atan2(t[1], t[0])))
+            at = s
+            for _ in range(4):  # measured, as figcheck does, at the curve's point nearest the name's ink
+                q, angle, ink, off = beside(at, side)
+                mid = q + (ink.min(axis=0) + ink.max(axis=0)) / 2 if len(ink) else q
+                near = float(c.s[int(np.argmin(np.hypot(c.xy[:, 0] - mid[0], c.xy[:, 1] - mid[1])))])
+                if abs(near - at) < 1e-3:
+                    break
+                at = near
+            box = tuple(float(v) for v in _reach(ink) + np.array([q[0], q[1], q[0], q[1]]))
+            room = float(np.hypot(c.xy[:, 0] - q[0], c.xy[:, 1] - q[1]).min()) - (off - 0.01)
+            gaps = [_gap(box, r) for r in rects + names] + [_gap(box, d.rect) for d in others]
+            hit = any(g <= 0 for g in gaps[: len(rects) + len(names)]) or any(
+                _box_meets_body(box, d) for d in others if _gap(box, d.rect) <= 0
+            )
+            score = min([room, *gaps]) if gaps else room
+            if room >= 0 and not hit:
+                best = (math.inf, q, angle, ink)
+                break
+            if best is None or score > best[0] + 1e-9:
+                best = (score, q, angle, ink)
+        if best[0] == math.inf:
+            break
+    _, q, angle, ink = best
+    c.name_xy, c.name_angle = tuple(float(v) for v in q), angle
+    c.name_keep = _grown(tuple(float(v) for v in _reach(ink) + np.array([q[0], q[1], q[0], q[1]])), margin)
+
+
+def _gap(a, b) -> float:
+    """The distance between two boxes (x0, y0, x1, y1), 0 where they meet or overlap."""
+    return float(math.hypot(max(a[0] - b[2], b[0] - a[2], 0.0), max(a[1] - b[3], b[1] - a[3], 0.0)))
+
+
+def _element_names(layout: Layout) -> list:
+    """The elements' name boxes (layout.label_boxes' label: entries)."""
+    from .layout import label_boxes
+
+    return [(name, b) for name, b in label_boxes(layout, []) if name.startswith("label:")]
 
 
 def _ctrl(ps: list[PlacedStem]) -> np.ndarray:
@@ -376,23 +501,6 @@ def _make(parent: str, ks: list[int], ps: list[PlacedStem], xy, centres, gyres, 
     return NACurve(parent, name, ks, xy, s, tangent, rail, width, at, side, pairs, gyres, overlap)
 
 
-def _name_off(layout: Layout, c: NACurve, gh: float) -> float:
-    """How far from the curve's axis its name is centred: as a stem's (layout._name_at), _INK_MARGIN em beyond the
-    ink of its letter row across it, the name's ink reaching back that far (figcheck.stem_name_gaps, A17); with no
-    letter row drawn, a glyph and a half beyond the letters' place."""
-    from .layout import _INK_MARGIN, _LETTER_EM, _NAME_EM, _ink_em, _ink_points
-
-    row = layout.na_letter_rows[0]
-    na = layout.nucleic
-    if row is None or na is None:
-        return c.rail + NT_ROW + 1.5 * gh
-    em = _ink_em(layout, layout.font_scale)
-    bases = sorted({na.strands[s].bases[i] for s, i in c.at})
-    across = max(float(np.abs(_ink_points(b, False, _LETTER_EM * em, 0.0)[:, 1]).max(initial=0.0)) for b in bases)
-    inner = float(np.abs(_ink_points(c.name, True, _NAME_EM * em, 0.0)[:, 1]).max(initial=0.0))
-    return math.ceil((c.rail + row + across + _INK_MARGIN * em + inner) * 1e4) / 1e4
-
-
 def build_curves(layout: Layout) -> list[NACurve]:
     """Every bent duplex of the layout as one curve (NACurve), its nucleotides placed on it: the curve build_layout
     laid it out on (lay_out) while its pieces stand where that put them, else one through the pieces as placed."""
@@ -401,7 +509,7 @@ def build_curves(layout: Layout) -> list[NACurve]:
     gw, gh = glyph(layout)
     laid = {c.parent: c for c in layout.na_curves}
     out = []
-    for parent, ks in bent_duplexes(stems):
+    for parent, ks in bent_duplexes(stems, na):
         ps = [stems[k] for k in ks]
         band = 2 * (ps[0].rail + NT_ROW + gh)  # rails and base letters
         c = laid.get(parent)
@@ -409,9 +517,11 @@ def build_curves(layout: Layout) -> list[NACurve]:
             xy, centres, gyres, overlap = _curve_of(stems, ks, band)
             c = _make(parent, ks, ps, xy, centres, gyres, overlap, na)
         c.band = band
-        c.name_xy, c.name_angle = _name_place(c, band, _name_off(layout, c, gh))
-        c.named = True
+        c.overlap = _far_gap(c.xy, _arc(c.xy), band) < band  # the band over itself, on the curve drawn (A5)
         out.append(c)
+    for c in out:  # then each name, clear of every curve's body and of the names placed before it
+        _name_place(c, layout, out, gh)
+        c.named = True
     return out
 
 
@@ -476,8 +586,9 @@ def _onto(c: NACurve, ps: list[PlacedStem], off: float, stretch: float) -> None:
     c.held = [(d.cx, d.cy, d.angle) for d in ps]
 
 
-def _band_boxes(c: NACurve) -> list[tuple[float, float, float, float]]:
-    """The curve's band (rails and letters) as squares two across, a quarter of the band apart along it."""
+def _band_boxes(c: NACurve) -> tuple[list[tuple[float, float, float, float]], list[tuple[float, ...]]]:
+    """The curve's band (rails and letters) as squares two across, a quarter of the band apart along it, and for each
+    the band it stands for (Walls.band: its centreline point, the unit normal there, half the band)."""
     lo, hi = c.extent()
     h = c.band / 4
     s = np.arange(lo, hi + h / 2, h)
@@ -485,7 +596,8 @@ def _band_boxes(c: NACurve) -> list[tuple[float, float, float, float]]:
     out = []
     for q in np.vstack([p + h * n, p - h * n]).tolist():
         out.append((q[0] - h, q[1] - h, q[0] + h, q[1] + h))
-    return [tuple(float(v) for v in b) for b in _snap(out)]
+    rows = [(*a, *b, c.band / 2) for a, b in zip(np.vstack([p, p]).tolist(), np.vstack([n, n]).tolist())]
+    return [tuple(float(v) for v in b) for b in _snap(out)], [tuple(float(v) for v in r) for r in rows]
 
 
 def lay_out(items: list, na, style, contacts: dict, walls: Walls | None, ties: dict) -> tuple[list, Walls | None, list]:
@@ -511,7 +623,7 @@ def lay_out(items: list, na, style, contacts: dict, walls: Walls | None, ties: d
                 stems.append(m)
                 item_of.append(k)
     tied = set(ties or {}) | {j for j, _ in (ties or {}).values()}
-    groups = [(p, ks) for p, ks in bent_duplexes(stems) if not any(item_of[k] in tied for k in ks)]
+    groups = [(p, ks) for p, ks in bent_duplexes(stems, na) if not any(item_of[k] in tied for k in ks)]
     if not groups:
         return [], walls, []
     gh = _GLYPH_H * max(1.0, float(style.font_scale))
@@ -546,20 +658,32 @@ def lay_out(items: list, na, style, contacts: dict, walls: Walls | None, ties: d
         c = _make(parent, ks, ps, xy, centres, gyres, overlap, na, along)
         c.band = band
         _onto(c, ps, *along)
-        for k in ks:
+        curves.append(c)
+    _part(curves, stems)  # laid out each on its own and then pinned: nothing else parts two curves
+    for c in curves:
+        for k in c.pieces:
             it = items[item_of[k]]
             it.cx, it.cy = stems[k].cx, stems[k].cy  # (a stem is an item of its own: offset 0)
             it.home = (it.cx, it.cy)
             it.pinned = True
-        curves.append(c)
     pinned = {item_of[k] for c in curves for k in c.pieces}
-    boxes = [b for c in curves for b in _band_boxes(c)]
+    boxes, rows = [], []
+    for c in curves:
+        b, r = _band_boxes(c)
+        boxes += b
+        rows += r
     hard = np.ones((len(items), len(boxes)), bool)
     hard[sorted(pinned)] = False
+    band = np.asarray(rows, float).reshape(-1, 5)
     if walls is not None:
-        walls = Walls(np.vstack([walls.boxes, np.asarray(boxes, float).reshape(-1, 4)]), np.hstack([walls.hard, hard]))
+        before = walls.band if walls.band is not None else np.full((len(walls.boxes), 5), np.nan)
+        walls = Walls(
+            np.vstack([walls.boxes, np.asarray(boxes, float).reshape(-1, 4)]),
+            np.hstack([walls.hard, hard]),
+            np.vstack([before, band]),
+        )
     else:
-        walls = Walls(np.asarray(boxes, float).reshape(-1, 4), hard)
+        walls = Walls(np.asarray(boxes, float).reshape(-1, 4), hard, band)
     ids = {stems[k].id for c in curves for k in c.pieces}
     for key in [key for key in contacts if key & ids]:
         del contacts[key]
@@ -620,6 +744,47 @@ def lay_out(items: list, na, style, contacts: dict, walls: Walls | None, ties: d
         items[k].home = (x, y)
     _to_its_side(items, elements, curves, sides, set(start) | {s[0] for s in springs})
     return curves, walls, springs
+
+
+_PART_STEP, _PART_TRIES = 0.25, 400  # page units a curve moves at a time while parted from another, at most this often
+
+
+def _centreline(c: NACurve) -> np.ndarray:
+    """The curve's centreline about every half page unit (for gaps between curves)."""
+    return c.xy[:: max(1, int(round(0.5 / CURVE_STEP)))]
+
+
+def _part(curves: list[NACurve], stems: list[PlacedStem]) -> None:
+    """Each curve after the first moved whole (its pieces with it), away from the middle of each earlier curve its band
+    comes within MARGIN of, by what it lacks (at least _PART_STEP) at a time, until it keeps clear of all of them: each
+    curve is laid out on its own (_chain, _ring) and then pinned, so nothing else would part two (3D0U's P3 and P4
+    drawn over one another)."""
+    for i, c in enumerate(curves):
+        for _ in range(_PART_TRIES):
+            near = None
+            for e in curves[:i]:
+                a, b = _centreline(c), _centreline(e)
+                gap = float(np.hypot(a[:, None, 0] - b[None, :, 0], a[:, None, 1] - b[None, :, 1]).min())
+                need = (c.band + e.band) / 2 + MARGIN - gap
+                if need > 1e-9:
+                    near = (e, need)
+                    break
+            if near is None:
+                break
+            e, need = near
+            way = c.xy.mean(axis=0) - e.xy.mean(axis=0)
+            size = float(np.hypot(*way))
+            way = way / size if size > 1e-9 else np.array([1.0, 0.0])
+            _shift(c, [stems[k] for k in c.pieces], _snap(way * max(_PART_STEP, need)))
+
+
+def _shift(c: NACurve, ps: list[PlacedStem], v) -> None:
+    """The curve and its pieces moved by v, whole."""
+    c.xy = _snap(c.xy + v)
+    for d in ps:
+        d.cx, d.cy = float(_snap(d.cx + v[0])), float(_snap(d.cy + v[1]))
+    c.held = [(d.cx, d.cy, d.angle) for d in ps]
+    c.drawn.clear()
 
 
 def _beyond(c: NACurve, a: float, edge: np.ndarray, way: np.ndarray) -> np.ndarray:
@@ -825,6 +990,7 @@ class Chord(PlacedStem):
     curve: int = -1
     s0: float = 0.0
     s1: float = 0.0
+    band: float = 0.0  # the curve's band (NACurve.band)
 
 
 def _owner(c: NACurve, stems: list[PlacedStem], s: float) -> PlacedStem:
@@ -841,7 +1007,7 @@ def _owner(c: NACurve, stems: list[PlacedStem], s: float) -> PlacedStem:
 
 
 def chords(c: NACurve, n: int, stems: list[PlacedStem]) -> list[Chord]:
-    """The curve's body as Chords, each at most its rail offset long along the curve (a turn of under 20 degrees
+    """The curve's body as Chords, each at most half its rail offset long along the curve (a turn of under 10 degrees
     from one to the next at the tightest bend, _R_MIN), each grown past both ends by what closes the wedge its turn
     from its neighbour opens on the bend's outside, and across by how far the curve bows off it there (its sagitta,
     each side): one band, no gap, nothing past it but those hairs. Kept on the curve, whose geometry is fixed once
@@ -850,7 +1016,7 @@ def chords(c: NACurve, n: int, stems: list[PlacedStem]) -> list[Chord]:
     if key in c.drawn:
         return c.drawn[key]
     lo, hi = c.extent()
-    m = max(1, math.ceil((hi - lo) / max(c.rail, 0.1)))
+    m = max(1, math.ceil((hi - lo) / max(c.rail / 2, 0.05)))
     edges = np.linspace(lo, hi, m + 1)
     p = c.frames(edges)[0]
     seg = np.diff(p, axis=0)
@@ -885,6 +1051,7 @@ def chords(c: NACurve, n: int, stems: list[PlacedStem]) -> list[Chord]:
                 curve=n,
                 s0=s0,
                 s1=s1,
+                band=c.band,
             )
         )
     c.drawn[key] = out
@@ -945,9 +1112,12 @@ def drawn_pieces(layout) -> list[PlacedStem]:
     return out
 
 
-def label_box(c: NACurve, k: float) -> tuple[float, float, float, float]:
-    """The box round the curve's name, written along the curve at its place (_name_place): glyphs `k` (glyph_scale)
-    times _GLYPH_W x _GLYPH_H, as layout._stem_label_box sizes a stem's."""
+def label_box(c: NACurve, k: float, keep: bool = False) -> tuple[float, float, float, float]:
+    """The box round the curve's name at its place (_name_place): with `keep` what routes keep out of, its ink grown
+    by _INK_MARGIN em (name_keep, as a stem's stem_keep_box); else its text box, glyphs `k` (glyph_scale) times
+    _GLYPH_W x _GLYPH_H, as layout._stem_label_box sizes a stem's."""
+    if keep and c.name_keep is not None:
+        return c.name_keep
     along, across = _GLYPH_W * k * len(c.name) / 2 + 0.05, _GLYPH_H * k / 2
     cos, sin = abs(math.cos(c.name_angle)), abs(math.sin(c.name_angle))
     return centred_box(*c.name_xy, cos * along + sin * across, sin * along + cos * across)

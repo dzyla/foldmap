@@ -431,9 +431,14 @@ class Layout:
 
     @property
     def bent_duplex(self) -> bool:
-        """A duplex is drawn cut into two or more pieces where its axis turns (PlacedStem.parent): Style.na_bend is
-        a choice (the app offers it only then), whichever it is."""
-        return any(n > 1 for n in Counter(d.parent for d in self.stems if d.parent).values())
+        """A duplex is drawn cut into two or more pieces where its axis turns (PlacedStem.parent) and may be drawn as
+        one curve (na_curve.bent_duplexes: none of its chains pairs with itself in a stem outside its own helix):
+        Style.na_bend is a choice (the app and the MCP result offer it only then), whichever it is."""
+        if not any(d.parent for d in self.stems):
+            return False
+        from .na_curve import bent_duplexes
+
+        return bool(bent_duplexes(self.stems, self.nucleic))
 
     @property
     def width(self) -> float:
@@ -1380,10 +1385,24 @@ def _joint_matrix(n: int, joints) -> np.ndarray:
 class Walls(NamedTuple):
     """Boxes that stay where they are (x0, y0, x1, y1 rows: each nucleotide of an unpaired strand's trace, a bead
     either side), and for each (item, box) whether the item must keep off it: an item holding an element that
-    touches that trace is exempt (a single strand lies on the protein it wraps)."""
+    touches that trace is exempt (a single strand lies on the protein it wraps). `band` (rows px, py, nx, ny, half
+    width; NaN for a box that stands for no band): a box standing for a stretch of a curved duplex's band
+    (na_curve._band_boxes) is met only where a footprint reaches into the band itself (its strip: the half width either
+    side of the centreline point p, across the unit normal n), and is left along that normal (_off_walls)."""
 
     boxes: np.ndarray  # (m, 4)
     hard: np.ndarray  # (items, m) bool
+    band: np.ndarray | None = None  # (m, 5) or None: no box stands for a band
+
+
+def _band_reach(xy, halves, band: np.ndarray, rows: np.ndarray, cols: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """For footprints `rows` (centres xy, half extents) against band boxes `cols`: the signed distance of each centre
+    across the band from its centreline point, and how far the footprint must stand from it to clear the strip
+    (its reach along the normal, the band's half width and MARGIN)."""
+    p, n, hw = band[cols, :2], band[cols, 2:4], band[cols, 4]
+    s = ((xy[rows] - p) * n).sum(axis=1)
+    need = halves[rows, 0] * np.abs(n[:, 0]) + halves[rows, 1] * np.abs(n[:, 1]) + hw + MARGIN
+    return s, need
 
 
 def _separate(
@@ -1421,7 +1440,7 @@ def _separate(
             [items[k] for k in keep],
             {new[i]: (new[j], c) for i, (j, c) in ties.items() if i in new and j in new} if ties else ties,
             {(new[i], new[j]) for i, j in joints if i in new and j in new},
-            None if fixed is None else Walls(fixed.boxes, fixed.hard[keep]),
+            None if fixed is None else Walls(fixed.boxes, fixed.hard[keep], fixed.band),
             mirror,
             room,
             None if level is None else level[keep],
@@ -1710,8 +1729,11 @@ def _off_walls(
     """Push each footprint overlapping a fixed box it must keep off (Walls), MARGIN kept, the whole way off it
     along the axis of least overlap, moving its group (`group[i]`, the items moved with item i) in place; `sx`
     (-1 for a mirrored copy, _push_apart) turns a sideways move of a group's copies the other way; `held` (bool per
-    item, _push_apart's): a group keeping its height is moved sideways only. True if any overlapped (with
-    move=False, only that is reported)."""
+    item, _push_apart's): a group keeping its height is moved sideways only. A box standing for a stretch of a curved
+    duplex's band (Walls.band) counts only where the footprint reaches into the band's strip, and is left along the
+    band's normal, the whole strip at once: off one square of a diagonal band along x it would land on the next one,
+    and back (the staircase that kept 3IGI's pushes going all 5000 sweeps). True if any overlapped (with move=False,
+    only that is reported)."""
     if walls is None or not len(walls.boxes):
         return False
     boxes = np.asarray(walls.boxes, float)
@@ -1719,9 +1741,31 @@ def _off_walls(
     d = centres[None, :, :] - (xy + mids)[:, None, :]
     pen = halves[:, None, :] + half[None, :, :] + MARGIN - np.abs(d)
     hits = np.argwhere((pen[..., 0] > 1e-9) & (pen[..., 1] > 1e-9) & walls.hard)
+    band = walls.band
+    if band is not None and len(hits):  # a band's box: met only where the footprint reaches into the band's strip
+        on = ~np.isnan(band[hits[:, 1], 0])
+        if on.any():
+            s, need = _band_reach(xy + mids, halves, band, hits[on, 0], hits[on, 1])
+            keep = np.ones(len(hits), bool)
+            keep[np.flatnonzero(on)] = np.abs(s) < need - 1e-9
+            hits = hits[keep]
     if not move or not len(hits):
         return bool(len(hits))
     for i, w in hits.tolist():  # in order; an earlier push may already have cleared it
+        if band is not None and not np.isnan(band[w, 0]):  # off the band along its normal, the whole way
+            s, need = (float(v[0]) for v in _band_reach(xy + mids, halves, band, np.array([i]), np.array([w])))
+            gap = need - abs(s)
+            if gap <= 1e-9:
+                continue
+            n = band[w, 2:4] * (1.0 if s >= 0 else -1.0)
+            turn = 1.0 if sx is None else sx[group[i]] * sx[i]
+            if held is not None and held[i]:  # keeps its height: sideways, as far as clears the strip
+                if abs(n[0]) > 1e-6:
+                    xy[group[i], 0] += turn * np.sign(n[0]) * (gap / abs(n[0]) + _SEP_PUSH)
+                continue
+            xy[group[i], 0] += turn * n[0] * (gap + _SEP_PUSH)
+            xy[group[i], 1] += n[1] * (gap + _SEP_PUSH)
+            continue
         dx, dy = centres[w] - xy[i] - mids[i]
         px = halves[i, 0] + half[w, 0] + MARGIN - abs(dx)
         py = halves[i, 1] + half[w, 1] + MARGIN - abs(dy)
@@ -1762,6 +1806,19 @@ def _slide_clear(
         (SimpleNamespace(cx=(x0 + x1) / 2, cy=(y0 + y1) / 2), ((x1 - x0) / 2, (y1 - y0) / 2), (0.0, 0.0))
         for x0, y0, x1, y1 in boxes
     ]
+    band = None if fixed is None else fixed.band
+    if band is not None:  # a band's box (Walls.band) is met only where the footprint reaches into the band's strip
+        walls = [w if np.isnan(band[k, 0]) else (*w, k) for k, w in enumerate(walls)]
+
+    def meets(j: int, o) -> bool:
+        if not _collide(items[j], halves[j], mids[j], *o[:3]):
+            return False
+        if len(o) < 4:
+            return True
+        p, n, hw = band[o[3], :2], band[o[3], 2:4], band[o[3], 4]
+        s = (items[j].cx + mids[j][0] - p[0]) * n[0] + (items[j].cy + mids[j][1] - p[1]) * n[1]
+        return abs(s) < halves[j][0] * abs(n[0]) + halves[j][1] * abs(n[1]) + hw + MARGIN - 1e-9
+
     later = set(last)
     order = [i for i in range(len(items)) if i not in later] + [i for i in range(len(items)) if i in later]
     links = sorted(joints) + [(i, j) for i, (j, _) in sorted((ties or {}).items())]
@@ -1778,17 +1835,17 @@ def _slide_clear(
         group = [j for j in order if cid[j] == cid[i]]  # i alone, or its rigid chain of duplex pieces
         start = [(items[j].cx, items[j].cy) for j in group]
         others = [(items[j], halves[j], mids[j]) for j in settled]
-        mine = {j: [w for k, w in enumerate(walls) if fixed.hard[j, k]] if walls else [] for j in group}
+        mine = {j: [walls[k] for k in np.flatnonzero(fixed.hard[j]).tolist()] if walls else [] for j in group}
         pairs = [(j, o) for j in group for o in mine[j] + others]
         k = 0
         sideways = level is not None and any(level[j] for j in group)
         ways = ((1, 0), (-1, 0)) if sideways else ((1, 0), (-1, 0), (0, 1), (0, -1))
-        while any(_collide(items[j], halves[j], mids[j], *o) for j, o in pairs):
+        while any(meets(j, o) for j, o in pairs):
             k += 1
             for dx, dy in ways:
                 for j, (x0, y0) in zip(group, start):
                     items[j].cx, items[j].cy = x0 + k * dx * turn[j] * _SLIDE_STEP, y0 + k * dy * _SLIDE_STEP
-                if not any(_collide(items[j], halves[j], mids[j], *o) for j, o in pairs):
+                if not any(meets(j, o) for j, o in pairs):
                     break
         settled += group
         done.add(cid[i])
@@ -4464,7 +4521,7 @@ def build_layout(
         if style.copy_ghosts == "off":  # each lent strand -> the item it left, whose sheet it pairs in
             apart = {m.sse.id: id(items[x]) for i, x in left.items() for m in items[i].members if m.sse.kind == "E"}
         if left and walls is not None:  # an element that left its item keeps off the traces it kept off
-            walls = Walls(walls.boxes, np.vstack([walls.hard, walls.hard[list(left.values())]]))
+            walls = Walls(walls.boxes, np.vstack([walls.hard, walls.hard[list(left.values())]]), walls.band)
         copy_ties = _copy_ties(items, ties, frame, mirror is not None)
         tied_ids = {
             m.sse.id for i, (j, _) in ties.items() for k in (i, j) if id(items[k]) not in own for m in items[k].members
@@ -5406,7 +5463,8 @@ def stem_keep_box(d: PlacedStem, k: float | None = None) -> tuple[float, float, 
 def stem_bodies(layout: Layout) -> list[PlacedStem]:
     """The stems' bodies as drawn, for what keeps off them or judges them: layout.stems; with bent duplexes drawn as
     curves (Style.na_bend curved, Layout.na_curves), each curve's straight stretches (na_curve.Chord) in place of its
-    pieces, which are not drawn."""
+    pieces, which are not drawn. The stretches are kept on the curve (na_curve.chords) and shared by every reader:
+    read them, never change them."""
     if not getattr(layout, "na_curves", None):
         return layout.stems
     from .na_curve import bodies
@@ -5428,7 +5486,7 @@ def stem_name_keeps(
 
     hidden = on_curves(layout)
     out = [box(d, k) for n, d in enumerate(layout.stems) if n not in hidden]
-    return out + [label_box(c, _GLYPH_K.get() if k is None else k) for c in curves if c.named]
+    return out + [label_box(c, _GLYPH_K.get() if k is None else k, keep) for c in curves if c.named]
 
 
 def stem_points(layout: Layout, off: float = 0.0) -> dict[tuple[int, int], np.ndarray]:
@@ -5442,15 +5500,19 @@ def stem_points(layout: Layout, off: float = 0.0) -> dict[tuple[int, int], np.nd
 
 def stems_at(layout: Layout) -> dict:
     """Stem nucleotide -> what it is drawn on, as na_paths.among reads it: its stem; on a bent duplex drawn as a curve
-    (Layout.na_curves), every straight stretch of the curve (na_curve.Chord)."""
+    (Layout.na_curves), the curve's straight stretches (na_curve.Chord) within na_curve._FAR bands of it along the
+    curve (its own stretch of the band, as a piece is its own: a strand through a far stretch of its duplex counts)."""
     at = {key: d for d in layout.stems for key in d.axial}
     curves = getattr(layout, "na_curves", None)
     if curves:
-        from .na_curve import chords
+        from .na_curve import _FAR, chords
 
         for n, c in enumerate(curves):
-            mine = tuple(chords(c, n, layout.stems))
-            at.update(dict.fromkeys(c.at, mine))
+            mine = chords(c, n, layout.stems)
+            reach = _FAR * c.band
+            s0, s1 = np.array([b.s0 for b in mine]), np.array([b.s1 for b in mine])
+            for key, s in c.at.items():
+                at[key] = tuple(mine[i] for i in np.flatnonzero((s1 >= s - reach) & (s0 <= s + reach)).tolist())
     return at
 
 
@@ -6225,7 +6287,7 @@ def label_boxes(
     if curves:
         from .na_curve import label_box
 
-        out += [(f"stem-label:curve:{n}", label_box(c, k)) for n, c in enumerate(curves) if c.named]
+        out += [(f"stem-label:curve:{n}", label_box(c, k, route)) for n, c in enumerate(curves) if c.named]
     for n, tie in enumerate(layout.na_ties):  # a long tie's labels at its two marks
         for end, (_, _, (x, y)) in enumerate(tie.marks):
             out.append((f"tie-label:{n}:{end}", centred_box(x, y, gw / 2 + 0.05, gh / 2)))

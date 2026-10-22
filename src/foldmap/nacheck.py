@@ -22,6 +22,7 @@ from scipy.stats import spearmanr
 from .frame import Frame
 from .io import CONTACT
 from .layout import SCALE, stem_bodies, stem_pieces, stems_at
+from .na_curve import drawn_pieces, piece_bodies
 from .na_paths import _BEAD, among, crosses_body, graze, in_body
 from .nucleic import stem_axis
 from .route import clip_len
@@ -402,7 +403,7 @@ def shape(lay) -> dict:
     unknown = [d.id for d in lay.stems if d.id not in pieces]
     if unknown:
         raise ValueError(f"drawn stems that are no piece of the structure's stems: {unknown}")
-    stems = _pieces(lay)  # as drawn: a curve's pieces where it draws their nucleotides (na_curve.drawn_pieces)
+    stems = drawn_pieces(lay)  # as drawn: a curve's pieces where it draws their nucleotides (na_curve.drawn_pieces)
     if not stems:
         return {"stems_drawn": 0}
     axes = [stem_axis(pieces[d.id], na.strands) for d in stems]
@@ -443,26 +444,6 @@ def shape(lay) -> dict:
     return out
 
 
-def _pieces(lay) -> list:
-    """layout.stems as drawn: a bent duplex drawn as a curve (Layout.na_curves) has its pieces where the curve draws
-    their nucleotides (na_curve.drawn_pieces), never where the layout left them."""
-    if not getattr(lay, "na_curves", None):
-        return list(lay.stems)
-    from .na_curve import drawn_pieces
-
-    return drawn_pieces(lay)
-
-
-def _piece_bodies(lay) -> list[list]:
-    """Each of layout.stems' bodies as drawn: [the stem]; a piece of a curve, the curve's stretches over its
-    nucleotides (na_curve.piece_bodies)."""
-    if not getattr(lay, "na_curves", None):
-        return [[d] for d in lay.stems]
-    from .na_curve import piece_bodies
-
-    return piece_bodies(lay)
-
-
 def _gap(a, b) -> float:
     """Distance between two boxes (x0, y0, x1, y1), 0 when they touch or overlap."""
     return float(np.hypot(max(a[0] - b[2], b[0] - a[2], 0), max(a[1] - b[3], b[1] - a[3], 0)))
@@ -487,7 +468,7 @@ def contacts(lay, sses) -> dict:
         }
     drawn = [s for s in sses if s.id in lay.placed]
     aucs, precs, nearer = [], [], []
-    for d, body in zip(lay.stems, _piece_bodies(lay)):  # each stem's body as drawn (a curve's piece: its stretches)
+    for d, body in zip(lay.stems, piece_bodies(lay)):  # each stem's body as drawn (a curve's piece: its stretches)
         mine = set(d.axial)
         touch = {s.id for s in drawn if any(mine & na.contacts.get(r, set()) for r in range(s.start, s.end + 1))}
         rest = [s.id for s in drawn if s.id not in touch]
@@ -614,10 +595,15 @@ def _box_meets_body(box, d) -> bool:
 
 
 def _whole(d):
-    """What a body counts as: itself; a stretch of a curve (na_curve.Chord), the curve (one thing, however many of its
-    stretches a line or a label meets)."""
+    """What a body counts as: itself; a stretch of a curve (na_curve.Chord), its stretch of the curve na_curve._FAR
+    bands long (one thing however many of its stretches a line or a label meets there, as a piece is; two passes through
+    two gyres are two)."""
     n = getattr(d, "curve", -1)
-    return ("curve", n) if n >= 0 else id(d)
+    if n < 0:
+        return id(d)
+    from .na_curve import _FAR
+
+    return ("curve", n, int(((d.s0 + d.s1) / 2) // max(_FAR * d.band, 1e-9)))
 
 
 def _trimmed(lay) -> list[np.ndarray]:

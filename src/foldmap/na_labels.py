@@ -201,9 +201,7 @@ def _place_letters(
     the one furthest from the other letters.
     `only` (a set of (strand, nucleotide)): place those letters again, every other letter staying where
     layout.na_letters has it, clear of the ties' and gaps' labels placed since too (_letters_off_loops)."""
-    where = {key: d.point(key) for d in layout.stems for key in d.axial}
-    curve_of = {key: c for c in getattr(layout, "na_curves", ()) for key in c.at}  # a bent duplex as one curve
-    where.update({key: c.point(key) for key, c in curve_of.items()})
+    where = stem_points(layout)  # on its curve where a bent duplex is drawn as one (na_curve)
     lines = [np.asarray(p.points, float).reshape(-1, 2) for p in paths if len(p.points) > 1]
     lines += [np.asarray(pts, float).reshape(-1, 2) for pts in loops if len(pts) > 1]
     strand_segs = np.vstack([np.hstack([q[:-1], q[1:]]) for q in lines]) if lines else np.empty((0, 4))
@@ -223,9 +221,8 @@ def _place_letters(
 
     where.update({(p.strand, i): np.asarray(xy) for p in paths for i, xy in zip(p.nts, p.nt_xy)})
     taken = _Points(1.0)  # every letter, nucleotide and end label so far: nearer than 1 is measured exactly
-    for d in layout.stems:
-        for key in d.axial:
-            taken.add(curve_of[key].point(key, NT_ROW) if key in curve_of else d.point(key, NT_ROW))
+    for xy in stem_points(layout, NT_ROW).values():  # each stem letter (on its curve where one is drawn)
+        taken.add(xy)
     index = {key: taken.add(xy) for key, xy in where.items()}  # a letter's own nucleotide does not count
     for _, _, xy in layout.na_ends:
         taken.add(xy)
@@ -535,11 +532,9 @@ def _ties(layout: Layout, paths: list[NAPath], loops=()) -> list[NATie]:
     and texts (random-100 C2b-6), the first such on a tie. A label is clear of a body when its box is (held-out 6S13:
     a label whose centre stood just off a stem had half its box on it)."""
     na = layout.nucleic
-    where = {key: d.point(key) for d in layout.stems for key in d.axial}
-    where.update({key: c.point(key) for c in getattr(layout, "na_curves", ()) for key in c.at})  # one curve (na_curve)
+    where = stem_points(layout)  # on its curve where a bent duplex is drawn as one (na_curve)
     where.update({(p.strand, i): np.asarray(xy) for p in paths for i, xy in zip(p.nts, p.nt_xy)})
-    letters = {key: d.point(key, NT_ROW) for d in layout.stems for key in d.axial}
-    letters.update({key: c.point(key, NT_ROW) for c in getattr(layout, "na_curves", ()) for key in c.at})
+    letters = stem_points(layout, NT_ROW)  # on its curve where a bent duplex is drawn as one (na_curve)
     letters.update({key: np.asarray(xy) for key, xy in layout.na_letters.items()})
     bodies = [*layout.placed.values(), *stem_bodies(layout)]
     outlines = [_outline(e) for e in bodies]  # as drawn: a label's box is clear of a strand's shaft and head

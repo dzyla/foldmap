@@ -58,7 +58,7 @@ def test_a_bent_duplex_is_one_curve_through_its_pieces_in_order():
     lay, _ = _routed("1IHF")
     assert len(lay.na_curves) == 1
     c = lay.na_curves[0]
-    (parent, ks), *_ = bent_duplexes(lay.stems)
+    (parent, ks), *_ = bent_duplexes(lay.stems, lay.nucleic)
     assert c.pieces == ks and len(ks) == 3 and c.name == "DNA 1" and not c.gyres and not c.overlap
     held = {key for k in ks for key in lay.stems[k].axial}
     assert set(c.at) == held == set(c.side)
@@ -165,7 +165,8 @@ def test_the_curve_is_on_the_grid_and_the_same_every_time():
     assert np.array_equal(again.xy, c.xy) and again.at == c.at and again.name_xy == c.name_xy
 
 
-def test_the_curve_does_not_depend_on_the_hash_seed():
+@pytest.mark.parametrize("pdb", ["1IHF", "1KX5"])  # an arc; gyres round the octamer (_gyres, _ring)
+def test_the_curve_does_not_depend_on_the_hash_seed(pdb):
     code = (
         "import hashlib, sys\n"
         "from dataclasses import replace\n"
@@ -181,7 +182,7 @@ def test_the_curve_does_not_depend_on_the_hash_seed():
     out = set()
     for seed in ("0", "1"):
         env = {**os.environ, "PYTHONHASHSEED": seed}
-        run = subprocess.run([sys.executable, "-c", code, str(_path("1IHF"))], capture_output=True, text=True, env=env)
+        run = subprocess.run([sys.executable, "-c", code, str(_path(pdb))], capture_output=True, text=True, env=env)
         assert run.returncode == 0, run.stderr
         out.add(run.stdout.strip())
     assert len(out) == 1
@@ -232,14 +233,17 @@ def test_the_pieces_are_laid_end_to_end_on_the_curve():
 
 
 def test_the_protein_is_laid_out_round_the_curve():
-    """1IHF: no protein element lies on the curve's band (rails and letters), no protein loop crosses its rails, and
+    """1IHF: no protein element lies on the curve's band (rails and letters), no protein loop crosses its rails (where
+    the text is in the font the routing keep-offs are calibrated on: figcheck.ink_font_reason, as test_criteria), and
     chain A's β-arm (A:60-63, A:70-73) stands on the inside of the bend, as in the structure, beside the band."""
-    lay, loops = _routed("1IHF")
+    drawn = _drawn_curved("1IHF")
+    lay, loops = drawn.layout, drawn.loops
     (c,) = lay.na_curves
     band = _band_points(c, lay)
     assert not [sid for sid, e in lay.placed.items() if _under(band, e)]
     rails = _rails(c)
-    assert sum(_crossings(r, _segments(lp.points)) for r in rails for lp in loops if len(lp.points) > 1) == 0
+    if not _font_off(drawn):  # routes keep off text measured in the calibrated font
+        assert sum(_crossings(r, _segments(lp.points)) for r in rails for lp in loops if len(lp.points) > 1) == 0
     lo, hi = c.span()
     s = np.arange(lo, hi, 0.1)
     pts, tan, nrm = c.frames(s)
@@ -255,14 +259,17 @@ def test_the_protein_is_laid_out_round_the_curve():
 
 def test_the_nucleosome_wraps_its_octamer():
     """1KX5: the gyres grown round the octamer (every protein element inside the inner gyre, none on the band, no
-    loop across a rail), the rungs spread evenly over them (each step between pairs the same multiple of its own)."""
-    lay, loops = _routed("1KX5")
+    loop across a rail where the text is in the calibrated font), the rungs spread evenly over them (each step between
+    pairs the same multiple of its own)."""
+    drawn = _drawn_curved("1KX5")
+    lay, loops = drawn.layout, drawn.loops
     (c,) = lay.na_curves
     assert c.gyres and not c.overlap
     band = _band_points(c, lay)
     assert not [sid for sid, e in lay.placed.items() if _under(band, e)]
     rails = _rails(c)
-    assert sum(_crossings(r, _segments(lp.points)) for r in rails for lp in loops if len(lp.points) > 1) == 0
+    if not _font_off(drawn):  # routes keep off text measured in the calibrated font
+        assert sum(_crossings(r, _segments(lp.points)) for r in rails for lp in loops if len(lp.points) > 1) == 0
     mid = (c.xy.min(axis=0) + c.xy.max(axis=0)) / 2  # the ring's middle
     inner = float(np.hypot(c.xy[:, 0] - mid[0], c.xy[:, 1] - mid[1]).min())
     for sid, e in lay.placed.items():
@@ -440,3 +447,106 @@ def test_na_bend_is_listed_and_a_layout_file_keeps_it(tmp_path):
     save(drawn.figure, tmp_path / "a.svg")
     save(again.figure, tmp_path / "b.svg")
     assert (tmp_path / "a.svg").read_bytes() == (tmp_path / "b.svg").read_bytes()
+
+
+def _font_off(drawn) -> str:
+    """Why the routing keep-offs (text ink) are not the calibrated ones here: figcheck.ink_font_reason ('' on Linux
+    with Liberation Sans; Arial on macOS and Windows)."""
+    from foldmap.figcheck import ink_font_reason
+
+    return ink_font_reason(drawn.figure)
+
+
+# ---- fix round 1: the gate, two curves apart, the band walls, the name ----
+
+
+def test_a_duplex_in_a_folded_rna_stays_in_pieces_with_a_note():
+    """na_curve.curvable: a bent duplex one of whose chains pairs with itself in a stem outside the duplex's own helix
+    (a duplex inside a folded RNA: 4YBB's rRNA stems) stays in pieces under na_bend=curved, the figure says so, and no
+    choice is offered (Layout.bent_duplex); IHF's DNA 1 still curves (its chain C pairs in DNA 2 with chain D)."""
+    from foldmap.na_curve import _pieces_of, curvable
+    from foldmap.provenance import _na_bend
+
+    lay, _ = _routed("4YBB")
+    assert _pieces_of(lay.stems) and lay.na_curves == [] and not lay.bent_duplex
+    (note,) = _na_bend(lay)
+    assert note["kind"] == "na_pieces" and note["count"] == len(_pieces_of(lay.stems))
+    assert "part of a folded RNA" in note["text"]
+    ihf, _ = _routed("1IHF")
+    (parent,) = _pieces_of(ihf.stems)
+    assert curvable(ihf.nucleic, parent) and ihf.bent_duplex and len(ihf.na_curves) == 1
+    assert _na_bend(ihf) == []
+
+
+def _straight_curve(x0: float, y: float, band: float = 4.0):
+    """A straight NACurve from (x0, y) ten units along x (no pieces), for _part."""
+    from foldmap.na_curve import NACurve
+
+    xs = np.arange(0.0, 10.05, 0.1)
+    xy = np.column_stack([x0 + xs, np.full(len(xs), y)])
+    c = NACurve("p", "DNA", [], xy, xs.copy(), np.tile([1.0, 0.0], (len(xs), 1)), 1.0, 2.0, {}, {}, [])
+    c.band = band
+    return c
+
+
+def test_two_curves_are_parted_whole():
+    """na_curve._part: each curve is laid out on its own and pinned, so the later one of two that meet is moved whole
+    until its band keeps MARGIN off the earlier one's; one already clear stays."""
+    from foldmap.layout import MARGIN
+    from foldmap.na_curve import _part
+
+    a, b, far = _straight_curve(0.0, 0.0), _straight_curve(3.0, 1.0), _straight_curve(0.0, 40.0)
+    before = far.xy.copy()
+    _part([a, b, far], [])
+    gap = float(np.hypot(b.xy[:, None, 0] - a.xy[None, :, 0], b.xy[:, None, 1] - a.xy[None, :, 1]).min())
+    assert gap >= (a.band + b.band) / 2 + MARGIN - 1e-6
+    assert np.array_equal(far.xy, before) and np.array_equal(a.xy, _straight_curve(0.0, 0.0).xy)
+
+
+def test_the_band_walls_settle():
+    """Walls standing for a curve's band (Walls.band, as na_curve._band_boxes builds them: squares two across) are
+    left along the band's normal, the whole strip at once: a footprint on a diagonal band is pushed clear in one go
+    and stays clear (no staircase of squares to ping-pong on), and one beside the band but in a square's corner (and
+    its MARGIN) is not met."""
+    from foldmap.layout import MARGIN, Walls, _off_walls
+
+    n = np.array([-1.0, 1.0]) / math.sqrt(2)  # a band along the diagonal through the origin, half width 1
+    boxes, band = [], []
+    for t in (-1.0, 0.0, 1.0):
+        for side in (1.0, -1.0):
+            c = np.array([t, t]) + side * 0.5 * n
+            boxes.append([c[0] - 0.5, c[1] - 0.5, c[0] + 0.5, c[1] + 0.5])
+            band.append([t, t, n[0], n[1], 1.0])
+    walls = Walls(np.array(boxes), np.ones((1, len(boxes)), bool), np.array(band))
+    group = [np.array([0])]
+    xy, halves, mids = np.array([[0.2, 0.4]]), np.array([[0.3, 0.3]]), np.zeros((1, 2))
+    assert _off_walls(xy, halves, mids, walls, group)
+    assert float(xy[0] @ n) >= 0.3 * math.sqrt(2) + 1.0 + MARGIN - 1e-9  # off the whole strip, along its normal
+    assert not _off_walls(xy, halves, mids, walls, group, move=False)
+    corner = np.array([0.0, 0.0]) + 0.5 * n + 1.1 * np.array([-1.0, 1.0])  # in the square's box with MARGIN only
+    assert not _off_walls(corner[None, :], np.array([[0.01, 0.01]]), mids, walls, group, move=False)
+
+
+@pytest.mark.parametrize("pdb", ["1IHF", "1KX5", "1RVA", "1AOI"])
+def test_the_curve_name_sits_at_the_stem_name_margin(pdb):
+    """The curve's name stands as a straight stem's does (layout._name_at): its ink _INK_MARGIN em beyond its letter
+    row's (A17's stem-name gap, measured by figcheck in the curve's frame), clear of every element, other name and
+    other stem; routes keep off its ink grown by that margin (name_keep, label_boxes route=True)."""
+    from foldmap.criteria import stem_gap_limit
+    from foldmap.figcheck import ink_font_reason, measure, stem_name_gaps
+    from foldmap.layout import _INK_MARGIN, _ink_em, label_boxes
+
+    drawn = _drawn_curved(pdb)
+    lay = drawn.layout
+    (c,) = lay.na_curves
+    keep = dict(label_boxes(lay, drawn.sses, route=True))["stem-label:curve:0"]
+    assert keep == c.name_keep
+    g = _INK_MARGIN * _ink_em(lay, lay.font_scale)  # the name's ink: its keep-out less the margin
+    x0, y0, x1, y1 = c.name_keep[0] + g, c.name_keep[1] + g, c.name_keep[2] - g, c.name_keep[3] - g
+    for p in lay.placed.values():
+        r = p.rect
+        assert not (r[0] < x1 and x0 < r[2] and r[1] < y1 and y0 < r[3]), p.sse.id
+    if ink_font_reason(drawn.figure):  # the gap is measured on Liberation Sans's ink
+        return
+    own, _ = stem_name_gaps(drawn, page=measure(drawn))["na:curve:0:label"]
+    assert own <= stem_gap_limit(drawn.figure)

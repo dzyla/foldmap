@@ -900,6 +900,7 @@ def _clear_termini(layout: Layout, sses: list[SSE], loops: list[Loop]) -> None:
     rects = [q.rect for q in [*layout.placed.values(), *layout.ghosts]]
     texts = dict(label_boxes(layout, sses))
     texts.update({f"na-text:{k}": b for k, b in enumerate(na_text_boxes(layout))})
+    stems = stem_bodies(layout)  # (a curve: its stretches)
     for end, chain, port, ex in ends:
         ex = np.asarray(ex, float)
         half = (max(gw / 2 + 0.05, em * _text_width(end) / 2), max(gh / 2, em * 0.4))
@@ -925,7 +926,7 @@ def _clear_termini(layout: Layout, sses: list[SSE], loops: list[Loop]) -> None:
                 box = box_at(xy)
                 if not (box[0] >= x0 and box[1] >= y0 and box[2] <= x1 and box[3] <= y1):
                     continue
-                if overlaps_any(box, rects + taken) or any(_box_meets_body(box, d) for d in stem_bodies(layout)):
+                if overlaps_any(box, rects + taken) or any(_box_meets_body(box, d) for d in stems):
                     continue
                 got = strikes(box)
                 if got < best[0]:

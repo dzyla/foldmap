@@ -15,6 +15,9 @@ elements (their ids: element ids, or domain, stem and ligand names). Kinds, in t
     bulge_joined       strands drawn whole across a beta-bulge DSSP splits them at (ss._join_bulged_pieces)
     helix_matched      helices cut or joined so copies of a protein are drawn alike (ss._copy_breaks)
     ghost_strands      strands drawn again as dashed copies: a barrel's closure, or in another copy's sheet
+    na_pieces          Style.na_bend curved: bent duplexes left in pieces, part of a folded RNA (na_curve.curvable)
+    na_curve_as_placed Style.na_bend curved: curves drawn through their pieces as placed, the protein not laid out
+                       round them (a duplex held by symmetry, stack mode)
     lent_apart         strands lent across an unrolled ring's cut drawn past the row's end, apart from the sheet they
                        pair in, with no dashed copy (Style.copy_ghosts off)
     names_moved        names set off their usual spot to stay readable
@@ -194,7 +197,8 @@ def _names_moved(fig, layout, labels: bool) -> list[dict]:
     if leaders:
         parts.append(f"domain names above their panel, with a leader: {', '.join(leaders)}")
         elements += leaders
-    stems = [d.name for d in layout.stems if d.label_out > 0 and d.name]
+    hidden = {k for c in getattr(layout, "na_curves", ()) for k in c.pieces}  # drawn as a curve: no name of its own
+    stems = [d.name for k, d in enumerate(layout.stems) if d.label_out > 0 and d.name and k not in hidden]
     if stems:
         parts.append(f"stem names set further out from their letters: {', '.join(stems)}")
         elements += stems
@@ -202,6 +206,29 @@ def _names_moved(fig, layout, labels: bool) -> list[dict]:
         return []
     text = f"{len(elements)} name(s) moved from their usual spot to stay readable: {'; '.join(parts)}"
     return [_item("names_moved", text, elements)]
+
+
+def _na_bend(layout) -> list[dict]:
+    """Style.na_bend curved: the bent duplexes left in pieces (na_curve.curvable: part of a folded RNA), and the
+    curves drawn through their pieces as placed, the protein not laid out round them (a duplex a symmetry tie holds,
+    stack mode: na_curve.lay_out left them; NACurve.held empty)."""
+    if getattr(layout, "na_bend", "pieces") != "curved" or not layout.stems:
+        return []
+    from .na_curve import left_in_pieces
+
+    out = []
+    kept = left_in_pieces(layout.stems, layout.nucleic)
+    if kept:
+        text = f"{len(kept)} bent duplex(es) drawn in pieces, not curved: part of a folded RNA: {', '.join(kept)}"
+        out.append(_item("na_pieces", text, kept))
+    placed = [c.name for c in getattr(layout, "na_curves", ()) if not c.held]
+    if placed:
+        text = (
+            f"{len(placed)} curve(s) drawn through their pieces as placed, the protein not laid out round them "
+            f"(held by symmetry, or stack mode): {', '.join(placed)}"
+        )
+        out.append(_item("na_curve_as_placed", text, placed))
+    return out
 
 
 def _counts_hidden(fig) -> list[dict]:
@@ -236,6 +263,7 @@ def figure_provenance(fig, layout, loops=(), labels: bool = True) -> list[dict]:
     out += _bulges(layout)
     out += _helix_matched(layout)
     out += _ghosts(layout)
+    out += _na_bend(layout)
     out += _names_moved(fig, layout, labels)
     out += _counts_hidden(fig)
     additives = _hidden_additives(layout)
