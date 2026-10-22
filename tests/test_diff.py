@@ -315,14 +315,23 @@ def test_two_states_are_drawn_alike_with_their_changes(two_states):
 def test_each_panel_stays_a_good_figure(two_states):
     """H5 for each panel: drawn on its own with its marks and colouring, it passes every S- and A-check its chain
     drawn alone passes, A6 (no text crossed, the outlines read as lines) among them."""
+    from foldmap import figcheck
     from foldmap.compare import panel_checks
 
     _, made = two_states
-    got = panel_checks(made)
+    found = {}
+    got = panel_checks(made, found=found)
     assert set(got) == {"a", "b"}
-    for side in got.values():
+    off = figcheck.ink_font_reason(made.figure)
+    for name, side in got.items():
         assert side["pass"] is True, side["detail"]
-        assert "A6" in side["value"]["alone"]
+        if not off:
+            assert "A6" in side["value"]["alone"]
+            continue
+        # A6's ink is read in Liberation Sans only (Arial on macOS and Windows): not measured here, in either drawing
+        for judged in found[name]:
+            a6 = judged["criteria"]["A6"]
+            assert a6["pass"] is None and a6["here"].startswith(f"ink checks are calibrated on {figcheck.INK_FONT}")
 
 
 _DIFF_PAGE = """

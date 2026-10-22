@@ -445,9 +445,13 @@ def test_text_bands_grow_by_the_strand_stroke_only():
 
 def test_text_keeps_off_a_strand_drawn_twice_as_wide():
     """A6 (no text crossed by a line, bodies included) passes on 1LMB with the backbone twice as wide."""
-    from foldmap import criteria
+    from foldmap import criteria, figcheck
     from foldmap.spec import draw_spec, figure_spec
 
     spec = figure_spec(LMB, style=["na_line=2", "na_backbone=chain"])
-    got = criteria.check_figure(draw_spec(spec), spec, LMB)["criteria"]
-    assert got["A6"]["pass"], got["A6"]
+    drawn = draw_spec(spec)
+    got = criteria.check_figure(drawn, spec, LMB)["criteria"]
+    if reason := figcheck.ink_font_reason(drawn.figure):  # A6's ink is read in Liberation Sans only: not measured here
+        assert got["A6"]["pass"] is None and got["A6"]["here"] == reason, got["A6"]
+    else:
+        assert got["A6"]["pass"], got["A6"]

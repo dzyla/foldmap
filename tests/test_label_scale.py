@@ -79,4 +79,7 @@ def test_names_keep_off_every_body_at_any_text_size(case, font_scale):
     ]
     assert on == []
     got = criteria.check_figure(drawn, spec, DATA / name)["criteria"]
-    assert got["A4"]["pass"] and got["A6"]["pass"], (got["A4"], got["A6"])
+    if reason := figcheck.ink_font_reason(drawn.figure):  # A6's ink is read in Liberation Sans only: not measured here
+        assert got["A4"]["pass"] and got["A6"]["pass"] is None and got["A6"]["here"] == reason, (got["A4"], got["A6"])
+    else:
+        assert got["A4"]["pass"] and got["A6"]["pass"], (got["A4"], got["A6"])

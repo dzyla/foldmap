@@ -25,6 +25,8 @@ def hom():
 
 @pytest.fixture(scope="module")
 def pairs(hom):
+    if not SET.exists():
+        pytest.skip("docs/validation/homologues is not part of the sdist")
     return hom.read_set(SET)
 
 
