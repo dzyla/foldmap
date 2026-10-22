@@ -240,6 +240,44 @@ def test_an_upload_clears_only_its_own_tables_warning(monkeypatch, tmp_path):
     assert ss["crosslinks_path"] and ss["data_missing"] == {} and missing_tables(ss) == []
 
 
+@pytest.mark.parametrize("kind", ["data", "crosslinks"])
+def test_a_table_read_over_a_limit_is_said_as_a_table_read(monkeypatch, tmp_path, kind):
+    """Open minor of the 13b-13d fix round: a table read stopped by the app's limits (or failing in its job) is said
+    as a table read ('Reading the table ... took longer than ...'), not with the figure's words ('took longer than
+    ... to draw', 'could not draw this setting')."""
+    from types import SimpleNamespace
+
+    from foldmap import app_jobs, fetch
+    from foldmap.app_controls import store_table
+
+    monkeypatch.setenv("FOLDMAP_APP_LOCAL_FILES", "0")
+    monkeypatch.setattr(fetch, "CACHE", tmp_path)
+    lim = app_jobs.limits(hosted=True)
+    said = {}
+    for err in (
+        app_jobs.JobLimit("time", ""),
+        app_jobs.JobLimit("memory", ""),
+        app_jobs.JobFailed("KeyError: 'x'"),
+    ):
+
+        def run_job(*args, err=err, **kwargs):
+            raise err
+
+        monkeypatch.setattr(app_jobs, "run_job", run_job)
+        ss = {"path": str(DATA / "1UBQ.cif"), f"{kind}_upload": SimpleNamespace(name="t.csv", getvalue=lambda: DDG)}
+        store_table(ss, kind)
+        assert not ss[f"{kind}_path"] and "to draw" not in ss[f"{kind}_error"]
+        assert "draw this setting" not in ss[f"{kind}_error"]
+        said[str(err)] = ss[f"{kind}_error"]
+    assert said["time"] == (
+        f"Reading the table t.csv took longer than {lim.timeout:g} s, the limit of this app. Use a smaller table, or "
+        f"use it on your own computer: pip install foldmap, then foldmap plot STRUCTURE --{kind} t.csv -o figure.svg."
+    )
+    assert said["memory"].startswith(f"Reading the table t.csv needs more memory than this app allows ({lim.memory_mb}")
+    assert said["KeyError: 'x'"].startswith("foldmap could not read the table t.csv (KeyError: 'x').")
+    assert said["KeyError: 'x'"].endswith(app_jobs.REPORT_SENTENCE)
+
+
 def test_an_uploaded_structures_data_name_it_as_uploaded(monkeypatch, tmp_path):
     """Section review 13b-13d, Minor 21: the data downloads of an uploaded structure name it as uploaded, not by the
     copy the server keeps (upload-<hash>.cif)."""

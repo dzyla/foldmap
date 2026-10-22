@@ -726,6 +726,35 @@ def limit_message(name: str, err: JobLimit, limits: Limits, command: str | None 
     return err.message
 
 
+def table_message(err: Exception, name: str, limits: Limits, kind: str = "data") -> str:
+    """What to tell the visitor when reading an uploaded table (`kind` "data" or "crosslinks", app_controls.
+    store_table) failed: a table read's wording, not explain's figure wording ('took longer than ... to draw').
+    JobLimit time and memory: say the read was over the limit and how to use the table on one's own computer; busy
+    and size as limit_message. JobFailed or a bug: 'foldmap could not read this table', with the report link.
+    ValueError, OSError, RuntimeError: as explain."""
+    from . import app
+
+    elsewhere = f"pip install foldmap, then foldmap plot STRUCTURE --{kind} {name} -o figure.svg"
+    if isinstance(err, JobLimit) and err.kind == "time":
+        return (
+            f"Reading the table {name} took longer than {limits.timeout:g} s, the limit of this app. Use a smaller "
+            f"table, or use it on your own computer: {elsewhere}."
+        )
+    if isinstance(err, JobLimit) and err.kind == "memory":
+        return (
+            f"Reading the table {name} needs more memory than this app allows ({limits.memory_mb} MB). Use a "
+            f"smaller table, or use it on your own computer: {elsewhere}."
+        )
+    if isinstance(err, JobLimit):
+        return limit_message(name, err, limits)
+    if isinstance(err, ValueError):
+        return str(err)
+    if isinstance(err, JobFailed) or not isinstance(err, (OSError, RuntimeError)):
+        text = str(err) if isinstance(err, JobFailed) else f"{type(err).__name__}: {err}"
+        return f"foldmap could not read the table {name} ({text}).{REPORT_SENTENCE}"
+    return app.trouble(err)
+
+
 _CHAINS = "Chains (Chains & assembly)"  # app_edits.CONTROLS["chains"], as control_for names it
 
 

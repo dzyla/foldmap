@@ -980,8 +980,8 @@ def store_table(ss: MutableMapping, kind: str) -> None:
             text = str(err)
         elif isinstance(err, OSError) and target is None:
             text = "the table could not be stored; try again"
-        else:  # over a limit, the structure unreadable, a bug: app_jobs.explain's words
-            text = app_jobs.explain(err, name, lim)[0]
+        else:  # over a limit, the structure unreadable, a bug: a table read's words (not explain's figure words)
+            text = app_jobs.table_message(err, name, lim, kind)
         ss.update({**clear, f"{kind}_error": text.replace(str(target), name) if target else text})
         data_colouring(ss)
         return
