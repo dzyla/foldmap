@@ -851,6 +851,8 @@ def trouble(err: Exception) -> str:
 # ---------------------------------------------------------------------------------------------- session
 STRUCTURE_STYLE = (  # Style fields that name this structure's parts
     "mark",
+    "element_colors",  # colours and widths set by hand (elstyle)
+    "element_widths",
     "highlight",
     "hbonds",
     "interactions",  # with its partners, as hbonds holds both: kept through a theme change, reset with a structure

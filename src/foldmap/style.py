@@ -73,6 +73,7 @@ LAYOUT_KEYS = (
     "cyclic",
     "copy_ghosts",
     "na_line",
+    "element_widths",
 )  # these move elements
 NA_BACKBONES = ("modality", "chain", "ink")
 MODALITIES = ("protein", "dna", "rna")
@@ -237,6 +238,10 @@ class Style:
     # interchain), na, interchain or chains:A+B,C+D
     interaction_max: int = 200  # at most this many lines of each kind but H-bonds (hbond_max caps those)
     mark: str = ""  # elements in a colour of their own: "G", "A:G=#2ca02c", "#3", "res:150-159=red", comma-separated
+    element_colors: str = ""  # colours set by hand (elstyle, plan 23), winning over color_by and marks: REF=COLOUR,
+    # comma-separated; REF an element (α1, A:G, res:A:1-60), loop:REF, na:CHAIN or lig:CODE (--color REF=COLOUR)
+    element_widths: str = ""  # each one's drawn width times a factor (0.25-4): REF=FACTOR, the same references
+    # (--width REF=FACTOR); a layout key: a wider element keeps its neighbours, labels and loops off
     domain_bar: str = "auto"  # a linear bar of the named domains under the figure, one per chain, N to C (Nishimasu
     # 2014 Fig 1A): auto (2 or more domains drawn), on (any), off
     domain_colours: bool = True  # with named domains and color_by=chain, colour elements by domain (the print and
@@ -259,6 +264,11 @@ class Style:
                 f"na_backbone must be {', '.join(NA_BACKBONES)} or a colour such as #8c564b; got {self.na_backbone!r}"
             )
         backbone_overrides(self.backbone_colors)
+        if self.element_colors or self.element_widths:
+            from .elstyle import colours, widths
+
+            colours(self.element_colors)
+            widths(self.element_widths)
         parse_selection(self.hbonds)
         if not is_color_like(self.hbond_color):
             raise ValueError(f"hbond_color must be a colour such as #d020f8 or teal; got {self.hbond_color!r}")

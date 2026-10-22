@@ -188,6 +188,8 @@ def draw_topology(
     swap: list[list[str]] | None = None,
     move: dict[str, list[float]] | None = None,
     rename: dict[str, str] | None = None,
+    colors: dict[str, str] | None = None,
+    widths: dict[str, float] | None = None,
     names: list[str] | None = None,
     msa_path: str | None = None,
     rotate: float | None = None,
@@ -217,7 +219,12 @@ def draw_topology(
     domains: named domain panels, e.g. {"N-lobe": ["res:A:13-59"]}. domains_from: "auto" (inferred from residue
     contacts, not a published assignment: the note says so) or "cath" (CATH's published chopping of a PDB entry,
     fetched from PDBe; the note names its domains, or says there are none). swap: pairs of elements to exchange, e.g.
-    [["α1", "α3"]]. move: nudges in page units, e.g. {"α2": [1, -2]}. rename: {"res:A:167-182": "Gd"}. Every
+    [["α1", "α3"]]. move: nudges in page units, e.g. {"α2": [1, -2]}. rename: {"res:A:167-182": "Gd"}. colors: each
+    one's own colour, winning over the colouring (the legend says colours were set by hand), e.g. {"α1": "red",
+    "res:A:20-25": "#1f77b4"}; widths: each one's drawn width times a factor from 0.25 to 4 (a helix's diameter, an
+    arrow's width, a loop's stroke, a backbone's weight; the layout keeps the room), e.g. {"α1": 2}; there a
+    reference may also be loop:REF (the loop after element REF), na:CHAIN (a nucleic-acid backbone) or lig:CODE (a
+    ligand's box, lig:HEM or lig:HEM:A142). Every
     element reference is checked before drawing: one that cannot be drawn (a range that does not parse, a chain the
     structure lacks or does not draw, residues it does not have) is an error saying so; a range written without res:
     (A:1-60) is read as res:A:1-60 and the note warns that it was. An element may also be named as "names" would
@@ -289,6 +296,8 @@ def draw_topology(
             names=names,
             swap=[tuple(p) for p in swap or []],
             move=[(ref, (d[0], d[1])) for ref, d in (move or {}).items()],
+            colors=[f"{ref}={value}" for ref, value in (colors or {}).items()],
+            widths=[f"{ref}={value}" for ref, value in (widths or {}).items()],
             like=like,
             data=data_path,
             data_column=data_column,

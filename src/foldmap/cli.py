@@ -990,7 +990,11 @@ def _drawn_like(
         args, kw = (spec.mode, spec.rotate, spec.flip_v), spec.layout_kwargs()
     else:  # this figure's look, less its marks: they name this structure's elements, so the reference's references
         # check (Q-A19) leaves them out; only render reads a mark, so the reference is laid out as before
-        mine = dataclasses.replace(look, mark="") if look is not None and look.mark else look
+        mine = (  # and less its own colours and widths (elstyle): they name this structure's parts too
+            dataclasses.replace(look, mark="", element_colors="", element_widths="")
+            if look is not None and (look.mark or look.element_colors or look.element_widths)
+            else look
+        )
         args, kw = (mode, rotate, flip_v), {"dna": dna, "look": mine, "assembly": assembly, "up": up, "view": view}
     model = like.get("model")  # already read as `assembly` reads it (compare's diff page), else read here
     if model is None or like.get("layout"):
@@ -1563,6 +1567,8 @@ def _spec_of(args) -> FigureSpec:
         rename=edits["rename"],
         swap=edits["swap"],
         move=edits["move"],
+        colors=getattr(args, "color", None) or [],
+        widths=getattr(args, "width", None) or [],
         names=args.names,
         like=_like_of(args),
         data=args.data,
@@ -1632,6 +1638,12 @@ def styles_help() -> str:
             return "whole number, at most this many lines (the shortest on the page kept, not the shortest in Å)"
         if key == "backbone_colors":
             return "KEY=COLOUR,... (KEY: a chain id, protein, dna or rna)"
+        if key == "mark":
+            return "REF[=COLOUR],... (elements in a colour of their own)"
+        if key == "element_colors":
+            return "REF=COLOUR,... (--color; REF an element, loop:REF, na:CHAIN or lig:CODE)"
+        if key == "element_widths":
+            return "REF=FACTOR,... (--width; 0.25 to 4, the same references)"
         return "true/false"
 
     lines = ["Themes (--theme NAME) change only how things are drawn:"]
@@ -1816,6 +1828,25 @@ def build_parser() -> argparse.ArgumentParser:
             default=[],
             metavar="REF=DX,DY",
             help="nudge an element (page units, one strand spacing ~1.1), e.g. α2=1,-2 (repeatable)",
+        )
+        q.add_argument(
+            "--color",
+            "--colour",
+            dest="color",
+            action="append",
+            default=[],
+            metavar="REF=COLOUR",
+            help="an element's own colour, winning over the colouring, e.g. α1=red or res:A:20-25=#1f77b4; REF may "
+            "also be loop:REF (the loop after REF), na:CHAIN (a nucleic-acid backbone) or lig:CODE (repeatable; "
+            "style key element_colors)",
+        )
+        q.add_argument(
+            "--width",
+            action="append",
+            default=[],
+            metavar="REF=FACTOR",
+            help="an element's drawn width times FACTOR (0.25 to 4): a helix's diameter, an arrow's width, a loop's "
+            "stroke, a backbone's weight, e.g. α1=2 or loop:β2=1.5 (repeatable; style key element_widths)",
         )
         q.add_argument(
             "--domain",

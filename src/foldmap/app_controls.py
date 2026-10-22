@@ -16,6 +16,7 @@ from types import SimpleNamespace
 
 from foldmap.app_edits import (
     EDITORS,
+    HAND,
     NAME_KEYWORDS,
     SYMMETRIES,
     UPLOADS,
@@ -347,7 +348,7 @@ def heading(st, label: str, as_text: str, help: str) -> None:
         st.toggle("as text", key=as_text, persist_state="session")
 
 
-EDITOR_TABS = ["Swap", "Move", "Rename", "Mark", "Domains"]
+EDITOR_TABS = ["Swap", "Move", "Rename", "Mark", "Colour", "Width", "Domains"]
 FOLD_TEMPLATE = {"auto": "βα row", "off": "as projected"}
 HELIX_ON_SHEET = {"off": "beside the sheet", "auto": "over the sheet"}
 TWO_FOLD = {"auto": "automatic", "mirror": "mirror image", "unrolled": "side by side"}
@@ -358,6 +359,8 @@ EXAMPLE = {  # the syntax, as text
     "move": "α2=1,-2",
     "rename": "α1=Gd",
     "mark": "α3=#2ca02c, β1",
+    "element_colors": "α1=#d1495b,loop:β2=teal,na:B=#555555",
+    "element_widths": "α1=2,loop:β2=1.5,na:B=2",
     "domains": "N=res:A:1-80\nC=α3,α4",
 }
 EDITOR_HELP = {
@@ -366,6 +369,11 @@ EDITOR_HELP = {
     "rename": "a new name for an element · as text: α1=Gd or res:A:167-182=Gd",
     "mark": "elements drawn in a colour, or the theme's mark colour when none is given · as text: "
     "G, A:G=#2ca02c, #3, res:150-159=red",
+    "element_colors": "an element's own colour, over the colouring (the legend says colours were set by hand): "
+    "a helix, strand, loop (loop:REF, the loop after REF), nucleic-acid chain (na:CHAIN) or ligand (lig:CODE) · "
+    "as text: α1=red,loop:β2=#1f77b4,na:B=teal,lig:HEM=orange",
+    "element_widths": "an element's drawn width times a factor, 0.25 to 4: a helix's diameter, an arrow's width, "
+    "a loop's stroke, a backbone's weight; the layout keeps the room · as text: α1=2,loop:β2=1.5,na:B=2",
     "domains": "a domain's elements are kept together, drawn on a panel with its name · as text: one per line, "
     "NAME=REF[,REF...], e.g. N=res:A:1-80",
 }
@@ -445,7 +453,8 @@ def layout_section(st, ss: MutableMapping) -> None:
         number, text = st.column_config.NumberColumn, st.column_config.TextColumn
         offsets = {"dx": number("dx", step=0.5, width=NARROW), "dy": number("dy", step=0.5, width=NARROW)}
         colour_column = text("Colour", validate=r"^(#[0-9a-fA-F]{6}|[a-z]+)?$", width=CELL)
-        swap, move, rename, mark, domains = st.tabs(EDITOR_TABS, key="editors")  # one editor in view at a time
+        width_column = number("Width", min_value=0.25, max_value=4.0, step=0.25, width=NARROW)
+        swap, move, rename, mark, colour, width, domains = st.tabs(EDITOR_TABS, key="editors")  # one in view
         with swap:
             editor(st, ss, "swap", "Swap", {"a": "Element", "b": "with"})
         with move:
@@ -454,6 +463,10 @@ def layout_section(st, ss: MutableMapping) -> None:
             editor(st, ss, "rename", "Rename", {"element": "Element", "name": text("Name", width=CELL)})
         with mark:
             editor(st, ss, "mark", "Mark", {"element": "Element", "colour": colour_column})
+        with colour:  # colours and widths set by hand (elstyle): helices, strands, loops, backbones, ligands
+            editor(st, ss, "element_colors", "Colour", {"element": "Element", "colour": colour_column})
+        with width:
+            editor(st, ss, "element_widths", "Width", {"element": "Element", "width": width_column})
         with domains:
             domains_block(st, ss)
 
@@ -594,6 +607,8 @@ ELEMENT_COLUMNS = {  # domains: names and ranges are typed
     "move": ("element",),
     "rename": ("element",),
     "mark": ("element",),
+    "element_colors": ("element",),
+    "element_widths": ("element",),
     "domains": (),
 }
 
@@ -606,13 +621,21 @@ def element_options(kind: str, rows: list[dict], choices: list[tuple[str, str]])
     return refs + [h for h in dict.fromkeys(held) if isinstance(h, str) and h and h not in refs]
 
 
+def hand_choices(choices: list[tuple[str, str]], na_chains: list[str], last=()) -> list[tuple[str, str]]:
+    """What the Colour and Width editors offer: each drawn element, the loop after it (loop:REF, as --color takes
+    it; none after a chain's `last` element) and each nucleic-acid chain's backbone (na:CHAIN). A ligand is typed as
+    text (lig:HEM)."""
+    loops = [(f"loop:{ref}", f"loop after {text.split(' · ')[0]}") for ref, text in choices if ref not in last]
+    return [*choices, *loops, *((f"na:{c}", f"nucleic acid {c}") for c in na_chains)]
+
+
 def editor_frame(kind: str, rows: list[dict]):
     """An editor's rows as the table the data editor shows: its columns in order, move's offsets as numbers (a
     cell that is not one is empty)."""
     import pandas as pd
 
     frame = pd.DataFrame(rows, columns=list(EDITORS[kind]))
-    for column in ("dx", "dy") if kind == "move" else ():
+    for column in {"move": ("dx", "dy"), "element_widths": ("width",)}.get(kind, ()):
         frame[column] = pd.to_numeric(frame[column], errors="coerce").astype(float)
     return frame
 
@@ -629,6 +652,9 @@ def editor(st, ss: MutableMapping, kind: str, label: str, columns: dict) -> None
     else:
         rows = table_rows(ss, kind)
         choices = element_choices(ss.get("elements") or [])
+        if kind in HAND:  # colours and widths set by hand: the loops after the elements and the backbones too
+            ends = {e["chain"]: e["ref"] for e in ss.get("elements") or []}.values()  # no loop after a chain's last
+            choices = hand_choices(choices, ss.get("na_chains") or [], set(ends))
         options = element_options(kind, rows, choices)
         config = {
             column: st.column_config.SelectboxColumn(
@@ -672,6 +698,8 @@ def reference_problems(ss: MutableMapping, kind: str) -> list:
             given = {"domains": parse_domains(items)}
         elif kind == "mark":
             given = {"look": Style(mark=text)}
+        elif kind in HAND:  # colours and widths set by hand: their own forms checked as the command line does
+            given = {"look": Style(**{kind: text}).validate()}
         else:  # the command line's own parsers, as app.layout_options reads them
             args = SimpleNamespace(**{"rename": [], "swap": [], "move": [], "up": None, "view": None, kind: items})
             given = {kind: adjustments(args)[kind]}

@@ -329,6 +329,12 @@ def backbone_colours(
             colour = mode
         colour = over.get("rna" if is_rna else "dna", colour)
         na[chain] = legible(over.get(chain, colour))
+    if look.element_colors:  # a backbone's colour set by hand (elstyle's na:CHAIN) wins over them all
+        from .elstyle import colours
+
+        for ref, colour in colours(look.element_colors):
+            if ref.startswith("na:") and ref[3:].strip() in na:
+                na[ref[3:].strip()] = legible(colour)
     loops = {c: legible(over[c] if c in over else over["protein"]) for c in protein if c in over or "protein" in over}
     return na, loops
 
@@ -394,10 +400,15 @@ class _NAInk(NamedTuple):
     seqs: list  # per strand, the residue number of each nucleotide as the structure file writes it
     em: float  # page units of one em of the text (font / points per page unit)
     wide: float  # the backbone's weight (Layout.na_line): rails, runs, ribbon tubes and block edges
+    chain_wide: dict = {}  # chain -> its weight's factor set by hand (Layout.na_widths; elstyle)
 
     def colour(self, strand: int) -> str:
         """The backbone colour of a strand: stem rails, ribbons, blocks, paths, hairpins, ties."""
         return self.backbone[self.chains[strand]]
+
+    def weight(self, strand: int) -> float:
+        """The backbone weight of a strand: `wide`, times its chain's factor set by hand."""
+        return self.wide * self.chain_wide.get(self.chains[strand], 1.0)
 
 
 _upright = upright_deg
@@ -421,20 +432,20 @@ def _rung_lines(ink: _NAInk, k: int, d: PlacedStem, inset: float = 0.0) -> None:
 
 def _ladder(ink: _NAInk, k: int, d: PlacedStem, where: dict, letters: dict) -> None:
     """Two rails (a bulged nucleotide pushed out a little) and a rung per pair; letters outside the rails."""
-    rails: dict[str, list] = {}  # backbone colour -> its rails (one colour unless a duplex mixes chains)
+    rails: dict[tuple, list] = {}  # (backbone colour, weight) -> its rails (one unless a duplex mixes chains)
     for sign in (1, -1):
         keys = sorted((key for key in d.axial if d.side[key] == sign), key=lambda key: d.axial[key])
-        for colour in dict.fromkeys(ink.colour(key[0]) for key in keys):
-            mine = [key for key in keys if ink.colour(key[0]) == colour]
-            rails.setdefault(colour, []).append(
+        for drawn in dict.fromkeys((ink.colour(key[0]), ink.weight(key[0])) for key in keys):
+            mine = [key for key in keys if (ink.colour(key[0]), ink.weight(key[0])) == drawn]
+            rails.setdefault(drawn, []).append(
                 np.array([d.point(key, 0.3 if key in d.bulges else 0.0) for key in mine])
             )
-    for n, (colour, parts) in enumerate(rails.items()):
+    for n, ((colour, weight), parts) in enumerate(rails.items()):
         rail = PathPatch(
             _compound([r for r in parts if len(r) > 1], closed=False),
             fc="none",
             ec=colour,
-            lw=ink.lw * 2.2 * ink.wide,
+            lw=ink.lw * 2.2 * weight,
             capstyle="round",
             joinstyle="round",
             zorder=Z["na-front"],
@@ -476,9 +487,10 @@ def _ribbon_point(d: PlacedStem, key: tuple[int, int]) -> np.ndarray:
 def _ribbon(ink: _NAInk, k: int, d: PlacedStem, where: dict, letters: dict) -> None:
     """The double helix, front and back backbones from one repeated turn, a rung per pair; no stem letters
     (the helix itself is the drawing). Beads sit on the backbone, in the strand's backbone colour."""
-    colour = {}  # backbone slot -> colour of the strand drawn there
+    colour, weight = {}, {}  # backbone slot -> colour and weight of the strand drawn there
     for key in sorted(d.axial):
         colour.setdefault(_ribbon_side(d, key), ink.colour(key[0]))
+        weight.setdefault(_ribbon_side(d, key), ink.weight(key[0]))
     slots: dict[str, list[int]] = {}  # colour -> its backbones (one colour unless a duplex mixes chains)
     for slot, c in sorted(colour.items()):
         slots.setdefault(c, []).append(slot)
@@ -490,7 +502,7 @@ def _ribbon(ink: _NAInk, k: int, d: PlacedStem, where: dict, letters: dict) -> N
     for n, (c, group) in enumerate(slots.items()):
         fronts, backs = [], []
         for slot in group:
-            f, b = _dna_turns(d, slot, ink.wide)
+            f, b = _dna_turns(d, slot, weight[slot])
             fronts += f
             backs += b
         suffix = "" if n == 0 else f":{n + 1}"
@@ -537,7 +549,7 @@ def _block(ink: _NAInk, k: int, d: PlacedStem, where: dict, letters: dict) -> No
             closed=True,
             fc="white" if ink.fill == "outline" else c,
             ec=c,
-            lw=ink.lw * 1.2 * ink.wide,
+            lw=ink.lw * 1.2 * max(ink.weight(key[0]) for key in d.axial),
             zorder=Z["na-front"],
         )
         body.set_gid(f"na:stem:{k}:block" if n == 0 else f"na:stem:{k}:block:{n + 1}")
@@ -591,7 +603,7 @@ def _draw_strands(ink: _NAInk, layout: Layout, style: str, where: dict, letters:
             pts[:, 0],
             pts[:, 1],
             color=ink.colour(path.strand),
-            lw=ink.lw * (1.0 if gap else NA_RUN_W * ink.wide),
+            lw=ink.lw * (1.0 if gap else NA_RUN_W * ink.weight(path.strand)),
             ls=((0, (2, 2)) if path.label else (0, (1, 1.5))) if gap else "-",
             solid_capstyle="round",
             solid_joinstyle="round",
@@ -743,6 +755,7 @@ def _draw_nucleic(
         [[lab.seq for lab in s.labels] for s in na.strands],
         font / pt_per_unit,
         layout.na_line,
+        dict(layout.na_widths),
     )
     style = _na_style(layout, look)
     where = nucleotide_points(layout, style)  # nucleotide -> where it is drawn (bead and hydrogen bonds go there)
@@ -1783,9 +1796,13 @@ def ligand_marks(layout: Layout, loops: list[Loop], sses: list[SSE], look: Style
     return out
 
 
-def _draw_ligands(ax, marks: list[dict], lw: float, font: float, layout: Layout, pt_per_unit: float) -> None:
+def _draw_ligands(ax, marks: list[dict], lw: float, font: float, layout: Layout, pt_per_unit: float, hand=None) -> None:
     """Each ligand's mark and name, and its tethers: drawn under the bodies and the text (only what shows of each,
-    visible_pieces), so none runs over a letter."""
+    visible_pieces), so none runs over a letter. `hand` (elstyle.Hand): the colours set by hand, a mark's fill; its
+    edge's width set by hand is Layout.ligand_widths'."""
+    from .elstyle import Hand
+
+    widths = Hand({}, {}, {}, list(layout.ligand_widths))
     bodies = link_bodies(layout, ax)
     keep = link_keep(lw * 0.7, pt_per_unit, ax.figure.dpi)
     halos = text_halos(ax, pt_per_unit, keep)
@@ -1812,9 +1829,11 @@ def _draw_ligands(ax, marks: list[dict], lw: float, font: float, layout: Layout,
             )
             tether.set_gid(f"ligand-tether:{key}:{k}")
             ax.add_patch(tether)
+        own = hand.ligand(g) if hand is not None else None  # a colour set by hand
+        edge = lw * 0.7 * widths.ligand(g, 1.0)  # and a width
         if g.metal:
-            fill = METAL_COLOURS.get(g.symbol, "#7f7f7f")
-            marker = Circle((cx, cy), hw, fc=fill, ec=darken(fill, 0.7), lw=lw * 0.7, zorder=Z["mark"])
+            fill = own or METAL_COLOURS.get(g.symbol, "#7f7f7f")
+            marker = Circle((cx, cy), hw, fc=fill, ec=darken(fill, 0.7), lw=edge, zorder=Z["mark"])
             ink = text_color_on(fill)
         else:
             marker = FancyBboxPatch(
@@ -1822,12 +1841,12 @@ def _draw_ligands(ax, marks: list[dict], lw: float, font: float, layout: Layout,
                 2 * hw,
                 2 * hh,
                 boxstyle="round,pad=0,rounding_size=0.12",
-                fc=LIGAND_FILL,
-                ec=LIGAND_EDGE,
-                lw=lw * 0.7,
+                fc=own or LIGAND_FILL,
+                ec=darken(own, 0.7) if own else LIGAND_EDGE,
+                lw=edge,
                 zorder=Z["mark"],
             )
-            ink = "#5c4300"
+            ink = text_color_on(own) if own else "#5c4300"
         marker.set_gid(f"ligand:{key}")
         ax.add_patch(marker)
         t = ax.text(
@@ -2831,10 +2850,31 @@ def _by_domain(sses: list[SSE], layout: Layout):
     return out, by_domain
 
 
+def hand_colours(layout: Layout, sses: list[SSE], look: Style):
+    """The colours set by hand (Style.element_colors) resolved against the figure (elstyle.Hand: elements, loops,
+    nucleic-acid chains, ligands), None without any; ValueError names a reference that names nothing."""
+    if not look.element_colors:
+        return None
+    from .elstyle import COLORS, colours, resolve_all
+
+    return resolve_all(layout, sses, colours(look.element_colors), COLORS)
+
+
+def hand_legend(look: Style) -> list:
+    """The legend entry saying colours were set by hand (Style.element_colors): its swatch the colours set (up to
+    four), [] without any."""
+    if not look.element_colors:
+        return []
+    from .elstyle import colours
+
+    shades = tuple(dict.fromkeys(c for _, c in colours(look.element_colors)))[:4]
+    return [(("hand", shades), "colours set by hand")]
+
+
 def element_colours(layout: Layout, sses: list[SSE], look: Style):
     """(element id -> fill colour, residue colour function) exactly as the figure draws them: the colouring
     mode (drawn like a reference under an identity colouring: the reference's colours, Layout.like_colour), then
-    marked elements, then highlight greys."""
+    marked elements, then the colours set by hand (hand_colours), then highlight greys."""
     chains = _chains_in_order(sses)
     colors = chain_colors(chains, look.palette)
     element_colour, residue_colour = _colouring(sses, chains, colors, look, layout)
@@ -2851,6 +2891,9 @@ def element_colours(layout: Layout, sses: list[SSE], look: Style):
             raise ValueError(f"mark colour {colour!r} is not a colour (use a name or #rrggbb)") from None
         for sid in resolve(layout, sses, ref):
             element_colour[sid] = colour
+    hand = hand_colours(layout, sses, look)  # colours set by hand: over the colouring and the marks
+    if hand is not None:
+        element_colour.update({k: v for k, v in hand.elements.items() if k in element_colour})
     if layout.focus is not None:  # highlight: everything outside the focus in one quiet grey
         dim = {s.chain for s in sses} - layout.focus
         element_colour = {k: (MATE_GREY if s.chain in dim else element_colour[k]) for k, s in ((s.id, s) for s in sses)}
@@ -3363,6 +3406,7 @@ class _Canvas:
     page: tuple[float, float, float, float]  # xmin, xmax, ymin, ymax
     backbone: tuple[dict[str, str], dict[str, str]]  # backbone_colours: nucleic-acid chains, protein loop overrides
     bar_h: float = 0.0  # page units each domain bar takes, under the content (0: no bar)
+    hand: object = None  # elstyle.Hand: the colours set by hand (Style.element_colors), None without any
 
 
 class _Legend(NamedTuple):
@@ -3461,6 +3505,8 @@ def _legend_entries(
         entries.append((LIGAND_FILL, "chromophore / linked residue"))
     if getattr(layout, "absent", None) and look.legend:  # foldmap diff: the dashed outline, as drawn
         entries.append(((ABSENT_KEY,), ABSENT_LEGEND))
+    if look.legend:  # colours set by hand (elstyle): said once, whatever the colouring
+        entries += hand_legend(look)
     return entries
 
 
@@ -3746,15 +3792,17 @@ def _draw_loops(c: _Canvas, layout: Layout, loops: list[Loop], sses: list[SSE], 
     over = c.backbone[1]
     counts = {count["name"]: count for count in (lcounts if lcounts is not None else loop_counts(layout, loops, sses))}
     lifted = {k for k, p in layout.placed.items() if p.over}  # helices over a sheet: their loops lie on it too
+    hand = c.hand.loops if c.hand is not None else {}  # colours set by hand (elstyle), by the element left
     for i, loop in enumerate(loops):
         z = (_OVER_LOOP_Z if lifted & {loop.a_id, loop.b_id} else Z["loop"]) + i * 1e-3
+        loop_lw = c.loop_lw * layout.loop_widths.get(loop.a_id, 1.0)  # a width set by hand
         path = _loop_path(loop, c.look, boxes)
         name = f"{loop.a_id}>{loop.b_id}"
         casing = PathPatch(
             path,
             fc="none",
             ec=c.look.background,
-            lw=c.loop_lw * 3.0,
+            lw=loop_lw * 3.0,
             capstyle="round",
             joinstyle="round",
             zorder=z,
@@ -3772,6 +3820,8 @@ def _draw_loops(c: _Canvas, layout: Layout, loops: list[Loop], sses: list[SSE], 
         mine = over.get(a_sse.chain) if a_sse else None  # backbone_colors for this protein chain
         if mine:
             loop_c = mine
+        if loop.a_id in hand:  # its own colour, set by hand: one colour, no residue runs
+            loop_c = mine = legible(hand[loop.a_id])
         if layout.focus is not None and a_sse is not None and a_sse.chain not in layout.focus:
             loop_c = _MATE_LINE
         if c.look.loop_arrows:
@@ -3781,7 +3831,7 @@ def _draw_loops(c: _Canvas, layout: Layout, loops: list[Loop], sses: list[SSE], 
                     arrow,
                     fc="none",
                     ec=loop_c,
-                    lw=c.loop_lw,
+                    lw=loop_lw,
                     capstyle="round",
                     joinstyle="round",
                     zorder=z + 7e-4,
@@ -3792,7 +3842,7 @@ def _draw_loops(c: _Canvas, layout: Layout, loops: list[Loop], sses: list[SSE], 
             path,
             fc="none",
             ec=loop_c,
-            lw=c.loop_lw,
+            lw=loop_lw,
             capstyle="round",
             joinstyle="round",
             ls=(0, (3, 2)) if loop.dashed else "-",
@@ -3820,13 +3870,13 @@ def _draw_loops(c: _Canvas, layout: Layout, loops: list[Loop], sses: list[SSE], 
             shades = [c.residue_colour(r, a_sse.chain) for r in (span or ends)]
             shades = [col or c.look.ink for col in shades]  # true colours, matching the legend ...
             line.set_edgecolor(_RUN_EDGE)  # ... on a dark edge (the loop's own line, also the hover target)
-            line.set_linewidth(c.loop_lw * _RUN_EDGE_W)
+            line.set_linewidth(loop_lw * _RUN_EDGE_W)
             for k, (shade, piece) in enumerate(residue_runs(path, shades)):
                 run = PathPatch(
                     Path(piece),
                     fc="none",
                     ec=shade,
-                    lw=c.loop_lw,
+                    lw=loop_lw,
                     capstyle="butt",
                     joinstyle="round",
                     ls=(0, (3, 2)) if loop.dashed else "-",
@@ -4538,6 +4588,14 @@ def _draw_legend(c: _Canvas, layout: Layout, legend: _Legend) -> None:
             )
             box.set_gid("legend-absent")
             c.ax.add_patch(box)
+        elif isinstance(colour, tuple) and colour[0] == "hand":  # colours set by hand: a swatch of them, side by side
+            shades = colour[1] or (c.look.ink,)
+            for q, shade in enumerate(shades):
+                w = 0.6 / len(shades)
+                c.ax.add_patch(Rectangle((x + q * w, y - 0.3), w, 0.6, fc=shade, ec="none"))
+            box = Rectangle((x, y - 0.3), 0.6, 0.6, fc="none", ec="#9a9a9a", lw=c.lw * 0.5)
+            box.set_gid("legend-hand")
+            c.ax.add_patch(box)
         elif isinstance(colour, tuple) and colour[0] == "ia":  # an interaction kind: a short line, as drawn
             ink, dash = interaction_ink(colour[1], c.look)
             wide = XL_WIDTH if colour[1] in XL_KINDS else 1.0
@@ -4667,6 +4725,7 @@ def _draw(
         at,
         dmarks,
     )
+    c.hand = hand_colours(layout, sses, look)
     _draw_loops(c, layout, loops, sses, lcounts)
     _draw_membrane(c, layout)
     _draw_axis_symbol(c, layout)
@@ -4693,7 +4752,7 @@ def _draw(
     _draw_ghosts(c, layout)
     # after every text but the marks' own: bars and tethers keep off the letters (text_halos)
     _draw_links(c.ax, layout, loops, sses, look, c.lw, c.pt_per_unit, bars=bars, counts=counts)
-    _draw_ligands(c.ax, marks, c.lw, c.font, layout, c.pt_per_unit)
+    _draw_ligands(c.ax, marks, c.lw, c.font, layout, c.pt_per_unit, c.hand)
     _draw_linked(c.ax, linked, c.lw, c.font)
     _draw_uniprot(c.ax, umarks, layout, c.lw, c.font)
     _draw_data_marks(c.ax, dmarks, c.lw, c.look.background)

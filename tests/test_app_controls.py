@@ -702,8 +702,10 @@ def test_the_editors_are_tabs_in_edit_layout():
     """One editor in view at a time (the all-open sidebar stays short); every editor is still built, so each keeps
     its table and "as text" switch."""
     at = opened(DATA / "2LZM.cif")
-    assert [t.label for t in at.sidebar.tabs] == ["Swap", "Move", "Rename", "Mark", "Domains"] and not at.main.tabs
-    assert all(at.toggle(key=f"{kind}__as_text") for kind in ("swap", "move", "rename", "mark", "domains"))
+    tabs = ["Swap", "Move", "Rename", "Mark", "Colour", "Width", "Domains"]  # Colour, Width: set by hand (plan 23)
+    assert [t.label for t in at.sidebar.tabs] == tabs and not at.main.tabs
+    kinds = ("swap", "move", "rename", "mark", "element_colors", "element_widths", "domains")
+    assert all(at.toggle(key=f"{kind}__as_text") for kind in kinds)
 
 
 def test_an_editor_tab_shows_no_second_heading_but_keeps_its_help_and_switch():
@@ -711,7 +713,7 @@ def test_an_editor_tab_shows_no_second_heading_but_keeps_its_help_and_switch():
 
     at = opened(DATA / "2LZM.cif")
     assert not [m.value for m in at.sidebar.markdown if m.value in {f"**{label}**" for label in EDITOR_TABS}]
-    for kind in ("swap", "move", "rename", "mark", "domains"):
+    for kind in ("swap", "move", "rename", "mark", "element_colors", "element_widths", "domains"):
         assert at.toggle(key=f"{kind}__as_text").proto.help == EDITOR_HELP[kind]
 
 

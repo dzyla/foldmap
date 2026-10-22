@@ -11,6 +11,8 @@ from pathlib import Path
 from typing import Any
 
 from . import layoutfile
+from .elstyle import COLORS, PREFIXES, WIDTHS, joined, references
+from .elstyle import FORMS as ELSTYLE_FORMS
 from .layout import CONVENTIONS, RES_RANGE
 from .render import draw
 from .route import route_loops
@@ -118,6 +120,8 @@ def figure_spec(
     loops: str | None = None,
     style_file: str | Path | None = None,
     layout_file: str | Path | None = None,
+    colors: list[str] | tuple[str, ...] = (),
+    widths: list[str] | tuple[str, ...] = (),
     **given: Any,
 ) -> FigureSpec:
     """The figure for `structure`: the layout file (if any), overlaid by every value in `given` that is not None,
@@ -135,6 +139,12 @@ def figure_spec(
     file_style = [f"{k}={v}" for k, v in (doc.get("style") or {}).items()]
     shorthand = [f"{k}={v}" for k, v in (("palette", palette), ("fill", fill), ("loops", loops)) if v is not None]
     look = resolve_style(theme, style_file, file_style + shorthand + list(style))
+    if colors or widths:  # --color / --width: after the file's and the style's own entries, so they win
+        look = replace(
+            look,
+            element_colors=joined(look.element_colors, colors),
+            element_widths=joined(look.element_widths, widths),
+        ).validate()
     lay = {k: v for k, v in (doc.get("layout") or {}).items() if v is not None}
     defaults = FigureSpec(Path(structure))
 
@@ -361,6 +371,13 @@ def _reference(ref: str, where: str, domain: bool, elements) -> tuple[list[Probl
     ref = ref.strip()
     if not ref:
         return [Problem(where, f"an empty reference; name an element as {FORMS}", True)], None
+    if ref.startswith(PREFIXES):  # --color/--width's own forms (elstyle): loop:REF checks its REF
+        prefix, body = ref.split(":", 1)
+        if not body.strip():
+            return [Problem(where, f"{ref} names nothing; write {prefix}:… as {ELSTYLE_FORMS}", True)], None
+        if prefix == "loop":
+            return _reference(body, where, domain, elements)
+        return [], None
     if ref.startswith("res:"):
         chain, body = ref[4:].split(":") if ref[4:].count(":") == 1 else (None, ref[4:])
         m = RES_RANGE.fullmatch(body) if chain != "" else None
@@ -418,6 +435,9 @@ def _references(spec: FigureSpec) -> tuple[list[Problem], list[tuple[str, str, b
     refs += [(f"--move {ref}", str(ref), False) for ref, _ in spec.move or []]
     marks = (getattr(spec.look, "mark", "") or "").split(",")
     refs += [(f"mark {entry.strip()}", entry.partition("=")[0], False) for entry in marks if entry.strip()]
+    for key, option in ((COLORS, "--color"), (WIDTHS, "--width")):  # set by hand (elstyle): loop:REF's REF too
+        for ref in references(getattr(spec.look, key, "") or ""):
+            refs.append((f"{option} {ref}", ref, False))
     return problems, refs
 
 

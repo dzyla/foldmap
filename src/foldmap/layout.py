@@ -360,6 +360,13 @@ class Layout:
     loop_stroke: float = 1.0  # a loop's drawn stroke in line_pt: Style.loop_width, RUN_EDGE_W times it under
     # residue colours (its dark edge); for line_band
     na_line: float = 1.0  # Style.na_line the figure is drawn with: a nucleic-acid run's stroke is NA_RUN_W times it
+    # widths set by hand (Style.element_widths, elstyle; build_layout): element id -> factor (its Placed.width already
+    # holds it), loop (by the element it leaves) -> factor of its stroke, nucleic-acid chain -> factor of its
+    # backbone, ligands [(selectors, factor)] for their box's edge; all empty without any
+    element_widths: dict = field(default_factory=dict)
+    loop_widths: dict = field(default_factory=dict)
+    na_widths: dict = field(default_factory=dict)
+    ligand_widths: list = field(default_factory=list)
     helix_matched: dict = field(default_factory=dict)  # {"cut", "joined"}: helix pieces made alike in copies (ss)
     helix_matched_ids: list[str] = field(default_factory=list)  # the helices those cuts and joins made
     na_letter_rows: tuple[float | None, bool] = (None, False)  # where a stem's base letters sit (NT_ROW, 0 on the
@@ -3695,6 +3702,79 @@ def _adjust(
             it.apply()
 
 
+def _half(m: Placed) -> tuple[float, float]:
+    """Half the extent, across x and y, of a member's box (Placed.rect), wherever it stands."""
+    x0, y0, x1, y1 = m.rect
+    return (x1 - x0) / 2, (y1 - y0) / 2
+
+
+_WIDEN_GAP = 0.1  # page units kept between two members of one item that a width set by hand pushed apart
+
+
+def _widen(items: list[_Item], factors: dict[str, float]) -> bool:
+    """Each element of `factors` (id -> width factor set by hand, Style.element_widths) drawn that much wider: its
+    Placed.width (a helix's diameter, a strand's arrow, a 3-10 box), a ghost of it too, a helix at least as long as
+    it is wide (_true_length). In an item of several members standing side by side (a sheet, a βα row, a bundle: all
+    upright, or all lying), the columns across them are pushed apart by half the growth of each pair of neighbours,
+    so a wider strand keeps its pitch to the next; members over a sheet move with the columns about them. Then any
+    two members of an item that meet now and did not before (a kinked helix's pieces at an angle) are pushed apart,
+    the one not widened (else the later) the least way, along x or y. Whether any element grew (the caller then
+    clears the items of each other: _separate)."""
+    grew = False
+    for it in items:
+        extra, before = [], [_half(m) if isinstance(m, Placed) else None for m in it.members]
+        for m in it.members:
+            f = factors.get(m.sse.id, 1.0) if isinstance(m, Placed) else 1.0
+            extra.append(max(0.0, m.width * (f - 1.0)))  # a narrower one keeps its slot
+            if f != 1.0:
+                m.width *= f
+                if m.sse.kind in ("H", "G"):
+                    m.length = max(m.length, m.width)
+                grew = True
+        side = [k for k, m in enumerate(it.members) if isinstance(m, Placed) and not m.over]
+        if len(side) < 2 or not any(extra[k] for k in side):
+            continue
+        old = {k: (*it.offsets[k], *before[k]) for k in side}  # where each stood, and its half extents, before
+        upright = all(abs(np.sin(it.members[k].angle)) > 0.99 for k in side)
+        lying = all(abs(np.cos(it.members[k].angle)) > 0.99 for k in side)
+        if upright or lying:
+            axis = 0 if upright else 1  # columns along x (upright members) or rows along y (lying ones)
+            at = sorted({round(it.offsets[k][axis], 6) for k in side})
+            grown = {c: max(extra[k] for k in side if round(it.offsets[k][axis], 6) == c) for c in at}
+            shift = [0.0]
+            for a, b in zip(at, at[1:]):
+                shift.append(shift[-1] + (grown[a] + grown[b]) / 2)
+            mid = (shift[0] + shift[-1]) / 2
+            shift = [s - mid for s in shift]
+            for k, (ox, oy) in enumerate(it.offsets):
+                move = float(np.interp(ox if axis == 0 else oy, at, shift))
+                it.offsets[k] = (ox + move, oy) if axis == 0 else (ox, oy + move)
+        for _ in range(len(side)):  # what still meets that did not: pushed apart, a few rounds at most
+            pushed = False
+            for i, a in enumerate(side):
+                for b in side[i + 1 :]:
+                    if not (extra[a] or extra[b]):
+                        continue
+                    (ax, ay), (bx, by) = it.offsets[a], it.offsets[b]
+                    (ahx, ahy), (bhx, bhy) = _half(it.members[a]), _half(it.members[b])
+                    over_x, over_y = ahx + bhx - abs(bx - ax), ahy + bhy - abs(by - ay)
+                    oa, ob = old[a], old[b]
+                    met = oa[2] + ob[2] > abs(ob[0] - oa[0]) and oa[3] + ob[3] > abs(ob[1] - oa[1])
+                    if over_x <= 1e-6 or over_y <= 1e-6 or met:  # touching is not meeting (a sheet's pitch)
+                        continue
+                    k, sign = (b, 1.0) if extra[a] or not extra[b] else (a, -1.0)  # the one not widened moves
+                    if over_x <= over_y:
+                        step = (over_x + _WIDEN_GAP) * sign * (1.0 if bx >= ax else -1.0)
+                        it.offsets[k] = (it.offsets[k][0] + step, it.offsets[k][1])
+                    else:
+                        step = (over_y + _WIDEN_GAP) * sign * (1.0 if by >= ay else -1.0)
+                        it.offsets[k] = (it.offsets[k][0], it.offsets[k][1] + step)
+                    pushed = True
+            if not pushed:
+                break
+    return grew
+
+
 def _tm_ends(it: _Item, level: set[str], y: float) -> list[tuple[float, float]]:
     """Page y of the two ends (ports) of each transmembrane element (`level`) of an item centred at height y."""
     out = []
@@ -4449,6 +4529,17 @@ def build_layout(
         names(named, sses)
     if rename or swap or move:
         _adjust(items, named, sses, rename or {}, swap or [], move or [], joints, walls, kept)
+    hand = None  # element_widths (elstyle): resolved against the labels as drawn, after the user's renames
+    if style.element_widths:
+        from .elstyle import WIDTHS, resolve_all, widths
+
+        hand = resolve_all(named, sses, widths(style.element_widths), WIDTHS)
+        if _widen(items, hand.elements):
+            for it in items:
+                it.home = (it.cx, it.cy)
+            _separate(items, None, joints, walls, level=kept)
+            for it in items:
+                it.apply()
     for g in ghosts:
         g.label = real[g.sse.id].label
     rects = np.array([p.rect for p in placed + ghosts + dna]).reshape(-1, 4)
@@ -4486,6 +4577,10 @@ def build_layout(
     lay.font_scale = style.font_scale
     lay.loop_stroke = style.loop_width * (RUN_EDGE_W if style.loop_color == "residue" else 1.0)
     lay.na_line = style.na_line
+    if hand is not None:  # widths set by hand: what render draws wider, and texts keep off (line_band)
+        lay.element_widths, lay.loop_widths, lay.na_widths = dict(hand.elements), dict(hand.loops), dict(hand.chains)
+        lay.ligand_widths = list(hand.ligands)
+        lay.loop_stroke *= max([1.0, *hand.loops.values()])
     lay.ligands = style.ligands
     lay.ba_rows = _ba_rows(items)  # after the user's swaps
     lay.stack_gaps = _stack_gaps(lay)
@@ -5423,13 +5518,21 @@ def line_pt(scale: float) -> float:
     return float(np.clip(0.9 * scale / IN_PER_UNIT, 0.5, 1.2))
 
 
+def na_weight(layout: Layout, chain: str | None = None) -> float:
+    """A nucleic-acid backbone's weight as drawn: Layout.na_line times the factor set by hand for `chain`
+    (Layout.na_widths); with no chain, the widest drawn (what the texts keep off)."""
+    if chain is not None:
+        return layout.na_line * layout.na_widths.get(chain, 1.0)
+    return layout.na_line * max([1.0, *layout.na_widths.values()])
+
+
 def line_band(layout: Layout) -> float:
     """How far (page units) a loop's ink reaches from its centre line as figcheck's A6 reads a line by a text
     (text_collisions at clearance 0: half the drawn stroke, line_pt times Layout.loop_stroke, or a nucleic-acid
     strand's NA_RUN_W times Layout.na_line if wider), plus one pixel at figcheck's 100 dpi to spare (page_text):
     what a text placed after routing keeps from every line (lines_meeting)."""
     unit = page_text(layout)[1]  # page units per point
-    stroke = max(layout.loop_stroke, NA_RUN_W * layout.na_line if layout.na_paths else 0.0)
+    stroke = max(layout.loop_stroke, NA_RUN_W * na_weight(layout) if layout.na_paths else 0.0)
     return (line_pt(1.0 / (72 * unit)) * stroke / 2 + 0.72) * unit
 
 
@@ -5673,7 +5776,7 @@ def _choose_label_sides(layout: Layout, sses: list[SSE], style: Style, mirrored:
     }
     beside = {}  # (stem, side) -> its name's (label_at, label_along) beside its letters (or its edge) there
     for d in layout.stems:
-        tube = DNA_TUBE * layout.na_line * d.width / DNA_W  # render's ribbon tube
+        tube = DNA_TUBE * na_weight(layout) * d.width / DNA_W  # render's ribbon tube (its widest)
         edge = (d.width + tube) / 2 if na_style == "ribbon" else d.rail  # drawn, without letters
         for side in (1, -1):
             beside[id(d), side] = _name_at(d, side, ink[id(d)], letter_ink[id(d)], edge, _INK_MARGIN * em)
@@ -5766,7 +5869,7 @@ def _run_band(layout: Layout) -> float:
     """How far a nucleic-acid run's ink reaches from its centre line as figcheck's A6 reads a line by a text (as
     line_band, with a run's NA_RUN_W times Layout.na_line stroke), on the page as it stands."""
     unit = page_text(layout)[1]
-    stroke = max(layout.loop_stroke, NA_RUN_W * layout.na_line)
+    stroke = max(layout.loop_stroke, NA_RUN_W * na_weight(layout))
     return (line_pt(1.0 / (72 * unit)) * stroke / 2 + 0.72) * unit
 
 

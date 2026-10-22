@@ -277,6 +277,8 @@ files).
 | Rename an element | `--rename res:A:167-182=Gd` |
 | Conventional names | `--names deposited` (the file's helix ids, e.g. globin A–H), `--names beta` (β1…βn) or `--names docs/names/2HHB-globin.yaml` (repeatable) |
 | Highlight elements | `--set mark=α4=#2ca02c` |
+| An element's own colour | `--color α1=#d1495b` (repeatable; wins over `color_by` and marks; the legend says colours were set by hand) |
+| An element's own width | `--width α1=2` (repeatable; a factor from 0.25 to 4: a helix's diameter, an arrow's width, a loop's stroke, a backbone's weight; the layout keeps the room) |
 | Named domain panels | `--domain N-lobe=res:A:13-59` (repeatable), `--domains auto` (inferred), `--domains cath` (CATH's published domains, needs network) or `--domains uniprot` |
 | Domain colours and bar | `--set color_by=domain`, `--set domain_bar=on\|off`, `--set domain_colours=false` |
 | βα row | `--set fold_template=off` draws an all-parallel α/β sheet as projected |
@@ -295,6 +297,12 @@ files).
 | Symmetry and assembly | `--symmetry auto\|off\|C3\|D2\|helical`, `--protomers "A,B;C,D"`, `--assembly auto\|asu\|ID` |
 
 Elements are named by label (`A`, `α2`, `η1`), `chain:label`, position (`#3`) or residue range (`res:A:10-25`). Negative numbers and insertion codes are written as in the file: `res:A:-7-4`, `res:H:100A-100K`.
+
+`--color` and `--width` (style keys `element_colors` and `element_widths`, saved in layout files as residue ranges;
+the app's Colour and Width editors under Edit layout; `colors` and `widths` in the MCP server) also take
+`loop:REF` (the loop leaving element REF, e.g. `loop:β2=1.5`; a residue range inside a loop names that loop too),
+`na:CHAIN` (a nucleic-acid chain's backbone: rails, ribbons, blocks, single strands) and `lig:CODE` (a ligand's box,
+`lig:HEM` or one copy `lig:HEM:A142`), e.g. `foldmap plot 1LMB --color na:1=#d1495b --width na:1=2`.
 
 References are checked before anything is drawn, the same way on the command line, in the app (under the field) and
 in the MCP server: a range written without `res:` (`--domain N=A:1-60`) is read as `res:A:1-60` with a warning; a

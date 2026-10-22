@@ -254,9 +254,18 @@ EDITORS = {
     "move": ("element", "dx", "dy"),
     "rename": ("element", "name"),
     "mark": ("element", "colour"),
+    "element_colors": ("element", "colour"),  # colours and widths set by hand (elstyle): --color, --width
+    "element_widths": ("element", "width"),
     "domains": ("name", "ranges"),
 }
-NEEDED = {"swap": ("a", "b"), "rename": ("element", "name"), "domains": ("name", "ranges")}  # a table row is
+HAND = ("element_colors", "element_widths")  # REF=VALUE, comma-separated, as the command line's style value
+NEEDED = {
+    "swap": ("a", "b"),
+    "rename": ("element", "name"),
+    "domains": ("name", "ranges"),
+    "element_colors": ("element", "colour"),
+    "element_widths": ("element", "width"),
+}  # a table row is
 # written once these are filled (else its first column): a swap of one element, a rename with no name or a domain
 # with no ranges would be an error
 _RANGE_IN_CHAIN = re.compile(r"(?![A-Za-z]+\d+:)[A-Za-z0-9]+:-?\d+[A-Z]?(--?\d+[A-Z]?)?")  # not a copy's (A1:)
@@ -297,7 +306,7 @@ def _residues(ref: str) -> str:
 def rows_of(kind: str, text: str) -> list[dict]:
     """Today's text of an editor as table rows (columns `EDITORS[kind]`)."""
     text = text or ""
-    if kind == "mark":
+    if kind == "mark" or kind in HAND:
         items = _list(text)
     else:
         items = [p.strip() for p in re.split(r"[;\n]", text) if p.strip()]
@@ -316,6 +325,10 @@ def rows_of(kind: str, text: str) -> list[dict]:
         elif kind == "mark":
             ref, _, colour = item.partition("=")
             rows.append({"element": ref.strip(), "colour": colour.strip()})
+        elif kind in HAND:
+            ref, _, value = item.rpartition("=")
+            column = EDITORS[kind][1]
+            rows.append({"element": ref.strip(), column: _float_or_text(value) if column == "width" else value.strip()})
         elif kind == "domains":
             if item == "auto":  # automatic domains are a switch, not a row
                 continue
@@ -343,10 +356,14 @@ def text_of(kind: str, rows: list[dict]) -> str:
         elif kind == "mark":
             ref, colour = _cell(row.get("element")), _cell(row.get("colour"))
             items.append(f"{ref}={colour}" if colour else ref)
+        elif kind == "element_colors":
+            items.append(f"{_cell(row.get('element'))}={_cell(row.get('colour'))}")
+        elif kind == "element_widths":
+            items.append(f"{_cell(row.get('element'))}={_number(row.get('width'))}")
         elif kind == "domains":
             refs = ",".join(_residues(r) for r in _list(_cell(row.get("ranges"))))
             items.append(f"{_cell(row.get('name'))}={refs}")
-    return {"mark": ", ", "domains": "\n"}.get(kind, "; ").join(items)
+    return {"mark": ", ", "domains": "\n", **dict.fromkeys(HAND, ",")}.get(kind, "; ").join(items)
 
 
 def table_rows(ss: MutableMapping, kind: str) -> list[dict]:
@@ -502,6 +519,8 @@ CONTROLS: dict[str, tuple[str, str, tuple[str, ...]]] = {
     "move": ("Move", _LAYOUT, ("move__as_text", "move")),
     "rename": ("Rename", _LAYOUT, ("rename__as_text", "rename")),
     "mark": ("Mark", _LAYOUT, ("mark__as_text", "mark")),
+    "element_colors": ("Colour", _LAYOUT, ("element_colors__as_text", "element_colors")),
+    "element_widths": ("Width", _LAYOUT, ("element_widths__as_text", "element_widths")),
     "domains": ("Domains", _LAYOUT, ("domains__auto", "domains__as_text", "domains")),
     "domains_from_file": ("Domains", _LAYOUT, ("domains__auto", "domains__as_text", "domains")),
     "domain_source": ("Domains", _LAYOUT, ("domains__auto", "domains__as_text", "domains")),
@@ -529,6 +548,10 @@ _NEEDLES = (  # (in the lower-cased error message, the setting it points at); th
     ("swap", "swap"),
     ("--move", "move"),
     ("rename", "rename"),
+    ("element_colors", "element_colors"),  # before mark and domain: the key names itself first
+    ("element_widths", "element_widths"),
+    ("--color", "element_colors"),
+    ("--width", "element_widths"),
     ("mark", "mark"),
     ("domain", "domains"),
     ("highlight", "highlight"),

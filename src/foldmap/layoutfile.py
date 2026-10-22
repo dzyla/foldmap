@@ -82,6 +82,14 @@ def document(
             ref, sep, colour = entry.partition("=")
             marks += [f"{c}{sep}{colour}" for c in canonical(layout, sses, ref)]
         style["mark"] = ",".join(marks)
+    for key in ("element_colors", "element_widths"):  # set by hand (elstyle): references as residue ranges too
+        if style.get(key):
+            from .elstyle import canonical as hand_ref
+            from .elstyle import entries
+
+            style[key] = ",".join(
+                f"{c}={value}" for ref, value in entries(style[key], key) for c in hand_ref(layout, sses, ref)
+            )
     rename = {c: name for ref, name in (edits.get("rename") or {}).items() for c in canonical(layout, sses, ref)}
     swap = [[canonical(layout, sses, a)[0], canonical(layout, sses, b)[0]] for a, b in edits.get("swap") or []]
     move = {}
