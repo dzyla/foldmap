@@ -430,6 +430,12 @@ class Layout:
         return self.stems
 
     @property
+    def bent_duplex(self) -> bool:
+        """A duplex is drawn cut into two or more pieces where its axis turns (PlacedStem.parent): Style.na_bend is
+        a choice (the app offers it only then), whichever it is."""
+        return any(n > 1 for n in Counter(d.parent for d in self.stems if d.parent).values())
+
+    @property
     def width(self) -> float:
         return self.bounds[2] - self.bounds[0]
 
@@ -5397,6 +5403,57 @@ def stem_keep_box(d: PlacedStem, k: float | None = None) -> tuple[float, float, 
     return x + x0, y + y0, x + x1, y + y1
 
 
+def stem_bodies(layout: Layout) -> list[PlacedStem]:
+    """The stems' bodies as drawn, for what keeps off them or judges them: layout.stems; with bent duplexes drawn as
+    curves (Style.na_bend curved, Layout.na_curves), each curve's straight stretches (na_curve.Chord) in place of its
+    pieces, which are not drawn."""
+    if not getattr(layout, "na_curves", None):
+        return layout.stems
+    from .na_curve import bodies
+
+    return bodies(layout)
+
+
+def stem_name_keeps(
+    layout: Layout, k: float | None = None, keep: bool = True
+) -> list[tuple[float, float, float, float]]:
+    """The boxes round the stems' names as drawn (glyphs `k`): with `keep` what routes and marks keep out of
+    (stem_keep_box), else their text boxes (_stem_label_box); with bent duplexes drawn as curves, each curve's name
+    (once placed: na_curve.label_box) in place of its pieces'."""
+    box = stem_keep_box if keep else _stem_label_box
+    curves = getattr(layout, "na_curves", None)
+    if not curves:
+        return [box(d, k) for d in layout.stems]
+    from .na_curve import label_box, on_curves
+
+    hidden = on_curves(layout)
+    out = [box(d, k) for n, d in enumerate(layout.stems) if n not in hidden]
+    return out + [label_box(c, _GLYPH_K.get() if k is None else k) for c in curves if c.named]
+
+
+def stem_points(layout: Layout, off: float = 0.0) -> dict[tuple[int, int], np.ndarray]:
+    """Each stem nucleotide's page position as drawn (PlacedStem.point; on its curve where a bent duplex is drawn as
+    one, NACurve.point), or `off` further out from the axis."""
+    out = {key: d.point(key, off) for d in layout.stems for key in d.axial}
+    for c in getattr(layout, "na_curves", None) or ():
+        out.update({key: c.point(key, off) for key in c.at})
+    return out
+
+
+def stems_at(layout: Layout) -> dict:
+    """Stem nucleotide -> what it is drawn on, as na_paths.among reads it: its stem; on a bent duplex drawn as a curve
+    (Layout.na_curves), every straight stretch of the curve (na_curve.Chord)."""
+    at = {key: d for d in layout.stems for key in d.axial}
+    curves = getattr(layout, "na_curves", None)
+    if curves:
+        from .na_curve import chords
+
+        for n, c in enumerate(curves):
+            mine = tuple(chords(c, n, layout.stems))
+            at.update(dict.fromkeys(c.at, mine))
+    return at
+
+
 def _stem_label_box(d: PlacedStem, k: float | None = None) -> tuple[float, float, float, float]:
     """The box around a stem's name, written along the stem: glyphs `k` (glyph_scale; the layout being built's,
     _GLYPH_K, when None) times _GLYPH_W x _GLYPH_H."""
@@ -5989,7 +6046,8 @@ def na_strand_lines(layout: Layout) -> list:
 def na_text_boxes(layout: Layout) -> list[tuple[float, float, float, float]]:
     """The ink boxes of the nucleic acid's text as render draws it, for protein loops to keep off once it is placed
     (route.route_loops, random-100 C11): each single-stranded nucleotide's letter (Layout.na_letters), each stem's
-    base letters on their row (Layout.na_letter_rows) and the strands' 5'/3' labels (a full em, bold)."""
+    base letters on their row (Layout.na_letter_rows; a bent duplex drawn as a curve, Layout.na_curves: on the
+    curve, with its name once placed) and the strands' 5'/3' labels (a full em, bold)."""
     na = layout.nucleic
     row, single = layout.na_letter_rows
     if na is None:
@@ -6004,10 +6062,17 @@ def na_text_boxes(layout: Layout) -> list[tuple[float, float, float, float]]:
     if single:
         for (s, i), xy in sorted(layout.na_letters.items()):
             add(na.strands[s].bases[i], False, _LETTER_EM * em, 0.0, xy)
+    curves = getattr(layout, "na_curves", None) or []  # bent duplexes drawn as curves: their letters and names
+    curve_of = {key: c for c in curves for key in c.at}
     if row is not None:
         for d in layout.stems:
             for key in sorted(d.axial):
-                add(na.strands[key[0]].bases[key[1]], False, _LETTER_EM * em, d.angle, d.point(key, row))
+                c = curve_of.get(key)
+                at, turn = (d.point(key, row), d.angle) if c is None else (c.point(key, row), c.angle(key))
+                add(na.strands[key[0]].bases[key[1]], False, _LETTER_EM * em, turn, at)
+    for c in curves:
+        if c.named:
+            add(c.name, True, _NAME_EM * em, c.name_angle, c.name_xy)
     for _, end, xy in layout.na_ends:
         add(end, True, em, 0.0, xy)
     return out
@@ -6152,8 +6217,15 @@ def label_boxes(
         )
         t = end_label_pos(layout, end, chain, port, ex)
         out.append((f"{end}:{chain}", centred_box(float(t[0]), float(t[1]), gw / 2 + 0.05, gh / 2)))
+    curves = getattr(layout, "na_curves", None) or []  # bent duplexes drawn as curves: their names, not the pieces'
+    hidden = {i for c in curves for i in c.pieces}
     for n, d in enumerate(layout.stems):
-        out.append((f"stem-label:{n}", stem_keep_box(d, k) if route else _stem_label_box(d, k)))
+        if n not in hidden:
+            out.append((f"stem-label:{n}", stem_keep_box(d, k) if route else _stem_label_box(d, k)))
+    if curves:
+        from .na_curve import label_box
+
+        out += [(f"stem-label:curve:{n}", label_box(c, k)) for n, c in enumerate(curves) if c.named]
     for n, tie in enumerate(layout.na_ties):  # a long tie's labels at its two marks
         for end, (_, _, (x, y)) in enumerate(tie.marks):
             out.append((f"tie-label:{n}:{end}", centred_box(x, y, gw / 2 + 0.05, gh / 2)))

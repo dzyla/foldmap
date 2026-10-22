@@ -215,7 +215,9 @@ def draw_topology(
 
     Options left out come from layout_file (if given), otherwise the defaults: theme publication, assembly auto,
     symmetry auto, membrane off, focus auto, mode projected, rotate 0.
-    style: style keys to change, e.g. {"color_by": "sequence", "residue_numbers": "true", "mark": "α2=#d1495b"}.
+    style: style keys to change, e.g. {"color_by": "sequence", "residue_numbers": "true", "mark": "α2=#d1495b"};
+    {"na_bend": "curved"} draws a bent duplex (nucleosome, IHF, TBP) as one curved ladder with the protein laid out
+    round it, instead of straight pieces (the result's `bent_duplex` is true where there is one).
     domains: named domain panels, e.g. {"N-lobe": ["res:A:13-59"]}. domains_from: "auto" (inferred from residue
     contacts, not a published assignment: the note says so) or "cath" (CATH's published chopping of a PDB entry,
     fetched from PDBe; the note names its domains, or says there are none). swap: pairs of elements to exchange, e.g.
@@ -329,6 +331,7 @@ def draw_topology(
                 "provenance": items,
                 "interactions": _interaction_lines(drawn.figure),
                 "data_problems": [{"where": p.where, "text": p.text} for p in problems],
+                "bent_duplex": drawn.layout.bent_duplex,  # na_bend (pieces or curved) is a choice for it
             },
         )
 

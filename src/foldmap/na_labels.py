@@ -25,10 +25,12 @@ from .layout import (
     _footprint,
     _ink_points,
     _reach,
-    _stem_label_box,
     glyph,
     label_boxes,
     line_clearance,
+    stem_bodies,
+    stem_name_keeps,
+    stem_points,
     text_em,
 )
 from .na_paths import _BEAD, NAPath, NATie, _dot, _near, _seg_dist, _seg_dists, _spaced, crosses_body, in_body, midway
@@ -230,10 +232,10 @@ def _place_letters(
     stay = {} if only is None else {k: xy for k, xy in layout.na_letters.items() if k not in only}
     for xy in stay.values():
         taken.add(xy)
-    bodies = [*layout.placed.values(), *layout.stems]  # by their true (tilted) outlines, not their boxes
+    bodies = [*layout.placed.values(), *stem_bodies(layout)]  # by their true (tilted) outlines, not their boxes
     gw, gh = glyph(layout)  # a letter's room, sized from the text drawn
     g = 1.2 * gh  # a stem's name stands a letter and a half clear of any base letter
-    boxes = [np.add(_stem_label_box(d, gw / _GLYPH_W), (-g, -g, g, g)) for d in layout.stems]
+    boxes = [np.add(b, (-g, -g, g, g)) for b in stem_name_keeps(layout, gw / _GLYPH_W, keep=False)]
     # and the elements' names, a letter's half size round them (held-out 13FZ: B:1's letter on A:987-990's name)
     half = (-gw / 2, -gh / 2, gw / 2, gh / 2)
     named = [p for p in layout.placed.values() if getattr(getattr(p, "sse", None), "kind", None) in ("H", "G")]
@@ -429,7 +431,7 @@ def _label_gaps(layout: Layout, paths: list[NAPath], loops=()) -> None:
     if not gaps:
         return
     em = _em(layout)
-    bodies = [*layout.placed.values(), *layout.ghosts, *layout.stems]
+    bodies = [*layout.placed.values(), *layout.ghosts, *stem_bodies(layout)]
     segs = [(a, b) for p in paths for a, b in zip(p.points, p.points[1:])]
     owner = [k for k, p in enumerate(paths) for _ in p.points[1:]]  # the path each segment is part of
     segs += [(a, b) for pts in loops for a, b in zip(pts, pts[1:])]
@@ -442,10 +444,10 @@ def _label_gaps(layout: Layout, paths: list[NAPath], loops=()) -> None:
     seg_box = seg_box.reshape(-1, 4)
     gw, gh = glyph(layout)  # a letter's room, sized from the text drawn
     g = gw / 2 + 0.05, gh / 2
-    glyphs = [d.point(key, NT_ROW) for d in layout.stems for key in d.axial] + list(layout.na_letters.values())
+    glyphs = list(stem_points(layout, NT_ROW).values()) + list(layout.na_letters.values())
     glyphs += [xy for _, _, xy in layout.na_ends]
     taken = [(x - g[0], y - g[1], x + g[0], y + g[1]) for x, y in glyphs] + [b for _, b in label_boxes(layout, [])]
-    beads = [d.point(key) for d in layout.stems for key in d.axial] + [q for p in paths for q in p.nt_xy]
+    beads = list(stem_points(layout).values()) + [q for p in paths for q in p.nt_xy]
     beads = np.asarray(beads, float).reshape(-1, 2)
 
     body_box = _boxes_of(bodies)
@@ -539,7 +541,7 @@ def _ties(layout: Layout, paths: list[NAPath], loops=()) -> list[NATie]:
     letters = {key: d.point(key, NT_ROW) for d in layout.stems for key in d.axial}
     letters.update({key: c.point(key, NT_ROW) for c in getattr(layout, "na_curves", ()) for key in c.at})
     letters.update({key: np.asarray(xy) for key, xy in layout.na_letters.items()})
-    bodies = [*layout.placed.values(), *layout.stems]
+    bodies = [*layout.placed.values(), *stem_bodies(layout)]
     outlines = [_outline(e) for e in bodies]  # as drawn: a label's box is clear of a strand's shaft and head
     rects = _boxes_of(bodies)
 
@@ -673,7 +675,7 @@ def _widen(layout: Layout, paths: list[NAPath]) -> None:
     pad = NT_ROW + max(gw, gh)
     boxes = [(x - pad, y - pad, x + pad, y + pad) for p in paths for x, y in p.points]
     g = max(gw, gh) / 2 + 0.05  # a letter turned any way
-    letters = [d.point(key, NT_ROW) for d in layout.stems for key in d.axial] + list(layout.na_letters.values())
+    letters = list(stem_points(layout, NT_ROW).values()) + list(layout.na_letters.values())
     letters += [xy for _, _, xy in layout.na_ends]
     boxes += [(x - g, y - g, x + g, y + g) for x, y in letters]
     boxes += [_gap_box(p, _em(layout)) for p in paths if p.label]

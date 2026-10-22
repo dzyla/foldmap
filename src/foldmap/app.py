@@ -1250,6 +1250,7 @@ def main() -> None:
             two_fold_assembly=result.get("two_fold_assembly", False),
             cyclic_assembly=result.get("cyclic_assembly", False),
             lent_across_cut=result.get("lent_across_cut", False),
+            bent_duplex=result.get("bent_duplex", False),
             all_chains=chain_choices(size["chain_ids"], [*result["chains"], *result["na_chains"]]),
             chains_total={"assembly": "auto", "count": result["chain_count"]},  # reset_structure: auto
             assemblies=size["assemblies"],

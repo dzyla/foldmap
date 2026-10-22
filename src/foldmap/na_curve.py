@@ -17,13 +17,14 @@ evenly), pinned there, the protein laid out round its band."""
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 import numpy as np
 
 from .layout import (
     _CONTACT_CAP,
     _GLYPH_H,
+    _GLYPH_W,
     _W_CONTACT,
     DNA_RISE,
     MARGIN,
@@ -34,6 +35,7 @@ from .layout import (
     PlacedStem,
     Walls,
     _snap,
+    centred_box,
     glyph,
 )
 
@@ -72,6 +74,7 @@ class NACurve:
     name_angle: float = 0.0
     band: float = 0.0  # its rails and base letters across (2 x (rail + NT_ROW + a glyph's height))
     held: list = field(default_factory=list)  # laid out by build_layout (lay_out): each piece's (cx, cy, angle) there
+    named: bool = False  # its name placed (build_curves: name_xy, name_angle); text keeps off it from then on
 
     def frames(self, s) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """(points, unit tangents, unit left normals) at arc lengths s; past either end the curve runs straight on."""
@@ -372,6 +375,23 @@ def _make(parent: str, ks: list[int], ps: list[PlacedStem], xy, centres, gyres, 
     return NACurve(parent, name, ks, xy, s, tangent, rail, width, at, side, pairs, gyres, overlap)
 
 
+def _name_off(layout: Layout, c: NACurve, gh: float) -> float:
+    """How far from the curve's axis its name is centred: as a stem's (layout._name_at), _INK_MARGIN em beyond the
+    ink of its letter row across it, the name's ink reaching back that far (figcheck.stem_name_gaps, A17); with no
+    letter row drawn, a glyph and a half beyond the letters' place."""
+    from .layout import _INK_MARGIN, _LETTER_EM, _NAME_EM, _ink_em, _ink_points
+
+    row = layout.na_letter_rows[0]
+    na = layout.nucleic
+    if row is None or na is None:
+        return c.rail + NT_ROW + 1.5 * gh
+    em = _ink_em(layout, layout.font_scale)
+    bases = sorted({na.strands[s].bases[i] for s, i in c.at})
+    across = max(float(np.abs(_ink_points(b, False, _LETTER_EM * em, 0.0)[:, 1]).max(initial=0.0)) for b in bases)
+    inner = float(np.abs(_ink_points(c.name, True, _NAME_EM * em, 0.0)[:, 1]).max(initial=0.0))
+    return math.ceil((c.rail + row + across + _INK_MARGIN * em + inner) * 1e4) / 1e4
+
+
 def build_curves(layout: Layout) -> list[NACurve]:
     """Every bent duplex of the layout as one curve (NACurve), its nucleotides placed on it: the curve build_layout
     laid it out on (lay_out) while its pieces stand where that put them, else one through the pieces as placed."""
@@ -388,7 +408,8 @@ def build_curves(layout: Layout) -> list[NACurve]:
             xy, centres, gyres, overlap = _curve_of(stems, ks, band)
             c = _make(parent, ks, ps, xy, centres, gyres, overlap, na)
         c.band = band
-        c.name_xy, c.name_angle = _name_place(c, band, c.rail + NT_ROW + 1.5 * gh)
+        c.name_xy, c.name_angle = _name_place(c, band, _name_off(layout, c, gh))
+        c.named = True
         out.append(c)
     return out
 
@@ -780,9 +801,163 @@ def widen(layout: Layout, curves: list[NACurve]) -> None:
 
 
 def bend(layout: Layout, paths: list, ends: list) -> list:
-    """Style.na_bend curved: layout.na_curves set, the strands leaving them moved with them (follow), the page
-    grown to hold them. Returns the strand ends moved."""
+    """Style.na_bend curved: layout.na_curves set, the strands leaving them moved with them (follow), the joints
+    between their pieces taken out of `paths` (drawn as the curve: what comes after, and every check, reads the
+    strands as drawn), the page grown to hold them. Returns the strand ends moved."""
     layout.na_curves = build_curves(layout)
     ends = follow(layout, layout.na_curves, paths, ends)
+    held = {key for c in layout.na_curves for key in c.at}
+    paths[:] = [p for p in paths if not (p.kind == "joint" and p.between and p.between[0] in held)]
     widen(layout, layout.na_curves)
     return ends
+
+
+# ---- the curve as drawn, for what reads the stems' bodies (checks, keep-outs): plan 25 Task 3 ----
+
+
+@dataclass(eq=False)
+class Chord(PlacedStem):
+    """A stretch of a curve's body (NACurve: its rails' width, end to end) as a straight stand-in, what checks and
+    keep-outs read in place of the curve's pieces (which are not drawn). id: the piece nearest it along the curve
+    (its owner, as route._oid names it); curve: the curve's index in layout.na_curves; s0, s1: its arc lengths."""
+
+    curve: int = -1
+    s0: float = 0.0
+    s1: float = 0.0
+
+
+def _owner(c: NACurve, stems: list[PlacedStem], s: float) -> PlacedStem:
+    """The piece of the curve whose nucleotides' arc lengths come nearest s."""
+    best, out = math.inf, stems[c.pieces[0]]
+    for k in c.pieces:
+        at = [c.at[key] for key in stems[k].axial if key in c.at]
+        if not at:
+            continue
+        gap = max(min(at) - s, s - max(at), 0.0)
+        if gap < best:
+            best, out = gap, stems[k]
+    return out
+
+
+def chords(c: NACurve, n: int, stems: list[PlacedStem]) -> list[Chord]:
+    """The curve's body as Chords, each at most its rail offset long along the curve (a turn of under 20 degrees
+    from one to the next at the tightest bend, _R_MIN), each grown past both ends by what closes the wedge its turn
+    from its neighbour opens on the bend's outside, and across by how far the curve bows off it there (its sagitta,
+    each side): one band, no gap, nothing past it but those hairs."""
+    lo, hi = c.extent()
+    m = max(1, math.ceil((hi - lo) / max(c.rail, 0.1)))
+    edges = np.linspace(lo, hi, m + 1)
+    p = c.frames(edges)[0]
+    seg = np.diff(p, axis=0)
+    ang = np.arctan2(seg[:, 1], seg[:, 0])
+    turn = np.abs((np.diff(ang) + np.pi) % (2 * np.pi) - np.pi)
+    turn = np.maximum(np.concatenate([[0.0], turn]), np.concatenate([turn, [0.0]]))  # at either end, the larger
+    grow = c.width / 2 * np.tan(np.minimum(turn, np.pi / 2) / 2)
+    keys = sorted(c.at, key=lambda key: (c.at[key], key))
+    out = []
+    for j in range(m):
+        s0, s1 = float(edges[j]), float(edges[j + 1])
+        mid = (p[j] + p[j + 1]) / 2
+        bow = c.xy[(c.s > s0) & (c.s < s1)]  # the curve between the ends: how far it bows off the chord
+        across = np.array([-seg[j, 1], seg[j, 0]]) / max(float(np.hypot(*seg[j])), 1e-12)
+        sag = float(np.abs((bow - mid) @ across).max()) if len(bow) else 0.0
+        mine = [key for key in keys if s0 <= c.at[key] < s1 or (j == m - 1 and c.at[key] == s1)]
+        owner = _owner(c, stems, (s0 + s1) / 2)
+        out.append(
+            Chord(
+                owner.id,
+                c.name,
+                list(owner.strands),
+                [],
+                float(mid[0]),
+                float(mid[1]),
+                float(np.hypot(*seg[j])) + 2 * float(grow[j]),
+                float(ang[j]),
+                c.width + 2 * sag,
+                {key: c.at[key] - (s0 + s1) / 2 for key in mine},
+                {key: c.side[key] for key in mine},
+                parent=c.parent,
+                curve=n,
+                s0=s0,
+                s1=s1,
+            )
+        )
+    return out
+
+
+def on_curves(layout) -> set[int]:
+    """The indices in layout.stems of the pieces drawn as curves (layout.na_curves)."""
+    return {k for c in getattr(layout, "na_curves", ()) for k in c.pieces}
+
+
+def bodies(layout) -> list[PlacedStem]:
+    """The stems' bodies as drawn: every stem drawn straight, then each curve's Chords (in place of its pieces)."""
+    curves = getattr(layout, "na_curves", ())
+    if not curves:
+        return list(layout.stems)
+    hidden = on_curves(layout)
+    out = [d for k, d in enumerate(layout.stems) if k not in hidden]
+    for n, c in enumerate(curves):
+        out += chords(c, n, layout.stems)
+    return out
+
+
+def drawn_pieces(layout) -> list[PlacedStem]:
+    """layout.stems as drawn: each piece of a curve as a straight stand-in where its nucleotides are drawn on it (its
+    centre the curve's point midway between its outermost rungs, its direction from the one to the other, its rails
+    on the curve's sides), every other stem itself. For the measures that read stems one by one (nacheck.shape,
+    nacheck.contacts)."""
+    curves = getattr(layout, "na_curves", ())
+    if not curves:
+        return list(layout.stems)
+    curve_of = {k: c for c in curves for k in c.pieces}
+    out = []
+    for k, d in enumerate(layout.stems):
+        c = curve_of.get(k)
+        if c is None:
+            out.append(d)
+            continue
+        at = {key: c.at[key] for key in d.axial if key in c.at}
+        lo, hi = min(at.values()), max(at.values())
+        mid = (lo + hi) / 2
+        a, b = c.to_page([lo, hi], [0.0, 0.0])
+        cx, cy = (float(v) for v in c.to_page(mid, 0.0)[0])
+        angle = float(math.atan2(b[1] - a[1], b[0] - a[0])) if hi > lo else c.angle(next(iter(at)))
+        arm = next(key for key in sorted(d.axial) if d.side[key] == d.first)
+        out.append(
+            replace(
+                d,
+                cx=cx,
+                cy=cy,
+                angle=angle,
+                length=hi - lo + DNA_RISE * SCALE,
+                axial={key: v - mid for key, v in at.items()},
+                side={key: c.side[key] for key in at},
+                first=c.side[arm],
+            )
+        )
+    return out
+
+
+def label_box(c: NACurve, k: float) -> tuple[float, float, float, float]:
+    """The box round the curve's name, written along the curve at its place (_name_place): glyphs `k` (glyph_scale)
+    times _GLYPH_W x _GLYPH_H, as layout._stem_label_box sizes a stem's."""
+    along, across = _GLYPH_W * k * len(c.name) / 2 + 0.05, _GLYPH_H * k / 2
+    cos, sin = abs(math.cos(c.name_angle)), abs(math.sin(c.name_angle))
+    return centred_box(*c.name_xy, cos * along + sin * across, sin * along + cos * across)
+
+
+def piece_bodies(layout) -> list[list[PlacedStem]]:
+    """Each of layout.stems' bodies as drawn, for the measures that read a stem's body (nacheck.contacts): the stem
+    itself; a piece of a curve, the curve's stretches (chords) over its nucleotides, from half a base-pair step before
+    its first rung to half a step past its last."""
+    curves = getattr(layout, "na_curves", ())
+    out = [[d] for d in layout.stems]
+    half = DNA_RISE * SCALE / 2
+    for n, c in enumerate(curves):
+        mine = chords(c, n, layout.stems)
+        for k in c.pieces:
+            at = [c.at[key] for key in layout.stems[k].axial if key in c.at]
+            lo, hi = min(at) - half, max(at) + half
+            out[k] = [b for b in mine if b.s1 > lo and b.s0 < hi]
+    return out

@@ -429,6 +429,22 @@ def test_cyclic_choice_is_offered_for_a_four_or_seven_fold_ring(monkeypatch):
     assert at.segmented_control(key="cyclic").value == "rosette"
 
 
+def test_bent_duplex_choice_is_offered_only_where_a_duplex_is_drawn_in_pieces(monkeypatch):
+    """Plan 25 Task 3: pieces (the default) or one curve, in the DNA/RNA block, only where a bent duplex is drawn
+    (IHF), whichever is chosen; a straight duplex (1LMB) has no such choice. Curved redraws the figure with the curve's
+    own ink (na:curve:0)."""
+    from foldmap import app_jobs
+
+    monkeypatch.setattr(app_jobs, "SLOW_SECONDS", float("inf"))
+    assert "na_bend" not in widget_keys(opened(DATA / "1LMB.cif").sidebar, skip=())
+    at = opened(DATA / "na" / "1IHF.cif.gz")
+    assert list(at.segmented_control(key="na_bend").options) == ["pieces", "curved"]
+    assert at.segmented_control(key="na_bend").value == "pieces" and 'id="na:curve:' not in svg_of(at)
+    at.segmented_control(key="na_bend").set_value("curved").run()
+    assert at.session_state["na_bend"] == "curved" and not at.exception and 'id="na:curve:0:rails"' in svg_of(at)
+    assert at.segmented_control(key="na_bend").value == "curved"  # still offered: the duplex is still bent
+
+
 def test_copy_ghosts_choice_is_offered_for_a_strand_lent_across_a_rings_cut(monkeypatch):
     """Plan 19 Task 2: with dashed copies (the default) or drawn once, beside the fold options, only where a strand
     is lent across an unrolled ring's cut (8UTF), and still offered once they are off. Auto-redraw stays on however
@@ -653,6 +669,7 @@ def test_every_setting_is_reachable():
     seen |= shown(opened(DATA / "2HHB.cif"))  # a two-fold assembly: the two_fold choice
     seen |= shown(opened(DATA / "1BL8.cif"))  # a C4 assembly: the cyclic choice
     seen |= shown(opened(DATA / "8UTF.cif"))  # a strand lent across a ring's cut: the copy_ghosts choice
+    seen |= shown(opened(DATA / "na" / "1IHF.cif.gz"))  # a duplex drawn in pieces: the na_bend choice
     at = opened(DATA / "1UBQ.cif")  # Draw like… with a reference: its chain, the page and the diff's domains
     at.text_input(key="like_source").input(str(DATA / "1UBQ.cif"))
     at.button(key="like_use").click().run()

@@ -21,7 +21,7 @@ from .layout import (
     label_boxes,
     lines_meeting,
     segments_of,
-    stem_keep_box,
+    stem_name_keeps,
 )
 from .na_ends import SHORT_GAP, _face_label, _gap, _label_room, _tail, _trace_clear
 from .na_labels import _boxes_of, _in_sight, _label_gaps, _place_letters, _ties, _unbunch, _widen
@@ -278,7 +278,7 @@ def route_nucleic(layout: Layout, router: _Router | None = None, loops=()) -> li
             _use(router.grid, p.points, beside)
     for pts in loops:
         _use(router.grid, pts, beside_loops)
-    names = [stem_keep_box(d, glyph(layout)[0] / _GLYPH_W) for d in layout.stems]  # each name with its margin
+    names = stem_name_keeps(layout, glyph(layout)[0] / _GLYPH_W)  # each name with its margin
     # and each domain's name with its room (label_boxes): a run's bow, not routed on the grid, kept off it only so
     # (random-100 C2b-4: 7Y7C's domains view, A:1256-1257 bowed along the top of "D1 · B")
     names += [box for name, box in label_boxes(layout, []) if name.startswith("domain-label:")]

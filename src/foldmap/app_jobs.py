@@ -385,6 +385,7 @@ def draw_job(path, settings_json: str, eager_after: float | None = None) -> dict
         "two_fold_assembly": bool(getattr(drawn.layout, "two_fold_assembly", False)),  # the two_fold choice shown
         "cyclic_assembly": bool(getattr(drawn.layout, "cyclic_assembly", False)),  # the cyclic choice shown
         "lent_across_cut": bool(getattr(drawn.layout, "lent_across_cut", False)),  # the copy_ghosts choice shown
+        "bent_duplex": bool(getattr(drawn.layout, "bent_duplex", False)),  # the na_bend choice shown
         "summary": summary_of(drawn),
         "chain_count": len(chains_of(drawn)),  # what the summary counts: protein and nucleic-acid chains
         "domains_note": stale_domains_note(spec.domains, drawn.sses),  # a layout file's stale ids, dropped

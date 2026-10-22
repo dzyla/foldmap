@@ -25,6 +25,7 @@ from .layout import (
     helix_label_pos,
     label_boxes,
     overlaps_any,
+    stem_bodies,
 )
 from .model import SSE
 
@@ -87,7 +88,7 @@ def _element_obstacles(layout: Layout, ghost_owner: bool = False) -> tuple[np.nd
     ghost = lambda g: g.sse.id if ghost_owner else None  # noqa: E731
     own = [(_oid(p), p.rect) for p in layout.placed.values()]
     own += [(ghost(g), g.rect) for g in layout.ghosts]
-    own += [(_oid(d), d.rect) for d in layout.stems]
+    own += [(_oid(d), d.rect) for d in stem_bodies(layout)]  # a bent duplex drawn as a curve: its stretches
     return np.array([r for _, r in own], float).reshape(-1, 4).T.copy(), [k for k, _ in own]
 
 
@@ -108,7 +109,9 @@ class _Grid:
         # each axis, so even a zero-width obstacle always blocks at least one cell.
         self.reach = (self.res - RES) / 2
         self.blocked = self._mask(
-            p.rect for p in [*layout.placed.values(), *layout.ghosts, *layout.stems] if not getattr(p, "over", False)
+            p.rect
+            for p in [*layout.placed.values(), *layout.ghosts, *stem_bodies(layout)]
+            if not getattr(p, "over", False)
         )
         # a helix over a sheet: the cells it covers beyond the strands are soft, opened to its own loops and its
         # sheet's (route_loops) and to any loop only when nothing else routes
@@ -757,7 +760,7 @@ def _clear_helix_names(layout: Layout, sses: list[SSE], loops: list[Loop]) -> No
     traces = [np.asarray(pts, float).reshape(-1, 2) for _, pts in sorted(layout.na_traces.items())]
     if not len(segs) and not traces:
         return
-    solid = [q.rect for q in [*layout.placed.values(), *layout.ghosts, *layout.stems]]
+    solid = [q.rect for q in [*layout.placed.values(), *layout.ghosts, *stem_bodies(layout)]]
     x0, y0, x1, y1 = layout.bounds
     texts = dict(label_boxes(layout, sses))
     mate_of = dict(layout.mirror_pairs)  # copy id -> mate id
@@ -922,7 +925,7 @@ def _clear_termini(layout: Layout, sses: list[SSE], loops: list[Loop]) -> None:
                 box = box_at(xy)
                 if not (box[0] >= x0 and box[1] >= y0 and box[2] <= x1 and box[3] <= y1):
                     continue
-                if overlaps_any(box, rects + taken) or any(_box_meets_body(box, d) for d in layout.stems):
+                if overlaps_any(box, rects + taken) or any(_box_meets_body(box, d) for d in stem_bodies(layout)):
                     continue
                 got = strikes(box)
                 if got < best[0]:

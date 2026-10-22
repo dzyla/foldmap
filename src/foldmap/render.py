@@ -94,8 +94,10 @@ from .layout import (
     resolve,
     segments_of,
     spans_crossed,
-    stem_keep_box,
+    stem_bodies,
     stem_label_pos,
+    stem_name_keeps,
+    stems_at,
     tail_counts,
     termini,
     text_anchor,
@@ -595,8 +597,9 @@ _STEM_STYLES = {"ladder": _ladder, "ribbon": _ribbon, "block": _block, "letters"
 
 
 # A bent duplex drawn as one curve (Style.na_bend curved, na_curve.NACurve): each style as on a straight stem, along
-# the curve. Its artists carry the gids of its first piece (k), as one stem.
-def _curve_rails(ink: _NAInk, k: int, c) -> None:
+# the curve. Its artists carry gids of its own: na:curve:<n>:rails, :rung(s), :back, :front, :block, :first, :label (n
+# its index in Layout.na_curves; the interactive page hovers and picks it as one, interactive.nucleicKey).
+def _curve_rails(ink: _NAInk, g: str, c) -> None:
     """A rail per strand along each side of the curve, from its first nucleotide to its last (through the stretches
     where the pieces' joints were)."""
     groups: dict[tuple[int, int], list[float]] = {}  # (side, strand) -> arc lengths of its nucleotides
@@ -617,11 +620,11 @@ def _curve_rails(ink: _NAInk, k: int, c) -> None:
             joinstyle="round",
             zorder=Z["na-front"],
         )
-        rail.set_gid(f"na:stem:{k}:rails" if n == 0 else f"na:stem:{k}:rails:{n + 1}")
+        rail.set_gid(f"{g}:rails" if n == 0 else f"{g}:rails:{n + 1}")
         ink.ax.add_patch(rail)
 
 
-def _curve_rungs(ink: _NAInk, k: int, c, inset: float = 0.0) -> None:
+def _curve_rungs(ink: _NAInk, g: str, c, inset: float = 0.0) -> None:
     for pair in c.pairs:
         a, i, b, j = pair
         p, q = c.point((a, i)), c.point((b, j))
@@ -634,18 +637,18 @@ def _curve_rungs(ink: _NAInk, k: int, c, inset: float = 0.0) -> None:
             solid_capstyle="round",
             zorder=Z["na-rung"],
         )
-        line.set_gid(f"na:stem:{k}:rung")
+        line.set_gid(f"{g}:rung")
 
 
-def _curve_ladder(ink: _NAInk, k: int, c, letters: dict) -> None:
-    _curve_rails(ink, k, c)
-    _curve_rungs(ink, k, c)
+def _curve_ladder(ink: _NAInk, g: str, c, letters: dict) -> None:
+    _curve_rails(ink, g, c)
+    _curve_rungs(ink, g, c)
     for key in c.at:
         letters[key] = (c.point(key, NT_ROW), _upright(c.angle(key)))
 
 
-def _curve_letters(ink: _NAInk, k: int, c, letters: dict) -> None:
-    _curve_rungs(ink, k, c, inset=0.3)
+def _curve_letters(ink: _NAInk, g: str, c, letters: dict) -> None:
+    _curve_rungs(ink, g, c, inset=0.3)
     for key in c.at:
         letters[key] = (c.point(key), _upright(c.angle(key)))
 
@@ -676,7 +679,7 @@ def _curve_turns(c, slot: int, wide: float) -> tuple[list[np.ndarray], list[np.n
     return front, back
 
 
-def _curve_ribbon(ink: _NAInk, k: int, c, letters: dict) -> None:
+def _curve_ribbon(ink: _NAInk, g: str, c, letters: dict) -> None:
     colour, weight = {}, {}  # backbone slot -> colour and weight of the strand drawn there
     for key in sorted(c.at):
         colour.setdefault(_curve_slot(c, key), ink.colour(key[0]))
@@ -693,7 +696,7 @@ def _curve_ribbon(ink: _NAInk, k: int, c, letters: dict) -> None:
             backs += b
         suffix = "" if n == 0 else f":{n + 1}"
         back = PathPatch(_compound(backs), fc=tint(col, 0.5), ec="none", zorder=Z["na-back"])
-        back.set_gid(f"na:stem:{k}:back{suffix}")
+        back.set_gid(f"{g}:back{suffix}")
         ink.ax.add_patch(back)
         front = PathPatch(
             _compound(fronts),
@@ -702,18 +705,18 @@ def _curve_ribbon(ink: _NAInk, k: int, c, letters: dict) -> None:
             lw=ink.lw * 0.8,
             zorder=Z["na-front"],
         )
-        front.set_gid(f"na:stem:{k}:front{suffix}")
+        front.set_gid(f"{g}:front{suffix}")
         ink.ax.add_patch(front)
     xs = [c.at[(a, i)] for a, i, _, _ in c.pairs]
     rungs = [c.to_page([x, x], [dna_y(0, x, c.width), dna_y(1, x, c.width)]) for x in xs]
     rung = PathPatch(
         _compound(rungs, closed=False), fc="none", ec=ink.rung, lw=ink.lw * 2.2, capstyle="round", zorder=Z["na-rung"]
     )
-    rung.set_gid(f"na:stem:{k}:rungs")
+    rung.set_gid(f"{g}:rungs")
     ink.ax.add_patch(rung)
 
 
-def _curve_block(ink: _NAInk, k: int, c, letters: dict) -> None:
+def _curve_block(ink: _NAInk, g: str, c, letters: dict) -> None:
     """A band between the two rails along the curve, named inside at its middle; its first pair's numbers beside
     it, where the ladder's name goes."""
     colour = {}
@@ -734,7 +737,7 @@ def _curve_block(ink: _NAInk, k: int, c, letters: dict) -> None:
             lw=ink.lw * 1.2 * max(ink.weight(key[0]) for key in c.at),
             zorder=Z["na-front"],
         )
-        body.set_gid(f"na:stem:{k}:block" if n == 0 else f"na:stem:{k}:block:{n + 1}")
+        body.set_gid(f"{g}:block" if n == 0 else f"{g}:block:{n + 1}")
         ink.ax.add_patch(body)
     mixed = _mix(shown[0], shown[-1], 0.5)
     p, tan, _ = c.frames((s0 + s1) / 2)
@@ -750,7 +753,7 @@ def _curve_block(ink: _NAInk, k: int, c, letters: dict) -> None:
         color=legible(mixed) if ink.fill == "outline" else text_color_on(mixed),
         zorder=Z["label"],
     )
-    t.set_gid(f"na:label:{k}")
+    t.set_gid(f"{g}:label")
     first = first_pair_text(c, ink.chains, ink.seqs)
     rot = _upright(c.name_angle)
     t = ink.ax.text(
@@ -764,10 +767,10 @@ def _curve_block(ink: _NAInk, k: int, c, letters: dict) -> None:
         color=ink.front,
         zorder=Z["label"],
     )
-    t.set_gid(f"na:stem:{k}:first")
+    t.set_gid(f"{g}:first")
 
 
-def _draw_curve_label(ink: _NAInk, k: int, c) -> None:
+def _draw_curve_label(ink: _NAInk, g: str, c) -> None:
     rot = _upright(c.name_angle)
     t = ink.ax.text(
         *text_anchor(c.name, True, c.name_xy, ink.em * 0.8, rot),
@@ -781,25 +784,16 @@ def _draw_curve_label(ink: _NAInk, k: int, c) -> None:
         color=ink.front,
         zorder=Z["label"],
     )
-    t.set_gid(f"na:label:{k}")
+    t.set_gid(f"{g}:label")
 
 
 _CURVE_STYLES = {"ladder": _curve_ladder, "ribbon": _curve_ribbon, "block": _curve_block, "letters": _curve_letters}
 
 
-def _curved_joints(layout: Layout) -> set[int]:
-    """The na_paths drawn as part of a curve (Layout.na_curves): the joints between its pieces."""
-    held = {key for c in layout.na_curves for key in c.at}
-    return {n for n, p in enumerate(layout.na_paths) if p.kind == "joint" and p.between and p.between[0] in held}
-
-
 def _draw_strands(ink: _NAInk, layout: Layout, style: str, where: dict, letters: dict) -> None:
     """Single strands along their drawn paths (cropped gaps dashed, labelled unless short); their letters beside
     them, where routing placed them (on the strand itself in the letters style)."""
-    curved = _curved_joints(layout) if getattr(layout, "na_curves", ()) else set()
     for n, path in enumerate(layout.na_paths):
-        if n in curved:
-            continue
         pts = np.asarray(path.points, float)
         gap = path.kind == "gap"
         (line,) = ink.ax.plot(
@@ -964,14 +958,14 @@ def _draw_nucleic(
     where = nucleotide_points(layout, style)  # nucleotide -> where it is drawn (bead and hydrogen bonds go there)
     letters: dict[tuple[int, int], tuple[np.ndarray, float]] = {}  # nucleotide -> letter position, rotation
     # Style.na_bend curved: a bent duplex drawn as one curve (Layout.na_curves), its pieces not drawn
-    curve_of = {k: c for c in getattr(layout, "na_curves", ()) for k in c.pieces}
+    curve_of = {k: (n, c) for n, c in enumerate(getattr(layout, "na_curves", ())) for k in c.pieces}
     for k, d in enumerate(layout.stems):
-        c = curve_of.get(k)
+        n, c = curve_of.get(k, (0, None))
         if c is not None:
             if k == c.pieces[0]:
-                _CURVE_STYLES.get(style, _curve_ladder)(ink, k, c, letters)
+                _CURVE_STYLES.get(style, _curve_ladder)(ink, f"na:curve:{n}", c, letters)
                 if style != "block" and look.labels:
-                    _draw_curve_label(ink, k, c)
+                    _draw_curve_label(ink, f"na:curve:{n}", c)
             continue
         _STEM_STYLES.get(style, _ladder)(ink, k, d, where, letters)
         if style != "block" and look.labels:
@@ -1820,15 +1814,15 @@ def _disulfide_lines(layout: Layout, loops: list[Loop], sses: list[SSE], look: S
 def _na_spots(layout: Layout, look: Style) -> tuple[dict, list, list]:
     """Where each drawn nucleotide sits (nucleotide_points, in the figure's stem style); the boxes a mark held by
     nucleotides keeps off: the stems, the strands' paths and the nucleic acid's text (letters and ends:
-    layout.na_text_boxes; stem names with their margin, as routes keep off them: layout.stem_keep_box); and the boxes
+    layout.na_text_boxes; stem names with their margin, as routes keep off them: layout.stem_name_keeps); and the boxes
     its tethers keep off, the stem names' own (label_boxes). A tether ends on a stem's rail, past the stem's box, its
     letters and the strand it touches: held to those too, no spot's tethers passed and the mark took the first clear
     spot whatever its tethers crossed (random-100 C2b-4 fix round 1: 3OWW's GLY A89 across P3b's rungs)."""
     if layout.nucleic is None:
         return {}, [], []
     paths = [box for p in layout.na_paths for box in thin_boxes(p.points)]
-    paths += [stem_keep_box(d, glyph(layout)[0] / _GLYPH_W) for d in layout.stems]
-    keep = [d.rect for d in layout.stems] + paths + na_text_boxes(layout)
+    paths += stem_name_keeps(layout, glyph(layout)[0] / _GLYPH_W)
+    keep = [d.rect for d in stem_bodies(layout)] + paths + na_text_boxes(layout)
     names = [box for name, box in label_boxes(layout, []) if name.startswith("stem-label:")]
     return nucleotide_points(layout, _na_style(layout, look)), keep, names
 
@@ -1845,6 +1839,7 @@ def _na_targets(layout: Layout, g, where: dict, near=None):
         (lab.chain, lab.seq, lab.icode): (s, i) for s, st in enumerate(na.strands) for i, lab in enumerate(st.labels)
     }
     stem = {k: d.id for d in layout.stems for k in d.axial}
+    stem.update({k: c.parent for c in getattr(layout, "na_curves", ()) for k in c.at})  # a curve: one stem
     groups: dict = {}
     for lab in g.nucleotides:
         k = key.get(lab)
@@ -1982,10 +1977,10 @@ def ligand_marks(layout: Layout, loops: list[Loop], sses: list[SSE], look: Style
         na, retarget = None, None
         if not g.contacts:  # held by nucleotides alone: its tethers, as drawn from each spot, off the stems and strands
             if na_lines is None:  # a run's stretches along its own stems' rails are the stems' (na_paths.among)
-                at = {key: d for d in layout.stems for key in d.axial}
+                at = stems_at(layout)
                 strands = [np.asarray(among(p, at), float).reshape(-1, 2) for p in layout.na_paths]
                 na_lines = [np.hstack([q[:-1], q[1:]]) for q in strands if len(q) > 1]
-            na = (layout.stems, na_lines)
+            na = (stem_bodies(layout), na_lines)
             retarget = lambda c, g=g, where=na_spots[0]: _na_targets(layout, g, where, np.asarray(c, float))[0]  # noqa: E731
         spot = _place_mark(anchor, half, targets, keep_off, lines, words, tethers, bodies, runs, na, retarget, bound)
         if not g.contacts:  # held by nucleotides alone: each tether to the touched nucleotide nearest the mark
@@ -2018,8 +2013,8 @@ def _draw_ligands(ax, marks: list[dict], lw: float, font: float, layout: Layout,
     bodies = link_bodies(layout, ax)
     keep = link_keep(lw * 0.7, pt_per_unit, ax.figure.dpi)
     halos = text_halos(ax, pt_per_unit, keep)
-    for d in layout.stems:  # names' margin, as routes keep it, the tether's own half width beyond
-        x0, y0, x1, y1 = stem_keep_box(d, glyph(layout)[0] / _GLYPH_W)
+    for x0, y0, x1, y1 in stem_name_keeps(layout, glyph(layout)[0] / _GLYPH_W):  # names' margin, as routes keep it,
+        # the tether's own half width beyond
         halos.append((x0 - keep, y0 - keep, x1 + keep, y1 + keep))
     # and the nucleic acid's letters and ends, drawn after the tethers (as the layout measures their ink)
     halos += [(x0 - keep, y0 - keep, x1 + keep, y1 + keep) for x0, y0, x1, y1 in na_text_boxes(layout)]
@@ -3940,7 +3935,7 @@ def loop_counts(layout: Layout, loops: list[Loop], sses: list[SSE], tails=None, 
     (a list), which the figure's provenance lists (counts_hidden). Placed after routing: no keep-out."""
     em = _ink_em(layout, layout.font_scale) or text_em(layout.width or 1.0) * layout.font_scale
     by_id = {s.id: s for s in sses}
-    taken = [p.rect for p in [*layout.placed.values(), *layout.ghosts, *layout.stems]]
+    taken = [p.rect for p in [*layout.placed.values(), *layout.ghosts, *stem_bodies(layout)]]
     taken += [b for _, b in label_boxes(layout, sses)] + [
         t["box"] for t in (tails if tails is not None else tail_counts(layout, sses, loops))
     ]

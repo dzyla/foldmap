@@ -43,9 +43,10 @@ _LOOP_GREY = "#9aa3ad"
 # a 6 px stroke ends exactly 3 px from the centre, where a click 3 px off the line would fall on its edge.
 HIT_PX = 8
 # the stroked parts of a run (na:run:K) and of a stem (na:stem:K:rails, :rung(s), :back, :front, :block, :N for a
-# second colour), each a group whose first child is the path matplotlib drew; a stem's texts (:first) are not ink
+# second colour) or a bent duplex drawn as a curve (na:curve:K:..., Style.na_bend curved), each a group whose first
+# child is the path matplotlib drew; a stem's texts (:first) are not ink
 _NA_INK = re.compile(
-    r'<g id="na:(?:(run):(\d+)|(stem):(\d+):(?:rails|rungs?|back|front|block)(?::\d+)?)">\s*'
+    r'<g id="na:(?:(run):(\d+)|(stem|curve):(\d+):(?:rails|rungs?|back|front|block)(?::\d+)?)">\s*'
     r'<path d="([^"]*)"(?: clip-path="([^"]*)")?'
 )
 _LOOP_INK = re.compile(r'<g id="loop:([^"]+)">\s*<path d="([^"]*)"(?: clip-path="([^"]*)")?')  # a loop's whole line
@@ -73,9 +74,10 @@ _LIB = r"""
       }
     },
     nucleicKey(id) {  // na:stem:3, na:stem:3:rails, na:stem:3:hit, na:label:3 -> 'stem:3'; na:run:5, na:run:5:hit
-      // (the page's wide click target) -> 'run:5'; anything else -> null
-      const m = /^na:(stem|label|run):(\d+)(?::|$)/.exec(id || '');
-      return m ? (m[1] === 'run' ? 'run:' : 'stem:') + m[2] : null;
+      // (the page's wide click target) -> 'run:5'; na:curve:0, na:curve:0:rails, na:curve:0:label (a bent duplex drawn
+      // as one curve) -> 'curve:0'; anything else -> null
+      const m = /^na:(stem|label|run|curve):(\d+)(?::|$)/.exec(id || '');
+      return m ? (m[1] === 'run' || m[1] === 'curve' ? m[1] + ':' : 'stem:') + m[2] : null;
     },
     toggle(pinned, item, additive) {  // click: pin it (or clear if it is the only pin); shift-click: add/remove
       const key = TopoLib.itemKey(item), has = pinned.some(p => TopoLib.itemKey(p) === key);
@@ -627,9 +629,10 @@ main { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1
 #stage svg.focus [id^="disulfide-end:"]:not(.on),
 #stage svg.focus [id^="glycan:"]:not(.on), #stage svg.focus [id^="ligand"]:not(.on),
 #stage svg.focus [id^="feature"]:not(.on), #stage svg.focus [id^="na:stem:"]:not(.on),
-#stage svg.focus [id^="na:label:"]:not(.on), #stage svg.focus [id^="na:run:"]:not(.on) { opacity: .2; transition: opacity .12s }
+#stage svg.focus [id^="na:label:"]:not(.on), #stage svg.focus [id^="na:run:"]:not(.on),
+#stage svg.focus [id^="na:curve:"]:not(.on) { opacity: .2; transition: opacity .12s }
 #stage svg [id^="disulfide:"], #stage svg [id^="ss-dot:"], #stage svg [id^="disulfide-end:"], #stage svg [id^="glycan:"], #stage svg [id^="ligand"],
-#stage svg [id^="na:stem:"], #stage svg [id^="na:label:"], #stage svg [id^="na:run:"],
+#stage svg [id^="na:stem:"], #stage svg [id^="na:label:"], #stage svg [id^="na:run:"], #stage svg [id^="na:curve:"],
 #stage svg [id^="hbond:"], #stage svg [id^="ia:"] { cursor: pointer }
 #stage svg [id^="loopcase:"] { pointer-events: none }  /* a loop's white casing: clicks reach its click target */
 #molpanel { flex: 1.15 }
@@ -711,8 +714,8 @@ def _component_type(name: str) -> str:
 
 
 def _nucleics(layout) -> list[dict]:
-    """Stems and single-stranded stretches as drawn: their nucleotides (for the 3D view) and the protein
-    residues touching them."""
+    """Stems (a bent duplex drawn as a curve: one, curve:<n>) and single-stranded stretches as drawn: their nucleotides
+    (for the 3D view) and the protein residues touching them."""
     na = layout.nucleic
     if na is None:
         return []
@@ -732,10 +735,18 @@ def _nucleics(layout) -> list[dict]:
         return {"key": key, "residues": residues, "het": [[lab.chain, lab.seq] for lab in labels], "text": text}
 
     out = []
+    curves = getattr(layout, "na_curves", None) or []  # a bent duplex drawn as one curve: one entry, not its pieces
+    hidden = {k for c in curves for k in c.pieces}
     for k, d in enumerate(layout.stems):
+        if k in hidden:
+            continue
         keys = sorted(d.axial)
         ends = span(na.strands[keys[0][0]].labels[keys[0][1]], na.strands[keys[-1][0]].labels[keys[-1][1]])
         out.append(entry(f"stem:{k}", keys, f"{d.name} \u00b7 {len(d.pairs)} bp \u00b7 {ends}"))
+    for n, c in enumerate(curves):
+        keys = sorted(c.at)
+        ends = span(na.strands[keys[0][0]].labels[keys[0][1]], na.strands[keys[-1][0]].labels[keys[-1][1]])
+        out.append(entry(f"curve:{n}", keys, f"{c.name} \u00b7 {len(c.pairs)} bp \u00b7 {ends}"))
     for n, p in enumerate(layout.na_paths):
         if p.nts:
             lab = na.strands[p.strand].labels
@@ -834,12 +845,12 @@ def _interactions(fig) -> list:
 
 def _hit_targets(svg: str) -> str:
     """The page's copy of the figure with click targets: an invisible path HIT_PX screen pixels wide along the drawn
-    lines of each nucleic-acid run and stem (na:run:K:hit, na:stem:K:hit; one per run and per stem, a stem's rails,
-    rungs and body together), of each protein loop (loop:<name>:hit) and of each interaction line (hbond:<a>-<b>:hit,
-    ia:<kind>:<a>-<b>:hit; plan 13c-5). All sit under the loops and the nucleic-acid ink, so a click on anything drawn
-    selects that thing; the loops' targets lie over the nucleic acid's, so a click a few pixels off a loop that runs
-    beside a strand still selects the loop, and both lie over the interaction lines', which end on them. The static
-    figure (save_svg) has none."""
+    lines of each nucleic-acid run, stem and curve (na:run:K:hit, na:stem:K:hit, na:curve:K:hit; one per run, stem and
+    curve, its rails, rungs and body together), of each protein loop (loop:<name>:hit) and of each interaction line
+    (hbond:<a>-<b>:hit, ia:<kind>:<a>-<b>:hit; plan 13c-5). All sit under the loops and the nucleic-acid ink, so a click
+    on anything drawn selects that thing; the loops' targets lie over the nucleic acid's, so a click a few pixels off a
+    loop that runs beside a strand still selects the loop, and both lie over the interaction lines', which end on them.
+    The static figure (save_svg) has none."""
     lines: dict[str, list[str]] = {}
     clips: dict[str, str | None] = {}
 

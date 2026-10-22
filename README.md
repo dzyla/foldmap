@@ -264,7 +264,7 @@ Change any key with `--set KEY=VALUE` (repeatable) or a YAML file for `--style-f
 `residue_numbers`, `highlight` (`asu`, `protomer` or chains), `mark` (elements in a colour of their own),
 `ligands` (`auto`, `all`, `none` or codes like `HEM,ZN`), `fold_template`, `helix_on_sheet`, `two_fold`, `cyclic`,
 `copy_ghosts`, `crosslink_layer`, `domain_bar`, `domain_colours`, `data_style`, `na_backbone`, `backbone_colors`, `dna_color`, `rna_color`, `hbonds`,
-`hbond_color`, `hbond_max`, `interactions`, `interactions_between`, `interaction_max`, `disulfides`, `glycans`, `helices_310`, `na_extent`, `na_style`, `background`, `ink`,
+`hbond_color`, `hbond_max`, `interactions`, `interactions_between`, `interaction_max`, `disulfides`, `glycans`, `helices_310`, `na_extent`, `na_style`, `na_bend`, `background`, `ink`,
 `helix_scale`, `strand_scale`, `font_scale`, `na_line` (`dna_extent` still works on the command line and in style and layout
 files).
 
@@ -286,6 +286,7 @@ files).
 | Two-fold assemblies | `--set two_fold=mirror` or `unrolled`: a C2 assembly's copies always as mirror images, or side by side (default `auto`: mirrored where each copy is one protein chain) |
 | Cyclic assemblies | `--set cyclic=rosette` (opt-in): a four- or seven-fold ring (C4, C7) drawn whole, seen down its axis, each copy the first one's drawing turned about it (default `unrolled`: side by side) |
 | Strands lent across a ring's cut | `--set copy_ghosts=off` draws such a strand once, past the row's end, with no dashed copies of it or its partners |
+| Bent duplexes | `--set na_bend=curved` (opt-in): a duplex the protein bends (nucleosome, IHF, TBP) drawn as one curved ladder, the protein laid out round it (default `pieces`: straight pieces joined where the axis turns) |
 | Hydrogen bonds | `--set hbonds=na`, `interchain` or `chains:A+B`; `--set hbond_max=30` |
 | Interactions | `--set interactions=hbond,salt` (or `all`), `--set interactions_between=chains:A+B` |
 | Only some chains | `--chains A,B` |
@@ -746,6 +747,13 @@ foldmap plot 1LMB --set hbonds=na --set hbond_max=16 -o 1lmb.svg     # proteinâ€
 chooses what is drawn and placed (a layout key): `auto` (everything up to 300 nt, otherwise the stems the protein
 touches, with gaps marked), `contacts` (the stretch the protein touches, with 6 nt beyond) or `all`. `dna_extent` is
 an alias of `na_extent`.
+
+`na_bend` (a layout key, opt-in) chooses how a bent duplex is drawn: `pieces` (the default: its straight pieces,
+joined where the axis turns) or `curved` (one ladder along a curve through the pieces in order, each keeping its own
+rung spacing; the protein is laid out round it, the elements that touch it beside the rungs they touch). A duplex
+that winds a full turn or more (the nucleosome's 1.65 turns) is drawn as gyres one inside the other, its rungs then
+spread evenly so the inner gyre holds the octamer as drawn. Every style (`na_style`) draws the curve; the figure's
+checks read the curve as drawn. The app offers the choice ("Bent duplexes") only when a duplex is drawn in pieces.
 
 **Nucleic-acid colours.** DNA backbones are brown (`dna_color`, `#8c564b`) and RNA backbones purple (`rna_color`,
 `#6a3d9a`), so they read apart from the black protein loops; contact beads keep the colour of the protein chain that

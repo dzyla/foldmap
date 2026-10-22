@@ -209,13 +209,15 @@ def nucleic_block(st, ss: MutableMapping) -> None:
         setting(ss, "na_style"),
         help="ladder: rails and base-pair rungs · ribbon: double helix · block: bars · letters",
     )
-    segmented(
-        st,
-        "Bent duplexes",
-        CHOICES["na_bend"],
-        setting(ss, "na_bend"),
-        help="pieces: straight pieces joined where the axis turns · curved: one ladder along a curve",
-    )
+    if ss.get("bent_duplex"):  # a duplex drawn cut where its axis turns: as pieces or one curve (plan 25, opt-in)
+        segmented(
+            st,
+            "Bent duplexes",
+            CHOICES["na_bend"],
+            setting(ss, "na_bend"),
+            help="pieces: straight pieces joined where the axis turns · curved: one ladder along a curve, the protein "
+            "laid out round it",
+        )
     segmented(
         st,
         "Shown",

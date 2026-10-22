@@ -608,3 +608,16 @@ def test_diff_structures_refuses_a_slash_in_a_domain_name():
     ubq = str(DATA / "1UBQ.cif")
     with pytest.raises(ToolError, match="cannot hold /"):
         call("diff_structures", {"source_a": ubq, "source_b": ubq, "domains": {"N/C": ["1-40"]}})
+
+
+def test_draw_topology_says_where_a_duplex_is_bent(tmp_path):
+    """Plan 25 Task 3: style {"na_bend": "curved"} draws IHF's bent duplex as one curve; the structured result says
+    where a duplex is drawn bent (the choice applies), whichever way it is drawn."""
+    out = tmp_path / "ihf.svg"
+    r = call(
+        "draw_topology",
+        {"source": str(DATA / "na" / "1IHF.cif.gz"), "output_path": str(out), "style": {"na_bend": "curved"}},
+    )
+    assert r.structured_content["bent_duplex"] is True and 'id="na:curve:0:rails"' in out.read_text()
+    r = call("draw_topology", {"source": UBQ, "output_path": str(tmp_path / "ubq.svg")})
+    assert r.structured_content["bent_duplex"] is False

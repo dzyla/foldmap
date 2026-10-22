@@ -21,7 +21,7 @@ from scipy.stats import spearmanr
 
 from .frame import Frame
 from .io import CONTACT
-from .layout import SCALE, stem_pieces
+from .layout import SCALE, stem_bodies, stem_pieces, stems_at
 from .na_paths import _BEAD, among, crosses_body, graze, in_body
 from .nucleic import stem_axis
 from .route import clip_len
@@ -402,7 +402,7 @@ def shape(lay) -> dict:
     unknown = [d.id for d in lay.stems if d.id not in pieces]
     if unknown:
         raise ValueError(f"drawn stems that are no piece of the structure's stems: {unknown}")
-    stems = list(lay.stems)
+    stems = _pieces(lay)  # as drawn: a curve's pieces where it draws their nucleotides (na_curve.drawn_pieces)
     if not stems:
         return {"stems_drawn": 0}
     axes = [stem_axis(pieces[d.id], na.strands) for d in stems]
@@ -443,6 +443,26 @@ def shape(lay) -> dict:
     return out
 
 
+def _pieces(lay) -> list:
+    """layout.stems as drawn: a bent duplex drawn as a curve (Layout.na_curves) has its pieces where the curve draws
+    their nucleotides (na_curve.drawn_pieces), never where the layout left them."""
+    if not getattr(lay, "na_curves", None):
+        return list(lay.stems)
+    from .na_curve import drawn_pieces
+
+    return drawn_pieces(lay)
+
+
+def _piece_bodies(lay) -> list[list]:
+    """Each of layout.stems' bodies as drawn: [the stem]; a piece of a curve, the curve's stretches over its
+    nucleotides (na_curve.piece_bodies)."""
+    if not getattr(lay, "na_curves", None):
+        return [[d] for d in lay.stems]
+    from .na_curve import piece_bodies
+
+    return piece_bodies(lay)
+
+
 def _gap(a, b) -> float:
     """Distance between two boxes (x0, y0, x1, y1), 0 when they touch or overlap."""
     return float(np.hypot(max(a[0] - b[2], b[0] - a[2], 0), max(a[1] - b[3], b[1] - a[3], 0)))
@@ -467,13 +487,13 @@ def contacts(lay, sses) -> dict:
         }
     drawn = [s for s in sses if s.id in lay.placed]
     aucs, precs, nearer = [], [], []
-    for d in lay.stems:
+    for d, body in zip(lay.stems, _piece_bodies(lay)):  # each stem's body as drawn (a curve's piece: its stretches)
         mine = set(d.axial)
         touch = {s.id for s in drawn if any(mine & na.contacts.get(r, set()) for r in range(s.start, s.end + 1))}
         rest = [s.id for s in drawn if s.id not in touch]
         if not touch:
             continue
-        dist = {s.id: _gap(lay.placed[s.id].rect, d.rect) for s in drawn}
+        dist = {s.id: min(_gap(lay.placed[s.id].rect, b.rect) for b in body) for s in drawn}
         nearer.append(float(np.mean([dist[t] for t in sorted(touch)])) < float(np.median(list(dist.values()))))
         if not rest:
             continue
@@ -593,11 +613,18 @@ def _box_meets_body(box, d) -> bool:
     return crosses_body(centre, centre, d) or in_body(centre, d)
 
 
+def _whole(d):
+    """What a body counts as: itself; a stretch of a curve (na_curve.Chord), the curve (one thing, however many of its
+    stretches a line or a label meets)."""
+    n = getattr(d, "curve", -1)
+    return ("curve", n) if n >= 0 else id(d)
+
+
 def _trimmed(lay) -> list[np.ndarray]:
     """Each nucleic-acid path's segments as drawn among the elements (na_paths.among): a run or joint without the
     two known rail stretches it runs along to its stems' end faces, so a pass through its own stem counts; any other
     path without its first and last stretches inside its own stems."""
-    at = {key: d for d in lay.stems for key in d.axial}
+    at = stems_at(lay)  # a curve's nucleotides: its stretches as drawn
     return [_segments(among(p, at)) for p in lay.na_paths]
 
 
@@ -611,12 +638,11 @@ def na_crossings(lay, loops) -> dict:
     drawn = list(zip(lay.na_paths, _trimmed(lay)))
     moving = [(p, seg) for p, seg in drawn if p.kind in ("run", "joint", "gap")]
     fixed = [seg for p, seg in drawn if p.kind in ("hairpin", "tail")]
+    bodies = stem_bodies(lay)  # as drawn: a curve's stretches, the curve counted once (_whole)
     through = sum(
-        1
+        len({_whole(d) for d in bodies if _boxes_meet(_span(seg), d.rect) and _through_stem(seg, d)})
         for _, seg in moving
         if len(seg)
-        for d in lay.stems
-        if _boxes_meet(_span(seg), d.rect) and _through_stem(seg, d)
     )
     at = {key: d.id for d in lay.stems for key in d.axial}
 
@@ -704,10 +730,10 @@ def render_checks(lay, loops, fig, sses, *, model=None, bb=None) -> dict:
     ]
     paths = _trimmed(lay)
     protein = [_segments(l.points) for l in loops]
-    bodies = [*lay.stems, *lay.placed.values(), *lay.ghosts]
+    bodies = [*stem_bodies(lay), *lay.placed.values(), *lay.ghosts]
     collisions = sum(1 for (_, a, _), (_, b, _) in combinations(gaps, 2) if _boxes_meet(a, b))
     for n, box, px in gaps:
-        collisions += sum(1 for d in bodies if _boxes_meet(box, d.rect) and _box_meets_body(box, d))
+        collisions += len({_whole(d) for d in bodies if _boxes_meet(box, d.rect) and _box_meets_body(box, d)})
         others = [seg for k, seg in enumerate(paths) if k != n] + protein
         collisions += sum(1 for seg in others if len(seg) and _boxes_meet(box, _span(seg)) and _box_hits(box, seg))
         collisions += sum(

@@ -89,20 +89,19 @@ def test_a_bent_duplex_is_one_curve_through_its_pieces_in_order():
 
 
 def test_the_curve_is_drawn_in_place_of_its_pieces_and_joints():
-    """The drawing: one ladder (the first piece's gids), no piece's own rails, no joint, one name; the contact beads
-    and the strands' 5'/3' labels with the nucleotides on the curve."""
+    """The drawing: one ladder with gids of its own (na:curve:0:..., Task 3), no piece's rails or name, no joint (the
+    joints taken out of the strands drawn), one name; the contact beads and the strands' 5'/3' labels with the
+    nucleotides on the curve."""
     drawn = draw_spec(figure_spec(_path("1IHF"), style=["na_bend=curved"]))
     lay, ax = drawn.layout, drawn.figure.axes[0]
     c = lay.na_curves[0]
     gids = {a.get_gid() for a in [*ax.patches, *ax.lines, *ax.texts, *ax.collections] if a.get_gid()}
-    k0 = c.pieces[0]
-    assert f"na:stem:{k0}:rails" in gids and f"na:label:{k0}" in gids
-    assert not any(f"na:stem:{k}:rails" in gids or f"na:label:{k}" in gids for k in c.pieces[1:])
-    joints = [n for n, p in enumerate(lay.na_paths) if p.kind == "joint"]
-    assert joints and not any(f"na:run:{n}" in gids for n in joints)
-    names = [t for t in ax.texts if t.get_gid() == f"na:label:{k0}"]
+    assert "na:curve:0:rails" in gids and "na:curve:0:label" in gids
+    assert not any(f"na:stem:{k}:" in g or g == f"na:label:{k}" for k in c.pieces for g in gids)
+    assert not [p for p in lay.na_paths if p.kind == "joint" and p.between[0] in c.at]
+    names = [t for t in ax.texts if t.get_gid() == "na:curve:0:label"]
     assert [t.get_text() for t in names] == ["DNA 1"]
-    rungs = [a for a in ax.lines if a.get_gid() == f"na:stem:{k0}:rung"]
+    rungs = [a for a in ax.lines if a.get_gid() == "na:curve:0:rung"]
     assert len(rungs) == len(c.pairs)
     beads = drawn.figure.foldmap_beads.marks
     on = [key for marks in beads.values() for key, _, _ in marks if key in c.at]
@@ -126,10 +125,9 @@ def test_every_stem_style_draws_the_curve(style):
     drawn = draw_spec(figure_spec(_path("1IHF"), style=["na_bend=curved", f"na_style={style}"]))
     c = drawn.layout.na_curves[0]
     gids = {a.get_gid() for a in [*drawn.figure.axes[0].patches, *drawn.figure.axes[0].lines] if a.get_gid()}
-    k0 = c.pieces[0]
-    want = {"ribbon": f"na:stem:{k0}:front", "block": f"na:stem:{k0}:block", "letters": f"na:stem:{k0}:rung"}[style]
+    want = {"ribbon": "na:curve:0:front", "block": "na:curve:0:block", "letters": "na:curve:0:rung"}[style]
     assert want in gids
-    assert not any(g.startswith(f"na:stem:{k}:") for k in c.pieces[1:] for g in gids)
+    assert not any(g.startswith(f"na:stem:{k}:") for k in c.pieces for g in gids)
 
 
 def test_the_nucleosome_gyres_are_drawn_one_inside_the_other():
@@ -282,3 +280,163 @@ def test_pieces_lay_out_nothing_on_a_curve():
     """The default (pieces): build_layout lays no curve out and pins nothing."""
     lay, _, _ = make_layout(_path("1IHF"), look=Style())
     assert lay.na_curves == []
+
+
+# ---- Task 3: the checks, keep-outs and pages read the curve as drawn, never its pieces ----
+
+
+def test_the_curve_body_as_drawn_is_one_band_of_straight_stretches():
+    """layout.stem_bodies: 1IHF's curve as straight stretches (Chord) in place of its pieces, which no check or
+    keep-out reads; together they cover the band between the rails from end to end (no gap where a turn opens one),
+    every nucleotide on a stretch of its own curve, and reach no further than half a body width off it."""
+    from foldmap.layout import stem_bodies, stems_at
+    from foldmap.na_curve import Chord
+    from foldmap.na_paths import in_body
+
+    lay, _ = _routed("1IHF")
+    (c,) = lay.na_curves
+    bodies = stem_bodies(lay)
+    chords = [b for b in bodies if isinstance(b, Chord)]
+    assert chords and {b.curve for b in chords} == {0}
+    assert not any(b is lay.stems[k] for k in c.pieces for b in bodies)
+    lo, hi = c.extent()
+    s = np.linspace(lo + 0.05, hi - 0.05, 300)
+    for off in (-c.width / 2 + 0.02, 0.0, c.width / 2 - 0.02):
+        for q in c.to_page(s, off):
+            assert any(in_body(q, b) for b in chords), (off, q)
+    for b in chords:  # no stretch reaches past the band's side
+        corners = [b.cx, b.cy] + np.array(
+            [x * b.length / 2 * b.direction + y * b.width / 2 * b.normal for x in (-1, 1) for y in (-1, 1)]
+        )
+        for q in corners:
+            assert float(np.hypot(c.xy[:, 0] - q[0], c.xy[:, 1] - q[1]).min()) <= c.width / 2 * 1.2 + 0.05
+    at = stems_at(lay)
+    for key in c.at:
+        assert isinstance(at[key], tuple) and any(in_body(c.point(key), b) for b in at[key]), key
+
+
+def test_the_checks_read_the_curve_not_its_pieces():
+    """figcheck: element overlaps count the curve once by its name (its stretches meeting at a turn are no overlap),
+    the page's stem bodies hold the curve (na:curve:0) and no piece, the stem-name gaps and line gaps are the curve's
+    name's, the stem names repeated are the curve's; layout.label_boxes and na_text_boxes keep text off the curve's
+    name and letters, not the pieces'; the joints are no strand drawn (provenance's stuck reads no hidden one)."""
+    from foldmap.figcheck import (
+        _stem_boxes,
+        element_overlaps,
+        label_repeats,
+        measure,
+        stem_name_gaps,
+        stem_name_line_gaps,
+    )
+    from foldmap.layout import _LETTER_EM, _ink_em, _ink_points, _reach, label_boxes, na_text_boxes
+
+    drawn = _drawn_curved("1IHF")
+    lay = drawn.layout
+    (c,) = lay.na_curves
+    pieces = {lay.stems[k].id for k in c.pieces}
+    joined: set = set()
+    names = [n for n, _ in _stem_boxes(lay, joined)]
+    assert not pieces & set(names) and any(n.startswith("DNA 1@") for n in names)
+    assert all(not any(x.startswith("DNA 1@") for x in pair) for pair in element_overlaps(lay))
+    page = measure(drawn)
+    stems = [g for g, _, _ in page.stems]
+    assert "na:curve:0" in stems and not any(g == f"na:stem:{k}" for k in c.pieces for g in stems)
+    gaps, lines = stem_name_gaps(drawn, page=page), stem_name_line_gaps(drawn, page=page)
+    assert "na:curve:0:label" in gaps and "na:curve:0:label" in lines
+    assert not any(f"na:label:{k}" in gaps for k in c.pieces)
+    assert label_repeats(lay) == {}
+    keep = dict(label_boxes(lay, drawn.sses))
+    assert "stem-label:curve:0" in keep and not any(f"stem-label:{k}" in keep for k in c.pieces)
+    em = _ink_em(lay, lay.font_scale)
+    na = lay.nucleic
+    key = next(iter(sorted(c.at)))
+    letter = tuple(
+        _reach(
+            _ink_points(na.strands[key[0]].bases[key[1]], False, _LETTER_EM * em, c.angle(key))
+            + c.point(key, lay.na_letter_rows[0])
+        )
+    )
+    assert letter in na_text_boxes(lay)
+    assert not [p for p in lay.na_paths if p.kind == "joint" and p.between and p.between[0] in c.at]
+
+
+def test_the_na_metrics_measure_the_pieces_where_the_curve_draws_them():
+    """nacheck reads each piece of a curve where its nucleotides are drawn (na_curve.drawn_pieces): centred on the
+    curve, from its first rung to its last, its rails on the curve's sides; its body (na_curve.piece_bodies, for the
+    contact gaps) the curve's stretches that hold its nucleotides as drawn."""
+    from foldmap.na_curve import drawn_pieces, piece_bodies
+    from foldmap.na_paths import in_body
+    from foldmap.nacheck import shape
+
+    lay, _ = _routed("1IHF")
+    (c,) = lay.na_curves
+    seen, bodies = drawn_pieces(lay), piece_bodies(lay)
+    assert len(seen) == len(bodies) == len(lay.stems)
+    for k in c.pieces:
+        d = seen[k]
+        assert set(d.axial) == set(lay.stems[k].axial) and d.id == lay.stems[k].id
+        assert float(np.hypot(c.xy[:, 0] - d.cx, c.xy[:, 1] - d.cy).min()) < 0.05
+        ends = sorted(d.axial, key=lambda key: c.at[key])
+        a, b = c.to_page([c.at[ends[0]], c.at[ends[-1]]], [0.0, 0.0])
+        assert abs(math.remainder(math.atan2(b[1] - a[1], b[0] - a[0]) - d.angle, 2 * math.pi)) < 1e-6
+        for key in d.axial:
+            assert d.side[key] == c.side[key]
+            assert any(in_body(c.point(key), e) for e in bodies[k]), key
+    assert shape(lay)["stems_drawn"] == len(lay.stems)
+
+
+def test_off_the_bodies_and_boxes_are_the_pieces():
+    """The default (pieces): every body and box the checks and keep-outs read is the layout's own stem."""
+    from foldmap.layout import stem_bodies, stem_name_keeps, stem_points, stems_at
+
+    lay, _ = _routed("1IHF", "pieces")
+    assert stem_bodies(lay) is lay.stems
+    assert stems_at(lay) == {key: d for d in lay.stems for key in d.axial}
+    pts = stem_points(lay)
+    assert all(np.array_equal(pts[key], d.point(key)) for d in lay.stems for key in d.axial)
+    assert len(stem_name_keeps(lay)) == len(lay.stems) and lay.bent_duplex
+
+
+def test_the_page_hovers_and_picks_the_curve_as_one():
+    """The interactive page: one nucleic-acid entry for the curve (curve:0, its nucleotides and the residues touching
+    them), none for its pieces; its ink's click target na:curve:0:hit."""
+    import json
+
+    from foldmap.interactive import _hit_targets, build_page
+
+    page = build_page(_path("1IHF"), look=replace(Style(), na_bend="curved"))
+    data = json.loads(page.split('<script type="application/json" id="topo-data">', 1)[1].split("</script>", 1)[0])
+    keys = [x["key"] for x in data["links"]["nucleics"]]
+    lay, _ = _routed("1IHF")
+    (c,) = lay.na_curves
+    assert "curve:0" in keys and not any(f"stem:{k}" in keys for k in c.pieces)
+    entry = next(x for x in data["links"]["nucleics"] if x["key"] == "curve:0")
+    assert entry["text"].startswith("DNA 1 · ") and len(entry["het"]) == len(c.at) and entry["residues"]
+    assert 'id="na:curve:0:rails"' in page and 'id="na:curve:0:hit"' in page
+    svg = '<g id="na:curve:2:rails">\n <path d="M 0 0 L 1 1"/>'
+    assert 'id="na:curve:2:hit"' in _hit_targets(svg + '\n<g id="loop:A>B">\n <path d="M 0 0"/>')
+
+
+def _drawn_curved(pdb, *style):
+    return draw_spec(figure_spec(_path(pdb), style=["na_bend=curved", *style]))
+
+
+def test_na_bend_is_listed_and_a_layout_file_keeps_it(tmp_path):
+    """`foldmap styles` lists the key with its choices; a layout file saved from a curved figure keeps na_bend and
+    redraws the same figure (A13)."""
+    from foldmap import layoutfile
+    from foldmap.cli import styles_help
+    from foldmap.render import save
+    from foldmap.spec import layout_document
+
+    assert "na_bend           one of pieces, curved" in styles_help()
+    spec = figure_spec(_path("1IHF"), style=["na_bend=curved"])
+    drawn = draw_spec(spec)
+    doc = layout_document(spec, drawn=drawn)
+    assert doc["style"]["na_bend"] == "curved"
+    keep = layoutfile.save(tmp_path / "ihf.yaml", doc)
+    again = draw_spec(figure_spec(_path("1IHF"), layout_file=keep))
+    assert again.layout.na_bend == "curved" and len(again.layout.na_curves) == 1
+    save(drawn.figure, tmp_path / "a.svg")
+    save(again.figure, tmp_path / "b.svg")
+    assert (tmp_path / "a.svg").read_bytes() == (tmp_path / "b.svg").read_bytes()

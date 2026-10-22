@@ -147,10 +147,10 @@ def stem_gap_limit(fig) -> float | None:
     if not fig.axes:
         return None
     ax = fig.axes[0]
-    name = next((t for t in ax.texts if (t.get_gid() or "").startswith("na:label:")), None)
+    name = next((t for t in ax.texts if re.fullmatch(r"na:(?:label:\d+|curve:\d+:label)", t.get_gid() or "")), None)
     if name is None:
         return None
-    block = any(re.fullmatch(r"na:stem:\d+:block(:\d+)?", a.get_gid() or "") for a in ax.patches)
+    block = any(re.fullmatch(r"na:(?:stem|curve):\d+:block(:\d+)?", a.get_gid() or "") for a in ax.patches)
     px_per_unit = ax.transData.transform((1, 0))[0] - ax.transData.transform((0, 0))[0]
     size = _BLOCK_NAME_EM if block else _NAME_EM  # render draws a block's name at 0.9 em, a ladder's at 0.8
     em = name.get_fontsize() / size * fig.dpi / 72 / px_per_unit

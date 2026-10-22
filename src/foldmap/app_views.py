@@ -149,6 +149,7 @@ def figure_view(ws: Workspace) -> None:
             two_fold_assembly=result.get("two_fold_assembly", False),
             cyclic_assembly=result.get("cyclic_assembly", False),
             lent_across_cut=result.get("lent_across_cut", False),
+            bent_duplex=result.get("bent_duplex", False),
         )
         ss["info"] = drawn_summary(ss, json.loads(target), result)
         slow = result["seconds"]  # the drawing itself, as at load (not the job's start-up or a cache hit)

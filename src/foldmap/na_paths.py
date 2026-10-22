@@ -350,10 +350,11 @@ def among(path: NAPath, at: dict) -> list[tuple[float, float]]:
     """The part of a drawn strand that lies among the other elements. A run or a joint (stem to stem) is drawn as
     [rail point, end face, ..., end face, rail point]: without its two rail stretches, its first and last segments.
     Any other strand without its first and last stretches inside its own stems (outside_own). `at`: stem nucleotide
-    -> its PlacedStem."""
+    -> its PlacedStem, or a tuple of the bodies it is drawn on (layout.stems_at: a curve's stretches)."""
     if path.kind in ("run", "joint") and len(path.between) == 2:
         return list(path.points[1:-1])
-    return outside_own(path.points, tuple(at[k] for k in path.between if k in at))
+    own = [b for k in path.between if k in at for b in (at[k] if isinstance(at[k], tuple) else (at[k],))]
+    return outside_own(path.points, tuple(own))
 
 
 def _seg_dists(points, a, b) -> np.ndarray:
