@@ -1,0 +1,65 @@
+{
+ "about": "Plan 13e-3: pairs with a known domain motion, beside the random-100 two-state pairs, for the core-fit cut (diff.CORE_CUT). A is the reference (closed or liganded where the paper compares that way), B the other state. Domains are residue ranges of A's chain as the papers define them. Synthetic hinges: 1UBQ with residues 41-76 turned about residue 40's CA (the 13e-1 test, at four angles), the truth known exactly.",
+ "pairs": [
+  {
+   "name": "hinge MBP",
+   "a": {"id": "1ANF", "chain": "A"},
+   "b": {"id": "1OMP", "chain": "A"},
+   "type": "open/closed",
+   "domains": {"N": ["1-109", "264-309"], "C": ["114-258", "316-370"]},
+   "published": {"relative": {"N/C": 35.0}, "source": "Sharff et al. 1992, Biochemistry 31:10657: maltose-free MBP (1OMP) opens by a ~35 degree rigid-body hinge bend of the two domains, with an ~8 degree twist, relative to the maltose complex (1ANF, Spurlino et al. 1991). Domains as Evenas et al. 2001 (J Mol Biol) give them: N 1-109, 264-309; C 114-258, 316-370."}
+  },
+  {
+   "name": "hinge lactoferrin",
+   "a": {"id": "1LFG", "chain": "A"},
+   "b": {"id": "1CB6", "chain": "A"},
+   "type": "open/closed",
+   "domains": {"N1": ["1-90", "251-333"], "N2": ["91-250"], "C": ["345-691"]},
+   "published": {"relative": {"N1/N2": 54.0}, "source": "Jameson et al. 1998, Acta Cryst D54:1319 (1CB6, apolactoferrin at 2.0 A; Norris et al. 1991 for 1LFH): the N-lobe opens by a 54 degree rotation of domain N2 relative to N1, against diferric lactoferrin (1LFG, Haridas et al. 1995); the C-lobe stays closed. Domains: N1 1-90, 251-333; N2 91-250; the C-lobe after the 334-344 helix."}
+  },
+  {
+   "name": "hinge adenylate kinase",
+   "a": {"id": "4AKE", "chain": "A"},
+   "b": {"id": "1AKE", "chain": "A"},
+   "type": "open/closed",
+   "domains": {"CORE": ["1-29", "68-117", "161-214"], "LID": ["118-160"], "NMP": ["30-67"]},
+   "published": {"relative": {}, "source": "Muller et al. 1996, Structure 4:147 (4AKE open, apo) and Muller and Schulz 1992 (1AKE, Ap5A): LID and NMP close over the substrates; no rotation angle was found stated in the abstracts read for this task. Domains: CORE 1-29, 68-117, 161-214; NMP 30-67; LID 118-160."}
+  },
+  {
+   "name": "synthetic hinge 15",
+   "a": {"id": "tests/data/1UBQ.cif", "chain": "A", "stem": "1UBQ"},
+   "b": {"id": "1UBQ", "chain": "A", "stem": "hinge15"},
+   "type": "synthetic hinge",
+   "synthetic": {"moved": [41, 76], "about": 40, "axis": [0, 1, 1], "turn": 15},
+   "domains": {"N": ["1-40"], "C": ["41-76"]},
+   "published": {"relative": {"N/C": 15.0}, "turns": {"N": 0.0, "C": 15.0}, "source": "constructed"}
+  },
+  {
+   "name": "synthetic hinge 30",
+   "a": {"id": "tests/data/1UBQ.cif", "chain": "A", "stem": "1UBQ"},
+   "b": {"id": "1UBQ", "chain": "A", "stem": "hinge30"},
+   "type": "synthetic hinge",
+   "synthetic": {"moved": [41, 76], "about": 40, "axis": [0, 1, 1], "turn": 30},
+   "domains": {"N": ["1-40"], "C": ["41-76"]},
+   "published": {"relative": {"N/C": 30.0}, "turns": {"N": 0.0, "C": 30.0}, "source": "constructed"}
+  },
+  {
+   "name": "synthetic hinge 45",
+   "a": {"id": "tests/data/1UBQ.cif", "chain": "A", "stem": "1UBQ"},
+   "b": {"id": "1UBQ", "chain": "A", "stem": "hinge45"},
+   "type": "synthetic hinge",
+   "synthetic": {"moved": [41, 76], "about": 40, "axis": [0, 1, 1], "turn": 45},
+   "domains": {"N": ["1-40"], "C": ["41-76"]},
+   "published": {"relative": {"N/C": 45.0}, "turns": {"N": 0.0, "C": 45.0}, "source": "constructed"}
+  },
+  {
+   "name": "synthetic hinge 60",
+   "a": {"id": "tests/data/1UBQ.cif", "chain": "A", "stem": "1UBQ"},
+   "b": {"id": "1UBQ", "chain": "A", "stem": "hinge60"},
+   "type": "synthetic hinge",
+   "synthetic": {"moved": [41, 76], "about": 40, "axis": [0, 1, 1], "turn": 60},
+   "domains": {"N": ["1-40"], "C": ["41-76"]},
+   "published": {"relative": {"N/C": 60.0}, "turns": {"N": 0.0, "C": 60.0}, "source": "constructed"}
+  }
+ ]
+}

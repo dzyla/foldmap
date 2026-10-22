@@ -380,10 +380,11 @@ def _page(
     return pin_fonts(fig), items
 
 
-def panel_checks(made: Compared, assembly: str = "auto") -> dict[str, dict]:
+def panel_checks(made: Compared, assembly: str = "auto", found: dict | None = None) -> dict[str, dict]:
     """H5 for each panel of a page (criteria.h5_good_figure): the panel drawn as a figure of its own, its marks and
     colouring as on the page (no title, as alone), passes every S- and A-check (criteria.check_figure) that its
-    structure's chain drawn alone in the page's look passes. {"a": A's panel, "b": B's}."""
+    structure's chain drawn alone in the page's look passes. {"a": A's panel, "b": B's}. `found`, when given, gets
+    each side's two check_figure results: {side: (the panel's, the chain drawn alone's)}."""
     from .criteria import check_figure, h5_good_figure
     from .spec import Drawn, FigureSpec, draw_spec
 
@@ -394,7 +395,10 @@ def panel_checks(made: Compared, assembly: str = "auto") -> dict[str, dict]:
         panel = Drawn(figure, p.loops, p.layout, p.sses, p.bb, p.model)
         alone_spec = replace(spec, look=p.plain)
         alone = draw_spec(alone_spec)
-        out[side] = h5_good_figure(check_figure(panel, spec, p.path), check_figure(alone, alone_spec, p.path))
+        judged = check_figure(panel, spec, p.path), check_figure(alone, alone_spec, p.path)
+        if found is not None:
+            found[side] = judged
+        out[side] = h5_good_figure(*judged)
     return out
 
 

@@ -41,6 +41,17 @@ report reads DIR/<stem>.json of every pair and writes the table (DIR/report.md, 
 H3's values drawn alike and drawn independently, the checks B drawn like A loses, and the failures by check. When
 the set's pairs carry a stratum (the held-out set), the table gains the stratum, and the report a summary (passes
 per check and stratum; the medians drawn independently and drawn alike), also written as JSON (DIR/summary.json).
+
+    python scripts/homologues.py diff --out DIR [--jobs 4] [--pairs 1RM5-2HKI,...] [--md PATH]
+
+diff (plan 13e-3) draws the two-state pairs as `foldmap diff A B` draws them (compare.diff_page: publication look,
+auto route and assembly, the pair's domains), a child process each (diff-pair). The pairs are the random-100
+samples' S11 pairs (seed as A, partner as B, each its first protein chain) and docs/validation/diff/hinges.json
+(published domain motions; synthetic hinges on 1UBQ, written into DIR). For each pair it writes DIR/<stem>.png and
+.svg, the --json output (DIR/<stem>-diff.json), and DIR/<stem>.json with: H5 and the S-/A-checks of each panel
+(compare.panel_checks); the Diff's numbers at each core-fit cut of CUTS (core kept and its share per domain, domain
+turns, each two domains' relative rotation fitted on their own); and the comparison with what the sample records
+of the pair. Then the tables (write_diff_report; diff-report rewrites them from DIR).
 """
 
 from __future__ import annotations
@@ -273,6 +284,289 @@ def cmd_run(args) -> int:
         codes = dict(pool.map(one, pairs))
     write_report(read_set(args.set), out, Path(args.md) if args.md else out / "report.md")
     return 0 if all(c == 0 for c in codes.values()) else 1
+
+
+# --------------------------------------------------------------------------------------------------------- diff
+
+DIFF_SAMPLES = tuple(ROOT / "docs" / "validation" / d / "sample.json" for d in ("random100", "random100-heldout",
+                                                                              "random100-third"))  # fmt: skip
+HINGES = ROOT / "docs" / "validation" / "diff" / "hinges.json"
+CUTS = (2.0, 1.0, 0.5)  # the core fit's cut (diff.CORE_CUT, in d0) each pair's numbers are measured at
+MOVED_A = 3.0  # Å: a residue counted as moved (the table's "moved" column)
+
+
+def sample_pairs(path) -> list[dict]:
+    """The two-state pairs (S11) of a random-100 sample.json: the seed as A, its partner as B, each its first protein
+    chain (as random-100's pair_check reads them), with what the sample records of the pair (`known`)."""
+    data = json.loads(Path(path).read_text(encoding="utf-8"))
+    by_id = {e["id"]: e for e in data["entries"] if e.get("pair")}
+    out = []
+    for e in sorted((e for e in by_id.values() if e["role"] == "seed"), key=lambda e: int(e["pair"][1:])):
+        p = by_id[e["partner"]]
+        out.append(
+            {
+                "name": f"{Path(path).parent.name} {e['pair']}",
+                "a": {"id": e["id"], "chain": None},
+                "b": {"id": p["id"], "chain": None},
+                "type": e["pair_type"],
+                "known": {
+                    "ligand_touching": [e["ligand_touching"], p["ligand_touching"]],
+                    "assembly1_chains": [e["assembly1_chains"], p["assembly1_chains"]],
+                    "ca_rmsd": e["ca_rmsd"],
+                },
+            }
+        )
+    return out
+
+
+def diff_set(samples=DIFF_SAMPLES, hinges=HINGES) -> list[dict]:
+    """Every sample's pairs, then the hinge set's (published domain motions and synthetic hinges)."""
+    pairs = [p for s in samples for p in sample_pairs(s)]
+    return pairs + json.loads(Path(hinges).read_text(encoding="utf-8"))["pairs"]
+
+
+def diff_stem(pair: dict) -> str:
+    def one(side: dict) -> str:
+        return side.get("stem") or side["id"] + (f"_{side['chain']}" if side.get("chain") else "")
+
+    return one(pair["a"]) + "-" + one(pair["b"])
+
+
+def _hinge_file(pair: dict, out: Path) -> Path:
+    """A synthetic hinge (pair["synthetic"]): A's chain with residues `moved` turned `turn` degrees about `about`'s
+    CA (axis `axis`), written as PDB."""
+    import gemmi
+    import numpy as np
+
+    s = pair["synthetic"]
+    st = gemmi.read_structure(str(ROOT / pair["a"]["id"]))
+    chain = st[0][pair["a"]["chain"]]
+    lo, hi = s["moved"]
+    centre = np.array(chain[str(s["about"])][0]["CA"][0].pos.tolist())
+    axis = np.asarray(s["axis"], float) / np.linalg.norm(s["axis"])
+    k = np.array([[0, -axis[2], axis[1]], [axis[2], 0, -axis[0]], [-axis[1], axis[0], 0]])
+    angle = np.radians(s["turn"])
+    turn = np.eye(3) + np.sin(angle) * k + (1 - np.cos(angle)) * k @ k
+    for res in chain:
+        if lo <= res.seqid.num <= hi:
+            for atom in res:
+                atom.pos = gemmi.Position(*(turn @ (np.array(atom.pos.tolist()) - centre) + centre))
+    path = out / f"{diff_stem(pair)}.pdb"
+    st.write_pdb(str(path))
+    return path
+
+
+def _measure(sa, sb, domains: dict | None) -> dict:
+    """The Diff's numbers at each cut of CUTS (diff.CORE_CUT set for the call): the core kept (pairs, and its share
+    in each domain), the core's RMSD, the largest displacement, residues moved past MOVED_A, the domains' turns after
+    the core fit and, core-free, each two domains' relative rotation (Kabsch of each on its own)."""
+    import numpy as np
+
+    from foldmap import diff as diff_module
+    from foldmap.symmetry import _kabsch, _rotation
+
+    out: dict = {}
+    keep = diff_module.CORE_CUT
+    try:
+        for cut in CUTS:
+            diff_module.CORE_CUT = cut
+            d = diff_module.diff_sides(sa, sb, "auto", domains)
+            aln = d.alignment
+            ia, ib = (np.array(k, dtype=int) for k in zip(*aln.pairs))
+            pa, pb = np.asarray(sa.bb.ca, float)[ia], np.asarray(sb.bb.ca, float)[ib]
+            core = set(d.core)
+            sel = np.array([p in core for p in aln.pairs], bool)
+            moved = pb[sel] @ d.rotation.T + d.translation - pa[sel]
+            row = {
+                "core": len(d.core),
+                "aligned": len(aln.pairs),
+                "core_rmsd": _round(np.sqrt((moved**2).sum(axis=1).mean())),
+                "max_displacement": _round(max(d.displacement.values(), default=0.0)),
+                "moved": sum(v > MOVED_A for v in d.displacement.values()),
+                "domain_turns": {k: _round(v) for k, v in d.domain_turns.items()},
+            }
+            if domains:
+                mine = {k: diff_module._domain_residues(k, v, sa) for k, v in domains.items()}
+                row["core_share"] = {k: sum(i in m for i, _ in d.core) for k, m in mine.items()}
+                rot = {}
+                for k, m in mine.items():
+                    s = np.array([i in m for i in ia], bool)
+                    rot[k] = _kabsch(pb[s], pa[s])[0]
+                names = list(domains)
+                row["relative"] = {
+                    f"{x}/{y}": _round(np.degrees(_rotation(rot[x] @ rot[y].T)[0]))
+                    for n, x in enumerate(names)
+                    for y in names[n + 1 :]
+                }
+            out[f"{cut:g}"] = row
+    finally:
+        diff_module.CORE_CUT = keep
+    out["route"] = d.alignment.method
+    out["all_rmsd"] = _round(_kabsch(pb, pa)[2])  # one fit on every aligned pair, as random-100's ca_rmsd
+    out["counts"] = dict(sorted(diff_module.counts(d).items()))
+    out["ligands"] = [list(r) for r in d.contacts["ligands"]]
+    out["interfaces"] = [list(r) for r in d.contacts["interfaces"]]
+    return out
+
+
+def _known(pair: dict, m: dict) -> dict | None:
+    """The diff against what the sample records of the pair: apo/holo, a ligand gained (or lost) on the side the
+    sample says touches one; monomer/oligomer, an interface gained (or lost) toward the oligomer; open/closed, the
+    RMSD of one fit on every aligned pair against the sample's ca_rmsd, and residues moved."""
+    known = pair.get("known")
+    if not known:
+        return None
+    t = pair["type"]
+    if t == "apo/holo":
+        want = "gained" if known["ligand_touching"][1] else "lost"
+        got = [r for r in m["ligands"] if r[-1] == want]
+        return {"expect": f"a ligand {want}", "agrees": bool(got), "got": m["ligands"]}
+    if t == "monomer/oligomer":
+        want = "gained" if known["assembly1_chains"][1] > known["assembly1_chains"][0] else "lost"
+        got = [r for r in m["interfaces"] if r[-1] == want]
+        return {"expect": f"an interface {want}", "agrees": bool(got), "got": m["interfaces"]}
+    rmsd = m["all_rmsd"]
+    return {
+        "expect": f"CA RMSD {known['ca_rmsd']} Å",
+        "agrees": rmsd is not None and abs(rmsd - known["ca_rmsd"]) <= 0.5,
+        "got": rmsd,
+    }
+
+
+def diff_pair(pair: dict, out: Path) -> dict:
+    """One pair: drawn as `foldmap diff A B` draws it (compare.diff_page, the publication look, auto route and
+    assembly, the pair's domains), the page written (DIR/<stem>.png and .svg, the JSON as --json writes it), H5 and
+    the S-/A-checks of each panel (compare.panel_checks) and the Diff's numbers at each cut of CUTS (_measure)."""
+    from foldmap.compare import diff_page, panel_checks, write_json
+    from foldmap.diff import CORE_CUT, _side
+    from foldmap.render import save
+    from foldmap.style import resolve_style
+
+    s = diff_stem(pair)
+    a = pair["a"]["id"] if "synthetic" not in pair else str(ROOT / pair["a"]["id"])
+    b = pair["b"]["id"] if "synthetic" not in pair else str(_hinge_file(pair, out))
+    ca, cb = pair["a"].get("chain"), pair["b"].get("chain")
+    domains = pair.get("domains") or None
+    look = resolve_style("publication")
+    t0 = time.perf_counter()
+    made = diff_page(a, b, ca, cb, "auto", look, "auto", domains)
+    seconds = time.perf_counter() - t0
+    for ext in ("png", "svg"):
+        save(made.figure, out / f"{s}.{ext}")
+    write_json(made.data, out / f"{s}-diff.json")
+    found: dict = {}
+    h5 = panel_checks(made, "auto", found)
+    sa = _side(a, ca, "A", "auto", look.helices_310)
+    sb = _side(b, cb, "B", "auto", look.helices_310)
+    measured = _measure(sa, sb, domains)
+    result = {
+        "pair": s,
+        "name": pair["name"],
+        "type": pair["type"],
+        "chains": [sa.chain, sb.chain],
+        "drawn_at_cut": CORE_CUT,
+        "note": made.note,
+        "h5": {k: {"pass": v["pass"], "detail": v.get("detail", "")} for k, v in h5.items()},
+        "checks": {k: {"panel": _summary(x), "alone": _summary(y)} for k, (x, y) in found.items()},
+        "measured": measured,
+        "known": _known(pair, measured),
+        "published": pair.get("published"),
+        "seconds": round(seconds, 1),
+    }
+    (out / f"{s}.json").write_text(json.dumps(result, indent=1, sort_keys=True) + "\n", encoding="utf-8")
+    return result
+
+
+def cmd_diff_pair(args) -> int:
+    out = Path(args.out)
+    out.mkdir(parents=True, exist_ok=True)
+    r = diff_pair(json.loads(Path(args.pair).read_text(encoding="utf-8")), out)
+    print(f"{r['pair']}: H5 " + ", ".join(f"{k} {_word(v)}" for k, v in r["h5"].items()))
+    return 0
+
+
+def cmd_diff(args) -> int:
+    """Every pair of diff_set (or --pairs, by stem) in a child each, as run does; then the table (write_diff_report)."""
+    pairs = diff_set()
+    if args.pairs:
+        wanted = set(args.pairs.split(","))
+        pairs = [p for p in pairs if diff_stem(p) in wanted]
+    out = Path(args.out)
+    out.mkdir(parents=True, exist_ok=True)
+    env = {**os.environ, "PYTHONHASHSEED": "0", "OPENBLAS_NUM_THREADS": "1"}
+
+    def one(p: dict) -> tuple[str, int]:
+        s = diff_stem(p)
+        spec = out / f"{s}.pair.json"
+        spec.write_text(json.dumps(p, indent=1, sort_keys=True) + "\n", encoding="utf-8")
+        cmd = [sys.executable, "-I", str(SCRIPT), "diff-pair", str(spec), "--out", str(out)]
+        with open(out / f"{s}.log", "w", encoding="utf-8") as log:
+            try:
+                done = subprocess.run(cmd, stdout=log, stderr=subprocess.STDOUT, env=env, timeout=PAIR_TIMEOUT_S)
+                code = done.returncode
+            except subprocess.TimeoutExpired:
+                code = -9
+        print(f"{s}: exit {code}", flush=True)
+        return s, code
+
+    with ThreadPoolExecutor(max_workers=max(1, args.jobs)) as pool:
+        codes = dict(pool.map(one, pairs))
+    write_diff_report(diff_set(), out, Path(args.md) if args.md else out / "report.md")
+    return 0 if all(c == 0 for c in codes.values()) else 1
+
+
+def _turns(row: dict) -> str:
+    return ", ".join(f"{k} {v:.1f}" for k, v in row.get("domain_turns", {}).items())
+
+
+def write_diff_report(pairs: list[dict], out: Path, md: Path) -> Path:
+    """The tables of a diff run: per pair the route, H5 per panel, the S-/A-checks each panel fails beside its chain
+    drawn alone, the changes counted, the known difference; then each pair's numbers at both cuts."""
+    head = [
+        "| pair | set | type | route | H5 A | H5 B | A fails (alone) | B fails (alone) | changes | known | agrees |",
+        "|---|---|---|---|---|---|---|---|---|---|---|",
+    ]
+    cuts = [
+        "| pair | cut | core / aligned | core RMSD | max disp. | moved > 3 Å | domain turns | relative "
+        "| core per domain |",
+        "|---|---|---|---|---|---|---|---|---|",
+    ]
+    for p in pairs:
+        s = diff_stem(p)
+        f = out / f"{s}.json"
+        if not f.is_file():
+            head.append(f"| {s} | {p['name']} | {p['type']} | not drawn (see {s}.log) | | | | | | | |")
+            continue
+        r = json.loads(f.read_text(encoding="utf-8"))
+        m, k = r["measured"], r["known"] or {}
+
+        def fails(side: str, r=r) -> str:
+            c = r["checks"].get(side, {})
+            return f"{', '.join(c['panel']['failed']) or '-'} ({', '.join(c['alone']['failed']) or '-'})" if c else ""
+
+        changed = ", ".join(f"{n.removeprefix('contacts.')} {v}" for n, v in m["counts"].items() if v) or "none"
+        agrees = "" if not k else ("yes" if k["agrees"] else "no")
+        head.append(
+            f"| {s} | {r['name']} | {r['type']} | {m['route']} | {_word(r['h5'].get('a'))} | "
+            f"{_word(r['h5'].get('b'))} | {fails('a')} | {fails('b')} | {changed} | {k.get('expect', '')} | {agrees} |"
+        )
+        for cut in CUTS:
+            row = m[f"{cut:g}"]
+            rel = ", ".join(f"{n} {v:.1f}" for n, v in row.get("relative", {}).items())
+            share = ", ".join(f"{n} {v}" for n, v in row.get("core_share", {}).items())
+            cuts.append(
+                f"| {s} | {cut:g}·d0 | {row['core']} / {row['aligned']} | {row['core_rmsd']:.2f} | "
+                f"{row['max_displacement']:.1f} | {row['moved']} | {_turns(row)} | {rel} | {share} |"
+            )
+    md.parent.mkdir(parents=True, exist_ok=True)
+    md.write_text("\n".join(head) + "\n\n" + "\n".join(cuts) + "\n", encoding="utf-8")
+    return md
+
+
+def cmd_diff_report(args) -> int:
+    out = Path(args.out)
+    print(f"wrote {write_diff_report(diff_set(), out, Path(args.md) if args.md else out / 'report.md')}")
+    return 0
 
 
 # ------------------------------------------------------------------------------------------------------- sample
@@ -716,8 +1010,20 @@ def main(argv: list[str] | None = None) -> int:
     rp.add_argument("--set", required=True)
     rp.add_argument("--out", required=True)
     rp.add_argument("--md", default="")
+    df = sub.add_parser("diff", help="the two-state pairs drawn as diffs (plan 13e-3), then the tables")
+    df.add_argument("--out", required=True)
+    df.add_argument("--jobs", type=int, default=4)
+    df.add_argument("--pairs", default="", help="only these stems (A-B), comma-separated")
+    df.add_argument("--md", default="")
+    dp = sub.add_parser("diff-pair", help="one diff pair (diff's child)")
+    dp.add_argument("pair", help="the pair as JSON (a diff_set item)")
+    dp.add_argument("--out", required=True)
+    dr = sub.add_parser("diff-report", help="the tables of a diff run")
+    dr.add_argument("--out", required=True)
+    dr.add_argument("--md", default="")
     args = ap.parse_args(argv)
-    commands = {"align": cmd_align, "pair": cmd_pair, "run": cmd_run, "sample": cmd_sample, "report": cmd_report}
+    commands = {"align": cmd_align, "pair": cmd_pair, "run": cmd_run, "sample": cmd_sample, "report": cmd_report,
+                "diff": cmd_diff, "diff-pair": cmd_diff_pair, "diff-report": cmd_diff_report}  # fmt: skip
     return commands[args.command](args)
 
 
