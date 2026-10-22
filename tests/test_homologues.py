@@ -1,5 +1,6 @@
 """The homologue tuning set (docs/validation/homologues/tuning.json) and its campaign script (scripts/homologues.py):
-the set's form only (no network, no US-align), and the report's table from a synthetic result."""
+the set's form only (no network), the report's table from a synthetic result, and the comparison with US-align
+(its run skipped where US-align is not installed)."""
 
 import importlib.util
 import json
@@ -218,3 +219,98 @@ def test_the_held_out_set_is_as_drawn(hom, pairs):
     ids = [p[s]["id"] for p in held for s in ("a", "b")]
     assert len(ids) == len(set(ids)) == 80
     assert not set(ids) & {p[s]["id"] for p in pairs for s in ("a", "b")}
+
+
+# ---- the aligner against US-align (Task 13a-3, plan 23 Task 3) ------------------------------------------------------
+
+USALIGN_OUT = """
+ * US-align (Version 20241108)                                      *
+Name of Structure_1: A.pdb:A (to be superimposed onto Structure_2)
+Name of Structure_2: B.pdb:A
+Length of Structure_1: 6 residues
+Length of Structure_2: 5 residues
+
+Aligned length= 4, RMSD=   1.20, Seq_ID=n_identical/n_aligned= 0.500
+TM-score= 0.40000 (normalized by length of Structure_1: L=6, d0=0.50)
+TM-score= 0.45000 (normalized by length of Structure_2: L=5, d0=0.50)
+(You should use TM-score normalized by length of the reference structure)
+
+(":" denotes residue pairs of d < 5.0 Angstrom, "." denotes other aligned residues)
+MKV-TLA
+ :: . .
+-KVGT-A
+
+#Total CPU time is  0.04 seconds
+"""
+
+
+def test_usalign_output_is_read_as_pairs(hom):
+    """parse_usalign: the version, lengths, both TM-scores, and every column with a residue of both as a pair (i in
+    structure 1, j in structure 2), those marked ':' also as close; gapped_rows writes the same rows back."""
+    got = hom.parse_usalign(USALIGN_OUT)
+    assert got["version"] == "20241108" and (got["length_1"], got["length_2"]) == (6, 5)
+    assert got["tm"] == {1: 0.4, 2: 0.45} and got["aligned"] == 4 and got["rmsd"] == 1.2
+    assert got["pairs"] == [(1, 0), (2, 1), (3, 3), (5, 4)] and got["close"] == [(1, 0), (2, 1)]
+    assert hom.gapped_rows(got["pairs"], "MKVTLA", "KVGTA") == [got["rows"][0], got["rows"][2]]
+    with pytest.raises(ValueError):
+        hom.parse_usalign(USALIGN_OUT.replace("Length of Structure_1: 6", "Length of Structure_1: 7"))
+
+
+def test_pairs_agree_within_one_residue(hom):
+    """pair_agreement: the share of the reference's pairs whose A residue the other alignment pairs within ±1 of the
+    same B residue; disagreements names the runs of A's residues that it shifts or leaves out."""
+    from foldmap.model import ResLabel
+
+    ref = [(0, 0), (1, 1), (2, 2), (3, 3)]
+    got = [(0, 0), (1, 2), (2, 5)]
+    assert hom.pair_agreement(ref, got) == 0.5 and hom.pair_agreement(ref, got, 0) == 0.25
+    assert hom.pair_agreement([], got) is None
+    labels = [ResLabel("A", n, "", "ALA") for n in range(10, 14)]
+    assert hom.disagreements(ref, got, labels) == ["A 12-12 (1): B shifted +3", "A 13-13 (1): not paired"]
+
+
+def test_the_comparison_counts_the_limits(hom):
+    """usalign_summary: the limits count only where US-align's TM-score reaches USALIGN_TM; H1's cut is compared on
+    every pair."""
+
+    def row(us, fm, share, fm_of_us=None):
+        applies = us >= hom.USALIGN_TM
+        tm_ok, pairs_ok = abs(fm - us) <= hom.TM_TOLERANCE, share >= hom.PAIR_AGREEMENT
+        return {"usalign": {
+            "usalign": {"tm_a": us, "foldmap_tm_of_its_pairs": us if fm_of_us is None else fm_of_us},
+            "structure": {"tm_score": fm}, "tm_difference": round(fm - us, 4), "agreement": {"within_1": share},
+            "limits": {"applies": applies, "tm": tm_ok, "pairs": pairs_ok}}}  # fmt: skip
+
+    s = hom.usalign_summary([row(0.8, 0.79, 0.99), row(0.6, 0.54, 0.9), row(0.7, 0.7, 0.0), row(0.45, 0.52, 0.2, 0.5)])
+    assert (s["pairs"], s["judged"], s["tm_within"], s["pairs_agree"], s["both"]) == (4, 3, 2, 2, 1)
+    assert s["within_1_median"] == 0.9 and s["within_1_min"] == 0.0
+    assert s["same_side_of_h1"] == 3 and s["foldmap_lower"] == 2 and s["search_short"] == 2
+    assert s["scoring_difference_max_abs"] == 0.05
+
+
+def test_usalign_agrees_with_foldmap_on_one_chain_against_itself(hom):
+    """US-align run on a chain as foldmap reads it (needs US-align: skipped where it is not installed)."""
+    exe = hom.find_usalign()
+    if not exe:
+        pytest.skip("US-align is not installed")
+    from foldmap.io import load_backbone
+
+    bb = load_backbone(ROOT / "tests" / "data" / "1UBQ.cif", "asu")
+    got = hom.compare_usalign(bb, "A", bb, "A", exe)
+    assert got["usalign"]["tm_a"] == got["structure"]["tm_score"] == 1.0
+    assert got["usalign"]["aligned"] == got["usalign"]["aligned_reported"] == 76
+    assert got["agreement"]["exact"] == 1.0 and got["limits"]["verdict"] == "pass" and not got["disagreements"]
+
+
+def test_the_committed_comparison_matches_its_summary(hom):
+    """usalign.json's rows give the summary's 'usalign' entry (heldout-summary.json) set by set."""
+    data_path, summary_path = SET.parent / "usalign.json", SET.parent / "heldout-summary.json"
+    if not data_path.exists() or not summary_path.exists():
+        pytest.skip("docs/validation/homologues is not part of the sdist")
+    data = json.loads(data_path.read_text(encoding="utf-8"))
+    summary = json.loads(summary_path.read_text(encoding="utf-8"))["usalign"]
+    assert set(data["sets"]) == {"tuning", "heldout"} and summary["measured_at"] == data["measured_at"]
+    for name, rows in data["sets"].items():
+        assert summary[name] == hom.usalign_summary(rows), name
+    assert summary["all"] == hom.usalign_summary([r for rows in data["sets"].values() for r in rows])
+    assert [x["pair"] for x in summary["h1_refused"]] == [r["pair"] for r in hom._h1_refused(data["sets"]["heldout"])]

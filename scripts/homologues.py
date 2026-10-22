@@ -4,11 +4,17 @@
 H1-H5 (foldmap.criteria.like_checks) beside B drawn on its own (needs network for the PDB entries; not run in CI).
 
     python scripts/homologues.py align --set docs/validation/homologues/tuning.json --out DIR
+                                       [--usalign PATH|auto] [--jobs 1]
+    python scripts/homologues.py usalign-report tuning=DIR1 heldout=DIR2 --out docs/validation/homologues
+                                       --summary docs/validation/homologues/heldout-summary.json --commit SHA
 
 align aligns each pair's two chains (foldmap.align.align_chains, auto route; as deposited) and element-mates
 them, without drawing: per pair the method, TM-score (normalised by A), RMSD, identity, aligned pairs, mates and
-same_fold, to DIR/align.json and a table on stdout. (The comparison with US-align, Task 13a-3, waits for the
-author's approval to install it on the remote machine; the task report says what it needs.)
+same_fold, to DIR/align.json and a table on stdout. With --usalign (the binary, or auto: find_usalign) each pair
+is also compared with US-align (Task 13a-3, compare_usalign): foldmap's structure route against US-align on the
+same residues, both TM-scores normalised by A, and the share of US-align's residue pairs foldmap reproduces within
+±1. usalign-report gathers such runs into usalign.json, usalign-report.md and the summary's 'usalign' entry
+(write_usalign_report).
 
     python scripts/homologues.py run --set docs/validation/homologues/tuning.json --out DIR [--jobs 4]
                                      [--pairs 2VWD_A-2ZB5_A,...]
@@ -65,7 +71,7 @@ import subprocess
 import sys
 import time
 import urllib.request
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 from dataclasses import dataclass, replace
 from pathlib import Path
 
@@ -102,10 +108,9 @@ def _round(x) -> float | None:
 # -------------------------------------------------------------------------------------------------------- align
 
 
-def _align(pair: dict) -> dict:
-    """The pair aligned and mated as `foldmap plot B --like A` aligns it (make_layout's _drawn_like): each chain laid
-    out alone first, for its elements."""
-    from foldmap.align import align_chains, element_mates
+def _sides(pair: dict) -> list[tuple]:
+    """Each side's (elements, backbone) as `foldmap plot B --like A` reads them (make_layout's _drawn_like): each
+    chain laid out alone first, for its elements (as deposited)."""
     from foldmap.cli import make_layout, resolve_structure
     from foldmap.io import read_model
 
@@ -115,10 +120,22 @@ def _align(pair: dict) -> dict:
         model = read_model(path, "asu")
         lay, sses, bb = make_layout(path, chains=[pair[side]["chain"]], model=model, assembly="asu")
         sides.append((sses, bb))
-    (sses_a, bb_a), (sses_b, bb_b) = sides
+    return sides
+
+
+def _align(pair: dict, usalign: str = "") -> dict:
+    """The pair aligned and mated as `foldmap plot B --like A` aligns it (auto route); with `usalign` (the US-align
+    binary) also compared with US-align (compare_usalign)."""
+    from foldmap.align import align_chains, element_mates
+
+    (sses_a, bb_a), (sses_b, bb_b) = _sides(pair)
     aln = align_chains(bb_a, pair["a"]["chain"], bb_b, pair["b"]["chain"], "auto")
     mates = element_mates(sses_a, sses_b, aln)
+    extra = {}
+    if usalign:
+        extra["usalign"] = compare_usalign(bb_a, pair["a"]["chain"], bb_b, pair["b"]["chain"], usalign, aln)
     return {
+        **extra,
         "pair": stem(pair),
         "kind": pair["kind"],
         "method": aln.method,
@@ -137,7 +154,17 @@ def _align(pair: dict) -> dict:
 
 
 def cmd_align(args) -> int:
-    rows = [_align(p) for p in read_set(args.set)]
+    pairs = read_set(args.set)
+    exe = ""
+    if args.usalign:
+        exe = find_usalign(None if args.usalign == "auto" else args.usalign)
+        if not exe:
+            raise SystemExit("--usalign auto: no US-align found (USALIGN, PATH, ~/foldmap-remote/usalign-env/bin)")
+    with ProcessPoolExecutor(max_workers=max(1, args.jobs)) as pool:
+        rows = list(pool.map(_align, pairs, [exe] * len(pairs)))
+    for p, r in zip(pairs, rows):
+        if "stratum" in p:
+            r["stratum"] = p["stratum"]
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
     (out / "align.json").write_text(json.dumps(rows, indent=1, sort_keys=True) + "\n", encoding="utf-8")
@@ -147,6 +174,359 @@ def cmd_align(args) -> int:
             f"{r['pair']}\t{r['kind']}\t{r['method']}\t{r['tm_score']:.4f}\t{r['rmsd']:.2f}\t{r['identity']:.3f}\t"
             f"{r['aligned']}/{r['length_a']}\t{r['mates']}/{r['pieces']}/{r['extras']}/{r['only_a']}\t{r['same_fold']}"
         )
+    if exe:
+        print("\npair\tUS-align TM\tfoldmap structure TM\tpairs within ±1\tlimits")
+        for r in rows:
+            u = r["usalign"]
+            print(f"{r['pair']}\t{u['usalign']['tm_a']:.4f}\t{u['structure']['tm_score']:.4f}\t"
+                  f"{u['agreement']['within_1']:.3f}\t{u['limits']['verdict']}")  # fmt: skip
+    return 0
+
+
+# ------------------------------------------------------------------------------------------------------ US-align
+
+# Task 13a-3's comparison of foldmap's structure route with US-align (Zhang et al. 2022). Both TM-scores are
+# normalised by A's chain (the reference; d0 of A's length, as foldmap's). The limits apply where US-align's TM-score
+# is at least USALIGN_TM: foldmap's within TM_TOLERANCE of it, and at least PAIR_AGREEMENT of US-align's residue pairs
+# (i, j) reproduced, foldmap pairing A's residue i with one of B's within PAIR_SLACK residues of j.
+USALIGN_TM = 0.5
+TM_TOLERANCE = 0.05
+PAIR_AGREEMENT = 0.85
+PAIR_SLACK = 1
+USALIGN_ARGS = ("-mol", "prot", "-mm", "0", "-ter", "2")  # one protein chain against one (each file holds one)
+
+
+def find_usalign(path: str | None = None) -> str:
+    """The US-align binary: `path`, else $USALIGN, else USalign on PATH, else zyla-office's
+    ~/foldmap-remote/usalign-env/bin/USalign; '' when none is there."""
+    import shutil
+
+    for p in (path, os.environ.get("USALIGN"), shutil.which("USalign"),
+              str(Path.home() / "foldmap-remote" / "usalign-env" / "bin" / "USalign")):  # fmt: skip
+        if p and Path(p).is_file() and os.access(p, os.X_OK):
+            return str(p)
+    return ""
+
+
+def write_ca_pdb(labels, ca, path: Path) -> None:
+    """One chain's Cα as a PDB file US-align reads: the residues exactly as foldmap aligns them (its Backbone of the
+    chain), numbered 1..n in their order (no insertion codes, nothing left out), chain A, then TER."""
+    lines = [
+        f"ATOM  {k + 1:5d}  CA  {(label.name or 'UNK')[:3]:>3s} A{k + 1:4d}    {x:8.3f}{y:8.3f}{z:8.3f}  1.00  0.00"
+        f"           C"
+        for k, (label, (x, y, z)) in enumerate(zip(labels, ca))
+    ]
+    path.write_text("\n".join([*lines, "TER", "END"]) + "\n", encoding="ascii")
+
+
+def parse_usalign(text: str) -> dict:
+    """US-align's default output for two chains: its version, both lengths, the TM-score normalised by each
+    structure, the RMSD and aligned length it reports, and the alignment: `rows` (structure 1, the marks, structure
+    2) and `pairs`, the (i, j) of every column where both rows hold a residue (':' and '.' alike: the pairs it
+    aligns), with `close` those marked ':' (under 5 Å). i and j count each structure's residues from 0."""
+    import re
+
+    got: dict = {"tm": {}}
+    lines = text.splitlines()
+    for line in lines:
+        if m := re.search(r"US-align \(Version (\S+)\)", line):
+            got["version"] = m.group(1)
+        elif m := re.match(r"Length of Structure_([12]):\s+(\d+) residues", line):
+            got[f"length_{m.group(1)}"] = int(m.group(2))
+        elif m := re.match(r"Aligned length=\s*(\d+), RMSD=\s*([\d.]+)", line):
+            got["aligned"], got["rmsd"] = int(m.group(1)), float(m.group(2))
+        elif m := re.match(r"TM-score=\s*([\d.]+) \(normalized by length of Structure_([12])", line):
+            got["tm"][int(m.group(2))] = float(m.group(1))
+    at = next(k for k, line in enumerate(lines) if line.startswith('(":" denotes'))
+    rows = [line.rstrip("\n") for line in lines[at + 1 : at + 4]]
+    if len(rows) != 3 or len(rows[0]) != len(rows[2]):
+        raise ValueError("US-align's alignment rows not found")
+    rows[1] = rows[1].ljust(len(rows[0]))
+    pairs, close, i, j = [], [], 0, 0
+    for x, mark, y in zip(*rows):
+        if x != "-" and y != "-":
+            pairs.append((i, j))
+            if mark == ":":
+                close.append((i, j))
+        i += x != "-"
+        j += y != "-"
+    if i != got.get("length_1") or j != got.get("length_2"):
+        raise ValueError(f"US-align's rows hold {i} and {j} residues, not {got.get('length_1')}, {got.get('length_2')}")
+    return {**got, "rows": rows, "pairs": pairs, "close": close}
+
+
+def run_usalign(exe: str, labels_a, ca_a, labels_b, ca_b) -> dict:
+    """US-align on A's chain (structure 1) and B's (structure 2), each written by write_ca_pdb; parse_usalign's
+    result."""
+    import tempfile
+
+    with tempfile.TemporaryDirectory() as tmp:
+        fa, fb = Path(tmp) / "A.pdb", Path(tmp) / "B.pdb"
+        write_ca_pdb(labels_a, ca_a, fa)
+        write_ca_pdb(labels_b, ca_b, fb)
+        done = subprocess.run([exe, str(fa), str(fb), *USALIGN_ARGS], capture_output=True, text=True, check=True)
+    return parse_usalign(done.stdout)
+
+
+def pair_agreement(ref, got, slack: int = PAIR_SLACK) -> float | None:
+    """The share of the pairs `ref` ((i, j): A's residue i with B's j) that `got` reproduces: got pairs A's i with a
+    residue of B within `slack` of j. None when ref is empty."""
+    to_b = dict(got)
+    if not ref:
+        return None
+    return sum(i in to_b and abs(to_b[i] - j) <= slack for i, j in ref) / len(ref)
+
+
+def disagreements(ref, got, labels_a, slack: int = PAIR_SLACK) -> list[str]:
+    """Where `got` departs from `ref`, as runs of A's residues (ref's pairs in order, A's numbers as written): 'A
+    12-30: B shifted +4' (got pairs them 4 residues further along B) or 'A 12-30: not paired' (got leaves them out)."""
+    to_b = dict(got)
+    runs: list[list] = []  # [first i, last i, what]
+    for i, j in ref:
+        what = "not paired" if i not in to_b else (None if abs(to_b[i] - j) <= slack else f"B shifted {to_b[i] - j:+d}")
+        if what is None:
+            continue
+        if runs and runs[-1][2] == what and runs[-1][1] == i - 1:
+            runs[-1][1] = i
+        else:
+            runs.append([i, i, what])
+    return [f"A {labels_a[x].tag}-{labels_a[y].tag} ({y - x + 1}): {what}" for x, y, what in runs]
+
+
+def gapped_rows(pairs, seq_a: str, seq_b: str) -> list[str]:
+    """Two gapped rows (A, then B) of a pairwise alignment given by its pairs, as US-align writes it: before each pair
+    the residues of A, then of B, that no pair holds."""
+    ra, rb, i, j = [], [], 0, 0
+    for x, y in [*pairs, (len(seq_a), len(seq_b))]:
+        ra.append(seq_a[i:x] + "-" * (y - j))
+        rb.append("-" * (x - i) + seq_b[j:y])
+        if x < len(seq_a):
+            ra.append(seq_a[x])
+            rb.append(seq_b[y])
+        i, j = x + 1, y + 1
+    return ["".join(ra), "".join(rb)]
+
+
+def compare_usalign(bb_a, chain_a: str, bb_b, chain_b: str, exe: str, auto=None) -> dict:
+    """foldmap's structure route (align_chains, match 'structure') on the chains against US-align on the same
+    residues: both TM-scores normalised by A, foldmap's TM-score of US-align's own pairs (scoring against
+    alignment), the share of US-align's pairs foldmap reproduces within PAIR_SLACK (and exactly, and of the pairs
+    under 5 Å), the limits (module constants) and, where the pairs disagree, the runs of A's residues (disagreements)
+    and both alignments' rows. `auto`: the auto route's alignment, whose agreement is recorded too."""
+    from foldmap.align import align_chains, tm_score
+    from foldmap.sequence import one_letter
+
+    aln = align_chains(bb_a, chain_a, bb_b, chain_b, "structure")
+    la, lb = list(aln.residues_a), list(aln.residues_b)
+    ka = [k for k, label in enumerate(bb_a.labels) if label.chain == chain_a]
+    kb = [k for k, label in enumerate(bb_b.labels) if label.chain == chain_b]
+    ca_a, ca_b = bb_a.ca[ka], bb_b.ca[kb]
+    us = run_usalign(exe, la, ca_a, lb, ca_b)
+    ref, got = us["pairs"], list(aln.pairs)
+    share = pair_agreement(ref, got)
+    tm_us, tm_fm = us["tm"][1], float(aln.tm_score)
+    applies = tm_us >= USALIGN_TM
+    tm_ok = abs(tm_fm - tm_us) <= TM_TOLERANCE
+    pairs_ok = share is not None and share >= PAIR_AGREEMENT
+    verdict = "pass" if tm_ok and pairs_ok else "miss"
+    seq_a, seq_b = one_letter([x.name for x in la]), one_letter([x.name for x in lb])
+    return {
+        "usalign": {
+            "version": us.get("version"),
+            "tm_a": _round(tm_us),
+            "tm_b": _round(us["tm"][2]),
+            "rmsd": _round(us["rmsd"]),
+            "aligned": len(ref),
+            "aligned_reported": us["aligned"],
+            "close": len(us["close"]),
+            "foldmap_tm_of_its_pairs": _round(tm_score(ca_a, ca_b, ref, len(la))[0]),
+        },
+        "structure": {"tm_score": _round(tm_fm), "rmsd": _round(aln.rmsd), "aligned": len(got)},
+        "auto": None
+        if auto is None
+        else {
+            "method": auto.method,
+            "tm_score": _round(auto.tm_score),
+            "within_1": _round(pair_agreement(ref, list(auto.pairs))),
+        },  # fmt: skip
+        "tm_difference": _round(tm_fm - tm_us),
+        "agreement": {
+            "within_1": _round(share),
+            "exact": _round(pair_agreement(ref, got, 0)),
+            "close_within_1": _round(pair_agreement(us["close"], got)),
+            "foldmap_pairs_in_usalign": _round(pair_agreement(got, ref)),
+        },
+        "limits": {"applies": applies, "tm": tm_ok, "pairs": pairs_ok, "verdict": verdict if applies else "–"},
+        "disagreements": disagreements(ref, got, la),
+        "rows": {"usalign": [us["rows"][0], us["rows"][2]], "foldmap": gapped_rows(got, seq_a, seq_b)},
+    }
+
+
+def usalign_summary(rows: list[dict]) -> dict:
+    """The comparison over rows (cmd_align's, each with its 'usalign' entry): the pairs; those US-align puts at TM
+    USALIGN_TM or more (where the limits apply), how many of them meet the TM limit, the pair limit and both, and the
+    median share of pairs reproduced; over all pairs, the median TM difference (foldmap - US-align) and how many fall
+    on the same side of SAME_FOLD_TM in both aligners (H1's cut)."""
+    from foldmap.align import SAME_FOLD_TM
+
+    us = [r["usalign"] for r in rows]
+    judged = [u for u in us if u["limits"]["applies"]]
+    return {
+        "pairs": len(us),
+        "judged": len(judged),
+        "tm_within": sum(u["limits"]["tm"] for u in judged),
+        "pairs_agree": sum(u["limits"]["pairs"] for u in judged),
+        "both": sum(u["limits"]["tm"] and u["limits"]["pairs"] for u in judged),
+        "within_1_median": _median([u["agreement"]["within_1"] for u in judged]),
+        "within_1_min": _round(min((u["agreement"]["within_1"] for u in judged), default=None)),
+        "tm_difference_median": _median([u["tm_difference"] for u in us]),
+        "tm_difference_max_abs": _round(max((abs(u["tm_difference"]) for u in us), default=0.0)),
+        "same_side_of_h1": sum(
+            (u["structure"]["tm_score"] >= SAME_FOLD_TM) == (u["usalign"]["tm_a"] >= SAME_FOLD_TM) for u in us
+        ),  # fmt: skip
+        "foldmap_lower": sum(u["tm_difference"] < 0 for u in us),
+        # foldmap's TM-score of US-align's own pairs minus US-align's: the scoring, apart from the alignment search
+        "scoring_difference_max_abs": _round(
+            max((abs(u["usalign"]["foldmap_tm_of_its_pairs"] - u["usalign"]["tm_a"]) for u in us), default=0.0)
+        ),
+        # pairs where US-align's pairs score higher in foldmap's own TM-score than foldmap's pairs (by > 0.005):
+        # foldmap's search stopped short of an alignment it would itself prefer
+        "search_short": sum(u["usalign"]["foldmap_tm_of_its_pairs"] > u["structure"]["tm_score"] + 0.005 for u in us),
+    }
+
+
+def _h1_refused(rows: list[dict]) -> list[dict]:
+    """The positives foldmap does not call one fold (the auto route's same_fold false: H1 refuses them)."""
+    return [r for r in rows if r["kind"] == "positive" and not r["same_fold"]]
+
+
+def write_usalign_report(runs: dict[str, list[dict]], out: Path, summary_path: Path | None, commit: str) -> Path:
+    """The comparison's files from align --usalign runs (`runs`: set name -> its align.json rows): out/usalign.json
+    (every row, per set), out/usalign-report.md (per pair: both TM-scores, the pairs reproduced, the limits; the
+    misses with where the alignments part; the held-out positives H1 refuses beside US-align's TM-score) and, with
+    summary_path (heldout-summary.json), its 'usalign' entry (usalign_summary per set and over all, the H1 refusals)."""
+    from foldmap.align import SAME_FOLD_TM
+
+    every = [r for rows in runs.values() for r in rows]
+    version = next((r["usalign"]["usalign"]["version"] for r in every), None)
+    how = (
+        f"scripts/homologues.py align --usalign at {commit}: foldmap's structure route (align_chains, match "
+        f"'structure') against US-align {version} (`USalign A.pdb B.pdb {' '.join(USALIGN_ARGS)}`) on the same "
+        "residues (each chain's Cα as foldmap reads it, --assembly asu). TM-scores normalised by A's chain (US-align: "
+        "by Structure_1, A; d0 of A's length, as foldmap's). US-align's pairs: every column of its alignment holding "
+        f"a residue of both. Limits where US-align's TM >= {USALIGN_TM}: foldmap's TM within {TM_TOLERANCE}, and >= "
+        f"{PAIR_AGREEMENT:.0%} of US-align's pairs reproduced within ±{PAIR_SLACK} residue (13a-3)."
+    )
+    sums = {name: usalign_summary(rows) for name, rows in runs.items()}
+    sums["all"] = usalign_summary(every)
+    held = runs.get("heldout", [])
+    refused = [
+        {
+            "pair": r["pair"],
+            "stratum": r.get("stratum"),
+            "foldmap_tm": r["tm_score"],
+            "usalign_tm": r["usalign"]["usalign"]["tm_a"],
+            "usalign_one_fold": r["usalign"]["usalign"]["tm_a"] >= SAME_FOLD_TM,
+        }
+        for r in _h1_refused(held)
+    ]
+    out.mkdir(parents=True, exist_ok=True)
+    data = {"about": how, "measured_at": commit, "usalign_version": version, "sets": runs}
+    (out / "usalign.json").write_text(json.dumps(data, indent=1, sort_keys=True) + "\n", encoding="utf-8")
+    lines = ["# foldmap's aligner against US-align", "", how, ""]
+    lines += [
+        "Columns: US-align's TM-score; foldmap's (structure route) and the difference; foldmap's TM-score of "
+        "US-align's own pairs (scoring apart from search); the auto route's TM-score as the campaign used it; the "
+        f"share of US-align's pairs foldmap reproduces within ±{PAIR_SLACK} (exactly; of those under 5 Å); the limits "
+        "('–': US-align's TM under the limits' cut).",
+        "",
+    ]
+    for name, rows in runs.items():
+        s = sums[name]
+        lines += [
+            f"## {name}",
+            "",
+            "| pair | kind | US-align TM | foldmap TM | diff. | foldmap TM of US pairs | auto route, TM | pairs ±1 "
+            "| exact | under 5 Å ±1 | limits |",
+            "|---|---|---|---|---|---|---|---|---|---|---|",
+        ]
+        for r in rows:
+            u = r["usalign"]
+            kind = r["kind"] + (f" ({r['stratum']})" if r.get("stratum") else "")
+            lines.append(
+                f"| {r['pair']} | {kind} | {u['usalign']['tm_a']:.3f} | {u['structure']['tm_score']:.3f} | "
+                f"{u['tm_difference']:+.3f} | {u['usalign']['foldmap_tm_of_its_pairs']:.3f} | {r['method']}, "
+                f"{r['tm_score']:.3f} | {u['agreement']['within_1']:.3f} | {u['agreement']['exact']:.3f} | "
+                f"{(u['agreement']['close_within_1'] or 0):.3f} | {u['limits']['verdict']} |"
+            )
+        lines += [
+            "",
+            f"- {s['judged']} of {s['pairs']} pairs at US-align TM >= {USALIGN_TM}: TM within {TM_TOLERANCE} "
+            f"{s['tm_within']}, pairs >= {PAIR_AGREEMENT:.0%} {s['pairs_agree']}, both **{s['both']}**; pairs "
+            f"reproduced (±{PAIR_SLACK}): median {s['within_1_median']}, least {s['within_1_min']}.",
+            f"- All {s['pairs']}: TM difference (foldmap - US-align) median {s['tm_difference_median']}, largest "
+            f"{s['tm_difference_max_abs']}; foldmap lower in {s['foldmap_lower']}; same side of H1's "
+            f"{SAME_FOLD_TM} in both: {s['same_side_of_h1']}; foldmap's own score of US-align's pairs above its "
+            f"own alignment's (search short): {s['search_short']}; scoring difference on US-align's pairs at most "
+            f"{s['scoring_difference_max_abs']}.",
+            "",
+        ]
+        misses = [r for r in rows if r["usalign"]["limits"]["verdict"] == "miss"]
+        for r in misses:
+            u = r["usalign"]
+            lines += [f"### Miss: {r['pair']}", "", "Where foldmap's pairs part from US-align's (A's residues):", ""]
+            lines += [f"- {d}" for d in u["disagreements"]] + ["", "```"]
+            for tag in ("usalign", "foldmap"):
+                ra, rb = u["rows"][tag]
+                for k in range(0, len(ra), 100):
+                    lines += [f"{tag:8s} A {ra[k : k + 100]}", f"{tag:8s} B {rb[k : k + 100]}", ""]
+            lines += ["```", ""]
+    if refused:
+        under = sum(not x["usalign_one_fold"] for x in refused)
+        lines += [
+            "## The held-out positives H1 refuses",
+            "",
+            "| pair | stratum | foldmap TM (auto) | US-align TM | US-align: one fold |",
+            "|---|---|---|---|---|",
+            *[
+                f"| {x['pair']} | {x['stratum']} | {x['foldmap_tm']:.3f} | {x['usalign_tm']:.3f} | "
+                f"{'yes' if x['usalign_one_fold'] else 'no'} |"
+                for x in refused
+            ],  # fmt: skip
+            "",
+            f"US-align puts {under} of {len(refused)} under TM {SAME_FOLD_TM} too.",
+            "",
+        ]
+    md = out / "usalign-report.md"
+    md.write_text("\n".join(lines), encoding="utf-8")
+    if summary_path is not None:
+        summary = json.loads(summary_path.read_text(encoding="utf-8"))
+        summary["usalign"] = {
+            "about": how + " Added after the held-out run (plan 23 Task 3); the held-out numbers above are as "
+            "measured at measured_at. Details: usalign-report.md, usalign.json.",
+            "measured_at": commit,
+            "version": version,
+            "limits": {
+                "usalign_tm": USALIGN_TM,
+                "tm_tolerance": TM_TOLERANCE,
+                "pair_agreement": PAIR_AGREEMENT,
+                "pair_slack": PAIR_SLACK,
+            },  # fmt: skip
+            **sums,
+            "h1_refused": refused,
+        }
+        summary_path.write_text(json.dumps(summary, indent=1, sort_keys=True) + "\n", encoding="utf-8")
+    print(f"wrote {md}")
+    return md
+
+
+def cmd_usalign_report(args) -> int:
+    runs = {}
+    for item in args.runs:
+        name, _, path = item.partition("=")
+        runs[name] = json.loads((Path(path) / "align.json").read_text(encoding="utf-8"))
+    summary = Path(args.summary) if args.summary else None
+    write_usalign_report(runs, Path(args.out), summary, args.commit)
     return 0
 
 
@@ -991,6 +1371,13 @@ def main(argv: list[str] | None = None) -> int:
     al = sub.add_parser("align", help="align and mate every pair, no drawing")
     al.add_argument("--set", required=True)
     al.add_argument("--out", required=True)
+    al.add_argument("--usalign", default="", help="also compare with US-align: its binary, or 'auto' (find_usalign)")
+    al.add_argument("--jobs", type=int, default=1)
+    ur = sub.add_parser("usalign-report", help="the US-align comparison's files from align --usalign runs")
+    ur.add_argument("runs", nargs="+", help="NAME=DIR of each align --usalign run (DIR/align.json)")
+    ur.add_argument("--out", required=True, help="where usalign.json and usalign-report.md go")
+    ur.add_argument("--summary", default="", help="a summary JSON (heldout-summary.json) whose 'usalign' is set")
+    ur.add_argument("--commit", required=True, help="the commit the runs measured")
     pr = sub.add_parser("pair", help="one pair (run's child)")
     pr.add_argument("a", help="ID:CHAIN of the reference")
     pr.add_argument("b", help="ID:CHAIN drawn like it")
@@ -1022,7 +1409,8 @@ def main(argv: list[str] | None = None) -> int:
     dr.add_argument("--out", required=True)
     dr.add_argument("--md", default="")
     args = ap.parse_args(argv)
-    commands = {"align": cmd_align, "pair": cmd_pair, "run": cmd_run, "sample": cmd_sample, "report": cmd_report,
+    commands = {"align": cmd_align, "usalign-report": cmd_usalign_report, "pair": cmd_pair, "run": cmd_run,
+                "sample": cmd_sample, "report": cmd_report,
                 "diff": cmd_diff, "diff-pair": cmd_diff_pair, "diff-report": cmd_diff_report}  # fmt: skip
     return commands[args.command](args)
 
