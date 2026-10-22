@@ -31,6 +31,11 @@ CORE_CUT·d0(L) Å of each other under it (L: A's chain length, align.d0; the wh
 fitted by Kabsch, the core pairs farther apart than that under the new fit dropped and the rest refitted, until the
 kept pairs repeat, at most align.ROUNDS fits, never fewer than 3 pairs.
 
+CORE_CUT is 1 (d0), not the 2·d0 first planned. On the two-state set (plan 13e-3, docs/validation/diff/report.md)
+d0 keeps the core in one domain where 2·d0 settles on a compromise between two domains that moved: lactoferrin's N2
+turns 54.5 degrees after the fit at d0 and 48.6 at 2·d0, against the published 54; a 45 degree hinge on 1UBQ splits
+0.0 / 45.0 at d0 and 7.7 / 41.1 at 2·d0. On 13 of the 15 random-100 pairs the core is the same at both cuts.
+
 Determinism (A12): distances are snapped to 1/align.GRID Å (align._dist) before the core's cut, turns are rounded to
 0.001 degree, every list is in a fixed order (A's residues and elements N to C, then B's; partners and ligand
 names sorted), and every set compared is of names, never of floats.
@@ -48,7 +53,7 @@ import numpy as np
 from .align import ROUNDS, ChainAlignment, Mates, _dist, align_chains, d0, element_mates
 from .model import SSE, Backbone
 
-CORE_CUT = 2.0  # core pairs farther apart than CORE_CUT·d0 after a fit are dropped from the next (_core_fit)
+CORE_CUT = 1.0  # core pairs farther apart than CORE_CUT·d0 after a fit are dropped from the next (_core_fit)
 NONE, ABSENT = "C", "-"  # a residue in no element; a residue the other structure lacks
 CONTACT_KEYS = ("elements", "interfaces", "interface_elements", "ligands", "ligand_elements")
 

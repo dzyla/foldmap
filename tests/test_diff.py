@@ -179,19 +179,21 @@ def test_two_proteins_take_the_structure_route():
     assert len(d.core) >= 3 and len(d.displacement) == len(d.alignment.pairs)
 
 
-def test_a_turned_domain_shows_its_turn(tmp_path):
-    """1UBQ with residues 41-76 turned 60 degrees about residue 40's CA (a hinge): the core fit, started from the
-    TM-score's superposition, keeps residues 1-40 (the turned ones move past 2·d0 and are dropped), so N turns by
-    nothing and C by 60 degrees."""
+@pytest.mark.parametrize("angle", [45.0, 60.0])
+def test_a_turned_domain_shows_its_turn(tmp_path, angle):
+    """1UBQ with residues 41-76 turned about residue 40's CA (a hinge): the core fit, started from the TM-score's
+    superposition, keeps residues 1-40 (the turned ones move past d0 and are dropped), so N turns by nothing and C by
+    the whole angle. At 45 degrees the cut first planned, 2·d0, kept 4 of C's residues and split the turn 7.7 / 41.1
+    (plan 13e-3)."""
     st = gemmi.read_structure(str(UBQ))
     moved = [a for r in st[0]["A"] if 41 <= r.seqid.num <= 76 for a in r]
     centre = np.array(st[0]["A"]["40"][0]["CA"][0].pos.tolist())
-    turn = _turn([0.0, 1.0, 1.0], np.radians(60.0))
+    turn = _turn([0.0, 1.0, 1.0], np.radians(angle))
     for a in moved:
         a.pos = gemmi.Position(*(turn @ (np.array(a.pos.tolist()) - centre) + centre))
     d = diff_structures(UBQ, "A", _write(st, tmp_path / "hinge.pdb"), "A", domains={"N": "1-40", "C": "41-76"})
     assert d.domain_turns["N"] < 0.1
-    assert d.domain_turns["C"] == pytest.approx(60.0, abs=0.1)
+    assert d.domain_turns["C"] == pytest.approx(angle, abs=0.1)
     assert all(i < 40 for i, _ in d.core)
 
 
