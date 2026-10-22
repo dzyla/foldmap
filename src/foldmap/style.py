@@ -56,6 +56,7 @@ CHOICES = {
     "cyclic": ("unrolled", "rosette"),  # a cyclic assembly unrolled side by side / a C4 or C7 seen down its axis,
     # each copy protomer 0's drawing turned (plan 21; opt-in; other orders and a D2 stay unrolled, with a note)
     "copy_ghosts": ("on", "off"),  # a strand lent across a ring's cut: with dashed copies where it pairs / none
+    "crosslink_layer": ("under", "over"),  # crosslink lines under the elements / over them
     "domain_bar": ("auto", "on", "off"),  # the linear domain bar: with 2+ named domains drawn / with any / never
 }
 _ALIASES = {"fill": {"classic": "bold", "flat": "pale"}}
@@ -193,6 +194,8 @@ class Style:
     copy_ghosts: str = "on"  # on: a strand lent across the cut of an unrolled ring (layout._unwrap) is drawn again,
     # dashed, in the sheet of the copy it pairs with, and dashed copies of its partners stand beside it past the row's
     # end; off: no such dashed copy of another copy's strand (a barrel's closing ghost stays)
+    crosslink_layer: str = "under"  # under: crosslink lines (--crosslinks) at the interaction lines' depth, below the
+    # elements; over: above the elements, each with a thin casing in the background colour so it reads on a ribbon
     helix_scale: float = 1.0  # helix ribbon diameter
     strand_scale: float = 1.0  # arrow width and the spacing of strands in a sheet
     dna_scale: float = 1.0  # duplex diameter

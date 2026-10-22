@@ -259,3 +259,24 @@ def test_an_uploaded_structures_data_name_it_as_uploaded(monkeypatch, tmp_path):
     named = json.loads(app_jobs.data_job(ss["path"], blob, "json", ss["structure_uploaded"]))
     assert named["structure"]["name"] == "my ubq.cif"
     assert json.loads(app_jobs.data_job(ss["path"], blob, "json"))["structure"]["name"] == Path(ss["path"]).name
+
+
+def test_crosslink_layer_choice_is_offered_once_crosslinks_are_loaded(monkeypatch, tmp_path):
+    """Your data: "Crosslinks drawn" (under or over the elements) appears with a crosslinks table loaded, and over
+    changes the figure (a casing under each line)."""
+    from foldmap import app_jobs
+
+    monkeypatch.setenv("FOLDMAP_APP_LOCAL_FILES", "1")
+    monkeypatch.setattr(app_jobs, "SLOW_SECONDS", float("inf"))
+    seed_cache(monkeypatch, tmp_path, "1UBQ")
+    at = opened("1UBQ")
+    assert "crosslink_layer" not in [w.key for w in at.get("segmented_control")]
+    at.file_uploader(key="crosslinks_upload").set_value(("xl.csv", XL, "text/csv")).run()
+    assert not at.exception and list(at.segmented_control(key="crosslink_layer").options) == [
+        "under the elements",
+        "over the elements",
+    ]
+    assert at.segmented_control(key="crosslink_layer").value == "under"
+    before = svg_of(at)
+    at.segmented_control(key="crosslink_layer").set_value("over").run()
+    assert not at.exception and at.session_state["crosslink_layer"] == "over" and svg_of(at) != before

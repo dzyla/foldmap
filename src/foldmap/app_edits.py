@@ -537,6 +537,7 @@ CONTROLS: dict[str, tuple[str, str, tuple[str, ...]]] = {
     "data_path": ("Per-residue values", _DATA, ("data_upload",)),
     "data_column": ("Column", _DATA, ("data_column",)),
     "crosslinks_path": ("Crosslinks", _DATA, ("crosslinks_upload",)),
+    "crosslink_layer": ("Crosslinks drawn", _DATA, ("crosslink_layer",)),
     # Draw like…
     "like": ("Reference", "Draw like…", ("like_source", "like_upload")),
     **{key: ("", "", ()) for key in HIDDEN},

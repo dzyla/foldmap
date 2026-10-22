@@ -757,6 +757,32 @@ def test_crosslink_ends_stand_on_their_residues(tmp_path):
     assert legend == ["Crosslinks (4)"]
 
 
+def test_crosslinks_are_drawn_under_or_over_the_elements(tmp_path):
+    """Style.crosslink_layer: under (the default) draws a crosslink at the interaction lines' depth, as before; over
+    draws it above the elements with a casing in the background colour beneath it. Both draw every crosslink."""
+    from foldmap.render import Z
+
+    path = _table(tmp_path, [("A", 6, "A", 48, ""), ("A", 1, "A", 72, 5)], "chain1,residue1,chain2,residue2,distance")
+
+    def drawn(*style):
+        d = _xl_figure(path, style=list(style))
+        lines = d.figure.axes[0].lines
+        return {l.get_gid(): l for l in lines if (l.get_gid() or "").startswith("ia:xl:")}, lines
+
+    under, under_all = drawn()
+    assert len(under) == 2 and all(l.get_zorder() == Z["hbond"] for l in under.values())
+    assert not any(l.get_zorder() == Z["xl-over"] - 0.01 for l in under_all)
+    over, over_all = drawn("crosslink_layer=over")
+    assert set(over) == set(under) and all(l.get_zorder() == Z["xl-over"] for l in over.values())
+    assert Z["xl-over"] > Z["body"] and Z["xl-over"] > Z["over"]
+    casings = [l for l in over_all if l.get_zorder() == Z["xl-over"] - 0.01]
+    assert len(casings) == 2 and all(l.get_color() == "#ffffff" for l in casings)
+    assert all(c.get_linewidth() > over[g].get_linewidth() for c, g in zip(casings, over))
+    assert len(over_all) == len(under_all) + 2
+    with pytest.raises(ValueError, match="crosslink_layer"):
+        drawn("crosslink_layer=beside")
+
+
 def test_a_crosslink_longer_than_its_span_is_drawn_dashed_and_said(tmp_path, capsys):
     """The span check: Cα–Cα in the structure against the row's distance (else 30 Å, DSS/BS3); one longer is drawn
     (kind xl-over: dashed, its own ink, its own legend entry), a warning names it and its numbers, and the hover

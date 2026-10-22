@@ -263,7 +263,7 @@ Change any key with `--set KEY=VALUE` (repeatable) or a YAML file for `--style-f
 `color_by`, `palette`, `fill`, `loops`, `loop_color` (`residue` colours loops residue by residue),
 `residue_numbers`, `highlight` (`asu`, `protomer` or chains), `mark` (elements in a colour of their own),
 `ligands` (`auto`, `all`, `none` or codes like `HEM,ZN`), `fold_template`, `helix_on_sheet`, `two_fold`, `cyclic`,
-`copy_ghosts`, `domain_bar`, `domain_colours`, `data_style`, `na_backbone`, `backbone_colors`, `dna_color`, `rna_color`, `hbonds`,
+`copy_ghosts`, `crosslink_layer`, `domain_bar`, `domain_colours`, `data_style`, `na_backbone`, `backbone_colors`, `dna_color`, `rna_color`, `hbonds`,
 `hbond_color`, `hbond_max`, `interactions`, `interactions_between`, `interaction_max`, `disulfides`, `glycans`, `helices_310`, `na_extent`, `na_style`, `background`, `ink`,
 `helix_scale`, `strand_scale`, `font_scale`, `na_line` (`dna_extent` still works on the command line and in style and layout
 files).
@@ -605,7 +605,10 @@ plum, every one drawn (no cap). Each is measured on the structure, Cα to Cα: o
 Cα–Cα 50.9 Å, longer than its 30 Å span"), so the figure shows what the structure cannot explain rather than
 hiding it. The legend counts both ("Crosslinks (11)", "Crosslinks longer than their span (2)"). A crosslink with an
 end the figure does not draw (a chain left out) is named in the figure's notes. On the interactive page a
-crosslink's line shows its residues, distance and span on hover.
+crosslink's line shows its residues, distance and span on hover. The lines lie under the elements, with the
+interaction lines, by default; `--set crosslink_layer=over` (the app's "Crosslinks drawn" choice, offered once
+crosslinks are loaded) draws them over the elements, as XL-MS maps usually do, each with a thin casing in the
+background colour so it reads on a ribbon.
 
 In the app, **Your data** takes both tables as uploads (read against the structure at once: a table none of whose
 rows names a residue is refused there, in words), with a Column picker; Colour by offers `data` once values are

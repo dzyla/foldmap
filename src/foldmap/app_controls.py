@@ -353,6 +353,7 @@ FOLD_TEMPLATE = {"auto": "βα row", "off": "as projected"}
 HELIX_ON_SHEET = {"off": "beside the sheet", "auto": "over the sheet"}
 TWO_FOLD = {"auto": "automatic", "mirror": "mirror image", "unrolled": "side by side"}
 CYCLIC = {"unrolled": "side by side", "rosette": "down the axis"}
+CROSSLINK_LAYER = {"under": "under the elements", "over": "over the elements"}
 COPY_GHOSTS = {"on": "with dashed copies", "off": "drawn once"}
 EXAMPLE = {  # the syntax, as text
     "swap": "α1,α3",
@@ -906,6 +907,16 @@ def data_section(st, ss: MutableMapping) -> None:
             st.error(shown(ss["crosslinks_error"]))
         elif ss.get("crosslinks_path") and ss.get("crosslinks_read"):
             st.caption(shown(ss["crosslinks_read"]))
+        if ss.get("crosslinks_path") and ss.get("crosslinks_read"):  # crosslinks loaded: under or over the elements
+            segmented(
+                st,
+                "Crosslinks drawn",
+                CHOICES["crosslink_layer"],
+                setting(ss, "crosslink_layer"),
+                format_func=CROSSLINK_LAYER.get,
+                help="the crosslink lines under the elements, with the interaction lines · or over them, each with a "
+                "thin casing so it reads on a ribbon",
+            )
         for name in missing_tables(ss):
             st.warning(f"The layout file's table {name} is not on this machine; upload it here.")
 

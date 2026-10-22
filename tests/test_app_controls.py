@@ -647,6 +647,9 @@ def test_every_setting_is_reachable():
     table = b"chain,residue,ddG\nA,3,0.5\nA,30,-1.2\n"  # data: colour by data, data_style and the column picker
     at.file_uploader(key="data_upload").set_value(("ddg.csv", table, "text/csv")).run()
     seen |= shown(at)
+    xl = b"chain1,residue1,chain2,residue2\nA,6,A,48\n"  # crosslinks: under or over the elements
+    at.file_uploader(key="crosslinks_upload").set_value(("xl.csv", xl, "text/csv")).run()
+    seen |= shown(at)
     seen |= shown(opened(DATA / "2HHB.cif"))  # a two-fold assembly: the two_fold choice
     seen |= shown(opened(DATA / "1BL8.cif"))  # a C4 assembly: the cyclic choice
     seen |= shown(opened(DATA / "8UTF.cif"))  # a strand lent across a ring's cut: the copy_ghosts choice

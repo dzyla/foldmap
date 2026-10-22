@@ -183,6 +183,7 @@ Z = {  # the drawing order, back to front (plan 10 R8: panel < plate < membrane 
     "gloss": 3.05,  # a helix's shine (Z["body"] + 0.05)
     "over-loop": 3.2,  # the loops of a helix over a sheet: above the strands, below the helix
     "over": 3.5,  # a helix over a sheet (Placed.over): above the strands, below their letters
+    "xl-over": 3.55,  # crosslinks drawn over the elements (Style.crosslink_layer over), above a helix over a sheet
     "tether": 3.6,  # ligand tethers and disulfide bars: above the bodies (R8), but drawn only where no body or text
     "bar": 3.7,  # is (visible_pieces), so they read as passing under them (plan 10 Task 6, Q-R10)
     "bar-end": 3.75,  # a disulfide's end dots and end marks (on a body's edge), glycan stems
@@ -3341,6 +3342,7 @@ def _draw_lines(c: _Canvas, kind: str, lines: list, slots: dict, halos=None) -> 
     diag = float(np.hypot(x1 - x0, y1 - y0))
     colour, dash = interaction_ink(kind, c.look)
     lw = c.loop_lw * 0.85 * (XL_WIDTH if kind in XL_KINDS else 1.0)
+    over = kind in XL_KINDS and c.look.crosslink_layer == "over"  # above the elements, cased in the background
     hidden = []
     for line in lines:
         ends = line.ends
@@ -3354,6 +3356,8 @@ def _draw_lines(c: _Canvas, kind: str, lines: list, slots: dict, halos=None) -> 
                 continue
             gap = np.full((1, 2), np.nan)
             xy = np.vstack([np.vstack([p, gap]) for p in pieces][:-1] + [pieces[-1]]).T
+        if over:  # the casing: a line of the background colour a little wider, just under the line
+            c.ax.plot(*xy, color=_BACKGROUND.get(), lw=lw * 1.9, solid_capstyle="butt", zorder=Z["xl-over"] - 0.01)
         (artist,) = c.ax.plot(
             *xy,
             color=colour,
@@ -3361,7 +3365,7 @@ def _draw_lines(c: _Canvas, kind: str, lines: list, slots: dict, halos=None) -> 
             ls=dash,
             alpha=1.0 if kind in XL_KINDS else hbond_alpha(line.length, diag),
             solid_capstyle="butt",
-            zorder=Z["hbond"],
+            zorder=Z["xl-over"] if over else Z["hbond"],
         )
         artist.set_gid(line.gid)
     return hidden
@@ -3370,8 +3374,9 @@ def _draw_lines(c: _Canvas, kind: str, lines: list, slots: dict, halos=None) -> 
 def _draw_interactions(c: _Canvas, overlay: InteractionOverlay) -> list[str]:
     """The lines of every kind but H-bonds (gid ia:<kind>:<a>-<b>), in interactions.KINDS order: drawn after every
     text in the figure (but the legend's and the title), so each keeps off the letters (text_halos turned,
-    link_keep), at the H-bonds' depth (Z["hbond"]: under the elements, beads and letters). Returns the gids of
-    those wholly under text, not drawn (the figure's notes name them)."""
+    link_keep), at the H-bonds' depth (Z["hbond"]: under the elements, beads and letters), crosslinks above the
+    elements when Style.crosslink_layer is over (Z["xl-over"], each with a casing in the background colour).
+    Returns the gids of those wholly under text, not drawn (the figure's notes name them)."""
     if not overlay.kinds:
         return []
     halos = {
