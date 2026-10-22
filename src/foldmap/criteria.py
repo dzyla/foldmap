@@ -516,12 +516,18 @@ def one_protein(a: dict, b: dict) -> dict | None:
     the residues the global alignment pairs (figcheck.aligned_positions) at least PAIR_IDENTITY, and that many
     identical residues at least PAIR_COVERAGE of the shorter chain? A UniProt accession is not enough: a polyprotein
     (SARS-CoV-2 pp1ab, P0DTD1) names nsp1 and nsp5 alike. None when either view lacks its residues."""
-    from .figcheck import aligned_positions
-
     ra, rb = ((x["views"].get("beta", {}).get("result") or {}).get("chain_residues") for x in (a, b))
     if not ra or not rb:
         return None
-    xs, ys = [n for _, n in ra["residues"]], [n for _, n in rb["residues"]]
+    return one_protein_names([n for _, n in ra["residues"]], [n for _, n in rb["residues"]])
+
+
+def one_protein_names(xs, ys) -> dict:
+    """A19's rule (one_protein) on two chains' residue names, in order: {one, identity, aligned, lengths}. foldmap
+    diff maps two states of one protein by sequence with it (plan 13e)."""
+    from .figcheck import aligned_positions
+
+    xs, ys = list(xs), list(ys)
     pairs = aligned_positions(xs, ys)
     same = sum(xs[i] == ys[j] for i, j in pairs)
     identity = same / len(pairs) if pairs else 0.0
