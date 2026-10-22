@@ -183,10 +183,10 @@ def test_disulfides_name_their_cysteines():
 
 
 def test_membrane_segments_and_sides(capsys):
-    """1C3W (bacteriorhodopsin) with --membrane auto: the helices whose CA run reaches both faces of the slab are its
-    transmembrane segments, as A18 counts them (figcheck.membrane_view), each entering from one side and leaving to
-    the other; every other element is out, in or in the slab by its depth (helices C and E stop short of a face of
-    the estimated 30 Å slab: in it)."""
+    """1C3W (bacteriorhodopsin) with --membrane auto. spans_slab is A18's rule (CA run within 2 Å of both faces of the
+    drawn slab, figcheck.membrane_view's count): 5 helices, C and E stopping short of a face of the estimated 30 Å
+    slab. crosses_midplane (the CA run crosses the centre plane and spans half the thickness) reads the usual 7
+    helices, alternating in and out; every other element is out, in or in the slab by its depth."""
     from foldmap.cli import make_layout
     from foldmap.figcheck import membrane_view
 
@@ -196,18 +196,24 @@ def test_membrane_segments_and_sides(capsys):
     assert _conforms(data, schema()) == []
     mem = data["membrane"]
     assert mem is not None and mem["page"] is not None and mem["termini"] == [{"chain": "A", "n": "out", "c": "in"}]
-    tm = [e for e in mem["elements"] if e["side"] == "tm"]
     lay, sses, bb = make_layout(path, membrane="auto", assembly="asu")
-    assert [e["element"] for e in tm] == mem["transmembrane"]
-    assert len(tm) == membrane_view(lay, sses, bb, lay.bilayer)["tm_helices"] >= 5
-    assert [e["from"] for e in tm] == ["out", "in", "in", "in", "out"]
-    assert all(e["from"] != e["to"] for e in tm)
+    spans = [e["element"] for e in mem["elements"] if e["spans_slab"]]
+    assert spans == mem["spans_slab"] and len(spans) == membrane_view(lay, sses, bb, lay.bilayer)["tm_helices"] == 5
+    across = [e for e in mem["elements"] if e["crosses_midplane"]]
+    assert [e["element"] for e in across] == mem["crosses_midplane"] and len(across) == 7
+    assert set(spans) <= set(mem["crosses_midplane"])
+    assert all(e["side"] == "across" for e in across)
+    for a, b in zip(across, across[1:]):  # each helix leaves on the side the next one enters from
+        assert a["from"] != a["to"] and a["to"] == b["from"]
+    assert across[0]["from"] == "out" and across[-1]["to"] == "in"
     half = mem["thickness"] / 2
     for e in mem["elements"]:
         lo, hi = e["depth"]
         assert lo <= hi
-        if e["side"] == "tm":
+        if e["spans_slab"]:
             assert lo <= -half + 2 and hi >= half - 2  # membrane.FACE_REACH of both faces
+        if e["crosses_midplane"]:
+            assert lo < 0 < hi and hi - lo >= half
         elif e["side"] == "out":
             assert hi > half
         elif e["side"] == "in":

@@ -417,10 +417,13 @@ foldmap data --schema                                # the format, as a JSON Sch
 - `disulfides`, each end's residue and element;
 - `symmetry`: the symmetry found (group, protomers, CA RMSD, axis; twist and rise of a helical one), how the figure
   draws the copies, and the stoichiometry (protein chains as copies of one protein, e.g. `A2B2`);
-- `membrane` (with `--membrane`): the transmembrane elements (whose CA run reaches both faces, as A18 counts them)
-  with the side each enters from and leaves to, every other element's side (`out`, `in`, `slab`), each chain's
-  termini, and the band on the page; `out` is the side the membrane's normal points to (`sided`: whether the
-  positive-inside rule settled it).
+- `membrane` (with `--membrane`): two measures of an element crossing the membrane, each named for what it
+  measures: `spans_slab`, its CA run within 2 Å of both faces of the drawn slab (the rule A18 counts a transmembrane
+  helix by), and `crosses_midplane`, its CA run crosses the slab's centre plane and spans at least half its
+  thickness (the usual reading; for bacteriorhodopsin, 1C3W, under the estimated 30 Å slab: 5 by the first, 7 by
+  the second). Each element also has its CA depth range, the sides its first and last CA are on and its side
+  (`across`, else `out`, `in`, `slab`); then each chain's termini and the band on the page. `out` is the side the
+  membrane's normal points to (`sided`: whether the positive-inside rule settled it).
 
 It takes `plot`'s `--chains`, `--assembly`, `--symmetry`, `--focus`, `--names`, `--rename`, `--domain`,
 `--domains`, `--uniprot`, `--membrane`, `--layout-file` and `--set` (layout keys), so its labels and places are

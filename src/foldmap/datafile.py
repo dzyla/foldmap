@@ -9,7 +9,8 @@ no routing, no drawing) becomes one versioned dict, its names the figure's names
 - sheets: each sheet's strands in the order the figure draws them, their directions, each pairing's kind and
   residue register (the DSSP bridges), accessory strands, and for a closed sheet the barrel's strand number n and
   shear number S (the bridges followed once round the barrel);
-- disulfides; symmetry and stoichiometry; the membrane's transmembrane segments and sides (with --membrane).
+- disulfides; symmetry and stoichiometry; with --membrane, the elements that span the drawn slab (A18's rule) or
+  cross its mid-plane, and the sides of elements and termini.
 
 Every list has a fixed order, every number is rounded to 0.001 (±0 written 0.0, angles in (-180, 180]), so the
 same structure and options give the same bytes (A12). `schema()` is the format, as a JSON Schema; SCHEMA_VERSION
@@ -347,11 +348,14 @@ def _side(depth: float, half: float) -> str:
 
 
 def _membrane(layout, sses, bb) -> dict | None:
-    """The membrane the figure draws (--membrane): None without one. An element is transmembrane ("tm", with the
-    sides it enters from and leaves to) when its CA run reaches both faces (within membrane.FACE_REACH, as A18
-    counts a transmembrane helix); any other is out, in or in the slab by its mean CA depth. Sides are named by the
-    membrane's normal, which points out (the non-cytoplasmic side; `sided` says whether the positive-inside rule
-    settled which side that is)."""
+    """The membrane the figure draws (--membrane): None without one. Two measures of an element crossing it, neither
+    stated as more than it measures: `spans_slab`, its CA run within membrane.FACE_REACH (2 Å) of both faces of the
+    drawn slab (the rule A18 counts a transmembrane helix by: figcheck.membrane_view); `crosses_midplane`, its CA run
+    crosses the slab's centre plane and spans at least half the slab's thickness (the usual reading of a
+    transmembrane segment, lenient to a slab estimated too thick or tilted). Its side: "across" when it crosses the
+    mid-plane, else out, in or slab by its mean CA depth; `from` and `to`, the sides of its first and last CA. Sides
+    are named by the membrane's normal, which points out (the non-cytoplasmic side; `sided` says whether the
+    positive-inside rule settled which side that is)."""
     mem = getattr(layout, "bilayer", None)
     if mem is None:
         return None
@@ -362,16 +366,27 @@ def _membrane(layout, sses, bb) -> dict | None:
     def sign(r: int) -> str:
         return "out" if depth[r] >= 0 else "in"
 
-    elements, tm = [], set()
+    elements, spans, crosses = [], [], []
     for s in sses:
         seg = depth[s.start : s.end + 1]
-        extent = [_num(seg.min()), _num(seg.max())]
-        if len(seg) >= 2 and seg.min() <= -mem.half + FACE_REACH and seg.max() >= mem.half - FACE_REACH:
-            tm.add(s.id)  # its CA run reaches both faces, as A18 counts a transmembrane helix (figcheck)
-            elements.append({"element": s.id, "side": "tm", "from": sign(s.start), "to": sign(s.end), "depth": extent})
-        else:
-            side = _side(float(np.mean(seg)), mem.half)
-            elements.append({"element": s.id, "side": side, "depth": extent})
+        lo, hi = float(seg.min()), float(seg.max())
+        span = len(seg) >= 2 and lo <= -mem.half + FACE_REACH and hi >= mem.half - FACE_REACH  # A18's rule
+        cross = len(seg) >= 2 and lo < 0 < hi and hi - lo >= mem.half  # mid-plane crossed, half the thickness spanned
+        if span:
+            spans.append(s.id)
+        if cross:
+            crosses.append(s.id)
+        elements.append(
+            {
+                "element": s.id,
+                "side": "across" if cross else _side(float(np.mean(seg)), mem.half),
+                "from": sign(s.start),
+                "to": sign(s.end),
+                "depth": [_num(lo), _num(hi)],
+                "spans_slab": bool(span),
+                "crosses_midplane": bool(cross),
+            }
+        )
     termini = []
     for chain in dict.fromkeys(l.chain for l in bb.labels):
         idx = [k for k, l in enumerate(bb.labels) if l.chain == chain]
@@ -388,7 +403,8 @@ def _membrane(layout, sses, bb) -> dict | None:
         "sided": bool(mem.sided),
         "thickness": _num(2 * mem.half),
         "normal": _vec(mem.normal),
-        "transmembrane": [s.id for s in sses if s.id in tm],
+        "spans_slab": spans,
+        "crosses_midplane": crosses,
         "elements": elements,
         "termini": termini,
         "page": {"y": [_num(band["y"][0]), _num(band["y"][1])], "inside": band["inside"]} if band else None,
@@ -547,32 +563,37 @@ def schema() -> dict:
             ),
         }
     )
-    sides = ["out", "in", "slab", "tm"]
+    sides = ["out", "in", "slab"]
+    spans = "its CA run within 2 Å of both faces of the drawn slab (the rule A18 counts a transmembrane helix by)"
+    crosses = "its CA run crosses the slab's centre plane and spans at least half the slab's thickness"
     membrane = _obj(
         {
             "source": _t("string", "opm (dummy atoms in the file) or estimate"),
             "sided": _t("boolean", "the positive-inside rule settled which side is out (non-cytoplasmic)"),
-            "thickness": _t("number", "Å"),
+            "thickness": _t("number", "the drawn slab's, Å"),
             "normal": _arr(_t("number"), "unit vector pointing out"),
-            "transmembrane": ids,
+            "spans_slab": _arr(_t("string"), "the elements whose " + spans),
+            "crosses_midplane": _arr(_t("string"), "the elements whose " + crosses),
             "elements": _arr(
                 _obj(
                     {
                         "element": _t("string"),
                         "side": _t(
                             "string",
-                            "tm: its CA run reaches both faces (within 2 Å); else out, in or slab by its mean depth",
-                            enum=sides,
+                            "across: it crosses the mid-plane (crosses_midplane); else out, in or slab by its mean "
+                            "CA depth",
+                            enum=["across", *sides],
                         ),
-                        "from": _t("string", "tm only: the side its first residue is on", enum=["out", "in"]),
-                        "to": _t("string", "tm only: the side its last residue is on", enum=["out", "in"]),
+                        "from": _t("string", "the side its first CA is on", enum=["out", "in"]),
+                        "to": _t("string", "the side its last CA is on", enum=["out", "in"]),
                         "depth": _arr(_t("number"), "its CAs' least and greatest depth, Å from the mid-plane, + out"),
+                        "spans_slab": _t("boolean", spans),
+                        "crosses_midplane": _t("boolean", crosses),
                     },
-                    required=["element", "side", "depth"],
                 )
             ),
             "termini": _arr(
-                _obj({"chain": _t("string"), "n": _t("string", enum=sides[:3]), "c": _t("string", enum=sides[:3])})
+                _obj({"chain": _t("string"), "n": _t("string", enum=sides), "c": _t("string", enum=sides)})
             ),
             "page": _obj(
                 {"y": _arr(_t("number")), "inside": _t("string", enum=["above", "below"])},
