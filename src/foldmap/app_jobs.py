@@ -318,18 +318,31 @@ def _keep_drawn(key: tuple[str, str], drawn) -> None:
 
 def _drawn(path, settings_json: str):
     """The Drawn for these settings: the one kept from an earlier job in this process, else drawn now (and kept)."""
-    from . import app
-    from . import spec as spec_mod
-
     key = (str(path), settings_json)
     with _LOCK:
         drawn = _DRAWN.get(key)
         if drawn is not None:
             _DRAWN.move_to_end(key)
     if drawn is None:
-        drawn = spec_mod.draw_spec(app.spec_of(path, json.loads(settings_json)))
+        drawn = draw_settings(path, json.loads(settings_json))[0]
         _keep_drawn(key, drawn)
     return drawn
+
+
+def draw_settings(path, settings: dict):
+    """(Drawn, the note of the reference) for these settings: the compare or diff page they ask for (app.pair_page:
+    a Drawn of the page, its panels' provenance and B's panel as drawn, so the pickers, the summary and the
+    downloads read B's elements and the page), else the figure (spec.draw_spec), with its like note when drawn
+    like a reference ("" without one)."""
+    from . import app
+    from . import spec as spec_mod
+
+    made = app.pair_page(path, settings)
+    if made is not None:
+        b = made.drawn[1]
+        return spec_mod.Drawn(made.figure, b.loops, b.layout, b.sses, b.bb, b.model), made.note
+    drawn = spec_mod.draw_spec(app.spec_of(path, settings))
+    return drawn, getattr(drawn.layout, "like_note", "") or ""
 
 
 def figure_bytes(fig, ext: str) -> bytes:
@@ -347,13 +360,13 @@ def draw_job(path, settings_json: str, eager_after: float | None = None) -> dict
     """Draw the figure: its SVG and what the app's pickers and notes need. When it took longer than
     `eager_after` seconds, its PNG and PDF come with it (a job process cannot hand back the figure itself)."""
     from . import app, render
-    from . import spec as spec_mod
     from .cli import stale_domains_note
     from .scope import drawn_scope
 
     t0 = time.perf_counter()
-    spec = app.spec_of(path, json.loads(settings_json))
-    drawn = spec_mod.draw_spec(spec)
+    settings = json.loads(settings_json)
+    spec = app.spec_of(path, settings)
+    drawn, like_note = draw_settings(path, settings)
     svg = render.save_svg(drawn.figure)
     seconds = time.perf_counter() - t0
     files = {}
@@ -375,6 +388,7 @@ def draw_job(path, settings_json: str, eager_after: float | None = None) -> dict
         "chain_count": len(chains_of(drawn)),  # what the summary counts: protein and nucleic-acid chains
         "domains_note": stale_domains_note(spec.domains, drawn.sses),  # a layout file's stale ids, dropped
         "provenance": drawn.provenance,  # how it was made: the list under the figure (provenance)
+        "like_note": like_note,  # drawn like a reference (Draw like…): the note shown under the figure
         "data_problems": [str(p) for p in drawn.layout.data_problems],  # your data: rows not used, notes
         "scope": drawn_scope(drawn.model, drawn.layout, spec.assembly, spec.focus),  # what auto choices left out
         "seconds": seconds,
@@ -676,9 +690,12 @@ def size_message(name: str, size: dict, limits: Limits) -> str:
     )
 
 
-def limit_message(name: str, err: JobLimit, limits: Limits) -> str:
-    """What to tell the visitor about a job over a limit."""
+def limit_message(name: str, err: JobLimit, limits: Limits, command: str | None = None) -> str:
+    """What to tell the visitor about a job over a limit. `command`: the command line that draws it (a figure drawn
+    like a reference, a compare or diff page: app.like_command), named instead of drawing part of it."""
     ending = f"Draw part of it (Chains & assembly), or on your own computer: {_elsewhere(name)}."
+    if command:
+        ending = f"Draw it on your own computer: pip install foldmap, then {command}."
     if err.kind == "time":
         return f"{name} took longer than {limits.timeout:g} s to draw, the limit of this app. {ending}"
     if err.kind == "memory":
@@ -691,10 +708,12 @@ def limit_message(name: str, err: JobLimit, limits: Limits) -> str:
 _CHAINS = "Chains (Chains & assembly)"  # app_edits.CONTROLS["chains"], as control_for names it
 
 
-def explain(err: Exception, name: str, limits: Limits, last_changed: str | None = None) -> tuple[str, str | None]:
+def explain(
+    err: Exception, name: str, limits: Limits, last_changed: str | None = None, command: str | None = None
+) -> tuple[str, str | None]:
     """The one handler for a failed job: (message for the visitor, control to point at, as 'Label (Section)', or
     None). JobLimit: limit_message, and for time and memory the Chains control. ValueError: its text and the control
-    it names (else the one changed last).
+    it names (else the one changed last). `command`: as limit_message's.
     JobFailed (checked before RuntimeError) or any exception that is not ValueError, OSError or RuntimeError (a
     bug, in a job process or in this one): 'foldmap could not draw this setting', with a link to report it.
     OSError, RuntimeError: app.trouble (the file is gone or unreadable; no server path, no setting to blame)."""
@@ -702,7 +721,7 @@ def explain(err: Exception, name: str, limits: Limits, last_changed: str | None 
     from .app_edits import control_for
 
     if isinstance(err, JobLimit):  # time and memory: draw part of it, the message says
-        return limit_message(name, err, limits), _CHAINS if err.kind in ("time", "memory") else None
+        return limit_message(name, err, limits, command), _CHAINS if err.kind in ("time", "memory") else None
     if isinstance(err, ValueError):
         return str(err), control_for(str(err), last_changed)
     if isinstance(err, JobFailed) or not isinstance(err, (OSError, RuntimeError)):

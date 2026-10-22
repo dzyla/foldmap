@@ -1590,3 +1590,140 @@ def test_data_downloads_are_the_command_lines(tmp_path, capsys):
         assert sorted(zf.namelist()) == sorted(p.name for p in out.iterdir())
         for name in zf.namelist():
             assert zf.read(name) == (out / name).read_bytes(), name
+
+
+# ------------------------------------------------------------------------------------- Draw like… (plan 13e-4)
+def _use_reference(at, source):
+    at.text_input(key="like_source").input(source)
+    at.button(key="like_use").click().run()
+    return at
+
+
+def test_drawing_a_structure_like_itself_shows_the_note(monkeypatch, tmp_path):
+    """Draw like… (ruling 9): 1UBQ drawn like 1UBQ shows the like note under the figure, as `foldmap plot --like`
+    says it; Compare and Diff show the two-panel pages with their notes; the share link carries the reference's
+    PDB id, its page and nothing else."""
+    seed_cache(monkeypatch, tmp_path, "1UBQ")
+    at = opened("1UBQ")
+    _use_reference(at, "1ubq")
+    ss = at.session_state
+    assert not at.exception and not at.error and ss["like"]["id"] == "1UBQ" and ss["like"]["page"] == "like"
+    notes = [c.value for c in at.caption if "drawn like" in c.value]
+    assert notes and _visible(notes[0]).startswith("drawn like 1UBQ chain A: 8 of 8 elements matched")
+    assert dict(at.query_params) == {"id": "1UBQ", "theme": "publication", "like": "1UBQ"}
+    at.segmented_control(key="like_page").set_value("compare").run()
+    assert not at.exception and not at.error and 'id="a/' in svg_of(at) and 'id="b/' in svg_of(at)
+    assert at.query_params["like_page"] == "compare"
+    at.segmented_control(key="like_page").set_value("diff").run()
+    at.text_area(key="like_domains").input("N=1-40\nC=41-76").run()
+    assert not at.exception and not at.error and ss["like"]["domains"] == "N=1-40\nC=41-76"
+    said = _visible(next(c.value for c in at.caption if "changes from" in c.value))
+    assert "changes from 1UBQ to 1UBQ: domains as given turn N 0.0°, C 0.0° after the core fit" in said
+    assert "each fitted on its own, against N (the first given): C 0.0°" in said
+    at.text_area(key="like_domains").input("N=").run()  # malformed: said, not taken
+    assert "Draw like… domains" in ss["like_error"] and ss["like"]["domains"] == "N=1-40\nC=41-76"
+    at.button(key="like_clear").click().run()
+    assert ss["like"] is None and not at.exception and set(at.query_params) == {"id", "theme"}
+    assert not any("drawn like" in c.value for c in at.caption)
+
+
+def test_new_structure_clears_the_reference(monkeypatch, tmp_path):
+    seed_cache(monkeypatch, tmp_path, "1UBQ", "1LMB")
+    at = _use_reference(opened("1UBQ"), "1UBQ")
+    assert at.session_state["like"]["id"] == "1UBQ"
+    at.button(key="new_structure").click().run()
+    assert at.session_state["like"] is None and at.session_state["stage"] == "load"
+    at.text_input(key="source").input("1LMB")
+    at.button(key="load").click().run()
+    ss = at.session_state
+    assert not at.exception and ss["stage"] == "edit" and ss["like"] is None and "like" not in at.query_params
+    assert not [s for s in at.segmented_control if s.key == "like_page"]
+
+
+@needs_fork
+def test_a_reference_upload_never_enters_the_link(monkeypatch, tmp_path):
+    """Hosted: a reference dropped under Draw like… is named as uploaded (a file name with no markup on the page) and
+    never by its kept path; the share link keeps the structure's id and theme only; a layout file saved names it as
+    uploaded and asks for it."""
+    import yaml
+
+    from foldmap.app_views import layout_yaml, uploads_of
+
+    seed_cache(monkeypatch, tmp_path, "1UBQ")
+    monkeypatch.setenv("FOLDMAP_APP_LOCAL_FILES", "0")
+    fresh_caches()
+    at = opened("1UBQ")
+    at.file_uploader(key="like_upload").set_value(
+        ("my ref.cif", (DATA / "1UBQ.cif").read_bytes(), "chemical/x-cif")
+    ).run()
+    ss = at.session_state
+    assert not at.exception and not at.error and ss["like"]["id"] == "" and ss["like"]["name"] == "my_ref.cif"
+    assert dict(at.query_params) == {"id": "1UBQ", "theme": "publication"}
+    note = _visible(next(c.value for c in at.caption if "drawn like" in c.value))
+    assert note.startswith("drawn like my_ref.cif chain A") and ss["like"]["structure"] not in note
+    at.segmented_control(key="like_page").set_value("compare").run()
+    assert not at.exception and not at.error and dict(at.query_params) == {"id": "1UBQ", "theme": "publication"}
+    text = layout_yaml(ss["path"], ss["drawn_blob"], uploads_of(ss)).decode()
+    assert yaml.safe_load(text)["layout"]["like"]["structure"] == "my ref.cif" and "my ref.cif" in text.split("\n")[0]
+    assert str(tmp_path) not in text
+
+
+def test_a_share_link_draws_like_its_reference(monkeypatch, tmp_path):
+    seed_cache(monkeypatch, tmp_path, "1UBQ")
+    at = app_test()
+    for key, value in (("id", "1UBQ"), ("theme", "publication"), ("like", "1UBQ"), ("like_page", "compare")):
+        at.query_params[key] = value
+    at.query_params["like_chain"] = "A"
+    at.run()
+    ss = at.session_state
+    assert not at.exception and ss["stage"] == "edit" and ss["like"]["page"] == "compare"
+    assert ss["like"]["chain"] == "A" and 'id="b/' in svg_of(at)
+    assert dict(at.query_params) == {
+        "id": "1UBQ", "theme": "publication", "like": "1UBQ", "like_chain": "A", "like_page": "compare",
+    }  # fmt: skip
+    at = app_test()
+    for key, value in (("id", "1UBQ"), ("like", "../../etc/passwd"), ("like_page", "<b>")):
+        at.query_params[key] = value
+    at.run()
+    assert not at.exception and at.session_state["stage"] == "edit" and at.session_state["like"] is None
+
+
+def test_a_layout_file_reference_is_honoured(monkeypatch, tmp_path):
+    """A layout file's like (13a-7, saved by --save-layout) is drawn like in the app: a PDB id fetched as Draw like…
+    fetches one; a file the app cannot read here (hosted: any path) is said under the figure; the app saves the
+    reference back as its id."""
+    import yaml
+
+    from foldmap.app import layout_document, settings_from_document
+
+    seed_cache(monkeypatch, tmp_path, "1UBQ")
+    doc = {"layout": {"like": {"structure": "1ubq", "chain": "A", "match": "sequence"}}}
+    at = opened("1UBQ")
+    at.file_uploader(key="layout_upload").set_value(
+        ("layout.yaml", yaml.safe_dump(doc).encode(), "application/x-yaml")
+    ).run()
+    ss = at.session_state
+    assert not at.exception and not at.error and ss["like"]["id"] == "1UBQ" and ss["like"]["match"] == "sequence"
+    assert Path(ss["like"]["structure"]).is_file() and ss["like"]["chain"] == "A"
+    assert any(_visible(c.value).startswith("drawn like 1UBQ chain A") for c in at.caption)
+    saved = layout_document(ss["path"], {k: ss[k] for k in ("theme", "like")})["layout"]["like"]
+    assert saved == {"structure": "1UBQ", "chain": "A", "match": "sequence"}
+    path = str(DATA / "1UBQ.cif")
+    assert settings_from_document({"layout": {"like": {"structure": path}}})["like"]["structure"] == path
+    monkeypatch.setenv("FOLDMAP_APP_LOCAL_FILES", "0")
+    back = settings_from_document({"layout": {"like": {"structure": path, "match": "/x/aln.fasta"}}})
+    assert back["like"] is None and back["like_missing"] == [f"the reference {path}: load it under Draw like…"]
+    with pytest.raises(ValueError, match="like: unknown key"):
+        settings_from_document({"layout": {"like": {"structure": "1UBQ", "name": "x"}}})
+
+
+def test_a_pair_over_the_residue_limit_is_refused_naming_the_command_line(monkeypatch, tmp_path):
+    seed_cache(monkeypatch, tmp_path, "1UBQ")
+    monkeypatch.setenv("FOLDMAP_APP_MAX_RESIDUES", "100")  # 1UBQ alone (76) is drawn; with itself (152) not
+    at = _use_reference(opened("1UBQ"), "1UBQ")
+    ss = at.session_state
+    assert not at.exception and ss["like"] is None
+    assert ss["like_error"] == (
+        "1UBQ and 1UBQ together have 152 residues, and the limit here is 100. Draw one like the other on your own "
+        "computer: pip install foldmap, then foldmap compare 1UBQ 1UBQ -o compare.svg"
+    )

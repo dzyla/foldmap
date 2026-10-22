@@ -75,12 +75,18 @@ class Workspace:
     status: Any
 
 
-def problem(ws: Workspace, err: Exception) -> str:
+def problem(ws: Workspace, err: Exception, settings: dict | None = None) -> str:
     """The callout for a failed job (app_jobs.explain), naming the control to check; a limit's message names its
-    own."""
-    from foldmap.app import local_files
+    own. `settings`: the figure's, whose reference (Draw like…) makes a limit's message name the command line that
+    draws it (app.like_command) and both structures."""
+    from foldmap.app import like_command, like_of, local_files
 
-    message, control = app_jobs.explain(err, ws.name, ws.lim, ws.ss.get("last_changed"))
+    like = like_of(settings or {})
+    name = ws.name
+    if like is not None:
+        name = f"{ws.name} with {like.get('id') or like.get('name')}"
+    command = like_command(settings or {}, ws.name)
+    message, control = app_jobs.explain(err, name, ws.lim, ws.ss.get("last_changed"), command)
     kept, name = ws.ss.get("names_uploaded") or ("", "")
     if kept:  # an uploaded names file's errors name it as uploaded, not by the copy kept on the server
         message = message.replace(kept, name)
@@ -113,6 +119,8 @@ def guarded(ws: Workspace, job: str, blob: str, make: Callable, view_json: str =
 def figure_view(ws: Workspace) -> None:
     """The figure in its card; on a failure the error above the last good figure (`figure_failed` names the
     settings that failed, for the Download popover)."""
+    from foldmap.app import local_files
+
     st, ss = ws.st, ws.ss
     target = ws.blob if ss["auto_redraw"] else ss.get("drawn_blob", ws.blob)
     result = None
@@ -121,7 +129,7 @@ def figure_view(ws: Workspace) -> None:
             result = guarded(ws, "figure", target, lambda: ws.render(ws.path, target))
     except Exception as err:  # the canvas keeps the last good figure
         ss["figure_failed"] = target
-        st.error(problem(ws, err))
+        st.error(problem(ws, err, json.loads(target)))
     if result is not None:
         ss.pop("figure_failed", None)
         ss.update(
@@ -153,6 +161,8 @@ def figure_view(ws: Workspace) -> None:
         background = json.loads(good["blob"]).get("background", "#ffffff")
         st.markdown(figure_card(good["svg"], background, ws.name), unsafe_allow_html=True)
         made = app_edits.provenance_caption(result.get("provenance", []), heading=False) if result else ""
+        if result and result.get("like_note"):  # drawn like a reference: how it matched, or why not (Draw like…)
+            st.caption(shown(result["like_note"], limit=2000, paths=not local_files()))
         if made:  # how it was made: folded away, opened on demand (the author: not needed under every figure)
             from foldmap.provenance import HEADING
 
@@ -198,6 +208,8 @@ def missing_files(ws: Workspace) -> None:
     for p in ws.ss.get("names_missing") or []:
         name = shown(p, paths=not local_files())
         ws.st.warning(f"The layout file's names file {name} is not on this machine; upload it under Edit layout.")
+    for what in ws.ss.get("like_missing") or []:  # a layout file's reference (Draw like…)
+        ws.st.warning(shown(f"The layout file's {what}.", paths=not local_files()))
 
 
 # ---------------------------------------------------------------------------------------------- scope bar
@@ -433,8 +445,8 @@ UPLOADS_NOTE = (
 
 def uploads_of(ss: MutableMapping) -> dict[str, str]:
     """Kept path -> uploaded name of this structure's uploads that a layout file names (names file, alignment, data and
-    crosslinks tables)."""
-    kept = ("names_uploaded", "msa_uploaded", "data_uploaded", "crosslinks_uploaded")
+    crosslinks tables, the reference under Draw like…)."""
+    kept = ("names_uploaded", "msa_uploaded", "data_uploaded", "crosslinks_uploaded", "like_uploaded")
     return dict(v for v in (ss.get(k) for k in kept) if v)
 
 
@@ -454,10 +466,11 @@ def layout_yaml(path, blob: str, uploads: dict[str, str] | None = None) -> bytes
     return (note + text).encode()
 
 
-def share_url(base: str | None, share_id: str, theme: str) -> str:
+def share_url(base: str | None, share_id: str, theme: str, like: dict[str, str] | None = None) -> str:
     """The link that opens this structure in this theme: the app's address (its query string dropped) with ?id and
-    ?theme only."""
-    return (base or "").split("?", 1)[0] + f"?id={share_id}&theme={theme}"
+    ?theme, then a PDB-id reference's (app.like_link: like, like_chain, like_page) when drawn like one."""
+    extra = "".join(f"&{k}={v}" for k, v in (like or {}).items())
+    return (base or "").split("?", 1)[0] + f"?id={share_id}&theme={theme}{extra}"
 
 
 def figure_downloads(
@@ -599,4 +612,6 @@ def download_menu(ws: Workspace) -> None:
     st.caption(FORMATS_NOTE)
     if ss.get("share_id"):
         st.caption("Link to this figure")
-        st.code(share_url(st.context.url, ss["share_id"], ss["theme"]), language=None)
+        from foldmap.app import like_link
+
+        st.code(share_url(st.context.url, ss["share_id"], ss["theme"], like_link(ss)), language=None)

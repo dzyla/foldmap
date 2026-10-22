@@ -969,7 +969,7 @@ def _drawn_like(
     from .like import like_from, like_note, reference_name, refused_note, uncarried_note
 
     given = str(like["structure"])
-    name = reference_name(given)
+    name = like.get("name") or reference_name(given)  # the app names an upload as uploaded
 
     def alone(note: str, reference=None, alignment=None, mates=None, refused=False) -> SimpleNamespace:
         return SimpleNamespace(

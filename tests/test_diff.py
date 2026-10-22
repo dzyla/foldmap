@@ -375,3 +375,27 @@ def test_command_line(tmp_path, capsys):
     assert json.loads(js.read_text(encoding="utf-8"))["domain_turns"]["LID"] > 30
     assert cli.main(["diff", str(UBQ), str(UBQ), "-o", str(svg), "--domain", "LID"]) == 2
     assert "give NAME=RANGES" in capsys.readouterr().err
+
+
+def test_each_domain_fitted_on_its_own_gives_the_whole_hinge(tmp_path):
+    """Plan 13e-4 (the 13e-3 ruling): beside each domain's turn after the core fit, each domain after the first is
+    measured against the first, each fitted on its own (no core). On a 30 degree hinge of 1UBQ the core settles
+    between the two domains (the turns split the hinge, as MBP's do at d0); the own-fit angle is the hinge, and a
+    turned copy of the whole chain turns no domain against another."""
+    st = gemmi.read_structure(str(UBQ))
+    moved = [a for r in st[0]["A"] if 41 <= r.seqid.num <= 76 for a in r]
+    centre = np.array(st[0]["A"]["40"][0]["CA"][0].pos.tolist())
+    turn = _turn([0.0, 1.0, 1.0], np.radians(30.0))
+    for a in moved:
+        a.pos = gemmi.Position(*(turn @ (np.array(a.pos.tolist()) - centre) + centre))
+    domains = {"N": "1-40", "C": "41-76"}
+    d = diff_structures(UBQ, "A", _write(st, tmp_path / "hinge.pdb"), "A", domains=domains)
+    assert d.domain_turns["N"] > 1.0  # a compromise: the core is not in N alone
+    assert d.domain_angles == {"N/C": pytest.approx(30.0, abs=0.05)}
+    whole = _write(gemmi.read_structure(str(UBQ)), tmp_path / "turned.pdb", _turn([1.0, 2.0, 3.0], 1.1))
+    three = {"A": "1-25", "B": "26-50", "C": "51-76"}
+    assert diff_structures(UBQ, "A", whole, "A", domains=three).domain_angles == {
+        "A/B": pytest.approx(0.0, abs=0.01),
+        "A/C": pytest.approx(0.0, abs=0.01),
+    }
+    assert diff_structures(UBQ, "A", UBQ, "A", domains={"N": "1-40"}).domain_angles == {}

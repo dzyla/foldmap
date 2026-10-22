@@ -82,10 +82,19 @@ class _Laid:
 
 
 def _lay_out(
-    source_a, source_b, chain_a, chain_b, match: str, look: Style, assembly: str, same_protein: bool = False
+    source_a,
+    source_b,
+    chain_a,
+    chain_b,
+    match: str,
+    look: Style,
+    assembly: str,
+    same_protein: bool = False,
+    names: tuple = (None, None),
 ) -> _Laid:
     """Both panels laid out: B like A (cli.make_layout's like; `same_protein`: drawn alike even under the fold's
-    TM-score, two states of one protein), else each on its own."""
+    TM-score, two states of one protein), else each on its own. `names`: what the titles and notes call A and B
+    (None: reference_name of the source; the app passes an upload's name as uploaded)."""
     from .align import align_chains, element_mates
     from .cli import make_layout, one_chain, resolve_structure
     from .io import load_backbone, read_model
@@ -96,6 +105,8 @@ def _lay_out(
     like = {"structure": str(source_a), "chain": chain_a, "match": match, "layout": None}
     if same_protein:
         like["same_protein"] = True
+    if names[0]:
+        like["name"] = names[0]
     got: dict = {}
     lay_b, sses_b, bb_b = make_layout(
         path_b,
@@ -120,8 +131,8 @@ def _lay_out(
         aln = align_chains(bb_a, chain_a, bb_b, chain_b, match)
         mates = element_mates(sses_a, sses_b, aln)
     panels = (
-        (lay_a, sses_a, bb_a, model_a, f"{reference_name(source_a)} chain {chain_a}"),
-        (lay_b, sses_b, bb_b, model_b, f"{reference_name(source_b)} chain {chain_b}"),
+        (lay_a, sses_a, bb_a, model_a, f"{names[0] or reference_name(source_a)} chain {chain_a}"),
+        (lay_b, sses_b, bb_b, model_b, f"{names[1] or reference_name(source_b)} chain {chain_b}"),
     )
     alike = got.get("like") is not None
     return _Laid(panels, lay_b.like_note, aln, mates, alike, (str(path_a), str(path_b)), (chain_a, chain_b))
@@ -139,13 +150,15 @@ def compare(
     match: str = "auto",
     look: Style | None = None,
     assembly: str = "auto",
+    names: tuple = (None, None),
 ) -> Compared:
     """The page of `source_b` (a file or PDB id) drawn like `source_a`, one protein chain of each (`chain_a`,
     `chain_b`, else each its first: ruling 7), aligned by `match` (auto, sequence, structure or a two-row alignment
     file, the reference's chain first), drawn with `look`; both read as `assembly` reads them (auto, asu: as
-    deposited, under the deposited chain names; or an assembly id)."""
+    deposited, under the deposited chain names; or an assembly id). `names`: what the titles and the note call A and B
+    (None: each by its source)."""
     look = (look or Style()).validate()
-    laid = _lay_out(source_a, source_b, chain_a, chain_b, match, look, assembly)
+    laid = _lay_out(source_a, source_b, chain_a, chain_b, match, look, assembly, names=names)
     (lay_a, sses_a, *_), (lay_b, sses_b, *_) = laid.panels
     drawn: list = []
     fig, items = _page(laid.panels, laid.note, look, sources=_sources(laid), drawn=drawn)
@@ -168,12 +181,13 @@ def diff_page(
     look: Style | None = None,
     assembly: str = "auto",
     domains: dict | None = None,
+    names: tuple = (None, None),
 ) -> Compared:
     """What changed from `source_a` to `source_b` (files or PDB ids; one protein chain of each, `chain_a`,
     `chain_b`, else each its first) drawn on their compare page (module docstring): diff.diff_structures' Diff, the
     page drawn as compare draws it with the alignment route diff took (auto: by sequence when the chains are one
     protein, A19's rule, else by structure). `domains` ({name: residue range or ranges of A's chain}) adds each
-    domain's turn to the note. Compared.data is diff_json; Compared.diff the Diff."""
+    domain's turn to the note. `names`: as compare's. Compared.data is diff_json; Compared.diff the Diff."""
     from .diff import diff_structures
     from .userdata import ResidueData
 
@@ -181,7 +195,7 @@ def diff_page(
     d = diff_structures(source_a, chain_a, source_b, chain_b, match, domains, assembly=assembly, look=look)
     route = d.alignment.method if match == "auto" else match
     one = match == "auto" and route == "sequence"  # one protein by A19's rule (diff._route): its states drawn alike
-    laid = _lay_out(source_a, source_b, chain_a, chain_b, route, look, assembly, one)
+    laid = _lay_out(source_a, source_b, chain_a, chain_b, route, look, assembly, one, names)
     (lay_a, sses_a, *rest_a), (lay_b, sses_b, *rest_b) = laid.panels
     lay_a, lay_b = copy.copy(lay_a), copy.copy(lay_b)  # the marks go on copies: make_layout's own stay as laid out
     carried = _carried(lay_a, lay_b, d) if laid.alike else None
@@ -273,7 +287,14 @@ def diff_note(d, lay_a, lay_b, title_a: str, title_b: str, carried: bool, colour
     if d.pairing:
         parts.append("pairing: " + ", ".join(f"{_label(lay_a, x)}–{_label(lay_a, y)} {c}" for x, y, c in d.pairing))
     if d.domain_turns:
-        parts.append("domains turn " + ", ".join(f"{k} {v:.1f}°" for k, v in d.domain_turns.items()))
+        own = d.domain_angles
+        said = "domains as given turn " + ", ".join(f"{k} {v:.1f}°" for k, v in d.domain_turns.items())
+        said += " after the core fit"
+        if own:  # core-free: each domain fitted on its own, against the first given
+            first = next(iter(own)).split("/", 1)[0]
+            each = ", ".join(f"{k.split('/', 1)[1]} {v:.1f}°" for k, v in own.items())
+            said += f"; each fitted on its own, against {first} (the first given): {each}"
+        parts.append(said)
     c = d.contacts
     if c.get("interfaces"):
         parts.append("interfaces: " + ", ".join(f"chain {p} {ch}" for p, _, ch in c["interfaces"]))
@@ -443,7 +464,15 @@ def mates_json(lay_a, sses_a, lay_b, sses_b, aln, mates) -> dict:
     }
 
 
-DIFF_KEYS = ("ss_changes", "pairing", "displacement", "core", "domain_turns", "contacts")  # diff_json's own
+DIFF_KEYS = (  # diff_json's own
+    "ss_changes",
+    "pairing",
+    "displacement",
+    "core",
+    "domain_turns",
+    "domain_angles",
+    "contacts",
+)
 
 
 def diff_json(lay_a, sses_a, lay_b, sses_b, d) -> dict:
@@ -452,8 +481,10 @@ def diff_json(lay_a, sses_a, lay_b, sses_b, d) -> dict:
     ss_changes [{chain, residue, a, b}] (each residue whose element kind differs: H, G, E, C none, - absent; A's
     chain and number, B's for a residue only B has), pairing [{strands: [A's names], change}], displacement
     [[B's chain, B's residue, Å]] (B's order), core (the residue pairs the core fit kept), domain_turns {name:
-    degrees} (domains given) and contacts {key: [[...parts, gained | lost]]} (diff.CONTACT_KEYS; elements by A's
-    names); numbers to 1e-3, every list in the Diff's order."""
+    degrees} (domains given: each domain's turn after the core fit), domain_angles {"FIRST/NAME": degrees}
+    (two domains or more: each after the first against it, each fitted on its own, no core) and contacts {key:
+    [[...parts, gained | lost]]} (diff.CONTACT_KEYS; elements by A's names); numbers to 1e-3, every list in the
+    Diff's order."""
     from .diff import CONTACT_KEYS
 
     out = mates_json(lay_a, sses_a, lay_b, sses_b, d.alignment, d.mates)
@@ -469,6 +500,7 @@ def diff_json(lay_a, sses_a, lay_b, sses_b, d) -> dict:
             "displacement": [[c, r, _round(v)] for (c, r), v in d.displacement.items()],
             "core": len(d.core),
             "domain_turns": {k: _round(v) for k, v in d.domain_turns.items()},
+            "domain_angles": {k: _round(v) for k, v in d.domain_angles.items()},
             "contacts": {key: [row(key, parts) for parts in d.contacts.get(key, ())] for key in CONTACT_KEYS},
         }
     )

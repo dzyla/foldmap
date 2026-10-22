@@ -634,3 +634,85 @@ def test_the_png_button_says_the_dpi_its_png_is_written_at(monkeypatch):
     width_pt = float(re.search(r'width="([\d.]+)pt"', out["svg"]).group(1))
     width_px = int.from_bytes(png.data()[16:20], "big")
     assert abs(width_px - width_pt / 72 * dpi) <= 1  # the file is what the label says
+
+
+# ------------------------------------------------------------------------------------- Draw like… (plan 13e-4)
+def _like(structure, page="like", **more) -> dict:
+    from foldmap.app import like_entry
+
+    like = like_entry(str(structure), Path(structure).stem, b=Path(structure).stem)
+    like.update(page=page, **more)
+    return like
+
+
+def test_the_compare_and_diff_pages_are_drawn_as_the_command_line_draws_them():
+    """The app's Compare and Diff (Draw like…) draw compare.compare / compare.diff_page of the reference and this
+    structure in the settings' look; the result names B's elements for the pickers and carries the page's note; a
+    download of the figure is the page."""
+    from foldmap import render
+    from foldmap.app import look_of
+    from foldmap.compare import compare, diff_page
+
+    ubq = DATA / "1UBQ.cif"
+    look = look_of({"theme": "publication"})
+    out = app_jobs.draw_job(ubq, _blob(like=_like(ubq, "compare")))
+    made = compare(ubq, ubq, look=look, names=("1UBQ", "1UBQ"))
+    assert out["svg"] == render.save_svg(made.figure) and out["like_note"] == made.note
+    alone = app_jobs.draw_job(ubq, _blob())
+    assert [e["ref"] for e in out["elements"]] == [e["ref"] for e in alone["elements"]] and out["chains"] == ["A"]
+    assert app_jobs.files_job(ubq, _blob(like=_like(ubq, "compare")), "svg").decode() == out["svg"]
+    marked = app_jobs.draw_job(ubq, _blob(mark="res:A:1-10=red", like=_like(ubq, "compare")))
+    assert marked["svg"] == out["svg"]  # this structure's marks are its figure's, not the page's (page_look)
+    domains = "N=1-40\nC=41-76"
+    out = app_jobs.draw_job(ubq, _blob(like=_like(ubq, "diff", domains=domains)))
+    made = diff_page(ubq, ubq, look=look, names=("1UBQ", "1UBQ"), domains={"N": ["1-40"], "C": ["41-76"]})
+    assert out["svg"] == render.save_svg(made.figure) and out["like_note"] == made.note
+    plain = app_jobs.draw_job(ubq, _blob(like=_like(ubq)))
+    assert plain["like_note"].startswith("drawn like 1UBQ chain A: 8 of 8 elements matched")
+    assert app_jobs.draw_job(ubq, _blob())["like_note"] == ""
+    with pytest.raises(ValueError, match="Draw like… domain X"):
+        app_jobs.draw_job(ubq, _blob(like=_like(ubq, "diff", domains="X=500-600")))
+
+
+def test_a_pair_over_a_limit_is_refused_naming_the_command_line():
+    """A figure drawn like a reference, or its Compare or Diff page, over the hosted limits: the message names
+    both structures and the command line that draws it on your own computer."""
+    from foldmap.app import like_command
+
+    settings = {"like": _like("/x/2VWD.cif", "compare", id="2VWD", name="2VWD")}
+    command = like_command(settings, "2ZB5")
+    assert command == "foldmap compare 2VWD 2ZB5 -o compare.svg"
+    said, control = app_jobs.explain(JobLimit("time", "stopped"), "2ZB5 with 2VWD", app_jobs.HOSTED, None, command)
+    assert said == (
+        "2ZB5 with 2VWD took longer than 90 s to draw, the limit of this app. Draw it on your own computer: "
+        "pip install foldmap, then foldmap compare 2VWD 2ZB5 -o compare.svg."
+    )
+    settings["like"]["page"] = "like"
+    assert like_command(settings, "2ZB5") == "foldmap plot 2ZB5 --like 2VWD -o 2ZB5.svg"
+    assert like_command({}, "2ZB5") is None
+
+
+@needs_fork
+def test_a_compare_page_over_the_time_limit_stops_in_its_job():
+    tim = DATA / "1TIM.cif"
+    blob = _blob(like=_like(tim, "diff"))
+    with pytest.raises(JobLimit) as err:
+        run_job(app_jobs.draw_job, tim, blob, limits=Limits(timeout=0.2, memory_mb=1024))
+    assert err.value.kind == "time"
+
+
+F7 = [Path.home() / ".cache" / "foldmap" / f"{i}.cif" for i in ("2VWD", "2ZB5")]
+
+
+@needs_fork
+@pytest.mark.skipif(not all(p.is_file() for p in F7), reason="2VWD and 2ZB5 are not in the download cache")
+@pytest.mark.parametrize("page", ["compare", "diff"])
+def test_the_f7_pair_is_drawn_within_the_hosted_limits(page):
+    """F7's pair (2ZB5 drawn like 2VWD, measles H and Nipah G heads) as the hosted app draws it: in a job of its own
+    under the hosted time and memory caps (90 s, 1 GB address space on top of the job server's), with room left."""
+    reference, structure = F7
+    blob = _blob(like={**_like(reference, page), "id": "2VWD", "name": "2VWD"})
+    t0 = time.perf_counter()
+    out = run_job(app_jobs.draw_job, structure, blob, limits=app_jobs.HOSTED)
+    assert time.perf_counter() - t0 < app_jobs.HOSTED.timeout / 2 and "<svg" in out["svg"]
+    assert out["like_note"].startswith("drawn like 2VWD chain A")

@@ -70,14 +70,18 @@ _drop_changed_foldmap()
 
 from foldmap import CREDIT, app_jobs, layoutfile
 from foldmap.app_controls import (
+    LIKE_WIDGETS,
     MB,
     alignment_rows,
     chains_section,
     conservation_section,
     data_section,
     layout_section,
+    like_section,
+    like_widgets,
     missing_alignment,
     prepare,
+    reference_by_id,
     setting,
     show_section,
     style_section,
@@ -145,6 +149,7 @@ LAYOUT_DEFAULTS = {
     "domain_source": "",  # ... and where they came from (inferred, CATH, UniProt): said again while unchanged
     "chains": "",
     "names": [],  # --names: deposited, beta or a YAML file (later ones win)
+    "like": None,  # Draw like…: the reference (like_entry), else None; only a PDB id enters the share link
     # layout-file options the app has no control for: kept as loaded and saved again
     "flip_v": False,
     "dna": True,
@@ -237,6 +242,7 @@ def layout_options(settings: dict) -> dict:
         "data_column": (settings.get("data_column") or None) if settings.get("data_path") else None,
         "crosslinks": settings.get("crosslinks_path") or None,
         "chains": [c.strip() for c in (settings.get("chains") or "").split(",") if c.strip()] or None,
+        "like": figure_like(settings),
         **adjustments(Args),
         **{k: settings[k] for k in HIDDEN_LAYOUT if k in settings},
     }
@@ -253,6 +259,148 @@ def spec_of(path, settings: dict) -> FigureSpec:
         names=list(settings.get("names") or []),
         **layout_options(settings),
     )
+
+
+# ---------------------------------------------------------------------------------------------- Draw like…
+LIKE_PAGES = {"like": "Drawn like", "compare": "Compare", "diff": "Diff"}  # what the canvas shows with a reference
+LIKE_MATCHES = ("auto", "sequence", "structure")  # a layout file's like.match the app keeps (else an alignment file)
+
+
+def like_entry(structure: str, name: str, id: str = "", chain: str = "", match: str = "auto", b: str = "") -> dict:
+    """The settings' `like`: the reference's file on this machine (`structure`: a PDB entry's download, an upload's
+    kept copy, a local path), what the notes call it (`name`: the PDB id, an upload as uploaded, a file's name), the
+    PDB id a share link and a layout file carry (`id`; "" for a file), its chain ("" its first protein chain), the
+    alignment route, what the canvas shows (`page`: LIKE_PAGES), the diff's domains (text, one NAME=RANGES a line)
+    and what the page calls this structure (`b`)."""
+    return {
+        "structure": str(structure),
+        "name": name,
+        "id": id,
+        "chain": chain,
+        "match": match,
+        "page": "like",
+        "domains": "",
+        "b": b,
+    }
+
+
+def like_of(settings: dict) -> dict | None:
+    """The reference the settings draw like (Draw like…), else None."""
+    like = settings.get("like")
+    return like if isinstance(like, dict) and like.get("structure") else None
+
+
+def figure_like(settings: dict) -> dict | None:
+    """FigureSpec.like of the settings' reference (cli.make_layout's like, named as the notes name it), else None."""
+    like = like_of(settings)
+    if like is None:
+        return None
+    return {
+        "structure": like["structure"],
+        "chain": like.get("chain") or None,
+        "match": like.get("match") or "auto",
+        "layout": None,
+        "name": like.get("name") or None,
+    }
+
+
+def like_domains(text: str) -> dict[str, list[str]] | None:
+    """The diff's domains typed under Draw like… (NAME=RANGES, one a line or ;-separated; cli.diff_domains): None
+    when none; a ValueError naming Draw like… for a malformed one."""
+    from foldmap.cli import diff_domains
+
+    lines = [p.strip() for p in re.split(r"[;\n]", text or "") if p.strip()]
+    if not lines:
+        return None
+    try:
+        return diff_domains(lines)
+    except ValueError as err:
+        raise ValueError(f"Draw like… domains: {str(err).replace('--domain ', '')}") from None
+
+
+def page_look(settings: dict) -> Style:
+    """The look of a compare or diff page: the settings' look less what names this structure's parts or data (the
+    marks, highlight, interaction partners and per-chain colours, STRUCTURE_STYLE, back to the theme's; colour by
+    data as the theme colours: the uploads are this structure's figure's), as both panels share it."""
+    theme = THEMES[settings.get("theme", "publication")]
+    plain = {**settings, "data_path": "", **{k: getattr(theme, k) for k in STRUCTURE_STYLE}}
+    return look_of(plain)
+
+
+def pair_page(path, settings: dict):
+    """The compare or diff page the settings ask for (Draw like…: the reference as A on the left, this structure as
+    B, drawn like it, on the right; compare.compare / compare.diff_page), else None. B is the chain the settings
+    draw when they name one, else its first protein chain; both in the settings' look and assembly. Layout edits
+    are this structure's figure's own: the page is drawn as `foldmap compare` / `foldmap diff` draw it."""
+    like = like_of(settings)
+    if like is None or like.get("page") not in ("compare", "diff"):
+        return None
+    from foldmap.compare import compare, diff_page
+
+    chains = [c.strip() for c in (settings.get("chains") or "").split(",") if c.strip()]
+    kw = {
+        "chain_a": like.get("chain") or None,
+        "chain_b": chains[0] if len(chains) == 1 else None,
+        "match": like.get("match") or "auto",
+        "look": page_look(settings),
+        "assembly": settings.get("assembly") or "auto",
+        "names": (like.get("name") or None, like.get("b") or None),
+    }
+    if like["page"] == "compare":
+        return compare(like["structure"], path, **kw)
+    domains = like_domains(like.get("domains", ""))
+    try:
+        return diff_page(like["structure"], path, domains=domains, **kw)
+    except ValueError as err:
+        if str(err).startswith("domain "):  # the reference's ranges (diff._domain_residues): typed under Draw like…
+            raise ValueError(f"Draw like… {err}") from None
+        raise
+
+
+def like_command(settings: dict, name: str) -> str | None:
+    """The command line that draws what the settings' reference asks for, for a figure over the app's limits
+    (app_jobs.limit_message): `foldmap compare` / `foldmap diff` / `foldmap plot --like`; None without one."""
+    like = like_of(settings)
+    if like is None:
+        return None
+    ref = like.get("id") or like.get("name") or "reference.cif"
+    page = like.get("page")
+    if page in ("compare", "diff"):
+        return f"foldmap {page} {ref} {name} -o {page}.svg"
+    return f"foldmap plot {name} --like {ref} -o {name}.svg"
+
+
+def like_link(ss: MutableMapping) -> dict[str, str]:
+    """What the share link carries of the reference: its PDB id (like), its chain (like_chain, when given) and the
+    page (like_page, when not drawn like); nothing for a reference that is a file (an upload, a path)."""
+    like = like_of(ss)
+    if like is None or not like.get("id"):
+        return {}
+    out = {"like": like["id"]}
+    if like.get("chain"):
+        out["like_chain"] = like["chain"]
+    if like.get("page") in ("compare", "diff"):
+        out["like_page"] = like["page"]
+    return out
+
+
+def like_from_link(ss: MutableMapping, params) -> None:
+    """A share link's reference (like_link), each value checked (an id, chain ids, a page), fetched and used as
+    Draw like… uses a PDB id typed; a value that is none of these is ignored."""
+    from foldmap.app_controls import LIKE_CHAIN
+    from foldmap.fetch import source_id
+
+    sid = source_id(params.get("like") or "")
+    if not sid:
+        return
+    chain = params.get("like_chain") or ""
+    page = params.get("like_page") or "like"
+    keep = {
+        "chain": chain if all(LIKE_CHAIN.fullmatch(c) for c in chain.split(",")) else "",
+        "page": page if page in LIKE_PAGES else "like",
+    }
+    reference_by_id(ss, sid, keep=keep)
+    ss.pop("last_changed", None)
 
 
 def structure_choices(source: str, limit: int = 12) -> list[tuple[str, str]]:
@@ -297,27 +445,35 @@ def sequence_figure(path, settings: dict, view: dict):
 
 def layout_document(path, settings: dict, uploads: dict[str, str] | None = None) -> dict:
     """The app's settings as a layout file document (element references saved as residue ranges). Hosted, the files
-    it names (names files, the alignment) can only be the server's copies of uploads: each is named as uploaded
-    (`uploads`: kept path -> uploaded name; else its file name), never by its server path."""
+    it names (names files, the alignment, the reference uploaded under Draw like…) can only be the server's copies of
+    uploads: each is named as uploaded (`uploads`: kept path -> uploaded name; else its file name), never by its
+    server path. A reference that is a PDB entry is saved as its id (`foldmap plot --layout-file` fetches it)."""
     doc = spec_document(spec_of(path, settings), structure_name=Path(path).name)
+
+    def own(p: str) -> str:
+        return (uploads or {}).get(p) or Path(p).name
+
     if not local_files():
-
-        def own(p: str) -> str:
-            return (uploads or {}).get(p) or Path(p).name
-
         if doc.get("names"):
             doc["names"] = [n if n in NAME_KEYWORDS else own(n) for n in doc["names"]]
         for key in ("msa", "data", "crosslinks"):  # the alignment, the data and crosslinks tables
             if (doc.get("layout") or {}).get(key):
                 doc["layout"][key] = own(doc["layout"][key])
+    like, saved = like_of(settings), (doc.get("layout") or {}).get("like")
+    if like is not None and saved:
+        saved["structure"] = like.get("id") or (saved["structure"] if local_files() else own(saved["structure"]))
     return doc
 
 
 def uploaded_files(doc: dict) -> list[str]:
     """The files a hosted layout document names (they were uploads): names files, then the alignment, the data and
-    crosslinks tables."""
+    crosslinks tables, then the reference (Draw like…) unless it is a PDB id."""
+    from foldmap.fetch import source_id
+
     lay = doc.get("layout") or {}
     files = [lay.get(key) for key in ("msa", "data", "crosslinks")]
+    like = (lay.get("like") or {}).get("structure") if isinstance(lay.get("like"), dict) else None
+    files.append(like if like and not source_id(like) else None)
     return [n for n in doc.get("names") or [] if n not in NAME_KEYWORDS] + [f for f in files if f]
 
 
@@ -411,6 +567,39 @@ def _domains(value) -> list[tuple[str, list[str]]]:
     return out
 
 
+def _like(value) -> tuple[dict | None, list[str]]:
+    """A layout file's `like` (spec.parse_like: checked) as the settings' reference (like_entry), and what of it
+    is not on this machine (said under the figure): the reference is a PDB id (its structure the id until
+    apply_layout_file fetches it as Draw like… does) or, on your own machine only, a file there; hosted, a file it
+    names was an upload, to load again under Draw like… An alignment file as its match is kept only where it is a
+    file here (else auto, said); its own layout file (like.layout, --like-layout) is not read by the app (said)."""
+    from foldmap.fetch import source_id
+    from foldmap.spec import parse_like
+
+    if value is None:
+        return None, []
+    like = parse_like(value)
+    structure = _text("like", like["structure"])
+    chain = _text("like", like["chain"] or "", IDS_MAX)
+    match = _text("like", like["match"])
+    missing = []
+    if match not in LIKE_MATCHES and not (local_files() and Path(match).is_file()):
+        missing.append(f"its alignment {match} (aligned automatically)")
+        match = "auto"
+    if like.get("layout"):
+        missing.append(f"its layout file {like['layout']} (the app draws it in this figure's settings)")
+    entry = None
+    if local_files() and Path(structure).expanduser().is_file():
+        path = Path(structure).expanduser().resolve()
+        entry = like_entry(str(path), path.name, chain=chain, match=match)
+    elif source_id(structure):
+        sid = source_id(structure)
+        entry = like_entry(sid, sid, id=sid, chain=chain, match=match)
+    else:
+        return None, [f"the reference {structure}: load it under Draw like…"]
+    return entry, missing
+
+
 def settings_from_document(doc: dict) -> dict:
     """App settings from a layout file document (layoutfile.load: its keys checked): the theme, its style changes,
     layout options, edits as text. A visitor's file may hold anything, so every value is checked for its kind (text
@@ -458,6 +647,7 @@ def settings_from_document(doc: dict) -> dict:
             raise ValueError(f"protomers must be groups of chain ids, like A,B;C,D; got {layoutfile._brief(protomers)}")
         out["protomers"] = [_ids("protomers", group) for group in protomers]
     out["chains"] = ",".join(_ids("chains", given.get("chains", "")))
+    out["like"], out["like_missing"] = _like(given.get("like"))
     msa = _text("msa", given.get("msa", ""))
     out["msa_path"] = msa if msa and local_files() and Path(msa).is_file() else ""  # no server paths when hosted
     out["msa_missing"] = msa if msa and not out["msa_path"] else ""  # saved on another machine
@@ -655,7 +845,7 @@ NAMES_AND_DOMAINS = (  # what the names and domains controls hold besides the se
     "domains__auto",
     "domains__manual",
 )
-STRUCTURE_WIDGETS = ("seq_chain", *NAMES_AND_DOMAINS)  # widget keys of one structure
+STRUCTURE_WIDGETS = ("seq_chain", *NAMES_AND_DOMAINS, *LIKE_WIDGETS)  # widget keys of one structure
 _LOG = logging.getLogger("foldmap.app")
 
 
@@ -797,9 +987,11 @@ def reset_structure(ss: MutableMapping) -> None:
         "data_read",
         "crosslinks_error",
         "crosslinks_read",
+        "like_error",
     ):
         ss[key] = ""
     ss["names_missing"], ss["msa_rows"], ss["data_missing"], ss["data_columns"] = [], [], {}, []
+    ss["like_missing"] = []
     ss["_synced"] = {}
     from foldmap.app_edits import EDITORS
 
@@ -819,6 +1011,7 @@ def reset_structure(ss: MutableMapping) -> None:
         "msa_uploaded",
         "data_uploaded",
         "crosslinks_uploaded",
+        "like_uploaded",
         "scope_kept",
     ):
         ss.pop(key, None)
@@ -841,6 +1034,9 @@ def apply_document(ss: MutableMapping, settings: dict) -> None:
     for key in NAMES_AND_DOMAINS:
         ss.pop(key, None)
     ss["_synced"] = {k: v for k, v in (ss.get("_synced") or {}).items() if k not in ("names", "domains")}
+    ss.pop("like_uploaded", None)  # the reference is the file's (or none)
+    ss["like_error"] = ""
+    like_widgets(ss, ss.get("like"))
 
 
 LAYOUT_FILE_MAX = MB  # the layout file uploader's cap (a layout file is a few kB), checked again before it is read
@@ -878,6 +1074,14 @@ def apply_layout_file(ss: MutableMapping) -> None:
         return
     ss["layout_error"] = ""
     apply_document(ss, settings)
+    like = ss.get("like")
+    if like:
+        like = ss["like"] = {**like, "b": ss.get("name", "")}  # what the pages call this structure
+    if like and like.get("id") and like["structure"] == like["id"]:  # a PDB id: fetched as Draw like… fetches it
+        if not reference_by_id(ss, like["id"], keep=like):
+            ss["like"] = None
+            ss["like_missing"] = [f"reference {like['id']}: {ss['like_error']}", *ss.get("like_missing", [])]
+        ss.pop("last_changed", None)
     ss["msa_rows"] = alignment_rows(ss.get("msa_path", ""))
     ss["data_columns"] = value_columns(ss["data_path"]) if ss.get("data_path") else []
 
@@ -1031,6 +1235,7 @@ def main() -> None:
             all_chains=chain_choices(size["chain_ids"], [*result["chains"], *result["na_chains"]]),
             chains_total={"assembly": "auto", "count": result["chain_count"]},  # reset_structure: auto
             assemblies=size["assemblies"],
+            residues=size["residues"],  # Draw like… counts them with the reference's against the limit
             share_id="" if file or local_path else source_id(text) or "",
             structure_uploaded=upload_name(file[0]) if file else "",  # the data download names it so
             stage="edit",
@@ -1051,6 +1256,8 @@ def main() -> None:
 
     def new_structure() -> None:
         ss["stage"], ss["share_id"], ss["source"] = "load", "", ""
+        ss.update(like=None, like_error="", like_missing=[])  # the reference was this structure's (ruling 9)
+        ss.pop("like_uploaded", None)
         ss["qp_tried"] = st.query_params.get("id")  # the link is cleared after this run: not a share link to open
 
     def start_inputs() -> None:
@@ -1106,9 +1313,13 @@ def main() -> None:
                 apply_theme(ss, theme)
             if source_id(qid):
                 load(source_id(qid))
+                if ss["stage"] == "edit":
+                    like_from_link(ss, st.query_params)
             else:
                 ss["load_error"] = "The link's id is not a PDB ID or UniProt accession."
     desired = {"id": ss["share_id"], "theme": ss["theme"]} if ss["stage"] == "edit" and ss.get("share_id") else {}
+    if desired:
+        desired.update(like_link(ss))  # a PDB-id reference only: an upload never enters the link
     if st.query_params.to_dict() != desired:  # uploads and paths never enter the link
         st.query_params.from_dict(desired)
 
@@ -1179,6 +1390,7 @@ def main() -> None:
             layout_section(st, ss)
             conservation_section(st, ss)
             data_section(st, ss)
+            like_section(st, ss)
             layout_file_section(st, ss)
         with st.container(key="credit"):
             st.caption(CREDIT)

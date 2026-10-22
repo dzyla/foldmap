@@ -650,6 +650,12 @@ def test_every_setting_is_reachable():
     seen |= shown(opened(DATA / "2HHB.cif"))  # a two-fold assembly: the two_fold choice
     seen |= shown(opened(DATA / "1BL8.cif"))  # a C4 assembly: the cyclic choice
     seen |= shown(opened(DATA / "8UTF.cif"))  # a strand lent across a ring's cut: the copy_ghosts choice
+    at = opened(DATA / "1UBQ.cif")  # Draw like… with a reference: its chain, the page and the diff's domains
+    at.text_input(key="like_source").input(str(DATA / "1UBQ.cif"))
+    at.button(key="like_use").click().run()
+    at.segmented_control(key="like_page").set_value("diff").run()
+    seen |= shown(at)
+    assert {"like_chain", "like_page", "like_domains", "like_clear"} <= seen
     wanted = {*STYLE_FIELDS, *LAYOUT_DEFAULTS, "theme"} - set(HIDDEN_LAYOUT)
     missing = sorted(k for k in wanted if not seen & set(CONTROLS[k][2]))
     assert missing == []
@@ -682,13 +688,13 @@ def test_uniprot_controls_write_the_option(monkeypatch):
     assert at.session_state["uniprot_sites"] == "active,binding"
 
 
-def test_the_sidebar_is_the_essentials_then_seven_sections():
+def test_the_sidebar_is_the_essentials_then_eight_sections():
     from foldmap import CREDIT
 
     at = opened(DATA / "1UBQ.cif")
     labels = [e.label for e in at.sidebar.expander]
     sections = ["Style", "Show", "Chains & assembly", "Edit layout", "Conservation & UniProt", "Your data"]
-    assert labels == [*sections, "Layout file"]
+    assert labels == [*sections, "Draw like…", "Layout file"]  # Draw like…: plan 13e-4, ruling 9
     assert at.sidebar.caption[-1].value == CREDIT  # the credit closes it
 
 

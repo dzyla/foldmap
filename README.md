@@ -411,7 +411,14 @@ foldmap diff 4AKE 1AKE -o adk.svg --json adk.json --domain LID=122-159 --domain 
 - B's panel is coloured by each residue's Cα displacement after superposition on the matched core (viridis, as
   `color_by=data` draws numbers, with a colour bar). This happens only when some residue moved 0.1 Å or more.
 - The note under both panels names the rest: residues whose secondary structure changes, sheet pairings gained,
-  lost or shifted in register, each `--domain`'s rigid turn, and interface, ligand and contact changes.
+  lost or shifted in register, the domains' turns, and interface, ligand and contact changes.
+- **Domains** are the ones you give with `--domain NAME=RANGES` (residue ranges of A's chain; nothing is inferred).
+  For each, the note gives two angles. The first is its turn after the core fit. When the core sits in one domain,
+  that domain turns about 0° and the others by their hinge. The second is core-free: each domain after the first,
+  fitted on its own, against the first one given. It gives the whole hinge even where the core settles between two
+  domains that moved. Maltose-binding protein (1ANF, 1OMP) turns N 20.2° and C 16.1° after the core fit, while C
+  against N is 36.2° (published: 35° plus an 8° twist). Lactoferrin (1LFG, 1CB6) gives N2 against N1 53.9°
+  (published: 54°). Give the domain you expect to stay still first.
 
 The chains are aligned by sequence when they are one protein (the rule the random-100 pairs use), else by structure.
 States of one protein are drawn alike even when their domains moved too far for one fold's TM-score (calmodulin
@@ -424,13 +431,40 @@ with and without calcium). A structure against itself gives exactly its compare 
 - `pairing`: the strands by A's names, and the change;
 - `displacement`: [chain, residue, Å] for each of B's aligned residues;
 - `core`: how many residue pairs the fit kept;
-- `domain_turns`: degrees for each domain;
+- `domain_turns`: degrees for each domain, after the core fit;
+- `domain_angles`: degrees for each domain after the first, keyed `FIRST/NAME`, each fitted on its own;
 - `contacts`: `elements`, `interfaces`, `interface_elements`, `ligands`, `ligand_elements`, each row ending in
   `gained` or `lost`.
 
 `--check` also judges each panel as a figure of its own (H5: it passes every check its chain drawn alone passes) and
 exits 1 when one does not. The MCP tool `diff_structures` (with `domains`, `assembly` and `check`) returns the same
 page's preview and the same record.
+
+#### In the app: Draw like…
+
+The app's **Draw like…** section takes a reference by PDB ID (on your own machine, a file path too) or as a dropped
+.cif / .pdb file. The structure is then drawn like it, with the note under the figure. **Show** switches between
+three views:
+
+- **Drawn like**: this structure in the reference's frame.
+- **Compare**: `foldmap compare REFERENCE THIS`.
+- **Diff**: `foldmap diff REFERENCE THIS`, with optional **Domains** for their turns.
+
+The reference is A, and this structure is B.
+
+- **Reference chain** names A's chain. B's chain is the one the Chains control names, else its first protein
+  chain.
+- The two pages are drawn in the figure's look. Layout edits, marks and your data apply to the figure drawn like.
+- **New structure** clears the reference, and so does **Clear**.
+- The share link carries a PDB-ID reference (`&like=2VWD`, with `like_chain` and `like_page` when set). An uploaded
+  reference never enters the link.
+- A layout file's `like:` is drawn like again: a PDB id is fetched, and hosted, a file it names is said under the
+  figure, to be loaded again.
+- Hosted, the reference is read under the same limits as any structure. The two structures together may have at
+  most the residues the app draws. A page over a limit is refused, with the `foldmap compare` / `foldmap diff`
+  command line that draws it on your own computer.
+- Measured on F7's pair (2ZB5 drawn like 2VWD) as the hosted app runs it: Compare took 2.4 s and Diff 4.7 s, against
+  the 90 s limit, adding about 60 MB of address space against the 1 GB cap.
 
 ### The figure as data
 
@@ -949,6 +983,9 @@ title. The rest is in sections:
 - **Edit layout**: arrangement, rotation, sizes, the βα template, helices packed on a sheet, swap, move, rename
   and mark (as tables or as text), element names, and domains with their colours and bar.
 - **Conservation & UniProt**: an alignment for conservation colours, and UniProt sites and domains.
+- **Your data**: per-residue values and crosslinks, as uploads.
+- **Draw like…**: a reference to draw this structure like, or to compare and diff it with (see "In the app: Draw
+  like…").
 - **Layout file**: load one saved from Download (or by `foldmap plot --save-layout`) to restore every setting.
 
 **Part of the file.** When foldmap draws part of the file on its own (assembly 1 when the file holds several

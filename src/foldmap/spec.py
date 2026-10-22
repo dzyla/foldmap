@@ -98,7 +98,7 @@ class FigureSpec:
         """The layout options as a layout file stores them (like: the keys given, the reference as given)."""
         out = {k: getattr(self, k) for k in layoutfile.LAYOUT}
         if self.like:
-            out["like"] = {k: v for k, v in self.like.items() if v is not None}
+            out["like"] = {k: v for k, v in self.like.items() if v is not None and k in LIKE_KEYS}
         return out
 
     def edits(self) -> dict:

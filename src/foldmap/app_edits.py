@@ -518,10 +518,14 @@ CONTROLS: dict[str, tuple[str, str, tuple[str, ...]]] = {
     "data_path": ("Per-residue values", _DATA, ("data_upload",)),
     "data_column": ("Column", _DATA, ("data_column",)),
     "crosslinks_path": ("Crosslinks", _DATA, ("crosslinks_upload",)),
+    # Draw like…
+    "like": ("Reference", "Draw like…", ("like_source", "like_upload")),
     **{key: ("", "", ()) for key in HIDDEN},
 }
 
 _NEEDLES = (  # (in the lower-cased error message, the setting it points at); the first match wins
+    ("draw like", "like"),  # the reference's chain, the diff's domains (app.pair_page)
+    ("--like", "like"),
     ("swap", "swap"),
     ("--move", "move"),
     ("rename", "rename"),

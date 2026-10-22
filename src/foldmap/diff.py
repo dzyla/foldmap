@@ -21,6 +21,12 @@ align.element_mates. From those:
 - displacement: each aligned B residue's Cα distance to its A residue after the core superposition (_core_fit);
 - domain_turns: with domains (name -> residue ranges of A's chain, res:A:1-60, A:1-60 or 1-60), each domain's rigid
   rotation, in degrees, left after the core superposition (the Kabsch fit of B's residues of it onto A's);
+- domain_angles: with two domains or more, each domain after the first against the first, each fitted on its own
+  (no core: the angle of R_d·R_first^T, R the Kabsch fit of B's residues of a domain onto A's). The domains are the
+  ones given (--domain; nothing is inferred), and the first given is the one the others are measured against. This
+  angle does not depend on the core: where the core settles between two domains that moved (MBP at d0: N 20.2,
+  C 16.1 degrees), the turns split the hinge and the own-fit angle still gives it whole (MBP N/C 36.2 against the
+  published 35 plus an 8 degree twist; lactoferrin N1/N2 53.9 against 54; plan 13e-3's report);
 - contacts: element and interface changes measured as foldmap data's tables measure them (_contacts).
 
 The core superposition (_core_fit), a fixed rule: the core is the aligned pairs inside mated elements (mates and
@@ -73,6 +79,8 @@ class Diff:
     domain_turns: dict[str, float]  # domain -> its rigid rotation after the core fit, degrees (domains given only)
     contacts: dict[str, tuple]  # CONTACT_KEYS -> changes (_contacts)
     core: tuple[tuple[int, int], ...] = ()  # the aligned pairs the core fit kept (indices as alignment.pairs)
+    # 'FIRST/NAME' -> each domain after the first given against it, each fitted on its own (no core), degrees
+    domain_angles: dict[str, float] = field(default_factory=dict)
     rotation: np.ndarray = field(default_factory=lambda: np.eye(3), compare=False)  # A ≈ R·B + t, the core fit
     translation: np.ndarray = field(default_factory=lambda: np.zeros(3), compare=False)
 
@@ -156,6 +164,7 @@ def diff_sides(sa: _Side, sb: _Side, match: str = "auto", domains: dict | None =
     to_a = {**mates.mate, **mates.pieces}  # B element id -> the A element it is (whole or a piece of)
     core, r, t, dist = _core_fit(sa, sb, aln, to_a)
     displacement = {(sb.chain, aln.residues_b[j].tag): float(d) for (_, j), d in zip(aln.pairs, dist)}
+    turns, own = _domain_turns(sa, sb, aln, r, t, domains) if domains else ({}, {})
     return Diff(
         alignment=aln,
         mates=mates,
@@ -164,7 +173,8 @@ def diff_sides(sa: _Side, sb: _Side, match: str = "auto", domains: dict | None =
         ss_changes=_ss_changes(sa, sb, aln),
         pairing=_pairing(sa, sb, aln, mates),
         displacement=displacement,
-        domain_turns=_domain_turns(sa, sb, aln, r, t, domains) if domains else {},
+        domain_turns=turns,
+        domain_angles=own,
         contacts=_contacts(sa, sb, to_a),
         core=core,
         rotation=r,
@@ -313,14 +323,25 @@ def _domain_residues(name: str, refs, side: _Side) -> set[int]:
     return got
 
 
-def _domain_turns(sa: _Side, sb: _Side, aln: ChainAlignment, r, t, domains: dict) -> dict[str, float]:
-    """Each domain's rotation (degrees, 0.001) of B's aligned residues of it, after the core fit, onto A's."""
-    from .symmetry import _kabsch, _rotation
+def _degrees(rot) -> float:
+    from .symmetry import _rotation
+
+    return round(float(np.degrees(_rotation(rot)[0])), 3) + 0.0
+
+
+def _domain_turns(
+    sa: _Side, sb: _Side, aln: ChainAlignment, r, t, domains: dict
+) -> tuple[dict[str, float], dict[str, float]]:
+    """(turns, own): each domain's rotation (degrees, 0.001) of B's aligned residues of it, after the core fit, onto
+    A's; and, with two domains or more, each domain after the first against the first, each fitted on its own (the
+    Kabsch fit of B's aligned residues of it onto A's, no core: the angle of R_d·R_first^T), keyed 'FIRST/NAME'."""
+    from .symmetry import _kabsch
 
     ia, ib = (np.array(k, dtype=int) for k in zip(*aln.pairs)) if aln.pairs else (np.zeros(0, int),) * 2
     pa = np.asarray(sa.bb.ca, float)[ia]
-    pb = np.asarray(sb.bb.ca, float)[ib] @ np.asarray(r).T + t
-    out = {}
+    raw = np.asarray(sb.bb.ca, float)[ib]
+    pb = raw @ np.asarray(r).T + t
+    turns, fits = {}, {}
     for name, refs in domains.items():
         mine = _domain_residues(name, refs, sa)
         sel = np.array([i in mine for i in ia], bool)
@@ -328,9 +349,10 @@ def _domain_turns(sa: _Side, sb: _Side, aln: ChainAlignment, r, t, domains: dict
             raise ValueError(
                 f"domain {name}: {int(sel.sum())} of its residues aligned with B; its turn needs at least 3"
             )
-        rd, _, _ = _kabsch(pb[sel], pa[sel])
-        out[name] = round(float(np.degrees(_rotation(rd)[0])), 3) + 0.0
-    return out
+        turns[name] = _degrees(_kabsch(pb[sel], pa[sel])[0])
+        fits[name] = _kabsch(raw[sel], pa[sel])[0]
+    first, *rest = list(fits)
+    return turns, {f"{first}/{name}": _degrees(fits[name] @ fits[first].T) for name in rest}
 
 
 def _changes(a: set, b: set) -> list[tuple]:

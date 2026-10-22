@@ -960,3 +960,205 @@ def contact_lines(report: dict | None, most: int = 10) -> list[str]:
     if len(problems) > most:
         lines.append(f"… and {len(problems) - most} more")
     return lines
+
+
+# ---------------------------------------------------------------------------------------------- Draw like…
+LIKE_MAX = 50 * MB  # the reference uploader's cap: the Start uploader's (APP_CONFIG maxUploadSize), checked again
+LIKE_WIDGETS = ("like_source", "like_chain", "like_page", "like_domains")  # the section's widgets (one structure's)
+LIKE_CHAIN = re.compile(r"[A-Za-z0-9]{1,4}")  # a chain id a share link may carry
+LIKE_HELP = (
+    "a structure of the same fold, by PDB ID or as a file: this structure is drawn in its frame, each element "
+    "where its match sits there and named after it; Compare and Diff draw both side by side"
+)
+DOMAINS_HELP = (
+    "the domains whose turns the diff reports: residue ranges of the reference's chain, one NAME=RANGES a line "
+    "(e.g. LID=122-159 or CORE=1-29,68-117): each domain's turn after the core fit, and each fitted on its own "
+    "against the first given"
+)
+
+
+def like_widgets(ss: MutableMapping, like: dict | None) -> None:
+    """The section's widgets showing `like`'s values (set before they are drawn: a layout file, a link, Clear)."""
+    ss["like_chain"] = (like or {}).get("chain", "")
+    ss["like_page"] = (like or {}).get("page") or "like"
+    ss["like_domains"] = (like or {}).get("domains", "")
+
+
+def use_reference(ss: MutableMapping, path, name: str, sid: str = "", keep: dict | None = None) -> bool:
+    """Make the structure file at `path` the reference (app.like_entry; `name` as the notes call it, `sid` its PDB
+    id), after reading its size under the session's limits (app_jobs.size_job, as every structure read): refused,
+    in words naming the command line, when it and this structure together are over the residues the app draws.
+    `keep`: a reference's chain, match, page and domains to keep (a layout file's, a link's). False with
+    like_error set when refused."""
+    from foldmap import app_jobs
+    from foldmap.app import like_entry, local_files
+
+    lim = app_jobs.limits(hosted=not local_files())
+    try:
+        size = app_jobs.run_job(app_jobs.size_job, str(path), limits=lim)
+    except (ValueError, OSError, RuntimeError, app_jobs.JobLimit) as err:
+        if isinstance(err, (OSError, RuntimeError)) and not isinstance(err, app_jobs.JobFailed):
+            text = f"{name} could not be read as a structure (mmCIF or PDB)"
+        else:
+            text = app_jobs.explain(err, name, lim)[0]
+        ss["like_error"] = text.replace(str(path), name)
+        return False
+    own = int(ss.get("residues") or 0)
+    if lim.max_residues and size["residues"] + own > lim.max_residues:
+        mine = ss.get("name", "")
+        ref = sid or name
+        ss["like_error"] = (
+            f"{mine} and {ref} together have {size['residues'] + own:,} residues, and the limit here is "
+            f"{lim.max_residues:,}. Draw one like the other on your own computer: pip install foldmap, then "
+            f"foldmap compare {ref} {mine} -o compare.svg"
+        )
+        return False
+    like = like_entry(str(path), name, id=sid, b=ss.get("name", ""))
+    like.update({k: v for k, v in (keep or {}).items() if k in ("chain", "match", "page", "domains")})
+    ss.update(like=like, like_error="", last_changed="like")
+    like_widgets(ss, like)
+    return True
+
+
+def reference_by_id(ss: MutableMapping, text: str, keep: dict | None = None) -> bool:
+    """The reference fetched by its PDB id or UniProt accession (fetch, as Start loads a structure; on your own
+    machine a file path too) and used (use_reference); False with like_error set when it cannot be."""
+    from foldmap.app import local_files
+    from foldmap.fetch import DOWNLOAD_MAX, fetch, source_id
+
+    text = (text or "").strip()
+    try:
+        path = fetch(text, None, local=local_files(), max_bytes=DOWNLOAD_MAX)
+    except ValueError as err:
+        ss["like_error"] = str(err)
+        return False
+    except OSError:
+        ss["like_error"] = "The file could not be stored on the server; try again."
+        return False
+    is_file = local_files() and Path(text).expanduser().is_file()
+    sid = "" if is_file else source_id(text) or ""
+    ss.pop("like_uploaded", None)
+    return use_reference(ss, path, sid or Path(path).name, sid, keep)
+
+
+def set_reference(ss: MutableMapping, upload: bool = False) -> None:
+    """Draw like…'s callbacks: the PDB ID typed (or, on your own machine, a file path), or the file dropped
+    (`upload`: size-capped, kept by fetch.keep_upload, named as uploaded), as the reference."""
+    from foldmap.fetch import keep_upload
+
+    if not upload:
+        if (ss.get("like_source") or "").strip():
+            reference_by_id(ss, ss["like_source"])
+        return
+    up = ss.get("like_upload")
+    if up is None:  # the file removed from the uploader: the reference stays until Clear
+        return
+    name = upload_name(up.name)
+    drawn_as = re.sub(r"[^\w.-]+", "_", Path(name).name)[:60]  # on the page (as Start names an upload): no markup
+    if wrong_upload(up.name, "structure"):
+        ss["like_error"] = wrong_upload(up.name, "structure")
+        return
+    data = up.getvalue()
+    if len(data) > LIKE_MAX:
+        ss["like_error"] = f"{name}: a reference structure is at most {LIKE_MAX // MB} MB"
+        return
+    try:
+        path = keep_upload(up.name, data)
+    except OSError:
+        ss["like_error"] = "The file could not be stored on the server; try again."
+        return
+    if use_reference(ss, path, drawn_as):
+        ss["like_uploaded"] = (str(path), name)  # a layout file names it as uploaded (app_views.uploads_of)
+
+
+def clear_reference(ss: MutableMapping) -> None:
+    """Draw on its own again: no reference (New structure does this too)."""
+    ss.update(like=None, like_error="", like_missing=[], last_changed="like")
+    ss.pop("like_uploaded", None)
+    like_widgets(ss, None)
+
+
+def like_changed(ss: MutableMapping, field: str) -> None:
+    """The reference's chain, page (what the canvas shows) or the diff's domains changed: the settings' `like`
+    takes it (a new dict: the figure's cache key changes); domains that do not parse are said and not taken."""
+    from foldmap.app import like_domains
+
+    like = dict(ss.get("like") or {})
+    if not like:
+        return
+    value = ss.get(f"like_{field}")
+    if field == "page":
+        value = value or "like"
+    else:
+        value = str(value or "").strip()
+    if field == "domains":
+        try:
+            like_domains(value)
+        except ValueError as err:
+            ss["like_error"] = str(err)
+            return
+    like[field] = value
+    ss.update(like=like, like_error="", last_changed="like")
+
+
+def like_section(st, ss: MutableMapping) -> None:
+    """Draw like…: a reference by PDB ID (on your own machine a file path too) or as an upload; with one, its chain,
+    what the canvas shows (this structure drawn like it, or the Compare or Diff page) and the diff's domains, and
+    Clear. Only a PDB-id reference enters the share link; New structure clears it."""
+    from foldmap.app import LIKE_PAGES, local_files
+
+    with st.expander("Draw like…", key="sec_like"):
+        with st.form("like_form", border=False, enter_to_submit=True):
+            with st.container(horizontal=True, vertical_alignment="bottom", key="like_row"):
+                hint = "PDB ID or file path" if local_files() else "PDB ID"
+                st.text_input("Reference", key="like_source", placeholder=hint, help=LIKE_HELP)
+                st.form_submit_button("Use", key="like_use", on_click=set_reference, args=(ss,))
+        st.file_uploader(
+            "or drop its .cif / .pdb file",
+            type=upload_types("structure"),
+            key="like_upload",
+            on_change=set_reference,
+            args=(ss,),
+            kwargs={"upload": True},
+            max_upload_size=LIKE_MAX // MB,
+        )
+        if ss.get("like_error"):
+            st.error(shown(ss["like_error"], paths=not local_files()))
+        like = ss.get("like")
+        if not like:
+            return
+        for key, value in (("like_page", like.get("page") or "like"), ("like_chain", like.get("chain", ""))):
+            ss.setdefault(key, value)  # a widget not drawn last run lost its state: it shows the reference's
+        if like.get("page") == "diff":
+            ss.setdefault("like_domains", like.get("domains", ""))
+        st.caption(f"Drawn like {shown(like.get('name') or like.get('id') or '', limit=80)}")
+        st.segmented_control(
+            "Show",
+            list(LIKE_PAGES),
+            format_func=LIKE_PAGES.get,
+            key="like_page",
+            required=True,
+            on_change=like_changed,
+            args=(ss, "page"),
+            help="Drawn like: this structure in the reference's frame · Compare: both side by side · Diff: the "
+            "same page with what changed (Cα displacement, elements only one has, domain turns)",
+        )
+        st.text_input(
+            "Reference chain",
+            key="like_chain",
+            placeholder="its first protein chain",
+            on_change=like_changed,
+            args=(ss, "chain"),
+        )
+        if like.get("page") == "diff":
+            st.text_area(
+                "Domains",
+                key="like_domains",
+                placeholder="N=1-90,251-333\nC=91-250",
+                help=DOMAINS_HELP,
+                on_change=like_changed,
+                args=(ss, "domains"),
+            )
+        if like.get("page") in ("compare", "diff"):
+            st.caption("The page is drawn in this look; edits, marks and your data apply to the figure drawn like.")
+        st.button("Clear", key="like_clear", type="tertiary", on_click=clear_reference, args=(ss,))
