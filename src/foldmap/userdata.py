@@ -16,7 +16,9 @@ categories. Without --data-column the first column of numbers is read. An option
 aa: ALA or A) is checked against the structure, so a file numbered another way (label_seq_id, a construct's own
 numbering) is caught where the names differ instead of colouring the wrong residue.
 
-A crosslinks file has chain1, residue1, chain2, residue2 (or chain_a ... residue_b) and an optional distance.
+A crosslinks file has chain1, residue1, chain2, residue2 (or chain_a ... residue_b) and an optional distance: the
+crosslinker's span, the most Cα–Cα distance (Å) it bridges (CROSSLINK_SPAN, 30 Å, when not given). Each crosslink is
+measured on the structure (crosslink_lengths); one longer than its span is a warning, and is drawn all the same.
 
 Every row is checked (spec.Problem, as check_references' pass 2 checks a reference): a chain the structure lacks, a
 residue its chain lacks, a residue named otherwise than in the structure, a cell that is no residue number, a
@@ -40,7 +42,12 @@ CHAIN = ("chain", "chainid", "chainname", "authasymid")
 RESIDUE = ("residue", "residuenumber", "resnum", "resno", "resi", "resid", "res", "resseq", "authseqid", "number")
 ICODE = ("icode", "insertioncode", "inscode", "pdbxpdbinscode")
 RESNAME = ("resname", "residuename", "aa", "aminoacid", "authcompid")
-DISTANCE = ("distance", "dist", "length")
+DISTANCE = ("distance", "dist", "length", "span", "maxdistance", "cutoff")  # the crosslinker's span (Å)
+# The Cα–Cα distance a crosslink is checked against when its row gives none: 30 Å, the usual limit for the
+# lysine-reactive NHS esters (DSS, BS3; their 11.4 Å spacer, two lysine side chains and backbone motion: Merkley et
+# al. 2014, Protein Sci 23:747; Leitner et al. 2016, Trends Biochem Sci 41:20). A row's own distance (the
+# crosslinker's span, Å) replaces it, e.g. 20 Å for a zero-length (EDC) or short crosslinker.
+CROSSLINK_SPAN = 30.0
 EMPTY = {"", "na", "n/a", "nan", "none", "null"}  # cells that hold no value (any case)
 _NUMBER = re.compile(r"(-?\d+)\s*([A-Za-z]?)")
 
@@ -419,4 +426,43 @@ def summary(values: ResidueData | None, links: list | None, data=None, crosslink
         out.append(f"--data {data}: column {values.column} ({kind}) on {len(values.values)} residues")
     if links is not None:
         out.append(f"--crosslinks {crosslinks}: {len(links)} crosslinks")
+    return out
+
+
+def crosslink_lengths(links: list, bb) -> list[float]:
+    """The Cα–Cα distance (Å, rounded to 0.001) of each crosslink, measured on the structure as read (`bb`, the
+    backbone the files were read on), in the order of `links`."""
+    import numpy as np
+
+    where = {(label.chain, label.tag): k for k, label in enumerate(bb.labels)}
+    out = []
+    for a, b, _ in links:
+        d = float(np.linalg.norm(bb.xyz[where[a], 1] - bb.xyz[where[b], 1]))
+        out.append(round(d, 3))
+    return out
+
+
+def crosslink_name(link) -> str:
+    """A crosslink as the notes name it: A:45 – B:120."""
+    (ca, ta), (cb, tb), _ = link
+    return f"{ca}:{ta} – {cb}:{tb}"
+
+
+def over_span(link, length: float) -> bool:
+    """Whether a crosslink's Cα–Cα distance is longer than its span (its row's distance, else CROSSLINK_SPAN)."""
+    return length > (link[2] if link[2] is not None else CROSSLINK_SPAN)
+
+
+def crosslink_problems(links: list, lengths: list[float], crosslinks, drawn=None) -> list:
+    """A warning for each crosslink whose ends lie further apart (Cα–Cα, in the structure) than its crosslinker
+    spans: drawn all the same, dashed (when both its chains are among `drawn`, None: all), so the figure shows what
+    the structure cannot explain."""
+    out = []
+    for link, length in zip(links, lengths):
+        if over_span(link, length):
+            span = link[2] if link[2] is not None else CROSSLINK_SPAN
+            text = f"crosslink {crosslink_name(link)}: Cα–Cα {length:.1f} Å, longer than its {span:g} Å span"
+            if drawn is None or (link[0][0] in drawn and link[1][0] in drawn):
+                text += " (drawn dashed)"
+            out.append(Problem(f"--crosslinks {crosslinks}", text, False))
     return out

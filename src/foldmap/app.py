@@ -74,12 +74,14 @@ from foldmap.app_controls import (
     alignment_rows,
     chains_section,
     conservation_section,
+    data_section,
     layout_section,
     missing_alignment,
     prepare,
     setting,
     show_section,
     style_section,
+    table_columns,
     touched,
 )
 from foldmap.app_edits import chain_choices, shown, upload_name, upload_types, wrong_upload
@@ -135,6 +137,9 @@ LAYOUT_DEFAULTS = {
     "cath_domains": False,  # --domains cath: CATH's published domains (PDBe)
     "msa_path": "",
     "msa_reference": "",
+    "data_path": "",  # --data: the researcher's per-residue values (an upload; never in the share link)
+    "data_column": "",  # --data-column: the column read ("": its first column of numbers)
+    "crosslinks_path": "",  # --crosslinks (an upload)
     "domains": "",
     "domains_from_file": "",  # the domains text a layout file gave, while unchanged: ids it names may be stale
     "domain_source": "",  # ... and where they came from (inferred, CATH, UniProt): said again while unchanged
@@ -222,6 +227,9 @@ def layout_options(settings: dict) -> dict:
         "uniprot": None if (settings.get("uniprot") or "off") in ("off", "") else settings["uniprot"],
         "msa": settings.get("msa_path") or None,
         "msa_reference": settings.get("msa_reference") or None,
+        "data": settings.get("data_path") or None,
+        "data_column": (settings.get("data_column") or None) if settings.get("data_path") else None,
+        "crosslinks": settings.get("crosslinks_path") or None,
         "chains": [c.strip() for c in (settings.get("chains") or "").split(",") if c.strip()] or None,
         **_adjustments(Args),
         **{k: settings[k] for k in HIDDEN_LAYOUT if k in settings},
@@ -291,15 +299,18 @@ def layout_document(path, settings: dict, uploads: dict[str, str] | None = None)
 
         if doc.get("names"):
             doc["names"] = [n if n in NAME_KEYWORDS else own(n) for n in doc["names"]]
-        if (doc.get("layout") or {}).get("msa"):
-            doc["layout"]["msa"] = own(doc["layout"]["msa"])
+        for key in ("msa", "data", "crosslinks"):  # the alignment, the data and crosslinks tables
+            if (doc.get("layout") or {}).get(key):
+                doc["layout"][key] = own(doc["layout"][key])
     return doc
 
 
 def uploaded_files(doc: dict) -> list[str]:
-    """The files a hosted layout document names (they were uploads): names files, then the alignment."""
-    msa = (doc.get("layout") or {}).get("msa")
-    return [n for n in doc.get("names") or [] if n not in NAME_KEYWORDS] + ([msa] if msa else [])
+    """The files a hosted layout document names (they were uploads): names files, then the alignment, the data and
+    crosslinks tables."""
+    lay = doc.get("layout") or {}
+    files = [lay.get(key) for key in ("msa", "data", "crosslinks")]
+    return [n for n in doc.get("names") or [] if n not in NAME_KEYWORDS] + [f for f in files if f]
 
 
 TITLE_MAX = 200  # characters of a layout file's title
@@ -443,6 +454,16 @@ def settings_from_document(doc: dict) -> dict:
     msa = _text("msa", given.get("msa", ""))
     out["msa_path"] = msa if msa and local_files() and Path(msa).is_file() else ""  # no server paths when hosted
     out["msa_missing"] = msa if msa and not out["msa_path"] else ""  # saved on another machine
+    missing = []  # the data and crosslinks tables, as the alignment: read only from this machine, never hosted
+    for key in ("data", "crosslinks"):
+        given_path = _text(key, given.get(key, ""))
+        kept = given_path if given_path and local_files() and Path(given_path).is_file() else ""
+        out[f"{key}_path"] = kept
+        missing += [given_path] if given_path and not kept else []
+    out["data_missing"] = missing
+    out["data_column"] = _text("data_column", given.get("data_column", "")) if out["data_path"] else ""
+    if out.get("color_by") == "data" and not out["data_path"]:  # colour by data is offered only with data loaded
+        out["color_by"] = THEMES[theme].color_by
     edits = layoutfile.edits_of(doc)  # the CLI's reading of them, as the editors' text
     out["rename"] = "; ".join(f"{k}={v}" for k, v in edits["rename"].items())
     out["swap"] = "; ".join(f"{a},{b}" for a, b in edits["swap"])
@@ -652,6 +673,22 @@ def apply_theme(ss: MutableMapping, name: str | None = None) -> None:
             ss[key] = copy.deepcopy(value)
     for key, value in LAYOUT_DEFAULTS.items():
         ss.setdefault(key, copy.deepcopy(value))
+    data_colouring(ss)
+
+
+def data_colouring(ss: MutableMapping) -> None:
+    """Colour by data while data are loaded and the theme colours by chain (the command line's rule: --data colours
+    the figure unless a colouring is asked for, spec.data_look); back to the theme's colouring when they are gone."""
+    theme = THEMES[ss.get("theme", "publication")]
+    if ss.get("data_path") and ss.get("color_by") == theme.color_by == Style().color_by:
+        ss["color_by"] = "data"
+    elif not ss.get("data_path") and ss.get("color_by") == "data":
+        ss["color_by"] = theme.color_by
+
+
+def colour_choices(ss: MutableMapping) -> list[str]:
+    """Colour by's choices: `data` only with data loaded (Your data), as conservation's grades need an alignment."""
+    return [c for c in CHOICES["color_by"] if c != "data" or ss.get("data_path") or ss.get("color_by") == "data"]
 
 
 # ---------------------------------------------------------------------------------------------- sidebar
@@ -714,7 +751,7 @@ def essentials(st, ss: MutableMapping) -> None:
         ]
         beside = [(key, label) for key, label, used in companions if used]
         cols = st.columns(1 + len(beside))  # side by side
-        cols[0].selectbox("Colour by", CHOICES["color_by"], **setting(ss, "color_by"))
+        cols[0].selectbox("Colour by", colour_choices(ss), **setting(ss, "color_by"))
         for col, (key, label) in zip(cols[1:], beside):
             col.selectbox(label, CHOICES[key], **setting(ss, key))
         with st.container(horizontal=True, gap="xsmall", key="label_toggles"):
@@ -743,9 +780,9 @@ def reset_structure(ss: MutableMapping) -> None:
     look = THEMES[ss.get("theme", "publication")]
     for key in STRUCTURE_STYLE:
         ss[key] = getattr(look, key)
-    for key in ("msa_path", "msa_error", "msa_reference", "msa_missing", "layout_error"):
+    for key in ("msa_path", "msa_error", "msa_reference", "msa_missing", "layout_error", "data_error", "data_read"):
         ss[key] = ""
-    ss["names_missing"], ss["msa_rows"] = [], []
+    ss["names_missing"], ss["msa_rows"], ss["data_missing"], ss["data_columns"] = [], [], [], []
     ss["_synced"] = {}
     from foldmap.app_edits import EDITORS
 
@@ -763,6 +800,8 @@ def reset_structure(ss: MutableMapping) -> None:
         "seq_drawn",
         "page_drawn",
         "msa_uploaded",
+        "data_uploaded",
+        "crosslinks_uploaded",
         "scope_kept",
     ):
         ss.pop(key, None)
@@ -822,6 +861,7 @@ def apply_layout_file(ss: MutableMapping) -> None:
     ss["layout_error"] = ""
     apply_document(ss, settings)
     ss["msa_rows"] = alignment_rows(ss.get("msa_path", ""))
+    ss["data_columns"] = table_columns(ss["data_path"]) if ss.get("data_path") else []
 
 
 def layout_file_section(st, ss: MutableMapping) -> None:
@@ -1119,6 +1159,7 @@ def main() -> None:
             chains_section(st, ss)
             layout_section(st, ss)
             conservation_section(st, ss)
+            data_section(st, ss)
             layout_file_section(st, ss)
         with st.container(key="credit"):
             st.caption(CREDIT)

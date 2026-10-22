@@ -14,7 +14,7 @@ import re
 import unicodedata
 from collections.abc import Callable, MutableMapping
 
-from foldmap.fetch import ALIGNMENT_SUFFIXES, STRUCTURE_SUFFIXES, upload_suffix
+from foldmap.fetch import ALIGNMENT_SUFFIXES, STRUCTURE_SUFFIXES, TABLE_SUFFIXES, upload_suffix
 
 # ------------------------------------------------------------------------------------------ composites
 NA_BACKBONE_COLOUR = "#8c564b"  # the picker's colour until one is chosen
@@ -430,6 +430,7 @@ SYMMETRIES = (
 # ------------------------------------------------------------------------------------ controls, errors
 _TOP, _STYLE, _SHOW = "top of the sidebar", "Style", "Show"
 _CHAINS, _LAYOUT, _CONSERVATION = "Chains & assembly", "Edit layout", "Conservation & UniProt"
+_DATA = "Your data"
 HIDDEN = ("flip_v", "dna", "symmetry_tol", "protomers", "up", "view")  # app.HIDDEN_LAYOUT: layout files only
 
 CONTROLS: dict[str, tuple[str, str, tuple[str, ...]]] = {
@@ -513,6 +514,10 @@ CONTROLS: dict[str, tuple[str, str, tuple[str, ...]]] = {
     "uniprot": ("UniProt", _CONSERVATION, ("uniprot__mode", "uniprot__acc")),
     "uniprot_domains": ("UniProt domains as panels", _CONSERVATION, ("uniprot_domains",)),
     "uniprot_sites": ("UniProt sites", _CONSERVATION, ("uniprot_sites__mode", "uniprot_sites__types")),
+    # Your data
+    "data_path": ("Per-residue values", _DATA, ("data_upload",)),
+    "data_column": ("Column", _DATA, ("data_column",)),
+    "crosslinks_path": ("Crosslinks", _DATA, ("crosslinks_upload",)),
     **{key: ("", "", ()) for key in HIDDEN},
 }
 
@@ -536,6 +541,9 @@ _NEEDLES = (  # (in the lower-cased error message, the setting it points at); th
     ("na_backbone", "na_backbone"),
     ("uniprot", "uniprot"),
     ("needs an alignment", "msa_path"),
+    ("--data", "data_path"),
+    ("color_by=data", "data_path"),
+    ("--crosslinks", "crosslinks_path"),
     ("--names", "names"),
 )
 
@@ -585,6 +593,7 @@ UPLOADS = {  # kind -> (suffixes, the MIME type also named, what it is called): 
     "layout": ((".yaml", ".yml"), "application/yaml", "a layout file"),
     "names": ((".yaml", ".yml"), "application/yaml", "a names file"),
     "alignment": (ALIGNMENT_SUFFIXES, "text/x-fasta", "an alignment"),
+    "table": (TABLE_SUFFIXES, "text/csv", "a table"),
 }
 
 

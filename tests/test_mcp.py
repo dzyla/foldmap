@@ -532,3 +532,34 @@ def test_structure_data_returns_the_command_lines_dict(tmp_path, capsys):
         call("structure_data", {"source": path, "output_path": str(tmp_path / "x.csv")})
     with pytest.raises(ToolError, match="nucleic_acid"):
         call("structure_data", {"source": path, "sections": ["elements"], "output_path": str(tmp_path / "y.ct")})
+
+
+def test_draw_topology_takes_your_data_and_crosslinks_and_says_their_problems(tmp_path):
+    """data_path, data_column and crosslinks_path: the figure is coloured by the data and the crosslinks drawn;
+    each row not used (and each crosslink longer than its span) is a warning in the note and in data_problems; a
+    table none of whose rows names a residue is an error result (isError), as the command line refuses it."""
+    from mcp.server.mcpserver.exceptions import ToolError
+
+    data, xl, out = tmp_path / "d.csv", tmp_path / "xl.csv", tmp_path / "ubq.svg"
+    data.write_text("chain,residue,ddG\nA,3,0.5\nA,30,-1.2\nA,999,1\n", encoding="utf-8")
+    xl.write_text("chain1,residue1,chain2,residue2,distance\nA,6,A,48,\nA,1,A,72,5\n", encoding="utf-8")
+    r = call(
+        "draw_topology", {"source": UBQ, "output_path": str(out), "data_path": str(data), "crosslinks_path": str(xl)}
+    )
+    assert not r.is_error
+    problems = r.structured_content["data_problems"]
+    assert [p["where"] for p in problems] == [f"--data {data} row 4", f"--crosslinks {xl}"]
+    assert "chain A has no residue 999" in problems[0]["text"] and "longer than its 5 Å span" in problems[1]["text"]
+    assert f"; warning: --data {data} row 4: chain A has no residue 999" in r.content[0].text
+    kinds = {x["id"]: x["kind"] for x in r.structured_content["interactions"]}
+    assert kinds == {"ia:xl:A:6-A:48": "xl", "ia:xl:A:1-A:72": "xl-over"}
+    svg = out.read_text()
+    assert 'id="data-stripe:' in svg and 'id="ia:xl:A:6-A:48"' in svg
+    r = call("draw_topology", {"source": UBQ, "output_path": str(out), "data_path": str(data), "data_column": "ddG"})
+    assert not r.is_error
+    bad = tmp_path / "bad.csv"
+    bad.write_text("chain,residue,ddG\nA,900,1\n", encoding="utf-8")
+    with pytest.raises(ToolError, match=f"--data {bad}: no row names a residue of the structure"):
+        call("draw_topology", {"source": UBQ, "output_path": str(tmp_path / "x.svg"), "data_path": str(bad)})
+    with pytest.raises(ToolError, match="needs data"):
+        call("draw_topology", {"source": UBQ, "output_path": str(tmp_path / "x.svg"), "data_column": "ddG"})

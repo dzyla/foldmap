@@ -45,6 +45,7 @@ GLYCAN_STEM = re.compile(r"glycan:[^:]+:stem$")
 # bodies are owned by their element id (label:<id>, resnum:<id>:<end>, ghostlabel:<id> are theirs).
 ELEMENT_BODIES = ("strand:", "helix:", "helix-back:", "eta:", "ghost:")
 OWN_BODIES = {"ligand:": "ligand-label:", "linked:": "linked-label:", "domain-name-plate:": "domain-label:"}
+DATA_BODIES = ("data-ring:",)  # a category mark of the researcher's data (render.data_marks): a text on one hides it
 BESIDE_BODIES = ("helix:", "helix-back:", "eta:")  # bodies whose name stands beside them, never on them: A6 reads
 # their own name over them (plan 22: names over their own bars at font_scale 2-3.5 went unread, owned)
 TEXT_OVERLAP_PX2 = 1.0  # text over text or a body: overlaps up to this many square pixels are anti-aliasing
@@ -410,7 +411,7 @@ class Page:
             gid = a.get_gid() or ""
             if gid.startswith(LINE_GIDS) or GLYCAN_STEM.match(gid):
                 self.lines.append((gid, _polylines(a), a.get_zorder(), a.get_linewidth() * fig.dpi / 72 / 2))
-            elif gid.startswith(ELEMENT_BODIES) or gid.startswith(tuple(OWN_BODIES)) or gid.startswith("na:stem:"):
+            elif gid.startswith((*ELEMENT_BODIES, *OWN_BODIES, *DATA_BODIES, "na:stem:")):
                 path = a.get_path().transformed(a.get_transform())
                 self.bodies.append((gid, path, a.get_zorder(), _opaque(a)))
             if gid.startswith("legend"):
@@ -617,7 +618,7 @@ def text_collisions(drawn, *, clearance_px: float = 0.0, page: Page | None = Non
     - text over text, their ink boxes overlapping by more than TEXT_OVERLAP_PX2 and deeper than TEXT_DEPTH_PX both
       ways (a text's own parts, one gid, never); two texts turned alike are compared in their turned frame
       (Page.pair_boxes: a stem's name beside its letter row);
-    - text over a body (an element, a stem, a ligand or linked mark, a domain name plate) it does not belong to (its
+    - text over a body (an element, a stem, a ligand or linked mark, a data category mark) it does not belong to (its
       label, its residue numbers, its letters, its name) or a helix's or 3-10 helix's bar under its own name
       (BESIDE_BODIES: the name stands beside its bar), by more than TEXT_OVERLAP_PX2 of its ink deeper than
       TEXT_DEPTH_PX inside it, once per element (a helix is drawn as helix: and helix-back:); a helix drawn over a

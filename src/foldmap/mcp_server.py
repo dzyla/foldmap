@@ -196,6 +196,9 @@ def draw_topology(
     like_source: str | None = None,
     like_chain: str | None = None,
     like_match: str | None = None,
+    data_path: str | None = None,
+    data_column: str | None = None,
+    crosslinks_path: str | None = None,
 ) -> CallToolResult:
     """Draw the topology diagram and write it to output_path (.svg, .png or .pdf; default: a temporary .svg).
     Returns where it was written plus a PNG preview of the same figure; when assembly or focus auto drew part of
@@ -234,7 +237,17 @@ def draw_topology(
     each: `chains` names this structure's, like_chain the reference's (else each its first protein chain).
     like_match: auto (sequence at 40% identity, else structure), sequence, structure, or a two-row alignment file
     (the reference's chain first). The note, and the `provenance` item of kind "like", say how many elements
-    matched, or why it was drawn on its own."""
+    matched, or why it was drawn on its own.
+    data_path: your own per-residue values, a table (CSV, TSV) with chain, residue and value columns; the figure is
+    coloured by them (color_by data) unless style asks for another colouring: numbers as a stripe per residue along
+    each element (style data_style mean: one colour per element), words (categories) as a mark on each residue.
+    data_column: the column read (default: the first column of numbers). crosslinks_path: a table with chain1,
+    residue1, chain2, residue2 and an optional distance, the crosslinker's span in Å (default 30 Å, DSS/BS3):
+    each crosslink is drawn as a solid line between its residues, or dashed when its Cα–Cα distance in the structure
+    is longer than its span. A file none of whose rows names a residue of the structure (or that lacks a needed
+    column) is an error; each row not used, and each crosslink longer than its span, is a warning in the note and
+    in the structured result's `data_problems` [{where, text}]; crosslinks drawn are among `interactions` (kind xl,
+    or xl-over when longer than their span)."""
     from . import layoutfile
     from .provenance import lines
     from .render import save
@@ -275,6 +288,9 @@ def draw_topology(
             swap=[tuple(p) for p in swap or []],
             move=[(ref, (d[0], d[1])) for ref, d in (move or {}).items()],
             like=like,
+            data=data_path,
+            data_column=data_column,
+            crosslinks=crosslinks_path,
         )
         warned = []  # element references checked before the structure is laid out (Q-A19), as the command line does
         for problem in check_references(spec):
@@ -286,6 +302,10 @@ def draw_topology(
         note = f"wrote {out}" + "".join(f"; warning: {problem}" for problem in warned)
         if keep is not None:
             note += f" and layout file {layoutfile.save(keep, layout_document(spec, drawn=drawn))}"
+        problems = list(drawn.layout.data_problems)  # your data: each row not used, each crosslink too long
+        note += "".join(f"; warning: {p}" for p in problems[:DATA_SAID])
+        if len(problems) > DATA_SAID:
+            note += f"; and {len(problems) - DATA_SAID} more data warnings (data_problems lists every one)"
         items = drawn.provenance  # how it was made: the note says it, the structured result lists it
         note += "".join(f"; {text}" for text in lines(items))
         scope = drawn_scope(drawn.model, drawn.layout, spec.assembly, spec.focus)
@@ -294,8 +314,15 @@ def draw_topology(
             note += f"; {said}"
         return CallToolResult(
             content=[TextContent(type="text", text=note), _preview(drawn.figure).to_image_content()],
-            structured_content={"provenance": items, "interactions": _interaction_lines(drawn.figure)},
+            structured_content={
+                "provenance": items,
+                "interactions": _interaction_lines(drawn.figure),
+                "data_problems": [{"where": p.where, "text": p.text} for p in problems],
+            },
         )
+
+
+DATA_SAID = 20  # data warnings said in the note (cli.SAID_ROWS); the structured result lists every one
 
 
 def _interaction_lines(fig) -> list[dict]:
@@ -434,14 +461,21 @@ def draw_sequence(
     ss_colour: str = "figure",
     full_sequence: bool = False,
     title: str | None = None,
+    data_path: str | None = None,
+    data_column: str | None = None,
 ) -> list:
     """Draw the sequence with its secondary structure on top (labels and colours as in the topology figure), in
     rows of `columns`. With msa_path (FASTA, Clustal or Stockholm), the whole alignment is shown, ESPript-style,
-    with the structure following its reference row. Writes output_path (.svg/.png/.pdf); returns a preview."""
+    with the structure following its reference row. data_path, data_column: your own per-residue values (as
+    draw_topology takes them), drawn on the track as the topology figure draws them. Writes output_path
+    (.svg/.png/.pdf); returns a preview."""
     from .render import save
     from .seqplot import draw_sequence as draw
     from .sequence import read_alignment
+    from .spec import data_look
 
+    if data_column and not data_path:
+        raise ValueError(f"data_column {data_column!r} needs data_path: the file it is a column of")
     path = _structure(source)
     with _output(output_path, ".svg", f"{path.stem}-sequence", FIGURE_SUFFIXES) as out:
         fig = draw(
@@ -450,11 +484,13 @@ def draw_sequence(
             alignment=read_alignment(msa_path) if msa_path else None,
             reference=reference,
             columns=columns,
-            look=_theme(theme),
+            look=data_look(_theme(theme), data_path, theme),
             full_sequence=full_sequence,
             ss_colour=ss_colour,
             title=title,
             msa=msa_path,
+            data=data_path,
+            data_column=data_column,
         )
         save(fig, out)
         return [f"wrote {out}", _preview(fig)]

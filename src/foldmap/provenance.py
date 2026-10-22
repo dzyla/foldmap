@@ -24,6 +24,8 @@ elements (their ids: element ids, or domain, stem and ligand names). Kinds, in t
     interactions_dropped  interaction lines left out: the independent re-check (interactions.verify_interactions)
                        found they break their rule
     interactions_hidden  interaction lines not drawn: they would run wholly under text
+    crosslinks_unplaced  the researcher's crosslinks not drawn: an end is not drawn (a chain left out, outside the
+                       focus) or both ends are drawn at one point
     loops_unrouted     loops or nucleic-acid strands with no clear route, drawn as plain curves
     loops_over_text    loops routed over a label or chain end, the only route found
     page_scaled        a page held at its largest with text under 6 pt; a PNG under 300 dpi
@@ -257,6 +259,10 @@ def figure_provenance(fig, layout, loops=(), labels: bool = True) -> list[dict]:
     if hidden := list(getattr(fig, "foldmap_interactions_hidden", [])):
         text = f"{len(hidden)} interaction line(s) not drawn: they would run wholly under text: {', '.join(hidden)}"
         out.append(_item("interactions_hidden", text, hidden))
+    if overlay is not None and getattr(overlay, "xl_unplaced", ()):
+        gone = list(overlay.xl_unplaced)
+        text = f"{len(gone)} crosslink(s) not drawn: " + "; ".join(gone)
+        out.append(_item("crosslinks_unplaced", text, gone))
     if lost := stuck(loops, layout):
         text = (
             f"no clear route for {len(lost)} loop(s) or strand(s), drawn as plain curves that may cross elements: "

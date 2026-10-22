@@ -717,3 +717,108 @@ def test_without_data_the_layout_holds_none_and_the_figure_draws_none():
     assert (lay.residue_data, lay.crosslinks, lay.data_problems) == (None, [], [])
     d = draw_spec(figure_spec(UBQ))
     assert not [p for p in d.figure.axes[0].patches if (p.get_gid() or "").startswith(("data", "legend-data"))]
+
+
+# ---------------------------------------------------------------------------------------- crosslinks (13d-6)
+HB = DATA / "2HHB.cif"
+
+
+def _xl_figure(path, structure=UBQ, **kw):
+    from foldmap.spec import draw_spec, figure_spec
+
+    return draw_spec(figure_spec(structure, crosslinks=path, **kw))
+
+
+def _xl_lines(d) -> list:
+    return [line for part in d.figure.foldmap_interactions.kinds for line in part.lines]
+
+
+def test_crosslink_ends_stand_on_their_residues(tmp_path):
+    """Each crosslink is one line (gid ia:xl:<a>-<b>) from its first residue's point to its second's (render.
+    residue_point, where S4 judges residue marks), measured Cα–Cα on the structure; every one drawn, no cap."""
+    from foldmap.render import residue_point
+
+    rows = [("A", 6, "A", 48), ("A", 11, "A", 33), ("A", 29, "A", 63), ("A", 1, "A", 72)]
+    d = _xl_figure(_table(tmp_path, rows, "chain1,residue1,chain2,residue2"))
+    lay = d.layout
+    lines = _xl_lines(d)
+    assert sorted(line.gid for line in lines) == sorted(f"ia:xl:A:{a}-A:{b}" for _, a, _, b in rows)
+    index = {lab.tag: k for k, lab in enumerate(lay.res_labels)}
+    ca = {lab.tag: d.bb.xyz[k, 1] for k, lab in enumerate(d.bb.labels)}
+    for line in lines:
+        a, b = line.gid.split(":", 2)[2].split("-")
+        ta, tb = a.split(":")[1], b.split(":")[1]
+        want = [residue_point(lay, d.loops, d.sses, lay.res_chain, index[t]) for t in (ta, tb)]
+        assert np.allclose(line.ends, want)
+        assert line.kind == "xl" and line.found[0].distance == pytest.approx(np.linalg.norm(ca[ta] - ca[tb]), abs=1e-3)
+    drawn = {l.get_gid() for l in d.figure.axes[0].lines if (l.get_gid() or "").startswith("ia:xl:")}
+    assert drawn == {line.gid for line in lines}
+    legend = [t.get_text() for t in d.figure.axes[0].texts if t.get_text().startswith("Crosslinks")]
+    assert legend == ["Crosslinks (4)"]
+
+
+def test_a_crosslink_longer_than_its_span_is_drawn_dashed_and_said(tmp_path, capsys):
+    """The span check: Cα–Cα in the structure against the row's distance (else 30 Å, DSS/BS3); one longer is drawn
+    (kind xl-over: dashed, its own ink, its own legend entry), a warning names it and its numbers, and the hover
+    record says it."""
+    from foldmap.render import INTERACTION_INK
+    from foldmap.userdata import CROSSLINK_SPAN
+
+    assert CROSSLINK_SPAN == 30.0
+    path = _table(tmp_path, [("A", 6, "A", 48, ""), ("A", 1, "A", 72, 5)], "chain1,residue1,chain2,residue2,distance")
+    d = _xl_figure(path)
+    kinds = {line.gid: line.kind for line in _xl_lines(d)}
+    assert kinds == {"ia:xl:A:6-A:48": "xl", "ia:xl:A:1-A:72": "xl-over"}
+    over = next(line for line in _xl_lines(d) if line.kind == "xl-over")
+    said = [str(p) for p in d.layout.data_problems]
+    length = over.found[0].distance
+    assert said == [
+        f"--crosslinks {path}: crosslink A:1 – A:72: Cα–Cα {length:.1f} Å, longer than its 5 Å span (drawn dashed)"
+    ]
+    assert said[0] in capsys.readouterr().err
+    artists = {l.get_gid(): l for l in d.figure.axes[0].lines}
+    assert artists["ia:xl:A:1-A:72"].get_color() == INTERACTION_INK["xl-over"][0]
+    assert artists["ia:xl:A:6-A:48"].get_linestyle() == "-"
+    assert artists["ia:xl:A:1-A:72"].get_linestyle() != "-"
+    texts = [t.get_text() for t in d.figure.axes[0].texts]
+    assert "Crosslinks (1)" in texts and "Crosslinks longer than their span (1)" in texts
+    record = next(r for r in d.figure.foldmap_interactions.records() if r["key"] == "ia:xl:A:1-A:72")
+    assert record["kind"] == "xl-over" and "longer than its 5 Å span" in record["text"]
+    assert record["text"].startswith("Crosslink longer than its span A:Met1 – A:")
+
+
+def test_a_crosslink_to_a_residue_not_drawn_is_noted(tmp_path):
+    """A crosslink reaching a chain the figure leaves out (--chains) is not drawn: the figure's notes (provenance
+    crosslinks_unplaced) name it, the legend counts it, and the data notes say a chain is left out."""
+    path = _table(tmp_path, [("A", 7, "A", 127), ("A", 7, "D", 120)], "chain1,residue1,chain2,residue2")
+    d = _xl_figure(path, structure=HB, chains=["A"], assembly="asu")
+    assert [line.gid for line in _xl_lines(d)] == ["ia:xl:A:7-A:127"]
+    item = next(i for i in d.provenance if i["kind"] == "crosslinks_unplaced")
+    assert item["text"] == "1 crosslink(s) not drawn: A:7 – D:120 (D:120 not drawn)" and item["count"] == 1
+    assert "Crosslinks (1, 1 with an end not drawn)" in [t.get_text() for t in d.figure.axes[0].texts]
+    assert any("1 crosslink reaches a chain the figure leaves out" in str(p) for p in d.layout.data_problems)
+
+
+def test_without_crosslinks_no_crosslink_is_drawn_or_noted():
+    from foldmap.spec import draw_spec, figure_spec
+
+    d = draw_spec(figure_spec(UBQ))
+    assert d.figure.foldmap_interactions.kinds == () and d.layout.crosslink_ca == []
+    assert not any(i["kind"] == "crosslinks_unplaced" for i in d.provenance)
+
+
+def test_the_category_legend_names_the_column_and_a6_reads_the_marks(tmp_path):
+    """Categories' legend entries name the column ("site: core"), as the colour bar does; A6 counts a category
+    mark (its ring) as a body a text must not sit on."""
+    from foldmap import figcheck
+
+    rows = [("A", n, ("core", "rim")[n % 2]) for n in range(1, 77, 5)]
+    d = _data_figure(_table(tmp_path, rows, "chain,residue,site"), data_column="site")
+    texts = [t.get_text() for t in d.figure.axes[0].texts]
+    assert "site: core" in texts and "site: rim" in texts
+    page = figcheck.measure(d)
+    assert {g for g, *_ in page.bodies if g.startswith("data-ring:")} == {f"data-ring:A:{n}" for _, n, _ in rows}
+    ring = next(p for p in _patches(d.figure, "data-ring:"))
+    t = d.figure.axes[0].text(*ring.center, "XXXX", ha="center", va="center", fontsize=9)
+    t.set_gid("label:test")
+    assert any(h.startswith("label:test × data-ring:") for h in figcheck.text_collisions(d))

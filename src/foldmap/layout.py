@@ -391,6 +391,7 @@ class Layout:
     # none given; the crosslinks read (--crosslinks); every problem said of either file (rows not used, notes)
     residue_data: object = None
     crosslinks: list = field(default_factory=list)
+    crosslink_ca: list = field(default_factory=list)  # each crosslink's Cα–Cα distance in the structure (Å)
     data_problems: list = field(default_factory=list)
     # what computes other_names on first need (build_layout's `conventions`; with_conventions): an element's names in
     # the conventions the figure does not show, so resolve can take dep: and beta: references; None: none known

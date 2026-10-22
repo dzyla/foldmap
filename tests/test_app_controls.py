@@ -636,8 +636,6 @@ def test_every_setting_is_reachable():
     seen |= shown(at)
     at.selectbox(key="color_by").select("sequence").run()  # sequence_map instead of palette
     seen |= shown(at)
-    at.selectbox(key="color_by").select("data").run()  # data_style (the figure asks for --data: said, not drawn)
-    seen |= shown(at)
     at.selectbox(key="color_by").select("chain").run()
     at.toggle(key="domains__auto").set_value(True).run()  # with domains: colour by domain and the domain bar
     seen |= shown(at)
@@ -645,6 +643,9 @@ def test_every_setting_is_reachable():
     at.file_uploader(key="msa_upload").set_value(
         ("ubq.fasta", (DATA / "ubq_family.fasta").read_bytes(), "text/plain")
     ).run()
+    seen |= shown(at)
+    table = b"chain,residue,ddG\nA,3,0.5\nA,30,-1.2\n"  # data: colour by data, data_style and the column picker
+    at.file_uploader(key="data_upload").set_value(("ddg.csv", table, "text/csv")).run()
     seen |= shown(at)
     seen |= shown(opened(DATA / "2HHB.cif"))  # a two-fold assembly: the two_fold choice
     seen |= shown(opened(DATA / "1BL8.cif"))  # a C4 assembly: the cyclic choice
@@ -681,12 +682,13 @@ def test_uniprot_controls_write_the_option(monkeypatch):
     assert at.session_state["uniprot_sites"] == "active,binding"
 
 
-def test_the_sidebar_is_the_essentials_then_six_sections():
+def test_the_sidebar_is_the_essentials_then_seven_sections():
     from foldmap import CREDIT
 
     at = opened(DATA / "1UBQ.cif")
     labels = [e.label for e in at.sidebar.expander]
-    assert labels == ["Style", "Show", "Chains & assembly", "Edit layout", "Conservation & UniProt", "Layout file"]
+    sections = ["Style", "Show", "Chains & assembly", "Edit layout", "Conservation & UniProt", "Your data"]
+    assert labels == [*sections, "Layout file"]
     assert at.sidebar.caption[-1].value == CREDIT  # the credit closes it
 
 

@@ -2686,7 +2686,7 @@ def _data_entries(layout: Layout, look: Style, dmarks: list[dict]) -> list:
     data = getattr(layout, "residue_data", None)
     shown = dict.fromkeys(m["category"] for m in dmarks)
     return [
-        (("datum", colour, shape), f"{name}")
+        (("datum", colour, shape, name), f"{data.column}: {name}")  # the column named, as the colour bar names it
         for name, (colour, shape) in data_categories(layout).items()
         if name in shown
     ] or ([(DATA_BODY, f"{data.column}: no residue drawn has a value")] if data is not None else [])
@@ -2929,7 +2929,13 @@ INTERACTION_INK = {  # kind -> (colour, dash) of its lines (plan 13c-4). H-bonds
     "stack": ("#125129", (0, (1, 1.2))),  # dark green, dense dots
     "cation-pi": ("#093fe0", (0, (5, 1.5, 1, 1.5))),  # blue, dash-dot
     "hydrophobic": ("#5d5605", (0, (1, 3.5))),  # dark olive, sparse dots
+    # the researcher's crosslinks (plan 13d-6): solid plum within their span, dashed raspberry longer than it (the
+    # same CIEDE2000 search: >= 6 from every chain colour and >= 7.8 from the other inks, black loops included)
+    "xl": ("#6c306c", "-"),
+    "xl-over": ("#c04884", (0, (4, 1.6))),
 }
+XL_KINDS = ("xl", "xl-over")  # crosslinks: drawn whenever --crosslinks is given, every one (no cap), never faded
+XL_WIDTH = 1.4  # a crosslink line is this many interaction lines wide: the researcher's own data, read first
 INK_ONLY_PALETTES = ("greys", "blueprint")  # the print and blueprint themes: every kind in hbond_color, by dash only
 INTERACTION_NAMES = {  # kind -> its legend's name
     "hbond": "H-bonds",
@@ -2937,6 +2943,8 @@ INTERACTION_NAMES = {  # kind -> its legend's name
     "stack": "π-stacking",
     "cation-pi": "Cation-π",
     "hydrophobic": "Hydrophobic contacts",
+    "xl": "Crosslinks",
+    "xl-over": "Crosslinks longer than their span",
 }
 INTERACTION_FINDERS = {
     "salt": find_salt_bridges,
@@ -2992,6 +3000,7 @@ class InteractionOverlay(NamedTuple):
     kinds: tuple = ()  # KindOverlay of each other kind asked for, in interactions.KINDS order
     slots: dict = {}  # gid -> (place, count): a line's place among the kinds drawn between its pair, when count > 1
     dropped: tuple = ()  # interactions.verify_interactions texts of the found ones it flagged: not drawn
+    xl_unplaced: tuple = ()  # the researcher's crosslinks not drawn ("A:45 – B:3 (B:3 not drawn)"): an end not drawn
 
     def lines(self) -> list:
         """Every line drawn: the H-bonds', then each kind's."""
@@ -3008,6 +3017,8 @@ INTERACTION_ONE = {  # kind -> what one line of it is called (the hover, the MCP
     "stack": "π-stacking",
     "cation-pi": "Cation-π",
     "hydrophobic": "Hydrophobic contact",
+    "xl": "Crosslink",
+    "xl-over": "Crosslink longer than its span",
 }
 
 
@@ -3117,11 +3128,17 @@ def interaction_overlay(
     reading of the coordinates; one it flags is not drawn and is named in `dropped` (the figure's notes say so).
     At most `look.hbond_max` H-bond lines and `look.interaction_max` lines of each other kind, the shortest on the
     page kept (not the shortest in Å). H-bond lines keep their hbond: gids and draw as before plan 13c; the others'
-    gids are ia:<kind>:<a>-<b>."""
+    gids are ia:<kind>:<a>-<b>. The researcher's crosslinks (Layout.crosslinks, --crosslinks; plan 13d-6) are kinds
+    xl and xl-over (_crosslink_lines): every one drawn, whatever the look's interactions."""
     asked = interactions_of(look, layout.nucleic is not None)  # interactions=..., else the older hbonds=...
     wanted = [k for k in asked.kinds if kinds is None or k in kinds]
+    links = getattr(layout, "crosslinks", None) if kinds is None or "xl" in kinds else None
     if not wanted:
-        return InteractionOverlay(HBondOverlay([], 0))
+        if not links:
+            return InteractionOverlay(HBondOverlay([], 0))
+        locate, labels = _locator(layout, loops, sses, look)
+        parts, unplaced = _crosslink_lines(layout, locate, labels)
+        return InteractionOverlay(HBondOverlay([], 0), parts, _slots([], parts), (), unplaced)
     sel = asked.between
     if model is None:
         given = f"interactions={look.interactions}" if look.interactions != "off" else f"hbonds={look.hbonds}"
@@ -3140,11 +3157,79 @@ def interaction_overlay(
                 found[x.kind].append(x)
     hb = _hbond_lines(bonds, locate, look) if "hbond" in wanted else HBondOverlay([], 0)
     parts = tuple(_kind_lines(k, found[k], locate, labels, look) for k in wanted if k != "hbond")
+    unplaced: tuple = ()
+    if links:
+        more, unplaced = _crosslink_lines(layout, locate, labels)
+        parts += more
+    return InteractionOverlay(hb, parts, _slots(hb.lines, parts), tuple(text for _, text in failing), unplaced)
+
+
+def _slots(hbond_lines: list, parts: tuple) -> dict:
+    """gid -> (place, count) of each line sharing its residue pair with another kind's (InteractionOverlay.slots)."""
     pairs: dict[str, list[str]] = {}  # residue pair -> the gids drawn between it, in KINDS order
-    for line in [*hb.lines, *(line for part in parts for line in part.lines)]:
+    for line in [*hbond_lines, *(line for part in parts for line in part.lines)]:
         pairs.setdefault(line.gid.split(":", 2 if line.gid.startswith("ia:") else 1)[-1], []).append(line.gid)
-    slots = {gid: (k, len(gids)) for gids in pairs.values() if len(gids) > 1 for k, gid in enumerate(gids)}
-    return InteractionOverlay(hb, parts, slots, tuple(text for _, text in failing))
+    return {gid: (k, len(gids)) for gids in pairs.values() if len(gids) > 1 for k, gid in enumerate(gids)}
+
+
+class CrosslinkFound(NamedTuple):
+    """One crosslink of the researcher's file as a line's `found` holds it (an interactions.Interaction's fields):
+    its two residues' CA atoms, their distance in the structure (Å) and the span it was checked against."""
+
+    kind: str  # xl (within its span) or xl-over (longer)
+    a: tuple  # (chain, tag, "CA")
+    b: tuple
+    distance: float  # Cα–Cα in the structure (Å; nan when not measured)
+    angle: None
+    note: str  # "within its 30 Å span" / "longer than its 30 Å span"
+
+
+def _crosslink_lines(layout: Layout, locate, labels: dict) -> tuple[tuple, tuple]:
+    """(the crosslink parts, those not drawn): the researcher's crosslinks (Layout.crosslinks, measured Cα–Cα in
+    Layout.crosslink_ca) as lines between their residues' points, one per residue pair, gid ia:xl:<a>-<b>. A pair
+    whose Cα atoms lie further apart than its crosslinker spans (the row's distance, else userdata.CROSSLINK_SPAN)
+    is kind xl-over, drawn too (dashed, in its own ink), so the figure shows what the structure cannot explain; the
+    others are kind xl. Every crosslink is drawn: no cap. One with an end that is not drawn (a chain left out, outside
+    the focus) is named in the second item."""
+    from .userdata import CROSSLINK_SPAN, crosslink_name
+
+    links = list(layout.crosslinks)
+    lengths = list(getattr(layout, "crosslink_ca", None) or [])
+    lengths += [None] * (len(links) - len(lengths))
+    pairs: dict[str, list] = {}
+    unplaced = []
+    for link, length in zip(links, lengths):
+        (ca, ta), (cb, tb), span = link
+        span = span if span is not None else CROSSLINK_SPAN
+        a, b = (locate(labels[end]) if end in labels else None for end in (link[0], link[1]))
+        if a is None or b is None:
+            gone = [f"{c}:{t}" for (c, t), e in ((link[0], a), (link[1], b)) if e is None]
+            unplaced.append(f"{crosslink_name(link)} ({' and '.join(gone)} not drawn)")
+            continue
+        over = length is not None and length > span
+        note = f"{'longer than' if over else 'within'} its {span:g} Å span"
+        dist = float("nan") if length is None else float(length)
+        found = CrosslinkFound("xl-over" if over else "xl", (ca, ta, "CA"), (cb, tb, "CA"), dist, None, note)
+        a, b = sorted((a, b), key=lambda e: e[0])
+        gid = f"ia:xl:{a[0][1]}:{a[0][2]}{a[0][3]}-{b[0][1]}:{b[0][2]}{b[0][3]}"
+        pairs.setdefault(gid, [a, b, []])[2].append(found)
+    lines: dict[str, list] = {"xl": [], "xl-over": []}
+    for gid, (a, b, xs) in pairs.items():
+        length = float(np.hypot(a[1][0] - b[1][0], a[1][1] - b[1][1]))
+        if length <= 0:  # both ends drawn at one point (a chain's end stub)
+            unplaced.append(f"{crosslink_name((xs[0].a[:2], xs[0].b[:2], None))} (both ends at one point)")
+            continue
+        kind = "xl-over" if any(x.kind == "xl-over" for x in xs) else "xl"
+        residues = tuple(e[2] for e in (a, b) if e[2] is not None)
+        lines[kind].append(InteractionLine(kind, gid, (a[1], b[1]), length, tuple(xs), residues, (a[3], b[3])))
+    for kind in lines:
+        lines[kind].sort(key=lambda l: (l.length, l.gid))
+    with_unplaced = "xl" if lines["xl"] or not lines["xl-over"] else "xl-over"
+    parts = tuple(
+        KindOverlay(kind, lines[kind], len(lines[kind]), len(unplaced) if kind == with_unplaced else 0)
+        for kind in lines
+    )
+    return parts, tuple(unplaced)
 
 
 def _hbond_lines(bonds, locate, look: Style) -> HBondOverlay:
@@ -3231,7 +3316,7 @@ def _draw_lines(c: _Canvas, kind: str, lines: list, slots: dict, halos=None) -> 
     x0, y0, x1, y1 = c.content
     diag = float(np.hypot(x1 - x0, y1 - y0))
     colour, dash = interaction_ink(kind, c.look)
-    lw = c.loop_lw * 0.85
+    lw = c.loop_lw * 0.85 * (XL_WIDTH if kind in XL_KINDS else 1.0)
     hidden = []
     for line in lines:
         ends = line.ends
@@ -3250,7 +3335,7 @@ def _draw_lines(c: _Canvas, kind: str, lines: list, slots: dict, halos=None) -> 
             color=colour,
             lw=lw,
             ls=dash,
-            alpha=hbond_alpha(line.length, diag),
+            alpha=1.0 if kind in XL_KINDS else hbond_alpha(line.length, diag),
             solid_capstyle="butt",
             zorder=Z["hbond"],
         )
@@ -3272,8 +3357,17 @@ def _draw_interactions(c: _Canvas, overlay: InteractionOverlay) -> list[str]:
     text, not drawn (the figure's notes name them)."""
     if not overlay.kinds:
         return []
-    halos = turned_halos(c.ax, c.pt_per_unit, link_keep(c.loop_lw * 0.85, c.pt_per_unit, c.fig.dpi))
-    return [gid for part in overlay.kinds for gid in _draw_lines(c, part.kind, part.lines, overlay.slots, halos)]
+    halos = {
+        w: turned_halos(c.ax, c.pt_per_unit, link_keep(c.loop_lw * 0.85 * w, c.pt_per_unit, c.fig.dpi))
+        for w in dict.fromkeys(XL_WIDTH if part.kind in XL_KINDS else 1.0 for part in overlay.kinds)
+    }  # a crosslink, wider, keeps further off
+    return [
+        gid
+        for part in overlay.kinds
+        for gid in _draw_lines(
+            c, part.kind, part.lines, overlay.slots, halos[XL_WIDTH if part.kind in XL_KINDS else 1.0]
+        )
+    ]
 
 
 @dataclass
@@ -4410,11 +4504,12 @@ def _draw_legend(c: _Canvas, layout: Layout, legend: _Legend) -> None:
             c.ax.add_patch(ring)
             mark = data_symbol(colour[2], (x + 0.3, y), _DATA_MARK * 1.2)
             mark.set(facecolor=colour[1], edgecolor="none")
-            mark.set_gid(f"legend-datum:{text}")
+            mark.set_gid(f"legend-datum:{colour[3]}")
             c.ax.add_patch(mark)
         elif isinstance(colour, tuple) and colour[0] == "ia":  # an interaction kind: a short line, as drawn
             ink, dash = interaction_ink(colour[1], c.look)
-            (mark,) = c.ax.plot([x, x + 0.6], [y, y], color=ink, lw=c.loop_lw * 0.85, ls=dash)
+            wide = XL_WIDTH if colour[1] in XL_KINDS else 1.0
+            (mark,) = c.ax.plot([x, x + 0.6], [y, y], color=ink, lw=c.loop_lw * 0.85 * wide, ls=dash)
             mark.set_gid(f"legend-ia:{colour[1]}")
         elif isinstance(colour, tuple):  # a property ramp
             for q in range(6):

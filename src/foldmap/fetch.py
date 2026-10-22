@@ -22,6 +22,7 @@ AFDB_VERSION = 6  # AlphaFold DB model version to fetch
 AGENT = "foldmap (https://pypi.org/project/foldmap)"  # the AlphaFold DB refuses requests without a user agent
 STRUCTURE_SUFFIXES = (".cif", ".mmcif", ".pdb", ".ent")
 ALIGNMENT_SUFFIXES = (".fasta", ".fa", ".aln", ".sto", ".txt")
+TABLE_SUFFIXES = (".csv", ".tsv", ".txt")  # the researcher's data and crosslinks tables (userdata)
 UPLOAD_MAX_AGE = 24 * 3600  # seconds an uploaded file is kept in the cache
 MB = 1024 * 1024
 DOWNLOAD_MAX = 100 * MB  # bytes the app downloads at most (fetch max_bytes; 3J3Q, the largest entry, is 242 MB)

@@ -829,6 +829,139 @@ def store_alignment(ss: MutableMapping) -> None:
     ss.update(msa_error="", msa_path=str(target), msa_rows=rows, msa_uploaded=(str(target), upload_name(up.name)))
 
 
+TABLE_MAX = 5 * MB  # the data and crosslinks uploaders' cap, checked again before the file is kept or read
+DATA_HELP = (
+    "a table (.csv, .tsv or .txt) with chain, residue and value columns, e.g. chain,residue,uptake: numbers are "
+    "drawn as a stripe per residue along each element (Data drawn as: mean, one colour per element), words "
+    "(categories) as a mark on each residue · residue numbers as the structure file writes them (45, 100A)"
+)
+CROSSLINKS_HELP = (
+    "a table with chain1, residue1, chain2, residue2 and an optional distance, the crosslinker's span in Å (30 Å, "
+    "DSS/BS3, when not given): each crosslink is a solid line between its residues, dashed when its Cα–Cα distance "
+    "in the structure is longer than its span"
+)
+_NOT_VALUES = ("chain", "chainid", "chainname", "authasymid", "icode", "insertioncode", "inscode", "pdbxpdbinscode")
+
+
+def data_section(st, ss: MutableMapping) -> None:
+    """Your data: the researcher's per-residue values (with the column read) and crosslinks, each an upload read
+    against the structure as it is kept (a file none of whose rows names a residue is refused here, in words). What
+    was read is said under each; the rows not used, and crosslinks longer than their span, under the figure. The
+    uploads never enter the share link (it holds the structure's id and the theme only)."""
+    with st.expander("Your data", key="sec_data"):
+        st.file_uploader(
+            "Per-residue values",
+            type=upload_types("table"),
+            key="data_upload",
+            on_change=store_table,
+            args=(ss, "data"),
+            max_upload_size=TABLE_MAX // MB,
+            help=DATA_HELP,
+        )
+        if ss.get("data_error"):
+            st.error(shown(ss["data_error"]))
+        elif ss.get("data_path") and ss.get("data_read"):
+            st.caption(shown(ss["data_read"]))
+        if ss.get("data_path") and ss.get("data_columns"):
+            st.selectbox(
+                "Column",
+                listed(["", *ss["data_columns"]], ss.get("data_column")),
+                format_func=lambda c: c or "first column of numbers",
+                help="the column drawn: numbers as stripes or means, words as marks",
+                **setting(ss, "data_column"),
+            )
+        st.file_uploader(
+            "Crosslinks",
+            type=upload_types("table"),
+            key="crosslinks_upload",
+            on_change=store_table,
+            args=(ss, "crosslinks"),
+            max_upload_size=TABLE_MAX // MB,
+            help=CROSSLINKS_HELP,
+        )
+        if ss.get("crosslinks_error"):
+            st.error(shown(ss["crosslinks_error"]))
+        elif ss.get("crosslinks_path") and ss.get("crosslinks_read"):
+            st.caption(shown(ss["crosslinks_read"]))
+        for name in missing_tables(ss):
+            st.warning(f"The layout file's table {name} is not on this machine; upload it here.")
+
+
+def missing_tables(ss: MutableMapping) -> list[str]:
+    """A layout file's data or crosslinks tables that are not on this machine, as shown (hosted: never a path)."""
+    from foldmap.app import local_files
+
+    return [shown(p, paths=not local_files()) for p in ss.get("data_missing") or []]
+
+
+def table_columns(path) -> list[str]:
+    """The value columns of a data table: its header's names but the chain, residue, insertion-code and
+    residue-name columns."""
+    from foldmap.userdata import RESIDUE, RESNAME, _key, _rows
+
+    header, _, problems = _rows(path, "data")
+    if problems:
+        return []
+    skip = {*_NOT_VALUES, *RESIDUE, *RESNAME}
+    return [h for h in header if h.strip() and _key(h) not in skip]
+
+
+def store_table(ss: MutableMapping, kind: str) -> None:
+    """The data (`kind` "data") or crosslinks uploader's callback: the table, size-capped, kept (fetch.keep_upload)
+    and read against the structure drawn (userdata, as the command line reads --data and --crosslinks): a fatal
+    problem is said (`<kind>_error`) and the table not used; else `<kind>_path` is set, with a line saying what was
+    read and (data) the value columns for the Column picker. Data loaded colour the figure by them when the theme
+    colours by chain (app.data_colouring), as on the command line."""
+    from foldmap.app import data_colouring
+    from foldmap.fetch import TABLE_SUFFIXES, keep_upload
+    from foldmap.io import load_backbone
+    from foldmap.userdata import read_crosslinks, read_residue_data, summary
+
+    ss["last_changed"] = f"{kind}_path"
+    up = ss.get(f"{kind}_upload")
+    clear = {f"{kind}_path": "", f"{kind}_read": "", f"{kind}_error": ""}
+    if kind == "data":
+        clear.update(data_columns=[], data_column="")
+    if up is None:
+        ss.update(clear)
+        data_colouring(ss)
+        return
+    name = upload_name(up.name)
+    if wrong_upload(up.name, "table"):
+        ss.update({**clear, f"{kind}_error": wrong_upload(up.name, "table")})
+        data_colouring(ss)
+        return
+    target = None
+    try:
+        data = up.getvalue()
+        if len(data) > TABLE_MAX:
+            raise ValueError(f"{name}: a table is at most {TABLE_MAX // MB} MB")
+        target = keep_upload(up.name, data, TABLE_SUFFIXES)
+        bb = load_backbone(ss["path"], ss.get("assembly") or "auto")
+        if kind == "data":
+            values, problems = read_residue_data(target, None, bb)
+            said = summary(values, None, name)
+        else:
+            links, problems = read_crosslinks(target, bb)
+            said = summary(None, links, crosslinks=name)
+        fatal = next((p for p in problems if p.fatal), None)
+        if fatal is not None:
+            raise ValueError(f"{name}: {fatal.text}")
+    except (ValueError, OSError) as err:
+        text = str(err) if isinstance(err, ValueError) else "the table could not be stored; try again"
+        ss.update({**clear, f"{kind}_error": text.replace(str(target), name) if target else text})
+        data_colouring(ss)
+        return
+    unused = sum(1 for p in problems if not p.fatal)
+    line = said[0].split(": ", 1)[-1] if said else ""
+    line += f"; {unused} row{'s' if unused > 1 else ''} not used (named under the figure)" if unused else ""
+    ss.update({**clear, f"{kind}_path": str(target), f"{kind}_read": line, f"{kind}_uploaded": (str(target), name)})
+    if kind == "data":
+        ss["data_columns"] = table_columns(target)
+    ss["data_missing"] = []
+    data_colouring(ss)
+
+
 def contact_lines(report: dict | None, most: int = 10) -> list[str]:
     """The contacts check under the figure: the count line, then one line per problem (at most `most`, then how
     many more). Only the first line is the app's own: the others name the file's residues, so the caller shows them

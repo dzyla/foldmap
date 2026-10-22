@@ -9,7 +9,7 @@ import pytest
 
 pytest.importorskip("streamlit")
 
-from app_helpers import DATA, app_test, opened, rendered_text, seed_cache, visible  # noqa: E402
+from app_helpers import DATA, app_test, opened, rendered_text, seed_cache, svg_of, visible  # noqa: E402
 
 
 @pytest.fixture
@@ -96,3 +96,59 @@ def test_kept_uploads_are_named_by_content_and_a_whitelisted_suffix(monkeypatch,
         kept = fetch.keep_upload(name, b"data_x\n")
         assert kept.parent == tmp_path / "uploads" and kept.name[:7] == "upload-" and len(kept.name) <= 23
         assert kept.suffix in fetch.STRUCTURE_SUFFIXES
+
+
+DDG = b"chain,residue,ddG,site\nA,3,0.5,core\nA,30,-1.2,rim\nA,999,1,core\n"
+XL = b"chain1,residue1,chain2,residue2,distance\nA,6,A,48,\nA,1,A,72,5\n"
+
+
+def test_a_data_upload_draws_what_the_command_line_draws(monkeypatch, tmp_path, capsys):
+    """Your data: the per-residue values and the crosslinks uploaded draw the same SVG as `foldmap plot --data
+    --crosslinks` on those files; Colour by offers data only once data are loaded (and turns to it, as the command
+    line does); the rows not used and the crosslink longer than its span are said under the figure, each table named
+    as uploaded; the share link holds the id and theme only."""
+    from foldmap.app_views import figure_card
+    from foldmap.cli import main
+
+    monkeypatch.setenv("FOLDMAP_APP_LOCAL_FILES", "1")
+    seed_cache(monkeypatch, tmp_path, "1UBQ")
+    at = opened("1UBQ")
+    assert "data" not in at.selectbox(key="color_by").options
+    at.file_uploader(key="data_upload").set_value(("my ddG.csv", DDG, "text/csv")).run()
+    at.file_uploader(key="crosslinks_upload").set_value(("xl.csv", XL, "text/csv")).run()
+    ss = at.session_state
+    assert not at.exception and ss["color_by"] == "data" and "data" in at.selectbox(key="color_by").options
+    assert ss["data_read"] == "column ddG (numbers) on 2 residues; 1 row not used (named under the figure)"
+    assert ss["crosslinks_read"] == "2 crosslinks" and at.selectbox(key="data_column").options == [
+        "first column of numbers",
+        "ddG",
+        "site",
+    ]
+    out = tmp_path / "cli.svg"
+    args = ["plot", str(tmp_path / "1UBQ.cif"), "-o", str(out), "--data", ss["data_path"]]
+    assert main([*args, "--crosslinks", ss["crosslinks_path"]]) == 0
+    capsys.readouterr()
+    cli = out.read_text(encoding="utf-8")
+    assert svg_of(at).count('id="ia:xl:') == 2 and svg_of(at) == figure_card(
+        cli[cli.index("<svg") :], "#ffffff", "1UBQ"
+    )
+    said = visible(next(w.value for w in at.warning if "Your data" in w.value))
+    assert "--data my ddG.csv row 4: chain A has no residue 999" in said and "longer than its 5 Å span" in said
+    assert ss["data_path"] not in said and set(at.query_params) == {"id", "theme"}  # uploads never enter the link
+    at.selectbox(key="data_column").select("site").run()
+    assert not at.exception and 'id="data:A:3"' in svg_of(at)  # categories: marks
+    at.file_uploader(key="data_upload").set_value(None).run()
+    assert not at.exception and ss["color_by"] == "chain" and "data" not in at.selectbox(key="color_by").options
+
+
+def test_a_data_upload_that_names_no_residue_is_refused_in_words(monkeypatch, tmp_path):
+    monkeypatch.setenv("FOLDMAP_APP_LOCAL_FILES", "0")
+    seed_cache(monkeypatch, tmp_path, "1UBQ")
+    at = opened("1UBQ")
+    at.file_uploader(key="data_upload").set_value(("bad.csv", b"chain,residue,x\nA,900,1\n", "text/csv")).run()
+    ss = at.session_state
+    assert not at.exception and ss["data_path"] == "" and ss["color_by"] == "chain"
+    assert ss["data_error"].startswith("bad.csv: no row names a residue of the structure")
+    assert "data" not in at.selectbox(key="color_by").options
+    at.file_uploader(key="crosslinks_upload").set_value(("xl.sh", XL, "text/csv")).run()
+    assert ss["crosslinks_error"] == "xl.sh is not a table: upload a .csv, .tsv or .txt file."

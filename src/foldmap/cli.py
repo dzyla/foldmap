@@ -874,14 +874,19 @@ def make_layout(
     )
     lay.cyclic_assembly = offered
     if user is not None:  # the researcher's data (plan 13d): Layout's defaults (none) when not given
+        from .userdata import crosslink_lengths, crosslink_problems
+
         values, links, problems = user
         drawn = {l.chain for l in bb.labels}
         if focus_chains:
             drawn &= set(focus_chains) | set(partial)
         notes = _left_out(values, links, drawn, data, crosslinks)
+        lengths = crosslink_lengths(links or [], read_bb)  # Cα–Cα on the structure: the span check, the drawing
+        notes += crosslink_problems(links or [], lengths, crosslinks, drawn)
         for note in notes:
             print(f"foldmap: warning: {note}", file=sys.stderr)
         lay.residue_data, lay.crosslinks, lay.data_problems = values, list(links or []), [*problems, *notes]
+        lay.crosslink_ca = lengths
     if msa:
         from .sequence import grades, is_consurf, read_alignment, read_consurf, residue_conservation
 

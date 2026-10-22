@@ -375,6 +375,7 @@ def draw_job(path, settings_json: str, eager_after: float | None = None) -> dict
         "chain_count": len(chains_of(drawn)),  # what the summary counts: protein and nucleic-acid chains
         "domains_note": stale_domains_note(spec.domains, drawn.sses),  # a layout file's stale ids, dropped
         "provenance": drawn.provenance,  # how it was made: the list under the figure (provenance)
+        "data_problems": [str(p) for p in drawn.layout.data_problems],  # your data: rows not used, notes
         "scope": drawn_scope(drawn.model, drawn.layout, spec.assembly, spec.focus),  # what auto choices left out
         "seconds": seconds,
         "files": files,
@@ -460,6 +461,9 @@ CONTACT_KEYS = (
     "color_by",
     "msa_path",
     "msa_reference",
+    "data_path",
+    "data_column",
+    "crosslinks_path",
     "domains",
     "uniprot",
     "uniprot_domains",

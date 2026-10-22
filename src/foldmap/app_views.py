@@ -161,6 +161,8 @@ def figure_view(ws: Workspace) -> None:
         if result and result.get("domains_note"):  # as the command line warns
             note = result["domains_note"]
             st.warning(shown(f"{note[0].upper()}{note[1:]}. {DOMAINS_EDIT}"))
+        if result and result.get("data_problems"):  # your data: rows not used, crosslinks longer than their span
+            st.warning(data_problems_text(ss, result["data_problems"]))
         missing_files(ws)
         if ss.get("check_contacts") and ss.get("na_chains"):
             contacts_check(ws, good["blob"])
@@ -168,6 +170,27 @@ def figure_view(ws: Workspace) -> None:
 
 DOMAINS_EDIT = "Edit Domains to remove them; an edit there checks every range."  # the layout file's domains are
 # read leniently only while unchanged (app.layout_options)
+
+
+DATA_SAID = 20  # data warnings listed under the figure (the command line's SAID_ROWS), then how many more
+
+
+def data_problems_text(ss, problems: list[str]) -> str:
+    """What the figure's notes say of the researcher's tables (Layout.data_problems), one line each (at most
+    DATA_SAID, then how many more), each table named as uploaded, never by its kept path."""
+    from foldmap.app import local_files
+
+    names = uploads_of(ss)
+
+    def own(text: str) -> str:
+        for kept, name in names.items():
+            text = text.replace(kept, name)
+        return shown(text, paths=not local_files())
+
+    lines = [own(t) for t in problems[:DATA_SAID]]
+    if len(problems) > DATA_SAID:
+        lines.append(f"… and {len(problems) - DATA_SAID} more")
+    return "Your data:  \n" + "  \n".join(lines)
 
 
 def missing_files(ws: Workspace) -> None:
@@ -411,8 +434,10 @@ UPLOADS_NOTE = (
 
 
 def uploads_of(ss: MutableMapping) -> dict[str, str]:
-    """Kept path -> uploaded name of this structure's uploads that a layout file names (names file, alignment)."""
-    return dict(v for v in (ss.get("names_uploaded"), ss.get("msa_uploaded")) if v)
+    """Kept path -> uploaded name of this structure's uploads that a layout file names (names file, alignment, data and
+    crosslinks tables)."""
+    kept = ("names_uploaded", "msa_uploaded", "data_uploaded", "crosslinks_uploaded")
+    return dict(v for v in (ss.get(k) for k in kept) if v)
 
 
 def layout_yaml(path, blob: str, uploads: dict[str, str] | None = None) -> bytes:

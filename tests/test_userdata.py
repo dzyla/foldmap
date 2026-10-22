@@ -315,7 +315,10 @@ def test_values_on_chains_the_figure_leaves_out_are_noted(tmp_path, capsys):
     assert notes[f"--data {path}"] == (
         "chain B's values (1 residue) are not drawn: the figure leaves chain B out (--chains, --focus)"
     )
-    assert notes[f"--crosslinks {xl}"] == "1 crosslink reaches a chain the figure leaves out (B; --chains, --focus)"
+    assert [p.text for p in lay.data_problems if p.where == f"--crosslinks {xl}"] == [
+        "1 crosslink reaches a chain the figure leaves out (B; --chains, --focus)",
+        "crosslink A:10 – B:10: Cα–Cα 32.4 Å, longer than its 30 Å span",  # measured all the same; not drawn
+    ]
     assert f"foldmap: warning: --data {path}: chain B's values" in capsys.readouterr().err
     lay, _, _ = make_layout(hb, data=str(path), assembly="asu")  # every chain drawn: nothing to note
     assert lay.data_problems == []

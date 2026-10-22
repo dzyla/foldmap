@@ -494,7 +494,8 @@ a `chain` column, a `residue` column (the number as the structure file writes it
 one (empty, `NA` and `NaN` cells are empty), else categories. With one protein chain the chain column may be left
 out. An optional `resname` (or `aa`) column, `ALA` or `A`, is checked against the structure, so a file numbered
 another way (`label_seq_id`, a construct's numbering) is caught where the residue names differ. A crosslinks file
-has `chain1`, `residue1`, `chain2`, `residue2` (or `chain_a` … `residue_b`) and an optional `distance`.
+has `chain1`, `residue1`, `chain2`, `residue2` (or `chain_a` … `residue_b`) and an optional `distance`: the
+crosslinker's span, the most Cα–Cα distance (Å) it bridges (30 Å, the usual limit for DSS and BS3, when not given).
 
 Every row is checked against the structure, and each one not used is named with its row number (the file's line
 number: a header on the first line is row 1): a chain the structure lacks, a residue its chain lacks (with the chain's
@@ -517,15 +518,30 @@ the column's name and range ("uptake: 0.12 → 0.95"), and "no value" when grey 
 draws them; `--set loop_color=residue` colours each loop residue by its value too. A column of words (categories)
 is drawn as a mark on each residue that has one (on its element or loop, where disulfide ends stand), one
 colour-blind-safe colour per category (a new shape after seven), over grey elements; the legend shows each mark.
-`foldmap check` judges each mark at its residue (S4). `foldmap sequence --data FILE.csv [--data-column NAME]`
-draws the same stripes and marks on its track. Crosslinks are read and checked; drawing them comes next (plan
-13d-6).
+`foldmap check` judges each mark at its residue (S4), and a text standing on a mark is a collision (A6). The legend
+names the column ("site: core"). `foldmap sequence --data FILE.csv [--data-column NAME]` draws the same stripes and
+marks on its track.
+
+**Drawing the crosslinks.** Each crosslink is a line between its two residues (where residue marks stand), in solid
+plum, every one drawn (no cap). Each is measured on the structure, Cα to Cα: one longer than its span (the row's
+`distance`, else 30 Å) is drawn all the same, dashed in raspberry, and a warning names it ("crosslink A:7 – D:120:
+Cα–Cα 50.9 Å, longer than its 30 Å span"), so the figure shows what the structure cannot explain rather than
+hiding it. The legend counts both ("Crosslinks (11)", "Crosslinks longer than their span (2)"). A crosslink with an
+end the figure does not draw (a chain left out) is named in the figure's notes. On the interactive page a
+crosslink's line shows its residues, distance and span on hover.
+
+In the app, **Your data** takes both tables as uploads (read against the structure at once: a table none of whose
+rows names a residue is refused there, in words), with a Column picker; Colour by offers `data` once values are
+loaded. The rows not used, and crosslinks longer than their span, are listed under the figure. Uploads never enter
+the share link. The MCP server's `draw_topology` takes `data_path`, `data_column` and `crosslinks_path` (its result
+lists `data_problems`; a table that names no residue is an error result), and `draw_sequence` takes the first two.
 
 ```bash
 foldmap plot 1UBQ -o ubq.svg --data hdx.csv --set loop_color=residue   # stripes, loops too
 foldmap plot 1UBQ -o ubq.svg --data ddg.csv --set data_style=mean      # one colour per element
 foldmap plot 2HHB -o hb.svg --data sites.csv --data-column site          # categories as residue marks
 foldmap sequence 1UBQ -o ubq-seq.svg --data hdx.csv
+foldmap plot 2HHB -o hb.svg --crosslinks xl.csv                       # crosslinks, checked against their span
 ```
 
 ### Conventions of the published figures
