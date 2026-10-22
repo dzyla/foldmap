@@ -631,10 +631,13 @@ def test_hbond_figures_are_byte_identical_to_those_before_the_overlay(name, tmp_
 
     import matplotlib
 
+    from foldmap import figcheck
     from foldmap.cli import main
 
     if matplotlib.__version__ != _TODAY["matplotlib"]:
         pytest.skip(f"recorded with matplotlib {_TODAY['matplotlib']}")
+    if reason := figcheck.ink_font_reason(_drawn(name, "hbonds=na")[0]):
+        pytest.skip(f"recorded with the text in {figcheck.INK_FONT}: {reason}")
     out = tmp_path / f"{name}.svg"
     assert main(["plot", str(_path(name)), "--set", "hbonds=na", "-o", str(out)]) == 0
     assert hashlib.sha256(out.read_bytes()).hexdigest() == _TODAY[name]

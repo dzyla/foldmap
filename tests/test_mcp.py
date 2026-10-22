@@ -560,7 +560,7 @@ def test_draw_topology_takes_your_data_and_crosslinks_and_says_their_problems(tm
     assert not r.is_error
     bad = tmp_path / "bad.csv"
     bad.write_text("chain,residue,ddG\nA,900,1\n", encoding="utf-8")
-    with pytest.raises(ToolError, match=f"--data {bad}: no row names a residue of the structure"):
+    with pytest.raises(ToolError, match=re.escape(f"--data {bad}: no row names a residue of the structure")):
         call("draw_topology", {"source": UBQ, "output_path": str(tmp_path / "x.svg"), "data_path": str(bad)})
     with pytest.raises(ToolError, match="needs data"):
         call("draw_topology", {"source": UBQ, "output_path": str(tmp_path / "x.svg"), "data_column": "ddG"})
