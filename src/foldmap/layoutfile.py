@@ -8,7 +8,8 @@ re-rendered later, after the model changes, or shared.
     theme: trace
     style: {residue_numbers: true}    # only what differs from the theme
     layout: {mode: projected, rotate: 0, symmetry: auto, assembly: auto,
-             like: {structure: 2HHB, chain: B, match: auto}}   # --like, the reference as given
+             like: {structure: 2HHB, chain: B, match: auto},   # --like, the reference as given
+             data: hdx.csv, data_column: uptake, crosslinks: xl.csv}   # the researcher's files (userdata), as given
     names: [deposited, my-names.yaml]  # --names, as given
     edits:
       rename: {res:A:167-182: Gd}
@@ -54,6 +55,9 @@ LAYOUT = (
     "focus",
     "uniprot",
     "like",
+    "data",
+    "data_column",
+    "crosslinks",
 )
 EDITS = ("rename", "swap", "move")
 

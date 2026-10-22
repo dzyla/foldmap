@@ -419,6 +419,24 @@ def _na_extent(na, extent: str):
     return na, False
 
 
+def _read_user_data(data, column, crosslinks, bb, na_chains):
+    """userdata.read_user_data for make_layout: the warnings (each row not used) printed to standard error, then the
+    first fatal problem raised as a BadReference (exit 2, before layout), else one line saying what was read from
+    each file."""
+    from .userdata import read_user_data, summary
+
+    values, links, problems = read_user_data(data, column, crosslinks, bb, na_chains=na_chains)
+    for problem in problems:
+        if not problem.fatal:
+            print(f"foldmap: warning: {problem}", file=sys.stderr)
+    for problem in problems:
+        if problem.fatal:
+            raise BadReference(problem)
+    for line in summary(values, links, data, crosslinks):
+        print(f"foldmap: {line}", file=sys.stderr)
+    return values, links, problems
+
+
 def make_layout(
     path,
     mode: str = "projected",
@@ -446,6 +464,9 @@ def make_layout(
     names: list[str] | None = None,
     like: dict | None = None,
     like_out: dict | None = None,
+    data: str | None = None,
+    data_column: str | None = None,
+    crosslinks: str | None = None,
 ):
     """`names` (--names): conventional names, each `deposited`, `beta` or a YAML file (names.apply_names), applied
     over the generic labels in order; `rename` wins over all of them. `like` (--like, plan 13a): drawn like a
@@ -455,7 +476,11 @@ def make_layout(
     the note saying why. `like_out` (a dict, foldmap compare, foldmap check's H1-H5): given what the reference gave,
     as far as it got: reference ((layout, sses, bb, model, chain) of the reference laid out, or None), alignment
     (align.ChainAlignment or None), mates (align.Mates or None), like (the like.Like this layout took, or None:
-    drawn on its own) and refused (True when drawn on its own as not the reference's fold, the note saying so: H1)."""
+    drawn on its own) and refused (True when drawn on its own as not the reference's fold, the note saying so: H1).
+    `data`, `data_column`, `crosslinks` (--data, --data-column, --crosslinks; plan 13d): the researcher's tables,
+    read on every protein chain (userdata) after the references are checked: a file that cannot be read is a
+    BadReference before layout, each row not used a warning on standard error; what was read is kept on the layout
+    (residue_data, crosslinks, data_problems), set only when a file is given."""
     for spec in names or []:
         check_spec(spec)
     model = model or read_model(path, assembly)  # once, for every loader below (`model`: already read, same assembly)
@@ -477,6 +502,7 @@ def make_layout(
     sses = build_sses(bb, dssp.ss, short_helices=(look or Style()).helices_310, bridges=dssp.bridges, matched=matched)
     sheets = build_sheets(sses, dssp.bridges)
     nucleic = load_nucleic(path, bb, assembly, model=model) if dna else None
+    na_chains = list(dict.fromkeys(st.chain for st in nucleic.strands)) if nucleic is not None else []
     if chains:
         held = list(dict.fromkeys(st.chain for st in nucleic.strands)) if nucleic is not None else []
         missing = [c for c in chains if c not in present and c not in held]
@@ -540,6 +566,7 @@ def make_layout(
     for problem in check_references(refs, read_bb, drawn=kept):
         if problem.fatal:  # the warnings were said where the spec was read (_spec_of, the app, the MCP server)
             raise BadReference(problem)
+    user = _read_user_data(data, data_column, crosslinks, read_bb, na_chains) if data or crosslinks else None
     mem = None
     up_from_membrane = False  # `up` set by the membrane (its normal), not asked for: the cyclic note says so
     if membrane not in ("off", None):
@@ -808,6 +835,8 @@ def make_layout(
         sym is not None and sym.kind == "C" and sym.n == 2 and len(sym.protomers) == 2 and not duplex
     )
     lay.cyclic_assembly = offered
+    if user is not None:  # the researcher's data (plan 13d): set only when given, so a figure without is as before
+        lay.residue_data, lay.crosslinks, lay.data_problems = user
     if msa:
         from .sequence import grades, is_consurf, read_alignment, read_consurf, residue_conservation
 
@@ -935,7 +964,7 @@ def _drawn_like(
     first = not any(c in present for c in named or []) and len(present) > 1  # chosen, not named: the note says so
     if uncarried is not None:  # this figure's own frame: drawn on its own
         return alone(uncarried_note(name, uncarried, mine=True))
-    kw.update(chains=[chain_a], like=None)
+    kw.update(chains=[chain_a], like=None, data=None, data_column=None, crosslinks=None)  # the data are this figure's
     lay_a, sses_a, bb_a = make_layout(ref, *args, model=model, **kw)
     reference = (lay_a, sses_a, bb_a, model, chain_a)
     if lay_a.uncarried is not None:  # the reference's frame (a stack, a straight duplex)
@@ -1454,6 +1483,8 @@ def _spec_of(args) -> FigureSpec:
         domains = _domain_spec(args.domain)
     except ValueError as err:  # --domain N= : a usage error, as a reference that cannot be drawn is
         raise UsageError(f"error: {err}") from None
+    if args.data_column and not args.data and not args.layout_file:
+        raise UsageError("error: --data-column needs --data FILE.csv (the table it is a column of)")
     spec = figure_spec(
         args.structure,
         theme=args.theme,
@@ -1483,6 +1514,9 @@ def _spec_of(args) -> FigureSpec:
         move=edits["move"],
         names=args.names,
         like=_like_of(args),
+        data=args.data,
+        data_column=args.data_column,
+        crosslinks=args.crosslinks,
     )
     for problem in check_references(spec):  # pass 1, before the structure is read (Q-A19); make_layout does pass 2
         if problem.fatal:
@@ -1790,6 +1824,23 @@ def build_parser() -> argparse.ArgumentParser:
         )
         q.add_argument("--msa-reference", metavar="NAME", help="alignment row that is the structure (default: best)")
         q.add_argument(
+            "--data",
+            metavar="FILE.csv",
+            help="your own per-residue values: a table with chain, residue (45, 100A) and value columns; every row "
+            "that names no residue of the structure is said with its row number",
+        )
+        q.add_argument(
+            "--data-column",
+            metavar="NAME",
+            help="the --data column to read (default: its first column of numbers); a column that is not all "
+            "numbers is read as categories",
+        )
+        q.add_argument(
+            "--crosslinks",
+            metavar="FILE.csv",
+            help="crosslinks: a table with chain1, residue1, chain2, residue2 and an optional distance column",
+        )
+        q.add_argument(
             "--up", metavar="X,Y,Z", help="3D direction to put at the top of the page (e.g. a membrane normal)"
         )
         q.add_argument("--view", metavar="X,Y,Z", help="3D direction pointing at the viewer")
@@ -1865,6 +1916,9 @@ _DATA_DEFAULTS = {
     "like_chain": None,
     "like_match": None,
     "like_layout": None,
+    "data": None,
+    "data_column": None,
+    "crosslinks": None,
 }
 
 

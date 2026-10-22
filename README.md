@@ -478,6 +478,33 @@ those of the figure drawn with the same options. `--sections` keeps some of the 
 standard output). The format is versioned (`"foldmap_data": 1`); keys are sorted, lists come in a fixed order and
 numbers are rounded to 0.001, so the same structure and options give the same bytes.
 
+### Your own data
+
+`plot` (and `interactive`, `check`, `contacts`) reads your own per-residue values and crosslinks:
+
+```bash
+foldmap plot 1UBQ -o ubq.svg --data hdx.csv                       # its first column of numbers
+foldmap plot 1UBQ -o ubq.svg --data hdx.csv --data-column site    # a named column; words are categories
+foldmap plot 2HHB -o hb.svg --crosslinks xl.csv
+```
+
+A data file is a table (comma, tab or semicolon separated; lines starting `#` before the header are skipped) with
+a `chain` column, a `residue` column (the number as the structure file writes it, with its insertion code: `45`,
+`-7`, `100A`; or the code in an `icode` column) and value columns. A column is numbers when every non-empty cell is
+one (empty, `NA` and `NaN` cells are empty), else categories. With one protein chain the chain column may be left
+out. An optional `resname` (or `aa`) column, `ALA` or `A`, is checked against the structure, so a file numbered
+another way (`label_seq_id`, a construct's numbering) is caught where the residue names differ. A crosslinks file
+has `chain1`, `residue1`, `chain2`, `residue2` (or `chain_a` … `residue_b`) and an optional `distance`.
+
+Every row is checked against the structure, and each one not used is named with its row number (the file's line
+number: a header on the first line is row 1): a chain the structure lacks, a residue its chain lacks (with the chain's
+numbering), a residue named otherwise, a cell that is no residue number, a residue given twice. A file whose header
+lacks a needed column (a file with no column of numbers and no `--data-column` names its columns), or none of whose
+rows names a residue of the structure, is an error before anything is laid out (exit 2). A chain an assembly drew
+as copies (`A1`, `A2`) takes its deposited chain's rows on every copy, and a warning says so; a crosslink between
+two such chains joins the copies of one number (`A1`-`B1`). `--save-layout` keeps the file paths and the column.
+Drawing the values and crosslinks comes next (plan 13d-5, 13d-6); for now they are read and checked.
+
 ### Conventions of the published figures
 
 foldmap follows the conventions of the hand-drawn topology figures readers know (Richardson 1981, the TIM and

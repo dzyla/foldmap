@@ -50,6 +50,11 @@ class FigureSpec:
     names: list[str] = field(default_factory=list)  # --names: deposited, beta or YAML files, later ones winning
     # --like: drawn like a reference, {structure, chain, match, layout} (cli.make_layout's like); None: on its own
     like: dict | None = None
+    # the researcher's own data (plan 13d, userdata): a per-residue table, the column read (None: its first of
+    # numbers) and a crosslinks table; paths as given
+    data: str | None = None
+    data_column: str | None = None
+    crosslinks: str | None = None
 
     def layout_kwargs(self, edits: bool = True) -> dict:
         """Keyword arguments for cli.make_layout after (path, mode, rotate, flip_v)."""
@@ -71,6 +76,9 @@ class FigureSpec:
             "focus": self.focus,
             "names": list(self.names),  # not an edit: the user's renames are written for the names
             "like": dict(self.like) if self.like else None,
+            "data": self.data,
+            "data_column": self.data_column,
+            "crosslinks": self.crosslinks,
         }
         if edits:
             kw.update(self.edits())
@@ -186,6 +194,7 @@ def figure_spec(
         focus=str(pick("focus")),
         names=names,
         like=parse_like(pick("like")),
+        **_user_data(pick("data"), pick("data_column"), pick("crosslinks")),
         **edits,
     )
 
@@ -214,6 +223,19 @@ def parse_like(value) -> dict | None:
     if out["structure"] is None:
         raise ValueError("like: structure (the reference, a file or PDB id) is required")
     out["match"] = out["match"] or "auto"
+    return out
+
+
+def _user_data(data, column, crosslinks) -> dict:
+    """FigureSpec's data, data_column and crosslinks (paths and a column name as text; a number YAML read stays a
+    name), checked: a column needs its data file."""
+    out = {}
+    for key, value in (("data", data), ("data_column", column), ("crosslinks", crosslinks)):
+        if value is not None and (isinstance(value, bool) or not isinstance(value, (str, int, float))):
+            raise ValueError(f"{key} is text (a file path or a column name); got {layoutfile._brief(value)}")
+        out[key] = str(value) if value is not None else None
+    if out["data_column"] is not None and out["data"] is None:
+        raise ValueError(f"data_column {out['data_column']!r} needs data (--data FILE.csv): the file it is a column of")
     return out
 
 
@@ -517,9 +539,8 @@ def layout_document(spec: FigureSpec, structure_name: str | None = None, drawn: 
     if drawn is not None and not any(spec.edits().values()):
         layout, sses = drawn.layout, drawn.sses
     else:
-        layout, sses, _ = make_layout(
-            spec.structure, spec.mode, spec.rotate, spec.flip_v, **spec.layout_kwargs(edits=False)
-        )
+        kw = {**spec.layout_kwargs(edits=False), "data": None, "data_column": None, "crosslinks": None}  # read once
+        layout, sses, _ = make_layout(spec.structure, spec.mode, spec.rotate, spec.flip_v, **kw)
     return layoutfile.document(
         structure_name or str(spec.structure),
         spec.theme,
