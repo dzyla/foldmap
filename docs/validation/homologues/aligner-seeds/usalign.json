@@ -1,0 +1,3818 @@
+{
+ "about": "scripts/homologues.py align --usalign at 28ab8e2: foldmap's structure route (align_chains, match 'structure') against US-align 20241108 (`USalign A.pdb B.pdb -mol prot -mm 0 -ter 2`) on the same residues (each chain's C\u03b1 as foldmap reads it, --assembly asu). TM-scores normalised by A's chain (US-align: by Structure_1, A; d0 of A's length, as foldmap's). US-align's pairs: every column of its alignment holding a residue of both. Limits where US-align's TM >= 0.5: foldmap's TM within 0.05, and >= 85% of US-align's pairs reproduced within \u00b11 residue (13a-3).",
+ "measured_at": "28ab8e2",
+ "sets": {
+  "heldout": [
+   {
+    "aligned": 101,
+    "extras": 1,
+    "identity": 0.5149,
+    "kind": "positive",
+    "length_a": 107,
+    "length_b": 118,
+    "mates": 5,
+    "method": "sequence",
+    "only_a": 0,
+    "pair": "1CO6_A-1JDL_A",
+    "pieces": 0,
+    "rmsd": 2.1914,
+    "same_fold": true,
+    "stratum": "close",
+    "tm_score": 0.8218,
+    "usalign": {
+     "agreement": {
+      "close_within_1": 1.0,
+      "exact": 1.0,
+      "foldmap_pairs_in_usalign": 1.0,
+      "within_1": 1.0
+     },
+     "auto": {
+      "method": "sequence",
+      "tm_score": 0.8218,
+      "within_1": 0.8812
+     },
+     "disagreements": [],
+     "limits": {
+      "applies": true,
+      "pairs": true,
+      "tm": true,
+      "verdict": "pass"
+     },
+     "rows": {
+      "foldmap": [
+       "QDAASGEQVFKQCLVCHSIGPGAKNKVGPVLNGLFGRHSGTIEGFAYSDANKNS--G-ITWTEEVFREYIRDPKAKIP--------------GTKMIFAGVKDEQKVSDLIAYIKQFNADGSKK",
+       "GDPAKGEAVFKKCMACHRVGPDAKNLVGPALTGVIDRQAGTAPGFNYSAINHAAGEAGLHWTPENIIAYLPDPNAFLRKFLADAGHAEQAKGSTKMVF-KLPDEQERKDVVAYLKQFS-----P"
+      ],
+      "usalign": [
+       "QDAASGEQVFKQCLVCHSIGPGAKNKVGPVLNGLFGRHSGTIEGFAYSDANKNS--G-ITWTEEVFREYIRDPKAKIP--------------GTKMIFAGVKDEQKVSDLIAYIKQFNADGSKK",
+       "GDPAKGEAVFKKCMACHRVGPDAKNLVGPALTGVIDRQAGTAPGFNYSAINHAAGEAGLHWTPENIIAYLPDPNAFLRKFLADAGHAEQAKGSTKMVF-KLPDEQERKDVVAYLKQFS-----P"
+      ]
+     },
+     "structure": {
+      "aligned": 101,
+      "rmsd": 1.2382,
+      "tm_score": 0.883
+     },
+     "tm_difference": -0.0001,
+     "usalign": {
+      "aligned": 101,
+      "aligned_reported": 101,
+      "close": 100,
+      "foldmap_tm_of_its_pairs": 0.883,
+      "rmsd": 1.24,
+      "tm_a": 0.8831,
+      "tm_b": 0.8051,
+      "version": "20241108"
+     }
+    }
+   },
+   {
+    "aligned": 188,
+    "extras": 5,
+    "identity": 0.0798,
+    "kind": "positive",
+    "length_a": 278,
+    "length_b": 228,
+    "mates": 14,
+    "method": "structure",
+    "only_a": 11,
+    "pair": "1G9R_A-1JYL_A",
+    "pieces": 2,
+    "rmsd": 4.1092,
+    "same_fold": true,
+    "stratum": "remote",
+    "tm_score": 0.5113,
+    "usalign": {
+     "agreement": {
+      "close_within_1": 0.9869,
+      "exact": 0.9259,
+      "foldmap_pairs_in_usalign": 0.984,
+      "within_1": 0.9788
+     },
+     "auto": {
+      "method": "structure",
+      "tm_score": 0.5113,
+      "within_1": 0.9788
+     },
+     "disagreements": [
+      "A 72-72 (1): not paired",
+      "A 147-147 (1): not paired",
+      "A 237-237 (1): not paired",
+      "A 248-248 (1): not paired"
+     ],
+     "limits": {
+      "applies": true,
+      "pairs": true,
+      "tm": true,
+      "verdict": "pass"
+     },
+     "rows": {
+      "foldmap": [
+       "--MDIVFAADDNY---------AAYLC------VAAKSVEAAHPDTEIR-FHVLDAGISEANRAAVAANLRGGGGNIRFIDVNPEDFAGFPLNIRHISITTYARLKLGEYIADCDKVLYLDIDVLVRDSLTPLWDTDLGDNWLGASID-L-----FVERQEGYKQKIGMAD------GEYY--------FNAGVLLINLKKWRR-HDIFKMSSEWVEQYKDVM-QYQDQDILNGLFKGGVCYANSRFNFMPTNYAFMASRHTDPLYRDRTNTVMPVAVSHYCGPAKPWHRDCTAWGAERFTELAGSLTTVPEEWRGKL",
+       "IRVKAIILAAGLGTRLRPLTENTPKALVQVNQKPLIEYQIEFLKEKGINDIIIIVGYLKE-QFDY-LK----EKYGVRLVFNDKY-AD---------YNNFYSLYLVKE-E--LANSYVIDADNYLFKNMFR-NDLTR----STYFSVYREDCTNEWFL----V-------YGDDYKVQDIIVDSKAGRILSGVSFWDAPTAEKIVSFIDKAYVSGE--F---VDLYWDNMVKDNIKELDVYVEEL---------------------------EGNSIYEI---DS--V-QDYRKLEEIL-K----------------"
+      ],
+      "usalign": [
+       "--MDIVFAADDNY---------AAYLC------VAAKSVEAAHPDTEIR-FHVLDAGISEANRAAVAANLRGGGGNIRFIDVNPEDFAGFPLNIRHISITTYARLKLGEYIADCDKVLYLDIDVLVRDSLTPLWDTDLGDNWLGASID-L----FVERQEGY-KQKIGMA------DGEYY-------FNAGVLLINLKKWRR-HDIFKMSSEWVEQYKDVM-QYQDQDILNGLFKGGVCYANSRFNFMPTNYAFMASRHTDPLYRDRTNTVMPVAVSHYCGPAKPWHRDCTAWGAERFTELAGSLTTVPEEWRGKL",
+       "IRVKAIILAAGLGTRLRPLTENTPKALVQVNQKPLIEYQIEFLKEKGINDIIIIVGYLKE-QFDY-LK----EKYGVRLVFNDKY-AD-Y--------NNFYSLYLVKE-E--LANSYVIDADNYLFKNMFR-NDLTR----STYFSVYREDCTNEWF----LV------YGDDYKVQDIIVDSKAGRILSGVSFWDAPTAEKIVSFIDKAYVSGE--F---VDLYWDNMVKDNIKELDVYVEEL--------------------------EG-NSIYEI--DS---V-QDYRKLEEIL-K----------------"
+      ]
+     },
+     "structure": {
+      "aligned": 188,
+      "rmsd": 4.1092,
+      "tm_score": 0.5113
+     },
+     "tm_difference": 0.0008,
+     "usalign": {
+      "aligned": 189,
+      "aligned_reported": 189,
+      "close": 153,
+      "foldmap_tm_of_its_pairs": 0.5105,
+      "rmsd": 4.15,
+      "tm_a": 0.5105,
+      "tm_b": 0.5986,
+      "version": "20241108"
+     }
+    }
+   },
+   {
+    "aligned": 55,
+    "extras": 5,
+    "identity": 0.0727,
+    "kind": "positive",
+    "length_a": 100,
+    "length_b": 97,
+    "mates": 6,
+    "method": "structure",
+    "only_a": 3,
+    "pair": "1JBI_A-3U7Z_A",
+    "pieces": 0,
+    "rmsd": 4.7754,
+    "same_fold": false,
+    "stratum": "remote",
+    "tm_score": 0.2713,
+    "usalign": {
+     "agreement": {
+      "close_within_1": 0.2812,
+      "exact": 0.0577,
+      "foldmap_pairs_in_usalign": 0.3091,
+      "within_1": 0.3269
+     },
+     "auto": {
+      "method": "structure",
+      "tm_score": 0.2713,
+      "within_1": 0.3269
+     },
+     "disagreements": [
+      "A 4-4 (1): not paired",
+      "A 8-8 (1): not paired",
+      "A 11-11 (1): not paired",
+      "A 13-14 (2): not paired",
+      "A 15-16 (2): B shifted -7",
+      "A 28-29 (2): B shifted -7",
+      "A 30-30 (1): B shifted -3",
+      "A 31-32 (2): B shifted -4",
+      "A 33-33 (1): B shifted -5",
+      "A 34-34 (1): B shifted -3",
+      "A 35-36 (2): B shifted -10",
+      "A 37-37 (1): B shifted -23",
+      "A 38-38 (1): B shifted -18",
+      "A 40-41 (2): B shifted -17",
+      "A 56-56 (1): not paired",
+      "A 61-70 (10): B shifted +2",
+      "A 71-74 (4): not paired"
+     ],
+     "limits": {
+      "applies": false,
+      "pairs": false,
+      "tm": true,
+      "verdict": "\u2013"
+     },
+     "rows": {
+      "foldmap": [
+       "TAPI-----AITCFTRGLDIRK-EKADVLCPGGCP----LEEF--S--VYG-----NIVYASVSSICG------------A---------AVHRGVISNSGGPVRVYSLPGRENYSSVDANGIQSQMLSRWSASFTVTLE--",
+       "----GEKHITV---T-V--IHGDQTENVFEFDTDAKYLGEVLESENLVDGESGEYGLFITTVDE----ETADDSKQQWWCITKGGEQVNTSADQT-PVSDGDAFELTLKE------------------------------GY"
+      ],
+      "usalign": [
+       "TAP---IAITCFTRGL----DIRKEKADVLCPGG------CPL-EE-FS---------VY-------------GNIVYASVSSICGA--------AVHRGVISNSGGPVRVYSLPGRENYSSVDANGIQSQMLSRWSASFTVTLE",
+       "---GEKHIT-V-TVIHGDQTENV-----FEFDTDAKYLGEVLESENLVDGESGEYGLFITTVDEETADDSKQQWW-CI---------TKGGEQVNTSADQTPV--SDGDAFELTLKEGY--------------------------"
+      ]
+     },
+     "structure": {
+      "aligned": 55,
+      "rmsd": 4.7754,
+      "tm_score": 0.2713
+     },
+     "tm_difference": 0.0282,
+     "usalign": {
+      "aligned": 52,
+      "aligned_reported": 52,
+      "close": 32,
+      "foldmap_tm_of_its_pairs": 0.2431,
+      "rmsd": 4.96,
+      "tm_a": 0.243,
+      "tm_b": 0.2467,
+      "version": "20241108"
+     }
+    }
+   },
+   {
+    "aligned": 79,
+    "extras": 0,
+    "identity": 0.8734,
+    "kind": "positive",
+    "length_a": 79,
+    "length_b": 80,
+    "mates": 8,
+    "method": "sequence",
+    "only_a": 2,
+    "pair": "1JK4_A-2HNW_A",
+    "pieces": 1,
+    "rmsd": 1.4428,
+    "same_fold": true,
+    "stratum": "close",
+    "tm_score": 0.8941,
+    "usalign": {
+     "agreement": {
+      "close_within_1": 0.9872,
+      "exact": 0.962,
+      "foldmap_pairs_in_usalign": 1.0,
+      "within_1": 0.9873
+     },
+     "auto": {
+      "method": "sequence",
+      "tm_score": 0.8941,
+      "within_1": 1.0
+     },
+     "disagreements": [
+      "A 51-51 (1): not paired"
+     ],
+     "limits": {
+      "applies": true,
+      "pairs": true,
+      "tm": true,
+      "verdict": "pass"
+     },
+     "rows": {
+      "foldmap": [
+       "LRQCLPCGPGGKGRCFGPSICCGDELGCFVGTAEALRCQEENYLPSP-CQSGQKPCGSGGRCAAAGICCNDESCVTEPEC-",
+       "VRTCLPCGPGGKGRCFGPSICCGDELGCFVGTAEALRCQEENYL-PSPCQSGQKPCGSGGRCAAAGICCSPDGCHEDPACD"
+      ],
+      "usalign": [
+       "LRQCLPCGPGGKGRCFGPSICCGDELGCFVGTAEALRCQEENYLPSPCQSGQKPCGSGGRCAAAGICCNDESCVTEPEC-",
+       "VRTCLPCGPGGKGRCFGPSICCGDELGCFVGTAEALRCQEENYLPSPCQSGQKPCGSGGRCAAAGICCSPDGCHEDPACD"
+      ]
+     },
+     "structure": {
+      "aligned": 78,
+      "rmsd": 1.2089,
+      "tm_score": 0.8954
+     },
+     "tm_difference": 0.001,
+     "usalign": {
+      "aligned": 79,
+      "aligned_reported": 79,
+      "close": 78,
+      "foldmap_tm_of_its_pairs": 0.8941,
+      "rmsd": 1.44,
+      "tm_a": 0.8943,
+      "tm_b": 0.8842,
+      "version": "20241108"
+     }
+    }
+   },
+   {
+    "aligned": 49,
+    "extras": 0,
+    "identity": 0.0816,
+    "kind": "negative",
+    "length_a": 174,
+    "length_b": 60,
+    "mates": 4,
+    "method": "structure",
+    "only_a": 9,
+    "pair": "1LSH_B-5MLC_3",
+    "pieces": 0,
+    "rmsd": 3.8612,
+    "same_fold": false,
+    "stratum": "negative",
+    "tm_score": 0.1929,
+    "usalign": {
+     "agreement": {
+      "close_within_1": 1.0,
+      "exact": 0.625,
+      "foldmap_pairs_in_usalign": 0.9796,
+      "within_1": 1.0
+     },
+     "auto": {
+      "method": "structure",
+      "tm_score": 0.1929,
+      "within_1": 1.0
+     },
+     "disagreements": [],
+     "limits": {
+      "applies": false,
+      "pairs": true,
+      "tm": true,
+      "verdict": "\u2013"
+     },
+     "rows": {
+      "foldmap": [
+       "-SKPKVVIV----LRAVRADGKQQGLQTTLYYGLTSNGLPK--AKIVA-VELSDLSVWKLCAKFRLSAHMKAKAAIGWGKNCQQYRAMLEASTGNLQSHPAARVDIKWGRLPSSLQRAKNALLENGAPVIASKLEMEIMPKANQKHQVSVILAAMTPRRMNIIVKLPKVTYFQQGILLPFTF---",
+       "DVRVKVILECTGCVRKSVNKGSRGVSRYITQKNR----HNTPSRLELRKFCPY-CYKHTIHG------------------------------------------------------------------------------------------------------------------------EIK"
+      ],
+      "usalign": [
+       "--SKPKVVIV---LRAVRADGKQQGLQTTL-YYGLTSNGLPK--AKIVA-VELSDLSVWKLCAKFRLSAHMKAKAAIGWGKNCQQYRAMLEASTGNLQSHPAARVDIKWGRLPSSLQRAKNALLENGAPVIASKLEMEIMPKANQKHQVSVILAAMTPRRMNIIVKLPKVTYFQQGILLPFTF---",
+       "DVRVKVILECTGCVRKSVN-KGSRGVSRYITQKNR----HNTPSRLELRKFCPY-CYKHTIHG------------------------------------------------------------------------------------------------------------------------EIK"
+      ]
+     },
+     "structure": {
+      "aligned": 49,
+      "rmsd": 3.8612,
+      "tm_score": 0.1929
+     },
+     "tm_difference": 0.0007,
+     "usalign": {
+      "aligned": 48,
+      "aligned_reported": 48,
+      "close": 37,
+      "foldmap_tm_of_its_pairs": 0.1923,
+      "rmsd": 3.76,
+      "tm_a": 0.1922,
+      "tm_b": 0.3748,
+      "version": "20241108"
+     }
+    }
+   },
+   {
+    "aligned": 79,
+    "extras": 0,
+    "identity": 0.2785,
+    "kind": "positive",
+    "length_a": 88,
+    "length_b": 80,
+    "mates": 2,
+    "method": "structure",
+    "only_a": 1,
+    "pair": "1NKP_A-1AM9_A",
+    "pieces": 0,
+    "rmsd": 1.8531,
+    "same_fold": true,
+    "stratum": "remote",
+    "tm_score": 0.7488,
+    "usalign": {
+     "agreement": {
+      "close_within_1": 1.0,
+      "exact": 1.0,
+      "foldmap_pairs_in_usalign": 1.0,
+      "within_1": 1.0
+     },
+     "auto": {
+      "method": "structure",
+      "tm_score": 0.7488,
+      "within_1": 1.0
+     },
+     "disagreements": [],
+     "limits": {
+      "applies": true,
+      "pairs": true,
+      "tm": true,
+      "verdict": "pass"
+     },
+     "rows": {
+      "foldmap": [
+       "GHMNVKRRTHNVLERQRRNELKRSFFALRDQIPELE-NNEKAPKVVILKKATAYILSVQAEEQKLISEEDLLRKRREQLKHKLEQLGGC",
+       "QSRGEKRTAHNAIEKRYRSSINDKIIELKDLV--VGTEAK-LNKSAVLRKAIDYIRFLQHSNQKLKQENLSLRTAVHKSKSL--K----"
+      ],
+      "usalign": [
+       "GHMNVKRRTHNVLERQRRNELKRSFFALRDQIPELE-NNEKAPKVVILKKATAYILSVQAEEQKLISEEDLLRKRREQLKHKLEQLGGC",
+       "QSRGEKRTAHNAIEKRYRSSINDKIIELKDLV--VGTEAK-LNKSAVLRKAIDYIRFLQHSNQKLKQENLSLRTAVHKSKSL--K----"
+      ]
+     },
+     "structure": {
+      "aligned": 79,
+      "rmsd": 1.8531,
+      "tm_score": 0.7488
+     },
+     "tm_difference": 0.0003,
+     "usalign": {
+      "aligned": 79,
+      "aligned_reported": 79,
+      "close": 78,
+      "foldmap_tm_of_its_pairs": 0.7488,
+      "rmsd": 1.85,
+      "tm_a": 0.7485,
+      "tm_b": 0.8092,
+      "version": "20241108"
+     }
+    }
+   },
+   {
+    "aligned": 44,
+    "extras": 14,
+    "identity": 0.0682,
+    "kind": "negative",
+    "length_a": 80,
+    "length_b": 203,
+    "mates": 1,
+    "method": "structure",
+    "only_a": 3,
+    "pair": "1PZW_A-1QHL_A",
+    "pieces": 1,
+    "rmsd": 4.034,
+    "same_fold": false,
+    "stratum": "negative",
+    "tm_score": 0.3161,
+    "usalign": {
+     "agreement": {
+      "close_within_1": 0.6765,
+      "exact": 0.0625,
+      "foldmap_pairs_in_usalign": 0.6364,
+      "within_1": 0.5833
+     },
+     "auto": {
+      "method": "structure",
+      "tm_score": 0.3161,
+      "within_1": 0.5833
+     },
+     "disagreements": [
+      "A 26-26 (1): not paired",
+      "A 27-27 (1): B shifted +44",
+      "A 28-28 (1): B shifted +15",
+      "A 29-34 (6): not paired",
+      "A 39-39 (1): B shifted +8",
+      "A 40-40 (1): B shifted +3",
+      "A 41-42 (2): B shifted +2",
+      "A 43-43 (1): B shifted -15",
+      "A 44-44 (1): B shifted -33",
+      "A 45-46 (2): B shifted -47",
+      "A 52-52 (1): B shifted +18",
+      "A 70-70 (1): not paired",
+      "A 75-75 (1): not paired"
+     ],
+     "limits": {
+      "applies": false,
+      "pairs": false,
+      "tm": true,
+      "verdict": "\u2013"
+     },
+     "rows": {
+      "foldmap": [
+       "DICR-----------------------------------------------LCLRGVSGAQMCL--QIFDVDSG--ESKVAEVL---------RQHF----------WFEVL----------PND------------------------------------------------EISKV-----------------ICNVCWTQVSEFHQFYVSIQEAQVIYATTS--------------",
+       "----RGKFRSLTLINWNGFFARTFDLDELVTTLSGGNGAGKSTTMAAFVTAL------------IPDLT-----LLLH------GKLKAGVCYSMLDTINSRHQRVVVGVRLQQVAGRDRKVDIKPFAIQGLPMSVQPTQLVTETLNERQARVLPLNELKDKLEAMEGVQFKQFNSITDYHSLMFDLGIIARRLRSASDRSKFYRLIEASLYG--GIS-------SAITRSLRDYLLPE"
+      ],
+      "usalign": [
+       "DICRLCLRGVSGAQMCLQIFDVDS----------GE-----------------------------SK-VAEVL------------------RQH-F-W-----F-EV-----------------L----------------------------P--------------NDEISKVI-----------------CNVCWTQVSEFHQFYVSIQEAQVIYATTS-------------",
+       "------------------------RGKFRSLTLINWNGFFARTFDLDELVTTLSGGNGAGKSTTMAAFVTALIPDLTLLLHGKLKAGVCYSML-DTINSRHQRVVVGVRLQQVAGRDRKVDIKPFAIQGLPMSVQPTQLVTETLNERQARVLPLNELKDKLEAMEGVQFKQFNSITDYHSLMFDLGIIARRLRSASDRSKFYRLIEASLYG-GISS------AITRSLRDYLLPE"
+      ]
+     },
+     "structure": {
+      "aligned": 44,
+      "rmsd": 4.034,
+      "tm_score": 0.3161
+     },
+     "tm_difference": -0.0064,
+     "usalign": {
+      "aligned": 48,
+      "aligned_reported": 48,
+      "close": 34,
+      "foldmap_tm_of_its_pairs": 0.3229,
+      "rmsd": 4.13,
+      "tm_a": 0.3226,
+      "tm_b": 0.166,
+      "version": "20241108"
+     }
+    }
+   },
+   {
+    "aligned": 82,
+    "extras": 8,
+    "identity": 0.061,
+    "kind": "negative",
+    "length_a": 138,
+    "length_b": 158,
+    "mates": 6,
+    "method": "structure",
+    "only_a": 3,
+    "pair": "1RPU_A-1ZWT_A",
+    "pieces": 0,
+    "rmsd": 4.8962,
+    "same_fold": false,
+    "stratum": "negative",
+    "tm_score": 0.339,
+    "usalign": {
+     "agreement": {
+      "close_within_1": 0.7143,
+      "exact": 0.4535,
+      "foldmap_pairs_in_usalign": 0.6707,
+      "within_1": 0.6395
+     },
+     "auto": {
+      "method": "structure",
+      "tm_score": 0.339,
+      "within_1": 0.6395
+     },
+     "disagreements": [
+      "A 25-29 (5): B shifted -3",
+      "A 30-32 (3): B shifted -2",
+      "A 33-34 (2): B shifted -3",
+      "A 36-36 (1): B shifted -3",
+      "A 38-38 (1): B shifted -3",
+      "A 39-40 (2): B shifted -4",
+      "A 41-41 (1): B shifted -5",
+      "A 42-44 (3): B shifted -4",
+      "A 45-55 (5): B shifted -3",
+      "A 60-60 (1): not paired",
+      "A 71-71 (1): not paired",
+      "A 83-83 (1): not paired",
+      "A 97-97 (1): not paired",
+      "A 102-102 (1): not paired",
+      "A 111-111 (1): not paired",
+      "A 114-114 (1): B shifted -3",
+      "A 137-137 (1): not paired"
+     ],
+     "limits": {
+      "applies": false,
+      "pairs": false,
+      "tm": true,
+      "verdict": "\u2013"
+     },
+     "rows": {
+      "foldmap": [
+       "DTREQ------ANGERWDGGSGGITSP-FKLPD--ES--PSWTE-WRL-YNDEN--P-----------------------------LGFKESWGFGKVVFK------RYLRYDRTEASLHRVLGS--WTGDSVNYAASRFLGANQVGCT------YSI----RFRGVSVTISG---------GSRTLQHLCEMA-IR-SKQELLQLTPVEV---",
+       "-----MEQSASD----------SNKSQNAISEVMSATSAINGLYIGQTSYSGLDSTILLNTSAIPDNYKDTTNKKITNPFGGELNVGPA------------NNNTAFGYYLT-----L-TR-LD-KAACVSLAT-LN------------LGTSAKGYGVNISGENNITSFGNSADQAAKSTAITPAEAATACK-NTDSTNKVTY-------FMK"
+      ],
+      "usalign": [
+       "DTREQANGERWDGGSG----------GITSPFKL-PDE--SP--S-WT-EWRLYNDENP---------------------------LGFKESWGFGKVVF-----KRYLRYDRTEASLHRVLGS-WTGDSVNYAASR--FLGANQVGC---TYS--I-RFRGVSVTISG---------GSRTLQHLCEMAIR-SKQELLQLTPVEV----",
+       "----------------MEQSASDSNKSQNAISEVMSATSAINGLYIGQTSYSGLDSTILLNTSAIPDNYKDTTNKKITNPFGGELNVGPA----------NNNTAFGYYLT-----LTR--LD-KAACVSLATLN--LGT--------SAKGYGVNISGENNITSFGNSADQAAKSTAITPAEAATACKNTDSTNKVT--------YFMK"
+      ]
+     },
+     "structure": {
+      "aligned": 82,
+      "rmsd": 4.8962,
+      "tm_score": 0.339
+     },
+     "tm_difference": 0.0081,
+     "usalign": {
+      "aligned": 86,
+      "aligned_reported": 86,
+      "close": 56,
+      "foldmap_tm_of_its_pairs": 0.331,
+      "rmsd": 5.01,
+      "tm_a": 0.331,
+      "tm_b": 0.3043,
+      "version": "20241108"
+     }
+    }
+   },
+   {
+    "aligned": 197,
+    "extras": 0,
+    "identity": 0.8731,
+    "kind": "positive",
+    "length_a": 199,
+    "length_b": 197,
+    "mates": 15,
+    "method": "sequence",
+    "only_a": 0,
+    "pair": "1T5B_A-2Z9C_A",
+    "pieces": 0,
+    "rmsd": 0.6226,
+    "same_fold": true,
+    "stratum": "close",
+    "tm_score": 0.9771,
+    "usalign": {
+     "agreement": {
+      "close_within_1": 1.0,
+      "exact": 1.0,
+      "foldmap_pairs_in_usalign": 1.0,
+      "within_1": 1.0
+     },
+     "auto": {
+      "method": "sequence",
+      "tm_score": 0.9771,
+      "within_1": 1.0
+     },
+     "disagreements": [],
+     "limits": {
+      "applies": true,
+      "pairs": true,
+      "tm": true,
+      "verdict": "pass"
+     },
+     "rows": {
+      "foldmap": [
+       "MSKVLVLKSSILAGYSQSGQLTDYFIEQWREKHVADEITVRDLAANPVPVLDGELVGAMRDAPLTPRQQDALALSDELIAELKAHDVIVIAAPMYNFNIPTQLKNYFDLIARAGITFRYTEKGPEGLVTGKRAVVLSSRGGIHKDTPTDLIAPYLKVFLGFIGITDVNFVFAEGIAYGPEVAAKAQADAKAAIDSVVAA",
+       "-SKVLVLKSSILAGYSQSNQLSDYFVEQWREKHSADEITVRDLAANPIPVLDGELVGALR-APLTPRQQEALALSDELIAELKAHDVIVIAAPMYNFNISTQLKNYFDLVARAGVTFRYTENGPEGLVTGKKAIVITSRGGIHKDGPTDLVTPYLSTFLGFIGITDVKFVFAEGIAYGPEMAAKAQSDAKAAIDSIVSA"
+      ],
+      "usalign": [
+       "MSKVLVLKSSILAGYSQSGQLTDYFIEQWREKHVADEITVRDLAANPVPVLDGELVGAMRDAPLTPRQQDALALSDELIAELKAHDVIVIAAPMYNFNIPTQLKNYFDLIARAGITFRYTEKGPEGLVTGKRAVVLSSRGGIHKDTPTDLIAPYLKVFLGFIGITDVNFVFAEGIAYGPEVAAKAQADAKAAIDSVVAA",
+       "-SKVLVLKSSILAGYSQSNQLSDYFVEQWREKHSADEITVRDLAANPIPVLDGELVGALR-APLTPRQQEALALSDELIAELKAHDVIVIAAPMYNFNISTQLKNYFDLVARAGVTFRYTENGPEGLVTGKKAIVITSRGGIHKDGPTDLVTPYLSTFLGFIGITDVKFVFAEGIAYGPEMAAKAQSDAKAAIDSIVSA"
+      ]
+     },
+     "structure": {
+      "aligned": 197,
+      "rmsd": 0.6226,
+      "tm_score": 0.9771
+     },
+     "tm_difference": 0.0,
+     "usalign": {
+      "aligned": 197,
+      "aligned_reported": 197,
+      "close": 197,
+      "foldmap_tm_of_its_pairs": 0.9771,
+      "rmsd": 0.62,
+      "tm_a": 0.9771,
+      "tm_b": 0.9869,
+      "version": "20241108"
+     }
+    }
+   },
+   {
+    "aligned": 291,
+    "extras": 1,
+    "identity": 0.2749,
+    "kind": "positive",
+    "length_a": 297,
+    "length_b": 307,
+    "mates": 27,
+    "method": "structure",
+    "only_a": 1,
+    "pair": "1TYY_A-3IQ0_A",
+    "pieces": 0,
+    "rmsd": 2.2976,
+    "same_fold": true,
+    "stratum": "remote",
+    "tm_score": 0.8885,
+    "usalign": {
+     "agreement": {
+      "close_within_1": 1.0,
+      "exact": 1.0,
+      "foldmap_pairs_in_usalign": 1.0,
+      "within_1": 1.0
+     },
+     "auto": {
+      "method": "structure",
+      "tm_score": 0.8885,
+      "within_1": 1.0
+     },
+     "disagreements": [],
+     "limits": {
+      "applies": true,
+      "pairs": true,
+      "tm": true,
+      "verdict": "pass"
+     },
+     "rows": {
+      "foldmap": [
+       "NKVWVIGDASVDLVPEK--Q-----NSYLK-CPGGASANVGVCVARLGGECGFIGCLGDDDAGRFLRQVFQDNGVDVTFLRLDADLTSAVLIVN---S-FTYLVHPGADTYVSPQ-DLPP-FRQYEWFYFSSIGLTDRPAREACLEGARRMREAGGYVLFDVNLRSKMWGNTDEIPELIARSAALASICKVSADELCQLSGASHWQDARYYLRDLGCDTTIISLGADGALLITAEGEFHFPAPRVDVVDTTGAGDAFVGGLLFTLSRANCWDHALLAEAISNANACGAMAVTAKGAMTALPFPDQLNTFLS--",
+       "SKVFTIGEILVEIMASKIGQPFDQPGIWNGPYPSGAPAIFIDQVTRLGVPCGIISCVGNDGFGDINIHRLAADGVDIRGISVLPLEATGSAFVTYHNRDFIFNIKNAACGKLSAQHVDENILKDCTHFHIMGSSLFSFHMVDAVKKAVTIVKANGGVISFDPNIRKE-MLDIPEMRDALHFVLELTDIYMPSEGEVLLLSPHSTPERAIAGFLEEGVKEVIVKRGNQGASYYSANEQFHVESYPVEEVDPTGAGDCFGGAWIACRQLG-----FDAHRALQYANACGALAVTRRGPMEGTSRLMEIETFIQRH"
+      ],
+      "usalign": [
+       "NKVWVIGDASVDLVPEK--Q-----NSYLK-CPGGASANVGVCVARLGGECGFIGCLGDDDAGRFLRQVFQDNGVDVTFLRLDADLTSAVLIVN---S-FTYLVHPGADTYVSPQ-DLPP-FRQYEWFYFSSIGLTDRPAREACLEGARRMREAGGYVLFDVNLRSKMWGNTDEIPELIARSAALASICKVSADELCQLSGASHWQDARYYLRDLGCDTTIISLGADGALLITAEGEFHFPAPRVDVVDTTGAGDAFVGGLLFTLSRANCWDHALLAEAISNANACGAMAVTAKGAMTALPFPDQLNTFLS--",
+       "SKVFTIGEILVEIMASKIGQPFDQPGIWNGPYPSGAPAIFIDQVTRLGVPCGIISCVGNDGFGDINIHRLAADGVDIRGISVLPLEATGSAFVTYHNRDFIFNIKNAACGKLSAQHVDENILKDCTHFHIMGSSLFSFHMVDAVKKAVTIVKANGGVISFDPNIRKE-MLDIPEMRDALHFVLELTDIYMPSEGEVLLLSPHSTPERAIAGFLEEGVKEVIVKRGNQGASYYSANEQFHVESYPVEEVDPTGAGDCFGGAWIACRQLG-----FDAHRALQYANACGALAVTRRGPMEGTSRLMEIETFIQRH"
+      ]
+     },
+     "structure": {
+      "aligned": 291,
+      "rmsd": 2.2976,
+      "tm_score": 0.8885
+     },
+     "tm_difference": 0.0,
+     "usalign": {
+      "aligned": 291,
+      "aligned_reported": 291,
+      "close": 278,
+      "foldmap_tm_of_its_pairs": 0.8885,
+      "rmsd": 2.3,
+      "tm_a": 0.8885,
+      "tm_b": 0.8615,
+      "version": "20241108"
+     }
+    }
+   },
+   {
+    "aligned": 31,
+    "extras": 1,
+    "identity": 0.129,
+    "kind": "positive",
+    "length_a": 80,
+    "length_b": 60,
+    "mates": 2,
+    "method": "structure",
+    "only_a": 2,
+    "pair": "1XU6_A-1PS2_A",
+    "pieces": 0,
+    "rmsd": 2.9168,
+    "same_fold": false,
+    "stratum": "remote",
+    "tm_score": 0.2643,
+    "usalign": {
+     "agreement": {
+      "close_within_1": 0.7826,
+      "exact": 0.2581,
+      "foldmap_pairs_in_usalign": 0.7419,
+      "within_1": 0.7419
+     },
+     "auto": {
+      "method": "structure",
+      "tm_score": 0.2643,
+      "within_1": 0.7419
+     },
+     "disagreements": [
+      "A 377-377 (1): not paired",
+      "A 380-380 (1): not paired",
+      "A 381-384 (4): B shifted -2",
+      "A 390-390 (1): B shifted -2",
+      "A 410-410 (1): not paired"
+     ],
+     "limits": {
+      "applies": false,
+      "pairs": false,
+      "tm": true,
+      "verdict": "\u2013"
+     },
+     "rows": {
+      "foldmap": [
+       "GSHMLEVLTQKHKPAESQQQAAET--------------EGSCNKK-DQ-NECK-SPCKWHNDAEN-KKCTLDKEEAKKVADETAKDGKTGNTNTTGSS-----------",
+       "------------------------EAQTETCTVAPRERQN-CGFPGVTPSQCANKGCCFDDTVRGVPWCFYPNT------------------------IDVPPEEESEF"
+      ],
+      "usalign": [
+       "GSHMLEVLTQKHKPAESQQQAAE--------------TEGSCNKKDQNEC--KSPCKWHNDAENK--KCTLDKEEAKKVADETAKDGKTGNTNTTGSS-----------",
+       "-----------------------EAQTETCTVAPRERQNCGFPGVTPSQCANKG-CCFDD-TVR-GVPWCFYPNT-----------------------IDVPPEEESEF"
+      ]
+     },
+     "structure": {
+      "aligned": 31,
+      "rmsd": 2.9168,
+      "tm_score": 0.2643
+     },
+     "tm_difference": 0.0237,
+     "usalign": {
+      "aligned": 31,
+      "aligned_reported": 31,
+      "close": 23,
+      "foldmap_tm_of_its_pairs": 0.2391,
+      "rmsd": 3.42,
+      "tm_a": 0.2406,
+      "tm_b": 0.2882,
+      "version": "20241108"
+     }
+    }
+   },
+   {
+    "aligned": 136,
+    "extras": 6,
+    "identity": 0.0441,
+    "kind": "negative",
+    "length_a": 293,
+    "length_b": 302,
+    "mates": 6,
+    "method": "structure",
+    "only_a": 6,
+    "pair": "2C3E_A-1HZF_A",
+    "pieces": 3,
+    "rmsd": 5.8151,
+    "same_fold": false,
+    "stratum": "negative",
+    "tm_score": 0.291,
+    "usalign": {
+     "agreement": {
+      "close_within_1": 0.4478,
+      "exact": 0.2692,
+      "foldmap_pairs_in_usalign": 0.3897,
+      "within_1": 0.4077
+     },
+     "auto": {
+      "method": "structure",
+      "tm_score": 0.291,
+      "within_1": 0.4077
+     },
+     "disagreements": [
+      "A 27-27 (1): not paired",
+      "A 38-38 (1): not paired",
+      "A 51-51 (1): not paired",
+      "A 83-88 (6): B shifted +6",
+      "A 89-89 (1): B shifted +2",
+      "A 115-115 (1): not paired",
+      "A 116-117 (2): B shifted +13",
+      "A 118-119 (2): not paired",
+      "A 120-122 (3): B shifted +11",
+      "A 123-123 (1): not paired",
+      "A 124-125 (2): B shifted +5",
+      "A 126-127 (2): not paired",
+      "A 128-129 (2): B shifted +3",
+      "A 131-131 (1): not paired",
+      "A 168-172 (5): not paired",
+      "A 173-176 (4): B shifted -3",
+      "A 177-177 (1): B shifted -11",
+      "A 178-180 (3): B shifted -12",
+      "A 181-181 (1): B shifted -9",
+      "A 182-191 (10): B shifted -7",
+      "A 192-192 (1): not paired",
+      "A 193-193 (1): B shifted -8",
+      "A 194-196 (3): not paired",
+      "A 197-197 (1): B shifted -9",
+      "A 198-198 (1): not paired",
+      "A 230-230 (1): not paired",
+      "A 245-248 (4): not paired",
+      "A 249-259 (11): B shifted -3",
+      "A 260-260 (1): B shifted -2",
+      "A 261-261 (1): B shifted -3",
+      "A 262-262 (1): B shifted +2",
+      "A 268-268 (1): B shifted -2"
+     ],
+     "limits": {
+      "applies": false,
+      "pairs": false,
+      "tm": true,
+      "verdict": "\u2013"
+     },
+     "rows": {
+      "foldmap": [
+       "SDQALSFLKDFLAGGVAAAISKTAV----------------------APIERVKLLLQVQHASKQISAEKQYKGIIDCVVRIPKEQGFLSFWRGNLANVIRYFP------TQALNFAFKDKYKQIFLGGVD--------------------------------RHKQ--FWRYFAGNLASGGAAGATSLCFVYPLDFARTRLAADVGKGAAQREFTGLGNCITKIFKSDGLRGLYQGFNVSV---Q--GIIIYRAAYFGVYDT--AKGMLPDPKNV----HIIVSWMIAQ-TV-TAV--A------------------G--LVSYPFDTVRRRMMMQSGRKGADI-----------------------------MYTGTVDCWRK-IA--------------KDEGPK------------------A-FFKGAWSNVLRGMGGAFVLVLYDEI------",
+       "-------------------------SPGGVASLLRLPRGCGEQTMIYL-APTLAASRY-------------L-DKTEQWSTLPPETKDHAVDLIQKGYMRIQQFRKADGSYAAWLSRDSS-----------TWLTAFVLKVLSLAQEQVGGSPEKLQETSNWLL---SQQQADGS--FQ--DPC-PV--LD-------------------------------------------RSMQGGLVGNDETVALTAFVTIAL-H---HGL----------AVFQDEGAEPLKQ-RVEASISKASSFLGEKASAGLLGAHAAAITAYALTL-------------------TKAPADLRGVAHNNLMAMAQETGDNLYWGQAPALWIETTAYALLHLLLHEGKAEMADQASAWLTRQGSFQGGFRSTQDTVIALDALSAY-------------------WIASHT"
+      ],
+      "usalign": [
+       "SDQALSFLKDFLAGGVAAAISKTAVA----------------------PIERVKLLLQVQHASKQISAEKQYKGIIDCVVRIPKEQGFLSFWRGNLANVIRYFPTQALNF----A--FKDKYKQIFLGGVDRHKQFWRYFAG----------------------------NLASGGAAG-----ATSLCFVYPLDFARTRLAADVGKGAAQREFTGLGNCITKIFKSDGLRGLYQGF--------N-VSVQGIIIYRAAYFGVYDTAKGMLPDPKNVHIIVSWMIAQTVTAVAGL-----------------------------------VSYPFDTVRRRMMMQSGRK---------------------------GADIMYTGTVDCWRKI-A---------K--DEGPK----------------------AFFKGAWSNVLRGMGGAFVLVLYDEI------",
+       "--------------------------SPGGVASLLRLPRGCGEQTMIYL-APTLAASR-Y-----------LDKTEQW-STLPPETKDHAVDLIQKGYMRIQQFRKADGSYAAWLSRDS-----------------------STWLTAFVLKVLSLAQEQVGGSPEKLQETSNWLLSQQQADGSFQDPCP-V------------------------------------LDRSMQGGLVGNDETVALTAFVTIALHHGLAVFQDEGAEP---------------------------LKQRVEASISKASSFLGEKASAGLLGAHAAAITAYALTLT--------------KAPADLRGVAHNNLMAMAQETGDNLYWGQAPALWIETTAYALLHLLLHEGKAEMADQASA--WLTRQGSFQGGFRSTQDTVIALDALSAY--------------------WIASHT"
+      ]
+     },
+     "structure": {
+      "aligned": 136,
+      "rmsd": 5.8151,
+      "tm_score": 0.291
+     },
+     "tm_difference": 0.0196,
+     "usalign": {
+      "aligned": 130,
+      "aligned_reported": 130,
+      "close": 67,
+      "foldmap_tm_of_its_pairs": 0.2713,
+      "rmsd": 6.15,
+      "tm_a": 0.2714,
+      "tm_b": 0.2655,
+      "version": "20241108"
+     }
+    }
+   },
+   {
+    "aligned": 37,
+    "extras": 7,
+    "identity": 0.0541,
+    "kind": "positive",
+    "length_a": 61,
+    "length_b": 84,
+    "mates": 1,
+    "method": "structure",
+    "only_a": 4,
+    "pair": "2D46_A-3F42_B",
+    "pieces": 0,
+    "rmsd": 2.9381,
+    "same_fold": false,
+    "stratum": "remote",
+    "tm_score": 0.3826,
+    "usalign": {
+     "agreement": {
+      "close_within_1": 0.8667,
+      "exact": 0.65,
+      "foldmap_pairs_in_usalign": 0.8108,
+      "within_1": 0.75
+     },
+     "auto": {
+      "method": "structure",
+      "tm_score": 0.3826,
+      "within_1": 0.75
+     },
+     "disagreements": [
+      "A 6-7 (2): B shifted +2",
+      "A 9-10 (2): not paired",
+      "A 14-14 (1): not paired",
+      "A 17-18 (2): B shifted -2",
+      "A 22-22 (1): not paired",
+      "A 34-34 (1): not paired",
+      "A 60-60 (1): B shifted +2"
+     ],
+     "limits": {
+      "applies": false,
+      "pairs": false,
+      "tm": true,
+      "verdict": "\u2013"
+     },
+     "rows": {
+      "foldmap": [
+       "GSHM---------------------YDNLYLHGIEDSEA-GSADSYTSRPSDSDVS------------LEE-DRE-A--IRQEREQQ-AAIQLERA-KS--KP-----",
+       "----GLLDGMKKEFSQLEEKNKDTIHTSK------SGGGMVS--------------VSFNGLGELVDLQIDDSLLEDKEAMQIYLMSALNDGYKAVEENRKNLAFNML"
+      ],
+      "usalign": [
+       "GSHMY--------------------DNLYLHGIEDS--EAGSADSYTSRPSDSDV---------SLEED-RE-A--IRQEREQ-QAAIQLERA-KSK--P-----",
+       "-----GLLDGMKKEFSQLEEKNKDTIH-TS---KSGGGMVSV-S-----------FNGLGELVDLQIDDSLLEDKEAMQIYLMSALNDGYKAVEENRKNLAFNML"
+      ]
+     },
+     "structure": {
+      "aligned": 37,
+      "rmsd": 2.9381,
+      "tm_score": 0.3826
+     },
+     "tm_difference": 0.0025,
+     "usalign": {
+      "aligned": 40,
+      "aligned_reported": 40,
+      "close": 30,
+      "foldmap_tm_of_its_pairs": 0.3798,
+      "rmsd": 3.39,
+      "tm_a": 0.3801,
+      "tm_b": 0.3089,
+      "version": "20241108"
+     }
+    }
+   },
+   {
+    "aligned": 156,
+    "extras": 0,
+    "identity": 0.891,
+    "kind": "positive",
+    "length_a": 156,
+    "length_b": 157,
+    "mates": 14,
+    "method": "sequence",
+    "only_a": 0,
+    "pair": "2EWR_A-2FCL_A",
+    "pieces": 0,
+    "rmsd": 0.3118,
+    "same_fold": true,
+    "stratum": "close",
+    "tm_score": 0.9958,
+    "usalign": {
+     "agreement": {
+      "close_within_1": 1.0,
+      "exact": 1.0,
+      "foldmap_pairs_in_usalign": 1.0,
+      "within_1": 1.0
+     },
+     "auto": {
+      "method": "sequence",
+      "tm_score": 0.9958,
+      "within_1": 1.0
+     },
+     "disagreements": [],
+     "limits": {
+      "applies": true,
+      "pairs": true,
+      "tm": true,
+      "verdict": "pass"
+     },
+     "rows": {
+      "foldmap": [
+       "-IRPEYLRVLRKIYDRLKNEKVNWVVTGSLSFALQGVPVEVHDIDIQTDEEGAYEIERIFSEFVSKKVRFSSTEKICSHFGELIIDGIKVEIMGDIRKRLEDGTWEDPVDLNKYKRFVETHGMKIPVLSLEYEYQAYLKLGRVEKAETLRKWLNERK",
+       "MIRPEYLRVLRKIYDRLKNEKVNWVVTGSLSFALQGVPVEVHDIDIQTDEEGAYEIERIFSEFVSKKVRFSSTEKICSHFGELIIDGIKVEIMGDIRKRLEDGTWEDPVDLNKYKRFVETHGMKIPVLSLEYEYQAYLKLGRVEKAETLRKWLNERK"
+      ],
+      "usalign": [
+       "-IRPEYLRVLRKIYDRLKNEKVNWVVTGSLSFALQGVPVEVHDIDIQTDEEGAYEIERIFSEFVSKKVRFSSTEKICSHFGELIIDGIKVEIMGDIRKRLEDGTWEDPVDLNKYKRFVETHGMKIPVLSLEYEYQAYLKLGRVEKAETLRKWLNERK",
+       "MIRPEYLRVLRXIYDRLXNEXVNWVVTGSLSFALQGVPVEVHDIDIQTDEEGAYEIERIFSEFVSXXVRFSSTEXICSHFGELIIDGIXVEIMGDIRXRLEDGTWEDPVDLNXYXRFVETHGMXIPVLSLEYEYQAYLXLGRVEXAETLRXWLNERX"
+      ]
+     },
+     "structure": {
+      "aligned": 156,
+      "rmsd": 0.3118,
+      "tm_score": 0.9958
+     },
+     "tm_difference": 0.0,
+     "usalign": {
+      "aligned": 156,
+      "aligned_reported": 156,
+      "close": 156,
+      "foldmap_tm_of_its_pairs": 0.9958,
+      "rmsd": 0.31,
+      "tm_a": 0.9958,
+      "tm_b": 0.9895,
+      "version": "20241108"
+     }
+    }
+   },
+   {
+    "aligned": 55,
+    "extras": 4,
+    "identity": 0.1091,
+    "kind": "negative",
+    "length_a": 207,
+    "length_b": 76,
+    "mates": 3,
+    "method": "structure",
+    "only_a": 10,
+    "pair": "2EX5_A-4NTQ_A",
+    "pieces": 0,
+    "rmsd": 5.2742,
+    "same_fold": false,
+    "stratum": "negative",
+    "tm_score": 0.1649,
+    "usalign": {
+     "agreement": {
+      "close_within_1": 0.8286,
+      "exact": 0.5227,
+      "foldmap_pairs_in_usalign": 0.6,
+      "within_1": 0.75
+     },
+     "auto": {
+      "method": "structure",
+      "tm_score": 0.1649,
+      "within_1": 0.75
+     },
+     "disagreements": [
+      "A 93-93 (1): not paired",
+      "A 118-118 (1): B shifted +2",
+      "A 133-133 (1): B shifted -18",
+      "A 138-138 (1): B shifted -25",
+      "A 139-139 (1): not paired",
+      "A 140-141 (2): B shifted -28",
+      "A 142-142 (1): not paired",
+      "A 146-146 (1): B shifted -28",
+      "A 154-154 (1): B shifted -21",
+      "A 156-156 (1): B shifted -20"
+     ],
+     "limits": {
+      "applies": false,
+      "pairs": false,
+      "tm": true,
+      "verdict": "\u2013"
+     },
+     "rows": {
+      "foldmap": [
+       "ILKPGEKLPQDKLEELKKINDAVKKTKNFSKYLIDLRKLFQIDEVQVTSESKLFLAGFLEGEASLNISTKKLATSKFGLVVDPEFNVTRHVNGVKVLYLALEVFKTGRIRH-KS-GSNATL-VLTIDNRQSLEEKVIPFYEQYVVAFSSPEK---VKRVA----NFKALLELFNNDAHQDLEQLVNKILPIWDQMRKQQGQSNEGFPNLEAAQDFAR-----------",
+       "--------------------------------------------------------LK----------------------------------GKEAQEAASN-LGFDRRIPPQKAPFNSHGQPVFYDGK-NY---IT-PD---IDSHNV---TNGWKMF-NSKGKRIG-------------------------------------------------TYDSGLNRIKD"
+      ],
+      "usalign": [
+       "ILKPGEKLPQDKLEELKKINDAVKKTKNFSKYLIDLRKLFQIDEVQVTSESKLFLAGFLEGEASLNISTKKLATSKFGLVVDPEFNVTRHVNGVKVLYLALEVFKTGRIRHKSG--S-NATLVLTI-DNRQS------------------LEEKV--------I--PFYEQYVVAFSSPEKVKRVANFKALLELFNNDAHQDLEQLVNKILPIWDQMRKQQGQSNEGFPNLEAAQDFAR",
+       "---------------------------------------------------------L------------------------------K---GKEAQEAASN-LGFDRRIPPQKAPFNSHGQPVFYDGKN--YITPDIDSHNVTNGWKMFN----SKGKRIGTYDSGLNR---I-------K-D-------------------------------------------------------"
+      ]
+     },
+     "structure": {
+      "aligned": 55,
+      "rmsd": 5.2742,
+      "tm_score": 0.1649
+     },
+     "tm_difference": 0.0006,
+     "usalign": {
+      "aligned": 44,
+      "aligned_reported": 44,
+      "close": 35,
+      "foldmap_tm_of_its_pairs": 0.1644,
+      "rmsd": 3.47,
+      "tm_a": 0.1643,
+      "tm_b": 0.3486,
+      "version": "20241108"
+     }
+    }
+   },
+   {
+    "aligned": 201,
+    "extras": 2,
+    "identity": 0.2189,
+    "kind": "positive",
+    "length_a": 233,
+    "length_b": 211,
+    "mates": 18,
+    "method": "structure",
+    "only_a": 8,
+    "pair": "2F20_A-1ZN6_A",
+    "pieces": 0,
+    "rmsd": 2.0039,
+    "same_fold": true,
+    "stratum": "remote",
+    "tm_score": 0.7817,
+    "usalign": {
+     "agreement": {
+      "close_within_1": 1.0,
+      "exact": 1.0,
+      "foldmap_pairs_in_usalign": 1.0,
+      "within_1": 1.0
+     },
+     "auto": {
+      "method": "structure",
+      "tm_score": 0.7817,
+      "within_1": 1.0
+     },
+     "disagreements": [],
+     "limits": {
+      "applies": true,
+      "pairs": true,
+      "tm": true,
+      "verdict": "pass"
+     },
+     "rows": {
+      "foldmap": [
+       "CFHNSMSAKAIKVAARYGRQSDVVEIYQSILDEQYHVNAFTFPRYPIITSS----DEVQVFNWGLIPFWVRSEEDATEIR-KMTLNARADTIFEKPSFREPIMK-KRCIVPSTGYFEWRHEGANKIPYYIYVKDEPIFSMAGIYDRWLDKDTGEEHETFSIITTDT--NSLTDYIDNT-K-HRMPAILTQEEEEKWLNPSLSKAEIASLLKPFDTEKMDAYVIRNDFLKKSPNDPTIVQRALE",
+       "CSHYQALKDQERMRKYFAA-H--PS-AE-VP--A-DMWP--RYMGAFIRRPLVPEREAATGRWGMIPPGTRP-EKLAEASKKNTSNARSETAHQLWTFRNAWAKAQHCIIPADAIYEPDWRSGKAVPTRFTRADGAPLGIAGLWDRYRN-AAGEWIDSYTMLTINADDDPLFRDYHQAGKEKRMVVILPDGAYGDWLTA-PAT-DTRDFLLPYPADRLVAAAVK--L----------------"
+      ],
+      "usalign": [
+       "CFHNSMSAKAIKVAARYGRQSDVVEIYQSILDEQYHVNAFTFPRYPIITSS----DEVQVFNWGLIPFWVRSEEDATEIR-KMTLNARADTIFEKPSFREPIMK-KRCIVPSTGYFEWRHEGANKIPYYIYVKDEPIFSMAGIYDRWLDKDTGEEHETFSIITTDT--NSLTDYIDNT-K-HRMPAILTQEEEEKWLNPSLSKAEIASLLKPFDTEKMDAYVIRNDFLKKSPNDPTIVQRALE",
+       "CSHYQALKDQERMRKYFAA-H--PS-AE-VP--A-DMWP--RYMGAFIRRPLVPEREAATGRWGMIPPGTRP-EKLAEASKKNTSNARSETAHQLWTFRNAWAKAQHCIIPADAIYEPDWRSGKAVPTRFTRADGAPLGIAGLWDRYRN-AAGEWIDSYTMLTINADDDPLFRDYHQAGKEKRMVVILPDGAYGDWLTA-PAT-DTRDFLLPYPADRLVAAAVK--L----------------"
+      ]
+     },
+     "structure": {
+      "aligned": 201,
+      "rmsd": 2.0039,
+      "tm_score": 0.7817
+     },
+     "tm_difference": 0.0,
+     "usalign": {
+      "aligned": 201,
+      "aligned_reported": 201,
+      "close": 199,
+      "foldmap_tm_of_its_pairs": 0.7817,
+      "rmsd": 2.0,
+      "tm_a": 0.7817,
+      "tm_b": 0.8565,
+      "version": "20241108"
+     }
+    }
+   },
+   {
+    "aligned": 46,
+    "extras": 6,
+    "identity": 0.1087,
+    "kind": "negative",
+    "length_a": 74,
+    "length_b": 114,
+    "mates": 3,
+    "method": "structure",
+    "only_a": 3,
+    "pair": "2H5F_A-4Z42_B",
+    "pieces": 0,
+    "rmsd": 4.174,
+    "same_fold": false,
+    "stratum": "negative",
+    "tm_score": 0.2958,
+    "usalign": {
+     "agreement": {
+      "close_within_1": 0.4545,
+      "exact": 0.2245,
+      "foldmap_pairs_in_usalign": 0.5,
+      "within_1": 0.4694
+     },
+     "auto": {
+      "method": "structure",
+      "tm_score": 0.2958,
+      "within_1": 0.4694
+     },
+     "disagreements": [
+      "A 3-3 (1): not paired",
+      "A 5-8 (4): not paired",
+      "A 9-10 (2): B shifted -3",
+      "A 11-11 (1): B shifted -4",
+      "A 12-13 (2): B shifted -21",
+      "A 14-17 (4): B shifted -22",
+      "A 18-25 (8): not paired",
+      "A 34-35 (2): not paired",
+      "A 36-36 (1): B shifted -18",
+      "A 76-76 (1): not paired"
+     ],
+     "limits": {
+      "applies": false,
+      "pairs": false,
+      "tm": true,
+      "verdict": "\u2013"
+     },
+     "rows": {
+      "foldmap": [
+       "VGLPHG------------------FCIQCNRKTWSNCSIGHRCLPYHMTCY--------------TLYK-PDENGEM---KWAV--K-----------------------GCARMCPTAKSG-ER-VKCCTGASCNS-----",
+       "------NTPLGGCILADTPITFNENKPVTKVKV------------------RNTGDRPIQVGSHFHFFEVNRAL---EFDRAAAYGKRLNISSTTAIRFEPGDETEVPLIPFGGKQTLYGFNNLVDGWTGEGVVPN-SERPD"
+      ],
+      "usalign": [
+       "--------------VG--LPHGFC-I-----------------QC-NRKTWSNCSIGHRCLPYHMTCYTLYKPDENGEMKWAVK----------------------GCARM-CPTAKS--G-ERVKCCTG-ASCN---S",
+       "NTPLGGCILADTPIT-FNENKPVTKVKVRNTGDRPIQVGSHFHFFEVNRALEFDRAAA--------YGK---------------RLNISSTTAIRFEPGDETEVPLIPFGGKQTLYG-FNNLVDGWTGEGVVPNSERPD"
+      ]
+     },
+     "structure": {
+      "aligned": 46,
+      "rmsd": 4.174,
+      "tm_score": 0.2958
+     },
+     "tm_difference": -0.0275,
+     "usalign": {
+      "aligned": 49,
+      "aligned_reported": 49,
+      "close": 33,
+      "foldmap_tm_of_its_pairs": 0.3218,
+      "rmsd": 4.5,
+      "tm_a": 0.3233,
+      "tm_b": 0.2485,
+      "version": "20241108"
+     }
+    }
+   },
+   {
+    "aligned": 59,
+    "extras": 11,
+    "identity": 0.0169,
+    "kind": "negative",
+    "length_a": 114,
+    "length_b": 179,
+    "mates": 4,
+    "method": "structure",
+    "only_a": 6,
+    "pair": "2IAY_A-4XZD_A",
+    "pieces": 0,
+    "rmsd": 3.9839,
+    "same_fold": false,
+    "stratum": "negative",
+    "tm_score": 0.3285,
+    "usalign": {
+     "agreement": {
+      "close_within_1": 0.9,
+      "exact": 0.4394,
+      "foldmap_pairs_in_usalign": 0.9322,
+      "within_1": 0.8333
+     },
+     "auto": {
+      "method": "structure",
+      "tm_score": 0.3285,
+      "within_1": 0.8333
+     },
+     "disagreements": [
+      "A 3-4 (2): B shifted +2",
+      "A 5-5 (1): not paired",
+      "A 64-64 (1): not paired",
+      "A 67-67 (1): not paired",
+      "A 75-75 (1): B shifted -2",
+      "A 102-102 (1): not paired",
+      "A 104-105 (2): not paired",
+      "A 110-111 (2): not paired"
+     ],
+     "limits": {
+      "applies": false,
+      "pairs": false,
+      "tm": true,
+      "verdict": "\u2013"
+     },
+     "rows": {
+      "foldmap": [
+       "-------------------GMA--YTTTVKLDGDTKTYTLSPTVKKYTLMDLGFVK--GRSGA---FSFERSLDPTSP-YQAAFKLKMTVNADLTGFKMTTVT--GN--------GV--QRANIFKNDAHPEAVE-----QLRY-ILANFIERDILT------TD---------------------------------------------------------------------",
+       "STTIQYNSNYADYSISSYLREWANNF------------------------------GDIDQAPAETKDRGSFSGS-STLFSGTQYAIGSSH--S-NPEGMIAEGDLKYSFMPQHTFHGQIDTLQ-----------FGKDLATNAGGP----------SAGKHLEKIDITFNELDLSGEFDSGKSMTENHQGDMHKSVRGLMKGNPDPMLEVMKAKGINVDTAFKDLSIASQYPD"
+      ],
+      "usalign": [
+       "-------------------GMAYTTTVKLDGDTKTYTLSPTVKKYTLMDLGFVK---GRSGA---FSFERSLDPTSPYQAAFKLKMTVNADLTGFKMTTV-TGN--------GV-QRANIFKNDAHPEAVEQ-------LRY-IL-AN-FIERDILTTD--------------------------------------------------------------------",
+       "STTIQYNSNYADYSISSYLREWANN-----------------------------FGDIDQAPAETKDRGSFSGS-STLFSGTQYAIGSSH-SNPEGMIAEGDLKYSFMPQHTFHGQIDTL------------QFGKDLATNAGGPSA-GKH----LEKIDITFNELDLSGEFDSGKSMTENHQGDMHKSVRGLMKGNPDPMLEVMKAKGINVDTAFKDLSIASQYPD"
+      ]
+     },
+     "structure": {
+      "aligned": 59,
+      "rmsd": 3.9839,
+      "tm_score": 0.3285
+     },
+     "tm_difference": -0.001,
+     "usalign": {
+      "aligned": 66,
+      "aligned_reported": 66,
+      "close": 50,
+      "foldmap_tm_of_its_pairs": 0.3294,
+      "rmsd": 4.48,
+      "tm_a": 0.3295,
+      "tm_b": 0.2416,
+      "version": "20241108"
+     }
+    }
+   },
+   {
+    "aligned": 209,
+    "extras": 5,
+    "identity": 0.1531,
+    "kind": "positive",
+    "length_a": 237,
+    "length_b": 308,
+    "mates": 13,
+    "method": "structure",
+    "only_a": 1,
+    "pair": "2IJE_S-3T6A_A",
+    "pieces": 2,
+    "rmsd": 3.342,
+    "same_fold": true,
+    "stratum": "remote",
+    "tm_score": 0.7385,
+    "usalign": {
+     "agreement": {
+      "close_within_1": 1.0,
+      "exact": 0.9857,
+      "foldmap_pairs_in_usalign": 0.9952,
+      "within_1": 0.9905
+     },
+     "auto": {
+      "method": "structure",
+      "tm_score": 0.7385,
+      "within_1": 0.9905
+     },
+     "disagreements": [
+      "A 1023-1023 (1): not paired",
+      "A 1063-1063 (1): not paired"
+     ],
+     "limits": {
+      "applies": true,
+      "pairs": true,
+      "tm": true,
+      "verdict": "pass"
+     },
+     "rows": {
+      "foldmap": [
+       "G----------------------------------PLGSALEIAEQLTLLDHLVFKS---------------IPYEEFFGQGWMKAEKYERTPYIMKTTKHFNHVSNFIASEIIR-NEDISARASAIEKWVAVADICRC-LHNYNAVLEITSSINRSAIFRLKKTWLKV---SKQTKSLLD-KLQKLVSSDGRFKNLRESLRNCDPPCVPYLGMYLTDLV------------------FIE-EGTPNYTEDGLVNFSKM---RMISHIIREIRQFQQ-TT--YK-IDPQPKVIQYLL--DE--SFM--------------LDEESLYESSLLIEPK",
+       "-TVSSFRPNEFESKFLPPENKPLETALLKRAKELFTNNDPKVIAQHVLSMDCRVARILGVSEEMRRNMGVSSGLELITLP-H--------GHQLRLDIIERHNTMAIGIAVDILGCTGTLEDRAATLSKIIQVAVELKDSMGDLYSFSALMKALEMPQITRLEKTWTALRHQYTQTAILYEKQLKPFSKLLHEGR-ESTCVPPNNV-SVPLLMPLVTLMERQAVTFEGTDMWEKNDQSCE-IML---------------NHLATARFMAEAADSYRMNAERILAGFQPDEEMNEICKTEFQMRLLWGSKGAQVNQTERYEKFNQILTALSRKLEPP"
+      ],
+      "usalign": [
+       "---------------------------------GPLGSALEIAEQLTLLDHLVFKS---------------IPYEEFFGQGWMKAEKYERTPYIMKTTKHFNHVSNFIASEIIR-NEDISARASAIEKWVAVADICRC-LHNYNAVLEITSSINRSAIFRLKKTWLKV---SKQTKSLLD-KLQKLVSSDGRFKNLRESLRNCDPPCVPYLGMYLTDLV------------------FIE-EGTPNYTEDGLVNFSKM---RMISHIIREIRQFQQ-TT--YK-IDPQPKVIQYLL--DE--SFM--------------LDEESLYESSLLIEPK",
+       "TVSSFRPNEFESKFLPPENKPLETALLKRAKELFTNNDPKVIAQHVLSMDCRVARILGVSEEMRRNMGVSSGLELITL--P-------HGHQLRLDIIERHNTMAIGIAVDILGCTGTLEDRAATLSKIIQVAVELKDSMGDLYSFSALMKALEMPQITRLEKTWTALRHQYTQTAILYEKQLKPFSKLLHEGR-ESTCVPPNNV-SVPLLMPLVTLMERQAVTFEGTDMWEKNDQSCE-IML---------------NHLATARFMAEAADSYRMNAERILAGFQPDEEMNEICKTEFQMRLLWGSKGAQVNQTERYEKFNQILTALSRKLEPP"
+      ]
+     },
+     "structure": {
+      "aligned": 209,
+      "rmsd": 3.342,
+      "tm_score": 0.7385
+     },
+     "tm_difference": -0.0007,
+     "usalign": {
+      "aligned": 210,
+      "aligned_reported": 210,
+      "close": 181,
+      "foldmap_tm_of_its_pairs": 0.7393,
+      "rmsd": 3.42,
+      "tm_a": 0.7392,
+      "tm_b": 0.5833,
+      "version": "20241108"
+     }
+    }
+   },
+   {
+    "aligned": 85,
+    "extras": 5,
+    "identity": 0.0824,
+    "kind": "positive",
+    "length_a": 123,
+    "length_b": 128,
+    "mates": 6,
+    "method": "structure",
+    "only_a": 5,
+    "pair": "2JCA_A-3LQ9_A",
+    "pieces": 0,
+    "rmsd": 4.3793,
+    "same_fold": false,
+    "stratum": "remote",
+    "tm_score": 0.3952,
+    "usalign": {
+     "agreement": {
+      "close_within_1": 0.9655,
+      "exact": 0.8736,
+      "foldmap_pairs_in_usalign": 0.9647,
+      "within_1": 0.9425
+     },
+     "auto": {
+      "method": "structure",
+      "tm_score": 0.3952,
+      "within_1": 0.9425
+     },
+     "disagreements": [
+      "A 90-91 (2): B shifted +2",
+      "A 92-93 (2): not paired",
+      "A 99-99 (1): not paired"
+     ],
+     "limits": {
+      "applies": false,
+      "pairs": true,
+      "tm": true,
+      "verdict": "\u2013"
+     },
+     "rows": {
+      "foldmap": [
+       "MSIIGVGIDVAEVERFGAALERTPA----LAGRLF-L--ESELLLP-------GGERRGVASLAARFAAKEALAKALGAPAGLLWTDAEVWVEA---GGRP-RLRVT-GTVAARAAELGVASWHVSLSH------------------------DAGIASAVVIAEG",
+       "-------------------------DEHLCA-NLMQLLQESL-AQARLGSRRPARLLMPSQLVSQVGKELLRLAYSEPCG-LRG--ALLDVCVEQGKSCHSVGQLALDPS--LVP----T-FQLTLVLRLDSRLWKIQGLFSSANSPSQSLTLST-GFRVIKKKLY"
+      ],
+      "usalign": [
+       "MSIIGVGIDVAEVERFGAALERTPA----LAGRLF-L--ESELLLP-------GGERRGVASLAARFAAKEALAKALGAPAGLLWTDAEVWVEA---GGRPRLRVTGTVAARAAELGVASWHVSLSH------------------------DAGIASAVVIAEG",
+       "-------------------------DEHLCA-NLMQLLQESL-AQARLGSRRPARLLMPSQLVSQVGKELLRLAYSEPCG-LRG--ALLDVCVEQGKSCHSVGQLALDPSLVP--T-F--QLTLVLRLDSRLWKIQGLFSSANSPSQSLTLST-GFRVIKKKLY"
+      ]
+     },
+     "structure": {
+      "aligned": 85,
+      "rmsd": 4.3793,
+      "tm_score": 0.3952
+     },
+     "tm_difference": 0.0013,
+     "usalign": {
+      "aligned": 87,
+      "aligned_reported": 87,
+      "close": 58,
+      "foldmap_tm_of_its_pairs": 0.394,
+      "rmsd": 4.51,
+      "tm_a": 0.3939,
+      "tm_b": 0.3841,
+      "version": "20241108"
+     }
+    }
+   },
+   {
+    "aligned": 77,
+    "extras": 0,
+    "identity": 0.1429,
+    "kind": "positive",
+    "length_a": 80,
+    "length_b": 88,
+    "mates": 5,
+    "method": "structure",
+    "only_a": 0,
+    "pair": "2LSR_A-4YL6_A",
+    "pieces": 1,
+    "rmsd": 1.5479,
+    "same_fold": true,
+    "stratum": "remote",
+    "tm_score": 0.8106,
+    "usalign": {
+     "agreement": {
+      "close_within_1": 1.0,
+      "exact": 1.0,
+      "foldmap_pairs_in_usalign": 1.0,
+      "within_1": 1.0
+     },
+     "auto": {
+      "method": "structure",
+      "tm_score": 0.8106,
+      "within_1": 1.0
+     },
+     "disagreements": [],
+     "limits": {
+      "applies": true,
+      "pairs": true,
+      "tm": true,
+      "verdict": "pass"
+     },
+     "rows": {
+      "foldmap": [
+       "-M--DRKVAREFRHKVDFLIENDAEKDYLYDVLRMYHQTMDVAVLVGDLKLVINEPSRLPLFDAIRPLIPLKHQVEYDQLTPR--------",
+       "LSASATELLQDYMLTLRTKL-SSQEIQQFAALLHEYRNGASIHEFCINLRQLYGDS-RKFLLLGLRPFIPEKDSQHFEN-FLETIGVKDLE"
+      ],
+      "usalign": [
+       "-M--DRKVAREFRHKVDFLIENDAEKDYLYDVLRMYHQTMDVAVLVGDLKLVINEPSRLPLFDAIRPLIPLKHQVEYDQLTPR--------",
+       "LSASATELLQDYMLTLRTKL-SSQEIQQFAALLHEYRNGASIHEFCINLRQLYGDS-RKFLLLGLRPFIPEKDSQHFEN-FLETIGVKDLE"
+      ]
+     },
+     "structure": {
+      "aligned": 77,
+      "rmsd": 1.5479,
+      "tm_score": 0.8106
+     },
+     "tm_difference": 0.0,
+     "usalign": {
+      "aligned": 77,
+      "aligned_reported": 77,
+      "close": 77,
+      "foldmap_tm_of_its_pairs": 0.8106,
+      "rmsd": 1.55,
+      "tm_a": 0.8106,
+      "tm_b": 0.7484,
+      "version": "20241108"
+     }
+    }
+   },
+   {
+    "aligned": 87,
+    "extras": 4,
+    "identity": 0.0805,
+    "kind": "positive",
+    "length_a": 141,
+    "length_b": 126,
+    "mates": 7,
+    "method": "structure",
+    "only_a": 2,
+    "pair": "2MJ7_A-2EHB_D",
+    "pieces": 0,
+    "rmsd": 2.678,
+    "same_fold": false,
+    "stratum": "remote",
+    "tm_score": 0.4918,
+    "usalign": {
+     "agreement": {
+      "close_within_1": 1.0,
+      "exact": 1.0,
+      "foldmap_pairs_in_usalign": 1.0,
+      "within_1": 1.0
+     },
+     "auto": {
+      "method": "structure",
+      "tm_score": 0.4918,
+      "within_1": 1.0
+     },
+     "disagreements": [],
+     "limits": {
+      "applies": false,
+      "pairs": true,
+      "tm": true,
+      "verdict": "\u2013"
+     },
+     "rows": {
+      "foldmap": [
+       "MGHHHHHHSHMQELPDSGALMLVPNRQLTADYFEKTWLSLKV-------------------------------AHQQVLPWRGEF-H-PDTLQMALQVVNIQTIAMSRAGSRPWKAYLSAQDDTGC-LFLTELLLEPGN---SEMQISVKQNEARTETLNSFISVLETVIGTIEEIKS--",
+       "------------------------------------------EGPLMMNAFEMITLSQGLNLSALFDRRQDFVKRQTRFVSRREPSEIIANIEAVANSMGFKS-HTR---N--FKTRLEGLSSIKAGQLAVVIEIYEVAPSLFMVDVRKAAG-ETL-EYHKFYKKLCSKLEN-II---WR"
+      ],
+      "usalign": [
+       "MGHHHHHHSHMQELPDSGALMLVPNRQLTADYFEKTWLSLKV-------------------------------AHQQVLPWRGEF-H-PDTLQMALQVVNIQTIAMSRAGSRPWKAYLSAQDDTGC-LFLTELLLEPGN---SEMQISVKQNEARTETLNSFISVLETVIGTIEEIKS--",
+       "------------------------------------------EGPLMMNAFEMITLSQGLNLSALFDRRQDFVKRQTRFVSRREPSEIIANIEAVANSMGFKS-HTR---N--FKTRLEGLSSIKAGQLAVVIEIYEVAPSLFMVDVRKAAG-ETL-EYHKFYKKLCSKLEN-II---WR"
+      ]
+     },
+     "structure": {
+      "aligned": 87,
+      "rmsd": 2.678,
+      "tm_score": 0.4918
+     },
+     "tm_difference": 0.0001,
+     "usalign": {
+      "aligned": 87,
+      "aligned_reported": 87,
+      "close": 80,
+      "foldmap_tm_of_its_pairs": 0.4918,
+      "rmsd": 2.68,
+      "tm_a": 0.4917,
+      "tm_b": 0.5397,
+      "version": "20241108"
+     }
+    }
+   },
+   {
+    "aligned": 128,
+    "extras": 0,
+    "identity": 0.8828,
+    "kind": "positive",
+    "length_a": 129,
+    "length_b": 128,
+    "mates": 13,
+    "method": "sequence",
+    "only_a": 0,
+    "pair": "2OKF_A-2INB_A",
+    "pieces": 0,
+    "rmsd": 0.8532,
+    "same_fold": true,
+    "stratum": "close",
+    "tm_score": 0.976,
+    "usalign": {
+     "agreement": {
+      "close_within_1": 1.0,
+      "exact": 1.0,
+      "foldmap_pairs_in_usalign": 1.0,
+      "within_1": 1.0
+     },
+     "auto": {
+      "method": "sequence",
+      "tm_score": 0.976,
+      "within_1": 1.0
+     },
+     "disagreements": [],
+     "limits": {
+      "applies": true,
+      "pairs": true,
+      "tm": true,
+      "verdict": "pass"
+     },
+     "rows": {
+      "foldmap": [
+       "RDVFHEVVKTALKKDGWQITDDPLTISVGGVNLKLIAAERQGQKIAVEVKSFLKQSSAISEFHTALGQFINYRGALRKVEPDRVLYLAVPLTTYKTFFQLDFPKEIIIENQVKMLVYDVEQEVIFQWIN",
+       "-DVFHQVVKIALEKDGWQITNDPLTISVGGVNLKLIAAEREGEKIAVEVKSFLERSSAISEFHTALGQFINYRGALRRRQPERVLYLAVPLTTYKTFFQLDFPKEMIAENQVKMLIYDVEQEVIFQWIN"
+      ],
+      "usalign": [
+       "RDVFHEVVKTALKKDGWQITDDPLTISVGGVNLKLIAAERQGQKIAVEVKSFLKQSSAISEFHTALGQFINYRGALRKVEPDRVLYLAVPLTTYKTFFQLDFPKEIIIENQVKMLVYDVEQEVIFQWIN",
+       "-DVFHQVVKIALEKDGWQITNDPLTISVGGVNLKLIAAEREGEKIAVEVKSFLERSSAISEFHTALGQFINYRGALRRRQPERVLYLAVPLTTYKTFFQLDFPKEMIAENQVKMLIYDVEQEVIFQWIN"
+      ]
+     },
+     "structure": {
+      "aligned": 128,
+      "rmsd": 0.8532,
+      "tm_score": 0.976
+     },
+     "tm_difference": 0.0,
+     "usalign": {
+      "aligned": 128,
+      "aligned_reported": 128,
+      "close": 126,
+      "foldmap_tm_of_its_pairs": 0.976,
+      "rmsd": 0.85,
+      "tm_a": 0.976,
+      "tm_b": 0.9835,
+      "version": "20241108"
+     }
+    }
+   },
+   {
+    "aligned": 73,
+    "extras": 3,
+    "identity": 0.0411,
+    "kind": "positive",
+    "length_a": 114,
+    "length_b": 85,
+    "mates": 6,
+    "method": "structure",
+    "only_a": 5,
+    "pair": "2Q82_A-2JTR_A",
+    "pieces": 1,
+    "rmsd": 3.8438,
+    "same_fold": false,
+    "stratum": "remote",
+    "tm_score": 0.3967,
+    "usalign": {
+     "agreement": {
+      "close_within_1": 0.9833,
+      "exact": 0.7324,
+      "foldmap_pairs_in_usalign": 0.9315,
+      "within_1": 0.9577
+     },
+     "auto": {
+      "method": "structure",
+      "tm_score": 0.3967,
+      "within_1": 0.9577
+     },
+     "disagreements": [
+      "A 72-72 (1): not paired",
+      "A 93-93 (1): not paired",
+      "A 116-116 (1): not paired"
+     ],
+     "limits": {
+      "applies": false,
+      "pairs": true,
+      "tm": true,
+      "verdict": "\u2013"
+     },
+     "rows": {
+      "foldmap": [
+       "ELQNRLAQYETSLMVMSHNGDVP-VITGFNVMRVTTMLDALKVPAVAVLGDDAQDLAYV--FGARPLAVGVNIIRVVDVPGQQPSALVDAELG----A-LHEVS-MVRVLNDIADEQLVKANM---",
+       "----------AEHWIDVRVPEQYQQEHVQ--------------GAINIPLKEVKERI-ATAV-PDKN-D--TVKVYC-NA-GRQSGQAKEILSEMGYTHVENAGGLKDI-AMPK---------VKG"
+      ],
+      "usalign": [
+       "ELQNRLAQYETSLMVMSHNGDVP--VITGFNVMRVTTMLDALKVPAVAVLGDDAQDLAYV-FGARPLAVGVNIIRVVDVPGQQPS-ALVDAELG----A-LHEVSM-VRVLNDIADEQLVKANM----",
+       "----------AEHWIDVRVPEQYQQEHV-Q--------------GAINIPLKEVKERIATAV-PDKN----DTVKVY-CNAGRQSGQ-AKEILSEMGYTHVENAGGLKD-IA-MP---------KVKG"
+      ]
+     },
+     "structure": {
+      "aligned": 73,
+      "rmsd": 3.8438,
+      "tm_score": 0.3967
+     },
+     "tm_difference": 0.0046,
+     "usalign": {
+      "aligned": 71,
+      "aligned_reported": 71,
+      "close": 60,
+      "foldmap_tm_of_its_pairs": 0.3925,
+      "rmsd": 3.58,
+      "tm_a": 0.3921,
+      "tm_b": 0.4693,
+      "version": "20241108"
+     }
+    }
+   },
+   {
+    "aligned": 123,
+    "extras": 19,
+    "identity": 0.0407,
+    "kind": "negative",
+    "length_a": 224,
+    "length_b": 356,
+    "mates": 8,
+    "method": "structure",
+    "only_a": 11,
+    "pair": "3BUU_A-3VDI_A",
+    "pieces": 0,
+    "rmsd": 5.602,
+    "same_fold": false,
+    "stratum": "negative",
+    "tm_score": 0.3301,
+    "usalign": {
+     "agreement": {
+      "close_within_1": 0.5,
+      "exact": 0.2769,
+      "foldmap_pairs_in_usalign": 0.374,
+      "within_1": 0.3538
+     },
+     "auto": {
+      "method": "structure",
+      "tm_score": 0.3301,
+      "within_1": 0.3538
+     },
+     "disagreements": [
+      "A 44-44 (1): not paired",
+      "A 46-50 (5): not paired",
+      "A 60-62 (3): not paired",
+      "A 63-64 (2): B shifted +5",
+      "A 65-67 (3): B shifted +4",
+      "A 80-80 (1): not paired",
+      "A 103-103 (1): B shifted +6",
+      "A 111-111 (1): B shifted +7",
+      "A 114-115 (2): not paired",
+      "A 116-121 (6): B shifted -2",
+      "A 122-122 (1): not paired",
+      "A 144-144 (1): B shifted -5",
+      "A 145-148 (4): B shifted -6",
+      "A 149-149 (1): not paired",
+      "A 159-165 (7): B shifted +3",
+      "A 166-166 (1): not paired",
+      "A 167-170 (4): B shifted +2",
+      "A 171-188 (18): not paired",
+      "A 189-192 (4): B shifted -91",
+      "A 198-198 (1): B shifted -67",
+      "A 199-200 (2): not paired",
+      "A 201-201 (1): B shifted -67",
+      "A 204-204 (1): B shifted -75",
+      "A 205-206 (2): not paired",
+      "A 207-210 (4): B shifted -41",
+      "A 214-214 (1): B shifted -49",
+      "A 220-220 (1): B shifted -55",
+      "A 222-224 (3): B shifted -55",
+      "A 225-226 (2): not paired"
+     ],
+     "limits": {
+      "applies": false,
+      "pairs": false,
+      "tm": true,
+      "verdict": "\u2013"
+     },
+     "rows": {
+      "foldmap": [
+       "AVTAQSILEKADEIRFP---------------QDSFQVNVAIRT-------AAPDH--AEDLYRYQVLS--KG-NENSIVMITEPA------SERGQAILMK------GRDLWVFM------PSVSQPIRLSLSQRLTGQVANGDIARANFTGDYHPQLLR--NESIDDE-----DYYVLELTGIDRSVTYQKVLLWVNQSNFRPYK------------------------------------------------AEFYSVS---------------------GRLLK--TSR---YEN------------------------------------FDNIL-----GEMRPTR-II-MEDALKSGEVSVLDYSDMKLRDLPDKIFTKDYLKRLE----------------------------------------------------------------",
+       "-----------------TTTAHSDYEIILEGGSSSWGQIKG---RAKVNVPAALPLLPADCNIKIEAKPLDA-QKGVVRFTSQIESIVDSTKNKLVVEVDIANETKDRRIAVGEGEVSVGDFSHK--FSFEGS----------V--------VNMYYYRS-DAV------RRNVPNPVYMQGRQ-FHDI------------------MMKVPLDNKDLIETWEGFQQSISGGGVNFGDWIREFWFIGPAYTAINEGGQRISPIQVNNFGVESGPVGVSRWKFSHAG--SGIVDSISR--WAELFPVEQLNKPASIEGGFRSDSQGIEVKVDGNLPGVSRDAGGGLRRILNHPLIPLVHHG---MVG---------------------------KFNDFTVDTQLKVVLPKGYKIRYAAPQFRSQNLEEYRWSGGAYARWVEHVCKGGTGQFEVLYAQ"
+      ],
+      "usalign": [
+       "AVTAQSILEK-------------AD-EIRFPQDSFQVNVAIRTAA-PDH------AEDLYRYQVLS--KGNENSIVMITEPA------SERGQAILMKG-----RDLWVFMP-------SVSQPIRLSLSQRLTGQVANGDIARANFTGDY------H-PQLLRNESIDDEDYYVLELTGIDRSV-------------------------------------------------------------------------------------TYQKV--L------------------------------------LWVNQSNFRPYKAEFYSVSGR--LLKTSR-------------YENFDNILGE----------------MRPTRI------------IM--EDALKSGEVSVLDYSDMKLRDLPDKIFTKDYLKRLE----------",
+       "----------TTTAHSDYEIILEG-GSSSWG------QIKGRAKVNVPAALPLLPADCNIKIEAKPLDAQKGVVRFTSQIESIVDSTKNKLVVEVDIANETKDRRIAVGEGEVSVGDFSHKFSFEGSVVN---------------------MYYYRSDAVRRNV---------PNPVYMQGRQFHDIMMKVPLDNKDLIETWEGFQQSISGGGVNFGDWIREFWFIGPAYTAINEGGQRISPIQVNNFGVESGPVGVSRWKFSHAGSGIVDSISRWAELFPVEQLNKPASIEGGFRSDSQGIEVKVDGNLPGVSRDAGGGLRRILNHPLI-----PLVHHG--MVGKFNDFTVDTQLKVVLPK---GYKIRYAAPQFRSQNLE-----EYRWSGGAYARWV-EHVCKGG-------------------------------TGQFEVLYAQ"
+      ]
+     },
+     "structure": {
+      "aligned": 123,
+      "rmsd": 5.602,
+      "tm_score": 0.3301
+     },
+     "tm_difference": -0.0175,
+     "usalign": {
+      "aligned": 130,
+      "aligned_reported": 130,
+      "close": 74,
+      "foldmap_tm_of_its_pairs": 0.3475,
+      "rmsd": 5.75,
+      "tm_a": 0.3476,
+      "tm_b": 0.2455,
+      "version": "20241108"
+     }
+    }
+   },
+   {
+    "aligned": 100,
+    "extras": 1,
+    "identity": 0.64,
+    "kind": "positive",
+    "length_a": 101,
+    "length_b": 101,
+    "mates": 7,
+    "method": "sequence",
+    "only_a": 0,
+    "pair": "3IE4_A-3AQX_A",
+    "pieces": 0,
+    "rmsd": 0.7429,
+    "same_fold": true,
+    "stratum": "close",
+    "tm_score": 0.9567,
+    "usalign": {
+     "agreement": {
+      "close_within_1": 1.0,
+      "exact": 1.0,
+      "foldmap_pairs_in_usalign": 1.0,
+      "within_1": 1.0
+     },
+     "auto": {
+      "method": "sequence",
+      "tm_score": 0.9567,
+      "within_1": 0.99
+     },
+     "disagreements": [],
+     "limits": {
+      "applies": true,
+      "pairs": true,
+      "tm": true,
+      "verdict": "pass"
+     },
+     "rows": {
+      "foldmap": [
+       "-YEVPKAKIDVFYPKGFEVSIPDEEGITLFAFHGKLNEEMEGLEAGTWARDIVKAKNGRWTFRDRITALKPGDTLYYWTYVIYNGLGYREDDGSFVVNGYSG",
+       "SYEAPPATLEAIHPKGLRVSVPDEG-FSLFAFHGKLNEEMEGLEAGHWSRDITKPKNGRWIFRDRNAALKIGDKIYFWTFVIKDGLGYRQDNGEWTVEGFVD"
+      ],
+      "usalign": [
+       "-YEVPKAKIDVFYPKGFEVSIPDEEGITLFAFHGKLNEEMEGLEAGTWARDIVKAKNGRWTFRDRITALKPGDTLYYWTYVIYNGLGYREDDGSFVVNGYSG",
+       "SYEAPPATLEAIHPKGLRVSVPDEG-FSLFAFHGKLNEEMEGLEAGHWSRDITKPKNGRWIFRDRNAALKIGDKIYFWTFVIKDGLGYRQDNGEWTVEGFVD"
+      ]
+     },
+     "structure": {
+      "aligned": 100,
+      "rmsd": 0.7223,
+      "tm_score": 0.9576
+     },
+     "tm_difference": 0.0,
+     "usalign": {
+      "aligned": 100,
+      "aligned_reported": 100,
+      "close": 100,
+      "foldmap_tm_of_its_pairs": 0.9576,
+      "rmsd": 0.72,
+      "tm_a": 0.9576,
+      "tm_b": 0.9576,
+      "version": "20241108"
+     }
+    }
+   },
+   {
+    "aligned": 111,
+    "extras": 2,
+    "identity": 0.1081,
+    "kind": "positive",
+    "length_a": 118,
+    "length_b": 134,
+    "mates": 8,
+    "method": "structure",
+    "only_a": 4,
+    "pair": "3N4H_A-4JCU_A",
+    "pieces": 0,
+    "rmsd": 2.8781,
+    "same_fold": true,
+    "stratum": "remote",
+    "tm_score": 0.7424,
+    "usalign": {
+     "agreement": {
+      "close_within_1": 1.0,
+      "exact": 0.9732,
+      "foldmap_pairs_in_usalign": 0.991,
+      "within_1": 0.9821
+     },
+     "auto": {
+      "method": "structure",
+      "tm_score": 0.7424,
+      "within_1": 0.9821
+     },
+     "disagreements": [
+      "A 55-55 (1): not paired",
+      "A 57-57 (1): B shifted -2"
+     ],
+     "limits": {
+      "applies": true,
+      "pairs": true,
+      "tm": true,
+      "verdict": "pass"
+     },
+     "rows": {
+      "foldmap": [
+       "-------XTYTCWSQRIRISREAKQRIAEAITDAHH-ELAHAPKYLVQVIFNEVEPDSYFIAAQS---ASENHIWVQATIRSGRTEKQKEELLLRLTQEIALILG-IPN----EEVWVYITEI-PGSNMTEYG-RL-----",
+       "NLYFQSMPHLTLEYTDNLPEP-RIPELLQKLNGVLLARPDIFPVGGIRARAYRLS-EYALA--DSSEPSDA-FVHLRLQIGAGRSEEVKKETGDALFAVLTDHFAAEF-AQRGLMLSAEISEFSEAGTWKKNNIH-ARYRK"
+      ],
+      "usalign": [
+       "-------XTYTCWSQRIRISREAKQRIAEAITDAHH-ELAHAPKYLVQVIFNEVEPDSYFIAAQ-S-ASENHIWVQATIRSGRTEKQKEELLLRLTQEIALILG-IPN----EEVWVYITEI-PGSNMTEYG-RL-----",
+       "NLYFQSMPHLTLEYTDNLPEP-RIPELLQKLNGVLLARPDIFPVGGIRARAYRLS-EYALA-DSSEPSDA-FVHLRLQIGAGRSEEVKKETGDALFAVLTDHFAAEF-AQRGLMLSAEISEFSEAGTWKKNNIH-ARYRK"
+      ]
+     },
+     "structure": {
+      "aligned": 111,
+      "rmsd": 2.8781,
+      "tm_score": 0.7424
+     },
+     "tm_difference": 0.0003,
+     "usalign": {
+      "aligned": 112,
+      "aligned_reported": 112,
+      "close": 99,
+      "foldmap_tm_of_its_pairs": 0.7421,
+      "rmsd": 2.95,
+      "tm_a": 0.7421,
+      "tm_b": 0.6665,
+      "version": "20241108"
+     }
+    }
+   },
+   {
+    "aligned": 136,
+    "extras": 2,
+    "identity": 0.2279,
+    "kind": "positive",
+    "length_a": 150,
+    "length_b": 155,
+    "mates": 7,
+    "method": "structure",
+    "only_a": 1,
+    "pair": "3O7I_A-2O8I_A",
+    "pieces": 0,
+    "rmsd": 2.9432,
+    "same_fold": true,
+    "stratum": "remote",
+    "tm_score": 0.7236,
+    "usalign": {
+     "agreement": {
+      "close_within_1": 1.0,
+      "exact": 0.9565,
+      "foldmap_pairs_in_usalign": 1.0,
+      "within_1": 0.9855
+     },
+     "auto": {
+      "method": "structure",
+      "tm_score": 0.7236,
+      "within_1": 0.9855
+     },
+     "disagreements": [
+      "A 94-94 (1): not paired",
+      "A 97-97 (1): not paired"
+     ],
+     "limits": {
+      "applies": true,
+      "pairs": true,
+      "tm": true,
+      "verdict": "pass"
+     },
+     "rows": {
+      "foldmap": [
+       "MIALSQFNSLSKDEAAGLLAPCV-ALPAWGETLVS-L-RPFASR-HALLQTAREAMANWGEDELNAALSAHPRIGE--KPTDSE----------NER-LA-QALREGNARYEARFGRVFLIRAKGRSGEEILQALTRRLQHTADEEVAEALAQLREITMLRLEGAIG-E",
+       "--------MVTREEFVARFGGVFEHSPFIAERAYDAGGAGLELTAKAVHGALCAQFRVASEAERLGVLRAHPDLAGKLA-----IAGELTGLDRLS-PQEHARFTQLNSAYTEKFGFPFIIAVKGLNRHDILSAFDTRIDNNAAQEFATATGQVEKIAWLRLASMLPEG"
+      ],
+      "usalign": [
+       "MIALSQFNSLSKDEAAGLLAPCV-ALPAWGETLVS-L-RPFASR-HALLQTAREAMANWGEDELNAALSAHPRIGE--KPTDS----------ENERLAQALREGNARYEARFGRVFLIRAKGRSGEEILQALTRRLQHTADEEVAEALAQLREITMLRLEGAIG-E",
+       "--------MVTREEFVARFGGVFEHSPFIAERAYDAGGAGLELTAKAVHGALCAQFRVASEAERLGVLRAHPDLAGKLA----IAGELTGLDRLSPQEHARFTQLNSAYTEKFGFPFIIAVKGLNRHDILSAFDTRIDNNAAQEFATATGQVEKIAWLRLASMLPEG"
+      ]
+     },
+     "structure": {
+      "aligned": 136,
+      "rmsd": 2.9432,
+      "tm_score": 0.7236
+     },
+     "tm_difference": -0.0006,
+     "usalign": {
+      "aligned": 138,
+      "aligned_reported": 138,
+      "close": 123,
+      "foldmap_tm_of_its_pairs": 0.7247,
+      "rmsd": 3.09,
+      "tm_a": 0.7242,
+      "tm_b": 0.7043,
+      "version": "20241108"
+     }
+    }
+   },
+   {
+    "aligned": 243,
+    "extras": 0,
+    "identity": 0.7778,
+    "kind": "positive",
+    "length_a": 243,
+    "length_b": 256,
+    "mates": 13,
+    "method": "sequence",
+    "only_a": 0,
+    "pair": "3OQL_A-4WWJ_A",
+    "pieces": 0,
+    "rmsd": 1.1321,
+    "same_fold": true,
+    "stratum": "close",
+    "tm_score": 0.988,
+    "usalign": {
+     "agreement": {
+      "close_within_1": 1.0,
+      "exact": 1.0,
+      "foldmap_pairs_in_usalign": 1.0,
+      "within_1": 1.0
+     },
+     "auto": {
+      "method": "sequence",
+      "tm_score": 0.988,
+      "within_1": 0.9959
+     },
+     "disagreements": [],
+     "limits": {
+      "applies": true,
+      "pairs": true,
+      "tm": true,
+      "verdict": "pass"
+     },
+     "rows": {
+      "foldmap": [
+       "-DTFERTGPLMEASSYPAWAQQLINDCSPAKARVVEHELYQQMRDAKLSPQIMRQYLIGGWPVVEQFAVYMAKNLTKTRFGRHPGEDMARRWLMRNIRVELNHADYWVNWCAAHDVTLEDLHDQRVAPELHALSHWCWQTSSSDSLAVAMAATNYAIEGATGEWSAVVCSTGVYAEAFAEETRKKSMKWLKMHAQY-DAHPWEALEIICTLVGNKPSLQLQAELRQAVTKSYDYMYLFLERCIQL-----------",
+       "IDTFSRTGPLMEAASYPAWTQQLIQDCSESKRRVVEHELYQRMRDNKLSAKVMRQYLIGGWPVVEQFALYMAQNLTKTRFARHPGEDMARRWLMRNIRVELNHADYWVHWSRAHGVTLEDLQAQQVPPELHALSHWCWHTSSADSLIVAIAATNYAIEGATGEWSALVCSNGIYAAAFPEEDRKRAMKWLKMHAQYDDAHPWEALEIIVTLAGLNPTKALQAELRQAICKSYDYMYLFLERCMQQEKTAVTRERLA"
+      ],
+      "usalign": [
+       "-DTFERTGPLMEASSYPAWAQQLINDCSPAKARVVEHELYQQMRDAKLSPQIMRQYLIGGWPVVEQFAVYMAKNLTKTRFGRHPGEDMARRWLMRNIRVELNHADYWVNWCAAHDVTLEDLHDQRVAPELHALSHWCWQTSSSDSLAVAMAATNYAIEGATGEWSAVVCSTGVYAEAFAEETRKKSMKWLKMHAQY-DAHPWEALEIICTLVGNKPSLQLQAELRQAVTKSYDYMYLFLERCIQL-----------",
+       "IDTFSRTGPLMEAASYPAWTQQLIQDCSESKRRVVEHELYQRMRDNKLSAKVMRQYLIGGWPVVEQFALYMAQNLTKTRFARHPGEDMARRWLMRNIRVELNHADYWVHWSRAHGVTLEDLQAQQVPPELHALSHWCWHTSSADSLIVAIAATNYAIEGATGEWSALVCSNGIYAAAFPEEDRKRAMKWLKMHAQYDDAHPWEALEIIVTLAGLNPTKALQAELRQAICKSYDYMYLFLERCMQQEKTAVTRERLA"
+      ]
+     },
+     "structure": {
+      "aligned": 243,
+      "rmsd": 0.5435,
+      "tm_score": 0.9915
+     },
+     "tm_difference": 0.0,
+     "usalign": {
+      "aligned": 243,
+      "aligned_reported": 243,
+      "close": 243,
+      "foldmap_tm_of_its_pairs": 0.9915,
+      "rmsd": 0.54,
+      "tm_a": 0.9915,
+      "tm_b": 0.9415,
+      "version": "20241108"
+     }
+    }
+   },
+   {
+    "aligned": 32,
+    "extras": 4,
+    "identity": 0.0938,
+    "kind": "negative",
+    "length_a": 71,
+    "length_b": 75,
+    "mates": 2,
+    "method": "structure",
+    "only_a": 4,
+    "pair": "3VDJ_A-2JXW_A",
+    "pieces": 0,
+    "rmsd": 3.6065,
+    "same_fold": false,
+    "stratum": "negative",
+    "tm_score": 0.2599,
+    "usalign": {
+     "agreement": {
+      "close_within_1": 0.0,
+      "exact": 0.0,
+      "foldmap_pairs_in_usalign": 0.0,
+      "within_1": 0.0
+     },
+     "auto": {
+      "method": "structure",
+      "tm_score": 0.2599,
+      "within_1": 0.0
+     },
+     "disagreements": [
+      "A 306-318 (13): not paired",
+      "A 320-323 (4): not paired",
+      "A 326-327 (2): not paired",
+      "A 332-336 (5): B shifted -38",
+      "A 338-338 (1): not paired",
+      "A 343-346 (4): B shifted -44",
+      "A 348-348 (1): not paired",
+      "A 365-365 (1): B shifted -37"
+     ],
+     "limits": {
+      "applies": false,
+      "pairs": false,
+      "tm": true,
+      "verdict": "\u2013"
+     },
+     "rows": {
+      "foldmap": [
+       "YVEFEPSDKHIKEYLNKIQNSL-----STEWSPCSVTCGNGIQVRIKPGSANKPKDELDYANDIEKK-------------------ICKMEKCPH-------------------",
+       "----------------------DPSKGRWVEGITSE----GYHYYY---DLISG---A----SQWEKPEGFQGDLKKTAVKTVWVEGLSEDG---FTYYYNTETGESRWEKPDD"
+      ],
+      "usalign": [
+       "-------------------------YVEFEPSDKHIKEYLN---KIQNSLSTEWSPCSVT---CGNGI----QVRIKPGSANKPKDELDYANDIEKKICKMEKCPH---------",
+       "DPSKGRWVEGITSEGYHYYYDLISGASQWEKPEGFQGD-LKKTAVK--TV----WVEGL-SEDG----FTYYYNTE-T----------------G-----------ESRWEKPDD"
+      ]
+     },
+     "structure": {
+      "aligned": 32,
+      "rmsd": 3.6065,
+      "tm_score": 0.2599
+     },
+     "tm_difference": 0.0157,
+     "usalign": {
+      "aligned": 31,
+      "aligned_reported": 31,
+      "close": 23,
+      "foldmap_tm_of_its_pairs": 0.2444,
+      "rmsd": 3.55,
+      "tm_a": 0.2441,
+      "tm_b": 0.2364,
+      "version": "20241108"
+     }
+    }
+   },
+   {
+    "aligned": 104,
+    "extras": 1,
+    "identity": 0.6346,
+    "kind": "positive",
+    "length_a": 104,
+    "length_b": 106,
+    "mates": 7,
+    "method": "sequence",
+    "only_a": 1,
+    "pair": "3WZ0_A-2AV5_A",
+    "pieces": 0,
+    "rmsd": 0.6722,
+    "same_fold": true,
+    "stratum": "close",
+    "tm_score": 0.9696,
+    "usalign": {
+     "agreement": {
+      "close_within_1": 1.0,
+      "exact": 1.0,
+      "foldmap_pairs_in_usalign": 1.0,
+      "within_1": 1.0
+     },
+     "auto": {
+      "method": "sequence",
+      "tm_score": 0.9696,
+      "within_1": 1.0
+     },
+     "disagreements": [],
+     "limits": {
+      "applies": true,
+      "pairs": true,
+      "tm": true,
+      "verdict": "pass"
+     },
+     "rows": {
+      "foldmap": [
+       "-NRYIAFQVIGERPFKKDEIKKAVWEASLSALGYLGSARAKPWFIKFDEKSQTGIVRVDRKHVEELRFALTMLTEINGSKVIFRTLGVSGTIKRLKRKFLAEYGW-",
+       "KKRYIAFKVISENQFNKDEIKEAIWNACLRTLGELGTAKAKPWLIKFDETTQTGIIRSDRNHVYDVIFSLTLVSDINGNKAIIKVLGVSGTIKRLKRKFLSQFGWR"
+      ],
+      "usalign": [
+       "-NRYIAFQVIGERPFKKDEIKKAVWEASLSALGYLGSARAKPWFIKFDEKSQTGIVRVDRKHVEELRFALTMLTEINGSKVIFRTLGVSGTIKRLKRKFLAEYGW-",
+       "KKRYIAFKVISENQFNKDEIKEAIWNACLRTLGELGTAKAKPWLIKFDETTQTGIIRSDRNHVYDVIFSLTLVSDINGNKAIIKVLGVSGTIKRLKRKFLSQFGWR"
+      ]
+     },
+     "structure": {
+      "aligned": 104,
+      "rmsd": 0.6722,
+      "tm_score": 0.9696
+     },
+     "tm_difference": 0.0,
+     "usalign": {
+      "aligned": 104,
+      "aligned_reported": 104,
+      "close": 104,
+      "foldmap_tm_of_its_pairs": 0.9696,
+      "rmsd": 0.67,
+      "tm_a": 0.9696,
+      "tm_b": 0.9519,
+      "version": "20241108"
+     }
+    }
+   },
+   {
+    "aligned": 135,
+    "extras": 0,
+    "identity": 0.1926,
+    "kind": "positive",
+    "length_a": 168,
+    "length_b": 138,
+    "mates": 14,
+    "method": "structure",
+    "only_a": 3,
+    "pair": "4E2U_A-2LWY_A",
+    "pieces": 0,
+    "rmsd": 2.0854,
+    "same_fold": true,
+    "stratum": "remote",
+    "tm_score": 0.7005,
+    "usalign": {
+     "agreement": {
+      "close_within_1": 1.0,
+      "exact": 1.0,
+      "foldmap_pairs_in_usalign": 1.0,
+      "within_1": 1.0
+     },
+     "auto": {
+      "method": "structure",
+      "tm_score": 0.7005,
+      "within_1": 1.0
+     },
+     "disagreements": [],
+     "limits": {
+      "applies": true,
+      "pairs": true,
+      "tm": true,
+      "verdict": "pass"
+     },
+     "rows": {
+      "foldmap": [
+       "SQHMAFARDTEVYYENDTVPHMESIEEMYSKYASMNGELPFDNGYAVPLDNVFVYTLDIASGEIKKTRASYIYREKVEKLIEIKLSSGYSLKVTPSHPVLLFRDGLQWVPAAEVKPGDVVVGVRNGELEFHEVSSVRIIDY--NNWVYDLVIPETHNFIA-PNGLVLHNAQ",
+       "SM-KAFVAGTMILTA----TGLVAIE-NI--K----------------AG-DKVIATNPETFEVAEKTVLETYVRETTELLHLTIGG-EVIKTTFDHPFYVK--DVGFVEAGKLQVGDKLLDSR---GNVLVVEEKKLEIADKPVKVYNFKVDDFHTYHVGDNEVLVHN--"
+      ],
+      "usalign": [
+       "SQHMAFARDTEVYYENDTVPHMESIEEMYSKYASMNGELPFDNGYAVPLDNVFVYTLDIASGEIKKTRASYIYREKVEKLIEIKLSSGYSLKVTPSHPVLLFRDGLQWVPAAEVKPGDVVVGVRNGELEFHEVSSVRIIDY--NNWVYDLVIPETHNFIA-PNGLVLHNAQ",
+       "SM-KAFVAGTMILTA----TGLVAIE-NI--K----------------AG-DKVIATNPETFEVAEKTVLETYVRETTELLHLTIGG-EVIKTTFDHPFYVK--DVGFVEAGKLQVGDKLLDSR---GNVLVVEEKKLEIADKPVKVYNFKVDDFHTYHVGDNEVLVHN--"
+      ]
+     },
+     "structure": {
+      "aligned": 135,
+      "rmsd": 2.0854,
+      "tm_score": 0.7005
+     },
+     "tm_difference": -0.0001,
+     "usalign": {
+      "aligned": 135,
+      "aligned_reported": 135,
+      "close": 130,
+      "foldmap_tm_of_its_pairs": 0.7005,
+      "rmsd": 2.09,
+      "tm_a": 0.7006,
+      "tm_b": 0.8333,
+      "version": "20241108"
+     }
+    }
+   },
+   {
+    "aligned": 61,
+    "extras": 6,
+    "identity": 0.1148,
+    "kind": "negative",
+    "length_a": 129,
+    "length_b": 143,
+    "mates": 3,
+    "method": "structure",
+    "only_a": 8,
+    "pair": "4IPV_A-4N2P_A",
+    "pieces": 0,
+    "rmsd": 4.0675,
+    "same_fold": false,
+    "stratum": "negative",
+    "tm_score": 0.3032,
+    "usalign": {
+     "agreement": {
+      "close_within_1": 0.0513,
+      "exact": 0.0704,
+      "foldmap_pairs_in_usalign": 0.1148,
+      "within_1": 0.0986
+     },
+     "auto": {
+      "method": "structure",
+      "tm_score": 0.3032,
+      "within_1": 0.0986
+     },
+     "disagreements": [
+      "A 31-48 (18): B shifted +4",
+      "A 49-52 (4): not paired",
+      "A 57-58 (2): not paired",
+      "A 59-62 (4): B shifted -2",
+      "A 66-70 (5): B shifted -2",
+      "A 90-90 (1): not paired",
+      "A 92-95 (4): B shifted +2",
+      "A 98-100 (3): B shifted +2",
+      "A 106-111 (6): B shifted +2",
+      "A 112-114 (3): not paired",
+      "A 144-144 (1): not paired",
+      "A 147-148 (2): B shifted -2",
+      "A 149-155 (7): B shifted -3",
+      "A 156-156 (1): not paired",
+      "A 157-158 (2): B shifted +2",
+      "A 159-159 (1): not paired"
+     ],
+     "limits": {
+      "applies": false,
+      "pairs": false,
+      "tm": true,
+      "verdict": "\u2013"
+     },
+     "rows": {
+      "foldmap": [
+       "------------------------------------------------------------NELQSAAEELNAMLQYARSEAVSQRRAISIQALKDKDWGKGLSIGVLASGSIAAPLRKHDG-------FRAATLTAKEKSAVEHLTFTANGTLVPPTERTFAICQNGKTDGGRVLSISQAGRIQLEPSSKAPQ---------SCY------",
+       "MLKKWEHYEHTADIGIRGYGDSLEEAFEAVAIALFDVMVNVNKVEKKEVREIEVEAEDLEALLYSFLEELLVIHDIEG----------LVFR---DFEVK---------------------IERVNGKYRLR--AKA-----YGEKLD---LKKHEP---------------------KE-EVKAITYHDMK-IERLPNGKWMA-QLVPDI"
+      ],
+      "usalign": [
+       "--------------------------------------------------------NELQSAAEELNAMLQYARSEAVSQRRAISIQALKDKDWGKGLSIGVLASGSIAAPLRKH-DG-FRAATLTAKEKSAVEHLTFTANGTL-VPPTERTFAICQNGKTDGGRVLSISQAGRI--QL-EPSSKAPQ---SCY-------",
+       "MLKKWEHYEHTADIGIRGYGDSLEEAFEAVAIALFDVMVNVNKVEKKEVREIEVEAEDLEALLYSFLEELLVIHDIEG----LVFRDF---EVKIE-------------------RV-NGKYR--LRA-----KAYGEKLDL--KKHE----------------------PKEEVKAITYHDMKIERLPNGKWMAQLVPDI"
+      ]
+     },
+     "structure": {
+      "aligned": 61,
+      "rmsd": 4.0675,
+      "tm_score": 0.3032
+     },
+     "tm_difference": -0.0061,
+     "usalign": {
+      "aligned": 71,
+      "aligned_reported": 71,
+      "close": 39,
+      "foldmap_tm_of_its_pairs": 0.3092,
+      "rmsd": 5.04,
+      "tm_a": 0.3093,
+      "tm_b": 0.2879,
+      "version": "20241108"
+     }
+    }
+   },
+   {
+    "aligned": 74,
+    "extras": 0,
+    "identity": 0.2568,
+    "kind": "positive",
+    "length_a": 80,
+    "length_b": 80,
+    "mates": 4,
+    "method": "structure",
+    "only_a": 0,
+    "pair": "4U12_A-4NPX_A",
+    "pieces": 0,
+    "rmsd": 1.7941,
+    "same_fold": true,
+    "stratum": "remote",
+    "tm_score": 0.768,
+    "usalign": {
+     "agreement": {
+      "close_within_1": 0.9861,
+      "exact": 0.96,
+      "foldmap_pairs_in_usalign": 1.0,
+      "within_1": 0.9867
+     },
+     "auto": {
+      "method": "structure",
+      "tm_score": 0.768,
+      "within_1": 0.9867
+     },
+     "disagreements": [
+      "A 65-65 (1): not paired"
+     ],
+     "limits": {
+      "applies": true,
+      "pairs": true,
+      "tm": true,
+      "verdict": "pass"
+     },
+     "rows": {
+      "foldmap": [
+       "---NPLDKWNDIIFHASKKLSKKELERLLELLALLETFIEKEDLEEKFESFAK-ALRIDEELQQKIESRKTDIVIQSMANILSG--",
+       "FNKTPKEKFIEIIQNGNLGALEKVFEEFFADHIAMVELLEKQGLT--EMDVKNFIL--E--NGDFIEERQNDIYIELGAKILGHEG"
+      ],
+      "usalign": [
+       "---NPLDKWNDIIFHASKKLSKKELERLLELLALLETFIEKEDLEEKFESFAKALRIDEELQQKIESRKTDIVIQSMANILSG--",
+       "FNKTPKEKFIEIIQNGNLGALEKVFEEFFADHIAMVELLEKQGLT--EMDVKNFIL-E--NGDFIEERQNDIYIELGAKILGHEG"
+      ]
+     },
+     "structure": {
+      "aligned": 74,
+      "rmsd": 1.7941,
+      "tm_score": 0.768
+     },
+     "tm_difference": 0.0016,
+     "usalign": {
+      "aligned": 75,
+      "aligned_reported": 75,
+      "close": 72,
+      "foldmap_tm_of_its_pairs": 0.7664,
+      "rmsd": 1.88,
+      "tm_a": 0.7664,
+      "tm_b": 0.7664,
+      "version": "20241108"
+     }
+    }
+   },
+   {
+    "aligned": 94,
+    "extras": 0,
+    "identity": 0.0745,
+    "kind": "positive",
+    "length_a": 111,
+    "length_b": 115,
+    "mates": 6,
+    "method": "structure",
+    "only_a": 2,
+    "pair": "5E4E_A-3TGX_B",
+    "pieces": 0,
+    "rmsd": 3.0983,
+    "same_fold": true,
+    "stratum": "remote",
+    "tm_score": 0.6181,
+    "usalign": {
+     "agreement": {
+      "close_within_1": 0.9759,
+      "exact": 0.9474,
+      "foldmap_pairs_in_usalign": 0.9787,
+      "within_1": 0.9684
+     },
+     "auto": {
+      "method": "structure",
+      "tm_score": 0.6181,
+      "within_1": 0.9684
+     },
+     "disagreements": [
+      "A 51-51 (1): not paired",
+      "A 82-82 (1): not paired",
+      "A 110-110 (1): not paired"
+     ],
+     "limits": {
+      "applies": true,
+      "pairs": true,
+      "tm": true,
+      "verdict": "pass"
+     },
+     "rows": {
+      "foldmap": [
+       "PGP-V-PPSTAVRELIEELINITQNAPLCNGSMVWSIN-R-T-A--GMYCAALESLINVSGC-----S--AIEKTQRMLSGFCPHKVSAGQFSS-------LHVRSSKIEVAQFVKDLLFHLRTLFREGQFN",
+       "---GQDRHMIRMRQLIDIVDQLKNYVNDLVPEFLPAPEDVETNCEWSAFSCFQKA--QLKSANTGNNERIINVSIKKLKRKPPS----------THRLTCPSCDSYEKKPPKEFLERFKSLLQKMIHQ-HL-"
+      ],
+      "usalign": [
+       "PGP-V-PPSTAVRELIEELINITQNAPLCNGSMVWSI-NR-T-A--GMYCAALESLINVSGC-----S--AIEKTQRMLSGFCPHKVSAGQFS------SLHVRSSKIEVAQFVKDLLFHLRTLFREGQFN",
+       "---GQDRHMIRMRQLIDIVDQLKNYVNDLVPEFLPAPEDVETNCEWSAFSCFQK-A-QLKSANTGNNERIINVSIKKLKRKPPS---------THRLTCPSCDSYEKKPPKEFLERFKSLLQKMI-HQHL-"
+      ]
+     },
+     "structure": {
+      "aligned": 94,
+      "rmsd": 3.0983,
+      "tm_score": 0.6181
+     },
+     "tm_difference": -0.0001,
+     "usalign": {
+      "aligned": 95,
+      "aligned_reported": 95,
+      "close": 83,
+      "foldmap_tm_of_its_pairs": 0.6177,
+      "rmsd": 3.24,
+      "tm_a": 0.6182,
+      "tm_b": 0.6013,
+      "version": "20241108"
+     }
+    }
+   },
+   {
+    "aligned": 156,
+    "extras": 3,
+    "identity": 0.1026,
+    "kind": "positive",
+    "length_a": 269,
+    "length_b": 187,
+    "mates": 11,
+    "method": "structure",
+    "only_a": 10,
+    "pair": "5GL3_A-1WPN_A",
+    "pieces": 0,
+    "rmsd": 3.8171,
+    "same_fold": false,
+    "stratum": "remote",
+    "tm_score": 0.4463,
+    "usalign": {
+     "agreement": {
+      "close_within_1": 1.0,
+      "exact": 1.0,
+      "foldmap_pairs_in_usalign": 1.0,
+      "within_1": 1.0
+     },
+     "auto": {
+      "method": "structure",
+      "tm_score": 0.4463,
+      "within_1": 1.0
+     },
+     "disagreements": [],
+     "limits": {
+      "applies": false,
+      "pairs": true,
+      "tm": true,
+      "verdict": "\u2013"
+     },
+     "rows": {
+      "foldmap": [
+       "MIAHLINTDIGNRGVLKVYLDYRRKNFNFLHNSTKMFLDNLERVLIVTGFPIPPMMVAETDGPPGALAIYRAVEM-LGGKAEILTYSEV--EK-ALE--PFGVSLARTPEPEDYSLIISVETPGRAADGRYYSMSALEIKRDPLDGIFLKARALGIPTIGVGDGGNEIGMGKIRELVVGHVPHGEKIASVVET---DELIVS-A-VSNWGAYGLVAQASIEVGRNLLEGWDERRVIEAISSAGLIDGVSKTLAPSV-DGIR-LMVHEGIVELLKAVVDEAIL------------------",
+       "-----------------------------------------EKILIFGHQN------PDTDTICSAIAYADLKNKLGFNAEPVRLGQVNGETQYALDYFKQESPRLVETAANEVNGVILVDHNER-----Q-----------QSIKDIEEV----QVLEVIDHHR----I------------------ANFETAEPLYYRAEPVGCTATILNKMYKE-N-----NVKIEKEIAGLMLSAI----ISDSL---LFKSPTCTDQDVAAAKELA-----------EIAGVDAEEYGLNMLKAG"
+      ],
+      "usalign": [
+       "MIAHLINTDIGNRGVLKVYLDYRRKNFNFLHNSTKMFLDNLERVLIVTGFPIPPMMVAETDGPPGALAIYRAVEM-LGGKAEILTYSEV--EK-ALE--PFGVSLARTPEPEDYSLIISVETPGRAADGRYYSMSALEIKRDPLDGIFLKARALGIPTIGVGDGGNEIGMGKIRELVVGHVPHGEKIASVVET---DELIVS-A-VSNWGAYGLVAQASIEVGRNLLEGWDERRVIEAISSAGLIDGVSKTLAPSV-DGIR-LMVHEGIVELLKAVVDEAIL------------------",
+       "-----------------------------------------EKILIFGHQN------PDTDTICSAIAYADLKNKLGFNAEPVRLGQVNGETQYALDYFKQESPRLVETAANEVNGVILVDHNER-----Q-----------QSIKDIEEV----QVLEVIDHHR----I------------------ANFETAEPLYYRAEPVGCTATILNKMYKE-N-----NVKIEKEIAGLMLSAI----ISDSL---LFKSPTCTDQDVAAAKELA-----------EIAGVDAEEYGLNMLKAG"
+      ]
+     },
+     "structure": {
+      "aligned": 156,
+      "rmsd": 3.8171,
+      "tm_score": 0.4463
+     },
+     "tm_difference": 0.0,
+     "usalign": {
+      "aligned": 156,
+      "aligned_reported": 156,
+      "close": 126,
+      "foldmap_tm_of_its_pairs": 0.4463,
+      "rmsd": 3.82,
+      "tm_a": 0.4462,
+      "tm_b": 0.5978,
+      "version": "20241108"
+     }
+    }
+   },
+   {
+    "aligned": 162,
+    "extras": 2,
+    "identity": 0.1667,
+    "kind": "positive",
+    "length_a": 169,
+    "length_b": 214,
+    "mates": 5,
+    "method": "structure",
+    "only_a": 3,
+    "pair": "5GY2_C-2D4X_A",
+    "pieces": 0,
+    "rmsd": 2.5702,
+    "same_fold": true,
+    "stratum": "remote",
+    "tm_score": 0.7989,
+    "usalign": {
+     "agreement": {
+      "close_within_1": 0.9868,
+      "exact": 0.9693,
+      "foldmap_pairs_in_usalign": 0.9938,
+      "within_1": 0.9877
+     },
+     "auto": {
+      "method": "structure",
+      "tm_score": 0.7989,
+      "within_1": 0.9877
+     },
+     "disagreements": [
+      "A 140-140 (1): B shifted +15",
+      "A 144-144 (1): not paired"
+     ],
+     "limits": {
+      "applies": true,
+      "pairs": true,
+      "tm": true,
+      "verdict": "pass"
+     },
+     "rows": {
+      "foldmap": [
+       "---G-QIRGLEMASKNSQDGISLIQTAEGALTETHAILQRMRELTVQAGNTGTQQAEDLGAIKDEMDALIEEIDGISNRTEFNGKKLLDG----------------TNSTDGFTFQIGANAGQQLNVKIDS--MSS----------------TAL-GV-NALD-VT-D--------FAAT-A-FDDQLKSIDTAINTVSTQRAKLGAVQNRLEHTINNLGA",
+       "VVLSQAQAQNSQYALARTFATQKVSLEESVLSQVTTAIQTAQEKIVYAGNGTL-SDDDRASLATDLQGIRDQLMNLANSTDGNGRYIFAGYKTEAAPFDQATGGYHGGEK-SVTQQVD-S-ARTMVIGHTGAQIFNSITSNAVPEPDGSDSEKNLFVMLDTAIAALKTPVEGNNVEKEKAAAAIDKTNRGLKNSLNNVLTVRAELGTQLSELSTLDSL---"
+      ],
+      "usalign": [
+       "---G-QIRGLEMASKNSQDGISLIQTAEGALTETHAILQRMRELTVQAGNTGTQQAEDLGAIKDEMDALIEEIDGISNRTEFNGKKLLDG-T--------------NSTDGFTFQIGANAGQQLNVKIDS--MSS----------------TAL-GV-NALD-VT-D--------FAAT-A-FDDQLKSIDTAINTVSTQRAKLGAVQNRLEHTINNLGA",
+       "VVLSQAQAQNSQYALARTFATQKVSLEESVLSQVTTAIQTAQEKIVYAGNGTL-SDDDRASLATDLQGIRDQLMNLANSTDGNGRYIFAGYKTEAAPFDQATGGYHGGEKSVTQQVD-S-ARTMVIGHTGAQIFNSITSNAVPEPDGSDSEKNLFVMLDTAIAALKTPVEGNNVEKEKAAAAIDKTNRGLKNSLNNVLTVRAELGTQLSELSTLDSL---"
+      ]
+     },
+     "structure": {
+      "aligned": 162,
+      "rmsd": 2.5702,
+      "tm_score": 0.7989
+     },
+     "tm_difference": 0.0007,
+     "usalign": {
+      "aligned": 163,
+      "aligned_reported": 163,
+      "close": 151,
+      "foldmap_tm_of_its_pairs": 0.7981,
+      "rmsd": 2.63,
+      "tm_a": 0.7982,
+      "tm_b": 0.6491,
+      "version": "20241108"
+     }
+    }
+   },
+   {
+    "aligned": 195,
+    "extras": 1,
+    "identity": 0.2205,
+    "kind": "positive",
+    "length_a": 211,
+    "length_b": 200,
+    "mates": 11,
+    "method": "structure",
+    "only_a": 3,
+    "pair": "5KDI_A-4NT2_A",
+    "pieces": 0,
+    "rmsd": 2.5018,
+    "same_fold": true,
+    "stratum": "remote",
+    "tm_score": 0.7967,
+    "usalign": {
+     "agreement": {
+      "close_within_1": 1.0,
+      "exact": 1.0,
+      "foldmap_pairs_in_usalign": 1.0,
+      "within_1": 1.0
+     },
+     "auto": {
+      "method": "structure",
+      "tm_score": 0.7967,
+      "within_1": 1.0
+     },
+     "disagreements": [],
+     "limits": {
+      "applies": true,
+      "pairs": true,
+      "tm": true,
+      "verdict": "pass"
+     },
+     "rows": {
+      "foldmap": [
+       "PTFFSTMNTSFSDI-ELL--EDSGIPTEAFLASCYAVVPVLDKLGPTVFAPVKMDLVGNIKKVNQKYITNKAKFTTLQKIVLHEVEADVAQVRNSATEALLWLKRGLKFLKGFLTEVKNGE-K-DIQTALNNAYGKTLRQHHGWVVRGVFALALRAAPSYEDFVAALTVKEGDHQKEAFSIGMQRDLSLYLPAMEKQLAILDTLYEVHGLESDEVV",
+       "DKPLRKISAAFKKLAIIVNSPNPEVPVTQFSHACSLVSPLFGCLG-IAFKFAEMDYVAKVDDLVRASS-S---ISTLVVMMDKDIEADCVRKAGSHTRNLLRVKRGLDMVKVLFEQIIASEGDNSLKDPATKSYAQVFAPHHGWAIRKAVSLGMYALPTRAHLLNMLK-----E----DEAAAKIHMQSYVNSSAPLITYLDNLFLSKQLGIDW--"
+      ],
+      "usalign": [
+       "PTFFSTMNTSFSDI-ELL--EDSGIPTEAFLASCYAVVPVLDKLGPTVFAPVKMDLVGNIKKVNQKYITNKAKFTTLQKIVLHEVEADVAQVRNSATEALLWLKRGLKFLKGFLTEVKNGE-K-DIQTALNNAYGKTLRQHHGWVVRGVFALALRAAPSYEDFVAALTVKEGDHQKEAFSIGMQRDLSLYLPAMEKQLAILDTLYEVHGLESDEVV",
+       "DKPLRKISAAFKKLAIIVNSPNPEVPVTQFSHACSLVSPLFGCLG-IAFKFAEMDYVAKVDDLVRASS-S---ISTLVVMMDKDIEADCVRKAGSHTRNLLRVKRGLDMVKVLFEQIIASEGDNSLKDPATKSYAQVFAPHHGWAIRKAVSLGMYALPTRAHLLNMLK-----E----DEAAAKIHMQSYVNSSAPLITYLDNLFLSKQLGIDW--"
+      ]
+     },
+     "structure": {
+      "aligned": 195,
+      "rmsd": 2.5018,
+      "tm_score": 0.7967
+     },
+     "tm_difference": 0.0,
+     "usalign": {
+      "aligned": 195,
+      "aligned_reported": 195,
+      "close": 185,
+      "foldmap_tm_of_its_pairs": 0.7967,
+      "rmsd": 2.5,
+      "tm_a": 0.7967,
+      "tm_b": 0.8356,
+      "version": "20241108"
+     }
+    }
+   },
+   {
+    "aligned": 113,
+    "extras": 0,
+    "identity": 0.7257,
+    "kind": "positive",
+    "length_a": 115,
+    "length_b": 115,
+    "mates": 4,
+    "method": "sequence",
+    "only_a": 0,
+    "pair": "5LNK_A-6G2J_A",
+    "pieces": 0,
+    "rmsd": 4.6483,
+    "same_fold": true,
+    "stratum": "close",
+    "tm_score": 0.6979,
+    "usalign": {
+     "agreement": {
+      "close_within_1": 1.0,
+      "exact": 0.9908,
+      "foldmap_pairs_in_usalign": 1.0,
+      "within_1": 0.9908
+     },
+     "auto": {
+      "method": "sequence",
+      "tm_score": 0.6979,
+      "within_1": 0.8165
+     },
+     "disagreements": [
+      "A 47-47 (1): not paired"
+     ],
+     "limits": {
+      "applies": true,
+      "pairs": true,
+      "tm": true,
+      "verdict": "pass"
+     },
+     "rows": {
+      "foldmap": [
+       "MNLMITLLTNFTLATLLVTIAFWLPQLNVYSEKTSP-YE-----CGFDPMGSA-RLPFSMKFFLVAITFLLFDLEIALLLPLPWASQTTNLNTMLTMALLLIFLLAVSLAYEWTQKGLEWTE",
+       "MNLYTVIFINILLSLTLILVAFWLP--Q-MNLYSEKANPYECGFDPTSS-A--RLPFSM-KFFLVAITFLLFDLEIALLLPLPWAIQTIKTSTMMIMAFILVTILSLGLAYEWTQKGLEWTE"
+      ],
+      "usalign": [
+       "MNLMITLLTNFTLATLLVTIAFWLPQLNVYSEKTSP-YE-----CGFDPMGSARLPFSMKFFLVAITFLLFDLEIALLLPLPWASQTTNLNTMLTMALLLIFLLAVSLAYEWTQKGLEWTE",
+       "XNLYTVIFINILLSLTLILVAFWLP--Q-MNLYSEKANPYECGFDPTSS-A-RLPFSM-KFFLVAITFLLFDLEIALLLPLPWAIQTIKTSTMMIMAFILVTILSLGLAYEWTQKGLEWTE"
+      ]
+     },
+     "structure": {
+      "aligned": 108,
+      "rmsd": 2.5497,
+      "tm_score": 0.7669
+     },
+     "tm_difference": -0.0012,
+     "usalign": {
+      "aligned": 109,
+      "aligned_reported": 109,
+      "close": 97,
+      "foldmap_tm_of_its_pairs": 0.7681,
+      "rmsd": 2.69,
+      "tm_a": 0.7681,
+      "tm_b": 0.7681,
+      "version": "20241108"
+     }
+    }
+   },
+   {
+    "aligned": 112,
+    "extras": 0,
+    "identity": 0.7232,
+    "kind": "positive",
+    "length_a": 112,
+    "length_b": 123,
+    "mates": 7,
+    "method": "sequence",
+    "only_a": 0,
+    "pair": "5U5S_A-2WP1_A",
+    "pieces": 0,
+    "rmsd": 1.6469,
+    "same_fold": true,
+    "stratum": "close",
+    "tm_score": 0.9372,
+    "usalign": {
+     "agreement": {
+      "close_within_1": 1.0,
+      "exact": 1.0,
+      "foldmap_pairs_in_usalign": 1.0,
+      "within_1": 1.0
+     },
+     "auto": {
+      "method": "sequence",
+      "tm_score": 0.9372,
+      "within_1": 1.0
+     },
+     "disagreements": [],
+     "limits": {
+      "applies": true,
+      "pairs": true,
+      "tm": true,
+      "verdict": "pass"
+     },
+     "rows": {
+      "foldmap": [
+       "------GK-LSEQLKHCNGILKELLSKKHAAYAWPFYKPVDASALGLHDYHDIIKHPMDLSTVKRKMENRDYRDAQEFAADVRLMFSNCYKYNPPDHDVVAMARKLQDVFEFRYAKMP-D---",
+       "QHKVLKTVKVTEQLKHCSEILKEMLAKKHLPYAWPFYNPVDADALGLHNYYDVVKNPMDLGTIKGKMDNQEYKDAYEFAADVRLMFMNCYKYNPPDHEVVAMARTLQDVFELHFAKIPDEPIE"
+      ],
+      "usalign": [
+       "------GK-LSEQLKHCNGILKELLSKKHAAYAWPFYKPVDASALGLHDYHDIIKHPMDLSTVKRKMENRDYRDAQEFAADVRLMFSNCYKYNPPDHDVVAMARKLQDVFEFRYAKMP-D---",
+       "QHKVLKTVKVTEQLKHCSEILKEMLAKKHLPYAWPFYNPVDADALGLHNYYDVVKNPMDLGTIKGKMDNQEYKDAYEFAADVRLMFMNCYKYNPPDHEVVAMARTLQDVFELHFAKIPDEPIE"
+      ]
+     },
+     "structure": {
+      "aligned": 112,
+      "rmsd": 1.5063,
+      "tm_score": 0.9393
+     },
+     "tm_difference": 0.0,
+     "usalign": {
+      "aligned": 112,
+      "aligned_reported": 112,
+      "close": 109,
+      "foldmap_tm_of_its_pairs": 0.9393,
+      "rmsd": 1.51,
+      "tm_a": 0.9393,
+      "tm_b": 0.8589,
+      "version": "20241108"
+     }
+    }
+   }
+  ],
+  "tuning": [
+   {
+    "aligned": 214,
+    "extras": 1,
+    "identity": 0.229,
+    "kind": "positive",
+    "length_a": 226,
+    "length_b": 218,
+    "mates": 14,
+    "method": "structure",
+    "only_a": 2,
+    "pair": "1EMA_A-1G7K_A",
+    "pieces": 1,
+    "rmsd": 1.7585,
+    "same_fold": true,
+    "tm_score": 0.8871,
+    "usalign": {
+     "agreement": {
+      "close_within_1": 1.0,
+      "exact": 1.0,
+      "foldmap_pairs_in_usalign": 1.0,
+      "within_1": 1.0
+     },
+     "auto": {
+      "method": "structure",
+      "tm_score": 0.8871,
+      "within_1": 1.0
+     },
+     "disagreements": [],
+     "limits": {
+      "applies": true,
+      "pairs": true,
+      "tm": true,
+      "verdict": "pass"
+     },
+     "rows": {
+      "foldmap": [
+       "SKGEELFTGVVPILVELDGDVNGHKFSVSGEGEGDATYGKLTLKFICTT-GKLPVPWPTLVTTFTVQCFSRYPDHMKRHDFFKSAMPEGYVQERTIFFKDDGNYKTRAEVKFEGDTLVNRIELKGIDFKEDGNILGHKLEYNYNSHNVYIMADKQKNGIKVNFKIRHNIEDGSVQLADHYQQNTPIGDGPVLLPDNHYLSTQSALSKDPNEKRDHMVLLEFVTAAGI---",
+       "----NVIKEFMRFKVRMEGTVNGHEFEIEGEGEGRPYEGHNTVKLKVTKGGPLPFAWDILSPQFQSKVYVKHPADI--PDYKKLSFPEGFKWERVMNFEDGGVVTVTQDSSLQDGCFIYKVKFIGVNFPSDGPVMQKKTM-GWEASTERLYPR-D-GVLKGEIHKALKLKDGGHYLVEFKSIYMAKK--PVQLPGYYYVDSKLDITSHN-EDYTIVEQYERTEGRHHLFL"
+      ],
+      "usalign": [
+       "SKGEELFTGVVPILVELDGDVNGHKFSVSGEGEGDATYGKLTLKFICTT-GKLPVPWPTLVTTFXVQCFSRYPDHMKRHDFFKSAMPEGYVQERTIFFKDDGNYKTRAEVKFEGDTLVNRIELKGIDFKEDGNILGHKLEYNYNSHNVYIMADKQKNGIKVNFKIRHNIEDGSVQLADHYQQNTPIGDGPVLLPDNHYLSTQSALSKDPNEKRDHMVLLEFVTAAGI---",
+       "----NVIKEFMRFKVRMEGTVNGHEFEIEGEGEGRPYEGHNTVKLKVTKGGPLPFAWDILSPQFXSKVYVKHPADI--PDYKKLSFPEGFKWERVMNFEDGGVVTVTQDSSLQDGCFIYKVKFIGVNFPSDGPVMQKKTM-GWEASTERLYPR-D-GVLKGEIHKALKLKDGGHYLVEFKSIYMAKK--PVQLPGYYYVDSKLDITSHN-EDYTIVEQYERTEGRHHLFL"
+      ]
+     },
+     "structure": {
+      "aligned": 214,
+      "rmsd": 1.7585,
+      "tm_score": 0.8871
+     },
+     "tm_difference": 0.0,
+     "usalign": {
+      "aligned": 214,
+      "aligned_reported": 214,
+      "close": 208,
+      "foldmap_tm_of_its_pairs": 0.8871,
+      "rmsd": 1.76,
+      "tm_a": 0.8871,
+      "tm_b": 0.918,
+      "version": "20241108"
+     }
+    }
+   },
+   {
+    "aligned": 235,
+    "extras": 2,
+    "identity": 0.2638,
+    "kind": "positive",
+    "length_a": 253,
+    "length_b": 242,
+    "mates": 17,
+    "method": "structure",
+    "only_a": 2,
+    "pair": "1HDC_A-1CYD_A",
+    "pieces": 0,
+    "rmsd": 1.9979,
+    "same_fold": true,
+    "tm_score": 0.8606,
+    "usalign": {
+     "agreement": {
+      "close_within_1": 1.0,
+      "exact": 1.0,
+      "foldmap_pairs_in_usalign": 1.0,
+      "within_1": 1.0
+     },
+     "auto": {
+      "method": "structure",
+      "tm_score": 0.8606,
+      "within_1": 1.0
+     },
+     "disagreements": [],
+     "limits": {
+      "applies": true,
+      "pairs": true,
+      "tm": true,
+      "verdict": "pass"
+     },
+     "rows": {
+      "foldmap": [
+       "NDLSG-KTVIITGGARGLGAEAARQAVAAGARVVLADVLDEEGAATARELGDAARYQHLDVTIEEDWQRVVAYAREEFGSVDGLVNNAGISTGMFLETESVERFRKVVEINLTGVFIGMKTVIPAMKDA-GGGSIVNISSAAGLMGLALTSSYGASKWGVRGLSKLAAVELGTDRIRVNSVHPGMTYTPMTAE-TGIRQGE----GNYPNTPMGRVGEPGEIAGAVVKLLSDTSSYVTGAELAVDGGWTTGPTVKYVMGQ",
+       "-LNFSGLRALVTGAGKGIGRDTVKALHASGAKVVAVTRTNSDLVSLAKECPG-IEPVCVDLGDWDATEKALGGIG----PVDLLVNNAALVIMQPFLEVTKEAFDRSFSVNLRSVFQVSQMVARDMINRGVPGSIVNVSSMVAHVTFPNLITYSSTKGAMTMLTKAMAMELGPHKIRVNSVNPTVVLTDMGKKVSADP---EFARKLKERHPLRKFAEVEDVVNSILFLLSDRSASTSGGGILVDAGYL-AS--------"
+      ],
+      "usalign": [
+       "NDLSG-KTVIITGGARGLGAEAARQAVAAGARVVLADVLDEEGAATARELGDAARYQHLDVTIEEDWQRVVAYAREEFGSVDGLVNNAGISTGMFLETESVERFRKVVEINLTGVFIGMKTVIPAMKDA-GGGSIVNISSAAGLMGLALTSSYGASKWGVRGLSKLAAVELGTDRIRVNSVHPGMTYTPMTAE-TGIRQGE----GNYPNTPMGRVGEPGEIAGAVVKLLSDTSSYVTGAELAVDGGWTTGPTVKYVMGQ",
+       "-LNFSGLRALVTGAGKGIGRDTVKALHASGAKVVAVTRTNSDLVSLAKECPG-IEPVCVDLGDWDATEKALGGIG----PVDLLVNNAALVIMQPFLEVTKEAFDRSFSVNLRSVFQVSQMVARDMINRGVPGSIVNVSSMVAHVTFPNLITYSSTKGAMTMLTKAMAMELGPHKIRVNSVNPTVVLTDMGKKVSADP---EFARKLKERHPLRKFAEVEDVVNSILFLLSDRSASTSGGGILVDAGYL-AS--------"
+      ]
+     },
+     "structure": {
+      "aligned": 235,
+      "rmsd": 1.9979,
+      "tm_score": 0.8606
+     },
+     "tm_difference": 0.0,
+     "usalign": {
+      "aligned": 235,
+      "aligned_reported": 235,
+      "close": 231,
+      "foldmap_tm_of_its_pairs": 0.8606,
+      "rmsd": 2.0,
+      "tm_a": 0.8606,
+      "tm_b": 0.8975,
+      "version": "20241108"
+     }
+    }
+   },
+   {
+    "aligned": 136,
+    "extras": 0,
+    "identity": 0.2132,
+    "kind": "positive",
+    "length_a": 153,
+    "length_b": 136,
+    "mates": 8,
+    "method": "structure",
+    "only_a": 1,
+    "pair": "1MBN_A-1ECA_A",
+    "pieces": 0,
+    "rmsd": 1.6103,
+    "same_fold": true,
+    "tm_score": 0.7982,
+    "usalign": {
+     "agreement": {
+      "close_within_1": 1.0,
+      "exact": 1.0,
+      "foldmap_pairs_in_usalign": 1.0,
+      "within_1": 1.0
+     },
+     "auto": {
+      "method": "structure",
+      "tm_score": 0.7982,
+      "within_1": 1.0
+     },
+     "disagreements": [],
+     "limits": {
+      "applies": true,
+      "pairs": true,
+      "tm": true,
+      "verdict": "pass"
+     },
+     "rows": {
+      "foldmap": [
+       "VLSEGEWQLVLHVWAKVEADVAGHGQDILIRLFKSHPETLEKFDRFKHLKTEAEMKASEDLKKHGVTVLTALGAILKKKGHHEAELKPLAQSHATKHKIPIKYLEFISEAIIHVLHSRHPGDFGADAQGAMNKALELFRKDIAAKYKELGYQG",
+       "-LSADQISTVQASFDKVK-G--D-PVGILYAVFKADPSIMAKFTQFAGKDLE-SIKGTAPFETHANRIVGFFSKIIGELPNIEADVNTFVASHKP-RGVTHDQLNNFRAGFVSYMKAHTD--FA-GAEAAWGATLDTFFGMIFSKM-------"
+      ],
+      "usalign": [
+       "VLSEGEWQLVLHVWAKVEADVAGHGQDILIRLFKSHPETLEKFDRFKHLKTEAEMKASEDLKKHGVTVLTALGAILKKKGHHEAELKPLAQSHATKHKIPIKYLEFISEAIIHVLHSRHPGDFGADAQGAMNKALELFRKDIAAKYKELGYQG",
+       "-LSADQISTVQASFDKVK-G--D-PVGILYAVFKADPSIMAKFTQFAGKDLE-SIKGTAPFETHANRIVGFFSKIIGELPNIEADVNTFVASHKP-RGVTHDQLNNFRAGFVSYMKAHTD--FA-GAEAAWGATLDTFFGMIFSKM-------"
+      ]
+     },
+     "structure": {
+      "aligned": 136,
+      "rmsd": 1.6103,
+      "tm_score": 0.7982
+     },
+     "tm_difference": 0.0,
+     "usalign": {
+      "aligned": 136,
+      "aligned_reported": 136,
+      "close": 136,
+      "foldmap_tm_of_its_pairs": 0.7982,
+      "rmsd": 1.61,
+      "tm_a": 0.7982,
+      "tm_b": 0.8869,
+      "version": "20241108"
+     }
+    }
+   },
+   {
+    "aligned": 77,
+    "extras": 5,
+    "identity": 0.0649,
+    "kind": "negative",
+    "length_a": 107,
+    "length_b": 152,
+    "mates": 6,
+    "method": "structure",
+    "only_a": 5,
+    "pair": "1REI_A-1TNF_A",
+    "pieces": 0,
+    "rmsd": 4.3926,
+    "same_fold": false,
+    "tm_score": 0.4192,
+    "usalign": {
+     "agreement": {
+      "close_within_1": 0.8036,
+      "exact": 0.2892,
+      "foldmap_pairs_in_usalign": 0.7922,
+      "within_1": 0.7349
+     },
+     "auto": {
+      "method": "structure",
+      "tm_score": 0.4192,
+      "within_1": 0.7349
+     },
+     "disagreements": [
+      "A 7-7 (1): B shifted +5",
+      "A 10-10 (1): B shifted +4",
+      "A 11-12 (2): B shifted +12",
+      "A 16-17 (2): not paired",
+      "A 26-26 (1): not paired",
+      "A 27-28 (2): B shifted -2",
+      "A 29-29 (1): B shifted -9",
+      "A 41-41 (1): not paired",
+      "A 70-75 (6): B shifted +2",
+      "A 76-76 (1): not paired",
+      "A 79-79 (1): not paired",
+      "A 92-92 (1): not paired",
+      "A 106-107 (2): not paired"
+     ],
+     "limits": {
+      "applies": false,
+      "pairs": false,
+      "tm": true,
+      "verdict": "\u2013"
+     },
+     "rows": {
+      "foldmap": [
+       "------------------DIQMTQ-----SPS---S--------LSASVGDRVTITCQASQDI---------IKYLNWYQQTPG-KAPKLLIYEASNLQAGVPSRFSGSG------------------SGTDYTFTISSLQPEDI--ATYYCQQYQSLPYTF----------GQGTKLQIT-",
+       "RTPSDKPVAHVVANPQAEGQLQWLNRRANALLANGVELRDNQLVVPSEG--LYLIYSQV-LFKGQGCPSTHVLLTHTISRIAV-SYQTKVNLLSAI--------------KSPCQRETPEGAEAKPWYEPIYLGGVF--Q---LEKGDRLSAEIN-RPD---YLLFAESGQVYFGI-IA--L"
+      ],
+      "usalign": [
+       "-----------------DIQMTQ-S----PSSLS------------ASVGDRVTITCQASQD-------IIKYLNWYQQTPG-KAPKLLIYEASNLQAGVPSRFSGSG----------------SGTDYTFTISSLQPEDI--ATYYCQQYQSLPYTF---------GQGTKLQIT",
+       "RTPSDKPVAHVVANPQAEGQLQWLNRRANALLANGVELRDNQLVVPSEGLY-LIYSQVLFKGQGCPSTHVLLTHTISRIAVSYQTKVNLLSAIK--------------SPCQRETPEGAEAKPWYE-PIYLGGV-FQ--LEKGDRLSAEINRPD----YLLFAESGQVYFG-IIAL"
+      ]
+     },
+     "structure": {
+      "aligned": 77,
+      "rmsd": 4.3926,
+      "tm_score": 0.4192
+     },
+     "tm_difference": 0.0049,
+     "usalign": {
+      "aligned": 83,
+      "aligned_reported": 83,
+      "close": 56,
+      "foldmap_tm_of_its_pairs": 0.4139,
+      "rmsd": 4.65,
+      "tm_a": 0.4143,
+      "tm_b": 0.3291,
+      "version": "20241108"
+     }
+    }
+   },
+   {
+    "aligned": 55,
+    "extras": 0,
+    "identity": 0.3455,
+    "kind": "positive",
+    "length_a": 57,
+    "length_b": 56,
+    "mates": 6,
+    "method": "structure",
+    "only_a": 0,
+    "pair": "1SHG_A-1CKA_A",
+    "pieces": 0,
+    "rmsd": 1.1329,
+    "same_fold": true,
+    "tm_score": 0.8431,
+    "usalign": {
+     "agreement": {
+      "close_within_1": 1.0,
+      "exact": 1.0,
+      "foldmap_pairs_in_usalign": 1.0,
+      "within_1": 1.0
+     },
+     "auto": {
+      "method": "structure",
+      "tm_score": 0.8431,
+      "within_1": 1.0
+     },
+     "disagreements": [],
+     "limits": {
+      "applies": true,
+      "pairs": true,
+      "tm": true,
+      "verdict": "pass"
+     },
+     "rows": {
+      "foldmap": [
+       "KELVLALYDYQEKSPREVTMKKGDILTLLNSTNKDWWKVEVN-DRQGFVPAAYVKKLD",
+       "AEYVRALFDFNGNDEEDLPFKKGDILRIRDKPEEQWWNAEDSEGKRGMIPVPYVEK--"
+      ],
+      "usalign": [
+       "KELVLALYDYQEKSPREVTMKKGDILTLLNSTNKDWWKVEVN-DRQGFVPAAYVKKLD",
+       "AEYVRALFDFNGNDEEDLPFKKGDILRIRDKPEEQWWNAEDSEGKRGMIPVPYVEK--"
+      ]
+     },
+     "structure": {
+      "aligned": 55,
+      "rmsd": 1.1329,
+      "tm_score": 0.8431
+     },
+     "tm_difference": -0.0001,
+     "usalign": {
+      "aligned": 55,
+      "aligned_reported": 55,
+      "close": 55,
+      "foldmap_tm_of_its_pairs": 0.8431,
+      "rmsd": 1.13,
+      "tm_a": 0.8433,
+      "tm_b": 0.8559,
+      "version": "20241108"
+     }
+    }
+   },
+   {
+    "aligned": 163,
+    "extras": 4,
+    "identity": 0.0798,
+    "kind": "negative",
+    "length_a": 247,
+    "length_b": 253,
+    "mates": 15,
+    "method": "structure",
+    "only_a": 6,
+    "pair": "1TIM_A-1HDC_A",
+    "pieces": 0,
+    "rmsd": 5.7329,
+    "same_fold": false,
+    "tm_score": 0.3991,
+    "usalign": {
+     "agreement": {
+      "close_within_1": 0.5495,
+      "exact": 0.1824,
+      "foldmap_pairs_in_usalign": 0.6012,
+      "within_1": 0.5765
+     },
+     "auto": {
+      "method": "structure",
+      "tm_score": 0.3991,
+      "within_1": 0.5765
+     },
+     "disagreements": [
+      "A 2-2 (1): not paired",
+      "A 9-9 (1): B shifted -2",
+      "A 10-11 (2): B shifted -3",
+      "A 12-14 (3): B shifted -2",
+      "A 21-21 (1): not paired",
+      "A 48-48 (1): not paired",
+      "A 52-52 (1): not paired",
+      "A 56-57 (2): not paired",
+      "A 68-69 (2): not paired",
+      "A 72-72 (1): not paired",
+      "A 90-90 (1): B shifted -2",
+      "A 100-100 (1): B shifted +4",
+      "A 101-102 (2): B shifted +3",
+      "A 103-105 (3): B shifted +2",
+      "A 106-120 (15): B shifted +3",
+      "A 132-137 (6): B shifted -2",
+      "A 138-138 (1): B shifted +3",
+      "A 139-139 (1): B shifted +2",
+      "A 140-140 (1): not paired",
+      "A 141-142 (2): B shifted +2",
+      "A 143-154 (12): B shifted +3",
+      "A 170-170 (1): B shifted -4",
+      "A 174-175 (2): B shifted +7",
+      "A 176-178 (3): B shifted +5",
+      "A 179-180 (2): not paired",
+      "A 181-182 (2): B shifted +5",
+      "A 185-185 (1): B shifted +3",
+      "A 223-223 (1): not paired"
+     ],
+     "limits": {
+      "applies": false,
+      "pairs": false,
+      "tm": true,
+      "verdict": "\u2013"
+     },
+     "rows": {
+      "foldmap": [
+       "APRKFFV--GGN-WKMNGKRKSLGE------LIHT-LDGAKLSADTEVVCGAPS--I---YLD--FAR-QKLDAKIGVAAQNCYKVPKG--AFTGE-ISPAMIKDIGAAW-VILGHSERR---------------H-VFGES-DELIGQKVAHALAEG-LGVIACIGEKLDEREAG-----ITE-KV-VFQETKAIADNVKDWSKVVLAYEPVWAI---G--T-G------K------TATPQQ--AQEV--HEKL---RGWLKTHVS----DAVAVQSRIIYGGSVTGGNCKELASQHDVDGFLVGGASLKPEFVDIINAKH--------------",
+       "--NDLSGKTVIITGGAR--------GLGAEAAR--QAV----A--AGARVVLADVLDEEGA--ATAR-ELGD---AARYQHLDV-----TIEE-DWQRVVAYAREEFGSVDGLVNNAGISTGMFLETESVERFRKVVEINLTGVFIGMKTVIPAMKDAGGGSIVNISSAAGLMGLALTSSYGA-SKWGVRGLSKLAAVELGTDRIRVNSVHPGMTYTPMTAETGIRQGEGNYPNTPMGRVGE--PGEI--AGA---VVKL--------LSDTSSYVT-GAELAVD---------G----------------------------GWTTGPTVKYVMGQ"
+      ],
+      "usalign": [
+       "APRKFFV-----G-GNWKMNGKRKS--LGE--LIHT-LDGAKLSADTEVVCGAPS--I--YLD-FARQKLDAKIGVAAQNCYKVPKGAFTGEISPAMIKDIG-AA-WVILGHSERR----------H--VF-GESDELIGQKVAHALAEG-----LGVIACIGEKL-DEREAGI-TEKVVFQETKAIADNV--KD--WSKVVLAYEPVWA---IG-TGK------T--ATPQQAQEV----HEKLRGWLKTHVS------------DAVAVQSRIIYGGSVTGGNCKELASQHDVDGFLVGGASLKPEFVDIINAKH-------------",
+       "-N-DLS-GKTVIITGGARG------LGA--EAAR--QAV----A--AGARVVLADVLDEEGA-ATARELGDA-ARYQHLDVTIE--E-D-WQRVVAYAREEFGSVDGLVNNAGISTGMFLETESVERFRKVVEINLTGVFIGMKTVIPAMKDAGGGSIVNISSAAGLMGLALTSSYGASKWGVRGLSKLAAVELGTDRIRVNSVHPGMTYTPMTAETGIRQGEGNYPNTPMGRVG--EPGEI------------AGAVVKLLSDTSSYVTG-AELAV-D---------G--G-------------------------WTTGPTVKYVMGQ"
+      ]
+     },
+     "structure": {
+      "aligned": 163,
+      "rmsd": 5.7329,
+      "tm_score": 0.3991
+     },
+     "tm_difference": -0.0117,
+     "usalign": {
+      "aligned": 170,
+      "aligned_reported": 170,
+      "close": 91,
+      "foldmap_tm_of_its_pairs": 0.4108,
+      "rmsd": 5.91,
+      "tm_a": 0.4108,
+      "tm_b": 0.4038,
+      "version": "20241108"
+     }
+    }
+   },
+   {
+    "aligned": 190,
+    "extras": 2,
+    "identity": 0.1158,
+    "kind": "positive",
+    "length_a": 247,
+    "length_b": 247,
+    "mates": 18,
+    "method": "structure",
+    "only_a": 3,
+    "pair": "1TIM_A-1IGS_A",
+    "pieces": 0,
+    "rmsd": 3.325,
+    "same_fold": true,
+    "tm_score": 0.6195,
+    "usalign": {
+     "agreement": {
+      "close_within_1": 0.988,
+      "exact": 0.9738,
+      "foldmap_pairs_in_usalign": 0.9789,
+      "within_1": 0.9738
+     },
+     "auto": {
+      "method": "structure",
+      "tm_score": 0.6195,
+      "within_1": 0.9738
+     },
+     "disagreements": [
+      "A 1-1 (1): not paired",
+      "A 2-4 (2): B shifted -2",
+      "A 32-32 (1): not paired",
+      "A 56-56 (1): not paired"
+     ],
+     "limits": {
+      "applies": true,
+      "pairs": true,
+      "tm": true,
+      "verdict": "pass"
+     },
+     "rows": {
+      "foldmap": [
+       "A-----------------------------------PR--K----FFVGGNWKMN-----GKRKSLGELIHTLDGAKLSADTEVVCGAP--------SIYLDFARQKLDAKIGVAAQN-CYKVPKGAFTGEISPAMIKDIGAAWVILGHSERRHVFGESDELIGQKVAHALAEGLGVIACIGEKLDEREAGITEKVVFQETKAIADNVKDWSKVVLAYEPVWA-IGTGKTATPQQAQEVHEKLRGWLKTHVSDAVAVQSRIIYGGSVTGGNCKELASQHDVDGFLVGGASL-KPEFVDIINAKH",
+       "-PRYLKGWLKDVVQLSLRRPSFRASRQRPIISLNERILEFNKRNITAIIAEYKRKSPSGLDVERDPIEYSKFME-R-YA---VGLSILTEEKYFNGSYETLRKIASSV-S-IPILMKDFIVKE--------SQIDDAYNLGADTVLLIV---K---ILTERELESLLEYARSYGMEPLIEIND----------E-NDLDIALRIG--A-----RFIGINSRDLETLEIN-KE--NQRKLISMIP-----------SN-VVKVAESGISERNEIEELRKLGVNAFLIGSSLMRNPEKIKEFIL--"
+      ],
+      "usalign": [
+       "------------------------------------APRK----FFVGGNWKMN-----GKRKSLGELIHTLDGAKLSADTEVVCGAP--------SIYLDFARQKLDAKIGVAAQN-CYKVPKGAFTGEISPAMIKDIGAAWVILGHSERRHVFGESDELIGQKVAHALAEGLGVIACIGEKLDEREAGITEKVVFQETKAIADNVKDWSKVVLAYEPVWA-IGTGKTATPQQAQEVHEKLRGWLKTHVSDAVAVQSRIIYGGSVTGGNCKELASQHDVDGFLVGGASL-KPEFVDIINAKH",
+       "PRYLKGWLKDVVQLSLRRPSFRASRQRPIISLNERILEFNKRNITAIIAEYKRKSPSGLDVERDPIEYSKFME--RYA---VGLSILTEEKYFNGSYETLRKIASS-VS-IPILMKDFIVKE--------SQIDDAYNLGADTVLLIV---K---ILTERELESLLEYARSYGMEPLIEIND----------E-NDLDIALRIG--A-----RFIGINSRDLETLEIN-KE--NQRKLISMIP-----------SN-VVKVAESGISERNEIEELRKLGVNAFLIGSSLMRNPEKIKEFIL--"
+      ]
+     },
+     "structure": {
+      "aligned": 190,
+      "rmsd": 3.325,
+      "tm_score": 0.6195
+     },
+     "tm_difference": -0.0008,
+     "usalign": {
+      "aligned": 191,
+      "aligned_reported": 191,
+      "close": 167,
+      "foldmap_tm_of_its_pairs": 0.6203,
+      "rmsd": 3.37,
+      "tm_a": 0.6203,
+      "tm_b": 0.6203,
+      "version": "20241108"
+     }
+    }
+   },
+   {
+    "aligned": 71,
+    "extras": 0,
+    "identity": 0.1408,
+    "kind": "positive",
+    "length_a": 76,
+    "length_b": 72,
+    "mates": 6,
+    "method": "structure",
+    "only_a": 2,
+    "pair": "1UBQ_A-1WM3_A",
+    "pieces": 0,
+    "rmsd": 1.3169,
+    "same_fold": true,
+    "tm_score": 0.8044,
+    "usalign": {
+     "agreement": {
+      "close_within_1": 1.0,
+      "exact": 1.0,
+      "foldmap_pairs_in_usalign": 1.0,
+      "within_1": 1.0
+     },
+     "auto": {
+      "method": "structure",
+      "tm_score": 0.8044,
+      "within_1": 1.0
+     },
+     "disagreements": [],
+     "limits": {
+      "applies": true,
+      "pairs": true,
+      "tm": true,
+      "verdict": "pass"
+     },
+     "rows": {
+      "foldmap": [
+       "-MQIFVKTLTGKTITLEVEPSDTIENVKAKIQDKEGIPPDQQRLIFAGKQLEDGRTLSDYNIQKESTLHLVLRLRGG",
+       "HINLKVAGQDGSVVQFKIKRHTPLSKLMKAYCERQGLSMRQIRFRFDGQPINETDTPAQLEMEDEDTIDVFQ-----"
+      ],
+      "usalign": [
+       "-MQIFVKTLTGKTITLEVEPSDTIENVKAKIQDKEGIPPDQQRLIFAGKQLEDGRTLSDYNIQKESTLHLVLRLRGG",
+       "HINLKVAGQDGSVVQFKIKRHTPLSKLMKAYCERQGLSMRQIRFRFDGQPINETDTPAQLEMEDEDTIDVFQ-----"
+      ]
+     },
+     "structure": {
+      "aligned": 71,
+      "rmsd": 1.3169,
+      "tm_score": 0.8044
+     },
+     "tm_difference": 0.0,
+     "usalign": {
+      "aligned": 71,
+      "aligned_reported": 71,
+      "close": 71,
+      "foldmap_tm_of_its_pairs": 0.8044,
+      "rmsd": 1.32,
+      "tm_a": 0.8044,
+      "tm_b": 0.8413,
+      "version": "20241108"
+     }
+    }
+   },
+   {
+    "aligned": 49,
+    "extras": 4,
+    "identity": 0.0204,
+    "kind": "negative",
+    "length_a": 76,
+    "length_b": 98,
+    "mates": 3,
+    "method": "structure",
+    "only_a": 5,
+    "pair": "1UBQ_A-2ACY_A",
+    "pieces": 0,
+    "rmsd": 3.6704,
+    "same_fold": false,
+    "tm_score": 0.3529,
+    "usalign": {
+     "agreement": {
+      "close_within_1": 0.0,
+      "exact": 0.0,
+      "foldmap_pairs_in_usalign": 0.0,
+      "within_1": 0.0
+     },
+     "auto": {
+      "method": "structure",
+      "tm_score": 0.3529,
+      "within_1": 0.0
+     },
+     "disagreements": [
+      "A 9-9 (1): B shifted +9",
+      "A 10-10 (1): not paired",
+      "A 11-12 (2): B shifted +9",
+      "A 18-19 (2): B shifted +18",
+      "A 20-21 (2): B shifted +33",
+      "A 22-32 (11): B shifted +35",
+      "A 34-36 (3): B shifted +42",
+      "A 40-43 (4): B shifted +42",
+      "A 50-50 (1): B shifted +43",
+      "A 54-55 (2): B shifted +44",
+      "A 57-57 (1): not paired",
+      "A 58-61 (4): B shifted +43",
+      "A 62-66 (5): B shifted +17",
+      "A 67-68 (2): not paired",
+      "A 70-74 (5): not paired"
+     ],
+     "limits": {
+      "applies": false,
+      "pairs": false,
+      "tm": true,
+      "verdict": "\u2013"
+     },
+     "rows": {
+      "foldmap": [
+       "MQIF----------VKTLTG-KT---IT--L--EV---EP-----------------SD--TIENVKAKIQD-K-----EGIPPDQQRLIFAGKQLEDGRTLS-DYNI-QKESTLHLVLRLRGG-",
+       "----AEGDTLISVDYEIFG-KVQGVFFRKYTQAEGKKLGLVGWVQNTDQGTVQGQLQGPASKVRHMQEWLETKGSPKSHIDR---ASFH-----NEK--VI--VKLDYTDFQIV----------K"
+      ],
+      "usalign": [
+       "MQIFVKTL-----TGKTITLEV------EP--SDTIENVKAKIQDKEGIPPDQQRLIFAGKQLEDGRTL-SDYNI---------------------------QKESTLHL------VLRLRGG-----",
+       "--------AEGDTLISV-----DYEIFGKVQGVFFRKYTQAEGKK-LGL---VGWV------Q---NT-DQGTVQGQLQGPASKVRHMQEWLETKGSPKSHIDRASFHN-EKVIVKLDYTD--FQIVK"
+      ]
+     },
+     "structure": {
+      "aligned": 49,
+      "rmsd": 3.6704,
+      "tm_score": 0.3529
+     },
+     "tm_difference": 0.0313,
+     "usalign": {
+      "aligned": 46,
+      "aligned_reported": 46,
+      "close": 35,
+      "foldmap_tm_of_its_pairs": 0.3221,
+      "rmsd": 4.06,
+      "tm_a": 0.3216,
+      "tm_b": 0.2754,
+      "version": "20241108"
+     }
+    }
+   },
+   {
+    "aligned": 72,
+    "extras": 4,
+    "identity": 0.0556,
+    "kind": "negative",
+    "length_a": 106,
+    "length_b": 153,
+    "mates": 3,
+    "method": "structure",
+    "only_a": 3,
+    "pair": "256B_A-1MBN_A",
+    "pieces": 2,
+    "rmsd": 4.0368,
+    "same_fold": false,
+    "tm_score": 0.4353,
+    "usalign": {
+     "agreement": {
+      "close_within_1": 0.9444,
+      "exact": 0.8514,
+      "foldmap_pairs_in_usalign": 0.9028,
+      "within_1": 0.8784
+     },
+     "auto": {
+      "method": "structure",
+      "tm_score": 0.4353,
+      "within_1": 0.8784
+     },
+     "disagreements": [
+      "A 1-1 (1): not paired",
+      "A 2-6 (5): B shifted -4",
+      "A 7-7 (1): B shifted -35",
+      "A 30-30 (1): not paired",
+      "A 55-55 (1): not paired"
+     ],
+     "limits": {
+      "applies": false,
+      "pairs": true,
+      "tm": true,
+      "verdict": "\u2013"
+     },
+     "rows": {
+      "foldmap": [
+       "A----------------------DLED-NM-----------------------------------ETLN--D----------------NLKVIEKADNAAQVKDALTK-MR-AAALDAQKATP-PKLEDKSPDSPEMKDFRHGFDILVGQIDDALKLANEGKVKEAQAAAEQLKTTRNAYHQKYR--",
+       "-VLSEGEWQLVLHVWAKVEADVAGHGQDILIRLFKSHPETLEKFDRFKHLKTEAEMKASEDLKKHGVTVLTALGAILKKKGHHEAELKPLAQS--H--ATKH-KI-PIKYLEFISEAIIHVLHSR-HPGDFGA-DAQGAMNKALELFRKDIAAKYKELGY-------------------------QG"
+      ],
+      "usalign": [
+       "-------------------------ADLED-N-------------------------------METLN--D----------------NLKVIEKADNAAQVKDALTKMR-AAALDAQKATP-PKLEDKSPDSPEMKDFRHGFDILVGQIDDALKLANEGKVKEAQAAAEQLKTTRNAYHQKYR--",
+       "VLSEGEWQLVLHVWAKVEADVAGHGQDILIRLFKSHPETLEKFDRFKHLKTEAEMKASEDLKKHGVTVLTALGAILKKKGHHEAELKPLAQS--H--ATKH-KIPIKYLEFISEAIIHVLHSR-HPGDFG-ADAQGAMNKALELFRKDIAAKYKELGY-------------------------QG"
+      ]
+     },
+     "structure": {
+      "aligned": 72,
+      "rmsd": 4.0368,
+      "tm_score": 0.4353
+     },
+     "tm_difference": 0.0003,
+     "usalign": {
+      "aligned": 74,
+      "aligned_reported": 74,
+      "close": 54,
+      "foldmap_tm_of_its_pairs": 0.434,
+      "rmsd": 4.2,
+      "tm_a": 0.435,
+      "tm_b": 0.3303,
+      "version": "20241108"
+     }
+    }
+   },
+   {
+    "aligned": 81,
+    "extras": 3,
+    "identity": 0.0617,
+    "kind": "positive",
+    "length_a": 98,
+    "length_b": 96,
+    "mates": 6,
+    "method": "structure",
+    "only_a": 1,
+    "pair": "2ACY_A-1URN_A",
+    "pieces": 0,
+    "rmsd": 3.5417,
+    "same_fold": true,
+    "tm_score": 0.5246,
+    "usalign": {
+     "agreement": {
+      "close_within_1": 0.9722,
+      "exact": 0.7778,
+      "foldmap_pairs_in_usalign": 0.9259,
+      "within_1": 0.9259
+     },
+     "auto": {
+      "method": "structure",
+      "tm_score": 0.5246,
+      "within_1": 0.9259
+     },
+     "disagreements": [
+      "A 15-15 (1): not paired",
+      "A 65-65 (1): not paired",
+      "A 88-90 (3): B shifted +2",
+      "A 91-91 (1): not paired"
+     ],
+     "limits": {
+      "applies": true,
+      "pairs": true,
+      "tm": true,
+      "verdict": "pass"
+     },
+     "rows": {
+      "foldmap": [
+       "-----AEGDTLISVDYEIFGKVQGV---FFRKYTQAEGKKL-GLVGWVQNTDQ--GTVQGQLQGPASKVRHMQE-WLETKGSPKSHIDRAS-FHNEKVI--VKLDYTDFQIVK",
+       "AVPETRP----NHTIYINN-LNEKIKKDELKKSLHAIFSRFGQILDILVSRSLKMRGQAFVIFKEVSSATNALRSM-QGFPF-YDKPMRIQYAKTDS--DIIAKM--------"
+      ],
+      "usalign": [
+       "AEGDTL-------ISVDYEIFGKVQGV--FFRKYTQAEGKK-LGLVGWVQNTDQ--GTVQGQLQGPASKVRHMQEWLETKGSPKSHIDRASFHNEKVIV--KLDYTDFQIVK-",
+       "------AVPETRPNHTIYINNLNEKIKKDELKKSLHAIFSRFGQILDILVSRSLKMRGQAFVIFKEVSSATNALRSMQGFPF-YDKPMRIQYAKTD---SDIIAK-------M"
+      ]
+     },
+     "structure": {
+      "aligned": 81,
+      "rmsd": 3.5417,
+      "tm_score": 0.5246
+     },
+     "tm_difference": 0.0062,
+     "usalign": {
+      "aligned": 81,
+      "aligned_reported": 81,
+      "close": 72,
+      "foldmap_tm_of_its_pairs": 0.5178,
+      "rmsd": 3.45,
+      "tm_a": 0.5184,
+      "tm_b": 0.5253,
+      "version": "20241108"
+     }
+    }
+   },
+   {
+    "aligned": 413,
+    "extras": 1,
+    "identity": 0.7724,
+    "kind": "positive",
+    "length_a": 413,
+    "length_b": 419,
+    "mates": 30,
+    "method": "sequence",
+    "only_a": 2,
+    "pair": "2VWD_A-2X9M_A",
+    "pieces": 0,
+    "rmsd": 1.2699,
+    "same_fold": true,
+    "tm_score": 0.9782,
+    "usalign": {
+     "agreement": {
+      "close_within_1": 1.0,
+      "exact": 1.0,
+      "foldmap_pairs_in_usalign": 1.0,
+      "within_1": 1.0
+     },
+     "auto": {
+      "method": "sequence",
+      "tm_score": 0.9782,
+      "within_1": 1.0
+     },
+     "disagreements": [],
+     "limits": {
+      "applies": true,
+      "pairs": true,
+      "tm": true,
+      "verdict": "pass"
+     },
+     "rows": {
+      "foldmap": [
+       "--NICLQKTSNQILKPKLI-STLPVVGQSGTCITDPLLAMDEGYFAYSHLERIGSC--GVSKQRIIGVGEVLDRGDEVPSLFMTNVWTPPNPNTVYHCSAVYNNEFYYVLCAVSTVGDPILNSTYWSGSLMMTRLAVKPKSNGGGYNQHQLALRSIEKGRYDKVMPYGPSGIKQGDTLYFPAVGFLVRTEFKYNDSNCPITKCQYSKPENCRLSMGIRPNSHYILRSGLLKYNLSDGENPKVVFIEISDQRLSIGSPSKIYDSLGQPVFYQASFSWDTMIKFGDVLTVNPLVVNWRNNTVISRPGQSQCPRFNTCPEICWEGVYNDAFLIDRINWISAGVFLDSNQTAENPVFTVFKDNEILYRAQLASEDTNAQKTITNCFLLKNKIWCISLVEIYDTGDNVIRPKLFAVKIPEQCT-",
+       "PNQICLQKTTSTILKPRLISYTLPINTREGVCITDPLLAVDNGFFAYSHLEKIGSCTRGIAKQRIIGVGEVLDRGDKVPSMFMTNVWTPPNPSTIHHCSSTYHEDFYYTLCAVSHVGDPILNSTSWTESLSLIRLAVRPKSDSGDYNQKYIAITKVERGKYDKVMPYGPSGIKQGDTLYFPAVGFLPRTEFQYNDSNCPIIHCKYSKAENCRLSMGVNSKSHYILRSGLLKYNLSLGGDIILQFIEIADNRLTIGSPSKIYNSLGQPVFYQASYSWDTMIKLGDVDTVDPLRVQWRNNSVISRPGQSQCPRFNVCPEVCWEGTYNDAFLIDRLNWVSAGVYLNSNQTAENPVFAVFKDNEILYQVPLAEDDTNAQKTITDCFLLENVIWCISLVEIYDTGDSVIRPKLFAVKIPAQCSE"
+      ],
+      "usalign": [
+       "--NICLQKTSNQILKPKLI-STLPVVGQSGTCITDPLLAMDEGYFAYSHLERIGSC--GVSKQRIIGVGEVLDRGDEVPSLFMTNVWTPPNPNTVYHCSAVYNNEFYYVLCAVSTVGDPILNSTYWSGSLMMTRLAVKPKSNGGGYNQHQLALRSIEKGRYDKVMPYGPSGIKQGDTLYFPAVGFLVRTEFKYNDSNCPITKCQYSKPENCRLSMGIRPNSHYILRSGLLKYNLSDGENPKVVFIEISDQRLSIGSPSKIYDSLGQPVFYQASFSWDTMIKFGDVLTVNPLVVNWRNNTVISRPGQSQCPRFNTCPEICWEGVYNDAFLIDRINWISAGVFLDSNQTAENPVFTVFKDNEILYRAQLASEDTNAQKTITNCFLLKNKIWCISLVEIYDTGDNVIRPKLFAVKIPEQCT-",
+       "PNQICLQKTTSTILKPRLISYTLPINTREGVCITDPLLAVDNGFFAYSHLEKIGSCTRGIAKQRIIGVGEVLDRGDKVPSMFMTNVWTPPNPSTIHHCSSTYHEDFYYTLCAVSHVGDPILNSTSWTESLSLIRLAVRPKSDSGDYNQKYIAITKVERGKYDKVMPYGPSGIKQGDTLYFPAVGFLPRTEFQYNDSNCPIIHCKYSKAENCRLSMGVNSKSHYILRSGLLKYNLSLGGDIILQFIEIADNRLTIGSPSKIYNSLGQPVFYQASYSWDTMIKLGDVDTVDPLRVQWRNNSVISRPGQSQCPRFNVCPEVCWEGTYNDAFLIDRLNWVSAGVYLNSNQTAENPVFAVFKDNEILYQVPLAEDDTNAQKTITDCFLLENVIWCISLVEIYDTGDSVIRPKLFAVKIPAQCSE"
+      ]
+     },
+     "structure": {
+      "aligned": 413,
+      "rmsd": 1.2432,
+      "tm_score": 0.9792
+     },
+     "tm_difference": 0.0,
+     "usalign": {
+      "aligned": 413,
+      "aligned_reported": 413,
+      "close": 407,
+      "foldmap_tm_of_its_pairs": 0.9792,
+      "rmsd": 1.24,
+      "tm_a": 0.9792,
+      "tm_b": 0.9654,
+      "version": "20241108"
+     }
+    }
+   },
+   {
+    "aligned": 373,
+    "extras": 7,
+    "identity": 0.126,
+    "kind": "positive",
+    "length_a": 413,
+    "length_b": 424,
+    "mates": 26,
+    "method": "structure",
+    "only_a": 6,
+    "pair": "2VWD_A-2ZB5_A",
+    "pieces": 0,
+    "rmsd": 4.2769,
+    "same_fold": true,
+    "tm_score": 0.7233,
+    "usalign": {
+     "agreement": {
+      "close_within_1": 0.9933,
+      "exact": 0.9335,
+      "foldmap_pairs_in_usalign": 0.9946,
+      "within_1": 0.9867
+     },
+     "auto": {
+      "method": "structure",
+      "tm_score": 0.7233,
+      "within_1": 0.9867
+     },
+     "disagreements": [
+      "A 305-305 (1): not paired",
+      "A 468-468 (1): not paired",
+      "A 473-473 (1): B shifted -2",
+      "A 556-556 (1): B shifted -2",
+      "A 567-567 (1): not paired"
+     ],
+     "limits": {
+      "applies": true,
+      "pairs": true,
+      "tm": true,
+      "verdict": "pass"
+     },
+     "rows": {
+      "foldmap": [
+       "N---------------ICLQKTSNQILKPKLIS-TL--PVVGQSGTCITDPLLAMDEGYFAYSHLERIGSC-GVSKQRIIGVGEVLDRGDEVPSLFMTNVWTPPNPNTVYHCSAVYNNEFYYVLCAVSTVGDPILNST-----YWSGSLMMTRLAVKPKSNGGGYNQHQLALRSIEKGRYDKVMPYGPSGIKQGDTLYFPAVGFLVRTEF-KYN-DSNCPITKCQYSKPENCRLSMGIRPNSHYILRSGLLKYNLSDGENPKVVFIEISDQRLSIGSPSKIYDSLG--QPVFYQASFSWDTMIKFGDVLTVN--PLVVNWRNNTVISRPGQSQCPR------------FNTCPEICW---EGVYNDAFLIDRINWISAGVFLDSNQTA-ENPVFTVFKDNEILYRAQLASEDT-N-A-QKTITNCFLLKNKIWCISLVEIYDTGD--NVIRPKLFAVKIPEQCT",
+       "-CADVAAEELMNALVNNCSGPT-TIRGQFSNMSLSLLDLYLGRG-YNVSSIVTMTSQGMYGGTYLVEKP--NQLSMYRVFEVGVIRNPGLGAPVFHMTNYLEQPVSNDLSNCMVALGELKLAALCH-G---EDS-ITIPYQGSGKGVSFQLVKLGVWKS----PTDMQSWVPLSTDDPVIDRLYLSSHRGVIADNQAKWAVPTTRTDDKLRMETCFQQACKGKI--QA--LCENPEWAPLKDNRIPSYGVLSVDLSLTVELKIKIASGFGPLITHGSGMDLYKSNHNNVYWLTIPPMKNLALGVIN-TLEWIPRFKVSPYLFTV------------PIKEAGGDCHAPTYLP-----DGDVKLSSNLVILPGQDLQYVLATYDTSRV-EHAVVYYVYSPSRSFSYFYPFRLPIKGVPIELQVECFT-WD-QKLWCRHFCVLADSESGGHITHSGMVGMGV-SCT"
+      ],
+      "usalign": [
+       "N---------------ICLQKTSNQILKPKLIS-TL--PVVGQSGTCITDPLLAMDEGYFAYSHLERIGSC-GVSKQRIIGVGEVLDRGDEVPSLFMTNVWTPPNPNTVYHCSAVYNNEFYYVLCAVSTVGDPILNST----YWSGSLMMTRLAVKPKSNGGGYNQHQLALRSIEKGRYDKVMPYGPSGIKQGDTLYFPAVGFLVRTEF-KYN-DSNCPITKCQYSKPENCRLSMGIRPNSHYILRSGLLKYNLSDGENPKVVFIEISDQRLSIGSPSKIYDSLG--QPVFYQASFSWDTMIKFGDVLTV-NPLVVNWRNNTVISRPGQSQCPR------------FNTCPEICW---EGVYNDAFLIDRINWISAGVFLDSNQTA-ENPVFTVFKDNEILYRAQL-ASED-TNAQKTITNCFLLKNKIWCISLVEIYDTGD--NVIRPKLFAVKIPEQCT",
+       "-CADVAAEELMNALVNNCSGPT-TIRGQFSNMSLSLLDLYLGRG-YNVSSIVTMTSQGMYGGTYLVEKP--NQLSMYRVFEVGVIRNPGLGAPVFHMTNYLEQPVSNDLSNCMVALGELKLAALCH-G---EDSITIPYQGSGKGVSFQLVKLGVWKS----PTDMQSWVPLSTDDPVIDRLYLSSHRGVIADNQAKWAVPTTRTDDKLRMETCFQQACKGKI--QA--LCENPEWAPLKDNRIPSYGVLSVDLSLTVELKIKIASGFGPLITHGSGMDLYKSNHNNVYWLTIPPMKNLALGVINTLEWIPRFKVSPYLFTV------------PIKEAGGDCHAPTYLP-----DGDVKLSSNLVILPGQDLQYVLATYDTSRV-EHAVVYYVYSPSRSFSYFYPFRLPIKGVPIELQVECFTWD-QKLWCRHFCVLADSESGGHITHSGMVGMGV-SCT"
+      ]
+     },
+     "structure": {
+      "aligned": 373,
+      "rmsd": 4.2769,
+      "tm_score": 0.7233
+     },
+     "tm_difference": 0.0005,
+     "usalign": {
+      "aligned": 376,
+      "aligned_reported": 376,
+      "close": 300,
+      "foldmap_tm_of_its_pairs": 0.7229,
+      "rmsd": 4.4,
+      "tm_a": 0.7229,
+      "tm_b": 0.7067,
+      "version": "20241108"
+     }
+    }
+   },
+   {
+    "aligned": 378,
+    "extras": 7,
+    "identity": 0.1032,
+    "kind": "positive",
+    "length_a": 424,
+    "length_b": 446,
+    "mates": 28,
+    "method": "structure",
+    "only_a": 5,
+    "pair": "2ZB5_A-1E8T_A",
+    "pieces": 0,
+    "rmsd": 4.6917,
+    "same_fold": true,
+    "tm_score": 0.6977,
+    "usalign": {
+     "agreement": {
+      "close_within_1": 1.0,
+      "exact": 0.9789,
+      "foldmap_pairs_in_usalign": 1.0,
+      "within_1": 0.9974
+     },
+     "auto": {
+      "method": "structure",
+      "tm_score": 0.6977,
+      "within_1": 0.9974
+     },
+     "disagreements": [
+      "A 401-401 (1): not paired"
+     ],
+     "limits": {
+      "applies": true,
+      "pairs": true,
+      "tm": true,
+      "verdict": "pass"
+     },
+     "rows": {
+      "foldmap": [
+       "CADVAAEELMN-AL--VN------N-C-SGP--TTIRGQFSNMSLSLLDLYLGRGYNVSSIVTMTSQG-MYGGTYLVEKPNQ-----LSMYRVFEVGVIRNPGLGAPVFHMTNYLEQPVSNDLSNCMVALGELKLAALCHGE---DS-ITI-PYQGSGKGVSFQLVKLGVWKSPTDMQSWVPLSTDDPVIDRLYL-SSHRGVIADNQAKWAVPT-TR--TDDKLRMETCFQQ-----------ACKGKIQALCE-NPEWAPLKDNRIPSYGVLSVDLSLTVELKIKIASGFGPLITHGSGMDLYKSNHNNVYWLTIPPMKNLALGVINTLEWIP-RFKVSPYLFTVPIKEAGGDCHAP-------------TYLPDGD-----VKLSSNLVILPG---QDL-QYVLATYDTSRVE-HAVVYYVYSPSRSFSYFYPFRLPIKGVPIELQVECFTWD----QKLWCRHFCVLADSESGGHITHSGMVGMGVSCT",
+       "-----GA-PI-HDPDFIGGIGKELIVDNASDVTSFYPSAFQEHLNF-I-PAPTTGSGCTRIPSFDMSATHYCYTHNVILS--GCRDHSHSHQYLALGVLRTTATGRIFFSTLRSISLDDTQNRKSCSVSATPLGCDMLCSKVTETEEEDY-NS---AV-PTLMAHGRLG-FDG--QYHEKDLDVTTLFEDWVANYPGVGGGSFIDGRVWFSVYGGLKPNSPSDTVQEGKYVIYKRYNDTCPDEQDYQIRMAKSSYKPGRF--GGKRIQ-QAILSIKVSTSLGEDPVLTVPPNTVTLMGAEGRILTVGT--SHFLYQRGSSYFSPALLYPMTVSNKTATLHSPYTF-------------NAFTRPGSIPCQASARC---PNSCVTGVYTDPYPLIFYRNHTLRGVFGTMLDSEQA-RLNPASAVFDS-TSRSRITRVSSSS-T-KAAYTTSTCFKVVKTNKTYCLSIAEISNTLF--GEFRIVPLLVEILKND"
+      ],
+      "usalign": [
+       "CADVAAEELMN-AL--VN------N-C-SGP--TTIRGQFSNMSLSLLDLYLGRGYNVSSIVTMTSQG-MYGGTYLVEKPNQ-----LSMYRVFEVGVIRNPGLGAPVFHMTNYLEQPVSNDLSNCMVALGELKLAALCHGE--DS--ITI-PYQGSGKGVSFQLVKLGVWKSPTDMQSWVPLSTDDPVIDRLYL-SSHRGVIADNQAKWAVPT-TR--TDDKLRMETCFQQ-----------ACKGKIQALCENPEWAPLKDNRIPSYGVLSVDLSLTVELKIKIASGFGPLITHGSGMDLYKSNHNNVYWLTIPPMKNLALGVINTLEWIP-RFKVSPYLFTVPIKEAGGDCHAP-------------TYLPDGD-----VKLSSNLVILPG---QDL-QYVLATYDTSRVE-HAVVYYVYSPSRSFSYFYPFRLPIKGVPIELQVECFTWD----QKLWCRHFCVLADSESGGHITHSGMVGMGVSCT",
+       "-----GA-PI-HDPDFIGGIGKELIVDNASDVTSFYPSAFQEHLNF-I-PAPTTGSGCTRIPSFDMSATHYCYTHNVILS--GCRDHSHSHQYLALGVLRTTATGRIFFSTLRSISLDDTQNRKSCSVSATPLGCDMLCSKVTETEEEDY-NS---AV-PTLMAHGRLG-FDG--QYHEKDLDVTTLFEDWVANYPGVGGGSFIDGRVWFSVYGGLKPNSPSDTVQEGKYVIYKRYNDTCPDEQDYQIRMAKSSYKPGRF-GGKRIQ-QAILSIKVSTSLGEDPVLTVPPNTVTLMGAEGRILTVGT--SHFLYQRGSSYFSPALLYPMTVSNKTATLHSPYTF-------------NAFTRPGSIPCQASARC---PNSCVTGVYTDPYPLIFYRNHTLRGVFGTMLDSEQA-RLNPASAVFDS-TSRSRITRVSSSS-T-KAAYTTSTCFKVVKTNKTYCLSIAEISNTLF--GEFRIVPLLVEILKND"
+      ]
+     },
+     "structure": {
+      "aligned": 378,
+      "rmsd": 4.6917,
+      "tm_score": 0.6977
+     },
+     "tm_difference": 0.0001,
+     "usalign": {
+      "aligned": 379,
+      "aligned_reported": 379,
+      "close": 278,
+      "foldmap_tm_of_its_pairs": 0.6976,
+      "rmsd": 4.72,
+      "tm_a": 0.6976,
+      "tm_b": 0.6682,
+      "version": "20241108"
+     }
+    }
+   },
+   {
+    "aligned": 260,
+    "extras": 10,
+    "identity": 0.0769,
+    "kind": "positive",
+    "length_a": 286,
+    "length_b": 413,
+    "mates": 22,
+    "method": "structure",
+    "only_a": 6,
+    "pair": "4CH9_A-2VWD_A",
+    "pieces": 0,
+    "rmsd": 3.9306,
+    "same_fold": true,
+    "tm_score": 0.6937,
+    "usalign": {
+     "agreement": {
+      "close_within_1": 0.0,
+      "exact": 0.0,
+      "foldmap_pairs_in_usalign": 0.0,
+      "within_1": 0.0
+     },
+     "auto": {
+      "method": "structure",
+      "tm_score": 0.6937,
+      "within_1": 0.0
+     },
+     "disagreements": [
+      "A 300-301 (2): B shifted -38",
+      "A 302-322 (21): not paired",
+      "A 323-324 (2): B shifted -59",
+      "A 325-335 (11): B shifted -63",
+      "A 336-336 (1): B shifted -64",
+      "A 337-356 (20): B shifted -60",
+      "A 357-358 (2): B shifted -58",
+      "A 359-359 (1): B shifted -57",
+      "A 360-360 (1): B shifted -56",
+      "A 361-371 (11): B shifted -65",
+      "A 372-378 (7): B shifted -67",
+      "A 379-380 (2): B shifted -68",
+      "A 381-381 (1): B shifted -69",
+      "A 382-382 (1): B shifted -73",
+      "A 383-383 (1): B shifted -72",
+      "A 384-394 (11): B shifted -70",
+      "A 395-403 (9): B shifted -71",
+      "A 404-404 (1): B shifted -101",
+      "A 405-407 (3): B shifted -106",
+      "A 408-416 (9): B shifted -97",
+      "A 417-417 (1): B shifted -96",
+      "A 418-418 (1): B shifted -90",
+      "A 419-425 (7): B shifted -93",
+      "A 426-427 (2): B shifted -92",
+      "A 428-428 (1): B shifted -91",
+      "A 429-429 (1): B shifted -89",
+      "A 430-439 (10): B shifted -90",
+      "A 440-441 (2): B shifted -91",
+      "A 442-450 (9): B shifted -90",
+      "A 453-453 (1): B shifted -54",
+      "A 455-467 (13): B shifted -53",
+      "A 468-468 (1): B shifted -50",
+      "A 469-477 (9): B shifted -51",
+      "A 478-478 (1): B shifted -49",
+      "A 479-480 (2): B shifted -48",
+      "A 481-488 (8): B shifted -67",
+      "A 489-490 (2): B shifted -66",
+      "A 491-497 (7): B shifted -69",
+      "A 498-499 (2): B shifted -70",
+      "A 500-501 (2): not paired",
+      "A 502-509 (8): B shifted -72",
+      "A 510-511 (2): B shifted -71",
+      "A 515-515 (1): B shifted -68",
+      "A 516-522 (7): B shifted -67",
+      "A 523-525 (3): B shifted -66",
+      "A 526-526 (1): B shifted -70",
+      "A 527-535 (9): B shifted -52",
+      "A 536-536 (1): B shifted -53",
+      "A 537-537 (1): B shifted -56",
+      "A 538-544 (7): B shifted -53",
+      "A 545-547 (3): B shifted -52",
+      "A 548-558 (11): B shifted -55",
+      "A 559-561 (3): not paired",
+      "A 562-563 (2): B shifted -58"
+     ],
+     "limits": {
+      "applies": true,
+      "pairs": false,
+      "tm": true,
+      "verdict": "miss"
+     },
+     "rows": {
+      "foldmap": [
+       "PKVMIVVGGQAPKAIRSVECYDF-------EEDRWDQIAELPSR------RCRAGVVFMAGHVYAVGGFN---GS-L-RVRTVDVYDGVK-----DQWTSIASMQE-R--RSTLGAAVLNDLLYAVGGFD-GSTG---------LASVEAYSY-K------TNEWFFVA-PM-N----TRRSSVGVGVVEG-KLYAVGGYDGA----------------------------------SRQCLSTVEQYNPAT---NEWIYVADMS--T-RRSGAGVGVL-SGQLYATGGHDGPLVRKSVEV-YDPGTN-TWKQVAD-MNMC------------------RRNAGVCAVNG---LLYVVGG-DDGSCNLASVEYYNPVTDKWTLLPTNMS---TGRSYAGVAVI-H----K-----------------------------",
+       "NI---------------------CLQKTSNQILKPKLISTLPVVGQSGTCITDPLLAMDEGYFAYSHLERIGSCGVSKQRIIGVGEVLDRGDEVPSLFMTNVWTPPNPNTVYHCSAVYNNEFYYVLCAVSTVGDPILNSTYWSGSLMMTRLAVKPKSNGGGYNQHQLALRSIEKGRYDKVMPYGPSGIKQGDTLYFPAVGFLVRTEFKYNDSNCPITKCQYSKPENCRLSMGIRPNSHYILRSGLLKYNLSDGENPKVVFIEISDQRLSIGSPSKIYDSLGQPVFYQASFS--WDTMIKFGDVLTVNPLVVNWRNNTVISRPGQSQCPRFNTCPEICWEGVYNDAFLIDRINWISAGVFLDSNQTAENPVFTVFK---DNEILYRAQLASEDTNAQKTITNCFLLKNKIWCISLVEIYDTGDNVIRPKLFAVKIPEQCT"
+      ],
+      "usalign": [
+       "--------------------------------------PKVMIVVGGQA---P-KA-IRSVECYD-F-EE----DRWDQIAELPS-R--RCRAGVVFMAGHVYAVGGFN-GSLR---------VRTVDVYDGVK-------DQWTSIA-SM-Q----ERRSTLGAAVLND-LLYAVGGFD-------------------------------G-----STGLASVEAYSYKT---NEWFFVAPMN--T-RRSSVGVGVV-EGKLYAVGGYDGASRQCLSTVEQYNPATN-EWIYVADMSTRR-------------------SGAGVGVLSG---QLYATGG-HDGPLVRKSVEVYDPGTNTWKQVADMNM----CRRNAGVCAV-N---GLLYVVGGDDG---SCNLASVEYYNPVTDKWTLLPTNMSTGRSYAGVAVIHK-",
+       "NICLQKTSNQILKPKLISTLPVVGQSGTCITDPLLAMDEGYFAYSHLERIGSCGVSKQRIIGVGEVLDRGDEVPSLFMTNVWTPPNPNTVYHCSAVYNNEFYYVLCAVSTVGDPILNSTYWSGSLMMTRLAVKPKSNGGGYNQHQLALRSIEKGRYDKVMPYGPSGIKQGDTLYFPAVGFLVRTEFKYNDSNCPITKCQYSKPENCRLSMGIRPNSHYILRSGLLKYNLSDGENPKVVFIEISDQRLSIGSPSKIYDSLGQPVFYQASFS--W-DTMIKFGDVLTVNPLVVNWRNNTVISRPGQSQCPRFNTCPEICWEGVYNDAFLIDRINWISAGVFLDSNQTAENPVFTVFK---DNEILYRAQLASEDTNAQKTITNCFLLKNKIWCISLVEIYDTGDNVIRPKLFAVKIPEQC----------------------T"
+      ]
+     },
+     "structure": {
+      "aligned": 260,
+      "rmsd": 3.9306,
+      "tm_score": 0.6937
+     },
+     "tm_difference": 0.0154,
+     "usalign": {
+      "aligned": 258,
+      "aligned_reported": 258,
+      "close": 206,
+      "foldmap_tm_of_its_pairs": 0.6784,
+      "rmsd": 4.05,
+      "tm_a": 0.6783,
+      "tm_b": 0.4998,
+      "version": "20241108"
+     }
+    }
+   }
+  ]
+ },
+ "usalign_version": "20241108"
+}

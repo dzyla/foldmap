@@ -174,3 +174,74 @@ propeller, a βα barrel), whose alignments can slip by a repeat or part of one 
   align.
 - To measure it: `homologues.py align --usalign` on both sets, with the search-short count, the median TM gap and the
   limits as the before/after numbers.
+
+## TM-align's other seeds (plan 24 Task 1, post hoc)
+
+Done in plan 24 (code 28ab8e2): `align.py` gained TM-align's local-superposition seed (`get_initial5`), its
+secondary-structure-plus-distance seed (`initial_ssplus`), and the second gap value of TM-align's `DP_iter` (each
+seed's refinement goes on without a gap penalty). Measured afterwards, on zyla-office with US-align 20241108.
+**Nothing frozen changes**: the H limits, `heldout-report.md`, `heldout-summary.json`, `tuning-report.md`,
+`usalign.json` and `usalign-report.md` stand as measured. The post-hoc tables, the same as plan 23's with the new
+aligner, are in `aligner-seeds/usalign-report.md` and `aligner-seeds/usalign.json`
+(`homologues.py usalign-report ... --out docs/validation/homologues/aligner-seeds --commit 28ab8e2`, no `--summary`).
+
+**Against US-align** (before: the committed `usalign.json`, 7ac7c0e; a re-run reproduced it):
+
+| | before | after |
+|---|---|---|
+| search short (US-align's pairs score > 0.005 higher under foldmap's own TM-score) | 28 of 55 | 5 of 55 |
+| ... of those 28: foldmap now within 0.002 of US-align's TM, or above it | – | 23 |
+| pairs whose TM-score dropped | – | 0 |
+| foldmap's TM lower than US-align's | 43 of 55 | 14 of 55 |
+| TM difference (foldmap - US-align), median | -0.005 | 0.000 |
+| US-align TM ≥ 0.5: TM within 0.05 | 34 of 34 | 34 of 34 |
+| ... both 13a-3 limits | 32 of 34 (tuning 9/11, held-out 23/23) | 33 of 34 (tuning 10/11, held-out 23/23) |
+| ... pairs reproduced (±1), median: tuning; held-out | 0.978; 0.990 | 1.000; 1.000 |
+| ... least pairs reproduced, held-out | 0.867 | 0.968 |
+| the same side of H1's 0.5 as US-align | 55 of 55 | 55 of 55 |
+
+- The gap-free rounds do most of it: with the two seeds alone (measured during the work) 2 of the 28 closed; with
+  the gap-free rounds as well, 23.
+- **1TIM-1IGS**, one of plan 23's two misses, now passes: 97.4 % of US-align's pairs (was 79.6 %), TM 0.620 against
+  0.620.
+- **4CH9-2VWD keeps its blade register**: 0 % agreement, B one blade along from US-align's choice, TM 0.694 against
+  US-align's 0.678 (was 0.681). foldmap's register still scores higher under its own TM-score. Its H2/H3 drawn alike
+  are unchanged: 2.10 / 5.22 and 0.948 (231 mate pairs), still failing.
+- **Still short (5)**, all under TM 0.42 and four of them negatives (foldmap / US-align): 1TIM-1HDC 0.399 / 0.411,
+  1PZW-1QHL 0.316 / 0.323, 2H5F-4Z42 0.296 / 0.323, 3BUU-3VDI 0.330 / 0.348, 4IPV-4N2P 0.303 / 0.309. TM-align's
+  fragment gapless threading (`get_initial_fgt`) is the seed still missing.
+- **Agreement lower on 8 pairs**, each now scoring at or above US-align's TM normalised by A, the score foldmap
+  maximises (US-align searches with the shorter chain's d0): 1REI-1TNF 0.747 to 0.735, 1JK4-2HNW 1.000 to 0.987,
+  2ACY-1URN 0.951 to 0.926, 1XU6-1PS2 0.839 to 0.742, 2C3E-1HZF 0.423 to 0.408, 2Q82-2JTR 0.986 to 0.958, 3N4H-4JCU
+  1.000 to 0.982, 3VDJ-2JXW 0.387 to 0 (TM 0.260 against 0.244). The three judged by the limits (1JK4, 2ACY, 3N4H)
+  still pass both.
+
+**Time** (the structure route alone, one pair at a time, zyla-office, one thread): median 0.14 s before, 0.19 s
+after; mean 0.20 s and 0.28 s; slowest 0.90 s and 1.55 s (2ZB5-1E8T, 424 x 446 residues). `test_budget`'s
+500-residue bundle (3 s limit): 0.46 s before, 0.77 s after. The local seed's work is capped by a count
+(`LOCAL_CELLS`: TM-align's own fragment starts up to about 520 residues a chain, fewer beyond), and a new candidate
+is scored in full only when its quick score can win (`SCREEN`); the first three seeds' penalised refinements are
+scored as before, so no TM-score drops.
+
+**H1-H5, post hoc.** `homologues.py run` on both sets, with 7ac7c0e's `align.py` and with plan 24's. **No verdict
+changes**: every pair passes and fails the same checks on both sets.
+
+| | frozen | re-run, 7ac7c0e | re-run, plan 24 |
+|---|---|---|---|
+| held-out positives passing H1-H5 | 16 of 30 (c099787) | 17 of 30 | 17 of 30 |
+| held-out negatives refused (H1) | 9 of 10 | 9 of 10 | 9 of 10 |
+| held-out positives refused by H1 | 7 | 7 | 7 |
+| held-out H2 median, drawn alike / independently | 0.11 / 1.89 | 0.11 / 1.89 | 0.11 / 2.05 |
+| held-out H3 share, drawn alike / independently | 1.00 / 0.71 | 1.00 / 0.71 | 1.00 / 0.70 |
+| tuning positives passing H1-H5 | 8 of 11 | 8 of 11 | 8 of 11 |
+| tuning negatives refused (H1) | 4 of 4 | 4 of 4 | 4 of 4 |
+
+- Frozen to 7ac7c0e is not the aligner: two close pairs on the sequence route (1JK4-2HNW's H3, 3WZ0-2AV5's H2 and
+  H3) pass at 7ac7c0e after the layout work since c099787.
+- The new aligner moves values, not verdicts. Drawn alike: 3N4H-4JCU's H2 0.09 / 0.16 to 0.04 / 0.12, 5GY2-2D4X's
+  0.18 / 0.46 to 0.30 / 0.44 (5 mates, was 6). The independent baseline moves where the mates change (5GY2-2D4X,
+  2Q82-2JTR, the refused and negative pairs): the held-out median 1.89 to 2.05.
+- The seven H1 refusals stay under 0.5: 1JBI-3U7Z 0.271, 1XU6-1PS2 0.264, 2D46-3F42 0.383, 2JCA-3LQ9 0.395,
+  2MJ7-2EHB 0.492 (now US-align's own 0.492), 2Q82-2JTR 0.397, 5GL3-1WPN 0.446.
+- `foldmap compare`/`--like` on 2LZM against 1UBQ (tests): TM 0.33 with 2 of 13 elements matched (was 0.32, 3),
+  still not one fold.
