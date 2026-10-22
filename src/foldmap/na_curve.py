@@ -75,6 +75,7 @@ class NACurve:
     band: float = 0.0  # its rails and base letters across (2 x (rail + NT_ROW + a glyph's height))
     held: list = field(default_factory=list)  # laid out by build_layout (lay_out): each piece's (cx, cy, angle) there
     named: bool = False  # its name placed (build_curves: name_xy, name_angle); text keeps off it from then on
+    drawn: dict = field(default_factory=dict, repr=False, compare=False)  # its Chords, kept (chords: read often)
 
     def frames(self, s) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """(points, unit tangents, unit left normals) at arc lengths s; past either end the curve runs straight on."""
@@ -843,7 +844,11 @@ def chords(c: NACurve, n: int, stems: list[PlacedStem]) -> list[Chord]:
     """The curve's body as Chords, each at most its rail offset long along the curve (a turn of under 20 degrees
     from one to the next at the tightest bend, _R_MIN), each grown past both ends by what closes the wedge its turn
     from its neighbour opens on the bend's outside, and across by how far the curve bows off it there (its sagitta,
-    each side): one band, no gap, nothing past it but those hairs."""
+    each side): one band, no gap, nothing past it but those hairs. Kept on the curve, whose geometry is fixed once
+    made (keepers of the result must not change them)."""
+    key = (n, tuple(stems[k].id for k in c.pieces))
+    if key in c.drawn:
+        return c.drawn[key]
     lo, hi = c.extent()
     m = max(1, math.ceil((hi - lo) / max(c.rail, 0.1)))
     edges = np.linspace(lo, hi, m + 1)
@@ -882,6 +887,7 @@ def chords(c: NACurve, n: int, stems: list[PlacedStem]) -> list[Chord]:
                 s1=s1,
             )
         )
+    c.drawn[key] = out
     return out
 
 
