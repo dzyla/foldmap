@@ -180,6 +180,7 @@ foldmap contacts 1LMB                             # check the contact beads agai
 foldmap check 9FWZ                                # check the figure's science and page (S1-S6, A1-A20)
 foldmap data 1TIM -o tim.json                     # the figure as data: elements, sheets, ligands, interfaces
 foldmap data 2HHB -o tables/                      # ... as CSV tables, one per file
+foldmap data 2GIS -o riboswitch.dbn               # the nucleic acid as dot-bracket (or .bpseq, .ct)
 foldmap app                                       # the Streamlit app
 foldmap styles                                    # every theme and style key
 ```
@@ -407,6 +408,8 @@ foldmap data 1C3W --membrane auto --sections membrane,elements
 foldmap data 2HHB --sections interfaces,interactions # chain pairs, with the interactions between them
 foldmap data 1TIM -o elements.csv --table elements   # one table as CSV
 foldmap data 2HHB -o tables/                         # every table of the sections, one CSV each
+foldmap data 2GIS -o sam.dbn                         # the nucleic acid as dot-bracket; .bpseq, .ct likewise
+foldmap data 1EHZ --format ct                        # ... to standard output
 foldmap data --schema                                # the format, as a JSON Schema
 ```
 
@@ -432,9 +435,21 @@ foldmap data --schema                                # the format, as a JSON Sch
   chromophore), with the protein residues it touches (a heavy atom within 4.0 Å; a metal's O, N or S within 3.1 Å),
   the element each is in, those elements in sequence order, and the residues covalently joined to it (a heavy atom
   within 1.9 Å: a glycan's Asn, a chromophore's neighbours in the chain);
-- `interfaces`: each pair of chains in contact, with its CA pairs within 8 Å, the residues of each chain in them,
+- `interfaces`: each pair of chains in contact, by its `measure`: two protein chains by their CA pairs within 8 Å
+  (`ca`); a protein and a nucleic-acid chain by their residue-nucleotide pairs with heavy atoms within 4 Å, read on
+  the structure (`atoms`: the rule the figure's contacts are read by, every nucleotide of the chains read, cropped
+  or not); two nucleic-acid chains by the base pairs the figure draws between them (`base_pairs`). Each has its
+  `contacts` by that measure, the residues (nucleotides) of each chain in them, its CA pairs (protein pairs only)
   and its element pairs in contact (the CA contacts the layout weighs, from 3 pairs); with `interactions` asked for,
   the interactions between the two chains by kind, in all and for each element pair;
+- `nucleic_acid` (null without one): the strands the figure draws (a chain broken, or cropped by `na_extent`, is
+  several), each with its residues, sequence (A C G U T, I, N; a modified nucleotide as its parent base) and its
+  part of the dot-bracket; the base pairs, numbered 1… through the strands in order, each with its kind (Watson-Crick
+  or G·U), its stem's name and its bracket level; the stems, the gaps and the G-tetrads. The pairs are the ones the
+  figure draws (`nucleic.py`: Watson-Crick and wobble pairs), so non-canonical pairs are not in it. Bracket levels
+  follow foldmap's pseudoknot rule, the one that names a stem PK: every stem it keeps nested is `()`; the others,
+  longest first, then the isolated pairs, each take the lowest level where they cross nothing (`[]`, `{}`, `<>`,
+  then `Aa`, `Bb` …), so the PK stem is `[]`. A pair between two strands is bracketed across them;
 - `interactions` (only when `--sections` names it): every H-bond, salt bridge, π-stacking, cation-π and hydrophobic
   contact between residues of two different chains, found by the same finders as the figure's lines and re-checked
   the same way, each with its atoms, distance (and angle), note and the element at each end.
@@ -442,8 +457,20 @@ foldmap data --schema                                # the format, as a JSON Sch
 Tables: `--table NAME` writes one table as CSV (to `-o FILE.csv` or standard output), and `-o DIR/` (or an existing
 directory) writes every table of the sections asked for as `DIR/NAME.csv`. The tables are `elements`, `sheets` (a
 row per strand), `sheet_pairs`, `sheet_register` (a row per bridge), `disulfides`, `membrane`, `ligands`,
-`ligand_contacts`, `interfaces`, `interface_elements` and `interactions`; each row comes in the JSON's order, an
-empty cell is null, and booleans read `true`/`false`.
+`ligand_contacts`, `interfaces`, `interface_elements`, `nucleotides` (a row per nucleotide, with its partner and
+bracket), `base_pairs` and `interactions`; each row comes in the JSON's order, an empty cell is null, and booleans
+read `true`/`false`.
+
+The nucleic acid as a file: `-o FILE.dbn` (or `.bpseq`, `.ct`, or `--format dbn|bpseq|ct` to standard output)
+writes the `nucleic_acid` section as dot-bracket (a `>CHAIN:FIRST-LAST` line, the sequence and the structure for
+each strand: the multi-strand form RNApolis reads), BPSEQ (number, base, partner's number or 0) or CT (a header with
+the count and the file's name, then number, base, the numbers before and after, 0 where a strand ends, partner, and
+the residue number in the file).
+
+The MCP tool `structure_data(source, sections, output_path, ...)` returns the same dict (the structured result; its
+text the JSON) with `draw_topology`'s layout arguments, and writes `.json`, `.dbn`, `.bpseq` or `.ct`. The app's
+Download menu has the data too: the JSON, and a zip of the CSV tables (with the dot-bracket, BPSEQ and CT of a
+nucleic acid), for the figure drawn.
 
 It takes `plot`'s `--chains`, `--assembly`, `--symmetry`, `--focus`, `--names`, `--rename`, `--domain`,
 `--domains`, `--uniprot`, `--membrane`, `--layout-file` and `--set` (layout keys), so its labels and places are
@@ -876,8 +903,8 @@ On your own machine there are no limits except `FOLDMAP_APP_SLOW`; each variable
 
 `foldmap mcp` runs a [Model Context Protocol](https://modelcontextprotocol.io) server over stdio, so agents can
 summarise structures and draw figures. Tools: `summarize_structure`, `draw_topology`, `compare_structures`,
-`draw_sequence`, `interactive_page`, `list_styles`; the drawing tools return a PNG preview along with the file they
-wrote.
+`draw_sequence`, `interactive_page`, `list_styles`, `structure_data` (the figure as data, as `foldmap data`); the
+drawing tools return a PNG preview along with the file they wrote.
 
 ```bash
 claude mcp add foldmap -- foldmap mcp        # Claude Code
@@ -890,7 +917,7 @@ claude mcp add foldmap -- foldmap mcp        # Claude Code
 (the second form for clients configured by JSON, such as Claude Desktop).
 
 Figures must end in `.svg`, `.png` or `.pdf`, pages in `.html`, layout files in `.yaml` or `.yml` and
-`compare_structures`' record in `.json`. Set
+`compare_structures`' record in `.json`, `structure_data`'s file in `.json`, `.dbn`, `.bpseq` or `.ct`. Set
 `FOLDMAP_OUTPUT_DIR` in the server's environment to confine the figure, page and layout files the server writes (default outputs included) to one folder;
 the structure download cache (`~/.cache/foldmap`) is not covered.
 

@@ -1059,7 +1059,7 @@ def test_downloads_are_built_only_when_asked(monkeypatch):
     seq = count_calls(monkeypatch, app_jobs, "sequence_job")
     page = count_calls(monkeypatch, app_jobs, "page_job")
     at = opened(DATA / "1UBQ.cif")
-    figure = {"dl_svg", "dl_png", "dl_pdf", "dl_layout"}
+    figure = {"dl_svg", "dl_png", "dl_pdf", "dl_layout", "dl_data_json", "dl_data_zip"}
     assert {b.key for b in at.download_button} == figure
     assert any(c.value == "Open the Sequence view to make this file." for c in at.caption)
     assert any(c.value == "Open the 3D view to make this file." for c in at.caption)
@@ -1558,3 +1558,35 @@ def test_a_swap_picked_by_deposited_name_draws_the_command_line_swap():
     as_text(at, "swap", text_of("swap", rows))
     cli = save_svg(draw_spec(figure_spec(path, theme="publication", swap=["res:A:4-17,res:A:59-76"])).figure)
     assert not at.exception and svg_of(at) == figure_card(cli, "#ffffff", at.session_state["name"])
+
+
+def test_data_downloads_are_the_command_lines(tmp_path, capsys):
+    """Plan 13d-3: the Download popover's Data buttons, called as a click calls them on the figure drawn, give the
+    JSON `foldmap data` writes for the same structure (the same bytes) and a zip of its CSV tables, each the file
+    `foldmap data -o DIR/` writes, with the nucleic acid's dot-bracket, BPSEQ and CT."""
+    import io
+    import zipfile
+
+    from foldmap import app_jobs
+    from foldmap.app_views import data_downloads
+    from foldmap.cli import main
+
+    path = str(DATA / "1LMB.cif")
+    at = opened(path)
+    blob = at.session_state["last_good"]["blob"]
+    assert {"dl_data_json", "dl_data_zip"} <= {b.key for b in at.download_button}
+    files = {d.key: d for d in data_downloads(path, blob, "1LMB", app_jobs.Limits())}
+    assert {k: d.file_name for k, d in files.items()} == {
+        "dl_data_json": "1LMB-data.json",
+        "dl_data_zip": "1LMB-data.zip",
+    }
+    assert main(["data", path]) == 0
+    assert files["dl_data_json"].data().decode("utf-8") == capsys.readouterr().out
+    out = tmp_path / "tables"
+    assert main(["data", path, "-o", f"{out}/"]) == 0
+    for ext in ("dbn", "bpseq", "ct"):
+        assert main(["data", path, "-o", str(out / f"nucleic_acid.{ext}")]) == 0
+    with zipfile.ZipFile(io.BytesIO(files["dl_data_zip"].data())) as zf:
+        assert sorted(zf.namelist()) == sorted(p.name for p in out.iterdir())
+        for name in zf.namelist():
+            assert zf.read(name) == (out / name).read_bytes(), name

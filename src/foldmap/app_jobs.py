@@ -390,6 +390,16 @@ def files_job(path, settings_json: str, ext: str) -> bytes:
         return figure_bytes(drawn.figure, ext)
 
 
+def data_job(path, settings_json: str, kind: str) -> bytes:
+    """The figure's data (datafile.spec_data, all sections but interactions, as `foldmap data` writes them): the
+    JSON (kind "json") or every CSV table, with a nucleic acid's dot-bracket, BPSEQ and CT, in a zip (kind "zip")."""
+    from . import app
+    from .datafile import DEFAULT, dumps, spec_data, zip_bytes
+
+    data = spec_data(app.spec_of(path, json.loads(settings_json)), DEFAULT)
+    return dumps(data).encode("utf-8") if kind == "json" else zip_bytes(data)
+
+
 def sequence_job(path, settings_json: str, view_json: str, ext: str) -> bytes:
     """The sequence figure (app.sequence_figure) as an svg, png or pdf file."""
     from . import app
@@ -572,6 +582,12 @@ def figure_file(path: str, blob: str, ext: str, limits: Limits, eager: tuple | N
     if ext in files:
         return files[ext]
     return run_job(files_job, path, blob, ext, limits=limits)
+
+
+@functools.lru_cache(maxsize=8)
+def data_file(path: str, blob: str, kind: str, limits: Limits) -> bytes:
+    """A data download (data_job: "json" or "zip")."""
+    return run_job(data_job, path, blob, kind, limits=limits)
 
 
 @functools.lru_cache(maxsize=8)

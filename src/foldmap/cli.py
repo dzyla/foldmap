@@ -1882,19 +1882,26 @@ def _data_parser(sub) -> None:
         "S; disulfides; symmetry and stoichiometry; with --membrane, the transmembrane segments and sides; the "
         "ligands, metal ions, glycans and fused residues (a chromophore) with the residues and elements they touch; "
         "the chain pairs in contact with their elements in contact; with --sections ...,interactions, every "
-        "interaction between two chains (H-bonds, salt bridges, stacking, cation-pi, hydrophobic). Numbers are "
+        "interaction between two chains (H-bonds, salt bridges, stacking, cation-pi, hydrophobic); the nucleic acid's "
+        "strands and base pairs (those the figure draws) with their stems and pseudoknot bracket levels. Numbers are "
         "rounded to 0.001; the same structure and options give the same bytes. `-o out.csv --table NAME` writes one "
-        "table as CSV; `-o DIR/` writes every table of the sections as DIR/NAME.csv.",
+        "table as CSV; `-o DIR/` writes every table of the sections as DIR/NAME.csv; `-o out.dbn` (or .bpseq, .ct; "
+        "--format for standard output) writes the nucleic acid as dot-bracket, BPSEQ or CT.",
     )
     dq.add_argument("structure", nargs="?", help="a file, PDB ID or UniProt accession (not needed with --schema)")
     dq.add_argument(
         "-o",
         "--output",
-        metavar="JSON|CSV|DIR/",
+        metavar="JSON|CSV|DIR/|DBN|BPSEQ|CT",
         help="where to write it (default: standard output); a directory (ending in /, or one that exists) gets one "
         "CSV per table",
     )
     dq.add_argument("--schema", action="store_true", help="print the JSON Schema of the output and exit")
+    dq.add_argument(
+        "--format",
+        choices=["json", "dbn", "bpseq", "ct"],
+        help="json (default), or the nucleic acid as dot-bracket (dbn), BPSEQ or CT; else from -o's suffix",
+    )
     dq.add_argument(
         "--sections",
         metavar="A,B",
@@ -2041,17 +2048,19 @@ def _cmd_compare(args: argparse.Namespace) -> int:
 
 
 def _cmd_data(args: argparse.Namespace) -> int:
-    """data: the figure `plot` would draw, laid out only, as datafile.structure_data's JSON (or --schema)."""
+    """data: the figure `plot` would draw, laid out only, as datafile.structure_data's JSON (or --schema), one CSV
+    table, every table, or the nucleic acid as dot-bracket, BPSEQ or CT."""
     import json
 
     from .datafile import (
         DEFAULT,
+        NA_FORMATS,
         SECTIONS,
         TABLES,
         csv_text,
         dumps,
         schema,
-        structure_data,
+        spec_data,
         tables,
         write,
         write_csv,
@@ -2066,8 +2075,16 @@ def _cmd_data(args: argparse.Namespace) -> int:
     table = args.table
     if table is not None and table not in TABLES:
         raise UsageError(f"error: no data table {table}; the tables are {', '.join(TABLES)}")
+    out = args.output
+    to_dir = bool(out) and (out.endswith(("/", "\\")) or Path(out).is_dir())
+    suffix = Path(out).suffix.lower().lstrip(".") if out and not to_dir else ""
+    form = args.format or ({"db": "dbn"}.get(suffix, suffix) if suffix in ("dbn", "db", "bpseq", "ct") else "json")
+    if form != "json" and (table is not None or to_dir):
+        raise UsageError(f"error: --format {form} writes the nucleic acid as one file: not with --table or -o DIR/")
     if args.sections:
         sections = tuple(s.strip() for s in args.sections.split(",") if s.strip())
+    elif form != "json":
+        sections = ("structure", "nucleic_acid")
     else:
         sections = (TABLES[table][0],) if table else DEFAULT
     unknown = [s for s in sections if s not in SECTIONS]
@@ -2075,17 +2092,22 @@ def _cmd_data(args: argparse.Namespace) -> int:
         raise UsageError(f"error: no data section {', '.join(unknown)}; the sections are {', '.join(SECTIONS)}")
     if table is not None and TABLES[table][0] not in sections:
         raise UsageError(f"error: table {table} comes from section {TABLES[table][0]}, which --sections leaves out")
-    out = args.output
-    to_dir = bool(out) and (out.endswith(("/", "\\")) or Path(out).is_dir())
-    if out and not to_dir and table is None and out.lower().endswith(".csv"):
+    if form != "json" and "nucleic_acid" not in sections:
+        raise UsageError(f"error: --format {form} comes from section nucleic_acid, which --sections leaves out")
+    if out and not to_dir and table is None and form == "json" and suffix == "csv":
         raise UsageError(f"error: a .csv holds one table: name it with --table ({', '.join(TABLES)}), or give -o DIR/")
-    spec = _spec_of(args)
-    model = read_model(spec.structure, spec.assembly)
-    layout, sses, bb = make_layout(
-        spec.structure, spec.mode, spec.rotate, spec.flip_v, model=model, **spec.layout_kwargs()
-    )
-    data = structure_data(layout, sses, bb, model, sections, name=str(spec.structure))
-    if to_dir:
+    data = spec_data(_spec_of(args), sections)
+    if form != "json":
+        text = NA_FORMATS[form](data)
+        if out:
+            path = Path(out)
+            path.parent.mkdir(parents=True, exist_ok=True)
+            with open(path, "w", encoding="utf-8", newline="\n") as fh:
+                fh.write(text)
+            print(f"wrote {path}", file=sys.stderr)
+        else:
+            sys.stdout.write(text)
+    elif to_dir:
         written = write_tables(data, out, None if table is None else (table,))
         print(f"wrote {len(written)} table{'s' if len(written) != 1 else ''} to {out}", file=sys.stderr)
     elif table is not None:

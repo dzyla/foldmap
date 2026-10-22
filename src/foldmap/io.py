@@ -595,8 +595,19 @@ def load_nucleic(
         return Nucleic()
     ns = gemmi.NeighborSearch(model, st.cell, 5).populate()
     where = {(l.chain, l.seq, l.icode): k for k, l in enumerate(bb.labels)}
+    contacts = na_contacts(ns, model, [run for _, run in found], where)
+    strands = [s for s, _ in found]
+    runs = [run for _, run in found]
+    chains = {k: bb.labels[k].chain for k in contacts}
+    return nucleic_from_pairs(strands, pair_nucleotides(runs), contacts, chains, _breaks(found), g_tetrads(runs))
+
+
+def na_contacts(ns, model, runs: list[list], where: dict) -> dict[int, set[tuple[int, int]]]:
+    """Which protein residues touch which nucleotides: Backbone index (`where`: (chain, number, icode) -> index) ->
+    {(strand, nucleotide)} of `runs` (each strand's gemmi residues), a heavy atom of each within CONTACT. `ns`: a
+    populated gemmi.NeighborSearch of `model`."""
     contacts: dict[int, set[tuple[int, int]]] = {}
-    for s, (_, run) in enumerate(found):
+    for s, run in enumerate(runs):
         for i, r in enumerate(run):
             for atom in r:
                 if atom.element.name == "H":
@@ -608,10 +619,7 @@ def load_nucleic(
                     k = where.get((cra.chain.name, cra.residue.seqid.num, cra.residue.seqid.icode.strip()))
                     if k is not None:
                         contacts.setdefault(k, set()).add((s, i))
-    strands = [s for s, _ in found]
-    runs = [run for _, run in found]
-    chains = {k: bb.labels[k].chain for k in contacts}
-    return nucleic_from_pairs(strands, pair_nucleotides(runs), contacts, chains, _breaks(found), g_tetrads(runs))
+    return contacts
 
 
 def _breaks(found) -> list[NAGap]:

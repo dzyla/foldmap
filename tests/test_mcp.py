@@ -35,6 +35,7 @@ def test_tools_are_listed_with_descriptions():
         "draw_sequence",
         "interactive_page",
         "uniprot_info",
+        "structure_data",
     }
     assert all(t.description for t in tools)
 
@@ -496,3 +497,38 @@ def test_draw_topology_returns_the_interaction_lines_drawn(tmp_path):
     assert salt["id"].startswith("ia:salt:") and salt["atoms"][0]["angle"] is None
     plain = call("draw_topology", {"source": UBQ, "output_path": str(tmp_path / "u.svg")})
     assert plain.structured_content["interactions"] == []
+
+
+def test_structure_data_returns_the_command_lines_dict(tmp_path, capsys):
+    """structure_data (plan 13d-3): the structured result is the dict `foldmap data` writes for the same structure
+    and options, the text its JSON; sections pick the sections; output_path writes the JSON, or the nucleic acid as
+    dot-bracket, BPSEQ or CT, the same bytes as the command line's; a bad section or suffix is an error."""
+    import json
+
+    from mcp.server.mcpserver.exceptions import ToolError
+
+    from foldmap.cli import main
+    from foldmap.datafile import DEFAULT, dumps
+
+    path = str(DATA / "1LMB.cif")
+    assert main(["data", path]) == 0
+    want = json.loads(capsys.readouterr().out)
+    r = call("structure_data", {"source": path})
+    assert not r.is_error and r.structured_content == want and set(want) == {"foldmap_data", "foldmap", *DEFAULT}
+    assert r.content[0].text == dumps(want)
+    assert any(f["measure"] == "atoms" for f in want["interfaces"])  # protein-DNA pairs, no interactions asked
+    r = call("structure_data", {"source": path, "sections": ["elements", "nucleic_acid"], "chains": ["3", "1", "2"]})
+    assert set(r.structured_content) == {"foldmap_data", "foldmap", "elements", "nucleic_acid"}
+    assert {e["chain"] for e in r.structured_content["elements"]} == {"3"}
+    for ext in ("dbn", "bpseq", "ct", "json"):
+        out = tmp_path / f"x.{ext}"
+        r = call("structure_data", {"source": path, "output_path": str(out)})
+        assert r.content[0].text == f"wrote {out}" and r.structured_content == want
+        assert main(["data", path, "-o", str(tmp_path / f"cli.{ext}")]) == 0
+        assert out.read_bytes() == (tmp_path / f"cli.{ext}").read_bytes(), ext
+    with pytest.raises(ToolError, match="no data section colours"):
+        call("structure_data", {"source": path, "sections": ["colours"]})
+    with pytest.raises(ToolError, match="must end in"):
+        call("structure_data", {"source": path, "output_path": str(tmp_path / "x.csv")})
+    with pytest.raises(ToolError, match="nucleic_acid"):
+        call("structure_data", {"source": path, "sections": ["elements"], "output_path": str(tmp_path / "y.ct")})

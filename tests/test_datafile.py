@@ -1,7 +1,8 @@
-"""foldmap data (plan 13d-1, 13d-2): the versioned dict of a laid-out structure. Its schema, its labels and sheet
-orders against the figure drawn from the same spec, a TIM barrel's n and S, ligand contacts (GFP's chromophore,
-hemoglobin's hemes) and interfaces (hemoglobin's chain pairs) against the coordinates, the CSV tables, and the same
-bytes for any hash seed (A12)."""
+"""foldmap data (plan 13d-1, 13d-2, 13d-3): the versioned dict of a laid-out structure. Its schema, its labels and
+sheet orders against the figure drawn from the same spec, a TIM barrel's n and S, ligand contacts (GFP's chromophore,
+hemoglobin's hemes) and interfaces (hemoglobin's chain pairs, a repressor's protein-DNA pairs) against the
+coordinates, the CSV tables, the nucleic acid as dot-bracket, BPSEQ and CT (read back, and by RNApolis where it is
+installed), and the same bytes for any hash seed (A12)."""
 
 import csv
 import hashlib
@@ -18,16 +19,23 @@ import pytest
 from foldmap.cli import main
 from foldmap.datafile import (
     ALL,
+    BRACKETS,
     DEFAULT,
     INTERACTION_KINDS,
     SCHEMA_VERSION,
     SECTIONS,
     TABLES,
+    bpseq_text,
     csv_text,
+    ct_text,
+    dot_bracket_text,
     dumps,
+    nucleic_acid,
+    pair_levels,
     schema,
     structure_data,
     tables,
+    zip_bytes,
 )
 from foldmap.spec import draw_spec, figure_spec
 
@@ -114,6 +122,7 @@ def test_schema_keys_and_version(drawn, hemoglobin):
         "membrane",
         "ligands",
         "interfaces",
+        "nucleic_acid",
         "interactions",
     }
     assert DEFAULT == tuple(s for s in SECTIONS if s != "interactions")  # the finders run only when asked for
@@ -314,12 +323,14 @@ print(hashlib.sha256(open(sys.argv[2], "rb").read()).hexdigest())
 """
 
 
-def test_same_bytes_for_any_hash_seed(tmp_path):
-    """A12: `foldmap data` writes the same bytes under PYTHONHASHSEED 0 and 1."""
+@pytest.mark.parametrize("name", ["1EMA", "1LMB"])
+def test_same_bytes_for_any_hash_seed(tmp_path, name):
+    """A12: `foldmap data` writes the same bytes under PYTHONHASHSEED 0 and 1 (1LMB: a protein-DNA complex, its
+    interfaces and nucleic acid)."""
     runs = []
     for seed in ("0", "1"):
         done = subprocess.run(
-            [sys.executable, "-c", _RUN, str(DATA / "1EMA.cif"), str(tmp_path / f"{seed}.json")],
+            [sys.executable, "-c", _RUN, str(DATA / f"{name}.cif"), str(tmp_path / f"{seed}.json")],
             env={**os.environ, "PYTHONHASHSEED": seed},
             capture_output=True,
             text=True,
@@ -554,3 +565,327 @@ def test_tables_same_bytes_for_any_hash_seed(tmp_path):
         )
         runs.append(done.stdout.split()[-1])
     assert len(runs[0]) == 64 and runs[0] == runs[1]
+
+
+# ---------------------------------------------------------------------------------------------- nucleic acid (13d-3)
+
+NA = DATA / "na"
+NA_FIXTURES = ["30QM", "1EHZ", "4OO8", "1KX5", "1IHF", "3CRX", "4YBB", "1RVA", "4LD0", "1HYS", "1AOI", "2GIS"]
+
+
+def _nucleic(pdb):
+    from foldmap.io import load_backbone, load_nucleic, read_model
+
+    path = NA / f"{pdb}.cif.gz"
+    model = read_model(path, "asu")
+    return load_nucleic(path, load_backbone(path, "asu", model=model), "asu", model=model)
+
+
+def _read_dot_bracket(text: str) -> tuple[list[str], str, set[tuple[int, int]]]:
+    """(strand headers, sequence, pairs as 1-based (i, j)) of a multi-strand dot-bracket: '>' lines, then a sequence
+    and a structure line each; brackets matched across the strands read one after another."""
+    lines = text.splitlines()
+    assert len(lines) % 3 == 0
+    heads, seq, marks = lines[0::3], "".join(lines[1::3]), "".join(lines[2::3])
+    assert all(h.startswith(">") for h in heads) and len(seq) == len(marks)
+    for s_, m_ in zip(lines[1::3], lines[2::3]):
+        assert len(s_) == len(m_)
+    opening = {o: c for o, c in BRACKETS}
+    closing = {c: o for o, c in BRACKETS}
+    open_at: dict[str, list[int]] = {o: [] for o in opening}
+    pairs = set()
+    for n, c in enumerate(marks, 1):
+        if c in opening:
+            open_at[c].append(n)
+        elif c in closing:
+            pairs.add((open_at[closing[c]].pop(), n))
+        else:
+            assert c == "."
+    assert not any(open_at.values())
+    return heads, seq, pairs
+
+
+def _read_bpseq(text: str) -> tuple[str, set[tuple[int, int]]]:
+    rows = [line.split() for line in text.splitlines()]
+    assert all(len(r) == 3 for r in rows)
+    assert [int(r[0]) for r in rows] == list(range(1, len(rows) + 1))
+    partner = {int(r[0]): int(r[2]) for r in rows}
+    assert all(partner[j] == i for i, j in partner.items() if j)  # each pair written from both ends
+    return "".join(r[1] for r in rows), {(i, j) for i, j in partner.items() if 0 < i < j}
+
+
+def _read_ct(text: str) -> tuple[str, set[tuple[int, int]], list[list[str]]]:
+    lines = text.splitlines()
+    n = int(lines[0].split()[0])
+    rows = [line.split() for line in lines[1:]]
+    assert len(rows) == n and all(len(r) == 6 for r in rows)
+    assert [int(r[0]) for r in rows] == list(range(1, n + 1))
+    partner = {int(r[0]): int(r[4]) for r in rows}
+    assert all(partner[j] == i for i, j in partner.items() if j)
+    return "".join(r[1] for r in rows), {(i, j) for i, j in partner.items() if 0 < i < j}, rows
+
+
+def _positions(na) -> dict[tuple[int, int], int]:
+    out, n = {}, 0
+    for s, st in enumerate(na.strands):
+        for i in range(len(st)):
+            n += 1
+            out[(s, i)] = n
+    return out
+
+
+@pytest.mark.parametrize("pdb", NA_FIXTURES)
+def test_dot_bracket_bpseq_and_ct_give_back_the_pairs_they_were_written_from(pdb):
+    """Every NA fixture: the base pairs read back from its dot-bracket, BPSEQ and CT are the pairs written
+    (nucleic.py's, the figure's), on the same sequence; a pair between strands is bracketed across them."""
+    na = _nucleic(pdb)
+    data = {"nucleic_acid": nucleic_acid(na)}
+    where = _positions(na)
+    want = {(where[(p.a, p.i)], where[(p.b, p.j)]) for p in na.base_pairs}
+    sequence = "".join(st.bases for st in na.strands)
+    heads, seq, got = _read_dot_bracket(dot_bracket_text(data))
+    assert heads == [f">{st.id}" for st in na.strands] and seq == sequence and got == want
+    assert _read_bpseq(bpseq_text(data)) == (sequence, want)
+    seq, got, _ = _read_ct(ct_text(data))
+    assert (seq, got) == (sequence, want)
+    assert {(p["i"], p["j"]) for p in data["nucleic_acid"]["pairs"]} == want
+    assert data["nucleic_acid"]["nucleotides"] == len(sequence) == na.size
+
+
+@pytest.mark.parametrize("pdb", ["1EHZ", "4LD0", "1KX5", "1AOI"])
+def test_dot_bracket_pairs_agree_with_rnapolis(pdb):
+    """The pairs read back from the dot-bracket, named by residue, against RNApolis' canonical and wobble pairs
+    (tests/data/na/reference.json, the NA campaign's): the same agreement test_na_pairs asks of the pairing."""
+    reference = json.loads((NA / "reference.json").read_text(encoding="utf-8"))
+    na = _nucleic(pdb)
+    data = {"nucleic_acid": nucleic_acid(na)}
+    residues = [tuple(r.values()) for st in data["nucleic_acid"]["strands"] for r in st["residues"]]
+    _, _, pairs = _read_dot_bracket(dot_bracket_text(data))
+    ours = {frozenset((residues[i - 1], residues[j - 1])) for i, j in pairs}
+    theirs = {frozenset((tuple(a), tuple(b))) for a, b, _ in reference[pdb]}
+    both = ours & theirs
+    assert len(both) / len(ours) >= 0.95 and len(both) / len(theirs) >= 0.90, pdb
+
+
+_RNAPOLIS = """
+import json, sys
+from pathlib import Path
+from rnapolis.common import BpSeq, MultiStrandDotBracket
+db = MultiStrandDotBracket.from_multiline_string(Path(sys.argv[1]).read_text())
+bp = BpSeq.from_string(Path(sys.argv[2]).read_text())
+print(json.dumps({
+    "dbn": sorted([i + 1, j + 1] for i, j in db.pairs),
+    "dbn_sequence": db.sequence,
+    "strands": len(db.strands),
+    "bpseq": sorted([i, j] for i, _, j in bp.entries if 0 < i < j),
+}))
+"""
+
+
+@pytest.mark.skipif(not os.environ.get("NA_RNAPOLIS_PYTHON"), reason="RNApolis' venv (NA_RNAPOLIS_PYTHON): zyla-office")
+@pytest.mark.parametrize("pdb", ["1EHZ", "2GIS", "1KX5", "4YBB"])
+def test_rnapolis_reads_our_dot_bracket_and_bpseq(pdb, tmp_path):
+    """RNApolis' own readers (the NA campaign's venv: MultiStrandDotBracket, BpSeq) take our dot-bracket and BPSEQ
+    and find the pairs, strands and sequence we wrote: a pseudoknot (2GIS), strands paired across (1KX5) and a
+    ribosome's many strands and levels (4YBB)."""
+    na = _nucleic(pdb)
+    data = {"nucleic_acid": nucleic_acid(na)}
+    (tmp_path / "x.dbn").write_text(dot_bracket_text(data))
+    (tmp_path / "x.bpseq").write_text(bpseq_text(data))
+    files = [str(tmp_path / f"x.{ext}") for ext in ("dbn", "bpseq")]
+    done = subprocess.run(
+        [os.environ["NA_RNAPOLIS_PYTHON"], "-I", "-c", _RNAPOLIS, *files], capture_output=True, text=True, timeout=600
+    )
+    assert done.returncode == 0, done.stderr[-2000:]
+    got = json.loads(done.stdout.splitlines()[-1])
+    pairs = sorted([p["i"], p["j"]] for p in data["nucleic_acid"]["pairs"])
+    assert got["dbn"] == pairs and got["bpseq"] == pairs
+    assert got["dbn_sequence"] == "".join(st.bases for st in na.strands)
+    assert got["strands"] == len(na.strands)
+
+
+def test_a_pseudoknot_is_bracketed_by_foldmaps_rule():
+    """2GIS (SAM-I riboswitch): the stem foldmap's rule calls the pseudoknot (PK, A:25-28/A:65-68, the one the figure
+    names) is written with [], every other stem with (); the levels are those of pair_levels."""
+    na = _nucleic("2GIS")
+    sec = nucleic_acid(na)
+    (strand,) = sec["strands"]
+    marks = dict(zip((r["seq"] for r in strand["residues"]), strand["dot_bracket"]))
+    (pk,) = [st for st in na.structure.stems if st.name == "PK"]
+    assert pk.id == "A:25-28/A:65-68"
+    for bp in pk.pairs:
+        assert marks[na.strands[bp.a].labels[bp.i].seq] == "[" and marks[na.strands[bp.b].labels[bp.j].seq] == "]"
+    assert set(strand["dot_bracket"]) <= {".", "(", ")", "[", "]"}
+    assert strand["dot_bracket"].count("[") == len(pk)
+    for st in sec["stems"]:
+        assert st["pseudoknot"] == (st["name"] == "PK") and st["level"] == (1 if st["name"] == "PK" else 0)
+    assert sec["levels"] == 2
+    levels = pair_levels(na)
+    assert [p["level"] for p in sec["pairs"]] == [levels[tuple(p[:4])] for p in na.base_pairs]
+    for p in sec["pairs"]:
+        assert (p["stem"] == "PK") == (p["level"] == 1)
+
+
+def test_crossing_pseudoknots_climb_the_bracket_levels():
+    """Synthetic: a hairpin, a knot crossing it, a shorter knot crossing both, and an isolated pair crossing none
+    of them: (), [], {} and () again, in the order foldmap's rule takes stems (longest first)."""
+    from foldmap.model import NAStrand, ResLabel, nucleic_from_pairs
+    from foldmap.nucleic import BasePair
+
+    n = 60
+    strand = NAStrand("A", [ResLabel("A", k + 1, "", "A") for k in range(n)], np.zeros((n, 3)), np.zeros((n, 3)), True)
+    pairs = [(k, 20 - k) for k in range(4)]  # the hairpin 0-3/17-20
+    pairs += [(10 + k, 30 - k) for k in range(3)]  # crosses the hairpin
+    pairs += [(15 + k, 40 - k) for k in range(2)]  # crosses both
+    pairs += [(50, 58)]  # an isolated pair inside nothing
+    na = nucleic_from_pairs([strand], [BasePair(0, i, 0, j, "WC") for i, j in pairs], {}, {})
+    sec = nucleic_acid(na)
+    db = sec["strands"][0]["dot_bracket"]
+    assert db[0:4] == "((((" and db[17:21] == "))))"
+    assert db[10:13] == "[[[" and db[28:31] == "]]]"
+    assert db[15:17] == "{{" and db[39:41] == "}}"
+    assert db[50] == "(" and db[58] == ")"
+    assert sec["levels"] == 3
+    _, _, got = _read_dot_bracket(dot_bracket_text({"nucleic_acid": sec}))
+    assert got == {(i + 1, j + 1) for i, j in pairs}
+
+
+def test_cli_writes_dot_bracket_bpseq_and_ct(tmp_path, capsys):
+    """`foldmap data X -o F.dbn | .bpseq | .ct` (or --format to standard output) writes the nucleic acid of the
+    figure `plot` draws: the base pairs of its section, the columns each format has (BPSEQ: number, base, partner;
+    CT: number, base, the one before, the one after, partner, residue number), the same for every route. A
+    structure with no nucleic acid is an error; a format with --table is refused."""
+    path = str(NA / "2GIS.cif.gz")
+    assert main(["data", path, "--sections", "structure,nucleic_acid"]) == 0
+    data = json.loads(capsys.readouterr().out)
+    sec = data["nucleic_acid"]
+    pairs = {(p["i"], p["j"]) for p in sec["pairs"]}
+    sequence = "".join(st["sequence"] for st in sec["strands"])
+    for ext in ("dbn", "bpseq", "ct"):
+        assert main(["data", path, "-o", str(tmp_path / f"x.{ext}")]) == 0
+        assert main(["data", path, "--format", ext]) == 0
+        assert capsys.readouterr().out == (tmp_path / f"x.{ext}").read_text(encoding="utf-8")
+    text = (tmp_path / "x.dbn").read_text(encoding="utf-8")
+    assert text == dot_bracket_text(data)
+    assert _read_dot_bracket(text)[1:] == (sequence, pairs)
+    assert _read_bpseq((tmp_path / "x.bpseq").read_text(encoding="utf-8")) == (sequence, pairs)
+    ct = (tmp_path / "x.ct").read_text(encoding="utf-8")
+    assert ct.splitlines()[0] == f"{len(sequence)} 2GIS.cif.gz"
+    seq, got, rows = _read_ct(ct)
+    assert (seq, got) == (sequence, pairs)
+    residues = [r for st in sec["strands"] for r in st["residues"]]
+    assert [int(r[5]) for r in rows] == [r["seq"] for r in residues]
+    for st in sec["strands"]:
+        first, last = st["first"], st["first"] + len(st["residues"]) - 1
+        for n in range(first, last + 1):
+            assert int(rows[n - 1][2]) == (n - 1 if n > first else 0)
+            assert int(rows[n - 1][3]) == (n + 1 if n < last else 0)
+    assert main(["data", str(DATA / "1UBQ.cif"), "--format", "dbn"]) == 1
+    assert "no nucleic acid" in capsys.readouterr().err
+    assert main(["data", path, "--format", "ct", "--table", "elements"]) == 2
+    assert main(["data", path, "-o", str(tmp_path / "y.ct"), "--sections", "elements"]) == 2
+    assert "leaves out" in capsys.readouterr().err
+
+
+def test_multistrand_dna_breaks_the_ct_chain_between_strands():
+    """1KX5 (nucleosome): the two DNA strands are two dot-bracket blocks whose brackets pair across them; in CT the
+    one-after column is 0 at the end of each strand and the one-before 0 at the start of the next."""
+    na = _nucleic("1KX5")
+    sec = nucleic_acid(na)
+    assert len(sec["strands"]) >= 2 and {st["chain"] for st in sec["strands"]} == {"I", "J"}
+    across = [p for p in sec["pairs"] if p["a"]["chain"] != p["b"]["chain"]]
+    assert len(across) > 100 and all(p["level"] == 0 for p in across)
+    _, _, rows = _read_ct(ct_text({"nucleic_acid": sec}))
+    for st in sec["strands"][1:]:
+        n = st["first"]
+        assert rows[n - 2][3] == "0" and rows[n - 1][2] == "0"
+
+
+def test_protein_nucleic_acid_interfaces_without_the_interactions_section():
+    """1LMB (λ repressor on DNA): the interfaces list each protein chain with each DNA strand it touches, measured
+    on the structure as residue-nucleotide pairs with heavy atoms within 4 Å (io.CONTACT), without the interactions
+    section; the two DNA strands are one interface by the base pairs the figure draws. Counts against a brute-force
+    reading of the coordinates."""
+    import gemmi
+
+    from foldmap.io import CONTACT
+
+    d = draw_spec(figure_spec(DATA / "1LMB.cif"))
+    data = structure_data(d.layout, d.sses, d.bb, d.model, DEFAULT)
+    faces = {tuple(f["chains"]): f for f in data["interfaces"]}
+    na = d.layout.nucleic
+    dna = sorted({st.chain for st in na.strands})
+    protein = sorted({l.chain for l in d.bb.labels})
+    model = d.model[0] if isinstance(d.model, tuple) else d.model
+
+    def heavy(res):
+        return np.array([a.pos.tolist() for a in res if a.element.name not in ("H", "D")])
+
+    residues = {c.name: [r for r in c] for c in model}
+    nucleotides = {c: [r for r in residues[c] if r.find_atom("C1'", "*") is not None] for c in dna}
+    where = {(l.chain, l.seq, l.icode) for l in d.bb.labels}
+    amino = {c: [r for r in residues[c] if (c, r.seqid.num, r.seqid.icode.strip()) in where] for c in protein}
+    seen = 0
+    for p in protein:
+        for q in dna:
+            n, mine, theirs = 0, set(), set()
+            for r in amino[p]:
+                x = heavy(r)
+                for t in nucleotides[q]:
+                    if (np.linalg.norm(x[:, None] - heavy(t)[None], axis=2) <= CONTACT).any():
+                        n += 1
+                        mine.add(r.seqid.num)
+                        theirs.add(t.seqid.num)
+            if n:
+                seen += 1
+                f = faces[(p, q)]
+                assert f["measure"] == "atoms" and f["ca_pairs"] is None and f["interactions"] is None
+                assert f["contacts"] == n and f["residues"] == [len(mine), len(theirs)], (p, q)
+            else:
+                assert (p, q) not in faces
+    assert seen >= 2
+    pair = tuple(dna)
+    across = sum(1 for bp in na.base_pairs if na.strands[bp.a].chain != na.strands[bp.b].chain)
+    assert faces[pair]["measure"] == "base_pairs" and faces[pair]["contacts"] == across > 10
+    for f in data["interfaces"]:
+        if f["measure"] == "ca":
+            assert f["contacts"] == f["ca_pairs"]
+    sch = schema()
+    assert _conforms(data, sch) == []
+    sec = data["nucleic_acid"]
+    assert {(p["i"], p["j"]) for p in sec["pairs"]} == {
+        (_positions(na)[(p.a, p.i)], _positions(na)[(p.b, p.j)]) for p in na.base_pairs
+    }
+    assert gemmi  # the model is gemmi's
+
+
+def test_nucleic_tables_and_zip(tmp_path):
+    """The nucleotides and base_pairs tables follow the section (one row per nucleotide, per pair); the zip holds
+    every table and the three nucleic-acid files, the same bytes each time."""
+    import zipfile
+
+    na = _nucleic("1EHZ")
+    data = {"structure": {"name": "1EHZ.cif.gz"}, "nucleic_acid": nucleic_acid(na)}
+    t = tables(data)
+    assert list(t) == ["nucleotides", "base_pairs"]
+    columns, rows = t["nucleotides"]
+    assert len(rows) == na.size and [r[0] for r in rows] == list(range(1, na.size + 1))
+    col = {c: k for k, c in enumerate(columns)}
+    partner = {r[0]: r[col["partner"]] for r in rows}
+    assert {(i, j) for i, j in partner.items() if j and i < j} == {
+        (p["i"], p["j"]) for p in data["nucleic_acid"]["pairs"]
+    }
+    assert "".join(r[col["bracket"]] for r in rows) == data["nucleic_acid"]["strands"][0]["dot_bracket"]
+    assert len(t["base_pairs"][1]) == len(na.base_pairs)
+    blob = zip_bytes(data)
+    assert blob == zip_bytes(data)
+    with zipfile.ZipFile(io.BytesIO(blob)) as zf:
+        assert zf.namelist() == [
+            "nucleotides.csv",
+            "base_pairs.csv",
+            "nucleic_acid.dbn",
+            "nucleic_acid.bpseq",
+            "nucleic_acid.ct",
+        ]
+        assert zf.read("nucleic_acid.ct").decode() == ct_text(data)
+        assert zf.read("nucleotides.csv").decode() == csv_text(*t["nucleotides"])

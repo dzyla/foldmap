@@ -13,8 +13,12 @@ no routing, no drawing) becomes one versioned dict, its names the figure's names
   cross its mid-plane, and the sides of elements and termini;
 - ligands: each ligand, metal ion, glycan and residue fused into the chain (a chromophore), the residues it touches
   (io's ligand rule) and the elements they are in;
-- interfaces: each pair of chains in contact, with their elements in contact (features.sse_contacts) and, with the
-  interactions section, the interactions between them by element pair;
+- interfaces: each pair of chains in contact (protein chains by CA pairs, a protein and a nucleic-acid chain by atom
+  contacts, two nucleic-acid chains by base pairs), with their elements in contact (features.sse_contacts) and,
+  with the interactions section, the interactions between them by element pair;
+- nucleic_acid: the strands the figure draws, their sequences and base pairs (nucleic.py's, the pairs the figure
+  draws) with the stem each is in and its bracket level (nucleic._knots' rule, extended to every pair), written as
+  dot-bracket, BPSEQ and CT by `dot_bracket_text`, `bpseq_text` and `ct_text`;
 - interactions (only when asked for): every interaction 13c's finders find between two chains, re-checked as the
   figure's lines are (interactions.failing_lines), with the element at each end.
 
@@ -22,7 +26,9 @@ Every list has a fixed order, every number is rounded to 0.001 (±0 written 0.0,
 same structure and options give the same bytes (A12). `schema()` is the format, as a JSON Schema; SCHEMA_VERSION
 is its version, the dict's "foldmap_data" key. `tables()` gives the list-shaped parts as flat tables (TABLES: one
 row per element, sheet strand, pairing, bridge, disulfide, membrane element, ligand, ligand contact, interface,
-interface element pair, interaction), written as CSV by `csv_text` and `write_tables`."""
+interface element pair, interaction, nucleotide, base pair), written as CSV by `csv_text` and `write_tables`.
+`spec_data` is the whole route from a figure spec (cli.make_layout on io.read_model's model), the one the command
+line, the MCP server and the app share."""
 
 from __future__ import annotations
 
@@ -45,6 +51,7 @@ SECTIONS = (
     "membrane",
     "ligands",
     "interfaces",
+    "nucleic_acid",
     "interactions",
 )
 ALL = SECTIONS
@@ -119,7 +126,11 @@ def structure_data(
         elif section == "ligands":
             out[section] = _ligands(layout, sses, bb, model)
         elif section == "interfaces":
-            out[section] = _interfaces(layout, sses, bb, found)
+            out[section] = _interfaces(layout, sses, bb, found, model)
+        elif section == "nucleic_acid":
+            na = layout.nucleic
+            drawn = na is not None and na.strands
+            out[section] = nucleic_acid(na, cropped=bool(layout.na_cropped)) if drawn else None
         else:
             out[section] = found
     return out
@@ -136,6 +147,38 @@ def write(data: dict, path) -> Path:
     with open(path, "w", encoding="utf-8", newline="\n") as fh:
         fh.write(dumps(data))
     return path
+
+
+def spec_data(spec, sections: tuple[str, ...] = DEFAULT) -> dict:
+    """The data of the figure a spec.FigureSpec describes: its structure read (io.read_model, its assembly) and laid
+    out as `plot` lays it out (cli.make_layout: no routing, no drawing), then structure_data. The one route the
+    command line, the MCP server and the app take, so they give the same bytes."""
+    from .cli import make_layout
+    from .io import read_model
+
+    model = read_model(spec.structure, spec.assembly)
+    layout, sses, bb = make_layout(
+        spec.structure, spec.mode, spec.rotate, spec.flip_v, model=model, **spec.layout_kwargs()
+    )
+    return structure_data(layout, sses, bb, model, sections, name=str(spec.structure))
+
+
+def zip_bytes(data: dict) -> bytes:
+    """Every table of `data` as NAME.csv, and with a nucleic acid its dot-bracket, BPSEQ and CT (nucleic_acid.dbn,
+    .bpseq, .ct), in one zip: the same bytes for the same data (fixed time stamps, TABLES order)."""
+    import zipfile
+
+    files = [(f"{name}.csv", csv_text(columns, rows)) for name, (columns, rows) in tables(data).items()]
+    if data.get("nucleic_acid") is not None:
+        files += [(f"nucleic_acid.{ext}", text_of(data)) for ext, text_of in NA_FORMATS.items()]
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        for name, text in files:
+            info = zipfile.ZipInfo(name, date_time=(1980, 1, 1, 0, 0, 0))
+            info.compress_type = zipfile.ZIP_DEFLATED
+            info.external_attr = 0o644 << 16
+            zf.writestr(info, text.encode("utf-8"))
+    return buf.getvalue()
 
 
 # ---------------------------------------------------------------------------------------------- sections
@@ -576,28 +619,80 @@ def _counts(kinds: Counter | None) -> dict | None:
     return None if kinds is None else {k: int(kinds[k]) for k in INTERACTION_KINDS}
 
 
-def _interfaces(layout, sses, bb, found: dict | None) -> list[dict]:
-    """Each pair of chains in contact: protein chains with CAs within features.CONTACT_CUTOFF (8 Å), and with the
-    interactions section any two chains with an interaction between them. For each, the CA pairs and the residues
-    of each chain in them, its element pairs (features.sse_contacts: CA pairs within 8 Å, listed from
-    MIN_CONTACT_PAIRS), and with `found` (the interactions section) the interactions by kind, in all and by element
-    pair (an end outside the elements: null)."""
+def _na_faces(layout, bb, model) -> tuple[dict, dict]:
+    """The nucleic acid's chain pairs in contact: (protein chain, nucleic-acid chain) -> (residue-nucleotide pairs
+    with a heavy atom of each within io.CONTACT, 4 Å: the rule the figure's contacts are read by, io.na_contacts;
+    the protein residues and the nucleotides in them), measured on the structure (`model`: every nucleotide of the
+    chains read, cropped or not; without it, the nucleic acid the figure draws); and (nucleic-acid chain,
+    nucleic-acid chain) -> (base pairs between them, the nucleotides of each in them), the base pairs the figure
+    draws (nucleic.py's)."""
+    na = layout.nucleic
+    protein: dict[tuple[str, str], list] = {}
+    if model is not None:
+        import gemmi
+
+        from .io import _nucleic_strands, na_contacts
+
+        read = set(layout.chains_read)
+        found = [(st, run) for st, run in _nucleic_strands(model) if not read or st.chain in read]
+        strand_chain = [st.chain for st, _ in found]
+        contacts = {}
+        if found and len(bb):
+            ns = gemmi.NeighborSearch(model, gemmi.UnitCell(), 5).populate()
+            contacts = na_contacts(ns, model, [run for _, run in found], _where(bb))
+    else:
+        strand_chain = [st.chain for st in na.strands] if na is not None else []
+        contacts = na.contacts if na is not None else {}
+    for k, touched in contacts.items():
+        for s, i in touched:
+            face = protein.setdefault((bb.labels[k].chain, strand_chain[s]), [0, set(), set()])
+            face[0] += 1
+            face[1].add(k)
+            face[2].add((s, i))
+    paired: dict[tuple[str, str], list] = {}
+    for p in na.base_pairs if na is not None else []:
+        ca, cb = na.strands[p.a].chain, na.strands[p.b].chain
+        if ca != cb:
+            face = paired.setdefault((ca, cb), [0, set(), set()])
+            face[0] += 1
+            face[1].add((p.a, p.i))
+            face[2].add((p.b, p.j))
+    return protein, paired
+
+
+def _interfaces(layout, sses, bb, found: dict | None, model=None) -> list[dict]:
+    """Each pair of chains in contact, by its measure: two protein chains with CAs within features.CONTACT_CUTOFF
+    (8 Å), "ca"; a protein and a nucleic-acid chain with a residue and a nucleotide in contact (_na_faces: heavy
+    atoms within 4 Å, on the structure), "atoms"; two nucleic-acid chains base-paired (the figure's pairs),
+    "base_pairs"; and with the interactions section any two chains with an interaction between them. For each, the
+    pairs in contact by its measure and the residues (nucleotides) of each chain in them, the CA pairs (protein
+    chains), its element pairs (features.sse_contacts: CA pairs within 8 Å, listed from MIN_CONTACT_PAIRS), and with
+    `found` (the interactions section) the interactions by kind, in all and by element pair (an end outside the
+    elements: null)."""
     from scipy.spatial import cKDTree
 
     from .features import CONTACT_CUTOFF, sse_contacts
 
     chains = [l.chain for l in bb.labels]
-    rank = {c: n for n, c in enumerate(dict.fromkeys([*layout.chains_read, *chains]))}
+    protein_chains = set(chains)
+    na = layout.nucleic
+    na_chains = [st.chain for st in na.strands] if na is not None else []
+    rank = {c: n for n, c in enumerate(dict.fromkeys([*layout.chains_read, *chains, *na_chains]))}
     order = {s.id: n for n, s in enumerate(sses)}
     chain_of = {s.id: s.chain for s in sses}
     pairs: dict[tuple[str, str], dict] = {}
+
+    def measure(a: str, b: str) -> str:
+        n = (a in protein_chains) + (b in protein_chains)
+        return "ca" if n == 2 else "atoms" if n == 1 else "base_pairs"
 
     def at(a: str, b: str) -> tuple[dict, bool]:
         """The interface of chains a and b, and whether a is its second chain."""
         swap = rank.get(a, len(rank)) > rank.get(b, len(rank)) or (a > b and rank.get(a) == rank.get(b))
         key = (b, a) if swap else (a, b)
         if key not in pairs:
-            pairs[key] = {"ca_pairs": 0, "residues": [0, 0], "elements": {}, "kinds": Counter()}
+            ca = 0 if measure(*key) == "ca" else None
+            pairs[key] = {"contacts": 0, "ca_pairs": ca, "residues": [0, 0], "elements": {}, "kinds": Counter()}
         return pairs[key], swap
 
     if len(bb) >= 2:
@@ -612,8 +707,13 @@ def _interfaces(layout, sses, bb, found: dict | None) -> list[dict]:
             for ci, cj in sorted({(int(a), int(b)) for a, b in zip(code[i], code[j])}):
                 mask = (code[i] == ci) & (code[j] == cj)
                 face, _ = at(chains[int(i[mask][0])], chains[int(j[mask][0])])
-                face["ca_pairs"] = int(mask.sum())
+                face["ca_pairs"] = face["contacts"] = int(mask.sum())
                 face["residues"] = [len(np.unique(i[mask])), len(np.unique(j[mask]))]
+    for faces in _na_faces(layout, bb, model):
+        for (a, b), (n, mine, theirs) in sorted(faces.items()):
+            face, swap = at(a, b)
+            face["contacts"] = n
+            face["residues"] = [len(theirs), len(mine)] if swap else [len(mine), len(theirs)]
     for key, n in sse_contacts(bb, sses).items():
         a, b = sorted(key, key=order.__getitem__)
         if chain_of[a] == chain_of[b]:
@@ -636,6 +736,8 @@ def _interfaces(layout, sses, bb, found: dict | None) -> list[dict]:
         out.append(
             {
                 "chains": [a, b],
+                "measure": measure(a, b),
+                "contacts": face["contacts"],
                 "ca_pairs": face["ca_pairs"],
                 "residues": face["residues"],
                 "elements": [
@@ -702,6 +804,189 @@ def _interactions(layout, sses, bb, model) -> dict:
         "found": rows,
         "failed_recheck": [text for _, text in failing],
     }
+
+
+# ---------------------------------------------------------------------------------------------- nucleic acid
+
+# bracket pairs by level: level 0 the nested pairs, 1 the first pseudoknot level, then upper- and lower-case
+# letters (the extended dot-bracket RNApolis and others read)
+BRACKETS = (("(", ")"), ("[", "]"), ("{", "}"), ("<", ">"), *((chr(c), chr(c + 32)) for c in range(65, 91)))
+
+
+def _crosses(x: tuple[int, int], placed: list[tuple[int, int]]) -> bool:
+    x0, x1 = x
+    return any(x0 < y0 < x1 < y1 or y0 < x0 < y1 < x1 for y0, y1 in placed)
+
+
+def pair_levels(na) -> dict[tuple[int, int, int, int], int]:
+    """The bracket level of each base pair of a model.Nucleic ((a, i, b, j) -> 0, 1, ...), nucleotides in strand
+    order (the strands one after another, as they are listed). foldmap's pseudoknot rule (nucleic._knots, the one
+    that names a stem PK) decides level 0: every stem in one chain it keeps nested. The rest, in the order that rule
+    takes stems (longest first, of equal ones the 5' one; then the isolated pairs, 5' first), each go whole to the
+    lowest level where none of their pairs crosses a pair already there: a PK stem to 1 ([]), one crossing it too
+    to 2 ({}), a stem between two chains (a duplex, a codon and anticodon) to 0 unless it crosses a pair there."""
+    from .nucleic import _knots
+
+    start, pos = 0, {}
+    for s, st in enumerate(na.strands):
+        pos[s] = start
+        start += len(st)
+    stems, strands = na.structure.stems, na.strands
+    knots = _knots(stems, strands)
+
+    def spans(pairs) -> list[tuple[int, int]]:
+        return [(pos[p.a] + p.i, pos[p.b] + p.j) for p in pairs]
+
+    levels: list[list[tuple[int, int]]] = [[]]
+    out: dict[tuple[int, int, int, int], int] = {}
+    rest = []
+    for k, st in enumerate(stems):
+        if k not in knots and strands[st.a].chain == strands[st.b].chain:  # nested by the rule: never crossing
+            levels[0] += spans(st.pairs)
+            out.update({tuple(p[:4]): 0 for p in st.pairs})
+        else:
+            rest.append(st.pairs)
+    rest = sorted(rest, key=lambda pairs: -len(pairs)) + [[p] for p in sorted(na.structure.ties)]
+    for pairs in rest:
+        mine = spans(pairs)
+        level = next((n for n, placed in enumerate(levels) if not any(_crosses(x, placed) for x in mine)), None)
+        if level is None:
+            level = len(levels)
+            levels.append([])
+        if level >= len(BRACKETS):
+            raise ValueError(f"the base pairs need more than {len(BRACKETS)} bracket levels")
+        levels[level] += mine
+        out.update({tuple(p[:4]): level for p in pairs})
+    return out
+
+
+def nucleic_acid(na, cropped: bool = False) -> dict:
+    """The nucleic-acid section of a model.Nucleic (the figure's: layout.nucleic): its strands (each a strand piece
+    as drawn, 5'->3', with its residues, sequence and dot-bracket), its base pairs (nucleic.py's, numbered 1.. in
+    strand order, with their stem and bracket level: pair_levels), stems, gaps and G-tetrads. `cropped`: na_extent
+    cropped it to what the protein touches."""
+    from .nucleic import _knots
+
+    levels = pair_levels(na)
+    knots = _knots(na.structure.stems, na.strands)
+    stem_of: dict[tuple, dict] = {}
+    stems = []
+    for k, st in enumerate(na.structure.stems):
+        entry = {
+            "id": st.id,
+            "name": st.name,
+            "pairs": len(st),
+            "level": levels[tuple(st.pairs[0][:4])],
+            "pseudoknot": k in knots,
+        }
+        stems.append(entry)
+        stem_of.update({tuple(p[:4]): entry for p in st.pairs})
+    start, pos = 1, {}
+    for s, st in enumerate(na.strands):
+        pos[s] = start
+        start += len(st)
+    marks = ["."] * (start - 1)
+    pairs = []
+    for p in na.base_pairs:
+        key = tuple(p[:4])
+        i, j = pos[p.a] + p.i, pos[p.b] + p.j
+        opening, closing = BRACKETS[levels[key]]
+        marks[i - 1], marks[j - 1] = opening, closing
+        stem = stem_of.get(key)
+        pairs.append(
+            {
+                "i": i,
+                "j": j,
+                "a": _res(na.strands[p.a].labels[p.i]),
+                "b": _res(na.strands[p.b].labels[p.j]),
+                "kind": p.kind,
+                "stem": stem["name"] if stem else None,
+                "level": levels[key],
+            }
+        )
+    strands = []
+    for s, st in enumerate(na.strands):
+        strands.append(
+            {
+                "id": st.id,
+                "chain": st.chain,
+                "rna": bool(st.rna),
+                "first": pos[s],
+                "residues": [_res(label) for label in st.labels],
+                "sequence": st.bases,
+                "dot_bracket": "".join(marks[pos[s] - 1 : pos[s] - 1 + len(st)]),
+                "cut5": bool(st.cut5),
+                "cut3": bool(st.cut3),
+            }
+        )
+    return {
+        "nucleotides": start - 1,
+        "cropped": bool(cropped),
+        "strands": strands,
+        "pairs": pairs,
+        "levels": 1 + max(levels.values(), default=0),
+        "stems": stems,
+        "gaps": [
+            {"before": na.strands[g.before].id, "after": na.strands[g.after].id, "nucleotides": int(g.count)}
+            for g in na.gaps
+        ],
+        "tetrads": [[_res(na.strands[s].labels[i]) for s, i in t] for t in na.tetrads],
+    }
+
+
+def _section(data: dict) -> dict:
+    na = data.get("nucleic_acid")
+    if na is None:
+        raise ValueError("no nucleic acid is drawn: dot-bracket, BPSEQ and CT need one (or the nucleic_acid section)")
+    return na
+
+
+def _partners(na: dict) -> list[int]:
+    partner = [0] * (na["nucleotides"] + 1)
+    for p in na["pairs"]:
+        partner[p["i"]], partner[p["j"]] = p["j"], p["i"]
+    return partner
+
+
+def dot_bracket_text(data: dict) -> str:
+    """The nucleic acid as dot-bracket: a '>' line naming each strand (CHAIN:FIRST-LAST), its sequence, its
+    structure; a pair between strands bracketed across them (the strands read one after another), pseudoknot levels
+    as [] {} <> then Aa Bb ... (BRACKETS). The multi-strand form RNApolis reads."""
+    na = _section(data)
+    lines = []
+    for st in na["strands"]:
+        lines += [f">{st['id']}", st["sequence"], st["dot_bracket"]]
+    return "\n".join(lines) + "\n"
+
+
+def bpseq_text(data: dict) -> str:
+    """The nucleic acid as BPSEQ: one line per nucleotide, its number (1.. through every strand in order), base and
+    partner's number (0 unpaired)."""
+    na = _section(data)
+    partner = _partners(na)
+    seq = "".join(st["sequence"] for st in na["strands"])
+    return "".join(f"{n} {seq[n - 1]} {partner[n]}\n" for n in range(1, na["nucleotides"] + 1))
+
+
+def ct_text(data: dict) -> str:
+    """The nucleic acid as CT (connect table): a header with the nucleotide count and the structure's name, then one
+    line per nucleotide: its number, base, the numbers before and after it (0 at a strand's end: a new strand, a
+    chain break or a cropped stretch), its partner's (0 unpaired) and its residue number in the file (the insertion
+    code is in the JSON)."""
+    na = _section(data)
+    partner = _partners(na)
+    name = (data.get("structure") or {}).get("name") or "foldmap"
+    lines = [f"{na['nucleotides']} {name}"]
+    for st in na["strands"]:
+        first, last = st["first"], st["first"] + len(st["residues"]) - 1
+        for n, (base, res) in enumerate(zip(st["sequence"], st["residues"]), first):
+            before = n - 1 if n > first else 0
+            after = n + 1 if n < last else 0
+            lines.append(f"{n} {base} {before} {after} {partner[n]} {res['seq']}")
+    return "\n".join(lines) + "\n"
+
+
+NA_FORMATS = {"dbn": dot_bracket_text, "bpseq": bpseq_text, "ct": ct_text}  # foldmap data --format, by suffix
 
 
 # ---------------------------------------------------------------------------------------------- tables
@@ -820,7 +1105,15 @@ def _t_ligand_contacts(d: dict) -> list[list]:
 
 def _t_interfaces(d: dict) -> list[list]:
     return [
-        [*f["chains"], f["ca_pairs"], *f["residues"], len(f["elements"]), *_kind_cells(f["interactions"])]
+        [
+            *f["chains"],
+            f["measure"],
+            f["contacts"],
+            f["ca_pairs"],
+            *f["residues"],
+            len(f["elements"]),
+            *_kind_cells(f["interactions"]),
+        ]
         for f in d["interfaces"]
     ]
 
@@ -845,6 +1138,43 @@ def _t_interactions(d: dict) -> list[list]:
             *x["elements"],
         ]
         for x in d["interactions"]["found"]
+    ]
+
+
+def _t_nucleotides(d: dict) -> list[list]:
+    na = d["nucleic_acid"]
+    if na is None:
+        return []
+    partner = _partners(na)
+    level = {n: p["level"] for p in na["pairs"] for n in (p["i"], p["j"])}
+    stem = {n: p["stem"] for p in na["pairs"] for n in (p["i"], p["j"])}
+    rows = []
+    for st in na["strands"]:
+        for n, (base, mark, r) in enumerate(zip(st["sequence"], st["dot_bracket"], st["residues"]), st["first"]):
+            rows.append(
+                [
+                    n,
+                    st["id"],
+                    r["chain"],
+                    r["seq"],
+                    r["icode"],
+                    base,
+                    partner[n] or None,
+                    mark,
+                    level.get(n),
+                    stem.get(n),
+                ]
+            )
+    return rows
+
+
+def _t_base_pairs(d: dict) -> list[list]:
+    na = d["nucleic_acid"]
+    if na is None:
+        return []
+    return [
+        [p["i"], p["j"], *(p["a"][k] for k in _RES), *(p["b"][k] for k in _RES), p["kind"], p["stem"], p["level"]]
+        for p in na["pairs"]
     ]
 
 
@@ -916,13 +1246,33 @@ TABLES: dict[str, tuple[str, tuple[str, ...], object]] = {  # name -> (its secti
     "ligand_contacts": ("ligands", ("ligand", "kind", "name", *_RES, "element"), _t_ligand_contacts),
     "interfaces": (
         "interfaces",
-        ("chain_a", "chain_b", "ca_pairs", "residues_a", "residues_b", "element_pairs", *INTERACTION_KINDS),
+        (
+            "chain_a",
+            "chain_b",
+            "measure",
+            "contacts",
+            "ca_pairs",
+            "residues_a",
+            "residues_b",
+            "element_pairs",
+            *INTERACTION_KINDS,
+        ),
         _t_interfaces,
     ),
     "interface_elements": (
         "interfaces",
         ("chain_a", "chain_b", "element_a", "element_b", "ca_pairs", *INTERACTION_KINDS),
         _t_interface_elements,
+    ),
+    "nucleotides": (
+        "nucleic_acid",
+        ("index", "strand", *_RES, "base", "partner", "bracket", "level", "stem"),
+        _t_nucleotides,
+    ),
+    "base_pairs": (
+        "nucleic_acid",
+        ("i", "j", *(f"a_{k}" for k in _RES), *(f"b_{k}" for k in _RES), "kind", "stem", "level"),
+        _t_base_pairs,
     ),
     "interactions": (
         "interactions",
@@ -1211,8 +1561,18 @@ def schema() -> dict:
     interface = _obj(
         {
             "chains": _arr(_t("string"), "the two chains, in the order read"),
-            "ca_pairs": _t("integer", "CA pairs within 8 Å, one CA of each chain (protein chains)"),
-            "residues": _arr(_t("integer"), "of each chain, the residues in those CA pairs"),
+            "measure": _t(
+                "string",
+                "how contact is measured: ca, two protein chains (CA pairs within 8 Å); atoms, a protein and a "
+                "nucleic-acid chain (residue-nucleotide pairs with heavy atoms within 4 Å, on the structure); "
+                "base_pairs, two nucleic-acid chains (the base pairs the figure draws)",
+                enum=["ca", "atoms", "base_pairs"],
+            ),
+            "contacts": _t("integer", "the pairs in contact by its measure (0: the chains meet only by interactions)"),
+            "ca_pairs": _t(
+                "integer", "CA pairs within 8 Å, one CA of each chain; null unless both are protein", nullable=True
+            ),
+            "residues": _arr(_t("integer"), "of each chain, the residues (nucleotides) in those pairs"),
             "elements": _arr(
                 _obj(
                     {
@@ -1231,6 +1591,63 @@ def schema() -> dict:
             ),
             "interactions": kinds,
         }
+    )
+    nucleic = _obj(
+        {
+            "nucleotides": _t("integer", "nucleotides drawn, numbered 1.. through the strands in order"),
+            "cropped": _t("boolean", "na_extent cropped a large nucleic acid to the stems the protein touches"),
+            "strands": _arr(
+                _obj(
+                    {
+                        "id": _t("string", "CHAIN:FIRST-LAST"),
+                        "chain": _t("string"),
+                        "rna": _t("boolean"),
+                        "first": _t("integer", "the number of its first nucleotide"),
+                        "residues": _arr(RESIDUE, "its nucleotides, 5'->3'"),
+                        "sequence": _t(
+                            "string", "A C G U T, I (inosine), N (no base read); a modified one as its parent"
+                        ),
+                        "dot_bracket": _t("string", "its part of the dot-bracket"),
+                        "cut5": _t("boolean", "the molecule goes on beyond its 5' end (a break, or cropped)"),
+                        "cut3": _t("boolean", "the molecule goes on beyond its 3' end"),
+                    }
+                ),
+                "strand pieces as drawn, in the order read",
+            ),
+            "pairs": _arr(
+                _obj(
+                    {
+                        "i": _t("integer"),
+                        "j": _t("integer", "i < j"),
+                        "a": RESIDUE,
+                        "b": RESIDUE,
+                        "kind": _t("string", "WC (Watson-Crick) or GU (G·U wobble)", enum=["WC", "GU"]),
+                        "stem": _t("string", "the stem's name (P1, PK, DNA 1); null: an isolated pair", nullable=True),
+                        "level": _t("integer", "bracket level: 0 (), 1 [], 2 {}, 3 <>, then Aa, Bb ..."),
+                    }
+                ),
+                "the base pairs the figure draws (nucleic.py: Watson-Crick and G·U wobble), in order of i",
+            ),
+            "levels": _t("integer", "bracket levels used"),
+            "stems": _arr(
+                _obj(
+                    {
+                        "id": _t("string"),
+                        "name": _t("string"),
+                        "pairs": _t("integer"),
+                        "level": _t("integer"),
+                        "pseudoknot": _t("boolean", "foldmap's pseudoknot rule calls it a knot (named PK)"),
+                    }
+                ),
+                "stems, 5'->3'",
+            ),
+            "gaps": _arr(
+                _obj({"before": _t("string"), "after": _t("string"), "nucleotides": _t("integer")}),
+                "nucleotides left out between two pieces of one molecule (a break, or cropping)",
+            ),
+            "tetrads": _arr(_arr(RESIDUE), "G-tetrads (read, not drawn)"),
+        },
+        nullable=True,
     )
     end = _obj({**RESIDUE["properties"], "atom": _t("string", "an atom name, ring:5 / ring:6, or centre (Arg)")})
     interactions = _obj(
@@ -1274,6 +1691,7 @@ def schema() -> dict:
             "membrane": membrane,
             "ligands": _arr(ligand, "ligands and metal ions (as io found them), then glycans, then linked residues"),
             "interfaces": _arr(interface, "chain pairs in contact, in the order the chains were read"),
+            "nucleic_acid": nucleic,
             "interactions": interactions,
         },
         "required": ["foldmap_data", "foldmap"],

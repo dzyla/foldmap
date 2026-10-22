@@ -398,7 +398,9 @@ def png_label(dpi: int | None) -> str:
 
 FORMATS_NOTE = (
     "SVG: edit in Illustrator or Inkscape · PNG: slides and web · PDF: print · Layout file: re-render this figure "
-    "later with `foldmap plot --layout-file`"
+    "later with `foldmap plot --layout-file` · Data: what the figure says (elements, sheets, contacts, interfaces, "
+    "base pairs) as JSON or CSV tables, as `foldmap data` writes them; the zip adds a nucleic acid's dot-bracket, "
+    "BPSEQ and CT"
 )
 
 
@@ -469,6 +471,26 @@ def figure_downloads(
     return out
 
 
+def data_downloads(path: str, blob: str, stem: str, lim: app_jobs.Limits) -> list[Download]:
+    """The figure's data (app_jobs.data_file): the JSON `foldmap data` writes, and its CSV tables in a zip."""
+    return [
+        Download(
+            "dl_data_json",
+            "Data · JSON",
+            partial(app_jobs.data_file, path, blob, "json", lim),
+            f"{stem}-data.json",
+            "application/json",
+        ),
+        Download(
+            "dl_data_zip",
+            "Data · CSV tables (zip)",
+            partial(app_jobs.data_file, path, blob, "zip", lim),
+            f"{stem}-data.zip",
+            "application/zip",
+        ),
+    ]
+
+
 def sequence_downloads(path: str, blob: str, view_json: str, stem: str, lim: app_jobs.Limits) -> list[Download]:
     """The sequence figure's files, with the Sequence view's options."""
     return [
@@ -532,6 +554,11 @@ def download_menu(ws: Workspace) -> None:
             st.caption(note)
         dpi = (ss.get("last_good") or {}).get("png_dpi")
         buttons(figure_downloads(ws.path, blob, ws.name, ws.lim, eager, uploads_of(ss), png_dpi=dpi))
+    st.markdown("**Data**")
+    if offered is None:
+        st.caption("Nothing to download until the figure draws.")
+    else:  # the figure's data: the figure offered above (its settings), laid out again when clicked
+        buttons(data_downloads(ws.path, offered[0], ws.name, ws.lim))
     st.markdown("**Sequence**")
     if ss.get("seq_drawn"):
         blob, view_json = ss["seq_drawn"]

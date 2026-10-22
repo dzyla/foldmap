@@ -29,7 +29,8 @@ labels (A, B... strands; α1, α2... helices; η1... 3-10 helices), then draw_to
 chain:label, #k (k-th element), residue range res:CHAIN:FIRST-LAST, or a name in another convention: dep:NAME (the
 deposited helix name, e.g. dep:E in a globin) or beta:NAME (the β-scheme's, e.g. beta:α4); a label that means another
 element in one of those is refused with the choices (fig:NAME is the label drawn). Call list_styles for themes and
-style keys.
+style keys. structure_data gives what the figure says (elements, sheets, contacts, interfaces, a nucleic acid's base
+pairs as dot-bracket) as data.
 """
     + CREDIT
 )
@@ -60,6 +61,7 @@ FIGURE_SUFFIXES = (".svg", ".png", ".pdf")
 PAGE_SUFFIXES = (".html",)
 LAYOUT_SUFFIXES = (".yaml", ".yml")
 JSON_SUFFIXES = (".json",)
+DATA_SUFFIXES = (".json", ".dbn", ".bpseq", ".ct")
 
 
 def _checked(path: str, allowed: tuple[str, ...]) -> Path:
@@ -344,6 +346,80 @@ def compare_structures(
             content=[TextContent(type="text", text=note), _preview(made.figure).to_image_content()],
             structured_content={**made.data, "provenance": made.provenance},
         )
+
+
+@tool
+def structure_data(
+    source: str,
+    sections: list[str] | None = None,
+    output_path: str | None = None,
+    assembly: str | None = None,
+    symmetry: str | None = None,
+    membrane: str | None = None,
+    focus: str | None = None,
+    chains: list[str] | None = None,
+    domains: dict[str, list[str]] | None = None,
+    domains_from: str | None = None,
+    rename: dict[str, str] | None = None,
+    names: list[str] | None = None,
+    style: dict[str, str] | None = None,
+    layout_file: str | None = None,
+) -> CallToolResult:
+    """What the topology figure says about a structure, as data (the command line's `foldmap data`; JSON schema
+    version 1): the structured result is the whole dict, the text the same as JSON (or, with output_path, where it
+    was written). The structure is laid out exactly as draw_topology draws it with the same arguments, so names
+    and labels are the figure's.
+
+    sections (default all but interactions): structure; elements (kind, residues, label, page place); sheets (strand
+    order as drawn, directions, each pairing's kind and residue register from the DSSP bridges, accessory strands,
+    a barrel's n and shear S); disulfides; symmetry (and stoichiometry); membrane (with membrane="auto"); ligands
+    (ligands, metal ions, glycans, fused residues: the residues and elements they touch); interfaces (chain pairs in
+    contact: protein pairs by CA pairs, protein-nucleic acid by atom contacts, nucleic-acid pairs by base pairs;
+    element pairs); nucleic_acid (strands, sequences, the base pairs the figure draws with their stem and
+    pseudoknot bracket level, the dot-bracket); interactions (every interaction between two chains, only when
+    named). output_path: .json writes the dict; .dbn, .bpseq or .ct the nucleic acid as dot-bracket, BPSEQ or CT.
+    The other arguments are draw_topology's."""
+    from .datafile import DEFAULT, NA_FORMATS, SECTIONS, dumps, spec_data
+    from .spec import check_references, figure_spec
+
+    if domains_from not in (None, "auto", "cath"):
+        raise ValueError(f"domains_from is auto or cath; got {domains_from!r}")
+    asked = tuple(sections) if sections else DEFAULT
+    unknown = [x for x in asked if x not in SECTIONS]
+    if unknown:
+        raise ValueError(f"no data section {', '.join(unknown)}; the sections are {', '.join(SECTIONS)}")
+    out = _checked(output_path, DATA_SUFFIXES) if output_path else None  # checked first
+    form = out.suffix.lower().lstrip(".") if out is not None else "json"
+    if form != "json" and "nucleic_acid" not in asked:
+        raise ValueError(f"a .{form} file is the nucleic_acid section, which sections leaves out")
+    path = _structure(source)
+    spec = figure_spec(
+        path,
+        style=[f"{k}={v}" for k, v in (style or {}).items()],
+        layout_file=layout_file,
+        assembly=assembly,
+        symmetry=symmetry,
+        membrane=membrane,
+        focus=focus,
+        chains=chains,
+        domains=[(n, list(r)) for n, r in (domains or {}).items()] or domains_from,
+        rename=rename,
+        names=names,
+    )
+    warned = []
+    for problem in check_references(spec):
+        if problem.fatal:
+            raise ValueError(str(problem))
+        warned.append(problem)
+    data = spec_data(spec, asked)
+    text = dumps(data)
+    if out is not None:
+        out.parent.mkdir(parents=True, exist_ok=True)
+        with open(out, "w", encoding="utf-8", newline="\n") as fh:
+            fh.write(text if form == "json" else NA_FORMATS[form](data))
+        text = f"wrote {out}"
+    text += "".join(f"; warning: {problem}" for problem in warned)
+    return CallToolResult(content=[TextContent(type="text", text=text)], structured_content=data)
 
 
 @tool
