@@ -393,6 +393,10 @@ class Layout:
     crosslinks: list = field(default_factory=list)
     crosslink_ca: list = field(default_factory=list)  # each crosslink's Cα–Cα distance in the structure (Å)
     data_problems: list = field(default_factory=list)
+    # foldmap diff (compare.diff_page): the other structure's elements this one has no mate for, each placed where
+    # its own page puts it, carried onto this page by the mates' rigid fit; drawn as dashed outlines
+    # (render._draw_absent). [] on every other figure
+    absent: list[Placed] = field(default_factory=list)
     # what computes other_names on first need (build_layout's `conventions`; with_conventions): an element's names in
     # the conventions the figure does not show, so resolve can take dep: and beta: references; None: none known
     names_source: Callable[[], dict] | None = field(default=None, repr=False)

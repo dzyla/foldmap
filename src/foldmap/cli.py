@@ -959,7 +959,9 @@ def _drawn_like(
     naming the extras as drawn), and what compare reads (make_layout's like_out): reference, alignment and mates,
     each None where it was not reached, and refused (not the reference's fold). Drawn on its own, the note says
     why: this figure's frame cannot be carried (`uncarried`, _uncarried: an assembly drawn by its symmetry, a stack,
-    a straight duplex), nor the reference's, or it is not the reference's fold (Mates.same_fold)."""
+    a straight duplex), nor the reference's, or it is not the reference's fold (Mates.same_fold; but not with
+    like['same_protein']: two states of one protein by A19's rule, foldmap diff, whose domains may move apart past
+    the fold's TM-score)."""
     from types import SimpleNamespace
 
     from .align import align_chains, element_mates
@@ -1008,7 +1010,7 @@ def _drawn_like(
     match = like.get("match") or "auto"
     aln = align_chains(bb_a, chain_a, bb, chain_b, match)
     mates = element_mates(sses_a, sses, aln)
-    if not mates.same_fold:
+    if not mates.same_fold and not like.get("same_protein"):  # two states of one protein (foldmap diff): alike
         return alone(refused_note(name, aln, mates), reference, aln, mates, refused=True)
     try:
         frame = frame_like(lay_a.frame, aln.rotation, aln.translation)
@@ -1940,8 +1942,81 @@ def build_parser() -> argparse.ArgumentParser:
     pq.add_argument("--theme", "--preset", dest="theme", choices=list(THEMES), help="a ready-made look")
     pq.add_argument("--style-file", help="YAML file of style keys (may name a theme)")
     pq.add_argument("--set", action="append", default=[], metavar="KEY=VALUE", help="one style key (repeatable)")
+    _diff_parser(sub)
     _data_parser(sub)
     return parser
+
+
+def _diff_parser(sub) -> None:
+    dq = sub.add_parser(
+        "diff",
+        help="what changed between two structures of one protein (two states), drawn on their compare page",
+        description="Draw one protein chain of A and the same chain of B drawn like it, as compare draws them, with "
+        "what changed: an element only one structure has as a dashed outline in the other's panel, B coloured by "
+        "each residue's CA displacement after superposition on the matched core, and the rest (secondary-structure "
+        "changes, sheet pairing gained, lost or shifted, domain turns, interface and contact changes) named in the "
+        "note under both. The chains are aligned by sequence when they are one protein, else by structure. Each "
+        "panel's ids start a/ and b/.",
+    )
+    dq.add_argument("structure_a", metavar="A", help="the reference state: a file or PDB id")
+    dq.add_argument("structure_b", metavar="B", help="the other state: a file or PDB id")
+    dq.add_argument(
+        "-o", "--output", action="append", required=True, default=[], help=".svg, .pdf or .png (repeatable)"
+    )
+    dq.add_argument("--chain-a", metavar="CHAIN", help="A's protein chain (default: its first)")
+    dq.add_argument("--chain-b", metavar="CHAIN", help="B's protein chain (default: its first)")
+    dq.add_argument(
+        "--match",
+        metavar="auto|sequence|structure|ALN",
+        default="auto",
+        help="how the chains are aligned: auto (sequence when they are one protein, else structure), sequence, "
+        "structure, or a two-row alignment file (A's chain first)",
+    )
+    dq.add_argument(
+        "--assembly",
+        metavar="auto|asu|ID",
+        default="auto",
+        help="how both files are read: auto (each file's first biological assembly when it adds copies), asu (as "
+        "deposited) or an assembly id",
+    )
+    dq.add_argument(
+        "--domain",
+        action="append",
+        default=[],
+        metavar="NAME=RANGES",
+        help="a domain of A's chain whose rigid turn the note gives, e.g. LID=122-159 or CORE=1-29,60-121 (repeatable)",
+    )
+    dq.add_argument(
+        "--json",
+        metavar="PATH",
+        help="also write what changed: compare's matching (alignment, mates, pieces, extras, only_a), then "
+        "ss_changes, pairing, displacement, core, domain_turns and contacts",
+    )
+    dq.add_argument(
+        "--check",
+        action="store_true",
+        help="also judge each panel as a figure of its own (H5: it passes every check its chain drawn alone passes); "
+        "exit 1 when one does not",
+    )
+    dq.add_argument("--theme", "--preset", dest="theme", choices=list(THEMES), help="a ready-made look")
+    dq.add_argument("--style-file", help="YAML file of style keys (may name a theme)")
+    dq.add_argument("--set", action="append", default=[], metavar="KEY=VALUE", help="one style key (repeatable)")
+
+
+def diff_domains(given: list[str]) -> dict[str, list[str]]:
+    """--domain NAME=RANGES (each a comma-separated list of ranges) as diff_structures' domains, in the order
+    given; a UsageError for one without a name or ranges, or a name given twice."""
+    out: dict[str, list[str]] = {}
+    for text in given:
+        name, _, ranges = text.partition("=")
+        name = name.strip()
+        parts = [r.strip() for r in ranges.split(",") if r.strip()]
+        if not name or not parts:
+            raise UsageError(f"--domain {text!r}: give NAME=RANGES, e.g. LID=122-159 or CORE=1-29,60-121")
+        if name in out:
+            raise UsageError(f"--domain {name} is given twice")
+        out[name] = parts
+    return out
 
 
 # plot's options `foldmap data` does not take, as plot's defaults (_spec_of reads them)
@@ -2159,6 +2234,34 @@ def _cmd_compare(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_diff(args: argparse.Namespace) -> int:
+    """diff: what changed from A to B drawn on their compare page (compare.diff_page); the page written to every
+    output, what changed to --json; --check: H5 for each panel (compare.panel_checks), exit 1 when one fails."""
+    from .compare import diff_page, panel_checks, write_json
+    from .criteria import LIKE_CHECKS, NOT_JUDGED
+
+    look = resolve_style(args.theme or "publication", args.style_file, args.set)
+    domains = diff_domains(args.domain) or None
+    made = diff_page(
+        args.structure_a, args.structure_b, args.chain_a, args.chain_b, args.match, look, args.assembly, domains
+    )
+    print(provenance_block(made.provenance), file=sys.stderr, end="")
+    for out in args.output:
+        print(f"wrote {save(made.figure, out)}")
+    if args.json:
+        print(f"wrote {write_json(made.data, args.json)}")
+    if not args.check:
+        return 0
+    failed = False
+    for side, got in panel_checks(made, args.assembly).items():
+        said = NOT_JUDGED if got["pass"] is None else "pass" if got["pass"] else "fail"
+        print(f"H5 {LIKE_CHECKS['H5']}, {'left' if side == 'a' else 'right'} panel: {said}")
+        if got.get("detail"):
+            print(f"  {got['detail']}")
+        failed = failed or got["pass"] is False
+    return 1 if failed else 0
+
+
 def _cmd_data(args: argparse.Namespace) -> int:
     """data: the figure `plot` would draw, laid out only, as datafile.structure_data's JSON (or --schema), one CSV
     table, every table, or the nucleic acid as dot-bracket, BPSEQ or CT."""
@@ -2344,6 +2447,7 @@ _COMMANDS: dict[str, Callable[[argparse.Namespace], int]] = {
     "contacts": _cmd_contacts,
     "check": _cmd_check,
     "compare": _cmd_compare,
+    "diff": _cmd_diff,
     "data": _cmd_data,
 }
 

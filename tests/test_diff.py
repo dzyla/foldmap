@@ -193,3 +193,183 @@ def test_a_turned_domain_shows_its_turn(tmp_path):
     assert d.domain_turns["N"] < 0.1
     assert d.domain_turns["C"] == pytest.approx(60.0, abs=0.1)
     assert all(i < 40 for i, _ in d.core)
+
+
+# ------------------------------------------------------------------------------- the diff page (plan 13e-2)
+
+PAIRS = DATA / "diff"  # two states of one protein each: adenylate kinase open (4AKE, apo) and closed (1AKE, AP5A);
+AKE = (PAIRS / "4AKE.cif.gz", PAIRS / "1AKE.cif.gz")  # calmodulin with calcium (1CLL) and without (1CFD, NMR)
+CAM = (PAIRS / "1CLL.cif.gz", PAIRS / "1CFD.cif.gz")
+
+
+def _gids(fig, prefix: str) -> list[str]:
+    return sorted(
+        a.get_gid()[len(prefix) :]
+        for ax in fig.axes
+        for a in ax.findobj(lambda o, ax=ax: o is not ax and (o.get_gid() or "").startswith(prefix))
+    )
+
+
+def test_a_self_diff_page_is_its_compare_page(tmp_path):
+    """1UBQ against itself: nothing changed, so nothing is drawn or said beyond the compare page: the same SVG,
+    byte for byte, and its JSON says nothing changed."""
+    from foldmap.cli import save
+    from foldmap.compare import DIFF_KEYS, compare, diff_page
+
+    made, plain = diff_page(UBQ, UBQ), compare(UBQ, UBQ)
+    assert made.note == plain.note and made.provenance == plain.provenance
+    svg, svg_plain = tmp_path / "diff.svg", tmp_path / "compare.svg"
+    save(made.figure, svg)
+    save(plain.figure, svg_plain)
+    assert svg.read_bytes() == svg_plain.read_bytes()
+    assert not [g for p in ("a/absent:", "b/absent:") for g in _gids(made.figure, p)]
+    data = made.data
+    assert {k: data[k] for k in plain.data} == plain.data
+    assert data["ss_changes"] == data["pairing"] == [] and data["domain_turns"] == {}
+    assert all(v == [] for v in data["contacts"].values()) and {r[2] for r in data["displacement"]} == {0.0}
+    assert set(data) == set(plain.data) | set(DIFF_KEYS)
+
+
+def test_the_deleted_helix_is_drawn_dashed_in_bs_panel(tmp_path):
+    """1UBQ less its helix: the helix outlined dashed in B's panel, where A's panel draws it (the panels are alike:
+    the mates' rigid fit carries it), with the legend's entry; A's panel has no outline (B has nothing A lacks);
+    nothing moved, so B keeps its colours; the note names the helix."""
+    from foldmap.compare import diff_page
+    from foldmap.figcheck import fit_deviations
+    from foldmap.render import ABSENT_LEGEND, absent_outline
+
+    path, (helix, *_) = _no_helix(tmp_path)
+    made = diff_page(UBQ, path)
+    assert made.diff.only_a == (helix,)
+    (lay_a, _, _), (lay_b, _, _) = made.panels
+    assert _gids(made.figure, "b/absent:") == [helix] and _gids(made.figure, "a/absent:") == []
+    (out,) = lay_b.absent
+    p = lay_a.placed[helix]
+    assert (out.length, out.width, out.sse.kind) == (p.length, p.width, "H")
+    mates = [(a, b) for b, a in made.diff.mates.mate.items() if a in lay_a.placed and b in lay_b.placed]
+    at_a = [(lay_a.placed[a].cx, lay_a.placed[a].cy) for a, _ in mates] + [(p.cx, p.cy)]
+    at_b = [(lay_b.placed[b].cx, lay_b.placed[b].cy) for _, b in mates] + [(out.cx, out.cy)]
+    assert fit_deviations(at_a, at_b)[-1] < 1.0  # where the mates' fit puts A's helix on B's page
+    (line,) = [a for a in made.figure.axes[2].lines if a.get_gid() == f"b/absent:{helix}"]
+    assert line.get_linestyle() == "--" and len(absent_outline(out)) > 8
+    legend = [t.get_text() for t in made.figure.axes[0].texts]
+    assert ABSENT_LEGEND in legend and not any(t.startswith("Cα displacement") for t in legend)
+    assert lay_b.residue_data is None
+    assert f"only in 1UBQ.cif: {p.label} (dashed outlines on the right)" in made.note
+    assert f"{len(made.diff.ss_changes)} residues change secondary structure" in made.note
+
+
+def test_diff_json_schema(tmp_path):
+    """--json: compare's matching, then ss_changes, pairing, displacement, core, domain_turns and contacts; numbers to
+    1e-3; written with keys sorted, short rows on one line, and read back the same."""
+    import json
+
+    from foldmap.compare import DIFF_KEYS, diff_page, write_json
+
+    path, (helix, *gone) = _no_helix(tmp_path)
+    data = diff_page(UBQ, path, domains={"N": ["1-40"], "C": ["41-76"]}).data
+    assert set(data) == {"alignment", "mates", "pieces", "extras", "only_a", *DIFF_KEYS}
+    assert [e["a_residues"] for e in data["only_a"]] == [f"res:A:{gone[0].tag}-{gone[-1].tag}"]
+    assert data["ss_changes"] == [{"chain": "A", "residue": l.tag, "a": "H", "b": "-"} for l in gone]
+    assert data["pairing"] == [] and set(data["domain_turns"]) == {"N", "C"}
+    assert [r[1] for r in data["displacement"]] == [p[1] for p in data["alignment"]["pairs"]]
+    assert all(len(r) == 3 and r[0] == "A" and r[2] == round(r[2], 3) for r in data["displacement"])
+    assert isinstance(data["core"], int) and data["core"] >= 3
+    assert set(data["contacts"]) == set(CONTACT_KEYS)
+    out = write_json(data, tmp_path / "diff.json")
+    text = out.read_text(encoding="utf-8")
+    assert json.loads(text) == data
+    assert '[\n  "A",\n  "1",\n' not in text and '"displacement": [\n  ["A", "1", 0.0],' in text
+
+
+@pytest.fixture(scope="module", params=["ake", "cam"])
+def two_states(request):
+    from foldmap.compare import diff_page
+
+    a, b = AKE if request.param == "ake" else CAM
+    domains = {"N": ["5-75"], "C": ["82-146"]} if request.param == "cam" else {"LID": ["122-159"], "NMP": ["30-59"]}
+    return request.param, diff_page(a, b, domains=domains)
+
+
+def test_two_states_are_drawn_alike_with_their_changes(two_states):
+    """Adenylate kinase open and closed, calmodulin with and without calcium: one protein each (sequence route),
+    B drawn like A even where the domains moved past the fold's TM-score (calmodulin, 0.38); each element only one
+    state has outlined in the other's panel; B coloured by displacement, with its colour bar; the lid and the
+    C-terminal lobe turn."""
+    name, made = two_states
+    d = made.diff
+    assert d.alignment.method == "sequence" and made.note.startswith("drawn like ")
+    for side, ids in (("a/absent:", d.only_b), ("b/absent:", d.only_a)):
+        assert _gids(made.figure, side) == sorted(ids)
+    assert d.only_a if name == "ake" else d.only_b
+    legend = [t.get_text() for t in made.figure.axes[0].texts]
+    assert any(t.startswith("Cα displacement (Å): ") for t in legend)
+    assert _gids(made.figure, "b/data-stripe:") and not _gids(made.figure, "a/data-stripe:")
+    turns = d.domain_turns
+    assert (turns["LID"] > 30 and turns["NMP"] > 20) if name == "ake" else (turns["C"] > 90 and turns["N"] < 20)
+    assert "the right panel coloured by Cα displacement" in made.note
+
+
+def test_each_panel_stays_a_good_figure(two_states):
+    """H5 for each panel: drawn on its own with its marks and colouring, it passes every S- and A-check its chain
+    drawn alone passes, A6 (no text crossed, the outlines read as lines) among them."""
+    from foldmap.compare import panel_checks
+
+    _, made = two_states
+    got = panel_checks(made)
+    assert set(got) == {"a", "b"}
+    for side in got.values():
+        assert side["pass"] is True, side["detail"]
+        assert "A6" in side["value"]["alone"]
+
+
+_DIFF_PAGE = """
+import hashlib, sys
+from foldmap import cli
+svg, js = sys.argv[3], sys.argv[4]
+assert cli.main(["diff", sys.argv[1], sys.argv[2], "-o", svg, "--json", js, "--domain", "LID=122-159"]) == 0
+print(hashlib.sha256(open(svg, "rb").read() + open(js, "rb").read()).hexdigest())
+"""
+
+
+def test_the_diff_page_does_not_depend_on_the_hash_seed(tmp_path):
+    """A12: the diff page (outlines and displacement colouring) and its JSON have the same bytes under
+    PYTHONHASHSEED 0 and 1."""
+    runs = []
+    for seed in ("0", "1"):
+        done = subprocess.run(
+            [
+                sys.executable,
+                "-c",
+                _DIFF_PAGE,
+                *map(str, AKE),
+                str(tmp_path / f"{seed}.svg"),
+                str(tmp_path / f"{seed}.json"),
+            ],
+            env={**os.environ, "PYTHONHASHSEED": seed},
+            capture_output=True,
+            text=True,
+            check=True,
+            timeout=600,
+        )
+        runs.append(done.stdout.split()[-1])
+    assert len(runs[0]) == 64 and runs[0] == runs[1]
+
+
+def test_command_line(tmp_path, capsys):
+    """foldmap diff A B -o diff.svg --json diff.json --check: the page and the JSON written, the note on stderr, H5
+    of each panel printed; a malformed --domain is a usage error (exit 2)."""
+    import json
+
+    from foldmap import cli
+
+    svg, js = tmp_path / "diff.svg", tmp_path / "diff.json"
+    args = ["diff", *map(str, AKE), "-o", str(svg), "--json", str(js), "--domain", "LID=122-159", "--check"]
+    assert cli.main(args) == 0
+    out, err = capsys.readouterr()
+    assert "changes from 4AKE.cif.gz to 1AKE.cif.gz: only in 4AKE.cif.gz:" in err and "LID " in err
+    assert "H5 still a good figure, left panel: pass" in out and "H5 still a good figure, right panel: pass" in out
+    assert 'id="b/absent:' in svg.read_text(encoding="utf-8")
+    assert json.loads(js.read_text(encoding="utf-8"))["domain_turns"]["LID"] > 30
+    assert cli.main(["diff", str(UBQ), str(UBQ), "-o", str(svg), "--domain", "LID"]) == 2
+    assert "give NAME=RANGES" in capsys.readouterr().err

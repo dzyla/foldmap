@@ -173,6 +173,7 @@ Z = {  # the drawing order, back to front (plan 10 R8: panel < plate < membrane 
     "na-tie-mark": 2.4,  # a long tie's marks
     "domain-bar": 2.0,  # the domain bar under the figure ...
     "domain-bar-label": 2.1,  # ... and the names in it
+    "absent": 2.5,  # foldmap diff: the dashed outline of an element only the other structure has, under the bodies
     "body-back": 2.9,  # a helix's back face (Z["body"] - 0.1)
     "data-stripe-back": 2.91,  # color_by=data: its stripes (clipped to it) ...
     "data-edge-back": 2.92,  # ... and its edge drawn again over them
@@ -3458,6 +3459,8 @@ def _legend_entries(
             entries.append((("ia", part.kind), part.legend()))
     if linked and look.legend:
         entries.append((LIGAND_FILL, "chromophore / linked residue"))
+    if getattr(layout, "absent", None) and look.legend:  # foldmap diff: the dashed outline, as drawn
+        entries.append(((ABSENT_KEY,), ABSENT_LEGEND))
     return entries
 
 
@@ -3488,6 +3491,9 @@ def _canvas(
     for m in [*marks, *({"centre": m["text_at"], "half": m["half"]} for m in linked if m["text_at"])]:
         (cx, cy), (hw, hh) = m["centre"], m["half"]  # markers may sit just outside the elements' bounds
         x0, y0, x1, y1 = min(x0, cx - hw), min(y0, cy - hh), max(x1, cx + hw), max(y1, cy + hh)
+    for p in getattr(layout, "absent", ()):  # foldmap diff: the other structure's elements, outlined here
+        bx0, by0, bx1, by1 = p.rect
+        x0, y0, x1, y1 = min(x0, bx0), min(y0, by0), max(x1, bx1), max(y1, by1)
     pad = 1.0
     # a loop routed around the outermost elements may leave the bounds: the page (bounds + pad, the legend below)
     # holds every loop point with _LOOP_ROOM to spare, so no loop is clipped at the edge or runs into the legend
@@ -4369,6 +4375,53 @@ def _draw_residue_numbers(c: _Canvas, layout: Layout) -> None:
                 t.set_gid(f"resnum:{p.sse.id}:{end}")
 
 
+ABSENT_INK = "#5d6877"  # foldmap diff (Layout.absent): an element only the other structure has, outlined in this ...
+ABSENT_DASH = (0, (3, 2))  # ... dash ...
+ABSENT_LW = 0.9  # ... this many line widths wide
+ABSENT_KEY = "absent"  # its legend entry's swatch ...
+ABSENT_LEGEND = "only in the other structure"  # ... and words
+
+
+def absent_outline(p: Placed) -> np.ndarray:
+    """The closed outline (page units, its first point repeated last) of an element drawn where it is absent
+    (Layout.absent): a strand's arrow; a helix's or 3-10 helix's box, its corners rounded."""
+    if p.sse.kind == "E":
+        pts = np.asarray(_arrow(p), float)
+    else:
+        r, hl, hw = min(p.width, p.length) * 0.3, p.length / 2, p.width / 2
+        arcs = []
+        for (x, y), start in (
+            ((hl - r, hw - r), 0),
+            ((r - hl, hw - r), 90),
+            ((r - hl, r - hw), 180),
+            ((hl - r, r - hw), 270),
+        ):
+            t = np.radians(start + np.arange(5) * 22.5)
+            arcs.append(np.c_[x + r * np.cos(t), y + r * np.sin(t)])
+        pts = Affine2D().rotate(p.angle).translate(p.cx, p.cy).transform(np.vstack(arcs))
+    return np.vstack([pts, pts[:1]])
+
+
+def _draw_absent(c: _Canvas, layout: Layout) -> None:
+    """foldmap diff: each element only the other structure has (Layout.absent), a dashed outline (absent_outline)
+    under the bodies, drawn after every text and broken where it would run under a letter (text_halos, as the
+    interaction lines), so no text is crossed (A6 reads it: figcheck.LINE_GIDS); gid absent:<id>."""
+    absent = getattr(layout, "absent", ())
+    if not absent:
+        return
+    lw = c.lw * ABSENT_LW
+    halos = text_halos(c.ax, c.pt_per_unit, link_keep(lw, c.pt_per_unit, c.fig.dpi), turned=True)
+    ink = legible(ABSENT_INK)
+    gap = np.full((1, 2), np.nan)
+    for p in absent:
+        pieces = visible_pieces(absent_outline(p), [], halos)
+        if not pieces:
+            continue
+        xy = np.vstack([np.vstack([q, gap]) for q in pieces][:-1] + [pieces[-1]]).T
+        (line,) = c.ax.plot(*xy, color=ink, lw=lw, ls=ABSENT_DASH, solid_capstyle="butt", zorder=Z["absent"])
+        line.set_gid(f"absent:{p.sse.id}")
+
+
 def _draw_ghosts(c: _Canvas, layout: Layout) -> None:
     """Dashed copies of elements that belong to a neighbouring subunit."""
     for g in layout.ghosts:
@@ -4479,6 +4532,12 @@ def _draw_legend(c: _Canvas, layout: Layout, legend: _Legend) -> None:
             mark.set(facecolor=colour[1], edgecolor="none")
             mark.set_gid(f"legend-datum:{colour[3]}")
             c.ax.add_patch(mark)
+        elif isinstance(colour, tuple) and colour[0] == ABSENT_KEY:  # foldmap diff: a dashed outline, as drawn
+            box = Rectangle(
+                (x, y - 0.3), 0.6, 0.6, fc="none", ec=legible(ABSENT_INK), lw=c.lw * ABSENT_LW, ls=ABSENT_DASH
+            )
+            box.set_gid("legend-absent")
+            c.ax.add_patch(box)
         elif isinstance(colour, tuple) and colour[0] == "ia":  # an interaction kind: a short line, as drawn
             ink, dash = interaction_ink(colour[1], c.look)
             wide = XL_WIDTH if colour[1] in XL_KINDS else 1.0
@@ -4639,6 +4698,7 @@ def _draw(
     _draw_uniprot(c.ax, umarks, layout, c.lw, c.font)
     _draw_data_marks(c.ax, dmarks, c.lw, c.look.background)
     c.fig.foldmap_interactions_hidden = _draw_interactions(c, hb)  # lines wholly under text (provenance)
+    _draw_absent(c, layout)  # after every text too: its outline keeps off the letters
     if c.bar_h:
         _draw_domain_bar(c, layout)
     if at is None:  # a panel's legend is its page's (_canvas)

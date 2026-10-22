@@ -39,6 +39,7 @@ LINE_GIDS = (
     "ia:",
     "stub:",
     "domain-leader:",
+    "absent:",  # foldmap diff: the dashed outline of an element only the other structure has (render._draw_absent)
 )
 GLYCAN_STEM = re.compile(r"glycan:[^:]+:stem$")
 # Bodies: opaque shapes a text must not sit on unless it is theirs, and that hide a line drawn under them. Element
@@ -727,14 +728,22 @@ def fit_deviations(a, b, mirrored: bool = False) -> np.ndarray:
     a, b = np.asarray(a, float).reshape(-1, 2), np.asarray(b, float).reshape(-1, 2)
     if mirrored:
         b = b * [-1.0, 1.0]
+    turn, cb, ca = rigid_fit(a, b)
+    fitted = (b - cb) @ turn + ca
+    return np.hypot(*(fitted - a).T)
+
+
+def rigid_fit(a, b) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """(turn, cb, ca): the best rigid motion (a turn and a shift, no mirror) of the 2D points b onto their matched
+    points a, a point q of b's moved to (q - cb) @ turn + ca (fit_deviations' Procrustes)."""
+    a, b = np.asarray(a, float).reshape(-1, 2), np.asarray(b, float).reshape(-1, 2)
     ca, cb = a.mean(axis=0), b.mean(axis=0)
     u, _, vt = np.linalg.svd((b - cb).T @ (a - ca))
     turn = u @ vt
     if np.linalg.det(turn) < 0:  # the best proper rotation
         u[:, -1] *= -1
         turn = u @ vt
-    fitted = (b - cb) @ turn + ca
-    return np.hypot(*(fitted - a).T)
+    return turn, cb, ca
 
 
 COPY_MIN_MATCHED = 3  # a tied copy is compared on at least this many elements, and on half the smaller copy's

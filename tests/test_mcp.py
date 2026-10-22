@@ -32,6 +32,7 @@ def test_tools_are_listed_with_descriptions():
         "list_styles",
         "draw_topology",
         "compare_structures",
+        "diff_structures",
         "draw_sequence",
         "interactive_page",
         "uniprot_info",
@@ -563,3 +564,38 @@ def test_draw_topology_takes_your_data_and_crosslinks_and_says_their_problems(tm
         call("draw_topology", {"source": UBQ, "output_path": str(tmp_path / "x.svg"), "data_path": str(bad)})
     with pytest.raises(ToolError, match="needs data"):
         call("draw_topology", {"source": UBQ, "output_path": str(tmp_path / "x.svg"), "data_column": "ddG"})
+
+
+def test_diff_structures_returns_the_preview_what_changed_and_h5(tmp_path):
+    """diff_structures (plan 13e-2): writes the diff page and its JSON and returns the note, a PNG preview and what
+    changed (the JSON's dict and the provenance), with check H5 of each panel; a bad domain is an error."""
+    import json
+
+    a, b = (str(DATA / "diff" / f"{p}.cif.gz") for p in ("4AKE", "1AKE"))
+    out, js = tmp_path / "diff.png", tmp_path / "diff.json"
+    r = call(
+        "diff_structures",
+        {
+            "source_a": a,
+            "source_b": b,
+            "domains": {"LID": ["res:A:122-159"]},
+            "output_path": str(out),
+            "json_path": str(js),
+            "check": True,
+        },
+    )
+    assert not r.is_error and [c.type for c in r.content] == ["text", "image"]
+    text = r.content[0].text
+    assert out.is_file() and str(out) in text and "changes from 4AKE.cif.gz to 1AKE.cif.gz" in text
+    assert "H5 left panel: pass" in text and "H5 right panel: pass" in text
+    data = r.structured_content
+    assert data["alignment"]["method"] == "sequence" and data["domain_turns"]["LID"] > 30
+    assert data["only_a"] and data["displacement"] and set(data["h5"]) == {"a", "b"}
+    assert any(i["kind"] == "diff" for i in data["provenance"])
+    assert json.loads(js.read_text(encoding="utf-8")) == {
+        k: v for k, v in data.items() if k not in ("provenance", "h5")
+    }
+    from mcp.server.mcpserver.exceptions import ToolError
+
+    with pytest.raises(ToolError, match="domain X: 'B:1-40' is not a residue range"):
+        call("diff_structures", {"source_a": a, "source_b": b, "domains": {"X": ["B:1-40"]}})

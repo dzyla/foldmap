@@ -397,6 +397,41 @@ of residue numbers, A's then B's), `mates`, `pieces` (of a helix A has whole), `
 `only_a` (A's elements B lacks), each element by its label as drawn and its residues; numbers to 0.001. The MCP
 tool `compare_structures` (with `assembly`) returns the same page's preview and the same record.
 
+#### What changed between two states
+
+`foldmap diff A B` draws two states of one protein (apo and holo, open and closed) on their compare page, with what
+changed drawn on it:
+
+```bash
+foldmap diff 4AKE 1AKE -o adk.svg --json adk.json --domain LID=122-159 --domain NMP=30-59   # adenylate kinase
+```
+
+- An element only one structure has is a dashed outline in the other's panel. It stands where the mates' rigid fit
+  puts it, under the elements and broken at any letter.
+- B's panel is coloured by each residue's Cα displacement after superposition on the matched core (viridis, as
+  `color_by=data` draws numbers, with a colour bar). This happens only when some residue moved 0.1 Å or more.
+- The note under both panels names the rest: residues whose secondary structure changes, sheet pairings gained,
+  lost or shifted in register, each `--domain`'s rigid turn, and interface, ligand and contact changes.
+
+The chains are aligned by sequence when they are one protein (the rule the random-100 pairs use), else by structure.
+States of one protein are drawn alike even when their domains moved too far for one fold's TM-score (calmodulin
+with and without calcium). A structure against itself gives exactly its compare page. `--chain-a`, `--chain-b`,
+`--match`, `--assembly` and the style options are compare's.
+
+`--json` adds to compare's record:
+
+- `ss_changes`: chain, residue and the kinds in A and B (H, G, E, C for none, - for absent);
+- `pairing`: the strands by A's names, and the change;
+- `displacement`: [chain, residue, Å] for each of B's aligned residues;
+- `core`: how many residue pairs the fit kept;
+- `domain_turns`: degrees for each domain;
+- `contacts`: `elements`, `interfaces`, `interface_elements`, `ligands`, `ligand_elements`, each row ending in
+  `gained` or `lost`.
+
+`--check` also judges each panel as a figure of its own (H5: it passes every check its chain drawn alone passes) and
+exits 1 when one does not. The MCP tool `diff_structures` (with `domains`, `assembly` and `check`) returns the same
+page's preview and the same record.
+
 ### The figure as data
 
 `foldmap data` lays the structure out as `plot` would (without drawing it) and writes what the figure says about it
@@ -969,7 +1004,7 @@ On your own machine there are no limits except `FOLDMAP_APP_SLOW`; each variable
 
 `foldmap mcp` runs a [Model Context Protocol](https://modelcontextprotocol.io) server over stdio, so agents can
 summarise structures and draw figures. Tools: `summarize_structure`, `draw_topology`, `compare_structures`,
-`draw_sequence`, `interactive_page`, `list_styles`, `structure_data` (the figure as data, as `foldmap data`); the
+`diff_structures`, `draw_sequence`, `interactive_page`, `list_styles`, `structure_data` (the figure as data, as `foldmap data`); the
 drawing tools return a PNG preview along with the file they wrote.
 
 ```bash
@@ -983,7 +1018,7 @@ claude mcp add foldmap -- foldmap mcp        # Claude Code
 (the second form for clients configured by JSON, such as Claude Desktop).
 
 Figures must end in `.svg`, `.png` or `.pdf`, pages in `.html`, layout files in `.yaml` or `.yml` and
-`compare_structures`' record in `.json`, `structure_data`'s file in `.json`, `.dbn`, `.bpseq` or `.ct`. Set
+`compare_structures`' and `diff_structures`' records in `.json`, `structure_data`'s file in `.json`, `.dbn`, `.bpseq` or `.ct`. Set
 `FOLDMAP_OUTPUT_DIR` in the server's environment to confine the figure, page and layout files the server writes (default outputs included) to one folder;
 the structure download cache (`~/.cache/foldmap`) is not covered.
 

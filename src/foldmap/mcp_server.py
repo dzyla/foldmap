@@ -30,7 +30,8 @@ chain:label, #k (k-th element), residue range res:CHAIN:FIRST-LAST, or a name in
 deposited helix name, e.g. dep:E in a globin) or beta:NAME (the β-scheme's, e.g. beta:α4); a label that means another
 element in one of those is refused with the choices (fig:NAME is the label drawn). Call list_styles for themes and
 style keys. structure_data gives what the figure says (elements, sheets, contacts, interfaces, a nucleic acid's base
-pairs as dot-bracket) as data.
+pairs as dot-bracket) as data. compare_structures draws two structures of one fold side by side on one map;
+diff_structures draws what changed between two states of one protein on that page.
 """
     + CREDIT
 )
@@ -370,6 +371,69 @@ def compare_structures(
         return CallToolResult(
             content=[TextContent(type="text", text=note), _preview(made.figure).to_image_content()],
             structured_content={**made.data, "provenance": made.provenance},
+        )
+
+
+@tool
+def diff_structures(
+    source_a: str,
+    source_b: str,
+    chain_a: str | None = None,
+    chain_b: str | None = None,
+    match: str = "auto",
+    domains: dict[str, list[str]] | None = None,
+    output_path: str | None = None,
+    json_path: str | None = None,
+    assembly: str = "auto",
+    check: bool = False,
+) -> CallToolResult:
+    """What changed between two structures of one protein (two states: apo and holo, open and closed), drawn on
+    their compare page (compare_structures' page: source_a on the left, source_b drawn like it on the right): an
+    element only one structure has as a dashed outline in the other's panel; source_b's panel coloured by each
+    residue's CA displacement after superposition on the matched core (when any residue moved); and, in the note under
+    both, secondary-structure changes, sheet pairing gained, lost or shifted, domain turns, interface and contact
+    changes. Writes output_path (.svg, .png or .pdf; default: a temporary .svg) and returns where, the note and a PNG
+    preview; the structured result is what changed: compare_structures' matching (alignment, mates, pieces, extras,
+    only_a), then ss_changes [{chain, residue, a, b}] (kinds H, G, E, C none, - absent), pairing [{strands, change}],
+    displacement [[chain, residue, angstroms]] (source_b's residues), core (residue pairs the fit kept),
+    domain_turns {name: degrees} and contacts {elements, interfaces, interface_elements, ligands, ligand_elements:
+    [[..., gained | lost]]}, plus the figure's provenance. json_path (.json) writes the same, without provenance.
+
+    source_a, source_b: file path, PDB ID or UniProt accession. One protein chain of each: chain_a, chain_b (else
+    each its first). match: auto (sequence when the chains are one protein, else structure), sequence, structure, or
+    a two-row alignment file (A's chain first). domains: {name: residue ranges of source_a's chain, e.g.
+    ["res:A:122-159"]}, each domain's rigid turn given. assembly: auto, asu or an assembly id. check: also judge each
+    panel as a figure of its own (H5: it passes every check its chain drawn alone passes), as h5 {a, b}."""
+    from .compare import diff_page, panel_checks, write_json
+    from .provenance import lines
+    from .render import save
+
+    keep = _checked(json_path, JSON_SUFFIXES) if json_path else None  # checked first
+    with _output(output_path, ".svg", f"{Path(str(source_b)).stem}-diff", FIGURE_SUFFIXES) as out:
+        made = diff_page(
+            source_a,
+            source_b,
+            chain_a,
+            chain_b,
+            match or "auto",
+            assembly=assembly or "auto",
+            domains=dict(domains) if domains else None,
+        )
+        save(made.figure, out)
+        note = f"wrote {out}"
+        if keep is not None:
+            note += f" and {write_json(made.data, keep)}"
+        note += "".join(f"; {text}" for text in lines(made.provenance))
+        result = {**made.data, "provenance": made.provenance}
+        if check:
+            result["h5"] = panel_checks(made, assembly or "auto")
+            note += "".join(
+                f"; H5 {side} panel: {'not judged' if got['pass'] is None else 'pass' if got['pass'] else 'fail'}"
+                for side, got in zip(("left", "right"), result["h5"].values())
+            )
+        return CallToolResult(
+            content=[TextContent(type="text", text=note), _preview(made.figure).to_image_content()],
+            structured_content=result,
         )
 
 
