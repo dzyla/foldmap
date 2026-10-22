@@ -651,3 +651,17 @@ def test_each_interaction_kind_has_its_ink_and_print_and_blueprint_tell_them_by_
         theme = THEMES[name]
         assert {interaction_ink(kind, theme)[0] for kind in KINDS} == {theme.hbond_color}, name
         assert [interaction_ink(kind, theme)[1] for kind in KINDS] == [dash for _, dash in inks.values()], name
+
+
+def test_an_unquoted_off_is_read_by_one_coercion():
+    """Section review 13b-13d, Minor 15: YAML reads an unquoted `interactions: off` as False; style._coerce,
+    parse_interactions and the app's layout reader share style.yaml_off."""
+    from foldmap.style import _coerce, parse_interactions, yaml_off
+
+    assert yaml_off("interactions", False) == "off" and yaml_off("legend", False) is False
+    assert yaml_off("interactions", "salt") == "salt"
+    assert _coerce("interactions", False) == "off" and parse_interactions(False) == ()
+    pytest.importorskip("streamlit")
+    from foldmap.app import _style_value
+
+    assert _style_value("interactions", False) == "off" and _style_value("legend", False) is False

@@ -3499,7 +3499,7 @@ def _copy_ties(
     return dict(sorted(out.items()))
 
 
-_RES_RANGE = re.compile(r"(-?\d+)([A-Za-z]?)(?:-(-?\d+)([A-Za-z]?))?")  # 150, 150-159, -7-4, 100A-100K
+RES_RANGE = re.compile(r"(-?\d+)([A-Za-z]?)(?:-(-?\d+)([A-Za-z]?))?")  # 150, 150-159, -7-4, 100A-100K
 
 
 _ANY_NAME = "a label such as A or α1, chain:label, #k, res:a-b, dep:name or beta:name"
@@ -3540,7 +3540,7 @@ def resolve(layout: Layout, sses: list[SSE], ref: str) -> list[str]:
         chain = None
         if body.count(":") == 1:
             chain, body = body.split(":")
-        m = _RES_RANGE.fullmatch(body)
+        m = RES_RANGE.fullmatch(body)
         if m is None:
             raise ValueError(
                 f"residue reference {ref!r} must look like res:150-159, res:A:150-159, res:A:-7-4 or res:H:100A-100K"
@@ -3572,7 +3572,7 @@ def resolve(layout: Layout, sses: list[SSE], ref: str) -> list[str]:
     else:
         label = ref.split(":", 1)[1] if ":" in ref else ref
         out = _named(layout, placed, "fig", ref)
-        m = _RES_RANGE.fullmatch(label)
+        m = RES_RANGE.fullmatch(label)
         if not out and m is not None and m[3] is not None:  # A:1-60, 1-60 naming no label: read as res:A:1-60
             return resolve(layout, sses, f"res:{ref}")  # (spec.check_references warns that it was)
         meant = {k: ids for k in CONVENTIONS if (ids := out if k == "fig" else _named(layout, placed, k, ref))}

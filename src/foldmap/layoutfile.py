@@ -71,9 +71,11 @@ def document(
     structure, theme: str, look: Style, options: dict, edits: dict, layout: Layout, sses: list[SSE], names=()
 ) -> dict:
     """The layout document for a figure: theme, style changes, layout options, names (--names, as given), edits in
-    residue form."""
+    residue form. With the researcher's data (options' data) color_by is written even when it is the theme's: read
+    back, a colouring not named turns to the data (spec.data_look), so a figure coloured by chain stays so."""
     base = THEMES[theme]
-    style = {k: v for k, v in asdict(look).items() if v != getattr(base, k)}
+    data = options.get("data") is not None
+    style = {k: v for k, v in asdict(look).items() if v != getattr(base, k) or (data and k == "color_by")}
     if style.get("mark"):
         marks = []
         for entry in filter(None, (e.strip() for e in style["mark"].split(","))):

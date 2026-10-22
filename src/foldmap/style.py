@@ -100,11 +100,17 @@ INTERACTION_FORMS = "off, all or kinds like hbond,salt (" + ", ".join(INTERACTIO
 BETWEEN_FORMS = "auto, na, interchain or chains:A+B,C+D"
 
 
+def yaml_off(key: str, value):
+    """A style value as YAML may have read it: an unquoted `off` is False, which for `interactions` (a text) means
+    the text off. The one coercion _coerce, parse_interactions and the app's layout file reader share."""
+    return "off" if key == "interactions" and value is False else value
+
+
 def parse_interactions(text) -> tuple[str, ...]:
     """The kinds an `interactions` value names, in interactions.KINDS order, each once: off -> (), all -> every kind
     but hydrophobic (drawn only on request: it can crowd a figure), or a comma list (all may be one of its items).
     Keywords in any case. ValueError names the accepted forms."""
-    value = "off" if text is False else str(text).strip()  # unquoted `off` in YAML is False
+    value = str(yaml_off("interactions", text)).strip()
     items = [item.strip() for item in value.lower().split(",")]
     if items == ["off"]:
         return ()
@@ -325,8 +331,8 @@ def _coerce(key: str, value):
         raise ValueError(f"unknown style key {key!r}; valid keys: {', '.join(_TYPES)}")
     kind = _TYPES[key]
     value = _ALIASES.get(key, {}).get(value, value)
-    if key == "interactions" and value is False:  # unquoted `off` in a YAML file
-        return "off"
+    if yaml_off(key, value) is not value:  # unquoted `off` in a YAML file
+        return yaml_off(key, value)
     if kind == "bool":
         if isinstance(value, bool):
             return value

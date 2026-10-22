@@ -165,7 +165,7 @@ class HBond(NamedTuple):
         return f"{self.donor} → {self.acceptor} {self.distance:.2f} Å"
 
 
-def _kind(res) -> int | None:
+def polymer_kind(res) -> int | None:
     """PROTEIN, NUCLEIC, or None (water, ligand, ion: any residue of a non-polymer entity, even of a polymer
     residue type; with no entity types in the file, the tabulated type decides)."""
     if res.entity_type not in (gemmi.EntityType.Polymer, gemmi.EntityType.Unknown) or res.is_water():
@@ -183,7 +183,7 @@ def _kind(res) -> int | None:
     return None
 
 
-def _heavy(res) -> dict[str, gemmi.Position]:
+def heavy_atoms(res) -> dict[str, gemmi.Position]:
     """Heavy atoms of a residue by name, the first conformer of each."""
     atoms: dict[str, gemmi.Position] = {}
     for atom in res:
@@ -288,11 +288,11 @@ def _sites(model, chains: set[str] | None) -> _Sites:
         c = chain_names.index(chain.name)
         kept, seen = [], set()
         for res in chain:  # one residue per number, the first (microheterogeneity), as io does
-            kind = _kind(res)
+            kind = polymer_kind(res)
             key = (res.seqid.num, res.seqid.icode.strip())
             if kind is not None and key not in seen:
                 seen.add(key)
-                kept.append((res, kind, _heavy(res)))
+                kept.append((res, kind, heavy_atoms(res)))
         for n, (res, kind, atoms) in enumerate(kept):
             prev = kept[n - 1][2] if n else None
             nxt = kept[n + 1][2] if n + 1 < len(kept) else None

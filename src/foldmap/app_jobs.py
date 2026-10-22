@@ -391,14 +391,39 @@ def files_job(path, settings_json: str, ext: str) -> bytes:
         return figure_bytes(drawn.figure, ext)
 
 
-def data_job(path, settings_json: str, kind: str) -> bytes:
+def data_job(path, settings_json: str, kind: str, name: str | None = None) -> bytes:
     """The figure's data (datafile.spec_data, all sections but interactions, as `foldmap data` writes them): the
-    JSON (kind "json") or every CSV table, with a nucleic acid's dot-bracket, BPSEQ and CT, in a zip (kind "zip")."""
+    JSON (kind "json") or every CSV table, with a nucleic acid's dot-bracket, BPSEQ and CT, in a zip (kind "zip").
+    `name`: the structure's name in the data (an upload's name as uploaded; None: its file's)."""
     from . import app
     from .datafile import DEFAULT, dumps, spec_data, zip_bytes
 
-    data = spec_data(app.spec_of(path, json.loads(settings_json)), DEFAULT)
+    data = spec_data(app.spec_of(path, json.loads(settings_json)), DEFAULT, name=name)
     return dumps(data).encode("utf-8") if kind == "json" else zip_bytes(data)
+
+
+def table_job(path, table, kind: str, assembly: str) -> dict:
+    """An uploaded data (`kind` "data") or crosslinks table read against the structure as the figure draws it
+    (`assembly`), as the command line reads --data and --crosslinks (userdata): {fatal: the first fatal problem's
+    text, else "", read: what was read ('column ddG (numbers) on 2 residues', '3 crosslinks'), unused: rows not used,
+    columns: (data) the value columns for the Column picker}. Run through run_job, as every structure read."""
+    from .io import load_backbone
+    from .userdata import read_crosslinks, read_residue_data, rows_unused, summary, value_columns
+
+    bb = load_backbone(path, assembly or "auto")
+    if kind == "data":
+        values, problems = read_residue_data(table, None, bb)
+        said = summary(values, None, "")
+    else:
+        links, problems = read_crosslinks(table, bb)
+        said = summary(None, links, crosslinks="")
+    fatal = next((p.text for p in problems if p.fatal), "")
+    return {
+        "fatal": fatal,
+        "read": said[0].split(": ", 1)[-1] if said and not fatal else "",
+        "unused": rows_unused(problems),
+        "columns": value_columns(table) if kind == "data" and not fatal else [],
+    }
 
 
 def sequence_job(path, settings_json: str, view_json: str, ext: str) -> bytes:
@@ -589,9 +614,9 @@ def figure_file(path: str, blob: str, ext: str, limits: Limits, eager: tuple | N
 
 
 @functools.lru_cache(maxsize=8)
-def data_file(path: str, blob: str, kind: str, limits: Limits) -> bytes:
-    """A data download (data_job: "json" or "zip")."""
-    return run_job(data_job, path, blob, kind, limits=limits)
+def data_file(path: str, blob: str, kind: str, limits: Limits, name: str | None = None) -> bytes:
+    """A data download (data_job: "json" or "zip"; `name`: an uploaded structure's name as uploaded)."""
+    return run_job(data_job, path, blob, kind, name, limits=limits)
 
 
 @functools.lru_cache(maxsize=8)

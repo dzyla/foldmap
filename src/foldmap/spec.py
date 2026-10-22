@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any
 
 from . import layoutfile
-from .layout import _RES_RANGE, CONVENTIONS
+from .layout import CONVENTIONS, RES_RANGE
 from .render import draw
 from .route import route_loops
 from .style import THEMES, Style, hbonds_superseded, resolve_style
@@ -348,7 +348,7 @@ RANGE_FORMS = "res:150-159, res:A:150-159, res:A:-7-4 or res:H:100A-100K"
 def _range(text: str) -> tuple[int, int] | None:
     """(first, last) residue numbers of a range written without res: (1-60, -7-4, 100A-100K); None for anything
     else, a single number included (it may be a label)."""
-    m = _RES_RANGE.fullmatch(text)
+    m = RES_RANGE.fullmatch(text)
     return (int(m[1]), int(m[3])) if m is not None and m[3] is not None else None
 
 
@@ -363,7 +363,7 @@ def _reference(ref: str, where: str, domain: bool, elements) -> tuple[list[Probl
         return [Problem(where, f"an empty reference; name an element as {FORMS}", True)], None
     if ref.startswith("res:"):
         chain, body = ref[4:].split(":") if ref[4:].count(":") == 1 else (None, ref[4:])
-        m = _RES_RANGE.fullmatch(body) if chain != "" else None
+        m = RES_RANGE.fullmatch(body) if chain != "" else None
         if m is None:
             return [Problem(where, f"{ref} is no residue range; write {RANGE_FORMS}", True)], None
         return [], (chain, (int(m[1]), int(m[3] if m[3] is not None else m[1])))

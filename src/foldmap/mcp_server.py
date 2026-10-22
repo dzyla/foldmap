@@ -253,6 +253,7 @@ def draw_topology(
     from .render import save
     from .scope import drawn_scope, scope_note
     from .spec import check_references, draw_spec, figure_spec, layout_document
+    from .userdata import SAID_ROWS
 
     if domains_from not in (None, "auto", "cath"):
         raise ValueError(f"domains_from is auto or cath; got {domains_from!r}")
@@ -303,9 +304,9 @@ def draw_topology(
         if keep is not None:
             note += f" and layout file {layoutfile.save(keep, layout_document(spec, drawn=drawn))}"
         problems = list(drawn.layout.data_problems)  # your data: each row not used, each crosslink too long
-        note += "".join(f"; warning: {p}" for p in problems[:DATA_SAID])
-        if len(problems) > DATA_SAID:
-            note += f"; and {len(problems) - DATA_SAID} more data warnings (data_problems lists every one)"
+        note += "".join(f"; warning: {p}" for p in problems[:SAID_ROWS])
+        if len(problems) > SAID_ROWS:
+            note += f"; and {len(problems) - SAID_ROWS} more data warnings (data_problems lists each)"
         items = drawn.provenance  # how it was made: the note says it, the structured result lists it
         note += "".join(f"; {text}" for text in lines(items))
         scope = drawn_scope(drawn.model, drawn.layout, spec.assembly, spec.focus)
@@ -320,9 +321,6 @@ def draw_topology(
                 "data_problems": [{"where": p.where, "text": p.text} for p in problems],
             },
         )
-
-
-DATA_SAID = 20  # data warnings said in the note (cli.SAID_ROWS); the structured result lists every one
 
 
 def _interaction_lines(fig) -> list[dict]:

@@ -358,13 +358,18 @@ from foldmap.nacheck import deposited_hydrog  # noqa: E402
 from foldmap.render import (  # noqa: E402
     INTERACTION_ONE,
     draw,
-    hbond_overlay,
+    interaction_overlay,
     nucleotide_points,
     residue_name,
     residue_point,
 )
 from foldmap.route import route_loops  # noqa: E402
 from foldmap.style import Style, resolve_style  # noqa: E402
+
+
+def _hbond_overlay(layout, loops, sses, look, model):
+    """The H-bond lines the look asks for: interaction_overlay's H-bond part."""
+    return interaction_overlay(layout, loops, sses, look, model, kinds=("hbond",)).hbonds
 
 
 @lru_cache(maxsize=None)
@@ -426,10 +431,10 @@ def test_the_legend_counts_the_lines_and_says_when_the_cap_cut_some():
 
 
 def test_hbond_max_keeps_the_shortest_lines():
-    all_ = hbond_overlay(
+    all_ = _hbond_overlay(
         *_drawn("1LMB", "hbonds=na", "hbond_max=1000")[1:4], Style(hbonds="na", hbond_max=1000), _model("1LMB")
     )
-    few = hbond_overlay(
+    few = _hbond_overlay(
         *_drawn("1LMB", "hbonds=na", "hbond_max=1000")[1:4], Style(hbonds="na", hbond_max=7), _model("1LMB")
     )
     assert [l.gid for l in few.lines] == [l.gid for l in all_.lines[:7]]
@@ -454,7 +459,7 @@ def test_the_legend_counts_pairs_that_are_not_drawn():
     assert HBondOverlay([1] * 5, 9, 2).legend() == "H-bonds (5 of 9, 2 not shown)"
     look = resolve_style(None, None, ["hbonds=interchain", "hbond_max=1000"])  # only chains A and B are drawn
     lay, sses, bb = make_layout(_path("2HHB"), look=look, model=_model("2HHB"), chains=["A", "B"])
-    overlay = hbond_overlay(lay, route_loops(lay, sses, bb), sses, look, _model("2HHB"))
+    overlay = _hbond_overlay(lay, route_loops(lay, sses, bb), sses, look, _model("2HHB"))
     assert overlay.unplaced > 0 and overlay.legend() == f"H-bonds ({len(overlay.lines)}, {overlay.unplaced} not shown)"
 
 
@@ -621,7 +626,7 @@ _TODAY = {  # sha256 of `foldmap plot X --set hbonds=na` drawn at 96aebc8, befor
 
 @pytest.mark.parametrize("name", ["1LMB", "1ZAA"])
 def test_hbond_figures_are_byte_identical_to_those_before_the_overlay(name, tmp_path):
-    """hbond_overlay is now interaction_overlay's H-bond part: an hbonds=na figure is the same file as before."""
+    """The H-bond lines are interaction_overlay's H-bond part: an hbonds=na figure is the same file as before."""
     import hashlib
 
     import matplotlib

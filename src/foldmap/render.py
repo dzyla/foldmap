@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import logging
+import math
 import re
 import threading
 from collections import Counter
@@ -2055,10 +2056,17 @@ def _ring(corners) -> Path:
     return Path(np.vstack([v, v[:1]]), closed=True)
 
 
-def text_halos(ax, pt_per_unit: float, keep: float, skip=()) -> list[tuple[float, float, float, float]]:
+def text_halos(
+    ax, pt_per_unit: float, keep: float, skip=(), turned: bool = False
+) -> list[tuple[float, float, float, float]]:
     """The ink boxes (page units, from text_metrics, as the layout measures text) of the texts drawn on the page so
     far, grown by `keep`: where a disulfide bar or a ligand tether is not drawn, so none runs through or by a
-    letter. Texts whose gid starts with one of `skip` are left out."""
+    letter. Texts whose gid starts with one of `skip` are left out.
+    `turned` (the interaction lines): turned texts placed as matplotlib places them, rotation_mode "anchor" turning
+    the alignment offset with the text about its anchor (else the offset stays unturned, so a turned left- or
+    baseline-aligned text, a stem's first-pair numbers, is boxed beside its ink), "default" aligning the turned line
+    box by ha and va; each box holds the turned ink (axis-aligned). Off (the disulfide bars and tethers of every
+    default figure are placed so), the boxes are as they always were."""
     up_down = (text_metrics.ASCENT + text_metrics.DESCENT) / text_metrics.UNITS  # a line box's height, ems
     out = []
     for t in ax.texts:
@@ -2067,35 +2075,15 @@ def text_halos(ax, pt_per_unit: float, keep: float, skip=()) -> list[tuple[float
             continue
         size = t.get_fontsize() / pt_per_unit  # page units to the em
         ink, start = _ink_line(words, str(t.get_fontweight()) in ("bold", "700", "heavy", "black"))
-        x, y = t.get_position()
-        ha, va = t.get_horizontalalignment(), t.get_verticalalignment()
-        cx = x + {"left": -start[0], "right": start[0]}.get(ha, 0.0) * size
-        cy = y + {"bottom": up_down / 2, "top": -up_down / 2, "baseline": -start[1]}.get(va, 0.0) * size
-        turn = np.radians(t.get_rotation())
-        rot = np.array([[np.cos(turn), -np.sin(turn)], [np.sin(turn), np.cos(turn)]])
-        x0, y0, x1, y1 = _reach(ink @ rot.T * size + (cx, cy))
-        out.append((x0 - keep, y0 - keep, x1 + keep, y1 + keep))
-    return out
-
-
-def turned_halos(ax, pt_per_unit: float, keep: float) -> list[tuple[float, float, float, float]]:
-    """text_halos for the interaction lines, with turned texts placed as matplotlib places them: rotation_mode
-    "anchor" turns the alignment offset with the text about its anchor (text_halos leaves the offset unturned, so a
-    turned left- or baseline-aligned text, a stem's first-pair numbers, is boxed beside its ink), "default" aligns
-    the turned line box by ha and va. Each box holds the turned ink (axis-aligned), grown by `keep`. text_halos
-    stays as it is: the disulfide bars and tethers of every default figure are placed by it."""
-    up_down = (text_metrics.ASCENT + text_metrics.DESCENT) / text_metrics.UNITS  # a line box's height, ems
-    out = []
-    for t in ax.texts:
-        words = t.get_text()
-        if not words.strip() or t.get_transform() != ax.transData:
-            continue
-        size = t.get_fontsize() / pt_per_unit  # page units to the em
-        ink, start = _ink_line(words, str(t.get_fontweight()) in ("bold", "700", "heavy", "black"))
         ha, va = t.get_horizontalalignment(), t.get_verticalalignment()
         turn = np.radians(t.get_rotation())
         rot = np.array([[np.cos(turn), -np.sin(turn)], [np.sin(turn), np.cos(turn)]])
-        if t.get_rotation_mode() == "anchor" or not t.get_rotation() % 360:
+        if not turned:
+            x, y = t.get_position()
+            cx = x + {"left": -start[0], "right": start[0]}.get(ha, 0.0) * size
+            cy = y + {"bottom": up_down / 2, "top": -up_down / 2, "baseline": -start[1]}.get(va, 0.0) * size
+            centre = (cx, cy)
+        elif t.get_rotation_mode() == "anchor" or not t.get_rotation() % 360:
             shift = np.array(
                 [
                     {"left": -start[0], "right": start[0]}.get(ha, 0.0),
@@ -2546,7 +2534,8 @@ def _by_data(sses: list[SSE], layout: Layout | None, look: Style):
 
     def element(s: SSE) -> str:
         mine = [v for v in values[s.start : s.end + 1] if v is not None]
-        return scale.colour(float(np.mean(mine))) if mine else DATA_NONE
+        # an exactly rounded sum, snapped: the same colour on every CPU (np.mean's SIMD sum may differ in its last bit)
+        return scale.colour(round(math.fsum(mine) / len(mine), 9)) if mine else DATA_NONE
 
     def by_value(r: int, chain: str | None = None) -> str | None:
         return scale.colour(values[r]) if 0 <= r < len(values) else None
@@ -2654,11 +2643,10 @@ def data_symbol(shape: str, xy, r: float) -> Circle | Polygon:
     return Polygon(np.column_stack([xy[0] + grow * r * np.cos(ang), xy[1] + grow * r * np.sin(ang)]), closed=True)
 
 
-def _draw_data_marks(ax, marks: list[dict], lw: float) -> None:
+def _draw_data_marks(ax, marks: list[dict], lw: float, background: str) -> None:
+    """Each category mark on a ring of the page's `background` (look.background, as the legend's marks)."""
     for m in marks:
-        ring = Circle(
-            m["at"], _DATA_RING, fc=_BACKGROUND.get(), ec=legible("#1d1d1f"), lw=lw * 0.6, zorder=Z["data-ring"]
-        )
+        ring = Circle(m["at"], _DATA_RING, fc=background, ec=legible("#1d1d1f"), lw=lw * 0.6, zorder=Z["data-ring"])
         ring.set_gid(f"data-ring:{m['key']}")
         ax.add_patch(ring)
         mark = data_symbol(m["shape"], m["at"], _DATA_MARK)
@@ -3283,15 +3271,6 @@ def _kind_lines(kind: str, found: list, locate, labels: dict, look: Style) -> Ki
     return KindOverlay(kind, lines[: look.interaction_max], len(lines), len(unplaced))
 
 
-def hbond_overlay(layout: Layout, loops: list[Loop], sses: list[SSE], look: Style, model=None) -> HBondOverlay:
-    """The hydrogen-bond lines the look asks for (style.interactions_of: `interactions` with hbond among its kinds,
-    else the older `hbonds`): interaction_overlay's H-bond part. One per residue pair (protein before nucleotide,
-    else by tag), between their points on the page; bonds with an end that is not drawn are left out. At most
-    `look.hbond_max` lines, the shortest on the page kept (not the shortest in Å). `model` is the io.read_model
-    result the layout was built from."""
-    return interaction_overlay(layout, loops, sses, look, model, kinds=("hbond",)).hbonds
-
-
 def hbond_alpha(length: float, diagonal: float) -> float:
     """Opacity of a hydrogen-bond line: 1 for short lines, falling linearly to 0.4 at half the page diagonal."""
     t = (length / diagonal - 0.15) / 0.35 if diagonal > 0 else 0.0
@@ -3310,9 +3289,10 @@ def _beside(ends: tuple, place: int, count: int, gap: float) -> tuple:
 def _draw_lines(c: _Canvas, kind: str, lines: list, slots: dict, halos=None) -> list[str]:
     """One kind's lines, dashed in its ink (interaction_ink); long ones fade (hbond_alpha). A line sharing its
     residue pair with another kind's lies beside it, INTERACTION_GAP line widths apart, the pair's lines centred
-    on the residues. With `halos` (turned_halos: the letters on the page, grown by the line's keep), a line is
+    on the residues. With `halos` (text_halos turned: the letters on the page, grown by the line's keep), a line is
     broken where it would run under a letter (visible_pieces), so no text is crossed; H-bond lines are drawn whole,
-    as before plan 13c (halos None). Returns the gids of lines wholly under text, not drawn."""
+    as before plan 13c (halos None), over the panels and the nucleic-acid rungs, under the backbone rails, the
+    contact beads, the elements and the letters. Returns the gids of lines wholly under text, not drawn."""
     x0, y0, x1, y1 = c.content
     diag = float(np.hypot(x1 - x0, y1 - y0))
     colour, dash = interaction_ink(kind, c.look)
@@ -3343,22 +3323,15 @@ def _draw_lines(c: _Canvas, kind: str, lines: list, slots: dict, halos=None) -> 
     return hidden
 
 
-def _draw_hbonds(c: _Canvas, overlay: HBondOverlay, slots: dict | None = None) -> None:
-    """Thin dashed lines between the residues of each hydrogen-bonded pair: over the panels and the nucleic-acid
-    rungs, under the backbone rails, the contact beads, the elements and the letters (gid hbond:<a>-<b>). Long
-    lines fade (alpha 1 up to 15% of the content's diagonal, 0.4 from 50% on), so a crowd of them stays legible."""
-    _draw_lines(c, "hbond", overlay.lines, slots or {})
-
-
 def _draw_interactions(c: _Canvas, overlay: InteractionOverlay) -> list[str]:
     """The lines of every kind but H-bonds (gid ia:<kind>:<a>-<b>), in interactions.KINDS order: drawn after every
-    text in the figure (but the legend's and the title), so each keeps off the letters (turned_halos, link_keep), at
-    the H-bonds' depth (Z["hbond"]: under the elements, beads and letters). Returns the gids of those wholly under
-    text, not drawn (the figure's notes name them)."""
+    text in the figure (but the legend's and the title), so each keeps off the letters (text_halos turned,
+    link_keep), at the H-bonds' depth (Z["hbond"]: under the elements, beads and letters). Returns the gids of
+    those wholly under text, not drawn (the figure's notes name them)."""
     if not overlay.kinds:
         return []
     halos = {
-        w: turned_halos(c.ax, c.pt_per_unit, link_keep(c.loop_lw * 0.85 * w, c.pt_per_unit, c.fig.dpi))
+        w: text_halos(c.ax, c.pt_per_unit, link_keep(c.loop_lw * 0.85 * w, c.pt_per_unit, c.fig.dpi), turned=True)
         for w in dict.fromkeys(XL_WIDTH if part.kind in XL_KINDS else 1.0 for part in overlay.kinds)
     }  # a crosslink, wider, keeps further off
     return [
@@ -4640,8 +4613,7 @@ def _draw(
     _draw_axis_symbol(c, layout)
     outlines = _draw_domains(c, layout)
     _draw_sheet_panels(c, layout, outlines)
-    _draw_hbonds(c, hb.hbonds, hb.slots)  # the other kinds after every text: they keep off the letters
-    c.fig.foldmap_hbonds = hb.hbonds  # the H-bond lines (the interactive page reads foldmap_interactions)
+    _draw_lines(c, "hbond", hb.hbonds.lines, hb.slots or {})  # the other kinds after every text: off the letters
     c.fig.foldmap_interactions = hb  # every line drawn, and those the re-check flagged (provenance)
     c.fig.foldmap_counts_hidden = hidden
     c.fig.foldmap_crowded_marks = [  # ligand marks with no clear spot, drawn over other ink (Drawn.crowded_marks)
@@ -4665,7 +4637,7 @@ def _draw(
     _draw_ligands(c.ax, marks, c.lw, c.font, layout, c.pt_per_unit)
     _draw_linked(c.ax, linked, c.lw, c.font)
     _draw_uniprot(c.ax, umarks, layout, c.lw, c.font)
-    _draw_data_marks(c.ax, dmarks, c.lw)
+    _draw_data_marks(c.ax, dmarks, c.lw, c.look.background)
     c.fig.foldmap_interactions_hidden = _draw_interactions(c, hb)  # lines wholly under text (provenance)
     if c.bar_h:
         _draw_domain_bar(c, layout)

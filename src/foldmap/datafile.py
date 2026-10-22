@@ -35,6 +35,7 @@ from __future__ import annotations
 import csv
 import io
 import json
+import re
 from collections import Counter
 from pathlib import Path
 from statistics import median_low
@@ -149,10 +150,11 @@ def write(data: dict, path) -> Path:
     return path
 
 
-def spec_data(spec, sections: tuple[str, ...] = DEFAULT) -> dict:
+def spec_data(spec, sections: tuple[str, ...] = DEFAULT, name: str | None = None) -> dict:
     """The data of the figure a spec.FigureSpec describes: its structure read (io.read_model, its assembly) and laid
     out as `plot` lays it out (cli.make_layout: no routing, no drawing), then structure_data. The one route the
-    command line, the MCP server and the app take, so they give the same bytes."""
+    command line, the MCP server and the app take, so they give the same bytes. `name`: the structure's name in the
+    data (default its file's; the app names an uploaded structure as uploaded, not by the copy it keeps)."""
     from .cli import make_layout
     from .io import read_model
 
@@ -160,7 +162,7 @@ def spec_data(spec, sections: tuple[str, ...] = DEFAULT) -> dict:
     layout, sses, bb = make_layout(
         spec.structure, spec.mode, spec.rotate, spec.flip_v, model=model, **spec.layout_kwargs()
     )
-    return structure_data(layout, sses, bb, model, sections, name=str(spec.structure))
+    return structure_data(layout, sses, bb, model, sections, name=name or str(spec.structure))
 
 
 def zip_bytes(data: dict) -> bytes:
@@ -1301,13 +1303,23 @@ def tables(data: dict, names=None) -> dict[str, tuple[tuple[str, ...], list[list
     return out
 
 
+_FORMULA = ("=", "+", "-", "@", "\t", "\r")  # a spreadsheet reads a cell starting so as a formula
+_NUMERIC = re.compile(r"[-+]?\d+(\.\d+)?([eE][-+]?\d+)?[A-Za-z]?")  # a number, or a residue number (-7, -7A)
+
+
 def _cell(v) -> str:
-    """A value as a CSV cell: null empty, booleans true/false (as JSON), numbers as written in the JSON."""
+    """A value as a CSV cell: null empty, booleans true/false (as JSON), numbers as written in the JSON. Text read
+    from the structure (chain ids, residue and ligand names: a crafted mmCIF may hold anything) that a spreadsheet
+    would run as a formula (=, +, -, @ first) is written with a ' before it, unless it is a number or a residue
+    number (-7, -7A); the JSON keeps every value as it is."""
     if v is None:
         return ""
     if isinstance(v, bool):
         return "true" if v else "false"
-    return str(v)
+    text = str(v)
+    if isinstance(v, str) and text.startswith(_FORMULA) and not _NUMERIC.fullmatch(text):
+        return "'" + text
+    return text
 
 
 def csv_text(columns, rows) -> str:

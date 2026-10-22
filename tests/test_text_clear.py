@@ -430,3 +430,44 @@ def test_line_clearance_is_figchecks_pixels_at_the_drawn_text_size():
         lay.placed["B:1-10"] = Placed(fake_sse("H", 20, 29, chain="B"), width - 2.0, 0.0, 1.0, 0.0, 0.5)
         per_pt = page_text(lay)[1]
         assert line_clearance(lay) == pytest.approx((LINE_TEXT_CLEARANCE_PX + 0.5) * 0.72 * per_pt)
+
+
+def _halos_before(ax, pt_per_unit, keep, skip=()):
+    """render.text_halos as it was before the turned switch (section review 13b-13d, Minor 13), kept here to hold
+    the switch's off position to it."""
+    from foldmap import text_metrics
+    from foldmap.render import _ink_line, _reach
+
+    up_down = (text_metrics.ASCENT + text_metrics.DESCENT) / text_metrics.UNITS
+    out = []
+    for t in ax.texts:
+        words, gid = t.get_text(), t.get_gid() or ""
+        if not words.strip() or t.get_transform() != ax.transData or (skip and gid.startswith(tuple(skip))):
+            continue
+        size = t.get_fontsize() / pt_per_unit
+        ink, start = _ink_line(words, str(t.get_fontweight()) in ("bold", "700", "heavy", "black"))
+        x, y = t.get_position()
+        ha, va = t.get_horizontalalignment(), t.get_verticalalignment()
+        cx = x + {"left": -start[0], "right": start[0]}.get(ha, 0.0) * size
+        cy = y + {"bottom": up_down / 2, "top": -up_down / 2, "baseline": -start[1]}.get(va, 0.0) * size
+        turn = np.radians(t.get_rotation())
+        rot = np.array([[np.cos(turn), -np.sin(turn)], [np.sin(turn), np.cos(turn)]])
+        x0, y0, x1, y1 = _reach(ink @ rot.T * size + (cx, cy))
+        out.append((x0 - keep, y0 - keep, x1 + keep, y1 + keep))
+    return out
+
+
+def test_text_halos_off_its_turned_switch_are_the_boxes_they_always_were():
+    """Section review 13b-13d, Minor 13: turned_halos (the interaction lines') is text_halos(turned=True). Off, the
+    switch gives the very boxes text_halos gave before it, float for float, on a figure's texts and on turned ones of
+    every alignment and rotation mode; on, a turned text's box differs (placed as matplotlib places it)."""
+    from foldmap.render import text_halos
+
+    ax = drawn(DATA / "1UBQ.cif").figure.axes[0]
+    for ha, va, mode in (("left", "baseline", "anchor"), ("right", "top", "default"), ("center", "bottom", "default")):
+        ax.text(5.0, 5.0, "12 Ab", rotation=63.0, rotation_mode=mode, ha=ha, va=va, gid="turned")
+    for keep, skip in ((0.0, ()), (0.13, ()), (0.2, ("turned",))):
+        assert text_halos(ax, 17.5, keep, skip) == _halos_before(ax, 17.5, keep, skip)
+        assert text_halos(ax, 17.5, keep, skip, turned=False) == _halos_before(ax, 17.5, keep, skip)
+    turned = text_halos(ax, 17.5, 0.1, turned=True)
+    assert len(turned) == len(_halos_before(ax, 17.5, 0.1)) and turned[-3:] != _halos_before(ax, 17.5, 0.1)[-3:]

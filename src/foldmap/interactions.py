@@ -70,7 +70,7 @@ import gemmi
 import numpy as np
 from scipy.spatial import cKDTree
 
-from .hbonds import MAX_DIST, MIN_DIST, NUCLEIC, PROTEIN, _heavy, _kind, parse_selection
+from .hbonds import MAX_DIST, MIN_DIST, NUCLEIC, PROTEIN, heavy_atoms, parse_selection, polymer_kind
 from .model import ResLabel
 
 KINDS = ("hbond", "salt", "stack", "cation-pi", "hydrophobic")
@@ -159,7 +159,7 @@ def _residues(model, select) -> tuple[object, list[_Residue], list[str]]:
         c = names.index(chain.name)
         kept, seen = [], set()
         for res in chain:  # one residue per number, the first (microheterogeneity), as hbonds does
-            kind = _kind(res)
+            kind = polymer_kind(res)
             key = (res.seqid.num, res.seqid.icode.strip())
             if kind is not None and key not in seen:
                 seen.add(key)
@@ -169,12 +169,12 @@ def _residues(model, select) -> tuple[object, list[_Residue], list[str]]:
             label = ResLabel(chain.name, res.seqid.num, res.seqid.icode.strip(), res.name)
             first = bool(protein) and n == protein[0]
             last = bool(protein) and n == protein[-1]
-            out.append(_Residue(label, c, kind, _heavy(res), _elements(res), first, last))
+            out.append(_Residue(label, c, kind, heavy_atoms(res), _elements(res), first, last))
     return sel, out, names
 
 
 def _elements(res) -> dict[str, str]:
-    """The element of each heavy atom of a residue, by name, as `_heavy` reads the atoms."""
+    """The element of each heavy atom of a residue, by name, as `heavy_atoms` reads the atoms."""
     out: dict[str, str] = {}
     for atom in res:
         if atom.element.name not in ("H", "D"):
@@ -443,9 +443,9 @@ def find_hydrophobic(model, select) -> list[Interaction]:
 
 
 # The independent re-check. Nothing below calls a finder or its helpers (_residues, _rings, _cations, _charged,
-# _hydrophobic_carbons, _heavy, _kind): residues are read from the model again, rings are planes fitted by an
-# eigen-decomposition (the finders take an SVD), angles come from atan2 (the finders take arccos), and distances from
-# math.dist. Only the limits and the names of the rule's atoms are shared.
+# _hydrophobic_carbons, heavy_atoms, polymer_kind): residues are read from the model again, rings are planes fitted
+# by an eigen-decomposition (the finders take an SVD), angles come from atan2 (the finders take arccos), and
+# distances from math.dist. Only the limits and the names of the rule's atoms are shared.
 
 _V_SLACK = 0.5 / _GRID + 1e-5  # a measured value the finders' grid could place on a limit passes it
 _V_BONDED = _COVALENT + 0.5 / _GRID - 1e-5  # surely bonded, as the finders judge it
@@ -488,10 +488,13 @@ def _v_polymer(res) -> str | None:
     return None
 
 
-def _v_book(model) -> dict[tuple[str, str], _VRes]:
-    """(chain, residue tag) -> its polymer residue, the first of a number."""
+def _v_book(model, chains=None) -> dict[tuple[str, str], _VRes]:
+    """(chain, residue tag) -> its polymer residue, the first of a number; of the chains in `chains` only (None:
+    every chain). A chain is read whole, so its termini are found as in the whole model."""
     book: dict[tuple[str, str], _VRes] = {}
     for chain in model:
+        if chains is not None and chain.name not in chains:
+            continue
         order: list[tuple[tuple[str, str], str, object]] = []
         seen: set[tuple[str, str]] = set()
         for res in chain:
@@ -694,10 +697,14 @@ def verify_interactions(model, drawn) -> list[str]:
 
 
 def failing_lines(model, drawn) -> list[tuple[int, str]]:
-    """verify_interactions with each failing line's place in `drawn`: (index, text), in the order drawn."""
+    """verify_interactions with each failing line's place in `drawn`: (index, text), in the order drawn. Only the
+    chains the lines name are read (nothing when nothing is drawn)."""
+    drawn = list(drawn)
+    if not drawn:
+        return []
     if isinstance(model, tuple):
         model = model[0]
-    book = _v_book(model)
+    book = _v_book(model, {p[0] for x in drawn for p in (x.a, x.b)})
     out = []
     for n, x in enumerate(drawn):
         bad: list[str] = []

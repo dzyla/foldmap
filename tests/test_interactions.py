@@ -713,3 +713,24 @@ def test_the_re_check_flags_each_broken_rule():
     for model, line, word in cases:
         flagged = verify_interactions(model, [line])
         assert len(flagged) == 1 and word in flagged[0], (line, flagged)
+
+
+def test_the_re_check_reads_only_the_chains_its_lines_name(monkeypatch):
+    """Section review 13b-13d, Minor 16: nothing drawn reads nothing; else only the chains the lines name are read
+    (whole, so a chain's termini are those of the model), and the answer is the same as over every chain."""
+    from foldmap import interactions
+
+    real = interactions._v_book
+    asked = []
+
+    def counted(model, chains=None):
+        asked.append(chains)
+        return real(model, chains)
+
+    monkeypatch.setattr(interactions, "_v_book", counted)
+    assert interactions.failing_lines(_lambda(), []) == [] and asked == []
+    found = [x for x in find_salt_bridges(_lambda(), "na") if (x.a, x.b) == (("3", "19", "NZ"), ("1", "4", "OP1"))]
+    assert found and interactions.failing_lines(_lambda(), found) == []
+    assert asked == [{"1", "3"}]
+    whole, some = real(_lambda()[0]), real(_lambda()[0], asked[0])
+    assert some == {k: v for k, v in whole.items() if k[0] in asked[0]} and len(some) < len(whole)

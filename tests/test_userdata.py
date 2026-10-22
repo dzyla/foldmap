@@ -292,15 +292,18 @@ def test_a_layout_file_keeps_the_data_files_and_one_without_has_none(tmp_path, c
 
 def test_many_rows_not_used_are_said_up_to_twenty_then_counted(tmp_path, capsys):
     """13d-4 review: a large file with many residues the model lacks is said row by row up to SAID_ROWS, then 'and N
-    more'; the layout keeps every one."""
-    from foldmap.cli import SAID_ROWS
+    more'. Section review 13b-13d, Minor 8: the layout (and so the app's job result and the MCP result) keeps the
+    same, not one text per row."""
+    from foldmap.userdata import SAID_ROWS, rows_unused
 
     rows = "".join(f"A,{n},1\n" for n in range(100, 125))  # 25 residues 1UBQ lacks
     path = _csv(tmp_path, "chain,residue,uptake\nA,1,0.5\n" + rows)
     lay, _, _ = make_layout(UBQ, data=str(path))
-    assert len([p for p in lay.data_problems if " row " in p.where]) == 25
+    assert len([p for p in lay.data_problems if " row " in p.where]) == SAID_ROWS == 20
+    assert str(lay.data_problems[SAID_ROWS]) == f"--data {path}: and 5 more rows not used"
+    assert rows_unused(lay.data_problems) == 25
     err = capsys.readouterr().err
-    assert err.count(f"foldmap: warning: --data {path} row ") == SAID_ROWS == 20
+    assert err.count(f"foldmap: warning: --data {path} row ") == SAID_ROWS
     assert f"foldmap: warning: --data {path}: and 5 more rows not used\n" in err
 
 
@@ -352,3 +355,90 @@ def test_a_crafted_table_is_refused_without_filling_memory(tmp_path):
     short.write_text("chain,residue,value,note\nA,5,1.5\n")
     header, rows, problems = userdata._rows(short, "short.csv")
     assert problems == [] and rows == [(2, ["A", "5", "1.5", ""])]
+
+
+def test_a_crafted_cell_is_said_back_short_and_a_capsids_chains_are_counted(tmp_path):
+    """Section review 13b-13d, Minor 8: a problem says a cell back in at most ECHO_MAX characters, and names at most
+    CHAINS_SAID of the structure's protein chains (a capsid has hundreds), then how many more."""
+    from foldmap.userdata import CHAINS_SAID, ECHO_MAX
+
+    bb = _bb(("A", CHAIN_A), *((f"C{k}", CHAIN_B) for k in range(30)))
+    long = "x" * 5000
+    path = _csv(tmp_path, f"chain,residue,aa,v\nA,{long},M,1\nZ{long},1,M,2\nA,1,{long},3\nA,2,Q,4\n")
+    got, problems = read_residue_data(path, None, bb)
+    texts = [p.text for p in problems]
+    assert got.values == {("A", "2"): 4.0} and all(len(t) < 2 * ECHO_MAX + 200 for t in texts)
+    assert texts[0] == f"'{'x' * (ECHO_MAX - 1)}…' is no residue number (45, -7 or 100A); the row is not used"
+    assert texts[1].startswith(f"no protein chain Z{'x' * (ECHO_MAX - 2)}… in the structure; its protein chains are A,")
+    assert texts[1].endswith(f", C{CHAINS_SAID - 2} and {31 - CHAINS_SAID} more; the row is not used")
+    assert texts[2] == f"A 1 is MET in the structure, the row says {'x' * (ECHO_MAX - 1)}…; the row is not used"
+
+
+def test_a_column_of_more_categories_than_the_marks_tell_apart_is_refused(tmp_path):
+    """Section review 13b-13d, Important 6: 7 colours x 4 shapes tell 28 categories apart; a 29th would be drawn as
+    the first is, so a column of more is refused, naming what to do."""
+    from foldmap.render import DATA_CATEGORY_COLOURS, DATA_SHAPES
+    from foldmap.userdata import MAX_CATEGORIES
+
+    assert MAX_CATEGORIES == len(DATA_CATEGORY_COLOURS) * len(DATA_SHAPES) == 28
+    bb = _bb(("A", [(str(k), "GLY") for k in range(1, 31)]))
+    many = _csv(tmp_path, "chain,residue,word\n" + "".join(f"A,{k},w{k}\n" for k in range(1, 30)))
+    got, problems = read_residue_data(many, "word", bb)
+    assert got.values == {} and [p.text for p in problems if p.fatal] == [
+        "column word has 29 categories; at most 28 can be told apart: choose a column of numbers or one of fewer "
+        "categories (--data-column NAME)"
+    ]
+    fewer = _csv(tmp_path, "chain,residue,word\n" + "".join(f"A,{k},w{k % 28}\n" for k in range(1, 30)), "ok.csv")
+    got, problems = read_residue_data(fewer, "word", bb)
+    assert problems == [] and len(set(got.values.values())) == 28
+
+
+def test_the_value_columns_are_those_the_reader_may_read(tmp_path):
+    """Section review 13b-13d, Minor 11: the app's Column picker lists the columns read_residue_data may read: a
+    second column named like a residue column (number) is a value column there too."""
+    from foldmap.userdata import value_columns
+
+    assert value_columns(_csv(tmp_path, "chain,residue,icode,aa,number,ddG, \n")) == ["number", "ddG"]
+    assert value_columns(_csv(tmp_path, "", "empty.csv")) == [] and value_columns(tmp_path) == []
+
+
+def test_crosslinks_longer_than_their_span_are_said_up_to_twenty():
+    from foldmap.userdata import SAID_ROWS, crosslink_problems
+
+    links = [(("A", str(k)), ("B", "1"), 5.0) for k in range(25)]
+    out = crosslink_problems(links, [10.0] * 25, "xl.csv")
+    assert len(out) == SAID_ROWS + 1
+    assert str(out[-1]) == "--crosslinks xl.csv: and 5 more crosslinks longer than their span"
+    assert len(crosslink_problems(links[:3], [10.0] * 3, "xl.csv")) == 3
+
+
+def test_a_data_column_with_a_layout_file_that_names_no_data_is_a_usage_error(tmp_path, capsys):
+    """Section review 13b-13d, Minor 19: exit 2, as --data-column alone, not 1."""
+    plain = tmp_path / "plain.yaml"
+    assert main(["plot", str(UBQ), "-o", str(tmp_path / "x.svg"), "--save-layout", str(plain)]) == 0
+    capsys.readouterr()
+    args = ["plot", str(UBQ), "-o", str(tmp_path / "y.svg"), "--layout-file", str(plain), "--data-column", "v"]
+    assert main(args) == 2
+    assert "--data-column needs --data FILE.csv" in capsys.readouterr().err
+
+
+def test_a_layout_file_of_data_coloured_by_chain_redraws_by_chain(tmp_path, capsys):
+    """Section review 13b-13d, Important 5 (A13): a figure drawn with --data and color_by=chain asked for saves
+    color_by although it is the theme's, so the layout file redraws it by chain (data_look turns an unnamed colouring
+    to the data); one coloured by the data redraws by the data; without data nothing more is written."""
+    import yaml
+
+    data = _csv(tmp_path, "chain,residue,uptake\nA,1,0.5\nA,2,1\n")
+    args = ["plot", str(UBQ), "-o", str(tmp_path / "x.svg"), "--data", str(data)]
+    by_chain, by_data, again = tmp_path / "chain.yaml", tmp_path / "data.yaml", tmp_path / "again.yaml"
+    assert main([*args, "--set", "color_by=chain", "--save-layout", str(by_chain)]) == 0
+    assert yaml.safe_load(by_chain.read_text(encoding="utf-8"))["style"]["color_by"] == "chain"
+    assert figure_spec(UBQ, layout_file=by_chain).look.color_by == "chain"
+    redraw = ["plot", str(UBQ), "-o", str(tmp_path / "y.svg"), "--layout-file", str(by_chain)]
+    assert main([*redraw, "--save-layout", str(again)]) == 0
+    assert yaml.safe_load(again.read_text(encoding="utf-8"))["style"]["color_by"] == "chain"
+    assert main([*args, "--save-layout", str(by_data)]) == 0
+    assert figure_spec(UBQ, layout_file=by_data).look.color_by == "data"
+    plain = tmp_path / "plain.yaml"
+    assert main(["plot", str(UBQ), "-o", str(tmp_path / "z.svg"), "--save-layout", str(plain)]) == 0
+    assert "color_by" not in (yaml.safe_load(plain.read_text(encoding="utf-8")).get("style") or {})

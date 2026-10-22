@@ -889,3 +889,13 @@ def test_nucleic_tables_and_zip(tmp_path):
         ]
         assert zf.read("nucleic_acid.ct").decode() == ct_text(data)
         assert zf.read("nucleotides.csv").decode() == csv_text(*t["nucleotides"])
+
+
+def test_csv_cells_from_the_structure_never_start_a_spreadsheet_formula():
+    """Section review 13b-13d, Minor 20: a crafted mmCIF's chain id or residue name starting =, +, - or @ is written
+    with a ' before it in the CSV tables (a spreadsheet would run it); numbers and residue numbers (-7, -7A) are not,
+    and the JSON keeps every value as it is."""
+    rows = [["=HYPERLINK(1)", "+x", 5, "-7A"], ["@a", "-1", -3, "A"], ["\tz", "-1e5", 2.5, "-"]]
+    assert csv_text(("chain", "name", "n", "tag"), rows) == (
+        "chain,name,n,tag\n'=HYPERLINK(1),'+x,5,-7A\n'@a,-1,-3,A\n'\tz,-1e5,2.5,'-\n"
+    )

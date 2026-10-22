@@ -50,6 +50,21 @@ DISTANCE = ("distance", "dist", "length", "span", "maxdistance", "cutoff")  # th
 CROSSLINK_SPAN = 30.0
 EMPTY = {"", "na", "n/a", "nan", "none", "null"}  # cells that hold no value (any case)
 _NUMBER = re.compile(r"(-?\d+)\s*([A-Za-z]?)")
+SAID_ROWS = 20  # rows of a file said one by one (each a Problem), the rest counted in one; also the most lines of
+# data problems the app and the MCP server's note say (the structured MCP result lists every Problem kept)
+ECHO_MAX = 40  # characters of a cell said back in a problem (a crafted cell is not repeated whole)
+MAX_CATEGORIES = 28  # categories a column may hold: render.DATA_CATEGORY_COLOURS x DATA_SHAPES marks told apart
+CHAINS_SAID = 12  # the structure's protein chains named when a row's chain is none of them (a capsid has hundreds)
+
+
+def _echo(cell: str) -> str:
+    """A cell as a problem says it back: quoted, at most ECHO_MAX characters."""
+    return repr(cell if len(cell) <= ECHO_MAX else cell[: ECHO_MAX - 1] + "…")
+
+
+def _brief(name: str) -> str:
+    """A chain or residue name from a cell, at most ECHO_MAX characters."""
+    return name if len(name) <= ECHO_MAX else name[: ECHO_MAX - 1] + "…"
 
 
 @dataclass(frozen=True)
@@ -152,7 +167,11 @@ class _Residues:
     def no_chain(self, chain: str) -> str:
         if chain in self.na_chains:
             return f"chain {chain} is a nucleic acid; only protein residues are read"
-        return f"no protein chain {chain} in the structure; its protein chains are {', '.join(self.names) or 'none'}"
+        names = list(self.names)
+        listed = ", ".join(names[:CHAINS_SAID]) or "none"
+        if len(names) > CHAINS_SAID:
+            listed += f" and {len(names) - CHAINS_SAID} more"
+        return f"no protein chain {_brief(chain)} in the structure; its protein chains are {listed}"
 
     def no_residue(self, chain: str, tag: str) -> str:
         lo, hi = self.span[chain]
@@ -188,9 +207,20 @@ class _Reader:
         self.problems: list[Problem] = []
         self.copied: dict[str, list[str]] = {}
         self.suffix: dict[str, str] = {}  # assembly copy -> the digits after its chain's name (A2 -> 2)
+        self.said = 0  # rows said so far
+        self.unsaid: dict[str, int] = {}  # past SAID_ROWS: what befell the rows not said -> how many
+
+    def say(self, number: int, text: str, befell: str = "not used") -> None:
+        """A problem of row `number`: the file's first SAID_ROWS said one by one, then only counted by what befell
+        them (notes says how many)."""
+        self.said += 1
+        if self.said <= SAID_ROWS:
+            self.problems.append(Problem(f"{self.where} row {number}", text, False))
+        else:
+            self.unsaid[befell] = self.unsaid.get(befell, 0) + 1
 
     def row(self, number: int, text: str) -> None:
-        self.problems.append(Problem(f"{self.where} row {number}", text + "; the row is not used", False))
+        self.say(number, text + "; the row is not used")
 
     def end(self, number: int, chain: str | None, cell: str, icode: str = "", resname: str = ""):
         """[(chain, tag)] the row's residue is in the structure (one per copy), or None (said for the row)."""
@@ -201,7 +231,7 @@ class _Reader:
             return None
         tag = _tag(cell, icode)
         if tag is None:
-            self.row(number, f"{cell!r} is no residue number (45, -7 or 100A)")
+            self.row(number, f"{_echo(cell)} is no residue number (45, -7 or 100A)")
             return None
         chains = self.res.copies(chain, self.named)
         if not chains:
@@ -217,14 +247,19 @@ class _Reader:
                 self.row(number, self.res.no_residue(c, tag))
                 return None
             if resname and not _same_residue(resname, name):
-                self.row(number, f"{c} {tag} is {name} in the structure, the row says {resname}")
+                self.row(number, f"{c} {tag} is {name} in the structure, the row says {_brief(resname)}")
                 return None
             found.append((c, tag))
         return found
 
     def notes(self) -> list[Problem]:
-        """One warning per chain read for its assembly copies."""
-        return [
+        """How many rows were not said (past SAID_ROWS), by what befell them; one warning per chain read for its
+        assembly copies."""
+        unsaid = [
+            Problem(self.where, f"and {n} more row{'s' if n > 1 else ''} {befell}", False)
+            for befell, n in self.unsaid.items()
+        ]
+        return unsaid + [
             Problem(
                 self.where,
                 f"chain {chain} is drawn as its assembly copies {', '.join(copies)}; each copy takes chain {chain}'s "
@@ -236,7 +271,23 @@ class _Reader:
 
 
 def _header_problem(where: str, header: list[str], text: str) -> Problem:
-    return Problem(where, f"{text}; its columns are {', '.join(header) or 'none'}", True)
+    return Problem(where, f"{text}; its columns are {', '.join(_brief(h) for h in header) or 'none'}", True)
+
+
+def _columns(header: list[str]) -> tuple[int | None, int | None, int | None, int | None, list[int]]:
+    """(chain, residue, insertion-code and residue-name columns, each the first so named or None; the others, which
+    may hold values) of a data table's header."""
+    ids = tuple(_find(header, names) for names in (CHAIN, RESIDUE, ICODE, RESNAME))
+    return (*ids, [k for k in range(len(header)) if k not in ids])
+
+
+def value_columns(path) -> list[str]:
+    """The names of a data table's columns that may hold values, as read_residue_data reads its header (every
+    column but its chain, residue, insertion-code and residue-name columns); [] for a table that cannot be read."""
+    header, _, problems = _rows(path, "data")
+    if problems:
+        return []
+    return [header[k] for k in _columns(header)[4] if header[k].strip()]
 
 
 def _number(cell: str) -> float | None:
@@ -265,8 +316,7 @@ def read_residue_data(path, column: str | None, bb, *, na_chains=()) -> tuple[Re
     header, rows, problems = _rows(path, where)
     if problems:
         return ResidueData(column or "", "number", {}), problems
-    chain_k, residue_k = _find(header, CHAIN), _find(header, RESIDUE)
-    icode_k, resname_k = _find(header, ICODE), _find(header, RESNAME)
+    chain_k, residue_k, icode_k, resname_k, candidates = _columns(header)
     residues = _Residues(bb, na_chains)
     empty = ResidueData(column or "", "number", {})
     if residue_k is None:
@@ -274,8 +324,6 @@ def read_residue_data(path, column: str | None, bb, *, na_chains=()) -> tuple[Re
     if chain_k is None and len(residues.names) != 1:
         text = f"no chain column, and the structure has protein chains {', '.join(residues.names) or 'none'}"
         return empty, [_header_problem(where, header, text)]
-    ids = {chain_k, residue_k, icode_k, resname_k}
-    candidates = [k for k in range(len(header)) if k not in ids]
     numeric = [k for k in candidates if all(_is_number(cells[k]) for _, cells in rows)]
     if column is not None:
         value_k = next((k for k in candidates if header[k] == column), None)
@@ -289,7 +337,7 @@ def read_residue_data(path, column: str | None, bb, *, na_chains=()) -> tuple[Re
     else:
         value_k = numeric[0]
         if len(numeric) > 1:
-            others = ", ".join(header[k] for k in numeric[1:])
+            others = ", ".join(_brief(header[k]) for k in numeric[1:])
             text = (
                 f"read column {header[value_k]}, the first of numbers; the file also has {others} (--data-column NAME)"
             )
@@ -318,7 +366,7 @@ def read_residue_data(path, column: str | None, bb, *, na_chains=()) -> tuple[Re
         if kind == "number":
             value = _number(cell)
             if value is not None and not math.isfinite(value):
-                reader.row(number, f"{header[value_k]} {cell!r} is not a finite number")
+                reader.row(number, f"{header[value_k]} {_echo(cell)} is not a finite number")
                 continue
         else:
             value = None if cell.lower() in EMPTY else cell
@@ -332,6 +380,13 @@ def read_residue_data(path, column: str | None, bb, *, na_chains=()) -> tuple[Re
         problems.append(Problem(where, text, True))
     elif not values:
         problems.append(Problem(where, f"no row gives a value in column {header[value_k]}", True))
+    elif kind == "category" and len(set(values.values())) > MAX_CATEGORIES:
+        text = (
+            f"column {_brief(header[value_k])} has {len(set(values.values()))} categories; at most {MAX_CATEGORIES} "
+            "can be told apart: choose a column of numbers or one of fewer categories (--data-column NAME)"
+        )
+        problems.append(Problem(where, text, True))
+        values = {}
     return ResidueData(header[value_k], kind, dict(sorted(values.items(), key=_order(bb)))), problems
 
 
@@ -393,13 +448,8 @@ def read_crosslinks(path, bb, *, na_chains=()) -> tuple[list[Crosslink], list[Pr
             except ValueError:
                 distance = math.nan
             if distance is not None and not math.isfinite(distance):
-                reader.problems.append(
-                    Problem(
-                        f"{where} row {number}",
-                        f"distance {cells[distance_k]!r} is no number; the crosslink is read without one",
-                        False,
-                    )
-                )
+                text = f"distance {_echo(cells[distance_k])} is no number; the crosslink is read without one"
+                reader.say(number, text, "read without a distance")
                 distance = None
         pairs = _pairs(*found, reader.suffix)
         if not pairs:
@@ -449,6 +499,14 @@ def summary(values: ResidueData | None, links: list | None, data=None, crosslink
     return out
 
 
+def rows_unused(problems: list) -> int:
+    """How many rows of a file its problems (read_residue_data's or read_crosslinks') say were not used: those said
+    one by one and those counted past SAID_ROWS."""
+    said = sum(1 for p in problems if " row " in p.where and p.text.endswith("; the row is not used"))
+    counted = (re.fullmatch(r"and (\d+) more rows? not used", p.text) for p in problems if " row " not in p.where)
+    return said + sum(int(m[1]) for m in counted if m)
+
+
 def crosslink_lengths(links: list, bb) -> list[float]:
     """The Cα–Cα distance (Å, rounded to 0.001) of each crosslink, measured on the structure as read (`bb`, the
     backbone the files were read on), in the order of `links`."""
@@ -476,13 +534,18 @@ def over_span(link, length: float) -> bool:
 def crosslink_problems(links: list, lengths: list[float], crosslinks, drawn=None) -> list:
     """A warning for each crosslink whose ends lie further apart (Cα–Cα, in the structure) than its crosslinker
     spans: drawn all the same, dashed (when both its chains are among `drawn`, None: all), so the figure shows what
-    the structure cannot explain."""
+    the structure cannot explain. The first SAID_ROWS said one by one, the rest counted in one more."""
     out = []
+    where = f"--crosslinks {crosslinks}"
     for link, length in zip(links, lengths):
         if over_span(link, length):
             span = link[2] if link[2] is not None else CROSSLINK_SPAN
             text = f"crosslink {crosslink_name(link)}: Cα–Cα {length:.1f} Å, longer than its {span:g} Å span"
             if drawn is None or (link[0][0] in drawn and link[1][0] in drawn):
                 text += " (drawn dashed)"
-            out.append(Problem(f"--crosslinks {crosslinks}", text, False))
+            out.append(Problem(where, text, False))
+    if len(out) > SAID_ROWS:
+        more = len(out) - SAID_ROWS
+        text = f"and {more} more crosslink{'s' if more > 1 else ''} longer than {'their' if more > 1 else 'its'} span"
+        out = [*out[:SAID_ROWS], Problem(where, text, False)]
     return out

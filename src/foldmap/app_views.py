@@ -172,13 +172,11 @@ DOMAINS_EDIT = "Edit Domains to remove them; an edit there checks every range." 
 # read leniently only while unchanged (app.layout_options)
 
 
-DATA_SAID = 20  # data warnings listed under the figure (the command line's SAID_ROWS), then how many more
-
-
 def data_problems_text(ss, problems: list[str]) -> str:
     """What the figure's notes say of the researcher's tables (Layout.data_problems), one line each (at most
-    DATA_SAID, then how many more), each table named as uploaded, never by its kept path."""
+    userdata.SAID_ROWS, then how many more), each table named as uploaded, never by its kept path."""
     from foldmap.app import local_files
+    from foldmap.userdata import SAID_ROWS
 
     names = uploads_of(ss)
 
@@ -187,9 +185,9 @@ def data_problems_text(ss, problems: list[str]) -> str:
             text = text.replace(kept, name)
         return shown(text, paths=not local_files())
 
-    lines = [own(t) for t in problems[:DATA_SAID]]
-    if len(problems) > DATA_SAID:
-        lines.append(f"… and {len(problems) - DATA_SAID} more")
+    lines = [own(t) for t in problems[:SAID_ROWS]]
+    if len(problems) > SAID_ROWS:
+        lines.append(f"… and {len(problems) - SAID_ROWS} more")
     return "Your data:  \n" + "  \n".join(lines)
 
 
@@ -496,20 +494,23 @@ def figure_downloads(
     return out
 
 
-def data_downloads(path: str, blob: str, stem: str, lim: app_jobs.Limits) -> list[Download]:
-    """The figure's data (app_jobs.data_file): the JSON `foldmap data` writes, and its CSV tables in a zip."""
+def data_downloads(
+    path: str, blob: str, stem: str, lim: app_jobs.Limits, uploaded: str | None = None
+) -> list[Download]:
+    """The figure's data (app_jobs.data_file): the JSON `foldmap data` writes, and its CSV tables in a zip.
+    `uploaded`: an uploaded structure's name as uploaded, which the data name it by (not the copy kept)."""
     return [
         Download(
             "dl_data_json",
             "Data · JSON",
-            partial(app_jobs.data_file, path, blob, "json", lim),
+            partial(app_jobs.data_file, path, blob, "json", lim, uploaded),
             f"{stem}-data.json",
             "application/json",
         ),
         Download(
             "dl_data_zip",
             "Data · CSV tables (zip)",
-            partial(app_jobs.data_file, path, blob, "zip", lim),
+            partial(app_jobs.data_file, path, blob, "zip", lim, uploaded),
             f"{stem}-data.zip",
             "application/zip",
         ),
@@ -583,7 +584,7 @@ def download_menu(ws: Workspace) -> None:
     if offered is None:
         st.caption("Nothing to download until the figure draws.")
     else:  # the figure's data: the figure offered above (its settings), laid out again when clicked
-        buttons(data_downloads(ws.path, offered[0], ws.name, ws.lim))
+        buttons(data_downloads(ws.path, offered[0], ws.name, ws.lim, ss.get("structure_uploaded") or None))
     st.markdown("**Sequence**")
     if ss.get("seq_drawn"):
         blob, view_json = ss["seq_drawn"]

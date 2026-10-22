@@ -34,7 +34,7 @@ from .frame import (
 )
 from .io import load_backbone, load_links, load_nucleic, read_model
 from .layout import (
-    _RES_RANGE,
+    RES_RANGE,
     SCALE,
     AmbiguousName,
     accessory_lines,
@@ -420,9 +420,6 @@ def _na_extent(na, extent: str):
     return na, False
 
 
-SAID_ROWS = 20  # rows not used said one by one, per file; the rest counted (all kept in Layout.data_problems)
-
-
 def _left_out(values, links, drawn: set[str], data, crosslinks) -> list:
     """Notes (spec.Problem warnings) for the values and crosslinks read on chains the figure leaves out (--chains,
     --focus): read, not drawn."""
@@ -452,20 +449,9 @@ def _read_user_data(data, column, crosslinks, bb, na_chains):
     from .userdata import read_user_data, summary
 
     values, links, problems = read_user_data(data, column, crosslinks, bb, na_chains=na_chains)
-    said: dict[str, int] = {}  # file -> rows said: the first SAID_ROWS of each, then how many more
-    for problem in problems:
-        if problem.fatal:
-            continue
-        name, row, _ = problem.where.partition(" row ")
-        if row:
-            said[name] = said.get(name, 0) + 1
-            if said[name] > SAID_ROWS:
-                continue
-        print(f"foldmap: warning: {problem}", file=sys.stderr)
-    for name, count in said.items():
-        if count > SAID_ROWS:
-            more = count - SAID_ROWS
-            print(f"foldmap: warning: {name}: and {more} more row{'s' if more > 1 else ''} not used", file=sys.stderr)
+    for problem in problems:  # userdata says the first SAID_ROWS rows of a file, then how many more
+        if not problem.fatal:
+            print(f"foldmap: warning: {problem}", file=sys.stderr)
     for problem in problems:
         if problem.fatal:
             raise BadReference(problem)
@@ -1377,7 +1363,7 @@ def _domains(
         return auto_domains(sses, contacts, rows, copies, lent, bb=bb)
     typed = [] if isinstance(spec, SavedDomains) else stale_domain_ids(spec, sses)  # typed ids naming no element
     for name, i in typed:  # A:1-60 is read as the range res:A:1-60 (Q-A19); a range that will not parse is an error
-        if _RES_RANGE.fullmatch(i.split(":", 1)[1]) is None:
+        if RES_RANGE.fullmatch(i.split(":", 1)[1]) is None:
             raise ValueError(
                 f"domain {name!r}: {i!r} is no element; write a residue range as res:CHAIN:FIRST-LAST "
                 "(e.g. res:A:1-60), or name elements by label (α1, A:G)"
@@ -1496,7 +1482,7 @@ def make_figure(path, *args, **kwargs):
     return make_figure_and_loops(path, *args, **kwargs)[0]
 
 
-def _adjustments(args) -> dict:
+def adjustments(args) -> dict:
     rename, swap, move = {}, [], []
     for item in args.rename:
         ref, sep, name = item.partition("=")
@@ -1523,17 +1509,27 @@ def _adjustments(args) -> dict:
     }
 
 
+def _layout_data(layout_file) -> bool:
+    """Whether a layout file (None: none given) names a data table, which --data-column may name a column of."""
+    if not layout_file:
+        return False
+    from . import layoutfile
+
+    lay = layoutfile.load(layout_file).get("layout")
+    return isinstance(lay, dict) and lay.get("data") is not None
+
+
 def _spec_of(args) -> FigureSpec:
     """The figure the command line asks for: a layout file (if given) overlaid by the options given."""
     shorthand = [
         f"{k}={v}" for k, v in (("palette", args.palette), ("fill", args.style), ("loops", args.loops)) if v is not None
     ]
-    edits = _adjustments(args)
+    edits = adjustments(args)
     try:
         domains = _domain_spec(args.domain)
     except ValueError as err:  # --domain N= : a usage error, as a reference that cannot be drawn is
         raise UsageError(f"error: {err}") from None
-    if args.data_column and not args.data and not args.layout_file:
+    if args.data_column and not args.data and not _layout_data(args.layout_file):
         raise UsageError("error: --data-column needs --data FILE.csv (the table it is a column of)")
     spec = figure_spec(
         args.structure,

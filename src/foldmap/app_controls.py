@@ -33,7 +33,8 @@ from foldmap.app_edits import (
     upload_types,
     wrong_upload,
 )
-from foldmap.render import SITE_GROUPS
+from foldmap.interactions import KINDS
+from foldmap.render import INTERACTION_NAMES, SITE_GROUPS
 from foldmap.style import CHOICES, THEMES, hbonds_superseded
 
 
@@ -149,13 +150,8 @@ def show_section(st, ss: MutableMapping) -> None:
             nucleic_block(st, ss)
 
 
-INTERACTIONS = {  # interactions.KINDS -> the checkbox's label
-    "hbond": "H-bonds",
-    "salt": "Salt bridges",
-    "stack": "π-stacking",
-    "cation-pi": "Cation-π",
-    "hydrophobic": "Hydrophobic",
-}
+INTERACTIONS = {kind: INTERACTION_NAMES[kind] for kind in KINDS}  # interactions.KINDS -> the checkbox's label
+# (the legend's name of the kind)
 BETWEEN = {"auto": "auto", "na": "protein–DNA/RNA", "interchain": "interchain", "chains": "chain pairs"}
 
 
@@ -663,7 +659,7 @@ def reference_problems(ss: MutableMapping, kind: str) -> list:
     the command line and the MCP server check them): a range written without res: read as one (a warning), a form
     that will not parse (an error). Element ids of the figure drawn (an assembly copy's A1:3-7) are no warning; a
     layout file's domains, unchanged, are its element ids and not checked."""
-    from foldmap.cli import _adjustments
+    from foldmap.cli import adjustments
     from foldmap.spec import FigureSpec, Problem, check_references, parse_domains
     from foldmap.style import Style
 
@@ -678,7 +674,7 @@ def reference_problems(ss: MutableMapping, kind: str) -> list:
             given = {"look": Style(mark=text)}
         else:  # the command line's own parsers, as app.layout_options reads them
             args = SimpleNamespace(**{"rename": [], "swap": [], "move": [], "up": None, "view": None, kind: items})
-            given = {kind: _adjustments(args)[kind]}
+            given = {kind: adjustments(args)[kind]}
     except ValueError as err:
         return [Problem(kind, str(err), True)]
     elements = {f"{e['chain']}:{e['first']}-{e['last']}" for e in ss.get("elements") or []}
@@ -840,7 +836,6 @@ CROSSLINKS_HELP = (
     "DSS/BS3, when not given): each crosslink is a solid line between its residues, dashed when its Cα–Cα distance "
     "in the structure is longer than its span"
 )
-_NOT_VALUES = ("chain", "chainid", "chainname", "authasymid", "icode", "insertioncode", "inscode", "pdbxpdbinscode")
 
 
 def data_section(st, ss: MutableMapping) -> None:
@@ -891,31 +886,20 @@ def missing_tables(ss: MutableMapping) -> list[str]:
     """A layout file's data or crosslinks tables that are not on this machine, as shown (hosted: never a path)."""
     from foldmap.app import local_files
 
-    return [shown(p, paths=not local_files()) for p in ss.get("data_missing") or []]
-
-
-def table_columns(path) -> list[str]:
-    """The value columns of a data table: its header's names but the chain, residue, insertion-code and
-    residue-name columns."""
-    from foldmap.userdata import RESIDUE, RESNAME, _key, _rows
-
-    header, _, problems = _rows(path, "data")
-    if problems:
-        return []
-    skip = {*_NOT_VALUES, *RESIDUE, *RESNAME}
-    return [h for h in header if h.strip() and _key(h) not in skip]
+    missing = ss.get("data_missing")  # kind (data, crosslinks) -> the path the layout file gave
+    return [shown(p, paths=not local_files()) for p in (missing.values() if isinstance(missing, dict) else [])]
 
 
 def store_table(ss: MutableMapping, kind: str) -> None:
     """The data (`kind` "data") or crosslinks uploader's callback: the table, size-capped, kept (fetch.keep_upload)
-    and read against the structure drawn (userdata, as the command line reads --data and --crosslinks): a fatal
-    problem is said (`<kind>_error`) and the table not used; else `<kind>_path` is set, with a line saying what was
-    read and (data) the value columns for the Column picker. Data loaded colour the figure by them when the theme
-    colours by chain (app.data_colouring), as on the command line."""
-    from foldmap.app import data_colouring
+    and read against the structure drawn (app_jobs.table_job, run under the session's limits as every structure
+    read): a fatal problem is said (`<kind>_error`) and the table not used; else `<kind>_path` is set, with a line
+    saying what was read and (data) the value columns for the Column picker, and a layout file's warning that this
+    table is missing goes. Data loaded colour the figure by them when the theme colours by chain
+    (app.data_colouring), as on the command line."""
+    from foldmap import app_jobs
+    from foldmap.app import data_colouring, local_files
     from foldmap.fetch import TABLE_SUFFIXES, keep_upload
-    from foldmap.io import load_backbone
-    from foldmap.userdata import read_crosslinks, read_residue_data, summary
 
     ss["last_changed"] = f"{kind}_path"
     up = ss.get(f"{kind}_upload")
@@ -932,33 +916,35 @@ def store_table(ss: MutableMapping, kind: str) -> None:
         data_colouring(ss)
         return
     target = None
+    lim = app_jobs.limits(hosted=not local_files())
     try:
         data = up.getvalue()
         if len(data) > TABLE_MAX:
             raise ValueError(f"{name}: a table is at most {TABLE_MAX // MB} MB")
         target = keep_upload(up.name, data, TABLE_SUFFIXES)
-        bb = load_backbone(ss["path"], ss.get("assembly") or "auto")
-        if kind == "data":
-            values, problems = read_residue_data(target, None, bb)
-            said = summary(values, None, name)
-        else:
-            links, problems = read_crosslinks(target, bb)
-            said = summary(None, links, crosslinks=name)
-        fatal = next((p for p in problems if p.fatal), None)
-        if fatal is not None:
-            raise ValueError(f"{name}: {fatal.text}")
-    except (ValueError, OSError) as err:
-        text = str(err) if isinstance(err, ValueError) else "the table could not be stored; try again"
+        read = app_jobs.run_job(
+            app_jobs.table_job, ss["path"], str(target), kind, ss.get("assembly") or "auto", limits=lim
+        )
+        if read["fatal"]:
+            raise ValueError(f"{name}: {read['fatal']}")
+    except (ValueError, OSError, RuntimeError, app_jobs.JobLimit) as err:
+        if isinstance(err, ValueError):
+            text = str(err)
+        elif isinstance(err, OSError) and target is None:
+            text = "the table could not be stored; try again"
+        else:  # over a limit, the structure unreadable, a bug: app_jobs.explain's words
+            text = app_jobs.explain(err, name, lim)[0]
         ss.update({**clear, f"{kind}_error": text.replace(str(target), name) if target else text})
         data_colouring(ss)
         return
-    unused = sum(1 for p in problems if not p.fatal)
-    line = said[0].split(": ", 1)[-1] if said else ""
+    unused = read["unused"]
+    line = read["read"]
     line += f"; {unused} row{'s' if unused > 1 else ''} not used (named under the figure)" if unused else ""
     ss.update({**clear, f"{kind}_path": str(target), f"{kind}_read": line, f"{kind}_uploaded": (str(target), name)})
     if kind == "data":
-        ss["data_columns"] = table_columns(target)
-    ss["data_missing"] = []
+        ss["data_columns"] = read["columns"]
+    missing = ss.get("data_missing")
+    ss["data_missing"] = {k: p for k, p in missing.items() if k != kind} if isinstance(missing, dict) else {}
     data_colouring(ss)
 
 

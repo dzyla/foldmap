@@ -81,18 +81,18 @@ from foldmap.app_controls import (
     setting,
     show_section,
     style_section,
-    table_columns,
     touched,
 )
 from foldmap.app_edits import chain_choices, shown, upload_name, upload_types, wrong_upload
 from foldmap.app_views import Workspace, download_menu, explorer_view, figure_view, said, sequence_view
-from foldmap.cli import _adjustments, _domain_spec
+from foldmap.cli import _domain_spec, adjustments
 from foldmap.fetch import DOWNLOAD_MAX, fetch, source_id
 from foldmap.names import KEYWORDS as NAME_KEYWORDS
 from foldmap.spec import MEMBRANES, MODES, FigureSpec, SavedDomains, parse_flag, parse_protomers
 from foldmap.spec import layout_document as spec_document
-from foldmap.style import _KEY_ALIASES, CHOICES, THEMES, Style
+from foldmap.style import _KEY_ALIASES, CHOICES, THEMES, Style, yaml_off
 from foldmap.symmetry import TOLERANCE
+from foldmap.userdata import value_columns
 
 STYLE_FIELDS = {f.name: f.type for f in fields(Style)}
 PREVIEW_THEMES = [  # shown in the style picker as static thumbnails (scripts/make_previews.py)
@@ -196,8 +196,14 @@ EXAMPLES = {"1LMB": "λ repressor–DNA", "5NKT": "FimA", "8UTF": "measles F", "
 
 # ---------------------------------------------------------------------------------------------- core
 def look_of(settings: dict) -> Style:
+    """The settings' Style: the theme's, with the settings' style values. Colour by data with no data loaded (a
+    session's colouring outliving its data) is the theme's colouring, as data_colouring makes it: never a figure
+    all grey."""
     base = THEMES[settings.get("theme", "publication")]
-    return replace(base, **{k: v for k, v in settings.items() if k in STYLE_FIELDS}).validate()
+    given = {k: v for k, v in settings.items() if k in STYLE_FIELDS}
+    if given.get("color_by") == "data" and not settings.get("data_path"):
+        given["color_by"] = base.color_by
+    return replace(base, **given).validate()
 
 
 def layout_options(settings: dict) -> dict:
@@ -231,7 +237,7 @@ def layout_options(settings: dict) -> dict:
         "data_column": (settings.get("data_column") or None) if settings.get("data_path") else None,
         "crosslinks": settings.get("crosslinks_path") or None,
         "chains": [c.strip() for c in (settings.get("chains") or "").split(",") if c.strip()] or None,
-        **_adjustments(Args),
+        **adjustments(Args),
         **{k: settings[k] for k in HIDDEN_LAYOUT if k in settings},
     }
 
@@ -284,6 +290,8 @@ def sequence_figure(path, settings: dict, view: dict):
         ss_colour=view.get("ss_colour", "figure"),
         title=settings.get("title") or None,
         msa=msa or None,
+        data=settings.get("data_path") or None,  # the same stripes and marks as the figure (color_by=data)
+        data_column=(settings.get("data_column") or None) if settings.get("data_path") else None,
     )
 
 
@@ -347,8 +355,7 @@ def _number(key: str, value, low: float, high: float) -> float:
 def _style_value(key: str, value):
     """A style value of a layout file, of its Style field's type."""
     kind = STYLE_FIELDS[key]
-    if key == "interactions" and value is False:  # unquoted `off` in YAML
-        return "off"
+    value = yaml_off(key, value)  # unquoted `off` in YAML
     if kind == "bool":
         if not isinstance(value, bool):
             raise ValueError(f"{key} must be true or false; got {layoutfile._brief(value)}")
@@ -454,13 +461,13 @@ def settings_from_document(doc: dict) -> dict:
     msa = _text("msa", given.get("msa", ""))
     out["msa_path"] = msa if msa and local_files() and Path(msa).is_file() else ""  # no server paths when hosted
     out["msa_missing"] = msa if msa and not out["msa_path"] else ""  # saved on another machine
-    missing = []  # the data and crosslinks tables, as the alignment: read only from this machine, never hosted
+    missing = {}  # the data and crosslinks tables, as the alignment: read only from this machine, never hosted
     for key in ("data", "crosslinks"):
         given_path = _text(key, given.get(key, ""))
         kept = given_path if given_path and local_files() and Path(given_path).is_file() else ""
         out[f"{key}_path"] = kept
-        missing += [given_path] if given_path and not kept else []
-    out["data_missing"] = missing
+        missing.update({key: given_path} if given_path and not kept else {})
+    out["data_missing"] = missing  # kind -> the path given (an upload of that kind clears its own)
     out["data_column"] = _text("data_column", given.get("data_column", "")) if out["data_path"] else ""
     if out.get("color_by") == "data" and not out["data_path"]:  # colour by data is offered only with data loaded
         out["color_by"] = THEMES[theme].color_by
@@ -780,9 +787,19 @@ def reset_structure(ss: MutableMapping) -> None:
     look = THEMES[ss.get("theme", "publication")]
     for key in STRUCTURE_STYLE:
         ss[key] = getattr(look, key)
-    for key in ("msa_path", "msa_error", "msa_reference", "msa_missing", "layout_error", "data_error", "data_read"):
+    for key in (
+        "msa_path",
+        "msa_error",
+        "msa_reference",
+        "msa_missing",
+        "layout_error",
+        "data_error",
+        "data_read",
+        "crosslinks_error",
+        "crosslinks_read",
+    ):
         ss[key] = ""
-    ss["names_missing"], ss["msa_rows"], ss["data_missing"], ss["data_columns"] = [], [], [], []
+    ss["names_missing"], ss["msa_rows"], ss["data_missing"], ss["data_columns"] = [], [], {}, []
     ss["_synced"] = {}
     from foldmap.app_edits import EDITORS
 
@@ -807,6 +824,7 @@ def reset_structure(ss: MutableMapping) -> None:
         ss.pop(key, None)
     ss["auto_redraw"] = True
     ss["pane"] = "Figure"
+    data_colouring(ss)  # the last structure's data are gone: its colouring by them too
 
 
 def apply_document(ss: MutableMapping, settings: dict) -> None:
@@ -861,7 +879,7 @@ def apply_layout_file(ss: MutableMapping) -> None:
     ss["layout_error"] = ""
     apply_document(ss, settings)
     ss["msa_rows"] = alignment_rows(ss.get("msa_path", ""))
-    ss["data_columns"] = table_columns(ss["data_path"]) if ss.get("data_path") else []
+    ss["data_columns"] = value_columns(ss["data_path"]) if ss.get("data_path") else []
 
 
 def layout_file_section(st, ss: MutableMapping) -> None:
@@ -1014,6 +1032,7 @@ def main() -> None:
             chains_total={"assembly": "auto", "count": result["chain_count"]},  # reset_structure: auto
             assemblies=size["assemblies"],
             share_id="" if file or local_path else source_id(text) or "",
+            structure_uploaded=upload_name(file[0]) if file else "",  # the data download names it so
             stage="edit",
             load_error="",
             uniprot_for="",
