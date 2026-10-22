@@ -27,7 +27,9 @@ align.element_mates. From those:
   angle does not depend on the core: where the core settles between two domains that moved (MBP at d0: N 20.2,
   C 16.1 degrees), the turns split the hinge and the own-fit angle still gives it whole (MBP N/C 36.2 against the
   published 35 plus an 8 degree twist; lactoferrin N1/N2 53.9 against 54; plan 13e-3's report);
-- contacts: element and interface changes measured as foldmap data's tables measure them (_contacts).
+- contacts: element and interface changes measured as foldmap data's tables measure them (_contacts), B's partner
+  chains named by the A chain in their place after the core fit (_partner_names), not by their ids;
+- partners: each of B's partner chains -> the name the contacts give it.
 
 The core superposition (_core_fit), a fixed rule: the core is the aligned pairs inside mated elements (mates and
 the pieces of a split helix; every aligned pair when fewer than 3 are). It starts from the superposition the
@@ -56,7 +58,7 @@ from types import SimpleNamespace
 
 import numpy as np
 
-from .align import ROUNDS, ChainAlignment, Mates, align_chains, d0, element_mates, pair_distances
+from .align import GRID, ROUNDS, ChainAlignment, Mates, align_chains, d0, element_mates, pair_distances
 from .model import SSE, Backbone
 
 CORE_CUT = 1.0  # core pairs farther apart than CORE_CUT·d0 after a fit are dropped from the next (_core_fit)
@@ -81,6 +83,8 @@ class Diff:
     core: tuple[tuple[int, int], ...] = ()  # the aligned pairs the core fit kept (indices as alignment.pairs)
     # 'FIRST/NAME' -> each domain after the first given against it, each fitted on its own (no core), degrees
     domain_angles: dict[str, float] = field(default_factory=dict)
+    # B's partner chain -> the name the contacts give it: A's chain in its place (_partner_names), else its own id
+    partners: dict[str, str] = field(default_factory=dict)
     rotation: np.ndarray = field(default_factory=lambda: np.eye(3), compare=False)  # A ≈ R·B + t, the core fit
     translation: np.ndarray = field(default_factory=lambda: np.zeros(3), compare=False)
 
@@ -201,6 +205,7 @@ def diff_sides(
     core, r, t, dist = _core_fit(sa, sb, aln, to_a)
     displacement = {(sb.chain, aln.residues_b[j].tag): float(d) for (_, j), d in zip(aln.pairs, dist)}
     turns, own = _domain_turns(sa, sb, aln, r, t, domains) if domains else ({}, {})
+    contacts, partners = _contacts(sa, sb, to_a, _partner_names(sa, sb, r, t))
     return Diff(
         alignment=aln,
         mates=mates,
@@ -211,7 +216,8 @@ def diff_sides(
         displacement=displacement,
         domain_turns=turns,
         domain_angles=own,
-        contacts=_contacts(sa, sb, to_a),
+        contacts=contacts,
+        partners=partners,
         core=core,
         rotation=r,
         translation=t,
@@ -393,21 +399,95 @@ def _changes(a: set, b: set) -> list[tuple]:
     return [(*k, "gained") for k in b - a] + [(*k, "lost") for k in a - b]
 
 
-def _contacts(sa: Side, sb: Side, to_a: dict[str, str]) -> dict[str, tuple]:
+PARTNER_SHIFT = 10.0  # Å: B's chain is in the place of A's when their centres lie this close after the core fit
+PARTNER_SIZE = 0.5  # ... and the shorter of the two has at least this fraction of the longer's residues
+UNPAIRED = " (in B)"  # after the id of B's chain in no A chain's place whose id is one of A's chains
+
+
+def _chain_centres(side: Side) -> dict[str, tuple[str, int, np.ndarray]]:
+    """Every polymer chain of the structure but the diffed one: chain -> (kind, residues, centre). Protein chains
+    ("ca") by their Cα (the whole structure's backbone); nucleic-acid chains ("atoms") by their nucleotides' atoms
+    in the model, as the interfaces table measures each (datafile.chain_interfaces)."""
+    import gemmi
+
+    out: dict[str, tuple[str, int, np.ndarray]] = {}
+    chains = np.array([l.chain for l in side.full.labels])
+    ca = np.asarray(side.full.ca, float)
+    for c in dict.fromkeys(chains.tolist()):
+        if c != side.chain:
+            mine = ca[chains == c]
+            out[c] = ("ca", len(mine), mine.mean(axis=0))
+    model = side.model[0] if isinstance(side.model, tuple) else side.model
+    nucleic = (gemmi.PolymerType.Dna, gemmi.PolymerType.Rna, gemmi.PolymerType.DnaRnaHybrid)
+    atoms: dict[str, list] = {}
+    for chain in model if model is not None else ():
+        polymer = chain.get_polymer()
+        if chain.name in out or chain.name == side.chain or not len(polymer):
+            continue
+        if polymer.check_polymer_type() in nucleic:
+            got = atoms.setdefault(chain.name, [0, []])
+            got[0] += len(polymer)
+            got[1] += [a.pos.tolist() for res in polymer for a in res]
+    for c, (n, xyz) in atoms.items():
+        if xyz:
+            out[c] = ("atoms", n, np.asarray(xyz, float).mean(axis=0))
+    return out
+
+
+def _partner_names(sa: Side, sb: Side, r: np.ndarray, t: np.ndarray) -> dict[str, str]:
+    """B's chains (all but the diffed one) -> the name the contacts give each: A's chain in its place, else its own
+    id. Two files of one complex need not letter its chains alike (a homologue's copies, an assembly's A2 for B), so
+    a partner is paired by place, not by id: after the core fit (A ≈ R·B + t) each B chain is paired with the A chain
+    of its kind (protein, nucleic acid) whose centre lies nearest, within PARTNER_SHIFT Å, the two of comparable size
+    (PARTNER_SIZE), nearest pairs first and each chain once. A chain left unpaired keeps its id when A has a chain of
+    that id left unpaired too (the id is all there is to go by), else is named "<id> (in B)" when its id is one of
+    A's chains (so it is not read as that chain), else its id."""
+    ca, cb = _chain_centres(sa), _chain_centres(sb)
+    near = []
+    for b, (kind_b, n_b, at_b) in cb.items():
+        here = at_b @ r.T + t
+        for a, (kind_a, n_a, at_a) in ca.items():
+            if kind_a != kind_b or min(n_a, n_b) < PARTNER_SIZE * max(n_a, n_b):
+                continue
+            d = float(np.round(np.linalg.norm(here - at_a) * GRID) / GRID)  # snapped (A12), as every distance here
+            if d <= PARTNER_SHIFT:
+                near.append((d, b, a))
+    names: dict[str, str] = {}
+    taken: set[str] = set()
+    for _, b, a in sorted(near):
+        if b not in names and a not in taken:
+            names[b] = a
+            taken.add(a)
+    own_a = {*ca, sa.chain}
+    for b in sorted(cb):
+        if b in names:
+            continue
+        if b in ca and b not in taken and ca[b][0] == cb[b][0]:
+            names[b] = b
+            taken.add(b)
+        else:
+            names[b] = f"{b}{UNPAIRED}" if b in own_a else b
+    return names
+
+
+def _contacts(sa: Side, sb: Side, to_a: dict[str, str], partner_names: dict[str, str] | None = None):
     """Changes of what the chain touches, as foldmap data measures it (datafile; elements named by A's ids, B's
     through their mates or as pieces; an element only one structure has is in only_a / only_b, not here):
 
     - elements: two matched elements in contact (features.sse_contacts: at least MIN_CONTACT_PAIRS Cα pairs within
       CONTACT_CUTOFF), (id, id, gained | lost);
     - interfaces: the chains the diffed chain has an interface with (datafile's interfaces table: protein chains by
-      Cα pairs, nucleic-acid chains by atom contacts), named by chain id, (partner, measure, gained | lost);
+      Cα pairs, nucleic-acid chains by atom contacts), (partner, measure, gained | lost);
     - interface_elements: for each protein partner of both, the chain's elements touching it (the same
       sse_contacts rule, the partner whole), (id, partner, gained | lost);
     - ligands: the ligands touching the chain (io.load_links, the figure's ligand rule; additives left out, as the
       figure hides them), by name, (name, gained | lost);
     - ligand_elements: for each ligand name of both, the chain's elements touching it, (id, name, gained | lost).
-    Partners and ligands are named, not mapped: two files that name one partner differently show it lost and
-    gained."""
+    A partner is named by A's chain id; B's partners by `partner_names` (_partner_names: the A chain in its place,
+    so two files that letter one complex differently do not show a partner lost and gained; without it, B's own
+    ids). Ligands are named by their chemical component name, which the two files share. Returns (the changes by
+    key, B's partner chains -> the names they are given)."""
+    rename = partner_names or {}
     rank_a = {s.id: k for k, s in enumerate(sa.sses)}
     matched = set(to_a.values())
 
@@ -424,7 +504,11 @@ def _contacts(sa: Side, sb: Side, to_a: dict[str, str]) -> dict[str, tuple]:
                 out.add(tuple(sorted((x, y), key=rank_a.__getitem__)))
         return out
 
+    def partner_name(side: Side, chain: str) -> str:
+        return rename.get(chain, chain) if side is sb else chain
+
     def faces(side: Side) -> dict[str, str]:
+        """Partner chain, by its own id -> measure."""
         from .datafile import chain_interfaces
 
         model = side.model[0] if isinstance(side.model, tuple) else side.model
@@ -463,7 +547,7 @@ def _contacts(sa: Side, sb: Side, to_a: dict[str, str]) -> dict[str, tuple]:
                 partner, own = sorted(ids)  # "\0..." sorts first
                 x = name_a(side, own)
                 if x is not None:
-                    out.add((x, partner[1:]))
+                    out.add((x, partner_name(side, partner[1:])))
         return out
 
     def ligands(side: Side) -> dict[str, set]:
@@ -479,8 +563,11 @@ def _contacts(sa: Side, sb: Side, to_a: dict[str, str]) -> dict[str, tuple]:
             got |= {name_a(side, own[k].id) for k in mine if own[k] is not None}
         return {name: {x for x in got if x is not None} for name, got in out.items()}
 
-    fa, fb = faces(sa), faces(sb)
+    fa, own_b = faces(sa), faces(sb)
+    fb = {partner_name(sb, c): m for c, m in own_b.items()}
+    paired = {c: partner_name(sb, c) for c in sorted(own_b)}
     both = sorted(c for c in set(fa) & set(fb) if fa[c] == fb[c] == "ca")
+    in_b = {name: c for c, name in paired.items()}
     la, lb = ligands(sa), ligands(sb)
     common = sorted(set(la) & set(lb))
 
@@ -492,12 +579,12 @@ def _contacts(sa: Side, sb: Side, to_a: dict[str, str]) -> dict[str, tuple]:
             sorted(_changes(element_pairs(sa), element_pairs(sb)), key=lambda r: (rank_a[r[0]], rank_a[r[1]], r[2]))
         ),
         "interfaces": tuple(sorted(_changes(set(fa.items()), set(fb.items())))),
-        "interface_elements": by_rank(_changes(touching(sa, set(both)), touching(sb, set(both)))),
+        "interface_elements": by_rank(_changes(touching(sa, set(both)), touching(sb, {in_b[c] for c in both}))),
         "ligands": tuple(sorted(_changes({(n,) for n in la}, {(n,) for n in lb}))),
         "ligand_elements": by_rank(
             _changes({(x, n) for n in common for x in la[n]}, {(x, n) for n in common for x in lb[n]})
         ),
-    }
+    }, paired
 
 
 def counts(diff: Diff) -> Counter:

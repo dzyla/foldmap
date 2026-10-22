@@ -409,8 +409,10 @@ def diff_structures(
     only_a), then ss_changes [{chain, residue, a, b}] (kinds H, G, E, C none, - absent), pairing [{strands, change}],
     displacement [[chain, residue, angstroms]] (source_b's residues), core (the number of pairs the core fit kept),
     domain_turns {name: degrees} (domains given: each domain's turn after the core fit), domain_angles {"FIRST/NAME":
-    degrees} (two domains or more: each after the first against it, each fitted on its own) and contacts {elements,
-    interfaces, interface_elements, ligands, ligand_elements: [[..., gained | lost]]}, plus the figure's provenance.
+    degrees} (two domains or more: each after the first against it, each fitted on its own), contacts {elements,
+    interfaces, interface_elements, ligands, ligand_elements: [[..., gained | lost]]} (partner chains named by
+    source_a's chain in their place) and partners {source_b's partner chain: the name contacts give it}, plus the
+    figure's provenance.
     json_path (.json) writes the same, without provenance.
 
     source_a, source_b: file path, PDB ID or UniProt accession. One protein chain of each: chain_a, chain_b (else

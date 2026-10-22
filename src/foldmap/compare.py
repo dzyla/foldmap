@@ -321,6 +321,12 @@ def diff_note(d, lay_a, lay_b, title_a: str, title_b: str, carried: bool, colour
     c = d.contacts
     if c.get("interfaces"):
         parts.append("interfaces: " + ", ".join(f"chain {p} {ch}" for p, _, ch in c["interfaces"]))
+    from .diff import UNPAIRED
+
+    renamed = [(b, a) for b, a in d.partners.items() if a != b and not a.endswith(UNPAIRED)]
+    if renamed:  # partners are named by A's chain in their place: say which of B's chains each is
+        each = ", ".join(f"{b} as {a}" for b, a in renamed)
+        parts.append(f"{name_b}'s partner chains taken as {name_a}'s in their place: {each}")
     if c.get("ligands"):
         parts.append("ligands: " + ", ".join(f"{n} {ch}" for n, ch in c["ligands"]))
     for key, word in (
@@ -427,7 +433,8 @@ def _page(
 def panel_checks(made: Compared, assembly: str = "auto", found: dict | None = None) -> dict[str, dict]:
     """H5 for each panel of a page (criteria.h5_good_figure): the panel drawn as a figure of its own, its marks and
     colouring as on the page (no title, as alone), passes every S- and A-check (criteria.check_figure) that its
-    structure's chain drawn alone in the page's look passes. {"a": A's panel, "b": B's}. `found`, when given, gets
+    structure's chain drawn alone in the page's look passes; the detail names that structure and chain (A's for the
+    left panel, not "B"). {"a": A's panel, "b": B's}. `found`, when given, gets
     each side's two check_figure results: {side: (the panel's, the chain drawn alone's)}."""
     from .criteria import check_figure, h5_good_figure
     from .spec import Drawn, FigureSpec, draw_spec
@@ -442,7 +449,7 @@ def panel_checks(made: Compared, assembly: str = "auto", found: dict | None = No
         judged = check_figure(panel, spec, p.path), check_figure(alone, alone_spec, p.path)
         if found is not None:
             found[side] = judged
-        out[side] = h5_good_figure(*judged)
+        out[side] = h5_good_figure(*judged, who=f"{Path(p.path).name} chain {p.chain}")  # this panel's, not "B"
     return out
 
 
@@ -495,6 +502,7 @@ DIFF_KEYS = (  # diff_json's own
     "domain_turns",
     "domain_angles",
     "contacts",
+    "partners",
 )
 
 
@@ -505,9 +513,10 @@ def diff_json(lay_a, sses_a, lay_b, sses_b, d) -> dict:
     chain and number, B's for a residue only B has), pairing [{strands: [A's names], change}], displacement
     [[B's chain, B's residue, Å]] (B's order), core (the number of residue pairs the core fit kept), domain_turns
     {name: degrees} (domains given: each domain's turn after the core fit), domain_angles {"FIRST/NAME": degrees}
-    (two domains or more: each after the first against it, each fitted on its own, no core) and contacts {key:
-    [[...parts, gained | lost]]} (diff.CONTACT_KEYS; elements by A's names); numbers to 1e-3, every list in the
-    Diff's order."""
+    (two domains or more: each after the first against it, each fitted on its own, no core), contacts {key:
+    [[...parts, gained | lost]]} (diff.CONTACT_KEYS; elements by A's names, partner chains by A's) and partners
+    {B's partner chain: the name contacts give it, the A chain in its place (diff._partner_names)}; numbers to 1e-3,
+    every list in the Diff's order."""
     from .diff import CONTACT_KEYS
 
     out = mates_json(lay_a, sses_a, lay_b, sses_b, d.alignment, d.mates)
@@ -525,6 +534,7 @@ def diff_json(lay_a, sses_a, lay_b, sses_b, d) -> dict:
             "domain_turns": {k: _round(v) for k, v in d.domain_turns.items()},
             "domain_angles": {k: _round(v) for k, v in d.domain_angles.items()},
             "contacts": {key: [row(key, parts) for parts in d.contacts.get(key, ())] for key in CONTACT_KEYS},
+            "partners": dict(d.partners),
         }
     )
     return out

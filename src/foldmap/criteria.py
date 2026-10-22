@@ -865,10 +865,12 @@ def h1_matched(aln, mates, alike: bool, refused: bool, kind: str | None = None, 
     return {**_ok(ok, f"{what}: {facts}"), "value": value}
 
 
-def h5_good_figure(judged_like: dict, judged_alone: dict) -> dict:
+def h5_good_figure(judged_like: dict, judged_alone: dict, who: str = "B") -> dict:
     """H5: likeness is not bought with a broken page: B drawn like A passes every S- and A-check that B drawn alone
     passes (each a check_figure result: {"science", "science_judged", "criteria"}; a check passes when it found
-    nothing and had something to judge, a criterion when its pass is True). Not judged when B alone passes none."""
+    nothing and had something to judge, a criterion when its pass is True). Not judged when B alone passes none.
+    `who`: the structure the detail names as drawn alone (B; a compare or diff page's panel names its own,
+    compare.panel_checks)."""
 
     def passed(found: dict) -> list[str]:
         judged = found.get("science_judged") or {}
@@ -877,7 +879,7 @@ def h5_good_figure(judged_like: dict, judged_alone: dict) -> dict:
 
     alone, like = passed(judged_alone), set(passed(judged_like))
     if not alone:
-        return _not_judged("B drawn alone passes no S- or A-check")
+        return _not_judged(f"{who} drawn alone passes no S- or A-check")
     lost = [k for k in alone if k not in like]
 
     def why(k: str) -> str:
@@ -886,7 +888,7 @@ def h5_good_figure(judged_like: dict, judged_alone: dict) -> dict:
             return f"{k} ({len(judged_like['science'].get(k) or [])} problem(s))"
         return f"{k} ({outcome(unmeasured(got))}{': ' + got['detail'][:120] if got.get('detail') else ''})"
 
-    detail = f"{len(alone) - len(lost)} of the {len(alone)} checks B alone passes"
+    detail = f"{len(alone) - len(lost)} of the {len(alone)} checks {who} alone passes"
     detail += f"; lost: {'; '.join(why(k) for k in lost)}" if lost else ""
     return {**_ok(not lost, detail), "value": {"alone": alone, "lost": lost}}
 

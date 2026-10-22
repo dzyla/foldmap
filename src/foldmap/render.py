@@ -175,7 +175,6 @@ Z = {  # the drawing order, back to front (plan 10 R8: panel < plate < membrane 
     "na-tie-mark": 2.4,  # a long tie's marks
     "domain-bar": 2.0,  # the domain bar under the figure ...
     "domain-bar-label": 2.1,  # ... and the names in it
-    "absent": 2.5,  # foldmap diff: the dashed outline of an element only the other structure has, under the bodies
     "body-back": 2.9,  # a helix's back face (Z["body"] - 0.1)
     "data-stripe-back": 2.91,  # color_by=data: its stripes (clipped to it) ...
     "data-edge-back": 2.92,  # ... and its edge drawn again over them
@@ -185,6 +184,9 @@ Z = {  # the drawing order, back to front (plan 10 R8: panel < plate < membrane 
     "gloss": 3.05,  # a helix's shine (Z["body"] + 0.05)
     "over-loop": 3.2,  # the loops of a helix over a sheet: above the strands, below the helix
     "over": 3.5,  # a helix over a sheet (Placed.over): above the strands, below their letters
+    # foldmap diff: the dashed outline of an element only the other structure has, over the bodies (an outline the
+    # 2D fit lands on another element stays whole, not hidden under it), broken at letters, below marks and labels
+    "absent": 3.52,
     "xl-over": 3.55,  # crosslinks drawn over the elements (Style.crosslink_layer over), above a helix over a sheet
     "tether": 3.6,  # ligand tethers and disulfide bars: above the bodies (R8), but drawn only where no body or text
     "bar": 3.7,  # is (visible_pieces), so they read as passing under them (plan 10 Task 6, Q-R10)
@@ -4668,8 +4670,9 @@ def absent_outline(p: Placed) -> np.ndarray:
 
 def _draw_absent(c: _Canvas, layout: Layout) -> None:
     """foldmap diff: each element only the other structure has (Layout.absent), a dashed outline (absent_outline)
-    under the bodies, drawn after every text and broken where it would run under a letter (text_halos, as the
-    interaction lines), so no text is crossed (A6 reads it: figcheck.LINE_GIDS); gid absent:<id>."""
+    over the bodies (Z["absent"]: one the 2D fit lands on another element stays whole, not hidden under it), drawn
+    after every text and broken where it would run under a letter (text_halos, as the interaction lines), so no text
+    is crossed (A6 reads it: figcheck.LINE_GIDS); gid absent:<id>."""
     absent = getattr(layout, "absent", ())
     if not absent:
         return

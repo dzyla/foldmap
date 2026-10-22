@@ -170,6 +170,49 @@ def test_interface_and_ligand_changes(tmp_path):
     assert d.contacts["elements"] == d.contacts["interface_elements"] == d.contacts["ligand_elements"] == ()
 
 
+def _renamed(st: gemmi.Structure, names: dict) -> gemmi.Structure:
+    """st with its chains renamed (old -> new, swaps allowed)."""
+    for chain in st[0]:
+        chain.name = "~" + chain.name
+    for chain in st[0]:
+        old = chain.name[1:]
+        chain.name = names.get(old, old)
+    return st
+
+
+def test_partners_are_paired_by_place_not_by_chain_id(tmp_path):
+    """Open minor of 13e-1/13e-2: two files that letter one complex differently. 2HHB with its alpha chains (A, C)
+    and its beta chains (B, D) swapped, its chain C (2HHB's A) against 2HHB's A: each partner is paired with the A
+    chain in its place after the core fit, so no interface is lost or gained and the pairing is said."""
+    from foldmap.compare import diff_json, diff_note
+
+    swaps = {"A": "C", "C": "A", "B": "D", "D": "B"}
+    swapped = _write(_renamed(gemmi.read_structure(str(HHB)), swaps), tmp_path / "s.pdb")
+    d = diff_structures(HHB, "A", swapped, "C", assembly="asu")
+    assert d.contacts["interfaces"] == () and d.contacts["interface_elements"] == ()
+    assert d.partners == {"A": "C", "B": "D", "D": "B"}
+    lay = type("Lay", (), {"placed": {}})()
+    note = diff_note(d, lay, lay, "2HHB.cif chain A", "s.pdb chain C", False, False)
+    assert "s.pdb's partner chains taken as 2HHB.cif's in their place: A as C, B as D, D as B" in note
+    assert diff_json(lay, [], lay, [], d)["partners"] == {"A": "C", "B": "D", "D": "B"}
+    same = diff_structures(HHB, "A", HHB, "A", assembly="asu")
+    assert same.partners == {"B": "B", "C": "C", "D": "D"}
+    assert "partner chains taken" not in diff_note(same, lay, lay, "2HHB.cif chain A", "2HHB.cif chain A", False, False)
+
+
+def test_a_partner_in_no_place_of_a_keeps_its_id_marked(tmp_path):
+    """A lacks the chain in a partner's place (2HHB without chain B) and B's file letters that partner with an id
+    A uses for another chain (B and C swapped): the partner is gained under its id marked "(in B)", not read as
+    A's chain of that id; the chain lettered B (2HHB's C) is paired with A's C, so that interface is unchanged."""
+    st = gemmi.read_structure(str(HHB))
+    st[0].remove_chain("B")
+    less = _write(st, tmp_path / "less.pdb")
+    swapped = _write(_renamed(gemmi.read_structure(str(HHB)), {"B": "C", "C": "B"}), tmp_path / "bc.pdb")
+    d = diff_structures(less, "A", swapped, "A", assembly="asu")
+    assert d.contacts["interfaces"] == (("C (in B)", "ca", "gained"),)
+    assert d.partners == {"B": "C", "C": "C (in B)", "D": "D"}
+
+
 def test_two_proteins_take_the_structure_route():
     """1UBQ against T4 lysozyme: not one protein by A19's rule, so mapped by structure; every element of each that
     has no mate is named, and nothing fails on a small core."""
@@ -245,7 +288,7 @@ def test_the_deleted_helix_is_drawn_dashed_in_bs_panel(tmp_path):
     nothing moved, so B keeps its colours; the note names the helix."""
     from foldmap.compare import diff_page
     from foldmap.figcheck import fit_deviations
-    from foldmap.render import ABSENT_LEGEND, absent_outline
+    from foldmap.render import ABSENT_LEGEND, Z, absent_outline
 
     path, (helix, *_) = _no_helix(tmp_path)
     made = diff_page(UBQ, path)
@@ -261,6 +304,8 @@ def test_the_deleted_helix_is_drawn_dashed_in_bs_panel(tmp_path):
     assert fit_deviations(at_a, at_b)[-1] < 1.0  # where the mates' fit puts A's helix on B's page
     (line,) = [a for a in made.figure.axes[2].lines if a.get_gid() == f"b/absent:{helix}"]
     assert line.get_linestyle() == "--" and len(absent_outline(out)) > 8
+    # over the bodies (a helix over a sheet too), under marks and labels: one landing on an element is not hidden
+    assert Z["over"] < line.get_zorder() == Z["absent"] < min(Z["tether"], Z["mark"], Z["label"])
     legend = [t.get_text() for t in made.figure.axes[0].texts]
     assert ABSENT_LEGEND in legend and not any(t.startswith("Cα displacement") for t in legend)
     assert lay_b.residue_data is None
@@ -349,6 +394,8 @@ def test_each_panel_stays_a_good_figure(two_states):
     off = figcheck.ink_font_reason(made.figure)
     for name, side in got.items():
         assert side["pass"] is True, side["detail"]
+        p = made.drawn["ab".index(name)]  # the detail names this panel's structure, not "B" for both
+        assert f"checks {Path(p.path).name} chain {p.chain} alone passes" in side["detail"]
         if not off:
             assert "A6" in side["value"]["alone"]
             continue
@@ -437,6 +484,24 @@ def test_a_page_not_drawn_alike_names_bs_own_elements_and_why_no_outlines():
     assert d.only_b
     assert not [g for p in ("a/absent:", "b/absent:") for g in _gids(made.figure, p)]
     assert "only in 2LZM.cif: " in made.note and "no dashed outlines: 2LZM.cif drawn on its own" in made.note
+
+
+def test_too_few_mates_to_carry_outlines_is_said():
+    """13e-2 concern 3: B drawn alike but with fewer than criteria.LIKE_MIN_MATES mates drawn, no outline can be
+    carried across; the note names each structure's own elements and says why there are no outlines."""
+    from types import SimpleNamespace
+
+    from foldmap.compare import diff_note
+    from foldmap.criteria import LIKE_MIN_MATES
+
+    lay = SimpleNamespace(placed={})
+    none = dict(ss_changes=(), pairing=(), domain_turns={}, domain_angles={}, contacts={}, partners={})
+    d = SimpleNamespace(only_a=("A:2-7",), only_b=("A:40-45",), displacement={}, **none)
+    note = diff_note(d, lay, lay, "P.cif chain A", "Q.cif chain A", False, False, alike=True)
+    assert "only in P.cif: A:2-7" in note
+    assert f"no dashed outlines: fewer than {LIKE_MIN_MATES} mates drawn to carry them by" in note
+    assert "(dashed outlines" not in note
+    assert diff_note(d, lay, lay, "P.cif chain A", "Q.cif chain A", False, False, alike=False).count("only in") == 2
 
 
 def test_a_domain_name_cannot_hold_a_slash():

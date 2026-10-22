@@ -340,6 +340,8 @@ def test_h5_fails_when_the_like_figure_fails_a_check_b_alone_passes(monkeypatch)
     spec = figure_spec(DATA / "1UBQ.cif")
     alone = criteria.check_figure(draw_spec(spec), spec, DATA / "1UBQ.cif")
     assert criteria.h5_good_figure(alone, alone)["pass"] is True
+    assert "checks B alone passes" in criteria.h5_good_figure(alone, alone)["detail"]
+    assert "checks 1UBQ.cif chain A alone passes" in criteria.h5_good_figure(alone, alone, "1UBQ.cif chain A")["detail"]
     monkeypatch.setattr(figcheck, "element_overlaps", lambda lay: [("A:2-7", "A:12-17")])
     broken = criteria.check_figure(draw_spec(spec), spec, DATA / "1UBQ.cif")
     got = criteria.h5_good_figure(broken, alone)

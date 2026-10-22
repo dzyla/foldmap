@@ -2025,7 +2025,8 @@ def _diff_parser(sub) -> None:
         metavar="PATH",
         help="also write what changed: compare's matching (alignment, mates, pieces, extras, only_a), then "
         "ss_changes, pairing, displacement, core (how many pairs the core fit kept), domain_turns, domain_angles (two "
-        "domains or more: each against the first, each fitted on its own) and contacts",
+        "domains or more: each against the first, each fitted on its own), contacts and partners (B's partner "
+        "chains, each named by A's chain in its place)",
     )
     dq.add_argument(
         "--check",

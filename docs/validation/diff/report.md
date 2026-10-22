@@ -62,6 +62,12 @@ Each pair type has its own test:
   helices only in 6M67 are outlined on the right.
 - **2BBJ-2BBH (monomer/oligomer) is also open/closed by the report's re-measure.** Its interfaces with B and E are
   lost (2BBJ's assembly has 5 chains, 2BBH's has 1), and a 20 Å motion is coloured.
+- **Partner chains are paired by place, not by id (2026-10-22).** The two files of a pair need not letter one
+  complex alike. B's partner chains now take the id of A's chain in their place after the core fit (diff
+  `partners`). Three rows of the table below changed with this; their other columns are unchanged:
+  - 1RM5-2HKI: interfaces 4 → 0 (2HKI's A3, A4 sit where 1RM5's B1, B2 do), interface_elements 6 → 2;
+  - 6M67-6LTO: interfaces 4 → 0 (D and F sit where B and G do), interface_elements 0 → 5 (now compared);
+  - 8OJZ-8QX1: interface_elements 12 → 2 (the assembly copies A2 and B1 are lettered the other way round).
 
 ## The core-fit cut: 2·d0 or d0
 
@@ -115,7 +121,7 @@ asked to make.
 
 | pair | set | type | route | H5 A | H5 B | A fails (alone) | B fails (alone) | changes | known | agrees |
 |---|---|---|---|---|---|---|---|---|---|---|
-| 1RM5-2HKI | random100 P1 | apo/holo | sequence | pass | pass | - (-) | - (-) | elements 2, interface_elements 6, interfaces 4, ligands 1, only_a 2, ss_changes 15 | a ligand lost | yes |
+| 1RM5-2HKI | random100 P1 | apo/holo | sequence | pass | pass | - (-) | - (-) | elements 2, interface_elements 2, ligands 1, only_a 2, ss_changes 15 | a ligand lost | yes |
 | 9YKJ-10UJ | random100 P2 | monomer/oligomer | sequence | pass | pass | - (-) | - (-) | elements 16, interfaces 1, only_a 3, only_b 19, ss_changes 167 | an interface lost | yes |
 | 6YPX-6YQD | random100 P3 | apo/holo | sequence | pass | pass | - (-) | - (-) | ligands 1, only_a 1, only_b 1, ss_changes 10 | a ligand lost | yes |
 | 8P3N-8OYQ | random100 P4 | monomer/oligomer | sequence | pass | pass | - (-) | - (-) | interfaces 1, ligands 2, ss_changes 7 | an interface lost | yes |
@@ -125,11 +131,11 @@ asked to make.
 | 8U9T-7IT6 | random100-heldout P3 | apo/holo | structure | pass | pass | - (-) | - (-) | elements 5, interfaces 1, ligands 1, only_a 19, only_b 6, pairing 2, ss_changes 175 | a ligand lost | yes |
 | 3U3H-6QND | random100-heldout P4 | monomer/oligomer | sequence | pass | pass | - (-) | - (-) | elements 2, interfaces 3, ligand_elements 1, ligands 4, only_a 1, ss_changes 6 | an interface lost | yes |
 | 2BBJ-2BBH | random100-heldout P5 | monomer/oligomer | sequence | pass | pass | - (-) | - (-) | elements 5, interfaces 2, ligands 2, only_a 5, only_b 2, ss_changes 106 | an interface lost | yes |
-| 8OJZ-8QX1 | random100-third P1 | apo/holo | sequence | pass | pass | - (-) | - (-) | elements 14, interface_elements 12, ligands 1, only_a 3, only_b 2, ss_changes 71 | a ligand gained | yes |
+| 8OJZ-8QX1 | random100-third P1 | apo/holo | sequence | pass | pass | - (-) | - (-) | elements 14, interface_elements 2, ligands 1, only_a 3, only_b 2, ss_changes 71 | a ligand gained | yes |
 | 3P2W-8CRC | random100-third P2 | apo/holo | sequence | pass | pass | - (-) | - (-) | ligands 1, ss_changes 7 | a ligand gained | yes |
 | 2YEJ-3FT8 | random100-third P3 | monomer/oligomer | sequence | pass | pass | - (-) | - (-) | interfaces 1, ligands 3, ss_changes 1 | an interface gained | yes |
 | 5U3R-5XMX | random100-third P4 | monomer/oligomer | sequence | pass | pass | - (-) | - (-) | elements 1, interfaces 1, ligands 4, ss_changes 8 | an interface gained | yes |
-| 6M67-6LTO | random100-third P5 | open/closed | sequence | pass | pass | - (-) | - (-) | elements 4, interfaces 4, only_a 7, only_b 3, ss_changes 70 | CA RMSD 8.376 Å | yes |
+| 6M67-6LTO | random100-third P5 | open/closed | sequence | pass | pass | - (-) | - (-) | elements 4, interface_elements 5, only_a 7, only_b 3, ss_changes 70 | CA RMSD 8.376 Å | yes |
 | 1ANF_A-1OMP_A | hinge MBP | open/closed | sequence | pass | pass | - (-) | - (-) | elements 6, ligands 1, only_a 2, ss_changes 13 |  |  |
 | 1LFG_A-1CB6_A | hinge lactoferrin | open/closed | sequence | pass | pass | - (-) | - (-) | elements 21, ligands 2, only_a 2, only_b 4, ss_changes 46 |  |  |
 | 4AKE_A-1AKE_A | hinge adenylate kinase | open/closed | sequence | pass | pass | - (-) | - (-) | elements 5, interfaces 1, ligands 1, only_a 2, ss_changes 18 |  |  |

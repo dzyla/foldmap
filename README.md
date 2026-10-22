@@ -443,7 +443,11 @@ with and without calcium). A structure against itself gives exactly its compare 
 - `domain_turns`: degrees for each domain, after the core fit;
 - `domain_angles`: degrees for each domain after the first, keyed `FIRST/NAME`, each fitted on its own;
 - `contacts`: `elements`, `interfaces`, `interface_elements`, `ligands`, `ligand_elements`, each row ending in
-  `gained` or `lost`.
+  `gained` or `lost`;
+- `partners`: each of B's partner chains and the name the contacts give it. Two files need not letter one complex
+  alike, so B's partner takes the id of A's chain in its place after the core fit (the nearest centre within 10 Å,
+  same kind and comparable size); the note says which chains were taken that way. A B chain in no A chain's place
+  keeps its id, written `D (in B)` when A has a chain D of its own.
 
 `--check` also judges each panel as a figure of its own (H5: it passes every check its chain drawn alone passes) and
 exits 1 when one does not. The MCP tool `diff_structures` (with `domains`, `assembly` and `check`) returns the same
