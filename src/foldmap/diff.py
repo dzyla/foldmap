@@ -13,11 +13,11 @@ align.element_mates. From those:
 - ss_changes: each residue whose element kind differs (H, G 3-10, E strand, C none; "-" a residue the other
   structure lacks): an aligned pair whose kinds differ, a residue of A in an element with no partner in B, a
   residue of B in an element with no partner in A;
-- pairing: each two strands paired (sheets._edge_table: at least sheets._MIN_PAIRS DSSP bridges) in one structure
-  and not in the other, and each pairing in both whose register moved (datafile._pair's bridges, the shift of the
-  median_low of j - s·i as datafile._shear reads a pairing: in B the residue across from each of the first strand's
-  residues lies k further along the second, counted in A's residues). Strands are named by A's ids (B's through
-  their mates); a pairing whose kind turned (parallel / antiparallel) is lost and gained;
+- pairing: each two strands paired (sheets.edge_table: at least sheets._MIN_PAIRS DSSP bridges) in one structure
+  and not in the other, and each pairing in both whose register moved (datafile.strand_pairing's bridges, the shift
+  of the median_low of j - s·i as datafile._shear reads a pairing: in B the residue across from each of the first
+  strand's residues lies k further along the second, counted in A's residues). Strands are named by A's ids (B's
+  through their mates); a pairing whose kind turned (parallel / antiparallel) is lost and gained;
 - displacement: each aligned B residue's Cα distance to its A residue after the core superposition (_core_fit);
 - domain_turns: with domains (name -> residue ranges of A's chain, res:A:1-60, A:1-60 or 1-60), each domain's rigid
   rotation, in degrees, left after the core superposition (the Kabsch fit of B's residues of it onto A's);
@@ -42,8 +42,8 @@ d0 keeps the core in one domain where 2·d0 settles on a compromise between two 
 turns 54.5 degrees after the fit at d0 and 48.6 at 2·d0, against the published 54; a 45 degree hinge on 1UBQ splits
 0.0 / 45.0 at d0 and 7.7 / 41.1 at 2·d0. On 13 of the 15 random-100 pairs the core is the same at both cuts.
 
-Determinism (A12): distances are snapped to 1/align.GRID Å (align._dist) before the core's cut, turns are rounded to
-0.001 degree, every list is in a fixed order (A's residues and elements N to C, then B's; partners and ligand
+Determinism (A12): distances are snapped to 1/align.GRID Å (align.pair_distances) before the core's cut, turns are
+rounded to 0.001 degree, every list is in a fixed order (A's residues and elements N to C, then B's; partners and ligand
 names sorted), and every set compared is of names, never of floats.
 """
 
@@ -56,7 +56,7 @@ from types import SimpleNamespace
 
 import numpy as np
 
-from .align import ROUNDS, ChainAlignment, Mates, _dist, align_chains, d0, element_mates
+from .align import ROUNDS, ChainAlignment, Mates, align_chains, d0, element_mates, pair_distances
 from .model import SSE, Backbone
 
 CORE_CUT = 1.0  # core pairs farther apart than CORE_CUT·d0 after a fit are dropped from the next (_core_fit)
@@ -86,7 +86,7 @@ class Diff:
 
 
 @dataclass(frozen=True)
-class _Side:
+class Side:
     """One structure as diff reads it: the chain alone (its backbone, elements and DSSP bridges, as a figure of that
     chain builds them), and the whole structure (every protein chain, the model, the ligands) for the contacts."""
 
@@ -100,11 +100,21 @@ class _Side:
     links: object
 
 
-def _side(source, chain: str | None, side: str, assembly: str, helices_310: bool) -> _Side:
+@dataclass(frozen=True)
+class Read:
+    """A structure read for diff (read_structure): its file, model, every protein chain, and the chain diffed."""
+
+    path: object
+    model: object
+    full: Backbone
+    chain: str
+
+
+def read_structure(source, chain: str | None, side: str, assembly: str) -> Read:
+    """`source` (a file or PDB id) read as `assembly` reads it, and its chain: `chain`, else its first protein chain;
+    ValueError naming `side` (A or B) for a structure with no protein chain or without `chain`."""
     from .cli import resolve_structure
-    from .dssp import assign_dssp
-    from .io import load_backbone, load_links, read_model
-    from .ss import build_sses
+    from .io import load_backbone, read_model
 
     path = resolve_structure(str(source))
     model = read_model(path, assembly)
@@ -116,11 +126,30 @@ def _side(source, chain: str | None, side: str, assembly: str, helices_310: bool
         chain = present[0]
     elif chain not in present:
         raise ValueError(f"no chain {chain!r} in {side} ({source}); its protein chains: {', '.join(present)}")
-    bb = full.only([chain])
+    return Read(path, model, full, chain)
+
+
+def read_side(source, chain: str | None, side: str, assembly: str, helices_310: bool) -> Side:
+    """One structure as diff reads it (Side): read_structure, then its chain's DSSP and elements (ss.build_sses, as
+    cli.make_layout builds them for one chain drawn; `helices_310`: Style.helices_310)."""
+    from .dssp import assign_dssp
+    from .ss import build_sses
+
+    got = read_structure(source, chain, side, assembly)
+    bb = got.full.only([got.chain])
     dssp = assign_dssp(bb)
     sses = build_sses(bb, dssp.ss, short_helices=helices_310, bridges=dssp.bridges)
-    links = load_links(path, full, assembly, model=model)
-    return _Side(str(source), chain, bb, sses, list(dssp.bridges), full, model, links)
+    return drawn_side(source, got, bb, sses, dssp.bridges, assembly)
+
+
+def drawn_side(source, got: Read, bb: Backbone, sses: list, bridges: list, assembly: str) -> Side:
+    """The Side of a structure read (`got`) whose chain is already laid out: its backbone `bb`, elements `sses` and
+    DSSP `bridges` as cli.make_layout read them (compare.diff_page: the panel's, so DSSP runs once and the elements
+    are the panel's), the ligands read on the whole structure."""
+    from .io import load_links
+
+    links = load_links(got.path, got.full, assembly, model=got.model)
+    return Side(str(source), got.chain, bb, list(sses), list(bridges), got.full, got.model, links)
 
 
 def diff_structures(
@@ -142,25 +171,32 @@ def diff_structures(
     from .style import Style
 
     helices_310 = (look or Style()).helices_310
-    sa = _side(a, chain_a, "A", assembly, helices_310)
-    sb = _side(b, chain_b, "B", assembly, helices_310)
+    sa = read_side(a, chain_a, "A", assembly, helices_310)
+    sb = read_side(b, chain_b, "B", assembly, helices_310)
     return diff_sides(sa, sb, match, domains)
 
 
-def _route(sa: _Side, sb: _Side, match: str) -> str:
-    """auto: the sequence route when the two chains are one protein (A19's rule), else the structure route."""
+def route(bb_a: Backbone, bb_b: Backbone, match: str) -> str:
+    """The alignment route of the two chains (`bb_a`, `bb_b`: each the chain alone): `match` itself unless auto;
+    auto: the sequence route when the two chains are one protein (A19's rule), else the structure route."""
     if match != "auto":
         return match
     from .criteria import one_protein_names
 
-    one = one_protein_names([l.name for l in sa.bb.labels], [l.name for l in sb.bb.labels])
+    one = one_protein_names([l.name for l in bb_a.labels], [l.name for l in bb_b.labels])
     return "sequence" if one["one"] else "structure"
 
 
-def diff_sides(sa: _Side, sb: _Side, match: str = "auto", domains: dict | None = None) -> Diff:
-    """diff_structures on two structures already read (_side)."""
-    aln = align_chains(sa.bb, sa.chain, sb.bb, sb.chain, _route(sa, sb, match))
-    mates = element_mates(sa.sses, sb.sses, aln)
+def diff_sides(
+    sa: Side, sb: Side, match: str = "auto", domains: dict | None = None, alignment=None, mates=None
+) -> Diff:
+    """diff_structures on two structures already read (read_side, drawn_side). `alignment` and `mates`: the two
+    chains' align.align_chains by route(match) and align.element_mates when already made (compare.diff_page: the
+    page's own), else made here."""
+    if alignment is None:
+        alignment = align_chains(sa.bb, sa.chain, sb.bb, sb.chain, route(sa.bb, sb.bb, match))
+    aln = alignment
+    mates = mates if mates is not None else element_mates(sa.sses, sb.sses, aln)
     to_a = {**mates.mate, **mates.pieces}  # B element id -> the A element it is (whole or a piece of)
     core, r, t, dist = _core_fit(sa, sb, aln, to_a)
     displacement = {(sb.chain, aln.residues_b[j].tag): float(d) for (_, j), d in zip(aln.pairs, dist)}
@@ -190,10 +226,10 @@ def _owner(sses: list[SSE], n: int) -> list[SSE | None]:
     return out
 
 
-def _core_fit(sa: _Side, sb: _Side, aln: ChainAlignment, to_a: dict[str, str]):
+def _core_fit(sa: Side, sb: Side, aln: ChainAlignment, to_a: dict[str, str]):
     """(core pairs kept, R, t, every aligned pair's snapped distance under them): the fixed rule of the module
     docstring."""
-    from .symmetry import _kabsch
+    from .symmetry import kabsch
 
     if not aln.pairs:
         return (), np.eye(3), np.zeros(3), np.zeros(0)
@@ -207,27 +243,27 @@ def _core_fit(sa: _Side, sb: _Side, aln: ChainAlignment, to_a: dict[str, str]):
         core = np.ones(len(aln.pairs), bool)
     if core.sum() < 3:  # one or two pairs: no rotation to fit
         r, t = np.eye(3), (pa - pb).mean(axis=0)
-        return tuple(aln.pairs), r, t, _dist(pa, pb, r, t)
+        return tuple(aln.pairs), r, t, pair_distances(pa, pb, r, t)
     cut = CORE_CUT * d0(len(sa.bb))
-    keep = core & (_dist(pa, pb, aln.rotation, aln.translation) <= cut)  # from the TM-score's superposition
+    keep = core & (pair_distances(pa, pb, aln.rotation, aln.translation) <= cut)  # from the TM-score's superposition
     if keep.sum() < 3:
         keep = core.copy()
     for _ in range(ROUNDS):
-        r, t, _ = _kabsch(pb[keep], pa[keep])
-        near = core & (_dist(pa, pb, r, t) <= cut)
+        r, t, _ = kabsch(pb[keep], pa[keep])
+        near = core & (pair_distances(pa, pb, r, t) <= cut)
         if near.sum() < 3 or np.array_equal(near, keep):
             break
         keep = near
-    r, t, _ = _kabsch(pb[keep], pa[keep])
+    r, t, _ = kabsch(pb[keep], pa[keep])
     kept = tuple(p for p, k in zip(aln.pairs, keep) if k)
-    return kept, r, t, _dist(pa, pb, r, t)
+    return kept, r, t, pair_distances(pa, pb, r, t)
 
 
-def _kinds(side: _Side) -> list[str]:
+def _kinds(side: Side) -> list[str]:
     return [s.kind if s is not None else NONE for s in _owner(side.sses, len(side.bb))]
 
 
-def _ss_changes(sa: _Side, sb: _Side, aln: ChainAlignment) -> tuple[tuple[str, str, str, str], ...]:
+def _ss_changes(sa: Side, sb: Side, aln: ChainAlignment) -> tuple[tuple[str, str, str, str], ...]:
     """Along the alignment: the pairs whose kinds differ, then before each pair the residues of A it skips that are
     in an element (kind in B "-"), then those of B (kind in A "-"); the ends after the last pair likewise."""
     ka, kb = _kinds(sa), _kinds(sb)
@@ -243,16 +279,16 @@ def _ss_changes(sa: _Side, sb: _Side, aln: ChainAlignment) -> tuple[tuple[str, s
     return tuple(out)
 
 
-def _pairings(side: _Side) -> dict[tuple[str, str], tuple[str, list]]:
-    """Each two strands of the chain paired by at least sheets._MIN_PAIRS bridges (sheets._edge_table): (id, id)
-    N to C -> (kind P or A, the bridges as (residue of the first, residue of the second), datafile._pair's)."""
-    from .datafile import _pair
-    from .sheets import _edge_table
+def pairings(side: Side) -> dict[tuple[str, str], tuple[str, list]]:
+    """Each two strands of the chain paired by at least sheets._MIN_PAIRS bridges (sheets.edge_table): (id, id)
+    N to C -> (kind P or A, the bridges as (residue of the first, residue of the second), datafile.strand_pairing's)."""
+    from .datafile import strand_pairing
+    from .sheets import edge_table
 
     strands = [s for s in side.sses if s.kind == "E"]
     out = {}
-    for x, y in sorted(_edge_table(strands, side.bridges)):
-        p = _pair(strands[x], strands[y], side.bridges, side.bb.labels)
+    for x, y in sorted(edge_table(strands, side.bridges)):
+        p = strand_pairing(strands[x], strands[y], side.bridges, side.bb.labels)
         out[(strands[x].id, strands[y].id)] = (p["kind"], [(i, j) for i, j, _ in p["_reg"]])
     return out
 
@@ -264,12 +300,12 @@ def _register(kind: str, reg: list[tuple[int, int]]) -> int | None:
     return median_low([j - s * i for i, j in reg]) if reg else None
 
 
-def _pairing(sa: _Side, sb: _Side, aln: ChainAlignment, mates: Mates) -> tuple[tuple[str, str, str], ...]:
+def _pairing(sa: Side, sb: Side, aln: ChainAlignment, mates: Mates) -> tuple[tuple[str, str, str], ...]:
     rank = {s.id: k for k, s in enumerate(sa.sses)}
     to_a_res = {j: i for i, j in aln.pairs}
-    in_a = _pairings(sa)
+    in_a = pairings(sa)
     in_b: dict[tuple[str, str], tuple[str, list]] = {}
-    for (x, y), (kind, reg) in _pairings(sb).items():
+    for (x, y), (kind, reg) in pairings(sb).items():
         if x not in mates.mate or y not in mates.mate:
             continue  # an extra strand's pairings: the strand itself is in only_b
         mx, my = mates.mate[x], mates.mate[y]
@@ -296,26 +332,21 @@ def _pairing(sa: _Side, sb: _Side, aln: ChainAlignment, mates: Mates) -> tuple[t
     return tuple(out)
 
 
-def _domain_residues(name: str, refs, side: _Side) -> set[int]:
+def _domain_residues(name: str, refs, side: Side) -> set[int]:
     """The indices of A's chain residues a domain's ranges name (res:A:1-60, A:1-60, 1-60; insertion codes as in
-    the file); ValueError naming the domain for a range that is malformed, on another chain, or names nothing."""
-    from .layout import RES_RANGE
+    the file; layout.residue_span reads them); ValueError naming the domain for a range that is malformed, on another
+    chain, or names nothing."""
+    from .layout import residue_span
 
     got: set[int] = set()
     for ref in [refs] if isinstance(refs, str) else list(refs):
-        body = ref.strip().removeprefix("res:")
-        chain = None
-        if body.count(":") == 1:
-            chain, body = body.split(":")
-        m = RES_RANGE.fullmatch(body)
-        if m is None or chain not in (None, side.chain):
+        span = residue_span(ref)
+        if span is None or span[0] not in (None, side.chain):
             raise ValueError(
                 f"domain {name}: {ref!r} is not a residue range of A's chain {side.chain} "
                 f"(res:{side.chain}:1-60, {side.chain}:1-60 or 1-60)"
             )
-        lo = (int(m[1]), m[2])
-        hi = (int(m[3]), m[4]) if m[3] is not None else lo
-        lo, hi = min(lo, hi), max(lo, hi)
+        lo, hi = min(span[1:]), max(span[1:])
         mine = {k for k, l in enumerate(side.bb.labels) if lo <= (l.seq, l.icode) <= hi}
         if not mine:
             raise ValueError(f"domain {name}: {ref!r} names no residue of chain {side.chain} in A ({side.name})")
@@ -324,18 +355,18 @@ def _domain_residues(name: str, refs, side: _Side) -> set[int]:
 
 
 def _degrees(rot) -> float:
-    from .symmetry import _rotation
+    from .symmetry import axis_angle
 
-    return round(float(np.degrees(_rotation(rot)[0])), 3) + 0.0
+    return round(float(np.degrees(axis_angle(rot)[0])), 3) + 0.0
 
 
 def _domain_turns(
-    sa: _Side, sb: _Side, aln: ChainAlignment, r, t, domains: dict
+    sa: Side, sb: Side, aln: ChainAlignment, r, t, domains: dict
 ) -> tuple[dict[str, float], dict[str, float]]:
     """(turns, own): each domain's rotation (degrees, 0.001) of B's aligned residues of it, after the core fit, onto
     A's; and, with two domains or more, each domain after the first against the first, each fitted on its own (the
     Kabsch fit of B's aligned residues of it onto A's, no core: the angle of R_d·R_first^T), keyed 'FIRST/NAME'."""
-    from .symmetry import _kabsch
+    from .symmetry import kabsch
 
     ia, ib = (np.array(k, dtype=int) for k in zip(*aln.pairs)) if aln.pairs else (np.zeros(0, int),) * 2
     pa = np.asarray(sa.bb.ca, float)[ia]
@@ -343,14 +374,16 @@ def _domain_turns(
     pb = raw @ np.asarray(r).T + t
     turns, fits = {}, {}
     for name, refs in domains.items():
+        if "/" in name:  # domain_angles names FIRST/NAME
+            raise ValueError(f"domain {name}: a domain name cannot hold /")
         mine = _domain_residues(name, refs, sa)
         sel = np.array([i in mine for i in ia], bool)
         if sel.sum() < 3:
             raise ValueError(
                 f"domain {name}: {int(sel.sum())} of its residues aligned with B; its turn needs at least 3"
             )
-        turns[name] = _degrees(_kabsch(pb[sel], pa[sel])[0])
-        fits[name] = _kabsch(raw[sel], pa[sel])[0]
+        turns[name] = _degrees(kabsch(pb[sel], pa[sel])[0])
+        fits[name] = kabsch(raw[sel], pa[sel])[0]
     first, *rest = list(fits)
     return turns, {f"{first}/{name}": _degrees(fits[name] @ fits[first].T) for name in rest}
 
@@ -360,7 +393,7 @@ def _changes(a: set, b: set) -> list[tuple]:
     return [(*k, "gained") for k in b - a] + [(*k, "lost") for k in a - b]
 
 
-def _contacts(sa: _Side, sb: _Side, to_a: dict[str, str]) -> dict[str, tuple]:
+def _contacts(sa: Side, sb: Side, to_a: dict[str, str]) -> dict[str, tuple]:
     """Changes of what the chain touches, as foldmap data measures it (datafile; elements named by A's ids, B's
     through their mates or as pieces; an element only one structure has is in only_a / only_b, not here):
 
@@ -378,10 +411,10 @@ def _contacts(sa: _Side, sb: _Side, to_a: dict[str, str]) -> dict[str, tuple]:
     rank_a = {s.id: k for k, s in enumerate(sa.sses)}
     matched = set(to_a.values())
 
-    def name_a(side: _Side, i: str) -> str | None:
+    def name_a(side: Side, i: str) -> str | None:
         return (i if i in matched else None) if side is sa else to_a.get(i)
 
-    def element_pairs(side: _Side) -> set:
+    def element_pairs(side: Side) -> set:
         from .features import sse_contacts
 
         out = set()
@@ -391,24 +424,23 @@ def _contacts(sa: _Side, sb: _Side, to_a: dict[str, str]) -> dict[str, tuple]:
                 out.add(tuple(sorted((x, y), key=rank_a.__getitem__)))
         return out
 
-    def faces(side: _Side) -> dict[str, str]:
-        from .datafile import _interfaces
+    def faces(side: Side) -> dict[str, str]:
+        from .datafile import chain_interfaces
 
-        layout = SimpleNamespace(nucleic=None, chains_read=())
         model = side.model[0] if isinstance(side.model, tuple) else side.model
         out = {}
-        for row in _interfaces(layout, [], side.full, None, model):
+        for row in chain_interfaces(side.full, model):
             if side.chain in row["chains"] and row["contacts"]:
                 partner = next(c for c in row["chains"] if c != side.chain)
                 out[partner] = row["measure"]
         return out
 
-    def chain_index(side: _Side) -> dict[int, int]:
+    def chain_index(side: Side) -> dict[int, int]:
         """The whole structure's residue index -> the chain's."""
         mine = [k for k, l in enumerate(side.full.labels) if l.chain == side.chain]
         return {k: n for n, k in enumerate(mine)}
 
-    def touching(side: _Side, partners: set[str]) -> set:
+    def touching(side: Side, partners: set[str]) -> set:
         """(element as named in A, partner) for the chain's elements touching each partner protein chain."""
         from .features import sse_contacts
 
@@ -434,7 +466,7 @@ def _contacts(sa: _Side, sb: _Side, to_a: dict[str, str]) -> dict[str, tuple]:
                     out.add((x, partner[1:]))
         return out
 
-    def ligands(side: _Side) -> dict[str, set]:
+    def ligands(side: Side) -> dict[str, set]:
         """Ligand name -> the chain's elements (as named in A, None: a loop) touching it."""
         index = chain_index(side)
         own = _owner(side.sses, len(side.bb))

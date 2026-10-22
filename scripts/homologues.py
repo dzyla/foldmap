@@ -363,7 +363,7 @@ def _measure(sa, sb, domains: dict | None) -> dict:
     import numpy as np
 
     from foldmap import diff as diff_module
-    from foldmap.symmetry import _kabsch, _rotation
+    from foldmap.symmetry import axis_angle, kabsch
 
     out: dict = {}
     keep = diff_module.CORE_CUT
@@ -391,10 +391,10 @@ def _measure(sa, sb, domains: dict | None) -> dict:
                 rot = {}
                 for k, m in mine.items():
                     s = np.array([i in m for i in ia], bool)
-                    rot[k] = _kabsch(pb[s], pa[s])[0]
+                    rot[k] = kabsch(pb[s], pa[s])[0]
                 names = list(domains)
                 row["relative"] = {
-                    f"{x}/{y}": _round(np.degrees(_rotation(rot[x] @ rot[y].T)[0]))
+                    f"{x}/{y}": _round(np.degrees(axis_angle(rot[x] @ rot[y].T)[0]))
                     for n, x in enumerate(names)
                     for y in names[n + 1 :]
                 }
@@ -402,7 +402,7 @@ def _measure(sa, sb, domains: dict | None) -> dict:
     finally:
         diff_module.CORE_CUT = keep
     out["route"] = d.alignment.method
-    out["all_rmsd"] = _round(_kabsch(pb, pa)[2])  # one fit on every aligned pair, as random-100's ca_rmsd
+    out["all_rmsd"] = _round(kabsch(pb, pa)[2])  # one fit on every aligned pair, as random-100's ca_rmsd
     out["counts"] = dict(sorted(diff_module.counts(d).items()))
     out["ligands"] = [list(r) for r in d.contacts["ligands"]]
     out["interfaces"] = [list(r) for r in d.contacts["interfaces"]]
@@ -438,7 +438,7 @@ def diff_pair(pair: dict, out: Path) -> dict:
     assembly, the pair's domains), the page written (DIR/<stem>.png and .svg, the JSON as --json writes it), H5 and
     the S-/A-checks of each panel (compare.panel_checks) and the Diff's numbers at each cut of CUTS (_measure)."""
     from foldmap.compare import diff_page, panel_checks, write_json
-    from foldmap.diff import CORE_CUT, _side
+    from foldmap.diff import CORE_CUT, read_side
     from foldmap.render import save
     from foldmap.style import resolve_style
 
@@ -456,8 +456,8 @@ def diff_pair(pair: dict, out: Path) -> dict:
     write_json(made.data, out / f"{s}-diff.json")
     found: dict = {}
     h5 = panel_checks(made, "auto", found)
-    sa = _side(a, ca, "A", "auto", look.helices_310)
-    sb = _side(b, cb, "B", "auto", look.helices_310)
+    sa = read_side(a, ca, "A", "auto", look.helices_310)
+    sb = read_side(b, cb, "B", "auto", look.helices_310)
     measured = _measure(sa, sb, domains)
     result = {
         "pair": s,

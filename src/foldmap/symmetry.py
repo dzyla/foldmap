@@ -145,7 +145,7 @@ class _Assembly:
 
 
 # ---------------------------------------------------------------------------------------------- geometry
-def _kabsch(p: np.ndarray, q: np.ndarray) -> tuple[np.ndarray, np.ndarray, float]:
+def kabsch(p: np.ndarray, q: np.ndarray) -> tuple[np.ndarray, np.ndarray, float]:
     """R, t with q ~ p @ R.T + t, and the RMSD."""
     pc, qc = p.mean(axis=0), q.mean(axis=0)
     u, _, vt = np.linalg.svd((p - pc).T @ (q - qc))
@@ -155,7 +155,7 @@ def _kabsch(p: np.ndarray, q: np.ndarray) -> tuple[np.ndarray, np.ndarray, float
     return r, t, float(np.sqrt(((p @ r.T + t - q) ** 2).sum(axis=1).mean()))
 
 
-def _rotation(r: np.ndarray) -> tuple[float, np.ndarray]:
+def axis_angle(r: np.ndarray) -> tuple[float, np.ndarray]:
     """(angle, unit axis) of a rotation matrix, the angle in [0, pi]."""
     angle = float(np.arccos(np.clip((np.trace(r) - 1) / 2, -1, 1)))
     axis = np.array([r[2, 1] - r[1, 2], r[0, 2] - r[2, 0], r[1, 0] - r[0, 1]])
@@ -177,7 +177,7 @@ def _turn(axis: np.ndarray, angle: float) -> np.ndarray:
 
 def _screw(r: np.ndarray, t: np.ndarray) -> tuple[float, np.ndarray, np.ndarray, float]:
     """A rigid motion x -> R x + t as a screw: (angle, axis, a point on the axis, rise along it)."""
-    angle, axis = _rotation(r)
+    angle, axis = axis_angle(r)
     rise = float(t @ axis)
     perp = t - rise * axis
     centre = np.linalg.lstsq(np.eye(3) - r, perp, rcond=None)[0]
@@ -197,8 +197,8 @@ def _candidate_axes(asm: _Assembly, tol: float) -> list[np.ndarray]:
                 p, q = asm.pair(a, b)
                 if len(p) < MIN_RES:
                     continue
-                r, _, rmsd = _kabsch(p, q)
-                angle, ax = _rotation(r)
+                r, _, rmsd = kabsch(p, q)
+                angle, ax = axis_angle(r)
                 if rmsd <= tol and angle >= MIN_TURN and not any(abs(ax @ x) > 0.99 for x in axes):
                     axes.append(ax)
     return axes
@@ -291,7 +291,7 @@ def _refine(asm: _Assembly, perm: dict[str, str], n: int, axis: np.ndarray, cent
     """Fit the axis to all copies at once; keep the guess if the fit is no better."""
     p = np.vstack([asm.pair(a, perm[a])[0] for a in perm])
     q = np.vstack([asm.pair(a, perm[a])[1] for a in perm])
-    r, t, _ = _kabsch(p, q)
+    r, t, _ = kabsch(p, q)
     _, ax, cen, _ = _screw(r, t)
     if ax @ axis < 0:
         ax = -ax
@@ -338,7 +338,7 @@ def _helical(asm: _Assembly, tol: float, min_copies: int):
                 p, q = asm.pair(a, b)
                 if len(p) < MIN_RES:
                     continue
-                r, t, rmsd = _kabsch(p, q)
+                r, t, rmsd = kabsch(p, q)
                 angle, ax, cen, rise = _screw(r, t)
                 if rmsd > tol or abs(rise) < MIN_RISE or abs(angle) < MIN_TWIST:
                     continue
@@ -418,7 +418,7 @@ def _from_user(asm: _Assembly, protomers: list[list[str]], tol: float) -> Symmet
 
     p0 = np.vstack([asm.pair(protomers[0][i], protomers[1][i])[0] for i in range(len(protomers[0]))])
     p1 = np.vstack([asm.pair(protomers[0][i], protomers[1][i])[1] for i in range(len(protomers[0]))])
-    r, t, rmsd = _kabsch(p0, p1)
+    r, t, rmsd = kabsch(p0, p1)
     angle, axis, centre, rise = _screw(r, t)
     n = len(protomers)
     others = sorted(known - {c for p in protomers for c in p})

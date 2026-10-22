@@ -8,7 +8,7 @@ hatch for any pair the aligner gets wrong). `auto` takes the sequence route when
 40 % identical and its pairs superpose as one fold (TM-score at least SEQUENCE_ROUTE_TM), else the structure route.
 Every route then scores its pairs with the TM-score normalised by A's chain length, over the superposition of B on A
 that maximises it (TM-align's search: Kabsch on fragments of the pairs, then on the pairs within a cutoff, repeated),
-always a proper rotation (symmetry._kabsch, never a mirror).
+always a proper rotation (symmetry.kabsch, never a mirror).
 element_mates then says which of B's elements are which of A's (mates, pieces of a split helix, extras) and whether
 the two chains are one fold (H1).
 
@@ -69,7 +69,7 @@ def _terms(d: np.ndarray, scale: float) -> np.ndarray:
     return np.round(_SCORE / (1.0 + (d / scale) ** 2)) / _SCORE
 
 
-def _dist(pa: np.ndarray, pb: np.ndarray, r: np.ndarray, t: np.ndarray) -> np.ndarray:
+def pair_distances(pa: np.ndarray, pb: np.ndarray, r: np.ndarray, t: np.ndarray) -> np.ndarray:
     """|R·b + t − a| for each pair, snapped to 1/GRID Å."""
     return np.round(np.sqrt(((pb @ r.T + t - pa) ** 2).sum(axis=1)) * GRID) / GRID
 
@@ -93,7 +93,7 @@ def _search(pa: np.ndarray, pb: np.ndarray, scale: float, step: int) -> tuple[fl
     highest TM-score that TM-align's search finds. Starts: all pairs, then contiguous fragments of n/2, n/4 … n/32
     pairs (at least 4) every `step` pairs; from each, Kabsch on the selection, keep the pairs closer than
     d0_search, refit, up to ROUNDS times or until the selection repeats one already fitted."""
-    from .symmetry import _kabsch
+    from .symmetry import kabsch
 
     n = len(pa)
     starts, size = [(0, n)], n // 2
@@ -116,8 +116,8 @@ def _search(pa: np.ndarray, pb: np.ndarray, scale: float, step: int) -> tuple[fl
             if key in fitted:
                 break
             fitted.add(key)
-            r, t, _ = _kabsch(pb[sel], pa[sel])
-            d = _dist(pa, pb, r, t)
+            r, t, _ = kabsch(pb[sel], pa[sel])
+            d = pair_distances(pa, pb, r, t)
             score = float(_terms(d, scale).sum())  # exact: snapped terms
             if score > best:
                 best, best_r, best_t = score, r, t
@@ -129,14 +129,14 @@ def tm_score(ca_a, ca_b, pairs, length_a, step: int = 1) -> tuple[float, np.ndar
     """(TM-score, R, t, RMSD) of B's Cα on A's over `pairs` ((i in A, j in B)), with A ≈ R·B + t the proper rotation
     that maximises the TM-score (_search; fragment starts every `step` pairs). Each pair scores 1/(1+(d/d0)²),
     d snapped to 1/GRID Å, summed over length_a. The RMSD is over all pairs after their own Kabsch fit."""
-    from .symmetry import _kabsch
+    from .symmetry import kabsch
 
     if not len(pairs):
         return 0.0, np.eye(3), np.zeros(3), 0.0
     ia, ib = (np.array(k, dtype=int) for k in zip(*pairs))
     pa, pb = np.asarray(ca_a, float)[ia], np.asarray(ca_b, float)[ib]
     score, r, t = _search(pa, pb, d0(length_a), step)
-    rmsd = _kabsch(pb, pa)[2]
+    rmsd = kabsch(pb, pa)[2]
     return score / length_a, r, t, rmsd
 
 
@@ -203,17 +203,17 @@ def _matrix(ca_a: np.ndarray, ca_b: np.ndarray, r: np.ndarray, t: np.ndarray, sc
 def _quick(pa: np.ndarray, pb: np.ndarray, scale: float) -> float:
     """A gapless threading's score, as TM-align's get_score_fast: the best TM-score sum of a Kabsch fit on all
     pairs and two refits on the pairs within d0_search, then within √(d0_search² + 1)."""
-    from .symmetry import _kabsch
+    from .symmetry import kabsch
 
-    r, t, _ = _kabsch(pb, pa)
-    d = _dist(pa, pb, r, t)
+    r, t, _ = kabsch(pb, pa)
+    d = pair_distances(pa, pb, r, t)
     best = float(_terms(d, scale).sum())
     for cut in (_cutoff(scale), float(np.sqrt(_cutoff(scale) ** 2 + 1))):
         sel = _within(d, cut)
         if sel.all():
             continue
-        r, t, _ = _kabsch(pb[sel], pa[sel])
-        d = _dist(pa, pb, r, t)
+        r, t, _ = kabsch(pb[sel], pa[sel])
+        d = pair_distances(pa, pb, r, t)
         best = max(best, float(_terms(d, scale).sum()))
     return best
 
@@ -285,7 +285,7 @@ def _structure_pairs(a: Backbone, b: Backbone, seq_pairs) -> tuple[list[tuple[in
         if not pairs:
             continue
         ia, ib = (np.array(k, dtype=int) for k in zip(*pairs))
-        near = _dist(ca_a[ia], ca_b[ib], r, t) <= far
+        near = pair_distances(ca_a[ia], ca_b[ib], r, t) <= far
         pairs = [p for p, keep in zip(pairs, near) if keep]
         tm = tm_score(ca_a, ca_b, pairs, n)
         if tm[0] > scored[0]:

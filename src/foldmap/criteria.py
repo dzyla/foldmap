@@ -647,11 +647,11 @@ def like_pairs(lay_a, lay_b, mates) -> list[tuple[str, str, tuple[str, ...]]]:
     return sorted(found, key=lambda x: (pa[x[0]].sse.start, x[0]))
 
 
-def _centres(lay, ids) -> np.ndarray:
+def element_centres(lay, ids) -> np.ndarray:
     return np.array([(lay.placed[k].cx, lay.placed[k].cy) for k in ids], float).reshape(-1, 2)
 
 
-def _part_centres(lay, pairs) -> np.ndarray:
+def part_centres(lay, pairs) -> np.ndarray:
     """Each mate's centre on B's page (like_pairs' pairs): its own, or for a helix drawn in parts the middle of their
     run, from its first end to its last along the mate's axis (like.like_from centres the run on A's helix)."""
     out = []
@@ -686,14 +686,14 @@ def _too_few(pairs) -> dict | None:
 
 def place_deviation(lay_a, lay_b, pairs) -> dict | None:
     """H2's measure: the median and 90th percentile (numpy's linear interpolation) of the mates' centre deviations
-    after the best rigid 2D motion of B's centres (_part_centres) onto A's (figcheck.fit_deviations, A15's
+    after the best rigid 2D motion of B's centres (part_centres) onto A's (figcheck.fit_deviations, A15's
     Procrustes: a turn and a shift, no mirror), rounded to 1e-3 page units, and the farthest mate; None under
     LIKE_MIN_MATES mates."""
     from .figcheck import fit_deviations
 
     if len(pairs) < LIKE_MIN_MATES:
         return None
-    dev = fit_deviations(_centres(lay_a, [a for a, *_ in pairs]), _part_centres(lay_b, pairs))
+    dev = fit_deviations(element_centres(lay_a, [a for a, *_ in pairs]), part_centres(lay_b, pairs))
     far = int(np.argmax(dev))
     a, b, _ = pairs[far]
     return {
@@ -727,7 +727,7 @@ def relations(lay_a, lay_b, pairs) -> dict | None:
     (sheet_orders). None under LIKE_MIN_MATES mates or with no two mates far enough apart."""
     if len(pairs) < LIKE_MIN_MATES:
         return None
-    ca, cb = _centres(lay_a, [a for a, *_ in pairs]), _part_centres(lay_b, pairs)
+    ca, cb = element_centres(lay_a, [a for a, *_ in pairs]), part_centres(lay_b, pairs)
     judged, turned = 0, []
     for i in range(len(pairs)):
         for j in range(i + 1, len(pairs)):
@@ -770,8 +770,8 @@ def sheet_orders(lay_a, lay_b, pairs) -> list[str]:
             across = np.array([-np.sin(mean), np.cos(mean)])
             if across[0] < -1e-9 or (abs(across[0]) <= 1e-9 and across[1] < 0):  # read left to right (or upward)
                 across = -across
-            pa = _centres(lay_a, [mate[b] for b in strands]) @ across
-            pb = _centres(lay_b, strands) @ across
+            pa = element_centres(lay_a, [mate[b] for b in strands]) @ across
+            pb = element_centres(lay_b, strands) @ across
             if all(
                 (pb[j] - pb[i]) * (pa[j] - pa[i]) > 0
                 for i in range(len(strands))

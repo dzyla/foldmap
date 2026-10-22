@@ -97,10 +97,10 @@ def partner_findings(spots: list[Spot], partner: dict[str, str], unshown=frozens
 
 def bridge_counts(sses: Iterable[SSE], bridges: list[Bridge]) -> Callable[[str, str], int]:
     """The number of DSSP bridges between two strands, by id (0 for any pair not bridged)."""
-    from .sheets import _edge_table
+    from .sheets import edge_table
 
     strands = [s for s in sses if s.kind == "E"]
-    table = _edge_table(strands, bridges, minimum=1)
+    table = edge_table(strands, bridges, minimum=1)
     by_pair = {frozenset((strands[a].id, strands[b].id)): sum(c.values()) for (a, b), c in table.items()}
     return lambda a, b: by_pair.get(frozenset((a, b)), 0)
 

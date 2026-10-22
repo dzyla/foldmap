@@ -127,7 +127,9 @@ def structure_data(
         elif section == "ligands":
             out[section] = _ligands(layout, sses, bb, model)
         elif section == "interfaces":
-            out[section] = _interfaces(layout, sses, bb, found, model)
+            out[section] = chain_interfaces(
+                bb, model, sses=sses, nucleic=layout.nucleic, chains_read=layout.chains_read, found=found
+            )
         elif section == "nucleic_acid":
             na = layout.nucleic
             drawn = na is not None and na.strands
@@ -275,7 +277,7 @@ def _same_cycle(got: list[str], want: list[str], closed: bool) -> bool:
     return any(got in (t, t[::-1]) for t in turns)
 
 
-def _pair(a, b, bridges, labels) -> dict:
+def strand_pairing(a, b, bridges, labels) -> dict:
     """Strands a and b as a pairing: its kind (the bridges' majority, P or A, as sheets._majority) and register
     (each bridge, a's residue then b's, in a's order)."""
     reg = []
@@ -326,7 +328,7 @@ def _sheets(layout, sses, bb) -> list[dict]:
         order = drawn if as_drawn else track
         sense = direction[order[0]]
         steps = list(zip(order, order[1:])) + ([(order[-1], order[0])] if sheet.closed and len(order) > 2 else [])
-        pairs = [_pair(by_id[a], by_id[b], bridges, bb.labels) for a, b in steps]
+        pairs = [strand_pairing(by_id[a], by_id[b], bridges, bb.labels) for a, b in steps]
         barrel = {"n": len(order), "shear": _shear(pairs)} if sheet.closed else None
         for p in pairs:
             del p["_reg"]
@@ -621,21 +623,21 @@ def _counts(kinds: Counter | None) -> dict | None:
     return None if kinds is None else {k: int(kinds[k]) for k in INTERACTION_KINDS}
 
 
-def _na_faces(layout, bb, model) -> tuple[dict, dict]:
+def _na_faces(na, chains_read, bb, model) -> tuple[dict, dict]:
     """The nucleic acid's chain pairs in contact: (protein chain, nucleic-acid chain) -> (residue-nucleotide pairs
     with a heavy atom of each within io.CONTACT, 4 Å: the rule the figure's contacts are read by, io.na_contacts;
     the protein residues and the nucleotides in them), measured on the structure (`model`: every nucleotide of the
     chains read, cropped or not; without it, the nucleic acid the figure draws); and (nucleic-acid chain,
     nucleic-acid chain) -> (base pairs between them, the nucleotides of each in them), the base pairs the figure
-    draws (nucleic.py's)."""
-    na = layout.nucleic
+    draws (nucleic.py's). `na`: the nucleic acid the figure draws (None: none); `chains_read`: the chains read
+    (none: every one)."""
     protein: dict[tuple[str, str], list] = {}
     if model is not None:
         import gemmi
 
         from .io import _nucleic_strands, na_contacts
 
-        read = set(layout.chains_read)
+        read = set(chains_read)
         found = [(st, run) for st, run in _nucleic_strands(model) if not read or st.chain in read]
         strand_chain = [st.chain for st, _ in found]
         contacts = {}
@@ -662,24 +664,25 @@ def _na_faces(layout, bb, model) -> tuple[dict, dict]:
     return protein, paired
 
 
-def _interfaces(layout, sses, bb, found: dict | None, model=None) -> list[dict]:
-    """Each pair of chains in contact, by its measure: two protein chains with CAs within features.CONTACT_CUTOFF
-    (8 Å), "ca"; a protein and a nucleic-acid chain with a residue and a nucleotide in contact (_na_faces: heavy
-    atoms within 4 Å, on the structure), "atoms"; two nucleic-acid chains base-paired (the figure's pairs),
-    "base_pairs"; and with the interactions section any two chains with an interaction between them. For each, the
-    pairs in contact by its measure and the residues (nucleotides) of each chain in them, the CA pairs (protein
-    chains), its element pairs (features.sse_contacts: CA pairs within 8 Å, listed from MIN_CONTACT_PAIRS), and with
-    `found` (the interactions section) the interactions by kind, in all and by element pair (an end outside the
-    elements: null)."""
+def chain_interfaces(bb, model=None, *, sses=(), nucleic=None, chains_read=(), found: dict | None = None) -> list[dict]:
+    """Each pair of chains in contact, by its measure: two protein chains of `bb` with CAs within
+    features.CONTACT_CUTOFF (8 Å), "ca"; a protein and a nucleic-acid chain with a residue and a nucleotide in
+    contact (_na_faces: heavy atoms within 4 Å, on the structure `model`, else on `nucleic`), "atoms"; two
+    nucleic-acid chains base-paired (`nucleic`'s pairs: the figure's), "base_pairs"; and with the interactions
+    section any two chains with an interaction between them. For each, the pairs in contact by its measure and the
+    residues (nucleotides) of each chain in them, the CA pairs (protein chains), its element pairs among `sses`
+    (features.sse_contacts: CA pairs within 8 Å, listed from MIN_CONTACT_PAIRS), and with `found` (the interactions
+    section) the interactions by kind, in all and by element pair (an end outside the elements: null). Chains are
+    ranked as `chains_read` (the figure's) lists them, then as `bb`, then the nucleic acid's."""
     from scipy.spatial import cKDTree
 
     from .features import CONTACT_CUTOFF, sse_contacts
 
     chains = [l.chain for l in bb.labels]
     protein_chains = set(chains)
-    na = layout.nucleic
+    na = nucleic
     na_chains = [st.chain for st in na.strands] if na is not None else []
-    rank = {c: n for n, c in enumerate(dict.fromkeys([*layout.chains_read, *chains, *na_chains]))}
+    rank = {c: n for n, c in enumerate(dict.fromkeys([*chains_read, *chains, *na_chains]))}
     order = {s.id: n for n, s in enumerate(sses)}
     chain_of = {s.id: s.chain for s in sses}
     pairs: dict[tuple[str, str], dict] = {}
@@ -711,7 +714,7 @@ def _interfaces(layout, sses, bb, found: dict | None, model=None) -> list[dict]:
                 face, _ = at(chains[int(i[mask][0])], chains[int(j[mask][0])])
                 face["ca_pairs"] = face["contacts"] = int(mask.sum())
                 face["residues"] = [len(np.unique(i[mask])), len(np.unique(j[mask]))]
-    for faces in _na_faces(layout, bb, model):
+    for faces in _na_faces(nucleic, chains_read, bb, model):
         for (a, b), (n, mine, theirs) in sorted(faces.items()):
             face, swap = at(a, b)
             face["contacts"] = n

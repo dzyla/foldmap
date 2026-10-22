@@ -373,7 +373,7 @@ def test_a_sheet_drawn_open_holds_no_ring_the_builder_finds():
     import networkx as nx
 
     import foldmap.layout as layout
-    from foldmap.sheets import _edge_table, _ring
+    from foldmap.sheets import _ring, edge_table
 
     rng = random.Random(12)
     opened = 0
@@ -387,7 +387,7 @@ def test_a_sheet_drawn_open_holds_no_ring_the_builder_finds():
             i, j = rng.sample(range(n), 2)
             br += ladder(t[i], t[j], "A", rng.randint(1, 6))
         graph = nx.Graph()
-        graph.add_weighted_edges_from((a, b, sum(c.values())) for (a, b), c in _edge_table(t, br).items())
+        graph.add_weighted_edges_from((a, b, sum(c.values())) for (a, b), c in edge_table(t, br).items())
         for sh in build_sheets(t, br):
             assert not hasattr(sh, "unclosed")
             if sh.closed:

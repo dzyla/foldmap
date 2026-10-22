@@ -779,6 +779,7 @@ def make_layout(
         lay.uncarried = _uncarried(frame, dyad if frame is dyad else None, mode, duplex, sym)
         lay.na_read = na_read if na_cropped else 0
         lay.links = links
+        lay.bridges = list(dssp.bridges)
         lay.res_chain = [l.chain for l in bb.labels]
         lay.res_name = [l.name for l in bb.labels]
         lay.res_labels = list(bb.labels)
@@ -991,7 +992,9 @@ def _drawn_like(
         # check (Q-A19) leaves them out; only render reads a mark, so the reference is laid out as before
         mine = dataclasses.replace(look, mark="") if look is not None and look.mark else look
         args, kw = (mode, rotate, flip_v), {"dna": dna, "look": mine, "assembly": assembly, "up": up, "view": view}
-    model = read_model(ref, kw["assembly"])
+    model = like.get("model")  # already read as `assembly` reads it (compare's diff page), else read here
+    if model is None or like.get("layout"):
+        model = read_model(ref, kw["assembly"])
     present = list(dict.fromkeys(l.chain for l in load_backbone(ref, kw["assembly"], model=model).labels))
     asked = [c.strip() for c in str(like.get("chain") or "").split(",") if c.strip()]
     missing = [c for c in asked if c not in present]
@@ -1990,7 +1993,8 @@ def _diff_parser(sub) -> None:
         "--json",
         metavar="PATH",
         help="also write what changed: compare's matching (alignment, mates, pieces, extras, only_a), then "
-        "ss_changes, pairing, displacement, core, domain_turns and contacts",
+        "ss_changes, pairing, displacement, core (how many pairs the core fit kept), domain_turns, domain_angles (two "
+        "domains or more: each against the first, each fitted on its own) and contacts",
     )
     dq.add_argument(
         "--check",
@@ -2005,7 +2009,8 @@ def _diff_parser(sub) -> None:
 
 def diff_domains(given: list[str]) -> dict[str, list[str]]:
     """--domain NAME=RANGES (each a comma-separated list of ranges) as diff_structures' domains, in the order
-    given; a UsageError for one without a name or ranges, or a name given twice."""
+    given; a UsageError for one without a name or ranges, a name given twice, or a name with "/" in it (the --json
+    domain_angles key is FIRST/NAME)."""
     out: dict[str, list[str]] = {}
     for text in given:
         name, _, ranges = text.partition("=")
@@ -2013,6 +2018,8 @@ def diff_domains(given: list[str]) -> dict[str, list[str]]:
         parts = [r.strip() for r in ranges.split(",") if r.strip()]
         if not name or not parts:
             raise UsageError(f"--domain {text!r}: give NAME=RANGES, e.g. LID=122-159 or CORE=1-29,60-121")
+        if "/" in name:
+            raise UsageError(f"--domain {name}: a domain name cannot hold / (domain_angles names FIRST/NAME)")
         if name in out:
             raise UsageError(f"--domain {name} is given twice")
         out[name] = parts

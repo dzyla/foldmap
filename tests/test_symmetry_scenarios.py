@@ -362,7 +362,7 @@ def test_an_icosahedral_cage_is_found_without_superposing_every_pair_again(tmp_p
     from foldmap import symmetry
 
     calls = {"kabsch": 0, "pair": 0}
-    kabsch, pair = symmetry._kabsch, symmetry._Assembly.pair
+    kabsch, pair = symmetry.kabsch, symmetry._Assembly.pair
 
     def count_kabsch(p, q):
         calls["kabsch"] += 1
@@ -372,7 +372,7 @@ def test_an_icosahedral_cage_is_found_without_superposing_every_pair_again(tmp_p
         calls["pair"] += 1
         return pair(self, a, b)
 
-    monkeypatch.setattr(symmetry, "_kabsch", count_kabsch)
+    monkeypatch.setattr(symmetry, "kabsch", count_kabsch)
     monkeypatch.setattr(symmetry._Assembly, "pair", count_pair)
     path = icosahedral(tmp_path)
     t = time.perf_counter()

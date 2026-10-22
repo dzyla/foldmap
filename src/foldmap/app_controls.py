@@ -994,13 +994,8 @@ def use_reference(ss: MutableMapping, path, name: str, sid: str = "", keep: dict
     from foldmap.app import like_entry, local_files
 
     lim = app_jobs.limits(hosted=not local_files())
-    try:
-        size = app_jobs.run_job(app_jobs.size_job, str(path), limits=lim)
-    except (ValueError, OSError, RuntimeError, app_jobs.JobLimit) as err:
-        if isinstance(err, (OSError, RuntimeError)) and not isinstance(err, app_jobs.JobFailed):
-            text = f"{name} could not be read as a structure (mmCIF or PDB)"
-        else:
-            text = app_jobs.explain(err, name, lim)[0]
+    size, text = app_jobs.read_size(path, name, lim)
+    if size is None:
         ss["like_error"] = text.replace(str(path), name)
         return False
     own = int(ss.get("residues") or 0)
@@ -1015,7 +1010,7 @@ def use_reference(ss: MutableMapping, path, name: str, sid: str = "", keep: dict
         return False
     like = like_entry(str(path), name, id=sid, b=ss.get("name", ""))
     like.update({k: v for k, v in (keep or {}).items() if k in ("chain", "match", "page", "domains")})
-    ss.update(like=like, like_error="", last_changed="like")
+    ss.update(like=like, like_error="", like_link_error="", last_changed="like")
     like_widgets(ss, like)
     return True
 
@@ -1073,14 +1068,15 @@ def set_reference(ss: MutableMapping, upload: bool = False) -> None:
 
 def clear_reference(ss: MutableMapping) -> None:
     """Draw on its own again: no reference (New structure does this too)."""
-    ss.update(like=None, like_error="", like_missing=[], last_changed="like")
+    ss.update(like=None, like_error="", like_link_error="", like_missing=[], last_changed="like")
     ss.pop("like_uploaded", None)
     like_widgets(ss, None)
 
 
 def like_changed(ss: MutableMapping, field: str) -> None:
     """The reference's chain, page (what the canvas shows) or the diff's domains changed: the settings' `like`
-    takes it (a new dict: the figure's cache key changes); domains that do not parse are said and not taken."""
+    takes it (a new dict: the figure's cache key changes); domains that do not parse, and a chain that is no chain
+    id (LIKE_CHAIN, as a share link carries it), are said and not taken."""
     from foldmap.app import like_domains
 
     like = dict(ss.get("like") or {})
@@ -1097,6 +1093,9 @@ def like_changed(ss: MutableMapping, field: str) -> None:
         except ValueError as err:
             ss["like_error"] = str(err)
             return
+    if field == "chain" and value and not all(LIKE_CHAIN.fullmatch(c) for c in value.split(",")):
+        ss["like_error"] = f"Reference chain {value}: a chain id is 1-4 letters or digits (e.g. A)"
+        return
     like[field] = value
     ss.update(like=like, like_error="", last_changed="like")
 

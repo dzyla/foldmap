@@ -249,7 +249,7 @@ def test_a_dimer_sheet_shared_by_two_copies_keeps_them_alike(monkeypatch, turned
     twice, with one continuous sheet across the two copies, an item no tie holds. It sat between A1's eta2 and its
     copy, the tied pushes never cleared and _separate drew the copies one by one, unalike (A15). The shared items now
     yield to the tied copies: A2~A1 and B2~B1 are drawn exactly alike. The dyad is a half-turn whose axis may point
-    either way (symmetry._rotation signs it): the copies are alike drawn either way up, and turned over against
+    either way (symmetry.axis_angle signs it): the copies are alike drawn either way up, and turned over against
     that sign the fixture still needs the shared items to yield (without that, b029264's parent: no `shared`, it is
     drawn unalike), so it holds the case whatever the sign. Drawn unrolled side by side, as before plan 18: in the
     dyad view (one copy and its mirror image) the shared sheet no longer stands between the copies."""
@@ -320,7 +320,7 @@ def test_a_sheet_seen_across_the_page_is_drawn_the_same_on_any_cpu(monkeypatch, 
 
 def test_a_dyad_points_the_same_way_on_any_cpu(monkeypatch):
     """1SLV's dyad is a crystallographic half-turn: the copies' rotation has no antisymmetric part, and
-    symmetry._rotation took the axis from np.linalg.eigh, whose sign LAPACK leaves free (OPENBLAS_CORETYPE=Nehalem,
+    symmetry.axis_angle took the axis from np.linalg.eigh, whose sign LAPACK leaves free (OPENBLAS_CORETYPE=Nehalem,
     Windows and numpy 1.24's OpenBLAS turned it over, and the figure upside down). It is now signed by a rule of its
     own, whatever sign eigh returns."""
     import foldmap.cli as cli

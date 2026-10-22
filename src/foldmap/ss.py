@@ -11,7 +11,7 @@ import re
 import numpy as np
 
 from .model import SSE, Backbone, Bridge, homolog_chains, same_place
-from .sheets import _MIN_PAIRS, _SPLIT_GAP, _edge_table
+from .sheets import _MIN_PAIRS, _SPLIT_GAP, edge_table
 
 log = logging.getLogger(__name__)
 
@@ -101,7 +101,7 @@ def _join_bulged_pieces(sses: list[SSE], ss: str, bb: Backbone, bridges: list[Br
     for shared in (False, True):
         while True:
             strands = sorted((s for s in sses if s.kind == "E"), key=lambda s: s.start)
-            table = _edge_table(strands, bridges, _MIN_PAIRS)
+            table = edge_table(strands, bridges, _MIN_PAIRS)
 
             pairs = range(len(strands) - 1)
             if shared:

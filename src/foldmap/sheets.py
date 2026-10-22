@@ -16,7 +16,7 @@ _BARREL_MIN = 5  # strands a sheet needs before a lone end-to-end bridge may clo
 _MIN_PAIRS = 2  # bridges needed between two strands to count them as neighbours
 
 
-def _edge_table(strands: list[SSE], bridges: list[Bridge], minimum: int = _MIN_PAIRS):
+def edge_table(strands: list[SSE], bridges: list[Bridge], minimum: int = _MIN_PAIRS):
     owner: dict[int, int] = {}
     for k, s in enumerate(strands):
         for r in range(s.start, s.end + 1):
@@ -136,8 +136,8 @@ def build_sheets(sses: list[SSE], bridges: list[Bridge]) -> list[Sheet]:
     always closed (its ends are a pairing left out of the tree); a shorter cycle is no barrel (drawn open unless a
     path's two ends pair; the pairing it does not draw side by side is a chord)."""
     strands = [s for s in sses if s.kind == "E"]
-    table = _edge_table(strands, bridges)
-    weak = _edge_table(strands, bridges, minimum=1)  # single bridges, used only to close barrels
+    table = edge_table(strands, bridges)
+    weak = edge_table(strands, bridges, minimum=1)  # single bridges, used only to close barrels
     graph = nx.Graph()
     graph.add_nodes_from(range(len(strands)))
     for (a, b), c in table.items():

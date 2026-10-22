@@ -34,7 +34,7 @@ from typing import Any
 import numpy as np
 from matplotlib.figure import Figure
 
-from .layout import _snap, font_pt, page_fit, page_scale
+from .layout import font_pt, page_fit, page_scale, snap
 from .model import res_ref
 from .render import draw, draw_page_legend, legible, page, page_legend, page_notes, page_size, pin_fonts
 from .route import route_loops
@@ -91,18 +91,22 @@ def _lay_out(
     assembly: str,
     same_protein: bool = False,
     names: tuple = (None, None),
+    models: tuple = (None, None),
 ) -> _Laid:
     """Both panels laid out: B like A (cli.make_layout's like; `same_protein`: drawn alike even under the fold's
     TM-score, two states of one protein), else each on its own. `names`: what the titles and notes call A and B
-    (None: reference_name of the source; the app passes an upload's name as uploaded)."""
+    (None: reference_name of the source; the app passes an upload's name as uploaded). `models`: A's and B's
+    io.read_model as `assembly` reads them, when already read (None: read here)."""
     from .align import align_chains, element_mates
     from .cli import make_layout, one_chain, resolve_structure
     from .io import load_backbone, read_model
     from .like import reference_name
 
     path_b = resolve_structure(str(source_b))
-    model_b = read_model(path_b, assembly)
+    model_b = models[1] if models[1] is not None else read_model(path_b, assembly)
     like = {"structure": str(source_a), "chain": chain_a, "match": match, "layout": None}
+    if models[0] is not None:
+        like["model"] = models[0]
     if same_protein:
         like["same_protein"] = True
     if names[0]:
@@ -120,7 +124,7 @@ def _lay_out(
     chain_b = bb_b.labels[0].chain if len(bb_b) else (chain_b or "")
     path_a = resolve_structure(str(source_a))
     if got.get("reference") is None:  # B's own frame cannot be carried: drawn on its own; A laid out here
-        model_a = read_model(path_a, assembly)
+        model_a = models[0] if models[0] is not None else read_model(path_a, assembly)
         present = list(dict.fromkeys(l.chain for l in load_backbone(path_a, assembly, model=model_a).labels))
         one = one_chain([chain_a] if chain_a else None, present, "--chain-a", str(source_a))
         lay_a, sses_a, bb_a = make_layout(path_a, look=look, chains=[one], assembly=assembly, model=model_a)
@@ -185,18 +189,26 @@ def diff_page(
 ) -> Compared:
     """What changed from `source_a` to `source_b` (files or PDB ids; one protein chain of each, `chain_a`,
     `chain_b`, else each its first) drawn on their compare page (module docstring): diff.diff_structures' Diff, the
-    page drawn as compare draws it with the alignment route diff took (auto: by sequence when the chains are one
-    protein, A19's rule, else by structure). `domains` ({name: residue range or ranges of A's chain}) adds each
-    domain's turn to the note. `names`: as compare's. Compared.data is diff_json; Compared.diff the Diff."""
-    from .diff import diff_structures
+    page drawn as compare draws it with the alignment route diff takes (auto: by sequence when the chains are one
+    protein, A19's rule, else by structure). Each structure is read once and its chain's DSSP run once: the Diff is
+    made from the panels as laid out (diff.drawn_side), with the page's alignment and mates. `domains` ({name:
+    residue range or ranges of A's chain}) adds each domain's turn to the note. `names`: as compare's.
+    Compared.data is diff_json; Compared.diff the Diff."""
+    from .diff import diff_sides, drawn_side, read_structure, route
     from .userdata import ResidueData
 
     look = (look or Style()).validate()
-    d = diff_structures(source_a, chain_a, source_b, chain_b, match, domains, assembly=assembly, look=look)
-    route = d.alignment.method if match == "auto" else match
-    one = match == "auto" and route == "sequence"  # one protein by A19's rule (diff._route): its states drawn alike
-    laid = _lay_out(source_a, source_b, chain_a, chain_b, route, look, assembly, one, names)
+    read_a = read_structure(source_a, chain_a, "A", assembly)
+    read_b = read_structure(source_b, chain_b, "B", assembly)
+    way = route(read_a.full.only([read_a.chain]), read_b.full.only([read_b.chain]), match)
+    one = match == "auto" and way == "sequence"  # one protein by A19's rule (diff.route): its states drawn alike
+    laid = _lay_out(source_a, source_b, chain_a, chain_b, way, look, assembly, one, names, (read_a.model, read_b.model))
     (lay_a, sses_a, *rest_a), (lay_b, sses_b, *rest_b) = laid.panels
+    sides = [
+        drawn_side(source, got, bb, sses, lay.bridges, assembly)
+        for source, got, (lay, sses, bb, *_) in zip((source_a, source_b), (read_a, read_b), laid.panels)
+    ]
+    d = diff_sides(*sides, way, domains, alignment=laid.aln, mates=laid.mates)
     lay_a, lay_b = copy.copy(lay_a), copy.copy(lay_b)  # the marks go on copies: make_layout's own stay as laid out
     carried = _carried(lay_a, lay_b, d) if laid.alike else None
     if carried is not None:
@@ -207,7 +219,8 @@ def diff_page(
         lay_b.residue_data = ResidueData(DISPLACEMENT, "number", dict(d.displacement))
         look_b = replace(look, color_by="data")
     laid.panels = ((lay_a, sses_a, *rest_a), (lay_b, sses_b, *rest_b))
-    said = diff_note(d, lay_a, lay_b, laid.panels[0][4], laid.panels[1][4], carried is not None, moved >= MOVED)
+    titles = laid.panels[0][4], laid.panels[1][4]
+    said = diff_note(d, lay_a, lay_b, *titles, carried is not None, moved >= MOVED, alike=laid.alike)
     note = f"{laid.note}\n{said}" if said else laid.note
     extra = [{"kind": "diff", "text": said, "count": 1, "elements": []}] if said else []
     drawn: list = []
@@ -225,15 +238,15 @@ def diff_page(
 
 def _motion(onto, points):
     """Placed -> Placed: an element of the page `points` come from, moved by the rigid 2D fit of `points` onto
-    their matched `onto` (figcheck.rigid_fit), its centre and angle snapped (layout._snap)."""
+    their matched `onto` (figcheck.rigid_fit), its centre and angle snapped (layout.snap)."""
     from .figcheck import rigid_fit
 
     turn, c_from, c_to = rigid_fit(onto, points)
     spin = float(np.arctan2(turn[0, 1], turn[0, 0]))
 
     def moved(p):
-        cx, cy = _snap((np.array([p.cx, p.cy]) - c_from) @ turn + c_to)
-        return replace(p, cx=float(cx), cy=float(cy), angle=float(_snap(p.angle + spin)))
+        cx, cy = snap((np.array([p.cx, p.cy]) - c_from) @ turn + c_to)
+        return replace(p, cx=float(cx), cy=float(cy), angle=float(snap(p.angle + spin)))
 
     return moved
 
@@ -242,12 +255,12 @@ def _carried(lay_a, lay_b, d):
     """(B's absent, A's absent): A's elements B has no mate for, carried onto B's page, and B's onto A's, by the
     rigid fit of the mates' page centres (criteria.like_pairs; B's centre of a helix drawn in pieces their run's,
     as H2 measures it); None under criteria.LIKE_MIN_MATES mates drawn (no fit to carry them by)."""
-    from .criteria import LIKE_MIN_MATES, _centres, _part_centres, like_pairs
+    from .criteria import LIKE_MIN_MATES, element_centres, like_pairs, part_centres
 
     pairs = like_pairs(lay_a, lay_b, d.mates)
     if len(pairs) < LIKE_MIN_MATES:
         return None
-    at_a, at_b = _centres(lay_a, [a for a, *_ in pairs]), _part_centres(lay_b, pairs)
+    at_a, at_b = element_centres(lay_a, [a for a, *_ in pairs]), part_centres(lay_b, pairs)
     to_b, to_a = _motion(at_b, at_a), _motion(at_a, at_b)
 
     def drawn(lay, ids):
@@ -269,11 +282,14 @@ def _counted(rows, word: str) -> str:
     )
 
 
-def diff_note(d, lay_a, lay_b, title_a: str, title_b: str, carried: bool, coloured: bool) -> str:
+def diff_note(d, lay_a, lay_b, title_a: str, title_b: str, carried: bool, coloured: bool, alike: bool = True) -> str:
     """What changed, said under both panels ('' when nothing did): A's elements B lacks (outlined on the right when
-    `carried`), B's own (outlined on the left; the like note names them), the residues whose secondary structure
-    changes, the pairings gained, lost or shifted (by A's names), the domains' turns, the interfaces, ligands and
-    contacts gained or lost, and, when `coloured`, the displacement colouring and its largest value."""
+    `carried`), B's own (outlined on the left when `carried`; the like note names them when B is drawn `alike`, else
+    they are named here), and, when either has elements the other lacks and they are not `carried`, why there are no
+    outlines (B not drawn `alike`, or fewer than criteria.LIKE_MIN_MATES mates drawn to carry them by); the residues
+    whose secondary structure changes, the pairings gained, lost or shifted (by A's names), the domains' turns, the
+    interfaces, ligands and contacts gained or lost, and, when `coloured`, the displacement colouring and its largest
+    value."""
     name_a, name_b = title_a.rsplit(" chain ", 1)[0], title_b.rsplit(" chain ", 1)[0]
     parts = []
     if d.only_a:
@@ -281,6 +297,13 @@ def diff_note(d, lay_a, lay_b, title_a: str, title_b: str, carried: bool, colour
         parts.append(f"only in {name_a}: {', '.join(_label(lay_a, k) for k in d.only_a)}{where}")
     if d.only_b and carried:
         parts.append(f"{name_b}'s own elements outlined dashed on the left")
+    elif d.only_b and not alike:  # drawn alike, the like note names them ("only in this structure")
+        parts.append(f"only in {name_b}: {', '.join(_label(lay_b, k) for k in d.only_b)}")
+    if (d.only_a or d.only_b) and not carried:
+        from .criteria import LIKE_MIN_MATES
+
+        why = f"{name_b} drawn on its own" if not alike else f"fewer than {LIKE_MIN_MATES} mates drawn to carry them by"
+        parts.append(f"no dashed outlines: {why}")
     if d.ss_changes:
         n = len(d.ss_changes)
         parts.append(f"{n} residue{'' if n == 1 else 's'} change{'s' if n == 1 else ''} secondary structure")
@@ -480,8 +503,8 @@ def diff_json(lay_a, sses_a, lay_b, sses_b, d) -> dict:
     its extras, A's that B lacks only_a), then
     ss_changes [{chain, residue, a, b}] (each residue whose element kind differs: H, G, E, C none, - absent; A's
     chain and number, B's for a residue only B has), pairing [{strands: [A's names], change}], displacement
-    [[B's chain, B's residue, Å]] (B's order), core (the residue pairs the core fit kept), domain_turns {name:
-    degrees} (domains given: each domain's turn after the core fit), domain_angles {"FIRST/NAME": degrees}
+    [[B's chain, B's residue, Å]] (B's order), core (the number of residue pairs the core fit kept), domain_turns
+    {name: degrees} (domains given: each domain's turn after the core fit), domain_angles {"FIRST/NAME": degrees}
     (two domains or more: each after the first against it, each fitted on its own, no core) and contacts {key:
     [[...parts, gained | lost]]} (diff.CONTACT_KEYS; elements by A's names); numbers to 1e-3, every list in the
     Diff's order."""
@@ -507,14 +530,19 @@ def diff_json(lay_a, sses_a, lay_b, sses_b, d) -> dict:
     return out
 
 
+def json_text(data: dict) -> str:
+    """`data` (mates_json or diff_json) as write_json writes it: keys sorted, LF line ends; a residue pair, and any
+    other short list of strings and numbers, on one line."""
+    text = json.dumps(data, indent=1, sort_keys=True, ensure_ascii=False)
+    text = _PAIR.sub(r"[\1, \2]", text)  # a residue pair on one line
+    text = _ROW.sub(lambda m: "[" + re.sub(r",\n\s*", ", ", m[1]) + "]", text)
+    return text + "\n"
+
+
 def write_json(data: dict, path) -> Path:
-    """`data` (mates_json or diff_json) written to `path`, keys sorted, LF line ends; a residue pair, and any other
-    short list of strings and numbers, on one line."""
+    """`data` (mates_json or diff_json) written to `path` (json_text)."""
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "w", encoding="utf-8", newline="\n") as fh:
-        text = json.dumps(data, indent=1, sort_keys=True, ensure_ascii=False)
-        text = _PAIR.sub(r"[\1, \2]", text)  # a residue pair on one line
-        text = _ROW.sub(lambda m: "[" + re.sub(r",\n\s*", ", ", m[1]) + "]", text)
-        fh.write(text + "\n")
+        fh.write(json_text(data))
     return path

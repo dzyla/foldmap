@@ -298,6 +298,8 @@ class Layout:
     frame: object = None  # the frame.Frame (or RadialFrame, CylinderFrame) that took 3D to the page
     focus: set[str] | None = None  # chains drawn in colour when highlighting; the rest in grey
     links: object = None  # model.Links: disulfides and glycans, residue indices in Backbone order
+    bridges: list = field(default_factory=list)  # the DSSP bridges (i, j, kind) of the protein chains laid out, in
+    # Backbone order (make_layout's; diff.drawn_side reads them: a diff page runs DSSP once)
     res_chain: list[str] = field(default_factory=list)  # chain of each Backbone residue
     res_name: list[str] = field(default_factory=list)  # residue type of each Backbone residue
     res_b: list[float] = field(default_factory=list)  # CA B-factor of each Backbone residue
@@ -3506,6 +3508,21 @@ def _copy_ties(
 RES_RANGE = re.compile(r"(-?\d+)([A-Za-z]?)(?:-(-?\d+)([A-Za-z]?))?")  # 150, 150-159, -7-4, 100A-100K
 
 
+def residue_span(text: str) -> tuple[str | None, tuple[int, str], tuple[int, str]] | None:
+    """A residue range as (chain or None, first, last), each end (number, insertion code) as written: res:150-159,
+    res:A:150-159, res:A:-7-4, res:H:100A-100K, one residue (res:A:150), the res: optional (A:1-60, 1-60); None
+    for anything else. What resolve reads after res:, and diff's domains."""
+    body = text.strip().removeprefix("res:")
+    chain = None
+    if body.count(":") == 1:
+        chain, body = body.split(":")
+    m = RES_RANGE.fullmatch(body)
+    if m is None:
+        return None
+    lo = (int(m[1]), m[2])
+    return chain, lo, ((int(m[3]), m[4]) if m[3] is not None else lo)
+
+
 _ANY_NAME = "a label such as A or α1, chain:label, #k, res:a-b, dep:name or beta:name"
 CONVENTIONS = {"fig": "the figure's", "dep": "the deposited", "beta": "the β-scheme's"}  # reference prefix -> its name
 
@@ -3540,17 +3557,12 @@ def resolve(layout: Layout, sses: list[SSE], ref: str) -> list[str]:
             raise ValueError(f"no element {ref!r}: elements are numbered #1 to #{len(placed)}")
         return [placed[k - 1].id]
     if ref.startswith("res:"):
-        body = ref[4:]
-        chain = None
-        if body.count(":") == 1:
-            chain, body = body.split(":")
-        m = RES_RANGE.fullmatch(body)
-        if m is None:
+        span = residue_span(ref)
+        if span is None:
             raise ValueError(
                 f"residue reference {ref!r} must look like res:150-159, res:A:150-159, res:A:-7-4 or res:H:100A-100K"
             )
-        lo = (int(m[1]), m[2])
-        hi = (int(m[3]), m[4]) if m[3] is not None else lo
+        chain, lo, hi = span
         in_chain = [s for s in placed if chain is None or s.chain == chain]
         # An element's own reference first: descending numbering (1H ... 1A, 1) has first > last.
         out = [s.id for s in in_chain if (s.first.tag, s.last.tag) == (f"{lo[0]}{lo[1]}", f"{hi[0]}{hi[1]}")]

@@ -599,3 +599,12 @@ def test_diff_structures_returns_the_preview_what_changed_and_h5(tmp_path):
 
     with pytest.raises(ToolError, match="domain X: 'B:1-40' is not a residue range"):
         call("diff_structures", {"source_a": a, "source_b": b, "domains": {"X": ["B:1-40"]}})
+
+
+def test_diff_structures_refuses_a_slash_in_a_domain_name():
+    """domain_angles names FIRST/NAME: a domain name holding "/" is refused before anything is drawn."""
+    from mcp.server.mcpserver.exceptions import ToolError
+
+    ubq = str(DATA / "1UBQ.cif")
+    with pytest.raises(ToolError, match="cannot hold /"):
+        call("diff_structures", {"source_a": ubq, "source_b": ubq, "domains": {"N/C": ["1-40"]}})

@@ -211,6 +211,11 @@ def look_of(settings: dict) -> Style:
     return replace(base, **given).validate()
 
 
+def chains_of(settings: dict) -> list[str]:
+    """The chains the settings draw (the Chains control, comma-separated); [] for every one."""
+    return [c.strip() for c in (settings.get("chains") or "").split(",") if c.strip()]
+
+
 def layout_options(settings: dict) -> dict:
     class Args:  # the CLI's own parsers for rename / swap / move
         rename = [p for p in re.split(r"[;\n]", settings.get("rename", "")) if p.strip()]
@@ -241,7 +246,7 @@ def layout_options(settings: dict) -> dict:
         "data": settings.get("data_path") or None,
         "data_column": (settings.get("data_column") or None) if settings.get("data_path") else None,
         "crosslinks": settings.get("crosslinks_path") or None,
-        "chains": [c.strip() for c in (settings.get("chains") or "").split(",") if c.strip()] or None,
+        "chains": chains_of(settings) or None,
         "like": figure_like(settings),
         **adjustments(Args),
         **{k: settings[k] for k in HIDDEN_LAYOUT if k in settings},
@@ -321,10 +326,22 @@ def like_domains(text: str) -> dict[str, list[str]] | None:
 def page_look(settings: dict) -> Style:
     """The look of a compare or diff page: the settings' look less what names this structure's parts or data (the
     marks, highlight, interaction partners and per-chain colours, STRUCTURE_STYLE, back to the theme's; colour by
-    data as the theme colours: the uploads are this structure's figure's), as both panels share it."""
+    data or by conservation as the theme colours, by chain under the conservation theme: the uploads and the
+    alignment are this structure's figure's), as both panels share it."""
     theme = THEMES[settings.get("theme", "publication")]
-    plain = {**settings, "data_path": "", **{k: getattr(theme, k) for k in STRUCTURE_STYLE}}
-    return look_of(plain)
+    plain = {**settings, "data_path": "", "msa_path": "", **{k: getattr(theme, k) for k in STRUCTURE_STYLE}}
+    look = look_of(plain)
+    if look.color_by == "conservation":  # the page is drawn with no alignment (compare._lay_out)
+        colour = theme.color_by if theme.color_by != "conservation" else Style().color_by
+        look = replace(look, color_by=colour).validate()
+    return look
+
+
+def pair_kind(settings: dict) -> str | None:
+    """The page the settings' reference asks the canvas to show instead of the figure: "compare" or "diff"; None
+    for none (no reference, or this structure drawn like it)."""
+    like = like_of(settings)
+    return like["page"] if like is not None and like.get("page") in ("compare", "diff") else None
 
 
 def pair_page(path, settings: dict):
@@ -333,11 +350,11 @@ def pair_page(path, settings: dict):
     draw when they name one, else its first protein chain; both in the settings' look and assembly. Layout edits
     are this structure's figure's own: the page is drawn as `foldmap compare` / `foldmap diff` draw it."""
     like = like_of(settings)
-    if like is None or like.get("page") not in ("compare", "diff"):
+    if pair_kind(settings) is None:
         return None
     from foldmap.compare import compare, diff_page
 
-    chains = [c.strip() for c in (settings.get("chains") or "").split(",") if c.strip()]
+    chains = chains_of(settings)
     kw = {
         "chain_a": like.get("chain") or None,
         "chain_b": chains[0] if len(chains) == 1 else None,
@@ -386,7 +403,9 @@ def like_link(ss: MutableMapping) -> dict[str, str]:
 
 def like_from_link(ss: MutableMapping, params) -> None:
     """A share link's reference (like_link), each value checked (an id, chain ids, a page), fetched and used as
-    Draw like… uses a PDB id typed; a value that is none of these is ignored."""
+    Draw like… uses a PDB id typed; a value that is none of these is ignored. A reference that cannot be used (a
+    failed download, over the residue limit) is said near the figure too (like_link_error: Draw like… is closed when
+    a link opens), the figure drawn on its own."""
     from foldmap.app_controls import LIKE_CHAIN
     from foldmap.fetch import source_id
 
@@ -399,7 +418,8 @@ def like_from_link(ss: MutableMapping, params) -> None:
         "chain": chain if all(LIKE_CHAIN.fullmatch(c) for c in chain.split(",")) else "",
         "page": page if page in LIKE_PAGES else "like",
     }
-    reference_by_id(ss, sid, keep=keep)
+    if not reference_by_id(ss, sid, keep=keep):
+        ss["like_link_error"] = f"The link's reference {sid}: {ss.get('like_error') or 'it could not be used'}"
     ss.pop("last_changed", None)
 
 
@@ -988,6 +1008,7 @@ def reset_structure(ss: MutableMapping) -> None:
         "crosslinks_error",
         "crosslinks_read",
         "like_error",
+        "like_link_error",
     ):
         ss[key] = ""
     ss["names_missing"], ss["msa_rows"], ss["data_missing"], ss["data_columns"] = [], [], {}, []
@@ -1035,7 +1056,7 @@ def apply_document(ss: MutableMapping, settings: dict) -> None:
         ss.pop(key, None)
     ss["_synced"] = {k: v for k, v in (ss.get("_synced") or {}).items() if k not in ("names", "domains")}
     ss.pop("like_uploaded", None)  # the reference is the file's (or none)
-    ss["like_error"] = ""
+    ss["like_error"] = ss["like_link_error"] = ""
     like_widgets(ss, ss.get("like"))
 
 
@@ -1193,13 +1214,8 @@ def main() -> None:
             ss["load_error"] = "The file could not be stored on the server; try again."
             return
         name = name or source_id(text) or path.stem
-        try:
-            size = sized(str(path))
-        except (ValueError, OSError, RuntimeError, app_jobs.JobLimit) as err:
-            if isinstance(err, (OSError, RuntimeError)) and not isinstance(err, app_jobs.JobFailed):
-                message = f"{name} could not be read as a structure (mmCIF or PDB)"  # gemmi cannot read it
-            else:
-                message = app_jobs.explain(err, name, lim)[0]
+        size, message = app_jobs.read_size(path, name, lim, sized)
+        if size is None:
             ss["load_error"] = said(message, path=path, name=name, paths=not local_files())
             return
         if lim.max_residues and size["residues"] > lim.max_residues:
@@ -1256,7 +1272,7 @@ def main() -> None:
 
     def new_structure() -> None:
         ss["stage"], ss["share_id"], ss["source"] = "load", "", ""
-        ss.update(like=None, like_error="", like_missing=[])  # the reference was this structure's (ruling 9)
+        ss.update(like=None, like_error="", like_link_error="", like_missing=[])  # this structure's (ruling 9)
         ss.pop("like_uploaded", None)
         ss["qp_tried"] = st.query_params.get("id")  # the link is cleared after this run: not a share link to open
 

@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from foldmap import app_jobs
+from foldmap import app_jobs, fetch
 from foldmap.app_jobs import JobLimit, Limits, run_job
 
 DATA = Path(__file__).parent / "data"
@@ -674,6 +674,23 @@ def test_the_compare_and_diff_pages_are_drawn_as_the_command_line_draws_them():
         app_jobs.draw_job(ubq, _blob(like=_like(ubq, "diff", domains="X=500-600")))
 
 
+def test_the_data_json_of_a_pair_page_is_the_pages():
+    """With Compare or Diff on the canvas, the Data JSON download is the page's (what `foldmap compare` /
+    `foldmap diff` --json write); without one it stays `foldmap data`'s."""
+    from foldmap.app import look_of
+    from foldmap.compare import compare, diff_page, json_text
+
+    ubq = DATA / "1UBQ.cif"
+    look = look_of({"theme": "publication"})
+    names = ("1UBQ", "1UBQ")
+    got = app_jobs.data_job(ubq, _blob(like=_like(ubq, "compare")), "json").decode()
+    assert got == json_text(compare(ubq, ubq, look=look, names=names).data)
+    got = app_jobs.data_job(ubq, _blob(like=_like(ubq, "diff", domains="N=1-40")), "json").decode()
+    assert got == json_text(diff_page(ubq, ubq, look=look, names=names, domains={"N": ["1-40"]}).data)
+    assert "domain_turns" in json.loads(got)
+    assert "domain_turns" not in json.loads(app_jobs.data_job(ubq, _blob(like=_like(ubq)), "json"))
+
+
 def test_a_pair_over_a_limit_is_refused_naming_the_command_line():
     """A figure drawn like a reference, or its Compare or Diff page, over the hosted limits: the message names
     both structures and the command line that draws it on your own computer."""
@@ -701,7 +718,7 @@ def test_a_compare_page_over_the_time_limit_stops_in_its_job():
     assert err.value.kind == "time"
 
 
-F7 = [Path.home() / ".cache" / "foldmap" / f"{i}.cif" for i in ("2VWD", "2ZB5")]
+F7 = [fetch.CACHE / f"{i}.cif" for i in ("2VWD", "2ZB5")]  # the download cache, as fetch reads it
 
 
 @needs_fork

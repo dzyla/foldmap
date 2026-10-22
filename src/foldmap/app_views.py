@@ -87,9 +87,10 @@ def problem(ws: Workspace, err: Exception, settings: dict | None = None) -> str:
         name = f"{ws.name} with {like.get('id') or like.get('name')}"
     command = like_command(settings or {}, ws.name)
     message, control = app_jobs.explain(err, name, ws.lim, ws.ss.get("last_changed"), command)
-    kept, name = ws.ss.get("names_uploaded") or ("", "")
-    if kept:  # an uploaded names file's errors name it as uploaded, not by the copy kept on the server
-        message = message.replace(kept, name)
+    for key in ("names_uploaded", "like_uploaded"):  # an uploaded names file's or reference's errors name it as
+        kept, as_uploaded = ws.ss.get(key) or ("", "")  # uploaded, not by the copy kept on the server
+        if kept:
+            message = message.replace(kept, as_uploaded)
     hint = f" Check {control}." if control and not isinstance(err, app_jobs.JobLimit) else ""
     if hint and not message.rstrip().endswith((".", "!", "?")):  # the hint is a sentence of its own
         message = message.rstrip() + "."
@@ -202,7 +203,8 @@ def data_problems_text(ss, problems: list[str]) -> str:
 
 
 def missing_files(ws: Workspace) -> None:
-    """Under the figure: a layout file's names files that are not on this machine (hosted: never read), to upload."""
+    """Under the figure: a layout file's names files that are not on this machine (hosted: never read), to upload, and
+    a reference (Draw like…) that a layout file or a share link named but could not be used."""
     from foldmap.app import local_files
 
     for p in ws.ss.get("names_missing") or []:
@@ -210,6 +212,8 @@ def missing_files(ws: Workspace) -> None:
         ws.st.warning(f"The layout file's names file {name} is not on this machine; upload it under Edit layout.")
     for what in ws.ss.get("like_missing") or []:  # a layout file's reference (Draw like…)
         ws.st.warning(shown(f"The layout file's {what}.", paths=not local_files()))
+    if ws.ss.get("like_link_error"):  # a share link's reference that could not be used (app.like_from_link)
+        ws.st.warning(shown(ws.ss["like_link_error"], paths=not local_files()))
 
 
 # ---------------------------------------------------------------------------------------------- scope bar
@@ -468,9 +472,12 @@ def layout_yaml(path, blob: str, uploads: dict[str, str] | None = None) -> bytes
 
 def share_url(base: str | None, share_id: str, theme: str, like: dict[str, str] | None = None) -> str:
     """The link that opens this structure in this theme: the app's address (its query string dropped) with ?id and
-    ?theme, then a PDB-id reference's (app.like_link: like, like_chain, like_page) when drawn like one."""
-    extra = "".join(f"&{k}={v}" for k, v in (like or {}).items())
-    return (base or "").split("?", 1)[0] + f"?id={share_id}&theme={theme}{extra}"
+    ?theme, then a PDB-id reference's (app.like_link: like, like_chain, like_page) when drawn like one; each value
+    URL-encoded."""
+    from urllib.parse import urlencode
+
+    query = urlencode({"id": share_id, "theme": theme, **(like or {})})
+    return (base or "").split("?", 1)[0] + f"?{query}"
 
 
 def figure_downloads(
@@ -507,17 +514,25 @@ def figure_downloads(
     return out
 
 
+PAIR_DATA_NOTE = (  # the Data downloads with a Compare or Diff page on the canvas
+    "{page} · JSON: the page's, as foldmap {command} --json writes it. The CSV tables, and the 3D view's page, are "
+    "this structure's figure drawn like the reference."
+)
+
+
 def data_downloads(
-    path: str, blob: str, stem: str, lim: app_jobs.Limits, uploaded: str | None = None
+    path: str, blob: str, stem: str, lim: app_jobs.Limits, uploaded: str | None = None, pair: str | None = None
 ) -> list[Download]:
     """The figure's data (app_jobs.data_file): the JSON `foldmap data` writes, and its CSV tables in a zip.
-    `uploaded`: an uploaded structure's name as uploaded, which the data name it by (not the copy kept)."""
+    `uploaded`: an uploaded structure's name as uploaded, which the data name it by (not the copy kept). `pair`
+    (app.pair_kind: "compare" or "diff"): the JSON is that page's, as `foldmap compare` / `foldmap diff` --json
+    write it."""
     return [
         Download(
             "dl_data_json",
-            "Data · JSON",
+            f"{pair.capitalize()} · JSON" if pair else "Data · JSON",
             partial(app_jobs.data_file, path, blob, "json", lim, uploaded),
-            f"{stem}-data.json",
+            f"{stem}-{pair or 'data'}.json",
             "application/json",
         ),
         Download(
@@ -597,7 +612,12 @@ def download_menu(ws: Workspace) -> None:
     if offered is None:
         st.caption("Nothing to download until the figure draws.")
     else:  # the figure's data: the figure offered above (its settings), laid out again when clicked
-        buttons(data_downloads(ws.path, offered[0], ws.name, ws.lim, ss.get("structure_uploaded") or None))
+        from foldmap.app import pair_kind
+
+        pair = pair_kind(json.loads(offered[0]))
+        if pair:
+            st.caption(PAIR_DATA_NOTE.format(page=pair.capitalize(), command=pair))
+        buttons(data_downloads(ws.path, offered[0], ws.name, ws.lim, ss.get("structure_uploaded") or None, pair))
     st.markdown("**Sequence**")
     if ss.get("seq_drawn"):
         blob, view_json = ss["seq_drawn"]

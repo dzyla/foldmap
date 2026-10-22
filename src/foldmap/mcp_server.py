@@ -395,19 +395,25 @@ def diff_structures(
     changes. Writes output_path (.svg, .png or .pdf; default: a temporary .svg) and returns where, the note and a PNG
     preview; the structured result is what changed: compare_structures' matching (alignment, mates, pieces, extras,
     only_a), then ss_changes [{chain, residue, a, b}] (kinds H, G, E, C none, - absent), pairing [{strands, change}],
-    displacement [[chain, residue, angstroms]] (source_b's residues), core (residue pairs the fit kept),
-    domain_turns {name: degrees} and contacts {elements, interfaces, interface_elements, ligands, ligand_elements:
-    [[..., gained | lost]]}, plus the figure's provenance. json_path (.json) writes the same, without provenance.
+    displacement [[chain, residue, angstroms]] (source_b's residues), core (the number of pairs the core fit kept),
+    domain_turns {name: degrees} (domains given: each domain's turn after the core fit), domain_angles {"FIRST/NAME":
+    degrees} (two domains or more: each after the first against it, each fitted on its own) and contacts {elements,
+    interfaces, interface_elements, ligands, ligand_elements: [[..., gained | lost]]}, plus the figure's provenance.
+    json_path (.json) writes the same, without provenance.
 
     source_a, source_b: file path, PDB ID or UniProt accession. One protein chain of each: chain_a, chain_b (else
     each its first). match: auto (sequence when the chains are one protein, else structure), sequence, structure, or
     a two-row alignment file (A's chain first). domains: {name: residue ranges of source_a's chain, e.g.
-    ["res:A:122-159"]}, each domain's rigid turn given. assembly: auto, asu or an assembly id. check: also judge each
-    panel as a figure of its own (H5: it passes every check its chain drawn alone passes), as h5 {a, b}."""
+    ["res:A:122-159"]}, each domain's rigid turn given (a name holds no "/"). assembly: auto, asu or an assembly id.
+    check: also judge each panel as a figure of its own (H5: it passes every check its chain drawn alone passes), as
+    h5 {a, b}."""
     from .compare import diff_page, panel_checks, write_json
     from .provenance import lines
     from .render import save
 
+    slashed = [name for name in domains or {} if "/" in name]
+    if slashed:  # domain_angles names FIRST/NAME
+        raise ValueError(f"domain {slashed[0]!r}: a domain name cannot hold / (domain_angles names FIRST/NAME)")
     keep = _checked(json_path, JSON_SUFFIXES) if json_path else None  # checked first
     with _output(output_path, ".svg", f"{Path(str(source_b)).stem}-diff", FIGURE_SUFFIXES) as out:
         made = diff_page(

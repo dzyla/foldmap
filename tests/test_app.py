@@ -1200,6 +1200,10 @@ def test_share_url_carries_id_and_theme_only():
         "https://foldmap.streamlit.app/?id=1LMB&theme=journal"
     )
     assert share_url(None, "1LMB", "trace") == "?id=1LMB&theme=trace"
+    like = {"like": "1UBQ", "like_chain": "A&theme=x", "like_page": "diff"}  # each value encoded: no extra key
+    assert share_url(None, "1LMB", "trace", like) == (
+        "?id=1LMB&theme=trace&like=1UBQ&like_chain=A%26theme%3Dx&like_page=diff"
+    )
 
 
 def test_the_popover_shows_the_share_link_of_an_id_only(monkeypatch, tmp_path):
@@ -1727,3 +1731,76 @@ def test_a_pair_over_the_residue_limit_is_refused_naming_the_command_line(monkey
         "1UBQ and 1UBQ together have 152 residues, and the limit here is 100. Draw one like the other on your own "
         "computer: pip install foldmap, then foldmap compare 1UBQ 1UBQ -o compare.svg"
     )
+
+
+@pytest.mark.parametrize("page", ["compare", "diff"])
+def test_a_page_under_conservation_colouring_draws(monkeypatch, tmp_path, page):
+    """An alignment loaded and the figure coloured by conservation: Compare and Diff draw their page (which has no
+    alignment: page_look colours it as the theme does, by chain under the conservation theme), no error."""
+    from foldmap.app import page_look
+
+    seed_cache(monkeypatch, tmp_path, "1UBQ")
+    at = opened("1UBQ")
+    at.file_uploader(key="msa_upload").set_value(
+        ("ubq.fasta", (DATA / "ubq_family.fasta").read_bytes(), "text/plain")
+    ).run()
+    at.selectbox(key="theme").select("conservation").run()
+    ss = at.session_state
+    assert ss["color_by"] == "conservation" and ss["msa_path"]
+    _use_reference(at, "1UBQ")
+    at.segmented_control(key="like_page").set_value(page).run()
+    assert not at.exception and not at.error, [e.value for e in at.error]
+    assert 'id="a/' in svg_of(at) and 'id="b/' in svg_of(at)
+    msa = str(DATA / "ubq_family.fasta")
+    assert page_look({"theme": "conservation", "msa_path": msa}).color_by == "chain"
+    assert page_look({"theme": "rainbow", "color_by": "conservation", "msa_path": msa}).color_by == "sequence"
+
+
+def test_a_theme_change_keeps_the_reference_and_redraws_the_page(monkeypatch, tmp_path):
+    """A reference with Compare, then another theme: the page is drawn again in the new theme, the reference kept,
+    and the link holds the id, the new theme and the reference. A Reference chain that is no chain id is said and
+    not taken (the link carries only chain ids)."""
+    seed_cache(monkeypatch, tmp_path, "1UBQ")
+    at = _use_reference(opened("1UBQ"), "1UBQ")
+    at.segmented_control(key="like_page").set_value("compare").run()
+    before = svg_of(at)
+    at.selectbox(key="theme").select("print").run()
+    ss = at.session_state
+    assert not at.exception and not at.error and ss["like"]["id"] == "1UBQ" and ss["like"]["page"] == "compare"
+    after = svg_of(at)
+    assert 'id="a/' in after and 'id="b/' in after and after != before
+    assert dict(at.query_params) == {"id": "1UBQ", "theme": "print", "like": "1UBQ", "like_page": "compare"}
+    at.text_input(key="like_chain").input("A&theme=x").run()
+    assert "Reference chain A&theme=x" in ss["like_error"] and ss["like"]["chain"] == ""
+    assert "like_chain" not in at.query_params
+
+
+def test_a_share_links_refused_reference_is_said_near_the_figure(monkeypatch, tmp_path):
+    """A share link whose reference cannot be used (here over the residue limit with this structure) opens the
+    structure drawn on its own, and says why under the figure, not only inside the closed Draw like… section."""
+    seed_cache(monkeypatch, tmp_path, "1UBQ")
+    monkeypatch.setenv("FOLDMAP_APP_MAX_RESIDUES", "100")
+    at = app_test()
+    for key, value in (("id", "1UBQ"), ("theme", "publication"), ("like", "1UBQ"), ("like_page", "compare")):
+        at.query_params[key] = value
+    at.run()
+    ss = at.session_state
+    assert not at.exception and ss["stage"] == "edit" and ss["like"] is None
+    said = [_visible(w.value) for w in at.warning if "The link's reference 1UBQ" in _visible(w.value)]
+    assert said and "together have 152 residues" in said[0]
+
+
+def test_a_failed_reference_upload_is_named_as_uploaded():
+    """A job's error naming an uploaded reference (Draw like…) names it as uploaded, never by the copy kept on the
+    server."""
+    from types import SimpleNamespace
+
+    from foldmap import app_jobs
+    from foldmap.app_views import problem
+
+    kept = str(Path("/srv") / "uploads" / "upload-0123abcd.cif")
+    ws = SimpleNamespace(
+        name="1UBQ", lim=app_jobs.HOSTED, ss={"like_uploaded": (kept, "my ref.cif")}, path=str(DATA / "1UBQ.cif")
+    )
+    said = _visible(problem(ws, ValueError(f"no protein chain X in {kept}; it has A"), {}))
+    assert "my ref.cif" in said and "upload-0123abcd" not in said

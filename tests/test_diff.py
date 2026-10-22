@@ -10,7 +10,7 @@ import gemmi
 import numpy as np
 import pytest
 
-from foldmap.diff import CONTACT_KEYS, Diff, _side, counts, diff_sides, diff_structures
+from foldmap.diff import CONTACT_KEYS, Diff, counts, diff_sides, diff_structures, read_side
 
 DATA = Path(__file__).parent / "data"
 UBQ, HHB = DATA / "1UBQ.cif", DATA / "2HHB.cif"
@@ -49,7 +49,7 @@ def test_a_structure_against_itself_has_no_differences(self_diff):
     assert len(d.displacement) == 76 and set(d.displacement.values()) == {0.0}
     assert d.domain_turns == {"N": 0.0, "C": 0.0}
     assert all(v == 0 for v in counts(d).values())
-    assert len(d.mates.mate) == len(_side(UBQ, "A", "A", "auto", True).sses)
+    assert len(d.mates.mate) == len(read_side(UBQ, "A", "A", "auto", True).sses)
 
 
 def test_a_turned_copy_has_no_differences_either(self_diff, tmp_path):
@@ -63,7 +63,7 @@ def test_a_turned_copy_has_no_differences_either(self_diff, tmp_path):
 
 def _no_helix(tmp_path) -> tuple[Path, list]:
     """1UBQ less its alpha helix (the longest H element), written to tmp_path; that helix's residue numbers."""
-    side = _side(UBQ, "A", "A", "auto", True)
+    side = read_side(UBQ, "A", "A", "auto", True)
     helix = max((s for s in side.sses if s.kind == "H"), key=len)
     gone = [side.bb.labels[k] for k in range(helix.start, helix.end + 1)]
     st = gemmi.read_structure(str(UBQ))
@@ -116,11 +116,11 @@ def test_deterministic_across_hash_seeds(tmp_path):
 def test_pairing_lost_and_register_moved():
     """B's bridges edited: one strand pairing's bridges dropped (lost), another's partner residues one further on
     (register +1, antiparallel: i + j grows by one)."""
-    a = _side(UBQ, "A", "A", "auto", True)
+    a = read_side(UBQ, "A", "A", "auto", True)
     strands = [s for s in a.sses if s.kind == "E"]
-    from foldmap.diff import _pairings
+    from foldmap.diff import pairings
 
-    pairs = _pairings(a)  # N to C
+    pairs = pairings(a)  # N to C
     assert len(pairs) >= 2
     (x1, y1), (x2, y2) = list(pairs)[:2]
     by_id = {s.id: s for s in strands}
@@ -175,8 +175,21 @@ def test_two_proteins_take_the_structure_route():
     has no mate is named, and nothing fails on a small core."""
     d = diff_structures(UBQ, "A", DATA / "2LZM.cif", "A")
     assert d.alignment.method == "structure"
-    assert len(d.only_a) + len(d.mates.mate) + len(d.mates.pieces) == len(_side(UBQ, "A", "A", "auto", True).sses)
+    sses = read_side(UBQ, "A", "A", "auto", True).sses
+    assert len(d.only_a) + len(d.mates.mate) + len(d.mates.pieces) == len(sses)
     assert len(d.core) >= 3 and len(d.displacement) == len(d.alignment.pairs)
+
+
+def _hinge(tmp_path, angle: float) -> Path:
+    """1UBQ with residues 41-76 turned by `angle` degrees about an axis through residue 40's CA (a hinge), written
+    to tmp_path."""
+    st = gemmi.read_structure(str(UBQ))
+    moved = [a for r in st[0]["A"] if 41 <= r.seqid.num <= 76 for a in r]
+    centre = np.array(st[0]["A"]["40"][0]["CA"][0].pos.tolist())
+    turn = _turn([0.0, 1.0, 1.0], np.radians(angle))
+    for a in moved:
+        a.pos = gemmi.Position(*(turn @ (np.array(a.pos.tolist()) - centre) + centre))
+    return _write(st, tmp_path / "hinge.pdb")
 
 
 @pytest.mark.parametrize("angle", [45.0, 60.0])
@@ -185,13 +198,7 @@ def test_a_turned_domain_shows_its_turn(tmp_path, angle):
     superposition, keeps residues 1-40 (the turned ones move past d0 and are dropped), so N turns by nothing and C by
     the whole angle. At 45 degrees the cut first planned, 2·d0, kept 4 of C's residues and split the turn 7.7 / 41.1
     (plan 13e-3)."""
-    st = gemmi.read_structure(str(UBQ))
-    moved = [a for r in st[0]["A"] if 41 <= r.seqid.num <= 76 for a in r]
-    centre = np.array(st[0]["A"]["40"][0]["CA"][0].pos.tolist())
-    turn = _turn([0.0, 1.0, 1.0], np.radians(angle))
-    for a in moved:
-        a.pos = gemmi.Position(*(turn @ (np.array(a.pos.tolist()) - centre) + centre))
-    d = diff_structures(UBQ, "A", _write(st, tmp_path / "hinge.pdb"), "A", domains={"N": "1-40", "C": "41-76"})
+    d = diff_structures(UBQ, "A", _hinge(tmp_path, angle), "A", domains={"N": "1-40", "C": "41-76"})
     assert d.domain_turns["N"] < 0.1
     assert d.domain_turns["C"] == pytest.approx(angle, abs=0.1)
     assert all(i < 40 for i, _ in d.core)
@@ -284,13 +291,30 @@ def test_diff_json_schema(tmp_path):
     assert '[\n  "A",\n  "1",\n' not in text and '"displacement": [\n  ["A", "1", 0.0],' in text
 
 
-@pytest.fixture(scope="module", params=["ake", "cam"])
+STATES = {  # each pair's files and domains
+    "ake": (AKE, {"LID": ["122-159"], "NMP": ["30-59"]}),
+    "cam": (CAM, {"N": ["5-75"], "C": ["82-146"]}),
+}
+
+
+@pytest.fixture(scope="module", params=list(STATES))
 def two_states(request):
     from foldmap.compare import diff_page
 
-    a, b = AKE if request.param == "ake" else CAM
-    domains = {"N": ["5-75"], "C": ["82-146"]} if request.param == "cam" else {"LID": ["122-159"], "NMP": ["30-59"]}
+    (a, b), domains = STATES[request.param]
     return request.param, diff_page(a, b, domains=domains)
+
+
+def test_the_pages_diff_is_the_engines(two_states):
+    """The page makes its Diff from its own panels (each structure read once, its chain's DSSP run once,
+    diff.drawn_side) with the page's alignment and mates: the same Diff diff_structures makes from the files."""
+    name, made = two_states
+    (a, b), domains = STATES[name]
+    alone, d = diff_structures(a, None, b, None, domains=domains), made.diff
+    for key in ("only_a", "only_b", "ss_changes", "pairing", "displacement", "domain_turns", "domain_angles"):
+        assert getattr(d, key) == getattr(alone, key), key
+    assert (d.contacts, d.core) == (alone.contacts, alone.core)
+    assert d.alignment.pairs == alone.alignment.pairs and d.mates.mate == alone.mates.mate
 
 
 def test_two_states_are_drawn_alike_with_their_changes(two_states):
@@ -382,14 +406,7 @@ def test_each_domain_fitted_on_its_own_gives_the_whole_hinge(tmp_path):
     measured against the first, each fitted on its own (no core). On a 30 degree hinge of 1UBQ the core settles
     between the two domains (the turns split the hinge, as MBP's do at d0); the own-fit angle is the hinge, and a
     turned copy of the whole chain turns no domain against another."""
-    st = gemmi.read_structure(str(UBQ))
-    moved = [a for r in st[0]["A"] if 41 <= r.seqid.num <= 76 for a in r]
-    centre = np.array(st[0]["A"]["40"][0]["CA"][0].pos.tolist())
-    turn = _turn([0.0, 1.0, 1.0], np.radians(30.0))
-    for a in moved:
-        a.pos = gemmi.Position(*(turn @ (np.array(a.pos.tolist()) - centre) + centre))
-    domains = {"N": "1-40", "C": "41-76"}
-    d = diff_structures(UBQ, "A", _write(st, tmp_path / "hinge.pdb"), "A", domains=domains)
+    d = diff_structures(UBQ, "A", _hinge(tmp_path, 30.0), "A", domains={"N": "1-40", "C": "41-76"})
     assert d.domain_turns["N"] > 1.0  # a compromise: the core is not in N alone
     assert d.domain_angles == {"N/C": pytest.approx(30.0, abs=0.05)}
     whole = _write(gemmi.read_structure(str(UBQ)), tmp_path / "turned.pdb", _turn([1.0, 2.0, 3.0], 1.1))
@@ -399,3 +416,25 @@ def test_each_domain_fitted_on_its_own_gives_the_whole_hinge(tmp_path):
         "A/C": pytest.approx(0.0, abs=0.01),
     }
     assert diff_structures(UBQ, "A", UBQ, "A", domains={"N": "1-40"}).domain_angles == {}
+
+
+def test_a_page_not_drawn_alike_names_bs_own_elements_and_why_no_outlines():
+    """Two proteins of other folds (1UBQ and T4 lysozyme): B is drawn on its own, so no outline carries an element
+    across; the note names each structure's own elements and says why there are no outlines."""
+    from foldmap.compare import diff_page
+
+    made = diff_page(UBQ, DATA / "2LZM.cif")
+    d = made.diff
+    assert d.only_b
+    assert not [g for p in ("a/absent:", "b/absent:") for g in _gids(made.figure, p)]
+    assert "only in 2LZM.cif: " in made.note and "no dashed outlines: 2LZM.cif drawn on its own" in made.note
+
+
+def test_a_domain_name_cannot_hold_a_slash():
+    """domain_angles names FIRST/NAME: a "/" in a domain's name is refused (the command line, the engine)."""
+    from foldmap.cli import UsageError, diff_domains
+
+    with pytest.raises(UsageError, match="cannot hold /"):
+        diff_domains(["N/C=1-40"])
+    with pytest.raises(ValueError, match="cannot hold /"):
+        diff_structures(UBQ, "A", UBQ, "A", domains={"N/C": "1-40"})

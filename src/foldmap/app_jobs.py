@@ -28,6 +28,7 @@ import tempfile
 import threading
 import time
 from collections import OrderedDict
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -408,11 +409,18 @@ def files_job(path, settings_json: str, ext: str) -> bytes:
 def data_job(path, settings_json: str, kind: str, name: str | None = None) -> bytes:
     """The figure's data (datafile.spec_data, all sections but interactions, as `foldmap data` writes them): the
     JSON (kind "json") or every CSV table, with a nucleic acid's dot-bracket, BPSEQ and CT, in a zip (kind "zip").
-    `name`: the structure's name in the data (an upload's name as uploaded; None: its file's)."""
+    `name`: the structure's name in the data (an upload's name as uploaded; None: its file's). With a Compare or
+    Diff page asked for (Draw like…), the JSON is the page's: what `foldmap compare` / `foldmap diff` --json write
+    (compare.mates_json, diff_json); the zip stays this structure's figure's."""
     from . import app
     from .datafile import DEFAULT, dumps, spec_data, zip_bytes
 
-    data = spec_data(app.spec_of(path, json.loads(settings_json)), DEFAULT, name=name)
+    settings = json.loads(settings_json)
+    if kind == "json" and app.pair_kind(settings):
+        from .compare import json_text
+
+        return json_text(app.pair_page(path, settings).data).encode("utf-8")
+    data = spec_data(app.spec_of(path, settings), DEFAULT, name=name)
     return dumps(data).encode("utf-8") if kind == "json" else zip_bytes(data)
 
 
@@ -537,6 +545,18 @@ def size_job(path) -> dict:
         "chain_ids": list(dict.fromkeys(name for name, _ in polymers)),
         "assemblies": [a.name for a in st.assemblies],
     }
+
+
+def read_size(path, name: str, lim: Limits, read: Callable | None = None) -> tuple[dict | None, str]:
+    """(size_job's dict, "") of the structure file at `path`, read under `lim` (`read`: the caller's own run of
+    size_job, e.g. a cached one); else (None, why) in words naming the file `name`: a file gemmi cannot read as a
+    structure, or explain's words for a limit or a failed job. What Start and Draw like… read before drawing."""
+    try:
+        return (read or (lambda p: run_job(size_job, p, limits=lim)))(str(path)), ""
+    except (ValueError, OSError, RuntimeError, JobLimit) as err:
+        if isinstance(err, (OSError, RuntimeError)) and not isinstance(err, JobFailed):
+            return None, f"{name} could not be read as a structure (mmCIF or PDB)"  # gemmi cannot read it
+        return None, explain(err, name, lim)[0]
 
 
 def elements_of(drawn) -> list[dict]:
