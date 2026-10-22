@@ -737,6 +737,7 @@ def make_layout(
         lay.coil_chains = [(c, n) for c, n in Counter(lay.res_chain).items() if c not in with_elements]
         lay.uniprot = ann
         lay.cyclic_note = cyclic_note
+        lay.symmetry, lay.bilayer = ring, mem  # what foldmap data reports (datafile); not drawn
         if made is not None:
             lay.like_colour = dict(made.like.colour) if made.like is not None else {}
             lay.like_extras = [e for e in made.extras if e in lay.placed]
@@ -1836,7 +1837,74 @@ def build_parser() -> argparse.ArgumentParser:
     pq.add_argument("--theme", "--preset", dest="theme", choices=list(THEMES), help="a ready-made look")
     pq.add_argument("--style-file", help="YAML file of style keys (may name a theme)")
     pq.add_argument("--set", action="append", default=[], metavar="KEY=VALUE", help="one style key (repeatable)")
+    _data_parser(sub)
     return parser
+
+
+# plot's options `foldmap data` does not take, as plot's defaults (_spec_of reads them)
+_DATA_DEFAULTS = {
+    "theme": None,
+    "style_file": None,
+    "palette": None,
+    "style": None,
+    "loops": None,
+    "title": None,
+    "mode": None,
+    "rotate": None,
+    "flip_v": False,
+    "no_dna": False,
+    "symmetry_tol": None,
+    "protomers": None,
+    "swap": [],
+    "move": [],
+    "up": None,
+    "view": None,
+    "msa": None,
+    "msa_reference": None,
+    "like": None,
+    "like_chain": None,
+    "like_match": None,
+    "like_layout": None,
+}
+
+
+def _data_parser(sub) -> None:
+    from .datafile import SECTIONS
+
+    dq = sub.add_parser(
+        "data",
+        help="what the figure says about the structure, as JSON: elements and their labels, sheets (order, "
+        "register, barrel n and shear S), disulfides, symmetry, membrane",
+        description="Lay the structure out as `plot` would (no drawing) and write what the figure says about it as "
+        "JSON (schema version 1; --schema prints it): the elements with their residues, the figure's labels and "
+        "page places; the sheets with their strands in the order drawn, directions, each pairing's kind and residue "
+        "register from the DSSP bridges, accessory strands, and a closed sheet's strand number n and shear number "
+        "S; disulfides; symmetry and stoichiometry; with --membrane, the transmembrane segments and sides. Numbers "
+        "are rounded to 0.001; the same structure and options give the same bytes.",
+    )
+    dq.add_argument("structure", nargs="?", help="a file, PDB ID or UniProt accession (not needed with --schema)")
+    dq.add_argument("-o", "--output", metavar="JSON", help="where to write it (default: standard output)")
+    dq.add_argument("--schema", action="store_true", help="print the JSON Schema of the output and exit")
+    dq.add_argument(
+        "--sections",
+        metavar="A,B",
+        help=f"only these sections (default all): {', '.join(SECTIONS)}",
+    )
+    dq.add_argument("--layout-file", metavar="YAML", help="a saved layout: its options and edits (names, domains)")
+    dq.add_argument(
+        "--set", action="append", default=[], metavar="KEY=VALUE", help="a layout style key, e.g. helices_310=false"
+    )
+    dq.add_argument("--chains", metavar="A,B", help="only these chains, as plot --chains")
+    dq.add_argument("--assembly", metavar="auto|asu|ID", help="as plot --assembly")
+    dq.add_argument("--symmetry", metavar="auto|off|Cn|Dn|helical", help="as plot --symmetry")
+    dq.add_argument("--focus", metavar="auto|none|protomer|A,B", help="as plot --focus")
+    dq.add_argument("--names", action="append", default=[], metavar="SPEC", help="as plot --names (repeatable)")
+    dq.add_argument("--rename", action="append", default=[], metavar="REF=NAME", help="as plot --rename (repeatable)")
+    dq.add_argument("--domain", action="append", default=[], metavar="NAME=REF[,REF...]", help="as plot --domain")
+    dq.add_argument("--domains", choices=["auto", "cath", "uniprot"], help="as plot --domains")
+    dq.add_argument("--uniprot", metavar="auto|ACCESSION", help="as plot --uniprot (for --domains uniprot)")
+    dq.add_argument("--membrane", choices=["off", "auto", "flip"], help="as plot --membrane")
+    dq.set_defaults(**_DATA_DEFAULTS)
 
 
 def resolve_structure(text: str) -> str:
@@ -1957,6 +2025,34 @@ def _cmd_compare(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_data(args: argparse.Namespace) -> int:
+    """data: the figure `plot` would draw, laid out only, as datafile.structure_data's JSON (or --schema)."""
+    import json
+
+    from .datafile import SECTIONS, dumps, schema, structure_data, write
+
+    if args.schema:
+        print(json.dumps(schema(), indent=1, sort_keys=True, ensure_ascii=False))
+        return 0
+    if not args.structure:
+        raise UsageError("data needs a structure (or --schema)")
+    sections = tuple(s.strip() for s in args.sections.split(",") if s.strip()) if args.sections else SECTIONS
+    unknown = [s for s in sections if s not in SECTIONS]
+    if unknown:
+        raise UsageError(f"error: no data section {', '.join(unknown)}; the sections are {', '.join(SECTIONS)}")
+    spec = _spec_of(args)
+    model = read_model(spec.structure, spec.assembly)
+    layout, sses, bb = make_layout(
+        spec.structure, spec.mode, spec.rotate, spec.flip_v, model=model, **spec.layout_kwargs()
+    )
+    data = structure_data(layout, sses, bb, model, sections, name=str(spec.structure))
+    if args.output:
+        print(f"wrote {write(data, args.output)}", file=sys.stderr)
+    else:
+        sys.stdout.write(dumps(data))
+    return 0
+
+
 def provenance_block(items: list[dict]) -> str:
     """The command line's "How this figure was made:" block (provenance): the heading, then one indented line per
     item, those the command line has always warned of starting "warning: "; '' when the list is empty."""
@@ -2066,6 +2162,7 @@ _COMMANDS: dict[str, Callable[[argparse.Namespace], int]] = {
     "contacts": _cmd_contacts,
     "check": _cmd_check,
     "compare": _cmd_compare,
+    "data": _cmd_data,
 }
 
 

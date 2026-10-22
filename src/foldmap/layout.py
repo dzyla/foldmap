@@ -384,6 +384,9 @@ class Layout:
     like_chain: str = ""  # the protein chain --like chose of several, none asked for (scope says so); '' otherwise
     # why this figure's page cannot be carried to a structure drawn like it (cli._uncarried: (kind, what)), None: it can
     uncarried: tuple[str, str] | None = None
+    symmetry: object = None  # symmetry.Symmetry of the assembly as read (cli.make_layout, before focus kept one
+    # subunit), None: none found; for foldmap data (datafile), never read in drawing
+    bilayer: object = None  # membrane.Membrane the figure is drawn with (--membrane, as flipped), None: none
     # what computes other_names on first need (build_layout's `conventions`; with_conventions): an element's names in
     # the conventions the figure does not show, so resolve can take dep: and beta: references; None: none known
     names_source: Callable[[], dict] | None = field(default=None, repr=False)

@@ -178,6 +178,7 @@ foldmap sequence 1UBQ -o aln.svg --msa family.fasta
 foldmap interactive 8UTF -o explorer.html         # linked topology / 3D / contact map
 foldmap contacts 1LMB                             # check the contact beads against the atoms
 foldmap check 9FWZ                                # check the figure's science and page (S1-S6, A1-A20)
+foldmap data 1TIM -o tim.json                     # the figure as data: elements, labels, sheets, barrel n and S
 foldmap app                                       # the Streamlit app
 foldmap styles                                    # every theme and style key
 ```
@@ -393,6 +394,39 @@ drawn as two figures of their own, side by side, with the note saying why. Each 
 of residue numbers, A's then B's), `mates`, `pieces` (of a helix A has whole), `extras` (B's elements A lacks) and
 `only_a` (A's elements B lacks), each element by its label as drawn and its residues; numbers to 0.001. The MCP
 tool `compare_structures` (with `assembly`) returns the same page's preview and the same record.
+
+### The figure as data
+
+`foldmap data` lays the structure out as `plot` would (without drawing it) and writes what the figure says about it
+as JSON, under the figure's own names:
+
+```bash
+foldmap data 1TIM -o tim.json                        # every section
+foldmap data 1C3W --membrane auto --sections membrane,elements
+foldmap data --schema                                # the format, as a JSON Schema
+```
+
+- `structure`: the file, the protein and nucleic-acid chains read, the subunit drawn under `--focus`;
+- `elements`: each helix, 3-10 helix and strand with its first and last residue (chain, number, insertion code), its
+  label as the figure writes it, its page place (`x`, `y`, `angle` N→C in degrees, `length`, `width`, page units),
+  its sheet and domain;
+- `sheets`: each sheet's strands left to right as drawn with their directions, each neighbouring pair's kind (`P`,
+  `A`) and residue register (the DSSP bridges, a residue of each strand), accessory strands beside their partner,
+  and for a closed sheet the barrel's strand number `n` and shear number `S` (a residue followed across each
+  pairing's register once round the barrel comes back `S` residues along: 1TIM's (βα)8 barrels give n 8, S 8);
+- `disulfides`, each end's residue and element;
+- `symmetry`: the symmetry found (group, protomers, CA RMSD, axis; twist and rise of a helical one), how the figure
+  draws the copies, and the stoichiometry (protein chains as copies of one protein, e.g. `A2B2`);
+- `membrane` (with `--membrane`): the transmembrane elements (whose CA run reaches both faces, as A18 counts them)
+  with the side each enters from and leaves to, every other element's side (`out`, `in`, `slab`), each chain's
+  termini, and the band on the page; `out` is the side the membrane's normal points to (`sided`: whether the
+  positive-inside rule settled it).
+
+It takes `plot`'s `--chains`, `--assembly`, `--symmetry`, `--focus`, `--names`, `--rename`, `--domain`,
+`--domains`, `--uniprot`, `--membrane`, `--layout-file` and `--set` (layout keys), so its labels and places are
+those of the figure drawn with the same options. `--sections` keeps some of the sections; `-o` writes a file (else
+standard output). The format is versioned (`"foldmap_data": 1`); keys are sorted, lists come in a fixed order and
+numbers are rounded to 0.001, so the same structure and options give the same bytes.
 
 ### Conventions of the published figures
 
