@@ -118,7 +118,8 @@ S1-S3), and those pairings differ between A and B.
   `_K_LIKE` 8 and 128.
 - It still passes 0.95, so the limit is kept.
 
-## Not done here
+## The aligner against US-align
 
-The aligner has not been compared against US-align. That needs US-align installed under `~/foldmap-remote/usalign/`
-on zyla-office, which waits for the author's approval (ruling 8).
+The aligner was compared against US-align afterwards (plan 23 Task 3): `usalign-report.md`. On this set, 9 of the 11
+pairs at US-align TM ≥ 0.5 meet both limits. The two misses keep the TM-score within the limit: 4CH9-2VWD is aligned
+one propeller blade apart, and 1TIM-1IGS is shifted 2-4 residues in its first βα units (`review.md`, last section).

@@ -22,8 +22,9 @@ the run's own output and pages show; none is fixed here.
 - H5: no pair lost a check by being drawn alike (40 of 40).
 - Routes: all 10 close pairs took the sequence route (TM 0.70-1.00); all remote and negative pairs the structure
   route.
-- **The aligner against US-align: not measured.** US-align is not installed on zyla-office (ledger: the install
-  waits for the author). The H1 failures below are where that comparison matters most.
+- **The aligner against US-align: not measured in this run.** US-align was not installed on zyla-office then. It
+  was measured afterwards, without changing anything above (plan 23 Task 3, the last section below and
+  `usalign-report.md`).
 
 ## Failures by check
 
@@ -43,7 +44,8 @@ All seven are cross-superfamily pairs of one topology, so the "positive" label i
 TM-score. Two readings are possible and this run cannot tell them apart without US-align: the pairs really are
 under TM 0.5 (CATH topologies hold pairs that far apart, and then H1's refusal is right and the label is too
 generous), or foldmap's aligner under-scores them. 2MJ7-2EHB (0.48, 7 of 9 matched) and 5GL3-1WPN (0.43, 11 of 14)
-are the ones nearest the limit. The US-align comparison of Task 13a-3 is what decides it.
+are the ones nearest the limit. The US-align comparison of Task 13a-3 is what decides it. (Decided afterwards: US-align
+puts all seven under 0.5 too; see the last section.)
 
 ### H2 and H3: 5 positives fail both or one, H2 1 more
 
@@ -82,8 +84,93 @@ nothing to judge. The campaign draws each pair with foldmap's defaults; this is 
 
 - Where the pair is one fold by foldmap's measure (23 positives drawn alike), 16 pass everything and all 22 judged
   pairs are drawn much closer to their reference than independently: the H2 median goes from 1.89 to 0.11.
-- The weak points, in order: the remote pairs that H1 refuses (7 of 20; needs US-align to know whether the aligner
-  or the labels are at fault), one sheet carried mirrored (3WZ0-2AV5), pairing differences that H3 does not yet
-  excuse, and three near-limit pairs.
+- The weak points, in order: the remote pairs that H1 refuses (7 of 20; US-align, measured afterwards, puts all
+  seven under TM 0.5 as well, so the labels and not the aligner are at fault), one sheet carried mirrored
+  (3WZ0-2AV5), pairing differences that H3 does not yet excuse, and three near-limit pairs.
 - The held-out pass rate (16 of 30 positives, 9 of 10 negatives refused) is lower than the tuning set's (8 of 11,
   4 of 4), mostly from the remote stratum's H1.
+
+## The aligner against US-align (plan 23 Task 3, added afterwards)
+
+Measured at c22ba5f with US-align 20241108 (bioconda usalign 20241201) on zyla-office, on the 15 tuning and 40
+held-out pairs. Nothing above changed: H1-H5, the limits and the routes stand as measured at c099787. The tables
+are in `usalign-report.md`, every pair's numbers and both alignments in `usalign.json`, and the counts in
+`heldout-summary.json` under `usalign`.
+
+**How.** `scripts/homologues.py align --usalign auto` aligns each pair with foldmap's structure route
+(`align_chains(..., "structure")`). It writes each chain's Cα, as foldmap reads it under `--assembly asu`, to a
+one-chain PDB file, and runs `USalign A.pdb B.pdb -mol prot -mm 0 -ter 2`. That is a single-chain, sequence-independent
+alignment, with A as Structure_1.
+- **Normalisation.** Both TM-scores are normalised by A, the reference: US-align's "normalized by length of
+  Structure_1", with d0 of A's length, the same as foldmap's d0.
+- **US-align's pairs.** Every column of its alignment that holds a residue of both chains. On all 55 pairs, that
+  count equals the "Aligned length" US-align prints.
+- **Agreement.** A US-align pair (i, j) is reproduced when foldmap pairs A's residue i with a residue of B within
+  ±1 of j. The 13a-3 limits apply where US-align's TM ≥ 0.5: foldmap's TM is within 0.05 of US-align's, and ≥ 85 % of
+  US-align's pairs are reproduced.
+
+**Numbers.**
+- **34 pairs with US-align TM ≥ 0.5** (11 tuning, 23 held-out). foldmap's TM is within 0.05 on all 34; the largest
+  gap is 0.016, on 1TIM-1IGS. Pair agreement is ≥ 85 % on 32. **32 of 34 meet both limits**, with a median of
+  98.9 % of pairs reproduced.
+  - The held-out set alone: **23 of 23**. The least agreement is 86.7 %, on 4U12-4NPX.
+  - The tuning set: 9 of 11.
+- **All 55 pairs** fall on the same side of H1's TM 0.5 in both aligners.
+  - foldmap is lower on 43 of 55: by 0.005 at the median, and by at most 0.08.
+  - Every gap over 0.03 (five pairs) is a negative that both put far under 0.5. The largest: 3BUU-3VDI 0.267
+    against 0.348, 3VDJ-2JXW 0.188 against 0.244, 4IPV-4N2P 0.260 against 0.309.
+- **Scoring against search.**
+  - foldmap's TM-score of US-align's own pairs equals US-align's TM-score within 0.0015 on every pair. The scoring,
+    d0 and superposition agree.
+  - So every difference between the two lies in the alignment search. On 28 of 55 pairs, foldmap's search stops
+    short: US-align's alignment scores higher under foldmap's own TM-score than foldmap's alignment does (by more
+    than 0.005). On the rest foldmap matches US-align, or beats it slightly by the score normalised by A, which
+    foldmap optimises; TM-align's search, which US-align keeps, uses the shorter chain's d0.
+
+**The two misses** both fail the pair limit, with TM within the limit. Both are internally repeated folds (a
+propeller, a βα barrel), whose alignments can slip by a repeat or part of one at almost the same TM-score.
+- **4CH9-2VWD** (Kelch against Nipah G, both six-bladed propellers): 0 % agreement, TM 0.681 (foldmap) against 0.678
+  (US-align).
+  - foldmap pairs each Kelch blade with the Nipah G blade one along from US-align's choice. B is shifted by 50-107
+    residues, about one blade.
+  - Under foldmap's own score, US-align's pairs give 0.678, slightly lower. The two registers are equally good
+    superpositions of a pseudo-symmetric fold, so this is an inherent ambiguity, not an aligner error.
+  - For `--like` it decides which blade mates which. The tuning run's H2/H3 failure of this pair (13a-10: blade
+    blocks too large for A's places) may partly come from that register as well. It was not re-examined here.
+- **1TIM-1IGS** (two TIM barrels): 79.6 % agreement, TM 0.605 against 0.620.
+  - foldmap's pairs are shifted 2-4 residues (once 7) through A 16-54, the first βα units, and at A 241-246, the
+    C-terminal end.
+  - US-align's pairs score 0.620 under foldmap's TM-score as well. foldmap's search stopped 0.016 short here.
+
+**The seven H1 refusals: US-align agrees with foldmap.**
+
+| pair | foldmap TM | US-align TM (by A) | US-align TM by B |
+|---|---|---|---|
+| 1JBI_A-3U7Z_A | 0.246 | 0.243 | 0.247 |
+| 1XU6_A-1PS2_A | 0.223 | 0.241 | 0.288 |
+| 2D46_A-3F42_B | 0.352 | 0.380 | 0.309 |
+| 2JCA_A-3LQ9_A | 0.369 | 0.394 | 0.384 |
+| 2MJ7_A-2EHB_D | 0.484 | 0.492 | 0.540 |
+| 2Q82_A-2JTR_A | 0.392 | 0.392 | 0.469 |
+| 5GL3_A-1WPN_A | 0.431 | 0.446 | 0.598 |
+
+- Normalised by the reference, as H1 is, US-align puts all seven under 0.5 (0.24-0.49). foldmap is lower by at most
+  0.028, so the aligner does not under-score them.
+- By H1's measure, CATH's topology label is generous for these cross-superfamily pairs, and the refusals stand.
+- **Two qualifications.**
+  - 2MJ7-2EHB is at 0.492, within 0.01 of the cut.
+  - Normalised by B, the smaller chain, 2MJ7-2EHB (0.54) and 5GL3-1WPN (0.60) would reach 0.5. B's fold is largely
+    contained in A's, and H1 asks whether B covers the reference.
+
+**Proposed follow-up (its own task; not done here: align.py unchanged).**
+- foldmap's structure search has three seeds: sequence, secondary structure, and gapless threading. TM-align has
+  more:
+  - a local-superposition seed (`get_initial5`: fragment superpositions scored by the DP);
+  - a secondary-structure-plus-distance seed (`get_initial_ssplus`);
+  - fragment gapless threading (`get_initial_fgt`).
+- Adding the first two would likely close most of the 28 search-short cases. No H1 verdict on these sets would
+  change: the nearest is 2MJ7-2EHB at 0.484, and US-align's best is 0.492.
+- The change would alter `--like`, `compare` and `diff` on low-TM pairs, but not the bench, since `plot` does not
+  align.
+- To measure it: `homologues.py align --usalign` on both sets, with the search-short count, the median TM gap and the
+  limits as the before/after numbers.

@@ -848,7 +848,11 @@ of one architecture), 16 of the 30 positives pass H1-H5 and 9 of the 10 negative
 reference is drawn as a DNA duplex, is not judged). Seven cross-superfamily pairs score under TM 0.5 and are refused;
 one close pair has a sheet carried mirrored, and others differ in strand pairing (`heldout-report.md`, `review.md`).
 Over the positives drawn alike, the mates' median deviation from the reference is 0.11 page units, against 1.89 for
-the two drawn independently.
+the two drawn independently. The aligner was checked against US-align on all 55 tuning and held-out pairs
+(`usalign-report.md`). Where US-align scores a pair at TM 0.5 or more, foldmap's TM-score is within 0.05 on 34 of 34
+pairs, and foldmap reproduces at least 85 % of US-align's residue pairs (within one residue) on 32 of 34. The two
+exceptions are a propeller and a TIM barrel aligned a repeat, or part of one, apart. US-align also puts all seven
+refused pairs under TM 0.5.
 
 **Checking the contact beads.** `foldmap contacts 1LMB.cif` draws the figure `plot` would (it takes the same options),
 checks every contact bead against the deposited atoms with an independent search, and prints how many beads were

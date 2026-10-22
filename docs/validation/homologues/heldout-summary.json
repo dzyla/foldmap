@@ -1,5 +1,5 @@
 {
- "about": "Plan 13a held-out homologue pairs (docs/validation/homologues/heldout.json), measured once at c099787 on zyla-office (scripts/homologues.py run --jobs 20); written by the run's report as summary.json. The aligner against US-align was not measured (US-align not installed).",
+ "about": "Plan 13a held-out homologue pairs (docs/validation/homologues/heldout.json), measured once at c099787 on zyla-office (scripts/homologues.py run --jobs 20); written by the run's report as summary.json. The aligner against US-align was measured afterwards (plan 23 Task 3): the usalign entry.",
  "cath_release": "v4_3_0",
  "limits": {
   "like_place_median": 1.0,
@@ -159,5 +159,111 @@
    ]
   }
  },
- "usalign": null
+ "usalign": {
+  "about": "scripts/homologues.py align --usalign at c22ba5f: foldmap's structure route (align_chains, match 'structure') against US-align 20241108 (`USalign A.pdb B.pdb -mol prot -mm 0 -ter 2`) on the same residues (each chain's C\u03b1 as foldmap reads it, --assembly asu). TM-scores normalised by A's chain (US-align: by Structure_1, A; d0 of A's length, as foldmap's). US-align's pairs: every column of its alignment holding a residue of both. Limits where US-align's TM >= 0.5: foldmap's TM within 0.05, and >= 85% of US-align's pairs reproduced within \u00b11 residue (13a-3). Added after the held-out run (plan 23 Task 3): the H1-H5 numbers of this file stand as measured at its top-level measured_at; this entry's measured_at is the comparison's. Details: usalign-report.md, usalign.json.",
+  "all": {
+   "both": 32,
+   "foldmap_lower": 43,
+   "judged": 34,
+   "pairs": 55,
+   "pairs_agree": 32,
+   "same_side_of_h1": 55,
+   "scoring_difference_max_abs": 0.0015,
+   "search_short": 28,
+   "tm_difference_max_abs": 0.0805,
+   "tm_difference_median": -0.0052,
+   "tm_within": 34,
+   "within_1_median": 0.9885,
+   "within_1_min": 0.0
+  },
+  "h1_refused": [
+   {
+    "foldmap_tm": 0.2461,
+    "pair": "1JBI_A-3U7Z_A",
+    "stratum": "remote",
+    "usalign_one_fold": false,
+    "usalign_tm": 0.243
+   },
+   {
+    "foldmap_tm": 0.2233,
+    "pair": "1XU6_A-1PS2_A",
+    "stratum": "remote",
+    "usalign_one_fold": false,
+    "usalign_tm": 0.2406
+   },
+   {
+    "foldmap_tm": 0.3523,
+    "pair": "2D46_A-3F42_B",
+    "stratum": "remote",
+    "usalign_one_fold": false,
+    "usalign_tm": 0.3801
+   },
+   {
+    "foldmap_tm": 0.3693,
+    "pair": "2JCA_A-3LQ9_A",
+    "stratum": "remote",
+    "usalign_one_fold": false,
+    "usalign_tm": 0.3939
+   },
+   {
+    "foldmap_tm": 0.4839,
+    "pair": "2MJ7_A-2EHB_D",
+    "stratum": "remote",
+    "usalign_one_fold": false,
+    "usalign_tm": 0.4917
+   },
+   {
+    "foldmap_tm": 0.3917,
+    "pair": "2Q82_A-2JTR_A",
+    "stratum": "remote",
+    "usalign_one_fold": false,
+    "usalign_tm": 0.3921
+   },
+   {
+    "foldmap_tm": 0.4308,
+    "pair": "5GL3_A-1WPN_A",
+    "stratum": "remote",
+    "usalign_one_fold": false,
+    "usalign_tm": 0.4462
+   }
+  ],
+  "heldout": {
+   "both": 23,
+   "foldmap_lower": 32,
+   "judged": 23,
+   "pairs": 40,
+   "pairs_agree": 23,
+   "same_side_of_h1": 40,
+   "scoring_difference_max_abs": 0.0015,
+   "search_short": 21,
+   "tm_difference_max_abs": 0.0805,
+   "tm_difference_median": -0.0057,
+   "tm_within": 23,
+   "within_1_median": 0.9897,
+   "within_1_min": 0.8667
+  },
+  "limits": {
+   "pair_agreement": 0.85,
+   "pair_slack": 1,
+   "tm_tolerance": 0.05,
+   "usalign_tm": 0.5
+  },
+  "measured_at": "c22ba5f",
+  "tuning": {
+   "both": 9,
+   "foldmap_lower": 11,
+   "judged": 11,
+   "pairs": 15,
+   "pairs_agree": 9,
+   "same_side_of_h1": 15,
+   "scoring_difference_max_abs": 0.001,
+   "search_short": 7,
+   "tm_difference_max_abs": 0.0242,
+   "tm_difference_median": -0.0037,
+   "tm_within": 11,
+   "within_1_median": 0.9779,
+   "within_1_min": 0.0
+  },
+  "version": "20241108"
+ }
 }

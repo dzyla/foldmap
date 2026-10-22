@@ -20,8 +20,9 @@ failure below stands as measured. The summary is also in `heldout-summary.json`.
 **Positives:** 16 of 30 pass H1-H5 (close 8 of 10, remote 8 of 20). **Negatives:** 9 of 10 refused with the note;
 1 not judged (1RPU-1ZWT: the reference's frame, a straight duplex, cannot be carried, so B was not aligned).
 **Drawn independently: H2 median 1.89, H3 0.71; drawn alike: H2 median 0.11, H3 1.00** (medians over the 22
-positives with H2 judged); 22 of 22 sit closer to A drawn alike. **The aligner against US-align was not measured:**
-US-align is not installed on zyla-office (it waits for the author).
+positives with H2 judged); 22 of 22 sit closer to A drawn alike. **The aligner against US-align was not measured
+in this run** (US-align was not installed); it was measured afterwards, with nothing here changed: `usalign-report.md`
+(plan 23 Task 3; US-align puts all seven H1 refusals under TM 0.5 too).
 
 TM: foldmap's TM-score normalised by A. Elements: mates / pieces / extras (B only) / only in A. H2: median / 90th percentile of the mates' centre deviations (page units) after the best rigid 2D motion; H3: share of mate pairs whose page relation agrees (pairs judged). 'alike': B drawn like A; 'indep.': A and B drawn independently (the baseline). Lost: checks B drawn alone passes and B drawn like A does not (H5).
 

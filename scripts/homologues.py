@@ -438,7 +438,8 @@ def write_usalign_report(runs: dict[str, list[dict]], out: Path, summary_path: P
         "Columns: US-align's TM-score; foldmap's (structure route) and the difference; foldmap's TM-score of "
         "US-align's own pairs (scoring apart from search); the auto route's TM-score as the campaign used it; the "
         f"share of US-align's pairs foldmap reproduces within ±{PAIR_SLACK} (exactly; of those under 5 Å); the limits "
-        "('–': US-align's TM under the limits' cut).",
+        "('–': US-align's TM under the limits' cut). What the numbers say (the misses, the H1 refusals, the "
+        "aligner's search) is in review.md.",
         "",
     ]
     for name, rows in runs.items():
@@ -502,8 +503,9 @@ def write_usalign_report(runs: dict[str, list[dict]], out: Path, summary_path: P
     if summary_path is not None:
         summary = json.loads(summary_path.read_text(encoding="utf-8"))
         summary["usalign"] = {
-            "about": how + " Added after the held-out run (plan 23 Task 3); the held-out numbers above are as "
-            "measured at measured_at. Details: usalign-report.md, usalign.json.",
+            "about": how + " Added after the held-out run (plan 23 Task 3): the H1-H5 numbers of this file stand as "
+            "measured at its top-level measured_at; this entry's measured_at is the comparison's. Details: "
+            "usalign-report.md, usalign.json.",
             "measured_at": commit,
             "version": version,
             "limits": {
