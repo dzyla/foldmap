@@ -1869,26 +1869,41 @@ _DATA_DEFAULTS = {
 
 
 def _data_parser(sub) -> None:
-    from .datafile import SECTIONS
+    from .datafile import SECTIONS, TABLES
 
     dq = sub.add_parser(
         "data",
-        help="what the figure says about the structure, as JSON: elements and their labels, sheets (order, "
-        "register, barrel n and shear S), disulfides, symmetry, membrane",
+        help="what the figure says about the structure, as JSON or CSV tables: elements and their labels, sheets "
+        "(order, register, barrel n and shear S), disulfides, symmetry, membrane, ligand contacts, interfaces",
         description="Lay the structure out as `plot` would (no drawing) and write what the figure says about it as "
         "JSON (schema version 1; --schema prints it): the elements with their residues, the figure's labels and "
         "page places; the sheets with their strands in the order drawn, directions, each pairing's kind and residue "
         "register from the DSSP bridges, accessory strands, and a closed sheet's strand number n and shear number "
-        "S; disulfides; symmetry and stoichiometry; with --membrane, the transmembrane segments and sides. Numbers "
-        "are rounded to 0.001; the same structure and options give the same bytes.",
+        "S; disulfides; symmetry and stoichiometry; with --membrane, the transmembrane segments and sides; the "
+        "ligands, metal ions, glycans and fused residues (a chromophore) with the residues and elements they touch; "
+        "the chain pairs in contact with their elements in contact; with --sections ...,interactions, every "
+        "interaction between two chains (H-bonds, salt bridges, stacking, cation-pi, hydrophobic). Numbers are "
+        "rounded to 0.001; the same structure and options give the same bytes. `-o out.csv --table NAME` writes one "
+        "table as CSV; `-o DIR/` writes every table of the sections as DIR/NAME.csv.",
     )
     dq.add_argument("structure", nargs="?", help="a file, PDB ID or UniProt accession (not needed with --schema)")
-    dq.add_argument("-o", "--output", metavar="JSON", help="where to write it (default: standard output)")
+    dq.add_argument(
+        "-o",
+        "--output",
+        metavar="JSON|CSV|DIR/",
+        help="where to write it (default: standard output); a directory (ending in /, or one that exists) gets one "
+        "CSV per table",
+    )
     dq.add_argument("--schema", action="store_true", help="print the JSON Schema of the output and exit")
     dq.add_argument(
         "--sections",
         metavar="A,B",
-        help=f"only these sections (default all): {', '.join(SECTIONS)}",
+        help=f"only these sections (default all but interactions): {', '.join(SECTIONS)}",
+    )
+    dq.add_argument(
+        "--table",
+        metavar="NAME",
+        help=f"write this table as CSV (its section is computed unless --sections says otherwise): {', '.join(TABLES)}",
     )
     dq.add_argument("--layout-file", metavar="YAML", help="a saved layout: its options and edits (names, domains)")
     dq.add_argument(
@@ -2029,25 +2044,58 @@ def _cmd_data(args: argparse.Namespace) -> int:
     """data: the figure `plot` would draw, laid out only, as datafile.structure_data's JSON (or --schema)."""
     import json
 
-    from .datafile import SECTIONS, dumps, schema, structure_data, write
+    from .datafile import (
+        DEFAULT,
+        SECTIONS,
+        TABLES,
+        csv_text,
+        dumps,
+        schema,
+        structure_data,
+        tables,
+        write,
+        write_csv,
+        write_tables,
+    )
 
     if args.schema:
         print(json.dumps(schema(), indent=1, sort_keys=True, ensure_ascii=False))
         return 0
     if not args.structure:
         raise UsageError("data needs a structure (or --schema)")
-    sections = tuple(s.strip() for s in args.sections.split(",") if s.strip()) if args.sections else SECTIONS
+    table = args.table
+    if table is not None and table not in TABLES:
+        raise UsageError(f"error: no data table {table}; the tables are {', '.join(TABLES)}")
+    if args.sections:
+        sections = tuple(s.strip() for s in args.sections.split(",") if s.strip())
+    else:
+        sections = (TABLES[table][0],) if table else DEFAULT
     unknown = [s for s in sections if s not in SECTIONS]
     if unknown:
         raise UsageError(f"error: no data section {', '.join(unknown)}; the sections are {', '.join(SECTIONS)}")
+    if table is not None and TABLES[table][0] not in sections:
+        raise UsageError(f"error: table {table} comes from section {TABLES[table][0]}, which --sections leaves out")
+    out = args.output
+    to_dir = bool(out) and (out.endswith(("/", "\\")) or Path(out).is_dir())
+    if out and not to_dir and table is None and out.lower().endswith(".csv"):
+        raise UsageError(f"error: a .csv holds one table: name it with --table ({', '.join(TABLES)}), or give -o DIR/")
     spec = _spec_of(args)
     model = read_model(spec.structure, spec.assembly)
     layout, sses, bb = make_layout(
         spec.structure, spec.mode, spec.rotate, spec.flip_v, model=model, **spec.layout_kwargs()
     )
     data = structure_data(layout, sses, bb, model, sections, name=str(spec.structure))
-    if args.output:
-        print(f"wrote {write(data, args.output)}", file=sys.stderr)
+    if to_dir:
+        written = write_tables(data, out, None if table is None else (table,))
+        print(f"wrote {len(written)} table{'s' if len(written) != 1 else ''} to {out}", file=sys.stderr)
+    elif table is not None:
+        columns, rows = tables(data, (table,))[table]
+        if out:
+            print(f"wrote {write_csv(columns, rows, out)}", file=sys.stderr)
+        else:
+            sys.stdout.write(csv_text(columns, rows))
+    elif out:
+        print(f"wrote {write(data, out)}", file=sys.stderr)
     else:
         sys.stdout.write(dumps(data))
     return 0

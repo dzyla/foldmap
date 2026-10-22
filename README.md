@@ -178,7 +178,8 @@ foldmap sequence 1UBQ -o aln.svg --msa family.fasta
 foldmap interactive 8UTF -o explorer.html         # linked topology / 3D / contact map
 foldmap contacts 1LMB                             # check the contact beads against the atoms
 foldmap check 9FWZ                                # check the figure's science and page (S1-S6, A1-A20)
-foldmap data 1TIM -o tim.json                     # the figure as data: elements, labels, sheets, barrel n and S
+foldmap data 1TIM -o tim.json                     # the figure as data: elements, sheets, ligands, interfaces
+foldmap data 2HHB -o tables/                      # ... as CSV tables, one per file
 foldmap app                                       # the Streamlit app
 foldmap styles                                    # every theme and style key
 ```
@@ -401,8 +402,11 @@ tool `compare_structures` (with `assembly`) returns the same page's preview and 
 as JSON, under the figure's own names:
 
 ```bash
-foldmap data 1TIM -o tim.json                        # every section
+foldmap data 1TIM -o tim.json                        # every section but interactions
 foldmap data 1C3W --membrane auto --sections membrane,elements
+foldmap data 2HHB --sections interfaces,interactions # chain pairs, with the interactions between them
+foldmap data 1TIM -o elements.csv --table elements   # one table as CSV
+foldmap data 2HHB -o tables/                         # every table of the sections, one CSV each
 foldmap data --schema                                # the format, as a JSON Schema
 ```
 
@@ -423,7 +427,23 @@ foldmap data --schema                                # the format, as a JSON Sch
   thickness (the usual reading; for bacteriorhodopsin, 1C3W, under the estimated 30 Å slab: 5 by the first, 7 by
   the second). Each element also has its CA depth range, the sides its first and last CA are on and its side
   (`across`, else `out`, `in`, `slab`); then each chain's termini and the band on the page. `out` is the side the
-  membrane's normal points to (`sided`: whether the positive-inside rule settled it).
+  membrane's normal points to (`sided`: whether the positive-inside rule settled it);
+- `ligands`: each ligand and metal ion (additives flagged), glycan and residue fused into the chain (GFP's
+  chromophore), with the protein residues it touches (a heavy atom within 4.0 Å; a metal's O, N or S within 3.1 Å),
+  the element each is in, those elements in sequence order, and the residues covalently joined to it (a heavy atom
+  within 1.9 Å: a glycan's Asn, a chromophore's neighbours in the chain);
+- `interfaces`: each pair of chains in contact, with its CA pairs within 8 Å, the residues of each chain in them,
+  and its element pairs in contact (the CA contacts the layout weighs, from 3 pairs); with `interactions` asked for,
+  the interactions between the two chains by kind, in all and for each element pair;
+- `interactions` (only when `--sections` names it): every H-bond, salt bridge, π-stacking, cation-π and hydrophobic
+  contact between residues of two different chains, found by the same finders as the figure's lines and re-checked
+  the same way, each with its atoms, distance (and angle), note and the element at each end.
+
+Tables: `--table NAME` writes one table as CSV (to `-o FILE.csv` or standard output), and `-o DIR/` (or an existing
+directory) writes every table of the sections asked for as `DIR/NAME.csv`. The tables are `elements`, `sheets` (a
+row per strand), `sheet_pairs`, `sheet_register` (a row per bridge), `disulfides`, `membrane`, `ligands`,
+`ligand_contacts`, `interfaces`, `interface_elements` and `interactions`; each row comes in the JSON's order, an
+empty cell is null, and booleans read `true`/`false`.
 
 It takes `plot`'s `--chains`, `--assembly`, `--symmetry`, `--focus`, `--names`, `--rename`, `--domain`,
 `--domains`, `--uniprot`, `--membrane`, `--layout-file` and `--set` (layout keys), so its labels and places are

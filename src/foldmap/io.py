@@ -867,16 +867,9 @@ def _ligands(model, where, skip: set | None = None) -> tuple[list[Ligand], dict[
         touching, held = set(), set()
         for k in ks:
             _, res, heavy, metal = parts[k]
-            reach = _METAL_REACH if metal else _LIGAND_REACH
-            for atom in heavy:
-                for mark in search.find_atoms(atom.pos, radius=reach):
-                    cra = mark.to_cra(model)
-                    key = (cra.chain.name, cra.residue.seqid.num, cra.residue.seqid.icode.strip())
-                    if not metal or cra.atom.element.name in ("O", "N", "S"):
-                        if key in where:
-                            touching.add(where[key])
-                        elif key in nucleotides:
-                            held.add(key)
+            t, h = touched(search, model, heavy, metal, where, nucleotides)
+            touching |= t
+            held |= h
         chain, res, heavy, metal = parts[ks[0]]
         if not touching and held and metal:
             na_ions[res.name] = na_ions.get(res.name, 0) + 1
@@ -900,6 +893,25 @@ def _ligands(model, where, skip: set | None = None) -> tuple[list[Ligand], dict[
             )
         )
     return out, na_ions
+
+
+def touched(search, model, heavy, metal: bool, where: dict, nucleotides=frozenset()) -> tuple[set[int], set[tuple]]:
+    """What the heavy atoms `heavy` of one ligand part touch, by the ligand rule: any atom of a residue within
+    _LIGAND_REACH, or for a metal ion an O, N or S within _METAL_REACH. Returns the residues' Backbone indices
+    (`where`: (chain, number, icode) -> index) and those of `nucleotides` ((chain, number, icode)) touched.
+    `search`: a populated gemmi.NeighborSearch of `model`."""
+    touching, held = set(), set()
+    reach = _METAL_REACH if metal else _LIGAND_REACH
+    for atom in heavy:
+        for mark in search.find_atoms(atom.pos, radius=reach):
+            cra = mark.to_cra(model)
+            key = (cra.chain.name, cra.residue.seqid.num, cra.residue.seqid.icode.strip())
+            if not metal or cra.atom.element.name in ("O", "N", "S"):
+                if key in where:
+                    touching.add(where[key])
+                elif key in nucleotides:
+                    held.add(key)
+    return touching, held
 
 
 def _ligand_parts(model, skip: set | None = None) -> list[tuple[str, gemmi.Residue, list[gemmi.Atom], bool]]:
