@@ -291,7 +291,8 @@ class Layout:
     na_letters: dict = field(default_factory=dict)  # single-stranded (strand, nt) -> its letter's place (route_loops)
     na_ties: list = field(default_factory=list)  # na_paths.NATie: isolated pairs as drawn (route_loops)
     na_curves: list = field(default_factory=list)  # na_curve.NACurve: each bent duplex drawn as one curve
-    # (Style.na_bend curved; route_loops), its pieces left in `stems` as placed
+    # (Style.na_bend curved): laid out by build_layout (na_curve.lay_out, projected mode: its pieces in `stems` set on
+    # it), drawn by route_loops (na_curve.bend)
     # (N or C, chain) -> where that chain end's letter is drawn when a line ran through its usual spot (route_loops:
     # route._clear_termini); end_label_pos reads it
     end_labels: dict = field(default_factory=dict)
@@ -448,6 +449,8 @@ class _Item:
     home: tuple[float, float]
     order: int  # first residue index, for stack mode
     chain: str  # chain of the lowest-numbered element, for stack mode
+    pinned: bool = False  # held where it is (a piece of a curved duplex, na_curve.lay_out): _attract and _separate
+    # move the other items round it, the walls standing for it
 
     @property
     def box(self) -> tuple[float, float, float, float]:
@@ -1404,7 +1407,21 @@ def _separate(
     (_tied_again): every item with no copy yields, and the result is kept if it takes at most _SEP_TIE_ROOM times
     the one-by-one room (both measured after their slides). Returns "alike" when the tied pushes are kept (the
     copies drawn alike), "wide" when the second chance keeps them, else "alone" (moved one by one; also with no
-    ties)."""
+    ties). Pinned items (_Item.pinned) stay where they are, left out: the walls in `fixed` stand for them."""
+    if any(it.pinned for it in items):
+        keep = [k for k, it in enumerate(items) if not it.pinned]
+        new = {k: n for n, k in enumerate(keep)}
+        return _separate(
+            [items[k] for k in keep],
+            {new[i]: (new[j], c) for i, (j, c) in ties.items() if i in new and j in new} if ties else ties,
+            {(new[i], new[j]) for i, j in joints if i in new and j in new},
+            None if fixed is None else Walls(fixed.boxes, fixed.hard[keep]),
+            mirror,
+            room,
+            None if level is None else level[keep],
+            {new[k] for k in shared if k in new},
+            again,
+        )
     halves = np.array([it.half for it in items], float).reshape(-1, 2)
     mids = np.array([it.mid for it in items], float).reshape(-1, 2)
     start = np.array([(it.cx, it.cy) for it in items], float).reshape(-1, 2)
@@ -2089,11 +2106,15 @@ def _attract(
     partner, a held item too (a bond drawn across the page is wrong whatever the reference)."""
     n = len(items)
     held = {i: h for i, h in (held or {}).items() if i not in (ties or {})}
+    pinned = [i for i, it in enumerate(items) if it.pinned]  # held where they are, walls standing for them
 
     def known(i: int, j: int, a: str, b: str) -> bool:  # a bridge between two held items the reference has too
         return i in held and j in held and (settled is None or frozenset((a, b)) in settled)
 
     W = _contact_weights(items, contacts)
+    if pinned:
+        W[pinned, :] = 0.0
+        W[:, pinned] = 0.0
     if held:  # two items held where a reference has them: no pull between them
         both = np.array(sorted(held), int)
         W[np.ix_(both, both)] = 0.0
@@ -2142,6 +2163,9 @@ def _attract(
     want = h[:, None, :] + h[None, :, :] + MARGIN
     joined = _joint_matrix(n, joints)  # consecutive pieces of a bent duplex: they may touch, with no margin between
     want[joined] = (h[:, None, :] + h[None, :, :])[joined]
+    if pinned:  # no box of a pinned item: its walls (`fixed`) stand for it
+        want[pinned, :] = 0.0
+        want[:, pinned] = 0.0
     anchor_w = _K_HOME * np.array([[_mass(it)] for it in items], float)
     if held:  # at the reference's places, unsnapped, and held there harder
         rows = np.array(sorted(held), int)
@@ -2183,6 +2207,8 @@ def _attract(
         else:
             E, g = _energy_dense(expand(z).ravel(), home, anchor_w, want, W, loops, lam, mids, walls)
         g = g.reshape(-1, 2)
+        if pinned:  # never moved: no gradient (L-BFGS then never steps them)
+            g[pinned] = 0.0
         gz = np.zeros((len(free), 2))
         if mirror is not None:  # the spread is fixed at 0 (no gradient)
             np.add.at(gz, base, g * flip)
@@ -2214,7 +2240,7 @@ def _attract(
         if np.sqrt(gx * gx + gy * gy) <= 2 * _SS_SLACK + 1.0:
             continue
         mover, anchor, om, oa = (i, j, oi, oj) if mass[i] <= mass[j] else (j, i, oj, oi)
-        if mover in ties:
+        if mover in ties or items[mover].pinned:
             continue
         hm, ha = h[mover], h[anchor]
         gap_x, gap_y = hm[0] + ha[0] + MARGIN, hm[1] + ha[1] + MARGIN
@@ -4400,6 +4426,7 @@ def build_layout(
     gone = 0  # copy items _one_per_mate let go
     lends = False  # a strand lent across an unrolled ring's cut (_unwrap): Style.copy_ghosts is a choice
     apart: dict[str, int] = {}  # copy_ghosts off: a strand lent across the cut -> id() of the item it left
+    curves: list = []  # Style.na_bend curved: each bent duplex's curve (na_curve.lay_out), projected mode
     if mode == "stack":
         rows = _stack(items, keep_depth)
         _centre_dna_over_binders(items, contacts)
@@ -4464,10 +4491,23 @@ def build_layout(
             else None
         )
         heights = [it.home[1] for it in items]
+        curved = style.na_bend == "curved" and bool(pieces)  # each bent duplex laid out as one curve (na_curve)
+        if curved and not (attract and len(items) > 1):
+            from .na_curve import lay_out
+
+            curves, walls, _ = lay_out(items, nucleic, style, contacts, walls, ties)
         if attract and len(items) > 1:
-            extra = _stem_springs(items, nucleic) if pieces else []
-            if pieces and not ties and walls is None:
-                _room_for_stems(items)
+            if curved:  # the stems as projected (and spread), then the bent duplexes set on their curves, pinned
+                from .na_curve import lay_out
+
+                if not ties and walls is None:
+                    _room_for_stems(items)
+                curves, walls, extra = lay_out(items, nucleic, style, contacts, walls, ties)
+                extra = _stem_springs(items, nucleic) + extra
+            else:
+                extra = _stem_springs(items, nucleic) if pieces else []
+                if pieces and not ties and walls is None:
+                    _room_for_stems(items)
             rise = getattr(frame, "rise", 0.0) * SCALE
             _attract(
                 items,
@@ -4582,6 +4622,7 @@ def build_layout(
     lay.loop_stroke = style.loop_width * (RUN_EDGE_W if style.loop_color == "residue" else 1.0)
     lay.na_line = style.na_line
     lay.na_bend = style.na_bend
+    lay.na_curves = curves  # drawn by route_nucleic (na_curve.bend) while their pieces stand where they were set
     if hand is not None:  # widths set by hand: what render draws wider, and texts keep off (line_band)
         lay.element_widths, lay.loop_widths, lay.na_widths = dict(hand.elements), dict(hand.loops), dict(hand.chains)
         lay.ligand_widths = list(hand.ligands)

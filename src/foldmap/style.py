@@ -200,7 +200,8 @@ class Style:
     # elements; over: above the elements, each with a thin casing in the background colour so it reads on a ribbon
     na_bend: str = "pieces"  # pieces: a bent duplex (cut where its axis turns, nucleic.segment_stem) as straight pieces
     # joined by routed joints; curved (opt-in, plan 25): one ladder along a curve through the pieces in order, each
-    # keeping its own rung spacing, gyres that would cross drawn one inside the other (na_curve)
+    # keeping its own rung spacing, gyres that would cross drawn one inside the other (na_curve); in projected mode
+    # the layout sets the pieces end to end on that curve and lays the protein out round it (na_curve.lay_out)
     helix_scale: float = 1.0  # helix ribbon diameter
     strand_scale: float = 1.0  # arrow width and the spacing of strands in a sheet
     dna_scale: float = 1.0  # duplex diameter

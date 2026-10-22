@@ -187,3 +187,98 @@ def test_the_curve_does_not_depend_on_the_hash_seed():
         assert run.returncode == 0, run.stderr
         out.add(run.stdout.strip())
     assert len(out) == 1
+
+
+# ---- Task 2: the pieces laid out end to end on the curve, the protein round it ----
+
+
+def _band_points(c, lay):
+    """Points over the curve's band: along both rails and both rows of letters, every 0.1."""
+    lo, hi = c.span()
+    s = np.arange(lo, hi + 0.05, 0.1)
+    return np.vstack([c.to_page(s, off) for off in (c.rail, -c.rail, c.rail + NT_ROW, -(c.rail + NT_ROW))])
+
+
+def _under(pts, e) -> bool:
+    cs, sn = math.cos(e.angle), math.sin(e.angle)
+    x, y = pts[:, 0] - e.cx, pts[:, 1] - e.cy
+    u, v = x * cs + y * sn, y * cs - x * sn
+    return bool(((np.abs(u) < e.length / 2) & (np.abs(v) < e.width / 2)).any())
+
+
+def _rails(c):
+    out = []
+    for side in (1, -1):
+        at = [c.at[k] for k in c.at if c.side[k] == side]
+        out.append(_segments(c.offset_line(min(at), max(at), side * c.rail)))
+    return out
+
+
+def test_the_pieces_are_laid_end_to_end_on_the_curve():
+    """1IHF's DNA 1: build_layout sets its pieces end to end on one curve (na_curve.lay_out), so the curve drawn
+    is the one it laid out: each piece centred on it along its direction, no bare rail between two pieces (no step
+    between consecutive pairs longer than the longest a piece has itself, or the duplex's own step at a joint)."""
+    lay, _ = _routed("1IHF")
+    (c,) = lay.na_curves
+    pieces = [lay.stems[k] for k in c.pieces]
+    assert c.held == [(d.cx, d.cy, d.angle) for d in pieces]
+    for d in pieces:
+        keys = [(a, i) for a, i, _, _ in d.pairs]
+        mid = (min(c.at[k] for k in keys) + max(c.at[k] for k in keys)) / 2
+        p, t, _ = (v[0] for v in c.frames(mid))
+        assert float(np.hypot(p[0] - d.cx, p[1] - d.cy)) < 0.05, d.name
+        assert abs(math.atan2(t[1], t[0]) - d.angle) < 0.01, d.name
+    own = max(float(np.diff(sorted(d.axial[(a, i)] for a, i, _, _ in d.pairs)).max()) for d in pieces)
+    us = np.array(sorted(c.at[(a, i)] for a, i, _, _ in c.pairs))
+    assert float(np.diff(us).max()) <= max(own, DNA_RISE * SCALE) + 1e-6
+
+
+def test_the_protein_is_laid_out_round_the_curve():
+    """1IHF: no protein element lies on the curve's band (rails and letters), no protein loop crosses its rails, and
+    chain A's β-arm (A:60-63, A:70-73) stands on the inside of the bend, as in the structure, beside the band."""
+    lay, loops = _routed("1IHF")
+    (c,) = lay.na_curves
+    band = _band_points(c, lay)
+    assert not [sid for sid, e in lay.placed.items() if _under(band, e)]
+    rails = _rails(c)
+    assert sum(_crossings(r, _segments(lp.points)) for r in rails for lp in loops if len(lp.points) > 1) == 0
+    lo, hi = c.span()
+    s = np.arange(lo, hi, 0.1)
+    pts, tan, nrm = c.frames(s)
+    for sid in ("A:60-63", "A:70-73"):
+        e = lay.placed[sid]
+        k = int(np.argmin(np.hypot(pts[:, 0] - e.cx, pts[:, 1] - e.cy)))
+        t0, t1 = c.frames(s[k] - 1.5)[1][0], c.frames(s[k] + 1.5)[1][0]
+        bend = float(t0[0] * t1[1] - t0[1] * t1[0])
+        side = float((np.array([e.cx, e.cy]) - pts[k]) @ nrm[k])
+        assert side * bend > 0, sid  # on the side the curve turns toward
+        assert float(np.hypot(e.cx - pts[k][0], e.cy - pts[k][1])) < c.band, sid
+
+
+def test_the_nucleosome_wraps_its_octamer():
+    """1KX5: the gyres grown round the octamer (every protein element inside the inner gyre, none on the band, no
+    loop across a rail), the rungs spread evenly over them (each step between pairs the same multiple of its own)."""
+    lay, loops = _routed("1KX5")
+    (c,) = lay.na_curves
+    assert c.gyres and not c.overlap
+    band = _band_points(c, lay)
+    assert not [sid for sid, e in lay.placed.items() if _under(band, e)]
+    rails = _rails(c)
+    assert sum(_crossings(r, _segments(lp.points)) for r in rails for lp in loops if len(lp.points) > 1) == 0
+    mid = (c.xy.min(axis=0) + c.xy.max(axis=0)) / 2  # the ring's middle
+    inner = float(np.hypot(c.xy[:, 0] - mid[0], c.xy[:, 1] - mid[1]).min())
+    for sid, e in lay.placed.items():
+        assert math.hypot(e.cx - mid[0], e.cy - mid[1]) < inner, sid
+    pieces = [lay.stems[k] for k in c.pieces]
+    for d in pieces:  # each piece's pairs as far apart on the curve as in the piece (stretched alike)
+        keys = sorted((a, i) for a, i, _, _ in d.pairs)
+        on, own = [c.at[k] - c.at[keys[0]] for k in keys], [d.axial[k] - d.axial[keys[0]] for k in keys]
+        assert np.allclose(on, own, atol=1e-3)
+    steps = [min(c.at[k] for k in e.axial) - max(c.at[k] for k in d.axial) for d, e in zip(pieces, pieces[1:])]
+    assert max(steps) - min(steps) < 0.01
+
+
+def test_pieces_lay_out_nothing_on_a_curve():
+    """The default (pieces): build_layout lays no curve out and pins nothing."""
+    lay, _, _ = make_layout(_path("1IHF"), look=Style())
+    assert lay.na_curves == []

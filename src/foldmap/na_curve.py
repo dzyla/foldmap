@@ -8,18 +8,34 @@ drawn shorter than the duplex's own (pieces that would overlap along the curve s
 takes: _isotonic). Where the band (rails and base letters) would come over itself and the duplex winds a full turn
 or more round the middle of its pieces (the nucleosome's two gyres seen down the superhelix axis), it is drawn as
 gyres one inside the other: a ring through the pieces' angles round that middle, the first gyre outside (or
-inside, as most of the pieces show it), parted by the band's width (_gyres). The pieces stay in layout.stems as
-the layout placed them; render draws the curve in their place (layout.na_curves) and route_nucleic's strands that
-leave or enter the duplex follow its nucleotides (follow)."""
+inside, as most of the pieces show it), parted by the band's width (_gyres). The pieces stay in layout.stems;
+render draws the curve in their place (layout.na_curves) and route_nucleic's strands that leave or enter the duplex
+follow its nucleotides (follow). In projected mode build_layout lays the curve out first (lay_out): the pieces end
+to end on it at the duplex's own rung spacing (the nucleosome's gyres grown round the octamer, their rungs spread
+evenly), pinned there, the protein laid out round its band."""
 
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import numpy as np
 
-from .layout import DNA_RISE, NT_ROW, SCALE, Layout, PlacedStem, _snap, glyph
+from .layout import (
+    _CONTACT_CAP,
+    _GLYPH_H,
+    _W_CONTACT,
+    DNA_RISE,
+    MARGIN,
+    NT_ROW,
+    SCALE,
+    Layout,
+    Placed,
+    PlacedStem,
+    Walls,
+    _snap,
+    glyph,
+)
 
 CURVE_STEP = 0.1  # page units between the curve's samples
 _FAR = 2.0  # two places on the band this many band widths apart along it are different stretches (_far_gap)
@@ -54,6 +70,8 @@ class NACurve:
     overlap: bool = False
     name_xy: tuple[float, float] = (0.0, 0.0)
     name_angle: float = 0.0
+    band: float = 0.0  # its rails and base letters across (2 x (rail + NT_ROW + a glyph's height))
+    held: list = field(default_factory=list)  # laid out by build_layout (lay_out): each piece's (cx, cy, angle) there
 
     def frames(self, s) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """(points, unit tangents, unit left normals) at arc lengths s; past either end the curve runs straight on."""
@@ -279,10 +297,7 @@ def _curve_of(stems: list[PlacedStem], ks: list[int], band: float) -> tuple[np.n
     """The centreline of one bent duplex (points on the grid), the arc length of each piece's centre on it, whether
     it is drawn as gyres, and whether its band still comes over itself."""
     ps = [stems[k] for k in ks]
-    ctrl = [np.array([ps[0].cx, ps[0].cy]) - ps[0].direction * ps[0].length / 2]
-    ctrl += [np.array([d.cx, d.cy]) for d in ps]
-    ctrl += [np.array([ps[-1].cx, ps[-1].cy]) + ps[-1].direction * ps[-1].length / 2]
-    ctrl = _snap(np.array(ctrl))
+    ctrl = _ctrl(ps)
     r_min = _R_MIN * ps[0].rail
     xy, idx = _distinct(*_catmull_rom(ctrl))
     xy, centres = _eased(xy, [float(v) for v in _arc(xy)[idx[1:-1]]], r_min)
@@ -315,41 +330,335 @@ def _name_place(c: NACurve, band: float, off: float) -> tuple[tuple[float, float
     return tuple(float(v) for v in _snap(q)), float(_snap(math.atan2(t[1], t[0])))
 
 
+def _ctrl(ps: list[PlacedStem]) -> np.ndarray:
+    """The curve's control points: the first piece's 5' end, each piece's centre, the last piece's far end."""
+    ctrl = [np.array([ps[0].cx, ps[0].cy]) - ps[0].direction * ps[0].length / 2]
+    ctrl += [np.array([d.cx, d.cy]) for d in ps]
+    ctrl += [np.array([ps[-1].cx, ps[-1].cy]) + ps[-1].direction * ps[-1].length / 2]
+    return _snap(np.array(ctrl))
+
+
+def _make(parent: str, ks: list[int], ps: list[PlacedStem], xy, centres, gyres, overlap, na, along=None) -> NACurve:
+    """The NACurve of one bent duplex on the centreline xy (`centres`: each piece's centre's arc length there), its
+    nucleotides placed, its first arm's side voted by the pieces. `along` None (the pieces where the layout left
+    them): each piece's pairs at its own spacing round its centre's place, pieces that would overlap slid apart
+    (_isotonic). Else (off, stretch), the pieces laid out on the curve (lay_out): end to end, the duplex's 5' end at
+    arc length off, every step `stretch` times its own."""
+    rail, width = ps[0].rail, ps[0].width
+    s = _arc(xy)
+    tangent = _tangents(xy)
+    tmp = NACurve(parent, "", ks, xy, s, tangent, rail, width, {}, {}, [])
+    lengths = [d.length for d in ps]
+    U = np.cumsum([0.0, *lengths[:-1]]) + np.array(lengths) / 2  # each centre along the straightened duplex
+    if along is None:
+        place, stretch = U + _isotonic(np.array(centres) - U, lengths), 1.0  # each piece's place along the curve
+    else:
+        off, stretch = along
+        place = off + stretch * U
+    vote = 0.0  # the first arm's side of the curve, as the pieces show it (those seen most clearly most)
+    for d, sk in zip(ps, centres):
+        t = tmp.frames(sk)[1][0]
+        along_t = float(t[0]) * float(d.direction[0]) + float(t[1]) * float(d.direction[1])
+        vote += (d.margin + 0.01) * d.first * (1.0 if along_t >= 0 else -1.0)
+    first_side = 1 if float(_snap(vote)) >= 0 else -1
+    at, side, pairs = {}, {}, []
+    for d, u in zip(ps, place):
+        for key, x in d.axial.items():
+            at[key] = float(_snap(u + stretch * x))
+            side[key] = first_side if d.side[key] == d.first else -first_side
+        pairs += list(d.pairs)
+    whole = next((st.name for st in na.structure.stems if st.id == parent), "") if na is not None else ""
+    name = whole or ps[0].name.rstrip("abcdefghijklmnopqrstuvwxyz").strip()
+    return NACurve(parent, name, ks, xy, s, tangent, rail, width, at, side, pairs, gyres, overlap)
+
+
 def build_curves(layout: Layout) -> list[NACurve]:
-    """Every bent duplex of the layout as one curve (NACurve), its nucleotides placed on it."""
+    """Every bent duplex of the layout as one curve (NACurve), its nucleotides placed on it: the curve build_layout
+    laid it out on (lay_out) while its pieces stand where that put them, else one through the pieces as placed."""
     stems = layout.stems
     na = layout.nucleic
     gw, gh = glyph(layout)
+    laid = {c.parent: c for c in layout.na_curves}
     out = []
     for parent, ks in bent_duplexes(stems):
         ps = [stems[k] for k in ks]
-        rail, width = ps[0].rail, ps[0].width
-        band = 2 * (rail + NT_ROW + gh)  # rails and base letters
-        xy, centres, gyres, overlap = _curve_of(stems, ks, band)
-        s = _arc(xy)
-        tangent = _tangents(xy)
-        tmp = NACurve(parent, "", ks, xy, s, tangent, rail, width, {}, {}, [])
-        lengths = [d.length for d in ps]
-        U = np.cumsum([0.0, *lengths[:-1]]) + np.array(lengths) / 2  # each centre along the straightened duplex
-        shift = _isotonic(np.array(centres) - U, lengths)  # each piece's place along the curve less its own
-        vote = 0.0  # the first arm's side of the curve, as the pieces show it (those seen most clearly most)
-        for d, sk in zip(ps, centres):
-            t = tmp.frames(sk)[1][0]
-            along = float(t[0]) * float(d.direction[0]) + float(t[1]) * float(d.direction[1])
-            vote += (d.margin + 0.01) * d.first * (1.0 if along >= 0 else -1.0)
-        first_side = 1 if float(_snap(vote)) >= 0 else -1
-        at, side, pairs = {}, {}, []
-        for d, u, sh in zip(ps, U, shift):
-            for key, x in d.axial.items():
-                at[key] = float(_snap(u + sh + x))
-                side[key] = first_side if d.side[key] == d.first else -first_side
-            pairs += list(d.pairs)
-        whole = next((st.name for st in na.structure.stems if st.id == parent), "") if na is not None else ""
-        name = whole or ps[0].name.rstrip("abcdefghijklmnopqrstuvwxyz").strip()
-        c = NACurve(parent, name, ks, xy, s, tangent, rail, width, at, side, pairs, gyres, overlap)
-        c.name_xy, c.name_angle = _name_place(c, band, rail + NT_ROW + 1.5 * gh)
+        band = 2 * (ps[0].rail + NT_ROW + gh)  # rails and base letters
+        c = laid.get(parent)
+        if c is None or c.pieces != ks or c.held != [(d.cx, d.cy, d.angle) for d in ps]:
+            xy, centres, gyres, overlap = _curve_of(stems, ks, band)
+            c = _make(parent, ks, ps, xy, centres, gyres, overlap, na)
+        c.band = band
+        c.name_xy, c.name_angle = _name_place(c, band, c.rail + NT_ROW + 1.5 * gh)
         out.append(c)
     return out
+
+
+# ---- build_layout's part (Style.na_bend curved, projected mode): the pieces end to end, the protein round them ----
+
+_ROOM = 1.0  # the inner gyre holds this many times the footprints (MARGIN round each) of the items inside it
+_RING_TRIES = 8  # the ring is grown about its middle at most this many times until it does
+_RUNG_W = 3.0  # a binding element's pull to its contact rungs at full contact, in layout._W_CONTACT
+
+
+def _chain(ps: list[PlacedStem]) -> None:
+    """The pieces end to end, each at its own angle (as projected) and length, the chain standing where the pieces'
+    centres stood on average (weighted by their lengths)."""
+    pos, j = [], np.zeros(2)
+    for d in ps:
+        c = j + d.direction * d.length / 2
+        pos.append(c)
+        j = c + d.direction * d.length / 2
+    pos = np.array(pos)
+    w = np.array([d.length for d in ps], float)
+    old = np.array([[d.cx, d.cy] for d in ps], float)
+    pos = _snap(pos + (w[:, None] * (old - pos)).sum(axis=0) / w.sum())
+    for d, p in zip(ps, pos.tolist()):
+        d.cx, d.cy = float(p[0]), float(p[1])
+
+
+def _ring(ps: list[PlacedStem], band: float, need: float) -> tuple[np.ndarray, list[float]] | None:
+    """The duplex as gyres one inside the other (_gyres) round the middle of its pieces, grown about that middle
+    until the inside of the inner gyre (less half the band) holds an area `need`: the points and each control
+    point's arc length (_ctrl's), or None when the pieces wind less than a full turn."""
+    ctrl = _ctrl(ps)
+    inner = ctrl[1:-1]
+    mid = _snap([(inner[:, 0].min() + inner[:, 0].max()) / 2, (inner[:, 1].min() + inner[:, 1].max()) / 2])
+    f, got = 1.0, None
+    for _ in range(_RING_TRIES):
+        wound = _gyres(_snap(mid + f * (ctrl - mid)), band)
+        if wound is None:
+            return got
+        got = _eased(*wound, _R_MIN * ps[0].rail)
+        r_in = float(np.hypot(got[0][:, 0] - mid[0], got[0][:, 1] - mid[1]).min()) - band / 2
+        if math.pi * max(r_in, 0.0) ** 2 >= need:
+            break
+        f = float(_snap(f * max(1.05, math.sqrt(need / math.pi) / max(r_in, band))))
+    return got
+
+
+def _onto(c: NACurve, ps: list[PlacedStem], off: float, stretch: float) -> None:
+    """Each piece set on the curve: centred on its place there, along the curve's direction, its rails on the
+    curve's sides, its pairs `stretch` times as far apart."""
+    lengths = [d.length for d in ps]
+    U = np.cumsum([0.0, *lengths[:-1]]) + np.array(lengths) / 2
+    for d, u in zip(ps, U):
+        p, t, _ = (v[0] for v in c.frames(off + stretch * u))
+        d.cx, d.cy = (float(v) for v in _snap(p))
+        d.angle = float(_snap(math.atan2(t[1], t[0])))
+        arm = next(key for key in sorted(d.axial) if d.side[key] == d.first)  # a nucleotide of its first arm
+        d.first = c.side[arm]
+        d.side = {key: c.side[key] for key in d.axial}
+        if stretch != 1.0:
+            d.axial = {key: float(_snap(stretch * x)) for key, x in d.axial.items()}
+            d.length = float(_snap(stretch * d.length))
+    c.held = [(d.cx, d.cy, d.angle) for d in ps]
+
+
+def _band_boxes(c: NACurve) -> list[tuple[float, float, float, float]]:
+    """The curve's band (rails and letters) as squares two across, a quarter of the band apart along it."""
+    lo, hi = c.extent()
+    h = c.band / 4
+    s = np.arange(lo, hi + h / 2, h)
+    p, _, n = c.frames(s)
+    out = []
+    for q in np.vstack([p + h * n, p - h * n]).tolist():
+        out.append((q[0] - h, q[1] - h, q[0] + h, q[1] + h))
+    return [tuple(float(v) for v in b) for b in _snap(out)]
+
+
+def lay_out(items: list, na, style, contacts: dict, walls: Walls | None, ties: dict) -> tuple[list, Walls | None, list]:
+    """Style.na_bend curved in build_layout (projected mode), before _attract: each bent duplex laid out as one
+    curve, the protein to be laid out round it. Its pieces (as projected) are set end to end (_chain) and a curve
+    drawn through them (_curve_of); the duplex lies on it at its own rung spacing. Where it winds a full turn or
+    more round the middle of its pieces (gyres, the nucleosome), the ring is grown until the items inside it (their
+    homes nearer its middle than its pieces on average) fit inside the inner gyre (_ROOM), and its rungs are spread
+    evenly over it. Each piece is then set on the curve (_onto) and its item pinned (_Item.pinned: held there,
+    _attract and _separate move the rest round it). Returns the curves (pieces as items' members), the walls the
+    other items keep off (`walls` with the curves' bands added, _band_boxes) and springs (as _stem_springs')
+    pulling each element touching a curve's nucleotides to its band's edge at the longest run of rungs it touches,
+    on the side most of its chain is projected on (so its loops need not cross the band; past an inner gyre where one
+    stands that way: _beyond); one projected across the band from there starts beside it (the walls would push it off
+    the band the way they find). An element no rung pulls whose neighbours in sequence all stand on its chain's side
+    starts there too (_to_its_side). The contacts between the binding elements and the pieces are dropped from
+    `contacts` (the springs pull instead). A duplex any of whose pieces a symmetry tie holds is left as pieces."""
+    stems, item_of = [], []
+    for k, it in enumerate(items):
+        for m, (ox, oy) in zip(it.members, it.offsets):
+            if isinstance(m, PlacedStem):
+                m.cx, m.cy = it.cx + ox, it.cy + oy
+                stems.append(m)
+                item_of.append(k)
+    tied = set(ties or {}) | {j for j, _ in (ties or {}).values()}
+    groups = [(p, ks) for p, ks in bent_duplexes(stems) if not any(item_of[k] in tied for k in ks)]
+    if not groups:
+        return [], walls, []
+    gh = _GLYPH_H * max(1.0, float(style.font_scale))
+    curves = []
+    for parent, ks in groups:
+        ps = [stems[k] for k in ks]
+        band = 2 * (ps[0].rail + NT_ROW + gh)
+        _chain(ps)
+        xy, centres, gyres, overlap = _curve_of(stems, ks, band)
+        total = float(sum(d.length for d in ps))
+        U = np.cumsum([0.0, *[d.length for d in ps][:-1]]) + np.array([d.length for d in ps]) / 2
+        w = np.array([d.length for d in ps], float)
+        along = (float(_snap((w * (np.array(centres) - U)).sum() / w.sum())), 1.0)
+        if gyres:
+            mid = _ctrl(ps)[1:-1].mean(axis=0)
+            reach = float(np.mean([math.hypot(d.cx - mid[0], d.cy - mid[1]) for d in ps]))
+            mine = {item_of[k] for k in ks}
+            need = 0.0
+            for k, it in enumerate(items):
+                if k in mine or any(isinstance(m, PlacedStem) for m in it.members):
+                    continue
+                hx, hy = it.half
+                mx, my = it.mid
+                if math.hypot(it.home[0] + mx - mid[0], it.home[1] + my - mid[1]) < reach:
+                    need += (2 * hx + MARGIN) * (2 * hy + MARGIN)
+            ring = _ring(ps, band, _ROOM * need)
+            if ring is not None:
+                xy, at = ring
+                centres = at[1:-1]
+                overlap = _far_gap(xy, _arc(xy), band) < band
+                along = (float(at[0]), float(_snap(max(1.0, (at[-1] - at[0]) / total))))
+        c = _make(parent, ks, ps, xy, centres, gyres, overlap, na, along)
+        c.band = band
+        _onto(c, ps, *along)
+        for k in ks:
+            it = items[item_of[k]]
+            it.cx, it.cy = stems[k].cx, stems[k].cy  # (a stem is an item of its own: offset 0)
+            it.home = (it.cx, it.cy)
+            it.pinned = True
+        curves.append(c)
+    pinned = {item_of[k] for c in curves for k in c.pieces}
+    boxes = [b for c in curves for b in _band_boxes(c)]
+    hard = np.ones((len(items), len(boxes)), bool)
+    hard[sorted(pinned)] = False
+    if walls is not None:
+        walls = Walls(np.vstack([walls.boxes, np.asarray(boxes, float).reshape(-1, 4)]), np.hstack([walls.hard, hard]))
+    else:
+        walls = Walls(np.asarray(boxes, float).reshape(-1, 4), hard)
+    ids = {stems[k].id for c in curves for k in c.pieces}
+    for key in [key for key in contacts if key & ids]:
+        del contacts[key]
+    elements = [  # (item, member, its offset, its projected place) of every protein element
+        (k, m, off, np.add(it.home, off))
+        for k, it in enumerate(items)
+        if k not in pinned
+        for m, off in zip(it.members, it.offsets)
+        if isinstance(m, Placed) and not m.ghost
+    ]
+    sides = {}  # (curve, chain) -> the side of the curve most of the chain's elements are projected on
+    for n, c in enumerate(curves):
+        lo, hi = c.span()
+        p, t, _ = c.frames(np.linspace(lo, hi, max(2, math.ceil((hi - lo) / CURVE_STEP) + 1)))
+        for _, m, _, q in elements:
+            near = int(np.argmin(np.hypot(p[:, 0] - q[0], p[:, 1] - q[1])))
+            d = q - p[near]
+            v = float(_snap(t[near, 0] * d[1] - t[near, 1] * d[0]))
+            sides[(n, m.sse.chain)] = sides.get((n, m.sse.chain), 0) + (1 if v >= 0 else -1)
+    springs, start = [], {}
+    for k, m, off, _ in elements:
+        for n, c in enumerate(curves):
+            res, keys = [], []
+            for r in range(m.sse.start, m.sse.end + 1):
+                hit = [x for x in na.contacts.get(r, ()) if x in c.at]
+                if hit:
+                    res.append(r)
+                    keys += hit
+            if not res:
+                continue
+            arcs = sorted(c.at[x] for x in keys)  # the rungs it touches, in runs along the duplex: the longest run
+            runs = [[arcs[0]]]
+            for v in arcs[1:]:
+                if v - runs[-1][-1] > c.band:
+                    runs.append([v])
+                else:
+                    runs[-1].append(v)
+            a = float(np.mean(max(runs, key=len)))
+            p, _, nrm = (v[0] for v in c.frames(a))
+            f = (float(np.mean(res)) - m.sse.start + 0.5) / (m.sse.end - m.sse.start + 1)
+            oi = np.add(off, m.direction * (f - 0.5) * m.length)
+            side = 1.0 if sides[(n, m.sse.chain)] >= 0 else -1.0  # its chain's side: its loops cross no band
+            target = _beyond(c, a, p + side * nrm * c.band / 2, side * nrm)
+            gaps = [math.hypot(stems[q].cx - p[0], stems[q].cy - p[1]) for q in c.pieces]
+            j = item_of[c.pieces[int(np.argmin(gaps))]]  # held by the piece nearest
+            oj = target - np.array([items[j].cx, items[j].cy])
+            wt = _RUNG_W * _W_CONTACT * min(4 * len(res), _CONTACT_CAP) / _CONTACT_CAP
+            springs.append((k, _snap(oi), j, _snap(oj), float(_snap(wt)), float(_snap(m.width / 2 + MARGIN))))
+            q = np.add(items[k].home, oi)  # is it projected on its side, clear of the band?
+            v = float((q - target) @ nrm) * side + c.band / 2
+            reach = c.band / 2 + max(items[k].half) + MARGIN
+            if v < reach:  # no: started beside the band at its rungs, on its side (the walls push it off the band
+                # the way they find, its loops then crossing it)
+                start.setdefault(k, []).append(target + side * nrm * (reach - c.band / 2) - oi)
+    for k, at in sorted(start.items()):
+        x, y = (float(v) for v in _snap(np.mean(at, axis=0)))
+        items[k].cx, items[k].cy = x, y
+        items[k].home = (x, y)
+    _to_its_side(items, elements, curves, sides, set(start) | {s[0] for s in springs})
+    return curves, walls, springs
+
+
+def _beyond(c: NACurve, a: float, edge: np.ndarray, way: np.ndarray) -> np.ndarray:
+    """`edge` (the band's edge at arc length a, `way` the unit direction out of it), or, where another stretch of
+    the band lies beyond it that way (a gyre inside the one at a), the edge of the last such stretch: the nearest
+    place an element touching the duplex at a can stand (the octamer stands inside the inner gyre)."""
+    other = np.abs(c.s - a) > 2 * c.band
+    if not other.any():
+        return edge
+    pts = c.xy[other]
+    out = edge
+    for t in np.arange(0.0, 3 * c.band, 0.25):
+        q = edge + t * way
+        if float(np.hypot(pts[:, 0] - q[0], pts[:, 1] - q[1]).min()) < c.band / 2:
+            out = q + way * 0.25
+    return _snap(out)
+
+
+def _side_of(c: NACurve, q) -> tuple[float, np.ndarray, np.ndarray]:
+    """How far q lies to the left of the curve (negative: right), and the curve's point and left normal nearest it."""
+    lo, hi = c.span()
+    p, _, n = c.frames(np.linspace(lo, hi, max(2, math.ceil((hi - lo) / CURVE_STEP) + 1)))
+    near = int(np.argmin(np.hypot(p[:, 0] - q[0], p[:, 1] - q[1])))
+    return float(_snap((np.asarray(q) - p[near]) @ n[near])), p[near], n[near]
+
+
+def _to_its_side(items: list, elements: list, curves: list[NACurve], sides: dict, bound: set[int]) -> None:
+    """An item no rung pulls (`bound`: those some do), projected across a curve from its chain, whose elements'
+    neighbours in sequence outside it are all on its chain's side, is started there instead: its place mirrored
+    across the curve (at least clear of the band), so its loops need not cross it (1YTB's C-terminal helix)."""
+    by_chain: dict[str, list] = {}
+    for k, m, _, _ in elements:
+        by_chain.setdefault(m.sse.chain, []).append((m.sse.start, m.sse.end, k))
+    for rows in by_chain.values():
+        rows.sort(key=lambda r: (r[0], r[1]))
+    mine: dict[int, list] = {}
+    for k, m, _, _ in elements:
+        mine.setdefault(k, []).append(m)
+    for k in sorted(mine):
+        if k in bound:
+            continue
+        it = items[k]
+        for n, c in enumerate(curves):
+            chains = {m.sse.chain for m in mine[k]}
+            if len(chains) != 1 or (n, next(iter(chains))) not in sides:
+                continue
+            chain = next(iter(chains))
+            want = 1.0 if sides[(n, chain)] >= 0 else -1.0
+            v, p, nrm = _side_of(c, it.home)
+            if v * want >= 0:
+                continue
+            rows = by_chain[chain]
+            here = [i for i, r in enumerate(rows) if r[2] == k]
+            near = [rows[i] for i in (here[0] - 1, here[-1] + 1) if 0 <= i < len(rows) and rows[i][2] != k]
+            if not near or any(_side_of(c, items[r[2]].home)[0] * want < 0 for r in near):
+                continue
+            reach = c.band / 2 + max(it.half) + MARGIN
+            x, y = (float(u) for u in _snap(np.asarray(it.home) + (max(abs(v), reach) + abs(v)) * want * nrm))
+            it.cx, it.cy = x, y
+            it.home = (x, y)
+            break
 
 
 def _fractions(points: np.ndarray, at: np.ndarray) -> np.ndarray:
