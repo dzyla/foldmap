@@ -5,6 +5,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
+from foldmap import fetch
 from foldmap.cli import main, make_figure, make_layout
 from foldmap.io import load_backbone
 from foldmap.membrane import find_membrane
@@ -687,3 +688,44 @@ def test_a_membrane_two_fold_dimer_is_drawn_no_worse_than_unrolled(monkeypatch):
     monkeypatch.setattr(cli, "_dyad_frame", lambda *a: None)
     unrolled = scored()
     assert drawn <= unrolled, (drawn, unrolled)
+
+
+# ------------------------------------------------------------------------------- plan 26: the whole structure
+def test_the_membrane_is_found_on_every_chain_whatever_chains_draws(monkeypatch):
+    """Plan 26 (32KS --chains A): the membrane was estimated on the chains --chains kept, so one protomer of a dimer
+    got a plane of its own, ~22° off the dimer's. It is found on every protein chain read; the drawing narrows, the
+    bilayer does not, and A18 (criteria.membrane_checks) judges the figure by the membrane it was drawn with."""
+    from foldmap import criteria, membrane
+    from foldmap.spec import draw_spec, figure_spec
+
+    path = R100 / "6JO6-AB.cif.gz"
+    whole = find_membrane(path, load_backbone(path, "auto"))
+    d = draw_spec(figure_spec(path, membrane="auto", chains=["A"]))
+    assert {l.chain for l in d.bb.labels} == {"A"}
+    m = d.layout.bilayer
+    assert m.normal.tolist() == whole.normal.tolist() and m.centre == whole.centre and m.sided == whole.sided
+
+    def refound(*_):
+        raise AssertionError("membrane_checks found the membrane again")
+
+    monkeypatch.setattr(membrane, "find_membrane", refound)
+    assert criteria.membrane_checks(d, path)["band"]
+
+
+KS32 = fetch.CACHE / "32KS.cif"  # the download cache as fetch reads it (read before conftest's _temp_cache)
+
+
+@pytest.mark.skipif(not KS32.is_file(), reason="32KS is not in the download cache")
+def test_comec_one_protomer_lies_in_the_dimers_membrane():
+    """32KS (ComEC, Deselaers et al., NAR 2025, Fig. 1C) --chains A --membrane auto: the membrane is the dimer's, so
+    TM1-TM3 (A:5-19, 29-43, 50-74) cross its mid-plane, inside the band (chain A alone put them below it: TM2 at 3 to
+    23 Å, wholly on one side)."""
+    whole = find_membrane(KS32, load_backbone(KS32, "auto"))
+    lay, _, bb = make_layout(KS32, membrane="auto", chains=["A"])
+    m = lay.bilayer
+    assert m.normal.tolist() == whole.normal.tolist() and m.centre == whole.centre
+    d = m.depth(bb.ca)
+    num = np.array([l.seq for l in bb.labels])
+    for lo, hi in ((5, 19), (29, 43), (50, 74)):
+        seg = d[(num >= lo) & (num <= hi)]
+        assert seg.min() < 0 < seg.max() and seg.min() > -m.half - 5 and seg.max() < m.half + 5, (lo, hi)

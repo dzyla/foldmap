@@ -123,12 +123,13 @@ def membrane_checks(drawn, path) -> dict:
     """A18 on a --membrane auto figure (figcheck.membrane_view, the same test the membrane view lays itself out by):
     each TM helix (its CA run reaches both membrane faces) enters its band through a face and reaches past its middle
     (C27 ruling); loops run sideways inside a band (figcheck.SLAB_MARGIN from its faces) only on the first segment
-    out of their own port inside it, up to clearing its element (membrane slab ruling)."""
+    out of their own port inside it, up to clearing its element (membrane slab ruling). The membrane is the one the
+    figure was drawn with (Layout.bilayer: found on every protein chain, whatever --chains draws)."""
     from . import figcheck
     from .membrane import find_membrane
 
     lay, bb = drawn.layout, drawn.bb
-    mem = find_membrane(path, bb)
+    mem = getattr(lay, "bilayer", None) or find_membrane(path, bb)
     if lay.membrane is None or mem is None:
         return {"band": lay.membrane is not None, "tm_helices": 0, "tm_short": [], "loops_in_slab": []}
     return {"band": True, **figcheck.membrane_view(lay, drawn.sses, bb, mem, drawn.loops)}

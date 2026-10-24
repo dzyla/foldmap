@@ -596,7 +596,7 @@ def make_layout(
     if membrane not in ("off", None):
         from .membrane import find_membrane
 
-        mem = find_membrane(path, bb)
+        mem = find_membrane(path, read_bb)  # on every protein chain: --chains narrows the drawing, not the bilayer
         flip = membrane == "flip"
         if mem is not None and flip:  # the other face is the outside: a 180° turn, never a mirror
             mem = dataclasses.replace(mem, normal=-mem.normal, centre=-mem.centre)
