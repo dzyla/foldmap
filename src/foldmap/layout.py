@@ -5131,10 +5131,6 @@ def build_layout(
                 walls,
                 state,
             )
-            # as 76a7d7d: its R15 loop's walrus rebound `gone` (the copies let go) to its last, empty, list, so a view
-            # with face helices never lays out again without letting go (cli.make_layout); kept, and parked for a
-            # ruling (plan 26 Task 3 report: undone, 6JLN's view changes)
-            gone = 0
         report = _TIE_TURN.get()[1]
         if report is not None:  # the shared sheets whose way up is a symmetry tie: _both_ways may turn them
             held = {m.sse.id for k in shared for m in items[k].members}

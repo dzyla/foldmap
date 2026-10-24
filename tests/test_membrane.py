@@ -1375,3 +1375,37 @@ def test_comec_auto_domains_in_the_membrane_view_are_the_papers_three():
     lo, hi = lay.membrane["y"]
     assert domain_panel(lay, "D1")[1] <= lo and domain_panel(lay, "D1")[3] >= hi
     assert domain_panel(lay, "D2")[1] >= hi and domain_panel(lay, "D3")[1] >= hi
+
+
+def test_a_membrane_view_with_face_helices_still_counts_the_copies_it_let_go(monkeypatch):
+    """Ruling R18: 76a7d7d's R15 loop rebound build_layout's `gone` (the copy items _one_per_mate let go) to its own
+    last, empty, list, so Layout.let_go read 0 on every membrane view with a face helix and cli.make_layout never
+    laid such a view out again without letting go (the A15 retry). Here one copy item is let go (the ties and the
+    choice faked) beside a helix held on a face: the layout counts it."""
+    import foldmap.layout as L
+    from helpers import fake_sse
+
+    band = (-3.45, 3.45)
+    tm = fake_sse("H", 0, 25, centroid=(0, 0, 0.0), axis=(0, 0, 1))
+    face = fake_sse("H", 30, 41, centroid=(5, 0, 10.0), axis=(1, 0, 0))
+    copy = fake_sse("H", 0, 25, centroid=(40, 0, 0.0), axis=(0, 0, 1), chain="B")
+
+    def tied(items, *a, **k):  # B's helix tied to A's, protomer 1
+        at = {m.sse.id: n for n, it in enumerate(items) for m in it.members}
+        return {at[copy.id]: (at[tm.id], 1)}
+
+    monkeypatch.setattr(L, "_symmetry_ties", tied)
+    monkeypatch.setattr(L, "_one_per_mate", lambda items, ties, **k: [])  # and let go
+    lay = L.build_layout(
+        [tm, face, copy],
+        [],
+        _page(),
+        "projected",
+        level={tm.id, copy.id},
+        upright={tm.id, copy.id},
+        flat={face.id},
+        band=band,
+        on_face={face.id: 1},
+        alike_first=False,
+    )
+    assert lay.let_go == 1
