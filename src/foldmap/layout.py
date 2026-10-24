@@ -3945,28 +3945,45 @@ _WALL_REACH = 1e3  # page units: a membrane wall's least reach beyond its face, 
 
 
 def _membrane_walls(
-    items: list[_Item], sides: dict[str, int], band: tuple[float, float], kept: np.ndarray | None, walls: Walls | None
+    items: list[_Item],
+    sides: dict[str, int],
+    band: tuple[float, float],
+    kept: np.ndarray | None,
+    walls: Walls | None,
+    panelled: set[str] = frozenset(),
 ) -> Walls | None:
     """`walls` with two fixed boxes more, one per side of a membrane view's band (bottom, top page y): the band and
     everything below it, which the items holding soluble elements of the upper side (`sides` +1) keep off, and the
     band and everything above it, for those of the lower side (-1); MARGIN clear of the face, as of any fixed box
     (_off_walls, _slide_clear, _attract's _fixed_overlap). An item keeping its height (`kept`), or holding soluble
-    elements of both sides, keeps off neither (plan 26 Task 2, ruling R4: no soluble element drawn in the slab)."""
-    hard = np.zeros((len(items), 2), bool)
+    elements of both sides, keeps off neither (plan 26 Task 2, ruling R4: no soluble element drawn in the slab).
+    With `panelled` (the elements of soluble domains, plan 26 ruling T3-c) two boxes more, reaching as far past
+    each face as a domain's panel reaches past its elements (domain_panel: DOMAIN_PAD, and the name's room above),
+    less MARGIN, plus _PANEL_CLEAR: the items holding such elements keep off those instead, so their domain's panel
+    stays out of the slab."""
+    panels = bool(panelled)
+    hard = np.zeros((len(items), 4 if panels else 2), bool)
     for k, it in enumerate(items):
         if kept is not None and kept[k]:
             continue
         on = {sides[m.sse.id] for m in it.members if isinstance(m, Placed) and not m.ghost and m.sse.id in sides}
         if len(on) == 1:
-            hard[k, 0 if on.pop() > 0 else 1] = True
+            boxed = panels and any(isinstance(m, Placed) and m.sse.id in panelled for m in it.members)
+            hard[k, (0 if on.pop() > 0 else 1) + (2 if boxed else 0)] = True
     if not hard.any():
         return walls
     lo, hi = band  # reaching ten times past the farthest item, however wide the page (review-2 M5)
     far = max(_WALL_REACH, 10 * max(abs(v) + max(it.half) for it in items for v in (it.cx, it.cy)))
     boxes = np.array([[-far, lo - far, far, hi], [-far, lo, far, hi + far]], float)
+    if panels:
+        up = max(0.0, DOMAIN_PAD - MARGIN) + _PANEL_CLEAR  # a panel's bottom edge, under its elements
+        down = max(0.0, DOMAIN_PAD + _DOMAIN_NAME_ROOM - MARGIN) + _PANEL_CLEAR  # its top edge, its name's room too
+        boxes = np.vstack([boxes, [[-far, lo - far, far, hi + up], [-far, lo - down, far, hi + far]]])
     if walls is None:
         return Walls(boxes, hard)
-    band_rows = None if walls.band is None else np.vstack([walls.band, np.full((2, walls.band.shape[1]), np.nan)])
+    band_rows = (
+        None if walls.band is None else np.vstack([walls.band, np.full((len(boxes), walls.band.shape[1]), np.nan)])
+    )
     return Walls(
         np.vstack([np.asarray(walls.boxes, float).reshape(-1, 4), boxes]), np.hstack([walls.hard, hard]), band_rows
     )
@@ -4154,6 +4171,44 @@ def _out_of_room(
             lo, hi = _face_room(items[k].members[0], spans)
             if not lo - 1e-9 <= items[k].cx <= hi + 1e-9:
                 out.append(k)
+    return out
+
+
+def _hold_rooms(
+    items: list[_Item],
+    faced: dict[int, tuple[float, float, int]],
+    kept: np.ndarray,
+    level: set[str],
+    seen_span: dict[str, tuple[float, float]],
+    walled: tuple,
+    separate: Callable[[Walls | None], str],
+) -> tuple[Walls | None, str] | None:
+    """Ruling R15: while a held face helix lies outside its room (_out_of_room) as the columns now stand, the first
+    time each is moved back within it (_into_room), still held; any carried out again is released to the ordinary
+    layout, walled off the band on its side (`walled`: _membrane_walls' sides, the face helices' faces, the band, the
+    walls before any membrane wall, and the soluble domains' elements), at its projected place as it stood to its
+    chain's columns (`seen_span`, the spans as projected), and the layout is separated again (`separate`, given the
+    walls) after each round. Run after every separation that may move the columns or the helices (build_layout: after
+    _attract and _separate, the domains' parting and a hand-widened element's room). Returns the walls and the last
+    separation's state, None when no helix was out of its room."""
+    off, on_face, band, bare, panelled = walled
+    out, clipped = None, False
+    while gone := _out_of_room(items, faced, kept, level):
+        if not clipped:  # first moved back within their rooms, still held, and the layout separated again
+            clipped = True
+            _into_room(items, faced, kept, level, gone)
+            gone = []
+        now = _tm_spans(items, level, now=True)
+        for k in gone:  # then any still carried out of its room released to the ordinary layout, walled off the
+            x0, y0, _ = faced[k]  # band on its side, at its projected place as it stood to its chain's columns
+            c = items[k].members[0].sse.chain
+            if c in seen_span and c in now:
+                x0 += (sum(now[c]) - sum(seen_span[c])) / 2
+            items[k].cx, items[k].cy, items[k].home = x0, y0, (x0, y0)
+            kept[k] = False
+        off.update(_released(items, on_face, kept))
+        walls = _membrane_walls(items, off, band, kept, bare, panelled)
+        out = (walls, separate(walls))
     return out
 
 
@@ -4716,6 +4771,7 @@ def build_layout(
     flat: set[str] | None = None,
     on_face: dict[str, int] | None = None,
     sides: dict[str, int] | None = None,
+    domain_sides: dict[str, int] | None = None,
     alike_first: bool = True,
     let_go: bool = True,
     mirror_only: bool = False,
@@ -4756,6 +4812,11 @@ def build_layout(
     view (`band`) the items keeping their height keep it through _attract too (moved sideways only), each chain's
     transmembrane columns are dealt back their places in projected order (_in_order, ruling R11), and a
     transmembrane helix half the band long is drawn a hair longer (_stretch_short, ruling R6).
+    `domain_sides` (with `band` and `domains`; domain name -> +1 above, -1 below: cli._domain_sides, plan 26 Task 3):
+    the soluble domains, each parted off the band on its side and its panel kept clear of the slab (its elements in
+    `sides` on that side, _membrane_walls' `panelled`); a domain holding an item that keeps its height is parted
+    sideways only, so its transmembrane elements stay across the band (_part_domains' `kept`), and the face rows'
+    bound (ruling R15, _hold_rooms) is held after the domains are parted.
     `alike_first`: a copy's elements are grouped as its mate's (_regroup_copies) and the copies the symmetry ties may
     be drawn alike in up to _SEP_TIE_ROOM (_separate's second chance, _tied_again), random-100 C2b-3; cli turns it
     off in a membrane view, where the transmembrane helices' heights are judged instead (C17).
@@ -4785,7 +4846,7 @@ def build_layout(
         given.update(domains=domains, partial=partial, rename=rename, swap=swap, move=move, keep_depth=keep_depth)
         given.update(na_cropped=na_cropped, template=template, copies=copies, relabel=relabel, names=names, over=over)
         given.update(level=level, band=band, upright=upright, alike_first=alike_first, let_go=let_go)
-        given.update(flat=flat, on_face=on_face, sides=sides)
+        given.update(flat=flat, on_face=on_face, sides=sides, domain_sides=domain_sides)
         given.update(conventions=conventions)
         return _rosette(sses, sheets, frame, mode, given)
     style = style or Style()
@@ -4912,6 +4973,7 @@ def build_layout(
     lends = False  # a strand lent across an unrolled ring's cut (_unwrap): Style.copy_ghosts is a choice
     apart: dict[str, int] = {}  # copy_ghosts off: a strand lent across the cut -> id() of the item it left
     curves: list = []  # Style.na_bend curved: each bent duplex's curve (na_curve.lay_out), projected mode
+    faced: dict[int, tuple[float, float, int]] = {}  # the flat helices held on a membrane face (projected mode)
     if mode == "stack":
         rows = _stack(items, keep_depth)
         _centre_dna_over_binders(items, contacts)
@@ -4978,8 +5040,9 @@ def build_layout(
             _face_rows(items, faced, kept, band, set(level or ()))
         bare, off = walls, dict(sides or {}) if band is not None else {}  # off the band: soluble and released items
         off.update(_released(items, (on_face or {}) if band is not None else {}, kept))
+        panelled = {k for name, ids in domains or [] if name in (domain_sides or {}) for k in ids}  # soluble domains
         if off:  # each kept off the band on its own side
-            walls = _membrane_walls(items, off, band, kept, bare)
+            walls = _membrane_walls(items, off, band, kept, bare, panelled)
         heights = [it.home[1] for it in items]
         seen_x = [it.home[0] for it in items]  # projected x: the order a membrane view keeps its columns in
         curved = False  # each bent duplex laid out as one curve (na_curve); with none curvable, exactly as pieces
@@ -5039,37 +5102,39 @@ def build_layout(
         state = _separate(  # "alike", "wide" (alike only by the second chance, in more room) or "alone"
             items, ties, joints, walls, mirror=mirror if ties else None, level=kept, shared=shared, again=alike_first
         )
-        clipped = False  # ruling R15: the face rows' bound held through _attract and _separate
-        while faced and (gone := _out_of_room(items, faced, kept, set(level or ()))):
-            if not clipped:  # first moved back within their rooms, still held, and the layout separated again
-                clipped = True
-                _into_room(items, faced, kept, set(level or ()), gone)
-                gone = []
-            now = _tm_spans(items, set(level or ()), now=True)
-            for k in gone:  # then any still carried out of its room released to the ordinary layout, walled off the
-                x0, y0, _ = faced[k]  # band on its side, at its projected place as it stood to its chain's columns
-                c = items[k].members[0].sse.chain
-                if c in seen_span and c in now:
-                    x0 += (sum(now[c]) - sum(seen_span[c])) / 2
-                items[k].cx, items[k].cy, items[k].home = x0, y0, (x0, y0)
-                kept[k] = False
-            off.update(_released(items, on_face, kept))
-            walls = _membrane_walls(items, off, band, kept, bare)
-            state = _separate(
-                items,
-                ties,
-                joints,
-                walls,
-                mirror=mirror if ties else None,
-                level=kept,
-                shared=shared,
-                again=alike_first,
-            )
-        if domains and _part_domains(items, domains, ties, mirror if ties else None):
-            # the domains, parted with their copies, keep them alike whatever room that takes
+        parted = bool(domains) and _part_domains(
+            items, domains, ties, mirror if ties else None, **_banded(domains, domain_sides, kept, band)
+        )
+        if parted:  # the domains, parted with their copies, keep them alike whatever room that takes
             state = _separate(
                 items, ties, joints, walls, mirror=mirror if ties else None, room=np.inf, level=kept, again=alike_first
             )
+        if faced:  # ruling R15: the face rows' bound held through _attract, _separate and the domains' parting
+
+            def hold(separate, walls, state):  # (the walls and the state after it)
+                return _hold_rooms(
+                    items, faced, kept, set(level or ()), seen_span, (off, on_face, band, bare, panelled), separate
+                ) or (walls, state)
+
+            walls, state = hold(
+                lambda w: _separate(
+                    items,
+                    ties,
+                    joints,
+                    w,
+                    mirror=mirror if ties else None,
+                    room=np.inf if parted else _SEP_SYM_ROOM,
+                    level=kept,
+                    shared=shared,
+                    again=alike_first,
+                ),
+                walls,
+                state,
+            )
+            # as 76a7d7d: its R15 loop's walrus rebound `gone` (the copies let go) to its last, empty, list, so a view
+            # with face helices never lays out again without letting go (cli.make_layout); kept, and parked for a
+            # ruling (plan 26 Task 3 report: undone, 6JLN's view changes)
+            gone = 0
         report = _TIE_TURN.get()[1]
         if report is not None:  # the shared sheets whose way up is a symmetry tie: _both_ways may turn them
             held = {m.sse.id for k in shared for m in items[k].members}
@@ -5106,6 +5171,8 @@ def build_layout(
             for it in items:
                 it.home = (it.cx, it.cy)
             _separate(items, None, joints, walls, level=kept)
+            if faced:  # the face rows' bound (R15) held after this separation too
+                walls, _ = hold(lambda w: _separate(items, None, joints, w, level=kept), walls, None)
             for it in items:
                 it.apply()
     for g in ghosts:
@@ -5235,6 +5302,8 @@ def _over_alike(
 
 
 DOMAIN_PAD = 0.7  # panel margin around a domain's elements
+_DOMAIN_NAME_ROOM = 0.6  # a domain panel's room above its elements for its name (domain_panel)
+_PANEL_CLEAR = 0.1  # page units a soluble domain's panel keeps clear of a membrane face (_membrane_walls)
 _DOMAIN_GAP = 2 * DOMAIN_PAD + 0.6  # clear space between two domains' elements: both panels plus a gutter
 
 
@@ -5247,6 +5316,8 @@ def _part_domains(
     ties: dict[int, tuple[int, int]] | None = None,
     mirror: float | None = None,
     sweeps: int = 60,
+    kept: np.ndarray | None = None,
+    sides: list[int] | None = None,
 ) -> bool:
     """Move whole domains apart (each as a rigid group) until their boxes no longer overlap. Each item goes with
     the domain most of its elements belong to. With `ties` (_symmetry_ties) copies stay alike: a domain moves with
@@ -5256,9 +5327,13 @@ def _part_domains(
     When the sweeps do not part them and leave the items' width plus height over _PART_BLOWUP times (3L9G: a sheet
     shared by four copies holds ten domains, so every sweep widened the spread again: random-100 C31), they start
     over with domains that share an item never parted (nor any domain joined to them so), stopping when a sweep no
-    longer shrinks the overlap. True if anything moved. A domain moves as a whole, up or down too, its transmembrane
-    elements in a membrane view with it (build_layout `level` is not held here: a domain keeps its own shape, and
-    holding some of its items' heights would tear it; the _separate after parting holds them again)."""
+    longer shrinks the overlap. True if anything moved. A domain moves as a whole, up or down, keeping its own shape.
+    A membrane view (`sides`, each domain's: +1 or -1 a soluble domain's side of the band, cli._domain_sides, 0 none;
+    `kept`, build_layout's items keeping their height, plan 26 Task 3) parts by the band (_part_way): a unit holding
+    an item that keeps its height, or no one known side, moves sideways only, so its transmembrane elements stay
+    across the band (rulings T3-a, T3-b; before, 32KS-A's competence domain was parted 1-2 Å off the band); a soluble
+    unit parts from such a unit by moving itself outward on its side, at its own x (ruling T3-c), and from another
+    soluble one sideways or, the cheaper way, outward."""
     ties = ties or {}
     owner = {k: d for d, (_, ids) in enumerate(domains) for k in ids}
     groups: dict[int, list[int]] = {}
@@ -5280,6 +5355,10 @@ def _part_domains(
     if len(keys) < 2:
         return False
     unit, members = _domain_units(len(items), groups, ties)
+    way = _part_way(keys, unit, members, kept, sides) if sides is not None else None
+    if way is not None:  # each domain moves as it stands: the _separate after parting leaves it so (32KS chain B's
+        for it in items:  # BLACT helix B:575-585, walled 6 units over its home, fell back to it alone, off its panel)
+            it.home = (it.cx, it.cy)
     copy_k = np.zeros(len(items))
     for i, (_, k) in ties.items():
         copy_k[i] = k
@@ -5339,14 +5418,45 @@ def _part_domains(
                     a, b = root(ds[0]), root(d)
                     bound[max(a, b)] = min(a, b)
         moved, parted = _part_sweeps(
-            keys, groups, unit, members, copy_k, mirror, box, shift, overlap, root, sweeps, second
+            keys, groups, unit, members, copy_k, mirror, box, shift, overlap, root, sweeps, second, way
         )
     return moved
 
 
-def _part_sweeps(keys, groups, unit, members, copy_k, mirror, box, shift, overlap, root, sweeps: int, guard: bool):
+def _part_way(
+    keys: list[int], unit: dict[int, int], members: dict[int, list[int]], kept: np.ndarray | None, sides: list[int]
+) -> dict[int, int]:
+    """_part_domains in a membrane view: each unit's way of parting, 0 sideways only (it holds an item keeping its
+    height, `kept`, or its domains are of no one known side, `sides`), else the side (+1, -1) its soluble domains go
+    off the band to."""
+    out = {}
+    for u in sorted(set(unit[d] for d in keys)):
+        on = {sides[d] for d in keys if unit[d] == u}
+        held = kept is not None and bool(kept[members[u]].any())
+        out[u] = 0 if held or len(on) != 1 else on.pop()
+    return out
+
+
+def _banded(
+    domains: list[tuple[str, list[str]]] | None,
+    domain_sides: dict[str, int] | None,
+    kept: np.ndarray | None,
+    band: tuple[float, float] | None,
+) -> dict:
+    """_part_domains' membrane arguments (`kept`, `sides`) in a membrane view with domains (build_layout `band` and
+    `domain_sides`), else none: parted as ever."""
+    if band is None or domain_sides is None:
+        return {}
+    return {"kept": kept, "sides": [domain_sides.get(name, 0) for name, _ in domains or []]}
+
+
+def _part_sweeps(
+    keys, groups, unit, members, copy_k, mirror, box, shift, overlap, root, sweeps: int, guard: bool, way=None
+):
     """_part_domains' sweeps: (anything moved, parted: a sweep found no clash); with `guard`, they also stop when a
-    sweep no longer shrinks the overlap."""
+    sweep no longer shrinks the overlap. `way` (_part_way, a membrane view): two units in the band part sideways, a
+    soluble one moves off one in the band outward on its side by all their overlap, and two soluble ones part
+    sideways or (the cheaper way) outward: the outer of two on one side moves on, two on either side each go half."""
     moved, last = False, (overlap() if guard else 0.0)  # summed only when it may stop the sweeps (its boxes cost)
     for _ in range(sweeps):
         clash = False
@@ -5362,10 +5472,22 @@ def _part_sweeps(keys, groups, unit, members, copy_k, mirror, box, shift, overla
                 ka, kb = _domain_level(groups[a], copy_k), _domain_level(groups[b], copy_k)
                 sa, sb = (-1.0 if k > 0 and mirror is not None else 1.0 for k in (ka, kb))
                 s = 1.0 if (B[0] + B[2]) >= (A[0] + A[2]) else -1.0  # b lies this way of a, in x
-                if unit[a] != unit[b]:
-                    if ox <= oy:  # the cheaper direction, each side going half way (as the domain's copy moves)
-                        shift(members[unit[a]], -s * ox / 2 * sa, 0.0)
+                wa, wb = (way[unit[a]], way[unit[b]]) if way is not None else (None, None)
+                if unit[a] != unit[b] and way is not None and (wa == 0) != (wb == 0):  # soluble off the band's
+                    d, w, other = (b, wb, A) if wa == 0 else (a, wa, B)
+                    S = box(d)
+                    need = ((other[3] - S[1]) if w > 0 else (S[3] - other[1])) + _DOMAIN_GAP
+                    shift(members[unit[d]], 0.0, w * need)
+                elif unit[a] != unit[b]:
+                    if ox <= oy or wa == 0:  # the cheaper direction, each side going half way (as the domain's copy
+                        shift(members[unit[a]], -s * ox / 2 * sa, 0.0)  # moves); two in the band only sideways
                         shift(members[unit[b]], s * ox / 2 * sb, 0.0)
+                    elif way is not None and wa == wb:  # soluble, on one side: the outer one further out
+                        outer = a if (A[1] + A[3]) * wa >= (B[1] + B[3]) * wa else b
+                        shift(members[unit[outer]], 0.0, wa * oy)
+                    elif way is not None:  # soluble, on either side: each its own way out
+                        shift(members[unit[a]], 0.0, wa * oy / 2)
+                        shift(members[unit[b]], 0.0, wb * oy / 2)
                     else:
                         t = 1.0 if (B[1] + B[3]) >= (A[1] + A[3]) else -1.0
                         shift(members[unit[a]], 0.0, -t * oy / 2)
@@ -5558,7 +5680,12 @@ def domain_panel(layout: Layout, name: str) -> tuple[float, float, float, float]
     ]
     r = np.array([layout.placed[k].rect for k in ids] + repeats)
     x0, y0, x1, y1 = r[:, 0].min(), r[:, 1].min(), r[:, 2].max(), r[:, 3].max()
-    return (float(x0 - DOMAIN_PAD), float(y0 - DOMAIN_PAD), float(x1 + DOMAIN_PAD), float(y1 + DOMAIN_PAD + 0.6))
+    return (
+        float(x0 - DOMAIN_PAD),
+        float(y0 - DOMAIN_PAD),
+        float(x1 + DOMAIN_PAD),
+        float(y1 + DOMAIN_PAD + _DOMAIN_NAME_ROOM),
+    )
 
 
 _PLATE_PAD = 0.3  # a sheet's plate reaches this far beyond its strands (render._draw_sheet_panels)

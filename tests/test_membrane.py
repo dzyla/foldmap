@@ -1187,3 +1187,191 @@ def test_a_held_face_helix_stays_within_its_chain_span_through_the_layout():
     _into_room(items, faced, kept, level, [1])
     assert items[1].cx == pytest.approx(0.5 + _FACE_PAD) and items[1].home[0] == items[1].cx
     assert _out_of_room(items, faced, kept, level) == [] and items[3].cx == -40.0
+
+
+# ------------------------------------------------------------- plan 26 Task 3: domains with a membrane
+def test_auto_domains_join_the_domains_holding_the_band_and_leave_the_rest():
+    """features.auto_domains `band` (ruling T3-a: contacts alone never split what the band holds; 32KS-A's competence
+    domain came in five): the domains holding any of its elements are one, numbered as the first; the others stay as
+    found; a chain whose every domain holds some is not split. On a committed fixture chain, 1AOZ_A (three domains)."""
+    from types import SimpleNamespace
+
+    from foldmap import domain_score as ds
+    from foldmap.features import auto_domains
+
+    inputs = ds.load_fixture(Path(__file__).parent / "data" / "domains" / "cath_inputs.npz")["1AOZ_A"]
+    bb = SimpleNamespace(labels=inputs.labels, ca=inputs.ca)
+
+    def auto(band=frozenset()):
+        return auto_domains(inputs.sses, inputs.contacts, inputs.rows, {}, frozenset(), bb=bb, band=band)
+
+    (_, d1), (_, d2), (_, d3) = auto()
+    assert auto({d2[0]}) == auto()  # a band in one domain joins nothing
+    joined = auto({d1[-1], d3[0]})
+    assert [name for name, _ in joined] == ["D1", "D2"]
+    assert sorted(joined[0][1]) == sorted(d1 + d3) and joined[1][1] == d2
+    assert auto({d1[0], d2[0], d3[0]}) == []
+
+
+def test_the_band_joins_a_proteins_domains_in_every_copy_alike():
+    """features._join_band: a domain holding a band element in any copy of a protein (`ref`, chain -> its reference)
+    joins in every copy; the domains are numbered again from 0; a protein left with one domain is not split."""
+    from foldmap.features import _join_band
+
+    owner = {f"{c}{k}": (c, k) for c in "AB" for k in range(4)}
+    owner |= {"C0": ("C", 0), "C1": ("C", 1)}
+    _join_band(owner, {"A": "A", "B": "A", "C": "C"}, {"A0", "B2", "C0", "C1"})
+    assert {k: d for k, (_, d) in owner.items()} == {
+        "A0": 0,
+        "A1": 1,
+        "A2": 0,
+        "A3": 2,
+        "B0": 0,
+        "B1": 1,
+        "B2": 0,
+        "B3": 2,
+    }
+
+
+def test_a_soluble_domain_takes_the_side_its_centroid_lies_on():
+    """cli._domain_sides (ruling T3-c) on a 30 Å slab, normal up: a domain holding a transmembrane or face element
+    (`held`) is none; any other goes by its residues' centroid, above or below, whatever its elements' own sides (MIX:
+    one 30 Å above, one 10 Å below); the sign follows the page, outer face up (+1) or down (-1)."""
+    from types import SimpleNamespace
+
+    from foldmap.cli import _domain_sides
+    from foldmap.membrane import Membrane
+
+    mem = Membrane(np.array([0.0, 0.0, 1.0]), 0.0, 15.0, "estimate")
+    runs = {"tm": np.linspace(-16, 16, 9), "face": np.full(5, 17.0), "up": np.full(5, 25.0), "down": np.full(5, -30.0)}
+    runs |= {"a": np.full(5, 30.0), "b": np.full(5, -10.0)}
+    ca, sses = [], []
+    for name, z in runs.items():
+        sses.append(SimpleNamespace(id=name, start=len(ca), end=len(ca) + len(z) - 1))
+        ca += [(0.0, 0.0, float(v)) for v in z]
+    bb = SimpleNamespace(ca=np.array(ca))
+    named = [("M", ["tm", "up"]), ("F", ["face"]), ("UP", ["up"]), ("DOWN", ["down"]), ("MIX", ["a", "b"])]
+    assert _domain_sides(named, sses, bb, mem, {"tm", "face"}, (3.45, -3.45)) == {"UP": 1, "DOWN": -1, "MIX": 1}
+    assert _domain_sides(named, sses, bb, mem, {"tm", "face"}, (-3.45, 3.45)) == {"UP": -1, "DOWN": 1, "MIX": -1}
+
+
+def _domain_item(s, x, y, length, angle):
+    from foldmap.layout import Placed, _Item
+
+    return _Item([Placed(s, 0, 0, length, angle, 1.0)], [(0.0, 0.0)], x, y, (x, y), s.start, s.chain)
+
+
+@pytest.mark.parametrize("case", ["band-soluble", "band-band", "soluble-soluble"])
+def test_domains_part_by_the_band(case):
+    """layout._part_domains in a membrane view (`kept`, `sides`; rulings T3-a to T3-c; 32KS-A's competence domain was
+    parted 1-2 Å off the band, four TM helices short): a soluble domain moves off a domain in the band outward on its
+    side, at its own x, and the band's domain stays; two domains in the band part sideways only, though up or down is
+    cheaper; of two soluble domains on one side, the outer moves on outward and the inner stays."""
+    from foldmap.layout import _DOMAIN_GAP, _part_domains
+    from helpers import fake_sse
+
+    a, b = fake_sse("H", 0, 20), fake_sse("H", 30, 40)
+    up, flat = np.pi / 2, 0.0
+    if case == "band-soluble":  # a TM column, and a soluble helix lying over its top
+        items = [_domain_item(a, 0.0, 0.0, 8.0, up), _domain_item(b, 0.5, 1.0, 6.0, flat)]
+        kept, sides = np.array([True, False]), [0, 1]
+    elif case == "band-band":  # a TM column and a face helix held over its top, of two domains in the band
+        items = [_domain_item(a, 0.0, 0.0, 8.0, up), _domain_item(b, 0.5, 4.5, 8.0, flat)]
+        kept, sides = np.array([True, True]), [0, 0]
+    else:  # two soluble helices above the band, the second a little higher
+        items = [_domain_item(a, 0.0, 6.0, 6.0, flat), _domain_item(b, 0.5, 7.0, 6.0, flat)]
+        kept, sides = np.array([False, False]), [1, 1]
+    before = [(it.cx, it.cy) for it in items]
+    assert _part_domains(items, [("P", [a.id]), ("Q", [b.id])], kept=kept, sides=sides)
+    (x0, y0), (x1, y1) = before
+    if case == "band-soluble":
+        assert (items[0].cx, items[0].cy) == (x0, y0) and items[1].cx == x1 and items[1].cy > y1
+        assert items[1].cy + items[1].box[1] >= items[0].cy + items[0].box[3] + _DOMAIN_GAP - 1e-6
+    elif case == "band-band":
+        assert items[0].cy == y0 and items[1].cy == y1 and abs(items[1].cx - items[0].cx) > abs(x1 - x0)
+    else:
+        assert (items[0].cx, items[0].cy) == (x0, y0) and items[1].cx == x1 and items[1].cy > y1
+
+
+def test_a_soluble_domains_panel_stays_out_of_the_slab():
+    """build_layout `domain_sides` (ruling T3-c): a soluble domain's elements keep off the band far enough that its
+    panel (domain_panel: DOMAIN_PAD round its elements, its name's room above) stays clear of the slab, on either side;
+    with the elements walled only MARGIN clear (no `domain_sides`), the lower domain's panel reaches into it."""
+    from foldmap.layout import build_layout, domain_panel
+    from helpers import fake_sse
+
+    band = (-3.45, 3.45)
+    tm = fake_sse("H", 0, 25, centroid=(0, 0, 0.0), axis=(0, 0, 1))
+    hi = fake_sse("H", 30, 41, centroid=(60, 0, 2.0), axis=(1, 0, 0))
+    lo = fake_sse("H", 45, 56, centroid=(-60, 0, -2.0), axis=(0, 0, 1))  # upright, its label beside it, not above
+    tail = fake_sse("H", 70, 80, centroid=(120, 0, 30.0), axis=(1, 0, 0))  # the C-terminus: no end letter on `lo`
+    doms = [("M", [tm.id]), ("HI", [hi.id, tail.id]), ("LO", [lo.id])]
+    sides = {hi.id: 1, tail.id: 1, lo.id: -1}
+    kw = dict(level={tm.id}, upright={tm.id}, flat={hi.id, tail.id}, band=band, sides=sides, domains=doms)
+    els = [tm, hi, lo, tail]
+    lay = build_layout(els, [], _page(), "projected", domain_sides={"HI": 1, "LO": -1}, **kw)
+    assert domain_panel(lay, "HI")[1] >= band[1] and domain_panel(lay, "LO")[3] <= band[0]
+    plain = build_layout(els, [], _page(), "projected", **kw)
+    assert domain_panel(plain, "LO")[3] > band[0]
+
+
+@pytest.mark.parametrize("step", ["parting", "widening"])
+def test_the_face_rows_bound_holds_after_the_domains_are_parted(monkeypatch, step):
+    """Ruling R15 through the whole layout (re-review-3's parked note): a held face helix that the domains' parting, or
+    a hand-widened element's separation, carries 40 units off its chain's columns is brought back within its padded
+    transmembrane span (or released, at its projected place), as after _attract and _separate."""
+    import foldmap.layout as L
+    from foldmap.style import Style
+    from helpers import fake_sse
+
+    band = (-3.45, 3.45)
+    tm = fake_sse("H", 0, 25, centroid=(0, 0, 0.0), axis=(0, 0, 1))
+    face = fake_sse("H", 30, 41, centroid=(5, 0, 10.0), axis=(1, 0, 0))
+
+    def away(items, *a, **k):  # the step moves the face helix far off, as a big parting or widening may
+        for it in items:
+            if any(m.sse.id == face.id for m in it.members):
+                it.cx += 40.0
+                it.home = (it.cx, it.home[1])
+        return True
+
+    monkeypatch.setattr(L, "_part_domains" if step == "parting" else "_widen", away)
+    lay = L.build_layout(
+        [tm, face],
+        [],
+        _page(),
+        "projected",
+        level={tm.id},
+        upright={tm.id},
+        flat={face.id},
+        band=band,
+        on_face={face.id: 1},
+        domains=[("M", [tm.id]), ("F", [face.id])],
+        domain_sides={},
+        style=Style(element_widths="α1=2") if step == "widening" else None,
+    )
+    p = lay.placed
+    pad = max(L._FACE_PAD, p[face.id].length)
+    assert p[tm.id].rect[0] - pad - 1e-6 <= p[face.id].cx <= p[tm.id].rect[2] + pad + 1e-6
+
+
+@pytest.mark.skipif(not KS32.is_file(), reason="32KS is not in the download cache")
+def test_comec_auto_domains_in_the_membrane_view_are_the_papers_three():
+    """32KS --chains A --membrane auto --domains auto (Deselaers et al., Fig. 1C): three domains, the competence domain
+    (every TM helix and the NS helices on the face, A:5-526 less the OB fold), the OB fold (A:87-195) and the
+    β-lactamase-like domain (A:535-795); A18 passes, the competence panel spans the band and the other two lie above it
+    (before: eight panels, four TM helices parted off the band)."""
+    from foldmap import criteria
+    from foldmap.layout import domain_panel
+    from foldmap.spec import draw_spec, figure_spec
+
+    d = draw_spec(figure_spec(KS32, membrane="auto", chains=["A"], domains="auto", style=["color_by=domain"]))
+    lay = d.layout
+    first = {name: min(lay.placed[k].sse.first.seq for k in ids) for name, ids in lay.domains}
+    last = {name: max(lay.placed[k].sse.last.seq for k in ids) for name, ids in lay.domains}
+    assert (first, last) == ({"D1": 5, "D2": 87, "D3": 535}, {"D1": 526, "D2": 195, "D3": 795})
+    m = criteria.membrane_checks(d, KS32)
+    assert m["band"] and not m["tm_short"] and not m["loops_in_slab"] and not m["soluble_in_slab"], m
+    lo, hi = lay.membrane["y"]
+    assert domain_panel(lay, "D1")[1] <= lo and domain_panel(lay, "D1")[3] >= hi
+    assert domain_panel(lay, "D2")[1] >= hi and domain_panel(lay, "D3")[1] >= hi

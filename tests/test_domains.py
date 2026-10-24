@@ -1013,7 +1013,7 @@ def test_parting_domains_sums_no_overlap_unless_it_may_stop(monkeypatch):
     calls = {"overlap": 0, "box": 0, "tries": []}
     real = L._part_sweeps
 
-    def counted(keys, groups, unit, members, copy_k, mirror, box, shift, overlap, root, sweeps, guard):
+    def counted(keys, groups, unit, members, copy_k, mirror, box, shift, overlap, root, sweeps, guard, way=None):
         def box_c(d):
             calls["box"] += 1
             return box(d)
@@ -1023,7 +1023,7 @@ def test_parting_domains_sums_no_overlap_unless_it_may_stop(monkeypatch):
             return overlap()
 
         calls["tries"].append(guard)
-        return real(keys, groups, unit, members, copy_k, mirror, box_c, shift, overlap_c, root, sweeps, guard)
+        return real(keys, groups, unit, members, copy_k, mirror, box_c, shift, overlap_c, root, sweeps, guard, way)
 
     monkeypatch.setattr(L, "_part_sweeps", counted)
     make_layout(FID / "1LDM.cif.gz", domains="auto")

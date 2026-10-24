@@ -698,8 +698,12 @@ def make_layout(
         template_rows(sheets, sses, copies) if mode == "projected" and (look or Style()).fold_template == "auto" else []
     )
     conventions = functools.partial(all_names, path, whole=whole)  # dep: and beta: references (layout.resolve)
-    named = _domains(domains, sses, contacts, rows, copies, partial, bb, conventions)
-    named_note = domain_note(source, named, found_note)
+    tm = _transmembrane(sses, bb, mem) if mem is not None and mode == "projected" else set()
+    in_band = (  # auto domains never split what the band holds (ruling T3-a): what crosses it, lies on its faces or
+        tm | set(_membrane_places(sses, bb, mem, tm, (1.0, -1.0))[1]) if tm else frozenset()  # is held in its slab
+    )
+    named = _domains(domains, sses, contacts, rows, copies, partial, bb, conventions, band=in_band)
+    named_note = domain_note(source, named, found_note, band=bool(in_band))
     for _, ids in named:  # a domain holds together: its elements pull on each other
         for a in range(len(ids)):
             for b in range(a + 1, len(ids)):
@@ -762,8 +766,6 @@ def make_layout(
             **({"like": made.like} if made is not None and made.like is not None else {}),
         )
 
-    tm = _transmembrane(sses, bb, mem) if mem is not None and mode == "projected" else set()
-
     def faces_of(frame):  # the membrane's two faces as projected through `frame` (None: no band to keep to)
         return _faces_on_page(frame, sses, bb, mem, tm) if tm else None
 
@@ -772,14 +774,16 @@ def make_layout(
         transmembrane element keeps its projected height across the band (`level`, `band`: the faces as projected),
         standing upright; each other helix stands or lies by its tilt (membrane.lies_flat, ruling R7); a flat one at
         a face or in the slab lies on that face, in rows (`on_face`, ruling R8), and a soluble element stays off the
-        band on its own side (`sides`), as _membrane_places reads them."""
+        band on its own side (`sides`), as _membrane_places reads them. With domains (plan 26 Task 3), each domain
+        holding none of the band's elements is soluble: it and every element of it stay off the band on the side
+        its centroid lies (`domain_sides`, _domain_sides; ruling T3-c)."""
         if mem is None or mode != "projected":
             return {}
         faces = faces_of(frame)
         flat, on_face, sides = _membrane_places(sses, bb, mem, tm, faces)
         if faces is None:  # no band: no height to keep, only the helices turned
             return {"upright": set(), "flat": flat}
-        return {
+        out = {
             "upright": tm,
             "flat": flat,
             "level": tm,
@@ -787,6 +791,11 @@ def make_layout(
             "on_face": on_face,
             "sides": sides,
         }
+        if named:  # each soluble domain on the side its centroid lies, every element of it with it (ruling T3-c)
+            out["domain_sides"] = _domain_sides(named, sses, bb, mem, tm | set(on_face), faces)
+            for name, side in out["domain_sides"].items():
+                sides.update({k: side for k in dict(named)[name]})
+        return out
 
     def finish(lay, frame, faces=None):  # what make_layout sets on a layout after build_layout through `frame`
         lay.helix_matched = {"cut": matched.get("cut", 0), "joined": matched.get("joined", 0)}
@@ -1136,6 +1145,24 @@ def _membrane_places(sses, bb, mem, tm: set[str], faces) -> tuple[set[str], dict
     return flat, on_face, sides
 
 
+def _domain_sides(named, sses, bb, mem, held: set[str], faces) -> dict[str, int]:
+    """The soluble domains of a projected membrane view (plan 26 ruling T3-c), each by the side of the band its
+    centroid lies on: +1 above, -1 below, as _membrane_places' `sides` (faces = (outer, inner) page y). A domain is
+    soluble when it holds no element of `held` (the transmembrane elements and those on a face or held in the slab:
+    a domain holding any keeps its place in the band)."""
+    depth = mem.depth(bb.ca)
+    up = 1 if faces[0] >= faces[1] else -1  # the page side of the outside
+    by_id = {s.id: s for s in sses}
+    out = {}
+    for name, ids in named:
+        mine = [by_id[k] for k in ids if k in by_id]
+        if not mine or held.intersection(ids):
+            continue
+        at = np.concatenate([np.arange(s.start, s.end + 1) for s in mine])
+        out[name] = up if float(depth[at].mean()) >= 0 else -up
+    return out
+
+
 def _transmembrane(sses, bb, mem) -> set[str]:
     """The elements that cross the membrane (membrane.crosses: their CA run crosses its mid-plane and spans half its
     thickness, as _face_medians and A18 count them) and define it (Membrane.defining): in a projected membrane view
@@ -1331,17 +1358,19 @@ def _domain_source(spec) -> str:
     return getattr(spec, "source", "") or ""
 
 
-def domain_note(source: str, named, found: str = "") -> str:
+def domain_note(source: str, named, found: str = "", band: bool = False) -> str:
     """What the notes say of the domains (Layout.domain_note): automatic ones are inferred, not published (plan 12
-    R2); CATH's come with their ids (`found`, cath.domains' note), or the note says why there are none."""
+    R2); CATH's come with their ids (`found`, cath.domains' note), or the note says why there are none. `band` (a
+    projected membrane view, plan 26 ruling T3-a): the note says the domains holding the band's elements are one."""
     if source == "CATH":
         return found
     if source != "inferred":
         return ""
     stems = list(dict.fromkeys(name.split(" · ")[0] for name, _ in named))
+    joined = "; what crosses the membrane, lies on its faces or sits in it is one domain per chain" if band else ""
     if not stems:
-        return "no domains inferred: each chain reads as one domain from its residue contacts"
-    return f"domains {', '.join(stems)} inferred from residue contacts, not a published domain assignment"
+        return "no domains inferred: each chain reads as one domain from its residue contacts" + joined
+    return f"domains {', '.join(stems)} inferred from residue contacts, not a published domain assignment" + joined
 
 
 def _uniprot_domains(ann, sses) -> list[tuple[str, list[str]]]:
@@ -1396,10 +1425,11 @@ def stale_domains_note(spec, sses) -> str:
 
 
 def _domains(
-    spec, sses, contacts, rows=(), copies=None, lent=frozenset(), bb=None, conventions=None
+    spec, sses, contacts, rows=(), copies=None, lent=frozenset(), bb=None, conventions=None, band=frozenset()
 ) -> list[tuple[str, list[str]]]:
     """[(name, element ids)] from 'auto' (chain by chain, copies of a protein (`copies`) alike, chains that only
-    lend elements (`lent`) in their mates' domains, never splitting a βα row of `rows`) or [(name, [refs])]; every
+    lend elements (`lent`) in their mates' domains, never splitting a βα row of `rows`, nor a membrane view's
+    `band`: its domains holding those elements joined, features.auto_domains) or [(name, [refs])]; every
     element in at most one domain. `conventions` (names.all_names, the structure bound): the names a reference may
     give with dep: or beta: (before layout no βα row is known, so a row helix's β-scheme name is not)."""
     from .features import auto_domains
@@ -1408,7 +1438,7 @@ def _domains(
     if not spec:
         return []
     if spec == "auto":
-        return auto_domains(sses, contacts, rows, copies, lent, bb=bb)
+        return auto_domains(sses, contacts, rows, copies, lent, bb=bb, band=band)
     typed = [] if isinstance(spec, SavedDomains) else stale_domain_ids(spec, sses)  # typed ids naming no element
     for name, i in typed:  # A:1-60 is read as the range res:A:1-60 (Q-A19); a range that will not parse is an error
         if RES_RANGE.fullmatch(i.split(":", 1)[1]) is None:

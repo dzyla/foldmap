@@ -283,6 +283,7 @@ def auto_domains(
     lent: set[str] = frozenset(),
     *,
     bb: Backbone,
+    band: set[str] = frozenset(),
 ) -> list[tuple[str, list[str]]]:
     """Domains, chain by chain: each chain's split (_chain_domains, from its residues in the backbone `bb`), named
     D1, D2... in sequence order (with " · chain" when several chains are split). Copies of one protein (`copies`,
@@ -291,7 +292,11 @@ def auto_domains(
     chain. Chains lending a few elements to the drawn subunit (`lent`, focus mode) add them to the domain they
     complete instead of having their own: the drawn domain they have most contacts with (1LDM's N-terminal strand
     of a neighbour pairs in the catalytic domain's sheet, though its mate is in the Rossmann domain), else their
-    mates'. [] when no chain reads as more than one domain."""
+    mates'. `band` (a projected membrane view, cli: the elements crossing the membrane and those drawn on its faces
+    or held in its slab): every domain of a protein holding any of them, in any copy, is one domain, the membrane
+    domain (_join_band; plan 26 Task 3 ruling T3-a: contacts alone never split the band, as 32KS's competence
+    domain, its eleven TM helices and its NS helices on the face, came in five); the other domains stay as found.
+    [] when no chain reads as more than one domain."""
     classes = copy_classes(sses, copies or {})
     mine = group_by_chain(sses)
     root = {c: (copies or {}).get(c, (c, 0))[0] for c in mine}
@@ -315,6 +320,8 @@ def auto_domains(
             owner[s.id] = (_host(s.id, drawn, contacts) or near) if chain in lent else (chain, near[1])
     ref = {c: classes.reference.get(root[c], c) for c in mine}
     _fold_small_copies(owner, ref, sses, contacts)
+    if band:
+        _join_band(owner, ref, band)
     groups: dict[tuple[str, int], list[str]] = {}
     for s in sses:
         if s.id in owner:
@@ -325,6 +332,28 @@ def auto_domains(
         for d in sorted(d for c, d in groups if c == chain):  # a copy's domains are numbered as its reference's
             out.append((f"D{d + 1}" if len(split) == 1 else f"D{d + 1} · {chain}", groups[(chain, d)]))
     return out
+
+
+def _join_band(owner: dict[str, tuple[str, int]], ref: dict[str, str], band: set[str]) -> None:
+    """In place (auto_domains' `band`): the domains of each protein (`ref`: chain -> its reference copy) that hold an
+    element of `band` in any copy joined into one, numbered as the first of them, in every copy alike; the domains
+    are then numbered again from 0 in each reference, and a protein left with one domain is not split."""
+    joined: dict[str, set[int]] = {}
+    for k, (chain, d) in owner.items():
+        if k in band:
+            joined.setdefault(ref.get(chain, chain), set()).add(d)
+    for k, (chain, d) in list(owner.items()):
+        into = joined.get(ref.get(chain, chain), ())
+        if d in into:
+            owner[k] = (chain, min(into))
+    for r in sorted(joined):
+        numbers = sorted({d for c, d in owner.values() if ref.get(c, c) == r})
+        for k, (chain, d) in list(owner.items()):
+            if ref.get(chain, chain) == r:
+                if len(numbers) < 2:
+                    del owner[k]
+                else:
+                    owner[k] = (chain, numbers.index(d))
 
 
 def _host(k: str, drawn: dict[str, tuple[str, int]], contacts: dict[frozenset[str], int]) -> tuple | None:

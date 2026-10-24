@@ -343,6 +343,14 @@ the row and its helices fall in one domain. A `--domain` set of your own that sp
 row is drawn as one unit, so its domains' panels overlap it. To let the parts move apart, draw the sheet as
 projected with `--set fold_template=off`.
 
+**Domains with a membrane.** With `--membrane auto` (projected), `--domains auto` never splits what the band holds:
+in each chain, the domains holding an element that crosses the membrane, lies on one of its faces or sits in its slab
+are joined into one membrane domain (32KS chain A: the competence domain, its TM helices and the NS helices on the
+face, with the OB fold and the β-lactamase-like domain as the other two). A domain holding such an element (yours,
+given with `--domain`, too) stays across the band and is parted from the others sideways only, so every panel that
+crosses the membrane shares the one band, drawn across the page. Every other domain is soluble: it is drawn beyond
+the face on the side its centroid lies, near its projected x, its panel clear of the slab.
+
 ### Drawing a structure like another
 
 `--like REFERENCE` draws a structure the way a reference of the same fold is drawn, so that two related proteins
