@@ -4116,7 +4116,8 @@ def _draw_axis_symbol(c: _Canvas, layout: Layout) -> None:
 
 
 def _draw_membrane(c: _Canvas, layout: Layout) -> None:
-    """The lipid bilayer: over the panels and plates, behind the loops and elements."""
+    """The lipid bilayer: over the panels and plates, behind the loops and elements. Its side names ("out", "in") are
+    moved, once every line is drawn, where none crosses them (_place_side_names)."""
     x0, y0, x1, y1 = c.content
     if layout.membrane is None:
         return
@@ -4146,6 +4147,84 @@ def _draw_membrane(c: _Canvas, layout: Layout) -> None:
         for text, y, va in sides if layout.membrane.get("sides", True) else ():
             t = c.ax.text(left + 0.1, y, text, ha="left", va=va, fontsize=c.font * 0.9, style="italic", color="#7a6a45")
             t.set_gid(f"membrane-side:{text}{row}")
+            t.foldmap_side = (left + 0.1, right - 0.1, 1.0 if va == "bottom" else -1.0)  # its spots: _place_side_names
+
+
+_SIDE_TRIES = 3  # side names tried this many label heights out from the face, at the band's left end, then its right
+_SIDE_LINES = (  # the lines a side name keeps off: figcheck.LINE_GIDS (A6 reads a text crossed by any of them)
+    "loop:",
+    "loop-seg:",
+    "loop-arrow:",
+    "na:run:",
+    "na:tie:",
+    "ligand-tether:",
+    "disulfide:",
+    "hbond:",
+    "ia:",
+    "stub:",
+    "domain-leader:",
+    "absent:",
+)
+
+
+def _place_side_names(c: _Canvas) -> None:
+    """Each band side name drawn (_draw_membrane) moved clear of every line drawn on the page (_clear_of_lines)."""
+    names = [t for t in c.ax.texts if (t.get_gid() or "").startswith("membrane-side:")]
+    if not names:
+        return
+    lines = []
+    for a in [*c.ax.patches, *c.ax.lines]:
+        if (a.get_gid() or "").startswith(_SIDE_LINES):
+            pts = a.get_xydata() if hasattr(a, "get_xydata") else a.get_path().vertices
+            if len(pts) >= 2:
+                lines.append(np.asarray(pts, float))
+    for t in names:
+        _clear_of_lines(c, t, lines, *t.foldmap_side)
+
+
+def _clear_of_lines(c: _Canvas, t, lines: list, left: float, right: float, out: float) -> None:
+    """Ruling R9 (review-2 I1: 32KS's "out" crossed by the loop into NS1, which the face rule laid at the face row's
+    left end): a band's side name moved, if a line (`lines`: each a run of page points) crosses its ink box, to the
+    first spot none does: the band's left end, then its right end (ranged right), each at the face and then one and
+    two label heights further `out` (+1 up, -1 down). Where every spot is crossed it stays where it was drawn."""
+    if not len(lines):
+        return
+    em = t.get_fontsize() / c.pt_per_unit  # page units to the em; the line box measured as the layout measures text
+    width = (
+        sum(text_metrics.ADVANCE_NORMAL.get(ch, text_metrics.UNITS // 2) for ch in t.get_text()) / text_metrics.UNITS
+    )
+    height = (text_metrics.ASCENT + text_metrics.DESCENT) / text_metrics.UNITS * em
+    x0, y0 = t.get_position()
+    for k in range(_SIDE_TRIES):
+        for x, ha in ((left, "left"), (right, "right")):
+            y = y0 + out * k * height
+            a = x if ha == "left" else x - width * em
+            b = y if t.get_verticalalignment() == "bottom" else y - height
+            box = (a, b, a + width * em, b + height)
+            if not any(_meets_box(p, q, box) for run in lines for p, q in zip(run, run[1:])):
+                t.set_position((x, y))
+                t.set_horizontalalignment(ha)
+                return
+    t.set_position((x0, y0))
+    t.set_horizontalalignment("left")
+
+
+def _meets_box(p, q, box, pad: float = 0.05) -> bool:
+    """Does the segment p-q pass through the box (x0, y0, x1, y1, grown by `pad` page units)? Liang-Barsky clipping."""
+    (x0, y0), (x1, y1) = p, q
+    bx0, by0, bx1, by1 = box
+    dx, dy = x1 - x0, y1 - y0
+    lo, hi = 0.0, 1.0
+    for d, a, b in ((dx, x0 - (bx0 - pad), (bx1 + pad) - x0), (dy, y0 - (by0 - pad), (by1 + pad) - y0)):
+        if abs(d) < 1e-12:
+            if a < 0 or b < 0:
+                return False
+            continue
+        t0, t1 = (-a / d, b / d) if d > 0 else (b / d, -a / d)
+        lo, hi = max(lo, t0), min(hi, t1)
+        if lo > hi:
+            return False
+    return True
 
 
 _NAME_PLATE_ALPHA = 0.85  # a domain name's plate: the page colour at this alpha over the panel's edge
@@ -4975,6 +5054,7 @@ def _draw(
     _draw_data_marks(c.ax, dmarks, c.lw, c.look.background)
     c.fig.foldmap_interactions_hidden = _draw_interactions(c, hb)  # lines wholly under text (provenance)
     _draw_absent(c, layout)  # after every text too: its outline keeps off the letters
+    _place_side_names(c)  # the band's side names off every line drawn (ruling R9)
     if c.bar_h:
         _draw_domain_bar(c, layout)
     if at is None:  # a panel's legend is its page's (_canvas)

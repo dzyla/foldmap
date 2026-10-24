@@ -592,10 +592,12 @@ def test_a_loop_runs_in_the_slab_only_beside_its_own_port():
 
 
 def test_a_membrane_view_is_laid_out_once_at_its_projected_heights(monkeypatch):
-    """Plan 26 Task 2 (C17's second layout made the first): a projected membrane view is laid out once, every
-    transmembrane element at its projected height (`level`) against the faces as projected (`band`), and the band it
-    draws is those faces. Before, a first layout drew the band at the medians of wherever its helices fell and a second
-    at projected heights was kept only when A18 scored it better (7VVK R:332-345 was left short of the middle)."""
+    """A guard against C17's two-layout path coming back (review-2 M2; the behaviour, every TM helix across the band at
+    the faces as projected, is test_every_transmembrane_helix_crosses_the_band_in_the_membrane_view's): a projected
+    membrane view is laid out once, every transmembrane element at its projected height (`level`) against the faces
+    as projected (`band`), and the band it draws is those faces. Before, a first layout drew the band at the medians
+    of wherever its helices fell and a second at projected heights was kept only when A18 scored it better (7VVK
+    R:332-345 was left short of the middle). 1BL8 lets no copy go, so one call it is."""
     import foldmap.cli as cli
 
     calls = []
@@ -630,10 +632,8 @@ def test_a_route_turning_out_of_a_port_at_or_in_the_slab_turns_at_the_port(entry
     path = r100_entry(entry)
     lay, sses, bb = make_layout(path, membrane="auto")
     view = membrane_view(lay, sses, bb, find_membrane(path, bb), route_loops(lay, sses, bb))
-    # ruling R3: 5LDW M:392-402, an 11-residue helix half the band long, reaches a face but not past the middle; it
-    # is carried to Task 2 as an A18 fail, the only helix short here
-    short = [x.split()[0] for x in view["tm_short"]]
-    assert view["tm_helices"] >= 14 and short == (["M:392-402"] if entry == "5LDW" else []), view
+    # ruling R6: 5LDW M:392-402, an 11-residue helix half the band long, is drawn a hair longer and crosses
+    assert view["tm_helices"] >= 14 and view["tm_short"] == [], view
     assert view["loops_in_slab"] == [], view
 
 
@@ -986,31 +986,31 @@ def test_a_helix_lies_flat_by_its_tilt_to_the_normal_not_as_it_is_seen():
 
 
 def test_a_flat_helix_lies_on_its_face_and_a_slab_element_keeps_its_height():
-    """build_layout `on_face` with `band` (cli._membrane_places): a flat helix at a face, projected inside the band,
-    is drawn centred on that face (+1 the upper, -1 the lower); an element in the slab crossing no membrane (0) keeps
-    its projected height while a free element seen at the same place is moved off it."""
-    from foldmap.layout import build_layout
+    """build_layout `on_face` with `band` (cli._membrane_places, ruling R8): a flat helix at a face, projected inside
+    the band, lies on that face's first row, just outside the band (+1 the upper face, -1 the lower), within its chain's
+    transmembrane span; one of a chain with no transmembrane element is released to the ordinary layout and kept off
+    the band like a soluble element; an element in the slab crossing no membrane (0) keeps its projected height while a
+    free element seen at the same place is moved off it."""
+    from foldmap.layout import MARGIN, SCALE, build_layout
     from helpers import fake_sse
 
     band = (-3.45, 3.45)
-    upper = fake_sse("H", 0, 15, centroid=(0, 0, 10.0), axis=(1, 0, 0))
-    lower = fake_sse("H", 20, 35, centroid=(30, 0, -12.0), axis=(1, 0, 0))
-    slab = fake_sse("H", 40, 50, centroid=(60, 0, -4.0), axis=(0, 0, 1))
-    free = fake_sse("H", 60, 70, centroid=(60, 5, -4.0), axis=(0, 0, 1))
-    els = [upper, lower, slab, free]
-    lay = build_layout(
-        els,
-        [],
-        _page(),
-        "projected",
-        flat={upper.id, lower.id},
-        band=band,
-        on_face={upper.id: 1, lower.id: -1, slab.id: 0},
-    )
+    tm = fake_sse("H", 0, 25, centroid=(0, 0, 0.0), axis=(0, 0, 1))
+    upper = fake_sse("H", 30, 41, centroid=(5, 0, 10.0), axis=(1, 0, 0))
+    lower = fake_sse("H", 45, 56, centroid=(-5, 0, -12.0), axis=(1, 0, 0))
+    slab = fake_sse("H", 60, 70, centroid=(60, 0, -4.0), axis=(0, 0, 1))
+    free = fake_sse("H", 80, 90, centroid=(60, 5, -4.0), axis=(0, 0, 1))
+    other = fake_sse("H", 0, 11, centroid=(-40, 0, 10.0), axis=(1, 0, 0), chain="B")
+    els = [tm, upper, lower, slab, free, other]
+    flat = {upper.id, lower.id, other.id}
+    on = {upper.id: 1, lower.id: -1, slab.id: 0, other.id: 1}
+    lay = build_layout(els, [], _page(), "projected", level={tm.id}, upright={tm.id}, flat=flat, band=band, on_face=on)
     p = lay.placed
-    assert p[upper.id].cy == pytest.approx(band[1]) and p[lower.id].cy == pytest.approx(band[0])
+    assert band[1] + MARGIN - 1e-6 <= p[upper.id].rect[1] < band[1] + 2 * MARGIN
+    assert band[0] - 2 * MARGIN < p[lower.id].rect[3] <= band[0] - MARGIN + 1e-6
     assert abs(np.sin(p[upper.id].angle)) < 1e-9 and abs(np.sin(p[lower.id].angle)) < 1e-9
-    assert p[slab.id].cy == pytest.approx(-4.0 * 0.23)
+    assert p[other.id].rect[1] >= band[1] + MARGIN - 1e-6  # released, off the band on its side
+    assert p[slab.id].cy == pytest.approx(-4.0 * SCALE)
     a, b = p[slab.id].rect, p[free.id].rect
     assert a[2] <= b[0] or b[2] <= a[0] or a[3] <= b[1] or b[3] <= a[1]  # the free one moved off the held one
 
@@ -1032,22 +1032,135 @@ def test_a_soluble_element_is_kept_off_the_band_on_its_own_side():
     assert kept[down.id].rect[3] <= band[0] - MARGIN + 1e-6
 
 
-def test_an_untied_copy_item_moves_with_its_protomer():
-    """layout._untied_spread (32KS chain B's OB sheet, 22 Å off its depth): in an unrolled two-fold assembly the ties
-    set protomer 1's copies a spread right of their mates, wider than the frame's own period; an item of protomer 1 no
-    tie places (its own sheet where DSSP split its mate's) is moved by the same amount less the frame's offset, so it
-    starts beside its own protomer's elements; protomer 0's items and the tied ones stay where they are."""
-    from foldmap.frame import CylinderFrame
-    from foldmap.layout import SCALE, Placed, _Item, _untied_spread
+def test_membrane_places_reads_each_element_by_its_depth_and_tilt():
+    """cli._membrane_places (review-2 I4) on a 30 Å slab, normal up: a lying helix 4.9 Å beyond the outer face lies on
+    it, one 5.1 Å beyond is soluble; a standing helix and a strand in the slab keep their height (0), a lying helix in
+    the slab lies on the face its centre is nearer; a 3-10 helix in the slab is placed as any other; an element crossing
+    the membrane is none of these. The face sign follows the page: outer face up (+1) or down (-1). With no band only
+    `flat` is read."""
+    from types import SimpleNamespace
+
+    from foldmap.cli import _membrane_places
+    from foldmap.membrane import Membrane
+
+    mem = Membrane(np.array([0.0, 0.0, 1.0]), 0.0, 15.0, "estimate")
+    lying, standing = np.array([1.0, 0.0, 0.0]), np.array([0.0, 0.0, 1.0])
+    runs = {  # id: (kind, axis, CA depths)
+        "face": ("H", lying, np.full(5, 19.9)),
+        "beyond": ("H", lying, np.full(5, 20.1)),
+        "deep": ("H", standing, np.full(5, -25.0)),
+        "upright": ("H", standing, np.linspace(-6.0, 6.0, 5)),
+        "strand": ("E", lying, np.full(5, 3.0)),
+        "inner": ("H", lying, np.full(5, -6.0)),
+        "turn": ("G", standing, np.full(3, 2.0)),
+        "tm": ("H", standing, np.linspace(-16.0, 16.0, 9)),
+    }
+    ca, sses = [], []
+    for name, (kind, axis, z) in runs.items():
+        sses.append(SimpleNamespace(id=name, kind=kind, axis=axis, start=len(ca), end=len(ca) + len(z) - 1))
+        ca += [(0.0, 0.0, float(v)) for v in z]
+    bb = SimpleNamespace(ca=np.array(ca))
+    flat, on_face, sides = _membrane_places(sses, bb, mem, {"tm"}, (3.45, -3.45))  # outer face up the page
+    assert flat == {"face", "beyond", "inner"}
+    assert on_face == {"face": 1, "upright": 0, "strand": 0, "inner": -1}
+    assert sides == {"beyond": 1, "deep": -1}
+    flat2, on_face2, sides2 = _membrane_places(sses, bb, mem, {"tm"}, (-3.45, 3.45))  # outer face down
+    assert flat2 == flat and on_face2 == {"face": -1, "upright": 0, "strand": 0, "inner": 1}
+    assert sides2 == {"beyond": -1, "deep": 1}
+    assert _membrane_places(sses, bb, mem, {"tm"}, None) == (flat, {}, {})
+
+
+def test_a_transmembrane_helix_half_the_band_long_is_drawn_a_hair_longer_and_crosses():
+    """Ruling R6 (5LDW M:392-402, an 11-residue helix exactly half the band long): layout._stretch_short draws a
+    transmembrane helix of at most half the band 2 * _PAST longer, so _to_face takes one end to a face and the other
+    past the middle; a longer one, a lying one and one crossing no membrane are left as they are."""
+    from foldmap.layout import _PAST, Placed, _Item, _stretch_short, _to_face, crosses_band
     from helpers import fake_sse
 
-    frame = CylinderFrame(np.zeros(3), np.array([0, 0, 1.0]), np.array([1.0, 0, 0]), 2, 10.0, {"A": 0, "B": 1})
+    band = (0.0, 6.9)
+    shapes = {"half": (3.45, np.pi / 2), "long": (5.0, np.pi / 2), "lying": (3.0, 0.0), "other": (3.0, np.pi / 2)}
+    items, members = [], {}
+    for k, (name, (length, angle)) in enumerate(shapes.items()):
+        s = fake_sse("H", 20 * k, 20 * k + 10)
+        members[name] = Placed(s, 0, 0, length, angle, 1.0)
+        items.append(_Item([members[name]], [(0.0, 0.0)], 0.0, 3.45, (0.0, 3.45), k, "A"))
+    level = {members[n].sse.id for n in ("half", "long", "lying")}
+    _stretch_short(items, level, band)
+    assert members["half"].length == pytest.approx(3.45 + 2 * _PAST)
+    assert [members[n].length for n in ("long", "lying", "other")] == [5.0, 3.0, 3.0]
+    shift = _to_face(items[0], level, band, 3.45)
+    m = members["half"]
+    assert crosses_band((3.45 + shift - m.length / 2, 3.45 + shift + m.length / 2), band)
+
+
+def test_a_face_row_keeps_the_projected_order_and_stacks_outward_when_full():
+    """Ruling R8 (layout._pack_row, _face_rows): a row packs its helices in their projected order, MARGIN apart, the
+    least moved, round the columns standing in it; three flat helices seen on top of one another over one
+    transmembrane helix cannot all lie within their chain's span on the face's first row, so one goes a row further
+    out, the order along each row kept."""
+    from foldmap.layout import MARGIN, _pack_row, build_layout
+    from helpers import fake_sse
+
+    at = _pack_row([0.0, 0.0], [1.0, 1.0], [(-np.inf, np.inf)])
+    assert at == pytest.approx([-1.0 - MARGIN / 2, 1.0 + MARGIN / 2])
+    at = _pack_row([-0.5, 0.5], [0.5, 0.5], [(-np.inf, -1.8), (1.8, np.inf)])  # a column from -1.8 to 1.8
+    assert at[0] <= -2.3 + 1e-9 and at[1] >= 2.3 - 1e-9
+    band = (-3.45, 3.45)
+    tm = fake_sse("H", 0, 25, centroid=(0, 0, 0.0), axis=(0, 0, 1))
+    flats = [
+        fake_sse("H", 30 + 15 * k, 41 + 15 * k, centroid=(x, 0, 10.0 + k), axis=(1, 0, 0))
+        for k, x in enumerate((-1, 0, 1))
+    ]
+    on = {s.id: 1 for s in flats}
+    lay = build_layout(
+        [tm, *flats], [], _page(), "projected", level={tm.id}, upright={tm.id}, flat=set(on), band=band, on_face=on
+    )
+    p = lay.placed
+    rows = {}
+    for s in flats:
+        assert p[s.id].rect[1] >= band[1] + MARGIN - 1e-6
+        rows.setdefault(round(p[s.id].rect[1], 3), []).append(s)
+    assert len(rows) >= 2
+    for row in rows.values():  # in each row, left to right in projected order
+        assert [s.id for s in sorted(row, key=lambda s: p[s.id].cx)] == [s.id for s in row]
+
+
+def test_transmembrane_columns_keep_their_projected_order():
+    """Ruling R11 (review-2 I5, layout._in_order): each chain's items holding transmembrane elements are dealt back the
+    places _attract found, left to right in their projected order; tied items and other chains' keep theirs."""
+    from foldmap.layout import Placed, _in_order, _Item
+    from helpers import fake_sse
+
     items = []
-    for k, chain in enumerate("ABBA"):
-        s = fake_sse("H", 10 * k, 10 * k + 8, chain=chain)
-        items.append(_Item([Placed(s, 0, 0, 3.0, 0.0, 1.0)], [(0.0, 0.0)], float(k), 1.0, (float(k), 1.0), k, chain))
-    spread = 50.0
-    _untied_spread(items, {1: (0, 1)}, frame, spread)
-    shift = spread - 10.0 * np.pi * SCALE
-    assert [it.cx for it in items] == pytest.approx([0.0, 1.0, 2.0 + shift, 3.0])
-    assert items[2].home == pytest.approx((2.0 + shift, 1.0)) and all(it.cy == 1.0 for it in items)
+    for k, (chain, x) in enumerate((("A", 5.0), ("A", -5.0), ("A", 1.0), ("B", 9.0))):
+        s = fake_sse("H", 10 * k, 10 * k + 20, chain=chain)
+        items.append(_Item([Placed(s, 0, 0, 5.0, np.pi / 2, 1.0)], [(0.0, 0.0)], x, 0.0, (x, 0.0), k, chain))
+    level = {it.members[0].sse.id for it in items}
+    _in_order(items, level, [-3.0, 0.0, 2.0, 0.0], {})  # projected: item 0 leftmost of A, then 1, then 2
+    assert [it.cx for it in items] == pytest.approx([-5.0, 1.0, 5.0, 9.0])
+    assert [it.home[0] for it in items] == pytest.approx([-5.0, 1.0, 5.0, 9.0])
+
+
+def test_a_band_side_name_moves_off_a_loop_crossing_it():
+    """Ruling R9 (review-2 I1: 32KS's "out" crossed by the loop into NS1 at the face row's left end): a side name a loop
+    crosses at the band's left end is drawn at its right end; with none crossing it, it stays (render._clear_of_lines,
+    run on every line drawn once the page is done: _place_side_names)."""
+    from types import SimpleNamespace
+
+    import matplotlib
+
+    matplotlib.use("Agg")
+    from matplotlib.figure import Figure
+
+    from foldmap.render import _clear_of_lines, _meets_box
+
+    assert _meets_box((0.0, -1.0), (0.0, 1.0), (-0.5, -0.5, 0.5, 0.5))
+    assert not _meets_box((1.0, -1.0), (1.0, 1.0), (-0.5, -0.5, 0.5, 0.5))
+    ax = Figure().add_subplot()
+    c = SimpleNamespace(pt_per_unit=20.0)
+    t = ax.text(0.1, 5.35, "out", ha="left", va="bottom", fontsize=9)
+    _clear_of_lines(c, t, [np.array([(0.4, 4.0), (0.4, 8.0)])], 0.1, 19.9, 1.0)
+    assert t.get_position() == (19.9, 5.35) and t.get_horizontalalignment() == "right"
+    t2 = ax.text(0.1, 5.35, "out", ha="left", va="bottom", fontsize=9)
+    _clear_of_lines(c, t2, [np.array([(10.0, 4.0), (10.0, 8.0)])], 0.1, 19.9, 1.0)
+    assert t2.get_position() == (0.1, 5.35) and t2.get_horizontalalignment() == "left"

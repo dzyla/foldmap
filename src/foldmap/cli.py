@@ -770,9 +770,9 @@ def make_layout(
     def in_membrane(frame) -> dict:
         """A projected membrane view (plan 26 Task 2): build_layout's membrane arguments through `frame`. Every
         transmembrane element keeps its projected height across the band (`level`, `band`: the faces as projected),
-        standing upright; each other helix stands or lies by its tilt (membrane.lies_flat); a flat one at a face or
-        in the slab lies on that face (`on_face`), and a soluble element stays off the band on its own side
-        (`sides`), as _membrane_places reads them."""
+        standing upright; each other helix stands or lies by its tilt (membrane.lies_flat, ruling R7); a flat one at
+        a face or in the slab lies on that face, in rows (`on_face`, ruling R8), and a soluble element stays off the
+        band on its own side (`sides`), as _membrane_places reads them."""
         if mem is None or mode != "projected":
             return {}
         faces = faces_of(frame)
@@ -1131,7 +1131,7 @@ def _membrane_places(sses, bb, mem, tm: set[str], faces) -> tuple[set[str], dict
             sides[s.id] = side
         elif lying:
             on_face[s.id] = side
-        elif abs(centre) <= mem.half:
+        elif abs(centre) <= mem.half and s.kind != "G":  # a 3-10 turn in the slab: placed as any other
             on_face[s.id] = 0
     return flat, on_face, sides
 

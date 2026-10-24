@@ -2162,6 +2162,7 @@ def _attract(
     held: dict[int, tuple[float, float]] | None = None,
     held_k: float = _K_LIKE,
     settled: frozenset[frozenset[str]] | None = None,
+    level: np.ndarray | None = None,
 ) -> None:
     """Minimise the layout energy (_energy) from the projected positions, raising the overlap penalty in
     stages. The result becomes each item's new home; _separate then guarantees no overlap remains. Every input
@@ -2182,6 +2183,7 @@ def _attract(
     pair), but a disulfide only this structure has still pulls, and when stretched may start again from beside its
     partner, a held item too (a bond drawn across the page is wrong whatever the reference)."""
     n = len(items)
+    still = [] if level is None else np.flatnonzero(level).tolist()  # items keeping their height (a membrane view's)
     held = {i: h for i, h in (held or {}).items() if i not in (ties or {})}
     pinned = [i for i, it in enumerate(items) if it.pinned]  # held where they are, walls standing for them
 
@@ -2286,6 +2288,8 @@ def _attract(
         g = g.reshape(-1, 2)
         if pinned:  # never moved: no gradient (L-BFGS then never steps them)
             g[pinned] = 0.0
+        if still:  # keeping their height: moved sideways only, so they keep their order along it too
+            g[still, 1] = 0.0
         gz = np.zeros((len(free), 2))
         if mirror is not None:  # the spread is fixed at 0 (no gradient)
             np.add.at(gz, base, g * flip)
@@ -2317,7 +2321,7 @@ def _attract(
         if np.sqrt(gx * gx + gy * gy) <= 2 * _SS_SLACK + 1.0:
             continue
         mover, anchor, om, oa = (i, j, oi, oj) if mass[i] <= mass[j] else (j, i, oj, oi)
-        if mover in ties or items[mover].pinned:
+        if mover in ties or items[mover].pinned or mover in still:
             continue
         hm, ha = h[mover], h[anchor]
         gap_x, gap_y = hm[0] + ha[0] + MARGIN, hm[1] + ha[1] + MARGIN
@@ -3937,9 +3941,7 @@ def _to_face(it: _Item, level: set[str], band: tuple[float, float], y: float) ->
     return shift
 
 
-_WALL_REACH = (
-    1e3  # page units: a membrane wall's reach beyond its face, along and across the page (a figure is ~100 across)
-)
+_WALL_REACH = 1e3  # page units: a membrane wall's least reach beyond its face, along and across the page
 
 
 def _membrane_walls(
@@ -3959,10 +3961,9 @@ def _membrane_walls(
             hard[k, 0 if on.pop() > 0 else 1] = True
     if not hard.any():
         return walls
-    lo, hi = band
-    boxes = np.array(
-        [[-_WALL_REACH, lo - _WALL_REACH, _WALL_REACH, hi], [-_WALL_REACH, lo, _WALL_REACH, hi + _WALL_REACH]], float
-    )
+    lo, hi = band  # reaching ten times past the farthest item, however wide the page (review-2 M5)
+    far = max(_WALL_REACH, 10 * max(abs(v) + max(it.half) for it in items for v in (it.cx, it.cy)))
+    boxes = np.array([[-far, lo - far, far, hi], [-far, lo, far, hi + far]], float)
     if walls is None:
         return Walls(boxes, hard)
     band_rows = None if walls.band is None else np.vstack([walls.band, np.full((2, walls.band.shape[1]), np.nan)])
@@ -3973,7 +3974,10 @@ def _membrane_walls(
 
 def _kept(items: list[_Item], level: set[str], on_face: dict[str, int] | None) -> np.ndarray | None:
     """Which items keep their height (_separate's `level`), None if none: an item holding an element of `level` or of
-    `on_face` (in the slab at its own height, or a helix set on its face by _onto_faces)."""
+    `on_face` (in the slab at its own height, or a helix set on its face by _onto_faces). Such an item is never walled
+    off the band (_membrane_walls), whatever else it holds: a sheet with one strand in the slab keeps every strand at
+    its projected height, soluble ones too, and A18 reports any drawn in the slab (review-2 M6; none in the
+    campaign)."""
     on_face = on_face or {}
     out = np.array(
         [
@@ -3985,33 +3989,264 @@ def _kept(items: list[_Item], level: set[str], on_face: dict[str, int] | None) -
     return out if out.any() else None
 
 
-def _onto_faces(items: list[_Item], on_face: dict[str, int], band: tuple[float, float]) -> None:
+def _onto_faces(
+    items: list[_Item], on_face: dict[str, int], band: tuple[float, float]
+) -> dict[int, tuple[float, float, int]]:
     """Each item that is one element of `on_face` (id -> +1 the upper face, -1 the lower; 0, its own height) set on
-    that face: centred on it, its home there too (build_layout then keeps its height, as a transmembrane element's)."""
-    for it in items:
+    that face: centred on it, its home there too (build_layout then keeps its height, as a transmembrane element's).
+    Returns, for each item set on a face, its projected place (home x and y before the move) and its face."""
+    out = {}
+    for k, it in enumerate(items):
         if len(it.members) != 1 or not isinstance(it.members[0], Placed) or it.members[0].ghost:
             continue
         side = on_face.get(it.members[0].sse.id)
         if side:
+            out[k] = (it.home[0], it.home[1], side)
             y = float(_snap(band[1] if side > 0 else band[0]))
             it.cy, it.home = y, (it.home[0], y)
+    return out
 
 
-def _untied_spread(items: list[_Item], ties: dict[int, tuple[int, int]], frame, spread: float) -> None:
-    """In an unrolled assembly (a CylinderFrame) whose copies the ties set `spread` apart, each item of a copy
-    protomer p > 0 that no tie places (its own sheet where DSSP split its mate's) moved as its protomer was: by p
-    spreads less the frame's own offset of that protomer, so it starts, and is anchored, beside its own protomer's
-    elements, not a frame's period away from them."""
-    angles, radius = getattr(frame, "angles", None), getattr(frame, "radius", 0.0)
-    if not angles or not radius:
-        return
-    placed = set(ties) | {j for j, _ in ties.values()}
-    for k, p in enumerate(_protomers(items, frame, False)):
-        if k in placed or not p:
+_FACE_ROWS = 3  # rows a face holds its flat helices in, the first on the face, the others stacked outward
+_ROW_TOUCH = (
+    1e-3  # page units: a column whose footprint ends this near a row stays out of it (a helix ending at the face)
+)
+_FACE_PAD = 5.0  # page units: a chain's transmembrane span, padded by this or a face helix's length, holds its helices
+
+
+def _tm_spans(items: list[_Item], level: set[str]) -> dict[str, tuple[float, float]]:
+    """Each chain's transmembrane span on the page: the x extent of the footprints of the items holding its elements
+    of `level`, at their homes."""
+    spans: dict[str, tuple[float, float]] = {}
+    for it in items:
+        for m in it.members:
+            if getattr(m, "sse", None) is not None and m.sse.id in level:
+                x0, x1 = it.home[0] + it.box[0], it.home[0] + it.box[2]
+                lo, hi = spans.get(m.sse.chain, (x0, x1))
+                spans[m.sse.chain] = (min(lo, x0), max(hi, x1))
+    return spans
+
+
+def _face_room(m: Placed, spans: dict[str, tuple[float, float]]) -> tuple[float, float]:
+    """The x a face helix may lie at: its chain's transmembrane span (_tm_spans), padded by the larger of _FACE_PAD
+    and its length (review-2's chain budget); empty when its chain has none."""
+    pad = max(_FACE_PAD, m.length)
+    lo, hi = spans.get(m.sse.chain, (np.inf, -np.inf))
+    return lo - pad, hi + pad
+
+
+def _face_release(
+    items: list[_Item], faced: dict[int, tuple[float, float, int]], level: set[str], kept: np.ndarray
+) -> dict[int, tuple[float, float, int]]:
+    """Of the items _onto_faces set on a face, those whose projected x lies outside their chain's transmembrane span
+    (_tm_spans), padded by the larger of _FACE_PAD and the helix's length, released to the ordinary layout: back at
+    their projected place, no longer keeping a height (ruling R8; review-2's chain budget: a face helix of a big
+    assembly otherwise ran the length of the face past every other chain's columns). The ones kept are returned."""
+    spans = _tm_spans(items, level)
+    held = {}
+    for k, (x, y, side) in faced.items():
+        lo, hi = _face_room(items[k].members[0], spans)
+        if lo <= x <= hi:
+            held[k] = (x, y, side)
+        else:
+            items[k].cy, items[k].home = y, (x, y)
+            kept[k] = False
+    return held
+
+
+def _pack_run(targets: list[float], halves: list[float], lo: float, hi: float) -> tuple[float, list[float]] | None:
+    """Centres for footprints in this order within [lo, hi], each `halves` wide either side and MARGIN apart, that
+    keep the order and move the least (summed squared) from `targets`: isotonic regression (pool adjacent violators)
+    over each centre less its least offset from the first, clipped to the room (which keeps it optimal). None when
+    they do not fit; else the cost and the centres."""
+    offset = [0.0]
+    for a, b in zip(halves, halves[1:]):
+        offset.append(offset[-1] + a + b + MARGIN)
+    least, most = lo + halves[0], hi - halves[-1] - offset[-1]
+    if least > most + 1e-9:
+        return None
+    blocks: list[list[float]] = []  # [value sum, count]
+    for t, c in zip(targets, offset):
+        blocks.append([t - c, 1])
+        while len(blocks) > 1 and blocks[-2][0] / blocks[-2][1] > blocks[-1][0] / blocks[-1][1]:
+            s, n = blocks.pop()
+            blocks[-1][0] += s
+            blocks[-1][1] += n
+    values = [min(max(s / n, least), most) for s, n in blocks for _ in range(int(n))]
+    at = [v + c for v, c in zip(values, offset)]
+    return sum((x - t) ** 2 for x, t in zip(at, targets)), at
+
+
+def _pack_row(targets: list[float], halves: list[float], gaps: list[tuple[float, float]]) -> list[float]:
+    """Centres for footprints taken in this order (their targets' order) along a line broken by fixed columns, which
+    leave `gaps` (lo, hi) in order: each footprint in a gap, the order kept across gaps too, MARGIN apart, with the
+    least summed squared move from `targets` (each run of consecutive footprints a gap holds placed by _pack_run;
+    the runs chosen by dynamic programming over the gaps in order)."""
+    n, inf = len(targets), float("inf")
+    best = [0.0] + [inf] * n  # best[i]: the least cost of the first i footprints in the gaps so far
+    how: list[list] = [[None] * (n + 1)]
+    for lo, hi in gaps:
+        now, step = list(best), [None] * (n + 1)
+        for j in range(n):
+            if best[j] == inf:
+                continue
+            for i in range(j + 1, n + 1):
+                run = _pack_run(targets[j:i], halves[j:i], lo, hi)
+                if run is None:
+                    break
+                if best[j] + run[0] < now[i]:
+                    now[i], step[i] = best[j] + run[0], (j, run[1])
+        best = now
+        how.append(step)
+    out, i = [0.0] * n, n
+    for step in reversed(how[1:]):
+        if i and step[i] is not None:
+            j, at = step[i]
+            out[j:i] = at
+            i = j
+    return out
+
+
+def _in_order(items: list[_Item], level: set[str], across: list[float], ties: dict[int, tuple[int, int]]) -> None:
+    """Ruling R11 (review-2 I5: 32KS-A's band helices, Kendall tau 0.82 -> 0.67): each chain's items holding its
+    transmembrane elements (`level`), no symmetry tie on them, given back their places across the page in their
+    projected order (`across`, x before _attract): the places _attract found, each footprint centre kept, dealt out
+    left to right in that order. _separate then pushes held items apart sideways, never past each other."""
+    tied = set(ties) | {j for j, _ in ties.values()}
+    groups: dict[str, list[int]] = {}
+    for k, it in enumerate(items):
+        chains = {m.sse.chain for m in it.members if getattr(m, "sse", None) is not None and m.sse.id in level}
+        if len(chains) == 1 and k not in tied:
+            groups.setdefault(chains.pop(), []).append(k)
+    for ks in groups.values():
+        centres = sorted(items[k].cx + items[k].mid[0] for k in ks)
+        for k, x in zip(sorted(ks, key=lambda k: (across[k], k)), centres):
+            items[k].cx = float(_snap(x - items[k].mid[0]))
+            items[k].home = (items[k].cx, items[k].home[1])
+
+
+def _released(items: list[_Item], on_face: dict[str, int], kept: np.ndarray | None) -> dict[str, int]:
+    """The flat helices of `on_face` (+1 or -1) whose items no longer keep a height (_face_release, _face_rows), by
+    the side of the band they lie on: released to the ordinary layout, they keep off the band there as a soluble
+    element does (_membrane_walls), so no loop of theirs runs in the slab."""
+    out = {}
+    for k, it in enumerate(items):
+        if kept is not None and kept[k]:
             continue
-        dx = float(_snap(p * spread - radius * (angles[p] - angles[0]) * SCALE))
-        items[k].cx += dx
-        items[k].home = (items[k].home[0] + dx, items[k].home[1])
+        for m in it.members:
+            if getattr(m, "sse", None) is not None and on_face.get(m.sse.id):
+                out[m.sse.id] = on_face[m.sse.id]
+    return out
+
+
+def _face_rows(
+    items: list[_Item],
+    faced: dict[int, tuple[float, float, int]],
+    kept: np.ndarray,
+    band: tuple[float, float],
+    level: set[str],
+) -> None:
+    """Each face's flat helices (`faced`, _face_release's) laid out as rows, ruling R8. A row is a line: its helices
+    keep their projected order along it and move the least (summed squared) from their projected x (_pack_row), round
+    the columns standing in it (the other items keeping their height, whose footprints reach into the row: fixed,
+    merged where they meet). A helix moved further than its own length goes to the next row outward, the one whose
+    projected centre lies furthest out first (rows stacked by depth, the shallowest on the face), up to _FACE_ROWS;
+    one still too far is released to the ordinary layout, at its projected place."""
+    if not faced:
+        return
+    tall = max(2 * items[k].half[1] for k in faced)  # a row's height: the tallest footprint (a helix and its name)
+    spans = _tm_spans(items, level)
+    room = {k: _face_room(items[k].members[0], spans) for k in faced}
+    others = [k for k in np.flatnonzero(kept).tolist() if k not in faced]
+    for side in (1, -1):
+        face = band[1] if side > 0 else band[0]
+        waiting = [k for k, (_, _, s) in faced.items() if s == side]
+        for row in range(_FACE_ROWS):
+            if not waiting:
+                break
+            near = face + side * (MARGIN + row * (tall + MARGIN))  # the row's edge nearer the band
+            low, high = sorted((near, near + side * tall))
+            columns = _row_columns(items, others, low - MARGIN, high + MARGIN)
+            place, outward = _fill_row(items, faced, waiting, columns, face, side, room)
+            for k, x in place.items():  # each footprint's band-side edge on the row's
+                (_, my), (_, hy) = items[k].mid, items[k].half
+                y = float(_snap(low - my + hy if side > 0 else high - my - hy))
+                items[k].cx, items[k].cy = float(_snap(x)), y
+                items[k].home = (items[k].cx, y)
+            waiting = outward
+        for k in waiting:  # no row left: to the ordinary layout, at its projected place
+            x0, y0, _ = faced[k]
+            items[k].cx, items[k].cy, items[k].home = x0, y0, (x0, y0)
+            kept[k] = False
+
+
+def _row_columns(items: list[_Item], others: list[int], low: float, high: float) -> list[list[float]]:
+    """The x extents, merged where they come within MARGIN, of the footprints of items `others` reaching into the
+    row between page y `low` and `high`."""
+    walls = []
+    for j in others:
+        it = items[j]
+        (mx, my), (hx, hy) = it.mid, it.half
+        if it.cy + my - hy < high - _ROW_TOUCH and it.cy + my + hy > low + _ROW_TOUCH:
+            walls.append([it.cx + mx - hx, it.cx + mx + hx])
+    merged: list[list[float]] = []
+    for a, b in sorted(walls):
+        if merged and a < merged[-1][1] + MARGIN:
+            merged[-1][1] = max(merged[-1][1], b)
+        else:
+            merged.append([a, b])
+    return merged
+
+
+def _fill_row(
+    items: list[_Item],
+    faced: dict[int, tuple[float, float, int]],
+    waiting: list[int],
+    columns: list[list[float]],
+    face: float,
+    side: int,
+    room: dict[int, tuple[float, float]],
+) -> tuple[dict[int, float], list[int]]:
+    """One row of _face_rows: the helices of `waiting`, in their projected order, packed into the gaps the fixed
+    `columns` leave (_pack_row); while one is moved out of its `room` (its chain's transmembrane span, padded), one of
+    those leaves for the next row: the one whose leaving leaves the fewest out of theirs, of those the one whose
+    projected centre lies furthest out (its projected y beyond `face`, on `side`). Returns the row's x by item, and
+    the items that left it."""
+    edges = [-np.inf] + [v for a, b in columns for v in (a - MARGIN, b + MARGIN)] + [np.inf]
+    gaps = list(zip(edges[::2], edges[1::2]))
+
+    def packed(row: list[int]) -> tuple[dict[int, float], list[int]]:
+        at = _pack_row([faced[k][0] + items[k].mid[0] for k in row], [items[k].half[0] for k in row], gaps)
+        place = {k: x - items[k].mid[0] for k, x in zip(row, at)}
+        return place, [k for k in row if not room[k][0] <= place[k] <= room[k][1]]
+
+    row, outward = sorted(waiting, key=lambda k: (faced[k][0], k)), []
+    while row:
+        place, far = packed(row)
+        if not far:
+            return place, outward
+        out = min(far, key=lambda k: (len(packed([j for j in row if j != k])[1]), -(faced[k][1] - face) * side, k))
+        row.remove(out)
+        outward.append(out)
+    return {}, outward
+
+
+def _stretch_short(items: list[_Item], level: set[str], band: tuple[float, float]) -> None:
+    """Ruling R6 (5LDW M:392-402, a piece of a kinked helix): a transmembrane helix drawn upright whose length is at
+    most half the band (11 residues or fewer in a 30 Å slab) can reach a face or pass the middle, never both
+    (crosses_band); it is drawn 2 * _PAST longer than half the band (0.2 page units, 0.9 Å, under one residue's
+    rise), about its own centre, so _to_face can make it do both. Its pitch stretches with it; nothing else moves (a
+    kinked piece's corner keeps _KINK_ROOM less _PAST at either end)."""
+    half = (band[1] - band[0]) / 2
+    for m in (m for it in items for m in it.members):
+        if (
+            isinstance(m, Placed)
+            and m.sse.id in level
+            and not m.ghost
+            and abs(abs(float(np.sin(m.angle))) - 1) < 1e-9
+            and m.length <= half + 1e-6
+        ):
+            m.length = float(half + 2 * _PAST)
 
 
 def _text_scaled(build):
@@ -4472,16 +4707,18 @@ def build_layout(
     (with `level`, in the default snapped angles): helices drawn up or down the page, a membrane view's
     transmembrane helices standing across the band whatever their tilt (plan 26: 7VVK's TM1, R:181-211, tilted 52°,
     was snapped flat across a face). `flat` (likewise): helices drawn right or left, lying along the membrane (plan 26
-    Task 2: cli._membrane_places, by their tilt to its normal), also a kinked helix's pieces. `on_face` (with `band`;
-    element id -> +1 the upper face, -1 the lower, 0 its own height): a flat helix drawn alone lies on that face
-    (amphipathic and interfacial helices: 32KS NS1), an element in the slab crossing no membrane stays at its projected
-    height (32KS A:328-339, a 14 Å helix of the paper's eleven), each item holding one keeping that height as `level`
-    items keep theirs. `sides` (with `band`; element id -> +1 above, -1 below): the soluble elements of a membrane
-    view, each item holding any (and none of `level`, all on one side) kept off the band on its side, MARGIN clear
-    (_membrane_walls: a fixed box from its face across the band and on; random-100 A18 ruling R4, 7PIU's Gβ, 32KS
-    chain B's OB sheet). With `band`, an item of a copy protomer no symmetry tie places
-    moves with its protomer's spread (_untied_spread: 32KS chain B's OB sheet, left at the frame's period while its
-    tied neighbours moved a spread along, was dragged 22 Å down into the band by its loops).
+    Task 2: cli._membrane_places, by their tilt to its normal), also a kinked helix's pieces; a helix in a bundle, a βα
+    row or over a sheet follows its unit (review-2 M1). `on_face` (with `band`; element id -> +1 the upper face, -1 the
+    lower, 0 its own height): the flat helices drawn alone lie on that face in rows (ruling R8: _face_release,
+    _face_rows), an element in the slab crossing no membrane stays at its projected height (32KS A:328-339, a 14 Å
+    helix of the paper's eleven), each item holding one keeping that height as `level` items keep theirs. `sides`
+    (with `band`; element id -> +1 above, -1 below): the soluble elements of a membrane view, each item holding any
+    (and none of `level`, all on one side) kept off the band on its side, MARGIN clear (_membrane_walls: a fixed box
+    from its face across the band and on; random-100 A18 ruling R4: 7PIU's Gβ, and 32KS chain B's OB sheet, which
+    _attract's loop springs to its neighbours in the band dragged 4.9 page units, 21 Å, into it). In a membrane
+    view (`band`) the items keeping their height keep it through _attract too (moved sideways only), each chain's
+    transmembrane columns are dealt back their places in projected order (_in_order, ruling R11), and a
+    transmembrane helix half the band long is drawn a hair longer (_stretch_short, ruling R6).
     `alike_first`: a copy's elements are grouped as its mate's (_regroup_copies) and the copies the symmetry ties may
     be drawn alike in up to _SEP_TIE_ROOM (_separate's second chance, _tied_again), random-100 C2b-3; cli turns it
     off in a membrane view, where the transmembrane helices' heights are judged instead (C17).
@@ -4694,14 +4931,19 @@ def build_layout(
             for i, (j, k) in ties.items():
                 items[i].cx, items[i].cy = items[j].cx + k * spread, items[j].cy + k * lift
                 items[i].home = (items[j].home[0] + k * spread, items[j].home[1] + k * lift)
-            if band is not None:  # a membrane view: copy items no tie places move with their protomer
-                _untied_spread(items, ties, frame, spread)
-        if on_face and band is not None:  # flat helices at a face, drawn alone: lying on it
-            _onto_faces(items, on_face, band)
+        if band is not None and level:  # a transmembrane helix half the band long, a hair longer (ruling R6)
+            _stretch_short(items, set(level), band)
+        faced = _onto_faces(items, on_face, band) if on_face and band is not None else {}  # flat helices on a face
         kept = _kept(items, set(level or ()), on_face if band is not None else None)
-        if sides and band is not None:  # soluble items kept off the band, each on its own side
-            walls = _membrane_walls(items, sides, band, kept, walls)
+        if faced:  # those beyond their chain's transmembrane span go back to the ordinary layout; the rest in rows
+            faced = _face_release(items, faced, set(level or ()), kept)
+            _face_rows(items, faced, kept, band, set(level or ()))
+        bare, off = walls, dict(sides or {}) if band is not None else {}  # off the band: soluble and released items
+        off.update(_released(items, (on_face or {}) if band is not None else {}, kept))
+        if off:  # each kept off the band on its own side
+            walls = _membrane_walls(items, off, band, kept, bare)
         heights = [it.home[1] for it in items]
+        seen_x = [it.home[0] for it in items]  # projected x: the order a membrane view keeps its columns in
         curved = False  # each bent duplex laid out as one curve (na_curve); with none curvable, exactly as pieces
         if style.na_bend == "curved" and pieces:
             from .na_curve import lays_out
@@ -4739,6 +4981,7 @@ def build_layout(
                 held=held,
                 held_k=_K_HOME * like.weight if like is not None else _K_LIKE,
                 settled=like.settled if like is not None else None,
+                level=kept if band is not None else None,
             )
         if kept is not None and kept.any():  # transmembrane elements at their projected height, reaching a face
             for k in np.flatnonzero(kept).tolist():
@@ -4746,6 +4989,8 @@ def build_layout(
                 y = float(_snap(heights[k] + shift))
                 items[k].cy = y
                 items[k].home = (items[k].home[0], y)
+            if band is not None and level:  # each chain's transmembrane columns in their projected order (R11)
+                _in_order(items, set(level), seen_x, ties)
         shared = {  # an item of several protomers that no tie holds: a dimer's continuous sheet (1SLV)
             k
             for k, it in enumerate(items)
