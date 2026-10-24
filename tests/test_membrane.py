@@ -908,3 +908,50 @@ def test_upright_helices_stand_up_the_page_whatever_their_tilt():
     across = build_layout([s], [], f, "projected").placed[s.id]
     up = build_layout([s], [], f, "projected", upright={s.id}).placed[s.id]
     assert abs(np.sin(across.angle)) < 1e-9 and abs(np.sin(up.angle)) == pytest.approx(1.0)
+
+
+# --------------------------------------------- plan 26 fix round 2: soluble elements in the slab, loops stop at gaps
+def test_a18_flags_a_soluble_element_drawn_in_the_slab_not_an_interfacial_or_crossing_one():
+    """Ruling R4: A18's sub-check "soluble element drawn in the slab" (figcheck.membrane_view soluble_in_slab). On a
+    30 Å slab drawn as the band 0..10: an element whose CA centre lies 10 Å beyond the outer face, drawn with its centre
+    in the band, is flagged; the same element drawn above the band is not, nor is one lying 3 Å beyond the face
+    (interfacial: within SOLUBLE_BEYOND), nor a helix crossing the membrane (drawn across the band)."""
+    from types import SimpleNamespace
+
+    from foldmap.figcheck import SOLUBLE_BEYOND, membrane_view
+    from foldmap.membrane import Membrane
+
+    mem = Membrane(np.array([0.0, 0.0, 1.0]), 0.0, 15.0, "estimate")
+    runs = {  # id: (CA depths, kind, drawn centre y)
+        "far": (np.full(6, 25.0), "H", 5.0),
+        "far-above": (np.full(6, 25.0), "E", 14.0),
+        "face": (np.full(6, 18.0), "H", 5.0),
+        "across": (np.arange(-21.0, 21.1, 1.5), "H", 5.0),
+    }
+    ca, sses, placed = [], [], {}
+    for name, (z, kind, cy) in runs.items():
+        sses.append(SimpleNamespace(id=name, kind=kind, start=len(ca), end=len(ca) + len(z) - 1))
+        ca += [(0.0, 0.0, float(v)) for v in z]
+        placed[name] = SimpleNamespace(cy=cy, n_port=(0.0, cy - 6.0), c_port=(0.0, cy + 6.0))
+    lay = SimpleNamespace(membrane={"y": (0.0, 10.0), "bands": [(0.0, 10.0)]}, placed=placed)
+    bb = SimpleNamespace(ca=np.array(ca))
+    view = membrane_view(lay, sses, bb, mem)
+    assert 18.0 - mem.half < SOLUBLE_BEYOND < 25.0 - mem.half
+    assert view["soluble_in_slab"] == ["far +25"]
+    assert view["tm_helices"] == 1 and view["tm_short"] == []
+
+
+def test_the_positive_inside_loops_stop_at_a_gap_in_the_numbering():
+    """Review M6 (plan 26): membrane._loops walked 20 residues by backbone index, so past an unmodelled stretch it
+    reached into whatever was modelled next. A helix across the membrane, three residues after it numbered on, then a
+    gap of 30 in the numbering and five Lys 5 Å beyond the face: the three are its loop, the Lys are not."""
+    from foldmap import membrane
+
+    helix = [("A", k + 1, (0.0, 0.0, z), "LEU") for k, z in enumerate(np.arange(-21.0, 21.1, 1.5))]
+    after = [("A", len(helix) + 1 + k, (0.0, 1.0, 20.0), "GLY") for k in range(3)]
+    beyond = [("A", len(helix) + 34 + k, (0.0, 2.0, 20.0), "LYS") for k in range(5)]
+    bb = _Chains(helix + after + beyond)
+    m = membrane.Membrane(np.array([0.0, 0.0, 1.0]), 0.0, membrane.HALF, "estimate")
+    loops = membrane._loops(m, bb, [_Element("H", 0, len(helix) - 1, "A")])
+    n = len(helix)
+    assert loops[n : n + 3].all() and not loops[n + 3 :].any()
