@@ -4014,14 +4014,16 @@ _ROW_TOUCH = (
 _FACE_PAD = 5.0  # page units: a chain's transmembrane span, padded by this or a face helix's length, holds its helices
 
 
-def _tm_spans(items: list[_Item], level: set[str]) -> dict[str, tuple[float, float]]:
-    """Each chain's transmembrane span on the page: the x extent of the footprints of the items holding its elements
-    of `level`, at their homes."""
+def _tm_spans(items: list[_Item], level: set[str], now: bool = False) -> dict[str, tuple[float, float]]:
+    """Each chain's transmembrane span on the page: the x extent of the bodies of its elements of `level`, their items
+    at their homes (`now`: where they stand)."""
     spans: dict[str, tuple[float, float]] = {}
     for it in items:
-        for m in it.members:
+        for m, (ox, _) in zip(it.members, it.offsets):
             if getattr(m, "sse", None) is not None and m.sse.id in level:
-                x0, x1 = it.home[0] + it.box[0], it.home[0] + it.box[2]
+                x = (it.cx if now else it.home[0]) + ox
+                half = abs(np.cos(m.angle)) * m.length / 2 + abs(np.sin(m.angle)) * m.width / 2
+                x0, x1 = x - half, x + half
                 lo, hi = spans.get(m.sse.chain, (x0, x1))
                 spans[m.sse.chain] = (min(lo, x0), max(hi, x1))
     return spans
@@ -4110,8 +4112,9 @@ def _pack_row(targets: list[float], halves: list[float], gaps: list[tuple[float,
 def _in_order(items: list[_Item], level: set[str], across: list[float], ties: dict[int, tuple[int, int]]) -> None:
     """Ruling R11 (review-2 I5: 32KS-A's band helices, Kendall tau 0.82 -> 0.67): each chain's items holding its
     transmembrane elements (`level`), no symmetry tie on them, given back their places across the page in their
-    projected order (`across`, x before _attract): the places _attract found, each footprint centre kept, dealt out
-    left to right in that order. _separate then pushes held items apart sideways, never past each other."""
+    projected order (`across`, each item's x before _attract): the places _attract found, each item's x, dealt out
+    left to right in that order, so what is ordered is what is dealt (re-review-2 N4; an item's footprint centre may
+    stand off its x by its label). _separate then pushes held items apart sideways, never past each other."""
     tied = set(ties) | {j for j, _ in ties.values()}
     groups: dict[str, list[int]] = {}
     for k, it in enumerate(items):
@@ -4119,10 +4122,39 @@ def _in_order(items: list[_Item], level: set[str], across: list[float], ties: di
         if len(chains) == 1 and k not in tied:
             groups.setdefault(chains.pop(), []).append(k)
     for ks in groups.values():
-        centres = sorted(items[k].cx + items[k].mid[0] for k in ks)
-        for k, x in zip(sorted(ks, key=lambda k: (across[k], k)), centres):
-            items[k].cx = float(_snap(x - items[k].mid[0]))
+        places = sorted(items[k].cx for k in ks)
+        for k, x in zip(sorted(ks, key=lambda k: (across[k], k)), places):
+            items[k].cx = float(_snap(x))
             items[k].home = (items[k].cx, items[k].home[1])
+
+
+def _into_room(
+    items: list[_Item], faced: dict[int, tuple[float, float, int]], kept: np.ndarray, level: set[str], ks: list[int]
+) -> None:
+    """Ruling R15: each held face helix of `ks` moved sideways back within its room (_face_room) as the columns now
+    stand (_attract and _separate move them), to its nearer edge; its home with it."""
+    spans = _tm_spans(items, level, now=True)
+    for k in ks:
+        if kept[k]:
+            lo, hi = _face_room(items[k].members[0], spans)
+            items[k].cx = float(_snap(min(max(items[k].cx, lo), hi)))
+            items[k].home = (items[k].cx, items[k].home[1])
+
+
+def _out_of_room(
+    items: list[_Item], faced: dict[int, tuple[float, float, int]], kept: np.ndarray, level: set[str]
+) -> list[int]:
+    """Ruling R15 (re-review-2 N1: _attract and _separate move a held face helix sideways, and 6JLN's e:42-47 ended
+    310 Å beyond its chain's columns): the face helices still held whose drawn x lies outside their chain's padded
+    transmembrane span (_face_room) as the columns now stand (their items' places, _tm_spans of the current homes)."""
+    spans = _tm_spans(items, level, now=True)
+    out = []
+    for k in faced:
+        if kept[k]:
+            lo, hi = _face_room(items[k].members[0], spans)
+            if not lo - 1e-9 <= items[k].cx <= hi + 1e-9:
+                out.append(k)
+    return out
 
 
 def _released(items: list[_Item], on_face: dict[str, int], kept: np.ndarray | None) -> dict[str, int]:
@@ -4149,9 +4181,12 @@ def _face_rows(
     """Each face's flat helices (`faced`, _face_release's) laid out as rows, ruling R8. A row is a line: its helices
     keep their projected order along it and move the least (summed squared) from their projected x (_pack_row), round
     the columns standing in it (the other items keeping their height, whose footprints reach into the row: fixed,
-    merged where they meet). A helix moved further than its own length goes to the next row outward, the one whose
-    projected centre lies furthest out first (rows stacked by depth, the shallowest on the face), up to _FACE_ROWS;
-    one still too far is released to the ordinary layout, at its projected place."""
+    merged where they meet). While a helix is packed outside its room (its chain's transmembrane span padded by the
+    larger of _FACE_PAD and its length, _face_room: review-2's chain budget, in place of R8's own-length bump), one
+    goes to the next row outward: the one whose leaving leaves the fewest outside theirs, and of those the one whose
+    projected centre lies furthest out (depth a tie-break only, _fill_row); up to _FACE_ROWS rows, then one still
+    outside is released to the ordinary layout, at its projected place. The room holds through the rest of the layout
+    too: a held helix _attract or _separate carries out of it is released then (_out_of_room, ruling R15)."""
     if not faced:
         return
     tall = max(2 * items[k].half[1] for k in faced)  # a row's height: the tallest footprint (a helix and its name)
@@ -4234,9 +4269,11 @@ def _fill_row(
 def _stretch_short(items: list[_Item], level: set[str], band: tuple[float, float]) -> None:
     """Ruling R6 (5LDW M:392-402, a piece of a kinked helix): a transmembrane helix drawn upright whose length is at
     most half the band (11 residues or fewer in a 30 Å slab) can reach a face or pass the middle, never both
-    (crosses_band); it is drawn 2 * _PAST longer than half the band (0.2 page units, 0.9 Å, under one residue's
-    rise), about its own centre, so _to_face can make it do both. Its pitch stretches with it; nothing else moves (a
-    kinked piece's corner keeps _KINK_ROOM less _PAST at either end)."""
+    (crosses_band); it is drawn half the band plus 2 * _PAST long (0.2 page units: 0.9 Å more for a helix exactly
+    half the band long, as 5LDW's; a shorter crossing piece stretches more, none in the campaign), about its own
+    centre, so _to_face can make it do both. Its pitch stretches with it, and its item's box with it (the box is read
+    from the member's rect, which its length sets); nothing else moves (a kinked piece's corner keeps _KINK_ROOM less
+    _PAST at either end)."""
     half = (band[1] - band[0]) / 2
     for m in (m for it in items for m in it.members):
         if (
@@ -4937,6 +4974,7 @@ def build_layout(
         kept = _kept(items, set(level or ()), on_face if band is not None else None)
         if faced:  # those beyond their chain's transmembrane span go back to the ordinary layout; the rest in rows
             faced = _face_release(items, faced, set(level or ()), kept)
+            seen_span = _tm_spans(items, set(level or ()))  # each chain's columns as projected
             _face_rows(items, faced, kept, band, set(level or ()))
         bare, off = walls, dict(sides or {}) if band is not None else {}  # off the band: soluble and released items
         off.update(_released(items, (on_face or {}) if band is not None else {}, kept))
@@ -5001,6 +5039,32 @@ def build_layout(
         state = _separate(  # "alike", "wide" (alike only by the second chance, in more room) or "alone"
             items, ties, joints, walls, mirror=mirror if ties else None, level=kept, shared=shared, again=alike_first
         )
+        clipped = False  # ruling R15: the face rows' bound held through _attract and _separate
+        while faced and (gone := _out_of_room(items, faced, kept, set(level or ()))):
+            if not clipped:  # first moved back within their rooms, still held, and the layout separated again
+                clipped = True
+                _into_room(items, faced, kept, set(level or ()), gone)
+                gone = []
+            now = _tm_spans(items, set(level or ()), now=True)
+            for k in gone:  # then any still carried out of its room released to the ordinary layout, walled off the
+                x0, y0, _ = faced[k]  # band on its side, at its projected place as it stood to its chain's columns
+                c = items[k].members[0].sse.chain
+                if c in seen_span and c in now:
+                    x0 += (sum(now[c]) - sum(seen_span[c])) / 2
+                items[k].cx, items[k].cy, items[k].home = x0, y0, (x0, y0)
+                kept[k] = False
+            off.update(_released(items, on_face, kept))
+            walls = _membrane_walls(items, off, band, kept, bare)
+            state = _separate(
+                items,
+                ties,
+                joints,
+                walls,
+                mirror=mirror if ties else None,
+                level=kept,
+                shared=shared,
+                again=alike_first,
+            )
         if domains and _part_domains(items, domains, ties, mirror if ties else None):
             # the domains, parted with their copies, keep them alike whatever room that takes
             state = _separate(

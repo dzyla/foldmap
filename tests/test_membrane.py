@@ -1087,6 +1087,8 @@ def test_a_transmembrane_helix_half_the_band_long_is_drawn_a_hair_longer_and_cro
     level = {members[n].sse.id for n in ("half", "long", "lying")}
     _stretch_short(items, level, band)
     assert members["half"].length == pytest.approx(3.45 + 2 * _PAST)
+    box = items[0].box  # the item's box is read from its member's rect: it covers the stretched length (N3)
+    assert box[3] - box[1] >= 3.45 + 2 * _PAST - 1e-9
     assert [members[n].length for n in ("long", "lying", "other")] == [5.0, 3.0, 3.0]
     shift = _to_face(items[0], level, band, 3.45)
     m = members["half"]
@@ -1164,3 +1166,24 @@ def test_a_band_side_name_moves_off_a_loop_crossing_it():
     t2 = ax.text(0.1, 5.35, "out", ha="left", va="bottom", fontsize=9)
     _clear_of_lines(c, t2, [np.array([(10.0, 4.0), (10.0, 8.0)])], 0.1, 19.9, 1.0)
     assert t2.get_position() == (0.1, 5.35) and t2.get_horizontalalignment() == "left"
+
+
+def test_a_held_face_helix_stays_within_its_chain_span_through_the_layout():
+    """Ruling R15 (re-review-2 N1: 6JLN e:42-47 ended 310 Å beyond its chain's columns after _attract and _separate):
+    layout._out_of_room finds each held face helix outside its chain's padded transmembrane span as the columns now
+    stand, and _into_room moves it sideways back to the nearer edge; a released one, or one inside, is left."""
+    from foldmap.layout import _FACE_PAD, Placed, _into_room, _Item, _out_of_room
+    from helpers import fake_sse
+
+    tm = fake_sse("H", 0, 25)
+    items = [_Item([Placed(tm, 0, 0, 6.0, np.pi / 2, 1.0)], [(0.0, 0.0)], 0.0, 0.0, (0.0, 0.0), 0, "A")]
+    for k, x in enumerate((30.0, 2.0, -40.0)):
+        s = fake_sse("H", 30 + 15 * k, 41 + 15 * k)
+        items.append(_Item([Placed(s, 0, 0, 3.0, 0.0, 1.0)], [(0.0, 0.0)], x, 5.0, (x, 5.0), k + 1, "A"))
+    faced = {1: (1.0, 4.0, 1), 2: (2.0, 4.0, 1), 3: (-1.0, 4.0, 1)}
+    kept = np.array([True, True, True, False])
+    level = {tm.id}
+    assert _out_of_room(items, faced, kept, level) == [1]
+    _into_room(items, faced, kept, level, [1])
+    assert items[1].cx == pytest.approx(0.5 + _FACE_PAD) and items[1].home[0] == items[1].cx
+    assert _out_of_room(items, faced, kept, level) == [] and items[3].cx == -40.0
