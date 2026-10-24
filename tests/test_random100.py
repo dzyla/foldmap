@@ -643,7 +643,8 @@ def test_a18_tm_helix_passes_when_it_reaches_both_leaflets(r100):
     """C27 (random-100, ruling): a TM helix passes A18 when it enters the band through a face and reaches past its
     middle, not by covering 75 % of the band's height: a tilted or offset helix that
     crosses one face and reaches past the middle (6PS3 A:267-298 covers 0.73, 7PIU R:48-70 0.70) passes; one
-    that stays in one leaflet fails. Bacteriorhodopsin's five helices whose CA runs reach both faces pass as drawn."""
+    that stays in one leaflet fails. Bacteriorhodopsin's seven helices, crossing the membrane (membrane.crosses, plan
+    26), pass as drawn."""
     from dataclasses import replace
 
     import numpy as np
@@ -653,7 +654,7 @@ def test_a18_tm_helix_passes_when_it_reaches_both_leaflets(r100):
     path = DATA / "1C3W.cif"
     d = draw_spec(figure_spec(path, membrane="auto", assembly="asu"))
     m = criteria.membrane_checks(d, path)
-    assert m["band"] and m["tm_helices"] == 5 and m["tm_short"] == [], m
+    assert m["band"] and m["tm_helices"] == 7 and m["tm_short"] == [], m
     lay = d.layout
     (y0, y1), mid = lay.membrane["y"], sum(lay.membrane["y"]) / 2
     hid = next(k for k, p in lay.placed.items() if abs(np.sin(p.angle)) > 0.9 and p.length > y1 - y0)

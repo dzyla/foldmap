@@ -5,7 +5,7 @@ sides), otherwise estimated from the structure. An outer-membrane beta-barrel (a
 oily) gives the normal as its axis, a 24 Å slab slid along it to its most hydrophobic outward-facing residues and
 Tyr/Trp girdles, and the sides from its loops (long outside, short turns in the periplasm). Otherwise the long
 helices and strands give the normal, a 30 Å slab is slid to the most hydrophobic, least charged position, and the
-cytoplasmic side comes from the positive-inside rule (more Lys/Arg)."""
+cytoplasmic side comes from the positive-inside rule (more Lys/Arg on the loops of the elements crossing it)."""
 
 from __future__ import annotations
 
@@ -18,7 +18,7 @@ import numpy as np
 
 from .dssp import assign_dssp
 from .layout import _snap, _unit
-from .model import SSE, Backbone, Bridge
+from .model import SSE, Backbone, Bridge, homolog_chains
 from .sheets import build_sheets
 from .ss import build_sses
 
@@ -31,6 +31,13 @@ _MIN_HYDROPHOBIC, _MAX_POLAR = 0.55, 0.15  # a slab this oily and this uncharged
 _MAX_POLAR_CROSSED, _MANY_CROSSING = 0.20, 10
 _SIDED_RATIO, _SIDED_DIFF = 2.0, 3  # Lys/Arg counts must differ this clearly to call the sides
 _MIN_CROSSING = 10.0  # Å an element must reach beyond the centre on both sides to cross the membrane
+# The positive-inside rule's loops: the chain this many residues past either end of an element that crosses the
+# membrane (crosses its mid-plane, spanning half its thickness), their Lys/Arg counted up to this far beyond its
+# face. Soluble domains beyond are left out (plan 26, 32KS ComEC: the periplasmic OB and β-lactamase-like domains'
+# own Lys/Arg near the face called their side the cytoplasm, 49 to 23; its loops say 4.5 to 9.5 per protomer).
+# Against OPM on the manuscript's membrane campaign (17 helical entries): 15 sided, 14 right (6QFA wrong, as
+# before), where every residue near the face sided 11, 10 right; no entry's side worse (plan 26 Task 1 report).
+_FLANK, _FLANK_REACH = 20, 15.0
 
 # Outer-membrane beta-barrels. OPM gives their hydrophobic half thickness as 11.7-12.6 Å (FimD 3RFZ 11.7, OmpX
 # 1QJ8 11.8, OmpA 1BXW 12.6, OmpF 2OMF 12.6): an outer membrane is thinner than a cytoplasmic one.
@@ -110,7 +117,7 @@ def _opm(path) -> Membrane | None:
 
 def find_membrane(path, bb: Backbone) -> Membrane | None:
     """The membrane, or None for a soluble protein."""
-    found = _opm(path)
+    found, sses = _opm(path), None
     if found is None:
         dssp = assign_dssp(bb)
         sses = build_sses(bb, dssp.ss, bridges=dssp.bridges)
@@ -120,7 +127,12 @@ def find_membrane(path, bb: Backbone) -> Membrane | None:
         found = _estimate(bb, sses)
     if found is None:
         return None
-    return found if found.sided else _orient(found, bb)  # OPM's own sides, when its dummy atoms give them
+    if found.sided:  # OPM's own sides, when its dummy atoms give them
+        return found
+    if sses is None:  # OPM's planes without its sides
+        dssp = assign_dssp(bb)
+        sses = build_sses(bb, dssp.ss, bridges=dssp.bridges)
+    return _orient(found, bb, sses)
 
 
 def _barrels(sses: list[SSE], bridges: list[Bridge]) -> list[list[SSE]]:
@@ -263,12 +275,24 @@ def _estimate(bb: Backbone, sses: list[SSE]) -> Membrane | None:
     return Membrane(normal, float(best[1]), HALF, "estimate")
 
 
-FACE_REACH = 2.0  # Å: an element whose CA run comes this near both faces crosses the membrane (figcheck A18, cli)
+FACE_REACH = 2.0  # Å: a long element whose CA run comes this near both faces spans the slab (_spans, the estimate)
+
+
+def crosses(depth: np.ndarray, half: float) -> bool:
+    """Does an element whose CA atoms lie at these depths cross the membrane: its run crosses the mid-plane and spans
+    at least half the thickness (`half`)? The one rule the membrane view lays its transmembrane elements out by
+    (cli._transmembrane, _face_medians), A18 judges them by (figcheck.membrane_view), foldmap data reports
+    (crosses_midplane) and the positive-inside rule takes their loops from (_loops). Plan 26: the rule before (the run
+    within FACE_REACH of both faces) counted 2 of 32KS's 11 transmembrane helices per chain, their DSSP runs spanning
+    14-25 Å of a 30 Å slab; OPM's membranes are as thick around helices as short (6DQN, 6BO8, 6MJ2)."""
+    seg = np.asarray(depth)
+    return len(seg) >= 2 and float(seg.min()) < 0.0 < float(seg.max()) and float(seg.max() - seg.min()) >= half
 
 
 def _spans(long: list[SSE], z: np.ndarray, centre: float) -> bool:
-    """Does a long element's CA run reach both faces of the HALF slab at `centre` (within FACE_REACH, as the membrane
-    view finds the transmembrane elements it draws the band by, cli._face_medians)?"""
+    """Does a long element's CA run reach both faces of the HALF slab at `centre` (within FACE_REACH)? The estimate's
+    own test (random-100 held-out 6MJ2), kept as it was measured when the view and A18 took `crosses` (plan 26): the
+    planes of the manuscript's membrane campaign do not move."""
     return any(
         z[s.start : s.end + 1].min() <= centre - HALF + FACE_REACH
         and z[s.start : s.end + 1].max() >= centre + HALF - FACE_REACH
@@ -296,13 +320,48 @@ def _membrane_like(long, z, slab, hyd, pol, chain) -> bool:
     return hyd[held].mean() >= _MIN_HYDROPHOBIC and pol[held].mean() <= polar
 
 
-def _orient(m: Membrane, bb: Backbone) -> Membrane:
-    """Point the normal outward: the side with fewer Lys/Arg just beyond the membrane (positive-inside rule)."""
+def _loops(m: Membrane, bb: Backbone, sses: list[SSE]) -> np.ndarray:
+    """The residues (a mask) within _FLANK of either end of an element that crosses the membrane: its mid-plane
+    crossed, half its thickness spanned (as datafile reads a transmembrane segment), along the element's chain."""
+    d = m.depth(bb.ca)
+    chain = [l.chain for l in bb.labels]
+    out = np.zeros(len(bb), dtype=bool)
+    for s in sses:
+        if not crosses(d[s.start : s.end + 1], m.half):
+            continue
+        for k in range(1, _FLANK + 1):
+            for j in (s.start - k, s.end + k):
+                if 0 <= j < len(bb) and chain[j] == s.chain:
+                    out[j] = True
+    return out
+
+
+def _orient(m: Membrane, bb: Backbone, sses: list[SSE]) -> Membrane:
+    """Point the normal outward: the side with fewer Lys/Arg on the loops of the membrane-crossing elements, within
+    _FLANK_REACH of its face (positive-inside rule, _loops), copies of one protein counted once (their mean: KcsA's
+    four copies of 2 to 1 are 2 to 1, not 8 to 4); on a tie, fewer Lys/Arg of any residue just beyond the membrane.
+    Sided when the loops' counts differ clearly, or when every residue's do and lean the same way (6BO8, TRPV6: its
+    loops 8 to 5 per copy, its ankyrin domains 72 to 28)."""
     d = m.depth(bb.ca)
     basic = np.array([l.name in ("LYS", "ARG") for l in bb.labels])
-    band = lambda lo, hi: int((basic & (d > lo) & (d < hi)).sum())  # noqa: E731
-    up, down = band(m.half - 5, m.half + 15), band(-m.half - 15, -m.half + 5)
-    sided = max(up, down) >= _SIDED_RATIO * min(up, down) and abs(up - down) >= _SIDED_DIFF
-    if up > down:
-        return Membrane(-m.normal, -m.centre, m.half, m.source, sided)
-    return Membrane(m.normal, m.centre, m.half, m.source, sided)
+    band = lambda lo, hi, on: basic & on & (d > lo) & (d < hi)  # noqa: E731
+    clear = lambda a, b: max(a, b) >= _SIDED_RATIO * min(a, b) and abs(a - b) >= _SIDED_DIFF  # noqa: E731
+    chain = np.array([l.chain for l in bb.labels])
+    copies: dict[str, list[str]] = {}
+    for c, (first, _) in homolog_chains(bb).items():
+        copies.setdefault(first, []).append(c)
+
+    def per_protein(on: np.ndarray) -> float:  # summed over the proteins, each its copies' mean
+        return float(sum(np.mean([on[chain == c].sum() for c in cs]) for cs in copies.values()))
+
+    loops = _loops(m, bb, sses)
+    up = per_protein(band(m.half, m.half + _FLANK_REACH, loops))
+    down = per_protein(band(-m.half - _FLANK_REACH, -m.half, loops))
+    every = np.ones(len(bb), dtype=bool)
+    up_all = int(band(m.half - 5, m.half + 15, every).sum())
+    down_all = int(band(-m.half - 15, -m.half + 5, every).sum())
+    flip = up > down if up != down else up_all > down_all
+    sided = clear(up, down) or (clear(up_all, down_all) and (up_all > down_all) == flip)
+    if flip:
+        return dataclasses.replace(m, normal=-m.normal, centre=-m.centre, sided=sided)
+    return dataclasses.replace(m, sided=sided)

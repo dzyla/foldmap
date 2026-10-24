@@ -21,7 +21,8 @@ from matplotlib.path import Path as MPath
 from matplotlib.transforms import Affine2D, Bbox
 
 from .layout import block_ghosts, joined_pieces, lying_over
-from .membrane import FACE_REACH
+from .layout import crosses_band as _crosses_band
+from .membrane import crosses
 from .na_curve import _FAR, on_curves
 
 # Lines a text can be crossed by (render's gids, matched by prefix). A loop's casing (loopcase:) and a stub's edge
@@ -1774,18 +1775,16 @@ _RUN_MIN = 0.5  # page units: a shorter sideways step is no run along the slab
 
 
 def crosses_band(ends: tuple[float, float], band: tuple[float, float]) -> bool:
-    """Does a transmembrane element drawn from page y ends[0] to ends[1] cross the band (bottom, top) as A18 judges
-    it: entering it through a face and reaching past its middle (C27 ruling)? Shared by the membrane view's own test
-    (cli._off_band) and the campaign's (random100.membrane_checks)."""
-    lo, hi = sorted(ends)
-    y0, y1 = band
-    return lo < (y0 + y1) / 2 < hi and (lo <= y0 or hi >= y1)
+    """layout.crosses_band: A18's test of one transmembrane element as drawn, shared with the layout that places it
+    (layout._to_face), the membrane view's own test (cli._off_band) and the campaign's (random100.membrane_checks)."""
+    return _crosses_band(ends, band)
 
 
 def membrane_view(layout, sses, bb, mem, loops=None) -> dict:
-    """A18 on a membrane view (layout.membrane, the membrane `mem` it was drawn for): tm_helices, the helices whose
-    CA run reaches both faces (within membrane.FACE_REACH); tm_short, those that do not cross their band
-    (crosses_band), with the share of the band they cover; loops_in_slab, slab_runs of `loops` (None: not measured)."""
+    """A18 on a membrane view (layout.membrane, the membrane `mem` it was drawn for): tm_helices, the helices that
+    cross the membrane (membrane.crosses: the CA run crosses its mid-plane and spans half its thickness); tm_short,
+    those that do not cross their band (crosses_band), with the share of the band they cover; loops_in_slab,
+    slab_runs of `loops` (None: not measured)."""
     bands = layout.membrane.get("bands") or [layout.membrane["y"]]
     depth = mem.depth(bb.ca)
     short, tm = [], 0
@@ -1793,8 +1792,7 @@ def membrane_view(layout, sses, bb, mem, loops=None) -> dict:
         p = layout.placed.get(s.id)
         if p is None or s.kind != "H":
             continue
-        seg = depth[s.start : s.end + 1]
-        if len(seg) < 2 or seg.min() > -mem.half + FACE_REACH or seg.max() < mem.half - FACE_REACH:
+        if not crosses(depth[s.start : s.end + 1], mem.half):
             continue
         tm += 1
         lo, hi = sorted((p.n_port[1], p.c_port[1]))

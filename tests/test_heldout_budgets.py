@@ -235,13 +235,19 @@ def test_the_floor_counts_the_text_as_drawn():
 
 
 def test_estimator_view_and_judge_share_one_face_reach():
-    """Task 6 review: membrane.FACE_REACH replaces the literal 2 Å in cli._transmembrane, cli._face_medians and
-    figcheck.membrane_view, so the estimate, the view and A18 count the same elements as crossing."""
+    """Task 6 review: membrane.FACE_REACH replaced the literal 2 Å in cli._transmembrane, cli._face_medians and
+    figcheck.membrane_view. Plan 26 (ruling R1): the membrane view, A18 and foldmap data count a transmembrane element
+    by one rule, membrane.crosses (the CA run crosses the mid-plane and spans half the thickness); FACE_REACH is the
+    estimate's own (membrane._spans)."""
     import inspect
 
-    from foldmap import cli, figcheck, membrane
+    from foldmap import cli, datafile, figcheck, membrane
 
-    assert cli.FACE_REACH is membrane.FACE_REACH and figcheck.FACE_REACH is membrane.FACE_REACH
-    for f in (cli._transmembrane, cli._face_medians, figcheck.membrane_view):
+    assert cli.crosses is membrane.crosses and figcheck.crosses is membrane.crosses
+    for f in (cli._transmembrane, cli._face_medians, figcheck.membrane_view, datafile._membrane):
         src = inspect.getsource(f)
-        assert "half + FACE_REACH" in src and "half + 2" not in src and "half - 2" not in src
+        assert "crosses(" in src or "crossing(" in src, f.__name__
+        assert "half + 2" not in src and "half - 2" not in src
+    for f in (cli._transmembrane, cli._face_medians, figcheck.membrane_view):
+        assert "FACE_REACH" not in inspect.getsource(f), f.__name__
+    assert "HALF + FACE_REACH" in inspect.getsource(membrane._spans)

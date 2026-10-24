@@ -166,11 +166,11 @@ def test_band_drawn_across_the_transmembrane_helices():
     assert {"in", "out"} <= texts
 
 
-def test_a_band_is_drawn_by_helices_that_only_reach_a_face():
-    """random-100 held-out 6MJ2 (TRPM2): its S1-S4 helices reach the inner face within 2 Å, so the membrane view
-    counts them transmembrane (as A18 does), but none passes it, and no band was drawn. When no element passes both
-    faces, those that reach them give the band at their CA nearest the face; one that passes both still decides
-    alone."""
+def test_a_band_is_drawn_by_the_line_of_helices_that_stop_short_of_a_face():
+    """Plan 26 (32KS: TM helices of 15-19 residues in a 30 Å slab; random-100 held-out 6MJ2, whose S1-S4 helices stop
+    1-2 Å short of the inner face): an element that crosses the membrane (membrane.crosses) passes a face where its CA
+    run does, or, stopping short of it, where the line through its run's first and last turn would, carried on along
+    the element as drawn. One wholly on one side of the mid-plane gives no face."""
     from types import SimpleNamespace
 
     from foldmap.cli import _face_medians
@@ -183,14 +183,16 @@ def test_a_band_is_drawn_by_helices_that_only_reach_a_face():
     bb = SimpleNamespace(ca=np.column_stack([np.zeros_like(z), np.zeros_like(z), z]))
     lay = SimpleNamespace(placed={"near": place})
     y_out, y_in = _face_medians(lay, [near], bb, mem)
-    assert y_in == pytest.approx(0.0) and y_out == pytest.approx(10.0 * (15.0 + 13.5) / 30.0)
-    deep = np.arange(-16.5, 16.6, 1.5)  # 23 CAs past both faces
-    through = SimpleNamespace(id="through", start=len(z), end=len(z) + len(deep) - 1)
-    bb.ca = np.vstack([bb.ca, np.column_stack([np.zeros_like(deep), np.zeros_like(deep), deep])])
-    lay.placed["through"] = SimpleNamespace(n_port=(5.0, 20.0), c_port=(5.0, 30.0))
-    y_out, y_in = _face_medians(lay, [near, through], bb, mem)
-    assert y_in == pytest.approx(20.0 + 10.0 * (16.5 - 15.0) / 33.0)
-    assert y_out == pytest.approx(20.0 + 10.0 * (16.5 + 15.0) / 33.0)
+    assert y_out == pytest.approx(10.0 * (15.0 + 13.5) / 30.0) and y_in == pytest.approx(10.0 * (-15.0 + 13.5) / 30.0)
+    runs = {"short": np.arange(-10.0, 10.1, 1.0), "above": np.arange(2.0, 20.1, 1.0)}  # 20 Å across; wholly above
+    elements = [near]
+    for name, (k, run) in zip(runs, enumerate(runs.values())):
+        start = len(bb.ca)
+        bb.ca = np.vstack([bb.ca, np.column_stack([np.zeros_like(run), np.zeros_like(run), run])])
+        elements.append(SimpleNamespace(id=name, start=start, end=start + len(run) - 1))
+        lay.placed[name] = SimpleNamespace(n_port=(5.0 * k, 20.0), c_port=(5.0 * k, 30.0))
+    y_out, y_in = _face_medians(lay, elements, bb, mem)  # short: faces at 32.5 and 17.5; above: none
+    assert y_out == pytest.approx((9.5 + 32.5) / 2) and y_in == pytest.approx((-0.5 + 17.5) / 2)
 
 
 def test_positive_inside_rule_puts_bacteriorhodopsin_c_terminus_inside():
@@ -592,16 +594,23 @@ def test_a_loop_runs_in_the_slab_only_beside_its_own_port():
 def test_the_second_membrane_layout_is_kept_only_when_it_does_better(monkeypatch):
     """C17 fix round 1: 6JLN's second layout put every TM helix on the band but added slab loops (1 -> 3); it is now
     kept only when it has fewer helices off the band and no more slab loops or route fallbacks (cli._membrane_score,
-    on a routed copy). 1BL8's does better (4 -> 0, nothing added) and is kept; scored worse, the first is kept."""
+    on a routed copy). 1BL8 draws every TM helix on its band from the first layout since plan 26 (upright, `upright`),
+    so a helix off it is told here to bring the second about: doing better (4 -> 0, nothing added) it is kept; scored
+    worse, the first is kept."""
     import foldmap.cli as cli
+    from foldmap import figcheck
 
+    real = figcheck.membrane_view
+    monkeypatch.setattr(figcheck, "membrane_view", lambda *a, **k: {**real(*a, **k), "tm_short": ["told"]})
     path = DATA / "1BL8.cif"
-    kept, _, _ = make_layout(path, membrane="auto")
-    scores = iter([(4, 0, 0), (0, 1, 0)])
-    monkeypatch.setattr(cli, "_membrane_score", lambda *a: next(scores))
-    first, _, _ = make_layout(path, membrane="auto")
+    laid = []
+    for scored in ([(4, 0, 0), (0, 0, 0)], [(4, 0, 0), (0, 1, 0)]):
+        scores = iter(scored)
+        monkeypatch.setattr(cli, "_membrane_score", lambda *a, scores=scores: next(scores))
+        laid.append(make_layout(path, membrane="auto")[0])
+        assert next(scores, None) is None
+    kept, first = laid
     assert kept.membrane["y"] != first.membrane["y"]  # the faces as projected, against the medians of the first
-    assert next(scores, None) is None
 
 
 @pytest.mark.parametrize("entry", ["5LDW", "6JO6", "6JLN"])
@@ -691,6 +700,67 @@ def test_a_membrane_two_fold_dimer_is_drawn_no_worse_than_unrolled(monkeypatch):
 
 
 # ------------------------------------------------------------------------------- plan 26: the whole structure
+class _Chains:  # a backbone as membrane._orient reads it: CA atoms and residue labels (chain, number, name)
+    def __init__(self, residues):
+        from types import SimpleNamespace
+
+        self.ca = np.array([xyz for _, _, xyz, _ in residues], float)
+        self.labels = [SimpleNamespace(chain=c, seq=n, icode="", name=name) for c, n, _, name in residues]
+
+    def __len__(self):
+        return len(self.labels)
+
+
+def _protein(chain, x, loop_kr):
+    """One chain along z: an N-terminal loop of four residues 5 Å below the lower face (`loop_kr` of them Lys, the
+    rest Gly), a helix across the 30 Å membrane (LEU), a 25-residue linker far above it, then a soluble domain of 20
+    residues 3 Å above the upper face, 12 of them Lys. Returns its residues and its helix's (start, end) offsets."""
+    out = [(chain, n + 1, (x, 0.0, -20.0), "LYS" if n < loop_kr else "GLY") for n in range(4)]
+    helix = [(chain, len(out) + k + 1, (x, 0.0, z), "LEU") for k, z in enumerate(np.arange(-21.0, 21.1, 1.5))]
+    span = (len(out), len(out) + len(helix) - 1)
+    out += helix
+    out += [(chain, len(out) + k + 1, (x + 5.0, 0.0, 60.0), "GLY") for k in range(25)]
+    out += [(chain, len(out) + k + 1, (x + 5.0, float(k), 18.0), "LYS" if k < 12 else "ALA") for k in range(20)]
+    return out, span
+
+
+def _oriented(proteins):
+    from foldmap import membrane
+
+    residues, elements = [], []
+    for chain, x, loop_kr in proteins:
+        got, (a, b) = _protein(chain, x, loop_kr)
+        elements.append(_Element("H", len(residues) + a, len(residues) + b, chain))
+        residues += got
+    bb = _Chains(residues)
+    flat = membrane.Membrane(np.array([0.0, 0.0, 1.0]), 0.0, membrane.HALF, "estimate")
+    return membrane._orient(flat, bb, elements), bb
+
+
+def test_the_positive_inside_rule_counts_the_loops_not_a_soluble_domain_beyond():
+    """Plan 26 (32KS, ComEC): the periplasmic OB and β-lactamase-like domains' own Lys/Arg within 15 Å of the face
+    outvoted the loops and put them on the cytoplasmic side. The rule counts the loops of the elements that cross the
+    membrane: a soluble domain on top with 12 Lys near the face, the helix's N-terminal loop under it with 4: the
+    loops' side is the cytoplasm, the domain outside, and the sides are called."""
+    m, bb = _oriented([("A", 0.0, 4)])
+    assert m.normal @ np.array([0.0, 0.0, 1.0]) > 0 and m.sided
+    domain = m.depth(bb.ca[-20:])
+    assert (domain > 0).all()
+    d0 = bb.ca[:, 2]  # every residue near the faces, as the rule counted before: 12 above, 4 below (the domain inside)
+    basic = np.array([l.name == "LYS" for l in bb.labels])
+    assert (basic & (d0 > 10) & (d0 < 30)).sum() == 12 and (basic & (d0 > -30) & (d0 < -10)).sum() == 4
+
+
+def test_copies_of_one_protein_count_their_loops_once():
+    """1BL8 (KcsA, four copies): its loops' Lys/Arg are 2 to 1 per copy, 8 to 4 summed, which called its sides the
+    wrong way. Copies of one protein count once (their mean): a loop with 2 Lys under the membrane and none above
+    calls no side (they must differ by 3), and neither do four copies of it, though summed (8 to 0) they would."""
+    one, _ = _oriented([("A", 0.0, 2)])
+    four, _ = _oriented([(c, 30.0 * k, 2) for k, c in enumerate("ABCD")])
+    assert not one.sided and not four.sided
+    assert one.normal @ np.array([0.0, 0.0, 1.0]) > 0 and np.allclose(four.normal, one.normal)
+
+
 def test_the_membrane_is_found_on_every_chain_whatever_chains_draws(monkeypatch):
     """Plan 26 (32KS --chains A): the membrane was estimated on the chains --chains kept, so one protomer of a dimer
     got a plane of its own, ~22° off the dimer's. It is found on every protein chain read; the drawing narrows, the
@@ -716,16 +786,52 @@ KS32 = fetch.CACHE / "32KS.cif"  # the download cache as fetch reads it (read be
 
 
 @pytest.mark.skipif(not KS32.is_file(), reason="32KS is not in the download cache")
-def test_comec_one_protomer_lies_in_the_dimers_membrane():
+def test_comec_one_protomer_lies_in_the_dimers_membrane_with_its_periplasmic_domains_outside():
     """32KS (ComEC, Deselaers et al., NAR 2025, Fig. 1C) --chains A --membrane auto: the membrane is the dimer's, so
     TM1-TM3 (A:5-19, 29-43, 50-74) cross its mid-plane, inside the band (chain A alone put them below it: TM2 at 3 to
-    23 Å, wholly on one side)."""
+    23 Å, wholly on one side), and the OB fold (A:85-196) and the β-lactamase-like domain (A:531-800) lie outside, the
+    sides called by the loops, with no --membrane flip."""
     whole = find_membrane(KS32, load_backbone(KS32, "auto"))
     lay, _, bb = make_layout(KS32, membrane="auto", chains=["A"])
     m = lay.bilayer
-    assert m.normal.tolist() == whole.normal.tolist() and m.centre == whole.centre
+    assert m.normal.tolist() == whole.normal.tolist() and m.centre == whole.centre and m.sided
     d = m.depth(bb.ca)
     num = np.array([l.seq for l in bb.labels])
     for lo, hi in ((5, 19), (29, 43), (50, 74)):
         seg = d[(num >= lo) & (num <= hi)]
         assert seg.min() < 0 < seg.max() and seg.min() > -m.half - 5 and seg.max() < m.half + 5, (lo, hi)
+    for lo, hi in ((85, 196), (531, 800)):
+        assert d[(num >= lo) & (num <= hi)].mean() > m.half, (lo, hi)
+
+
+COMEC_TMS = [(5, 19), (29, 43), (50, 74), (261, 277), (281, 298), (303, 320), (328, 339), (349, 363), (377, 399)]
+COMEC_TMS += [(475, 493), (508, 526)]  # chain A's eleven upright helices, the paper's TM1-TM11 by place and tilt
+
+
+@pytest.mark.skipif(not KS32.is_file(), reason="32KS is not in the download cache")
+@pytest.mark.parametrize("chains", [None, ["A"]], ids=["dimer", "A"])
+def test_comec_transmembrane_helices_count_as_crossing_and_stand_in_the_band(chains):
+    """Plan 26 (ruling R1): the band ran through the OB barrels and A18 judged 2 of the paper's 11 TM helices per
+    chain, the others stopping short of a face of the 30 Å slab (FACE_REACH). Counted by membrane.crosses, 10 of
+    chain A's 11 cross (A:328-339 spans 14 Å), in the dimer and with --chains A alike, 10 helices in each chain,
+    and A18 finds every one drawn across its band."""
+    from foldmap import membrane
+    from foldmap.figcheck import membrane_view
+    from foldmap.route import route_loops
+
+    lay, sses, bb = make_layout(KS32, membrane="auto", chains=chains)
+    m = lay.bilayer
+    d = m.depth(bb.ca)
+    view = membrane_view(lay, sses, bb, m, route_loops(lay, sses, bb))
+    drawn = sorted({l.chain for l in bb.labels})
+    for chain in drawn:  # B models no A:508-526 (TM11); its TM7, B:324-341, is 18 residues and crosses
+        tm = [
+            s.id
+            for s in sses
+            if s.chain == chain and s.kind == "H" and membrane.crosses(d[s.start : s.end + 1], m.half)
+        ]
+        assert len(tm) == 10, (chain, tm)
+    on, num = np.array([l.chain == "A" for l in bb.labels]), np.array([l.seq for l in bb.labels])
+    counted = [membrane.crosses(d[on & (num >= lo) & (num <= hi)], m.half) for lo, hi in COMEC_TMS]
+    assert sum(counted) == 10 and not counted[6], counted
+    assert view["tm_helices"] == 10 * len(drawn) and view["tm_short"] == [] and view["loops_in_slab"] == [], view

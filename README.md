@@ -292,7 +292,7 @@ files).
 | Only some chains | `--chains A,B` |
 | Draw like a reference | `--like 2HHB --like-chain B` (one chain of each; see below) |
 | Large assemblies | `--focus auto\|none\|protomer\|B` (one subunit plus what its neighbours add to its fold) |
-| Membrane | `--membrane auto` (OPM dummy atoms if present, otherwise estimated); `--membrane flip` puts the other side on top. When the layout leaves a transmembrane element off the band, the view is laid out again with every one at its projected height and the band drawn at the membrane's faces |
+| Membrane | `--membrane auto` (OPM dummy atoms if present, otherwise estimated on every protein chain, whatever `--chains` draws; the sides from the Lys/Arg on the loops of the elements crossing it); `--membrane flip` puts the other side on top. Transmembrane helices (crossing the mid-plane, spanning half the thickness) stand upright. When the layout leaves a transmembrane element off the band, the view is laid out again with every one at its projected height and the band drawn at the membrane's faces |
 | Conservation | `--theme conservation --msa family.fasta`, or `--msa consurf_grades.txt` for ConSurf's own grades |
 | Orientation | `--up X,Y,Z`, `--view X,Y,Z`, `--rotate DEG` |
 | Symmetry and assembly | `--symmetry auto\|off\|C3\|D2\|helical`, `--protomers "A,B;C,D"`, `--assembly auto\|asu\|ID` |
@@ -507,12 +507,12 @@ foldmap data --schema                                # the format, as a JSON Sch
 - `symmetry`: the symmetry found (group, protomers, CA RMSD, axis; twist and rise of a helical one), how the figure
   draws the copies, and the stoichiometry (protein chains as copies of one protein, e.g. `A2B2`);
 - `membrane` (with `--membrane`): two measures of an element crossing the membrane, each named for what it
-  measures: `spans_slab`, its CA run within 2 Å of both faces of the drawn slab (the rule A18 counts a transmembrane
-  helix by), and `crosses_midplane`, its CA run crosses the slab's centre plane and spans at least half its
-  thickness (the usual reading; for bacteriorhodopsin, 1C3W, under the estimated 30 Å slab: 5 by the first, 7 by
-  the second). Each element also has its CA depth range, the sides its first and last CA are on and its side
-  (`across`, else `out`, `in`, `slab`); then each chain's termini and the band on the page. `out` is the side the
-  membrane's normal points to (`sided`: whether the positive-inside rule settled it);
+  measures: `spans_slab`, its CA run within 2 Å of both faces of the drawn slab, and `crosses_midplane`, its CA run
+  crosses the slab's centre plane and spans at least half its thickness (the usual reading, and the rule the
+  membrane view draws and A18 counts a transmembrane element by; for bacteriorhodopsin, 1C3W, under the estimated
+  30 Å slab: 5 by the first, 7 by the second). Each element also has its CA depth range, the sides its first and
+  last CA are on and its side (`across`, else `out`, `in`, `slab`); then each chain's termini and the band on the
+  page. `out` is the side the membrane's normal points to (`sided`: whether the positive-inside rule settled it);
 - `ligands`: each ligand and metal ion (additives flagged), glycan and residue fused into the chain (GFP's
   chromophore), with the protein residues it touches (a heavy atom within 4.0 Å; a metal's O, N or S within 3.1 Å),
   the element each is in, those elements in sequence order, and the residues covalently joined to it (a heavy atom

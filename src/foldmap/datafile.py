@@ -435,16 +435,17 @@ def _side(depth: float, half: float) -> str:
 def _membrane(layout, sses, bb) -> dict | None:
     """The membrane the figure draws (--membrane): None without one. Two measures of an element crossing it, neither
     stated as more than it measures: `spans_slab`, its CA run within membrane.FACE_REACH (2 Å) of both faces of the
-    drawn slab (the rule A18 counts a transmembrane helix by: figcheck.membrane_view); `crosses_midplane`, its CA run
-    crosses the slab's centre plane and spans at least half the slab's thickness (the usual reading of a
-    transmembrane segment, lenient to a slab estimated too thick or tilted). Its side: "across" when it crosses the
-    mid-plane, else out, in or slab by its mean CA depth; `from` and `to`, the sides of its first and last CA. Sides
-    are named by the membrane's normal, which points out (the non-cytoplasmic side; `sided` says whether the
-    positive-inside rule settled which side that is)."""
+    drawn slab (A18's rule before plan 26); `crosses_midplane`, its CA run crosses the slab's centre plane and spans
+    at least half the slab's thickness (membrane.crosses: the usual reading of a transmembrane segment, lenient to a
+    slab estimated too thick or tilted, and the rule the membrane view and A18 count a transmembrane element by).
+    Its side: "across" when it crosses the mid-plane, else out, in or slab by its mean CA depth; `from` and `to`, the
+    sides of its first and last CA. Sides are named by the membrane's normal, which points out (the non-cytoplasmic
+    side; `sided` says whether the positive-inside rule settled which side that is)."""
     mem = getattr(layout, "bilayer", None)
     if mem is None:
         return None
     from .membrane import FACE_REACH
+    from .membrane import crosses as crossing
 
     depth = mem.depth(bb.ca)
 
@@ -455,8 +456,8 @@ def _membrane(layout, sses, bb) -> dict | None:
     for s in sses:
         seg = depth[s.start : s.end + 1]
         lo, hi = float(seg.min()), float(seg.max())
-        span = len(seg) >= 2 and lo <= -mem.half + FACE_REACH and hi >= mem.half - FACE_REACH  # A18's rule
-        cross = len(seg) >= 2 and lo < 0 < hi and hi - lo >= mem.half  # mid-plane crossed, half the thickness spanned
+        span = len(seg) >= 2 and lo <= -mem.half + FACE_REACH and hi >= mem.half - FACE_REACH
+        cross = crossing(seg, mem.half)  # mid-plane crossed, half the thickness spanned: the view's and A18's rule
         if span:
             spans.append(s.id)
         if cross:
@@ -1503,8 +1504,11 @@ def schema() -> dict:
         }
     )
     sides = ["out", "in", "slab"]
-    spans = "its CA run within 2 Å of both faces of the drawn slab (the rule A18 counts a transmembrane helix by)"
-    crosses = "its CA run crosses the slab's centre plane and spans at least half the slab's thickness"
+    spans = "its CA run within 2 Å of both faces of the drawn slab"
+    crosses = (
+        "its CA run crosses the slab's centre plane and spans at least half the slab's thickness (the rule the "
+        "membrane view and A18 count a transmembrane element by)"
+    )
     membrane = _obj(
         {
             "source": _t("string", "opm (dummy atoms in the file) or estimate"),

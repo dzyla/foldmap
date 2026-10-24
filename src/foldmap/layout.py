@@ -3881,16 +3881,44 @@ def _tm_ends(it: _Item, level: set[str], y: float) -> list[tuple[float, float]]:
     return out
 
 
+BAND_TOUCH = 1e-3  # page units: a drawn end this near a face or the middle reaches it (float and grid noise; 0.004 Å)
+
+
+def crosses_band(ends: tuple[float, float], band: tuple[float, float]) -> bool:
+    """Does a transmembrane element drawn from page y ends[0] to ends[1] cross the band (bottom, top) as A18 judges
+    it: entering it through a face and reaching past its middle (C27 ruling), each within BAND_TOUCH? Shared by
+    _to_face, the membrane view's own test (cli._off_band) and A18 (figcheck.membrane_view)."""
+    lo, hi = sorted(ends)
+    y0, y1 = band
+    mid = (y0 + y1) / 2
+    return lo < mid + BAND_TOUCH and mid - BAND_TOUCH < hi and (lo <= y0 + BAND_TOUCH or hi >= y1 - BAND_TOUCH)
+
+
 def _to_face(it: _Item, level: set[str], band: tuple[float, float], y: float) -> float:
     """The least move up or down that brings each transmembrane element of the item at height y drawn wholly
     between the faces (a tilted helix, drawn upright at its length, is shorter than the slab it crosses) to a face;
-    0 when none is."""
-    inside = [(y0, y1) for y0, y1 in _tm_ends(it, level, y) if band[0] < y0 and y1 < band[1]]
-    if not inside:
-        return 0.0
-    up = max(band[1] - y1 for _, y1 in inside)
-    down = min(band[0] - y0 for y0, _ in inside)
-    return up if up < -down else down
+    0 when none is. When that move leaves one of its transmembrane elements not crossing the band (crosses_band: a
+    bundle's other helix carried wholly inside, 6ZKT N:26-44; an 11-residue helix at a face short of the middle,
+    5LDW M:392-402), the least move that leaves every one crossing it, if any does."""
+    ends = _tm_ends(it, level, y)
+    inside = [(y0, y1) for y0, y1 in ends if band[0] < y0 and y1 < band[1]]
+    shift = 0.0
+    if inside:
+        up = max(band[1] - y1 for _, y1 in inside)
+        down = min(band[0] - y0 for y0, _ in inside)
+        shift = up if up < -down else down
+
+    def crossing(s: float) -> bool:
+        return all(crosses_band((y0 + s, y1 + s), band) for y0, y1 in ends)
+
+    if crossing(shift):
+        return shift
+    mid = (band[0] + band[1]) / 2
+    moves = {0.0, *(f - e for y0, y1 in ends for e in (y0, y1) for f in (band[0], band[1], mid))}
+    for s in sorted(moves, key=lambda s: (abs(s), s)):
+        if crossing(s):
+            return s
+    return shift
 
 
 def _text_scaled(build):
@@ -4319,6 +4347,7 @@ def build_layout(
     over: dict[str, int] | None = None,
     level: set[str] | None = None,
     band: tuple[float, float] | None = None,
+    upright: set[str] | None = None,
     alike_first: bool = True,
     let_go: bool = True,
     mirror_only: bool = False,
@@ -4343,7 +4372,10 @@ def build_layout(
     transmembrane elements of a membrane view, cli): the items holding them keep their projected height, so they
     cross the band where the membrane is; the rest moves round them (_separate). `band` (page y of the membrane's
     two faces as projected): a lone transmembrane helix drawn wholly between them (a tilted helix drawn upright at
-    its length is shorter than the slab it crosses) is moved, the least way, until one end meets a face.
+    its length is shorter than the slab it crosses) is moved, the least way, until one end meets a face. `upright`
+    (with `level`, in the default snapped angles): helices drawn up or down the page, a membrane view's
+    transmembrane helices standing across the band whatever their tilt (plan 26: 7VVK's TM1, R:181-211, tilted 52°,
+    was snapped flat across a face).
     `alike_first`: a copy's elements are grouped as its mate's (_regroup_copies) and the copies the symmetry ties may
     be drawn alike in up to _SEP_TIE_ROOM (_separate's second chance, _tied_again), random-100 C2b-3; cli turns it
     off in a membrane view, where the transmembrane helices' heights are judged instead (C17).
@@ -4372,7 +4404,8 @@ def build_layout(
         given = dict(attract=attract, contacts=contacts, nucleic=nucleic, style=style, bridges=bridges)
         given.update(domains=domains, partial=partial, rename=rename, swap=swap, move=move, keep_depth=keep_depth)
         given.update(na_cropped=na_cropped, template=template, copies=copies, relabel=relabel, names=names, over=over)
-        given.update(level=level, band=band, alike_first=alike_first, let_go=let_go, conventions=conventions)
+        given.update(level=level, band=band, upright=upright, alike_first=alike_first, let_go=let_go)
+        given.update(conventions=conventions)
         return _rosette(sses, sheets, frame, mode, given)
     style = style or Style()
     angle_mode = "upright" if mode == "stack" else style.helix_angle
@@ -4452,8 +4485,9 @@ def build_layout(
     lying = {m.sse.id for it in items for m in it.members if m.over}  # over a sheet: on_sheet less any crowded out
     grouped = bundled | in_rows | {s.id for g in kinked for s in g} | lying
     seen_as = seen_as or {}
+    across = {*(upright or ()), *(level or ())} if angle_mode == "snap" else set()  # standing across the band
     items += [
-        _helix_item(s, frame, angle_mode, helix_w, angle=seen_as.get(s.id))
+        _helix_item(s, frame, "upright" if s.id in across else angle_mode, helix_w, angle=seen_as.get(s.id))
         for s in sses
         if s.kind == "H" and s.id not in grouped
     ]

@@ -44,7 +44,7 @@ from .layout import (
     snap,
     template_rows,
 )
-from .membrane import FACE_REACH
+from .membrane import crosses
 from .model import AUTO_NT, crop_nucleic, homolog_chains, nucleic_of_chains, nucleic_touching, res_ref
 from .names import all_names, apply_names, check_spec
 from .nucleic import StemView, stem_views, straight_duplex
@@ -758,6 +758,7 @@ def make_layout(
             over=over,
             conventions=conventions,
             alike_first=mem is None,  # a membrane view is judged by its bands (C17), not its copies (A15)
+            upright=_transmembrane(sses, bb, mem) if mem is not None and mode == "projected" else None,
             **({"like": made.like} if made is not None and made.like is not None else {}),
         )
 
@@ -1102,14 +1103,14 @@ def _membrane_score(lay, sses, bb, mem) -> tuple[int, int, int]:
 
 
 def _transmembrane(sses, bb, mem) -> set[str]:
-    """The elements that cross the membrane (their CA run reaching both faces, as _face_medians counts them) and
-    define it (Membrane.defining): in a projected membrane view they keep their projected height (build_layout
-    `level`), so each crosses the band where the membrane is (random-100 C17)."""
+    """The elements that cross the membrane (membrane.crosses: their CA run crosses its mid-plane and spans half its
+    thickness, as _face_medians and A18 count them) and define it (Membrane.defining): in a projected membrane view
+    they keep their projected height (build_layout `level`), so each crosses the band where the membrane is
+    (random-100 C17)."""
     depth = mem.depth(bb.ca)
     out = set()
     for s in sses:
-        seg = depth[s.start : s.end + 1]
-        if len(seg) < 2 or seg.min() > -mem.half + FACE_REACH or seg.max() < mem.half - FACE_REACH:
+        if not crosses(depth[s.start : s.end + 1], mem.half):
             continue
         if mem.defining is not None and mem.defining.isdisjoint(range(s.start, s.end + 1)):
             continue
@@ -1129,31 +1130,35 @@ def _faces_on_page(frame, sses, bb, mem, tm: set[str]) -> tuple[float, float]:
     return float(snap(y_out)), float(snap(y_in))
 
 
-def _face_medians(lay, sses, bb, mem, reach: bool = False) -> tuple[float, float] | None:
-    """Where these elements pass the outer and the inner membrane face on the page (medians), if any is TM and
-    defines the membrane (Membrane.defining: a beta-barrel's strands, not a subunit lying in its lumen). When none
-    passes both faces, the TM elements that only reach a face (within membrane.FACE_REACH, as they are counted TM)
-    give it at their CA nearest it (`reach`: random-100 held-out 6MJ2, whose S1-S4 helices stop 1-2 Å short of the
-    inner face)."""
+def _face_medians(lay, sses, bb, mem) -> tuple[float, float] | None:
+    """Where these elements pass the outer and the inner membrane face on the page (medians), if any crosses the
+    membrane (membrane.crosses) and defines it (Membrane.defining: a beta-barrel's strands, not a subunit lying in its
+    lumen). An element passes a face where its CA run does; one whose run stops short of a face (32KS: TM helices of
+    15-19 residues in a 30 Å slab; 6MJ2's S1-S4, 1-2 Å short of the inner face) passes it where the run's straight
+    line through its depths would, carried on along the element as drawn."""
     depth = mem.depth(bb.ca)
     outs, ins = [], []
     for s in sses:
         p = lay.placed.get(s.id)
         seg = depth[s.start : s.end + 1]
-        if p is None or len(seg) < 2 or seg.min() > -mem.half + FACE_REACH or seg.max() < mem.half - FACE_REACH:
+        if p is None or not crosses(seg, mem.half):
             continue
         if mem.defining is not None and mem.defining.isdisjoint(range(s.start, s.end + 1)):
             continue
+        along = np.linspace(0.0, 1.0, len(seg))  # the line through its first and last turn (4 residues each)
+        t0, t1, d0, d1 = along[:4].mean(), along[-4:].mean(), seg[:4].mean(), seg[-4:].mean()
+        slope = (d1 - d0) / (t1 - t0) if t1 > t0 else 0.0
+        at0 = d0 - slope * t0
 
-        def page_y(face: float, seg=seg, p=p) -> float | None:
+        def page_y(face: float, seg=seg, p=p, slope=slope, at0=at0) -> float | None:
             k = np.flatnonzero(np.diff(np.sign(seg - face)) != 0)
-            if not k.size:
-                if not reach:
-                    return None
-                k = int(np.argmin(np.abs(seg - face)))  # the run's CA nearest the face it reaches
-                return float(p.n_port[1] + k / (len(seg) - 1) * (p.c_port[1] - p.n_port[1]))
-            k = int(k[0])
-            t = (k + (face - seg[k]) / (seg[k + 1] - seg[k])) / (len(seg) - 1)
+            if k.size:
+                k = int(k[0])
+                t = (k + (face - seg[k]) / (seg[k + 1] - seg[k])) / (len(seg) - 1)
+            elif abs(slope) > 1e-9:
+                t = (face - at0) / slope  # beyond the run's end: its line carried on
+            else:
+                return None
             return float(p.n_port[1] + t * (p.c_port[1] - p.n_port[1]))
 
         o, i = page_y(mem.half), page_y(-mem.half)
@@ -1161,7 +1166,7 @@ def _face_medians(lay, sses, bb, mem, reach: bool = False) -> tuple[float, float
             outs.append(o)
             ins.append(i)
     if not outs:
-        return None if reach else _face_medians(lay, sses, bb, mem, reach=True)
+        return None
     return float(np.median(outs)), float(np.median(ins))
 
 
