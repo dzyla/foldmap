@@ -44,7 +44,7 @@ from .layout import (
     snap,
     template_rows,
 )
-from .membrane import crosses
+from .membrane import SOLUBLE_BEYOND, crosses, lies_flat
 from .model import AUTO_NT, crop_nucleic, homolog_chains, nucleic_of_chains, nucleic_touching, res_ref
 from .names import all_names, apply_names, check_spec
 from .nucleic import StemView, stem_views, straight_duplex
@@ -758,9 +758,35 @@ def make_layout(
             over=over,
             conventions=conventions,
             alike_first=mem is None,  # a membrane view is judged by its bands (C17), not its copies (A15)
-            upright=_transmembrane(sses, bb, mem) if mem is not None and mode == "projected" else None,
+            **in_membrane(frame),
             **({"like": made.like} if made is not None and made.like is not None else {}),
         )
+
+    tm = _transmembrane(sses, bb, mem) if mem is not None and mode == "projected" else set()
+
+    def faces_of(frame):  # the membrane's two faces as projected through `frame` (None: no band to keep to)
+        return _faces_on_page(frame, sses, bb, mem, tm) if tm else None
+
+    def in_membrane(frame) -> dict:
+        """A projected membrane view (plan 26 Task 2): build_layout's membrane arguments through `frame`. Every
+        transmembrane element keeps its projected height across the band (`level`, `band`: the faces as projected),
+        standing upright; each other helix stands or lies by its tilt (membrane.lies_flat); a flat one at a face or
+        in the slab lies on that face (`on_face`), and a soluble element stays off the band on its own side
+        (`sides`), as _membrane_places reads them."""
+        if mem is None or mode != "projected":
+            return {}
+        faces = faces_of(frame)
+        flat, on_face, sides = _membrane_places(sses, bb, mem, tm, faces)
+        if faces is None:  # no band: no height to keep, only the helices turned
+            return {"upright": set(), "flat": flat}
+        return {
+            "upright": tm,
+            "flat": flat,
+            "level": tm,
+            "band": tuple(sorted(faces)),
+            "on_face": on_face,
+            "sides": sides,
+        }
 
     def finish(lay, frame, faces=None):  # what make_layout sets on a layout after build_layout through `frame`
         lay.helix_matched = {"cut": matched.get("cut", 0), "joined": matched.get("joined", 0)}
@@ -810,23 +836,12 @@ def make_layout(
         lay = lay_out(mirror_only=True) if mirror_only else lay_out()
         if lay is None:
             return None
-        lay = finish(lay, frame)
+        faces = faces_of(frame)  # a projected membrane view: the band is the faces as projected (C17, plan 26)
+        lay = finish(lay, frame, faces)
         if lay.let_go:  # copy items let go (layout._one_per_mate): kept only when the copies come out more alike (A15)
-            held = finish(lay_out(let_go=False), frame)
+            held = finish(lay_out(let_go=False), frame, faces)
             if _unalike(held, bb) <= _unalike(lay, bb):
                 lay, lay_out = held, functools.partial(lay_out, let_go=False)
-        if mem is not None and mode == "projected" and lay.membrane is not None:
-            from .figcheck import membrane_view
-
-            if membrane_view(lay, sses, bb, mem)["tm_short"]:  # a transmembrane helix drawn off its band: laid out
-                before = _membrane_score(lay, sses, bb, mem)  # again with every one at its projected height (C17)
-                level = _transmembrane(sses, bb, mem)
-                faces = _faces_on_page(frame, sses, bb, mem, level)
-                again = finish(lay_out(level=level, band=tuple(sorted(faces))), frame, faces)
-                after = _membrane_score(again, sses, bb, mem)
-                # kept only when it helps: fewer helices off the band, no more loops in the slab, no more fallbacks
-                if after[0] < before[0] and after[1] <= before[1] and after[2] <= before[2]:
-                    lay = again
         return lay
 
     def off_band(lay) -> int:  # transmembrane helices drawn off their band (A18; 0 off a membrane view)
@@ -1088,18 +1103,37 @@ def _membrane_band(lay, sses, bb, mem, faces=None) -> dict | None:
     }
 
 
-def _membrane_score(lay, sses, bb, mem) -> tuple[int, int, int]:
-    """A membrane view judged as A18 judges it (figcheck.membrane_view, on a routed copy of the layout): transmembrane
-    helices off their band, loops running in the slab, and route fallbacks; make_layout keeps a second layout only
-    when it does better (C17, fix round 1)."""
-    import copy
-
-    from .figcheck import membrane_view
-
-    trial = copy.deepcopy(lay)
-    loops = route_loops(trial, sses, bb)
-    view = membrane_view(trial, sses, bb, mem, loops)
-    return len(view["tm_short"]), len(view["loops_in_slab"]), sum(lp.fallback for lp in loops)
+def _membrane_places(sses, bb, mem, tm: set[str], faces) -> tuple[set[str], dict[str, int], dict[str, int]]:
+    """Where a projected membrane view draws each element that crosses no membrane (plan 26 Task 2 rulings), from its
+    CA run's depths: `flat`, the helices (and 3-10 helices) that lie along the membrane (membrane.lies_flat: tilted
+    FLAT_TILT or more from the normal); `on_face`, those of them whose CA centre lies in the slab or within
+    SOLUBLE_BEYOND beyond a face (amphipathic and interfacial helices: 32KS's NS1, A:200-219), each drawn lying on
+    the face its centre is nearer (+1 the face higher on the page, -1 the lower: faces = (outer, inner) page y), and
+    (0) every other element whose CA centre lies in the slab, kept at its projected height (32KS A:328-339); and
+    `sides`, every element whose CA centre lies more than SOLUBLE_BEYOND beyond a face (soluble, as A18 counts it:
+    ruling R4), kept off the band on that face's side (+1 above, -1 below). With no band (faces None) only `flat`
+    is read. Elements of `tm`, and any other crossing the membrane (a subunit in a barrel lumen), are none of these."""
+    depth = mem.depth(bb.ca)
+    up = 1 if faces is None or faces[0] >= faces[1] else -1  # the page side of the outside
+    flat, on_face, sides = set(), {}, {}
+    for s in sses:
+        seg = depth[s.start : s.end + 1]
+        if s.id in tm or crosses(seg, mem.half):
+            continue
+        centre = float(seg.mean())
+        side = up if centre >= 0 else -up
+        lying = s.kind in ("H", "G") and lies_flat(s.axis, mem.normal)
+        if lying:
+            flat.add(s.id)
+        if faces is None:
+            continue
+        if abs(centre) > mem.half + SOLUBLE_BEYOND:
+            sides[s.id] = side
+        elif lying:
+            on_face[s.id] = side
+        elif abs(centre) <= mem.half:
+            on_face[s.id] = 0
+    return flat, on_face, sides
 
 
 def _transmembrane(sses, bb, mem) -> set[str]:

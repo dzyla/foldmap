@@ -292,7 +292,7 @@ files).
 | Only some chains | `--chains A,B` |
 | Draw like a reference | `--like 2HHB --like-chain B` (one chain of each; see below) |
 | Large assemblies | `--focus auto\|none\|protomer\|B` (one subunit plus what its neighbours add to its fold) |
-| Membrane | `--membrane auto` (OPM dummy atoms if present, otherwise estimated on every protein chain, whatever `--chains` draws; the sides from the Lys/Arg on the loops of the elements crossing it); `--membrane flip` puts the other side on top. Transmembrane helices (crossing the mid-plane, spanning half the thickness) stand upright. When the layout leaves a transmembrane element off the band, the view is laid out again with every one at its projected height and the band drawn at the membrane's faces |
+| Membrane | `--membrane auto` (OPM dummy atoms if present, otherwise estimated on every protein chain, whatever `--chains` draws; the sides from the Lys/Arg on the loops of the elements crossing it); `--membrane flip` puts the other side on top. Transmembrane helices (crossing the mid-plane, spanning half the thickness) stand upright at their projected height, the band drawn at the membrane's faces; every other helix stands or lies by its tilt to the normal (flat from 45°). A flat helix in the slab or within 5 Å of a face lies on that face, other elements in the slab keep their projected height, and soluble elements (more than 5 Å beyond a face) are kept off the band on their own side |
 | Conservation | `--theme conservation --msa family.fasta`, or `--msa consurf_grades.txt` for ConSurf's own grades |
 | Orientation | `--up X,Y,Z`, `--view X,Y,Z`, `--rotate DEG` |
 | Symmetry and assembly | `--symmetry auto\|off\|C3\|D2\|helical`, `--protomers "A,B;C,D"`, `--assembly auto\|asu\|ID` |

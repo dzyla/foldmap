@@ -546,9 +546,9 @@ def test_stack_rows_get_a_band_only_from_the_elements_that_define_the_membrane()
 def test_every_transmembrane_helix_crosses_the_band_in_the_membrane_view():
     """1BL8 (random-100 C17, A18 on 6JLN and 5LDW): the projected membrane view placed KcsA's inner helices (86-112)
     by their loops and contacts, with half of each above the band it drew (0.49 of the band covered, no face
-    crossed past the middle). When a transmembrane element comes out off the band, the view is laid out again with
-    every transmembrane element at its projected height (moved to meet a face when drawn wholly inside the slab),
-    and the band is the membrane's faces as projected: each enters through a face and reaches past the middle."""
+    crossed past the middle). The view is laid out with every transmembrane element at its projected height (moved to
+    meet a face when drawn wholly inside the slab; plan 26 Task 2: from the first layout on), and the band is the
+    membrane's faces as projected: each enters through a face and reaches past the middle."""
     path = DATA / "1BL8.cif"
     lay, sses, bb = make_layout(path, membrane="auto")
     mem = find_membrane(path, bb)
@@ -591,26 +591,25 @@ def test_a_loop_runs_in_the_slab_only_beside_its_own_port():
     assert slab_runs([past], band, placed) == ["h>o"] and slab_runs([later], band, placed) == ["h>o"]
 
 
-def test_the_second_membrane_layout_is_kept_only_when_it_does_better(monkeypatch):
-    """C17 fix round 1: 6JLN's second layout put every TM helix on the band but added slab loops (1 -> 3); it is now
-    kept only when it has fewer helices off the band and no more slab loops or route fallbacks (cli._membrane_score,
-    on a routed copy). 1BL8 draws every TM helix on its band from the first layout since plan 26 (upright, `upright`),
-    so a helix off it is told here to bring the second about: doing better (4 -> 0, nothing added) it is kept; scored
-    worse, the first is kept."""
+def test_a_membrane_view_is_laid_out_once_at_its_projected_heights(monkeypatch):
+    """Plan 26 Task 2 (C17's second layout made the first): a projected membrane view is laid out once, every
+    transmembrane element at its projected height (`level`) against the faces as projected (`band`), and the band it
+    draws is those faces. Before, a first layout drew the band at the medians of wherever its helices fell and a second
+    at projected heights was kept only when A18 scored it better (7VVK R:332-345 was left short of the middle)."""
     import foldmap.cli as cli
-    from foldmap import figcheck
 
-    real = figcheck.membrane_view
-    monkeypatch.setattr(figcheck, "membrane_view", lambda *a, **k: {**real(*a, **k), "tm_short": ["told"]})
+    calls = []
+    real = cli.build_layout
+
+    def spy(*a, **k):
+        calls.append(k)
+        return real(*a, **k)
+
+    monkeypatch.setattr(cli, "build_layout", spy)
     path = DATA / "1BL8.cif"
-    laid = []
-    for scored in ([(4, 0, 0), (0, 0, 0)], [(4, 0, 0), (0, 1, 0)]):
-        scores = iter(scored)
-        monkeypatch.setattr(cli, "_membrane_score", lambda *a, scores=scores: next(scores))
-        laid.append(make_layout(path, membrane="auto")[0])
-        assert next(scores, None) is None
-    kept, first = laid
-    assert kept.membrane["y"] != first.membrane["y"]  # the faces as projected, against the medians of the first
+    lay, sses, bb = make_layout(path, membrane="auto")
+    assert len(calls) == 1 and calls[0]["level"] and calls[0]["level"] == calls[0]["upright"]
+    assert lay.membrane["y"] == calls[0]["band"]
 
 
 @pytest.mark.parametrize("entry", ["5LDW", "6JO6", "6JLN"])
@@ -955,3 +954,100 @@ def test_the_positive_inside_loops_stop_at_a_gap_in_the_numbering():
     loops = membrane._loops(m, bb, [_Element("H", 0, len(helix) - 1, "A")])
     n = len(helix)
     assert loops[n : n + 3].all() and not loops[n + 3 :].any()
+
+
+# ---------------------------------------------------- plan 26 Task 2: upright and flat helices, the band kept clear
+def _page():
+    """A frame whose page-up is the membrane normal (z), page x is x, and y points at the viewer."""
+    from foldmap.frame import Frame
+
+    return Frame(np.zeros(3), np.array([1.0, 0, 0]), np.array([0, 0, 1.0]), np.array([0, -1.0, 0]))
+
+
+def test_a_helix_lies_flat_by_its_tilt_to_the_normal_not_as_it_is_seen():
+    """membrane.lies_flat (FLAT_TILT, 45°): a helix tilted 44° from the normal stands, one tilted 46° lies. 32KS's
+    amphipathic NS1 (A:200-219, 71° from the normal) points into the page, so the snapped angle stood it upright;
+    build_layout `flat` lays it along the page, as its tilt says."""
+    from foldmap.layout import build_layout
+    from foldmap.membrane import FLAT_TILT, lies_flat
+    from helpers import fake_sse
+
+    normal = np.array([0.0, 0.0, 1.0])
+
+    def tilted(deg):  # an axis tilted `deg` from the normal, its sideways part into the page
+        return np.array([0.0, np.sin(np.radians(deg)), np.cos(np.radians(deg))])
+
+    assert FLAT_TILT == 45.0
+    assert not lies_flat(tilted(44.0), normal) and lies_flat(tilted(46.0), normal) and lies_flat(-tilted(71.0), normal)
+    s = fake_sse("H", 10, 30, centroid=(0, 0, 0), axis=tilted(71.0))
+    seen = build_layout([s], [], _page(), "projected").placed[s.id]
+    flat = build_layout([s], [], _page(), "projected", flat={s.id}).placed[s.id]
+    assert abs(np.sin(seen.angle)) == pytest.approx(1.0) and abs(np.sin(flat.angle)) < 1e-9
+
+
+def test_a_flat_helix_lies_on_its_face_and_a_slab_element_keeps_its_height():
+    """build_layout `on_face` with `band` (cli._membrane_places): a flat helix at a face, projected inside the band,
+    is drawn centred on that face (+1 the upper, -1 the lower); an element in the slab crossing no membrane (0) keeps
+    its projected height while a free element seen at the same place is moved off it."""
+    from foldmap.layout import build_layout
+    from helpers import fake_sse
+
+    band = (-3.45, 3.45)
+    upper = fake_sse("H", 0, 15, centroid=(0, 0, 10.0), axis=(1, 0, 0))
+    lower = fake_sse("H", 20, 35, centroid=(30, 0, -12.0), axis=(1, 0, 0))
+    slab = fake_sse("H", 40, 50, centroid=(60, 0, -4.0), axis=(0, 0, 1))
+    free = fake_sse("H", 60, 70, centroid=(60, 5, -4.0), axis=(0, 0, 1))
+    els = [upper, lower, slab, free]
+    lay = build_layout(
+        els,
+        [],
+        _page(),
+        "projected",
+        flat={upper.id, lower.id},
+        band=band,
+        on_face={upper.id: 1, lower.id: -1, slab.id: 0},
+    )
+    p = lay.placed
+    assert p[upper.id].cy == pytest.approx(band[1]) and p[lower.id].cy == pytest.approx(band[0])
+    assert abs(np.sin(p[upper.id].angle)) < 1e-9 and abs(np.sin(p[lower.id].angle)) < 1e-9
+    assert p[slab.id].cy == pytest.approx(-4.0 * 0.23)
+    a, b = p[slab.id].rect, p[free.id].rect
+    assert a[2] <= b[0] or b[2] <= a[0] or a[3] <= b[1] or b[3] <= a[1]  # the free one moved off the held one
+
+
+def test_a_soluble_element_is_kept_off_the_band_on_its_own_side():
+    """build_layout `sides` (ruling R4, plan 26 Task 2): two soluble helices projected into the band (7PIU's Gβ was
+    pulled there by its loops; 32KS chain B's OB sheet by its neighbours) are each kept off it on their own side, MARGIN
+    clear of the face (layout._membrane_walls); without `sides` they stay in the band."""
+    from foldmap.layout import MARGIN, build_layout
+    from helpers import fake_sse
+
+    band = (-3.45, 3.45)
+    up = fake_sse("H", 0, 12, centroid=(0, 0, 2.0), axis=(1, 0, 0))
+    down = fake_sse("H", 20, 32, centroid=(20, 0, -2.0), axis=(1, 0, 0))
+    plain = build_layout([up, down], [], _page(), "projected", band=band).placed
+    assert all(band[0] < plain[s.id].cy < band[1] for s in (up, down))
+    kept = build_layout([up, down], [], _page(), "projected", band=band, sides={up.id: 1, down.id: -1}).placed
+    assert kept[up.id].rect[1] >= band[1] + MARGIN - 1e-6
+    assert kept[down.id].rect[3] <= band[0] - MARGIN + 1e-6
+
+
+def test_an_untied_copy_item_moves_with_its_protomer():
+    """layout._untied_spread (32KS chain B's OB sheet, 22 Å off its depth): in an unrolled two-fold assembly the ties
+    set protomer 1's copies a spread right of their mates, wider than the frame's own period; an item of protomer 1 no
+    tie places (its own sheet where DSSP split its mate's) is moved by the same amount less the frame's offset, so it
+    starts beside its own protomer's elements; protomer 0's items and the tied ones stay where they are."""
+    from foldmap.frame import CylinderFrame
+    from foldmap.layout import SCALE, Placed, _Item, _untied_spread
+    from helpers import fake_sse
+
+    frame = CylinderFrame(np.zeros(3), np.array([0, 0, 1.0]), np.array([1.0, 0, 0]), 2, 10.0, {"A": 0, "B": 1})
+    items = []
+    for k, chain in enumerate("ABBA"):
+        s = fake_sse("H", 10 * k, 10 * k + 8, chain=chain)
+        items.append(_Item([Placed(s, 0, 0, 3.0, 0.0, 1.0)], [(0.0, 0.0)], float(k), 1.0, (float(k), 1.0), k, chain))
+    spread = 50.0
+    _untied_spread(items, {1: (0, 1)}, frame, spread)
+    shift = spread - 10.0 * np.pi * SCALE
+    assert [it.cx for it in items] == pytest.approx([0.0, 1.0, 2.0 + shift, 3.0])
+    assert items[2].home == pytest.approx((2.0 + shift, 1.0)) and all(it.cy == 1.0 for it in items)

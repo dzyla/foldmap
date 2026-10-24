@@ -291,6 +291,21 @@ def crosses(depth: np.ndarray, half: float) -> bool:
     return len(seg) >= 2 and float(seg.min()) < 0.0 < float(seg.max()) and float(seg.max() - seg.min()) >= half
 
 
+SOLUBLE_BEYOND = 5.0  # Å: an element whose CA centre lies this far beyond a face is soluble, not interfacial (R4)
+FLAT_TILT = (
+    45.0  # degrees: a helix crossing no membrane whose axis is tilted this far or more from the normal lies flat
+)
+
+
+def lies_flat(axis: np.ndarray, normal: np.ndarray) -> bool:
+    """Is a helix with this axis drawn lying along the membrane, not standing across it: tilted FLAT_TILT or more
+    from the normal (plan 26 Task 2 ruling: the nearer of upright and flat, by the angle in 3D, not as projected;
+    32KS's amphipathic NS1, A:200-219, tilted 71°, pointed into the page and was snapped upright)? The test is on
+    the axis' component along the normal, on the grid, so noise never decides it."""
+    along = abs(float(_snap(np.dot(_unit(np.asarray(axis, float)), normal))))
+    return along <= float(_snap(np.cos(np.radians(FLAT_TILT))))
+
+
 def _spans(long: list[SSE], z: np.ndarray, centre: float) -> bool:
     """Does a long element's CA run reach both faces of the HALF slab at `centre` (within FACE_REACH)? The estimate's
     own test (random-100 held-out 6MJ2), kept as it was measured when the view and A18 took `crosses` (plan 26): the

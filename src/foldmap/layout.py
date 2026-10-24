@@ -1184,7 +1184,8 @@ def _helix_item(
     angle: float | None = None,
 ) -> _Item:
     """Always true length. angle_mode: 'tilted' as seen in the view; 'snap' to the nearest of up, down, left,
-    right (the topology-diagram convention); 'upright' up or down like a strand (stack mode). `angle`: drawn so
+    right (the topology-diagram convention); 'upright' up or down like a strand (stack mode); 'flat' right or left
+    (a membrane view's helix lying along the membrane, build_layout `flat`). `angle`: drawn so
     instead (a reference's, Like.angle)."""
     au, av = frame.direction(sse.centroid, sse.axis)
     length = _true_length(sse, width, rise)  # true length even when tilted: equal pitch everywhere
@@ -1222,7 +1223,12 @@ _KINK_ROOM = 0.25  # one routing cell (route.RES): the corner loop's room on eac
 
 
 def _kink_item(
-    group: list[SSE], frame: Frame, angle_mode: str, width: float = HELIX_W, ref_angle: dict[str, float] | None = None
+    group: list[SSE],
+    frame: Frame,
+    angle_mode: str,
+    width: float = HELIX_W,
+    ref_angle: dict[str, float] | None = None,
+    turn: dict[str, str] | None = None,
 ) -> _Item:
     """The pieces of a kinked helix as one unit, end to end, so the corner reads as one helix turning (2HHB α's AB
     corner, which an element seen between the pieces kept five widths apart): each piece as _helix_item draws it
@@ -1230,9 +1236,10 @@ def _kink_item(
     it: a piece across the last starts just beyond its end and just off its axis, both legs a routing cell clear of
     the two bodies (_KINK_ROOM); a piece running on starts a little further along; a piece turned back runs beside
     the last, MARGIN apart, on the side it is seen. The unit sits at the mean of the pieces' projected places,
-    offsets on the grid. `ref_angle`: the pieces a reference draws at its angles (Like.angle)."""
-    ref_angle = ref_angle or {}
-    parts = [_helix_item(s, frame, angle_mode, width, angle=ref_angle.get(s.id)) for s in group]
+    offsets on the grid. `ref_angle`: the pieces a reference draws at its angles (Like.angle); `turn`: a piece's own
+    angle mode in place of `angle_mode` (a membrane view's, build_layout)."""
+    ref_angle, turn = ref_angle or {}, turn or {}
+    parts = [_helix_item(s, frame, turn.get(s.id, angle_mode), width, angle=ref_angle.get(s.id)) for s in group]
     members = [p.members[0] for p in parts]
     at = [np.zeros(2)]
     for k, (a, b) in enumerate(zip(members, members[1:])):
@@ -1268,6 +1275,10 @@ def _angle(seen: float, av: float, mode: str) -> float:
     up = float(_snap(av)) >= 0
     if mode == "upright":
         return np.pi / 2 if up else -np.pi / 2
+    if mode == "flat":  # along the page, right or left as seen (seen straight on: right; left as +pi or -pi as av)
+        if float(_snap(np.cos(seen))) >= 0:
+            return 0.0
+        return np.pi if up else -np.pi
     if mode == "snap":
         k = float(np.round(seen / (np.pi / 2)))
         if abs(k) == 2:  # left: +pi or -pi as av's side (on the grid)
@@ -3926,6 +3937,83 @@ def _to_face(it: _Item, level: set[str], band: tuple[float, float], y: float) ->
     return shift
 
 
+_WALL_REACH = (
+    1e3  # page units: a membrane wall's reach beyond its face, along and across the page (a figure is ~100 across)
+)
+
+
+def _membrane_walls(
+    items: list[_Item], sides: dict[str, int], band: tuple[float, float], kept: np.ndarray | None, walls: Walls | None
+) -> Walls | None:
+    """`walls` with two fixed boxes more, one per side of a membrane view's band (bottom, top page y): the band and
+    everything below it, which the items holding soluble elements of the upper side (`sides` +1) keep off, and the
+    band and everything above it, for those of the lower side (-1); MARGIN clear of the face, as of any fixed box
+    (_off_walls, _slide_clear, _attract's _fixed_overlap). An item keeping its height (`kept`), or holding soluble
+    elements of both sides, keeps off neither (plan 26 Task 2, ruling R4: no soluble element drawn in the slab)."""
+    hard = np.zeros((len(items), 2), bool)
+    for k, it in enumerate(items):
+        if kept is not None and kept[k]:
+            continue
+        on = {sides[m.sse.id] for m in it.members if isinstance(m, Placed) and not m.ghost and m.sse.id in sides}
+        if len(on) == 1:
+            hard[k, 0 if on.pop() > 0 else 1] = True
+    if not hard.any():
+        return walls
+    lo, hi = band
+    boxes = np.array(
+        [[-_WALL_REACH, lo - _WALL_REACH, _WALL_REACH, hi], [-_WALL_REACH, lo, _WALL_REACH, hi + _WALL_REACH]], float
+    )
+    if walls is None:
+        return Walls(boxes, hard)
+    band_rows = None if walls.band is None else np.vstack([walls.band, np.full((2, walls.band.shape[1]), np.nan)])
+    return Walls(
+        np.vstack([np.asarray(walls.boxes, float).reshape(-1, 4), boxes]), np.hstack([walls.hard, hard]), band_rows
+    )
+
+
+def _kept(items: list[_Item], level: set[str], on_face: dict[str, int] | None) -> np.ndarray | None:
+    """Which items keep their height (_separate's `level`), None if none: an item holding an element of `level` or of
+    `on_face` (in the slab at its own height, or a helix set on its face by _onto_faces)."""
+    on_face = on_face or {}
+    out = np.array(
+        [
+            any(getattr(m, "sse", None) is not None and (m.sse.id in level or m.sse.id in on_face) for m in it.members)
+            for it in items
+        ],
+        bool,
+    )
+    return out if out.any() else None
+
+
+def _onto_faces(items: list[_Item], on_face: dict[str, int], band: tuple[float, float]) -> None:
+    """Each item that is one element of `on_face` (id -> +1 the upper face, -1 the lower; 0, its own height) set on
+    that face: centred on it, its home there too (build_layout then keeps its height, as a transmembrane element's)."""
+    for it in items:
+        if len(it.members) != 1 or not isinstance(it.members[0], Placed) or it.members[0].ghost:
+            continue
+        side = on_face.get(it.members[0].sse.id)
+        if side:
+            y = float(_snap(band[1] if side > 0 else band[0]))
+            it.cy, it.home = y, (it.home[0], y)
+
+
+def _untied_spread(items: list[_Item], ties: dict[int, tuple[int, int]], frame, spread: float) -> None:
+    """In an unrolled assembly (a CylinderFrame) whose copies the ties set `spread` apart, each item of a copy
+    protomer p > 0 that no tie places (its own sheet where DSSP split its mate's) moved as its protomer was: by p
+    spreads less the frame's own offset of that protomer, so it starts, and is anchored, beside its own protomer's
+    elements, not a frame's period away from them."""
+    angles, radius = getattr(frame, "angles", None), getattr(frame, "radius", 0.0)
+    if not angles or not radius:
+        return
+    placed = set(ties) | {j for j, _ in ties.values()}
+    for k, p in enumerate(_protomers(items, frame, False)):
+        if k in placed or not p:
+            continue
+        dx = float(_snap(p * spread - radius * (angles[p] - angles[0]) * SCALE))
+        items[k].cx += dx
+        items[k].home = (items[k].home[0] + dx, items[k].home[1])
+
+
 def _text_scaled(build):
     """build_layout with _GLYPH_K set, while it runs, to the glyph_scale of the text its style draws (Style.font_scale):
     the glyph room of footprints and stem names follows the text size, as layout.glyph does where a layout is held."""
@@ -4353,6 +4441,9 @@ def build_layout(
     level: set[str] | None = None,
     band: tuple[float, float] | None = None,
     upright: set[str] | None = None,
+    flat: set[str] | None = None,
+    on_face: dict[str, int] | None = None,
+    sides: dict[str, int] | None = None,
     alike_first: bool = True,
     let_go: bool = True,
     mirror_only: bool = False,
@@ -4380,7 +4471,17 @@ def build_layout(
     its length is shorter than the slab it crosses) is moved, the least way, until one end meets a face. `upright`
     (with `level`, in the default snapped angles): helices drawn up or down the page, a membrane view's
     transmembrane helices standing across the band whatever their tilt (plan 26: 7VVK's TM1, R:181-211, tilted 52°,
-    was snapped flat across a face).
+    was snapped flat across a face). `flat` (likewise): helices drawn right or left, lying along the membrane (plan 26
+    Task 2: cli._membrane_places, by their tilt to its normal), also a kinked helix's pieces. `on_face` (with `band`;
+    element id -> +1 the upper face, -1 the lower, 0 its own height): a flat helix drawn alone lies on that face
+    (amphipathic and interfacial helices: 32KS NS1), an element in the slab crossing no membrane stays at its projected
+    height (32KS A:328-339, a 14 Å helix of the paper's eleven), each item holding one keeping that height as `level`
+    items keep theirs. `sides` (with `band`; element id -> +1 above, -1 below): the soluble elements of a membrane
+    view, each item holding any (and none of `level`, all on one side) kept off the band on its side, MARGIN clear
+    (_membrane_walls: a fixed box from its face across the band and on; random-100 A18 ruling R4, 7PIU's Gβ, 32KS
+    chain B's OB sheet). With `band`, an item of a copy protomer no symmetry tie places
+    moves with its protomer's spread (_untied_spread: 32KS chain B's OB sheet, left at the frame's period while its
+    tied neighbours moved a spread along, was dragged 22 Å down into the band by its loops).
     `alike_first`: a copy's elements are grouped as its mate's (_regroup_copies) and the copies the symmetry ties may
     be drawn alike in up to _SEP_TIE_ROOM (_separate's second chance, _tied_again), random-100 C2b-3; cli turns it
     off in a membrane view, where the transmembrane helices' heights are judged instead (C17).
@@ -4410,6 +4511,7 @@ def build_layout(
         given.update(domains=domains, partial=partial, rename=rename, swap=swap, move=move, keep_depth=keep_depth)
         given.update(na_cropped=na_cropped, template=template, copies=copies, relabel=relabel, names=names, over=over)
         given.update(level=level, band=band, upright=upright, alike_first=alike_first, let_go=let_go)
+        given.update(flat=flat, on_face=on_face, sides=sides)
         given.update(conventions=conventions)
         return _rosette(sses, sheets, frame, mode, given)
     style = style or Style()
@@ -4486,18 +4588,22 @@ def build_layout(
     ]
     helix_w = HELIX_W * style.helix_scale
     items += [_bundle_item([by_id[k] for k in g], frame, angle_mode, helix_w, seen_as) for g in bundles]
-    items += [_kink_item(g, frame, angle_mode, helix_w, seen_as) for g in kinked]
+    across = {*(upright or ()), *(level or ())} if angle_mode == "snap" else set()  # standing across the band
+    turn = {k: "flat" for k in (flat or ()) if k not in across} if angle_mode == "snap" else {}  # lying along it
+    turn.update({k: "upright" for k in across})
+    items += [_kink_item(g, frame, angle_mode, helix_w, seen_as, turn) for g in kinked]
     lying = {m.sse.id for it in items for m in it.members if m.over}  # over a sheet: on_sheet less any crowded out
     grouped = bundled | in_rows | {s.id for g in kinked for s in g} | lying
     seen_as = seen_as or {}
-    across = {*(upright or ()), *(level or ())} if angle_mode == "snap" else set()  # standing across the band
     items += [
-        _helix_item(s, frame, "upright" if s.id in across else angle_mode, helix_w, angle=seen_as.get(s.id))
+        _helix_item(s, frame, turn.get(s.id, angle_mode), helix_w, angle=seen_as.get(s.id))
         for s in sses
         if s.kind == "H" and s.id not in grouped
     ]
     items += [
-        _helix_item(s, frame, angle_mode, HELIX_W * ETA_W * style.helix_scale, TEN_RISE, angle=seen_as.get(s.id))
+        _helix_item(
+            s, frame, turn.get(s.id, angle_mode), HELIX_W * ETA_W * style.helix_scale, TEN_RISE, angle=seen_as.get(s.id)
+        )
         for s in sses
         if s.kind == "G"
     ]
@@ -4588,13 +4694,13 @@ def build_layout(
             for i, (j, k) in ties.items():
                 items[i].cx, items[i].cy = items[j].cx + k * spread, items[j].cy + k * lift
                 items[i].home = (items[j].home[0] + k * spread, items[j].home[1] + k * lift)
-        kept = (
-            np.array(
-                [any(getattr(m, "sse", None) is not None and m.sse.id in level for m in it.members) for it in items]
-            )
-            if level
-            else None
-        )
+            if band is not None:  # a membrane view: copy items no tie places move with their protomer
+                _untied_spread(items, ties, frame, spread)
+        if on_face and band is not None:  # flat helices at a face, drawn alone: lying on it
+            _onto_faces(items, on_face, band)
+        kept = _kept(items, set(level or ()), on_face if band is not None else None)
+        if sides and band is not None:  # soluble items kept off the band, each on its own side
+            walls = _membrane_walls(items, sides, band, kept, walls)
         heights = [it.home[1] for it in items]
         curved = False  # each bent duplex laid out as one curve (na_curve); with none curvable, exactly as pieces
         if style.na_bend == "curved" and pieces:
@@ -4636,7 +4742,7 @@ def build_layout(
             )
         if kept is not None and kept.any():  # transmembrane elements at their projected height, reaching a face
             for k in np.flatnonzero(kept).tolist():
-                shift = _to_face(items[k], level, band, heights[k]) if band is not None else 0.0
+                shift = _to_face(items[k], set(level or ()), band, heights[k]) if band is not None else 0.0
                 y = float(_snap(heights[k] + shift))
                 items[k].cy = y
                 items[k].home = (items[k].home[0], y)

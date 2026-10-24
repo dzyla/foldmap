@@ -21,7 +21,7 @@ from matplotlib.path import Path as MPath
 from matplotlib.transforms import Affine2D, Bbox
 
 from .layout import block_ghosts, crosses_band, joined_pieces, lying_over
-from .membrane import crosses
+from .membrane import SOLUBLE_BEYOND, crosses
 from .na_curve import _FAR, on_curves
 
 # Lines a text can be crossed by (render's gids, matched by prefix). A loop's casing (loopcase:) and a stub's edge
@@ -1771,9 +1771,6 @@ def accessories_named(layout) -> list[str]:
 # ------------------------------------------------------------------------------------------- membrane (A18)
 SLAB_MARGIN = 0.3  # page units: a loop's sideways run this far inside a band's faces is in the slab
 _RUN_MIN = 0.5  # page units: a shorter sideways step is no run along the slab
-
-
-SOLUBLE_BEYOND = 5.0  # Å: an element whose CA centre lies this far beyond a face is soluble, not interfacial (R4)
 
 
 def membrane_view(layout, sses, bb, mem, loops=None) -> dict:
