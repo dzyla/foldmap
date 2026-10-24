@@ -55,7 +55,7 @@ Each pair type has its own test:
   are left out. The diff reports CAC (cacodylate, a buffer) lost, because the figure's ligand rule does not count
   CAC as an additive. That is the figure's rule and was not changed here (concern 3 below).
 - **8U9T-7IT6 (heldout P3).** A19 rules this pair "not one protein": 50% identity over 113 residues, chains of 306
-  and 113 residues. The diff takes the structure route, draws the two chains independently and says why (TM 0.16).
+  and 113 residues. The diff takes the structure route, draws the two chains independently and says why (TM 0.17).
   Its "W1L lost" agrees with the sample. The pair is drawn and judged, but it is not a two-state pair.
 - **The other open/closed pairs reproduce the recorded RMSD to 1e-3 Å:** 3HQB-4P39 at 4.297 Å and 6M67-6LTO at
   8.376 Å. Both pages colour the moved part. On 6M67-6LTO the C-terminal helices move by up to 31 Å, and the 7
@@ -65,7 +65,8 @@ Each pair type has its own test:
 - **Partner chains are paired by place, not by id (2026-10-22).** The two files of a pair need not letter one
   complex alike. B's partner chains now take the id of A's chain in their place after the core fit (diff
   `partners`). Three rows of the table below changed with this; their other columns are unchanged:
-  - 1RM5-2HKI: interfaces 4 → 0 (2HKI's A3, A4 sit where 1RM5's B1, B2 do), interface_elements 6 → 2;
+  - 1RM5-2HKI: interfaces 4 → 0 (partners A2 → B1, A3 → A2, A4 → B2: 2HKI's A2, A3 and A4 sit where 1RM5's B1,
+    A2 and B2 do), interface_elements 6 → 2;
   - 6M67-6LTO: interfaces 4 → 0 (D and F sit where B and G do), interface_elements 0 → 5 (now compared);
   - 8OJZ-8QX1: interface_elements 12 → 2 (the assembly copies A2 and B1 are lettered the other way round).
 
@@ -99,10 +100,13 @@ moving.
 Residues counted as moved more than 3 Å fall from 452 to 168 on lactoferrin between 2·d0 and d0. At d0 the N1 domain
 and the C-lobe are dark and N2 is bright. At 2·d0 the whole chain is a mid-range blur.
 
-On the 15 random-100 pairs, d0 keeps the same core as 2·d0 on 13. The other two keep slightly fewer residues:
+On the 15 random-100 pairs, d0 keeps the same core as 2·d0 on 14. The other keeps slightly fewer residues:
 
-- 8U9T-7IT6: 25 → 22 residues, core RMSD 3.70 → 2.99 Å;
 - 2BBJ-2BBH: 133 → 126 residues, core RMSD 3.11 → 2.44 Å.
+
+(Before plan 24's aligner change, 28ab8e2, 8U9T-7IT6 also differed: 25 → 22 residues over 70 aligned pairs. Since
+that change its structure-route alignment has 77 pairs, and the core is 19 residues at both cuts. The 8U9T-7IT6
+rows and numbers in this report were re-measured at that later code, 2026-10-24.)
 
 **Ruling (commit 1571141, before these final numbers): the cut becomes d0.** Wherever the two cuts differ, d0 is
 closer to the published or constructed angle, and it is never worse.
@@ -128,7 +132,7 @@ asked to make.
 | 6FYF-6FY9 | random100 P5 | open/closed | sequence | pass | pass | - (-) | - (-) | elements 3, ligands 1, only_a 3, only_b 2, ss_changes 30 | CA RMSD 3.78 Å | no |
 | 3HQB-4P39 | random100-heldout P1 | open/closed | sequence | pass | pass | - (-) | - (-) | only_a 1, ss_changes 9 | CA RMSD 4.297 Å | yes |
 | 1C6A-244L | random100-heldout P2 | apo/holo | sequence | pass | pass | - (-) | - (-) | ligands 2 | a ligand gained | yes |
-| 8U9T-7IT6 | random100-heldout P3 | apo/holo | structure | pass | pass | - (-) | - (-) | elements 5, interfaces 1, ligands 1, only_a 19, only_b 6, pairing 2, ss_changes 175 | a ligand lost | yes |
+| 8U9T-7IT6 | random100-heldout P3 | apo/holo | structure | pass | pass | - (-) | - (-) | elements 3, interfaces 1, ligands 1, only_a 19, only_b 6, ss_changes 174 | a ligand lost | yes |
 | 3U3H-6QND | random100-heldout P4 | monomer/oligomer | sequence | pass | pass | - (-) | - (-) | elements 2, interfaces 3, ligand_elements 1, ligands 4, only_a 1, ss_changes 6 | an interface lost | yes |
 | 2BBJ-2BBH | random100-heldout P5 | monomer/oligomer | sequence | pass | pass | - (-) | - (-) | elements 5, interfaces 2, ligands 2, only_a 5, only_b 2, ss_changes 106 | an interface lost | yes |
 | 8OJZ-8QX1 | random100-third P1 | apo/holo | sequence | pass | pass | - (-) | - (-) | elements 14, interface_elements 2, ligands 1, only_a 3, only_b 2, ss_changes 71 | a ligand gained | yes |
@@ -167,9 +171,9 @@ asked to make.
 | 1C6A-244L | 2·d0 | 120 / 162 | 0.21 | 0.6 | 0 |  |  |  |
 | 1C6A-244L | 1·d0 | 120 / 162 | 0.21 | 0.6 | 0 |  |  |  |
 | 1C6A-244L | 0.5·d0 | 120 / 162 | 0.21 | 0.6 | 0 |  |  |  |
-| 8U9T-7IT6 | 2·d0 | 25 / 70 | 3.70 | 11.4 | 49 |  |  |  |
-| 8U9T-7IT6 | 1·d0 | 22 / 70 | 2.99 | 10.9 | 48 |  |  |  |
-| 8U9T-7IT6 | 0.5·d0 | 17 / 70 | 1.72 | 10.0 | 50 |  |  |  |
+| 8U9T-7IT6 | 2·d0 | 19 / 77 | 2.63 | 14.0 | 55 |  |  |  |
+| 8U9T-7IT6 | 1·d0 | 19 / 77 | 2.63 | 14.0 | 55 |  |  |  |
+| 8U9T-7IT6 | 0.5·d0 | 13 / 77 | 1.41 | 13.4 | 53 |  |  |  |
 | 3U3H-6QND | 2·d0 | 226 / 386 | 0.45 | 1.4 | 0 |  |  |  |
 | 3U3H-6QND | 1·d0 | 226 / 386 | 0.45 | 1.4 | 0 |  |  |  |
 | 3U3H-6QND | 0.5·d0 | 226 / 386 | 0.45 | 1.4 | 0 |  |  |  |

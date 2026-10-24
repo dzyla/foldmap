@@ -270,8 +270,9 @@ def test_a_table_read_over_a_limit_is_said_as_a_table_read(monkeypatch, tmp_path
         assert "draw this setting" not in ss[f"{kind}_error"]
         said[str(err)] = ss[f"{kind}_error"]
     assert said["time"] == (
-        f"Reading the table t.csv took longer than {lim.timeout:g} s, the limit of this app. Use a smaller table, or "
-        f"use it on your own computer: pip install foldmap, then foldmap plot STRUCTURE --{kind} t.csv -o figure.svg."
+        f"Reading the table t.csv took longer than {lim.timeout:g} s, the limit of this app. Use a smaller table, "
+        "draw part of the structure (Chains & assembly), or use it on your own computer: pip install foldmap, then "
+        f"foldmap plot STRUCTURE --{kind} t.csv -o figure.svg."
     )
     assert said["memory"].startswith(f"Reading the table t.csv needs more memory than this app allows ({lim.memory_mb}")
     assert said["KeyError: 'x'"].startswith("foldmap could not read the table t.csv (KeyError: 'x').")

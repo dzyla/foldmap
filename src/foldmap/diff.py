@@ -42,7 +42,7 @@ kept pairs repeat, at most align.ROUNDS fits, never fewer than 3 pairs.
 CORE_CUT is 1 (d0), not the 2·d0 first planned. On the two-state set (plan 13e-3, docs/validation/diff/report.md)
 d0 keeps the core in one domain where 2·d0 settles on a compromise between two domains that moved: lactoferrin's N2
 turns 54.5 degrees after the fit at d0 and 48.6 at 2·d0, against the published 54; a 45 degree hinge on 1UBQ splits
-0.0 / 45.0 at d0 and 7.7 / 41.1 at 2·d0. On 13 of the 15 random-100 pairs the core is the same at both cuts.
+0.0 / 45.0 at d0 and 7.7 / 41.1 at 2·d0. On 14 of the 15 random-100 pairs the core is the same at both cuts.
 
 Determinism (A12): distances are snapped to 1/align.GRID Å (align.pair_distances) before the core's cut, turns are
 rounded to 0.001 degree, every list is in a fixed order (A's residues and elements N to C, then B's; partners and ligand
@@ -406,8 +406,9 @@ UNPAIRED = " (in B)"  # after the id of B's chain in no A chain's place whose id
 
 def _chain_centres(side: Side) -> dict[str, tuple[str, int, np.ndarray]]:
     """Every polymer chain of the structure but the diffed one: chain -> (kind, residues, centre). Protein chains
-    ("ca") by their Cα (the whole structure's backbone); nucleic-acid chains ("atoms") by their nucleotides' atoms
-    in the model, as the interfaces table measures each (datafile.chain_interfaces)."""
+    ("ca") by their Cα (the whole structure's backbone); nucleic-acid chains ("atoms", as the interfaces table
+    measures them: datafile.chain_interfaces) by one atom of each nucleotide in the model, its C4' (else its first
+    atom), so a ribosome-sized chain costs one position per nucleotide."""
     import gemmi
 
     out: dict[str, tuple[str, int, np.ndarray]] = {}
@@ -427,7 +428,10 @@ def _chain_centres(side: Side) -> dict[str, tuple[str, int, np.ndarray]]:
         if polymer.check_polymer_type() in nucleic:
             got = atoms.setdefault(chain.name, [0, []])
             got[0] += len(polymer)
-            got[1] += [a.pos.tolist() for res in polymer for a in res]
+            for res in polymer:
+                one = res.find_atom("C4'", "*") or (res[0] if len(res) else None)
+                if one is not None:
+                    got[1].append(one.pos.tolist())
     for c, (n, xyz) in atoms.items():
         if xyz:
             out[c] = ("atoms", n, np.asarray(xyz, float).mean(axis=0))

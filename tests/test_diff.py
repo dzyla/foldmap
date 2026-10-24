@@ -200,6 +200,17 @@ def test_partners_are_paired_by_place_not_by_chain_id(tmp_path):
     assert "partner chains taken" not in diff_note(same, lay, lay, "2HHB.cif chain A", "2HHB.cif chain A", False, False)
 
 
+def test_nucleic_acid_partners_are_paired_by_place_too(tmp_path):
+    """1LMB's repressor chain 3 against a copy with its two DNA strands (1, 2) lettered the other way round: the
+    strands are paired by place (one atom per nucleotide), so no interface is lost or gained."""
+    lmb = DATA / "1LMB.cif"
+    swapped = _write(_renamed(gemmi.read_structure(str(lmb)), {"1": "2", "2": "1"}), tmp_path / "lmb.pdb")
+    d = diff_structures(lmb, "3", swapped, "3", assembly="asu")
+    assert d.contacts["interfaces"] == ()
+    strands = {b: a for b, a in d.partners.items() if b in ("1", "2")}
+    assert strands and all(a == {"1": "2", "2": "1"}[b] for b, a in strands.items())
+
+
 def test_a_partner_in_no_place_of_a_keeps_its_id_marked(tmp_path):
     """A lacks the chain in a partner's place (2HHB without chain B) and B's file letters that partner with an id
     A uses for another chain (B and C swapped): the partner is gained under its id marked "(in B)", not read as
@@ -488,7 +499,9 @@ def test_a_page_not_drawn_alike_names_bs_own_elements_and_why_no_outlines():
 
 def test_too_few_mates_to_carry_outlines_is_said():
     """13e-2 concern 3: B drawn alike but with fewer than criteria.LIKE_MIN_MATES mates drawn, no outline can be
-    carried across; the note names each structure's own elements and says why there are no outlines."""
+    carried across. diff_note on a hand-built Diff (a real pair drawn alike with so few mates is hard to find, so
+    the page's `carried` wiring is not exercised here): it names A's own elements and says why there are no
+    outlines (B's own are the like note's to name when B is drawn alike); with B not drawn alike it names both."""
     from types import SimpleNamespace
 
     from foldmap.compare import diff_note

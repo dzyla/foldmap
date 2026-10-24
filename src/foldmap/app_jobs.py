@@ -735,16 +735,15 @@ def table_message(err: Exception, name: str, limits: Limits, kind: str = "data")
     from . import app
 
     elsewhere = f"pip install foldmap, then foldmap plot STRUCTURE --{kind} {name} -o figure.svg"
+    # the job reads the structure too: either may be what is too large
+    ways = (
+        "Use a smaller table, draw part of the structure (Chains & assembly), or use it on your own computer: "
+        f"{elsewhere}."
+    )
     if isinstance(err, JobLimit) and err.kind == "time":
-        return (
-            f"Reading the table {name} took longer than {limits.timeout:g} s, the limit of this app. Use a smaller "
-            f"table, or use it on your own computer: {elsewhere}."
-        )
+        return f"Reading the table {name} took longer than {limits.timeout:g} s, the limit of this app. {ways}"
     if isinstance(err, JobLimit) and err.kind == "memory":
-        return (
-            f"Reading the table {name} needs more memory than this app allows ({limits.memory_mb} MB). Use a "
-            f"smaller table, or use it on your own computer: {elsewhere}."
-        )
+        return f"Reading the table {name} needs more memory than this app allows ({limits.memory_mb} MB). {ways}"
     if isinstance(err, JobLimit):
         return limit_message(name, err, limits)
     if isinstance(err, ValueError):
