@@ -284,7 +284,9 @@ def crosses(depth: np.ndarray, half: float) -> bool:
     (cli._transmembrane, _face_medians), A18 judges them by (figcheck.membrane_view), foldmap data reports
     (crosses_midplane) and the positive-inside rule takes their loops from (_loops). Plan 26: the rule before (the run
     within FACE_REACH of both faces) counted 2 of 32KS's 11 transmembrane helices per chain, their DSSP runs spanning
-    14-25 Å of a 30 Å slab; OPM's membranes are as thick around helices as short (6DQN, 6BO8, 6MJ2)."""
+    14-25 Å of a 30 Å slab; OPM's membranes are as thick around helices as short (6DQN, 6BO8, 6MJ2). The predicate is
+    shared, the sets it is put to are not: A18 judges helices only; the layout keeps to a barrel's strands
+    (Membrane.defining) besides."""
     seg = np.asarray(depth)
     return len(seg) >= 2 and float(seg.min()) < 0.0 < float(seg.max()) and float(seg.max() - seg.min()) >= half
 
@@ -321,18 +323,22 @@ def _membrane_like(long, z, slab, hyd, pol, chain) -> bool:
 
 
 def _loops(m: Membrane, bb: Backbone, sses: list[SSE]) -> np.ndarray:
-    """The residues (a mask) within _FLANK of either end of an element that crosses the membrane: its mid-plane
-    crossed, half its thickness spanned (as datafile reads a transmembrane segment), along the element's chain."""
+    """The residues (a mask) within _FLANK of either end of an element that crosses the membrane (membrane.crosses),
+    along the element's chain and up to the first gap in its numbering (an unmodelled stretch: the residues past it
+    are no part of this loop)."""
     d = m.depth(bb.ca)
     chain = [l.chain for l in bb.labels]
+    seq = [l.seq for l in bb.labels]
     out = np.zeros(len(bb), dtype=bool)
     for s in sses:
         if not crosses(d[s.start : s.end + 1], m.half):
             continue
-        for k in range(1, _FLANK + 1):
-            for j in (s.start - k, s.end + k):
-                if 0 <= j < len(bb) and chain[j] == s.chain:
-                    out[j] = True
+        for step, j in ((-1, s.start - 1), (1, s.end + 1)):
+            for _ in range(_FLANK):
+                if not (0 <= j < len(bb)) or chain[j] != s.chain or abs(seq[j] - seq[j - step]) > 1:
+                    break
+                out[j] = True
+                j += step
     return out
 
 

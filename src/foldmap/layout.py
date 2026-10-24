@@ -3881,25 +3881,29 @@ def _tm_ends(it: _Item, level: set[str], y: float) -> list[tuple[float, float]]:
     return out
 
 
-BAND_TOUCH = 1e-3  # page units: a drawn end this near a face or the middle reaches it (float and grid noise; 0.004 Å)
+BAND_TOUCH = 1e-9  # page units: a drawn end this near a face reaches it (float noise only: 6DQN's ports, ~4e-15 short)
+_PAST = 0.1  # page units: _to_face's own moves take an end this far past a face or the middle (0.4 Å at SCALE)
 
 
 def crosses_band(ends: tuple[float, float], band: tuple[float, float]) -> bool:
     """Does a transmembrane element drawn from page y ends[0] to ends[1] cross the band (bottom, top) as A18 judges
-    it: entering it through a face and reaching past its middle (C27 ruling), each within BAND_TOUCH? Shared by
-    _to_face, the membrane view's own test (cli._off_band) and A18 (figcheck.membrane_view)."""
+    it: entering it through a face (within BAND_TOUCH, float noise) and reaching past its middle, strictly (C27
+    ruling; ruling R3: an end on the middle is not past it)? Shared by _to_face, the membrane view's own test
+    (make_layout's off_band) and A18 (figcheck.membrane_view)."""
     lo, hi = sorted(ends)
     y0, y1 = band
     mid = (y0 + y1) / 2
-    return lo < mid + BAND_TOUCH and mid - BAND_TOUCH < hi and (lo <= y0 + BAND_TOUCH or hi >= y1 - BAND_TOUCH)
+    return lo < mid < hi and (lo <= y0 + BAND_TOUCH or hi >= y1 - BAND_TOUCH)
 
 
 def _to_face(it: _Item, level: set[str], band: tuple[float, float], y: float) -> float:
     """The least move up or down that brings each transmembrane element of the item at height y drawn wholly
     between the faces (a tilted helix, drawn upright at its length, is shorter than the slab it crosses) to a face;
     0 when none is. When that move leaves one of its transmembrane elements not crossing the band (crosses_band: a
-    bundle's other helix carried wholly inside, 6ZKT N:26-44; an 11-residue helix at a face short of the middle,
-    5LDW M:392-402), the least move that leaves every one crossing it, if any does."""
+    bundle's other helix carried wholly inside, 6ZKT N:26-44), the least move that takes ends _PAST a face or the
+    middle and leaves every one crossing it, if any does. An element no longer than half the band (an 11-residue
+    helix upright: 5LDW M:392-402) can reach a face or pass the middle, not both: it stays as the first move put it,
+    and A18 reports it (ruling R3)."""
     ends = _tm_ends(it, level, y)
     inside = [(y0, y1) for y0, y1 in ends if band[0] < y0 and y1 < band[1]]
     shift = 0.0
@@ -3914,7 +3918,8 @@ def _to_face(it: _Item, level: set[str], band: tuple[float, float], y: float) ->
     if crossing(shift):
         return shift
     mid = (band[0] + band[1]) / 2
-    moves = {0.0, *(f - e for y0, y1 in ends for e in (y0, y1) for f in (band[0], band[1], mid))}
+    targets = (band[0] - _PAST, band[1] + _PAST, mid - _PAST, mid + _PAST)
+    moves = {0.0, *(f - e for y0, y1 in ends for e in (y0, y1) for f in targets)}
     for s in sorted(moves, key=lambda s: (abs(s), s)):
         if crossing(s):
             return s

@@ -5,10 +5,10 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from foldmap import fetch
 from foldmap.cli import main, make_figure, make_layout
 from foldmap.io import load_backbone
 from foldmap.membrane import find_membrane
+from helpers import R100_CACHE
 
 DATA = Path(__file__).parent / "data"
 
@@ -631,7 +631,11 @@ def test_a_route_turning_out_of_a_port_at_or_in_the_slab_turns_at_the_port(entry
     path = r100_entry(entry)
     lay, sses, bb = make_layout(path, membrane="auto")
     view = membrane_view(lay, sses, bb, find_membrane(path, bb), route_loops(lay, sses, bb))
-    assert view["tm_helices"] >= 14 and view["tm_short"] == [] and view["loops_in_slab"] == [], view
+    # ruling R3: 5LDW M:392-402, an 11-residue helix half the band long, reaches a face but not past the middle; it
+    # is carried to Task 2 as an A18 fail, the only helix short here
+    short = [x.split()[0] for x in view["tm_short"]]
+    assert view["tm_helices"] >= 14 and short == (["M:392-402"] if entry == "5LDW" else []), view
+    assert view["loops_in_slab"] == [], view
 
 
 def test_a_users_move_never_pushes_a_transmembrane_helix_off_its_height():
@@ -782,7 +786,7 @@ def test_the_membrane_is_found_on_every_chain_whatever_chains_draws(monkeypatch)
     assert criteria.membrane_checks(d, path)["band"]
 
 
-KS32 = fetch.CACHE / "32KS.cif"  # the download cache as fetch reads it (read before conftest's _temp_cache)
+KS32 = R100_CACHE / "32KS.cif"  # the download cache (FOLDMAP_R100_CACHE overrides it), as the random-100 tests read it
 
 
 @pytest.mark.skipif(not KS32.is_file(), reason="32KS is not in the download cache")
@@ -835,3 +839,72 @@ def test_comec_transmembrane_helices_count_as_crossing_and_stand_in_the_band(cha
     counted = [membrane.crosses(d[on & (num >= lo) & (num <= hi)], m.half) for lo, hi in COMEC_TMS]
     assert sum(counted) == 10 and not counted[6], counted
     assert view["tm_helices"] == 10 * len(drawn) and view["tm_short"] == [] and view["loops_in_slab"] == [], view
+
+
+# ------------------------------------------------------- plan 26 fix round 1: the band test and _to_face, in CI
+def test_a_tm_helix_crosses_its_band_only_past_the_middle_and_from_a_face():
+    """C27 as ruling R3 reads it: an end on the middle is not past it (strict); a face is reached within
+    layout.BAND_TOUCH (1e-9, float noise: 6DQN's ports ~4e-15 short), no further."""
+    from foldmap.layout import BAND_TOUCH, crosses_band
+
+    band = (0.0, 10.0)
+    assert BAND_TOUCH == 1e-9
+    assert not crosses_band((5.0, 10.0), band)  # from the upper face to the middle exactly: not past it
+    assert crosses_band((5.0 - 1e-6, 10.0), band)
+    assert crosses_band((2.0, 10.0 - 1e-12), band) and not crosses_band((2.0, 10.0 - 1e-6), band)
+    assert crosses_band((1e-12, 6.0), band) and not crosses_band((1e-6, 6.0), band)
+    assert crosses_band((6.0, -1.0), band)  # either way up
+
+
+def _upright_item(ends):
+    """An item at height 0 holding upright transmembrane helices drawn from page y lo to hi, as layout._to_face reads
+    one: each member's id, angle, length and ghost flag, and its offset from the item's centre."""
+    from types import SimpleNamespace
+
+    members = [
+        SimpleNamespace(sse=SimpleNamespace(id=f"t{k}"), angle=np.pi / 2, length=hi - lo, ghost=False)
+        for k, (lo, hi) in enumerate(ends)
+    ]
+    return SimpleNamespace(members=members, offsets=[(0.0, (lo + hi) / 2) for lo, hi in ends])
+
+
+def test_to_face_leaves_every_tm_helix_of_an_item_crossing_the_band():
+    """6ZKT N:26-44 (plan 26): an item's first move brings the helix drawn wholly inside the band (2..8) down to the
+    lower face, and carries its partner (-3..7) to end on the middle, short of it. The least move that takes ends
+    layout._PAST beyond a face or the middle and leaves both crossing is taken instead: up 2.1, the inner helix past
+    the upper face."""
+    from foldmap.layout import _PAST, _to_face, crosses_band
+
+    band, ends = (0.0, 10.0), [(2.0, 8.0), (-3.0, 7.0)]
+    assert not crosses_band((-3.0 - 2.0, 7.0 - 2.0), band)  # the first move (down 2) leaves the partner short
+    it = _upright_item(ends)
+    shift = _to_face(it, {"t0", "t1"}, band, 0.0)
+    assert shift == pytest.approx(10.0 + _PAST - 8.0)
+    assert all(crosses_band((lo + shift, hi + shift), band) for lo, hi in ends)
+
+
+def test_to_face_cannot_make_a_helix_half_the_band_long_cross_it():
+    """5LDW M:392-402 (ruling R3): an 11-residue helix drawn upright is exactly half the band long, so it can reach a
+    face or pass the middle, never both; _to_face leaves it where the first move put it and A18 reports it short."""
+    from foldmap.layout import _to_face, crosses_band
+
+    band = (0.0, 10.0)
+    it = _upright_item([(6.0, 11.0)])
+    shift = _to_face(it, {"t0"}, band, 0.0)
+    assert shift == 0.0 and not crosses_band((6.0, 11.0), band)
+    assert not any(crosses_band((lo, lo + 5.0), band) for lo in np.round(np.arange(-6.0, 11.0, 0.01), 2))
+
+
+def test_upright_helices_stand_up_the_page_whatever_their_tilt():
+    """build_layout `upright` (a membrane view's transmembrane helices, cli): a helix seen nearly across the page
+    (7VVK's TM1, tilted 52°, was snapped flat across the outer face) is drawn up or down the page; without it, the
+    default snapped angle lays it across."""
+    from foldmap.frame import Frame
+    from foldmap.layout import build_layout
+    from helpers import fake_sse
+
+    f = Frame(np.zeros(3), np.array([1.0, 0, 0]), np.array([0, 1.0, 0]), np.array([0, 0, 1.0]))
+    s = fake_sse("H", 10, 30, centroid=(0, 0, 0), axis=(1.0, 0.6, 0.0))
+    across = build_layout([s], [], f, "projected").placed[s.id]
+    up = build_layout([s], [], f, "projected", upright={s.id}).placed[s.id]
+    assert abs(np.sin(across.angle)) < 1e-9 and abs(np.sin(up.angle)) == pytest.approx(1.0)

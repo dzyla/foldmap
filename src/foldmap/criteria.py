@@ -73,7 +73,7 @@ CRITERIA = {
     "A15": "copies drawn alike",
     "A16": "domains: one chain, alike, not tiny, panels apart, names clear",
     "A17": "nucleic-acid metrics and stem names by their letters",
-    "A18": "membrane: TM helices in the band, loops out of the slab",
+    "A18": "membrane: TM helices in the band, loops and soluble elements out of the slab",
     "A19": "two states: same names in the same order",
     "A20": "ligand tethers local",
 }
@@ -121,17 +121,19 @@ def tether_lengths(drawn, look) -> list[tuple[str, float, str, str]]:
 
 def membrane_checks(drawn, path) -> dict:
     """A18 on a --membrane auto figure (figcheck.membrane_view, the same test the membrane view lays itself out by):
-    each TM helix (its CA run reaches both membrane faces) enters its band through a face and reaches past its middle
-    (C27 ruling); loops run sideways inside a band (figcheck.SLAB_MARGIN from its faces) only on the first segment
-    out of their own port inside it, up to clearing its element (membrane slab ruling). The membrane is the one the
-    figure was drawn with (Layout.bilayer: found on every protein chain, whatever --chains draws)."""
+    each TM helix (its CA run crosses the membrane's mid-plane and spans half its thickness, membrane.crosses) enters
+    its band through a face and reaches past its middle (C27 ruling); loops run sideways inside a band
+    (figcheck.SLAB_MARGIN from its faces) only on the first segment out of their own port inside it, up to clearing
+    its element (membrane slab ruling); no soluble element is drawn in the slab (ruling R4). The membrane is the one
+    the figure was drawn with (Layout.bilayer: found on every protein chain, whatever --chains draws); a figure with
+    no band is judged as such, never by a membrane found again on the chains it draws."""
     from . import figcheck
-    from .membrane import find_membrane
 
     lay, bb = drawn.layout, drawn.bb
-    mem = getattr(lay, "bilayer", None) or find_membrane(path, bb)
+    mem = getattr(lay, "bilayer", None)
     if lay.membrane is None or mem is None:
-        return {"band": lay.membrane is not None, "tm_helices": 0, "tm_short": [], "loops_in_slab": []}
+        none = {"tm_helices": 0, "tm_short": [], "loops_in_slab": [], "soluble_in_slab": []}
+        return {"band": False, **none}
     return {"band": True, **figcheck.membrane_view(lay, drawn.sses, bb, mem, drawn.loops)}
 
 
@@ -429,6 +431,7 @@ def figure_criteria(views: dict[str, dict]) -> dict:
         else:
             bad = ([] if m["band"] else ["no band drawn"]) + [f"TM helix {x}" for x in m["tm_short"]]
             bad += [f"loop in the slab {x}" for x in m["loops_in_slab"]]
+            bad += [f"soluble element in the slab {x}" for x in m.get("soluble_in_slab", [])]
             out["A18"] = _ok(not bad, "; ".join(bad))
     if "default" in views and d:
         # only a tether to another chain is bounded (ruling); a long one to the home chain is reported

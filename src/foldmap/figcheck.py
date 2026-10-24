@@ -20,8 +20,7 @@ import numpy as np
 from matplotlib.path import Path as MPath
 from matplotlib.transforms import Affine2D, Bbox
 
-from .layout import block_ghosts, joined_pieces, lying_over
-from .layout import crosses_band as _crosses_band
+from .layout import block_ghosts, crosses_band, joined_pieces, lying_over
 from .membrane import crosses
 from .na_curve import _FAR, on_curves
 
@@ -1774,25 +1773,30 @@ SLAB_MARGIN = 0.3  # page units: a loop's sideways run this far inside a band's 
 _RUN_MIN = 0.5  # page units: a shorter sideways step is no run along the slab
 
 
-def crosses_band(ends: tuple[float, float], band: tuple[float, float]) -> bool:
-    """layout.crosses_band: A18's test of one transmembrane element as drawn, shared with the layout that places it
-    (layout._to_face), the membrane view's own test (cli._off_band) and the campaign's (random100.membrane_checks)."""
-    return _crosses_band(ends, band)
+SOLUBLE_BEYOND = 5.0  # Å: an element whose CA centre lies this far beyond a face is soluble, not interfacial (R4)
 
 
 def membrane_view(layout, sses, bb, mem, loops=None) -> dict:
     """A18 on a membrane view (layout.membrane, the membrane `mem` it was drawn for): tm_helices, the helices that
     cross the membrane (membrane.crosses: the CA run crosses its mid-plane and spans half its thickness); tm_short,
     those that do not cross their band (crosses_band), with the share of the band they cover; loops_in_slab,
-    slab_runs of `loops` (None: not measured)."""
+    slab_runs of `loops` (None: not measured); soluble_in_slab, the elements (any kind, crossing none) whose CA centre
+    lies more than SOLUBLE_BEYOND beyond a face but whose drawn centre lies inside a band, each with that depth
+    (ruling R4: a soluble element drawn in the slab; interfacial ones, within SOLUBLE_BEYOND of a face, are not)."""
     bands = layout.membrane.get("bands") or [layout.membrane["y"]]
     depth = mem.depth(bb.ca)
-    short, tm = [], 0
+    short, tm, soluble = [], 0, []
     for s in sses:
         p = layout.placed.get(s.id)
-        if p is None or s.kind != "H":
+        if p is None:
             continue
-        if not crosses(depth[s.start : s.end + 1], mem.half):
+        seg = depth[s.start : s.end + 1]
+        if not crosses(seg, mem.half):
+            centre = float(seg.mean())
+            if abs(centre) > mem.half + SOLUBLE_BEYOND and any(lo < p.cy < hi for lo, hi in bands):
+                soluble.append(f"{s.id} {centre:+.0f}")
+            continue
+        if s.kind != "H":
             continue
         tm += 1
         lo, hi = sorted((p.n_port[1], p.c_port[1]))
@@ -1800,7 +1804,7 @@ def membrane_view(layout, sses, bb, mem, loops=None) -> dict:
         if not crosses_band((lo, hi), (y0, y1)):
             short.append(f"{s.id} {(min(hi, y1) - max(lo, y0)) / max(y1 - y0, 1e-9):.2f}")
     slab = None if loops is None else slab_runs(loops, bands, layout.placed)
-    return {"tm_helices": tm, "tm_short": short, "loops_in_slab": slab}
+    return {"tm_helices": tm, "tm_short": short, "loops_in_slab": slab, "soluble_in_slab": soluble}
 
 
 def slab_runs(loops, bands, placed, margin: float = SLAB_MARGIN) -> list[str]:
