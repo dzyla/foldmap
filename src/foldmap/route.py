@@ -225,6 +225,200 @@ class _Grid:
         return None
 
 
+_LANE = _INFLATE + 2 * RES  # page units beside a band element (past its clearance) a loop may cross the slab in (P34)
+
+
+@dataclass
+class _Wall:
+    """Plan 27 Task 5 (the author: nothing that is not in the bilayer is drawn in the band; rulings P33-P35): the slab
+    as a wall, not a cost, for one loop of a membrane view. Its bound is membrane.loop_side_bound, the rule A18's
+    loop_in_band judges it by: no cell nearer the mid-plane, on the loop's own `side`, than `bound` (Å) is open to it
+    (the page read as depth by membrane.page_depth, against the band nearest each row), but
+    - the stub out of a band element's port it leaves or enters, when that port points to its side (`stub_a`,
+      `stub_b`): the port's own column, out to the bound (a loop leaving a TM end runs to its own face first);
+    - the lanes beside an end it cannot reach otherwise (`lanes`, page boxes): an end whose port is drawn nearer the
+      mid-plane than the bound and points away from the loop's side (a transmembrane helix stretched to the far face,
+      a helix of the slab ending deeper than the loop's residues): the loop climbs beside its element to its bound.
+      A18 still flags such a loop (`short` names its ends); the layout, not the route, put the port there.
+    A loop whose bound lies past the far face (`cross`: its residues reach both faces, ruling P34) has the slab closed
+    to it as well, but in the lanes beside its band elements (their port columns, across the band) and past the band's
+    ends (`ends`: x beyond every band element's clearance): it crosses there, never mid-band. The router validates each
+    drawing it takes by `clear` (membrane.loop_excess, A18's own measure)."""
+
+    side: int
+    bound: float
+    bands: list
+    half: float
+    up: int
+    stub_a: bool
+    stub_b: bool
+    cross: bool = False
+    ends: tuple[float, float] = (-math.inf, math.inf)
+    lanes: list = None  # (x0, y0, x1, y1) page boxes
+    short: tuple = ()  # the ends ("a", "b") the loop reaches only by a lane
+
+    def depth_rows(self, ys: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+        """Each page y's depth on the loop's side (Å) and BAND_EPS in Å, by the band nearest it (membrane.nearest_band,
+        page_depth and band_eps, for every row at once)."""
+        from .membrane import BAND_EPS
+
+        b = np.asarray(self.bands, float).reshape(-1, 2)
+        k = np.argmin(np.abs((b[:, 0] + b[:, 1])[None, :] / 2 - np.asarray(ys, float)[:, None]), axis=1)
+        b0, b1 = b[k, 0], b[k, 1]
+        scale = 2 * self.half / np.maximum(b1 - b0, 1e-9)
+        return self.side * self.up * (ys - (b0 + b1) / 2) * scale, BAND_EPS * scale
+
+    def eps(self, y: float) -> float:
+        from .membrane import band_eps, nearest_band
+
+        return band_eps(nearest_band(self.bands, y), self.half)
+
+    def page_y(self, depth: float, near_y: float) -> float:
+        """The page y standing for `depth` (Å on the loop's side) by the band nearest page y `near_y`."""
+        from .membrane import nearest_band
+
+        b0, b1 = nearest_band(self.bands, near_y)
+        return (b0 + b1) / 2 + self.side * self.up * depth * (b1 - b0) / (2 * self.half)
+
+    def mask(self, grid: "_Grid", ends=()) -> np.ndarray:
+        """The cells closed to the loop on `grid`: the rows nearer the mid-plane than its bound and, for a crossing
+        loop, the slab's rows away from its lanes and the band's ends; its lanes open, and the stubs of `ends`
+        ((start cell, its stub allowed) for each end: the cell's column out to the bound)."""
+        d, eps = self.depth_rows(grid.ys)
+        rows = d < self.bound - eps
+        m = np.broadcast_to(rows[None, :], (grid.nx, grid.ny)).copy()
+        across = None
+        if self.cross:
+            slab = np.abs(d) < self.half - eps
+            across = np.outer((grid.xs > self.ends[0]) & (grid.xs < self.ends[1]), slab)
+            m |= across
+        for x0, y0, x1, y1 in self.lanes or ():
+            m &= ~np.outer((grid.xs >= x0) & (grid.xs <= x1), (grid.ys >= y0) & (grid.ys <= y1))
+        toward = self.side * self.up  # page direction of the loop's side
+        for start, stub, clear_port in ends:
+            if start is None:
+                continue
+            i, j = start
+            if stub:
+                while 0 <= j < grid.ny and m[i, j]:  # its own column, out to the first open row
+                    m[i, j] = False
+                    j += toward
+                continue
+            while clear_port and 0 <= j < grid.ny and rows[j]:
+                # a port just clear of the wall, pointing into it: the rows from its first cell back to it, its turn
+                # drawn back between the port and the wall (_pull_turns, room) when the drawing keeps to the wall
+                m[:, j] = across[:, j] if across is not None else False
+                j += toward
+        return m
+
+    def reaches(self, port) -> bool:
+        """Does a port lie on the loop's side of its bound (or on it)?"""
+        from .membrane import nearest_band, page_depth
+
+        y = float(port[1])
+        return self.side * page_depth(y, nearest_band(self.bands, y), self.half, self.up) >= self.bound - self.eps(y)
+
+    def room(self, port, out) -> float:
+        """How far out of a port along its exit `out` its route's first turn is drawn: its clearance, _INFLATE, or
+        half way to the wall when that is nearer (a port pointing into the wall just clear of it)."""
+        if abs(out[0]) > 1e-9 or out[1] * self.side * self.up >= 0 or not self.reaches(port):
+            return _INFLATE
+        gap = abs(self.page_y(self.bound, float(port[1])) - float(port[1]))
+        return min(_INFLATE, gap / 2)
+
+    def in_lane(self, p, q) -> bool:
+        return any(
+            x0 - 1e-9 <= min(p[0], q[0])
+            and max(p[0], q[0]) <= x1 + 1e-9
+            and y0 - 1e-9 <= min(p[1], q[1])
+            and max(p[1], q[1]) <= y1 + 1e-9
+            for x0, y0, x1, y1 in self.lanes or ()
+        )
+
+    def _pieces(self, p, q) -> list:
+        """Segment p-q cut where it crosses a lane's edge or a band's face: pieces each wholly in or out of each."""
+        cuts = {0.0, 1.0}
+        xs = [v for x0, _, x1, _ in self.lanes or () for v in (x0, x1)]
+        ys = [v for _, y0, _, y1 in self.lanes or () for v in (y0, y1)] + [v for b in self.bands for v in b]
+        for k, vals in ((0, xs), (1, ys)):
+            dk = q[k] - p[k]
+            if abs(dk) > 1e-12:
+                cuts |= {t for t in ((v - p[k]) / dk for v in vals) if 0.0 < t < 1.0}
+        ts = sorted(cuts)
+        at = lambda t: (p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t)  # noqa: E731
+        return [(at(s), at(t)) for s, t in zip(ts, ts[1:])]
+
+    def clear(self, pts) -> bool:
+        """Does a drawing keep to the wall: A18's measure (membrane.loop_excess) finds nothing but in the loop's lanes
+        (none: exactly A18's reading); and a crossing loop runs inside the slab only in a lane or past the band's
+        ends?"""
+        from .membrane import BAND_EPS, loop_excess, nearest_band, stub_segments
+
+        pts = [(float(x), float(y)) for x, y in pts]
+        args = (self.side, self.bound, self.bands, self.half, self.up)
+        if not self.lanes and not self.cross:
+            return loop_excess(pts, *args, self.stub_a, self.stub_b) is None
+        first, last = 0, len(pts) - 1
+        if self.stub_a:
+            first = stub_segments(pts, self.side * self.up)
+        if self.stub_b:
+            last = len(pts) - 1 - stub_segments(pts[::-1], self.side * self.up)
+        for seg in zip(pts[first:last], pts[first + 1 : last + 1]):
+            for p, q in self._pieces(*seg):
+                if self.in_lane(p, q):
+                    continue
+                if loop_excess([p, q], *args, False, False) is not None:
+                    return False
+                b0, b1 = nearest_band(self.bands, (p[1] + q[1]) / 2)
+                in_slab = max(p[1], q[1]) > b0 + BAND_EPS and min(p[1], q[1]) < b1 - BAND_EPS
+                past_ends = max(p[0], q[0]) <= self.ends[0] or min(p[0], q[0]) >= self.ends[1]
+                if self.cross and in_slab and not past_ends:
+                    return False
+        return True
+
+
+def _walls(layout: Layout, sses: list[SSE], bb, pairs) -> dict:
+    """Plan 27 Task 5: each loop's wall (_Wall) in a membrane view (layout.membrane, drawn for layout.bilayer); {} in
+    any other view, whose routing the wall leaves exactly as it was."""
+    mem = getattr(layout, "bilayer", None)
+    if not layout.membrane or mem is None or getattr(bb, "ca", None) is None:
+        return {}
+    from .membrane import band_set, loop_side_bound, nearest_band, page_depth
+
+    depth = mem.depth(bb.ca)
+    band = band_set(sses, depth, mem)
+    bands = list(layout.membrane.get("bands") or [layout.membrane["y"]])
+    up = 1 if layout.membrane.get("inside", "below") == "below" else -1
+    rects = [layout.placed[k].rect for k in sorted(band) if k in layout.placed]
+    ends = (min(r[0] for r in rects) - _INFLATE, max(r[2] for r in rects) + _INFLATE) if rects else (0.0, 0.0)
+    out = {}
+    for a, b in pairs:
+        side, bound = loop_side_bound(a, b, depth, mem)
+        wall = _Wall(side, bound, bands, mem.half, up, a.id in band, b.id in band, bound <= -mem.half, ends, [])
+        short = []
+        for name, p, port, out_vec, banded in (
+            ("a", layout.placed[a.id], layout.placed[a.id].c_port, layout.placed[a.id].exit_c, a.id in band),
+            ("b", layout.placed[b.id], layout.placed[b.id].n_port, layout.placed[b.id].exit_n, b.id in band),
+        ):
+            near = nearest_band(bands, float(port[1]))
+            at = side * page_depth(float(port[1]), near, mem.half, up)
+            if wall.cross and banded:  # its port column across the band (P34)
+                x0, _, x1, _ = p.rect
+                wall.lanes.append((x0 - _LANE, near[0], x1 + _LANE, near[1]))
+            stub = banded and abs(out_vec[0]) < 1e-6 and out_vec[1] * side * up > 0
+            if at >= bound - wall.eps(float(port[1])) or stub:
+                continue
+            # an end it cannot reach but from the port's own depth: a lane beside its element, out to the bound
+            x0, y0, x1, y1 = p.rect
+            yb = wall.page_y(bound, float(port[1]))
+            back = float(port[1]) - side * up * (_PUSH[-1] + _INFLATE)
+            wall.lanes.append((x0 - _LANE, min(back, yb), x1 + _LANE, max(back, yb)))
+            short.append(name)
+        wall.short = tuple(short)
+        out[(a.id, b.id)] = wall
+    return out
+
+
 def clip_len(p, q, rect) -> float:
     """Length of the part of segment p-q strictly inside rect (Liang-Barsky clipping); 0.0 when it misses
     or only touches the edge."""
@@ -461,12 +655,14 @@ def _route_ports(
     max_nodes: int = _MAX_NODES,
     wide: "_Router | None" = None,
     spent: list | None = None,
+    wall: _Wall | None = None,
 ):
     """Grid cells of the cheapest orthogonal route from port pa (leaving along ea) to port pb (entered against
     eb), or None; own_a and own_b (anything with a rect) are what the ports belong to. `loose`: see
     _Grid.free_cell_along; a pair (for pa, for pb) or one value for both. A search that finds no route within
     max_nodes is run again (_Router.second) when `wide` (the router) allows: free cells join its two ends, and the
-    page's budget is not spent. `spent` (a one-item list): the first search's nodes are added to it."""
+    page's budget is not spent. `spent` (a one-item list): the first search's nodes are added to it. `wall` (a loop of a
+    membrane view): its closed cells (_Wall.mask) are obstacles to the search, its two end cells and stubs apart."""
     la, lb = loose if isinstance(loose, tuple) else (loose, loose)
     start = grid.free_cell_along(pa, ea, own_a, la)
     goal = grid.free_cell_along(pb, eb, own_b, lb)
@@ -475,25 +671,43 @@ def _route_ports(
     stubs = grid.stub_cells(pa, start) | grid.stub_cells(pb, goal)  # the straight ends drawn to each port
     for c in stubs:
         grid.blocked[c] = True
+    held = None
+    if wall is not None:  # a hard obstacle, not a cost (ruling P33)
+        out = lambda e: abs(e[0]) < 1e-6 and e[1] * wall.side * wall.up > 0  # noqa: E731 - a port facing its side
+        ends = ((start, wall.stub_a and out(ea), wall.reaches(pa)), (goal, wall.stub_b and out(eb), wall.reaches(pb)))
+        held = wall.mask(grid, ends) & ~grid.blocked
+        held[start] = held[goal] = False
+        grid.blocked |= held
     ends = (grid, start, _axis(ea), goal, _axis(-np.asarray(eb)), max_nodes)
-    cells = _astar(*ends) if spent is None else _astar(*ends, spent)
-    if cells is None and wide is not None:
-        cells = wide.second(start, _axis(ea), goal, _axis(-np.asarray(eb)), max_nodes)
-    for c in stubs:
-        grid.blocked[c] = False
+    try:
+        cells = _astar(*ends) if spent is None else _astar(*ends, spent)
+        if cells is None and wide is not None:
+            cells = wide.second(start, _axis(ea), goal, _axis(-np.asarray(eb)), max_nodes)
+    finally:
+        if held is not None:
+            grid.blocked &= ~held
+        for c in stubs:
+            grid.blocked[c] = False
     return cells
 
 
-def _polyline(grid: _Grid, cells, pa, ea, pb, eb, snap: bool):
-    """The route through `cells` from port to port, its end runs moved onto the ports' axes if `snap`."""
+def _polyline(grid: _Grid, cells, pa, ea, pb, eb, snap):
+    """The route through `cells` from port to port, its end runs moved onto the ports' axes if `snap`. "end" (a
+    membrane wall): as True, but a route of one run goes onto the last port's axis, not the first's, so the jog
+    between two ports a hair apart is drawn at the first and the stub into the last is straight
+    (membrane.stub_segments)."""
     pts = [list(grid.center(c)) for c in _corners(cells)]
-    if snap:
+    perp = 0 if abs(eb[0]) < 1e-6 else 1 if abs(eb[1]) < 1e-6 else None
+    if snap == "end" and perp is not None and all(abs(q[perp] - pts[0][perp]) < 1e-9 for q in pts):
+        for q in pts:
+            q[perp] = pb[perp]
+    elif snap:
         _snap_to_port(pts, pa, ea, True)
         _snap_to_port(pts, pb, eb, False)
     return _simplify([tuple(pa)] + [(x, y) for x, y in pts] + [tuple(pb)])
 
 
-def _pull_turns(pts, pa, ea, pb, eb, at_a: bool, at_b: bool) -> list:
+def _pull_turns(pts, pa, ea, pb, eb, at_a: bool, at_b: bool, reach=(_INFLATE, _INFLATE)) -> list:
     """The drawn route with the first turn out of a port at a face (_Grid.at_face) moved back to the port's own
     clearance, _INFLATE out along its exit: the stub out of the port and the run after it, when the run is followed
     by a turn the move keeps square (C2b-5 fix round 1: 6JO6's turn lay 0.17 to 0.42 inside the face as the grid's
@@ -501,14 +715,15 @@ def _pull_turns(pts, pa, ea, pb, eb, at_a: bool, at_b: bool) -> list:
     both ports are at a face and the two pulls would move the same run (one run between them), the run goes to the
     first of their clearances that keeps both ports clear (the one farther out along exits that point alike),
     whichever port is higher (C2b-6 review minor 1). Each drawing is judged on the run its own pull moved, at point 2:
-    on a route of five points the first port's pull moves points 1-2 and the second's points 3-2 (C2b-6 re-review)."""
+    on a route of five points the first port's pull moves points 1-2 and the second's points 3-2 (C2b-6 re-review).
+    `reach`: how far out each port's turn is drawn (a membrane wall nearer than _INFLATE: _Wall.room)."""
 
-    def pull(p, port, out) -> list:
+    def pull(p, port, out, r=_INFLATE) -> list:
         if len(p) < 4 or abs(out[0]) > 1e-9:
             return p
         (x0, y0), (x1, y1), (x2, y2), (x3, y3) = p[:4]
-        y = port[1] + out[1] * _INFLATE
-        if abs(x1 - x0) > 1e-9 or abs(y2 - y1) > 1e-9 or abs(x3 - x2) > 1e-9 or abs(y1 - y0) <= _INFLATE + 1e-9:
+        y = port[1] + out[1] * r
+        if abs(x1 - x0) > 1e-9 or abs(y2 - y1) > 1e-9 or abs(x3 - x2) > 1e-9 or abs(y1 - y0) <= r + 1e-9:
             return p
         if (y3 - y) * (y3 - y1) < 0:  # the run after the turn would double back on itself
             return p
@@ -516,18 +731,18 @@ def _pull_turns(pts, pa, ea, pb, eb, at_a: bool, at_b: bool) -> list:
 
     out = [tuple(q) for q in pts]
     if at_a and at_b and len(out) < 6:  # both pulls move the same run: the clearance that keeps both ports clear
-        firsts = [pull(out, pa, ea), pull(out[::-1], pb, eb)[::-1]]
+        firsts = [pull(out, pa, ea, reach[0]), pull(out[::-1], pb, eb, reach[1])[::-1]]
         moved = [q for q in firsts if q != out]
 
-        def keeps(q) -> bool:  # the moved run (point 2: both pulls move it) at least _INFLATE out of both ports
+        def keeps(q) -> bool:  # the moved run (point 2: both pulls move it) at least its reach out of both ports
             y = q[2][1]
-            return all((y - port[1]) * e[1] >= _INFLATE - 1e-9 for port, e in ((pa, ea), (pb, eb)))
+            return all((y - port[1]) * e[1] >= r - 1e-9 for port, e, r in ((pa, ea, reach[0]), (pb, eb, reach[1])))
 
         return _simplify(next((q for q in moved if keeps(q)), moved[0] if moved else out))
     if at_a:
-        out = pull(out, pa, ea)
+        out = pull(out, pa, ea, reach[0])
     if at_b:
-        out = pull(out[::-1], pb, eb)[::-1]
+        out = pull(out[::-1], pb, eb, reach[1])[::-1]
     return _simplify(out)
 
 
@@ -545,6 +760,7 @@ class _Router:
         self.wide_searches = self.wide_refused = 0  # debug counts: second searches run, refused for the budget
         self.closed_searches = self.closed_nodes = 0  # debug counts: slab-closed searches (route) and their nodes
         self._free: tuple[bytes, np.ndarray] | None = None  # the last free-cell labelling (_joined) and its key
+        self.walls: dict = {}  # (a id, b id) -> the loop's _Wall in a membrane view (route_loops, _walls)
 
     def _joined(self, a, b) -> bool:
         """Are cells a and b joined by free cells (side by side, as A* steps)? The grid as the search sees it, the
@@ -603,29 +819,41 @@ class _Router:
         wide=True,
         max_nodes: int | None = None,
         spent: list | None = None,
+        wall: _Wall | None = None,
     ):
         """The A* route from port pa to port pb as drawn, snapped to the ports or else unsnapped; None if there
         is no route or every drawing of it crosses an element (`under`: see _clear). `wide`: a search that runs out
         of its nodes may run again on the page's second-search budget (_route_ports). `max_nodes`: the first
-        search's budget if not the router's; `spent`: its nodes are added to it."""
+        search's budget if not the router's; `spent`: its nodes are added to it. `wall`: the loop's (_Wall), closed to
+        the search, and every drawing taken keeps to it (_Wall.clear)."""
         grid = self.grid
         first = self.max_nodes if max_nodes is None else max_nodes
-        cells = _route_ports(grid, pa, ea, own_a, pb, eb, own_b, loose, first, self if wide else None, spent)
+        cells = _route_ports(grid, pa, ea, own_a, pb, eb, own_b, loose, first, self if wide else None, spent, wall)
         if cells is None:
             return None
-        for snap in (True, False):
+        keeps = (lambda q: True) if wall is None else wall.clear
+        for snap in (True, False) if wall is None else (True, False, "end"):
             pts = _polyline(grid, cells, pa, ea, pb, eb, snap)
             pulled_ok = False
-            if grid.at_face(pa, ea) or grid.at_face(pb, eb):
-                pulled = _pull_turns(pts, pa, ea, pb, eb, grid.at_face(pa, ea), grid.at_face(pb, eb))
+            ats = (grid.at_face(pa, ea), grid.at_face(pb, eb))
+            reach = (_INFLATE, _INFLATE)
+            if wall is not None and not keeps(pts):  # its turn out of a port beside the wall pulled to its room
+                into = lambda p, e: abs(e[0]) < 1e-9 and e[1] * wall.side * wall.up < 0  # noqa: E731 - into the wall
+                ats = (ats[0] or into(pa, ea), ats[1] or into(pb, eb))
+                reach = (wall.room(pa, ea), wall.room(pb, eb))
+            if any(ats):
+                pulled = _pull_turns(pts, pa, ea, pb, eb, *ats, reach)
                 kw = dict(own_body=own_body, under=under, exempt=exempt)
                 if (
                     pulled != pts
-                    and _clear(pulled, (own_a, own_b), *self.elements, grow=_INFLATE - 1e-6, **kw)
+                    and _clear(pulled, (own_a, own_b), *self.elements, grow=min(reach) - 1e-6, **kw)
                     and _text_hits(pulled, self.keep_out) <= _text_hits(pts, self.keep_out)
+                    and (keeps(pulled) or not keeps(pts))
                 ):
                     pts, pulled_ok = pulled, True
-            if _clear(pts, (own_a, own_b), *self.elements, own_body=own_body, under=under, exempt=exempt):
+            if keeps(pts) and _clear(
+                pts, (own_a, own_b), *self.elements, own_body=own_body, under=under, exempt=exempt
+            ):
                 drawn = cells
                 if pulled_ok:  # the cells under the route as drawn, not those of its search (C2b-5 parked minor)
                     drawn = sorted({c for p, q in zip(pts, pts[1:]) for c in grid.cells_along(p, q)})
@@ -640,7 +868,19 @@ class _Router:
         return None
 
     def route(
-        self, pa, ea, own_a, pb, eb, own_b, own_body=False, loose=False, under=((), ()), exempt=(), text_toll=0.0
+        self,
+        pa,
+        ea,
+        own_a,
+        pb,
+        eb,
+        own_b,
+        own_body=False,
+        loose=False,
+        under=((), ()),
+        exempt=(),
+        text_toll=0.0,
+        wall: _Wall | None = None,
     ):
         """(points, over labels): a drawn route, kept off text and stubs unless nothing else routes; None
         points if there is no clear route at all. Over labels: found with the keep-outs open, it runs through one of
@@ -651,15 +891,20 @@ class _Router:
         Ports on one side of every membrane band (_Grid.one_side) are first joined with the slab closed, its nodes
         drawn from the page's budget (wide_left, as second searches' are; not run once that is spent): a loop between
         two elements outside the membrane stays out of it when it can (A18; random-100 held-out 7JI3's loop from a
-        strand's foot ran up into the slab and over the strand's head, the cheapest way past a crowded sheet below)."""
+        strand's foot ran up into the slab and over the strand's head, the cheapest way past a crowded sheet below).
+        `wall`: the loop's in a membrane view (_Wall, plan 27 Task 5), kept to by every search and drawing; a loop it
+        already holds out of the slab (its bound at its face) skips the slab-closed search."""
         grid = self.grid
-        if grid.one_side(pa, pb) and self.wide_left > 0:
+        walled = wall is not None and wall.bound >= wall.half and not wall.lanes
+        if grid.one_side(pa, pb) and self.wide_left > 0 and not walled:
             held = grid.slab & ~grid.blocked
             grid.blocked |= held
             spent = [0]
             try:
                 budget = min(self.max_nodes, self.wide_left)
-                pts = self.drawn(pa, ea, own_a, pb, eb, own_b, own_body, loose, under, exempt, False, budget, spent)
+                pts = self.drawn(
+                    pa, ea, own_a, pb, eb, own_b, own_body, loose, under, exempt, False, budget, spent, wall
+                )
             finally:
                 grid.blocked &= ~held
                 self.wide_left -= spent[0]
@@ -667,7 +912,7 @@ class _Router:
                 self.closed_nodes += spent[0]
             if pts is not None:
                 return pts, False
-        pts = self.drawn(pa, ea, own_a, pb, eb, own_b, own_body, loose, under, exempt)
+        pts = self.drawn(pa, ea, own_a, pb, eb, own_b, own_body, loose, under, exempt, wall=wall)
         if pts is not None or not grid.soft.any():
             return pts, False
         saved = grid.toll
@@ -676,7 +921,7 @@ class _Router:
             grid.toll = toll if saved is None else saved + toll
         grid.blocked &= ~grid.soft
         try:
-            pts = self.drawn(pa, ea, own_a, pb, eb, own_b, own_body, loose, under, exempt)
+            pts = self.drawn(pa, ea, own_a, pb, eb, own_b, own_body, loose, under, exempt, wall=wall)
         finally:
             grid.blocked |= grid.soft
             grid.toll = saved
@@ -936,6 +1181,59 @@ def _clear_termini(layout: Layout, sses: list[SSE], loops: list[Loop]) -> None:
             texts[f"{end}:{chain}"] = box_at(best[1])
 
 
+_FALLBACK_OUT = 1.0  # page units past the page's edge a walled loop's fallback detours by
+
+
+def _walled_fallback(layout: Layout, wall: _Wall, pa: Placed, pb: Placed, curve) -> list:
+    """Ruling P35: the fallback of a loop no route keeps to its wall (_Wall) for, kept to it all the same, never a
+    curve through the band: the usual curve if it keeps to the wall; else a detour out of each port along its exit and
+    round the page on the loop's own side; else (a loop whose ports lie either side of the band) round the band's left
+    or right end, past every element. The first of them that keeps to the wall (_Wall.clear); the last tried if none
+    does, logged. Either way a fallback: flagged (A3), drawn as it is."""
+    if wall.clear(curve):
+        return curve
+    x0, y0, x1, y1 = layout.bounds
+    far = y1 + _FALLBACK_OUT if wall.side * wall.up > 0 else y0 - _FALLBACK_OUT
+    mid = sum(wall.bands[0]) / 2
+
+    def edge(y):  # the page's edge on the side of the band page y lies
+        return y1 + _FALLBACK_OUT if y >= mid else y0 - _FALLBACK_OUT
+
+    def leg(p: Placed, port, out, to_y) -> list:
+        """Out of a port along its exit; then, when that points away from page y `to_y`, a step past its element."""
+        first = (port[0] + out[0] * _PUSH[0], port[1] + out[1] * _PUSH[0])
+        pts = [tuple(port), first]
+        if abs(out[0]) < 1e-6 and out[1] * (to_y - port[1]) < 0:
+            pts.append((p.rect[2] + _PUSH[0], first[1]))
+        return pts
+
+    tries = []
+    for ya, yb, xf in [(far, far, None)] + [(edge(pa.c_port[1]), edge(pb.n_port[1]), x) for x in (x0, x1)]:
+        a = leg(pa, pa.c_port, pa.exit_c, ya)
+        b = leg(pb, pb.n_port, pb.exit_n, yb)[::-1]
+        turn = [] if xf is None else [(xf - _FALLBACK_OUT if xf == x0 else xf + _FALLBACK_OUT, v) for v in (ya, yb)]
+        tries.append([*a, (a[-1][0], ya), *turn, (b[0][0], yb), *b])
+    for pts in tries:
+        pts = _runs([tuple(map(float, p)) for p in pts])
+        if wall.clear(pts):
+            return pts
+    log.warning("loop %s>%s: no fallback keeps to its membrane wall", pa.sse.id, pb.sse.id)
+    return pts
+
+
+def _runs(points) -> list:
+    """A polyline with the points inside a straight run dropped (not those where it turns back on itself)."""
+    out = [points[0]]
+    for b, c in zip(points[1:], points[2:]):
+        a = out[-1]
+        cross = (b[0] - a[0]) * (c[1] - b[1]) - (b[1] - a[1]) * (c[0] - b[0])
+        on = (b[0] - a[0]) * (c[0] - b[0]) + (b[1] - a[1]) * (c[1] - b[1])
+        if abs(cross) > 1e-9 or on < 0 or b == a:
+            out.append(b)
+    out.append(points[-1])
+    return [q for k, q in enumerate(out) if k == 0 or q != out[k - 1]]
+
+
 def route_loops(layout: Layout, sses: list[SSE], bb) -> list[Loop]:
     """The loop between each pair of sequence-adjacent elements, routed around everything placed. When the layout
     holds nucleic acid it also routes the single strands (route_na.route_nucleic): that sets layout.na_paths,
@@ -960,6 +1258,7 @@ def route_loops(layout: Layout, sses: list[SSE], bb) -> list[Loop]:
     owners = elements[1] + [n.removeprefix("label:") if n.startswith("label:") else None for n, _ in keep_out]
     rects = np.hstack([elements[0], np.array([r for _, r in keep_out], float).reshape(-1, 4).T])
     router = _Router(grid, elements, [b for _, b in keep_out])
+    router.walls = _walls(layout, sses, bb, pairs)  # a membrane view's: each loop's slab wall (plan 27 Task 5)
 
     dist = lambda ab: math.dist(layout.placed[ab[0].id].c_port, layout.placed[ab[1].id].n_port)  # noqa: E731
     routed: dict[tuple[str, str], tuple[list, bool, bool]] = {}  # points, fallback curve, over labels
@@ -973,8 +1272,9 @@ def route_loops(layout: Layout, sses: list[SSE], bb) -> list[Loop]:
         # a kink is drawn straight with no grid clearance, so it clears by the full _INFLATE (drawn routes use _TOUCH)
         kinked = b.start - a.end - 1 <= KINK_GAP or (a.id, b.id) in getattr(layout, "kink_links", ())  # a copy's
         # pieces drawn as their mates', a kink there (layout._regroup_copies)
+        wall = router.walls.get((a.id, b.id))
         if kinked and np.hypot(*gap) < 1.5 and gap @ pa.exit_c > 0:
-            if _clear(  # and labels
+            if (wall is None or wall.clear([pa.c_port, pb.n_port])) and _clear(  # and labels
                 [pa.c_port, pb.n_port],
                 (pa, pb),
                 rects,
@@ -1000,7 +1300,7 @@ def route_loops(layout: Layout, sses: list[SSE], bb) -> list[Loop]:
         pts, over = None, False
         for ea, eb in _over_exits(pa, pb):
             pts, over = router.route(
-                pa.c_port, ea, pa, pb.n_port, eb, pb, loose=(pa.over, pb.over), under=under, exempt=exempt
+                pa.c_port, ea, pa, pb.n_port, eb, pb, loose=(pa.over, pb.over), under=under, exempt=exempt, wall=wall
             )
             if pts is not None:
                 break
@@ -1012,7 +1312,10 @@ def route_loops(layout: Layout, sses: list[SSE], bb) -> list[Loop]:
                 for c in grid.cells_along(p, q):
                     grid.used[c] += 1
         if pts is None:
-            routed[(a.id, b.id)] = (_curve(pa.c_port, pa.exit_c, pb.n_port, pb.exit_n), True, False)
+            curve = _curve(pa.c_port, pa.exit_c, pb.n_port, pb.exit_n)
+            if wall is not None:  # never a curve through the wall (ruling P35)
+                curve = _walled_fallback(layout, wall, pa, pb, curve)
+            routed[(a.id, b.id)] = (curve, True, False)
         else:
             routed[(a.id, b.id)] = (pts, False, over)
     for (a, b), (mate, k) in turned.items():  # over: not the mate's flag (the copy's names are upright, their sides
@@ -1114,12 +1417,22 @@ def _fine_route(layout: Layout, keep_out, elements, pa: Placed, pb: Placed, unde
         grid = _Grid(layout, [b for _, b in keep_out], window)
         router = _Router(grid, elements, [b for _, b in keep_out])
         router.wide_left = page.window_left
+        wall = page.walls.get((pa.sse.id, pb.sse.id))
         for h in exempt:
             grid.blocked &= ~grid.over[h]
         try:
             for ea, eb in _over_exits(pa, pb):
                 pts, over = router.route(
-                    pa.c_port, ea, pa, pb.n_port, eb, pb, loose=(pa.over, pb.over), under=under, exempt=exempt
+                    pa.c_port,
+                    ea,
+                    pa,
+                    pb.n_port,
+                    eb,
+                    pb,
+                    loose=(pa.over, pb.over),
+                    under=under,
+                    exempt=exempt,
+                    wall=wall,
                 )
                 if pts is not None:
                     return pts, over
@@ -1155,7 +1468,16 @@ def _route_again(layout: Layout, router: _Router, lp: Loop):
     best, over = None, False
     for ea, eb in _over_exits(pa, pb):
         best, over = router.route(
-            pa.c_port, ea, pa, pb.n_port, eb, pb, loose=(pa.over, pb.over), under=under, exempt=exempt
+            pa.c_port,
+            ea,
+            pa,
+            pb.n_port,
+            eb,
+            pb,
+            loose=(pa.over, pb.over),
+            under=under,
+            exempt=exempt,
+            wall=router.walls.get((lp.a_id, lp.b_id)),
         )
         if best is not None:
             break
@@ -1308,7 +1630,16 @@ def _off_na_text(layout: Layout, router: _Router, loops: list[Loop]) -> None:
         best, over = None, False
         for ea, eb in _over_exits(pa, pb):
             best, over = router.route(
-                pa.c_port, ea, pa, pb.n_port, eb, pb, loose=(pa.over, pb.over), under=under, exempt=exempt
+                pa.c_port,
+                ea,
+                pa,
+                pb.n_port,
+                eb,
+                pb,
+                loose=(pa.over, pb.over),
+                under=under,
+                exempt=exempt,
+                wall=router.walls.get((lp.a_id, lp.b_id)),
             )
             if best is not None:
                 break

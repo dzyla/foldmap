@@ -255,7 +255,7 @@ def test_a_strand_route_through_text_pays_for_each_text_cell(monkeypatch):
     router = _Router(grid, _element_obstacles(lay), [(4.0, 4.0, 6.0, 6.0)])
     seen = []
 
-    def drawn(self, *a):
+    def drawn(self, *a, **k):
         seen.append(None if self.grid.toll is None else self.grid.toll.copy())
         return None if len(seen) == 1 else [(1.0, 5.0), (9.0, 5.0)]
 

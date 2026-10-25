@@ -1255,3 +1255,167 @@ def test_a_loop_is_over_a_label_only_while_the_label_is_there():
     loops.append(Loop("e", "f", through, False, False, False))
     _still_over(lay, [h.sse], loops)
     assert [lp.crosses_labels for lp in loops] == [False, True, False]
+
+
+# ------------------------------------------------------------------------------- plan 27 Task 5: the slab as a wall
+_BAND = (0.0, 6.9)  # a 30 Å slab (normal z, mid-plane 0) as the band on the page, the outside up: 0.23 page units per Å
+
+
+def _membrane_view(chain_a, others, depths):
+    """A membrane view of the chain A elements `chain_a` (in sequence) and the other chain's `others`, every residue's
+    CA atom at depths[k] Å along the normal: route_loops' layout (band _BAND, the outside up) and backbone."""
+    from foldmap.membrane import Membrane
+
+    lay = layout_of(*chain_a, *others)
+    lay.membrane = {"y": _BAND, "bands": [_BAND], "inside": "below"}
+    lay.bilayer = Membrane(np.array([0.0, 0.0, 1.0]), 0.0, 15.0, "estimate")
+    n = len(depths)
+    bb = SimpleNamespace(ca=np.column_stack([np.zeros(n), np.zeros(n), depths]), prev=np.ones(n, bool))
+    return lay, [p.sse for p in (*chain_a, *others)], bb
+
+
+def _helix(chain, start, cx, cy, length, angle, label="a"):
+    return Placed(fake_sse("H", start, start + 9, chain=chain), cx, cy, length, angle, HELIX_W, label)
+
+
+def _page_depth(y):
+    return (y - sum(_BAND) / 2) * 30.0 / (_BAND[1] - _BAND[0])
+
+
+def test_a_loop_out_of_a_transmembrane_end_runs_to_its_face_never_mid_slab():
+    """Plan 27 Task 5 (ruling P33; the author: nothing that is not in the bilayer is drawn in the band). A loop out of a
+    transmembrane helix whose C end the layout draws 3 Å inside the outer face, to an element beyond the face, its
+    residues all 20 Å out: a tall element stands on the face between them, 0.1 above it. The slab as a cost let the
+    loop run sideways in the slab under that element, far cheaper than over it (A18 loop_in_band: 2-3 Å into the
+    slab). As a wall (route._Wall: no cell nearer the mid-plane than the loop's bound, membrane.loop_side_bound, its
+    face here) it runs straight out of its port to the face, along the port's own column, and over the top."""
+    from foldmap.membrane import loop_excess
+
+    depths = np.zeros(120)
+    depths[0:10] = np.linspace(-15.0, 12.0, 10)  # crosses: a band element, its C end 3 Å inside the outer face
+    depths[10:20] = 20.0  # the loop's residues, all beyond the face
+    depths[20:30] = 25.0
+    depths[100:110] = 40.0
+    top = _BAND[0] + 27.0 * 0.23  # page y of 12 Å
+    a = _helix("A", 0, 0.0, top / 2, top, np.pi / 2)  # its C port at (0, top), pointing up
+    b = _helix("A", 20, 6.0, 8.0, 2.0, 0.0)  # its N port at (5, 8), pointing left
+    tall = _helix("Z", 100, 2.5, 30.0, 46.0, np.pi / 2)  # y 7.0 to 53, 0.1 above the face
+    lay, sses, bb = _membrane_view([a, b], [tall], depths)
+    (ab,) = [lp for lp in route_loops(lay, sses, bb) if lp.a_id == a.sse.id]
+    assert not ab.fallback
+    assert loop_excess(ab.points, 1, 15.0, [_BAND], 15.0, 1, True, False) is None, ab.points
+    (x0, y0), (x1, y1) = ab.points[:2]
+    assert x1 == pytest.approx(x0, abs=1e-9) and y1 >= _BAND[1]  # straight out of its port, past the face
+    assert max(y for _, y in ab.points) > tall.rect[3]  # over the top
+
+
+def test_a_loop_joining_the_two_faces_crosses_only_beside_its_port_or_past_the_bands_end():
+    """Plan 27 Task 5 (ruling P34). A loop whose residues reach both faces (-20 to 30 Å: its bound lies past the far
+    face) leaves a transmembrane helix's C end on the inner face, pointing down, for an element above the band, right,
+    over four more transmembrane helices. As a cost the slab let it cross the band anywhere, between two of them; it
+    crosses only in the lane beside its own helix (route._LANE, its port column) or past the band's last element."""
+    from foldmap.route import _LANE
+
+    depths = np.zeros(200)
+    depths[0:10] = np.linspace(15.0, -15.0, 10)
+    depths[10:20] = np.linspace(-20.0, 30.0, 10)
+    depths[20:30] = 30.0
+    a = _helix("A", 0, 0.0, 3.45, 6.9, -np.pi / 2)  # its C port at (0, 0), pointing down
+    b = _helix("A", 20, 10.0, 10.0, 2.0, 0.0)  # its N port at (9, 10), pointing left
+    tms = []  # another chain's, down and up, its loops round the faces
+    for k, x in enumerate((1.4, 4.0, 8.0, 12.0)):
+        down = k % 2 == 0
+        depths[100 + 10 * k : 110 + 10 * k] = np.linspace(15.0, -15.0, 10) * (1 if down else -1)
+        tms.append(_helix("Z", 100 + 10 * k, x, 3.45, 6.9, -np.pi / 2 if down else np.pi / 2, ""))
+    lay, sses, bb = _membrane_view([a, b], tms, depths)
+    (ab,) = [lp for lp in route_loops(lay, sses, bb) if lp.a_id == a.sse.id]
+    assert not ab.fallback
+    lane, end = a.rect[2] + _LANE, max(p.rect[2] for p in tms)
+    for (xa, ya), (xb, yb) in zip(ab.points, ab.points[1:]):
+        if max(ya, yb) > _BAND[0] + 1e-6 and min(ya, yb) < _BAND[1] - 1e-6:  # in the slab
+            assert max(xa, xb) <= lane or min(xa, xb) >= end, ab.points
+
+
+def test_a_loop_no_route_finds_falls_back_outside_the_slab():
+    """Plan 27 Task 5 (ruling P35). Two elements just above the band, their ports pointing down at it, the second's
+    blocked by an element under it: no route, so a fallback. The fallback curve (route._curve) would dip 1.5 into the
+    slab; the walled fallback (route._walled_fallback) keeps to the wall: no point nearer the mid-plane than the
+    loop's bound (its residues all 20 Å out: the face), never a line through the band."""
+    from foldmap.membrane import loop_excess
+
+    depths = np.zeros(120)
+    depths[0:10] = 22.0
+    depths[10:20] = 20.0
+    depths[20:30] = 22.0
+    depths[100:110] = 30.0
+    a = _helix("A", 0, 0.0, 7.9, 1.0, -np.pi / 2)  # its C port at (0, 7.4), pointing down
+    b = _helix("A", 20, 3.0, 7.9, 1.0, np.pi / 2)  # its N port at (3, 7.4), pointing down
+    under = _helix("Z", 100, 3.0, 7.5, 2.0, 0.0)  # across b's way out
+    lay, sses, bb = _membrane_view([a, b], [under], depths)
+    (ab,) = [lp for lp in route_loops(lay, sses, bb) if lp.a_id == a.sse.id]
+    assert ab.fallback
+    assert loop_excess(ab.points, 1, 15.0, [_BAND], 15.0, 1, False, False) is None, ab.points
+    assert min(y for _, y in ab.points) >= _BAND[1]
+
+
+def test_a_loop_between_two_stacked_band_ports_a_hair_apart_jogs_at_the_first():
+    """Plan 27 Task 5 (5LDW L:241-246>L:255-262, M:259-267>M:271-278): two helices of the slab stacked in one column,
+    their ports facing, 0.0004 apart across the page; the loop's residues lie 1-8 Å in, so it may come no nearer the
+    outer face than 1 Å in, but the upper helix's N end is drawn 4 Å out. One straight run joins them; snapped to the
+    first port's axis (route._snap_to_port) the jog lands at the second, 4 Å out, off its stub. Snapped to the second's
+    ("end", route._polyline), the jog is at the first port and the run into the second is its stub (A18 clean)."""
+    from foldmap.membrane import loop_excess
+
+    depths = np.zeros(40)
+    depths[0:10] = np.linspace(-10.0, -3.0, 10)
+    depths[10:20] = np.linspace(-1.0, -8.0, 10)
+    depths[20:30] = np.linspace(4.0, 10.0, 10)
+    y = lambda d: 3.45 + d * 0.23  # noqa: E731
+    a = _helix("A", 0, 0.0, (y(-10) + y(-3)) / 2, y(-3) - y(-10), np.pi / 2)  # C port at (0, y(-3)), pointing up
+    b = _helix("A", 20, 0.0004, (y(4) + y(10)) / 2, y(10) - y(4), np.pi / 2)  # N port at (0.0004, y(4)), down
+    lay, sses, bb = _membrane_view([a, b], [], depths)
+    (ab,) = route_loops(lay, sses, bb)
+    assert not ab.fallback
+    assert loop_excess(ab.points, -1, 1.0, [_BAND], 15.0, 1, True, True) is None, ab.points
+
+
+def test_a_loop_into_a_port_just_clear_of_its_wall_turns_between_them():
+    """Plan 27 Task 5 (6VBG A:103-119>A:121-135): a helix of the slab whose N end is drawn 0.3 Å past the loop's bound
+    (its residues 10-20 Å out), pointing into the wall, the gap 0.07 page units, less than a route's clearance out of a
+    port (_INFLATE). Its first turn is drawn half way to the wall (_Wall.room, _pull_turns), checked with that
+    clearance, so the loop is routed and A18 clean; at the clearance the turn would be in the wall: a fallback."""
+    from foldmap.membrane import loop_excess
+
+    depths = np.zeros(40)
+    depths[0:10] = 30.0
+    depths[10:20] = np.linspace(10.0, 20.0, 10)
+    depths[20:30] = np.linspace(10.3, 15.0, 10)
+    y = lambda d: 3.45 + d * 0.23  # noqa: E731
+    a = _helix("A", 0, -3.0, 9.0, 2.0, 0.0)  # C port at (-2, 9), pointing right
+    b = _helix("A", 20, 2.0, (y(10.3) + y(15)) / 2, y(15) - y(10.3), np.pi / 2)  # N port at (2, y(10.3)), down
+    lay, sses, bb = _membrane_view([a, b], [], depths)
+    (ab,) = route_loops(lay, sses, bb)
+    assert not ab.fallback
+    assert loop_excess(ab.points, 1, 10.0, [_BAND], 15.0, 1, False, True) is None, ab.points
+
+
+def test_a_loop_whose_own_port_lies_past_its_bound_climbs_beside_its_element():
+    """Plan 27 Task 5 (5LDW H:74-84>H:102-110, 6JO6 A:262-265>A:269-272: proposed ruling P36). A transmembrane helix
+    stretched across the band ends at the inner face, pointing down, its loop's residues 2-15 Å out: no route
+    reaches the port but from past the loop's bound, so A18 flags it whatever the router does. The wall opens a lane
+    beside the element (route._LANE) from its port to the bound: the loop climbs there, routed (no fallback), and comes
+    no nearer the mid-plane than its own port's first step (A18's finding: the port's own 17 Å and that step)."""
+    from foldmap.membrane import loop_excess
+
+    depths = np.zeros(40)
+    depths[0:10] = np.linspace(15.0, -1.0, 10)
+    depths[10:20] = np.linspace(2.0, 15.0, 10)
+    depths[20:30] = 25.0
+    a = _helix("A", 0, 0.0, 3.45, 6.9, -np.pi / 2)  # C port at (0, 0), drawn pointing down
+    b = _helix("A", 20, 5.0, 9.0, 2.0, 0.0)  # N port at (4, 9), pointing left
+    lay, sses, bb = _membrane_view([a, b], [], depths)
+    (ab,) = route_loops(lay, sses, bb)
+    assert not ab.fallback
+    found = loop_excess(ab.points, 1, 2.0, [_BAND], 15.0, 1, True, False)
+    assert 17.0 < found <= 17.0 + (route._PUSH[0] + route.RES / 2) * 30 / 6.9, found
+    assert all(x <= a.rect[2] + route._LANE for (x, y), _ in zip(ab.points, ab.points[1:]) if y < 3.45 + 2.0 * 0.23)

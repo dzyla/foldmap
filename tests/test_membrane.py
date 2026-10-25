@@ -718,9 +718,12 @@ def test_a_route_turning_out_of_a_port_at_or_in_the_slab_turns_at_the_port(entry
     assert sideways_in_slab(loops, lay.membrane["bands"], lay.placed) == []
 
 
-# plan 27 rule P7: A18 made strict before the layout is (Tasks 4 and 5 take these marks off)
+# plan 27 rule P7: A18 made strict before the layout is. Task 5 walls the slab for every loop (route._Wall): what is
+# left in these three is a loop whose own port the layout draws nearer the mid-plane than the loop's bound, pointing
+# away from its side (a transmembrane helix stretched to the far face, a helix of the slab ending deeper than its loop):
+# no route reaches it but past its bound (task-5-report, proposed ruling P36)
 PENDING = pytest.mark.xfail(  # only a failed assertion is the expected failure, never a crash (review-2 M4)
-    strict=True, raises=AssertionError, reason="plan 27 T5: loops not yet kept out of the slab"
+    strict=True, raises=AssertionError, reason="plan 27 T5: a loop's own port drawn past its bound (P36 proposed)"
 )
 
 
@@ -2136,9 +2139,6 @@ COMEC_CASES = {  # the three ComEC figures A18 is held on (Fig. 1C): the dimer, 
     "A-domains": {"chains": ["A"], "domains": "auto", "style": ["color_by=domain"]},
 }
 A18_PARTS = ("slab_helix", "band_member", "strand_in_band", "outside_in_band", "wrong_side", "loop_in_band")
-# A18's parts ComEC's figures pass: all since plan 27 Task 4 (the band laid out first, every other element bound to its
-# side) but the dimer's loop_in_band, Task 5's (a loop routed through the slab)
-COMEC_PASSING = {"dimer": set(A18_PARTS) - {"loop_in_band"}, "A": set(A18_PARTS), "A-domains": set(A18_PARTS)}
 
 
 @functools.cache
@@ -2153,11 +2153,7 @@ def _comec_a18(case: str) -> dict:
 @pytest.mark.skipif(not KS32.is_file(), reason="32KS is not in the download cache")
 @pytest.mark.parametrize(
     "case, part",
-    [
-        pytest.param(case, part, marks=() if part in COMEC_PASSING[case] else PENDING, id=f"{case}-{part}")
-        for case in COMEC_CASES
-        for part in A18_PARTS
-    ],
+    [pytest.param(case, part, id=f"{case}-{part}") for case in COMEC_CASES for part in A18_PARTS],
 )
 def test_a18_on_comec(case, part):
     """Plan 27 Task 2 (A18 strict) on 32KS, ComEC, the figure the author judged the membrane view by (Fig. 1C): in the

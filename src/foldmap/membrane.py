@@ -462,6 +462,74 @@ def loop_bound(depth: np.ndarray, m: Membrane) -> tuple[int, float]:
     return side, min(nearest, m.half)
 
 
+def loop_residues(a: SSE, b: SSE) -> list[int]:
+    """The residues of the loop from element a to element b, whose depths its bound is taken from (loop_bound): those
+    between them, or with none, the two ends' CA atoms (a's last, b's first)."""
+    return list(range(a.end + 1, b.start)) or [a.end, b.start]
+
+
+def loop_side_bound(a: SSE, b: SSE, depth: np.ndarray, m: Membrane) -> tuple[int, float]:
+    """loop_bound of the loop from element a to element b (loop_residues), every residue's depth given: the one rule
+    A18's loop_in_band judges a loop by and the router walls the slab by (plan 27 rulings P14, P33)."""
+    return loop_bound(np.asarray(depth)[loop_residues(a, b)], m)
+
+
+# The page side of the band (plan 27 Task 5): page y read as a depth by a band's own scale, the measure A18 judges a
+# drawn loop by (figcheck.loops_in_band) and the router keeps its routes to (route._Wall). Shared, so the two agree.
+BAND_EPS = 1e-6  # page units: float snapping, and no more
+
+
+def nearest_band(bands, y: float):
+    """The band (page y bottom, top) whose middle lies nearest page y."""
+    return min(bands, key=lambda b: abs((b[0] + b[1]) / 2 - y))
+
+
+def page_depth(y: float, band, half: float, up: int) -> float:
+    """The depth (Å from the mid-plane, positive outside) page y stands for, by the band's own scale: its height is the
+    slab's 2 * `half`; `up` +1 when page-up is the outside."""
+    b0, b1 = band
+    return up * (y - (b0 + b1) / 2) * 2 * half / max(b1 - b0, 1e-9)
+
+
+def band_eps(band, half: float) -> float:
+    """BAND_EPS in Å, by the band's scale."""
+    return BAND_EPS * 2 * half / max(band[1] - band[0], 1e-9)
+
+
+def stub_segments(pts, toward: int) -> int:
+    """How many segments of the polyline `pts` run on from its first point straight along the page's y, at its x,
+    towards page side `toward` (+1 up): the stub out of a port to its face, the one part of a loop out of a band
+    element's port that loop_excess does not judge."""
+    x = pts[0][0]
+    n = 0
+    for (xa, ya), (xb, yb) in zip(pts, pts[1:]):
+        if abs(xa - x) > BAND_EPS or abs(xb - x) > BAND_EPS or (yb - ya) * toward < -BAND_EPS:
+            break
+        n += 1
+    return n
+
+
+def loop_excess(pts, side: int, bound: float, bands, half: float, up: int, stub_a: bool, stub_b: bool) -> float | None:
+    """How much nearer the mid-plane (Å), on its own `side`, than its `bound` (loop_side_bound) a loop drawn along the
+    page polyline `pts` comes at its worst; None when nowhere. A loop out of (into) a band element's port (`stub_a`,
+    `stub_b`) may first (last) run straight along the page's y towards its side (stub_segments), not judged; every other
+    segment is, by its point nearer the mid-plane, against the band nearest its middle. A18's loop_in_band (plan 27
+    ruling P14) and the router's wall (P33) both read a drawn loop by this."""
+    pts = [(float(x), float(y)) for x, y in pts]
+    first, last = 0, len(pts) - 1  # the segments judged: first .. last - 1
+    if stub_a:
+        first = stub_segments(pts, side * up)
+    if stub_b:
+        last = len(pts) - 1 - stub_segments(pts[::-1], side * up)
+    worst = None
+    for (_, ya), (_, yb) in zip(pts[first:last], pts[first + 1 : last + 1]):
+        near = nearest_band(bands, (ya + yb) / 2)
+        drawn = min(side * page_depth(y, near, half, up) for y in (ya, yb))  # its point nearer the mid-plane
+        if drawn < bound - band_eps(near, half):
+            worst = bound - drawn if worst is None else max(worst, bound - drawn)
+    return worst
+
+
 def slab_range(s: SSE, depth: np.ndarray, m: Membrane) -> tuple[float, float]:
     """Where a helix in the slab (slab_helix) has its axis drawn, in Å from the mid-plane, positive outside (ruling
     P13): standing, within its CA atoms' depths and inside the slab; lying flat (lies_flat_here), within its CA

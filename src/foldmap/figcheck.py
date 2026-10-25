@@ -21,7 +21,10 @@ from matplotlib.path import Path as MPath
 from matplotlib.transforms import Affine2D, Bbox
 
 from .layout import block_ghosts, crosses_band, joined_pieces, lying_over
-from .membrane import band_set, crosses, loop_bound, own_bound, slab_helix, slab_range
+from .membrane import BAND_EPS, band_set, crosses, loop_excess, loop_side_bound, own_bound, slab_helix, slab_range
+from .membrane import band_eps as _eps
+from .membrane import nearest_band as _nearest_band
+from .membrane import page_depth as _drawn_depth
 from .na_curve import _FAR, on_curves
 
 # Lines a text can be crossed by (render's gids, matched by prefix). A loop's casing (loopcase:) and a stub's edge
@@ -1775,7 +1778,7 @@ def accessories_named(layout) -> list[str]:
 # the slab only when its drawn centre was), the 5 Å an element beyond a face could reach in (T5-5) and the loops'
 # runs excused beside their ports (C26, the membrane slab ruling). The band's elements are membrane.band_set's, the
 # one rule the layout lays the band out by.
-BAND_EPS = 1e-6  # page units: float snapping, and no more
+# (membrane.BAND_EPS; the page reading of the band, page_depth and the rest, is shared with the router there)
 
 
 def membrane_view(layout, sses, bb, mem, loops=None) -> dict:
@@ -1794,7 +1797,7 @@ def membrane_view(layout, sses, bb, mem, loops=None) -> dict:
       nearest CA atom (membrane.own_bound; Å nearer);
     - wrong_side, the elements not of the band whose drawn centre lies on the side opposite their own
       (membrane.own_side; Å past the mid-plane);
-    - loop_in_band, the loops with a segment drawn nearer the mid-plane than their bound (membrane.loop_bound: their
+    - loop_in_band, the loops with a segment drawn nearer the mid-plane than their bound (loop_side_bound: their
       nearest residue, or their face when every residue lies beyond it; ruling P14) but on the stub straight out of a
       band element's port to that face (None: `loops` not given).
     Each entry is "<id> <Å>" (findings_text: "<0.1" under 0.05 Å); band_member and strand_in_band say how far in from
@@ -1865,45 +1868,23 @@ def _angstrom(x: float) -> str:
 
 def loops_in_band(loops, sses, depth, band: set[str], bands, mem, up: int) -> list[str]:
     """A18's loop_in_band (membrane_view; ruling P14): each loop (a>b) with a segment drawn nearer the mid-plane, on its
-    own side, than its bound (membrane.loop_bound, from its residues, or the two ends' CA atoms for a loop with no
-    residue between its elements: its nearest residue, or its face when all lie beyond it), how much nearer, in Å.
-    Out of the port of an element of the band (`band`) the loop may run straight to its face along the page's normal,
-    and cross the face line there (_stub); nowhere else. A loop out of a TM helix whose first residues lie just inside
-    the face is drawn no deeper than they are. `up`: +1 when page-up is the outside."""
+    own side, than its bound (membrane.loop_side_bound, from its residues, or the two ends' CA atoms for a loop with no
+    residue between its elements: its nearest residue, or its face when all lie beyond it), how much nearer, in Å
+    (membrane.loop_excess, the measure the router's wall keeps to). Out of the port of an element of the band (`band`)
+    the loop may run straight to its face along the page's normal, and cross the face line there; nowhere else. A loop
+    out of a TM helix whose first residues lie just inside the face is drawn no deeper than they are. `up`: +1 when
+    page-up is the outside."""
     by_id = {s.id: s for s in sses}
     out = []
     for lp in loops:
         a, b = by_id.get(lp.a_id), by_id.get(lp.b_id)
         if a is None or b is None:
             continue
-        side, bound = loop_bound(depth[list(range(a.end + 1, b.start)) or [a.end, b.start]], mem)
-        pts = [(float(x), float(y)) for x, y in lp.points]
-        first, last = 0, len(pts) - 1  # the segments judged: first .. last - 1
-        if lp.a_id in band:
-            first = _stub(pts, side * up)
-        if lp.b_id in band:
-            last = len(pts) - 1 - _stub(pts[::-1], side * up)
-        worst = None
-        for (_, ya), (_, yb) in zip(pts[first:last], pts[first + 1 : last + 1]):
-            near = _nearest_band(bands, (ya + yb) / 2)
-            drawn = min(side * _drawn_depth(y, near, mem.half, up) for y in (ya, yb))  # its point nearer the mid-plane
-            if drawn < bound - _eps(near, mem.half):
-                worst = bound - drawn if worst is None else max(worst, bound - drawn)
+        side, bound = loop_side_bound(a, b, depth, mem)
+        worst = loop_excess(lp.points, side, bound, bands, mem.half, up, lp.a_id in band, lp.b_id in band)
         if worst is not None:
             out.append(f"{lp.a_id}>{lp.b_id} {_angstrom(worst)}")
     return out
-
-
-def _stub(pts, toward: int) -> int:
-    """How many segments of the polyline `pts` run on from its first point straight along the page's y, at its x,
-    towards page side `toward` (+1 up): the stub out of a port to its face."""
-    x = pts[0][0]
-    n = 0
-    for (xa, ya), (xb, yb) in zip(pts, pts[1:]):
-        if abs(xa - x) > BAND_EPS or abs(xb - x) > BAND_EPS or (yb - ya) * toward < -BAND_EPS:
-            break
-        n += 1
-    return n
 
 
 def _band_reach(y0: float, y1: float, bands, half: float, up: int, side: int) -> float | None:
@@ -1918,23 +1899,6 @@ def _band_reach(y0: float, y1: float, bands, half: float, up: int, side: int) ->
         into = half - max(deepest, -half)
         out = into if out is None else max(out, into)
     return out
-
-
-def _nearest_band(bands, y: float):
-    """The band whose middle lies nearest page y."""
-    return min(bands, key=lambda b: abs((b[0] + b[1]) / 2 - y))
-
-
-def _drawn_depth(y: float, band, half: float, up: int) -> float:
-    """The depth (Å from the mid-plane, positive outside) page y stands for, by the band's own scale: its height is the
-    slab's 2 * `half`."""
-    b0, b1 = band
-    return up * (y - (b0 + b1) / 2) * 2 * half / max(b1 - b0, 1e-9)
-
-
-def _eps(band, half: float) -> float:
-    """BAND_EPS in Å, by the band's scale."""
-    return BAND_EPS * 2 * half / max(band[1] - band[0], 1e-9)
 
 
 # ------------------------------------------------------------------------------------------- all of them
