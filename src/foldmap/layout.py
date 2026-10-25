@@ -4135,23 +4135,46 @@ def _pack_row(targets: list[float], halves: list[float], gaps: list[tuple[float,
     return out
 
 
-def _in_order(items: list[_Item], level: set[str], across: list[float], ties: dict[int, tuple[int, int]]) -> None:
+def _in_order(
+    items: list[_Item],
+    level: set[str],
+    across: list[float],
+    ties: dict[int, tuple[int, int]],
+    mirror: float | None = None,
+) -> bool:
     """Ruling R11 (review-2 I5: 32KS-A's band helices, Kendall tau 0.82 -> 0.67): each chain's items holding its
-    transmembrane elements (`level`), no symmetry tie on them, given back their places across the page in their
-    projected order (`across`, each item's x before _attract): the places _attract found, each item's x, dealt out
-    left to right in that order, so what is ordered is what is dealt (re-review-2 N4; an item's footprint centre may
-    stand off its x by its label). _separate then pushes held items apart sideways, never past each other."""
-    tied = set(ties) | {j for j, _ in ties.values()}
+    transmembrane elements (`level`) given back their places across the page in their projected order (`across`, each
+    item's x before _attract): the places _attract found, each item's x, dealt out left to right in that order, so
+    what is ordered is what is dealt (re-review-2 N4; an item's footprint centre may stand off its x by its label).
+    _separate then pushes held items apart sideways, never past each other. A copy tied to a mate by symmetry
+    (`ties`) is not dealt itself: it moves as far as its mate was moved (the other way when the copies are drawn as
+    the mate's mirror image, `mirror`), so the copies stay drawn alike and in order with it (ruling R29: 6BO8's
+    unrolled tetramer, its mates left to _attract, came out in reverse order in every chain once a flat linker
+    widened one of their items, tau 0.6 -> -0.867). True when any item moved. build_layout deals them again after
+    the last separation, which can push a column past another (a face row's helix overlapping two columns pushes each
+    its own way: 7VVK's R:218-245 and R:279-311 swapped once T5-2 laid R:451-460 flat), and separates again, up to
+    _ORDER_ROUNDS times."""
     groups: dict[str, list[int]] = {}
     for k, it in enumerate(items):
         chains = {m.sse.chain for m in it.members if getattr(m, "sse", None) is not None and m.sse.id in level}
-        if len(chains) == 1 and k not in tied:
+        if len(chains) == 1 and k not in ties:
             groups.setdefault(chains.pop(), []).append(k)
+    moved: dict[int, float] = {}
     for ks in groups.values():
         places = sorted(items[k].cx for k in ks)
         for k, x in zip(sorted(ks, key=lambda k: (across[k], k)), places):
-            items[k].cx = float(_snap(x))
+            x = float(_snap(x))
+            moved[k] = x - items[k].cx
+            items[k].cx = x
             items[k].home = (items[k].cx, items[k].home[1])
+    for i, (j, _) in ties.items():
+        if moved.get(j):
+            items[i].cx = float(_snap(items[i].cx + (-moved[j] if mirror is not None else moved[j])))
+            items[i].home = (items[i].cx, items[i].home[1])
+    return any(abs(d) > 1e-9 for d in moved.values())
+
+
+_ORDER_ROUNDS = 3  # build_layout: deal the band columns back their projected order and separate, at most this often
 
 
 def _carried(room: tuple[float, float], moved: dict[int, float] | None, k: int) -> tuple[float, float]:
@@ -5148,7 +5171,7 @@ def build_layout(
                 items[k].cy = y
                 items[k].home = (items[k].home[0], y)
             if band is not None and level:  # each chain's transmembrane columns in their projected order (R11)
-                _in_order(items, set(level), seen_x, ties)
+                _in_order(items, set(level), seen_x, ties, mirror if ties else None)
         shared = {  # an item of several protomers that no tie holds: a dimer's continuous sheet (1SLV)
             k
             for k, it in enumerate(items)
@@ -5197,6 +5220,27 @@ def build_layout(
                 walls,
                 state,
             )
+        if band is not None and level:  # ruling R29: each chain's columns dealt back their projected order
+
+            def separate_again(w):
+                return _separate(
+                    items,
+                    ties,
+                    joints,
+                    w,
+                    mirror=mirror if ties else None,
+                    room=_SEP_SYM_ROOM,
+                    level=kept,
+                    shared=shared,
+                    again=alike_first,
+                )
+
+            for _ in range(_ORDER_ROUNDS):
+                if not _in_order(items, set(level), seen_x, ties, mirror if ties else None):
+                    break
+                state = separate_again(walls)
+                if faced:
+                    walls, state = hold(separate_again, walls, state)
         report = _TIE_TURN.get()[1]
         if report is not None:  # the shared sheets whose way up is a symmetry tie: _both_ways may turn them
             held = {m.sse.id for k in shared for m in items[k].members}

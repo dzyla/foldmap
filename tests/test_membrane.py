@@ -1622,13 +1622,13 @@ def test_flat_helix_pieces_a_break_apart_are_joined_only_going_on_as_one():
 
 
 def test_join_runs_joins_each_next_run_its_predicate_names():
-    """ss._join_runs: three runs, the predicate joining the first two: one run of both, the first's start reported;
-    the third kept apart."""
+    """ss._join_runs: three runs, the predicate joining the first two: one run of both, reported as made; the third
+    kept apart."""
     from foldmap.ss import _join_runs
 
     runs = [(0, 10), (13, 25), (30, 40)]
     out, made = _join_runs(runs, lambda x, y: y[0] == 13)
-    assert out == [(0, 25), (30, 40)] and made == [0]
+    assert out == [(0, 25), (30, 40)] and made == [(0, 25)]
     assert _join_runs(runs, lambda x, y: False) == (runs, [])
 
 
@@ -1904,3 +1904,109 @@ def test_a_turn_that_lowers_the_pooled_tau_is_not_taken():
     assert _worst_tau(frame, [[a], [b]]) == -1 and _worst_tau(quarter, [[a], [b]]) == 0  # the worse chain gains 1
     assert _sequence_score(frame, [a, b]) == 12 and _sequence_score(quarter, [a, b]) == 0  # pooled falls
     assert _in_sequence(frame, sses, SimpleNamespace(ca=np.array(ca)), mem) is frame
+
+
+def test_the_membrane_join_note_lists_only_joins_the_copies_keep():
+    """Review-5 M1: a join of one copy that _copy_breaks cuts back (the other copy broken there, the join refused for
+    it: a tie, so the whole run is cut) is no join, and build_sses' `matched["membrane"]` leaves it out; joined in
+    both copies, both are listed."""
+    from foldmap.model import Backbone, ResLabel
+    from foldmap.ss import build_sses
+
+    t = np.radians(100.0) * np.arange(25)
+    one = np.stack([2.3 * np.cos(t), 2.3 * np.sin(t), 1.5 * np.arange(25)], axis=1)
+    ca = np.vstack([one, one + np.array([30.0, 0.0, 0.0])])
+    labels = [ResLabel(c, k + 1, "", "ALA") for c in "AB" for k in range(25)]
+    bb = Backbone(labels, np.repeat(ca[:, None, :], 4, axis=1), np.array([k % 25 > 0 for k in range(50)]))
+    ss = ("H" * 12 + "T" + "H" * 12) * 2
+    only_a: dict = {}
+    sses = build_sses(bb, ss, matched=only_a, join=lambda x, y: bb.labels[x[0]].chain == bb.labels[y[0]].chain == "A")
+    assert only_a["membrane"] == [] and only_a["cut"] == 1
+    assert [s.id for s in sses if s.chain == "A"] == ["A:1-12", "A:14-25"]
+    both: dict = {}
+    build_sses(bb, ss, matched=both, join=lambda x, y: bb.labels[x[0]].chain == bb.labels[y[0]].chain)
+    assert both["membrane"] == ["A:1-25", "B:1-25"] and both["cut"] == 0
+
+
+def test_make_layout_wires_the_joins_the_flat_rule_and_the_turn(monkeypatch):
+    """Review-5 M7, on a tracked fixture (1C3W, bacteriorhodopsin, one chain): a projected membrane view asks
+    membrane.joins of its helix runs and copies' breaks (crosses_joined), lays helices flat by lies_flat_here, passes
+    `nearer` to build_layout and draws the frame _in_sequence returns; with no membrane none of them is asked, and in
+    stack mode neither the joins nor the turn."""
+    import foldmap.cli as cli
+    from foldmap.frame import Frame
+
+    asked: dict[str, int] = {}
+
+    def spy(name):
+        real = getattr(cli, name)
+
+        def wrapped(*a, **k):
+            asked[name] = asked.get(name, 0) + 1
+            return real(*a, **k)
+
+        monkeypatch.setattr(cli, name, wrapped)
+
+    for name in ("membrane_joins", "lies_flat_here", "_nearer_faces"):
+        spy(name)
+    monkeypatch.setattr(cli, "crosses_joined", lambda *a: asked.update(crosses_joined=1) or False)
+    turned = {}
+
+    def quarter(frame, *a, **k):  # the frame turned a quarter about the normal, so its use shows on the page axes
+        u = np.cross(frame.v, frame.u)
+        turned["u"] = u
+        return Frame(frame.origin, u, frame.v, np.cross(u, frame.v))
+
+    monkeypatch.setattr(cli, "_in_sequence", quarter)
+    built = {}
+    real_build = cli.build_layout
+
+    def build(*a, **k):
+        built.update(k)
+        return real_build(*a, **k)
+
+    monkeypatch.setattr(cli, "build_layout", build)
+    one = Path(__file__).parent / "data" / "1C3W.cif"
+    lay, _, _ = make_layout(one, membrane="auto", chains=["A1"])
+    assert asked.get("membrane_joins") and asked.get("lies_flat_here") and asked.get("_nearer_faces")
+    assert "nearer" in built and np.allclose(lay.page_axes[0], turned["u"])
+    asked.clear(), turned.clear(), built.clear()
+    make_layout(one, chains=["A1"])
+    assert not asked and not turned and "nearer" not in built
+    make_layout(one, "stack", membrane="auto", chains=["A1"])
+    assert not asked.get("membrane_joins") and not turned
+
+
+@pytest.mark.parametrize("mirror", [None, 0.0])
+def test_tied_columns_are_dealt_their_projected_order_and_their_copies_follow(mirror):
+    """Ruling R29 (6BO8, an unrolled tetramer: its protomer-0 columns were left to _attract, being symmetry mates,
+    and came out in reverse order in every chain, tau 0.6 -> -0.867): layout._in_order deals a mate's columns their
+    projected order too, and each copy tied to a mate moves as far as its mate (the other way when copies are drawn
+    as mirror images), so the copies stay drawn alike. It says whether anything moved."""
+    from foldmap.layout import Placed, _in_order, _Item
+    from helpers import fake_sse
+
+    items = []
+    for k, (chain, x) in enumerate((("A", 5.0), ("A", -5.0), ("A", 1.0), ("B", 25.0), ("B", 15.0), ("B", 21.0))):
+        s = fake_sse("H", 10 * k, 10 * k + 20, chain=chain)
+        items.append(_Item([Placed(s, 0, 0, 5.0, np.pi / 2, 1.0)], [(0.0, 0.0)], x, 0.0, (x, 0.0), k, chain))
+    level = {it.members[0].sse.id for it in items}
+    ties = {3: (0, 1), 4: (1, 1), 5: (2, 1)}  # B's columns are A's copies, protomer 1
+    across = [-3.0, 0.0, 2.0, 17.0, 20.0, 22.0]  # projected: A's item 0 leftmost, then 1, then 2
+    assert _in_order(items, level, across, ties, mirror)
+    assert [it.cx for it in items[:3]] == pytest.approx([-5.0, 1.0, 5.0])
+    moves = np.array([-10.0, 6.0, 4.0]) * (-1 if mirror is not None else 1)
+    assert [it.cx for it in items[3:]] == pytest.approx(list(np.array([25.0, 15.0, 21.0]) + moves))
+    assert not _in_order(items, level, across, ties, mirror)  # in order now: nothing moves
+
+
+def test_a_missing_chain_is_said_before_the_membrane_is_looked_for(monkeypatch):
+    """Review-5 M3: make_layout looks for the membrane before DSSP's elements (a membrane view joins helix pieces,
+    ruling T5-1), but after the cheap checks: a chain the structure lacks fails without a membrane search."""
+    import foldmap.membrane as membrane
+
+    called = []
+    monkeypatch.setattr(membrane, "find_membrane", lambda *a: called.append(1))
+    with pytest.raises(ValueError, match="no chain Z"):
+        make_layout(Path(__file__).parent / "data" / "1C3W.cif", membrane="auto", chains=["Z"])
+    assert not called

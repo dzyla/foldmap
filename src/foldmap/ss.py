@@ -275,19 +275,18 @@ def _copy_breaks(
     return out, n_cut, n_joined, changed
 
 
-def _join_runs(helices: list[tuple[int, int]], join) -> tuple[list[tuple[int, int]], list[int]]:
+def _join_runs(helices: list[tuple[int, int]], join) -> tuple[list[tuple[int, int]], list[tuple[int, int]]]:
     """Helix runs with each next run `join` (x, y) -> bool says belongs to it joined into one (x|y|z all three, each
-    pair asked as it stands: x joined with y, then that with z), and the first residue of each run made so."""
+    pair asked as it stands: x joined with y, then that with z), and the runs made so."""
     out: list[tuple[int, int]] = []
-    made: list[int] = []
+    made: set[int] = set()  # indices into out of the runs made by joining
     for run in helices:
         if out and join(out[-1], run):
-            if not made or made[-1] != out[-1][0]:
-                made.append(out[-1][0])
+            made.add(len(out) - 1)
             out[-1] = (out[-1][0], run[1])
         else:
             out.append(run)
-    return out, made
+    return out, [out[k] for k in sorted(made)]
 
 
 def build_sses(
@@ -318,10 +317,11 @@ def build_sses(
         for a, b in _runs(ss, "HGI", bb.prev)
         if ss[a : b + 1].count("H") >= _MIN_HELIX_H or b - a + 1 >= _MIN_HELIX_ANY
     ]
-    joined_here: list[int] = []
+    joined_here: list[tuple[int, int]] = []
     if join is not None:
         helices, joined_here = _join_runs(helices, join)
     helices, n_cut, n_joined, changed = _copy_breaks(helices, bb, copies, whole_if)
+    kept_whole = {a for a, b in joined_here if (a, b) in set(helices)}  # a join copies cut back is no join (review M1)
     kinks = {h: _kinks(*h, ss, bb) for h in helices}
     sharp = [_span(bb, copies(), x, y) for h in helices for x, y, angle in kinks[h] if angle > KINK_SPLIT]
     corners: list[int] = []  # residues of a kink between two helix pieces: no element of their own
@@ -344,5 +344,5 @@ def build_sses(
         ids = [s.id for s in out if s.kind == "H" and any(s.start <= r <= s.end for r in changed)]
         matched.update(cut=n_cut, joined=n_joined, ids=ids)
         if join is not None:
-            matched["membrane"] = [s.id for s in out if s.kind == "H" and s.start in joined_here]
+            matched["membrane"] = [s.id for s in out if s.kind == "H" and s.start in kept_whole]
     return out

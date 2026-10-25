@@ -523,16 +523,26 @@ def make_layout(
         bb = bb.only([c for c in chains if c in present])
     if (look or Style()).color_by == "conservation" and not msa:
         raise ValueError("conservation colouring needs an alignment: add --msa ALIGNMENT")
+    nucleic = load_nucleic(path, bb, assembly, model=model) if dna else None
+    na_chains = list(dict.fromkeys(st.chain for st in nucleic.strands)) if nucleic is not None else []
+    if chains:  # a chain the structure lacks is said before the membrane is looked for (review-5 M3)
+        held = list(dict.fromkeys(st.chain for st in nucleic.strands)) if nucleic is not None else []
+        missing = [c for c in chains if c not in present and c not in held]
+        if missing:
+            have = f"protein chains {', '.join(present) or 'none'}" + (
+                f", nucleic-acid chains {', '.join(held)}" if held else ""
+            )
+            raise ValueError(f"no chain {', '.join(missing)}; the structure has {have}")
+        if any(c in held for c in chains):  # nucleic-acid chains named: only those (else every strand)
+            nucleic = nucleic_of_chains(nucleic, chains)
     mem = None
     flip = membrane == "flip"
-    if membrane not in ("off", None):
+    if membrane not in ("off", None):  # before DSSP's elements: a membrane view joins helix pieces (ruling T5-1)
         from .membrane import find_membrane
 
         mem = find_membrane(path, read_bb)  # on every protein chain: --chains narrows the drawing, not the bilayer
         if mem is not None and flip:  # the other face is the outside: a 180° turn, never a mirror
             mem = dataclasses.replace(mem, normal=-mem.normal, centre=-mem.centre)
-        if mem is None:
-            print(f"foldmap: warning: no membrane found in {path}; drawing it without one", file=sys.stderr)
     dssp = assign_dssp(bb)
     matched: dict = {}  # helix pieces cut or joined so copies match (ss._copy_breaks): told by scope.drawn_scope
     in_view = mem is not None and mode == "projected"  # helix runs one or two residues apart joined (ruling T5-1)
@@ -546,18 +556,6 @@ def make_layout(
         whole_if=functools.partial(crosses_joined, bb, mem) if in_view else None,
     )
     sheets = build_sheets(sses, dssp.bridges)
-    nucleic = load_nucleic(path, bb, assembly, model=model) if dna else None
-    na_chains = list(dict.fromkeys(st.chain for st in nucleic.strands)) if nucleic is not None else []
-    if chains:
-        held = list(dict.fromkeys(st.chain for st in nucleic.strands)) if nucleic is not None else []
-        missing = [c for c in chains if c not in present and c not in held]
-        if missing:
-            have = f"protein chains {', '.join(present) or 'none'}" + (
-                f", nucleic-acid chains {', '.join(held)}" if held else ""
-            )
-            raise ValueError(f"no chain {', '.join(missing)}; the structure has {have}")
-        if any(c in held for c in chains):  # nucleic-acid chains named: only those (else every strand)
-            nucleic = nucleic_of_chains(nucleic, chains)
     sym = detect_symmetry(bb, sses, symmetry, protomers, symmetry_tol) if sses else None
     ring = sym  # the assembly as read, before focus may leave one subunit (_rosette_declined)
     shared = _homolog_labels(bb, sses)  # copies of one protein share labels, however much of each is modelled
@@ -611,6 +609,8 @@ def make_layout(
     for problem in check_references(refs, read_bb, drawn=kept):
         if problem.fatal:  # the warnings were said where the spec was read (_spec_of, the app, the MCP server)
             raise BadReference(problem)
+    if membrane not in ("off", None) and mem is None:  # said after the references' errors (review-5 M3)
+        print(f"foldmap: warning: no membrane found in {path}; drawing it without one", file=sys.stderr)
     user = _read_user_data(data, data_column, crosslinks, read_bb, na_chains) if data or crosslinks else None
     up_from_membrane = False  # `up` set by the membrane (its normal), not asked for: the cyclic note says so
     if mem is not None:
@@ -1269,7 +1269,9 @@ def _worst_tau(frame, proteins: list[list[list[np.ndarray]]]) -> Fraction:
 
 def _in_sequence(frame, sses, bb, mem, copies: dict[str, tuple[str, int]] | None = None):
     """Ruling T5-3: a membrane view's page-right turned about the membrane normal (page-up), so that the band helices
-    (the transmembrane helices, _transmembrane) stand left to right as nearly in sequence order as a turn can put them:
+    (the transmembrane helices, _transmembrane) stand left to right as nearly in sequence order as a turn can put them
+    (make_layout asks it only when the membrane set page-up, in projected mode, with no --rotate or --flip-v: a turn
+    asked for keeps the frame view_frame chose; review-5 M4):
     of the turns in AZIMUTH_STEP steps, the one whose worst copy's Kendall tau of page x against sequence is highest
     (ruling R23, _worst_tau: each protein's least tau over its copies, `copies` as model.homolog_chains gives them,
     each chain its own protein without; then the least over the proteins); on a tie the frame as view_frame chose it,

@@ -146,8 +146,8 @@ def _membrane_joined(layout) -> list[dict]:
     if not ids:
         return []
     text = (
-        "helices DSSP breaks by one or two residues drawn whole in the membrane view, both pieces lying flat or the "
-        f"whole crossing the membrane: {', '.join(ids)}"
+        "helices DSSP breaks by one or two residues drawn whole in the membrane view, both pieces and the whole lying "
+        f"flat, one piece going on as the other: {', '.join(ids)}"
     )
     return [_item("membrane_joined", text, ids)]
 

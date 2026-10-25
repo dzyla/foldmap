@@ -73,7 +73,7 @@ CRITERIA = {
     "A15": "copies drawn alike",
     "A16": "domains: one chain, alike, not tiny, panels apart, names clear",
     "A17": "nucleic-acid metrics and stem names by their letters",
-    "A18": "membrane: TM helices in the band, loops and soluble elements out of the slab",
+    "A18": "membrane: TM helices in the band, loops and soluble elements out of the slab, none drawn in from beyond",
     "A19": "two states: same names in the same order",
     "A20": "ligand tethers local",
 }
@@ -124,7 +124,9 @@ def membrane_checks(drawn, path) -> dict:
     each TM helix (its CA run crosses the membrane's mid-plane and spans half its thickness, membrane.crosses) enters
     its band through a face and reaches past its middle (C27 ruling); loops run sideways inside a band
     (figcheck.SLAB_MARGIN from its faces) only on the first segment out of their own port inside it, up to clearing
-    its element (membrane slab ruling); no soluble element is drawn in the slab (ruling R4). The membrane is the one
+    its element (membrane slab ruling); no soluble element is drawn in the slab (ruling R4), and no element whose CA
+    run lies wholly beyond a face is drawn more than figcheck.SLAB_ENTRY into it (outside_in_slab, ruling T5-5). The
+    membrane is the one
     the figure was drawn with (Layout.bilayer: found on every protein chain, whatever --chains draws); a figure with
     no band is judged as such, never by a membrane found again on the chains it draws."""
     from . import figcheck

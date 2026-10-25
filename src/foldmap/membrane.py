@@ -353,15 +353,19 @@ def _apart(bb: Backbone, x: tuple[int, int], y: tuple[int, int]) -> bool:
 def joins(bb: Backbone, m: Membrane, x: tuple[int, int], y: tuple[int, int]) -> bool:
     """Ruling T5-1, item 1: in a membrane view two helix runs of one chain (first and last residue index each), at
     most JOIN_GAP non-helix residues apart in an unbroken chain, are drawn as one helix when both lie flat
-    (lies_flat_here) and one goes on as the other (their axes within JOIN_ANGLE): 32KS's NS7, A:436-461, which DSSP
-    breaks at 447-448 in chain A only, its pieces 37° apart."""
+    (lies_flat_here), one goes on as the other (their axes within JOIN_ANGLE) and the joined helix lies flat as well:
+    32KS's NS7, A:436-461, which DSSP breaks at 447-448 in chain A only, its pieces 37° apart."""
     if not _apart(bb, x, y):
         return False
     d = m.depth(bb.ca)
     ax, ay = (_fit_axis(bb.ca[a : b + 1]) for a, b in (x, y))
     if float(_snap(np.dot(ax, ay))) < float(_snap(np.cos(np.radians(JOIN_ANGLE)))):
         return False
-    return all(lies_flat_here(axis, d[a : b + 1], m) for axis, (a, b) in ((ax, x), (ay, y)))
+    if not all(lies_flat_here(axis, d[a : b + 1], m) for axis, (a, b) in ((ax, x), (ay, y))):
+        return False
+    # and the joined helix lies flat too (ruling R29: 7VVK's R:435-448 and R:451-460, each flat, joined crossed the
+    # membrane and stood in the band as a sixth transmembrane helix)
+    return lies_flat_here(_fit_axis(bb.ca[x[0] : y[1] + 1]), d[x[0] : y[1] + 1], m)
 
 
 def crosses_joined(bb: Backbone, m: Membrane, x: tuple[int, int], y: tuple[int, int]) -> bool:

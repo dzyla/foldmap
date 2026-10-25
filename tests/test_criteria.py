@@ -39,7 +39,7 @@ def test_check_prints_the_figure_criteria_under_the_science_checks(capsys):
     )
     assert f"A10 secondary structure agrees with mkdssp: not measured here ({criteria.NOT_HERE['A10']})" in out
     assert "A17 nucleic-acid metrics and stem names by their letters: does not apply" in out  # no nucleic acid
-    a18 = "A18 membrane: TM helices in the band, loops and soluble elements out of the slab"
+    a18 = "A18 membrane: TM helices in the band, loops and soluble elements out of the slab, none drawn in from beyond"
     assert f"{a18}: does not apply" in out  # no --membrane
     assert [line.split()[0] for line in out if line[:1] in "SA"] == [
         "S1",
