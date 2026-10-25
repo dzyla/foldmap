@@ -1314,8 +1314,8 @@ def test_a_loop_joining_the_two_faces_crosses_only_beside_its_port_or_past_the_b
     """Plan 27 Task 5 (ruling P34). A loop whose residues reach both faces (-20 to 30 Å: its bound lies past the far
     face) leaves a transmembrane helix's C end on the inner face, pointing down, for an element above the band, right,
     over four more transmembrane helices. As a cost the slab let it cross the band anywhere, between two of them; it
-    crosses only in the lane beside its own helix (route._LANE, its port column) or past the band's last element."""
-    from foldmap.route import _LANE
+    crosses only in the lane beside its own helix (membrane.LANE, its port column) or past the band's last element."""
+    from foldmap.membrane import LANE
 
     depths = np.zeros(200)
     depths[0:10] = np.linspace(15.0, -15.0, 10)
@@ -1331,7 +1331,7 @@ def test_a_loop_joining_the_two_faces_crosses_only_beside_its_port_or_past_the_b
     lay, sses, bb = _membrane_view([a, b], tms, depths)
     (ab,) = [lp for lp in route_loops(lay, sses, bb) if lp.a_id == a.sse.id]
     assert not ab.fallback
-    lo, hi = a.c_port[0] - HELIX_W / 2 - _LANE, a.c_port[0] + HELIX_W / 2 + _LANE  # the strip at its port (P38)
+    lo, hi = a.c_port[0] - HELIX_W / 2 - LANE, a.c_port[0] + HELIX_W / 2 + LANE  # the strip at its port (P38)
     left, right = a.rect[0] - _INFLATE, max(p.rect[2] for p in tms) + _INFLATE  # the band's ends
     crossed = False
     for (xa, ya), (xb, yb) in zip(ab.points, ab.points[1:]):
@@ -1388,9 +1388,9 @@ def test_a_loop_whose_own_port_lies_past_its_bound_climbs_beside_its_element():
     """Plan 27 Task 5 (5LDW H:74-84>H:102-110, 6JO6 A:262-265>A:269-272: ruling P36a). A transmembrane helix
     stretched across the band ends at the inner face, pointing down, its C-terminal CA 1 Å out and its loop's residues
     2-15 Å out: no route reaches the port but from past the loop's bound. The wall opens the lane beside the element
-    (membrane.loop_lanes, route._LANE) from its port to the bound: the loop climbs there, routed (no fallback), and A18
-    excuses it there (the same lanes); without them it would read the port's own 17 Å and the first step."""
-    from foldmap.membrane import loop_excess, loop_lanes
+    (membrane.loop_lanes, membrane.LANE) from its port to the bound: the loop climbs there, routed (no fallback), and
+    A18 excuses it there (the same lanes); without them it would read the port's own 17 Å and the first step."""
+    from foldmap.membrane import LANE, loop_excess, loop_lanes
 
     depths = np.zeros(40)
     depths[0:10] = [15.0, 12.0, 9.0, 6.0, 3.0, 0.0, -3.0, -2.0, 0.5, 1.0]  # crosses; its last CA 1 Å out
@@ -1406,7 +1406,7 @@ def test_a_loop_whose_own_port_lies_past_its_bound_climbs_beside_its_element():
     lanes = loop_lanes(a.sse, b.sse, bb.ca[:, 2], lay.bilayer, ends, {a.sse.id}, [_BAND], 1)
     assert loop_excess(ab.points, 1, 2.0, [_BAND], 15.0, 1, True, False, lanes=lanes, boxes=(a.rect, b.rect)) is None
     assert 17.0 < found <= 17.0 + (route._PUSH[0] + route.RES / 2) * 30 / 6.9, found
-    assert all(x <= a.rect[2] + route._LANE for (x, y), _ in zip(ab.points, ab.points[1:]) if y < 3.45 + 2.0 * 0.23)
+    assert all(x <= a.rect[2] + LANE for (x, y), _ in zip(ab.points, ab.points[1:]) if y < 3.45 + 2.0 * 0.23)
 
 
 def test_a_crossing_lane_opens_the_slab_never_the_loops_depth_wall():
@@ -1502,3 +1502,58 @@ def test_a_two_face_loop_drawn_either_side_of_the_band_joins_the_faces():
     assert wall.bound == pytest.approx(-5.0) and wall.cross
     (ab,) = [lp for lp in route_loops(lay, sses, bb) if lp.a_id == a.sse.id]
     assert not ab.fallback and wall.clear(ab.points)
+
+
+@pytest.mark.parametrize("loops", ["orthogonal", "curved"])
+def test_a_drawn_corner_at_a_ports_stub_stays_in_its_strip(loops):
+    """Plan 27 final review M2 (ruling P43): A18 judges the routed polyline, the page draws its corners rounded. Out of
+    a helix of the slab drawn 12-14 Å in (its loop's residues 20 Å out), the loop runs over 6 page
+    units up its port's stub to the outer face and turns: the drawn corner (render._loop_path, a 0.3 rounded one or a
+    curved one, which may take up to 3.0 of its legs) stays in the strip at the port (membrane.strip: its x ± half the
+    helix's width and LANE) wherever it is inside the band."""
+    import matplotlib
+
+    matplotlib.use("Agg")
+    from foldmap import render
+    from foldmap.membrane import strip
+    from foldmap.style import Style
+
+    depths = np.zeros(40)
+    depths[0:10] = np.linspace(-14.0, -12.0, 10)  # a helix of the slab, deep in the inner half
+    depths[10:20] = 20.0
+    depths[20:30] = 25.0
+    y = lambda d: 3.45 + d * 0.23  # noqa: E731
+    a = _helix("A", 0, 0.0, (y(-14) + y(-12)) / 2, y(-12) - y(-14), np.pi / 2)  # C port at (0, y(-12)), pointing up
+    b = _helix("A", 20, 12.0, 7.2, 2.0, 0.0)  # far right, its N port 0.3 above the face: the turn just past it
+    lay, sses, bb = _membrane_view([a, b], [], depths)
+    (ab,) = route_loops(lay, sses, bb)
+    assert ab.points[1][1] > _BAND[1] and ab.points[1][1] - ab.points[0][1] > 6.0  # the long stub, then the turn
+    path = render._loop_path(ab, Style(loops=loops), render._loop_boxes(lay), lay)
+    pts = np.concatenate(path.to_polygons(closed_only=False))
+    x0, x1 = strip(a.c_port, a.rect)
+    inside = pts[(pts[:, 1] > _BAND[0] + 1e-9) & (pts[:, 1] < _BAND[1] - 1e-9)]
+    assert len(inside) and (inside[:, 0] >= x0 - 1e-9).all() and (inside[:, 0] <= x1 + 1e-9).all(), inside
+
+
+def test_the_lane_is_the_routers_clearance_and_two_cells():
+    """Plan 27 final review (pins): membrane.LANE, the one lane width A18 and the router read, is the router's
+    clearance round an element and two grid cells past it."""
+    from foldmap.membrane import LANE
+
+    assert LANE == pytest.approx(route._INFLATE + 2 * route.RES)
+
+
+def test_a18_names_a_loop_whose_end_is_not_drawn():
+    """Plan 27 final review (pins): A18 judges a loop by its own drawn ports and boxes (Layout.placed); a loop with an
+    end not drawn is a clear error naming it, not a bare KeyError."""
+    from foldmap.figcheck import loops_crossing, loops_in_band
+    from foldmap.membrane import Membrane
+    from foldmap.route import Loop
+
+    a, b = fake_sse("H", 0, 9), fake_sse("H", 12, 21)
+    placed = {a.id: bar(0, 0.0, 3.45, 6.9, np.pi / 2)}
+    mem = Membrane(np.array([0.0, 0.0, 1.0]), 0.0, 15.0, "estimate")
+    loop = Loop(a.id, b.id, [(0.0, 6.9), (1.0, 8.0)], False, False)
+    for judge in (loops_in_band, loops_crossing):
+        with pytest.raises(ValueError, match=f"{a.id}>{b.id}.*{b.id}"):
+            judge([loop], [a, b], np.zeros(30), {a.id}, [_BAND], mem, 1, placed)

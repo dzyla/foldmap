@@ -418,11 +418,14 @@ def in_band(s: SSE, depth: np.ndarray, m: Membrane) -> bool:
     """Is element `s` (its CA atoms at depth[s.start : s.end + 1]: `depth` is every residue's, m.depth(bb.ca)) one of
     the band's: a helix crossing the membrane (crosses); a helix in the slab, its CA median inside it, at any tilt
     (slab_helix, ruling P10: re-entrant and half-membrane helices, ComEC's TM7 A:328-339, are in the bilayer in 3D); or
-    a strand crossing the membrane, a barrel's or one in a barrel's lumen (ruling P11: 9FWZ's FimA)? No other β-strand,
-    an interfacial one, is ever of the band (the author: sheets in the membrane are wrong)."""
+    a strand crossing the membrane, a barrel's or one in a barrel's lumen (ruling P11: 9FWZ's FimA), or any strand of
+    the barrel that defines the membrane (Membrane.defining: design 1, "the strands of a membrane-crossing barrel",
+    its short ones too, as the layout keeps the barrel's sheet whole with the band; final review M1)? No other
+    β-strand, an interfacial one, is ever of the band (the author: sheets in the membrane are wrong)."""
     seg = np.asarray(depth)[s.start : s.end + 1]
     if s.kind == "E":
-        return crosses(seg, m.half)
+        barrel = m.defining is not None and m.defining.issuperset(range(s.start, s.end + 1))
+        return crosses(seg, m.half) or barrel
     return s.kind in HELIX_KINDS and (crosses(seg, m.half) or slab_helix(s, depth, m))
 
 

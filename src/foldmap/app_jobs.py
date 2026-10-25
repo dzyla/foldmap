@@ -122,10 +122,12 @@ class JobFailed(RuntimeError):
 
 
 @functools.cache
-def code_fingerprint() -> str:
-    """A hash of foldmap's own .py sources (paths and text, line endings normalised), taken once per process. The app
-    keys its figure cache on it, so a deploy, or a reload after a code change (app._drop_changed_foldmap loads this
-    module afresh, so it is taken again), never serves a figure drawn by older code (plan 27 Task 1: 32KS).
+def code_fingerprint(root: Path | None = None) -> str:
+    """A hash of foldmap's own .py sources, every one on disk under the package (or `root`), imported or not (paths
+    relative to it, in sorted order, and text, line endings normalised), taken once per process. The app keys its
+    figure cache on it, so a deploy, or a reload after a code change (app._drop_changed_foldmap loads this module
+    afresh when any .py of the package changes on disk, so it is taken again), never serves a figure drawn by older
+    code (plan 27 Task 1: 32KS).
 
     Never raises (functools.cache does not store an exception, so a raise would repeat on every render). A source
     that cannot be read contributes its path and an error marker. When the sources cannot be listed at all (a zipped
@@ -134,7 +136,7 @@ def code_fingerprint() -> str:
     gets a new key; two builds of one version with the same mtime would share it (plan 27 ruling P8)."""
     import hashlib
 
-    root = Path(__file__).resolve().parent
+    root = Path(__file__).resolve().parent if root is None else root
     h = hashlib.sha256()
     try:
         sources = sorted(root.rglob("*.py"), key=lambda q: q.relative_to(root).as_posix())

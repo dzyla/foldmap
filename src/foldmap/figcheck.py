@@ -1819,7 +1819,11 @@ def membrane_view(layout, sses, bb, mem, loops=None) -> dict:
       opposite sides and their ports either side of the band) drawn across the band anywhere but in the strip at one
       of their own ports or past the band's ends (P34, P39; loops_crossing; None: `loops` not given).
     Each entry is "<id> <Å>" (findings_text: "<0.1" under 0.05 Å); band_member and strand_in_band say how far in from
-    the element's own face. A barrel's ghost strand is judged as its strand, "<id> ghost <Å>"."""
+    the element's own face. A barrel's ghost strand is judged as its strand, "<id> ghost <Å>".
+    Loops are judged on their routed polyline. The page rounds its corners (final review M2): a rounded corner
+    (render._CORNER, 0.3) and a curved one (Style loops curved, kept out of the band beside its ports' strips by
+    render._beside_strips) stay within their two legs, never nearer the mid-plane than the polyline, and a corner at a
+    port's stub stays inside the strip at that port, though it may cut a little inside the face there."""
     bands = layout.membrane.get("bands") or [layout.membrane["y"]]
     up = 1 if layout.membrane.get("inside", "below") == "below" else -1  # page-up is the outside's direction
     half = mem.half
@@ -1886,6 +1890,15 @@ def _angstrom(x: float) -> str:
     return "<0.1" if x < 0.05 else f"{x:.1f}"
 
 
+def _loop_ends(placed, lp):
+    """The drawn elements a loop joins (Layout.placed), or a ValueError naming the loop when one is not drawn (A18
+    judges a loop by its own ports and boxes; route_loops routes only loops whose two ends are placed)."""
+    missing = [k for k in (lp.a_id, lp.b_id) if k not in placed]
+    if missing:
+        raise ValueError(f"A18: loop {lp.a_id}>{lp.b_id} joins an element not drawn: {', '.join(missing)}")
+    return placed[lp.a_id], placed[lp.b_id]
+
+
 def loops_in_band(loops, sses, depth, band: set[str], bands, mem, up: int, placed) -> list[str]:
     """A18's loop_in_band (membrane_view; rulings P14, P36, P38): each loop (a>b) with a segment drawn nearer the
     mid-plane, on its own side, than its bound (membrane.loop_side_bound, from its residues, and its two end residues
@@ -1902,7 +1915,7 @@ def loops_in_band(loops, sses, depth, band: set[str], bands, mem, up: int, place
         a, b = by_id.get(lp.a_id), by_id.get(lp.b_id)
         if a is None or b is None:
             continue
-        pa, pb = placed[lp.a_id], placed[lp.b_id]
+        pa, pb = _loop_ends(placed, lp)
         side, bound = loop_side_bound(a, b, depth, mem)
         lanes = loop_lanes(a, b, depth, mem, ((pa.c_port, pa.rect), (pb.n_port, pb.rect)), band, bands, up)
         stubs = (lp.a_id in band, lp.b_id in band)
@@ -1928,7 +1941,7 @@ def loops_crossing(loops, sses, depth, band: set[str], bands, mem, up: int, plac
         a, b = by_id.get(lp.a_id), by_id.get(lp.b_id)
         if a is None or b is None:
             continue
-        pa, pb = placed[lp.a_id], placed[lp.b_id]
+        pa, pb = _loop_ends(placed, lp)
         cross, lanes = loop_crossing(a, b, depth, mem, ((pa.c_port, pa.rect), (pb.n_port, pb.rect)), band, bands, up)
         worst = crossing_excess(lp.points, lanes, ends, bands, mem.half, up) if cross else None
         if worst is not None:

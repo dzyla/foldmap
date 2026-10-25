@@ -1523,16 +1523,34 @@ def test_a_foldmap_module_changed_on_disk_is_loaded_fresh(tmp_path, monkeypatch)
     seen.clear()
     assert app._drop_changed_foldmap() == []  # first look records the stamps
     assert app._drop_changed_foldmap() == []  # nothing changed
-    name = next(n for n in seen if n.startswith("foldmap.") and n != "foldmap.app")
-    monkeypatch.setitem(seen, name, -1)  # as if that file changed since it was loaded
+    # final review M3: every .py of the package is stamped, a module this process never imported among them
+    loaded = {n.removeprefix("foldmap.").replace(".", "/") + ".py" for n in sys.modules if n.startswith("foldmap.")}
+    never = next(f for f in seen if f not in loaded and f != "__init__.py")
+    monkeypatch.setitem(seen, never, -1)  # as if that file changed on disk
     kept = dict(sys.modules)
     try:
         dropped = app._drop_changed_foldmap()
-        assert name in dropped and "foldmap.app" not in dropped
+        assert "foldmap.app_jobs" in dropped and "foldmap.app" not in dropped
         assert not any(n in sys.modules for n in dropped)
     finally:
         sys.modules.update(kept)
         seen.clear()
+
+
+def test_the_code_fingerprint_follows_a_module_never_imported(tmp_path):
+    """Plan 27 final review M3: the fingerprint hashes every .py file under the package on disk (sorted relative
+    paths), not only the modules a process has loaded: a change to one never imported changes it."""
+    from foldmap import app_jobs
+
+    (tmp_path / "used.py").write_text("x = 1\n")
+    (tmp_path / "sub").mkdir()
+    (tmp_path / "sub" / "never.py").write_text("y = 2\n")
+    first = app_jobs.code_fingerprint(tmp_path)
+    assert app_jobs.code_fingerprint(tmp_path) == first
+    (tmp_path / "sub" / "never.py").write_text("y = 3\n")
+    app_jobs.code_fingerprint.cache_clear()
+    assert app_jobs.code_fingerprint(tmp_path) != first
+    app_jobs.code_fingerprint.cache_clear()
 
 
 def _counting_render():

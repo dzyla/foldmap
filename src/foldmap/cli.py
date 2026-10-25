@@ -60,6 +60,7 @@ from .membrane import (
     slab_range,
 )
 from .membrane import joins as membrane_joins
+from .membrane import page_y as depth_page_y
 from .model import AUTO_NT, crop_nucleic, homolog_chains, nucleic_of_chains, nucleic_touching, res_ref
 from .names import all_names, apply_names, check_spec
 from .nucleic import StemView, stem_views, straight_duplex
@@ -1159,8 +1160,9 @@ def _membrane_places(sses, bb, mem, tm: set[str], faces) -> _Places:
     up = 1 if faces is None or faces[0] >= faces[1] else -1  # the page side of the outside
     band = band_set(sses, depth, mem)
     out = _Places(set(), {}, {}, {}, set())
-    if faces is not None:
-        mid, per = (faces[0] + faces[1]) / 2, (faces[0] - faces[1]) / (2 * mem.half)  # page y of depth d: mid + d * per
+    if faces is not None:  # the page y of a depth, by the measure A18 and the router read (final review M5)
+        band_y = (min(faces), max(faces))
+        at = lambda d: float(depth_page_y(d, band_y, mem.half, up))  # noqa: E731
     for s in sses:
         seg = depth[s.start : s.end + 1]
         if s.id in tm:
@@ -1174,15 +1176,15 @@ def _membrane_places(sses, bb, mem, tm: set[str], faces) -> _Places:
             if not slab_helix(s, depth, mem):
                 out.slab[s.id] = None  # crossing, not tm: at its projected height
             elif lying:
-                face = mid + nearer_face(seg, mem) * per  # the face slab_range lets it lie on
+                face = at(nearer_face(seg, mem))  # the face slab_range lets it lie on
                 out.slab[s.id] = (face, face, True)
             else:
-                y0, y1 = sorted(mid + d * per for d in slab_range(s, depth, mem))
+                y0, y1 = sorted(at(d) for d in slab_range(s, depth, mem))
                 out.slab[s.id] = (y0, y1, False)
                 out.standing.add(s.id)
             continue
         side, nearest = own_bound(seg)
-        out.bounds[s.id] = (side * up, mid + side * nearest * per)
+        out.bounds[s.id] = (side * up, at(side * nearest))
         if lying and abs(float(seg.mean())) <= mem.half + SOLUBLE_BEYOND:
             out.on_face[s.id] = side * up
     return out

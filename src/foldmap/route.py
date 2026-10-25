@@ -29,7 +29,6 @@ from .layout import (
 )
 from .membrane import (
     BAND_EPS,
-    LANE,
     band_ends,
     band_eps,
     band_set,
@@ -56,6 +55,10 @@ _TURN = 2.5
 _REUSE = 6.0  # extra cost for a cell an earlier loop already uses
 _SLAB_COST = 3.0  # extra cost for a cell inside the membrane slab: loops between TM helices go round it
 _SLAB_RUN = 12.0  # ... a step along the slab, not across it: a loop leaves the slab at a face (random-100 C26)
+# Since plan 27 Task 5 these costs, and route()'s slab-closed first search, are only a preference inside what a loop's
+# wall (_Wall, a hard obstacle, in a view laid out band-first) allows: where the wall lets a loop into the slab (its
+# residues there, its lanes) they still keep it out when they can; in any other view (a stack) they are all there is
+# (final review M6: retiring them would change membrane routes, a campaign re-measure)
 _PAD = 3.0
 _MAX_NODES = 200_000
 # a search that ran out of _MAX_NODES with its two ends joined by free cells is run once more with this budget
@@ -239,11 +242,6 @@ class _Grid:
             if not (loose or (rx0 - g < cx < rx1 + g and ry0 - g < cy < ry1 + g)):
                 return None
         return None
-
-
-_LANE = (
-    LANE  # membrane.LANE, the one lane width (P34, P36a): past an element's clearance by two cells, _INFLATE + 2 * RES
-)
 
 
 @dataclass

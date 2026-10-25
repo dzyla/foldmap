@@ -22,28 +22,41 @@ from dataclasses import fields, replace
 from pathlib import Path
 
 
+def _package_stamps(root: Path | None = None) -> dict[str, int | None]:
+    """Every .py file of the foldmap package on disk (under `root`, the package's own folder by default), by its path
+    relative to it in sorted order -> its modification time (None when it cannot be read): what _drop_changed_foldmap
+    compares, the modules no process has loaded yet included (plan 27 final review M3)."""
+    root = Path(__file__).resolve().parent if root is None else root
+    try:
+        paths = sorted(root.rglob("*.py"), key=lambda q: q.relative_to(root).as_posix())
+    except OSError:
+        paths = []
+    out: dict[str, int | None] = {}
+    for p in paths:
+        try:
+            out[p.relative_to(root).as_posix()] = p.stat().st_mtime_ns
+        except OSError:
+            out[p.relative_to(root).as_posix()] = None
+    return out
+
+
 def _drop_changed_foldmap(here: str = __name__) -> list[str]:
     """Streamlit Cloud updates the code in place and reruns this script, but the foldmap modules it already imported
     keep their old code in memory, so a new app.py can ask an old module for a name it does not have yet (an
-    ImportError until the app is rebooted). When any foldmap file changed on disk since it was loaded, forget every
-    foldmap module (not this one) so all of them load fresh and agree, and stop the jobs' forkserver, which
+    ImportError until the app is rebooted). When any foldmap file changed on disk since the last look (any .py of the
+    package, loaded or not: _package_stamps; a module only jobs import changes the figures too, and the code
+    fingerprint the figure cache is keyed on is taken again only when app_jobs loads afresh: final review M3), forget
+    every foldmap module (not this one) so all of them load fresh and agree, and stop the jobs' forkserver, which
     preloaded the old modules: the next job starts a fresh one (final review C-I3). Returns the names forgotten."""
     seen = sys.__dict__.setdefault("_foldmap_file_stamps", {})
-    mods = {n: m for n, m in sys.modules.items() if (n == "foldmap" or n.startswith("foldmap.")) and n != here}
-
-    def stamp(m):
-        try:
-            return os.stat(m.__file__).st_mtime_ns
-        except (AttributeError, TypeError, OSError):
-            return None
-
-    now = {n: stamp(m) for n, m in mods.items()}
-    if any(n in seen and now[n] != seen[n] for n in now):
+    mods = sorted(n for n in sys.modules if (n == "foldmap" or n.startswith("foldmap.")) and n != here)
+    now = _package_stamps()
+    if any(k in seen and seen[k] != v for k, v in now.items()):  # a file seen before changed (a new one: next look)
         for n in mods:
             del sys.modules[n]
         seen.clear()
         _stop_job_server()
-        return sorted(mods)
+        return mods
     seen.update(now)
     return []
 

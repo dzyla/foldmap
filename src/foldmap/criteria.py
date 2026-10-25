@@ -156,8 +156,9 @@ def membrane_checks(drawn, path) -> dict:
     (or its face, when all lie beyond it) but straight out of a band element's port, or, when its residues lie in the
     bilayer (their median in the slab), in the lane beside its own port where the layout draws that port past its
     bound, never through its own element (loop_in_band, rulings P14, P36-P38); a loop joining the two faces crosses the
-    band only in the strip at one of its own ports or past the band's ends (loop_crossing, rulings P34, P39). The
-    membrane is the one the figure was drawn with
+    band only in the strip at one of its own ports or past the band's ends (loop_crossing, rulings P34, P39). Loops are
+    judged on their routed polyline; the drawn rounded corners stay within its legs, and a corner at a port's stub
+    inside the strip at that port (final review M2). The membrane is the one the figure was drawn with
     (Layout.bilayer: found on every protein chain, whatever --chains draws); a figure with no band is judged as such,
     never by a membrane found again on the chains it draws."""
     from . import figcheck

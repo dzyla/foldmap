@@ -3980,13 +3980,44 @@ def _loop_boxes(layout: Layout) -> np.ndarray:
     return boxes + [1e-6, 1e-6, -1e-6, -1e-6]
 
 
-def _loop_path(loop: Loop, look: Style, boxes: np.ndarray) -> Path:
+def _beside_strips(layout: Layout, loop: Loop) -> np.ndarray:
+    """In a membrane view laid out band-first (Layout.banded): the band's rows on either side of the strips at the
+    loop's two ports (membrane.strip, the lanes A18 and the router read; plan 27 final review M2), as boxes a curved
+    corner keeps out of (_smooth_path), so a corner at a port's stub stays in its strip. None in any other view."""
+    if not getattr(layout, "banded", False) or not layout.membrane:
+        return None
+    from .membrane import strip
+
+    pa, pb = layout.placed.get(loop.a_id), layout.placed.get(loop.b_id)
+    if pa is None or pb is None:
+        return None
+    spans = sorted([strip(pa.c_port, pa.rect), strip(pb.n_port, pb.rect)])
+    merged = [list(spans[0])]
+    for x0, x1 in spans[1:]:
+        if x0 <= merged[-1][1]:
+            merged[-1][1] = max(merged[-1][1], x1)
+        else:
+            merged.append([x0, x1])
+    far = 1e9
+    xs = [-far, *(v for span in merged for v in span), far]
+    boxes = [
+        (a + 1e-6, b0 + 1e-6, b - 1e-6, b1 - 1e-6)
+        for b0, b1 in layout.membrane.get("bands") or [layout.membrane["y"]]
+        for a, b in zip(xs[::2], xs[1::2])
+    ]
+    return np.array(boxes, float).reshape(-1, 4)
+
+
+def _loop_path(loop: Loop, look: Style, boxes: np.ndarray, layout: Layout | None = None) -> Path:
     """A loop's line as drawn: a fallback curve as it is, else the route with smooth (Style.loops curved) or rounded
-    corners."""
+    corners. A curved corner keeps out of the element boxes and, in a membrane view laid out band-first, out of the band
+    beside the strips at the loop's own ports (_beside_strips): a corner at a stub stays in its strip, as a rounded one
+    (radius _CORNER, under the strip's half width) always does."""
     if loop.fallback:  # already a smooth curve
         return _polyline(loop.points)
     if look.loops == "curved":
-        return _smooth_path(loop.points, boxes)
+        extra = _beside_strips(layout, loop) if layout is not None else None
+        return _smooth_path(loop.points, boxes if extra is None else np.vstack([boxes, extra]))
     return _rounded_path(loop.points)
 
 
@@ -3996,7 +4027,7 @@ def drawn_lines(layout: Layout, loops: list[Loop], look: Style) -> list[np.ndarr
     boxes = _loop_boxes(layout)
     out = []
     for loop in loops:
-        pieces = _loop_path(loop, look, boxes).to_polygons(closed_only=False) if len(loop.points) > 1 else []
+        pieces = _loop_path(loop, look, boxes, layout).to_polygons(closed_only=False) if len(loop.points) > 1 else []
         out.append(np.concatenate(pieces) if pieces else np.asarray(loop.points, float).reshape(-1, 2))
     return out
 
@@ -4012,7 +4043,7 @@ def _draw_loops(c: _Canvas, layout: Layout, loops: list[Loop], sses: list[SSE], 
     for i, loop in enumerate(loops):
         z = (_OVER_LOOP_Z if lifted & {loop.a_id, loop.b_id} else Z["loop"]) + i * 1e-3
         loop_lw = c.loop_lw * layout.loop_widths.get(loop.a_id, 1.0)  # a width set by hand
-        path = _loop_path(loop, c.look, boxes)
+        path = _loop_path(loop, c.look, boxes, layout)
         name = f"{loop.a_id}>{loop.b_id}"
         casing = PathPatch(
             path,

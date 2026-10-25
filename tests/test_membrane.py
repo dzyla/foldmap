@@ -504,6 +504,30 @@ def _closed_barrel_strands(bb):
     return [s for s in barrel.strands if len(s) >= 7]
 
 
+def test_every_strand_of_the_barrel_defining_the_membrane_is_of_the_band():
+    """Plan 27 final review M1 (design 1: "the strands of a membrane-crossing barrel"): a strand of the barrel that
+    defines the membrane (Membrane.defining) is of the band though too short to cross it, as the layout keeps the
+    barrel's sheet whole with the band; a short strand outside the barrel is not. 9FWZ's FimD barrel: every strand
+    of it is of the band (as estimated here each crosses the band anyway)."""
+    from foldmap.dssp import assign_dssp
+    from foldmap.membrane import Membrane, band_set, in_band
+    from foldmap.ss import build_sses
+    from helpers import fake_sse
+
+    depth = np.concatenate([np.linspace(-4.0, 4.0, 5), np.linspace(-4.0, 4.0, 5)])
+    short, other = fake_sse("E", 0, 4), fake_sse("E", 5, 9)
+    m = Membrane(np.array([0.0, 0.0, 1.0]), 0.0, 12.0, "estimate", defining=frozenset(range(5)))
+    assert in_band(short, depth, m) and not in_band(other, depth, m)
+    path = R100 / "9FWZ-DB.cif.gz"
+    bb = load_backbone(path, "asu")
+    mem = find_membrane(path, bb)
+    dssp = assign_dssp(bb)
+    sses = build_sses(bb, dssp.ss, bridges=dssp.bridges)
+    d = mem.depth(bb.ca)
+    barrel = [s for s in sses if s.kind == "E" and mem.defining.issuperset(range(s.start, s.end + 1))]
+    assert len(barrel) >= 20 and {s.id for s in barrel} <= band_set(sses, d, mem)
+
+
 @pytest.mark.parametrize("name", OMP_NORMALS)
 def test_outer_membrane_barrels_are_recognised(name):
     """9FWZ (the FimD usher, author: "9FWZ does not draw membrane") and OmpA: the barrel's axis is the normal, the
@@ -1076,8 +1100,9 @@ def test_the_band_holds_crossing_helices_helices_in_the_slab_and_crossing_strand
     """Plan 27 rulings P5, P10, P11 (membrane.in_band, the one rule A18 and the layout take the band by): the band holds
     a helix crossing the membrane; a helix or 3-10 helix whose CA median lies in the slab, at any tilt (P10: flat, or
     standing short of crossing, as ComEC's TM7); and a strand crossing the membrane, of a barrel or in a barrel's
-    lumen (P11: 9FWZ's FimA, of no barrel defining the membrane). Not a helix whose CA median lies beyond a face, flat
-    or standing, nor an interfacial strand, even one Membrane.defining names."""
+    lumen (P11: 9FWZ's FimA, of no barrel defining the membrane), or any strand of the barrel defining the membrane
+    (Membrane.defining, final review M1: a short one too). Not a helix whose CA median lies beyond a face, flat or
+    standing, nor an interfacial strand of no defining barrel."""
     from foldmap.membrane import band_set, own_side, slab_helix
 
     runs = {
@@ -1095,10 +1120,10 @@ def test_the_band_holds_crossing_helices_helices_in_the_slab_and_crossing_strand
     assert band_set(sses, depth, mem) == expected
     assert {s.id for s in sses if slab_helix(s, depth, mem)} == {"flat-in", "eta-in", "standing"}
     by = {s.id: s for s in sses}
-    for named in ("tm", "interfacial"):  # a barrel elsewhere (the strand crossing in its lumen), or named interfacial
+    for named in ("tm", "interfacial"):  # a barrel elsewhere (the strand crossing in its lumen), or a strand of it
         barrel = frozenset(range(by[named].start, by[named].end + 1))
         _, sses, mem, depth = _a18(runs, defining=barrel)
-        assert band_set(sses, depth, mem) == expected, named
+        assert band_set(sses, depth, mem) == expected | ({named} if by[named].kind == "E" else set()), named
     assert own_side(np.array([-1.0, 1.0])) == 1 and own_side(np.array([-2.0, 1.0])) == -1
 
 
@@ -1217,9 +1242,10 @@ _DIPPING_TM = np.array([15.0, 10.0, 5.0, 0.0, -3.0, -1.0, 1.0])  # crosses, its 
 def test_a18_excuses_a_loop_climbing_beside_its_own_band_element_never_through_it():
     """Ruling P36a (5LDW H:74-84>H:102-110: a transmembrane helix drawn across the band, design 2, its C end at the
     inner face, its loop's residues 2-14 Å out, in the bilayer). The loop cannot leave that port but from past its
-    bound (2 Å out); it may climb the lane beside its own helix (membrane.loop_lanes: its box ± LANE, from the port to
-    the bound) and A18 excuses that. A line through the helix's own box is never excused, not as a lane and not as its
-    stub (straight up its port's column towards its side): the loophole the router never used, now flagged."""
+    bound (2 Å out); it may climb the lane beside its own helix (membrane.loop_lanes: the strip at its port, its x ±
+    half the helix's width and LANE, rulings P38, P41; from the port to the bound) and A18 excuses that. A line
+    through the helix's own box is never excused, not as a lane and not as its stub (straight up its port's column
+    towards its side): the loophole the router never used, now flagged."""
     runs = {
         "tm": ("H", _DIPPING_TM, UPRIGHT, (10.0, 0.0)),  # N at the outer face, C port at (0, 0) pointing down
         "l": (None, np.linspace(2.0, 14.0, 6), None, (0, 0)),
