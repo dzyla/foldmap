@@ -143,8 +143,8 @@ def membrane_checks(drawn, path) -> dict:
     """A18 on a --membrane auto figure (figcheck.membrane_view; plan 27 Task 2, rulings P3-P6, P10, P11): each TM
     helix (its CA run crosses the membrane's mid-plane and spans half its thickness, membrane.crosses) enters its band
     through a face and reaches past its middle (C27 ruling); and, every drawn body and loop segment judged against the
-    band with no tolerance: a helix in the slab that crosses none is drawn inside the band at its own depth range
-    (slab_helix);
+    band with no tolerance: a helix in the slab that crosses none has its axis at its own depth range, a flat one
+    perhaps on its nearer face (slab_helix, ruling P13: its axis, not its body);
     only the band's elements (membrane.band_set) overlap the band (band_member), no β-strand crossing no membrane
     among them (strand_in_band); every other element is drawn no nearer the mid-plane than its nearest residue
     (outside_in_band) and on its own side (wrong_side); a loop whose residues all lie beyond a face enters the slab only

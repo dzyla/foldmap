@@ -915,8 +915,9 @@ def _y(depth: float) -> float:
 
 def _a18(runs, loops=None, defining=None):
     """figcheck.membrane_view on a 30 Å slab (normal z, mid-plane at 0) drawn as the band 0..10, the outside up (_y).
-    runs: id -> (kind, CA depths, axis, (drawn page y of the N port, of the C port)), in sequence; each element drawn
-    upright at x = 0, 1 wide; kind None: residues no element holds (a loop's). loops: (a, b, points)."""
+    runs: id -> (kind, CA depths, axis, (N port, C port)), in sequence: a port is a page y (at x = 0) or an (x, y)
+    point; each element is drawn 1 wide about the line between its ports, its rect that body's bounding box; kind
+    None: residues no element holds (a loop's). loops: (a, b, points)."""
     from types import SimpleNamespace
 
     from foldmap.figcheck import membrane_view
@@ -925,12 +926,17 @@ def _a18(runs, loops=None, defining=None):
 
     mem = Membrane(np.array([0.0, 0.0, 1.0]), 0.0, 15.0, "estimate", defining=defining)
     ca, sses, placed = [], [], {}
-    for name, (kind, z, axis, (y0, y1)) in runs.items():
+    for name, (kind, z, axis, ports) in runs.items():
         if kind is not None:
             s = SimpleNamespace(id=name, kind=kind, axis=np.array(axis), start=len(ca), end=len(ca) + len(z) - 1)
             sses.append(s)
-            rect = (-0.5, min(y0, y1), 0.5, max(y0, y1))
-            placed[name] = SimpleNamespace(sse=s, rect=rect, n_port=(0.0, y0), c_port=(0.0, y1), cy=(y0 + y1) / 2)
+            n, c = (np.array(q, float) if np.ndim(q) else np.array([0.0, q]) for q in ports)
+            d = c - n
+            d = d / np.hypot(*d) if np.hypot(*d) > 0 else np.array([0.0, 1.0])
+            side = np.array([-d[1], d[0]]) / 2
+            corners = np.array([n + side, n - side, c + side, c - side])
+            rect = (*corners.min(axis=0), *corners.max(axis=0))
+            placed[name] = SimpleNamespace(sse=s, rect=rect, n_port=tuple(n), c_port=tuple(c), cy=(n[1] + c[1]) / 2)
         ca += [(0.0, 0.0, float(v)) for v in z]
     band = (0.0, 10.0)
     lay = SimpleNamespace(membrane={"y": band, "bands": [band], "inside": "below"}, placed=placed, ghosts=[])
@@ -971,24 +977,36 @@ def test_the_band_holds_crossing_helices_helices_in_the_slab_and_crossing_strand
     assert own_side(np.array([-1.0, 1.0])) == 1 and own_side(np.array([-2.0, 1.0])) == -1
 
 
-def test_a18_holds_a_helix_in_the_slab_inside_the_band_at_its_own_depth_range():
-    """Ruling P10 (slab_helix): a helix of the band crossing no membrane, its CA median in the slab, is drawn inside the
-    band at its own depth range (Å past it, the furthest): not stretched across the band (ComEC's TM7, A:328-339,
-    -8.8 to +5.1 Å, drawn from face to face), not on the face row outside it, not 1 Å deeper than its deepest CA, not
-    past a face though its CA atoms reach there (5LDW L:212-222, 4.0 to 18.3 Å). Drawn
-    at its depths, flat or standing, it passes; none of these is judged as an element off the band."""
+def test_a18_holds_a_helix_in_the_slab_by_its_axis_at_its_own_depth_range():
+    """Rulings P10, P13 (slab_helix): a helix of the band crossing no membrane, its CA median in the slab, is judged by
+    its axis (its ports), not its body (Å off, the furthest). Standing, the axis lies inside the band and within its
+    CA atoms' depths: not stretched across the band (ComEC's TM7, A:328-339, -8.8 to +5.1 Å, drawn face to face), not
+    1 Å deeper than its deepest CA, not past a face though its CA atoms reach there (5LDW L:212-222, 4.0 to 18.3 Å);
+    drawn to its depth span it passes, tilted on the page too (its body's corners reach further). Flat, the axis lies
+    within its CA depths extended to its nearer face: on the face line (Fig. 1C's NS7, A:436-461, its CA atoms past
+    it or all inside), or inside no deeper than its deepest CA; not on the face row outside the band, nor deeper. None
+    is judged as an element off the band."""
     tm7 = np.linspace(-8.8, 5.1, 12)
     flat = np.array([10.5, 11.0, 12.0, 12.5, 13.0, 14.9])
+    ns7 = np.array([12.5, 13.0, 13.9, 14.5, 16.0, 18.7])  # median 14.2, its outer CA atoms beyond the face
+
+    def across(depth):  # a flat helix drawn along the page, its axis at this depth
+        return ((-2.0, _y(depth)), (2.0, _y(depth)))
+
     runs = {
         "tm7": ("H", tm7, UPRIGHT, (_y(-8.8), _y(5.1))),
+        "tilted": ("H", tm7, UPRIGHT, ((-1.0, _y(-8.8)), (1.0, _y(5.1)))),
         "stretched": ("H", tm7, UPRIGHT, (_y(-15.0), _y(15.0))),
-        "on-face": ("H", np.full(6, 12.0), FLAT, (_y(15.6), _y(16.6))),
         "deeper": ("H", tm7, UPRIGHT, (_y(-9.8), _y(4.1))),
-        "snug-flat": ("H", flat, FLAT, (_y(10.5), _y(14.9))),
         "past-face": ("H", np.linspace(4.0, 18.0, 8), UPRIGHT, (_y(4.0), _y(18.0))),  # at its depths, past the face
+        "on-face": ("H", ns7, FLAT, across(15.0)),
+        "on-face-below": ("H", np.array([11.0, 12.0, 12.5, 13.0, 13.5, 14.0]), FLAT, across(15.0)),  # CA all inside
+        "inside": ("H", flat, FLAT, across(12.7)),
+        "face-row": ("H", np.full(6, 12.0), FLAT, across(16.6)),
+        "flat-deep": ("H", flat, FLAT, across(9.5)),
     }
     view, *_ = _a18(runs)
-    assert view["slab_helix"] == ["stretched 9.9", "on-face 4.6", "deeper 1.0", "past-face 3.0"], view
+    assert view["slab_helix"] == ["stretched 9.9", "deeper 1.0", "past-face 3.0", "face-row 1.6", "flat-deep 1.0"]
     assert view["band_member"] == [] and view["outside_in_band"] == [] and view["tm_helices"] == 0, view
 
 

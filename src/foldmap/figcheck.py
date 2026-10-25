@@ -21,7 +21,7 @@ from matplotlib.path import Path as MPath
 from matplotlib.transforms import Affine2D, Bbox
 
 from .layout import block_ghosts, crosses_band, joined_pieces, lying_over
-from .membrane import band_set, crosses, own_side, slab_helix
+from .membrane import band_set, crosses, lies_flat_here, own_side, slab_helix
 from .na_curve import _FAR, on_curves
 
 # Lines a text can be crossed by (render's gids, matched by prefix). A loop's casing (loopcase:) and a stub's edge
@@ -1784,8 +1784,9 @@ def membrane_view(layout, sses, bb, mem, loops=None) -> dict:
       half its thickness); tm_short, those that do not cross their band (crosses_band), with the share of the band
       they cover;
     - slab_helix, the helices of the band that cross no membrane, their CA median in the slab (membrane.slab_helix,
-      ruling P10), whose drawn body is not inside the band at their own depth range: it reaches past a face, or
-      deeper than their CA atoms either way (Å, the furthest);
+      ruling P10) whose axis (its two ports: ruling P13, the one part not judged on the body) lies off their own depth
+      range (Å, the furthest): a standing one's past a face or past its CA atoms' depths either way; a flat one's
+      (membrane.lies_flat_here) past its CA depths extended to its nearer face, where it may lie (Fig. 1C's NS1, NS7);
     - band_member, the elements not of the band (membrane.in_band: crossing helices, helices in the slab at any tilt,
       crossing strands) whose drawn body overlaps a band;
     - strand_in_band, those of them that are β-strands (an interfacial strand is never in the membrane);
@@ -1820,11 +1821,16 @@ def membrane_view(layout, sses, bb, mem, loops=None) -> dict:
             if not crosses_band((lo, hi), (y0, y1)):
                 short.append(f"{s.id} {(min(hi, y1) - max(lo, y0)) / max(y1 - y0, 1e-9):.2f}")
         if s.id in band:
-            if slab_helix(s, depth, mem):  # inside the band at its own depth range (P10)
-                _, y0, _, y1 = p.rect
-                b = _nearest_band(bands, (y0 + y1) / 2)
-                lo, hi = sorted(_drawn_depth(y, b, half, up) for y in (y0, y1))
-                off = max(-half - lo, hi - half, float(seg.min()) - lo, hi - float(seg.max()))
+            if slab_helix(s, depth, mem):  # its axis at its own depth range (P10, P13)
+                ends = (p.n_port[1], p.c_port[1])
+                b = _nearest_band(bands, sum(ends) / 2)
+                lo, hi = sorted(_drawn_depth(y, b, half, up) for y in ends)
+                deep, shallow = float(seg.min()), float(seg.max())
+                if lies_flat_here(s.axis, seg, mem):  # on its nearer face, or inside no deeper than its CA atoms
+                    face = half if float(np.median(seg)) >= 0 else -half
+                    off = max(min(deep, face) - lo, hi - max(shallow, face))
+                else:  # standing: inside the band, within its CA atoms' depths
+                    off = max(-half - lo, hi - half, deep - lo, hi - shallow)
                 if off > _eps(b, half):
                     flats.append(f"{s.id} {off:.1f}")
             continue

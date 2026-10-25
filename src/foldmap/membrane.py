@@ -351,8 +351,8 @@ def in_band(s: SSE, depth: np.ndarray, m: Membrane) -> bool:
 
 def slab_helix(s: SSE, depth: np.ndarray, m: Membrane) -> bool:
     """Is element `s` a helix of the band that does not cross the membrane: a helix (HELIX_KINDS) whose CA median lies
-    inside the slab, at any tilt (ruling P10)? It is drawn inside the band at its own depth range, never stretched
-    across it (figcheck.membrane_view's slab_helix)."""
+    inside the slab, at any tilt (ruling P10)? Its axis is drawn at its own depth range, a flat one perhaps on its
+    nearer face, never stretched across the band (figcheck.membrane_view's slab_helix, ruling P13)."""
     seg = np.asarray(depth)[s.start : s.end + 1]
     return s.kind in HELIX_KINDS and not crosses(seg, m.half) and abs(float(np.median(seg))) < m.half
 
