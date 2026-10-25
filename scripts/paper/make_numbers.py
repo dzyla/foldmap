@@ -597,6 +597,7 @@ def build_homologues(nb: Numbers):
         h = load_source("hom_summary")
     except (OSError, KeyError, ValueError):
         return  # the harness commit predates the held-out run: the keys stay unset
+    quotable("hom_summary", h)  # never a summary of mixed code or one not for the paper (ruling Q18)
     src = ["hom_summary"]
     pos, neg = h["positives"], h["negatives"]
     nb.put("hom_seed", h["seed"], str(h["seed"]), src, "homologues.py sample --seed")
@@ -763,14 +764,15 @@ def main() -> int:
         "The three random-100 reports record foldmap_commit 7696947 for the report and every entry. Per "
         "docs/validation/random100/review.md (838c579), the run itself recorded 'unknown' (zyla-lab's synced tree has "
         "no .git); 7696947 was stamped into the reports afterwards from that synced tree and the reports were judged "
-        "again from the measurements, with the same counts.",
+        "again from the measurements, with the same counts. Having no source stamp, they are recorded as legacy (no "
+        "measured-at commit; the written 7696947 kept as legacy_foldmap_commit, never used: plan 28 ruling Q11).",
         "One code commit lies between 7696947 and the harness commit 838c579: e5b4bae (route._MAX_NODES_WINDOWS, a "
         "coarse page's fine windows share a pool of their own). Per its message and the reviews' after-the-run notes "
         "it changes 7NZ2's domains view (held-out sample; 7NZ2 still fails) and 9FZL's (third sample; still fails, 5 "
         "-> 2 fallback curves). The counts here are as measured at 7696947; they were not rerun at 838c579.",
-        "The NA report.json carries no commit; its measurement commit (7696947) is read from review.md's last rerun "
-        "heading. e5b4bae (routing of huge pages' windows) is not expected to touch the 39 NA entries, but they were "
-        "not rerun at 838c579.",
+        "The NA report.json carries no source stamp (written before plan 28 Task 1): the code that measured it is not "
+        "recorded by the run, and no commit is read for it from anywhere else (ruling Q11). e5b4bae (routing of huge "
+        "pages' windows) is not expected to touch the 39 NA entries, but they were not rerun at 838c579.",
         "r100_held_pass_first is read at 1ef0706: the held-out first run (drawings at 5650dbd for 92 entries, 44a1c1b "
         "for the 8 redrawn after the check corrections of F1 fix round 1). It is a historical count by design.",
         "Domain scores (dom_cal/held/fresh) are computed by domains.py from the committed fixtures with the code at "

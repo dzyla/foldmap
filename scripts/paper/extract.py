@@ -67,8 +67,9 @@ def _stamp_commit(st: dict) -> str | None:
 def recorded_commits(name: str, data, repo=REPO) -> tuple[dict, str, list[str]]:
     """The code a source was measured (or a sample drawn) with, read from its own source stamps only (ruling Q11), each
     verified against the commit it names (verify_stamp.py); where that comes from; and the problems that stop the
-    numbers: a stamp that does not verify, entries measured by different code (mixed_code), a report run outside its
-    paper protocol (not_for_paper)."""
+    numbers: a stamp that does not verify (a dirty or unknown tree included: ruling Q16), entries measured by different
+    code (mixed_code) or at more than one commit (Q17), a report run outside its paper protocol (not_for_paper).
+    The record keeps the stamp's git source (git or asserted by runner) and dirty flag."""
     if not isinstance(data, dict):  # an NA report written before the stamp: the bare list of rows
         return {"report": None}, LEGACY, []
     st = data.get("source_stamp")
@@ -85,7 +86,18 @@ def recorded_commits(name: str, data, repo=REPO) -> tuple[dict, str, list[str]]:
     for r in checked:
         if not r["verified"]:
             problems.append(f"{name}: stamp {r['code_fingerprint']} not verified: {r['why']}")
-    rec = {key: _stamp_commit(st), "code_fingerprint": st.get("code_fingerprint"), "verified": checked}
+    commits = sorted({r["commit"] for r in checked if r["verified"]})
+    if len(commits) > 1:  # entries measured at different commits (scripts/ outside the code key: ruling Q17)
+        problems.append(f"{name}: measured at {len(commits)} commits {[c[:7] for c in commits]} (mixed)")
+    git = st.get("git") or {}
+    rec = {
+        key: _stamp_commit(st),
+        "source": git.get("source"),
+        "dirty": git.get("dirty"),
+        "code_fingerprint": st.get("code_fingerprint"),
+        "verified": checked,
+        "commits": commits,
+    }
     if "entry_code" in data:
         rec["entry_code"] = data["entry_code"]
     how = "the file's source stamps (git or asserted by the runner), each verified against its commit's src/foldmap"

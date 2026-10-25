@@ -5,7 +5,8 @@ make_numbers.py. Nothing here is typed in: every value is counted from those fil
 
   DSSP vs mkdssp   data/m2/dssp/          (dssp_mkdssp.py on zyla-lab)
   membrane vs OPM  data/m2/membrane/      (membrane_opm.py on zyla-lab; OPM files from opm_fetch.py in data/opm/)
-  pseudoknots      data/m2/na/report.json (scripts/na_validate.py at 2467011 on zyla-lab)
+  pseudoknots      data/m2/na/report.json (scripts/na_validate.py; its code from its own verified stamp, else
+                                          labelled "no source stamp", as the current, pre-stamp file is)
   determinism      data/m2/determinism/   (scripts/paper/determinism.py: the Linux leg on zyla-lab; the CI artifacts)
 """
 
@@ -449,6 +450,19 @@ def write_membrane_table(rows: list[dict]) -> None:
 # ---- pseudoknots -----------------------------------------------------------------------------------------------------
 
 
+def _na_code(raw) -> str:
+    """The NA rerun's code, as a source label: its own stamp, checked by verify_stamp (ruling Q11; Q18). A stamp that
+    does not verify (or a file from before the stamps) is labelled "no source stamp ...", never quoted at a commit."""
+    if not (isinstance(raw, dict) and raw.get("source_stamp")):
+        return stamped_commit(raw)
+    from verify_stamp import verify_report
+
+    checked = verify_report(raw)
+    if checked and all(r["verified"] for r in checked):
+        return f"{stamped_commit(raw)}, verified"
+    return "no source stamp verified (" + "; ".join(r["why"] for r in checked if not r["verified"]) + ")"
+
+
 def build_pk(nb, committed_na: list[dict]) -> None:
     path = M2 / "na" / "report.json"
     if not path.exists():
@@ -466,7 +480,7 @@ def build_pk(nb, committed_na: list[dict]) -> None:
     )
     if not same or passed != sum(not e["failed"] for e in committed_na):
         raise SystemExit("NA rerun differs from the committed report beyond pk_* and seconds")
-    commit = stamped_commit(raw)  # from the report's own stamp only (ruling Q11; no COMMIT file)
+    commit = _na_code(raw)  # from the report's own stamp, verified (rulings Q11, Q18; no COMMIT file)
     src = [
         f"data/m2/na/report.json (scripts/na_validate.py --require-rnapolis, {commit}; every other "
         "field equal to docs/validation/na/report.json, asserted)"

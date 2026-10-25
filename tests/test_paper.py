@@ -250,6 +250,22 @@ def test_a_stamp_is_verified_against_the_commit_it_names(tmp_path, monkeypatch):
     assert "not a commit" in verify.verify_report({"source_stamp": asserted}, repo=tmp_path)[0]["why"]
     nothing = st | {"git": None}
     assert "names no commit" in verify.verify_report({"source_stamp": nothing}, repo=tmp_path)[0]["why"]
+    # ruling Q16: a dirty tree, or one of unknown state, never verifies, even when src/foldmap and the script match
+    sibling = tmp_path / "scripts" / "na_validate.py"  # a script the campaign loads, outside the code key
+    sibling.write_text("print(2)\n", encoding="utf-8")
+    git("add", ".")
+    git("commit", "-q", "-m", "sibling")
+    head2 = git("rev-parse", "HEAD")
+    sibling.write_text("print(3)\n", encoding="utf-8")  # an uncommitted edit
+    dirty = source_stamp(script, package=pkg)
+    assert dirty["git"]["dirty"] is True and dirty["git"]["dirty_paths"] == ["scripts/na_validate.py"]
+    got = verify.verify_report({"source_stamp": dirty}, repo=tmp_path)[0]
+    assert got["verified"] is False and "dirty" in got["why"] and got["commit"] == head2
+    unknown = st | {"git": {"commit": head, "dirty": None, "source": "asserted by runner"}}
+    got = verify.verify_report({"source_stamp": unknown}, repo=tmp_path)[0]
+    assert got["verified"] is False and "unknown" in got["why"]
+    asserted_clean = st | {"git": {"commit": head, "dirty": False, "source": "asserted by runner"}}
+    assert verify.verify_report({"source_stamp": asserted_clean}, repo=tmp_path)[0]["verified"] is True
     # a paper step's run stamp: checked against the harness commit its tree was exported at
     run = {"source_stamp": {"harness_commit": head, "source_stamp": st | {"git": None}}}
     assert verify.verify_report(run, repo=tmp_path)[0]["verified"] is True
@@ -269,7 +285,7 @@ def test_extract_reads_commits_from_stamps_only_and_refuses_mixed_or_unquotable_
     assert rec == {"report": None} and "no source stamp" in how and not stop
     rec, how, stop = extract.recorded_commits("r100_third_report", {"foldmap_commit": "7696947", "entries": []})
     assert rec == {"report": None, "legacy_foldmap_commit": "7696947"} and not stop  # asserted after the run: unused
-    _, pkg, script, head = _repo_with_foldmap(tmp_path)
+    git, pkg, script, head = _repo_with_foldmap(tmp_path)
     st = source_stamp(script, package=pkg)
     doc = {"source_stamp": st, **code_mix([st]), "entries": [{"entry": "1EHZ", "source_stamp": st}]}
     rec, _, stop = extract.recorded_commits("na_report", doc, repo=tmp_path)
@@ -280,6 +296,13 @@ def test_extract_reads_commits_from_stamps_only_and_refuses_mixed_or_unquotable_
     assert any("not for the paper" in p for p in extract.recorded_commits("na_report", marked, repo=tmp_path)[2])
     forged = doc | {"source_stamp": st | {"code_fingerprint": "0" * 16}}
     assert any("not verified" in p for p in extract.recorded_commits("na_report", forged, repo=tmp_path)[2])
+    assert rec["dirty"] is False and rec["source"] == "git" and rec["commits"] == [head]
+    # ruling Q17: verified stamps at two commits (scripts/ is outside the code key) are a mixed report
+    git("commit", "-q", "--allow-empty", "-m", "two")
+    later = st | {"git": st["git"] | {"commit": git("rev-parse", "HEAD")}}
+    two = doc | {"entries": [{"entry": "1EHZ", "source_stamp": st}, {"entry": "1FFK", "source_stamp": later}]}
+    rec2, _, stop2 = extract.recorded_commits("na_report", two, repo=tmp_path)
+    assert len(rec2["commits"]) == 2 and any("2 commits" in p for p in stop2)
 
 
 def test_make_numbers_refuses_a_mixed_or_unquotable_report():

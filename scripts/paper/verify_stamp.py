@@ -9,8 +9,10 @@ A run on a machine without .git records only the code fingerprint and the commit
 report's own, each entry's, and those nested in a paper step's run stamp), it exports src/foldmap at the commit the
 stamp names (`git archive` into a temporary folder; --commit, else a run stamp's harness_commit, comes first) and
 computes its fingerprint with the same function the stamp used (app_jobs.code_fingerprint, from this checkout). The
-stamp is verified when the fingerprints agree and, where the stamp names its script, the script's text at that commit
-hashes to the stamp's SHA-256. Needs this checkout's .git. Exit 0 only when every stamp is verified.
+stamp is verified when the tree it ran from was clean (git.dirty False: a dirty or unknown state is refused, as the
+dirty scope covers scripts/ and tests/data, which the fingerprint does not; a paper step's run stamp, whose code is
+build/tree, is exempt), the fingerprints agree and, where the stamp names its script, the script's text at that
+commit hashes to the stamp's SHA-256. Needs this checkout's .git. Exit 0 only when every stamp is verified.
 """
 
 from __future__ import annotations
@@ -67,32 +69,42 @@ def script_sha256(commit: str, name: str, repo: Path = REPO) -> str | None:
 
 
 def verify(stamp: dict, commit: str | None, repo: Path = REPO, _seen: dict | None = None) -> dict:
-    """{commit, verified, why}: does the stamp's code (and script) match `commit`'s?"""
+    """{commit, verified, why, dirty}: does the stamp's code (and script) match `commit`'s? A stamp of the checkout
+    itself (not a paper step's build/tree) verifies only when its tree was clean (git.dirty is False): the dirty scope
+    covers scripts/ and tests/data, which the fingerprint and the one script hash do not (ruling Q16); a dirty or
+    unknown state (an asserted commit without FOLDMAP_GIT_DIRTY) is refused."""
+    git = stamp.get("git") or {}
+    dirty = git.get("dirty")
+    is_run_tree = git.get("commit") != commit  # a run stamp: the code is build/tree at its harness commit
     if not commit:
-        return {"commit": None, "verified": False, "why": "the stamp names no commit (no git, nothing asserted)"}
+        return {"commit": None, "verified": False, "dirty": dirty,
+                "why": "the stamp names no commit (no git, nothing asserted)"}  # fmt: skip
     try:
         full = subprocess.run(
             ["git", "-C", str(repo), "rev-parse", "--verify", f"{commit}^{{commit}}"],
             capture_output=True, text=True, check=True,
         ).stdout.strip()  # fmt: skip
-    except subprocess.CalledProcessError:
-        return {"commit": commit, "verified": False, "why": f"{commit} is not a commit of this repository"}
+    except (subprocess.CalledProcessError, OSError):
+        return {"commit": commit, "verified": False, "dirty": dirty,
+                "why": f"{commit} is not a commit of this repository (or no git here)"}  # fmt: skip
+    if not is_run_tree and dirty is not False:
+        state = "dirty" if dirty else "of unknown cleanliness"
+        return {"commit": full, "verified": False, "dirty": dirty,
+                "why": f"the tree was {state} when it ran ({', '.join(git.get('dirty_paths', [])[:5])})"}  # fmt: skip
     seen = _seen if _seen is not None else {}
     if full not in seen:
         seen[full] = tree_fingerprint(full, repo)
     want = seen[full]
     if stamp.get("code_fingerprint") != want:
         why = f"code fingerprint {stamp.get('code_fingerprint')} is not {full[:7]}'s src/foldmap ({want})"
-        return {"commit": full, "verified": False, "why": why}
+        return {"commit": full, "verified": False, "dirty": dirty, "why": why}
     script = stamp.get("script") or {}
-    is_run_tree = (stamp.get("git") or {}).get(
-        "commit"
-    ) != commit  # a run stamp: the script is the checkout's, not the tree's
     if script.get("name") and script.get("sha256") and not is_run_tree:
         got = script_sha256(full, script["name"], repo)
         if got != script["sha256"]:
-            return {"commit": full, "verified": False, "why": f"{script['name']} differs from {full[:7]}'s"}
-    return {"commit": full, "verified": True, "why": ""}
+            return {"commit": full, "verified": False, "dirty": dirty,
+                    "why": f"{script['name']} differs from {full[:7]}'s"}  # fmt: skip
+    return {"commit": full, "verified": True, "dirty": dirty, "why": ""}
 
 
 def verify_report(doc, commit: str | None = None, repo: Path = REPO) -> list[dict]:
@@ -100,7 +112,12 @@ def verify_report(doc, commit: str | None = None, repo: Path = REPO) -> list[dic
     seen: dict = {}
     done: dict[tuple, dict] = {}
     for st, c in stamps(doc, commit):
-        key = (st.get("code_fingerprint"), (st.get("script") or {}).get("sha256"), c)
+        key = (
+            st.get("code_fingerprint"),
+            (st.get("script") or {}).get("sha256"),
+            (st.get("git") or {}).get("dirty"),
+            c,
+        )
         if key not in done:
             done[key] = verify(st, c, repo, seen) | {"code_fingerprint": st.get("code_fingerprint")}
     return list(done.values())

@@ -198,16 +198,28 @@ NOT_REPORTS = {
 }
 
 
+def _is_key(node) -> bool:
+    return isinstance(node, ast.Constant) and node.value == "source_stamp"
+
+
 def _uses_stamp(fn: ast.AST) -> bool:
+    """Takes the stamp (a call to it, or the stamp taken at start), or WRITES the "source_stamp" key: a dict literal's
+    key, a subscript assignment, a keyword, setdefault. Reading the key from an input does not count (ruling Q18)."""
     for node in ast.walk(fn):
         if isinstance(node, ast.Call):
             f = node.func
             name = f.id if isinstance(f, ast.Name) else f.attr if isinstance(f, ast.Attribute) else None
             if name in STAMP_CALLS:
                 return True
+            if name == "setdefault" and node.args and _is_key(node.args[0]):
+                return True
+            if any(k.arg == "source_stamp" for k in node.keywords):
+                return True
         if isinstance(node, ast.Name) and node.id in STAMP_NAMES:
             return True
-        if isinstance(node, ast.Constant) and node.value == "source_stamp":
+        if isinstance(node, ast.Dict) and any(_is_key(k) for k in node.keys):
+            return True
+        if isinstance(node, ast.Subscript) and isinstance(node.ctx, ast.Store) and _is_key(node.slice):
             return True
     return False
 
@@ -274,6 +286,8 @@ def test_every_report_writer_in_scripts_takes_the_stamp():
         'def run(out, s):\n    (out / f"{s}.md").write_text("# report\\n")\n',
         "import json\ndef run(out):\n    def inner():\n        out.write_text(json.dumps([1]))\n    inner()\n",
         'import json\nfrom pathlib import Path\nPath("x.json").write_text(json.dumps({}))\n',
+        'import json\ndef run(out, r):\n    stamp = r.get("source_stamp")\n'
+        '    out.write_text(json.dumps({"x": stamp}))\n',
     ],
 )
 def test_the_net_catches_a_planted_unstamped_writer(planted):
