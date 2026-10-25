@@ -3,6 +3,8 @@ name: release
 # Publishes to PyPI when a GitHub release is published. Uses PyPI trusted publishing (no API token):
 # on pypi.org, add this repository as a trusted publisher for the project "foldmap"
 # (workflow: release.yml, environment: pypi) before the first release.
+# Nothing is built or published unless the tests (tests.yml) and the cross-platform determinism run
+# (determinism.yml: the same figures on Linux, macOS and Windows) both pass on the commit being released.
 
 on:
   release:
@@ -22,8 +24,12 @@ jobs:
     needs: check-tag
     uses: ./.github/workflows/tests.yml
 
+  determinism:
+    needs: check-tag
+    uses: ./.github/workflows/determinism.yml
+
   build:
-    needs: tests
+    needs: [tests, determinism]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

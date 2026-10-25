@@ -40,5 +40,22 @@ def test_release_checks_the_tag_first_then_tests_then_builds_and_publishes():
     assert any("check_release.py" in s.get("run", "") for s in jobs["check-tag"]["steps"])
     assert "needs" not in jobs["check-tag"]
     assert jobs["tests"]["uses"] == "./.github/workflows/tests.yml" and jobs["tests"]["needs"] == "check-tag"
-    assert jobs["build"]["needs"] == "tests" and jobs["publish"]["needs"] == "build"
+    assert "tests" in jobs["build"]["needs"] and jobs["publish"]["needs"] == "build"
     assert not any("check_release.py" in s.get("run", "") for s in jobs["build"]["steps"])
+
+
+DETERMINISM = ROOT / ".github" / "workflows" / "determinism.yml"
+
+
+@needs_workflows
+def test_nothing_is_built_or_published_unless_the_cross_platform_determinism_run_passed():
+    """Plan 28 Task 1: release.yml calls determinism.yml on the commit being released, beside the tests; the build
+    (and so the publish after it) needs both."""
+    jobs = yaml.safe_load(RELEASE.read_text(encoding="utf-8"))["jobs"]
+    assert jobs["determinism"]["uses"] == "./.github/workflows/determinism.yml"
+    assert jobs["determinism"]["needs"] == "check-tag"
+    assert set(jobs["build"]["needs"]) == {"tests", "determinism"}
+    det = yaml.safe_load(DETERMINISM.read_text(encoding="utf-8"))
+    triggers = det.get("on", det.get(True))  # PyYAML reads the key `on` as True
+    assert "workflow_call" in triggers
+    assert det["jobs"]["compare"]["needs"] == "draw"

@@ -2,11 +2,13 @@ name: determinism
 
 # The same figures on Linux, macOS and Windows: every committed test structure's default figure drawn with Liberation
 # Sans forced (scripts/paper/determinism.py), then the three runs' layout signatures (as text) and SVG hashes
-# compared. Apart from tests.yml, so a platform difference never blocks a release.
+# compared. Release-blocking (plan 28 Task 1): release.yml calls this workflow on the release commit and publishes
+# nothing unless both jobs pass. Apart from tests.yml, so a platform difference never blocks an ordinary push or PR.
 
 on:
   push:
     branches: [main]
+  workflow_call:  # release.yml: the cross-platform run of the very commit being released
   workflow_dispatch:
 
 concurrency:
