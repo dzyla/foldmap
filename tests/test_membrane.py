@@ -1872,3 +1872,35 @@ def test_a_two_fold_dimer_about_the_normal_keeps_its_frame():
     assert _in_sequence(frame, sses, bb, mem, {"A": ("A", 0), "B": ("A", 0)}) is frame
     turned = Frame(frame.origin, np.array([0.0, 1.0, 0.0]), frame.v, np.cross([0.0, 1.0, 0.0], frame.v))
     assert _sequence_score(turned, [a, b]) == 15 - 10 and _worst_tau(turned, [[a, b]]) == -1  # summed, it won
+
+
+def test_a_turn_that_lowers_the_pooled_tau_is_not_taken():
+    """Ruling R27 (6ZKT, a photosystem of many chains: turned 105° for one chain's tau, -1.0 to -0.6, the tau pooled
+    over all its band helices fell): two proteins, A's six band helices in sequence along x, B's three against it.
+    A quarter turn lifts the worse chain (B: -1 to 0, a gain of 1 over the 0.1 floor) but pools A's 15 pairs and B's 3
+    from +12 to 0: the frame as chosen is kept."""
+    from types import SimpleNamespace
+
+    from foldmap.cli import _in_sequence, _sequence_score, _worst_tau
+    from foldmap.frame import Frame, view_frame
+    from foldmap.membrane import Membrane
+    from helpers import fake_sse
+
+    mem = Membrane(np.array([0.0, 0.0, 1.0]), 0.0, 15.0, "estimate")
+    ca, sses = [], []
+    for chain, xs in (("A", (-5.0, -3.0, -1.0, 1.0, 3.0, 5.0)), ("B", (4.0, 0.0, -4.0))):
+        for x in xs:
+            first = len(ca)
+            ca += [(x, 0.0, z) for z in np.linspace(-18.0, 18.0, 25)]
+            sses.append(fake_sse("H", first, len(ca) - 1, centroid=(x, 0.0, 0.0), axis=(0, 0, 1), chain=chain))
+    for x in (-150.0, 150.0):
+        first = len(ca)
+        ca += [(x + t, 30.0, 40.0) for t in np.linspace(-9.0, 9.0, 13)]
+        sses.append(fake_sse("H", first, len(ca) - 1, centroid=(x, 30.0, 40.0), axis=(1, 0, 0), chain="C"))
+    frame = view_frame(sses, up=mem.normal)
+    a = [s.centroid for s in sses if s.chain == "A"]
+    b = [s.centroid for s in sses if s.chain == "B"]
+    quarter = Frame(frame.origin, np.array([0.0, 1.0, 0.0]), frame.v, np.cross([0.0, 1.0, 0.0], frame.v))
+    assert _worst_tau(frame, [[a], [b]]) == -1 and _worst_tau(quarter, [[a], [b]]) == 0  # the worse chain gains 1
+    assert _sequence_score(frame, [a, b]) == 12 and _sequence_score(quarter, [a, b]) == 0  # pooled falls
+    assert _in_sequence(frame, sses, SimpleNamespace(ca=np.array(ca)), mem) is frame

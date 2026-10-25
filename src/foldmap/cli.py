@@ -1274,10 +1274,12 @@ def _in_sequence(frame, sses, bb, mem, copies: dict[str, tuple[str, int]] | None
     (ruling R23, _worst_tau: each protein's least tau over its copies, `copies` as model.homolog_chains gives them,
     each chain its own protein without; then the least over the proteins); on a tie the frame as view_frame chose it,
     else the least turn (anticlockwise seen from the outside first); the frame as chosen when the best gains less than
-    0.1 (MIN_TAU_GAIN_INV). Still a projection: the same frame turned, never a reordering. 32KS chain A's TM1 stood in
-    the middle of its band, tau 0.47; turned 35°, 0.78. A two-fold dimer whose axis is the normal keeps its frame: a
-    turn that orders one copy reverses the other (32KS: turned 55° for the pair's summed tau, it drew its protomers
-    through each other)."""
+    0.1 (MIN_TAU_GAIN_INV), or when it lowers the tau pooled over every band helix of the view (ruling R27: 6ZKT, a
+    photosystem of many chains, turned 105° for one chain's tau, -1.0 to -0.6, its pooled tau fell). Still a
+    projection: the same frame turned, never a reordering. 32KS chain A's TM1 stood in the middle of its band, tau
+    0.47; turned 35°, 0.78. In a two-fold dimer whose axis is the normal a turn that orders one copy reverses the
+    other: scored by the pair's summed tau, 32KS turned 55° and drew its protomers through each other; by its worse
+    copy it turns 15°, both copies at 0.156 or better."""
     tm = _transmembrane(sses, bb, mem)
     chains: dict[str, list[np.ndarray]] = {}
     for s in sses:
@@ -1302,6 +1304,9 @@ def _in_sequence(frame, sses, bb, mem, copies: dict[str, tuple[str, int]] | None
         if best is None or score > best:
             best, best_frame = score, turned
     if (best - _worst_tau(frame, proteins)) * MIN_TAU_GAIN_INV < 1:  # tau gains less than 1/10
+        return frame
+    every = [cents for copies in proteins for cents in copies]
+    if _sequence_score(best_frame, every) < _sequence_score(frame, every):  # the pooled tau falls (R27)
         return frame
     return best_frame
 
