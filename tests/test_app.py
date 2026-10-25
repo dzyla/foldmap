@@ -1567,6 +1567,68 @@ def test_the_render_cache_misses_when_the_code_fingerprint_changes(monkeypatch):
         drawn.clear()
 
 
+def _misses_on_new_code(monkeypatch, module, name, scenario):
+    """Every st.cache_data family of the app is keyed by the code fingerprint: `scenario()` (a run of the app that
+    reaches the function `module.name`) calls it again under a new fingerprint, and not under the same one."""
+    from app_helpers import count_calls
+
+    from foldmap import app_jobs
+
+    fresh_caches()
+    try:
+        fingerprint = ["old"]
+        monkeypatch.setattr(app_jobs, "code_fingerprint", lambda: fingerprint[0])
+        calls = count_calls(monkeypatch, module, name)
+        scenario()
+        first = len(calls)
+        assert first >= 1
+        scenario()
+        assert len(calls) == first  # the same code: served from the cache
+        fingerprint[0] = "new"
+        scenario()
+        assert len(calls) > first  # new code: drawn again
+    finally:
+        fresh_caches()
+
+
+def test_every_job_cache_misses_on_new_code(monkeypatch):
+    """The figure (draw_job), its size (size_job), the sequence view, the 3D page and the contacts check (plan 27
+    Task 1 ruling: not only render)."""
+    from foldmap import app_jobs
+
+    def seen(pane=None, contacts=False):
+        at = opened(DATA / ("1LMB.cif" if contacts else "1UBQ.cif"))  # the check is offered with nucleic acid
+        if contacts:
+            at.toggle(key="check_contacts").set_value(True).run()
+        if pane:
+            at.segmented_control(key="pane").set_value(pane).run()
+        assert not at.exception
+
+    for name, scenario in (
+        ("draw_job", seen),
+        ("size_job", seen),
+        ("sequence_job", lambda: seen("Sequence")),
+        ("page_job", lambda: seen("3D")),
+        ("contacts_job", lambda: seen(contacts=True)),
+    ):
+        _misses_on_new_code(monkeypatch, app_jobs, name, scenario)
+
+
+def test_the_uniprot_choices_cache_misses_on_new_code(monkeypatch):
+    import json
+
+    from foldmap import uniprot
+
+    e = uniprot.parse_entry(json.loads((DATA / "uniprot" / "P07911.json").read_text()))
+    monkeypatch.setattr(uniprot, "entry", lambda acc, cache_dir=None: e)
+
+    def scenario():
+        at = load(app_test(), "P07911")
+        assert not at.exception and at.dataframe
+
+    _misses_on_new_code(monkeypatch, uniprot, "entry", scenario)
+
+
 def test_the_render_cache_hits_when_the_code_is_the_same():
     render, calls, drawn = _counting_render()
     try:

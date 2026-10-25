@@ -72,9 +72,9 @@ from foldmap import CREDIT, app_jobs, layoutfile
 
 
 def keyed_by_code(cached):
-    """`cached(path, blob, code)` (a cache_data function) as `(path, blob)`, with the fingerprint of foldmap's code as
-    its third argument: figures drawn by older code are missed, not served (plan 27 Task 1)."""
-    return lambda path, blob: cached(path, blob, app_jobs.code_fingerprint())
+    """`cached(*args, code)` (a cache_data function whose last parameter is `code`) as `(*args)`, with the fingerprint
+    of foldmap's code as that last argument: output drawn by older code is missed, not served (plan 27 Task 1)."""
+    return lambda *args: cached(*args, app_jobs.code_fingerprint())
 
 
 from foldmap.app_controls import (
@@ -1178,24 +1178,34 @@ def main() -> None:
     render = keyed_by_code(drawn)
 
     @st.cache_data(show_spinner=False, max_entries=64)
-    def sized(path: str) -> dict:
+    def sized_of(path: str, code: str) -> dict:
         return app_jobs.run_job(app_jobs.size_job, path, limits=lim)
 
+    sized = keyed_by_code(sized_of)
+
     @st.cache_data(show_spinner=False, ttl=86400, max_entries=64)
-    def choices(accession: str) -> list[tuple[str, str]]:
+    def choices_of(accession: str, code: str) -> list[tuple[str, str]]:
         return structure_choices(accession)
 
+    choices = keyed_by_code(choices_of)
+
     @st.cache_data(show_spinner=False, max_entries=CACHES["sequence"][0])
-    def sequence_svg(path: str, blob: str, view_json: str) -> bytes:
+    def sequence_svg_of(path: str, blob: str, view_json: str, code: str) -> bytes:
         return app_jobs.run_job(app_jobs.sequence_job, path, blob, view_json, "svg", limits=lim)
 
+    sequence_svg = keyed_by_code(sequence_svg_of)
+
     @st.cache_data(show_spinner=False, max_entries=CACHES["page"][0])
-    def page(path: str, blob: str) -> str:
+    def page_of(path: str, blob: str, code: str) -> str:
         return app_jobs.run_job(app_jobs.page_job, path, blob, limits=lim)
 
+    page = keyed_by_code(page_of)
+
     @st.cache_data(show_spinner=False, max_entries=16)
-    def contacts(path: str, key: str, _blob: str) -> dict | None:  # key: app_jobs.contacts_key; _blob not hashed
-        return app_jobs.run_job(app_jobs.contacts_job, path, _blob, limits=lim)
+    def contacts_of(path: str, key: str, _blob: str, code: str) -> dict | None:  # key: app_jobs.contacts_key
+        return app_jobs.run_job(app_jobs.contacts_job, path, _blob, limits=lim)  # _blob not hashed
+
+    contacts = keyed_by_code(contacts_of)
 
     def load(source: str | None = None, upload: bool = False) -> None:
         """Load a structure and draw its first figure; the workspace opens only when that succeeds. upload: the
