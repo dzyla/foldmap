@@ -125,15 +125,40 @@ class JobFailed(RuntimeError):
 def code_fingerprint() -> str:
     """A hash of foldmap's own .py sources (paths and text, line endings normalised), taken once per process. The app
     keys its figure cache on it, so a deploy, or a reload after a code change (app._drop_changed_foldmap loads this
-    module afresh, so it is taken again), never serves a figure drawn by older code (plan 27 Task 1: 32KS)."""
+    module afresh, so it is taken again), never serves a figure drawn by older code (plan 27 Task 1: 32KS).
+
+    Never raises (functools.cache does not store an exception, so a raise would repeat on every render). A source
+    that cannot be read contributes its path and an error marker. When the sources cannot be listed at all (a zipped
+    or frozen install has no .py files on disk), the hash is of foldmap.__version__ and the mtime of the nearest
+    existing path of this module's __file__ (the archive or the build), a per-build value, so a new build still
+    gets a new key; two builds of one version with the same mtime would share it (plan 27 ruling P8)."""
     import hashlib
 
     root = Path(__file__).resolve().parent
     h = hashlib.sha256()
-    for p in sorted(root.rglob("*.py"), key=lambda q: q.relative_to(root).as_posix()):
+    try:
+        sources = sorted(root.rglob("*.py"), key=lambda q: q.relative_to(root).as_posix())
+    except OSError:
+        sources = []
+    if not sources:
+        from foldmap import __version__
+
+        here = Path(__file__)
+        while not here.exists() and here != here.parent:
+            here = here.parent
+        try:
+            stamp = here.stat().st_mtime_ns
+        except OSError:
+            stamp = 0
+        h.update(f"no-sources\0{__version__}\0{stamp}".encode())
+        return h.hexdigest()[:16]
+    for p in sources:
         h.update(p.relative_to(root).as_posix().encode())
         h.update(b"\0")
-        h.update(p.read_bytes().replace(b"\r\n", b"\n"))
+        try:
+            h.update(p.read_bytes().replace(b"\r\n", b"\n"))
+        except OSError as e:
+            h.update(f"unreadable:{type(e).__name__}".encode())
         h.update(b"\0")
     return h.hexdigest()[:16]
 

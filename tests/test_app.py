@@ -1649,6 +1649,51 @@ def test_the_code_fingerprint_is_stable_and_follows_the_sources():
     assert first != hashlib.sha256(b"").hexdigest()[:16]
 
 
+def test_the_code_fingerprint_survives_an_unreadable_source(monkeypatch):
+    from pathlib import Path
+
+    from foldmap import app_jobs
+
+    app_jobs.code_fingerprint.cache_clear()
+    normal = app_jobs.code_fingerprint()
+    real = Path.read_bytes
+
+    def read_bytes(self):
+        if self.name == "app_jobs.py":
+            raise PermissionError("unreadable")
+        return real(self)
+
+    monkeypatch.setattr(Path, "read_bytes", read_bytes)
+    app_jobs.code_fingerprint.cache_clear()
+    try:
+        got = app_jobs.code_fingerprint()  # an error marker in place of the text, no exception
+        assert len(got) == 16 and got != normal
+    finally:
+        monkeypatch.undo()
+        app_jobs.code_fingerprint.cache_clear()
+
+
+def test_the_code_fingerprint_without_listable_sources_follows_the_version(monkeypatch):
+    """Zipped or frozen: no .py on disk. The hash is then the version's and the build's, not a constant."""
+    import hashlib
+    from pathlib import Path
+
+    import foldmap
+    from foldmap import app_jobs
+
+    monkeypatch.setattr(Path, "rglob", lambda self, pattern: iter(()))
+    try:
+        app_jobs.code_fingerprint.cache_clear()
+        one = app_jobs.code_fingerprint()
+        assert len(one) == 16 and one != hashlib.sha256(b"").hexdigest()[:16]
+        monkeypatch.setattr(foldmap, "__version__", "99.0.0")
+        app_jobs.code_fingerprint.cache_clear()
+        assert app_jobs.code_fingerprint() != one
+    finally:
+        monkeypatch.undo()
+        app_jobs.code_fingerprint.cache_clear()
+
+
 def test_a_swap_picked_by_deposited_name_draws_the_command_line_swap():
     """1MBN (deposited helices A-H): the pickers' option text carries the deposited name, so typing "helix A" finds
     α1; picking it stores its res: reference, and the swap draws the figure --swap res:… draws."""
