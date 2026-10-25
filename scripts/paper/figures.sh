@@ -11,9 +11,9 @@
 # Inputs: the manuscript folder's figures/data/ (the CI determinism artifacts F3d reads), and what F5 reads
 # (build/domains.json, build/tables/, data/m2/dssp/, data/m2/na/). Needs foldmap on PATH (the paper environment),
 # tectonic ($TECTONIC or on PATH), pdftocairo and pdftoppm.
-# Provenance: a runner syncs the working tree, not a commit. Before each run this records HEAD and whether src/ or
-# scripts/ differ from it (build/figures/provenance-local.json; make_figures.py copies it into figures.json beside
-# foldmap.source_stamp of the code that drew) and warns when they do.
+# Provenance: a runner syncs the working tree, not a commit. Before each run this records HEAD and whether src/,
+# scripts/, pyproject.toml or tests/data differ from it (build/figures/provenance-local.json; make_figures.py copies
+# it into figures.json beside foldmap.source_stamp of the code that drew) and warns when they do.
 set -uo pipefail
 H=$(cd "$(dirname "$0")" && pwd)
 REPO=$(cd "$H/../.." && pwd)
@@ -23,11 +23,11 @@ out=$M/build/figures
 mkdir -p "$out"
 for _ in $(seq 1 20); do
   head=$(git -C "$REPO" rev-parse HEAD)
-  changed=$(git -C "$REPO" status --porcelain -- src scripts)
+  changed=$(git -C "$REPO" status --porcelain -- src scripts pyproject.toml tests/data)  # as foldmap.source_stamp.CODE
   dirty=false
   if [[ -n $changed ]]; then
     dirty=true
-    echo "WARNING: src/ or scripts/ differ from HEAD $head; the figures are drawn from the working tree as it is:" >&2
+    echo "WARNING: the code differs from HEAD $head; the figures are drawn from the working tree as it is:" >&2
     echo "$changed" | sed 's/^/  /' >&2
   fi
   {

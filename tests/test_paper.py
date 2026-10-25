@@ -4,6 +4,8 @@ its protocol: a fixed seed and cutoff, no id of samples 1-3, drawn once."""
 
 import importlib.util
 import json
+import shutil
+import subprocess
 import sys
 from pathlib import Path
 
@@ -133,34 +135,66 @@ def test_the_draw_excludes_samples_one_to_three_and_records_its_protocol(fourth,
         entries = [{"id": f"9Z{k:02d}"} for k in range(100)]
         return {"seed": seed, "query_date": date, "entries": entries, "replaced": [], "quotas": {}}
 
+    out = tmp_path / "random100-fourth" / "sample.json"
     monkeypatch.setattr(r100, "sample", fake_sample)
     monkeypatch.setattr(fourth, "random100", lambda: r100)
-    out = tmp_path / "random100-fourth" / "sample.json"
-    assert fourth.main(["draw", "--release", "v9.9.9", "--out", str(out)]) == 0
+    monkeypatch.setattr(fourth, "OUT", out)  # its one path, here in a temporary folder
+    monkeypatch.setattr(fourth, "release_problem", lambda tag, stamp: None)  # as at the release
+    assert fourth.main(["draw", "--release", "v9.9.9"]) == 0
     assert asked == {"seed": 20261025, "date": "2026-10-13", "exclude": want}
-    doc = json.loads(out.read_text(encoding="utf-8"))
-    p = doc["protocol"]
-    assert (p["seed"], p["query_date"], p["release"], p["excluded_ids"]) == (
-        20261025,
-        "2026-10-13",
-        "v9.9.9",
-        len(want),
-    )
+    p = json.loads(out.read_text(encoding="utf-8"))["protocol"]
+    assert (p["seed"], p["query_date"], p["release"], p["excluded_ids"]) == (20261025, "2026-10-13", "v9.9.9",
+                                                                             len(want))  # fmt: skip
     assert [f["path"] for f in p["excluded"]] == list(fourth.SAMPLE_SHA256)
     assert p["source_stamp"]["code_fingerprint"] and p["document"] == "docs/validation/fourth-sample-protocol.md"
     with pytest.raises(SystemExit, match="drawn once"):
-        fourth.main(["draw", "--release", "v9.9.9", "--out", str(out)])
+        fourth.main(["draw", "--release", "v9.9.9"])
+    with pytest.raises(SystemExit):  # no --out: it writes only to its fixed path (ruling Q14)
+        fourth.main(["draw", "--release", "v9.9.9", "--out", str(tmp_path / "elsewhere.json")])
 
 
 @needs_samples
 def test_a_draw_holding_an_excluded_id_is_refused(fourth, tmp_path, monkeypatch):
+    """Review M10: what random100 run will draw, the entries and the A1c refusals, is checked."""
     r100 = fourth.random100()
     want, _ = fourth.excluded(r100)
-    monkeypatch.setattr(r100, "sample", lambda seed, date, exclude=(): {"entries": [{"id": want[0]}], "quotas": {}})
+    refused = {"entries": [{"id": "9ZZZ"}], "replaced": [{"id": want[0], "replacement": None}], "quotas": {}}
+    monkeypatch.setattr(r100, "sample", lambda seed, date, exclude=(): refused)
     monkeypatch.setattr(fourth, "random100", lambda: r100)
+    monkeypatch.setattr(fourth, "OUT", tmp_path / "s.json")
+    monkeypatch.setattr(fourth, "release_problem", lambda tag, stamp: None)
     with pytest.raises(SystemExit, match="samples 1-3"):
-        fourth.main(["draw", "--release", "v9.9.9", "--out", str(tmp_path / "s.json")])
+        fourth.main(["draw", "--release", "v9.9.9"])
     assert not (tmp_path / "s.json").exists()
+
+
+def test_the_draw_runs_only_in_a_clean_checkout_at_the_release_tag(fourth, tmp_path):
+    """Ruling Q14: HEAD must be the tag's commit, the tree clean, the foldmap the checkout's; no .git: refused."""
+    if shutil.which("git") is None:
+        pytest.skip("needs git")
+
+    def git(*args):
+        return subprocess.run(["git", "-C", str(tmp_path), "-c", "user.name=t", "-c", "user.email=t@t", *args],
+                              capture_output=True, text=True, check=True).stdout.strip()  # fmt: skip
+
+    git("init", "-q")
+    (tmp_path / "a.txt").write_text("1\n", encoding="utf-8")
+    git("add", ".")
+    git("commit", "-q", "-m", "one")
+    git("tag", "v1.0.0")
+    head = git("rev-parse", "HEAD")
+    clean = {"git": {"commit": head, "dirty": False, "source": "git"}, "installed_matches_checkout": True}
+    assert fourth.release_problem("v1.0.0", clean, tmp_path) is None
+    assert "not v1.0.0" in fourth.release_problem("v1.0.0", clean | {"git": clean["git"] | {"commit": "0" * 40}},
+                                                   tmp_path)  # fmt: skip
+    assert "no-such-tag" in fourth.release_problem("no-such-tag", clean, tmp_path)
+    dirty = clean | {"git": clean["git"] | {"dirty": True, "dirty_paths": ["src/x.py"]}}
+    assert "clean tree" in fourth.release_problem("v1.0.0", dirty, tmp_path)
+    asserted = clean | {"git": clean["git"] | {"source": "asserted by runner"}}
+    assert "no git checkout" in fourth.release_problem("v1.0.0", asserted, tmp_path)
+    assert "no git checkout" in fourth.release_problem("v1.0.0", {"git": None}, tmp_path)
+    other = clean | {"installed_matches_checkout": False}
+    assert "not the checkout" in fourth.release_problem("v1.0.0", other, tmp_path)
 
 
 def test_a_changed_sample_stops_the_draw(fourth, tmp_path):
@@ -169,3 +203,104 @@ def test_a_changed_sample_stops_the_draw(fourth, tmp_path):
         (tmp_path / rel).write_text('{"entries": [], "replaced": []}\n', encoding="utf-8")
     with pytest.raises(SystemExit, match="changed after the protocol"):
         fourth.excluded(None, root=tmp_path)
+
+
+# ---------------------------------------------------------------------------------------------- stamps, checked
+
+
+def _repo_with_foldmap(root: Path):
+    """A git checkout holding src/foldmap/a.py and scripts/c.py, committed; returns (git, package, script, commit)."""
+
+    def git(*args):
+        return subprocess.run(["git", "-C", str(root), "-c", "user.name=t", "-c", "user.email=t@t", *args],
+                              capture_output=True, text=True, check=True).stdout.strip()  # fmt: skip
+
+    (root / "pyproject.toml").write_text("[project]\nname = 'x'\n", encoding="utf-8")
+    pkg = root / "src" / "foldmap"
+    pkg.mkdir(parents=True)
+    (pkg / "a.py").write_text("X = 1\n", encoding="utf-8")
+    script = root / "scripts" / "c.py"
+    script.parent.mkdir()
+    script.write_text("print(1)\n", encoding="utf-8")
+    git("init", "-q")
+    git("add", ".")
+    git("commit", "-q", "-m", "one")
+    return git, pkg, script, git("rev-parse", "HEAD")
+
+
+needs_git = pytest.mark.skipif(shutil.which("git") is None, reason="needs git")
+
+
+@needs_git
+def test_a_stamp_is_verified_against_the_commit_it_names(tmp_path, monkeypatch):
+    """Ruling Q11: the fingerprint of the commit's src/foldmap (git archive), by the same function, must match."""
+    from foldmap.source_stamp import source_stamp
+
+    verify = _load("verify_stamp")
+    git, pkg, script, head = _repo_with_foldmap(tmp_path)
+    st = source_stamp(script, package=pkg)
+    assert st["git"]["commit"] == head
+    good = verify.verify_report({"source_stamp": st, "entries": [{"source_stamp": st}]}, repo=tmp_path)
+    assert [r["verified"] for r in good] == [True]  # one distinct code, checked once
+    forged = st | {"code_fingerprint": "0" * 16}
+    assert "is not" in verify.verify_report({"source_stamp": forged}, repo=tmp_path)[0]["why"]
+    other_script = st | {"script": {"name": "scripts/c.py", "sha256": "0" * 64}}
+    assert "differs" in verify.verify_report({"source_stamp": other_script}, repo=tmp_path)[0]["why"]
+    asserted = st | {"git": {"commit": "f" * 40, "dirty": False, "source": "asserted by runner"}}
+    assert "not a commit" in verify.verify_report({"source_stamp": asserted}, repo=tmp_path)[0]["why"]
+    nothing = st | {"git": None}
+    assert "names no commit" in verify.verify_report({"source_stamp": nothing}, repo=tmp_path)[0]["why"]
+    # a paper step's run stamp: checked against the harness commit its tree was exported at
+    run = {"source_stamp": {"harness_commit": head, "source_stamp": st | {"git": None}}}
+    assert verify.verify_report(run, repo=tmp_path)[0]["verified"] is True
+    out = tmp_path / "report.json"
+    out.write_text(json.dumps({"source_stamp": st}), encoding="utf-8")
+    monkeypatch.setattr(verify, "REPO", tmp_path)
+    assert verify.verify_report(verify.load(out), repo=tmp_path)[0]["verified"] is True
+
+
+@needs_git
+def test_extract_reads_commits_from_stamps_only_and_refuses_mixed_or_unquotable_reports(tmp_path):
+    """Review I1 (5): both NA formats, legacy files, verified stamps, mixed code and not-for-paper."""
+    from foldmap.source_stamp import code_mix, source_stamp
+
+    extract = _load("extract")
+    rec, how, stop = extract.recorded_commits("na_report", [{"entry": "1EHZ", "failed": []}])
+    assert rec == {"report": None} and "no source stamp" in how and not stop
+    rec, how, stop = extract.recorded_commits("r100_third_report", {"foldmap_commit": "7696947", "entries": []})
+    assert rec == {"report": None, "legacy_foldmap_commit": "7696947"} and not stop  # asserted after the run: unused
+    _, pkg, script, head = _repo_with_foldmap(tmp_path)
+    st = source_stamp(script, package=pkg)
+    doc = {"source_stamp": st, **code_mix([st]), "entries": [{"entry": "1EHZ", "source_stamp": st}]}
+    rec, _, stop = extract.recorded_commits("na_report", doc, repo=tmp_path)
+    assert rec["report"] == head and rec["verified"][0]["verified"] and not stop
+    mixed = doc | code_mix([st, st | {"code_fingerprint": "0" * 16}])
+    assert any("mixed_code" in p for p in extract.recorded_commits("na_report", mixed, repo=tmp_path)[2])
+    marked = doc | {"not_for_paper": "run with --not-for-paper (asked)"}
+    assert any("not for the paper" in p for p in extract.recorded_commits("na_report", marked, repo=tmp_path)[2])
+    forged = doc | {"source_stamp": st | {"code_fingerprint": "0" * 16}}
+    assert any("not verified" in p for p in extract.recorded_commits("na_report", forged, repo=tmp_path)[2])
+
+
+def test_make_numbers_refuses_a_mixed_or_unquotable_report():
+    common = _load("common")
+    common.quotable("ok", {"mixed_code": False})
+    common.quotable("legacy", [{"entry": "1EHZ"}])
+    with pytest.raises(SystemExit, match="different code"):
+        common.quotable("x", {"mixed_code": True, "entry_code": {"a": 1, "b": 1}})
+    with pytest.raises(SystemExit, match="not for the paper"):
+        common.quotable("x", {"not_for_paper": "asked"})
+    assert common.stamped_commit([]) == "no source stamp (written before plan 28 Task 1)"
+    st = {"code_fingerprint": "f", "git": {"commit": "a" * 40, "dirty": False, "source": "asserted by runner"}}
+    assert common.stamped_commit({"source_stamp": st}).startswith("at aaaaaaa (asserted by runner, dirty False")
+
+
+def test_a_tree_older_than_the_stamp_is_still_fingerprinted():
+    """Review M9: run_stamp's fallback computes the tree's fingerprint (the same algorithm) and the versions."""
+    from foldmap import app_jobs
+
+    common = _load("common")
+    aj = common.repo_module("app_jobs")
+    here = (ROOT / "src" / "foldmap").resolve()
+    assert aj.code_fingerprint(here) == app_jobs.code_fingerprint(here)
+    assert common.repo_module("source_stamp").RUNTIME[0] == "gemmi"

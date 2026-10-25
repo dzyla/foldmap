@@ -8,14 +8,16 @@ Writes
   build/sources/HEAD/<path>      each campaign output as it is at the harness commit
   build/sources/<sha>/<path>     a source read at an earlier commit (the held-out sample's first run, 1ef0706)
   build/tree/                    src/, tests/data/domains/ and pyproject.toml at the harness commit (domains.py)
-  build/provenance.json          the harness commit and, per source: the commit that last wrote the file, the commit
-                                 the measurement inside it was made at (as the file records it), whether that commit
-                                 is an ancestor of the harness commit, and every code commit (src/, scripts/) between
-                                 the two, with its subject.
+  build/provenance.json          the harness commit and, per source: the commit that last wrote the file, the code
+                                 the measurement inside it was made with (from the file's own source stamps only,
+                                 each verified against the commit it names by verify_stamp.py; a file from before the
+                                 stamps says so), and every code commit (src/, scripts/) between that commit and the
+                                 harness commit, with its subject.
 
 The check of M1 item 3 lives here: a source measured at an earlier commit than the harness commit is not hidden; its
 code changes in between are listed in provenance.json and copied into numbers.json's metadata. It exits 1 when a
-source records a commit that is not an ancestor of the harness commit (a number from another line of history).
+source records a commit that is not an ancestor of the harness commit (a number from another line of history), when
+a stamp does not verify, and when a report mixes code (mixed_code) or is marked not for the paper (plan 28 Task 1).
 """
 
 from __future__ import annotations
@@ -28,9 +30,9 @@ import shutil
 import subprocess
 import sys
 import tarfile
-from collections import Counter
 
 from common import BUILD, CAMPAIGN, DEFAULT_COMMIT, REPO, SOURCES, TREE, TREE_PATHS, full_sha, git, load_json
+from verify_stamp import verify_report
 
 CODE = ("src", "scripts")  # what can change a measurement
 
@@ -52,37 +54,42 @@ def code_between(older: str, newer: str) -> list[dict]:
     return out
 
 
-def recorded_commits(name: str, path, data_path) -> tuple[dict, str]:
-    """The commit(s) the measurement in a source was made at, as the source records it, and where that comes from."""
-    if name.endswith("_report") and name.startswith("r100"):
-        d = load_json(data_path)
-        per = Counter(e.get("foldmap_commit") or "unknown" for e in d["entries"])
-        return {
-            "report": d.get("foldmap_commit"),
-            "entries": dict(per),
-        }, "report.json foldmap_commit (report and per entry)"
-    if name.endswith("_sample"):
-        d = load_json(data_path)
-        return {"sample": d.get("foldmap_commit")}, "sample.json foldmap_commit (the code that drew the sample)"
-    if name == "na_report":
-        d = load_json(data_path)
-        if isinstance(d, dict):  # stamped as written (plan 28 Task 1): its git commit, or the code fingerprint
-            st = d.get("source_stamp") or {}
-            commit = (st.get("git") or {}).get("commit")
-            if commit:
-                return {"report": commit}, "report.json source_stamp.git.commit (stamped as written)"
-            return {"report": None, "code_fingerprint": st.get("code_fingerprint")}, (
-                "report.json source_stamp: no git where it ran; the code fingerprint names the code"
-            )
-        # an older report.json carries no commit; review.md's last "## Rerun ... (<date>, <sha>; ...)" heading names it.
-        review = (SOURCES / "HEAD" / CAMPAIGN["na_review"][0]).read_text(encoding="utf-8")
-        heads = re.findall(r"^## .*?\((\d{4}-\d\d-\d\d), ([0-9a-f]{7,40})[;)]", review, flags=re.M)
-        if heads:
-            return {
-                "report": heads[-1][1]
-            }, f"not stamped in report.json; review.md's last rerun heading ({heads[-1][0]})"
-        return {"report": None}, "not stamped in report.json and no rerun heading in review.md"
-    return {}, ""
+LEGACY = (
+    "no source stamp (written before plan 28 Task 1): the code that measured is not recorded by the run; a commit "
+    "written into the file was asserted by hand after the run and is kept as legacy_foldmap_commit, never used"
+)
+
+
+def _stamp_commit(st: dict) -> str | None:
+    return (st.get("git") or {}).get("commit")
+
+
+def recorded_commits(name: str, data, repo=REPO) -> tuple[dict, str, list[str]]:
+    """The code a source was measured (or a sample drawn) with, read from its own source stamps only (ruling Q11), each
+    verified against the commit it names (verify_stamp.py); where that comes from; and the problems that stop the
+    numbers: a stamp that does not verify, entries measured by different code (mixed_code), a report run outside its
+    paper protocol (not_for_paper)."""
+    if not isinstance(data, dict):  # an NA report written before the stamp: the bare list of rows
+        return {"report": None}, LEGACY, []
+    st = data.get("source_stamp")
+    key = "sample" if name.endswith("_sample") else "report"
+    if not st:
+        legacy = {"legacy_foldmap_commit": data["foldmap_commit"]} if data.get("foldmap_commit") else {}
+        return {key: None, **legacy}, LEGACY, []
+    problems = []
+    if data.get("mixed_code"):
+        problems.append(f"{name}: entries measured by different code {data.get('entry_code')} (mixed_code)")
+    if data.get("not_for_paper"):
+        problems.append(f"{name}: marked not for the paper ({data['not_for_paper']})")
+    checked = verify_report(data, repo=repo)
+    for r in checked:
+        if not r["verified"]:
+            problems.append(f"{name}: stamp {r['code_fingerprint']} not verified: {r['why']}")
+    rec = {key: _stamp_commit(st), "code_fingerprint": st.get("code_fingerprint"), "verified": checked}
+    if "entry_code" in data:
+        rec["entry_code"] = data["entry_code"]
+    how = "the file's source stamps (git or asserted by the runner), each verified against its commit's src/foldmap"
+    return rec, how, problems
 
 
 def after_the_run(review_text: str) -> list[str]:
@@ -129,15 +136,16 @@ def main() -> int:
         }
 
     for name, rec in sources.items():
-        recorded, how = recorded_commits(name, rec["path"], SOURCES / (CAMPAIGN[name][1] or "HEAD") / rec["path"])
-        if not recorded:
+        if not name.endswith(("_report", "_sample")):
             continue
+        data = load_json(SOURCES / (CAMPAIGN[name][1] or "HEAD") / rec["path"])
+        recorded, how, stop = recorded_commits(name, data)
+        problems += stop
         rec["measured_at"] = recorded
         rec["measured_at_from"] = how
         if "sample" in recorded:  # a sample is a draw, not a measurement: code after it changes nothing in it
             continue
-        main_commit = recorded.get("report")
-        commits = {c for c in [main_commit, *recorded.get("entries", {})] if c and c != "unknown"}
+        commits = {r["commit"] for r in recorded.get("verified", []) if r["verified"]}
         rec["code_changes_to_harness_commit"] = {}
         for c in sorted(commits):
             try:
@@ -176,7 +184,7 @@ def main() -> int:
         main_c = m.get("report") or m.get("sample") or "-"
         changes = rec.get("code_changes_to_harness_commit", {})
         n = sum(len(v) for v in changes.values())
-        entries = m.get("entries")
+        entries = m.get("entry_code")
         mixed = f" entries {entries}" if entries and len(entries) > 1 else ""
         print(
             f"  {name:24s} read at {rec['read_at']}  written by {rec['file_written_by']['commit']}  "

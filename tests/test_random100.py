@@ -1037,10 +1037,13 @@ def test_an_entrys_work_folder_starts_empty(r100, tmp_path):
     assert sorted(p.name for p in work.iterdir()) == ["entry.err", "entry.out"]
 
 
-def test_the_commit_can_come_from_the_environment(r100, monkeypatch):
-    """Final review B, Minor 6: each entry records its commit; a copy with no .git (zl) names it FOLDMAP_COMMIT."""
+def test_the_commit_is_never_taken_from_the_environment(r100, monkeypatch):
+    """Plan 28 ruling Q11 (replacing final review B, Minor 6's FOLDMAP_COMMIT): foldmap_commit is git's or "unknown";
+    a runner's asserted commit goes into the source stamp, marked as asserted."""
     monkeypatch.setenv("FOLDMAP_COMMIT", "abc123")
-    assert r100._commit() == "abc123"
+    assert r100._commit() != "abc123"
+    git = r100.SOURCE_STAMP["git"] or {}
+    assert r100._commit() == (git["commit"] if git.get("source") == "git" else "unknown")
 
 
 def test_a_gzipped_report_is_read(r100, tmp_path):
@@ -1299,3 +1302,65 @@ def test_a_chain_whose_s5_scoring_crashes_is_counted_in_the_report(r100, cath_of
     assert "3 chains CATH chops not scored, by reason:" in md
     assert "- RuntimeError: 2 (2LZM B, 1ABC D)" in md and f"- {r100.NO_RESIDUE}: 1 (2LZM C)" in md
     assert "- no chain CATH chops could be scored: 1" in md
+
+
+# ------------------------------------------------------------------------------ plan 28 Task 1, fix round 1
+
+
+def _stamped_entry(r100, i, stamp):
+    crit = {k: {"pass": True, "detail": ""} for k in r100.CRITERIA}
+    e = {"id": i, "name": i, "stratum": "S1", "bin": "S", "views": {}, "facts": {"chains": 1}, "criteria": crit}
+    e["source_stamp"] = stamp
+    return r100._verdict(e)
+
+
+def test_a_report_of_entries_measured_by_different_code_says_so(r100, tmp_path):
+    """Ruling Q13: entries measured at X and rerun at Y make a mixed report, never quoted as one measurement."""
+    other = r100.SOURCE_STAMP | {"code_fingerprint": "0" * 16}
+    r100.report(
+        [_stamped_entry(r100, "1ABC", r100.SOURCE_STAMP), _stamped_entry(r100, "2DEF", other)], tmp_path, None, total=2
+    )
+    doc = json.loads((tmp_path / "report.json").read_text(encoding="utf-8"))
+    assert doc["mixed_code"] is True and sorted(doc["entry_code"].values()) == [1, 1]
+    assert "MIXED CODE" in (tmp_path / "report.md").read_text(encoding="utf-8")
+    r100.report([_stamped_entry(r100, "1ABC", r100.SOURCE_STAMP)], tmp_path, None, total=1)
+    assert json.loads((tmp_path / "report.json").read_text(encoding="utf-8"))["mixed_code"] is False
+
+
+def _paper_sample(tmp_path, fingerprint):
+    sample = tmp_path / "sample.json"
+    protocol = {"seed": 1, "source_stamp": {"code_fingerprint": fingerprint}}
+    sample.write_text(json.dumps({"protocol": protocol, "entries": [], "replaced": []}), encoding="utf-8")
+    return sample
+
+
+def test_a_paper_sample_runs_once_whole_with_the_code_that_drew_it(r100, tmp_path):
+    """Ruling Q14: a second run, --ids, --failed-from or other code is refused without --not-for-paper."""
+    import argparse
+
+    out = tmp_path / "run"
+    sample = _paper_sample(tmp_path, r100.SOURCE_STAMP["code_fingerprint"])
+    plain = argparse.Namespace(ids=None, failed_from=None)
+    assert r100.paper_run_problem(out, sample, plain) is None
+    assert "whole" in r100.paper_run_problem(out, sample, argparse.Namespace(ids="1ABC", failed_from=None))
+    assert "whole" in r100.paper_run_problem(out, sample, argparse.Namespace(ids=None, failed_from="r.json"))
+    other = _paper_sample(tmp_path, "0" * 16)
+    assert "not the code that drew" in r100.paper_run_problem(out, other, plain)
+    out.mkdir()
+    (out / "run.log").write_text("1ABC: PASS\n", encoding="utf-8")
+    assert "runs once" in r100.paper_run_problem(out, sample, plain)
+    with pytest.raises(SystemExit, match="refused"):
+        r100.main(["run", "--sample", str(sample), "--out", str(out)])
+    assert not (out / "report.json").exists()
+    no_protocol = tmp_path / "plain.json"
+    no_protocol.write_text(json.dumps({"entries": [], "replaced": []}), encoding="utf-8")
+    assert r100.paper_run_problem(out, no_protocol, plain) is None
+
+
+def test_not_for_paper_marks_the_report_never_to_be_quoted(r100, tmp_path):
+    out = tmp_path / "run"
+    sample = _paper_sample(tmp_path, "0" * 16)  # other code: refused, unless marked
+    assert r100.main(["run", "--sample", str(sample), "--out", str(out), "--not-for-paper"]) == 0
+    doc = json.loads((out / "report.json").read_text(encoding="utf-8"))
+    assert "not-for-paper" in doc["not_for_paper"] and doc["protocol"]["seed"] == 1
+    assert "NOT FOR THE PAPER" in (out / "report.md").read_text(encoding="utf-8")

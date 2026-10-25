@@ -134,6 +134,9 @@ def main() -> None:
     ap.add_argument("--timeout", type=int, default=240)
     ap.add_argument("--workers", type=int, default=6)
     args = ap.parse_args()
+    from foldmap.source_stamp import source_stamp
+
+    stamp = source_stamp(__file__)  # the code as the sweep starts (plan 28 Task 1, review M8)
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
     entries = sample(args.sample, args.seed)
@@ -150,9 +153,7 @@ def main() -> None:
                 f"{r['id']}: {'ok' if r.get('ok') else 'FAIL'} {r.get('seconds', '')}s {r.get('error', '')[:100]}",
                 flush=True,
             )
-    from foldmap.source_stamp import source_stamp
-
-    doc = {"source_stamp": source_stamp(__file__), "entries": rows}
+    doc = {"source_stamp": stamp, "entries": rows}
     (out / "report.json").write_text(json.dumps(doc, indent=1), encoding="utf-8")
     ok = [r for r in rows if r.get("ok")]
     lines = [

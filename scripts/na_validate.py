@@ -32,7 +32,8 @@ report says how many entries were not validated. The exit code is 0 only if ever
 (`seconds`) is gated but is a timing, not a deterministic quantity.
 and writes a contact sheet per entry (the figure, the drawn layout with stems coloured, the 3D structure projected
 the same way with the same colours) plus report.md and report.json with pass/fail against THRESHOLDS. report.json
-holds {"source_stamp": the code that measured (foldmap.source_stamp, at write time), "entries": one row per entry};
+holds {"source_stamp": the code that measured (foldmap.source_stamp, as the process starts), "entry_code" and
+"mixed_code" (code_mix), "entries": one row per entry, each with its stamp};
 reports written before plan 28 Task 1 are the bare list of rows.
 """
 
@@ -63,7 +64,9 @@ from foldmap.nucleic import MIN_LOOP, BasePair, pair_nucleotides, secondary_stru
 from foldmap.palette import chain_colors  # noqa: E402
 from foldmap.render import draw, save  # noqa: E402
 from foldmap.route import route_loops  # noqa: E402
-from foldmap.source_stamp import source_stamp, stamp_line  # noqa: E402
+from foldmap.source_stamp import code_mix, source_stamp, stamp_line  # noqa: E402
+
+SOURCE_STAMP = source_stamp(__file__)  # the code as this process starts (plan 28 Task 1); every entry is measured by it
 
 # id -> (category, why it is in the set)
 BENCHMARK = {
@@ -594,9 +597,10 @@ def main(argv=None) -> int:
                 m = _isolated(name, path, args.out, OPTIONS.get(name))
         else:
             m = _isolated(name, path, args.out, None)
+        m["source_stamp"] = SOURCE_STAMP
         rows.append(m)
         print(f"{name}: {'PASS' if not m['failed'] else 'FAIL ' + '; '.join(m['failed'])}", flush=True)
-    doc = {"source_stamp": source_stamp(__file__), "entries": rows}
+    doc = {"source_stamp": SOURCE_STAMP, **code_mix(m["source_stamp"] for m in rows), "entries": rows}
     (args.out / "report.json").write_text(json.dumps(doc, indent=1, default=str), encoding="utf-8")
     cols = [
         "entry",

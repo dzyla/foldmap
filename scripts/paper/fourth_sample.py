@@ -7,11 +7,14 @@ constant here, set before any draw (2026-10-25).
     python scripts/paper/fourth_sample.py plan                    the fixed choices and the excluded ids; no network,
                                                                   writes nothing
     python scripts/paper/fourth_sample.py draw --release TAG      draw the sample (network: the RCSB search service and
-                                                                  downloads) into OUT; refuses when OUT exists
+                                                                  downloads) into OUT, its one fixed path; refused
+                                                                  unless this is a clean git checkout at TAG, and
+                                                                  when OUT exists
 
 The draw is scripts/random100.py's sampler unchanged (its strata, quotas, size bins, search pools and LOOK) with:
   SEED      20261025, fixed here, never re-drawn
-  DATE      2026-10-13, the release-date cutoff of samples 1-3 (the same population, less their ids)
+  DATE      2026-10-13, the release-date cutoff of samples 1-3 (the same rule; the pools as the search service
+            returns them on the draw date, recorded with their counts and hashes in sample.json)
   EXCLUDED  every id of samples 1-3 (their entries and their CA-only / P-only replacements: random100's --exclude),
             read from the three committed sample.json files, which must still hash to SAMPLE_SHA256
 sample.json then carries a "protocol" record: the seed, cutoff and rule, each excluded file with its SHA-256 and id
@@ -19,6 +22,9 @@ count, the release tag, and foldmap.source_stamp of the code that drew. Its run,
 
     python scripts/random100.py run --views all --jobs N --sample docs/validation/random100-fourth/sample.json \\
         --out docs/validation/random100-fourth
+
+random100.py refuses a second run of it, a partial run (--ids) and a rerun (--failed-from), and a run with code other
+than the draw's, unless --not-for-paper, which marks the report never to be quoted (extract.py refuses it).
 """
 
 from __future__ import annotations
@@ -26,6 +32,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import importlib.util
+import subprocess
 import sys
 from pathlib import Path
 
@@ -91,18 +98,42 @@ def cmd_plan(args) -> int:
     return 0
 
 
+def release_problem(tag: str, stamp: dict, root: Path = ROOT) -> str | None:
+    """Why the draw may not run here (None: it may): it runs only in a clean git checkout whose HEAD is the release
+    tag's commit, with that checkout's foldmap (plan 28 Task 1, ruling Q14). `stamp`: foldmap.source_stamp of this
+    script."""
+    git = stamp.get("git") or {}
+    if git.get("source") != "git" or not git.get("commit"):
+        return "no git checkout here (a runner's asserted commit is not enough): draw in the release's checkout"
+    if git.get("dirty") is not False:
+        return f"the checkout differs from HEAD ({', '.join(git.get('dirty_paths', [])[:5])}): draw from a clean tree"
+    if stamp.get("installed_matches_checkout") is False:
+        return "the foldmap imported is not the checkout's src/foldmap"
+    done = subprocess.run(["git", "-C", str(root), "rev-parse", "--verify", f"{tag}^{{commit}}"], capture_output=True,
+                          text=True)  # fmt: skip
+    if done.returncode != 0:
+        return f"{tag} is not a tag or commit of this repository"
+    if done.stdout.strip() != git["commit"]:
+        return f"HEAD {git['commit'][:12]} is not {tag} ({done.stdout.strip()[:12]}): draw at the release"
+    return None
+
+
 def cmd_draw(args) -> int:
-    out = Path(args.out)
+    from foldmap.source_stamp import source_stamp
+
+    stamp = source_stamp(__file__)  # the code as the draw starts
+    problem = release_problem(args.release, stamp)
+    if problem:
+        raise SystemExit(f"refused: {problem}")
+    out = OUT  # fixed: a draw anywhere else is no draw (ruling Q14)
     if out.exists():
         raise SystemExit(f"{out} exists: the fourth sample is drawn once; it is never re-drawn")
     r100 = random100()
     ids, files = excluded(r100)
     doc = r100.sample(SEED, DATE, ids)
-    drawn = {e["id"] for e in doc["entries"]}
-    if drawn & set(ids):
-        raise SystemExit(f"the draw holds ids of samples 1-3: {sorted(drawn & set(ids))}")
-    from foldmap.source_stamp import source_stamp
-
+    to_run = {e["id"] for e in doc["entries"]} | {r["id"] for r in doc.get("replaced", []) if r["replacement"] is None}
+    if to_run & set(ids):  # what random100 run will draw: the entries and the A1c refusals (_sample_entries)
+        raise SystemExit(f"the draw holds ids of samples 1-3: {sorted(to_run & set(ids))}")
     doc["protocol"] = {
         "name": "fourth random-100 sample",
         "document": PROTOCOL,
@@ -112,7 +143,7 @@ def cmd_draw(args) -> int:
         "excluded": files,
         "excluded_ids": len(ids),
         "release": args.release,
-        "source_stamp": source_stamp(__file__),
+        "source_stamp": stamp,
     }
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(r100.dump(doc), encoding="utf-8")
@@ -129,7 +160,6 @@ def main(argv=None) -> int:
     p.set_defaults(func=cmd_plan)
     d = sub.add_parser("draw", help="draw the sample once, at the frozen release (network)")
     d.add_argument("--release", required=True, help="the frozen release's tag, recorded in the sample")
-    d.add_argument("--out", default=str(OUT))
     d.set_defaults(func=cmd_draw)
     args = ap.parse_args(argv)
     return args.func(args)

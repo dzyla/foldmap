@@ -1,14 +1,21 @@
 name: release
 
-# Publishes to PyPI when a GitHub release is published. Uses PyPI trusted publishing (no API token):
-# on pypi.org, add this repository as a trusted publisher for the project "foldmap"
-# (workflow: release.yml, environment: pypi) before the first release.
-# Nothing is built or published unless the tests (tests.yml) and the cross-platform determinism run
-# (determinism.yml: the same figures on Linux, macOS and Windows) both pass on the commit being released.
+# A release starts from a version tag pushed to the repository (git tag vX.Y.Z && git push origin vX.Y.Z), never
+# from the GitHub web UI (plan 28 Task 1, ruling Q15). In order:
+#   1. check-tag: the tag names the version the package carries (scripts/check_release.py);
+#   2. tests (tests.yml) and the cross-platform determinism run (determinism.yml: the same figures on Linux, macOS
+#      and Windows), both on the tagged commit;
+#   3. build: the sdist and wheel, only when both pass;
+#   4. publish: PyPI, by trusted publishing (no API token; opt in with the repository variable PUBLISH_PYPI = true
+#      once pypi.org lists this repository as a trusted publisher for "foldmap": workflow release.yml, environment
+#      pypi);
+#   5. github-release: the GitHub release is created last, with the built files attached. Zenodo archives a release
+#      (and mints its DOI) when one is published, so nothing is archived unless every gate above passed.
+# RELEASING.md describes the steps.
 
 on:
-  release:
-    types: [published]
+  push:
+    tags: ["v*"]
 
 jobs:
   check-tag:
@@ -58,3 +65,22 @@ jobs:
           name: dist
           path: dist/
       - uses: pypa/gh-action-pypi-publish@release/v1
+
+  github-release:
+    needs: [build, publish]
+    # after the build, and after PyPI when that is on (publish skipped when PUBLISH_PYPI is not set; never failed)
+    if: ${{ !cancelled() && needs.build.result == 'success' && contains(fromJSON('["success", "skipped"]'), needs.publish.result) }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      - name: Create the GitHub release (Zenodo archives it), the built files attached
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          gh release create "$GITHUB_REF_NAME" dist/* --repo "$GITHUB_REPOSITORY" --verify-tag
+          --title "foldmap $GITHUB_REF_NAME" --generate-notes

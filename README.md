@@ -1151,7 +1151,8 @@ If you use foldmap in published work, please cite it:
 ```
 
 GitHub's "Cite this repository" button gives the same reference (from [`CITATION.cff`](CITATION.cff)). Each
-release is archived on Zenodo with its own DOI; please cite the version you used.
+release is archived on Zenodo with its own DOI; please cite the version you used. How a release is made:
+[`RELEASING.md`](RELEASING.md).
 
 ## License
 

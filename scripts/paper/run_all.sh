@@ -47,14 +47,12 @@ if [[ "${M2_RERUN:-0}" == 1 ]]; then  # the M2 measurements (raw outputs under d
   heavy --push "$M/build" --pull "$D/m2/dssp" -- env FOLDMAP_MANUSCRIPT="$M" python "$H/dssp_mkdssp.py"
   heavy --pull "$RUN/na" -- bash -c "rm -rf '$RUN/na' && python scripts/na_validate.py --out '$RUN/na' \
     --require-rnapolis; mkdir -p '$RUN/na'"
-  mkdir -p "$D/m2/na" && cp "$RUN/na/report.json" "$RUN/na/report.md" "$D/m2/na/" \
-    && git -C "$REPO" rev-parse HEAD > "$D/m2/na/COMMIT"
+  mkdir -p "$D/m2/na" && cp "$RUN/na/report.json" "$RUN/na/report.md" "$D/m2/na/"  # its code: its own stamp
   # the Linux leg: determinism.py's three configurations, compared (exit 1 on a difference)
   heavy --pull "$RUN/determinism" -- bash -c "rm -rf '$RUN/determinism' && \
     python scripts/paper/determinism.py --configurations '$RUN/determinism'; rc=\$?; mkdir -p '$RUN/determinism'; exit \$rc" \
     || echo "determinism: the Linux leg's runs differ (listed above); make_numbers reports which" >&2
-  mkdir -p "$D/m2/determinism" && cp "$RUN"/determinism/linux-*.json "$D/m2/determinism/" \
-    && git -C "$REPO" rev-parse HEAD > "$D/m2/determinism/COMMIT"
+  mkdir -p "$D/m2/determinism" && cp "$RUN"/determinism/linux-*.json "$D/m2/determinism/"  # stamped runs
 fi
 python "$H/make_numbers.py"                                                  # build/numbers.json, tables/
 python "$H/table_s1.py" || echo "table_s1: a value is not in the code at $COMMIT (named above)" >&2  # Table S1

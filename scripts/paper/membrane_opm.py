@@ -354,6 +354,7 @@ def main() -> int:
 
     where = Path(foldmap.__file__).resolve()
     assert str(where).startswith(str(TREE.resolve())), f"foldmap imported from {where}, not build/tree"
+    stamp = run_stamp(__file__)  # the code as the step starts (plan 28 Task 1)
     sel = json.loads((OPM / "selection.json").read_text(encoding="utf-8"))
     OUT.mkdir(parents=True, exist_ok=True)
     from concurrent.futures import ProcessPoolExecutor
@@ -382,7 +383,7 @@ def main() -> int:
         print(extra[-1], flush=True)
     doc = {
         "generator": "scripts/paper/membrane_opm.py",
-        "source_stamp": run_stamp(__file__),
+        "source_stamp": stamp,
         "foldmap_from": str(where),
         "selection": sel,
         "entries": rows,

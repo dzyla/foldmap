@@ -68,7 +68,7 @@ def af_accession(entry_id: str):
 
 
 def one(job):
-    pid, samples = job
+    pid, samples, stamp = job
     from foldmap.dssp import assign_dssp
     from foldmap.fetch import fetch
     from foldmap.io import load_backbone
@@ -116,6 +116,7 @@ def one(job):
         "excluded_chromophore": len(stood_in) + len(near),
         "compared": len(table),
         "rows": table,
+        "source_stamp": stamp,  # the code that compared, as the step started (run_stamp)
     }
     (OUT / f"{pid}.json.gz").write_bytes(gzip.compress(json.dumps(doc, separators=(",", ":")).encode(), mtime=0))
     return {"id": pid, "compared": len(table)}
@@ -127,6 +128,7 @@ def main() -> int:
 
     where = Path(foldmap.__file__).resolve()
     assert str(where).startswith(str(TREE.resolve())), f"foldmap imported from {where}, not build/tree"
+    stamp = run_stamp(__file__)  # the code as the step starts (plan 28 Task 1)
     version = subprocess.run([os.environ["MKDSSP"], "--version"], capture_output=True, text=True).stdout.strip()
     assert "mkdssp version 3.1.2" in version, version
     jobs: dict[str, list[str]] = {}
@@ -139,11 +141,11 @@ def main() -> int:
     from concurrent.futures import ProcessPoolExecutor
 
     with ProcessPoolExecutor(24) as ex:
-        done = list(ex.map(one, sorted(jobs.items()), chunksize=1))
+        done = list(ex.map(one, [(pid, s, stamp) for pid, s in sorted(jobs.items())], chunksize=1))
     bad = [d for d in done if "error" in d]
     run = {
         "generator": "scripts/paper/dssp_mkdssp.py",
-        "source_stamp": run_stamp(__file__),
+        "source_stamp": stamp,
         "foldmap_from": str(where),
         "mkdssp": version,
         "entries": len(jobs),

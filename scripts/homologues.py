@@ -165,6 +165,7 @@ def cmd_align(args) -> int:
     for p, r in zip(pairs, rows):
         if "stratum" in p:
             r["stratum"] = p["stratum"]
+        r["source_stamp"] = _stamp()  # align.json: each pair with the code that aligned it
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
     (out / "align.json").write_text(json.dumps(rows, indent=1, sort_keys=True) + "\n", encoding="utf-8")
@@ -400,11 +401,18 @@ def _h1_refused(rows: list[dict]) -> list[dict]:
     return [r for r in rows if r["kind"] == "positive" and not r["same_fold"]]
 
 
-def _stamp() -> dict:
-    """The code that measured (foldmap.source_stamp, plan 28 Task 1), stamped into each result as it is written."""
-    from foldmap.source_stamp import source_stamp
+_STAMP: dict | None = None
 
-    return source_stamp(__file__)
+
+def _stamp() -> dict:
+    """The code that measured (foldmap.source_stamp, plan 28 Task 1), stamped into each result as it is written: taken
+    once, when main() starts (review M8), and reused."""
+    global _STAMP
+    if _STAMP is None:
+        from foldmap.source_stamp import source_stamp
+
+        _STAMP = source_stamp(__file__)
+    return _STAMP
 
 
 def write_usalign_report(runs: dict[str, list[dict]], out: Path, summary_path: Path | None, commit: str) -> Path:
@@ -413,6 +421,7 @@ def write_usalign_report(runs: dict[str, list[dict]], out: Path, summary_path: P
     misses with where the alignments part; the held-out positives H1 refuses beside US-align's TM-score) and, with
     summary_path (heldout-summary.json), its 'usalign' entry (usalign_summary per set and over all, the H1 refusals)."""
     from foldmap.align import SAME_FOLD_TM
+    from foldmap.source_stamp import code_mix
 
     every = [r for rows in runs.values() for r in rows]
     version = next((r["usalign"]["usalign"]["version"] for r in every), None)
@@ -439,6 +448,7 @@ def write_usalign_report(runs: dict[str, list[dict]], out: Path, summary_path: P
     ]
     out.mkdir(parents=True, exist_ok=True)
     data = {"about": how, "measured_at": commit, "usalign_version": version, "sets": runs, "source_stamp": _stamp()}
+    data |= code_mix(r.get("source_stamp") for r in every)  # the aligning code, per pair (ruling Q13)
     (out / "usalign.json").write_text(json.dumps(data, indent=1, sort_keys=True) + "\n", encoding="utf-8")
     lines = ["# foldmap's aligner against US-align", "", how, ""]
     lines += [
@@ -914,6 +924,9 @@ def _turns(row: dict) -> str:
 def write_diff_report(pairs: list[dict], out: Path, md: Path) -> Path:
     """The tables of a diff run: per pair the route, H5 per panel, the S-/A-checks each panel fails beside its chain
     drawn alone, the changes counted, the known difference; then each pair's numbers at both cuts."""
+    from foldmap.source_stamp import code_mix, stamp_line
+
+    measured = []  # each drawn pair's stamp (diff_pair)
     head = [
         "| pair | set | type | route | H5 A | H5 B | A fails (alone) | B fails (alone) | changes | known | agrees |",
         "|---|---|---|---|---|---|---|---|---|---|---|",
@@ -931,6 +944,7 @@ def write_diff_report(pairs: list[dict], out: Path, md: Path) -> Path:
             continue
         r = json.loads(f.read_text(encoding="utf-8"))
         m, k = r["measured"], r["known"] or {}
+        measured.append(r.get("source_stamp"))
 
         def fails(side: str, r=r) -> str:
             c = r["checks"].get(side, {})
@@ -950,8 +964,16 @@ def write_diff_report(pairs: list[dict], out: Path, md: Path) -> Path:
                 f"| {s} | {cut:g}·d0 | {row['core']} / {row['aligned']} | {row['core_rmsd']:.2f} | "
                 f"{row['max_displacement']:.1f} | {row['moved']} | {_turns(row)} | {rel} | {share} |"
             )
+    mix = code_mix(measured)
+    code = [
+        f"Report written by: {stamp_line(_stamp())}",
+        f"Pairs measured by {len(mix['entry_code'])} code version(s): "
+        + ", ".join(f"{c} ({n})" for c, n in mix["entry_code"].items())
+        + (" -- MIXED CODE" if mix["mixed_code"] else ""),
+        "",
+    ]
     md.parent.mkdir(parents=True, exist_ok=True)
-    md.write_text("\n".join(head) + "\n\n" + "\n".join(cuts) + "\n", encoding="utf-8")
+    md.write_text("\n".join(code + head) + "\n\n" + "\n".join(cuts) + "\n", encoding="utf-8")
     return md
 
 
@@ -1296,6 +1318,8 @@ def summarize(pairs: list[dict], results: dict[str, dict]) -> dict:
 
 def write_report(pairs: list[dict], out: Path, md: Path) -> Path:
     """The table of every pair's result (module doc)."""
+    from foldmap.source_stamp import code_mix
+
     rows, failures, missing, results = [], {k: [] for k in CHECKS}, [], {}
     strata = any("stratum" in p for p in pairs)
     for p in pairs:
@@ -1342,6 +1366,7 @@ def write_report(pairs: list[dict], out: Path, md: Path) -> Path:
     if strata:
         summary = summarize(pairs, results)
         summary["source_stamp"] = _stamp()
+        summary |= code_mix(r.get("source_stamp") for r in results.values())  # each pair's measuring code
         (out / "summary.json").write_text(json.dumps(summary, indent=1, sort_keys=True) + "\n", encoding="utf-8")
         lines += ["", "## Summary", "", "| stratum | pairs | results | all pass | " + " | ".join(CHECKS) + " |"]
         lines.append("|---|---|---|---|" + "---|" * len(CHECKS))
@@ -1422,6 +1447,7 @@ def main(argv: list[str] | None = None) -> int:
     dr.add_argument("--out", required=True)
     dr.add_argument("--md", default="")
     args = ap.parse_args(argv)
+    _stamp()  # the code as this process starts, written with every result it measures (review M8)
     commands = {"align": cmd_align, "usalign-report": cmd_usalign_report, "pair": cmd_pair, "run": cmd_run,
                 "sample": cmd_sample, "report": cmd_report,
                 "diff": cmd_diff, "diff-pair": cmd_diff_pair, "diff-report": cmd_diff_report}  # fmt: skip

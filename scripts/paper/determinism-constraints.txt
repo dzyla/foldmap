@@ -1,7 +1,0 @@
-# The packages the figures depend on, pinned for CI's determinism workflow (.github/workflows/determinism.yml) to the
-# versions of the Linux leg run on zyla-lab (Python 3.13.13), so every platform's run, CI's and that one, compares.
-numpy==2.5.4
-matplotlib==3.11.2
-scipy==1.18.1
-networkx==3.7
-gemmi==0.7.5

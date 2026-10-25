@@ -15,7 +15,8 @@ gets
   svg_sha256         sha256 of the SVG foldmap wrote (kept in --svg-dir if given)
 and the run records fonts.font_report() (the font resolved after fonts.force_liberation_sans(), asserted per figure
 with fonts.assert_figure_font; with the font file's revision), the platform, the Python, numpy, scipy, networkx,
-matplotlib and gemmi versions, PYTHONHASHSEED and the CPU-feature environment. Exits 1 when a figure was not drawn.
+matplotlib and gemmi versions, PYTHONHASHSEED, the CPU-feature environment and the source stamp of the code that drew
+(foldmap.source_stamp). Exits 1 when a figure was not drawn.
 --any-font draws with whatever font resolves (for comparing runs on one machine without Liberation Sans; never for
 the cross-platform run).
 
@@ -28,7 +29,7 @@ Compare (--compare): the runs are the JSON files given, found under a directory 
 (text, not parsed floats: 0.0 == -0.0 would hide a difference), and (--systems N) on at least N platform.system()
 values. Runs whose package versions or font (family, revision) differ are "not comparable": that is the verdict,
 and a figure difference is listed as "(versions differ)", not taken for the platform's. CI's determinism workflow
-(.github/workflows/determinism.yml, pinned by determinism-constraints.txt) draws on Linux, macOS and Windows and
+(.github/workflows/determinism.yml, installed from requirements.lock) draws on Linux, macOS and Windows and
 compares; the compare needs nothing but the standard library.
 """
 
@@ -262,12 +263,18 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--systems", type=int, default=0, help="--compare: fail with fewer platforms than this")
     ap.add_argument("paths", nargs="*", type=Path, help="structures to draw (default tests/data/*.cif), or runs")
     args = ap.parse_args(argv)
+    stamp = None
+    if args.out:  # the code that draws, as this process starts (plan 28 Task 1): every run record carries it
+        from foldmap.source_stamp import source_stamp
+
+        stamp = source_stamp(__file__)
     if args.compare:
         runs = [json.loads(p.read_text(encoding="utf-8")) for p in find_runs(list(map(str, args.paths)))]
     else:
         structures = args.paths or sorted((REPO / "tests" / "data").glob("*.cif"))
         if args.out:
             doc = draw(structures, args.label, args.svg_dir, force_font=not args.any_font)
+            doc["source_stamp"] = stamp
             args.out.parent.mkdir(parents=True, exist_ok=True)
             args.out.write_text(json.dumps(doc, indent=1) + "\n", encoding="utf-8")
             return 0 if all(_drawn(f) for f in doc["figures"]) else 1

@@ -59,3 +59,24 @@ def test_nothing_is_built_or_published_unless_the_cross_platform_determinism_run
     triggers = det.get("on", det.get(True))  # PyYAML reads the key `on` as True
     assert "workflow_call" in triggers
     assert det["jobs"]["compare"]["needs"] == "draw"
+
+
+@needs_workflows
+def test_a_release_starts_from_a_tag_and_the_github_release_comes_last():
+    """Ruling Q15: release.yml runs on a pushed v* tag (no GitHub release exists yet), and creates the GitHub release
+    (which Zenodo archives) only after tests, determinism, the build and PyPI (when on): no gate can be passed by."""
+    wf = yaml.safe_load(RELEASE.read_text(encoding="utf-8"))
+    triggers = wf.get("on", wf.get(True))
+    assert triggers == {"push": {"tags": ["v*"]}}
+    jobs = wf["jobs"]
+    last = jobs["github-release"]
+    assert set(last["needs"]) == {"build", "publish"}
+    assert "needs.build.result == 'success'" in last["if"] and "skipped" in last["if"] and "!cancelled()" in last["if"]
+    assert last["permissions"] == {"contents": "write"}
+    run = " ".join(s.get("run", "") for s in last["steps"])
+    assert "gh release create" in run and "dist/*" in run and "--verify-tag" in run
+    others = [j for name, j in jobs.items() if name != "github-release"]
+    assert not any("gh release" in s.get("run", "") for j in others for s in j.get("steps", []))
+    det = yaml.safe_load(DETERMINISM.read_text(encoding="utf-8"))
+    install = " ".join(s.get("run", "") for s in det["jobs"]["draw"]["steps"])
+    assert "--require-hashes -r scripts/paper/requirements.lock" in install  # the paper's environment (review M1)

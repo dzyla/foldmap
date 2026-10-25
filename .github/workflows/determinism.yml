@@ -30,7 +30,7 @@ jobs:
         with:
           python-version: "3.13.13"  # one patch release on every OS (and the Linux leg's)
       - uses: ./.github/actions/liberation-sans
-      - run: pip install . -c scripts/paper/determinism-constraints.txt
+      - run: pip install --require-hashes -r scripts/paper/requirements.lock && pip install --no-deps .  # the paper environment
       - name: Draw (Liberation Sans forced)
         env:
           PYTHONHASHSEED: "0"

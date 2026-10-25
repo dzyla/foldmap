@@ -21,7 +21,7 @@ gemmi version and the SHA-256 of every candidate file read, so a changed file is
 lists those now obsolete, without changing the file.
 
     python scripts/random100.py run [--ids A,B | --failed-from report.json] [--views all|quick|v1,v2]
-                                    [--out docs/validation/random100] [--jobs 1]
+                                    [--out docs/validation/random100] [--jobs 1] [--not-for-paper]
 
 run draws every entry (plus each CA-only / P-only id met while sampling, which must be refused: A1c) with `entry <id>
 --out DIR`, a child process (python -I, OPENBLAS_NUM_THREADS=1, PYTHONHASHSEED=0). The entry draws each view (VIEWS) in
@@ -37,6 +37,10 @@ per entry (the figure, the 3D CA/P traces seen through the figure's page axes in
 written.
 Exit 0 only if every entry passes. Each view's files are kept in <out>/work/<id>/. Pairing against RNApolis needs
 NA_RNAPOLIS_PYTHON (the Python of a venv that has it); mkdssp 3.1.2 is found on PATH or as MKDSSP.
+Every entry and report carries the source stamp of the code that measured or wrote it (foldmap.source_stamp, taken
+as the process starts); a report whose entries differ in code says "mixed_code" and is never quoted. A paper sample (a
+sample.json with a protocol record) runs once, whole, with the code that drew it: a second run, --ids or
+--failed-from is refused unless --not-for-paper, which marks the report never to be quoted (plan 28 Task 1).
 """
 
 from __future__ import annotations
@@ -86,9 +90,12 @@ from foldmap.criteria import (  # noqa: E402
     pair_check,
 )
 from foldmap.criteria import jsonable as _jsonable  # noqa: E402
-from foldmap.source_stamp import source_stamp, stamp_line  # noqa: E402
+from foldmap.source_stamp import code_mix, source_stamp, stamp_line  # noqa: E402
+
+SOURCE_STAMP = source_stamp(__file__)  # the code as this process starts (plan 28 Task 1, review M8)
 
 SEED = 20261013
+NOT_FOR_PAPER = "NOT-FOR-PAPER.txt"  # in a run's folder: its report is never quoted (plan 28 Task 1, ruling Q14)
 LOOK = 200  # candidates looked at per pool, at most
 OUT = ROOT / "docs" / "validation" / "random100"
 SEARCH = "https://search.rcsb.org/rcsbsearch/v2/query"
@@ -627,14 +634,10 @@ def af_accession(entry_id: str) -> str | None:
 
 
 def _commit() -> str:
-    """HEAD of this checkout, or FOLDMAP_COMMIT where there is no .git (a copy synced to another machine)."""
-    if os.environ.get("FOLDMAP_COMMIT"):
-        return os.environ["FOLDMAP_COMMIT"]
-    try:
-        done = subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True, text=True, cwd=ROOT, check=True)
-        return done.stdout.strip()
-    except (OSError, subprocess.CalledProcessError):
-        return "unknown"
+    """HEAD of this checkout as git reads it, else "unknown" (kept for older readers; the source stamp is the record,
+    and a runner's asserted commit goes there, marked as asserted, never here: plan 28 Task 1, ruling Q11)."""
+    git = SOURCE_STAMP.get("git") or {}
+    return git.get("commit") or "unknown" if git.get("source") == "git" else "unknown"
 
 
 def _log(*parts) -> None:
@@ -906,7 +909,7 @@ def sample(seed: int, date: str, exclude: Iterable[str] = ()) -> dict:
         "query_date": date,
         "foldmap_commit": _commit(),
         "gemmi": gemmi.__version__,
-        "source_stamp": source_stamp(__file__),
+        "source_stamp": SOURCE_STAMP,
         "look": LOOK,
         "bins": {b: [lo or 0, hi - 1] for b, (lo, hi) in BINS.items()},
         "strata": s.records,
@@ -1476,7 +1479,7 @@ def run_entry(source: str, out: Path, views=VIEWS, info: dict | None = None) -> 
     keep = ("stratum", "bin", "order", "quota", "pair", "pair_type", "role", "partner", "refusal")
     e: dict = {"id": info.get("id", name), "name": name, **{k: info[k] for k in keep if k in info}, "views": {}}
     e["foldmap_commit"] = _commit()  # this entry's own: a report may join runs (final review B, Minor 6)
-    e["source_stamp"] = source_stamp(__file__)  # the code measuring this entry (plan 28 Task 1)
+    e["source_stamp"] = SOURCE_STAMP  # the code measuring this entry (plan 28 Task 1)
     try:
         path = resolve(source)
         e["file"], e["sha256"] = str(path), _sha256(path.read_bytes())
@@ -1842,11 +1845,13 @@ def report(entries: list[dict], out: Path, sample_path: Path | None = None, tota
     limits) and index.html (a grid of the contact sheets, linking to each)."""
     total = total or len(entries)
     passed = sum(1 for e in entries if e.get("pass"))
+    drawn = json.loads(sample_path.read_text(encoding="utf-8")) if sample_path and sample_path.is_file() else {}
     doc = {
         "date": datetime.date.today().isoformat(),
         "foldmap_commit": _commit(),
         "versions": _versions(),
-        "source_stamp": source_stamp(__file__),
+        "source_stamp": SOURCE_STAMP,  # the code that judged and wrote the report; each entry has its measuring code
+        **code_mix(e.get("source_stamp") for e in entries),  # entry_code, mixed_code (ruling Q13)
         "sample_sha256": _sha256(sample_path.read_bytes()) if sample_path and sample_path.is_file() else None,
         "limits": LIMITS,
         "documented_warnings": list(DOCUMENTED_WARNINGS),
@@ -1854,20 +1859,31 @@ def report(entries: list[dict], out: Path, sample_path: Path | None = None, tota
         "passed": passed,
         "entries": entries,
     }
+    if drawn.get("protocol"):  # a paper sample (scripts/paper/fourth_sample.py): its protocol, and whether quotable
+        doc["protocol"] = drawn["protocol"]
+    if (out / NOT_FOR_PAPER).is_file():
+        doc["not_for_paper"] = (out / NOT_FOR_PAPER).read_text(encoding="utf-8").strip()
     out.mkdir(parents=True, exist_ok=True)
     (out / "report.json").write_text(json.dumps(_jsonable(doc), indent=1) + "\n", encoding="utf-8")
     keys = list(CRITERIA)
     strata: dict[str, list] = {}
     for e in entries:
         strata.setdefault(e.get("stratum") or "-", []).append(e)
-    drawn = json.loads(sample_path.read_text(encoding="utf-8")) if sample_path and sample_path.is_file() else {}
     lines = [
         "# foldmap random-100 campaign",
         "",
         f"{passed} of {total} pass.",
         "",
-        f"Code: {stamp_line(doc['source_stamp'])}",
+        f"Report written by: {stamp_line(doc['source_stamp'])}",
         "",
+        f"Entries measured by {len(doc['entry_code'])} code version(s): "
+        + ", ".join(f"{k} ({n})" for k, n in doc["entry_code"].items())
+        + (" -- MIXED CODE: not quotable as one measurement" if doc["mixed_code"] else ""),
+        "",
+    ]
+    if doc.get("not_for_paper"):
+        lines += [f"NOT FOR THE PAPER: {doc['not_for_paper']}", ""]
+    lines += [
         "An entry passes when no criterion fails. A criterion with nothing to judge in an entry is not judged (or does "
         "not apply), never counted as a pass: see the outcomes per criterion below.",
         "",
@@ -2349,10 +2365,35 @@ def read_report(path: Path) -> dict:
     return json.loads(gzip.decompress(data) if path.suffix == ".gz" else data)
 
 
+def paper_run_problem(out: Path, sample_path: Path, args) -> str | None:
+    """Why this run of a paper sample (a sample.json with a protocol record: scripts/paper/fourth_sample.py) would not
+    be the one quotable run: a run already made in `out`, a partial run (--ids) or a rerun (--failed-from), or code
+    other than the draw's. None when it may run."""
+    if not sample_path.is_file():
+        return None
+    protocol = json.loads(sample_path.read_text(encoding="utf-8")).get("protocol")
+    if not protocol:
+        return None
+    if any((out / f).exists() for f in ("report.json", "report.json.gz", "run.log")):
+        return f"{out} holds a run already: a paper sample runs once"
+    if args.failed_from or args.ids:
+        return "--failed-from / --ids: a paper sample runs once, whole"
+    drew = (protocol.get("source_stamp") or {}).get("code_fingerprint")
+    if drew != SOURCE_STAMP["code_fingerprint"]:
+        return f"the code ({SOURCE_STAMP['code_fingerprint']}) is not the code that drew the sample ({drew})"
+    return None
+
+
 def cmd_run(args) -> int:
     from concurrent.futures import ThreadPoolExecutor
 
     out, sample_path = Path(args.out), Path(args.sample)
+    problem = paper_run_problem(out, sample_path, args)
+    if problem and not args.not_for_paper:
+        raise SystemExit(f"refused: {problem}. --not-for-paper runs it anyway, its report marked never to be quoted")
+    if args.not_for_paper:
+        out.mkdir(parents=True, exist_ok=True)
+        (out / NOT_FOR_PAPER).write_text(f"run with --not-for-paper ({problem or 'asked'})\n", encoding="utf-8")
     listed = _sample_entries(sample_path) if sample_path.is_file() else []
     if args.ids:
         ids = args.ids.split(",")
@@ -2380,6 +2421,7 @@ def cmd_run(args) -> int:
             e["error"] += f", killed after {timeout} s" if r["timed_out"] else f" ({' | '.join(tail)})"
             info = next((x for x in listed if x["id"] == i), {})
             e.update({k: info[k] for k in ("stratum", "bin", "pair", "pair_type", "role", "partner") if k in info})
+            e["source_stamp"] = SOURCE_STAMP  # measured (to its death) by this run's code
             e["criteria"] = criteria(e)
             _verdict(e)
         e["process"] = r
@@ -2438,6 +2480,11 @@ def main(argv=None) -> int:
     r.add_argument("--out", default=str(OUT))
     r.add_argument("--sample", default=str(OUT / "sample.json"))
     r.add_argument("--jobs", type=int, default=1, help="entries drawn at once")
+    r.add_argument(
+        "--not-for-paper",
+        action="store_true",
+        help="run a paper sample again, in part or with other code: the report is marked never to be quoted",
+    )
     r.set_defaults(func=cmd_run)
     e = sub.add_parser("entry", help="draw and measure one entry in every view that applies (run's child)")
     e.add_argument("id", help="a sampled id, or a local structure file")

@@ -37,6 +37,7 @@ from foldmap.cli import make_layout
 from foldmap.route import route_loops
 from foldmap.source_stamp import source_stamp
 
+SOURCE_STAMP = source_stamp(__file__)  # the code as this process starts (taken once, written with each baseline)
 DATA = Path(__file__).resolve().parent.parent / "tests" / "data"
 PHASES = {  # timed wherever they are looked up
     "read_model": (io, cli),
@@ -102,7 +103,7 @@ def _meta() -> dict:
         "options": OPTIONS,
         "commit": commit,
         "version": foldmap.__version__,
-        "source_stamp": source_stamp(__file__),
+        "source_stamp": SOURCE_STAMP,
     }
 
 

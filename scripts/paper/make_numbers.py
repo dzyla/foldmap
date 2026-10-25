@@ -19,7 +19,20 @@ import sys
 from collections import Counter, defaultdict
 from datetime import date
 
-from common import BUILD, TABLES, TREE, load_source, median, na_rows, percentile, stamp, tex_escape, tex_frac, tex_int
+from common import (
+    BUILD,
+    TABLES,
+    TREE,
+    load_source,
+    median,
+    na_rows,
+    percentile,
+    quotable,
+    stamp,
+    tex_escape,
+    tex_frac,
+    tex_int,
+)
 
 SAMPLES = {"tuned": "r100_tuned", "held": "r100_held", "third": "r100_third"}
 OUTCOMES = ("pass", "fail", "not judged", "does not apply")
@@ -167,6 +180,8 @@ def sample_summary(report: dict) -> dict:
 def build_r100(nb: Numbers) -> dict:
     reports = {s: load_source(f"{p}_report") for s, p in SAMPLES.items()}
     samples = {s: load_source(f"{p}_sample") for s, p in SAMPLES.items()}
+    for s, p in SAMPLES.items():
+        quotable(f"{p}_report", reports[s])  # never a report of mixed code or one not for the paper
     summ = {s: sample_summary(r) for s, r in reports.items()}
 
     for s, p in SAMPLES.items():
@@ -188,6 +203,7 @@ def build_r100(nb: Numbers) -> dict:
         )
 
     first = load_source("r100_held_first_report")
+    quotable("r100_held_first_report", first)
     fs = sample_summary(first)
     nb.put(
         "r100_held_pass_first",
@@ -381,7 +397,9 @@ def write_r100_tables(summ: dict, reports: dict, first: dict):
 
 
 def build_na(nb: Numbers):
-    rep = na_rows(load_source("na_report"))
+    raw = load_source("na_report")
+    quotable("na_report", raw)
+    rep = na_rows(raw)
     src = ["na_report"]
     n = len(rep)
     nb.put("na_n_entries", n, str(n), src, "entries in report.json")

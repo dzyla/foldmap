@@ -15,7 +15,7 @@ import gzip
 import json
 from collections import Counter, defaultdict
 
-from common import MANUSCRIPT, TABLES, median, na_rows, tex_escape, tex_frac, tex_int
+from common import MANUSCRIPT, TABLES, median, na_rows, quotable, stamped_commit, tex_escape, tex_frac, tex_int
 
 DATA = MANUSCRIPT / "data"
 M2 = DATA / "m2"
@@ -54,7 +54,7 @@ def build_dssp(nb, reports: dict) -> None:
         doc = json.loads(gzip.decompress(f.read_bytes()))
         entries[doc["id"]] = doc
     src = [
-        "data/m2/dssp/*.json.gz, raw/*.dssp.gz, run.json (harness/dssp_mkdssp.py on zyla-lab: mkdssp 3.1.2, "
+        "data/m2/dssp/*.json.gz, raw/*.dssp.gz, run.json (scripts/paper/dssp_mkdssp.py on zyla-lab: mkdssp 3.1.2, "
         "foldmap from build/tree)"
     ]
 
@@ -281,8 +281,8 @@ def build_membrane(nb) -> None:
     if bad:
         raise SystemExit(f"membrane: entries with errors {bad}")
     src = [
-        "data/m2/membrane/results.json (harness/membrane_opm.py on zyla-lab, foldmap from build/tree)",
-        "data/opm/*.json, *.pdb.gz, selection.json (harness/opm_fetch.py: OPM's API and "
+        "data/m2/membrane/results.json (scripts/paper/membrane_opm.py on zyla-lab, foldmap from build/tree)",
+        "data/opm/*.json, *.pdb.gz, selection.json (scripts/paper/opm_fetch.py: OPM's API and "
         "coordinate files, opm-back.cc.lehigh.edu and opm-assets.storage.googleapis.com)",
     ]
     sel = doc["selection"]
@@ -453,19 +453,22 @@ def build_pk(nb, committed_na: list[dict]) -> None:
     path = M2 / "na" / "report.json"
     if not path.exists():
         return
-    rep = na_rows(json.loads(path.read_text(encoding="utf-8")))
+    raw = json.loads(path.read_text(encoding="utf-8"))
+    quotable("data/m2/na/report.json", raw)
+    rep = na_rows(raw)
     passed = sum(not e["failed"] for e in rep)
     old = {e["entry"]: e for e in committed_na}
+    skip = ("seconds", "source_stamp")
     same = all(
-        {k: v for k, v in e.items() if k not in ("seconds",) and not k.startswith(("pk_", "deposited_pk_"))}
-        == {k: v for k, v in old[e["entry"]].items() if k != "seconds"}
+        {k: v for k, v in e.items() if k not in skip and not k.startswith(("pk_", "deposited_pk_"))}
+        == {k: v for k, v in old[e["entry"]].items() if k not in skip}
         for e in rep
     )
     if not same or passed != sum(not e["failed"] for e in committed_na):
         raise SystemExit("NA rerun differs from the committed report beyond pk_* and seconds")
-    commit = (M2 / "na" / "COMMIT").read_text(encoding="utf-8").strip()[:7]
+    commit = stamped_commit(raw)  # from the report's own stamp only (ruling Q11; no COMMIT file)
     src = [
-        f"data/m2/na/report.json (scripts/na_validate.py --require-rnapolis at {commit} on zyla-lab; every other "
+        f"data/m2/na/report.json (scripts/na_validate.py --require-rnapolis, {commit}; every other "
         "field equal to docs/validation/na/report.json, asserted)"
     ]
     ref = sum(e["pk_reference"] for e in rep)

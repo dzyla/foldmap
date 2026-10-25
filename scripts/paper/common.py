@@ -87,6 +87,19 @@ def na_rows(report) -> list[dict]:
     return report["entries"] if isinstance(report, dict) else report
 
 
+def stamped_commit(report) -> str:
+    """What a report's own source stamp says about the code that measured it, as words for a source label: the commit
+    (as git read it, or as the runner asserted it) and the fingerprint; never a commit from anywhere else (Q11)."""
+    st = report.get("source_stamp") if isinstance(report, dict) else None
+    if not st:
+        return "no source stamp (written before plan 28 Task 1)"
+    git = st.get("git") or {}
+    fp = f"code fingerprint {st.get('code_fingerprint')}"
+    if git.get("commit"):
+        return f"at {git['commit'][:7]} ({git.get('source')}, dirty {git.get('dirty')}; {fp})"
+    return f"{fp}, no commit recorded"
+
+
 def stamp() -> dict:
     """What extract.py recorded: the harness commit and every source's provenance."""
     path = BUILD / "provenance.json"
@@ -95,11 +108,33 @@ def stamp() -> dict:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+def repo_module(name: str):
+    """A module of this checkout's src/foldmap loaded on its own, outside any foldmap package: app_jobs (for
+    code_fingerprint, the one fingerprint algorithm) and source_stamp (RUNTIME) import only the standard library at
+    module level. Used where the foldmap imported is another tree's (build/tree) or none."""
+    import importlib.util
+    import sys
+
+    key = f"_paper_repo_{name}"
+    if key not in sys.modules:
+        spec = importlib.util.spec_from_file_location(key, REPO / "src" / "foldmap" / f"{name}.py")
+        mod = importlib.util.module_from_spec(spec)
+        sys.modules[key] = mod
+        spec.loader.exec_module(mod)
+    return sys.modules[key]
+
+
 def run_stamp(script: str) -> dict:
-    """The source identity of a step that runs foldmap (domains.py, dssp_mkdssp.py, membrane_opm.py), written into its
-    output as it is written (plan 28 Task 1): the harness commit build/tree was exported at (exact: the tree is
-    `git archive` of it), and foldmap.source_stamp of the foldmap imported (the tree's, which the step asserts) when
-    that code has it; a tree from before plan 28 Task 1 has not, and says so."""
+    """The source identity of a step that runs foldmap from build/tree (domains.py, dssp_mkdssp.py, membrane_opm.py),
+    taken when the step starts and written into its output (plan 28 Task 1): the harness commit build/tree was
+    exported at (exact: the tree is `git archive` of it; scripts/paper/verify_stamp.py checks the fingerprint against
+    it), and foldmap.source_stamp of the foldmap imported (the tree's, which the step asserts). A tree from before
+    foldmap.source_stamp gets the same fields this checkout's code computes for it: the tree's fingerprint (the same
+    algorithm, app_jobs.code_fingerprint), Python, the platform and the runtime dependencies' versions."""
+    import platform
+
+    import foldmap
+
     out: dict = {"harness_commit": None}
     prov = BUILD / "provenance.json"
     if prov.exists():
@@ -107,15 +142,33 @@ def run_stamp(script: str) -> dict:
     try:
         from foldmap.source_stamp import source_stamp
     except ImportError:
-        import platform
-
-        out["source_stamp"] = None
-        out["note"] = "the foldmap under measurement predates foldmap.source_stamp"
-        out["python"] = platform.python_version()
-        out["platform"] = platform.platform()
+        package = Path(foldmap.__file__).resolve().parent
+        runtime = repo_module("source_stamp")
+        out["source_stamp"] = {
+            "foldmap": getattr(foldmap, "__version__", None),
+            "code_fingerprint": repo_module("app_jobs").code_fingerprint(package),
+            "package": "tree (it predates foldmap.source_stamp; fields computed by this checkout's code)",
+            "git": None,
+            "script": runtime._script(Path(script).resolve(), REPO),
+            "python": {"version": platform.python_version(), "implementation": platform.python_implementation()},
+            "platform": {"platform": platform.platform(), "machine": platform.machine()},
+            "packages": {name: runtime._version(name) for name in runtime.RUNTIME},
+        }
         return out
     out["source_stamp"] = source_stamp(script)
     return out
+
+
+def quotable(name: str, report) -> None:
+    """Stop when a campaign report may not be quoted: its entries were measured by different code (mixed_code), or it
+    was run outside its paper protocol (not_for_paper; plan 28 Task 1, rulings Q13, Q14)."""
+    if not isinstance(report, dict):
+        return
+    if report.get("mixed_code"):
+        raise SystemExit(f"{name}: its entries were measured by different code ({report.get('entry_code')}); "
+                         "a mixed report is not quoted: rerun it whole with one code")  # fmt: skip
+    if report.get("not_for_paper"):
+        raise SystemExit(f"{name}: marked not for the paper ({report['not_for_paper']})")
 
 
 # ---- statistics ----------------------------------------------------------------------------------------------------

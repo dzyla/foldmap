@@ -293,6 +293,33 @@ def determinism_here() -> None:
     print("determinism draw:", p.returncode, p.stdout[-300:], p.stderr[-600:], flush=True)
 
 
+_STAMP: dict | None = None
+
+
+def _stamp() -> dict:
+    """foldmap.source_stamp of the code that draws (the installed foldmap the CLI runs), taken once as main() starts
+    (plan 28 Task 1, review M8) and written with every panel and figure record."""
+    global _STAMP
+    if _STAMP is None:
+        from foldmap.source_stamp import source_stamp
+
+        _STAMP = source_stamp(__file__)
+    return _STAMP
+
+
+def tool_versions() -> dict:
+    """The external tools the figures pass through (review M2): tectonic, pdftocairo and pdftoppm (poppler)."""
+    out = {}
+    for name, cmd in (("tectonic", [str(TECTONIC), "--version"]), ("pdftocairo", ["pdftocairo", "-v"]),
+                      ("pdftoppm", ["pdftoppm", "-v"])):  # fmt: skip
+        try:
+            done = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+            out[name] = ((done.stdout or done.stderr).strip().splitlines() or [None])[0]
+        except (OSError, subprocess.SubprocessError) as err:
+            out[name] = f"unavailable: {type(err).__name__}"
+    return out
+
+
 def draw(ids: list[str]) -> None:
     from concurrent.futures import ThreadPoolExecutor
 
@@ -307,6 +334,7 @@ def draw(ids: list[str]) -> None:
                     shutil.copy(base.with_suffix(ext), PANELS / f"{pid}{ext}")
             how = "python foldmap_silent.py " if r.get("mode") == "silent" else "foldmap plot "
             r["cmd"] = how + " ".join(r["args"]) + f" -o {pid}.svg"
+            r["source_stamp"] = _stamp()  # the code that drew this panel
             rec[pid] = r
             print(
                 pid,
@@ -917,20 +945,21 @@ GALLERY = ["F2a", "F2b", "F2c", "F2d", "S1a", "S1b", "S1c", "S1d", "S1e"]
 def provenance() -> dict:
     """The code the panels were drawn with: the repository state figures.sh read before the run (HEAD, and whether
     src/ or scripts/ differ from it: build/figures/provenance-local.json; a runner syncs the working tree, not a
-    commit), and foldmap.source_stamp of the foldmap that drew, taken here as the figures are written."""
-    from foldmap.source_stamp import source_stamp
-
+    commit), foldmap.source_stamp of the foldmap that drew (taken as the process started) and the versions of the
+    external tools."""
     p = OUT / "provenance-local.json"
     out = (
         json.loads(p.read_text(encoding="utf-8"))
         if p.exists()
         else {"head": None, "note": "not run through figures.sh"}
     )
-    out["source_stamp"] = source_stamp(__file__)
+    out["source_stamp"] = _stamp()
+    out["tools"] = tool_versions()
     return out
 
 
 def main(argv: list[str]) -> None:
+    _stamp()  # the code as this process starts
     OUT.mkdir(parents=True, exist_ok=True)
     what = argv[0] if argv else "all"
     if what == "draw":
