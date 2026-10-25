@@ -538,12 +538,21 @@ def meets_box(p, q, box) -> bool:
     return (t1 - t0) * float(np.hypot(dx, dy)) > BAND_EPS
 
 
-def lane(box, port_y: float, bound_y: float, toward: int) -> tuple[float, float, float, float]:
-    """Ruling P36a: the lane beside an element's `box` (LANE either side of it) from its drawn port (page y `port_y`,
-    and the first step out of it: LANE further away from the loop's side, page direction `toward`) to the page y of the
-    loop's bound."""
+def strip(port, box) -> tuple[float, float]:
+    """Ruling P38: the page x range of a lane at a port: the port's x ± (half its element's narrow side + LANE). For a
+    standing helix that is its box ± LANE (beside it); for a flat one, only the column at its end, never along it."""
+    half = min(box[2] - box[0], box[3] - box[1]) / 2 + LANE
+    return float(port[0]) - half, float(port[0]) + half
+
+
+def lane(port, box, bound_y: float, toward: int) -> tuple[float, float, float, float]:
+    """Rulings P36a, P38: the lane at an element's drawn port (strip: beside its port, LANE past its narrow side) from
+    the port (and the first step out of it: LANE further away from the loop's side, page direction `toward`) to the page
+    y of the loop's bound."""
+    port_y = float(port[1])
     beyond = port_y - toward * LANE
-    return (box[0] - LANE, min(beyond, bound_y), box[2] + LANE, max(beyond, bound_y))
+    x0, x1 = strip(port, box)
+    return (x0, min(beyond, bound_y), x1, max(beyond, bound_y))
 
 
 def in_lane(p, q, lanes) -> bool:
@@ -578,8 +587,56 @@ def loop_lanes(a: SSE, b: SSE, depth: np.ndarray, m: Membrane, ends, band_ids, b
         if side * page_depth(float(port[1]), near, m.half, up) >= bound - band_eps(near, m.half):
             continue
         yb = page_y(side * bound, near, m.half, up)
-        out.append((lane(box, float(port[1]), yb, side * up), tuple(box)))
+        out.append((lane(port, box, yb, side * up), tuple(box)))
     return out
+
+
+def band_ends(rects, clear: float) -> tuple[float, float]:
+    """Ruling P34: the page x past which a loop may cross the band at its ends: `clear` (the router's clearance,
+    route._INFLATE) beyond the outermost of the band elements' drawn `rects`."""
+    rects = list(rects)
+    if not rects:
+        return (0.0, 0.0)
+    return (min(r[0] for r in rects) - clear, max(r[2] for r in rects) + clear)
+
+
+def loop_crossing(a: SSE, b: SSE, depth: np.ndarray, m: Membrane, ends, band_ids, bands, up: int):
+    """Rulings P34, P36b, P38: (does the loop from a to b join the two faces, its crossing lanes). It joins them when
+    its bound lies past the far face, or when it is a two-face loop (two_face) whose ports are drawn either side of the
+    band (on a face or beyond it). Its crossing lanes are the strips at its own ports (strip) across the band, for an
+    end of the band or either end of a two-face loop. `ends`: ((port, box) of a's C end, of b's N end) as drawn."""
+    side, bound = loop_side_bound(a, b, depth, m)
+    two = two_face(a, b, depth)
+    at = [page_depth(float(port[1]), nearest_band(bands, float(port[1])), m.half, up) for port, _ in ends]
+    cross = bound <= -m.half or (two and at[0] * at[1] < 0 and min(abs(at[0]), abs(at[1])) >= m.half - 1e-6)
+    lanes = []
+    for s, (port, box) in zip((a, b), ends) if cross else ():
+        if s.id in band_ids or two:
+            b0, b1 = nearest_band(bands, float(port[1]))
+            x0, x1 = strip(port, box)
+            lanes.append(((x0, b0, x1, b1), tuple(box)))
+    return cross, lanes
+
+
+def crossing_excess(pts, lanes, ends: tuple[float, float], bands, half: float, up: int) -> float | None:
+    """Ruling P39 (A18's loop_crossing) and the router's P34: how far inside the band (Å from its nearer face) a
+    crossing loop drawn along `pts` runs at its worst where it may not, in the slab but in none of its crossing `lanes`
+    (loop_crossing, in_lane) and not past the band's `ends` (band_ends); None when nowhere."""
+    worst = None
+    pts = [(float(x), float(y)) for x, y in pts]
+    for seg in zip(pts, pts[1:]):
+        for p, q in _pieces(*seg, lanes):
+            b0, b1 = nearest_band(bands, (p[1] + q[1]) / 2)
+            if not (max(p[1], q[1]) > b0 + BAND_EPS and min(p[1], q[1]) < b1 - BAND_EPS):
+                continue  # not in the slab
+            if max(p[0], q[0]) <= ends[0] or min(p[0], q[0]) >= ends[1] or in_lane(p, q, lanes):
+                continue
+            ys = [min(max(y, b0), b1) for y in (p[1], q[1])]
+            inside = half - min(abs(page_depth(y, (b0, b1), half, up)) for y in ys)
+            if p[1] != q[1] and (p[1] - (b0 + b1) / 2) * (q[1] - (b0 + b1) / 2) <= 0:
+                inside = half  # it passes the mid-plane
+            worst = inside if worst is None else max(worst, inside)
+    return worst
 
 
 def stub_segments(pts, toward: int, box=None) -> int:

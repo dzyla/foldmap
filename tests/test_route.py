@@ -1330,10 +1330,15 @@ def test_a_loop_joining_the_two_faces_crosses_only_beside_its_port_or_past_the_b
     lay, sses, bb = _membrane_view([a, b], tms, depths)
     (ab,) = [lp for lp in route_loops(lay, sses, bb) if lp.a_id == a.sse.id]
     assert not ab.fallback
-    lane, end = a.rect[2] + _LANE, max(p.rect[2] for p in tms)
+    lo, hi = a.c_port[0] - HELIX_W / 2 - _LANE, a.c_port[0] + HELIX_W / 2 + _LANE  # the strip at its port (P38)
+    left, right = a.rect[0] - _INFLATE, max(p.rect[2] for p in tms) + _INFLATE  # the band's ends
+    crossed = False
     for (xa, ya), (xb, yb) in zip(ab.points, ab.points[1:]):
         if max(ya, yb) > _BAND[0] + 1e-6 and min(ya, yb) < _BAND[1] - 1e-6:  # in the slab
-            assert max(xa, xb) <= lane or min(xa, xb) >= end, ab.points
+            crossed = True
+            in_lane = lo - 1e-9 <= min(xa, xb) and max(xa, xb) <= hi + 1e-9
+            assert in_lane or max(xa, xb) <= left or min(xa, xb) >= right, ab.points
+    assert crossed
 
 
 def test_a_loop_no_route_finds_falls_back_outside_the_slab():
@@ -1418,3 +1423,81 @@ def test_a_crossing_lane_opens_the_slab_never_the_loops_depth_wall():
     far = grid.cell((5.0, 0.0))[0]
     assert m[i, deep] and not m[i, shallow]  # the lane: open above the bound, closed below it
     assert m[far, shallow]  # beside no lane, the slab is closed to it
+
+
+def _tm_exit_case(height: float = 46.0):
+    """test_a_loop_out_of_a_transmembrane_end_runs_to_its_face_never_mid_slab's figure: a TM helix's C port 3 Å inside
+    the outer face, its loop's residues 20 Å out, a tall element standing on the face between it and the next element
+    (the slab as a cost ran the loop under it, in the slab)."""
+    depths = np.zeros(120)
+    depths[0:10] = np.linspace(-15.0, 12.0, 10)
+    depths[10:20] = 20.0
+    depths[20:30] = 25.0
+    depths[100:110] = 40.0
+    top = _BAND[0] + 27.0 * 0.23
+    a = _helix("A", 0, 0.0, top / 2, top, np.pi / 2)
+    b = _helix("A", 20, 6.0, 8.0, 2.0, 0.0)
+    tall = _helix("Z", 100, 2.5, 7.0 + height / 2, height, np.pi / 2)
+    lay, sses, bb = _membrane_view([a, b], [tall], depths)
+    return lay, sses, bb, a, b
+
+
+@pytest.mark.parametrize("path", ["route_again", "fine_route"])
+def test_a_loop_routed_again_keeps_to_its_wall(path):
+    """Review-5 M5: the re-routes (route._route_again: stack gaps and nucleic-acid text; route._fine_route: a coarse
+    page's windows, 3 and 8 page units round the ports: the tall element 4 high there) route a loop with its wall too
+    (router.walls): out of its TM end to the face and over the tall element, never under it in the slab."""
+    from foldmap.membrane import loop_excess
+
+    lay, sses, bb, a, b = _tm_exit_case(46.0 if path == "route_again" else 4.0)  # a window holds the way over
+    (ab,) = [lp for lp in route_loops(lay, sses, bb) if lp.a_id == a.sse.id]
+    router = route._Router(_Grid(lay, []), route._element_obstacles(lay), [])
+    router.walls = route._walls(lay, sses, bb, [(a.sse, b.sse)])
+    if path == "route_again":
+        pts, _ = route._route_again(lay, router, ab)
+    else:
+        pts, _ = route._fine_route(lay, [], router.elements, a, b, (set(), set()), [], router)
+    assert pts is not None
+    assert loop_excess(pts, 1, 15.0, [_BAND], 15.0, 1, True, False) is None, pts
+
+
+def test_a_kink_through_the_wall_is_routed_instead():
+    """Review-5 M5: two pieces of one helix a kink apart (route_loops' kink link, drawn straight) whose straight join
+    would leave the first piece's port, 3 Å inside the face, sideways in the slab: the join is not drawn (its wall,
+    _Wall.clear) and the loop is routed out of the port to the face instead."""
+    from foldmap.membrane import loop_excess
+
+    depths = np.zeros(40)
+    depths[0:10] = np.linspace(-15.0, 12.0, 10)
+    depths[10:12] = 20.0  # two residues: a kink
+    depths[12:22] = 25.0
+    top = _BAND[0] + 27.0 * 0.23
+    a = _helix("A", 0, 0.0, top / 2, top, np.pi / 2)  # C port at (0, 6.21), pointing up
+    b = Placed(fake_sse("H", 12, 21), 1.5, 7.3, 2.0, 0.0, HELIX_W, "a")  # N port at (0.5, 7.3)
+    lay, sses, bb = _membrane_view([a, b], [], depths)
+    (ab,) = route_loops(lay, sses, bb)
+    assert len(ab.points) > 2 and not ab.fallback, ab.points
+    assert loop_excess(ab.points, 1, 15.0, [_BAND], 15.0, 1, True, False) is None, ab.points
+
+
+def test_a_two_face_loop_drawn_either_side_of_the_band_joins_the_faces():
+    """Rulings P34, P36b (review-5 M5): a loop whose bound lies only 5 Å past the mid-plane (its end residue, a TM
+    helix's last CA) but whose two ends lie on opposite sides, its ports drawn on the two faces' far sides, crosses
+    the band: route._walls makes it a crossing loop (membrane.loop_crossing), so it crosses only in the strip at its
+    own port or past the band's ends."""
+    depths = np.zeros(200)
+    depths[0:10] = np.linspace(15.0, -5.0, 10)  # crosses; its last CA 5 Å in
+    depths[10:20] = np.linspace(-3.0, 20.0, 10)
+    depths[20:30] = 25.0
+    a = _helix("A", 0, 0.0, 3.45, 6.9, -np.pi / 2)  # its C port at (0, 0), pointing down
+    b = _helix("A", 20, 10.0, 10.0, 2.0, 0.0)
+    tms = []
+    for k, x in enumerate((1.4, 4.0, 8.0, 12.0)):
+        down = k % 2 == 0
+        depths[100 + 10 * k : 110 + 10 * k] = np.linspace(15.0, -15.0, 10) * (1 if down else -1)
+        tms.append(_helix("Z", 100 + 10 * k, x, 3.45, 6.9, -np.pi / 2 if down else np.pi / 2, ""))
+    lay, sses, bb = _membrane_view([a, b], tms, depths)
+    wall = route._walls(lay, sses, bb, [(a.sse, b.sse)])[(a.sse.id, b.sse.id)]
+    assert wall.bound == pytest.approx(-5.0) and wall.cross
+    (ab,) = [lp for lp in route_loops(lay, sses, bb) if lp.a_id == a.sse.id]
+    assert not ab.fallback and wall.clear(ab.points)

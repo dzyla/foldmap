@@ -23,8 +23,11 @@ from matplotlib.transforms import Affine2D, Bbox
 from .layout import block_ghosts, crosses_band, joined_pieces, lying_over
 from .membrane import (
     BAND_EPS,
+    band_ends,
     band_set,
     crosses,
+    crossing_excess,
+    loop_crossing,
     loop_excess,
     loop_lanes,
     loop_side_bound,
@@ -1809,7 +1812,12 @@ def membrane_view(layout, sses, bb, mem, loops=None) -> dict:
       (membrane.own_side; Å past the mid-plane);
     - loop_in_band, the loops with a segment drawn nearer the mid-plane than their bound (loop_side_bound: their
       nearest residue, or their face when every residue lies beyond it; ruling P14) but on the stub straight out of a
-      band element's port to that face (None: `loops` not given).
+      band element's port to that face, or in the lane at its own port, beside its element, from a port drawn past
+      the bound to the bound, when its residues lie in the bilayer (their median in the slab; P36-P38); never through
+      its own element (loops_in_band);
+    - loop_crossing, the loops that join the two faces (their bound past the far face, or their end residues on
+      opposite sides and their ports either side of the band) drawn across the band anywhere but in the strip at one
+      of their own ports or past the band's ends (P34, P39; loops_crossing; None: `loops` not given).
     Each entry is "<id> <Å>" (findings_text: "<0.1" under 0.05 Å); band_member and strand_in_band say how far in from
     the element's own face. A barrel's ghost strand is judged as its strand, "<id> ghost <Å>"."""
     bands = layout.membrane.get("bands") or [layout.membrane["y"]]
@@ -1859,6 +1867,7 @@ def membrane_view(layout, sses, bb, mem, loops=None) -> dict:
             centre = side * _drawn_depth((y0 + y1) / 2, b, half, up)
             if centre < -eps:
                 wrong.append(f"{name} {_angstrom(-centre)}")
+    judged = (loops, sses, depth, band, bands, mem, up, layout.placed)
     return {
         "tm_helices": tm,
         "tm_short": short,
@@ -1867,9 +1876,8 @@ def membrane_view(layout, sses, bb, mem, loops=None) -> dict:
         "strand_in_band": strands,
         "outside_in_band": nearer,
         "wrong_side": wrong,
-        "loop_in_band": None
-        if loops is None
-        else loops_in_band(loops, sses, depth, band, bands, mem, up, layout.placed),
+        "loop_in_band": None if loops is None else loops_in_band(*judged),
+        "loop_crossing": None if loops is None else loops_crossing(*judged),
     }
 
 
@@ -1878,31 +1886,51 @@ def _angstrom(x: float) -> str:
     return "<0.1" if x < 0.05 else f"{x:.1f}"
 
 
-def loops_in_band(loops, sses, depth, band: set[str], bands, mem, up: int, placed=None) -> list[str]:
-    """A18's loop_in_band (membrane_view; rulings P14, P36): each loop (a>b) with a segment drawn nearer the mid-plane,
-    on its own side, than its bound (membrane.loop_side_bound, from its residues, and its two end residues when they lie
-    on opposite sides: its nearest residue, or its face when all lie beyond it), how much nearer, in Å
+def loops_in_band(loops, sses, depth, band: set[str], bands, mem, up: int, placed) -> list[str]:
+    """A18's loop_in_band (membrane_view; rulings P14, P36, P38): each loop (a>b) with a segment drawn nearer the
+    mid-plane, on its own side, than its bound (membrane.loop_side_bound, from its residues, and its two end residues
+    when they lie on opposite sides: its nearest residue, or its face when all lie beyond it), how much nearer, in Å
     (membrane.loop_excess, the measure the router's wall keeps to). Out of the port of an element of the band (`band`)
     the loop may run straight to its face along the page's normal, and cross the face line there, never through its own
-    element's box. From an end the layout draws
-    past its bound (`placed`: the drawn elements) it may climb the lane beside that element to the bound
-    (membrane.loop_lanes, in_lane; ruling P36a: a band element's end, or either end of a two-face loop, P36b), when its
-    residues lie in the bilayer; nowhere else. `up`: +1 when page-up is the outside."""
+    element's box. From an end the layout draws past its bound it may climb the lane at that port (membrane.loop_lanes,
+    lane, in_lane: the port's x ± half its element's width and LANE, from the port to the bound; ruling P36a: a band
+    element's end, or either end of a two-face loop, P36b), when its residues lie in the bilayer; nowhere else.
+    `placed`: the drawn elements (Layout.placed), their ports and boxes. `up`: +1 when page-up is the outside."""
     by_id = {s.id: s for s in sses}
     out = []
     for lp in loops:
         a, b = by_id.get(lp.a_id), by_id.get(lp.b_id)
         if a is None or b is None:
             continue
+        pa, pb = placed[lp.a_id], placed[lp.b_id]
         side, bound = loop_side_bound(a, b, depth, mem)
-        pa, pb = (placed or {}).get(lp.a_id), (placed or {}).get(lp.b_id)
-        boxes, lanes = (None, None), []
-        if pa is not None and pb is not None:
-            boxes = (pa.rect, pb.rect)
-            ends = ((pa.c_port, pa.rect), (pb.n_port, pb.rect))
-            lanes = loop_lanes(a, b, depth, mem, ends, band, bands, up)
+        lanes = loop_lanes(a, b, depth, mem, ((pa.c_port, pa.rect), (pb.n_port, pb.rect)), band, bands, up)
         stubs = (lp.a_id in band, lp.b_id in band)
-        worst = loop_excess(lp.points, side, bound, bands, mem.half, up, *stubs, lanes=lanes, boxes=boxes)
+        worst = loop_excess(lp.points, side, bound, bands, mem.half, up, *stubs, lanes=lanes, boxes=(pa.rect, pb.rect))
+        if worst is not None:
+            out.append(f"{lp.a_id}>{lp.b_id} {_angstrom(worst)}")
+    return out
+
+
+def loops_crossing(loops, sses, depth, band: set[str], bands, mem, up: int, placed) -> list[str]:
+    """A18's loop_crossing (membrane_view; rulings P34, P39): each loop that joins the two faces
+    (membrane.loop_crossing: its bound past the far face, or its two end residues on opposite sides of the mid-plane
+    and its ports drawn either side of the band) and runs inside the band anywhere but in the strip at one of its own
+    ports across the band or past the band's ends (membrane.band_ends: the router's clearance beyond the outermost
+    band element), with how far inside the band it runs there, in Å from the nearer face (membrane.crossing_excess,
+    the router's own check)."""
+    from .route import _INFLATE
+
+    by_id = {s.id: s for s in sses}
+    ends = band_ends([placed[k].rect for k in sorted(band) if k in placed], _INFLATE)
+    out = []
+    for lp in loops:
+        a, b = by_id.get(lp.a_id), by_id.get(lp.b_id)
+        if a is None or b is None:
+            continue
+        pa, pb = placed[lp.a_id], placed[lp.b_id]
+        cross, lanes = loop_crossing(a, b, depth, mem, ((pa.c_port, pa.rect), (pb.n_port, pb.rect)), band, bands, up)
+        worst = crossing_excess(lp.points, lanes, ends, bands, mem.half, up) if cross else None
         if worst is not None:
             out.append(f"{lp.a_id}>{lp.b_id} {_angstrom(worst)}")
     return out

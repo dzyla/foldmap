@@ -1233,6 +1233,46 @@ def test_a18_excuses_no_lane_to_a_loop_whose_residues_lie_beyond_the_bilayer():
     assert [f.split()[0] for f in view["loop_in_band"]] == ["s>h"], view
 
 
+def test_a18_excuses_the_strip_at_a_flat_helixs_port_never_a_run_along_it():
+    """Ruling P38 (review-5 I1): a lane is a strip at the loop's own port (its x ± half the element's narrow side and
+    LANE), not the element's whole box. A flat helix of the slab whose C end the layout draws at 9 Å, its loop's
+    residues 11-14 Å out: the loop may step out of the port and climb beside it to 11 Å, but a run along the helix,
+    under it, 3.8 Å deeper than the loop, is flagged (the box-wide lane excused it)."""
+    runs = {
+        "h": (
+            "H",
+            np.linspace(9.0, 10.0, 6),
+            FLAT,
+            ((0.0, _y(9.0)), (6.0, _y(9.0))),
+        ),  # C port at (6, 8), pointing right
+        "l": (None, np.linspace(11.0, 14.0, 5), None, (0, 0)),
+        "s": ("E", np.full(3, 20.0), UPRIGHT, ((3.0, 12.0), (3.0, 13.0))),
+    }
+    beside = [(6.0, 8.0), (6.5, 8.0), (6.5, 9.0), (3.0, 9.0), (3.0, 12.0)]
+    along = [(6.0, 8.0), (6.5, 8.0), (6.5, 7.4), (-0.5, 7.4), (-0.5, 9.0), (3.0, 9.0), (3.0, 12.0)]
+    assert _a18(runs, [("h", "s", beside)])[0]["loop_in_band"] == []
+    assert _a18(runs, [("h", "s", along)])[0]["loop_in_band"] == ["h>s 3.8"]
+
+
+def test_a18_holds_a_loop_joining_the_faces_to_cross_beside_its_port_or_past_the_bands_ends():
+    """Ruling P39 (P34 judged by A18, review-5 M1): a loop whose residues reach both faces (-20 to 30 Å) leaves a
+    transmembrane helix's C end on the inner face for an element above the band. Crossing the band in the strip at its
+    port, or past the band's last element, it passes loop_crossing; crossing mid-band, between two transmembrane
+    helices, it is flagged (15 Å inside: it passes the mid-plane there). loop_in_band, its bound past the far face,
+    flags none of them."""
+    runs = {
+        "tm": ("H", np.linspace(15.0, -15.0, 7), UPRIGHT, (10.0, 0.0)),  # C port at (0, 0), pointing down
+        "l": (None, np.linspace(-20.0, 30.0, 6), None, (0, 0)),
+        "s": ("E", np.full(3, 30.0), UPRIGHT, ((8.0, 12.0), (8.0, 13.0))),
+        "tm2": ("H", np.linspace(-15.0, 15.0, 7), UPRIGHT, ((12.0, 0.0), (12.0, 10.0))),  # the band's last element
+    }
+    out = [(0.0, 0.0), (0.0, -0.3)]
+    tail = [(8.0, 11.0), (8.0, 12.0)]
+    for x, want in ((1.0, []), (13.0, []), (4.0, ["tm>s 15.0"])):
+        view, *_ = _a18(runs, [("tm", "s", [*out, (x, -0.3), (x, 11.0), *tail])])
+        assert view["loop_crossing"] == want and view["loop_in_band"] == [], (x, view)
+
+
 def test_a_loop_whose_ends_lie_on_opposite_sides_is_a_two_face_loop():
     """Ruling P36b (5LDW g:51-68>g:88-103, 6DQN A:2490-2498>A:2504-2536): the loop's bound takes in its two end
     residues when they lie on opposite sides of the mid-plane (membrane.two_face), and either of its ends drawn past
@@ -2199,7 +2239,15 @@ COMEC_CASES = {  # the three ComEC figures A18 is held on (Fig. 1C): the dimer, 
     "A": {"chains": ["A"]},
     "A-domains": {"chains": ["A"], "domains": "auto", "style": ["color_by=domain"]},
 }
-A18_PARTS = ("slab_helix", "band_member", "strand_in_band", "outside_in_band", "wrong_side", "loop_in_band")
+A18_PARTS = (
+    "slab_helix",
+    "band_member",
+    "strand_in_band",
+    "outside_in_band",
+    "wrong_side",
+    "loop_in_band",
+    "loop_crossing",
+)
 
 
 @functools.cache

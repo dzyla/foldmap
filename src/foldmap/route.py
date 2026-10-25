@@ -27,6 +27,22 @@ from .layout import (
     overlaps_any,
     stem_bodies,
 )
+from .membrane import (
+    BAND_EPS,
+    LANE,
+    band_ends,
+    band_eps,
+    band_set,
+    crossing_excess,
+    lane,
+    loop_crossing,
+    loop_excess,
+    loop_lanes,
+    loop_side_bound,
+    nearest_band,
+    page_depth,
+    page_y,
+)
 from .model import SSE
 
 RES = 0.25  # grid cell size, page units
@@ -225,24 +241,26 @@ class _Grid:
         return None
 
 
-_LANE = _INFLATE + 2 * RES  # page units beside an element (past its clearance) a loop may climb in (P34, P36a)
+_LANE = (
+    LANE  # membrane.LANE, the one lane width (P34, P36a): past an element's clearance by two cells, _INFLATE + 2 * RES
+)
 
 
 @dataclass
 class _Wall:
-    """Plan 27 Task 5 (the author: nothing that is not in the bilayer is drawn in the band; rulings P33-P36): the slab
+    """Plan 27 Task 5 (the author: nothing that is not in the bilayer is drawn in the band; rulings P33-P40): the slab
     as a wall, not a cost, for one loop of a membrane view. Its bound is membrane.loop_side_bound, the rule A18's
     loop_in_band judges it by: no cell nearer the mid-plane, on the loop's own `side`, than `bound` (Å) is open to it
     (the page read as depth by membrane.page_depth, against the band nearest each row), but
     - the stub out of a band element's port it leaves or enters, when that port points to its side (`stub_a`,
       `stub_b`): the port's own column, out to the bound (a loop leaving a TM end runs to its own face first);
-    - the lanes (`lanes`: membrane.lane, in_lane) beside an end the layout draws past the bound: membrane.loop_lanes's
-      (ruling P36a, P36b), which A18 excuses too, and any other such end's (`short`: A18 still flags it).
-    A loop that joins the two faces (`cross`: its bound past the far face, or its ends on opposite sides of the
-    mid-plane drawn either side of the band; rulings P34, P36b) has the slab closed to it as well, but in the lanes
-    beside its own elements across the band (`crossing`) and past the band's ends (`ends`: x beyond every band
-    element's clearance): it crosses there, never mid-band. The router validates each drawing it takes by `clear`
-    (membrane.loop_excess with the same lanes, A18's own measure)."""
+    - the lanes (membrane.lane: a strip at its own port, from the port to the bound) of an end the layout draws past
+      the bound: membrane.loop_lanes's (`lanes`, rulings P36a, P36b, P38), which A18 excuses too, and any other such
+      end's (`routing`: drawn there all the same, A18 flagging it; 6JLN d:58-61>d:67-69, ruling P37).
+    A loop that joins the two faces (`cross`, membrane.loop_crossing; rulings P34, P36b) has the slab closed to it as
+    well, but in the strips at its own ports across the band (`crossing`) and past the band's ends (`ends`,
+    membrane.band_ends): it crosses there, never mid-band (A18's loop_crossing, P39). The router validates every
+    drawing it takes by `clear`."""
 
     side: int
     bound: float
@@ -253,16 +271,14 @@ class _Wall:
     stub_b: bool
     cross: bool = False
     ends: tuple[float, float] = (-math.inf, math.inf)
-    lanes: list = field(default_factory=list)  # (lane box, its element's box)
+    lanes: list = field(default_factory=list)  # (lane box, its element's box): A18's (loop_lanes)
+    routing: list = field(default_factory=list)  # (lane box, its element's box): opened, A18 not excusing them
     crossing: list = field(default_factory=list)  # (lane box, its element's box): across the band, P34
     boxes: tuple = (None, None)  # a's and b's drawn boxes
-    short: tuple = ()  # the ends ("a", "b") reached only by a lane A18 does not excuse
 
     def depth_rows(self, ys: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
         """Each page y's depth on the loop's side (Å) and BAND_EPS in Å, by the band nearest it (membrane.nearest_band,
         page_depth and band_eps, for every row at once)."""
-        from .membrane import BAND_EPS
-
         b = np.asarray(self.bands, float).reshape(-1, 2)
         k = np.argmin(np.abs((b[:, 0] + b[:, 1])[None, :] / 2 - np.asarray(ys, float)[:, None]), axis=1)
         b0, b1 = b[k, 0], b[k, 1]
@@ -270,21 +286,20 @@ class _Wall:
         return self.side * self.up * (ys - (b0 + b1) / 2) * scale, BAND_EPS * scale
 
     def eps(self, y: float) -> float:
-        from .membrane import band_eps, nearest_band
-
+        """BAND_EPS in Å at page y, by the band nearest it (membrane.band_eps): the float snapping A18 allows."""
         return band_eps(nearest_band(self.bands, y), self.half)
 
     def page_y(self, depth: float, near_y: float) -> float:
         """The page y standing for `depth` (Å on the loop's side) by the band nearest page y `near_y`."""
-        from .membrane import nearest_band, page_y
-
         return page_y(self.side * depth, nearest_band(self.bands, near_y), self.half, self.up)
 
     def mask(self, grid: "_Grid", ends=()) -> np.ndarray:
         """The cells closed to the loop on `grid`: the rows nearer the mid-plane than its bound and, for a crossing
-        loop, the slab's rows away from its lanes and the band's ends; its lanes open, and the stubs of `ends`
-        ((start cell, its stub allowed, its port clear of the wall) for each end: the cell's column out to the
-        bound)."""
+        loop, the slab's rows away from its crossing lanes and the band's ends; its lanes open, and for each of `ends`
+        ((start cell, its stub allowed, its port clear of the wall)) the cell's column out to the bound (a stub), or,
+        for a port just clear of the wall pointing into it, the rows from its first cell back to the port (ruling P40:
+        whole rows, so its turn can be drawn between port and wall by _pull_turns, room). Opened cells only let the
+        search through: every route taken is still checked by `clear`."""
         d, eps = self.depth_rows(grid.ys)
         rows = d < self.bound - eps
 
@@ -293,14 +308,13 @@ class _Wall:
                 mask &= ~np.outer((grid.xs >= x0) & (grid.xs <= x1), (grid.ys >= y0) & (grid.ys <= y1))
             return mask
 
-        # the depth wall, open in the loop's own lanes; a crossing loop's slab, open in those and across the band
-        m = opened(np.broadcast_to(rows[None, :], (grid.nx, grid.ny)).copy(), self.lanes)
+        # the depth wall, open in the loop's lanes; a crossing loop's slab, open in those and in its crossing lanes
+        own = [*self.lanes, *self.routing]
+        m = opened(np.broadcast_to(rows[None, :], (grid.nx, grid.ny)).copy(), own)
         across = None
         if self.cross:
             slab = np.abs(d) < self.half - eps
-            across = opened(
-                np.outer((grid.xs > self.ends[0]) & (grid.xs < self.ends[1]), slab), [*self.lanes, *self.crossing]
-            )
+            across = opened(np.outer((grid.xs > self.ends[0]) & (grid.xs < self.ends[1]), slab), [*own, *self.crossing])
             m |= across
         toward = self.side * self.up  # page direction of the loop's side
         for start, stub, clear_port in ends:
@@ -313,16 +327,12 @@ class _Wall:
                     j += toward
                 continue
             while clear_port and 0 <= j < grid.ny and rows[j]:
-                # a port just clear of the wall, pointing into it: the rows from its first cell back to it, its turn
-                # drawn back between the port and the wall (_pull_turns, room) when the drawing keeps to the wall
                 m[:, j] = across[:, j] if across is not None else False
                 j += toward
         return m
 
     def reaches(self, port) -> bool:
         """Does a port lie on the loop's side of its bound (or on it)?"""
-        from .membrane import nearest_band, page_depth
-
         y = float(port[1])
         return self.side * page_depth(y, nearest_band(self.bands, y), self.half, self.up) >= self.bound - self.eps(y)
 
@@ -334,25 +344,15 @@ class _Wall:
         gap = abs(self.page_y(self.bound, float(port[1])) - float(port[1]))
         return min(_INFLATE, gap / 2)
 
-    def clear(self, pts) -> bool:
-        """Does a drawing keep to the wall: A18's measure (membrane.loop_excess, with its lanes) finds nothing; and a
-        crossing loop runs inside the slab only in a lane beside its own elements or past the band's ends?"""
-        from .membrane import BAND_EPS, _pieces, in_lane, loop_excess, nearest_band
-
-        pts = [(float(x), float(y)) for x, y in pts]
+    def clear(self, pts, routing: bool = False) -> bool:
+        """Does a drawing keep to the wall as A18 reads it: loop_in_band (membrane.loop_excess with the loop's lanes)
+        and loop_crossing (membrane.crossing_excess) find nothing? `routing`: a part in one of the routing-only lanes is
+        let pass too (the router's own check: such a loop is drawn there and A18 reports it)."""
+        lanes = [*self.lanes, *self.routing] if routing else self.lanes
         args = (self.side, self.bound, self.bands, self.half, self.up, self.stub_a, self.stub_b)
-        if loop_excess(pts, *args, lanes=self.lanes, boxes=self.boxes) is not None:
+        if loop_excess(pts, *args, lanes=lanes, boxes=self.boxes) is not None:
             return False
-        if not self.cross:
-            return True
-        for seg in zip(pts, pts[1:]):
-            for p, q in _pieces(*seg, self.crossing):
-                b0, b1 = nearest_band(self.bands, (p[1] + q[1]) / 2)
-                in_slab = max(p[1], q[1]) > b0 + BAND_EPS and min(p[1], q[1]) < b1 - BAND_EPS
-                past_ends = max(p[0], q[0]) <= self.ends[0] or min(p[0], q[0]) >= self.ends[1]
-                if in_slab and not past_ends and not in_lane(p, q, self.crossing):
-                    return False
-        return True
+        return not self.cross or crossing_excess(pts, self.crossing, self.ends, self.bands, self.half, self.up) is None
 
 
 def _walls(layout: Layout, sses: list[SSE], bb, pairs) -> dict:
@@ -361,43 +361,29 @@ def _walls(layout: Layout, sses: list[SSE], bb, pairs) -> dict:
     mem = getattr(layout, "bilayer", None)
     if not layout.membrane or mem is None or getattr(bb, "ca", None) is None:
         return {}
-    from .membrane import LANE, band_set, lane, loop_lanes, loop_side_bound, nearest_band, page_depth, two_face
-
     depth = mem.depth(bb.ca)
     band = band_set(sses, depth, mem)
     bands = list(layout.membrane.get("bands") or [layout.membrane["y"]])
     up = 1 if layout.membrane.get("inside", "below") == "below" else -1
-    rects = [layout.placed[k].rect for k in sorted(band) if k in layout.placed]
-    ends = (min(r[0] for r in rects) - _INFLATE, max(r[2] for r in rects) + _INFLATE) if rects else (0.0, 0.0)
+    ends = band_ends([layout.placed[k].rect for k in sorted(band) if k in layout.placed], _INFLATE)
     out = {}
     for a, b in pairs:
         pa, pb = layout.placed[a.id], layout.placed[b.id]
         side, bound = loop_side_bound(a, b, depth, mem)
-        drawn = [
-            (p, port, page_depth(float(port[1]), nearest_band(bands, float(port[1])), mem.half, up))
-            for p, port in ((pa, pa.c_port), (pb, pb.n_port))
-        ]
-        two = two_face(a, b, depth)
-        cross = bound <= -mem.half or (
-            two and drawn[0][2] * drawn[1][2] < 0 and min(abs(drawn[0][2]), abs(drawn[1][2])) >= mem.half - 1e-6
-        )
-        wall = _Wall(side, bound, bands, mem.half, up, a.id in band, b.id in band, cross, ends)
+        drawn = ((pa.c_port, pa.rect), (pb.n_port, pb.rect))
+        cross, crossing = loop_crossing(a, b, depth, mem, drawn, band, bands, up)
+        wall = _Wall(side, bound, bands, mem.half, up, a.id in band, b.id in band, cross, ends, crossing=crossing)
         wall.boxes = (pa.rect, pb.rect)
-        wall.lanes = loop_lanes(a, b, depth, mem, ((pa.c_port, pa.rect), (pb.n_port, pb.rect)), band, bands, up)
+        wall.lanes = loop_lanes(a, b, depth, mem, drawn, band, bands, up)
         excused = {own for _, own in wall.lanes}
-        short = []
-        for name, s, (p, port, at), out_vec in (("a", a, drawn[0], pa.exit_c), ("b", b, drawn[1], pb.exit_n)):
-            near = nearest_band(bands, float(port[1]))
-            if cross and (s.id in band or two):  # its port column across the band (P34)
-                x0, _, x1, _ = p.rect
-                wall.crossing.append(((x0 - LANE, near[0], x1 + LANE, near[1]), tuple(p.rect)))
+        for s, (port, box), out_vec in ((a, drawn[0], pa.exit_c), (b, drawn[1], pb.exit_n)):
             stub = s.id in band and abs(out_vec[0]) < 1e-6 and out_vec[1] * side * up > 0
-            if side * at >= bound - wall.eps(float(port[1])) or stub or tuple(p.rect) in excused:
+            if wall.reaches(port) or stub or tuple(box) in excused:
                 continue
             # an end it reaches only from past its bound, A18 not excusing it: a lane all the same, the finding left
-            wall.lanes.append((lane(p.rect, float(port[1]), wall.page_y(bound, float(port[1])), side * up), p.rect))
-            short.append(name)
-        wall.short = tuple(short)
+            wall.routing.append((lane(port, box, wall.page_y(bound, float(port[1])), side * up), tuple(box)))
+        if wall.routing:
+            log.debug("loop %s>%s: an end past its bound with no lane A18 excuses", a.id, b.id)
         out[(a.id, b.id)] = wall
     return out
 
@@ -807,7 +793,7 @@ class _Router:
         cells = _route_ports(grid, pa, ea, own_a, pb, eb, own_b, loose, first, self if wide else None, spent, wall)
         if cells is None:
             return None
-        keeps = (lambda q: True) if wall is None else wall.clear
+        keeps = (lambda q: True) if wall is None else (lambda q: wall.clear(q, routing=True))
         for snap in (True, False):
             pts = _polyline(grid, cells, pa, ea, pb, eb, snap)
             pulled_ok = False
@@ -1166,14 +1152,13 @@ def _walled_fallback(layout: Layout, wall: _Wall, pa: Placed, pb: Placed, curve)
     round the page on the loop's own side; else (a loop whose ports lie either side of the band) round the band's left
     or right end, past every element. The first of them that keeps to the wall (_Wall.clear); the last tried if none
     does, logged. Either way a fallback: flagged (A3), drawn as it is."""
-    if wall.clear(curve):
+    if wall.clear(curve, routing=True):
         return curve
     x0, y0, x1, y1 = layout.bounds
     far = y1 + _FALLBACK_OUT if wall.side * wall.up > 0 else y0 - _FALLBACK_OUT
-    mid = sum(wall.bands[0]) / 2
 
-    def edge(y):  # the page's edge on the side of the band page y lies
-        return y1 + _FALLBACK_OUT if y >= mid else y0 - _FALLBACK_OUT
+    def edge(y):  # the page's edge on the side of the band nearest page y (a wrapped stack has one per row)
+        return y1 + _FALLBACK_OUT if y >= sum(nearest_band(wall.bands, y)) / 2 else y0 - _FALLBACK_OUT
 
     def leg(p: Placed, port, out, to_y) -> list:
         """Out of a port along its exit; then, when that points away from page y `to_y`, a step past its element."""
@@ -1191,7 +1176,7 @@ def _walled_fallback(layout: Layout, wall: _Wall, pa: Placed, pb: Placed, curve)
         tries.append([*a, (a[-1][0], ya), *turn, (b[0][0], yb), *b])
     for pts in tries:
         pts = _runs([tuple(map(float, p)) for p in pts])
-        if wall.clear(pts):
+        if wall.clear(pts, routing=True):
             return pts
     log.warning("loop %s>%s: no fallback keeps to its membrane wall", pa.sse.id, pb.sse.id)
     return pts
@@ -1250,7 +1235,7 @@ def route_loops(layout: Layout, sses: list[SSE], bb) -> list[Loop]:
         # pieces drawn as their mates', a kink there (layout._regroup_copies)
         wall = router.walls.get((a.id, b.id))
         if kinked and np.hypot(*gap) < 1.5 and gap @ pa.exit_c > 0:
-            if (wall is None or wall.clear([pa.c_port, pb.n_port])) and _clear(  # and labels
+            if (wall is None or wall.clear([pa.c_port, pb.n_port], routing=True)) and _clear(  # and labels
                 [pa.c_port, pb.n_port],
                 (pa, pb),
                 rects,

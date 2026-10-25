@@ -74,7 +74,9 @@ CRITERIA = {
     "A16": "domains: one chain, alike, not tiny, panels apart, names clear",
     "A17": "nucleic-acid metrics and stem names by their letters",
     "A18": "membrane: only the band set in the band (TM helices across it, slab helices at their depths, crossing "
-    "strands), no element or loop nearer than its residues or on the wrong side",
+    "strands), no element nearer than its residues or on the wrong side, no loop nearer than its residues but out of "
+    "a band element's port to its face or, for a loop in the bilayer, beside its own port to its residues' depth; a "
+    "loop joining the faces crosses the band only beside its own port or past the band's ends",
     "A19": "two states: same names in the same order",
     "A20": "ligand tethers local",
 }
@@ -128,6 +130,7 @@ MEMBRANE_PARTS = (  # A18's, in order
     "outside_in_band",
     "wrong_side",
     "loop_in_band",
+    "loop_crossing",
 )
 # how A18's detail words each part's finding (figure_criteria)
 MEMBRANE_WORDS = {
@@ -137,6 +140,7 @@ MEMBRANE_WORDS = {
     "outside_in_band": "drawn nearer the mid-plane than its nearest residue",
     "wrong_side": "drawn on the side opposite its own",
     "loop_in_band": "loop drawn nearer the mid-plane than its residues",
+    "loop_crossing": "loop joining the faces drawn across the band away from its lane",
 }
 
 
@@ -149,7 +153,10 @@ def membrane_checks(drawn, path) -> dict:
     only the band's elements (membrane.band_set) overlap the band (band_member), no β-strand crossing no membrane
     among them (strand_in_band); every other element is drawn no nearer the mid-plane than its nearest residue
     (outside_in_band) and on its own side (wrong_side); no loop is drawn nearer the mid-plane than its nearest residue
-    (or its face, when all lie beyond it) but straight out of a band element's port (loop_in_band, ruling P14). The
+    (or its face, when all lie beyond it) but straight out of a band element's port, or, when its residues lie in the
+    bilayer (their median in the slab), in the lane beside its own port where the layout draws that port past its
+    bound, never through its own element (loop_in_band, rulings P14, P36-P38); a loop joining the two faces crosses the
+    band only in the strip at one of its own ports or past the band's ends (loop_crossing, rulings P34, P39). The
     membrane is the one the figure was drawn with
     (Layout.bilayer: found on every protein chain, whatever --chains draws); a figure with no band is judged as such,
     never by a membrane found again on the chains it draws."""
