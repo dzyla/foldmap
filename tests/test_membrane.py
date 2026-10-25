@@ -1839,3 +1839,36 @@ def test_comec_reads_as_its_figure_1c():
     assert r[1] < sum(dimer.membrane["y"]) / 2 < r[3]
     view = membrane_view(dimer, dsses, dbb, dimer.bilayer, route_loops(dimer, dsses, dbb))
     assert view["outside_in_slab"] == [] and view["soluble_in_slab"] == [] and view["tm_short"] == []
+
+
+def test_a_two_fold_dimer_about_the_normal_keeps_its_frame():
+    """Ruling R23 (32KS: turned 55° for the pair's summed tau, its protomers were drawn through each other): a turn is
+    judged by its worst copy (cli._worst_tau). Two copies of a protein, the second the first turned 180° about the
+    normal and one band helix short (32KS chain B has no TM11): any turn that stands one in sequence reverses the
+    other, so the frame as chosen is kept; summed over the chains, the turn would have won (15 - 10 pairs)."""
+    from types import SimpleNamespace
+
+    from foldmap.cli import _in_sequence, _sequence_score, _worst_tau
+    from foldmap.frame import Frame, view_frame
+    from foldmap.membrane import Membrane
+    from helpers import fake_sse
+
+    mem = Membrane(np.array([0.0, 0.0, 1.0]), 0.0, 15.0, "estimate")
+    ca, sses = [], []
+    for chain, sign, n in (("A", 1.0, 6), ("B", -1.0, 5)):
+        for k in range(n):
+            first, y = len(ca), sign * (10.0 * k + 5.0)
+            ca += [(0.0, y, z) for z in np.linspace(-18.0, 18.0, 25)]
+            sses.append(fake_sse("H", first, len(ca) - 1, centroid=(0.0, y, 0.0), axis=(0, 0, 1), chain=chain))
+    for x in (-150.0, 150.0):
+        first = len(ca)
+        ca += [(x + t, 0.0, 40.0) for t in np.linspace(-9.0, 9.0, 13)]
+        sses.append(fake_sse("H", first, len(ca) - 1, centroid=(x, 0.0, 40.0), axis=(1, 0, 0), chain="A"))
+    bb = SimpleNamespace(ca=np.array(ca))
+    frame = view_frame(sses, up=mem.normal)
+    a = [s.centroid for s in sses if s.chain == "A"][:6]
+    b = [s.centroid for s in sses if s.chain == "B"]
+    assert _worst_tau(frame, [[a, b]]) == 0 and _sequence_score(frame, [a, b]) == 0
+    assert _in_sequence(frame, sses, bb, mem, {"A": ("A", 0), "B": ("A", 0)}) is frame
+    turned = Frame(frame.origin, np.array([0.0, 1.0, 0.0]), frame.v, np.cross([0.0, 1.0, 0.0], frame.v))
+    assert _sequence_score(turned, [a, b]) == 15 - 10 and _worst_tau(turned, [[a, b]]) == -1  # summed, it won

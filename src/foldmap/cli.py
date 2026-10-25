@@ -12,6 +12,7 @@ import re
 import sys
 from collections import Counter
 from collections.abc import Callable
+from fractions import Fraction
 from pathlib import Path
 
 import numpy as np
@@ -683,7 +684,7 @@ def make_layout(
         stems = [StemView(snap(v.centroid), snap(v.axis), v.n) for v in stems]
         frame = view_frame(sses + stems, rotate, flip_v, up, view)
         if up_from_membrane and mode == "projected" and not rotate and not flip_v:  # turned about the normal (T5-3)
-            frame = _in_sequence(frame, sses, bb, mem)
+            frame = _in_sequence(frame, sses, bb, mem, copies)
     if sym is not None and sym.kind == "C" and sym.n == 2 and isinstance(frame, (RadialFrame, Frame)):
         _mirror_frame(frame, sym)
     if duplex and sym is not None and not getattr(frame, "sector", None):
@@ -1239,10 +1240,10 @@ def _transmembrane(sses, bb, mem) -> set[str]:
 
 
 AZIMUTH_STEP = 5  # degrees: the turns about the membrane normal a membrane view's page-right is chosen from (T5-3)
-# A turn is taken only when it raises tau by 1/MIN_TAU_GAIN_INV (0.1) or more (ruling T5-3: today's turn is kept where
-# the gain is under 0.1 and the page grows past the campaign's +15% gate). On the membrane campaign every turn worth
-# less was such a view, its loop crossings turned against d132d4c's: 6JO6 (tau +0.014, +51 %), 6ZKT with domains
-# (+0.092, +19 %) and 30BU with domains (+0.066, +32 %).
+# A turn is taken only when it raises the worst copy's tau by 1/MIN_TAU_GAIN_INV (0.1) or more (rulings T5-3, R23:
+# today's turn is kept where the gain is under 0.1). Scored by the tau summed over the chains, every turn worth less on
+# the membrane campaign grew its page past the campaign's +15% gate: 6JO6 (tau +0.014, crossings +51 % against
+# d132d4c), 6ZKT with domains (+0.092, +19 %) and 30BU with domains (+0.066, +32 %).
 MIN_TAU_GAIN_INV = 10
 
 
@@ -1256,21 +1257,39 @@ def _sequence_score(frame, chains: list[list[np.ndarray]]) -> int:
     return score
 
 
-def _in_sequence(frame, sses, bb, mem):
+def _worst_tau(frame, proteins: list[list[list[np.ndarray]]]) -> Fraction:
+    """Ruling R23: the band's tau as a turn is judged by it, exactly: each chain's Kendall tau (_sequence_score over
+    its pairs), the least over the copies of each protein, then the least over the proteins (`proteins`: each
+    protein's copies, each copy its band helix centroids in sequence order, two or more)."""
+    return min(
+        min(Fraction(_sequence_score(frame, [cents]), len(cents) * (len(cents) - 1) // 2) for cents in copies)
+        for copies in proteins
+    )
+
+
+def _in_sequence(frame, sses, bb, mem, copies: dict[str, tuple[str, int]] | None = None):
     """Ruling T5-3: a membrane view's page-right turned about the membrane normal (page-up), so that the band helices
     (the transmembrane helices, _transmembrane) stand left to right as nearly in sequence order as a turn can put them:
-    of the turns in AZIMUTH_STEP steps, the one whose page x order of each chain's band helices agrees best with their
-    sequence (Kendall's tau, summed over the chains: _sequence_score); on a tie the frame as view_frame chose it, else
-    the least turn (anticlockwise seen from the outside first); the frame as chosen when the best gains less than 0.1
-    in tau (MIN_TAU_GAIN_INV). Still a projection: the same frame turned, never a reordering. 32KS chain A's TM1 stood
-    in the middle of its band, tau 0.47; turned 35°, 0.78."""
+    of the turns in AZIMUTH_STEP steps, the one whose worst copy's Kendall tau of page x against sequence is highest
+    (ruling R23, _worst_tau: each protein's least tau over its copies, `copies` as model.homolog_chains gives them,
+    each chain its own protein without; then the least over the proteins); on a tie the frame as view_frame chose it,
+    else the least turn (anticlockwise seen from the outside first); the frame as chosen when the best gains less than
+    0.1 (MIN_TAU_GAIN_INV). Still a projection: the same frame turned, never a reordering. 32KS chain A's TM1 stood in
+    the middle of its band, tau 0.47; turned 35°, 0.78. A two-fold dimer whose axis is the normal keeps its frame: a
+    turn that orders one copy reverses the other (32KS: turned 55° for the pair's summed tau, it drew its protomers
+    through each other)."""
     tm = _transmembrane(sses, bb, mem)
     chains: dict[str, list[np.ndarray]] = {}
     for s in sses:
         if s.id in tm and s.kind == "H":
             chains.setdefault(s.chain, []).append(np.asarray(s.centroid, float))
-    if not any(len(c) > 1 for c in chains.values()):
+    groups: dict[str, list[list[np.ndarray]]] = {}
+    for c, cents in chains.items():
+        if len(cents) > 1:
+            groups.setdefault((copies or {}).get(c, (c, 0))[0], []).append(cents)
+    if not groups:
         return frame
+    proteins = list(groups.values())
     u0, v = np.asarray(frame.u, float), np.asarray(frame.v, float)
     side = np.cross(v, u0)  # u0 turned a quarter turn about v
     turns = sorted(range(-180 + AZIMUTH_STEP, 181, AZIMUTH_STEP), key=lambda a: (abs(a), a < 0))
@@ -1279,11 +1298,10 @@ def _in_sequence(frame, sses, bb, mem):
         t = np.radians(a)
         u = u0 if a == 0 else snap(np.cos(t) * u0 + np.sin(t) * side)
         turned = frame if a == 0 else Frame(frame.origin, u, frame.v, np.cross(u, v))
-        score = _sequence_score(turned, list(chains.values()))
+        score = _worst_tau(turned, proteins)
         if best is None or score > best:
             best, best_frame = score, turned
-    pairs = sum(len(c) * (len(c) - 1) // 2 for c in chains.values())
-    if (best - _sequence_score(frame, list(chains.values()))) * MIN_TAU_GAIN_INV < pairs:  # tau gains < 1/10
+    if (best - _worst_tau(frame, proteins)) * MIN_TAU_GAIN_INV < 1:  # tau gains less than 1/10
         return frame
     return best_frame
 
