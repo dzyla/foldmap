@@ -121,6 +121,23 @@ class JobFailed(RuntimeError):
     """An unexpected exception inside an isolated job, as '<Type>: <text>'. A RuntimeError: catch it first."""
 
 
+@functools.cache
+def code_fingerprint() -> str:
+    """A hash of foldmap's own .py sources (paths and text, line endings normalised), taken once per process. The app
+    keys its figure cache on it, so a deploy, or a reload after a code change (app._drop_changed_foldmap loads this
+    module afresh, so it is taken again), never serves a figure drawn by older code (plan 27 Task 1: 32KS)."""
+    import hashlib
+
+    root = Path(__file__).resolve().parent
+    h = hashlib.sha256()
+    for p in sorted(root.rglob("*.py"), key=lambda q: q.relative_to(root).as_posix()):
+        h.update(p.relative_to(root).as_posix().encode())
+        h.update(b"\0")
+        h.update(p.read_bytes().replace(b"\r\n", b"\n"))
+        h.update(b"\0")
+    return h.hexdigest()[:16]
+
+
 # ---------------------------------------------------------------------------------------------- running a job
 _CONTEXT = None
 _LOCK = threading.Lock()

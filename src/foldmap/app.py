@@ -69,6 +69,14 @@ def _stop_job_server() -> None:
 _drop_changed_foldmap()
 
 from foldmap import CREDIT, app_jobs, layoutfile
+
+
+def keyed_by_code(cached):
+    """`cached(path, blob, code)` (a cache_data function) as `(path, blob)`, with the fingerprint of foldmap's code as
+    its third argument: figures drawn by older code are missed, not served (plan 27 Task 1)."""
+    return lambda path, blob: cached(path, blob, app_jobs.code_fingerprint())
+
+
 from foldmap.app_controls import (
     LIKE_WIDGETS,
     MB,
@@ -1164,8 +1172,10 @@ def main() -> None:
     log_mode(lim)
 
     @st.cache_data(show_spinner=False, max_entries=CACHES["render"][0])
-    def render(path: str, blob: str) -> dict:
+    def drawn(path: str, blob: str, code: str) -> dict:  # code: app_jobs.code_fingerprint, part of the key
         return app_jobs.run_job(app_jobs.draw_job, path, blob, lim.slow, limits=lim)
+
+    render = keyed_by_code(drawn)
 
     @st.cache_data(show_spinner=False, max_entries=64)
     def sized(path: str) -> dict:

@@ -1535,6 +1535,59 @@ def test_a_foldmap_module_changed_on_disk_is_loaded_fresh(tmp_path, monkeypatch)
         seen.clear()
 
 
+def _counting_render():
+    """A cache_data function like the app's render, keyed through app.keyed_by_code, and the list of its real calls."""
+    import streamlit as st
+
+    from foldmap import app
+
+    calls = []
+
+    @st.cache_data(show_spinner=False)
+    def drawn(path: str, blob: str, code: str) -> dict:
+        calls.append((path, blob, code))
+        return {"svg": f"drawn {len(calls)}"}
+
+    drawn.clear()
+    return app.keyed_by_code(drawn), calls, drawn
+
+
+def test_the_render_cache_misses_when_the_code_fingerprint_changes(monkeypatch):
+    """Plan 27 Task 1 (32KS): after a deploy the app served a figure drawn by the old code."""
+    from foldmap import app_jobs
+
+    render, calls, drawn = _counting_render()
+    try:
+        monkeypatch.setattr(app_jobs, "code_fingerprint", lambda: "old")
+        assert render("a.cif", "{}") == {"svg": "drawn 1"}
+        monkeypatch.setattr(app_jobs, "code_fingerprint", lambda: "new")
+        assert render("a.cif", "{}") == {"svg": "drawn 2"}  # new code: drawn again
+        assert [c[2] for c in calls] == ["old", "new"]
+    finally:
+        drawn.clear()
+
+
+def test_the_render_cache_hits_when_the_code_is_the_same():
+    render, calls, drawn = _counting_render()
+    try:
+        assert render("a.cif", "{}") == render("a.cif", "{}") == {"svg": "drawn 1"}
+        assert len(calls) == 1
+    finally:
+        drawn.clear()
+
+
+def test_the_code_fingerprint_is_stable_and_follows_the_sources():
+    import hashlib
+
+    from foldmap import app_jobs
+
+    first = app_jobs.code_fingerprint()
+    assert app_jobs.code_fingerprint() == first and len(first) == 16
+    app_jobs.code_fingerprint.cache_clear()  # taken again from the files: the same code, the same value
+    assert app_jobs.code_fingerprint() == first
+    assert first != hashlib.sha256(b"").hexdigest()[:16]
+
+
 def test_a_swap_picked_by_deposited_name_draws_the_command_line_swap():
     """1MBN (deposited helices A-H): the pickers' option text carries the deposited name, so typing "helix A" finds
     α1; picking it stores its res: reference, and the swap draws the figure --swap res:… draws."""
