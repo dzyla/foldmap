@@ -1,5 +1,6 @@
 """Membrane bands: the lipid bilayer drawn behind transmembrane proteins, with its inside and outside."""
 
+import functools
 from pathlib import Path
 
 import numpy as np
@@ -615,13 +616,16 @@ def test_a_route_turning_out_of_a_port_at_or_in_the_slab_turns_at_the_port(entry
 
 
 # plan 27 rule P7: A18 made strict before the layout is (Tasks 4 and 5 take these marks off)
-PENDING = pytest.mark.xfail(strict=True, reason="plan 27 T4/T5: layout not yet by construction")
+PENDING = pytest.mark.xfail(  # only a failed assertion is the expected failure, never a crash (review-2 M4)
+    strict=True, raises=AssertionError, reason="plan 27 T4/T5: layout not yet by construction"
+)
 
 
-@pytest.mark.parametrize("entry", ["5LDW", pytest.param("6JO6", marks=PENDING), "6JLN"])
+@pytest.mark.parametrize("entry", [pytest.param(e, marks=PENDING) for e in ("5LDW", "6JO6", "6JLN")])
 def test_a18_holds_loops_beyond_a_face_out_of_the_slab(entry):
-    """Plan 27 Task 2 (A18 strict, ruling P4): random-100 C2b-5's membrane views (5LDW, 6JO6, 6JLN), no loop whose
-    residues all lie beyond a face drawn in the slab but on its band element's port stub (loop_in_band)."""
+    """Plan 27 Task 2 (A18 strict, rulings P4, P14): random-100 C2b-5's membrane views (5LDW, 6JO6, 6JLN), no loop drawn
+    nearer the mid-plane than its residues (its face, when all lie beyond it) but on its band element's port stub
+    (loop_in_band)."""
     from foldmap.figcheck import membrane_view
     from foldmap.route import route_loops
     from helpers import r100_entry
@@ -1026,8 +1030,8 @@ def test_a18_flags_every_element_of_no_band_whose_drawn_body_overlaps_it():
         "flat-in": ("H", np.full(6, 11.0), FLAT, (_y(11.0), _y(11.0))),
     }
     view, *_ = _a18(runs)
-    assert view["band_member"] == ["hairpin 4.5", "hair 0.0", "dips 1.0"], view
-    assert view["strand_in_band"] == ["hairpin 4.5", "hair 0.0"], view
+    assert view["band_member"] == ["hairpin 4.5", "hair <0.1", "dips 1.0"], view
+    assert view["strand_in_band"] == ["hairpin 4.5", "hair <0.1"], view
     assert view["tm_helices"] == 1 and view["tm_short"] == []
 
 
@@ -1052,12 +1056,14 @@ def test_a18_flags_an_element_drawn_nearer_the_mid_plane_than_its_nearest_residu
     assert view["band_member"] == ["straddle 20.0"] and view["strand_in_band"] == ["straddle 20.0"], view
 
 
-def test_a18_flags_a_loop_beyond_a_face_with_any_segment_in_the_slab_but_its_ports_stub():
-    """Ruling P4 (loop_in_band): a loop whose residues all lie beyond one face enters the slab nowhere (how far in from
-    that face): not between two elements outside the band (32KS A:436-461>A:467-469, dipping 3-5 Å in), and out of a
-    band element's port only straight along the normal to that face, crossing the face line at the port (a TM helix
-    ending short of the face): a turn inside the slab, or a first step away from the face, is in it. A loop of residues
-    in the slab is not judged by this; loops not given, the part is not measured (None)."""
+def test_a18_flags_a_loop_drawn_nearer_the_mid_plane_than_its_residues_but_on_its_ports_stub():
+    """Rulings P4, P14 (loop_in_band): no loop is drawn nearer the mid-plane, on its own side, than its bound (Å
+    nearer): its nearest residue, or its face where every residue lies beyond it. Between two elements outside the band
+    a loop of residues beyond the face stays out of the slab (32KS A:436-461>A:467-469, dipping 3-5 Å in); out of a band
+    element's port it runs only straight along the normal to that face, crossing the face line at the port (a TM
+    helix ending short of the face): a turn inside the slab, or a first step away from the face, is in it. A loop one
+    of whose residues lies inside the face (10 Å: a TM exit DSSP ends short) may dip to that residue, no further: drawn
+    sideways along the mid-plane it is 10 Å too deep. Loops not given, the part is not measured (None)."""
     out = np.full(4, 20.0)
     runs = {
         "tm1": ("H", np.linspace(-18.0, 13.5, 22), UPRIGHT, (_y(-18.0), 9.0)),  # its C port 1.5 Å inside the face
@@ -1065,7 +1071,7 @@ def test_a18_flags_a_loop_beyond_a_face_with_any_segment_in_the_slab_but_its_por
         "s1": ("E", np.full(3, 19.0), UPRIGHT, (11.0, 12.0)),
         "l2": (None, out, None, (0, 0)),
         "s2": ("E", np.full(3, 19.0), UPRIGHT, (12.0, 11.0)),
-        "l3": (None, np.array([20.0, 10.0, 20.0]), None, (0, 0)),  # dips into the slab: its own
+        "l3": (None, np.array([20.0, 10.0, 20.0]), None, (0, 0)),  # one residue 5 Å inside the face
         "s3": ("E", np.full(3, 19.0), UPRIGHT, (11.0, 12.0)),
     }
     up = [(0.0, 9.0), (0.0, 10.6), (3.0, 10.6), (3.0, 11.0)]  # the stub to the face, on along it
@@ -1073,20 +1079,23 @@ def test_a18_flags_a_loop_beyond_a_face_with_any_segment_in_the_slab_but_its_por
     away = [(0.0, 9.0), (0.0, 8.0), (0.0, 10.6), (3.0, 10.6), (3.0, 11.0)]  # first down, then up its stub
     dip = [(0.0, 12.0), (0.0, 9.7), (4.0, 9.7), (4.0, 12.0)]  # between two outside the band
     over = [(0.0, 12.0), (0.0, 10.0), (4.0, 10.0), (4.0, 12.0)]  # along the face line: not in the slab
-    own = [(0.0, 11.0), (0.0, 5.0), (4.0, 5.0), (4.0, 11.0)]
-    loops = [("tm1", "s1", up), ("s1", "s2", over), ("s2", "s3", own)]
+    to_residue = [(0.0, 11.0), (0.0, _y(10.0)), (4.0, _y(10.0)), (4.0, 11.0)]  # down to its 10 Å residue
+    mid_slab = [(0.0, 11.0), (0.0, 5.0), (4.0, 5.0), (4.0, 11.0)]  # sideways along the mid-plane
+    loops = [("tm1", "s1", up), ("s1", "s2", over), ("s2", "s3", to_residue)]
     view, *_ = _a18(runs, loops)
     assert view["loop_in_band"] == [], view
-    bad = [("tm1", "s1", turn), ("tm1", "s1", away), ("s1", "s2", dip)]
+    bad = [("tm1", "s1", turn), ("tm1", "s1", away), ("s1", "s2", dip), ("s2", "s3", mid_slab)]
     view, *_ = _a18(runs, bad)
-    assert view["loop_in_band"] == ["tm1>s1 1.5", "tm1>s1 6.0", "s1>s2 0.9"], view
+    assert view["loop_in_band"] == ["tm1>s1 1.5", "tm1>s1 6.0", "s1>s2 0.9", "s2>s3 10.0"], view
     assert _a18(runs)[0]["loop_in_band"] is None
 
 
 def test_a18_judges_its_parts_each_by_name_and_none_unmeasured_as_a_pass():
-    """Plan 27 Task 2: A18's detail names each part's findings (criteria.MEMBRANE_WORDS) and fails on any; a part a
-    result does not hold (measured before plan 27) is not measured, never a pass."""
+    """Plan 27 Task 2: A18's detail names each part's findings (criteria.MEMBRANE_WORDS), at most MEMBRANE_SHOWN per
+    part and the rest counted (review-2 M3), and fails on any; a part a result does not hold (measured before plan 27)
+    is not measured, never a pass. A finding under 0.05 Å reads "<0.1", never "0.0"."""
     from foldmap import criteria
+    from foldmap.figcheck import _angstrom
 
     clean = {"band": True, "tm_helices": 7, "tm_short": [], **{k: [] for k in criteria.MEMBRANE_PARTS}}
     judged = criteria.figure_criteria({"membrane": {"result": {"membrane": clean}}})["A18"]
@@ -1096,6 +1105,11 @@ def test_a18_judges_its_parts_each_by_name_and_none_unmeasured_as_a_pass():
         assert one["pass"] is False and one["detail"] == f"{criteria.MEMBRANE_WORDS[part]} A:1-9 2.5 Å", part
         old = {k: v for k, v in clean.items() if k != part}
         assert criteria.figure_criteria({"membrane": {"result": {"membrane": old}}})["A18"]["pass"] is False
+    many = [f"A:{k}-{k + 4} 1.0" for k in range(criteria.MEMBRANE_SHOWN + 3)]
+    capped = criteria.figure_criteria({"membrane": {"result": {"membrane": {**clean, "wrong_side": many}}}})["A18"]
+    shown = capped["detail"].split("; ")
+    assert len(shown) == criteria.MEMBRANE_SHOWN + 1 and shown[-1] == "(+3 more wrong_side)", shown
+    assert (_angstrom(0.049), _angstrom(0.05), _angstrom(2.25)) == ("<0.1", "0.1", "2.2")
 
 
 # ---------------------------------------------------------------- plan 26 fix round 2: loops stop at gaps
@@ -1970,27 +1984,41 @@ def test_comec_reads_as_its_figure_1c():
     assert view["tm_short"] == []  # and nothing beyond a face in the slab, A18 strict: test_a18_on_comec
 
 
-@pytest.mark.skipif(not KS32.is_file(), reason="32KS is not in the download cache")
-@pytest.mark.parametrize(
-    "options",
-    [
-        pytest.param({}, marks=PENDING, id="dimer"),
-        pytest.param({"chains": ["A"]}, marks=PENDING, id="A"),
-        pytest.param({"chains": ["A"], "domains": "auto", "style": ["color_by=domain"]}, marks=PENDING, id="A-domains"),
-    ],
-)
-def test_a18_on_comec(options):
-    """Plan 27 Task 2 (A18 strict, rulings P3-P6) on 32KS, ComEC, the figure the author judged the membrane view by
-    (Fig. 1C): in the dimer, chain A alone and chain A with its domains, every part of A18 passes
-    (criteria.membrane_checks on the drawn figure): only the band's elements in the band, no β-strand there (the OB
-    barrels' G/H hairpins), none nearer than its residues or on the wrong side, no loop beyond a face in the slab."""
+COMEC_CASES = {  # the three ComEC figures A18 is held on (Fig. 1C): the dimer, chain A, chain A with its domains
+    "dimer": {},
+    "A": {"chains": ["A"]},
+    "A-domains": {"chains": ["A"], "domains": "auto", "style": ["color_by=domain"]},
+}
+COMEC_PASSING = {"wrong_side"}  # A18's parts ComEC's figures pass today: they guard 32KS until Tasks 4 and 5
+
+
+@functools.cache
+def _comec_a18(case: str) -> dict:
+    """criteria.membrane_checks on one ComEC figure (COMEC_CASES), drawn once per process."""
     from foldmap import criteria
     from foldmap.spec import draw_spec, figure_spec
 
-    d = draw_spec(figure_spec(KS32, membrane="auto", **options))
-    m = criteria.membrane_checks(d, KS32)
+    return criteria.membrane_checks(draw_spec(figure_spec(KS32, membrane="auto", **COMEC_CASES[case])), KS32)
+
+
+@pytest.mark.skipif(not KS32.is_file(), reason="32KS is not in the download cache")
+@pytest.mark.parametrize(
+    "case, part",
+    [
+        pytest.param(case, part, marks=() if part in COMEC_PASSING else PENDING, id=f"{case}-{part}")
+        for case in COMEC_CASES
+        for part in ("slab_helix", "band_member", "strand_in_band", "outside_in_band", "wrong_side", "loop_in_band")
+    ],
+)
+def test_a18_on_comec(case, part):
+    """Plan 27 Task 2 (A18 strict) on 32KS, ComEC, the figure the author judged the membrane view by (Fig. 1C): in the
+    dimer, chain A alone and chain A with its domains, each part of A18 passes on its own (criteria.membrane_checks
+    on the drawn figure; review-2 M4: marked per part, so a Task's gate shows its own parts flip): helices in the slab
+    at their depths, only the band's elements in the band, no β-strand there (the OB barrels' G/H hairpins), none
+    nearer than its residues or on the wrong side, no loop nearer than its residues."""
+    m = _comec_a18(case)
     assert m["band"] and not m["tm_short"], m
-    assert {k: m[k] for k in criteria.MEMBRANE_PARTS if m[k]} == {}
+    assert m[part] == [], m[part]
 
 
 def test_a_two_fold_dimer_about_the_normal_keeps_its_frame():

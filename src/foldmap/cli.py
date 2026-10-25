@@ -1118,7 +1118,8 @@ def _membrane_places(sses, bb, mem, tm: set[str], faces) -> tuple[set[str], dict
     interfacial helices: 32KS's NS1, A:200-219), each drawn lying on the face its centre is nearer (+1 the face higher
     on the page, -1 the lower: faces = (outer, inner) page y), and (0) every other element whose CA centre lies in
     the slab, kept at its projected height (32KS A:328-339); and `sides`, every element whose CA centre lies more than
-    SOLUBLE_BEYOND beyond a face (soluble, as A18 counts it: ruling R4), and every other one not lying flat whose CA
+    SOLUBLE_BEYOND beyond a face (soluble: ruling R4; A18 now judges every element's drawn body, plan 27), and every
+    other one not lying flat whose CA
     run lies wholly beyond a face (ruling T5-5: 6ZKT's M:50-51, 18-19 Å out, was drawn 10 Å into the slab), kept off
     the band on that face's side (+1 above, -1 below). With no band (faces None) only `flat` is read. Elements of
     `tm`, and any other crossing the membrane (a subunit in a barrel lumen), are none of these."""

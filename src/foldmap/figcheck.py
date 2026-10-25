@@ -21,7 +21,7 @@ from matplotlib.path import Path as MPath
 from matplotlib.transforms import Affine2D, Bbox
 
 from .layout import block_ghosts, crosses_band, joined_pieces, lying_over
-from .membrane import band_set, crosses, lies_flat_here, own_side, slab_helix
+from .membrane import band_set, crosses, loop_bound, own_bound, slab_helix, slab_range
 from .na_curve import _FAR, on_curves
 
 # Lines a text can be crossed by (render's gids, matched by prefix). A loop's casing (loopcase:) and a stub's edge
@@ -1784,21 +1784,21 @@ def membrane_view(layout, sses, bb, mem, loops=None) -> dict:
       half its thickness); tm_short, those that do not cross their band (crosses_band), with the share of the band
       they cover;
     - slab_helix, the helices of the band that cross no membrane, their CA median in the slab (membrane.slab_helix,
-      ruling P10) whose axis (its two ports: ruling P13, the one part not judged on the body) lies off their own depth
-      range (Å, the furthest): a standing one's past a face or past its CA atoms' depths either way; a flat one's
-      (membrane.lies_flat_here) past its CA depths extended to its nearer face, where it may lie (Fig. 1C's NS1, NS7);
+      ruling P10), whose axis (its two ports: ruling P13, the one part not judged on the body) lies off the range
+      membrane.slab_range gives it (Å, the furthest): a standing one inside the slab within its CA atoms' depths, a
+      flat one within them extended to its nearer face, where it may lie (Fig. 1C's NS1, NS7);
     - band_member, the elements not of the band (membrane.in_band: crossing helices, helices in the slab at any tilt,
       crossing strands) whose drawn body overlaps a band;
     - strand_in_band, those of them that are β-strands (an interfacial strand is never in the membrane);
     - outside_in_band, the elements not of the band drawn nearer the mid-plane, on their own side, than their own
-      nearest CA atom (Å nearer);
+      nearest CA atom (membrane.own_bound; Å nearer);
     - wrong_side, the elements not of the band whose drawn centre lies on the side opposite their own
       (membrane.own_side; Å past the mid-plane);
-    - loop_in_band, the loops whose residues all lie beyond one face (the two ends' CA atoms for a loop with none)
-      with a segment inside a band, but for the stub straight out of a band element's port to that face, the one
-      place such a loop may cross the face line (None: `loops` not given).
-    Each entry is "<id> <Å>"; band_member, strand_in_band and loop_in_band say how far in from the element's (the
-    loop's) own face. A barrel's ghost strand is judged as its strand, "<id> ghost <Å>"."""
+    - loop_in_band, the loops with a segment drawn nearer the mid-plane than their bound (membrane.loop_bound: their
+      nearest residue, or their face when every residue lies beyond it; ruling P14) but on the stub straight out of a
+      band element's port to that face (None: `loops` not given).
+    Each entry is "<id> <Å>" (findings_text: "<0.1" under 0.05 Å); band_member and strand_in_band say how far in from
+    the element's own face. A barrel's ghost strand is judged as its strand, "<id> ghost <Å>"."""
     bands = layout.membrane.get("bands") or [layout.membrane["y"]]
     up = 1 if layout.membrane.get("inside", "below") == "below" else -1  # page-up is the outside's direction
     half = mem.half
@@ -1825,31 +1825,27 @@ def membrane_view(layout, sses, bb, mem, loops=None) -> dict:
                 ends = (p.n_port[1], p.c_port[1])
                 b = _nearest_band(bands, sum(ends) / 2)
                 lo, hi = sorted(_drawn_depth(y, b, half, up) for y in ends)
-                deep, shallow = float(seg.min()), float(seg.max())
-                if lies_flat_here(s.axis, seg, mem):  # on its nearer face, or inside no deeper than its CA atoms
-                    face = half if float(np.median(seg)) >= 0 else -half
-                    off = max(min(deep, face) - lo, hi - max(shallow, face))
-                else:  # standing: inside the band, within its CA atoms' depths
-                    off = max(-half - lo, hi - half, deep - lo, hi - shallow)
+                low, high = slab_range(s, depth, mem)
+                off = max(low - lo, hi - high)
                 if off > _eps(b, half):
-                    flats.append(f"{s.id} {off:.1f}")
+                    flats.append(f"{s.id} {_angstrom(off)}")
             continue
-        side, closest = own_side(seg), float((own_side(seg) * seg).min())
+        side, closest = own_bound(seg)
         for q, name in [(p, s.id), *((g, f"{s.id} ghost") for g in ghosts.get(s.id, []))]:
             _, y0, _, y1 = q.rect
             into = _band_reach(y0, y1, bands, half, up, side)
             if into is not None:
-                member.append(f"{name} {into:.1f}")
+                member.append(f"{name} {_angstrom(into)}")
                 if s.kind == "E":
-                    strands.append(f"{name} {into:.1f}")
+                    strands.append(f"{name} {_angstrom(into)}")
             b = _nearest_band(bands, (y0 + y1) / 2)
             eps = _eps(b, half)
             edge = min(side * _drawn_depth(y, b, half, up) for y in (y0, y1))  # its edge nearer the mid-plane
             if edge < closest - eps:
-                nearer.append(f"{name} {closest - edge:.1f}")
+                nearer.append(f"{name} {_angstrom(closest - edge)}")
             centre = side * _drawn_depth((y0 + y1) / 2, b, half, up)
             if centre < -eps:
-                wrong.append(f"{name} {-centre:.1f}")
+                wrong.append(f"{name} {_angstrom(-centre)}")
     return {
         "tm_helices": tm,
         "tm_short": short,
@@ -1858,41 +1854,43 @@ def membrane_view(layout, sses, bb, mem, loops=None) -> dict:
         "strand_in_band": strands,
         "outside_in_band": nearer,
         "wrong_side": wrong,
-        "loop_in_band": None if loops is None else loops_in_band(loops, sses, depth, band, bands, half, up),
+        "loop_in_band": None if loops is None else loops_in_band(loops, sses, depth, band, bands, mem, up),
     }
 
 
-def loops_in_band(loops, sses, depth, band: set[str], bands, half: float, up: int) -> list[str]:
-    """A18's loop_in_band (membrane_view): each loop (a>b) whose residues all lie beyond one face (the two ends' CA
-    atoms, for a loop with no residue between its elements) with any segment inside a band, how far in from that
-    face, in Å. Out of the port of an element of the band (`band`), the loop may run straight to its face, along the
-    page's normal, and cross the face line there (_stub); nowhere else. `up`: +1 when page-up is the outside."""
+def _angstrom(x: float) -> str:
+    """A finding's Å, one decimal; one under 0.05 Å reads "<0.1", never "0.0" (it is a finding, not a pass)."""
+    return "<0.1" if x < 0.05 else f"{x:.1f}"
+
+
+def loops_in_band(loops, sses, depth, band: set[str], bands, mem, up: int) -> list[str]:
+    """A18's loop_in_band (membrane_view; ruling P14): each loop (a>b) with a segment drawn nearer the mid-plane, on its
+    own side, than its bound (membrane.loop_bound, from its residues, or the two ends' CA atoms for a loop with no
+    residue between its elements: its nearest residue, or its face when all lie beyond it), how much nearer, in Å.
+    Out of the port of an element of the band (`band`) the loop may run straight to its face along the page's normal,
+    and cross the face line there (_stub); nowhere else. A loop out of a TM helix whose first residues lie just inside
+    the face is drawn no deeper than they are. `up`: +1 when page-up is the outside."""
     by_id = {s.id: s for s in sses}
     out = []
     for lp in loops:
         a, b = by_id.get(lp.a_id), by_id.get(lp.b_id)
         if a is None or b is None:
             continue
-        held = depth[list(range(a.end + 1, b.start)) or [a.end, b.start]]
-        if (held >= half).all():
-            side = 1
-        elif (held <= -half).all():
-            side = -1
-        else:  # residues in the slab, or on both sides: crossing it is theirs
-            continue
+        side, bound = loop_bound(depth[list(range(a.end + 1, b.start)) or [a.end, b.start]], mem)
         pts = [(float(x), float(y)) for x, y in lp.points]
         first, last = 0, len(pts) - 1  # the segments judged: first .. last - 1
         if lp.a_id in band:
             first = _stub(pts, side * up)
         if lp.b_id in band:
             last = len(pts) - 1 - _stub(pts[::-1], side * up)
-        reach = [
-            _band_reach(min(pts[k][1], pts[k + 1][1]), max(pts[k][1], pts[k + 1][1]), bands, half, up, side)
-            for k in range(first, last)
-        ]
-        reach = [r for r in reach if r is not None]
-        if reach:
-            out.append(f"{lp.a_id}>{lp.b_id} {max(reach):.1f}")
+        worst = None
+        for (_, ya), (_, yb) in zip(pts[first:last], pts[first + 1 : last + 1]):
+            near = _nearest_band(bands, (ya + yb) / 2)
+            drawn = min(side * _drawn_depth(y, near, mem.half, up) for y in (ya, yb))  # its point nearer the mid-plane
+            if drawn < bound - _eps(near, mem.half):
+                worst = bound - drawn if worst is None else max(worst, bound - drawn)
+        if worst is not None:
+            out.append(f"{lp.a_id}>{lp.b_id} {_angstrom(worst)}")
     return out
 
 

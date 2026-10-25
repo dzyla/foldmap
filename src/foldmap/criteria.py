@@ -73,8 +73,8 @@ CRITERIA = {
     "A15": "copies drawn alike",
     "A16": "domains: one chain, alike, not tiny, panels apart, names clear",
     "A17": "nucleic-acid metrics and stem names by their letters",
-    "A18": "membrane: TM helices across the band, nothing else in it, none nearer than its residues or on the wrong "
-    "side, loops beyond a face out of the slab",
+    "A18": "membrane: only the band set in the band (TM helices across it, slab helices at their depths, crossing "
+    "strands), no element or loop nearer than its residues or on the wrong side",
     "A19": "two states: same names in the same order",
     "A20": "ligand tethers local",
 }
@@ -120,6 +120,7 @@ def tether_lengths(drawn, look) -> list[tuple[str, float, str, str]]:
     return out
 
 
+MEMBRANE_SHOWN = 4  # findings A18's detail shows per part, the rest counted (as the tethers' detail does)
 MEMBRANE_PARTS = (  # A18's, in order
     "slab_helix",
     "band_member",
@@ -135,7 +136,7 @@ MEMBRANE_WORDS = {
     "strand_in_band": "β-strand crossing no membrane in the band",
     "outside_in_band": "drawn nearer the mid-plane than its nearest residue",
     "wrong_side": "drawn on the side opposite its own",
-    "loop_in_band": "loop beyond a face drawn in the slab",
+    "loop_in_band": "loop drawn nearer the mid-plane than its residues",
 }
 
 
@@ -147,8 +148,9 @@ def membrane_checks(drawn, path) -> dict:
     perhaps on its nearer face (slab_helix, ruling P13: its axis, not its body);
     only the band's elements (membrane.band_set) overlap the band (band_member), no β-strand crossing no membrane
     among them (strand_in_band); every other element is drawn no nearer the mid-plane than its nearest residue
-    (outside_in_band) and on its own side (wrong_side); a loop whose residues all lie beyond a face enters the slab only
-    straight out of a band element's port (loop_in_band). The membrane is the one the figure was drawn with
+    (outside_in_band) and on its own side (wrong_side); no loop is drawn nearer the mid-plane than its nearest residue
+    (or its face, when all lie beyond it) but straight out of a band element's port (loop_in_band, ruling P14). The
+    membrane is the one the figure was drawn with
     (Layout.bilayer: found on every protein chain, whatever --chains draws); a figure with no band is judged as such,
     never by a membrane found again on the chains it draws."""
     from . import figcheck
@@ -455,7 +457,11 @@ def figure_criteria(views: dict[str, dict]) -> dict:
             bad = ([] if m["band"] else ["no band drawn"]) + [f"TM helix {x}" for x in m["tm_short"]]
             for part in MEMBRANE_PARTS:  # a part not measured (an older result) is not measured, never a pass
                 found = m.get(part)
-                bad += [f"{part} not measured"] if found is None else [f"{MEMBRANE_WORDS[part]} {x} Å" for x in found]
+                if found is None:
+                    bad.append(f"{part} not measured")
+                    continue
+                bad += [f"{MEMBRANE_WORDS[part]} {x} Å" for x in found[:MEMBRANE_SHOWN]]
+                bad += [f"(+{len(found) - MEMBRANE_SHOWN} more {part})"] if len(found) > MEMBRANE_SHOWN else []
             out["A18"] = _ok(not bad, "; ".join(bad))
     if "default" in views and d:
         # only a tether to another chain is bounded (ruling); a long one to the home chain is reported

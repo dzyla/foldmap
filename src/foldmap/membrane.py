@@ -368,6 +368,36 @@ def own_side(depth: np.ndarray) -> int:
     return 1 if float(np.mean(depth)) >= 0.0 else -1
 
 
+def own_bound(depth: np.ndarray) -> tuple[int, float]:
+    """The one-sided bound of an element not of the band whose CA atoms lie at these depths (ruling P4): its side
+    (own_side) and how near the mid-plane it may be drawn, on that side, in Å signed by the side: its nearest CA. Free
+    outward. A18's outside_in_band holds every such element to it, and the layout binds it there."""
+    side = own_side(depth)
+    return side, float((side * np.asarray(depth)).min())
+
+
+def loop_bound(depth: np.ndarray, m: Membrane) -> tuple[int, float]:
+    """The one-sided bound of a loop whose residues (or, with none between its elements, the two ends' CA atoms) lie at
+    these depths (ruling P14): its side (own_side) and how near the mid-plane it may be drawn, in Å signed by the side,
+    past the stub out of a band element's port: its nearest residue, or its face where every residue lies beyond it
+    (a loop wholly beyond a face stays out of the slab)."""
+    side, nearest = own_bound(depth)
+    return side, min(nearest, m.half)
+
+
+def slab_range(s: SSE, depth: np.ndarray, m: Membrane) -> tuple[float, float]:
+    """Where a helix in the slab (slab_helix) has its axis drawn, in Å from the mid-plane, positive outside (ruling
+    P13): standing, within its CA atoms' depths and inside the slab; lying flat (lies_flat_here), within its CA
+    atoms' depths extended to its nearer face (by its CA median), so it may lie on that face (Fig. 1C's NS1, NS7),
+    never deeper than its deepest CA. A18's slab_helix judges it, and the layout draws it there."""
+    seg = np.asarray(depth)[s.start : s.end + 1]
+    deep, shallow = float(seg.min()), float(seg.max())
+    if lies_flat_here(s.axis, seg, m):
+        face = m.half if float(np.median(seg)) >= 0.0 else -m.half
+        return min(deep, face), max(shallow, face)
+    return max(deep, -m.half), min(shallow, m.half)
+
+
 # Ruling T5-1: in a membrane view two helix runs of one chain at most JOIN_GAP non-helix residues apart are joined
 # only when both lie flat or the joined helix crosses the membrane. Joined as those words allow, 199 pairs of the
 # membrane campaign's 21 views would have been: hairpins (32KS's NS1 and NS2, A:200-219 and A:222-233, their axes

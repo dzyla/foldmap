@@ -4002,8 +4002,8 @@ def _kept(items: list[_Item], level: set[str], on_face: dict[str, int] | None) -
     """Which items keep their height (_separate's `level`), None if none: an item holding an element of `level` or of
     `on_face` (in the slab at its own height, or a helix set on its face by _onto_faces). Such an item is never walled
     off the band (_membrane_walls), whatever else it holds: a sheet with one strand in the slab keeps every strand at
-    its projected height, soluble ones too, and A18 reports any drawn in the slab (review-2 M6; none in the
-    campaign)."""
+    its projected height, soluble ones too, and A18 reports any of them drawn overlapping the band (band_member, plan
+    27; review-2 M6)."""
     on_face = on_face or {}
     out = np.array(
         [
