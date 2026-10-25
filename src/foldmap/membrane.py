@@ -462,21 +462,36 @@ def loop_bound(depth: np.ndarray, m: Membrane) -> tuple[int, float]:
     return side, min(nearest, m.half)
 
 
-def loop_residues(a: SSE, b: SSE) -> list[int]:
+def loop_residues(a: SSE, b: SSE, depth: np.ndarray) -> list[int]:
     """The residues of the loop from element a to element b, whose depths its bound is taken from (loop_bound): those
-    between them, or with none, the two ends' CA atoms (a's last, b's first)."""
-    return list(range(a.end + 1, b.start)) or [a.end, b.start]
+    between them; with none, or when its two end residues (a's last, b's first) lie on opposite sides of the mid-plane
+    (two_face, ruling P36b: the loop joins the two sides), those ends as well."""
+    inner = list(range(a.end + 1, b.start))
+    return [a.end, *inner, b.start] if not inner or two_face(a, b, depth) else inner
 
 
 def loop_side_bound(a: SSE, b: SSE, depth: np.ndarray, m: Membrane) -> tuple[int, float]:
     """loop_bound of the loop from element a to element b (loop_residues), every residue's depth given: the one rule
-    A18's loop_in_band judges a loop by and the router walls the slab by (plan 27 rulings P14, P33)."""
-    return loop_bound(np.asarray(depth)[loop_residues(a, b)], m)
+    A18's loop_in_band judges a loop by and the router walls the slab by (plan 27 rulings P14, P33, P36b)."""
+    return loop_bound(np.asarray(depth)[loop_residues(a, b, depth)], m)
+
+
+def two_face(a: SSE, b: SSE, depth: np.ndarray) -> bool:
+    """Ruling P36b: do the loop's two end residues (a's last, b's first) lie on opposite sides of the mid-plane?"""
+    d = np.asarray(depth)
+    return float(d[a.end]) * float(d[b.start]) < 0.0
+
+
+def in_bilayer(a: SSE, b: SSE, depth: np.ndarray, m: Membrane) -> bool:
+    """Do the loop's residues (loop_residues) lie in the bilayer: their median inside the slab, the rule an element is
+    of the bilayer by (slab_helix, ruling P10)? Only such a loop may climb a lane (ruling P36a)."""
+    return abs(float(np.median(np.asarray(depth)[loop_residues(a, b, depth)]))) < m.half
 
 
 # The page side of the band (plan 27 Task 5): page y read as a depth by a band's own scale, the measure A18 judges a
 # drawn loop by (figcheck.loops_in_band) and the router keeps its routes to (route._Wall). Shared, so the two agree.
 BAND_EPS = 1e-6  # page units: float snapping, and no more
+LANE = 0.65  # page units beside an element's box a loop may climb in (rulings P34, P36a): route._INFLATE + 2 * RES
 
 
 def nearest_band(bands, y: float):
@@ -491,42 +506,138 @@ def page_depth(y: float, band, half: float, up: int) -> float:
     return up * (y - (b0 + b1) / 2) * 2 * half / max(b1 - b0, 1e-9)
 
 
+def page_y(depth: float, band, half: float, up: int) -> float:
+    """The page y standing for `depth` (Å from the mid-plane, positive outside) by the band's own scale (page_depth's
+    inverse)."""
+    b0, b1 = band
+    return (b0 + b1) / 2 + up * depth * (b1 - b0) / (2 * half)
+
+
 def band_eps(band, half: float) -> float:
     """BAND_EPS in Å, by the band's scale."""
     return BAND_EPS * 2 * half / max(band[1] - band[0], 1e-9)
 
 
-def stub_segments(pts, toward: int) -> int:
+def meets_box(p, q, box) -> bool:
+    """Does segment p-q run through the inside of `box` (x0, y0, x1, y1), not only along or up to its edge?"""
+    x0, y0, x1, y1 = box
+    dx, dy = q[0] - p[0], q[1] - p[1]
+    t0, t1 = 0.0, 1.0
+    for pk, qk in ((-dx, p[0] - x0), (dx, x1 - p[0]), (-dy, p[1] - y0), (dy, y1 - p[1])):
+        if abs(pk) < 1e-12:
+            if qk <= BAND_EPS:
+                return False
+            continue
+        r = qk / pk
+        if pk < 0:
+            t0 = max(t0, r)
+        else:
+            t1 = min(t1, r)
+        if t0 >= t1:
+            return False
+    return (t1 - t0) * float(np.hypot(dx, dy)) > BAND_EPS
+
+
+def lane(box, port_y: float, bound_y: float, toward: int) -> tuple[float, float, float, float]:
+    """Ruling P36a: the lane beside an element's `box` (LANE either side of it) from its drawn port (page y `port_y`,
+    and the first step out of it: LANE further away from the loop's side, page direction `toward`) to the page y of the
+    loop's bound."""
+    beyond = port_y - toward * LANE
+    return (box[0] - LANE, min(beyond, bound_y), box[2] + LANE, max(beyond, bound_y))
+
+
+def in_lane(p, q, lanes) -> bool:
+    """Ruling P36a: does segment p-q lie in one of `lanes` ((lane box, its element's box) pairs) and through no part of
+    that element's own box (a line through its own element is never excused)?"""
+    return any(
+        x0 - BAND_EPS <= min(p[0], q[0])
+        and max(p[0], q[0]) <= x1 + BAND_EPS
+        and y0 - BAND_EPS <= min(p[1], q[1])
+        and max(p[1], q[1]) <= y1 + BAND_EPS
+        and not meets_box(p, q, own)
+        for (x0, y0, x1, y1), own in lanes
+    )
+
+
+def loop_lanes(a: SSE, b: SSE, depth: np.ndarray, m: Membrane, ends, band_ids, bands, up: int) -> list:
+    """Ruling P36a, P36b: the lanes (lane, the element's box) a loop from a to b climbs from an end the layout draws
+    nearer the mid-plane than its bound (loop_side_bound) to that bound. `ends`: ((port, box) of a's C end, of b's N
+    end) as drawn. An end of the band (`band_ids`: a transmembrane helix spanning the band, a helix of the slab drawn at
+    its CA depths) has one, and so does either end of a two-face loop (two_face); none when the loop's residues do
+    not lie in the bilayer (in_bilayer), and none for an end on or past its bound. A18's loop_in_band excuses a segment
+    in a lane (in_lane), and the router opens it."""
+    if not in_bilayer(a, b, depth, m):
+        return []
+    side, bound = loop_side_bound(a, b, depth, m)
+    two = two_face(a, b, depth)
+    out = []
+    for s, (port, box) in zip((a, b), ends):
+        if s.id not in band_ids and not two:
+            continue
+        near = nearest_band(bands, float(port[1]))
+        if side * page_depth(float(port[1]), near, m.half, up) >= bound - band_eps(near, m.half):
+            continue
+        yb = page_y(side * bound, near, m.half, up)
+        out.append((lane(box, float(port[1]), yb, side * up), tuple(box)))
+    return out
+
+
+def stub_segments(pts, toward: int, box=None) -> int:
     """How many segments of the polyline `pts` run on from its first point straight along the page's y, at its x,
-    towards page side `toward` (+1 up): the stub out of a port to its face, the one part of a loop out of a band
-    element's port that loop_excess does not judge."""
+    towards page side `toward` (+1 up), and through no part of its element's `box` (ruling P36a): the stub out of a
+    port to its face, the one part of a loop out of a band element's port that loop_excess does not judge."""
     x = pts[0][0]
     n = 0
     for (xa, ya), (xb, yb) in zip(pts, pts[1:]):
         if abs(xa - x) > BAND_EPS or abs(xb - x) > BAND_EPS or (yb - ya) * toward < -BAND_EPS:
             break
+        if box is not None and meets_box((xa, ya), (xb, yb), box):
+            break
         n += 1
     return n
 
 
-def loop_excess(pts, side: int, bound: float, bands, half: float, up: int, stub_a: bool, stub_b: bool) -> float | None:
+def _pieces(p, q, lanes) -> list:
+    """Segment p-q cut where it crosses an edge of one of `lanes`: pieces each wholly in or out of each lane."""
+    cuts = {0.0, 1.0}
+    for k in (0, 1):
+        dk = q[k] - p[k]
+        if abs(dk) > 1e-12:
+            for (x0, y0, x1, y1), _ in lanes:
+                for v in (x0, x1) if k == 0 else (y0, y1):
+                    t = (v - p[k]) / dk
+                    if 0.0 < t < 1.0:
+                        cuts.add(t)
+    ts = sorted(cuts)
+    at = lambda t: (p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t)  # noqa: E731
+    return [(at(s), at(t)) for s, t in zip(ts, ts[1:])]
+
+
+def loop_excess(
+    pts, side: int, bound: float, bands, half: float, up: int, stub_a, stub_b, lanes=(), boxes=(None, None)
+) -> float | None:
     """How much nearer the mid-plane (Å), on its own `side`, than its `bound` (loop_side_bound) a loop drawn along the
     page polyline `pts` comes at its worst; None when nowhere. A loop out of (into) a band element's port (`stub_a`,
-    `stub_b`) may first (last) run straight along the page's y towards its side (stub_segments), not judged; every other
-    segment is, by its point nearer the mid-plane, against the band nearest its middle. A18's loop_in_band (plan 27
-    ruling P14) and the router's wall (P33) both read a drawn loop by this."""
+    `stub_b`) may first (last) run straight along the page's y towards its side (stub_segments), not judged, unless that
+    runs through its element's own box (`boxes`: a's, b's); a part of it in one of its `lanes` (loop_lanes, in_lane) is
+    not judged either. Every other part is, by its point nearer the mid-plane, against the band nearest its middle.
+    A18's loop_in_band (plan 27 rulings P14, P36a) and the router's wall (P33) both read a drawn loop by this."""
     pts = [(float(x), float(y)) for x, y in pts]
     first, last = 0, len(pts) - 1  # the segments judged: first .. last - 1
     if stub_a:
-        first = stub_segments(pts, side * up)
+        first = stub_segments(pts, side * up, boxes[0])
     if stub_b:
-        last = len(pts) - 1 - stub_segments(pts[::-1], side * up)
+        last = len(pts) - 1 - stub_segments(pts[::-1], side * up, boxes[1])
     worst = None
-    for (_, ya), (_, yb) in zip(pts[first:last], pts[first + 1 : last + 1]):
-        near = nearest_band(bands, (ya + yb) / 2)
-        drawn = min(side * page_depth(y, near, half, up) for y in (ya, yb))  # its point nearer the mid-plane
-        if drawn < bound - band_eps(near, half):
-            worst = bound - drawn if worst is None else max(worst, bound - drawn)
+    for seg in zip(pts[first:last], pts[first + 1 : last + 1]):
+        for p, q in _pieces(*seg, lanes) if lanes else [seg]:
+            if lanes and in_lane(p, q, lanes):
+                continue
+            ya, yb = p[1], q[1]
+            near = nearest_band(bands, (ya + yb) / 2)
+            drawn = min(side * page_depth(y, near, half, up) for y in (ya, yb))  # its point nearer the mid-plane
+            if drawn < bound - band_eps(near, half):
+                worst = bound - drawn if worst is None else max(worst, bound - drawn)
     return worst
 
 

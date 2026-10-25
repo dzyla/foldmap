@@ -1358,27 +1358,6 @@ def test_a_loop_no_route_finds_falls_back_outside_the_slab():
     assert min(y for _, y in ab.points) >= _BAND[1]
 
 
-def test_a_loop_between_two_stacked_band_ports_a_hair_apart_jogs_at_the_first():
-    """Plan 27 Task 5 (5LDW L:241-246>L:255-262, M:259-267>M:271-278): two helices of the slab stacked in one column,
-    their ports facing, 0.0004 apart across the page; the loop's residues lie 1-8 Å in, so it may come no nearer the
-    outer face than 1 Å in, but the upper helix's N end is drawn 4 Å out. One straight run joins them; snapped to the
-    first port's axis (route._snap_to_port) the jog lands at the second, 4 Å out, off its stub. Snapped to the second's
-    ("end", route._polyline), the jog is at the first port and the run into the second is its stub (A18 clean)."""
-    from foldmap.membrane import loop_excess
-
-    depths = np.zeros(40)
-    depths[0:10] = np.linspace(-10.0, -3.0, 10)
-    depths[10:20] = np.linspace(-1.0, -8.0, 10)
-    depths[20:30] = np.linspace(4.0, 10.0, 10)
-    y = lambda d: 3.45 + d * 0.23  # noqa: E731
-    a = _helix("A", 0, 0.0, (y(-10) + y(-3)) / 2, y(-3) - y(-10), np.pi / 2)  # C port at (0, y(-3)), pointing up
-    b = _helix("A", 20, 0.0004, (y(4) + y(10)) / 2, y(10) - y(4), np.pi / 2)  # N port at (0.0004, y(4)), down
-    lay, sses, bb = _membrane_view([a, b], [], depths)
-    (ab,) = route_loops(lay, sses, bb)
-    assert not ab.fallback
-    assert loop_excess(ab.points, -1, 1.0, [_BAND], 15.0, 1, True, True) is None, ab.points
-
-
 def test_a_loop_into_a_port_just_clear_of_its_wall_turns_between_them():
     """Plan 27 Task 5 (6VBG A:103-119>A:121-135): a helix of the slab whose N end is drawn 0.3 Å past the loop's bound
     (its residues 10-20 Å out), pointing into the wall, the gap 0.07 page units, less than a route's clearance out of a
@@ -1400,15 +1379,15 @@ def test_a_loop_into_a_port_just_clear_of_its_wall_turns_between_them():
 
 
 def test_a_loop_whose_own_port_lies_past_its_bound_climbs_beside_its_element():
-    """Plan 27 Task 5 (5LDW H:74-84>H:102-110, 6JO6 A:262-265>A:269-272: proposed ruling P36). A transmembrane helix
-    stretched across the band ends at the inner face, pointing down, its loop's residues 2-15 Å out: no route
-    reaches the port but from past the loop's bound, so A18 flags it whatever the router does. The wall opens a lane
-    beside the element (route._LANE) from its port to the bound: the loop climbs there, routed (no fallback), and comes
-    no nearer the mid-plane than its own port's first step (A18's finding: the port's own 17 Å and that step)."""
-    from foldmap.membrane import loop_excess
+    """Plan 27 Task 5 (5LDW H:74-84>H:102-110, 6JO6 A:262-265>A:269-272: ruling P36a). A transmembrane helix
+    stretched across the band ends at the inner face, pointing down, its C-terminal CA 1 Å out and its loop's residues
+    2-15 Å out: no route reaches the port but from past the loop's bound. The wall opens the lane beside the element
+    (membrane.loop_lanes, route._LANE) from its port to the bound: the loop climbs there, routed (no fallback), and A18
+    excuses it there (the same lanes); without them it would read the port's own 17 Å and the first step."""
+    from foldmap.membrane import loop_excess, loop_lanes
 
     depths = np.zeros(40)
-    depths[0:10] = np.linspace(15.0, -1.0, 10)
+    depths[0:10] = [15.0, 12.0, 9.0, 6.0, 3.0, 0.0, -3.0, -2.0, 0.5, 1.0]  # crosses; its last CA 1 Å out
     depths[10:20] = np.linspace(2.0, 15.0, 10)
     depths[20:30] = 25.0
     a = _helix("A", 0, 0.0, 3.45, 6.9, -np.pi / 2)  # C port at (0, 0), drawn pointing down
@@ -1417,5 +1396,25 @@ def test_a_loop_whose_own_port_lies_past_its_bound_climbs_beside_its_element():
     (ab,) = route_loops(lay, sses, bb)
     assert not ab.fallback
     found = loop_excess(ab.points, 1, 2.0, [_BAND], 15.0, 1, True, False)
+    ends = ((a.c_port, a.rect), (b.n_port, b.rect))
+    lanes = loop_lanes(a.sse, b.sse, bb.ca[:, 2], lay.bilayer, ends, {a.sse.id}, [_BAND], 1)
+    assert loop_excess(ab.points, 1, 2.0, [_BAND], 15.0, 1, True, False, lanes=lanes, boxes=(a.rect, b.rect)) is None
     assert 17.0 < found <= 17.0 + (route._PUSH[0] + route.RES / 2) * 30 / 6.9, found
     assert all(x <= a.rect[2] + route._LANE for (x, y), _ in zip(ab.points, ab.points[1:]) if y < 3.45 + 2.0 * 0.23)
+
+
+def test_a_crossing_lane_opens_the_slab_never_the_loops_depth_wall():
+    """Rulings P34, P36b (6DQN A:2490-2498>A:2504-2536 with domains, fix round 1): a two-face loop whose bound lies
+    2 Å past the mid-plane may cross the band only in the lane beside its own element; that lane lifts the crossing
+    rule, not the depth wall: deeper than the bound it stays closed but in the loop's own lanes (_Wall.lanes, A18's)."""
+    from foldmap.route import _Wall
+
+    grid = _Grid(Layout({}, (-10.0, -5.0, 10.0, 12.0)), [])
+    lane = ((-1.0, _BAND[0], 1.0, _BAND[1]), (-0.5, -3.0, 0.5, -1.0))
+    wall = _Wall(1, -2.0, [_BAND], 15.0, 1, False, False, True, (-8.0, 8.0), crossing=[lane])
+    m = wall.mask(grid)
+    i = grid.cell((0.0, 0.0))[0]
+    deep, shallow = grid.cell((0.0, 3.45 - 3.0 * 0.23))[1], grid.cell((0.0, 3.45 + 3.0 * 0.23))[1]
+    far = grid.cell((5.0, 0.0))[0]
+    assert m[i, deep] and not m[i, shallow]  # the lane: open above the bound, closed below it
+    assert m[far, shallow]  # beside no lane, the slab is closed to it

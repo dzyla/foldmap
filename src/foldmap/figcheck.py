@@ -21,7 +21,17 @@ from matplotlib.path import Path as MPath
 from matplotlib.transforms import Affine2D, Bbox
 
 from .layout import block_ghosts, crosses_band, joined_pieces, lying_over
-from .membrane import BAND_EPS, band_set, crosses, loop_excess, loop_side_bound, own_bound, slab_helix, slab_range
+from .membrane import (
+    BAND_EPS,
+    band_set,
+    crosses,
+    loop_excess,
+    loop_lanes,
+    loop_side_bound,
+    own_bound,
+    slab_helix,
+    slab_range,
+)
 from .membrane import band_eps as _eps
 from .membrane import nearest_band as _nearest_band
 from .membrane import page_depth as _drawn_depth
@@ -1857,7 +1867,9 @@ def membrane_view(layout, sses, bb, mem, loops=None) -> dict:
         "strand_in_band": strands,
         "outside_in_band": nearer,
         "wrong_side": wrong,
-        "loop_in_band": None if loops is None else loops_in_band(loops, sses, depth, band, bands, mem, up),
+        "loop_in_band": None
+        if loops is None
+        else loops_in_band(loops, sses, depth, band, bands, mem, up, layout.placed),
     }
 
 
@@ -1866,14 +1878,16 @@ def _angstrom(x: float) -> str:
     return "<0.1" if x < 0.05 else f"{x:.1f}"
 
 
-def loops_in_band(loops, sses, depth, band: set[str], bands, mem, up: int) -> list[str]:
-    """A18's loop_in_band (membrane_view; ruling P14): each loop (a>b) with a segment drawn nearer the mid-plane, on its
-    own side, than its bound (membrane.loop_side_bound, from its residues, or the two ends' CA atoms for a loop with no
-    residue between its elements: its nearest residue, or its face when all lie beyond it), how much nearer, in Å
+def loops_in_band(loops, sses, depth, band: set[str], bands, mem, up: int, placed=None) -> list[str]:
+    """A18's loop_in_band (membrane_view; rulings P14, P36): each loop (a>b) with a segment drawn nearer the mid-plane,
+    on its own side, than its bound (membrane.loop_side_bound, from its residues, and its two end residues when they lie
+    on opposite sides: its nearest residue, or its face when all lie beyond it), how much nearer, in Å
     (membrane.loop_excess, the measure the router's wall keeps to). Out of the port of an element of the band (`band`)
-    the loop may run straight to its face along the page's normal, and cross the face line there; nowhere else. A loop
-    out of a TM helix whose first residues lie just inside the face is drawn no deeper than they are. `up`: +1 when
-    page-up is the outside."""
+    the loop may run straight to its face along the page's normal, and cross the face line there, never through its own
+    element's box. From an end the layout draws
+    past its bound (`placed`: the drawn elements) it may climb the lane beside that element to the bound
+    (membrane.loop_lanes, in_lane; ruling P36a: a band element's end, or either end of a two-face loop, P36b), when its
+    residues lie in the bilayer; nowhere else. `up`: +1 when page-up is the outside."""
     by_id = {s.id: s for s in sses}
     out = []
     for lp in loops:
@@ -1881,7 +1895,14 @@ def loops_in_band(loops, sses, depth, band: set[str], bands, mem, up: int) -> li
         if a is None or b is None:
             continue
         side, bound = loop_side_bound(a, b, depth, mem)
-        worst = loop_excess(lp.points, side, bound, bands, mem.half, up, lp.a_id in band, lp.b_id in band)
+        pa, pb = (placed or {}).get(lp.a_id), (placed or {}).get(lp.b_id)
+        boxes, lanes = (None, None), []
+        if pa is not None and pb is not None:
+            boxes = (pa.rect, pb.rect)
+            ends = ((pa.c_port, pa.rect), (pb.n_port, pb.rect))
+            lanes = loop_lanes(a, b, depth, mem, ends, band, bands, up)
+        stubs = (lp.a_id in band, lp.b_id in band)
+        worst = loop_excess(lp.points, side, bound, bands, mem.half, up, *stubs, lanes=lanes, boxes=boxes)
         if worst is not None:
             out.append(f"{lp.a_id}>{lp.b_id} {_angstrom(worst)}")
     return out

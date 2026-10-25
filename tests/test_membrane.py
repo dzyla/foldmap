@@ -718,16 +718,15 @@ def test_a_route_turning_out_of_a_port_at_or_in_the_slab_turns_at_the_port(entry
     assert sideways_in_slab(loops, lay.membrane["bands"], lay.placed) == []
 
 
-# plan 27 rule P7: A18 made strict before the layout is. Task 5 walls the slab for every loop (route._Wall): what is
-# left in these three is a loop whose own port the layout draws nearer the mid-plane than the loop's bound, pointing
-# away from its side (a transmembrane helix stretched to the far face, a helix of the slab ending deeper than its loop):
-# no route reaches it but past its bound (task-5-report, proposed ruling P36)
+# plan 27 rule P7: A18 made strict before the layout is. Task 5 walls the slab (route._Wall, rulings P33-P36); 6JLN's
+# d:58-61>d:67-69 is left: the layout draws its helix's N end 1.2 Å deeper than the loop's nearest residue, and its
+# residues (12.9-23.8 Å out, median 18.9) do not lie in the bilayer, so no lane excuses it (P36a; task-5-report)
 PENDING = pytest.mark.xfail(  # only a failed assertion is the expected failure, never a crash (review-2 M4)
-    strict=True, raises=AssertionError, reason="plan 27 T5: a loop's own port drawn past its bound (P36 proposed)"
+    strict=True, raises=AssertionError, reason="plan 27 T5: 6JLN d:58-61>d:67-69, a port past a loop not in the bilayer"
 )
 
 
-@pytest.mark.parametrize("entry", [pytest.param(e, marks=PENDING) for e in ("5LDW", "6JO6", "6JLN")])
+@pytest.mark.parametrize("entry", ["5LDW", "6JO6", pytest.param("6JLN", marks=PENDING)])
 def test_a18_holds_loops_beyond_a_face_out_of_the_slab(entry):
     """Plan 27 Task 2 (A18 strict, rulings P4, P14): random-100 C2b-5's membrane views (5LDW, 6JO6, 6JLN), no loop drawn
     nearer the mid-plane than its residues (its face, when all lie beyond it) but on its band element's port stub
@@ -1194,6 +1193,68 @@ def test_a18_flags_a_loop_drawn_nearer_the_mid_plane_than_its_residues_but_on_it
     view, *_ = _a18(runs, bad)
     assert view["loop_in_band"] == ["tm1>s1 1.5", "tm1>s1 6.0", "s1>s2 0.9", "s2>s3 10.0"], view
     assert _a18(runs)[0]["loop_in_band"] is None
+
+
+_DIPPING_TM = np.array([15.0, 10.0, 5.0, 0.0, -3.0, -1.0, 1.0])  # crosses, its C-terminal CA 1 Å out
+
+
+def test_a18_excuses_a_loop_climbing_beside_its_own_band_element_never_through_it():
+    """Ruling P36a (5LDW H:74-84>H:102-110: a transmembrane helix drawn across the band, design 2, its C end at the
+    inner face, its loop's residues 2-14 Å out, in the bilayer). The loop cannot leave that port but from past its
+    bound (2 Å out); it may climb the lane beside its own helix (membrane.loop_lanes: its box ± LANE, from the port to
+    the bound) and A18 excuses that. A line through the helix's own box is never excused, not as a lane and not as its
+    stub (straight up its port's column towards its side): the loophole the router never used, now flagged."""
+    runs = {
+        "tm": ("H", _DIPPING_TM, UPRIGHT, (10.0, 0.0)),  # N at the outer face, C port at (0, 0) pointing down
+        "l": (None, np.linspace(2.0, 14.0, 6), None, (0, 0)),
+        "s": ("E", np.full(3, 20.0), UPRIGHT, ((3.0, 11.0), (3.0, 12.0))),
+    }
+    climb = [(0.0, 0.0), (0.0, -0.3), (0.8, -0.3), (0.8, 6.0), (3.0, 6.0), (3.0, 11.0)]  # beside it, to 6 (3 Å out)
+    through = [(0.0, 0.0), (0.0, 6.0), (3.0, 6.0), (3.0, 11.0)]  # up its own column, through its body
+    wide = [(0.0, 0.0), (0.0, -0.3), (1.5, -0.3), (1.5, 6.0), (3.0, 6.0), (3.0, 11.0)]  # 1.0 clear: off the lane
+    view, *_ = _a18(runs, [("tm", "s", climb)])
+    assert view["loop_in_band"] == [], view
+    for pts, want in ((through, 17.0), (wide, 17.9)):
+        view, *_ = _a18(runs, [("tm", "s", pts)])
+        assert view["loop_in_band"] == [f"tm>s {want:.1f}"], (pts, view)
+
+
+def test_a18_excuses_no_lane_to_a_loop_whose_residues_lie_beyond_the_bilayer():
+    """Ruling P36a: only a loop whose residues lie in the bilayer (membrane.in_bilayer: their median in the slab, the
+    rule an element is of the bilayer by, P10) climbs a lane: 6JLN d:58-61>d:67-69, residues 12.9-23.8 Å out (median
+    18.9), into a helix of the slab whose N end the layout draws at 11.7 Å, stays a finding."""
+    runs = {
+        "s": ("E", np.full(3, 20.0), UPRIGHT, ((3.0, 12.0), (3.0, 11.0))),
+        "l": (None, np.array([23.8, 20.9, 18.9, 15.2, 12.9]), None, (0, 0)),
+        "h": ("H", np.linspace(11.7, 14.0, 4), UPRIGHT, (_y(11.7), _y(14.0))),  # N port at (0, 8.9), pointing down
+    }
+    climb = [(3.0, 11.0), (3.0, 9.6), (0.8, 9.6), (0.8, 8.6), (0.0, 8.6), (0.0, _y(11.7))]
+    view, *_ = _a18(runs, [("s", "h", climb)])
+    assert [f.split()[0] for f in view["loop_in_band"]] == ["s>h"], view
+
+
+def test_a_loop_whose_ends_lie_on_opposite_sides_is_a_two_face_loop():
+    """Ruling P36b (5LDW g:51-68>g:88-103, 6DQN A:2490-2498>A:2504-2536): the loop's bound takes in its two end
+    residues when they lie on opposite sides of the mid-plane (membrane.two_face), and either of its ends drawn past
+    that bound, band element or not, has a lane (loop_lanes); a loop whose ends lie on one side keeps the bound of its
+    own residues, and an end outside the band has no lane."""
+    from foldmap.membrane import Membrane, loop_lanes, loop_residues, loop_side_bound, two_face
+    from helpers import fake_sse
+
+    mem = Membrane(np.array([0.0, 0.0, 1.0]), 0.0, 15.0, "estimate")
+    depth = np.zeros(40)
+    a, b = fake_sse("H", 0, 9), fake_sse("H", 20, 29)
+    depth[9], depth[10:20], depth[20] = -2.5, np.linspace(-1.3, 22.7, 10), 25.0  # g:68, the loop, g:88
+    assert two_face(a, b, depth) and loop_residues(a, b, depth) == list(range(9, 21))
+    assert loop_side_bound(a, b, depth, mem) == (1, -2.5)
+    band = (0.0, 6.9)  # the outside up, 0.23 page units per Å
+    ends = (((0.0, -3.0), (-0.5, -5.0, 0.5, -3.0)), ((4.0, 12.0), (4.0, 11.5, 6.0, 12.5)))  # a drawn 28 Å in
+    (lane,) = loop_lanes(a, b, depth, mem, ends, set(), [band], 1)
+    assert lane[1] == ends[0][1] and lane[0][1] < -3.0 and lane[0][3] == pytest.approx(3.45 - 2.5 * 0.23)
+    depth[9] = 1.0  # its ends on one side: its own residues' bound, and no lane outside the band
+    assert not two_face(a, b, depth) and loop_residues(a, b, depth) == list(range(10, 20))
+    assert loop_side_bound(a, b, depth, mem) == (1, -1.3)
+    assert loop_lanes(a, b, depth, mem, ends, set(), [band], 1) == []
 
 
 def test_a18_judges_its_parts_each_by_name_and_none_unmeasured_as_a_pass():
