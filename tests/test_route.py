@@ -11,7 +11,7 @@ from foldmap.frame import view_frame
 from foldmap.layout import ETA_W, HELIX_W, PITCH, Layout, Placed, build_layout, label_boxes
 from foldmap.route import _INFLATE, _MAX_CELLS, _Grid, route_loops
 from foldmap.spec import draw_spec, figure_spec
-from helpers import fake_sse, pipeline, r100_entry
+from helpers import fake_sse, pipeline, r100_entry, sideways_in_slab
 
 DATA = Path(__file__).parent / "data"
 
@@ -573,8 +573,6 @@ def test_a_loop_between_ports_below_the_band_stays_out_of_the_slab():
     sheet below costing more than the run along the slab. Two ports below the band and a long element between them
     whose head is 0.6 inside it: ports on one side of every band are joined with the slab closed first, so the loop
     goes the long way under the element and nothing runs in the slab."""
-    from foldmap.figcheck import slab_runs
-
     a = bar(0, 0.0, 1.0, 4.0, np.pi / 2)  # C port at (0, 3), below the band, pointing up
     b = bar(10, 10.0, 1.0, 4.0, -np.pi / 2)  # N port at (10, 3)
     wall = bar(40, 5.0, -27.2, 65.6, np.pi / 2)  # from y = -60 up to 5.6, 0.6 inside the band's lower face
@@ -584,7 +582,7 @@ def test_a_loop_between_ports_below_the_band_stays_out_of_the_slab():
     loops = route_loops(lay, [a.sse, b.sse, wall.sse], stub_bb())
     (ab,) = [lp for lp in loops if (lp.a_id, lp.b_id) == (a.sse.id, b.sse.id)]
     assert not ab.fallback
-    assert slab_runs([ab], [band], lay.placed) == []
+    assert sideways_in_slab([ab], [band], lay.placed) == []
     assert max(y for _, y in ab.points) < band[0]
 
 
@@ -620,8 +618,6 @@ def test_a_route_out_of_a_port_whose_first_step_lands_in_the_slab_turns_at_the_p
     past its clearance (fifth-of-a-cell steps from _INFLATE), and a port just outside a face has its first turn
     drawn at its clearance when that is clear: no loop runs in the slab, none falls back. A port whose first step
     leaves the slab, or that leaves sideways, starts as before."""
-    from foldmap.figcheck import slab_runs
-
     for k in range(10):
         lay, sses, band = _slab_case(case, k * 0.025)
         grid = _Grid(lay, [])
@@ -631,7 +627,7 @@ def test_a_route_out_of_a_port_whose_first_step_lands_in_the_slab_turns_at_the_p
         assert _INFLATE < start <= _INFLATE + grid.res + 1e-9, (k, start)  # the first free row past the clearance
         loops = route_loops(lay, sses, stub_bb())
         assert not any(lp.fallback for lp in loops), k
-        assert slab_runs(loops, [band], lay.placed) == [], (k, [lp.points for lp in loops])
+        assert sideways_in_slab(loops, [band], lay.placed) == [], (k, [lp.points for lp in loops])
     if case == "inband":
         return
     c = bar(40, 0.0, 9.0, 2.0, np.pi / 2)  # a port above the band, its first step out of it: as before

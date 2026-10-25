@@ -566,31 +566,6 @@ def test_every_transmembrane_helix_crosses_the_band_in_the_membrane_view():
         assert y0 < (lo + hi) / 2 < y1 and (y0 <= lo or y1 >= hi), s.id
 
 
-def test_a_loop_runs_in_the_slab_only_beside_its_own_port():
-    """A18's loops in the slab (figcheck.slab_runs; C26 port rule, membrane slab ruling): with a band from 0 to 10, a
-    loop leaving a port inside it may run sideways on its first two segments (the stub out of the port and the turn
-    after it), and on its first run as far as that stays over its own element's body (8W9Y: back above the
-    interfacial helix it leaves, round α8's end). A run past the element, or any later run, is in the slab."""
-    from types import SimpleNamespace
-
-    from foldmap.figcheck import slab_runs
-    from foldmap.route import Loop
-
-    helix = SimpleNamespace(rect=(-6.0, 3.5, 0.0, 4.5))  # lying in the slab, its C end (the port) at x = 0
-    placed = {"h": helix, "o": SimpleNamespace(rect=(9.0, -5.0, 10.0, 5.0))}
-    band = [(0.0, 10.0)]
-
-    def loop(*pts):
-        return Loop("h", "o", list(pts), False, False)
-
-    turn = loop((0, 4), (0, 6), (3, 6), (3, 12), (9.5, 12), (9.5, 5))  # up, then sideways on its 2nd segment
-    back = loop((0, 4), (0.3, 4), (0.3, 6), (-2, 6), (-2, 12), (9.5, 12), (9.5, 5))  # 3rd segment, over the helix
-    past = loop((0, 4), (0.3, 4), (0.3, 6), (-7, 6), (-7, 12), (9.5, 12), (9.5, 5))  # 3rd segment, past the helix
-    later = loop((0, 4), (0, 6), (2, 6), (2, 7), (5, 7), (5, 12), (9.5, 12), (9.5, 5))  # a 2nd run in the slab
-    assert slab_runs([turn, back], band, placed) == []
-    assert slab_runs([past], band, placed) == ["h>o"] and slab_runs([later], band, placed) == ["h>o"]
-
-
 def test_a_membrane_view_is_laid_out_once_at_its_projected_heights(monkeypatch):
     """A guard against C17's two-layout path coming back (review-2 M2; the behaviour, every TM helix across the band at
     the faces as projected, is test_every_transmembrane_helix_crosses_the_band_in_the_membrane_view's): a projected
@@ -624,17 +599,37 @@ def test_a_route_turning_out_of_a_port_at_or_in_the_slab_turns_at_the_port(entry
     first step lands in the slab now starts nearer (route._Grid._into_slab): 5LDW keeps the second layout, every TM
     helix across the band, and neither view has a loop in the slab. 6JLN: c:81-83's N port, inside the band, leaves
     sideways; starting it nearer moved its route's turn beside the element, 0.75 along mid-slab, so a port leaving
-    sideways starts as before."""
+    sideways starts as before. Plan 27 Task 2: the router is held here to its own measure (helpers.sideways_in_slab,
+    A18's loop test before it was made strict); test_a18_holds_loops_beyond_a_face_out_of_the_slab holds it to A18."""
+    from foldmap.figcheck import membrane_view
+    from foldmap.route import route_loops
+    from helpers import r100_entry, sideways_in_slab
+
+    path = r100_entry(entry)
+    lay, sses, bb = make_layout(path, membrane="auto")
+    loops = route_loops(lay, sses, bb)
+    view = membrane_view(lay, sses, bb, find_membrane(path, bb), loops)
+    # ruling R6: 5LDW M:392-402, an 11-residue helix half the band long, is drawn a hair longer and crosses
+    assert view["tm_helices"] >= 14 and view["tm_short"] == [], view
+    assert sideways_in_slab(loops, lay.membrane["bands"], lay.placed) == []
+
+
+# plan 27 rule P7: A18 made strict before the layout is (Tasks 4 and 5 take these marks off)
+PENDING = pytest.mark.xfail(strict=True, reason="plan 27 T4/T5: layout not yet by construction")
+
+
+@pytest.mark.parametrize("entry", [pytest.param("5LDW", marks=PENDING), pytest.param("6JO6", marks=PENDING), "6JLN"])
+def test_a18_holds_loops_beyond_a_face_out_of_the_slab(entry):
+    """Plan 27 Task 2 (A18 strict, ruling P4): random-100 C2b-5's membrane views (5LDW, 6JO6, 6JLN), no loop whose
+    residues all lie beyond a face drawn in the slab but on its band element's port stub (loop_in_band)."""
     from foldmap.figcheck import membrane_view
     from foldmap.route import route_loops
     from helpers import r100_entry
 
     path = r100_entry(entry)
     lay, sses, bb = make_layout(path, membrane="auto")
-    view = membrane_view(lay, sses, bb, find_membrane(path, bb), route_loops(lay, sses, bb))
-    # ruling R6: 5LDW M:392-402, an 11-residue helix half the band long, is drawn a hair longer and crosses
-    assert view["tm_helices"] >= 14 and view["tm_short"] == [], view
-    assert view["loops_in_slab"] == [], view
+    view = membrane_view(lay, sses, bb, lay.bilayer, route_loops(lay, sses, bb))
+    assert view["loop_in_band"] == [], view["loop_in_band"]
 
 
 def test_a_users_move_never_pushes_a_transmembrane_helix_off_its_height():
@@ -837,7 +832,7 @@ def test_comec_transmembrane_helices_count_as_crossing_and_stand_in_the_band(cha
     on, num = np.array([l.chain == "A" for l in bb.labels]), np.array([l.seq for l in bb.labels])
     counted = [membrane.crosses(d[on & (num >= lo) & (num <= hi)], m.half) for lo, hi in COMEC_TMS]
     assert sum(counted) == 10 and not counted[6], counted
-    assert view["tm_helices"] == 10 * len(drawn) and view["tm_short"] == [] and view["loops_in_slab"] == [], view
+    assert view["tm_helices"] == 10 * len(drawn) and view["tm_short"] == [], view  # A18 strict: test_a18_on_comec
 
 
 # ------------------------------------------------------- plan 26 fix round 1: the band test and _to_face, in CI
@@ -909,37 +904,159 @@ def test_upright_helices_stand_up_the_page_whatever_their_tilt():
     assert abs(np.sin(across.angle)) < 1e-9 and abs(np.sin(up.angle)) == pytest.approx(1.0)
 
 
-# --------------------------------------------- plan 26 fix round 2: soluble elements in the slab, loops stop at gaps
-def test_a18_flags_a_soluble_element_drawn_in_the_slab_not_an_interfacial_or_crossing_one():
-    """Ruling R4: A18's sub-check "soluble element drawn in the slab" (figcheck.membrane_view soluble_in_slab). On a
-    30 Å slab drawn as the band 0..10: an element whose CA centre lies 10 Å beyond the outer face, drawn with its centre
-    in the band, is flagged; the same element drawn above the band is not, nor is one lying 3 Å beyond the face
-    (interfacial: within SOLUBLE_BEYOND), nor a helix crossing the membrane (drawn across the band)."""
+# ------------------------------------------------ plan 27 Task 2: A18 strict, every body and loop segment, no tolerance
+UPRIGHT, FLAT = (0.0, 0.0, 1.0), (1.0, 0.0, 0.0)
+
+
+def _y(depth: float) -> float:
+    """Page y of a depth (Å) on _a18's page: the 30 Å slab is the band 0..10, the outside up, 3 Å a page unit."""
+    return 5.0 + depth / 3.0
+
+
+def _a18(runs, loops=None, defining=None):
+    """figcheck.membrane_view on a 30 Å slab (normal z, mid-plane at 0) drawn as the band 0..10, the outside up (_y).
+    runs: id -> (kind, CA depths, axis, (drawn page y of the N port, of the C port)), in sequence; each element drawn
+    upright at x = 0, 1 wide; kind None: residues no element holds (a loop's). loops: (a, b, points)."""
     from types import SimpleNamespace
 
-    from foldmap.figcheck import SOLUBLE_BEYOND, membrane_view
+    from foldmap.figcheck import membrane_view
     from foldmap.membrane import Membrane
+    from foldmap.route import Loop
 
-    mem = Membrane(np.array([0.0, 0.0, 1.0]), 0.0, 15.0, "estimate")
-    runs = {  # id: (CA depths, kind, drawn centre y)
-        "far": (np.full(6, 25.0), "H", 5.0),
-        "far-above": (np.full(6, 25.0), "E", 14.0),
-        "face": (np.full(6, 18.0), "H", 5.0),
-        "across": (np.arange(-21.0, 21.1, 1.5), "H", 5.0),
-    }
+    mem = Membrane(np.array([0.0, 0.0, 1.0]), 0.0, 15.0, "estimate", defining=defining)
     ca, sses, placed = [], [], {}
-    for name, (z, kind, cy) in runs.items():
-        sses.append(SimpleNamespace(id=name, kind=kind, start=len(ca), end=len(ca) + len(z) - 1))
+    for name, (kind, z, axis, (y0, y1)) in runs.items():
+        if kind is not None:
+            s = SimpleNamespace(id=name, kind=kind, axis=np.array(axis), start=len(ca), end=len(ca) + len(z) - 1)
+            sses.append(s)
+            rect = (-0.5, min(y0, y1), 0.5, max(y0, y1))
+            placed[name] = SimpleNamespace(sse=s, rect=rect, n_port=(0.0, y0), c_port=(0.0, y1), cy=(y0 + y1) / 2)
         ca += [(0.0, 0.0, float(v)) for v in z]
-        placed[name] = SimpleNamespace(cy=cy, n_port=(0.0, cy - 6.0), c_port=(0.0, cy + 6.0))
-    lay = SimpleNamespace(membrane={"y": (0.0, 10.0), "bands": [(0.0, 10.0)]}, placed=placed)
-    bb = SimpleNamespace(ca=np.array(ca))
-    view = membrane_view(lay, sses, bb, mem)
-    assert 18.0 - mem.half < SOLUBLE_BEYOND < 25.0 - mem.half
-    assert view["soluble_in_slab"] == ["far +25"]
+    band = (0.0, 10.0)
+    lay = SimpleNamespace(membrane={"y": band, "bands": [band], "inside": "below"}, placed=placed, ghosts=[])
+    drawn = None if loops is None else [Loop(a, b, list(pts), False, False) for a, b, pts in loops]
+    return membrane_view(lay, sses, SimpleNamespace(ca=np.array(ca)), mem, drawn), sses, mem, np.array(ca)[:, 2]
+
+
+TM = ("H", np.linspace(-18.0, 18.0, 25), UPRIGHT, (_y(-18.0), _y(18.0)))
+
+
+def test_the_band_holds_crossing_helices_a_crossing_barrels_strands_and_helices_flat_in_the_slab():
+    """Plan 27 rulings P4, P5 (membrane.in_band, the one rule A18 and the layout take the band by): the band holds a
+    helix crossing the membrane, a helix or 3-10 helix lying flat with its CA median in the slab, and a strand of a
+    crossing barrel (Membrane.defining; a strand crossing the membrane where no barrel defines it). Not a helix standing
+    in the slab short of crossing, nor one lying flat beyond the face, nor any other strand: an interfacial one, or one
+    crossing the slab in a barrel's lumen (9FWZ's FimA: of no barrel defining the membrane)."""
+    from foldmap.membrane import band_set, in_band, own_side
+
+    runs = {
+        "tm": TM,
+        "flat-in": ("H", np.array([9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 16.0]), FLAT, (0, 0)),  # median 12
+        "eta-in": ("G", np.full(3, -8.0), FLAT, (0, 0)),
+        "flat-out": ("H", np.array([13.0, 14.0, 15.5, 16.0, 17.0]), FLAT, (0, 0)),  # median 15.5: beyond the face
+        "standing": ("H", np.linspace(2.0, 12.0, 8), UPRIGHT, (0, 0)),
+        "crossing-strand": ("E", np.linspace(-14.0, 14.0, 9), UPRIGHT, (0, 0)),
+        "interfacial": ("E", np.linspace(10.4, 17.0, 3), UPRIGHT, (0, 0)),
+    }
+    _, sses, mem, depth = _a18(runs)
+    assert band_set(sses, depth, mem) == {"tm", "flat-in", "eta-in", "crossing-strand"}
+    by = {s.id: s for s in sses}
+    barrel = frozenset(range(by["interfacial"].start, by["interfacial"].end + 1))  # a barrel of that one strand
+    _, sses, mem, depth = _a18(runs, defining=barrel)
+    assert band_set(sses, depth, mem) == {"tm", "flat-in", "eta-in", "interfacial"}  # a crossing strand in its lumen
+    assert not in_band(by["crossing-strand"], depth, mem)
+    assert own_side(np.array([-1.0, 1.0])) == 1 and own_side(np.array([-2.0, 1.0])) == -1
+
+
+def test_a18_flags_every_element_of_no_band_whose_drawn_body_overlaps_it():
+    """Rulings P3, P4 (band_member, strand_in_band): an element not of the band whose drawn body (its whole rect)
+    overlaps the band, by any amount past float snapping, is flagged, how far in from its own face: the interfacial
+    hairpin strand drawn at its depth (32KS B:402-404, 10.4 to 17.0 Å), a soluble helix dipping 1 Å in. Among them the
+    β-strands are flagged again. Not one drawn from the face out, nor a crossing helix or a helix flat in the slab drawn
+    in it."""
+    runs = {
+        "tm": TM,
+        "hairpin": ("E", np.linspace(10.4, 17.0, 3), UPRIGHT, (_y(10.5), _y(17.1))),
+        "on-face": ("E", np.linspace(10.4, 17.0, 3), UPRIGHT, (10.0, 12.2)),
+        "hair": ("E", np.linspace(16.0, 20.0, 3), UPRIGHT, (10.0 - 1e-3, 11.0)),  # 0.003 Å in: no tolerance
+        "snapped": ("E", np.linspace(16.0, 20.0, 3), UPRIGHT, (10.0 - 1e-7, 11.0)),  # float snapping: on the face
+        "dips": ("H", np.linspace(16.0, 24.0, 6), UPRIGHT, (_y(14.0), _y(22.0))),
+        "flat-in": ("H", np.full(6, 11.0), FLAT, (_y(11.0), _y(11.0))),
+    }
+    view, *_ = _a18(runs)
+    assert view["band_member"] == ["hairpin 4.5", "hair 0.0", "dips 1.0"], view
+    assert view["strand_in_band"] == ["hairpin 4.5", "hair 0.0"], view
     assert view["tm_helices"] == 1 and view["tm_short"] == []
 
 
+def test_a18_flags_an_element_drawn_nearer_the_mid_plane_than_its_nearest_residue_or_on_the_wrong_side():
+    """Rulings P4 (outside_in_band, wrong_side): an element not of the band is drawn no nearer the mid-plane, on its own
+    side, than its nearest CA atom (Å nearer), and its drawn centre lies on its own side (membrane.own_side; Å past the
+    mid-plane), outside the band too: a soluble helix 25-30 Å out drawn from 20 Å; one 31-34 Å in drawn 50-55 Å out
+    (6ZKT α4, drawn below the band, the other way: both); a short strand straddling the mid-plane (-6 to +8 Å, its own
+    side the outside) drawn from -5 to +1 Å, no nearer than its residues but its centre inside. Not one drawn from its
+    nearest residue out, nor further out, nor one inside drawn inside."""
+    runs = {
+        "near": ("H", np.linspace(25.0, 30.0, 4), UPRIGHT, (_y(20.0), _y(27.0))),
+        "at-bound": ("H", np.linspace(25.0, 30.0, 4), UPRIGHT, (_y(25.0), _y(32.0))),
+        "far-out": ("H", np.linspace(25.0, 30.0, 4), UPRIGHT, (_y(40.0), _y(47.0))),
+        "flipped": ("H", np.linspace(-34.0, -31.0, 4), UPRIGHT, (_y(50.0), _y(55.0))),
+        "inner": ("H", np.linspace(-34.0, -31.0, 4), UPRIGHT, (_y(-40.0), _y(-35.0))),
+        "straddle": ("E", np.linspace(-6.0, 8.0, 3), UPRIGHT, (_y(-5.0), _y(1.0))),
+    }
+    view, *_ = _a18(runs)
+    assert view["outside_in_band"] == ["near 5.0", "flipped 86.0"], view
+    assert view["wrong_side"] == ["flipped 52.5", "straddle 2.0"], view
+    assert view["band_member"] == ["straddle 20.0"] and view["strand_in_band"] == ["straddle 20.0"], view
+
+
+def test_a18_flags_a_loop_beyond_a_face_with_any_segment_in_the_slab_but_its_ports_stub():
+    """Ruling P4 (loop_in_band): a loop whose residues all lie beyond one face enters the slab nowhere (how far in from
+    that face): not between two elements outside the band (32KS A:436-461>A:467-469, dipping 3-5 Å in), and out of a
+    band element's port only straight along the normal to that face, crossing the face line at the port (a TM helix
+    ending short of the face): a turn inside the slab, or a first step away from the face, is in it. A loop of residues
+    in the slab is not judged by this; loops not given, the part is not measured (None)."""
+    out = np.full(4, 20.0)
+    runs = {
+        "tm1": ("H", np.linspace(-18.0, 13.5, 22), UPRIGHT, (_y(-18.0), 9.0)),  # its C port 1.5 Å inside the face
+        "l1": (None, out, None, (0, 0)),
+        "s1": ("E", np.full(3, 19.0), UPRIGHT, (11.0, 12.0)),
+        "l2": (None, out, None, (0, 0)),
+        "s2": ("E", np.full(3, 19.0), UPRIGHT, (12.0, 11.0)),
+        "l3": (None, np.array([20.0, 10.0, 20.0]), None, (0, 0)),  # dips into the slab: its own
+        "s3": ("E", np.full(3, 19.0), UPRIGHT, (11.0, 12.0)),
+    }
+    up = [(0.0, 9.0), (0.0, 10.6), (3.0, 10.6), (3.0, 11.0)]  # the stub to the face, on along it
+    turn = [(0.0, 9.0), (0.0, 9.5), (2.0, 9.5), (2.0, 10.6), (3.0, 10.6), (3.0, 11.0)]  # turns in the slab
+    away = [(0.0, 9.0), (0.0, 8.0), (0.0, 10.6), (3.0, 10.6), (3.0, 11.0)]  # first down, then up its stub
+    dip = [(0.0, 12.0), (0.0, 9.7), (4.0, 9.7), (4.0, 12.0)]  # between two outside the band
+    over = [(0.0, 12.0), (0.0, 10.0), (4.0, 10.0), (4.0, 12.0)]  # along the face line: not in the slab
+    own = [(0.0, 11.0), (0.0, 5.0), (4.0, 5.0), (4.0, 11.0)]
+    loops = [("tm1", "s1", up), ("s1", "s2", over), ("s2", "s3", own)]
+    view, *_ = _a18(runs, loops)
+    assert view["loop_in_band"] == [], view
+    bad = [("tm1", "s1", turn), ("tm1", "s1", away), ("s1", "s2", dip)]
+    view, *_ = _a18(runs, bad)
+    assert view["loop_in_band"] == ["tm1>s1 1.5", "tm1>s1 6.0", "s1>s2 0.9"], view
+    assert _a18(runs)[0]["loop_in_band"] is None
+
+
+def test_a18_judges_its_parts_each_by_name_and_none_unmeasured_as_a_pass():
+    """Plan 27 Task 2: A18's detail names each part's findings (criteria.MEMBRANE_WORDS) and fails on any; a part a
+    result does not hold (measured before plan 27) is not measured, never a pass."""
+    from foldmap import criteria
+
+    clean = {"band": True, "tm_helices": 7, "tm_short": [], **{k: [] for k in criteria.MEMBRANE_PARTS}}
+    judged = criteria.figure_criteria({"membrane": {"result": {"membrane": clean}}})["A18"]
+    assert judged["pass"] is True
+    for part in criteria.MEMBRANE_PARTS:
+        one = criteria.figure_criteria({"membrane": {"result": {"membrane": {**clean, part: ["A:1-9 2.5"]}}}})["A18"]
+        assert one["pass"] is False and one["detail"] == f"{criteria.MEMBRANE_WORDS[part]} A:1-9 2.5 Å", part
+        old = {k: v for k, v in clean.items() if k != part}
+        assert criteria.figure_criteria({"membrane": {"result": {"membrane": old}}})["A18"]["pass"] is False
+
+
+# ---------------------------------------------------------------- plan 26 fix round 2: loops stop at gaps
 def test_the_positive_inside_loops_stop_at_a_gap_in_the_numbering():
     """Review M6 (plan 26): membrane._loops walked 20 residues by backbone index, so past an unmodelled stretch it
     reached into whatever was modelled next. A helix across the membrane, three residues after it numbered on, then a
@@ -1373,7 +1490,7 @@ def test_comec_auto_domains_in_the_membrane_view_are_the_papers_three():
     last = {name: max(lay.placed[k].sse.last.seq for k in ids) for name, ids in lay.domains}
     assert (first, last) == ({"D1": 5, "D2": 87, "D3": 535}, {"D1": 526, "D2": 195, "D3": 795})
     m = criteria.membrane_checks(d, KS32)
-    assert m["band"] and not m["tm_short"] and not m["loops_in_slab"] and not m["soluble_in_slab"], m
+    assert m["band"] and not m["tm_short"], m  # and the rest of A18, strict: test_a18_on_comec
     lo, hi = lay.membrane["y"]
     assert domain_panel(lay, "D1")[1] <= lo and domain_panel(lay, "D1")[3] >= hi
     assert domain_panel(lay, "D2")[1] >= hi and domain_panel(lay, "D3")[1] >= hi
@@ -1698,36 +1815,6 @@ def test_a_tm_helix_drawn_between_the_faces_goes_to_the_face_its_run_comes_neare
     assert _nearer_faces(tm, bb, mem, {"TM1"}, (-3.45, 3.45)) == {"TM1": 1}
 
 
-def test_a18_flags_an_element_beyond_a_face_drawn_into_the_slab():
-    """Ruling T5-5 (32KS chain B's NS3, B:241-249, 15.2 to 24.4 Å out, drawn from the outer face 12 Å down into the
-    band; its centre within SOLUBLE_BEYOND, R4 let it pass): figcheck.membrane_view's outside_in_slab flags an element
-    whose CA run lies wholly beyond a face drawn more than SLAB_ENTRY into the slab; not one drawn on the face, nor
-    one drawn wholly beyond the other face, nor one whose run reaches into the slab."""
-    from types import SimpleNamespace
-
-    from foldmap.figcheck import SLAB_ENTRY, membrane_view
-    from foldmap.membrane import Membrane
-
-    mem = Membrane(np.array([0.0, 0.0, 1.0]), 0.0, 15.0, "estimate")
-    per = 10.0 / 30.0  # band 0..10 page units for the 30 Å slab
-    runs = {  # id: (CA depths, drawn ends in Å from the mid-plane)
-        "ns3": (np.linspace(15.2, 24.4, 9), (3.0, 15.0)),
-        "on-face": (np.linspace(15.2, 24.4, 9), (15.0, 15.0)),
-        "shallow": (np.linspace(15.2, 24.4, 9), (15.0 - SLAB_ENTRY + 0.5, 25.0)),
-        "far-side": (np.linspace(-34.0, -31.0, 4), (50.0, 55.0)),
-        "dips-in": (np.linspace(12.0, 24.0, 9), (3.0, 15.0)),
-    }
-    ca, sses, placed = [], [], {}
-    for name, (z, (lo, hi)) in runs.items():
-        sses.append(SimpleNamespace(id=name, kind="H", start=len(ca), end=len(ca) + len(z) - 1))
-        ca += [(0.0, 0.0, float(v)) for v in z]
-        y0, y1 = 5.0 + lo * per, 5.0 + hi * per
-        placed[name] = SimpleNamespace(cy=(y0 + y1) / 2, n_port=(0.0, y0), c_port=(0.0, y1))
-    lay = SimpleNamespace(membrane={"y": (0.0, 10.0), "bands": [(0.0, 10.0)], "inside": "below"}, placed=placed)
-    view = membrane_view(lay, sses, SimpleNamespace(ca=np.array(ca)), mem)
-    assert view["outside_in_slab"] == ["ns3 12"] and view["soluble_in_slab"] == []
-
-
 def test_an_element_wholly_beyond_a_face_is_kept_off_the_band():
     """Ruling T5-5's layout (6ZKT's M:50-51, 18-19 Å out, drawn 10 Å into the slab): cli._membrane_places puts an
     element standing wholly beyond a face, its centre within SOLUBLE_BEYOND, among the soluble ones kept off the band
@@ -1838,7 +1925,30 @@ def test_comec_reads_as_its_figure_1c():
     r = dimer.placed["A:349-371"].rect
     assert r[1] < sum(dimer.membrane["y"]) / 2 < r[3]
     view = membrane_view(dimer, dsses, dbb, dimer.bilayer, route_loops(dimer, dsses, dbb))
-    assert view["outside_in_slab"] == [] and view["soluble_in_slab"] == [] and view["tm_short"] == []
+    assert view["tm_short"] == []  # and nothing beyond a face in the slab, A18 strict: test_a18_on_comec
+
+
+@pytest.mark.skipif(not KS32.is_file(), reason="32KS is not in the download cache")
+@pytest.mark.parametrize(
+    "options",
+    [
+        pytest.param({}, marks=PENDING, id="dimer"),
+        pytest.param({"chains": ["A"]}, marks=PENDING, id="A"),
+        pytest.param({"chains": ["A"], "domains": "auto", "style": ["color_by=domain"]}, marks=PENDING, id="A-domains"),
+    ],
+)
+def test_a18_on_comec(options):
+    """Plan 27 Task 2 (A18 strict, rulings P3-P6) on 32KS, ComEC, the figure the author judged the membrane view by
+    (Fig. 1C): in the dimer, chain A alone and chain A with its domains, every part of A18 passes
+    (criteria.membrane_checks on the drawn figure): only the band's elements in the band, no β-strand there (the OB
+    barrels' G/H hairpins), none nearer than its residues or on the wrong side, no loop beyond a face in the slab."""
+    from foldmap import criteria
+    from foldmap.spec import draw_spec, figure_spec
+
+    d = draw_spec(figure_spec(KS32, membrane="auto", **options))
+    m = criteria.membrane_checks(d, KS32)
+    assert m["band"] and not m["tm_short"], m
+    assert {k: m[k] for k in criteria.MEMBRANE_PARTS if m[k]} == {}
 
 
 def test_a_two_fold_dimer_about_the_normal_keeps_its_frame():

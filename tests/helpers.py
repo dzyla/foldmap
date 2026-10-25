@@ -68,3 +68,42 @@ def tripeptide(src, tmp_path):
     out = tmp_path / "tri.pdb"
     out.write_text("\n".join(keep) + "\nEND\n")
     return out
+
+
+def sideways_in_slab(loops, bands, placed, margin: float = 0.3) -> list[str]:
+    """The router's own measure of a loop run along the membrane slab (A18's loop test until plan 27 made A18 strict,
+    figcheck.loops_in_band): the loops (a>b) that run sideways (more than 0.5) inside a band, more than `margin` from
+    its faces, but beside an in-band port (its first two segments, and its first run as far as it stays over its own
+    element's body grown by the router's clearance). The router's tests (C2b-5, 7JI3) hold it to this; A18 holds
+    every loop to more."""
+    from foldmap.route import _INFLATE
+
+    def inside(y, m):
+        return any(lo + m < y < hi - m for lo, hi in bands)
+
+    def within(port, step, element) -> bool:  # does a run of `step` from the port stay over its element's body?
+        if element is None:
+            return False
+        x0, _, x1, _ = element.rect
+        reach = (x1 + _INFLATE - port[0]) if step > 0 else (port[0] - (x0 - _INFLATE))
+        return abs(step) <= max(reach, 0.0) + 1e-9
+
+    out = []
+    for lp in loops:
+        pts, n = lp.points, len(lp.points)
+        segs = list(zip(pts, pts[1:]))
+        runs = [k for k, ((xa, ya), (xb, yb)) in enumerate(segs) if abs(ya - yb) < 1e-9 and abs(xa - xb) > 0.5]
+        start_in, end_in = inside(pts[0][1], 0.0), inside(pts[-1][1], 0.0)
+        for k in runs:
+            (xa, ya), (xb, _) = segs[k]
+            if not inside(ya, margin):
+                continue
+            if (start_in and k <= 1) or (end_in and k >= n - 3):  # beside its own port (C26)
+                continue
+            if start_in and k == runs[0] and within(pts[0], xb - xa, placed.get(lp.a_id)):
+                continue
+            if end_in and k == runs[-1] and within(pts[-1], xa - xb, placed.get(lp.b_id)):
+                continue
+            out.append(f"{lp.a_id}>{lp.b_id}")
+            break
+    return out

@@ -330,6 +330,42 @@ def lies_flat_here(axis: np.ndarray, depth: np.ndarray, m: Membrane) -> bool:
     return lies_flat(axis, m.normal, FACE_FLAT_TILT if at_face(depth, m.half) else FLAT_TILT)
 
 
+# Plan 27 (the author, 2026-10-24, on 32KS: "betasheets are in the membrane that is highly unlikely and wrong ... first
+# the transmembrane should be determined and all set at the same hight and rest orietn around it"). The band set is
+# decided first, by one rule (ruling P5): A18 judges a membrane view by it (figcheck.membrane_view) and the layout
+# lays the band out by it. Nothing else is drawn overlapping the band.
+HELIX_KINDS = ("H", "G")  # the helices a band holds: alpha (and pi) helices, and 3-10 helices
+
+
+def in_band(s: SSE, depth: np.ndarray, m: Membrane) -> bool:
+    """Is element `s` (its CA atoms at depth[s.start : s.end + 1]: `depth` is every residue's, m.depth(bb.ca)) one of
+    the band's (plan 27 ruling P4): a helix crossing the membrane (crosses); a strand of a membrane-crossing barrel
+    (its residues among Membrane.defining's; where no barrel defines the membrane, a strand crossing it, as only a
+    barrel's can, its partners' hydrogen bonds held in the bilayer); or a helix lying in the slab, its CA median inside
+    the slab and lying flat (lies_flat_here)? No other β-strand is ever of the band."""
+    seg = np.asarray(depth)[s.start : s.end + 1]
+    if s.kind == "E":
+        if m.defining is not None:
+            return not m.defining.isdisjoint(range(s.start, s.end + 1))
+        return crosses(seg, m.half)
+    if s.kind not in HELIX_KINDS:
+        return False
+    if crosses(seg, m.half):
+        return True
+    return abs(float(np.median(seg))) < m.half and lies_flat_here(s.axis, seg, m)
+
+
+def band_set(sses: list[SSE], depth: np.ndarray, m: Membrane) -> set[str]:
+    """The ids of the elements of the band (in_band), every residue's depth given (m.depth(bb.ca))."""
+    return {s.id for s in sses if in_band(s, depth, m)}
+
+
+def own_side(depth: np.ndarray) -> int:
+    """The side of the membrane an element whose CA atoms lie at these depths is on: +1 outside, -1 inside, by its CA
+    centre (outside when on the mid-plane, as cli._membrane_places reads it). Its own, never its domain's."""
+    return 1 if float(np.mean(depth)) >= 0.0 else -1
+
+
 # Ruling T5-1: in a membrane view two helix runs of one chain at most JOIN_GAP non-helix residues apart are joined
 # only when both lie flat or the joined helix crosses the membrane. Joined as those words allow, 199 pairs of the
 # membrane campaign's 21 views would have been: hairpins (32KS's NS1 and NS2, A:200-219 and A:222-233, their axes

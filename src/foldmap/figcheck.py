@@ -21,7 +21,7 @@ from matplotlib.path import Path as MPath
 from matplotlib.transforms import Affine2D, Bbox
 
 from .layout import block_ghosts, crosses_band, joined_pieces, lying_over
-from .membrane import SOLUBLE_BEYOND, crosses
+from .membrane import band_set, crosses, own_side
 from .na_curve import _FAR, on_curves
 
 # Lines a text can be crossed by (render's gids, matched by prefix). A loop's casing (loopcase:) and a stub's edge
@@ -1769,110 +1769,157 @@ def accessories_named(layout) -> list[str]:
 
 
 # ------------------------------------------------------------------------------------------- membrane (A18)
-SLAB_MARGIN = 0.3  # page units: a loop's sideways run this far inside a band's faces is in the slab
-# Å: an element wholly beyond a face drawn reaching further than this into the slab is in it (ruling T5-5): R4's own
-# interfacial reach. At 3 Å it would flag two β-strands kept level with their hairpin partners in the slab, 6JO6's
-# B:114-116 and 30BU's A:467-469 (15.1-18.1 Å out, 3.1 and 3.2 Å in): a 3-residue strand drawn upright at its length
-# reaches past the 1.8-2.3 Å its run spans along the normal.
-SLAB_ENTRY = SOLUBLE_BEYOND
-_RUN_MIN = 0.5  # page units: a shorter sideways step is no run along the slab
+# Plan 27 Task 2 (rulings P3, P4, P6): A18 judges each element's drawn body (Placed.rect, its full drawn extent, a
+# helix's and an arrow's ends included) and every segment of every loop against the band drawn, with no tolerance but
+# float snapping (BAND_EPS). What it let pass before is gone: the centre-only test (ruling R4: a soluble element was in
+# the slab only when its drawn centre was), the 5 Å an element beyond a face could reach in (T5-5) and the loops'
+# runs excused beside their ports (C26, the membrane slab ruling). The band's elements are membrane.band_set's, the
+# one rule the layout lays the band out by.
+BAND_EPS = 1e-6  # page units: float snapping, and no more
 
 
 def membrane_view(layout, sses, bb, mem, loops=None) -> dict:
-    """A18 on a membrane view (layout.membrane, the membrane `mem` it was drawn for): tm_helices, the helices that
-    cross the membrane (membrane.crosses: the CA run crosses its mid-plane and spans half its thickness); tm_short,
-    those that do not cross their band (crosses_band), with the share of the band they cover; loops_in_slab,
-    slab_runs of `loops` (None: not measured); soluble_in_slab, the elements (any kind, crossing none) whose CA centre
-    lies more than SOLUBLE_BEYOND beyond a face but whose drawn centre lies inside a band, each with that depth
-    (ruling R4: a soluble element drawn in the slab; interfacial ones, within SOLUBLE_BEYOND of a face, are not);
-    outside_in_slab, the elements whose CA run lies wholly beyond a face drawn reaching more than SLAB_ENTRY into
-    the slab (_into_slab), each with how far in Å (ruling T5-5: 32KS chain B's NS3, B:241-249, 15.2 to 24.4 Å out,
-    drawn from the outer face 12 Å down into the band, which R4's centre test let pass)."""
+    """A18 on a membrane view (layout.membrane, the membrane `mem` it was drawn for):
+    - tm_helices, the helices that cross the membrane (membrane.crosses: the CA run crosses its mid-plane and spans
+      half its thickness); tm_short, those that do not cross their band (crosses_band), with the share of the band
+      they cover;
+    - band_member, the elements not of the band (membrane.in_band: crossing helices, a crossing barrel's strands,
+      helices lying flat in the slab) whose drawn body overlaps a band;
+    - strand_in_band, those of them that are β-strands (no strand off a crossing barrel is in the membrane);
+    - outside_in_band, the elements not of the band drawn nearer the mid-plane, on their own side, than their own
+      nearest CA atom (Å nearer);
+    - wrong_side, the elements not of the band whose drawn centre lies on the side opposite their own
+      (membrane.own_side; Å past the mid-plane);
+    - loop_in_band, the loops whose residues all lie beyond one face (the two ends' CA atoms for a loop with none)
+      with a segment inside a band, but for the stub straight out of a band element's port to that face, the one
+      place such a loop may cross the face line (None: `loops` not given).
+    Each entry is "<id> <Å>"; band_member, strand_in_band and loop_in_band say how far in from the element's (the
+    loop's) own face. A barrel's ghost strand is judged as its strand, "<id> ghost <Å>"."""
     bands = layout.membrane.get("bands") or [layout.membrane["y"]]
+    up = 1 if layout.membrane.get("inside", "below") == "below" else -1  # page-up is the outside's direction
+    half = mem.half
     depth = mem.depth(bb.ca)
-    short, tm, soluble, entered = [], 0, [], []
+    band = band_set(sses, depth, mem)
+    ghosts: dict[str, list] = {}
+    for g in getattr(layout, "ghosts", []):
+        ghosts.setdefault(g.sse.id, []).append(g)
+    short, tm = [], 0
+    member, strands, nearer, wrong = [], [], [], []
     for s in sses:
         p = layout.placed.get(s.id)
         if p is None:
             continue
         seg = depth[s.start : s.end + 1]
-        if not crosses(seg, mem.half):
-            centre = float(seg.mean())
-            if abs(centre) > mem.half + SOLUBLE_BEYOND and any(lo < p.cy < hi for lo, hi in bands):
-                soluble.append(f"{s.id} {centre:+.0f}")
-            if float(seg.min()) >= mem.half or float(seg.max()) <= -mem.half:  # wholly beyond a face
-                into = _into_slab(sorted((p.n_port[1], p.c_port[1])), bands, mem.half)
-                if into > SLAB_ENTRY:
-                    entered.append(f"{s.id} {into:.0f}")
+        if s.kind == "H" and crosses(seg, half):
+            tm += 1
+            lo, hi = sorted((p.n_port[1], p.c_port[1]))
+            y0, y1 = min(bands, key=lambda b: abs((b[0] + b[1]) / 2 - (lo + hi) / 2))
+            if not crosses_band((lo, hi), (y0, y1)):
+                short.append(f"{s.id} {(min(hi, y1) - max(lo, y0)) / max(y1 - y0, 1e-9):.2f}")
+        if s.id in band:
             continue
-        if s.kind != "H":
-            continue
-        tm += 1
-        lo, hi = sorted((p.n_port[1], p.c_port[1]))
-        y0, y1 = min(bands, key=lambda b: abs((b[0] + b[1]) / 2 - (lo + hi) / 2))
-        if not crosses_band((lo, hi), (y0, y1)):
-            short.append(f"{s.id} {(min(hi, y1) - max(lo, y0)) / max(y1 - y0, 1e-9):.2f}")
-    slab = None if loops is None else slab_runs(loops, bands, layout.placed)
+        side, closest = own_side(seg), float((own_side(seg) * seg).min())
+        for q, name in [(p, s.id), *((g, f"{s.id} ghost") for g in ghosts.get(s.id, []))]:
+            _, y0, _, y1 = q.rect
+            into = _band_reach(y0, y1, bands, half, up, side)
+            if into is not None:
+                member.append(f"{name} {into:.1f}")
+                if s.kind == "E":
+                    strands.append(f"{name} {into:.1f}")
+            b = _nearest_band(bands, (y0 + y1) / 2)
+            eps = _eps(b, half)
+            edge = min(side * _drawn_depth(y, b, half, up) for y in (y0, y1))  # its edge nearer the mid-plane
+            if edge < closest - eps:
+                nearer.append(f"{name} {closest - edge:.1f}")
+            centre = side * _drawn_depth((y0 + y1) / 2, b, half, up)
+            if centre < -eps:
+                wrong.append(f"{name} {-centre:.1f}")
     return {
         "tm_helices": tm,
         "tm_short": short,
-        "loops_in_slab": slab,
-        "soluble_in_slab": soluble,
-        "outside_in_slab": entered,
+        "band_member": member,
+        "strand_in_band": strands,
+        "outside_in_band": nearer,
+        "wrong_side": wrong,
+        "loop_in_band": None if loops is None else loops_in_band(loops, sses, depth, band, bands, half, up),
     }
 
 
-def _into_slab(ends: list[float], bands, half: float) -> float:
-    """How far (Å) an element drawn from page y ends[0] to ends[1] (its ports) reaches into the slab: the deepest
-    point of it inside the band it lies nearest, measured from that band's nearer face (the band's height is the
-    slab's 2 * `half`); 0 when it lies wholly outside every band."""
-    lo, hi = ends
-    y0, y1 = min(bands, key=lambda b: abs((b[0] + b[1]) / 2 - (lo + hi) / 2))
-    a, b = max(lo, y0), min(hi, y1)
-    if a > b or y1 <= y0:
-        return 0.0
-    mid = (y0 + y1) / 2
-    deepest = (mid - y0) if a <= mid <= b else max(min(a - y0, y1 - a), min(b - y0, y1 - b))
-    return deepest * 2 * half / (y1 - y0)
-
-
-def slab_runs(loops, bands, placed, margin: float = SLAB_MARGIN) -> list[str]:
-    """The loops (a>b) that run sideways (more than _RUN_MIN) inside a band, more than `margin` from its faces (A18).
-    Excused, at either end of a loop whose port lies inside the band: its first two segments (the C26 port rule: the
-    stub out of the port and the turn after it), and its first run out of that port up to the length that clears
-    the port's own element (its box grown by the router's clearance: 8W9Y's loop leaving an interfacial helix's end
-    runs back above that helix to pass α8's end; membrane slab ruling); every other run in the slab counts."""
-    from .route import _INFLATE
-
-    def inside(y, m):
-        return any(lo + m < y < hi - m for lo, hi in bands)
-
-    def within(port, step, element) -> bool:  # does a run of `step` from the port stay over its element's body?
-        if element is None:
-            return False
-        x0, _, x1, _ = element.rect
-        reach = (x1 + _INFLATE - port[0]) if step > 0 else (port[0] - (x0 - _INFLATE))
-        return abs(step) <= max(reach, 0.0) + 1e-9
-
+def loops_in_band(loops, sses, depth, band: set[str], bands, half: float, up: int) -> list[str]:
+    """A18's loop_in_band (membrane_view): each loop (a>b) whose residues all lie beyond one face (the two ends' CA
+    atoms, for a loop with no residue between its elements) with any segment inside a band, how far in from that
+    face, in Å. Out of the port of an element of the band (`band`), the loop may run straight to its face, along the
+    page's normal, and cross the face line there (_stub); nowhere else. `up`: +1 when page-up is the outside."""
+    by_id = {s.id: s for s in sses}
     out = []
     for lp in loops:
-        pts, n = lp.points, len(lp.points)
-        segs = list(zip(pts, pts[1:]))
-        runs = [k for k, ((xa, ya), (xb, yb)) in enumerate(segs) if abs(ya - yb) < 1e-9 and abs(xa - xb) > _RUN_MIN]
-        start_in, end_in = inside(pts[0][1], 0.0), inside(pts[-1][1], 0.0)
-        for k in runs:
-            (xa, ya), (xb, _) = segs[k]
-            if not inside(ya, margin):
-                continue
-            if (start_in and k <= 1) or (end_in and k >= n - 3):  # beside its own port (C26)
-                continue
-            if start_in and k == runs[0] and within(pts[0], xb - xa, placed.get(lp.a_id)):
-                continue
-            if end_in and k == runs[-1] and within(pts[-1], xa - xb, placed.get(lp.b_id)):
-                continue
-            out.append(f"{lp.a_id}>{lp.b_id}")
-            break
+        a, b = by_id.get(lp.a_id), by_id.get(lp.b_id)
+        if a is None or b is None:
+            continue
+        held = depth[list(range(a.end + 1, b.start)) or [a.end, b.start]]
+        if (held >= half).all():
+            side = 1
+        elif (held <= -half).all():
+            side = -1
+        else:  # residues in the slab, or on both sides: crossing it is theirs
+            continue
+        pts = [(float(x), float(y)) for x, y in lp.points]
+        first, last = 0, len(pts) - 1  # the segments judged: first .. last - 1
+        if lp.a_id in band:
+            first = _stub(pts, side * up)
+        if lp.b_id in band:
+            last = len(pts) - 1 - _stub(pts[::-1], side * up)
+        reach = [
+            _band_reach(min(pts[k][1], pts[k + 1][1]), max(pts[k][1], pts[k + 1][1]), bands, half, up, side)
+            for k in range(first, last)
+        ]
+        reach = [r for r in reach if r is not None]
+        if reach:
+            out.append(f"{lp.a_id}>{lp.b_id} {max(reach):.1f}")
     return out
+
+
+def _stub(pts, toward: int) -> int:
+    """How many segments of the polyline `pts` run on from its first point straight along the page's y, at its x,
+    towards page side `toward` (+1 up): the stub out of a port to its face."""
+    x = pts[0][0]
+    n = 0
+    for (xa, ya), (xb, yb) in zip(pts, pts[1:]):
+        if abs(xa - x) > BAND_EPS or abs(xb - x) > BAND_EPS or (yb - ya) * toward < -BAND_EPS:
+            break
+        n += 1
+    return n
+
+
+def _band_reach(y0: float, y1: float, bands, half: float, up: int, side: int) -> float | None:
+    """How far (Å) a body or segment drawn from page y0 to y1 (y0 <= y1) reaches into the bands it overlaps, from the
+    face on its own `side` (+1 outside), past the other face counted no further; None when it overlaps none (touching
+    a face, within BAND_EPS, is not overlapping)."""
+    out = None
+    for b0, b1 in bands:
+        if not (y1 > b0 + BAND_EPS and y0 < b1 - BAND_EPS):
+            continue
+        deepest = min(side * _drawn_depth(y, (b0, b1), half, up) for y in (max(y0, b0), min(y1, b1)))
+        into = half - max(deepest, -half)
+        out = into if out is None else max(out, into)
+    return out
+
+
+def _nearest_band(bands, y: float):
+    """The band whose middle lies nearest page y."""
+    return min(bands, key=lambda b: abs((b[0] + b[1]) / 2 - y))
+
+
+def _drawn_depth(y: float, band, half: float, up: int) -> float:
+    """The depth (Å from the mid-plane, positive outside) page y stands for, by the band's own scale: its height is the
+    slab's 2 * `half`."""
+    b0, b1 = band
+    return up * (y - (b0 + b1) / 2) * 2 * half / max(b1 - b0, 1e-9)
+
+
+def _eps(band, half: float) -> float:
+    """BAND_EPS in Å, by the band's scale."""
+    return BAND_EPS * 2 * half / max(band[1] - band[0], 1e-9)
 
 
 # ------------------------------------------------------------------------------------------- all of them

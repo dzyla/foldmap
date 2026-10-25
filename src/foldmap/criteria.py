@@ -73,7 +73,8 @@ CRITERIA = {
     "A15": "copies drawn alike",
     "A16": "domains: one chain, alike, not tiny, panels apart, names clear",
     "A17": "nucleic-acid metrics and stem names by their letters",
-    "A18": "membrane: TM helices in the band, loops and soluble elements out of the slab, none drawn in from beyond",
+    "A18": "membrane: TM helices across the band, nothing else in it, none nearer than its residues or on the wrong "
+    "side, loops beyond a face out of the slab",
     "A19": "two states: same names in the same order",
     "A20": "ligand tethers local",
 }
@@ -119,23 +120,33 @@ def tether_lengths(drawn, look) -> list[tuple[str, float, str, str]]:
     return out
 
 
+MEMBRANE_PARTS = ("band_member", "strand_in_band", "outside_in_band", "wrong_side", "loop_in_band")  # A18's, in order
+# how A18's detail words each part's finding (figure_criteria)
+MEMBRANE_WORDS = {
+    "band_member": "not of the band, drawn in it",
+    "strand_in_band": "β-strand off a crossing barrel in the band",
+    "outside_in_band": "drawn nearer the mid-plane than its nearest residue",
+    "wrong_side": "drawn on the side opposite its own",
+    "loop_in_band": "loop beyond a face drawn in the slab",
+}
+
+
 def membrane_checks(drawn, path) -> dict:
-    """A18 on a --membrane auto figure (figcheck.membrane_view, the same test the membrane view lays itself out by):
-    each TM helix (its CA run crosses the membrane's mid-plane and spans half its thickness, membrane.crosses) enters
-    its band through a face and reaches past its middle (C27 ruling); loops run sideways inside a band
-    (figcheck.SLAB_MARGIN from its faces) only on the first segment out of their own port inside it, up to clearing
-    its element (membrane slab ruling); no soluble element is drawn in the slab (ruling R4), and no element whose CA
-    run lies wholly beyond a face is drawn more than figcheck.SLAB_ENTRY into it (outside_in_slab, ruling T5-5). The
-    membrane is the one
-    the figure was drawn with (Layout.bilayer: found on every protein chain, whatever --chains draws); a figure with
-    no band is judged as such, never by a membrane found again on the chains it draws."""
+    """A18 on a --membrane auto figure (figcheck.membrane_view; plan 27 Task 2, rulings P3-P6): each TM helix (its CA
+    run crosses the membrane's mid-plane and spans half its thickness, membrane.crosses) enters its band through a face
+    and reaches past its middle (C27 ruling); and, every drawn body and loop segment judged against the band with no
+    tolerance: only the band's elements (membrane.band_set) overlap it (band_member), no β-strand off a crossing barrel
+    among them (strand_in_band); every other element is drawn no nearer the mid-plane than its nearest residue
+    (outside_in_band) and on its own side (wrong_side); a loop whose residues all lie beyond a face enters the slab only
+    straight out of a band element's port (loop_in_band). The membrane is the one the figure was drawn with
+    (Layout.bilayer: found on every protein chain, whatever --chains draws); a figure with no band is judged as such,
+    never by a membrane found again on the chains it draws."""
     from . import figcheck
 
     lay, bb = drawn.layout, drawn.bb
     mem = getattr(lay, "bilayer", None)
     if lay.membrane is None or mem is None:
-        none = {"tm_helices": 0, "tm_short": [], "loops_in_slab": [], "soluble_in_slab": [], "outside_in_slab": []}
-        return {"band": False, **none}
+        return {"band": False, "tm_helices": 0, "tm_short": [], **{k: [] for k in MEMBRANE_PARTS}}
     return {"band": True, **figcheck.membrane_view(lay, drawn.sses, bb, mem, drawn.loops)}
 
 
@@ -432,9 +443,9 @@ def figure_criteria(views: dict[str, dict]) -> dict:
             out["A18"] = _ok(False, "not measured")
         else:
             bad = ([] if m["band"] else ["no band drawn"]) + [f"TM helix {x}" for x in m["tm_short"]]
-            bad += [f"loop in the slab {x}" for x in m["loops_in_slab"]]
-            bad += [f"soluble element in the slab {x}" for x in m.get("soluble_in_slab", [])]
-            bad += [f"element beyond a face drawn into the slab {x} Å" for x in m.get("outside_in_slab", [])]
+            for part in MEMBRANE_PARTS:  # a part not measured (an older result) is not measured, never a pass
+                found = m.get(part)
+                bad += [f"{part} not measured"] if found is None else [f"{MEMBRANE_WORDS[part]} {x} Å" for x in found]
             out["A18"] = _ok(not bad, "; ".join(bad))
     if "default" in views and d:
         # only a tether to another chain is bounded (ruling); a long one to the home chain is reported
