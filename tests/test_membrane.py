@@ -2447,12 +2447,46 @@ def test_an_interfacial_hairpin_is_lifted_out_whole():
     assert apart(p) == pytest.approx(apart(plain))
 
 
+def test_a_sheet_of_both_sides_is_held_on_its_majority_side_and_a18_flags_the_rest():
+    """Ruling P25 (review-4 M2, re-review-4): a sheet whose strands lie on both sides is never split across the face;
+    it is held whole on the side most of its strands are (layout._limits). Its minority strand is then drawn on the
+    wrong side, and A18 says so (wrong_side): the layout never hides it. Two strands 14-15 Å out, one 12 Å in."""
+    from types import SimpleNamespace
+
+    from foldmap.figcheck import membrane_view
+    from foldmap.layout import SCALE, build_layout
+    from foldmap.membrane import Membrane
+    from foldmap.model import Sheet
+    from helpers import fake_sse
+
+    band = (-15.0 * SCALE, 15.0 * SCALE)
+    depth = np.zeros(60)
+    tm = fake_sse("H", 0, 25, centroid=(-20, 0, 0.0), axis=(0, 0, 1))
+    s1 = fake_sse("E", 30, 36, centroid=(0, 0, 14.0), axis=(0, 0, 1))
+    s2 = fake_sse("E", 39, 45, centroid=(4.8, 0, 15.0), axis=(0, 0, -1))
+    s3 = fake_sse("E", 48, 54, centroid=(9.6, 0, -12.0), axis=(0, 0, 1))
+    depth[0:26] = np.linspace(-18.0, 18.0, 26)
+    for s, z in ((s1, 14.0), (s2, 15.0), (s3, -12.0)):
+        depth[s.start : s.end + 1] = z
+    sheets = [Sheet([s1, s2, s3], [1, -1, 1], ["A", "A"])]
+    bounds = {s1.id: (1, 14.0 * SCALE), s2.id: (1, 15.0 * SCALE), s3.id: (-1, -12.0 * SCALE)}
+    els = [tm, s1, s2, s3]
+    lay = build_layout(els, sheets, _page(), "projected", level={tm.id}, upright={tm.id}, band=band, bounds=bounds)
+    p = lay.placed
+    assert min(p[s.id].rect[1] for s in (s1, s2, s3)) >= band[1]  # whole, on the side of two of its three
+    lay.membrane = {"y": band, "bands": [band], "inside": "below"}
+    mem = Membrane(np.array([0.0, 0.0, 1.0]), 0.0, 15.0, "estimate")
+    bb = SimpleNamespace(ca=np.column_stack([np.zeros(60), np.zeros(60), depth]))
+    view = membrane_view(lay, els, bb, mem)
+    assert [f.split()[0] for f in view["wrong_side"]] == [s3.id], view["wrong_side"]
+
+
 def test_a_helix_of_the_slab_is_drawn_at_its_own_depth_range():
     """Ruling P23 with P13 (layout._into_slab, _face_line): a flat helix of the slab lies with its axis on its face line
     (Fig. 1C's NS1 and NS7), beside the transmembrane column it was seen across; a standing one is drawn upright over
     its own depth range, its ends within it. Laid out without attraction, the column stays at its projected x: the
     face line, not the separation, makes the flat helix's room."""
-    from foldmap.layout import build_layout
+    from foldmap.layout import MARGIN, build_layout
     from helpers import fake_sse
 
     band = (-3.45, 3.45)
@@ -2475,6 +2509,9 @@ def test_a_helix_of_the_slab_is_drawn_at_its_own_depth_range():
     f = p[flat.id]
     assert f.n_port[1] == pytest.approx(band[0], abs=1e-9) and f.c_port[1] == pytest.approx(band[0], abs=1e-9)
     assert _rects_apart(f.rect, p[tm.id].rect) and p[tm.id].cx == pytest.approx(0.0)
+    # the place _face_line's _pack_row gives it: MARGIN right of the column, the nearer gap to its projected x (0); with
+    # the call removed, _separate parts the two instead, the column moved 3.6 left (plan 27 T5, re-review-4 M4)
+    assert f.rect[0] == pytest.approx(p[tm.id].rect[2] + MARGIN, abs=1e-6)
     g = p[stand.id]
     assert all(-0.5 <= y <= 2.0 for y in (g.n_port[1], g.c_port[1])) and abs(g.n_port[1] - g.c_port[1]) > 2.0
 
