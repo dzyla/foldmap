@@ -19,6 +19,7 @@ def test_membrane_proteins_are_recognised(name):
     m = find_membrane(DATA / f"{name}.cif", load_backbone(DATA / f"{name}.cif", "asu"))
     assert m is not None and m.source == "estimate" and 13 <= m.half <= 17
     assert np.isclose(np.linalg.norm(m.normal), 1.0)
+    assert m.fit == "crossing helices' axis (1 round), converged"  # the normal refitted (ruling P17)
 
 
 @pytest.mark.parametrize("name", ["1UBQ", "2LZM", "2HHB", "8UUP", "8UTF", "6ZS5", "1TIM", "AF-P04637", "1EMA"])
@@ -107,6 +108,104 @@ def test_a_slab_is_judged_by_the_chains_that_cross_it():
     assert polar > membrane._MAX_POLAR  # every residue in the slab counted: refused
     m = membrane._estimate(bb, sses)
     assert m is not None and abs(m.centre) <= 1.0
+
+
+def _rods(rods):
+    """A backbone (CA and residue labels only) and its helices: `rods` are (chain, start xyz, direction, CA count,
+    name) runs, one CA every 1.5 Å along the direction, each residue named name(its z)."""
+    from types import SimpleNamespace
+
+    ca, labels, elements = [], [], []
+    for chain, p0, u, n, name in rods:
+        u = np.asarray(u, float) / np.linalg.norm(u)
+        start = len(ca)
+        for k in range(n):
+            p = np.asarray(p0, float) + 1.5 * k * u
+            ca.append(p)
+            labels.append(SimpleNamespace(chain=chain, name=name(p[2])))
+        h = _Element("H", start, len(ca) - 1, chain)
+        h.axis = u
+        elements.append(h)
+    return SimpleNamespace(ca=np.array(ca, float), labels=labels), elements
+
+
+def _tm(z):  # a transmembrane helix's residue at height z: oily inside the bilayer (|z| < 15 Å), Gly beyond it
+    return "LEU" if abs(z) < 15.0 else "GLY"
+
+
+def _soluble(z):  # a soluble helix's residues, half of them charged, whatever the height
+    return ("GLU", "LEU", "LYS", "ALA")[int(round(z * 7.0)) % 4]
+
+
+def _bundle(chain, n, radius=9.0):
+    """`n` transmembrane helices along z on a circle, 31 CA from z = -22.5 to +22.5, alternately up and down."""
+    out = []
+    for k in range(n):
+        x, y = radius * np.cos(2 * np.pi * k / n), radius * np.sin(2 * np.pi * k / n)
+        up = k % 2 == 0
+        out.append((chain, (x, y, -22.5 if up else 22.5), (0.0, 0.0, 1.0 if up else -1.0), 31, _tm))
+    return out
+
+
+def _tilt(normal) -> float:  # degrees from the z axis, as an axis
+    return float(np.degrees(np.arccos(min(1.0, abs(float(normal[2])) / float(np.linalg.norm(normal))))))
+
+
+def _g_protein(chain, n=5):
+    """`n` long soluble helices (40 CA) below the bilayer, tilted 60° from z: a partner's helices, as Gs's in 7VVK."""
+    u = (np.sin(np.radians(60.0)), 0.0, np.cos(np.radians(60.0)))
+    return [(chain, (-20.0 + 8.0 * k, 12.0 * (k % 2), -85.0), u, 40, _soluble) for k in range(n)]
+
+
+def test_a_soluble_helix_bundle_beside_the_membrane_does_not_tilt_its_normal():
+    """Plan 27 Task 3 (ruling P17; 7VVK and 7PIU, PTH1R-Gs and MC4R-Gs: the first normal, every long element's common
+    axis, was 32° and 29° off OPM's, the G protein's helices pulling it). Seven helices across the bilayer (along z) and
+    a bundle of long soluble helices below it, tilted 60°: the first estimate's normal leans toward the bundle; refitted
+    to the helices crossing it, the normal is theirs."""
+    from foldmap import membrane
+
+    bb, sses = _rods(_bundle("A", 7) + _g_protein("B"))
+    first = membrane._estimate(bb, sses)
+    assert first is not None and _tilt(first.normal) > 10.0  # the soluble bundle pulls the first normal over
+    m = membrane._refit(first, bb, sses)
+    assert _tilt(m.normal) < 0.5 and abs(m.centre) <= 1.0
+    assert "crossing helices" in m.fit and "converged" in m.fit
+
+
+def test_the_refit_repeats_until_the_crossing_helices_stop_changing():
+    """Ruling P17: the plane is refitted until the helices crossing it are the ones it was fitted to. A soluble helix
+    reaching up into the cavity under the bundle, tilted 40°, crosses the first (leaning) estimate, so the first refit
+    is pulled by it; it crosses the refitted plane no more, and the second refit, to the transmembrane helices alone,
+    is the bilayer's own. The result is a fixed point, and the same every time."""
+    from foldmap import membrane
+
+    reach = ("C", (24.0, 0.0, -40.0), (np.sin(np.radians(40.0)), 0.0, np.cos(np.radians(40.0))), 20, _soluble)
+    bb, sses = _rods(_bundle("A", 7) + _g_protein("B") + [reach])
+    first = membrane._estimate(bb, sses)
+    cavity = sses[-1]
+    assert cavity in membrane._crossing_helices(first, bb, sses)  # it crosses the leaning first estimate
+    m = membrane._refit(first, bb, sses)
+    assert _tilt(m.normal) < 0.5 and cavity not in membrane._crossing_helices(m, bb, sses)
+    assert "(2 rounds), converged" in m.fit or "(3 rounds), converged" in m.fit
+    again = membrane._refit(m, bb, sses)  # a fixed point: refitting the result changes nothing
+    assert np.array_equal(again.normal, m.normal) and again.centre == m.centre
+    twice = membrane._refit(membrane._estimate(bb, sses), bb, sses)
+    assert np.array_equal(twice.normal, m.normal) and twice.centre == m.centre and twice.fit == m.fit
+
+
+def test_fewer_than_three_crossing_helices_keep_the_first_estimate():
+    """Ruling P17: with fewer than MIN_CROSSING_HELICES (3) helices crossing the first estimate, its normal (every long
+    element's common axis) stands, and Membrane.fit says why: two helices across the bilayer, the soluble bundle
+    below."""
+    from foldmap import membrane
+
+    bb, sses = _rods(_bundle("A", 2) + _g_protein("B", 2))
+    first = membrane._estimate(bb, sses)
+    assert first is not None and len(membrane._crossing_helices(first, bb, sses)) == 2
+    assert _tilt(first.normal) > 1.0  # a refit to the two would move it
+    m = membrane._refit(first, bb, sses)
+    assert np.array_equal(m.normal, first.normal) and m.centre == first.centre
+    assert m.fit == "long elements' axis: 2 helices cross it, fewer than 3"
 
 
 def test_opm_dummy_atoms_give_the_exact_membrane(tmp_path):
@@ -446,17 +545,19 @@ def test_gfp_barrel_is_rejected_by_its_outward_residues():
     assert hydrophobic < _MIN_OUTWARD_HYDROPHOBIC  # measured 0.35 (outer-membrane barrels 0.76-1.00)
 
 
-HELICAL = {  # find_membrane before the beta-barrel estimate: (normal, centre, half, source, sided), or None
+HELICAL = {  # find_membrane on helical entries: (normal, centre, half, source, sided), or None; the barrel estimate
+    # leaves them alone. Pinned again at plan 27 Task 3, the normal refitted to the crossing helices: 1C3W moved
+    # 0.01°, 1BL8 0.03°
     DATA / "1C3W.cif": (
-        [0.015091081379981436, 0.11620109627440002, -0.9931110534514308],
-        -1.5448989290611692,
+        [0.015110595070360774, 0.11599719757296773, -0.9931345931301746],
+        -1.5538979930960757,
         15.0,
         "estimate",
         True,
     ),
     DATA / "1BL8.cif": (
-        [0.36292304637025796, -0.0033065376136334106, 0.9318132480397247],
-        47.81279573824658,
+        [0.36343509384616624, -0.0031080189220848323, 0.9316143369331583],
+        47.846376820458005,
         15.0,
         "estimate",
         False,

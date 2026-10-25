@@ -4,8 +4,10 @@
 sides), otherwise estimated from the structure. An outer-membrane beta-barrel (a closed barrel whose outside is
 oily) gives the normal as its axis, a 24 Å slab slid along it to its most hydrophobic outward-facing residues and
 Tyr/Trp girdles, and the sides from its loops (long outside, short turns in the periplasm). Otherwise the long
-helices and strands give the normal, a 30 Å slab is slid to the most hydrophobic, least charged position, and the
-cytoplasmic side comes from the positive-inside rule (more Lys/Arg on the loops of the elements crossing it)."""
+helices and strands give a first normal, a 30 Å slab is slid to the most hydrophobic, least charged position, the
+normal is refitted to the helices crossing that slab and the slab slid again, until those helices stop changing
+(_refit), and the cytoplasmic side comes from the positive-inside rule (more Lys/Arg on the loops of the elements
+crossing it)."""
 
 from __future__ import annotations
 
@@ -36,7 +38,9 @@ _MIN_CROSSING = 10.0  # Å an element must reach beyond the centre on both sides
 # face. Soluble domains beyond are left out (plan 26, 32KS ComEC: the periplasmic OB and β-lactamase-like domains'
 # own Lys/Arg near the face called their side the cytoplasm, 49 to 23; its loops say 4.5 to 9.5 per protomer).
 # Against OPM on the manuscript's membrane campaign (17 helical entries): 15 sided, 14 right (6QFA wrong, as
-# before), where every residue near the face sided 11, 10 right; no entry's side worse (plan 26 Task 1 report).
+# before), where every residue near the face sided 11, 10 right; no entry's side worse (plan 26 Task 1 report). With
+# the refitted normal (plan 27 Task 3): 14 sided, 13 right; 6ZKT's loops, 23 to 45 per protein, fall short of the
+# 2-to-1 ratio, and its side, still right, is no longer called.
 _FLANK, _FLANK_REACH = 20, 15.0
 
 # Outer-membrane beta-barrels. OPM gives their hydrophobic half thickness as 11.7-12.6 Å (FimD 3RFZ 11.7, OmpX
@@ -68,6 +72,9 @@ class Membrane:
     # residues (indices) of the elements that define it, a beta-barrel's strands: only those give a page row its band
     # (a subunit in the barrel's lumen spans the slab without being in the membrane); None: any element crossing it
     defining: frozenset[int] | None = None
+    # an estimate's note of where its normal came from (_refit): the crossing helices' axis and in how many rounds, or
+    # why the long elements' axis stands; "" for OPM's planes and a barrel's axis
+    fit: str = ""
 
     def depth(self, xyz: np.ndarray) -> np.ndarray:
         """Signed distance from the mid-plane, positive outside."""
@@ -125,6 +132,8 @@ def find_membrane(path, bb: Backbone) -> Membrane | None:
         if barrel is not None:
             return barrel  # sided by its loops, never by the positive-inside rule
         found = _estimate(bb, sses)
+        if found is not None:  # the normal fitted to the helices crossing it (ruling P17)
+            found = _refit(found, bb, sses)
     if found is None:
         return None
     if found.sided:  # OPM's own sides, when its dummy atoms give them
@@ -245,15 +254,26 @@ def _barrel_sides(m: Membrane, bb: Backbone, strands: list[SSE]) -> Membrane:
     return dataclasses.replace(m, sided=sided)
 
 
+def _long(sses: list[SSE]) -> list[SSE]:
+    """The long elements the estimate reads: helices of 16 residues or more, strands of 8 or more."""
+    return [s for s in sses if (s.kind == "H" and len(s) >= 16) or (s.kind == "E" and len(s) >= 8)]
+
+
 def _estimate(bb: Backbone, sses: list[SSE]) -> Membrane | None:
-    """The best-scoring HALF slab across the long elements' common axis, if it is membrane (_membrane_like). When no
-    long element spans that slab face to face (_spans), so the view would find no transmembrane element to draw
-    its band by, the best-scoring slab that one spans and that is membrane takes its place (random-100 held-out
-    6MJ2, TRPM2: the dense cytoplasmic domain pulls the summed score 4-5 Å below the S1-S4 helices)."""
-    long = [s for s in sses if (s.kind == "H" and len(s) >= 16) or (s.kind == "E" and len(s) >= 8)]
+    """The first estimate (_refit then fits the normal to the helices crossing it): the best-scoring HALF slab across
+    the long elements' common axis (_slab), if it is membrane."""
+    long = _long(sses)
     if not long:
         return None
     normal = np.linalg.eigh(sum(len(s) * np.outer(s.axis, s.axis) for s in long))[1][:, -1]
+    return _slab(bb, long, normal)
+
+
+def _slab(bb: Backbone, long: list[SSE], normal: np.ndarray) -> Membrane | None:
+    """The best-scoring HALF slab along `normal`, if it is membrane (_membrane_like). When no long element spans that
+    slab face to face (_spans), so the view would find no transmembrane element to draw its band by, the best-scoring
+    slab that one spans and that is membrane takes its place (random-100 held-out 6MJ2, TRPM2: the dense cytoplasmic
+    domain pulls the summed score 4-5 Å below the S1-S4 helices)."""
     z = bb.ca @ normal
     hyd = np.array([l.name in _HYDROPHOBIC for l in bb.labels])
     pol = np.array([l.name in _POLAR for l in bb.labels])
@@ -273,6 +293,61 @@ def _estimate(bb: Backbone, sses: list[SSE]) -> Membrane | None:
     if not _membrane_like(long, z, best, hyd, pol, chain):
         return None
     return Membrane(normal, float(best[1]), HALF, "estimate")
+
+
+# Plan 27 Task 3 (ruling P17): the normal is the transmembrane helices' own. The first estimate's normal is the common
+# axis of every long element, soluble ones included, and against OPM it was 29.1° off on 7PIU and 32.2° on 7VVK
+# (PTH1R-Gs: the G protein's helices; its normal 28.8° from the receptor's TM helices' own axis). So the normal is
+# refitted to the helices crossing the estimate (membrane.crosses), their length-weighted mean axis (each turned to
+# the normal's side), the slab slid along it again (_slab: the centre refitted), and again until the helices crossing
+# it are the ones it was fitted to, at most REFIT_ROUNDS times. With fewer than MIN_CROSSING_HELICES crossing, the
+# first estimate stands, and so does the last plane when a refit is not membrane or leaves fewer than that crossing.
+# Membrane.fit says which. Against OPM (plan 27 Task 3 report): 7PIU 16.2° and 7VVK 17.4°, where OPM's own TM
+# segments' mean axis lies 15.1° and 20.6° from OPM's normal (its records' tilts, 13° and 19°): a G-protein-coupled
+# receptor's helices lean together, and OPM's normal is its hydrophobic slab's, not their axis.
+MIN_CROSSING_HELICES = 3
+REFIT_ROUNDS = 8
+
+
+def _crossing_helices(m: Membrane, bb: Backbone, sses: list[SSE]) -> list[SSE]:
+    """The helices (HELIX_KINDS) whose CA run crosses membrane `m` (crosses)."""
+    d = m.depth(bb.ca)
+    return [s for s in sses if s.kind in HELIX_KINDS and crosses(d[s.start : s.end + 1], m.half)]
+
+
+def _mean_axis(helices: list[SSE], ref: np.ndarray) -> np.ndarray:
+    """The length-weighted mean of the helices' axes, each turned to `ref`'s side, as a unit vector."""
+    total = sum(len(s) * (1.0 if float(s.axis @ ref) >= 0.0 else -1.0) * np.asarray(s.axis, float) for s in helices)
+    return total / np.linalg.norm(total)
+
+
+def _refit(m: Membrane, bb: Backbone, sses: list[SSE]) -> Membrane:
+    """The estimate `m` with its normal fitted to the helices crossing it, and its centre to that normal, repeated
+    until the crossing helices stop changing (ruling P17; see MIN_CROSSING_HELICES)."""
+    long = _long(sses)
+    crossing = _crossing_helices(m, bb, sses)
+    if len(crossing) < MIN_CROSSING_HELICES:
+        return dataclasses.replace(
+            m, fit=f"long elements' axis: {len(crossing)} helices cross it, fewer than {MIN_CROSSING_HELICES}"
+        )
+    for rounds in range(1, REFIT_ROUNDS + 1):
+        new = _slab(bb, long, _mean_axis(crossing, m.normal))
+        again = _crossing_helices(new, bb, sses) if new is not None else []
+        if len(again) < MIN_CROSSING_HELICES:  # the refit is no membrane, or too few helices cross it
+            why = "is no membrane" if new is None else f"is crossed by {len(again)} helices"
+            return dataclasses.replace(m, fit=f"{_fitted(rounds - 1)}; refit {rounds} {why}, not taken")
+        m = new
+        if [(s.start, s.end) for s in again] == [(s.start, s.end) for s in crossing]:
+            return dataclasses.replace(m, fit=f"{_fitted(rounds)}, converged")
+        crossing = again
+    return dataclasses.replace(m, fit=f"{_fitted(REFIT_ROUNDS)}, crossing helices still changing")
+
+
+def _fitted(rounds: int) -> str:
+    """Where the normal came from, for Membrane.fit."""
+    if rounds == 0:
+        return "long elements' axis"
+    return f"crossing helices' axis ({rounds} round{'s' if rounds > 1 else ''})"
 
 
 FACE_REACH = 2.0  # Å: a long element whose CA run comes this near both faces spans the slab (_spans, the estimate)
@@ -446,8 +521,8 @@ def crosses_joined(bb: Backbone, m: Membrane, x: tuple[int, int], y: tuple[int, 
 
 def _spans(long: list[SSE], z: np.ndarray, centre: float) -> bool:
     """Does a long element's CA run reach both faces of the HALF slab at `centre` (within FACE_REACH)? The estimate's
-    own test (random-100 held-out 6MJ2), kept as it was measured when the view and A18 took `crosses` (plan 26): the
-    planes of the manuscript's membrane campaign do not move."""
+    own test (random-100 held-out 6MJ2), kept as it was measured when the view and A18 took `crosses` (plan 26); the
+    plane moves only by _refit's normal (plan 27 Task 3)."""
     return any(
         z[s.start : s.end + 1].min() <= centre - HALF + FACE_REACH
         and z[s.start : s.end + 1].max() >= centre + HALF - FACE_REACH
