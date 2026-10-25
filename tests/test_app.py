@@ -1571,7 +1571,6 @@ def _misses_on_new_code(monkeypatch, module, name, scenario):
     """Every st.cache_data family of the app is keyed by the code fingerprint: `scenario()` (a run of the app that
     reaches the function `module.name`) calls it again under a new fingerprint, and not under the same one."""
     from app_helpers import count_calls
-
     from foldmap import app_jobs
 
     fresh_caches()
