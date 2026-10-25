@@ -741,6 +741,22 @@ def test_a18_holds_loops_beyond_a_face_out_of_the_slab(entry):
     assert view["loop_in_band"] == [], view["loop_in_band"]
 
 
+@pytest.mark.parametrize("entry", ["7PIU", "6JO6"])
+def test_a_stack_membrane_view_routes_its_loops_with_no_wall(entry):
+    """Plan 27 final review I1: a depth-keeping stack drawn with its membrane (mode stack, --membrane auto) is not laid
+    out band-first (its rows are bound to no side, Layout.banded is false), so the router walls none of its loops
+    (route._walls). Walled against the nearest band, 7PIU fell back on 12 loops and 6JO6 on 4; they route as before
+    plan 27 Task 5, every loop a route."""
+    from foldmap.route import route_loops
+    from helpers import r100_entry
+
+    path = r100_entry(entry)
+    lay, sses, bb = make_layout(path, membrane="auto", mode="stack")
+    assert lay.membrane is not None and not lay.banded
+    loops = route_loops(lay, sses, bb)
+    assert [f"{lp.a_id}>{lp.b_id}" for lp in loops if lp.fallback] == []
+
+
 def test_a_users_move_never_pushes_a_transmembrane_helix_off_its_height():
     """C17 fix round 1 (Q8): the transmembrane elements of a membrane view laid out at their projected height keep it
     through the user's own moves (_adjust's _separate) and the pushes off unpaired strands (_off_walls). In 1BL8, the

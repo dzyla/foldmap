@@ -356,10 +356,12 @@ class _Wall:
 
 
 def _walls(layout: Layout, sses: list[SSE], bb, pairs) -> dict:
-    """Plan 27 Task 5: each loop's wall (_Wall) in a membrane view (layout.membrane, drawn for layout.bilayer); {} in
-    any other view, whose routing the wall leaves exactly as it was."""
+    """Plan 27 Task 5: each loop's wall (_Wall) in a membrane view laid out band-first (layout.banded: projected, every
+    other element bound to its side; layout.membrane, drawn for layout.bilayer); {} in any other view, whose routing
+    the wall leaves exactly as it was: a depth-keeping stack's rows are bound to no side, and a wall read against
+    their nearest band closed most of the page (final review I1: 7PIU 12 fallbacks, 6JO6 4)."""
     mem = getattr(layout, "bilayer", None)
-    if not layout.membrane or mem is None or getattr(bb, "ca", None) is None:
+    if not getattr(layout, "banded", False) or not layout.membrane or mem is None or getattr(bb, "ca", None) is None:
         return {}
     depth = mem.depth(bb.ca)
     band = band_set(sses, depth, mem)

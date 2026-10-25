@@ -402,6 +402,10 @@ class Layout:
     symmetry: object = None  # symmetry.Symmetry of the assembly as read (cli.make_layout, before focus kept one
     # subunit), None: none found; for foldmap data (datafile), never read in drawing
     bilayer: object = None  # membrane.Membrane the figure is drawn with (--membrane, as flipped), None: none
+    # laid out band-first (build_layout's `banded`, ruling P23: a projected membrane view, every other element bound to
+    # its side): only then does the router wall the slab for its loops (route._walls; final review I1: a stack view's
+    # rows are not bound, and a wall there closed most of the page)
+    banded: bool = False
     # the researcher's own data (plan 13d, userdata; cli.make_layout): the per-residue values read (--data), None:
     # none given; the crosslinks read (--crosslinks); every problem said of either file (rows not used, notes)
     residue_data: object = None
@@ -5534,6 +5538,7 @@ def build_layout(
         sheet_ghosts=[ghost_ids for _, ghost_ids, _ in blocks],
     )
     lay.na_traces = traces
+    lay.banded = banded
     lay.names_source = named.names_source  # one reading: a swap leaves the βα rows' elements as they were
     lay.frame = frame
     lay.units = {

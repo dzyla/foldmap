@@ -1269,6 +1269,7 @@ def _membrane_view(chain_a, others, depths):
     lay = layout_of(*chain_a, *others)
     lay.membrane = {"y": _BAND, "bands": [_BAND], "inside": "below"}
     lay.bilayer = Membrane(np.array([0.0, 0.0, 1.0]), 0.0, 15.0, "estimate")
+    lay.banded = True  # laid out band-first, as a projected membrane view is (route._walls)
     n = len(depths)
     bb = SimpleNamespace(ca=np.column_stack([np.zeros(n), np.zeros(n), depths]), prev=np.ones(n, bool))
     return lay, [p.sse for p in (*chain_a, *others)], bb
