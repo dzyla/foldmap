@@ -5,8 +5,9 @@
     python scripts/sweep.py --sample 60 --seed 20261009 --out sweep/
 
 For each entry: time, errors, element overlaps (must be none), loops that fell back to plain curves, loops
-crossing labels; large entries (> --max-residues) are drawn one or two chains at a time. Writes report.json,
-report.md and contact sheets (sheet-*.png) of the figures for a visual check.
+crossing labels; large entries (> --max-residues) are drawn one or two chains at a time. Writes report.json
+({"source_stamp": the code that measured, foldmap.source_stamp; "entries": one row per entry}), report.md and contact
+sheets (sheet-*.png) of the figures for a visual check.
 """
 
 from __future__ import annotations
@@ -149,7 +150,10 @@ def main() -> None:
                 f"{r['id']}: {'ok' if r.get('ok') else 'FAIL'} {r.get('seconds', '')}s {r.get('error', '')[:100]}",
                 flush=True,
             )
-    (out / "report.json").write_text(json.dumps(rows, indent=1), encoding="utf-8")
+    from foldmap.source_stamp import source_stamp
+
+    doc = {"source_stamp": source_stamp(__file__), "entries": rows}
+    (out / "report.json").write_text(json.dumps(doc, indent=1), encoding="utf-8")
     ok = [r for r in rows if r.get("ok")]
     lines = [
         f"# Sweep: {len(ok)}/{len(rows)} rendered",

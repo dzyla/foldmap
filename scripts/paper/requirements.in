@@ -1,0 +1,21 @@
+# The paper's environment: foldmap's runtime dependencies at the versions the paper's results were measured and drawn
+# with (the runner's .venv, Python 3.13.13, 2026-10-25; the same as determinism-constraints.txt), their own
+# dependencies pinned the same way. foldmap itself is installed from the release checkout on top:
+#   pip install --require-hashes -r scripts/paper/requirements.lock && pip install --no-deps .
+# Rebuild the lock after changing this file (uv 0.4 or later):
+#   uv pip compile scripts/paper/requirements.in --universal --python-version 3.13 --generate-hashes -o scripts/paper/requirements.lock
+gemmi==0.7.5
+numpy==2.5.4
+scipy==1.18.1
+networkx==3.7
+matplotlib==3.11.2
+PyYAML==6.0.3
+contourpy==1.4.0
+cycler==0.12.1
+fonttools==4.67.0
+kiwisolver==1.5.1
+packaging==26.3
+pillow==12.3.0
+pyparsing==3.3.3
+python-dateutil==2.9.0.post0
+six==1.17.0

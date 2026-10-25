@@ -145,7 +145,7 @@ def test_citation_file_ships_in_the_wheel_metadata():
 
 
 def test_every_source_file_names_its_license():
-    files = sorted((ROOT / "src" / "foldmap").glob("*.py")) + sorted((ROOT / "scripts").glob("*.py"))
+    files = sorted((ROOT / "src" / "foldmap").glob("*.py")) + sorted((ROOT / "scripts").rglob("*.py"))
     missing = [f.name for f in files if not f.read_text(encoding="utf-8").startswith(HEADER)]
     assert not missing, f"add the SPDX header to: {', '.join(missing)}"
     js = (ROOT / "site" / "app.js").read_text(encoding="utf-8")

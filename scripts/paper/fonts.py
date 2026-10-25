@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Dawid Zyla. Additional terms (AGPL-3.0 section 7(b)): see NOTICE.
 """Liberation Sans forced, for the cross-platform determinism run (determinism.py, same directory).
 
 render._FONTS lists Arial first, so macOS and Windows draw with Arial even where Liberation Sans 2.1.5 is installed

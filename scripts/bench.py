@@ -35,6 +35,7 @@ import foldmap
 from foldmap import cli, io, layout
 from foldmap.cli import make_layout
 from foldmap.route import route_loops
+from foldmap.source_stamp import source_stamp
 
 DATA = Path(__file__).resolve().parent.parent / "tests" / "data"
 PHASES = {  # timed wherever they are looked up
@@ -97,7 +98,12 @@ def _meta() -> dict:
         commit = done.stdout.strip()
     except (OSError, subprocess.CalledProcessError):
         commit = "unknown"
-    return {"options": OPTIONS, "commit": commit, "version": foldmap.__version__}
+    return {
+        "options": OPTIONS,
+        "commit": commit,
+        "version": foldmap.__version__,
+        "source_stamp": source_stamp(__file__),
+    }
 
 
 def signature(lay) -> dict:

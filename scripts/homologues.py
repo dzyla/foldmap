@@ -400,6 +400,13 @@ def _h1_refused(rows: list[dict]) -> list[dict]:
     return [r for r in rows if r["kind"] == "positive" and not r["same_fold"]]
 
 
+def _stamp() -> dict:
+    """The code that measured (foldmap.source_stamp, plan 28 Task 1), stamped into each result as it is written."""
+    from foldmap.source_stamp import source_stamp
+
+    return source_stamp(__file__)
+
+
 def write_usalign_report(runs: dict[str, list[dict]], out: Path, summary_path: Path | None, commit: str) -> Path:
     """The comparison's files from align --usalign runs (`runs`: set name -> its align.json rows): out/usalign.json
     (every row, per set), out/usalign-report.md (per pair: both TM-scores, the pairs reproduced, the limits; the
@@ -431,7 +438,7 @@ def write_usalign_report(runs: dict[str, list[dict]], out: Path, summary_path: P
         for r in _h1_refused(held)
     ]
     out.mkdir(parents=True, exist_ok=True)
-    data = {"about": how, "measured_at": commit, "usalign_version": version, "sets": runs}
+    data = {"about": how, "measured_at": commit, "usalign_version": version, "sets": runs, "source_stamp": _stamp()}
     (out / "usalign.json").write_text(json.dumps(data, indent=1, sort_keys=True) + "\n", encoding="utf-8")
     lines = ["# foldmap's aligner against US-align", "", how, ""]
     lines += [
@@ -516,6 +523,7 @@ def write_usalign_report(runs: dict[str, list[dict]], out: Path, summary_path: P
             },  # fmt: skip
             **sums,
             "h1_refused": refused,
+            "source_stamp": _stamp(),
         }
         summary_path.write_text(json.dumps(summary, indent=1, sort_keys=True) + "\n", encoding="utf-8")
     print(f"wrote {md}")
@@ -620,6 +628,7 @@ def run_pair(pair: dict, out: Path) -> dict:
         "checks_alone": _summary(found_alone),
         "seconds_like": round(t_like, 1),
     }
+    result["source_stamp"] = _stamp()
     (out / f"{s}.json").write_text(json.dumps(result, indent=1, sort_keys=True) + "\n", encoding="utf-8")
     return result
 
@@ -855,6 +864,7 @@ def diff_pair(pair: dict, out: Path) -> dict:
         "published": pair.get("published"),
         "seconds": round(seconds, 1),
     }
+    result["source_stamp"] = _stamp()
     (out / f"{s}.json").write_text(json.dumps(result, indent=1, sort_keys=True) + "\n", encoding="utf-8")
     return result
 
@@ -1331,6 +1341,7 @@ def write_report(pairs: list[dict], out: Path, md: Path) -> Path:
         lines += ["", f"No result (the pair's child failed; see its log): {', '.join(missing)}"]
     if strata:
         summary = summarize(pairs, results)
+        summary["source_stamp"] = _stamp()
         (out / "summary.json").write_text(json.dumps(summary, indent=1, sort_keys=True) + "\n", encoding="utf-8")
         lines += ["", "## Summary", "", "| stratum | pairs | results | all pass | " + " | ".join(CHECKS) + " |"]
         lines.append("|---|---|---|---|" + "---|" * len(CHECKS))

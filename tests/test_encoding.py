@@ -25,6 +25,6 @@ def _unspecified(path: Path) -> list[str]:
 
 
 def test_library_and_scripts_name_the_text_encoding():
-    files = sorted([*(ROOT / "src").rglob("*.py"), *(ROOT / "scripts").glob("*.py")])
+    files = sorted([*(ROOT / "src").rglob("*.py"), *(ROOT / "scripts").rglob("*.py")])
     missing = [hit for f in files for hit in _unspecified(f)]
     assert not missing, "add encoding='utf-8' at " + ", ".join(missing)

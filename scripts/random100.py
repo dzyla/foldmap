@@ -86,6 +86,7 @@ from foldmap.criteria import (  # noqa: E402
     pair_check,
 )
 from foldmap.criteria import jsonable as _jsonable  # noqa: E402
+from foldmap.source_stamp import source_stamp, stamp_line  # noqa: E402
 
 SEED = 20261013
 LOOK = 200  # candidates looked at per pool, at most
@@ -905,6 +906,7 @@ def sample(seed: int, date: str, exclude: Iterable[str] = ()) -> dict:
         "query_date": date,
         "foldmap_commit": _commit(),
         "gemmi": gemmi.__version__,
+        "source_stamp": source_stamp(__file__),
         "look": LOOK,
         "bins": {b: [lo or 0, hi - 1] for b, (lo, hi) in BINS.items()},
         "strata": s.records,
@@ -1474,6 +1476,7 @@ def run_entry(source: str, out: Path, views=VIEWS, info: dict | None = None) -> 
     keep = ("stratum", "bin", "order", "quota", "pair", "pair_type", "role", "partner", "refusal")
     e: dict = {"id": info.get("id", name), "name": name, **{k: info[k] for k in keep if k in info}, "views": {}}
     e["foldmap_commit"] = _commit()  # this entry's own: a report may join runs (final review B, Minor 6)
+    e["source_stamp"] = source_stamp(__file__)  # the code measuring this entry (plan 28 Task 1)
     try:
         path = resolve(source)
         e["file"], e["sha256"] = str(path), _sha256(path.read_bytes())
@@ -1834,8 +1837,8 @@ def pairs_section(entries: list[dict]) -> list[str]:
 
 
 def report(entries: list[dict], out: Path, sample_path: Path | None = None, total: int | None = None) -> dict:
-    """report.json (every value, LIMITS, commit, versions, sample.json's SHA-256, date), report.md (the counts,
-    a table per stratum and per entry with the A1-A20 marks and what failed, the reported-only statistics, the
+    """report.json (every value, LIMITS, commit, source stamp, versions, sample.json's SHA-256, date), report.md (the
+    counts, a table per stratum and per entry with the A1-A20 marks and what failed, the reported-only statistics, the
     limits) and index.html (a grid of the contact sheets, linking to each)."""
     total = total or len(entries)
     passed = sum(1 for e in entries if e.get("pass"))
@@ -1843,6 +1846,7 @@ def report(entries: list[dict], out: Path, sample_path: Path | None = None, tota
         "date": datetime.date.today().isoformat(),
         "foldmap_commit": _commit(),
         "versions": _versions(),
+        "source_stamp": source_stamp(__file__),
         "sample_sha256": _sha256(sample_path.read_bytes()) if sample_path and sample_path.is_file() else None,
         "limits": LIMITS,
         "documented_warnings": list(DOCUMENTED_WARNINGS),
@@ -1861,6 +1865,8 @@ def report(entries: list[dict], out: Path, sample_path: Path | None = None, tota
         "# foldmap random-100 campaign",
         "",
         f"{passed} of {total} pass.",
+        "",
+        f"Code: {stamp_line(doc['source_stamp'])}",
         "",
         "An entry passes when no criterion fails. A criterion with nothing to judge in an entry is not judged (or does "
         "not apply), never counted as a pass: see the outcomes per criterion below.",

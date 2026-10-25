@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Dawid Zyla. Additional terms (AGPL-3.0 section 7(b)): see NOTICE.
 """The same figure on any platform, CPU and hash seed: draw a fixed set of figures with Liberation Sans forced, record
 each figure's layout signature and SVG hash, and compare runs.
 
