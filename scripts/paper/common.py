@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import gzip
 import json
+import math
 import os
 import subprocess
 from pathlib import Path
@@ -176,8 +177,6 @@ def quotable(name: str, report) -> None:
 
 def percentile(xs: list[float], q: float) -> float:
     """Linear interpolation between closest ranks (numpy.percentile's default)."""
-    import math
-
     xs = sorted(xs)
     k = (len(xs) - 1) * q / 100
     lo, hi = math.floor(k), math.ceil(k)
@@ -198,8 +197,6 @@ Z95 = 1.959963984540054  # the standard normal's 97.5th percentile: a two-sided 
 def wilson(k: int, n: int, z: float = Z95) -> tuple[float, float] | None:
     """The Wilson score interval of a proportion k of n (95% by default; plan 28 Task 2, ruling Q19): (low, high), or
     None when n is 0. It stays inside [0, 1] and is not degenerate at 0 or n, unlike the normal approximation."""
-    import math
-
     if n <= 0:
         return None
     if not 0 <= k <= n:

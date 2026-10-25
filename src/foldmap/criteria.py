@@ -1048,7 +1048,7 @@ def check_figure(drawn, spec, path) -> dict:
         elif key in here:
             got = {**got, "here": here[key]}
         out[key] = unmeasured(got)
-    from .science import check_kinds
+    from .science import check_kinds  # local, as every package import of this module (it stays light to import)
 
     return {
         "science": result["science"],

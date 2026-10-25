@@ -639,7 +639,11 @@ def test_every_judged_measure_says_what_it_is_evidence_of():
     }
     assert ROLE["pair_f1"] == ROLE["stem_recall"] == "external"
     nv = _na_validate()
-    assert nv._paper_common().ZERO_BY_CONSTRUCTION == ZERO_BY_CONSTRUCTION
+    common = nv._paper_common()  # the paper pipeline's copy of the vocabulary (it never imports foldmap): kept equal
+    assert common.ZERO_BY_CONSTRUCTION == ZERO_BY_CONSTRUCTION
+    assert common.NA_GUARDS == tuple(k for k, r in ROLE.items() if r == "regression-guard")
+    fidelity = [k for k, r in ROLE.items() if r == "fidelity"]  # mirrored and stems_nearer_frac summarised apart
+    assert common.NA_FIDELITY == tuple(k for k in fidelity if k not in ("mirrored", "stems_nearer_frac"))
     assert judge({"angle_max": 0.0, "stems_nearer_frac": 0.0}) == ["stems_nearer_frac 0.0 (limit 1.0)"]
 
 

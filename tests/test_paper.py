@@ -353,47 +353,62 @@ def numbers():
     return _load("make_numbers")
 
 
-def test_sets_json_tags_every_set_make_numbers_quotes(numbers):
+@pytest.fixture(scope="module")
+def layers():
+    return _load("layers")
+
+
+def test_sets_json_tags_every_set_make_numbers_quotes(layers):
     """Each benchmark set is tagged tuning, regression or unseen with the reason; every set a key family names is
-    in sets.json; the third sample is unseen at 7696947 (historical), the fourth unseen by its protocol."""
-    sets = numbers.load_sets()
+    in sets.json. A set measured once at a commit that is not the release is "unseen at <commit>, historical"; one
+    gated or pooled with the tuning sample is not unseen (plan 28 T2 fix round 1, rulings Q20-Q22)."""
+    sets = layers.load_sets()
     tags = {k: s["tag"] for k, s in sets["sets"].items()}
     assert set(sets["_legend"]) == {"tuning", "regression", "unseen"}
     assert all(s["tag"].split()[0] in sets["_legend"] and s["reason"] and s["what"] for s in sets["sets"].values())
-    quoted = {w.replace("{1}", x) for _, _, w, _ in numbers.FAMILIES if w for x in ("tuned", "held", "third")}
+    quoted = {w.replace("{1}", x) for _, _, w, _ in layers.FAMILIES if w for x in ("tuned", "held", "third")}
     assert quoted <= set(tags), quoted - set(tags)
-    assert tags["r100_tuned"] == "tuning" and tags["r100_held"] == "regression" and tags["r100_held_first"] == "unseen"
+    assert tags["r100_tuned"] == "tuning" and tags["dom_cal"] == "tuning" and tags["na_benchmark"] == "tuning"
     assert tags["r100_third"] == "unseen at 7696947, historical" and tags["r100_fourth"] == "unseen (protocol)"
-    assert tags["dom_cal"] == "tuning" and tags["dom_fresh"] == "unseen" and tags["na_benchmark"] == "tuning"
+    assert tags["r100_held_first"] == "unseen at 5650dbd, historical"  # Q21
+    assert tags["hom_heldout"] == "unseen at c099787, historical"  # Q21
+    assert tags["dom_fresh"] == "regression" and "CI" in sets["sets"]["dom_fresh"]["reason"]  # Q21: gated in CI
+    assert tags["membrane_opm"] == "tuning" and "7VVK" in sets["sets"]["membrane_opm"]["reason"]  # Q20
+    assert tags["r100_held"] == "tuning" and "a963bb6" in sets["sets"]["r100_held"]["reason"]  # Q22 M6
+    assert [k for k, t in tags.items() if t == "unseen"] == []  # every unseen set names its commit or protocol
 
 
-def test_every_key_gets_a_layer_and_a_set(numbers):
+def test_every_key_gets_a_layer_and_a_set(numbers, layers):
     """FAMILIES labels every key make_numbers writes (the pending ones too) with one of the five layers or none, and
-    a rate's _n / _ci keys take their base key's labels; a key no family names, or a set sets.json lacks, stops it."""
+    a rate's _n / _ci keys take their base key's labels; a key no family names, or a set sets.json lacks, stops it.
+    Counts and keys mixing layers get none, with a note (Q22 M3-M5)."""
     from types import SimpleNamespace
 
-    layers = set(numbers.LAYERS) | {None}
+    family = layers.family
+    allowed = set(layers.LAYERS) | {None}
     for key in numbers.PENDING:
-        assert numbers.family(key)[0] in layers, key
-    assert numbers.family("r100_third_pass")[:2] == ("readability", "r100_third")
-    assert numbers.family("r100_third_pass_ci_lo", {"r100_third_pass"})[:2] == ("readability", "r100_third")
-    assert numbers.family("r100_held_pass_first")[1] == "r100_held_first"
-    assert numbers.family("r100_third_science")[0] == "consistency"
-    assert numbers.family("dom_r100_pass")[0] == "external" and numbers.family("bp_recall")[0] == "external"
-    assert numbers.family("dom_held_nohom_f1")[1] == "dom_held_nohom" and numbers.family("dom_held_f1")[1] == "dom_held"
-    assert numbers.family("na_regression_guards")[:2] == ("regression-guard", "na_benchmark")
-    assert numbers.family("na_stems_nearer_pass_n", {"na_stems_nearer_pass"})[0] == "fidelity"
-    assert numbers.family("membrane_thickness_mad")[2].endswith("fixed by the method (not predicted)")
-    assert numbers.family("determinism_n")[0] == "regression-guard"  # a key of its own, not a rate's denominator
+        assert family(key)[0] in allowed, key
+    assert family("r100_third_pass")[:2] == ("readability", "r100_third")
+    assert family("r100_third_pass_ci_lo", {"r100_third_pass"})[:2] == ("readability", "r100_third")
+    assert family("r100_held_pass_first")[1] == "r100_held_first"
+    assert family("r100_third_science")[0] is None and "S5" in family("r100_third_science_fail")[2]  # M4
+    assert family("dom_r100_pass")[0] == "external" and family("bp_recall")[0] == "external"
+    assert family("dom_held_nohom_f1")[1] == "dom_held_nohom" and family("dom_held_f1")[1] == "dom_held"
+    assert family("na_regression_guards")[:2] == ("regression-guard", "na_benchmark")
+    assert family("na_stems_nearer_pass_n", {"na_stems_nearer_pass"})[0] == "fidelity"
+    thickness = family("membrane_thickness_mad")  # M5
+    assert thickness[0] is None and "fixed by the method (not predicted)" in thickness[2]
+    assert family("determinism_n")[0] is None and family("determinism_platforms")[0] is None  # M3: counts
+    assert family("determinism_identical")[0] == "regression-guard"
     with pytest.raises(KeyError):
-        numbers.family("no_such_key")
+        family("no_such_key")
     nb = SimpleNamespace(keys={"r100_third_pass": {"value": 83}}, extra={"na_fidelity": {}})
-    numbers.label(nb, numbers.load_sets())
+    layers.label(nb, layers.load_sets())
     got = nb.keys["r100_third_pass"]
     assert got["layer"] == "readability" and got["set_tag"] == "unseen at 7696947, historical" and got["layer_note"]
     assert nb.extra["na_fidelity"]["layer"] == "fidelity"
     with pytest.raises(SystemExit, match="no_such_key"):
-        numbers.label(SimpleNamespace(keys={"no_such_key": {}}, extra={}), numbers.load_sets())
+        layers.label(SimpleNamespace(keys={"no_such_key": {}}, extra={}), layers.load_sets())
 
 
 def test_a_rate_gets_its_denominator_and_interval_beside_it(numbers, monkeypatch):

@@ -554,11 +554,13 @@ def cmd_usalign_report(args) -> int:
 
 
 def _summary(found: dict) -> dict:
-    """check_figure's result in short: the S-checks with problems (their counts) and the criteria that fail."""
-    return {
-        "science": {k: len(v) for k, v in sorted(found["science"].items()) if v},
-        "failed": sorted(k for k, v in found["criteria"].items() if v.get("pass") is False),
-    }
+    """check_figure's result in short: the S-checks with problems (their counts), the criteria that fail, and the
+    kind of each check named (check_figure's "kinds", science.KIND: consistency, external or readability; plan 28
+    Task 2)."""
+    science = {k: len(v) for k, v in sorted(found["science"].items()) if v}
+    failed = sorted(k for k, v in found["criteria"].items() if v.get("pass") is False)
+    kinds = found.get("kinds") or {}
+    return {"science": science, "failed": failed, "kinds": {k: kinds[k] for k in [*science, *failed] if k in kinds}}
 
 
 def run_pair(pair: dict, out: Path) -> dict:

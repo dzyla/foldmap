@@ -50,12 +50,14 @@ Every key in `numbers.json` says what it is evidence of and where it was measure
   `external` (against a reference foldmap does not compute: CATH, RNApolis, mkdssp, OPM, US-align, published
   figures), `readability` (the page criteria A1-A20 and the gates built on them), `regression-guard` (zero or
   identical by construction: the NA angle and joint errors on an ordinary projection, determinism) or `fidelity`
-  (Spearman, Procrustes, mirrored stems, contact proximity); null for what is no measurement (seeds, entry counts,
-  tables, timings). `layer_note` says more where a key mixes layers (the entry gates).
-- `set` and `set_tag`: the benchmark set, tagged in `sets.json` as `tuning`, `regression` or `unseen`, with the
-  reason. A key no family names (`make_numbers.FAMILIES`), or a set `sets.json` lacks, stops the run.
-- Every headline rate also gets `<key>_n`, `<key>_ci_lo` and `<key>_ci_hi`: its denominator and its Wilson 95%
-  interval (`common.wilson`). Rates pooled over residues, pairs or segments say so: those are not independent.
+  (Spearman, Procrustes, mirrored stems, contact proximity); null for what is no measurement (seeds, counts, tables,
+  timings) or mixes layers (S1-S6 together; OPM's thickness against the fixed one). `layer_note` says more.
+- `set` and `set_tag`: the benchmark set, tagged in `sets.json` as `tuning`, `regression` or `unseen` (a set measured
+  once at a commit that is not the release: `unseen at <commit>, historical`), with the reason. A key no family
+  names (`layers.FAMILIES`, in `layers.py`), or a set `sets.json` lacks, stops the run.
+- Every headline rate (not a regression guard) also gets `<key>_n`, `<key>_ci_lo` and `<key>_ci_hi`: its denominator
+  and its Wilson 95% interval (`common.wilson`). Rates pooled over residues, pairs or segments say so: those are
+  not independent.
 
 The NA measures are summarised by role in `common.na_measures`, which `scripts/na_validate.py` also writes into its
 report: the angle and joint errors as regression guards, the fidelity measures' quartiles, and `stems_nearer_frac`'s

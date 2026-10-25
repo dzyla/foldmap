@@ -632,4 +632,3 @@ def build_determinism(nb) -> None:
         src,
         "figures whose layout signature and SVG hash are the same in every run",
     )
-    nb.rate("determinism_identical", len(identical), len(figs), "figures drawn on every platform (determinism_n)")

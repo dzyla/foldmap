@@ -37,6 +37,7 @@ figcheck.science_checks reads the drawn figure (its sheet blocks, columns by whe
 
 from __future__ import annotations
 
+import re
 from collections.abc import Callable, Iterable
 
 import networkx as nx
@@ -280,8 +281,6 @@ def sheet_judged(sheets: list[Sheet]) -> dict[str, int]:
 def kind(code: str) -> str:
     """What a check is evidence of: KIND for a science check (S1-S6), READABILITY for a page criterion (A1-A20,
     criteria.CRITERIA's keys: A1c, A2b too). KeyError for any other code."""
-    import re
-
     if code in KIND:
         return KIND[code]
     if re.fullmatch(r"A\d+[a-z]?", code):

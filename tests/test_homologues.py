@@ -332,3 +332,21 @@ def test_the_new_seeds_lower_no_pair(hom):
             assert y["usalign"]["usalign"]["tm_a"] == x["usalign"]["usalign"]["tm_a"], x["pair"]
             assert y["usalign"]["structure"]["tm_score"] >= x["usalign"]["structure"]["tm_score"], x["pair"]
         assert hom.usalign_summary(after[name])["search_short"] < hom.usalign_summary(before[name])["search_short"]
+
+
+def test_a_pairs_check_summary_keeps_each_named_checks_kind(hom):
+    """Plan 28 Task 2 (Q22 M1): the summary of check_figure's result keeps the kind of each S-check and criterion it
+    names (science.KIND: consistency, external; the page criteria readability)."""
+    from foldmap.criteria import CRITERIA
+    from foldmap.science import check_kinds
+
+    found = {
+        "science": {"S1": ["sheet 1: a | b drawn side by side with no bridge"], "S2": [], "S5": None},
+        "criteria": {"A5": {"pass": False, "detail": ""}, "A6": {"pass": True, "detail": ""}},
+        "kinds": check_kinds(CRITERIA),
+    }
+    assert hom._summary(found) == {
+        "science": {"S1": 1},
+        "failed": ["A5"],
+        "kinds": {"S1": "consistency", "A5": "readability"},
+    }

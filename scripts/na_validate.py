@@ -43,6 +43,7 @@ reports written before plan 28 Task 1 are the bare list of rows.
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import json
 import os
 import subprocess
@@ -582,8 +583,6 @@ def _isolated(name: str, path: Path, out: Path, options: dict | None = None) -> 
 def _paper_common():
     """scripts/paper/common.py, loaded by path under a private name: the one place the NA measures are summarised by
     role (na_measures), shared with the paper's make_numbers.py."""
-    import importlib.util
-
     name = "_na_validate_paper_common"
     if name not in sys.modules:
         spec = importlib.util.spec_from_file_location(name, Path(__file__).resolve().parent / "paper" / "common.py")
