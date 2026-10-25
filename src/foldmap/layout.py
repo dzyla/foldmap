@@ -1438,8 +1438,10 @@ def _separate(
     level: np.ndarray | None = None,
     shared: set[int] = frozenset(),
     again: bool = False,
+    limits: tuple[np.ndarray, np.ndarray] | None = None,
 ) -> str:
-    """Push overlapping items apart, then slide any left over clear. With `ties` (_symmetry_ties) the pushes
+    """Push overlapping items apart, then slide any left over clear, each item's centre within `limits` throughout
+    (_limits: a membrane view's one-sided bounds, plan 27 ruling P24). With `ties` (_symmetry_ties) the pushes
     keep every protomer drawn alike (_push_apart), and that result is kept if it clears every overlap within
     _SEP_ORBIT_SWEEPS sweeps and its box takes at most `room` times the area of moving the items one by
     one from the same start (widening the spread can otherwise cost far more room); else the one-by-one
@@ -1469,7 +1471,9 @@ def _separate(
             None if level is None else level[keep],
             {new[k] for k in shared if k in new},
             again,
+            None if limits is None else (limits[0][keep], limits[1][keep]),
         )
+    _within(items, limits)
     halves = np.array([it.half for it in items], float).reshape(-1, 2)
     mids = np.array([it.mid for it in items], float).reshape(-1, 2)
     start = np.array([(it.cx, it.cy) for it in items], float).reshape(-1, 2)
@@ -1478,26 +1482,30 @@ def _separate(
     apart = _joint_matrix(len(items), joints)
     xy = start.copy()
     alone = start.copy()
-    _push_apart(alone, halves, mids, home, {}, _SEP_SWEEPS, apart, fixed, level=level)
+    _push_apart(alone, halves, mids, home, {}, _SEP_SWEEPS, apart, fixed, level=level, limits=limits)
     if mirror is not None:  # mirror images about a dyad in the page: drawn so whenever room allows (9GEP)
         sweeps, room = _SEP_SWEEPS, max(room, _SEP_MIRROR_ROOM)
     else:
         sweeps = _SEP_ORBIT_SWEEPS
-    together = ties and _push_apart(xy, halves, mids, home, ties, sweeps, apart, fixed, mirror, level)
+    together = ties and _push_apart(xy, halves, mids, home, ties, sweeps, apart, fixed, mirror, level, limits=limits)
     lone: list[int] = []
     if ties and shared and not together:  # the tied pushes fail: again, the shared items yielding to the copies
         xy, lone = start.copy(), sorted(shared)
-        together = _push_apart(xy, halves, mids, home, ties, sweeps, apart, fixed, mirror, level, shared)
+        together = _push_apart(xy, halves, mids, home, ties, sweeps, apart, fixed, mirror, level, shared, limits)
         if not together and _lone_left(xy, halves, mids, apart, set(lone)):
             together = True  # what is left overlaps only the shared items: they slide clear, the copies stay alike
     if not together or _box_area(xy, halves, mids) > room * _box_area(alone, halves, mids):
         xy, lone = alone, []
     for it, (x, y) in zip(items, xy.tolist()):
         it.cx, it.cy = x, y
-    _slide_clear(items, joints, fixed, level, lone)
+    _slide_clear(items, joints, fixed, level, lone, limits=limits)
     if ties and xy is not alone:
         return "alike"
-    if ties and again and _tied_again(items, ties, start, halves, mids, home, joints, apart, fixed, mirror, level):
+    if (
+        ties
+        and again
+        and _tied_again(items, ties, start, halves, mids, home, joints, apart, fixed, mirror, level, limits)
+    ):
         return "wide"
     return "alone"
 
@@ -1543,8 +1551,10 @@ def _tied_again(
     fixed: Walls | None,
     mirror: float | None,
     level: np.ndarray | None,
+    limits: tuple[np.ndarray, np.ndarray] | None = None,
 ) -> bool:
-    """_separate's second chance for copies drawn alike, the items already placed one by one (and slid clear). The
+    """_separate's second chance for copies drawn alike, the items already placed one by one (and slid clear), within
+    `limits` as they (_separate). The
     tied pushes run again from `start` for _SEP_SWEEPS passes with every item that has no copy (no tie holds it or
     holds it as a mate: elements one copy lacks, a bundle with a chain outside every protomer, a shared sheet)
     yielding to the orbits (_push_apart's `shared`), and sliding clear last. Pushed against an orbit, such an item
@@ -1564,14 +1574,14 @@ def _tied_again(
     }
     stems = any(isinstance(m, PlacedStem) for it in items for m in it.members)
     xy = start.copy()
-    done = _push_apart(xy, halves, mids, home, ties, _SEP_SWEEPS, apart, fixed, mirror, level, free)
+    done = _push_apart(xy, halves, mids, home, ties, _SEP_SWEEPS, apart, fixed, mirror, level, free, limits)
     if stems and not done and not _lone_left(xy, halves, mids, apart, free):
         return False
     alone = [(it.cx, it.cy) for it in items]
     room = _box_area(np.array(alone, float).reshape(-1, 2), halves, mids)
     for it, (x, y) in zip(items, xy.tolist()):
         it.cx, it.cy = x, y
-    _slide_clear(items, joints, fixed, level, sorted(free), None if stems else ties, mirror)
+    _slide_clear(items, joints, fixed, level, sorted(free), None if stems else ties, mirror, limits)
     now = np.array([(it.cx, it.cy) for it in items], float).reshape(-1, 2)
     clear = stems or not len(_overlapping(now, halves, mids, apart))
     if clear and _box_area(now, halves, mids) <= _SEP_TIE_ROOM * room:
@@ -1664,8 +1674,12 @@ def _push_apart(
     mirror: float | None = None,
     level: np.ndarray | None = None,
     shared: set[int] = frozenset(),
+    limits: tuple[np.ndarray, np.ndarray] | None = None,
 ) -> bool:
     """Push overlapping footprints apart in place (axis of least penetration); spring back to home early on.
+    `limits` (_limits, a membrane view's one-sided bounds, plan 27 ruling P24): every centre held within them after
+    each sweep, and a push up or down that would take one of a pair past its bound is taken by the other, the whole
+    way, or, when neither can, made sideways (_bounded_push).
     Each sweep finds the overlapping pairs at once and resolves them in order. With `ties` a push moves an
     item's whole orbit (it and its symmetry copies) by the same amount, and a sideways push between two
     protomers moves protomer k by k times the amount when that widens the spread between protomers (also
@@ -1721,7 +1735,12 @@ def _push_apart(
                 else:
                     xy[group[q], 1] += sign * ((1 if dy > 0 else -1) if dy != 0 else 1) * (py + _SEP_PUSH)
                 continue
-            if px < py:
+            if limits is not None and px >= py:  # parted up or down within the bounds, else sideways
+                s = (1 if dy > 0 else -1) if dy != 0 else 1
+                fast = (False, False) if held is None else (bool(held[i]), bool(held[j]))
+                if _bounded_push(xy, limits, gi, gj, s, py, fast):
+                    continue
+            if px < py or limits is not None:  # (with limits, a pair not parted up or down parts sideways)
                 s = (1 if dx > 0 else -1) if dx != 0 else 1
                 if mirror is None and None not in (protomer[i], protomer[j]) and protomer[i] != protomer[j]:
                     wider = s * (px + 2 * _SEP_PUSH) / (protomer[j] - protomer[i])
@@ -1743,7 +1762,35 @@ def _push_apart(
         _off_walls(xy, halves, mids, walls, group, sx=sx, held=held)
         if sweep < 100:
             xy += 0.03 * (home - xy)
+        if limits is not None:  # every centre back within its bounds (ruling P24)
+            xy[:, 1] = np.minimum(np.maximum(xy[:, 1], limits[0]), limits[1])
     return not len(_overlapping(xy, halves, mids, apart)) and not _off_walls(xy, halves, mids, walls, group, move=False)
+
+
+def _bounded_push(xy, limits, gi, gj, s: int, py: float, held: tuple[bool, bool]) -> bool:
+    """_push_apart's push up or down, within one-sided bounds (`limits`, _limits; plan 27 ruling P24): groups gi and gj
+    (index arrays, or one index each) parted by py plus _SEP_PUSH each, gj along page side `s` and gi the other way,
+    half each as unbounded; what one cannot take short of its bound (or of nothing at all: `held`, keeping its height)
+    the other takes. False, nothing moved, when the two cannot part by py up or down: the caller parts them sideways."""
+    lo, hi = limits
+
+    def room(g, way: int, still: bool) -> float:  # how far group g may move along page side `way`
+        if still:
+            return 0.0
+        g = np.atleast_1d(g)
+        left = (hi[g] - xy[g, 1]) if way > 0 else (xy[g, 1] - lo[g])
+        return max(float(left.min()), 0.0)
+
+    need = py + 2 * _SEP_PUSH
+    ri, rj = room(gi, -s, held[0]), room(gj, s, held[1])
+    if ri + rj < py + _SEP_PUSH:
+        return False
+    a = min(need / 2, ri)
+    b = min(need - a, rj)
+    a = min(need - b, ri)
+    xy[gi, 1] -= s * a
+    xy[gj, 1] += s * b
+    return True
 
 
 def _off_walls(
@@ -1803,10 +1850,12 @@ def _slide_clear(
     last: list[int] = (),
     ties: dict[int, tuple[int, int]] | None = None,
     mirror: float | None = None,
+    limits: tuple[np.ndarray, np.ndarray] | None = None,
 ) -> None:
     """Guarantee: each item in turn, if it still overlaps one already settled (other than a piece it is joined
     to, `joints`) or a `fixed` box it must keep off, takes the nearest clear spot straight right, left, up or down
-    (in that order on a tie), in _SLIDE_STEP steps; one that keeps its height (`level`) right or left only. Pieces
+    (in that order on a tie), in _SLIDE_STEP steps; one that keeps its height (`level`) right or left only; none
+    outside its one-sided bounds (`limits`, _limits: a spot past one is not clear; plan 27 ruling P24). Pieces
     of a bent duplex `joints` holds together (_rigid_joints) slide as one, their offsets kept, each exempt from the
     others (random-100 C2b-4: slid one at a time, 7Y7C's P138c2 landed on P138c1 and P85a2 28 units from P85a1); the
     group settles when its first item comes up in that order (so a group with one item in `last` and one not settles
@@ -1834,6 +1883,10 @@ def _slide_clear(
         centre = (items[j].cx + mids[j][0], items[j].cy + mids[j][1])
         return _band_out(centre, halves[j], band[o[3]]) is not None
 
+    def past(group: list[int]) -> bool:  # an item of the group stands past its bounds (_limits)
+        return limits is not None and any(not limits[0][j] <= items[j].cy <= limits[1][j] for j in group)
+
+    _within(items, limits)
     later = set(last)
     order = [i for i in range(len(items)) if i not in later] + [i for i in range(len(items)) if i in later]
     links = sorted(joints) + [(i, j) for i, (j, _) in sorted((ties or {}).items())]
@@ -1855,12 +1908,12 @@ def _slide_clear(
         k = 0
         sideways = level is not None and any(level[j] for j in group)
         ways = ((1, 0), (-1, 0)) if sideways else ((1, 0), (-1, 0), (0, 1), (0, -1))
-        while any(meets(j, o) for j, o in pairs):
+        while any(meets(j, o) for j, o in pairs) or past(group):
             k += 1
             for dx, dy in ways:
                 for j, (x0, y0) in zip(group, start):
                     items[j].cx, items[j].cy = x0 + k * dx * turn[j] * _SLIDE_STEP, y0 + k * dy * _SLIDE_STEP
-                if not any(meets(j, o) for j, o in pairs):
+                if not any(meets(j, o) for j, o in pairs) and not past(group):
                     break
         settled += group
         done.add(cid[i])
@@ -1930,7 +1983,7 @@ def _x_overlaps(Q, want, reach=None) -> tuple[np.ndarray, np.ndarray]:
     return i[k], j[k]
 
 
-def _energy(flat, home, anchor_w, want, pull, loops, lam, mids=None, fixed=None, reach=None):
+def _energy(flat, home, anchor_w, want, pull, loops, lam, mids=None, fixed=None, reach=None, bound=None):
     """Layout energy and gradient over only the overlapping boxes and the contact pairs `pull` = (i, j, w), i < j.
     Same terms as _energy_dense. `reach`: see _x_overlaps."""
     P = flat.reshape(-1, 2)
@@ -1938,6 +1991,7 @@ def _energy(flat, home, anchor_w, want, pull, loops, lam, mids=None, fixed=None,
     E = float((anchor_w[:, 0] * ((P - home) ** 2).sum(1)).sum())
     Q = P if mids is None else P + mids  # footprint centres
     E += _fixed_overlap(Q, fixed, lam, grad)
+    E += _past_bounds(P, bound, lam, grad)
     oi, oj = _x_overlaps(Q, want, reach)
     keep = want[oi, oj, 1] > np.abs(Q[oj, 1] - Q[oi, 1])
     oi, oj = oi[keep], oj[keep]
@@ -1984,6 +2038,17 @@ def _fixed_overlap(Q, fixed, lam, grad) -> float:
     return float((w * np.where(hit, np.where(on_x, px, py), 0.0) ** 2).sum())
 
 
+def _past_bounds(P, bound, lam, grad) -> float:
+    """lam * the squared distance of each item's centre (P) past its one-sided bounds, `bound` = (least, most) page y
+    per item (_limits, a membrane view's; None: no term); the gradient added to `grad` in place."""
+    if bound is None:
+        return 0.0
+    lo, hi = bound
+    below, above = np.maximum(lo - P[:, 1], 0.0), np.maximum(P[:, 1] - hi, 0.0)
+    grad[:, 1] += 2 * lam * (above - below)
+    return float(lam * (below * below + above * above).sum())
+
+
 def _pair_grad(grad, i, j, d, gx, gy) -> None:
     """Add dE/d(overlap depth) of pairs (i, j), d = Q_j - Q_i, to the per-item gradient (in place)."""
     n = len(grad)
@@ -1992,17 +2057,19 @@ def _pair_grad(grad, i, j, d, gx, gy) -> None:
     grad[:, 1] += np.bincount(i, fy, n) - np.bincount(j, fy, n)
 
 
-def _energy_dense(flat, home, anchor_w, want, W, loops, lam, mids=None, fixed=None):
+def _energy_dense(flat, home, anchor_w, want, W, loops, lam, mids=None, fixed=None, bound=None):
     """Layout energy and its gradient. Terms: stay near the projected position (fold); loop ends within
     _LOOP_SLACK of each other; touching elements' (and DNA binders') boxes adjacent;
     lam * squared box overlap (raised stage by stage until overlaps are gone), with each other and with the
-    `fixed` boxes (_fixed_overlap)."""
+    `fixed` boxes (_fixed_overlap); lam * squared distance past a membrane view's one-sided bounds (`bound`,
+    _past_bounds)."""
     P = flat.reshape(-1, 2)
     n = len(P)
     grad = 2 * anchor_w * (P - home)
     E = float((anchor_w[:, 0] * ((P - home) ** 2).sum(1)).sum())
     Q = P if mids is None else P + mids  # footprint centres
     E += _fixed_overlap(Q, fixed, lam, grad)
+    E += _past_bounds(P, bound, lam, grad)
     d = Q[None, :, :] - Q[:, None, :]  # d[i, j] = Q_j - Q_i
     sg = np.sign(d)
     px, py = want[..., 0] - np.abs(d[..., 0]), want[..., 1] - np.abs(d[..., 1])  # overlap depth per axis
@@ -2164,9 +2231,12 @@ def _attract(
     held_k: float = _K_LIKE,
     settled: frozenset[frozenset[str]] | None = None,
     level: np.ndarray | None = None,
+    limits: tuple[np.ndarray, np.ndarray] | None = None,
 ) -> None:
     """Minimise the layout energy (_energy) from the projected positions, raising the overlap penalty in
-    stages. The result becomes each item's new home; _separate then guarantees no overlap remains. Every input
+    stages. The result becomes each item's new home; _separate then guarantees no overlap remains. `limits` (_limits,
+    a membrane view's one-sided bounds, plan 27 ruling P24): a centre past them costs as an overlap does
+    (_past_bounds), and the result is moved back within them. Every input
     is snapped to the grid (_snap) and _lbfgs runs without BLAS, so the minimum is the same on every machine.
     `extra`: further springs (item i, port offset, item j, port offset, weight, slack), the nucleic-acid strands
     from stem to stem (_stem_springs). `joints` (_joints): pairs of items kept apart without MARGIN, so their
@@ -2258,6 +2328,7 @@ def _attract(
     walls = (centres, h[:, None, :] + halves[None, :, :] + MARGIN, weight)
     spread, lift = float(_snap(spread)), float(_snap(lift))
     mirror = None if mirror is None else float(_snap(mirror))
+    bound = None if limits is None else (_snap(limits[0]), _snap(limits[1]))  # on the grid as every input (+-inf kept)
     ties = ties or {}
     free = [i for i in range(n) if i not in ties]
     slot = {i: k for k, i in enumerate(free)}
@@ -2283,9 +2354,9 @@ def _attract(
     def tied(z):  # one position per orbit of symmetry copies, plus the spread between protomers
         evals[0] += 1
         if n > _PAIR_ENERGY_ABOVE:
-            E, g = _energy(expand(z).ravel(), home, anchor_w, want, pull, loops, lam, mids, walls, reach)
+            E, g = _energy(expand(z).ravel(), home, anchor_w, want, pull, loops, lam, mids, walls, reach, bound)
         else:
-            E, g = _energy_dense(expand(z).ravel(), home, anchor_w, want, W, loops, lam, mids, walls)
+            E, g = _energy_dense(expand(z).ravel(), home, anchor_w, want, W, loops, lam, mids, walls, bound)
         g = g.reshape(-1, 2)
         if pinned:  # never moved: no gradient (L-BFGS then never steps them)
             g[pinned] = 0.0
@@ -2354,6 +2425,7 @@ def _attract(
     for it, p in zip(items, x.reshape(n, 2)):
         it.cx, it.cy = float(p[0]), float(p[1])
         it.home = (it.cx, it.cy)
+    _within(items, limits)
 
 
 _STEM_ROOM = 1.5  # the room a nucleic acid's stems take on the page: their footprints' area (with half a MARGIN round
@@ -3950,67 +4022,186 @@ def _to_face(
     return shift
 
 
-_WALL_REACH = 1e3  # page units: a membrane wall's least reach beyond its face, along and across the page
+# Plan 27 Task 4 (the author, 2026-10-24: "first the transmembrane should be determined and all set at the same hight
+# and rest orietn around it"; rulings P23-P26). A membrane view decides its band first (membrane.band_set, cli): the
+# crossing helices stand across it (`level`), the helices in the slab are drawn at their own depth range (`slab`,
+# membrane.slab_range: a standing one over its range, a flat one on its nearer face line), and every other element is
+# held by a hard one-sided bound (`bounds`, membrane.own_bound): its drawn body never nearer the mid-plane, on its own
+# side, than its nearest CA atom, and its footprint MARGIN clear of the face there (a soluble domain's element, its
+# panel's room: domain_panel), free outward and in x. The bound replaces the sides walled off the band (plan 26
+# ruling R4), the elements nothing held (the "free" ones: 6DQN's α89 drawn across the whole band, 6ZKT's α4 below it)
+# and the whole sheet a strand in the slab kept at its projected height (32KS's G/H hairpins in the band). It is a
+# constraint of every step that moves an item (_attract's energy, _separate's pushes and slides, the face rows, the
+# domains' parting, the face rows' rooms, a hand-widened element's room), each item's centre held within _limits.
+_BOUND_SLACK = 1e-3  # page units (0.004 Å) kept inside a bound, so a place snapped to the grid (_GRID) stays within it
 
 
-def _membrane_walls(
-    items: list[_Item],
-    sides: dict[str, int],
-    band: tuple[float, float],
-    kept: np.ndarray | None,
-    walls: Walls | None,
-    panelled: set[str] = frozenset(),
-) -> Walls | None:
-    """`walls` with two fixed boxes more, one per side of a membrane view's band (bottom, top page y): the band and
-    everything below it, which the items holding soluble elements of the upper side (`sides` +1) keep off, and the
-    band and everything above it, for those of the lower side (-1); MARGIN clear of the face, as of any fixed box
-    (_off_walls, _slide_clear, _attract's _fixed_overlap). An item keeping its height (`kept`), or holding soluble
-    elements of both sides, keeps off neither (plan 26 Task 2, ruling R4: no soluble element drawn in the slab).
-    With `panelled` (the elements of soluble domains, plan 26 ruling T3-c) two boxes more, reaching as far past
-    each face as a domain's panel reaches past its elements (domain_panel: DOMAIN_PAD, and the name's room above),
-    less MARGIN, plus _PANEL_CLEAR: the items holding such elements keep off those instead, so their domain's panel
-    stays out of the slab."""
-    panels = bool(panelled)
-    hard = np.zeros((len(items), 4 if panels else 2), bool)
+def _band_key(level: set[str], slab: dict, bounds: dict) -> Callable[[str], object]:
+    """What an element is in a membrane view, for grouping (_by_band): a crossing helix of the band (`level`), a helix
+    in the slab (`slab`, each its own: drawn at its own depth range, never with another), an element bound to a side
+    (`bounds`, by that side), or none of these."""
+
+    def key(sid: str) -> object:
+        if sid in level:
+            return "level"
+        if sid in slab:
+            return ("slab", sid)
+        if sid in bounds:
+            return ("side", bounds[sid][0])
+        return "other"
+
+    return key
+
+
+def _by_band(group: list, key: Callable[[str], object], run: bool) -> list[list]:
+    """Ruling P23: the parts of a group of helices drawn as one unit (a bundle of ids, a kinked helix's pieces) that are
+    alike by `key` (_band_key), each part of two or more a unit of its own (the rest drawn alone): a unit never holds
+    the band's elements and others (6UW4's A:423-432, 32 Å below the slab, a kinked piece of its TM A:438-461; 5LDW's
+    bundle of fifteen, TM and soluble helices of six chains). `run`: the parts are consecutive runs (a kinked helix's
+    pieces, end to end), else every member alike, in order (a bundle's)."""
+    of = [key(x if isinstance(x, str) else x.id) for x in group]
+    if len(set(of)) == 1:
+        return [group]
+    if run:
+        parts: list[list] = []
+        for n, (x, k) in enumerate(zip(group, of)):
+            if n and of[n - 1] == k:
+                parts[-1].append(x)
+            else:
+                parts.append([x])
+    else:
+        parts = [[x for x, k in zip(group, of) if k == c] for c in dict.fromkeys(of)]
+    return [p for p in parts if len(p) > 1]
+
+
+def _into_slab(items: list[_Item], slab: dict, band: tuple[float, float]) -> dict[int, int]:
+    """Ruling P23: each item that is one helix of the slab (`slab`: id -> (page y, page y, lying), cli from
+    membrane.slab_range; None: kept at its projected height) set at its own depth range: lying flat, its axis on its
+    face line (P13: Fig. 1C's NS1, NS7); standing, its axis over its range, its length its projected vertical extent,
+    _BOUND_SLACK inside it at either end. Its home goes with it (build_layout keeps its height, as a transmembrane
+    element's). Returns, for each item lying on a face line, that face: +1 the upper (band[1]), -1 the lower."""
+    out = {}
     for k, it in enumerate(items):
-        if kept is not None and kept[k]:
+        if len(it.members) != 1 or not isinstance(it.members[0], Placed) or it.members[0].ghost:
             continue
-        on = {sides[m.sse.id] for m in it.members if isinstance(m, Placed) and not m.ghost and m.sse.id in sides}
-        if len(on) == 1:
-            boxed = panels and any(isinstance(m, Placed) and m.sse.id in panelled for m in it.members)
-            hard[k, (0 if on.pop() > 0 else 1) + (2 if boxed else 0)] = True
-    if not hard.any():
-        return walls
-    lo, hi = band  # reaching ten times past the farthest item, however wide the page (review-2 M5)
-    far = max(_WALL_REACH, 10 * max(abs(v) + max(it.half) for it in items for v in (it.cx, it.cy)))
-    boxes = np.array([[-far, lo - far, far, hi], [-far, lo, far, hi + far]], float)
-    if panels:
-        up = max(0.0, DOMAIN_PAD - MARGIN) + _PANEL_CLEAR  # a panel's bottom edge, under its elements
-        down = max(0.0, DOMAIN_PAD + _DOMAIN_NAME_ROOM - MARGIN) + _PANEL_CLEAR  # its top edge, its name's room too
-        boxes = np.vstack([boxes, [[-far, lo - far, far, hi + up], [-far, lo - down, far, hi + far]]])
-    if walls is None:
-        return Walls(boxes, hard)
-    band_rows = (
-        None if walls.band is None else np.vstack([walls.band, np.full((len(boxes), walls.band.shape[1]), np.nan)])
-    )
-    return Walls(
-        np.vstack([np.asarray(walls.boxes, float).reshape(-1, 4), boxes]), np.hstack([walls.hard, hard]), band_rows
-    )
+        m = it.members[0]
+        span = slab.get(m.sse.id)
+        if span is None:
+            continue
+        y0, y1, lying = span
+        if lying:
+            y = float(y0)
+            out[k] = 1 if y >= (band[0] + band[1]) / 2 else -1
+        else:
+            rise = abs(float(np.sin(m.angle)))
+            y = (y0 + y1) / 2
+            if rise > 1e-9:
+                m.length = max(abs(y1 - y0) - 2 * _BOUND_SLACK, 0.0) / rise
+        it.cy, it.home = y, (it.home[0], y)
+    return out
 
 
-def _kept(items: list[_Item], level: set[str], on_face: dict[str, int] | None) -> np.ndarray | None:
-    """Which items keep their height (_separate's `level`), None if none: an item holding an element of `level` or of
-    `on_face` (in the slab at its own height, or a helix set on its face by _onto_faces). Such an item is never walled
-    off the band (_membrane_walls), whatever else it holds: a sheet with one strand in the slab keeps every strand at
-    its projected height, soluble ones too, and A18 reports any of them drawn overlapping the band (band_member, plan
-    27; review-2 M6)."""
-    on_face = on_face or {}
+def _face_line(items: list[_Item], line: dict[int, int], kept: np.ndarray) -> None:
+    """Ruling P23: the flat helices of the slab (`line`, _into_slab's: item -> its face) lying on their face line,
+    each face's in their projected order along it, packed round the columns standing there (the other items keeping
+    their height whose footprints reach the line's: _row_columns) with the least summed squared move from their
+    projected x (_pack_row). No room limits them: none may leave the face line for the ordinary layout (face rows do,
+    _face_rows), being in the bilayer."""
+    others = [k for k in np.flatnonzero(kept).tolist() if k not in line]
+    for side in (1, -1):
+        ks = sorted((k for k, s in line.items() if s == side), key=lambda k: (items[k].home[0], k))
+        if not ks:
+            continue
+        low = min(items[k].cy + items[k].box[1] for k in ks)
+        high = max(items[k].cy + items[k].box[3] for k in ks)
+        columns = _row_columns(items, others, low - MARGIN, high + MARGIN)
+        edges = [-np.inf] + [v for a, b in columns for v in (a - MARGIN, b + MARGIN)] + [np.inf]
+        at = _pack_row(
+            [items[k].home[0] + items[k].mid[0] for k in ks],
+            [items[k].half[0] for k in ks],
+            list(zip(edges[::2], edges[1::2])),
+        )
+        for k, x in zip(ks, at):
+            items[k].cx = float(_snap(x - items[k].mid[0]))
+            items[k].home = (items[k].cx, items[k].home[1])
+
+
+def _limits(
+    items: list[_Item],
+    bounds: dict | None,
+    band: tuple[float, float] | None,
+    panelled: set[str] = frozenset(),
+    banded: set[str] = frozenset(),
+) -> tuple[np.ndarray, np.ndarray] | None:
+    """Ruling P24: the least and the most page y of each item's centre (cy) that its one-sided bounds allow, -inf and
+    inf where it holds none; None when no element has a bound. `bounds`: element id -> (page side, page y), +1 above the
+    band, -1 below, and the y its nearest CA atom stands for (cli._membrane_places): each member's body (Placed.rect,
+    a ghost's too) keeps that side of that y, _BOUND_SLACK inside, and the item's footprint (labels and ends with it)
+    MARGIN clear of the face on that side, or for the elements of a soluble domain (`panelled`) as far as its panel
+    reaches past them (domain_panel: DOMAIN_PAD, and the name's room above), less MARGIN, plus _PANEL_CLEAR, so the
+    panel stays out of the slab (plan 26 ruling T3-c). An item holding elements of both sides (none on the campaign) is
+    held whole on the side most of them are (ruling P25: never split across the face). An item holding an element of
+    the band (`banded`: `level` and `slab`) takes no bound: the band's elements keep their height, and a unit no
+    _by_band splits (a barrel's sheet, its short strands crossing no membrane: 9FWZ's FimD) is kept with them. Measured
+    on the items as they stand: a hand-widened element changes its (build_layout measures again)."""
+    if not bounds or band is None:
+        return None
+    lo, hi = np.full(len(items), -np.inf), np.full(len(items), np.inf)
+    b0, b1 = band
+    near = max(0.0, DOMAIN_PAD - MARGIN) + _PANEL_CLEAR + MARGIN  # a panel's bottom edge under its elements
+    far = max(0.0, DOMAIN_PAD + _DOMAIN_NAME_ROOM - MARGIN) + _PANEL_CLEAR + MARGIN  # its top edge, the name's room
+    for k, it in enumerate(items):
+        if any(getattr(m, "sse", None) is not None and m.sse.id in banded for m in it.members):
+            continue
+        a, b, ups, downs, boxed = -np.inf, np.inf, 0, 0, False
+        for m, (_, oy) in zip(it.members, it.offsets):
+            if not isinstance(m, Placed) or m.sse.id not in bounds:
+                continue
+            side, y = bounds[m.sse.id]
+            hy = (m.rect[3] - m.rect[1]) / 2
+            boxed = boxed or m.sse.id in panelled
+            if side > 0:
+                ups += 1
+                a = max(a, y - (oy - hy) + _BOUND_SLACK)
+            else:
+                downs += 1
+                b = min(b, y - (oy + hy) - _BOUND_SLACK)
+        if not ups and not downs:
+            continue
+        _, y0, _, y1 = it.box
+        if ups:
+            a = max(a, b1 + (near if boxed else MARGIN) - y0)
+        if downs:
+            b = min(b, b0 - (far if boxed else MARGIN) - y1)
+        if ups and downs:  # both sides: held whole on the side most of its elements are
+            a, b = (a, np.inf) if ups >= downs else (-np.inf, b)
+        lo[k], hi[k] = a, b
+    return lo, hi
+
+
+def _within(items: list[_Item], limits: tuple[np.ndarray, np.ndarray] | None) -> None:
+    """Each item's centre, and its home with it, moved the least way back within its _limits (ruling P24)."""
+    if limits is None:
+        return
+    lo, hi = limits
+    for k, it in enumerate(items):
+        y = min(max(it.cy, float(lo[k])), float(hi[k]))
+        if y != it.cy:
+            it.cy = y
+        h = min(max(it.home[1], float(lo[k])), float(hi[k]))
+        if h != it.home[1]:
+            it.home = (it.home[0], h)
+
+
+def _kept(items: list[_Item], held: set[str]) -> np.ndarray | None:
+    """Which items keep their height (_separate's `level`), None if none: an item holding an element of `held` (the
+    transmembrane elements, the band's others at their own depth range, _into_slab, and the flat helices set on a face
+    by _onto_faces). A unit holding the band's elements holds no other (_by_band), so no element bound to a side is
+    kept with one of the band (plan 27 ruling P24: the whole sheet a strand in the slab kept at its projected height,
+    32KS's G/H hairpins, is gone with the band set first; a sheet holding a crossing strand and others, none on the
+    campaign, is kept whole)."""
     out = np.array(
-        [
-            any(getattr(m, "sse", None) is not None and (m.sse.id in level or m.sse.id in on_face) for m in it.members)
-            for it in items
-        ],
-        bool,
+        [any(getattr(m, "sse", None) is not None and m.sse.id in held for m in it.members) for it in items], bool
     )
     return out if out.any() else None
 
@@ -4253,20 +4444,18 @@ def _hold_rooms(
     kept: np.ndarray,
     level: set[str],
     seen_span: dict[str, tuple[float, float]],
-    walled: tuple,
-    separate: Callable[[Walls | None], str],
+    separate: Callable[[], str],
     moved: dict[int, float] | None = None,
-) -> tuple[Walls | None, str] | None:
+    limits: tuple[np.ndarray, np.ndarray] | None = None,
+) -> str | None:
     """Ruling R15: while a held face helix lies outside its room (_out_of_room) as the columns now stand, the first
     time each is moved back within it (_into_room), still held; any carried out again is released to the ordinary
-    layout, walled off the band on its side (`walled`: _membrane_walls' sides, the face helices' faces, the band, the
-    walls before any membrane wall, and the soluble domains' elements), at its projected place as it stood to its
-    chain's columns (`seen_span`, the spans as projected), and the layout is separated again (`separate`, given the
-    walls) after each round. Run after every separation that may move the columns or the helices (build_layout: after
-    _attract and _separate, the domains' parting and a hand-widened element's room). Returns the walls and the last
-    separation's state, None when no helix was out of its room. `moved` (_parted_rooms): rooms, and a released helix's
-    place, carried as far as the domains' parting carried the helix off its chain's columns."""
-    off, on_face, band, bare, panelled = walled
+    layout, at its projected place as it stood to its chain's columns (`seen_span`, the spans as projected), within
+    its one-sided bound (`limits`, _limits: off the band on its own side, plan 27 ruling P24), and the layout is
+    separated again (`separate`) after each round. Run after every separation that may move the columns or the helices
+    (build_layout: after _attract and _separate, the domains' parting and a hand-widened element's room). Returns the
+    last separation's state, None when no helix was out of its room. `moved` (_parted_rooms): rooms, and a released
+    helix's place, carried as far as the domains' parting carried the helix off its chain's columns."""
     out, clipped = None, False
     while gone := _out_of_room(items, faced, kept, level, moved):
         if not clipped:  # first moved back within their rooms, still held, and the layout separated again
@@ -4283,23 +4472,8 @@ def _hold_rooms(
                 x0 += moved[k]
             items[k].cx, items[k].cy, items[k].home = x0, y0, (x0, y0)
             kept[k] = False
-        off.update(_released(items, on_face, kept))
-        walls = _membrane_walls(items, off, band, kept, bare, panelled)
-        out = (walls, separate(walls))
-    return out
-
-
-def _released(items: list[_Item], on_face: dict[str, int], kept: np.ndarray | None) -> dict[str, int]:
-    """The flat helices of `on_face` (+1 or -1) whose items no longer keep a height (_face_release, _face_rows), by
-    the side of the band they lie on: released to the ordinary layout, they keep off the band there as a soluble
-    element does (_membrane_walls), so no loop of theirs runs in the slab."""
-    out = {}
-    for k, it in enumerate(items):
-        if kept is not None and kept[k]:
-            continue
-        for m in it.members:
-            if getattr(m, "sse", None) is not None and on_face.get(m.sse.id):
-                out[m.sse.id] = on_face[m.sse.id]
+        _within(items, limits)
+        out = separate()
     return out
 
 
@@ -4309,8 +4483,11 @@ def _face_rows(
     kept: np.ndarray,
     band: tuple[float, float],
     level: set[str],
+    limits: tuple[np.ndarray, np.ndarray] | None = None,
 ) -> None:
-    """Each face's flat helices (`faced`, _face_release's) laid out as rows, ruling R8. A row is a line: its helices
+    """Each face's flat helices (`faced`, _face_release's) laid out as rows, ruling R8, each within its one-sided bound
+    (`limits`, _limits: a row nearer the face than its nearest CA atom holds it out there; plan 27 ruling P24). A row
+    is a line: its helices
     keep their projected order along it and move the least (summed squared) from their projected x (_pack_row), round
     the columns standing in it (the other items keeping their height, whose footprints reach into the row: fixed,
     merged where they meet). While a helix is packed outside its room (its chain's transmembrane span padded by the
@@ -4345,6 +4522,7 @@ def _face_rows(
             x0, y0, _ = faced[k]
             items[k].cx, items[k].cy, items[k].home = x0, y0, (x0, y0)
             kept[k] = False
+    _within(items, limits)
 
 
 def _row_columns(items: list[_Item], others: list[int], low: float, high: float) -> list[list[float]]:
@@ -4847,7 +5025,8 @@ def build_layout(
     upright: set[str] | None = None,
     flat: set[str] | None = None,
     on_face: dict[str, int] | None = None,
-    sides: dict[str, int] | None = None,
+    slab: dict[str, tuple[float, float, bool] | None] | None = None,
+    bounds: dict[str, tuple[int, float]] | None = None,
     domain_sides: dict[str, int] | None = None,
     nearer: dict[str, int] | None = None,
     alike_first: bool = True,
@@ -4881,22 +5060,29 @@ def build_layout(
     transmembrane helices standing across the band whatever their tilt (plan 26: 7VVK's TM1, R:181-211, tilted 52°,
     was snapped flat across a face). `flat` (likewise): helices drawn right or left, lying along the membrane (plan 26
     Task 2: cli._membrane_places, by their tilt to its normal), also a kinked helix's pieces; a helix in a bundle, a βα
-    row or over a sheet follows its unit (review-2 M1). `on_face` (with `band`; element id -> +1 the upper face, -1 the
-    lower, 0 its own height): the flat helices drawn alone lie on that face in rows (ruling R8: _face_release,
-    _face_rows), an element in the slab crossing no membrane stays at its projected height (32KS A:328-339, a 14 Å
-    helix of the paper's eleven), each item holding one keeping that height as `level` items keep theirs. `sides`
-    (with `band`; element id -> +1 above, -1 below): the soluble elements of a membrane view, each item holding any
-    (and none of `level`, all on one side) kept off the band on its side, MARGIN clear (_membrane_walls: a fixed box
-    from its face across the band and on; random-100 A18 ruling R4: 7PIU's Gβ, and 32KS chain B's OB sheet, which
-    _attract's loop springs to its neighbours in the band dragged 4.9 page units, 21 Å, into it). In a membrane
-    view (`band`) the items keeping their height keep it through _attract too (moved sideways only), each chain's
-    transmembrane columns are dealt back their places in projected order (_in_order, ruling R11), and a
-    transmembrane helix half the band long is drawn a hair longer (_stretch_short, ruling R6).
-    `domain_sides` (with `band` and `domains`; domain name -> +1 above, -1 below: cli._domain_sides, plan 26 Task 3):
-    the soluble domains, each parted off the band on its side and its panel kept clear of the slab (its elements in
-    `sides` on that side, _membrane_walls' `panelled`); a domain holding an item that keeps its height is parted
-    sideways only, so its transmembrane elements stay across the band (_part_domains' `kept`), and the face rows'
-    bound (ruling R15, _hold_rooms) is held after the domains are parted.
+    row or over a sheet follows its unit (review-2 M1). A membrane view's band is decided first (plan 27 rulings
+    P23-P26; cli._membrane_places, membrane.band_set): `slab` (with `band`; element id -> (page y, page y, lying), or
+    None): the band's elements that are not `level`, each drawn alone (no bundle or kinked helix holds them with
+    another, _by_band) at its own depth range (_into_slab): a helix in the slab lying flat on its face line (P13,
+    Fig. 1C's NS1 and NS7; packed along it round the columns, _face_line), standing over its range at its projected
+    vertical extent; None, a crossing element that is not `level` (a subunit in a barrel's lumen), at its projected
+    height. `on_face` (with `band`; element id -> +1 the upper face, -1 the lower): the flat helices at a face that are
+    not the band's, drawn alone, lie beside that face in rows (ruling R8: _face_release, _face_rows). Each item holding
+    an element of `slab` or `on_face` keeps its height as `level` items keep theirs. `bounds` (with `band`; element id
+    -> (+1 above, -1 below), page y): every element not of the band, held by a hard one-sided bound (_limits, ruling
+    P24): its body never nearer the band's middle, on its own side, than its nearest CA atom (the page y), its footprint
+    MARGIN clear of the face, free outward and in x, through every step that moves it (_attract, _separate, the face
+    rows, the domains' parting, the face rows' rooms, a hand-widened element's room); no unit holds elements bound to a
+    side with the band's (_by_band). In a membrane view (`band`) the items keeping their height keep it through
+    _attract too (moved sideways only), each chain's transmembrane columns are dealt back their places in projected
+    order (_in_order, ruling R11), and a transmembrane helix half the band long is drawn a hair longer (_stretch_short,
+    ruling R6).
+    `domain_sides` (with `band` and `domains`; domain name -> +1 above, -1 below: cli._domain_sides, plan 26 Task 3,
+    ruling P25: the side all its elements are on, never its own over theirs): the soluble domains, each parted off the
+    band on its side and its panel kept clear of the slab (_limits' `panelled`); a domain holding an item that keeps
+    its height, or elements of both sides, is parted sideways only, so its transmembrane elements stay across the
+    band (_part_domains' `kept`), and the face rows' bound (ruling R15, _hold_rooms) is held after the domains are
+    parted.
     `alike_first`: a copy's elements are grouped as its mate's (_regroup_copies) and the copies the symmetry ties may
     be drawn alike in up to _SEP_TIE_ROOM (_separate's second chance, _tied_again), random-100 C2b-3; cli turns it
     off in a membrane view, where the transmembrane helices' heights are judged instead (C17).
@@ -4926,7 +5112,7 @@ def build_layout(
         given.update(domains=domains, partial=partial, rename=rename, swap=swap, move=move, keep_depth=keep_depth)
         given.update(na_cropped=na_cropped, template=template, copies=copies, relabel=relabel, names=names, over=over)
         given.update(level=level, band=band, upright=upright, alike_first=alike_first, let_go=let_go)
-        given.update(flat=flat, on_face=on_face, sides=sides, domain_sides=domain_sides, nearer=nearer)
+        given.update(flat=flat, on_face=on_face, slab=slab, bounds=bounds, domain_sides=domain_sides, nearer=nearer)
         given.update(conventions=conventions)
         return _rosette(sses, sheets, frame, mode, given)
     style = style or Style()
@@ -4972,10 +5158,16 @@ def build_layout(
     bundles = helix_bundles([s for s in sses if s.id not in in_rows])  # bundles are coiled coils, never a row's
     if getattr(frame, "sector", None):  # each protomer's part of a bundle drawn with its own copy
         bundles = _within_protomers(bundles, by_id, frame.sector)
+    banded = band is not None and mode == "projected" and bool(level or slab or bounds)  # the band decided first (P23)
+    key = _band_key(set(level or ()), slab or {}, bounds or {}) if banded else None
+    if banded:  # no bundle holds the band's elements and others; each part still of two chains or more
+        bundles = [p for g in bundles for p in _by_band(g, key, False) if len({by_id[k].chain for k in p}) > 1]
     bundled = {k for g in bundles for k in g}
     kinked = (
         _kink_groups(sses, bundled | in_rows) if mode == "projected" else []
     )  # a stack row draws each piece on its own
+    if banded:  # nor a kinked helix's pieces: each run of them alike drawn as one
+        kinked = [p for g in kinked for p in _by_band(g, key, True)]
     on_sheet = (
         _over_alike(over or {}, sses, rowed, bundled | in_rows | {s.id for g in kinked for s in g}, copies or {})
         if mode == "projected"
@@ -5044,6 +5236,7 @@ def build_layout(
     walls = _trace_walls(items, traces, nucleic) if traces else None  # traces stay: items keep off them
     rows: list[list[_Item]] = []
     kept = None  # items keeping their height (projected mode, `level`)
+    limits = None  # each item's least and most centre height by its elements' one-sided bounds (_limits, `bounds`)
     mirrored: list[tuple] = []  # (copy, mate) members of protomers drawn as mirror images
     copy_ties: dict[str, tuple[str, bool]] = {}
     tied_ids: set[str] = set()
@@ -5113,16 +5306,19 @@ def build_layout(
         if band is not None and level:  # a transmembrane helix half the band long, a hair longer (ruling R6)
             _stretch_short(items, set(level), band)
         faced = _onto_faces(items, on_face, band) if on_face and band is not None else {}  # flat helices on a face
-        kept = _kept(items, set(level or ()), on_face if band is not None else None)
+        line = _into_slab(items, slab, band) if slab and band is not None else {}  # the band's own, at their depths
+        held_ids = set(level or ()) | (set(on_face or ()) | set(slab or ()) if band is not None else set())
+        kept = _kept(items, held_ids)
+        if line:  # the flat helices of the slab on their face line, round the columns standing there
+            _face_line(items, line, kept)
+        panelled = {k for name, ids in domains or [] if name in (domain_sides or {}) for k in ids}  # soluble domains
+        ours = set(level or ()) | set(slab or ())  # the band's elements: their items keep their height, no bound
+        limits = _limits(items, bounds, band, panelled, ours) if banded else None  # every other element's bound (P24)
+        _within(items, limits)
         if faced:  # those beyond their chain's transmembrane span go back to the ordinary layout; the rest in rows
             faced = _face_release(items, faced, set(level or ()), kept)
             seen_span = _tm_spans(items, set(level or ()))  # each chain's columns as projected
-            _face_rows(items, faced, kept, band, set(level or ()))
-        bare, off = walls, dict(sides or {}) if band is not None else {}  # off the band: soluble and released items
-        off.update(_released(items, (on_face or {}) if band is not None else {}, kept))
-        panelled = {k for name, ids in domains or [] if name in (domain_sides or {}) for k in ids}  # soluble domains
-        if off:  # each kept off the band on its own side
-            walls = _membrane_walls(items, off, band, kept, bare, panelled)
+            _face_rows(items, faced, kept, band, set(level or ()), limits)
         heights = [it.home[1] for it in items]
         seen_x = [it.home[0] for it in items]  # projected x: the order a membrane view keeps its columns in
         curved = False  # each bent duplex laid out as one curve (na_curve); with none curvable, exactly as pieces
@@ -5163,6 +5359,7 @@ def build_layout(
                 held_k=_K_HOME * like.weight if like is not None else _K_LIKE,
                 settled=like.settled if like is not None else None,
                 level=kept if band is not None else None,
+                limits=limits,
             )
         if kept is not None and kept.any():  # transmembrane elements at their projected height, reaching a face
             for k in np.flatnonzero(kept).tolist():
@@ -5180,67 +5377,75 @@ def build_layout(
             and len({sector_of.get(m.sse.chain) for m in it.members if isinstance(m, Placed)} - {None}) > 1
         }
         state = _separate(  # "alike", "wide" (alike only by the second chance, in more room) or "alone"
-            items, ties, joints, walls, mirror=mirror if ties else None, level=kept, shared=shared, again=alike_first
+            items,
+            ties,
+            joints,
+            walls,
+            mirror=mirror if ties else None,
+            level=kept,
+            shared=shared,
+            again=alike_first,
+            limits=limits,
         )
         before = [it.cx for it in items]
         parted = bool(domains) and _part_domains(
-            items, domains, ties, mirror if ties else None, **_banded(domains, domain_sides, kept, band)
+            items, domains, ties, mirror if ties else None, **_banded(domains, domain_sides, kept, band, limits)
         )
         moved = _parted_rooms(items, faced, set(level or ()), before) if parted and faced else {}
         if parted:  # the domains, parted with their copies, keep them alike whatever room that takes
             state = _separate(
-                items, ties, joints, walls, mirror=mirror if ties else None, room=np.inf, level=kept, again=alike_first
+                items,
+                ties,
+                joints,
+                walls,
+                mirror=mirror if ties else None,
+                room=np.inf,
+                level=kept,
+                again=alike_first,
+                limits=limits,
             )
         if faced:  # ruling R15: the face rows' bound held through _attract, _separate and the domains' parting
 
-            def hold(separate, walls, state):  # (the walls and the state after it)
-                return _hold_rooms(
-                    items,
-                    faced,
-                    kept,
-                    set(level or ()),
-                    seen_span,
-                    (off, on_face, band, bare, panelled),
-                    separate,
-                    moved,
-                ) or (walls, state)
+            def hold(separate, state):  # (the state after it)
+                return _hold_rooms(items, faced, kept, set(level or ()), seen_span, separate, moved, limits) or state
 
-            walls, state = hold(
-                lambda w: _separate(
+            state = hold(
+                lambda: _separate(
                     items,
                     ties,
                     joints,
-                    w,
+                    walls,
                     mirror=mirror if ties else None,
                     room=np.inf if parted else _SEP_SYM_ROOM,
                     level=kept,
                     shared=shared,
                     again=alike_first,
+                    limits=limits,
                 ),
-                walls,
                 state,
             )
         if band is not None and level:  # ruling R29: each chain's columns dealt back their projected order
 
-            def separate_again(w):
+            def separate_again():
                 return _separate(
                     items,
                     ties,
                     joints,
-                    w,
+                    walls,
                     mirror=mirror if ties else None,
                     room=_SEP_SYM_ROOM,
                     level=kept,
                     shared=shared,
                     again=alike_first,
+                    limits=limits,
                 )
 
             for _ in range(_ORDER_ROUNDS):
                 if not _in_order(items, set(level), seen_x, ties, mirror if ties else None):
                     break
-                state = separate_again(walls)
+                state = separate_again()
                 if faced:
-                    walls, state = hold(separate_again, walls, state)
+                    state = hold(separate_again, state)
         report = _TIE_TURN.get()[1]
         if report is not None:  # the shared sheets whose way up is a symmetry tie: _both_ways may turn them
             held = {m.sse.id for k in shared for m in items[k].members}
@@ -5276,9 +5481,11 @@ def build_layout(
         if _widen(items, hand.elements):
             for it in items:
                 it.home = (it.cx, it.cy)
-            _separate(items, None, joints, walls, level=kept)
+            if limits is not None:  # the bounds measured on the widened bodies (P24)
+                limits = _limits(items, bounds, band, panelled, ours)
+            _separate(items, None, joints, walls, level=kept, limits=limits)
             if faced:  # the face rows' bound (R15) held after this separation too
-                walls, _ = hold(lambda w: _separate(items, None, joints, w, level=kept), walls, None)
+                hold(lambda: _separate(items, None, joints, walls, level=kept, limits=limits), None)
             for it in items:
                 it.apply()
     for g in ghosts:
@@ -5409,7 +5616,7 @@ def _over_alike(
 
 DOMAIN_PAD = 0.7  # panel margin around a domain's elements
 _DOMAIN_NAME_ROOM = 0.6  # a domain panel's room above its elements for its name (domain_panel)
-_PANEL_CLEAR = 0.1  # page units a soluble domain's panel keeps clear of a membrane face (_membrane_walls)
+_PANEL_CLEAR = 0.1  # page units a soluble domain's panel keeps clear of a membrane face (_limits)
 _DOMAIN_GAP = 2 * DOMAIN_PAD + 0.6  # clear space between two domains' elements: both panels plus a gutter
 
 
@@ -5424,10 +5631,13 @@ def _part_domains(
     sweeps: int = 60,
     kept: np.ndarray | None = None,
     sides: list[int] | None = None,
+    limits: tuple[np.ndarray, np.ndarray] | None = None,
 ) -> bool:
-    """Move whole domains apart (each as a rigid group) until their boxes no longer overlap. Each item goes with
-    the domain most of its elements belong to. With `ties` (_symmetry_ties) copies stay alike: a domain moves with
-    its copies' domains and every item of their orbits (a unit, _domain_units), each copy by its tie (a mirrored
+    """Move whole domains apart (each as a rigid group) until their boxes no longer overlap, each item moved held within
+    its one-sided bounds (`limits`, _limits, plan 27 ruling P24: a soluble domain parts outward on the side all its
+    elements are, cli._domain_sides, so a move never takes one toward the band; the hold is the guarantee). Each item
+    goes with the domain most of its elements belong to. With `ties` (_symmetry_ties) copies stay alike: a domain moves
+    with its copies' domains and every item of their orbits (a unit, _domain_units), each copy by its tie (a mirrored
     copy, `mirror`, the other way across); two domains of one unit, copies of each other, part by widening the
     spread between protomers (protomer k moves k times the step), or for a mirror image sideways symmetrically.
     When the sweeps do not part them and leave the items' width plus height over _PART_BLOWUP times (3L9G: a sheet
@@ -5493,6 +5703,9 @@ def _part_domains(
             step = _snap(np.array([sx[n] * dx, dy]))
             it.cx, it.cy = it.cx + float(step[0]), it.cy + float(step[1])
             it.home = (it.home[0] + float(step[0]), it.home[1] + float(step[1]))  # rest here from now on
+            if limits is not None:
+                it.cy = min(max(it.cy, float(limits[0][n])), float(limits[1][n]))
+                it.home = (it.home[0], min(max(it.home[1], float(limits[0][n])), float(limits[1][n])))
 
     def overlap() -> float:  # summed over the pairs that may part
         total = 0.0
@@ -5585,12 +5798,13 @@ def _banded(
     domain_sides: dict[str, int] | None,
     kept: np.ndarray | None,
     band: tuple[float, float] | None,
+    limits: tuple[np.ndarray, np.ndarray] | None = None,
 ) -> dict:
-    """_part_domains' membrane arguments (`kept`, `sides`) in a membrane view with domains (build_layout `band` and
-    `domain_sides`), else none: parted as ever."""
+    """_part_domains' membrane arguments (`kept`, `sides`, `limits`) in a membrane view with domains (build_layout
+    `band` and `domain_sides`), else none: parted as ever."""
     if band is None or domain_sides is None:
-        return {}
-    return {"kept": kept, "sides": [domain_sides.get(name, 0) for name, _ in domains or []]}
+        return {"limits": limits} if limits is not None else {}
+    return {"kept": kept, "sides": [domain_sides.get(name, 0) for name, _ in domains or []], "limits": limits}
 
 
 def _part_sweeps(

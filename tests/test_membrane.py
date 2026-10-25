@@ -720,7 +720,7 @@ def test_a_route_turning_out_of_a_port_at_or_in_the_slab_turns_at_the_port(entry
 
 # plan 27 rule P7: A18 made strict before the layout is (Tasks 4 and 5 take these marks off)
 PENDING = pytest.mark.xfail(  # only a failed assertion is the expected failure, never a crash (review-2 M4)
-    strict=True, raises=AssertionError, reason="plan 27 T4/T5: layout not yet by construction"
+    strict=True, raises=AssertionError, reason="plan 27 T5: loops not yet kept out of the slab"
 )
 
 
@@ -1265,8 +1265,9 @@ def test_a_flat_helix_lies_on_its_face_and_a_slab_element_keeps_its_height():
     """build_layout `on_face` with `band` (cli._membrane_places, ruling R8): a flat helix at a face, projected inside
     the band, lies on that face's first row, just outside the band (+1 the upper face, -1 the lower), within its chain's
     transmembrane span; one of a chain with no transmembrane element is released to the ordinary layout and kept off
-    the band like a soluble element; an element in the slab crossing no membrane (0) keeps its projected height while a
-    free element seen at the same place is moved off it."""
+    the band by its bound (`bounds`, plan 27 ruling P24); an element of the band held at its projected height (`slab`
+    None: a crossing one that does not define the membrane) keeps it while a free element seen at the same place is
+    moved off it."""
     from foldmap.layout import MARGIN, SCALE, build_layout
     from helpers import fake_sse
 
@@ -1279,11 +1280,25 @@ def test_a_flat_helix_lies_on_its_face_and_a_slab_element_keeps_its_height():
     other = fake_sse("H", 0, 11, centroid=(-40, 0, 10.0), axis=(1, 0, 0), chain="B")
     els = [tm, upper, lower, slab, free, other]
     flat = {upper.id, lower.id, other.id}
-    on = {upper.id: 1, lower.id: -1, slab.id: 0, other.id: 1}
-    lay = build_layout(els, [], _page(), "projected", level={tm.id}, upright={tm.id}, flat=flat, band=band, on_face=on)
+    on = {upper.id: 1, lower.id: -1, other.id: 1}
+    bounds = {upper.id: (1, 10.0 * SCALE), lower.id: (-1, -12.0 * SCALE), other.id: (1, 10.0 * SCALE)}
+    lay = build_layout(
+        els,
+        [],
+        _page(),
+        "projected",
+        level={tm.id},
+        upright={tm.id},
+        flat=flat,
+        band=band,
+        on_face=on,
+        slab={slab.id: None},
+        bounds=bounds,
+    )
     p = lay.placed
     assert band[1] + MARGIN - 1e-6 <= p[upper.id].rect[1] < band[1] + 2 * MARGIN
-    assert band[0] - 2 * MARGIN < p[lower.id].rect[3] <= band[0] - MARGIN + 1e-6
+    # the lower one, carried out of its room by the separation, is released (R15): held by its bound below the face
+    assert p[lower.id].rect[3] <= band[0] - MARGIN + 1e-6
     assert abs(np.sin(p[upper.id].angle)) < 1e-9 and abs(np.sin(p[lower.id].angle)) < 1e-9
     assert p[other.id].rect[1] >= band[1] + MARGIN - 1e-6  # released, off the band on its side
     assert p[slab.id].cy == pytest.approx(-4.0 * SCALE)
@@ -1292,28 +1307,33 @@ def test_a_flat_helix_lies_on_its_face_and_a_slab_element_keeps_its_height():
 
 
 def test_a_soluble_element_is_kept_off_the_band_on_its_own_side():
-    """build_layout `sides` (ruling R4, plan 26 Task 2): two soluble helices projected into the band (7PIU's Gβ was
-    pulled there by its loops; 32KS chain B's OB sheet by its neighbours) are each kept off it on their own side, MARGIN
-    clear of the face (layout._membrane_walls); without `sides` they stay in the band."""
-    from foldmap.layout import MARGIN, build_layout
+    """build_layout `bounds` (ruling R4, plan 26 Task 2; plan 27 ruling P24): two soluble helices projected into the
+    band (7PIU's Gβ was pulled there by its loops; 32KS chain B's OB sheet by its neighbours) are each kept off it on
+    their own side, MARGIN clear of the face (layout._limits); without `bounds` they stay in the band. A third, its
+    nearest CA atom 25 Å out (page y 5.75), is held out there, nearer the band than the face's MARGIN would."""
+    from foldmap.layout import MARGIN, SCALE, build_layout
     from helpers import fake_sse
 
     band = (-3.45, 3.45)
     up = fake_sse("H", 0, 12, centroid=(0, 0, 2.0), axis=(1, 0, 0))
     down = fake_sse("H", 20, 32, centroid=(20, 0, -2.0), axis=(1, 0, 0))
-    plain = build_layout([up, down], [], _page(), "projected", band=band).placed
-    assert all(band[0] < plain[s.id].cy < band[1] for s in (up, down))
-    kept = build_layout([up, down], [], _page(), "projected", band=band, sides={up.id: 1, down.id: -1}).placed
+    far = fake_sse("H", 40, 52, centroid=(40, 0, 2.0), axis=(1, 0, 0))
+    plain = build_layout([up, down, far], [], _page(), "projected", band=band).placed
+    assert all(band[0] < plain[s.id].cy < band[1] for s in (up, down, far))
+    bounds = {up.id: (1, 2.0 * SCALE), down.id: (-1, -2.0 * SCALE), far.id: (1, 25.0 * SCALE)}
+    kept = build_layout([up, down, far], [], _page(), "projected", band=band, bounds=bounds).placed
     assert kept[up.id].rect[1] >= band[1] + MARGIN - 1e-6
     assert kept[down.id].rect[3] <= band[0] - MARGIN + 1e-6
+    assert kept[far.id].rect[1] >= 25.0 * SCALE
 
 
 def test_membrane_places_reads_each_element_by_its_depth_and_tilt():
-    """cli._membrane_places (review-2 I4) on a 30 Å slab, normal up: a lying helix 4.9 Å beyond the outer face lies on
-    it, one 5.1 Å beyond is soluble; a standing helix and a strand in the slab keep their height (0), a lying helix in
-    the slab lies on the face its centre is nearer; a 3-10 helix in the slab is placed as any other; an element crossing
-    the membrane is none of these. The face sign follows the page: outer face up (+1) or down (-1). With no band only
-    `flat` is read."""
+    """cli._membrane_places (review-2 I4; plan 27 rulings P23, P24) on a 30 Å slab, normal up, faces at page y +-3.45:
+    a lying helix 4.9 Å beyond the outer face lies in its rows, one 5.1 Å beyond does not, and both are bound to their
+    side at their nearest CA; a standing helix in the slab (and a 3-10 helix there) is the band's, drawn upright over
+    its own depth range; a lying helix in the slab is the band's, on the face line its CA median is nearer; a strand in
+    the slab is never the band's: it is bound to its side; a transmembrane element is none of these. The signs and the
+    page y follow the page: outer face up or down. With no band only `flat` is read."""
     from types import SimpleNamespace
 
     from foldmap.cli import _membrane_places
@@ -1336,14 +1356,22 @@ def test_membrane_places_reads_each_element_by_its_depth_and_tilt():
         sses.append(SimpleNamespace(id=name, kind=kind, axis=axis, start=len(ca), end=len(ca) + len(z) - 1))
         ca += [(0.0, 0.0, float(v)) for v in z]
     bb = SimpleNamespace(ca=np.array(ca))
-    flat, on_face, sides = _membrane_places(sses, bb, mem, {"tm"}, (3.45, -3.45))  # outer face up the page
-    assert flat == {"face", "beyond", "inner"}
-    assert on_face == {"face": 1, "upright": 0, "strand": 0, "inner": -1}
-    assert sides == {"beyond": 1, "deep": -1}
-    flat2, on_face2, sides2 = _membrane_places(sses, bb, mem, {"tm"}, (-3.45, 3.45))  # outer face down
-    assert flat2 == flat and on_face2 == {"face": -1, "upright": 0, "strand": 0, "inner": 1}
-    assert sides2 == {"beyond": -1, "deep": 1}
-    assert _membrane_places(sses, bb, mem, {"tm"}, None) == (flat, {}, {})
+    k = 3.45 / 15.0  # page units per Å
+    for up in (1, -1):  # outer face up the page, then down
+        got = _membrane_places(sses, bb, mem, {"tm"}, (3.45 * up, -3.45 * up))
+        assert got.flat == {"face", "beyond", "inner"}
+        assert got.on_face == {"face": up}
+        assert got.bounds.keys() == {"face", "beyond", "deep", "strand"}
+        want = {"face": (up, 19.9 * k * up), "beyond": (up, 20.1 * k * up), "deep": (-up, -25.0 * k * up)}
+        want["strand"] = (up, 3.0 * k * up)
+        for name, (side, y) in want.items():
+            assert got.bounds[name][0] == side and got.bounds[name][1] == pytest.approx(y)
+        assert got.slab.keys() == {"upright", "inner", "turn"} and got.standing == {"upright", "turn"}
+        assert got.slab["upright"] == pytest.approx(tuple(sorted((-6.0 * k * up, 6.0 * k * up))) + (False,))
+        assert got.slab["inner"] == pytest.approx((-3.45 * up, -3.45 * up, True))
+        assert got.slab["turn"] == pytest.approx((2.0 * k * up, 2.0 * k * up, False))
+    none = _membrane_places(sses, bb, mem, {"tm"}, None)
+    assert none.flat == {"face", "beyond", "inner"} and not (none.on_face or none.slab or none.bounds or none.standing)
 
 
 def test_a_transmembrane_helix_half_the_band_long_is_drawn_a_hair_longer_and_crosses():
@@ -1509,10 +1537,11 @@ def test_the_band_joins_a_proteins_domains_in_every_copy_alike():
     }
 
 
-def test_a_soluble_domain_takes_the_side_its_centroid_lies_on():
-    """cli._domain_sides (ruling T3-c) on a 30 Å slab, normal up: a domain holding a transmembrane or face element
-    (`held`) is none; any other goes by its residues' centroid, above or below, whatever its elements' own sides (MIX:
-    one 30 Å above, one 10 Å below); the sign follows the page, outer face up (+1) or down (-1)."""
+def test_a_soluble_domain_takes_the_side_all_its_elements_lie_on():
+    """cli._domain_sides (rulings T3-c, P25) on a 30 Å slab, normal up: a domain holding a transmembrane or face element
+    (`held`) is none; any other goes by the side all its elements lie on (membrane.own_side), above or below; one whose
+    elements lie on both sides (MIX: one 30 Å above, one 10 Å below; 6JLN's η7 and η8 in a domain lying outside) has
+    none: never its centroid's side over its elements' own. The sign follows the page, outer face up (+1) or down."""
     from types import SimpleNamespace
 
     from foldmap.cli import _domain_sides
@@ -1527,8 +1556,8 @@ def test_a_soluble_domain_takes_the_side_its_centroid_lies_on():
         ca += [(0.0, 0.0, float(v)) for v in z]
     bb = SimpleNamespace(ca=np.array(ca))
     named = [("M", ["tm", "up"]), ("F", ["face"]), ("UP", ["up"]), ("DOWN", ["down"]), ("MIX", ["a", "b"])]
-    assert _domain_sides(named, sses, bb, mem, {"tm", "face"}, (3.45, -3.45)) == {"UP": 1, "DOWN": -1, "MIX": 1}
-    assert _domain_sides(named, sses, bb, mem, {"tm", "face"}, (-3.45, 3.45)) == {"UP": -1, "DOWN": 1, "MIX": -1}
+    assert _domain_sides(named, sses, bb, mem, {"tm", "face"}, (3.45, -3.45)) == {"UP": 1, "DOWN": -1}
+    assert _domain_sides(named, sses, bb, mem, {"tm", "face"}, (-3.45, 3.45)) == {"UP": -1, "DOWN": 1}
 
 
 def _domain_item(s, x, y, length, angle):
@@ -1572,8 +1601,8 @@ def test_domains_part_by_the_band(case):
 def test_a_soluble_domains_panel_stays_out_of_the_slab():
     """build_layout `domain_sides` (ruling T3-c): a soluble domain's elements keep off the band far enough that its
     panel (domain_panel: DOMAIN_PAD round its elements, its name's room above) stays clear of the slab, on either side;
-    with the elements walled only MARGIN clear (no `domain_sides`), the lower domain's panel reaches into it."""
-    from foldmap.layout import build_layout, domain_panel
+    with the elements bound only MARGIN clear (no `domain_sides`), the lower domain's panel reaches into it."""
+    from foldmap.layout import SCALE, build_layout, domain_panel
     from helpers import fake_sse
 
     band = (-3.45, 3.45)
@@ -1582,8 +1611,8 @@ def test_a_soluble_domains_panel_stays_out_of_the_slab():
     lo = fake_sse("H", 45, 56, centroid=(-60, 0, -2.0), axis=(0, 0, 1))  # upright, its label beside it, not above
     tail = fake_sse("H", 70, 80, centroid=(120, 0, 30.0), axis=(1, 0, 0))  # the C-terminus: no end letter on `lo`
     doms = [("M", [tm.id]), ("HI", [hi.id, tail.id]), ("LO", [lo.id])]
-    sides = {hi.id: 1, tail.id: 1, lo.id: -1}
-    kw = dict(level={tm.id}, upright={tm.id}, flat={hi.id, tail.id}, band=band, sides=sides, domains=doms)
+    bounds = {hi.id: (1, 2.0 * SCALE), tail.id: (1, 30.0 * SCALE), lo.id: (-1, -2.0 * SCALE)}
+    kw = dict(level={tm.id}, upright={tm.id}, flat={hi.id, tail.id}, band=band, bounds=bounds, domains=doms)
     els = [tm, hi, lo, tail]
     lay = build_layout(els, [], _page(), "projected", domain_sides={"HI": 1, "LO": -1}, **kw)
     assert domain_panel(lay, "HI")[1] >= band[1] and domain_panel(lay, "LO")[3] <= band[0]
@@ -1776,9 +1805,11 @@ def test_the_note_says_when_the_band_joined_every_domain():
 def test_the_band_holds_a_crossing_subunit_that_does_not_define_the_membrane():
     """Review-3 M3 and M4 (cli._band_ids): 9FWZ's FimA subunit (chain B) lies in the usher's lumen, crossing the slab
     without defining the membrane (a beta-barrel's strands do): it is in no transmembrane set, but the band holds it,
-    so auto domains never split it off and a domain of it is not soluble. The face and slab ids of _membrane_places
-    are the same whichever way the faces lie on the page (the contract _band_ids asserts)."""
+    so auto domains never split it off and a domain of it is not soluble; those of its elements that cross the
+    membrane are membrane.band_set's, drawn at their projected height (_membrane_places `slab` None, plan 27 P23)
+    whichever way the faces lie on the page."""
     from foldmap.cli import _band_ids, _domain_sides, _membrane_places, _transmembrane
+    from foldmap.membrane import crosses
 
     lay, sses, bb = make_layout(DATA / "r100" / "9FWZ-DB.cif.gz", membrane="auto")
     mem = lay.bilayer
@@ -1786,8 +1817,12 @@ def test_the_band_holds_a_crossing_subunit_that_does_not_define_the_membrane():
     held = _band_ids(sses, bb, mem, tm)
     lumen = {"B:52-61", "B:68-74", "B:127-138", "B:153-158"}
     assert lumen <= held and not lumen & tm
-    up, down = (_membrane_places(sses, bb, mem, tm, f)[1] for f in ((1.0, -1.0), (-1.0, 1.0)))
-    assert up.keys() == down.keys() and all(up[k] == -down[k] for k in up)
+    depth = mem.depth(bb.ca)
+    crossing = {s.id for s in sses if s.id in lumen and crosses(depth[s.start : s.end + 1], mem.half)}
+    assert crossing
+    for faces in ((1.0, -1.0), (-1.0, 1.0)):
+        slab = _membrane_places(sses, bb, mem, tm, faces).slab
+        assert all(k in slab and slab[k] is None for k in crossing)
     assert _domain_sides([("FimA", sorted(lumen))], sses, bb, mem, held, (3.45, -3.45)) == {}
 
 
@@ -1975,10 +2010,10 @@ def test_a_tm_helix_drawn_between_the_faces_goes_to_the_face_its_run_comes_neare
 
 
 def test_an_element_wholly_beyond_a_face_is_kept_off_the_band():
-    """Ruling T5-5's layout (6ZKT's M:50-51, 18-19 Å out, drawn 10 Å into the slab): cli._membrane_places puts an
-    element standing wholly beyond a face, its centre within SOLUBLE_BEYOND, among the soluble ones kept off the band
-    on that side (`sides`); a flat one there still lies on the face, and one reaching into the slab is placed as
-    before."""
+    """Ruling T5-5's layout (6ZKT's M:50-51, 18-19 Å out, drawn 10 Å into the slab), and plan 27 ruling P24: every
+    element not of the band is bound to its side at its nearest CA atom (cli._membrane_places `bounds`): one standing
+    wholly beyond a face, a flat one there (which also lies in the face's rows), and a strand reaching into the slab
+    (no longer held at its projected height, an interfacial strand in the band: 32KS's G/H hairpin)."""
     from types import SimpleNamespace
 
     from foldmap.cli import _membrane_places
@@ -1994,8 +2029,12 @@ def test_an_element_wholly_beyond_a_face_is_kept_off_the_band():
     for name, (kind, axis, z) in runs.items():
         sses.append(SimpleNamespace(id=name, kind=kind, axis=axis, start=len(ca), end=len(ca) + len(z) - 1))
         ca += [(0.0, 0.0, float(v)) for v in z]
-    _, on_face, sides = _membrane_places(sses, SimpleNamespace(ca=np.array(ca)), mem, set(), (3.45, -3.45))
-    assert sides == {"strand": 1} and on_face == {"flat": 1}
+    got = _membrane_places(sses, SimpleNamespace(ca=np.array(ca)), mem, set(), (3.45, -3.45))
+    assert got.on_face == {"flat": 1} and not got.slab
+    k = 3.45 / 15.0
+    want = {"strand": 18.3 * k, "flat": 17.0 * k, "reaching": 14.0 * k}
+    assert {n: s for n, (s, _) in got.bounds.items()} == dict.fromkeys(want, 1)
+    assert all(got.bounds[n][1] == pytest.approx(y) for n, y in want.items())
 
 
 def _band_helices(order_x, spread=100.0):
@@ -2092,7 +2131,10 @@ COMEC_CASES = {  # the three ComEC figures A18 is held on (Fig. 1C): the dimer, 
     "A": {"chains": ["A"]},
     "A-domains": {"chains": ["A"], "domains": "auto", "style": ["color_by=domain"]},
 }
-COMEC_PASSING = {"wrong_side"}  # A18's parts ComEC's figures pass today: they guard 32KS until Tasks 4 and 5
+A18_PARTS = ("slab_helix", "band_member", "strand_in_band", "outside_in_band", "wrong_side", "loop_in_band")
+# A18's parts ComEC's figures pass: all since plan 27 Task 4 (the band laid out first, every other element bound to its
+# side) but the dimer's loop_in_band, Task 5's (a loop routed through the slab)
+COMEC_PASSING = {"dimer": set(A18_PARTS) - {"loop_in_band"}, "A": set(A18_PARTS), "A-domains": set(A18_PARTS)}
 
 
 @functools.cache
@@ -2108,9 +2150,9 @@ def _comec_a18(case: str) -> dict:
 @pytest.mark.parametrize(
     "case, part",
     [
-        pytest.param(case, part, marks=() if part in COMEC_PASSING else PENDING, id=f"{case}-{part}")
+        pytest.param(case, part, marks=() if part in COMEC_PASSING[case] else PENDING, id=f"{case}-{part}")
         for case in COMEC_CASES
-        for part in ("slab_helix", "band_member", "strand_in_band", "outside_in_band", "wrong_side", "loop_in_band")
+        for part in A18_PARTS
     ],
 )
 def test_a18_on_comec(case, part):
@@ -2293,3 +2335,139 @@ def test_a_missing_chain_is_said_before_the_membrane_is_looked_for(monkeypatch):
     with pytest.raises(ValueError, match="no chain Z"):
         make_layout(Path(__file__).parent / "data" / "1C3W.cif", membrane="auto", chains=["Z"])
     assert not called
+
+
+# ------------------------------------------------- plan 27 Task 4: the band first, one-sided bounds (P23-P26)
+def _rects_apart(a, b) -> bool:
+    return a[2] <= b[0] + 1e-9 or b[2] <= a[0] + 1e-9 or a[3] <= b[1] + 1e-9 or b[3] <= a[1] + 1e-9
+
+
+def test_the_bound_holds_through_the_separation():
+    """Ruling P24 (layout._separate, _bounded_push): two strands overlapping mostly up and down, the lower held by its
+    bound at page y 5 (its nearest CA atom's), are parted by the upper one moving the whole way; without the bound the
+    push takes each half the way, the lower one down past it."""
+    from foldmap.layout import Placed, _Item, _overlapping, _separate
+    from helpers import fake_sse
+
+    a, b = fake_sse("E", 0, 6), fake_sse("E", 10, 16)
+
+    def laid(limits):
+        items = [
+            _Item([Placed(s, 0, 0, 4.0, 0.0, 1.0)], [(0.0, 0.0)], 0.0, y, (0.0, y), s.start, s.chain)
+            for s, y in ((a, 5.0), (b, 5.5))
+        ]
+        _separate(items, limits=limits)
+        xy = np.array([(it.cx, it.cy) for it in items])
+        halves, mids = np.array([it.half for it in items]), np.array([it.mid for it in items])
+        assert not len(_overlapping(xy, halves, mids))
+        return items
+
+    assert laid(None)[0].cy < 5.0  # unbound: pushed down past it
+    held = laid((np.array([5.0, -np.inf]), np.full(2, np.inf)))
+    assert held[0].cy >= 5.0 and held[1].cy > 5.5
+
+
+def test_every_element_keeps_its_bound_through_the_layout():
+    """Ruling P24 through build_layout (_attract, _separate, the face rows): soluble helices projected into and about
+    the band, their loops pulling them toward a transmembrane helix and each other, end with each body clear of the face
+    on its own side and never nearer the band's middle than its nearest CA atom (page y)."""
+    from foldmap.layout import SCALE, build_layout
+    from helpers import fake_sse
+
+    band = (-3.45, 3.45)
+    tm = fake_sse("H", 0, 25, centroid=(0, 0, 0.0), axis=(0, 0, 1))
+    els, bounds = [tm], {}
+    for k, (x, z, near) in enumerate(((2, 2.0, 1.0), (-3, 9.0, 21.0), (4, -5.0, -26.0), (1, 14.0, 18.0), (-1, -1, -3))):
+        s = fake_sse("H", 30 + 15 * k, 41 + 15 * k, centroid=(x, 0, z), axis=(1, 0, 0) if k % 2 else (0, 0, 1))
+        els.append(s)
+        bounds[s.id] = (1 if near > 0 else -1, near * SCALE)
+    lay = build_layout(els, [], _page(), "projected", level={tm.id}, upright={tm.id}, band=band, bounds=bounds)
+    for sid, (side, y) in bounds.items():
+        _, y0, _, y1 = lay.placed[sid].rect
+        if side > 0:
+            assert y0 >= max(y, band[1]), sid
+        else:
+            assert y1 <= min(y, band[0]), sid
+
+
+def test_a_domain_never_takes_an_element_off_its_own_side():
+    """Ruling P25 (6JLN with domains: η7 and η8, B:488-490 and B:502-504, 34 Å inside, parted with their domain, whose
+    centroid lies outside, 55 Å above the band): a soluble domain parted outward on its side (`domain_sides`) leaves its
+    element of the other side bound below the band, at its nearest CA atom; cli._domain_sides gives such a domain no
+    side at all (test_a_soluble_domain_takes_the_side_all_its_elements_lie_on)."""
+    from foldmap.layout import SCALE, build_layout
+    from helpers import fake_sse
+
+    band = (-3.45, 3.45)
+    tm = fake_sse("H", 0, 25, centroid=(0, 0, 0.0), axis=(0, 0, 1))
+    out = fake_sse("H", 30, 41, centroid=(1, 0, 25.0), axis=(1, 0, 0))
+    inner = fake_sse("H", 45, 48, centroid=(2, 0, -34.0), axis=(1, 0, 0))
+    bounds = {out.id: (1, 22.0 * SCALE), inner.id: (-1, -33.0 * SCALE)}
+    lay = build_layout(
+        [tm, out, inner],
+        [],
+        _page(),
+        "projected",
+        level={tm.id},
+        upright={tm.id},
+        flat={out.id, inner.id},
+        band=band,
+        bounds=bounds,
+        domains=[("M", [tm.id]), ("S", [out.id, inner.id])],
+        domain_sides={"S": 1},  # as the domain's centroid would have it
+    )
+    p = lay.placed
+    assert p[inner.id].rect[3] <= -33.0 * SCALE and p[out.id].rect[1] >= 22.0 * SCALE
+
+
+def test_an_interfacial_hairpin_is_lifted_out_whole():
+    """Rulings P24, P25 (32KS's G/H hairpin, A:402-404 and A:467-469, 13-17 Å out, held in the band at its projected
+    height with its sheet): an interfacial β-hairpin, its strands' nearest CA atoms 5 and 9 Å out (in the slab), is no
+    band element: the sheet is lifted out of the band whole, MARGIN clear of the outer face, its strands where they
+    stand in it to each other."""
+    from foldmap.layout import MARGIN, SCALE, build_layout
+    from foldmap.model import Sheet
+    from helpers import fake_sse
+
+    band = (-3.45, 3.45)
+    tm = fake_sse("H", 0, 25, centroid=(-20, 0, 0.0), axis=(0, 0, 1))
+    s1 = fake_sse("E", 30, 36, centroid=(0, 0, 8.0), axis=(0, 0, 1))
+    s2 = fake_sse("E", 39, 45, centroid=(4.8, 0, 12.0), axis=(0, 0, -1))
+    sheets = [Sheet([s1, s2], [1, -1], ["A"])]
+    kw = dict(level={tm.id}, upright={tm.id}, band=band)
+    plain = build_layout([tm, s1, s2], sheets, _page(), "projected", **kw).placed  # projected at 1.84: in the band
+    bounds = {s1.id: (1, 5.0 * SCALE), s2.id: (1, 9.0 * SCALE)}
+    p = build_layout([tm, s1, s2], sheets, _page(), "projected", bounds=bounds, **kw).placed
+    assert min(p[s1.id].rect[1], p[s2.id].rect[1]) >= band[1] + MARGIN - 1e-6
+    apart = lambda q: (q[s2.id].cx - q[s1.id].cx, q[s2.id].cy - q[s1.id].cy)  # noqa: E731
+    assert apart(p) == pytest.approx(apart(plain))
+
+
+def test_a_helix_of_the_slab_is_drawn_at_its_own_depth_range():
+    """Ruling P23 with P13 (layout._into_slab, _face_line): a flat helix of the slab lies with its axis on its face line
+    (Fig. 1C's NS1 and NS7), beside the transmembrane column it was seen across; a standing one is drawn upright over
+    its own depth range, its ends within it."""
+    from foldmap.layout import build_layout
+    from helpers import fake_sse
+
+    band = (-3.45, 3.45)
+    tm = fake_sse("H", 0, 25, centroid=(0, 0, 0.0), axis=(0, 0, 1))
+    flat = fake_sse("H", 30, 45, centroid=(0, 0, -6.0), axis=(1, 0, 0))
+    stand = fake_sse("H", 50, 61, centroid=(15, 0, 3.0), axis=(0, 0, 1))
+    slab = {flat.id: (band[0], band[0], True), stand.id: (-0.5, 2.0, False)}
+    p = build_layout(
+        [tm, flat, stand],
+        [],
+        _page(),
+        "projected",
+        level={tm.id},
+        upright={tm.id, stand.id},
+        flat={flat.id},
+        band=band,
+        slab=slab,
+    ).placed
+    f = p[flat.id]
+    assert f.n_port[1] == pytest.approx(band[0], abs=1e-9) and f.c_port[1] == pytest.approx(band[0], abs=1e-9)
+    assert _rects_apart(f.rect, p[tm.id].rect)
+    g = p[stand.id]
+    assert all(-0.5 <= y <= 2.0 for y in (g.n_port[1], g.c_port[1])) and abs(g.n_port[1] - g.c_port[1]) > 2.0

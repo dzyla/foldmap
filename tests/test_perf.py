@@ -213,13 +213,13 @@ def test_push_apart_clears_a_crowd_without_the_fallback_slide(monkeypatch):
     left = []
     real = L._slide_clear
 
-    def spy(items, *a):
+    def spy(items, *a, **k):
         h = [it.half for it in items]
         m = [it.mid for it in items]
         left.append(
             sum(L._collide(items[i], h[i], m[i], items[j], h[j], m[j]) for i in range(len(items)) for j in range(i))
         )
-        real(items, *a)
+        real(items, *a, **k)
 
     monkeypatch.setattr(L, "_slide_clear", spy)
     sses, f = _pile(60)

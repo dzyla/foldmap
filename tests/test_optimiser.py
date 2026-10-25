@@ -139,10 +139,10 @@ def test_optimiser_inputs_are_snapped_to_a_grid(pdb, focus, restarts, monkeypatc
         starts.append(np.array(x0))
         return real_lbfgs(f, x0, **k)
 
-    def dense(flat, home, anchor_w, want, W, loops, lam, mids=None, fixed=None):
+    def dense(flat, home, anchor_w, want, W, loops, lam, mids=None, fixed=None, bound=None):
         if len(firsts) < len(starts):
             firsts.append((lam, flat, home, want, loops[1], loops[3], mids, fixed))
-        return real_dense(flat, home, anchor_w, want, W, loops, lam, mids, fixed)
+        return real_dense(flat, home, anchor_w, want, W, loops, lam, mids, fixed, bound)
 
     monkeypatch.setattr(L, "_lbfgs", lbfgs)
     monkeypatch.setattr(L, "_energy_dense", dense)

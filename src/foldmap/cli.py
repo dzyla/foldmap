@@ -14,6 +14,7 @@ from collections import Counter
 from collections.abc import Callable
 from fractions import Fraction
 from pathlib import Path
+from typing import NamedTuple
 
 import numpy as np
 
@@ -45,7 +46,18 @@ from .layout import (
     snap,
     template_rows,
 )
-from .membrane import SOLUBLE_BEYOND, crosses, crosses_joined, lies_flat_here
+from .membrane import (
+    HELIX_KINDS,
+    SOLUBLE_BEYOND,
+    band_set,
+    crosses,
+    crosses_joined,
+    lies_flat_here,
+    own_bound,
+    own_side,
+    slab_helix,
+    slab_range,
+)
 from .membrane import joins as membrane_joins
 from .model import AUTO_NT, crop_nucleic, homolog_chains, nucleic_of_chains, nucleic_touching, res_ref
 from .names import all_names, apply_names, check_spec
@@ -1110,82 +1122,110 @@ def _membrane_band(lay, sses, bb, mem, faces=None) -> dict | None:
     }
 
 
-def _membrane_places(sses, bb, mem, tm: set[str], faces) -> tuple[set[str], dict[str, int], dict[str, int]]:
-    """Where a projected membrane view draws each element that crosses no membrane (plan 26 Task 2 rulings), from its
-    CA run's depths: `flat`, the helices (and 3-10 helices) that lie along the membrane (membrane.lies_flat_here:
-    tilted FLAT_TILT or more from the normal, FACE_FLAT_TILT in a face's interfacial zone, ruling T5-2); `on_face`,
-    those of them whose CA centre lies in the slab or within SOLUBLE_BEYOND beyond a face (amphipathic and
-    interfacial helices: 32KS's NS1, A:200-219), each drawn lying on the face its centre is nearer (+1 the face higher
-    on the page, -1 the lower: faces = (outer, inner) page y), and (0) every other element whose CA centre lies in
-    the slab, kept at its projected height (32KS A:328-339); and `sides`, every element whose CA centre lies more than
-    SOLUBLE_BEYOND beyond a face (soluble: ruling R4; A18 now judges every element's drawn body, plan 27), and every
-    other one not lying flat whose CA
-    run lies wholly beyond a face (ruling T5-5: 6ZKT's M:50-51, 18-19 Å out, was drawn 10 Å into the slab), kept off
-    the band on that face's side (+1 above, -1 below). With no band (faces None) only `flat` is read. Elements of
-    `tm`, and any other crossing the membrane (a subunit in a barrel lumen), are none of these."""
+class _Places(NamedTuple):
+    """Where a projected membrane view draws each element that is not `tm` (_membrane_places)."""
+
+    flat: set[str]  # the helices lying along the membrane (turned flat)
+    on_face: dict[str, int]  # the flat helices at a face not of the band, in rows beside it: +1 upper face, -1 lower
+    slab: dict[str, tuple[float, float, bool] | None]  # the band's others: their axis' page y range, and lying flat
+    bounds: dict[str, tuple[int, float]]  # every element not of the band: its page side and its nearest CA's page y
+    standing: set[str]  # the helices of the slab that stand (drawn upright)
+
+
+def _membrane_places(sses, bb, mem, tm: set[str], faces) -> _Places:
+    """Where a projected membrane view draws each element that is not `tm`, from its CA run's depths, its band decided
+    first (plan 27 rulings P23-P26, membrane.band_set; faces = (outer, inner) page y, page y of a depth read by the
+    faces' own scale, as A18 reads it):
+    - `flat`, the helices (and 3-10 helices) crossing no membrane that lie along it (membrane.lies_flat_here: tilted
+      FLAT_TILT or more from the normal, FACE_FLAT_TILT in a face's interfacial zone, ruling T5-2);
+    - `slab`, the band's elements that are not `tm`: a helix in the slab (membrane.slab_helix, ruling P10) drawn at
+      membrane.slab_range, lying flat on its nearer face line (ruling P13: Fig. 1C's NS1, NS7; (face y, face y, True)),
+      standing over its range ((y0, y1, False), and in `standing`); any other crossing the membrane (a subunit in a
+      barrel's lumen, 9FWZ's FimA) None, at its projected height;
+    - `bounds`, every element not of the band (an interfacial β-strand too: the author, sheets in the membrane are
+      wrong): its own side (membrane.own_bound; +1 the side higher on the page, -1 the lower) and the page y of its
+      nearest CA atom, which its drawn body never passes (ruling P24);
+    - `on_face`, those of `flat` not of the band whose CA centre lies within SOLUBLE_BEYOND beyond a face (32KS's
+      NS1, A:200-219), each laid in rows beside the face it lies by (ruling R8), within its bound.
+    With no band (faces None) only `flat` is read."""
     depth = mem.depth(bb.ca)
     up = 1 if faces is None or faces[0] >= faces[1] else -1  # the page side of the outside
-    flat, on_face, sides = set(), {}, {}
+    band = band_set(sses, depth, mem)
+    out = _Places(set(), {}, {}, {}, set())
+    if faces is not None:
+        mid, per = (faces[0] + faces[1]) / 2, (faces[0] - faces[1]) / (2 * mem.half)  # page y of depth d: mid + d * per
     for s in sses:
         seg = depth[s.start : s.end + 1]
-        if s.id in tm or crosses(seg, mem.half):
+        if s.id in tm:
             continue
-        centre = float(seg.mean())
-        side = up if centre >= 0 else -up
-        lying = s.kind in ("H", "G") and lies_flat_here(s.axis, seg, mem)
+        lying = s.kind in HELIX_KINDS and lies_flat_here(s.axis, seg, mem)
         if lying:
-            flat.add(s.id)
+            out.flat.add(s.id)
         if faces is None:
             continue
-        beyond = float(seg.min()) >= mem.half or float(seg.max()) <= -mem.half  # wholly beyond a face
-        if abs(centre) > mem.half + SOLUBLE_BEYOND or (beyond and not lying):
-            sides[s.id] = side
-        elif lying:
-            on_face[s.id] = side
-        elif abs(centre) <= mem.half and s.kind != "G":  # a 3-10 turn in the slab: placed as any other
-            on_face[s.id] = 0
-    return flat, on_face, sides
+        if s.id in band:
+            if not slab_helix(s, depth, mem):
+                out.slab[s.id] = None  # crossing, not tm: at its projected height
+            elif lying:
+                face = mid + (mem.half if float(np.median(seg)) >= 0.0 else -mem.half) * per
+                out.slab[s.id] = (face, face, True)
+            else:
+                y0, y1 = sorted(mid + d * per for d in slab_range(s, depth, mem))
+                out.slab[s.id] = (y0, y1, False)
+                out.standing.add(s.id)
+            continue
+        side, nearest = own_bound(seg)
+        out.bounds[s.id] = (side * up, mid + side * nearest * per)
+        if lying and abs(float(seg.mean())) <= mem.half + SOLUBLE_BEYOND:
+            out.on_face[s.id] = side * up
+    return out
 
 
 def _band_ids(sses, bb, mem, tm: set[str]) -> set[str]:
-    """What a projected membrane view's band holds (plan 26 ruling R17; review-3 M3, M4): the transmembrane elements
-    `tm`, every other element crossing the membrane (membrane.crosses: 9FWZ's FimA subunit in the usher's lumen, which
-    does not define it) and the elements _membrane_places sets on a face or holds in the slab. Contract: the ids
-    _membrane_places puts in `on_face` do not depend on the faces' page order, only their signs do, so any faces
-    serve; both orders are read and the contract asserted. Auto domains never split these (features.auto_domains
-    `band`); a domain holding any is not soluble (_domain_sides)."""
+    """The elements at the membrane that auto domains never split (plan 26 ruling R17; review-3 M3, M4;
+    features.auto_domains `band`): the transmembrane elements `tm`, every other element crossing the membrane
+    (membrane.crosses: 9FWZ's FimA subunit in the usher's lumen), the flat helices whose CA centre lies in the slab or
+    within SOLUBLE_BEYOND beyond a face, and every other element but a 3-10 helix whose CA centre lies in the slab. A
+    domain holding any is not soluble (_domain_sides). The domains' glue, not the layout's band: plan 27 lays the band
+    out by membrane.band_set (_membrane_places) and binds every other element to its side, these too; set by the band,
+    6UW4's interfacial A:570-582 left its transmembrane domain, and the soluble part parted off to the far side."""
     depth = mem.depth(bb.ca)
-    crossing = {s.id for s in sses if crosses(depth[s.start : s.end + 1], mem.half)}
-    up, down = (set(_membrane_places(sses, bb, mem, tm, faces)[1]) for faces in ((1.0, -1.0), (-1.0, 1.0)))
-    assert up == down, "_membrane_places' face and slab ids depend on the faces' order"
-    return set(tm) | crossing | up
+    out = set(tm)
+    for s in sses:
+        seg = depth[s.start : s.end + 1]
+        centre = abs(float(seg.mean()))
+        lying = s.kind in HELIX_KINDS and lies_flat_here(s.axis, seg, mem)
+        at = centre <= mem.half + SOLUBLE_BEYOND if lying else centre <= mem.half and s.kind != "G"
+        if at or crosses(seg, mem.half):
+            out.add(s.id)
+    return out
 
 
 def _membrane_args(sses, bb, mem, tm: set[str], faces, named, in_band: set[str]) -> dict:
     """build_layout's membrane arguments for a projected view through a frame whose faces project to `faces` ((outer,
-    inner) page y; None: no band): every transmembrane element keeps its projected height across the band (`level`,
-    `band`), standing upright and reaching the face its run comes nearer (`nearer`, _nearer_faces, ruling T5-4); each
-    other helix stands or lies by its tilt (membrane.lies_flat_here, rulings R7 and T5-2); a flat one at a face or in
-    the slab lies on that face, in rows (`on_face`, ruling R8), and a soluble element stays off the band on its own
-    side (`sides`), as _membrane_places reads them. With domains (`named`; plan 26 Task 3), each
-    domain holding none of the band's elements (`in_band`, _band_ids) is soluble: it and every element of it stay off
-    the band on the side its centroid lies (`domain_sides`, _domain_sides; ruling T3-c)."""
-    flat, on_face, sides = _membrane_places(sses, bb, mem, tm, faces)
+    inner) page y; None: no band), its band decided first (plan 27 ruling P23, _membrane_places): every transmembrane
+    element keeps its projected height across the band (`level`, `band`), standing upright and reaching the face its
+    run comes nearer (`nearer`, _nearer_faces, ruling T5-4); the band's others drawn at their own depth range (`slab`;
+    a standing one upright); each other helix stands or lies by its tilt (membrane.lies_flat_here, rulings R7 and
+    T5-2), a flat one at a face in rows beside it (`on_face`, ruling R8); and every element not of the band held by its
+    one-sided bound (`bounds`, ruling P24). With domains (`named`; plan 26 Task 3), each domain holding none of the
+    band's elements (`in_band`, _band_ids) and all of whose elements lie on one side is soluble: parted off the band
+    on that side (`domain_sides`, _domain_sides; rulings T3-c, P25)."""
+    places = _membrane_places(sses, bb, mem, tm, faces)
     if faces is None:  # no band: no height to keep, only the helices turned
-        return {"upright": set(), "flat": flat}
+        return {"upright": set(), "flat": places.flat}
     out = {
-        "upright": tm,
-        "flat": flat,
+        "upright": set(tm) | places.standing,
+        "flat": places.flat,
         "level": tm,
         "band": tuple(sorted(faces)),
-        "on_face": on_face,
-        "sides": sides,
+        "on_face": places.on_face,
+        "slab": places.slab,
+        "bounds": places.bounds,
         "nearer": _nearer_faces(sses, bb, mem, tm, faces),
     }
-    if named:  # each soluble domain on the side its centroid lies, every element of it with it (ruling T3-c)
+    if named:  # each soluble domain parted on the side all its elements are (rulings T3-c, P25)
         out["domain_sides"] = _domain_sides(named, sses, bb, mem, set(in_band), faces)
-        for name, side in out["domain_sides"].items():
-            sides.update({k: side for k in dict(named)[name]})
     return out
 
 
@@ -1207,10 +1247,12 @@ def _nearer_faces(sses, bb, mem, tm: set[str], faces) -> dict[str, int]:
 
 
 def _domain_sides(named, sses, bb, mem, held: set[str], faces) -> dict[str, int]:
-    """The soluble domains of a projected membrane view (plan 26 ruling T3-c), each by the side of the band its
-    centroid lies on: +1 above, -1 below, as _membrane_places' `sides` (faces = (outer, inner) page y). A domain is
-    soluble when it holds no element of `held` (the band's, _band_ids: a domain holding any keeps its place in the
-    band)."""
+    """The soluble domains of a projected membrane view (plan 26 ruling T3-c), each by the side of the band all its
+    elements lie on (membrane.own_side): +1 above, -1 below (faces = (outer, inner) page y). A domain is soluble when it
+    holds no element of `held` (the band's, _band_ids: a domain holding any keeps its place in the band). Ruling P25: an
+    element's side is its own, never its domain's: a domain whose elements lie on both sides has none here, and is
+    parted sideways only (6JLN's η7 and η8, B:488-490 and B:502-504, 34 Å inside, were parted 55 Å outside with their
+    domain, whose centroid lies there, and drawn above the band)."""
     depth = mem.depth(bb.ca)
     up = 1 if faces[0] >= faces[1] else -1  # the page side of the outside
     by_id = {s.id: s for s in sses}
@@ -1219,8 +1261,9 @@ def _domain_sides(named, sses, bb, mem, held: set[str], faces) -> dict[str, int]
         mine = [by_id[k] for k in ids if k in by_id]
         if not mine or held.intersection(ids):
             continue
-        at = np.concatenate([np.arange(s.start, s.end + 1) for s in mine])
-        out[name] = up if float(depth[at].mean()) >= 0 else -up
+        sides = {own_side(depth[s.start : s.end + 1]) for s in mine}
+        if len(sides) == 1:
+            out[name] = up * sides.pop()
     return out
 
 
