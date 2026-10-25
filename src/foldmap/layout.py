@@ -4145,30 +4145,71 @@ def _in_order(items: list[_Item], level: set[str], across: list[float], ties: di
             items[k].home = (items[k].cx, items[k].home[1])
 
 
+def _carried(room: tuple[float, float], moved: dict[int, float] | None, k: int) -> tuple[float, float]:
+    """A face helix's room (_face_room) carried sideways by `moved` (_parted_rooms) when it holds an entry for item `k`;
+    else as it is."""
+    d = (moved or {}).get(k)
+    return (room[0] + d, room[1] + d) if d else room
+
+
+def _parted_rooms(
+    items: list[_Item], faced: dict[int, tuple[float, float, int]], level: set[str], before: list[float]
+) -> dict[int, float]:
+    """Review-3 M2: how far the domains' parting carried each face helix sideways off its chain's transmembrane
+    columns (its move less their mean move; `before`, every item's x before the parting), where it did: a user's
+    domain of face helices parted sideways off its chain's TM panel is then held within its room carried as far
+    (_into_room, _out_of_room), not pulled back over that panel. A face helix parted with its columns (an automatic
+    membrane domain, ruling R17) moves with them: none."""
+    moves: dict[str, list[float]] = {}
+    for n, it in enumerate(items):
+        for m in it.members:
+            if getattr(m, "sse", None) is not None and m.sse.id in level:
+                moves.setdefault(m.sse.chain, []).append(it.cx - before[n])
+    out = {}
+    for k in faced:
+        c = items[k].members[0].sse.chain
+        if c in moves:
+            d = (items[k].cx - before[k]) - float(np.mean(moves[c]))
+            if abs(d) > 1e-9:
+                out[k] = d
+    return out
+
+
 def _into_room(
-    items: list[_Item], faced: dict[int, tuple[float, float, int]], kept: np.ndarray, level: set[str], ks: list[int]
+    items: list[_Item],
+    faced: dict[int, tuple[float, float, int]],
+    kept: np.ndarray,
+    level: set[str],
+    ks: list[int],
+    moved: dict[int, float] | None = None,
 ) -> None:
     """Ruling R15: each held face helix of `ks` moved sideways back within its room (_face_room) as the columns now
-    stand (_attract and _separate move them), to its nearer edge; its home with it."""
+    stand (_attract and _separate move them), to its nearer edge; its home with it. `moved` (_parted_rooms): a room
+    carried sideways as the domains' parting carried the helix off its chain's columns."""
     spans = _tm_spans(items, level, now=True)
     for k in ks:
         if kept[k]:
-            lo, hi = _face_room(items[k].members[0], spans)
+            lo, hi = _carried(_face_room(items[k].members[0], spans), moved, k)
             items[k].cx = float(_snap(min(max(items[k].cx, lo), hi)))
             items[k].home = (items[k].cx, items[k].home[1])
 
 
 def _out_of_room(
-    items: list[_Item], faced: dict[int, tuple[float, float, int]], kept: np.ndarray, level: set[str]
+    items: list[_Item],
+    faced: dict[int, tuple[float, float, int]],
+    kept: np.ndarray,
+    level: set[str],
+    moved: dict[int, float] | None = None,
 ) -> list[int]:
     """Ruling R15 (re-review-2 N1: _attract and _separate move a held face helix sideways, and 6JLN's e:42-47 ended
     310 Å beyond its chain's columns): the face helices still held whose drawn x lies outside their chain's padded
-    transmembrane span (_face_room) as the columns now stand (their items' places, _tm_spans of the current homes)."""
+    transmembrane span (_face_room) as the columns now stand (their items' places, _tm_spans of the current homes),
+    each room carried by `moved` (_parted_rooms)."""
     spans = _tm_spans(items, level, now=True)
     out = []
     for k in faced:
         if kept[k]:
-            lo, hi = _face_room(items[k].members[0], spans)
+            lo, hi = _carried(_face_room(items[k].members[0], spans), moved, k)
             if not lo - 1e-9 <= items[k].cx <= hi + 1e-9:
                 out.append(k)
     return out
@@ -4182,6 +4223,7 @@ def _hold_rooms(
     seen_span: dict[str, tuple[float, float]],
     walled: tuple,
     separate: Callable[[Walls | None], str],
+    moved: dict[int, float] | None = None,
 ) -> tuple[Walls | None, str] | None:
     """Ruling R15: while a held face helix lies outside its room (_out_of_room) as the columns now stand, the first
     time each is moved back within it (_into_room), still held; any carried out again is released to the ordinary
@@ -4190,13 +4232,14 @@ def _hold_rooms(
     chain's columns (`seen_span`, the spans as projected), and the layout is separated again (`separate`, given the
     walls) after each round. Run after every separation that may move the columns or the helices (build_layout: after
     _attract and _separate, the domains' parting and a hand-widened element's room). Returns the walls and the last
-    separation's state, None when no helix was out of its room."""
+    separation's state, None when no helix was out of its room. `moved` (_parted_rooms): rooms, and a released helix's
+    place, carried as far as the domains' parting carried the helix off its chain's columns."""
     off, on_face, band, bare, panelled = walled
     out, clipped = None, False
-    while gone := _out_of_room(items, faced, kept, level):
+    while gone := _out_of_room(items, faced, kept, level, moved):
         if not clipped:  # first moved back within their rooms, still held, and the layout separated again
             clipped = True
-            _into_room(items, faced, kept, level, gone)
+            _into_room(items, faced, kept, level, gone, moved)
             gone = []
         now = _tm_spans(items, level, now=True)
         for k in gone:  # then any still carried out of its room released to the ordinary layout, walled off the
@@ -4204,6 +4247,8 @@ def _hold_rooms(
             c = items[k].members[0].sse.chain
             if c in seen_span and c in now:
                 x0 += (sum(now[c]) - sum(seen_span[c])) / 2
+            if moved and k in moved:
+                x0 += moved[k]
             items[k].cx, items[k].cy, items[k].home = x0, y0, (x0, y0)
             kept[k] = False
         off.update(_released(items, on_face, kept))
@@ -5102,9 +5147,11 @@ def build_layout(
         state = _separate(  # "alike", "wide" (alike only by the second chance, in more room) or "alone"
             items, ties, joints, walls, mirror=mirror if ties else None, level=kept, shared=shared, again=alike_first
         )
+        before = [it.cx for it in items]
         parted = bool(domains) and _part_domains(
             items, domains, ties, mirror if ties else None, **_banded(domains, domain_sides, kept, band)
         )
+        moved = _parted_rooms(items, faced, set(level or ()), before) if parted and faced else {}
         if parted:  # the domains, parted with their copies, keep them alike whatever room that takes
             state = _separate(
                 items, ties, joints, walls, mirror=mirror if ties else None, room=np.inf, level=kept, again=alike_first
@@ -5113,7 +5160,14 @@ def build_layout(
 
             def hold(separate, walls, state):  # (the walls and the state after it)
                 return _hold_rooms(
-                    items, faced, kept, set(level or ()), seen_span, (off, on_face, band, bare, panelled), separate
+                    items,
+                    faced,
+                    kept,
+                    set(level or ()),
+                    seen_span,
+                    (off, on_face, band, bare, panelled),
+                    separate,
+                    moved,
                 ) or (walls, state)
 
             walls, state = hold(
@@ -5351,7 +5405,7 @@ def _part_domains(
     if len(keys) < 2:
         return False
     unit, members = _domain_units(len(items), groups, ties)
-    way = _part_way(keys, unit, members, kept, sides) if sides is not None else None
+    way = _part_way(items, keys, unit, members, kept, sides) if sides is not None else None
     if way is not None:  # each domain moves as it stands: the _separate after parting leaves it so (32KS chain B's
         for it in items:  # BLACT helix B:575-585, walled 6 units over its home, fell back to it alone, off its panel)
             it.home = (it.cx, it.cy)
@@ -5419,18 +5473,55 @@ def _part_domains(
     return moved
 
 
+class _Parting(NamedTuple):
+    """_part_domains' parting in a membrane view (_part_way)."""
+
+    side: dict[int, int]  # unit -> 0 (in the band: parted sideways only) or the side (+1, -1) a soluble one goes to
+    follow: dict[int, list[int]]  # band unit -> the soluble units carried along when it parts sideways
+    own: dict[int, set[int]]  # soluble unit -> the band units of its chains
+
+
 def _part_way(
-    keys: list[int], unit: dict[int, int], members: dict[int, list[int]], kept: np.ndarray | None, sides: list[int]
-) -> dict[int, int]:
+    items: list[_Item],
+    keys: list[int],
+    unit: dict[int, int],
+    members: dict[int, list[int]],
+    kept: np.ndarray | None,
+    sides: list[int],
+) -> _Parting:
     """_part_domains in a membrane view: each unit's way of parting, 0 sideways only (it holds an item keeping its
     height, `kept`, or its domains are of no one known side, `sides`), else the side (+1, -1) its soluble domains go
-    off the band to."""
-    out = {}
+    off the band to; and each soluble unit's chains' band units (those holding an item that keeps its height with an
+    element of a chain the soluble unit holds), the one whose items' mean x lies nearest its own carrying it along
+    whenever it parts sideways (ruling R20: a soluble domain stays near its projected x as its chain's membrane panel
+    stands, not where the page was)."""
+    side = {}
     for u in sorted(set(unit[d] for d in keys)):
         on = {sides[d] for d in keys if unit[d] == u}
         held = kept is not None and bool(kept[members[u]].any())
-        out[u] = 0 if held or len(on) != 1 else on.pop()
-    return out
+        side[u] = 0 if held or len(on) != 1 else on.pop()
+
+    def chains(u: int, held_only: bool = False) -> set[str]:
+        return {
+            m.sse.chain
+            for n in members[u]
+            if not held_only or (kept is not None and kept[n])
+            for m in items[n].members
+            if isinstance(m, Placed)
+        }
+
+    def x(u: int) -> float:
+        return float(np.mean([items[n].cx for n in members[u]]))
+
+    band = {u: chains(u, True) for u, w in side.items() if w == 0}
+    follow: dict[int, list[int]] = {}
+    own: dict[int, set[int]] = {}
+    for u, w in side.items():
+        mine = {b for b, cs in band.items() if cs & chains(u)} if w else set()
+        if mine:
+            own[u] = mine
+            follow.setdefault(min(sorted(mine), key=lambda b: abs(x(b) - x(u))), []).append(u)
+    return _Parting(side, follow, own)
 
 
 def _banded(
@@ -5450,9 +5541,14 @@ def _part_sweeps(
     keys, groups, unit, members, copy_k, mirror, box, shift, overlap, root, sweeps: int, guard: bool, way=None
 ):
     """_part_domains' sweeps: (anything moved, parted: a sweep found no clash); with `guard`, they also stop when a
-    sweep no longer shrinks the overlap. `way` (_part_way, a membrane view): two units in the band part sideways, a
-    soluble one moves off one in the band outward on its side by all their overlap, and two soluble ones part
+    sweep no longer shrinks the overlap. `way` (_part_way, a membrane view): two units in the band part sideways,
+    each carrying the soluble units that follow it; a soluble one moves off its own chains' band unit outward on its
+    side by all their overlap, and off another's sideways when that is cheaper, else outward; two soluble ones part
     sideways or (the cheaper way) outward: the outer of two on one side moves on, two on either side each go half."""
+
+    def carry(u: int) -> list[int]:  # a unit's items, with the soluble units following it
+        return members[u] + [n for f in way.follow.get(u, ()) for n in members[f]] if way is not None else members[u]
+
     moved, last = False, (overlap() if guard else 0.0)  # summed only when it may stop the sweeps (its boxes cost)
     for _ in range(sweeps):
         clash = False
@@ -5468,16 +5564,19 @@ def _part_sweeps(
                 ka, kb = _domain_level(groups[a], copy_k), _domain_level(groups[b], copy_k)
                 sa, sb = (-1.0 if k > 0 and mirror is not None else 1.0 for k in (ka, kb))
                 s = 1.0 if (B[0] + B[2]) >= (A[0] + A[2]) else -1.0  # b lies this way of a, in x
-                wa, wb = (way[unit[a]], way[unit[b]]) if way is not None else (None, None)
+                wa, wb = (way.side[unit[a]], way.side[unit[b]]) if way is not None else (None, None)
                 if unit[a] != unit[b] and way is not None and (wa == 0) != (wb == 0):  # soluble off the band's
-                    d, w, other = (b, wb, A) if wa == 0 else (a, wa, B)
-                    S = box(d)
-                    need = ((other[3] - S[1]) if w > 0 else (S[3] - other[1])) + _DOMAIN_GAP
-                    shift(members[unit[d]], 0.0, w * need)
+                    d, w, other, at = (b, wb, A, unit[a]) if wa == 0 else (a, wa, B, unit[b])
+                    if ox <= oy and at not in way.own.get(unit[d], ()):  # another chain's: sideways, the cheaper
+                        shift(members[unit[d]], (s if d == b else -s) * ox * (sb if d == b else sa), 0.0)
+                    else:
+                        S = box(d)
+                        need = ((other[3] - S[1]) if w > 0 else (S[3] - other[1])) + _DOMAIN_GAP
+                        shift(members[unit[d]], 0.0, w * need)
                 elif unit[a] != unit[b]:
                     if ox <= oy or wa == 0:  # the cheaper direction, each side going half way (as the domain's copy
-                        shift(members[unit[a]], -s * ox / 2 * sa, 0.0)  # moves); two in the band only sideways
-                        shift(members[unit[b]], s * ox / 2 * sb, 0.0)
+                        shift(carry(unit[a]), -s * ox / 2 * sa, 0.0)  # moves); two in the band only sideways, each
+                        shift(carry(unit[b]), s * ox / 2 * sb, 0.0)  # carrying its followers
                     elif way is not None and wa == wb:  # soluble, on one side: the outer one further out
                         outer = a if (A[1] + A[3]) * wa >= (B[1] + B[3]) * wa else b
                         shift(members[unit[outer]], 0.0, wa * oy)
@@ -5489,7 +5588,7 @@ def _part_sweeps(
                         shift(members[unit[a]], 0.0, -t * oy / 2)
                         shift(members[unit[b]], 0.0, t * oy / 2)
                 elif sa != sb:  # a domain and its mirror image: apart sideways, symmetrically
-                    shift(members[unit[a]], s * ox / (sb - sa), 0.0)
+                    shift(carry(unit[a]), s * ox / (sb - sa), 0.0)
                 elif kb != ka and mirror is None:  # copies of one domain: the spread widens
                     wider = s * ox / (kb - ka)
                     for n, k in enumerate(copy_k.tolist()):

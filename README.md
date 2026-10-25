@@ -348,8 +348,10 @@ in each chain, the domains holding an element that crosses the membrane, lies on
 are joined into one membrane domain (32KS chain A: the competence domain, its TM helices and the NS helices on the
 face, with the OB fold and the β-lactamase-like domain as the other two). A domain holding such an element (yours,
 given with `--domain`, too) stays across the band and is parted from the others sideways only, so every panel that
-crosses the membrane shares the one band, drawn across the page. Every other domain is soluble: it is drawn beyond
-the face on the side its centroid lies, near its projected x, its panel clear of the slab.
+crosses the membrane shares the one band, drawn across the page (a domain of face helices you give apart from its
+chain's TM helices lies on the face beside them). Every other domain is soluble: it is drawn beyond the face on the
+side its centroid lies, near its projected x as its chain's membrane panel stands, its panel clear of the slab. When
+the band joins every domain the contacts found, none is drawn, and the notes say why.
 
 ### Drawing a structure like another
 

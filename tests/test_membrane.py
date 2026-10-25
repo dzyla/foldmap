@@ -1317,9 +1317,10 @@ def test_a_soluble_domains_panel_stays_out_of_the_slab():
 
 @pytest.mark.parametrize("step", ["parting", "widening"])
 def test_the_face_rows_bound_holds_after_the_domains_are_parted(monkeypatch, step):
-    """Ruling R15 through the whole layout (re-review-3's parked note): a held face helix that the domains' parting, or
-    a hand-widened element's separation, carries 40 units off its chain's columns is brought back within its padded
-    transmembrane span (or released, at its projected place), as after _attract and _separate."""
+    """Ruling R15 through the whole layout (re-review-3's parked note): a held face helix that a step after the domains'
+    parting, or a hand-widened element's separation, carries 40 units off its chain's columns is brought back within
+    its padded transmembrane span (or released, at its projected place), as after _attract and _separate. The 40 are
+    put down to the step itself, the room not carried by the parting (_parted_rooms, review-3 M2: tested below)."""
     import foldmap.layout as L
     from foldmap.style import Style
     from helpers import fake_sse
@@ -1336,6 +1337,7 @@ def test_the_face_rows_bound_holds_after_the_domains_are_parted(monkeypatch, ste
         return True
 
     monkeypatch.setattr(L, "_part_domains" if step == "parting" else "_widen", away)
+    monkeypatch.setattr(L, "_parted_rooms", lambda *a, **k: {})  # the rooms not carried (review-3 M2: tested below)
     lay = L.build_layout(
         [tm, face],
         [],
@@ -1409,3 +1411,162 @@ def test_a_membrane_view_with_face_helices_still_counts_the_copies_it_let_go(mon
         alike_first=False,
     )
     assert lay.let_go == 1
+
+
+# ------------------------------------------------- plan 26 Task 3 fix round 1 (review-3: R20, M1-M5)
+@pytest.mark.parametrize("case", ["carried", "aside"])
+def test_a_soluble_domain_keeps_to_its_chains_membrane_panel(case):
+    """Ruling R20 (layout._part_way's `follow`, `own`): when two chains' band domains part sideways, a soluble domain of
+    a chain moves with that chain's band domain (it stayed at its absolute x); a soluble domain overlapping another
+    chain's band domain moves sideways off it where that is cheaper, its height kept (it was only lifted)."""
+    from foldmap.layout import _part_domains
+    from helpers import fake_sse
+
+    up, flat = np.pi / 2, 0.0
+    a, b = fake_sse("H", 0, 20), fake_sse("H", 0, 20, chain="B")
+    s = fake_sse("H", 30, 40)  # chain A's soluble helix
+    if case == "carried":  # A's and B's columns side by side, overlapping; A's soluble helix high above A's
+        items = [
+            _domain_item(a, 0.0, 0.0, 8.0, up),
+            _domain_item(b, 1.0, 0.0, 8.0, up),
+            _domain_item(s, -0.5, 9.0, 4.0, flat),
+        ]
+    else:  # A's columns far left; A's soluble helix over the edge of B's column, deeper than it is wide
+        items = [
+            _domain_item(a, -40.0, 0.0, 8.0, up),
+            _domain_item(b, 0.0, 0.0, 8.0, up),
+            _domain_item(s, 3.0, 1.0, 4.0, flat),
+        ]
+    before = [(it.cx, it.cy) for it in items]
+    doms = [("A", [a.id]), ("B", [b.id]), ("S", [s.id])]
+    assert _part_domains(items, doms, kept=np.array([True, True, False]), sides=[0, 0, 1])
+    if case == "carried":
+        assert items[0].cx != before[0][0] and items[2].cx - before[2][0] == pytest.approx(items[0].cx - before[0][0])
+        assert items[2].cy == before[2][1]
+    else:
+        assert items[2].cy == before[2][1] and items[2].cx > before[2][0]
+        assert items[0].cx == before[0][0] and items[1].cx == before[1][0]
+
+
+def test_a_face_domain_parted_off_its_columns_is_held_where_it_was_parted(monkeypatch):
+    """Review-3 M2: a user's domain of face helices parted sideways off its chain's TM panel is held within its room
+    carried as far as the parting moved it (_parted_rooms), not pulled back over the panel by R15."""
+    import foldmap.layout as L
+    from helpers import fake_sse
+
+    band = (-3.45, 3.45)
+    tm = fake_sse("H", 0, 25, centroid=(0, 0, 0.0), axis=(0, 0, 1))
+    face = fake_sse("H", 30, 41, centroid=(5, 0, 10.0), axis=(1, 0, 0))
+
+    def apart(items, *a, **k):  # the face domain parted 40 units off the TM domain, as a wide panel would push it
+        for it in items:
+            if any(m.sse.id == face.id for m in it.members):
+                it.cx += 40.0
+                it.home = (it.cx, it.home[1])
+        return True
+
+    monkeypatch.setattr(L, "_part_domains", apart)
+    lay = L.build_layout(
+        [tm, face],
+        [],
+        _page(),
+        "projected",
+        level={tm.id},
+        upright={tm.id},
+        flat={face.id},
+        band=band,
+        on_face={face.id: 1},
+        domains=[("TM", [tm.id]), ("NS", [face.id])],
+        domain_sides={},
+    )
+    p = lay.placed
+    assert p[face.id].cx > p[tm.id].rect[2] + max(L._FACE_PAD, p[face.id].length) + 20.0
+
+
+def test_the_note_says_when_the_band_joined_every_domain():
+    """Review-3 M1 (ruling R19): when residue contacts split a chain but the band joins every domain (5JDN's two TM
+    halves), the note says no domains are drawn and why, not that contacts found one domain."""
+    from foldmap.cli import domain_note
+
+    note = domain_note("inferred", [], band=True, absorbed=True)
+    assert note.startswith("no domains drawn") and "one domain per chain" in note and "reads as one domain" not in note
+    assert domain_note("inferred", [], band=True).startswith("no domains inferred: each chain reads as one domain")
+    assert (
+        domain_note("inferred", [], band=False)
+        == "no domains inferred: each chain reads as one domain from its residue contacts"
+    )
+
+
+def test_the_band_holds_a_crossing_subunit_that_does_not_define_the_membrane():
+    """Review-3 M3 and M4 (cli._band_ids): 9FWZ's FimA subunit (chain B) lies in the usher's lumen, crossing the slab
+    without defining the membrane (a beta-barrel's strands do): it is in no transmembrane set, but the band holds it,
+    so auto domains never split it off and a domain of it is not soluble. The face and slab ids of _membrane_places
+    are the same whichever way the faces lie on the page (the contract _band_ids asserts)."""
+    from foldmap.cli import _band_ids, _domain_sides, _membrane_places, _transmembrane
+
+    lay, sses, bb = make_layout(DATA / "r100" / "9FWZ-DB.cif.gz", membrane="auto")
+    mem = lay.bilayer
+    tm = _transmembrane(sses, bb, mem)
+    held = _band_ids(sses, bb, mem, tm)
+    lumen = {"B:52-61", "B:68-74", "B:127-138", "B:153-158"}
+    assert lumen <= held and not lumen & tm
+    up, down = (_membrane_places(sses, bb, mem, tm, f)[1] for f in ((1.0, -1.0), (-1.0, 1.0)))
+    assert up.keys() == down.keys() and all(up[k] == -down[k] for k in up)
+    assert _domain_sides([("FimA", sorted(lumen))], sses, bb, mem, held, (3.45, -3.45)) == {}
+
+
+def test_a_comec_like_protein_draws_the_three_domains_of_the_paper():
+    """Review-3 M5, on CI: a synthetic ComEC (one chain; 30 Å slab, normal up): three TM helices, a soluble block above
+    them, three TM helices with a helix lying on the outer face, and another soluble block above, in sequence. Residue
+    contacts find four domains (the two TM groups 40 Å apart); the band joins the TM groups and the face helix
+    (features.auto_domains `band`, cli._band_ids), so three are drawn, as the paper's competence, OB and β-lactamase
+    domains (cli._membrane_args, layout.build_layout): the competence panel across the band, every TM helix across its
+    middle, the two soluble panels above the outer face, no two panels overlapping."""
+    from types import SimpleNamespace
+
+    from foldmap.cli import _band_ids, _faces_on_page, _membrane_args, _transmembrane
+    from foldmap.features import auto_domains
+    from foldmap.layout import build_layout, domain_panel
+    from foldmap.membrane import Membrane
+    from foldmap.model import ResLabel
+    from helpers import fake_sse
+
+    ca, sses = [], []
+
+    def helix(start, end, n=24):
+        start, end = np.asarray(start, float), np.asarray(end, float)
+        first = len(ca)
+        ca.extend(start + (end - start) * t for t in np.linspace(0.0, 1.0, n))
+        axis = (end - start) / np.linalg.norm(end - start)
+        sses.append(fake_sse("H", first, len(ca) - 1, centroid=(start + end) / 2, axis=axis))
+        return sses[-1].id
+
+    tm1 = [helix((x, 0, -17.25 * sg), (x, 0, 17.25 * sg)) for x, sg in ((0, 1), (10, -1), (20, 1))]
+    ob = [helix((0, 0, z), (28.5, 0, z), 20) for z in (32, 37, 42)]
+    tm2 = [helix((x, 0, -17.25 * sg), (x, 0, 17.25 * sg)) for x, sg in ((60, 1), (70, -1), (80, 1))]
+    face = helix((56, 6, 17), (84.5, 6, 17), 20)
+    blact = [helix((60, 0, z), (88.5, 0, z), 20) for z in (32, 37, 42)]
+
+    bb = SimpleNamespace(ca=np.array(ca), labels=[ResLabel("A", k, "", "ALA") for k in range(len(ca))])
+    mem = Membrane(np.array([0.0, 0.0, 1.0]), 0.0, 15.0, "estimate")
+    tm = _transmembrane(sses, bb, mem)
+    assert tm == set(tm1 + tm2)
+    assert len(auto_domains(sses, {}, [], {}, frozenset(), bb=bb)) == 4  # contacts alone: four
+    in_band = _band_ids(sses, bb, mem, tm)
+    named = auto_domains(sses, {}, [], {}, frozenset(), bb=bb, band=in_band)
+    assert [(n, set(ids)) for n, ids in named] == [("D1", set(tm1 + tm2 + [face])), ("D2", set(ob)), ("D3", set(blact))]
+    args = _membrane_args(sses, bb, mem, tm, _faces_on_page(_page(), sses, bb, mem, tm), named, in_band)
+    assert args["domain_sides"] == {"D2": 1, "D3": 1}
+    lay = build_layout(sses, [], _page(), "projected", domains=named, **args)
+    lo, hi = args["band"]
+    panel = {n: domain_panel(lay, n) for n, _ in named}
+    assert panel["D1"][1] < lo and panel["D1"][3] > hi
+    assert panel["D2"][1] >= hi and panel["D3"][1] >= hi
+    names = sorted(panel)
+    for i, m in enumerate(names):
+        for n in names[i + 1 :]:
+            P, Q = panel[m], panel[n]
+            assert P[2] <= Q[0] or Q[2] <= P[0] or P[3] <= Q[1] or Q[3] <= P[1], (m, n)
+    for k in tm:
+        r = lay.placed[k].rect
+        assert r[1] < (lo + hi) / 2 < r[3]

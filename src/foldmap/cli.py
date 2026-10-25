@@ -699,11 +699,15 @@ def make_layout(
     )
     conventions = functools.partial(all_names, path, whole=whole)  # dep: and beta: references (layout.resolve)
     tm = _transmembrane(sses, bb, mem) if mem is not None and mode == "projected" else set()
-    in_band = (  # auto domains never split what the band holds (ruling T3-a): what crosses it, lies on its faces or
-        tm | set(_membrane_places(sses, bb, mem, tm, (1.0, -1.0))[1]) if tm else frozenset()  # is held in its slab
-    )
+    in_band = _band_ids(sses, bb, mem, tm) if tm else frozenset()  # auto domains never split these (R17)
     named = _domains(domains, sses, contacts, rows, copies, partial, bb, conventions, band=in_band)
-    named_note = domain_note(source, named, found_note, band=bool(in_band))
+    absorbed = (  # the band joined every domain contacts found (5JDN's two halves): the note says so (review-3 M1)
+        bool(in_band)
+        and source == "inferred"
+        and not named
+        and bool(_domains(domains, sses, contacts, rows, copies, partial, bb, conventions))
+    )
+    named_note = domain_note(source, named, found_note, band=bool(in_band), absorbed=absorbed)
     for _, ids in named:  # a domain holds together: its elements pull on each other
         for a in range(len(ids)):
             for b in range(a + 1, len(ids)):
@@ -770,32 +774,11 @@ def make_layout(
         return _faces_on_page(frame, sses, bb, mem, tm) if tm else None
 
     def in_membrane(frame) -> dict:
-        """A projected membrane view (plan 26 Task 2): build_layout's membrane arguments through `frame`. Every
-        transmembrane element keeps its projected height across the band (`level`, `band`: the faces as projected),
-        standing upright; each other helix stands or lies by its tilt (membrane.lies_flat, ruling R7); a flat one at
-        a face or in the slab lies on that face, in rows (`on_face`, ruling R8), and a soluble element stays off the
-        band on its own side (`sides`), as _membrane_places reads them. With domains (plan 26 Task 3), each domain
-        holding none of the band's elements is soluble: it and every element of it stay off the band on the side
-        its centroid lies (`domain_sides`, _domain_sides; ruling T3-c)."""
+        """A projected membrane view (plan 26 Task 2): build_layout's membrane arguments through `frame`
+        (_membrane_args, the faces as projected through it)."""
         if mem is None or mode != "projected":
             return {}
-        faces = faces_of(frame)
-        flat, on_face, sides = _membrane_places(sses, bb, mem, tm, faces)
-        if faces is None:  # no band: no height to keep, only the helices turned
-            return {"upright": set(), "flat": flat}
-        out = {
-            "upright": tm,
-            "flat": flat,
-            "level": tm,
-            "band": tuple(sorted(faces)),
-            "on_face": on_face,
-            "sides": sides,
-        }
-        if named:  # each soluble domain on the side its centroid lies, every element of it with it (ruling T3-c)
-            out["domain_sides"] = _domain_sides(named, sses, bb, mem, tm | set(on_face), faces)
-            for name, side in out["domain_sides"].items():
-                sides.update({k: side for k in dict(named)[name]})
-        return out
+        return _membrane_args(sses, bb, mem, tm, faces_of(frame), named, in_band)
 
     def finish(lay, frame, faces=None):  # what make_layout sets on a layout after build_layout through `frame`
         lay.helix_matched = {"cut": matched.get("cut", 0), "joined": matched.get("joined", 0)}
@@ -1145,11 +1128,51 @@ def _membrane_places(sses, bb, mem, tm: set[str], faces) -> tuple[set[str], dict
     return flat, on_face, sides
 
 
+def _band_ids(sses, bb, mem, tm: set[str]) -> set[str]:
+    """What a projected membrane view's band holds (plan 26 ruling R17; review-3 M3, M4): the transmembrane elements
+    `tm`, every other element crossing the membrane (membrane.crosses: 9FWZ's FimA subunit in the usher's lumen, which
+    does not define it) and the elements _membrane_places sets on a face or holds in the slab. Contract: the ids
+    _membrane_places puts in `on_face` do not depend on the faces' page order, only their signs do, so any faces
+    serve; both orders are read and the contract asserted. Auto domains never split these (features.auto_domains
+    `band`); a domain holding any is not soluble (_domain_sides)."""
+    depth = mem.depth(bb.ca)
+    crossing = {s.id for s in sses if crosses(depth[s.start : s.end + 1], mem.half)}
+    up, down = (set(_membrane_places(sses, bb, mem, tm, faces)[1]) for faces in ((1.0, -1.0), (-1.0, 1.0)))
+    assert up == down, "_membrane_places' face and slab ids depend on the faces' order"
+    return set(tm) | crossing | up
+
+
+def _membrane_args(sses, bb, mem, tm: set[str], faces, named, in_band: set[str]) -> dict:
+    """build_layout's membrane arguments for a projected view through a frame whose faces project to `faces` ((outer,
+    inner) page y; None: no band): every transmembrane element keeps its projected height across the band (`level`,
+    `band`), standing upright; each other helix stands or lies by its tilt (membrane.lies_flat, ruling R7); a flat one
+    at a face or in the slab lies on that face, in rows (`on_face`, ruling R8), and a soluble element stays off the
+    band on its own side (`sides`), as _membrane_places reads them. With domains (`named`; plan 26 Task 3), each
+    domain holding none of the band's elements (`in_band`, _band_ids) is soluble: it and every element of it stay off
+    the band on the side its centroid lies (`domain_sides`, _domain_sides; ruling T3-c)."""
+    flat, on_face, sides = _membrane_places(sses, bb, mem, tm, faces)
+    if faces is None:  # no band: no height to keep, only the helices turned
+        return {"upright": set(), "flat": flat}
+    out = {
+        "upright": tm,
+        "flat": flat,
+        "level": tm,
+        "band": tuple(sorted(faces)),
+        "on_face": on_face,
+        "sides": sides,
+    }
+    if named:  # each soluble domain on the side its centroid lies, every element of it with it (ruling T3-c)
+        out["domain_sides"] = _domain_sides(named, sses, bb, mem, set(in_band), faces)
+        for name, side in out["domain_sides"].items():
+            sides.update({k: side for k in dict(named)[name]})
+    return out
+
+
 def _domain_sides(named, sses, bb, mem, held: set[str], faces) -> dict[str, int]:
     """The soluble domains of a projected membrane view (plan 26 ruling T3-c), each by the side of the band its
     centroid lies on: +1 above, -1 below, as _membrane_places' `sides` (faces = (outer, inner) page y). A domain is
-    soluble when it holds no element of `held` (the transmembrane elements and those on a face or held in the slab:
-    a domain holding any keeps its place in the band)."""
+    soluble when it holds no element of `held` (the band's, _band_ids: a domain holding any keeps its place in the
+    band)."""
     depth = mem.depth(bb.ca)
     up = 1 if faces[0] >= faces[1] else -1  # the page side of the outside
     by_id = {s.id: s for s in sses}
@@ -1358,16 +1381,23 @@ def _domain_source(spec) -> str:
     return getattr(spec, "source", "") or ""
 
 
-def domain_note(source: str, named, found: str = "", band: bool = False) -> str:
+def domain_note(source: str, named, found: str = "", band: bool = False, absorbed: bool = False) -> str:
     """What the notes say of the domains (Layout.domain_note): automatic ones are inferred, not published (plan 12
     R2); CATH's come with their ids (`found`, cath.domains' note), or the note says why there are none. `band` (a
-    projected membrane view, plan 26 ruling T3-a): the note says the domains holding the band's elements are one."""
+    projected membrane view, plan 26 ruling T3-a): the note says the domains holding the band's elements are one;
+    `absorbed`: residue contacts split some chain but the band joined every domain, so none is drawn (5JDN's two
+    halves; ruling R19, review-3 M1)."""
     if source == "CATH":
         return found
     if source != "inferred":
         return ""
     stems = list(dict.fromkeys(name.split(" · ")[0] for name, _ in named))
     joined = "; what crosses the membrane, lies on its faces or sits in it is one domain per chain" if band else ""
+    if not stems and absorbed:
+        return (
+            "no domains drawn: residue contacts split a chain into domains, but each holds what crosses the membrane, "
+            "lies on its faces or sits in it, which is one domain per chain"
+        )
     if not stems:
         return "no domains inferred: each chain reads as one domain from its residue contacts" + joined
     return f"domains {', '.join(stems)} inferred from residue contacts, not a published domain assignment" + joined
