@@ -300,8 +300,10 @@ def _slab(bb: Backbone, long: list[SSE], normal: np.ndarray) -> Membrane | None:
 # (PTH1R-Gs: the G protein's helices; its normal 28.8° from the receptor's TM helices' own axis). So the normal is
 # refitted to the helices crossing the estimate (membrane.crosses), their length-weighted mean axis (each turned to
 # the normal's side), the slab slid along it again (_slab: the centre refitted), and again until the helices crossing
-# it are the ones it was fitted to, at most REFIT_ROUNDS times. With fewer than MIN_CROSSING_HELICES crossing, the
-# first estimate stands, and so does the last plane when a refit is not membrane or leaves fewer than that crossing.
+# it are the ones it was fitted to, at most REFIT_ROUNDS times. The crossing helices are any chain's, a soluble one's
+# too: a soluble helix reaching across the first estimate pulls the first refit until a later round no longer counts
+# it (test_the_refit_repeats_until_the_crossing_helices_stop_changing). With fewer than MIN_CROSSING_HELICES crossing,
+# the first estimate stands, and so does the last plane when a refit is not membrane or leaves fewer than that crossing.
 # Membrane.fit says which. Against OPM (plan 27 Task 3 report): 7PIU 16.2° and 7VVK 17.4°, where OPM's own TM
 # segments' mean axis lies 15.1° and 20.6° from OPM's normal (its records' tilts, 13° and 19°): a G-protein-coupled
 # receptor's helices lean together, and OPM's normal is its hydrophobic slab's, not their axis.

@@ -186,7 +186,7 @@ def test_the_refit_repeats_until_the_crossing_helices_stop_changing():
     assert cavity in membrane._crossing_helices(first, bb, sses)  # it crosses the leaning first estimate
     m = membrane._refit(first, bb, sses)
     assert _tilt(m.normal) < 0.5 and cavity not in membrane._crossing_helices(m, bb, sses)
-    assert "(2 rounds), converged" in m.fit or "(3 rounds), converged" in m.fit
+    assert m.fit == "crossing helices' axis (2 rounds), converged"  # the leaning plane, then the bilayer's own
     again = membrane._refit(m, bb, sses)  # a fixed point: refitting the result changes nothing
     assert np.array_equal(again.normal, m.normal) and again.centre == m.centre
     twice = membrane._refit(membrane._estimate(bb, sses), bb, sses)
@@ -574,7 +574,9 @@ def test_helical_membranes_are_unchanged_by_the_barrel_estimate(path):
         assert m is None
         return
     normal, centre, half, source, sided = HELICAL[path]
-    assert m.normal.tolist() == pytest.approx(normal, rel=1e-12, abs=1e-12)
+    # the normal, a normalised sum of helix axes from an eigh start, to 1e-9 across platforms and numpy builds (Task 3
+    # review M2); the centre, a 1 Å step of the slab scan from the lowest CA, as tight as before
+    assert m.normal.tolist() == pytest.approx(normal, rel=1e-9, abs=1e-12)
     assert m.centre == pytest.approx(centre, rel=1e-12, abs=1e-12)
     assert (m.half, m.source, m.sided) == (half, source, sided)
 
