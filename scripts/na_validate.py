@@ -33,7 +33,10 @@ report says how many entries were not validated. The exit code is 0 only if ever
 and writes a contact sheet per entry (the figure, the drawn layout with stems coloured, the 3D structure projected
 the same way with the same colours) plus report.md and report.json with pass/fail against THRESHOLDS. report.json
 holds {"source_stamp": the code that measured (foldmap.source_stamp, as the process starts), "entry_code" and
-"mixed_code" (code_mix), "entries": one row per entry, each with its stamp};
+"mixed_code" (code_mix), "measures": the measures by what each is evidence of (nacheck.ROLE: angle_median,
+angle_max and joint_error_max zero by construction on an ordinary projection, regression guards; Spearman,
+Procrustes, mirrored stems and contact proximity the fidelity measures, stems_nearer_frac with its distribution and
+its not-applicable rows; plan 28 Task 2), "entries": one row per entry, each with its stamp};
 reports written before plan 28 Task 1 are the bare list of rows.
 """
 
@@ -59,7 +62,15 @@ from foldmap.cli import make_layout  # noqa: E402
 from foldmap.fetch import fetch  # noqa: E402
 from foldmap.io import _nucleic_strands, read_model  # noqa: E402
 from foldmap.layout import SCALE, stem_pieces  # noqa: E402
-from foldmap.nacheck import THRESHOLDS, contacts, judge, render_checks, shape  # noqa: E402
+from foldmap.nacheck import (  # noqa: E402
+    ROLE,
+    THRESHOLDS,
+    ZERO_BY_CONSTRUCTION,
+    contacts,
+    judge,
+    render_checks,
+    shape,
+)
 from foldmap.nucleic import MIN_LOOP, BasePair, pair_nucleotides, secondary_structure, stem_axis  # noqa: E402
 from foldmap.palette import chain_colors  # noqa: E402
 from foldmap.render import draw, save  # noqa: E402
@@ -568,6 +579,78 @@ def _isolated(name: str, path: Path, out: Path, options: dict | None = None) -> 
     return {"entry": name, "failed": [f"died (exit code {child.exitcode})"]}
 
 
+def _paper_common():
+    """scripts/paper/common.py, loaded by path under a private name: the one place the NA measures are summarised by
+    role (na_measures), shared with the paper's make_numbers.py."""
+    import importlib.util
+
+    name = "_na_validate_paper_common"
+    if name not in sys.modules:
+        spec = importlib.util.spec_from_file_location(name, Path(__file__).resolve().parent / "paper" / "common.py")
+        mod = importlib.util.module_from_spec(spec)
+        sys.modules[name] = mod
+        spec.loader.exec_module(mod)
+    return sys.modules[name]
+
+
+def measures(rows: list[dict]) -> dict:
+    """The rows' measures by what each is evidence of (plan 28 Task 2, ruling Q19): {"roles": nacheck.ROLE,
+    "regression_guards", "fidelity"} (common.na_measures, stems_nearer_frac against its THRESHOLDS limit)."""
+    return {"roles": dict(ROLE), **_paper_common().na_measures(rows, THRESHOLDS["stems_nearer_frac"])}
+
+
+def _num(v) -> str:
+    return f"{v:.3g}" if isinstance(v, float) else str(v)
+
+
+def measure_lines(got: dict) -> list[str]:
+    """report.md's section on what each measure is evidence of: the roles, the regression guards (zero by
+    construction on an ordinary projection) with every row that is not zero, the fidelity measures' quartiles, and
+    stems_nearer_frac's distribution next to its strict pass, the rows where it is not applicable named apart."""
+    by_role: dict[str, list[str]] = {}
+    for k, r in got["roles"].items():
+        by_role.setdefault(r, []).append(k)
+    lines = ["## What each measure is evidence of", ""]
+    lines += [f"- **{r}**: {', '.join(ks)}" for r, ks in by_role.items()]
+    lines += ["", f"Regression guards, {ZERO_BY_CONSTRUCTION} on an ordinary projection (stems are drawn along their "
+              "axes as seen; on an unrolled frame they measure the unrolling):", ""]  # fmt: skip
+    for k, g in got["regression_guards"].items():
+        other = ", ".join(f"{e} {_num(v)}" for e, v in g["nonzero"].items()) or "none"
+        lines.append(f"- {k}: 0 in {g['zero']} of {g['measured']} measured; not 0: {other}")
+    lines += ["", "Fidelity (n, median, quartiles, range):", ""]
+    for k, d in got["fidelity"].items():
+        if k == "mirrored":
+            lines.append(
+                f"- mirrored: {d['stems']} stem(s) in {len(d['entries_with_mirrored'])} of {d['measured']} measured"
+                + (f" ({', '.join(d['entries_with_mirrored'])})" if d["entries_with_mirrored"] else "")
+            )
+        elif k == "stems_nearer_frac":
+            q = d["distribution"]
+            dist = (
+                f"median {_num(q['median'])}, quartiles {_num(q['q1'])}-{_num(q['q3'])}, range "
+                f"{_num(q['min'])}-{_num(q['max'])}"
+                if q["n"]
+                else "none applicable"
+            )
+            bins = "; ".join(
+                (f"[{b['from']}, {b['to']})" if b["from"] != b["to"] else f"{b['from']}") + f" {b['entries']}"
+                for b in d["bins"]
+            )
+            lines.append(
+                f"- stems_nearer_frac: strict pass (>= {d['strict_limit']}) in {d['strict_pass']} of {d['applicable']} "
+                f"applicable; not applicable (every drawn element touches the stem): "
+                f"{', '.join(d['not_applicable']) or 'none'}; {dist}; histogram {bins}"
+            )
+        elif d["n"]:
+            lines.append(
+                f"- {k}: n {d['n']}, median {_num(d['median'])}, quartiles {_num(d['q1'])}-{_num(d['q3'])}, range "
+                f"{_num(d['min'])}-{_num(d['max'])}"
+            )
+        else:
+            lines.append(f"- {k}: not measured")
+    return lines
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--ids", help="comma-separated entries (default: the whole benchmark)")
@@ -600,7 +683,8 @@ def main(argv=None) -> int:
         m["source_stamp"] = SOURCE_STAMP
         rows.append(m)
         print(f"{name}: {'PASS' if not m['failed'] else 'FAIL ' + '; '.join(m['failed'])}", flush=True)
-    doc = {"source_stamp": SOURCE_STAMP, **code_mix(m["source_stamp"] for m in rows), "entries": rows}
+    got = measures(rows)  # by role: regression guards, fidelity (plan 28 Task 2)
+    doc = {"source_stamp": SOURCE_STAMP, **code_mix(m["source_stamp"] for m in rows), "measures": got, "entries": rows}
     (args.out / "report.json").write_text(json.dumps(doc, indent=1, default=str), encoding="utf-8")
     cols = [
         "entry",
@@ -666,6 +750,8 @@ def main(argv=None) -> int:
         + "\n\nThresholds: "
         + ", ".join(f"{k} {v}" for k, v in THRESHOLDS.items())
         + ("\n\nNotes:\n" + "\n".join(notes) if notes else "")
+        + "\n\n"
+        + "\n".join(measure_lines(got))
         + "\n\n## Entries\n\n"
         + "\n".join(why)
         + "\n",

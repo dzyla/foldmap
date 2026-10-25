@@ -1,0 +1,100 @@
+{
+ "_about": "Every benchmark set the paper quotes, tagged by what its numbers can show (plan 28 Task 2, ruling Q19). make_numbers.py reads this file and labels each key with its set and tag; a key naming a set not listed here stops it. A tag starts with tuning, regression or unseen; a set pooling others takes the least clean of their tags.",
+ "_legend": {
+  "tuning": "constants, rules or limits were chosen while looking at this set's results: its numbers describe the fit, not generalisation",
+  "regression": "looked at before the number quoted (failures fixed, or used as a gate while the code changed), but not used to choose constants: a guard against regressions, not evidence on unseen structures",
+  "unseen": "measured once, with no change aimed at it before the measurement quoted"
+ },
+ "sets": {
+  "r100_tuned": {
+   "tag": "tuning",
+   "what": "random-100 sample 1 (docs/validation/random100/, seed 20261013)",
+   "reason": "the sample the layout's constants were tuned on and whose failures were fixed (docs/validation/fourth-sample-protocol.md; claims table R2)"
+  },
+  "r100_held_first": {
+   "tag": "unseen",
+   "what": "random-100 sample 2 (docs/validation/random100-heldout/, seed 20261017), its first run, as judged at 1ef0706",
+   "reason": "run once before any fix aimed at it (drawings at 5650dbd, 8 redrawn at 44a1c1b after the check corrections of F1 fix round 1); a historical count by design"
+  },
+  "r100_held": {
+   "tag": "regression",
+   "what": "random-100 sample 2 (docs/validation/random100-heldout/, seed 20261017), as rerun at 7696947",
+   "reason": "held out at first, then the input of plan 15, which fixed the mechanisms behind its failures (fourth-sample-protocol.md)"
+  },
+  "r100_third": {
+   "tag": "unseen at 7696947, historical",
+   "what": "random-100 sample 3 (docs/validation/random100-third/, seed 20261018)",
+   "reason": "drawn and run once at 7696947 with no fix aimed at it; code changed after that run (e5b4bae, then plans 16-28), so its count describes 7696947, not the release (fourth-sample-protocol.md)"
+  },
+  "r100_fourth": {
+   "tag": "unseen (protocol)",
+   "what": "random-100 sample 4 (docs/validation/random100-fourth/, seed 20261025), not drawn yet",
+   "reason": "drawn and run once at the frozen release under docs/validation/fourth-sample-protocol.md, excluding every id of samples 1-3; the paper's headline count"
+  },
+  "r100_pooled": {
+   "tag": "tuning",
+   "what": "random-100 samples 1-3 pooled (300 entries)",
+   "reason": "pools sample 1, the tuning sample, with samples 2 and 3"
+  },
+  "na_benchmark": {
+   "tag": "tuning",
+   "what": "the 39-entry nucleic-acid benchmark (scripts/na_validate.py BENCHMARK)",
+   "reason": "its limits were set from its measured campaign (nacheck.THRESHOLDS) and its failures fixed in the NA layout (docs/validation/na/review.md)"
+  },
+  "dom_cal": {
+   "tag": "tuning",
+   "what": "the 22 domain calibration chains (tests/data/domains/cath_reference.json minus the chain-by-chain held third)",
+   "reason": "the domain parameters were chosen on them (domain_score.held_out docstring)"
+  },
+  "dom_held": {
+   "tag": "regression",
+   "what": "the 11 domain chains held out chain by chain (seed 20261016:domains)",
+   "reason": "homologues of tuning chains present (6FY9/6FYF, 2YBE/3PGK, the hexokinases), and the split was looked at twice while the parameters were chosen, so not untouched (domain_score.held_out docstring)"
+  },
+  "dom_held_nohom": {
+   "tag": "regression",
+   "what": "the held chains with no tuning chain in the same CATH homology group",
+   "reason": "a subset of dom_held: the same split, looked at twice"
+  },
+  "dom_reference": {
+   "tag": "tuning",
+   "what": "all 33 reference chains (dom_cal and dom_held pooled)",
+   "reason": "pools the calibration chains"
+  },
+  "dom_fresh": {
+   "tag": "unseen",
+   "what": "tests/data/domains/cath_fresh.json: 11 chains of superfamilies none of the 33 has",
+   "reason": "the never-seen check: never tuned on (domain_score.held_out docstring; tests/test_domain_score.py)"
+  },
+  "hom_heldout": {
+   "tag": "unseen",
+   "what": "plan 13a's held-out homologue pairs (docs/validation/homologues/heldout.json: 30 positive, 10 negative)",
+   "reason": "one run at c099787 with the limits frozen at 76fd936 on the tuning set; nothing changed after the run (docs/validation/homologues/review.md)"
+  },
+  "hom_usalign": {
+   "tag": "tuning",
+   "what": "the homologue tuning and held-out pairs pooled, foldmap's aligner against US-align (plan 23 Task 3)",
+   "reason": "pools the tuning pairs the like-limits were frozen on; measured once, after the held-out run"
+  },
+  "dssp_m2": {
+   "tag": "tuning",
+   "what": "the protein entries of random-100 samples 1-3 whose file mkdssp reads (M2: foldmap's DSSP against mkdssp 3.1.2)",
+   "reason": "pools sample 1, the tuning sample"
+  },
+  "membrane_opm": {
+   "tag": "regression",
+   "what": "the membrane stratum of random-100 samples 1-3 that OPM publishes an oriented file for (data/opm/selection.json)",
+   "reason": "chosen by a stated rule before any foldmap result, then used as a gate while the membrane code changed (plan 15 Task 6's rules, a963bb6, are attributed on them; plan 27 Task 3's refit was gated on them)"
+  },
+  "determinism": {
+   "tag": "regression",
+   "what": "the committed test structures, drawn on Linux, macOS and Windows (scripts/paper/determinism.py)",
+   "reason": "the test suite's own structures: a reproducibility guard, not a sample"
+  },
+  "pub": {
+   "tag": "tuning",
+   "what": "published hand-drawn topology figures (work/published-compare, M3)",
+   "reason": "the figures the layout was judged against during development"
+  }
+ }
+}

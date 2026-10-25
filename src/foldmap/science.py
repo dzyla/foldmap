@@ -28,6 +28,10 @@ wrong sheet (plan 12, the external review's FimD 9FWZ: a strand wedged between t
   accessory stands in the column on its 3D side of the partner, end to end with the strand there (9FWZ's D:662-666
   beside D:645-659, on D:634-641's side).
 
+Kinds (KIND, plan 28 Task 2): S1-S4 and S6 are structural consistency checks (the figure against the structure's
+own coordinates, DSSP and pairing: internal), S5 is external validation (against CATH), the page criteria A1-A20
+readability; every check report carries its checks' kinds.
+
 Two readings, one rule: sheet_checks reads the sheets as built (sheets.build_sheets, for `foldmap summary`), and
 figcheck.science_checks reads the drawn figure (its sheet blocks, columns by where the strands stand)."""
 
@@ -48,6 +52,19 @@ SCIENCE = {
     "S6": "accessory drawn at its partner",
 }
 NOT_YET = ("S4", "S5")  # None where not measured: S4 off a drawn figure, S5 without a reference chopping
+# What each check is evidence of (plan 28 Task 2, ruling Q19): S1-S4 and S6 hold the figure to the structure's own
+# coordinates, DSSP bridges and pairing, the inputs foldmap draws from (structural consistency: internal, never a
+# comparison with another method); S5 compares with a reference foldmap does not compute (CATH's chopping: external
+# validation); the page criteria A1-A20 (criteria.CRITERIA) judge how the page reads (readability). A label only: no
+# check is judged differently by its kind.
+CONSISTENCY, EXTERNAL, READABILITY = "consistency", "external", "readability"
+KIND = {"S1": CONSISTENCY, "S2": CONSISTENCY, "S3": CONSISTENCY, "S4": CONSISTENCY, "S5": EXTERNAL, "S6": CONSISTENCY}
+KINDS = {
+    CONSISTENCY: "structural consistency: the figure against the structure's own coordinates, DSSP and pairing "
+    "(internal, not external validation)",
+    EXTERNAL: "external validation: against a reference foldmap does not compute (S5: CATH's chopping)",
+    READABILITY: "readability: how the page reads and what it leaves out (page criteria A1-A20)",
+}
 RESIDUE_STEP = 0.5  # page units along a loop's route per residue from the nearer element end (render.residue_point)
 MARK_SLACK = 0.5  # page units a mark may stand off its place and its bound (a star is drawn 0.38 across)
 
@@ -258,6 +275,32 @@ def sheet_judged(sheets: list[Sheet]) -> dict[str, int]:
         "S3": len(sheets),
         "S6": sum(len(s.accessory) for s in sheets),
     }
+
+
+def kind(code: str) -> str:
+    """What a check is evidence of: KIND for a science check (S1-S6), READABILITY for a page criterion (A1-A20,
+    criteria.CRITERIA's keys: A1c, A2b too). KeyError for any other code."""
+    import re
+
+    if code in KIND:
+        return KIND[code]
+    if re.fullmatch(r"A\d+[a-z]?", code):
+        return READABILITY
+    raise KeyError(f"no kind for check {code!r}")
+
+
+def check_kinds(codes: Iterable[str] = ()) -> dict[str, str]:
+    """{code: kind} for every science check, then each code given (a report's criteria)."""
+    return {c: kind(c) for c in dict.fromkeys([*SCIENCE, *codes])}
+
+
+def kind_line() -> str:
+    """One line naming the checks of each kind, for the text reports (`foldmap check`, `foldmap summary`)."""
+    by = {k: [c for c, v in KIND.items() if v == k] for k in (CONSISTENCY, EXTERNAL)}
+    return (
+        f"check kinds: {', '.join(by[CONSISTENCY])} structural consistency (the figure against its own structure, "
+        f"internal); {', '.join(by[EXTERNAL])} external validation (against CATH); A1-A20 readability (the page)"
+    )
 
 
 def science_lines(found: dict[str, list[str] | None], judged: dict[str, int] | None = None) -> list[str]:

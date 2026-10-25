@@ -327,3 +327,114 @@ def test_a_tree_older_than_the_stamp_is_still_fingerprinted():
     here = (ROOT / "src" / "foldmap").resolve()
     assert aj.code_fingerprint(here) == app_jobs.code_fingerprint(here)
     assert common.repo_module("source_stamp").RUNTIME[0] == "gemmi"
+
+
+# ---------------------------------------------------------------------------------------------- the validation layers
+
+
+def test_wilson_interval_has_its_known_values():
+    """Plan 28 Task 2 (ruling Q19): one Wilson 95% helper for every headline rate. 83 of 100 is (0.7445, 0.8911);
+    the interval stays in [0, 1] and is not degenerate at 0 or n; no interval for n = 0."""
+    common = _load("common")
+    lo, hi = common.wilson(83, 100)
+    assert lo == pytest.approx(0.74452, abs=5e-5) and hi == pytest.approx(0.89107, abs=5e-5)
+    lo, hi = common.wilson(0, 10)
+    assert lo == 0.0 and hi == pytest.approx(0.27753, abs=5e-5)
+    lo, hi = common.wilson(10, 10)
+    assert hi == 1.0 and lo == pytest.approx(0.72247, abs=5e-5)
+    assert common.wilson(1554, 1566) == pytest.approx((0.98665, 0.99561), abs=1e-5)
+    assert common.wilson(0, 0) is None
+    with pytest.raises(ValueError):
+        common.wilson(5, 4)
+
+
+@pytest.fixture(scope="module")
+def numbers():
+    return _load("make_numbers")
+
+
+def test_sets_json_tags_every_set_make_numbers_quotes(numbers):
+    """Each benchmark set is tagged tuning, regression or unseen with the reason; every set a key family names is
+    in sets.json; the third sample is unseen at 7696947 (historical), the fourth unseen by its protocol."""
+    sets = numbers.load_sets()
+    tags = {k: s["tag"] for k, s in sets["sets"].items()}
+    assert set(sets["_legend"]) == {"tuning", "regression", "unseen"}
+    assert all(s["tag"].split()[0] in sets["_legend"] and s["reason"] and s["what"] for s in sets["sets"].values())
+    quoted = {w.replace("{1}", x) for _, _, w, _ in numbers.FAMILIES if w for x in ("tuned", "held", "third")}
+    assert quoted <= set(tags), quoted - set(tags)
+    assert tags["r100_tuned"] == "tuning" and tags["r100_held"] == "regression" and tags["r100_held_first"] == "unseen"
+    assert tags["r100_third"] == "unseen at 7696947, historical" and tags["r100_fourth"] == "unseen (protocol)"
+    assert tags["dom_cal"] == "tuning" and tags["dom_fresh"] == "unseen" and tags["na_benchmark"] == "tuning"
+
+
+def test_every_key_gets_a_layer_and_a_set(numbers):
+    """FAMILIES labels every key make_numbers writes (the pending ones too) with one of the five layers or none, and
+    a rate's _n / _ci keys take their base key's labels; a key no family names, or a set sets.json lacks, stops it."""
+    from types import SimpleNamespace
+
+    layers = set(numbers.LAYERS) | {None}
+    for key in numbers.PENDING:
+        assert numbers.family(key)[0] in layers, key
+    assert numbers.family("r100_third_pass")[:2] == ("readability", "r100_third")
+    assert numbers.family("r100_third_pass_ci_lo", {"r100_third_pass"})[:2] == ("readability", "r100_third")
+    assert numbers.family("r100_held_pass_first")[1] == "r100_held_first"
+    assert numbers.family("r100_third_science")[0] == "consistency"
+    assert numbers.family("dom_r100_pass")[0] == "external" and numbers.family("bp_recall")[0] == "external"
+    assert numbers.family("dom_held_nohom_f1")[1] == "dom_held_nohom" and numbers.family("dom_held_f1")[1] == "dom_held"
+    assert numbers.family("na_regression_guards")[:2] == ("regression-guard", "na_benchmark")
+    assert numbers.family("na_stems_nearer_pass_n", {"na_stems_nearer_pass"})[0] == "fidelity"
+    assert numbers.family("membrane_thickness_mad")[2].endswith("fixed by the method (not predicted)")
+    assert numbers.family("determinism_n")[0] == "regression-guard"  # a key of its own, not a rate's denominator
+    with pytest.raises(KeyError):
+        numbers.family("no_such_key")
+    nb = SimpleNamespace(keys={"r100_third_pass": {"value": 83}}, extra={"na_fidelity": {}})
+    numbers.label(nb, numbers.load_sets())
+    got = nb.keys["r100_third_pass"]
+    assert got["layer"] == "readability" and got["set_tag"] == "unseen at 7696947, historical" and got["layer_note"]
+    assert nb.extra["na_fidelity"]["layer"] == "fidelity"
+    with pytest.raises(SystemExit, match="no_such_key"):
+        numbers.label(SimpleNamespace(keys={"no_such_key": {}}, extra={}), numbers.load_sets())
+
+
+def test_a_rate_gets_its_denominator_and_interval_beside_it(numbers, monkeypatch):
+    """Numbers.rate adds <key>_n, <key>_ci_lo and <key>_ci_hi; the key's own value is left as it was."""
+    monkeypatch.setattr(numbers, "stamp", lambda: {"sources": {}, "harness_commit_short": "abc1234"})
+    nb = numbers.Numbers()
+    nb.put("r100_third_pass", 83, "83", [], "entries passing")
+    nb.rate("r100_third_pass", 83, 100, "entries in the report")
+    assert nb.keys["r100_third_pass"]["value"] == 83
+    assert nb.keys["r100_third_pass_n"]["value"] == 100
+    assert nb.keys["r100_third_pass_ci_lo"]["text"] == "0.745" and nb.keys["r100_third_pass_ci_hi"]["text"] == "0.891"
+    with pytest.raises(KeyError):
+        nb.rate("not_put", 1, 2, "x")
+
+
+def test_na_measures_tag_the_guards_and_give_stems_nearer_its_distribution():
+    """The angle and joint errors are tagged zero by construction (regression guards), each row that is not 0 named;
+    stems_nearer_frac is given with its quartiles and histogram beside its strict pass, and a row where every drawn
+    element touches the stem (contact_auc None, stems_nearer_frac measured: ruling Q5) is not applicable, never a
+    pass or a failure."""
+    common = _load("common")
+    rows = [
+        {"entry": "A", "angle_median": 0.0, "angle_max": 0.0, "spearman": 0.9, "contact_auc": 0.8,
+         "stems_nearer_frac": 1.0, "mirrored": 0},
+        {"entry": "B", "angle_median": 0.0, "angle_max": 2.5, "joint_error_max": 0.0, "spearman": 0.7,
+         "contact_auc": 0.6, "stems_nearer_frac": 0.5, "mirrored": 2},
+        {"entry": "6VTX", "angle_median": 0.0, "angle_max": 0.0, "contact_auc": None, "stems_nearer_frac": 0.0,
+         "mirrored": 0},
+        {"entry": "D", "contact_auc": None, "stems_nearer_frac": None},
+        {"entry": "E", "contact_auc": 0.7, "stems_nearer_frac": 0.8},
+    ]  # fmt: skip
+    got = common.na_measures(rows, 1.0)
+    g = got["regression_guards"]
+    assert g["angle_max"] == {"tag": "zero by construction (regression guard)", "measured": 3, "zero": 2,
+                              "nonzero": {"B": 2.5}}  # fmt: skip
+    assert g["joint_error_max"]["measured"] == 1 and g["joint_error_max"]["nonzero"] == {}
+    near = got["fidelity"]["stems_nearer_frac"]
+    assert near["measured"] == 4 and near["not_applicable"] == ["6VTX"] and near["applicable"] == 3
+    assert near["strict_pass"] == 1 and near["distribution"]["median"] == 0.8
+    assert near["distribution"]["q1"] == pytest.approx(0.65) and near["distribution"]["q3"] == pytest.approx(0.9)
+    assert [b["entries"] for b in near["bins"]] == [0, 0, 1, 1, 1]  # [0,.25) [.25,.5) [.5,.75) [.75,1) 1
+    assert got["fidelity"]["mirrored"] == {"measured": 3, "stems": 2, "entries_with_mirrored": ["B"]}
+    assert got["fidelity"]["spearman"]["n"] == 2 and got["fidelity"]["procrustes"] == {"n": 0}
+    assert common.nearer_applies(rows[2]) is False and common.nearer_applies(rows[3]) is None

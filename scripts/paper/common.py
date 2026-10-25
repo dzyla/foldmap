@@ -188,6 +188,112 @@ def median(xs: list[float]) -> float:
     return percentile(xs, 50)
 
 
+POOLED = (  # the note of a Wilson interval over units that are not independent (common.wilson)
+    "pooled over residues, pairs or segments, which are not independent within an entry: the interval is narrower "
+    "than one over entries would be"
+)
+Z95 = 1.959963984540054  # the standard normal's 97.5th percentile: a two-sided 95% interval
+
+
+def wilson(k: int, n: int, z: float = Z95) -> tuple[float, float] | None:
+    """The Wilson score interval of a proportion k of n (95% by default; plan 28 Task 2, ruling Q19): (low, high), or
+    None when n is 0. It stays inside [0, 1] and is not degenerate at 0 or n, unlike the normal approximation."""
+    import math
+
+    if n <= 0:
+        return None
+    if not 0 <= k <= n:
+        raise ValueError(f"wilson: {k} of {n}")
+    p, z2 = k / n, z * z
+    centre = (p + z2 / (2 * n)) / (1 + z2 / n)
+    half = z * math.sqrt(p * (1 - p) / n + z2 / (4 * n * n)) / (1 + z2 / n)
+    # exact at the ends: the interval reaches 0 at k = 0 and 1 at k = n (in floating point it can stop a hair short)
+    return 0.0 if k == 0 else max(0.0, centre - half), 1.0 if k == n else min(1.0, centre + half)
+
+
+def quartiles(xs: list[float]) -> dict:
+    """n, min, first quartile, median, third quartile and max of xs (percentile's interpolation); {"n": 0} for none."""
+    if not xs:
+        return {"n": 0}
+    return {
+        "n": len(xs),
+        "min": min(xs),
+        "q1": percentile(xs, 25),
+        "median": percentile(xs, 50),
+        "q3": percentile(xs, 75),
+        "max": max(xs),
+    }
+
+
+# stems_nearer_frac's histogram: [0, .25), [.25, .5), [.5, .75), [.75, 1) and 1 exactly, the strict pass's own bin
+NEARER_BINS = (0.0, 0.25, 0.5, 0.75, 1.0)
+
+
+def nearer_applies(row: dict) -> bool | None:
+    """Whether an NA report row's stems_nearer_frac is a measure (ruling Q5): not where every drawn element touches
+    each stem it scores, where the touching elements are compared with themselves (6VTX). nacheck.contacts computes
+    contact_auc on exactly the scored stems that leave an element untouched, so a row shows that case as contact_auc
+    None with stems_nearer_frac measured. None when stems_nearer_frac is not measured at all. (A row mixing such stems
+    with others keeps them in its fraction: the rows hold no per-stem split; plan 28 F7 changes the measure.)"""
+    if row.get("stems_nearer_frac") is None:
+        return None
+    return row.get("contact_auc") is not None
+
+
+def nearer_summary(rows: list[dict], limit: float = 1.0) -> dict:
+    """stems_nearer_frac over NA report rows, next to its strict pass (at least `limit`, nacheck.THRESHOLDS): how
+    many rows measure it, those where it is not applicable (nearer_applies; reported as such, never as a pass), and
+    over the rest the strict passes, the quartiles and the histogram on NEARER_BINS."""
+    measured = [r for r in rows if nearer_applies(r) is not None]
+    na = [r["entry"] for r in measured if not nearer_applies(r)]
+    vals = [float(r["stems_nearer_frac"]) for r in measured if nearer_applies(r)]
+    edges = NEARER_BINS
+    bins = [{"from": lo, "to": hi, "entries": sum(lo <= v < hi for v in vals)} for lo, hi in zip(edges, edges[1:])] + [
+        {"from": edges[-1], "to": edges[-1], "entries": sum(v >= edges[-1] for v in vals)}
+    ]
+    return {
+        "measured": len(measured),
+        "not_applicable": na,
+        "applicable": len(vals),
+        "strict_limit": limit,
+        "strict_pass": sum(v >= limit for v in vals),
+        "distribution": quartiles(vals),
+        "bins": bins,
+    }
+
+
+# The NA measures by what they are evidence of (nacheck.ROLE; plan 28 Task 2, ruling Q19)
+ZERO_BY_CONSTRUCTION = "zero by construction (regression guard)"  # = nacheck.ZERO_BY_CONSTRUCTION
+NA_GUARDS = ("angle_median", "angle_max", "joint_error_max")
+NA_FIDELITY = ("spearman", "procrustes", "contact_auc", "contact_precision_at_k", "ss_contacts_nearer")
+
+
+def na_measures(rows: list[dict], nearer_limit: float = 1.0) -> dict:
+    """NA report rows summarised by role. regression_guards: angle_median, angle_max and joint_error_max, zero by
+    construction on an ordinary projection (stems are drawn along their axes as seen): per measure the rows measuring
+    it, how many are 0 and each other row's value (an unrolled frame's, which measures the unrolling). fidelity: the
+    quartiles of Spearman, Procrustes and the contact measures; mirrored stems (rows measured, stems in all, rows with
+    any); stems_nearer_frac's distribution next to its strict pass (nearer_summary)."""
+    guards = {}
+    for k in NA_GUARDS:
+        got = {r["entry"]: r[k] for r in rows if r.get(k) is not None}
+        guards[k] = {
+            "tag": ZERO_BY_CONSTRUCTION,
+            "measured": len(got),
+            "zero": sum(v == 0 for v in got.values()),
+            "nonzero": {e: v for e, v in got.items() if v != 0},
+        }
+    fidelity: dict = {k: quartiles([float(r[k]) for r in rows if r.get(k) is not None]) for k in NA_FIDELITY}
+    mirrored = {r["entry"]: r["mirrored"] for r in rows if r.get("mirrored") is not None}
+    fidelity["mirrored"] = {
+        "measured": len(mirrored),
+        "stems": sum(mirrored.values()),
+        "entries_with_mirrored": sorted(e for e, v in mirrored.items() if v),
+    }
+    fidelity["stems_nearer_frac"] = nearer_summary(rows, nearer_limit)
+    return {"regression_guards": guards, "fidelity": fidelity}
+
+
 # ---- formatting for LaTeX -------------------------------------------------------------------------------------------
 
 

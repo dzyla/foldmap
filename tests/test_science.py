@@ -539,3 +539,47 @@ def test_s4_reports_a_mark_with_no_place_found():
     from foldmap.science import mark_findings
 
     assert mark_findings([("A:66", (1.0, 1.0), None)]) == ["A:66 is drawn, but no place was found for its residue"]
+
+
+def test_each_check_names_what_it_is_evidence_of():
+    """Plan 28 Task 2 (ruling Q19): S1-S4 and S6 are structural consistency checks (the figure against the
+    structure's own DSSP and pairing: internal), S5 external validation (against CATH), the page criteria A1-A20
+    readability. The table covers every science check and nothing else; a code with no kind is an error."""
+    from foldmap.criteria import CRITERIA
+    from foldmap.science import KIND, KINDS, check_kinds, kind, kind_line
+
+    assert KIND == {
+        "S1": "consistency",
+        "S2": "consistency",
+        "S3": "consistency",
+        "S4": "consistency",
+        "S5": "external",
+        "S6": "consistency",
+    }
+    assert list(KIND) == list(SCIENCE) and set(KIND.values()) | {"readability"} == set(KINDS)
+    assert {kind(c) for c in CRITERIA} == {"readability"}  # A1c and A2b too
+    with pytest.raises(KeyError):
+        kind("H1")
+    assert check_kinds(CRITERIA) == {**KIND, **dict.fromkeys(CRITERIA, "readability")}
+    assert kind_line() == (
+        "check kinds: S1, S2, S3, S4, S6 structural consistency (the figure against its own structure, internal); "
+        "S5 external validation (against CATH); A1-A20 readability (the page)"
+    )
+
+
+def test_check_and_summary_reports_carry_the_kinds(capsys):
+    """`foldmap check` prints the kinds above its checks and check_figure's result carries them as a field; `foldmap
+    summary` prints them with the science checks of the sheets as built. The checks themselves are unchanged."""
+    from foldmap import criteria
+    from foldmap.cli import main, summarize
+    from foldmap.science import kind_line
+    from foldmap.spec import draw_spec, figure_spec
+
+    assert main(["check", str(DATA / "1UBQ.cif")]) == 0
+    out = capsys.readouterr().out.splitlines()
+    assert out.index(kind_line()) < out.index("S1 sheet neighbours pair: pass")
+    spec = figure_spec(DATA / "1UBQ.cif")
+    got = criteria.check_figure(draw_spec(spec), spec, DATA / "1UBQ.cif")
+    assert got["kinds"]["S5"] == "external" and got["kinds"]["S1"] == "consistency"
+    assert got["kinds"]["A5"] == "readability" and set(got["kinds"]) == {*SCIENCE, *criteria.CRITERIA}
+    assert f"  {kind_line()}" in summarize(str(R100 / "1BXW-A.cif.gz")).splitlines()

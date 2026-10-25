@@ -623,3 +623,45 @@ def test_contact_sheet_panels_hang_from_the_top(monkeypatch, tmp_path):
     sheet.canvas.draw()
     tops = [a.get_position().y1 for a in sheet.axes]
     assert max(tops) - min(tops) < 1e-6, tops
+
+
+def test_every_judged_measure_says_what_it_is_evidence_of():
+    """Plan 28 Task 2 (ruling Q19): each NA measure has a role; the angle and joint errors are regression guards
+    (zero by construction on an ordinary projection), Spearman, Procrustes, mirrored stems and contact proximity the
+    fidelity measures, the pairing external (RNApolis). A label only: judge() is unchanged."""
+    from foldmap.nacheck import ROLE, ZERO_BY_CONSTRUCTION
+
+    assert set(THRESHOLDS) <= set(ROLE)
+    assert set(ROLE.values()) <= {"external", "fidelity", "regression-guard", "consistency", "readability"}
+    assert [k for k, r in ROLE.items() if r == "regression-guard"] == ["angle_median", "angle_max", "joint_error_max"]
+    assert {"spearman", "procrustes", "mirrored", "contact_auc", "stems_nearer_frac"} <= {
+        k for k, r in ROLE.items() if r == "fidelity"
+    }
+    assert ROLE["pair_f1"] == ROLE["stem_recall"] == "external"
+    nv = _na_validate()
+    assert nv._paper_common().ZERO_BY_CONSTRUCTION == ZERO_BY_CONSTRUCTION
+    assert judge({"angle_max": 0.0, "stems_nearer_frac": 0.0}) == ["stems_nearer_frac 0.0 (limit 1.0)"]
+
+
+def test_the_report_names_the_guards_and_the_not_applicable_rows():
+    """na_validate's report.json carries the measures by role and report.md prints them: the guards with every row
+    not 0, the fidelity quartiles, stems_nearer_frac's strict pass beside its distribution, a row where every drawn
+    element touches the stem named not applicable (ruling Q5)."""
+    nv = _na_validate()
+    rows = [
+        {"entry": "30QM", "angle_median": 0.0, "angle_max": 1.5, "joint_error_max": 0.0, "spearman": 0.8,
+         "procrustes": 0.3, "mirrored": 0, "contact_auc": 0.9, "stems_nearer_frac": 1.0, "failed": []},
+        {"entry": "6VTX", "angle_median": 0.0, "angle_max": 0.0, "mirrored": 1, "contact_auc": None,
+         "stems_nearer_frac": 0.0, "failed": ["stems_nearer_frac 0.0 (limit 1.0)"]},
+        {"entry": "1BAD", "failed": ["download failed"]},
+    ]  # fmt: skip
+    got = nv.measures(rows)
+    assert got["roles"]["angle_max"] == "regression-guard"
+    assert got["regression_guards"]["angle_max"]["nonzero"] == {"30QM": 1.5}
+    assert got["fidelity"]["stems_nearer_frac"]["not_applicable"] == ["6VTX"]
+    text = "\n".join(nv.measure_lines(got))
+    assert "zero by construction (regression guard)" in text
+    assert "- angle_max: 0 in 1 of 2 measured; not 0: 30QM 1.5" in text
+    near = "strict pass (>= 1.0) in 1 of 1 applicable; not applicable (every drawn element touches the stem): 6VTX"
+    assert near in text
+    assert "- mirrored: 1 stem(s) in 1 of 2 measured (6VTX)" in text and "- procrustes: n 1, median 0.3" in text

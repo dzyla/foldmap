@@ -683,7 +683,11 @@ def test_science_checks_are_reported_apart_from_the_criteria(r100, tmp_path):
     found = {"S1": ["sheet 0: a | b drawn side by side with no bridge"], "S2": [], "S3": [], "S4": None, "S5": None}
     e = {"id": "1ABC", "name": "1ABC", "views": {"default": {"result": {"science": found}}}, "criteria": crit}
     e = r100._verdict(e)
-    assert e["pass"] and r100.science(e)["S1"] == {"pass": False, "detail": "default: " + found["S1"][0]}
+    assert e["pass"] and r100.science(e)["S1"] == {
+        "pass": False,
+        "detail": "default: " + found["S1"][0],
+        "kind": "consistency",
+    }
     assert r100.science(e)["S4"]["pass"] is None
     r100.report([e], tmp_path, None, total=1)
     md = (tmp_path / "report.md").read_text(encoding="utf-8")
@@ -691,6 +695,13 @@ def test_science_checks_are_reported_apart_from_the_criteria(r100, tmp_path):
     assert (
         "| S1 sheet neighbours pair | 0 | 1 | 0 | 0 |" in md and "default: S1 sheet 0: a / b drawn side by side" in md
     )
+    # plan 28 Task 2 (ruling Q19): each check says what it is evidence of, in report.md and report.json
+    assert "| S1 sheet neighbours pair | 0 | 1 | 0 | 0 | consistency |" in md
+    assert "| S5 automatic domains agree with a reference | 0 | 0 | 0 | 1 | external |" in md
+    assert r100.science(e)["S5"]["kind"] == "external"
+    kinds = json.loads((tmp_path / "report.json").read_text(encoding="utf-8"))["check_kinds"]
+    assert kinds["S5"] == "external" and kinds["S6"] == "consistency" and kinds["A10"] == "readability"
+    assert set(kinds) == {"S1", "S2", "S3", "S4", "S5", "S6", *r100.CRITERIA}
 
 
 def test_science_checks_run_in_every_drawn_view(r100, tmp_path):
@@ -721,6 +732,7 @@ def test_science_checks_run_in_every_drawn_view(r100, tmp_path):
     assert e["pass"] and s["S1"] == {
         "pass": False,
         "detail": "focus: sheet 27: a | b drawn side by side with no bridge",
+        "kind": "consistency",
     }
     assert s["S6"]["pass"] is False and s["S6"]["detail"].startswith("domains: sheet 3: c drawn away")
     assert s["S2"]["pass"] is True and s["S4"]["pass"] is True and s["S5"]["pass"] is None

@@ -1015,7 +1015,8 @@ def check_figure(drawn, spec, path) -> dict:
     """One drawn figure judged as the campaign judges the view of it its options make (measure_figure,
     figure_criteria): the membrane view when it asks for a membrane (or draws a band), else the domains view when it
     asks for domains (or draws them), else the default view. {"science": figcheck.science_checks' findings,
-    "criteria": {criterion: {"pass", "detail"}, ...}, every criterion of CRITERIA}. A criterion it cannot judge has
+    "criteria": {criterion: {"pass", "detail"}, ...}, every criterion of CRITERIA, "kinds": {check: its kind},
+    science.check_kinds}. A criterion it cannot judge has
     pass None and its reason under "here": NOT_HERE; one the campaign judges on other views, not on this one; a check
     the text font keeps from being measured (figcheck.ink_font_reason; for A16 only its domain names, its domain rules
     and panels are judged); a measure that reads "unmeasured" (unmeasured)."""
@@ -1047,7 +1048,14 @@ def check_figure(drawn, spec, path) -> dict:
         elif key in here:
             got = {**got, "here": here[key]}
         out[key] = unmeasured(got)
-    return {"science": result["science"], "science_judged": result["science_judged"], "criteria": out}
+    from .science import check_kinds
+
+    return {
+        "science": result["science"],
+        "science_judged": result["science_judged"],
+        "criteria": out,
+        "kinds": check_kinds(CRITERIA),  # what each check is evidence of (science.KIND; plan 28 Task 2)
+    }
 
 
 def _domains_off_font(result: dict, font: str) -> dict:

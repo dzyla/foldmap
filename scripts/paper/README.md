@@ -42,6 +42,26 @@ run COMMAND there in the checkout, copy each `--pull` path back); exit 75 means 
 that run foldmap put `build/tree/src` (the code at that commit) first on the path and assert it is the foldmap they
 imported. `make_numbers.py` and `table_s1.py` read code constants with `ast` and never import foldmap.
 
+## Layers, sets and intervals (plan 28 Task 2)
+
+Every key in `numbers.json` says what it is evidence of and where it was measured:
+
+- `layer`: `consistency` (the figure against the structure's own coordinates, DSSP and pairing: S1-S4, S6, H1-H5),
+  `external` (against a reference foldmap does not compute: CATH, RNApolis, mkdssp, OPM, US-align, published
+  figures), `readability` (the page criteria A1-A20 and the gates built on them), `regression-guard` (zero or
+  identical by construction: the NA angle and joint errors on an ordinary projection, determinism) or `fidelity`
+  (Spearman, Procrustes, mirrored stems, contact proximity); null for what is no measurement (seeds, entry counts,
+  tables, timings). `layer_note` says more where a key mixes layers (the entry gates).
+- `set` and `set_tag`: the benchmark set, tagged in `sets.json` as `tuning`, `regression` or `unseen`, with the
+  reason. A key no family names (`make_numbers.FAMILIES`), or a set `sets.json` lacks, stops the run.
+- Every headline rate also gets `<key>_n`, `<key>_ci_lo` and `<key>_ci_hi`: its denominator and its Wilson 95%
+  interval (`common.wilson`). Rates pooled over residues, pairs or segments say so: those are not independent.
+
+The NA measures are summarised by role in `common.na_measures`, which `scripts/na_validate.py` also writes into its
+report: the angle and joint errors as regression guards, the fidelity measures' quartiles, and `stems_nearer_frac`'s
+distribution beside its strict pass, with the entries where it is not applicable (every drawn element touches the
+stem: ruling Q5) named apart.
+
 ## Provenance: every report says which code produced it
 
 `foldmap.source_stamp.source_stamp(__file__)` (plan 28 Task 1) is taken when a campaign process starts and written

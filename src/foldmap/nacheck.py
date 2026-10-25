@@ -331,6 +331,40 @@ THRESHOLDS = {
     "seconds": 120.0,
 }
 _HIGH_IS_GOOD = ("pair_f1", "stem_recall", "spearman", "contact_auc", "stems_nearer_frac")
+# What each measure is evidence of (plan 28 Task 2, ruling Q19), for the reports: a label only, no limit or verdict
+# depends on it. "external": against RNApolis; "fidelity": how far the page keeps the 3D arrangement; "regression
+# guard": zero by construction on an ordinary (plain) projection, since stems are drawn along their axes as seen
+# (shape()), so they guard against a regression there and are no evidence of fidelity (on an unrolled frame they
+# measure the unrolling); "consistency": beads against the model's own atoms; "readability": the page.
+ZERO_BY_CONSTRUCTION = "zero by construction (regression guard)"
+ROLE = {
+    "pair_f1": "external",
+    "stem_recall": "external",
+    "spearman": "fidelity",
+    "procrustes": "fidelity",
+    "mirrored": "fidelity",
+    "contact_auc": "fidelity",
+    "contact_precision_at_k": "fidelity",
+    "stems_nearer_frac": "fidelity",
+    "ss_contacts_nearer": "fidelity",
+    "angle_median": "regression-guard",
+    "angle_max": "regression-guard",
+    "joint_error_max": "regression-guard",
+    "beads_missing": "consistency",
+    "bead_colour_wrong": "consistency",
+    "beads_false": "consistency",
+    "beads_unmatched": "consistency",
+    "overlaps": "readability",
+    "text_off_page": "readability",
+    "letter_overlaps": "readability",
+    "fallbacks": "readability",
+    "na_crossings": "readability",
+    "bead_overlaps": "readability",
+    "gap_label_collisions": "readability",
+    "na_run_crossings": "readability",
+    "na_protein_crossings": "readability",
+    "seconds": "readability",  # the run time, judged with the page criteria (A2's kind)
+}
 # Å: a stem whose first arm is seen at least this far beside its second, across the drawn axis, has a side the
 # drawing must keep. Below it the arms are seen nearly on top of each other and both sides fit the projection
 # about equally. Equal to the layout's own cut, layout._SIDE_CLEAR (τ, set by the plan-07 Task 7p ruling), but

@@ -8,6 +8,13 @@ with the supplementary tables under build/tables/.
 Reads only what extract.py wrote (build/sources/, build/tree/, build/provenance.json) and domains.py's
 build/domains.json. Every value names its source files, the commit each was read at and the commit the measurement
 in it was made at. Keys that need runs not made yet are null with "pending": "M2" / "M3" / "M8" / "freeze".
+
+Plan 28 Task 2 (ruling Q19): every key also says which validation layer it belongs to ("layer", LAYERS: structural
+consistency, external validation, readability, regression guard or fidelity; null for what is no measurement: seeds,
+counts of entries, tables, timings) and which benchmark set it was measured on ("set", "set_tag": sets.json's tag,
+tuning, regression or unseen), by FAMILIES; a key no family names stops the run. Every headline rate (a count k of n,
+or a pooled proportion) gets <key>_n, <key>_ci_lo and <key>_ci_hi: its denominator and Wilson 95% interval
+(common.wilson). Computed from the reports already committed: no measurement is redone.
 """
 
 from __future__ import annotations
@@ -15,16 +22,21 @@ from __future__ import annotations
 import ast
 import csv
 import json
+import re
 import sys
 from collections import Counter, defaultdict
 from datetime import date
 
 from common import (
     BUILD,
+    HARNESS,
+    POOLED,
     TABLES,
     TREE,
+    ZERO_BY_CONSTRUCTION,
     load_source,
     median,
+    na_measures,
     na_rows,
     percentile,
     quotable,
@@ -32,7 +44,9 @@ from common import (
     tex_escape,
     tex_frac,
     tex_int,
+    wilson,
 )
+from m2 import pct
 
 SAMPLES = {"tuned": "r100_tuned", "held": "r100_held", "third": "r100_third"}
 OUTCOMES = ("pass", "fail", "not judged", "does not apply")
@@ -72,6 +86,123 @@ PENDING = {
     "pub_agree": ("M3", "as pub_n_structures"),
     "pub_total": ("M3", "as pub_n_structures"),
 }
+
+# ---- what each key is evidence of (plan 28 Task 2, ruling Q19) -----------------------------------------------------
+
+LAYERS = {
+    "consistency": "structural consistency: the figure against the structure's own coordinates, DSSP and pairing "
+    "(internal: S1-S4, S6, the homologue checks H1-H5)",
+    "external": "external validation: against a reference foldmap does not compute (CATH, RNApolis, mkdssp, OPM, "
+    "US-align, published figures)",
+    "readability": "readability: the page criteria A1-A20 and the gates built on them",
+    "regression-guard": "a regression guard: zero or identical by construction where the method works as designed "
+    "(the NA angle and joint errors on an ordinary projection, cross-platform determinism); no evidence of fidelity",
+    "fidelity": "fidelity: how far the page keeps the 3D arrangement (Spearman, Procrustes, mirrored stems, contact "
+    "proximity)",
+}
+GATE = (
+    "the entry gate (no criterion A1-A20 failed) is readability (science.KIND); it includes A10 (secondary structure "
+    "against mkdssp) and A17 (the NA metrics, pairing against RNApolis), external comparisons quoted on their own "
+    "(dssp_*, bp_*, stem_agreement)"
+)
+THICKNESS = "fixed by the method (not predicted)"
+# (key pattern, layer, set, note): the first pattern matching the whole key labels it; "{1}" in a set is the match's
+# first group. A layer of None: no measurement (seeds, entry counts, tables, timings); a set of None: no benchmark set.
+FAMILIES = [
+    (r"r100_(tuned|held|third)_(seed|cutoff)", None, "r100_{1}", None),
+    (r"r100_held_pass_first", "readability", "r100_held_first", GATE),
+    (r"r100_(tuned|held|third)_pass", "readability", "r100_{1}", GATE),
+    (r"r100_third_(fail_by_check|fail_by_stratum|not_judged|a12_pass|a13_pass)", "readability", "r100_third", None),
+    (
+        r"r100_third_science(_fail)?",
+        "consistency",
+        "r100_third",
+        "S1-S4 and S6 are structural consistency checks; S5 within it is external validation (against CATH), quoted on "
+        "its own as dom_r100_*",
+    ),
+    (r"dom_r100_(n|pass|per_sample)", "external", "r100_pooled", "S5: automatic domains against CATH's chopping"),
+    (r"limit_dssp_agree", "external", None, "A10's limit: secondary structure against mkdssp"),
+    (r"dssp_r100_(agree|residues|entries|tuned)", "external", "r100_tuned", "A10: against mkdssp"),
+    (r"dssp_r100_(held|third)", "external", "r100_{1}", "A10: against mkdssp"),
+    (r"supp_table_r100|runtime_all|runtime_fit|supp_fig_runtime", None, "r100_pooled", None),
+    (r"runtime_(median_s|p95_s)", None, "r100_third", None),
+    (r"na_n_entries|supp_table_na", None, "na_benchmark", None),
+    (r"bp_precision|bp_recall|stem_agreement|na_macro_means", "external", "na_benchmark", "against RNApolis"),
+    (
+        r"na_campaign_pass",
+        "readability",
+        "na_benchmark",
+        "A17's gate: every nacheck.THRESHOLDS limit, which mixes external (pairing against RNApolis), fidelity, "
+        "regression guards, consistency (beads) and readability (nacheck.ROLE; extra.na_fidelity)",
+    ),
+    (r"na_regression_guards", "regression-guard", "na_benchmark", ZERO_BY_CONSTRUCTION),
+    (r"na_(spearman|procrustes|mirrored|contact_auc|stems_nearer)_\w+|na_fidelity", "fidelity", "na_benchmark", None),
+    (r"pk_\w+", "external", "na_benchmark", "against RNApolis"),
+    (r"dom_cal_\w+", "external", "dom_cal", "against CATH"),
+    (r"dom_held_nohom_\w+", "external", "dom_held_nohom", "against CATH"),
+    (r"dom_held_\w+|dom_group_held", "external", "dom_held", "against CATH"),
+    (r"dom_fresh_\w+", "external", "dom_fresh", "against CATH"),
+    (r"dom_all33", "external", "dom_reference", "against CATH"),
+    (r"supp_table_domains", None, "dom_reference", None),
+    (r"hom_usalign_h1_under", "external", "hom_heldout", "foldmap's aligner against US-align"),
+    (r"hom_usalign\w*", "external", "hom_usalign", "foldmap's aligner against US-align"),
+    (r"hom_(seed|n_pairs|n_pos|n_neg)", None, "hom_heldout", None),
+    (r"hom_\w+", "consistency", "hom_heldout", "H1-H5: B drawn like A, judged against A and B themselves (internal)"),
+    (r"dssp_\w+", "external", "dssp_m2", "against mkdssp 3.1.2"),
+    (r"supp_table_dssp", None, "dssp_m2", None),
+    (r"membrane_thickness_mad", "external", "membrane_opm", f"against OPM; the thickness is {THICKNESS}"),
+    (r"membrane_\w+", "external", "membrane_opm", "against OPM"),
+    (r"determinism_\w+", "regression-guard", "determinism", "identical by design on every platform"),
+    (r"pub_\w+", "external", "pub", "against published hand-drawn figures"),
+    (r"release_tag|zenodo_doi", None, None, None),
+]
+RATE = re.compile(r"(.+)_(n|ci_lo|ci_hi)")  # a rate's denominator and interval keys (Numbers.rate)
+
+
+def load_sets() -> dict:
+    """scripts/paper/sets.json: each benchmark set's tag (tuning, regression or unseen) and why."""
+    doc = json.loads((HARNESS / "sets.json").read_text(encoding="utf-8"))
+    bad = {k: s["tag"] for k, s in doc["sets"].items() if s["tag"].split()[0] not in doc["_legend"]}
+    if bad:
+        raise SystemExit(f"sets.json: tags must start with tuning, regression or unseen: {bad}")
+    return doc
+
+
+def family(key: str, known=frozenset()) -> tuple[str | None, str | None, str | None]:
+    """(layer, set, note) of a key by FAMILIES; a rate's _n, _ci_lo and _ci_hi keys (`known` holds their base) take
+    their base key's. KeyError for a key no family names."""
+    m = RATE.fullmatch(key)
+    if m and m.group(1) in known:
+        key = m.group(1)
+    for pattern, layer, where, note in FAMILIES:
+        got = re.fullmatch(pattern, key)
+        if got:
+            return layer, where.replace("{1}", got.group(1)) if where and "{1}" in where else where, note
+    raise KeyError(key)
+
+
+def label(nb: "Numbers", sets: dict) -> None:
+    """Every key and extra gets its layer, set and the set's tag (FAMILIES, sets.json); a key no family names, or a
+    set sets.json lacks, stops the run."""
+    known = set(nb.keys) | set(nb.extra)
+    unknown, missing = [], set()
+    for where in (nb.keys, nb.extra):
+        for key, rec in where.items():
+            try:
+                layer, s, note = family(key, known)
+            except KeyError:
+                unknown.append(key)
+                continue
+            if s is not None and s not in sets["sets"]:
+                missing.add(s)
+                continue
+            rec["layer"] = layer
+            rec["set"] = s
+            rec["set_tag"] = sets["sets"][s]["tag"] if s else None
+            if note:
+                rec["layer_note"] = note
+    if unknown or missing:
+        raise SystemExit(f"keys no family names: {sorted(unknown)}; sets not in sets.json: {sorted(missing)}")
 
 
 # ---- helpers --------------------------------------------------------------------------------------------------------
@@ -151,6 +282,26 @@ class Numbers:
             "how": how,
         }
 
+    def rate(self, key: str, k: int, n: int, of: str, fmt=None, note: str = ""):
+        """A headline rate's denominator and Wilson 95% interval (plan 28 Task 2), beside the key already put (its
+        value unchanged): <key>_n (n, `of` saying what it counts), <key>_ci_lo and <key>_ci_hi (the interval of the
+        proportion k / n, common.wilson; `fmt` its text, three decimals by default), from the key's sources."""
+        where = self.extra if key in self.extra else self.keys
+        if key not in where:
+            raise KeyError(f"rate of {key}: put the key first")
+        fmt = fmt or (lambda x: tex_frac(x, 3))
+        srcs = where[key]["sources"]
+        lo, hi = wilson(k, n) or (None, None)
+        why = f"Wilson 95% interval of the proportion {k} of {n} (common.wilson){'; ' + note if note else ''}"
+        where[f"{key}_n"] = {"value": n, "text": tex_int(n), "sources": srcs, "how": f"denominator of {key}: {of}"}
+        for end, v in (("lo", lo), ("hi", hi)):
+            where[f"{key}_ci_{end}"] = {
+                "value": v,
+                "text": "--" if v is None else fmt(v),
+                "sources": srcs,
+                "how": f"{why}: {'low' if end == 'lo' else 'high'} end",
+            }
+
 
 def sample_summary(report: dict) -> dict:
     entries = report["entries"]
@@ -201,6 +352,7 @@ def build_r100(nb: Numbers) -> dict:
             [f"{p}_report"],
             "entries with no criterion failed (report.json passed, recounted from the entries)",
         )
+        nb.rate(f"r100_{s}_pass", summ[s]["passed"], summ[s]["n"], "entries in the sample's report")
 
     first = load_source("r100_held_first_report")
     quotable("r100_held_first_report", first)
@@ -213,6 +365,7 @@ def build_r100(nb: Numbers) -> dict:
         "the held-out sample's first full run as judged after F1 fix round 1 (report.json.gz at 1ef0706; controller "
         "ruling 2026-10-17). Its entries were measured at 5650dbd (92) and 44a1c1b (8 redrawn): see _meta",
     )
+    nb.rate("r100_held_pass_first", fs["passed"], fs["n"], "entries in the first run's report")
 
     t = summ["third"]
     fails = {c: t["by_criterion"][c]["fail"] for c in t["criteria"]}
@@ -250,6 +403,13 @@ def build_r100(nb: Numbers) -> dict:
     for c in ("A12", "A13"):
         n = t["by_criterion"][c]["pass"]
         nb.put(f"r100_third_{c.lower()}_pass", n, str(n), ["r100_third_report"], f"entries passing {c}")
+        judged = n + t["by_criterion"][c]["fail"]
+        nb.rate(
+            f"r100_third_{c.lower()}_pass",
+            n,
+            judged,
+            f"entries {c} judged (pass or fail; not judged and does not apply left out)",
+        )
     nb.put(
         "r100_third_science_fail",
         len(t["science_fail_entries"]),
@@ -257,6 +417,7 @@ def build_r100(nb: Numbers) -> dict:
         ["r100_third_report"],
         "entries failing at least one science check S1-S6 (entry science outcomes)",
     )
+    nb.rate("r100_third_science_fail", len(t["science_fail_entries"]), t["n"], "entries in the report")
     failing = {k: v["fail"] for k, v in t["science"].items() if v["fail"]}
     clean = [k for k, v in t["science"].items() if not v["fail"]]
     parts = [f"{k} in {n} entries" for k, n in sorted(failing.items(), key=lambda kv: order_key(kv[0]))]
@@ -288,6 +449,13 @@ def build_r100(nb: Numbers) -> dict:
         str(len(within)),
         [f"{p}_report" for p in SAMPLES.values()] + ["src/foldmap/domain_score.py"],
         f"of those, chains with overlap, boundary F1 and recall all at or above domain_score.TARGETS {targets}",
+    )
+    nb.rate(
+        "dom_r100_pass",
+        len(within),
+        len(chains),
+        "chains S5 scored (dom_r100_n)",
+        note="chains of one entry are not independent",
     )
     per = {}
     for s in SAMPLES:
@@ -327,6 +495,7 @@ def build_r100(nb: Numbers) -> dict:
             nb.put("dssp_r100_agree", agree, tex_int(agree), src, "sum over measured entries of residues - len(differ)")
             nb.put("dssp_r100_residues", res, tex_int(res), src, "sum of dssp.residues over measured entries")
             nb.put("dssp_r100_entries", len(measured), str(len(measured)), src, "entries with dssp.agree measured")
+            nb.rate("dssp_r100_agree", agree, res, "residues compared (dssp_r100_residues)", fmt=pct, note=POOLED)
         nb.put(
             f"dssp_r100_{s}",
             {"agree": agree, "residues": res, "entries": len(measured)},
@@ -416,7 +585,9 @@ def build_na(nb: Numbers):
         src,
         f"pooled over entries, pairs as drawn: {tp} true of {drawn} drawn (canonical and wobble)",
     )
+    nb.rate("bp_precision", tp, drawn, "pairs drawn (canonical and wobble), pooled over entries", note=POOLED)
     nb.put("bp_recall", tp / ref, tex_frac(tp / ref), src, f"pooled: {tp} found of {ref} RNApolis pairs")
+    nb.rate("bp_recall", tp, ref, "RNApolis pairs, pooled over entries", note=POOLED)
     macro = {k: sum(e[k] for e in rep) / n for k in ("pair_precision", "pair_recall", "pair_f1", "stem_recall")}
     nb.put("na_macro_means", macro, "", src, "means over entries (the pooled numbers are the keys)", extra=True)
     stems_ref = sum(e["stems_reference"] for e in rep)
@@ -428,12 +599,95 @@ def build_na(nb: Numbers):
         src,
         f"pooled: {stems_found} of {stems_ref} reference stems found (stem_recall x stems_reference per entry)",
     )
+    nb.rate("stem_agreement", stems_found, stems_ref, "reference stems, pooled over entries", note=POOLED)
     ok = [e["entry"] for e in rep if not e["failed"]]
     nb.put(
         "na_campaign_pass", len(ok), str(len(ok)), src, "entries whose failed list is empty (every THRESHOLDS limit)"
     )
+    nb.rate("na_campaign_pass", len(ok), n, "entries in report.json")
+    build_na_measures(nb, rep, src)
     write_na_table(rep)
     nb.put("supp_table_na", "tables/na.tex", r"\input{tables/na.tex}", src, "per entry: pairs, stems, pass or failures")
+
+
+def build_na_measures(nb: Numbers, rep: list[dict], src: list[str]):
+    """The NA measures by what they are evidence of (plan 28 Task 2, ruling Q19; common.na_measures): the angle and
+    joint errors as regression guards (zero by construction on an ordinary projection), Spearman, Procrustes, mirrored
+    stems and contact proximity as the fidelity measures, and stems_nearer_frac's distribution beside its strict pass,
+    its not-applicable entries named apart (ruling Q5)."""
+    limit = constant("src/foldmap/nacheck.py", "THRESHOLDS")["stems_nearer_frac"]
+    got = na_measures(rep, limit)
+    guards, fid = got["regression_guards"], got["fidelity"]
+    other = sorted({e for g in guards.values() for e in g["nonzero"]})
+    nb.put(
+        "na_regression_guards",
+        guards,
+        "0 on every entry measured" + (f" but {join_and(other)}" if other else ""),
+        src,
+        "angle_median, angle_max and joint_error_max: zero by construction on an ordinary projection (stems are drawn "
+        "along their axes as seen, nacheck.shape), so regression guards there, not evidence of fidelity; a value "
+        "that is not 0 is an unrolled frame's, which measures the unrolling. Per measure: entries measured, how many "
+        "are 0, the others' values",
+    )
+    nb.keys["na_regression_guards"]["tag"] = ZERO_BY_CONSTRUCTION
+    for k in ("spearman", "procrustes", "contact_auc"):
+        d = fid[k]
+        nb.put(
+            f"na_{k}_median",
+            d.get("median"),
+            "--" if not d["n"] else tex_frac(d["median"], 2),
+            src,
+            f"median over the {d['n']} entries measuring {k} (quartiles and range in extra.na_fidelity)",
+        )
+    mir = fid["mirrored"]
+    nb.put(
+        "na_mirrored_entries",
+        len(mir["entries_with_mirrored"]),
+        str(len(mir["entries_with_mirrored"])),
+        src,
+        f"entries with a stem drawn mirrored (mirrored > 0), of {mir['measured']} measured; {mir['stems']} stems in all"
+        + (f": {', '.join(mir['entries_with_mirrored'])}" if mir["entries_with_mirrored"] else ""),
+    )
+    nb.rate("na_mirrored_entries", len(mir["entries_with_mirrored"]), mir["measured"], "entries measuring mirrored")
+    near = fid["stems_nearer_frac"]
+    nb.put(
+        "na_stems_nearer_pass",
+        near["strict_pass"],
+        str(near["strict_pass"]),
+        src,
+        f"entries whose stems_nearer_frac meets its strict limit (>= {limit}), of the {near['applicable']} where it "
+        "applies; its distribution in extra.na_fidelity",
+    )
+    nb.rate("na_stems_nearer_pass", near["strict_pass"], near["applicable"], "entries where stems_nearer_frac applies")
+    nb.put(
+        "na_stems_nearer_not_applicable",
+        near["not_applicable"],
+        f"{len(near['not_applicable'])}"
+        + (f" ({', '.join(near['not_applicable'])})" if near["not_applicable"] else ""),
+        src,
+        "entries where stems_nearer_frac is not applicable (ruling Q5): every drawn element touches each stem it "
+        "scores, seen as contact_auc None with stems_nearer_frac measured (common.nearer_applies); reported as such, "
+        "never as a pass",
+    )
+    d = near["distribution"]
+    nb.put(
+        "na_stems_nearer_median",
+        d.get("median"),
+        "--" if not d["n"] else tex_frac(d["median"], 2),
+        src,
+        f"median stems_nearer_frac over the {d['n']} entries where it applies (quartiles, histogram in "
+        "extra.na_fidelity)",
+    )
+    nb.put(
+        "na_fidelity",
+        fid,
+        "",
+        src,
+        "the fidelity measures over entries: quartiles of spearman, procrustes, contact_auc, contact_precision_at_k "
+        "and ss_contacts_nearer; mirrored stems; stems_nearer_frac's distribution beside its strict pass "
+        "(common.na_measures)",
+        extra=True,
+    )
 
 
 def write_na_table(rep: list[dict]):
@@ -605,9 +859,14 @@ def build_homologues(nb: Numbers):
     nb.put("hom_n_pos", pos["pairs"], str(pos["pairs"]), src, "positive pairs (remote + close strata)")
     nb.put("hom_n_neg", neg["pairs"], str(neg["pairs"]), src, "negative pairs (one architecture, two topologies)")
     nb.put("hom_pos_pass", pos["all_pass"], str(pos["all_pass"]), src, "positives passing H1-H5")
+    nb.rate("hom_pos_pass", pos["all_pass"], pos["pairs"], "positive pairs")
     nb.put("hom_neg_refused", neg["refused"], str(neg["refused"]), src, "negatives refused with the note (H1 pass)")
+    nb.rate("hom_neg_refused", neg["refused"], neg["pairs"], "negative pairs")
     for k in ("H1", "H2", "H3", "H4", "H5"):
         nb.put(f"hom_pos_{k.lower()}", pos["pass"][k], str(pos["pass"][k]), src, f"positives passing {k}")
+        nb.rate(
+            f"hom_pos_{k.lower()}", pos["pass"][k], pos["pairs"], "positive pairs (not judged counted as not passing)"
+        )
     for key, field in (
         ("hom_h2_indep", "h2_median_independent"),
         ("hom_h2_alike", "h2_median_alike"),
@@ -641,6 +900,7 @@ def build_homologues(nb: Numbers):
         f"{lim['pair_agreement']:.0%} of US-align's residue pairs reproduced within ±{lim['pair_slack']}), of the "
         f"{scope}",
     )
+    nb.rate("hom_usalign_agreement", a["both"], a["judged"], "pairs judged (hom_usalign_judged)")
     nb.put("hom_usalign_judged", a["judged"], str(a["judged"]), src, f"the {scope}")
     nb.put(
         "hom_usalign_tm_within",
@@ -649,6 +909,7 @@ def build_homologues(nb: Numbers):
         src,
         f"of the {scope}: foldmap's TM-score within {lim['tm_tolerance']} of US-align's",
     )
+    nb.rate("hom_usalign_tm_within", a["tm_within"], a["judged"], "pairs judged (hom_usalign_judged)")
     nb.put(
         "hom_usalign_pairs_median",
         a["within_1_median"],
@@ -672,6 +933,7 @@ def build_homologues(nb: Numbers):
         src,
         "held-out positives H1 refuses (foldmap TM-score under SAME_FOLD_TM) that US-align also puts under it",
     )
+    nb.rate("hom_usalign_h1_under", under, len(refused), "held-out positives H1 refuses")
     nb.put("hom_usalign", us, "", src, "the comparison per set and over all (heldout-summary.json usalign)", extra=True)
 
 
@@ -758,6 +1020,8 @@ def main() -> int:
             nb.put(key, tags[0], tags[0], [], "git tag pointing at the harness commit")
             continue
         nb.keys.setdefault(key, {"value": None, "pending": stage, "why": why})
+    sets = load_sets()
+    label(nb, sets)  # every key's layer, set and the set's tag (plan 28 Task 2)
 
     prov = nb.prov
     notes = [
@@ -777,6 +1041,9 @@ def main() -> int:
         "for the 8 redrawn after the check corrections of F1 fix round 1). It is a historical count by design.",
         "Domain scores (dom_cal/held/fresh) are computed by domains.py from the committed fixtures with the code at "
         "the harness commit; the fixtures were built at bbe1bd8 and CI checks four of them against their structures.",
+        "Each key's layer and set (sets.json), and each headline rate's denominator and Wilson 95% interval (<key>_n, "
+        "<key>_ci_lo, <key>_ci_hi; plan 28 Task 2, ruling Q19), are computed from these same committed reports: no "
+        "measurement was redone, so they describe the numbers above until the freeze rebuild.",
     ]
     doc = {
         "_meta": {
@@ -790,6 +1057,8 @@ def main() -> int:
             "source_problems": prov["problems"],
             "reviews_after_the_run": prov["reviews_after_the_run"],
             "notes": notes,
+            "layers": LAYERS,
+            "sets": sets,
             "pending_legend": {
                 "M2": "validation still missing (plan 14 M2)",
                 "CI": "needs a CI run on other platforms (job in scripts/paper/README.md)",

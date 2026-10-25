@@ -16,10 +16,11 @@ import gzip
 import json
 from collections import Counter, defaultdict
 
-from common import MANUSCRIPT, TABLES, median, na_rows, quotable, stamped_commit, tex_escape, tex_frac, tex_int
+from common import MANUSCRIPT, POOLED, TABLES, median, na_rows, quotable, stamped_commit, tex_escape, tex_frac, tex_int
 
 DATA = MANUSCRIPT / "data"
 M2 = DATA / "m2"
+THICKNESS_FIXED = "fixed by the method (not predicted)"  # the membrane thickness (plan 28 Task 2, ruling Q19)
 Q3 = {"H": "H", "G": "H", "I": "H", "E": "E", "B": "E"}  # everything else (T, S read as '-', '-') is coil
 
 
@@ -151,6 +152,7 @@ def build_dssp(nb, reports: dict) -> None:
         f"pooled over residues: {t['q8']} of {t['residues']} with the same DSSP code (mkdssp S and blank read as "
         "'-'); text rounded to the fewest places that do not round to 100",
     )
+    nb.rate("dssp_q8_mean", t["q8"], t["residues"], "residues compared", fmt=pct, note=POOLED)
     nb.put(
         "dssp_q3_mean",
         t["q3"] / t["residues"],
@@ -158,6 +160,7 @@ def build_dssp(nb, reports: dict) -> None:
         src,
         f"pooled: {t['q3']} of {t['residues']} in the same class (helix H, G, I; strand E, B; other the rest)",
     )
+    nb.rate("dssp_q3_mean", t["q3"], t["residues"], "residues compared", fmt=pct, note=POOLED)
     nb.put(
         "dssp_bridge_agreement",
         t["bridge_same"] / t["bridged"],
@@ -165,6 +168,14 @@ def build_dssp(nb, reports: dict) -> None:
         src,
         f"pooled: {t['bridge_same']} of {t['bridged']} residues with a bridge partner in either program have the "
         "same set of partners in both (mkdssp BP1/BP2; foldmap DsspResult.bridges)",
+    )
+    nb.rate(
+        "dssp_bridge_agreement",
+        t["bridge_same"],
+        t["bridged"],
+        "residues with a bridge partner in either program",
+        fmt=pct,
+        note=POOLED,
     )
     nb.put(
         "dssp_n_diff_residues",
@@ -307,6 +318,13 @@ def build_membrane(nb) -> None:
         f"mean |2 x half - OPM's DUM-plane distance| over the {len(found)} entries foldmap finds a membrane in "
         f"(refused: {', '.join(refused) or 'none'})",
     )
+    fixed = sorted({2 * e["estimate"]["half"] for e in found})
+    thickness = (
+        f"{THICKNESS_FIXED}: every estimate's thickness is one of {', '.join(f'{x:g}' for x in fixed)} A "
+        "(membrane.HALF, BARREL_HALF for a beta-barrel), so this difference measures OPM's spread around the fixed "
+        "value, not a prediction"
+    )
+    nb.keys["membrane_thickness_mad"]["thickness"] = thickness
     ang = [e["estimate"]["normal_angle_deg"] for e in found]
     nb.put(
         "membrane_tilt_median",
@@ -327,6 +345,12 @@ def build_membrane(nb) -> None:
         f"{len(segs)} cross the estimated slab (CA run reaching membrane._MIN_CROSSING = 10 A beyond its mid-plane "
         "on both sides); a refused entry's segments count as not crossing",
     )
+    nb.rate("membrane_tm_recall", len(hit), len(segs), "OPM transmembrane segments with >= 3 CA atoms", note=POOLED)
+    nb.keys["membrane_tm_recall"]["limitation"] = (
+        f"a limitation, reported as one: {len(hit)} of {len(segs)} OPM transmembrane segments cross the estimated "
+        "slab by foldmap's strict crossing rule (OPM's own planes reach extra.membrane_detail.opm_own_ceiling under "
+        "the same rule)"
+    )
     called = [e for e in found if e["estimate"]["sided"]]
     right = [e for e in called if e["estimate"]["side_correct"]]
     nb.put(
@@ -343,6 +367,9 @@ def build_membrane(nb) -> None:
         src,
         "of those, outward normal on OPM's outer side (dot with OPM's outward normal > 0; OPM 'O' DUM atoms outer, "
         "'N' inner)",
+    )
+    nb.rate(
+        "membrane_side_correct", len(right), len(called), "entries whose sides foldmap calls (membrane_side_called)"
     )
     # extras: refusals, found-only recall, OPM's own ceiling, offsets, by class, attribution
     segs_found = [x for x in segs if any(e["id"] == x[0] for e in found)]
@@ -390,6 +417,7 @@ def build_membrane(nb) -> None:
         "per OPM class, frame-fit RMSD, OPM's DUM side convention checked against its topology field",
         extra=True,
     )
+    nb.extra["membrane_detail"]["thickness"] = thickness  # its by_class thickness_mad
     attr = {e["id"]: e["attribution"] for e in rows}
     for x in doc.get("attribution_extra", []):
         attr[x["id"]] = x.get("attribution") or x.get("error")
@@ -496,6 +524,7 @@ def build_pk(nb, committed_na: list[dict]) -> None:
         "knot rule (nucleic._knots) calls pseudoknotted, on the pairs the figure draws",
     )
     nb.put("pk_found", got, str(got), src, "of those, recalled by a drawn stem (the two-thirds match of stem_recall)")
+    nb.rate("pk_found", got, ref, "pseudoknotted reference stems (pk_reference), pooled over entries", note=POOLED)
     nb.put(
         "pk_deposited",
         {
@@ -603,3 +632,4 @@ def build_determinism(nb) -> None:
         src,
         "figures whose layout signature and SVG hash are the same in every run",
     )
+    nb.rate("determinism_identical", len(identical), len(figs), "figures drawn on every platform (determinism_n)")

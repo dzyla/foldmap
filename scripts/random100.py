@@ -1843,6 +1843,8 @@ def report(entries: list[dict], out: Path, sample_path: Path | None = None, tota
     """report.json (every value, LIMITS, commit, source stamp, versions, sample.json's SHA-256, date), report.md (the
     counts, a table per stratum and per entry with the A1-A20 marks and what failed, the reported-only statistics, the
     limits) and index.html (a grid of the contact sheets, linking to each)."""
+    from foldmap.science import check_kinds
+
     total = total or len(entries)
     passed = sum(1 for e in entries if e.get("pass"))
     drawn = json.loads(sample_path.read_text(encoding="utf-8")) if sample_path and sample_path.is_file() else {}
@@ -1856,6 +1858,7 @@ def report(entries: list[dict], out: Path, sample_path: Path | None = None, tota
         "limits": LIMITS,
         "documented_warnings": list(DOCUMENTED_WARNINGS),
         "criteria": CRITERIA,
+        "check_kinds": check_kinds(CRITERIA),  # what each check is evidence of (science.KIND; plan 28 Task 2)
         "passed": passed,
         "entries": entries,
     }
@@ -2052,8 +2055,9 @@ def science(e: dict) -> dict:
     fails when any view has a finding, each named by its view ("focus: sheet 27: ..."); it passes when some view had
     something to judge (science_judged: a sheet, a barrel, a mark, an accessory) and none has a finding; else it
     does not apply to an entry with no protein, and is not judged for one with protein (final review B, Important 3:
-    nothing to judge is no pass). S5 is the entry's, once (chain-level, against CATH's chopping: domain_reference)."""
-    from foldmap.science import NOTHING, SCIENCE, domain_findings
+    nothing to judge is no pass). S5 is the entry's, once (chain-level, against CATH's chopping: domain_reference).
+    Each result carries its check's kind (science.KIND: S1-S4, S6 consistency, S5 external; plan 28 Task 2)."""
+    from foldmap.science import KIND, NOTHING, SCIENCE, domain_findings
 
     per_view, judged = _view_science(e), _view_judged(e)
     protein = bool((e.get("facts") or {}).get("protein"))
@@ -2076,7 +2080,7 @@ def science(e: dict) -> dict:
             out[key] = _ok(None, "not measured", NOT_JUDGED if protein else NOT_APPLICABLE)
         else:
             out[key] = _ok(None, f"{NOTHING[key]} in any view", NOT_JUDGED if protein else NOT_APPLICABLE)
-    return out
+    return {k: {**v, "kind": KIND[k]} for k, v in out.items()}
 
 
 def science_views(e: dict) -> dict[str, dict[str, int]]:
@@ -2087,22 +2091,24 @@ def science_views(e: dict) -> dict[str, dict[str, int]]:
 def science_section(entries: list[dict]) -> list[str]:
     """report.md's science checks: per check how many entries pass, fail or are not measured (an entry fails a check
     when any of its views has a finding), then per view how many entries it was measured in and how many of them it
-    fails per check, then each entry with its marks and findings (each named by its view)."""
-    from foldmap.science import SCIENCE
+    fails per check, then each entry with its marks and findings (each named by its view). Each check names its kind
+    (science.KIND: structural consistency or external validation)."""
+    from foldmap.science import KIND, SCIENCE, kind_line
 
     rows = [(e, science(e)) for e in entries]
     lines = ["", "## Science checks (S1-S6), apart from A1-A20", ""]
     lines += [f"Judged in every drawn view ({', '.join(SCIENCE_VIEWS)}); S5 once per entry.", ""]
+    lines += [kind_line()[0].upper() + kind_line()[1:] + ".", ""]
     lines += [
         "A check passes only where it had something to judge; an entry with protein and nothing to judge (no sheet "
         "drawn, no barrel, no residue mark, no accessory strand, no CATH chopping) is not judged, one with no "
         "protein does not apply.",
         "",
     ]
-    lines += ["| check | " + " | ".join(OUTCOMES) + " |", "|---|---|---|---|---|"]
+    lines += ["| check | " + " | ".join(OUTCOMES) + " | kind |", "|---|---|---|---|---|---|"]
     for key, what in SCIENCE.items():
         got = Counter(outcome(s[key]) for _, s in rows)
-        lines.append(f"| {key} {what} | " + " | ".join(str(got[o]) for o in OUTCOMES) + " |")
+        lines.append(f"| {key} {what} | " + " | ".join(str(got[o]) for o in OUTCOMES) + f" | {KIND[key]} |")
     keys = [k for k in SCIENCE if k != "S5"]
     lines += [
         "",

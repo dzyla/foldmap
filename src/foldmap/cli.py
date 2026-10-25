@@ -67,7 +67,7 @@ from .nucleic import StemView, stem_views, straight_duplex
 from .palette import PALETTES
 from .render import LOOP_STYLES, STYLES, draw, save
 from .route import route_loops
-from .science import science_lines, sheet_checks, sheet_judged
+from .science import kind_line, science_lines, sheet_checks, sheet_judged
 from .scope import drawn_scope, scope_note
 from .sheets import build_sheets
 from .spec import (
@@ -160,6 +160,7 @@ def summarize(path: str) -> str:
         lines += [f"  pairs with {b.id}, in another sheet: {a.id}" for a, b in sh.joined]
     if sheets:  # the science checks of the sheets as built (figcheck.science_checks reads them as drawn)
         lines.append("science checks (the sheets as built):")
+        lines.append(f"  {kind_line()}")
         found = sheet_checks(sheets, sses, dssp.bridges)
         lines += [f"  {line}" for line in science_lines(found, sheet_judged(sheets))]
     try:
@@ -2679,7 +2680,6 @@ def _cmd_check(args: argparse.Namespace) -> int:
     Drawn like a reference (--like), then H1-H5 (criteria.like_checks), B also drawn alone for H5 and the baseline.
     Exit 1 when any check found a problem or any criterion judged here fails."""
     from .criteria import check_figure, criteria_lines, like_lines
-    from .science import science_lines
 
     spec = _spec_of(args)
     got: dict | None = {} if spec.like else None
@@ -2688,6 +2688,7 @@ def _cmd_check(args: argparse.Namespace) -> int:
     for out in args.output:
         print(f"wrote {save(drawn.figure, out)}")
     found = check_figure(drawn, spec, args.structure)
+    print(kind_line())  # what each check is evidence of (science.KIND; plan 28 Task 2)
     for line in science_lines(found["science"], found["science_judged"]) + criteria_lines(found["criteria"]):
         print(line)
     failed = any(c["pass"] is False for c in found["criteria"].values())
