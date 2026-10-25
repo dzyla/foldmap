@@ -1771,7 +1771,9 @@ def _bounded_push(xy, limits, gi, gj, s: int, py: float, held: tuple[bool, bool]
     """_push_apart's push up or down, within one-sided bounds (`limits`, _limits; plan 27 ruling P24): groups gi and gj
     (index arrays, or one index each) parted by py plus _SEP_PUSH each, gj along page side `s` and gi the other way,
     half each as unbounded; what one cannot take short of its bound (or of nothing at all: `held`, keeping its height)
-    the other takes. False, nothing moved, when the two cannot part by py up or down: the caller parts them sideways."""
+    the other takes: then py plus 2 _SEP_PUSH, one _SEP_PUSH more than _push_apart's unbounded height-keeping branch
+    moves it (review-4 M7). False, nothing moved, when the two cannot part by py up or down: the caller parts them
+    sideways."""
     lo, hi = limits
 
     def room(g, way: int, still: bool) -> float:  # how far group g may move along page side `way`
@@ -4054,11 +4056,12 @@ def _band_key(level: set[str], slab: dict, bounds: dict) -> Callable[[str], obje
 
 
 def _by_band(group: list, key: Callable[[str], object], run: bool) -> list[list]:
-    """Ruling P23: the parts of a group of helices drawn as one unit (a bundle of ids, a kinked helix's pieces) that are
-    alike by `key` (_band_key), each part of two or more a unit of its own (the rest drawn alone): a unit never holds
-    the band's elements and others (6UW4's A:423-432, 32 Å below the slab, a kinked piece of its TM A:438-461; 5LDW's
-    bundle of fifteen, TM and soluble helices of six chains). `run`: the parts are consecutive runs (a kinked helix's
-    pieces, end to end), else every member alike, in order (a bundle's)."""
+    """Rulings P23, P30: the parts of a group of helices drawn as one unit (a bundle of ids, a kinked helix's pieces)
+    that are alike by `key` (_band_key), each part of two or more a unit of its own (the rest drawn alone): a unit never
+    holds the band's elements and others, nor elements of both sides (6UW4's A:423-432, 32 Å below the slab, a kinked
+    piece of its TM A:438-461; 5LDW's bundle of fifteen, TM and soluble helices of six chains). A βα row or a helix over
+    a sheet holding elements not alike is not drawn so (build_layout, _alike). `run`: the parts are consecutive runs (a
+    kinked helix's pieces, end to end), else every member alike, in order (a bundle's)."""
     of = [key(x if isinstance(x, str) else x.id) for x in group]
     if len(set(of)) == 1:
         return [group]
@@ -4072,6 +4075,18 @@ def _by_band(group: list, key: Callable[[str], object], run: bool) -> list[list]
     else:
         parts = [[x for x, k in zip(group, of) if k == c] for c in dict.fromkeys(of)]
     return [p for p in parts if len(p) > 1]
+
+
+def _alike(ids: list[str], key: Callable[[str], object]) -> bool:
+    """Are these elements all alike by `key` (_band_key): may one unit hold them in a membrane view (ruling P30)?"""
+    return len({key(k) for k in ids}) <= 1
+
+
+def _row_ids(sheet: Sheet, sses: list[SSE]) -> list[str]:
+    """The elements a βα row of this sheet holds (_ba_template, as template_rows reads them): its strands and every
+    helix of its in-row βα units."""
+    units = _ba_units(_open_at_ends(sheet), sses)
+    return [s.id for s in sheet.strands] + sorted({h.id for u in units if u.inrow for h in u.helices})
 
 
 def _into_slab(items: list[_Item], slab: dict, band: tuple[float, float]) -> dict[int, int]:
@@ -4101,13 +4116,14 @@ def _into_slab(items: list[_Item], slab: dict, band: tuple[float, float]) -> dic
     return out
 
 
-def _face_line(items: list[_Item], line: dict[int, int], kept: np.ndarray) -> None:
+def _face_line(items: list[_Item], line: dict[int, int], kept: np.ndarray, rows: set[int] = frozenset()) -> None:
     """Ruling P23: the flat helices of the slab (`line`, _into_slab's: item -> its face) lying on their face line,
     each face's in their projected order along it, packed round the columns standing there (the other items keeping
     their height whose footprints reach the line's: _row_columns) with the least summed squared move from their
     projected x (_pack_row). No room limits them: none may leave the face line for the ordinary layout (face rows do,
-    _face_rows), being in the bilayer."""
-    others = [k for k in np.flatnonzero(kept).tolist() if k not in line]
+    _face_rows), being in the bilayer. The face rows' helices (`rows`, _onto_faces's, set on the face only until
+    _face_rows lays them beside it, round these) are no columns here (ruling P31)."""
+    others = [k for k in np.flatnonzero(kept).tolist() if k not in line and k not in rows]
     for side in (1, -1):
         ks = sorted((k for k, s in line.items() if s == side), key=lambda k: (items[k].home[0], k))
         if not ks:
@@ -4173,8 +4189,9 @@ def _limits(
             a = max(a, b1 + (near if boxed else MARGIN) - y0)
         if downs:
             b = min(b, b0 - (far if boxed else MARGIN) - y1)
-        if ups and downs:  # both sides: held whole on the side most of its elements are
+        if ups and downs:  # both sides (a sheet: P30 splits every other unit): whole on the side most of it is
             a, b = (a, np.inf) if ups >= downs else (-np.inf, b)
+            log.debug("a unit held on one side has elements of both: %s", [m.sse.id for m in it.members])
         lo[k], hi[k] = a, b
     return lo, hi
 
@@ -4183,23 +4200,29 @@ def _within(items: list[_Item], limits: tuple[np.ndarray, np.ndarray] | None) ->
     """Each item's centre, and its home with it, moved the least way back within its _limits (ruling P24)."""
     if limits is None:
         return
-    lo, hi = limits
     for k, it in enumerate(items):
-        y = min(max(it.cy, float(lo[k])), float(hi[k]))
-        if y != it.cy:
-            it.cy = y
-        h = min(max(it.home[1], float(lo[k])), float(hi[k]))
-        if h != it.home[1]:
-            it.home = (it.home[0], h)
+        _hold(it, k, limits)
+
+
+def _hold(it: _Item, k: int, limits: tuple[np.ndarray, np.ndarray]) -> None:
+    """Item `it` (item k of _limits') and its home moved the least way back within its limits."""
+    lo, hi = float(limits[0][k]), float(limits[1][k])
+    y = min(max(it.cy, lo), hi)
+    if y != it.cy:
+        it.cy = y
+    h = min(max(it.home[1], lo), hi)
+    if h != it.home[1]:
+        it.home = (it.home[0], h)
 
 
 def _kept(items: list[_Item], held: set[str]) -> np.ndarray | None:
     """Which items keep their height (_separate's `level`), None if none: an item holding an element of `held` (the
     transmembrane elements, the band's others at their own depth range, _into_slab, and the flat helices set on a face
-    by _onto_faces). A unit holding the band's elements holds no other (_by_band), so no element bound to a side is
-    kept with one of the band (plan 27 ruling P24: the whole sheet a strand in the slab kept at its projected height,
-    32KS's G/H hairpins, is gone with the band set first; a sheet holding a crossing strand and others, none on the
-    campaign, is kept whole)."""
+    by _onto_faces). In a membrane view no bundle, kinked helix, βα row or helix over a sheet holds the band's elements
+    with others (_by_band, _alike; rulings P24, P30), so no element bound to a side is kept with one of the band: the
+    whole sheet a strand in the slab kept at its projected height (32KS's G/H hairpins) is gone. A sheet is never split:
+    one holding a crossing strand and strands crossing no membrane (a barrel's short ones, 9FWZ's FimD; none on the
+    campaign) is kept whole, its short strands with it."""
     out = np.array(
         [any(getattr(m, "sse", None) is not None and m.sse.id in held for m in it.members) for it in items], bool
     )
@@ -4209,15 +4232,16 @@ def _kept(items: list[_Item], held: set[str]) -> np.ndarray | None:
 def _onto_faces(
     items: list[_Item], on_face: dict[str, int], band: tuple[float, float]
 ) -> dict[int, tuple[float, float, int]]:
-    """Each item that is one element of `on_face` (id -> +1 the upper face, -1 the lower; 0, its own height) set on
-    that face: centred on it, its home there too (build_layout then keeps its height, as a transmembrane element's).
-    Returns, for each item set on a face, its projected place (home x and y before the move) and its face."""
+    """Each item that is one element of `on_face` (id -> +1 the upper face, -1 the lower) set on that face: centred
+    on it, its home there too (build_layout then keeps its height, as a transmembrane element's; _face_rows lays it in
+    rows beside the face). Returns, for each item set on a face, its projected place (home x and y before the move) and
+    its face."""
     out = {}
     for k, it in enumerate(items):
         if len(it.members) != 1 or not isinstance(it.members[0], Placed) or it.members[0].ghost:
             continue
         side = on_face.get(it.members[0].sse.id)
-        if side:
+        if side:  # +1 or -1
             out[k] = (it.home[0], it.home[1], side)
             y = float(_snap(band[1] if side > 0 else band[0]))
             it.cy, it.home = y, (it.home[0], y)
@@ -4463,8 +4487,8 @@ def _hold_rooms(
             _into_room(items, faced, kept, level, gone, moved)
             gone = []
         now = _tm_spans(items, level, now=True)
-        for k in gone:  # then any still carried out of its room released to the ordinary layout, walled off the
-            x0, y0, _ = faced[k]  # band on its side, at its projected place as it stood to its chain's columns
+        for k in gone:  # then any still carried out of its room released to the ordinary layout, at its projected
+            x0, y0, _ = faced[k]  # place as it stood to its chain's columns, held by its bound (_within, below)
             c = items[k].members[0].sse.chain
             if c in seen_span and c in now:
                 x0 += (sum(now[c]) - sum(seen_span[c])) / 2
@@ -5134,6 +5158,11 @@ def build_layout(
         rowed = [bool(x) for x in like.template]
     if like is not None and mode == "projected":  # over its sheet only where the reference's mate is
         over = {h: k for h, k in (over or {}).items() if like.over.get(h, True)}
+    banded = band is not None and mode == "projected" and bool(level or slab or bounds)  # the band decided first (P23)
+    key = _band_key(set(level or ()), slab or {}, bounds or {}) if banded else None
+    if banded:  # no unit holds the band's elements and others, nor elements of both sides (ruling P30)
+        rowed = [row and _alike(_row_ids(sh, sses), key) for sh, row in zip(sheets, rowed)]
+        over = {h: k for h, k in (over or {}).items() if _alike([h, *(s.id for s in sheets[k].strands)], key)}
     templates = {
         k: _ba_template(
             ring := _open_at_ends(sh),
@@ -5158,8 +5187,6 @@ def build_layout(
     bundles = helix_bundles([s for s in sses if s.id not in in_rows])  # bundles are coiled coils, never a row's
     if getattr(frame, "sector", None):  # each protomer's part of a bundle drawn with its own copy
         bundles = _within_protomers(bundles, by_id, frame.sector)
-    banded = band is not None and mode == "projected" and bool(level or slab or bounds)  # the band decided first (P23)
-    key = _band_key(set(level or ()), slab or {}, bounds or {}) if banded else None
     if banded:  # no bundle holds the band's elements and others; each part still of two chains or more
         bundles = [p for g in bundles for p in _by_band(g, key, False) if len({by_id[k].chain for k in p}) > 1]
     bundled = {k for g in bundles for k in g}
@@ -5310,7 +5337,7 @@ def build_layout(
         held_ids = set(level or ()) | (set(on_face or ()) | set(slab or ()) if band is not None else set())
         kept = _kept(items, held_ids)
         if line:  # the flat helices of the slab on their face line, round the columns standing there
-            _face_line(items, line, kept)
+            _face_line(items, line, kept, set(faced))
         panelled = {k for name, ids in domains or [] if name in (domain_sides or {}) for k in ids}  # soluble domains
         ours = set(level or ()) | set(slab or ())  # the band's elements: their items keep their height, no bound
         limits = _limits(items, bounds, band, panelled, ours) if banded else None  # every other element's bound (P24)
@@ -5704,8 +5731,7 @@ def _part_domains(
             it.cx, it.cy = it.cx + float(step[0]), it.cy + float(step[1])
             it.home = (it.home[0] + float(step[0]), it.home[1] + float(step[1]))  # rest here from now on
             if limits is not None:
-                it.cy = min(max(it.cy, float(limits[0][n])), float(limits[1][n]))
-                it.home = (it.home[0], min(max(it.home[1], float(limits[0][n])), float(limits[1][n])))
+                _hold(it, n, limits)
 
     def overlap() -> float:  # summed over the pairs that may part
         total = 0.0
@@ -5801,9 +5827,10 @@ def _banded(
     limits: tuple[np.ndarray, np.ndarray] | None = None,
 ) -> dict:
     """_part_domains' membrane arguments (`kept`, `sides`, `limits`) in a membrane view with domains (build_layout
-    `band` and `domain_sides`), else none: parted as ever."""
+    `band` and `domain_sides`), else none: parted as ever (the bounds go only with the sides, which part a soluble
+    domain outward on its own side; review-4 M6)."""
     if band is None or domain_sides is None:
-        return {"limits": limits} if limits is not None else {}
+        return {}
     return {"kept": kept, "sides": [domain_sides.get(name, 0) for name, _ in domains or []], "limits": limits}
 
 

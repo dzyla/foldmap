@@ -470,9 +470,15 @@ def slab_range(s: SSE, depth: np.ndarray, m: Membrane) -> tuple[float, float]:
     seg = np.asarray(depth)[s.start : s.end + 1]
     deep, shallow = float(seg.min()), float(seg.max())
     if lies_flat_here(s.axis, seg, m):
-        face = m.half if float(np.median(seg)) >= 0.0 else -m.half
+        face = nearer_face(seg, m)
         return min(deep, face), max(shallow, face)
     return max(deep, -m.half), min(shallow, m.half)
+
+
+def nearer_face(depth: np.ndarray, m: Membrane) -> float:
+    """The face (Å from the mid-plane, positive outside) a helix of the slab whose CA atoms lie at these depths is
+    nearer, by their median: the face a flat one may lie on (slab_range; cli draws it on that face's line, P13)."""
+    return m.half if float(np.median(np.asarray(depth))) >= 0.0 else -m.half
 
 
 # Ruling T5-1: in a membrane view two helix runs of one chain at most JOIN_GAP non-helix residues apart are joined

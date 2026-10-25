@@ -53,6 +53,7 @@ from .membrane import (
     crosses,
     crosses_joined,
     lies_flat_here,
+    nearer_face,
     own_bound,
     own_side,
     slab_helix,
@@ -1122,6 +1123,12 @@ def _membrane_band(lay, sses, bb, mem, faces=None) -> dict | None:
     }
 
 
+def _lying(s, seg, mem) -> bool:
+    """Is element `s`, its CA atoms at depths `seg`, a helix (or 3-10 helix) drawn lying flat in a membrane view
+    (membrane.lies_flat_here)? The one test _membrane_places and _band_ids read (review-4 M9)."""
+    return s.kind in HELIX_KINDS and lies_flat_here(s.axis, seg, mem)
+
+
 class _Places(NamedTuple):
     """Where a projected membrane view draws each element that is not `tm` (_membrane_places)."""
 
@@ -1158,7 +1165,7 @@ def _membrane_places(sses, bb, mem, tm: set[str], faces) -> _Places:
         seg = depth[s.start : s.end + 1]
         if s.id in tm:
             continue
-        lying = s.kind in HELIX_KINDS and lies_flat_here(s.axis, seg, mem)
+        lying = _lying(s, seg, mem)
         if lying:
             out.flat.add(s.id)
         if faces is None:
@@ -1167,7 +1174,7 @@ def _membrane_places(sses, bb, mem, tm: set[str], faces) -> _Places:
             if not slab_helix(s, depth, mem):
                 out.slab[s.id] = None  # crossing, not tm: at its projected height
             elif lying:
-                face = mid + (mem.half if float(np.median(seg)) >= 0.0 else -mem.half) * per
+                face = mid + nearer_face(seg, mem) * per  # the face slab_range lets it lie on
                 out.slab[s.id] = (face, face, True)
             else:
                 y0, y1 = sorted(mid + d * per for d in slab_range(s, depth, mem))
@@ -1194,7 +1201,7 @@ def _band_ids(sses, bb, mem, tm: set[str]) -> set[str]:
     for s in sses:
         seg = depth[s.start : s.end + 1]
         centre = abs(float(seg.mean()))
-        lying = s.kind in HELIX_KINDS and lies_flat_here(s.axis, seg, mem)
+        lying = _lying(s, seg, mem)
         at = centre <= mem.half + SOLUBLE_BEYOND if lying else centre <= mem.half and s.kind != "G"
         if at or crosses(seg, mem.half):
             out.add(s.id)

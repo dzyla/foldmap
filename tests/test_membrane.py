@@ -1297,8 +1297,12 @@ def test_a_flat_helix_lies_on_its_face_and_a_slab_element_keeps_its_height():
     )
     p = lay.placed
     assert band[1] + MARGIN - 1e-6 <= p[upper.id].rect[1] < band[1] + 2 * MARGIN
-    # the lower one, carried out of its room by the separation, is released (R15): held by its bound below the face
-    assert p[lower.id].rect[3] <= band[0] - MARGIN + 1e-6
+    # Ruling P32. The lower one, pushed sideways out of its room by the separation, is released to the ordinary layout
+    # (R15), so R8's first row no longer holds it: before plan 27 its wall pushed it back just under the face; under P24
+    # its bound holds it MARGIN below the face from the first sweep (_separate's _within), and what it still overlaps
+    # of the transmembrane column (the N-end letter) is parted up or down, the free helix moving the whole way
+    # (_bounded_push). Its place: within its bound, and no further than 3.6 units below the face (measured 3.54).
+    assert band[0] - 3.6 < p[lower.id].rect[3] <= band[0] - MARGIN + 1e-6
     assert abs(np.sin(p[upper.id].angle)) < 1e-9 and abs(np.sin(p[lower.id].angle)) < 1e-9
     assert p[other.id].rect[1] >= band[1] + MARGIN - 1e-6  # released, off the band on its side
     assert p[slab.id].cy == pytest.approx(-4.0 * SCALE)
@@ -2446,7 +2450,8 @@ def test_an_interfacial_hairpin_is_lifted_out_whole():
 def test_a_helix_of_the_slab_is_drawn_at_its_own_depth_range():
     """Ruling P23 with P13 (layout._into_slab, _face_line): a flat helix of the slab lies with its axis on its face line
     (Fig. 1C's NS1 and NS7), beside the transmembrane column it was seen across; a standing one is drawn upright over
-    its own depth range, its ends within it."""
+    its own depth range, its ends within it. Laid out without attraction, the column stays at its projected x: the
+    face line, not the separation, makes the flat helix's room."""
     from foldmap.layout import build_layout
     from helpers import fake_sse
 
@@ -2465,9 +2470,162 @@ def test_a_helix_of_the_slab_is_drawn_at_its_own_depth_range():
         flat={flat.id},
         band=band,
         slab=slab,
+        attract=False,
     ).placed
     f = p[flat.id]
     assert f.n_port[1] == pytest.approx(band[0], abs=1e-9) and f.c_port[1] == pytest.approx(band[0], abs=1e-9)
-    assert _rects_apart(f.rect, p[tm.id].rect)
+    assert _rects_apart(f.rect, p[tm.id].rect) and p[tm.id].cx == pytest.approx(0.0)
     g = p[stand.id]
     assert all(-0.5 <= y <= 2.0 for y in (g.n_port[1], g.c_port[1])) and abs(g.n_port[1] - g.c_port[1]) > 2.0
+
+
+def test_a_ba_row_holding_band_helices_and_interfacial_strands_is_not_drawn_as_one():
+    """Ruling P30 (review-4 I1): in a membrane view no unit holds the band's elements with others. A βα row (four
+    parallel strands, a helix between each two: fold_template auto draws it as one rigid unit) whose helices cross the
+    membrane and whose strands lie at the interface is drawn as its sheet and its helices apart: the helices stand
+    across the band, the strands are lifted clear of it by their bounds, never kept in it with the helices."""
+    from foldmap.layout import MARGIN, SCALE, build_layout, template_applies
+    from foldmap.model import Sheet
+    from helpers import fake_sse
+
+    band = (-3.45, 3.45)
+    strands, helices, els = [], [], []
+    for k in range(4):
+        s = fake_sse("E", 40 * k, 40 * k + 5, centroid=(4.8 * k, 0, 10.0), axis=(1, 0, 0))
+        strands.append(s)
+        els.append(s)
+        if k < 3:
+            h = fake_sse("H", 40 * k + 10, 40 * k + 32, centroid=(4.8 * k + 2.4, 10, 0.0), axis=(0, 0, 1))
+            helices.append(h)
+            els.append(h)
+    sheet = Sheet(strands, [1, 1, 1, 1], ["P", "P", "P"])
+    assert template_applies(sheet, els)  # drawn as a βα row but for the band
+    ids = {h.id for h in helices}
+    bounds = {s.id: (1, 8.0 * SCALE) for s in strands}
+    lay = build_layout(els, [sheet], _page(), "projected", level=ids, upright=ids, band=band, bounds=bounds)
+    assert lay.ba_rows == []
+    for s in strands:
+        assert lay.placed[s.id].rect[1] >= band[1] + MARGIN - 1e-6, s.id
+    for h in helices:
+        lo, hi = sorted((lay.placed[h.id].n_port[1], lay.placed[h.id].c_port[1]))
+        assert lo < 0.0 < hi, h.id
+
+
+def _flat_item(s, x, y, length=4.0):
+    from foldmap.layout import Placed, _Item
+
+    return _Item([Placed(s, 0, 0, length, 0.0, 1.0)], [(0.0, 0.0)], x, y, (x, y), s.start, s.chain)
+
+
+@pytest.mark.parametrize("step", ["attract", "face_rows", "part_domains", "hold_rooms", "slide_clear"])
+def test_each_step_holds_the_bound_itself(step):
+    """Ruling P24, review-4 M4: each step that moves an item holds it within its bound itself, not only through the
+    separation after it (whose own first clamp would hide a step's missing one): _attract (its energy term and clamp),
+    _face_rows (a row nearer the face than the helix's nearest CA atom), _part_domains (a soluble domain parted
+    sideways off another chain's band domain from below its bound), _hold_rooms (a face helix released at its
+    projected place, in the band) and _slide_clear (a spot past the bound is not clear: the item slides another way).
+    Item 0 is held at page y 6 or above."""
+    import foldmap.layout as L
+    from helpers import fake_sse
+
+    band = (-3.45, 3.45)
+    a, b = fake_sse("H", 0, 12), fake_sse("H", 30, 42, chain="B")
+    lo, hi = np.array([6.0, -np.inf]), np.full(2, np.inf)
+    if step == "attract":  # pulled by a strong contact toward a partner keeping its height in the band
+        items = [_flat_item(a, 0.0, 6.0), _flat_item(b, 0.0, 0.0)]
+        L._attract(items, [a, b], {frozenset((a.id, b.id)): 50}, level=np.array([False, True]), limits=(lo, hi))
+    elif step == "face_rows":  # no room on its chain's (absent) columns: released at its projected place, y 1
+        items = [_flat_item(a, 0.0, band[1])]
+        L._face_rows(items, {0: (0.0, 1.0, 1)}, np.array([True]), band, set(), (lo[:1], hi[:1]))
+    elif step == "part_domains":
+        items = [_flat_item(a, 0.0, 5.0), _flat_item(b, 3.8, 4.5)]
+        kept = np.array([False, True])
+        L._part_domains(items, [("S", [a.id]), ("M", [b.id])], kept=kept, sides=[1, 0], limits=(lo, hi))
+    elif step == "hold_rooms":  # carried out of its room after each separation: released at y 1
+        tm = fake_sse("H", 50, 75)
+        column = L._Item([L.Placed(tm, 0, 0, 6.9, np.pi / 2, 1.0)], [(0.0, 0.0)], 0.0, 0.0, (0.0, 0.0), 50, "A")
+        items = [_flat_item(a, 30.0, 6.0), column]
+
+        def separate():  # the separation carries it off again
+            items[0].cx = 30.0
+            return "alone"
+
+        spans = {"A": (-0.5, 0.5)}
+        L._hold_rooms(items, {0: (0.0, 1.0, 1)}, np.array([True, True]), {tm.id}, spans, separate, None, (lo, hi))
+    else:  # item 1 overlaps the settled item 0 from just below it, straight down being its nearest way out
+        items = [_flat_item(b, 0.0, 6.5), _flat_item(a, 0.0, 6.0)]
+        lo, hi = lo[::-1], hi[::-1]
+        L._slide_clear(items, limits=(lo, hi))
+    k = 1 if step == "slide_clear" else 0
+    assert items[k].cy >= 6.0 - 1e-9
+
+
+def test_the_face_line_packs_its_helices_round_the_columns_but_not_the_rows():
+    """Rulings P23, P31 (layout._face_line): a flat helix of the slab on its face line goes where _pack_row puts it in
+    the gaps the standing columns leave (the transmembrane column it was seen across), the least move from its
+    projected x; a face row's helix, set on the face only until _face_rows lays it beside the face, is no column."""
+    import foldmap.layout as L
+    from helpers import fake_sse
+
+    band = (-3.45, 3.45)
+    tm, flat, row = fake_sse("H", 0, 25), fake_sse("H", 30, 45), fake_sse("H", 50, 61)
+    column = L._Item([L.Placed(tm, 0, 0, 6.9, np.pi / 2, 1.0)], [(0.0, 0.0)], 0.0, 0.0, (0.0, 0.0), 0, "A")
+    items = [column, _flat_item(flat, 0.5, band[1], 5.0), _flat_item(row, 4.0, band[1])]
+    it = items[1]
+    columns = L._row_columns(items, [0], band[1] + it.box[1] - L.MARGIN, band[1] + it.box[3] + L.MARGIN)
+    edges = [-np.inf] + [v for a, b in columns for v in (a - L.MARGIN, b + L.MARGIN)] + [np.inf]
+    (want,) = L._pack_row([it.home[0] + it.mid[0]], [it.half[0]], list(zip(edges[::2], edges[1::2])))
+    L._face_line(items, {1: 1}, np.array([True, True, True]), {2})
+    assert it.cx == pytest.approx(float(L._snap(want - it.mid[0])))
+    assert it.cy == band[1] and abs(it.cx - 0.5) > 1.0  # moved off the column, still on the face line
+
+
+def test_a_domain_of_both_sides_is_never_drawn_across_the_band():
+    """Review-4 M3 (6JLN with domains: D3 of chain B holds η7 and η8 below the band, its other elements above): a
+    domain whose elements lie on both sides has no side (cli._domain_sides, P25) and each element is held on its own
+    side, so its panel, a field round its elements (layout.domain_fields, render.domain_outline), is drawn as islands
+    either side of the band, none of them across it."""
+    from foldmap.layout import SCALE, build_layout, domain_fields
+    from foldmap.render import domain_outline
+    from helpers import fake_sse
+
+    band = (-3.45, 3.45)
+    tm = fake_sse("H", 0, 25, centroid=(0, 0, 0.0), axis=(0, 0, 1))
+    out = fake_sse("H", 30, 41, centroid=(1, 0, 22.0), axis=(1, 0, 0))
+    inner = fake_sse("H", 45, 48, centroid=(2, 0, -20.0), axis=(1, 0, 0))
+    lay = build_layout(
+        [tm, out, inner],
+        [],
+        _page(),
+        "projected",
+        level={tm.id},
+        upright={tm.id},
+        flat={out.id, inner.id},
+        band=band,
+        bounds={out.id: (1, 20.0 * SCALE), inner.id: (-1, -18.0 * SCALE)},
+        domains=[("M", [tm.id]), ("S", [out.id, inner.id])],
+        domain_sides={},
+    )
+    rings = domain_outline(domain_fields(lay), "S").to_polygons(closed_only=False)
+    assert len(rings) >= 2
+    assert not any(r[:, 1].min() < band[1] and r[:, 1].max() > band[0] for r in rings)
+
+
+def test_a_band_helix_is_never_drawn_over_an_interfacial_sheet():
+    """Ruling P30 (review-4 I1): a crossing helix packed on an interfacial sheet's face (`over`, helix_on_sheet auto)
+    is drawn apart from the sheet, standing across the band, and the sheet is lifted clear of the band by its bounds."""
+    from foldmap.layout import MARGIN, SCALE, build_layout
+    from foldmap.model import Sheet
+    from helpers import fake_sse
+
+    band = (-3.45, 3.45)
+    s1 = fake_sse("E", 0, 6, centroid=(0, 0, 8.0), axis=(1, 0, 0))
+    s2 = fake_sse("E", 10, 16, centroid=(0, 4.8, 8.0), axis=(-1, 0, 0))
+    h = fake_sse("H", 20, 45, centroid=(0, 2.4, 0.0), axis=(0, 0, 1))
+    sheet = Sheet([s1, s2], [1, -1], ["A"])
+    kw = dict(level={h.id}, upright={h.id}, band=band, bounds={s1.id: (1, 6.0 * SCALE), s2.id: (1, 6.0 * SCALE)})
+    lay = build_layout([s1, s2, h], [sheet], _page(), "projected", over={h.id: 0}, **kw)
+    assert not lay.on_sheet
+    assert min(lay.placed[s.id].rect[1] for s in (s1, s2)) >= band[1] + MARGIN - 1e-6
+    lo, hi = sorted((lay.placed[h.id].n_port[1], lay.placed[h.id].c_port[1]))
+    assert lo < 0.0 < hi
