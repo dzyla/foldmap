@@ -1524,14 +1524,52 @@ def test_a_foldmap_module_changed_on_disk_is_loaded_fresh(tmp_path, monkeypatch)
     assert app._drop_changed_foldmap() == []  # first look records the stamps
     assert app._drop_changed_foldmap() == []  # nothing changed
     # final review M3: every .py of the package is stamped, a module this process never imported among them
-    loaded = {n.removeprefix("foldmap.").replace(".", "/") + ".py" for n in sys.modules if n.startswith("foldmap.")}
-    never = next(f for f in seen if f not in loaded and f != "__init__.py")
+    from pathlib import Path
+
+    loaded = {
+        str(Path(m.__file__).resolve())
+        for n, m in list(sys.modules.items())
+        if n.startswith("foldmap") and getattr(m, "__file__", None)
+    }
+    never = next(f for f in seen if f not in loaded)
     monkeypatch.setitem(seen, never, -1)  # as if that file changed on disk
     kept = dict(sys.modules)
     try:
         dropped = app._drop_changed_foldmap()
         assert "foldmap.app_jobs" in dropped and "foldmap.app" not in dropped
         assert not any(n in sys.modules for n in dropped)
+    finally:
+        sys.modules.update(kept)
+        seen.clear()
+
+
+def test_the_app_run_from_another_tree_never_reloads_foldmap(tmp_path, monkeypatch):
+    """Plan 27 CI fix (e98f1b6, run 40199844418): CI installs foldmap (non-editable) and AppTest runs the source tree's
+    app.py, so its stamps (keyed by path relative to the script's own folder) and those of the installed app module
+    told every file as changed: foldmap was reloaded mid-run and later tests held two copies of each class (route's
+    _oid: 'Placed' object has no attribute 'id'). The stamps are taken of the imported package and keyed by absolute
+    path: an app.py elsewhere (a copy, its file newer) changes nothing, and a layout's elements stay the router's."""
+    import importlib
+    import shutil
+    import sys
+
+    from foldmap import app
+    from foldmap.layout import Placed
+    from helpers import fake_sse
+
+    other = tmp_path / "src" / "foldmap"
+    other.mkdir(parents=True)
+    shutil.copy(app.__file__, other / "app.py")  # another tree's app.py, newer than the installed one
+    p = Placed(fake_sse("H", 0, 9), 0.0, 0.0, 2.0, 0.0, 1.0, "a")
+    seen = sys.__dict__.setdefault("_foldmap_file_stamps", {})
+    seen.clear()
+    kept = dict(sys.modules)
+    try:
+        assert app._drop_changed_foldmap() == []  # the installed package's stamps
+        monkeypatch.setattr(app, "__file__", str(other / "app.py"))  # the same look from the other tree's script
+        assert app._drop_changed_foldmap() == []
+        route = importlib.import_module("foldmap.route")
+        assert route._oid(p) == p.sse.id  # one Placed class: the layout's elements are the router's
     finally:
         sys.modules.update(kept)
         seen.clear()

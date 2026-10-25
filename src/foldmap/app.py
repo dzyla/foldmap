@@ -22,11 +22,30 @@ from dataclasses import fields, replace
 from pathlib import Path
 
 
+def _package_root() -> Path:
+    """The folder of the foldmap package this process imports (sys.modules, or where the import system finds it,
+    without importing it), not this script's: `streamlit run src/foldmap/app.py`, and the test suite's AppTest, run
+    the source tree's app.py while the installed package may be imported from elsewhere (CI installs it
+    non-editable). Its own folder when neither tells."""
+    import importlib.util
+
+    origin = getattr(sys.modules.get("foldmap"), "__file__", None)
+    if origin is None:
+        try:
+            spec = importlib.util.find_spec("foldmap")
+        except (ImportError, ValueError):
+            spec = None
+        origin = spec.origin if spec is not None else None
+    return Path(origin).resolve().parent if origin else Path(__file__).resolve().parent
+
+
 def _package_stamps(root: Path | None = None) -> dict[str, int | None]:
-    """Every .py file of the foldmap package on disk (under `root`, the package's own folder by default), by its path
-    relative to it in sorted order -> its modification time (None when it cannot be read): what _drop_changed_foldmap
-    compares, the modules no process has loaded yet included (plan 27 final review M3)."""
-    root = Path(__file__).resolve().parent if root is None else root
+    """Every .py file of the foldmap package on disk (under `root`, the imported package's folder by default:
+    _package_root), by its absolute path in sorted order -> its modification time (None when it cannot be read): what
+    _drop_changed_foldmap compares, the modules no process has loaded yet included (plan 27 final review M3). Keyed
+    by absolute path, so files of two trees (the source's and the installed package's) are never compared with each
+    other (CI fix: a test process that looked at both read every file as changed and reloaded foldmap mid-run)."""
+    root = _package_root() if root is None else root
     try:
         paths = sorted(root.rglob("*.py"), key=lambda q: q.relative_to(root).as_posix())
     except OSError:
@@ -34,9 +53,9 @@ def _package_stamps(root: Path | None = None) -> dict[str, int | None]:
     out: dict[str, int | None] = {}
     for p in paths:
         try:
-            out[p.relative_to(root).as_posix()] = p.stat().st_mtime_ns
+            out[str(p.resolve())] = p.stat().st_mtime_ns
         except OSError:
-            out[p.relative_to(root).as_posix()] = None
+            out[str(p.resolve())] = None
     return out
 
 

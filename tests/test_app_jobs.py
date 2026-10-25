@@ -277,7 +277,7 @@ def test_a_code_change_restarts_the_job_server_and_keeps_the_job_slots(monkeypat
     seen.clear()
     assert app._drop_changed_foldmap() == []  # first look records the stamps
     assert forkserver._forkserver._forkserver_pid == server  # nothing changed: the server stays
-    monkeypatch.setitem(seen, "app_jobs.py", -1)  # as if app_jobs.py changed since it was loaded
+    monkeypatch.setitem(seen, str(Path(app_jobs.__file__).resolve()), -1)  # as if app_jobs.py changed on disk
     kept = dict(sys.modules)
     try:
         assert "foldmap.app_jobs" in app._drop_changed_foldmap()
@@ -300,7 +300,7 @@ def _fake_change(app, monkeypatch):
     seen = sys.__dict__.setdefault("_foldmap_file_stamps", {})
     seen.clear()
     assert app._drop_changed_foldmap() == []
-    monkeypatch.setitem(seen, "app_jobs.py", -1)
+    monkeypatch.setitem(seen, str(Path(app_jobs.__file__).resolve()), -1)
     return seen
 
 
