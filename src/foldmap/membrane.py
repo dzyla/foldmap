@@ -339,20 +339,22 @@ HELIX_KINDS = ("H", "G")  # the helices a band holds: alpha (and pi) helices, an
 
 def in_band(s: SSE, depth: np.ndarray, m: Membrane) -> bool:
     """Is element `s` (its CA atoms at depth[s.start : s.end + 1]: `depth` is every residue's, m.depth(bb.ca)) one of
-    the band's (plan 27 ruling P4): a helix crossing the membrane (crosses); a strand of a membrane-crossing barrel
-    (its residues among Membrane.defining's; where no barrel defines the membrane, a strand crossing it, as only a
-    barrel's can, its partners' hydrogen bonds held in the bilayer); or a helix lying in the slab, its CA median inside
-    the slab and lying flat (lies_flat_here)? No other β-strand is ever of the band."""
+    the band's: a helix crossing the membrane (crosses); a helix in the slab, its CA median inside it, at any tilt
+    (slab_helix, ruling P10: re-entrant and half-membrane helices, ComEC's TM7 A:328-339, are in the bilayer in 3D); or
+    a strand crossing the membrane, a barrel's or one in a barrel's lumen (ruling P11: 9FWZ's FimA)? No other β-strand,
+    an interfacial one, is ever of the band (the author: sheets in the membrane are wrong)."""
     seg = np.asarray(depth)[s.start : s.end + 1]
     if s.kind == "E":
-        if m.defining is not None:
-            return not m.defining.isdisjoint(range(s.start, s.end + 1))
         return crosses(seg, m.half)
-    if s.kind not in HELIX_KINDS:
-        return False
-    if crosses(seg, m.half):
-        return True
-    return abs(float(np.median(seg))) < m.half and lies_flat_here(s.axis, seg, m)
+    return s.kind in HELIX_KINDS and (crosses(seg, m.half) or slab_helix(s, depth, m))
+
+
+def slab_helix(s: SSE, depth: np.ndarray, m: Membrane) -> bool:
+    """Is element `s` a helix of the band that does not cross the membrane: a helix (HELIX_KINDS) whose CA median lies
+    inside the slab, at any tilt (ruling P10)? It is drawn inside the band at its own depth range, never stretched
+    across it (figcheck.membrane_view's slab_helix)."""
+    seg = np.asarray(depth)[s.start : s.end + 1]
+    return s.kind in HELIX_KINDS and not crosses(seg, m.half) and abs(float(np.median(seg))) < m.half
 
 
 def band_set(sses: list[SSE], depth: np.ndarray, m: Membrane) -> set[str]:

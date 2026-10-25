@@ -21,7 +21,7 @@ from matplotlib.path import Path as MPath
 from matplotlib.transforms import Affine2D, Bbox
 
 from .layout import block_ghosts, crosses_band, joined_pieces, lying_over
-from .membrane import band_set, crosses, own_side
+from .membrane import band_set, crosses, own_side, slab_helix
 from .na_curve import _FAR, on_curves
 
 # Lines a text can be crossed by (render's gids, matched by prefix). A loop's casing (loopcase:) and a stub's edge
@@ -1783,9 +1783,12 @@ def membrane_view(layout, sses, bb, mem, loops=None) -> dict:
     - tm_helices, the helices that cross the membrane (membrane.crosses: the CA run crosses its mid-plane and spans
       half its thickness); tm_short, those that do not cross their band (crosses_band), with the share of the band
       they cover;
-    - band_member, the elements not of the band (membrane.in_band: crossing helices, a crossing barrel's strands,
-      helices lying flat in the slab) whose drawn body overlaps a band;
-    - strand_in_band, those of them that are β-strands (no strand off a crossing barrel is in the membrane);
+    - slab_helix, the helices of the band that cross no membrane, their CA median in the slab (membrane.slab_helix,
+      ruling P10), whose drawn body is not inside the band at their own depth range: it reaches past a face, or
+      deeper than their CA atoms either way (Å, the furthest);
+    - band_member, the elements not of the band (membrane.in_band: crossing helices, helices in the slab at any tilt,
+      crossing strands) whose drawn body overlaps a band;
+    - strand_in_band, those of them that are β-strands (an interfacial strand is never in the membrane);
     - outside_in_band, the elements not of the band drawn nearer the mid-plane, on their own side, than their own
       nearest CA atom (Å nearer);
     - wrong_side, the elements not of the band whose drawn centre lies on the side opposite their own
@@ -1804,7 +1807,7 @@ def membrane_view(layout, sses, bb, mem, loops=None) -> dict:
     for g in getattr(layout, "ghosts", []):
         ghosts.setdefault(g.sse.id, []).append(g)
     short, tm = [], 0
-    member, strands, nearer, wrong = [], [], [], []
+    member, strands, nearer, wrong, flats = [], [], [], [], []
     for s in sses:
         p = layout.placed.get(s.id)
         if p is None:
@@ -1817,6 +1820,13 @@ def membrane_view(layout, sses, bb, mem, loops=None) -> dict:
             if not crosses_band((lo, hi), (y0, y1)):
                 short.append(f"{s.id} {(min(hi, y1) - max(lo, y0)) / max(y1 - y0, 1e-9):.2f}")
         if s.id in band:
+            if slab_helix(s, depth, mem):  # inside the band at its own depth range (P10)
+                _, y0, _, y1 = p.rect
+                b = _nearest_band(bands, (y0 + y1) / 2)
+                lo, hi = sorted(_drawn_depth(y, b, half, up) for y in (y0, y1))
+                off = max(-half - lo, hi - half, float(seg.min()) - lo, hi - float(seg.max()))
+                if off > _eps(b, half):
+                    flats.append(f"{s.id} {off:.1f}")
             continue
         side, closest = own_side(seg), float((own_side(seg) * seg).min())
         for q, name in [(p, s.id), *((g, f"{s.id} ghost") for g in ghosts.get(s.id, []))]:
@@ -1837,6 +1847,7 @@ def membrane_view(layout, sses, bb, mem, loops=None) -> dict:
     return {
         "tm_helices": tm,
         "tm_short": short,
+        "slab_helix": flats,
         "band_member": member,
         "strand_in_band": strands,
         "outside_in_band": nearer,

@@ -618,7 +618,7 @@ def test_a_route_turning_out_of_a_port_at_or_in_the_slab_turns_at_the_port(entry
 PENDING = pytest.mark.xfail(strict=True, reason="plan 27 T4/T5: layout not yet by construction")
 
 
-@pytest.mark.parametrize("entry", [pytest.param("5LDW", marks=PENDING), pytest.param("6JO6", marks=PENDING), "6JLN"])
+@pytest.mark.parametrize("entry", ["5LDW", pytest.param("6JO6", marks=PENDING), "6JLN"])
 def test_a18_holds_loops_beyond_a_face_out_of_the_slab(entry):
     """Plan 27 Task 2 (A18 strict, ruling P4): random-100 C2b-5's membrane views (5LDW, 6JO6, 6JLN), no loop whose
     residues all lie beyond a face drawn in the slab but on its band element's port stub (loop_in_band)."""
@@ -941,31 +941,55 @@ def _a18(runs, loops=None, defining=None):
 TM = ("H", np.linspace(-18.0, 18.0, 25), UPRIGHT, (_y(-18.0), _y(18.0)))
 
 
-def test_the_band_holds_crossing_helices_a_crossing_barrels_strands_and_helices_flat_in_the_slab():
-    """Plan 27 rulings P4, P5 (membrane.in_band, the one rule A18 and the layout take the band by): the band holds a
-    helix crossing the membrane, a helix or 3-10 helix lying flat with its CA median in the slab, and a strand of a
-    crossing barrel (Membrane.defining; a strand crossing the membrane where no barrel defines it). Not a helix standing
-    in the slab short of crossing, nor one lying flat beyond the face, nor any other strand: an interfacial one, or one
-    crossing the slab in a barrel's lumen (9FWZ's FimA: of no barrel defining the membrane)."""
-    from foldmap.membrane import band_set, in_band, own_side
+def test_the_band_holds_crossing_helices_helices_in_the_slab_and_crossing_strands():
+    """Plan 27 rulings P5, P10, P11 (membrane.in_band, the one rule A18 and the layout take the band by): the band holds
+    a helix crossing the membrane; a helix or 3-10 helix whose CA median lies in the slab, at any tilt (P10: flat, or
+    standing short of crossing, as ComEC's TM7); and a strand crossing the membrane, of a barrel or in a barrel's
+    lumen (P11: 9FWZ's FimA, of no barrel defining the membrane). Not a helix whose CA median lies beyond a face, flat
+    or standing, nor an interfacial strand, even one Membrane.defining names."""
+    from foldmap.membrane import band_set, own_side, slab_helix
 
     runs = {
         "tm": TM,
         "flat-in": ("H", np.array([9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 16.0]), FLAT, (0, 0)),  # median 12
         "eta-in": ("G", np.full(3, -8.0), FLAT, (0, 0)),
-        "flat-out": ("H", np.array([13.0, 14.0, 15.5, 16.0, 17.0]), FLAT, (0, 0)),  # median 15.5: beyond the face
         "standing": ("H", np.linspace(2.0, 12.0, 8), UPRIGHT, (0, 0)),
+        "flat-out": ("H", np.array([13.0, 14.0, 15.5, 16.0, 17.0]), FLAT, (0, 0)),  # median 15.5: beyond the face
+        "standing-out": ("H", np.linspace(14.0, 24.0, 8), UPRIGHT, (0, 0)),
         "crossing-strand": ("E", np.linspace(-14.0, 14.0, 9), UPRIGHT, (0, 0)),
         "interfacial": ("E", np.linspace(10.4, 17.0, 3), UPRIGHT, (0, 0)),
     }
     _, sses, mem, depth = _a18(runs)
-    assert band_set(sses, depth, mem) == {"tm", "flat-in", "eta-in", "crossing-strand"}
+    expected = {"tm", "flat-in", "eta-in", "standing", "crossing-strand"}
+    assert band_set(sses, depth, mem) == expected
+    assert {s.id for s in sses if slab_helix(s, depth, mem)} == {"flat-in", "eta-in", "standing"}
     by = {s.id: s for s in sses}
-    barrel = frozenset(range(by["interfacial"].start, by["interfacial"].end + 1))  # a barrel of that one strand
-    _, sses, mem, depth = _a18(runs, defining=barrel)
-    assert band_set(sses, depth, mem) == {"tm", "flat-in", "eta-in", "interfacial"}  # a crossing strand in its lumen
-    assert not in_band(by["crossing-strand"], depth, mem)
+    for named in ("tm", "interfacial"):  # a barrel elsewhere (the strand crossing in its lumen), or named interfacial
+        barrel = frozenset(range(by[named].start, by[named].end + 1))
+        _, sses, mem, depth = _a18(runs, defining=barrel)
+        assert band_set(sses, depth, mem) == expected, named
     assert own_side(np.array([-1.0, 1.0])) == 1 and own_side(np.array([-2.0, 1.0])) == -1
+
+
+def test_a18_holds_a_helix_in_the_slab_inside_the_band_at_its_own_depth_range():
+    """Ruling P10 (slab_helix): a helix of the band crossing no membrane, its CA median in the slab, is drawn inside the
+    band at its own depth range (Å past it, the furthest): not stretched across the band (ComEC's TM7, A:328-339,
+    -8.8 to +5.1 Å, drawn from face to face), not on the face row outside it, not 1 Å deeper than its deepest CA, not
+    past a face though its CA atoms reach there (5LDW L:212-222, 4.0 to 18.3 Å). Drawn
+    at its depths, flat or standing, it passes; none of these is judged as an element off the band."""
+    tm7 = np.linspace(-8.8, 5.1, 12)
+    flat = np.array([10.5, 11.0, 12.0, 12.5, 13.0, 14.9])
+    runs = {
+        "tm7": ("H", tm7, UPRIGHT, (_y(-8.8), _y(5.1))),
+        "stretched": ("H", tm7, UPRIGHT, (_y(-15.0), _y(15.0))),
+        "on-face": ("H", np.full(6, 12.0), FLAT, (_y(15.6), _y(16.6))),
+        "deeper": ("H", tm7, UPRIGHT, (_y(-9.8), _y(4.1))),
+        "snug-flat": ("H", flat, FLAT, (_y(10.5), _y(14.9))),
+        "past-face": ("H", np.linspace(4.0, 18.0, 8), UPRIGHT, (_y(4.0), _y(18.0))),  # at its depths, past the face
+    }
+    view, *_ = _a18(runs)
+    assert view["slab_helix"] == ["stretched 9.9", "on-face 4.6", "deeper 1.0", "past-face 3.0"], view
+    assert view["band_member"] == [] and view["outside_in_band"] == [] and view["tm_helices"] == 0, view
 
 
 def test_a18_flags_every_element_of_no_band_whose_drawn_body_overlaps_it():

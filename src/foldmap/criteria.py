@@ -120,11 +120,19 @@ def tether_lengths(drawn, look) -> list[tuple[str, float, str, str]]:
     return out
 
 
-MEMBRANE_PARTS = ("band_member", "strand_in_band", "outside_in_band", "wrong_side", "loop_in_band")  # A18's, in order
+MEMBRANE_PARTS = (  # A18's, in order
+    "slab_helix",
+    "band_member",
+    "strand_in_band",
+    "outside_in_band",
+    "wrong_side",
+    "loop_in_band",
+)
 # how A18's detail words each part's finding (figure_criteria)
 MEMBRANE_WORDS = {
+    "slab_helix": "helix in the slab drawn off its own depth range",
     "band_member": "not of the band, drawn in it",
-    "strand_in_band": "β-strand off a crossing barrel in the band",
+    "strand_in_band": "β-strand crossing no membrane in the band",
     "outside_in_band": "drawn nearer the mid-plane than its nearest residue",
     "wrong_side": "drawn on the side opposite its own",
     "loop_in_band": "loop beyond a face drawn in the slab",
@@ -132,10 +140,12 @@ MEMBRANE_WORDS = {
 
 
 def membrane_checks(drawn, path) -> dict:
-    """A18 on a --membrane auto figure (figcheck.membrane_view; plan 27 Task 2, rulings P3-P6): each TM helix (its CA
-    run crosses the membrane's mid-plane and spans half its thickness, membrane.crosses) enters its band through a face
-    and reaches past its middle (C27 ruling); and, every drawn body and loop segment judged against the band with no
-    tolerance: only the band's elements (membrane.band_set) overlap it (band_member), no β-strand off a crossing barrel
+    """A18 on a --membrane auto figure (figcheck.membrane_view; plan 27 Task 2, rulings P3-P6, P10, P11): each TM
+    helix (its CA run crosses the membrane's mid-plane and spans half its thickness, membrane.crosses) enters its band
+    through a face and reaches past its middle (C27 ruling); and, every drawn body and loop segment judged against the
+    band with no tolerance: a helix in the slab that crosses none is drawn inside the band at its own depth range
+    (slab_helix);
+    only the band's elements (membrane.band_set) overlap the band (band_member), no β-strand crossing no membrane
     among them (strand_in_band); every other element is drawn no nearer the mid-plane than its nearest residue
     (outside_in_band) and on its own side (wrong_side); a loop whose residues all lie beyond a face enters the slab only
     straight out of a band element's port (loop_in_band). The membrane is the one the figure was drawn with
