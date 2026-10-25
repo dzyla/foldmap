@@ -20,7 +20,7 @@ from .dssp import assign_dssp
 from .layout import _snap, _unit
 from .model import SSE, Backbone, Bridge, homolog_chains
 from .sheets import build_sheets
-from .ss import build_sses
+from .ss import _fit_axis, build_sses
 
 HALF = 15.0  # Å, half the hydrophobic thickness of a typical bilayer
 _HYDROPHOBIC = {"ALA", "ILE", "LEU", "MET", "PHE", "VAL", "TRP", "CYS"}
@@ -297,13 +297,79 @@ FLAT_TILT = (
 )
 
 
-def lies_flat(axis: np.ndarray, normal: np.ndarray) -> bool:
-    """Is a helix with this axis drawn lying along the membrane, not standing across it: tilted FLAT_TILT or more
-    from the normal (plan 26 Task 2 ruling: the nearer of upright and flat, by the angle in 3D, not as projected;
-    32KS's amphipathic NS1, A:200-219, tilted 71°, pointed into the page and was snapped upright)? The test is on
-    the axis' component along the normal, on the grid, so noise never decides it."""
+# Plan 26 Task 5 ruling T5-2: at a face a helix lies flat from FACE_FLAT_TILT. The interfacial zone of a face is
+# INTERFACE either side of it: the bilayer's interfacial region, its headgroups and water, is about 15 Å thick on
+# each side of the hydrocarbon core (White & Wimley 1999, Annu Rev Biophys Biomol Struct 28:319). 32KS's NS2 and NS3
+# (A:222-233, A:241-250), tilted 44.6° and 38.6° with their centres 2.9 and 6.1 Å beyond the outer face, stood
+# upright 12-36 Å above it; ComEC's Fig. 1C draws them flat on the face.
+FACE_FLAT_TILT = 35.0  # degrees
+INTERFACE = 7.5  # Å either side of a face
+
+
+def lies_flat(axis: np.ndarray, normal: np.ndarray, tilt: float = FLAT_TILT) -> bool:
+    """Is a helix with this axis drawn lying along the membrane, not standing across it: tilted `tilt` (FLAT_TILT)
+    or more from the normal (plan 26 Task 2 ruling: the nearer of upright and flat, by the angle in 3D, not as
+    projected; 32KS's amphipathic NS1, A:200-219, tilted 71°, pointed into the page and was snapped upright)? The test
+    is on the axis' component along the normal, on the grid, so noise never decides it."""
     along = abs(float(_snap(np.dot(_unit(np.asarray(axis, float)), normal))))
-    return along <= float(_snap(np.cos(np.radians(FLAT_TILT))))
+    return along <= float(_snap(np.cos(np.radians(tilt))))
+
+
+def at_face(depth: np.ndarray, half: float) -> bool:
+    """Does an element whose CA atoms lie at these depths lie in a face's interfacial zone: its CA centre within
+    INTERFACE of either face (ruling T5-2)?"""
+    return abs(abs(float(np.mean(depth))) - half) <= INTERFACE
+
+
+def lies_flat_here(axis: np.ndarray, depth: np.ndarray, m: Membrane) -> bool:
+    """Is a helix with this axis, its CA atoms at these depths, drawn lying flat in a membrane view: crossing no
+    membrane and tilted FLAT_TILT or more from the normal, or FACE_FLAT_TILT or more when it lies in a face's
+    interfacial zone (at_face; ruling T5-2); a crossing helix always stands (ruling R7)."""
+    if crosses(depth, m.half):
+        return False
+    return lies_flat(axis, m.normal, FACE_FLAT_TILT if at_face(depth, m.half) else FLAT_TILT)
+
+
+# Ruling T5-1: in a membrane view two helix runs of one chain at most JOIN_GAP non-helix residues apart are joined
+# only when both lie flat or the joined helix crosses the membrane. Joined as those words allow, 199 pairs of the
+# membrane campaign's 21 views would have been: hairpins (32KS's NS1 and NS2, A:200-219 and A:222-233, their axes
+# 151° apart; 6UW4's A:119-129 and A:132-145, 163°), and the cytoplasmic CH1 into TM11 (A:501-505, A:508-526), TM6
+# into TM7 of 32KS chain B. So the flat pieces join only when one goes on as the other (their axes within
+# JOIN_ANGLE: NS7's 37°), and a crossing helix only where copies of the protein disagree (ss._copy_breaks: joined, not
+# cut, when the joined helix crosses).
+JOIN_GAP = 2  # residues
+JOIN_ANGLE = 45.0  # degrees between the two pieces' axes, N to C
+
+
+def _apart(bb: Backbone, x: tuple[int, int], y: tuple[int, int]) -> bool:
+    """Are two helix runs (first and last residue index each) of one chain, 1 to JOIN_GAP residues apart in an
+    unbroken chain?"""
+    gap = y[0] - x[1] - 1
+    if bb.labels[x[0]].chain != bb.labels[y[0]].chain or not 1 <= gap <= JOIN_GAP:
+        return False
+    return bool(np.asarray(bb.prev[x[1] + 1 : y[0] + 1]).all())
+
+
+def joins(bb: Backbone, m: Membrane, x: tuple[int, int], y: tuple[int, int]) -> bool:
+    """Ruling T5-1, item 1: in a membrane view two helix runs of one chain (first and last residue index each), at
+    most JOIN_GAP non-helix residues apart in an unbroken chain, are drawn as one helix when both lie flat
+    (lies_flat_here) and one goes on as the other (their axes within JOIN_ANGLE): 32KS's NS7, A:436-461, which DSSP
+    breaks at 447-448 in chain A only, its pieces 37° apart."""
+    if not _apart(bb, x, y):
+        return False
+    d = m.depth(bb.ca)
+    ax, ay = (_fit_axis(bb.ca[a : b + 1]) for a, b in (x, y))
+    if float(_snap(np.dot(ax, ay))) < float(_snap(np.cos(np.radians(JOIN_ANGLE)))):
+        return False
+    return all(lies_flat_here(axis, d[a : b + 1], m) for axis, (a, b) in ((ax, x), (ay, y)))
+
+
+def crosses_joined(bb: Backbone, m: Membrane, x: tuple[int, int], y: tuple[int, int]) -> bool:
+    """Ruling T5-1, item 3: does a helix DSSP breaks in two (x, y: first and last residue index each, at most JOIN_GAP
+    apart) cross the membrane joined? Copies of the protein that disagree are then joined, not cut (ss._copy_breaks
+    `whole`): 32KS chain B's TM8, B:349-371, broken at 364, cut chain A's whole TM8 in two, its C-terminal piece lying
+    flat under the inner face."""
+    return _apart(bb, x, y) and crosses(m.depth(bb.ca)[x[0] : y[1] + 1], m.half)
 
 
 def _spans(long: list[SSE], z: np.ndarray, centre: float) -> bool:

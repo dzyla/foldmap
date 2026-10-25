@@ -1570,3 +1570,272 @@ def test_a_comec_like_protein_draws_the_three_domains_of_the_paper():
     for k in tm:
         r = lay.placed[k].rect
         assert r[1] < (lo + hi) / 2 < r[3]
+
+
+# ------------------------------------------------- plan 26 Task 5: joins, the face's flat cut, TM1, A18, the turn
+def _straight(points, chain="A"):
+    """A backbone as membrane.joins and ss._copy_breaks read it, one residue per CA point (given as runs of points):
+    CA atoms, labels (chain, number from 1) and every residue bonded to the one before within its chain."""
+    from types import SimpleNamespace
+
+    from foldmap.model import ResLabel
+
+    ca = np.array(points, float)
+    labels = [ResLabel(chain, k + 1, "", "ALA") for k in range(len(ca))]
+    prev = np.array([k > 0 for k in range(len(ca))])
+    return SimpleNamespace(ca=ca, labels=labels, prev=prev)
+
+
+def _run(start, direction, n, step=1.5):
+    start, direction = np.asarray(start, float), np.asarray(direction, float)
+    return [start + direction / np.linalg.norm(direction) * step * k for k in range(n)]
+
+
+def test_flat_helix_pieces_a_break_apart_are_joined_only_going_on_as_one():
+    """Ruling T5-1, item 1 (32KS's NS7, A:436-461, broken by DSSP at 447-448, its pieces 37° apart): two helix runs
+    two residues apart, both lying flat at the outer face, are one helix in a membrane view when one goes on as the
+    other (membrane.JOIN_ANGLE); not when the second folds back (a hairpin, 32KS's NS1 and NS2, 151°), nor three
+    residues apart, nor when one stands."""
+    from foldmap.membrane import JOIN_ANGLE, Membrane, joins
+
+    mem = Membrane(np.array([0.0, 0.0, 1.0]), 0.0, 15.0, "estimate")
+
+    def pair(turn_deg, gap=2, second=(None,)):
+        first = _run((0, 0, 17), (1, 0, 0), 11)
+        end = first[-1]
+        t = np.radians(turn_deg)
+        d = np.array([np.cos(t), np.sin(t), 0.0]) if second[0] is None else np.asarray(second, float)
+        linker = _run(end + d * 1.5, d, gap)
+        rest = _run(linker[-1] + d * 1.5, d, 13)
+        bb = _straight(first + linker + rest)
+        return bb, (0, 10), (11 + gap, 11 + gap + 12)
+
+    assert JOIN_ANGLE == 45.0
+
+    def joined(bb, x, y):
+        return joins(bb, mem, x, y)
+
+    assert joined(*pair(37.0))
+    assert not joined(*pair(151.0))
+    assert not joined(*pair(37.0, gap=3))
+    assert not joined(*pair(0.0, second=(0.3, 0.0, 1.0)))
+
+
+def test_join_runs_joins_each_next_run_its_predicate_names():
+    """ss._join_runs: three runs, the predicate joining the first two: one run of both, the first's start reported;
+    the third kept apart."""
+    from foldmap.ss import _join_runs
+
+    runs = [(0, 10), (13, 25), (30, 40)]
+    out, made = _join_runs(runs, lambda x, y: y[0] == 13)
+    assert out == [(0, 25), (30, 40)] and made == [0]
+    assert _join_runs(runs, lambda x, y: False) == (runs, [])
+
+
+def test_copies_broken_where_the_joined_helix_crosses_are_joined_not_cut():
+    """Ruling T5-1, item 3 (32KS: chain B's TM8 broken at B:364, chain A's whole): one copy whole and one broken by a
+    residue tie, so _copy_breaks cuts the whole one; with `whole_if` (membrane.crosses_joined: the joined helix
+    crosses the membrane) the broken copy is joined instead, both drawn whole."""
+    from foldmap.membrane import Membrane, crosses_joined
+    from foldmap.model import ResLabel
+    from foldmap.ss import _copy_breaks
+
+    helix = _run((0, 0, -18), (0, 0, 1), 25)
+    bb = _straight(helix + [p + np.array([30.0, 0, 0]) for p in helix])
+    bb.labels = [ResLabel("A" if k < 25 else "B", k % 25 + 1, "", "ALA") for k in range(50)]
+    bb.prev = np.array([k % 25 > 0 for k in range(50)])
+    copies = lambda: {"A": ("A", 0), "B": ("A", 0)}  # noqa: E731
+    runs = [(0, 24), (25, 37), (39, 49)]
+    cut, n_cut, _, _ = _copy_breaks(runs, bb, copies)
+    assert n_cut == 1 and (0, 12) in cut and (14, 24) in cut
+    mem = Membrane(np.array([0.0, 0.0, 1.0]), 0.0, 15.0, "estimate")
+    whole, n_cut, n_joined, _ = _copy_breaks(runs, bb, copies, lambda x, y: crosses_joined(bb, mem, x, y))
+    assert n_cut == 0 and n_joined == 1 and whole == [(0, 24), (25, 49)]
+
+
+def test_a_helix_at_a_face_lies_flat_from_35_degrees():
+    """Ruling T5-2 (32KS's NS2 and NS3, tilted 44.6° and 38.6°, centres 2.9 and 6.1 Å beyond the outer face, stood
+    upright above it): in a face's interfacial zone (membrane.INTERFACE either side of it) a helix lies flat from
+    FACE_FLAT_TILT; elsewhere from FLAT_TILT; a crossing helix always stands."""
+    from foldmap.membrane import FACE_FLAT_TILT, FLAT_TILT, INTERFACE, Membrane, lies_flat_here
+
+    mem = Membrane(np.array([0.0, 0.0, 1.0]), 0.0, 15.0, "estimate")
+
+    def at(deg, centre, n=5):
+        axis = np.array([np.sin(np.radians(deg)), 0.0, np.cos(np.radians(deg))])
+        return axis, centre + np.linspace(-1.0, 1.0, n) * np.cos(np.radians(deg)) * 3
+
+    assert (FACE_FLAT_TILT, FLAT_TILT, INTERFACE) == (35.0, 45.0, 7.5)
+    assert lies_flat_here(*at(38.6, 21.1), mem) and lies_flat_here(*at(36.0, -9.0), mem)
+    assert not lies_flat_here(*at(34.0, 21.1), mem)
+    assert not lies_flat_here(*at(40.0, 0.0), mem) and not lies_flat_here(*at(40.0, 30.0), mem)
+    assert lies_flat_here(*at(46.0, 0.0), mem)
+    axis = np.array([np.sin(np.radians(50.0)), 0.0, np.cos(np.radians(50.0))])
+    assert not lies_flat_here(axis, np.linspace(-17.0, 17.0, 12), mem)  # it crosses: it stands
+
+
+def test_a_tm_helix_drawn_between_the_faces_goes_to_the_face_its_run_comes_nearer():
+    """Ruling T5-4 (32KS's TM1, A:5-19: its run -11.0 to +9.2 Å, drawn 21 Å long about its CA centre at +0.1 Å, went
+    4.4 Å out rather than 4.6 Å in, its N end 5 Å off): a helix drawn wholly inside the band goes to the face its CA
+    run comes nearer (cli._nearer_faces, layout._to_face `nearer`), not the nearer by the least move."""
+    from types import SimpleNamespace
+
+    from foldmap.cli import _nearer_faces
+    from foldmap.layout import _to_face, crosses_band
+    from foldmap.membrane import Membrane
+
+    band, ends = (0.0, 10.0), (1.6, 7.6)  # the lower face 1.6 away, the upper 2.4
+    it = _upright_item([ends])
+    assert _to_face(it, {"t0"}, band, 0.0) == pytest.approx(-1.6)  # the least move
+    shift = _to_face(it, {"t0"}, band, 0.0, {"t0": 1})
+    assert shift == pytest.approx(2.4) and crosses_band((ends[0] + shift, ends[1] + shift), band)
+    assert _to_face(it, {"t0"}, band, 0.0, {"t0": -1}) == pytest.approx(-1.6)
+    mem = Membrane(np.array([0.0, 0.0, 1.0]), 0.0, 15.0, "estimate")
+    z = np.array([-11.0, -7.9, -6.2, -5.9, -4.6, -1.9, -0.9, -0.6, 1.6, 3.8, 4.3, 5.0, 7.7, 9.1, 9.2])
+    bb = SimpleNamespace(ca=np.stack([np.zeros(15), np.zeros(15), z], axis=1))
+    tm = [SimpleNamespace(id="TM1", start=0, end=14)]
+    assert _nearer_faces(tm, bb, mem, {"TM1"}, (3.45, -3.45)) == {"TM1": -1}  # outer face up: the lower face
+    assert _nearer_faces(tm, bb, mem, {"TM1"}, (-3.45, 3.45)) == {"TM1": 1}
+
+
+def test_a18_flags_an_element_beyond_a_face_drawn_into_the_slab():
+    """Ruling T5-5 (32KS chain B's NS3, B:241-249, 15.2 to 24.4 Å out, drawn from the outer face 12 Å down into the
+    band; its centre within SOLUBLE_BEYOND, R4 let it pass): figcheck.membrane_view's outside_in_slab flags an element
+    whose CA run lies wholly beyond a face drawn more than SLAB_ENTRY into the slab; not one drawn on the face, nor
+    one drawn wholly beyond the other face, nor one whose run reaches into the slab."""
+    from types import SimpleNamespace
+
+    from foldmap.figcheck import SLAB_ENTRY, membrane_view
+    from foldmap.membrane import Membrane
+
+    mem = Membrane(np.array([0.0, 0.0, 1.0]), 0.0, 15.0, "estimate")
+    per = 10.0 / 30.0  # band 0..10 page units for the 30 Å slab
+    runs = {  # id: (CA depths, drawn ends in Å from the mid-plane)
+        "ns3": (np.linspace(15.2, 24.4, 9), (3.0, 15.0)),
+        "on-face": (np.linspace(15.2, 24.4, 9), (15.0, 15.0)),
+        "shallow": (np.linspace(15.2, 24.4, 9), (15.0 - SLAB_ENTRY + 0.5, 25.0)),
+        "far-side": (np.linspace(-34.0, -31.0, 4), (50.0, 55.0)),
+        "dips-in": (np.linspace(12.0, 24.0, 9), (3.0, 15.0)),
+    }
+    ca, sses, placed = [], [], {}
+    for name, (z, (lo, hi)) in runs.items():
+        sses.append(SimpleNamespace(id=name, kind="H", start=len(ca), end=len(ca) + len(z) - 1))
+        ca += [(0.0, 0.0, float(v)) for v in z]
+        y0, y1 = 5.0 + lo * per, 5.0 + hi * per
+        placed[name] = SimpleNamespace(cy=(y0 + y1) / 2, n_port=(0.0, y0), c_port=(0.0, y1))
+    lay = SimpleNamespace(membrane={"y": (0.0, 10.0), "bands": [(0.0, 10.0)], "inside": "below"}, placed=placed)
+    view = membrane_view(lay, sses, SimpleNamespace(ca=np.array(ca)), mem)
+    assert view["outside_in_slab"] == ["ns3 12"] and view["soluble_in_slab"] == []
+
+
+def test_an_element_wholly_beyond_a_face_is_kept_off_the_band():
+    """Ruling T5-5's layout (6ZKT's M:50-51, 18-19 Å out, drawn 10 Å into the slab): cli._membrane_places puts an
+    element standing wholly beyond a face, its centre within SOLUBLE_BEYOND, among the soluble ones kept off the band
+    on that side (`sides`); a flat one there still lies on the face, and one reaching into the slab is placed as
+    before."""
+    from types import SimpleNamespace
+
+    from foldmap.cli import _membrane_places
+    from foldmap.membrane import Membrane
+
+    mem = Membrane(np.array([0.0, 0.0, 1.0]), 0.0, 15.0, "estimate")
+    runs = {
+        "strand": ("E", np.array([0.0, 0.0, 1.0]), np.linspace(18.3, 19.3, 3)),
+        "flat": ("H", np.array([1.0, 0.0, 0.0]), np.full(5, 17.0)),
+        "reaching": ("E", np.array([0.0, 0.0, 1.0]), np.linspace(14.0, 18.0, 3)),
+    }
+    ca, sses = [], []
+    for name, (kind, axis, z) in runs.items():
+        sses.append(SimpleNamespace(id=name, kind=kind, axis=axis, start=len(ca), end=len(ca) + len(z) - 1))
+        ca += [(0.0, 0.0, float(v)) for v in z]
+    _, on_face, sides = _membrane_places(sses, SimpleNamespace(ca=np.array(ca)), mem, set(), (3.45, -3.45))
+    assert sides == {"strand": 1} and on_face == {"flat": 1}
+
+
+def _band_helices(order_x, spread=100.0):
+    """Six helices crossing a 30 Å slab (normal z) at y = 10 k in sequence and x = order_x[k], with two soluble
+    helices `spread` Å apart along x above it, so view_frame's page-right is x."""
+    from types import SimpleNamespace
+
+    from helpers import fake_sse
+
+    ca, sses = [], []
+    for k, x in enumerate(order_x):
+        first = len(ca)
+        ca += [(x, 10.0 * k, z) for z in np.linspace(-18.0, 18.0, 25)]
+        sses.append(fake_sse("H", first, len(ca) - 1, centroid=(x, 10.0 * k, 0.0), axis=(0, 0, 1)))
+    for x in (-spread / 2, spread / 2):
+        first = len(ca)
+        ca += [(x + t, 25.0, 40.0) for t in np.linspace(-9.0, 9.0, 13)]
+        sses.append(fake_sse("H", first, len(ca) - 1, centroid=(x, 25.0, 40.0), axis=(1, 0, 0)))
+    return sses, SimpleNamespace(ca=np.array(ca))
+
+
+def test_a_membrane_view_turns_about_the_normal_to_stand_its_helices_in_sequence():
+    """Ruling T5-3 (32KS chain A: TM1 in the middle of the band, tau 0.47): of the turns about the normal in
+    AZIMUTH_STEP steps, cli._in_sequence takes the one whose page x order of the band helices agrees best with their
+    sequence: helices in sequence along y, seen along x in no order, are turned until all stand in order; the frame
+    stays a rotation with page-up the normal. Helices already in order keep the frame as chosen."""
+    from foldmap.cli import _in_sequence, _sequence_score
+    from foldmap.frame import view_frame
+    from foldmap.membrane import Membrane
+
+    mem = Membrane(np.array([0.0, 0.0, 1.0]), 0.0, 15.0, "estimate")
+    sses, bb = _band_helices([3.0, -2.0, 1.0, -3.0, 2.0, 0.0])
+    frame = view_frame(sses, up=mem.normal)
+    cents = [[s.centroid for s in sses[:6]]]
+    assert _sequence_score(frame, cents) < 15
+    turned = _in_sequence(frame, sses, bb, mem)
+    assert _sequence_score(turned, cents) == 15  # tau 1
+    assert np.allclose(turned.v, frame.v) and np.allclose(np.cross(turned.u, turned.v), turned.w)
+    assert turned is not frame
+    ordered, bb2 = _band_helices([-5.0, -3.0, -1.0, 1.0, 3.0, 5.0])
+    plain = view_frame(ordered, up=mem.normal)
+    assert _in_sequence(plain, ordered, bb2, mem) is plain
+
+
+def test_a_turn_worth_less_than_a_tenth_in_tau_is_not_taken(monkeypatch):
+    """Ruling T5-3's floor (MIN_TAU_GAIN_INV, 0.1): fifteen pairs, one of them out of order as the frame was chosen;
+    a turn puts all in order, tau +2/15 (0.13): taken. With the floor at 1/6 (0.17) the frame as chosen is kept."""
+    import foldmap.cli as cli
+    from foldmap.frame import view_frame
+    from foldmap.membrane import Membrane
+
+    mem = Membrane(np.array([0.0, 0.0, 1.0]), 0.0, 15.0, "estimate")
+    sses, bb = _band_helices([-5.0, -3.0, 1.0, -1.0, 3.0, 5.0])  # x order: one pair swapped
+    frame = view_frame(sses, up=mem.normal)
+    cents = [[s.centroid for s in sses[:6]]]
+    best = cli._in_sequence(frame, sses, bb, mem)
+    assert cli._sequence_score(frame, cents) == 13 and cli._sequence_score(best, cents) == 15
+    monkeypatch.setattr(cli, "MIN_TAU_GAIN_INV", 6)
+    assert cli._in_sequence(frame, sses, bb, mem) is frame
+
+
+@pytest.mark.skipif(not KS32.is_file(), reason="32KS is not in the download cache")
+def test_comec_reads_as_its_figure_1c():
+    """Plan 26 Task 5 gates on 32KS (ComEC, Fig. 1C): with --chains A, NS7 (A:436-461) is one helix lying flat, NS2 and
+    NS3 (A:222-233, A:241-250) lie flat, TM1 (A:5-19) reaches the inner face, its N terminus below the band, and the
+    band helices read more nearly in sequence (tau over 0.7); in the dimer chain A's TM8 (A:349-371) is one helix
+    across the band, and nothing beyond a face is drawn in the slab."""
+    from foldmap.figcheck import membrane_view
+    from foldmap.route import route_loops
+
+    lay, sses, bb = make_layout(KS32, membrane="auto", chains=["A"])
+    p = lay.placed
+    for k in ("A:436-461", "A:222-233", "A:241-250"):
+        assert k in p and abs(np.sin(p[k].angle)) < 1e-9, k
+    from foldmap.cli import _transmembrane
+
+    lo, hi = lay.membrane["y"]
+    tm1 = sorted((p["A:5-19"].n_port[1], p["A:5-19"].c_port[1]))
+    assert tm1[0] == pytest.approx(lo, abs=1e-3) and p["A:5-19"].n_port[1] < p["A:5-19"].c_port[1]
+    tm = _transmembrane(sses, bb, lay.bilayer)
+    x = [p[s.id].cx for s in sses if s.id in tm and s.kind == "H"]
+    pairs = [(i, j) for i in range(len(x)) for j in range(i + 1, len(x))]
+    assert sum(np.sign(x[j] - x[i]) for i, j in pairs) / len(pairs) > 0.7
+    dimer, dsses, dbb = make_layout(KS32, membrane="auto")
+    assert "A:349-371" in dimer.placed and "B:349-371" in dimer.placed
+    r = dimer.placed["A:349-371"].rect
+    assert r[1] < sum(dimer.membrane["y"]) / 2 < r[3]
+    view = membrane_view(dimer, dsses, dbb, dimer.bilayer, route_loops(dimer, dsses, dbb))
+    assert view["outside_in_slab"] == [] and view["soluble_in_slab"] == [] and view["tm_short"] == []

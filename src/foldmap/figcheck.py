@@ -1770,6 +1770,11 @@ def accessories_named(layout) -> list[str]:
 
 # ------------------------------------------------------------------------------------------- membrane (A18)
 SLAB_MARGIN = 0.3  # page units: a loop's sideways run this far inside a band's faces is in the slab
+# Å: an element wholly beyond a face drawn reaching further than this into the slab is in it (ruling T5-5): R4's own
+# interfacial reach. At 3 Å it would flag two β-strands kept level with their hairpin partners in the slab, 6JO6's
+# B:114-116 and 30BU's A:467-469 (15.1-18.1 Å out, 3.1 and 3.2 Å in): a 3-residue strand drawn upright at its length
+# reaches past the 1.8-2.3 Å its run spans along the normal.
+SLAB_ENTRY = SOLUBLE_BEYOND
 _RUN_MIN = 0.5  # page units: a shorter sideways step is no run along the slab
 
 
@@ -1779,10 +1784,13 @@ def membrane_view(layout, sses, bb, mem, loops=None) -> dict:
     those that do not cross their band (crosses_band), with the share of the band they cover; loops_in_slab,
     slab_runs of `loops` (None: not measured); soluble_in_slab, the elements (any kind, crossing none) whose CA centre
     lies more than SOLUBLE_BEYOND beyond a face but whose drawn centre lies inside a band, each with that depth
-    (ruling R4: a soluble element drawn in the slab; interfacial ones, within SOLUBLE_BEYOND of a face, are not)."""
+    (ruling R4: a soluble element drawn in the slab; interfacial ones, within SOLUBLE_BEYOND of a face, are not);
+    outside_in_slab, the elements whose CA run lies wholly beyond a face drawn reaching more than SLAB_ENTRY into
+    the slab (_into_slab), each with how far in Å (ruling T5-5: 32KS chain B's NS3, B:241-249, 15.2 to 24.4 Å out,
+    drawn from the outer face 12 Å down into the band, which R4's centre test let pass)."""
     bands = layout.membrane.get("bands") or [layout.membrane["y"]]
     depth = mem.depth(bb.ca)
-    short, tm, soluble = [], 0, []
+    short, tm, soluble, entered = [], 0, [], []
     for s in sses:
         p = layout.placed.get(s.id)
         if p is None:
@@ -1792,6 +1800,10 @@ def membrane_view(layout, sses, bb, mem, loops=None) -> dict:
             centre = float(seg.mean())
             if abs(centre) > mem.half + SOLUBLE_BEYOND and any(lo < p.cy < hi for lo, hi in bands):
                 soluble.append(f"{s.id} {centre:+.0f}")
+            if float(seg.min()) >= mem.half or float(seg.max()) <= -mem.half:  # wholly beyond a face
+                into = _into_slab(sorted((p.n_port[1], p.c_port[1])), bands, mem.half)
+                if into > SLAB_ENTRY:
+                    entered.append(f"{s.id} {into:.0f}")
             continue
         if s.kind != "H":
             continue
@@ -1801,7 +1813,27 @@ def membrane_view(layout, sses, bb, mem, loops=None) -> dict:
         if not crosses_band((lo, hi), (y0, y1)):
             short.append(f"{s.id} {(min(hi, y1) - max(lo, y0)) / max(y1 - y0, 1e-9):.2f}")
     slab = None if loops is None else slab_runs(loops, bands, layout.placed)
-    return {"tm_helices": tm, "tm_short": short, "loops_in_slab": slab, "soluble_in_slab": soluble}
+    return {
+        "tm_helices": tm,
+        "tm_short": short,
+        "loops_in_slab": slab,
+        "soluble_in_slab": soluble,
+        "outside_in_slab": entered,
+    }
+
+
+def _into_slab(ends: list[float], bands, half: float) -> float:
+    """How far (Å) an element drawn from page y ends[0] to ends[1] (its ports) reaches into the slab: the deepest
+    point of it inside the band it lies nearest, measured from that band's nearer face (the band's height is the
+    slab's 2 * `half`); 0 when it lies wholly outside every band."""
+    lo, hi = ends
+    y0, y1 = min(bands, key=lambda b: abs((b[0] + b[1]) / 2 - (lo + hi) / 2))
+    a, b = max(lo, y0), min(hi, y1)
+    if a > b or y1 <= y0:
+        return 0.0
+    mid = (y0 + y1) / 2
+    deepest = (mid - y0) if a <= mid <= b else max(min(a - y0, y1 - a), min(b - y0, y1 - b))
+    return deepest * 2 * half / (y1 - y0)
 
 
 def slab_runs(loops, bands, placed, margin: float = SLAB_MARGIN) -> list[str]:

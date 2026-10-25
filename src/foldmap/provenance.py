@@ -14,6 +14,7 @@ elements (their ids: element ids, or domain, stem and ligand names). Kinds, in t
     ambiguous_pairing  pairings drawn off a sheet's run, named only, or joining barrels drawn apart (sheet_note_items)
     bulge_joined       strands drawn whole across a beta-bulge DSSP splits them at (ss._join_bulged_pieces)
     helix_matched      helices cut or joined so copies of a protein are drawn alike (ss._copy_breaks)
+    membrane_joined    helices DSSP breaks by one or two residues drawn whole in a membrane view (membrane.joins)
     ghost_strands      strands drawn again as dashed copies: a barrel's closure, or in another copy's sheet
     na_pieces          Style.na_bend curved: bent duplexes left in pieces, part of a folded RNA (na_curve.curvable)
     na_curve_as_placed Style.na_bend curved: curves drawn through their pieces as placed, the protein not laid out
@@ -140,6 +141,17 @@ def _helix_matched(layout) -> list[dict]:
     return [_item("helix_matched", text, ids)]
 
 
+def _membrane_joined(layout) -> list[dict]:
+    ids = [i for i in getattr(layout, "membrane_joined_ids", []) if i in layout.placed]
+    if not ids:
+        return []
+    text = (
+        "helices DSSP breaks by one or two residues drawn whole in the membrane view, both pieces lying flat or the "
+        f"whole crossing the membrane: {', '.join(ids)}"
+    )
+    return [_item("membrane_joined", text, ids)]
+
+
 def _ghosts(layout) -> list[dict]:
     from .layout import block_ghosts
 
@@ -264,6 +276,7 @@ def figure_provenance(fig, layout, loops=(), labels: bool = True) -> list[dict]:
     out += [dict(i) for i in getattr(layout, "sheet_items", [])]
     out += _bulges(layout)
     out += _helix_matched(layout)
+    out += _membrane_joined(layout)
     out += _ghosts(layout)
     out += _na_bend(layout)
     out += _names_moved(fig, layout, labels)

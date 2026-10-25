@@ -132,7 +132,7 @@ def membrane_checks(drawn, path) -> dict:
     lay, bb = drawn.layout, drawn.bb
     mem = getattr(lay, "bilayer", None)
     if lay.membrane is None or mem is None:
-        none = {"tm_helices": 0, "tm_short": [], "loops_in_slab": [], "soluble_in_slab": []}
+        none = {"tm_helices": 0, "tm_short": [], "loops_in_slab": [], "soluble_in_slab": [], "outside_in_slab": []}
         return {"band": False, **none}
     return {"band": True, **figcheck.membrane_view(lay, drawn.sses, bb, mem, drawn.loops)}
 
@@ -432,6 +432,7 @@ def figure_criteria(views: dict[str, dict]) -> dict:
             bad = ([] if m["band"] else ["no band drawn"]) + [f"TM helix {x}" for x in m["tm_short"]]
             bad += [f"loop in the slab {x}" for x in m["loops_in_slab"]]
             bad += [f"soluble element in the slab {x}" for x in m.get("soluble_in_slab", [])]
+            bad += [f"element beyond a face drawn into the slab {x} Å" for x in m.get("outside_in_slab", [])]
             out["A18"] = _ok(not bad, "; ".join(bad))
     if "default" in views and d:
         # only a tether to another chain is bounded (ruling); a long one to the home chain is reported

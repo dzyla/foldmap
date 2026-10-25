@@ -374,6 +374,7 @@ class Layout:
     ligand_widths: list = field(default_factory=list)
     helix_matched: dict = field(default_factory=dict)  # {"cut", "joined"}: helix pieces made alike in copies (ss)
     helix_matched_ids: list[str] = field(default_factory=list)  # the helices those cuts and joins made
+    membrane_joined_ids: list[str] = field(default_factory=list)  # helices a membrane view joined (ruling T5-1)
     na_letter_rows: tuple[float | None, bool] = (None, False)  # where a stem's base letters sit (NT_ROW, 0 on the
     # rails, None: not drawn) and whether single-stranded letters are drawn, as render draws them (na_text_boxes)
     ligands: str = "auto"  # Style.ligands the figure is drawn with (auto hides additives: scope.drawn_scope names them)
@@ -3911,21 +3912,29 @@ def crosses_band(ends: tuple[float, float], band: tuple[float, float]) -> bool:
     return lo < mid < hi and (lo <= y0 + BAND_TOUCH or hi >= y1 - BAND_TOUCH)
 
 
-def _to_face(it: _Item, level: set[str], band: tuple[float, float], y: float) -> float:
-    """The least move up or down that brings each transmembrane element of the item at height y drawn wholly
-    between the faces (a tilted helix, drawn upright at its length, is shorter than the slab it crosses) to a face;
-    0 when none is. When that move leaves one of its transmembrane elements not crossing the band (crosses_band: a
-    bundle's other helix carried wholly inside, 6ZKT N:26-44), the least move that takes ends _PAST a face or the
-    middle and leaves every one crossing it, if any does. An element no longer than half the band (an 11-residue
-    helix upright: 5LDW M:392-402) can reach a face or pass the middle, not both: it stays as the first move put it,
-    and A18 reports it (ruling R3)."""
+def _to_face(
+    it: _Item, level: set[str], band: tuple[float, float], y: float, nearer: dict[str, int] | None = None
+) -> float:
+    """The move up or down that brings each transmembrane element of the item at height y drawn wholly between the
+    faces (a tilted helix, drawn upright at its length, is shorter than the slab it crosses) to a face; 0 when none
+    is: to the face their CA runs come nearer in 3D, when `nearer` (element id -> +1 the upper face, band[1]; -1 the
+    lower) names one face for all of them, else the least move (ruling T5-4: 32KS's TM1, A:5-19, its run -11.0 to
+    +9.2 Å, drawn 21 Å long about its CA centre at +0.1 Å, was moved 4.4 Å out rather than 4.6 Å in, its N end 5 Å
+    off where the run ends 4 Å from the inner face). When that move leaves one of its transmembrane elements not
+    crossing the band (crosses_band: a bundle's other helix carried wholly inside, 6ZKT N:26-44), the least move that
+    takes ends _PAST a face or the middle and leaves every one crossing it, if any does. An element no longer than
+    half the band (an 11-residue helix upright: 5LDW M:392-402) can reach a face or pass the middle, not both: it
+    stays as the first move put it, and A18 reports it (ruling R3)."""
     ends = _tm_ends(it, level, y)
-    inside = [(y0, y1) for y0, y1 in ends if band[0] < y0 and y1 < band[1]]
+    ids = [m.sse.id for m in it.members if getattr(m, "sse", None) is not None and m.sse.id in level and not m.ghost]
+    held = [k for k, (y0, y1) in enumerate(ends) if band[0] < y0 and y1 < band[1]]
+    inside = [ends[k] for k in held]
     shift = 0.0
     if inside:
         up = max(band[1] - y1 for _, y1 in inside)
         down = min(band[0] - y0 for y0, _ in inside)
-        shift = up if up < -down else down
+        toward = {(nearer or {}).get(ids[k]) for k in held}
+        shift = up if toward == {1} else down if toward == {-1} else up if up < -down else down
 
     def crossing(s: float) -> bool:
         return all(crosses_band((y0 + s, y1 + s), band) for y0, y1 in ends)
@@ -4817,6 +4826,7 @@ def build_layout(
     on_face: dict[str, int] | None = None,
     sides: dict[str, int] | None = None,
     domain_sides: dict[str, int] | None = None,
+    nearer: dict[str, int] | None = None,
     alike_first: bool = True,
     let_go: bool = True,
     mirror_only: bool = False,
@@ -4841,7 +4851,9 @@ def build_layout(
     transmembrane elements of a membrane view, cli): the items holding them keep their projected height, so they
     cross the band where the membrane is; the rest moves round them (_separate). `band` (page y of the membrane's
     two faces as projected): a lone transmembrane helix drawn wholly between them (a tilted helix drawn upright at
-    its length is shorter than the slab it crosses) is moved, the least way, until one end meets a face. `upright`
+    its length is shorter than the slab it crosses) is moved until one end meets a face: the face its CA run comes
+    nearer in 3D (`nearer`: element id -> +1 the upper face, -1 the lower; cli, ruling T5-4), else the least way
+    (_to_face). `upright`
     (with `level`, in the default snapped angles): helices drawn up or down the page, a membrane view's
     transmembrane helices standing across the band whatever their tilt (plan 26: 7VVK's TM1, R:181-211, tilted 52°,
     was snapped flat across a face). `flat` (likewise): helices drawn right or left, lying along the membrane (plan 26
@@ -4891,7 +4903,7 @@ def build_layout(
         given.update(domains=domains, partial=partial, rename=rename, swap=swap, move=move, keep_depth=keep_depth)
         given.update(na_cropped=na_cropped, template=template, copies=copies, relabel=relabel, names=names, over=over)
         given.update(level=level, band=band, upright=upright, alike_first=alike_first, let_go=let_go)
-        given.update(flat=flat, on_face=on_face, sides=sides, domain_sides=domain_sides)
+        given.update(flat=flat, on_face=on_face, sides=sides, domain_sides=domain_sides, nearer=nearer)
         given.update(conventions=conventions)
         return _rosette(sses, sheets, frame, mode, given)
     style = style or Style()
@@ -5131,7 +5143,7 @@ def build_layout(
             )
         if kept is not None and kept.any():  # transmembrane elements at their projected height, reaching a face
             for k in np.flatnonzero(kept).tolist():
-                shift = _to_face(items[k], set(level or ()), band, heights[k]) if band is not None else 0.0
+                shift = _to_face(items[k], set(level or ()), band, heights[k], nearer) if band is not None else 0.0
                 y = float(_snap(heights[k] + shift))
                 items[k].cy = y
                 items[k].home = (items[k].home[0], y)

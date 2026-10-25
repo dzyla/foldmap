@@ -187,14 +187,16 @@ _BREAK_MAX = 2  # residues: a helix broken by this few in one copy of a protein 
 
 
 def _copy_breaks(
-    helices: list[tuple[int, int]], bb: Backbone, copies
+    helices: list[tuple[int, int]], bb: Backbone, copies, whole_if=None
 ) -> tuple[list[tuple[int, int]], int, int, list[int]]:
     """Helix runs broken alike in every copy of a protein: where DSSP breaks a helix by up to _BREAK_MAX residues in
     some copies (two runs, chain-contiguous) and other copies' runs cover that place whole, the majority decides, a
     tie breaking: the whole runs are cut there, at the same residue numbers (copies() as in model.homolog_chains),
     the residues between in no piece, each piece still a helix's length (_MIN_HELIX_ANY); or the broken copies' two
     runs are joined into one (and a run broken twice so, all three). 7OKA: 225-231 + 233-238 in B and C, 225-238 in
-    A: A is cut. One copy of many broken does not cut all the others (7JU4's tubulins). Returns the runs and how
+    A: A is cut. One copy of many broken does not cut all the others (7JU4's tubulins). `whole_if` (a membrane view,
+    membrane.crosses_joined; ruling T5-1): (x, y) -> True for a broken copy's two runs that are joined rather than
+    the whole runs cut, whatever the majority, when it says so of every broken copy's. Returns the runs and how
     many cuts and joins were made (logged at INFO: the README tells the rule), and a residue of each run joined and
     each piece cut (their elements are named in the notes: provenance)."""
     pairs = [
@@ -224,8 +226,15 @@ def _copy_breaks(
         for g in broken:
             if g[0] == root and lo <= g[1] and g[2] <= hi:
                 whole[g].add(bb.labels[a].chain)
-    cut = {g for g in broken if whole[g] and len(broken[g]) >= len(whole[g])}
-    join = {g for g in broken if whole[g] and len(broken[g]) < len(whole[g])}
+    kept_whole = set()  # broken where the joined helix crosses a membrane: joined in every copy (ruling T5-1)
+    if whole_if is not None:
+        by_place: dict[tuple, list[bool]] = {}
+        for x, y in pairs:
+            root, _, xb, ya, _ = _span(bb, copies(), x, y)
+            by_place.setdefault((root, xb, ya), []).append(bool(whole_if(x, y)))
+        kept_whole = {g for g, said in by_place.items() if all(said)}
+    cut = {g for g in broken if whole[g] and len(broken[g]) >= len(whole[g]) and g not in kept_whole}
+    join = {g for g in broken if whole[g] and (len(broken[g]) < len(whole[g]) or g in kept_whole)}
     following: dict[int, tuple[int, int]] = {}  # a broken run's start -> the run it is joined to
     for x, y in pairs:
         root, _, xb, ya, _ = _span(bb, copies(), x, y)
@@ -266,8 +275,30 @@ def _copy_breaks(
     return out, n_cut, n_joined, changed
 
 
+def _join_runs(helices: list[tuple[int, int]], join) -> tuple[list[tuple[int, int]], list[int]]:
+    """Helix runs with each next run `join` (x, y) -> bool says belongs to it joined into one (x|y|z all three, each
+    pair asked as it stands: x joined with y, then that with z), and the first residue of each run made so."""
+    out: list[tuple[int, int]] = []
+    made: list[int] = []
+    for run in helices:
+        if out and join(out[-1], run):
+            if not made or made[-1] != out[-1][0]:
+                made.append(out[-1][0])
+            out[-1] = (out[-1][0], run[1])
+        else:
+            out.append(run)
+    return out, made
+
+
 def build_sses(
-    bb: Backbone, ss: str, short_helices: bool = False, bridges: list[Bridge] | None = None, *, matched=None
+    bb: Backbone,
+    ss: str,
+    short_helices: bool = False,
+    bridges: list[Bridge] | None = None,
+    *,
+    matched=None,
+    join=None,
+    whole_if=None,
 ) -> list[SSE]:
     """Strands (E) and helices (H); with short_helices, isolated 3-10 runs too short to count as helices
     become their own kind G (drawn as small boxes, labelled η). Pass the DSSP bridges so that strand pieces
@@ -276,7 +307,10 @@ def build_sses(
     globin AB corner; _kinks). A kink split or a bulge join in one copy of a protein is made in its other copies
     too, whatever their angle and up to two residues further apart, so that identical chains are drawn alike; a helix
     DSSP breaks by one or two residues in some copies and not in others is drawn as most copies have it (_copy_breaks;
-    `matched`, a dict, gets the numbers of cuts and joins, and the ids of the helices they made)."""
+    `matched`, a dict, gets the numbers of cuts and joins, and the ids of the helices they made). `join` (a membrane
+    view, membrane.joins; ruling T5-1): (x, y) -> whether two consecutive helix runs (first and last residue index
+    each) are one helix, asked before copies are matched; `matched` gets the ids of the helices it made under
+    "membrane". `whole_if` (likewise, membrane.crosses_joined): _copy_breaks' own."""
     copies = functools.cache(lambda: homolog_chains(bb))  # computed only when some copy splits or joins
     out = [_sse("E", bb, a, b) for a, b in _runs(ss, "E", bb.prev) if b - a + 1 >= _MIN_STRAND]
     helices = [
@@ -284,7 +318,10 @@ def build_sses(
         for a, b in _runs(ss, "HGI", bb.prev)
         if ss[a : b + 1].count("H") >= _MIN_HELIX_H or b - a + 1 >= _MIN_HELIX_ANY
     ]
-    helices, n_cut, n_joined, changed = _copy_breaks(helices, bb, copies)
+    joined_here: list[int] = []
+    if join is not None:
+        helices, joined_here = _join_runs(helices, join)
+    helices, n_cut, n_joined, changed = _copy_breaks(helices, bb, copies, whole_if)
     kinks = {h: _kinks(*h, ss, bb) for h in helices}
     sharp = [_span(bb, copies(), x, y) for h in helices for x, y, angle in kinks[h] if angle > KINK_SPLIT]
     corners: list[int] = []  # residues of a kink between two helix pieces: no element of their own
@@ -306,4 +343,6 @@ def build_sses(
     if matched is not None:
         ids = [s.id for s in out if s.kind == "H" and any(s.start <= r <= s.end for r in changed)]
         matched.update(cut=n_cut, joined=n_joined, ids=ids)
+        if join is not None:
+            matched["membrane"] = [s.id for s in out if s.kind == "H" and s.start in joined_here]
     return out

@@ -44,7 +44,8 @@ from .layout import (
     snap,
     template_rows,
 )
-from .membrane import SOLUBLE_BEYOND, crosses, lies_flat
+from .membrane import SOLUBLE_BEYOND, crosses, crosses_joined, lies_flat_here
+from .membrane import joins as membrane_joins
 from .model import AUTO_NT, crop_nucleic, homolog_chains, nucleic_of_chains, nucleic_touching, res_ref
 from .names import all_names, apply_names, check_spec
 from .nucleic import StemView, stem_views, straight_duplex
@@ -521,9 +522,28 @@ def make_layout(
         bb = bb.only([c for c in chains if c in present])
     if (look or Style()).color_by == "conservation" and not msa:
         raise ValueError("conservation colouring needs an alignment: add --msa ALIGNMENT")
+    mem = None
+    flip = membrane == "flip"
+    if membrane not in ("off", None):
+        from .membrane import find_membrane
+
+        mem = find_membrane(path, read_bb)  # on every protein chain: --chains narrows the drawing, not the bilayer
+        if mem is not None and flip:  # the other face is the outside: a 180° turn, never a mirror
+            mem = dataclasses.replace(mem, normal=-mem.normal, centre=-mem.centre)
+        if mem is None:
+            print(f"foldmap: warning: no membrane found in {path}; drawing it without one", file=sys.stderr)
     dssp = assign_dssp(bb)
     matched: dict = {}  # helix pieces cut or joined so copies match (ss._copy_breaks): told by scope.drawn_scope
-    sses = build_sses(bb, dssp.ss, short_helices=(look or Style()).helices_310, bridges=dssp.bridges, matched=matched)
+    in_view = mem is not None and mode == "projected"  # helix runs one or two residues apart joined (ruling T5-1)
+    sses = build_sses(
+        bb,
+        dssp.ss,
+        short_helices=(look or Style()).helices_310,
+        bridges=dssp.bridges,
+        matched=matched,
+        join=functools.partial(membrane_joins, bb, mem) if in_view else None,
+        whole_if=functools.partial(crosses_joined, bb, mem) if in_view else None,
+    )
     sheets = build_sheets(sses, dssp.bridges)
     nucleic = load_nucleic(path, bb, assembly, model=model) if dna else None
     na_chains = list(dict.fromkeys(st.chain for st in nucleic.strands)) if nucleic is not None else []
@@ -591,18 +611,9 @@ def make_layout(
         if problem.fatal:  # the warnings were said where the spec was read (_spec_of, the app, the MCP server)
             raise BadReference(problem)
     user = _read_user_data(data, data_column, crosslinks, read_bb, na_chains) if data or crosslinks else None
-    mem = None
     up_from_membrane = False  # `up` set by the membrane (its normal), not asked for: the cyclic note says so
-    if membrane not in ("off", None):
-        from .membrane import find_membrane
-
-        mem = find_membrane(path, read_bb)  # on every protein chain: --chains narrows the drawing, not the bilayer
-        flip = membrane == "flip"
-        if mem is not None and flip:  # the other face is the outside: a 180° turn, never a mirror
-            mem = dataclasses.replace(mem, normal=-mem.normal, centre=-mem.centre)
-        if mem is None:
-            print(f"foldmap: warning: no membrane found in {path}; drawing it without one", file=sys.stderr)
-        elif up is None and view is None:  # the bilayer horizontal, outside on top (unless the symmetry axis
+    if mem is not None:
+        if up is None and view is None:  # the bilayer horizontal, outside on top (unless the symmetry axis
             along = sym is not None and abs(float(np.dot(sym.axis, mem.normal))) > 0.9  # already stands upright)
             if not along:
                 up, up_from_membrane = mem.normal, True
@@ -671,6 +682,8 @@ def make_layout(
         stems = stem_views(nucleic.structure, nucleic.strands) if nucleic is not None else []
         stems = [StemView(snap(v.centroid), snap(v.axis), v.n) for v in stems]
         frame = view_frame(sses + stems, rotate, flip_v, up, view)
+        if up_from_membrane and mode == "projected" and not rotate and not flip_v:  # turned about the normal (T5-3)
+            frame = _in_sequence(frame, sses, bb, mem)
     if sym is not None and sym.kind == "C" and sym.n == 2 and isinstance(frame, (RadialFrame, Frame)):
         _mirror_frame(frame, sym)
     if duplex and sym is not None and not getattr(frame, "sector", None):
@@ -783,6 +796,7 @@ def make_layout(
     def finish(lay, frame, faces=None):  # what make_layout sets on a layout after build_layout through `frame`
         lay.helix_matched = {"cut": matched.get("cut", 0), "joined": matched.get("joined", 0)}
         lay.helix_matched_ids = list(matched.get("ids", []))
+        lay.membrane_joined_ids = list(matched.get("membrane", []))
         lay.domain_source, lay.domain_note = (source if lay.domains else ""), named_note
         if lay.domains:  # copies of one domain share a tone
             from .features import domain_tones
@@ -1097,14 +1111,16 @@ def _membrane_band(lay, sses, bb, mem, faces=None) -> dict | None:
 
 def _membrane_places(sses, bb, mem, tm: set[str], faces) -> tuple[set[str], dict[str, int], dict[str, int]]:
     """Where a projected membrane view draws each element that crosses no membrane (plan 26 Task 2 rulings), from its
-    CA run's depths: `flat`, the helices (and 3-10 helices) that lie along the membrane (membrane.lies_flat: tilted
-    FLAT_TILT or more from the normal); `on_face`, those of them whose CA centre lies in the slab or within
-    SOLUBLE_BEYOND beyond a face (amphipathic and interfacial helices: 32KS's NS1, A:200-219), each drawn lying on
-    the face its centre is nearer (+1 the face higher on the page, -1 the lower: faces = (outer, inner) page y), and
-    (0) every other element whose CA centre lies in the slab, kept at its projected height (32KS A:328-339); and
-    `sides`, every element whose CA centre lies more than SOLUBLE_BEYOND beyond a face (soluble, as A18 counts it:
-    ruling R4), kept off the band on that face's side (+1 above, -1 below). With no band (faces None) only `flat`
-    is read. Elements of `tm`, and any other crossing the membrane (a subunit in a barrel lumen), are none of these."""
+    CA run's depths: `flat`, the helices (and 3-10 helices) that lie along the membrane (membrane.lies_flat_here:
+    tilted FLAT_TILT or more from the normal, FACE_FLAT_TILT in a face's interfacial zone, ruling T5-2); `on_face`,
+    those of them whose CA centre lies in the slab or within SOLUBLE_BEYOND beyond a face (amphipathic and
+    interfacial helices: 32KS's NS1, A:200-219), each drawn lying on the face its centre is nearer (+1 the face higher
+    on the page, -1 the lower: faces = (outer, inner) page y), and (0) every other element whose CA centre lies in
+    the slab, kept at its projected height (32KS A:328-339); and `sides`, every element whose CA centre lies more than
+    SOLUBLE_BEYOND beyond a face (soluble, as A18 counts it: ruling R4), and every other one not lying flat whose CA
+    run lies wholly beyond a face (ruling T5-5: 6ZKT's M:50-51, 18-19 Å out, was drawn 10 Å into the slab), kept off
+    the band on that face's side (+1 above, -1 below). With no band (faces None) only `flat` is read. Elements of
+    `tm`, and any other crossing the membrane (a subunit in a barrel lumen), are none of these."""
     depth = mem.depth(bb.ca)
     up = 1 if faces is None or faces[0] >= faces[1] else -1  # the page side of the outside
     flat, on_face, sides = set(), {}, {}
@@ -1114,12 +1130,13 @@ def _membrane_places(sses, bb, mem, tm: set[str], faces) -> tuple[set[str], dict
             continue
         centre = float(seg.mean())
         side = up if centre >= 0 else -up
-        lying = s.kind in ("H", "G") and lies_flat(s.axis, mem.normal)
+        lying = s.kind in ("H", "G") and lies_flat_here(s.axis, seg, mem)
         if lying:
             flat.add(s.id)
         if faces is None:
             continue
-        if abs(centre) > mem.half + SOLUBLE_BEYOND:
+        beyond = float(seg.min()) >= mem.half or float(seg.max()) <= -mem.half  # wholly beyond a face
+        if abs(centre) > mem.half + SOLUBLE_BEYOND or (beyond and not lying):
             sides[s.id] = side
         elif lying:
             on_face[s.id] = side
@@ -1145,9 +1162,10 @@ def _band_ids(sses, bb, mem, tm: set[str]) -> set[str]:
 def _membrane_args(sses, bb, mem, tm: set[str], faces, named, in_band: set[str]) -> dict:
     """build_layout's membrane arguments for a projected view through a frame whose faces project to `faces` ((outer,
     inner) page y; None: no band): every transmembrane element keeps its projected height across the band (`level`,
-    `band`), standing upright; each other helix stands or lies by its tilt (membrane.lies_flat, ruling R7); a flat one
-    at a face or in the slab lies on that face, in rows (`on_face`, ruling R8), and a soluble element stays off the
-    band on its own side (`sides`), as _membrane_places reads them. With domains (`named`; plan 26 Task 3), each
+    `band`), standing upright and reaching the face its run comes nearer (`nearer`, _nearer_faces, ruling T5-4); each
+    other helix stands or lies by its tilt (membrane.lies_flat_here, rulings R7 and T5-2); a flat one at a face or in
+    the slab lies on that face, in rows (`on_face`, ruling R8), and a soluble element stays off the band on its own
+    side (`sides`), as _membrane_places reads them. With domains (`named`; plan 26 Task 3), each
     domain holding none of the band's elements (`in_band`, _band_ids) is soluble: it and every element of it stay off
     the band on the side its centroid lies (`domain_sides`, _domain_sides; ruling T3-c)."""
     flat, on_face, sides = _membrane_places(sses, bb, mem, tm, faces)
@@ -1160,11 +1178,29 @@ def _membrane_args(sses, bb, mem, tm: set[str], faces, named, in_band: set[str])
         "band": tuple(sorted(faces)),
         "on_face": on_face,
         "sides": sides,
+        "nearer": _nearer_faces(sses, bb, mem, tm, faces),
     }
     if named:  # each soluble domain on the side its centroid lies, every element of it with it (ruling T3-c)
         out["domain_sides"] = _domain_sides(named, sses, bb, mem, set(in_band), faces)
         for name, side in out["domain_sides"].items():
             sides.update({k: side for k in dict(named)[name]})
+    return out
+
+
+def _nearer_faces(sses, bb, mem, tm: set[str], faces) -> dict[str, int]:
+    """Ruling T5-4: for each transmembrane element, the face its CA run comes nearer in 3D, +1 the face higher on the
+    page, -1 the lower (faces = (outer, inner) page y), as build_layout's `nearer` takes it: one drawn wholly between
+    the faces is moved to that face (layout._to_face). None for a run as near both (on the grid)."""
+    depth = mem.depth(bb.ca)
+    up = 1 if faces[0] >= faces[1] else -1  # the page side of the outside
+    out = {}
+    for s in sses:
+        if s.id not in tm:
+            continue
+        seg = depth[s.start : s.end + 1]
+        gap_out, gap_in = float(snap(mem.half - seg.max())), float(snap(seg.min() + mem.half))
+        if gap_out != gap_in:
+            out[s.id] = up if gap_out < gap_in else -up
     return out
 
 
@@ -1200,6 +1236,56 @@ def _transmembrane(sses, bb, mem) -> set[str]:
             continue
         out.add(s.id)
     return out
+
+
+AZIMUTH_STEP = 5  # degrees: the turns about the membrane normal a membrane view's page-right is chosen from (T5-3)
+# A turn is taken only when it raises tau by 1/MIN_TAU_GAIN_INV (0.1) or more (ruling T5-3: today's turn is kept where
+# the gain is under 0.1 and the page grows past the campaign's +15% gate). On the membrane campaign every turn worth
+# less was such a view, its loop crossings turned against d132d4c's: 6JO6 (tau +0.014, +51 %), 6ZKT with domains
+# (+0.092, +19 %) and 30BU with domains (+0.066, +32 %).
+MIN_TAU_GAIN_INV = 10
+
+
+def _sequence_score(frame, chains: list[list[np.ndarray]]) -> int:
+    """Kendall's concordant less discordant pairs of each chain's band helices, their page x (snapped) against their
+    order in sequence, summed over the chains (`chains`: each chain's helix centroids in sequence order)."""
+    score = 0
+    for cents in chains:
+        x = [float(snap(c @ frame.u)) for c in cents]
+        score += sum(int(np.sign(x[j] - x[i])) for i in range(len(x)) for j in range(i + 1, len(x)))
+    return score
+
+
+def _in_sequence(frame, sses, bb, mem):
+    """Ruling T5-3: a membrane view's page-right turned about the membrane normal (page-up), so that the band helices
+    (the transmembrane helices, _transmembrane) stand left to right as nearly in sequence order as a turn can put them:
+    of the turns in AZIMUTH_STEP steps, the one whose page x order of each chain's band helices agrees best with their
+    sequence (Kendall's tau, summed over the chains: _sequence_score); on a tie the frame as view_frame chose it, else
+    the least turn (anticlockwise seen from the outside first); the frame as chosen when the best gains less than 0.1
+    in tau (MIN_TAU_GAIN_INV). Still a projection: the same frame turned, never a reordering. 32KS chain A's TM1 stood
+    in the middle of its band, tau 0.47; turned 35°, 0.78."""
+    tm = _transmembrane(sses, bb, mem)
+    chains: dict[str, list[np.ndarray]] = {}
+    for s in sses:
+        if s.id in tm and s.kind == "H":
+            chains.setdefault(s.chain, []).append(np.asarray(s.centroid, float))
+    if not any(len(c) > 1 for c in chains.values()):
+        return frame
+    u0, v = np.asarray(frame.u, float), np.asarray(frame.v, float)
+    side = np.cross(v, u0)  # u0 turned a quarter turn about v
+    turns = sorted(range(-180 + AZIMUTH_STEP, 181, AZIMUTH_STEP), key=lambda a: (abs(a), a < 0))
+    best, best_frame = None, frame
+    for a in turns:
+        t = np.radians(a)
+        u = u0 if a == 0 else snap(np.cos(t) * u0 + np.sin(t) * side)
+        turned = frame if a == 0 else Frame(frame.origin, u, frame.v, np.cross(u, v))
+        score = _sequence_score(turned, list(chains.values()))
+        if best is None or score > best:
+            best, best_frame = score, turned
+    pairs = sum(len(c) * (len(c) - 1) // 2 for c in chains.values())
+    if (best - _sequence_score(frame, list(chains.values()))) * MIN_TAU_GAIN_INV < pairs:  # tau gains < 1/10
+        return frame
+    return best_frame
 
 
 def _faces_on_page(frame, sses, bb, mem, tm: set[str]) -> tuple[float, float]:
