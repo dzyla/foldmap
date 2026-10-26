@@ -7,8 +7,8 @@
   "checkout_fingerprint": "3ee0d171d9aa58f5",
   "installed_matches_checkout": true,
   "git": {
-   "commit": "7f3175f9022d35552152423f01f22141088b1f30",
-   "dirty": true,
+   "commit": "ee5f34dd677476e5e7127ac9d0f9954f5569f8a5",
+   "dirty": false,
    "source": "asserted by runner"
   },
   "script": {
@@ -55,8 +55,8 @@
     "geometry": 25,
     "measured": 28,
     "named-entry": 36,
-    "convention": 100,
-    "unknown": 339
+    "convention": 102,
+    "unknown": 337
    },
    "default": {
     "convention": 3,
@@ -66,12 +66,12 @@
     "unknown": 1
    },
    "comparison": {
-    "convention": 154,
-    "unknown": 143
+    "convention": 155,
+    "unknown": 142
    },
    "argument": {
-    "convention": 182,
-    "unknown": 481
+    "convention": 183,
+    "unknown": 480
    },
    "fallback": {
     "named-entry": 4,
@@ -88,8 +88,8 @@
    "geometry": 25,
    "measured": 28,
    "named-entry": 43,
-   "convention": 440,
-   "unknown": 1039
+   "convention": 444,
+   "unknown": 1035
   }
  },
  "items": [

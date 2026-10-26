@@ -79,14 +79,14 @@ every correction of a rule are by hand.
 
 | kind | items | biology | geometry | measured | named-entry | convention | unknown |
 |---|---|---|---|---|---|---|---|
-| constant | 590 | 62 | 25 | 28 | 36 | 100 | 339 |
+| constant | 590 | 62 | 25 | 28 | 36 | 102 | 337 |
 | default | 33 | 0 | 0 | 0 | 0 | 3 | 30 |
 | local | 1 | 0 | 0 | 0 | 0 | 0 | 1 |
-| comparison | 297 | 0 | 0 | 0 | 0 | 154 | 143 |
-| argument | 663 | 0 | 0 | 0 | 0 | 182 | 481 |
+| comparison | 297 | 0 | 0 | 0 | 0 | 155 | 142 |
+| argument | 663 | 0 | 0 | 0 | 0 | 183 | 480 |
 | fallback | 24 | 0 | 0 | 0 | 4 | 1 | 19 |
 | fallback-marker | 29 | 0 | 0 | 0 | 3 | 0 | 26 |
-| all | 1637 | 62 | 25 | 28 | 43 | 440 | 1039 |
+| all | 1637 | 62 | 25 | 28 | 43 | 444 | 1035 |
 
 Of the 43 named-entry rows, 32 rest on the comment at the item and 11 on git (evidence starting `git:`: a commit whose message ties the value to the entries).
 
