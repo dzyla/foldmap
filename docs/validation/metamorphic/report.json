@@ -1,18 +1,18 @@
 {
  "source_stamp": {
   "foldmap": "0.1.0",
-  "code_fingerprint": "72fb15138b17e48a",
+  "code_fingerprint": "e79936f0b9edb832",
   "package": "checkout",
-  "checkout_fingerprint": "72fb15138b17e48a",
+  "checkout_fingerprint": "e79936f0b9edb832",
   "installed_matches_checkout": true,
   "git": {
-   "commit": "ddc408cc31feed76a91b588c7cf7ba00f283e6d5",
+   "commit": "6ca884c56b611d6bd94d61d2a9a6985458bc6681",
    "dirty": false,
    "source": "asserted by runner"
   },
   "script": {
    "name": "scripts/metamorphic_record.py",
-   "sha256": "666c5be1bb4737fea6800ef032c9737e7946bb3d2d6606d8d419e822cab0f396"
+   "sha256": "0c8095a92b40f92df0b432bc84deae8f1f5aaf70f55a874f4d2a12d2a74dce19"
   },
   "python": {
    "version": "3.13.13",
@@ -32,7 +32,7 @@
   }
  },
  "findings": {
-  "F1": "Chain names choose protomer 0: symmetry._orbits walks the chains in name order (symmetry.py:234), symmetry._protomers sorts the orbits by their first chain's name (symmetry.py:255) and breaks its ties by name (symmetry.py:259); protomer 0 is drawn on the left (cli._dyad_frame, cli.py:359) or is the copy the others mirror (cli._mirror_frame, cli.py:257). A renaming that reverses the chains' name order moves the figure of an assembly of several deposited chains; its structure facts and check verdicts stay equal.",
+  "F1": "Chain names choose protomer 0: symmetry._orbits walks the chains in name order (symmetry.py:234), symmetry._protomers sorts the orbits by their first chain's name (symmetry.py:255) and breaks its ties by name (symmetry.py:259); protomer 0 is drawn on the left (cli._dyad_frame) or is the copy the others mirror (cli._mirror_frame); on an unrolled frame its nucleic-acid stems are the template its copies' stems are tied to (layout._stem_ties, plan 28 F2), and when protomer 0 holds no nucleic acid no stem is tied at all, so a renaming can change that figure in kind. A renaming that reverses the chains' name order moves the figure of an assembly of several deposited chains; its structure facts and check verdicts stay equal.",
   "F2": "Base-pair H-bond window: foldmap calls a canonical pair whose Watson-Crick-edge H-bonds reach 3.8 \u00c5 (nucleic.HBOND_MAX, nucleic.py:16, applied at :147), one stretched to 4.0 \u00c5 (HBOND_STRETCH, :17, applied at :149); the kernel holds two of them to 3.5 \u00c5.",
   "F3": "C1'-C1' window: foldmap accepts 9.0-12.0 \u00c5 (nucleic.C1_PAIR, nucleic.py:18, applied at :127 and :131); the kernel 9.5-11.5 \u00c5.",
   "F4": "Planarity: foldmap drops a pair whose base planes are more than 45 degrees apart (nucleic.PLANE_MAX, nucleic.py:19, applied at :156); the kernel has no planarity bound."

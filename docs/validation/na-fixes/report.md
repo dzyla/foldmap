@@ -1,24 +1,25 @@
 # Nucleic-acid fixes, measured
 
-Plan 28 (ruling Q37). Written by: foldmap 0.1.0, git 3fb5df1ecaa9 (asserted by runner, dirty False), code fingerprint be5353d8a5d01df6, scripts/na_fixes_record.py sha256 8757ecc4696c; Python 3.13.13 on Linux-7.0.0-38-generic-x86_64-with-glibc2.43; gemmi 0.7.5, numpy 2.5.4, scipy 1.18.1, networkx 3.7, matplotlib 3.11.2, PyYAML 6.0.3
+Plan 28 (ruling Q37). Written by: foldmap 0.1.0, git 6ca884c56b61 (asserted by runner, dirty False), code fingerprint e79936f0b9edb832, scripts/na_fixes_record.py sha256 1a75487e59c5; Python 3.13.13 on Linux-7.0.0-38-generic-x86_64-with-glibc2.43; gemmi 0.7.5, numpy 2.5.4, scipy 1.18.1, networkx 3.7, matplotlib 3.11.2, PyYAML 6.0.3
 
 Each fix measured before and after on the 7 failing cases of the third random sample (8VBG, 6VTX, 6ZY7, 3EGZ, 4AS1, 6QIK, 8XJV) and 39 nucleic-acid controls that passed, in the default view, with scripts/random100.py's entry runs (A17 as random100 takes it). **These are regression sets, not unseen ones**: the failures were diagnosed on these entries and the fixes made for them. The unseen measurement is the fourth sample at the frozen release. A fix is committed only when its target moves and no control gets worse on any judged A17 measure, fallback count, crossing count or bead overlap (ruling Q37).
 
-Runs (the code each step measured; git is the commit checked out, the step's fix uncommitted on it, so the code fingerprint names the code: a committed fix's equals its commit's src):
+Runs (the code each run measured: the commit whose src code fingerprint equals the run's; the git a run carries is the commit checked out when it ran):
 
-- F2: code 9b4ffd133cae3036, git 85481f388d6a
-- F3: code 18715a42781107ab, git 218f4bb26642
-- F4: code 71ec92ce87407de7, git 218f4bb26642
-- F5: code 403da61da25c40ed, git 3380435a1b82
-- F6: code be5353d8a5d01df6, git 3380435a1b82
-- F7: code 41c64420bd651819, git 5726aeca9fe8
-- base: code 72fb15138b17e48a, git 5726aeca9fe8
+- F2: code 9b4ffd133cae3036, measured 36adc3b (checked out 85481f388d6a)
+- F3: code 18715a42781107ab, measured 218f4bb + reverted/F3.patch (checked out 218f4bb26642)
+- F4: code 71ec92ce87407de7, measured 3380435 (checked out 218f4bb26642)
+- F5: code 403da61da25c40ed, measured 3380435 + reverted/F5.patch (checked out 3380435a1b82)
+- F6: code be5353d8a5d01df6, measured 218f4bb (checked out 3380435a1b82)
+- F7: code 41c64420bd651819, measured 24676d3 (checked out 5726aeca9fe8)
+- R1: code e79936f0b9edb832, measured the fix round 1 head (checked out ec04b4799c8d)
+- base: code 72fb15138b17e48a, measured 5726aec (checked out 5726aeca9fe8)
 
 ## F7: committed in 24676d3
 
 - Mechanism: M3: stems_nearer_frac scored where every drawn element touches the stem.
 - Change: nacheck.contacts scores a stem in stems_nearer_frac only when an element does not touch it; such stems are counted apart (stems_nearer_not_applicable) and reported not applicable (ruling Q5).
-- Bench: every entry identical (the bench's structures hold no case these fixes act on).
+- Bench: every entry identical; the bench holds two nucleic-acid entries (1LMB, 1ZAA), on which F4 and F6 run without changing the drawing; the evidence that these fixes leave other figures alone is the 39 unchanged controls.
 - Steps: base -> F7.
 
 Target:
@@ -42,7 +43,7 @@ Controls worse: none
 
 - Mechanism: M4: unrolled RNA placed by the protomer it faces, measured against one plain view.
 - Change: a CylinderFrame unrolls each nucleic-acid chain one protomer holds (cli._na_holders: at least NA_HOLD_MIN residues touching it and more than every other protomer together) with that protomer, its stems tied to protomer 0's copy (layout._stem_ties); the shape measures take each copy in a plain frame at its own centre, Spearman and Procrustes per copy (the worst kept), the angles judged against half the turn between neighbouring copies.
-- Bench: every entry identical (the bench's structures hold no case these fixes act on).
+- Bench: every entry identical; the bench holds two nucleic-acid entries (1LMB, 1ZAA), on which F4 and F6 run without changing the drawing; the evidence that these fixes leave other figures alone is the 39 unchanged controls.
 - Steps: F7 -> F2.
 
 Target:
@@ -69,8 +70,8 @@ Controls worse: none
 ## F4: committed in 3380435
 
 - Mechanism: M5: a gap meets a free end's tip along the end's own outward heading.
-- Change: the 5' free end after a gap turns toward the gap's start as well as its touching protein; the gap tries a free arrival along the chord, then the clear straight chord, before an unblocked route; a 3' end the protein touches keeps lying along it.
-- Bench: every entry identical (the bench's structures hold no case these fixes act on).
+- Change: the 5' free end after a gap turns toward the gap's start as well as its touching protein; the gap tries a free arrival along the chord, then (fix round 1) the straight chord of two ends nearer than two grid cells crossing no strand, before an unblocked route; a 3' end the protein touches keeps lying along it.
+- Bench: every entry identical; the bench holds two nucleic-acid entries (1LMB, 1ZAA), on which F4 and F6 run without changing the drawing; the evidence that these fixes leave other figures alone is the 39 unchanged controls.
 - Steps: F2 -> F4.
 
 Target:
@@ -121,7 +122,7 @@ Controls worse: 1RVA (angle_median, angle_max, joint_error_max)
 
 - Mechanism: M7: bead clearance best effort.
 - Change: a run nucleotide _unbunch leaves short of a bead's width from another run's has the other run slide (na_labels._clear_junctions, _slide_from); routing runs for (m + 1) * max(NT_STEP, bead) changes nothing, as NT_STEP (0.55) is wider than a bead (0.45), so it is not made.
-- Bench: every entry identical (the bench's structures hold no case these fixes act on).
+- Bench: every entry identical; the bench holds two nucleic-acid entries (1LMB, 1ZAA), on which F4 and F6 run without changing the drawing; the evidence that these fixes leave other figures alone is the 39 unchanged controls.
 - Steps: F4 -> F6.
 
 Target:
@@ -183,10 +184,30 @@ Controls that moved:
 
 Controls worse: 6JCY (na_protein_crossings); 4NLG (contact_auc); 2VBO (contact_auc); 9K4F (spearman, procrustes, contact_auc, na_run_crossings); 7XSP (na_protein_crossings); 9CJI (na_protein_crossings); 1IHF (procrustes, contact_auc); 3KTQ (contact_auc, stems_nearer_frac); 4OO8 (na_protein_crossings); 5W1H (contact_auc)
 
+## Fix round 1 (ruling Q38)
+
+Run R1 measures the head after fix round 1. Its code changes: F4's straight chord limited to its mechanism (two ends nearer than two grid cells, crossing no strand drawn so far, not only no free end); the unrolled angle limit taken from frame.angles (half the mean turn between neighbouring copies, not 180/n) and set only when every stem with an angle is seen through its copy's frame; _slide_each and _slide_from share their loop (_slide_loop). The judgement changes F2 brought are named apart: 3EGZ's spearman is not measured per copy (paper common.na_measures and na_validate list it), its angles pass under the unrolled limit (listed with it)
+
+F6 -> R1 (every case and control that moved):
+
+- 3EGZ: copies_measured None -> 4; angle_limit None -> 45
+
+base -> R1 (every case and control that moved):
+
+- 6VTX: stems_nearer_frac 0 -> None; stems_nearer_not_applicable None -> 1 (worse: stems_nearer_frac)
+- 3EGZ: spearman 0.347 -> None; procrustes 0.982 -> 0.572; angle_median 22 -> 10.3; angle_max 126 -> 10.4; mirrored 1 -> 0; na_run_crossings 11 -> 8; ss_contacts_nearer 0.8 -> 0.95; copies_measured None -> 4; angle_limit None -> 45 (worse: spearman)
+- 4AS1: na_crossings 1 -> 0
+- 6QIK: bead_overlaps 1 -> 0; na_run_crossings 406 -> 404; na_protein_crossings 362 -> 360
+- 8XJV: bead_overlaps 125 -> 127; na_protein_crossings 731 -> 725 (worse: bead_overlaps)
+
+Controls worse, base -> R1: none
+
 ## Limitations
 
 - F1 (M1, pairs missed at low resolution) deferred past the freeze: 8XJV pair recall, 3EGZ A2.U64 (pair_f1 0.941) and 6ZY7 stem_recall 0.667 (ruling Q4) stay failures.
 - 3EGZ procrustes 0.572 per copy (limit 0.5): the stems of one copy span 49 degrees round the axis, unrolled flat.
+- 3EGZ spearman is not measured per copy (3 stems a copy, under the 5 a rank correlation needs): through one view of the whole assembly it was 0.347, a failure; it no longer fails only because it is not measured.
+- 3EGZ angle_median and angle_max (10.3, 10.4) pass only under the unrolled limit (45: half the turn between its copies, each copy in its own frame); against the plain-frame limit 0.05 they fail.
 - 6QIK (F5 not committed): fallback, crossing and the A3 strand y:8-9 remain.
 - 8VBG (F3 not committed): contact_auc 0.505, stems_nearer_frac 0.5 remain; 9YLM, 9K4F, 30QM, 3KTQ, 1YTB as before.
-- 8XJV: everything M1 explains (fallbacks 10, na_crossings 10, bead_overlaps 127, time).
+- 8XJV: fallbacks 10, na_crossings 10 and 125 of its bead_overlaps are M1's; F4 added 4 (125 -> 129) and F6 removed 2 (-> 127), net +2 from base, accepted because 8XJV is a case, not a control (Q37 binds controls).

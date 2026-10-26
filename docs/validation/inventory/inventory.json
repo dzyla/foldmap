@@ -7,8 +7,8 @@
   "checkout_fingerprint": "e79936f0b9edb832",
   "installed_matches_checkout": true,
   "git": {
-   "commit": "e060370111866ca94e21cf2cf621452acf977aa7",
-   "dirty": true,
+   "commit": "6ca884c56b611d6bd94d61d2a9a6985458bc6681",
+   "dirty": false,
    "source": "asserted by runner"
   },
   "script": {

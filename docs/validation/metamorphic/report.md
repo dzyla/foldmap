@@ -1,12 +1,12 @@
 # Metamorphic tests and independent kernels
 
-Plan 28 Task 7 (rulings Q34, Q35). Written by: foldmap 0.1.0, git ddc408cc31fe (asserted by runner, dirty False), code fingerprint 72fb15138b17e48a, scripts/metamorphic_record.py sha256 666c5be1bb47; Python 3.13.13 on Linux-7.0.0-38-generic-x86_64-with-glibc2.43; gemmi 0.7.5, numpy 2.5.4, scipy 1.18.1, networkx 3.7, matplotlib 3.11.2, PyYAML 6.0.3
+Plan 28 Task 7 (rulings Q34, Q35). Written by: foldmap 0.1.0, git 6ca884c56b61 (asserted by runner, dirty False), code fingerprint e79936f0b9edb832, scripts/metamorphic_record.py sha256 0c8095a92b40; Python 3.13.13 on Linux-7.0.0-38-generic-x86_64-with-glibc2.43; gemmi 0.7.5, numpy 2.5.4, scipy 1.18.1, networkx 3.7, matplotlib 3.11.2, PyYAML 6.0.3
 
 What tests/test_metamorphic.py, tests/test_independent_kernels.py and tests/test_deep_check.py assert, measured on committed fixtures; the findings they pin with xfail(strict). The deep-check runs below are recorded runs (they need mkdssp and RNApolis), not tests.
 
 ## Findings
 
-- **F1.** Chain names choose protomer 0: symmetry._orbits walks the chains in name order (symmetry.py:234), symmetry._protomers sorts the orbits by their first chain's name (symmetry.py:255) and breaks its ties by name (symmetry.py:259); protomer 0 is drawn on the left (cli._dyad_frame, cli.py:359) or is the copy the others mirror (cli._mirror_frame, cli.py:257). A renaming that reverses the chains' name order moves the figure of an assembly of several deposited chains; its structure facts and check verdicts stay equal.
+- **F1.** Chain names choose protomer 0: symmetry._orbits walks the chains in name order (symmetry.py:234), symmetry._protomers sorts the orbits by their first chain's name (symmetry.py:255) and breaks its ties by name (symmetry.py:259); protomer 0 is drawn on the left (cli._dyad_frame) or is the copy the others mirror (cli._mirror_frame); on an unrolled frame its nucleic-acid stems are the template its copies' stems are tied to (layout._stem_ties, plan 28 F2), and when protomer 0 holds no nucleic acid no stem is tied at all, so a renaming can change that figure in kind. A renaming that reverses the chains' name order moves the figure of an assembly of several deposited chains; its structure facts and check verdicts stay equal.
 - **F2.** Base-pair H-bond window: foldmap calls a canonical pair whose Watson-Crick-edge H-bonds reach 3.8 Å (nucleic.HBOND_MAX, nucleic.py:16, applied at :147), one stretched to 4.0 Å (HBOND_STRETCH, :17, applied at :149); the kernel holds two of them to 3.5 Å.
 - **F3.** C1'-C1' window: foldmap accepts 9.0-12.0 Å (nucleic.C1_PAIR, nucleic.py:18, applied at :127 and :131); the kernel 9.5-11.5 Å.
 - **F4.** Planarity: foldmap drops a pair whose base planes are more than 45 degrees apart (nucleic.PLANE_MAX, nucleic.py:19, applied at :156); the kernel has no planarity bound.

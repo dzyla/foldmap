@@ -1,18 +1,18 @@
 {
  "source_stamp": {
   "foldmap": "0.1.0",
-  "code_fingerprint": "be5353d8a5d01df6",
+  "code_fingerprint": "e79936f0b9edb832",
   "package": "checkout",
-  "checkout_fingerprint": "be5353d8a5d01df6",
+  "checkout_fingerprint": "e79936f0b9edb832",
   "installed_matches_checkout": true,
   "git": {
-   "commit": "3fb5df1ecaa951fb601fc66ffd4447d546b986e5",
+   "commit": "6ca884c56b611d6bd94d61d2a9a6985458bc6681",
    "dirty": false,
    "source": "asserted by runner"
   },
   "script": {
    "name": "scripts/na_fixes_record.py",
-   "sha256": "8757ecc4696ca750a7d5dbd227825467a0107496c087e13fbd0502cb4ad23b85"
+   "sha256": "1a75487e59c5384e5ed928963b15d101c451d0fde3df8aeb47626f06da2fe287"
   },
   "python": {
    "version": "3.13.13",
@@ -116,13 +116,15 @@
   "na_run_crossings",
   "na_protein_crossings"
  ],
- "bench": "every entry identical (the bench's structures hold no case these fixes act on)",
+ "bench": "every entry identical; the bench holds two nucleic-acid entries (1LMB, 1ZAA), on which F4 and F6 run without changing the drawing; the evidence that these fixes leave other figures alone is the 39 unchanged controls",
  "limitations": [
   "F1 (M1, pairs missed at low resolution) deferred past the freeze: 8XJV pair recall, 3EGZ A2.U64 (pair_f1 0.941) and 6ZY7 stem_recall 0.667 (ruling Q4) stay failures",
   "3EGZ procrustes 0.572 per copy (limit 0.5): the stems of one copy span 49 degrees round the axis, unrolled flat",
+  "3EGZ spearman is not measured per copy (3 stems a copy, under the 5 a rank correlation needs): through one view of the whole assembly it was 0.347, a failure; it no longer fails only because it is not measured",
+  "3EGZ angle_median and angle_max (10.3, 10.4) pass only under the unrolled limit (45: half the turn between its copies, each copy in its own frame); against the plain-frame limit 0.05 they fail",
   "6QIK (F5 not committed): fallback, crossing and the A3 strand y:8-9 remain",
   "8VBG (F3 not committed): contact_auc 0.505, stems_nearer_frac 0.5 remain; 9YLM, 9K4F, 30QM, 3KTQ, 1YTB as before",
-  "8XJV: everything M1 explains (fallbacks 10, na_crossings 10, bead_overlaps 127, time)"
+  "8XJV: fallbacks 10, na_crossings 10 and 125 of its bead_overlaps are M1's; F4 added 4 (125 -> 129) and F6 removed 2 (-> 127), net +2 from base, accepted because 8XJV is a case, not a control (Q37 binds controls)"
  ],
  "runs": {
   "F2": {
@@ -180,6 +182,16 @@
     "code_fingerprint": "41c64420bd651819",
     "git": {
      "commit": "5726aeca9fe822a1557fd1ed2df3cb7271a408d5",
+     "dirty": true,
+     "source": "asserted by runner"
+    }
+   }
+  },
+  "R1": {
+   "code": {
+    "code_fingerprint": "e79936f0b9edb832",
+    "git": {
+     "commit": "ec04b4799c8dfcecccd31a30f6698553e5d5dc9d",
      "dirty": true,
      "source": "asserted by runner"
     }
@@ -332,7 +344,7 @@
   {
    "fix": "F4",
    "mechanism": "M5: a gap meets a free end's tip along the end's own outward heading",
-   "change": "the 5' free end after a gap turns toward the gap's start as well as its touching protein; the gap tries a free arrival along the chord, then the clear straight chord, before an unblocked route; a 3' end the protein touches keeps lying along it",
+   "change": "the 5' free end after a gap turns toward the gap's start as well as its touching protein; the gap tries a free arrival along the chord, then (fix round 1) the straight chord of two ends nearer than two grid cells crossing no strand, before an unblocked route; a 3' end the protein touches keeps lying along it",
    "before": "F2",
    "after": "F4",
    "committed": "3380435",
@@ -1200,5 +1212,123 @@
     }
    }
   }
- ]
+ ],
+ "round1": {
+  "F6->R1": {
+   "3EGZ": {
+    "changed": {
+     "copies_measured": [
+      null,
+      4
+     ],
+     "angle_limit": [
+      null,
+      45.0
+     ]
+    },
+    "worse": []
+   }
+  },
+  "base->R1": {
+   "6VTX": {
+    "changed": {
+     "stems_nearer_frac": [
+      0.0,
+      null
+     ],
+     "stems_nearer_not_applicable": [
+      null,
+      1
+     ]
+    },
+    "worse": [
+     "stems_nearer_frac"
+    ]
+   },
+   "3EGZ": {
+    "changed": {
+     "spearman": [
+      0.347,
+      null
+     ],
+     "procrustes": [
+      0.982,
+      0.572
+     ],
+     "angle_median": [
+      22.0,
+      10.3
+     ],
+     "angle_max": [
+      125.7,
+      10.4
+     ],
+     "mirrored": [
+      1,
+      0
+     ],
+     "na_run_crossings": [
+      11,
+      8
+     ],
+     "ss_contacts_nearer": [
+      0.8,
+      0.95
+     ],
+     "copies_measured": [
+      null,
+      4
+     ],
+     "angle_limit": [
+      null,
+      45.0
+     ]
+    },
+    "worse": [
+     "spearman"
+    ]
+   },
+   "4AS1": {
+    "changed": {
+     "na_crossings": [
+      1,
+      0
+     ]
+    },
+    "worse": []
+   },
+   "6QIK": {
+    "changed": {
+     "bead_overlaps": [
+      1,
+      0
+     ],
+     "na_run_crossings": [
+      406,
+      404
+     ],
+     "na_protein_crossings": [
+      362,
+      360
+     ]
+    },
+    "worse": []
+   },
+   "8XJV": {
+    "changed": {
+     "bead_overlaps": [
+      125,
+      127
+     ],
+     "na_protein_crossings": [
+      731,
+      725
+     ]
+    },
+    "worse": [
+     "bead_overlaps"
+    ]
+   }
+  }
+ }
 }
