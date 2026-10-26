@@ -38,3 +38,31 @@ def test_gap_does_not_cross_the_tail_it_joins():
     assert tails and not [t.strand for t in tails if _crossings(_segments(gap.points), _segments(t.points))]
     assert render_checks(lay, loops, fig, sses, model=model, bb=bb)["na_crossings"] == 0
     assert np.isfinite(np.asarray(gap.points, float)).all()
+
+
+def test_beads_clear_where_runs_meet():
+    """Plan 28 F6 (M7): _unbunch slides each run against the runs placed before it, which stay put, so where runs meet
+    the later one could only keep the best spot it found (6QIK: A:G1447 and y:G85, 0.28 apart where three runs meet;
+    a bead is 0.45 wide). Now the other run slides instead (na_labels._clear_junctions). Planted on 4OO8: a run redrawn
+    across another's first nucleotide, its middle nucleotide 0.2 from it; afterwards no nucleotide of the two is under
+    a bead's width from one of the other."""
+    from foldmap.na_labels import _clear_junctions
+    from foldmap.na_paths import _BEAD, _spaced
+
+    path = Path(__file__).parent / "data" / "na" / "4OO8.cif.gz"
+    lay, sses, bb = make_layout(path)
+    route_loops(lay, sses, bb)
+    runs = [p for p in lay.na_paths if p.kind == "run" and p.nts]
+    q = runs[0]
+    p = next(r for r in runs[1:] if len(r.nts) % 2 == 1 and len(r.nts) >= 3)
+    x, y = q.nt_xy[0]
+    half = (len(p.nts) + 1) * 0.55 / 2
+    p.points = [(x - half, y + 0.2), (x + half, y + 0.2)]
+    p.nt_xy = _spaced(p.points, len(p.nts))
+
+    def nearest() -> float:
+        return min(np.hypot(a[0] - b[0], a[1] - b[1]) for a in p.nt_xy for b in q.nt_xy)
+
+    assert nearest() < _BEAD
+    _clear_junctions(lay, lay.na_paths, runs, {key: d for d in lay.stems for key in d.axial})
+    assert nearest() >= _BEAD - 1e-9

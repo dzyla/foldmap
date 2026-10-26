@@ -82,11 +82,11 @@ every correction of a rule are by hand.
 | constant | 590 | 62 | 25 | 28 | 36 | 102 | 337 |
 | default | 33 | 0 | 0 | 0 | 0 | 3 | 30 |
 | local | 1 | 0 | 0 | 0 | 0 | 0 | 1 |
-| comparison | 297 | 0 | 0 | 0 | 0 | 155 | 142 |
-| argument | 665 | 0 | 1 | 0 | 0 | 184 | 480 |
+| comparison | 298 | 0 | 0 | 0 | 0 | 156 | 142 |
+| argument | 666 | 0 | 1 | 0 | 0 | 185 | 480 |
 | fallback | 24 | 0 | 0 | 0 | 4 | 1 | 19 |
 | fallback-marker | 29 | 0 | 0 | 0 | 3 | 0 | 26 |
-| all | 1639 | 62 | 26 | 28 | 43 | 445 | 1035 |
+| all | 1641 | 62 | 26 | 28 | 43 | 447 | 1035 |
 
 Of the 43 named-entry rows, 32 rest on the comment at the item and 11 on git (evidence starting `git:`: a commit whose message ties the value to the entries).
 
@@ -1129,6 +1129,8 @@ Of the 43 named-entry rows, 32 rest on the comment at the item and 11 on git (ev
 | `na_labels:_GAP_TEXT` | constant | 0.75 | _GAP_TEXT = 0.75 # a gap label's text size, in ems of the figure's text (render draws it at 0.75 of the font) | unknown | earliest in this file: b43695e 2026-10-11 Split route_na.py (1480 lines) into na_paths, na_runs, na_ends and na_labels | - | - |
 | `na_labels:_GAP_CHAR` | constant | 0.5 | _GAP_CHAR = 0.5 # its mean character width, in ems of its own text ("…", digits and spaces are narrow) | unknown | earliest in this file: b43695e 2026-10-11 Split route_na.py (1480 lines) into na_paths, na_runs, na_ends and na_labels | - | - |
 | `na_labels:_GAP_ROOM` | constant | 1.15 | _GAP_ROOM = 1.15 # room for the page to grow (its bounds widen after routing) and for a larger font | unknown | earliest in this file: b43695e 2026-10-11 Split route_na.py (1480 lines) into na_paths, na_runs, na_ends and na_labels | - | - |
+| `na_labels:_clear_junctions:comparison:1e-9@3bc77eb7` | comparison | 1e-9 | if short(moved) < was - 1e-9: | convention | a floating-point tolerance | na_routing | - |
+| `na_labels:_slide_from.where:argument:1e-12@e74e0fc5` | argument | 1e-12 | f = np.clip(((q - a) * d).sum(axis=1) / np.maximum((d * d).sum(axis=1), 1e-12), 0.0, 1.0) | convention | a floating-point tolerance | heldout_copies, na_layout, na_routing, na_text_keepoff +1 | - |
 | `na_labels:_outline:argument:0.45@1a594b62` | argument | 0.45 | head = min(HEAD_LEN, e.length * 0.45) | unknown | - | na_text_keepoff | - |
 | `na_labels:_boxes_of:argument:4@68aeb51c` | argument | 4 | return np.empty((0, 4)) | convention | an array's shape | na_metrics, na_text_keepoff | - |
 | `na_labels:_place_letters:argument:4@6e8955a0` | argument | 4 | strand_segs = np.vstack([np.hstack([q[:-1], q[1:]]) for q in lines]) if lines else np.empty((0, 4)) | convention | an array's shape | na_layout, na_text_keepoff | - |

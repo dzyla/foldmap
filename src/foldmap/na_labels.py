@@ -90,6 +90,96 @@ def _unbunch(layout: Layout, paths: list[NAPath]) -> None:
         p.nt_xy = best
         for xy in best:
             taken.add(xy)
+    _clear_junctions(layout, paths, runs, at)
+
+
+def _clear_junctions(layout: Layout, paths: list[NAPath], runs: list[NAPath], at: dict) -> None:
+    """Plan 28 F6 (M7): a run nucleotide _unbunch left under a bead's width from another run's (each run is slid
+    against the runs placed before it, which stay put: 6QIK's A:G1447 and y:G85, 0.28 apart where three runs meet)
+    has the other run slide instead: every run holding such a nucleotide, in turn, slides its nucleotides alone from
+    where they are (_slide_from), against every other nucleotide as now placed. A slide is kept only when the run's
+    nucleotides then fall short of a bead's width by less in all (a nucleotide's room is its nearest neighbour's
+    distance, so a slide onto a third nucleotide counts against itself)."""
+    fixed = [d.point(key) for d in layout.stems for key in d.axial]
+    fixed += [xy for p in paths if p.kind != "run" for xy in p.nt_xy]
+    every = _Points(_BEAD)  # every nucleotide as placed: the runs short of room are found once
+    for xy in fixed:
+        every.add(xy)
+    whose = [-1] * len(fixed)
+    for r, p in enumerate(runs):
+        for xy in p.nt_xy:
+            whose.append(r)
+            every.add(xy)
+    tight = sorted({whose[k] for k, xy in enumerate(every.xy) if whose[k] >= 0 and every.nearest(xy, skip=k) < _BEAD})
+    for r in tight:
+        p = runs[r]
+        others = _Points(_BEAD)
+        for xy in fixed:
+            others.add(xy)
+        for k, q in enumerate(runs):
+            if k != r:
+                for xy in q.nt_xy:
+                    others.add(xy)
+        own = [at[key] for key in p.between]
+
+        def room(xy, i, mine, own=own, others=others) -> float:
+            if any(in_body(xy, d) for d in own):
+                return -1.0
+            return min([others.nearest(xy), *(math.dist(xy, q) for k, q in enumerate(mine) if k != i)])
+
+        def short(xy, room=room) -> float:  # how far the run's nucleotides fall short of a bead's width, together
+            return sum(max(0.0, _BEAD - room(q, i, xy)) for i, q in enumerate(xy))
+
+        was = short(p.nt_xy)
+        moved = _slide_from(p.points, list(p.nt_xy), room)
+        if short(moved) < was - 1e-9:
+            p.nt_xy = moved
+
+
+def _slide_from(pts, xy: list, room) -> list[tuple[float, float]]:
+    """_slide_each from the nucleotides' present places along the run `pts`: each one whose room(xy, i, all) is under
+    a bead's width slides alone the least distance that clears it (else to the place that leaves it most room), never
+    nearer than a bead's width (along the run) to its neighbours or the run's two ends."""
+    p = np.asarray(pts, float)
+    seg = np.hypot(*np.diff(p, axis=0).T)
+    cum = np.concatenate([[0.0], np.cumsum(seg)])
+    total = float(cum[-1])
+
+    def at(t: float) -> tuple[float, float]:
+        k = min(int(np.searchsorted(cum, t, side="right")) - 1, len(seg) - 1)
+        f = 0.0 if seg[k] == 0 else (t - cum[k]) / seg[k]
+        q = p[k] + f * (p[k + 1] - p[k])
+        return float(q[0]), float(q[1])
+
+    def where(q) -> float:  # the place along the run nearest q
+        a, b = p[:-1], p[1:]
+        d = b - a
+        f = np.clip(((q - a) * d).sum(axis=1) / np.maximum((d * d).sum(axis=1), 1e-12), 0.0, 1.0)
+        near = a + f[:, None] * d
+        k = int(np.argmin(np.hypot(*(near - q).T)))
+        return float(cum[k] + f[k] * seg[k])
+
+    m = len(xy)
+    ts = [where(np.asarray(q, float)) for q in xy]
+    for i in range(m):
+        space = room(xy[i], i, xy)
+        if space >= _BEAD:
+            continue
+        t0 = ts[i]
+        lo = (ts[i - 1] if i > 0 else 0.0) + _BEAD
+        hi = (ts[i + 1] if i < m - 1 else total) - _BEAD
+        for k in range(1, int(max(t0 - lo, hi - t0, 0.0) / _EACH_STEP) + 1):
+            for t in (t0 + k * _EACH_STEP, t0 - k * _EACH_STEP):
+                if lo <= t <= hi:
+                    q = at(t)
+                    r = room(q, i, xy)
+                    if r > space:
+                        ts[i], xy[i], space = t, q, r
+                    if r >= _BEAD:
+                        break
+            if space >= _BEAD:
+                break
+    return xy
 
 
 _EACH_STEP = 0.05  # page units: the steps a nucleotide still on another's spot slides alone along its run (_slide_each)
