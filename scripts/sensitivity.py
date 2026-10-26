@@ -8,7 +8,7 @@ tuned on (docs/validation/random100-third; never the fourth sample, whose protoc
     python scripts/sensitivity.py plan                              # the constants, perturbations and stage A subset
     python scripts/sensitivity.py run --stage A --out DIR [--labels baselines|perturbations|L1,L2] [--jobs 8]
                                       [--parallel 4]
-    python scripts/sensitivity.py run --stage B --out DIR --from-a DIR    # the constants stage A saw move
+    python scripts/sensitivity.py run --stage B --out DIR                # the whole sample, every perturbation (Q30)
     python scripts/sensitivity.py report --a DIR [--b DIR]          # docs/validation/sensitivity/report.{md,json}
 
 A perturbation is the value times the factor, an int rounded half away from zero; it is skipped and listed when that
@@ -23,7 +23,7 @@ third); a run whose keys file exists is not run again, so a stopped stage resume
 Stage A: a fixed stratified subset of the third sample (SEED; units are entries, a pair is one unit; an entry whose
 recorded time in the third run exceeds SLOW_S is left out, listed), the default view, two baselines (they must be
 identical: the measurement is deterministic), a reads run and every perturbation. Stage B: the whole third sample,
-default view, the same unperturbed runs and both perturbations of each constant that moved any key in stage A. The
+default view, the same unperturbed runs and every perturbation (ruling Q30; Q29 ran only those that moved in A). The
 reads run is unperturbed with FOLDMAP_TRACE_READS set (perturb.install_trace): which entries ran a line naming each
 constant, so a stable constant no line read is told apart (its stability is no evidence); it must move no key.
 
@@ -377,13 +377,11 @@ def _third() -> tuple[dict, dict]:
     return sample, _script("random100").read_report(THIRD / "report.json")
 
 
-def stage_runs(stage: str, the_plan: dict, from_a: Path | None) -> list[tuple[str, str | None]]:
-    """(name, FOLDMAP_PERTURB) of every run of a stage: the baselines and the reads run first."""
+def stage_runs(stage: str, the_plan: dict) -> list[tuple[str, str | None]]:
+    """(name, FOLDMAP_PERTURB) of every run of stage A or B: the baselines and the reads run first, then every
+    perturbation (stage B: all of them, ruling Q30, not only those that moved in stage A)."""
     runs = [(b, None) for b in (*BASELINES, READS)]
-    if stage == "A":
-        return runs + [(p["label"], p["perturb"]) for p in the_plan["perturbations"]]
-    moved_in_a = moved_constants(from_a, the_plan)
-    return runs + [(p["label"], p["perturb"]) for p in the_plan["perturbations"] if p["id"] in moved_in_a]
+    return runs + [(p["label"], p["perturb"]) for p in the_plan["perturbations"]]
 
 
 def read_keys(where: Path) -> dict[str, dict]:
@@ -449,7 +447,7 @@ def cmd_run(args) -> int:
             raise SystemExit(f"{held} holds another subset (another --size?)")
         held.write_text(json.dumps({**sub, "source_stamp": SOURCE_STAMP}, indent=1) + "\n", encoding="utf-8")
         ids = sub["ids"]
-    runs = stage_runs(args.stage, the_plan, Path(args.from_a) if args.from_a else None)
+    runs = stage_runs(args.stage, the_plan)
     if args.labels == "baselines":
         runs = [r for r in runs if r[0] in (*BASELINES, READS)]
     elif args.labels == "perturbations":
@@ -727,7 +725,6 @@ def main(argv=None) -> int:
     r = sub.add_parser("run", help="run a stage's runs not run yet")
     r.add_argument("--stage", choices=("A", "B"), required=True)
     r.add_argument("--out", required=True, help="the stage's folder (never inside docs/validation/random100-third)")
-    r.add_argument("--from-a", help="stage B: stage A's folder (the constants that moved there)")
     r.add_argument("--labels", help="baselines, perturbations or a comma-separated list of run names")
     r.add_argument("--size", type=int, default=SUBSET)
     r.add_argument("--jobs", type=int, default=8, help="entries drawn at once in each run")
@@ -741,8 +738,6 @@ def main(argv=None) -> int:
     args = ap.parse_args(argv)
     if os.environ.get(ENV, "").strip():
         ap.error(f"{ENV} is set: this process must run unperturbed (it sets {ENV} for each run's child)")
-    if args.command == "run" and args.stage == "B" and not args.from_a:
-        ap.error("stage B needs --from-a")
     return args.func(args)
 
 
