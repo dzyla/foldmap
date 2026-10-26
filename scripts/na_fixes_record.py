@@ -40,15 +40,38 @@ CONTROLS = (
 )  # fmt: skip
 F3_RISK = ("1IHF", "1ZAA", "1ZBI", "1ZDI", "9C75")
 # scripts/bench.py --check (heldout-failures bench-before.json) --exact, run at each committed fix (the gate)
-BENCH = "every entry identical (the bench's structures hold no case these fixes act on)"
-# what stays a limitation (ruling Q37; Q4: 6ZY7)
+BENCH = (
+    "every entry identical; the bench holds two nucleic-acid entries (1LMB, 1ZAA), on which F4 and F6 run without "
+    "changing the drawing; the evidence that these fixes leave other figures alone is the 39 unchanged controls"
+)
+# what stays a limitation, and what passes only by a changed judgement (ruling Q37, Q38; Q4: 6ZY7)
 LIMITS = (
     "F1 (M1, pairs missed at low resolution) deferred past the freeze: 8XJV pair recall, 3EGZ A2.U64 (pair_f1 0.941) "
     "and 6ZY7 stem_recall 0.667 (ruling Q4) stay failures",
     "3EGZ procrustes 0.572 per copy (limit 0.5): the stems of one copy span 49 degrees round the axis, unrolled flat",
+    "3EGZ spearman is not measured per copy (3 stems a copy, under the 5 a rank correlation needs): through one view "
+    "of the whole assembly it was 0.347, a failure; it no longer fails only because it is not measured",
+    "3EGZ angle_median and angle_max (10.3, 10.4) pass only under the unrolled limit (45: half the turn between its "
+    "copies, each copy in its own frame); against the plain-frame limit 0.05 they fail",
     "6QIK (F5 not committed): fallback, crossing and the A3 strand y:8-9 remain",
     "8VBG (F3 not committed): contact_auc 0.505, stems_nearer_frac 0.5 remain; 9YLM, 9K4F, 30QM, 3KTQ, 1YTB as before",
-    "8XJV: everything M1 explains (fallbacks 10, na_crossings 10, bead_overlaps 127, time)",
+    "8XJV: fallbacks 10, na_crossings 10 and 125 of its bead_overlaps are M1's; F4 added 4 (125 -> 129) and F6 removed "
+    "2 (-> 127), net +2 from base, accepted because 8XJV is a case, not a control (Q37 binds controls)",
+)
+# the code each run measured: the commit whose src fingerprint equals the run's (a run's own git field is the commit
+# checked out when it ran, the step's fix uncommitted on it or, for F4's re-measure, the commit's src restored)
+MEASURED = {
+    "base": "5726aec", "F7": "24676d3", "F2": "36adc3b", "F4": "3380435", "F6": "218f4bb",
+    "F5": "3380435 + reverted/F5.patch", "F3": "218f4bb + reverted/F3.patch", "R1": "the fix round 1 head",
+}  # fmt: skip
+# fix round 1 (ruling Q38): what changed after the six steps, measured once more at the new head (run R1)
+ROUND1 = (
+    "Run R1 measures the head after fix round 1. Its code changes: F4's straight chord limited to its mechanism (two "
+    "ends nearer than two grid cells, crossing no strand drawn so far, not only no free end); the unrolled angle limit "
+    "taken from frame.angles (half the mean turn between neighbouring copies, not 180/n) and set only when every stem "
+    "with an angle is seen through its copy's frame; _slide_each and _slide_from share their loop (_slide_loop). "
+    "The judgement changes F2 brought are named apart: 3EGZ's spearman is not measured per copy (paper "
+    "common.na_measures and na_validate list it), its angles pass under the unrolled limit (listed with it)"
 )
 # what a control must not get worse on: every judged A17 measure (time apart: it is the machine's), and the crossings
 # reported but not judged
@@ -63,6 +86,8 @@ KEPT = JUDGED + (
     "ss_contacts_nearer",
     "bend_3d",
     "bend_drawn",
+    "copies_measured",
+    "angle_limit",
 )
 # The fixes in the order made (ruling Q37). before/after: run labels; committed: the commit, or None when reverted
 # (its case stays a limitation); target: the entries and measures it was made to move.
@@ -94,7 +119,8 @@ FIXES = [
         "fix": "F4",
         "mechanism": "M5: a gap meets a free end's tip along the end's own outward heading",
         "change": "the 5' free end after a gap turns toward the gap's start as well as its touching protein; the gap "
-        "tries a free arrival along the chord, then the clear straight chord, before an unblocked route; a 3' end the "
+        "tries a free arrival along the chord, then (fix round 1) the straight chord of two ends nearer than two grid "
+        "cells crossing no strand, before an unblocked route; a 3' end the "
         "protein touches keeps lying along it",
         "before": "F2",
         "after": "F4",
@@ -251,6 +277,11 @@ def report() -> dict:
             k: {"code": {c: v["source_stamp"].get(c) for c in ("code_fingerprint", "git")}} for k, v in runs.items()
         },
         "fixes": fixes,
+        **(
+            {"round1": {"F6->R1": compare(runs["F6"], runs["R1"]), "base->R1": compare(runs["base"], runs["R1"])}}
+            if {"F6", "R1", "base"} <= set(runs)
+            else {}
+        ),
     }
     OUT.mkdir(parents=True, exist_ok=True)
     (OUT / "report.json").write_text(json.dumps(doc, indent=1, default=str) + "\n", encoding="utf-8")
@@ -275,13 +306,16 @@ def lines(doc: dict, runs: dict) -> list[str]:
         "the fourth sample at the frozen release. A fix is committed only when its target moves and no control gets "
         "worse on any judged A17 measure, fallback count, crossing count or bead overlap (ruling Q37).",
         "",
-        "Runs (the code each step measured; git is the commit checked out, the step's fix uncommitted on it, so the "
-        "code fingerprint names the code: a committed fix's equals its commit's src):",
+        "Runs (the code each run measured: the commit whose src code fingerprint equals the run's; the git a run "
+        "carries is the commit checked out when it ran):",
         "",
     ]
     for k, v in doc["runs"].items():
         g = v["code"].get("git") or {}
-        out.append(f"- {k}: code {v['code'].get('code_fingerprint')}, git {str(g.get('commit'))[:12]}")
+        out.append(
+            f"- {k}: code {v['code'].get('code_fingerprint')}, measured {MEASURED.get(k, '?')} (checked out "
+            f"{str(g.get('commit'))[:12]})"
+        )
     for f in doc["fixes"]:
         state = f"committed in {f['committed']}" if f["committed"] else "**not committed** (reverted)"
         out += ["", f"## {f['fix']}: {state}", "", f"- Mechanism: {f['mechanism']}.", f"- Change: {f['change']}."]
@@ -302,6 +336,14 @@ def lines(doc: dict, runs: dict) -> list[str]:
         out += _changes(f["controls_changed"])
         worse = f["controls_worse"]
         out += ["", "Controls worse: " + ("; ".join(f"{i} ({', '.join(k)})" for i, k in worse.items()) or "none")]
+    if "round1" in doc:
+        r = doc["round1"]
+        out += ["", "## Fix round 1 (ruling Q38)", "", ROUND1, ""]
+        out += ["F6 -> R1 (every case and control that moved):", ""] + _changes(r["F6->R1"])
+        out += ["", "base -> R1 (every case and control that moved):", ""] + _changes(r["base->R1"])
+        worse = {i: d["worse"] for i, d in r["base->R1"].items() if i in CONTROLS and d["worse"]}
+        listed = "; ".join(f"{i} ({', '.join(k)})" for i, k in worse.items()) or "none"
+        out += ["", f"Controls worse, base -> R1: {listed}"]
     out += ["", "## Limitations", ""] + [f"- {x}." for x in LIMITS]
     return out
 
