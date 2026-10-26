@@ -140,16 +140,7 @@ def _slide_from(pts, xy: list, room) -> list[tuple[float, float]]:
     """_slide_each from the nucleotides' present places along the run `pts`: each one whose room(xy, i, all) is under
     a bead's width slides alone the least distance that clears it (else to the place that leaves it most room), never
     nearer than a bead's width (along the run) to its neighbours or the run's two ends."""
-    p = np.asarray(pts, float)
-    seg = np.hypot(*np.diff(p, axis=0).T)
-    cum = np.concatenate([[0.0], np.cumsum(seg)])
-    total = float(cum[-1])
-
-    def at(t: float) -> tuple[float, float]:
-        k = min(int(np.searchsorted(cum, t, side="right")) - 1, len(seg) - 1)
-        f = 0.0 if seg[k] == 0 else (t - cum[k]) / seg[k]
-        q = p[k] + f * (p[k + 1] - p[k])
-        return float(q[0]), float(q[1])
+    p, seg, cum, at = _run_line(pts)
 
     def where(q) -> float:  # the place along the run nearest q
         a, b = p[:-1], p[1:]
@@ -159,8 +150,32 @@ def _slide_from(pts, xy: list, room) -> list[tuple[float, float]]:
         k = int(np.argmin(np.hypot(*(near - q).T)))
         return float(cum[k] + f[k] * seg[k])
 
+    return _slide_loop([where(np.asarray(q, float)) for q in xy], xy, float(cum[-1]), at, room)
+
+
+_EACH_STEP = 0.05  # page units: the steps a nucleotide still on another's spot slides alone along its run (_slide_each)
+
+
+def _run_line(pts):
+    """A run's polyline as (points, segment lengths, cumulative lengths, at): at(t) is the point t along it."""
+    p = np.asarray(pts, float)
+    seg = np.hypot(*np.diff(p, axis=0).T)
+    cum = np.concatenate([[0.0], np.cumsum(seg)])
+
+    def at(t: float) -> tuple[float, float]:
+        k = min(int(np.searchsorted(cum, t, side="right")) - 1, len(seg) - 1)
+        f = 0.0 if seg[k] == 0 else (t - cum[k]) / seg[k]
+        q = p[k] + f * (p[k + 1] - p[k])
+        return float(q[0]), float(q[1])
+
+    return p, seg, cum, at
+
+
+def _slide_loop(ts: list[float], xy: list, total: float, at, room) -> list[tuple[float, float]]:
+    """Each nucleotide (place ts[i] along the run, xy[i] on the page) whose room(xy, i, all) is under a bead's width
+    slid alone the least distance that clears it (else the one that leaves it most room), never nearer than a bead's
+    width (along the run) to its neighbours or the run's two ends (0 and `total`); _slide_each's and _slide_from's."""
     m = len(xy)
-    ts = [where(np.asarray(q, float)) for q in xy]
     for i in range(m):
         space = room(xy[i], i, xy)
         if space >= _BEAD:
@@ -180,9 +195,6 @@ def _slide_from(pts, xy: list, room) -> list[tuple[float, float]]:
             if space >= _BEAD:
                 break
     return xy
-
-
-_EACH_STEP = 0.05  # page units: the steps a nucleotide still on another's spot slides alone along its run (_slide_each)
 
 
 def _slide_each(pts, m: int, shift: float, room) -> list[tuple[float, float]]:
@@ -191,38 +203,10 @@ def _slide_each(pts, m: int, shift: float, room) -> list[tuple[float, float]]:
     room), never nearer than a bead's width (along the run) to its neighbours or the run's two ends: two runs side by
     side, spaced differently, whose nucleotides no slide of a whole run keeps apart (6S13 a:692-694 beside
     a:713-716)."""
-    p = np.asarray(pts, float)
-    seg = np.hypot(*np.diff(p, axis=0).T)
-    cum = np.concatenate([[0.0], np.cumsum(seg)])
+    _, _, cum, at = _run_line(pts)
     total = float(cum[-1])
-
-    def at(t: float) -> tuple[float, float]:
-        k = min(int(np.searchsorted(cum, t, side="right")) - 1, len(seg) - 1)
-        f = 0.0 if seg[k] == 0 else (t - cum[k]) / seg[k]
-        q = p[k] + f * (p[k + 1] - p[k])
-        return float(q[0]), float(q[1])
-
     ts = [float(t) for t in (np.arange(1, m + 1) + shift) / (m + 1) * total]
-    xy = [at(t) for t in ts]
-    for i in range(m):
-        space = room(xy[i], i, xy)
-        if space >= _BEAD:
-            continue
-        t0 = ts[i]
-        lo = (ts[i - 1] if i > 0 else 0.0) + _BEAD
-        hi = (ts[i + 1] if i < m - 1 else total) - _BEAD
-        for k in range(1, int(max(t0 - lo, hi - t0, 0.0) / _EACH_STEP) + 1):
-            for t in (t0 + k * _EACH_STEP, t0 - k * _EACH_STEP):
-                if lo <= t <= hi:
-                    q = at(t)
-                    r = room(q, i, xy)
-                    if r > space:
-                        ts[i], xy[i], space = t, q, r
-                    if r >= _BEAD:
-                        break
-            if space >= _BEAD:
-                break
-    return xy
+    return _slide_loop(ts, [at(t) for t in ts], total, at, room)
 
 
 _LETTER_GAP = 0.38  # page units: closest two base letters (or a letter and a nucleotide) may sit

@@ -64,5 +64,8 @@ def test_beads_clear_where_runs_meet():
         return min(np.hypot(a[0] - b[0], a[1] - b[1]) for a in p.nt_xy for b in q.nt_xy)
 
     assert nearest() < _BEAD
+    before = list(q.nt_xy)
     _clear_junctions(lay, lay.na_paths, runs, {key: d for d in lay.stems for key in d.axial})
     assert nearest() >= _BEAD - 1e-9
+    # p alone, held by its neighbours to +-0.1 along it, reaches at most ~0.22 from q's nucleotide: q itself slid
+    assert q.nt_xy != before
