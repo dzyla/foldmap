@@ -53,7 +53,9 @@ F1 = (
     "T7 finding F1: protomer order follows chain names (symmetry._orbits iterates sorted(perm), symmetry.py:234; "
     "symmetry._protomers sorts orbits by first chain name, symmetry.py:255, and breaks its ties by name, "
     "symmetry.py:259); protomer 0 is laid out first and drawn "
-    "on the left (cli._dyad_frame, cli.py:359) or is the copy the other mirrors (cli._mirror_frame, cli.py:257)"
+    "on the left (cli._dyad_frame) or is the copy the other mirrors (cli._mirror_frame); on an unrolled frame its "
+    "nucleic-acid stems are the template the copies' stems are tied to (layout._stem_ties), none tied when protomer 0 "
+    "holds no nucleic acid"
 )
 XF1 = pytest.mark.xfail(strict=True, raises=AssertionError, reason=F1)
 

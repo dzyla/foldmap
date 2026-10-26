@@ -45,8 +45,10 @@ D3_ENTRIES = ("1EHZ", "2OEU", "4OO8", "1KX5", "1AOI")
 FINDINGS = {
     "F1": "Chain names choose protomer 0: symmetry._orbits walks the chains in name order (symmetry.py:234), "
     "symmetry._protomers sorts the orbits by their first chain's name (symmetry.py:255) and breaks its ties by name "
-    "(symmetry.py:259); protomer 0 is drawn on the left (cli._dyad_frame, cli.py:359) or is the copy the others "
-    "mirror (cli._mirror_frame, cli.py:257). A renaming that reverses the chains' name order moves the figure of "
+    "(symmetry.py:259); protomer 0 is drawn on the left (cli._dyad_frame) or is the copy the others mirror "
+    "(cli._mirror_frame); on an unrolled frame its nucleic-acid stems are the template its copies' stems are tied to "
+    "(layout._stem_ties, plan 28 F2), and when protomer 0 holds no nucleic acid no stem is tied at all, so a renaming "
+    "can change that figure in kind. A renaming that reverses the chains' name order moves the figure of "
     "an assembly of several deposited chains; its structure facts and check verdicts stay equal.",
     "F2": "Base-pair H-bond window: foldmap calls a canonical pair whose Watson-Crick-edge H-bonds reach 3.8 Å "
     "(nucleic.HBOND_MAX, nucleic.py:16, applied at :147), one stretched to 4.0 Å (HBOND_STRETCH, :17, applied at "
