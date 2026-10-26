@@ -2,12 +2,12 @@
  "what": "foldmap's thresholds, special cases and fallbacks, scanned from src/foldmap (scripts/inventory.py)",
  "source_stamp": {
   "foldmap": "0.1.0",
-  "code_fingerprint": "4b9c836b01cb8d00",
+  "code_fingerprint": "3ee0d171d9aa58f5",
   "package": "checkout",
-  "checkout_fingerprint": "4b9c836b01cb8d00",
+  "checkout_fingerprint": "3ee0d171d9aa58f5",
   "installed_matches_checkout": true,
   "git": {
-   "commit": "5f096844423ba62f4ad1a57e482fb3ad615c06c0",
+   "commit": "7f3175f9022d35552152423f01f22141088b1f30",
    "dirty": true,
    "source": "asserted by runner"
   },
@@ -41,9 +41,9 @@
  ],
  "counts": {
   "by_kind": {
-   "constant": 588,
-   "comparison": 296,
-   "argument": 659,
+   "constant": 590,
+   "comparison": 297,
+   "argument": 663,
    "default": 33,
    "fallback-marker": 29,
    "fallback": 24,
@@ -56,7 +56,7 @@
     "measured": 28,
     "named-entry": 36,
     "convention": 100,
-    "unknown": 337
+    "unknown": 339
    },
    "default": {
     "convention": 3,
@@ -67,11 +67,11 @@
    },
    "comparison": {
     "convention": 154,
-    "unknown": 142
+    "unknown": 143
    },
    "argument": {
-    "convention": 179,
-    "unknown": 480
+    "convention": 182,
+    "unknown": 481
    },
    "fallback": {
     "named-entry": 4,
@@ -88,8 +88,8 @@
    "geometry": 25,
    "measured": 28,
    "named-entry": 43,
-   "convention": 437,
-   "unknown": 1035
+   "convention": 440,
+   "unknown": 1039
   }
  },
  "items": [
@@ -195,7 +195,8 @@
    "at": "SAME_FOLD_TM = 0.5 # H1: one fold at this TM-score (normalised by A) ... (frozen on the tuning set, 13a-10)",
    "comment": "H1: one fold at this TM-score (normalised by A) ... (frozen on the tuning set, 13a-10)",
    "tests": [
-    "test_align"
+    "test_align",
+    "test_sensitivity"
    ]
   },
   {
@@ -275,7 +276,9 @@
    "value": "0.0",
    "at": "SCREEN = 0.0 # 0, 0.003 and 0.01 chose the same alignments on the 55 homologue pairs (plan 24)",
    "comment": "a candidate alignment that is not one of the first three seeds' penalised refinements (those are always scored, so the result is never below what they alone give) is scored in full (tm_score: a fragment start at every pair) only when its quick score (_search at ROUND_STEP) exceeds the best alignment's quick score less SCREEN·L 0, 0.003 and 0.01 chose the same alignments on the 55 homologue pairs (plan 24)",
-   "tests": []
+   "tests": [
+    "test_sensitivity"
+   ]
   },
   {
    "id": "align:d0:comparison:15@8d42232c",
@@ -1801,7 +1804,9 @@
    "value": "(4, 7)",
    "at": "ROSETTE_ORDERS = (4, 7) # cyclic=rosette: Cn assemblies of these orders are drawn seen down their axis. Plan 21's",
    "comment": "cyclic=rosette: Cn assemblies of these orders are drawn seen down their axis. Plan 21's look test kept these two: C3, C5, C6 and C8 rosettes (and a D2's two mirrored rings) read worse than their unrolled figures on most entries tried, with more check failures, so those stay unrolled with a note (_rosette_declined)",
-   "tests": []
+   "tests": [
+    "test_sensitivity"
+   ]
   },
   {
    "id": "cli:DYAD_TURNS",
@@ -1982,6 +1987,7 @@
     "test_matrix",
     "test_mcp",
     "test_membrane",
+    "test_metamorphic",
     "test_na_contacts",
     "test_na_curve",
     "test_na_layout",
@@ -2810,6 +2816,107 @@
    "call": "NeighborSearch",
    "keyword": null,
    "tests": []
+  },
+  {
+   "id": "deep:VERSION",
+   "kind": "constant",
+   "module": "deep",
+   "function": "<module>",
+   "line": 41,
+   "value": "1",
+   "at": "VERSION = 1",
+   "comment": "",
+   "tests": [
+    "test_deep_check"
+   ]
+  },
+  {
+   "id": "deep:TIMEOUT",
+   "kind": "constant",
+   "module": "deep",
+   "function": "<module>",
+   "line": 54,
+   "value": "600",
+   "at": "TIMEOUT = 600 # s for an external program",
+   "comment": "s for an external program",
+   "tests": []
+  },
+  {
+   "id": "deep:parse_dssp:comparison:17@1840e38e",
+   "kind": "comparison",
+   "module": "deep",
+   "function": "parse_dssp",
+   "line": 150,
+   "value": "17",
+   "at": "if not started or len(line) < 17 or line[13] == \"!\":",
+   "comment": "",
+   "tests": [
+    "test_deep_check"
+   ]
+  },
+  {
+   "id": "deep:mkdssp_rows:argument:60@6360e5a9",
+   "kind": "argument",
+   "module": "deep",
+   "function": "mkdssp_rows",
+   "line": 166,
+   "value": "60",
+   "at": "done = subprocess.run([exe, \"--version\"], capture_output=True, text=True, timeout=60)",
+   "comment": "",
+   "callee": "subprocess.run",
+   "call": "run",
+   "keyword": "timeout",
+   "tests": [
+    "test_deep_check"
+   ]
+  },
+  {
+   "id": "deep:pairs_check:argument:4@f10d1b07",
+   "kind": "argument",
+   "module": "deep",
+   "function": "pairs_check",
+   "line": 265,
+   "value": "4",
+   "at": "\"precision\": round(precision, 4),",
+   "comment": "",
+   "callee": "round",
+   "call": "round",
+   "keyword": null,
+   "tests": [
+    "test_deep_check"
+   ]
+  },
+  {
+   "id": "deep:pairs_check:argument:4@7adbda5e",
+   "kind": "argument",
+   "module": "deep",
+   "function": "pairs_check",
+   "line": 266,
+   "value": "4",
+   "at": "\"recall\": round(recall, 4),",
+   "comment": "",
+   "callee": "round",
+   "call": "round",
+   "keyword": null,
+   "tests": [
+    "test_deep_check"
+   ]
+  },
+  {
+   "id": "deep:pairs_check:argument:4@d0160d6a",
+   "kind": "argument",
+   "module": "deep",
+   "function": "pairs_check",
+   "line": 267,
+   "value": "4",
+   "at": "\"f1\": round(f1, 4),",
+   "comment": "",
+   "callee": "round",
+   "call": "round",
+   "keyword": null,
+   "tests": [
+    "test_deep_check"
+   ]
   },
   {
    "id": "diff:CORE_CUT",
@@ -4351,6 +4458,7 @@
     "test_layout",
     "test_like",
     "test_membrane",
+    "test_metamorphic",
     "test_nucleic",
     "test_robustness",
     "test_route",
@@ -4373,6 +4481,7 @@
     "test_layout",
     "test_like",
     "test_membrane",
+    "test_metamorphic",
     "test_nucleic",
     "test_robustness",
     "test_route",
@@ -4395,6 +4504,7 @@
     "test_layout",
     "test_like",
     "test_membrane",
+    "test_metamorphic",
     "test_nucleic",
     "test_robustness",
     "test_route",
@@ -4417,6 +4527,7 @@
     "test_layout",
     "test_like",
     "test_membrane",
+    "test_metamorphic",
     "test_nucleic",
     "test_robustness",
     "test_route",
@@ -4439,6 +4550,7 @@
     "test_layout",
     "test_like",
     "test_membrane",
+    "test_metamorphic",
     "test_nucleic",
     "test_robustness",
     "test_route",
@@ -4461,6 +4573,7 @@
     "test_layout",
     "test_like",
     "test_membrane",
+    "test_metamorphic",
     "test_nucleic",
     "test_robustness",
     "test_route",
@@ -4483,6 +4596,7 @@
     "test_layout",
     "test_like",
     "test_membrane",
+    "test_metamorphic",
     "test_nucleic",
     "test_robustness",
     "test_route",
@@ -5265,10 +5379,12 @@
     "test_focus",
     "test_frame",
     "test_homologues",
+    "test_independent_kernels",
     "test_io",
     "test_ligands",
     "test_links",
     "test_membrane",
+    "test_metamorphic",
     "test_na_pairs",
     "test_na_structure",
     "test_nucleic",
@@ -5308,10 +5424,12 @@
     "test_focus",
     "test_frame",
     "test_homologues",
+    "test_independent_kernels",
     "test_io",
     "test_ligands",
     "test_links",
     "test_membrane",
+    "test_metamorphic",
     "test_na_pairs",
     "test_na_structure",
     "test_nucleic",
@@ -5341,6 +5459,7 @@
    "tests": [
     "test_assembly",
     "test_datafile",
+    "test_independent_kernels",
     "test_na_pairs",
     "test_na_structure",
     "test_nucleic",
@@ -5900,7 +6019,8 @@
    "at": "_K_HOME = 0.02 # pull back toward the projected position, keeps the fold recognisable",
    "comment": "pull back toward the projected position, keeps the fold recognisable",
    "tests": [
-    "test_heldout_budgets"
+    "test_heldout_budgets",
+    "test_sensitivity"
    ]
   },
   {
@@ -5912,7 +6032,9 @@
    "value": "128 * _K_HOME",
    "at": "_K_LIKE = 128 * _K_HOME",
    "comment": "an item drawn like a reference (build_layout's `like`, plan 13a): pulled to its mates' place in the reference's finished layout this much harder, so it stays there unless it must move to clear an overlap. Frozen on the homologue tuning set (13a-10): 2, 8, 32, 64, 128 tried; H2 and H3 of every positive pair at 128 as good as or better than at 8 (the three propeller pairs most: 2ZB5 on 1E8T median 4.63 -> 3.32), none worse; at 128 _attract's step times the spring (_STEP * _K_LIKE = 0.38 per unit mass) stays well inside its stable range",
-   "tests": []
+   "tests": [
+    "test_sensitivity"
+   ]
   },
   {
    "id": "layout:_STEP",
@@ -6166,7 +6288,8 @@
    "at": "_STACK_PAD = 1.3 # page units between two strands drawn end to end in one column: room for the loops leaving",
    "comment": "like.like_from's split helix) page units between two strands drawn end to end in one column: room for the loops leaving their facing ends (0.2 left 5KQJ's B and F loops no route, 1.0 5JB1's; C34 set 1.2 on 5 sample entries). Plan 12 fix round 3 (accessories beside their partner): swept 1.2-1.6 on the 37 sample entries with accessory strands (5 views) and the 30QM and 4YBB fixtures; entries newly failing against t12c2b: 1.2: 7 (and 4YBB's run crossing), 1.25: 5, 1.3: 8RRX, 1.35: 5JB1, 8RRX, 1.4: 5JB1, 8RRX (and 30QM's beads), 1.45: 7GLY, 7XSP, 8RRX (and 30QM's beads), 1.5: 5, 1.6: 5. The stabl…",
    "tests": [
-    "test_layout"
+    "test_layout",
+    "test_sensitivity"
    ]
   },
   {
@@ -7856,7 +7979,8 @@
     "test_heldout_budgets",
     "test_like",
     "test_membrane",
-    "test_na_layout"
+    "test_na_layout",
+    "test_sensitivity"
    ]
   },
   {
@@ -10071,7 +10195,9 @@
    "value": "2",
    "at": "JOIN_GAP = 2 # residues",
    "comment": "Ruling T5-1: in a membrane view two helix runs of one chain at most JOIN_GAP non-helix residues apart are joined only when both lie flat or the joined helix crosses the membrane. Joined as those words allow, 199 pairs of the membrane campaign's 21 views would have been: hairpins (32KS's NS1 and NS2, A:200-219 and A:222-233, their axes 151° apart; 6UW4's A:119-129 and A:132-145, 163°), and the cytoplasmic CH1 into TM11 (A:501-505, A:508-526), TM6 into TM7 of 32KS chain B. So the flat pieces join only when one goes on as the other (their axes within JOIN_ANGLE: NS7's 37°), and a crossing helix …",
-   "tests": []
+   "tests": [
+    "test_sensitivity"
+   ]
   },
   {
    "id": "membrane:JOIN_ANGLE",
@@ -11078,7 +11204,9 @@
    "value": "tuple(np.radians(a) for a in range(0, 360, 5))",
    "at": "_OFF_TURNS = tuple(np.radians(a) for a in range(0, 360, 5)) # in any direction, the first that clears",
    "comment": "element not holding it, nearest first: up to 2.5 (random-100 held-out 13FZ: B:3 lay 1.07 inside A:1027-1031's end) in any direction, the first that clears",
-   "tests": []
+   "tests": [
+    "test_sensitivity"
+   ]
   },
   {
    "id": "na_ends:_GAP_BOWS",
@@ -11470,7 +11598,8 @@
    "comment": "how far beside its gap a label may sit, in multiples of the least that clears it (4 and 6, random-100 C2b-6: 7Y7C's \"... 62 nt ...\" beside a gap 0.57 across, between stems)",
    "tests": [
     "test_na_layout",
-    "test_na_text_keepoff"
+    "test_na_text_keepoff",
+    "test_sensitivity"
    ]
   },
   {
@@ -11495,7 +11624,9 @@
    "value": "tuple(math.radians(a) for a in range(0, 360, 5))",
    "at": "_GAP_TURNS = tuple(math.radians(a) for a in range(0, 360, 5)) # height, every 5°, nearest first (random-100 held-out",
    "comment": "height, every 5°, nearest first (random-100 held-out 8ZTU: \"... 5 nt ...\" by a gap 0.54 long among runs, where every spot beside it met one; the one clear spot, between two runs 0.7 apart, 2.7 such steps out)",
-   "tests": []
+   "tests": [
+    "test_sensitivity"
+   ]
   },
   {
    "id": "na_labels:_GAP_TEXT",
@@ -12195,7 +12326,9 @@
    "value": "(1.0, 1.5, 2.0, 0.5, 3.0)",
    "at": "_JOINT_BENDS = (1.0, 1.5, 2.0, 0.5, 3.0)",
    "comment": "a joint no route reaches and no line or elbow may take is drawn as a smooth curve out of its face along the axis and into the partner's face along its axis, its control points this far out (page units), the first clear taken: the duplex bends round; random-100 C2b-6 (8VWQ's P26a <-> P26b, 73-76° off their faces; P124a's pieces turned back)",
-   "tests": []
+   "tests": [
+    "test_sensitivity"
+   ]
   },
   {
    "id": "na_runs:_JOINT_SWINGS",
@@ -12207,7 +12340,8 @@
    "at": "_JOINT_SWINGS = (0.0, 1.0, 2.0, -1.0, -2.0)",
    "comment": "... and when none of those is clear, the same swung sideways by this much at each end (page units): outward on its rail's side first (pieces turned back from each other, 8VWQ's P124a and 7Y7C's P103, meet past the corners of their bodies, which reach beyond the rails), then the other way (pieces side by side, 7Y7C's P138c1 and P138c2)",
    "tests": [
-    "test_na_layout"
+    "test_na_layout",
+    "test_sensitivity"
    ]
   },
   {
@@ -12811,7 +12945,9 @@
    "value": "3.8",
    "at": "HBOND_MAX = 3.8 # Å, donor-acceptor distance of a base-pair hydrogen bond (stretched pairs at 2-3 Å resolution)",
    "comment": "Å, donor-acceptor distance of a base-pair hydrogen bond (stretched pairs at 2-3 Å resolution)",
-   "tests": []
+   "tests": [
+    "test_independent_kernels"
+   ]
   },
   {
    "id": "nucleic:HBOND_STRETCH",
@@ -12822,7 +12958,9 @@
    "value": "4.0",
    "at": "HBOND_STRETCH = 4.0 # Å, the one longer bond a pair stacked in register on a strict pair may have (1HYS, 1AOI)",
    "comment": "Å, the one longer bond a pair stacked in register on a strict pair may have (1HYS, 1AOI)",
-   "tests": []
+   "tests": [
+    "test_independent_kernels"
+   ]
   },
   {
    "id": "nucleic:C1_PAIR",
@@ -12833,7 +12971,9 @@
    "value": "(9.0, 12.0)",
    "at": "C1_PAIR = (9.0, 12.0) # Å, C1'-C1' across a Watson-Crick or wobble pair (10.5 +- 1.5)",
    "comment": "Å, C1'-C1' across a Watson-Crick or wobble pair (10.5 +- 1.5)",
-   "tests": []
+   "tests": [
+    "test_independent_kernels"
+   ]
   },
   {
    "id": "nucleic:PLANE_MAX",
@@ -12845,6 +12985,7 @@
    "at": "PLANE_MAX = 45.0 # degrees between the two base planes (TBP and nucleosome DNA reach 40 of propeller twist)",
    "comment": "degrees between the two base planes (TBP and nucleosome DNA reach 40 of propeller twist)",
    "tests": [
+    "test_independent_kernels",
     "test_na_pairs"
    ]
   },
@@ -19050,7 +19191,8 @@
    "at": "_MAX_NODES_WINDOWS = 8_000_000",
    "comment": "... and the second searches of the fine windows a coarse page's loops are routed again in (_fine_route) together spend at most this many more, a pool of their own: windows run only on huge pages, by when the page's own second searches have often spent its budget (plan 15 final review: drawing them from it, 7NZ2's domains view went from 0 to 3 fallback curves, 9FZL's had 5), and a fresh budget per window had no bound",
    "tests": [
-    "test_heldout_budgets"
+    "test_heldout_budgets",
+    "test_sensitivity"
    ]
   },
   {
@@ -19146,7 +19288,9 @@
    "value": "(0.0, -0.25, 0.25, -0.4, 0.4)",
    "at": "_NAME_ALONG = (0.0, -0.25, 0.25, -0.4, 0.4) # where along its helix a name that must move may sit: helix lengths",
    "comment": "where along its helix a name that must move may sit: helix lengths",
-   "tests": []
+   "tests": [
+    "test_sensitivity"
+   ]
   },
   {
    "id": "route:_END_TURNS",
@@ -19275,7 +19419,8 @@
     "test_fidelity_fixtures",
     "test_links",
     "test_membrane",
-    "test_random100"
+    "test_random100",
+    "test_sensitivity"
    ]
   },
   {
@@ -19291,7 +19436,8 @@
     "test_fidelity_fixtures",
     "test_links",
     "test_membrane",
-    "test_random100"
+    "test_random100",
+    "test_sensitivity"
    ]
   },
   {
@@ -20265,7 +20411,8 @@
    "comment": "the loops as drawn (A3, the notes)",
    "name": "loop_curve",
    "tests": [
-    "test_inventory"
+    "test_inventory",
+    "test_sensitivity"
    ]
   },
   {
@@ -22277,7 +22424,9 @@
    "callee": "tree[c].count_neighbors",
    "call": "count_neighbors",
    "keyword": null,
-   "tests": []
+   "tests": [
+    "test_metamorphic"
+   ]
   },
   {
    "id": "symmetry:_cubic:comparison:3@35218ade",

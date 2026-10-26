@@ -2005,7 +2005,9 @@ def build_parser() -> argparse.ArgumentParser:
         "H3, the map reads the same way (page dx, dy signs of mate pairs; each mated sheet's order); H4, mates carry "
         "one name; H5, it passes every S- and A-check the structure drawn alone passes. H2 and H3 also give the "
         "two drawn independently, for comparison; their limits are frozen on a homologue tuning set. Prints one line "
-        "per check and one per problem; exits 1 on a problem, 0 otherwise.",
+        "per check and one per problem; exits 1 on a problem, 0 otherwise. With --deep, then D1-D3: the figure drawn "
+        "again, mkdssp and RNApolis where they are set up (unavailable otherwise, never passed); with --json, the "
+        "report as JSON.",
     )
     for cmd in (q, iq, cq, kq):
         q = cmd
@@ -2203,6 +2205,21 @@ def build_parser() -> argparse.ArgumentParser:
             metavar="Å",
             help=f"how far copies may differ, CA RMSD (default {TOLERANCE:g}; raise it for low-resolution X-ray)",
         )
+    kq.add_argument(
+        "--deep",
+        action="store_true",
+        help="also run the deep checks: D1, the figure drawn again is the same (layout signature and SVG); D2, "
+        "foldmap's DSSP against mkdssp 3.1.2 (when MKDSSP names it); D3, its base pairs against RNApolis (when "
+        "NA_RNAPOLIS_PYTHON names a Python that has it); one that cannot run is reported unavailable, never passed",
+    )
+    kq.add_argument(
+        "--json",
+        metavar="PATH",
+        help="also write the check report as JSON (schema foldmap-check, version 1): every check's status (pass, "
+        "fail, unavailable, not_judged, not_applicable), kind and detail, and a verdict that is fail on a failure, "
+        "else incomplete while any check is unavailable, else pass; '-' writes it to standard output instead of "
+        "the text",
+    )
     pq = sub.add_parser(
         "compare",
         help="two structures of one fold on one page: A on the left, B drawn like A on the right",
@@ -2687,19 +2704,42 @@ def _cmd_check(args: argparse.Namespace) -> int:
     spec = _spec_of(args)
     got: dict | None = {} if spec.like else None
     drawn = draw_spec(spec, like_out=got)
+    to_json = getattr(args, "json", None)
+    text = to_json != "-"  # the text report, unless the JSON one goes to standard output in its place
     print(provenance_block(drawn.provenance), file=sys.stderr, end="")
     for out in args.output:
-        print(f"wrote {save(drawn.figure, out)}")
+        print(f"wrote {save(drawn.figure, out)}", file=sys.stdout if text else sys.stderr)
     found = check_figure(drawn, spec, args.structure)
-    print(kind_line())  # what each check is evidence of (science.KIND; plan 28 Task 2)
-    for line in science_lines(found["science"], found["science_judged"]) + criteria_lines(found["criteria"]):
-        print(line)
+    if text:
+        print(kind_line())  # what each check is evidence of (science.KIND; plan 28 Task 2)
+        for line in science_lines(found["science"], found["science_judged"]) + criteria_lines(found["criteria"]):
+            print(line)
     failed = any(c["pass"] is False for c in found["criteria"].values())
+    like = None
     if got is not None:
         like = _like_checks(spec, drawn, found, got)
-        for line in like_lines(like):
+        for line in like_lines(like) if text else ():
             print(line)
         failed = failed or any(c["pass"] is False for c in like.values())
+    deep = None
+    if getattr(args, "deep", False):  # D1-D3 (deep.py, plan 28 Task 7): an unavailable one is never a pass
+        from .deep import FAIL, deep_checks, deep_lines
+
+        deep = deep_checks(spec, drawn, args.structure)
+        for line in deep_lines(deep) if text else ():
+            print(line)
+        failed = failed or any(d["status"] == FAIL for d in deep.values())
+    if to_json:
+        import json
+
+        from .deep import report
+
+        doc = json.dumps(report(args.structure, found, like, deep), indent=1, default=str) + "\n"
+        if text:
+            Path(to_json).write_text(doc, encoding="utf-8")
+            print(f"wrote {to_json}")
+        else:
+            sys.stdout.write(doc)
     return 1 if any(found["science"].values()) or failed else 0
 
 
