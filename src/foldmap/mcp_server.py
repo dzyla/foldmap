@@ -332,6 +332,7 @@ def draw_topology(
                 "interactions": _interaction_lines(drawn.figure),
                 "data_problems": [{"where": p.where, "text": p.text} for p in problems],
                 "bent_duplex": drawn.layout.bent_duplex,  # na_bend (pieces or curved) is a choice for it
+                "fallbacks": drawn.fallbacks,  # each named fallback taken -> how many times (fallback.FALLBACKS)
             },
         )
 

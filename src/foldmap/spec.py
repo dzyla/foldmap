@@ -10,7 +10,7 @@ from dataclasses import dataclass, field, fields, replace
 from pathlib import Path
 from typing import Any
 
-from . import layoutfile
+from . import fallback, layoutfile
 from .elstyle import COLORS, PREFIXES, WIDTHS, joined, references
 from .elstyle import FORMS as ELSTYLE_FORMS
 from .layout import CONVENTIONS, RES_RANGE
@@ -527,6 +527,12 @@ class Drawn:
         return [dict(i) for i in getattr(self.figure, "foldmap_provenance", [])]
 
     @property
+    def fallbacks(self) -> dict[str, int]:
+        """Each named fallback (fallback.FALLBACKS) taken while the figure was made -> how many times
+        (Layout.fallbacks); {} when none was."""
+        return dict(getattr(self.layout, "fallbacks", {}) or {})
+
+    @property
     def stuck(self) -> list[str]:
         """Loops with no clear route, drawn as plain curves, then nucleic-acid strands drawn with no clear way."""
         from .provenance import stuck
@@ -567,12 +573,15 @@ def draw_spec(spec: FigureSpec, like_out: dict | None = None) -> Drawn:
     from .cli import make_layout
     from .io import read_model
 
-    model = read_model(spec.structure, spec.assembly)
-    layout, sses, bb = make_layout(
-        spec.structure, spec.mode, spec.rotate, spec.flip_v, model=model, like_out=like_out, **spec.layout_kwargs()
-    )
-    loops = route_loops(layout, sses, bb)
-    return Drawn(draw(layout, loops, sses, spec.title, model=model, look=spec.look), loops, layout, sses, bb, model)
+    with fallback.counting() as fired:  # every named fallback taken in making it (Layout.fallbacks; never drawn)
+        model = read_model(spec.structure, spec.assembly)
+        layout, sses, bb = make_layout(
+            spec.structure, spec.mode, spec.rotate, spec.flip_v, model=model, like_out=like_out, **spec.layout_kwargs()
+        )
+        loops = route_loops(layout, sses, bb)
+        fig = draw(layout, loops, sses, spec.title, model=model, look=spec.look)
+    layout.fallbacks = fallback.counts(fired)
+    return Drawn(fig, loops, layout, sses, bb, model)
 
 
 def layout_document(spec: FigureSpec, structure_name: str | None = None, drawn: Drawn | None = None) -> dict:

@@ -11,6 +11,7 @@ import math
 
 import numpy as np
 
+from . import fallback
 from .layout import (
     _GLYPH_W,
     NT_ROW,
@@ -314,4 +315,10 @@ def route_nucleic(layout: Layout, router: _Router | None = None, loops=()) -> li
     _widen(layout, out)
     if log.isEnabledFor(logging.DEBUG):
         log.debug("%d nucleic-acid paths: %d fallbacks", len(out), sum(p.fallback for p in out))
+    fell = [p.kind for p in out if p.fallback]  # the paths as drawn (A3, nacheck's fallbacks, the notes)
+    fallback.note("na_tail_straight", fell.count("tail"))
+    fallback.note("na_gap_unclear", fell.count("gap"))
+    fallback.note("na_hairpin_unclear", fell.count("hairpin"))
+    fallback.note("na_run_unclear", fell.count("run") + fell.count("joint"))
+    fallback.note("na_trace_unclear", fell.count("trace"))
     return out

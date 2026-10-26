@@ -42,6 +42,7 @@ from collections.abc import Callable, Iterable
 
 import networkx as nx
 
+from . import fallback
 from .model import SSE, Bridge, Sheet
 
 SCIENCE = {
@@ -181,6 +182,7 @@ def pairing_cycle(ids: Iterable[str], count: Callable[[str, str], int], closure=
     best = 0
     for seen, cycle in enumerate(nx.simple_cycles(core)):
         if seen >= _MAX_CYCLES:
+            fallback.note("s3_cycles_capped")
             return None
         best = max(best, len(cycle))
     return best

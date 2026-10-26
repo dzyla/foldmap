@@ -75,6 +75,7 @@ os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
 
 # A1-A20 live in the package (plan 10 Task 13a: `foldmap check` judges by them too), imported once the path is set
 from foldmap import criteria as criteria_module  # noqa: E402
+from foldmap import fallback  # noqa: E402
 from foldmap.criteria import (  # noqa: E402
     CRITERIA,
     DOCUMENTED_WARNINGS,
@@ -90,6 +91,7 @@ from foldmap.criteria import (  # noqa: E402
     pair_check,
 )
 from foldmap.criteria import jsonable as _jsonable  # noqa: E402
+from foldmap.fallback import FALLBACKS  # noqa: E402
 from foldmap.source_stamp import code_mix, source_stamp, stamp_line  # noqa: E402
 
 SOURCE_STAMP = source_stamp(__file__)  # the code as this process starts (plan 28 Task 1, review M8)
@@ -1371,7 +1373,10 @@ def cmd_view(args) -> int:
             warnings.simplefilter("ignore")  # the measuring's own warnings are not the figure's
             try:
                 drawn, spec = caught["drawn"], caught["spec"]
-                result.update(measure_view(args.view, drawn, spec, path, args.name, work, na=args.na))
+                result["fallbacks"] = drawn.fallbacks  # each named fallback the figure took (plan 28 Task 9.1)
+                with fallback.counting() as measuring:  # ... and those its measuring took (a check's own: S3's cap)
+                    result.update(measure_view(args.view, drawn, spec, path, args.name, work, na=args.na))
+                result["measure_fallbacks"] = fallback.counts(measuring)
             except Exception:  # the measure failed: the view is not measured, which fails it (fail closed)
                 import traceback
 
@@ -1862,6 +1867,7 @@ def report(entries: list[dict], out: Path, sample_path: Path | None = None, tota
         "passed": passed,
         "entries": entries,
     }
+    doc["fallbacks"] = fallback_totals(entries)  # how often each named fallback fired (plan 28 Task 9.1)
     if drawn.get("protocol"):  # a paper sample (scripts/paper/fourth_sample.py): its protocol, and whether quotable
         doc["protocol"] = drawn["protocol"]
     if (out / NOT_FOR_PAPER).is_file():
@@ -1931,6 +1937,7 @@ def report(entries: list[dict], out: Path, sample_path: Path | None = None, tota
     ]
     for e in entries:
         lines.append(f"| {e['id']} | " + " | ".join(str(v) for v in reported(e).values()) + " |")
+    lines += fallbacks_section(entries)
     lines += science_section(entries)
     lines += domains_section(entries)
     lines += accessories_section(entries)
@@ -2239,6 +2246,59 @@ def accessories_section(entries: list[dict]) -> list[str]:
         got = accessories_named(e)
         if any(of for _, of in got.values()):
             lines.append(f"| {e['id']} | " + "; ".join(f"{v} {n} of {of}" for v, (n, of) in got.items()) + " |")
+    return lines
+
+
+def entry_fallbacks(e: dict, views: Iterable[str] | None = ("default",)) -> Counter:
+    """The named fallbacks (foldmap.fallback.FALLBACKS) an entry's figures took -> how many times: its default
+    view's, or with `views` None every view's summed (each view's own figure; the app view's job process counts
+    none)."""
+    got: Counter = Counter()
+    for view, run in sorted((e.get("views") or {}).items()):
+        if views is None or view in views:
+            got.update(((run or {}).get("result") or {}).get("fallbacks") or {})
+    return got
+
+
+def fallback_totals(entries: list[dict]) -> dict:
+    """report.json's fallbacks: per name, the entries whose default view took it, the times it did there, and the
+    times over every view; then each entry's default-view counts (only entries with any)."""
+    first = {e["id"]: entry_fallbacks(e) for e in entries}
+    every = Counter()
+    for e in entries:
+        every.update(entry_fallbacks(e, None))
+    return {
+        "names": {
+            name: {
+                "entries": sum(1 for got in first.values() if got[name]),
+                "default_view": sum(got[name] for got in first.values()),
+                "every_view": every[name],
+            }
+            for name in FALLBACKS
+        },
+        "per_entry": {i: fallback.counts(got) for i, got in first.items() if +got},
+    }
+
+
+def fallbacks_section(entries: list[dict]) -> list[str]:
+    """report.md's named fallbacks (plan 28 Task 9.1): how often each fired, over the entries' default views and over
+    every view, then each entry's default-view counts. Reported, not gated."""
+    got = fallback_totals(entries)
+    lines = ["", "## Fallbacks taken", ""]
+    lines += [
+        "Each named fallback (foldmap.fallback.FALLBACKS, docs/validation/inventory/inventory.md) counted as the "
+        "figures were made: reported, not gated.",
+        "",
+        "| fallback | entries (default view) | times (default view) | times (every view) |",
+        "|---|---|---|---|",
+    ]
+    lines += [f"| {n} | {c['entries']} | {c['default_view']} | {c['every_view']} |" for n, c in got["names"].items()]
+    lines += ["", "| id | default view |", "|---|---|"]
+    lines += [
+        f"| {i} | " + "; ".join(f"{n} {k}" for n, k in counts.items()) + " |" for i, counts in got["per_entry"].items()
+    ]
+    if not got["per_entry"]:
+        lines.append("| - | none |")
     return lines
 
 

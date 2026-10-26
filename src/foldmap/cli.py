@@ -21,6 +21,7 @@ import numpy as np
 from . import layoutfile
 from .criteria import LIMITS
 from .dssp import assign_dssp
+from .fallback import line as fallback_line
 from .features import helices_on_sheets, sse_contacts
 from .frame import (
     CylinderFrame,
@@ -2507,6 +2508,8 @@ def _cmd_figure(args: argparse.Namespace) -> int:
         if note:  # an automatic choice drew part of the file
             print(f"foldmap: {note}", file=sys.stderr)
         print(provenance_block(drawn.provenance), file=sys.stderr, end="")
+        if said := fallback_line(drawn.fallbacks):  # how often each named fallback fired (notes only, never drawn)
+            print(f"foldmap: {said}", file=sys.stderr)
         for out in args.output:
             print(f"wrote {save(drawn.figure, out)}")
     method = experimental_method(spec.structure) if spec.look.color_by == "plddt" else None

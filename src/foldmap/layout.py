@@ -17,7 +17,7 @@ from typing import TYPE_CHECKING, NamedTuple
 
 import numpy as np
 
-from . import panels, text_metrics
+from . import fallback, panels, text_metrics
 from .features import KINK_GAP, helix_bundles
 from .frame import Frame, RosetteFrame, symmetric_frame, view_frame
 from .model import SSE, Nucleic, Sheet, generic_label, group_by_chain, pair_places, res_ref, same_place
@@ -419,6 +419,9 @@ class Layout:
     # what computes other_names on first need (build_layout's `conventions`; with_conventions): an element's names in
     # the conventions the figure does not show, so resolve can take dep: and beta: references; None: none known
     names_source: Callable[[], dict] | None = field(default=None, repr=False)
+    # each named fallback (fallback.FALLBACKS) taken while the figure was made -> how many times (spec.draw_spec counts
+    # them): the notes and the campaigns read it; never drawn. {} when none was, or the layout was made outside one
+    fallbacks: dict[str, int] = field(default_factory=dict)
 
     @property
     def other_names(self) -> dict[str, dict[str, str]]:
@@ -6279,6 +6282,7 @@ def _place_domain_names(layout: Layout, sses: list[SSE], font_scale: float = 1.0
             None,
         )
         if spot is None:  # else of the places clear but for that room (else of all), the one leaving the ways most
+            fallback.note("domain_name_least_bad")
             spot = max([s for s in spots if clear(*s, 0.0, bare, room=False)] or spots, key=lambda s: room(*s))
         box, foot = spot
         layout.domain_names[name] = box
@@ -6562,6 +6566,9 @@ def _ink_line(text: str, bold: bool) -> tuple[np.ndarray, np.ndarray]:
         up, down = max(p[:, 1].max(initial=0.0), tm.ASCENT), max(-p[:, 1].min(initial=0.0), tm.DESCENT)
         start = np.array([-pen / 2, -(up - down) / 2])
         _ink_lines[key] = ((p + start) / tm.UNITS, start / tm.UNITS)
+    known = text_metrics.ADVANCE if bold else text_metrics.ADVANCE_NORMAL
+    if not all(c in known for c in text):  # every measuring counted, kept (_ink_lines) or not
+        fallback.note("glyph_width_guessed")
     return _ink_lines[key]
 
 
@@ -6630,8 +6637,10 @@ def _text_width(text: str, bold: bool = True) -> float:
     advance, kern = text_metrics.ADVANCE, text_metrics.KERN
     if not bold:
         advance, kern = text_metrics.ADVANCE_NORMAL, text_metrics.KERN_NORMAL
-    fallback = _FALLBACK_WIDTH * text_metrics.UNITS
-    pen = sum(advance.get(c, fallback) for c in text) + sum(kern.get(a + b, 0) for a, b in zip(text, text[1:]))
+    guess = _FALLBACK_WIDTH * text_metrics.UNITS
+    if not all(c in advance for c in text):
+        fallback.note("glyph_width_guessed")
+    pen = sum(advance.get(c, guess) for c in text) + sum(kern.get(a + b, 0) for a, b in zip(text, text[1:]))
     return float(_snap(pen / text_metrics.UNITS))
 
 
@@ -6950,11 +6959,12 @@ def _choose_label_sides(layout: Layout, sses: list[SSE], style: Style, mirrored:
             free.append(not len(leaving) or not lines_meeting(box, leaving, band).any())
             if _pick_slot(rooms[-1:], _INK_MARGIN * em) == (0, False) and free[-1]:
                 break
-        k, fallback = next(
+        k, fell_back = next(
             ((k, False) for k, r in enumerate(rooms) if free[k] and _pick_slot([r], _INK_MARGIN * em) == (0, False)),
             _pick_slot(rooms, _INK_MARGIN * em),
         )
-        if fallback:
+        if fell_back:
+            fallback.note("stem_name_least_bad")
             clear, nearer, room = rooms[k]
             log.info(
                 "stem %s: no slot is clear, nearer its own stem and %.2f em from every other letter; took side %d "

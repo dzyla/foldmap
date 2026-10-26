@@ -11,6 +11,7 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
+from . import fallback
 from .features import KINK_GAP
 from .layout import (
     _GLYPH_W,
@@ -748,6 +749,7 @@ class _Router:
         budget = min(self.wide_nodes, self.wide_left)
         if budget <= max_nodes:
             self.wide_refused += self.wide_nodes > max_nodes  # a wider search would have run but for the budget
+            fallback.note("route_second_search_refused", int(self.wide_nodes > max_nodes))
             return None
         if not self._joined(start, goal):
             return None
@@ -825,6 +827,8 @@ class _Router:
                     self.tight += not _clear(
                         pts, (own_a, own_b), *self.elements, grow=_INFLATE - 1e-6, under=under, exempt=exempt
                     )
+                if not snap:  # its snapped drawing crossed an element
+                    fallback.note("route_unsnapped")
                 return pts
             self.rejected += 1
         return None
@@ -1018,6 +1022,7 @@ def _clear_helix_names(layout: Layout, sses: list[SSE], loops: list[Loop]) -> No
             q.label_side, q.label_along = side, along
             texts[f"label:{q.sse.id}"] = _element_label_box(q, k)  # as label_boxes sized it (layout.glyph)
     log.debug("%d helix names moved off lines", moved)  # random-100 C6: what the campaign reports of the mover
+    fallback.note("helix_name_moved", moved)
 
 
 def _still_over(layout: Layout, sses: list[SSE], loops: list[Loop]) -> None:
@@ -1154,6 +1159,7 @@ def _walled_fallback(layout: Layout, wall: _Wall, pa: Placed, pb: Placed, curve)
     does, logged. Either way a fallback: flagged (A3), drawn as it is."""
     if wall.clear(curve, routing=True):
         return curve
+    fallback.note("loop_wall_detour")
     x0, y0, x1, y1 = layout.bounds
     far = y1 + _FALLBACK_OUT if wall.side * wall.up > 0 else y0 - _FALLBACK_OUT
 
@@ -1179,6 +1185,7 @@ def _walled_fallback(layout: Layout, wall: _Wall, pa: Placed, pb: Placed, curve)
         if wall.clear(pts, routing=True):
             return pts
     log.warning("loop %s>%s: no fallback keeps to its membrane wall", pa.sse.id, pb.sse.id)
+    fallback.note("loop_wall_unkept")
     return pts
 
 
@@ -1330,6 +1337,8 @@ def route_loops(layout: Layout, sses: list[SSE], bb) -> list[Loop]:
         router.closed_searches,
         router.closed_nodes,
     )
+    fallback.note("loop_curve", sum(lp.fallback for lp in out))  # the loops as drawn (A3, the notes)
+    fallback.note("loop_over_text", sum(lp.crosses_labels for lp in out))  # ... (A4, the notes)
     return out
 
 

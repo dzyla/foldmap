@@ -29,7 +29,7 @@ from matplotlib.text import Text
 from matplotlib.textpath import text_to_path
 from matplotlib.transforms import Affine2D
 
-from . import text_metrics
+from . import fallback, text_metrics
 from .hbonds import find_hbonds
 from .interactions import (
     Interaction,
@@ -3795,6 +3795,8 @@ def _canvas(
     else:
         scale, fig, ax = at(w_u, h_u, list(entries))
     fig.foldmap_page_fit = page_fit(w_u * scale, h_u * scale, _font_pt(scale))  # the notes' page line, if any
+    if fig.foldmap_page_fit:
+        fallback.note("page_text_small")
     ax.set_xlim(xmin, xmax)
     ax.set_ylim(ymin, ymax)
     ax.set_aspect("equal")
@@ -4221,6 +4223,8 @@ def _clear_of_lines(c: _Canvas, t, lines: list, left: float, right: float, out: 
     if not len(lines):
         return
     em = t.get_fontsize() / c.pt_per_unit  # page units to the em; the line box measured as the layout measures text
+    if not all(ch in text_metrics.ADVANCE_NORMAL for ch in t.get_text()):
+        fallback.note("glyph_width_guessed")
     width = (
         sum(text_metrics.ADVANCE_NORMAL.get(ch, text_metrics.UNITS // 2) for ch in t.get_text()) / text_metrics.UNITS
     )
@@ -5084,6 +5088,11 @@ def _draw(
     _draw_uniprot(c.ax, umarks, layout, c.lw, c.font)
     _draw_data_marks(c.ax, dmarks, c.lw, c.look.background)
     c.fig.foldmap_interactions_hidden = _draw_interactions(c, hb)  # lines wholly under text (provenance)
+    fallback.note("counts_hidden", len(hidden))  # what the notes list (provenance), counted per figure
+    fallback.note("mark_least_bad_spot", len(c.fig.foldmap_crowded_marks))
+    fallback.note("interactions_dropped", len(hb.dropped))
+    fallback.note("interactions_hidden", len(c.fig.foldmap_interactions_hidden))
+    fallback.note("crosslinks_unplaced", len(hb.xl_unplaced))
     _draw_absent(c, layout)  # after every text too: its outline keeps off the letters
     _place_side_names(c)  # the band's side names off every line drawn (ruling R9)
     if c.bar_h:
