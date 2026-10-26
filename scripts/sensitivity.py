@@ -568,6 +568,8 @@ def _said(run: dict | None) -> str:
     parts += [f"{n} {a}->{b}" for n, (a, b) in run["fallbacks"].items()]
     if run["area_moved"]:
         parts.append(f"area {len(run['area_moved'])} entr{'y' if len(run['area_moved']) == 1 else 'ies'}")
+    if run["entries_moved"]:  # some keys move without a count changing (one entry's S5 fails, another's passes)
+        parts.append(f"{len(run['entries_moved'])} entr{'y' if len(run['entries_moved']) == 1 else 'ies'} moved")
     if not run.get("reached", True):
         parts.append("NOT REACHED")
     return "; ".join(parts)
