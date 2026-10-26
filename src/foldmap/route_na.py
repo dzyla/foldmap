@@ -210,6 +210,19 @@ def route_nucleic(layout: Layout, router: _Router | None = None, loops=()) -> li
         nxt = [i for i in range(len(na.strands[g.after])) if (g.after, i) in at]
         if nxt:
             goes_on[g.before] = tuple(float(c) for c in at[(g.after, nxt[0])].point((g.after, nxt[0])))
+    # strand whose 5' end comes out of a gap -> the strand before the gap (_tail's target: its 3' exit, plan 28 F4)
+    comes_from = {g.after: g.before for g in na.gaps}
+
+    def came_from(s: int):  # where the molecule comes from into strand s's 5' end: the previous piece's 3' exit
+        b = comes_from.get(s)
+        if b is None:
+            return None
+        got = exits.get((b, len(na.strands[b]) - 1))
+        if got is not None:
+            return tuple(float(c) for c in got[0])
+        prev = [i for i in range(len(na.strands[b])) if (b, i) in at]  # not drawn yet: its last stem nucleotide
+        return tuple(float(c) for c in at[(b, prev[-1])].point((b, prev[-1]))) if prev else None
+
     for s, strand in enumerate(na.strands):
         n = len(strand)
         if s in layout.na_traces:
@@ -229,7 +242,17 @@ def route_nucleic(layout: Layout, router: _Router | None = None, loops=()) -> li
         d0 = at[(s, first)]
         if first > 0:
             path, tip, v = _tail(
-                router, layout, d0, s, (s, first), list(range(first)), True, room(s, "5′"), strands, circles
+                router,
+                layout,
+                d0,
+                s,
+                (s, first),
+                list(range(first)),
+                True,
+                room(s, "5′"),
+                strands,
+                circles,
+                came_from(s),
             )
             fix((s, -1), path)
             exits[(s, 0)] = (np.add(path.nt_xy[0], v * NT_STEP / 2), v, d0)

@@ -104,7 +104,7 @@ def _tail(
     3' end was turned onto its 5' end's line, nucleotides on top of each other): first the straight or turned ones
     off the strands, then the routed ones kept off their cells (strict); only then the old order, a routed end
     crossing strands as a cost last. `target`: where the molecule goes on
-    past a gap at this 3' end (_toward)."""
+    past a gap at this 3' end, or comes from before a gap at this 5' end (_toward)."""
     found = None
     tries = (True, False) if labels is not None else (False,)
     door = _doorway(d, key, five)
@@ -164,19 +164,26 @@ def _touchers(layout: Layout, s: int, nts) -> dict[int, list[tuple[float, float,
 
 def _toward(layout: Layout, d: PlacedStem, s: int, key, nts: list[int], five: bool, target=None) -> tuple[float, ...]:
     """_TURNS, of those at most a right angle off straight the ones that bring a free end's touched nucleotides
-    nearest their touching elements' boxes (mean gap) first, then the rest. When the protein touches none of it, a
-    3' free end that runs into a gap (`target`: the stem point where the molecule goes on past it) turns its tip
-    nearest that first (3OWW: P5's loop is broken by a missing nucleotide; its 5' piece pointed away and the dashed
-    gap went round the stem across a run); else _TURNS as they are."""
+    nearest their touching elements' boxes (mean gap) first, then the rest. A free end at a gap (`target`) turns its
+    tip nearest that first: a 3' end the protein does not touch, toward the stem point where the molecule goes on past
+    the gap (3OWW: P5's loop is broken by a missing nucleotide; its 5' piece pointed away and the dashed gap went round
+    the stem across a run); a 5' end, toward where the molecule comes from (the previous piece's 3' exit), weighed with
+    its touching elements when the protein touches it (their mean gap plus the tip's distance; plan 28 F4: 4AS1's 5'
+    end B:36-40 after the gap from B:31 turned to its protein, away from B:31, and the gap crossed it to reach its
+    tip). Else _TURNS as they are."""
     held = _touchers(layout, s, nts)
+    if held and not five:
+        target = None  # a 3' end the protein touches lies along it (as before F4: 6QIK's gap after strand 4 crossed it)
     if not held and target is None:
         return _TURNS
 
     def gap(turn: float) -> float:
-        if not held:
-            return math.dist(_free_end(d, key, len(nts), five, turn)[2], target)
-        xy = dict(zip(nts, _free_end(d, key, len(nts), five, turn)[1]))
-        return float(np.mean([_box_gap(xy[k], b) for k in sorted(held) for b in held[k]]))
+        tip = _free_end(d, key, len(nts), five, turn)
+        cost = 0.0 if target is None else math.dist(tip[2], target)
+        if held:
+            xy = dict(zip(nts, tip[1]))
+            cost += float(np.mean([_box_gap(xy[k], b) for k in sorted(held) for b in held[k]]))
+        return cost
 
     ahead = sorted((t for t in _TURNS if abs(t) <= np.pi / 2 + 1e-9), key=lambda t: _snap_gap(gap(t)))
     return (*ahead, *(t for t in _TURNS if abs(t) > np.pi / 2 + 1e-9))  # folding back along the stem only after
@@ -524,14 +531,29 @@ def _gap(router: _Router, g, a, b, strands=None) -> NAPath:
     route = None
     if strands is not None and strands.fixed_cells is not None and strands.fixed_cells.any():
         grid = router.grid
-        saved, used = grid.blocked.copy(), grid.used.copy()
-        grid.blocked |= strands.fixed_cells
-        try:
-            route, _ = router.route(pa, ea, own_a, pb, eb, own_b, own_body=True, text_toll=TEXT_TOLL)
-        finally:
-            grid.blocked = saved
-        if route is not None and strands.crosses(_xy(route), fixed_only=True):
-            route, grid.used = None, used  # the cells it marked used are not drawn
+        chord = np.subtract(pa, pb)
+        chord = chord / max(float(np.hypot(*chord)), 1e-9)
+        # arriving along the end's own outward heading first; then, with the free ends still blocked, along the chord
+        # from where the gap comes (plan 28 F4: 4AS1's gap to B:36's tip, whose heading pointed away from B:31, found
+        # no blocked route that way and fell to one crossing the tail it joins)
+        for heading in (eb, chord):
+            saved, used = grid.blocked.copy(), grid.used.copy()
+            grid.blocked |= strands.fixed_cells
+            try:
+                route, _ = router.route(pa, ea, own_a, pb, heading, own_b, own_body=True, text_toll=TEXT_TOLL)
+            finally:
+                grid.blocked = saved
+            if route is not None and strands.crosses(_xy(route), fixed_only=True):
+                route, grid.used = None, used  # the cells it marked used are not drawn
+            if route is not None:
+                break
+        straight = [tuple(map(float, pa)), tuple(map(float, pb))]
+        if (
+            route is None
+            and _na_clear(straight, own, router.elements)
+            and not strands.crosses(straight, fixed_only=True)
+        ):
+            route = straight  # the chord itself, clear: two ends turned to meet (4AS1, F4), which no grid route joins
     if route is None:
         route, _ = router.route(pa, ea, own_a, pb, eb, own_b, own_body=True, text_toll=TEXT_TOLL)
     if route is None:  # an end in another element's clearance margin

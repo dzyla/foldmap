@@ -61,13 +61,17 @@ CONTROLS = {
     "1EYG": ("1EYG", None, {}),  # E. coli SSB tetramer with ssDNA wrapped over it: unpaired traces on their protein
 }
 
-# plan 28's nucleic-acid fixes (docs/validation/na-fixes): fixture name -> (id, chains or None, windows), written to
+# plan 28's nucleic-acid fixes (docs/validation/na-fixes): fixture name -> (id, chains or None, windows, slim: None or
+# SLIM, the protein far from the nucleic acid cut to its backbone and CB; anisotropic B factors are dropped), written to
 # tests/data/na_fixes/ (OUT_FIXES), apart from the fixtures the independent kernels compare (tests/data/na/*)
 OUT_FIXES = OUT.parent / "na_fixes"
+SLIM = 8.0  # Å: a protein residue farther than this from every nucleotide keeps N, CA, C, O and CB only (_slim)
 FIXES = {
     # F2: a C4 assembly (kept: ASSEMBLIES) of four protein-RNA copies, each RNA held by one protomer; unrolled, each
     # RNA must stay with its protomer (one stem was unrolled into the next protomer, copy B1 torn across the seam)
-    "3EGZ": ("3EGZ", None, {}),
+    "3EGZ": ("3EGZ", None, {}, None),
+    # F4: a protein (A) on its RNA (B), B:32-35 not modelled; the gap from B:31 crossed the 5' end B:36-40
+    "4AS1": ("4AS1", ["A", "B"], {}, SLIM),
 }
 
 
@@ -120,6 +124,31 @@ def control(st: gemmi.Structure, chains, windows, keep_assemblies: bool = False)
     for k in reversed(range(len(st.connections))):
         if not {st.connections[k].partner1.chain_name, st.connections[k].partner2.chain_name} <= names:
             del st.connections[k]
+    return st
+
+
+def _slim(st: gemmi.Structure, near: float) -> gemmi.Structure:
+    """Protein residues with no atom within `near` of a nucleotide cut to N, CA, C, O and CB: secondary structure
+    (DSSP reads the backbone) and every protein-nucleic-acid contact (io.CONTACT, 4 Å) as in the entry, at a fraction
+    of the size."""
+    model = st[0]
+    ns = gemmi.NeighborSearch(model, st.cell, near + 1).populate()
+    close = set()
+    for chain in model:
+        if _is_nucleic(chain):
+            for res in chain:
+                for atom in res:
+                    for mark in ns.find_atoms(atom.pos, "\0", radius=near):
+                        cra = mark.to_cra(model)
+                        close.add((cra.chain.name, cra.residue.seqid.num, cra.residue.seqid.icode))
+    for chain in model:
+        if chain.get_polymer().check_polymer_type() != gemmi.PolymerType.PeptideL:
+            continue
+        for res in chain:
+            if (chain.name, res.seqid.num, res.seqid.icode) not in close:
+                for k in reversed(range(len(res))):
+                    if res[k].name not in ("N", "CA", "C", "O", "CB"):
+                        del res[k]
     return st
 
 
@@ -177,9 +206,12 @@ def _fetch(pdb: str, src: Path | None) -> str:
         return gzip.decompress(r.read()).decode("utf-8")
 
 
-def _write(name: str, st: gemmi.Structure, out: Path = OUT) -> int:
+def _write(name: str, st: gemmi.Structure, out: Path = OUT, lean: bool = False) -> int:
     path = out / f"{name}.cif.gz"
-    cif = st.make_mmcif_document().as_string()
+    doc = st.make_mmcif_document()
+    if lean:  # anisotropic B: no figure reads it
+        doc.sole_block().find_mmcif_category("_atom_site_anisotrop.").erase()
+    cif = doc.as_string()
     path.write_bytes(gzip.compress(cif.encode("utf-8"), 9, mtime=0))  # no timestamp: rerunning is reproducible
     size = path.stat().st_size
     chains = ",".join(c.name for c in st[0])
@@ -213,10 +245,11 @@ def main(argv=None) -> int:
             st = gemmi.read_structure_string(_fetch(pdb, args.src))
             total += _write(name, control(st, chains, windows, name in ASSEMBLIES))
     OUT_FIXES.mkdir(parents=True, exist_ok=True)
-    for name, (pdb, chains, windows) in FIXES.items():
+    for name, (pdb, chains, windows, slim) in FIXES.items():
         if name in wanted:
             st = gemmi.read_structure_string(_fetch(pdb, args.src))
-            total += _write(name, control(st, chains, windows, name in ASSEMBLIES), OUT_FIXES)
+            st = control(st, chains, windows, name in ASSEMBLIES)
+            total += _write(name, _slim(st, slim) if slim else st, OUT_FIXES, lean=bool(slim))
     if wanted & set(ENTRIES):
         ref_path.write_text(json.dumps(reference, separators=(",", ":")) + "\n", encoding="utf-8")
         print(f"reference pairs in {ref_path}")

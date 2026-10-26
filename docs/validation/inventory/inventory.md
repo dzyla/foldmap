@@ -83,10 +83,10 @@ every correction of a rule are by hand.
 | default | 33 | 0 | 0 | 0 | 0 | 3 | 30 |
 | local | 1 | 0 | 0 | 0 | 0 | 0 | 1 |
 | comparison | 297 | 0 | 0 | 0 | 0 | 155 | 142 |
-| argument | 664 | 0 | 1 | 0 | 0 | 183 | 480 |
+| argument | 665 | 0 | 1 | 0 | 0 | 184 | 480 |
 | fallback | 24 | 0 | 0 | 0 | 4 | 1 | 19 |
 | fallback-marker | 29 | 0 | 0 | 0 | 3 | 0 | 26 |
-| all | 1638 | 62 | 26 | 28 | 43 | 444 | 1035 |
+| all | 1639 | 62 | 26 | 28 | 43 | 445 | 1035 |
 
 Of the 43 named-entry rows, 32 rest on the comment at the item and 11 on git (evidence starting `git:`: a commit whose message ties the value to the entries).
 
@@ -295,7 +295,7 @@ Of the 43 named-entry rows, 32 rest on the comment at the item and 11 on git (ev
 | `cli:_within_protomer:argument:-2@a5990100` | argument | -2 | return [b for b in bridges if sector.get(bb.labels[b.i].chain, -1) == sector.get(bb.labels[b.j].chain, -2)] | unknown | - | - | - |
 | `cli:_dyad_turn:comparison:3@7abf1d4b` | comparison | 3 | if len(cents) < 3: | unknown | - | symmetry | - |
 | `cli:_dyad_turn:argument:9@e1d90e4a` | argument | 9 | score[turn] = round(float((page * in3d).sum() / norm), 9) if norm > 0 else 0.0 | convention | rounding digits | symmetry | - |
-| `cli:make_layout:comparison:0.9@a523a9c0` | comparison | 0.9 | along = sym is not None and abs(float(np.dot(sym.axis, mem.normal))) > 0.9 # already stands upright) | unknown | - | 310, assembly, cath, chains +51 | - |
+| `cli:make_layout:comparison:0.9@a523a9c0` | comparison | 0.9 | along = sym is not None and abs(float(np.dot(sym.axis, mem.normal))) > 0.9 # already stands upright) | unknown | - | 310, assembly, cath, chains +52 | - |
 | `cli:make_layout.matches:argument:20@52bac9c2` | argument | 20 | enough = not borrowed or shared >= min(20, 0.5 * min(len(rows[c]), len(names[chain]))) | unknown | - | na_contacts, na_layout, sheets | - |
 | `cli:make_layout.matches:comparison:0.9@771a2cb3` | comparison | 0.9 | return shared > 0 and same >= 0.9 * shared and enough | unknown | - | na_contacts, na_layout, sheets | - |
 | `cli:_in_sequence:argument:-180@6d2655ae` | argument | -180 | turns = sorted(range(-180 + AZIMUTH_STEP, 181, AZIMUTH_STEP), key=lambda a: (abs(a), a < 0)) | unknown | - | membrane | - |
@@ -625,7 +625,7 @@ Of the 43 named-entry rows, 32 rest on the comment at the item and 11 on git (ev
 | `io:_drop_coincident:argument:3@b9797183` | argument | 3 | xyz = np.array([a.pos.tolist() for r in chain for a in r], float).reshape(-1, 3) | convention | an array's shape | assembly, na_validation | - |
 | `io:_operator_tags:comparison:1e-3@561161d9` | comparison | 1e-3 | if not len(c) or not len(c[0]) or c[0][0].pos.dist(p) > 1e-3: | unknown | - | - | - |
 | `io:_same_proteins:argument:20@7ee7e2fd` | argument | 20 | or min(len(seq), len(ref)) < max(20, SAME_LENGTH * max(len(seq), len(ref))) | unknown | line last changed by 2a8ae8e C30 (random-100 fix round 1): a peptide is not a copy of its receptor; chains that pair are one object (3OWW) (git blame; evidence only) | assembly | - |
-| `io:read_model:argument:1e-3@bc170007` | argument | 1e-3 | if name not in claimed and len(o) == len(xyz) and np.allclose(o, xyz, atol=1e-3): | unknown | - | app_scope, assembly, datafile, hbonds +11 | - |
+| `io:read_model:argument:1e-3@bc170007` | argument | 1e-3 | if name not in claimed and len(o) == len(xyz) and np.allclose(o, xyz, atol=1e-3): | unknown | - | app_scope, assembly, datafile, hbonds +12 | - |
 | `io:load_backbone:argument:4@3fcf5457` | argument | 4 | return Backbone([], np.zeros((0, 4, 3)), np.zeros(0, bool), set(), np.zeros(0)) # drawn on its own | convention | an array's shape | 310, align, assembly, datafile +26 | - |
 | `io:load_backbone:argument:3@3fcf5457` | argument | 3 | return Backbone([], np.zeros((0, 4, 3)), np.zeros(0, bool), set(), np.zeros(0)) # drawn on its own | convention | an array's shape | 310, align, assembly, datafile +26 | - |
 | `io:load_nucleic:argument:5@0a63058f` | argument | 5 | ns = gemmi.NeighborSearch(model, st.cell, 5).populate() | unknown | - | assembly, datafile, independent_kernels, na_pairs +4 | - |
@@ -1103,6 +1103,7 @@ Of the 43 named-entry rows, 32 rest on the comment at the item and 11 on git (ev
 | `na_ends:_routed_end:comparison:0.9@e59df786` | comparison | 0.9 | if min(math.dist(p, q) for k, p in enumerate(marks) for q in marks[k + 1 :]) < 0.9 * NT_STEP: | unknown | - | na_layout | - |
 | `na_ends:_label_room:argument:0.05@e6b2a12c` | argument | 0.05 | return not any(_near(xy, e, hh + 0.05) for e in parts) | unknown | - | na_metrics | - |
 | `na_ends:_side_start:argument:6@4f83f474` | argument | 6 | found.append((round(d, 6), c)) | convention | rounding digits | - | - |
+| `na_ends:_gap:argument:1e-9@36a76709` | argument | 1e-9 | chord = chord / max(float(np.hypot(*chord)), 1e-9) | convention | a floating-point tolerance | na_layout, na_metrics | - |
 | `na_ends:_tail:fallback-marker` | fallback-marker | 2 | drawn so far (`strands`); else it is drawn straight, a fallback. A drawing that keeps out of its partner's | unknown | a free end drawn straight: counted as na_tail_straight (route_na.route_nucleic, over the paths as drawn) | na_layout | - |
 | `na_ends:off_unheld:fallback-marker` | fallback-marker | 1 | fallback). Run once the elements are placed (layout.layout): random-100 held-out 13FZ's RNA B, held by its sheet at | named-entry:13FZ | a trace nucleotide no nudge clears stays: counted as na_trace_unclear | na_text_keepoff | - |
 | `na_ends:_gap:fallback-marker` | fallback-marker | 4 | fallback = route is None | unknown | counted as na_gap_unclear | na_layout, na_metrics | - |
@@ -1226,11 +1227,11 @@ Of the 43 named-entry rows, 32 rest on the comment at the item and 11 on git (ev
 | `nacheck:_ss_contacts_nearer:argument:3@48960175` | argument | 3 | return round(sum(nearer) / len(nearer), 3) | convention | rounding digits | - | - |
 | `nacheck:_box_hits:comparison:1e-9@9895dca8` | comparison | 1e-9 | return any(clip_len(s[:2], s[2:], box) > 1e-9 for s in seg) | convention | a floating-point tolerance | - | - |
 | `nacheck:_whole:argument:1e-9@1125114d` | argument | 1e-9 | return ("curve", n, int(((d.s0 + d.s1) / 2) // max(_FAR * d.band, 1e-9))) | convention | a floating-point tolerance | - | - |
-| `nacheck:render_checks:argument:4@4ced30c9` | argument | 4 | ink = np.array([e.extents for e in letters], float).reshape(-1, 4) | convention | an array's shape | na_layout, na_validation, perf | - |
-| `nacheck:render_checks:comparison:3@e64f5bc1` | comparison | 3 | if w > 0 and h > 0 and w * h > min(a.width * a.height, b.width * b.height) / 3: | unknown | - | na_layout, na_validation, perf | - |
-| `nacheck:render_checks:comparison:1e-6@1561dea6` | comparison | 1e-6 | bead_overlaps += int(np.count_nonzero(np.hypot(d[:, 0], d[:, 1]) < size[i] + size[i + 1 :] - 1e-6)) | convention | a floating-point tolerance | na_layout, na_validation, perf | - |
+| `nacheck:render_checks:argument:4@4ced30c9` | argument | 4 | ink = np.array([e.extents for e in letters], float).reshape(-1, 4) | convention | an array's shape | na_layout, na_routing, na_validation, perf | - |
+| `nacheck:render_checks:comparison:3@e64f5bc1` | comparison | 3 | if w > 0 and h > 0 and w * h > min(a.width * a.height, b.width * b.height) / 3: | unknown | - | na_layout, na_routing, na_validation, perf | - |
+| `nacheck:render_checks:comparison:1e-6@1561dea6` | comparison | 1e-6 | bead_overlaps += int(np.count_nonzero(np.hypot(d[:, 0], d[:, 1]) < size[i] + size[i + 1 :] - 1e-6)) | convention | a floating-point tolerance | na_layout, na_routing, na_validation, perf | - |
 | `nacheck:<module>:fallback-marker` | fallback-marker | 1 | "fallbacks": 0, # strand or loop routes that fell back to a curve | unknown | not a fallback: the check counting the loop and nucleic-acid fallbacks (nacheck fallbacks) | - | - |
-| `nacheck:render_checks:fallback-marker` | fallback-marker | 1 | "fallbacks": sum(p.fallback for p in lay.na_paths) + sum(l.fallback for l in loops), | unknown | not a fallback: the check counting the loop and nucleic-acid fallbacks (nacheck fallbacks) | na_layout, na_validation, perf | - |
+| `nacheck:render_checks:fallback-marker` | fallback-marker | 1 | "fallbacks": sum(p.fallback for p in lay.na_paths) + sum(l.fallback for l in loops), | unknown | not a fallback: the check counting the loop and nucleic-acid fallbacks (nacheck fallbacks) | na_layout, na_routing, na_validation, perf | - |
 
 ## names
 
@@ -1778,9 +1779,9 @@ Of the 43 named-entry rows, 32 rest on the comment at the item and 11 on git (ev
 | `route:_pull_turns.keeps:comparison:1e-9@bf6d1401` | comparison | 1e-9 | return all((y - port[1]) * e[1] >= r - 1e-9 for port, e, r in ((pa, ea, reach[0]), (pb, eb, reach[1]))) | convention | a floating-point tolerance | app, browser, copies, datafile +22 | - |
 | `route:_Router._joined:argument:16@94b3a97e` | argument | 16 | key = blake2b(np.packbits(free).tobytes(), digest_size=16).digest() | unknown | - | route | - |
 | `route:_Router.second:fallback:route_second_search_refused` | fallback | route_second_search_refused | fallback.note("route_second_search_refused", int(self.wide_nodes > max_nodes)) | named-entry:7QUP | _MAX_NODES_PAGE: "once spent, a search that runs out of _MAX_NODES falls back as before (fix round 1: 7QUP's focus view took 158 s of its 180)" | - | random-100 reports second_searches_refused (not gated) |
-| `route:_Router.drawn:comparison:1e-9@e06060ef` | comparison | 1e-9 | into = lambda p, e: abs(e[0]) < 1e-9 and e[1] * wall.side * wall.up < 0 # noqa: E731 - into the wall | convention | a floating-point tolerance | 310, app, browser, cli +36 | - |
-| `route:_Router.drawn:argument:1e-6@9f109e39` | argument | 1e-6 | and _clear(pulled, (own_a, own_b), *self.elements, grow=min(reach) - 1e-6, **kw) | convention | a floating-point tolerance | 310, app, browser, cli +36 | - |
-| `route:_Router.drawn:argument:1e-6@a3e6346a` | argument | 1e-6 | pts, (own_a, own_b), *self.elements, grow=_INFLATE - 1e-6, under=under, exempt=exempt | convention | a floating-point tolerance | 310, app, browser, cli +36 | - |
+| `route:_Router.drawn:comparison:1e-9@e06060ef` | comparison | 1e-9 | into = lambda p, e: abs(e[0]) < 1e-9 and e[1] * wall.side * wall.up < 0 # noqa: E731 - into the wall | convention | a floating-point tolerance | 310, app, browser, cli +37 | - |
+| `route:_Router.drawn:argument:1e-6@9f109e39` | argument | 1e-6 | and _clear(pulled, (own_a, own_b), *self.elements, grow=min(reach) - 1e-6, **kw) | convention | a floating-point tolerance | 310, app, browser, cli +37 | - |
+| `route:_Router.drawn:argument:1e-6@a3e6346a` | argument | 1e-6 | pts, (own_a, own_b), *self.elements, grow=_INFLATE - 1e-6, under=under, exempt=exempt | convention | a floating-point tolerance | 310, app, browser, cli +37 | - |
 | `route:_Router.drawn:fallback:route_unsnapped` | fallback | route_unsnapped | fallback.note("route_unsnapped") | unknown | _TOUCH: "A drawing that still breaches it is redrawn unsnapped, then becomes the flagged fallback" | - | none |
 | `route:_clear_helix_names:fallback:helix_name_moved` | fallback | helix_name_moved | fallback.note("helix_name_moved", moved) | named-entry:6MHS,7SMR,8UUP,1KX5 | git: 803038c's message: "route._clear_helix_names, after routing, puts a name that a line strikes ... (6MHS B:275-283)" | inventory | - |
 | `route:_clear_termini:argument:0.05@8c1a698f` | argument | 0.05 | half = (max(gw / 2 + 0.05, em * _text_width(end) / 2), max(gh / 2, em * 0.4)) | unknown | line last changed by ce76192 A chain end's N or C letter that a line runs through turns round its stub's tip, or stands further out, to th… (git blame; evidence only) | na_text_keepoff, route | - |
@@ -1789,9 +1790,9 @@ Of the 43 named-entry rows, 32 rest on the comment at the item and 11 on git (ev
 | `route:_walled_fallback.leg:comparison:1e-6@fd25fb47` | comparison | 1e-6 | if abs(out[0]) < 1e-6 and out[1] * (to_y - port[1]) < 0: | convention | a floating-point tolerance | - | - |
 | `route:_walled_fallback:fallback:loop_wall_unkept` | fallback | loop_wall_unkept | fallback.note("loop_wall_unkept") | unknown | cites ruling P35 (plan 27 Task 5) | - | a WARNING log; A3 and A18 (gated) |
 | `route:_runs:comparison:1e-9@baed2711` | comparison | 1e-9 | if abs(cross) > 1e-9 or on < 0 or b == a: | convention | a floating-point tolerance | - | - |
-| `route:route_loops:argument:4@27d70797` | argument | 4 | rects = np.hstack([elements[0], np.array([r for _, r in keep_out], float).reshape(-1, 4).T]) | convention | an array's shape | 310, cli, domains, focus +24 | - |
-| `route:route_loops:comparison:1.5@b669155f` | comparison | 1.5 | if kinked and np.hypot(*gap) < 1.5 and gap @ pa.exit_c > 0: | unknown | line last changed by 63274b1 A copy's elements are grouped as its mate's where DSSP grouped them otherwise (C2b-3, A15: 9P1X, 7QUP, 6JLN) (git blame; evidence only) | 310, cli, domains, focus +24 | - |
-| `route:route_loops:comparison:1e-9@c1d86acf` | comparison | 1e-9 | if pts is None and grid.res > RES + 1e-9: # a page so large its grid is coarse: a fine grid round the ports | convention | a floating-point tolerance | 310, cli, domains, focus +24 | - |
+| `route:route_loops:argument:4@27d70797` | argument | 4 | rects = np.hstack([elements[0], np.array([r for _, r in keep_out], float).reshape(-1, 4).T]) | convention | an array's shape | 310, cli, domains, focus +25 | - |
+| `route:route_loops:comparison:1.5@b669155f` | comparison | 1.5 | if kinked and np.hypot(*gap) < 1.5 and gap @ pa.exit_c > 0: | unknown | line last changed by 63274b1 A copy's elements are grouped as its mate's where DSSP grouped them otherwise (C2b-3, A15: 9P1X, 7QUP, 6JLN) (git blame; evidence only) | 310, cli, domains, focus +25 | - |
+| `route:route_loops:comparison:1e-9@c1d86acf` | comparison | 1e-9 | if pts is None and grid.res > RES + 1e-9: # a page so large its grid is coarse: a fine grid round the ports | convention | a floating-point tolerance | 310, cli, domains, focus +25 | - |
 | `route:route_loops:fallback:loop_curve` | fallback | loop_curve | fallback.note("loop_curve", sum(lp.fallback for lp in out)) # the loops as drawn (A3, the notes) | unknown | - | inventory, sensitivity | A3 "no route fallbacks" (gated); notes: loops_unrouted |
 | `route:route_loops:fallback:loop_over_text` | fallback | loop_over_text | fallback.note("loop_over_text", sum(lp.crosses_labels for lp in out)) # ... (A4, the notes) | unknown | - | - | A4 "no loop over a label" (gated); notes: loops_over_text |
 | `route:_in_box:argument:0.05@a4d098f3` | argument | 0.05 | n = max(1, int(math.dist(p, q) / 0.05)) | unknown | - | - | - |
@@ -1817,7 +1818,7 @@ Of the 43 named-entry rows, 32 rest on the comment at the item and 11 on git (ev
 | `route:_turned_over:fallback-marker` | fallback-marker | 1 | lp.crosses_labels = not lp.fallback and bool(len(segs)) and bool(lines_meeting(boxes, segs, band).any()) | unknown | not a fallback: a fallback loop is never flagged over labels | - | - |
 | `route:_walled_fallback:fallback-marker` | fallback-marker | 6 | def _walled_fallback(layout: Layout, wall: _Wall, pa: Placed, pb: Placed, curve) -> list: | unknown | holds loop_wall_detour and loop_wall_unkept (ruling P35) | route | - |
 | `route:_walled_fallback.edge:fallback-marker` | fallback-marker | 1 | return y1 + _FALLBACK_OUT if y >= sum(nearest_band(wall.bands, y)) / 2 else y0 - _FALLBACK_OUT | unknown | part of loop_wall_detour | - | - |
-| `route:route_loops:fallback-marker` | fallback-marker | 5 | routed: dict[tuple[str, str], tuple[list, bool, bool]] = {} # points, fallback curve, over labels | unknown | holds loop_curve and loop_over_text | 310, cli, domains, focus +24 | - |
+| `route:route_loops:fallback-marker` | fallback-marker | 5 | routed: dict[tuple[str, str], tuple[list, bool, bool]] = {} # points, fallback curve, over labels | unknown | holds loop_curve and loop_over_text | 310, cli, domains, focus +25 | - |
 | `route:_apart_in_stack_gaps:fallback-marker` | fallback-marker | 1 | if len(ends) < 2 or loops[ends["lower"]].fallback or loops[ends["upper"]].fallback: | unknown | not a fallback: leaves fallback loops as they are | route | - |
 | `route:_off_na_text:fallback-marker` | fallback-marker | 2 | when it crosses less of it (random-100 C11: 6SO9's RRM loops ran over the bound RNA's letters). Fallback | unknown | not a fallback: reroutes loops that are no fallback | heldout_copies, na_text_keepoff | - |
 
