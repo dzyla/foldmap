@@ -1,7 +1,8 @@
 """Independent kernels (plan 28 Task 7, review 3.8): small implementations written here from the published
 definitions, not from foldmap's code, compared with what foldmap computes on committed fixtures. A disagreement is a
-finding (task-7-report.md); each is pinned with xfail(strict) naming it, and the agreement measured is asserted not
-to fall.
+finding, recorded in docs/validation/metamorphic/report.md (scripts/metamorphic_record.py); each is pinned with
+xfail(strict) naming it, the disagreements themselves are pinned exactly (FINDINGS), and the agreement measured is
+asserted not to fall.
 
 - H-bond energy: Kabsch & Sander (1983) Biopolymers 22:2577, the electrostatic model of the backbone H-bond,
   E = q1 q2 (1/r(ON) + 1/r(CH) - 1/r(OH) - 1/r(CN)) f, q1 = 0.42 e, q2 = 0.20 e, f = 332 (E in kcal/mol, r in Å),
@@ -194,6 +195,7 @@ def _xyz(res, name):
     return None if a is None else np.array(a.pos.tolist())
 
 
+@functools.cache
 def nucleotides(path) -> dict[str, Nt]:
     """The standard nucleotides of the deposited model 1 with a C1' and the N bonded to it, by key."""
     st = gemmi.read_structure(str(path))
@@ -251,19 +253,23 @@ def failed(m: dict) -> list[str]:
     return out
 
 
+@functools.cache
 def canonical_pairs(path) -> dict[frozenset, str]:
-    """Canonical pairs of the deposited model 1: {frozenset of the two keys: "WC" or "GU"}."""
+    """Canonical pairs of the deposited model 1: {frozenset of the two keys: "WC" or "GU"}. The candidates are the
+    nucleotide pairs whose C1' atoms lie within C1_RANGE's upper end (a k-d tree: a distance prefilter only)."""
+    from scipy.spatial import cKDTree
+
     nts = list(nucleotides(path).values())
     out = {}
-    for x, a in enumerate(nts):
-        for b in nts[x + 1 :]:
-            if a.chain == b.chain and abs(a.k - b.k) <= HAIRPIN_MIN:
-                continue
-            if float(np.linalg.norm(b.c1 - a.c1)) > C1_RANGE[1]:
-                continue
-            m = measure(a, b)
-            if m is not None and not failed(m):
-                out[frozenset((a.key, b.key))] = m["kind"]
+    if len(nts) < 2:
+        return out
+    for x, y in sorted(cKDTree(np.array([n.c1 for n in nts])).query_pairs(C1_RANGE[1])):
+        a, b = nts[x], nts[y]
+        if a.chain == b.chain and abs(a.k - b.k) <= HAIRPIN_MIN:
+            continue
+        m = measure(a, b)
+        if m is not None and not failed(m):
+            out[frozenset((a.key, b.key))] = m["kind"]
     return out
 
 
@@ -277,6 +283,7 @@ def plane_angle(a: Nt, b: Nt) -> float:
     return float(np.degrees(np.arccos(min(1.0, abs(float(normal(a.res) @ normal(b.res)))))))
 
 
+@functools.cache
 def foldmap_pairs(path) -> dict[frozenset, str]:
     bb = load_backbone(path, "asu")
     na = load_nucleic(path, bb, "asu")
@@ -378,7 +385,7 @@ def _disagreements(name: str) -> dict[str, list[str]]:
 
 def test_base_pairs_agree_with_the_kernel():
     """Over every nucleic-acid fixture (and 1LMB's operator DNA): 820 pairs both call, 54 only foldmap, 5 only the
-    kernel (task-7-report.md); held at no less than 0.92 of the union."""
+    kernel (docs/validation/metamorphic/report.md); held at no less than 0.92 of the union."""
     both = union = 0
     for name in NA_FIXTURES:
         ours, theirs = foldmap_pairs(NA / name).keys(), canonical_pairs(NA / name).keys()
@@ -402,16 +409,58 @@ def _any(why: str) -> list[str]:
     return [f"{name}: {p}" for name in NA_FIXTURES for p in _disagreements(name).get(why, [])]
 
 
-@pytest.mark.xfail(strict=True, reason=F2)
+# The disagreements exactly as recorded (docs/validation/metamorphic/report.md): F2 by fixture (count), F3, F4, the
+# glycosidic angle (with F2) and the modified nucleotides by pair. A new one, or one gone, fails
+# test_the_findings_are_exactly_these, not only the xfails below.
+FINDINGS = {
+    "hbond": {"1AOI.cif.gz": 16, "1HYS.cif.gz": 2, "1KX5.cif.gz": 8, "1URN.cif.gz": 1, "3CRX.cif.gz": 9,
+              "4OO8.cif.gz": 1, "4YBB.cif.gz": 7},
+    "c1": ["1AOI.cif.gz: I:11/J:282", "1AOI.cif.gz: I:28/J:265", "1HYS.cif.gz: E:867/F:887", "4LD0.cif.gz: D:12/F:22",
+           "4YBB.cif.gz: AA:112/AA:330", "4YBB.cif.gz: AA:582/AA:760"],
+    "plane": ["1IHF.cif.gz: C:-37/E:37", "4YBB.cif.gz: AA:456/AA:476", "4YBB.cif.gz: AA:457/AA:475",
+              "4YBB.cif.gz: AA:80/AA:89", "4YBB.cif.gz: AA:82/AA:87"],
+    "lambda": ["1AOI.cif.gz: I:25/J:268"],
+    "modified": ["1EHZ.cif.gz: A:10/A:25", "1EHZ.cif.gz: A:30/A:40", "1EHZ.cif.gz: A:49/A:65", "2OEU.cif.gz: A:1/B:20",
+                 "2OEU.cif.gz: A:10/B:11", "4YBB-psi.cif.gz: DA:2590/DA:2604", "4YBB.cif.gz: AA:522/AA:527"],
+}  # fmt: skip
+
+
+def test_the_findings_are_exactly_these():
+    by_fixture = {name: len(_disagreements(name).get("hbond", [])) for name in NA_FIXTURES}
+    assert {k: v for k, v in by_fixture.items() if v} == FINDINGS["hbond"]
+    assert sum(FINDINGS["hbond"].values()) == 44
+    for why in ("c1", "plane", "lambda", "modified"):
+        assert sorted(_any(why)) == sorted(FINDINGS[why]), why
+
+
+def f2_pairs(name: str) -> list[str]:
+    """F2's pairs on one fixture ("CHAIN:NUMBER/CHAIN:NUMBER")."""
+    return list(_disagreements(name).get("hbond", []))
+
+
+@pytest.mark.xfail(strict=True, raises=AssertionError, reason=F2)
 def test_foldmap_pairs_hold_their_hbonds_within_3_5():
     assert not _any("hbond")
 
 
-@pytest.mark.xfail(strict=True, reason=F3)
+@pytest.mark.xfail(strict=True, raises=AssertionError, reason=F3)
 def test_foldmap_pairs_span_the_kernels_c1_window():
     assert not _any("c1")
 
 
-@pytest.mark.xfail(strict=True, reason=F4)
+@pytest.mark.xfail(strict=True, raises=AssertionError, reason=F4)
 def test_foldmap_finds_every_kernel_pair():
     assert not _any("plane")
+
+
+RECORD = Path(__file__).resolve().parents[1] / "docs" / "validation" / "metamorphic" / "report.json"
+
+
+@pytest.mark.skipif(not RECORD.is_file(), reason="the metamorphic record is not part of the sdist")
+def test_the_record_names_these_findings():
+    """The committed record (scripts/metamorphic_record.py) holds the disagreements the kernels find now."""
+    import json
+
+    record = json.loads(RECORD.read_text(encoding="utf-8"))["base_pairs"]["disagreements"]
+    for why in ("hbond", "c1", "plane", "lambda", "modified"):
+        assert sorted(record.get(why, [])) == sorted(_any(why)), why

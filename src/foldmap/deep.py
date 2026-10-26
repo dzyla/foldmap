@@ -52,6 +52,7 @@ LIKE = "like"
 LIKE_KIND = "drawn like a reference (H1-H5): the figure against the reference's figure and its own drawn alone"
 MKDSSP_VERSION = "mkdssp version 3.1.2"
 TIMEOUT = 600  # s for an external program
+_TEXT = {"capture_output": True, "encoding": "utf-8", "errors": "replace"}  # a tool's output never stops the check
 
 # RNApolis' canonical and wobble pairs of a file, run in the Python that has it (scripts/na_validate.py's reference)
 _RNAPOLIS = """
@@ -163,11 +164,12 @@ def mkdssp_rows(path, exe: str | None = None) -> list[tuple[str, int, str, str]]
     if not exe:
         return "MKDSSP is not set (the path of mkdssp 3.1.2)"
     try:
-        done = subprocess.run([exe, "--version"], capture_output=True, text=True, timeout=60)
+        done = subprocess.run([exe, "--version"], timeout=60, **_TEXT)
     except (OSError, subprocess.SubprocessError) as err:
         return f"cannot run mkdssp ({exe}): {err}"
-    if MKDSSP_VERSION not in done.stdout:
-        return f"mkdssp 3.1.2 is required (found: {done.stdout.strip()[:60] or 'no version output'})"
+    said = f"{done.stdout}\n{done.stderr}"  # some builds print their version to stderr
+    if MKDSSP_VERSION not in said:
+        return f"mkdssp 3.1.2 is required (found: {said.strip()[:60] or 'no version output'})"
     with tempfile.TemporaryDirectory() as tmp:
         src = Path(path)
         if src.suffix == ".gz":
@@ -176,7 +178,7 @@ def mkdssp_rows(path, exe: str | None = None) -> list[tuple[str, int, str, str]]
             src = plain
         out = Path(tmp) / "out.dssp"
         try:
-            done = subprocess.run([exe, str(src), str(out)], capture_output=True, text=True, timeout=TIMEOUT)
+            done = subprocess.run([exe, str(src), str(out)], timeout=TIMEOUT, **_TEXT)
         except subprocess.TimeoutExpired:
             return f"mkdssp took longer than {TIMEOUT} s"
         if done.returncode or not out.is_file():
@@ -211,12 +213,12 @@ def rnapolis_pairs(path, python: str | None = None) -> set[frozenset] | str:
     if not python:
         return "NA_RNAPOLIS_PYTHON is not set (the Python of an environment with rnapolis)"
     try:
-        done = subprocess.run(
-            [python, "-I", "-c", _RNAPOLIS, str(path)], capture_output=True, text=True, timeout=TIMEOUT
-        )
+        done = subprocess.run([python, "-I", "-c", _RNAPOLIS, str(path)], timeout=TIMEOUT, **_TEXT)
     except (OSError, subprocess.SubprocessError) as err:
         return f"cannot run RNApolis ({python}): {err}"
     if done.returncode:
+        if "No module named 'rnapolis" in done.stderr:
+            return f"rnapolis is not installed in {python}"
         tail = (done.stderr.strip().splitlines() or ["failed"])[-1]
         return f"RNApolis could not read it: {tail[:160]}"
     try:

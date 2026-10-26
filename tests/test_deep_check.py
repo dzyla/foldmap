@@ -172,7 +172,7 @@ def test_rnapolis_unavailable_says_why(no_tools):
     got = deep.rnapolis_pairs(TRNA, sys.executable)
     if not isinstance(got, str):
         pytest.skip("this Python has rnapolis")
-    assert got.startswith("RNApolis could not read it")
+    assert got == f"rnapolis is not installed in {sys.executable}"
 
 
 @pytest.mark.skipif(not os.environ.get("MKDSSP"), reason="MKDSSP not set (mkdssp 3.1.2): D2 unavailable here")
@@ -192,3 +192,40 @@ def test_d3_with_rnapolis(tmp_path):
     gemmi.read_structure(str(TRNA)).write_pdb(str(pdb))
     got = deep.pairs_check(pdb)
     assert got["status"] == deep.PASS, got
+
+
+def test_json_into_a_missing_directory_is_a_usage_error(capsys, tmp_path):
+    assert main(["check", str(UBQ), "--json", str(tmp_path / "no-such-dir" / "report.json")]) == 2
+    assert "no directory" in capsys.readouterr().err
+
+
+def _rnapolis_key(text: str) -> tuple[str, int, str]:
+    import re
+
+    chain, rest = text.split(":")
+    number, icode = re.fullmatch(r"(-?\d+)([A-Za-z]?)", rest).groups()
+    return chain, int(number), icode
+
+
+@pytest.mark.skipif(not os.environ.get("NA_RNAPOLIS_PYTHON"), reason="NA_RNAPOLIS_PYTHON not set: D3 unavailable")
+@pytest.mark.parametrize(
+    ("name", "outside", "agreement"), [("1AOI", {"I:28/J:265"}, (139, 140)), ("1KX5", set(), (146, 146))]
+)
+def test_f2_pairs_are_rnapolis_pairs(tmp_path, name, outside, agreement):
+    """F2's reading (docs/validation/metamorphic/report.md): the pairs foldmap calls with an H-bond past the kernel's
+    3.5 Å are, but for `outside` (1AOI's I:28/J:265, also past the kernel's C1'-C1' window: F3), pairs RNApolis calls
+    too; and RNApolis calls `agreement` (both, of foldmap's) of foldmap's pairs. On PDB copies (RNApolis stops on the
+    trimmed mmCIF fixtures). Run where RNApolis is set up (zyla-office), skipped in CI."""
+    import gemmi
+
+    from test_independent_kernels import f2_pairs
+
+    pdb = tmp_path / f"{name}.pdb"
+    gemmi.read_structure(str(DATA / "na" / f"{name}.cif.gz")).write_pdb(str(pdb))
+    theirs = deep.rnapolis_pairs(pdb)
+    assert isinstance(theirs, set), theirs
+    pairs = f2_pairs(f"{name}.cif.gz")
+    assert pairs
+    assert {p for p in pairs if frozenset(map(_rnapolis_key, p.split("/"))) not in theirs} == outside
+    got = deep.pairs_check(pdb)
+    assert (got["both"], got["pairs"]) == agreement, got

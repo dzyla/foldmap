@@ -377,7 +377,7 @@ Of the 43 named-entry rows, 32 rest on the comment at the item and 11 on git (ev
 | `deep:VERSION` | constant | 1 | VERSION = 1 | convention | the check report schema version (deep.py docstring) | deep_check | - |
 | `deep:TIMEOUT` | constant | 600 | TIMEOUT = 600 # s for an external program | convention | a time limit for mkdssp or RNApolis on one file, as random100.mkdssp_rows and na_validate use | - | - |
 | `deep:parse_dssp:comparison:17@1840e38e` | comparison | 17 | if not started or len(line) < 17 or line[13] == "!": | convention | the DSSP file format: the secondary-structure code is column 17 | deep_check | - |
-| `deep:mkdssp_rows:argument:60@6360e5a9` | argument | 60 | done = subprocess.run([exe, "--version"], capture_output=True, text=True, timeout=60) | convention | a time limit for `mkdssp --version` | deep_check | - |
+| `deep:mkdssp_rows:argument:60@02f70620` | argument | 60 | done = subprocess.run([exe, "--version"], timeout=60, **_TEXT) | convention | a time limit for `mkdssp --version` | deep_check | - |
 | `deep:pairs_check:argument:4@f10d1b07` | argument | 4 | "precision": round(precision, 4), | convention | rounding digits | deep_check | - |
 | `deep:pairs_check:argument:4@7adbda5e` | argument | 4 | "recall": round(recall, 4), | convention | rounding digits | deep_check | - |
 | `deep:pairs_check:argument:4@d0160d6a` | argument | 4 | "f1": round(f1, 4), | convention | rounding digits | deep_check | - |

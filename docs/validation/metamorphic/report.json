@@ -1,0 +1,661 @@
+{
+ "source_stamp": {
+  "foldmap": "0.1.0",
+  "code_fingerprint": "72fb15138b17e48a",
+  "package": "checkout",
+  "checkout_fingerprint": "72fb15138b17e48a",
+  "installed_matches_checkout": true,
+  "git": {
+   "commit": "be8224abb86a75d7b129197619709fd9a6c5386c",
+   "dirty": true,
+   "source": "asserted by runner"
+  },
+  "script": {
+   "name": "scripts/metamorphic_record.py",
+   "sha256": "666c5be1bb4737fea6800ef032c9737e7946bb3d2d6606d8d419e822cab0f396"
+  },
+  "python": {
+   "version": "3.13.13",
+   "implementation": "CPython"
+  },
+  "platform": {
+   "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.43",
+   "machine": "x86_64"
+  },
+  "packages": {
+   "gemmi": "0.7.5",
+   "numpy": "2.5.4",
+   "scipy": "1.18.1",
+   "networkx": "3.7",
+   "matplotlib": "3.11.2",
+   "PyYAML": "6.0.3"
+  }
+ },
+ "findings": {
+  "F1": "Chain names choose protomer 0: symmetry._orbits walks the chains in name order (symmetry.py:234), symmetry._protomers sorts the orbits by their first chain's name (symmetry.py:255) and breaks its ties by name (symmetry.py:259); protomer 0 is drawn on the left (cli._dyad_frame, cli.py:359) or is the copy the others mirror (cli._mirror_frame, cli.py:257). A renaming that reverses the chains' name order moves the figure of an assembly of several deposited chains; its structure facts and check verdicts stay equal.",
+  "F2": "Base-pair H-bond window: foldmap calls a canonical pair whose Watson-Crick-edge H-bonds reach 3.8 \u00c5 (nucleic.HBOND_MAX, nucleic.py:16, applied at :147), one stretched to 4.0 \u00c5 (HBOND_STRETCH, :17, applied at :149); the kernel holds two of them to 3.5 \u00c5.",
+  "F3": "C1'-C1' window: foldmap accepts 9.0-12.0 \u00c5 (nucleic.C1_PAIR, nucleic.py:18, applied at :127 and :131); the kernel 9.5-11.5 \u00c5.",
+  "F4": "Planarity: foldmap drops a pair whose base planes are more than 45 degrees apart (nucleic.PLANE_MAX, nucleic.py:19, applied at :156); the kernel has no planarity bound."
+ },
+ "na_fixtures": [
+  "1AOI.cif.gz",
+  "1ATP.cif.gz",
+  "1EHZ.cif.gz",
+  "1EYG.cif.gz",
+  "1HYS.cif.gz",
+  "1IHF.cif.gz",
+  "1KX5.cif.gz",
+  "1QBJ.cif.gz",
+  "1RVA.cif.gz",
+  "1URN.cif.gz",
+  "2GIS.cif.gz",
+  "2OEU.cif.gz",
+  "30QM.cif.gz",
+  "3CRX.cif.gz",
+  "4LD0.cif.gz",
+  "4OO8.cif.gz",
+  "4YBB-psi.cif.gz",
+  "4YBB.cif.gz",
+  "../1LMB.cif"
+ ],
+ "transforms": {
+  "1UBQ.cif": {
+   "motion": {
+    "gap": 0.0,
+    "facts_equal": true,
+    "verdicts_equal": true
+   },
+   "rename": {
+    "gap": 0.0,
+    "facts_equal": true,
+    "verdicts_equal": true
+   },
+   "shuffle": {
+    "gap": 0.0,
+    "facts_equal": true,
+    "verdicts_equal": true
+   },
+   "pdb": {
+    "gap": 0.0,
+    "facts_equal": true,
+    "verdicts_equal": true
+   },
+   "turn": {
+    "gap": 0.0,
+    "facts_equal": true,
+    "verdicts_equal": true
+   }
+  },
+  "1TIM.cif": {
+   "motion": {
+    "gap": 0.0,
+    "facts_equal": true,
+    "verdicts_equal": true
+   },
+   "rename": {
+    "gap": 0.0,
+    "facts_equal": true,
+    "verdicts_equal": true
+   },
+   "shuffle": {
+    "gap": 0.0,
+    "facts_equal": true,
+    "verdicts_equal": true
+   },
+   "pdb": {
+    "gap": 0.0,
+    "facts_equal": true,
+    "verdicts_equal": true
+   },
+   "turn": {
+    "gap": 0.0,
+    "facts_equal": true,
+    "verdicts_equal": true
+   },
+   "reverse": {
+    "gap": 29.053073586204498,
+    "facts_equal": true,
+    "verdicts_equal": true
+   }
+  },
+  "1C3W.cif": {
+   "motion": {
+    "gap": 0.0,
+    "facts_equal": true,
+    "verdicts_equal": true
+   },
+   "rename": {
+    "gap": 0.0,
+    "facts_equal": true,
+    "verdicts_equal": true
+   },
+   "shuffle": {
+    "gap": 0.0,
+    "facts_equal": true,
+    "verdicts_equal": true
+   },
+   "pdb": {
+    "gap": 0.00235752713311399,
+    "facts_equal": true,
+    "verdicts_equal": true
+   },
+   "turn": {
+    "gap": 0.0,
+    "facts_equal": true,
+    "verdicts_equal": true
+   }
+  },
+  "1LMB.cif": {
+   "motion": {
+    "gap": 0.0,
+    "facts_equal": true,
+    "verdicts_equal": true
+   },
+   "rename": {
+    "gap": 0.0,
+    "facts_equal": true,
+    "verdicts_equal": true
+   },
+   "shuffle": {
+    "gap": 0.0,
+    "facts_equal": true,
+    "verdicts_equal": true
+   },
+   "pdb": {
+    "gap": 0.0,
+    "facts_equal": true,
+    "verdicts_equal": true
+   },
+   "turn": {
+    "gap": 0.0,
+    "facts_equal": true,
+    "verdicts_equal": true
+   },
+   "reverse": {
+    "gap": 0.7500005961374008,
+    "facts_equal": true,
+    "verdicts_equal": true
+   }
+  },
+  "na/1EHZ.cif.gz": {
+   "motion": {
+    "gap": 0.0,
+    "facts_equal": true,
+    "verdicts_equal": true
+   },
+   "rename": {
+    "gap": 0.0,
+    "facts_equal": true,
+    "verdicts_equal": true
+   },
+   "shuffle": {
+    "gap": 0.0,
+    "facts_equal": true,
+    "verdicts_equal": true
+   },
+   "pdb": {
+    "gap": 0.0,
+    "facts_equal": true,
+    "verdicts_equal": true
+   },
+   "turn": {
+    "gap": 0.0005735802273472146,
+    "facts_equal": true,
+    "verdicts_equal": true
+   }
+  },
+  "1BL8.cif": {
+   "reverse": {
+    "gap": 15.797999646437404,
+    "facts_equal": true,
+    "verdicts_equal": true
+   }
+  }
+ },
+ "noise": {
+  "1UBQ.cif": {
+   "0.05": {
+    "bridges": 0.0,
+    "ss": 0.0132,
+    "bridges_n": 16,
+    "base_pairs_n": 0
+   },
+   "0.1": {
+    "bridges": 0.0303,
+    "ss": 0.0263,
+    "bridges_n": 16,
+    "base_pairs_n": 0
+   }
+  },
+  "1TIM.cif": {
+   "0.05": {
+    "bridges": 0.0161,
+    "ss": 0.0182,
+    "bridges_n": 61,
+    "base_pairs_n": 0
+   },
+   "0.1": {
+    "bridges": 0.0339,
+    "ss": 0.0445,
+    "bridges_n": 61,
+    "base_pairs_n": 0
+   }
+  },
+  "1C3W.cif": {
+   "0.05": {
+    "bridges": 0.0909,
+    "ss": 0.009,
+    "tm_residues": 0.0,
+    "bridges_n": 6,
+    "base_pairs_n": 0
+   },
+   "0.1": {
+    "bridges": 0.0909,
+    "ss": 0.018,
+    "tm_residues": 0.006,
+    "bridges_n": 6,
+    "base_pairs_n": 0
+   }
+  },
+  "1LMB.cif": {
+   "0.05": {
+    "bridges": 0.0,
+    "ss": 0.0335,
+    "base_pairs": 0.0,
+    "bridges_n": 0,
+    "base_pairs_n": 19
+   },
+   "0.1": {
+    "bridges": 0.0,
+    "ss": 0.0447,
+    "base_pairs": 0.0,
+    "bridges_n": 0,
+    "base_pairs_n": 19
+   }
+  },
+  "na/1EHZ.cif.gz": {
+   "0.05": {
+    "bridges": 0.0,
+    "base_pairs": 0.0,
+    "bridges_n": 0,
+    "base_pairs_n": 21
+   },
+   "0.1": {
+    "bridges": 0.0,
+    "base_pairs": 0.0233,
+    "bridges_n": 0,
+    "base_pairs_n": 21
+   }
+  }
+ },
+ "kernels": {
+  "dssp": {
+   "1UBQ": {
+    "residues": 76,
+    "kernel_bonds": 126,
+    "foldmap_bonds": 54,
+    "kernel_only": 72,
+    "foldmap_only": 0,
+    "bridges": 16,
+    "bridges_equal": true
+   },
+   "1TIM": {
+    "residues": 494,
+    "kernel_bonds": 835,
+    "foldmap_bonds": 357,
+    "kernel_only": 478,
+    "foldmap_only": 0,
+    "bridges": 61,
+    "bridges_equal": true
+   },
+   "1EMA": {
+    "residues": 226,
+    "kernel_bonds": 384,
+    "foldmap_bonds": 169,
+    "kernel_only": 215,
+    "foldmap_only": 0,
+    "bridges": 94,
+    "bridges_equal": true
+   },
+   "2LZM": {
+    "residues": 164,
+    "kernel_bonds": 282,
+    "foldmap_bonds": 122,
+    "kernel_only": 160,
+    "foldmap_only": 0,
+    "bridges": 7,
+    "bridges_equal": true
+   },
+   "1C3W": {
+    "residues": 222,
+    "kernel_bonds": 402,
+    "foldmap_bonds": 191,
+    "kernel_only": 211,
+    "foldmap_only": 0,
+    "bridges": 6,
+    "bridges_equal": true
+   },
+   "6ZS5": {
+    "residues": 257,
+    "kernel_bonds": 392,
+    "foldmap_bonds": 147,
+    "kernel_only": 245,
+    "foldmap_only": 0,
+    "bridges": 73,
+    "bridges_equal": true
+   }
+  },
+  "base_pairs": {
+   "both": 820,
+   "only_foldmap": 54,
+   "only_kernel": 5,
+   "disagreements": {
+    "hbond": [
+     "1AOI.cif.gz: I:10/J:283",
+     "1AOI.cif.gz: I:105/J:188",
+     "1AOI.cif.gz: I:124/J:169",
+     "1AOI.cif.gz: I:126/J:167",
+     "1AOI.cif.gz: I:19/J:274",
+     "1AOI.cif.gz: I:24/J:269",
+     "1AOI.cif.gz: I:25/J:268",
+     "1AOI.cif.gz: I:26/J:267",
+     "1AOI.cif.gz: I:28/J:265",
+     "1AOI.cif.gz: I:32/J:261",
+     "1AOI.cif.gz: I:34/J:259",
+     "1AOI.cif.gz: I:39/J:254",
+     "1AOI.cif.gz: I:55/J:238",
+     "1AOI.cif.gz: I:56/J:237",
+     "1AOI.cif.gz: I:69/J:224",
+     "1AOI.cif.gz: I:91/J:202",
+     "1HYS.cif.gz: E:867/F:887",
+     "1HYS.cif.gz: E:868/F:886",
+     "1KX5.cif.gz: I:-15/J:15",
+     "1KX5.cif.gz: I:-19/J:19",
+     "1KX5.cif.gz: I:-31/J:31",
+     "1KX5.cif.gz: I:-42/J:42",
+     "1KX5.cif.gz: I:32/J:-32",
+     "1KX5.cif.gz: I:39/J:-39",
+     "1KX5.cif.gz: I:40/J:-40",
+     "1KX5.cif.gz: I:42/J:-42",
+     "1URN.cif.gz: R:19/R:2",
+     "3CRX.cif.gz: C:18/D:19",
+     "3CRX.cif.gz: C:20/F:17",
+     "3CRX.cif.gz: C:23/F:14",
+     "3CRX.cif.gz: C:24/F:13",
+     "3CRX.cif.gz: C:32/F:5",
+     "3CRX.cif.gz: D:13/E:24",
+     "3CRX.cif.gz: D:14/E:23",
+     "3CRX.cif.gz: D:17/E:20",
+     "3CRX.cif.gz: D:5/E:32",
+     "4OO8.cif.gz: B:84/B:94",
+     "4YBB.cif.gz: AA:131/AA:231",
+     "4YBB.cif.gz: AA:449/AA:486",
+     "4YBB.cif.gz: AA:454/AA:479",
+     "4YBB.cif.gz: AA:459/AA:473",
+     "4YBB.cif.gz: AA:461/AA:471",
+     "4YBB.cif.gz: AA:582/AA:760",
+     "4YBB.cif.gz: AA:75/AA:95"
+    ],
+    "c1": [
+     "1AOI.cif.gz: I:11/J:282",
+     "1AOI.cif.gz: I:28/J:265",
+     "1HYS.cif.gz: E:867/F:887",
+     "4LD0.cif.gz: D:12/F:22",
+     "4YBB.cif.gz: AA:112/AA:330",
+     "4YBB.cif.gz: AA:582/AA:760"
+    ],
+    "plane": [
+     "1IHF.cif.gz: C:-37/E:37",
+     "4YBB.cif.gz: AA:456/AA:476",
+     "4YBB.cif.gz: AA:457/AA:475",
+     "4YBB.cif.gz: AA:80/AA:89",
+     "4YBB.cif.gz: AA:82/AA:87"
+    ],
+    "lambda": [
+     "1AOI.cif.gz: I:25/J:268"
+    ],
+    "modified": [
+     "1EHZ.cif.gz: A:10/A:25",
+     "1EHZ.cif.gz: A:30/A:40",
+     "1EHZ.cif.gz: A:49/A:65",
+     "2OEU.cif.gz: A:1/B:20",
+     "2OEU.cif.gz: A:10/B:11",
+     "4YBB-psi.cif.gz: DA:2590/DA:2604",
+     "4YBB.cif.gz: AA:522/AA:527"
+    ]
+   }
+  }
+ },
+ "external": {
+  "D2": {
+   "1UBQ": {
+    "status": "pass",
+    "detail": "1.0000 of 76 residues agree (limit 0.99)",
+    "residues": 76,
+    "foldmap_only": 0,
+    "mkdssp_only": 0,
+    "differ": [],
+    "agree": 1.0
+   },
+   "1TIM": {
+    "status": "pass",
+    "detail": "1.0000 of 494 residues agree (limit 0.99)",
+    "residues": 494,
+    "foldmap_only": 0,
+    "mkdssp_only": 0,
+    "differ": [],
+    "agree": 1.0
+   },
+   "1EMA": {
+    "status": "pass",
+    "detail": "1.0000 of 217 residues agree (limit 0.99)",
+    "residues": 217,
+    "foldmap_only": 0,
+    "mkdssp_only": 0,
+    "differ": [],
+    "agree": 1.0
+   },
+   "2LZM": {
+    "status": "pass",
+    "detail": "1.0000 of 164 residues agree (limit 0.99)",
+    "residues": 164,
+    "foldmap_only": 0,
+    "mkdssp_only": 0,
+    "differ": [],
+    "agree": 1.0
+   },
+   "1C3W": {
+    "status": "pass",
+    "detail": "1.0000 of 222 residues agree (limit 0.99)",
+    "residues": 222,
+    "foldmap_only": 0,
+    "mkdssp_only": 0,
+    "differ": [],
+    "agree": 1.0
+   },
+   "6ZS5": {
+    "status": "pass",
+    "detail": "1.0000 of 257 residues agree (limit 0.99)",
+    "residues": 257,
+    "foldmap_only": 0,
+    "mkdssp_only": 0,
+    "differ": [],
+    "agree": 1.0
+   }
+  },
+  "D3": {
+   "1EHZ": {
+    "mmcif": {
+     "status": "unavailable",
+     "detail": "RNApolis could not read it: IndexError: string index out of range"
+    },
+    "pdb": {
+     "status": "pass",
+     "detail": "F1 1.000 (21 of 21 pairs, 21 in RNApolis; limit 0.95)",
+     "pairs": 21,
+     "reference_pairs": 21,
+     "both": 21,
+     "precision": 1.0,
+     "recall": 1.0,
+     "f1": 1.0
+    },
+    "f2_pairs": 0,
+    "f2_not_in_rnapolis": []
+   },
+   "2OEU": {
+    "mmcif": {
+     "status": "unavailable",
+     "detail": "RNApolis could not read it: IndexError: string index out of range"
+    },
+    "pdb": {
+     "status": "pass",
+     "detail": "F1 1.000 (20 of 20 pairs, 20 in RNApolis; limit 0.95)",
+     "pairs": 20,
+     "reference_pairs": 20,
+     "both": 20,
+     "precision": 1.0,
+     "recall": 1.0,
+     "f1": 1.0
+    },
+    "f2_pairs": 0,
+    "f2_not_in_rnapolis": []
+   },
+   "4OO8": {
+    "mmcif": {
+     "status": "unavailable",
+     "detail": "RNApolis could not read it: IndexError: string index out of range"
+    },
+    "pdb": {
+     "status": "pass",
+     "detail": "F1 0.988 (42 of 42 pairs, 43 in RNApolis; limit 0.95)",
+     "pairs": 42,
+     "reference_pairs": 43,
+     "both": 42,
+     "precision": 1.0,
+     "recall": 0.9767,
+     "f1": 0.9882
+    },
+    "f2_pairs": 1,
+    "f2_not_in_rnapolis": []
+   },
+   "1KX5": {
+    "mmcif": {
+     "status": "unavailable",
+     "detail": "RNApolis could not read it: IndexError: string index out of range"
+    },
+    "pdb": {
+     "status": "pass",
+     "detail": "F1 1.000 (146 of 146 pairs, 146 in RNApolis; limit 0.95)",
+     "pairs": 146,
+     "reference_pairs": 146,
+     "both": 146,
+     "precision": 1.0,
+     "recall": 1.0,
+     "f1": 1.0
+    },
+    "f2_pairs": 8,
+    "f2_not_in_rnapolis": []
+   },
+   "1AOI": {
+    "mmcif": {
+     "status": "unavailable",
+     "detail": "RNApolis could not read it: IndexError: string index out of range"
+    },
+    "pdb": {
+     "status": "pass",
+     "detail": "F1 0.986 (139 of 140 pairs, 142 in RNApolis; limit 0.95)",
+     "pairs": 140,
+     "reference_pairs": 142,
+     "both": 139,
+     "precision": 0.9929,
+     "recall": 0.9789,
+     "f1": 0.9858
+    },
+    "f2_pairs": 16,
+    "f2_not_in_rnapolis": [
+     "I:28/J:265"
+    ]
+   }
+  }
+ },
+ "base_pairs": {
+  "both": 820,
+  "only_foldmap": 54,
+  "only_kernel": 5,
+  "disagreements": {
+   "hbond": [
+    "1AOI.cif.gz: I:10/J:283",
+    "1AOI.cif.gz: I:105/J:188",
+    "1AOI.cif.gz: I:124/J:169",
+    "1AOI.cif.gz: I:126/J:167",
+    "1AOI.cif.gz: I:19/J:274",
+    "1AOI.cif.gz: I:24/J:269",
+    "1AOI.cif.gz: I:25/J:268",
+    "1AOI.cif.gz: I:26/J:267",
+    "1AOI.cif.gz: I:28/J:265",
+    "1AOI.cif.gz: I:32/J:261",
+    "1AOI.cif.gz: I:34/J:259",
+    "1AOI.cif.gz: I:39/J:254",
+    "1AOI.cif.gz: I:55/J:238",
+    "1AOI.cif.gz: I:56/J:237",
+    "1AOI.cif.gz: I:69/J:224",
+    "1AOI.cif.gz: I:91/J:202",
+    "1HYS.cif.gz: E:867/F:887",
+    "1HYS.cif.gz: E:868/F:886",
+    "1KX5.cif.gz: I:-15/J:15",
+    "1KX5.cif.gz: I:-19/J:19",
+    "1KX5.cif.gz: I:-31/J:31",
+    "1KX5.cif.gz: I:-42/J:42",
+    "1KX5.cif.gz: I:32/J:-32",
+    "1KX5.cif.gz: I:39/J:-39",
+    "1KX5.cif.gz: I:40/J:-40",
+    "1KX5.cif.gz: I:42/J:-42",
+    "1URN.cif.gz: R:19/R:2",
+    "3CRX.cif.gz: C:18/D:19",
+    "3CRX.cif.gz: C:20/F:17",
+    "3CRX.cif.gz: C:23/F:14",
+    "3CRX.cif.gz: C:24/F:13",
+    "3CRX.cif.gz: C:32/F:5",
+    "3CRX.cif.gz: D:13/E:24",
+    "3CRX.cif.gz: D:14/E:23",
+    "3CRX.cif.gz: D:17/E:20",
+    "3CRX.cif.gz: D:5/E:32",
+    "4OO8.cif.gz: B:84/B:94",
+    "4YBB.cif.gz: AA:131/AA:231",
+    "4YBB.cif.gz: AA:449/AA:486",
+    "4YBB.cif.gz: AA:454/AA:479",
+    "4YBB.cif.gz: AA:459/AA:473",
+    "4YBB.cif.gz: AA:461/AA:471",
+    "4YBB.cif.gz: AA:582/AA:760",
+    "4YBB.cif.gz: AA:75/AA:95"
+   ],
+   "c1": [
+    "1AOI.cif.gz: I:11/J:282",
+    "1AOI.cif.gz: I:28/J:265",
+    "1HYS.cif.gz: E:867/F:887",
+    "4LD0.cif.gz: D:12/F:22",
+    "4YBB.cif.gz: AA:112/AA:330",
+    "4YBB.cif.gz: AA:582/AA:760"
+   ],
+   "plane": [
+    "1IHF.cif.gz: C:-37/E:37",
+    "4YBB.cif.gz: AA:456/AA:476",
+    "4YBB.cif.gz: AA:457/AA:475",
+    "4YBB.cif.gz: AA:80/AA:89",
+    "4YBB.cif.gz: AA:82/AA:87"
+   ],
+   "lambda": [
+    "1AOI.cif.gz: I:25/J:268"
+   ],
+   "modified": [
+    "1EHZ.cif.gz: A:10/A:25",
+    "1EHZ.cif.gz: A:30/A:40",
+    "1EHZ.cif.gz: A:49/A:65",
+    "2OEU.cif.gz: A:1/B:20",
+    "2OEU.cif.gz: A:10/B:11",
+    "4YBB-psi.cif.gz: DA:2590/DA:2604",
+    "4YBB.cif.gz: AA:522/AA:527"
+   ]
+  }
+ }
+}

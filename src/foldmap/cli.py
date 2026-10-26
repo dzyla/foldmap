@@ -2701,10 +2701,12 @@ def _cmd_check(args: argparse.Namespace) -> int:
     Exit 1 when any check found a problem or any criterion judged here fails."""
     from .criteria import check_figure, criteria_lines, like_lines
 
+    to_json = getattr(args, "json", None)
+    if to_json and to_json != "-" and not Path(to_json).parent.is_dir():  # before the figure is drawn
+        raise UsageError(f"error: --json {to_json}: no directory {Path(to_json).parent}")
     spec = _spec_of(args)
     got: dict | None = {} if spec.like else None
     drawn = draw_spec(spec, like_out=got)
-    to_json = getattr(args, "json", None)
     text = to_json != "-"  # the text report, unless the JSON one goes to standard output in its place
     print(provenance_block(drawn.provenance), file=sys.stderr, end="")
     for out in args.output:
