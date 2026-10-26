@@ -2,10 +2,12 @@
 # Copyright (C) 2026 Dawid Zyla. Additional terms (AGPL-3.0 section 7(b)): see NOTICE.
 """How fragile foldmap's tuned constants are (plan 28 Task 9.2, rulings Q29, Q30): each module constant the inventory
 (docs/validation/inventory/inventory.md) gives the origin "measured" or "named-entry" is perturbed to x0.75 and x1.25,
-one at a time, and the random-100 campaign keys are measured on the third random sample: not the tuning set (the first
-sample), but run and looked at since plan 15, and two of its entries are named by constants measured here (9FZL for
-route._MAX_NODES_WINDOWS, 6UW4 for membrane.JOIN_GAP: the report computes this overlap). Never the fourth sample,
-whose protocol any look voids.
+one at a time, and the random-100 campaign keys are measured on the third random sample. That sample is not among the
+samples and entries named in the inventory as tuning ones, but it has been run and looked at since plan 15: two of its
+entries are named by constants measured here (9FZL for route._MAX_NODES_WINDOWS, 6UW4 for membrane.JOIN_GAP; the
+report computes this from the origins that name entries, a lower bound), and the membrane constants were tuned in
+plan 26 with 6DQN, 6BO8, 6UW4 and 6QUE among the entries looked at. Never the fourth sample, whose protocol any look
+voids.
 
     python scripts/sensitivity.py plan                              # the constants, perturbations and stage A subset
     python scripts/sensitivity.py run --stage A --out DIR [--labels baselines|perturbations|L1,L2] [--jobs 8]
@@ -17,7 +19,8 @@ whose protocol any look voids.
 
 A perturbation is the value times the factor, an int rounded half away from zero; it is skipped and listed when that
 gives the same value or one that cannot be meant (an int count of 1 or more falling under 1). A tuple, a bool or any
-other non-number is listed as not perturbable. Each run is `random100.py run --not-for-paper --views default` in a
+other non-number is listed as not perturbable. Each run is `random100.py run --not-for-paper --views V` (the default
+view; stage X every view but the app's, stage V the default and its own) in a
 child process with FOLDMAP_PERTURB=module:NAME=VALUE: scripts/perturb.py, installed by random100.py before it imports
 foldmap, rewrites that module as it is imported, so the run's every process (the run, each entry, each view) draws
 and judges with the value, and so does every reader of it (from-import binders, defaults and constants derived from
@@ -29,7 +32,8 @@ recorded time in the third run exceeds SLOW_S is left out, listed), the default 
 identical: the measurement is deterministic), a reads run and every perturbation. Stage B: the whole third sample,
 default view, the same unperturbed runs and every perturbation (ruling Q30; Q29 ran only those that moved in A). The
 reads run is unperturbed with FOLDMAP_TRACE_READS set (perturb.install_trace): which entries ran a line naming each
-constant, and in which view; it must move no key. Stage X: one such traced run of every view on the whole sample.
+constant, and in which view; it must move no key. Stage X: one such traced run of every view but the app's (its job
+process is not traced) on the whole sample.
 Stage V (one per view): the constants stable in stage B that no line of the default view read and that the view
 (VIEW_STAGES) reads in the most entries in stage X, on the entries it reads them in, the default view drawn first
 (focus and domains follow from it) and the keys taken from the view; two baselines, a reads run and their
@@ -88,6 +92,8 @@ READS = "reads"  # an unperturbed run recording which constants each entry reads
 TRACE_ENV = "FOLDMAP_TRACE_READS"  # scripts/perturb.py's
 CLASSES = ("stable", "sensitive", "fragile")  # by worsening
 NOT_EXERCISED = "not exercised"  # ruling Q30: stable, and no view measured here read it: no evidence
+# the entries plan 26 tuned the membrane constants on (docs/superpowers/plans/2026-10-24-26-membrane-panel.md, Task 2)
+PLAN26_MEMBRANE = ("6DQN", "6BO8", "6UW4", "6QUE")
 
 
 def _squash(text: str, most: int = 80) -> str:
@@ -490,20 +496,6 @@ def view_targets(the_plan: dict, default_reads: dict, survey: dict) -> dict[str,
     return out
 
 
-def moved_constants(where: Path, the_plan: dict) -> set[str]:
-    """The constants either perturbation of which moved any key in a stage."""
-    keys = read_keys(where)
-    base = keys[BASELINES[0]]["entries"]
-    out = set()
-    for p in the_plan["perturbations"]:
-        k = keys.get(p["label"])
-        if k is None:
-            raise SystemExit(f"{where}: stage A has no run {p['label']}; finish it first")
-        if k["entries"] is None or moved(base, k["entries"]):
-            out.add(p["id"])
-    return out
-
-
 def cmd_plan(args) -> int:
     the_plan = plan()
     sample, rep = _third()
@@ -627,6 +619,8 @@ def _stage(where: Path, the_plan: dict) -> dict:
         "seconds": round(sum(t["seconds"] for t in timing), 1),
         "run_seconds": round(sum(k["seconds"] for k in keys.values()), 1),
         "runs": {},
+        # which code made each run's random-100 report (its stamp): build() refuses runs of more than one foldmap
+        "codes": {name: _code(k) for name, k in keys.items()},
     }
     traced = keys.get(READS)
     if traced is not None:  # the reads run draws unperturbed: it must change no key either
@@ -649,6 +643,12 @@ def _stage(where: Path, the_plan: dict) -> dict:
     if traced is not None:
         out["trace_records"] = traced.get("trace_records")
     return out
+
+
+def _code(keys_doc: dict) -> dict:
+    """The code a run's random-100 report was made by: its foldmap code fingerprint and the commit it names."""
+    stamp = keys_doc.get("report_stamp") or {}
+    return {"code_fingerprint": stamp.get("code_fingerprint"), "commit": (stamp.get("git") or {}).get("commit")}
 
 
 def _read(stage: dict, cid: str, view: str | None = None) -> tuple[int, bool]:
@@ -702,7 +702,28 @@ def build(
     for where in views:
         st = _stage(where, the_plan)
         stage_v[st["keyed"]] = st
-    surveyed = read_keys(survey)[SURVEY]["reads_by_view"] if survey else None
+    survey_keys = read_keys(survey) if survey else {}
+    surveyed = survey_keys[SURVEY]["reads_by_view"] if survey else None
+    survey_seconds = (
+        round(
+            sum(
+                json.loads(t)["seconds"]
+                for t in (survey / "stages.jsonl").read_text(encoding="utf-8").splitlines()
+                if t
+            ),
+            1,
+        )
+        if survey and (survey / "stages.jsonl").is_file()
+        else None
+    )
+    # one foldmap made every run: the runs are re-keyed by this code, so their reports must measure the same foldmap
+    codes = {f"{n}/{r}": c for n, st in (("A", stage_a), ("B", stage_b), *stage_v.items()) if st for r, c in
+             st["codes"].items()}  # fmt: skip
+    codes |= {f"X/{r}": _code(k) for r, k in survey_keys.items()}
+    fingerprints = {c["code_fingerprint"] for c in codes.values()}
+    if len(fingerprints) != 1 or None in fingerprints:
+        raise SystemExit(f"refused: the runs' reports name {len(fingerprints)} foldmap code fingerprints "
+                         f"({sorted(map(str, fingerprints))}); a report must rest on one foldmap")  # fmt: skip
     rows = {}
     for p in the_plan["perturbations"]:
         row = rows.setdefault(p["id"], {"id": p["id"], "origin": p["origin"], "value": p["value"], "runs": {}})
@@ -748,6 +769,9 @@ def build(
         },
         "stage_a": stage_a,
         "stage_b": stage_b,
+        "survey_seconds": survey_seconds,
+        "code_fingerprint": fingerprints.pop(),  # every run's report, checked above
+        "run_commits": sorted({c["commit"] for c in codes.values() if c["commit"]}),
         "view_stages": stage_v,
         "counts": {c: counts.get(c, 0) for c in names} | {"incomplete": counts.get(None, 0)},
         "constants": list(rows.values()),
@@ -819,7 +843,12 @@ def _stage_line(name: str, st: dict) -> str:
 def render(doc: dict) -> str:
     a, b, vs = doc["stage_a"], doc["stage_b"], doc["view_stages"]
     stages = [("A", a), ("B", b), *((f"V ({v})", s) for v, s in vs.items())]
-    hours = sum(s["seconds"] for _, s in stages if s) / 3600
+    hours = (sum(s["seconds"] for _, s in stages if s) + (doc["survey_seconds"] or 0)) / 3600
+    thin = {  # view-stage constants read in one entry only: their class rests on that entry
+        v: [r["id"] for r in doc["constants"] if r["stage"] == v and r["read_in"] == 1] for v in vs
+    }
+    membrane = vs.get("membrane", {}).get("entries", [])
+    plan26 = [i for i in PLAN26_MEMBRANE if i in membrane]
     lines = [
         "# Sensitivity of the tuned constants",
         "",
@@ -828,9 +857,11 @@ def render(doc: dict) -> str:
         "Every module constant the inventory gives the origin `measured` or `named-entry` was set to x0.75 and x1.25 "
         "of its value, one at a time, and the random-100 campaign keys were measured on the third random sample, in "
         "the default view, against an unperturbed baseline run the same way: stage A on a subset, stage B on the "
-        "whole sample for every constant. The third sample is not the tuning set (the first sample), but it has been "
-        "run and looked at since plan 15, and some constants were set on its entries since (listed below: "
-        "`named in the sample`); it is no unseen sample. The perturbation reaches every reader "
+        "whole sample for every constant. The third sample is not among the samples and entries named in the inventory "
+        "as tuning ones, but it has been "
+        "run and looked at since plan 15, and some constants were set with its entries among those looked at (below: "
+        "`named in the sample`, and the membrane constants); it is no unseen sample. The perturbation reaches every "
+        "reader "
         "(scripts/perturb.py: the module is rewritten as it is imported, so `from ... import` binders, defaults and "
         "constants derived from it at import follow; `perturb.py reach` checked each run). Keys: each entry's pass "
         "or fail, the failing count per A- and S-criterion, the named fallbacks and the figure area of the view. "
@@ -841,7 +872,8 @@ def render(doc: dict) -> str:
         "A reads run (unperturbed, traced: perturb.install_trace) records which entries ran a line, inside a "
         "function, that names each constant. A constant stable in the default view that no line of it read was "
         "measured again in the view that reads it (stage V: its entries, the default view drawn too, keyed on that "
-        "view), found by a traced run of every view on the whole sample (stage X); **not exercised** when no "
+        "view), found by a traced run of every view but the app's (its job process is not traced) on the whole sample "
+        "(stage X); **not exercised** when no "
         "measurable view reads it, or its stage V reads run saw no read: its stability would be no evidence.",
         "",
         "**Time is recorded, not judged, and so is A2** (the default view drawn within 60 s of wall time, a criterion "
@@ -855,13 +887,37 @@ def render(doc: dict) -> str:
         "**Limits of the method.** One factor at a time: no interaction between constants is measured. Two points "
         "per constant (x0.75, x1.25): a constant can move at another value and not at these. One sample (the third, "
         "100 entries): a class is this sample's. Stage A's subset leaves out the slowest entries, where the route "
-        "search budgets (`route:_MAX_NODES_*`) bind; stage B, on the whole sample, does not. A read is a line naming "
+        "search budgets (`route:_MAX_NODES_*`) may bind; stage B, on the whole sample, does not. A read is a line "
+        "naming "
         "the constant that ran, not a decision it made. A run that crashed or whose value did not reach its readers "
-        "is incomplete and gets no class.",
+        "is incomplete and gets no class. "
+        + "".join(
+            f"Stage V ({v}) has {len(st['entries'])} entries"
+            + (
+                f"; {len(thin[v])} of its constants were read in 1 of them ({', '.join(f'`{c}`' for c in thin[v])}), "
+                "so their class rests on that one entry"
+                if thin[v]
+                else ""
+            )
+            + ". "
+            for v, st in vs.items()
+        )
+        + f"The runs were made by {len(doc['run_commits'])} commits of the tooling ("
+        + ", ".join(c[:7] for c in doc["run_commits"])
+        + "), "
+        "re-keyed by this report's code; every run's report names the one foldmap code fingerprint "
+        f"{doc['code_fingerprint']} (checked).",
         "",
-        "**Named in the sample**: the constants whose inventory origin names an entry of the third sample: "
+        "**Named in the sample**: the constants whose inventory origin *names* an entry of the third sample, a lower "
+        "bound on the overlap (a `measured` origin names no entries): "
         + (", ".join(f"`{c}` ({', '.join(ids)})" for c, ids in doc["named_in_sample"].items()) or "none")
-        + ".",
+        + "."
+        + (
+            f" Besides, the membrane constants were tuned in plan 26 with {', '.join(plan26)} among the entries looked "
+            f"at: {len(plan26)} of the membrane stage's {len(membrane)} entries."
+            if plan26
+            else ""
+        ),
         "",
         "## Counts",
         "",
@@ -872,6 +928,7 @@ def render(doc: dict) -> str:
         f"{len(doc['constants'])} constants perturbed, {len(doc['not_perturbable'])} not perturbable, "
         f"{len(doc['no_perturbation'])} with both perturbations skipped; zl time {hours:.1f} h ("
         + ", ".join(f"stage {n} {s['seconds'] / 3600:.2f} h" for n, s in stages if s)
+        + (f", stage X {doc['survey_seconds'] / 3600:.2f} h" if doc["survey_seconds"] is not None else "")
         + ").",
         "",
         "## Limitations: the fragile constants",
@@ -917,6 +974,13 @@ def render(doc: dict) -> str:
     for name, st in stages:
         if st:
             lines += [_stage_line(name, st), ""]
+    if doc["survey_seconds"] is not None:
+        lines += [
+            f"Stage X: one unperturbed run of every view but the app's (its job process is not traced), traced, on the "
+            f"whole sample; {doc['survey_seconds'] / 3600:.2f} h of zl time. It gave each constant the default view "
+            "never reads to the view that reads it in the most entries (stage V), or to none (not exercised).",
+            "",
+        ]
     for v, st in vs.items():
         lines += [
             f"Stage V ({v}) measured {', '.join(f'`{c}`' for c in st['constants'])} on {', '.join(st['entries'])}.",
@@ -995,8 +1059,9 @@ def main(argv=None) -> int:
     w.add_argument("--out", default=str(OUT))
     w.set_defaults(func=cmd_report)
     args = ap.parse_args(argv)
-    if os.environ.get(ENV, "").strip():
-        ap.error(f"{ENV} is set: this process must run unperturbed (it sets {ENV} for each run's child)")
+    for var in (ENV, TRACE_ENV):  # this process runs unperturbed and untraced; it sets them for each run's child
+        if os.environ.get(var, "").strip():
+            ap.error(f"{var} is set: this process must run unperturbed and untraced (it sets {var} per child)")
     return args.func(args)
 
 

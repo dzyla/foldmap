@@ -427,8 +427,9 @@ def test_the_committed_report_is_stamped_and_its_classes_add_up():
     assert doc["named_in_sample"].get("route:_MAX_NODES_WINDOWS") == ["9FZL"]  # review I1: computed, not asserted
 
 
-def _stage_folder(sens, where: Path, runs: dict, reads: dict, unreached=()) -> Path:
-    """A stage folder as sensitivity.py writes it, from {run name: [entry dicts]} (keys files only, no runs/)."""
+def _stage_folder(sens, where: Path, runs: dict, reads: dict, unreached=(), foreign=()) -> Path:
+    """A stage folder as sensitivity.py writes it, from {run name: [entry dicts]} (keys files only, no runs/); a run
+    in `foreign` was made by another foldmap (its report's code fingerprint differs)."""
     (where / "keys").mkdir(parents=True)
     (where / "subset.json").write_text(
         json.dumps({"seed": 1, "size": 2, "ids": ["1ABC", "2DEF"], "quota": {"S1": 2}, "left_out": {}}),
@@ -443,6 +444,10 @@ def _stage_folder(sens, where: Path, runs: dict, reads: dict, unreached=()) -> P
             "exit": 1,
             "seconds": 30.0,
             "reach": None if name in (*sens.BASELINES, sens.READS) else {"reached": name not in unreached},
+            "report_stamp": {
+                "code_fingerprint": "0" * 16 if name in foreign else "f" * 16,
+                "git": {"commit": "c" * 40},
+            },
         }
         if name == sens.READS:
             doc |= {"reads": reads, "reads_by_view": {c: {"default": w} for c, w in reads.items()}}
@@ -494,3 +499,18 @@ def test_build_classes_each_constant_from_its_deciding_stage(sens, tmp_path):
     assert doc["stage_b"]["determinism"]["identical"] and doc["no_perturbation"] == []
     md = sens.render(doc)
     assert "`m:MOVEB` (1ABC)" in md and "**Limits of the method.**" in md and "incomplete" in md
+    assert doc["code_fingerprint"] == "f" * 16 and doc["run_commits"] == ["c" * 40]
+    # Q32: runs whose reports measured another foldmap are refused, never re-keyed into one report
+    (tmp_path / "B").rename(tmp_path / "B-ok")
+    b = _stage_folder(sens, tmp_path / "B", moved, reads, foreign=("m:SKIPx1.25",))
+    with pytest.raises(SystemExit, match="2 foldmap code fingerprints"):
+        sens.build(a, b, sens.SOURCE_STAMP, the_plan=the_plan, sample=sample)
+
+
+@pytest.mark.parametrize("var", ["FOLDMAP_PERTURB", "FOLDMAP_TRACE_READS"])
+def test_sensitivity_refuses_to_run_perturbed_or_traced_itself(sens, monkeypatch, capsys, var):
+    """Q32: the parent runs clean; an inherited hook variable is refused before anything runs."""
+    monkeypatch.setenv(var, "layout:_STACK_PAD=0.975" if var == "FOLDMAP_PERTURB" else "/nowhere")
+    with pytest.raises(SystemExit):
+        sens.main(["plan"])
+    assert f"{var} is set" in capsys.readouterr().err
