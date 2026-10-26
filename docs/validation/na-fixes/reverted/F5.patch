@@ -1,0 +1,177 @@
+diff --git a/scripts/make_na_fixtures.py b/scripts/make_na_fixtures.py
+index c2c7936..a8ee728 100644
+--- a/scripts/make_na_fixtures.py
++++ b/scripts/make_na_fixtures.py
+@@ -62,16 +62,20 @@ CONTROLS = {
+ }
+ 
+ # plan 28's nucleic-acid fixes (docs/validation/na-fixes): fixture name -> (id, chains or None, windows, slim: None or
+-# SLIM, the protein far from the nucleic acid cut to its backbone and CB; anisotropic B factors are dropped), written to
++# SLIM, the protein far from the nucleic acid cut to its backbone and CB, anisotropic B factors dropped; near: the chains
++# are nucleic-acid chains, kept with every protein chain within NEAR of them, as ENTRIES are), written to
+ # tests/data/na_fixes/ (OUT_FIXES), apart from the fixtures the independent kernels compare (tests/data/na/*)
+ OUT_FIXES = OUT.parent / "na_fixes"
+ SLIM = 8.0  # Å: a protein residue farther than this from every nucleotide keeps N, CA, C, O and CB only (_slim)
+ FIXES = {
+     # F2: a C4 assembly (kept: ASSEMBLIES) of four protein-RNA copies, each RNA held by one protomer; unrolled, each
+     # RNA must stay with its protomer (one stem was unrolled into the next protomer, copy B1 torn across the seam)
+-    "3EGZ": ("3EGZ", None, {}, None),
++    "3EGZ": ("3EGZ", None, {}, None, False),
+     # F4: a protein (A) on its RNA (B), B:32-35 not modelled; the gap from B:31 crossed the 5' end B:36-40
+-    "4AS1": ("4AS1", ["A", "B"], {}, SLIM),
++    "4AS1": ("4AS1", ["A", "B"], {}, SLIM, False),
++    # F5: a ribosome (16 MB): the 10-bp duplex 25S A:410-419 / 5.8S y:4-13 (cut into two pieces 52 degrees apart in
++    # 3D, 111 on the page), with every protein chain within NEAR of it
++    "6QIK": ("6QIK", ["A", "y"], {"A": (400, 430), "y": (1, 20)}, SLIM, True),
+ }
+ 
+ 
+@@ -245,10 +249,11 @@ def main(argv=None) -> int:
+             st = gemmi.read_structure_string(_fetch(pdb, args.src))
+             total += _write(name, control(st, chains, windows, name in ASSEMBLIES))
+     OUT_FIXES.mkdir(parents=True, exist_ok=True)
+-    for name, (pdb, chains, windows, slim) in FIXES.items():
++    for name, (pdb, chains, windows, slim, near) in FIXES.items():
+         if name in wanted:
+             st = gemmi.read_structure_string(_fetch(pdb, args.src))
+-            st = control(st, chains, windows, name in ASSEMBLIES)
++            keep = name in ASSEMBLIES
++            st = trim(st, chains, windows, None, keep) if near else control(st, chains, windows, keep)
+             total += _write(name, _slim(st, slim) if slim else st, OUT_FIXES, lean=bool(slim))
+     if wanted & set(ENTRIES):
+         ref_path.write_text(json.dumps(reference, separators=(",", ":")) + "\n", encoding="utf-8")
+diff --git a/src/foldmap/layout.py b/src/foldmap/layout.py
+index 1fc59b6..0da3009 100644
+--- a/src/foldmap/layout.py
++++ b/src/foldmap/layout.py
+@@ -21,7 +21,7 @@ from . import fallback, panels, text_metrics
+ from .features import KINK_GAP, helix_bundles
+ from .frame import Frame, RosetteFrame, symmetric_frame, view_frame
+ from .model import SSE, Nucleic, Sheet, generic_label, group_by_chain, pair_places, res_ref, same_place
+-from .nucleic import Stem, StemView, segment_stem, stem_axis, stem_views
++from .nucleic import SEGMENT_MIN, Stem, StemView, bend, segment_stem, stem_axis, stem_views
+ from .style import CHOICES, Style
+ 
+ if TYPE_CHECKING:
+@@ -2554,8 +2554,38 @@ def _assign_labels(placed: list[Placed]) -> None:
+ 
+ 
+ def stem_pieces(na: Nucleic) -> list[Stem]:
+-    """Every stem of the nucleic acid, long bent ones cut into straight pieces, in 5'->3' order."""
+-    return [piece for st in na.structure.stems for piece in segment_stem(st, na.strands)]
++    """Every stem of the nucleic acid, long bent ones cut into straight pieces, in 5'->3' order; a stem the layout keeps
++    whole (Nucleic.whole, _kept_whole) as it is."""
++    whole = getattr(na, "whole", set())
++    return [piece for st in na.structure.stems for piece in ([st] if st.id in whole else segment_stem(st, na.strands))]
++
++
++WHOLE_BEND = 60.0  # degrees: a short duplex whose pieces turn less than this in 3D may be kept whole (_kept_whole)
++WHOLE_DRAWN = 90.0  # degrees: ... when its pieces would be drawn turned more than this (a right angle) on the page
++
++
++def _kept_whole(na: Nucleic, frame) -> set[str]:
++    """The stems drawn whole although segment_stem cuts them (plan 28 F5, M6): a duplex under 2 * SEGMENT_MIN pairs
++    whose pieces turn less than WHOLE_BEND degrees in 3D (nucleic.bend) but would be drawn turned more than WHOLE_DRAWN
++    degrees from one to the next, as `frame` sees their axes: projection, not the molecule, makes that fold. 6QIK's
++    10-bp A:410-419/y:4-13, cut into two 5-bp pieces turned 52 degrees in 3D and 111 on the page, was drawn with its
++    pieces pushed apart and its 0-nt joint y:8-9 with no route. Strongly kinked DNA keeps its pieces (1IHF over 160
++    degrees, 1YTB 80)."""
++    out = set()
++    for st in na.structure.stems:
++        if len(st) >= 2 * SEGMENT_MIN:
++            continue
++        parts = segment_stem(st, na.strands)
++        if len(parts) < 2 or bend(parts, na.strands) >= WHOLE_BEND:
++            continue
++        seen = [frame.direction(*stem_axis(p, na.strands)) for p in parts]
++        turns = [
++            math.degrees(math.acos(max(-1.0, min(1.0, float(a @ b) / max(float(np.hypot(*a) * np.hypot(*b)), 1e-12)))))
++            for a, b in zip(seen, seen[1:])
++        ]
++        if max(turns) > WHOLE_DRAWN:
++            out.add(st.id)
++    return out
+ 
+ 
+ _MIN_RISE = 2.6  # Å per base pair, the least a stem is drawn with (A-form rises 2.8, B-form 3.4)
+@@ -5288,6 +5318,8 @@ def build_layout(
+         if s.kind == "G"
+     ]
+     contacts = dict(contacts or {})
++    if nucleic is not None and nucleic.strands:  # short duplexes projection alone folds: drawn whole (F5)
++        nucleic.whole = _kept_whole(nucleic, frame) if mode == "projected" else set()
+     pieces = stem_pieces(nucleic) if nucleic is not None and nucleic.strands else []
+     stem_items = [_stem_item(p, nucleic, frame, mode == "stack", NA_W * style.dna_scale) for p in pieces]
+     if stem_items:
+diff --git a/src/foldmap/model.py b/src/foldmap/model.py
+index 41b6eaf..e5976ba 100644
+--- a/src/foldmap/model.py
++++ b/src/foldmap/model.py
+@@ -324,6 +324,9 @@ class Nucleic:
+     structure: NAStructure = field(default_factory=NAStructure)
+     gaps: list[NAGap] = field(default_factory=list)
+     tetrads: list[tuple[tuple[int, int], ...]] = field(default_factory=list)  # G-tetrads (nucleic.g_tetrads), not drawn
++    # stems drawn whole although segment_stem would cut them (layout._kept_whole, plan 28 F5), set by the layout that
++    # draws them, so every reader of stem_pieces sees the pieces as drawn
++    whole: set[str] = field(default_factory=set)
+ 
+     @property
+     def size(self) -> int:
+diff --git a/tests/test_na_routing.py b/tests/test_na_routing.py
+index e13af2a..043c854 100644
+--- a/tests/test_na_routing.py
++++ b/tests/test_na_routing.py
+@@ -14,12 +14,17 @@ from foldmap.render import draw
+ from foldmap.route import route_loops
+ 
+ NA = Path(__file__).parent / "data" / "na_fixes"  # plan 28 fixtures, apart from the kernels' tests/data/na
++# the whole 6QIK's page-up and view (its default view's frame): the fixture, a window of it, is seen as the entry is
++SEEN_6QIK = (
++    (0.05411141752802722, 0.8584561247487728, -0.5100245448744863),
++    (-0.9866713062240714, -0.032533348293423546, -0.15944063071533388),
++)
+ 
+ 
+-def _drawn(name):
++def _drawn(name, **kw):
+     path = NA / f"{name}.cif.gz"
+     model = read_model(path)
+-    lay, sses, bb = make_layout(path, model=model)
++    lay, sses, bb = make_layout(path, model=model, **kw)
+     loops = route_loops(lay, sses, bb)
+     return lay, sses, bb, loops, model, draw(lay, loops, sses, name)
+ 
+@@ -38,3 +43,33 @@ def test_gap_does_not_cross_the_tail_it_joins():
+     assert tails and not [t.strand for t in tails if _crossings(_segments(gap.points), _segments(t.points))]
+     assert render_checks(lay, loops, fig, sses, model=model, bb=bb)["na_crossings"] == 0
+     assert np.isfinite(np.asarray(gap.points, float)).all()
++
++
++def test_short_duplex_joint_routes():
++    """Plan 28 F5 (M6): 6QIK's 10-bp duplex A:410-419/y:4-13 is exactly SEGMENT_MIN long; cut into two 5-bp pieces
++    turned 52 degrees from each other in 3D and 111 on the page, it was drawn with its pieces pushed apart and its 0-nt
++    joint y:8-9 with no route (a fallback curling into its own piece P16b). Projection, not the molecule, made that
++    fold, so the duplex is drawn whole (layout._kept_whole): no joint, no fallback, no path through it (the fixture is a
++    window of the entry, seen as the entry is: SEEN_6QIK). Kinked DNA keeps
++    its pieces: 1IHF (over 160 degrees) and 1RVA (its kinked site) are cut as segment_stem cuts them."""
++    from foldmap.layout import stem_pieces
++    from foldmap.nucleic import segment_stem
++
++    lay, sses, bb, loops, model, fig = _drawn("6QIK", up=SEEN_6QIK[0], view=SEEN_6QIK[1])
++    na = lay.nucleic
++    (st,) = [
++        st
++        for st in na.structure.stems
++        if {(na.strands[p.a].chain, na.strands[p.a].labels[p.i].seq) for p in st.pairs} >= {("A", 410), ("A", 419)}
++    ]
++    assert len(segment_stem(st, na.strands)) == 2 and st.id in na.whole
++    (d,) = [d for d in lay.stems if d.id == st.id]
++    mine = set(d.axial)
++    assert not [p for p in lay.na_paths if p.fallback], [(p.kind, p.strand) for p in lay.na_paths if p.fallback]
++    assert not [p for p in lay.na_paths if p.kind == "joint" and set(p.between) & mine]
++    for name in ("1IHF", "1RVA"):
++        path = Path(__file__).parent / "data" / "na" / f"{name}.cif.gz"
++        lay, _, _ = make_layout(path)
++        na = lay.nucleic
++        assert not na.whole and len(stem_pieces(na)) == sum(len(segment_stem(s, na.strands)) for s in na.structure.stems)
++        assert len(stem_pieces(na)) > len(na.structure.stems), name

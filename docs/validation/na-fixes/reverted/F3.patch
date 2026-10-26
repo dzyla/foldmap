@@ -1,0 +1,178 @@
+diff --git a/src/foldmap/layout.py b/src/foldmap/layout.py
+index 1fc59b6..71b6b04 100644
+--- a/src/foldmap/layout.py
++++ b/src/foldmap/layout.py
+@@ -2241,11 +2241,13 @@ def _attract(
+     settled: frozenset[frozenset[str]] | None = None,
+     level: np.ndarray | None = None,
+     limits: tuple[np.ndarray, np.ndarray] | None = None,
++    stronger: tuple[int, ...] = (),
+ ) -> None:
+     """Minimise the layout energy (_energy) from the projected positions, raising the overlap penalty in
+     stages. The result becomes each item's new home; _separate then guarantees no overlap remains. `limits` (_limits,
+     a membrane view's one-sided bounds, plan 27 ruling P24): a centre past them costs as an overlap does
+-    (_past_bounds), and the result is moved back within them. Every input
++    (_past_bounds), and the result is moved back within them. `stronger`: stem items whose contact pulls are
++    _EMBED_PULL times as strong (_embedded_stems, plan 28 F3). Every input
+     is snapped to the grid (_snap) and _lbfgs runs without BLAS, so the minimum is the same on every machine.
+     `extra`: further springs (item i, port offset, item j, port offset, weight, slack), the nucleic-acid strands
+     from stem to stem (_stem_springs). `joints` (_joints): pairs of items kept apart without MARGIN, so their
+@@ -2271,6 +2273,9 @@ def _attract(
+         return i in held and j in held and (settled is None or frozenset((a, b)) in settled)
+ 
+     W = _contact_weights(items, contacts)
++    for k in stronger:  # a stem inside the protein's projection, pulled to what touches it (_embedded_stems, F3)
++        W[k, :] *= _EMBED_PULL
++        W[:, k] *= _EMBED_PULL
+     if pinned:
+         W[pinned, :] = 0.0
+         W[:, pinned] = 0.0
+@@ -2443,6 +2448,85 @@ _STEM_ROOM = 1.5  # the room a nucleic acid's stems take on the page: their foot
+ # within 0.001 (1.2: 4LVV 0.961 -> 0.886; 2.0: 4P9R 0.82 -> 0.798)
+ 
+ 
++_EMBED_PULL = 10.0  # times the contact pull between an embedded stem and its touching elements (_embedded_stems)
++
++
++def _hull(pts: list[tuple[float, float]]) -> list[tuple[float, float]]:
++    """The convex hull of page points, anticlockwise (Andrew's monotone chain); fewer than 3 corners when flat."""
++    pts = sorted(set(pts))
++    if len(pts) < 3:
++        return pts
++
++    def turn(o, a, b) -> float:
++        return (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0])
++
++    lower: list = []
++    upper: list = []
++    for p in pts:
++        while len(lower) >= 2 and turn(lower[-2], lower[-1], p) <= 0:
++            lower.pop()
++        lower.append(p)
++    for p in reversed(pts):
++        while len(upper) >= 2 and turn(upper[-2], upper[-1], p) <= 0:
++            upper.pop()
++        upper.append(p)
++    return lower[:-1] + upper[:-1]
++
++
++def _embedded_stems(items: list[_Item], contacts: dict[frozenset[str], int]) -> tuple[int, ...]:
++    """The stem items whose projected centre lies inside the convex hull of the elements touching them (plan 28 F3, M2:
++    8VBG's DNA hairpin, seen inside its protein, was pushed out to the page's edge by _attract, its contact pull losing
++    to the overlap penalty). Only a lone stem item with at least three touching elements counts."""
++    owner = _owner(items)
++    out = []
++    for k, it in enumerate(items):
++        if len(it.members) != 1 or not isinstance(it.members[0], PlacedStem):
++            continue
++        sid = it.members[0].id
++        pts = []
++        for pair in sorted(tuple(sorted(p)) for p in contacts if sid in p and len(p) == 2):
++            other = pair[0] if pair[1] == sid else pair[1]
++            if other in owner and not isinstance(owner[other][1], PlacedStem):
++                j, _, (ox, oy) = owner[other]
++                pts.append((float(_snap(items[j].cx + ox)), float(_snap(items[j].cy + oy))))
++        hull = _hull(pts)
++        if len(hull) >= 3:
++            x, y = it.cx, it.cy
++            edges = zip(hull, hull[1:] + hull[:1])
++            if all((b[0] - a[0]) * (y - a[1]) - (b[1] - a[1]) * (x - a[0]) > 0 for a, b in edges):
++                out.append(k)
++    return tuple(out)
++
++
++def _room_round(items: list[_Item], stems: tuple[int, ...]) -> None:
++    """Room made round each embedded stem (_embedded_stems) before _attract: every other item whose footprint, with
++    MARGIN, meets the stem's moves straight away from the stem's centre until clear, its home with it, in as many
++    passes as there are items (plan 28 F3: _attract alone pushed 8VBG's hairpin out of its protein)."""
++    for _ in range(len(items)):
++        moved = False
++        for k in stems:
++            s = items[k]
++            sx0, sy0, sx1, sy1 = (s.cx + s.box[0] - MARGIN, s.cy + s.box[1] - MARGIN, s.cx + s.box[2] + MARGIN,
++                                  s.cy + s.box[3] + MARGIN)  # fmt: skip
++            for j, it in enumerate(items):
++                if j in stems or it.pinned:
++                    continue
++                b = it.box
++                ox = min(sx1, it.cx + b[2]) - max(sx0, it.cx + b[0])
++                oy = min(sy1, it.cy + b[3]) - max(sy0, it.cy + b[1])
++                if ox <= 0 or oy <= 0:
++                    continue
++                v = np.array([it.cx - s.cx, it.cy - s.cy])
++                n = float(np.hypot(*v))
++                v = v / n if n > 1e-6 else np.array([0.0, -1.0])
++                step = min(ox / max(abs(v[0]), 1e-3), oy / max(abs(v[1]), 1e-3)) + 1.0 / _GRID  # a grid step past touching
++                it.cx, it.cy = float(_snap(it.cx + v[0] * step)), float(_snap(it.cy + v[1] * step))
++                it.home = (float(_snap(it.home[0] + v[0] * step)), float(_snap(it.home[1] + v[1] * step)))
++                moved = True
++        if not moved:
++            return
++
++
+ def _room_for_stems(items: list[_Item]) -> None:
+     """A nucleic acid drawn with no protein element (every item a stem; a protein with no helix or strand, drawn as
+     coil only, does not count): its projected places spread about their middle, all
+@@ -5404,6 +5488,7 @@ def build_layout(
+             from .na_curve import lay_out
+ 
+             curves, walls, _ = lay_out(items, nucleic, style, contacts, walls, ties)
++        embedded: tuple[int, ...] = ()  # stems inside the protein's projection (_embedded_stems, plan 28 F3)
+         if attract and len(items) > 1:
+             if curved:  # the stems as projected (and spread), then the bent duplexes set on their curves, pinned
+                 from .na_curve import lay_out
+@@ -5414,6 +5499,9 @@ def build_layout(
+                 extra = _stem_springs(items, nucleic) + extra
+             else:
+                 extra = _stem_springs(items, nucleic) if pieces else []
++                if pieces and mode == "projected" and type(frame) is Frame and not frame.sector and not ties and not held:
++                    embedded = _embedded_stems(items, contacts)  # inside the protein as seen: room made round it (F3)
++                    _room_round(items, embedded)
+                 if pieces and not ties and walls is None:
+                     _room_for_stems(items)
+             rise = getattr(frame, "rise", 0.0) * SCALE
+@@ -5434,6 +5522,7 @@ def build_layout(
+                 settled=like.settled if like is not None else None,
+                 level=kept if band is not None else None,
+                 limits=limits,
++                stronger=embedded,
+             )
+         if kept is not None and kept.any():  # transmembrane elements at their projected height, reaching a face
+             for k in np.flatnonzero(kept).tolist():
+diff --git a/tests/test_na_layout.py b/tests/test_na_layout.py
+index c772e9c..39cb852 100644
+--- a/tests/test_na_layout.py
++++ b/tests/test_na_layout.py
+@@ -3342,3 +3342,32 @@ def test_unrolled_rna_copy_stays_with_its_protomer():
+     offsets = [[(d.cx - c[0], d.cy - c[1]) for d in stems] for c, stems in copies.values()]
+     for other in offsets[1:]:
+         assert np.allclose(other, offsets[0], atol=0.1), (offsets[0], other)
++
++
++def test_embedded_stem_kept_inside(monkeypatch):
++    """Plan 28 F3 (M2): 8VBG's DNA hairpin is seen inside its protein (its centre inside the hull of the elements
++    touching it), and _attract, whose contact pull lost to the overlap penalty, pushed it and its protein out to the
++    page's edge (contact_auc 0.505, stems_nearer_frac 0.5). In a plain frame such a stem now gets room before _attract
++    and a stronger pull (layout._embedded_stems, _room_round): its touching elements are drawn nearer it than the
++    rest. A stem the protein holds from outside is no embedded stem (1IHF's bent DNA; 1ZAA's duplex across the page,
++    a RadialFrame, is never asked)."""
++    import foldmap.layout as L
++    from foldmap.nacheck import contacts as near
++
++    found: dict[str, list] = {}
++    real = L._embedded_stems
++
++    def spy(items, contacts):
++        got = real(items, contacts)
++        found.setdefault(name, []).extend(items[k].members[0].id for k in got)
++        return got
++
++    monkeypatch.setattr(L, "_embedded_stems", spy)
++    name = "8VBG"
++    lay, sses, bb = make_layout(Path(__file__).parent / "data" / "na_fixes" / "8VBG.cif.gz")
++    assert found["8VBG"], found
++    m = near(lay, sses)
++    assert m["contact_auc"] >= 0.6 and m["stems_nearer_frac"] == 1.0, m
++    for name, path in (("1IHF", NA / "1IHF.cif.gz"), ("1ZAA", Path(__file__).parent / "data" / "1ZAA.cif")):
++        make_layout(path)
++        assert not found.get(name), found
