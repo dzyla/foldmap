@@ -1,18 +1,20 @@
-"""The readability floor (plan 28 Task 4, the review's 3.3, ruling Q39): floor.readability_floor names why a figure
-is below it (text under 6 pt on its page, the route budget spent, more than the hosted time to make), the notes say
-it with the existing options that draw less, `--strict-floor` writes nothing below it, `foldmap check` reports R1,
-and the default figure is unchanged. The floor's logic is tested on synthetic measures; a figure below it is made
-from a committed fixture by holding its page small (layout.MAX_PAGE_IN), never by timing anything."""
+"""The readability floor (plan 28 Task 4, the review's 3.3, rulings Q39-Q41): floor.readability_floor names why a
+figure is below it (text under 6 pt on its page, the route budget spent), the notes say it with the existing options
+that draw less, `--strict-floor` writes nothing below it, `foldmap check` reports R1 (a fail exits 1); the time a
+figure took is said, never judged; the default figure is unchanged. The floor's logic is tested on synthetic
+measures; a figure below it is made from a committed fixture by holding its page small (layout.MAX_PAGE_IN), and a
+slow one by its measures, never by timing anything."""
 
 from __future__ import annotations
 
 import json
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
 from foldmap import deep, floor, layout
-from foldmap.cli import build_parser, main
+from foldmap.cli import main
 from foldmap.science import READABILITY
 from foldmap.spec import draw_spec, figure_spec
 
@@ -45,14 +47,20 @@ def test_each_reason_from_its_measure():
     assert got["reason"] == floor.ROUTE_BUDGET and got["measured"] == 2
     assert got["text"] == "its route budget was spent: 2 wider route searches not run, 3 loops drawn as curves"
     assert floor.reasons_of(_measures(fallbacks={"loop_curve": 3})) == []  # a stuck loop is A3's, not the floor's
-    (got,) = floor.reasons_of(_measures(seconds=107.9))
+    assert set(floor.REASONS) == {floor.TEXT_SMALL, floor.ROUTE_BUDGET}  # time is said, never judged (Q40)
+
+
+def test_time_is_a_note_never_a_reason():
+    assert floor.reasons_of(_measures(seconds=107.9)) == []
+    (got,) = floor.time_notes(_measures(seconds=107.9))
     assert got["reason"] == floor.TIME and got["limit"] == floor.TIME_LIMIT_S == 90
-    assert got["text"] == "it took 108 s to make, over the hosted app's 90 s"
-    assert floor.reasons_of(_measures(seconds=90.0)) == []
-    assert floor.reasons_of(_measures(seconds=None)) == []  # not timed: not judged on time
-    both = floor.reasons_of(_measures(text_pt=5.48, seconds=107.9))
-    assert [r["reason"] for r in both] == [floor.TEXT_SMALL, floor.TIME]
-    assert set(floor.REASONS) == {floor.TEXT_SMALL, floor.ROUTE_BUDGET, floor.TIME}
+    assert got["text"] == "it took 108 s to make, over the hosted app's 90 s (said, not judged)"
+    assert floor.time_notes(_measures(seconds=90.0)) == [] and floor.time_notes(_measures(seconds=None)) == []
+    both = _measures(text_pt=5.48, seconds=107.9)
+    assert [r["reason"] for r in floor.reasons_of(both)] == [floor.TEXT_SMALL]
+    line = floor.note(floor.reasons_of(both), [], timed=floor.time_notes(both))
+    assert line.startswith("below the readability floor: its text is 5.4 pt") and line.endswith("(said, not judged)")
+    assert floor.note([], [], timed=floor.time_notes(both)).startswith("it took 108 s")
 
 
 def test_the_options_in_each_interfaces_words():
@@ -98,10 +106,24 @@ def test_suggestions_draw_less(tmp_path):
     offered = floor.suggestions(drawn)
     first = drawn.bb.labels[0].chain
     assert [o["options"] for o in offered][-2:] == [{"focus": first}, {"chains": first}]
-    if len(set((getattr(drawn.layout.frame, "sector", None) or {}).values())) > 1:
-        assert offered[0]["options"] == {"focus": "protomer"}
     alone = draw_spec(figure_spec(TETRAMER, chains=[first]))
     assert {p.sse.chain for p in alone.layout.placed.values()} == {first}
+
+
+def _stub(sector=None, focus=None, chains=("A", "B")):
+    """A drawn figure as suggestions() reads it: its frame's protomers, its focus, its protein chains."""
+    lay = SimpleNamespace(frame=SimpleNamespace(sector=sector), focus_chains=focus, nucleic=None)
+    return SimpleNamespace(layout=lay, bb=SimpleNamespace(labels=[SimpleNamespace(chain=c) for c in chains]))
+
+
+def test_which_options_are_offered():
+    def offered(drawn):
+        return [o["options"] for o in floor.suggestions(drawn)]
+
+    assert offered(_stub({"A": 0, "B": 1})) == [{"focus": "protomer"}, {"focus": "A"}, {"chains": "A"}]
+    assert offered(_stub({"A": 0, "B": 0})) == [{"focus": "A"}, {"chains": "A"}]  # one protomer: no subunit to pick
+    assert offered(_stub({"A": 0, "B": 1}, focus={"A"})) == [{"chains": "A"}]  # already one subunit, chain A
+    assert offered(_stub(None, chains=("A",))) == []  # one chain: nothing to draw less of
 
 
 def test_plot_says_it_and_strict_writes_nothing(small_page, tmp_path, capsys):
@@ -149,14 +171,41 @@ def test_check_passes_r1_above_the_floor(capsys):
     assert f"R1 {floor.TITLE}: pass" in capsys.readouterr().out
 
 
-def test_reduced_detail_is_a_preset_the_user_overrides():
-    from foldmap.cli import _spec_of
+@pytest.fixture
+def slow(monkeypatch):
+    """Every figure measured as if it took 107.9 s (8XJV's time in the record), its text as drawn: no timing."""
+    measured = floor.measures
 
-    args = build_parser().parse_args(["plot", str(UBQ), "-o", "x.svg", "--reduced-detail", "--set", "ligands=all"])
-    look = _spec_of(args).look
-    assert (look.nucleotide_labels, look.glycans, look.helices_310, look.ligands) == (False, False, False, "all")
-    plain = _spec_of(build_parser().parse_args(["plot", str(UBQ), "-o", "x.svg"])).look
-    assert (plain.nucleotide_labels, plain.glycans, plain.helices_310, plain.ligands) == (True, True, True, "auto")
+    monkeypatch.setattr(floor, "measures", lambda drawn: {**measured(drawn), "seconds": 107.9})
+
+
+def test_time_alone_passes_check(slow, capsys):
+    """Q40: the time a figure took never fails R1 nor changes the exit code, and is not in the --json report."""
+    assert main(["check", str(UBQ)]) == 0
+    out = capsys.readouterr().out
+    assert f"R1 {floor.TITLE}: pass" in out and "  it took 108 s to make, over the hosted app's 90 s" in out
+    assert main(["check", str(UBQ), "--json", "-"]) == 0
+    text = capsys.readouterr().out
+    (r1,) = [c for c in json.loads(text)["checks"] if c["code"] == floor.CODE]
+    assert r1["status"] == deep.PASS and "seconds" not in r1["measures"]["measures"]
+    assert "107.9" not in text and "took" not in json.dumps(r1)  # no wall time in the report: the same every run
+
+
+def test_strict_writes_a_figure_only_time_is_said_of(slow, tmp_path, capsys):
+    out = tmp_path / "f.svg"
+    assert main(["plot", str(UBQ), "-o", str(out), "--strict-floor"]) == 0 and out.is_file()
+    err = capsys.readouterr().err
+    assert "foldmap: warning: it took 108 s to make" in err and "below the readability floor" not in err
+
+
+def test_a_floor_that_cannot_judge_never_stops_a_figure(small_page, monkeypatch, tmp_path, capsys):
+    def broken(drawn):
+        raise RuntimeError("no")
+
+    monkeypatch.setattr(floor, "suggestions", broken)
+    out = tmp_path / "f.svg"
+    assert main(["plot", str(UBQ), "-o", str(out), "--strict-floor"]) == 0 and out.is_file()
+    assert "foldmap: warning: readability floor not judged: RuntimeError" in capsys.readouterr().err
 
 
 def test_the_mcp_result_says_it(small_page, monkeypatch):
@@ -179,6 +228,18 @@ def test_the_app_says_it(small_page):
     assert out["floor_note"].startswith("below the readability floor: its text is")
 
 
+def test_the_app_says_nothing_of_a_pair_page(small_page):
+    """A compare or diff page is two panels on one page, not the figure the floor judges (B's layout under the
+    page's text): the app says no floor of it."""
+    from foldmap import app, app_jobs
+
+    like = app.like_entry(str(UBQ), "1UBQ", b="1UBQ")
+    like.update(page="compare")
+    blob = json.dumps({"theme": "publication", "like": like}, sort_keys=True, default=str)
+    out = app_jobs.draw_job(UBQ, blob)
+    assert app.pair_kind(json.loads(blob)) == "compare" and out["floor_note"] == ""
+
+
 @pytest.mark.skipif(not RECORD.is_file(), reason="docs/validation is not part of the sdist")
 def test_the_record_is_what_the_floor_says_of_its_measures():
     """The committed record (scripts/readability_floor.py): each figure's reasons are reasons_of its measures, and
@@ -192,6 +253,9 @@ def test_the_record_is_what_the_floor_says_of_its_measures():
                 continue
             got = floor.reasons_of(fig["measures"])
             assert [x["reason"] for x in got] == fig["reasons"], (r["id"], fig.get("options"))
+        if "error" not in r["default"]:
+            timed = [x["reason"] for x in floor.time_notes(r["default"]["measures"])]
+            assert timed == r["default"]["notes"], r["id"]  # said, never among the reasons (Q40)
         offered = [t for t in r["tried"] if t.get("offered")]
         if r["default"]["reasons"]:
             assert offered, r["id"]

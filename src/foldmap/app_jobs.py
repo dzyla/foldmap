@@ -406,8 +406,7 @@ def draw_job(path, settings_json: str, eager_after: float | None = None) -> dict
     `eager_after` seconds, its PNG and PDF come with it (a job process cannot hand back the figure itself)."""
     from . import app, render
     from .cli import stale_domains_note
-    from .floor import note as floor_note
-    from .floor import suggestions
+    from .floor import said as floor_said
     from .scope import drawn_scope
 
     t0 = time.perf_counter()
@@ -439,8 +438,9 @@ def draw_job(path, settings_json: str, eager_after: float | None = None) -> dict
         "like_note": like_note,  # drawn like a reference (Draw like…): the note shown under the figure
         "data_problems": [str(p) for p in drawn.layout.data_problems],  # your data: rows not used, notes
         "scope": drawn_scope(drawn.model, drawn.layout, spec.assembly, spec.focus),  # what auto choices left out
-        # below the readability floor (floor.py): why, and the controls that draw less, in the app's words ('' above)
-        "floor_note": floor_note(drawn.floor, suggestions(drawn), how="app"),
+        # below the readability floor (floor.py): why, the controls that draw less and the time note, in the app's
+        # words ('' above it); never on a compare or diff page (its page and B's layout are not one figure)
+        "floor_note": "" if app.pair_kind(settings) else floor_said(drawn, "app")[1],
         "seconds": seconds,
         "files": files,
     }

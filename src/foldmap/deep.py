@@ -24,7 +24,9 @@ The report (report(); SCHEMA, VERSION): {"schema": "foldmap-check", "version": 1
 version, "deep": whether D1-D3 were run, "verdict", "counts": {status: n}, "kinds": {kind: what it is evidence of},
 "checks": [{"code", "group" (science, criteria, floor, like, deep), "title", "kind", "status", "detail", "findings",
 "reason", "measures"}, ...]}. A field is added in a later version only with VERSION raised. The floor group (plan 28
-Task 4) holds R1, the readability floor (floor.check), after the criteria: a check id added, the shape unchanged."""
+Task 4) holds R1, the readability floor (floor.check), after the criteria: a check id added, the shape unchanged;
+its measures hold no wall time (the time a figure took is said in the text only, ruling Q41), so the report is the
+same on every run."""
 
 from __future__ import annotations
 

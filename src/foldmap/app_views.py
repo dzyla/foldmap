@@ -172,7 +172,7 @@ def figure_view(ws: Workspace) -> None:
                 st.caption(made)
         if result and result.get("floor_note"):  # below the readability floor (floor.py), as the command line warns
             note = result["floor_note"]
-            st.warning(f"{note[0].upper()}{note[1:]}.")
+            st.warning(shown(f"{note[0].upper()}{note[1:]}."))
         if result and result.get("domains_note"):  # as the command line warns
             note = result["domains_note"]
             st.warning(shown(f"{note[0].upper()}{note[1:]}. {DOMAINS_EDIT}"))

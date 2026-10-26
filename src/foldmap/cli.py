@@ -23,11 +23,9 @@ from .criteria import LIMITS
 from .dssp import assign_dssp
 from .fallback import line as fallback_line
 from .features import helices_on_sheets, sse_contacts
-from .floor import REDUCED_DETAIL
 from .floor import check as floor_check
 from .floor import lines as floor_lines
-from .floor import note as floor_note
-from .floor import suggestions as floor_suggestions
+from .floor import said as floor_said
 from .frame import (
     CylinderFrame,
     Frame,
@@ -1842,7 +1840,7 @@ def _spec_of(args) -> FigureSpec:
     spec = figure_spec(
         args.structure,
         theme=args.theme,
-        style=(list(REDUCED_DETAIL) if getattr(args, "reduced_detail", False) else []) + shorthand + args.set,
+        style=shorthand + args.set,
         style_file=args.style_file,
         layout_file=args.layout_file,
         title=args.title,
@@ -2019,7 +2017,8 @@ def build_parser() -> argparse.ArgumentParser:
     kq = sub.add_parser(
         "check",
         help="check the figure: its science against the coordinates (sheet neighbours, barrel closure and strand "
-        "count, strands drawn beside their partner) and its page (criteria A1-A20; exit 1 on a problem)",
+        "count, strands drawn beside their partner), its page (criteria A1-A20) and the readability floor (R1; exit "
+        "1 on a problem)",
         description="Draw the figure as `plot` would and check what it says about the structure against the "
         "coordinates, apart from how the page looks: S1, two strands drawn side by side in a sheet (adjacent "
         "columns, level) are joined by a bridge, and two in one column (collinear) never overlap; S2, a barrel's "
@@ -2031,7 +2030,10 @@ def build_parser() -> argparse.ArgumentParser:
         "every figure by, with the same limits: route fallbacks, loops over labels, overlapping elements, text "
         "collisions, text off the page, repeated labels, chains left out without a note, N->C and sheet order, "
         "copies drawn alike, domains (with --domains), membrane (with --membrane), ligand tethers; a --membrane or "
-        "--domains figure is judged as the campaign's membrane or domains view. Those that need "
+        "--domains figure is judged as the campaign's membrane or domains view. Then R1, the readability floor: the "
+        "figure's text under 6 pt on its page (judged at text size 1: a theme's smaller font_scale prints smaller), "
+        "or the page's route budget spent, fails and exits 1, naming the options that draw less; the time it took "
+        "is said when over the hosted app's 90 s, never judged. Those that need "
         "more than one drawing or a tool foldmap does not use (process exit and time, the app, mkdssp, a second "
         "seed, a saved-layout round trip, RNApolis, a two-state partner) are named 'not measured here' with the "
         "reason. With --like REFERENCE, then H1-H5 of the figure drawn like the reference: H1, drawn alike exactly "
@@ -2239,17 +2241,12 @@ def build_parser() -> argparse.ArgumentParser:
             metavar="Å",
             help=f"how far copies may differ, CA RMSD (default {TOLERANCE:g}; raise it for low-resolution X-ray)",
         )
-        q.add_argument(
-            "--reduced-detail",
-            action="store_true",
-            help="leave out low-priority annotations, for a large figure: base letters, ligand marks, glycans and "
-            "3-10 helix boxes (the style keys " + ", ".join(REDUCED_DETAIL) + "; --set wins over them)",
-        )
     plot_q.add_argument(
         "--strict-floor",
         action="store_true",
-        help="write no figure below the readability floor (text under 6 pt on its page, the route budget spent, "
-        f"or longer than {LIMITS['app_s']:g} s to make) and exit 1; by default it is written and the notes say so",
+        help="write no figure below the readability floor (its text under 6 pt on its page, or the page's route "
+        "budget spent) and exit 1; by default it is written and the notes say so. The time it took is said, never "
+        "judged",
     )
     kq.add_argument(
         "--deep",
@@ -2573,12 +2570,13 @@ def _cmd_figure(args: argparse.Namespace) -> int:
         print(provenance_block(drawn.provenance), file=sys.stderr, end="")
         if said := fallback_line(drawn.fallbacks):  # how often each named fallback fired (notes only, never drawn)
             print(f"foldmap: {said}", file=sys.stderr)
-        if below := drawn.floor:  # the readability floor (floor.py, plan 28 Task 4): said, never drawn
-            print(f"foldmap: warning: {floor_note(below, floor_suggestions(drawn))}", file=sys.stderr)
-            if args.strict_floor:
-                said = "foldmap: error: no figure written: it is below the readability floor (--strict-floor)"
-                print(said, file=sys.stderr)
-                return 1
+        below, line = floor_said(drawn)  # the readability floor (floor.py, plan 28 Task 4): said, never drawn
+        if line:  # its judged reasons, and the time note (never judged)
+            print(f"foldmap: warning: {line}", file=sys.stderr)
+        if below and args.strict_floor:  # judged reasons only: the time note never stops a figure (Q40)
+            said = "foldmap: error: no figure written: it is below the readability floor (--strict-floor)"
+            print(said, file=sys.stderr)
+            return 1
         for out in args.output:
             print(f"wrote {save(drawn.figure, out)}")
     method = experimental_method(spec.structure) if spec.look.color_by == "plddt" else None
@@ -2748,9 +2746,11 @@ def _cmd_contacts(args: argparse.Namespace) -> int:
 
 def _cmd_check(args: argparse.Namespace) -> int:
     """Draw the figure `plot` would and print its science checks (figcheck.science_checks), one line per check and
-    one per problem, then its figure criteria A1-A20 (criteria.check_figure), one line per criterion and its detail.
+    one per problem, then its figure criteria A1-A20 (criteria.check_figure), one line per criterion and its detail,
+    then R1, the readability floor (floor.check: text under 6 pt on its page or the route budget spent fails; the
+    time it took is said, never judged).
     Drawn like a reference (--like), then H1-H5 (criteria.like_checks), B also drawn alone for H5 and the baseline.
-    Exit 1 when any check found a problem or any criterion judged here fails."""
+    Exit 1 when any check found a problem or any criterion judged here, R1 included, fails."""
     from .criteria import check_figure, criteria_lines, like_lines
 
     to_json = getattr(args, "json", None)

@@ -1,38 +1,40 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 # Copyright (C) 2026 Dawid Zyla. Additional terms (AGPL-3.0 section 7(b)): see NOTICE.
-"""The readability floor (plan 28 Task 4, the review's 3.3, ruling Q39): a figure that cannot be read as a
+"""The readability floor (plan 28 Task 4, the review's 3.3, rulings Q39-Q41): a figure that cannot be read as a
 publication figure says so, and names the options that exist today which draw less.
 
 readability_floor(drawn) gives the reasons a drawn figure (spec.Drawn) is below the floor, each named (REASONS), with
-what was measured and the limit; [] when it is above it:
+what was measured and the limit; [] when it is above it. Two are judged:
 
 - text_small: the figure's text is under layout.MIN_TEXT_PT (6 pt) on its page. Below that size the page grows
   instead (layout.page_scale, random-100 C4) until it reaches layout.MAX_PAGE_IN; past that the whole figure, its text
   with it, is scaled to fit (layout.page_fit's note; page_text_small among the named fallbacks). The size judged is the
   figure's own text (element names, chain ends) at Style.font_scale 1, as page_fit judges it: a theme's smaller font
-  is the theme's choice, not the page's. The smallest text drawn is given with it but never judged: residue counts,
-  base letters and ligand names are drawn at 0.6-0.9 of the figure's text by design, so on any page they are under
-  6 pt whenever the figure's text is under 10 pt (docs/validation/readability-floor: on every figure measured).
+  (the journal theme's 0.9, --set font_scale=0.8) prints smaller text than the size judged. The smallest text drawn is
+  given with it but never judged: residue counts, base letters and ligand names are drawn at 0.6-0.9 of the figure's
+  text by design, so on any page they are under 6 pt whenever the figure's text is under 10 pt
+  (docs/validation/readability-floor: 17 of the 18 figures measured).
 - route_budget: the page's budget for second, wider route searches (route._MAX_NODES_PAGE) was spent, so searches it
   would have run were not (counted as the named fallbacks route_second_search_refused): the loops left are drawn as
   curves or over text. A figure's route fallbacks of other kinds (one stuck loop) are A3's, not the floor's: they
   happen on small pages too, while a spent budget is the page's size.
-- time: making the figure took longer than the hosted app allows (criteria.LIMITS["app_s"], 90 s). Measured on the
-  drawing in hand (Drawn.seconds, spec.draw_spec's wall time), so it depends on the machine and its load; a Drawn
-  with no time (None: a compare page, a figure not made by draw_spec) is not judged on it.
+
+The time a figure took is said, never judged (ruling Q40): time_notes(measures) names a figure that took longer than
+the hosted app allows (criteria.LIMITS["app_s"], 90 s) to make, measured on the drawing in hand (Drawn.seconds,
+spec.draw_spec's wall time), which is the machine's and its load's as much as the figure's. It never fails R1, never
+changes `foldmap check`'s exit code or --strict-floor, and is never in the check's --json report (that report holds
+no wall time, so it is the same on every run).
 
 suggestions(drawn) names the existing options that draw less, those that apply: --focus protomer (one subunit of a
 symmetric assembly drawn whole, in full), --focus CHAIN (its first chain in full, with what its neighbours add to its
 fold) and --chains CHAIN (that chain only). Measured on 9FZL, 8XJV and the largest entries of the three random samples
 (docs/validation/readability-floor, scripts/readability_floor.py): each brought every figure it was offered for above
-the floor; the notes still say "may", as nothing is measured before it is drawn. --reduced-detail (REDUCED_DETAIL, an
-option preset of existing style keys that leaves out low-priority annotations: base letters, ligand marks, glycans,
-3-10 helix boxes; elements, chains and their interfaces kept) removes most of the text drawn under 6 pt but measured
-to bring no figure above the floor (the page's size is set by its elements), so the notes do not offer it for that.
+the floor; the notes still say "may", as nothing is measured before it is drawn.
 
-Where it is said: the command line's notes (`foldmap plot`; with --strict-floor no figure is written below the floor
-and it exits 1), `foldmap check` (R1, a readability check, in the text and the --json report), the MCP result (its
-note and `floor`) and the app (a warning under the figure). It never reaches the drawn figure or its files: the
+Where it is said (said(), guarded: a failure to judge is said, never raised): the command line's notes (`foldmap
+plot`; with --strict-floor no figure below the floor is written and it exits 1), `foldmap check` (R1, a readability
+check, in the text and the --json report; a fail exits 1), the MCP result (its note and `floor`) and the app (a
+warning under the figure; never on a compare or diff page). It never reaches the drawn figure or its files: the
 default figure is unchanged (bench --exact)."""
 
 from __future__ import annotations
@@ -43,17 +45,17 @@ from .criteria import LIMITS
 from .layout import MIN_TEXT_PT
 
 CODE = "R1"  # the floor's check id in `foldmap check` (deep.report: group "floor", kind readability)
-TITLE = "readability floor: text at 6 pt or more, route budget not spent, made within the hosted time"
+TITLE = "readability floor: text at 6 pt or more on its page, route budget not spent"
 TEXT_SMALL, ROUTE_BUDGET, TIME = "text_small", "route_budget", "time"
-REASONS = {
+REASONS = {  # judged: a figure with one is below the floor
     TEXT_SMALL: "the figure's text is under 6 pt on its page (layout.MIN_TEXT_PT): its page is at its largest",
     ROUTE_BUDGET: "the page's budget for wider route searches was spent (route._MAX_NODES_PAGE)",
-    TIME: "it took longer to make than the hosted app allows (criteria.LIMITS['app_s'])",
+}
+NOTES = {  # said, never judged (ruling Q40)
+    TIME: "it took longer to make than the hosted app allows (criteria.LIMITS['app_s']); the machine's as much as "
+    "the figure's",
 }
 TIME_LIMIT_S = LIMITS["app_s"]  # the hosted app's limit (app_jobs.HOSTED)
-# the reduced-detail preset (--reduced-detail, the MCP's reduced_detail): existing style keys only, low-priority
-# annotations off; given before the user's own style keys, which win
-REDUCED_DETAIL = ("nucleotide_labels=false", "ligands=none", "glycans=false", "helices_310=false")
 
 
 def text_sizes(fig) -> tuple[float | None, float | None]:
@@ -68,8 +70,8 @@ def text_sizes(fig) -> tuple[float | None, float | None]:
 
 
 def measures(drawn) -> dict:
-    """What the floor is judged on: the page's size (inches), the figure's text and its smallest text (points), the
-    named fallbacks taken (Drawn.fallbacks) and the seconds it took (None when not timed)."""
+    """What the floor is judged on: the page's size (inches), the figure's text and its smallest text (points) and
+    the named fallbacks taken (Drawn.fallbacks); and the seconds it took (None when not timed), for time_notes only."""
     w, h = (float(x) for x in drawn.figure.get_size_inches())
     text, smallest = text_sizes(drawn.figure)
     seconds = getattr(drawn, "seconds", None)
@@ -83,7 +85,8 @@ def measures(drawn) -> dict:
 
 
 def reasons_of(got: dict) -> list[dict]:
-    """The floor's reasons for measures `got` (measures()), each {reason, measured, limit, text}; [] above it."""
+    """The floor's judged reasons for measures `got` (measures()), each {reason, measured, limit, text}; [] above
+    it. Never time (time_notes)."""
     out = []
     text = got.get("text_pt")
     if text is not None and text < MIN_TEXT_PT - 1e-6:
@@ -98,11 +101,17 @@ def reasons_of(got: dict) -> list[dict]:
         if curves := fired.get("loop_curve", 0):
             said += f", {curves} loop{'' if curves == 1 else 's'} drawn as curves"
         out.append({"reason": ROUTE_BUDGET, "measured": refused, "limit": 0, "text": said})
-    seconds = got.get("seconds")
-    if seconds is not None and seconds > TIME_LIMIT_S:
-        said = f"it took {seconds:.0f} s to make, over the hosted app's {TIME_LIMIT_S:g} s"
-        out.append({"reason": TIME, "measured": seconds, "limit": TIME_LIMIT_S, "text": said})
     return out
+
+
+def time_notes(got: dict) -> list[dict]:
+    """The time note for measures `got`, [{reason: time, measured, limit, text}] when it took longer than the hosted
+    app allows, else []: said, never judged (ruling Q40)."""
+    seconds = got.get("seconds")
+    if seconds is None or seconds <= TIME_LIMIT_S:
+        return []
+    said = f"it took {seconds:.0f} s to make, over the hosted app's {TIME_LIMIT_S:g} s (said, not judged)"
+    return [{"reason": TIME, "measured": seconds, "limit": TIME_LIMIT_S, "text": said}]
 
 
 def _down(pt: float) -> str:
@@ -170,37 +179,53 @@ def ways(offered: list[dict], how: str = "cli") -> str:
     return "drawing less may bring it above: " + "; ".join(said) if said else ""
 
 
-def note(reasons: list[dict], offered: list[dict], how: str = "cli") -> str:
+def note(reasons: list[dict], offered: list[dict], how: str = "cli", timed: list[dict] = ()) -> str:
     """One line for the notes: below the readability floor, why, and the options that draw less and may bring it
-    above (ways); '' above it."""
-    if not reasons:
-        return ""
-    said = "below the readability floor: " + "; ".join(r["text"] for r in reasons)
-    more = ways(offered, how)
-    return f"{said}; {more}" if more else said
+    above (ways); then the time note (`timed`, time_notes), said with or without a reason; '' when neither."""
+    parts = []
+    if reasons:
+        parts.append("below the readability floor: " + "; ".join(r["text"] for r in reasons))
+        if more := ways(offered, how):
+            parts.append(more)
+    parts += [t["text"] for t in timed]
+    return "; ".join(parts)
+
+
+def said(drawn, how: str = "cli") -> tuple[list[dict], str]:
+    """(the judged reasons, the notes' line: note() with the time note) for the figure `drawn`, in `how`'s words;
+    guarded: a failure to judge it is said ("readability floor not judged: ..."), never raised, so a figure is
+    always written whatever the floor's code does."""
+    try:
+        got = measures(drawn)
+        reasons = reasons_of(got)
+        return reasons, note(reasons, suggestions(drawn) if reasons else [], how, time_notes(got))
+    except Exception as err:  # noqa: BLE001 (said in the notes: the floor never stops a figure)
+        return [], f"readability floor not judged: {type(err).__name__}"
 
 
 def check(drawn) -> dict:
-    """R1 for `foldmap check` (deep.report's floor entry): {status, detail, reasons, suggestions, measures}; status
-    pass or fail, the reasons named."""
+    """R1 for `foldmap check`: {status, detail, reasons, suggestions, measures} for deep.report (status pass or fail
+    on the judged reasons; no wall time anywhere in it), and `timed` (time_notes) for the text only."""
     got = measures(drawn)
     reasons = reasons_of(got)
     offered = suggestions(drawn) if reasons else []
-    detail = note(reasons, offered) if reasons else "above the readability floor"
     return {
         "status": "fail" if reasons else "pass",
-        "detail": detail,
+        "detail": note(reasons, offered) if reasons else "above the readability floor",
         "reasons": reasons,
         "suggestions": offered,
-        "measures": got,
+        "measures": {k: v for k, v in got.items() if k != "seconds"},
+        "timed": time_notes(got),
     }
 
 
 def lines(got: dict) -> list[str]:
-    """`foldmap check`'s lines for R1 (check()): the verdict, then each reason and the options, indented."""
+    """`foldmap check`'s lines for R1 (check()): the verdict, then each reason and the options, then the time note,
+    indented."""
     out = [f"{CODE} {TITLE}: {got['status']}"]
     if got["status"] == "fail":
         out += [f"  {r['text']}" for r in got["reasons"]]
-        if said := ways(got["suggestions"]):
-            out.append(f"  {said}")
+        if more := ways(got["suggestions"]):
+            out.append(f"  {more}")
+    out += [f"  {t['text']}" for t in got.get("timed", [])]
     return out

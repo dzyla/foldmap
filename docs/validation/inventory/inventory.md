@@ -302,8 +302,8 @@ Of the 43 named-entry rows, 32 rest on the comment at the item and 11 on git (ev
 | `cli:_in_sequence:argument:181@6d2655ae` | argument | 181 | turns = sorted(range(-180 + AZIMUTH_STEP, 181, AZIMUTH_STEP), key=lambda a: (abs(a), a < 0)) | unknown | - | membrane | - |
 | `cli:_face_medians.page_y:comparison:1e-9@0f0573ec` | comparison | 1e-9 | elif abs(slope) > 1e-9: | convention | a floating-point tolerance | - | - |
 | `cli:_one_of_each:comparison:0.9@92fb00cc` | comparison | 0.9 | if SequenceMatcher(None, seq[g[0]], seq[c], autojunk=False).ratio() > 0.9: | unknown | - | - | - |
-| `cli:build_parser:argument:60@29d007de` | argument | 60 | sq.add_argument("--columns", type=int, default=60, help="residues (alignment columns) per row (default 60)") | unknown | - | cli, elstyle, floor, names +1 | - |
-| `cli:build_parser:argument:0.7@afd84f49` | argument | 0.7 | default=0.7, | unknown | - | cli, elstyle, floor, names +1 | - |
+| `cli:build_parser:argument:60@29d007de` | argument | 60 | sq.add_argument("--columns", type=int, default=60, help="residues (alignment columns) per row (default 60)") | unknown | - | cli, elstyle, names, science | - |
+| `cli:build_parser:argument:0.7@afd84f49` | argument | 0.7 | default=0.7, | unknown | - | cli, elstyle, names, science | - |
 
 ## compare
 

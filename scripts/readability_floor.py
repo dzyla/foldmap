@@ -1,7 +1,8 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 # Copyright (C) 2026 Dawid Zyla. Additional terms (AGPL-3.0 section 7(b)): see NOTICE.
-"""The record of the readability floor (plan 28 Task 4, the review's 3.3, ruling Q39): the largest figures measured
-at the default page size, which floor reasons fire on them, and what each existing option that draws less achieves.
+"""The record of the readability floor (plan 28 Task 4, the review's 3.3, rulings Q39-Q41): the largest figures
+measured at the default page size, which floor reasons fire on them, and what each existing option that draws less
+achieves.
 
     python scripts/readability_floor.py [--out docs/validation/readability-floor] [--jobs 12] [--ids 9FZL,8XJV]
 
@@ -16,10 +17,12 @@ time (the entries are fetched into ~/.cache/foldmap); not run in CI.
   each drawn as `foldmap plot ID` draws it (spec.draw_spec, the default options) in a process of its own, JOBS at a
   time (so times include that load), measured by floor.measures (page, the figure's text and its smallest text at
   the page size, named fallbacks, seconds), with A5's element overlaps and A6's text collisions (figcheck) and the
-  count of texts drawn under 6 pt; its floor reasons (floor.reasons_of) and the options the notes offer
-  (floor.suggestions).
-- tried: each option offered, drawn and measured the same way, and the reduced-detail preset (floor.REDUCED_DETAIL,
-  never offered for the floor) on every entry."""
+  count of texts drawn under 6 pt; its floor reasons (floor.reasons_of), its time note (floor.time_notes, never
+  judged), the options the notes offer (floor.suggestions) and its other checks' verdicts (criteria.check_figure:
+  the S-checks with findings and the A-criteria that fail), which say whether R1 alone makes `foldmap check` exit 1.
+- tried: each option offered, drawn and measured the same way, and the preset measured (PRESET_KEYS: four existing
+  style keys that leave out low-priority annotations; not an option: ruling Q40 dropped --reduced-detail after this
+  measurement) on every entry."""
 
 from __future__ import annotations
 
@@ -47,7 +50,8 @@ SAMPLES = ("random100", "random100-heldout", "random100-third")
 NAMED = ("9FZL", "8XJV")  # the review's 3.3
 LARGEST = 3  # the largest entries of each sample measured (by sample.json residues)
 SMALL_NOTE = re.compile(r"so its text is ([0-9.]+) pt, under 6 pt")
-PRESET = "reduced-detail"
+PRESET = "preset"  # the preset measured, not an option (ruling Q40): these style keys, given as --set
+PRESET_KEYS = ("nucleotide_labels=false", "ligands=none", "glycans=false", "helices_310=false")
 
 
 def _report(name: str) -> dict:
@@ -104,7 +108,7 @@ def _spec_kw(options: dict) -> dict:
     kw: dict = {}
     for k, v in options.items():
         if k == PRESET:
-            kw["style"] = list(floor.REDUCED_DETAIL)
+            kw["style"] = list(PRESET_KEYS)
         elif k == "chains":
             kw["chains"] = [v]
         else:
@@ -113,7 +117,9 @@ def _spec_kw(options: dict) -> dict:
 
 
 def phrase(options: dict) -> str:
-    return " ".join(f"--{k}" if v is None else f"--{k} {v}" for k, v in options.items()) or "(default)"
+    if PRESET in options:
+        return "the preset measured (not an option)"
+    return " ".join(f"--{k} {v}" for k, v in options.items()) or "(default)"
 
 
 def figure(task: tuple[str, dict, bool]) -> dict:
@@ -158,7 +164,13 @@ def figure(task: tuple[str, dict, bool]) -> dict:
     )
     if not options:
         row["suggestions"] = floor.suggestions(drawn) if reasons else []  # the notes offer them below it only
-        row["note"] = floor.note(reasons, row["suggestions"])
+        row["notes"] = [t["reason"] for t in floor.time_notes(m)]  # said, never judged (Q40)
+        row["note"] = floor.note(reasons, row["suggestions"], timed=floor.time_notes(m))
+        from foldmap.criteria import check_figure
+
+        found = check_figure(drawn, spec, path)  # what `foldmap check` judges besides R1 (its exit code)
+        row["science_findings"] = sorted(k for k, v in found["science"].items() if v)
+        row["criteria_failed"] = sorted(k for k, v in found["criteria"].items() if v["pass"] is False)
     plt.close(drawn.figure)
     return row
 
@@ -190,7 +202,11 @@ def effects(rows: list[dict]) -> dict:
             if "error" in t:
                 continue
             k = next(iter(t["options"]))
-            kind = f"--{k} protomer" if t["options"][k] == "protomer" else f"--{k}" + ("" if k == PRESET else " CHAIN")
+            kind = (
+                phrase(t["options"])
+                if k == PRESET
+                else f"--{k} " + ("protomer" if t["options"][k] == "protomer" else "CHAIN")
+            )
             got = out.setdefault(kind, {"tried_below": 0, "brought_above": 0, "entries": [], "seconds": [], "pt": []})
             got["tried_below"] += 1
             got["brought_above"] += not t["reasons"]
@@ -220,18 +236,50 @@ def _line(fig: dict) -> str:
     )
 
 
+def _preset_worse(rows: list[dict]) -> str:
+    """The figures the preset took from above the floor to below it, said (', and on X it took ...'), or ''."""
+    worse = []
+    for r in rows:
+        d = r["default"]
+        if "error" in d or d["reasons"]:
+            continue
+        for t in r["tried"]:
+            if PRESET in t["options"] and "error" not in t and t["reasons"]:
+                was, now = d["measures"]["text_pt"], t["measures"]["text_pt"]
+                worse.append(f"{r['id']} ({was:.2f} pt to {now:.2f} pt)")
+    if not worse:
+        return ""
+    return "; on " + ", ".join(worse) + " it took a figure above the floor to below it"
+
+
+def _flips(rows: list[dict]) -> str:
+    """Which default figures below the floor passed every other check (R1 alone now makes check exit 1) and which
+    already failed one, said as a sentence."""
+    alone, already = [], []
+    for r in rows:
+        d = r["default"]
+        if "error" in d or not d["reasons"]:
+            continue
+        other = d.get("science_findings", []) + d.get("criteria_failed", [])
+        (already if other else alone).append(f"{r['id']} ({', '.join(other)})" if other else r["id"])
+    return (
+        f"passed on {len(alone)} of them, which now exit 1 on R1 alone: {', '.join(alone) or 'none'}; and already "
+        f"failed on {len(already)}, which exited 1 before: {', '.join(already) or 'none'}."
+    )
+
+
 def render(doc: dict) -> str:
     rows, found = doc["entries"], doc["census"]
     below = [r for r in rows if r["default"].get("reasons")]
     lines = [
         "# The readability floor",
         "",
-        f"Plan 28 Task 4 (the review's 3.3, ruling Q39). Written by: {stamp_line(doc['source_stamp'])}",
+        f"Plan 28 Task 4 (the review's 3.3, rulings Q39-Q41). Written by: {stamp_line(doc['source_stamp'])}",
         "",
         "A figure below the readability floor says so (floor.readability_floor): in `foldmap plot`'s notes (and with "
-        "`--strict-floor` it writes no figure and exits 1), in `foldmap check` as R1 (readability) and its --json "
-        "report, in the MCP result and under the app's figure, naming the existing options that draw less. The "
-        "figure itself is unchanged. This record is what the reasons and their limits rest on.",
+        "`--strict-floor` it writes no figure and exits 1), in `foldmap check` as R1 (readability; a fail exits 1) "
+        "and its --json report, in the MCP result and under the app's figure, naming the existing options that draw "
+        "less. The figure itself is unchanged. This record is what the reasons and their limits rest on.",
         "",
         "## The reasons and their limits",
         "",
@@ -247,9 +295,19 @@ def render(doc: dict) -> str:
         "counted as the named fallbacks route_second_search_refused. It fired on none of the figures measured here "
         "and on none of the samples' default views (census below: their reports count none refused), so it is "
         "tested on synthetic measures only; a stuck loop of another kind is A3's, as it happens on small pages too.",
-        f"- **time**: longer than the hosted app's {floor.TIME_LIMIT_S:g} s (criteria.LIMITS app_s) to make, "
-        "measured as spec.draw_spec's wall time. It depends on the machine and its load: the figures here were "
-        f"drawn {doc['jobs']} at a time.",
+        f"- **time**: reported, never judged (ruling Q40). A figure that took longer than the hosted app's "
+        f"{floor.TIME_LIMIT_S:g} s (criteria.LIMITS app_s) to make, measured as spec.draw_spec's wall time, is said "
+        "so in the notes, the check's text, the MCP note and the app; it never fails R1, never changes `foldmap "
+        "check`'s exit code or --strict-floor, and is not in the check's --json report (which holds no wall time). "
+        "It depends on the machine and its load: the figures here were drawn "
+        f"{doc['jobs']} at a time. Time notes here: "
+        + (
+            ", ".join(
+                f"{r['id']} ({r['default']['measures']['seconds']:.0f} s)" for r in rows if r["default"].get("notes")
+            )
+            or "none"
+        )
+        + ".",
         "",
         "## Census of the three samples' default views",
         "",
@@ -287,10 +345,20 @@ def render(doc: dict) -> str:
         )
     lines += [
         "",
-        f"`--{PRESET}` is the preset `{' '.join('--set ' + s for s in floor.REDUCED_DETAIL)}` (existing style keys "
-        "only). It leaves out low-priority annotations, and so most of the text drawn under 6 pt, but the page's "
-        "size is set by its elements, so it does not raise the figure's text: the notes never offer it for the "
-        "floor.",
+        f"The preset measured is `{' '.join('--set ' + s for s in PRESET_KEYS)}` (existing style keys "
+        "only), not an option: ruling Q40 dropped the --reduced-detail option this measured, as it brought none of "
+        "the figures below the floor above it. It leaves out low-priority annotations, and so most of the text drawn "
+        "under 6 pt, but the page's size is set by its elements, so it does not raise the figure's text"
+        + _preset_worse(rows)
+        + ".",
+        "",
+        "## What `foldmap check` now says",
+        "",
+        "R1 fails, and `foldmap check` exits 1, on the figures below the floor. Before R1 these default figures' "
+        "other checks (the S-checks and A1-A20 judged here, criteria.check_figure) "
+        + _flips(rows)
+        + " The census above is of the samples' reports at their own commit, so that every sample default whose "
+        "text is under 6 pt is among those measured here is inferred from it, not run at this code on all 300.",
         "",
         "## Every figure",
         "",
@@ -326,8 +394,9 @@ def main(argv=None) -> int:
     doc = {
         "source_stamp": SOURCE_STAMP,
         "jobs": args.jobs,
-        "limits": {"text_pt": floor.MIN_TEXT_PT, "route_budget_refused": 0, "seconds": floor.TIME_LIMIT_S},
-        "reduced_detail": list(floor.REDUCED_DETAIL),
+        "limits": {"text_pt": floor.MIN_TEXT_PT, "route_budget_refused": 0},
+        "time_note_s": floor.TIME_LIMIT_S,  # said, never judged (Q40)
+        "preset_measured": list(PRESET_KEYS),  # not an option (Q40)
         "census": found,
         "entries": rows,
         "effects": effects(rows),
