@@ -446,7 +446,8 @@ def shape(lay) -> dict:
     for an unrolled frame the plain projection of the same orientation; on an unrolled frame that unrolls each
     nucleic-acid copy with the protomer holding it, each copy's stems through that copy's own plain frame
     (copy_frames; "copies_measured" their number), Spearman and Procrustes taken per copy and the worst copy's kept,
-    and the angles judged against half the turn between neighbouring copies ("angle_limit", unrolled_angle_limit).
+    and, when every stem with an angle is seen through its copy's frame, the angles judged against half the turn between
+    neighbouring copies ("angle_limit", unrolled_angle_limit).
     Stems are drawn along their axes as seen
     in the layout's frame, so on a plain frame angle_median, angle_max and joint_error_max are 0 by construction:
     regression guards there, not fidelity checks; on an unrolled frame they measure the unrolling.
@@ -499,12 +500,12 @@ def shape(lay) -> dict:
         out["procrustes"] = max(fit)
     if len(groups) > 1:
         out["copies_measured"] = len(groups)
-        out["angle_limit"] = unrolled_angle_limit(lay.frame)
-    errors, mirrored = [], 0
+    errors, mirrored, plain_angled = [], 0, False
     for d, f, (centre, axis) in zip(stems, frames, axes):
         a2 = f.direction(centre, axis)
         if _norm(a2) > 0.5:  # seen side-on enough to have a direction on the page
             errors.append(_angle(a2, d.direction))
+            plain_angled |= f is plain
         (a, i0, i1), (b, j0, j1) = pieces[d.id].arm5, pieces[d.id].arm3
         across = na.strands[a].c1[i0 : i1 + 1].mean(axis=0) - na.strands[b].c1[j0 : j1 + 1].mean(axis=0)
         s2 = f.direction(centre, across)
@@ -513,6 +514,8 @@ def shape(lay) -> dict:
             mirrored += (1 if beside > 0 else -1) != d.first
     out["angle_median"] = round(float(np.median(errors)), 1) if errors else None
     out["angle_max"] = round(float(np.max(errors)), 1) if errors else None
+    if copies and errors and not plain_angled:  # every angle taken in a copy's own frame: the unrolled limit
+        out["angle_limit"] = unrolled_angle_limit(lay.frame)
     out["mirrored"] = mirrored
     joints = []  # (seen turn, drawn turn), signed, between consecutive pieces of one duplex
     for k in range(len(stems) - 1):
@@ -529,11 +532,16 @@ def shape(lay) -> dict:
 
 
 def unrolled_angle_limit(frame) -> float:
-    """The angle limit (degrees) of a figure whose copies are measured each through its own plain frame (copy_frames):
-    half the turn between neighbouring copies round the axis. A copy's own parts lie up to that far round from its
-    centre, and the unrolled frame shows each part from its own place round the axis, so its stems are drawn turned
-    against the copy's single view by up to that much (3EGZ, four copies: measured 10.4 at most, limit 45). Not a
-    fidelity check: angles are regression guards (ROLE); this keeps the guard from failing the unrolling itself."""
+    """The angle limit (degrees) of a figure whose stems are measured each through its copy's own plain frame
+    (copy_frames), set by shape only when every stem with an angle is (a stem seen through the plain frame keeps the
+    plain limit): half the turn between neighbouring copies round the axis, the mean step of frame.angles (a helical
+    filament's turn per copy, not 360/n). A copy's own parts lie up to about that far round from its centre, and the
+    unrolled frame shows each part from its own place round the axis, so its stems are drawn turned against the
+    copy's single view (3EGZ, four copies 90 degrees apart: measured 10.4 at most, limit 45). Not a fidelity check:
+    angles are regression guards (ROLE); this keeps the guard from failing the unrolling itself."""
+    angles = list(getattr(frame, "angles", None) or [])
+    if len(angles) > 1:
+        return round(0.5 * float(np.degrees(abs(float(np.mean(np.diff(angles)))))), 1)
     return round(180.0 / max(int(getattr(frame, "n", 1)), 1), 1)
 
 

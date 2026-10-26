@@ -267,12 +267,23 @@ NA_GUARDS = ("angle_median", "angle_max", "joint_error_max")
 NA_FIDELITY = ("spearman", "procrustes", "contact_auc", "contact_precision_at_k", "ss_contacts_nearer")
 
 
+def _unrolled(rows: list[dict], key: str) -> dict:
+    """{"unrolled_limit": {entry: limit}} for angle_median and angle_max where a row was judged under shape's unrolled
+    limit (angle_limit, plan 28 F2: each copy in its own frame, the plain limit 0.05 set aside); {} when none was."""
+    if key not in ("angle_median", "angle_max"):
+        return {}
+    got = {r["entry"]: r["angle_limit"] for r in rows if r.get("angle_limit") is not None and r.get(key) is not None}
+    return {"unrolled_limit": got} if got else {}
+
+
 def na_measures(rows: list[dict], nearer_limit: float = 1.0) -> dict:
     """NA report rows summarised by role. regression_guards: angle_median, angle_max and joint_error_max, zero by
     construction on an ordinary projection (stems are drawn along their axes as seen): per measure the rows measuring
     it, how many are 0 and each other row's value (an unrolled frame's, which measures the unrolling). fidelity: the
     quartiles of Spearman, Procrustes and the contact measures; mirrored stems (rows measured, stems in all, rows with
-    any); stems_nearer_frac's distribution next to its strict pass (nearer_summary)."""
+    any); stems_nearer_frac's distribution next to its strict pass (nearer_summary). Plan 28 F2: the rows judged
+    under the unrolled angle limit are named in the guards (unrolled_limit), and the rows whose Spearman is not
+    measured because each copy has too few stems in fidelity["spearman"]["not_measured_per_copy"]."""
     guards = {}
     for k in NA_GUARDS:
         got = {r["entry"]: r[k] for r in rows if r.get(k) is not None}
@@ -281,6 +292,7 @@ def na_measures(rows: list[dict], nearer_limit: float = 1.0) -> dict:
             "measured": len(got),
             "zero": sum(v == 0 for v in got.values()),
             "nonzero": {e: v for e, v in got.items() if v != 0},
+            **_unrolled(rows, k),
         }
     fidelity: dict = {k: quartiles([float(r[k]) for r in rows if r.get(k) is not None]) for k in NA_FIDELITY}
     mirrored = {r["entry"]: r["mirrored"] for r in rows if r.get("mirrored") is not None}
@@ -290,6 +302,9 @@ def na_measures(rows: list[dict], nearer_limit: float = 1.0) -> dict:
         "entries_with_mirrored": sorted(e for e, v in mirrored.items() if v),
     }
     fidelity["stems_nearer_frac"] = nearer_summary(rows, nearer_limit)
+    per_copy = sorted(r["entry"] for r in rows if r.get("copies_measured") and r.get("spearman") is None)
+    if per_copy:  # plan 28 F2: each copy too few stems for a rank correlation (3EGZ: 3 a copy), so none at all
+        fidelity["spearman"]["not_measured_per_copy"] = per_copy
     return {"regression_guards": guards, "fidelity": fidelity}
 
 

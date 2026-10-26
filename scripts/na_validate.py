@@ -615,7 +615,11 @@ def measure_lines(got: dict) -> list[str]:
               "axes as seen; on an unrolled frame they measure the unrolling):", ""]  # fmt: skip
     for k, g in got["regression_guards"].items():
         other = ", ".join(f"{e} {_num(v)}" for e, v in g["nonzero"].items()) or "none"
-        lines.append(f"- {k}: 0 in {g['zero']} of {g['measured']} measured; not 0: {other}")
+        unrolled = ", ".join(f"{e} {_num(v)}" for e, v in g.get("unrolled_limit", {}).items())
+        lines.append(
+            f"- {k}: 0 in {g['zero']} of {g['measured']} measured; not 0: {other}"
+            + (f"; judged under the unrolled limit (each copy in its own frame): {unrolled}" if unrolled else "")
+        )
     lines += ["", "Fidelity (n, median, quartiles, range):", ""]
     for k, d in got["fidelity"].items():
         if k == "mirrored":
@@ -640,13 +644,16 @@ def measure_lines(got: dict) -> list[str]:
                 f"applicable; not applicable (every drawn element touches the stem): "
                 f"{', '.join(d['not_applicable']) or 'none'}; {dist}; histogram {bins}"
             )
-        elif d["n"]:
-            lines.append(
+        else:
+            text = (
                 f"- {k}: n {d['n']}, median {_num(d['median'])}, quartiles {_num(d['q1'])}-{_num(d['q3'])}, range "
                 f"{_num(d['min'])}-{_num(d['max'])}"
+                if d["n"]
+                else f"- {k}: not measured"
             )
-        else:
-            lines.append(f"- {k}: not measured")
+            if d.get("not_measured_per_copy"):  # plan 28 F2: an unrolled figure measured copy by copy
+                text += f"; not measured per copy (each copy under 5 stems): {', '.join(d['not_measured_per_copy'])}"
+            lines.append(text)
     return lines
 
 
@@ -707,6 +714,8 @@ def main(argv=None) -> int:
         "angle_median",
         "angle_max",
         "mirrored",
+        "copies_measured",
+        "angle_limit",
         "bend_3d",
         "bend_drawn",
         "joint_error_max",

@@ -707,7 +707,7 @@ def test_shape_measured_per_copy_on_cylinder():
     m = shape(lay)
     assert m["copies_measured"] == 4 and m["angle_limit"] == unrolled_angle_limit(lay.frame) == 45.0
     assert m["mirrored"] == 0, m
-    assert m["angle_max"] <= m["angle_limit"], m
+    assert m["angle_max"] <= 11 <= m["angle_limit"], m  # measured 10.4: the drawing pinned, not only the limit
     assert not [f for f in judge(m) if f.startswith(("angle", "mirrored"))], judge(m)
     # each copy measured in its own view: 0.572 at worst (measured), against 0.982 for all four through one view; still
     # past THRESHOLDS (0.5): the stems of one copy span 49 degrees round the axis, unrolled flat
@@ -715,3 +715,23 @@ def test_shape_measured_per_copy_on_cylinder():
     plain = {**m}
     plain.pop("angle_limit")  # judged against the plain limit, the unrolling itself fails it
     assert any(f.startswith("angle_max") for f in judge(plain))
+
+
+def test_the_report_names_rows_measured_per_copy():
+    """Plan 28 fix round 1 (ruling Q38): a figure measured copy by copy (3EGZ) is named where it passes by it: its
+    Spearman, not measured per copy (3 stems a copy), and its angles, judged under the unrolled limit."""
+    nv = _na_validate()
+    rows = [
+        {"entry": "3EGZ", "angle_median": 10.3, "angle_max": 10.4, "angle_limit": 45.0, "copies_measured": 4,
+         "spearman": None, "procrustes": 0.572, "mirrored": 0, "failed": []},
+        {"entry": "1LMB", "angle_median": 0.0, "angle_max": 0.0, "spearman": 0.9, "mirrored": 0, "failed": []},
+    ]  # fmt: skip
+    got = nv.measures(rows)
+    assert got["regression_guards"]["angle_max"]["unrolled_limit"] == {"3EGZ": 45.0}
+    assert got["fidelity"]["spearman"]["not_measured_per_copy"] == ["3EGZ"]
+    text = "\n".join(nv.measure_lines(got))
+    assert "- angle_max: 0 in 1 of 2 measured; not 0: 3EGZ 10.4; judged under the unrolled limit" in text
+    assert "not measured per copy (each copy under 5 stems): 3EGZ" in text
+    plain = nv.measures(rows[1:])
+    assert "unrolled_limit" not in plain["regression_guards"]["angle_max"]
+    assert "not_measured_per_copy" not in plain["fidelity"]["spearman"]
