@@ -1,0 +1,1894 @@
+{
+ "source_stamp": {
+  "foldmap": "0.1.0",
+  "code_fingerprint": "0fe34f04e08547af",
+  "package": "checkout",
+  "checkout_fingerprint": "0fe34f04e08547af",
+  "installed_matches_checkout": true,
+  "git": {
+   "commit": "eac6756ee494926883bbc36e18adc6051cd14b7d",
+   "dirty": false,
+   "source": "asserted by runner"
+  },
+  "script": {
+   "name": "scripts/readability_floor.py",
+   "sha256": "4e6ec669cc96e2cafbbaa4fb17a8c0e7e39963dd1e2eaa7401f8454989cda7d5"
+  },
+  "python": {
+   "version": "3.13.13",
+   "implementation": "CPython"
+  },
+  "platform": {
+   "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.43",
+   "machine": "x86_64"
+  },
+  "packages": {
+   "gemmi": "0.7.5",
+   "numpy": "2.5.4",
+   "scipy": "1.18.1",
+   "networkx": "3.7",
+   "matplotlib": "3.11.2",
+   "PyYAML": "6.0.3"
+  }
+ },
+ "jobs": 12,
+ "limits": {
+  "text_pt": 6.0,
+  "route_budget_refused": 0,
+  "seconds": 90
+ },
+ "reduced_detail": [
+  "nucleotide_labels=false",
+  "ligands=none",
+  "glycans=false",
+  "helices_310=false"
+ ],
+ "census": {
+  "random100": {
+   "commit": "76969474ca5bd64e295d6401b4bec32bc7f3c828",
+   "default_views": 100,
+   "text_under_6pt": {
+    "7JU4": 5.5,
+    "6JLN": 4.5
+   },
+   "over_60_s": {
+    "7Y7C": 66.92,
+    "8VWQ": 64.51
+   },
+   "over_90_s": {},
+   "route_budget_refused": {},
+   "largest": {
+    "7QUP": 29575,
+    "6YF9": 25200,
+    "7JU4": 23990
+   }
+  },
+  "random100-heldout": {
+   "commit": "76969474ca5bd64e295d6401b4bec32bc7f3c828",
+   "default_views": 100,
+   "text_under_6pt": {
+    "6ET5": 2.4,
+    "8WMV": 5.5,
+    "7NZ2": 5.2,
+    "8ZTU": 5.7
+   },
+   "over_60_s": {
+    "8ZTU": 60.74
+   },
+   "over_90_s": {},
+   "route_budget_refused": {},
+   "largest": {
+    "8D3D": 23504,
+    "7SPB": 23478,
+    "9GTP": 22650
+   }
+  },
+  "random100-third": {
+   "commit": "76969474ca5bd64e295d6401b4bec32bc7f3c828",
+   "default_views": 100,
+   "text_under_6pt": {
+    "9FZL": 2.0,
+    "8XJV": 5.4
+   },
+   "over_60_s": {
+    "8XJV": 129.02
+   },
+   "over_90_s": {
+    "8XJV": 129.02
+   },
+   "route_budget_refused": {},
+   "largest": {
+    "8FZN": 30000,
+    "7SPI": 23478,
+    "9HEO": 21040
+   }
+  }
+ },
+ "entries": [
+  {
+   "id": "9FZL",
+   "default": {
+    "options": {},
+    "said": "(default)",
+    "offered": false,
+    "measures": {
+     "page_in": [
+      48.0,
+      9.85
+     ],
+     "text_pt": 2.049,
+     "smallest_pt": 1.229,
+     "fallbacks": {
+      "counts_hidden": 2,
+      "helix_name_moved": 22,
+      "page_text_small": 1
+     },
+     "seconds": 53.62
+    },
+    "reasons": [
+     "text_small"
+    ],
+    "texts": 1442,
+    "texts_under_6pt": 1442,
+    "element_overlaps": 0,
+    "text_collisions": 0,
+    "stuck": 0,
+    "elements": 976,
+    "chains_drawn": 98,
+    "check_seconds": 2.3,
+    "suggestions": [
+     {
+      "options": {
+       "focus": "protomer"
+      },
+      "what": "one subunit in full"
+     },
+     {
+      "options": {
+       "focus": "2M"
+      },
+      "what": "chain 2M in full, with what its neighbours add to its fold"
+     },
+     {
+      "options": {
+       "chains": "2M"
+      },
+      "what": "chain 2M only"
+     }
+    ],
+    "note": "below the readability floor: its text is 2.0 pt, under 6 pt, on its 48 x 10 in page (its smallest text 1.2 pt); drawing less may bring it above: --focus protomer (one subunit in full); --focus 2M (chain 2M in full, with what its neighbours add to its fold); --chains 2M (chain 2M only)"
+   },
+   "tried": [
+    {
+     "options": {
+      "focus": "protomer"
+     },
+     "said": "--focus protomer",
+     "offered": true,
+     "measures": {
+      "page_in": [
+       45.54,
+       20.88
+      ],
+      "text_pt": 6.0,
+      "smallest_pt": 3.6,
+      "fallbacks": {
+       "counts_hidden": 1
+      },
+      "seconds": 14.06
+     },
+     "reasons": [],
+     "texts": 750,
+     "texts_under_6pt": 179,
+     "element_overlaps": 0,
+     "text_collisions": 0,
+     "stuck": 0,
+     "elements": 511,
+     "chains_drawn": 67,
+     "check_seconds": 1.8
+    },
+    {
+     "options": {
+      "focus": "2M"
+     },
+     "said": "--focus 2M",
+     "offered": true,
+     "measures": {
+      "page_in": [
+       8.75,
+       7.23
+      ],
+      "text_pt": 6.0,
+      "smallest_pt": 3.6,
+      "fallbacks": {},
+      "seconds": 2.36
+     },
+     "reasons": [],
+     "texts": 52,
+     "texts_under_6pt": 10,
+     "element_overlaps": 0,
+     "text_collisions": 0,
+     "stuck": 0,
+     "elements": 46,
+     "chains_drawn": 1,
+     "check_seconds": 0.5
+    },
+    {
+     "options": {
+      "chains": "2M"
+     },
+     "said": "--chains 2M",
+     "offered": true,
+     "measures": {
+      "page_in": [
+       8.75,
+       6.55
+      ],
+      "text_pt": 6.0,
+      "smallest_pt": 3.6,
+      "fallbacks": {},
+      "seconds": 0.94
+     },
+     "reasons": [],
+     "texts": 50,
+     "texts_under_6pt": 9,
+     "element_overlaps": 0,
+     "text_collisions": 0,
+     "stuck": 0,
+     "elements": 46,
+     "chains_drawn": 1,
+     "check_seconds": 0.3
+    },
+    {
+     "options": {
+      "reduced-detail": null
+     },
+     "said": "--reduced-detail",
+     "offered": false,
+     "measures": {
+      "page_in": [
+       48.0,
+       9.31
+      ],
+      "text_pt": 2.057,
+      "smallest_pt": 1.481,
+      "fallbacks": {
+       "counts_hidden": 7,
+       "helix_name_moved": 11,
+       "page_text_small": 1
+      },
+      "seconds": 50.85
+     },
+     "reasons": [
+      "text_small"
+     ],
+     "texts": 1195,
+     "texts_under_6pt": 1195,
+     "element_overlaps": 0,
+     "text_collisions": 0,
+     "stuck": 0,
+     "elements": 800,
+     "chains_drawn": 96,
+     "check_seconds": 2.2
+    }
+   ]
+  },
+  {
+   "id": "8XJV",
+   "default": {
+    "options": {},
+    "said": "(default)",
+    "offered": false,
+    "measures": {
+     "page_in": [
+      46.94,
+      48.0
+     ],
+     "text_pt": 5.482,
+     "smallest_pt": 3.947,
+     "fallbacks": {
+      "counts_hidden": 5,
+      "glyph_width_guessed": 76,
+      "helix_name_moved": 19,
+      "na_gap_unclear": 3,
+      "na_tail_straight": 4,
+      "na_trace_unclear": 3,
+      "page_text_small": 1
+     },
+     "seconds": 109.91
+    },
+    "reasons": [
+     "text_small",
+     "time"
+    ],
+    "texts": 1288,
+    "texts_under_6pt": 1288,
+    "element_overlaps": 0,
+    "text_collisions": 3,
+    "stuck": 10,
+    "elements": 670,
+    "chains_drawn": 110,
+    "check_seconds": 3.1,
+    "suggestions": [
+     {
+      "options": {
+       "focus": "A"
+      },
+      "what": "chain A in full, with what its neighbours add to its fold"
+     },
+     {
+      "options": {
+       "chains": "A"
+      },
+      "what": "chain A only"
+     }
+    ],
+    "note": "below the readability floor: its text is 5.4 pt, under 6 pt, on its 47 x 48 in page (its smallest text 3.9 pt); it took 110 s to make, over the hosted app's 90 s; drawing less may bring it above: --focus A (chain A in full, with what its neighbours add to its fold); --chains A (chain A only)"
+   },
+   "tried": [
+    {
+     "options": {
+      "focus": "A"
+     },
+     "said": "--focus A",
+     "offered": true,
+     "measures": {
+      "page_in": [
+       8.97,
+       10.19
+      ],
+      "text_pt": 6.0,
+      "smallest_pt": 4.32,
+      "fallbacks": {
+       "glyph_width_guessed": 20
+      },
+      "seconds": 13.39
+     },
+     "reasons": [],
+     "texts": 42,
+     "texts_under_6pt": 22,
+     "element_overlaps": 0,
+     "text_collisions": 0,
+     "stuck": 0,
+     "elements": 12,
+     "chains_drawn": 5,
+     "check_seconds": 0.5
+    },
+    {
+     "options": {
+      "chains": "A"
+     },
+     "said": "--chains A",
+     "offered": true,
+     "measures": {
+      "page_in": [
+       8.11,
+       10.52
+      ],
+      "text_pt": 6.0,
+      "smallest_pt": 4.32,
+      "fallbacks": {
+       "glyph_width_guessed": 20
+      },
+      "seconds": 1.99
+     },
+     "reasons": [],
+     "texts": 33,
+     "texts_under_6pt": 21,
+     "element_overlaps": 0,
+     "text_collisions": 0,
+     "stuck": 0,
+     "elements": 6,
+     "chains_drawn": 3,
+     "check_seconds": 0.3
+    },
+    {
+     "options": {
+      "reduced-detail": null
+     },
+     "said": "--reduced-detail",
+     "offered": false,
+     "measures": {
+      "page_in": [
+       45.64,
+       48.0
+      ],
+      "text_pt": 5.194,
+      "smallest_pt": 3.74,
+      "fallbacks": {
+       "counts_hidden": 13,
+       "glyph_width_guessed": 57,
+       "helix_name_moved": 15,
+       "na_gap_unclear": 4,
+       "na_tail_straight": 3,
+       "na_trace_unclear": 3,
+       "page_text_small": 1
+      },
+      "seconds": 113.73
+     },
+     "reasons": [
+      "text_small",
+      "time"
+     ],
+     "texts": 1257,
+     "texts_under_6pt": 1257,
+     "element_overlaps": 0,
+     "text_collisions": 5,
+     "stuck": 10,
+     "elements": 634,
+     "chains_drawn": 110,
+     "check_seconds": 3.0
+    }
+   ]
+  },
+  {
+   "id": "7QUP",
+   "default": {
+    "options": {},
+    "said": "(default)",
+    "offered": false,
+    "measures": {
+     "page_in": [
+      7.81,
+      10.03
+     ],
+     "text_pt": 6.0,
+     "smallest_pt": 3.6,
+     "fallbacks": {},
+     "seconds": 23.91
+    },
+    "reasons": [],
+    "texts": 73,
+    "texts_under_6pt": 12,
+    "element_overlaps": 0,
+    "text_collisions": 0,
+    "stuck": 0,
+    "elements": 63,
+    "chains_drawn": 2,
+    "check_seconds": 1.1,
+    "suggestions": [],
+    "note": ""
+   },
+   "tried": [
+    {
+     "options": {
+      "reduced-detail": null
+     },
+     "said": "--reduced-detail",
+     "offered": false,
+     "measures": {
+      "page_in": [
+       7.69,
+       10.7
+      ],
+      "text_pt": 6.0,
+      "smallest_pt": 5.1,
+      "fallbacks": {},
+      "seconds": 24.87
+     },
+     "reasons": [],
+     "texts": 62,
+     "texts_under_6pt": 1,
+     "element_overlaps": 0,
+     "text_collisions": 0,
+     "stuck": 0,
+     "elements": 55,
+     "chains_drawn": 2,
+     "check_seconds": 1.3
+    }
+   ]
+  },
+  {
+   "id": "6YF9",
+   "default": {
+    "options": {},
+    "said": "(default)",
+    "offered": false,
+    "measures": {
+     "page_in": [
+      5.15,
+      4.26
+     ],
+     "text_pt": 7.366,
+     "smallest_pt": 6.261,
+     "fallbacks": {},
+     "seconds": 3.91
+    },
+    "reasons": [],
+    "texts": 15,
+    "texts_under_6pt": 0,
+    "element_overlaps": 0,
+    "text_collisions": 0,
+    "stuck": 0,
+    "elements": 10,
+    "chains_drawn": 2,
+    "check_seconds": 0.7,
+    "suggestions": [],
+    "note": ""
+   },
+   "tried": [
+    {
+     "options": {
+      "reduced-detail": null
+     },
+     "said": "--reduced-detail",
+     "offered": false,
+     "measures": {
+      "page_in": [
+       5.15,
+       4.26
+      ],
+      "text_pt": 7.366,
+      "smallest_pt": 6.261,
+      "fallbacks": {},
+      "seconds": 4.32
+     },
+     "reasons": [],
+     "texts": 15,
+     "texts_under_6pt": 0,
+     "element_overlaps": 0,
+     "text_collisions": 0,
+     "stuck": 0,
+     "elements": 10,
+     "chains_drawn": 2,
+     "check_seconds": 0.7
+    }
+   ]
+  },
+  {
+   "id": "7JU4",
+   "default": {
+    "options": {},
+    "said": "(default)",
+    "offered": false,
+    "measures": {
+     "page_in": [
+      32.78,
+      48.0
+     ],
+     "text_pt": 5.537,
+     "smallest_pt": 3.322,
+     "fallbacks": {
+      "page_text_small": 1
+     },
+     "seconds": 38.13
+    },
+    "reasons": [
+     "text_small"
+    ],
+    "texts": 1298,
+    "texts_under_6pt": 1298,
+    "element_overlaps": 0,
+    "text_collisions": 0,
+    "stuck": 0,
+    "elements": 1065,
+    "chains_drawn": 61,
+    "check_seconds": 2.8,
+    "suggestions": [
+     {
+      "options": {
+       "focus": "0"
+      },
+      "what": "chain 0 in full, with what its neighbours add to its fold"
+     },
+     {
+      "options": {
+       "chains": "0"
+      },
+      "what": "chain 0 only"
+     }
+    ],
+    "note": "below the readability floor: its text is 5.5 pt, under 6 pt, on its 33 x 48 in page (its smallest text 3.3 pt); drawing less may bring it above: --focus 0 (chain 0 in full, with what its neighbours add to its fold); --chains 0 (chain 0 only)"
+   },
+   "tried": [
+    {
+     "options": {
+      "focus": "0"
+     },
+     "said": "--focus 0",
+     "offered": true,
+     "measures": {
+      "page_in": [
+       2.5,
+       12.18
+      ],
+      "text_pt": 7.366,
+      "smallest_pt": 5.303,
+      "fallbacks": {},
+      "seconds": 2.93
+     },
+     "reasons": [],
+     "texts": 9,
+     "texts_under_6pt": 1,
+     "element_overlaps": 0,
+     "text_collisions": 0,
+     "stuck": 0,
+     "elements": 3,
+     "chains_drawn": 2,
+     "check_seconds": 0.2
+    },
+    {
+     "options": {
+      "chains": "0"
+     },
+     "said": "--chains 0",
+     "offered": true,
+     "measures": {
+      "page_in": [
+       1.84,
+       11.03
+      ],
+      "text_pt": 7.366,
+      "smallest_pt": 5.303,
+      "fallbacks": {},
+      "seconds": 0.91
+     },
+     "reasons": [],
+     "texts": 5,
+     "texts_under_6pt": 1,
+     "element_overlaps": 0,
+     "text_collisions": 0,
+     "stuck": 0,
+     "elements": 2,
+     "chains_drawn": 1,
+     "check_seconds": 0.2
+    },
+    {
+     "options": {
+      "reduced-detail": null
+     },
+     "said": "--reduced-detail",
+     "offered": false,
+     "measures": {
+      "page_in": [
+       34.34,
+       48.0
+      ],
+      "text_pt": 5.866,
+      "smallest_pt": 4.223,
+      "fallbacks": {
+       "page_text_small": 1
+      },
+      "seconds": 30.66
+     },
+     "reasons": [
+      "text_small"
+     ],
+     "texts": 1162,
+     "texts_under_6pt": 1162,
+     "element_overlaps": 0,
+     "text_collisions": 0,
+     "stuck": 0,
+     "elements": 965,
+     "chains_drawn": 61,
+     "check_seconds": 2.5
+    }
+   ]
+  },
+  {
+   "id": "6JLN",
+   "default": {
+    "options": {},
+    "said": "(default)",
+    "offered": false,
+    "measures": {
+     "page_in": [
+      48.0,
+      9.34
+     ],
+     "text_pt": 4.528,
+     "smallest_pt": 2.717,
+     "fallbacks": {
+      "page_text_small": 1
+     },
+     "seconds": 17.95
+    },
+    "reasons": [
+     "text_small"
+    ],
+    "texts": 584,
+    "texts_under_6pt": 584,
+    "element_overlaps": 0,
+    "text_collisions": 0,
+    "stuck": 0,
+    "elements": 309,
+    "chains_drawn": 39,
+    "check_seconds": 1.0,
+    "suggestions": [
+     {
+      "options": {
+       "focus": "protomer"
+      },
+      "what": "one subunit in full"
+     },
+     {
+      "options": {
+       "focus": "A"
+      },
+      "what": "chain A in full, with what its neighbours add to its fold"
+     },
+     {
+      "options": {
+       "chains": "A"
+      },
+      "what": "chain A only"
+     }
+    ],
+    "note": "below the readability floor: its text is 4.5 pt, under 6 pt, on its 48 x 9 in page (its smallest text 2.7 pt); drawing less may bring it above: --focus protomer (one subunit in full); --focus A (chain A in full, with what its neighbours add to its fold); --chains A (chain A only)"
+   },
+   "tried": [
+    {
+     "options": {
+      "focus": "protomer"
+     },
+     "said": "--focus protomer",
+     "offered": true,
+     "measures": {
+      "page_in": [
+       26.37,
+       11.35
+      ],
+      "text_pt": 6.0,
+      "smallest_pt": 3.6,
+      "fallbacks": {},
+      "seconds": 4.01
+     },
+     "reasons": [],
+     "texts": 300,
+     "texts_under_6pt": 116,
+     "element_overlaps": 0,
+     "text_collisions": 0,
+     "stuck": 0,
+     "elements": 156,
+     "chains_drawn": 21,
+     "check_seconds": 0.7
+    },
+    {
+     "options": {
+      "focus": "A"
+     },
+     "said": "--focus A",
+     "offered": true,
+     "measures": {
+      "page_in": [
+       7.21,
+       5.06
+      ],
+      "text_pt": 6.0,
+      "smallest_pt": 3.6,
+      "fallbacks": {},
+      "seconds": 0.72
+     },
+     "reasons": [],
+     "texts": 49,
+     "texts_under_6pt": 29,
+     "element_overlaps": 0,
+     "text_collisions": 0,
+     "stuck": 0,
+     "elements": 21,
+     "chains_drawn": 3,
+     "check_seconds": 0.3
+    },
+    {
+     "options": {
+      "chains": "A"
+     },
+     "said": "--chains A",
+     "offered": true,
+     "measures": {
+      "page_in": [
+       6.3,
+       5.41
+      ],
+      "text_pt": 7.366,
+      "smallest_pt": 4.419,
+      "fallbacks": {},
+      "seconds": 0.47
+     },
+     "reasons": [],
+     "texts": 42,
+     "texts_under_6pt": 23,
+     "element_overlaps": 0,
+     "text_collisions": 0,
+     "stuck": 0,
+     "elements": 17,
+     "chains_drawn": 1,
+     "check_seconds": 0.2
+    },
+    {
+     "options": {
+      "reduced-detail": null
+     },
+     "said": "--reduced-detail",
+     "offered": false,
+     "measures": {
+      "page_in": [
+       48.0,
+       14.37
+      ],
+      "text_pt": 5.286,
+      "smallest_pt": 3.806,
+      "fallbacks": {
+       "page_text_small": 1
+      },
+      "seconds": 6.53
+     },
+     "reasons": [
+      "text_small"
+     ],
+     "texts": 389,
+     "texts_under_6pt": 389,
+     "element_overlaps": 0,
+     "text_collisions": 0,
+     "stuck": 0,
+     "elements": 246,
+     "chains_drawn": 39,
+     "check_seconds": 0.7
+    }
+   ]
+  },
+  {
+   "id": "7Y7C",
+   "default": {
+    "options": {},
+    "said": "(default)",
+    "offered": false,
+    "measures": {
+     "page_in": [
+      47.13,
+      41.77
+     ],
+     "text_pt": 6.0,
+     "smallest_pt": 3.72,
+     "fallbacks": {
+      "counts_hidden": 4,
+      "glyph_width_guessed": 100
+     },
+     "seconds": 44.95
+    },
+    "reasons": [],
+    "texts": 1201,
+    "texts_under_6pt": 654,
+    "element_overlaps": 0,
+    "text_collisions": 0,
+    "stuck": 0,
+    "elements": 427,
+    "chains_drawn": 55,
+    "check_seconds": 3.0,
+    "suggestions": [],
+    "note": ""
+   },
+   "tried": [
+    {
+     "options": {
+      "reduced-detail": null
+     },
+     "said": "--reduced-detail",
+     "offered": false,
+     "measures": {
+      "page_in": [
+       48.0,
+       38.89
+      ],
+      "text_pt": 5.373,
+      "smallest_pt": 3.868,
+      "fallbacks": {
+       "counts_hidden": 4,
+       "glyph_width_guessed": 75,
+       "na_run_unclear": 2,
+       "page_text_small": 1
+      },
+      "seconds": 50.57
+     },
+     "reasons": [
+      "text_small"
+     ],
+     "texts": 1155,
+     "texts_under_6pt": 1155,
+     "element_overlaps": 0,
+     "text_collisions": 1,
+     "stuck": 2,
+     "elements": 381,
+     "chains_drawn": 55,
+     "check_seconds": 2.8
+    }
+   ]
+  },
+  {
+   "id": "8VWQ",
+   "default": {
+    "options": {},
+    "said": "(default)",
+    "offered": false,
+    "measures": {
+     "page_in": [
+      47.97,
+      42.26
+     ],
+     "text_pt": 6.0,
+     "smallest_pt": 3.6,
+     "fallbacks": {
+      "counts_hidden": 3,
+      "glyph_width_guessed": 76
+     },
+     "seconds": 45.51
+    },
+    "reasons": [],
+    "texts": 1243,
+    "texts_under_6pt": 657,
+    "element_overlaps": 0,
+    "text_collisions": 0,
+    "stuck": 0,
+    "elements": 455,
+    "chains_drawn": 56,
+    "check_seconds": 2.9,
+    "suggestions": [],
+    "note": ""
+   },
+   "tried": [
+    {
+     "options": {
+      "reduced-detail": null
+     },
+     "said": "--reduced-detail",
+     "offered": false,
+     "measures": {
+      "page_in": [
+       46.36,
+       41.75
+      ],
+      "text_pt": 6.0,
+      "smallest_pt": 4.32,
+      "fallbacks": {
+       "counts_hidden": 2,
+       "glyph_width_guessed": 57,
+       "helix_name_moved": 1
+      },
+      "seconds": 45.77
+     },
+     "reasons": [],
+     "texts": 1189,
+     "texts_under_6pt": 603,
+     "element_overlaps": 0,
+     "text_collisions": 2,
+     "stuck": 0,
+     "elements": 419,
+     "chains_drawn": 56,
+     "check_seconds": 2.9
+    }
+   ]
+  },
+  {
+   "id": "8D3D",
+   "default": {
+    "options": {},
+    "said": "(default)",
+    "offered": false,
+    "measures": {
+     "page_in": [
+      15.23,
+      8.1
+     ],
+     "text_pt": 6.0,
+     "smallest_pt": 3.72,
+     "fallbacks": {},
+     "seconds": 16.13
+    },
+    "reasons": [],
+    "texts": 128,
+    "texts_under_6pt": 20,
+    "element_overlaps": 0,
+    "text_collisions": 0,
+    "stuck": 0,
+    "elements": 116,
+    "chains_drawn": 2,
+    "check_seconds": 1.0,
+    "suggestions": [],
+    "note": ""
+   },
+   "tried": [
+    {
+     "options": {
+      "reduced-detail": null
+     },
+     "said": "--reduced-detail",
+     "offered": false,
+     "measures": {
+      "page_in": [
+       15.73,
+       8.86
+      ],
+      "text_pt": 6.0,
+      "smallest_pt": 4.32,
+      "fallbacks": {},
+      "seconds": 14.45
+     },
+     "reasons": [],
+     "texts": 113,
+     "texts_under_6pt": 5,
+     "element_overlaps": 0,
+     "text_collisions": 0,
+     "stuck": 0,
+     "elements": 104,
+     "chains_drawn": 2,
+     "check_seconds": 0.9
+    }
+   ]
+  },
+  {
+   "id": "7SPB",
+   "default": {
+    "options": {},
+    "said": "(default)",
+    "offered": false,
+    "measures": {
+     "page_in": [
+      6.71,
+      8.13
+     ],
+     "text_pt": 7.366,
+     "smallest_pt": 5.303,
+     "fallbacks": {},
+     "seconds": 0.7
+    },
+    "reasons": [],
+    "texts": 48,
+    "texts_under_6pt": 3,
+    "element_overlaps": 0,
+    "text_collisions": 0,
+    "stuck": 0,
+    "elements": 31,
+    "chains_drawn": 5,
+    "check_seconds": 0.3,
+    "suggestions": [],
+    "note": ""
+   },
+   "tried": [
+    {
+     "options": {
+      "reduced-detail": null
+     },
+     "said": "--reduced-detail",
+     "offered": false,
+     "measures": {
+      "page_in": [
+       6.78,
+       7.99
+      ],
+      "text_pt": 7.366,
+      "smallest_pt": 5.303,
+      "fallbacks": {},
+      "seconds": 0.69
+     },
+     "reasons": [],
+     "texts": 47,
+     "texts_under_6pt": 3,
+     "element_overlaps": 0,
+     "text_collisions": 0,
+     "stuck": 0,
+     "elements": 30,
+     "chains_drawn": 5,
+     "check_seconds": 0.3
+    }
+   ]
+  },
+  {
+   "id": "9GTP",
+   "default": {
+    "options": {},
+    "said": "(default)",
+    "offered": false,
+    "measures": {
+     "page_in": [
+      19.4,
+      15.6
+     ],
+     "text_pt": 6.0,
+     "smallest_pt": 4.32,
+     "fallbacks": {},
+     "seconds": 2.2
+    },
+    "reasons": [],
+    "texts": 194,
+    "texts_under_6pt": 27,
+    "element_overlaps": 0,
+    "text_collisions": 0,
+    "stuck": 0,
+    "elements": 156,
+    "chains_drawn": 14,
+    "check_seconds": 0.8,
+    "suggestions": [],
+    "note": ""
+   },
+   "tried": [
+    {
+     "options": {
+      "reduced-detail": null
+     },
+     "said": "--reduced-detail",
+     "offered": false,
+     "measures": {
+      "page_in": [
+       15.75,
+       15.02
+      ],
+      "text_pt": 6.0,
+      "smallest_pt": 4.32,
+      "fallbacks": {},
+      "seconds": 1.93
+     },
+     "reasons": [],
+     "texts": 182,
+     "texts_under_6pt": 15,
+     "element_overlaps": 0,
+     "text_collisions": 0,
+     "stuck": 0,
+     "elements": 142,
+     "chains_drawn": 14,
+     "check_seconds": 0.7
+    }
+   ]
+  },
+  {
+   "id": "6ET5",
+   "default": {
+    "options": {},
+    "said": "(default)",
+    "offered": false,
+    "measures": {
+     "page_in": [
+      48.0,
+      5.77
+     ],
+     "text_pt": 2.464,
+     "smallest_pt": 1.479,
+     "fallbacks": {
+      "helix_name_moved": 1,
+      "page_text_small": 1
+     },
+     "seconds": 2.9
+    },
+    "reasons": [
+     "text_small"
+    ],
+    "texts": 422,
+    "texts_under_6pt": 422,
+    "element_overlaps": 0,
+    "text_collisions": 0,
+    "stuck": 0,
+    "elements": 141,
+    "chains_drawn": 54,
+    "check_seconds": 0.7,
+    "suggestions": [
+     {
+      "options": {
+       "focus": "C"
+      },
+      "what": "chain C in full, with what its neighbours add to its fold"
+     },
+     {
+      "options": {
+       "chains": "C"
+      },
+      "what": "chain C only"
+     }
+    ],
+    "note": "below the readability floor: its text is 2.4 pt, under 6 pt, on its 48 x 6 in page (its smallest text 1.4 pt); drawing less may bring it above: --focus C (chain C in full, with what its neighbours add to its fold); --chains C (chain C only)"
+   },
+   "tried": [
+    {
+     "options": {
+      "focus": "C"
+     },
+     "said": "--focus C",
+     "offered": true,
+     "measures": {
+      "page_in": [
+       7.0,
+       5.68
+      ],
+      "text_pt": 7.366,
+      "smallest_pt": 4.419,
+      "fallbacks": {},
+      "seconds": 0.83
+     },
+     "reasons": [],
+     "texts": 30,
+     "texts_under_6pt": 6,
+     "element_overlaps": 0,
+     "text_collisions": 0,
+     "stuck": 0,
+     "elements": 19,
+     "chains_drawn": 2,
+     "check_seconds": 0.1
+    },
+    {
+     "options": {
+      "chains": "C"
+     },
+     "said": "--chains C",
+     "offered": true,
+     "measures": {
+      "page_in": [
+       5.43,
+       6.09
+      ],
+      "text_pt": 7.366,
+      "smallest_pt": 4.419,
+      "fallbacks": {},
+      "seconds": 0.3
+     },
+     "reasons": [],
+     "texts": 27,
+     "texts_under_6pt": 6,
+     "element_overlaps": 0,
+     "text_collisions": 0,
+     "stuck": 0,
+     "elements": 19,
+     "chains_drawn": 1,
+     "check_seconds": 0.1
+    },
+    {
+     "options": {
+      "reduced-detail": null
+     },
+     "said": "--reduced-detail",
+     "offered": false,
+     "measures": {
+      "page_in": [
+       48.0,
+       8.14
+      ],
+      "text_pt": 3.299,
+      "smallest_pt": 2.375,
+      "fallbacks": {
+       "counts_hidden": 1,
+       "page_text_small": 1
+      },
+      "seconds": 1.79
+     },
+     "reasons": [
+      "text_small"
+     ],
+     "texts": 344,
+     "texts_under_6pt": 344,
+     "element_overlaps": 0,
+     "text_collisions": 0,
+     "stuck": 0,
+     "elements": 123,
+     "chains_drawn": 54,
+     "check_seconds": 0.6
+    }
+   ]
+  },
+  {
+   "id": "8WMV",
+   "default": {
+    "options": {},
+    "said": "(default)",
+    "offered": false,
+    "measures": {
+     "page_in": [
+      48.0,
+      12.75
+     ],
+     "text_pt": 5.525,
+     "smallest_pt": 3.315,
+     "fallbacks": {
+      "page_text_small": 1
+     },
+     "seconds": 14.12
+    },
+    "reasons": [
+     "text_small"
+    ],
+    "texts": 737,
+    "texts_under_6pt": 737,
+    "element_overlaps": 0,
+    "text_collisions": 0,
+    "stuck": 0,
+    "elements": 243,
+    "chains_drawn": 28,
+    "check_seconds": 1.4,
+    "suggestions": [
+     {
+      "options": {
+       "focus": "A"
+      },
+      "what": "chain A in full, with what its neighbours add to its fold"
+     },
+     {
+      "options": {
+       "chains": "A"
+      },
+      "what": "chain A only"
+     }
+    ],
+    "note": "below the readability floor: its text is 5.5 pt, under 6 pt, on its 48 x 13 in page (its smallest text 3.3 pt); drawing less may bring it above: --focus A (chain A in full, with what its neighbours add to its fold); --chains A (chain A only)"
+   },
+   "tried": [
+    {
+     "options": {
+      "focus": "A"
+     },
+     "said": "--focus A",
+     "offered": true,
+     "measures": {
+      "page_in": [
+       9.14,
+       6.81
+      ],
+      "text_pt": 6.0,
+      "smallest_pt": 3.6,
+      "fallbacks": {},
+      "seconds": 1.21
+     },
+     "reasons": [],
+     "texts": 120,
+     "texts_under_6pt": 79,
+     "element_overlaps": 0,
+     "text_collisions": 0,
+     "stuck": 0,
+     "elements": 48,
+     "chains_drawn": 1,
+     "check_seconds": 0.3
+    },
+    {
+     "options": {
+      "chains": "A"
+     },
+     "said": "--chains A",
+     "offered": true,
+     "measures": {
+      "page_in": [
+       9.14,
+       6.13
+      ],
+      "text_pt": 6.0,
+      "smallest_pt": 3.6,
+      "fallbacks": {},
+      "seconds": 0.87
+     },
+     "reasons": [],
+     "texts": 118,
+     "texts_under_6pt": 78,
+     "element_overlaps": 0,
+     "text_collisions": 0,
+     "stuck": 0,
+     "elements": 48,
+     "chains_drawn": 1,
+     "check_seconds": 0.2
+    },
+    {
+     "options": {
+      "reduced-detail": null
+     },
+     "said": "--reduced-detail",
+     "offered": false,
+     "measures": {
+      "page_in": [
+       48.0,
+       12.97
+      ],
+      "text_pt": 5.77,
+      "smallest_pt": 4.155,
+      "fallbacks": {
+       "page_text_small": 1
+      },
+      "seconds": 6.91
+     },
+     "reasons": [
+      "text_small"
+     ],
+     "texts": 322,
+     "texts_under_6pt": 322,
+     "element_overlaps": 0,
+     "text_collisions": 0,
+     "stuck": 0,
+     "elements": 207,
+     "chains_drawn": 28,
+     "check_seconds": 0.7
+    }
+   ]
+  },
+  {
+   "id": "7NZ2",
+   "default": {
+    "options": {},
+    "said": "(default)",
+    "offered": false,
+    "measures": {
+     "page_in": [
+      48.0,
+      37.31
+     ],
+     "text_pt": 5.215,
+     "smallest_pt": 3.129,
+     "fallbacks": {
+      "page_text_small": 1
+     },
+     "seconds": 43.8
+    },
+    "reasons": [
+     "text_small"
+    ],
+    "texts": 1029,
+    "texts_under_6pt": 1029,
+    "element_overlaps": 0,
+    "text_collisions": 0,
+    "stuck": 0,
+    "elements": 860,
+    "chains_drawn": 44,
+    "check_seconds": 2.7,
+    "suggestions": [
+     {
+      "options": {
+       "focus": "A1"
+      },
+      "what": "chain A1 in full, with what its neighbours add to its fold"
+     },
+     {
+      "options": {
+       "chains": "A1"
+      },
+      "what": "chain A1 only"
+     }
+    ],
+    "note": "below the readability floor: its text is 5.2 pt, under 6 pt, on its 48 x 37 in page (its smallest text 3.1 pt); drawing less may bring it above: --focus A1 (chain A1 in full, with what its neighbours add to its fold); --chains A1 (chain A1 only)"
+   },
+   "tried": [
+    {
+     "options": {
+      "focus": "A1"
+     },
+     "said": "--focus A1",
+     "offered": true,
+     "measures": {
+      "page_in": [
+       20.1,
+       22.23
+      ],
+      "text_pt": 6.0,
+      "smallest_pt": 3.6,
+      "fallbacks": {},
+      "seconds": 2.57
+     },
+     "reasons": [],
+     "texts": 96,
+     "texts_under_6pt": 21,
+     "element_overlaps": 0,
+     "text_collisions": 0,
+     "stuck": 0,
+     "elements": 70,
+     "chains_drawn": 7,
+     "check_seconds": 0.8
+    },
+    {
+     "options": {
+      "chains": "A1"
+     },
+     "said": "--chains A1",
+     "offered": true,
+     "measures": {
+      "page_in": [
+       20.06,
+       22.34
+      ],
+      "text_pt": 6.0,
+      "smallest_pt": 3.6,
+      "fallbacks": {},
+      "seconds": 1.45
+     },
+     "reasons": [],
+     "texts": 90,
+     "texts_under_6pt": 20,
+     "element_overlaps": 0,
+     "text_collisions": 0,
+     "stuck": 0,
+     "elements": 67,
+     "chains_drawn": 5,
+     "check_seconds": 0.4
+    },
+    {
+     "options": {
+      "reduced-detail": null
+     },
+     "said": "--reduced-detail",
+     "offered": false,
+     "measures": {
+      "page_in": [
+       48.0,
+       36.23
+      ],
+      "text_pt": 4.953,
+      "smallest_pt": 3.566,
+      "fallbacks": {
+       "page_text_small": 1
+      },
+      "seconds": 36.87
+     },
+     "reasons": [
+      "text_small"
+     ],
+     "texts": 929,
+     "texts_under_6pt": 929,
+     "element_overlaps": 0,
+     "text_collisions": 0,
+     "stuck": 0,
+     "elements": 776,
+     "chains_drawn": 44,
+     "check_seconds": 2.5
+    }
+   ]
+  },
+  {
+   "id": "8ZTU",
+   "default": {
+    "options": {},
+    "said": "(default)",
+    "offered": false,
+    "measures": {
+     "page_in": [
+      48.0,
+      41.68
+     ],
+     "text_pt": 5.748,
+     "smallest_pt": 3.449,
+     "fallbacks": {
+      "counts_hidden": 1,
+      "glyph_width_guessed": 76,
+      "page_text_small": 1
+     },
+     "seconds": 44.32
+    },
+    "reasons": [
+     "text_small"
+    ],
+    "texts": 1209,
+    "texts_under_6pt": 1209,
+    "element_overlaps": 0,
+    "text_collisions": 1,
+    "stuck": 0,
+    "elements": 428,
+    "chains_drawn": 55,
+    "check_seconds": 3.0,
+    "suggestions": [
+     {
+      "options": {
+       "focus": "B"
+      },
+      "what": "chain B in full, with what its neighbours add to its fold"
+     },
+     {
+      "options": {
+       "chains": "B"
+      },
+      "what": "chain B only"
+     }
+    ],
+    "note": "below the readability floor: its text is 5.7 pt, under 6 pt, on its 48 x 42 in page (its smallest text 3.4 pt); drawing less may bring it above: --focus B (chain B in full, with what its neighbours add to its fold); --chains B (chain B only)"
+   },
+   "tried": [
+    {
+     "options": {
+      "focus": "B"
+     },
+     "said": "--focus B",
+     "offered": true,
+     "measures": {
+      "page_in": [
+       11.0,
+       9.7
+      ],
+      "text_pt": 6.0,
+      "smallest_pt": 4.5,
+      "fallbacks": {
+       "glyph_width_guessed": 40
+      },
+      "seconds": 2.29
+     },
+     "reasons": [],
+     "texts": 53,
+     "texts_under_6pt": 31,
+     "element_overlaps": 0,
+     "text_collisions": 0,
+     "stuck": 0,
+     "elements": 18,
+     "chains_drawn": 2,
+     "check_seconds": 0.4
+    },
+    {
+     "options": {
+      "chains": "B"
+     },
+     "said": "--chains B",
+     "offered": true,
+     "measures": {
+      "page_in": [
+       11.0,
+       9.38
+      ],
+      "text_pt": 6.0,
+      "smallest_pt": 4.5,
+      "fallbacks": {
+       "glyph_width_guessed": 40
+      },
+      "seconds": 1.84
+     },
+     "reasons": [],
+     "texts": 51,
+     "texts_under_6pt": 30,
+     "element_overlaps": 0,
+     "text_collisions": 0,
+     "stuck": 0,
+     "elements": 18,
+     "chains_drawn": 2,
+     "check_seconds": 0.3
+    },
+    {
+     "options": {
+      "reduced-detail": null
+     },
+     "said": "--reduced-detail",
+     "offered": false,
+     "measures": {
+      "page_in": [
+       48.0,
+       41.63
+      ],
+      "text_pt": 5.887,
+      "smallest_pt": 4.239,
+      "fallbacks": {
+       "glyph_width_guessed": 57,
+       "helix_name_moved": 1,
+       "page_text_small": 1
+      },
+      "seconds": 39.69
+     },
+     "reasons": [
+      "text_small"
+     ],
+     "texts": 1159,
+     "texts_under_6pt": 1159,
+     "element_overlaps": 0,
+     "text_collisions": 1,
+     "stuck": 0,
+     "elements": 390,
+     "chains_drawn": 55,
+     "check_seconds": 2.6
+    }
+   ]
+  },
+  {
+   "id": "8FZN",
+   "default": {
+    "options": {},
+    "said": "(default)",
+    "offered": false,
+    "measures": {
+     "page_in": [
+      6.79,
+      8.99
+     ],
+     "text_pt": 7.366,
+     "smallest_pt": 5.303,
+     "fallbacks": {},
+     "seconds": 6.32
+    },
+    "reasons": [],
+    "texts": 52,
+    "texts_under_6pt": 2,
+    "element_overlaps": 0,
+    "text_collisions": 0,
+    "stuck": 0,
+    "elements": 45,
+    "chains_drawn": 3,
+    "check_seconds": 1.0,
+    "suggestions": [],
+    "note": ""
+   },
+   "tried": [
+    {
+     "options": {
+      "reduced-detail": null
+     },
+     "said": "--reduced-detail",
+     "offered": false,
+     "measures": {
+      "page_in": [
+       5.18,
+       9.03
+      ],
+      "text_pt": 7.366,
+      "smallest_pt": 5.303,
+      "fallbacks": {},
+      "seconds": 6.62
+     },
+     "reasons": [],
+     "texts": 48,
+     "texts_under_6pt": 2,
+     "element_overlaps": 0,
+     "text_collisions": 0,
+     "stuck": 0,
+     "elements": 41,
+     "chains_drawn": 3,
+     "check_seconds": 1.1
+    }
+   ]
+  },
+  {
+   "id": "7SPI",
+   "default": {
+    "options": {},
+    "said": "(default)",
+    "offered": false,
+    "measures": {
+     "page_in": [
+      6.7,
+      8.22
+     ],
+     "text_pt": 7.366,
+     "smallest_pt": 5.303,
+     "fallbacks": {},
+     "seconds": 0.59
+    },
+    "reasons": [],
+    "texts": 48,
+    "texts_under_6pt": 3,
+    "element_overlaps": 0,
+    "text_collisions": 0,
+    "stuck": 0,
+    "elements": 31,
+    "chains_drawn": 5,
+    "check_seconds": 0.3,
+    "suggestions": [],
+    "note": ""
+   },
+   "tried": [
+    {
+     "options": {
+      "reduced-detail": null
+     },
+     "said": "--reduced-detail",
+     "offered": false,
+     "measures": {
+      "page_in": [
+       7.2,
+       6.3
+      ],
+      "text_pt": 6.331,
+      "smallest_pt": 4.558,
+      "fallbacks": {},
+      "seconds": 0.57
+     },
+     "reasons": [],
+     "texts": 47,
+     "texts_under_6pt": 4,
+     "element_overlaps": 0,
+     "text_collisions": 0,
+     "stuck": 0,
+     "elements": 30,
+     "chains_drawn": 5,
+     "check_seconds": 0.3
+    }
+   ]
+  },
+  {
+   "id": "9HEO",
+   "default": {
+    "options": {},
+    "said": "(default)",
+    "offered": false,
+    "measures": {
+     "page_in": [
+      20.29,
+      25.26
+     ],
+     "text_pt": 6.0,
+     "smallest_pt": 3.6,
+     "fallbacks": {},
+     "seconds": 5.58
+    },
+    "reasons": [],
+    "texts": 307,
+    "texts_under_6pt": 28,
+    "element_overlaps": 0,
+    "text_collisions": 0,
+    "stuck": 0,
+    "elements": 287,
+    "chains_drawn": 5,
+    "check_seconds": 1.1,
+    "suggestions": [],
+    "note": ""
+   },
+   "tried": [
+    {
+     "options": {
+      "reduced-detail": null
+     },
+     "said": "--reduced-detail",
+     "offered": false,
+     "measures": {
+      "page_in": [
+       21.26,
+       25.1
+      ],
+      "text_pt": 6.0,
+      "smallest_pt": 4.32,
+      "fallbacks": {},
+      "seconds": 7.14
+     },
+     "reasons": [],
+     "texts": 285,
+     "texts_under_6pt": 6,
+     "element_overlaps": 0,
+     "text_collisions": 0,
+     "stuck": 0,
+     "elements": 268,
+     "chains_drawn": 5,
+     "check_seconds": 1.0
+    }
+   ]
+  }
+ ],
+ "effects": {
+  "--focus protomer": {
+   "tried_below": 2,
+   "brought_above": 2,
+   "entries": [
+    "9FZL",
+    "6JLN"
+   ],
+   "median_seconds": 9.035,
+   "median_text_pt": 6.0
+  },
+  "--focus CHAIN": {
+   "tried_below": 8,
+   "brought_above": 8,
+   "entries": [
+    "9FZL",
+    "8XJV",
+    "7JU4",
+    "6JLN",
+    "6ET5",
+    "8WMV",
+    "7NZ2",
+    "8ZTU"
+   ],
+   "median_seconds": 2.325,
+   "median_text_pt": 6.0
+  },
+  "--chains CHAIN": {
+   "tried_below": 8,
+   "brought_above": 8,
+   "entries": [
+    "9FZL",
+    "8XJV",
+    "7JU4",
+    "6JLN",
+    "6ET5",
+    "8WMV",
+    "7NZ2",
+    "8ZTU"
+   ],
+   "median_seconds": 0.925,
+   "median_text_pt": 6.0
+  },
+  "--reduced-detail": {
+   "tried_below": 8,
+   "brought_above": 0,
+   "entries": [
+    "9FZL",
+    "8XJV",
+    "7JU4",
+    "6JLN",
+    "6ET5",
+    "8WMV",
+    "7NZ2",
+    "8ZTU"
+   ],
+   "median_seconds": 33.765,
+   "median_text_pt": 5.24
+  }
+ }
+}
