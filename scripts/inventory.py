@@ -129,6 +129,16 @@ def _anchor(code: str) -> str:
     return hashlib.sha1(code.encode("utf-8")).hexdigest()[:8]
 
 
+def _call_name(func: ast.AST) -> str | None:
+    """The called function's own name, never shortened (np.asarray(...).reshape -> reshape, round -> round); None
+    for a callee that is neither a name nor an attribute (a subscript, a call's result)."""
+    if isinstance(func, ast.Attribute):
+        return func.attr
+    if isinstance(func, ast.Name):
+        return func.id
+    return None
+
+
 def _comments(source: str) -> tuple[dict[int, str], set[int], dict[int, int]]:
     """Each line's comment, the lines holding a comment alone, and the column each comment starts at."""
     said, alone, cut = {}, set(), {}
@@ -338,7 +348,8 @@ class _Scan(ast.NodeVisitor):
 
     def inline(self, stmt: ast.AST) -> None:
         """The comparisons' and arguments' numbers of one statement's own expressions (not its nested statements):
-        its expression fields, and those of its with items, keywords (a class's) and match cases' guards."""
+        its expression fields, and those of its with items, keywords and match cases' guards (a class's keyword is
+        read but listed only inside a call or a comparison, so a bare one is not)."""
         for _, value in ast.iter_fields(stmt):
             for n in value if isinstance(value, list) else [value]:
                 if isinstance(n, ast.withitem):
@@ -368,10 +379,10 @@ class _Scan(ast.NodeVisitor):
             if isinstance(p, ast.keyword):
                 kw = p.arg
             if isinstance(p, ast.Compare):
-                kind, callee = "comparison", None
+                kind, callee, call = "comparison", None, None
                 break
             if isinstance(p, ast.Call) and node is not p.func:
-                kind, callee = "argument", self.segment(p.func, 60)
+                kind, callee, call = "argument", self.segment(p.func, 60), _call_name(p.func)
                 break
             if isinstance(p, ast.Lambda) and node is not p.body:
                 return
@@ -380,7 +391,7 @@ class _Scan(ast.NodeVisitor):
             return
         text = self.segment(lit, 30)
         ident = f"{self.module}:{self.qual()}:{kind}:{text}@{_anchor(self.code(lit.lineno))}"
-        extra = {"callee": callee, "keyword": kw} if kind == "argument" else {}
+        extra = {"callee": callee, "call": call, "keyword": kw} if kind == "argument" else {}
         self.add(kind, ident, lit, text, stmt=stmt, **extra)
 
     # ----------------------------------------------------------------------------------------------- markers
@@ -510,7 +521,7 @@ def role_origin(item: dict) -> tuple[str, str] | None:
         v = float(item["value"].replace("_", ""))
     except ValueError:
         return None
-    callee = (item.get("callee") or "").split(".")[-1]
+    callee = item.get("call") or ""  # the callee's own name (_call_name), not the shortened text in "callee"
     argument = item["kind"] == "argument"
     if v != 0 and abs(v) <= 1e-5:
         return "convention", "a floating-point tolerance"

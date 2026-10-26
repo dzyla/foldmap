@@ -79,16 +79,16 @@ every correction of a rule are by hand.
 
 | kind | items | biology | geometry | measured | named-entry | convention | unknown |
 |---|---|---|---|---|---|---|---|
-| constant | 588 | 62 | 25 | 28 | 39 | 100 | 334 |
+| constant | 588 | 62 | 25 | 28 | 36 | 100 | 337 |
 | default | 33 | 0 | 0 | 0 | 0 | 3 | 30 |
 | local | 1 | 0 | 0 | 0 | 0 | 0 | 1 |
 | comparison | 296 | 0 | 0 | 0 | 0 | 154 | 142 |
-| argument | 659 | 0 | 0 | 0 | 0 | 172 | 487 |
+| argument | 659 | 0 | 0 | 0 | 0 | 179 | 480 |
 | fallback | 24 | 0 | 0 | 0 | 4 | 1 | 19 |
 | fallback-marker | 29 | 0 | 0 | 0 | 3 | 0 | 26 |
-| all | 1630 | 62 | 25 | 28 | 46 | 430 | 1039 |
+| all | 1630 | 62 | 25 | 28 | 43 | 437 | 1035 |
 
-Of the 46 named-entry rows, 32 rest on the comment at the item and 14 on git (evidence starting `git:`: a commit whose message ties the value to the entries).
+Of the 43 named-entry rows, 32 rest on the comment at the item and 11 on git (evidence starting `git:`: a commit whose message ties the value to the entries).
 
 ## Named fallbacks (foldmap.fallback.FALLBACKS)
 
@@ -599,7 +599,7 @@ Of the 46 named-entry rows, 32 rest on the comment at the item and 14 on git (ev
 | `io:AUTO_MAX` | constant | 24 | AUTO_MAX = 24 # `auto` builds assemblies up to this many chains (a capsid is better asked for by name) | convention | an assembly size limit; earliest in this file: 0438931 2026-10-09 Rename to foldmap; add README | - | - |
 | `io:COINCIDENT_FRAC` | constant | 0.90 | COINCIDENT_FRAC = 0.90 # of a copy's atoms ... | unknown | earliest in this file: 13139b4 2026-10-11 C5: drop assembly copies laid exactly on a chain already present | - | - |
 | `io:COINCIDENT_DIST` | constant | 1.0 | COINCIDENT_DIST = 1.0 # ... within this many Å of one chain already present: the same molecule seen twice | unknown | earliest in this file: 13139b4 2026-10-11 C5: drop assembly copies laid exactly on a chain already present | - | - |
-| `io:SAME_PROTEIN` | constant | 0.9 | SAME_PROTEIN = 0.9 # two polymer entities are one protein when their full sequences align this identical (of the | named-entry:4UM3 | git: 391d211's message: "entities whose full sequences align at least 90 % identical ... as one protein ... 4UM3 draws assembly 1's pentamer" | - | - |
+| `io:SAME_PROTEIN` | constant | 0.9 | SAME_PROTEIN = 0.9 # two polymer entities are one protein when their full sequences align this identical (of the | unknown | introduced by 391d211 (4UM3), whose message states the rule's 90 % and then 4UM3's outcome, not a value set on 4UM3 (as figcheck:COPY_IDENTITY); its message: "entities whose full sequences align at least 90 % identical ... as one protein ... 4UM3 draws assembly 1's pentamer" | - | - |
 | `io:SAME_LENGTH` | constant | 0.8 | SAME_LENGTH = 0.8 | unknown | introduced by 2a8ae8e (C30: 3OWW), whose message ties 0.8 to "a bound peptide", no entry; earliest in this file: 2a8ae8e 2026-10-14 C30 (random-100 fix round 1): a peptide is not a copy of its receptor; chains th… | - | - |
 | `io:PAIRED_MIN` | constant | 3 | PAIRED_MIN = 3 # residue pairs of two chains' nucleotides with polar base atoms this near: held together (_paired) | named-entry:4PLX,3OWW | git: ddcbcbf's message (the value's last change): "PAIRED_MIN is 3: 3OWW's dimer pairs in 4 and stays A+B ... 4PLX draws assembly 1 again" | assembly | - |
 | `io:_PAIR_DIST` | constant | 3.4 | _PAIR_DIST = 3.4 # angstrom | named-entry:3OWW | git: 2a8ae8e's message: "3OWW ruling: chains held together by base pairs ... within 3.4 A ... are one object" | - | - |
@@ -610,7 +610,7 @@ Of the 46 named-entry rows, 32 rest on the comment at the item and 14 on git (ev
 | `io:_METAL_REACH` | constant | 3.1 | _METAL_REACH = 3.1 # Å, metal to a coordinating atom (K+ to carbonyl O is ~2.8-3.0) | biology | "K+ to carbonyl O is ~2.8-3.0"; earliest in this file: df8de19 2026-10-09 Add ligand and metal ion markers | - | - |
 | `io:_LIGAND_REACH` | constant | 4.0 | _LIGAND_REACH = 4.0 # Å, ligand heavy atom to a residue atom | unknown | earliest in this file: df8de19 2026-10-09 Add ligand and metal ion markers | - | - |
 | `io:_BOND` | constant | 1.9 | _BOND = 1.9 # Å between heavy atoms of two residues that are covalently joined | biology | "heavy atoms of two residues that are covalently joined"; earliest in this file: 0438931 2026-10-09 Rename to foldmap; add README | perf | - |
-| `io:_drop_coincident:argument:3@b9797183` | argument | 3 | xyz = np.array([a.pos.tolist() for r in chain for a in r], float).reshape(-1, 3) | unknown | - | assembly, na_validation | - |
+| `io:_drop_coincident:argument:3@b9797183` | argument | 3 | xyz = np.array([a.pos.tolist() for r in chain for a in r], float).reshape(-1, 3) | convention | an array's shape | assembly, na_validation | - |
 | `io:_operator_tags:comparison:1e-3@561161d9` | comparison | 1e-3 | if not len(c) or not len(c[0]) or c[0][0].pos.dist(p) > 1e-3: | unknown | - | - | - |
 | `io:_same_proteins:argument:20@7ee7e2fd` | argument | 20 | or min(len(seq), len(ref)) < max(20, SAME_LENGTH * max(len(seq), len(ref))) | unknown | line last changed by 2a8ae8e C30 (random-100 fix round 1): a peptide is not a copy of its receptor; chains that pair are one object (3OWW) (git blame; evidence only) | assembly | - |
 | `io:read_model:argument:1e-3@bc170007` | argument | 1e-3 | if name not in claimed and len(o) == len(xyz) and np.allclose(o, xyz, atol=1e-3): | unknown | - | app_scope, assembly, datafile, hbonds +11 | - |
@@ -688,7 +688,7 @@ Of the 46 named-entry rows, 32 rest on the comment at the item and 14 on git (ev
 | `layout:_STACK_SHUT` | constant | 0.6 | _STACK_SHUT = 0.6 | named-entry:9P1X,8OZJ | "… either side standing past the gap's ends but for a sliver: 9P1X 0.15, 8OZJ 0.54), the loops leaving its facing ends have no way out, or squeeze thr…"; earliest in this file: 0df3a22 2026-10-16 A stack gap shut on both sides opens: the strand stacked last stands further off… | layout | - |
 | `layout:_STACK_OPEN` | constant | 0.85 | _STACK_OPEN = 0.85 | geometry | "two loops' grid cells, route.RES, each _INFLATE clear of the strands"; earliest in this file: 0df3a22 2026-10-16 A stack gap shut on both sides opens: the strand stacked last stands further off… | - | - |
 | `layout:_STACK_NUDGE` | constant | 1.0 | _STACK_NUDGE = 1.0 | named-entry:9P1X,8OZJ | git: 0df3a22's message: "by at most _STACK_NUDGE 1.0 in 0.05 steps" (9P1X, 8OZJ: slivers of 0.15 and 0.54) | - | - |
-| `layout:_NUDGE_STEP` | constant | 0.05 | _NUDGE_STEP = 0.05 | named-entry:9P1X,8OZJ | git: 0df3a22's message: "by at most _STACK_NUDGE 1.0 in 0.05 steps" (9P1X, 8OZJ: slivers of 0.15 and 0.54) | - | - |
+| `layout:_NUDGE_STEP` | constant | 0.05 | _NUDGE_STEP = 0.05 | unknown | introduced by 0df3a22 (9P1X, 8OZJ), whose message names it only as the search step, not a value set on those entries; its message: "by at most _STACK_NUDGE 1.0 in 0.05 steps" (9P1X, 8OZJ: slivers of 0.15 and 0.54) | - | - |
 | `layout:_POCKET_REACH` | constant | 2.0 | _POCKET_REACH = 2.0 | named-entry:8BCU,12BM | "…s partner or not, until it closes none (random-100 held-out 8BCU: G:111-114, level with G:119-122, closed the run four loops needed; 12BM: C:71-79 c…"; earliest in this file: 99d40e4 2026-10-17 Held-out A3/A5 (plan 15 task 1): route fallbacks and overlapping boxes, by mecha… | - | - |
 | `layout:_TOUCH` | constant | 1e-6 | _TOUCH = 1e-6 # page units two drawn spans must share to stand level (science._TOUCH) | convention | a float tolerance (1e-6); earliest in this file: 7b0292a 2026-10-17 An accessory strand never stands level with a strand it does not pair with in th… | - | - |
 | `layout:_CLEAR` | constant | 1e-4 | _CLEAR = 1e-4 # page units past a block's end a cleared height stands, one snap step (_column_heights) | geometry | "one snap step" (1/_GRID); earliest in this file: a287c05 2026-10-10 fix: stems the projection cannot side keep strands uncrossed; short runs hold st… | - | - |
@@ -813,7 +813,7 @@ Of the 46 named-entry rows, 32 rest on the comment at the item and 14 on git (ev
 | `layout:_wolfe:default:evals` | default | 20 | def _wolfe(fun, x, f0, g0, d, step, c1=1e-3, c2=0.9, evals=20): | unknown | - | optimiser | - |
 | `layout:_wolfe:comparison:0.1@13289bf0` | comparison | 0.1 | if min(a, b) + 0.1 * abs(b - a) <= c <= max(a, b) - 0.1 * abs(b - a): | unknown | - | optimiser | - |
 | `layout:_wolfe:comparison:0.1@13289bf0#2` | comparison | 0.1 | if min(a, b) + 0.1 * abs(b - a) <= c <= max(a, b) - 0.1 * abs(b - a): | unknown | - | optimiser | - |
-| `layout:_attract:argument:4@a26058a4` | argument | 4 | boxes = np.asarray(fixed.boxes if fixed is not None else [], float).reshape(-1, 4) | unknown | - | copies, heldout_budgets, like, membrane +1 | - |
+| `layout:_attract:argument:4@a26058a4` | argument | 4 | boxes = np.asarray(fixed.boxes if fixed is not None else [], float).reshape(-1, 4) | convention | an array's shape | copies, heldout_budgets, like, membrane +1 | - |
 | `layout:_room_for_stems:argument:4.0@c8dc89f9` | argument | 4.0 | need = float(sum(4.0 * float(x) * float(y) for x, y in h.tolist())) | unknown | line last changed by ea0765b A nucleic acid drawn without protein is spread by one factor to the room its stems take before the pull, keep… (git blame; evidence only) | na_layout | - |
 | `layout:_collide:comparison:1e-9@511e5cc6` | comparison | 1e-9 | return ha[0] + hb[0] + MARGIN - abs(dx) > 1e-9 and ha[1] + hb[1] + MARGIN - abs(dy) > 1e-9 | convention | a floating-point tolerance | heldout_copies, layout, perf, symmetry | - |
 | `layout:_collide:comparison:1e-9@511e5cc6#2` | comparison | 1e-9 | return ha[0] + hb[0] + MARGIN - abs(dx) > 1e-9 and ha[1] + hb[1] + MARGIN - abs(dy) > 1e-9 | convention | a floating-point tolerance | heldout_copies, layout, perf, symmetry | - |
@@ -843,7 +843,7 @@ Of the 46 named-entry rows, 32 rest on the comment at the item and 14 on git (ev
 | `layout:_wrap_angle:comparison:1e-9@17005f7c` | comparison | 1e-9 | return float(_HALF_TURN) if a <= -_HALF_TURN + 1e-9 else a + 0.0 | convention | a floating-point tolerance | - | - |
 | `layout:_rosette:comparison:1e-6@42142d6c` | comparison | 1e-6 | out = _snap(mid / np.linalg.norm(mid)) if np.linalg.norm(mid) > 1e-6 else np.array([0.0, 1.0]) | convention | a floating-point tolerance | - | - |
 | `layout:_rosette:comparison:1e-6@a1fb05c6` | comparison | 1e-6 | radial = radial / np.linalg.norm(radial) if np.linalg.norm(radial) > 1e-6 else turn2(out, a) | convention | a floating-point tolerance | - | - |
-| `layout:_rosette:argument:4@4100ee4e` | argument | 4 | rects = np.array([p.rect for p in [*lay.placed.values(), *lay.ghosts]]).reshape(-1, 4) | unknown | - | - | - |
+| `layout:_rosette:argument:4@4100ee4e` | argument | 4 | rects = np.array([p.rect for p in [*lay.placed.values(), *lay.ghosts]]).reshape(-1, 4) | convention | an array's shape | - | - |
 | `layout:_rosette:argument:4@2b642db6` | argument | 4 | rects = np.vstack([rects, [b for _, b in label_boxes(lay, sses)] or np.empty((0, 4))]) | convention | an array's shape | - | - |
 | `layout:build_layout:argument:4@572130e5` | argument | 4 | rects = np.array([p.rect for p in placed + ghosts + dna]).reshape(-1, 4) | convention | an array's shape | cli, heldout_copies, layout, like +10 | - |
 | `layout:build_layout:argument:4@2b642db6` | argument | 4 | rects = np.vstack([rects, [b for _, b in label_boxes(lay, sses)] or np.empty((0, 4))]) | convention | an array's shape | cli, heldout_copies, layout, like +10 | - |
@@ -1054,8 +1054,8 @@ Of the 46 named-entry rows, 32 rest on the comment at the item and 14 on git (ev
 | `na_curve:lay_out:argument:4@c3d38b87` | argument | 4 | np.vstack([walls.boxes, np.asarray(boxes, float).reshape(-1, 4)]), | convention | an array's shape | na_curve | - |
 | `na_curve:lay_out:argument:4@52dc8f3a` | argument | 4 | walls = Walls(np.asarray(boxes, float).reshape(-1, 4), hard, band) | convention | an array's shape | na_curve | - |
 | `na_curve:lay_out:argument:4@3d11c03a` | argument | 4 | wt = _RUNG_W * _W_CONTACT * min(4 * len(res), _CONTACT_CAP) / _CONTACT_CAP | unknown | - | na_curve | - |
-| `na_curve:_boxes_meet:argument:4@e5d5fc96` | argument | 4 | a = np.array([ch.rect for ch in chords(c, n, stems)], float).reshape(-1, 4) | unknown | - | na_curve | - |
-| `na_curve:_boxes_meet:argument:4@307a871b` | argument | 4 | b = np.array([ch.rect for ch in chords(e, m, stems)], float).reshape(-1, 4) | unknown | - | na_curve | - |
+| `na_curve:_boxes_meet:argument:4@e5d5fc96` | argument | 4 | a = np.array([ch.rect for ch in chords(c, n, stems)], float).reshape(-1, 4) | convention | an array's shape | na_curve | - |
+| `na_curve:_boxes_meet:argument:4@307a871b` | argument | 4 | b = np.array([ch.rect for ch in chords(e, m, stems)], float).reshape(-1, 4) | convention | an array's shape | na_curve | - |
 | `na_curve:_boxes_meet:comparison:1e-6@3cdd2367` | comparison | 1e-6 | return bool(((w > 1e-6) & (h > 1e-6)).any()) | convention | a floating-point tolerance | na_curve | - |
 | `na_curve:_boxes_meet:comparison:1e-6@3cdd2367#2` | comparison | 1e-6 | return bool(((w > 1e-6) & (h > 1e-6)).any()) | convention | a floating-point tolerance | na_curve | - |
 | `na_curve:_part:comparison:1e-9@5b0a4082` | comparison | 1e-9 | if need > 1e-9 or _boxes_meet(c, i, e, j, stems): | convention | a floating-point tolerance | na_curve | - |
@@ -1307,7 +1307,7 @@ Of the 46 named-entry rows, 32 rest on the comment at the item and 14 on git (ev
 | `panels:GUTTER` | constant | 0.3 | GUTTER = 0.3 # clear space kept between two domains' panels, where their elements leave room for it | unknown | earliest in this file: 498a910 2026-10-12 Domain panels follow their elements and keep apart; names on clear plates (4OO8,… | perf | - |
 | `panels:NAME_PAD` | constant | 0.15 | NAME_PAD = 0.15 # a name's box is wrapped this far | unknown | earliest in this file: 498a910 2026-10-12 Domain panels follow their elements and keep apart; names on clear plates (4OO8,… | perf | - |
 | `panels:EDGE` | constant | 0.05 | EDGE = 0.05 # each element's own box, grown this far (never past half way to another's), is inside its panel | unknown | earliest in this file: 498a910 2026-10-12 Domain panels follow their elements and keep apart; names on clear plates (4OO8,… | - | - |
-| `panels:panel_fields.window:argument:4@9776f952` | argument | 4 | b = np.asarray(list(owned[d]) + ([names[d]] if d in names else []), float).reshape(-1, 4) | unknown | - | membrane, perf | - |
+| `panels:panel_fields.window:argument:4@9776f952` | argument | 4 | b = np.asarray(list(owned[d]) + ([names[d]] if d in names else []), float).reshape(-1, 4) | convention | an array's shape | membrane, perf | - |
 
 ## provenance
 
@@ -1550,7 +1550,7 @@ Of the 46 named-entry rows, 32 rest on the comment at the item and 14 on git (ev
 | `render:_canvas:fallback:page_text_small` | fallback | page_text_small | fallback.note("page_text_small") | unknown | cites random-100 C4 (layout.page_fit) | - | notes: page_scaled |
 | `render:page_legend:argument:0.9@4eaaade1` | argument | 0.9 | per_row = max(1, int((width - 2 + 0.9) // entry)) | unknown | - | - | - |
 | `render:_foot:argument:1e-12@a107771a` | argument | 1e-12 | t = float(np.clip(np.dot(c - p, d) / max(float(np.dot(d, d)), 1e-12), 0.0, 1.0)) | convention | a floating-point tolerance | - | - |
-| `render:_loop_boxes:argument:4@f9fa9685` | argument | 4 | boxes = np.array([p.rect for p in [*layout.placed.values(), *layout.ghosts]]).reshape(-1, 4) # none: DNA only | unknown | line last changed by 4d11ab3 Counts keep off the loops as drawn, corners rounded or smoothed, not their routes (C2b-1 fix round 1, 6FY9) (git blame; evidence only) | route | - |
+| `render:_loop_boxes:argument:4@f9fa9685` | argument | 4 | boxes = np.array([p.rect for p in [*layout.placed.values(), *layout.ghosts]]).reshape(-1, 4) # none: DNA only | convention | an array's shape; line last changed by 4d11ab3 Counts keep off the loops as drawn, corners rounded or smoothed, not their routes (C2b-1 fix round 1, 6FY9) (git blame; evidence only) | route | - |
 | `render:_beside_strips:local:far` | local | 1e9 | far = 1e9 | unknown | - | - | - |
 | `render:_beside_strips:argument:4@287e48ca` | argument | 4 | return np.array(boxes, float).reshape(-1, 4) | convention | an array's shape | - | - |
 | `render:_draw_loops:argument:3.0@8a0a1a07` | argument | 3.0 | lw=loop_lw * 3.0, | unknown | - | text_clear | - |
@@ -1951,7 +1951,7 @@ Of the 46 named-entry rows, 32 rest on the comment at the item and 14 on git (ev
 | `ss:_PARTNER_GAP` | constant | 4 | _PARTNER_GAP = 4 # residues of a partner strand this close pair with the same side of it | unknown | earliest in this file: 4f83002 2026-10-09 Strands one residue apart are one strand only when they pair with the same strand | - | - |
 | `ss:KINK_SPLIT` | constant | 30.0 | KINK_SPLIT = 30.0 # degrees: alpha segments of one helix run meeting at a 3-10/pi kink sharper than this split it | unknown | earliest in this file: bdf507c 2026-10-11 Helix runs split where α segments meet at a 3₁₀/π kink of more than 30° (2HHB α … | ss | - |
 | `ss:_MIN_KINK_ARM` | constant | 7 | _MIN_KINK_ARM = 7 # residues: an alpha segment shorter than this has no axis precise enough to measure a kink by | unknown | earliest in this file: d8c0fbb 2026-10-11 Kinks are measured on local helix axes between arms of 7+ residues (π-bulges sta… | - | - |
-| `ss:_BREAK_MAX` | constant | 2 | _BREAK_MAX = 2 # residues: a helix broken by this few in one copy of a protein is broken there in every copy | named-entry:7OKA | git: c18a18d's message: "breaks a helix run where DSSP breaks it by one or two residues in another copy ... 7OKA: B~A, C~A 0.000" | - | - |
+| `ss:_BREAK_MAX` | constant | 2 | _BREAK_MAX = 2 # residues: a helix broken by this few in one copy of a protein is broken there in every copy | unknown | introduced by c18a18d (7OKA), whose message ties 2 to the kink rule (one or two residues; 7OKA's break is one), not to 7OKA; its message: "breaks a helix run where DSSP breaks it by one or two residues in another copy ... 7OKA: B~A, C~A 0.000" | - | - |
 | `ss:_kinks:argument:4@b5b03a7a` | argument | 4 | (x, y, round(_angle(axis(x), axis(y)), 4)) for x, y in zip(hs, hs[1:]) if set(ss[x[1] + 1 : y[0]]) <= set("GI") | convention | rounding digits | - | - |
 
 ## style

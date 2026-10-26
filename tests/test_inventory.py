@@ -122,6 +122,28 @@ def test_the_scan_reads_with_items_and_except_clauses(inv, scanned):
     assert any(it["module"] == "app" and it.get("keyword") == "width" and it["value"] == "150" for it in scanned)
 
 
+def test_the_scan_reads_an_except_clauses_number(inv):
+    """Ruling Q28: an except clause's type is read as its own statement, so a number in it is listed once."""
+    src = "def f(x):\n    try:\n        return x\n    except errors(17):\n        return None\n"
+    got = [(it["kind"], it["value"]) for it in inv.scan_source("m", src)]
+    assert got == [("argument", "17")]
+
+
+def test_the_role_reads_the_callees_own_name_however_long_the_receiver(inv):
+    """Ruling Q28: role_origin sees the called function's own name (p.func.attr / id), not the shortened callee text,
+    so a reshape(-1, 4) after a long receiver is an array's shape as after a short one."""
+    long = "a = np.asarray([some_long_attribute_name.rect for some_long_attribute_name in items], float).reshape(-1, 4)"
+    src = f"def f(items):\n    {long}\n    b = np.zeros(4)\n    return round(a, 3)\n"
+    items = [it for it in inv.scan_source("m", src) if it["kind"] == "argument"]
+    assert [it["call"] for it in items] == ["reshape", "zeros", "round"]
+    assert items[0]["callee"].endswith("…")  # the shown text is shortened, the role is not
+    assert [inv.role_origin(it) for it in items] == [
+        ("convention", "an array's shape"),
+        ("convention", "an array's shape"),
+        ("convention", "rounding digits"),
+    ]
+
+
 def test_tests_naming_an_item_skip_short_and_common_names(inv):
     index = {"test_a": {"at", "compare", "draw", "layout", "_text_width"}, "test_b": {"_text_width"}}
     assert inv._naming("at", "compare", index) == [] and inv._naming("draw", "layout", index) == []
