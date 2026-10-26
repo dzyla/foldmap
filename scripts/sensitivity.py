@@ -28,7 +28,9 @@ reads run is unperturbed with FOLDMAP_TRACE_READS set (perturb.install_trace): w
 constant, so a stable constant no line read is told apart (its stability is no evidence); it must move no key.
 
 Keys, per run: each entry's pass or fail; the failing count per A- and S-criterion; each entry's named fallbacks
-(default view); each entry's figure area; time is recorded, not judged. A perturbation is stable when no key moves
+(default view); each entry's figure area; time is recorded, not judged, and so are the time criteria (TIMED: A2, the
+default view's wall time within 60 s, moved with the load of the machine between two identical baselines; an entry
+passes here when no other A-criterion fails). A perturbation is stable when no key moves
 from the baseline, sensitive when any does, fragile when the pass count moves by FRAGILE_PASS or more or a criterion
 that fails in no baseline entry fails in some entry; a constant takes the worse of its two perturbations, from stage B
 where it ran there. Fragile constants are the limitations list for the paper."""
@@ -71,6 +73,7 @@ SEED = 20261025  # stage A's subset draw (ruling Q29: seed recorded)
 SUBSET = 40  # stage A's entries, fixed before the baselines ran
 SLOW_S = 120  # ruling Q29: an entry recorded slower than this is left out of stage A
 FRAGILE_PASS = 2  # ruling Q29: a pass count moving by this many is fragile
+TIMED = ("A2", "A2b")  # time criteria (the default view's and the app's wall time): recorded, not judged (Q29)
 BASELINES = ("baseline-1", "baseline-2")
 READS = "reads"  # an unperturbed run recording which constants each entry reads (perturb.install_trace)
 TRACE_ENV = "FOLDMAP_TRACE_READS"  # scripts/perturb.py's
@@ -205,19 +208,21 @@ def subset(sample: dict, seconds: dict[str, float], size: int = SUBSET, seed: in
 
 def keys_of(report: dict) -> dict[str, dict]:
     """The campaign keys of every entry of a random-100 report: pass, the failing A- and S-criteria, the default
-    view's named fallbacks and figure area, and (recorded, not judged) its seconds and SVG hash."""
+    view's named fallbacks and figure area, and (recorded, not judged) its seconds, its failing time criteria
+    (TIMED: a wall-clock limit moves with the machine's load, not the code) and SVG hash. pass is no A-criterion but
+    a timed one failing."""
     out = {}
     for e in report["entries"]:
         crit, sci = e.get("criteria") or {}, e.get("science") or {}
         d = ((e.get("views") or {}).get("default") or {}).get("result") or {}
-        failing = [k for k, c in crit.items() if c.get("pass") is False]
-        failing += [k for k, c in sci.items() if c.get("pass") is False]
+        judged = [k for k, c in crit.items() if c.get("pass") is False and k not in TIMED]
         out[e["id"]] = {
-            "pass": bool(e.get("pass")),
-            "failing": sorted(failing),
+            "pass": not judged,
+            "failing": sorted(judged + [k for k, c in sci.items() if c.get("pass") is False]),
             "fallbacks": dict(sorted((d.get("fallbacks") or {}).items())),
             "area": d.get("area"),
             "seconds": (e.get("process") or {}).get("seconds"),
+            "timed_failing": sorted(k for k, c in crit.items() if c.get("pass") is False and k in TIMED),
             "svg_sha256": d.get("svg_sha256"),
         }
     return out
@@ -382,7 +387,16 @@ def stage_runs(stage: str, the_plan: dict, from_a: Path | None) -> list[tuple[st
 
 
 def read_keys(where: Path) -> dict[str, dict]:
-    return {p.stem: json.loads(p.read_text(encoding="utf-8")) for p in sorted((where / "keys").glob("*.json"))}
+    """A stage's keys files, each run's entries keyed again (keys_of) from its kept report: the keys are this code's,
+    whichever code wrote the keys file."""
+    out = {}
+    for p in sorted((where / "keys").glob("*.json")):
+        doc = json.loads(p.read_text(encoding="utf-8"))
+        rep = where / "runs" / p.stem / "report.json"
+        if rep.is_file():
+            doc["entries"] = keys_of(_script("random100").read_report(rep))
+        out[p.stem] = doc
+    return out
 
 
 def moved_constants(where: Path, the_plan: dict) -> set[str]:
@@ -479,6 +493,9 @@ def _stage(where: Path, the_plan: dict) -> dict:
         "entries": sorted(base),
         "baseline_passed": passed(base),
         "baseline_failing": dict(sorted(failing_counts(base).items())),
+        "baselines_timed_failing": [  # recorded, not judged (TIMED)
+            sorted(i for i, e in run.items() if e.get("timed_failing")) for run in (base, other)
+        ],
         "determinism": {"identical": not moved(base, other) and not svg, "moved": moved(base, other), "svg": svg},
         "seconds": round(sum(t["seconds"] for t in timing), 1),
         "run_seconds": round(sum(k["seconds"] for k in keys.values()), 1),
@@ -589,7 +606,9 @@ def render(doc: dict) -> str:
         "The perturbation reaches every reader (scripts/perturb.py: the module is rewritten as it is imported, so "
         "`from ... import` binders, defaults and constants derived from it at import follow; `perturb.py reach` "
         "checked each run). Keys: each entry's pass or fail, the failing count per A- and S-criterion, the named "
-        "fallbacks and the figure area of the default view; time is recorded, not judged. **stable**: no key moved; "
+        "fallbacks and the figure area of the default view; time is recorded, not judged, and so is A2 (the default "
+        "view within 60 s of wall time: it moved between two identical baselines with the load of the machine), so an "
+        "entry passes here when no other A-criterion fails. **stable**: no key moved; "
         f"**sensitive**: some key moved; **fragile**: the pass count moved by {doc['rules']['fragile_pass']} or more, "
         "or a criterion failing in no baseline entry failed in some entry. A constant takes the worse of its two "
         "perturbations, from stage B (the whole sample) when it ran there, else from stage A (its subset only).",
@@ -644,6 +663,8 @@ def render(doc: dict) -> str:
             + (", ".join(f"{k} {n}" for k, n in st["baseline_failing"].items()) or "none")
             + f". The two baselines are {'identical (keys and SVGs)' if det['identical'] else 'NOT identical'}"
             + ("" if det["identical"] else f": {det['moved'][:10]} SVG {det['svg'][:10]}")
+            + f". A2 (time, not judged) failed in {', '.join(st['baselines_timed_failing'][0]) or 'none'} and in "
+            + f"{', '.join(st['baselines_timed_failing'][1]) or 'none'} of the two baselines"
             + f". {len(st['runs'])} perturbation runs; {st['seconds'] / 3600:.2f} h of zl time."
             + (
                 ""

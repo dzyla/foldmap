@@ -320,6 +320,9 @@ def test_the_classes_follow_the_ruling(sens):
     new = sens.judge(base, keys(_entry("1"), _entry("2", sci=("S1",)), _entry("3", ok=False, failing=("A1",))))
     assert new["class"] == "fragile" and new["new_failing"] == ["S1"] and new["pass_delta"] == 0
     assert sens.worst(["stable", "fragile", "sensitive"]) == "fragile" and sens.worst([]) == "stable"
+    slow = keys(_entry("1", ok=False, failing=("A2",)), _entry("2"), _entry("3", ok=False, failing=("A1",)))
+    assert slow["1"]["pass"] and slow["1"]["failing"] == [] and slow["1"]["timed_failing"] == ["A2"]
+    assert sens.judge(base, slow)["class"] == "stable"  # a wall-clock limit is recorded, not judged
 
 
 def test_sensitivity_never_writes_into_the_third_sample():
