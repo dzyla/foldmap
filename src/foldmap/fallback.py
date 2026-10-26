@@ -11,7 +11,9 @@ random-100 report, so a campaign says how often each fallback fired. They never 
 PDF or PNG): counting changes no figure.
 
 A count is how many times the path was taken while the figure was made, including in drawings tried and set aside
-(a candidate layout make_layout weighs, a reference laid out for --like)."""
+(a candidate layout make_layout weighs, a reference laid out for --like). Figures made outside spec.draw_spec count
+nothing: compare and diff panels (compare.py), interactive pages (interactive.build_page, app_jobs.page_job) and
+cli.make_figure_and_loops."""
 
 from __future__ import annotations
 

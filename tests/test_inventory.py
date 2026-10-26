@@ -20,6 +20,9 @@ from foldmap.spec import draw_spec, figure_spec
 ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / "src" / "foldmap"
 INVENTORY = ROOT / "docs" / "validation" / "inventory"
+needs_inventory = pytest.mark.skipif(
+    not (INVENTORY / "inventory.md").exists(), reason="the inventory is not part of the sdist"
+)
 
 
 def _script(name: str):
@@ -73,16 +76,66 @@ def test_the_scan_finds_a_planted_constant_comparison_argument_and_fallback(inv)
     assert kinds["planted:f:fallback-marker"] == "fallback-marker"
 
 
-def test_an_inline_id_follows_its_line_not_its_line_number(inv):
+def test_an_inline_id_follows_its_code_not_its_line_number_comment_or_spacing(inv):
+    """Ruling Q25 (a): the anchor is the line's code, its comment cut off, its whitespace dropped."""
     one = {it["id"] for it in inv.scan_source("m", PLANTED)}
     moved = {it["id"] for it in inv.scan_source("m", "\n\n# a comment\n" + PLANTED)}
-    edited = {it["id"] for it in inv.scan_source("m", PLANTED.replace("x > 7.25 and", "x > 7.25  and"))}
-    assert moved == one
-    assert edited == one  # whitespace collapsed
+    spaced = {it["id"] for it in inv.scan_source("m", PLANTED.replace("x > 7.25 and", "x>7.25  and"))}
+    reworded = inv.scan_source("m", PLANTED.replace("# falls back to rounding", "# digits kept"))
+    assert moved == one and spaced == one
+    assert {it["id"] for it in reworded if it["kind"] != "fallback-marker"} == {
+        i for i in one if not i.endswith("fallback-marker")
+    }
+    commented = inv.scan_source("m", PLANTED.replace("return max(x * 0.8, 12)", "return max(x * 0.8, 12)  # a note"))
+    assert {it["id"] for it in commented} == one
     changed = {it["id"] for it in inv.scan_source("m", PLANTED.replace("x > 7.25", "x >= 7.25"))}
     assert changed != one and any(i.startswith("m:f:comparison:7.25@") for i in changed - one)
 
 
+def test_the_merge_carries_a_row_to_its_edited_line_and_gives_new_rows_their_role(inv):
+    """Ruling Q25 (b), (c): an edited line's row moves to its new id when the two alone share
+    module:function:kind:value; a new row takes the origin its number's role fixes, else unknown."""
+    before = inv.scan_source("m", PLANTED)
+    rows = {
+        it["id"]: {"id": it["id"], "origin": "named-entry:1ABC", "evidence": "by hand", "check": "-"} for it in before
+    }
+    after = inv.scan_source("m", PLANTED.replace("x > 7.25", "x >= 7.25") + "\n\ndef g(v):\n    return v < 1e-9\n")
+    merged, diff = inv.merge(after, rows)
+    old = next(i for i in rows if i.startswith("m:f:comparison:7.25@"))
+    new = next(it["id"] for it in after if it["id"].startswith("m:f:comparison:7.25@"))
+    assert diff["carried"] == [(old, new)] and old not in merged
+    assert merged[new]["origin"] == "named-entry:1ABC" and merged[new]["evidence"] == "by hand"
+    tol = next(it["id"] for it in after if it["function"] == "g")
+    assert diff["added"] == [tol] and merged[tol]["origin"] == "convention"  # a float tolerance, by role
+    assert not diff["dropped"]
+    twice = PLANTED.replace("return max(x * 0.8, 12)", "return max(x * 0.8, 12) + max(x * 0.8, 12)")
+    two = inv.scan_source("m", twice.replace("x > 7.25", "x >= 7.25"))
+    _, diff = inv.merge(two, rows)  # two 0.8s and 12s on the edited line: no unique match, nothing carried there
+    assert not any(o.startswith("m:f:argument:0.8@") for o, _ in diff["carried"])
+
+
+def test_the_scan_reads_with_items_and_except_clauses(inv, scanned):
+    """Ruling Q26 M1: a with statement's call (cath's urlopen timeout) is scanned as any other."""
+    src = "def f(p):\n    with open(p, buffering=4096) as fh:\n        return fh\n"
+    assert [it["value"] for it in inv.scan_source("m", src) if it["kind"] == "argument"] == ["4096"]
+    assert any(it["module"] == "cath" and it["kind"] == "argument" and it.get("keyword") == "timeout" for it in scanned)
+    assert any(it["module"] == "app" and it.get("keyword") == "width" and it["value"] == "150" for it in scanned)
+
+
+def test_tests_naming_an_item_skip_short_and_common_names(inv):
+    index = {"test_a": {"at", "compare", "draw", "layout", "_text_width"}, "test_b": {"_text_width"}}
+    assert inv._naming("at", "compare", index) == [] and inv._naming("draw", "layout", index) == []
+    assert inv._naming("_text_width", "layout", index) == ["test_a"]  # test_b names the function, not its module
+
+
+def test_a_fallback_note_with_no_literal_name_is_reported(inv):
+    """Ruling Q26 M6: the scan cannot read a computed name, so none may exist."""
+    s = inv._scanned("m", "def f(name):\n    fallback.note(name)\n    fallback.note('loop_curve')\n")
+    assert s.dynamic == ["m:2"] and [it["name"] for it in s.items if it["kind"] == "fallback"] == ["loop_curve"]
+    assert inv.dynamic_notes(SRC) == []
+
+
+@needs_inventory
 def test_the_table_lists_every_item_the_scan_finds_and_no_other(inv, scanned):
     """Ruling Q23: a new threshold or fallback the table lacks fails here, and so does a row the code no longer has.
     Run python scripts/inventory.py, then complete the new rows (origin, evidence, check)."""
@@ -93,6 +146,7 @@ def test_the_table_lists_every_item_the_scan_finds_and_no_other(inv, scanned):
     assert not got["bad_origin"], f"rows whose origin is none of {inv.ORIGINS}: {got['bad_origin'][:20]}"
 
 
+@needs_inventory
 def test_the_staleness_check_catches_both_ways(inv, scanned):
     rows = inv.read_table((INVENTORY / "inventory.md").read_text(encoding="utf-8"))
     planted = inv.scan_source("planted", PLANTED)
@@ -105,6 +159,7 @@ def test_the_staleness_check_catches_both_ways(inv, scanned):
     assert inv.compare(scanned, bad)["bad_origin"] == [scanned[0]["id"]]
 
 
+@needs_inventory
 def test_the_table_reads_back_what_it_writes(inv, scanned):
     rows = inv.read_table((INVENTORY / "inventory.md").read_text(encoding="utf-8"))
     again = inv.read_table(inv.render_table(scanned, rows, "# header\n"))
@@ -113,6 +168,7 @@ def test_the_table_reads_back_what_it_writes(inv, scanned):
     }
 
 
+@needs_inventory
 def test_the_committed_json_is_the_scan(scanned):
     doc = json.loads((INVENTORY / "inventory.json").read_text(encoding="utf-8"))
     assert [(it["id"], it["kind"], it["value"]) for it in doc["items"]] == [

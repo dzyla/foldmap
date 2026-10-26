@@ -3,9 +3,10 @@
 """The inventory of foldmap's thresholds, special cases and fallbacks (plan 28 Task 9.1, ruling Q23).
 
 python scripts/inventory.py          # scan src/foldmap, write docs/validation/inventory/inventory.json and merge
-                                     # inventory.md: rows kept by id with their hand columns, new rows added as
-                                     # origin unknown, rows the scan no longer finds dropped (each printed)
-python scripts/inventory.py --check  # exit 1 when inventory.md and the scan disagree (tests/test_inventory.py)
+                                     # inventory.md (merge): rows kept by id with their hand columns, a row carried
+                                     # to an edited line's new id, new rows by role or unknown, gone rows dropped
+python scripts/inventory.py --check  # exit 1 when inventory.md and the scan disagree (tests/test_inventory.py), or a
+                                     # fallback.note call has no literal name (dynamic_notes)
 
 The scan is an AST scan of every module of src/foldmap. It lists, each item under a stable id:
 
@@ -15,7 +16,8 @@ The scan is an AST scan of every module of src/foldmap. It lists, each item unde
   local            a name bound in a function to a value made of numbers alone (x = 0.35, x = (3, 4.5)) holding a
                    non-trivial one; id module:function:local:name
   comparison       a non-trivial number inside a comparison (d < 3.5, 0.2 <= x <= y)
-  argument         a non-trivial number inside a call's argument (f(x, 3.5), g(tol=0.2), h(x * 0.8))
+  argument         a non-trivial number inside a call's argument (f(x, 3.5), g(tol=0.2), h(x * 0.8)), with items
+                   (with urlopen(r, timeout=30)) and except clauses included
   fallback         a fallback.note(NAME) call: a named fallback path, counted per figure (foldmap.fallback);
                    id module:function:fallback:NAME
   fallback-marker  a function whose text (code, comments, docstring) speaks of falling back (fallback, falls back,
@@ -23,17 +25,20 @@ The scan is an AST scan of every module of src/foldmap. It lists, each item unde
                    says which named fallback it holds, or why it holds none; id module:function:fallback-marker
 
 Comparison and argument ids are module:function:kind:value@anchor, the anchor the first 8 hex digits of the SHA-1 of
-the item's source line (whitespace collapsed), so an id survives lines moving and changes when its line does; the
-k-th repeat of an id in one function takes "#k". Trivial numbers (TRIVIAL): 0, 1, 2, -1 and 0.5, as int or float.
-Not listed: numbers in arithmetic outside those places (a bare x * 0.35, a return value), indices and slices (a[3],
-a[:12]), numbers in f-strings, and dataclass field defaults (Style's keys, documented in style.py); a module-level
-statement other than an assignment is scanned as function "<module>".
+the item's line of code, its comment cut off (tokenize), every whitespace character and a trailing comma dropped: an
+id survives lines moving, its comment reworded and a formatter's spacing, and changes when the code on its line does;
+the merge then carries the row to the new id when the two alone share module:function:kind:value. The k-th repeat of
+an id in one function takes "#k". Trivial numbers (TRIVIAL): 0, 1, 2, -1 and 0.5, as int or float. Not listed:
+numbers in arithmetic outside those places (a bare x * 0.35, a return value), indices and slices (a[3], a[:12]),
+numbers in f-strings, a class's keywords, match patterns, and dataclass field defaults (Style's keys, documented in
+style.py); a module-level statement other than an assignment is scanned as function "<module>". A new inline row
+takes the origin its number's role fixes (role_origin), else unknown.
 
 Each item carries the comments at it (the trailing comments of its statement's lines, a compound statement's header
 only; the comment block directly above it; for a constant, the block carried on under it when a blank line ends it)
-and the test files naming it (a constant by its name, a function's item by the function's name, a fallback
-by its quoted name): grep evidence, not proof that a test pins the value. The hand columns of inventory.md (origin,
-evidence, check) are kept across merges by id."""
+and the test files naming it (a constant or a function's item: files naming both its module and its name, none for a
+name under 4 characters or in COMMON; a fallback: its quoted name): grep evidence, not proof that a test pins the
+value. The hand columns of inventory.md (origin, evidence, check) are kept across merges."""
 
 from __future__ import annotations
 
@@ -117,25 +122,29 @@ def _squash(text: str, most: int = 0) -> str:
     return text if not most or len(text) <= most else text[: most - 1] + "…"
 
 
-def _anchor(line: str) -> str:
-    return hashlib.sha1(_squash(line).encode("utf-8")).hexdigest()[:8]
+def _anchor(code: str) -> str:
+    """The anchor of a line's code (its comment already cut off by the tokenizer): every whitespace character and a
+    trailing comma dropped, so a reworded comment or a formatter's spacing does not change an id."""
+    code = re.sub(r"\s+", "", code).rstrip(",")
+    return hashlib.sha1(code.encode("utf-8")).hexdigest()[:8]
 
 
-def _comments(source: str) -> tuple[dict[int, str], set[int]]:
-    """Each line's comment, and the lines holding a comment alone."""
-    said, alone = {}, set()
+def _comments(source: str) -> tuple[dict[int, str], set[int], dict[int, int]]:
+    """Each line's comment, the lines holding a comment alone, and the column each comment starts at."""
+    said, alone, cut = {}, set(), {}
     try:
         tokens = list(tokenize.generate_tokens(io.StringIO(source).readline))
     except (tokenize.TokenError, SyntaxError):
-        return said, alone
+        return said, alone, cut
     code_lines = set()
     for t in tokens:
         if t.type == tokenize.COMMENT:
             said[t.start[0]] = t.string.lstrip("#").strip()
+            cut[t.start[0]] = t.start[1]
         elif t.type not in (tokenize.NL, tokenize.NEWLINE, tokenize.INDENT, tokenize.DEDENT, tokenize.ENDMARKER):
             code_lines.update(range(t.start[0], t.end[0] + 1))
     alone = {n for n in said if n not in code_lines}
-    return said, alone
+    return said, alone, cut
 
 
 class _Scan(ast.NodeVisitor):
@@ -144,8 +153,9 @@ class _Scan(ast.NodeVisitor):
     def __init__(self, module: str, source: str):
         self.module, self.source = module, source
         self.lines = source.splitlines()
-        self.said, self.alone = _comments(source)
+        self.said, self.alone, self.cut = _comments(source)
         self.items: list[dict] = []
+        self.dynamic: list[str] = []  # fallback.note calls whose name is no string literal (module:line)
         self.stack: list[str] = []
         self.seen: Counter = Counter()
         self.statement: list[ast.stmt] = []
@@ -153,6 +163,11 @@ class _Scan(ast.NodeVisitor):
     # ----------------------------------------------------------------------------------------------- helpers
     def qual(self) -> str:
         return ".".join(self.stack) or "<module>"
+
+    def code(self, line: int) -> str:
+        """Line `line`'s code, its comment cut off."""
+        text = self.lines[line - 1]
+        return text[: self.cut[line]] if line in self.cut else text
 
     def comment_at(self, first: int, last: int, below: bool = False) -> str:
         """The comment block directly above line `first`, then the comments on lines first..last; with `below`, then
@@ -286,11 +301,12 @@ class _Scan(ast.NodeVisitor):
     def generic_visit(self, node: ast.AST) -> None:
         if id(node) in self.constant_nodes:
             return
-        if isinstance(node, ast.stmt):
+        own = isinstance(node, (ast.stmt, ast.excepthandler))  # an except clause's type is read as its own statement
+        if own:
             self.statement.append(node)
             self.inline(node)
         super().generic_visit(node)
-        if isinstance(node, ast.stmt):
+        if own:
             self.statement.pop()
 
     def visit_Assign(self, node: ast.Assign) -> None:
@@ -310,23 +326,33 @@ class _Scan(ast.NodeVisitor):
             and f.attr == "note"
             and isinstance(f.value, ast.Name)
             and f.value.id == "fallback"
-            and node.args
-            and isinstance(node.args[0], ast.Constant)
-            and isinstance(node.args[0].value, str)
         ):
-            name = node.args[0].value
-            stmt = self.statement[-1] if self.statement else node
-            self.add("fallback", f"{self.module}:{self.qual()}:fallback:{name}", node, name, stmt=stmt, name=name)
+            first = node.args[0] if node.args else None
+            if isinstance(first, ast.Constant) and isinstance(first.value, str):
+                name = first.value
+                stmt = self.statement[-1] if self.statement else node
+                self.add("fallback", f"{self.module}:{self.qual()}:fallback:{name}", node, name, stmt=stmt, name=name)
+            else:  # a name the scan cannot read: the registry check could not see it (dynamic_notes)
+                self.dynamic.append(f"{self.module}:{node.lineno}")
         self.generic_visit(node)
 
-    def inline(self, stmt: ast.stmt) -> None:
-        """The comparisons' and arguments' numbers of one statement's own expressions (not its nested statements)."""
+    def inline(self, stmt: ast.AST) -> None:
+        """The comparisons' and arguments' numbers of one statement's own expressions (not its nested statements):
+        its expression fields, and those of its with items, keywords (a class's) and match cases' guards."""
         for _, value in ast.iter_fields(stmt):
-            nodes = value if isinstance(value, list) else [value]
-            for n in nodes:
-                if isinstance(n, ast.expr):
-                    for lit in _literals(n):
-                        self.place(lit, stmt)
+            for n in value if isinstance(value, list) else [value]:
+                if isinstance(n, ast.withitem):
+                    exprs = [n.context_expr, n.optional_vars]
+                elif isinstance(n, ast.keyword):
+                    exprs = [n.value]
+                elif isinstance(n, ast.match_case):
+                    exprs = [n.guard]
+                else:
+                    exprs = [n]
+                for e in exprs:
+                    if isinstance(e, ast.expr):
+                        for lit in _literals(e):
+                            self.place(lit, stmt)
 
     def place(self, lit: ast.AST, stmt: ast.stmt) -> None:
         value = _number(lit)
@@ -353,7 +379,7 @@ class _Scan(ast.NodeVisitor):
         else:
             return
         text = self.segment(lit, 30)
-        ident = f"{self.module}:{self.qual()}:{kind}:{text}@{_anchor(self.lines[lit.lineno - 1])}"
+        ident = f"{self.module}:{self.qual()}:{kind}:{text}@{_anchor(self.code(lit.lineno))}"
         extra = {"callee": callee, "keyword": kw} if kind == "argument" else {}
         self.add(kind, ident, lit, text, stmt=stmt, **extra)
 
@@ -396,11 +422,40 @@ class _Scan(ast.NodeVisitor):
             )
 
 
-def scan_source(module: str, source: str) -> list[dict]:
-    """The items of one module's source."""
+def _scanned(module: str, source: str) -> _Scan:
     s = _Scan(module, source)
     s.scan_module(ast.parse(source))
-    return s.items
+    return s
+
+
+def scan_source(module: str, source: str) -> list[dict]:
+    """The items of one module's source."""
+    return _scanned(module, source).items
+
+
+def dynamic_notes(src: Path = SRC) -> list[str]:
+    """module:line of every fallback.note call whose name is no string literal: the scan (and the registry check)
+    cannot read its name, so there must be none."""
+    return [
+        d for path in sorted(src.glob("*.py")) for d in _scanned(path.stem, path.read_text(encoding="utf-8")).dynamic
+    ]
+
+
+# words too common to say a test exercises the function or constant named so (as are names under 4 characters)
+COMMON = frozenset(
+    "draw line lines note main read scan name names text route layout items item count counts place clear label "
+    "labels build make load save write check checks spec data page path paths points sheet sheets stem stems loop "
+    "loops box boxes copy copies value values result run start first last next order kind side sides ends end size "
+    "tail gap gaps edge mark marks frame width height color colour style look join split sort keep left right rest "
+    "test plot show turn turns step steps area pairs pair room near span".split()
+)
+
+
+def _naming(word: str, module: str, index: dict[str, set]) -> list[str]:
+    """The test files naming `word` and its module both (a qualified mention); none for a short or common word."""
+    if word == "<module>" or len(word) < 4 or word.lower() in COMMON:
+        return []
+    return [t for t, words in index.items() if word in words and module in words]
 
 
 def scan(src: Path = SRC, tests: Path | None = TESTS) -> list[dict]:
@@ -424,8 +479,52 @@ def scan(src: Path = SRC, tests: Path | None = TESTS) -> list[dict]:
                 word = (
                     it["id"].split(":")[1].split(".")[-1] if it["kind"] == "constant" else it["function"].split(".")[-1]
                 )
-                it["tests"] = [t for t, words in index.items() if word in words] if word != "<module>" else []
+                it["tests"] = _naming(word, it["module"], index)
     return items
+
+
+# ------------------------------------------------------------------------------------------------- origin by role
+
+UNITS = {72: "72 points to the inch", 25.4: "25.4 mm to the inch", 1024: "bytes", 1024**2: "bytes", 1024**3: "bytes"}
+TURNS = {90: "a right angle", 180: "a half turn", 360: "a full turn"}
+SHAPES = ("reshape", "zeros", "ones", "empty", "full", "eye")
+ROLE_KEYWORDS = {
+    "axis": "an array axis",
+    "indent": "a JSON indent",
+    "ndigits": "rounding digits",
+    "decimals": "rounding digits",
+    "zorder": "drawing order",
+    "maxsize": "a cache size",
+    "maxsplit": "a split count",
+}
+
+
+def role_origin(item: dict) -> tuple[str, str] | None:
+    """The origin a number's role fixes, for an inline item (default, local, comparison, argument), as inventory.md's
+    rules say: convention for a float tolerance (|v| <= 1e-5), a keyword of ROLE_KEYWORDS, round's digits, an
+    array's shape (3, 4, 6 given to SHAPES), 72 points or 25.4 mm to the inch and byte sizes; geometry for 90, 180
+    or 360 degrees given to radians. None for any other: its origin is not fixed by its role."""
+    if item["kind"] not in ("default", "local", "comparison", "argument"):
+        return None
+    try:
+        v = float(item["value"].replace("_", ""))
+    except ValueError:
+        return None
+    callee = (item.get("callee") or "").split(".")[-1]
+    argument = item["kind"] == "argument"
+    if v != 0 and abs(v) <= 1e-5:
+        return "convention", "a floating-point tolerance"
+    if item.get("keyword") in ROLE_KEYWORDS:
+        return "convention", ROLE_KEYWORDS[item["keyword"]]
+    if argument and callee == "round":
+        return "convention", "rounding digits"
+    if argument and callee in SHAPES and v in (3, 4, 6):
+        return "convention", "an array's shape"
+    if v in UNITS:
+        return "convention", UNITS[v]
+    if argument and callee in ("radians", "deg2rad") and v in TURNS:
+        return "geometry", TURNS[v]
+    return None
 
 
 # ------------------------------------------------------------------------------------------------- the table
@@ -504,6 +603,15 @@ def render_table(items: list[dict], rows: dict[str, dict], header: str) -> str:
         got = c["by_kind_origin"][k]
         out.append(f"| {k} | {c['by_kind'].get(k, 0)} | " + " | ".join(str(got.get(o, 0)) for o in ORIGINS) + " |")
     out.append(f"| all | {len(items)} | " + " | ".join(str(c["by_origin"][o]) for o in ORIGINS) + " |")
+    named = [
+        rows[it["id"]] for it in items if origin_kind((rows.get(it["id"]) or {}).get("origin", "")) == "named-entry"
+    ]
+    by_git = sum(r.get("evidence", "").startswith("git:") for r in named)
+    out += [
+        "",
+        f"Of the {len(named)} named-entry rows, {len(named) - by_git} rest on the comment at the item and {by_git} on "
+        "git (evidence starting `git:`: a commit whose message ties the value to the entries).",
+    ]
     sites = Counter(it["name"] for it in items if it["kind"] == "fallback")
     out += ["", "## Named fallbacks (foldmap.fallback.FALLBACKS)", "", "| name | sites | what it is |", "|---|---|---|"]
     out += [f"| `{n}` | {sites[n]} | {_cell(what)} |" for n, what in FALLBACKS.items()]
@@ -522,14 +630,50 @@ def render_table(items: list[dict], rows: dict[str, dict], header: str) -> str:
     return "\n".join(out) + "\n"
 
 
-def write(items: list[dict], out: Path = OUT) -> dict[str, list[str]]:
-    """inventory.json, then inventory.md merged by id. -> what the merge added and dropped."""
+def _key(ident: str) -> str:
+    """An id less its line anchor and repeat number: module:function:kind:value for an inline item."""
+    return re.sub(r"@[0-9a-f]{8}(?:#\d+)?$", "", ident)
+
+
+def merge(items: list[dict], rows: dict[str, dict]) -> tuple[dict[str, dict], dict[str, list]]:
+    """The table's rows for the scanned items: a row kept by its id; a dropped id's row carried to an added id when
+    the two alone share module:function:kind:value (its line was edited, the number not); an added id with no row a
+    new one, its origin by role (role_origin) or unknown. -> (rows, {"carried": [(old, new)], "added": [ids],
+    "dropped": [ids]})."""
+    have = {it["id"] for it in items}
+    added = [it for it in items if it["id"] not in rows]
+    dropped = [i for i in rows if i not in have]
+    by_key_added, by_key_dropped = {}, {}
+    for it in added:
+        by_key_added.setdefault(_key(it["id"]), []).append(it["id"])
+    for i in dropped:
+        by_key_dropped.setdefault(_key(i), []).append(i)
+    out = {i: r for i, r in rows.items() if i in have}
+    carried = []
+    for key, new in by_key_added.items():
+        old = by_key_dropped.get(key, [])
+        if len(new) == 1 and len(old) == 1 and new[0] != key:
+            out[new[0]] = {**rows[old[0]], "id": new[0]}
+            carried.append((old[0], new[0]))
+    for it in added:
+        if it["id"] not in out:
+            origin, evidence = role_origin(it) or ("unknown", "-")
+            out[it["id"]] = {"id": it["id"], "origin": origin, "evidence": evidence, "check": "-"}
+    gone = {o for o, _ in carried}
+    return out, {
+        "carried": carried,
+        "added": [it["id"] for it in added if it["id"] not in {n for _, n in carried}],
+        "dropped": sorted(i for i in dropped if i not in gone),
+    }
+
+
+def write(items: list[dict], out: Path = OUT) -> dict[str, list]:
+    """inventory.json, then inventory.md merged by id (merge). -> what the merge carried, added and dropped."""
     out.mkdir(parents=True, exist_ok=True)
     md = out / "inventory.md"
     text = md.read_text(encoding="utf-8") if md.is_file() else "# foldmap inventory\n"
-    rows = read_table(text)
+    rows, diff = merge(items, read_table(text))
     header = text.split(GENERATED)[0]
-    diff = compare(items, rows)
     doc = {
         "what": "foldmap's thresholds, special cases and fallbacks, scanned from src/foldmap (scripts/inventory.py)",
         "source_stamp": SOURCE_STAMP,
@@ -537,8 +681,9 @@ def write(items: list[dict], out: Path = OUT) -> dict[str, list[str]]:
         "counts": counts(items, rows),
         "items": items,
     }
-    (out / "inventory.json").write_text(json.dumps(doc, indent=1, ensure_ascii=False) + "\n", encoding="utf-8")
-    md.write_text(render_table(items, rows, header), encoding="utf-8")
+    text = json.dumps(doc, indent=1, ensure_ascii=False) + "\n"
+    (out / "inventory.json").write_text(text, encoding="utf-8", newline="\n")
+    md.write_text(render_table(items, rows, header), encoding="utf-8", newline="\n")
     return diff
 
 
@@ -549,20 +694,25 @@ def main(argv=None) -> int:
     )
     args = ap.parse_args(argv)
     items = scan()
+    dynamic = dynamic_notes()
+    for d in dynamic:
+        print(f"fallback.note with no literal name (the scan cannot read it): {d}")
     if args.check:
         md = OUT / "inventory.md"
         got = compare(items, read_table(md.read_text(encoding="utf-8") if md.is_file() else ""))
         for k, ids in got.items():
             for i in ids:
                 print(f"{k}: {i}")
-        return 1 if any(got.values()) else 0
+        return 1 if any(got.values()) or dynamic else 0
     diff = write(items)
-    for i in diff["missing"]:
-        print(f"added (origin unknown): {i}")
-    for i in diff["stale"]:
+    for old, new in diff["carried"]:
+        print(f"carried: {old} -> {new}")
+    for i in diff["added"]:
+        print(f"added: {i}")
+    for i in diff["dropped"]:
         print(f"dropped (no longer found): {i}")
     print(f"{len(items)} items: " + ", ".join(f"{k} {n}" for k, n in Counter(it["kind"] for it in items).items()))
-    return 0
+    return 1 if dynamic else 0
 
 
 if __name__ == "__main__":
