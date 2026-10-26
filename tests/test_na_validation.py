@@ -669,3 +669,26 @@ def test_the_report_names_the_guards_and_the_not_applicable_rows():
     near = "strict pass (>= 1.0) in 1 of 1 applicable; not applicable (every drawn element touches the stem): 6VTX"
     assert near in text
     assert "- mirrored: 1 stem(s) in 1 of 2 measured (6VTX)" in text and "- procrustes: n 1, median 0.3" in text
+
+
+def test_stems_nearer_skips_stem_every_element_touches():
+    """Plan 28 F7 (M3, ruling Q5): where every drawn element touches a stem (6VTX's zinc finger under its DNA), the
+    touching elements would be compared with themselves; that stem is not scored in stems_nearer_frac but counted
+    not applicable, so a figure with no other stem gives None (never a pass) and the reports name it not applicable.
+    Here 1LMB with every drawn element made to touch every stem; as drawn, its stems are scored."""
+    lay, sses, bb = make_layout(Path(__file__).parent / "data" / "1LMB.cif")
+    m = contacts(lay, sses)
+    assert m["stems_nearer_frac"] is not None and m["stems_nearer_not_applicable"] == 0
+    every = {nt for d in lay.stems for nt in d.axial}
+    for s in sses:
+        if s.id in lay.placed:
+            for r in range(s.start, s.end + 1):
+                lay.nucleic.contacts[r] = set(every)
+    m = contacts(lay, sses)
+    assert m["stems_nearer_frac"] is None and m["contact_auc"] is None
+    assert m["stems_nearer_not_applicable"] == len(lay.stems) > 0
+    assert not judge(m)
+    common = _na_validate()._paper_common()
+    assert common.nearer_applies({"entry": "6VTX", **m}) is False
+    near = common.nearer_summary([{"entry": "6VTX", **m}, {"entry": "A", "contact_auc": 0.8, "stems_nearer_frac": 1.0}])
+    assert near["not_applicable"] == ["6VTX"] and near["applicable"] == 1 and near["strict_pass"] == 1

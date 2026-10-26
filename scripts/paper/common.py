@@ -228,12 +228,14 @@ NEARER_BINS = (0.0, 0.25, 0.5, 0.75, 1.0)
 
 def nearer_applies(row: dict) -> bool | None:
     """Whether an NA report row's stems_nearer_frac is a measure (ruling Q5): not where every drawn element touches
-    each stem it scores, where the touching elements are compared with themselves (6VTX). nacheck.contacts computes
-    contact_auc on exactly the scored stems that leave an element untouched, so a row shows that case as contact_auc
-    None with stems_nearer_frac measured. None when stems_nearer_frac is not measured at all. (A row mixing such stems
-    with others keeps them in its fraction: the rows hold no per-stem split; plan 28 F7 changes the measure.)"""
+    each stem it scores, where the touching elements are compared with themselves (6VTX). Since plan 28 F7,
+    nacheck.contacts leaves such stems out of the fraction and counts them in stems_nearer_not_applicable, so a row
+    where no stem is left shows stems_nearer_frac None with that count above 0. A row measured before F7 shows the
+    case as contact_auc None with stems_nearer_frac measured (contact_auc is computed on exactly the stems that leave
+    an element untouched). None when stems_nearer_frac is not measured at all. (A row from before F7 mixing such
+    stems with others keeps them in its fraction: the rows hold no per-stem split.)"""
     if row.get("stems_nearer_frac") is None:
-        return None
+        return False if row.get("stems_nearer_not_applicable") else None
     return row.get("contact_auc") is not None
 
 

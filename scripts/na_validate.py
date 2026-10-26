@@ -713,6 +713,7 @@ def main(argv=None) -> int:
         "contact_auc",
         "contact_precision_at_k",
         "stems_nearer_frac",
+        "stems_nearer_not_applicable",
         "ss_contacts_nearer",
         "beads_missing",
         "bead_colour_wrong",

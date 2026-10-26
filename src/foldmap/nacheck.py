@@ -488,7 +488,10 @@ def contacts(lay, sses) -> dict:
     with both kinds: the AUC of the box gaps (a touching element nearer than a non-touching one; ties count half)
     and the precision of the k nearest elements, k the number touching (elements tied at the k-th gap share the
     remaining places); both averaged over the stems. stems_nearer_frac: the fraction of the stems any element
-    touches whose mean gap to those elements is below their median gap to every element (the spec's criterion).
+    touches whose mean gap to those elements is below their median gap to every element (the spec's criterion),
+    over the stems some drawn element does not touch: where every element touches a stem the touching elements
+    would be compared with themselves (6VTX), so that stem is not scored but counted in stems_nearer_not_applicable
+    (plan 28 F7, ruling Q5: not applicable, never a pass; stems_nearer_frac None when no stem is left).
     ss_contacts_nearer (reported, not judged): the same for each touched single-stranded nucleotide as drawn (a
     free end, hairpin loop, run or trace; 1URN's loop held by U1A), its gap from its drawn place to the element
     boxes; None before routing or when no such nucleotide is touched."""
@@ -498,20 +501,22 @@ def contacts(lay, sses) -> dict:
             "contact_auc": None,
             "contact_precision_at_k": None,
             "stems_nearer_frac": None,
+            "stems_nearer_not_applicable": 0,
             "ss_contacts_nearer": None,
         }
     drawn = [s for s in sses if s.id in lay.placed]
-    aucs, precs, nearer = [], [], []
+    aucs, precs, nearer, everyone = [], [], [], 0
     for d, body in zip(lay.stems, piece_bodies(lay)):  # each stem's body as drawn (a curve's piece: its stretches)
         mine = set(d.axial)
         touch = {s.id for s in drawn if any(mine & na.contacts.get(r, set()) for r in range(s.start, s.end + 1))}
         rest = [s.id for s in drawn if s.id not in touch]
         if not touch:
             continue
+        if not rest:  # every drawn element touches it: nothing to be nearer than (F7)
+            everyone += 1
+            continue
         dist = {s.id: min(_gap(lay.placed[s.id].rect, b.rect) for b in body) for s in drawn}
         nearer.append(float(np.mean([dist[t] for t in sorted(touch)])) < float(np.median(list(dist.values()))))
-        if not rest:
-            continue
         wins = sum((dist[t] < dist[r]) + 0.5 * (dist[t] == dist[r]) for t in sorted(touch) for r in rest)
         aucs.append(wins / (len(touch) * len(rest)))
         kth = sorted(dist.values())[len(touch) - 1]
@@ -523,6 +528,7 @@ def contacts(lay, sses) -> dict:
         "contact_auc": round(float(np.mean(aucs)), 3) if aucs else None,
         "contact_precision_at_k": round(float(np.mean(precs)), 3) if precs else None,
         "stems_nearer_frac": round(sum(nearer) / len(nearer), 3) if nearer else None,
+        "stems_nearer_not_applicable": everyone,
         "ss_contacts_nearer": _ss_contacts_nearer(lay, drawn),
     }
 
