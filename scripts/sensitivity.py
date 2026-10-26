@@ -142,7 +142,17 @@ def perturbed(value, factor: float) -> tuple[int | float | None, str | None]:
 
 
 def label(cid: str, factor: float) -> str:
-    return f"{cid.replace(':', '.')}x{factor}"
+    """The run name, file and folder name of a perturbation: "module:NAME" with its ":" (a name Windows forbids in a
+    path) made ".", then x and the factor ("layout._STACK_PADx0.75"). Every path named after a constant's run is
+    this."""
+    return safe_name(f"{cid.replace(':', '.')}x{factor}")
+
+
+def safe_name(name: str) -> str:
+    """`name`, refused (ValueError) unless it is a file name every OS takes (no : \\ / * ? \" < > |)."""
+    if not name or any(c in name for c in ':\\/*?"<>|'):
+        raise ValueError(f'{name!r} is no file name on every OS (Windows forbids : \\ / * ? " < > |)')
+    return name
 
 
 def plan(items: list[dict] | None = None) -> dict:
@@ -383,7 +393,7 @@ def run_one(
     """One random-100 run (`views`, default the default view; --not-for-paper) with `perturb` set, then its keys
     (view `keyed`) and reach; with `trace` (constant ids), unperturbed, which entries read each, and in which view
     (perturb.install_trace). The run's figures and sheets are deleted, its report kept."""
-    where = out / "runs" / name
+    where = out / "runs" / safe_name(name)  # a run name is a path: never a "module:NAME" (label)
     if where.exists():
         shutil.rmtree(where)  # a run stopped half way: run it again whole
     where.mkdir(parents=True)

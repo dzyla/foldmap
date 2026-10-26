@@ -451,7 +451,7 @@ def _stage_folder(sens, where: Path, runs: dict, reads: dict, unreached=(), fore
         }
         if name == sens.READS:
             doc |= {"reads": reads, "reads_by_view": {c: {"default": w} for c, w in reads.items()}}
-        (where / "keys" / f"{name}.json").write_text(json.dumps(doc), encoding="utf-8")
+        (where / "keys" / f"{sens.safe_name(name)}.json").write_text(json.dumps(doc), encoding="utf-8")
     return where
 
 
@@ -461,8 +461,14 @@ def test_build_classes_each_constant_from_its_deciding_stage(sens, tmp_path):
     readers is incomplete; a constant naming a sample entry is listed."""
 
     def p(cid, factor, origin="measured"):
-        return {"id": cid, "origin": origin, "value": 2.0, "new": 2.0 * factor, "factor": factor,
-                "label": f"{cid}x{factor}"}  # fmt: skip
+        return {
+            "id": cid,
+            "origin": origin,
+            "value": 2.0,
+            "new": 2.0 * factor,
+            "factor": factor,
+            "label": sens.label(cid, factor),
+        }  # fmt: skip  (the one safe name: no ":", which Windows forbids)
 
     the_plan = {
         "perturbations": [
@@ -484,8 +490,8 @@ def test_build_classes_each_constant_from_its_deciding_stage(sens, tmp_path):
     }
     reads = {"m:MOVEB": ["1ABC"], "m:SKIP": ["2DEF"], "m:LOST": ["1ABC"]}
     a = _stage_folder(sens, tmp_path / "A", plain, reads)
-    moved = plain | {"m:MOVEBx1.25": [_entry("1ABC", area=12.0), _entry("2DEF")]}
-    b = _stage_folder(sens, tmp_path / "B", moved, reads, unreached=("m:LOSTx0.75",))
+    moved = plain | {sens.label("m:MOVEB", 1.25): [_entry("1ABC", area=12.0), _entry("2DEF")]}
+    b = _stage_folder(sens, tmp_path / "B", moved, reads, unreached=(sens.label("m:LOST", 0.75),))
     doc = sens.build(a, b, sens.SOURCE_STAMP, the_plan=the_plan, sample=sample)
     got = {r["id"]: (r["class"], r["stage"]) for r in doc["constants"]}
     assert got == {
@@ -502,7 +508,7 @@ def test_build_classes_each_constant_from_its_deciding_stage(sens, tmp_path):
     assert doc["code_fingerprint"] == "f" * 16 and doc["run_commits"] == ["c" * 40]
     # Q32: runs whose reports measured another foldmap are refused, never re-keyed into one report
     (tmp_path / "B").rename(tmp_path / "B-ok")
-    b = _stage_folder(sens, tmp_path / "B", moved, reads, foreign=("m:SKIPx1.25",))
+    b = _stage_folder(sens, tmp_path / "B", moved, reads, foreign=(sens.label("m:SKIP", 1.25),))
     with pytest.raises(SystemExit, match="2 foldmap code fingerprints"):
         sens.build(a, b, sens.SOURCE_STAMP, the_plan=the_plan, sample=sample)
 
@@ -514,3 +520,12 @@ def test_sensitivity_refuses_to_run_perturbed_or_traced_itself(sens, monkeypatch
     with pytest.raises(SystemExit):
         sens.main(["plan"])
     assert f"{var} is set" in capsys.readouterr().err
+
+
+def test_every_run_path_is_a_name_every_os_takes(sens):
+    """Branch CI (windows-latest): a "module:NAME" key made a file name Windows refuses. label() is the one name of a
+    run's files and folder, and run_one refuses any other through safe_name()."""
+    assert sens.label("layout:_STACK_PAD", 0.75) == "layout._STACK_PADx0.75"
+    for bad in ("m:LIMITx0.75", "a/b", 'a"b', "", "a?b"):
+        with pytest.raises(ValueError):
+            sens.safe_name(bad)
