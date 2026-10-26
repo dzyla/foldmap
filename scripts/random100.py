@@ -41,6 +41,9 @@ Every entry and report carries the source stamp of the code that measured or wro
 as the process starts); a report whose entries differ in code says "mixed_code" and is never quoted. A paper sample (a
 sample.json with a protocol record) runs once, whole, with the code that drew it: a second run, --ids or
 --failed-from is refused unless --not-for-paper, which marks the report never to be quoted (plan 28 Task 1).
+With FOLDMAP_PERTURB set (scripts/sensitivity.py, plan 28 Task 9.2) every process of the run draws and judges with one
+constant perturbed (scripts/perturb.py, installed before foldmap is imported); the run needs --not-for-paper, and its
+entries and report say what was perturbed.
 """
 
 from __future__ import annotations
@@ -72,6 +75,16 @@ if __name__ == "__main__" and (ROOT / "src" / "foldmap").is_dir():
     # the foldmap of this checkout, not whichever one is installed (children run with python -I: no PYTHONPATH)
     sys.path.insert(0, str(ROOT / "src"))
 os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
+PERTURB_ENV = "FOLDMAP_PERTURB"  # scripts/perturb.py's: one constant perturbed in this run's every process (Q29)
+TRACE_ENV = "FOLDMAP_TRACE_READS"  # scripts/perturb.py's: which tuned constants this run's processes read
+if os.environ.get(PERTURB_ENV, "").strip() or os.environ.get(TRACE_ENV, "").strip():  # set only by sensitivity.py
+    import importlib.util
+
+    _spec = importlib.util.spec_from_file_location("foldmap_perturb", Path(__file__).resolve().parent / "perturb.py")
+    _perturb = importlib.util.module_from_spec(_spec)
+    _spec.loader.exec_module(_perturb)
+    _perturb.install()  # before the first foldmap module is imported (it raises otherwise)
+    _perturb.install_trace()
 
 # A1-A20 live in the package (plan 10 Task 13a: `foldmap check` judges by them too), imported once the path is set
 from foldmap import criteria as criteria_module  # noqa: E402
@@ -1485,6 +1498,8 @@ def run_entry(source: str, out: Path, views=VIEWS, info: dict | None = None) -> 
     e: dict = {"id": info.get("id", name), "name": name, **{k: info[k] for k in keep if k in info}, "views": {}}
     e["foldmap_commit"] = _commit()  # this entry's own: a report may join runs (final review B, Minor 6)
     e["source_stamp"] = SOURCE_STAMP  # the code measuring this entry (plan 28 Task 1)
+    if os.environ.get(PERTURB_ENV, "").strip():  # measured with one constant perturbed (scripts/perturb.py)
+        e["perturbed"] = os.environ[PERTURB_ENV].strip()
     try:
         path = resolve(source)
         e["file"], e["sha256"] = str(path), _sha256(path.read_bytes())
@@ -1872,6 +1887,8 @@ def report(entries: list[dict], out: Path, sample_path: Path | None = None, tota
         doc["protocol"] = drawn["protocol"]
     if (out / NOT_FOR_PAPER).is_file():
         doc["not_for_paper"] = (out / NOT_FOR_PAPER).read_text(encoding="utf-8").strip()
+    if os.environ.get(PERTURB_ENV, "").strip():  # judged with one constant perturbed (scripts/perturb.py)
+        doc["perturbed"] = os.environ[PERTURB_ENV].strip()
     out.mkdir(parents=True, exist_ok=True)
     (out / "report.json").write_text(json.dumps(_jsonable(doc), indent=1) + "\n", encoding="utf-8")
     keys = list(CRITERIA)
@@ -1892,6 +1909,8 @@ def report(entries: list[dict], out: Path, sample_path: Path | None = None, tota
     ]
     if doc.get("not_for_paper"):
         lines += [f"NOT FOR THE PAPER: {doc['not_for_paper']}", ""]
+    if doc.get("perturbed"):
+        lines += [f"PERTURBED (sensitivity, scripts/perturb.py): {doc['perturbed']}", ""]
     lines += [
         "An entry passes when no criterion fails. A criterion with nothing to judge in an entry is not judged (or does "
         "not apply), never counted as a pass: see the outcomes per criterion below.",
@@ -2454,6 +2473,8 @@ def cmd_run(args) -> int:
     from concurrent.futures import ThreadPoolExecutor
 
     out, sample_path = Path(args.out), Path(args.sample)
+    if os.environ.get(PERTURB_ENV, "").strip() and not args.not_for_paper:
+        raise SystemExit(f"refused: {PERTURB_ENV} perturbs a constant (sensitivity); such a run needs --not-for-paper")
     problem = paper_run_problem(out, sample_path, args)
     if problem and not args.not_for_paper:
         raise SystemExit(f"refused: {problem}. --not-for-paper runs it anyway, its report marked never to be quoted")

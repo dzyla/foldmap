@@ -182,6 +182,7 @@ NOT_REPORTS = {
     ("random100.py", "measure_view"): "a view's measures inside an entry's process; the entry record is stamped",
     ("homologues.py", "cmd_sample"): "a drawn pair set (the input of a run, not a measurement); its runs are stamped",
     ("make_na_fixtures.py", "main"): "committed test fixtures",
+    ("perturb.py", "install_trace"): "the constants a process read, an input to sensitivity.py's stamped keys",
     ("random100.py", "cmd_sample"): "writes the sample sample() built, which carries the stamp",
     ("random100.py", "cmd_view"): "a view's measures inside an entry's process; the entry record is stamped",
     ("random100.py", "finish"): "re-judges stamped entries and rewrites them with their measuring stamps",
