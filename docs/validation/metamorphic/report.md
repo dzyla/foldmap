@@ -1,6 +1,6 @@
 # Metamorphic tests and independent kernels
 
-Plan 28 Task 7 (rulings Q34, Q35). Written by: foldmap 0.1.0, git be8224abb86a (asserted by runner, dirty True), code fingerprint 72fb15138b17e48a, scripts/metamorphic_record.py sha256 666c5be1bb47; Python 3.13.13 on Linux-7.0.0-38-generic-x86_64-with-glibc2.43; gemmi 0.7.5, numpy 2.5.4, scipy 1.18.1, networkx 3.7, matplotlib 3.11.2, PyYAML 6.0.3
+Plan 28 Task 7 (rulings Q34, Q35). Written by: foldmap 0.1.0, git ddc408cc31fe (asserted by runner, dirty False), code fingerprint 72fb15138b17e48a, scripts/metamorphic_record.py sha256 666c5be1bb47; Python 3.13.13 on Linux-7.0.0-38-generic-x86_64-with-glibc2.43; gemmi 0.7.5, numpy 2.5.4, scipy 1.18.1, networkx 3.7, matplotlib 3.11.2, PyYAML 6.0.3
 
 What tests/test_metamorphic.py, tests/test_independent_kernels.py and tests/test_deep_check.py assert, measured on committed fixtures; the findings they pin with xfail(strict). The deep-check runs below are recorded runs (they need mkdssp and RNApolis), not tests.
 
