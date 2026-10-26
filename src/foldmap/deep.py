@@ -22,8 +22,9 @@ unavailable check: 1 on a failure, else 0.
 
 The report (report(); SCHEMA, VERSION): {"schema": "foldmap-check", "version": 1, "structure", "foldmap": the
 version, "deep": whether D1-D3 were run, "verdict", "counts": {status: n}, "kinds": {kind: what it is evidence of},
-"checks": [{"code", "group" (science, criteria, like, deep), "title", "kind", "status", "detail", "findings",
-"reason"}, ...]}. A field is added in a later version only with VERSION raised."""
+"checks": [{"code", "group" (science, criteria, floor, like, deep), "title", "kind", "status", "detail", "findings",
+"reason", "measures"}, ...]}. A field is added in a later version only with VERSION raised. The floor group (plan 28
+Task 4) holds R1, the readability floor (floor.check), after the criteria: a check id added, the shape unchanged."""
 
 from __future__ import annotations
 
@@ -35,7 +36,7 @@ import subprocess
 import tempfile
 from pathlib import Path
 
-from .science import CONSISTENCY, EXTERNAL, KINDS, NOTHING, SCIENCE, check_kinds
+from .science import CONSISTENCY, EXTERNAL, KINDS, NOTHING, READABILITY, SCIENCE, check_kinds
 
 SCHEMA = "foldmap-check"
 VERSION = 1
@@ -49,6 +50,7 @@ DEEP = {
 DEEP_KIND = {"D1": CONSISTENCY, "D2": EXTERNAL, "D3": EXTERNAL}
 # H1-H5 (a figure drawn like a reference, criteria.LIKE_CHECKS) are none of science.KIND's layers: named apart
 LIKE = "like"
+FLOOR = "floor"  # the group of R1, the readability floor (floor.py, plan 28 Task 4): kind readability, as A1-A20
 LIKE_KIND = "drawn like a reference (H1-H5): the figure against the reference's figure and its own drawn alone"
 MKDSSP_VERSION = "mkdssp version 3.1.2"
 TIMEOUT = 600  # s for an external program
@@ -332,10 +334,14 @@ def _criterion_entry(got: dict) -> dict:
     return {"status": NOT_APPLICABLE, "detail": detail}
 
 
-def report(structure, found: dict, like: dict | None = None, deep: dict | None = None) -> dict:
+def report(
+    structure, found: dict, like: dict | None = None, deep: dict | None = None, floor: dict | None = None
+) -> dict:
     """The machine-readable check report (module docstring) of `foldmap check`: `found` criteria.check_figure's,
-    `like` the H checks (criteria.like_checks) when drawn like a reference, `deep` D1-D3 (deep_checks) when run."""
+    `like` the H checks (criteria.like_checks) when drawn like a reference, `deep` D1-D3 (deep_checks) when run,
+    `floor` R1 (floor.check: the readability floor) when judged."""
     from . import __version__
+    from . import floor as floor_mod
     from .criteria import CRITERIA, LIKE_CHECKS
 
     kinds = {**check_kinds(CRITERIA), **DEEP_KIND}
@@ -346,6 +352,11 @@ def report(structure, found: dict, like: dict | None = None, deep: dict | None =
     for code, title in CRITERIA.items():
         entry = _criterion_entry(found["criteria"].get(code))
         checks.append({"code": code, "group": "criteria", "title": title, "kind": kinds[code], **entry})
+    if floor is not None:  # R1, readability like A1-A20; its reasons and the options that draw less as measures
+        measures = {k: floor[k] for k in ("reasons", "suggestions", "measures")}
+        entry = {"status": floor["status"], "detail": floor["detail"], "measures": measures}
+        head = {"code": floor_mod.CODE, "group": FLOOR, "title": floor_mod.TITLE, "kind": READABILITY}
+        checks.append({**head, **entry})
     for code, title in LIKE_CHECKS.items() if like is not None else ():
         got = like.get(code) or {"pass": None, "detail": ""}
         detail = str(got.get("detail") or "")

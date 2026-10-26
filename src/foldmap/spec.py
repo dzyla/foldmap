@@ -6,6 +6,7 @@ point; values given explicitly win; defaults fill the rest."""
 
 from __future__ import annotations
 
+import time
 from dataclasses import dataclass, field, fields, replace
 from pathlib import Path
 from typing import Any
@@ -508,6 +509,9 @@ class Drawn:
     sses: list
     bb: Any  # model.Backbone
     model: Any = None  # io.read_model result the figure was built from
+    # wall seconds draw_spec took to read, lay out, route and draw it (the readability floor's time, floor.TIME); None
+    # when not timed (a compare page, a figure made elsewhere). Never part of the figure
+    seconds: float | None = None
 
     @property
     def beads(self):
@@ -531,6 +535,14 @@ class Drawn:
         """Each named fallback (fallback.FALLBACKS) taken while the figure was made -> how many times
         (Layout.fallbacks); {} when none was."""
         return dict(getattr(self.layout, "fallbacks", {}) or {})
+
+    @property
+    def floor(self) -> list[dict]:
+        """The named reasons the figure is below the readability floor (floor.readability_floor: text under 6 pt on
+        its page, route budget spent, made in more than the hosted time), [] when it is above it."""
+        from .floor import readability_floor
+
+        return readability_floor(self)
 
     @property
     def stuck(self) -> list[str]:
@@ -573,6 +585,7 @@ def draw_spec(spec: FigureSpec, like_out: dict | None = None) -> Drawn:
     from .cli import make_layout
     from .io import read_model
 
+    start = time.perf_counter()
     with fallback.counting() as fired:  # every named fallback taken in making it (Layout.fallbacks; never drawn)
         model = read_model(spec.structure, spec.assembly)
         layout, sses, bb = make_layout(
@@ -581,7 +594,7 @@ def draw_spec(spec: FigureSpec, like_out: dict | None = None) -> Drawn:
         loops = route_loops(layout, sses, bb)
         fig = draw(layout, loops, sses, spec.title, model=model, look=spec.look)
     layout.fallbacks = fallback.counts(fired)
-    return Drawn(fig, loops, layout, sses, bb, model)
+    return Drawn(fig, loops, layout, sses, bb, model, seconds=time.perf_counter() - start)
 
 
 def layout_document(spec: FigureSpec, structure_name: str | None = None, drawn: Drawn | None = None) -> dict:

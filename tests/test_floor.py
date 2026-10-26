@@ -1,0 +1,199 @@
+"""The readability floor (plan 28 Task 4, the review's 3.3, ruling Q39): floor.readability_floor names why a figure
+is below it (text under 6 pt on its page, the route budget spent, more than the hosted time to make), the notes say
+it with the existing options that draw less, `--strict-floor` writes nothing below it, `foldmap check` reports R1,
+and the default figure is unchanged. The floor's logic is tested on synthetic measures; a figure below it is made
+from a committed fixture by holding its page small (layout.MAX_PAGE_IN), never by timing anything."""
+
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+import pytest
+
+from foldmap import deep, floor, layout
+from foldmap.cli import build_parser, main
+from foldmap.science import READABILITY
+from foldmap.spec import draw_spec, figure_spec
+
+DATA = Path(__file__).parent / "data"
+UBQ = DATA / "1UBQ.cif"
+TETRAMER = DATA / "1BL8.cif"  # a C4 potassium channel: four chains, one per subunit
+RECORD = Path(__file__).resolve().parents[1] / "docs" / "validation" / "readability-floor" / "report.json"
+
+
+def _measures(**given) -> dict:
+    return {"page_in": [7.0, 5.0], "text_pt": 7.37, "smallest_pt": 4.4, "fallbacks": {}, "seconds": 1.0} | given
+
+
+@pytest.fixture
+def small_page(monkeypatch):
+    """Pages held at 3 in on their longer side: 1UBQ's text falls under 6 pt (page_scale scales the figure)."""
+    monkeypatch.setattr(layout, "MAX_PAGE_IN", 3.0)
+
+
+def test_each_reason_from_its_measure():
+    assert floor.reasons_of(_measures()) == []
+    assert floor.reasons_of(_measures(text_pt=6.0, smallest_pt=3.6)) == []  # the floor is the figure's text
+    (got,) = floor.reasons_of(_measures(page_in=[48.0, 9.8], text_pt=2.049, smallest_pt=1.23))
+    assert got["reason"] == floor.TEXT_SMALL and got["limit"] == layout.MIN_TEXT_PT == 6.0
+    assert got["text"] == "its text is 2.0 pt, under 6 pt, on its 48 x 10 in page (its smallest text 1.2 pt)"
+    (got,) = floor.reasons_of(_measures(text_pt=5.97))  # rounded down, as page_fit says it: never "6.0, under 6"
+    assert "5.9 pt, under 6 pt" in got["text"]
+    fired = {"route_second_search_refused": 2, "loop_curve": 3, "helix_name_moved": 9}
+    (got,) = floor.reasons_of(_measures(fallbacks=fired))
+    assert got["reason"] == floor.ROUTE_BUDGET and got["measured"] == 2
+    assert got["text"] == "its route budget was spent: 2 wider route searches not run, 3 loops drawn as curves"
+    assert floor.reasons_of(_measures(fallbacks={"loop_curve": 3})) == []  # a stuck loop is A3's, not the floor's
+    (got,) = floor.reasons_of(_measures(seconds=107.9))
+    assert got["reason"] == floor.TIME and got["limit"] == floor.TIME_LIMIT_S == 90
+    assert got["text"] == "it took 108 s to make, over the hosted app's 90 s"
+    assert floor.reasons_of(_measures(seconds=90.0)) == []
+    assert floor.reasons_of(_measures(seconds=None)) == []  # not timed: not judged on time
+    both = floor.reasons_of(_measures(text_pt=5.48, seconds=107.9))
+    assert [r["reason"] for r in both] == [floor.TEXT_SMALL, floor.TIME]
+    assert set(floor.REASONS) == {floor.TEXT_SMALL, floor.ROUTE_BUDGET, floor.TIME}
+
+
+def test_the_options_in_each_interfaces_words():
+    offered = [
+        {"options": {"focus": "protomer"}, "what": "one subunit in full"},
+        {"options": {"focus": "2M"}, "what": "chain 2M in full"},
+        {"options": {"chains": "2M"}, "what": "chain 2M only"},
+    ]
+    reasons = floor.reasons_of(_measures(text_pt=2.0))
+    cli = floor.note(reasons, offered)
+    assert cli.startswith("below the readability floor: its text is 2.0 pt")
+    assert cli.endswith(
+        "drawing less may bring it above: --focus protomer (one subunit in full); --focus 2M (chain 2M in full); "
+        "--chains 2M (chain 2M only)"
+    )
+    assert 'focus="protomer"' in floor.note(reasons, offered, "mcp") and 'chains=["2M"]' in floor.note(
+        reasons, offered, "mcp"
+    )
+    app = floor.note(reasons, offered, "app")
+    assert "protomer" not in app  # the app has no control for it
+    assert "Chains & assembly, Large assemblies: these chains in full, 2M" in app
+    assert floor.note([], offered) == "" and floor.note(reasons, []).endswith("pt)")
+
+
+def test_an_ordinary_figure_is_above_the_floor():
+    drawn = draw_spec(figure_spec(UBQ))
+    got = floor.measures(drawn)
+    assert got["text_pt"] >= 6.0 and got["smallest_pt"] < got["text_pt"]
+    assert drawn.seconds is not None and got["seconds"] == round(drawn.seconds, 2)
+    assert drawn.floor == [] and floor.suggestions(drawn) == []  # one chain: nothing to draw less of
+
+
+def test_a_page_held_small_is_below_the_floor(small_page):
+    drawn = draw_spec(figure_spec(UBQ))
+    (got,) = drawn.floor
+    assert got["reason"] == floor.TEXT_SMALL and got["measured"] < 6.0
+    assert drawn.fallbacks.get("page_text_small") == 1  # the same condition page_fit says and counts
+    assert drawn.page_notes and "under 6 pt" in drawn.page_notes[0]
+
+
+def test_suggestions_draw_less(tmp_path):
+    drawn = draw_spec(figure_spec(TETRAMER))
+    offered = floor.suggestions(drawn)
+    first = drawn.bb.labels[0].chain
+    assert [o["options"] for o in offered][-2:] == [{"focus": first}, {"chains": first}]
+    if len(set((getattr(drawn.layout.frame, "sector", None) or {}).values())) > 1:
+        assert offered[0]["options"] == {"focus": "protomer"}
+    alone = draw_spec(figure_spec(TETRAMER, chains=[first]))
+    assert {p.sse.chain for p in alone.layout.placed.values()} == {first}
+
+
+def test_plot_says_it_and_strict_writes_nothing(small_page, tmp_path, capsys):
+    out = tmp_path / "f.svg"
+    assert main(["plot", str(UBQ), "-o", str(out)]) == 0
+    err = capsys.readouterr().err
+    assert "foldmap: warning: below the readability floor: its text is" in err and out.is_file()
+    strict = tmp_path / "g.svg"
+    assert main(["plot", str(UBQ), "-o", str(strict), "--strict-floor"]) == 1
+    err = capsys.readouterr().err
+    assert "no figure written: it is below the readability floor (--strict-floor)" in err
+    assert not strict.exists()
+
+
+def test_strict_writes_a_figure_above_the_floor(tmp_path, capsys):
+    out = tmp_path / "f.svg"
+    assert main(["plot", str(UBQ), "-o", str(out), "--strict-floor"]) == 0 and out.is_file()
+    assert "readability floor" not in capsys.readouterr().err
+
+
+def test_the_floor_is_never_in_the_file(small_page, tmp_path):
+    """The floor is said in the notes, never drawn or written into the figure's file (its <desc> is the
+    provenance's, which says the page, as before)."""
+    out = tmp_path / "f.svg"
+    assert main(["plot", str(UBQ), "-o", str(out)]) == 0
+    svg = out.read_text(encoding="utf-8")
+    assert "readability floor" not in svg and "route budget" not in svg
+
+
+def test_check_reports_r1(small_page, capsys):
+    code = main(["check", str(UBQ)])
+    out = capsys.readouterr().out
+    assert code == 1
+    assert f"R1 {floor.TITLE}: fail" in out and "  its text is" in out
+    code = main(["check", str(UBQ), "--json", "-"])
+    doc = json.loads(capsys.readouterr().out)
+    (r1,) = [c for c in doc["checks"] if c["code"] == floor.CODE]
+    assert r1["group"] == deep.FLOOR and r1["kind"] == READABILITY and r1["status"] == deep.FAIL
+    assert [r["reason"] for r in r1["measures"]["reasons"]] == [floor.TEXT_SMALL]
+    assert doc["verdict"] == "fail" and doc["version"] == 1
+
+
+def test_check_passes_r1_above_the_floor(capsys):
+    assert main(["check", str(UBQ)]) == 0
+    assert f"R1 {floor.TITLE}: pass" in capsys.readouterr().out
+
+
+def test_reduced_detail_is_a_preset_the_user_overrides():
+    from foldmap.cli import _spec_of
+
+    args = build_parser().parse_args(["plot", str(UBQ), "-o", "x.svg", "--reduced-detail", "--set", "ligands=all"])
+    look = _spec_of(args).look
+    assert (look.nucleotide_labels, look.glycans, look.helices_310, look.ligands) == (False, False, False, "all")
+    plain = _spec_of(build_parser().parse_args(["plot", str(UBQ), "-o", "x.svg"])).look
+    assert (plain.nucleotide_labels, plain.glycans, plain.helices_310, plain.ligands) == (True, True, True, "auto")
+
+
+def test_the_mcp_result_says_it(small_page, monkeypatch):
+    pytest.importorskip("mcp")
+    monkeypatch.delenv("FOLDMAP_OUTPUT_DIR", raising=False)
+    import asyncio
+
+    from foldmap.mcp_server import server
+
+    r = asyncio.run(server.call_tool("draw_topology", {"source": str(UBQ)}))
+    assert [x["reason"] for x in r.structured_content["floor"]] == [floor.TEXT_SMALL]
+    assert "warning: below the readability floor" in r.content[0].text
+
+
+def test_the_app_says_it(small_page):
+    from foldmap import app, app_jobs
+
+    blob = json.dumps({**app.LAYOUT_DEFAULTS, "theme": "publication"}, sort_keys=True)
+    out = app_jobs.draw_job(UBQ, blob)
+    assert out["floor_note"].startswith("below the readability floor: its text is")
+
+
+@pytest.mark.skipif(not RECORD.is_file(), reason="docs/validation is not part of the sdist")
+def test_the_record_is_what_the_floor_says_of_its_measures():
+    """The committed record (scripts/readability_floor.py): each figure's reasons are reasons_of its measures, and
+    every option the notes offered for a figure below the floor brought it above."""
+    doc = json.loads(RECORD.read_text(encoding="utf-8"))
+    rows = doc["entries"]
+    assert rows and {"9FZL", "8XJV"} <= {r["id"] for r in rows}
+    for r in rows:
+        for fig in [r["default"], *r["tried"]]:
+            if "error" in fig:
+                continue
+            got = floor.reasons_of(fig["measures"])
+            assert [x["reason"] for x in got] == fig["reasons"], (r["id"], fig.get("options"))
+        offered = [t for t in r["tried"] if t.get("offered")]
+        if r["default"]["reasons"]:
+            assert offered, r["id"]
+        for t in offered:
+            assert t["reasons"] == [], (r["id"], t["options"])

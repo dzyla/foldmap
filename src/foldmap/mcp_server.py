@@ -202,6 +202,7 @@ def draw_topology(
     data_path: str | None = None,
     data_column: str | None = None,
     crosslinks_path: str | None = None,
+    reduced_detail: bool = False,
 ) -> CallToolResult:
     """Draw the topology diagram and write it to output_path (.svg, .png or .pdf; default: a temporary .svg).
     Returns where it was written plus a PNG preview of the same figure; when assembly or focus auto drew part of
@@ -237,7 +238,11 @@ def draw_topology(
     membrane: off, auto (draw the lipid bilayer) or flip (the same, the two sides swapped). focus: auto draws
     filaments, cages and large assemblies as one subunit plus the neighbouring parts of its fold; none draws the
     whole assembly; or chains, e.g. "B".
-    chains: draw only these chains, e.g. ["A", "B"].
+    chains: draw only these chains, e.g. ["A", "B"]. reduced_detail: leave out low-priority annotations (base letters,
+    ligand marks, glycans, 3-10 helix boxes: the style keys of floor.REDUCED_DETAIL; style wins over them).
+    A figure below the readability floor (its text under 6 pt on its page, its route budget spent, or more than 90 s
+    to make) is still written: the note says why and which arguments draw less (focus, chains); the structured
+    result's `floor` lists the reasons, each {reason, measured, limit, text} (empty above it).
     msa_path: alignment for theme 'conservation'. uniprot: "auto" or an accession, to mark UniProt active and binding
     sites (style key uniprot_sites: all, or types like "active,modified"); uniprot_domains: UniProt domain panels.
     layout_file / save_layout: load or write a YAML layout file that re-creates the figure
@@ -259,6 +264,8 @@ def draw_topology(
     in the structured result's `data_problems` [{where, text}]; crosslinks drawn are among `interactions` (kind xl,
     or xl-over when longer than their span)."""
     from . import layoutfile
+    from .floor import REDUCED_DETAIL, suggestions
+    from .floor import note as floor_note
     from .provenance import lines
     from .render import save
     from .scope import drawn_scope, scope_note
@@ -279,7 +286,7 @@ def draw_topology(
         spec = figure_spec(
             path,
             theme=theme,
-            style=[f"{k}={v}" for k, v in (style or {}).items()],
+            style=[*(REDUCED_DETAIL if reduced_detail else ()), *(f"{k}={v}" for k, v in (style or {}).items())],
             layout_file=layout_file,
             title=title,
             mode=mode,
@@ -325,6 +332,9 @@ def draw_topology(
         said = scope_note({**scope, "additives": []}, how="mcp")  # the additives hidden are in the list
         if said:  # an automatic choice drew part of the file
             note += f"; {said}"
+        below = drawn.floor  # the readability floor (floor.py): said, never drawn
+        if below:
+            note += f"; warning: {floor_note(below, suggestions(drawn), how='mcp')}"
         return CallToolResult(
             content=[TextContent(type="text", text=note), _preview(drawn.figure).to_image_content()],
             structured_content={
@@ -333,6 +343,7 @@ def draw_topology(
                 "data_problems": [{"where": p.where, "text": p.text} for p in problems],
                 "bent_duplex": drawn.layout.bent_duplex,  # na_bend (pieces or curved) is a choice for it
                 "fallbacks": drawn.fallbacks,  # each named fallback taken -> how many times (fallback.FALLBACKS)
+                "floor": below,  # why it is below the readability floor (floor.readability_floor), [] above it
             },
         )
 

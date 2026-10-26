@@ -206,7 +206,11 @@ foldmap styles                                    # every theme and style key
   sized from the text as drawn. Its PNG is 300 dpi up to 50
   megapixels and takes a lower dpi past that (said in the notes); SVG and PDF keep the page whole. The 6 pt floor is
   at text size 1: a smaller text size (`--set font_scale=0.8`, the app's Text size, the journal theme's 0.9) draws
-  the text that much smaller.
+  the text that much smaller. A figure below the readability floor (its text under 6 pt on its page, its route
+  budget spent, or more than the hosted app's 90 s to make) is drawn as before and says so in the notes, `foldmap
+  check` (R1) and the MCP result and app, naming the options that draw less (`--focus protomer`, `--focus B`,
+  `--chains B`); `--strict-floor` writes no figure below it instead (exit 1). What each option achieved on the
+  largest figures measured is in `docs/validation/readability-floor`.
 - **How each figure was made** comes with it: one list of what it infers, leaves ambiguous or moves for
   readability — domains inferred from contacts (or CATH's, UniProt's, or given), strands drawn off a sheet's run and
   pairings only named, strands joined across a β-bulge, helix pieces matched across copies, ghost strands, names
@@ -292,6 +296,7 @@ files).
 | Only some chains | `--chains A,B` |
 | Draw like a reference | `--like 2HHB --like-chain B` (one chain of each; see below) |
 | Large assemblies | `--focus auto\|none\|protomer\|B` (one subunit plus what its neighbours add to its fold) |
+| Large figures | `--reduced-detail`: no base letters, ligand marks, glycans or 3-10 helix boxes (`--set` wins over it); `--strict-floor`: no figure below the readability floor |
 | Membrane | `--membrane auto` (OPM dummy atoms if present, otherwise estimated on every protein chain, whatever `--chains` draws; the sides from the Lys/Arg on the loops of the elements crossing it); `--membrane flip` puts the other side on top. Transmembrane helices (crossing the mid-plane, spanning half the thickness) stand upright at their projected height, the band drawn at the membrane's faces; every other helix stands or lies by its tilt to the normal (flat from 45°, or from 35° with its centre within 7.5 Å of a face; one in a bundle or βα row follows its unit). Two flat helix pieces a DSSP break of one or two residues apart, one going on as the other (within 45°) and lying flat joined, are drawn as one helix, and copies of a protein that disagree on such a break are joined where the joined helix crosses the membrane; the sequence plot and `foldmap data` keep DSSP's pieces. A transmembrane helix shorter than the slab reaches the face its residues come nearer. Unless `--rotate` or `--flip-v` is given, the view is turned about the normal (in 5° steps) so that the transmembrane helices stand left to right as nearly in sequence as a turn allows (Kendall τ of the chain it orders worst, taken when that gains 0.1 or more and the τ pooled over all of them does not fall); each chain's transmembrane helices keep their projected order across the band. Flat helices in the slab or within 5 Å of a face lie on that face in rows, in their projected order, stacked outward where a row is full (a helix beyond its chain's transmembrane span is laid out as any other); other elements in the slab keep their projected height, and soluble elements (more than 5 Å beyond a face, or standing wholly beyond it) are kept off the band on their own side |
 | Conservation | `--theme conservation --msa family.fasta`, or `--msa consurf_grades.txt` for ConSurf's own grades |
 | Orientation | `--up X,Y,Z`, `--view X,Y,Z`, `--rotate DEG` |

@@ -82,11 +82,11 @@ every correction of a rule are by hand.
 | constant | 590 | 62 | 25 | 28 | 36 | 102 | 337 |
 | default | 33 | 0 | 0 | 0 | 0 | 3 | 30 |
 | local | 1 | 0 | 0 | 0 | 0 | 0 | 1 |
-| comparison | 298 | 0 | 0 | 0 | 0 | 156 | 142 |
-| argument | 666 | 0 | 1 | 0 | 0 | 185 | 480 |
+| comparison | 299 | 0 | 0 | 0 | 0 | 157 | 142 |
+| argument | 668 | 0 | 1 | 0 | 0 | 187 | 480 |
 | fallback | 24 | 0 | 0 | 0 | 4 | 1 | 19 |
 | fallback-marker | 29 | 0 | 0 | 0 | 3 | 0 | 26 |
-| all | 1641 | 62 | 26 | 28 | 43 | 447 | 1035 |
+| all | 1644 | 62 | 26 | 28 | 43 | 450 | 1035 |
 
 Of the 43 named-entry rows, 32 rest on the comment at the item and 11 on git (evidence starting `git:`: a commit whose message ties the value to the entries).
 
@@ -172,7 +172,7 @@ Of the 43 named-entry rows, 32 rest on the comment at the item and 11 on git (ev
 
 | id | kind | value | at | origin | evidence | tests naming it | check |
 |---|---|---|---|---|---|---|---|
-| `app:LAYOUT_DEFAULTS` | constant | { "mode": "projected", "rotate": 0.0, "symmetry": "auto", "assembly": "auto", "rename": "", "swap": "", "move": "", "ti… | LAYOUT_DEFAULTS = { | convention | the app's default settings; earliest in this file: 0438931 2026-10-09 Rename to foldmap; add README | app, app_controls, app_edits | - |
+| `app:LAYOUT_DEFAULTS` | constant | { "mode": "projected", "rotate": 0.0, "symmetry": "auto", "assembly": "auto", "rename": "", "swap": "", "move": "", "ti… | LAYOUT_DEFAULTS = { | convention | the app's default settings; earliest in this file: 0438931 2026-10-09 Rename to foldmap; add README | app, app_controls, app_edits, floor | - |
 | `app:TITLE_MAX` | constant | 200 | TITLE_MAX = 200 # characters of a layout file's title | convention | an input limit; earliest in this file: 81aec46 2026-10-12 User YAML: no anchors or aliases in layout, names and style files; every layout … | - | - |
 | `app:TEXT_MAX` | constant | 2000 | TEXT_MAX = 2000 # characters of any other text a layout file gives (a path, a mark list, a reference) | convention | an input limit; earliest in this file: 81aec46 2026-10-12 User YAML: no anchors or aliases in layout, names and style files; every layout … | - | - |
 | `app:IDS_MAX` | constant | 20_000 | IDS_MAX = 20_000 # characters of a list of chain ids, joined (a capsid has hundreds of chains) | convention | an input limit; earliest in this file: 81aec46 2026-10-12 User YAML: no anchors or aliases in layout, names and style files; every layout … | - | - |
@@ -302,8 +302,8 @@ Of the 43 named-entry rows, 32 rest on the comment at the item and 11 on git (ev
 | `cli:_in_sequence:argument:181@6d2655ae` | argument | 181 | turns = sorted(range(-180 + AZIMUTH_STEP, 181, AZIMUTH_STEP), key=lambda a: (abs(a), a < 0)) | unknown | - | membrane | - |
 | `cli:_face_medians.page_y:comparison:1e-9@0f0573ec` | comparison | 1e-9 | elif abs(slope) > 1e-9: | convention | a floating-point tolerance | - | - |
 | `cli:_one_of_each:comparison:0.9@92fb00cc` | comparison | 0.9 | if SequenceMatcher(None, seq[g[0]], seq[c], autojunk=False).ratio() > 0.9: | unknown | - | - | - |
-| `cli:build_parser:argument:60@29d007de` | argument | 60 | sq.add_argument("--columns", type=int, default=60, help="residues (alignment columns) per row (default 60)") | unknown | - | cli, elstyle, names, science | - |
-| `cli:build_parser:argument:0.7@afd84f49` | argument | 0.7 | default=0.7, | unknown | - | cli, elstyle, names, science | - |
+| `cli:build_parser:argument:60@29d007de` | argument | 60 | sq.add_argument("--columns", type=int, default=60, help="residues (alignment columns) per row (default 60)") | unknown | - | cli, elstyle, floor, names +1 | - |
+| `cli:build_parser:argument:0.7@afd84f49` | argument | 0.7 | default=0.7, | unknown | - | cli, elstyle, floor, names +1 | - |
 
 ## compare
 
@@ -527,6 +527,14 @@ Of the 43 named-entry rows, 32 rest on the comment at the item and 11 on git (ev
 | `figcheck:drawn_columns:argument:3@849de405` | argument | 3 | cols.setdefault(round(float(np.array([p.cx, p.cy]) @ across), 3), []).append((i, ghost)) | convention | rounding digits | science | - |
 | `figcheck:_angstrom:comparison:0.05@e7f1471b` | comparison | 0.05 | return "<0.1" if x < 0.05 else f"{x:.1f}" | unknown | - | membrane | - |
 
+## floor
+
+| id | kind | value | at | origin | evidence | tests naming it | check |
+|---|---|---|---|---|---|---|---|
+| `floor:measures:argument:3@ead16c7c` | argument | 3 | "text_pt": None if text is None else round(text, 3), | convention | rounding digits | floor | - |
+| `floor:measures:argument:3@11773890` | argument | 3 | "smallest_pt": None if smallest is None else round(smallest, 3), | convention | rounding digits | floor | - |
+| `floor:reasons_of:comparison:1e-6@027f97a0` | comparison | 1e-6 | if text is not None and text < MIN_TEXT_PT - 1e-6: | convention | a floating-point tolerance | floor | - |
+
 ## frame
 
 | id | kind | value | at | origin | evidence | tests naming it | check |
@@ -662,8 +670,8 @@ Of the 43 named-entry rows, 32 rest on the comment at the item and 11 on git (ev
 | `layout:_GLYPH_K` | constant | ContextVar("foldmap_glyph_scale", default=1.0) | _GLYPH_K: ContextVar[float] = ContextVar("foldmap_glyph_scale", default=1.0) # glyph_scale of the text the layout | convention | a context default (glyph scale 1); earliest in this file: f22c038 2026-10-15 C6 fix round 1 (findings 4, 5, 8): every glyph-sized room goes through layout.gl… | label_scale, page_text | - |
 | `layout:IN_PER_UNIT` | constant | 0.30 | IN_PER_UNIT = 0.30 # render: inches per page unit, at most | unknown | earliest in this file: 7104faa 2026-10-11 C6/C10 follow-ups from the rerun: a gap the grid cannot route is curved before i… | page_text | - |
 | `layout:MAX_WIDTH_IN` | constant | 7.2 | MAX_WIDTH_IN = 7.2 # render: a figure is drawn at most this wide (double column), inches, while its text stays ... | convention | "double column" page width; earliest in this file: 7104faa 2026-10-11 C6/C10 follow-ups from the rerun: a gap the grid cannot route is curved before i… | page_text | - |
-| `layout:MIN_TEXT_PT` | constant | 6.0 | MIN_TEXT_PT = 6.0 # ... this size or larger: a wider page grows past MAX_WIDTH_IN instead (random-100 C4 ruling) | convention | the smallest text size printed (random-100 C4 ruling); earliest in this file: a3cf24d 2026-10-15 C4 (random-100, batch C1): text has a 6 pt floor and the page grows instead; leg… | page_text | - |
-| `layout:MAX_PAGE_IN` | constant | 48.0 | MAX_PAGE_IN = 48.0 # render: the longest side a page grows to (A0's, about); past it the whole figure, its text | convention | "A0's, about"; earliest in this file: a3cf24d 2026-10-15 C4 (random-100, batch C1): text has a 6 pt floor and the page grows instead; leg… | app_jobs, heldout_budgets, mcp, page_text | - |
+| `layout:MIN_TEXT_PT` | constant | 6.0 | MIN_TEXT_PT = 6.0 # ... this size or larger: a wider page grows past MAX_WIDTH_IN instead (random-100 C4 ruling) | convention | the smallest text size printed (random-100 C4 ruling); earliest in this file: a3cf24d 2026-10-15 C4 (random-100, batch C1): text has a 6 pt floor and the page grows instead; leg… | floor, page_text | - |
+| `layout:MAX_PAGE_IN` | constant | 48.0 | MAX_PAGE_IN = 48.0 # render: the longest side a page grows to (A0's, about); past it the whole figure, its text | convention | "A0's, about"; earliest in this file: a3cf24d 2026-10-15 C4 (random-100, batch C1): text has a 6 pt floor and the page grows instead; leg… | app_jobs, floor, heldout_budgets, mcp +1 | - |
 | `layout:_MAX_ROW` | constant | 30.0 | _MAX_ROW = 30.0 | unknown | earliest in this file: 0438931 2026-10-09 Rename to foldmap; add README | membrane, route | - |
 | `layout:_MIN_STRAND` | constant | 1.0 | _MIN_STRAND = 1.0 # shortest drawn strand (room for the arrow head) | unknown | earliest in this file: 0438931 2026-10-09 Rename to foldmap; add README | - | - |
 | `layout:_PAIR_ENERGY_ABOVE` | constant | 200 | _PAIR_ENERGY_ABOVE = 200 | unknown | earliest in this file: d1fa11e 2026-10-10 Tests compare the pair-list energy with the production dense energy | optimiser, perf | - |
@@ -932,9 +940,9 @@ Of the 43 named-entry rows, 32 rest on the comment at the item and 11 on git (ev
 | `layout:label_boxes:argument:0.1@877d99ef#2` | argument | 0.1 | out.append((f"domain-leader:{name}", (x - 0.1, min(y0, y1), x + 0.1, max(y0, y1)))) | unknown | - | domains, heldout_budgets, layout, matrix +6 | - |
 | `layout:font_pt:argument:72@02145b1a` | argument | 72 | return float(min(_EM_TUNED * scale * 72, 9.0)) | convention | 72 points to the inch | - | - |
 | `layout:font_pt:argument:9.0@02145b1a` | argument | 9.0 | return float(min(_EM_TUNED * scale * 72, 9.0)) | unknown | - | - | - |
-| `layout:page_fit:comparison:1e-6@76d04fa7` | comparison | 1e-6 | if font >= MIN_TEXT_PT - 1e-6: | convention | a floating-point tolerance | heldout_budgets, page_text | - |
-| `layout:page_fit:comparison:1e-6@fbdc5ce9` | comparison | 1e-6 | if longest <= MAX_PAGE_IN + 1e-6: | convention | a floating-point tolerance | heldout_budgets, page_text | - |
-| `layout:page_fit:comparison:1e-6@64e8f504` | comparison | 1e-6 | elif longest < MAX_GROWN_IN - 1e-6: | convention | a floating-point tolerance | heldout_budgets, page_text | - |
+| `layout:page_fit:comparison:1e-6@76d04fa7` | comparison | 1e-6 | if font >= MIN_TEXT_PT - 1e-6: | convention | a floating-point tolerance | floor, heldout_budgets, page_text | - |
+| `layout:page_fit:comparison:1e-6@fbdc5ce9` | comparison | 1e-6 | if longest <= MAX_PAGE_IN + 1e-6: | convention | a floating-point tolerance | floor, heldout_budgets, page_text | - |
+| `layout:page_fit:comparison:1e-6@64e8f504` | comparison | 1e-6 | elif longest < MAX_GROWN_IN - 1e-6: | convention | a floating-point tolerance | floor, heldout_budgets, page_text | - |
 | `layout:_part_domains:fallback-marker` | fallback-marker | 1 | for it in items: # BLACT helix B:575-585, walled 6 units over its home, fell back to it alone, off its panel) | unknown | not a fallback: the comment tells of a past bug (32KS chain B's BLACT helix) | copies, domains, membrane, perf | - |
 | `layout:_place_domain_names:fallback-marker` | fallback-marker | 1 | (else of all), the one that leaves the ways out the most (random-100 held-out 7NZ2: a name falling back to the | named-entry:7NZ2 | holds domain_name_least_bad | domains | - |
 | `layout:_ink_line:fallback-marker` | fallback-marker | 1 | pen += advance.get(c, _FALLBACK_WIDTH * tm.UNITS) | unknown | holds glyph_width_guessed | na_layout, text_clear | - |
@@ -1329,7 +1337,7 @@ Of the 43 named-entry rows, 32 rest on the comment at the item and 11 on git (ev
 
 | id | kind | value | at | origin | evidence | tests naming it | check |
 |---|---|---|---|---|---|---|---|
-| `provenance:stuck:fallback-marker` | fallback-marker | 2 | out = [f"{l.a_id}>{l.b_id}" for l in loops if l.fallback] | unknown | not a fallback: the notes' list of loop_curve and na_* fallbacks | copies, mcp, na_curve | - |
+| `provenance:stuck:fallback-marker` | fallback-marker | 2 | out = [f"{l.a_id}>{l.b_id}" for l in loops if l.fallback] | unknown | not a fallback: the notes' list of loop_curve and na_* fallbacks | copies, floor, mcp, na_curve | - |
 | `provenance:over_labels:fallback-marker` | fallback-marker | 1 | return [f"{l.a_id}>{l.b_id}" for l in loops if l.crosses_labels and not l.fallback] | unknown | not a fallback: the notes' list of loop_over_text | app_jobs | - |
 
 ## render
@@ -1563,7 +1571,7 @@ Of the 43 named-entry rows, 32 rest on the comment at the item and 11 on git (ev
 | `render:_canvas:argument:0.9@b03d82a5` | argument | 0.9 | x1 = max(x1, x0 + entry - 0.9) | unknown | - | - | - |
 | `render:_canvas:argument:0.9@e2de3741` | argument | 0.9 | per_row = max(1, int((x1 - x0 + 0.9) // entry)) | unknown | - | - | - |
 | `render:_canvas:argument:2.4@536d099c` | argument | 2.4 | bar_h = max(_DOMAIN_BAR_H, 2.4 * em + _BAR_TICK) if bars else 0.0 | unknown | - | - | - |
-| `render:_canvas:fallback:page_text_small` | fallback | page_text_small | fallback.note("page_text_small") | unknown | cites random-100 C4 (layout.page_fit) | - | notes: page_scaled |
+| `render:_canvas:fallback:page_text_small` | fallback | page_text_small | fallback.note("page_text_small") | unknown | cites random-100 C4 (layout.page_fit) | floor | notes: page_scaled; R1 (the readability floor: text_small) |
 | `render:page_legend:argument:0.9@4eaaade1` | argument | 0.9 | per_row = max(1, int((width - 2 + 0.9) // entry)) | unknown | - | - | - |
 | `render:_foot:argument:1e-12@a107771a` | argument | 1e-12 | t = float(np.clip(np.dot(c - p, d) / max(float(np.dot(d, d)), 1e-12), 0.0, 1.0)) | convention | a floating-point tolerance | - | - |
 | `render:_loop_boxes:argument:4@f9fa9685` | argument | 4 | boxes = np.array([p.rect for p in [*layout.placed.values(), *layout.ghosts]]).reshape(-1, 4) # none: DNA only | convention | an array's shape; line last changed by 4d11ab3 Counts keep off the loops as drawn, corners rounded or smoothed, not their routes (C2b-1 fix round 1, 6FY9) (git blame; evidence only) | route | - |
@@ -1780,12 +1788,12 @@ Of the 43 named-entry rows, 32 rest on the comment at the item and 11 on git (ev
 | `route:_pull_turns:comparison:6@949e987b` | comparison | 6 | if at_a and at_b and len(out) < 6: # both pulls move the same run: the clearance that keeps both ports clear | unknown | - | route | - |
 | `route:_pull_turns.keeps:comparison:1e-9@bf6d1401` | comparison | 1e-9 | return all((y - port[1]) * e[1] >= r - 1e-9 for port, e, r in ((pa, ea, reach[0]), (pb, eb, reach[1]))) | convention | a floating-point tolerance | app, browser, copies, datafile +22 | - |
 | `route:_Router._joined:argument:16@94b3a97e` | argument | 16 | key = blake2b(np.packbits(free).tobytes(), digest_size=16).digest() | unknown | - | route | - |
-| `route:_Router.second:fallback:route_second_search_refused` | fallback | route_second_search_refused | fallback.note("route_second_search_refused", int(self.wide_nodes > max_nodes)) | named-entry:7QUP | _MAX_NODES_PAGE: "once spent, a search that runs out of _MAX_NODES falls back as before (fix round 1: 7QUP's focus view took 158 s of its 180)" | - | random-100 reports second_searches_refused (not gated) |
-| `route:_Router.drawn:comparison:1e-9@e06060ef` | comparison | 1e-9 | into = lambda p, e: abs(e[0]) < 1e-9 and e[1] * wall.side * wall.up < 0 # noqa: E731 - into the wall | convention | a floating-point tolerance | 310, app, browser, cli +37 | - |
-| `route:_Router.drawn:argument:1e-6@9f109e39` | argument | 1e-6 | and _clear(pulled, (own_a, own_b), *self.elements, grow=min(reach) - 1e-6, **kw) | convention | a floating-point tolerance | 310, app, browser, cli +37 | - |
-| `route:_Router.drawn:argument:1e-6@a3e6346a` | argument | 1e-6 | pts, (own_a, own_b), *self.elements, grow=_INFLATE - 1e-6, under=under, exempt=exempt | convention | a floating-point tolerance | 310, app, browser, cli +37 | - |
+| `route:_Router.second:fallback:route_second_search_refused` | fallback | route_second_search_refused | fallback.note("route_second_search_refused", int(self.wide_nodes > max_nodes)) | named-entry:7QUP | _MAX_NODES_PAGE: "once spent, a search that runs out of _MAX_NODES falls back as before (fix round 1: 7QUP's focus view took 158 s of its 180)" | floor | random-100 reports second_searches_refused (not gated); R1 (the readability floor: route_budget) |
+| `route:_Router.drawn:comparison:1e-9@e06060ef` | comparison | 1e-9 | into = lambda p, e: abs(e[0]) < 1e-9 and e[1] * wall.side * wall.up < 0 # noqa: E731 - into the wall | convention | a floating-point tolerance | 310, app, browser, cli +38 | - |
+| `route:_Router.drawn:argument:1e-6@9f109e39` | argument | 1e-6 | and _clear(pulled, (own_a, own_b), *self.elements, grow=min(reach) - 1e-6, **kw) | convention | a floating-point tolerance | 310, app, browser, cli +38 | - |
+| `route:_Router.drawn:argument:1e-6@a3e6346a` | argument | 1e-6 | pts, (own_a, own_b), *self.elements, grow=_INFLATE - 1e-6, under=under, exempt=exempt | convention | a floating-point tolerance | 310, app, browser, cli +38 | - |
 | `route:_Router.drawn:fallback:route_unsnapped` | fallback | route_unsnapped | fallback.note("route_unsnapped") | unknown | _TOUCH: "A drawing that still breaches it is redrawn unsnapped, then becomes the flagged fallback" | - | none |
-| `route:_clear_helix_names:fallback:helix_name_moved` | fallback | helix_name_moved | fallback.note("helix_name_moved", moved) | named-entry:6MHS,7SMR,8UUP,1KX5 | git: 803038c's message: "route._clear_helix_names, after routing, puts a name that a line strikes ... (6MHS B:275-283)" | inventory | - |
+| `route:_clear_helix_names:fallback:helix_name_moved` | fallback | helix_name_moved | fallback.note("helix_name_moved", moved) | named-entry:6MHS,7SMR,8UUP,1KX5 | git: 803038c's message: "route._clear_helix_names, after routing, puts a name that a line strikes ... (6MHS B:275-283)" | floor, inventory | - |
 | `route:_clear_termini:argument:0.05@8c1a698f` | argument | 0.05 | half = (max(gw / 2 + 0.05, em * _text_width(end) / 2), max(gh / 2, em * 0.4)) | unknown | line last changed by ce76192 A chain end's N or C letter that a line runs through turns round its stub's tip, or stands further out, to th… (git blame; evidence only) | na_text_keepoff, route | - |
 | `route:_clear_termini:argument:0.4@8c1a698f` | argument | 0.4 | half = (max(gw / 2 + 0.05, em * _text_width(end) / 2), max(gh / 2, em * 0.4)) | unknown | line last changed by ce76192 A chain end's N or C letter that a line runs through turns round its stub's tip, or stands further out, to th… (git blame; evidence only) | na_text_keepoff, route | - |
 | `route:_walled_fallback:fallback:loop_wall_detour` | fallback | loop_wall_detour | fallback.note("loop_wall_detour") | unknown | cites ruling P35 (plan 27 Task 5) | - | A3 (still a fallback curve, gated); A18 judges the loop against the band (gated) |
@@ -1795,7 +1803,7 @@ Of the 43 named-entry rows, 32 rest on the comment at the item and 11 on git (ev
 | `route:route_loops:argument:4@27d70797` | argument | 4 | rects = np.hstack([elements[0], np.array([r for _, r in keep_out], float).reshape(-1, 4).T]) | convention | an array's shape | 310, cli, domains, focus +25 | - |
 | `route:route_loops:comparison:1.5@b669155f` | comparison | 1.5 | if kinked and np.hypot(*gap) < 1.5 and gap @ pa.exit_c > 0: | unknown | line last changed by 63274b1 A copy's elements are grouped as its mate's where DSSP grouped them otherwise (C2b-3, A15: 9P1X, 7QUP, 6JLN) (git blame; evidence only) | 310, cli, domains, focus +25 | - |
 | `route:route_loops:comparison:1e-9@c1d86acf` | comparison | 1e-9 | if pts is None and grid.res > RES + 1e-9: # a page so large its grid is coarse: a fine grid round the ports | convention | a floating-point tolerance | 310, cli, domains, focus +25 | - |
-| `route:route_loops:fallback:loop_curve` | fallback | loop_curve | fallback.note("loop_curve", sum(lp.fallback for lp in out)) # the loops as drawn (A3, the notes) | unknown | - | inventory, sensitivity | A3 "no route fallbacks" (gated); notes: loops_unrouted |
+| `route:route_loops:fallback:loop_curve` | fallback | loop_curve | fallback.note("loop_curve", sum(lp.fallback for lp in out)) # the loops as drawn (A3, the notes) | unknown | - | floor, inventory, sensitivity | A3 "no route fallbacks" (gated); notes: loops_unrouted |
 | `route:route_loops:fallback:loop_over_text` | fallback | loop_over_text | fallback.note("loop_over_text", sum(lp.crosses_labels for lp in out)) # ... (A4, the notes) | unknown | - | - | A4 "no loop over a label" (gated); notes: loops_over_text |
 | `route:_in_box:argument:0.05@a4d098f3` | argument | 0.05 | n = max(1, int(math.dist(p, q) / 0.05)) | unknown | - | - | - |
 | `route:_in_box:comparison:1e-9@48e36be7` | comparison | 1e-9 | if box[0] - 1e-9 <= x <= box[2] + 1e-9 and box[1] - 1e-9 <= y <= box[3] + 1e-9: | convention | a floating-point tolerance | - | - |

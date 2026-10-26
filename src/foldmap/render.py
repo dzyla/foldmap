@@ -3795,6 +3795,7 @@ def _canvas(
     else:
         scale, fig, ax = at(w_u, h_u, list(entries))
     fig.foldmap_page_fit = page_fit(w_u * scale, h_u * scale, _font_pt(scale))  # the notes' page line, if any
+    fig.foldmap_text_pt = _font_pt(scale)  # the text size page_fit judges (font_scale 1): the readability floor's
     if fig.foldmap_page_fit:
         fallback.note("page_text_small")
     ax.set_xlim(xmin, xmax)

@@ -23,6 +23,11 @@ from .criteria import LIMITS
 from .dssp import assign_dssp
 from .fallback import line as fallback_line
 from .features import helices_on_sheets, sse_contacts
+from .floor import REDUCED_DETAIL
+from .floor import check as floor_check
+from .floor import lines as floor_lines
+from .floor import note as floor_note
+from .floor import suggestions as floor_suggestions
 from .frame import (
     CylinderFrame,
     Frame,
@@ -1837,7 +1842,7 @@ def _spec_of(args) -> FigureSpec:
     spec = figure_spec(
         args.structure,
         theme=args.theme,
-        style=shorthand + args.set,
+        style=(list(REDUCED_DETAIL) if getattr(args, "reduced_detail", False) else []) + shorthand + args.set,
         style_file=args.style_file,
         layout_file=args.layout_file,
         title=args.title,
@@ -2000,7 +2005,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="your own per-residue values (as plot's --data), drawn on the track as the topology figure draws them",
     )
     sq.add_argument("--data-column", metavar="NAME", help="the --data column to read (default: its first of numbers)")
-    q = sub.add_parser("plot", help="draw the topology figure")
+    q = plot_q = sub.add_parser("plot", help="draw the topology figure")
     iq = sub.add_parser("interactive", help="an HTML page linking the topology, the contact map and the 3D model")
     iq.add_argument("--viewer", choices=["molstar", "3dmol"], default="molstar", help="3D viewer (default Mol*)")
     cq = sub.add_parser(
@@ -2234,6 +2239,18 @@ def build_parser() -> argparse.ArgumentParser:
             metavar="Å",
             help=f"how far copies may differ, CA RMSD (default {TOLERANCE:g}; raise it for low-resolution X-ray)",
         )
+        q.add_argument(
+            "--reduced-detail",
+            action="store_true",
+            help="leave out low-priority annotations, for a large figure: base letters, ligand marks, glycans and "
+            "3-10 helix boxes (the style keys " + ", ".join(REDUCED_DETAIL) + "; --set wins over them)",
+        )
+    plot_q.add_argument(
+        "--strict-floor",
+        action="store_true",
+        help="write no figure below the readability floor (text under 6 pt on its page, the route budget spent, "
+        f"or longer than {LIMITS['app_s']:g} s to make) and exit 1; by default it is written and the notes say so",
+    )
     kq.add_argument(
         "--deep",
         action="store_true",
@@ -2556,6 +2573,12 @@ def _cmd_figure(args: argparse.Namespace) -> int:
         print(provenance_block(drawn.provenance), file=sys.stderr, end="")
         if said := fallback_line(drawn.fallbacks):  # how often each named fallback fired (notes only, never drawn)
             print(f"foldmap: {said}", file=sys.stderr)
+        if below := drawn.floor:  # the readability floor (floor.py, plan 28 Task 4): said, never drawn
+            print(f"foldmap: warning: {floor_note(below, floor_suggestions(drawn))}", file=sys.stderr)
+            if args.strict_floor:
+                said = "foldmap: error: no figure written: it is below the readability floor (--strict-floor)"
+                print(said, file=sys.stderr)
+                return 1
         for out in args.output:
             print(f"wrote {save(drawn.figure, out)}")
     method = experimental_method(spec.structure) if spec.look.color_by == "plddt" else None
@@ -2746,6 +2769,10 @@ def _cmd_check(args: argparse.Namespace) -> int:
         for line in science_lines(found["science"], found["science_judged"]) + criteria_lines(found["criteria"]):
             print(line)
     failed = any(c["pass"] is False for c in found["criteria"].values())
+    floor = floor_check(drawn)  # R1, the readability floor (floor.py, plan 28 Task 4): readability, as A1-A20
+    for line in floor_lines(floor) if text else ():
+        print(line)
+    failed = failed or floor["status"] == "fail"
     like = None
     if got is not None:
         like = _like_checks(spec, drawn, found, got)
@@ -2765,7 +2792,7 @@ def _cmd_check(args: argparse.Namespace) -> int:
 
         from .deep import report
 
-        doc = json.dumps(report(args.structure, found, like, deep), indent=1, default=str) + "\n"
+        doc = json.dumps(report(args.structure, found, like, deep, floor), indent=1, default=str) + "\n"
         if text:
             Path(to_json).write_text(doc, encoding="utf-8")
             print(f"wrote {to_json}")
