@@ -8,13 +8,13 @@
   "checkout_fingerprint": "4b9c836b01cb8d00",
   "installed_matches_checkout": true,
   "git": {
-   "commit": "e6a8e26a7066c04190364dfeb42587e416e08792",
+   "commit": "608e206905f19e1dbd9edb44f638ca12554e3191",
    "dirty": false,
    "source": "asserted by runner"
   },
   "script": {
    "name": "scripts/sensitivity.py",
-   "sha256": "61df6b1a735ae59922db7be6574879256ff84d1451e797507daeb2ad9bdcc5e8"
+   "sha256": "d36bfe7f199c10e562a0e3a9b24561ee24f79e90f68bb9236bdd3c220fd75a3d"
   },
   "python": {
    "version": "3.13.13",
