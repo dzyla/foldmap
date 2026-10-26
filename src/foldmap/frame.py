@@ -53,6 +53,9 @@ class CylinderFrame:
     classes: dict = None  # chain -> chain class (its position within a protomer)
     angles: list = None  # each protomer's turn about the axis (radians, unwrapped); default 2*pi*k/n
     rise: float = 0.0  # Å along the axis from one protomer to the next (helical filaments)
+    # nucleic-acid chain -> the one protomer holding it (cli._na_holders, plan 28 F2): its stems and traces are
+    # unrolled with that protomer, as its protein is, not into the protomer each part happens to face
+    held: dict | None = None
 
     def __post_init__(self):
         if self.angles is None:
@@ -81,7 +84,8 @@ class CylinderFrame:
 
     def project(self, points: np.ndarray, chains=None) -> np.ndarray:
         pts = np.atleast_2d(points)
-        ks = [None] * len(pts) if chains is None else [self.sector.get(c) for c in chains]
+        held = self.held or {}
+        ks = [None] * len(pts) if chains is None else [self.sector.get(c, held.get(c)) for c in chains]
         return np.array([self._place(p, k) for p, k in zip(pts, ks)])
 
     def basis(self, point) -> tuple[np.ndarray, np.ndarray, np.ndarray]:

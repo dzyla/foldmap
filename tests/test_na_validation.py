@@ -692,3 +692,26 @@ def test_stems_nearer_skips_stem_every_element_touches():
     assert common.nearer_applies({"entry": "6VTX", **m}) is False
     near = common.nearer_summary([{"entry": "6VTX", **m}, {"entry": "A", "contact_auc": 0.8, "stems_nearer_frac": 1.0}])
     assert near["not_applicable"] == ["6VTX"] and near["applicable"] == 1 and near["strict_pass"] == 1
+
+
+def test_shape_measured_per_copy_on_cylinder():
+    """Plan 28 F2 (M4): 3EGZ's four RNA copies, unrolled each with the protomer holding it, are measured each through
+    the plain frame at its own place round the axis (nacheck.copy_frames), not all through one view from the
+    assembly's centre (copies 2-4 were seen from 90, 180 and 270 degrees round: angle_max 125.7, B2's P4 mirrored).
+    No stem is mirrored, and the angles, which measure the unrolling within a copy, are within the unrolled limit
+    (half the turn between neighbouring copies)."""
+    from foldmap.nacheck import copy_frames, unrolled_angle_limit
+
+    lay, sses, bb = make_layout(Path(__file__).parent / "data" / "na_fixes" / "3EGZ.cif.gz")
+    assert len({id(f) for f in copy_frames(lay).values()}) == 4
+    m = shape(lay)
+    assert m["copies_measured"] == 4 and m["angle_limit"] == unrolled_angle_limit(lay.frame) == 45.0
+    assert m["mirrored"] == 0, m
+    assert m["angle_max"] <= m["angle_limit"], m
+    assert not [f for f in judge(m) if f.startswith(("angle", "mirrored"))], judge(m)
+    # each copy measured in its own view: 0.572 at worst (measured), against 0.982 for all four through one view; still
+    # past THRESHOLDS (0.5): the stems of one copy span 49 degrees round the axis, unrolled flat
+    assert m["procrustes"] < 0.6 and "spearman" not in m, m  # three stems a copy: too few for a rank correlation
+    plain = {**m}
+    plain.pop("angle_limit")  # judged against the plain limit, the unrolling itself fails it
+    assert any(f.startswith("angle_max") for f in judge(plain))

@@ -418,9 +418,36 @@ def measuring_frame(lay):
     return Frame(centre, np.asarray(u, float), np.asarray(v, float), np.asarray(w, float))
 
 
+def copy_frames(lay) -> dict[str, Frame]:
+    """Nucleic-acid chain -> the plain Frame its copy is measured through, on an unrolled frame that unrolls the chain
+    with the one protomer holding it (CylinderFrame.held, plan 28 F2): the unrolled frame's orientation at the centre
+    of that copy's nucleic acid (the chains one protomer holds), so each copy is measured as seen from its own place
+    round the axis, not from the assembly's centre (3EGZ: copies 2-4 were measured seen from 90, 180 and 270 degrees
+    round). Empty for any other frame."""
+    frame, na = lay.frame, lay.nucleic
+    held = getattr(frame, "held", None) or {}
+    if na is None or not held:
+        return {}
+    out = {}
+    for k in sorted(set(held.values())):
+        chains = {c for c, x in held.items() if x == k}
+        pts = [s.p for s in na.strands if s.chain in chains]
+        if not pts:
+            continue
+        centre = np.vstack(pts).mean(axis=0)
+        u, v, w = frame.basis(centre)
+        f = Frame(centre, np.asarray(u, float), np.asarray(v, float), np.asarray(w, float))
+        out.update({c: f for c in chains})
+    return out
+
+
 def shape(lay) -> dict:
     """Drawn stems against the 3D structure seen through measuring_frame(lay): the figure's own plain frame, or
-    for an unrolled frame the plain projection of the same orientation. Stems are drawn along their axes as seen
+    for an unrolled frame the plain projection of the same orientation; on an unrolled frame that unrolls each
+    nucleic-acid copy with the protomer holding it, each copy's stems through that copy's own plain frame
+    (copy_frames; "copies_measured" their number), Spearman and Procrustes taken per copy and the worst copy's kept,
+    and the angles judged against half the turn between neighbouring copies ("angle_limit", unrolled_angle_limit).
+    Stems are drawn along their axes as seen
     in the layout's frame, so on a plain frame angle_median, angle_max and joint_error_max are 0 by construction:
     regression guards there, not fidelity checks; on an unrolled frame they measure the unrolling.
     stems_drawn; spearman (pairwise stem-centre distances, drawn against 3D, >= 5 stems); procrustes (>= 3
@@ -430,8 +457,8 @@ def shape(lay) -> dict:
     bend_drawn (net signed turn from piece to piece, degrees, counterclockwise positive) and joint_error_max (the
     largest difference of the signed drawn and seen turns at one joint, so a bend drawn the wrong way counts).
     A drawn stem that is no piece of the structure's stems raises ValueError: no stem is left out unmeasured."""
-    na, frame = lay.nucleic, measuring_frame(lay)
-    if na is None or frame is None:
+    na, plain = lay.nucleic, measuring_frame(lay)
+    if na is None or plain is None:
         return {}
     pieces = {p.id: p for p in stem_pieces(na)}
     unknown = [d.id for d in lay.stems if d.id not in pieces]
@@ -440,25 +467,47 @@ def shape(lay) -> dict:
     stems = drawn_pieces(lay)  # as drawn: a curve's pieces where it draws their nucleotides (na_curve.drawn_pieces)
     if not stems:
         return {"stems_drawn": 0}
+    copies = copy_frames(lay)
+
+    def seen_by(d):  # the frame a drawn stem is measured through: its copy's, when its chains are one copy's
+        p = pieces[d.id]
+        got = {id(copies.get(na.strands[s].chain)) for s in (p.a, p.b)}
+        return (
+            copies[na.strands[p.a].chain] if copies.get(na.strands[p.a].chain) is not None and len(got) == 1 else plain
+        )
+
+    frames = [seen_by(d) for d in stems]
     axes = [stem_axis(pieces[d.id], na.strands) for d in stems]
     c3 = np.array([c for c, _ in axes])
     drawn = np.array([[d.cx, d.cy] for d in stems])
     out: dict = {"stems_drawn": len(stems)}
-    if len(stems) >= 5:  # fewer stems give too few distances for a rank correlation
-        pairs = list(combinations(range(len(stems)), 2))
-        d3 = [_norm(c3[i] - c3[j]) for i, j in pairs]
-        d2 = [_norm(drawn[i] - drawn[j]) for i, j in pairs]
-        out["spearman"] = round(float(spearmanr(d3, d2).statistic), 3)
-    if len(stems) >= 3:
-        out["procrustes"] = round(_similarity_rmsd(frame.project(c3) * SCALE, drawn), 3)
+    groups: dict[int, list[int]] = {}  # the stems seen through one frame
+    for i, f in enumerate(frames):
+        groups.setdefault(id(f), []).append(i)
+    rho, fit = [], []
+    for idx in groups.values():
+        if len(idx) >= 5:  # fewer stems give too few distances for a rank correlation
+            pairs = list(combinations(idx, 2))
+            d3 = [_norm(c3[i] - c3[j]) for i, j in pairs]
+            d2 = [_norm(drawn[i] - drawn[j]) for i, j in pairs]
+            rho.append(round(float(spearmanr(d3, d2).statistic), 3))
+        if len(idx) >= 3:
+            fit.append(round(_similarity_rmsd(frames[idx[0]].project(c3[idx]) * SCALE, drawn[idx]), 3))
+    if rho:
+        out["spearman"] = min(rho)
+    if fit:
+        out["procrustes"] = max(fit)
+    if len(groups) > 1:
+        out["copies_measured"] = len(groups)
+        out["angle_limit"] = unrolled_angle_limit(lay.frame)
     errors, mirrored = [], 0
-    for d, (centre, axis) in zip(stems, axes):
-        a2 = frame.direction(centre, axis)
+    for d, f, (centre, axis) in zip(stems, frames, axes):
+        a2 = f.direction(centre, axis)
         if _norm(a2) > 0.5:  # seen side-on enough to have a direction on the page
             errors.append(_angle(a2, d.direction))
         (a, i0, i1), (b, j0, j1) = pieces[d.id].arm5, pieces[d.id].arm3
         across = na.strands[a].c1[i0 : i1 + 1].mean(axis=0) - na.strands[b].c1[j0 : j1 + 1].mean(axis=0)
-        s2 = frame.direction(centre, across)
+        s2 = f.direction(centre, across)
         beside = float(d.direction[0] * s2[1] - d.direction[1] * s2[0])  # Å the first arm is seen left of the second
         if abs(beside) >= SIDE_SEEN:  # the arms are seen side by side across the drawn axis
             mirrored += (1 if beside > 0 else -1) != d.first
@@ -470,12 +519,22 @@ def shape(lay) -> dict:
         d, e = stems[k], stems[k + 1]
         if d.parent and d.parent == e.parent:
             (ca, a3), (cb, b3) = axes[k], axes[k + 1]
-            joints.append((_turn(frame.direction(ca, a3), frame.direction(cb, b3)), _turn(d.direction, e.direction)))
+            seen = _turn(frames[k].direction(ca, a3), frames[k + 1].direction(cb, b3))
+            joints.append((seen, _turn(d.direction, e.direction)))
     if joints:
         out["bend_3d"] = round(sum(j[0] for j in joints), 1)
         out["bend_drawn"] = round(sum(j[1] for j in joints), 1)
         out["joint_error_max"] = round(max(abs(_wrap(a - b)) for a, b in joints), 1)
     return out
+
+
+def unrolled_angle_limit(frame) -> float:
+    """The angle limit (degrees) of a figure whose copies are measured each through its own plain frame (copy_frames):
+    half the turn between neighbouring copies round the axis. A copy's own parts lie up to that far round from its
+    centre, and the unrolled frame shows each part from its own place round the axis, so its stems are drawn turned
+    against the copy's single view by up to that much (3EGZ, four copies: measured 10.4 at most, limit 45). Not a
+    fidelity check: angles are regression guards (ROLE); this keeps the guard from failing the unrolling itself."""
+    return round(180.0 / max(int(getattr(frame, "n", 1)), 1), 1)
 
 
 def _gap(a, b) -> float:
@@ -792,10 +851,14 @@ def render_checks(lay, loops, fig, sses, *, model=None, bb=None) -> dict:
 
 
 def judge(m: dict) -> list[str]:
-    """The metrics past their THRESHOLDS, as "name value (limit limit)"; unmeasured (None) ones pass, NaN fails."""
+    """The metrics past their THRESHOLDS, as "name value (limit limit)"; unmeasured (None) ones pass, NaN fails. A
+    figure whose copies are measured each in its own frame (shape's angle_limit, plan 28 F2) has its angles judged
+    against that limit."""
     failed = []
     for key, limit in THRESHOLDS.items():
         v = m.get(key)
+        if key in ("angle_median", "angle_max") and m.get("angle_limit") is not None:
+            limit = m["angle_limit"]
         if limit is None or v is None:
             continue
         if v != v or ((v < limit) if key in _HIGH_IS_GOOD else (v > limit)):

@@ -236,6 +236,33 @@ def _na_shared(nucleic, sym, bb) -> bool:
     return any(sum(len(rs) >= NA_HOLD_MIN for rs in by.values()) >= 2 for by in holders.values())
 
 
+def _na_holders(nucleic, sym, bb) -> dict[str, int]:
+    """Nucleic-acid chain -> the one protomer of `sym` holding it: the protomer touching the chain with at least
+    NA_HOLD_MIN residues and with more than every other protomer together. A chain shared more evenly (nucleosome
+    DNA, a duplex bound by both halves of a dimer), or touched by none, is left out: it keeps the unrolled frame's
+    rule, each part in the protomer it faces (plan 28 F2: 3EGZ's four RNAs, each bound by one protomer with 25
+    residues and grazed by the next with 3, had a stem unrolled into the next protomer, copy B1 torn across the
+    seam)."""
+    if nucleic is None or sym is None:
+        return {}
+    sector = {c: k for k, chains in enumerate(sym.protomers) for c in chains}
+    holders: dict[str, dict[int, set[int]]] = {}  # nucleic-acid chain -> protomer -> residues touching it
+    for r, touched in sorted(nucleic.contacts.items()):
+        k = sector.get(bb.labels[r].chain)
+        if k is not None:
+            for s, _ in sorted(touched):
+                holders.setdefault(nucleic.strands[s].chain, {}).setdefault(k, set()).add(r)
+    out = {}
+    for chain, by in sorted(holders.items()):
+        if chain in sector:
+            continue
+        k = max(sorted(by), key=lambda x: len(by[x]))
+        mine, rest = len(by[k]), sum(len(rs) for x, rs in by.items() if x != k)
+        if mine >= NA_HOLD_MIN and mine > rest:
+            out[chain] = k
+    return out
+
+
 DYAD_IN_PAGE = np.radians(10)  # a two-fold axis within this of the page plane is drawn as a mirror line
 
 
@@ -701,6 +728,8 @@ def make_layout(
         frame = view_frame(sses + stems, rotate, flip_v, up, view)
         if up_from_membrane and mode == "projected" and not rotate and not flip_v:  # turned about the normal (T5-3)
             frame = _in_sequence(frame, sses, bb, mem, copies)
+    if isinstance(frame, CylinderFrame) and nucleic is not None:  # each nucleic acid one protomer holds, with it (F2)
+        frame.held = _na_holders(nucleic, sym, bb) or None
     if sym is not None and sym.kind == "C" and sym.n == 2 and isinstance(frame, (RadialFrame, Frame)):
         _mirror_frame(frame, sym)
     if duplex and sym is not None and not getattr(frame, "sector", None):

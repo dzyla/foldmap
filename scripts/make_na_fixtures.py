@@ -49,7 +49,7 @@ ENTRIES = {
 }
 # entries whose assembly is kept: 3CRX's operator lays a copy of every DNA strand on a deposited one (the junction
 # sits on the crystallographic two-fold), which io.read_model must drop
-ASSEMBLIES = {"3CRX"}
+ASSEMBLIES = {"3CRX", "3EGZ"}
 # fixture name -> (id, chains to keep or None for all, {chain: (first, last)} residue windows)
 CONTROLS = {
     "1ATP": ("1ATP", None, {}),  # protein kinase A with ATP: a nucleotide ligand, never a strand
@@ -59,6 +59,15 @@ CONTROLS = {
     "1URN": ("1URN", ["C", "R"], {}),  # U1A on an RNA hairpin whose loop is not modelled (U13-C14): a chain break
     "1QBJ": ("1QBJ", None, {}),  # Zalpha on Z-DNA: strand F pairs only with a crystal mate, drawn as a trace
     "1EYG": ("1EYG", None, {}),  # E. coli SSB tetramer with ssDNA wrapped over it: unpaired traces on their protein
+}
+
+# plan 28's nucleic-acid fixes (docs/validation/na-fixes): fixture name -> (id, chains or None, windows), written to
+# tests/data/na_fixes/ (OUT_FIXES), apart from the fixtures the independent kernels compare (tests/data/na/*)
+OUT_FIXES = OUT.parent / "na_fixes"
+FIXES = {
+    # F2: a C4 assembly (kept: ASSEMBLIES) of four protein-RNA copies, each RNA held by one protomer; unrolled, each
+    # RNA must stay with its protomer (one stem was unrolled into the next protomer, copy B1 torn across the seam)
+    "3EGZ": ("3EGZ", None, {}),
 }
 
 
@@ -97,12 +106,12 @@ def _finish(st: gemmi.Structure, keep_assemblies: bool = False) -> gemmi.Structu
     return st
 
 
-def control(st: gemmi.Structure, chains, windows) -> gemmi.Structure:
+def control(st: gemmi.Structure, chains, windows, keep_assemblies: bool = False) -> gemmi.Structure:
     model = _first_model(st, windows)
     for name in [c.name for c in model]:
         if chains is not None and name not in chains:
             model.remove_chain(name)
-    _finish(st)
+    _finish(st, keep_assemblies)
     kept = {r.subchain for c in model for r in c}
     names = {c.name for c in model}
     for k in reversed(range(len(st.entities))):  # entities and links of dropped chains only add bulk
@@ -168,8 +177,8 @@ def _fetch(pdb: str, src: Path | None) -> str:
         return gzip.decompress(r.read()).decode("utf-8")
 
 
-def _write(name: str, st: gemmi.Structure) -> int:
-    path = OUT / f"{name}.cif.gz"
+def _write(name: str, st: gemmi.Structure, out: Path = OUT) -> int:
+    path = out / f"{name}.cif.gz"
     cif = st.make_mmcif_document().as_string()
     path.write_bytes(gzip.compress(cif.encode("utf-8"), 9, mtime=0))  # no timestamp: rerunning is reproducible
     size = path.stat().st_size
@@ -183,10 +192,10 @@ def main(argv=None) -> int:
     ap.add_argument("names", nargs="*", help="fixtures to build (default: all)")
     ap.add_argument("--from", dest="src", type=Path, help="read DIR/<ID>.cif instead of downloading")
     args = ap.parse_args(argv)
-    unknown = set(args.names) - set(ENTRIES) - set(CONTROLS)
+    unknown = set(args.names) - set(ENTRIES) - set(CONTROLS) - set(FIXES)
     if unknown:
         ap.error(f"unknown fixture {', '.join(sorted(unknown))}")
-    wanted = set(args.names) or set(ENTRIES) | set(CONTROLS)
+    wanted = set(args.names) or set(ENTRIES) | set(CONTROLS) | set(FIXES)
     OUT.mkdir(parents=True, exist_ok=True)
     total = 0
     ref_path = OUT / "reference.json"
@@ -201,7 +210,13 @@ def main(argv=None) -> int:
         total += _write(pdb, st)
     for name, (pdb, chains, windows) in CONTROLS.items():
         if name in wanted:
-            total += _write(name, control(gemmi.read_structure_string(_fetch(pdb, args.src)), chains, windows))
+            st = gemmi.read_structure_string(_fetch(pdb, args.src))
+            total += _write(name, control(st, chains, windows, name in ASSEMBLIES))
+    OUT_FIXES.mkdir(parents=True, exist_ok=True)
+    for name, (pdb, chains, windows) in FIXES.items():
+        if name in wanted:
+            st = gemmi.read_structure_string(_fetch(pdb, args.src))
+            total += _write(name, control(st, chains, windows, name in ASSEMBLIES), OUT_FIXES)
     if wanted & set(ENTRIES):
         ref_path.write_text(json.dumps(reference, separators=(",", ":")) + "\n", encoding="utf-8")
         print(f"reference pairs in {ref_path}")

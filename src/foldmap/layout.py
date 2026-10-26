@@ -2603,6 +2603,17 @@ def _hairpin(piece: Stem, na: Nucleic) -> int:
     return next((r.hi - r.lo + 1 for r in na.structure.runs if r.left == (a, i) and r.right == (b, j)), -1)
 
 
+def _held_chains(frame, chains: set, n: int = 1) -> list[str] | None:
+    """The chains to project n points of a nucleic acid with (CylinderFrame.held, plan 28 F2): its chain, n times,
+    when an unrolled frame has one protomer holding it (a stem of two chains: one protomer holding both); else None,
+    each point unrolled into the protomer it faces."""
+    held = getattr(frame, "held", None) or {}
+    ks = {held.get(c) for c in chains}
+    if len(ks) != 1 or None in ks:
+        return None
+    return [min(chains)] * n
+
+
 def _stem_item(piece: Stem, na: Nucleic, frame: Frame, flat: bool, width: float = NA_W) -> _Item:
     """A stem piece as a rigid item at its projected place, turned onto the page (never mirrored). Its axis
     differs in the last bit between BLAS kernels, so every number the layout takes from it is snapped (_snap)."""
@@ -2616,7 +2627,8 @@ def _stem_item(piece: Stem, na: Nucleic, frame: Frame, flat: bool, width: float 
     signal = _side_signal(piece, na, frame, centre, angle)
     first = 1 if signal >= 0 else -1
     side = {k: first if n <= i1 - i0 else -first for n, k in enumerate(keys)}  # keys: first arm, then second
-    x, y = (float(v) for v in _snap(frame.project(centre)[0] * SCALE))
+    chains = _held_chains(frame, {na.strands[a].chain, na.strands[b].chain})  # one protomer holds it: with it (F2)
+    x, y = (float(v) for v in _snap(frame.project(centre, chains)[0] * SCALE))
     d = PlacedStem(
         piece.id,
         piece.name,
@@ -2828,7 +2840,9 @@ def _traces(na: Nucleic, frame: Frame) -> dict[int, np.ndarray]:
     taken = np.zeros((sum(len(na.strands[s]) for s in traced), 2))  # every trace nucleotide placed so far
     count = 0
     for s in traced:
-        pts = _snap(frame.project(na.strands[s].p) * SCALE)
+        pts = _snap(
+            frame.project(na.strands[s].p, _held_chains(frame, {na.strands[s].chain}, len(na.strands[s]))) * SCALE
+        )
         for i in range(len(pts)):
             others = taken[:count]
             space = _room(others, pts[i])
@@ -3063,6 +3077,31 @@ def _protomers(items: list[_Item], frame, mirror: bool) -> list[int | None]:
         else:
             out.append(None if mirror or None in ks or not members else _host(members, sector, classes))
     return out
+
+
+def _stem_ties(items: list[_Item], frame, na: Nucleic | None) -> dict[int, tuple[int, int]]:
+    """Copy stem item -> (its protomer-0 mate, protomer index k), as _symmetry_ties ties protein copies, for the
+    nucleic acid an unrolled frame unrolls with the protomer holding it (CylinderFrame.held, plan 28 F2): a stem of a
+    chain protomer k holds is tied to the stem of a chain protomer 0 holds with the same pairs by residue number. So
+    every copy's stems sit where its mate's do in protomer 0, one spread along, as its protein does (3EGZ's four
+    RNA copies were drawn up to 3 page units apart from one another)."""
+    held = getattr(frame, "held", None) or {}
+    if not held or na is None:
+        return {}
+
+    def seen(it: _Item):  # (protomer, pairs by residue number) of a lone stem item whose chains one protomer holds
+        if len(it.members) != 1 or not isinstance(it.members[0], PlacedStem):
+            return None
+        d = it.members[0]
+        ks = {held.get(na.strands[s].chain) for p in d.pairs for s in (p[0], p[2])}
+        if len(ks) != 1 or None in ks:
+            return None
+        lab = lambda s, i: (na.strands[s].labels[i].seq, na.strands[s].labels[i].icode)  # noqa: E731
+        return ks.pop(), tuple((lab(a, i), lab(b, j)) for a, i, b, j in d.pairs)
+
+    got = [seen(it) for it in items]
+    zero = {g[1]: n for n, g in enumerate(got) if g is not None and g[0] == 0}
+    return {n: (zero[g[1]], g[0]) for n, g in enumerate(got) if g is not None and g[0] and g[1] in zero}
 
 
 def _symmetry_ties(
@@ -5317,6 +5356,7 @@ def build_layout(
         tied_ids = {
             m.sse.id for i, (j, _) in ties.items() for k in (i, j) if id(items[k]) not in own for m in items[k].members
         }
+        ties.update(_stem_ties(items, frame, nucleic))  # each nucleic-acid copy with its protomer (F2)
         spread, lift = 0.0, 0.0
         if ties and mirror is not None:  # a dyad in the page: each copy starts at its mate's mirror image
             mirrored = [

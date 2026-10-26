@@ -3304,3 +3304,41 @@ def test_a_route_from_beside_a_face_keeps_off_the_strands_drawn_before_it():
     t = np.clip(((samples[:, None] - seg_a) * ab).sum(-1) / np.maximum((ab * ab).sum(-1), 1e-12), 0, 1)
     d = np.hypot(*(samples[:, None] - (seg_a + t[..., None] * ab)).transpose(2, 0, 1)).min(axis=1)
     assert (d < 0.1).mean() < 0.05, (d < 0.1).mean()  # it no longer runs along the strand drawn before it
+
+
+def _copies_3egz():
+    """3EGZ unrolled: {protomer: (its protein elements' mean page place, [its RNA's stems, 5' to 3'])}, with the
+    frame and the layout."""
+    from foldmap.frame import CylinderFrame
+
+    lay, _, _ = make_layout(Path(__file__).parent / "data" / "na_fixes" / "3EGZ.cif.gz")
+    frame = lay.frame
+    assert isinstance(frame, CylinderFrame)
+    na = lay.nucleic
+    out = {}
+    for k in sorted(set(frame.sector.values())):
+        own = [p for p in lay.placed.values() if frame.sector.get(p.sse.chain) == k]
+        mine = [d for d in lay.stems if (frame.held or {}).get(na.strands[d.strands[0]].chain) == k]
+        out[k] = (np.mean([[p.cx, p.cy] for p in own], axis=0), sorted(mine, key=lambda d: d.pairs[0][1]))
+    return out, frame, lay
+
+
+def test_unrolled_rna_copy_stays_with_its_protomer():
+    """Plan 28 F2 (M4): 3EGZ, a C4 assembly of four protein-RNA copies, is unrolled. Each RNA chain is held by one
+    protomer (25 residues; the next grazes it with 3), and its stems are unrolled with that protomer
+    (CylinderFrame.held), not each into the protomer it faces: B1's P1 faced protomer 3 and was drawn at the far
+    right, its P2 and P3 at the far left. So no copy is torn (its stems lie within one protomer's spread of its
+    protein: the RNA reaches over the next protomer in 3D, so it may stand nearer that one's column), and the copies
+    are tied as the protein's are (layout._stem_ties): each stem's offset from its protomer's protein agrees between
+    the four copies within 0.1."""
+    copies, frame, lay = _copies_3egz()
+    assert len(copies) == 4 and len(set(frame.held.values())) == 4
+    centres = sorted(c[0] for c, _ in copies.values())
+    spread = centres[1] - centres[0]
+    for k, (centre, stems) in copies.items():
+        assert len(stems) == 3, (k, [d.id for d in stems])
+        xs = [d.cx for d in stems]
+        assert max(abs(x - centre[0]) for x in xs) < spread and max(xs) - min(xs) < spread / 2, (k, xs, spread)
+    offsets = [[(d.cx - c[0], d.cy - c[1]) for d in stems] for c, stems in copies.values()]
+    for other in offsets[1:]:
+        assert np.allclose(other, offsets[0], atol=0.1), (offsets[0], other)

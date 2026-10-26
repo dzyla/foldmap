@@ -83,10 +83,10 @@ every correction of a rule are by hand.
 | default | 33 | 0 | 0 | 0 | 0 | 3 | 30 |
 | local | 1 | 0 | 0 | 0 | 0 | 0 | 1 |
 | comparison | 297 | 0 | 0 | 0 | 0 | 155 | 142 |
-| argument | 663 | 0 | 0 | 0 | 0 | 183 | 480 |
+| argument | 664 | 0 | 1 | 0 | 0 | 183 | 480 |
 | fallback | 24 | 0 | 0 | 0 | 4 | 1 | 19 |
 | fallback-marker | 29 | 0 | 0 | 0 | 3 | 0 | 26 |
-| all | 1637 | 62 | 25 | 28 | 43 | 444 | 1035 |
+| all | 1638 | 62 | 26 | 28 | 43 | 444 | 1035 |
 
 Of the 43 named-entry rows, 32 rest on the comment at the item and 11 on git (evidence starting `git:`: a commit whose message ties the value to the entries).
 
@@ -1215,10 +1215,11 @@ Of the 43 named-entry rows, 32 rest on the comment at the item and 11 on git (ev
 | `nacheck:_similarity_rmsd:argument:1e-12@83c6c6d2` | argument | 1e-12 | residual = max(aa - (dot * dot + cross * cross) / max(bb, 1e-12), 0.0) | convention | a floating-point tolerance | na_validation | - |
 | `nacheck:_similarity_rmsd:argument:1e-9@2d68066b` | argument | 1e-9 | return float(np.sqrt(residual / len(a)) / max(np.sqrt(aa / len(a)), 1e-9)) | convention | a floating-point tolerance | na_validation | - |
 | `nacheck:_angle:argument:1e-12@11ff906f` | argument | 1e-12 | cos = float((u * v).sum()) / max(float(np.sqrt((u * u).sum() * (v * v).sum())), 1e-12) | convention | a floating-point tolerance | - | - |
-| `nacheck:shape:comparison:5@d3512330` | comparison | 5 | if len(stems) >= 5: # fewer stems give too few distances for a rank correlation | unknown | - | hbonds, na_curve, na_layout, na_validation +1 | - |
-| `nacheck:shape:argument:3@3cdc9535` | argument | 3 | out["spearman"] = round(float(spearmanr(d3, d2).statistic), 3) | convention | rounding digits | hbonds, na_curve, na_layout, na_validation +1 | - |
-| `nacheck:shape:comparison:3@9704058b` | comparison | 3 | if len(stems) >= 3: | unknown | - | hbonds, na_curve, na_layout, na_validation +1 | - |
-| `nacheck:shape:argument:3@ceff3d3c` | argument | 3 | out["procrustes"] = round(_similarity_rmsd(frame.project(c3) * SCALE, drawn), 3) | convention | rounding digits | hbonds, na_curve, na_layout, na_validation +1 | - |
+| `nacheck:shape:comparison:5@d845aa8b` | comparison | 5 | if len(idx) >= 5: # fewer stems give too few distances for a rank correlation | unknown | - | hbonds, na_curve, na_layout, na_validation +1 | - |
+| `nacheck:shape:argument:3@34a7a506` | argument | 3 | rho.append(round(float(spearmanr(d3, d2).statistic), 3)) | convention | rounding digits | hbonds, na_curve, na_layout, na_validation +1 | - |
+| `nacheck:shape:comparison:3@82524758` | comparison | 3 | if len(idx) >= 3: | unknown | - | hbonds, na_curve, na_layout, na_validation +1 | - |
+| `nacheck:shape:argument:3@6d25e6e4` | argument | 3 | fit.append(round(_similarity_rmsd(frames[idx[0]].project(c3[idx]) * SCALE, drawn[idx]), 3)) | convention | rounding digits | hbonds, na_curve, na_layout, na_validation +1 | - |
+| `nacheck:unrolled_angle_limit:argument:180.0@7d9adf3e` | argument | 180.0 | return round(180.0 / max(int(getattr(frame, "n", 1)), 1), 1) | geometry | half a turn in degrees: the angle limit is half the turn between neighbouring copies (180 / n), how far round the axis a copy's own parts lie from its centre | na_validation | - |
 | `nacheck:contacts:argument:3@92bf1457` | argument | 3 | "contact_auc": round(float(np.mean(aucs)), 3) if aucs else None, | convention | rounding digits | layout, na_contacts, na_layout, na_metrics +1 | - |
 | `nacheck:contacts:argument:3@7b296ef8` | argument | 3 | "contact_precision_at_k": round(float(np.mean(precs)), 3) if precs else None, | convention | rounding digits | layout, na_contacts, na_layout, na_metrics +1 | - |
 | `nacheck:contacts:argument:3@d75cbf4b` | argument | 3 | "stems_nearer_frac": round(sum(nearer) / len(nearer), 3) if nearer else None, | convention | rounding digits | layout, na_contacts, na_layout, na_metrics +1 | - |
