@@ -1,18 +1,18 @@
 {
  "source_stamp": {
   "foldmap": "0.1.0",
-  "code_fingerprint": "0fe34f04e08547af",
+  "code_fingerprint": "bb2a8840012731a4",
   "package": "checkout",
-  "checkout_fingerprint": "0fe34f04e08547af",
+  "checkout_fingerprint": "bb2a8840012731a4",
   "installed_matches_checkout": true,
   "git": {
-   "commit": "eac6756ee494926883bbc36e18adc6051cd14b7d",
+   "commit": "e6fcf362f06029b5a1979cf3671e846c66129d9c",
    "dirty": false,
    "source": "asserted by runner"
   },
   "script": {
    "name": "scripts/readability_floor.py",
-   "sha256": "4e6ec669cc96e2cafbbaa4fb17a8c0e7e39963dd1e2eaa7401f8454989cda7d5"
+   "sha256": "b609c57ac5664f1fbb0466e32a46775e037b6b2078c1708b11e38507982e6df8"
   },
   "python": {
    "version": "3.13.13",
@@ -34,10 +34,10 @@
  "jobs": 12,
  "limits": {
   "text_pt": 6.0,
-  "route_budget_refused": 0,
-  "seconds": 90
+  "route_budget_refused": 0
  },
- "reduced_detail": [
+ "time_note_s": 90,
+ "preset_measured": [
   "nucleotide_labels=false",
   "ligands=none",
   "glycans=false",
@@ -123,7 +123,7 @@
       "helix_name_moved": 22,
       "page_text_small": 1
      },
-     "seconds": 53.62
+     "seconds": 66.39
     },
     "reasons": [
      "text_small"
@@ -135,7 +135,7 @@
     "stuck": 0,
     "elements": 976,
     "chains_drawn": 98,
-    "check_seconds": 2.3,
+    "check_seconds": 2.5,
     "suggestions": [
      {
       "options": {
@@ -156,7 +156,10 @@
       "what": "chain 2M only"
      }
     ],
-    "note": "below the readability floor: its text is 2.0 pt, under 6 pt, on its 48 x 10 in page (its smallest text 1.2 pt); drawing less may bring it above: --focus protomer (one subunit in full); --focus 2M (chain 2M in full, with what its neighbours add to its fold); --chains 2M (chain 2M only)"
+    "notes": [],
+    "note": "below the readability floor: its text is 2.0 pt, under 6 pt, on its 48 x 10 in page (its smallest text 1.2 pt); drawing less may bring it above: --focus protomer (one subunit in full); --focus 2M (chain 2M in full, with what its neighbours add to its fold); --chains 2M (chain 2M only)",
+    "science_findings": [],
+    "criteria_failed": []
    },
    "tried": [
     {
@@ -175,7 +178,7 @@
       "fallbacks": {
        "counts_hidden": 1
       },
-      "seconds": 14.06
+      "seconds": 14.71
      },
      "reasons": [],
      "texts": 750,
@@ -185,7 +188,7 @@
      "stuck": 0,
      "elements": 511,
      "chains_drawn": 67,
-     "check_seconds": 1.8
+     "check_seconds": 1.7
     },
     {
      "options": {
@@ -201,7 +204,7 @@
       "text_pt": 6.0,
       "smallest_pt": 3.6,
       "fallbacks": {},
-      "seconds": 2.36
+      "seconds": 2.64
      },
      "reasons": [],
      "texts": 52,
@@ -211,7 +214,7 @@
      "stuck": 0,
      "elements": 46,
      "chains_drawn": 1,
-     "check_seconds": 0.5
+     "check_seconds": 0.6
     },
     {
      "options": {
@@ -227,7 +230,7 @@
       "text_pt": 6.0,
       "smallest_pt": 3.6,
       "fallbacks": {},
-      "seconds": 0.94
+      "seconds": 0.98
      },
      "reasons": [],
      "texts": 50,
@@ -241,9 +244,9 @@
     },
     {
      "options": {
-      "reduced-detail": null
+      "preset": null
      },
-     "said": "--reduced-detail",
+     "said": "the preset measured (not an option)",
      "offered": false,
      "measures": {
       "page_in": [
@@ -257,7 +260,7 @@
        "helix_name_moved": 11,
        "page_text_small": 1
       },
-      "seconds": 50.85
+      "seconds": 55.09
      },
      "reasons": [
       "text_small"
@@ -269,7 +272,7 @@
      "stuck": 0,
      "elements": 800,
      "chains_drawn": 96,
-     "check_seconds": 2.2
+     "check_seconds": 2.1
     }
    ]
   },
@@ -295,11 +298,10 @@
       "na_trace_unclear": 3,
       "page_text_small": 1
      },
-     "seconds": 109.91
+     "seconds": 128.38
     },
     "reasons": [
-     "text_small",
-     "time"
+     "text_small"
     ],
     "texts": 1288,
     "texts_under_6pt": 1288,
@@ -308,7 +310,7 @@
     "stuck": 10,
     "elements": 670,
     "chains_drawn": 110,
-    "check_seconds": 3.1,
+    "check_seconds": 3.3,
     "suggestions": [
      {
       "options": {
@@ -323,7 +325,15 @@
       "what": "chain A only"
      }
     ],
-    "note": "below the readability floor: its text is 5.4 pt, under 6 pt, on its 47 x 48 in page (its smallest text 3.9 pt); it took 110 s to make, over the hosted app's 90 s; drawing less may bring it above: --focus A (chain A in full, with what its neighbours add to its fold); --chains A (chain A only)"
+    "notes": [
+     "time"
+    ],
+    "note": "below the readability floor: its text is 5.4 pt, under 6 pt, on its 47 x 48 in page (its smallest text 3.9 pt); drawing less may bring it above: --focus A (chain A in full, with what its neighbours add to its fold); --chains A (chain A only); it took 128 s to make, over the hosted app's 90 s (said, not judged)",
+    "science_findings": [],
+    "criteria_failed": [
+     "A3",
+     "A6"
+    ]
    },
    "tried": [
     {
@@ -342,7 +352,7 @@
       "fallbacks": {
        "glyph_width_guessed": 20
       },
-      "seconds": 13.39
+      "seconds": 13.67
      },
      "reasons": [],
      "texts": 42,
@@ -352,7 +362,7 @@
      "stuck": 0,
      "elements": 12,
      "chains_drawn": 5,
-     "check_seconds": 0.5
+     "check_seconds": 0.6
     },
     {
      "options": {
@@ -370,7 +380,7 @@
       "fallbacks": {
        "glyph_width_guessed": 20
       },
-      "seconds": 1.99
+      "seconds": 1.93
      },
      "reasons": [],
      "texts": 33,
@@ -384,9 +394,9 @@
     },
     {
      "options": {
-      "reduced-detail": null
+      "preset": null
      },
-     "said": "--reduced-detail",
+     "said": "the preset measured (not an option)",
      "offered": false,
      "measures": {
       "page_in": [
@@ -404,11 +414,10 @@
        "na_trace_unclear": 3,
        "page_text_small": 1
       },
-      "seconds": 113.73
+      "seconds": 112.16
      },
      "reasons": [
-      "text_small",
-      "time"
+      "text_small"
      ],
      "texts": 1257,
      "texts_under_6pt": 1257,
@@ -435,7 +444,7 @@
      "text_pt": 6.0,
      "smallest_pt": 3.6,
      "fallbacks": {},
-     "seconds": 23.91
+     "seconds": 25.11
     },
     "reasons": [],
     "texts": 73,
@@ -447,14 +456,17 @@
     "chains_drawn": 2,
     "check_seconds": 1.1,
     "suggestions": [],
-    "note": ""
+    "notes": [],
+    "note": "",
+    "science_findings": [],
+    "criteria_failed": []
    },
    "tried": [
     {
      "options": {
-      "reduced-detail": null
+      "preset": null
      },
-     "said": "--reduced-detail",
+     "said": "the preset measured (not an option)",
      "offered": false,
      "measures": {
       "page_in": [
@@ -464,7 +476,7 @@
       "text_pt": 6.0,
       "smallest_pt": 5.1,
       "fallbacks": {},
-      "seconds": 24.87
+      "seconds": 25.12
      },
      "reasons": [],
      "texts": 62,
@@ -474,7 +486,7 @@
      "stuck": 0,
      "elements": 55,
      "chains_drawn": 2,
-     "check_seconds": 1.3
+     "check_seconds": 1.0
     }
    ]
   },
@@ -492,7 +504,7 @@
      "text_pt": 7.366,
      "smallest_pt": 6.261,
      "fallbacks": {},
-     "seconds": 3.91
+     "seconds": 5.24
     },
     "reasons": [],
     "texts": 15,
@@ -502,16 +514,19 @@
     "stuck": 0,
     "elements": 10,
     "chains_drawn": 2,
-    "check_seconds": 0.7,
+    "check_seconds": 0.8,
     "suggestions": [],
-    "note": ""
+    "notes": [],
+    "note": "",
+    "science_findings": [],
+    "criteria_failed": []
    },
    "tried": [
     {
      "options": {
-      "reduced-detail": null
+      "preset": null
      },
-     "said": "--reduced-detail",
+     "said": "the preset measured (not an option)",
      "offered": false,
      "measures": {
       "page_in": [
@@ -521,7 +536,7 @@
       "text_pt": 7.366,
       "smallest_pt": 6.261,
       "fallbacks": {},
-      "seconds": 4.32
+      "seconds": 4.63
      },
      "reasons": [],
      "texts": 15,
@@ -531,7 +546,7 @@
      "stuck": 0,
      "elements": 10,
      "chains_drawn": 2,
-     "check_seconds": 0.7
+     "check_seconds": 0.9
     }
    ]
   },
@@ -551,7 +566,7 @@
      "fallbacks": {
       "page_text_small": 1
      },
-     "seconds": 38.13
+     "seconds": 47.83
     },
     "reasons": [
      "text_small"
@@ -578,7 +593,10 @@
       "what": "chain 0 only"
      }
     ],
-    "note": "below the readability floor: its text is 5.5 pt, under 6 pt, on its 33 x 48 in page (its smallest text 3.3 pt); drawing less may bring it above: --focus 0 (chain 0 in full, with what its neighbours add to its fold); --chains 0 (chain 0 only)"
+    "notes": [],
+    "note": "below the readability floor: its text is 5.5 pt, under 6 pt, on its 33 x 48 in page (its smallest text 3.3 pt); drawing less may bring it above: --focus 0 (chain 0 in full, with what its neighbours add to its fold); --chains 0 (chain 0 only)",
+    "science_findings": [],
+    "criteria_failed": []
    },
    "tried": [
     {
@@ -595,7 +613,7 @@
       "text_pt": 7.366,
       "smallest_pt": 5.303,
       "fallbacks": {},
-      "seconds": 2.93
+      "seconds": 3.14
      },
      "reasons": [],
      "texts": 9,
@@ -621,7 +639,7 @@
       "text_pt": 7.366,
       "smallest_pt": 5.303,
       "fallbacks": {},
-      "seconds": 0.91
+      "seconds": 0.95
      },
      "reasons": [],
      "texts": 5,
@@ -635,9 +653,9 @@
     },
     {
      "options": {
-      "reduced-detail": null
+      "preset": null
      },
-     "said": "--reduced-detail",
+     "said": "the preset measured (not an option)",
      "offered": false,
      "measures": {
       "page_in": [
@@ -649,7 +667,7 @@
       "fallbacks": {
        "page_text_small": 1
       },
-      "seconds": 30.66
+      "seconds": 33.07
      },
      "reasons": [
       "text_small"
@@ -661,7 +679,7 @@
      "stuck": 0,
      "elements": 965,
      "chains_drawn": 61,
-     "check_seconds": 2.5
+     "check_seconds": 2.6
     }
    ]
   },
@@ -681,7 +699,7 @@
      "fallbacks": {
       "page_text_small": 1
      },
-     "seconds": 17.95
+     "seconds": 20.43
     },
     "reasons": [
      "text_small"
@@ -693,7 +711,7 @@
     "stuck": 0,
     "elements": 309,
     "chains_drawn": 39,
-    "check_seconds": 1.0,
+    "check_seconds": 1.1,
     "suggestions": [
      {
       "options": {
@@ -714,7 +732,10 @@
       "what": "chain A only"
      }
     ],
-    "note": "below the readability floor: its text is 4.5 pt, under 6 pt, on its 48 x 9 in page (its smallest text 2.7 pt); drawing less may bring it above: --focus protomer (one subunit in full); --focus A (chain A in full, with what its neighbours add to its fold); --chains A (chain A only)"
+    "notes": [],
+    "note": "below the readability floor: its text is 4.5 pt, under 6 pt, on its 48 x 9 in page (its smallest text 2.7 pt); drawing less may bring it above: --focus protomer (one subunit in full); --focus A (chain A in full, with what its neighbours add to its fold); --chains A (chain A only)",
+    "science_findings": [],
+    "criteria_failed": []
    },
    "tried": [
     {
@@ -731,7 +752,7 @@
       "text_pt": 6.0,
       "smallest_pt": 3.6,
       "fallbacks": {},
-      "seconds": 4.01
+      "seconds": 4.12
      },
      "reasons": [],
      "texts": 300,
@@ -757,7 +778,7 @@
       "text_pt": 6.0,
       "smallest_pt": 3.6,
       "fallbacks": {},
-      "seconds": 0.72
+      "seconds": 0.82
      },
      "reasons": [],
      "texts": 49,
@@ -783,7 +804,7 @@
       "text_pt": 7.366,
       "smallest_pt": 4.419,
       "fallbacks": {},
-      "seconds": 0.47
+      "seconds": 0.44
      },
      "reasons": [],
      "texts": 42,
@@ -797,9 +818,9 @@
     },
     {
      "options": {
-      "reduced-detail": null
+      "preset": null
      },
-     "said": "--reduced-detail",
+     "said": "the preset measured (not an option)",
      "offered": false,
      "measures": {
       "page_in": [
@@ -811,7 +832,7 @@
       "fallbacks": {
        "page_text_small": 1
       },
-      "seconds": 6.53
+      "seconds": 6.9
      },
      "reasons": [
       "text_small"
@@ -844,7 +865,7 @@
       "counts_hidden": 4,
       "glyph_width_guessed": 100
      },
-     "seconds": 44.95
+     "seconds": 47.93
     },
     "reasons": [],
     "texts": 1201,
@@ -854,16 +875,19 @@
     "stuck": 0,
     "elements": 427,
     "chains_drawn": 55,
-    "check_seconds": 3.0,
+    "check_seconds": 3.1,
     "suggestions": [],
-    "note": ""
+    "notes": [],
+    "note": "",
+    "science_findings": [],
+    "criteria_failed": []
    },
    "tried": [
     {
      "options": {
-      "reduced-detail": null
+      "preset": null
      },
-     "said": "--reduced-detail",
+     "said": "the preset measured (not an option)",
      "offered": false,
      "measures": {
       "page_in": [
@@ -878,7 +902,7 @@
        "na_run_unclear": 2,
        "page_text_small": 1
       },
-      "seconds": 50.57
+      "seconds": 52.44
      },
      "reasons": [
       "text_small"
@@ -911,7 +935,7 @@
       "counts_hidden": 3,
       "glyph_width_guessed": 76
      },
-     "seconds": 45.51
+     "seconds": 50.72
     },
     "reasons": [],
     "texts": 1243,
@@ -921,16 +945,19 @@
     "stuck": 0,
     "elements": 455,
     "chains_drawn": 56,
-    "check_seconds": 2.9,
+    "check_seconds": 3.0,
     "suggestions": [],
-    "note": ""
+    "notes": [],
+    "note": "",
+    "science_findings": [],
+    "criteria_failed": []
    },
    "tried": [
     {
      "options": {
-      "reduced-detail": null
+      "preset": null
      },
-     "said": "--reduced-detail",
+     "said": "the preset measured (not an option)",
      "offered": false,
      "measures": {
       "page_in": [
@@ -944,7 +971,7 @@
        "glyph_width_guessed": 57,
        "helix_name_moved": 1
       },
-      "seconds": 45.77
+      "seconds": 47.29
      },
      "reasons": [],
      "texts": 1189,
@@ -954,7 +981,7 @@
      "stuck": 0,
      "elements": 419,
      "chains_drawn": 56,
-     "check_seconds": 2.9
+     "check_seconds": 3.0
     }
    ]
   },
@@ -972,7 +999,7 @@
      "text_pt": 6.0,
      "smallest_pt": 3.72,
      "fallbacks": {},
-     "seconds": 16.13
+     "seconds": 16.55
     },
     "reasons": [],
     "texts": 128,
@@ -982,16 +1009,19 @@
     "stuck": 0,
     "elements": 116,
     "chains_drawn": 2,
-    "check_seconds": 1.0,
+    "check_seconds": 1.1,
     "suggestions": [],
-    "note": ""
+    "notes": [],
+    "note": "",
+    "science_findings": [],
+    "criteria_failed": []
    },
    "tried": [
     {
      "options": {
-      "reduced-detail": null
+      "preset": null
      },
-     "said": "--reduced-detail",
+     "said": "the preset measured (not an option)",
      "offered": false,
      "measures": {
       "page_in": [
@@ -1001,7 +1031,7 @@
       "text_pt": 6.0,
       "smallest_pt": 4.32,
       "fallbacks": {},
-      "seconds": 14.45
+      "seconds": 13.81
      },
      "reasons": [],
      "texts": 113,
@@ -1011,7 +1041,7 @@
      "stuck": 0,
      "elements": 104,
      "chains_drawn": 2,
-     "check_seconds": 0.9
+     "check_seconds": 1.0
     }
    ]
   },
@@ -1029,7 +1059,7 @@
      "text_pt": 7.366,
      "smallest_pt": 5.303,
      "fallbacks": {},
-     "seconds": 0.7
+     "seconds": 0.67
     },
     "reasons": [],
     "texts": 48,
@@ -1041,14 +1071,17 @@
     "chains_drawn": 5,
     "check_seconds": 0.3,
     "suggestions": [],
-    "note": ""
+    "notes": [],
+    "note": "",
+    "science_findings": [],
+    "criteria_failed": []
    },
    "tried": [
     {
      "options": {
-      "reduced-detail": null
+      "preset": null
      },
-     "said": "--reduced-detail",
+     "said": "the preset measured (not an option)",
      "offered": false,
      "measures": {
       "page_in": [
@@ -1058,7 +1091,7 @@
       "text_pt": 7.366,
       "smallest_pt": 5.303,
       "fallbacks": {},
-      "seconds": 0.69
+      "seconds": 0.8
      },
      "reasons": [],
      "texts": 47,
@@ -1086,7 +1119,7 @@
      "text_pt": 6.0,
      "smallest_pt": 4.32,
      "fallbacks": {},
-     "seconds": 2.2
+     "seconds": 2.13
     },
     "reasons": [],
     "texts": 194,
@@ -1096,16 +1129,19 @@
     "stuck": 0,
     "elements": 156,
     "chains_drawn": 14,
-    "check_seconds": 0.8,
+    "check_seconds": 0.9,
     "suggestions": [],
-    "note": ""
+    "notes": [],
+    "note": "",
+    "science_findings": [],
+    "criteria_failed": []
    },
    "tried": [
     {
      "options": {
-      "reduced-detail": null
+      "preset": null
      },
-     "said": "--reduced-detail",
+     "said": "the preset measured (not an option)",
      "offered": false,
      "measures": {
       "page_in": [
@@ -1115,7 +1151,7 @@
       "text_pt": 6.0,
       "smallest_pt": 4.32,
       "fallbacks": {},
-      "seconds": 1.93
+      "seconds": 2.05
      },
      "reasons": [],
      "texts": 182,
@@ -1125,7 +1161,7 @@
      "stuck": 0,
      "elements": 142,
      "chains_drawn": 14,
-     "check_seconds": 0.7
+     "check_seconds": 0.8
     }
    ]
   },
@@ -1146,7 +1182,7 @@
       "helix_name_moved": 1,
       "page_text_small": 1
      },
-     "seconds": 2.9
+     "seconds": 2.77
     },
     "reasons": [
      "text_small"
@@ -1173,7 +1209,10 @@
       "what": "chain C only"
      }
     ],
-    "note": "below the readability floor: its text is 2.4 pt, under 6 pt, on its 48 x 6 in page (its smallest text 1.4 pt); drawing less may bring it above: --focus C (chain C in full, with what its neighbours add to its fold); --chains C (chain C only)"
+    "notes": [],
+    "note": "below the readability floor: its text is 2.4 pt, under 6 pt, on its 48 x 6 in page (its smallest text 1.4 pt); drawing less may bring it above: --focus C (chain C in full, with what its neighbours add to its fold); --chains C (chain C only)",
+    "science_findings": [],
+    "criteria_failed": []
    },
    "tried": [
     {
@@ -1190,7 +1229,7 @@
       "text_pt": 7.366,
       "smallest_pt": 4.419,
       "fallbacks": {},
-      "seconds": 0.83
+      "seconds": 0.86
      },
      "reasons": [],
      "texts": 30,
@@ -1200,7 +1239,7 @@
      "stuck": 0,
      "elements": 19,
      "chains_drawn": 2,
-     "check_seconds": 0.1
+     "check_seconds": 0.2
     },
     {
      "options": {
@@ -1216,7 +1255,7 @@
       "text_pt": 7.366,
       "smallest_pt": 4.419,
       "fallbacks": {},
-      "seconds": 0.3
+      "seconds": 0.25
      },
      "reasons": [],
      "texts": 27,
@@ -1230,9 +1269,9 @@
     },
     {
      "options": {
-      "reduced-detail": null
+      "preset": null
      },
-     "said": "--reduced-detail",
+     "said": "the preset measured (not an option)",
      "offered": false,
      "measures": {
       "page_in": [
@@ -1245,7 +1284,7 @@
        "counts_hidden": 1,
        "page_text_small": 1
       },
-      "seconds": 1.79
+      "seconds": 2.0
      },
      "reasons": [
       "text_small"
@@ -1257,7 +1296,7 @@
      "stuck": 0,
      "elements": 123,
      "chains_drawn": 54,
-     "check_seconds": 0.6
+     "check_seconds": 0.7
     }
    ]
   },
@@ -1277,7 +1316,7 @@
      "fallbacks": {
       "page_text_small": 1
      },
-     "seconds": 14.12
+     "seconds": 15.48
     },
     "reasons": [
      "text_small"
@@ -1289,7 +1328,7 @@
     "stuck": 0,
     "elements": 243,
     "chains_drawn": 28,
-    "check_seconds": 1.4,
+    "check_seconds": 1.5,
     "suggestions": [
      {
       "options": {
@@ -1304,7 +1343,10 @@
       "what": "chain A only"
      }
     ],
-    "note": "below the readability floor: its text is 5.5 pt, under 6 pt, on its 48 x 13 in page (its smallest text 3.3 pt); drawing less may bring it above: --focus A (chain A in full, with what its neighbours add to its fold); --chains A (chain A only)"
+    "notes": [],
+    "note": "below the readability floor: its text is 5.5 pt, under 6 pt, on its 48 x 13 in page (its smallest text 3.3 pt); drawing less may bring it above: --focus A (chain A in full, with what its neighbours add to its fold); --chains A (chain A only)",
+    "science_findings": [],
+    "criteria_failed": []
    },
    "tried": [
     {
@@ -1321,7 +1363,7 @@
       "text_pt": 6.0,
       "smallest_pt": 3.6,
       "fallbacks": {},
-      "seconds": 1.21
+      "seconds": 1.18
      },
      "reasons": [],
      "texts": 120,
@@ -1347,7 +1389,7 @@
       "text_pt": 6.0,
       "smallest_pt": 3.6,
       "fallbacks": {},
-      "seconds": 0.87
+      "seconds": 0.82
      },
      "reasons": [],
      "texts": 118,
@@ -1361,9 +1403,9 @@
     },
     {
      "options": {
-      "reduced-detail": null
+      "preset": null
      },
-     "said": "--reduced-detail",
+     "said": "the preset measured (not an option)",
      "offered": false,
      "measures": {
       "page_in": [
@@ -1375,7 +1417,7 @@
       "fallbacks": {
        "page_text_small": 1
       },
-      "seconds": 6.91
+      "seconds": 6.99
      },
      "reasons": [
       "text_small"
@@ -1407,7 +1449,7 @@
      "fallbacks": {
       "page_text_small": 1
      },
-     "seconds": 43.8
+     "seconds": 51.64
     },
     "reasons": [
      "text_small"
@@ -1419,7 +1461,7 @@
     "stuck": 0,
     "elements": 860,
     "chains_drawn": 44,
-    "check_seconds": 2.7,
+    "check_seconds": 2.9,
     "suggestions": [
      {
       "options": {
@@ -1434,7 +1476,10 @@
       "what": "chain A1 only"
      }
     ],
-    "note": "below the readability floor: its text is 5.2 pt, under 6 pt, on its 48 x 37 in page (its smallest text 3.1 pt); drawing less may bring it above: --focus A1 (chain A1 in full, with what its neighbours add to its fold); --chains A1 (chain A1 only)"
+    "notes": [],
+    "note": "below the readability floor: its text is 5.2 pt, under 6 pt, on its 48 x 37 in page (its smallest text 3.1 pt); drawing less may bring it above: --focus A1 (chain A1 in full, with what its neighbours add to its fold); --chains A1 (chain A1 only)",
+    "science_findings": [],
+    "criteria_failed": []
    },
    "tried": [
     {
@@ -1451,7 +1496,7 @@
       "text_pt": 6.0,
       "smallest_pt": 3.6,
       "fallbacks": {},
-      "seconds": 2.57
+      "seconds": 2.77
      },
      "reasons": [],
      "texts": 96,
@@ -1461,7 +1506,7 @@
      "stuck": 0,
      "elements": 70,
      "chains_drawn": 7,
-     "check_seconds": 0.8
+     "check_seconds": 0.9
     },
     {
      "options": {
@@ -1477,7 +1522,7 @@
       "text_pt": 6.0,
       "smallest_pt": 3.6,
       "fallbacks": {},
-      "seconds": 1.45
+      "seconds": 1.7
      },
      "reasons": [],
      "texts": 90,
@@ -1487,13 +1532,13 @@
      "stuck": 0,
      "elements": 67,
      "chains_drawn": 5,
-     "check_seconds": 0.4
+     "check_seconds": 0.5
     },
     {
      "options": {
-      "reduced-detail": null
+      "preset": null
      },
-     "said": "--reduced-detail",
+     "said": "the preset measured (not an option)",
      "offered": false,
      "measures": {
       "page_in": [
@@ -1505,7 +1550,7 @@
       "fallbacks": {
        "page_text_small": 1
       },
-      "seconds": 36.87
+      "seconds": 38.69
      },
      "reasons": [
       "text_small"
@@ -1517,7 +1562,7 @@
      "stuck": 0,
      "elements": 776,
      "chains_drawn": 44,
-     "check_seconds": 2.5
+     "check_seconds": 2.4
     }
    ]
   },
@@ -1539,7 +1584,7 @@
       "glyph_width_guessed": 76,
       "page_text_small": 1
      },
-     "seconds": 44.32
+     "seconds": 47.4
     },
     "reasons": [
      "text_small"
@@ -1551,7 +1596,7 @@
     "stuck": 0,
     "elements": 428,
     "chains_drawn": 55,
-    "check_seconds": 3.0,
+    "check_seconds": 2.9,
     "suggestions": [
      {
       "options": {
@@ -1566,7 +1611,12 @@
       "what": "chain B only"
      }
     ],
-    "note": "below the readability floor: its text is 5.7 pt, under 6 pt, on its 48 x 42 in page (its smallest text 3.4 pt); drawing less may bring it above: --focus B (chain B in full, with what its neighbours add to its fold); --chains B (chain B only)"
+    "notes": [],
+    "note": "below the readability floor: its text is 5.7 pt, under 6 pt, on its 48 x 42 in page (its smallest text 3.4 pt); drawing less may bring it above: --focus B (chain B in full, with what its neighbours add to its fold); --chains B (chain B only)",
+    "science_findings": [],
+    "criteria_failed": [
+     "A6"
+    ]
    },
    "tried": [
     {
@@ -1585,7 +1635,7 @@
       "fallbacks": {
        "glyph_width_guessed": 40
       },
-      "seconds": 2.29
+      "seconds": 2.46
      },
      "reasons": [],
      "texts": 53,
@@ -1613,7 +1663,7 @@
       "fallbacks": {
        "glyph_width_guessed": 40
       },
-      "seconds": 1.84
+      "seconds": 1.9
      },
      "reasons": [],
      "texts": 51,
@@ -1627,9 +1677,9 @@
     },
     {
      "options": {
-      "reduced-detail": null
+      "preset": null
      },
-     "said": "--reduced-detail",
+     "said": "the preset measured (not an option)",
      "offered": false,
      "measures": {
       "page_in": [
@@ -1643,7 +1693,7 @@
        "helix_name_moved": 1,
        "page_text_small": 1
       },
-      "seconds": 39.69
+      "seconds": 41.15
      },
      "reasons": [
       "text_small"
@@ -1655,7 +1705,7 @@
      "stuck": 0,
      "elements": 390,
      "chains_drawn": 55,
-     "check_seconds": 2.6
+     "check_seconds": 2.7
     }
    ]
   },
@@ -1673,7 +1723,7 @@
      "text_pt": 7.366,
      "smallest_pt": 5.303,
      "fallbacks": {},
-     "seconds": 6.32
+     "seconds": 7.18
     },
     "reasons": [],
     "texts": 52,
@@ -1683,16 +1733,19 @@
     "stuck": 0,
     "elements": 45,
     "chains_drawn": 3,
-    "check_seconds": 1.0,
+    "check_seconds": 1.2,
     "suggestions": [],
-    "note": ""
+    "notes": [],
+    "note": "",
+    "science_findings": [],
+    "criteria_failed": []
    },
    "tried": [
     {
      "options": {
-      "reduced-detail": null
+      "preset": null
      },
-     "said": "--reduced-detail",
+     "said": "the preset measured (not an option)",
      "offered": false,
      "measures": {
       "page_in": [
@@ -1702,7 +1755,7 @@
       "text_pt": 7.366,
       "smallest_pt": 5.303,
       "fallbacks": {},
-      "seconds": 6.62
+      "seconds": 6.58
      },
      "reasons": [],
      "texts": 48,
@@ -1712,7 +1765,7 @@
      "stuck": 0,
      "elements": 41,
      "chains_drawn": 3,
-     "check_seconds": 1.1
+     "check_seconds": 1.2
     }
    ]
   },
@@ -1730,7 +1783,7 @@
      "text_pt": 7.366,
      "smallest_pt": 5.303,
      "fallbacks": {},
-     "seconds": 0.59
+     "seconds": 0.86
     },
     "reasons": [],
     "texts": 48,
@@ -1742,14 +1795,17 @@
     "chains_drawn": 5,
     "check_seconds": 0.3,
     "suggestions": [],
-    "note": ""
+    "notes": [],
+    "note": "",
+    "science_findings": [],
+    "criteria_failed": []
    },
    "tried": [
     {
      "options": {
-      "reduced-detail": null
+      "preset": null
      },
-     "said": "--reduced-detail",
+     "said": "the preset measured (not an option)",
      "offered": false,
      "measures": {
       "page_in": [
@@ -1759,7 +1815,7 @@
       "text_pt": 6.331,
       "smallest_pt": 4.558,
       "fallbacks": {},
-      "seconds": 0.57
+      "seconds": 0.68
      },
      "reasons": [],
      "texts": 47,
@@ -1769,7 +1825,7 @@
      "stuck": 0,
      "elements": 30,
      "chains_drawn": 5,
-     "check_seconds": 0.3
+     "check_seconds": 0.4
     }
    ]
   },
@@ -1787,7 +1843,7 @@
      "text_pt": 6.0,
      "smallest_pt": 3.6,
      "fallbacks": {},
-     "seconds": 5.58
+     "seconds": 5.88
     },
     "reasons": [],
     "texts": 307,
@@ -1797,16 +1853,19 @@
     "stuck": 0,
     "elements": 287,
     "chains_drawn": 5,
-    "check_seconds": 1.1,
+    "check_seconds": 1.2,
     "suggestions": [],
-    "note": ""
+    "notes": [],
+    "note": "",
+    "science_findings": [],
+    "criteria_failed": []
    },
    "tried": [
     {
      "options": {
-      "reduced-detail": null
+      "preset": null
      },
-     "said": "--reduced-detail",
+     "said": "the preset measured (not an option)",
      "offered": false,
      "measures": {
       "page_in": [
@@ -1816,7 +1875,7 @@
       "text_pt": 6.0,
       "smallest_pt": 4.32,
       "fallbacks": {},
-      "seconds": 7.14
+      "seconds": 7.35
      },
      "reasons": [],
      "texts": 285,
@@ -1826,7 +1885,7 @@
      "stuck": 0,
      "elements": 268,
      "chains_drawn": 5,
-     "check_seconds": 1.0
+     "check_seconds": 1.2
     }
    ]
   }
@@ -1839,7 +1898,7 @@
     "9FZL",
     "6JLN"
    ],
-   "median_seconds": 9.035,
+   "median_seconds": 9.415000000000001,
    "median_text_pt": 6.0
   },
   "--focus CHAIN": {
@@ -1855,7 +1914,7 @@
     "7NZ2",
     "8ZTU"
    ],
-   "median_seconds": 2.325,
+   "median_seconds": 2.55,
    "median_text_pt": 6.0
   },
   "--chains CHAIN": {
@@ -1871,10 +1930,10 @@
     "7NZ2",
     "8ZTU"
    ],
-   "median_seconds": 0.925,
+   "median_seconds": 0.965,
    "median_text_pt": 6.0
   },
-  "--reduced-detail": {
+  "the preset measured (not an option)": {
    "tried_below": 8,
    "brought_above": 0,
    "entries": [
@@ -1887,7 +1946,7 @@
     "7NZ2",
     "8ZTU"
    ],
-   "median_seconds": 33.765,
+   "median_seconds": 35.879999999999995,
    "median_text_pt": 5.24
   }
  }
