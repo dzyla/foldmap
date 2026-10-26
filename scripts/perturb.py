@@ -26,7 +26,8 @@ constants FOLDER/names.json lists are read while the process runs, so a constant
 that reads it and does not move. A read is the run of a line, inside a function body of src/foldmap, that names the
 constant (its module's own name for it, a from-import binder's, or an attribute NAME); a module-level line, a default
 or a constant derived at import is no read, and neither is a read of what was derived from it. Each process writes
-FOLDER/<pid>.json at exit: its argv and the constants read. Each line location is reported once, then disabled, so
+FOLDER/<pid>-<random>.json at exit: its argv and the constants read (a process killed first, at a view's timeout, writes
+none; an attribute `x.NAME` counts whatever x is). Each line location is reported once, then disabled, so
 the drawing is not slowed much and not changed."""
 
 from __future__ import annotations
@@ -280,7 +281,8 @@ def reading_lines(src: Path, wanted: list[str], package: str = PACKAGE) -> dict[
 
 def install_trace(folder: str | None = None, package: str = PACKAGE) -> dict | None:
     """Record, until this process exits, which constants of FOLDER/names.json are read (the module docstring);
-    written to FOLDER/<pid>.json at exit. None without FOLDMAP_TRACE_READS. -> the live record {"reads": set}."""
+    written to FOLDER/<pid>-<random>.json at exit. None without FOLDMAP_TRACE_READS. -> the live record
+    {"reads": set}."""
     import atexit
 
     folder = os.environ.get(TRACE_ENV, "") if folder is None else folder
@@ -307,7 +309,8 @@ def install_trace(folder: str | None = None, package: str = PACKAGE) -> dict | N
     def write():
         mon.set_events(tool, 0)
         doc = {"argv": record["argv"], "reads": sorted(record["reads"])}
-        (Path(folder) / f"{os.getpid()}.json").write_text(json.dumps(doc) + "\n", encoding="utf-8")
+        name = f"{os.getpid()}-{os.urandom(4).hex()}.json"  # a pid reused by a later process keeps both records
+        (Path(folder) / name).write_text(json.dumps(doc) + "\n", encoding="utf-8")
 
     tool = next(t for t in range(6) if mon.get_tool(t) is None)
     mon.use_tool_id(tool, "foldmap-trace-reads")

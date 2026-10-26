@@ -1889,6 +1889,8 @@ def report(entries: list[dict], out: Path, sample_path: Path | None = None, tota
         doc["not_for_paper"] = (out / NOT_FOR_PAPER).read_text(encoding="utf-8").strip()
     if os.environ.get(PERTURB_ENV, "").strip():  # judged with one constant perturbed (scripts/perturb.py)
         doc["perturbed"] = os.environ[PERTURB_ENV].strip()
+    if os.environ.get(TRACE_ENV, "").strip():  # its processes traced the constants they read (scripts/perturb.py)
+        doc["traced"] = True
     out.mkdir(parents=True, exist_ok=True)
     (out / "report.json").write_text(json.dumps(_jsonable(doc), indent=1) + "\n", encoding="utf-8")
     keys = list(CRITERIA)
@@ -1911,6 +1913,8 @@ def report(entries: list[dict], out: Path, sample_path: Path | None = None, tota
         lines += [f"NOT FOR THE PAPER: {doc['not_for_paper']}", ""]
     if doc.get("perturbed"):
         lines += [f"PERTURBED (sensitivity, scripts/perturb.py): {doc['perturbed']}", ""]
+    if doc.get("traced"):
+        lines += ["TRACED (sensitivity, scripts/perturb.py): its processes recorded the tuned constants they read", ""]
     lines += [
         "An entry passes when no criterion fails. A criterion with nothing to judge in an entry is not judged (or does "
         "not apply), never counted as a pass: see the outcomes per criterion below.",
@@ -2473,8 +2477,11 @@ def cmd_run(args) -> int:
     from concurrent.futures import ThreadPoolExecutor
 
     out, sample_path = Path(args.out), Path(args.sample)
-    if os.environ.get(PERTURB_ENV, "").strip() and not args.not_for_paper:
-        raise SystemExit(f"refused: {PERTURB_ENV} perturbs a constant (sensitivity); such a run needs --not-for-paper")
+    hooked = [v for v in (PERTURB_ENV, TRACE_ENV) if os.environ.get(v, "").strip()]
+    if hooked and not args.not_for_paper:
+        raise SystemExit(f"refused: {', '.join(hooked)} set (sensitivity); such a run needs --not-for-paper")
+    if hooked and "app" in _view_list(args.views):  # the app draws in a fresh job process the hook never reaches
+        raise SystemExit(f"refused: {', '.join(hooked)} set and the app view asked for; its job process escapes them")
     problem = paper_run_problem(out, sample_path, args)
     if problem and not args.not_for_paper:
         raise SystemExit(f"refused: {problem}. --not-for-paper runs it anyway, its report marked never to be quoted")

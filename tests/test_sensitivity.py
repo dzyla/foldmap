@@ -52,6 +52,7 @@ PLANTED = {
     "    return late\n",
     "c.py": "from .b import BOUND\n",
     "d.py": "from . import a\n\n\ndef k():\n    return a.LIMIT\n",
+    "e.py": "try:\n    EDGE = 2.0\nexcept ImportError:\n    EDGE = 3.0\nif EDGE:\n    STEP = 1.0\nSTEP += 1.0\n",
 }
 
 
@@ -166,16 +167,88 @@ def test_the_trace_says_which_constants_a_process_read(perturb, tmp_path):
     assert len(records) == 1 and records[0]["reads"] == ["m:USED"]
 
 
+def _view_argv(r100, view: str, name: str, na: bool = False) -> list[str]:
+    """A view process's sys.argv as random100 starts it (view_command; python's own -I -W are not in sys.argv)."""
+    cmd, _ = r100.view_command(view, Path("f.cif"), name, Path("w"), na=na)
+    return cmd[cmd.index(str(r100.SCRIPT)) :]
+
+
 def test_reads_are_counted_per_entry(sens, tmp_path):
-    report = {"entries": [{"id": "1ABC", "name": "1ABC"}, {"id": "AF-X", "name": "AF_X"}]}
+    """Minor 4 of the T9.2 review: the view processes' argv is random100's own (view_command), so a change to its
+    layout fails here instead of filing view reads under "(judging)"."""
+    r100 = _script("random100")
+    report = {"entries": [{"id": "1ABC", "name": "1ABC"}, {"id": "AF-X", "name": "AF_X"}, {"id": "2DEF"}]}
     for pid, argv, reads in (
-        (1, ["r.py", "view", "--name", "AF_X", "--work", "w", "default", "f.cif"], ["m:A"]),
-        (2, ["r.py", "entry", "1ABC", "--out", "o"], ["m:A", "m:B"]),
+        (1, _view_argv(r100, "default", "AF_X"), ["m:A"]),
+        (2, ["r.py", "entry", "1ABC", "--out", "o"], ["m:A", "m:B"]),  # cmd_run's own line for an entry
         (3, ["r.py", "run", "--ids", "1ABC"], ["m:B"]),
+        (4, _view_argv(r100, "membrane", "1ABC", na=True), ["m:C"]),
+        (5, _view_argv(r100, "default", "1ABC"), []),
     ):
-        (tmp_path / f"{pid}.json").write_text(json.dumps({"argv": argv, "reads": reads}), encoding="utf-8")
+        (tmp_path / f"{pid}-x.json").write_text(json.dumps({"argv": argv, "reads": reads}), encoding="utf-8")
     (tmp_path / "names.json").write_text("[]", encoding="utf-8")
-    assert sens.read_traces(tmp_path, report) == {"m:A": ["1ABC", "AF-X"], "m:B": ["(judging)", "1ABC"]}
+    assert sens.read_traces(tmp_path, report) == {
+        "m:A": ["1ABC", "AF-X"],
+        "m:B": ["(judging)", "1ABC"],
+        "m:C": ["1ABC"],
+    }
+    assert sens.read_traces(tmp_path, report, by_view=True) == {
+        "m:A": {"(entry)": ["1ABC"], "default": ["AF-X"]},
+        "m:B": {"(entry)": ["1ABC"], "(judging)": ["(judging)"]},
+        "m:C": {"membrane": ["1ABC"]},
+    }
+    # 2DEF's view left no record (killed at its timeout): its reads are unknown, said so
+    got = sens.trace_records(tmp_path, report)
+    assert got == {"per_entry": {"1ABC": 2, "AF-X": 1, "2DEF": 0}, "no_view_record": ["2DEF"]}
+
+
+def test_a_binding_in_a_top_level_try_or_if_and_an_augmented_one_are_perturbed(perturb, planted):
+    """Minor 9 of the T9.2 review: rewrite's claims about if, try and += hold."""
+    finder = perturb.install("e:EDGE=5.0", package="plantpkg")
+    try:
+        (e,) = _load("e")
+    finally:
+        perturb.uninstall(finder)
+    assert e.EDGE == 5.0 and finder.loader.bound == 2 and e.STEP == 2.0  # the try body and its handler
+    _forget("plantpkg.e")
+    finder = perturb.install("e:STEP=7.0", package="plantpkg")
+    try:
+        (e,) = _load("e")
+    finally:
+        perturb.uninstall(finder)
+    assert e.STEP == 7.0 and finder.loader.bound == 2  # in the if, and again after STEP += 1.0
+
+
+def test_a_constant_the_default_view_never_reads_goes_to_the_view_that_reads_it_or_is_not_exercised(sens):
+    """Ruling Q30: a constant stable and unread in the default view is measured in the view that reads it in the
+    most entries; with none, or with a view stage that reads it nowhere, it is "not exercised", never stable."""
+    the_plan = {"perturbations": [{"id": i} for i in ("m:READ", "m:BAND", "m:TWO", "m:NONE")]}
+    default_reads = {"m:READ": ["1ABC"], "m:BAND": [], "m:NONE": ["(judging)"]}
+    survey = {
+        "m:BAND": {"membrane": ["6ABC", "6DEF"], "default": []},
+        "m:TWO": {"focus": ["1ABC"], "domains": ["1ABC"], "app": ["1ABC", "2ABC"]},
+    }
+    assert sens.unread_in_default(default_reads, the_plan) == ["m:BAND", "m:TWO"]
+    assert sens.view_targets(the_plan, default_reads, survey) == {"membrane": ["m:BAND"], "focus": ["m:TWO"]}
+
+    def row(cid, cls="stable", read=0, runs=None):
+        return {"id": cid, "class": cls, "read_in": read, "read_judging": False, "runs": runs or {}, "stage": "B"}
+
+    stable, moved = {"class": "stable"}, {"class": "sensitive"}
+    stage_v = {
+        "membrane": {"constants": ["m:BAND"], "reads_by_view": {"m:BAND": {"membrane": ["6ABC"]}}},
+        "focus": {"constants": ["m:TWO"], "reads_by_view": {}},
+    }
+    cases = [
+        (row("m:READ", read=3), "stable", "B"),  # read in the default view: stable is evidence
+        (row("m:X", "sensitive"), "sensitive", "B"),  # moved: exercised whatever the trace says
+        (row("m:NONE"), "not exercised", "B"),  # no view stage measures it
+        (row("m:BAND", runs={"x0.75": {"membrane": moved}, "x1.25": {"membrane": stable}}), "sensitive", "membrane"),
+        (row("m:TWO", runs={"x0.75": {"focus": stable}, "x1.25": {"focus": stable}}), "not exercised", "focus"),
+    ]
+    for r, cls, stage in cases:
+        sens.settle(r, stage_v)
+        assert (r["class"], r["stage"]) == (cls, stage), r["id"]
 
 
 def _child(code: str, perturbed: str | None) -> list:
@@ -220,8 +293,18 @@ def test_a_perturbed_random100_run_needs_not_for_paper(tmp_path, monkeypatch):
     r100 = _script("random100")  # loaded unperturbed
     monkeypatch.setenv("FOLDMAP_PERTURB", "layout:_STACK_PAD=0.975")
     out = tmp_path / "o"
+    run = ["run", "--ids", "1ABC", "--out", str(out), "--sample", str(tmp_path / "none.json")]
     with pytest.raises(SystemExit, match="not-for-paper"):
-        r100.main(["run", "--ids", "1ABC", "--out", str(out), "--sample", str(tmp_path / "none.json")])
+        r100.main(run)
+    # Minor 6 of the T9.2 review: the app view draws in a fresh job process neither hook reaches
+    with pytest.raises(SystemExit, match="app view"):
+        r100.main([*run, "--not-for-paper", "--views", "default,app"])
+    monkeypatch.delenv("FOLDMAP_PERTURB")
+    monkeypatch.setenv("FOLDMAP_TRACE_READS", str(tmp_path / "reads"))  # Minor 5: a traced run is refused alike
+    with pytest.raises(SystemExit, match="not-for-paper"):
+        r100.main(run)
+    with pytest.raises(SystemExit, match="app view"):
+        r100.main([*run, "--not-for-paper", "--views", "all"])
     assert not out.exists()
 
 
@@ -336,5 +419,78 @@ def test_the_committed_report_is_stamped_and_its_classes_add_up():
     doc = json.loads((VALIDATION / "sensitivity" / "report.json").read_text(encoding="utf-8"))
     assert doc["source_stamp"]["script"]["name"] == "scripts/sensitivity.py"
     assert sum(doc["counts"].values()) == len(doc["constants"])
-    assert doc["stage_a"]["determinism"]["identical"]
+    stages = [doc["stage_a"], doc["stage_b"], *doc["view_stages"].values()]
+    assert all(st["determinism"]["identical"] and not st["reads_run_moved"] for st in stages)
+    assert all(run["reached"] for st in stages for run in st["runs"].values())
     assert doc["limitations"] == [c["id"] for c in doc["constants"] if c["class"] == "fragile"]
+    assert doc["counts"]["incomplete"] == 0
+    assert doc["named_in_sample"].get("route:_MAX_NODES_WINDOWS") == ["9FZL"]  # review I1: computed, not asserted
+
+
+def _stage_folder(sens, where: Path, runs: dict, reads: dict, unreached=()) -> Path:
+    """A stage folder as sensitivity.py writes it, from {run name: [entry dicts]} (keys files only, no runs/)."""
+    (where / "keys").mkdir(parents=True)
+    (where / "subset.json").write_text(
+        json.dumps({"seed": 1, "size": 2, "ids": ["1ABC", "2DEF"], "quota": {"S1": 2}, "left_out": {}}),
+        encoding="utf-8",
+    )
+    (where / "stages.jsonl").write_text(
+        json.dumps({"stage": "x", "runs": list(runs), "seconds": 60}) + "\n", encoding="utf-8"
+    )
+    for name, entries in runs.items():
+        doc = {
+            "entries": sens.keys_of({"entries": entries}),
+            "exit": 1,
+            "seconds": 30.0,
+            "reach": None if name in (*sens.BASELINES, sens.READS) else {"reached": name not in unreached},
+        }
+        if name == sens.READS:
+            doc |= {"reads": reads, "reads_by_view": {c: {"default": w} for c, w in reads.items()}}
+        (where / "keys" / f"{name}.json").write_text(json.dumps(doc), encoding="utf-8")
+    return where
+
+
+def test_build_classes_each_constant_from_its_deciding_stage(sens, tmp_path):
+    """Important 2 of the T9.2 review: a constant moved only in stage B is sensitive (B); one with a skipped factor
+    is classed from its one run; one no line read is not exercised (ruling Q30); one whose run did not reach its
+    readers is incomplete; a constant naming a sample entry is listed."""
+
+    def p(cid, factor, origin="measured"):
+        return {"id": cid, "origin": origin, "value": 2.0, "new": 2.0 * factor, "factor": factor,
+                "label": f"{cid}x{factor}"}  # fmt: skip
+
+    the_plan = {
+        "perturbations": [
+            p("m:MOVEB", 0.75, "named-entry:1ABC,9XYZ"),
+            p("m:MOVEB", 1.25, "named-entry:1ABC,9XYZ"),
+            p("m:SKIP", 1.25),
+            p("m:UNREAD", 0.75),
+            p("m:UNREAD", 1.25),
+            p("m:LOST", 0.75),
+            p("m:LOST", 1.25),
+        ],
+        "skipped": [{"id": "m:SKIP", "value": 2, "factor": 0.75, "why": "same value", "origin": "measured"}],
+        "not_perturbable": [],
+    }
+    sample = {"entries": [{"id": "1ABC", "stratum": "S1"}, {"id": "2DEF", "stratum": "S1"}], "replaced": []}
+    same = [_entry("1ABC"), _entry("2DEF")]
+    plain = {name: same for name in (*sens.BASELINES, sens.READS)} | {
+        q["label"]: same for q in the_plan["perturbations"]
+    }
+    reads = {"m:MOVEB": ["1ABC"], "m:SKIP": ["2DEF"], "m:LOST": ["1ABC"]}
+    a = _stage_folder(sens, tmp_path / "A", plain, reads)
+    moved = plain | {"m:MOVEBx1.25": [_entry("1ABC", area=12.0), _entry("2DEF")]}
+    b = _stage_folder(sens, tmp_path / "B", moved, reads, unreached=("m:LOSTx0.75",))
+    doc = sens.build(a, b, sens.SOURCE_STAMP, the_plan=the_plan, sample=sample)
+    got = {r["id"]: (r["class"], r["stage"]) for r in doc["constants"]}
+    assert got == {
+        "m:MOVEB": ("sensitive", "B"),  # stable in A, moved in B
+        "m:SKIP": ("stable", "B"),  # one factor skipped: its one run decides
+        "m:UNREAD": ("not exercised", "B"),  # read by no line, measured by no view stage
+        "m:LOST": (None, "B"),  # a run that did not reach its readers: incomplete, no class
+    }
+    assert doc["counts"] == {"fragile": 0, "sensitive": 1, "stable": 1, "not exercised": 1, "incomplete": 1}
+    assert doc["named_in_sample"] == {"m:MOVEB": ["1ABC"]} and doc["not_exercised"] == ["m:UNREAD"]
+    assert doc["stage_b"]["determinism"]["identical"] and doc["no_perturbation"] == []
+    md = sens.render(doc)
+    assert "`m:MOVEB` (1ABC)" in md and "**Limits of the method.**" in md and "incomplete" in md
