@@ -2,12 +2,12 @@
  "what": "foldmap's thresholds, special cases and fallbacks, scanned from src/foldmap (scripts/inventory.py)",
  "source_stamp": {
   "foldmap": "0.1.0",
-  "code_fingerprint": "24ba1b4e2f1de6f6",
+  "code_fingerprint": "d2f79ea38f109b63",
   "package": "checkout",
-  "checkout_fingerprint": "24ba1b4e2f1de6f6",
+  "checkout_fingerprint": "d2f79ea38f109b63",
   "installed_matches_checkout": true,
   "git": {
-   "commit": "046c9dd8ba3237550fd102f5fb83d6fd8bbfd76b",
+   "commit": "4aec81ad3ce0a3fafb1f1fe1f60ab447c8ae9100",
    "dirty": true,
    "source": "asserted by runner"
   },
@@ -11412,7 +11412,7 @@
    "kind": "argument",
    "module": "na_ends",
    "function": "_gap",
-   "line": 535,
+   "line": 537,
    "value": "1e-9",
    "at": "chord = chord / max(float(np.hypot(*chord)), 1e-9)",
    "comment": "",
@@ -11462,15 +11462,15 @@
    "kind": "fallback-marker",
    "module": "na_ends",
    "function": "_gap",
-   "line": 572,
+   "line": 576,
    "value": "4",
    "at": "fallback = route is None",
    "comment": "fallback = route is None / if not fallback: / fallback = fallback or not _na_clear(pts, own, router.elements) / return NAPath(\"gap\", g.before, [], pts, [], label, fallback)",
    "lines": [
-    572,
-    574,
-    577,
-    578
+    576,
+    578,
+    581,
+    582
    ],
    "tests": [
     "test_na_layout",

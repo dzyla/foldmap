@@ -523,7 +523,9 @@ def _gap(router: _Router, g, a, b, strands=None) -> NAPath:
     never routed and, with no curve or bow clear, drawn straight across six stems and a terminus. As a run's first
     pass does, it keeps off the hairpin loops and free ends drawn (`strands`, a _Strands: their cells blocked) when a
     route does, and only then crosses them at the reuse cost (6S13's gaps after a:36 and a:462 ran across the free
-    5' end of a:37-72 they lead to)."""
+    5' end of a:37-72 they lead to). Plan 28 F4: with the free ends blocked it may also arrive along the chord from
+    where it comes, and two ends nearer than two grid cells (turned to meet: 4AS1) are joined by the chord itself when
+    it is clear and crosses no strand drawn so far; a longer chord is never taken."""
     (pa, ea, own_a), (pb, eb, own_b) = a, b
     own_a = own_a if own_a is not None else _Point(float(pa[0]), float(pa[1]))
     own_b = own_b if own_b is not None else _Point(float(pb[0]), float(pb[1]))
@@ -548,12 +550,14 @@ def _gap(router: _Router, g, a, b, strands=None) -> NAPath:
             if route is not None:
                 break
         straight = [tuple(map(float, pa)), tuple(map(float, pb))]
-        if (
+        if (  # two ends turned to meet (4AS1, F4), nearer than a grid route can join: the chord itself, when it is
+            # that short (two grid cells), clear of the elements and crossing no strand drawn so far
             route is None
+            and math.dist(pa, pb) <= 2 * grid.res
             and _na_clear(straight, own, router.elements)
-            and not strands.crosses(straight, fixed_only=True)
+            and not strands.crosses(straight)
         ):
-            route = straight  # the chord itself, clear: two ends turned to meet (4AS1, F4), which no grid route joins
+            route = straight
     if route is None:
         route, _ = router.route(pa, ea, own_a, pb, eb, own_b, own_body=True, text_toll=TEXT_TOLL)
     if route is None:  # an end in another element's clearance margin
