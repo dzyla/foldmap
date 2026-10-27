@@ -92,6 +92,7 @@ def marks_of(i: str) -> dict:
                 "on_loop": round(on, 3),
                 "crowded": bool(m["crowded"]),
                 "over_bodies": round(float(render._over_bodies(m["centre"], m["targets"], bodies)), 3),  # C9
+                "along_loops": round(float(render._along_loops(m["centre"], m["targets"], segs)), 3),  # C9 (5HI7)
                 "tethers": [
                     [round(float(np.hypot(tx - cx, ty - cy)), 3), chains[0], c]
                     for (tx, ty), c in zip(m["targets"], chains)
@@ -127,6 +128,15 @@ def _over(rows: list[dict]) -> float:
     return round(sum(r["over_bodies"] for r in rows), 3)
 
 
+def _along(rows: list[dict]) -> float:
+    return round(sum(r["along_loops"] for r in rows), 3)
+
+
+def _c9(rows: list[dict]) -> float:
+    """C9's measure, as render._mark_spot ranks spots: the tethers' length over bodies and along loop lines."""
+    return round(_over(rows) + _along(rows), 3)
+
+
 def _cross(rows: list[dict]) -> list[float]:
     return [t[0] for r in rows for t in r["tethers"] if t[1] != t[2]]
 
@@ -144,6 +154,7 @@ def mark_changes(before: list[dict], after: list[dict]) -> dict:
                     "to": b["centre"],
                     "on_loop": [a["on_loop"], b["on_loop"]],
                     "over_bodies": [a["over_bodies"], b["over_bodies"]],
+                    "along_loops": [a["along_loops"], b["along_loops"]],
                     "longest_tether": [
                         max((t[0] for t in a["tethers"]), default=None),
                         max((t[0] for t in b["tethers"]), default=None),
@@ -155,6 +166,8 @@ def mark_changes(before: list[dict], after: list[dict]) -> dict:
     return {
         "marks": [len(before), len(after)],
         "over_bodies": [_over(before), _over(after)],
+        "along_loops": [_along(before), _along(after)],
+        "c9": [_c9(before), _c9(after)],
         "on_loop": [_on(before), _on(after)],
         "crowded": [sum(r["crowded"] for r in before), sum(r["crowded"] for r in after)],
         "longest_cross_chain_tether": [max(xa, default=None), max(xb, default=None)],
@@ -307,6 +320,10 @@ def build(args) -> dict:
                 round(sum(_over(mb["entries"][i]) for i in ids), 3),
                 round(sum(_over(ma["entries"][i]) for i in ids), 3),
             ],  # fmt: skip
+            "c9": [
+                round(sum(_c9(mb["entries"][i]) for i in ids), 3),
+                round(sum(_c9(ma["entries"][i]) for i in ids), 3),
+            ],
         }
 
     marks_total = total(every)
@@ -332,13 +349,13 @@ def build(args) -> dict:
         "bench": bench["worse"],
         "marks_on_loop": [i for i, m in marks.items() if len(m["on_loop"][1]) > len(m["on_loop"][0])],
         "marks_crowded": [i for i, m in marks.items() if m["crowded"][1] > m["crowded"][0]],
-        "marks_over_bodies": [i for i, m in marks.items() if m["over_bodies"][1] > m["over_bodies"][0]],
+        "marks_c9": [i for i, m in marks.items() if m["c9"][1] > m["c9"][0]],
         "marks_elsewhere": [
             i
             for i, m in marks_elsewhere.items()
             if len(m["on_loop"][1]) > len(m["on_loop"][0])
             or m["crowded"][1] > m["crowded"][0]
-            or m["over_bodies"][1] > m["over_bodies"][0]
+            or m["c9"][1] > m["c9"][0]
         ],  # fmt: skip
     }
     better = {
@@ -347,7 +364,7 @@ def build(args) -> dict:
         "third": third["better"],
         "na": na["better"],
         "marks_on_loop": [i for i, m in marks.items() if len(m["on_loop"][1]) < len(m["on_loop"][0])],
-        "marks_over_bodies": [i for i, m in marks.items() if m["over_bodies"][1] < m["over_bodies"][0]],
+        "marks_c9": [i for i, m in marks.items() if m["c9"][1] < m["c9"][0]],
     }
     patch = None
     if args.patch:
@@ -439,36 +456,44 @@ def render(doc: dict) -> str:
     lines += ["", "## Ligand marks", ""]
     lines.append(
         f"Over the {t['entries']} tune entries measured both ways: marks {_pair(t['marks'])}, on a loop line "
-        f"{_pair(t['on_loop'])}, crowded {_pair(t['crowded'])}, tethers over bodies (C9, page units) "
+        f"{_pair(t['on_loop'])}, crowded {_pair(t['crowded'])}; C9 (the tethers' length over bodies and along loop "
+        f"lines, page units: render._mark_spot's ranking) {_pair(t['c9'])}, of it over bodies "
         f"{_pair(t['over_bodies'])}; marks moved in a figure that did not change: "
         f"{', '.join(t['moved_in_unchanged_figures']) or 'none'}."
     )
     e = doc["marks_elsewhere_total"]
-    lines += ["", f"The third sample's and the NA figures that moved ({e['entries']}, drawn the app's way): marks "
-              f"{_pair(e['marks'])}, on a loop line {_pair(e['on_loop'])}, crowded {_pair(e['crowded'])}, tethers "
-              f"over bodies {_pair(e['over_bodies'])}."]  # fmt: skip
-    for i, m in doc["marks_elsewhere"].items():
-        lines.append(
-            f"- `{i}`: on a loop line {_pair([len(x) for x in m['on_loop']])}, over bodies {_pair(m['over_bodies'])}, "
-            f"{len(m['moved'])} moved"
-        )
-    lines += ["", "The tune entries whose figure changed:", ""]
-    lines += ["| id | marks | on a loop line | longest tether to another chain | moved |", "|---|---|---|---|---|"]
-    for i, m in doc["marks"].items():
-        on = _pair([len(x) for x in m["on_loop"]])
-        lines.append(
-            f"| `{i}` | {_pair(m['marks'])} | {on} | {_pair(m['longest_cross_chain_tether'])} | {len(m['moved'])} |"
-        )
     lines += [
         "",
-        "Each moved mark: its place, the line it holds (page units) and its tethers' lengths, before -> after.",
+        f"The third sample's and the NA figures that moved ({e['entries']}, drawn the app's way): marks "
+        f"{_pair(e['marks'])}, on a loop line {_pair(e['on_loop'])}, crowded {_pair(e['crowded'])}; C9 "
+        f"{_pair(e['c9'])}, of it over bodies {_pair(e['over_bodies'])}.",
+        "",
+    ]
+    for i, m in doc["marks_elsewhere"].items():
+        lines.append(
+            f"- `{i}`: on a loop line {_pair([len(x) for x in m['on_loop']])}; C9 {_pair(m['c9'])} (over bodies "
+            f"{_pair(m['over_bodies'])}, along loop lines {_pair(m['along_loops'])}); {len(m['moved'])} moved"
+        )
+    lines += ["", "The tune entries whose figure changed:", ""]
+    lines += [
+        "| id | marks | on a loop line | C9 | longest tether to another chain | moved |",
+        "|---|---|---|---|---|---|",
+    ]
+    for i, m in doc["marks"].items():
+        on, c9, cross = _pair([len(x) for x in m["on_loop"]]), _pair(m["c9"]), _pair(m["longest_cross_chain_tether"])
+        lines.append(f"| `{i}` | {_pair(m['marks'])} | {on} | {c9} | {cross} | {len(m['moved'])} |")
+    lines += [
+        "",
+        "Each moved mark: its place, the line it holds, its tethers over bodies and along loop lines (page units), and "
+        "its tethers' lengths, before -> after.",
         "",
     ]
     for i, m in doc["marks"].items():
         for x in m["moved"]:
             lines.append(
-                f"- `{i}` {x['mark']}: {x['from']} -> {x['to']}; on a loop line {_pair(x['on_loop'])}; "
-                f"over bodies {_pair(x['over_bodies'])}; tethers {x['tethers'][0]} -> {x['tethers'][1]}"
+                f"- `{i}` {x['mark']}: {x['from']} -> {x['to']}; on a loop line {_pair(x['on_loop'])}; over bodies "
+                f"{_pair(x['over_bodies'])}; along loop lines {_pair(x['along_loops'])}; tethers {x['tethers'][0]} -> "
+                f"{x['tethers'][1]}"
             )
     lines += ["", "## Pictures (gitignored, for looking)", ""]
     for i, p in doc["pngs"].items():
