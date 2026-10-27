@@ -582,7 +582,8 @@ def floor_part(args, tune: list[dict]) -> dict:
             if "text_pt" in d:
                 drawings.append(d)
     agree = [d["predicted_below"] == bool(d["floor"]) for d in drawings]
-    gap = max((abs(d["predicted_pt"] - d["text_pt"]) for d in drawings if d["text_pt"] is not None), default=None)
+    gaps = [abs(d["predicted_pt"] - d["text_pt"]) for d in drawings if d["text_pt"] is not None]
+    gap = round(max(gaps), 3) if gaps else None
     return {
         "inputs": {
             "leads_before_foldmap": lb.get("foldmap"),
