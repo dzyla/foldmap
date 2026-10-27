@@ -23,8 +23,10 @@ count, the release tag, and foldmap.source_stamp of the code that drew. Its run,
     python scripts/random100.py run --views all --jobs N --sample docs/validation/random100-fourth/sample.json \\
         --out docs/validation/random100-fourth
 
-random100.py refuses a second run of it, a partial run (--ids) and a rerun (--failed-from), and a run with code other
-than the draw's, unless --not-for-paper, which marks the report never to be quoted (extract.py refuses it).
+random100.py refuses, unless --not-for-paper (which marks the report never to be quoted; extract.py refuses it), a run
+of the sample from any path but OUT (random100.PAPER_SAMPLES) or into any folder but OUT's, a second run (a report or
+run log already in that folder, whatever --out says), a partial run (--ids), a rerun (--failed-from), a run with fewer
+views than all, and a run with code other than the draw's.
 """
 
 from __future__ import annotations

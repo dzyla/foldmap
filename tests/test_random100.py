@@ -1339,26 +1339,29 @@ def test_a_report_of_entries_measured_by_different_code_says_so(r100, tmp_path):
     assert json.loads((tmp_path / "report.json").read_text(encoding="utf-8"))["mixed_code"] is False
 
 
-def _paper_sample(tmp_path, fingerprint):
-    sample = tmp_path / "sample.json"
+def _paper_sample(tmp_path, fingerprint, folder="fourth"):
+    sample = tmp_path / folder / "sample.json"
+    sample.parent.mkdir(parents=True, exist_ok=True)
     protocol = {"seed": 1, "source_stamp": {"code_fingerprint": fingerprint}}
     sample.write_text(json.dumps({"protocol": protocol, "entries": [], "replaced": []}), encoding="utf-8")
     return sample
 
 
-def test_a_paper_sample_runs_once_whole_with_the_code_that_drew_it(r100, tmp_path):
+def test_a_paper_sample_runs_once_whole_with_the_code_that_drew_it(r100, tmp_path, monkeypatch):
     """Ruling Q14: a second run, --ids, --failed-from or other code is refused without --not-for-paper."""
     import argparse
 
-    out = tmp_path / "run"
     sample = _paper_sample(tmp_path, r100.SOURCE_STAMP["code_fingerprint"])
-    plain = argparse.Namespace(ids=None, failed_from=None)
+    other = _paper_sample(tmp_path, "0" * 16, "other")
+    monkeypatch.setattr(r100, "PAPER_SAMPLES", (sample, other))
+    out = sample.parent
+    plain = argparse.Namespace(ids=None, failed_from=None, views="all")
     assert r100.paper_run_problem(out, sample, plain) is None
-    assert "whole" in r100.paper_run_problem(out, sample, argparse.Namespace(ids="1ABC", failed_from=None))
-    assert "whole" in r100.paper_run_problem(out, sample, argparse.Namespace(ids=None, failed_from="r.json"))
-    other = _paper_sample(tmp_path, "0" * 16)
-    assert "not the code that drew" in r100.paper_run_problem(out, other, plain)
-    out.mkdir()
+    some = argparse.Namespace(ids="1ABC", failed_from=None, views="all")
+    assert "whole" in r100.paper_run_problem(out, sample, some)
+    again = argparse.Namespace(ids=None, failed_from="r.json", views="all")
+    assert "whole" in r100.paper_run_problem(out, sample, again)
+    assert "not the code that drew" in r100.paper_run_problem(other.parent, other, plain)
     (out / "run.log").write_text("1ABC: PASS\n", encoding="utf-8")
     assert "runs once" in r100.paper_run_problem(out, sample, plain)
     with pytest.raises(SystemExit, match="refused"):
@@ -1366,7 +1369,44 @@ def test_a_paper_sample_runs_once_whole_with_the_code_that_drew_it(r100, tmp_pat
     assert not (out / "report.json").exists()
     no_protocol = tmp_path / "plain.json"
     no_protocol.write_text(json.dumps({"entries": [], "replaced": []}), encoding="utf-8")
-    assert r100.paper_run_problem(out, no_protocol, plain) is None
+    assert r100.paper_run_problem(tmp_path / "anywhere", no_protocol, plain) is None
+
+
+def test_a_paper_sample_runs_once_whatever_the_output_folder(r100, tmp_path, monkeypatch):
+    """Final review F3: the guard is the sample's folder, not --out: a run written elsewhere, a copy of the sample
+    run elsewhere and a second run beside a first are refused, and so is a run with fewer views than all."""
+    import argparse
+
+    sample = _paper_sample(tmp_path, r100.SOURCE_STAMP["code_fingerprint"])
+    monkeypatch.setattr(r100, "PAPER_SAMPLES", (sample,))
+    plain = argparse.Namespace(ids=None, failed_from=None, views="all")
+    elsewhere = tmp_path / "x"
+    assert "written beside it" in r100.paper_run_problem(elsewhere, sample, plain)
+    copy = _paper_sample(tmp_path, r100.SOURCE_STAMP["code_fingerprint"], "copy")
+    assert "fixed path" in r100.paper_run_problem(copy.parent, copy, plain)
+    for views in ("default", "quick", "default,seed1"):
+        few = argparse.Namespace(ids=None, failed_from=None, views=views)
+        assert "every view" in r100.paper_run_problem(sample.parent, sample, few), views
+    every = argparse.Namespace(ids=None, failed_from=None, views=",".join(reversed(r100.VIEWS)))
+    assert r100.paper_run_problem(sample.parent, sample, every) is None  # all views, in any order
+    (sample.parent / "report.json").write_text("{}", encoding="utf-8")  # the one run is made
+    assert "runs once" in r100.paper_run_problem(elsewhere, sample, plain)
+    with pytest.raises(SystemExit, match="refused"):
+        r100.main(["run", "--sample", str(sample), "--out", str(elsewhere)])
+    assert not elsewhere.exists()
+
+
+def test_the_release_window_narrows_every_pool(r100):
+    """Ruling Q59: a development sample is drawn from entries released after the fourth sample's cutoff."""
+    q = r100.query([], "2026-12-31", after="2026-10-13")
+    nodes = [n["parameters"] for n in q["query"]["nodes"] if n["type"] == "terminal"]
+    when = "rcsb_accession_info.initial_release_date"
+    assert {"attribute": when, "operator": "greater", "value": "2026-10-13"} in nodes
+    assert {"attribute": when, "operator": "less_or_equal", "value": "2026-12-31"} in nodes
+    plain = r100.query([], "2026-10-13")["query"]["nodes"]
+    assert all(n["parameters"]["operator"] != "greater" for n in plain)  # no window unless asked
+    with pytest.raises(SystemExit, match="empty window"):
+        r100.main(["sample", "--date", "2026-10-13", "--released-after", "2026-10-13", "--out", "unused.json"])
 
 
 def test_not_for_paper_marks_the_report_never_to_be_quoted(r100, tmp_path):

@@ -3,7 +3,8 @@
 """The random-100 campaign: a stratified random sample of 100 PDB entries and AlphaFold models, each drawn in every
 view foldmap offers, measured and shown on a contact sheet (plan 10, needs network; not run in CI).
 
-    python scripts/random100.py sample [--seed 20261013] [--date YYYY-MM-DD] [--out .../sample.json] [--check]
+    python scripts/random100.py sample [--seed 20261013] [--date YYYY-MM-DD] [--released-after YYYY-MM-DD]
+                                       [--out .../sample.json] [--check]
                                        [--exclude other/sample.json [--exclude another/sample.json ...]]
 
 sample draws the sample from the RCSB search API (https://search.rcsb.org/rcsbsearch/v2/query) and writes
@@ -16,9 +17,11 @@ quotas inside a stratum (S4 helical, big, cap; S8 ribosome) are drawn first from
 follow PAIR_TYPES (one UniProt accession and one protein by sequence: same_protein); the cross-cutting quotas
 (QUOTAS) are then topped up. --exclude takes another sample's ids out of every pool (the held-out sample: final review
 A, Important 2); given more than once, the ids of every sample it names (the third sample: none of the tuned or the
-held-out ids). The same seed, date, pools and files give the same draw; the file also records the foldmap commit, the
-gemmi version and the SHA-256 of every candidate file read, so a changed file is seen. --check re-queries the ids and
-lists those now obsolete, without changing the file.
+held-out ids). --released-after keeps only entries released after a date as well (a release window): a development
+sample drawn after the fourth sample's cutoff (2026-10-13) can hold none of its pools' entries (plan 28 final review
+F4, ruling Q59; CONTRIBUTING.md). The same seed, dates, pools and files give the same draw; the file also records the
+foldmap commit, the gemmi version and the SHA-256 of every candidate file read, so a changed file is seen. --check
+re-queries the ids and lists those now obsolete, without changing the file.
 
     python scripts/random100.py run [--ids A,B | --failed-from report.json] [--views all|quick|v1,v2]
                                     [--out docs/validation/random100] [--jobs 1] [--not-for-paper]
@@ -39,8 +42,9 @@ Exit 0 only if every entry passes. Each view's files are kept in <out>/work/<id>
 NA_RNAPOLIS_PYTHON (the Python of a venv that has it); mkdssp 3.1.2 is found on PATH or as MKDSSP.
 Every entry and report carries the source stamp of the code that measured or wrote it (foldmap.source_stamp, taken
 as the process starts); a report whose entries differ in code says "mixed_code" and is never quoted. A paper sample (a
-sample.json with a protocol record) runs once, whole, with the code that drew it: a second run, --ids or
---failed-from is refused unless --not-for-paper, which marks the report never to be quoted (plan 28 Task 1).
+sample.json with a protocol record) runs once, whole, in every view, with the code that drew it, from its one fixed
+path (PAPER_SAMPLES) into its own folder: a run elsewhere, a second run, --ids, --failed-from or fewer views is
+refused unless --not-for-paper, which marks the report never to be quoted (plan 28 Task 1; final review F3).
 With FOLDMAP_PERTURB set (scripts/sensitivity.py, plan 28 Task 9.2) every process of the run draws and judges with one
 constant perturbed (scripts/perturb.py, installed before foldmap is imported); the run needs --not-for-paper, and its
 entries and report say what was perturbed.
@@ -113,6 +117,10 @@ SEED = 20261013
 NOT_FOR_PAPER = "NOT-FOR-PAPER.txt"  # in a run's folder: its report is never quoted (plan 28 Task 1, ruling Q14)
 LOOK = 200  # candidates looked at per pool, at most
 OUT = ROOT / "docs" / "validation" / "random100"
+# the paper samples (a sample.json with a protocol record) by their one fixed path: each runs from there, into its own
+# folder, once (scripts/paper/fourth_sample.py OUT; plan 28 final review F3)
+PAPER_SAMPLES = (ROOT / "docs" / "validation" / "random100-fourth" / "sample.json",)
+RUN_FILES = ("report.json", "report.json.gz", "run.log")  # a folder holding one of these holds a run
 SEARCH = "https://search.rcsb.org/rcsbsearch/v2/query"
 
 # --------------------------------------------------------------------------------------------- strata
@@ -287,8 +295,8 @@ RIBOSOME_NT = 2500
 BIG_CHAINS = 20  # S4 "big": more than this many polymer chains in assembly 1
 
 
-def date_node(date: str) -> dict:
-    return term("rcsb_accession_info.initial_release_date", "less_or_equal", date)
+def date_node(date: str, operator: str = "less_or_equal") -> dict:
+    return term("rcsb_accession_info.initial_release_date", operator, date)
 
 
 def stratum_nodes(stratum: dict, bin_: str | None, extra: dict | None = None) -> list[dict]:
@@ -303,10 +311,12 @@ def stratum_nodes(stratum: dict, bin_: str | None, extra: dict | None = None) ->
     return nodes + (extra["nodes"] if extra else [])
 
 
-def query(nodes: list[dict], date: str, content: str = "experimental") -> dict:
-    """The search request for every entry matching all nodes, released on or before date, every hit as a bare id."""
+def query(nodes: list[dict], date: str, content: str = "experimental", after: str | None = None) -> dict:
+    """The search request for every entry matching all nodes, released on or before date (and, with `after`, after
+    that date), every hit as a bare id."""
+    window = [date_node(date)] + ([date_node(after, "greater")] if after else [])
     return {
-        "query": {"type": "group", "logical_operator": "and", "nodes": [*nodes, date_node(date)]},
+        "query": {"type": "group", "logical_operator": "and", "nodes": [*nodes, *window]},
         "return_type": "entry",
         "request_options": {
             "return_all_hits": True,
@@ -672,8 +682,8 @@ def resolve(entry_id: str) -> Path:
 class Sampler:
     """The network side of the draw: pools from the search service, files from foldmap.fetch, features cached."""
 
-    def __init__(self, seed: int, date: str, exclude: Iterable[str] = ()):
-        self.seed, self.date = seed, date
+    def __init__(self, seed: int, date: str, exclude: Iterable[str] = (), after: str | None = None):
+        self.seed, self.date, self.after = seed, date, after  # after: released after it too (a release window)
         self.exclude = set(exclude)  # another sample's ids, never drawn (the held-out sample)
         self.feats: dict[str, dict] = {}
         self.files: dict[str, str] = {}  # id -> SHA-256 of the file its features were read from
@@ -686,7 +696,7 @@ class Sampler:
         self.orders: dict[tuple[str, str], list[str]] = {}  # (stratum, bin) -> its seeded order
 
     def pool(self, nodes: list[dict], content: str = "experimental") -> list[str]:
-        return fetch_pool(query(nodes, self.date, content))
+        return fetch_pool(query(nodes, self.date, content, self.after))
 
     def feature(self, i: str, contacts: bool = False) -> dict:
         f = self.feats.get(i)
@@ -748,7 +758,7 @@ class Sampler:
             "name": name,
             "title": s["title"],
             "n": s["n"],
-            "query": query(stratum_nodes(s, None), self.date, content),
+            "query": query(stratum_nodes(s, None), self.date, content, self.after),
             "bins": {},
             "extra": [],
         }
@@ -810,7 +820,12 @@ class Sampler:
         """S11: pairs of entries of one protein (one UniProt accession, and one protein by sequence: same_protein) in
         two states."""
         seed_pool = self.pool(s["nodes"])
-        rec = {"name": s["name"], "title": s["title"], "n": s["n"], "query": query(s["nodes"], self.date)}
+        rec = {
+            "name": s["name"],
+            "title": s["title"],
+            "n": s["n"],
+            "query": query(s["nodes"], self.date, after=self.after),
+        }
         rec["seed_pool"] = pool_record(seed_pool)
         rec["pairs"] = dict(s["pairs"])
         _log(f"S11 seed pool {len(seed_pool)}")
@@ -867,12 +882,12 @@ class Sampler:
         self.records.append(rec)
 
 
-def sample(seed: int, date: str, exclude: Iterable[str] = ()) -> dict:
+def sample(seed: int, date: str, exclude: Iterable[str] = (), after: str | None = None) -> dict:
     """Draw the whole sample (network): every stratum, the pairs, then the cross-cutting top-up; `exclude`: ids never
-    drawn (another sample's)."""
+    drawn (another sample's); `after`: only entries released after this date too (a release window)."""
     import gemmi
 
-    s = Sampler(seed, date, exclude)
+    s = Sampler(seed, date, exclude, after)
     rest: dict = {}
     for st in STRATA:
         if st["name"] == "S11":
@@ -922,6 +937,7 @@ def sample(seed: int, date: str, exclude: Iterable[str] = ()) -> dict:
     out = {
         "seed": seed,
         "query_date": date,
+        **({"released_after": after} if after else {}),
         "foldmap_commit": _commit(),
         "gemmi": gemmi.__version__,
         "source_stamp": SOURCE_STAMP,
@@ -951,7 +967,7 @@ def obsolete(doc: dict) -> list[str]:
         group = [i for i in ids if (af_accession(i) is not None) == (content == "computational")]
         if group:
             nodes = [term("rcsb_entry_container_identifiers.entry_id", "in", group)]
-            found |= set(fetch_pool(query(nodes, doc["query_date"], content)))
+            found |= set(fetch_pool(query(nodes, doc["query_date"], content, doc.get("released_after"))))
     return [i for i in ids if i not in found]
 
 
@@ -971,7 +987,9 @@ def cmd_sample(args) -> int:
         print(f"{len(gone)} obsolete id(s){': ' + ', '.join(gone) if gone else ''}")
         return 1 if gone else 0
     exclude = sorted({e["id"] for f in args.exclude or [] for e in _sample_entries(Path(f))})
-    doc = sample(args.seed, args.date, exclude)
+    if args.released_after and args.released_after >= args.date:
+        raise SystemExit(f"--released-after {args.released_after} is not before --date {args.date}: an empty window")
+    doc = sample(args.seed, args.date, exclude, args.released_after)
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(dump(doc), encoding="utf-8")
     print(quota_table(doc))
@@ -2456,17 +2474,29 @@ def read_report(path: Path) -> dict:
 
 def paper_run_problem(out: Path, sample_path: Path, args) -> str | None:
     """Why this run of a paper sample (a sample.json with a protocol record: scripts/paper/fourth_sample.py) would not
-    be the one quotable run: a run already made in `out`, a partial run (--ids) or a rerun (--failed-from), or code
-    other than the draw's. None when it may run."""
+    be the one quotable run: a sample read from anywhere but its fixed path (PAPER_SAMPLES; a copy elsewhere is the
+    same sample), a run written anywhere but beside it, a run already made there (whatever `out` says: the guard is
+    the sample's folder, not the output's), a partial run (--ids), a rerun (--failed-from), fewer views than all, or
+    code other than the draw's. None when it may run. A clone elsewhere is beyond any guard here: the protocol's rule
+    that the run is made once, in the release checkout, and committed is the guard there."""
     if not sample_path.is_file():
         return None
     protocol = json.loads(sample_path.read_text(encoding="utf-8")).get("protocol")
     if not protocol:
         return None
-    if any((out / f).exists() for f in ("report.json", "report.json.gz", "run.log")):
-        return f"{out} holds a run already: a paper sample runs once"
+    fixed = [p.resolve() for p in PAPER_SAMPLES]
+    if sample_path.resolve() not in fixed:
+        return f"{sample_path} is not a paper sample's fixed path ({', '.join(map(str, PAPER_SAMPLES))})"
+    home = sample_path.resolve().parent
+    held = [p for p in {home, out.resolve()} if any((p / f).exists() for f in RUN_FILES)]
+    if held:
+        return f"{held[0]} holds a run already: a paper sample runs once"
+    if out.resolve() != home:
+        return f"{out} is not {home}: a paper sample's one run is written beside it"
     if args.failed_from or args.ids:
         return "--failed-from / --ids: a paper sample runs once, whole"
+    if set(_view_list(getattr(args, "views", "all"))) != set(VIEWS):
+        return f"--views {args.views}: a paper sample runs in every view (--views all)"
     drew = (protocol.get("source_stamp") or {}).get("code_fingerprint")
     if drew != SOURCE_STAMP["code_fingerprint"]:
         return f"the code ({SOURCE_STAMP['code_fingerprint']}) is not the code that drew the sample ({drew})"
@@ -2557,6 +2587,12 @@ def main(argv=None) -> int:
     s = sub.add_parser("sample", help="draw the stratified sample (network)")
     s.add_argument("--seed", type=int, default=SEED)
     s.add_argument("--date", default=datetime.date.today().isoformat(), help="release-date cutoff (YYYY-MM-DD)")
+    s.add_argument(
+        "--released-after",
+        metavar="YYYY-MM-DD",
+        help="only entries released after this date as well; a development sample is drawn after the fourth sample's "
+        "cutoff (2026-10-13), so it cannot hold an entry of it (CONTRIBUTING.md)",
+    )
     s.add_argument("--out", default=str(OUT / "sample.json"))
     s.add_argument("--check", action="store_true", help="list the sampled ids now obsolete; change nothing")
     s.add_argument(

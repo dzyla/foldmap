@@ -113,6 +113,7 @@ def test_the_fourth_samples_choices_are_fixed(fourth):
     assert (fourth.SEED, fourth.DATE) == (20261025, "2026-10-13")
     assert fourth.OUT == ROOT / "docs" / "validation" / "random100-fourth" / "sample.json"
     assert len(fourth.SAMPLE_SHA256) == 3 and (ROOT / fourth.PROTOCOL).name == "fourth-sample-protocol.md"
+    assert fourth.OUT in fourth.random100().PAPER_SAMPLES  # random100's run guard knows its one path (F3)
 
 
 @needs_samples

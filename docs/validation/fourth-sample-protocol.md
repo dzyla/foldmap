@@ -51,10 +51,14 @@ Once, at the frozen release (the tagged commit the paper describes), after the r
        python scripts/random100.py run --views all --jobs N \
            --sample docs/validation/random100-fourth/sample.json --out docs/validation/random100-fourth
 
-   `random100.py` refuses a second run of a sample carrying a protocol record, a partial run (`--ids`), a rerun
-   (`--failed-from`) and a run with code other than the draw's (by code fingerprint), unless `--not-for-paper` is
-   given; that flag marks the report never to be quoted, and `scripts/paper/extract.py` refuses it, as it refuses a
-   report whose entries were measured by different code (`mixed_code`).
+   For a sample carrying a protocol record, `random100.py` refuses, unless `--not-for-paper` is given: the sample read
+   from any path but its fixed one (`random100.PAPER_SAMPLES`, so a copy elsewhere is refused too); a run written
+   anywhere but beside it, in `docs/validation/random100-fourth`; a second run (a report or run log already in that
+   folder, whatever `--out` says); a partial run (`--ids`); a rerun (`--failed-from`); fewer views than all; and code
+   other than the draw's (by code fingerprint). `--not-for-paper` marks the report never to be quoted, and
+   `scripts/paper/extract.py` refuses it, as it refuses a report whose entries were measured by different code
+   (`mixed_code`). The guard holds in one checkout; a run in another clone is outside it, and the rule that the one
+   run is made in the release checkout and committed as it is (step 4) is the guard there.
 
 4. Commit `sample.json`, `report.json` (gzipped when over 5 MB, as for the other samples), `report.md` and the run log
    as they are. Every report and entry carries its own `source_stamp` (taken as its process starts).
@@ -73,6 +77,11 @@ Once, at the frozen release (the tagged commit the paper describes), after the r
   historical prospective evaluation at 7696947.
 - If the draw comes up short of a quota or of 100 entries, the sample is still the one run and reported, with the
   shortfall stated; it is not re-drawn with another seed.
+- **No other draw from its pools before it runs.** Until this sample is drawn and run, no other random sample is drawn
+  from releases on or before its cutoff (2026-10-13): such a draw could hold its entries, and looking at foldmap's
+  results on them voids it (next rule). A development sample (plan 29 onward) is drawn from entries released after
+  the cutoff (`random100.py sample --released-after 2026-10-13`), so it is disjoint from this one by construction
+  (ruling Q59; `CONTRIBUTING.md`).
 - **The seed is public.** It is fixed here, in the open, so anyone can compute the sample before the release with
   `random100.py sample --seed 20261025 --exclude ...`. Drawing it, or looking at foldmap's results on any entry of it,
   before the release by any route voids the sample: the protocol is then rewritten with a new seed, and the reason is
