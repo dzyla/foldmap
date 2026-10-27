@@ -7,6 +7,7 @@
     draw [PANEL ...]          foldmap panels -> out/panels/<id>.svg/.pdf/.png + out/panels/panels.json
     f1 | f2 | f3 | f4 | f5    one figure -> out/F<n>.pdf/.svg/.png (300 dpi); several may follow
     fs                        the supplementary gallery -> out/FSgallery.pdf/.svg/.png
+    cas9                      the supplementary Cas9 figure (Fig. 4c until plan 28 Task 8) -> out/FScas9.*
     gallery                   draw Fig. 2's and the supplementary gallery's panels, assemble both
     all                       draw, then every figure, then the rule checks (out/checks.json)
     check                     the rule checks only, on what is in out/
@@ -79,12 +80,19 @@ LAYOUTS: dict[str, list[tuple]] = {
         ("c", "F3c", 0, 105, 88, 66),
         ("d", "F3d", 90, 105, 88, 42),
     ],
+    # Fig. 4 in 165 mm, so that it and its caption fit one page (plan 28 Task 8, review: the caption ran off the page
+    # at 234 mm, "Float too large ... by 175 pt"): tRNA over the lambda repressor on the left, the riboswitch on the
+    # right. Cas9 left Fig. 4 for a figure of its own (FScas9): its labels need the full page width to print at 6 pt
     "F4": [
-        ("a", "F4a", 0, 0, 82, 92),
-        ("b", "F4b", 84, 0, 94, 142),
-        ("c", "F4c", 0, 92, 82, 50),
-        ("d", "F4d", 0, 142, 178, 92),
+        ("a", "F4a", 0, 0, 78, 79),
+        ("b", "F4b", 80, 0, 98, 165),
+        ("c", "F4c", 0, 79, 78, 86),
     ],
+    # Cas9-sgRNA-target DNA (4OO8, --domains auto), a supplementary figure at the full page width (it was Fig. 4c,
+    # printed at 0.131 of its drawn size with no text): domain names, element labels, stems and the domain bar at
+    # 6 pt or more. 198 mm (the panel at font_scale 6.25 is 192.6 mm tall at 178 mm wide) leaves room for a caption
+    # on a page of the supplement
+    "FScas9": [("", "Scas9", 0, 0, 178, 198)],
     "F1": [("", "F1x", 0.5, 30.0, 56.6, 34.0)],
 }
 # Panel ids follow the letters: F2a..F2d, S1a..S1e (NOTES.md, 2026-10-21: gallery)
@@ -92,6 +100,7 @@ LAYOUTS: dict[str, list[tuple]] = {
 # tried in F2d's box, NOTES.md 2026-10-21: gallery)
 BOX_AS: dict[str, str] = {}
 
+F3A_STRAND, F3A_COLOUR = "res:D:662-666", "#D55E00"  # Okabe-Ito vermilion, clear of the chain's blue
 # id -> foldmap arguments after `foldmap plot` (structure first). Defaults unless the caption asks for an option.
 PANEL_ARGS: dict[str, list[str]] = {
     "F1x": ["1UBQ"],  # the small example in the schematic
@@ -109,15 +118,19 @@ PANEL_ARGS: dict[str, list[str]] = {
     # box at font_scale 3.5 (3.95 pt in 178 x 65 mm), which with the other panels does not fit the page
     "S1e": ["1KX5"],
     # Fig. 3, method details
-    "F3a": ["9FWZ", "--chains", "D"],
+    # the accessory strand, chain D 662-666, in a colour of its own (foldmap's --color) so the reader can find it;
+    # f3() names the colour beside the panel letter (plan 28 Task 8, review: the strand was not marked)
+    "F3a": ["9FWZ", "--chains", "D", "--color", f"{F3A_STRAND}={F3A_COLOUR}"],
     "F3b": ["1EMA"],
     "F3c": ["2LZM"],
     "F3d": ["tests/data/1TIM.cif"],  # the file the determinism run draws (scripts/paper/determinism.py)
     # Fig. 4, nucleic acids
     "F4a": ["1EHZ", "--names", "docs/names/1EHZ-trna.yaml"],
     "F4b": ["2GIS"],
-    "F4c": ["4OO8", "--domains", "auto"],
-    "F4d": ["1LMB", "--set", "hbonds=na"],
+    "F4c": ["1LMB", "--set", "hbonds=na"],  # Fig. 4d until plan 28 Task 8 moved Cas9 out
+    # Cas9 (Fig. 4c until plan 28 Task 8): the legend left out, since the domain bar and the labels on the figure name
+    # every domain; with it (220 pt more at font_scale 6.0) the panel needs 178 x 223 mm for 6 pt
+    "Scas9": ["4OO8", "--domains", "auto", "--set", "legend=false"],
 }
 # The text floor. A panel is first drawn as is; if its smallest text prints under MIN_PT in its box, it is drawn again
 # with a larger font_scale (foldmap's own style key: the layout makes room for the larger text), up to FS_MAX. Panels
@@ -125,7 +138,7 @@ PANEL_ARGS: dict[str, list[str]] = {
 # nucleotide or residue-number labels and no legend (BARE), the remaining text fitted the same way; a panel that
 # still fails is drawn SILENT: the bare figure with every text hidden (foldmap_silent.py), so none prints under 6 pt.
 FS_MAX = 3.0
-KEEP_LABELS = {"F3c", "F4a", "F4b", "F4d"}
+KEEP_LABELS = {"F3c", "F4a", "F4b", "F4c", "Scas9"}
 BARE = [
     "--set",
     "labels=false",
@@ -146,11 +159,16 @@ FS_MAX_LABELS = 2.5  # other panels, labels on: past this, labels outgrow narrow
 GALLERY_LABELS = {"F2a", "F2b", "F2c", "F2d"}
 FS_MAX_GALLERY = 2.8  # past this the labels collide with elements (foldmap check A4/A6 fail)
 FS_MAX_PANEL = {"F2b": 2.4}  # 1C3W: A4 and A6 fail from 2.6 (foldmap check)
+# Cas9 is drawn at the size its text needs: 4OO8's layout changes in jumps with font_scale (a sweep from 5.6 to 7.0,
+# plan 28 Task 8: at 6.25 the page is 1716 x 1857 pt with the smallest text 22.5 pt, 6.6 pt across 178 mm)
+FS_MAX_PANEL["Scas9"] = 7.0
+# bare panels whose fit needs a little more than FS_MAX (9FWZ chain D, the strand coloured: 3.0 prints 5.75 pt)
+FS_MAX_BARE = {"F3a": 3.5}
 # the supplementary gallery's labelled panels may go to 3.5 before they are drawn bare
 FS_MAX_SUPP = {"S1a": 3.5, "S1b": 3.5, "S1c": 3.5, "S1d": 3.5, "S1e": 3.5}
 # where the fit starts (labels mode): font_scale read off a sweep of each panel at 1..4 for its box (the layouts
 # change with the text, not smoothly, so a start near the answer avoids a jump to a worse layout)
-FS_START = {"F2a": 1.3, "F2b": 2.3, "F2c": 2.8, "F2d": 2.8, "S1b": 2.6, "S1c": 2.8}
+FS_START = {"F2a": 1.3, "F2b": 2.3, "F2c": 2.8, "F2d": 2.8, "S1b": 2.6, "S1c": 2.8, "Scas9": 6.25}
 
 
 def box_of(pid: str) -> tuple[float, float]:
@@ -225,7 +243,7 @@ def fit_panel(pid: str) -> dict:
             if pid in KEEP_LABELS
             else FS_MAX_SUPP.get(pid, FS_MAX_LABELS)
             if mode == "labels"
-            else FS_MAX
+            else FS_MAX_BARE.get(pid, FS_MAX)
         )
         for k in range(8 if pid in GALLERY_LABELS else 6):
             args = PANEL_ARGS[pid] + extra + (["--set", f"font_scale={fs:.2f}"] if fs != 1.0 else [])
@@ -375,7 +393,7 @@ def assemble(
 ) -> dict:
     """One figure page, width_mm x height_mm, built by tectonic. items: {pdf, x, y, w | h} in mm from the top left
     (the panel is scaled to width w, or to height h); letters: (letter, x, y) in mm, top left of the letter;
-    texts: (text, x, y, size_pt, anchor 'l'|'c'|'r', mono). Returns the scale of each item."""
+    texts: (text, x, y, size_pt, anchor 'l'|'c'|'r', mono[, colour #rrggbb]). Returns the scale of each item."""
     build = OUT / "tex" / name
     shutil.rmtree(build, ignore_errors=True)
     build.mkdir(parents=True)
@@ -397,15 +415,17 @@ def assemble(
             rf"\put({x:.2f},{height_mm - y:.2f}){{\makebox(0,0)[lt]{{\fontsize{{{LETTER_PT}}}{{{LETTER_PT}}}"
             rf"\selectfont\bfseries {letter}}}}}"
         )
-    for text, x, y, size, anchor, mono in texts:
+    for text, x, y, size, anchor, mono, *colour in texts:
         fam = r"\ttfamily" if mono else ""
+        if colour:
+            fam += rf"\color[HTML]{{{colour[0].lstrip('#').upper()}}}"
         body.append(
             rf"\put({x:.2f},{height_mm - y:.2f}){{\makebox(0,0)[{anchor}t]{{\fontsize{{{size}}}{{{size * 1.2:.1f}}}"
             rf"\selectfont{fam} {_tex_escape(text)}}}}}"
         )
     tex = rf"""\documentclass{{article}}
 \usepackage[paperwidth={width_mm}mm,paperheight={height_mm}mm,margin=0mm]{{geometry}}
-\usepackage{{graphicx,fontspec}}
+\usepackage{{graphicx,xcolor,fontspec}}
 \setmainfont{{{FONT}}}\setmonofont{{Liberation Mono}}
 \pagestyle{{empty}}\setlength{{\unitlength}}{{1mm}}\setlength{{\parindent}}{{0pt}}
 \begin{{document}}\noindent\begin{{picture}}({width_mm},{height_mm})
@@ -654,6 +674,14 @@ def f3() -> dict:
     for i, (k, v) in enumerate(hashes.items()):
         texts.append((k, x, ty + 3.2 + i * 5.4, 6, "l", False))
         texts.append((v, x, ty + 5.6 + i * 5.4, 6, "l", True))
+    # panel a: the key to the coloured accessory strand, right of the letter, in the strand's colour
+    _, _, xa, ya, wa, ha = next(b for b in LAYOUTS["F3"] if b[1] == "F3a")
+    pw, _, _ = fit("F3a", wa, ha - LETTER_ROOM - 0.5)
+    x_letter = max(xa, xa + (wa - pw) / 2 - 1.0)  # as box_items places it
+    _, chain, span = F3A_STRAND.split(":")
+    lo, hi = span.split("-")
+    key = f"accessory strand: chain {chain}, residues {lo}\u2013{hi}"
+    texts.append((key, x_letter + 4.0, ya + 1.2, 6, "l", False, F3A_COLOUR))
     info = box_figure("F3", texts, extra_h=0.0)
     info["hashes"] = hashes
     info["identical"] = len(set(hashes.values())) == 1
@@ -663,6 +691,12 @@ def f3() -> dict:
 # ------------------------------------------------------------------------------------------------------- F4
 def f4() -> dict:
     return box_figure("F4")
+
+
+def fscas9() -> dict:
+    """Supplementary figure: Cas9 with its guide RNA and target DNA (4OO8, --domains auto), Fig. 4c until plan 28
+    Task 8, at the full page width so its text prints at 6 pt."""
+    return box_figure("FScas9")
 
 
 # ------------------------------------------------------------------------------------------------------- F5
@@ -938,6 +972,7 @@ TARGETS = {
     "f4": ("F4", f4),
     "f5": ("F5", f5),
     "fs": ("FSgallery", fsgallery),
+    "cas9": ("FScas9", fscas9),
 }
 GALLERY = ["F2a", "F2b", "F2c", "F2d", "S1a", "S1b", "S1c", "S1d", "S1e"]
 

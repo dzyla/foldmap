@@ -24,7 +24,7 @@ of this checkout (gitignored), or the folder `$FOLDMAP_MANUSCRIPT` names.
 | `build/tables/params.tex`, `params.json` (Table S1 from the code's constants) | `python scripts/paper/table_s1.py` |
 | `build/main-filled.tex`, `supplement-filled.tex`, `keys.json` | `python scripts/paper/fill.py` |
 | `build/crosscheck.json` (numbers in the prose against the sources) | `python scripts/paper/crosscheck.py` |
-| `build/figures/` (Figs. 1-5, the supplementary gallery, `checks.json`) | `scripts/paper/figures.sh [TARGET ...]` |
+| `build/figures/` (Figs. 1-5, the supplementary gallery and Cas9 figure, `checks.json`) | `scripts/paper/figures.sh [TARGET ...]` |
 | `build/pdf/` | `scripts/paper/render.sh` |
 | M2: `data/opm/` | `python scripts/paper/opm_fetch.py` (network) |
 | M2: `data/m2/membrane/results.json` | `python scripts/paper/membrane_opm.py` |

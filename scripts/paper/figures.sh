@@ -2,9 +2,9 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 # Every manuscript figure (make_figures.py), into build/figures/ of the manuscript folder.
 #
-#   scripts/paper/figures.sh            draw every foldmap panel, assemble F1-F5 and the supplementary gallery, check
-#   scripts/paper/figures.sh f2         one target (draw [IDS] | gallery | f1 | f2 | f3 | f4 | f5 | fs | check) after
-#                                       a draw; several figure targets may follow each other (figures.sh f2 fs)
+#   scripts/paper/figures.sh            draw every foldmap panel, assemble F1-F5 and the supplementary figures, check
+#   scripts/paper/figures.sh f2         one target (draw [IDS] | gallery | f1 | f2 | f3 | f4 | f5 | fs | cas9 | check)
+#                                       after a draw; several figure targets may follow each other (figures.sh f2 fs)
 #   PAPER_ZL=/path/to/zl scripts/paper/figures.sh ...   on a runner with zl's interface (see run_all.sh); exit 75
 #                                       (busy) or 23 (rsync raced another writer) is retried
 #
