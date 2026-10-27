@@ -3,19 +3,19 @@
  "date": "2026-10-27",
  "source_stamp": {
   "foldmap": "0.1.0",
-  "code_fingerprint": "8f878e5bd79166bf",
+  "code_fingerprint": "1a96dacb9a78f068",
   "package": "checkout",
-  "checkout_fingerprint": "8f878e5bd79166bf",
+  "checkout_fingerprint": "1a96dacb9a78f068",
   "installed_matches_checkout": true,
   "git": {
-   "commit": "c64ea7a4503195834028058919f99a1936bbaec5",
+   "commit": "b730a05051f46d2b4787fa281c4bd5eb1b1cc3c7",
    "dirty": false,
    "dirty_paths": [],
    "source": "git"
   },
   "script": {
    "name": "scripts/prune.py",
-   "sha256": "e7ee21efc107d3569c2fc47667e0ebf5536b919148906498bba2cb1bafe600f9"
+   "sha256": "59997af73e9181d6580e9759b3b704a31bdf3935d715cadc6887b882f9088680"
   },
   "python": {
    "version": "3.12.9",
@@ -129,21 +129,28 @@
      "worse": [],
      "better": [],
      "moved": [],
-     "code": "4eb4cad74365b1ed"
+     "code": "4eb4cad74365b1ed",
+     "svg": []
     },
     "domains": {
      "verdict": "identical",
      "worse": [],
      "better": [],
      "moved": [],
-     "code": "4eb4cad74365b1ed"
+     "code": "4eb4cad74365b1ed",
+     "svg": [
+      "5NF8",
+      "7F5S",
+      "9FZL"
+     ]
     },
     "na": {
      "verdict": "identical",
      "worse": [],
      "better": [],
      "moved": [],
-     "code": "4eb4cad74365b1ed"
+     "code": "4eb4cad74365b1ed",
+     "svg": []
     },
     "domsets": {
      "verdict": "identical",
@@ -190,14 +197,16 @@
      "worse": [],
      "better": [],
      "moved": [],
-     "code": "4eb4cad74365b1ed"
+     "code": "4eb4cad74365b1ed",
+     "svg": []
     },
     "na": {
      "verdict": "identical",
      "worse": [],
      "better": [],
      "moved": [],
-     "code": "4eb4cad74365b1ed"
+     "code": "4eb4cad74365b1ed",
+     "svg": []
     },
     "domsets": {
      "verdict": "identical",
@@ -244,14 +253,16 @@
      "worse": [],
      "better": [],
      "moved": [],
-     "code": "4eb4cad74365b1ed"
+     "code": "4eb4cad74365b1ed",
+     "svg": []
     },
     "na": {
      "verdict": "identical",
      "worse": [],
      "better": [],
      "moved": [],
-     "code": "4eb4cad74365b1ed"
+     "code": "4eb4cad74365b1ed",
+     "svg": []
     },
     "domsets": {
      "verdict": "identical",
@@ -313,14 +324,16 @@
      "worse": [],
      "better": [],
      "moved": [],
-     "code": "4eb4cad74365b1ed"
+     "code": "4eb4cad74365b1ed",
+     "svg": []
     },
     "na": {
      "verdict": "identical",
      "worse": [],
      "better": [],
      "moved": [],
-     "code": "4eb4cad74365b1ed"
+     "code": "4eb4cad74365b1ed",
+     "svg": []
     },
     "domsets": {
      "verdict": "identical",
@@ -378,14 +391,16 @@
      "worse": [],
      "better": [],
      "moved": [],
-     "code": "4eb4cad74365b1ed"
+     "code": "4eb4cad74365b1ed",
+     "svg": []
     },
     "na": {
      "verdict": "identical",
      "worse": [],
      "better": [],
      "moved": [],
-     "code": "4eb4cad74365b1ed"
+     "code": "4eb4cad74365b1ed",
+     "svg": []
     },
     "domsets": {
      "verdict": "identical",
@@ -448,14 +463,16 @@
      "worse": [],
      "better": [],
      "moved": [],
-     "code": "4eb4cad74365b1ed"
+     "code": "4eb4cad74365b1ed",
+     "svg": []
     },
     "na": {
      "verdict": "identical",
      "worse": [],
      "better": [],
      "moved": [],
-     "code": "4eb4cad74365b1ed"
+     "code": "4eb4cad74365b1ed",
+     "svg": []
     },
     "domsets": {
      "verdict": "identical",
@@ -522,7 +539,12 @@
       "8XJV: fallback counts_hidden 5 -> 3"
      ],
      "moved": [],
-     "code": "4eb4cad74365b1ed"
+     "code": "4eb4cad74365b1ed",
+     "svg": [
+      "6QIK",
+      "7F5S",
+      "8XJV"
+     ]
     },
     "na": {
      "verdict": "better",
@@ -532,7 +554,11 @@
       "8XJV: named_fallbacks 111 -> 109"
      ],
      "moved": [],
-     "code": "4eb4cad74365b1ed"
+     "code": "4eb4cad74365b1ed",
+     "svg": [
+      "6QIK",
+      "8XJV"
+     ]
     },
     "domsets": {
      "verdict": "identical",
@@ -592,7 +618,10 @@
      "moved": [
       "3W96: area 3042.22 -> 3115.51"
      ],
-     "code": "4eb4cad74365b1ed"
+     "code": "4eb4cad74365b1ed",
+     "svg": [
+      "3W96"
+     ]
     },
     "na": {
      "verdict": "worse",
@@ -611,7 +640,11 @@
      "moved": [
       "30QM: ss_contacts_nearer 0.857 -> 0.821"
      ],
-     "code": "4eb4cad74365b1ed"
+     "code": "4eb4cad74365b1ed",
+     "svg": [
+      "30QM",
+      "3W96"
+     ]
     },
     "domsets": {
      "verdict": "identical",
@@ -700,14 +733,19 @@
       "9FZL: area 65458.72 -> 34193.58",
       "9Y70: area 3779.14 -> 3598.23"
      ],
-     "code": "4eb4cad74365b1ed"
+     "code": "4eb4cad74365b1ed",
+     "svg": [
+      "9FZL",
+      "9Y70"
+     ]
     },
     "na": {
      "verdict": "identical",
      "worse": [],
      "better": [],
      "moved": [],
-     "code": "4eb4cad74365b1ed"
+     "code": "4eb4cad74365b1ed",
+     "svg": []
     },
     "domsets": {
      "verdict": "identical",
@@ -796,14 +834,19 @@
       "7U9Z: area 6539.89 -> 6622.02",
       "9NMN: area 10388.35 -> 9853.15"
      ],
-     "code": "4eb4cad74365b1ed"
+     "code": "4eb4cad74365b1ed",
+     "svg": [
+      "7U9Z",
+      "9NMN"
+     ]
     },
     "na": {
      "verdict": "identical",
      "worse": [],
      "better": [],
      "moved": [],
-     "code": "4eb4cad74365b1ed"
+     "code": "4eb4cad74365b1ed",
+     "svg": []
     },
     "domsets": {
      "verdict": "identical",
@@ -882,14 +925,19 @@
      "moved": [
       "9NMN: area 10388.35 -> 9556.46"
      ],
-     "code": "4eb4cad74365b1ed"
+     "code": "4eb4cad74365b1ed",
+     "svg": [
+      "7U9Z",
+      "9NMN"
+     ]
     },
     "na": {
      "verdict": "identical",
      "worse": [],
      "better": [],
      "moved": [],
-     "code": "4eb4cad74365b1ed"
+     "code": "4eb4cad74365b1ed",
+     "svg": []
     },
     "domsets": {
      "verdict": "identical",
@@ -945,14 +993,16 @@
      "worse": [],
      "better": [],
      "moved": [],
-     "code": "4eb4cad74365b1ed"
+     "code": "4eb4cad74365b1ed",
+     "svg": []
     },
     "na": {
      "verdict": "identical",
      "worse": [],
      "better": [],
      "moved": [],
-     "code": "4eb4cad74365b1ed"
+     "code": "4eb4cad74365b1ed",
+     "svg": []
     },
     "domsets": {
      "verdict": "identical",
@@ -1029,14 +1079,22 @@
       "9FZL: area 65458.72 -> 55656.15",
       "AF_AFQ8ZPJ0F1: area 421.83 -> 389.15"
      ],
-     "code": "4eb4cad74365b1ed"
+     "code": "4eb4cad74365b1ed",
+     "svg": [
+      "2AIQ",
+      "5ES7",
+      "6DQN",
+      "9FZL",
+      "AF_AFQ8ZPJ0F1"
+     ]
     },
     "na": {
      "verdict": "identical",
      "worse": [],
      "better": [],
      "moved": [],
-     "code": "4eb4cad74365b1ed"
+     "code": "4eb4cad74365b1ed",
+     "svg": []
     },
     "domsets": {
      "verdict": "identical",
@@ -1110,14 +1168,16 @@
      "worse": [],
      "better": [],
      "moved": [],
-     "code": "4eb4cad74365b1ed"
+     "code": "4eb4cad74365b1ed",
+     "svg": []
     },
     "na": {
      "verdict": "identical",
      "worse": [],
      "better": [],
      "moved": [],
-     "code": "4eb4cad74365b1ed"
+     "code": "4eb4cad74365b1ed",
+     "svg": []
     },
     "domsets": {
      "verdict": "identical",
@@ -1177,7 +1237,8 @@
      "worse": [],
      "better": [],
      "moved": [],
-     "code": "4eb4cad74365b1ed"
+     "code": "4eb4cad74365b1ed",
+     "svg": []
     },
     "domains": {
      "verdict": "moved",
@@ -1186,14 +1247,18 @@
      "moved": [
       "8U1N: area 1331.46 -> 8059.7"
      ],
-     "code": "4eb4cad74365b1ed"
+     "code": "4eb4cad74365b1ed",
+     "svg": [
+      "8U1N"
+     ]
     },
     "na": {
      "verdict": "identical",
      "worse": [],
      "better": [],
      "moved": [],
-     "code": "4eb4cad74365b1ed"
+     "code": "4eb4cad74365b1ed",
+     "svg": []
     },
     "domsets": {
      "verdict": "identical",
@@ -1265,21 +1330,24 @@
      "worse": [],
      "better": [],
      "moved": [],
-     "code": "4eb4cad74365b1ed"
+     "code": "4eb4cad74365b1ed",
+     "svg": []
     },
     "membrane": {
      "verdict": "identical",
      "worse": [],
      "better": [],
      "moved": [],
-     "code": "4eb4cad74365b1ed"
+     "code": "4eb4cad74365b1ed",
+     "svg": []
     },
     "na": {
      "verdict": "identical",
      "worse": [],
      "better": [],
      "moved": [],
-     "code": "4eb4cad74365b1ed"
+     "code": "4eb4cad74365b1ed",
+     "svg": []
     },
     "domsets": {
      "verdict": "identical",
@@ -1341,21 +1409,24 @@
      "worse": [],
      "better": [],
      "moved": [],
-     "code": "4eb4cad74365b1ed"
+     "code": "4eb4cad74365b1ed",
+     "svg": []
     },
     "membrane": {
      "verdict": "identical",
      "worse": [],
      "better": [],
      "moved": [],
-     "code": "4eb4cad74365b1ed"
+     "code": "4eb4cad74365b1ed",
+     "svg": []
     },
     "na": {
      "verdict": "identical",
      "worse": [],
      "better": [],
      "moved": [],
-     "code": "4eb4cad74365b1ed"
+     "code": "4eb4cad74365b1ed",
+     "svg": []
     },
     "domsets": {
      "verdict": "identical",
@@ -1417,7 +1488,8 @@
      "worse": [],
      "better": [],
      "moved": [],
-     "code": "4eb4cad74365b1ed"
+     "code": "4eb4cad74365b1ed",
+     "svg": []
     },
     "membrane": {
      "verdict": "moved",
@@ -1432,14 +1504,24 @@
       "7Y63: area 2061.57 -> 2061.64",
       "8GG4: area 1443.94 -> 1465.57"
      ],
-     "code": "4eb4cad74365b1ed"
+     "code": "4eb4cad74365b1ed",
+     "svg": [
+      "6BO8",
+      "6DQN",
+      "6QUE",
+      "6UW4",
+      "6VBG",
+      "7Y63",
+      "8GG4"
+     ]
     },
     "na": {
      "verdict": "identical",
      "worse": [],
      "better": [],
      "moved": [],
-     "code": "4eb4cad74365b1ed"
+     "code": "4eb4cad74365b1ed",
+     "svg": []
     },
     "domsets": {
      "verdict": "identical",
@@ -1515,7 +1597,8 @@
      "worse": [],
      "better": [],
      "moved": [],
-     "code": "4eb4cad74365b1ed"
+     "code": "4eb4cad74365b1ed",
+     "svg": []
     },
     "membrane": {
      "verdict": "moved",
@@ -1527,14 +1610,21 @@
       "6QUE: area 3673.36 -> 3819.28",
       "6VBG: area 1068.13 -> 1054.13"
      ],
-     "code": "4eb4cad74365b1ed"
+     "code": "4eb4cad74365b1ed",
+     "svg": [
+      "6BO8",
+      "6DQN",
+      "6QUE",
+      "6VBG"
+     ]
     },
     "na": {
      "verdict": "identical",
      "worse": [],
      "better": [],
      "moved": [],
-     "code": "4eb4cad74365b1ed"
+     "code": "4eb4cad74365b1ed",
+     "svg": []
     },
     "domsets": {
      "verdict": "identical",
@@ -1604,7 +1694,8 @@
      "worse": [],
      "better": [],
      "moved": [],
-     "code": "4eb4cad74365b1ed"
+     "code": "4eb4cad74365b1ed",
+     "svg": []
     },
     "membrane": {
      "verdict": "moved",
@@ -1614,14 +1705,19 @@
       "6DQN: area 3776.94 -> 3538.28",
       "6QUE: area 3673.36 -> 4118.51"
      ],
-     "code": "4eb4cad74365b1ed"
+     "code": "4eb4cad74365b1ed",
+     "svg": [
+      "6DQN",
+      "6QUE"
+     ]
     },
     "na": {
      "verdict": "identical",
      "worse": [],
      "better": [],
      "moved": [],
-     "code": "4eb4cad74365b1ed"
+     "code": "4eb4cad74365b1ed",
+     "svg": []
     },
     "domsets": {
      "verdict": "identical",
@@ -1692,14 +1788,21 @@
      "worse": [],
      "better": [],
      "moved": [],
-     "code": "4eb4cad74365b1ed"
+     "code": "4eb4cad74365b1ed",
+     "svg": [
+      "6QIK",
+      "7F5S"
+     ]
     },
     "na": {
      "verdict": "identical",
      "worse": [],
      "better": [],
      "moved": [],
-     "code": "4eb4cad74365b1ed"
+     "code": "4eb4cad74365b1ed",
+     "svg": [
+      "6QIK"
+     ]
     },
     "domsets": {
      "verdict": "identical",
@@ -1759,14 +1862,16 @@
      "worse": [],
      "better": [],
      "moved": [],
-     "code": "4eb4cad74365b1ed"
+     "code": "4eb4cad74365b1ed",
+     "svg": []
     },
     "na": {
      "verdict": "identical",
      "worse": [],
      "better": [],
      "moved": [],
-     "code": "4eb4cad74365b1ed"
+     "code": "4eb4cad74365b1ed",
+     "svg": []
     },
     "domsets": {
      "verdict": "identical",
@@ -1846,7 +1951,16 @@
       "9OWM: area 2626.22 -> 2626.69",
       "9XSF: area 2382.08 -> 2350.25"
      ],
-     "code": "4eb4cad74365b1ed"
+     "code": "4eb4cad74365b1ed",
+     "svg": [
+      "3G6E",
+      "6LAB",
+      "6QIK",
+      "7F5S",
+      "8XJV",
+      "9OWM",
+      "9XSF"
+     ]
     },
     "na": {
      "verdict": "worse",
@@ -1950,7 +2064,19 @@
       "1HYS: bend_3d -12.7 -> -8.9",
       "1HYS: bend_drawn -12.7 -> -8.9"
      ],
-     "code": "4eb4cad74365b1ed"
+     "code": "4eb4cad74365b1ed",
+     "svg": [
+      "1HYS",
+      "1Z43",
+      "5K7Z",
+      "6LAB",
+      "6QIK",
+      "7XSP",
+      "8XJV",
+      "9OWM",
+      "9WB3",
+      "9XSF"
+     ]
     },
     "domsets": {
      "verdict": "identical",
@@ -2035,7 +2161,8 @@
      "worse": [],
      "better": [],
      "moved": [],
-     "code": "4eb4cad74365b1ed"
+     "code": "4eb4cad74365b1ed",
+     "svg": []
     },
     "domains": {
      "verdict": "worse",
@@ -2056,14 +2183,66 @@
       "8VBG: area 2290.41 -> 2285.22",
       "9NMN: area 14221.44 -> 14298.62"
      ],
-     "code": "4eb4cad74365b1ed"
+     "code": "4eb4cad74365b1ed",
+     "svg": [
+      "10LI",
+      "12DV",
+      "1NID",
+      "1RKA",
+      "1XZ4",
+      "3ABR",
+      "3EOM",
+      "3G6E",
+      "3W96",
+      "4B2T",
+      "4GWY",
+      "4YJ5",
+      "4ZH4",
+      "5C1A",
+      "5NF8",
+      "5S4U",
+      "6BO8",
+      "6DQN",
+      "6JCY",
+      "6LAB",
+      "6QIK",
+      "6QUE",
+      "6UW4",
+      "6VBG",
+      "6ZTQ",
+      "6ZY7",
+      "7ADZ",
+      "7F1V",
+      "7F5S",
+      "7KMZ",
+      "7SPI",
+      "7U9Z",
+      "7UKO",
+      "7XBK",
+      "7Y63",
+      "8EM7",
+      "8FZN",
+      "8GG4",
+      "8PIN",
+      "8U1N",
+      "8VBG",
+      "9BZD",
+      "9DU3",
+      "9FZL",
+      "9HEO",
+      "9N2E",
+      "9NMN",
+      "9XSF",
+      "9Y70"
+     ]
     },
     "na": {
      "verdict": "identical",
      "worse": [],
      "better": [],
      "moved": [],
-     "code": "4eb4cad74365b1ed"
+     "code": "4eb4cad74365b1ed",
+     "svg": []
     },
     "domsets": {
      "verdict": "identical",
@@ -2131,7 +2310,7 @@
    "tests": "ligands, text_clear",
    "not_exercised": false,
    "off": 1,
-   "why": "a ligand mark is never looked for beyond _SPOT_RADIUS (render._place_mark)",
+   "why": "a ligand mark is never looked for beyond _SPOT_RADIUS (render._place_mark), and _least_bad_spot's rings are narrowed to _SPOT_RADIUS too (not a faithful revert: that sweep reads the same constant)",
    "perturb": "render:_SPOT_FAR=1",
    "view": null,
    "measures": {
@@ -2148,14 +2327,23 @@
      ],
      "better": [],
      "moved": [],
-     "code": "4eb4cad74365b1ed"
+     "code": "4eb4cad74365b1ed",
+     "svg": [
+      "3G6E",
+      "4D5B",
+      "6IZP",
+      "6PO4"
+     ]
     },
     "na": {
      "verdict": "identical",
      "worse": [],
      "better": [],
      "moved": [],
-     "code": "4eb4cad74365b1ed"
+     "code": "4eb4cad74365b1ed",
+     "svg": [
+      "6IZP"
+     ]
     },
     "domsets": {
      "verdict": "identical",
@@ -2223,14 +2411,71 @@
      "worse": [],
      "better": [],
      "moved": [],
-     "code": "4eb4cad74365b1ed"
+     "code": "4eb4cad74365b1ed",
+     "svg": [
+      "1GQ2",
+      "1N6K",
+      "1NID",
+      "2LYO",
+      "2YEJ",
+      "3FT8",
+      "3G6E",
+      "3WAU",
+      "4D5B",
+      "4GWY",
+      "4YJ5",
+      "4YP6",
+      "5ES7",
+      "5JNN",
+      "5U3R",
+      "5XMX",
+      "6A7T",
+      "6DQN",
+      "6JCY",
+      "6LAB",
+      "6QIK",
+      "6UW4",
+      "6ZTQ",
+      "6ZY7",
+      "7F5S",
+      "7U9Z",
+      "7UKO",
+      "7XBK",
+      "7Y63",
+      "8CRC",
+      "8EM7",
+      "8GG4",
+      "8PIN",
+      "8S8X",
+      "9BZD",
+      "9FZL",
+      "9HEO",
+      "9NMN",
+      "9PDH",
+      "9UY1",
+      "9Y70"
+     ]
     },
     "na": {
      "verdict": "identical",
      "worse": [],
      "better": [],
      "moved": [],
-     "code": "4eb4cad74365b1ed"
+     "code": "4eb4cad74365b1ed",
+     "svg": [
+      "1IHF",
+      "1ZAA",
+      "3KTQ",
+      "3L2V",
+      "5K7Z",
+      "6JCY",
+      "6LAB",
+      "6QIK",
+      "6ZY7",
+      "7XSP",
+      "8BW5",
+      "9YLM"
+     ]
     },
     "domsets": {
      "verdict": "identical",
@@ -2290,14 +2535,16 @@
      "worse": [],
      "better": [],
      "moved": [],
-     "code": "4eb4cad74365b1ed"
+     "code": "4eb4cad74365b1ed",
+     "svg": []
     },
     "na": {
      "verdict": "identical",
      "worse": [],
      "better": [],
      "moved": [],
-     "code": "4eb4cad74365b1ed"
+     "code": "4eb4cad74365b1ed",
+     "svg": []
     },
     "domsets": {
      "verdict": "identical",
@@ -2355,14 +2602,16 @@
      "worse": [],
      "better": [],
      "moved": [],
-     "code": "4eb4cad74365b1ed"
+     "code": "4eb4cad74365b1ed",
+     "svg": []
     },
     "na": {
      "verdict": "identical",
      "worse": [],
      "better": [],
      "moved": [],
-     "code": "4eb4cad74365b1ed"
+     "code": "4eb4cad74365b1ed",
+     "svg": []
     },
     "domsets": {
      "verdict": "identical",
@@ -2410,7 +2659,10 @@
      "worse": [],
      "better": [],
      "moved": [],
-     "code": "4eb4cad74365b1ed"
+     "code": "4eb4cad74365b1ed",
+     "svg": [
+      "6ZY7"
+     ]
     },
     "na": {
      "verdict": "worse",
@@ -2422,7 +2674,16 @@
       "9K4F: na_protein_crossings 10 -> 8"
      ],
      "moved": [],
-     "code": "4eb4cad74365b1ed"
+     "code": "4eb4cad74365b1ed",
+     "svg": [
+      "1IHF",
+      "30QM",
+      "3CRX",
+      "4OO8",
+      "6ZY7",
+      "7XSP",
+      "9K4F"
+     ]
     },
     "domsets": {
      "verdict": "identical",
@@ -2489,7 +2750,8 @@
      "worse": [],
      "better": [],
      "moved": [],
-     "code": "4eb4cad74365b1ed"
+     "code": "4eb4cad74365b1ed",
+     "svg": []
     },
     "na": {
      "verdict": "worse",
@@ -2498,7 +2760,10 @@
      ],
      "better": [],
      "moved": [],
-     "code": "4eb4cad74365b1ed"
+     "code": "4eb4cad74365b1ed",
+     "svg": [
+      "1IHF"
+     ]
     },
     "domsets": {
      "verdict": "identical",
@@ -2564,14 +2829,16 @@
      "worse": [],
      "better": [],
      "moved": [],
-     "code": "4eb4cad74365b1ed"
+     "code": "4eb4cad74365b1ed",
+     "svg": []
     },
     "na": {
      "verdict": "identical",
      "worse": [],
      "better": [],
      "moved": [],
-     "code": "4eb4cad74365b1ed"
+     "code": "4eb4cad74365b1ed",
+     "svg": []
     },
     "domsets": {
      "verdict": "identical",
@@ -2762,5 +3029,55 @@
   "layout:_NAME_OPEN, 7NZ2 (held-out sample) domains view: keys identical (pass, failing A17 only, fallbacks, area); its SVG differs (the name's place)",
   "na_runs:_JOINT_NEAR, 9C75 default view: identical, SVG too (9C75 is also an NA control, measured above)",
   "route:_MAX_NODES_PAGE, 7QUP focus view: identical, SVG too, 161.7 s both; 7NZ2 domains view: worse (see held)"
- ]
+ ],
+ "equivalence": {
+  "measures": {
+   "r100": {
+    "entries": 100,
+    "moved_from_baseline": [],
+    "off": {
+     "layout:_NAME_OPEN": {
+      "identical": 100,
+      "differ": []
+     },
+     "na_runs:_JOINT_NEAR": {
+      "identical": 100,
+      "differ": []
+     }
+    }
+   },
+   "domains": {
+    "entries": 49,
+    "moved_from_baseline": [
+     "5NF8",
+     "7F5S",
+     "9FZL"
+    ],
+    "off": {
+     "layout:_NAME_OPEN": {
+      "identical": 49,
+      "differ": []
+     }
+    }
+   },
+   "na": {
+    "entries": 46,
+    "moved_from_baseline": [],
+    "off": {
+     "layout:_NAME_OPEN": {
+      "identical": 46,
+      "differ": []
+     },
+     "na_runs:_JOINT_NEAR": {
+      "identical": 46,
+      "differ": []
+     }
+    }
+   }
+  },
+  "after_code": "8f878e5bd79166bf",
+  "after_commit": "c64ea7a4503195834028058919f99a1936bbaec5",
+  "runs_code": "4eb4cad74365b1ed",
+  "runs_commit": "46f5ebf2cd231f0b54ee250275ecc74892ccae9e"
+ }
 }
