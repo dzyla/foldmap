@@ -323,6 +323,7 @@ def test_run_ui_drives_the_page_for_the_tune_half_only(app29, monkeypatch, tmp_p
 @pytest.mark.skipif(sys.platform == "win32", reason="isolated jobs need forkserver")
 def test_the_page_session_draws_changes_the_theme_and_presses_every_download(app29, monkeypatch, tmp_path):
     """ui_session on 1UBQ (from the cache, no network), hosted: drawn, the theme changed, six files, each whole."""
+    pytest.importorskip("streamlit")  # the app extra: absent in the sdist and minimum-deps jobs
     from app_helpers import fresh_caches, seed_cache
 
     before = os.environ.get("FOLDMAP_APP_LOCAL_FILES")
