@@ -540,6 +540,7 @@ def make_layout(
     data: str | None = None,
     data_column: str | None = None,
     crosslinks: str | None = None,
+    below_floor: bool = False,
 ):
     """`names` (--names): conventional names, each `deposited`, `beta` or a YAML file (names.apply_names), applied
     over the generic labels in order; `rename` wins over all of them. `like` (--like, plan 13a): drawn like a
@@ -554,7 +555,10 @@ def make_layout(
     read on every protein chain (userdata) after the references are checked: a file that cannot be read is a
     BadReference before layout, each row not used a warning on standard error (the first SAID_ROWS of a file, then
     how many more); values and crosslinks on chains the figure leaves out are noted; what was read is kept on the
-    layout (Layout.residue_data, crosslinks, data_problems: their defaults, none, when no file is given)."""
+    layout (Layout.residue_data, crosslinks, data_problems: their defaults, none, when no file is given).
+    `below_floor` (spec.draw_spec only): this figure drawn whole was below the readability floor, so focus auto takes
+    one subunit of an assembly of two (_focus_chains); Layout.whole_of_two says when auto drew such an assembly
+    whole."""
     for spec in names or []:
         check_spec(spec)
     model = model or read_model(path, assembly)  # once, for every loader below (`model`: already read, same assembly)
@@ -610,7 +614,7 @@ def make_layout(
     copies = homolog_chains(bb)
     if focus == "auto" and (look or Style()).highlight != "none":
         focus = "none"  # highlighting the asymmetric unit or a protomer asks for the whole assembly
-    focus_chains = _focus_chains(focus, sym, bb, sses, nucleic)
+    focus_chains, whole_of_two = _focus_plan(focus, sym, bb, sses, nucleic, below_floor)
     strands = nucleic.strands if nucleic is not None else []
     read = list(dict.fromkeys([l.chain for l in bb.labels] + [s.chain for s in strands]))
     subunits = None
@@ -859,6 +863,7 @@ def make_layout(
         if focus_chains:
             lay.focus, lay.focus_chains, lay.context = set(focus_chains), set(focus_chains), context
             lay.unjoined, lay.subunits = unjoined, subunits
+        lay.whole_of_two = whole_of_two
         lay.chains_read = read
         lay.chains_asked = asked
         lay.like_chain = chain_b if chosen else ""
@@ -1459,35 +1464,44 @@ def _face_medians(lay, sses, bb, mem) -> tuple[float, float] | None:
 FOCUS_CHAINS, FOCUS_ELEMENTS = 6, 160  # symmetric assemblies larger than this are drawn one subunit at a time
 
 
-def _focus_chains(focus: str, sym, bb, sses, nucleic=None) -> set | None:
+def _focus_chains(focus: str, sym, bb, sses, nucleic=None, below_floor: bool = False) -> set | None:
     """The chains drawn in full: none ('none', or a modest assembly under 'auto'), one protomer (helical
     filaments, cubic cages, or assemblies over FOCUS_CHAINS chains / FOCUS_ELEMENTS elements), or the chains
-    named. Helical filaments use their middle subunit, so it has neighbours on both sides. 'auto' never takes one
-    subunit of two (a C2 histone octamer is drawn whole), nor one of a ring or other point-group assembly whose
-    protomers share a nucleic acid (_na_shared: nucleosome DNA); filaments and cages keep it."""
+    named. Helical filaments use their middle subunit, so it has neighbours on both sides. 'auto' draws an assembly
+    of two subunits whole (a C2 histone octamer is drawn whole) unless the whole was drawn below the readability
+    floor (`below_floor`: spec.draw_spec drew it whole and floor.readability_floor gave a reason; 31FD's C2
+    photosystem II dimer, 48 in wide with 5 pt text, plan 29 Task 5): then it takes one subunit, whatever its size.
+    'auto' never takes one subunit of a ring or other point-group assembly whose protomers share a nucleic acid
+    (_na_shared: nucleosome DNA), below the floor or not; filaments and cages keep it."""
+    return _focus_plan(focus, sym, bb, sses, nucleic, below_floor)[0]
+
+
+def _focus_plan(focus: str, sym, bb, sses, nucleic=None, below_floor: bool = False) -> tuple[set | None, bool]:
+    """(_focus_chains: the chains drawn in full; whether 'auto' drew an assembly of two subunits whole that it draws
+    as one subunit below the readability floor: Layout.whole_of_two, which spec.draw_spec reads)."""
     present = list(dict.fromkeys(l.chain for l in bb.labels))
     if focus in (None, "none"):
-        return None
+        return None, False
     if focus not in ("auto", "protomer"):
         named = [c.strip() for c in focus.split(",") if c.strip()]
         missing = [c for c in named if c not in present]
         if missing:
             raise ValueError(f"--focus: no chain {', '.join(missing)}; the structure has {', '.join(present)}")
-        return set(named)
+        return set(named), False
     if sym is None:
         if focus == "protomer":
             raise ValueError("--focus protomer needs a symmetric assembly; name chains instead (--focus A)")
-        return None
-    big = sym.kind in ("H", "T", "O", "I") or len(present) > FOCUS_CHAINS or len(sses) > FOCUS_ELEMENTS
-    if focus == "auto" and not big:
-        return None
+        return None, False
     k = len(sym.protomers) // 2 if sym.kind == "H" else 0
     one = _one_of_each(sym.protomers[k], bb)
-    if focus == "auto" and (
-        _subunits(sym, one) <= 2 or (sym.kind in ("C", "D") and _na_shared(nucleic, sym, bb))
-    ):  # one complex: drawn whole
-        return None
-    return one
+    if focus == "protomer":
+        return one, False
+    if sym.kind in ("C", "D") and _na_shared(nucleic, sym, bb):  # one complex its nucleic acid ties: drawn whole
+        return None, False
+    if _subunits(sym, one) <= 2:  # two subunits: one complex, drawn whole while the whole is above the floor
+        return (one, False) if below_floor else (None, True)
+    big = sym.kind in ("H", "T", "O", "I") or len(present) > FOCUS_CHAINS or len(sses) > FOCUS_ELEMENTS
+    return (one if big else None), False
 
 
 def _one_of_each(chains: list[str], bb) -> set:

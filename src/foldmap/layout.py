@@ -316,6 +316,8 @@ class Layout:
     context: str | None = None  # what the figure shows of the assembly, e.g. "1 of 6 subunits · helical ..."
     subunits: tuple[int, str] | None = None  # focus on a symmetric assembly: its subunits and symmetry (sym.label,
     # or "helical")
+    whole_of_two: bool = False  # focus auto drew an assembly of two subunits whole (cli._focus_plan): below the
+    # readability floor, spec.draw_spec draws one subunit instead (plan 29 Task 5)
     chains_read: list[str] = field(default_factory=list)  # every chain read and asked for (protein, then nucleic
     # acid), before focus kept one subunit
     chains_asked: list[str] = field(default_factory=list)  # --chains: the protein chains asked for (scope says so)

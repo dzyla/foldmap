@@ -50,6 +50,19 @@ def test_each_reason_from_its_measure():
     assert set(floor.REASONS) == {floor.TEXT_SMALL, floor.ROUTE_BUDGET}  # time is said, never judged (Q40)
 
 
+def test_below_judges_the_reasons_without_the_smallest_text():
+    """floor.below (spec.draw_spec's judgment, plan 29 Task 5) gives a reason exactly when reasons_of does: the text
+    size the page gives, the route budget spent; the smallest text and the time are never judged."""
+
+    def drawn(pt, fired=None):
+        fig = SimpleNamespace(get_size_inches=lambda: (48.0, 9.0), foldmap_text_pt=pt)
+        return SimpleNamespace(figure=fig, fallbacks=fired or {})
+
+    assert floor.below(drawn(5.026)) and not floor.below(drawn(6.0))
+    assert floor.below(drawn(7.0, {"route_second_search_refused": 1}))
+    assert not floor.below(drawn(7.0, {"loop_curve": 2}))
+
+
 def test_time_is_a_note_never_a_reason():
     assert floor.reasons_of(_measures(seconds=107.9)) == []
     (got,) = floor.time_notes(_measures(seconds=107.9))
@@ -85,18 +98,47 @@ def test_the_options_in_each_interfaces_words():
     assert floor.note([], offered) == "" and floor.note(reasons, []).endswith("pt)")
 
 
+def test_each_surface_names_only_the_options_it_has():
+    """Plan 29 Task 5 (ruling P29-7 b): the note never tells a user to do what their surface cannot. Every option
+    suggestions() offers is named by the command line and the MCP tool; the app names the two it has controls for
+    (Chains & assembly: Large assemblies' "these chains in full", Chains) and drops one subunit, which it has no
+    control for, so a note offering only that offers nothing in the app."""
+    one = {"focus": "protomer"}
+    for options in (one, {"focus": "A"}, {"chains": "A"}):
+        assert floor._phrase(options, "cli") and floor._phrase(options, "mcp")
+    assert floor._phrase(one, "app") is None and floor.ways([{"options": one, "what": "x"}], "app") == ""
+    assert floor._phrase({"focus": "A"}, "app") == "Chains & assembly, Large assemblies: these chains in full, A"
+    assert floor._phrase({"chains": "A"}, "app") == "Chains & assembly, Chains: A"
+
+
+def test_the_apps_words_are_its_controls():
+    """The app's words (floor._SAID) are the controls app_controls.chains_section draws: Large assemblies offers
+    auto, none and "these chains in full", no subunit."""
+    pytest.importorskip("streamlit")  # the app extra: absent in the sdist and minimum-deps jobs
+    import inspect
+
+    from foldmap import app_controls
+
+    assert "protomer" not in app_controls.FOCUS and "protomer" not in app_controls.FOCUS.values()
+    assert floor._SAID["app"]["focus"].endswith(f"Large assemblies: {app_controls.FOCUS['chains']}, {{v}}")
+    source = inspect.getsource(app_controls.chains_section)
+    assert '"Chains & assembly"' in source and '"Large assemblies"' in source and 'heading(st, "Chains"' in source
+
+
 def test_an_ordinary_figure_is_above_the_floor():
     drawn = draw_spec(figure_spec(UBQ))
     got = floor.measures(drawn)
     assert got["text_pt"] >= 6.0 and got["smallest_pt"] < got["text_pt"]
     assert drawn.seconds is not None and got["seconds"] == round(drawn.seconds, 2)
     assert drawn.floor == [] and floor.suggestions(drawn) == []  # one chain: nothing to draw less of
+    assert not floor.below(drawn)
 
 
 def test_a_page_held_small_is_below_the_floor(small_page):
     drawn = draw_spec(figure_spec(UBQ))
     (got,) = drawn.floor
     assert got["reason"] == floor.TEXT_SMALL and got["measured"] < 6.0
+    assert floor.below(drawn)  # the judgment spec.draw_spec makes, without walking the figure's text
     assert drawn.fallbacks.get("page_text_small") == 1  # the same condition page_fit says and counts
     assert drawn.page_notes and "under 6 pt" in drawn.page_notes[0]
 

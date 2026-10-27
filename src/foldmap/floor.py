@@ -29,13 +29,15 @@ suggestions(drawn) names the existing options that draw less, those that apply: 
 symmetric assembly drawn whole, in full), --focus CHAIN (its first chain in full, with what its neighbours add to its
 fold) and --chains CHAIN (that chain only). Measured on 9FZL, 8XJV and the largest entries of the three random samples
 (docs/validation/readability-floor, scripts/readability_floor.py): each brought every figure it was offered for above
-the floor; the notes still say "may", as nothing is measured before it is drawn.
+the floor; the notes still say "may", as nothing is measured before it is drawn. Each surface names only the options
+it has (_phrase, _SAID): the app has no control for one subunit, so it is never told to the app's user.
 
 Where it is said (said(), guarded: a failure to judge is said, never raised): the command line's notes (`foldmap
 plot`; with --strict-floor no figure below the floor is written and it exits 1), `foldmap check` (R1, a readability
 check, in the text and the --json report; a fail exits 1), the MCP result (its note and `floor`) and the app (a
-warning under the figure; never on a compare or diff page). It never reaches the drawn figure or its files: the
-default figure is unchanged (bench --exact)."""
+warning under the figure; never on a compare or diff page). The note never reaches the drawn figure or its files.
+The judgment does in one case: focus auto draws an assembly of two subunits whole, and draws it again as one subunit
+when the whole is below the floor (spec.draw_spec, cli._focus_chains; plan 29 Task 5, 31FD)."""
 
 from __future__ import annotations
 
@@ -58,22 +60,23 @@ NOTES = {  # said, never judged (ruling Q40)
 TIME_LIMIT_S = LIMITS["app_s"]  # the hosted app's limit (app_jobs.HOSTED)
 
 
-def text_sizes(fig) -> tuple[float | None, float | None]:
+def text_sizes(fig, walk: bool = True) -> tuple[float | None, float | None]:
     """(the figure's text size, the smallest text drawn), points: render's foldmap_text_pt (layout.font_pt of its
     page's scale, at Style.font_scale 1) and the smallest font size of the visible texts on it; None where there is
-    none (a figure render did not make)."""
+    none (a figure render did not make), and for the smallest without `walk` (no text on the figure is walked)."""
     from matplotlib.text import Text
 
-    sizes = [t.get_fontsize() for t in fig.findobj(Text) if t.get_visible() and t.get_text().strip()]
+    sizes = [t.get_fontsize() for t in fig.findobj(Text) if t.get_visible() and t.get_text().strip()] if walk else []
     own = getattr(fig, "foldmap_text_pt", None)
     return (None if own is None else float(own)), (float(min(sizes)) if sizes else None)
 
 
-def measures(drawn) -> dict:
-    """What the floor is judged on: the page's size (inches), the figure's text and its smallest text (points) and
-    the named fallbacks taken (Drawn.fallbacks); and the seconds it took (None when not timed), for time_notes only."""
+def measures(drawn, walk: bool = True) -> dict:
+    """What the floor is judged on: the page's size (inches), the figure's text and its smallest text (points; None
+    without `walk`: text_sizes) and the named fallbacks taken (Drawn.fallbacks); and the seconds it took (None when
+    not timed), for time_notes only."""
     w, h = (float(x) for x in drawn.figure.get_size_inches())
-    text, smallest = text_sizes(drawn.figure)
+    text, smallest = text_sizes(drawn.figure, walk)
     seconds = getattr(drawn, "seconds", None)
     return {
         "page_in": [round(w, 2), round(h, 2)],
@@ -125,6 +128,13 @@ def readability_floor(drawn) -> list[dict]:
     return reasons_of(measures(drawn))
 
 
+def below(drawn) -> bool:
+    """Whether the figure `drawn` is below the floor (readability_floor gives a reason), judged on the same measures
+    without its smallest text (said, never judged), so no text on the figure is walked (spec.draw_spec asks it of
+    every assembly of two that focus auto draws whole)."""
+    return bool(reasons_of(measures(drawn, walk=False)))
+
+
 def suggestions(drawn) -> list[dict]:
     """The existing options that draw less of the figure `drawn`, each {options: {name: value}, what}: one subunit
     in full when it draws a symmetric assembly whole (--focus protomer), then its first chain in full and that chain
@@ -151,24 +161,28 @@ def suggestions(drawn) -> list[dict]:
 
 
 def _phrase(options: dict, how: str) -> str | None:
-    """Options as the command line (how='cli'), the MCP tool (how='mcp') or the app (how='app') takes them; None
-    where the app has no control for them (--focus protomer)."""
+    """Options in the words of the surface showing the note (_SAID): the command line (how='cli'), the MCP tool
+    (how='mcp') or the app (how='app'); None when that surface has no control for one of them, so the note never
+    tells a user to do what they cannot (the app has no subunit control: Large assemblies offers auto, none and
+    chains only)."""
+    said = _SAID[how]
     parts = []
     for k, v in options.items():
-        if how == "mcp":
-            parts.append(f'chains=["{v}"]' if k == "chains" else f'{k}="{v}"')
-        elif how == "app":
-            if k == "focus" and v == "protomer":
-                return None
-            parts.append(_APP[k].format(v=v))
-        else:
-            parts.append(f"--{k} {v}")
+        word = said.get(f"{k}:{v}") if k == "focus" and v in _FOCUS_WORDS else said.get(k)  # a word: its own entry
+        if word is None:
+            return None
+        parts.append(word.format(v=v))
     return " ".join(parts)
 
 
-_APP = {  # the app's controls for each option (app_controls.chains_section)
-    "focus": "Chains & assembly, Large assemblies: these chains in full, {v}",
-    "chains": "Chains & assembly, Chains: {v}",
+_FOCUS_WORDS = ("protomer",)  # focus values that are words, not chains: a surface names each only by its own entry
+_SAID = {  # each surface's words for the options it has (suggestions' options); an option missing here is not named
+    "cli": {"focus": "--focus {v}", "focus:protomer": "--focus {v}", "chains": "--chains {v}"},
+    "mcp": {"focus": 'focus="{v}"', "focus:protomer": 'focus="{v}"', "chains": 'chains=["{v}"]'},
+    "app": {  # the app's controls (app_controls.chains_section; Large assemblies is app_controls.FOCUS): no subunit
+        "focus": "Chains & assembly, Large assemblies: these chains in full, {v}",
+        "chains": "Chains & assembly, Chains: {v}",
+    },
 }
 
 

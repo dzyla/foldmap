@@ -509,8 +509,9 @@ class Drawn:
     sses: list
     bb: Any  # model.Backbone
     model: Any = None  # io.read_model result the figure was built from
-    # wall seconds draw_spec took to read, lay out, route and draw it (the readability floor's time, floor.TIME); None
-    # when not timed (a compare page, a figure made elsewhere). Never part of the figure
+    # wall seconds draw_spec took to read, lay out, route and draw it, both drawings when it drew an assembly of two
+    # subunits whole and again as one (the readability floor's time, floor.TIME); None when not timed (a compare page,
+    # a figure made elsewhere). Never part of the figure
     seconds: float | None = None
 
     @property
@@ -581,16 +582,49 @@ class Drawn:
 
 
 def draw_spec(spec: FigureSpec, like_out: dict | None = None) -> Drawn:
-    """Lay out, route and draw the figure once. `like_out`: cli.make_layout's (a figure drawn like a reference: what
-    the reference gave, for the H checks)."""
+    """Lay out, route and draw the figure. `like_out`: cli.make_layout's (a figure drawn like a reference: what the
+    reference gave, for the H checks). Focus auto draws an assembly of two subunits whole (Layout.whole_of_two);
+    when that whole figure is below the readability floor (floor.readability_floor gives a reason), it is drawn a
+    second time as one subunit (cli._focus_chains, plan 29 Task 5: 31FD's C2 photosystem II dimer), with the
+    wording of any other subunit focus auto draws (Layout.context, scope.drawn_scope). Its seconds are both
+    drawings'. A floor that cannot be judged keeps the whole figure, and so does an element reference the figure
+    names (--rename, --domain, a mark, ...) on a chain of the other subunit, which one subunit cannot draw
+    (BadReference)."""
+    from .cli import BadReference
+
+    start = time.perf_counter()
+    drawn = _draw_once(spec, like_out)
+    if getattr(drawn.layout, "whole_of_two", False) and _below_floor(drawn):
+        try:
+            drawn = _draw_once(spec, like_out, below_floor=True)
+        except BadReference:  # a reference to the other subunit, drawn whole: the whole figure is kept
+            pass
+    drawn.seconds = time.perf_counter() - start
+    return drawn
+
+
+def _below_floor(drawn: Drawn) -> bool:
+    """Whether `drawn` is below the readability floor (floor.below); False when the floor cannot be judged (as
+    floor.said's guard)."""
+    from .floor import below
+
+    try:
+        return below(drawn)
+    except Exception:  # noqa: BLE001 (a figure whose floor cannot be judged is kept as drawn; floor.said says so)
+        return False
+
+
+def _draw_once(spec: FigureSpec, like_out: dict | None, below_floor: bool = False) -> Drawn:
+    """Lay out, route and draw the figure once (`below_floor`: cli.make_layout's)."""
     from .cli import make_layout
     from .io import read_model
 
     start = time.perf_counter()
     with fallback.counting() as fired:  # every named fallback taken in making it (Layout.fallbacks; never drawn)
         model = read_model(spec.structure, spec.assembly)
+        kw = {**spec.layout_kwargs(), **({"below_floor": True} if below_floor else {})}
         layout, sses, bb = make_layout(
-            spec.structure, spec.mode, spec.rotate, spec.flip_v, model=model, like_out=like_out, **spec.layout_kwargs()
+            spec.structure, spec.mode, spec.rotate, spec.flip_v, model=model, like_out=like_out, **kw
         )
         loops = route_loops(layout, sses, bb)
         fig = draw(layout, loops, sses, spec.title, model=model, look=spec.look)
@@ -602,13 +636,17 @@ def layout_document(spec: FigureSpec, structure_name: str | None = None, drawn: 
     """The layout file document for the figure. Element references in the edits are resolved against the
     layout without the edits (the labels they were written for) and saved as residue ranges. With no edits that is
     the layout `drawn` (the figure of this spec, draw_spec) when given, which is not laid out again (random-100
-    C33: 7JU4's figure was laid out twice, 27 of its 183 s)."""
+    C33: 7JU4's figure was laid out twice, 27 of its 183 s). Laid out again, it keeps the subunit `drawn` took of an
+    assembly of two below the readability floor (draw_spec); without `drawn` (the app's download) such an assembly is
+    laid out whole."""
     from .cli import make_layout
 
     if drawn is not None and not any(spec.edits().values()):
         layout, sses = drawn.layout, drawn.sses
     else:
         kw = {**spec.layout_kwargs(edits=False), "data": None, "data_column": None, "crosslinks": None}  # read once
+        if drawn is not None and drawn.layout.focus_chains:  # the subunit drawn (no effect on any other focus)
+            kw["below_floor"] = True
         layout, sses, _ = make_layout(spec.structure, spec.mode, spec.rotate, spec.flip_v, **kw)
     return layoutfile.document(
         structure_name or str(spec.structure),

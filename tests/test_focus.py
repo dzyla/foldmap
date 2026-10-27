@@ -150,9 +150,10 @@ NUCLEOSOME = DATA / "assemblies" / "3UTB.cif.gz"  # C2 histone octamer wrapped b
 
 def test_focus_auto_never_reduces_a_two_subunit_assembly():
     """The histone octamer without its DNA: C2, 8 protein chains (more than FOCUS_CHAINS), two subunits. focus
-    auto draws both halves; asked for, the protomer is still one half."""
+    auto lays out both halves (and says it drew an assembly of two whole: spec.draw_spec judges that figure's floor);
+    asked for, the protomer is still one half."""
     lay, sses, _ = make_layout(NUCLEOSOME, dna=False)
-    assert lay.focus_chains is None and _chains(sses) == set("ABCDEFGH")
+    assert lay.focus_chains is None and _chains(sses) == set("ABCDEFGH") and lay.whole_of_two
     lay, _, _ = make_layout(NUCLEOSOME, dna=False, focus="protomer")
     assert lay.focus_chains is not None and len(lay.focus_chains) == 4
 
@@ -239,3 +240,105 @@ def test_a_ring_of_helices_lends_a_subunit_its_two_neighbours():
         for c, t in zip("ABC", (0, 2.1, 4.2))
     ]
     assert _focus_subset(stalk, {"A"}, [])[1] == {"B", "C"}
+
+
+PSII = DATA / "app29" / "31FD-O-small.cif.gz"  # a crop of 31FD (plan 29's tune half), the C2 photosystem II dimer
+
+
+@pytest.fixture
+def page_held_at_16_in(monkeypatch):
+    """Pages held at 16 in on their longer side (layout.MAX_PAGE_IN, 48 in): the crop of 31FD drawn whole (22-23 in at
+    6 pt) is below the readability floor, as the whole entry is at 48 in, and one subunit (11-12 in) is above it."""
+    from foldmap import layout
+
+    monkeypatch.setattr(layout, "MAX_PAGE_IN", 16.0)
+
+
+def test_a_two_subunit_complex_below_the_floor_draws_one_subunit(page_held_at_16_in):
+    """Plan 29 Task 5 (ruling P29-7, 31FD): focus auto drew this C2 photosystem II dimer whole although that figure is
+    below the readability floor (the app's warning offered only chain A). Now the whole is judged and, below the floor,
+    drawn again as one subunit, said as any other subunit focus auto draws. The fixture is 31FD's two copies of PsbO
+    (O, o) and the ten single-helix subunits (E F H I K L M T U X and their copies), backbone (N, CA, C, O) only,
+    rewritten by gemmi (B 50, occupancy 1): the whole entry so trimmed is 298 kB, so the page is held small instead
+    (the whole entry, at 48 in, is test_31fd_is_drawn_as_one_subunit)."""
+    from foldmap.scope import drawn_scope
+    from foldmap.spec import draw_spec, figure_spec
+
+    whole = draw_spec(figure_spec(PSII, focus="none"))
+    assert whole.floor and whole.floor[0]["reason"] == "text_small"  # the fault: the whole is below the floor
+    d = draw_spec(figure_spec(PSII))
+    assert d.floor == []
+    assert d.layout.subunits == (2, "C2")
+    assert len({c.upper() for c in d.layout.focus_chains}) == len(d.layout.focus_chains) == 11  # one of each chain
+    assert d.layout.context.startswith("1 of 2 subunits shown · C2 symmetry")
+    scope = drawn_scope(d.model, d.layout, "auto", "auto")
+    assert scope["reason"].startswith("one of 2 subunits (C2 symmetry)") and scope["all_options"] == {"focus": "none"}
+    lay, _, _ = make_layout(PSII)  # laid out alone, nothing judged: whole, and said to be an assembly of two
+    assert lay.focus_chains is None and lay.whole_of_two
+
+
+def test_a_two_subunit_complex_above_the_floor_stays_whole():
+    """The control (Task 3 review): the C2 histone octamer without its DNA (3UTB), above the floor drawn whole, is
+    drawn whole, both halves and every chain; drawn once (no second figure)."""
+    from foldmap import spec as spec_mod
+
+    drawn = []
+    once = spec_mod._draw_once
+
+    def counted(*args, **kw):
+        drawn.append(kw.get("below_floor", False))
+        return once(*args, **kw)
+
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(spec_mod, "_draw_once", counted)
+        d = spec_mod.draw_spec(spec_mod.figure_spec(NUCLEOSOME, dna=False))
+    assert d.floor == [] and d.layout.whole_of_two and d.layout.focus_chains is None
+    assert _chains(d.sses) == set("ABCDEFGH") and drawn == [False]
+
+
+def test_a_shared_dna_keeps_the_nucleosome_whole_below_the_floor(monkeypatch):
+    """The nucleosome's DNA ties its two halves (_na_shared): below the floor too, focus auto draws it whole (no
+    subunit of two is taken where its protomers share a nucleic acid)."""
+    from foldmap import layout
+    from foldmap.spec import draw_spec, figure_spec
+
+    monkeypatch.setattr(layout, "MAX_PAGE_IN", 6.0)
+    d = draw_spec(figure_spec(NUCLEOSOME))
+    assert d.floor and not d.layout.whole_of_two and d.layout.focus_chains is None
+    assert _chains(d.sses) == set("ABCDEFGH")
+
+
+def test_a_reference_to_the_other_subunit_keeps_the_whole(page_held_at_16_in):
+    """An element the figure names on a chain one subunit leaves out (a rename) cannot be drawn by that subunit
+    (BadReference): the whole figure is kept, below the floor, as before."""
+    from foldmap.spec import draw_spec, figure_spec
+
+    kept = draw_spec(figure_spec(PSII)).layout.focus_chains
+    lay, sses, _ = make_layout(PSII)
+    other = next(s for s in sses if s.chain not in kept)
+    d = draw_spec(figure_spec(PSII, rename={f"res:{other.chain}:{other.first.seq}-{other.last.seq}": "X"}))
+    assert d.floor and d.layout.focus_chains is None and other.chain in _chains(d.sses)
+
+
+def test_the_app_draws_one_subunit_below_the_floor(page_held_at_16_in):
+    """The app's path (app_jobs.draw_settings, the app's default settings) reaches the same decision, with no floor
+    note and the scope said in focus auto's words."""
+    pytest.importorskip("streamlit")  # the app extra: absent in the sdist and minimum-deps jobs
+    from foldmap import app, app_jobs
+    from foldmap.floor import said
+    from foldmap.scope import drawn_scope
+
+    settings = {**app.LAYOUT_DEFAULTS, "theme": "publication"}
+    d, _ = app_jobs.draw_settings(PSII, settings)
+    assert d.layout.subunits == (2, "C2") and said(d, "app") == ([], "")
+    assert drawn_scope(d.model, d.layout, "auto", "auto")["reason"].startswith("one of 2 subunits")
+
+
+def test_31fd_is_drawn_as_one_subunit():
+    """The same, end to end on the whole 31FD (the download; skipped where it is not): drawn whole, its text was
+    5.0 pt on a 48 x 9 in page; one subunit is above the floor."""
+    from foldmap.spec import draw_spec, figure_spec
+    from helpers import r100_entry
+
+    d = draw_spec(figure_spec(r100_entry("31FD")))
+    assert d.floor == [] and d.layout.subunits == (2, "C2") and len(d.layout.focus_chains) == 15

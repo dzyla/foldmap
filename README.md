@@ -111,8 +111,9 @@ cross-β stacking) and helices bundled with its own. Neighbours' elements are gr
 termini or loops of their own, and a line under the legend says what is shown, e.g. *1 of 6 subunits shown ·
 helical, 115.0° twist, 7.9 Å rise per subunit*. A left-handed filament has a negative twist and says so:
 *−115.0° twist (left-handed)*. `--focus none` draws everything; `--focus B` picks the subunit. A two-subunit
-assembly (a C2 histone octamer) is never cut in half, nor a ring whose subunits share one DNA or RNA (nucleosome DNA):
-those are drawn whole.
+assembly (a C2 histone octamer) is drawn whole while that figure is above the readability floor (its text at 6 pt or
+more, its route budget not spent); below it, one subunit is drawn (a photosystem II dimer). A ring whose subunits share one DNA or RNA (nucleosome DNA) is
+never cut: it is drawn whole.
 
 ### Sequence and alignment
 
